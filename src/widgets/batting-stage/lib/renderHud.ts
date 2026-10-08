@@ -10,7 +10,7 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
  *   베이스: 1루 (68,14) · 2루 (59,9) · 3루 (50,14), 주자 있으면 파트 6 (빈 베이스 파트 5 는 프레임에 있다)
  *   램프: S 파트 13 (58,24)(67,24) · B 파트 14 (58,34)(67,34)(76,34) · O 파트 15 (58,44)(67,44)
  *   이닝: 박스 0 (15,8,10,9) — "회" 글자 앞
- *   점수: 숫자 프레임 20~, 자간 −3, 아래 줄은 y+3 (점검 에이전트) · 공격 막대 높이 h−2 · 위 줄 = 먼저 공격(원정)
+ *   점수: 숫자 프레임 20~ 를 0xba51c 로 (`alignedNumberGlyphsOf`) — 자간 1 · ox −3, 아래 줄은 y+3 · 공격 막대 높이 h−2 · 위 줄 = 먼저 공격(원정)
  *
  * **확정** (F-3 · 3-1): 숫자 글꼴 = `ui/num.pzx` (0x3740c → 0x330f0), 점수 **오른쪽 정렬**
  * (0x3756c 정렬 0x24 = 오른쪽+세로 가운데, 아래 줄은 오른쪽만),
@@ -122,7 +122,15 @@ const lampZoom: Record<LampKey, LampZoomMemory> = {
 
 const INNING_BOX = { x: 15, y: 8, width: 10 }
 const SCORE_DIGITS_START = 20
-const SCORE_LETTER_SPACING = -3
+/**
+ * 점수 숫자 0xba719 → 0xba51c (37552~3756c 위 · 37624~37640 아래, 직접 떴다): 박스 = 줄 상자에서 x 를 로고 앞 +3 (3751c · 375ee)
+ * 옮긴 것, 자간 1 · ox −3 · oy 0. 정렬은 위 줄 0x24(오른쪽 + 세로 가운데) · 아래 줄 4(오른쪽만, 대신 박스 y + 3 — 37614).
+ */
+const SCORE_LETTER_SPACING = 1
+const SCORE_BOX_SHIFT_X = 3
+const SCORE_OFFSET_X = -3
+const SCORE_ALIGN_TOP = 0x24
+const SCORE_ALIGN_BOTTOM = 0x4
 const BOTTOM_ROW_SCORE_OFFSET_Y = 3
 const INNING_DIGITS_START = 0
 
@@ -135,8 +143,8 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
 
   // 위 줄 = 측 0(선공, 초 공격), 아래 줄 = 측 1(후공, 말 공격). 공격 막대는 st[9] == 0 이면 위, == 1 이면 아래 (0x374e0 · 0x375b2)
   const rows = hudRowsOf(hud)
-  drawTeamRow(context, ROW_TOP, rows.top.logoUrl, rows.top.score, rows.top.isBatting, 0)
-  drawTeamRow(context, ROW_BOTTOM, rows.bottom.logoUrl, rows.bottom.score, rows.bottom.isBatting, BOTTOM_ROW_SCORE_OFFSET_Y)
+  drawTeamRow(context, ROW_TOP, rows.top.logoUrl, rows.top.score, rows.top.isBatting, 0, SCORE_ALIGN_TOP)
+  drawTeamRow(context, ROW_BOTTOM, rows.bottom.logoUrl, rows.bottom.score, rows.bottom.isBatting, BOTTOM_ROW_SCORE_OFFSET_Y, SCORE_ALIGN_BOTTOM)
 
   const frame = placedFrame(HUD_FRAMES, 0)
   if (frame !== null) context.drawImage(frame.image, HUD_ORIGIN.x + frame.offsetX, HUD_ORIGIN.y + frame.offsetY)
@@ -215,6 +223,7 @@ function drawTeamRow(
   score: number,
   isBatting: boolean,
   scoreOffsetY: number,
+  scoreAlign: number,
 ): void {
   context.fillStyle = ROW_COLOR
   context.fillRect(row.x, row.y, row.width, row.height)
@@ -224,7 +233,70 @@ function drawTeamRow(
   }
   const logo = sprite(logoUrl)
   if (logo !== null) context.drawImage(logo, row.x + LOGO_OFFSET.x, row.y + LOGO_OFFSET.y)
-  drawNumber(context, score, row.x + row.width - 1, row.y + scoreOffsetY, SCORE_DIGITS_START, SCORE_LETTER_SPACING)
+  const box = { x: row.x + SCORE_BOX_SHIFT_X, y: row.y + scoreOffsetY, width: row.width, height: row.height }
+  const glyphs = alignedNumberGlyphsOf(score, box, {
+    spacing: SCORE_LETTER_SPACING, start: SCORE_DIGITS_START, align: scoreAlign, offsetX: SCORE_OFFSET_X, offsetY: 0,
+  }, numGlyphSizeOf)
+  if (glyphs === null) return
+  for (const glyph of glyphs) {
+    const image = sprite(numGlyphUrl(glyph.index))
+    if (image !== null) context.drawImage(image, glyph.x, glyph.y)
+  }
+}
+
+const numGlyphUrl = (index: number) => `./sprites/num/${String(index).padStart(3, '0')}.png`
+
+function numGlyphSizeOf(index: number): { readonly width: number; readonly height: number } | null {
+  const image = sprite(numGlyphUrl(index))
+  return image === null ? null : { width: image.width, height: image.height }
+}
+
+export interface NumberGlyphPlacement {
+  readonly index: number
+  readonly x: number
+  readonly y: number
+}
+
+/**
+ * 숫자 그리기 **0xba51c(x, y, w, h, 자간, 값, 기준, 그림, 정렬, ox, oy)** (직접 떴다, 0xba51c~0xba67a).
+ * ```
+ * x0 = x + ox ; y0 = y + oy
+ * 자리마다 Σ += 글자폭 + 자간 (끝 자리 뒤 자간까지) ; 최대높이 = max(글자높이)
+ * 정렬 & 0x4  → x0 += w − Σ                    (ba594)
+ * 정렬 & 0x20 → y0 += ceil((h − 최대높이) / 2)   (ba5a6 — 나머지를 위로 올린다)
+ * 정렬 & 0x40 → y0 += h − 최대높이              (ba5c8)
+ * 정렬 & 0x2  → x0 += (w − Σ) >> 1              (ba5dc)
+ * 높은 자리부터 그림 (기준 + 숫자) 을 (x0, y0 + 최대높이 − 글자높이) 에 — 글자 아래 맞춤 — 그리고 x0 += 글자폭 + 자간
+ * ```
+ * 그림이 아직 안 읽혔으면 null.
+ */
+export function alignedNumberGlyphsOf(
+  value: number,
+  box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  options: { readonly spacing: number; readonly start: number; readonly align: number; readonly offsetX: number; readonly offsetY: number },
+  sizeOf: (index: number) => { readonly width: number; readonly height: number } | null,
+): NumberGlyphPlacement[] | null {
+  const digits = [...String(Math.max(0, Math.trunc(value)))].map((digit) => options.start + Number(digit))
+  const sizes = digits.map(sizeOf)
+  if (sizes.some((size) => size === null)) return null
+  const known = sizes as { readonly width: number; readonly height: number }[]
+  const total = known.reduce((sum, size) => sum + size.width + options.spacing, 0)
+  const maxHeight = known.reduce((max, size) => Math.max(max, size.height), 0)
+  let x = box.x + options.offsetX
+  let y = box.y + options.offsetY
+  if ((options.align & 0x4) !== 0) x += box.width - total
+  if ((options.align & 0x20) !== 0) {
+    const gap = box.height - maxHeight
+    y += (gap >> 1) + (gap - Math.trunc(gap / 2) * 2)
+  }
+  if ((options.align & 0x40) !== 0) y += box.height - maxHeight
+  if ((options.align & 0x2) !== 0) x += (box.width - total) >> 1
+  return digits.map((index, order) => {
+    const size = known[order]
+    const glyph = { index, x, y: y + maxHeight - size.height }
+    x += size.width + options.spacing
+    return glyph
+  })
 }
 
 /** ui/num.pzx 숫자를 오른쪽 끝(rightX)에 맞춰 그린다 */

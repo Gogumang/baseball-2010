@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INITIAL_LAMP_ZOOM, hudRowsOf, lampCountOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
+import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, lampCountOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
   inning: 1,
@@ -68,5 +68,33 @@ describe('stepLampZoom — 새 램프 확대 (0x37730~0x37892)', () => {
 
   it('틱이 거꾸로 가면(타석 시작 0xd 진입 0x48f08) 타이머만 지운다 — 지난 칸 수는 남는다', () => {
     expect(run([1, 1, 2], [10, 0, 1])).toEqual([5, 0, 5])
+  })
+})
+
+describe('alignedNumberGlyphsOf — HUD 점수 0xba719 → 0xba51c', () => {
+  // num.pzx 020~029: "1" 은 4×10, 나머지는 6×10
+  const sizeOf = (index: number) => ({ width: index === 21 ? 4 : 6, height: 10 })
+  const options = (align: number) => ({ spacing: 1, start: 20, align, offsetX: -3, offsetY: 0 })
+
+  it('위 줄 (박스 = 줄 상자 x + 3, 정렬 0x24): x = 줄x + 36 − Σ(폭 + 1), y = 줄y + 2', () => {
+    expect(alignedNumberGlyphsOf(3, { x: 11, y: 21, width: 36, height: 14 }, options(0x24), sizeOf))
+      .toEqual([{ index: 23, x: 37, y: 23 }])
+    expect(alignedNumberGlyphsOf(10, { x: 11, y: 21, width: 36, height: 14 }, options(0x24), sizeOf))
+      .toEqual([{ index: 21, x: 32, y: 23 }, { index: 20, x: 37, y: 23 }])
+  })
+
+  it('아래 줄 (박스 y + 3, 정렬 4): 세로 맞춤 없이 y = 41', () => {
+    expect(alignedNumberGlyphsOf(12, { x: 11, y: 41, width: 36, height: 14 }, options(0x4), sizeOf))
+      .toEqual([{ index: 21, x: 32, y: 41 }, { index: 22, x: 37, y: 41 }])
+  })
+
+  it('세로 가운데는 나머지를 아래로 — (h − 최대높이) 홀수면 올림, 글자는 아래 맞춤', () => {
+    const tall = (index: number) => ({ width: 6, height: index === 21 ? 9 : 10 })
+    expect(alignedNumberGlyphsOf(12, { x: 0, y: 0, width: 20, height: 15 }, { ...options(0x20), offsetX: 0 }, tall))
+      .toEqual([{ index: 21, x: 0, y: 4 }, { index: 22, x: 7, y: 3 }])
+  })
+
+  it('그림이 아직 없으면 null', () => {
+    expect(alignedNumberGlyphsOf(1, { x: 0, y: 0, width: 1, height: 1 }, options(0), () => null)).toBeNull()
   })
 })
