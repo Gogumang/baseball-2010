@@ -70,11 +70,15 @@ type Phase = '엔딩' | '보너스'
 export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBonusReceived, onFinish }: SeasonEndingScreenProps) {
   const [phase, setPhase] = useState<Phase>('엔딩')
   /**
-   * 효과기 — 진입 0x6be8 6c32~6c42 가 종류 2(검정에서 밝아짐), 키 0x6b3c 6b52~6b6e 가 단계 + 1 · 종류 1(어두워짐)을 건다
-   * (전역 하나라 새로 걸면 앞 것을 덮는다). 종류 1 의 끝을 본 틀에 `0x8bd8` 이 넘긴다(`onFinish`).
-   * 효과기가 도는 동안은 키가 안 먹는다(`SeasonScreenFade` — 0x4b18 · 0x4b34).
+   * 단계 [this+0x140] — 효과기: 진입 0x6be8 6c32~6c42 가 종류 2(검정에서 밝아짐), 키 0x6b3c 6b52~6b6e 가 단계 + 1 · 종류 1(어두워짐)을
+   * 새로 건다(전역 하나라 새로 걸면 앞 것을 덮는다 — 웹은 단계마다 새로 마운트). 그리기 `0x8bd8` 8cd2~8cee 는 **단계 == 1** 이고
+   * 효과기가 살아 있고(+4 ≠ 0) 끝(+0x10 == 2)일 때만 넘긴다(`onFinish`).
+   * 효과기가 도는 동안(+0x10 == 0)은 키가 안 먹는다(`SeasonScreenFade` — 0x4b18 · 0x4b34). 그러나 종류 1 이 마지막 칠하기에 끝을
+   * 세운 틀과 `0x8bd8` 이 그 끝을 보는 다음 틀 사이에는 키가 먹는다 — 그 키는 SR+0x7b 가 선 0x6b3c 라 **단계 2** · 종류 1 을 다시
+   * 걸고, 그 틀의 `0x8bd8` 은 단계 ≠ 1 이라 넘기지 않는다. 그 뒤로도 키마다 단계만 오르고 효과기가 다시 돌 뿐 영영 넘어가지 않는다
+   * (원본 버그 그대로). 끝을 본 다음 틀에 효과기가 비워져(0xbd85e) 어두워진 화면은 걷힌다.
    */
-  const [isLeaving, setLeaving] = useState(false)
+  const [leaveStage, setLeaveStage] = useState(0)
 
   /** 원이 화면을 다 덮으면(t ≥ 7) 연출이 끝난다 — 그 뒤로는 움직이는 것이 없다 */
   const tick = Math.min(useUpdateCounter(), ENDING_IRIS.fullTick)
@@ -138,18 +142,18 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
           type="button"
           className={styles.pressArea}
           aria-label="확인"
-          // 키 0x6b3c — SR+0x7b 만 본다(보너스 값은 안 본다). 서 있으면 단계 1 · 종류 1 — 끝은 아래 효과기가 알린다.
-          // ⚠️ 종류 1 이 끝을 세운 뒤 0x8bd8 이 그 끝을 보기 전 한 틀 사이의 키(단계 2 가 되어 넘어가지 않는다)는 옮기지 않았다
+          // 키 0x6b3c — SR+0x7b 만 본다(보너스 값도 단계도 안 본다). 서 있으면 단계 + 1 · 종류 1 — 끝은 아래 효과기가 알린다.
+          // 효과기가 도는 동안의 키는 `SeasonScreenFade` 가 삼켜 여기까지 안 온다
           onClick={() => {
-            if (isLeaving) return
-            if (isBonusReceived) setLeaving(true)
+            if (isBonusReceived) setLeaveStage((stage) => stage + 1)
             else setPhase('보너스')
           }}
         />
       )}
 
-      {isLeaving
-        ? <SeasonScreenFade key="종류1" kind="검정에서밝아짐" onEnd={onFinish} />
+      {leaveStage > 0
+        // 단계 1 의 종류 1 끝만 넘긴다(0x8bd8 8cdc `cmp r1, #1`) — 단계 2 부터는 끝나도 아무 일이 없다
+        ? <SeasonScreenFade key={`종류1:${leaveStage}`} kind="검정에서밝아짐" {...(leaveStage === 1 ? { onEnd: onFinish } : {})} />
         : <SeasonScreenFade key="종류2" kind="검게어두워짐" />}
 
       {phase === '보너스' && (

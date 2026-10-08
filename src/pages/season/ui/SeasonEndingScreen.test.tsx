@@ -83,6 +83,43 @@ describe('엔딩 보너스 StrMODE[214] — 키 0x6b3c 는 SR+0x7b 만 본다', 
     }
   })
 
+  it('⚠️ 원본 버그 그대로 — 종류 1 이 끝을 세운 틀과 0x8bd8 이 그 끝을 보는 틀 사이의 키는 단계 2 를 만들어 영영 넘어가지 않는다 (6b52~6b6e · 8cdc)', () => {
+    vi.useFakeTimers()
+    try {
+      const onFinish = vi.fn()
+      render(<SeasonEndingScreen endingIndex={0} isBonusReceived onFinish={onFinish} />)
+      // 진입의 종류 2 를 다 보낸다
+      act(() => {
+        vi.advanceTimersByTime(12 * millisecondsPerFrame())
+      })
+      fireEvent.click(screen.getByRole('button', { name: '확인' }))
+      // 종류 1 의 마지막 칠하기(단계 0 — 완전 검정, 끝을 세운 틀)까지 한 틀씩
+      const 덮개 = () => screen.queryByTestId('화면-효과기') as HTMLElement | null
+      for (let frame = 0; frame < 20 && 덮개()?.style.opacity !== '1'; frame += 1) {
+        act(() => {
+          vi.advanceTimersByTime(millisecondsPerFrame())
+        })
+      }
+      expect(덮개()?.style.opacity).toBe('1')
+      expect(onFinish).not.toHaveBeenCalled()
+      // 그 틀에 누른 키 — 효과기가 끝이라(+0x10 == 2) 키 받기가 막지 않는다 → 단계 2 · 종류 1 을 다시 건다
+      fireEvent.click(screen.getByRole('button', { name: '확인' }))
+      act(() => {
+        vi.advanceTimersByTime(30 * millisecondsPerFrame())
+      })
+      expect(onFinish).not.toHaveBeenCalled()
+      // 끝난 효과기는 비워져 화면이 다시 보이고, 그 뒤의 키도 단계만 올린다
+      expect(덮개()).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: '확인' }))
+      act(() => {
+        vi.advanceTimersByTime(30 * millisecondsPerFrame())
+      })
+      expect(onFinish).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('효과기가 도는 동안은 키를 삼킨다 (0x4b18 · 0x4b34 — +4 ≠ 0 · +0x10 == 0)', () => {
     vi.useFakeTimers()
     try {
