@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
@@ -1351,16 +1351,18 @@ export function useMissionSession({
    * 보상은 이번 클리어를 더하기 **전** 횟수로 계산하므로 다시 깰수록 줄어든다.
    * 원본은 99 회에서 센 것을 멈춘다.
    */
-  const rememberCleared = (mission: OriginalMission, status: string) => {
-    if (status !== '성공') return
+  const rememberCleared = (mission: OriginalMission, status: string): number => {
+    if (status !== '성공') return 0
     const key = missionKeyOf(mission)
     const previous = clearCounts[key] ?? 0
     const reward = missionRewardOf(mission.stage, previous)
     // 정산 0x4ea0c 4ef3e — g[0x11f] · g[0x176] 중 하나라도 서 있으면 G 를 건너뛴다(횟수는 0xa5368 이 플래그 없이 올린다)
-    if (reward > 0 && !isAceMatchHeld(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD)) onGamePointReward?.(reward)
+    const earned = isAceMatchHeld(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD) ? 0 : reward
+    if (earned > 0) onGamePointReward?.(earned)
     const next = { ...clearCounts, [key]: Math.min(MAXIMUM_CLEARS, previous + 1) }
     setClearCounts(next)
     missionRecord.save(next)
+    return earned
   }
 
   /**
@@ -1368,22 +1370,18 @@ export function useMissionSession({
    * 그 편의 클리어 칸을 올린다(−1 에서 시작, 99 상한). 보상 G 는 0x4ef3e 가 건너뛴다 (`entities/mission/model/aceMatchClear`).
    */
   /**
-   * 보통 미션 결과 판을 떠난다 — 정산 0x4ea0c 의 몫(G · 횟수 `rememberCleared`, 결과 바이트 4efc6~4f018)을 하고 갈 곳을 고른다.
-   * 대기(g[0x11f] · g[0x176])가 없으면 미션 목록, 서 있으면 결과 판 키 0x407f0 4090c 대로 g[0xf6] ∈ {3, 4} 의 나리 장면
-   * (`onReturnToNari`). **g[0xf6] 이 3 · 4 가 아니면(한 편 140 이 다른 편 대기를 남긴 채 g[0xf6] 을 0 으로 지웠을 때) 그 키가 아무 일도
-   * 안 해 판에 갇힌다 — 원본 그대로** 판을 안 닫고 거짓을 돌려준다.
-   * ⚠️ 근사: 원본은 판이 서는 정산 진입에서 G · 결과 바이트를 적는다. 웹은 판을 떠날 때 적는다(보이는 값은 같다).
+   * 보통 미션 결과 판을 떠난다 — 정산(G · 횟수 · 결과 바이트)은 판이 설 때 이미 했다(아래 `settledEarned` 고리). 대기(g[0x11f] ·
+   * g[0x176])가 없으면 미션 목록, 서 있으면 결과 판 키 0x407f0 4090c 대로 g[0xf6] ∈ {3, 4} 의 나리 장면(`onReturnToNari`).
+   * **g[0xf6] 이 3 · 4 가 아니면(한 편 140 이 다른 편 대기를 남긴 채 g[0xf6] 을 0 으로 지웠을 때) 그 키가 아무 일도 안 해 판에
+   * 갇힌다 — 원본 그대로** 판을 안 닫고 거짓을 돌려준다.
    */
-  const leaveMissionResult = (mission: OriginalMission, status: string): boolean => {
+  const leaveMissionResult = (): boolean => {
     const held = aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD
     if (!isAceMatchHeld(held)) {
-      rememberCleared(mission, status)
       setScreen({ kind: '미션선택' })
       return true
     }
     if (held.originalMode !== PITCHER_EDITION_MODE && held.originalMode !== BATTER_EDITION_MODE) return false
-    rememberCleared(mission, status)
-    aceMatchHold?.writeResult(status === '성공')
     onReturnToNari?.(held.originalMode)
     return true
   }
@@ -1395,6 +1393,38 @@ export function useMissionSession({
     setClearCounts(next)
     missionRecord.save(next)
   }
+
+  /**
+   * **미션 끝 → 정산 진입** (직접 떴다). 미션이 끝나면 메시지 0x76c/0x76d 를 받은 0x509a0(50cfa~50d0e · 50d18~50d2c)이
+   * `0xa5368(미션, 성공?)` — 성공이면 클리어 횟수 칸 +1 · [미션+0xa0] = 보상 0xa52b0, 실패(0)면 아무 일도 안 함(a538a~a538e) — 뒤
+   * 0x19 를 예약하고, 다음 틀 0x19 진입 0x4ea0c 가 G(4ef3e — 대기가 없을 때만, [+0x17f4] = 보상 · G += 보상) · 결과 바이트(4efc6~4f018
+   * — 서 있는 대기마다 이 판 성공 여부)를 적는다. 곧 결과 판이 **서는 그 순간** 다 적혀 있다 — 판에서 앱을 꺼도 남는다.
+   * 웹은 판 상태가 진행중에서 끝으로 바뀐 그 그리기 전에 한 번 한다. 결과 판의 번 G 는 그때 적은 값(`settledEarned`)이다.
+   * 판을 닫는 키(목록 · 다시하기 · 대결 결과 이벤트)는 더 적지 않는다 — 다시하기 0x1e908 의 `0xa5368(미션, 0)` 은 아무 일도 안 한다.
+   */
+  const [settledEarned, setSettledEarned] = useState<number | null>(null)
+  const isSettledRef = useRef(false)
+  useLayoutEffect(() => {
+    const run = missionRun ?? pitcherRun
+    if (run === null || run.status === '진행중') {
+      isSettledRef.current = false
+      if (settledEarned !== null) setSettledEarned(null)
+      return
+    }
+    if (isSettledRef.current) return
+    isSettledRef.current = true
+    const isWin = run.status === '성공'
+    const aceMission = missionRun !== null ? (screen.kind === '마선수대결' ? screen.mission : null) : pitcherAceMatchMission
+    if (aceMission !== null) {
+      // 대결은 0x4ef3e 가 G 를 건너뛰고, 0xa5368 은 +0xbd(team − 1) ≤ 15 일 때만 그 편 칸을 올린다
+      if (isWin) rememberAceMatchCleared(aceMission)
+      setSettledEarned(0)
+    } else {
+      setSettledEarned(rememberCleared(run.mission, run.status))
+    }
+    // 0x4efc6~0x4f018 — 서 있는 대기마다(대결이면 SYS 8 이 세운 그 편 칸도) 결과 바이트를 이 판 결과로. g[0xf6] 은 안 본다
+    if (isAceMatchHeld(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD)) aceMatchHold?.writeResult(isWin)
+  })
 
   /**
    * **하늘 줄 — 구장 +0x10** (0x783b0, `stadiumSkyRowOf`). 미션(모드 5 · 6)은 그 밖 갈래라 rand(0, 6) — 경기 적재(상태 8 갱신
@@ -1647,10 +1677,8 @@ export function useMissionSession({
      */
     finishPitcherAceMatch: (): boolean | null => {
       if (pitcherRun === null || pitcherAceMatchMission === null) return null
+      // 결과 바이트 · 클리어 칸은 판이 설 때 정산이 적었다
       const isWin = pitcherRun.status === '성공'
-      // 정산 0x4ea0c 4efc6~4f018 — 서 있는 대기마다 결과 바이트를 이 판 결과로(다른 편 대기도)
-      aceMatchHold?.writeResult(isWin)
-      if (isWin) rememberAceMatchCleared(pitcherAceMatchMission)
       setPitcherRun(null)
       setPitcherAceMatchMission(null)
       setPendingDefensePlay(null)
@@ -1665,9 +1693,7 @@ export function useMissionSession({
      */
     finishAceMatch: () => {
       if (missionRun === null || screen.kind !== '마선수대결') return
-      // 정산 0x4ea0c 4efc6~4f018 — 서 있는 대기마다 결과 바이트를 이 판 결과로(다른 편 대기도)
-      aceMatchHold?.writeResult(missionRun.status === '성공')
-      if (missionRun.status === '성공') rememberAceMatchCleared(screen.mission)
+      // 결과 바이트 · 클리어 칸은 판이 설 때 정산이 적었다
       const eventId = matchResultEventOf(screen.resultEvents, missionRun.status === '성공')
       setMissionRun(null)
       setScreen({ kind: '이벤트', eventId, context: screen.context, carried: screen.carried })
@@ -1841,13 +1867,13 @@ export function useMissionSession({
      */
     finishBatter: () => {
       if (missionRun === null) return
-      if (!leaveMissionResult(missionRun.mission, missionRun.status)) return
+      if (!leaveMissionResult()) return
       setMissionRun(null)
     },
 
     finishPitcher: () => {
       if (pitcherRun === null) return
-      if (!leaveMissionResult(pitcherRun.mission, pitcherRun.status)) return
+      if (!leaveMissionResult()) return
       setPitcherRun(null)
     },
 
@@ -1859,13 +1885,11 @@ export function useMissionSession({
      */
     retryBatter: () => {
       if (missionRun === null) return
-      rememberCleared(missionRun.mission, missionRun.status)
       actions.begin(missionRun.mission)
     },
 
     retryPitcher: () => {
       if (pitcherRun === null) return
-      rememberCleared(pitcherRun.mission, pitcherRun.status)
       actions.begin(pitcherRun.mission)
     },
   }
@@ -1873,11 +1897,11 @@ export function useMissionSession({
   /**
    * 결과 판 0x4a384 의 번 G [+0x17f4] — 진입 0x4ea0c(0x4ef18~0x4efba): 성공이고 g[0x11f] · g[0x176](마선수 대결)이
    * 안 섰으면 [미션+0xa0] = 0xa5368 이 적은 보상 0xa52b0(이번 클리어를 더하기 전 횟수로), 실패면 0.
-   * ⚠️ 근사: 원본은 이 진입에서 g[0x64] 에 보상을 더한다. 웹은 판을 나갈 때(`rememberCleared`) 더하므로 판의 보유 G 는
-   *    부르는 쪽이 `missionResultHeldOf` 로 더해 보인다 — 보이는 값은 같다.
+   * 이 진입이 g[0x64] 에 더하므로(웹은 판이 설 때의 정산 고리) 판의 보유 G 는 이미 더한 값이다. 정산을 지났으면 그때 적은 값을
+   * 돌려준다(그 뒤 횟수가 올라 다시 재면 다음 보상이 나온다).
    */
   const resultEarnedGamePointOf = (mission: OriginalMission, status: string, isAceMatch: boolean): number =>
-    missionResultEarnedOf(
+    settledEarned ?? missionResultEarnedOf(
       status === '성공',
       isAceMatch,
       missionRewardOf(mission.stage, clearCounts[missionKeyOf(mission)] ?? 0),

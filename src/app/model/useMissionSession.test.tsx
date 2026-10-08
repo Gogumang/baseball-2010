@@ -1705,11 +1705,20 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
       act(() => session.handleThrow(PITCH_TYPES[0], 4, 9, true))
     }
     const status = rendered.result.current.pitcherRun?.status
+    // 판이 선 그 순간(정산 진입 0x4ea0c) 이미 적은 것들 — 판을 닫기 전
+    const beforeLeave = {
+      writes: writeResult.mock.calls.length,
+      saves: save.mock.calls.length,
+      rewards: onGamePointReward.mock.calls.length,
+      earned: rendered.result.current.pitcherRun === null
+        ? 0
+        : rendered.result.current.resultEarnedGamePointOf(mission, rendered.result.current.pitcherRun.status, false),
+    }
     setScreen.mockClear()
     act(() => rendered.result.current.actions.finishPitcher())
     const after = rendered.result.current
     rendered.unmount()
-    return { mission, started, status, after, save, onGamePointReward, onReturnToNari, writeResult, setScreen }
+    return { mission, started, status, beforeLeave, after, save, onGamePointReward, onReturnToNari, writeResult, setScreen }
   }
 
   it('사람 칸 = g[0xf6] 편 나리 저장의 팀 · 판을 닫으면 결과 바이트를 덮어쓰고 G 없이 그 편 장면으로', () => {
@@ -1739,9 +1748,31 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
     // 사람 칸 팀도 레코드 그대로(aa704 m = 0)
     expect(played.started?.game.humanBatting.teamId).toBe(missionHumanTeamIdOf(played.mission))
     expect(played.onReturnToNari).not.toHaveBeenCalled()
-    expect(played.writeResult).not.toHaveBeenCalled()
+    // 결과 바이트는 판이 설 때 정산 4eff0~4f01e 가 g[0x176] 만 보고 적었다 — g[0xf6] 은 안 본다
+    expect(played.writeResult).toHaveBeenCalledTimes(1)
+    expect(played.writeResult).toHaveBeenCalledWith(played.status === '성공')
     expect(played.setScreen).not.toHaveBeenCalled()
     expect(played.after.pitcherRun).not.toBeNull()
+  })
+
+  it('G · 클리어 횟수 · 결과 바이트는 판이 서는 정산 진입에서 적는다 — 판을 닫기 전, 닫을 때는 더 안 적는다 (0x509a0 → 0xa5368 → 0x4ea0c)', () => {
+    const held = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      .map((seed) => playHeldPitcherMission(seed, { batter: true, pitcher: false, originalMode: 4 }))
+      .find((candidate) => candidate.status === '성공')
+    if (held === undefined) throw new Error('씨앗 1~12 에 성공 판이 없다')
+    expect(held.beforeLeave.writes).toBe(1)
+    expect(held.beforeLeave.saves).toBe(1)
+    expect(held.writeResult).toHaveBeenCalledTimes(1)
+    expect(held.save).toHaveBeenCalledTimes(1)
+
+    const free = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      .map((seed) => playHeldPitcherMission(seed, { batter: false, pitcher: false, originalMode: 0 }))
+      .find((candidate) => candidate.status === '성공')
+    if (free === undefined) throw new Error('씨앗 1~12 에 성공 판이 없다')
+    expect(free.beforeLeave.rewards).toBe(1)
+    // 판의 번 G 는 정산이 적은 값 그대로 — 횟수가 오른 뒤의 다음 보상이 아니다
+    expect(free.beforeLeave.earned).toBe(free.onGamePointReward.mock.calls[0]?.[0])
+    expect(free.onGamePointReward).toHaveBeenCalledTimes(1)
   })
 
   it('대기가 없으면 예전처럼 목록으로 — 결과 바이트는 안 쓴다', () => {

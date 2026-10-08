@@ -69,7 +69,7 @@ const BATTER_ACE_MATCH_FLAGS = { flag11f: true, flag176: false } as const
 const PITCHER_ACE_MATCH_FLAGS = { flag11f: false, flag176: true } as const
 
 /**
- * 결과 판의 번 G · 보유 G (0x4ea0c 가 더한 뒤 — `missionResultHeldOf`). 판의 대결 꼴은 전역 칸 g[0x11f] · g[0x176] 을 그대로 본다 —
+ * 결과 판의 번 G · 보유 G (0x4ea0c 가 더한 뒤 — 세션이 판이 설 때 더했다). 판의 대결 꼴은 전역 칸 g[0x11f] · g[0x176] 을 그대로 본다 —
  * 대기가 서 있으면 보통 미션 판도 대결 꼴이다(0x4a384 · 0x407f0 · 0x4ef3e). 대결이면 그 편 칸은 SYS 8 이 세웠다.
  */
 function resultBoardOf(
@@ -86,7 +86,8 @@ function resultBoardOf(
   const earnedGamePoint = session.resultEarnedGamePointOf(mission, status, aceMatch !== undefined)
   return {
     earnedGamePoint,
-    ...(gamePoint === undefined ? {} : { heldGamePoint: missionResultHeldOf(gamePoint, earnedGamePoint) }),
+    // 정산 진입 0x4ea0c 가 G 를 더한 뒤다 — 세션이 판이 설 때 이미 지갑에 더했다(`useMissionSession` 정산 고리)
+    ...(gamePoint === undefined ? {} : { heldGamePoint: missionResultHeldOf(gamePoint, 0) }),
     ...(aceMatch === undefined ? {} : { aceMatch }),
   }
 }
