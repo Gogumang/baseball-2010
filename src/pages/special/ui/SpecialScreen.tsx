@@ -29,6 +29,7 @@ import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLay
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
+import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 
 const MAIN_UI = './sprites/main_ui'
@@ -66,6 +67,9 @@ interface SpecialScreenProps {
    * 넘기면 두 화면 머리띠를 G 까지 그리고, 안 넘기면 예전처럼 제목 0 띠만(G 없음) 그린다.
    */
   readonly gamePoint?: number
+  /** 기록연감 비밀 번호 상태 — 메뉴 객체에 사는 값이라 들고 있는 쪽(메인 메뉴)이 넘긴다 (`RecordAnnals` 참고) */
+  readonly annalsSecretCode?: SecretCodeState
+  readonly onAnnalsSecretCodeChange?: (next: SecretCodeState) => void
   readonly onBack: () => void
 }
 
@@ -84,7 +88,9 @@ interface SpecialScreenProps {
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
  * 바퀴는 호와 공만(칸 여섯은 메인 메뉴 몫), 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
  */
-export function SpecialScreen({ collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, onBack }: SpecialScreenProps) {
+export function SpecialScreen({
+  collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange, onBack,
+}: SpecialScreenProps) {
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -120,7 +126,12 @@ export function SpecialScreen({ collection, renderAceSelect, renderEdit, hallOfF
   })
 
   if (view === '기록연감') {
-    return <RecordAnnals collection={collection} {...(gamePoint === undefined ? {} : { gamePoint })} onBack={() => setView('목록')} />
+    return (
+      <RecordAnnals collection={collection} {...(gamePoint === undefined ? {} : { gamePoint })}
+        {...(annalsSecretCode === undefined ? {} : { secretCode: annalsSecretCode })}
+        {...(onAnnalsSecretCodeChange === undefined ? {} : { onSecretCodeChange: onAnnalsSecretCodeChange })}
+        onBack={() => setView('목록')} />
+    )
   }
 
   if (view === '마선수선택' && renderAceSelect !== undefined) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { addGamePointEarned, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
 import {
-  INITIAL_SECRET_CODE_STATE, statCellOf, statPageCellsOf, statTotalTextOf, statValueTextOf, typeSecretDigit,
+  INITIAL_SECRET_CODE_STATE, enterAnnalsSecretCode, statCellOf, statPageCellsOf, statTotalTextOf, statValueTextOf, typeSecretDigit,
 } from '@/pages/record/lib/statCells'
 
 /** 기록연감 통계 칸 0x7a08c · 비밀 번호 0x2b7a0 */
@@ -55,5 +55,10 @@ describe('비밀 번호 1212123', () => {
 
   it('숫자가 아닌 키는 세지 않는다', () => {
     expect(typeSecretDigit(INITIAL_SECRET_CODE_STATE, 'a')).toBe(INITIAL_SECRET_CODE_STATE)
+  })
+
+  it('들어올 때(0x2407c)는 버퍼만 비우고 센 수·열림은 둔다', () => {
+    expect(enterAnnalsSecretCode({ typed: '12', count: 2, isUnlocked: false })).toEqual({ typed: '', count: 2, isUnlocked: false })
+    expect(enterAnnalsSecretCode({ typed: '', count: 7, isUnlocked: true }).isUnlocked).toBe(true)
   })
 })

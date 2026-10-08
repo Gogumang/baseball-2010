@@ -27,9 +27,10 @@ import {
 } from '@/pages/record/lib/annalsGrid'
 import type { NicknameScroll } from '@/pages/record/lib/annalsGrid'
 import {
-  INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
+  INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, enterAnnalsSecretCode, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
   statValueTextOf, typeSecretDigit,
 } from '@/pages/record/lib/statCells'
+import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import { RECORD_COUNT_KINDS, achievementMarkOf, recordCountOf } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
@@ -49,6 +50,12 @@ interface RecordAnnalsProps {
   readonly onBack: () => void
   /** 머리띠 G포인트 */
   readonly gamePoint?: number
+  /**
+   * 비밀 번호 상태 — 원본은 메뉴 객체에 있어 이 화면보다 오래 산다(메뉴 생성 0x234d4 만 지운다).
+   * 들고 있는 쪽이 넘기며, 이 화면은 들어올 때 버퍼만 비운다(0x2407c). 안 넘기면 화면 안에서 센다.
+   */
+  readonly secretCode?: SecretCodeState
+  readonly onSecretCodeChange?: (next: SecretCodeState) => void
 }
 
 /** 화면 크기 — 판 안 그림을 자르는 clip-path 를 잴 때 쓴다 */
@@ -69,14 +76,13 @@ const SCREEN = { width: 240, height: 320 } as const
  * 탭 4 통계는 칸 번호(쪽 × 8 + 줄)마다 이름·값이 정해진 `lib/statCells.ts` 대로 그린다. 값은 웹이 쌓는
  * GP 아이템 구매 수·사용처별 소모 GP 만 있고, 플레이 시간·우승 횟수·획득 GP 는 비운다.
  * 아이템·GP 쪽(2~7)은 숫자 키로 **"1212123"** 을 쳐야 열린다 (`typeSecretDigit`, 0x2b7a0).
- *   ⚠️ 원본은 센 수·열림 표시를 메인 메뉴 객체에 두어(만들 때 0x234d4 만 지운다) 들어올 때(0x2407c) 버퍼만 비우지만,
- *   웹은 이 화면을 열 때마다 처음부터 센다 (근사).
+ *   센 수·열림 표시는 메인 메뉴 객체에 있어(만들 때 0x234d4 만 지운다) 들어올 때(0x2407c) 버퍼만 비운다 — `secretCode` prop.
  *
  * 키 처리는 원본 갱신 0x2b7a0 그대로다(`lib/annalsGrid.ts`): 들어오면 **탭 막대에 초점**이 있어 ←→ 가 탭을 바꾸고,
  * OK·↓ 로 본문에 들어가 ←→ 는 쪽(진행·스킬은 같은 줄 안 커서 감기), ↑↓ 는 커서 — 진행·스킬은 보이는 3줄 창이
  * 커서를 따라 한 줄씩 움직인다. 취소는 본문 → 탭 막대 → 닫기. 탭 아이콘·칸 누르기는 웹 덧붙임이다.
  */
-export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnalsProps) {
+export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: heldSecretCode, onSecretCodeChange }: RecordAnnalsProps) {
   const [tab, setTab] = useState(0)
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState(0)
@@ -103,7 +109,11 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0 }: RecordAnnals
   const cursorShake = !isTabFocused && shake !== null ? cursorShakeOf(shake.directionCode, tick - shake.startedAt) : null
   /** 탭 0·4 목록 격자를 마지막으로 다시 지은 틱 — 깜박임 카운터 +0x18 = 지금 틱 − 이 값 (0x7a005) */
   const [listBuiltAt, setListBuiltAt] = useState(0)
-  const [secretCode, setSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
+  // 들어올 때 0x2407c — 버퍼 this+0x178 만 비운다. 이 화면이 떠 있는 동안은 여기만 고치므로 바뀔 때마다 위로 알린다
+  const [secretCode, setSecretCode] = useState(() => enterAnnalsSecretCode(heldSecretCode ?? INITIAL_SECRET_CODE_STATE))
+  const reportSecretCode = useRef(onSecretCodeChange)
+  reportSecretCode.current = onSecretCodeChange
+  useEffect(() => reportSecretCode.current?.(secretCode), [secretCode])
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
   /** 진행 탭 칸 20 — 0~14 나리 엔딩(전역기록 +0xa8 + i) · 15~19 시즌 엔딩(+0xa0 + j) (0x58b5c) */

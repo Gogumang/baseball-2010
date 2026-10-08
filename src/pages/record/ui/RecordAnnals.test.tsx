@@ -227,6 +227,19 @@ describe('기록연감 칸 격자', () => {
     expect(screen.getByText('2/2')).toBeTruthy()
   })
 
+  it('열림은 메뉴 객체 값이라 다시 들어와도 남는다 — 들어올 때는 버퍼만 비운다 (0x2407c · 0x2413c)', () => {
+    const onSecretCodeChange = vi.fn()
+    띄우기({ secretCode: { typed: '121', count: 3, isUnlocked: false }, onSecretCodeChange })
+    expect(onSecretCodeChange).toHaveBeenLastCalledWith({ typed: '', count: 3, isUnlocked: false })
+    cleanup()
+
+    띄우기({ secretCode: { typed: '', count: 7, isUnlocked: true } })
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByText('8/2')).toBeTruthy()
+  })
+
   it('마지막 쪽(소모 GP)은 사용처별 값을 보이고 합계는 원본 버그대로 0G 다', () => {
     const stats = applyAnnalsStat(EMPTY_COLLECTION.stats, { kind: 'G사용', usage: 0, amount: 3000 })
     띄우기({ collection: { ...EMPTY_COLLECTION, stats } })

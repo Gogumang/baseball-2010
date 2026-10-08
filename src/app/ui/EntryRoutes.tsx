@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { MessageBox } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
@@ -31,6 +31,7 @@ import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mai
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MY_LEAGUE_TEAM_GRID_SHAPE } from '@/pages/create-player/lib/teamSelectLayout'
+import { INITIAL_SECRET_CODE_STATE } from '@/pages/record/lib/statCells'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
@@ -140,6 +141,16 @@ export function EntryRoutes({
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
   nariGameReady, onResumeNariGame, recordStat, aceMatchHold, gameStartCursor,
 }: EntryRoutesProps) {
+  /**
+   * 기록연감 비밀 번호의 센 수·열림 [skin+0x2d0] — 메뉴 객체 값이라 메뉴를 만들 때(0x234d4, 0x237f8)만 지운다.
+   * 웹은 메뉴 장면이 아닌 곳(나만의리그 등록 장면 0xf684 · 홈런더비 경기 장면)으로 가면 비운다 —
+   * 경기 모드로 가면 이 컴포넌트가 내려가 저절로 비워진다. 버퍼는 기록연감이 들어올 때 비운다(0x2407c).
+   */
+  const [annalsSecretCode, setAnnalsSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
+  const isOutsideMenuScene = screen.kind === '팀선택' || screen.kind === '선수등록' || screen.kind === '홈런더비'
+  useEffect(() => {
+    if (isOutsideMenuScene) setAnnalsSecretCode(INITIAL_SECRET_CODE_STATE)
+  }, [isOutsideMenuScene])
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
   const claimReward = () => setCollectionRewardText(claimCollectionReward?.() ?? null)
@@ -172,6 +183,8 @@ export function EntryRoutes({
         {...(hallOfFameDeletion === undefined ? {} : { hallOfFameDeletion })}
         // 머리띠 0x54d95 는 제목이 있으면 전역 G(mgr+0x64)를 같이 그린다 — 스페셜 목록(제목 0)·명예의 전당(제목 16)
         gamePoint={wallet.balance}
+        annalsSecretCode={annalsSecretCode}
+        onAnnalsSecretCodeChange={setAnnalsSecretCode}
         // 상태 28 = 공용 목록 k 11 + 레벨업 창 0x5f395 — OK·`0` 이 오픈/레벨업, CLR 이 상태 6 으로 (0x2af20)
         {...(aceSelect === undefined ? {} : {
           renderAceSelect: (onBack: () => void) => (

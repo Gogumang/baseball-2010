@@ -106,6 +106,14 @@ export interface SecretCodeState {
 
 export const INITIAL_SECRET_CODE_STATE: SecretCodeState = { typed: '', count: 0, isUnlocked: false }
 
+/**
+ * 기록연감에 들어올 때 0x2407c — 입력 버퍼 this+0x178 만 지운다(0x2413c). 센 수와 열림 [skin+0x2d0] 은 그대로다 —
+ * 그 둘은 메뉴 객체를 만들 때(0x234d4, 0x237f8)만 0 이 된다. 곧 틀린 일곱 자를 다 치면 메뉴를 다시 만들기 전까지 못 연다.
+ */
+export function enterAnnalsSecretCode(state: SecretCodeState): SecretCodeState {
+  return { ...state, typed: '' }
+}
+
 export function typeSecretDigit(state: SecretCodeState, digit: string): SecretCodeState {
   if (state.isUnlocked || !/^[0-9]$/.test(digit)) return state
   const appended = state.count <= 6 ? { typed: state.typed + digit, count: state.count + 1 } : state
