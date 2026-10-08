@@ -2261,6 +2261,16 @@ export function stepDefensePlay(
         startLeg(runner, runner.state.targetBase + 1)
         continue
       }
+    }
+    // 득점 — 주자 관리 vt18 `0xaa0a8`(aa12a). 원본 한 그림의 차례는 공용 갱신 0x3f060 의 주자 틱(장면 +0x1e4 목록 vt8 0xbfe9c —
+    // 목록 0 부터 오름차순으로 모두 움직인다) 뒤 슬롯 2 0x524c0 의 52540 0xaa008 · 525e8 플레이 vt48 · **525fc 0xaa0a8** 이다.
+    // 0xaa0a8 은 **i = 주자 수 − 1 부터 0 까지 내림차순**(aa0ce · aa342 `subs` / `bmi`)으로 `+0x3b(막 도착) && +0x8c == 4` 인 주자를
+    // 득점으로 세고 바로 득점이면 aa1b0 메시지 0x13(인자 i)을 곧바로(0xbfbad) 보낸다. 곧 **모두 움직인 뒤** 앞선 주자부터 센다 —
+    // 같은 틱에 들어온 타자주자(0)는 맨 뒤다(홈런 점수판 0x52030 이 타자주자 메시지에서 선다).
+    // ⚠️ 웹은 이 자리를 플레이 틱 안(야수 이동 뒤)에 두는 근사를 그대로 쓴다 — 주자 틱(0x3f060)이 플레이 틱(슬롯 2)보다 앞서는 차례는 `entities/fielding/model/playGate` 머리글.
+    for (let index = runners.length - 1; index >= 0; index -= 1) {
+      const runner = runners[index]!
+      if (runner.state.isOut || runner.state.scored || !isAtTarget(runner.state)) continue
       // 홈을 밟았다 — 2아웃 보류 규칙(state[0])을 태운다
       if (wrapBase(runner.state.targetBase) === 0 && runner.state.targetBase !== 0 && !runner.counted) {
         runner.counted = true

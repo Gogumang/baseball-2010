@@ -415,8 +415,7 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
         unmount()
         return count
       }
-      // 주자 없는 홈런 — 타자주자 홈인(n = 1 · 간격 20 · 타이머 20)이 판을 세운다. 주자가 있으면 웹 진행기는 타자주자와 같은 틱에
-      // 들어오는 주자가 뒤 차례라(목록 0 이 타자주자) 그 메시지 0x13(칸 ≠ 0)이 [+0x1100] 을 곧바로 내린다
+      // 주자 없는 홈런 — 타자주자 홈인(n = 1 · 간격 20 · 타이머 20)이 판을 세운다
       const 맨 = { ...홈런(), bases: { first: false, second: false, third: false } }
       const 코드 = { ...맨, outcome: registerContact(맨.outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
       const 판길이 = runDefensePlay(맨).ticks.length
@@ -424,6 +423,17 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       expect(Math.abs(갱신수(맨) - (판길이 + 10))).toBeLessThanOrEqual(2)
       // 홈런 점수판은 21 + 20 번 그린 뒤(n < 0) 내려간다 — 판 끝(타자주자 홈인 = 0xa990c == 0) 뒤 41 번째 닫힌 갱신 무렵
       expect(Math.abs(갱신수(코드) - (판길이 + 41))).toBeLessThanOrEqual(3)
+
+      // 1루 주자 홈런 — 1루 주자와 타자주자가 같은 틱에 홈을 밟는다(둘 다 1루에 섰다가 홈런 +0x111 로 함께 뛴다). 득점 0xaa0a8 은
+      // 내림차순이라 1루 주자(칸 1, 판 내림) → 타자주자(칸 0, n = 2 · 간격 20 · 타이머 40) 차례로 메시지 0x13 이 와 판이 선다
+      const 일루 = { ...홈런(), outcome: registerContact(홈런().outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
+      const 일루판 = runDefensePlay(일루)
+      expect(일루판.log.filter((line) => line.includes('주자 홈 —')).map((line) => line.replace(/ — .*/, ''))).toEqual([
+        `${일루판.ticks.length - 1}틱 1번 주자 홈`,
+        `${일루판.ticks.length - 1}틱 0번 주자 홈`,
+      ])
+      // 두 점이 g 번마다 오른 뒤 g 번 더 — 판 끝 뒤 약 61 번째 닫힌 갱신 (예전 웹은 타자주자가 먼저라 판이 곧바로 내려 11 번째)
+      expect(Math.abs(갱신수(일루) - (일루판.ticks.length + 61))).toBeLessThanOrEqual(3)
     } finally {
       vi.useRealTimers()
     }
