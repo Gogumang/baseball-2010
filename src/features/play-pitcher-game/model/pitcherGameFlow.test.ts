@@ -181,6 +181,16 @@ describe('투구', () => {
     expect(after.lastPitch?.type).toBe('FASTBALL')
   })
 
+  it('스태미나는 공이 손을 떠나기 전(0x11 진입 0x3dec6 → 0xa5e14)에 깎인다 — 놓기 0x4dc78 의 등급 · 피로가 깎은 뒤 체력%를 본다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(3))
+    // 둘 다 던지기 전엔 1~19%(피로 −50%)다 — 150 은 이 공으로 0%(피로 −90% · 제구 등급 지친 갈래 0xb74bc)가 되고 250 은 1% 에 남는다
+    const 지침 = throwPitch({ ...progress, stamina: 150 }, 한가운데직구, 씨앗(5))
+    const 버팀 = throwPitch({ ...progress, stamina: 250 }, 한가운데직구, 씨앗(5))
+    expect(Math.trunc(지침.stamina / 100)).toBe(0)
+    expect(Math.trunc(버팀.stamina / 100)).toBe(1)
+    expect(지침.lastPitch).not.toEqual(버팀.lastPitch)
+  })
+
   it('마구는 코스 확정 때 횟수가 준다 — 다 쓰면 못 던진다 (0x50e9c · 0x50db8)', () => {
     let progress = startPitcherGame({ ...기본옵션, magicCount: 1 }, 씨앗(3))
     progress = throwPitch(progress, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, 씨앗(5))

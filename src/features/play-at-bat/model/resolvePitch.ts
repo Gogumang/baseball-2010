@@ -195,7 +195,12 @@ export function resolvePitch(
   }
 
   const error = plateErrorOf(pitch, swing.shift)
-  const pitcherStats = cpuPitchStatsOf(context.pitcher)
+  // 투수 체력%는 공에 실린 **깎은 뒤** 값이다 — 원본은 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 이미 깎았다
+  const pitcherStats = cpuPitchStatsOf(
+    pitch.pitcherStaminaPercent === undefined
+      ? context.pitcher
+      : { ...context.pitcher, staminaPercent: pitch.pitcherStaminaPercent },
+  )
   const result = swingResultOf(
     {
       horizontalError: error.horizontal,

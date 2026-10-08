@@ -215,7 +215,12 @@ export function MissionRoutes({
         ability={stageBatter.ability}
         batterSkillIds={stageBatter.skillIds}
         batterName={stageBatter.name}
-        pitcherAbility={missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent)}
+        pitcherAbility={{
+          ...missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent),
+          // 공이 손을 떠나며(0x3dec6 → 0xa5e14) 깎은 뒤 체력%를 놓기 0x4dc78 · 스윙 0xab214 가 본다
+          staminaPercentAfterPitch: (pitchTypeNumber) =>
+            session.opponentStaminaPercentAfterPitch(missionRun, pitchTypeNumber),
+        }}
         opponent={missionMoundOpponent(missionRun)}
         atBat={runner.atBat}
         isPaused={runner.isPaused}

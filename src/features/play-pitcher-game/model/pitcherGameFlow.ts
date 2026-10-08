@@ -985,8 +985,23 @@ export function startPitch(
   const isMagic = input.typeNumber === MAGIC_PITCH_TYPE_NUMBER
   if (isMagic && progress.magicRemaining <= 0) return progress
 
-  const staminaPercent = staminaPercentOf(progress.stamina)
-  const fatigued = fatiguedStatsOf(options.stats, progress.stamina)
+  // 스태미나 소모 0xa5e14 — 상태 0x11 **진입** 0x3de10 의 0x3dec6 이다. 놓기 0x4dc78(0x11 의 틱 10)보다 앞이라
+  // 등급 굴림 0x4dbac(4dcba) · 피로 능력치 0x34968(4dcc2) · CPU 타자 스윙 0xab214(ab548 · ab582 · ab838)가 모두
+  // **이번 공을 깎은 뒤**의 체력을 본다. 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
+  const stamina = drainStamina({
+    stamina: progress.stamina,
+    typeNumber: input.typeNumber,
+    staminaAbility: options.staminaAbility,
+    teamMorale: options.teamMorale,
+    // 선발로 나왔으면 아직 교체가 없는 "첫 투수" 다. 구원으로 올라오면 +200 이 없다
+    isFirstPitcher: startsToday(options),
+    // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다 — 채우려면 타자 스킬 표가 필요하다
+    batterIntimidates: false,
+    pitcherIsCoward: options.pitcherIsCoward === true,
+    pitcherEndures: options.pitcherEndures === true,
+  })
+  const staminaPercent = staminaPercentOf(stamina)
+  const fatigued = fatiguedStatsOf(options.stats, stamina)
   const grade = pitchGradeOf(
     {
       gaugeSettingOn: options.gaugeSettingOn,
@@ -1084,20 +1099,6 @@ export function startPitch(
   )
   const resolution = thrown.resolution
   const foulContact = thrown.foulContact
-
-  // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
-  const stamina = drainStamina({
-    stamina: progress.stamina,
-    typeNumber: input.typeNumber,
-    staminaAbility: options.staminaAbility,
-    teamMorale: options.teamMorale,
-    // 선발로 나왔으면 아직 교체가 없는 "첫 투수" 다. 구원으로 올라오면 +200 이 없다
-    isFirstPitcher: startsToday(options),
-    // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다 — 채우려면 타자 스킬 표가 필요하다
-    batterIntimidates: false,
-    pitcherIsCoward: options.pitcherIsCoward === true,
-    pitcherEndures: options.pitcherEndures === true,
-  })
 
   const afterPitch: PitcherGameProgress = {
     ...progress,

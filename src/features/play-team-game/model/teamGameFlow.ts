@@ -1812,6 +1812,9 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
       ? {}
       : { gameAbility: entryPitcherGameAbilityParts(abilityContextOf(progress.options), teamId, entry) }),
     staminaPercent: staminaPercentOf(progress.opponentStamina),
+    // 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 깎은 뒤 체력을 놓기 0x4dc78 · 스윙 0xab214 가 본다 — 깎는 셈은
+    // 진행기(`throwOpponentPitch`)와 같은 것이고, 화면이 판정된 공을 넘기면 진행기가 같은 값으로 깎는다
+    staminaPercentAfterPitch: (pitchTypeNumber) => staminaPercentOf(opponentStaminaAfterPitch(progress, pitchTypeNumber)),
     repertoire: {
       form: repertoire.form,
       pitchMask: repertoire.pitchMask,
@@ -2038,21 +2041,26 @@ function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number 
     ...progress,
     opponentMagicRemaining: magic.remaining,
     ballMagicNumber: magic.ballMagicNumber,
-    opponentStamina: drainStamina({
-      stamina: progress.opponentStamina,
-      typeNumber: pitchTypeNumber,
-      staminaAbility: opponentPitcherStaminaAbility(progress),
-      teamMorale: 100,
-      isFirstPitcher: progress.opponentUsedPitchers.length === 0,
-      batterIntimidates: false,
-      ...pitcherSkillFlagsAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
-    }),
+    opponentStamina: opponentStaminaAfterPitch(progress, pitchTypeNumber),
     opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, 0, 1, false),
     pitcherLines: chargeMoundLine(progress, false, { pitches: 1 }),
     pitcherJustChanged: false,
     // 같은 0xa5e14 가 바로 뒤(a5e7c)에서 state[0xe] 도 내린다
     cpuPinchHitUsed: false,
   }
+}
+
+/** 상대 CPU 투수가 이 구질을 던져 깎은 뒤의 +0x2c (0xa5e14 → 0xaeb08) — `throwOpponentPitch` 와 타석 화면의 투구 AI 가 함께 쓴다 */
+function opponentStaminaAfterPitch(progress: TeamGameProgress, pitchTypeNumber: number): number {
+  return drainStamina({
+    stamina: progress.opponentStamina,
+    typeNumber: pitchTypeNumber,
+    staminaAbility: opponentPitcherStaminaAbility(progress),
+    teamMorale: 100,
+    isFirstPitcher: progress.opponentUsedPitchers.length === 0,
+    batterIntimidates: false,
+    ...pitcherSkillFlagsAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+  })
 }
 
 export interface BatterOutcomeOptions {
@@ -2402,8 +2410,23 @@ function pitchOnce(
   if (isMagic && progress.magicRemaining <= 0) return progress
 
   const stats = ourPitcherStats(progress)
-  const fatigued = fatiguedStatsOf(stats, progress.stamina)
-  const staminaPercent = staminaPercentOf(progress.stamina)
+  // 스태미나 소모 0xa5e14 — 상태 0x11 **진입** 0x3de10 의 0x3dec6 이다. 놓기 0x4dc78(0x11 의 틱 10)보다 앞이라
+  // 등급 굴림 0x4dbac · 피로 능력치 0x34968 · CPU 타자 스윙 0xab214 가 모두 **이번 공을 깎은 뒤**의 체력을 본다.
+  // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
+  const stamina = drainStamina({
+    stamina: progress.stamina,
+    typeNumber: input.typeNumber,
+    staminaAbility: stats.stamina,
+    teamMorale: ourTeamMoraleOf(options),
+    // 0xaeb08 `team+0x26 − team+0x33 == 1` — 마운드를 밟은 투수가 지금 투수 하나뿐일 때만 첫 투수 보너스(0x66e44 +200).
+    // 교체로 올라온 구원 투수는 받지 않는다 (P1 3-2, 상대 쪽 `throwOpponentPitch` 와 같은 식)
+    isFirstPitcher: progress.ourUsedPitchers.length === 0,
+    // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다
+    batterIntimidates: false,
+    ...pitcherSkillFlagsAt(progress, options.ourTeamId, progress.ourPitcherIndex),
+  })
+  const fatigued = fatiguedStatsOf(stats, stamina)
+  const staminaPercent = staminaPercentOf(stamina)
   const repertoire = pitcherRepertoireAt(progress, options.ourTeamId, progress.ourPitcherIndex)
   const grade = pitchGradeOf(
     {
@@ -2525,20 +2548,6 @@ function pitchOnce(
   )
   const resolution = thrown.resolution
   const foulContact = thrown.foulContact
-
-  // 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
-  const stamina = drainStamina({
-    stamina: progress.stamina,
-    typeNumber: input.typeNumber,
-    staminaAbility: stats.stamina,
-    teamMorale: ourTeamMoraleOf(options),
-    // 0xaeb08 `team+0x26 − team+0x33 == 1` — 마운드를 밟은 투수가 지금 투수 하나뿐일 때만 첫 투수 보너스(0x66e44 +200).
-    // 교체로 올라온 구원 투수는 받지 않는다 (P1 3-2, 상대 쪽 `throwOpponentPitch` 와 같은 식)
-    isFirstPitcher: progress.ourUsedPitchers.length === 0,
-    // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다
-    batterIntimidates: false,
-    ...pitcherSkillFlagsAt(progress, options.ourTeamId, progress.ourPitcherIndex),
-  })
 
   const afterPitch: TeamGameProgress = {
     ...progress,

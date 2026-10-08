@@ -338,7 +338,11 @@ describe('경기용 능력치가 화면까지 이어진다', () => {
     const 좋음 = 대회({ illness: 0, morale: 100, coach: -1 })
     const 나쁨 = 대회({ illness: 5, morale: 5, coach: -1 })
     expect(currentBatterAbility(나쁨.progress)).toEqual(currentBatterAbility(좋음.progress))
-    expect(currentPitcherAbility(나쁨.progress)).toEqual(currentPitcherAbility(좋음.progress))
+    // 깎은 뒤 체력%를 내는 함수(`staminaPercentAfterPitch`)는 값으로 견준다 — 상대 투수 소모는 사기 100 이라 같다
+    const { staminaPercentAfterPitch: 나쁨셈, ...나쁨투수 } = currentPitcherAbility(나쁨.progress)
+    const { staminaPercentAfterPitch: 좋음셈, ...좋음투수 } = currentPitcherAbility(좋음.progress)
+    expect(나쁨투수).toEqual(좋음투수)
+    expect(나쁨셈?.(1)).toBe(좋음셈?.(1))
     expect(ourPitcherStats(나쁨.progress)).toEqual(ourPitcherStats(좋음.progress))
   })
 

@@ -174,8 +174,11 @@ export function selectPitch(
     }
     target = pitchTargetOf(kind, situation, random)
   }
+  // 소모 0xa5e14 — 구질이 정해진 뒤 상태 0x11 진입 0x3de10(0x3dec6)에서 깎는다. 놓기 0x4dc78 의 0x4dbac · 0x34968 은 그 **뒤**
+  // 체력을 본다 (`staminaPercentAfterPitch`). 난수는 쓰지 않는다
+  const staminaPercent = pitcher.staminaPercentAfterPitch?.(typeNumber) ?? pitcher.staminaPercent
   // 경기용 능력치 0xb570c(…, 체력% 0xaebb0) — 피로 0xb58e6 를 먹인 제구·구속·변화 (`pitcherGameStats`)
-  const gameStats = cpuPitchStatsOf(pitcher)
+  const gameStats = cpuPitchStatsOf(staminaPercent === undefined ? pitcher : { ...pitcher, staminaPercent })
   const stats = { control: gameStats.control, velocity: gameStats.velocity, breaking: gameStats.breaking }
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   // 0x4dbac: 구질(scene+0xfc8) == 22(마구)면 굴림 없이 5 를 돌려준다 (4dbb8 cmp #0x16 → 4dbbc movs r0,#5).
@@ -236,6 +239,10 @@ export function selectPitch(
     isMagicPitch: isMagic,
     pitcherMagicNumber: repertoire.magicId,
     pitcherForm: repertoire.form,
+    // 깎은 뒤 체력% — 사람 스윙 판정 0xab214 가 같은 값을 본다
+    ...(pitcher.staminaPercentAfterPitch === undefined || staminaPercent === undefined
+      ? {}
+      : { pitcherStaminaPercent: staminaPercent }),
   }
   return { kind: '투구', pitch, pitchTypeNumber: typeNumber, isMistakePitch: isMistake }
 }

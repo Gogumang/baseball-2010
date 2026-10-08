@@ -66,6 +66,35 @@ describe('selectPitch — 원본 CPU 투구 (0x344dc → 0x9eeac → 0x345fc →
   })
 })
 
+describe('selectPitch 체력 — 소모 0xa5e14 는 0x11 진입(0x3dec6)이라 놓기 0x4dc78 앞이다', () => {
+  const 지친투수 = { ...투수(60), staminaPercent: 0 }
+
+  it('구질을 고른 뒤 깎은 체력%로 피로 · 제구 등급을 낸다 — 깎은 뒤 0 이면 처음부터 0 인 투수와 같은 공', () => {
+    const 받은구질: number[] = []
+    const 깎임 = selectPitch(
+      {
+        ...투수(60),
+        staminaPercent: 1,
+        staminaPercentAfterPitch: (typeNumber) => {
+          받은구질.push(typeNumber)
+          return 0
+        },
+      },
+      상황,
+      createSeededRandom(42),
+    )
+    const 처음부터 = selectPitch(지친투수, 상황, createSeededRandom(42))
+    expect(받은구질).toHaveLength(1)
+    expect(깎임.type).toBe(PITCH_TYPES[받은구질[0] - 1].name)
+    // 공에 깎은 뒤 체력%를 실어 스윙 판정 0xab214 까지 넘긴다 — 그 칸만 다르다
+    expect(깎임).toEqual({ ...처음부터, pitcherStaminaPercent: 0 })
+  })
+
+  it('셈을 안 넘기면 예전 그대로 지금 체력%를 쓰고 공에 아무것도 안 싣는다', () => {
+    expect(selectPitch(지친투수, 상황, createSeededRandom(42)).pitcherStaminaPercent).toBeUndefined()
+  })
+})
+
 describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de10 · 0x46fa8)', () => {
   const 마투수 = (index: number) => ({
     control: 67,

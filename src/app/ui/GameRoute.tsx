@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import { opponentPitcherAbilityOf } from '@/features/play-game/model/gameFlow'
+import { opponentPitcherAbilityOf, opponentStaminaPercentAfterPitchOf } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
@@ -49,6 +49,9 @@ interface GameRouteProps {
    */
   readonly aceLevels?: Readonly<Record<number, number>>
 }
+
+/** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (`useCareerSession` 과 같은 칸) */
+const INTIMIDATE_SKILL_ID = 22
 
 /**
  * 나만의리그 경기 — 원작 로딩 화면(StrTIP)이 끝나면 타석으로.
@@ -245,11 +248,16 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         // 지금 마운드의 상대 투수 — CPU 교체(0xac428)가 바꾸면 바뀐 투수가 던진다 (0xae83c).
         // 마선수 대결의 마투수는 0xb6414 첫 단계 `v · 0xd88aa[mgr[0x13a + 순번]] / 100` 을 먹는다.
         // 마투수도 마운드 레코드 +0x2c 로 체력% 0xaebb0 을 낸다 — 피로 0xb58e6 · 제구 등급 지친 갈래 0xb74bc
-        pitcherAbility={
-          progress.aceOpponent === null
+        // 체력%는 공이 손을 떠나며(0x3dec6 → 0xa5e14) 깎은 뒤 값을 놓기 0x4dc78 · 스윙 0xab214 가 본다 — 압도 22 는
+        // `handlePitchResolved` 의 `throwOpponentPitch` 와 같은 장착 비트다
+        pitcherAbility={{
+          ...(progress.aceOpponent === null
             ? opponentPitcherAbilityOf(progress)
-            : pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina))
-        }
+            : pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina))),
+          staminaPercentAfterPitch: opponentStaminaPercentAfterPitchOf(progress, {
+            batterIntimidates: career.equippedSkillIds.includes(INTIMIDATE_SKILL_ID),
+          }),
+        }}
         aceLevels={aceLevels}
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}

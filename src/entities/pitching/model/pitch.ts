@@ -56,6 +56,12 @@ export interface Pitch {
   readonly pitcherMagicNumber?: number
   /** 던진 투수 폼 = `rec[0xb] >> 4` (0xb6e24). 마구 4 는 `폼 >> 1 == 0` 일 때만 그림 이펙트를 쓴다 */
   readonly pitcherForm?: number
+  /**
+   * CPU 투수가 이 공을 던진 **뒤**의 체력% (`PitcherAbility.staminaPercentAfterPitch`) — 사람 스윙 판정 0xab214 가 수비 투수를
+   * `0xb570c(…, 체력%)` 로 부르고(ab548 · ab582) ab838 이 0 이면 B · C 에 +2000 을 더한다. 원본은 공이 손을 떠나는 0x11 진입에서
+   * 이미 깎았다. 없으면 타석 화면이 넘긴 `PitcherAbility.staminaPercent` 다.
+   */
+  readonly pitcherStaminaPercent?: number
 }
 
 /** 투수 레코드에서 온 폼·구질 (pitcherRepertoires) */
@@ -85,6 +91,14 @@ export interface PitcherAbility {
    * 피로 감소(0xb58e6)와 제구 등급의 지친 갈래(0xb74bc, 0 일 때)가 본다. 없으면 지치지 않은 것으로 본다.
    */
   readonly staminaPercent?: number
+  /**
+   * **이 구질을 던져 깎은 뒤의 체력%** — 구질 번호를 받아 `0xa5e14` 소모 뒤의 `0xaebb0` 를 돌려준다.
+   * 원본은 구질을 고른 뒤(0xf · 0x10 의 0x344dc) 상태 0x11 **진입** 0x3de10 의 0x3dec6 에서 깎고, 놓기 0x4dc78(0x11 의 틱 10)의
+   * 제구 등급 0x4dbac · 피로 능력치 0x34968, 사람 스윙 판정 0xab214(ab548 · ab582 · ab838)가 그 **깎은 뒤** 값을 본다.
+   * 있으면 `selectPitch` 가 구질을 정한 뒤 이 값으로 피로·등급을 내고 공(`Pitch.pitcherStaminaPercent`)에 실어 스윙 판정까지 넘긴다.
+   * 없으면 `staminaPercent` 그대로다(홈런더비 — 0xaebb0 이 늘 100 · 시험).
+   */
+  readonly staminaPercentAfterPitch?: (pitchTypeNumber: number) => number
 }
 
 export const DEFAULT_PITCHER_ABILITY: PitcherAbility = {

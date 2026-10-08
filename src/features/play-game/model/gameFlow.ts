@@ -659,13 +659,39 @@ export function throwOpponentPitch(
     ...progress,
     opponentMound: {
       ...mound,
-      stamina: drainPitcherForPitch(opponentQuickDefenseOf(progress), mound, pitchTypeNumber, options.batterIntimidates),
+      stamina: opponentStaminaAfterPitch(progress, pitchTypeNumber, options),
       pitches: mound.pitches + 1,
       justChanged: false,
     },
     // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c)
     pinchHitUsed: false,
   }
+}
+
+/** 상대 투수가 이 구질을 던져 깎은 뒤의 +0x2c (0xa5e14 → 0xaeb08) — `throwOpponentPitch` 와 타석 화면의 투구 AI 가 함께 쓴다 */
+function opponentStaminaAfterPitch(
+  progress: GameProgress,
+  pitchTypeNumber: number,
+  options: { readonly batterIntimidates: boolean },
+): number {
+  return drainPitcherForPitch(
+    opponentQuickDefenseOf(progress),
+    progress.opponentMound,
+    pitchTypeNumber,
+    options.batterIntimidates,
+  )
+}
+
+/**
+ * **이 구질을 던져 깎은 뒤의 상대 투수 체력%** — `PitcherAbility.staminaPercentAfterPitch` 로 타석 화면에 넘긴다.
+ * 원본은 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 깎고, 놓기 0x4dc78 의 제구 등급 0x4dbac · 피로 0x34968 과
+ * 스윙 판정 0xab214 가 그 **깎은 뒤** 체력을 본다. 깎는 셈은 `throwOpponentPitch` 와 같다(같은 `batterIntimidates` 를 넘긴다).
+ */
+export function opponentStaminaPercentAfterPitchOf(
+  progress: GameProgress,
+  options: { readonly batterIntimidates: boolean },
+): (pitchTypeNumber: number) => number {
+  return (pitchTypeNumber) => staminaPercentOf(opponentStaminaAfterPitch(progress, pitchTypeNumber, options))
 }
 
 /**

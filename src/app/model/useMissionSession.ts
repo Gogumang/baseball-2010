@@ -129,6 +129,7 @@ import {
   withMissionCpuSpecialSwing,
   missionCpuAtNewPlateAppearance,
 } from '@/entities/mission/model/missionCpuTeam'
+import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
@@ -772,27 +773,11 @@ export function useMissionSession({
       if (pitchingRun !== null && pitchTypeNumber !== undefined) {
         // 0xa5e14 — state[0xd] · state[0xe] 내림 · 마운드 투수 투구 수 · 스태미나 (`missionCpuAfterPitch`). 마투수면 그 레코드 +0x2c 를
         // 세션 셈(`missionOpponentStaminaAfterPitch`)으로 깎아 마운드에 든다 — 내려가면 마스터 줄 소모를 CPU 팀이 든다
-        setMissionRun((previous) => {
-          if (previous === null) return previous
-          const skillIds = missionBatterSkillIdsOf(previous, batterSkillIds)
-          const aceStamina = isMissionCpuMoundAce(previous.cpu)
-            ? missionOpponentStaminaAfterPitch(
-                missionAceMoundStaminaOf(previous),
-                previous.mission,
-                pitchTypeNumber,
-                skillIds,
-                aceLevels,
-              )
-            : undefined
-          return {
-            ...previous,
-            cpu: missionCpuAfterPitch(previous.cpu, {
-              pitchTypeNumber,
-              batterIntimidates: skillIds.includes(INTIMIDATE_SKILL_ID),
-              ...(aceStamina === undefined ? {} : { aceStamina }),
-            }),
-          }
-        })
+        setMissionRun((previous) =>
+          previous === null
+            ? previous
+            : { ...previous, cpu: missionCpuAfterThrow(previous, pitchTypeNumber, batterSkillIds, aceLevels) },
+        )
       }
       const hasSwung = detail.hasSwung
       // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58) ·
@@ -1945,6 +1930,15 @@ export function useMissionSession({
     random,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
     opponentStaminaPercent: staminaPercentOf(opponentMoundStamina),
+    /**
+     * 타자 미션 마운드 투수가 이 구질을 던져 **깎은 뒤**의 체력% — `PitcherAbility.staminaPercentAfterPitch` 로 타석 화면에 넘긴다.
+     * 원본은 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 깎고 놓기 0x4dc78 · 스윙 0xab214 가 그 뒤 체력을 본다.
+     * 마운드가 비면(CPU 팀 없음) 10000 이다
+     */
+    opponentStaminaPercentAfterPitch: (run: MissionRun, pitchTypeNumber: number) =>
+      staminaPercentOf(
+        missionCpuAfterThrow(run, pitchTypeNumber, batterSkillIds, aceLevels).pitching?.mound.stamina ?? FULL_STAMINA,
+      ),
     /** 자동진행 0x21 의 마지막 중계 칸 — 중계 화면이 그린다 (`stepAutoRelay`) */
     autoRelayStep,
     /** 자동진행 0x21 의 틱 하나를 굴린다 — 중계 화면이 틱마다 부른다 */
@@ -2056,6 +2050,28 @@ export function missionStageBatterOf(
     specialSwingNumber: 0,
     name: batter.row.name,
   }
+}
+
+/**
+ * **타자 미션 마운드 투수가 공 하나를 던진 뒤의 CPU 팀** — 0xa5e14 (`missionCpuAfterPitch`). 마투수면 그 레코드 +0x2c 를
+ * 세션 셈(`missionOpponentStaminaAfterPitch`)으로 깎아 마운드에 든다 — 내려가면 마스터 줄 소모를 CPU 팀이 든다.
+ * 판정된 공을 먹일 때(`handleMissionPitch`)와 타석 화면 투구 AI 의 깎은 뒤 체력%(`opponentStaminaPercentAfterPitch`)가 같은 셈이다.
+ */
+function missionCpuAfterThrow(
+  run: MissionRun,
+  pitchTypeNumber: number,
+  batterSkillIds: readonly number[],
+  aceLevels?: Readonly<Record<number, number>>,
+): MissionCpuTeam {
+  const skillIds = missionBatterSkillIdsOf(run, batterSkillIds)
+  const aceStamina = isMissionCpuMoundAce(run.cpu)
+    ? missionOpponentStaminaAfterPitch(missionAceMoundStaminaOf(run), run.mission, pitchTypeNumber, skillIds, aceLevels)
+    : undefined
+  return missionCpuAfterPitch(run.cpu, {
+    pitchTypeNumber,
+    batterIntimidates: skillIds.includes(INTIMIDATE_SKILL_ID),
+    ...(aceStamina === undefined ? {} : { aceStamina }),
+  })
 }
 
 /** 지금 타자의 장착 스킬 — 미션 타자면 세션이 받은 것, 마스터 줄이면 그 줄 +0x14 의 켜진 비트 (0xb62b4(타자, n) — 압도 22) */

@@ -172,6 +172,25 @@ describe('resolvePitch — 스윙한 경우', () => {
   })
 })
 
+describe('resolvePitch — 투수 체력%는 공에 실린 깎은 뒤 값 (0x3dec6 → 0xa5e14 가 놓기 · 스윙보다 앞)', () => {
+  const 서른번 = (pitch: Pitch, context: BattingContext) => {
+    const random = createSeededRandom(11)
+    let deck = createPatternDeck(random)
+    return Array.from({ length: 30 }, () => {
+      const result = resolvePitch(pitch, { frame: 16, shift: 0, buntKind: 0 }, context, deck, random)
+      deck = result.deck
+      return result.detail
+    })
+  }
+  const 체력 = (staminaPercent: number): BattingContext => ({ ...상황, pitcher: { ...상황.pitcher, staminaPercent } })
+
+  it('공에 깎은 뒤 0% 가 실리면 화면이 넘긴 체력%(100)가 아니라 지친 투수로 판정한다 — ab838 의 +2000', () => {
+    const 깎인공 = 서른번(직구({ pitcherStaminaPercent: 0 }), 체력(100))
+    expect(깎인공).toEqual(서른번(직구(), 체력(0)))
+    expect(깎인공).not.toEqual(서른번(직구(), 체력(100)))
+  })
+})
+
 describe('resolvePitch — 보정 구조체 0x34d6c 를 판정에 싣는다', () => {
   /** 앞 몇 개만 정하고 나머지는 0.5 */
   const 앞값 = (values: readonly number[]): RandomPort => {
