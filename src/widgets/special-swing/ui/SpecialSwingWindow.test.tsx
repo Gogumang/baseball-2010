@@ -122,4 +122,32 @@ describe('배우기 — 상태 0x6c · 0x17828', () => {
 
     expect(onTrain).toHaveBeenCalledTimes(1)
   })
+
+  it('처음 커서는 min(L, 3) 칸이다 — 108 진입 0x17730 177b6~17806 (L = 2 면 다음에 배울 칸 2 에서 Enter → [66])', () => {
+    훈련창({ level: 2 })
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(알림글()).toContain(한줄로('배우시겠습니까?'))
+    expect(알림글()).not.toContain(문구(63))
+  })
+
+  it('L ≥ 3 이면 커서는 마지막 칸 3 이다 — 다 배운 L = 4 면 Enter → [63]', () => {
+    훈련창({ level: 4 })
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(알림글()).toContain(문구(63))
+  })
+
+  it('질문 상자의 "예" 클릭이 덮개로 올라가 창을 닫지 않는다', () => {
+    const onClose = vi.fn()
+    const { onTrain } = 훈련창({ level: 0, gamePoint: 500, onClose })
+
+    칸누르기('파워 스윙')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onTrain).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })

@@ -85,7 +85,11 @@ export function SpecialSwingWindow({
   level, sessions, battingTypeIndex, mode = '사용', selectedNumber, onSelectNumber,
   popularity = 0, gamePoint = 0, onTrain, onBuyGamePoint, onClose,
 }: SpecialSwingWindowProps) {
-  const [cursor, setCursor] = useState(Math.min(Math.max(level - 1, 0), SLOT_COUNT - 1))
+  // 처음 커서 — '훈련'(108 진입 0x17730 177b6~17806)은 min(s8 [저장+0x201], 3) = min(L, 3) 칸.
+  // ⚠️ '사용'(0x7b) 진입의 커서는 이 커밋에서 다시 뜨지 않았다 — 예전 값 min(max(L − 1, 0), 3) 그대로
+  const [cursor, setCursor] = useState(mode === '훈련'
+    ? Math.min(level, SLOT_COUNT - 1)
+    : Math.min(Math.max(level - 1, 0), SLOT_COUNT - 1))
   /** 바깥이 번호를 들고 있지 않을 때의 자리 — 원본 레코드 +0x18 에 이어야 한다 */
   const [ownNumber, setOwnNumber] = useState(NO_SPECIAL_SWING_NUMBER)
   const inUseNumber = selectedNumber ?? ownNumber
@@ -195,6 +199,8 @@ export function SpecialSwingWindow({
           top: COUNT_BOX.y + Math.trunc((COUNT_BOX.height - LABEL_HEIGHT + 1) / 2),
         }} />
 
+      {/* 상자 클릭이 덮개(onClick = onClose)로 올라가 창째 닫히지 않게 여기서 멈춘다 — 원본은 상자가 키를 다 가져간다 */}
+      <div onClick={(event) => event.stopPropagation()}>
       {question !== null && (
         <MessageBox text={question.text} buttons={['예', '아니오']}
           onAnswer={(index) => { const pending = question; setQuestion(null); if (index === 0) pending.onYes() }} />
@@ -202,6 +208,7 @@ export function SpecialSwingWindow({
       {question === null && notice !== null && (
         <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
       )}
+      </div>
     </div>
   )
 }
