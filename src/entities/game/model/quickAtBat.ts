@@ -1,6 +1,8 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { swingResultOf } from '@/entities/batting/model/swingResult'
 import { BALANCE } from '@/shared/config/original/balance'
+import { D_LEVEL } from '@/shared/config/original/dLevel'
+import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -81,6 +83,14 @@ export interface QuickAtBatBatter {
    * 투수 스킬 31(0xabcd8)이 2·3·4 를 본다. 안 넘기면 0
    */
   readonly recordSlot?: number
+  /** 마선수(0xb633c = 레코드 +0xa 비트6)면 그 순번·레벨 — 0xab214 에 넘기는 보정 구조체에 히트·파워를 얹는다 (`quickSwingBoostOf`) */
+  readonly ace?: QuickAceSlot
+}
+
+/** 마선수 한 명의 순번(0xb63a0, 0~4)과 레벨(`mgr[0x13f/0x13a + 순번]`, 0~4) */
+export interface QuickAceSlot {
+  readonly order: number
+  readonly level: number
 }
 
 export interface QuickAtBatPitcher {
@@ -96,6 +106,8 @@ export interface QuickAtBatPitcher {
   readonly isOwnPlayer?: boolean
   /** 손 `0xb63c0(투수)` — 0 우투 · 1 좌투 (`pitcherHandOf`). 타자 스킬 13·14 가 본다. 안 넘기면 0 */
   readonly hand?: number
+  /** 마선수면 그 순번·레벨 — 보정 구조체에 구속·제구를 얹는다 (`quickSwingBoostOf`) */
+  readonly ace?: QuickAceSlot
 }
 
 export interface QuickAtBatSituation {
@@ -201,6 +213,38 @@ export function judgePitchOf(
   return strikes <= STRIKES_FOR_STRIKEOUT - 2 ? '스트라이크' : '삼진'
 }
 
+const ACE_SLOT_COUNT = 5
+const aceKOf = (ace: QuickAceSlot) =>
+  Math.min(Math.max(Math.trunc(ace.level), 0), ACE_SLOT_COUNT - 1) * ACE_SLOT_COUNT +
+  Math.min(Math.max(Math.trunc(ace.order), 0), ACE_SLOT_COUNT - 1)
+
+/**
+ * 간이 타석이 0xab214 에 넘기는 12바이트 보정 구조체 (0xc11f0 c11fe~c12c4, 디스어셈 대조 — 확정).
+ * ```
+ * c11fe  memset(sp+0x74, 0, 12)
+ * c1226  if 0xb633c(타자):  k = 레벨·5 + 순번 (레벨 = s8 mgr[0x13f + 순번], 순번 = 0xb63a0)
+ *            out+0 = D[0x100+2k] · out+2 = D[0x132+2k]          ; 히트 · 파워
+ * c1278  if 0xb633c(투수):  k = 레벨·5 + 순번 (레벨 = s8 mgr[0x13a + 순번])
+ *            out+4 = D[0xce+2k] · out+6 = D[0x9c+2k]            ; 구속 · 제구
+ * ```
+ * 사람 타석의 0x34d6c 와 달리 **필살·마구 번호를 보지 않고** 마선수면 늘 붙으며 % 칸(out+8~0xb)은 0 이다.
+ * 표 값은 레벨 0·1 150 · 2 180 · 3 200 · 4 220 (다섯 순번 같다). 두 겨루기(c12f8·c135a)와 세 번째 스트라이크
+ * 겨루기(c1764)는 0xb570c 를 따로 불러 이 보정을 안 받는다.
+ */
+export function quickSwingBoostOf(batter: QuickAtBatBatter, pitcher: QuickAtBatPitcher): SwingBoost {
+  const table = D_LEVEL.boost
+  const batterK = batter.ace === undefined ? -1 : aceKOf(batter.ace)
+  const pitcherK = pitcher.ace === undefined ? -1 : aceKOf(pitcher.ace)
+  return {
+    batterHit: batterK < 0 ? 0 : table.aceBatterHit[batterK] ?? 0,
+    batterPower: batterK < 0 ? 0 : table.aceBatterPower[batterK] ?? 0,
+    pitcherVelocity: pitcherK < 0 ? 0 : table.acePitcherSpeed[pitcherK] ?? 0,
+    pitcherControl: pitcherK < 0 ? 0 : table.acePitcherControl[pitcherK] ?? 0,
+    solidPercent: 0,
+    homeRunPercent: 0,
+  }
+}
+
 /** 0xc11f0 의 결과 코드 분기를 그대로 옮긴 판정 하나 */
 type PitchVerdict =
   /** 헛스윙 (0xab214 out 플래그 sp+0x6e == 0 → c14fa 가 c1748 로) — 세 번째면 겨루기를 한다 */
@@ -232,6 +276,7 @@ function verdictOf(
       controlTier,
       batter,
       pitcher,
+      boost: quickSwingBoostOf(batter, pitcher),
       mode: '일반',
       isPitcherExhausted: pitcher.stamina === 0,
       batterSkillIds: batter.skillIds,

@@ -370,9 +370,11 @@ function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | 
   const ace = ACE_PITCHERS[index]
   if (ace === undefined) return undefined
   // 마투수 레코드 +0xc 부터 u16 넷 = 제구·구속·변화·체력 (acePlayers 의 hit·power·defense·run 칸 차례)
-  const ability = aceAbilityAtLevel(ace.ability, aceLevelOf(levels, aceLevelSlotOf('투수', index + 1)))
+  const level = aceLevelOf(levels, aceLevelSlotOf('투수', index + 1))
+  const ability = aceAbilityAtLevel(ace.ability, level)
   return {
-    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
+    // 0xb633c 비트6 — 간이 타석 보정 구조체에 구속·제구가 붙는다 (`quickSwingBoostOf`)
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [], ace: { order: index, level } },
     staminaAbility: ability.run,
     breaking: ability.defense,
     stamina: ACE_PITCHER_RECORD_STAMINA,
@@ -382,8 +384,10 @@ function acePitcherOf(index: number, levels: Readonly<Record<number, number>> | 
 function aceBatterOf(index: number, levels: Readonly<Record<number, number>> | undefined): QuickAtBatBatter | undefined {
   const ace = ACE_BATTERS[index]
   if (ace === undefined) return undefined
-  const ability = aceAbilityAtLevel(ace.ability, aceLevelOf(levels, aceLevelSlotOf('타자', index + 1)))
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [] }
+  const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
+  const ability = aceAbilityAtLevel(ace.ability, level)
+  // 0xb633c 비트6 — 간이 타석 보정 구조체에 히트·파워가 붙는다 (`quickSwingBoostOf`)
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [], ace: { order: index, level } }
 }
 
 /**
