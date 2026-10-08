@@ -131,6 +131,7 @@ import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
 import { NO_ROSTER_SLOT, entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import {
   FULL_PITCHER_STAMINA, SEASON_SHOP_TEXT, SEASON_STAMINA_ITEM, applySeasonGpItem, applySeasonSubItem, seasonGpItemPriceOf,
   seasonShopTextOf,
@@ -399,6 +400,11 @@ export interface SeasonActions {
    * 거치지 않았으면 여기서 정산한다
    */
   readonly finishGame: (summary: TeamGameSummary) => void
+  /**
+   * 시즌모드로 들어와 장면 0x105 를 새로 세웠다(메인 메뉴 시즌모드 · [최근게임] 의 3284e — 중간 저장 경기가 없을 때). 상태 1 의
+   * 적재 0x75fc 가 로딩 판에 팁 rand(0, 73) 을 굴린다(76cc `0x53dbd`) — `SeasonRoute` 가 들어올 때 한 번 부른다
+   */
+  readonly constructScene: () => void
   /**
    * 경기 화면이 이어하기 저장을 썼다 — 0xdd OK(0x847e: +0x4e = 1 · 칸 0xc 두 팀 · 0xd st · 파일) · 반 이닝 0x4f928(모드 2:
    * 칸 0xb SR · 0xc · 0xd) · 경기 장면 진입 0x3a426(+0x4e = 1 · 파일). +0x4e 를 세우고 블록을 시즌 저장에 쓴다.
@@ -2134,17 +2140,29 @@ export function useSeasonSession(
   /**
    * 결과 화면 확인 — 정산 진입에서 정해 둔 다음 장면으로 간다. 정산 진입을 거치지 않고 왔으면(테스트 · 옛 길) 여기서 정산한다.
    */
+  /**
+   * **장면 0x105 의 상태 1 — 자원 적재 0x75fc**(직접 떴다, 그리기 나무 0xedb6 의 edd0 `cmp #1` → 0xee6a). 로딩 판 0x667f9 · 진행 막대
+   * 0x54121(판, 7) 뒤 76cc `0x53dbd(판, [this+0xcc])` — StrTIP 첫 줄(73)로 rand(0, 73)(53dde, 경기 장면 상태 7 의 0x39f88 과 같은
+   * 함수). 이어서 적재 뒤 7878 `0xbcb49([this+0x24])` 로 진입 분기 0xcb 로 간다. 곧 장면 0x105 를 세울 때마다 한 번, 그 장면의 어느
+   * 굴림보다 앞이다. 웹 시즌은 로딩 판을 안 그려 값은 버린다.
+   */
+  const rollSceneLoadTip = useCallback(() => {
+    rollSceneLoadingTip(random)
+  }, [random])
+
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
       const settled = settledGame.current ?? settleGame(summary)
       settledGame.current = null
       setResumeGame(null)
+      // 경기 장면이 끝나면 장면 0x105 를 새로 세운다(0x3874 가 지운 뒤 0x3b14) — 상태 1 의 팁 굴림이 그 장면의 맨 앞이다
+      if (settled !== null) rollSceneLoadTip()
       if (settled === null) return
       setGameOptions(null)
       if (settled.jingle !== null) activeSound().play(settled.jingle)
       setScene(settled.next)
     },
-    [settleGame],
+    [rollSceneLoadTip, settleGame],
   )
 
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
@@ -2795,7 +2813,7 @@ export function useSeasonSession(
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
       openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
-      playCupGame, finishCup, finishGame, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
+      playCupGame, finishCup, finishGame, constructScene: rollSceneLoadTip, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
       runTraining, closeTrainingResult, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,

@@ -79,6 +79,24 @@ function 시즌화면({ store, 장면, onExit, hallOfFame, nari, nariRecords }: 
 
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
+describe('장면 0x105 를 세운 상태 1 의 팁 굴림 (0x75fc 76cc · 3284e)', () => {
+  function 엿보는화면({ store, constructScene }: { readonly store: JsonStorePort; readonly constructScene: () => void }) {
+    const session = useSeasonSession(store, createSeededRandom(20100901))
+    const gameSettings = useGameSettings(설정저장)
+    return (
+      <SeasonRoute session={{ ...session, actions: { ...session.actions, constructScene } }}
+        random={createSeededRandom(20100901)} gameSettings={gameSettings} onExit={vi.fn()} />
+    )
+  }
+
+  it('시즌모드로 들어오면 한 번 — 다시 그려도 더 안 굴린다', () => {
+    const constructScene = vi.fn()
+    const { rerender } = render(<엿보는화면 store={메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100] })))} constructScene={constructScene} />)
+    rerender(<엿보는화면 store={메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100] })))} constructScene={constructScene} />)
+    expect(constructScene).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('엔딩 0xf5 배선', () => {
   /** 효과기 종류 1 · 2 는 아홉 틀 — 그 끝을 본 다음 틀까지 넘긴다 (`SeasonScreenFade`) */
   const 효과기넘기기 = () => act(() => {

@@ -222,8 +222,15 @@ export function SeasonRoute({
   /** 엔딩을 넘긴 틀이 건 효과기 종류 2 — 관리 메뉴 0xc9 위에서 돈다 (`SeasonEndingScreen`) */
   const [isEndingFadeIn, setEndingFadeIn] = useState(false)
   const [isEnteringGame, setEnteringGame] = useState(() => session.isGameInProgress)
+  /** 장면 0x105 를 세운 굴림은 들어올 때 한 번 (StrictMode 의 효과 다시 돌기에도) */
+  const isSceneConstructed = useRef(false)
   useLayoutEffect(() => {
-    if (!isEnteringGame) return
+    // 3284e — 중간 저장 경기(+0x42 && +0x4e)가 없으면 장면 0x105 를 세운다: 상태 1 적재 0x75fc 의 팁 rand(0, 73) 이 그 장면 맨 앞
+    if (!isEnteringGame) {
+      if (!isSceneConstructed.current) actions.constructScene()
+      isSceneConstructed.current = true
+      return
+    }
     actions.resumeSavedGame()
     setEnteringGame(false)
     // 들어올 때 한 번만 — 0x327b8 은 시즌모드에 들어오는 그 순간에만 돈다

@@ -145,6 +145,24 @@ describe('시즌 세션', () => {
     expect(result.current.state?.record.gameRecord).toEqual(Array.from({ length: 16 }, () => 0))
   })
 
+  it('장면 0x105 를 세울 때마다 상태 1 적재 0x75fc 가 팁 rand(0, 73) 하나 — 들어올 때(constructScene) · 경기 결과를 닫고 돌아올 때 그 장면 맨 앞', () => {
+    const seeded = createSeededRandom(20100901)
+    let calls = 0
+    const random = { ...seeded, next: () => { calls += 1; return seeded.next() } }
+    const { result } = renderHook(() => useSeasonSession(메모리저장(), random))
+    const before = calls
+    act(() => result.current.actions.constructScene())
+    expect(calls).toBe(before + 1)
+
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.enterGameSettlement(요약()))
+    // 정산 진입(경기 장면 0x4ea0c)까지는 장면 0x105 가 없다
+    const settled = calls
+    act(() => result.current.actions.finishGame(요약()))
+    expect(calls).toBe(settled + 1)
+  })
+
   it('경기가 끝나면 경기 수가 오르고 관중수입 창으로 간다 (0xe9)', () => {
     const { result } = 띄우기()
     시작(result, 0)
