@@ -72,6 +72,11 @@ interface AutoPlayRelayScreenProps {
    * (자동진행 끝) 상태 0x18 로 넘긴다(+0x1784 = 0, 미션은 판 없이 곧장 0xd — 이 화면이 내려간다).
    */
   readonly onTick: (tick: number) => void
+  /**
+   * 참이면 장면이 멈춘다 — 틱(경기+0x2c)이 안 오르고 `onTick` 도 안 불린다. 팀경기 CLR 질문 창(StrGAME[6])이 떠 있는 동안
+   * 프레임 0x52c50 이 0xbc9c8 · 갱신 · 그리기를 건너뛰는 것(52cc6 `0x754f9`).
+   */
+  readonly isPaused?: boolean
   /** 두 측 팀 (경기[0x28 + 칸] — 0xaa57c 가 세운 사람 칸 · 다른 칸 팀) */
   readonly sideTeams: readonly [number, number]
   /** 사람 칸 (st[0x31 + 칸] == 0 인 측) */
@@ -109,9 +114,11 @@ interface AutoPlayRelayScreenProps {
  *
  * ⚠️ 미이식(그림): 배경(운동장 전경)은 안 그린다.
  */
-export function AutoPlayRelayScreen({ step, onTick, sideTeams, humanSide, missionBatterName, overlay }: AutoPlayRelayScreenProps) {
+export function AutoPlayRelayScreen({
+  step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay,
+}: AutoPlayRelayScreenProps) {
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
-  const tick = useSceneTick((next) => onTick(next))
+  const tick = useSceneTick((next) => onTick(next), !isPaused)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   if (step === null) return <RawScreen>{overlay ?? null}</RawScreen>
 

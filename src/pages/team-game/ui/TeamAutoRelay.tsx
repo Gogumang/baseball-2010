@@ -41,6 +41,13 @@ const SPEED_MARKS_Y = 196 + 18 + SPEED_PLATE_HEIGHT + 4
 const CHANGE_IMAGE = 93
 const CHANGE_SIZE = { width: 98, height: 19 } as const
 
+/**
+ * 질문 창 뒤 어둡게 — 경기 장면은 [창+0x24f] = 1(0x3301c)이라 창을 연 그림에 한 번만 0x746cc 가 검정 단계 5 = (5 + 1)/16 로 덮는다
+ * (+0x24d 를 지움). 그 뒤로는 장면을 안 그려(0x52efe — [+0x250] 도 그 그림에 지워진다) 멈춘 장면 + 어둡게 위에 창만 그린다.
+ * ⚠️ 단계 5 의 칠하기([0x15605d0]) 본문은 미해독 — 이벤트 장면 창과 같은 6/16 으로 둔다.
+ */
+const GAME_POPUP_DIM_OPACITY = 6 / 16
+
 /** 부호 있는 바이트로 줄인다 — sim+0x9d 는 `strb` · `lsls #0x18` 로 비교하는 바이트다 */
 function signedByte(value: number): number {
   return ((((value + 128) % 256) + 256) % 256) - 128
@@ -76,10 +83,18 @@ interface TeamAutoRelayProps {
  * 키 0x3e25c (sim[0] ≠ 0 · 모드 ∈ {1,2,8,9}): ←/'4' 속도 −1 · →/'6' 속도 +1 · CLR → StrGAME[6] 질문(코드 0x1e) → 예면 중단.
  * 진입 0x3abf0: 모드 ∈ {1,2,8,9} · v ≠ 2 면 배경음 33.
  *
+ * **질문 창이 떠 있는 동안** (프레임 0x52c50, 2026-10-08 직접 뜸): 52cc6 `0x754f9(창, 키)` 가 [창+9] ≠ 0 이면 늘 1 이라 52ef2 로
+ * 건너뛴다 — 장면 틱 0xbc9c8(52cd4) · 진입 · 키 0x498d4 · 갱신 0x48480 · 0xaada4 가 모두 안 돈다(펼침 · 닫힘 동안도). 그리기는
+ * 52efe 가 `[+0x24f](경기 장면 1) && [창+9] && [+0x250] == 0` 이면 건너뛰는데, 창을 연 0x74ef4 가 +0x250 = 1 을 걸고 같은 그림 끝의
+ * 창 그리기 0x746cc(53078)가 지운다 — 곧 CLR 을 받은 그림은 키(창 열기) → 갱신 → 그리기를 평소대로 마치고, 그 뒤 그림부터
+ * 장면이 멈춘다(틱 · sim+0x9d · 깜빡임 그대로). 예/아니오가 다 닫힌 뒤 다음 그림부터 다시 돈다 — 예면 프레임 머리 52c9e 가
+ * 닫히는 동안 sim+0xa0 = 0 · 0xc0ea8(sim, 1) 을 걸어 다음 갱신(속도 칸 · CHANGE 대기를 지나는)의 0xc2198 이 거짓이다.
+ * ⚠️ CLR 그림의 갱신이 마침 중계를 끝내면(0x18) 원본은 창이 다음 장면 위에 남아 예 → sim+0x9f = 1 이 되지만, 웹은 중계 화면과
+ * 함께 창이 내려간다(미이식).
+ *
  * ⚠️ 근사 · 미이식:
  * - 작은 다이아몬드 · 주자 그림(0x79d10, 표 0xd0028) · 투수/타자 그림(0x79b48)과 배경은 안 그린다(그림 짝을 아직 못 맞췄다).
  * - 프레임 33 의 효과 (1, 0xc) · 세모의 흐림 효과 (1, 6)은 불투명도로 근사했다.
- * - 질문 창이 떠 있는 동안은 갱신 · 그리기 셈(sim+0x9d)을 멈춘다(원본 팝업 동안의 장면 갱신은 안 읽었다).
  */
 export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }: TeamAutoRelayProps) {
   const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
@@ -90,6 +105,8 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
   const [isAsking, setAsking] = useState(false)
   const isAskingRef = useRef(false)
   isAskingRef.current = isAsking
+  /** CLR 을 받았다 — 다음 그림(그 키의 그림)이 갱신 · 그리기를 다 한 뒤 질문 창을 띄운다 */
+  const clrPendingRef = useRef(false)
   const [sceneTick, setSceneTick] = useState(0)
   /** sim+0x9c · sim+0x9d */
   const waitRef = useRef({ armed: false, count: 0 })
@@ -116,7 +133,8 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
       if (event.key === 'ArrowRight' || event.key === '6') return change(1)
       if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
-        setAsking(true)
+        // 원본은 키 단계(0x3e25c → 0xbbef8)에서 창을 열고 **같은 그림의** 갱신 0x48480 · 그리기 0x4258c 를 그대로 마친다
+        clrPendingRef.current = true
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -125,6 +143,18 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
 
   const onTick = (tick: number) => {
     if (isDoneRef.current || isAskingRef.current) return
+    update(tick)
+    if (clrPendingRef.current) {
+      clrPendingRef.current = false
+      if (isDoneRef.current) return
+      // 창이 떠 있는 동안은 장면 틱(0xbc9c8) · 키 · 갱신이 안 돌고 장면도 다시 안 그린다 — 화면이 `isPaused` 로 멈춘다
+      isAskingRef.current = true
+      setAsking(true)
+    }
+  }
+
+  /** 한 그림 — 갱신 0x48480 뒤 그리기 0x4258c 의 sim+0x9d 셈 */
+  const update = (tick: number) => {
     setSceneTick(tick)
     const v = speedRef.current
     const fast = v === AUTO_RELAY_SPEED_MAX
@@ -209,6 +239,7 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
       {isAsking && (
         <MessageBox
           text={AUTO_RELAY_STOP_QUESTION}
+          dimOpacity={GAME_POPUP_DIM_OPACITY}
           buttons={['예', '아니오']}
           onAnswer={(index) => {
             setAsking(false)
@@ -220,6 +251,6 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
   )
 
   return (
-    <AutoPlayRelayScreen step={shown} onTick={onTick} sideTeams={sideTeams} humanSide={humanSide} overlay={overlay} />
+    <AutoPlayRelayScreen step={shown} onTick={onTick} isPaused={isAsking} sideTeams={sideTeams} humanSide={humanSide} overlay={overlay} />
   )
 }

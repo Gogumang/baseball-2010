@@ -77,10 +77,34 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
     expect(봤다).toBe(true)
   })
 
+  it('질문 창이 떠 있는 동안은 장면이 멈춘다 — 틱 · 갱신(0xc262c)이 안 돌고, 아니오로 닫으면 멈춘 틱부터 다시 돈다 (52cc6 0x754f9)', () => {
+    띄우기()
+    흘리기(8)
+    const 첫글 = screen.getByTestId('중계-글').textContent
+    // 8틱째 갱신 바로 앞 그림에 CLR — 그 그림(틱 15)은 갱신이 없고, 창이 선 뒤로는 틱이 멈춰 16 에 닿지 않는다
+    흘리기(6)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    흘리기(1)
+    expect(screen.getByText('자동진행을 중단하시겠습니까?')).toBeTruthy()
+    흘리기(8 * 10)
+    expect(screen.getByTestId('중계-글').textContent).toBe(첫글)
+    // 아니오 — 다 닫힌 뒤 틱 16 에서 다음 0xc262c
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    for (let frame = 0; frame < 30 && screen.queryByText('자동진행을 중단하시겠습니까?') !== null; frame += 1) 흘리기(1)
+    expect(screen.queryByText('자동진행을 중단하시겠습니까?')).toBeNull()
+    expect(screen.getByTestId('중계-글').textContent).toBe(첫글)
+    흘리기(1)
+    expect(screen.getByTestId('중계-글').textContent).not.toBe(첫글)
+  })
+
   it('CLR → StrGAME[6] 질문 → 예 — 다음 갱신에 중계가 끝나 사람 장면이 서고 배경음을 끈다', () => {
     띄우기()
     흘리기(8 * 3)
     fireEvent.keyDown(window, { key: 'Escape' })
+    // 창은 키를 받은 그림(갱신 · 그리기를 마친 뒤)에 선다
+    expect(screen.queryByText('자동진행을 중단하시겠습니까?')).toBeNull()
+    흘리기(1)
     expect(screen.getByText('자동진행을 중단하시겠습니까?')).toBeTruthy()
     흘리기(10)
     fireEvent.keyDown(window, { key: 'Enter' })
