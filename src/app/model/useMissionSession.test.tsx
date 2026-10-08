@@ -1586,6 +1586,25 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     expect(rendered.result.current.sceneConfirm?.entries).toBe(1)
   })
 
+  it('다시하기 · 재도전(같은 미션을 다시 세운다)도 같은 길 — 판이 다시 서고 굴림 36 을 또 쓴다', () => {
+    const mission = MISSIONS.find((row) => row.side === '타자' && row.id === 1)!
+    const { rendered, random } = sessionOf(6)
+    act(() => rendered.result.current.actions.begin(mission))
+    act(() => rendered.result.current.actions.confirmHalfInningBoard())
+    act(() => rendered.result.current.actions.begin(mission))
+
+    // 두 번째 장면: 덱 → rand(0, 2) → 하늘 줄 → 판 36
+    const expected = seededAfterStart(6)
+    createPatternDeck(expected)
+    rollSceneEffectInit(expected)
+    rollSimulatorInit(expected)
+    randomIntegerBelow(expected, 0, SKY_ROW_COUNT)
+    rollHalfInningFielders(expected)
+    expect(random.next()).toBe(expected.next())
+    expect(rendered.result.current.halfInningBoard?.serial).toBe(2)
+    expect(rendered.result.current.sceneConfirm).toBeNull()
+  })
+
   it('마선수 대결(타자편 · 투수편)도 미션 장면이라 같은 판 — 판이 OK 를 기다린다', () => {
     const batter = aceMatchMissionOf(16, '타자')!
     const pitcher = aceMatchMissionOf(16, '투수')!

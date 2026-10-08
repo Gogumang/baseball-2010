@@ -1768,6 +1768,8 @@ export function useMissionSession({
     /**
      * 결과 판(0x19) "예" — 0x140006c = 3 → 장면 0x107 상태 3 진입 0x1e908: 같은 미션(obj+0xbd = this+0x9c)을
      * `0xa5368(obj, 0)` 뒤 곧바로 장면 0x104 로 다시 세운다(목록을 안 지난다, Q2 2a). 보상은 진입 0x4ea0c 가 이미 줬다.
+     * 경기 중 메뉴 "다시하기" 0x3c98e 도 모드 5 · 6 이면(3c9bc) 0x140006c = 3 · 장면 0x107(3c9ce)로 같은 길이고, 목록에서 다음 미션을
+     * 고르는 것도 새 장면 0x104 다 — 셋 다 상태 7 → 9 → 8 → 첫 0x18 판(굴림 36 · OK 대기)을 다시 지난다(`begin` · `openFirstHalfBoard`).
      */
     retryBatter: () => {
       if (missionRun === null) return
