@@ -59,7 +59,12 @@ import {
   pitcherPlaceEventOf,
   scanPitcherEventFrom,
 } from '@/entities/pitcher-career/model/pitcherStoryScene'
-import { EVENT_TRIGGER, markRewardedEvent } from '@/entities/story/model/storyScene'
+import {
+  EVENT_TRIGGER,
+  markRewardedEvent,
+  nariSeasonEndStateOfResumeCode,
+  rewardResumePatchOf,
+} from '@/entities/story/model/storyScene'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import {
   careerNationalCupRewardItems,
@@ -441,6 +446,39 @@ function leagueGameOptionsOf(career: PitcherCareer, settings: Parameters<typeof 
   return { ...options, ...pitcherLeagueGameSetupOf(career, options.opponentTeamId) }
 }
 
+/**
+ * 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 세운 대회와 대표팀 칸(모드 3 갈래 0xb521d 내 칸)을 들고 S+0x50 = 3(웹 null) ·
+ * S+0x12c = 1. 보상 명령 뒤(0x8cca2)와 재생 끝(`continueYearEnd`) 둘 다 이 꼴이다 — 굴림 없이 서므로 두 번 세워도 같은 값이다.
+ * 칭호 8 은 134 첫 틀(0x1b92c 머리) 몫이라 여기 없다.
+ */
+/** 134 첫 틀(0x1b92c 머리)의 칭호 8 — 비트 8 이 이미 섰으면 그대로 */
+function withNationalCupTitle(career: PitcherCareer): PitcherCareer {
+  const title = nationalCupStandingsTitleOf(career.titleIds)
+  return title === null ? career : awardPitcherTitles(career, [title])
+}
+
+function withPitcherNationalCupEntered(career: PitcherCareer): PitcherCareer {
+  const cup = createNationalCup()
+  return {
+    ...career,
+    seasonEndState: null,
+    nationalCup: cup,
+    nariCupTeams: createPitcherCupTeams(career.positionCode, nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID),
+  }
+}
+
+/**
+ * 보상 명령 뒤 이어하기 자리 — 0x8c460 끝 8cc2e(나리 갈래, 모드 3 이라 393~396 은 0xd) → 8cd44 저장 (`rewardResumePatchOf`).
+ * 464 의 S+0x12c = 0 은 웹이 464 앞에 대회를 세우지 않아 이미 그 값이다.
+ */
+function withPitcherRewardResumePatch(career: PitcherCareer, eventId: number): PitcherCareer {
+  const patch = rewardResumePatchOf(eventId, '나리투수')
+  if (patch === null) return career
+  if (patch.nationalCup === true) return withPitcherNationalCupEntered(career)
+  const state = nariSeasonEndStateOfResumeCode(patch.resumeCode)
+  return career.seasonEndState === state ? career : { ...career, seasonEndState: state }
+}
+
 /** 저장의 국가대항전 대회 레코드 두 칸 — 없으면(대회 중 옛 저장) 대회 초기화 꼴로 세운다 */
 function pitcherCupTeamsOf(career: PitcherCareer, opponentTeamId: number): NariCupTeams {
   return career.nariCupTeams ?? createPitcherCupTeams(career.positionCode, opponentTeamId)
@@ -582,6 +620,10 @@ export function usePitcherLeagueSession(
     resumed.current = {
       career: saved !== null && point.kind === '이벤트'
         ? enterPitcherYearEndEvent(saved, point.eventId)
+        // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
+        : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved)
+        // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" (463 보상 뒤 끊겼으면 아직 없다)
+        : saved !== null && point.kind === '국가대항전' ? withNationalCupTitle(saved)
         // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
         : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
       point,
@@ -1293,14 +1335,10 @@ export function usePitcherLeagueSession(
         // 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 (장면 0x106 은 모드 3·4 공용)
         const nationalTitle = nationalCupStandingsTitleOf(current.titleIds)
         const titled = nationalTitle === null ? current : awardPitcherTitles(current, [nationalTitle])
-        const cup = createNationalCup()
-        // 463 끝 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1, 0x8cd44 저장. 대회 칸(0xb7bf1)은 133 이 세운 그대로 파일에 든다
-        commit({
-          ...titled,
-          seasonEndState: null,
-          nationalCup: cup,
-          nariCupTeams: createPitcherCupTeams(titled.positionCode, nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID),
-        })
+        // 463 보상 뒤 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1, 0x8cd44 저장. 대회 칸(0xb7bf1)은 133 이 세운 그대로 파일에 든다
+        const entered = withPitcherNationalCupEntered(titled)
+        const cup = entered.nationalCup ?? createNationalCup()
+        commit(entered)
         setCupView({ cup, atStandings: false })
         return setScene('국가대항전')
       }
@@ -1393,6 +1431,8 @@ export function usePitcherLeagueSession(
       setStory({ eventId: point.eventId, context: '연말', viewed: [] })
       return setScene('이벤트')
     }
+    // 1c25e — S+0x50 == 0x11 → 새 시즌 처리 0x1b768 (경기 중에는 이 값이 남지 않지만 같은 분기라 함께 둔다)
+    if (point.kind === '새시즌') return startNewSeason(career)
     if (point.kind === '포스트시즌') setPostseasonPopup(regularSeasonPopupOnEnter(career))
     if (point.kind === '국가대항전') {
       // 그 밖 갈래 S+0x12c → 134 대진판 (1c348~1c358)
@@ -1401,7 +1441,7 @@ export function usePitcherLeagueSession(
       setCupView({ cup: point.cup, atStandings: false })
     }
     setScene(point.kind)
-  }, [career])
+  }, [career, startNewSeason])
 
   /**
    * 내보이는 커리어의 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 관리 화면 뱃지·구질 훈련
@@ -1677,7 +1717,9 @@ export function usePitcherLeagueSession(
       items
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
-      commit(markRewardedEvent(rewarded, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds))
+      const marked = markRewardedEvent(rewarded, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds)
+      // 8cc2e — 이벤트 번호로 이어하기 자리(S+0x50)를 고치고 8cd44 에서 다시 저장한다 (`withPitcherRewardResumePatch`)
+      commit(withPitcherRewardResumePatch(marked, eventId))
     },
     [career, commit, random, recordStat, story, storyEvents],
   )

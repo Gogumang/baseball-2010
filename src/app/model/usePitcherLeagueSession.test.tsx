@@ -363,6 +363,36 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(연말.current.scene).toBe('관리')
   })
 
+  it('보상 명령 뒤 이어하기 자리(0x8c460 끝 8cc2e → 8cd44 저장) — 393 은 0xd(130) · 464 는 0x11(새 시즌) · 463 은 3 · S+0x12c', () => {
+    const 끊고다시 = (seasonEndState: 136 | 132, eventId: number, items: readonly { kind: number; value: number }[], viewed: readonly number[]) => {
+      const store = 메모리저장()
+      const 첫판 = 띄우기(store)
+      act(() => 첫판.result.current.actions.create('투수', 신인))
+      act(() => 첫판.result.current.actions.save({ ...첫판.result.current.career!, season: 2, gamesPlayed: 45, seasonEndState }))
+      const 판 = 띄우기(store).result
+      act(() => 판.current.actions.giveStoryReward(items, eventId, viewed))
+      return { 받은뒤: 판.current.career!, 저장: store.load() as 커리어, 다시: 띄우기(store).result }
+    }
+
+    // 393 보상 창에서 끊김 — 392 를 다시 틀지 않고 130(370)부터: 목표 보상이 겹치지 않는다
+    const 목표 = 끊고다시(136, 393, [{ kind: 1, value: 44 }], [392, 393])
+    expect(목표.저장.seasonEndState).toBe(130)
+    expect(목표.다시.current.story?.eventId).toBe(370)
+    expect(목표.다시.current.career?.reputation).toBe(목표.받은뒤.reputation)
+
+    // 464 거절 — 이어하기가 새 시즌 0x1b768 → 105
+    const 거절 = 끊고다시(132, 464, [{ kind: 1, value: -20 }], [461, 464])
+    expect(거절.저장.seasonEndState).toBe(137)
+    expect(거절.다시.current.scene).toBe('관리')
+    expect(거절.다시.current.career).toMatchObject({ season: 3, seasonEndState: null, reputation: 거절.받은뒤.reputation })
+
+    // 463 출전 — 대회가 저장에 들고 이어하기는 134 대진판, 134 첫 틀이 칭호 8
+    const 출전 = 끊고다시(132, 463, [{ kind: 1, value: 10 }], [461, 463])
+    expect(출전.저장).toMatchObject({ seasonEndState: null, nationalCup: createNationalCup() })
+    expect(출전.다시.current.scene).toBe('국가대항전')
+    expect(출전.다시.current.career?.titleIds).toContain(TITLE_NAMES[8])
+  })
+
   it('이어하기 — 109 진입이 S+0x50 = 4 를 저장했으면 109 로 (이전 상태 1 이라 취소가 안 먹는다)', () => {
     const 순위 = 이어하기({ gamesPlayed: 4, seasonEndState: 109 })
     expect(순위.current.scene).toBe('다음경기순위')

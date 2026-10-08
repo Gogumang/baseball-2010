@@ -175,6 +175,80 @@ describe('국가대항전 저장 · 이어하기 (S+0x12c · L+0xa8~ — 463 끝
   })
 })
 
+describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 → 8cd44 저장)', () => {
+  /** 같은 저장을 새 장면으로 다시 연다 — 끄고 이어하기 */
+  const 열기 = (saveGame: SaveGamePort) => {
+    const random = createSeededRandom(1)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    return rendered
+  }
+  const 보상받기 = (rendered: ReturnType<typeof 열기>, eventId: number, items: readonly { kind: number; value: number }[], viewed: readonly number[]) => {
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId, context: '시즌' }))
+    act(() => rendered.result.current.session.actions.giveEventReward(items, eventId, viewed))
+  }
+
+  it('393 보상 창에서 끄면 S+0x50 = 0xc(130) — 이어하기는 392 가 아니라 370 부터라 목표 보상이 겹치지 않는다', () => {
+    const saveGame = 메모리저장(목표달성선수({ seasonEndState: 136 }))
+    const 처음 = 열기(saveGame)
+    expect(처음.result.current.screen).toEqual({ kind: '이벤트', eventId: 392, context: '시즌' })
+    보상받기(처음, 393, [{ kind: 1, value: 44 }], [392, 393])
+    const 받은평판 = 처음.result.current.session.career!.reputation
+    expect(saveGame.load()?.seasonEndState).toBe(130)
+
+    const 다시 = 열기(saveGame)
+    expect(다시.result.current.screen).toEqual({ kind: '이벤트', eventId: 370, context: '시즌' })
+    expect(다시.result.current.session.career?.reputation).toBe(받은평판)
+  })
+
+  it('371~374 → 0xe(131, 375 부터) · 377 → 0xf(128 대진) · 보상 없는 결과 이벤트는 0x8c460 이 안 돌아 그대로', () => {
+    const 타이틀 = 메모리저장(목표달성선수({ seasonEndState: 130 }))
+    보상받기(열기(타이틀), 373, [{ kind: 3, value: 6 }], [370, 373])
+    expect(타이틀.load()?.seasonEndState).toBe(131)
+    expect(열기(타이틀).result.current.screen).toEqual({ kind: '이벤트', eventId: 375, context: '시즌' })
+
+    const mvp = 메모리저장(목표달성선수({ seasonEndState: 131, postseason: startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) }))
+    보상받기(열기(mvp), 377, [{ kind: 0, value: 20 }], [375, 377])
+    expect(mvp.load()?.seasonEndState).toBe(128)
+    expect(열기(mvp).result.current.screen).toMatchObject({ kind: '포스트시즌', fromReentry: true })
+
+    // 다른 이벤트 보상(관리 이벤트 따위)은 S+0x50 을 안 건드린다
+    const 그밖 = 메모리저장(목표달성선수({ seasonEndState: 132 }))
+    보상받기(열기(그밖), 383, [{ kind: 1, value: 20 }], [380, 383])
+    expect(그밖.load()?.seasonEndState).toBe(132)
+  })
+
+  it('464 거절 보상 뒤 끄면 S+0x50 = 0x11 — 이어하기가 새 시즌(0x1b768)으로 간다, 평판 −20 은 한 번', () => {
+    const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
+    const 처음 = 열기(saveGame)
+    보상받기(처음, 464, [{ kind: 1, value: -20 }], [461, 464])
+    const 받은평판 = 처음.result.current.session.career!.reputation
+    expect(saveGame.load()?.seasonEndState).toBe(137)
+
+    const 다시 = 열기(saveGame)
+    expect(다시.result.current.screen).toEqual({ kind: '관리' })
+    expect(다시.result.current.session.career?.season).toBe(2)
+    expect(다시.result.current.session.career?.seasonEndState).toBeNull()
+    expect(다시.result.current.session.career?.reputation).toBe(받은평판)
+  })
+
+  it('463 출전 보상 뒤 끄면 S+0x50 = 3 · S+0x12c = 1 — 이어하기가 134 대진판, 134 첫 틀이 칭호 8 을 준다', () => {
+    const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
+    보상받기(열기(saveGame), 463, [{ kind: 1, value: 10 }], [461, 463])
+    expect(saveGame.load()).toMatchObject({ seasonEndState: null, nationalCup: createNationalCup() })
+    expect(saveGame.load()?.titleIds).not.toContain(TITLE_NAMES[8])
+
+    const 다시 = 열기(saveGame)
+    expect(다시.result.current.screen).toEqual({ kind: '국가대항전', cup: createNationalCup() })
+    expect(다시.result.current.session.career?.titleIds).toContain(TITLE_NAMES[8])
+    expect(다시.result.current.session.career?.nariCupTeams?.opponentTeamId).toBe(11)
+  })
+})
+
 describe('전역 경기 상태 +0x6b — 타자편 경기도 같은 칸 (0x1c47a · 0x3a200 · 0xb6b6c)', () => {
   it('142 진입이 0 으로 되돌리고, 경기 중 나가면 그 이닝이 남는다', () => {
     const rendered = 띄우기({ ...createCareer('상태'), gamesPlayed: 4 })

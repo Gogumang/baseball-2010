@@ -61,9 +61,10 @@ export const GAMES_PER_SEASON = BALANCE.season.gamesPerSeason
 /**
  * S+0x50(돌아온 까닭)을 쓰는 상태 번호 — `PlayerCareer.seasonEndState`. 시즌 끝 사슬(S+0x50 값 0xb·0xc·0xe·0xf·9)과
  * 다음경기 앞 순위표 109(진입 0x10d8c 의 `S+0x50 = 4`, 0x10db0), 경기 뒤 평가 116(진입 0x1278c 의 `S+0x50 = 2`, 0x1279a)이다.
- * 그 밖 값(1 · 3)은 웹이 null 로 든다.
+ * 그 밖 값(1 · 3)은 웹이 null 로 든다. **137** 은 이벤트 464(국가대표 거절) 보상 뒤 0x8ccba 가 쓰는 `S+0x50 = 0x11` 이다 —
+ * 0x1c154(1c25e)가 새 시즌 0x1b768(→ 137 "N년차")로 보낸다 (`rewardResumePatchOf`).
  */
-export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109 | 116
+export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109 | 116 | 137
 
 /**
  * **116 경기 뒤 평가를 다시 띄울 재료** — 원본은 S 의 칸(+0x4a 지난 경기 인기도 변화 · +0x1d8 이 경기 기록 바이트)이 저장에 남아

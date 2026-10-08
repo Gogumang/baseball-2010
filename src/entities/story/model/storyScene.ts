@@ -1,4 +1,4 @@
-import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import type { PlayerCareer, SeasonEndState } from '@/entities/career/model/playerCareer'
 import { GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -228,7 +228,7 @@ const LAST_PLACE_TRIGGER = 6
  * ```
  * 곧 원본은 **보상 명령마다 저장하고, 그 저장에는 본 표시 · 장소 행동함이 든다.** 웹은 그 자리에서 본 이벤트를 남기고
  * (`viewedEventIds` — 지금 이벤트와 이 재생에서 거친 이벤트, 파일 이벤트만) 장소 이벤트면 행동함을 켠다. 둘 다 끝
- * (`finishEvent` · 장소 끝 처리)에서 다시 해도 같은 값이다. ⚠️ 미해결: 8cc2e 의 이벤트별 S+0x50(이어하기 자리) 고치기는 옮기지 않았다.
+ * (`finishEvent` · 장소 끝 처리)에서 다시 해도 같은 값이다. 8cc2e 의 이벤트별 S+0x50(이어하기 자리) 고치기는 `rewardResumePatchOf`.
  */
 export function markRewardedEvent<C extends RewardedEventHolder>(
   career: C,
@@ -239,6 +239,66 @@ export function markRewardedEvent<C extends RewardedEventHolder>(
   const seen = added.length === 0 ? career : { ...career, seenEventIds: [...career.seenEventIds, ...added] }
   const isPlaceEvent = event !== null && event.id > 0 && event.trigger >= FIRST_PLACE_TRIGGER && event.trigger <= LAST_PLACE_TRIGGER
   return isPlaceEvent && !seen.hasActedThisCycle ? { ...seen, hasActedThisCycle: true } : seen
+}
+
+/** 0x8cc2e 가 가르는 모드 — `0x7b999([mgr+0xb4])`(게임 +0x20 == 2, 시즌모드)와 나리 갈래의 `0x7b971`(== 4, 타자편) */
+export type RewardResumeMode = '나리타자' | '나리투수' | '시즌'
+
+/** 보상 명령 뒤 고치는 이어하기 자리 — S+0x50 값과 S+0x12c(국가대항전 중, 463 · 464 만) */
+export interface RewardResumePatch {
+  /** S+0x50 (나리 0x1c154 · 시즌 0xcb 가 이 값으로 돌아갈 곳을 고른다) */
+  readonly resumeCode: number
+  /** S+0x12c — 463 은 1, 464 는 0. 그 밖 이벤트는 안 건드린다 */
+  readonly nationalCup?: boolean
+}
+
+/**
+ * **보상 명령 뒤 이벤트 번호로 이어하기 자리를 고친다** — 0x8c460 끝 8cc1e~8cd42 (직접 떴다). 0x8b0e4 저장 뒤 지금 이벤트
+ * 번호(0xacb61([mgr+4]))로 S = [mgr+0x2f8] 의 +0x50 을 쓰고, 갈래와 상관없이 8cd44 에서 `0x1fded · 0x22755(…, 1) · 0x1f1b9`
+ * (전역기록 game_o.sav) 로 **한 번 더 저장한다**. 고치는 번호가 아니어도 저장은 한다.
+ * ```
+ * 나리(0x7b999 거짓, 8cc32~8ccc6)                    시즌(0x7b999 참, 8ccc8~8cd42 — S = SR)
+ *   371~374 → 0xe                                     372 · 373 → 0xd       374 · 375 → 0xe
+ *   377     → 0xf                                     378 · 379 → 0x10      393~396  → 0xc
+ *   393~396 → 0x7b971(타자편) ? 0xc : 0xd              401~403  → 0xf
+ *   463     → 3 · S+0x12c = 1
+ *   464     → 0x11 · S+0x12c = 0
+ * ```
+ * 곧 시즌 끝 사슬의 결과 이벤트가 보상을 주면 이어하기 자리가 **다음 상태**로 넘어간다 — 나리 393~396(136 의 결과) → 130,
+ * 371~374(130) → 131, 377(131) → 128 (0x1c154: 0xc|0xd → 130 · 0xe → 131 · 0xf → 그 밖 갈래 128), 시즌 393~396(0xee) → 0xeb ·
+ * 373(0xeb) → 0xec · 375(0xec) → 0xed · 379(0xed) → 0xf0 · 401~403(0xf0) → 0xf(결산). 보상 창을 띄운 채 끄고 이어해도 그 결과
+ * 이벤트를 다시 틀지 않는다(보상이 겹치지 않는다). 보상이 없는 결과 이벤트(나리 371 · 376, 시즌 372 · 374 · 378 · 395)는
+ * 0x8c460 이 안 돌아 그대로다 — 끄고 이어하면 그 상태가 이벤트를 다시 튼다(보상이 없어 겹칠 것도 없다).
+ * 463(출전) · 464(거절)는 461 의 선택지 결과다 — 3 · S+0x12c 면 0x1c154 그 밖 갈래가 134 대진판, 0x11 이면 1c25e 새 시즌 0x1b768.
+ * 시즌 갈래는 463 · 464 를 안 본다(시즌 461 은 선택지가 없다 — s_event).
+ */
+export function rewardResumePatchOf(eventId: number, mode: RewardResumeMode): RewardResumePatch | null {
+  if (mode === '시즌') {
+    if (eventId === 372 || eventId === 373) return { resumeCode: 0xd }
+    if (eventId === 374 || eventId === 375) return { resumeCode: 0xe }
+    if (eventId === 378 || eventId === 379) return { resumeCode: 0x10 }
+    if (eventId >= 393 && eventId <= 396) return { resumeCode: 0xc }
+    if (eventId >= 401 && eventId <= 403) return { resumeCode: 0xf }
+    return null
+  }
+  if (eventId >= 371 && eventId <= 374) return { resumeCode: 0xe }
+  if (eventId === 377) return { resumeCode: 0xf }
+  if (eventId >= 393 && eventId <= 396) return { resumeCode: mode === '나리타자' ? 0xc : 0xd }
+  if (eventId === 463) return { resumeCode: 3, nationalCup: true }
+  if (eventId === 464) return { resumeCode: 0x11, nationalCup: false }
+  return null
+}
+
+/**
+ * 나리 S+0x50 값 → 웹 `seasonEndState` (상태 번호). 0x1c154 가 그 값으로 돌아가는 상태다 — 0xc|0xd 130 · 0xe 131 · 0xf 128 ·
+ * 0x11 새 시즌 0x1b768(→ 137). 3 은 웹이 null 로 든다(그 밖 갈래). 다른 값은 0x8cc2e 가 안 쓴다.
+ */
+export function nariSeasonEndStateOfResumeCode(resumeCode: number): SeasonEndState | null {
+  if (resumeCode === 0xc || resumeCode === 0xd) return 130
+  if (resumeCode === 0xe) return 131
+  if (resumeCode === 0xf) return 128
+  if (resumeCode === 0x11) return 137
+  return null
 }
 
 /** 이벤트를 마친다. 선택지로 이어 본 이벤트까지 모두 본 것으로 남긴다. */

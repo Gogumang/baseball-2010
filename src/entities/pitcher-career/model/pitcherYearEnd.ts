@@ -189,6 +189,8 @@ export type PitcherResumePoint =
   | { readonly kind: '관리' }
   /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표 (S+0x50 == 4 이거나 g 홀수). 이전 상태가 1 이라 취소가 안 먹는다 */
   | { readonly kind: '다음경기순위' }
+  /** S+0x50 == 0x11(464 거절 보상 0x8ccba — `seasonEndState` 137) → 1c25e 새 시즌 0x1b768 */
+  | { readonly kind: '새시즌' }
   /** 그 밖 갈래의 첫 줄 S+0x12c(국가대항전 중) → 134 대진판 (1c348~1c358) — 저장의 대회 그대로 */
   | { readonly kind: '국가대항전'; readonly cup: NationalCup }
 
@@ -206,6 +208,8 @@ export type PitcherResumePoint =
  */
 export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint {
   if (career.endingIndex !== null) return { kind: '관리' }
+  // 1c25e — 0x11 은 6|7 바로 다음, 2(116)보다 앞에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
+  if (career.seasonEndState === 137) return { kind: '새시즌' }
   if (career.seasonEndState === 116 && career.lastGame !== undefined) return { kind: '경기결과' }
   switch (career.seasonEndState) {
     case 136:

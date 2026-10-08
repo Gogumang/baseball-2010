@@ -94,6 +94,8 @@ export type ResumePoint =
   | { readonly kind: '관리' }
   /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표. 이전 상태가 1(자원 적재)이라 취소가 안 먹는다 */
   | { readonly kind: '다음경기순위' }
+  /** S+0x50 == 0x11(464 거절 보상 0x8ccba — `seasonEndState` 137) → 1c25e 새 시즌 0x1b768 */
+  | { readonly kind: '새시즌' }
 
 /**
  * 이어하기 분기 0x1c154 (R9 2b, 직접 떴다 — 1c24c~1c3b8):
@@ -112,7 +114,8 @@ export type ResumePoint =
  * 4  109 진입 0x10d8c(0x10db0, 저장 — 이전 142 면 저장 생략)
  * 6  141 진입(0x1230e) · 9 132 · 0xb 136 · 0xc|0xd 130 · 0xe 131 · 0xf 128
  * ```
- * 7 · 0xa · 0x11 을 쓰는 곳은 이 장면 안에 없다(다른 장면 쪽 — 미해결).
+ * 7 · 0xa · 0x11 을 쓰는 곳은 이 장면 안에 없다. 0x11 은 이벤트 관리자의 보상 명령 끝 0x8ccba(464 거절)가 쓰고, 같은 자리
+ * 8cc2e 가 결과 이벤트 보상 뒤 0xc|0xd · 0xe · 0xf · 3 도 쓴다(`rewardResumePatchOf`). 7 · 0xa 는 미해결.
  * 정규시즌 웹 null 은 1 · 2 · 3 이다. 2 는 116 을 다시 띄워 그 끝(0x12b98~0x12bb0)이 g 짝수 → 105 · 홀수 → 109 로 가고,
  * 1 · 3 은 위 맨 끝 갈래가 같은 g 짝홀로 가른다 — 셋 모두 **g 짝수면 105, 홀수면 109** 다. 4 는 g 와 상관없이 109.
  * 웹은 국가대항전(S+0x12c)을 저장하지 않는다. S+0x50 == 2(116 경기 뒤 평가 — 웹은 경기 뒤 `seasonEndState` null)는
@@ -124,6 +127,8 @@ export type ResumePoint =
 export function resumePointOf(career: PlayerCareer): ResumePoint {
   // 엔딩 141 은 S+0x50 = 6(0x1230e) 갈래다 — 웹 이어하기는 엔딩으로 돌아가지 않는다(예전 그대로 관리 화면)
   if (career.endingIndex !== null) return { kind: '관리' }
+  // 1c25e — 0x11 은 6|7 바로 다음에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
+  if (career.seasonEndState === 137) return { kind: '새시즌' }
   switch (career.seasonEndState) {
     case 136:
       return { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }

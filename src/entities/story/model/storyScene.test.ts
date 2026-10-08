@@ -6,9 +6,11 @@ import {
   forgetRepeatableEvents,
   illnessChanceOf,
   markRewardedEvent,
+  nariSeasonEndStateOfResumeCode,
   nextEventFor,
   OPENING_EVENT_ID,
   placeTriggerOf,
+  rewardResumePatchOf,
   scanEventFrom,
 } from '@/entities/story/model/storyScene'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -271,5 +273,30 @@ describe('markRewardedEvent — 0x8c460 끝 (0x8cbe0~0x8cc1a)', () => {
     expect(markRewardedEvent(선수(), { id: 401, trigger: 1 }, [401]).hasActedThisCycle).toBe(false)
     const once = markRewardedEvent(선수(), { id: 101, trigger: 4 }, [101])
     expect(markRewardedEvent(once, { id: 101, trigger: 4 }, [101])).toBe(once)
+  })
+})
+
+describe('rewardResumePatchOf — 0x8c460 끝 8cc2e 의 이벤트별 S+0x50', () => {
+  it('나리 갈래 — 371~374 0xe · 377 0xf · 393~396 타자 0xc / 투수 0xd · 463 3 + S+0x12c · 464 0x11', () => {
+    expect([371, 374].map((id) => rewardResumePatchOf(id, '나리타자'))).toEqual([{ resumeCode: 0xe }, { resumeCode: 0xe }])
+    expect(rewardResumePatchOf(377, '나리투수')).toEqual({ resumeCode: 0xf })
+    expect(rewardResumePatchOf(376, '나리타자')).toBeNull()
+    expect(rewardResumePatchOf(393, '나리타자')).toEqual({ resumeCode: 0xc })
+    expect(rewardResumePatchOf(396, '나리투수')).toEqual({ resumeCode: 0xd })
+    expect(rewardResumePatchOf(463, '나리타자')).toEqual({ resumeCode: 3, nationalCup: true })
+    expect(rewardResumePatchOf(464, '나리투수')).toEqual({ resumeCode: 0x11, nationalCup: false })
+    expect(rewardResumePatchOf(401, '나리타자')).toBeNull()
+  })
+
+  it('시즌 갈래 — 372·373 0xd · 374·375 0xe · 378·379 0x10 · 393~396 0xc · 401~403 0xf, 463·464 는 안 본다', () => {
+    expect([372, 373, 374, 375, 378, 379, 393, 396, 401, 403].map((id) => rewardResumePatchOf(id, '시즌')?.resumeCode))
+      .toEqual([0xd, 0xd, 0xe, 0xe, 0x10, 0x10, 0xc, 0xc, 0xf, 0xf])
+    expect(rewardResumePatchOf(371, '시즌')).toBeNull()
+    expect(rewardResumePatchOf(377, '시즌')).toBeNull()
+    expect(rewardResumePatchOf(463, '시즌')).toBeNull()
+  })
+
+  it('나리 값 → 0x1c154 가 돌아가는 상태 — 0xc|0xd 130 · 0xe 131 · 0xf 128 · 0x11 새 시즌(137) · 3 은 null', () => {
+    expect([0xc, 0xd, 0xe, 0xf, 0x11, 3].map(nariSeasonEndStateOfResumeCode)).toEqual([130, 130, 131, 128, 137, null])
   })
 })

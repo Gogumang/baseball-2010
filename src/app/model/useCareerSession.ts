@@ -113,7 +113,12 @@ import {
   midSeasonTitlesOf,
   yearEndEventId,
 } from '@/entities/career/model/seasonFlow'
-import { forgetRepeatableEvents, markRewardedEvent } from '@/entities/story/model/storyScene'
+import {
+  forgetRepeatableEvents,
+  markRewardedEvent,
+  nariSeasonEndStateOfResumeCode,
+  rewardResumePatchOf,
+} from '@/entities/story/model/storyScene'
 import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
@@ -215,6 +220,34 @@ function withBatterCollectorIds(career: PlayerCareer | null): PlayerCareer | nul
  */
 function cupTeamsOf(career: PlayerCareer, opponentTeamId: number): NariCupTeams {
   return career.nariCupTeams ?? createNariCupTeams(renumberedBattingOrderOf(career) - 1, opponentTeamId)
+}
+
+/**
+ * 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 세운 대회와 대표팀 칸(+0xbc4 대표팀 · +0xbe0 첫날 상대 · 0xb53f1 내 칸)을 들고
+ * S+0x50 = 3(웹 null) · S+0x12c = 1. 보상 명령 뒤(0x8cca2)와 재생 끝(`continueSeason`) 둘 다 이 꼴이다 — 대회 · 칸은 굴림 없이
+ * 서므로 두 번 세워도 같은 값이다. 칭호 8 은 134 첫 틀(0x1b92c 머리) 몫이라 여기 없다.
+ */
+function withNationalCupEntered(career: PlayerCareer): PlayerCareer {
+  const cup = createNationalCup()
+  return {
+    ...career,
+    seasonEndState: null,
+    nationalCup: cup,
+    nariCupTeams: createNariCupTeams(renumberedBattingOrderOf(career) - 1, nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID),
+  }
+}
+
+/**
+ * 보상 명령 뒤 이어하기 자리 — 0x8c460 끝 8cc2e(나리 갈래, 모드 4 라 393~396 은 0xc) → 8cd44 저장 (`rewardResumePatchOf`).
+ * 463 은 S+0x12c = 1(대회 진행 중)이라 웹은 대회를 이 자리에서 세운다. 464 는 S+0x50 = 0x11 · S+0x12c = 0 — 웹은 464 앞에
+ * 대회를 세우지 않으므로(463 만 세운다) 0 은 이미 그 값이다.
+ */
+function withRewardResumePatch(career: PlayerCareer, eventId: number): PlayerCareer {
+  const patch = rewardResumePatchOf(eventId, '나리타자')
+  if (patch === null) return career
+  if (patch.nationalCup === true) return withNationalCupEntered(career)
+  const state = nariSeasonEndStateOfResumeCode(patch.resumeCode)
+  return career.seasonEndState === state ? career : { ...career, seasonEndState: state }
 }
 
 /** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
@@ -1033,19 +1066,11 @@ export function useCareerSession({
       // 134 의 틀 0x1b92c 머리가 들어온 첫 틀(장면+0x2c == 1)에 비트 8 이 없으면 칭호 8 "국가 대표" 를 준다 — 그 뒤다
       const nationalTitle = nationalCupStandingsTitleOf(viewed.titleIds)
       const titled = nationalTitle === null ? viewed : awardTitles(viewed, [nationalTitle])
-      const cup = createNationalCup()
       // 0xb7bf0 대회 레코드 두 칸(+0xbc4 대표팀 · +0xbe0 첫날 상대) + 133 의 0xb53f1 — 대표팀 내 칸 t 에 내 선수 · 저장.
-      // 463 끝 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1 → 0x8cd44 저장: 대회 칸(L+0xa8~)째 파일에 든다(`nationalCup`)
-      setCareer({
-        ...titled,
-        seasonEndState: null,
-        nationalCup: cup,
-        nariCupTeams: createNariCupTeams(
-          renumberedBattingOrderOf(titled) - 1,
-          nationalCupMatchupOf(cup)?.opponent ?? KOREA_TEAM_ID,
-        ),
-      })
-      return setScreen({ kind: '국가대항전', cup })
+      // 463 보상 뒤 0x8cca2 — S+0x50 = 3(웹 null) · S+0x12c = 1 → 0x8cd44 저장: 대회 칸(L+0xa8~)째 파일에 든다(`nationalCup`)
+      const entered = withNationalCupEntered(titled)
+      setCareer(entered)
+      return setScreen({ kind: '국가대항전', cup: entered.nationalCup ?? createNationalCup() })
     }
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.거절) || viewedEventIds.includes(NATIONAL_CUP_EVENT.탈락)) {
       // 464 거절은 `S+0x12c = 0` 으로 바로 새 시즌이다 (P5 요약, 확정).
@@ -1312,13 +1337,18 @@ export function useCareerSession({
         })
       }
       const point = resumePointOf(savedCareer)
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
+      if (point.kind === '새시즌') return startNewSeason(savedCareer)
       if (point.kind === '이벤트') {
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
         return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })
       }
       // 그 밖 갈래의 첫 줄 1c348~1c358 — S+0x12c(국가대항전 중)면 134 대진판. 463 끝이 S+0x50 = 3 으로 두므로 대회 중엔 늘 이 갈래다
       if (savedCareer.nationalCup !== undefined) {
-        setCareer(savedCareer)
+        // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표". 이어하기로 들어와도 같다
+        // (463 보상 뒤 끊겼으면 아직 없다 — 대회 중 끊겼으면 이미 있어 그대로)
+        const nationalTitle = nationalCupStandingsTitleOf(savedCareer.titleIds)
+        setCareer(nationalTitle === null ? savedCareer : awardTitles(savedCareer, [nationalTitle]))
         return setScreen({ kind: '국가대항전', cup: savedCareer.nationalCup })
       }
       if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
@@ -1758,7 +1788,9 @@ export function useCareerSession({
       items
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: reward.value }))
-      setCareer(markRewardedEvent(given, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds))
+      const marked = markRewardedEvent(given, storyEvents?.find((event) => event.id === eventId) ?? null, viewedEventIds)
+      // 8cc2e — 이벤트 번호로 이어하기 자리(S+0x50)를 고치고 8cd44 에서 다시 저장한다 (`withRewardResumePatch`)
+      setCareer(withRewardResumePatch(marked, eventId))
     },
 
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
