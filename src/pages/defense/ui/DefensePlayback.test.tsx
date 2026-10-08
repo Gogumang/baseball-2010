@@ -5,6 +5,7 @@ import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { registerContact } from '@/entities/batting/model/battedContact'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import {
   acceptsFastForwardKey,
@@ -278,7 +279,8 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
       expect(shown.length).toBeGreaterThan(0)
       expect(shown.slice(0, 5)).toEqual(['2:3', '2:3', '2:3', '2:3', '2:3'])
       expect(shown[5]).toBe('2:4')
-      expect(shown.length).toBeLessThanOrEqual(20)
+      // 20 번 그린다 — 갱신 계수는 시계로 돌아 한 진행에 갱신이 안 오르면 같은 그림을 한 번 더 볼 수 있다
+      expect(shown.length).toBeLessThanOrEqual(21)
     } finally {
       vi.useRealTimers()
     }
@@ -300,23 +302,28 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
 describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생 갈래 홈런 갈래', () => {
   const 측 = [{ team: 1, isComputer: true }, { team: 4, isComputer: false }] as const
 
-  it('실시간 갈래 — 플레이가 끝난 뒤 붙든 그림 위에는 판이 없다 (0x35108 이 타이머 0)', () => {
+  it('실시간 갈래 — 관문이 닫힌 뒤 11 번째 갱신(+0x1094 > 10)에 0x35108 로 끝낸다 — 그때까지 득점 점수판은 타이머대로 그린다', () => {
     vi.useFakeTimers()
     try {
       const onDone = vi.fn()
+      const input = 타구(단타, 주자3루)
+      const 미리 = runDefensePlay(input)
       const { queryByTestId } = render(
-        <DefensePlayback input={타구(단타, 주자3루)} onDone={onDone} holdUpdates={30}
-          runScoreBoard={{ sides: 측, scores: [2, 3], battingSide: 1 }} />,
+        <DefensePlayback input={input} onDone={onDone} runScoreBoard={{ sides: 측, scores: [2, 3], battingSide: 1 }} />,
       )
       const presence: boolean[] = []
       for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
         act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
         presence.push(queryByTestId('수비-득점판') !== null)
       }
-      // 판은 섰다가(3루 주자 홈인) — 붙든 30 갱신 동안은 하나도 없다
-      expect(presence.some(Boolean)).toBe(true)
-      expect(presence.slice(-30).some(Boolean)).toBe(false)
       expect(onDone).toHaveBeenCalled()
+      // 갱신마다 한 틱 — 마지막 틱(관문이 닫힌 틱) 뒤 닫힌 갱신 10 번을 그리고 11 번째에 끝난다(예전 웹은 붙든 갱신 8).
+      // 갱신 계수는 시계로 돌아 진행 한 번에 갱신이 안 오르거나 둘 오를 수 있어 앞뒤 두 갱신을 둔다
+      expect(presence.length).toBeGreaterThanOrEqual(미리.ticks.length + 10 - 2)
+      expect(presence.length).toBeLessThanOrEqual(미리.ticks.length + 10 + 2)
+      // 3루 주자 홈인부터 20 번 — 닫힌 갱신에서도 0x46e62 가 그대로 그린다(예전 웹은 판이 닫히면 안 그렸다)
+      expect(presence.filter(Boolean).length).toBeGreaterThanOrEqual(19)
+      expect(presence.slice(-3).some(Boolean)).toBe(false)
     } finally {
       vi.useRealTimers()
     }
@@ -335,7 +342,7 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
     try {
       const onDone = vi.fn()
       const { queryByTestId } = render(
-        <DefensePlayback ticks={ticks} onDone={onDone} holdUpdates={0}
+        <DefensePlayback ticks={ticks} onDone={onDone}
           runScoreBoard={{ sides: 측, scores: [0, 0], battingSide: 0 }} />,
       )
       const shown: string[] = []
@@ -381,7 +388,7 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       const h = 홈런틱(input)
       expect(h).toBeLessThan(그대로.ticks.length)
       const onDone = vi.fn()
-      render(<DefensePlayback input={input} side="공격" onDone={onDone} holdUpdates={30} />)
+      render(<DefensePlayback input={input} side="공격" onDone={onDone} />)
       for (let i = 0; i < h + 1; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       expect(onDone).not.toHaveBeenCalled()
       fireEvent.keyDown(window, { key: '5' })
@@ -390,6 +397,33 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       const 건너뜀 = 결과(onDone)
       expect(건너뜀.advance).toEqual(그대로.advance)
       expect(건너뜀.log.some((line) => line.includes('키 건너뛰기'))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('홈런 타구(0x357e0)는 홈런 점수판 [+0x1100] 이 내려갈 때까지 0x35108 을 미룬다 (52a1c) — 결과 코드가 없으면 11 번째 갱신', () => {
+    vi.useFakeTimers()
+    try {
+      const 갱신수 = (input: DefensePlayInput): number => {
+        const onDone = vi.fn()
+        const { unmount } = render(<DefensePlayback input={input} onDone={onDone} />)
+        let count = 0
+        for (; count < 600 && onDone.mock.calls.length === 0; count += 1) {
+          act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        }
+        unmount()
+        return count
+      }
+      // 주자 없는 홈런 — 타자주자 홈인(n = 1 · 간격 20 · 타이머 20)이 판을 세운다. 주자가 있으면 웹 진행기는 타자주자와 같은 틱에
+      // 들어오는 주자가 뒤 차례라(목록 0 이 타자주자) 그 메시지 0x13(칸 ≠ 0)이 [+0x1100] 을 곧바로 내린다
+      const 맨 = { ...홈런(), bases: { first: false, second: false, third: false } }
+      const 코드 = { ...맨, outcome: registerContact(맨.outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
+      const 판길이 = runDefensePlay(맨).ticks.length
+      // 결과 코드가 없으면 닫힌 뒤 11 번째 갱신 — 앞뒤 두 갱신(시계로 도는 갱신 계수)
+      expect(Math.abs(갱신수(맨) - (판길이 + 10))).toBeLessThanOrEqual(2)
+      // 홈런 점수판은 21 + 20 번 그린 뒤(n < 0) 내려간다 — 판 끝(타자주자 홈인 = 0xa990c == 0) 뒤 41 번째 닫힌 갱신 무렵
+      expect(Math.abs(갱신수(코드) - (판길이 + 41))).toBeLessThanOrEqual(3)
     } finally {
       vi.useRealTimers()
     }

@@ -50,8 +50,8 @@ import { fireworksPortOf } from '@/widgets/batting-stage/lib/homeRunEffects'
  * ⚠️ 남은 것
  * - 키 건너뛰기 0x519cc(+0xfe7)는 `fastForwardDefenseEffects`(글자 끄기 · 효과 칸 버리기 · 파티클 치우기) 뒤 52b26 이 한 그림 안에서
  *   판을 끝까지 돌리는 동안 `updateDefenseEffectsWithoutDraw`(갱신 쪽만)다 — 수비 재생 화면(`DefensePlayback`)이 부른다.
- * - 판이 닫힌 뒤 0x35108 까지의 그림 수: 원본은 +0x1094 가 11 이 될 때(그리고 홈런 타구 0x357e0 && 홈런 점수판 [+0x1100] 이 켜져 있는
- *   동안은 더) — 웹 수비 재생은 그 자리를 붙든 갱신(`holdUpdates`)으로 근사하고, 그 갱신마다 파티클 틱을 돌린다.
+ * - 판이 닫힌 뒤 0x35108 까지의 그림 수는 +0x1094 가 11 이 될 때(홈런 타구 0x357e0 && 홈런 점수판 [+0x1100] 이 켜져 있는 동안은 더 —
+ *   `runScoreBoard.closesDefenseScene`)다. 수비 재생은 그 갱신마다 그리기(비거리 판 · 득점 점수판) · 파티클 틱을 돌린다.
  * - 0x11 · 0x13 타석 화면에서 쏜 타격 불꽃 이미터(그 화면의 파티클 장면)는 0x17 로 넘겨받지 않는다 — 원본은 관리자 하나라 0x17 에서도
  *   끝날 때까지 굴린다.
  */

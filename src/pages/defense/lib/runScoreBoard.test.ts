@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   RUN_SCORE_BOARD_FRAME_AT, RUN_SCORE_BOARD_TICKS, RUN_SCORE_SLOTS, drawRunScoreBoard, runScoreBoardScoresOf,
   runScoreBoardSourceOf, runScoreGlyphsOf, EMPTY_HOME_RUN_SCORE_BOARD, drawHomeRunScoreBoard, homeRunScoreBoardRunIn,
-  runScoreBoardHiddenScoresOf,
+  runScoreBoardHiddenScoresOf, closesDefenseScene, drawRunScoreBoardScene, isHomeRunHitCode, runScoreBoardRunIn,
 } from '@/pages/defense/lib/runScoreBoard'
 
 describe('수비 장면 득점 점수판 0x41a64', () => {
@@ -91,5 +91,40 @@ describe('득점 점수판 홈런 갈래 (0x52030 · 0x41a9e)', () => {
   it('공격 쪽에서 감춘 수를 뺀다', () => {
     expect(runScoreBoardHiddenScoresOf([5, 2], 0, 3)).toEqual([2, 2])
     expect(runScoreBoardHiddenScoresOf([5, 2], 1, 1)).toEqual([5, 1])
+  })
+})
+
+describe('판이 닫힌 뒤 0x35108 까지 — 529f0~52a32 · 메시지 0x13 두 갈래', () => {
+  it('0x357e0 = 결과 코드 24~26', () => {
+    expect([23, 24, 25, 26, 27].map(isHomeRunHitCode)).toEqual([false, true, true, true, false])
+    expect(isHomeRunHitCode(null)).toBe(false)
+  })
+
+  it('닫힌 갱신 11 번째(+0x1094 > 10)에 끝난다 — 홈런 타구는 홈런 점수판 [+0x1100] 이 선 동안 더', () => {
+    const 섰음 = { ...EMPTY_HOME_RUN_SCORE_BOARD, active: true }
+    expect(closesDefenseScene(10, false, EMPTY_HOME_RUN_SCORE_BOARD)).toBe(false)
+    expect(closesDefenseScene(11, false, EMPTY_HOME_RUN_SCORE_BOARD)).toBe(true)
+    expect(closesDefenseScene(11, true, 섰음)).toBe(false)
+    expect(closesDefenseScene(40, true, 섰음)).toBe(false)
+    expect(closesDefenseScene(11, true, EMPTY_HOME_RUN_SCORE_BOARD)).toBe(true)
+    // 홈런 타구가 아니면 [+0x1100] 을 안 본다
+    expect(closesDefenseScene(11, false, 섰음)).toBe(true)
+  })
+
+  it('메시지 0x13 — 0x357e0 && +0xfe7 == 0 이면 홈런 갈래, 아니면 [+0x1100] = 0 · [+0x10fc] = 1 · 타이머 20 (52074)', () => {
+    expect(runScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, 0, true, false)).toEqual(homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, true))
+    expect(runScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, 0x64, true, false)).toEqual(
+      homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, false),
+    )
+    const 섰음 = homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, true)
+    expect(runScoreBoardRunIn(섰음, 0, true, true)).toEqual({ ...섰음, active: false, count: 1, timer: RUN_SCORE_BOARD_TICKS })
+    expect(runScoreBoardRunIn(섰음, 2, false, false)).toEqual({ ...섰음, active: false, count: 1, timer: RUN_SCORE_BOARD_TICKS })
+  })
+
+  it('그리기 — 0x357e0 이면 홈런 갈래(41a9e), 아니면 보통 갈래(41b10)', () => {
+    const 보통 = runScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, 1, false, false)
+    expect(drawRunScoreBoardScene(보통, false)).toEqual({ visible: true, hidden: 1, next: { ...보통, timer: 19 } })
+    // 홈런 타구인데 보통 갈래로 세운 판(건너뛰기 뒤)은 [+0x1100] 이 0 이라 안 선다
+    expect(drawRunScoreBoardScene(보통, true).visible).toBe(false)
   })
 })

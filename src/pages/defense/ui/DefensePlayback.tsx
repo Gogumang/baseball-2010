@@ -20,11 +20,12 @@ import { activeSound } from '@/shared/api/audio/soundPort'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import {
-  EMPTY_HOME_RUN_SCORE_BOARD, RUN_SCORE_BOARD_TICKS, drawHomeRunScoreBoard, drawRunScoreBoard, homeRunScoreBoardRunIn,
-  runScoreBoardHiddenScoresOf, runScoreBoardScoresOf,
+  EMPTY_HOME_RUN_SCORE_BOARD, closesDefenseScene, drawRunScoreBoardScene, isHomeRunHitCode, runScoreBoardHiddenScoresOf,
+  runScoreBoardRunIn,
 } from '@/pages/defense/lib/runScoreBoard'
 import type { HomeRunScoreBoard } from '@/pages/defense/lib/runScoreBoard'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { RunScoreBoard } from '@/pages/defense/ui/RunScoreBoard'
 import { createParticleScene, type ParticleScene } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
@@ -73,8 +74,6 @@ interface DefensePlaybackProps {
   readonly side?: ControlSide
   /** 마지막 틱까지 다 보여 준 뒤. 실시간 갈래는 그 플레이의 결과를 함께 넘긴다 */
   readonly onDone: (result?: DefensePlayResult) => void
-  /** 다 본 뒤 잠깐 멈춰 두는 갱신 횟수 — 마지막 장면이 스치듯 지나가지 않게 */
-  readonly holdUpdates?: number
   /**
    * 시즌 구장 잔디 — `stadium/defense.mpl` 줄 (`0x7885c`). `DefenseScreen` 과 같은 뜻이다.
    * 시즌 **홈경기**에서만 값이 오고, 그 밖에는 null(구운 그림 = 칸 3 특급천연잔디)이다.
@@ -94,12 +93,11 @@ interface DefensePlaybackProps {
   readonly children?: React.ReactNode
 }
 
-/** 판이 닫힌 뒤 붙든 갱신의 파티클 틱 — 탭이 잠들었다 돌아와도 한 번에 이만큼만 따라잡는다 */
+/** 판이 닫힌 뒤 갱신(+0x1094 셈 · 그리기 · 파티클 틱) — 탭이 잠들었다 돌아와도 한 번에 이만큼만 따라잡는다 */
 const MAX_CLOSED_CATCH_UP = 30
 
 /** 원작 경기 루프는 한 갱신에 한 틱이다 (0xc2198) */
 const UPDATES_PER_TICK = 1
-const DEFAULT_HOLD_UPDATES = 8
 
 /**
  * **펌블(공 놓침) 소리 53** — 원본은 야수 동작 `0xd` 를 거는 `0xa1e60` 이 그 자리에서 낸다
@@ -124,7 +122,6 @@ export function DefensePlayback({
   input,
   side,
   onDone,
-  holdUpdates = DEFAULT_HOLD_UPDATES,
   grassPalette = null,
   runScoreBoard,
   sceneMemory,
@@ -136,7 +133,6 @@ export function DefensePlayback({
         input={input}
         side={side}
         onDone={onDone}
-        holdUpdates={holdUpdates}
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoard}
         sceneMemory={sceneMemory}
@@ -149,7 +145,6 @@ export function DefensePlayback({
     <RecordedPlayback
       ticks={ticks ?? []}
       onDone={onDone}
-      holdUpdates={holdUpdates}
       grassPalette={grassPalette}
       runScoreBoard={runScoreBoard}
     >
@@ -161,7 +156,6 @@ export function DefensePlayback({
 interface RecordedPlaybackProps {
   readonly ticks: readonly DefenseViewState[]
   readonly onDone: (result?: DefensePlayResult) => void
-  readonly holdUpdates: number
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
@@ -172,110 +166,113 @@ const HOME_PLATE = basePosition(0)
 const isAtHome = (runner: { readonly x: number; readonly z: number }) =>
   runner.x === HOME_PLATE.x && runner.z === HOME_PLATE.z
 
-/** 재생 갈래 득점 점수판의 셈 — 다음에 볼 틱 · 주자별 홈을 떠났나/밟았나 · 들어온 수 · 두 갈래 칸 */
+/** 재생 갈래 득점 점수판의 셈 — 다음에 볼 갱신 · 주자별 홈을 떠났나/밟았나 · 들어온 수 · 점수판 칸 · 닫힌 셈 */
 interface RecordedBoardTally {
   readonly nextIndex: number
   readonly leftHome: ReadonlySet<number>
   readonly scored: ReadonlySet<number>
   readonly runs: number
-  readonly timer: number
-  readonly homeRun: HomeRunScoreBoard
+  /** [+0x10f8] 타이머 · [+0x10fc] 수 · [+0x1101] 간격 · [+0x1100] 홈런 판 섰음 — 두 갈래가 같이 쓴다 */
+  readonly board: HomeRunScoreBoard
+  /** +0x1094 — 판이 닫힌(마지막 틱 뒤) 갱신 수 */
+  readonly closedCount: number
+  /** 0x35108 을 지났다 (0x17 끝) */
+  readonly ended: boolean
+  /** 마지막 그리기에서 판이 섰나 · 공격 쪽에서 뺄 점수 */
+  readonly visible: boolean
+  readonly hidden: number
 }
 
 const EMPTY_RECORDED_TALLY: RecordedBoardTally = {
-  nextIndex: 0, leftHome: new Set(), scored: new Set(), runs: 0, timer: 0, homeRun: EMPTY_HOME_RUN_SCORE_BOARD,
+  nextIndex: 0, leftHome: new Set(), scored: new Set(), runs: 0, board: EMPTY_HOME_RUN_SCORE_BOARD, closedCount: 0,
+  ended: false, visible: false, hidden: 0,
 }
 
 /**
- * 재생 틱 하나를 지난다 — 홈을 떠난 적 있는 주자(타자주자는 홈에서 출발한다)가 홈 자리에 닿으면 1점(메시지 0x13).
- * 홈런 재생(타자주자가 달린다)은 홈런 갈래, 아니면 보통 갈래 타이머 20. 그 틱 그리기 한 번까지 돌린다.
+ * 재생 갱신 하나를 지난다. 마지막 틱까지는 그 틱의 갱신 — 홈을 떠난 적 있는 주자(타자주자는 홈에서 출발한다)가 홈 자리에 닿으면
+ * 1점(메시지 0x13, 홈런 재생은 그 주자 칸으로 홈런 갈래). 마지막 틱 뒤는 닫힌 갱신(+0x1094 — `closesDefenseScene`).
+ * 끝나지 않았으면 그 갱신 그리기 한 번까지 돌린다.
  */
 function stepRecordedBoard(
-  tally: RecordedBoardTally, view: DefenseViewState, isHomeRun: boolean,
-): { readonly tally: RecordedBoardTally; readonly visible: boolean; readonly hidden: number } {
+  tally: RecordedBoardTally, view: DefenseViewState, isHomeRun: boolean, isClosed: boolean,
+): RecordedBoardTally {
   const leftHome = new Set(tally.leftHome)
   const scored = new Set(tally.scored)
-  let { runs, timer, homeRun } = tally
-  for (const runner of view.runners) {
-    if (scored.has(runner.index)) continue
-    if (!isAtHome(runner)) {
-      leftHome.add(runner.index)
-      continue
+  let { runs, board, closedCount } = tally
+  if (isClosed) {
+    closedCount += 1
+    // 52a1c — 홈런 판이 서 있는 동안은 안 닫는다
+    if (closesDefenseScene(closedCount, isHomeRun, board)) {
+      return { ...tally, nextIndex: tally.nextIndex + 1, closedCount, ended: true, visible: false, hidden: 0 }
     }
-    if (!leftHome.has(runner.index)) continue
-    scored.add(runner.index)
-    runs += 1
-    if (isHomeRun) homeRun = homeRunScoreBoardRunIn(homeRun, runner.index === 0)
-    else timer = RUN_SCORE_BOARD_TICKS
-  }
-  let visible: boolean
-  let hidden: number
-  if (isHomeRun) {
-    const drawn = drawHomeRunScoreBoard(homeRun)
-    homeRun = drawn.next
-    visible = drawn.visible
-    hidden = drawn.hiddenRuns
   } else {
-    const drawn = drawRunScoreBoard(timer)
-    timer = drawn.timerAfter
-    visible = drawn.visible
-    hidden = drawn.previousScore ? 1 : 0
+    for (const runner of view.runners) {
+      if (scored.has(runner.index)) continue
+      if (!isAtHome(runner)) {
+        leftHome.add(runner.index)
+        continue
+      }
+      if (!leftHome.has(runner.index)) continue
+      scored.add(runner.index)
+      runs += 1
+      board = runScoreBoardRunIn(board, runner.index, isHomeRun, false)
+    }
   }
-  return { tally: { nextIndex: tally.nextIndex + 1, leftHome, scored, runs, timer, homeRun }, visible, hidden }
+  const drawn = drawRunScoreBoardScene(board, isHomeRun)
+  return {
+    nextIndex: tally.nextIndex + 1, leftHome, scored, runs, board: drawn.next, closedCount, ended: false,
+    visible: drawn.visible, hidden: drawn.hidden,
+  }
 }
 
 /**
- * 미리 계산해 둔 틱을 차례대로 보여 주기만 한다 — 지금까지의 그 갈래 그대로다.
+ * 미리 계산해 둔 틱을 차례대로 보여 주기만 한다 — 한 갱신에 한 틱, 마지막 틱(관문이 닫힌 틱) 뒤로는 원본 닫힌 갈래대로
+ * +0x1094 가 11 이 되는 갱신(홈런 재생은 홈런 점수판이 내려갈 때까지 더)에 끝낸다 — 그동안 마지막 그림과 점수판을 그린다.
  *
  * ⚠️ **펌블 소리 53 은 여기서 내지 않는다.** 이 갈래로 오는 타구 판은 패턴 없이 온 홈런의 재생(`homeRunPlayback` — 시험·옛 호출)뿐이고
  * (그 밖은 견제 · 도루 · 폭투 판), 그 판은 난수 없이 돌려 펌블 굴림 자체가 없다. 화면 스냅샷(`DefenseViewState`)에는
  * 펌블 동작(0xd)도 `fumbled` 칸도 실려 오지 않으므로 여기서는 알 길도 없다.
  * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
+ * ⚠️ 0x357e0(결과 코드 24~26)은 재생 틱에 없어 "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
  */
-function RecordedPlayback({ ticks, onDone, holdUpdates, grassPalette, runScoreBoard, children }: RecordedPlaybackProps) {
+function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, children }: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
-  const isFinished = ticks.length === 0 || update >= lastIndex * UPDATES_PER_TICK + holdUpdates
-  /** 득점 점수판 셈 — 틱을 한 번씩만 지나도록 ref 로 든다 (재생 묶음이 바뀌면 처음부터) */
+  /** 셈 — 갱신을 한 번씩만 지나도록 ref 로 든다 (재생 묶음이 바뀌면 처음부터) */
   const tallyRef = useRef<{ readonly ticks: readonly DefenseViewState[]; tally: RecordedBoardTally } | null>(null)
-  const boardRef = useRef<readonly [number, number] | null>(null)
+  if (tallyRef.current === null || tallyRef.current.ticks !== ticks) {
+    tallyRef.current = { ticks, tally: EMPTY_RECORDED_TALLY }
+  }
+  // 타자주자(칸 0)가 달리는 재생 = 홈런 비행 — 웹 재생 갈래의 다른 판(견제·도루·폭투)은 타자주자를 안 싣는다
+  const isHomeRun = ticks[0]?.runners.some((runner) => runner.index === 0) === true
+  const holder = tallyRef.current
+  while (ticks.length > 0 && !holder.tally.ended && holder.tally.nextIndex <= update) {
+    const at = holder.tally.nextIndex
+    const view = ticks[Math.min(at, lastIndex)]
+    if (view === undefined) break
+    holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex)
+  }
+  const isFinished = ticks.length === 0 || holder.tally.ended
 
   useEffect(() => {
     if (isFinished) onDone()
   }, [isFinished, onDone])
 
-  if (runScoreBoard !== undefined) {
-    if (tallyRef.current === null || tallyRef.current.ticks !== ticks) {
-      tallyRef.current = { ticks, tally: EMPTY_RECORDED_TALLY }
-      boardRef.current = null
-    }
-    // 타자주자(칸 0)가 달리는 재생 = 홈런 비행 — 웹 재생 갈래의 다른 판(견제·도루·폭투)은 타자주자를 안 싣는다
-    const isHomeRun = ticks[0]?.runners.some((runner) => runner.index === 0) === true
-    const holder = tallyRef.current
-    while (holder.tally.nextIndex <= index) {
-      const view = ticks[holder.tally.nextIndex]
-      if (view === undefined) break
-      const stepped = stepRecordedBoard(holder.tally, view, isHomeRun)
-      holder.tally = stepped.tally
-      const runs = stepped.tally.runs
-      const scores: readonly [number, number] = [
-        runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
-        runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
-      ]
-      boardRef.current = stepped.visible
-        ? runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, stepped.hidden)
-        : null
-    }
-  }
-
   const state = ticks[index]
   if (state === undefined) return null
-  // 마지막 틱 = 플레이 끝(0x17 을 나간다, 0x35108 이 타이머 0) — 그 뒤 붙든 그림 위에는 판이 없다
-  const board = index >= lastIndex ? null : boardRef.current
+  let board: readonly [number, number] | null = null
+  if (runScoreBoard !== undefined && holder.tally.visible && !holder.tally.ended) {
+    const runs = holder.tally.runs
+    const scores: readonly [number, number] = [
+      runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
+      runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
+    ]
+    board = runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, holder.tally.hidden)
+  }
   return (
     <DefenseScreen state={state} grassPalette={grassPalette}>
-      {runScoreBoard !== undefined && board !== null && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
+      {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
       {children}
     </DefenseScreen>
   )
@@ -285,7 +282,6 @@ interface LivePlaybackProps {
   readonly input: DefensePlayInput
   readonly side?: ControlSide
   readonly onDone: (result?: DefensePlayResult) => void
-  readonly holdUpdates: number
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
   readonly sceneMemory?: { current: DefenseSceneMemory }
@@ -305,7 +301,7 @@ interface RunScoreBoardView {
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
 function LivePlayback({
-  input, side, onDone, holdUpdates, grassPalette, runScoreBoard, sceneMemory, children,
+  input, side, onDone, grassPalette, runScoreBoard, sceneMemory, children,
 }: LivePlaybackProps) {
   const update = useUpdateCounter(true)
   const stateRef = useRef<DefensePlayState | null>(null)
@@ -322,29 +318,33 @@ function LivePlayback({
    * 따라잡을 때 같은 갱신 안에서 두 번 보지 않게 여기서도 한 번으로 막는다.
    */
   const fumbleSoundPlayedRef = useRef(false)
-  /** 득점 점수판 타이머 [+0x10f8] — 메시지 0x13(1점)마다 20, 그릴 때마다 1 씩 (0x52074 · 0x41b10) */
-  const runBoardTimerRef = useRef(0)
+  /**
+   * 득점 점수판 칸 — 타이머 [+0x10f8] · 수 [+0x10fc] · 간격 [+0x1101] · 홈런 판 [+0x1100] (`lib/runScoreBoard`).
+   * 메시지 0x13(1점)마다 0x357e0 이면 홈런 갈래, 아니면 타이머 20 — 그릴 때마다 줄인다. 판이 닫힌 뒤에도 0x35108 까지 그린다.
+   */
+  const boardRef = useRef<HomeRunScoreBoard>(EMPTY_HOME_RUN_SCORE_BOARD)
+  /** +0x1094 — 관문이 닫힌 뒤 지난 갱신 수 (판 시작 0) */
+  const closedCountRef = useRef(0)
   const [view, setView] = useState<DefenseViewState | null>(null)
   const [runBoard, setRunBoard] = useState<RunScoreBoardView | null>(null)
-  const [finishedAt, setFinishedAt] = useState<number | null>(null)
+  /** 0x35108(0x17 끝)을 지났다 — 닫힌 뒤 11 번째 갱신, 홈런 점수판이 선 홈런 타구는 내려갈 때까지 더, 키 건너뛰기면 그 그림 */
+  const [ended, setEnded] = useState(false)
   /**
    * 홈런 연출(HOMERUN 글자 · 홈런 효과 · 파티클 · 비거리 판 — `lib/defenseHomeRunEffects`). 원본 한 그림 = 진행기 한 틱이라 틱마다
-   * 갱신(홈런 갈래) → 그리기(글자 · 유지 그림의 효과 틱) → 파티클 틱 차례로 돌고, 판이 닫힌 뒤 붙든 갱신에도 파티클 틱은 돈다.
+   * 갱신(홈런 갈래) → 그리기(글자 · 유지 그림의 효과 틱) → 파티클 틱 차례로 돌고, 판이 닫힌 뒤 갱신에도 그리기 · 파티클 틱은 돈다.
    * 난수는 진행기와 같은 경기 난수(`input.random`)다 — 진행기 굴림 뒤에 그 그림의 효과 · 파티클 굴림이 든다.
    */
   const effectsRef = useRef<DefenseEffects>(defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START))
   const particlesRef = useRef<ParticleScene>(createParticleScene())
-  /** 판이 닫힌 뒤 파티클 틱을 돌린 마지막 갱신 */
+  /** 마지막으로 돈 갱신 — 판이 닫힌 뒤 건너뛴 갱신을 따라잡는다 */
   const closedUpdateRef = useRef<number | null>(null)
-  /**
-   * 키 건너뛰기(+0xfe7, 0x519cc)로 판 끝 · 닫힌 뒤 +0x1094 11 번 · 0x35108 까지 한 그림 안에서 다 돌았다 — 붙든 갱신 없이 곧바로 끝낸다
-   */
-  const [fastForwarded, setFastForwarded] = useState(false)
   const [effectsView, setEffectsView] = useState<{
     readonly text: HomeRunTextFrame | null
     readonly distanceBoard: number | null
     readonly version: number
   }>({ text: null, distanceBoard: null, version: 0 })
+  /** 0x357e0 — 이 타구의 결과 코드 [+0xfd4] 가 24~26(홈런성)인가. 타석이 묶어 둔 쏜 공(`contactOfOutcome`)에서 읽는다 */
+  const homeRunHit = isHomeRunHitCode(contactOfOutcome(input.outcome)?.resultCode)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -365,65 +365,68 @@ function LivePlayback({
       startedAtRef.current = update
       pressesRef.current = []
       fumbleSoundPlayedRef.current = false
-      runBoardTimerRef.current = 0
+      boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
+      closedCountRef.current = 0
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
       particlesRef.current = createParticleScene()
       closedUpdateRef.current = null
-      setFastForwarded(false)
+      setEnded(false)
       setView(null)
       setRunBoard(null)
       setEffectsView({ text: null, distanceBoard: null, version: 0 })
-      setFinishedAt(null)
+    } else if (ended) {
+      return
     }
     const state = stateRef.current
     if (state === null) return
+
+    /** 득점 점수판 그리기 0x41a64 한 번 — 공격 쪽 점수는 지금 점수판 득점에서 그 갈래가 숨기는 만큼 뺀다 */
+    const drawBoard = (runs: number): RunScoreBoardView | null => {
+      const drawn = drawRunScoreBoardScene(boardRef.current, homeRunHit)
+      boardRef.current = drawn.next
+      if (runScoreBoard === undefined || !drawn.visible) return null
+      const scores: readonly [number, number] = [
+        runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
+        runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
+      ]
+      return { scores: runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, drawn.hidden) }
+    }
 
     // 한 갱신 = 한 틱. 프레임을 건너뛴 만큼은 따라잡는다
     const wanted = Math.floor((update - startedAtRef.current) / UPDATES_PER_TICK) + 1
     let running = state
     let moved = false
-    let board: RunScoreBoardView | null = null
+    let board: RunScoreBoardView | null | undefined
     const effectsPorts = { particles: particlesRef.current, random: input.random, configOf: particleConfigOf }
     let effectsFrame: ReturnType<typeof stepDefenseEffects> | null = null
     let skippedNow = false
     // 키 건너뛰기(+0xfe7)가 서면 52b26~52b40 이 한 그림 안에서 판 끝까지 되풀이한다 — 따라잡을 틱 수와 상관없이 끝까지 돈다
     while ((running.tick < wanted || running.fastForward) && !isDefensePlayFinished(running)) {
-      const runsBefore = running.held.scoreboardRuns
       const tickBefore = tickBeforeOf(running)
       const wasFastForward = running.fastForward
       // 건너뛰는 동안은 그 그림의 키 처리(0x498d4)가 다시 오지 않는다
       running = stepDefensePlay(running, wasFastForward ? null : pressesRef.current.shift() ?? null)
       moved = true
       const facts = defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running))
+      if (running.fastForward && !wasFastForward) {
+        // 0x519cc 는 이 틱 갱신보다 먼저 — 글자 끄기 · 효과 칸 버리기 · 파티클 치우기 · 홈런 점수판 [+0x1100] = 0
+        effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        boardRef.current = { ...boardRef.current, active: false }
+      }
+      // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래
+      for (const slot of running.runInsThisTick) {
+        boardRef.current = runScoreBoardRunIn(boardRef.current, slot, homeRunHit, running.fastForward)
+      }
       if (running.fastForward) {
-        // 0x519cc 는 이 틱 갱신보다 먼저 — 글자 끄기 · 효과 칸 버리기 · 파티클 치우기. 그 뒤로는 그리기 · 파티클 틱이 없다
-        if (!wasFastForward) effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        // 건너뛰는 동안은 그리기 · 프레임 끝 파티클 틱이 없다 — 갱신 쪽(글자 켜기 · +0x36)만
         effectsRef.current = updateDefenseEffectsWithoutDraw(effectsRef.current, facts)
         skippedNow = true
       } else {
         // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
         effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts)
         effectsRef.current = effectsFrame.effects
-      }
-      // 득점 점수판 0x41a64 — 점수판에 1점 오를 때마다(메시지 0x13) 타이머 20, 그 틱 그리기부터 센다.
-      // 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
-      if (runScoreBoard !== undefined) {
-        if (running.held.scoreboardRuns > runsBefore) runBoardTimerRef.current = RUN_SCORE_BOARD_TICKS
-        const drawn = drawRunScoreBoard(runBoardTimerRef.current)
-        runBoardTimerRef.current = drawn.timerAfter
-        const runs = running.held.scoreboardRuns
-        const scores: readonly [number, number] = [
-          runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
-          runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
-        ]
-        board = drawn.visible
-          ? { scores: runScoreBoardScoresOf(scores, runScoreBoard.battingSide, drawn.previousScore) }
-          : null
-        // 플레이가 끝난 틱 — 0x17 끝 0x528b0 의 0x35108 이 타이머를 0 으로 두고 상태를 나간다. 그 뒤로는 그리지 않는다
-        if (isDefensePlayFinished(running)) {
-          runBoardTimerRef.current = 0
-          board = null
-        }
+        // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
+        board = drawBoard(running.held.scoreboardRuns)
       }
       // 펌블 소리 53 — 진행기가 `state.fumbled` 를 세우는 **그 틱**에 낸다 (0xb41d0 굴림 → 동작 0xd).
       // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
@@ -437,58 +440,60 @@ function LivePlayback({
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     }
     stateRef.current = running
+    const finished = isDefensePlayFinished(running)
     // 닫힌 뒤(+0x1094 를 세는 갱신)에 온 키도 0x519cc 를 지난다 — 받으면 52b26 이 남은 셈을 이 그림 안에서 다 돈다
-    if (!moved && isDefensePlayFinished(running) && pressesRef.current.length > 0) {
+    if (!moved && finished && pressesRef.current.length > 0) {
       pressesRef.current = []
       if (acceptsFastForwardKey(running)) {
         effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        boardRef.current = { ...boardRef.current, active: false }
         skippedNow = true
       }
     }
-    if (skippedNow) {
-      // 판 끝 → +0x1094 11 번 → 0x35108 이 이 그림 안에서 끝났다. 이 그림의 프레임 끝 파티클 틱은 치운 장면이라 굴림이 없다
-      if (isDefensePlayFinished(running) && !fastForwarded) {
-        setFastForwarded(true)
-        setEffectsView((previous) => ({ text: null, distanceBoard: null, version: previous.version + 1 }))
-        if (moved) {
-          setView(running.ticks[running.ticks.length - 1] ?? null)
-          setRunBoard(null)
-        }
-        if (finishedAt === null) setFinishedAt(update)
-        return
-      }
-    }
-    // 판이 닫힌 뒤 붙든 갱신 — 갱신은 529f0 으로 빠지고(판 칸 · 글자 없음) 프레임 끝 파티클 틱만 돈다. 진행기가 닫은 갱신은 위에서 돌았다
-    if (!moved && isDefensePlayFinished(running) && !fastForwarded) {
-      // 갱신을 건너뛴 만큼 따라잡는다(진행기 틱과 같은 상한)
+    let endsNow = false
+    if (skippedNow && finished) {
+      // 판 끝 → +0x1094 11 번(+0x1100 은 0x519cc 가 내렸다) → 0x35108 이 이 그림 안에서 끝났다
+      endsNow = true
+    } else if (!moved && finished) {
+      // 판이 닫힌 뒤 갱신 — 갱신은 529f0(+0x1094 셈, 판 칸 · 글자 없음), 그리기는 비거리 판 · 득점 점수판, 프레임 끝 파티클 틱.
+      // 진행기가 닫은 갱신은 위에서 돌았다. 갱신을 건너뛴 만큼 따라잡는다(진행기 틱과 같은 상한)
       const closedFrames = Math.min(update - (closedUpdateRef.current ?? update - 1), MAX_CLOSED_CATCH_UP)
       for (let frame = 0; frame < closedFrames; frame += 1) {
+        closedCountRef.current += 1
+        if (closesDefenseScene(closedCountRef.current, homeRunHit, boardRef.current)) {
+          endsNow = true
+          break
+        }
         effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts)
         effectsRef.current = effectsFrame.effects
+        board = drawBoard(running.held.scoreboardRuns)
       }
     }
     closedUpdateRef.current = update
-    if (moved) {
-      setView(running.ticks[running.ticks.length - 1] ?? null)
-      setRunBoard(board)
+    if (moved) setView(running.ticks[running.ticks.length - 1] ?? null)
+    if (endsNow) {
+      // 0x35108 — 타이머 [+0x10f8] = 0 · +0x1100 = 0 · 글자 끄기 · 파티클 치우기 (아래 끝 효과)
+      boardRef.current = { ...boardRef.current, timer: 0, active: false }
+      setRunBoard(null)
+      setEffectsView((previous) => ({ text: null, distanceBoard: null, version: previous.version + 1 }))
+      setEnded(true)
+      return
     }
+    if (board !== undefined) setRunBoard(board)
     if (effectsFrame !== null) {
       const drawn = effectsFrame
       setEffectsView((previous) => ({ text: drawn.text, distanceBoard: drawn.distanceBoard, version: previous.version + 1 }))
     }
-    if (isDefensePlayFinished(running) && finishedAt === null) setFinishedAt(update)
-  }, [update, input, side, finishedAt, fastForwarded, runScoreBoard, sceneMemory])
-
-  const isFinished = finishedAt !== null && (fastForwarded || update >= finishedAt + holdUpdates)
+  }, [update, input, side, ended, runScoreBoard, sceneMemory, homeRunHit])
 
   useEffect(() => {
-    if (!isFinished) return
+    if (!ended) return
     // 0x17 끝 0x35108 — 글자를 끄고 파티클을 치운다. 장면에 남는 칸(글자 칸 · +0x36)은 부르는 쪽 ref 로 돌려준다
     effectsRef.current = endDefenseEffects(effectsRef.current, particlesRef.current)
     if (sceneMemory !== undefined) sceneMemory.current = sceneMemoryOf(effectsRef.current)
     const state = stateRef.current
     onDone(state === null ? undefined : defensePlayResultOf(state))
-  }, [isFinished, onDone, sceneMemory])
+  }, [ended, onDone, sceneMemory])
 
   if (view === null) return null
   // 0x46c88 차례 — 비거리 판(0x46cb6) → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62), 그 뒤 프레임 끝 파티클(0x6dd68)
@@ -496,7 +501,7 @@ function LivePlayback({
     <DefenseScreen state={view} grassPalette={grassPalette}>
       {effectsView.distanceBoard !== null && <DefenseDistanceBoard value={effectsView.distanceBoard} />}
       {effectsView.text !== null && <DefenseHomeRunText frame={effectsView.text} />}
-      {runScoreBoard !== undefined && runBoard !== null && finishedAt === null && (
+      {runScoreBoard !== undefined && runBoard !== null && !ended && (
         <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />
       )}
       <DefenseParticles scene={particlesRef.current} version={effectsView.version} />

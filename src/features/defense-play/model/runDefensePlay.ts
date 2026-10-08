@@ -165,6 +165,8 @@ const DEFAULT_ABILITY = 500
 const HIT_STAGGER_LOCK_TICKS = 15
 /** 한 플레이가 이 틱을 넘기면 강제로 끊는다 (원본에는 없는 우리 쪽 안전망) */
 const DEFAULT_MAXIMUM_TICKS = 240
+/** 보류 해제 0xaa39e 가 메시지 0x13 에 싣는 주자 칸 (`movs r2, #0x64`) — 타자주자(0)가 아니다 */
+export const RELEASED_RUN_SLOT = 0x64
 /** 홈을 가리키는 루 번호 — 원본 루 표의 [4] 가 홈의 사본이라 진루는 4 로 센다 */
 const HOME_BASE = 4
 
@@ -738,6 +740,11 @@ export interface DefensePlayState {
    * 사람 키 0x5199c(+0x31c 잠금으로 한 플레이 한 번) · 자동 0x5268c(잠금 없음, 슬라이딩시킨 수 > 0) 둘 다 여기로 온다.
    */
   slidingSoundThisTick: boolean
+  /**
+   * 이번 틱의 메시지 0x13(주자 하나 홈인 — 점수판에 1점) 인자 차례 — 바로 득점 0xaa1b0 은 그 주자 칸(0 = 타자주자),
+   * 보류 해제 0xaa39e 는 0x64(100). 수비 장면 득점 점수판(0x51fb8 → 0x52030 홈런 갈래 · 0x52074 보통 갈래)이 본다
+   */
+  runInsThisTick: readonly number[]
   /** 경기+0x19ad(반짝임) */
   laserShining: boolean
   /** 경기+0x19ae(레이저 확정) */
@@ -987,6 +994,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     autoBaserunning: true,
     slidingSoundPlayed: false,
     slidingSoundThisTick: false,
+    runInsThisTick: [],
     laserShining: false,
     laserConfirmed: false,
     laserRolled: false,
@@ -1102,6 +1110,7 @@ export function stepDefensePlay(
   let autoBaserunning = state.autoBaserunning
   let slidingSoundPlayed = state.slidingSoundPlayed
   let slidingSoundThisTick = false
+  const runInsThisTick: number[] = []
   let laserShining = state.laserShining
   let laserConfirmed = state.laserConfirmed
   let laserRolled = state.laserRolled
@@ -2256,12 +2265,15 @@ export function stepDefensePlay(
       if (wrapBase(runner.state.targetBase) === 0 && runner.state.targetBase !== 0 && !runner.counted) {
         runner.counted = true
         runner.state = { ...runner.state, scored: true }
+        const scoredBefore = held.scoreboardRuns
         held = onRunnerReachesHome(held, {
           outs,
           ballOnGround,
           batterRunner: runners[0].state,
           scoringRunnerIsBatterRunner: runner.state.index === 0,
         })
+        // 바로 득점 0xaa1b0 — 메시지 0x13(주자 칸)
+        if (held.scoreboardRuns > scoredBefore) runInsThisTick.push(runner.state.index)
         log.push(`${tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${held.heldRuns} / 득점 ${held.scoreboardRuns}`)
       }
     }
@@ -2418,12 +2430,15 @@ export function stepDefensePlay(
       runners.map((runner) => runner.state),
       isAtTarget,
     )
+    const scoredBeforeRelease = held.scoreboardRuns
     held = releaseHeldRuns(held, {
       outs,
       ballOnGround,
       batterRunner: runners[0].state,
       someRunnerStillActive: stillActive,
     })
+    // 보류 해제 0xaa39e — 푼 수만큼 메시지 0x13(0x64)
+    for (let run = scoredBeforeRelease; run < held.scoreboardRuns; run += 1) runInsThisTick.push(RELEASED_RUN_SLOT)
 
     // ── 8. 판 진행 관문 0xb0d28 — 이 틱 그리기 0x46e3c(G3) · 0x3f378(G4, 안 쥐었을 때) · 다음 틱 0x3f060(G1) · 슬롯 2 머리 52502(G2) ──
     // (전문은 `entities/fielding/model/playGate.ts` — `passPlayGateBetweenTicks`). 부를 때마다 +0x120 이 오르므로 주자가 다 서고
@@ -2495,6 +2510,7 @@ export function stepDefensePlay(
   state.autoBaserunning = autoBaserunning
   state.slidingSoundPlayed = slidingSoundPlayed
   state.slidingSoundThisTick = slidingSoundThisTick
+  state.runInsThisTick = runInsThisTick
   state.laserShining = laserShining
   state.laserConfirmed = laserConfirmed
   state.laserRolled = laserRolled

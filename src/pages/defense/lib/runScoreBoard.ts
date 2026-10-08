@@ -36,9 +36,9 @@
  * 곧 타자주자가 홈을 밟는 순간 판이 서고, g 번마다 1점씩 올라가 보이다가 다 오른 뒤 g 번 더 서 있다.
  * [+0x10fc] 는 새 타석 0x48d50(48f7e)이 0 으로 비운다.
  *
- * ## 판이 끝난 뒤 — 상태 0x17 을 나가면 안 그린다
- * 0x41a64 는 0x17 그리기 0x46c88 에서만 불리고(0x46e62), 0x17 끝 0x528b0 의 0x35108(3519c)이 타이머 [+0x10f8] = 0 으로 둔다.
- * 웹 수비 재생은 플레이가 끝난 뒤 잠깐 마지막 그림을 붙들고 있다(웹 전용) — 그 동안은 판을 안 그린다.
+ * ## 판이 끝난 뒤 — 0x35108 까지는 그리고, 상태 0x17 을 나가면 안 그린다
+ * 0x41a64 는 0x17 그리기 0x46c88 에서만 불리고(0x46e62 — 관문과 상관없이), 0x17 끝 0x528b0 의 0x35108(3519c)이 타이머 [+0x10f8] = 0
+ * 으로 둔다. 관문이 닫힌 뒤 0x35108 까지의 갱신(아래 `closesDefenseScene`)에도 그리기는 돌아 판이 타이머대로 선다.
  */
 
 /** 화면 240×320 — W · H */
@@ -170,4 +170,56 @@ export function runScoreBoardHiddenScoresOf(
   scores: readonly [number, number], battingSide: number, hidden: number,
 ): readonly [number, number] {
   return battingSide === 0 ? [scores[0] - hidden, scores[1]] : [scores[0], scores[1] - hidden]
+}
+
+/** 0x357e0 — 타구 결과 코드 [+0xfd4] 가 24~26(홈런성)인가 */
+export function isHomeRunHitCode(resultCode: number | null | undefined): boolean {
+  return resultCode !== null && resultCode !== undefined && resultCode - 0x18 >= 0 && resultCode - 0x18 <= 2
+}
+
+/**
+ * 메시지 0x13 한 번 (0x51fb8 → 5201a) — `0x357e0 && +0xfe7 == 0` 이면 홈런 갈래(0x52030), 아니면 보통 갈래 52074:
+ * `[+0x1100] = 0 · [+0x10fc] = 1 · [+0x10f8] = 0x14`. 두 갈래가 같은 칸(+0x10f8 타이머 · +0x10fc 수)을 쓴다.
+ */
+export function runScoreBoardRunIn(
+  board: HomeRunScoreBoard, slot: number, homeRunHit: boolean, fastForward: boolean,
+): HomeRunScoreBoard {
+  if (homeRunHit && !fastForward) return homeRunScoreBoardRunIn(board, slot === 0)
+  return { ...board, active: false, count: 1, timer: RUN_SCORE_BOARD_TICKS }
+}
+
+/**
+ * 그리기 0x41a64 한 번 — 0x41a94 `0x357e0` 이면 홈런 갈래(41a9e), 아니면 보통 갈래(41b10). `hidden` 은 공격 쪽 점수에서 뺄 수.
+ * 0x357e0 은 +0xfe7 을 안 본다(그리기 쪽).
+ */
+export function drawRunScoreBoardScene(
+  board: HomeRunScoreBoard, homeRunHit: boolean,
+): { readonly visible: boolean; readonly hidden: number; readonly next: HomeRunScoreBoard } {
+  if (homeRunHit) {
+    const drawn = drawHomeRunScoreBoard(board)
+    return { visible: drawn.visible, hidden: drawn.hiddenRuns, next: drawn.next }
+  }
+  const drawn = drawRunScoreBoard(board.timer)
+  return { visible: drawn.visible, hidden: drawn.previousScore ? 1 : 0, next: { ...board, timer: drawn.timerAfter } }
+}
+
+/**
+ * ============================================================================
+ * **판이 닫힌 뒤 0x35108 까지 — 슬롯 2 의 닫힌 갈래 529f0~52a32** (직접 뜸)
+ * ============================================================================
+ * ```
+ * 529f0  +0x1094 += 1 ; ≤ 10 이면 52b26(+0xfe7 이면 되돌아 돈다)
+ * 52a00  … 공+0x34 > 0x7cf 면 소리 0x27(0x62369)
+ * 52a1c  0x357e0(홈런성 결과) && [+0x1100](홈런 점수판 섰음) → 52b36 (이번 그림은 안 닫는다 — 다음 그림 +0x1094 가 또 오른다)
+ * 52a34  메시지 0xbb9 · 판정 0xae3e8 · 0x4e600 · **0x35108**(0x17 끝 — 타이머 [+0x10f8] = 0 · +0x1960 = 0 · 파티클 치우기) ·
+ *        +0xfe7 = 0 · +0x1100 = 0
+ * ```
+ * 곧 관문이 닫힌 뒤 **11 번째 갱신**에서 끝나고, 홈런 타구는 홈런 점수판이 내려갈(그리기 41b08 이 n < 0 에서 [+0x1100] = 0) 때까지 더 선다.
+ * 그동안 그리기 0x46c88 은 그대로 돈다 — 득점 점수판(0x46e62) · 비거리 판 · 프레임 끝 파티클 틱. +0x1094 는 판 시작에 0 이다.
+ */
+export const CLOSED_UPDATES_BEFORE_END = 10
+
+/** 닫힌 갱신 하나 — 이 갱신의 +0x1094(올린 뒤)와 그 앞 그리기까지의 홈런 점수판으로 0x35108 을 부르는가 */
+export function closesDefenseScene(closedCount: number, homeRunHit: boolean, board: HomeRunScoreBoard): boolean {
+  return closedCount > CLOSED_UPDATES_BEFORE_END && !(homeRunHit && board.active)
 }
