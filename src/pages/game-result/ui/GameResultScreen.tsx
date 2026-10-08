@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  BigResult, Button, DialogueBox, MarkupText, Notice, Panel, PixelScreen, RawScreen, StatGrid, TitleTag,
+  BigResult, Button, Notice, Panel, PixelScreen, RawScreen, StatGrid, TitleTag,
 } from '@/shared/ui'
 import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
 import { nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
 import type { NariRecordLine, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
+import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
+import { batterEvaluationExpressionOf, streakSayExpressionOf } from '@/pages/story/lib/evaluationDialogue'
+import { hasHitlessStreak, nariStreakSayOf } from '@/pages/game-result/lib/nariStreakSay'
+import { yearGoalWindowValuesOf } from '@/entities/career/model/seasonFlow'
+import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
+import { messageGameNumberOf } from '@/pages/management/lib/managementLayout'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { battingAverageOf, formatBattingAverage } from '@/entities/career/model/seasonStats'
@@ -74,18 +80,11 @@ interface GameResultScreenProps {
   readonly career: PlayerCareer
   readonly onContinue: () => void
   /**
-   * 맨 밑에 까는 그림 — 나리 116 평가 대화(114 · 내장 이벤트 0x8a6fc)의 밑그림. 116 그림 0x11e0c 와 대화창 0x8b5ac 가
+   * 나리 116 평가 대화(114 · 내장 이벤트 0x8a6fc)의 밑그림. 116 그림 0x11e0c 와 대화창 0x8b5ac 가
    * 공 무늬 · 상태판 0x7d34c(gfx, [이벤트+0xb] = 1 — 메시지줄 경기 번호 −1) · 머리띠를 깐다. 부르는 쪽이 넘긴다.
+   * 결과 판(0x18 · 0x19 — 경기 장면)이 아니라 [확인] 뒤 평가 단계에만 깐다.
    */
   readonly underlay?: ReactNode
-}
-
-/** StrUSER_EVT[75] "사기 변화: %d / 현재 사기: %d / … 평판" */
-const EVALUATION_POPUP_INDEX = 75
-
-const fillNumbers = (raw: string, values: readonly number[]) => {
-  let index = 0
-  return raw.replace(/%d/g, () => String(values[index++] ?? ''))
 }
 
 /**
@@ -95,9 +94,10 @@ const fillNumbers = (raw: string, values: readonly number[]) => {
  * YOU WIN/LOSE 를 (120,50) 기준으로 얹는다. 그 아래가 점수 두 개와 **승리투수·패전투수·세이브
  * 세 줄**(img_text 388·389·329)이다.
  *
- * 감독 평가·오늘의 성적은 원본에서 이 화면이 아니라 팝업(StrUSER_EVT[75])·다른 화면 몫이라
- * 여기 배치가 없다. 웹에서 이미 보여 주던 것이라 지우지 않고 **[자세히] 칸**으로 옮겼다
- * (원본에 없는 웹 전용 길).
+ * **116 경기 뒤 평가**(평가가 있을 때)는 [확인] 뒤에 원본 차례대로 튼다 — 장면 0x106 상태 116 → 114 가 내장 이벤트
+ * 0x8a6fc 를 재생: 명령 1 say(기록 줄 + 감독 글) → 명령 2 system sub 2 변화 창(0x86c90, `EvaluationChangeWindow` —
+ * 글 [75] 가 아니다) → (있으면) 명령 3 say(연속 기록) → 끝나면 `onContinue`(114 끝). 그림 틀은 투수편과 같은 `EvaluationEventPlayer`.
+ * 오늘의 성적 · 보상은 원본 배치가 없어 **[자세히] 칸**에 둔다(원본에 없는 웹 전용 길).
  */
 export function GameResultScreen({
   summary,
@@ -112,18 +112,47 @@ export function GameResultScreen({
   underlay,
 }: GameResultScreenProps) {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isEvaluating, setIsEvaluating] = useState(false)
+  // 결과 판 [확인] — 116 평가가 있으면 평가 이벤트로, 없으면(국가대항전) 곧장 다음
+  const confirm = () => (evaluation === undefined ? onContinue() : setIsEvaluating(true))
   const { stats } = summary
   // 진행기가 요약에 실어 보낸 이름이 기본이다 (`gameFlow.pitchersOfRecordOf` — 득점 0xa5c34·교체 0xa60c0 로 센 칸)
   const names = pitcherNames ?? summary.pitchersOfRecord
   const rowNames =
     names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
 
+  if (isEvaluating && evaluation !== undefined) {
+    // 0x86531(gfx, S+7, 사기, S+0x4a, 인기도, S+0x64, 평판) — 116 0x12b08~0x12b70 이 넘기는 차례
+    const changeValues = {
+      changes: [evaluation.moraleChange, evaluation.popularityChange, evaluation.reputationChange],
+      currents: [career.morale, career.popularity, career.reputation],
+    } as const
+    return (
+      <RawScreen>
+        <EvaluationEventPlayer
+          underlay={underlay}
+          // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
+          dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
+          dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
+          changeValues={changeValues}
+          goals={yearGoalWindowValuesOf(career)}
+          year={career.season}
+          // 0x7d120(…, 1) — 막 치른 경기 번호
+          game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
+          streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
+          streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
+          onDone={onContinue}
+        />
+      </RawScreen>
+    )
+  }
+
   if (isDetailOpen) {
     return (
       <PixelScreen
         title="경기 결과"
         leftKey={{ label: '닫기', onPress: () => setIsDetailOpen(false) }}
-        rightKey={{ label: '확인', onPress: onContinue }}
+        rightKey={{ label: '확인', onPress: confirm }}
       >
         <Panel>
           <BigResult>
@@ -131,31 +160,6 @@ export function GameResultScreen({
           </BigResult>
         </Panel>
 
-        {evaluation !== undefined && <Panel heading="감독 평가">
-          {/* 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로 */}
-          <DialogueBox>
-            <MarkupText
-              raw={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
-            />
-          </DialogueBox>
-          <MarkupText
-            raw={fillNumbers(ORIGINAL_USER_EVENTS[EVALUATION_POPUP_INDEX] ?? '', [
-              evaluation.moraleChange,
-              career.morale,
-              evaluation.popularityChange,
-              career.popularity,
-              evaluation.reputationChange,
-              career.reputation,
-            ])}
-          />
-          {streakNotices.map((notice) => (
-            <Notice key={notice.labelIndex}>
-              {notice.count}{ORIGINAL_USER_EVENTS[notice.labelIndex]} · {ORIGINAL_USER_EVENTS[notice.commentIndex]} (평판{' '}
-              {notice.reputationChange > 0 ? '+' : ''}
-              {notice.reputationChange})
-            </Notice>
-          ))}
-        </Panel>}
 
         <Panel heading="오늘의 성적">
           <StatGrid
@@ -196,7 +200,6 @@ export function GameResultScreen({
 
   return (
     <RawScreen>
-      {underlay}
       {/* 1. 패배(무승부 포함)면 화면 전체를 검정 단계 8 로 어둡게 (0x4a42a — 이기면 그대로) */}
       {summary.result !== '승' && (
         <div className={styles.loseDim} style={{ opacity: LOSE_DIM_OPACITY }} />
@@ -247,7 +250,7 @@ export function GameResultScreen({
       <Button variant="corner" className={styles.detailButton} onClick={() => setIsDetailOpen(true)}>
         자세히
       </Button>
-      <Button variant="corner" className={styles.continueButton} onClick={onContinue}>
+      <Button variant="corner" className={styles.continueButton} onClick={confirm}>
         확인
       </Button>
     </RawScreen>

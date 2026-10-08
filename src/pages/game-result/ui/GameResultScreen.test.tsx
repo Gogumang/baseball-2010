@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -52,14 +54,15 @@ const 그림찾기 = (container: HTMLElement, file: string) =>
   container.querySelector(`img[src$="${file}"]`) as HTMLElement | null
 
 describe('경기 결과 원본 배치', () => {
-  it('넘긴 밑그림(116 평가 대화의 상태판)을 맨 밑에 깐다', () => {
-    const { container } = render(
+  it('밑그림(116 평가 대화의 상태판)은 결과 판이 아니라 [확인] 뒤 평가 단계에 깐다', () => {
+    render(
       <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} career={createCareer('선수')} onContinue={vi.fn()}
+        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
         underlay={<div data-testid="밑그림" />} />,
     )
-    const 밑그림 = screen.getByTestId('밑그림')
-    expect(밑그림.parentElement?.firstElementChild).toBe(밑그림)
-    expect(container.contains(밑그림)).toBe(true)
+    expect(screen.queryByTestId('밑그림')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.getByTestId('밑그림')).toBeTruthy()
   })
 
   it('띠는 (0,40) 240×30 이다', () => {
@@ -174,40 +177,77 @@ describe('보상·기록 줄', () => {
 })
 
 describe('웹 전용 단추', () => {
-  it('[확인] 을 누르면 다음으로 넘긴다', () => {
+  it('[확인] 은 116 평가 이벤트를 튼다 — 대사 → 변화 창(system sub 2 · 0x86c90, 글 [75] 아님) → 114 끝에 다음으로', () => {
+    vi.useFakeTimers()
     const onContinue = vi.fn()
-    띄우기(요약(), onContinue)
-
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]}
+        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
+        recordLine={{ atBats: 4, hits: 2, runsBattedIn: 3, homeRuns: 1 }}
+        career={createCareer('선수')} onContinue={onContinue} />,
+    )
+    const 다찍기 = () => act(() => {
+      vi.advanceTimersByTime(200 * millisecondsPerFrame())
+    })
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
-
+    expect(onContinue).not.toHaveBeenCalled()
+    다찍기()
+    // 0x8bab8 — 기록 줄(…홈런!N) 뒤 감독 글, 첫 줄은 기록 줄 하나
+    const 줄 = [...screen.getByTestId('대사-상자').querySelectorAll('[data-part="글줄"]')].map((line) => line.textContent)
+    expect(줄[0]).toBe('4타수 2안타 3타점 1홈런')
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain((ORIGINAL_USER_EVENTS[40] ?? '').replace(/!c[0-9A-Fa-f]{6}|!N/g, '').slice(0, 4))
+    for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
+      fireEvent.keyDown(window, { key: 'Enter' })
+      다찍기()
+    }
+    const 창 = screen.getByRole('dialog', { name: '경기 평가 변화' })
+    const 글 = [...창.querySelectorAll('img[data-frame]')].map((img) => Number(img.getAttribute('data-frame')))
+    expect(글.slice(0, 4)).toEqual([359, 84, 327, 331])
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    fireEvent.keyDown(window, { key: '5' })
+    // 연속 기록 알림이 없으면 명령 3 이 없다 — 114 끝
     expect(onContinue).toHaveBeenCalledOnce()
+    vi.useRealTimers()
   })
 
-  it('[자세히] 는 감독 평가·오늘의 성적 칸을 연다', () => {
+  it('연속 기록이 있으면 변화 창 뒤 명령 3 say — 같은 상자에 " / " 로 이은 줄을 찍는다', () => {
+    vi.useFakeTimers()
+    const onContinue = vi.fn()
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]}
+        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
+        streakNotices={[
+          { labelIndex: 100, count: 5, commentIndex: 108, reputationChange: 10 },
+          { labelIndex: 101, count: 5, commentIndex: 108, reputationChange: 10 },
+        ]}
+        career={createCareer('선수')} onContinue={onContinue} />,
+    )
+    const 다찍기 = () => act(() => {
+      vi.advanceTimersByTime(200 * millisecondsPerFrame())
+    })
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
+      다찍기()
+      fireEvent.keyDown(window, { key: 'Enter' })
+    }
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onContinue).not.toHaveBeenCalled()
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain(' / 5')
+    for (let page = 0; page < 5 && onContinue.mock.calls.length === 0; page += 1) {
+      다찍기()
+      fireEvent.keyDown(window, { key: 'Enter' })
+    }
+    expect(onContinue).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
+  it('[자세히] 는 오늘의 성적 칸을 연다 — 감독 평가는 평가 이벤트 몫이라 없다', () => {
     띄우기()
 
     fireEvent.click(screen.getByRole('button', { name: '자세히' }))
 
-    expect(screen.getByText('감독 평가')).toBeTruthy()
+    expect(screen.queryByText('감독 평가')).toBeNull()
     expect(screen.getByText('오늘의 성적')).toBeTruthy()
-  })
-
-  it('116 평가 대사는 기록 줄 "N타수 N안타 N타점 N홈런" 뒤에 감독 글을 다음 줄로 잇는다 (0x1278c 12958~1299a · 0x8bab8)', () => {
-    render(
-      <GameResultScreen
-        summary={요약()}
-        gamePointReward={0}
-        newTitles={[]}
-        evaluation={{ popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 }}
-        recordLine={{ atBats: 4, hits: 2, runsBattedIn: 3, homeRuns: 1 }}
-        career={createCareer('선수')}
-        onContinue={vi.fn()}
-      />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: '자세히' }))
-    const 줄 = screen.getByText('4타수 2안타 3타점 1홈런')
-    // !N 이 줄을 끊는다 — 기록 줄은 제 줄(<p>) 하나다
-    expect(줄.closest('p')?.textContent).toBe('4타수 2안타 3타점 1홈런')
   })
 
   it('국가대항전 경기(116 평가 없음)는 같은 결과 판에 평가 칸이 없다', () => {
