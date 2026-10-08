@@ -7,6 +7,7 @@ import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindo
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
+import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { PitchSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -393,6 +394,16 @@ export function TeamGameScreen({
     dayCounter: options.dayCounter ?? 0,
     side0TeamId: options.playerSide === 0 ? options.ourTeamId : options.opponentTeamId,
   })
+  /**
+   * 구장 객체 둘(0x39fdc 모드 1·8·9 갈래) — 타석 구장 +0x70 이 펜스 프레임을, 두 객체 +0xc 가 바닥·수비 바탕 팔레트 줄을 정한다.
+   * 시즌 홈경기(seasonStadium)면 경기 준비 0x352e8 의 시즌 갈래가 잔디 칸으로 덮는다. 없으면 0번 구장 · 기본색
+   */
+  const sceneStadium = progress.sceneStadium ?? null
+  const fieldPalette = seasonStadium?.grassPalette ?? sceneFieldPaletteOf(sceneStadium)
+  const sceneryProps = {
+    ...(sceneStadium === null ? {} : { stadium: sceneStadium.stadium }),
+    fieldPalette,
+  }
   /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
   isAwaitingConfirmRef.current = isAwaitingConfirm
@@ -530,6 +541,7 @@ export function TeamGameScreen({
             acePitcher={null}
             // 시즌 홈경기·대전이면 배경 고르기 0x40ff0 이 시즌 구장으로 간다 — 타석과 같은 규칙
             seasonStadium={seasonStadium}
+            {...sceneryProps}
             isPaused
             isResultBackdrop
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
@@ -579,7 +591,7 @@ export function TeamGameScreen({
       <DefensePlayback
         input={pending.input}
         side={pending.side}
-        grassPalette={seasonStadium?.grassPalette ?? null}
+        grassPalette={fieldPalette}
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
@@ -596,7 +608,7 @@ export function TeamGameScreen({
     return (
       <DefensePlayback
         runnerPlay={runnerPlay}
-        grassPalette={seasonStadium?.grassPalette ?? null}
+        grassPalette={fieldPalette}
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         onDone={actions.finishRunnerPlay}
       />
@@ -610,7 +622,7 @@ export function TeamGameScreen({
     return (
       <DefensePlayback
         ticks={play.ticks}
-        grassPalette={seasonStadium?.grassPalette ?? null}
+        grassPalette={fieldPalette}
         onDone={finishPlayback}
         freePassPlay={isWalkPlayResult(play)}
       />
@@ -655,7 +667,7 @@ export function TeamGameScreen({
         onStop={actions.stopAutoRelay}
         sideTeams={options.playerSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId]}
         humanSide={options.playerSide}
-        grassPalette={seasonStadium?.grassPalette ?? null}
+        grassPalette={fieldPalette}
       />
     )
   }
@@ -844,6 +856,7 @@ export function TeamGameScreen({
               }
               // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
               seasonStadium={seasonStadium}
+              {...sceneryProps}
               // 상대 마투수의 마구 횟수 0xd8509[mgr[0x13a + 순번]] (0xaebe4) — 전역 마선수 레벨 칸
               aceLevels={options.aceLevels}
               // 상대 팀+0x28 과 공+0x10 은 진행기가 든다 — 공 객체는 경기에 하나라 사람 투구와 칸을 함께 쓴다

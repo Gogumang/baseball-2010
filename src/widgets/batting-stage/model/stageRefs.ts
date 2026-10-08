@@ -90,6 +90,10 @@ export interface StageLatest {
    * 원본은 모드 2 의 **홈경기**(0x40ff0 `내 팀 == 홈팀`)와 대전 모드 8·9 에서만 그 길로 간다.
    */
   readonly seasonStadium?: SeasonStadium
+  /** 구장 번호 (구장 객체 +0x70) — `BattingStage` 의 같은 이름 props 주석 참고. 없으면 0 */
+  readonly stadium?: number
+  /** 바닥 팔레트 줄 (구장 객체 +0xc) — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly fieldPalette?: number | null
   /** 게임 모드(전역 `0x1552d10`) — 하늘 조명 0x78490 이 모드 5·6·7 에서 안 그린다 */
   readonly gameMode?: number
   /** 홈런더비(모드 7) 구질 — `BattingStage` 의 같은 이름 props 주석 참고 */

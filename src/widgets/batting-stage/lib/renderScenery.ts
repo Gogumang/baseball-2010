@@ -76,8 +76,15 @@ export interface SceneryState {
   readonly skyColumn: number
   /** 타석 화면이 열린 뒤 흐른 틱 — 구름·전광판 이동 */
   readonly tick: number
-  /** 구장 번호 — 고르는 규칙(st+0x70)이 미확인이라 0 (추정) */
+  /**
+   * 구장 번호 = 구장 객체 +0x70. 모드 1·8·9 는 장면 셋업 0x39fdc 가 st+0x30 으로 채운다(9 보다 크면 rand(0, 10) —
+   * `features/play-team-game/model/sceneStadium`). 그 밖의 모드는 아직 0 이다(그 갈래들의 규칙은 미확인)
+   */
   readonly stadium: number
+  /**
+   * 바닥 그림 팔레트 줄 = 구장 객체 +0xc (0x76b6c). `seasonStadium.grassPalette` 가 있으면 그쪽이 먼저다. null · 생략이면 기본색
+   */
+  readonly fieldPalette?: number | null
   readonly ourTeamId: number | null
   readonly opponentTeamId: number | null
   /** 타자 손 (0 우타 · 1 좌타). 우타면 펜스 묶음이 좌우로 뒤집힌다. 없으면 좌타 배치다 */
@@ -199,7 +206,7 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   if (isCloudVisible(colorIndex)) drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
   const offsetY = state.offsetY ?? 0
   drawFence(context, state, offsetY)
-  drawField(context, state.seasonStadium?.grassPalette ?? null, offsetY)
+  drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY)
   if (offsetY === 0) drawSkyLight(context, state, colorIndex)
 }
 

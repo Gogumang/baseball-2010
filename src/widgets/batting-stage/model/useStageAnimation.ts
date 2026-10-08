@@ -460,11 +460,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         stagePhase: stagePhaseNow(now, tickLength),
         timeKeyCount: latestRef.current.timeKeyCount ?? null,
         specialSwingRemaining: latestRef.current.specialSwingRemaining ?? null,
-        // 일반 구장 번호를 고르는 규칙(st+0x70)이 미확인이라 0 번 구장으로 둔다 (추정).
+        // 구장 번호(구장 +0x70)는 장면 셋업 0x39fdc 가 채운다 — 모드 1·8·9 만 넘어오고, 그 밖은 0 번 구장이다.
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {
           skyRow: skyRowNow(),
-          stadium: 0,
+          stadium: latestRef.current.stadium ?? 0,
+          fieldPalette: latestRef.current.fieldPalette ?? null,
           seasonStadium: latestRef.current.seasonStadium,
           // 하늘 조명 0x78490 은 모드 5·6·7(미션·홈런더비)에서 안 그린다
           gameMode: latestRef.current.gameMode,
