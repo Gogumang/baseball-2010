@@ -9,6 +9,7 @@ import {
   SEASON_ENDING_TEXT, endingIrisRadiusOf, seasonEndingTextIndexOf,
 } from '@/widgets/season/lib/seasonEndingLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
+import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 
 /** 엔딩 보너스 안내 — StrMODE[214] 원문 그대로 (J 4-8) */
 const BONUS_TEXT = '!C엔딩 보너스 획득!N[!cFFFF00%d G포인트!cFFFFFF]'
@@ -30,8 +31,8 @@ export interface SeasonEndingScreenProps {
   /** 보너스 팝업 0x2b 를 닫았다 — G · SR+0x7b · 저장 · 통계는 부르는 쪽 (`0x8bd8` 8bf0~8c84) */
   readonly onBonusReceived?: () => void
   /**
-   * 엔딩을 넘겼다 — SR+0x7b 가 선 채로 키를 누르면 단계 1 · 전환 뒤 `0x8bd8` 8ccc~8d2c 가 SR+0x1bc = 1 · 저장 · 관리 메뉴 0xc9
-   * (부르는 쪽)
+   * 엔딩을 넘겼다 — SR+0x7b 가 선 채로 키를 누르면 단계 1 · 효과기 종류 1(어두워짐) — 그 끝을 본 틀의 `0x8bd8` 8ccc~8d2c 가
+   * SR+0x1bc = 1 · 저장 · 관리 메뉴 0xc9 · 효과기 종류 2(검정에서 밝아짐 — 부르는 쪽이 0xc9 위에 `SeasonScreenFade` 로 건다)
    */
   readonly onFinish: () => void
 }
@@ -63,6 +64,12 @@ type Phase = '엔딩' | '보너스'
  */
 export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBonusReceived, onFinish }: SeasonEndingScreenProps) {
   const [phase, setPhase] = useState<Phase>('엔딩')
+  /**
+   * 효과기 — 진입 0x6be8 6c32~6c42 가 종류 2(검정에서 밝아짐), 키 0x6b3c 6b52~6b6e 가 단계 + 1 · 종류 1(어두워짐)을 건다
+   * (전역 하나라 새로 걸면 앞 것을 덮는다). 종류 1 의 끝을 본 틀에 `0x8bd8` 이 넘긴다(`onFinish`).
+   * 효과기가 도는 동안은 키가 안 먹는다(`SeasonScreenFade` — 0x4b18 · 0x4b34).
+   */
+  const [isLeaving, setLeaving] = useState(false)
 
   /** 원이 화면을 다 덮으면(t ≥ 7) 연출이 끝난다 — 그 뒤로는 움직이는 것이 없다 */
   const tick = Math.min(useUpdateCounter(), ENDING_IRIS.fullTick)
@@ -126,10 +133,19 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
           type="button"
           className={styles.pressArea}
           aria-label="확인"
-          // 키 0x6b3c — SR+0x7b 만 본다(보너스 값은 안 본다)
-          onClick={() => (isBonusReceived ? onFinish() : setPhase('보너스'))}
+          // 키 0x6b3c — SR+0x7b 만 본다(보너스 값은 안 본다). 서 있으면 단계 1 · 종류 1 — 끝은 아래 효과기가 알린다.
+          // ⚠️ 종류 1 이 끝을 세운 뒤 0x8bd8 이 그 끝을 보기 전 한 틀 사이의 키(단계 2 가 되어 넘어가지 않는다)는 옮기지 않았다
+          onClick={() => {
+            if (isLeaving) return
+            if (isBonusReceived) setLeaving(true)
+            else setPhase('보너스')
+          }}
         />
       )}
+
+      {isLeaving
+        ? <SeasonScreenFade key="종류1" kind="검정에서밝아짐" onEnd={onFinish} />
+        : <SeasonScreenFade key="종류2" kind="검게어두워짐" />}
 
       {phase === '보너스' && (
         <MessageBox

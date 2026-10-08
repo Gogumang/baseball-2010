@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { SeasonEndingScreen } from '@/pages/season/ui/SeasonEndingScreen'
 import {
   ENDING_IRIS_STAGES, SEASON_ENDING_TEXT, endingIrisRadiusOf, seasonEndingTextIndexOf,
@@ -58,14 +59,47 @@ describe('엔딩 보너스 StrMODE[214] — 키 0x6b3c 는 SR+0x7b 만 본다', 
     expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
   })
 
-  it('SR+0x7b 가 서 있으면(판정 0 은 진입 0x6be8 이 세운다) 알림 없이 넘긴다 (6b52~6b6e)', () => {
-    const onFinish = vi.fn()
-    render(<SeasonEndingScreen endingIndex={0} isBonusReceived onFinish={onFinish} />)
+  it('SR+0x7b 가 서 있으면(판정 0 은 진입 0x6be8 이 세운다) 알림 없이 넘긴다 — 효과기 종류 1 아홉 틀이 끝난 틀에 (6b52~6b6e · 8ccc~8d2c)', () => {
+    vi.useFakeTimers()
+    try {
+      const onFinish = vi.fn()
+      render(<SeasonEndingScreen endingIndex={0} isBonusReceived onFinish={onFinish} />)
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+      fireEvent.click(screen.getByRole('button', { name: '확인' }))
 
-    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
-    expect(onFinish).toHaveBeenCalled()
+      expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+      expect(onFinish).not.toHaveBeenCalled()
+      // 종류 1 은 16,14,…,0 을 칠하는 아홉 틀 — 8 틀째에는 아직이다
+      act(() => {
+        vi.advanceTimersByTime(8 * millisecondsPerFrame())
+      })
+      expect(onFinish).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(3 * millisecondsPerFrame())
+      })
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('효과기가 도는 동안은 키를 삼킨다 (0x4b18 · 0x4b34 — +4 ≠ 0 · +0x10 == 0)', () => {
+    vi.useFakeTimers()
+    try {
+      const onKey = vi.fn()
+      window.addEventListener('keydown', onKey)
+      render(<SeasonEndingScreen endingIndex={1} onFinish={vi.fn()} />)
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(onKey).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(12 * millisecondsPerFrame())
+      })
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(onKey).toHaveBeenCalledTimes(1)
+      window.removeEventListener('keydown', onKey)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

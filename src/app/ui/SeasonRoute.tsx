@@ -10,6 +10,7 @@ import {
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
   SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay, SeasonEventEndFrame,
+  SeasonScreenFade,
 } from '@/pages/season'
 import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { SEASON_STAMINA_ITEM } from '@/entities/season-mode/model/seasonItemShop'
@@ -218,6 +219,8 @@ export function SeasonRoute({
   const previousScene = sceneTrail.current.previous
   /** 0xd3 재생이 끝난 한 틀 — 대화창 없이 0xa09c 의 끝 그림을 그린 뒤 넘긴다 (`useEventEndFrame`) */
   const eventEnd = useEventEndFrame(actions.finishSeasonEvent)
+  /** 엔딩을 넘긴 틀이 건 효과기 종류 2 — 관리 메뉴 0xc9 위에서 돈다 (`SeasonEndingScreen`) */
+  const [isEndingFadeIn, setEndingFadeIn] = useState(false)
   const [isEnteringGame, setEnteringGame] = useState(() => session.isGameInProgress)
   useLayoutEffect(() => {
     if (!isEnteringGame) return
@@ -330,6 +333,7 @@ export function SeasonRoute({
   if (scene === SEASON_SCENE_STATE.관리메뉴) {
     const request = session.tradeRequest
     return (
+      <>
       <SeasonManagementScreen
         state={state}
         // 0xec10 — StrMODE[203] "[%s] 팀에서 트레이드 요청이 왔습니다 확인 하시겠습니까?", %s = 팀 이름([this+0x158])
@@ -349,6 +353,9 @@ export function SeasonRoute({
         gamePoint={session.gamePoints}
         centerSlidesIn={previousScene === null || CENTER_SLIDE_FROM.includes(previousScene)}
       />
+      {/* 엔딩을 넘긴 0x8bd8 8d1e~8d2c 의 효과기 종류 2(검정에서 밝아짐) — 0xc9 위에서 아홉 틀, 그동안 키가 안 먹는다 */}
+      {isEndingFadeIn && <SeasonScreenFade kind="검게어두워짐" onEnd={() => setEndingFadeIn(false)} />}
+      </>
     )
   }
 
@@ -902,7 +909,10 @@ export function SeasonRoute({
         isBonusReceived={state.record.endingBonusReceived}
         onBonusReceived={actions.receiveEndingBonus}
         // 키 0x6b3c → 단계 1 → 전환이 끝나면 0x8bd8 8ccc~8d2c: SR+0x1bc = 1 · 저장 · **관리 메뉴 0xc9**(메인 메뉴가 아니다)
-        onFinish={actions.finishEnding}
+        onFinish={() => {
+          actions.finishEnding()
+          setEndingFadeIn(true)
+        }}
       />
     )
   }

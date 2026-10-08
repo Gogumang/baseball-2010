@@ -103,6 +103,7 @@ export { SeasonSummaryScreen } from '@/pages/season/ui/SeasonSummaryScreen'
 export type { SeasonSummaryScreenProps } from '@/pages/season/ui/SeasonSummaryScreen'
 
 export { SeasonEndingScreen } from '@/pages/season/ui/SeasonEndingScreen'
+export { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 export type { SeasonEndingScreenProps } from '@/pages/season/ui/SeasonEndingScreen'
 
 /** 포스트시즌 대진표 0x853ac (P6 4a-1 확정) — 시즌 끝 화면 둘이 함께 쓴다 */

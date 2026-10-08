@@ -80,6 +80,14 @@ function 시즌화면({ store, 장면, onExit, hallOfFame, nari, nariRecords }: 
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 describe('엔딩 0xf5 배선', () => {
+  /** 효과기 종류 1 · 2 는 아홉 틀 — 그 끝을 본 다음 틀까지 넘긴다 (`SeasonScreenFade`) */
+  const 효과기넘기기 = () => act(() => {
+    vi.advanceTimersByTime(12 * millisecondsPerFrame())
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('phase 6 으로 들어오면 **엔딩 화면**이 뜬다 — 예전에는 "화면이 없습니다" 로 샜다', () => {
     const store = 메모리저장(세이브(레코드({
       phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
@@ -101,7 +109,10 @@ describe('엔딩 0xf5 배선', () => {
       // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
       seenEvents: [400, 1, 5, 100],
     })))
+    vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={onExit} />)
+    // 진입 0x6be8 의 효과기 종류 2 — 도는 동안은 키가 안 먹는다(0x4b18)
+    효과기넘기기()
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     // 판정 1 → 표값 3 × 1000 = 3000 G (StrMODE[214])
@@ -112,10 +123,18 @@ describe('엔딩 0xf5 배선', () => {
     expect(document.body.textContent).toContain('지역 인기 구단')
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    // 키 0x6b3c → 효과기 종류 1(어두워짐) 아홉 틀 — 그 끝을 본 틀에야 0x8bd8 이 넘긴다
+    expect(screen.getByTestId('화면-효과기')).toBeDefined()
+    expect(store.load()).toMatchObject({ state: { record: { endingSeen: false } } })
+    효과기넘기기()
 
     expect(onExit).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
     expect(store.load()).toMatchObject({ state: { record: { endingSeen: true } } })
+    // 0xc9 위에서 효과기 종류 2(검정에서 밝아짐)가 돌고 끝나면 걷힌다
+    expect(screen.getByTestId('화면-효과기')).toBeDefined()
+    효과기넘기기()
+    expect(screen.queryByTestId('화면-효과기')).toBeNull()
   })
 
   it('보너스를 받고 넘기기 전에 끄면 다시 엔딩이다 — SR+0x7b 가 서 있어 보너스 팝업 없이 넘어간다 (0x6b3c)', () => {
@@ -129,11 +148,14 @@ describe('엔딩 0xf5 배선', () => {
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
     cleanup()
 
+    vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={vi.fn()} />)
 
     expect(document.body.textContent).toContain('지역 인기 구단')
+    효과기넘기기()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    효과기넘기기()
     expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
   })
 
@@ -143,8 +165,11 @@ describe('엔딩 0xf5 배선', () => {
       // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
       seenEvents: [400, 1, 5, 100],
     })))
+    vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={vi.fn()} />)
+    효과기넘기기()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    효과기넘기기()
     cleanup()
 
     render(<시즌화면 store={store} onExit={vi.fn()} />)
