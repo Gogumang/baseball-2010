@@ -15,7 +15,7 @@ import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
-import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
+import { hallOfFameBatterAt, hallOfFamePitcherAt } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
@@ -34,6 +34,7 @@ import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionResultHeldOf } from '@/pages/mission-play/lib/missionResultBoard'
 import { missionRunScoreBoardOf, missionScoreboardSidesOf } from '@/pages/mission-play/lib/missionRunScoreBoard'
+import { missionFirstBoardCardsOf } from '@/pages/mission-play/lib/missionFirstBoardCards'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
@@ -150,6 +151,7 @@ export function MissionRoutes({
   const overlay = missionOverlayOf(
     session, defenseSceneRef, playingRun, runner.bannerText, isFreePassReady,
     missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
+    missionPitcherNameOf(session, hallOfFame, nari.투수),
   )
   if (overlay !== null) return overlay
 
@@ -331,8 +333,10 @@ function missionOverlayOf(
   bannerText: string,
   /** 재생 칸의 판을 세워도 되나 — 밀어내기 판(종류 2)은 0x12 대기 0x1f 틱 뒤 (`useFreePassPlayStart`) */
   isFreePassReady: boolean,
-  /** 미션 타자 이름 (`missionBatterNameOf`) — 0x21 DUE UP 의 그 선수 줄 */
+  /** 미션 타자 이름 (`missionBatterNameOf`) — 0x21 · 첫 0x18 DUE UP 의 그 선수 줄 */
   missionBatterName?: string | null,
+  /** 미션 투수 이름 (`missionPitcherNameOf`) — 투수 미션 첫 0x18 판의 PITCHER */
+  missionPitcherName?: string | null,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   if (pendingDefensePlay !== null) {
@@ -378,8 +382,8 @@ function missionOverlayOf(
   // 미션 시작의 첫 0x18 판 — 상태 8 끝(48bf0)이 인트로 없이 보내고, 첫 반 이닝이 사람 몫이라 판이 서서 OK 를 기다린다
   // (굴림 36 은 세션이 세울 때 썼다). 틱 2 에 징글 13(0x4f7ac). OK → 0xae3a0 → 0xd → 0xe. 제한 시간은 그 동안에도 흐르고(0xaada4),
   // 다 되면 0x76d → 0x19 가 덮어 결과 판으로 간다.
-  // ⚠️ 미이식 — 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")(틱 ≥ 70): 첫 판의 공격 팀 타순 세 칸 · 수비 팀 지금 투수 이름을
-  //    미션 판이 아직 한 곳에 모아 들고 있지 않아 그리지 않는다. 점수판 틀 0x41440 은 그린다.
+  // 틱 ≥ 70 에 점수판 틀 0x41440 과 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER") — 공격 팀 타순 세 칸 · 수비 팀 지금 투수 이름 ·
+  // 48c86 0xaae7c 가 깐 미션 시작 카운트 점 (`missionFirstBoardCardsOf`).
   const board = session.halfInningBoard
   if (board !== null && playingRun !== null && playingRun.status === '진행중') {
     const sideMission = missionWithSideTeamsOf(playingRun.mission, playingRun.game.humanBatting.teamId)
@@ -392,6 +396,10 @@ function missionOverlayOf(
           if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
         }}
         scoreboardSides={missionScoreboardSidesOf(sideMission)}
+        cards={missionFirstBoardCardsOf(playingRun, {
+          missionBatter: missionBatterName ?? null,
+          missionPitcher: missionPitcherName ?? null,
+        })}
         onConfirm={actions.confirmHalfInningBoard}
       />
     )
@@ -426,10 +434,29 @@ function missionBatterNameOf(
   isAceMatch: boolean,
 ): string | null {
   const pick = session.player
-  if (!isAceMatch && pick?.side === '타자' && pick.hallOfFameIndex !== null) {
+  // 0x1fc20 — g[0x11f](타자편 대기)가 서 있으면 보통 미션도 명예 갈래를 안 탄다 (세션 `hallOfFameBatter` 와 같은 갈래)
+  if (!isAceMatch && !session.aceMatchHold.batter && pick?.side === '타자' && pick.hallOfFameIndex !== null) {
     return hallOfFameBatterAt(hallOfFame, pick.hallOfFameIndex)?.name ?? null
   }
   return nariBatter?.name ?? null
+}
+
+/**
+ * **미션 투수 0x1fbd0 의 이름** — 모드 5 · g[0x176] == 0 · +0xa5 ≥ 0 이면 명예 투수(0x1f62c) 기록, 그 밖은 나리 투수편 저장 선수
+ * (세션 `hallOfFamePitcher` 와 같은 갈래). 0xb62c0 은 둘 다 이름표 칸 밖이라 기록 +1 의 이름이다.
+ * 투수편 마선수 대결(`PitcherAceMatchRoute`)은 g[0x176] 이 서 있어 늘 나리 투수다 — 그 라우트는 이름을 따로 받는다.
+ */
+function missionPitcherNameOf(
+  session: ReturnType<typeof useMissionSession>,
+  hallOfFame: Collection,
+  nariPitcher: HallOfFameNariPlayer | null,
+): string | null {
+  const pick = session.player
+  if (session.pitcherAceMatchMission === null && !session.aceMatchHold.pitcher
+    && pick?.side === '투수' && pick.hallOfFameIndex !== null) {
+    return hallOfFamePitcherAt(hallOfFame, pick.hallOfFameIndex)?.name ?? null
+  }
+  return nariPitcher?.name ?? null
 }
 
 /**
@@ -455,6 +482,11 @@ interface PitcherAceMatchRouteProps {
   readonly onFinish: (isWin: boolean) => void
   /** 경기 중 "나가기" 0x40140 — 투수편 세션이 대결을 내려놓는다(대기 칸은 남는다). 메인 메뉴로는 미션 세션이 간다 */
   readonly onQuit: () => void
+  /**
+   * 던지는 나리 투수편 저장 선수의 이름 — 0x1fbd0 은 g[0x176] 이면 늘 [저장+0x3c] 선수다. 첫 0x18 판 PITCHER(0x420dc)가 쓴다.
+   * 안 주면 그 판에 이름을 안 쓴다.
+   */
+  readonly pitcherName?: string | null
 }
 
 /**
@@ -464,7 +496,7 @@ interface PitcherAceMatchRouteProps {
  * 들어서면 `beginPitcherAceMatch` 로 미션을 세우고, 결과 [확인]에서 `finishPitcherAceMatch` 의 이겼나를 넘긴다.
  */
 export function PitcherAceMatchRoute(
-  { mission, session, runner, pitchControl, gameSettings, onFinish, onQuit }: PitcherAceMatchRouteProps,
+  { mission, session, runner, pitchControl, gameSettings, onFinish, onQuit, pitcherName }: PitcherAceMatchRouteProps,
 ) {
   const beginRef = useRef(session.actions.beginPitcherAceMatch)
   beginRef.current = session.actions.beginPitcherAceMatch
@@ -482,7 +514,7 @@ export function PitcherAceMatchRoute(
   )
   const overlay = missionOverlayOf(
     session, defenseSceneRef, session.pitcherAceMatchMission === mission ? session.pitcherRun : null, runner.bannerText,
-    isFreePassReady,
+    isFreePassReady, null, pitcherName ?? null,
   )
   if (overlay !== null) return overlay
 

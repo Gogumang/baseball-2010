@@ -8,6 +8,7 @@ import { aceMatchMissionOf } from '@/entities/story/model/aceMatch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
 
 /** 투구 화면이 받은 속성 — 그림은 여기서 볼 것이 아니라 갈아 끼운다 */
 interface 받은속성 {
@@ -154,6 +155,33 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(finished?.run.status).toBe('실패')
     act(() => finished?.onFinish())
     expect(onFinish).toHaveBeenCalledWith(false)
+  })
+
+  it('첫 0x18 판은 틱 70 부터 두 팀 판 — PITCHER 는 넘겨받은 나리 투수 이름, DUE UP 첫 줄은 0xaae7c 가 끼운 마타자', () => {
+    vi.useFakeTimers()
+    const mission = aceMatchMissionOf(18, '투수')
+    if (mission === null) throw new Error('투수 미션 18 이 없다')
+
+    function Harness() {
+      const runner = useAtBatRunner()
+      const session = useMissionSession({
+        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        setScreen: vi.fn(),
+      })
+      return (
+        <PitcherAceMatchRoute
+          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
+          onFinish={vi.fn()} onQuit={vi.fn()} pitcherName="판투수"
+        />
+      )
+    }
+    const view = render(<Harness />)
+    expect(view.queryByTestId('교대판-투수')).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 70)
+    })
+    expect(view.getByTestId('교대판-투수이름').textContent).toBe('판투수')
+    expect(view.getByTestId('교대판-타자이름-0').textContent).toBe(missionOpponentOf('타자', mission.opponentAce)!.name)
   })
 
   it('볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기 0x1f 틱 뒤에 재생 칸을 연다 — 그동안 투구 화면 (0x4e6d4 → 0xae24c)', () => {
