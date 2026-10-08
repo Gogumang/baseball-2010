@@ -1829,7 +1829,7 @@ function batterPitch(
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
-  // 장면 +0xfdc — 사람 타석은 번트 · 스윙 키(0x51dce · 0x51e2c · 0x51e84 · 0x51eba)가 쓴다. ⚠️ 웹 타석 화면은 안 휘두른 공을 0 으로 낸다
+  // 장면 +0xfdc — 사람 타석은 번트 · 스윙 키(0x51dce · 0x51e2c · 0x51e84)가 쓴다. 타석 화면이 이 칸을 받아 키 없는 공은 앞 값 그대로 낸다
   progress = { ...progress, sceneBuntKind: options.buntKind ?? 0 }
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다. 연속 파울 기록(0xa7dbc)은 판의 결과 코드 7 메시지(51c5c)에서라 판이 파울로 닫힐 때 센다.
   // 필살 스윙의 성공 굴림(0x517e6)은 타석 판정이 쏜 공(`detail.foulContact`)에 재료만 실어 판 시작(필살수비 · 폴 굴림 뒤)이 굴린다

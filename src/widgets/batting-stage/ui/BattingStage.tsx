@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
@@ -33,7 +33,7 @@ import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
-import { buntStanceAfterBuntKey, buntStanceAfterSwingKey } from '@/widgets/batting-stage/lib/buntStance'
+import { buntStanceAfterBuntKey, buntStanceAfterSwingKey, sceneBuntKindAfterKey } from '@/widgets/batting-stage/lib/buntStance'
 import { canSpecialSwing, remainingAfterSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
@@ -196,8 +196,9 @@ interface BattingStageProps {
   /**
    * 세 번째 인자는 **필살타법이 성공한 타구인가** — 성공하면 야수가 쥐지 않고 지나친다
    * (0x51800 → `features/defense-play` 의 `isUncatchable`).
-   * 네 번째 인자는 이 공의 **번트 종류** 장면 +0xfdc (0 스윙 · 1~3 번트 키 '8'·'7'·'9') — 타구 판 시작 리드(0x3d7b8)가
-   * 도루 안 한 주자에게 +3 틱을 더한다(`DefensePlayInput.buntKind`). 안 휘둘렀으면 0.
+   * 네 번째 인자는 이 공이 판정될 때의 **장면 +0xfdc**(0 스윙 · 1~3 번트 키 '8'·'7'·'9') — 타구 판 시작 리드(0x3d7b8)가
+   * 도루 안 한 주자에게 +3 틱을 더하고(`DefensePlayInput.buntKind`) 공 도착 판도 본다. 사람 키만 쓴다(`sceneBuntKind` 주석) —
+   * 이 공에 키가 없었으면 앞 공의 값이 그대로 나간다.
    */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
   /**
@@ -217,10 +218,24 @@ interface BattingStageProps {
    *    나만의리그 타자편(`pages/game`)·미션(`pages/mission-play`)도 진행기에 견제 판이 생기면 넘겨야 한다.
    */
   readonly onPickoff?: (base: 1 | 2 | 3) => void
+  /**
+   * 이 공 앞의 **장면 +0xfdc** — 마지막으로 쓴 번트 종류. 쓰는 곳은 CPU 스윙 0x34436 과 사람 키 넷이다(직접 뜸):
+   * ```
+   * 51dce  스윙 0x6a5(상태 0x11 · S+4):        +0xfe0 = 1 · +0xfdc = 0 · +0xfd8 = 지금 틱 · S+0x10 = 0
+   * 51e2c  필살 0x6a6(+ 남은 횟수 0xaea30 ≠ 0): +0xfe0 = 1 · +0xfdc = 0 · …                  ; S+0x10 = 타자 +0x18
+   * 51e84  번트 0x6a7(+ 마선수 아님 0xb633c):  예약 +0xfe0 이 남아 있으면 지우고 +0xfdc = 0, 없으면 +0xfe0 = 1 · +0xfdc = 종류
+   * 51eba  0x6a8(키 사건 +0x1c 비트 9 · '7'~'9'): +0xfdc ≠ 0 && S+4 == 0 && 마선수 아님 → +0xfe0 = +0xfdc = 0 · 번트 자세 풀기
+   * ```
+   * 키를 안 누른 공은 아무도 안 써 **앞 공의 값이 남는다**(CPU 쪽 dccb8af 와 같다). 번트 자세에서 스윙 키를 누르면 스윙은 안 나가도
+   * (0xb9374) +0xfdc 는 0 이 된다 — 그 번트 타구의 판은 번트 종류 0 으로 본다(원본 그대로).
+   * 안 넘기면 이 화면이 마운트된 동안 스스로 든다(장면 new 의 0 에서).
+   * ⚠️ 미이식: 같은 갱신 안에서 번트 키를 두 번 눌러 예약을 지우는 갈래(51e98 — +0xfdc = 0)와 0x6a8(키 사건 비트 9 의 뜻 미확인).
+   */
+  readonly sceneBuntKind?: number
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -234,6 +249,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     recentAtBatCodes,
   })
   const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, particlesRef, latestRef } = refs
+  /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
+  const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
+  useEffect(() => {
+    if (sceneBuntKind !== undefined) sceneBuntKindRef.current = sceneBuntKind
+  }, [sceneBuntKind])
 
   const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
     const pitch = pitchRef.current
@@ -334,7 +354,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         // 큰 타구 감상이 끝나는 자리에 016 을 쏜다 (0x4cb1c → 0x4cd14)
         bigHitAt: watchesBigHit ? contact : null,
         resultText,
-        buntKind: swing?.buntKind ?? 0,
+        buntKind: sceneBuntKindRef.current,
       }
       phaseRef.current = '타격'
       phaseStartedAtRef.current = now
@@ -345,7 +365,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     homeRunStartedAtRef.current = isHomeRun ? now : -1
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
-    latest.onPitchResolved(result.detail, pitch, isUncatchable, swing?.buntKind ?? 0)
+    latest.onPitchResolved(result.detail, pitch, isUncatchable, sceneBuntKindRef.current)
   }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
@@ -379,6 +399,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         // 상태 0x13 은 OK(−5)·'5' 로 건너뛴다 (0x406e8). 그때 스윙 키는 건너뛰기로만 쓰인다
         if (phaseRef.current === '타격') return commitHit(now)
         if (!isFlying(now)) return
+        // 0x51dce — 스윙 키는 번트 자세여도 +0xfdc = 0 을 쓴다
+        sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindRef.current, { kind: '스윙' })
         // 번트 자세면 스윙이 안 나가고(0xb9374 가 S+8 을 보고 그냥 돌아간다) 판정 F(+0xfd8)만 이 틱으로 바뀐다
         const bunt = buntRef.current
         if (bunt !== null) {
@@ -394,6 +416,12 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
        */
       toggleBunt: (kind: number, now: number) => {
         if (!isFlying(now)) return
+        // 0x51e84 — 마선수가 아니면 +0xfdc = 종류(예약은 다음 갱신 0x4e100 이 풀어 자세를 세우거나 취소한다)
+        sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindRef.current, {
+          kind: '번트',
+          buntKind: kind,
+          isAceBatter: aceBatterIndex >= 0,
+        })
         buntRef.current = buntStanceAfterBuntKey(buntRef.current, kind, frameNow(now), aceBatterIndex >= 0)
       },
       moveBatter: (direction: -1 | 1) => {
@@ -408,6 +436,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         if (!isFlying(now)) return
         // 0x51e14: 남은 횟수 0xaea30 이 0 이면 무시 — 번호(+0x18)가 0 이면 늘 0 이다
         if (!canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)) return
+        // 0x51e2c — 필살 키도 +0xfdc = 0
+        sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindRef.current, { kind: '필살' })
         // 0x4e136: 예약이 풀리는 틱에 S+0x10 ≠ 0 이고 남은 > 0 이면 −1 (결과와 무관 — 번트 자세라 스윙이 안 나가도)
         if (specialSwingRemaining !== undefined && specialSwingRemaining > 0) {
           onSpecialSwingUsed?.(remainingAfterSpecialSwing(specialSwingRemaining))

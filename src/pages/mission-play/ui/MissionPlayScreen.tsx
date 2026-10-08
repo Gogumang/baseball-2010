@@ -52,6 +52,11 @@ interface MissionPlayScreenProps {
   readonly specialSwingRemaining?: number
   /** 필살 스윙이 나가 남은 횟수가 줄었다 (0x4e136) — 인자는 줄인 뒤 값 */
   readonly onSpecialSwingUsed?: (remaining: number) => void
+  /**
+   * 이 공 앞의 장면 +0xfdc(마지막으로 쓴 번트 종류) — 타석 화면(`BattingStage.sceneBuntKind`)이 사람 키로 고치고 판정된 공의
+   * `onPitchResolved` 넷째 인자로 돌려준다. 부르는 쪽이 경기 장면 동안 들고 있다가 다시 넘긴다. 안 주면 타석 화면이 스스로 든다.
+   */
+  readonly sceneBuntKind?: number
   readonly onGiveUp: () => void
   /** 결과 판에서 미션 목록으로(0x140006c = 1) — 마선수 대결이면 대결 끝(결과 이벤트로) */
   readonly onFinish: () => void
@@ -117,6 +122,7 @@ export function MissionPlayScreen({
   specialSwingNumber,
   specialSwingRemaining,
   onSpecialSwingUsed,
+  sceneBuntKind,
   aceLevels,
   onPickoff,
   onGiveUp,
@@ -270,6 +276,7 @@ export function MissionPlayScreen({
             specialSwingNumber={specialSwingNumber}
             specialSwingRemaining={specialSwingRemaining}
             onSpecialSwingUsed={onSpecialSwingUsed}
+            sceneBuntKind={sceneBuntKind}
             gameMode={MISSION_BATTER_MODE}
             // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
             isScoreboardOn={settings?.isScoreboardOn}

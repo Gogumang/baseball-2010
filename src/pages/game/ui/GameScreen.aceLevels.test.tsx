@@ -17,6 +17,7 @@ interface 받은칸 {
   readonly isBatterOwnPlayer?: boolean
   readonly careerYearIndex?: number
   readonly canBunt?: boolean
+  readonly sceneBuntKind?: number
 }
 const 받은props: 받은칸[] = []
 vi.mock('@/widgets/batting-stage/ui/BattingStage', () => ({
@@ -117,5 +118,25 @@ describe('나만의리그 타자편 번트 — 0x535a4 → 0x6a7 → 0x51e48 은
       />,
     )
     expect(받은props.at(-1)?.canBunt).toBe(true)
+  })
+})
+
+describe('나만의리그 타자편 장면 +0xfdc — 키 없는 공은 앞 공의 값 (0x51dce · 0x51e84)', () => {
+  it('부르는 쪽이 든 장면 +0xfdc 를 타석 그림에 넘긴다', () => {
+    render(
+      <GameScreen
+        career={createCareer('테스트')}
+        progress={startGame(createSeededRandom(20100901))}
+        atBat={createAtBat()}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onQuit={vi.fn()}
+        sceneBuntKind={2}
+      />,
+    )
+    expect(받은props.at(-1)?.sceneBuntKind).toBe(2)
   })
 })

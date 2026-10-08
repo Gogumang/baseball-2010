@@ -45,3 +45,20 @@ export function buntStanceAfterBuntKey(
   if (isAceBatter) return stance
   return stance === null ? { kind, frame } : null
 }
+
+/** 장면 +0xfdc 를 쓰는 사람 키 (상태 0x11 · S+4 — 부르는 쪽 `isFlying` 이 본다) */
+export type SceneBuntKey =
+  | { readonly kind: '스윙' }
+  | { readonly kind: '필살' }
+  | { readonly kind: '번트'; readonly buntKind: number; readonly isAceBatter: boolean }
+
+/**
+ * **사람 키가 쓰는 장면 +0xfdc** (직접 뜸 — `BattingStage` 의 `sceneBuntKind` 주석):
+ * 스윙 0x51dce · 필살 0x51e2c 는 0, 번트 0x51e84 는 마선수가 아니면 종류(마선수면 키 자체를 무시 — 그대로).
+ * 키가 없는 공은 아무도 안 써 앞 공의 값이 남는다.
+ * ⚠️ 같은 갱신 안에서 번트 키를 두 번 눌러 예약(+0xfe0)을 지우는 갈래(51e98 → 0)는 옮기지 않았다 — 웹 키는 틱 예약을 따로 안 든다.
+ */
+export function sceneBuntKindAfterKey(previous: number, key: SceneBuntKey): number {
+  if (key.kind !== '번트') return 0
+  return key.isAceBatter ? previous : key.buntKind
+}

@@ -86,6 +86,8 @@ export function MissionRoutes({
   const { ability } = batter
   /** 미션 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
+  const sceneBuntKindRef = useRef(0)
 
   const overlay = missionOverlayOf(session, screen.kind === '마선수대결', defenseSceneRef)
   if (overlay !== null) return overlay
@@ -150,9 +152,11 @@ export function MissionRoutes({
         isPaused={runner.isPaused}
         bannerText={runner.bannerText}
         random={random}
-        onPitchResolved={(detail, _pitch, isUncatchable, buntKind) =>
+        onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
+          sceneBuntKindRef.current = buntKind ?? 0
           session.handleMissionPitch(detail, isUncatchable, buntKind)
-        }
+        }}
+        sceneBuntKind={sceneBuntKindRef.current}
         // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)
         specialSwingNumber={batter.specialSwingNumber}
         specialSwingRemaining={missionBatterSpecialSwingRemainingOf(session.batterSpecialSwingStored, batter)}

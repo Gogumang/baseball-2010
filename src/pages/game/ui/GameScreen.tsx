@@ -78,6 +78,11 @@ interface GameScreenProps {
    * 안 넘기면 횟수를 줄여도 받아 줄 곳이 없어 경기 내내 처음 횟수로 남는다.
    */
   readonly onSpecialSwingUsed?: (remaining: number) => void
+  /**
+   * 이 공 앞의 장면 +0xfdc(마지막으로 쓴 번트 종류) — 타석 화면(`BattingStage.sceneBuntKind`)이 사람 키로 고치고 판정된 공의
+   * `onPitchResolved` 넷째 인자로 돌려준다. 부르는 쪽이 경기 장면 동안 들고 있다가 다시 넘긴다. 안 주면 타석 화면이 스스로 든다.
+   */
+  readonly sceneBuntKind?: number
   /** 경기 중 기록 달성 알림 0x4e35c 의 이번 그림 (`useRecordAlert`, 부르는 쪽이 든다). 안 넘기면 안 그린다 */
   readonly recordAlert?: RecordAlertFrame
   /** 알림을 든 쪽에 이 화면의 팝업 · 장면 갈래를 알린다 (`RecordAlertScene`) — 바뀔 때마다 */
@@ -117,6 +122,7 @@ export function GameScreen({
   onSettingsChange,
   onBenchClearingDone,
   onSpecialSwingUsed,
+  sceneBuntKind,
   recordAlert,
   onRecordAlertSceneChange,
 }: GameScreenProps) {
@@ -335,6 +341,7 @@ export function GameScreen({
               hasRuthlessSkill: career.equippedSkillIds.includes(RUTHLESS_SKILL_ID),
             })}
             onSpecialSwingUsed={onSpecialSwingUsed}
+            sceneBuntKind={sceneBuntKind}
             // 0xab214 의 내 선수 보너스 — 모드 4 에서 rec = 0x1f8d4(저장, 4) = [저장+0xbc]+0x11c 의 rec[0xa] 비트7(육성)이
             // 서고(0xb6389, ab3d6), 연차 idx 는 같은 레코드 +0xb3 (ab3f2) — 커리어 연차는 1부터라 1 을 뺀다
             isBatterOwnPlayer

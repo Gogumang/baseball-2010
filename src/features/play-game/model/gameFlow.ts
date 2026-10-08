@@ -1919,7 +1919,7 @@ export function arrivePitch(
       offenseIsCpu: false,
       runningMode: progress.runningModeManual ? '수동' : '자동',
       // 장면 +0xfdc — 못 맞힌 번트면 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
-      // (안 휘두른 공은 원본이 앞 공의 값을 그대로 두지만 웹은 0 — 미해결, `PitchArrivalPlayInput.buntKind`)
+      // (키 없는 공은 앞 공의 값 — 타석 화면이 장면 +0xfdc 를 들고 낸다, `BattingStage.sceneBuntKind`)
       buntKind: pitch.buntKind ?? 0,
     },
     random,

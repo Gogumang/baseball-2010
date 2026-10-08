@@ -727,6 +727,8 @@ export function TeamGameScreen({
               batterAbility={currentBatterAbility(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
+              // 장면 +0xfdc — CPU 타석(0x34436)과 사람 키가 같은 칸을 쓴다. 진행기가 공마다 든 값을 넘긴다
+              sceneBuntKind={progress.sceneBuntKind ?? 0}
               // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
               canBunt
               // 팀 경기(모드 1·2·8·9)는 판정 묶음 '일반' — "내 선수" 보너스(모드 3·4)도 타자 미션 +100(모드 6)도 없다 (0xab214)

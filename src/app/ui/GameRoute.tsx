@@ -64,6 +64,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const finishPlayback = useCallback(() => setShownPlay(play), [play])
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
+  const sceneBuntKindRef = useRef(0)
 
   /** 제안 대사를 이미 보여 준 돌발 행. 판정은 진행기가 지워 주므로 여기서 셀 것이 없다 */
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)
@@ -124,6 +126,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       // 0x12 대기 틱은 이 공으로 끝난 타석 결과(st[0xb])로 정한다 — 굴림 없는 카운트 계산이다
       const outcomeAfter = applyPitchResolution(runner.atBat, detail.resolution).outcome
       pitchEnd.notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
+      sceneBuntKindRef.current = buntKind ?? 0
       resolvePitchInSession(detail, pitch, isUncatchable, buntKind)
     },
     [pitchEnd.notePitchResolved, resolvePitchInSession, runner.atBat],
@@ -196,6 +199,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         bannerText={runner.bannerText}
         random={random}
         onPitchResolved={handlePitchResolved}
+        sceneBuntKind={sceneBuntKindRef.current}
         onQuit={session.actions.quitGame}
         onSteal={session.actions.stealBase}
         // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다
