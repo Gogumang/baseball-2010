@@ -280,18 +280,13 @@ export function useSeasonMenuBgm(sound: SoundPort, isActive: boolean, scene: num
 }
 
 /**
- * 화면에 **들어설 때 한 번** 나는 효과음·음성 (배경음이 아니다).
+ * 화면에 **들어설 때 한 번** 나는 효과음·음성 (배경음이 아니다). 지금은 없다.
  *
- * ```
- * 0  로고 "GAMEVIL"  장면 0x103 상태 2 = 시작 인증·로고 화면 (0x69400)
- * ```
- *
- * ⚠️ **브라우저는 사용자가 한 번 누르기 전에는 소리를 못 낸다** (`useSound` 머리 주석).
- * 앱을 켜고 처음 보는 타이틀에서는 이 음성이 실제로 울리지 않는다 — 다시 타이틀로 돌아오면 난다.
+ * 로고 음성 0 은 들어설 때가 아니라 켤 때 로고(하위 2) 객체의 상태 2 끝(0x694c4 `0x6ea6d(소리, 0, −1, 0)`)에 난다 —
+ * `LogoScreen` 이 그 갱신에 부른다. 타이틀(하위 3) 진입은 소리를 안 낸다. 앞 화면 `<이용안내>` 에서 한 번 눌렀으니
+ * 브라우저 자동 재생 막기(`useSound` 머리 주석)에도 걸리지 않는다.
  */
-export const SCREEN_ENTER_SOUND = {
-  타이틀: 0,
-} as const satisfies Partial<Record<Screen['kind'], number>>
+export const SCREEN_ENTER_SOUND = {} as const satisfies Partial<Record<Screen['kind'], number>>
 
 /** 이 화면에 들어설 때 낼 효과음. 없으면 null */
 export function screenEnterSoundOf(screen: Screen): number | null {

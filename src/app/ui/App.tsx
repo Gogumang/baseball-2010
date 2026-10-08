@@ -92,7 +92,7 @@ const MODE_SAVE_KEY = 'compus-baseball/mode-save'
 const NARI_BATTER_MODE = 4
 const NARI_PITCHER_MODE = 3
 
-const ENTRY_SCREENS: readonly Screen['kind'][] = ['타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
+const ENTRY_SCREENS: readonly Screen['kind'][] = ['이용안내', '로고', '타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
 
 const MISSION_SCREENS: readonly Screen['kind'][] = [
   '마선수대결',
@@ -148,14 +148,15 @@ export function App() {
   const sound = useSound(gameSettings.settings.soundLevel)
   // 부팅 씨앗 — 원본 0x2ed8 은 밀리초 시계의 아래 32비트 (저장 · 읽기 때 다시 세우기는 옮기지 않았다 — seededRandom 머리 주석)
   const random = useMemo(() => createSeededRandom(bootSeed()), [])
-  const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
+  // 켤 때는 장면 0x103 생성자의 [0x140006c] = −1 갈래 — 하위 0x2a <이용안내> 부터 (→ 2 로고 → 3 타이틀)
+  const [screen, setScreen] = useState<Screen>({ kind: '이용안내' })
   /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
   const gameStartCursor = useRef(createGameStartCursor()).current
   /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */
   const [isGeneralQuickStart, setGeneralQuickStart] = useState(false)
   /** 일반모드 이어하기로 올린 진행 — 있으면 준비 화면 없이 경기 장면으로 (0x213c0(앱, 1, 0) → 0x104) */
   const [generalResume, setGeneralResume] = useState<TeamGameProgress | null>(null)
-  // 화면에 들어설 때 한 번 나는 소리 — 타이틀의 로고 음성 0 (0x69400)
+  // 화면에 들어설 때 한 번 나는 소리 (`SCREEN_ENTER_SOUND` — 지금은 없다. 로고 음성 0 은 `EntryRoutes` 의 onLogoVoice)
   useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
 
   const runner = useAtBatRunner()
@@ -190,6 +191,8 @@ export function App() {
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
   const seasonSession = useSeasonSession(
     seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
+    // 전역기록 +0x11e — 0xdd 진입 0x6548 과 일반 22 진입 0x3163c 가 같은 칸을 본다
+    modeSave.matchSettingsSeenPort,
   )
   // 142 경기 준비 0x1c46c 가 내 마타자·마투수를 열린 것 중에서 굴린다 (0x9f604 · 0x9f650, 825865d)
   const nariOpenedAces = useMemo(
@@ -478,6 +481,11 @@ export function App() {
           recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
           modeSave.finishGeneralGame()
         }}
+        // 경기진행 설정 전역 m = 0 칸 — 창을 열 때 읽고(0x5fef4) 확인 0x60376 이 되써 0x1f1b9 로 남긴다. 이어하기 경기도 이 값
+        initialSettings={modeSave.save.generalMatchSettings}
+        onMatchSettingsConfirm={modeSave.setGeneralMatchSettings}
+        // 전역기록 +0x11e — 22 에 처음 들어오면 설정 창을 저절로 연다. 시즌 0xdd 와 같은 칸
+        matchSettingsSeen={modeSave.matchSettingsSeenPort}
         // 진입 창 [13] 의 빠른실행 (this+0x14c) — 1~6 단계를 건너뛰고 경기정보로
         isQuickStart={isGeneralQuickStart}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}
@@ -549,6 +557,8 @@ export function App() {
         screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
         gameStartCursor={gameStartCursor}
+        // 켤 때 로고 객체 상태 2 끝의 0x6ea6d(소리, 0, −1, 0)
+        onLogoVoice={() => sound.play(0)}
         hallOfFameDeletion={hallOfFameDeletion}
         recordStat={recordStat}
         // 홈런더비 타자 게터 0x1fc20 — 타자편 대결 대기(g[0x11f])면 명예 타자 대신 나리 타자

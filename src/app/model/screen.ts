@@ -9,6 +9,10 @@ import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
 
 /** 지금 떠 있는 화면 하나. 화면마다 필요한 값을 같이 들고 다닌다. */
 export type Screen =
+  /** 켤 때 첫 화면 `<이용안내>` — 장면 0x103 하위 0x2a (생성자 0x234d4 의 `[0x140006c]` = −1 갈래). 아무 키나 → 로고 */
+  | { readonly kind: '이용안내' }
+  /** 켤 때 GAMEVIL 로고 — 하위 2 (로고 객체 0x69401 이 답 1 을 내면 하위 3 타이틀) */
+  | { readonly kind: '로고' }
   | { readonly kind: '타이틀' }
   /**
    * 메인 메뉴(장면 0x103). `openTier` 는 장면을 세울 때 생성자 0x234d4 가 보는 전역 `[0x140006c]` — 5 면 게임시작 목록(하위 5)

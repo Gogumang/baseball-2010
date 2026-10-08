@@ -27,6 +27,8 @@ import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScree
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
+import { UsageNoticeScreen } from '@/pages/title/ui/UsageNoticeScreen'
+import { LogoScreen } from '@/pages/title/ui/LogoScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { createGameStartCursor } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mainMenu'
@@ -128,6 +130,8 @@ interface EntryRoutesProps {
   readonly aceMatchHold?: AceMatchHoldPort
   /** 게임시작 목록 커서 전역 [0x1552d24] — 앱이 들고 다닌다(메인 메뉴가 다시 마운트돼도 남는다). 안 넘기면 늘 0 칸 */
   readonly gameStartCursor?: GameStartCursor
+  /** 켤 때 로고(하위 2) 상태 2 끝의 `0x6ea6d(소리, 0, −1, 0)` — 로고 음성 0. 안 넘기면 소리 없이 */
+  readonly onLogoVoice?: () => void
 }
 
 /** 원본 모드 번호 — 0x327b8 이 +0x3c 에 적는 값 */
@@ -141,7 +145,7 @@ export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onResetCareerEdition, careerResetBlockOf, onResetSeason, onStartGeneralMode,
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
-  nariGameReady, onResumeNariGame, recordStat, aceMatchHold, gameStartCursor,
+  nariGameReady, onResumeNariGame, recordStat, aceMatchHold, gameStartCursor, onLogoVoice,
 }: EntryRoutesProps) {
   /**
    * 기록연감 비밀 번호의 센 수·열림 [skin+0x2d0] — 메뉴 객체 값이라 메뉴를 만들 때(0x234d4, 0x237f8)만 지운다.
@@ -174,6 +178,12 @@ export function EntryRoutes({
     const value = (saved as { bestDistance?: unknown } | null)?.bestDistance
     return typeof value === 'number' && Number.isFinite(value) ? value : 0
   })
+
+  // 켤 때 앞 화면 둘 — 하위 0x2a <이용안내> → (아무 키) 하위 2 로고 → (답 1) 하위 3 타이틀
+  if (screen.kind === '이용안내') return <UsageNoticeScreen onNext={() => setScreen({ kind: '로고' })} />
+  if (screen.kind === '로고') {
+    return <LogoScreen onDone={() => setScreen({ kind: '타이틀' })} {...(onLogoVoice === undefined ? {} : { onVoice: onLogoVoice })} />
+  }
 
   if (screen.kind === '타이틀') {
     return <TitleScreen onStart={() => setScreen({ kind: '메인메뉴' })} />
