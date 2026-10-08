@@ -259,14 +259,15 @@ describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => 
     expect(screen.getAllByRole('button', { name: TEAMS[1].name }).length).toBeGreaterThan(0)
   })
 
-  it('트레이드를 한 번 쓰면(SR+0x56) 가드가 걸린다', () => {
+  it('트레이드를 한 번 쓰면(SR+0x56) 위·아래가 트레이드 칸을 건너뛴다 (0x6c444) — 구장관리 ↓ 는 선수영입', () => {
     const store = 메모리저장(세이브(레코드({ tradeUsed: 1 })))
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /트레이드/ }))
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'Enter' })
 
-    expect(알림글()).toContain('이미 사용했습니다')
     expect(screen.queryAllByRole('button', { name: TEAMS[1].name })).toHaveLength(0)
+    expect(document.body.textContent).not.toContain('이미 사용했습니다')
   })
 
   it('코치채용을 고르면 코치 목록이 뜨고, 뽑은 코치가 **저장에 남는다** (SR+0x185)', () => {

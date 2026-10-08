@@ -262,15 +262,12 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   })
 })
 
-describe('커맨드 가드 (SR+0x56)', () => {
-  it('이미 쓴 뒤에 들어오면 팀 고르기 대신 막는 알림이 뜨고 나간다', () => {
-    const { onBack } = 띄우기(상태({ tradeUsed: 1 }))
+describe('SR+0x56 (이번 주기에 트레이드를 썼다)', () => {
+  it('0xe4 는 막지 않는다 — 0x4e40 · 0x4774 가 켬 표를 안 본다(막는 것은 구단관리 이동 0x6c444 뿐)', () => {
+    띄우기(상태({ tradeUsed: 1 }))
 
-    expect(알림글()).toContain('이미 사용했습니다')
-    expect(screen.queryAllByRole('button', { name: TEAMS[OPPONENT].name })).toHaveLength(0)
-
-    누르기('확인')
-    expect(onBack).toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getAllByRole('button', { name: TEAMS[OPPONENT].name }).length).toBeGreaterThan(0)
   })
 })
 

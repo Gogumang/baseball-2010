@@ -3,7 +3,7 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_BOOST_COUNT, canUseTradeCommand, markTradeUsed, rollTradeSuccess,
+  TRADE_BOOST_COUNT, markTradeUsed, rollTradeSuccess,
   tradeBoostCostOf, tradeSuccessRate, withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
@@ -40,12 +40,6 @@ const REQUEST_ACQUIRED = ORIGINAL_MODE_TEXT[204]
 const REQUEST_GIVEN = ORIGINAL_MODE_TEXT[205]
 /** 0xe5 키 0x7104 — 요청 중 취소(−16)면 [216] "트레이드를 취소 하시겠습니까?" (팝업 id 0x2e) */
 const REQUEST_CANCEL_QUESTION = ORIGINAL_MODE_TEXT[216]
-
-/**
- * ⚠️ **문구 미해독 — 근사**: SR+0x56 이 서 있을 때 원본이 어떤 글로 막는지 찾지 못했다
- * (StrMODE[176] 은 "트레이드 커맨드 활성 상태에서는 **구매**할 수 없습니다" 로 협회허가증 쪽이다).
- */
-const ALREADY_USED = '!C이번 트레이드 커맨드는!N이미 사용했습니다'
 
 /**
  * 탭 — 원본 `[this+0x154]` 는 `0xb5695(팀, 탭, i)` 에 그대로 들어가 **0 이면 투수(0xb51fc) · 1 이면 타자(0xb53d0)** 다.
@@ -149,15 +143,12 @@ export function TradeScreen({
   const [listTab, setListTab] = useState<number>(() => forced?.tab ?? TRADE_REQUEST_TAB.투수)
   const [boost, setBoost] = useState(0)
   const [question, setQuestion] = useState<TradeQuestion | null>(null)
-  // 커맨드 가드 (SR+0x56) — 한 번 쓰면 협회허가증(GP 아이템 칸 5)으로만 되살아난다.
-  // 들어오자마자 막아야 하므로 첫 상태로 세운다. CPU 요청은 0xc9 → 0xe5 로 바로 가 이 가드를 안 지난다
-  const [notice, setNotice] = useState<string | null>(() => {
-    if (forced !== null) return REQUEST_ACQUIRED
-    return canUseTradeCommand(record) ? null : ALREADY_USED
-  })
-  /** 결과·가드 알림을 닫으면 나간다 — 결과면 관리 메뉴(0xc9), 가드면 구단관리 */
-  const [isDone, setDone] = useState<'결과' | '가드' | null>(() =>
-    forced === null && !canUseTradeCommand(record) ? '가드' : null)
+  // SR+0x56(이번 주기에 트레이드를 썼다)은 여기서 막지 않는다 — 구단관리 키 0x4e40 은 켬 표를 안 보고 칸 1 이면 0xe4 로
+  // 오고, 0xe4 진입 0x4774 도 그 칸을 안 본다. 막는 것은 구단관리 위·아래 이동 0x6c444 가 꺼진 칸을 건너뛰는 것뿐이다
+  // (`SeasonTeamMenuScreen` 의 `disabled`). CPU 요청은 0xc9 → 0xe5 로 바로 가 [204] 부터 띄운다
+  const [notice, setNotice] = useState<string | null>(() => (forced !== null ? REQUEST_ACQUIRED : null))
+  /** 결과 알림을 닫으면 관리 메뉴(0xc9)로 나간다 */
+  const [isDone, setDone] = useState<'결과' | null>(null)
 
   const isPitcher = tradeTab === TRADE_REQUEST_TAB.투수
   const isListPitcher = listTab === TRADE_REQUEST_TAB.투수
@@ -293,8 +284,7 @@ export function TradeScreen({
 
   const closeNotice = () => {
     setNotice(null)
-    if (isDone === '결과') return onFinish()
-    if (isDone === '가드') onBack()
+    if (isDone === '결과') onFinish()
   }
 
   const listEntries = shownEntries
