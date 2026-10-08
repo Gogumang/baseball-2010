@@ -371,9 +371,12 @@ describe('0xe7 진행 연출 (0xcecc · 0xc66c 단계 1~3)', () => {
     act(() => {
       vi.advanceTimersByTime(millisecondsPerFrame() * 10)
     })
-    const 너비 = (screen.getByTestId('트레이드-게이지') as HTMLElement).style.width
+    const 게이지 = screen.getByTestId('트레이드-게이지') as HTMLElement
+    const 너비 = 게이지.style.width
     expect(Number.parseInt(너비, 10)).toBeGreaterThan(2)
-    expect(Number.parseInt(너비, 10)).toBeLessThan(160)
+    expect(Number.parseInt(너비, 10)).toBeLessThan(169)
+    // mode_ui 프레임 72 박스 1 (37, 216, 169, 13) — 0xcecc · 0xdc6c
+    expect([게이지.style.left, 게이지.style.top, 게이지.style.height]).toEqual(['37px', '216px', '13px'])
     expect(굴림).toEqual([])
 
     틀보내기()

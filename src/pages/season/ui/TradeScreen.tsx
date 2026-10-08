@@ -468,10 +468,11 @@ export function TradeScreen({
 }
 
 /**
- * 진행 게이지 판 — ⚠️ 판 자리·크기는 그림 자료([gfx+0x120] 의 사각, 0x94a65)에서 오는데 풀지 못했다 — **근사**.
- * 게이지 끝(this+0x164 의 상한)도 그 사각의 너비라 이 값을 쓴다.
+ * 진행 게이지 판 — 그림 자료 `[[장면+0xc8]+0xc]+8` 의 +0x120 = **mode_ui 프레임 72** (0x120 / 4) 의 **박스 1** (37, 216, 169, 13)
+ * (0x94a65(…, 프레임 72, 0, 1) — 갱신 0xcecc 와 그림 0xdc6c 가 같은 박스를 읽는다). 게이지 끝(this+0x164 의 상한)도 그 너비 169 다.
+ * 그림 0xdc4a 가 먼저 읽는 박스 0 (35, 186, 174, 45) 은 창 0x802dd(창) 에 넘기지 않고 덮여 쓰인다 — 쓰는 곳이 없다.
  */
-const PROGRESS_BOX = { x: 40, y: 150, width: 160, height: 12 } as const
+const PROGRESS_BOX = { x: 37, y: 216, width: 169, height: 13 } as const
 /** 0xcecc — 갱신마다 this+0x164 += 2 */
 const PROGRESS_STEP = 2
 
@@ -491,7 +492,9 @@ interface TradeProgressProps {
  * 단계 1  [173] + "." × this+0x168 (틀 수 & 3 == 0 마다 +1, 4 에서 0) — 흰 글, 판 위 22px
  *         0xcecc: this+0x164 += 2, 너비에 닿으면 참 → 굴림
  *         키 확인 · '5' · 취소 → this+0x164 = 너비 (다음 틀에 끝난다)
- * 단계 2  [174] 노랑 (0xff, 0xff, 0)    단계 3  [175] 빨강 (0xff, 0, 0)
+ * 단계 2  [174] 초록 (0, 0xff, 0) — de00~de06 `r1 = 0xff · r2 = 0 · r0 = 0` → 0x1400748(r, g, b)
+ * 단계 3  [175] 빨강 (0xff, 0, 0) — de1e~de24
+ * 글은 0xba411(박스 1, 글, 0x22, …, dy −22) — 박스 1 가운데, 22px 위
  *         키 확인 · '5' · 취소 → 0xc9
  * ```
  */
@@ -536,7 +539,7 @@ function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
   const dots = '.'.repeat(Math.floor(update / 4) % 4)
   const text = stage === '진행'
     ? `!C!cFFFFFF${TRADE_PROGRESS}${dots}`
-    : stage === '성공' ? `!C!cFFFF00${TRADE_SUCCESS}` : `!C!cFF0000${TRADE_FAILURE}`
+    : stage === '성공' ? `!C!c00FF00${TRADE_SUCCESS}` : `!C!cFF0000${TRADE_FAILURE}`
   const box = PROGRESS_BOX
   return (
     <div role="status" aria-label="트레이드 진행" onClick={() => (stage === '진행' ? skip() : onFinish())}
