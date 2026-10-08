@@ -134,6 +134,10 @@ export interface HalfInningResult {
   readonly pinchHits: readonly HalfInningPinchHit[]
   /** 경기 끝 판정 0xb68fc(`hooks.endsGame`)이 참을 낸 타석에서 멈췄다 — 경기가 끝났다 */
   readonly gameEnded?: boolean
+  /** `hooks.stopsBefore` 가 참이라 그 타석을 열기 전에 멈췄다 — 반 이닝이 아직 이어진다 */
+  readonly stoppedBeforeBatter?: boolean
+  /** 멈춘 자리(또는 3아웃)의 루 */
+  readonly bases?: BaseState
 }
 
 /* ── 공격 쪽: 명단과 CPU 대타 (0xc1ba4 → 0xac228 → 0xaebe4) ───────────────────── */
@@ -277,6 +281,11 @@ export interface HalfInningDefense {
    * 안 넘기면 0(둘 다 거짓)이다.
    */
   readonly skillBitsAt?: (pitcherSlot: number) => number
+  /**
+   * 간이 엔진 0xc1ba4 의 투수 교체 갈래를 막는다 — c1c78 `0x66864()` 가 0 이면 c1cb6 에서 0xac428 을 건너뛴다(미션 모드 6 의
+   * 미션 객체 +0xbd ∈ {3, 7}). 안 넘기면 막지 않는다.
+   */
+  readonly pitcherChangeBlocked?: boolean
 }
 
 /** `roleAt` 을 안 넘긴 길 — 보직을 모른다 */
@@ -331,6 +340,12 @@ export interface HalfInningHooks {
    * 부르는 쪽이 경기 점수로 `isGameOverAt` 을 본다. 안 주면 3아웃까지 돈다.
    */
   readonly endsGame?: (state: { readonly runs: number; readonly outs: number }) => boolean
+  /**
+   * **자동진행이 사람에게 넘기는 자리** — 0x21 갱신 0x48480 은 타석마다 0xc2198 → 0xc1e04 로 "이 타석도 자동인가" 를 다시 묻고
+   * 아니면 0x18 로 넘긴다(반 이닝 중간이어도). 타석을 열기 앞(대타 · 교체 판정 0xc1ba4 보다 먼저)에 이것이 참이면 그 자리에서 멈춘다 —
+   * 미션 타자 미션의 미션 타자 차례(0xc1d38). 안 주면 3아웃까지 돈다.
+   */
+  readonly stopsBefore?: (state: { readonly battingOrderIndex: number; readonly lineup?: QuickLineup }) => boolean
 }
 
 export function simulateHalfInning(
@@ -386,7 +401,13 @@ export function simulateHalfInning(
     })
   }
 
+  /** `hooks.stopsBefore` 가 참을 낸 타석 앞에서 멈췄나 */
+  let stoppedBeforeBatter = false
   for (let faced = 0; faced < MAXIMUM_BATTERS && outs < OUTS_PER_INNING; faced += 1) {
+    if (hooks.stopsBefore?.({ battingOrderIndex: order, ...(lineup === undefined ? {} : { lineup }) }) === true) {
+      stoppedBeforeBatter = true
+      break
+    }
     // 0xc1ba4 안 차례 그대로 — **CPU 대타(공격 팀)가 먼저**다 (0xc1c50, 투수 교체 0xc1ce2 보다 앞).
     // 둘 중 하나라도 바뀌면 0xc1ba4 가 1 을 돌려 0xc262c 가 공 없이 돌아가고(c266c), 다음 부름에서 **같은 타석**으로
     // 0xc1ba4 를 다시 지난다 — 바뀐 쪽은 state[0xe]·state[0xd] 로 곧장 빠지고 안 바뀐 쪽은 다시 판정(굴림 포함)한다.
@@ -416,7 +437,7 @@ export function simulateHalfInning(
         }
       }
       // 간이 타석 루프 0xc262c 는 **타석마다 먼저** 0xc1ba4 를 불러 수비 팀 투수 교체를 판정한다
-      if (defense !== undefined && mound !== undefined) {
+      if (defense !== undefined && mound !== undefined && defense.pitcherChangeBlocked !== true) {
         const changed = changePitcherIfNeeded(defense, mound, {
           inningIndex: inning - 1,
           lead: defense.lead - runs,
@@ -605,6 +626,8 @@ export function simulateHalfInning(
     pinchHitUsed,
     pinchHits,
     gameEnded,
+    ...(stoppedBeforeBatter ? { stoppedBeforeBatter } : {}),
+    bases,
   }
 }
 

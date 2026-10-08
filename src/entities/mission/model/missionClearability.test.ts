@@ -13,7 +13,9 @@ import {
   applySteal,
   canSteal,
   checkSwingsExhausted,
+  isMissionBatterUp,
   recordSwing,
+  runBatterMissionAutoHalves,
   startMission,
 } from '@/entities/mission/model/missionRun'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
@@ -57,11 +59,16 @@ function playIdealBatter(mission: OriginalMission): MissionRun {
   if (mission.goals.includes('도루')) run = applySteal(run)
   const isBunt = mission.goals.includes('번트')
 
+  // 미션 타자 타석 사이의 사람 칸 마스터 타자는 삼진으로 넘기고, 3아웃이면 자동진행 반 이닝 — 씨앗 고정
+  const random = createSeededRandom(1)
   for (const outcome of idealBatterOutcomes(mission)) {
+    for (let plate = 0; plate < 200 && run.status === '진행중' && !isMissionBatterUp(run); plate += 1) {
+      run = runBatterMissionAutoHalves(applyOutcome(run, STRIKEOUT), random)
+    }
     if (run.status !== '진행중') break
     const played = isBunt ? SINGLE : outcome
     run = recordSwing(run)
-    run = applyOutcome(run, played, isBunt)
+    run = runBatterMissionAutoHalves(applyOutcome(run, played, isBunt), random)
   }
   return run
 }

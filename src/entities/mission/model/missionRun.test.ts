@@ -1,10 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { applyOutcome, applyPickoff, giveUp, missionAdvance, startMission, tick } from '@/entities/mission/model/missionRun'
+import {
+  applyOutcome,
+  applyPickoff,
+  giveUp,
+  isMissionBatterUp,
+  missionAdvance,
+  recordSwing,
+  runBatterMissionAutoHalves,
+  startMission,
+  tick,
+} from '@/entities/mission/model/missionRun'
+import type { MissionRun } from '@/entities/mission/model/missionRun'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 
 const 첫걸음 = MISSIONS.find((m) => m.name === '명품 타자의 첫 걸음')!
+
+/**
+ * 미션 타자 차례까지 — 원본은 미션 타자 타석 뒤 3아웃 전이면 다음 타순 마스터 타자도 사람이 친다(목표 · 타석 칸에 안 든다).
+ * 시험은 그 타석을 삼진으로 넘기고, 3아웃이면 0x18 · 자동진행 반 이닝(`runBatterMissionAutoHalves`)을 돌린다.
+ */
+function 미션타자차례까지(start: MissionRun, random: RandomPort = createSeededRandom(4)): MissionRun {
+  let run = runBatterMissionAutoHalves(start, random)
+  for (let plate = 0; plate < 200 && run.status === '진행중' && !isMissionBatterUp(run); plate += 1) {
+    run = runBatterMissionAutoHalves(applyOutcome(run, { kind: '삼진' }), random)
+  }
+  return run
+}
 const 사이클링 = MISSIONS.find((m) => m.name.includes('사이클링'))!
 const 치명적인유혹 = MISSIONS.find((m) => m.name === '치명적인 유혹')!
 const 추격타 = MISSIONS.find((m) => m.name === '추격타의 주인공')!
@@ -41,6 +66,12 @@ describe('applyOutcome', () => {
     let run = startMission(첫걸음)
     run = applyOutcome(run, { kind: '안타', bases: 1 })
     expect(run.status).toBe('진행중')
+    // 다음 타순은 사람 칸 팀 마스터 타자 — 그 타석은 목표에 안 든다
+    expect(isMissionBatterUp(run)).toBe(false)
+    const before = run.progress
+    run = applyOutcome(run, { kind: '안타', bases: 1 })
+    expect(run.progress).toBe(before)
+    run = 미션타자차례까지(run)
 
     run = applyOutcome(run, { kind: '안타', bases: 1 })
 
@@ -52,6 +83,9 @@ describe('applyOutcome', () => {
 
     run = applyOutcome(run, { kind: '삼진' })
     expect(run.status).toBe('진행중')
+    expect(run.remainingPlateAppearances).toBe(1)
+    run = 미션타자차례까지(run)
+    expect(run.remainingPlateAppearances).toBe(1)
     run = applyOutcome(run, { kind: '삼진' })
 
     expect(run.status).toBe('실패')
@@ -61,6 +95,7 @@ describe('applyOutcome', () => {
     let run = startMission(추격타)
 
     run = applyOutcome(run, { kind: '삼진' })
+    run = 미션타자차례까지(run)
     run = applyOutcome(run, { kind: '홈런' })
 
     expect(run.status).toBe('성공')
@@ -69,6 +104,7 @@ describe('applyOutcome', () => {
   it('끝난 미션은 더 이상 바뀌지 않는다', () => {
     let run = startMission(첫걸음)
     run = applyOutcome(run, { kind: '안타', bases: 1 })
+    run = 미션타자차례까지(run)
     run = applyOutcome(run, { kind: '안타', bases: 1 })
     expect(run.status).toBe('성공')
 
@@ -208,24 +244,28 @@ describe('applyPickoff — CPU 견제 한 판 (메시지 0x10 → 종류 4 → 0
     expect(applyPickoff(run, { bases: run.bases, runsScored: 0, outsAdded: 0 }).bases).toEqual(run.bases)
   })
 
-  it('3아웃이면 도루 실패와 같이 시작 상황으로 되돌린다', () => {
+  it('3아웃이면 빈 루 · 0아웃으로 0x18 · 자동진행을 기다린다 — 시작 상황은 경기 처음에만 깐다(0xaae7c aaf10)', () => {
     const run = { ...startMission(번트의달인), outs: 2 }
     const next = applyPickoff(run, { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 1 })
-    expect(next.outs).toBe(번트의달인.start.outs)
-    expect(next.bases).toEqual(번트의달인.start.runners)
+    expect(next.outs).toBe(0)
+    expect(next.bases).toEqual({ first: false, second: false, third: false })
+    expect(next.game.halfEnded).toBe(true)
   })
 })
 
 describe('타점은 3아웃으로 끝난 판의 득점도 든다 (0xae3e8 ae554 → 정산 0xa8024 a8994 += 이벤트 0xf 수)', () => {
   const 찬스 = MISSIONS.find((m) => m.name === '찬스를 노려라')!
 
-  it('2아웃 3루 주자 뜬공 — 포구 전에 홈을 밟은 바로 득점이 타점 1 이고, 루·아웃은 시작 상황으로 돌아간다', () => {
+  it('2아웃 3루 주자 뜬공 — 포구 전에 홈을 밟은 바로 득점이 타점 1 이고, 3아웃이라 빈 루 · 0아웃 · 자동진행 대기', () => {
     const run = startMission(찬스)
     expect(run.outs).toBe(2)
     const next = applyOutcome(run, { kind: '아웃', detail: '뜬공아웃' })
     expect(next.progress.counts['타점']).toBe(1)
-    expect(next.outs).toBe(찬스.start.outs)
-    expect(next.bases).toEqual(찬스.start.runners)
+    expect(next.outs).toBe(0)
+    expect(next.bases).toEqual({ first: false, second: false, third: false })
+    expect(next.game.halfEnded).toBe(true)
+    // 점수판 득점도 사람 칸(측 1) 점수에 든다
+    expect(next.game.scores[1]).toBe(찬스.start.ourScore + 1)
     // 2루타 목표가 남아 아직이다
     expect(next.status).toBe('진행중')
   })
@@ -243,5 +283,41 @@ describe('타점은 3아웃으로 끝난 판의 득점도 든다 (0xae3e8 ae554 
     expect(played.runnerFates[0].retired).toBe(true)
     const next = applyOutcome(run, 땅볼아웃, false, undefined, played)
     expect(next.progress.counts['타점']).toBe(1)
+  })
+})
+
+describe('타자 미션의 이닝 넘김 — 3아웃 → 0x18 → 자동진행 0x21 → 미션 타자 차례 0xd (`runBatterMissionAutoHalves`)', () => {
+  it('CPU 공격 반 이닝을 통째로, 사람 칸 반 이닝은 미션 타자 차례 앞까지 간이 엔진이 돈다', () => {
+    // 첫 걸음 — 1회말 1사, 사람 칸(홈) 공격, 미션 타자는 타순 3번(레코드 +7 윗 4비트 2)
+    let run = startMission(첫걸음)
+    run = applyOutcome(run, { kind: '삼진' })
+    while (run.outs !== 0 || !run.game.halfEnded) run = applyOutcome(run, { kind: '삼진' })
+    expect(run.game).toMatchObject({ inning: 0, offenseSide: 1, halfEnded: true })
+
+    const after = runBatterMissionAutoHalves(run, createSeededRandom(9))
+    expect(after.status).toBe('진행중')
+    expect(after.game.halfEnded).toBe(false)
+    // 말이 끝나 2회 — 초(CPU)는 지났고 지금은 다시 사람 칸의 말
+    expect(after.game.inning).toBeGreaterThanOrEqual(1)
+    expect(after.game.offenseSide).toBe(1)
+    expect(isMissionBatterUp(after)).toBe(true)
+    expect(after.outs).toBeLessThan(3)
+  })
+
+  it('9회말 2사에 미션 타자가 삼진이면 경기가 끝나 실패다 — 0xaaa6c aad20 (운명의 대결, 4:7)', () => {
+    const 운명 = MISSIONS.find((m) => m.side === '타자' && m.id === 12)!
+    const run = applyOutcome(startMission(운명), { kind: '삼진' })
+    expect(run.status).toBe('실패')
+  })
+
+  it('미션 타자가 아닌 타석은 스윙 · 타석 칸에 안 든다 (0xa57f8 a5844)', () => {
+    const 빠르게 = MISSIONS.find((m) => m.side === '타자' && m.id === 10)!
+    let run = applyOutcome(startMission(빠르게), { kind: '아웃', detail: '땅볼아웃' })
+    expect(isMissionBatterUp(run)).toBe(false)
+    const swings = run.remainingSwings
+    const plates = run.remainingPlateAppearances
+    run = applyOutcome(recordSwing(run), { kind: '삼진' })
+    expect(run.remainingSwings).toBe(swings)
+    expect(run.remainingPlateAppearances).toBe(plates)
   })
 })

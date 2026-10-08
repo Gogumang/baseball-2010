@@ -6,10 +6,14 @@ import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { simulateHalfInning } from '@/entities/game/model/simulateHalfInning'
 import { isGameOverAt } from '@/entities/game/model/gameState'
 import {
+  MISSION_CPU_START,
   missionPitchingDefenseOf,
   startMissionCpuPitching,
 } from '@/entities/mission/model/missionCpuTeam'
-import type { MissionCpuPitching } from '@/entities/mission/model/missionCpuTeam'
+import { EMPTY_BASES } from '@/entities/game/model/baseState'
+import type { BaseState } from '@/entities/game/model/baseState'
+import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import type { MissionAcePitcher, MissionCpuPitching } from '@/entities/mission/model/missionCpuTeam'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -47,20 +51,34 @@ export interface MissionGame {
   readonly humanBatting: MissionTeamBatting
   /** 투수 미션의 CPU 수비 — 사람 칸 팀이 치는 자동진행 반 이닝에 던진다 (선발 = 레코드 +6 아래 4비트, 0xb8c94) */
   readonly cpuAutoPitching: MissionCpuPitching | null
+  /** 타자 미션의 CPU 타선 — CPU 가 치는 자동진행 반 이닝 (타순 = 레코드 +7 아래 4비트) */
+  readonly cpuAutoBatting: MissionTeamBatting | null
+  /** 타자 미션의 사람 칸 팀 투수진 — CPU 가 치는 자동진행 반 이닝에 던진다 (명부 차례 그대로 — 0xaa57c 는 모드 6 에서 안 바꾼다) */
+  readonly humanPitching: MissionCpuPitching | null
   /** 사람이 맡은 반 이닝이 3아웃으로 끝나 0x18 · 자동진행을 기다린다 (부르는 쪽이 난수로 `runMissionAutoHalves` 류를 돌린다) */
   readonly halfEnded: boolean
 }
 
 export interface MissionTeamBatting {
   readonly teamId: number
-  /** `team+0xe` 명단 — 칸마다 레코드 번호(= 마스터 줄, 사람 칸 팀은 마선수가 없다) */
+  /** `team+0xe` 명단 — 칸마다 레코드 번호 */
   readonly lineup: QuickLineup
+  /** 레코드 칸마다 든 선수 — 마스터 줄(팀 안 0~11) 또는 미션 타자(`MISSION_NARI_RECORD`) */
+  readonly records: readonly number[]
   /** `team+0x32` */
   readonly order: number
 }
 
+/**
+ * 타자 미션의 **미션 타자** 레코드 표지 — 0xaa57c aa7b0(모드 6)이 `0xb87cc(사람 칸 팀)`으로 나리 타자편 저장 선수(0x1fc20)를
+ * 명부 끝(레코드 12, 0xb53f0 · 벤치 +0x28c +1)에 넣고 `0xb8cb8(팀, 레코드 +7 윗 4비트, 그 번호)` 로 시작 타순 레코드와 맞바꾼다.
+ */
+export const MISSION_NARI_RECORD = -2
+
 /** 마스터 팀 타자 12 줄 */
 const BATTERS_PER_TEAM = 12
+/** 마스터 팀 투수 8 줄 */
+const PITCHERS_PER_TEAM = 8
 
 /**
  * 레코드 +7 의 **윗 4비트** — 사람 칸 팀의 시작 타순(aa87c~aa88c `팀[사람 칸]+0x32`). 원본 표(`base/extracted/Xls*_MISSION.json`
@@ -91,6 +109,14 @@ export function startMissionGame(mission: OriginalMission): MissionGame {
   scores[human] = mission.start.ourScore
   scores[cpu] = mission.start.opponentScore
   const humanTeamId = mission.sideTeams[human]
+  const humanOrder = MISSION_HUMAN_START_ORDER[missionKeyOf(mission)] ?? 0
+  const isBatterMission = mission.side === '타자'
+  const humanRecords = Array.from({ length: BATTERS_PER_TEAM }, (_unused, record) => record)
+  if (isBatterMission) {
+    // 레코드 12 에 미션 타자 → 시작 타순 레코드 ↔ 12
+    humanRecords.push(humanRecords[humanOrder] ?? humanOrder)
+    humanRecords[humanOrder] = MISSION_NARI_RECORD
+  }
   return {
     inning: mission.start.inning - 1,
     offenseSide: mission.side === '투수' ? cpu : human,
@@ -98,10 +124,28 @@ export function startMissionGame(mission: OriginalMission): MissionGame {
     aceCheckedInning: -1,
     humanBatting: {
       teamId: humanTeamId,
-      lineup: rosterLineupOf(BATTERS_PER_TEAM),
-      order: MISSION_HUMAN_START_ORDER[missionKeyOf(mission)] ?? 0,
+      lineup: rosterLineupOf(humanRecords.length),
+      records: humanRecords,
+      order: humanOrder,
     },
-    cpuAutoPitching: mission.side === '투수' ? startMissionCpuPitching(mission) : null,
+    cpuAutoPitching: isBatterMission ? null : startMissionCpuPitching(mission),
+    cpuAutoBatting: isBatterMission
+      ? {
+          teamId: mission.sideTeams[cpu],
+          lineup: rosterLineupOf(BATTERS_PER_TEAM),
+          records: Array.from({ length: BATTERS_PER_TEAM }, (_unused, record) => record),
+          order: MISSION_CPU_START[missionKeyOf(mission)]?.battingOrder ?? 0,
+        }
+      : null,
+    humanPitching: isBatterMission
+      ? {
+          teamId: humanTeamId,
+          roster: Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot),
+          mound: { pitcherSlot: 0, stamina: FULL_STAMINA, runsAllowed: 0, pitches: 0, usedSlots: [], justChanged: false },
+          inningRunsAllowed: 0,
+          ourRuns: 0,
+        }
+      : null,
     halfEnded: false,
   }
 }
@@ -134,23 +178,49 @@ export function flipMissionHalf(game: MissionGame): MissionGame {
   }
 }
 
+/** 그 타선의 지금 타순 칸에 선 레코드 (마스터 줄 · 미션 타자 표지) */
+export function battingRecordAt(batting: MissionTeamBatting, order: number = batting.order): number {
+  const record = rosterSlotAt(batting.lineup, order)
+  return batting.records[record] ?? record
+}
+
+/** 자동진행 반 이닝 하나의 끝 */
+export interface MissionAutoHalf {
+  readonly batting: MissionTeamBatting
+  readonly pitching: MissionCpuPitching
+  /** 이 반 이닝(멈춘 자리까지)의 득점 */
+  readonly runs: number
+  readonly outs: number
+  readonly bases: BaseState
+  /** c21d6 — 경기 끝(끝내기 · 콜드 · 9회 3아웃) */
+  readonly gameEnded: boolean
+  /** 미션 타자 차례라 멈췄다 (타자 미션의 사람 칸 팀 공격만) */
+  readonly stoppedBeforeNari: boolean
+}
+
 /**
- * **사람 칸 팀이 치는 자동진행 반 이닝** (투수 미션) — 0x21 의 간이 타석 0xc262c 고리. 공격 = 사람 칸 팀 마스터 타선(`humanBatting`),
- * 수비 = CPU 팀(`cpuAutoPitching`, 투수 교체 0xac428 · 대타 0xac228 은 간이 엔진 0xc1ba4 그대로). 타석마다 c21d6 경기 끝(끝내기 · 콜드)을 본다.
- * 사람 칸 팀 마스터 타자는 육성·명예 선수가 아니라(0xb6389 · 0xb6349 거짓) 0xc1e04 가 반 이닝 내내 자동이다.
+ * **자동진행 반 이닝** — 0x21 의 간이 타석 0xc262c 고리 (공격 `batting` · 수비 `pitching`, 투수 교체 0xac428 · 대타 0xac228 은
+ * 간이 엔진 0xc1ba4 그대로). 타석마다 c21d6 경기 끝을 보고, 타자 미션은 0xc1e04 가 미션 타자 차례에서 사람에게 넘긴다(`stopBeforeNari`).
+ * `start` 는 이어서 도는 반 이닝의 루 · 아웃 · 득점(새 반 이닝이면 빈 루 · 0) — 간이 엔진은 반 이닝 첫머리부터만 돌므로 이어 돌 일은 없다.
  */
-export function simulateHumanTeamAutoHalf(
+export function simulateMissionAutoHalf(
   game: MissionGame,
+  batting: MissionTeamBatting,
+  pitching: MissionCpuPitching,
   random: RandomPort,
-): { readonly game: MissionGame; readonly gameEnded: boolean } {
-  const pitching = game.cpuAutoPitching
-  if (pitching === null) return { game, gameEnded: false }
-  const humanSide = game.offenseSide
-  const cpuSide = humanSide === 0 ? 1 : 0
-  const batting = game.humanBatting
+  stopBeforeNari: boolean,
+  /** 수비 재료 갈래 — 마투수 칸의 레코드 · 0x66864 교체 막음 (`missionPitchingDefenseOf`) */
+  defenseOptions: { readonly ace?: MissionAcePitcher; readonly pitcherChangeBlocked?: boolean } = {},
+): MissionAutoHalf {
+  const offenseSide = game.offenseSide
+  const defenseSide = offenseSide === 0 ? 1 : 0
   const rows = teamBatters(batting.teamId)
-  const batterOf = (recordIndex: number) => quickBatterOf(rows[recordIndex % rows.length])
-  const defense = missionPitchingDefenseOf(pitching, game.scores[cpuSide] - game.scores[humanSide])
+  // 미션 타자 표지는 멈춤 갈래가 먼저 걸러 여기 안 온다
+  const batterOf = (record: number) => {
+    const row = batting.records[record] ?? record
+    return quickBatterOf(rows[Math.max(0, row) % rows.length])
+  }
+  const defense = missionPitchingDefenseOf(pitching, game.scores[defenseSide] - game.scores[offenseSide], defenseOptions)
   const result = simulateHalfInning(
     batting.order,
     (cursor) => batterOf(rosterSlotAt(batting.lineup, cursor)),
@@ -161,29 +231,53 @@ export function simulateHumanTeamAutoHalf(
     {
       endsGame: ({ runs, outs }) => {
         const scores: [number, number] = [game.scores[0], game.scores[1]]
-        scores[humanSide] += runs
+        scores[offenseSide] += runs
         return isMissionGameOver(game, outs, scores)
       },
+      ...(stopBeforeNari
+        ? {
+            stopsBefore: ({ battingOrderIndex, lineup }: { readonly battingOrderIndex: number; readonly lineup?: QuickLineup }) =>
+              battingRecordAt({ ...batting, lineup: lineup ?? batting.lineup }, battingOrderIndex) === MISSION_NARI_RECORD,
+          }
+        : {}),
     },
     defense,
     { lineup: batting.lineup, batterOf, pinchHitUsed: false },
   )
-  const scored = withMissionScore(game, humanSide, result.runs)
+  // A(+0x284) — 멈춘 반 이닝이면 마지막 교체 뒤 이 반 이닝 실점이 남는다
+  const lastChange = result.pitcherChanges?.[result.pitcherChanges.length - 1]
+  const inningRunsAllowed = result.runs - (lastChange?.runsBefore ?? 0)
+  const scores: [number, number] = [game.scores[0], game.scores[1]]
+  scores[offenseSide] += result.runs
+  return {
+    batting: { ...batting, lineup: result.lineup ?? batting.lineup, order: result.nextBattingOrderIndex },
+    pitching: { ...pitching, mound: result.mound ?? pitching.mound, inningRunsAllowed },
+    runs: result.runs,
+    outs: result.outs,
+    bases: result.bases ?? EMPTY_BASES,
+    gameEnded: result.gameEnded === true || isMissionGameOver({ ...game, scores }, result.outs),
+    stoppedBeforeNari: result.stoppedBeforeBatter === true,
+  }
+}
+
+/**
+ * **사람 칸 팀이 치는 자동진행 반 이닝** (투수 미션) — 공격 = 사람 칸 마스터 타선(`humanBatting`), 수비 = CPU 팀(`cpuAutoPitching`).
+ * 사람 칸 팀 마스터 타자는 육성·명예 선수가 아니라(0xb6389 · 0xb6349 거짓) 0xc1e04 모드 5 가 반 이닝 내내 자동이다.
+ */
+export function simulateHumanTeamAutoHalf(
+  game: MissionGame,
+  random: RandomPort,
+): { readonly game: MissionGame; readonly gameEnded: boolean } {
+  const pitching = game.cpuAutoPitching
+  if (pitching === null) return { game, gameEnded: false }
+  const half = simulateMissionAutoHalf(game, game.humanBatting, pitching, random, false)
   return {
     game: {
-      ...scored,
-      humanBatting: {
-        ...batting,
-        lineup: result.lineup ?? batting.lineup,
-        order: result.nextBattingOrderIndex,
-      },
-      cpuAutoPitching: {
-        ...pitching,
-        // 이닝 교대 0xa5b00 이 A 를 0 으로 — 다음 자동진행 반 이닝은 0 에서 선다
-        mound: result.mound ?? pitching.mound,
-        inningRunsAllowed: 0,
-      },
+      ...withMissionScore(game, game.offenseSide, half.runs),
+      humanBatting: half.batting,
+      // 이닝 교대 0xa5b00 이 A 를 0 으로 — 다음 자동진행 반 이닝은 0 에서 선다
+      cpuAutoPitching: { ...half.pitching, inningRunsAllowed: 0 },
     },
-    gameEnded: result.gameEnded === true || isMissionGameOver(scored, result.outs),
+    gameEnded: half.gameEnded,
   }
 }

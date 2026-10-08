@@ -16,6 +16,9 @@ import {
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -351,17 +354,51 @@ export function missionCpuBatterAbilityOf(team: MissionCpuTeam): BatterAbility |
   }
 }
 
-/** 팀 투수 칸의 0xac428 · 0xabfcc 재료 — 리그 `defenseOf` · 타자편 `quickDefenseOf` 와 같은 모양 */
-export function missionPitchingDefenseOf(pitching: MissionCpuPitching, lead: number): HalfInningDefense {
+/** 미션 마투수의 간이 타석 재료 — 레벨 배율 먹은 네 칸(0xb6414, 레코드 +0xc 부터 제구 · 구속 · 변화 · 체력) */
+export interface MissionAcePitcher {
+  readonly quick: QuickAtBatPitcher
+  readonly staminaAbility: number
+}
+
+/** 타자 미션의 마투수 (마투수 미션이 아니면 undefined) */
+export function missionAcePitcherOf(
+  mission: OriginalMission,
+  aceLevels?: Readonly<Record<number, number>>,
+): MissionAcePitcher | undefined {
+  if (mission.side !== '타자' || mission.opponentAce <= 0) return undefined
+  const ace = ACE_PITCHERS[mission.opponentAce - 1]
+  if (ace === undefined) return undefined
+  const ability = aceAbilityAtLevel(ace.ability, aceLevelOf(aceLevels, aceLevelSlotOf('투수', mission.opponentAce)))
+  return {
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
+    staminaAbility: ability.run,
+  }
+}
+
+/** `0x66864` 의 모드 6 갈래 — 사람 타석 0x3d954 와 간이 엔진 0xc1ba4(c1c78) 둘 다 이것으로 투수 교체를 막는다 */
+export function isMissionPitcherChangeBlocked(mission: OriginalMission): boolean {
+  return mission.side === '타자' && PITCHER_CHANGE_BLOCKED_SLOTS.includes(missionSlotOf(mission))
+}
+
+/**
+ * 팀 투수 칸의 0xac428 · 0xabfcc 재료 — 리그 `defenseOf` · 타자편 `quickDefenseOf` 와 같은 모양.
+ * `ace` 를 주면 마투수 칸이 그 레코드로 던지고 그 체력 칸으로 깎인다(간이 엔진 — 자동진행 반 이닝).
+ */
+export function missionPitchingDefenseOf(
+  pitching: MissionCpuPitching,
+  lead: number,
+  options: { readonly ace?: MissionAcePitcher; readonly pitcherChangeBlocked?: boolean } = {},
+): HalfInningDefense {
   const masters = teamPitchers(pitching.teamId)
   const isAce = (slot: number) => pitching.roster[slot] === MISSION_ACE_ROSTER_SLOT
   const masterAt = (slot: number) => masters[pitching.roster[slot] ?? slot] ?? masters[0]
   return {
     mound: pitching.mound,
     pitcherSlots: pitching.roster.map((_master, slot) => slot),
-    pitcherAt: (slot) => quickPitcherOf(masterAt(slot)),
-    // 투수 능력치 칸 3 = 체력 — 소모(0x66e44 용량)에만 쓴다. 마투수 소모는 세션이 따로 들어 여기서 안 부른다
-    staminaAbilityAt: (slot) => masterAt(slot).ability[3],
+    pitcherAt: (slot) => (isAce(slot) && options.ace !== undefined ? options.ace.quick : quickPitcherOf(masterAt(slot))),
+    // 투수 능력치 칸 3 = 체력 — 소모(0x66e44 용량)에만 쓴다. 사람 타석의 마투수 소모는 세션이 든다(`ace` 를 안 넘긴다)
+    staminaAbilityAt: (slot) =>
+      isAce(slot) && options.ace !== undefined ? options.ace.staminaAbility : masterAt(slot).ability[3],
     // 벤치 줄의 +0x2c — 마스터 줄은 모두 10000 이고 미션 한 판 안에서는 벤치가 안 던진다
     staminaAt: () => FULL_STAMINA,
     lead,
@@ -376,6 +413,7 @@ export function missionPitchingDefenseOf(pitching: MissionCpuPitching, lead: num
     isSpecialPitcherAt: isAce,
     // 소모 0xa5e14 의 비트 18 · 10 — 마스터 줄 +0x14 (Xls 행 사본). 마투수 소모는 세션이 든다
     skillBitsAt: (slot) => masterPitcherRowAt(pitching, slot)?.skillBits ?? 0,
+    ...(options.pitcherChangeBlocked === true ? { pitcherChangeBlocked: true } : {}),
   }
 }
 
@@ -384,7 +422,7 @@ const MAXIMUM_COUNTER = 99
 /**
  * **점수판 득점** — 득점 처리 0xa5c34 가 1점마다 수비 투수의 A(+0x284) · B(+0x280)를 올린다(99 에서 멈춤, P7 E1).
  * 타자 미션에서만 뜻이 있다(CPU 가 수비). `inningEnded` 면 이어서 이닝 교대 0xa5b00 이 A 를 0 으로 —
- * ⚠️ 웹 미션은 3아웃이면 시작 상황으로 돌아가므로(`advanceSituation` 의 추정) 그 자리를 이닝 교대로 본다.
+ * 사람 칸 반 이닝이 3아웃이면 그 자리가 이닝 교대다(뒤이어 자동진행 — `missionRun.runBatterMissionAutoHalves`).
  */
 export function missionCpuAfterRuns(team: MissionCpuTeam, runs: number, inningEnded: boolean): MissionCpuTeam {
   const pitching = team.pitching
@@ -425,14 +463,19 @@ export function missionCpuAfterPlateAppearance(team: MissionCpuTeam, outcome: At
  */
 export function missionCpuAfterPitch(
   team: MissionCpuTeam,
-  pitch: { readonly pitchTypeNumber: number; readonly batterIntimidates: boolean },
+  pitch: {
+    readonly pitchTypeNumber: number
+    readonly batterIntimidates: boolean
+    /** 마투수가 마운드면 세션이 깎은 그 레코드 +0x2c (`missionOpponentStaminaAfterPitch`) — 안 주면 그대로 */
+    readonly aceStamina?: number
+  },
 ): MissionCpuTeam {
   const pitching = team.pitching
   if (pitching === null) return team.pinchHitBlocked ? { ...team, pinchHitBlocked: false } : team
   const mound = pitching.mound
   const isAce = pitching.roster[mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
   const stamina = isAce
-    ? mound.stamina
+    ? (pitch.aceStamina ?? mound.stamina)
     : drainPitcherForPitch(missionPitchingDefenseOf(pitching, 0), mound, pitch.pitchTypeNumber, pitch.batterIntimidates)
   return {
     ...team,
@@ -464,6 +507,10 @@ export interface MissionPitchSelectionSituation {
   readonly strikes: number
   /** 마투수가 마운드면 그 스태미나 +0x2c (세션 `missionOpponentStaminaAfterPitch` 값). 아니면 안 본다 */
   readonly aceStamina: number
+  /** `st[0x6b]` 0부터 센 이닝 (`MissionRun.game`). 안 주면 시작 이닝 */
+  readonly inningIndex?: number
+  /** 리드 0xb69b0(수비 − 공격) = CPU 점수 − 사람 칸 점수 (`MissionRun.game.scores`). 안 주면 시작 점수 + 사람 득점으로 */
+  readonly lead?: number
 }
 
 /**
@@ -482,15 +529,15 @@ export function enterMissionPitchSelection(
   if (pitching !== null) {
     // 0x66864 — 모드 6 은 +0xbd ∈ {3, 7} 이면 막는다
     if (PITCHER_CHANGE_BLOCKED_SLOTS.includes(missionSlotOf(mission))) return unchanged
-    const lead = mission.start.opponentScore - (mission.start.ourScore + pitching.ourRuns)
+    const lead = situation.lead ?? mission.start.opponentScore - (mission.start.ourScore + pitching.ourRuns)
     const isAceMound = pitching.roster[pitching.mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
     const mound = isAceMound ? { ...pitching.mound, stamina: situation.aceStamina } : pitching.mound
     const after = changePitcherIfNeeded(
       missionPitchingDefenseOf({ ...pitching, mound }, lead),
       mound,
       {
-        // state[0x6b] — 0xaa57c 가 레코드 +3 아래 4비트로 적는다. ⚠️ 웹 미션은 이닝을 넘기지 않아 시작 이닝 그대로다
-        inningIndex: mission.start.inning - 1,
+        // state[0x6b] — 0xaa57c 가 레코드 +3 아래 4비트로 적고 말이 끝날 때마다 0xb6b6c 가 올린다 (`MissionRun.game`)
+        inningIndex: situation.inningIndex ?? mission.start.inning - 1,
         lead,
         runnerCount: situation.runnerCount,
         inningRunsAllowed: pitching.inningRunsAllowed,

@@ -2,7 +2,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { createProgress, isCleared, recordOutcome, recordSteal } from '@/entities/mission/model/missionGoal'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
-import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
+import { EMPTY_BASES, advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -14,8 +14,19 @@ import { runnerFatesWithoutPlay, type RunnerFate } from '@/features/defense-play
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { missionCpuAfterRuns, startMissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
-import { startMissionGame } from '@/entities/mission/model/missionGame'
+import {
+  MISSION_NARI_RECORD,
+  battingRecordAt,
+  flipMissionHalf,
+  humanSideOf,
+  isMissionGameOver,
+  simulateMissionAutoHalf,
+  startMissionGame,
+  withMissionScore,
+} from '@/entities/mission/model/missionGame'
+import { isMissionPitcherChangeBlocked, missionAcePitcherOf } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionGame } from '@/entities/mission/model/missionGame'
+import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineup'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -212,8 +223,8 @@ const MISSION_PITCHER_SIDE_MODE = 5
 export const MISSION_BATTER_MODE = 6
 
 /**
- * 공격 결과로 주자·아웃을 옮긴다. 3아웃이 되면 미션 시작 상황으로 되돌린다 —
- * 미션은 한 이닝을 넘기지 않는 것으로 본다 (추정).
+ * 공격 결과로 주자·아웃을 옮긴다. 3아웃이면 빈 루 · 0아웃이고 `inningEnded` — 반 이닝 넘김 · 자동진행은 부르는 쪽이
+ * 난수로 돌린다(`runBatterMissionAutoHalves`, `missionGame` 머리글). 원본은 시작 상황을 경기 처음에만 깐다(0xaae7c aaf10).
  *
  * **득점은 3아웃이어도 그대로 낸다** — 미션 '타점'(R+0x104)의 원본 길 (직접 재역어셈):
  * - 판 끝 판정 B 0xae3e8 은 아웃 > 2 여도(ae554 → 0x18) 정산 0xa8024 를 부른다(ae5b2), 판정 0xaaa6c 는 그 뒤(ae5c4).
@@ -236,8 +247,8 @@ export function advanceSituation(
   const outs = run.outs + advance.outsAdded
   if (outs >= OUTS_PER_INNING) {
     return {
-      bases: run.mission.start.runners,
-      outs: run.mission.start.outs,
+      bases: EMPTY_BASES,
+      outs: 0,
       runsScored: advance.runsScored,
       outcome: play.outcome,
       inningEnded: true,
@@ -246,9 +257,42 @@ export function advanceSituation(
   return { bases: advance.bases, outs, runsScored: advance.runsScored, outcome: play.outcome, inningEnded: false }
 }
 
-/** 배트를 냈다 (헛스윙·파울 포함). 스윙 제한이 있는 미션만 줄어든다. */
+/**
+ * **지금 사람 칸 팀 타석에 미션 타자가 섰나** — 사건 기록 0xa57f8 은 코드 ≤ 0x13(안타 · 타점 · 타석 7 · 스윙 9 · 도루 0x10 …)을
+ * `0xa56dc(R, 0xae89c(공격 팀), 1)` — 지금 타자가 R 의 선수(미션 타자)일 때만 R 에 넣는다(a5844~a584c). 타자 미션의 다른 타순은 사람 칸 팀
+ * 마스터 줄이라 목표 · 타석 · 스윙 칸에 안 든다. 투수 미션은 늘 참(이 칸을 안 쓴다).
+ */
+export function isMissionBatterUp(run: Pick<MissionRun, 'mission' | 'game'>): boolean {
+  if (run.mission.side !== '타자') return true
+  return battingRecordAt(run.game.humanBatting) === MISSION_NARI_RECORD
+}
+
+/**
+ * 사람 칸 팀 타석 하나가 끝났다 — 정산 0xa8024 가 그 타순 칸 기록을 올리고 0xaf020 이 타순을 (+1) mod 9 로 넘긴다.
+ * 점수판 득점(0xa5c34)은 사람 칸 측, 3아웃이면 0x18 · 자동진행을 기다린다.
+ */
+function afterHumanPlateAppearance(game: MissionGame, mission: OriginalMission, outcome: AtBatOutcome | null, runs: number, inningEnded: boolean): MissionGame {
+  const batting = game.humanBatting
+  const scored = withMissionScore(game, humanSideOf(mission), runs)
+  return {
+    ...scored,
+    humanBatting:
+      outcome === null
+        ? batting
+        : { ...batting, lineup: recordLineupPlay(batting.lineup, batting.order, outcome), order: lineupSlotOf(batting.order + 1) },
+    halfEnded: scored.halfEnded || inningEnded,
+  }
+}
+
+/** 판 끝 판정 0xaaa6c aad20 — 경기 끝(0xb68fc)인데 아직이면 실패. `outs` 는 판정 때 state[6](3아웃 판이면 3) */
+function judgedAtGameEnd<T extends MissionRun>(run: T, outs: number): T {
+  if (run.status !== '진행중') return run
+  return isMissionGameOver(run.game, Math.min(OUTS_PER_INNING, outs)) ? { ...run, status: '실패' } : run
+}
+
+/** 배트를 냈다 (헛스윙·파울 포함). 스윙 제한이 있는 미션만 줄어든다 — 스윙 칸(코드 9)은 미션 타자의 스윙만 센다. */
 export function recordSwing<T extends MissionRun>(run: T): T {
-  if (run.status !== '진행중' || run.remainingSwings === null) return run
+  if (run.status !== '진행중' || run.remainingSwings === null || !isMissionBatterUp(run)) return run
   return { ...run, remainingSwings: run.remainingSwings - 1 }
 }
 
@@ -274,23 +318,22 @@ export function applyOutcome(
   if (run.status !== '진행중') return run
 
   const situation = advanceSituation(run, outcome, random, played)
+  // 미션 타자가 아닌 사람 칸 타순(마스터 줄)의 타석은 목표 · 타석 칸에 안 든다 (0xa57f8 a5844 — `isMissionBatterUp`)
+  const counts = isMissionBatterUp(run)
   // 목표는 판 끝 정산(0xa8024 → 미션 판정 0xaaa6c)이 낸 결과로 센다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
-  const progress = recordOutcome(
-    run.progress,
-    situation.outcome,
-    situation.runsScored,
-    isBunt,
-    runnerCountOf(run.bases),
-  )
+  const progress = counts
+    ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, runnerCountOf(run.bases))
+    : run.progress
   const advanced: MissionRun = {
     ...run,
     bases: situation.bases,
     outs: situation.outs,
     // 점수판 득점 0xa5c34 → CPU 수비 투수의 실점 A·B, 3아웃이면 이닝 교대 0xa5b00 의 A = 0
     cpu: missionCpuAfterRuns(run.cpu, situation.runsScored, situation.inningEnded),
+    game: afterHumanPlateAppearance(run.game, run.mission, situation.outcome, situation.runsScored, situation.inningEnded),
   }
   const remaining =
-    run.remainingPlateAppearances === null ? null : run.remainingPlateAppearances - 1
+    run.remainingPlateAppearances === null || !counts ? run.remainingPlateAppearances : run.remainingPlateAppearances - 1
 
   if (isCleared(run.mission, progress)) {
     return { ...advanced, progress, remainingPlateAppearances: remaining, status: '성공' }
@@ -298,12 +341,13 @@ export function applyOutcome(
   const isOutOfChances =
     (remaining !== null && remaining <= 0) ||
     (run.remainingSwings !== null && run.remainingSwings <= 0)
-  return {
+  const judged: MissionRun = {
     ...advanced,
     progress,
     remainingPlateAppearances: remaining,
     status: isOutOfChances ? '실패' : '진행중',
   }
+  return judgedAtGameEnd(judged, situation.inningEnded ? OUTS_PER_INNING : situation.outs)
 }
 
 /** 시간을 흘린다. 0이 되면 실패다. 투수편도 같은 규칙이다. */
@@ -339,7 +383,7 @@ export function applySteal(run: MissionRun): MissionRun {
  * 정산 0xa8024 와 미션 판정 0xaaa6c(0xae5c4)를 부른다. 종류 4 는 타석이 아니라(state[0x26], 0xa8d98)
  * 남은 타석·스윙은 그대로이고, 안타·타점 가지도 안 선다 — 목표 칸은 하나도 안 움직인다.
  *
- * 3아웃이면 도루 실패(`failSteal`)·타구(`advanceSituation`)와 같이 미션 시작 상황으로 되돌린다 (같은 추정).
+ * 3아웃이면 빈 루 · 0아웃 · 자동진행 대기(타구 `advanceSituation` 과 같다). 판 끝 판정은 경기 끝(끝내기 등)이면 실패로.
  * ⚠️ 악송구로 들어온 득점은 타점이 아니라 목표에 안 들고, 화면 점수(시작 점수 + 타점)에도 안 보인다 — 웹 미션은
  *    득점 칸을 따로 들지 않는다(근사).
  */
@@ -347,11 +391,13 @@ export function applyPickoff<T extends MissionRun>(run: T, advance: AdvanceResul
   if (run.status !== '진행중') return run
   const outs = run.outs + advance.outsAdded
   // 판의 득점도 점수판 득점 0xa5c34 라 CPU 수비 투수의 실점 A·B 에 든다 (타자 미션)
-  const cpu = missionCpuAfterRuns(run.cpu, advance.runsScored, outs >= OUTS_PER_INNING)
-  if (outs >= OUTS_PER_INNING) {
-    return { ...run, bases: run.mission.start.runners, outs: run.mission.start.outs, cpu }
-  }
-  return { ...run, bases: advance.bases, outs, cpu }
+  const isInningOver = outs >= OUTS_PER_INNING
+  const cpu = missionCpuAfterRuns(run.cpu, advance.runsScored, isInningOver)
+  const game = afterHumanPlateAppearance(run.game, run.mission, null, advance.runsScored, isInningOver)
+  const moved: T = isInningOver
+    ? { ...run, bases: EMPTY_BASES, outs: 0, cpu, game }
+    : { ...run, bases: advance.bases, outs, cpu, game }
+  return judgedAtGameEnd(moved, outs)
 }
 
 /** 도루 실패 — 주자가 죽는다 */
@@ -360,14 +406,88 @@ export function failSteal(run: MissionRun): MissionRun {
   const bases = { ...run.bases, first: false }
   const outs = run.outs + 1
   if (outs >= OUTS_PER_INNING) {
-    return {
-      ...run,
-      bases: run.mission.start.runners,
-      outs: run.mission.start.outs,
-      cpu: missionCpuAfterRuns(run.cpu, 0, true),
-    }
+    return judgedAtGameEnd(
+      {
+        ...run,
+        bases: EMPTY_BASES,
+        outs: 0,
+        cpu: missionCpuAfterRuns(run.cpu, 0, true),
+        game: afterHumanPlateAppearance(run.game, run.mission, null, 0, true),
+      },
+      outs,
+    )
   }
   return { ...run, bases, outs }
+}
+
+/** 반 이닝을 몇 번까지 자동으로 돌리나 — 경기 끝(연장도 결국 끝난다) 전에 멈출 일이 없게 넉넉히 */
+const MAXIMUM_AUTO_HALVES = 200
+
+/**
+ * **타자 미션의 3아웃 뒤** — 0x18 → 0xc2198 → 자동진행 0x21 → … → 0xd (`missionGame` 머리글).
+ *
+ * 0xc1e04 모드 6(c1e6a)은 공격 타자가 육성·명예 선수가 아니면 자동이라:
+ * 1. CPU 가 치는 반 이닝 통째 — 공격 CPU 타선(`cpuAutoBatting`) · 수비 사람 칸 팀 투수진(`humanPitching`).
+ * 2. 사람 칸 팀 반 이닝 — 미션 타자 차례(`MISSION_NARI_RECORD`)가 오기 전까지 자동(수비 = CPU 팀 `cpu.pitching`). 오면 0x18 → 0xd —
+ *    그 자리의 루 · 아웃 · 카운트 0-0 으로 미션 타자가 선다. 그 반 이닝이 미션 타자 차례 전에 3아웃이면 1 로 돌아간다.
+ * 반 이닝이 끝날 때마다 c21d6 경기 끝 → 끝났으면 판정 없이 0x19(미션 객체 +0xbc 가 안 서 **실패**), 아니면 0xb6b6c · c2248 판정(목표 칸은
+ * 그 사이 안 움직인다 — 사건 0xa57f8 은 지금 타자가 미션 타자일 때만 R 에 든다).
+ * 미션 객체 +0xbd ∈ {3, 7}(레오니 · 발렌타인)이면 간이 엔진 0xc1ba4 도 0x66864 로 투수 교체를 건너뛴다 — 양 팀 모두.
+ * 0xd 의 0xaae7c 마투수 다시 끼우기(ab006~ab06e, 모드 6 · 공격이 사람)는 웹에 남는 일이 없다: 마투수가 마운드에 있으면 안 끼우고,
+ * 내려갔으면 명부 레코드 0 ↔ 8 만 바뀌고 `0xaea84(팀, 0)` 이 교체 예약(+0x290)을 지워 마운드(team[0])는 그대로다 — 0xabfcc 는
+ * 마선수를 안 고르므로 그 레코드가 다시 오를 길도 없다.
+ * 난수: 자동진행 반 이닝마다 간이 엔진 굴림(타석마다 0xc1ba4 대타 · 투수 교체, 0xc262c 공 · 타구).
+ */
+export function runBatterMissionAutoHalves(
+  run: MissionRun,
+  random: RandomPort,
+  aceLevels?: Readonly<Record<number, number>>,
+): MissionRun {
+  if (!run.game.halfEnded) return run
+  let game: MissionGame = { ...run.game, halfEnded: false }
+  if (run.status !== '진행중' || run.mission.side !== '타자') return { ...run, game }
+  const cpuBatting = game.cpuAutoBatting
+  const humanPitching = game.humanPitching
+  let cpuPitching = run.cpu.pitching
+  if (cpuBatting === null || humanPitching === null || cpuPitching === null) return { ...run, game }
+  const blocked = isMissionPitcherChangeBlocked(run.mission)
+  const ace = missionAcePitcherOf(run.mission, aceLevels)
+  for (let half = 0; half < MAXIMUM_AUTO_HALVES; half += 1) {
+    // CPU 공격 반 이닝
+    game = flipMissionHalf(game)
+    const cpuHalf = simulateMissionAutoHalf(game, game.cpuAutoBatting ?? cpuBatting, game.humanPitching ?? humanPitching, random, false, {
+      pitcherChangeBlocked: blocked,
+    })
+    game = {
+      ...withMissionScore(game, game.offenseSide, cpuHalf.runs),
+      cpuAutoBatting: cpuHalf.batting,
+      // 이닝 교대 0xa5b00 이 A 를 0 으로
+      humanPitching: { ...cpuHalf.pitching, inningRunsAllowed: 0 },
+    }
+    if (cpuHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
+    // 사람 칸 팀 반 이닝 — 미션 타자 차례까지
+    game = flipMissionHalf(game)
+    const humanHalf = simulateMissionAutoHalf(
+      game,
+      game.humanBatting,
+      { ...cpuPitching, inningRunsAllowed: 0 },
+      random,
+      true,
+      { ...(ace === undefined ? {} : { ace }), pitcherChangeBlocked: blocked },
+    )
+    game = { ...withMissionScore(game, game.offenseSide, humanHalf.runs), humanBatting: humanHalf.batting }
+    cpuPitching = {
+      ...humanHalf.pitching,
+      // 리드(수비 − 공격)의 우리 쪽 — 사람 칸 팀 득점
+      ourRuns: humanHalf.pitching.ourRuns + humanHalf.runs,
+      inningRunsAllowed: humanHalf.stoppedBeforeNari ? humanHalf.pitching.inningRunsAllowed : 0,
+    }
+    if (humanHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
+    if (humanHalf.stoppedBeforeNari) {
+      return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, bases: humanHalf.bases, outs: humanHalf.outs }
+    }
+  }
+  return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching } }
 }
 
 export function giveUp(run: MissionRun): MissionRun {
