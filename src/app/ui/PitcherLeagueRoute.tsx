@@ -92,7 +92,8 @@ export function PitcherLeagueRoute({
   const previousScene = sceneTrail.current.previous
   /**
    * 관리 메뉴 [this+0x8c] 의 커서 — 타자편 `CareerRoutes` 와 같다(`NariMainMenuCursor`). 105 에 들어올 때마다(관리 장면, 또는
-   * 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 규칙: 행동함이고 이전이 109 · 110(웹 상점은 곧장 돌아온다)이 아니면 첫 칸.
+   * 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 규칙: 행동함이고 이전이 109 · 110 이 아니면 첫 칸. 상점(111 · 121)에서
+   * 돌아오면 105 가 아니라 하위 메뉴(110 · 106)로 선다(`nariReturnSubMenuOf`) — 이 규칙을 안 친다.
    */
   const mainCursor = useRef(createNariMainMenuCursor()).current
   const entryTrail = useRef<string | null>(null)
@@ -103,8 +104,9 @@ export function PitcherLeagueRoute({
     const isFromManagementFrame = scene === '이벤트' && entryTrail.current === '관리'
     if (career !== null && entryKey !== null && !isFromManagementFrame) {
       // 이벤트 → 관리 · 이벤트 → 이벤트는 이전 114 다
-      const isFromKeptState = entryTrail.current === null && (previousScene === '다음경기순위' || previousScene === '상점')
-      mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, isFromKeptState)
+      const isFromStandings = entryTrail.current === null && previousScene === '다음경기순위'
+      const isSubMenuReturn = entryTrail.current === null && previousScene === '상점'
+      if (!isSubMenuReturn) mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, isFromStandings)
     }
     entryTrail.current = entryKey
   }
@@ -384,7 +386,7 @@ export function PitcherLeagueRoute({
         gpDetail={shopGpDetail}
         onCloseGpDetail={actions.closeShopGpDetail}
         onPurchase={(itemId) => actions.purchase(itemId, openedHiddenIds)}
-        // 111 취소 → 110, 121 취소 → 106 이지만 웹 관리 화면은 다시 열 때 105 부터다 (근사)
+        // 111 취소 → 110 — 관리 화면이 다시 열릴 때 아이템 하위 메뉴 그 칸에 선다(`nariReturnSubMenuOf`). 121 취소 → 106 은 아직 105 부터다 (근사)
         onBack={() => actions.goto('관리')}
       />
     )

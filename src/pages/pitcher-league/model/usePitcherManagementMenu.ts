@@ -110,6 +110,11 @@ export interface UsePitcherManagementMenuInput {
   readonly onOpenShop?: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
+  /**
+   * 처음 설 하위 메뉴 — 111 상점 취소는 110(0x13460 의 13b1e) · 121 장비착용 취소는 106(0x17ad0 의 17aee)으로 돌아온다
+   * (`nariReturnSubMenuOf`). 없으면 105.
+   */
+  readonly initialKind?: PitcherMenuKind
 }
 
 export interface PitcherManagementMenu {
@@ -165,7 +170,7 @@ const MAGIC_GAME_POINT_COST: readonly number[] = BALANCE.specialSwing.gamePointC
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
   const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit } = input
-  const [kind, setKind] = useState<PitcherMenuKind>('관리')
+  const [kind, setKind] = useState<PitcherMenuKind>(input.initialKind ?? '관리')
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
   const [isTitleWindowOpen, setIsTitleWindowOpen] = useState(false)

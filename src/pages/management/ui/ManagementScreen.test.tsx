@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScreen'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { createNariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
 
 /** 알림 상자는 "확인"을 누르면 닫히고, 같은 문구라도 다시 띄우면 다시 보여야 한다. */
 
@@ -368,6 +369,32 @@ describe('관리 메뉴 [this+0x8c] 커서 — 루트가 들고 105 진입 0x119
     clickCommand('선수정보')
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(mainCursor.current).toBe(0)
+  })
+
+  it('110 확인 → 111 상점에서 돌아오면 105 가 아니라 110 그 칸(0x13460 13b1e → 0x6e · 0x107e0 은 커서를 안 건드린다), 110 취소가 105 진입', () => {
+    const career = { ...createCareer('테스터'), hasActedThisCycle: true }
+    const mainCursor = createNariMainMenuCursor()
+    const onOpenShop = vi.fn()
+    render(<ManagementScreen {...propsWith({ career, mainCursor, onOpenShop })} />)
+    clickCommand('아이템')
+    clickCommand('서브')
+    expect(onOpenShop).toHaveBeenCalledWith('서브')
+    cleanup()
+
+    // 상점이 관리 화면을 내렸다가 돌아온다 — 아이템 하위 메뉴, 고른 칸
+    render(<ManagementScreen {...propsWith({ career, mainCursor })} />)
+    expect(screen.getByRole('button', { name: '서브' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.queryByRole('button', { name: '다음경기' })).toBeNull()
+
+    // 110 취소 → 105: 이전 110 이라 행동함이어도 커서가 남는다(아이템 칸)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(mainCursor.current).toBe(4)
+    expect(screen.getByRole('button', { name: '아이템' }).getAttribute('aria-current')).toBe('true')
+    cleanup()
+
+    // 한 번 돌아오면 끝 — 그 뒤 다시 마운트되면 105
+    render(<ManagementScreen {...propsWith({ career, mainCursor })} />)
+    expect(screen.getByRole('button', { name: '다음경기' })).toBeTruthy()
   })
 
   it('화면 안 행동(휴식 127)으로 행동함이 서면, 결과 창이 걷힌 뒤 105 진입이 첫 칸으로', () => {

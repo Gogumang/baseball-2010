@@ -27,7 +27,9 @@ import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { PITCHER_COMMAND_BAR, pitcherLabelDxOf, pitcherParentSlotOf } from '@/pages/pitcher-league/lib/pitcherCommandBar'
 import type { PitcherCommandKind } from '@/pages/pitcher-league/lib/pitcherCommandBar'
 import type { PitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
-import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import {
+  createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
+} from '@/pages/management/model/nariMainMenuCursor'
 import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
 
 /**
@@ -77,6 +79,8 @@ export interface PitcherManagementScreenProps {
 const NO_DISABLED: ReadonlySet<string> = new Set()
 /** 커서를 옮긴 뒤 두 번 그리는 동안 +1, −1 로 튄다 (카운터 [gfx+0x98]) */
 const BOUNCE_BY_UPDATE = [1, -1]
+/** 칸 등장 0x7ff8c 가 다 내려온 뒤의 갱신 수 — 하위 메뉴로 돌아올 때는 펼침(0x7ff55)이 없어 칸이 제자리다 */
+const SETTLED_UPDATES = 1_000
 
 /**
  * 커맨드 줄 0x7e418 (투수 표 `lib/pitcherCommandBar`). 칸 등장 0x7ff8c · 부모 칸 0x8003c 는 메뉴가 열린 뒤 갱신 수로,
@@ -97,11 +101,21 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
   const slots = PITCHER_COMMAND_BAR[kind]
   const update = useUpdateCounter()
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
-  const [state, setState] = useState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: 0, movedAt: null as number | null })
+  // 하위 메뉴가 선 채로 마운트되면(하위 창 119 · 122~124 · 108 이나 상점 111 · 121 에서 돌아옴) 그 하위 메뉴 객체의 커서 그대로,
+  // 칸은 다 펼쳐져 있다(106 진입 0x11530 은 이전 105 일 때만 · 107 · 110 진입은 커서를 안 건드리고 펼침 0x7ff55 도 없다)
+  const [state, setState] = useState(() => ({
+    kind,
+    cursor: kind === '관리' ? mainCursor.current : mainCursor.subCursor ?? 0,
+    openedAt: kind === '관리' ? 0 : -SETTLED_UPDATES,
+    movedAt: null as number | null,
+  }))
   if (state.kind !== kind) {
     if (kind === '관리') {
       const returning = Math.max(0, slots.findIndex((slot) => slot.id === state.kind))
       mainCursor.current = nariMainCursorOnEntry(returning, hasActed, state.kind === '아이템')
+    } else {
+      // 105 에서 하위 메뉴로 — 106 은 진입이, 107 · 110 은 앞선 105 진입이 커서를 0 으로 되감아 둔다
+      mainCursor.subCursor = 0
     }
     setState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: update, movedAt: null })
   }
@@ -109,6 +123,7 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
   const moveTo = (index: number) => {
     if (index === cursor) return
     if (kind === '관리') mainCursor.current = index
+    else mainCursor.subCursor = index
     setState((held) => ({ ...held, cursor: index, movedAt: update }))
   }
   const latest = useRef({ cursor, slots, moveTo, menu })
@@ -169,9 +184,25 @@ function titleViewOf(career: PitcherCareer): PlayerCareer {
 
 export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const { career } = props
-  const menu = usePitcherManagementMenu(props)
   const ownMainCursor = useRef(createNariMainMenuCursor()).current
   const mainCursor = props.mainCursor ?? ownMainCursor
+  /** 111 상점 · 121 장비착용에서 돌아왔으면 그 하위 메뉴(110 · 106) (`nariReturnSubMenuOf`) */
+  const [returned] = useState(() => nariReturnSubMenuOf(mainCursor))
+  useEffect(() => {
+    mainCursor.returnSubMenu = null
+  }, [mainCursor])
+  const { onOpenShop } = props
+  const menu = usePitcherManagementMenu({
+    ...props,
+    ...(returned === null ? {} : { initialKind: returned.kind }),
+    // 110 확인 → 111(키 0x11478) — 상점 취소는 110 으로 돌아온다(0x13460 의 13b1e). 커서는 고른 칸 그대로
+    ...(onOpenShop === undefined ? {} : {
+      onOpenShop: (tab: PitcherShopTab) => {
+        if (tab !== '착용') leaveNariSubMenu(mainCursor, '아이템', PITCHER_COMMAND_BAR.아이템.findIndex((slot) => slot.id === tab))
+        onOpenShop(tab)
+      },
+    }),
+  })
   /*
    * 화면 안 행동(훈련 125 · 휴식 127 — S+4 = 1)은 그 상태를 거쳐 105 로 다시 들어온다 — 그 진입이 행동함이라 커서를 첫 칸으로.
    * 행동함이 막 서면, 결과 창 · 하위 창이 걷혀 관리 메뉴만 남는 때에 그 진입을 친다(타자편 `useManagementMenu` 와 같다).

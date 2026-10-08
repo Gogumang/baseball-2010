@@ -1615,7 +1615,7 @@ export function usePitcherLeagueSession(
   const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PitcherCareer> | null>(null)
   const closeShopGpDetail = useCallback(() => setShopGpDetail(null), [])
 
-  /** [아이템] → 110 → 111 장비 상점 · [선수정보] → 121 장비착용. 취소는 `goto('관리')` (원본 111 → 110 → 105) */
+  /** [아이템] → 110 → 111 장비 상점 · [선수정보] → 121 장비착용. 취소는 `goto('관리')` — 관리 화면이 하위 메뉴로 선다(원본 111 → 110) */
   const openShop = useCallback((tab: PitcherShopTab) => {
     setShopTab(tab)
     setShopNotice('')

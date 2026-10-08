@@ -7,7 +7,9 @@ import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScre
 import {
   abilityDetailScrollKeyOf, batterAbilityDetailViewOf, scrollAbilityDetail,
 } from '@/pages/management/lib/abilityDetail'
-import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import {
+  createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
+} from '@/pages/management/model/nariMainMenuCursor'
 
 /** 커서를 옮긴 뒤 두 번 갱신하는 동안 +1, −1 로 튄다 (카운터 +0x98) */
 const BOUNCE_BY_UPDATE = [1, -1]
@@ -16,6 +18,8 @@ const CYCLE_COMMANDS = ['트레이닝', '휴식', '외출']
 const SUB_MENU_KINDS: readonly string[] = ['선수정보', '트레이닝', '아이템']
 /** 트레이닝 하위 메뉴 칸 4 — 능력 훈련(칸 0~3)과 흐름이 다르다 */
 const SPECIAL_SWING_MENU_ID = '필살타법'
+/** 칸 등장 0x7ff8c 가 다 내려온 뒤의 갱신 수 — 하위 메뉴로 돌아올 때는 펼침(0x7ff55)이 없어 칸이 제자리다 */
+const SETTLED_UPDATES = 1_000
 
 type MenuKind = 'main' | SubMenuKind
 
@@ -28,14 +32,21 @@ export type ManagementOverlay = '기록실' | '필살타법' | '필살타법훈�
 
 /** 관리 화면 커서·하위 메뉴·훈련 연출 상태 */
 export function useManagementMenu(props: ManagementScreenProps) {
-  const [kind, setKind] = useState<MenuKind>('main')
   /** 관리 메뉴 [this+0x8c] 커서 — 루트가 들고 있으면 그것(다른 화면을 다녀와도 남는다), 아니면 이 화면 몫 */
   const ownMainCursor = useRef(createNariMainMenuCursor()).current
   const mainCursor = props.mainCursor ?? ownMainCursor
-  const [cursor, setCursor] = useState(() => mainCursor.current)
-  const [parent, setParent] = useState<MenuSlot | null>(null)
+  /** 111 상점 · 121 장비착용에서 돌아왔으면 그 하위 메뉴(110 · 106) 그 칸, 다 펼쳐진 채 (`nariReturnSubMenuOf`) */
+  const [returned] = useState(() => nariReturnSubMenuOf(mainCursor))
+  const [kind, setKind] = useState<MenuKind>(returned?.kind ?? 'main')
+  const [cursor, setCursor] = useState(() => returned?.cursor ?? mainCursor.current)
+  const [parent, setParent] = useState<MenuSlot | null>(
+    () => (returned === null ? null : COMMAND_SLOTS.find((slot) => slot.id === returned.kind) ?? null),
+  )
   const [movedAt, setMovedAt] = useState<number | null>(null)
-  const [openedAt, setOpenedAt] = useState(0)
+  const [openedAt, setOpenedAt] = useState(returned === null ? 0 : -SETTLED_UPDATES)
+  useEffect(() => {
+    mainCursor.returnSubMenu = null
+  }, [mainCursor])
   /** 선수정보 하위 메뉴에서 연 카드 — 상태판 자리에 그린다 (0x15e20) */
   const [isShowingBasicInfo, setIsShowingBasicInfo] = useState(false)
   /**
@@ -139,7 +150,11 @@ export function useManagementMenu(props: ManagementScreenProps) {
       if (props.isTrainingBlocked(id)) return props.onTrainingBlocked(id)
       return ask(`!C[!cFFFF00${id}훈련!cFFFFFF]을 하시겠습니까?`, () => playback.start(id))
     }
-    if (kind === '아이템') return props.onOpenShop(id)
+    // 110 확인 → 111 상점(키 0x11478) — 상점 취소는 110 으로 돌아온다(0x13460 의 13b1e), 커서는 고른 칸 그대로
+    if (kind === '아이템') {
+      leaveNariSubMenu(mainCursor, '아이템', slots.findIndex((slot) => slot.id === id))
+      return props.onOpenShop(id)
+    }
     if (id === '기본정보') return setIsShowingBasicInfo(true)
     if (id === '기록실' || id === '필살타법') return setOverlay(id)
     // 아이템/스킬(하위 상태 122) — 스킬 장착 창. 세션이 장착을 받지 않으면 예전처럼 바깥에 맡긴다

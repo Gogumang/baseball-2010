@@ -8,6 +8,7 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createNariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
 
 /**
  * 나만의리그 **투수편 관리 화면** (원본 장면 0x106 의 상태 105·106·107).
@@ -636,6 +637,38 @@ describe('[아이템] 110 하위 메뉴 → 111 장비 상점 · [장비착용] 
 
     누르기('GP')
     expect(onOpenShop).toHaveBeenLastCalledWith('GP')
+  })
+})
+
+describe('111 상점 취소 → 110 (0x13460 13b1e — 110 진입 0x107e0 은 커서를 안 건드린다)', () => {
+  const 다시띄우기 = (mainCursor: ReturnType<typeof createNariMainMenuCursor>, onOpenShop: (tab: PitcherShopTab) => void) =>
+    render(
+      <PitcherManagementScreen career={투수({ hasActedThisCycle: true })} random={난수} onSave={() => {}} onNextGame={() => {}}
+        onOpenShop={onOpenShop} onExit={() => {}} mainCursor={mainCursor} />,
+    )
+  const 커서칸 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')]
+    .find((button) => button.getAttribute('aria-current') === 'true')?.getAttribute('aria-label')
+
+  it('상점에서 돌아오면 아이템 하위 메뉴 고른 칸에 서고, 그 취소가 105 진입(이전 110 — 행동함이어도 아이템 칸)이다', () => {
+    const mainCursor = createNariMainMenuCursor()
+    const onOpenShop = vi.fn()
+    다시띄우기(mainCursor, onOpenShop)
+    누르기('아이템')
+    누르기('GP')
+    expect(onOpenShop).toHaveBeenLastCalledWith('GP')
+    cleanup()
+
+    다시띄우기(mainCursor, onOpenShop)
+    expect(칸이름들()).toEqual(['장착', '서브', 'GP'])
+    expect(커서칸()).toBe('GP')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(칸이름들()).toHaveLength(6)
+    expect(커서칸()).toBe('아이템')
+    cleanup()
+
+    다시띄우기(mainCursor, onOpenShop)
+    expect(칸이름들()).toHaveLength(6)
   })
 })
 
