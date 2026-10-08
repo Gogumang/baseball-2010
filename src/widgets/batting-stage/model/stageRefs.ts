@@ -13,6 +13,7 @@ import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
+import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -162,6 +163,8 @@ export interface StageRefs {
   readonly deckRef: MutableRefObject<PatternDeck | null>
   /** 상태 0x13 이 붙잡고 있는 타격 결과. 없으면 이 단계가 아니다 */
   readonly pendingHitRef: MutableRefObject<PendingHit | null>
+  /** '결과' 단계(0x12)가 서 있을 그림 수 — 결과를 세울 때 정한다 (`resultPhaseTicksOf`) */
+  readonly resultTicksRef: MutableRefObject<number>
   /** 살아 있는 파티클 이미터 목록 (원본 파티클 관리자 [0x1400068]) */
   readonly particlesRef: MutableRefObject<ParticleScene>
   readonly pointerDownAtRef: MutableRefObject<number>
@@ -190,6 +193,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     buntRef: useRef<BuntStance | null>(null),
     deckRef: useRef<PatternDeck | null>(null),
     pendingHitRef: useRef<PendingHit | null>(null),
+    resultTicksRef: useRef(RESULT_PHASE_TICKS),
     particlesRef: useRef<ParticleScene>(createParticleScene()),
     pointerDownAtRef: useRef(0),
     latestRef,

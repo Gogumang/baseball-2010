@@ -28,13 +28,10 @@ import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
+import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
-/** 다음 투구까지의 준비 시간 */
-const WIND_UP_MILLISECONDS = 850
-/** 결과 문구를 보여주는 시간 */
-const RESULT_DISPLAY_MILLISECONDS = 1150
 /** 타자 스킬 22 압도 (skills.json 22) — 상대 투수 실투율 +5 */
 const INTIMIDATE_SKILL_ID = 22
 
@@ -56,6 +53,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     shiftRef,
     buntRef,
     pendingHitRef,
+    resultTicksRef,
     particlesRef,
     latestRef,
   } = refs
@@ -105,8 +103,6 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
 
     const advancePhase = (now: number) => {
-      const elapsed = now - phaseStartedAtRef.current
-
       if (phaseRef.current === '대기') {
         if (latestRef.current.isPaused) {
           // 타석이 끝나 쉬는 동안 — 다음 타석 준비(0x48d50)처럼 좌우 이동을 되돌린다
@@ -114,7 +110,8 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           phaseStartedAtRef.current = now
           return
         }
-        if (elapsed >= WIND_UP_MILLISECONDS) {
+        // 0xf(9 그림) + 0x10(7 그림) 뒤 0x11 — 틱으로 센다 (`PRE_PITCH_TICKS`)
+        if (pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame()) >= PRE_PITCH_TICKS) {
           const { pitcherAbility, random, hud, onPickoff } = latestRef.current
           const bases = hud?.bases ?? { first: false, second: false, third: false }
           const choice = selectPitch(
@@ -191,7 +188,11 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         return
       }
 
-      if (phaseRef.current === '결과' && elapsed >= RESULT_DISPLAY_MILLISECONDS) {
+      // 0x12 는 16 그림(볼넷 · 사구 · 삼진 32) — 결과를 세울 때 정한 틱 수(`resultPhaseTicksOf`)
+      if (
+        phaseRef.current === '결과' &&
+        pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame()) >= resultTicksRef.current
+      ) {
         phaseRef.current = '대기'
         phaseStartedAtRef.current = now
         pitchRef.current = null
