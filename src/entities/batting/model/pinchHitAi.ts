@@ -2,12 +2,13 @@ import { withAtBatResult } from '@/entities/batting/model/atBatResultRing'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
- * **CPU 대타 판정 `0xac228`** — 공격 팀이 CPU 일 때 타석 시작마다 한 번 물어보는 함수다 (Q1 4절).
+ * **CPU 대타 판정 `0xac228`** — 공격 팀이 CPU 일 때 묻는 함수다 (Q1 4절). 간이 엔진은 타석마다, 사람 장면은 0xf 진입마다(공마다).
  *
  * 부르는 곳은 둘뿐이다:
  *   - 간이 엔진 `0xc1ba4` (`0xc1c50`): `0xac228([장면+0x7c], 공격팀 [장면+0x74], 주자관리
  *     [장면+0x80], 경기 [장면+0x60])` — **투수 교체 `0xac428` 보다 먼저** 부른다 (0xc1ce2).
- *   - 사람 경기 타석 시작 `0x3d954` (`0x3da6e`): `경기[0x31 + 경기[0xa](수비팀)] == 1`
+ *   - 사람 장면 상태 0xf 진입 `0x3d954` (`0x3da6e`) — 새 타석뿐 아니라 볼·스트라이크·파울 뒤 다음 공, 판 끝, 견제 끝,
+ *     코스 고르기 취소마다 다시 들어선다: `경기[0x31 + 경기[0xa](수비팀)] == 1`
  *     (수비가 CPU) 이면 `0xac428`, **아니면(사람이 수비) `0xac228(…, 공격팀 [장면+0x220],
  *     주자관리 [장면+0x20c], 경기)`**.
  *
@@ -16,10 +17,10 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *
  * ```
  * 0xac228(?, team, 주자관리, state):                 ; 첫 인자는 안 쓴다
- *   if state[0xe] != 0: return 0                    ; ac234  이번 경기 이미 썼다
- *   if 마선수(0xae89c(team)): return 0               ; ac242~ac250
+ *   if state[0xe] != 0: return 0                    ; ac234  다음 공(0xa5e14 a5e7c)이 나가기 전에 이미 냈다
+ *   if 0xb633c(0xae89c(team)): return 0             ; ac23e~ac250  지금 타석 타자(0xae89c)가 마선수
  *   n = team[+0x28c]; if n <= 0: return 0            ; ac252~ac25e  벤치 타자 수
- *   if 마선수(0xae89c(team)): return 0               ; ac260~ac26e  ← 같은 검사를 한 번 더 한다(원본 그대로)
+ *   if 0xb633c(0xae89c(team)): return 0             ; ac260~ac26e  ← 같은 검사를 한 번 더 한다(원본 그대로)
  *   e = team + 0x34 + team[+0x32](타순)×0x18
  *   if e[0x13] != 0: return 0                        ; ac282  이 경기 홈런을 쳤으면 안 바꾼다
  *   if e[0x12] >  1: return 0                        ; ac288  안타 2개 이상이면 안 바꾼다
@@ -35,8 +36,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   state[0xe] = 1; return 1                         ; ac338~ac33e
  * ```
  *
- * ⚠️ `state[0xe]` 는 **경기 하나에 한 칸**이다 — 두 팀 몫이 따로 있지 않다. 곧 한 경기에 CPU 대타는
- * 어느 쪽이 쓰든 **딱 한 번**이다.
+ * ⚠️ `state[0xe]` 는 **두 팀 공용 한 칸**이다 — 두 팀 몫이 따로 있지 않다. "경기에 한 번" 이 아니라 **다음 공까지**다:
+ * 세우는 곳 ac33e, 내리는 곳 0xa5e14 a5e7c(공마다) · 0x48d50 48eb6(사람 장면 타석 시작) · 0xb67d0 b6806(경기 상태 초기화).
  */
 
 /**
@@ -138,7 +139,7 @@ export interface CpuPinchHitInput {
   readonly batterHasEquipment?: boolean
   /** 주자 수 0~3 (`0xa9598` = 주자관리 `+0xc`) */
   readonly runnerCount: number
-  /** `state[4]` 스트라이크 — 원본은 타석 시작(0-0)에만 부르므로 사실상 0 이다 */
+  /** `state[4]` 스트라이크 — 간이 엔진(타석 시작)은 0, 사람 장면 0xf 진입은 공마다 불러 그때의 카운트다 */
   readonly strikes: number
   /** `state[5]` 볼 */
   readonly balls: number
