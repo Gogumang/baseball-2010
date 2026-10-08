@@ -366,6 +366,38 @@ export function simulateHalfInning(
   defense?: HalfInningDefense,
   offense?: HalfInningOffense,
 ): HalfInningResult {
+  const ticks = simulateHalfInningTicks(battingOrderIndex, batterAt, pitcher, inning, random, before, hooks, defense, offense)
+  for (;;) {
+    const next = ticks.next()
+    if (next.done === true) return next.value
+  }
+}
+
+/**
+ * **간이 엔진 0xc262c 한 번** — 자동진행 0x21 갱신 0x48480 은 틱마다 0xc2198 → 0xc262c 를 **한 번** 부른다. 그 한 번은
+ * - `substitution`: 0xc1ba4 가 대타 · 투수 교체를 내 공 없이 돌아간 부름(c266c) — 다음 부름이 같은 타석을 다시 묻는다
+ * - `plateAppearance`: 타석 하나(c26be~c271c — 지금 타자 0xae89c ≠ 예약 다음 타자 0xae944 가 될 때까지 공을 던진다)
+ * 다. 굴림은 그 부름 안에서만 나간다 — 다음 틱을 안 부르면 남은 타석은 굴리지 않는다.
+ */
+export type HalfInningTick =
+  | { readonly kind: 'substitution' }
+  | { readonly kind: 'plateAppearance'; readonly appearance: HalfInningPlateAppearance }
+
+/**
+ * `simulateHalfInning` 의 **틱 단위** 꼴 — 0xc262c 한 번마다 멈춘다(`HalfInningTick`). 끝까지 돌리면 `simulateHalfInning` 과
+ * 굴림 · 결과가 한 톨도 다르지 않다(같은 몸통). 자동진행 중계(미션 0x21)가 틱마다 한 번씩 부른다.
+ */
+export function* simulateHalfInningTicks(
+  battingOrderIndex: number,
+  batterAt: (battingOrderIndex: number) => QuickAtBatBatter,
+  pitcher: QuickAtBatPitcher,
+  inning: number,
+  random: RandomPort,
+  before: HalfInningPitching = EMPTY_HALF_INNING_PITCHING,
+  hooks: HalfInningHooks = {},
+  defense?: HalfInningDefense,
+  offense?: HalfInningOffense,
+): Generator<HalfInningTick, HalfInningResult, void> {
   let bases = EMPTY_BASES
   let outs = 0
   let runs = 0
@@ -470,6 +502,8 @@ export function simulateHalfInning(
       }
       if (!substituted) break
       substitutionCalls += 1
+      // 0xc262c c266c — 이 부름은 공 없이 돌아간다 (한 틱)
+      yield { kind: 'substitution' }
     }
     // 상태 0xf — 타석 준비. 원본은 여기서 돌발미션 발동을 굴린다 (0x8f158)
     hooks.onAtBatStart?.({
@@ -608,6 +642,8 @@ export function simulateHalfInning(
     // 같은 0xa5e14 가 state[0xe](CPU 대타 막음)도 내린다 (a5e7c) — 다음 타석은 다시 대타를 묻는다
     if (pinchHitUsed !== undefined) pinchHitUsed = false
     order += 1
+    // 0xc262c 한 번 = 이 타석 (한 틱). 경기 끝 · 3아웃 판정은 다음 틱의 0xc2198 이라 굴림이 없다
+    yield { kind: 'plateAppearance', appearance: plateAppearances[plateAppearances.length - 1]! }
     // 0xc2198 c21d6 — 타석 뒤 경기 끝 판정 0xb68fc (3아웃이 된 타석 뒤에도 반 이닝 넘김보다 먼저 본다)
     if (hooks.endsGame?.({ runs, outs }) === true) {
       gameEnded = true

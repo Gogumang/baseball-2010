@@ -8,8 +8,9 @@ import {
   relayCodeOf,
   relayLineOf,
 } from '@/entities/mission/model/missionAutoRelay'
-import { startPitcherMission, runPitcherMissionAutoHalves } from '@/entities/mission/model/pitcherRun'
-import { runBatterMissionAutoHalves, startMission } from '@/entities/mission/model/missionRun'
+import { pitcherMissionAutoTicks, startPitcherMission, runPitcherMissionAutoHalves } from '@/entities/mission/model/pitcherRun'
+import { batterMissionAutoTicks, runBatterMissionAutoHalves, startMission } from '@/entities/mission/model/missionRun'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { HalfInningPlateAppearance } from '@/entities/game/model/simulateHalfInning'
 
 const missionOf = (side: OriginalMission['side'], id: number): OriginalMission => {
@@ -77,5 +78,53 @@ describe('미션 자동진행의 중계 틱 목록 — 반 이닝들이 한 줄�
     // 다음 자동진행은 serial 이 오른다
     const again = runBatterMissionAutoHalves({ ...after, game: { ...after.game, halfEnded: true } }, createSeededRandom(4))
     if (again.status === '진행중') expect(again.game.autoRelay?.serial).toBe(2)
+  })
+})
+
+/** 씨앗 난수를 감싸 뽑은 수를 센다 */
+function counted(seed: number): { readonly port: RandomPort; readonly draws: () => number } {
+  const inner = createSeededRandom(seed)
+  let draws = 0
+  return {
+    port: {
+      next: () => { draws += 1; return inner.next() },
+      nextInRange: (minimum, maximum) => { draws += 1; return inner.nextInRange(minimum, maximum) },
+      pick: (candidates) => { draws += 1; return inner.pick(candidates) },
+    },
+    draws: () => draws,
+  }
+}
+
+describe('틱마다 한 번 — 0x48480 갱신 한 번 = 0xc262c 한 번 (중계 도중 끊기면 남은 타석은 안 굴린다)', () => {
+  it('타자 미션: 틱 꼴을 끝까지 돌리면 한꺼번에 굴린 것과 굴림 · 중계 · 끝 판이 같다', () => {
+    const run = startMission(missionOf('타자', 1))
+    const ended = { ...run, game: { ...run.game, halfEnded: true } }
+    const whole = counted(3)
+    const after = runBatterMissionAutoHalves(ended, whole.port)
+    const ticked = counted(3)
+    const ticks = batterMissionAutoTicks(ended, ticked.port)
+    const steps = []
+    let next = ticks.next()
+    while (next.done !== true) {
+      steps.push(next.value)
+      next = ticks.next()
+    }
+    expect(steps).toEqual(after.game.autoRelay?.steps)
+    expect(ticked.draws()).toBe(whole.draws())
+    expect({ ...next.value.game, autoRelay: null }).toEqual({ ...after.game, autoRelay: null })
+  })
+
+  it('투수 미션: 첫 틱만 부르면 그 타석의 굴림만 나간다 — 다음 틱을 안 부르면 남은 타석은 굴리지 않는다', () => {
+    const run = startPitcherMission(missionOf('투수', 6))
+    const ended = { ...run, game: { ...run.game, halfEnded: true } }
+    const whole = counted(7)
+    const after = runPitcherMissionAutoHalves(ended, whole.port)
+    const partial = counted(7)
+    const ticks = pitcherMissionAutoTicks(ended, partial.port)
+    const first = ticks.next()
+    expect(first.done).toBe(false)
+    expect(first.value).toEqual(after.game.autoRelay?.steps[0])
+    expect(partial.draws()).toBeGreaterThan(0)
+    expect(partial.draws()).toBeLessThan(whole.draws())
   })
 })

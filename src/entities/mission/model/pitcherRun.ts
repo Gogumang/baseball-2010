@@ -25,11 +25,13 @@ import {
   cpuSideOf,
   flipMissionHalf,
   isMissionGameOver,
-  simulateHumanTeamAutoHalf,
+  simulateHumanTeamAutoHalfTicks,
   withMissionAutoRelay,
   startMissionGame,
   withMissionScore,
 } from '@/entities/mission/model/missionGame'
+import { drainMissionAutoTicks } from '@/entities/mission/model/missionAutoRelay'
+import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 
 /**
  * 투수편 미션 진행.
@@ -251,13 +253,22 @@ export function withHalfEnd(game: PitcherRun['game'], isInningOver: boolean): Pi
  */
 export function runPitcherMissionAutoHalves(run: PitcherRun, random: RandomPort): PitcherRun {
   if (!run.game.halfEnded) return run
+  const { steps, result } = drainMissionAutoTicks(pitcherMissionAutoTicks(run, random))
+  // 0x21 중계 — 그 반 이닝의 타석마다 한 틱 (`missionAutoRelay`)
+  return steps.length === 0 ? result : { ...result, game: withMissionAutoRelay(result.game, steps) }
+}
+
+/**
+ * `runPitcherMissionAutoHalves` 의 **틱 단위** 꼴 — 0x21 갱신 0x48480 한 번(= 0xc262c 한 번)마다 그 틱의 중계 칸을 내고 멈춘다.
+ * 끝 값은 자동진행이 끝난(0x18 → 0xd) 판이다.
+ */
+export function* pitcherMissionAutoTicks(run: PitcherRun, random: RandomPort): Generator<MissionAutoRelayStep, PitcherRun, void> {
+  if (!run.game.halfEnded) return run
   const settled: PitcherRun = { ...run, game: { ...run.game, halfEnded: false } }
   if (settled.status !== '진행중') return settled
-  const auto = simulateHumanTeamAutoHalf(flipMissionHalf(settled.game), random)
-  // 0x21 중계 — 그 반 이닝의 타석마다 한 틱 (`missionAutoRelay`)
-  const relayed = withMissionAutoRelay(auto.game, auto.relay)
-  if (auto.gameEnded) return { ...settled, game: relayed, status: '실패' }
-  const game = flipMissionHalf(relayed)
+  const auto = yield* simulateHumanTeamAutoHalfTicks(flipMissionHalf(settled.game), random)
+  if (auto.gameEnded) return { ...settled, game: auto.game, status: '실패' }
+  const game = flipMissionHalf(auto.game)
   const judged: PitcherRun = { ...settled, game, bases: EMPTY_BASES, outs: 0 }
   const status = judgeStatus(judged, 0)
   if (status !== '진행중') return { ...judged, status }

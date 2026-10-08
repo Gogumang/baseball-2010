@@ -14,21 +14,22 @@ import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { runnerFatesWithoutPlay, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { missionCpuAfterRuns, startMissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
-import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
+import type { MissionCpuPitching, MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import {
   MISSION_NARI_RECORD,
   battingRecordAt,
   flipMissionHalf,
   humanSideOf,
   isMissionGameOver,
-  simulateMissionAutoHalf,
+  simulateMissionAutoHalfTicks,
   startMissionGame,
   withMissionAutoRelay,
   withMissionScore,
 } from '@/entities/mission/model/missionGame'
 import { isMissionPitcherChangeBlocked, missionAcePitcherOf } from '@/entities/mission/model/missionCpuTeam'
-import type { MissionGame } from '@/entities/mission/model/missionGame'
+import type { MissionAutoHalf, MissionGame } from '@/entities/mission/model/missionGame'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
+import { drainMissionAutoTicks } from '@/entities/mission/model/missionAutoRelay'
 import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineup'
 
 /**
@@ -448,34 +449,46 @@ export function runBatterMissionAutoHalves(
   aceLevels?: Readonly<Record<number, number>>,
 ): MissionRun {
   if (!run.game.halfEnded) return run
+  const { steps, result } = drainMissionAutoTicks(batterMissionAutoTicks(run, random, aceLevels))
+  // 자동진행이 돌았으면(반 이닝은 타석이 적어도 하나라 틱이 있다) 그 중계를 새 `serial` 로 싣는다
+  return steps.length === 0 ? result : { ...result, game: withMissionAutoRelay(result.game, steps) }
+}
+
+/**
+ * `runBatterMissionAutoHalves` 의 **틱 단위** 꼴 — 0x21 갱신 0x48480 한 번(= 0xc262c 한 번)마다 그 틱의 중계 칸을 내고 멈춘다.
+ * 끝 값은 자동진행이 끝난(0x18 → 0xd) 판이다. 3아웃 넘김 0xb6b6c · c2248 판정 · 경기 끝 c21d6 은 0xc2198 안이라 그 다음 틱 머리에서
+ * 굴림 없이 지난다. 자동진행이 돌 일이 없으면(반 이닝이 안 끝났거나 판이 끝났으면) 틱 없이 곧장 끝난다.
+ */
+export function* batterMissionAutoTicks(
+  run: MissionRun,
+  random: RandomPort,
+  aceLevels?: Readonly<Record<number, number>>,
+): Generator<MissionAutoRelayStep, MissionRun, void> {
+  if (!run.game.halfEnded) return run
   let game: MissionGame = { ...run.game, halfEnded: false }
   if (run.status !== '진행중' || run.mission.side !== '타자') return { ...run, game }
   const cpuBatting = game.cpuAutoBatting
   const humanPitching = game.humanPitching
-  let cpuPitching = run.cpu.pitching
+  let cpuPitching: MissionCpuPitching | null = run.cpu.pitching
   if (cpuBatting === null || humanPitching === null || cpuPitching === null) return { ...run, game }
   const blocked = isMissionPitcherChangeBlocked(run.mission)
   const ace = missionAcePitcherOf(run.mission, aceLevels)
-  // 0x21 중계 — 이번 자동진행의 반 이닝들이 한 줄로 이어진다 (3아웃 넘김은 0xc2198 안에서 같은 틱)
-  const relay: MissionAutoRelayStep[] = []
-  const relayed = (next: MissionGame): MissionGame => withMissionAutoRelay(next, relay)
   for (let half = 0; half < MAXIMUM_AUTO_HALVES; half += 1) {
     // CPU 공격 반 이닝
     game = flipMissionHalf(game)
-    const cpuHalf = simulateMissionAutoHalf(game, game.cpuAutoBatting ?? cpuBatting, game.humanPitching ?? humanPitching, random, false, {
-      pitcherChangeBlocked: blocked,
-    })
-    relay.push(...cpuHalf.relay)
+    const cpuHalf: MissionAutoHalf = yield* simulateMissionAutoHalfTicks(
+      game, game.cpuAutoBatting ?? cpuBatting, game.humanPitching ?? humanPitching, random, false, { pitcherChangeBlocked: blocked },
+    )
     game = {
       ...withMissionScore(game, game.offenseSide, cpuHalf.runs),
       cpuAutoBatting: cpuHalf.batting,
       // 이닝 교대 0xa5b00 이 A 를 0 으로
       humanPitching: { ...cpuHalf.pitching, inningRunsAllowed: 0 },
     }
-    if (cpuHalf.gameEnded) return { ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
+    if (cpuHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
     // 사람 칸 팀 반 이닝 — 미션 타자 차례까지
     game = flipMissionHalf(game)
-    const humanHalf = simulateMissionAutoHalf(
+    const humanHalf: MissionAutoHalf = yield* simulateMissionAutoHalfTicks(
       game,
       game.humanBatting,
       { ...cpuPitching, inningRunsAllowed: 0 },
@@ -483,7 +496,6 @@ export function runBatterMissionAutoHalves(
       true,
       { ...(ace === undefined ? {} : { ace }), pitcherChangeBlocked: blocked },
     )
-    relay.push(...humanHalf.relay)
     game = { ...withMissionScore(game, game.offenseSide, humanHalf.runs), humanBatting: humanHalf.batting }
     cpuPitching = {
       ...humanHalf.pitching,
@@ -491,14 +503,12 @@ export function runBatterMissionAutoHalves(
       ourRuns: humanHalf.pitching.ourRuns + humanHalf.runs,
       inningRunsAllowed: humanHalf.stoppedBeforeNari ? humanHalf.pitching.inningRunsAllowed : 0,
     }
-    if (humanHalf.gameEnded) return { ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
+    if (humanHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
     if (humanHalf.stoppedBeforeNari) {
-      return {
-        ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching }, bases: humanHalf.bases, outs: humanHalf.outs,
-      }
+      return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, bases: humanHalf.bases, outs: humanHalf.outs }
     }
   }
-  return { ...run, game: relayed(game), cpu: { ...run.cpu, pitching: cpuPitching } }
+  return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching } }
 }
 
 export function giveUp(run: MissionRun): MissionRun {

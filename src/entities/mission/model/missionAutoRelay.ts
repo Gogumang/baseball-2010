@@ -1,5 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import type { HalfInningPlateAppearance } from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningPlateAppearance, HalfInningTick } from '@/entities/game/model/simulateHalfInning'
 
 /**
  * **자동진행 중계(경기 장면 상태 0x21)의 한 틱** — 미션(모드 5·6)도 3아웃 뒤 사람이 안 나서는 반 이닝을 0x21 로 돌린다
@@ -107,6 +107,43 @@ export function missionAutoRelayStepsOf(
     })
   }
   return steps
+}
+
+/**
+ * **중계 틱 하나** — 0xc262c 한 번(`HalfInningTick`)을 중계 칸으로. `scores` 는 그 틱 앞 점수 — 타석 틱이면 타점을 더한 값을 칸에 싣는다.
+ * `missionAutoRelayStepsOf` 의 한 칸과 같다.
+ */
+export function missionAutoRelayStepOfTick(
+  half: { readonly inning: number; readonly offenseSide: 0 | 1 },
+  scoresBefore: readonly [number, number],
+  tick: HalfInningTick,
+  nameOf: (appearance: HalfInningPlateAppearance) => string,
+): MissionAutoRelayStep {
+  if (tick.kind === 'substitution') {
+    return { inning: half.inning, offenseSide: half.offenseSide, scores: [scoresBefore[0], scoresBefore[1]], line: null }
+  }
+  const { appearance } = tick
+  const scores: [number, number] = [scoresBefore[0], scoresBefore[1]]
+  scores[half.offenseSide] += appearance.runsBattedIn
+  return {
+    inning: half.inning,
+    offenseSide: half.offenseSide,
+    scores,
+    line: relayLineOf(nameOf(appearance), relayCodeOf(appearance.outcome, appearance.fouled === true)),
+  }
+}
+
+/** 틱 묶음을 끝까지 돌린다 — 중계 칸들과 끝 값 (한꺼번에 굴리는 길 · 시험) */
+export function drainMissionAutoTicks<R>(ticks: Generator<MissionAutoRelayStep, R, void>): {
+  readonly steps: MissionAutoRelayStep[]
+  readonly result: R
+} {
+  const steps: MissionAutoRelayStep[] = []
+  for (;;) {
+    const next = ticks.next()
+    if (next.done === true) return { steps, result: next.value }
+    steps.push(next.value)
+  }
 }
 
 /** 한 번의 자동진행(0x18 → 0x21 → 0x18) 동안 쌓인 중계 — `serial` 은 새로 돌 때마다 오른다 (화면이 한 번씩 튼다) */
