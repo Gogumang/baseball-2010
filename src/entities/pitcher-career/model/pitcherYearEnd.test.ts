@@ -89,6 +89,17 @@ describe('투수편 연말 사슬 (상태 136 → 130 → 131 → 132)', () => {
     // 엔딩은 본 번호가 아니라 그 칸으로 간다
     expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [502, 496, 503]).kind).not.toBe('엔딩')
   })
+
+  it('엔딩 번호는 본 번호가 아니라 141 진입 0x12300 의 0xa3a85(S) 하나로 판정한다 (모드 갈림 없음)', () => {
+    // 본 번호가 501 이어도 판정이 부상(누적 > 19)이면 0, 13년차 504 는 판정값 그대로
+    expect(nextPitcherYearEndStep(투수({ season: 7, popularity: 100, injuredGamesPlayed: 20 }), [501], true))
+      .toEqual({ kind: '엔딩', endingIndex: 0 })
+    expect(nextPitcherYearEndStep(투수({ season: 13, popularity: 2600, reputation: 500 }), [504], true))
+      .toEqual({ kind: '엔딩', endingIndex: 7 })
+    // 본 번호와 상관없다 — 같은 커리어면 같은 번호
+    expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [500], true))
+      .toEqual(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [503], true))
+  })
 })
 
 describe('연말 이벤트 보상 (명령 7, 점프표 0xd4e50)', () => {

@@ -6,7 +6,6 @@ import { applyPitcherEventRewards } from '@/entities/pitcher-career/model/pitche
 import {
   judgePitcherEnding,
   judgePitcherSeasonAwards,
-  pitcherRetirementEndingOf,
   pitcherSalaryNegotiationRankOf,
   pitcherYearEndStepOf,
   PITCHER_RELEASE_ENDING,
@@ -75,8 +74,6 @@ const TITLE_RESULT_EVENT_IDS: readonly number[] = [371, 372, 373, 374]
 const MVP_RESULT_EVENT_IDS: readonly number[] = [376, 377]
 /** 384~391 — 연봉 결과 */
 const SALARY_RESULT_EVENT_IDS: readonly number[] = [384, 385, 386, 387, 388, 389, 390, 391]
-const INJURY_ENDING_EVENT_ID = 500
-const INJURY_ENDING = 0
 
 /** 연말 사슬의 다음 걸음 */
 export type PitcherYearEndEventStep =
@@ -110,23 +107,18 @@ export function nextPitcherYearEndStep(
   viewed: readonly number[],
   /**
    * [0x1552adc] — 재생이 첫 종류 21 로 끝났는가(0x8d4ce). 엔딩은 본 번호가 아니라 이 칸으로 간다(114 끝 0x1c014 1c088 → 141).
-   * ⚠️ 엔딩 번호는 아래처럼 본 번호로 고른다 — 원본 141 진입 0x12300 은 `0xa3a85(S)` 하나로 새로 판정한다(투수 갈래 대조는 미해결).
+   * 엔딩 번호는 141 진입 0x12300 이 `e = 0xa3a85(S)` 하나로 **새로 판정한다** — 12300~12312 는 S+0x50 = 6 뒤 곧장
+   * `0xa3a85([this+0xb0])` 이고 모드 갈림이 없으며, 판정 0xa3a84 안(a3a84~a3b7a)에도 모드를 보는 줄이 없다(직접 떴다).
+   * 곧 투수편도 타자편 `judgeEnding` 과 같은 `judgePitcherEnding` 하나다. 500(부상 누적 > 19 → 0) · 501(7년차 인기도 ≤ 499 → 1) ·
+   * 504(13년차)는 같은 판정이 고른 이벤트이고 그 사이 값을 바꾸는 보상이 없어(500 · 501 · 503 · 504 의 보상은 종류 21 하나)
+   * 예전 번호와 같다.
    */
   endingRequested = false,
 ): PitcherYearEndEventStep {
   const saw = (id: number) => viewed.includes(id)
   const sawAny = (ids: readonly number[]) => viewed.some((id) => ids.includes(id))
 
-  if (endingRequested) {
-    const endingIndex = saw(INJURY_ENDING_EVENT_ID)
-      ? INJURY_ENDING
-      : saw(RELEASE_EVENT_ID)
-        ? PITCHER_RELEASE_ENDING
-        : saw(FINAL_RETIREMENT_EVENT_ID)
-          ? (judgePitcherEnding(career) ?? PITCHER_RETIREMENT_ENDING)
-          : pitcherRetirementEndingOf(career)
-    return { kind: '엔딩', endingIndex }
-  }
+  if (endingRequested) return { kind: '엔딩', endingIndex: judgePitcherEnding(career) ?? PITCHER_RETIREMENT_ENDING }
   if (sawAny(SALARY_RESULT_EVENT_IDS) || saw(SALARY_ACCEPT_EVENT_ID)) return { kind: '새시즌' }
   if (saw(SALARY_FIRM_EVENT_ID) || saw(SALARY_POLITE_EVENT_ID)) {
     const choice = saw(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID
