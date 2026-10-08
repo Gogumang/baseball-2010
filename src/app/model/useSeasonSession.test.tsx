@@ -395,22 +395,36 @@ describe('시즌 이벤트 재생 0xd3', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.이벤트재생)
   })
 
-  it('보상 명령 하나를 그 자리에서 준다(0x8c460 모드 2) — 저장은 0x7fe90 · 재생 끝 몫이라 안 한다', () => {
+  it('보상 명령 하나를 그 자리에서 준다(0x8c460 모드 2) — 끝(0x8cbe0~0x8cd5e)이 본 표시 · phase 를 고치고 저장한다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
     act(() => result.current.actions.chooseTeam(0))
+    // 시즌 끝 사슬 0xee(392) 안 — 포스트시즌 중 g == 0
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, inPostseason: true, games: 0, phase: 0xb }))
     const 전 = result.current.state!.record
-    const 저장전 = store.load()
 
-    act(() => result.current.actions.giveSeasonEventReward([{ kind: 0, value: 25 }, { kind: 3, value: 35 }], 393))
+    act(() => result.current.actions.giveSeasonEventReward([{ kind: 0, value: 25 }, { kind: 3, value: 35 }], 393, [392, 393]))
 
-    // 393 은 연차 보정 +5y — 첫 해(y = 0)라 그대로
-    expect(result.current.state?.record.popularity).toBe(전.popularity + 25)
-    expect(result.current.state?.record.money).toBe(전.money + 35)
-    expect(store.load()).toBe(저장전)
-    // 다음 저장(0x7fe90)에는 그때까지 준 보상이 든다
-    act(() => result.current.actions.confirmEventSystemWindow())
-    expect((store.load() as { state: { record: { popularity: number } } }).state.record.popularity).toBe(전.popularity + 25)
+    // 393 은 연차 보정 +5y — 첫 해(y = 0)라 그대로. 재생 끝을 기다리지 않고 저장에 든다(0x8b0e4 · 0x8cd44 → 0x22755)
+    type 저장꼴 = { state: { record: { popularity: number; money: number; seenEvents: number[]; phase: number } } }
+    const 저장 = (store.load() as 저장꼴).state.record
+    expect(저장.popularity).toBe(전.popularity + 25)
+    expect(저장.money).toBe(전.money + 35)
+    // 지금 이벤트(0xacf49)와 떠나온 이벤트(0x8b0e4) 본 표시
+    expect(저장.seenEvents).toEqual(expect.arrayContaining([392, 393]))
+    // 8ccc8 — 시즌 393~396 → phase 0xc: 보상 창에서 끄고 다시 들어오면 진입 분기 0xcb 가 392 가 아니라 0xeb(370)로
+    expect(저장.phase).toBe(0xc)
+    const 다시 = 띄우기(store).result
+    // 0xeb 진입(0xe854)이 곧바로 370 을 튼다
+    expect(다시.current.eventPlayback).toMatchObject({ eventId: 370, returnScene: SEASON_SCENE_STATE.투수시상 })
+    expect(다시.current.state?.record.popularity).toBe(전.popularity + 25)
+
+    // 연초 목표 내장 이벤트(번호 0 — mgr+0xa ≠ 0)는 본 표시를 안 한다 · 고치는 번호가 아니면 phase 그대로
+    act(() => 다시.current.actions.giveSeasonEventReward([{ kind: 0, value: 1 }], 120, [0, 120]))
+    const 그밖 = (store.load() as 저장꼴).state.record
+    expect(그밖.seenEvents).not.toContain(0)
+    expect(그밖.seenEvents).toContain(120)
+    expect(그밖.phase).toBe(다시.current.state?.record.phase)
   })
 
   it('20경기 뒤 관리 메뉴에 들어오면 100 이 G 1000 을 준다 — 한 번 받으면 다시 안 뜬다 (전역 +0xbe)', () => {

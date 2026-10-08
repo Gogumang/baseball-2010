@@ -111,6 +111,7 @@ import {
   tickAfterAnyGame,
 } from '@/entities/season-mode/model/seasonEventFlow'
 import type { SeasonEventCursor, SeasonEventReward } from '@/entities/season-mode/model/seasonEventFlow'
+import { rewardResumePatchOf } from '@/entities/story/model/storyScene'
 import {
   achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, seasonGoalWindowNumbersOf, seasonGoalWindowRankOf,
   teamBattingAverageOf, teamEarnedRunAverageOf,
@@ -439,10 +440,10 @@ export interface SeasonActions {
    */
   readonly finishSeasonEvent: (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => void
   /**
-   * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 2 갈래). 저장은 안 한다
-   * (0x7fe90 · 재생 끝이 저장한다). `StoryScreen.onReward` 로 잇는다.
+   * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 2 갈래). 그 끝이 본 표시
+   * (지금 이벤트 · 떠나온 이벤트 0x8b0e4) · 이벤트별 phase(8ccc8)를 하고 저장한다. `StoryScreen.onReward` 로 잇는다.
    */
-  readonly giveSeasonEventReward: (rewards: readonly SeasonEventReward[], eventId: number) => void
+  readonly giveSeasonEventReward: (rewards: readonly SeasonEventReward[], eventId: number, viewedEventIds?: readonly number[]) => void
   /**
    * 이벤트의 system 창(알림 · 올해의 목표)을 답 0 으로 닫았다 — 0x8d928~0x8d942 의 0x7fe90: 시즌모드라 기록 +0x187 = 1 ·
    * 저장(0x22755). 하위와 상관없이 모든 system 창이다.
@@ -2539,23 +2540,38 @@ export function useSeasonSession(
   /**
    * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 2 갈래(`applySeasonEventRewards`). 이벤트 번호는 그 명령이 든 이벤트다
    * (연차 보정 0x8d508 · 이벤트 100 의 전역 +0xbe 가 지금 이벤트를 본다). G 는 지갑으로 · 0x8c6e4 `0x22c7d(v, 모드)` 통계.
-   * 저장은 하지 않는다 — 마지막 저장 칸(`latestSave`)만 옮겨 다음 저장(0x7fe90 · 재생 끝)이 이 값을 쓴다.
+   *
+   * **본 표시 · 이어하기 자리 · 저장** — 0x8c460 의 끝(0x8cbe0~0x8cd5e)은 모드 2 · 3 · 4 공용이다(직접 떴다):
+   * ```
+   * 8cbe0  [mgr+0xa] == 0(파일 이벤트) → 0xacf49(지금 이벤트) 본 표시
+   * 8cbfa  지금 이벤트 trigger 2~6 이면 SR+4 = 1      ; s_event 는 모두 trigger 0 이라 시즌에서는 안 탄다
+   * 8cc1a  0x8b0e4 — 떠나온 이벤트 줄마다 본 표시 → 0x1fded · 0x22755(저장, 1)
+   *        (그 안 0x8b12c 의 [[mgr+0xb4]+0x174] == 0x70|0x71 갈래는 나리 외출 상태 번호라 시즌 상태(0xc9~)와 안 겹친다)
+   * 8ccc8  시즌(0x7b999 참) — 이벤트 번호로 SR+0x50(phase)을 고친다 (`rewardResumePatchOf(…, '시즌')`)
+   * 8cd44  0x1fded · 0x22755(저장, 1) · 0x1f1b9
+   * ```
+   * 곧 시즌 끝 사슬의 결과 이벤트(393~396 · 373 · 375 · 379 · 401~403)가 보상을 주면 phase 가 다음 단계로 넘어가 저장된다 —
+   * 보상 창에서 끄고 다시 들어와도 진입 분기 0xcb 가 그 결과 이벤트를 다시 틀지 않는다(보상이 겹치지 않는다).
+   * 연초 목표 내장 이벤트(번호 0, mgr+0xa ≠ 0)는 본 표시를 안 한다. 끝(`finishSeasonEvent`)에서 다시 켜도 같은 값이다.
    */
   const giveSeasonEventReward = useCallback(
-    (rewards: readonly SeasonEventReward[], eventId: number) => {
+    (rewards: readonly SeasonEventReward[], eventId: number, viewedEventIds: readonly number[] = [eventId]) => {
       const current = latestSave.current
       if (current === null) return
       const applied = applySeasonEventRewards(current.state, rewards, eventId, random)
-      const next: SeasonSave = { ...current, state: applied.state }
-      latestSave.current = next
-      setSave(next)
+      const seen = [eventId, ...viewedEventIds]
+        .filter((id) => id !== YEAR_GOAL_EVENT_ID)
+        .reduce(markEventSeen, applied.state.record)
+      const patch = rewardResumePatchOf(eventId, '시즌')
+      const record = patch === null || seen.phase === patch.resumeCode ? seen : { ...seen, phase: patch.resumeCode }
+      commit({ ...current, state: { ...applied.state, record } })
       if (rewards.some((reward) => reward.kind === 10)) {
         gainGamePoint(applied.gamePoint)
         recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
       }
       if (applied.event100Awarded) setEvent100Awarded(true)
     },
-    [gainGamePoint, random, recordStat],
+    [commit, gainGamePoint, random, recordStat],
   )
 
   /**
