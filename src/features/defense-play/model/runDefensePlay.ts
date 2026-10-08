@@ -773,6 +773,11 @@ export interface DefensePlayState {
    * 틱 끝 G2 와 다를 수 있다 — +0x120 세기로 닫히는 판은 G3 이 열리고 그 뒤 G1 · G2 에서 닫힐 수 있다.
    */
   drawGateOpen: boolean | null
+  /**
+   * 장면 +0xfe7 — 0x17 키 건너뛰기(0x519cc). 서면 판 끝까지(닫힌 뒤 +0x1094 11 번까지) 한 그림 안에서 돈다(52b26~52b40) —
+   * 틱 사이 관문이 G1 · G2 둘뿐이다(`passPlayGateBetweenTicks`). 판 시작 0 · 0x35108 이 끝에서 0 으로 둔다.
+   */
+  fastForward: boolean
   /** state[0xb] — 사건 코드 처리 0xb2bc4 가 마지막으로 받은 결과 코드 */
   lastEventCode: number
   /** 플레이 +0x112 — 공을 쥐었거나 공이 땅에 닿았거나 담장선을 넘었다 (6d 절) */
@@ -999,6 +1004,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     deferredThrowBase: NONE,
     endCounter: 0,
     drawGateOpen: null,
+    fastForward: false,
     lastEventCode: 0,
     ballContacted: false,
     foulFlag: false,
@@ -1018,6 +1024,21 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
  */
 export function isDefensePlayFinished(state: DefensePlayState): boolean {
   return state.play.finished || state.tick > state.maximumTicks
+}
+
+/**
+ * **0x519cc — 0x17 키 건너뛰기를 받는가** (직접 뜸):
+ * ```
+ * 519cc  state[0x1d](사건 8 홈런, 0xb2bd8) ≠ 0 → 51a0a
+ * 519d4  플레이 +0x129(사건 12 폴 홈런) ≠ 0 → 51a0a
+ * 519e6  state[0xb] == 4 || state[0xb] == 3 → 51a0a ; 아니면 0x523aa(돌아감)
+ * 51a0a  0x6e418(소리 멈춤) · +0xfe7 = 1 · +0x1960 = 0(HOMERUN 글자) · +0x1100 = 0(홈런 점수판) · 0x8fc70(홈런 효과 칸 버리기) ·
+ *        파티클 +0x57 = 0 · 0x6dee4(파티클 모두 치우기)
+ * ```
+ * 판이 닫힌 뒤(+0x1094 를 세는 동안)에도 키가 오면 받는다 — 529f0 의 52b26 도 +0xfe7 을 보고 되돌아 돈다.
+ */
+export function acceptsFastForwardKey(state: Pick<DefensePlayState, 'homeRunFlag' | 'play' | 'lastEventCode'>): boolean {
+  return state.homeRunFlag || state.play.suppressed || state.lastEventCode === 3 || state.lastEventCode === 4
 }
 
 /**
@@ -1098,6 +1119,13 @@ export function stepDefensePlay(
   let deferredThrowBase = state.deferredThrowBase
   let endCounter = state.endCounter
   let drawGateOpen = state.drawGateOpen
+  // ── 0x17 키 건너뛰기 — 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x509a0(0x50afe) → 0x519cc (갱신 0x524c0 보다 먼저) ──
+  // state[0x1d](홈런) || +0x129(폴 홈런) || state[0xb] ∈ {3, 4} 일 때만 +0xfe7 = 1 — 이 틱부터 한 그림 안에서 판을 끝까지 돈다
+  let fastForward = state.fastForward
+  if (key !== null && !fastForward && acceptsFastForwardKey(state)) {
+    fastForward = true
+    log.push(`${tick}틱 키 건너뛰기 (0x519cc +0xfe7)`)
+  }
   let lastEventCode = state.lastEventCode
   let ballContacted = state.ballContacted
   let foulFlag = state.foulFlag
@@ -2401,34 +2429,37 @@ export function stepDefensePlay(
     // (전문은 `entities/fielding/model/playGate.ts` — `passPlayGateBetweenTicks`). 부를 때마다 +0x120 이 오르므로 주자가 다 서고
     // (+0x94 까지) 누가 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17 틱) 닫힌다. 그동안에도 자동 진루 · CPU 송구가 돈다.
     // 3아웃(b0dbe) · 사건 코드 11(b0db4)이면 곧바로 닫힌다. 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
-    const gate = passPlayGateBetweenTicks({
-      foulFlag,
-      // 파울 갈래(b0d2c)만 본다 — 멈춤 · 담장선 넘은 뒤 떨어지는 틱 · 홈 뒤(z > 32599, −315 < 각 < −225)
-      foulBall: foulFlag
-        ? {
-            // 공.vt18 = 0xa27f0(속도 · 수직 속도 워드 0) — 야수가 쥔 공(쥐기 0xb2710 의 메시지 0x15)은 손에 붙어 움직이지 않는다.
-            // ⚠️ 쥔 공의 속도 칸이 0 이 되는 자리(메시지 0x15 처리)는 안 떴다 — 쥔 공을 멈춘 공으로 본다(유력)
-            stopped:
-              play.held ||
-              (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
-            currentTick: tick,
-            landingTick: trajectory.landingTick,
-            fenceTick: trajectory.fenceTick,
-            z: trajectory.pointAt(tick).z,
-            angle: trajectory.pointDetailAt?.(tick).angle ?? 0,
-          }
-        : undefined,
-      lastEventCode,
-      outs,
-      someRunnerActive: stillActive,
-      homeRunDerby: false,
-      homeRunFlag,
-      poleHomeRunFlag: play.suppressed,
-      liveRunnerCount: liveRunnerCountOf(runners.map((runner) => runner.state)),
-      ballHeld: play.held,
-      groundRuleFlag,
-      endCounter,
-    })
+    const gate = passPlayGateBetweenTicks(
+      {
+        foulFlag,
+        // 파울 갈래(b0d2c)만 본다 — 멈춤 · 담장선 넘은 뒤 떨어지는 틱 · 홈 뒤(z > 32599, −315 < 각 < −225)
+        foulBall: foulFlag
+          ? {
+              // 공.vt18 = 0xa27f0(속도 · 수직 속도 워드 0) — 야수가 쥔 공(쥐기 0xb2710 의 메시지 0x15)은 손에 붙어 움직이지 않는다.
+              // ⚠️ 쥔 공의 속도 칸이 0 이 되는 자리(메시지 0x15 처리)는 안 떴다 — 쥔 공을 멈춘 공으로 본다(유력)
+              stopped:
+                play.held ||
+                (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
+              currentTick: tick,
+              landingTick: trajectory.landingTick,
+              fenceTick: trajectory.fenceTick,
+              z: trajectory.pointAt(tick).z,
+              angle: trajectory.pointDetailAt?.(tick).angle ?? 0,
+            }
+          : undefined,
+        lastEventCode,
+        outs,
+        someRunnerActive: stillActive,
+        homeRunDerby: false,
+        homeRunFlag,
+        poleHomeRunFlag: play.suppressed,
+        liveRunnerCount: liveRunnerCountOf(runners.map((runner) => runner.state)),
+        ballHeld: play.held,
+        groundRuleFlag,
+        endCounter,
+      },
+      fastForward,
+    )
     endCounter = gate.endCounter
     drawGateOpen = gate.drawOpen
     if (!gate.open) play = { ...play, finished: true }
@@ -2481,6 +2512,7 @@ export function stepDefensePlay(
   state.deferredThrowBase = deferredThrowBase
   state.endCounter = endCounter
   state.drawGateOpen = drawGateOpen
+  state.fastForward = fastForward
   state.lastEventCode = lastEventCode
   state.ballContacted = ballContacted
   state.foulFlag = foulFlag

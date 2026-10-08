@@ -48,8 +48,8 @@ import { fireworksPortOf } from '@/widgets/batting-stage/lib/homeRunEffects'
  * - 홈런더비(모드 7)는 이 화면이 아니다(타석 화면 — pages/home-run-derby). 여기는 일반 · 팀 · 투수 · 미션 모드의 0x17 이다.
  *
  * ⚠️ 남은 것
- * - 키 건너뛰기 0x519cc(+0xfe7 — 글자 끄기 · 효과 칸 버리기 · 파티클 치우기 뒤 52b26 이 한 그림 안에서 판을 끝까지 돌린다)는 수비 재생
- *   화면에 없다.
+ * - 키 건너뛰기 0x519cc(+0xfe7)는 `fastForwardDefenseEffects`(글자 끄기 · 효과 칸 버리기 · 파티클 치우기) 뒤 52b26 이 한 그림 안에서
+ *   판을 끝까지 돌리는 동안 `updateDefenseEffectsWithoutDraw`(갱신 쪽만)다 — 수비 재생 화면(`DefensePlayback`)이 부른다.
  * - 판이 닫힌 뒤 0x35108 까지의 그림 수: 원본은 +0x1094 가 11 이 될 때(그리고 홈런 타구 0x357e0 && 홈런 점수판 [+0x1100] 이 켜져 있는
  *   동안은 더) — 웹 수비 재생은 그 자리를 붙든 갱신(`holdUpdates`)으로 근사하고, 그 갱신마다 파티클 틱을 돌린다.
  * - 0x11 · 0x13 타석 화면에서 쏜 타격 불꽃 이미터(그 화면의 파티클 장면)는 0x17 로 넘겨받지 않는다 — 원본은 관리자 하나라 0x17 에서도
@@ -192,6 +192,30 @@ export function stepDefenseEffects(
   // 프레임 끝 — 0x6de84
   if (ports.random !== undefined) tickParticles(ports.particles, ports.random)
   return { effects: { textOn, text, fireworks, displayDistance }, text: textFrame, distanceBoard }
+}
+
+/**
+ * 키 건너뛰기 0x519cc(51a0a~51a32) — +0x1960 = 0(글자 끄기) · 0x8fc70(홈런 효과 칸 버리기) · 파티클 +0x57 = 0 · 0x6dee4(파티클 치우기).
+ * 글자 칸(+0x1961~)과 +0x36 은 안 건드린다. ⚠️ 0x6e418(소리 멈춤)은 소리 포트에 멈춤이 없어 안 옮겼다.
+ */
+export function fastForwardDefenseEffects(effects: DefenseEffects, particles: ParticleScene): DefenseEffects {
+  clearParticles(particles)
+  return { ...effects, textOn: false, fireworks: null }
+}
+
+/**
+ * 건너뛰기(+0xfe7) 동안의 갱신 하나 — 52b26 이 그리기 · 프레임 끝 파티클 틱 없이 슬롯 2 를 되풀이한다.
+ * 갱신 쪽(0x51c82 글자 켜기 · 효과 깔기 · 0x5297a +0x36)만 돈다. 파티클 틱 · 효과 틱 굴림이 없다.
+ */
+export function updateDefenseEffectsWithoutDraw(effects: DefenseEffects, facts: DefenseTickFacts): DefenseEffects {
+  let { textOn, text, fireworks, displayDistance } = effects
+  if (facts.homeRunBranch) {
+    text = generalHomeRunTextOn(text)
+    textOn = true
+    fireworks = initHomeRunFireworks<number>()
+  }
+  if (facts.displayDistance !== null) displayDistance = facts.displayDistance
+  return { textOn, text, fireworks, displayDistance }
 }
 
 /** 0x17 끝 0x35108 — 글자를 끄고(0x351d0) 파티클을 치운다(0x6dee4) */

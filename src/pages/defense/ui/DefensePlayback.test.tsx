@@ -6,12 +6,18 @@ import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
-import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  acceptsFastForwardKey,
+  isDefensePlayFinished,
+  runDefensePlay,
+  startDefensePlay,
+  stepDefensePlay,
+} from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -347,5 +353,54 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
+  /** 원본 코드 24 의 첫 패턴 — 담장을 넘는 홈런(사건 8 이 판 도중에 선다) */
+  const 홈런패턴 = (): BattedBallPattern => {
+    const pattern = BATTED_BALL_PATTERNS[24]?.[0]
+    if (pattern === undefined) throw new Error('홈런 패턴 없음')
+    return pattern
+  }
+  const 홈런 = (): DefensePlayInput => ({
+    outcome: { kind: '홈런' }, trajectory: battedBallTrajectory(홈런패턴()), bases: 주자1루, outs: 0,
+  })
+  /** 사건 8(state[0x1d])이 서는 틱 — 진행기로 미리 센다 */
+  const 홈런틱 = (input: DefensePlayInput): number => {
+    let state = startDefensePlay(input)
+    while (!isDefensePlayFinished(state) && !state.homeRunFlag) state = stepDefensePlay(state, null)
+    return state.tick
+  }
+
+  it('홈런(state[0x1d])이 선 뒤 키를 누르면 판 끝 · 닫힌 셈 · 0x35108 까지 그 그림 안에서 끝낸다 — 결과는 안 누른 판과 같다', () => {
+    vi.useFakeTimers()
+    try {
+      const input = 홈런()
+      const 그대로 = runDefensePlay(input)
+      const h = 홈런틱(input)
+      expect(h).toBeLessThan(그대로.ticks.length)
+      const onDone = vi.fn()
+      render(<DefensePlayback input={input} side="공격" onDone={onDone} holdUpdates={30} />)
+      for (let i = 0; i < h + 1; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(onDone).not.toHaveBeenCalled()
+      fireEvent.keyDown(window, { key: '5' })
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(onDone).toHaveBeenCalledTimes(1)
+      const 건너뜀 = 결과(onDone)
+      expect(건너뜀.advance).toEqual(그대로.advance)
+      expect(건너뜀.log.some((line) => line.includes('키 건너뛰기'))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('홈런이 아닌 판은 키를 눌러도 건너뛰지 않는다 (0x519cc → 0x523aa)', () => {
+    const state = startDefensePlay(타구(단타, 주자1루))
+    expect(acceptsFastForwardKey(state)).toBe(false)
+    expect(acceptsFastForwardKey({ ...state, homeRunFlag: true })).toBe(true)
+    expect(acceptsFastForwardKey({ ...state, play: { ...state.play, suppressed: true } })).toBe(true)
+    expect(acceptsFastForwardKey({ ...state, lastEventCode: 3 })).toBe(true)
+    expect(acceptsFastForwardKey({ ...state, lastEventCode: 4 })).toBe(true)
   })
 })

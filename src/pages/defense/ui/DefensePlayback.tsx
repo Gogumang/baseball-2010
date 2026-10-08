@@ -4,6 +4,7 @@ import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import {
+  acceptsFastForwardKey,
   defensePlayResultOf,
   isDefensePlayFinished,
   startDefensePlay,
@@ -33,9 +34,11 @@ import {
   defenseEffectsOf,
   defenseTickFactsOf,
   endDefenseEffects,
+  fastForwardDefenseEffects,
   sceneMemoryOf,
   stepDefenseEffects,
   tickBeforeOf,
+  updateDefenseEffectsWithoutDraw,
   type DefenseEffects,
   type DefenseSceneMemory,
 } from '@/pages/defense/lib/defenseHomeRunEffects'
@@ -333,6 +336,10 @@ function LivePlayback({
   const particlesRef = useRef<ParticleScene>(createParticleScene())
   /** 판이 닫힌 뒤 파티클 틱을 돌린 마지막 갱신 */
   const closedUpdateRef = useRef<number | null>(null)
+  /**
+   * 키 건너뛰기(+0xfe7, 0x519cc)로 판 끝 · 닫힌 뒤 +0x1094 11 번 · 0x35108 까지 한 그림 안에서 다 돌았다 — 붙든 갱신 없이 곧바로 끝낸다
+   */
+  const [fastForwarded, setFastForwarded] = useState(false)
   const [effectsView, setEffectsView] = useState<{
     readonly text: HomeRunTextFrame | null
     readonly distanceBoard: number | null
@@ -362,6 +369,7 @@ function LivePlayback({
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
       particlesRef.current = createParticleScene()
       closedUpdateRef.current = null
+      setFastForwarded(false)
       setView(null)
       setRunBoard(null)
       setEffectsView({ text: null, distanceBoard: null, version: 0 })
@@ -377,18 +385,26 @@ function LivePlayback({
     let board: RunScoreBoardView | null = null
     const effectsPorts = { particles: particlesRef.current, random: input.random, configOf: particleConfigOf }
     let effectsFrame: ReturnType<typeof stepDefenseEffects> | null = null
-    while (running.tick < wanted && !isDefensePlayFinished(running)) {
+    let skippedNow = false
+    // 키 건너뛰기(+0xfe7)가 서면 52b26~52b40 이 한 그림 안에서 판 끝까지 되풀이한다 — 따라잡을 틱 수와 상관없이 끝까지 돈다
+    while ((running.tick < wanted || running.fastForward) && !isDefensePlayFinished(running)) {
       const runsBefore = running.held.scoreboardRuns
       const tickBefore = tickBeforeOf(running)
-      running = stepDefensePlay(running, pressesRef.current.shift() ?? null)
+      const wasFastForward = running.fastForward
+      // 건너뛰는 동안은 그 그림의 키 처리(0x498d4)가 다시 오지 않는다
+      running = stepDefensePlay(running, wasFastForward ? null : pressesRef.current.shift() ?? null)
       moved = true
-      // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
-      effectsFrame = stepDefenseEffects(
-        effectsRef.current,
-        defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running)),
-        effectsPorts,
-      )
-      effectsRef.current = effectsFrame.effects
+      const facts = defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running))
+      if (running.fastForward) {
+        // 0x519cc 는 이 틱 갱신보다 먼저 — 글자 끄기 · 효과 칸 버리기 · 파티클 치우기. 그 뒤로는 그리기 · 파티클 틱이 없다
+        if (!wasFastForward) effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        effectsRef.current = updateDefenseEffectsWithoutDraw(effectsRef.current, facts)
+        skippedNow = true
+      } else {
+        // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
+        effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts)
+        effectsRef.current = effectsFrame.effects
+      }
       // 득점 점수판 0x41a64 — 점수판에 1점 오를 때마다(메시지 0x13) 타이머 20, 그 틱 그리기부터 센다.
       // 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
       if (runScoreBoard !== undefined) {
@@ -421,8 +437,29 @@ function LivePlayback({
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     }
     stateRef.current = running
+    // 닫힌 뒤(+0x1094 를 세는 갱신)에 온 키도 0x519cc 를 지난다 — 받으면 52b26 이 남은 셈을 이 그림 안에서 다 돈다
+    if (!moved && isDefensePlayFinished(running) && pressesRef.current.length > 0) {
+      pressesRef.current = []
+      if (acceptsFastForwardKey(running)) {
+        effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        skippedNow = true
+      }
+    }
+    if (skippedNow) {
+      // 판 끝 → +0x1094 11 번 → 0x35108 이 이 그림 안에서 끝났다. 이 그림의 프레임 끝 파티클 틱은 치운 장면이라 굴림이 없다
+      if (isDefensePlayFinished(running) && !fastForwarded) {
+        setFastForwarded(true)
+        setEffectsView((previous) => ({ text: null, distanceBoard: null, version: previous.version + 1 }))
+        if (moved) {
+          setView(running.ticks[running.ticks.length - 1] ?? null)
+          setRunBoard(null)
+        }
+        if (finishedAt === null) setFinishedAt(update)
+        return
+      }
+    }
     // 판이 닫힌 뒤 붙든 갱신 — 갱신은 529f0 으로 빠지고(판 칸 · 글자 없음) 프레임 끝 파티클 틱만 돈다. 진행기가 닫은 갱신은 위에서 돌았다
-    if (!moved && isDefensePlayFinished(running)) {
+    if (!moved && isDefensePlayFinished(running) && !fastForwarded) {
       // 갱신을 건너뛴 만큼 따라잡는다(진행기 틱과 같은 상한)
       const closedFrames = Math.min(update - (closedUpdateRef.current ?? update - 1), MAX_CLOSED_CATCH_UP)
       for (let frame = 0; frame < closedFrames; frame += 1) {
@@ -440,9 +477,9 @@ function LivePlayback({
       setEffectsView((previous) => ({ text: drawn.text, distanceBoard: drawn.distanceBoard, version: previous.version + 1 }))
     }
     if (isDefensePlayFinished(running) && finishedAt === null) setFinishedAt(update)
-  }, [update, input, side, finishedAt, runScoreBoard, sceneMemory])
+  }, [update, input, side, finishedAt, fastForwarded, runScoreBoard, sceneMemory])
 
-  const isFinished = finishedAt !== null && update >= finishedAt + holdUpdates
+  const isFinished = finishedAt !== null && (fastForwarded || update >= finishedAt + holdUpdates)
 
   useEffect(() => {
     if (!isFinished) return
