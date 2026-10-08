@@ -4,7 +4,7 @@ import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-s
 import { frameAnimations, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
-import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
+import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt, skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
 
 import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
@@ -34,7 +34,7 @@ export interface StageScene {
   readonly tick: number
   /** 판정 글자가 뜬 뒤 흐른 틱 */
   readonly resultTick: number
-  readonly scenery: Omit<SceneryState, 'tick' | 'inning' | 'ourTeamId' | 'opponentTeamId'>
+  readonly scenery: Omit<SceneryState, 'tick' | 'skyColumn' | 'ourTeamId' | 'opponentTeamId'>
   /** 타자 좌우 이동 fe4 — 타자 그림 x 에 더한다 */
   readonly shift: number
   /** 이글아이 아이템 사용 시 공의 도착 지점을 미리 보여준다. */
@@ -119,10 +119,10 @@ export interface StageScene {
   /** 경기 정산 비(종류 0) — 결과 배경 위에 빗방울 선 · 튐 점을 그린다 (0x8f8ec · 0x8fb08) */
   readonly rain?: SceneRain | null
   /**
-   * 하늘 칸(구장객체 +0x14)을 HUD 이닝 대신 이 값으로 — 정산 결과 배경이 쓴다(HUD 가 없다). 이기면 경기 끝 이닝 그대로,
-   * 지면 정산 진입 0x4ea0c 가 0x76fc5 로 12 칸에 둔다. 없으면 HUD 이닝(없으면 1).
+   * 하늘 칸(구장객체 +0x14, 0부터)을 HUD 이닝 대신 이 값으로 — 정산 결과 배경이 쓴다(HUD 가 없다). 이기면 경기 끝 이닝의 칸 그대로,
+   * 지면 정산 진입 0x4ea0c 가 0x76fc5 로 12 칸에 둔다. 없으면 HUD 이닝의 칸(`skyColumnOfInning`, HUD 가 없으면 1회 = 칸 0).
    */
-  readonly skyInning?: number | null
+  readonly skyColumn?: number | null
 }
 
 export function renderBattingStage(
@@ -135,7 +135,8 @@ export function renderBattingStage(
     ...scene.scenery,
     tick: scene.tick,
     side,
-    inning: scene.skyInning ?? scene.hud?.inning ?? 1,
+    // 하늘 칸 = 경기 상태 +0x6b(0부터 세는 이닝) — 1회가 칸 0
+    skyColumn: scene.skyColumn ?? skyColumnOfInning(scene.hud?.inning ?? 1),
     ourTeamId: scene.hud?.ourTeamId ?? null,
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
     offsetY: backdropOffsetY ?? 0,

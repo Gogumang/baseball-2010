@@ -5,10 +5,18 @@ import { SKY_COLOR_PAIRS, SKY_COLOR_ROWS } from '@/shared/config/original/stadiu
  */
 const SKY_LAST_COLUMN = 12
 
-/** 하늘 색 (0x77fe8) — 행은 구장 팀 데이터 +0xb2 (없으면 rand(0,6)), 열은 min(이닝, 12) */
-export function skyColorsOf(row: number, inning: number): { top: string; bottom: string; colorIndex: number } {
+/**
+ * 하늘 칸 — 이닝 넘김 0x3ad22 가 구장 +0x18 에 쓰는 **경기 상태 +0x6b(0부터 세는 이닝 인덱스)** 다(E-defense-rules · 0xb6b6c).
+ * 웹 `GameState.inning` 은 1부터 세므로 하나 뺀다 — 1회 = 칸 0.
+ */
+export function skyColumnOfInning(inning: number): number {
+  return inning - 1
+}
+
+/** 하늘 색 (0x77fe8 · 0x76fc4) — 행은 구장 팀 데이터 +0xb2 (없으면 rand(0,6)), 열은 min(칸, 12) — 칸은 `skyColumnOfInning` */
+export function skyColorsOf(row: number, skyColumn: number): { top: string; bottom: string; colorIndex: number } {
   const rowIndex = Math.max(0, Math.min(SKY_COLOR_ROWS.length - 1, row))
-  const column = Math.max(0, Math.min(SKY_LAST_COLUMN, inning))
+  const column = Math.max(0, Math.min(SKY_LAST_COLUMN, skyColumn))
   const colorIndex = SKY_COLOR_ROWS[rowIndex][column]
   const [topRed, topGreen, topBlue, bottomRed, bottomGreen, bottomBlue] = SKY_COLOR_PAIRS[colorIndex]
   return {

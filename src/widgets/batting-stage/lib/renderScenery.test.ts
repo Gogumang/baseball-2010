@@ -112,7 +112,7 @@ describe('drawScenery — 결과 창 밀기 offsetY (0x45c18 → 0x78578(구장,
     }
     return { context: context as unknown as CanvasRenderingContext2D, translates, fills }
   }
-  const 장면 = { skyRow: 0, inning: 1, tick: 0, stadium: 0, ourTeamId: null, opponentTeamId: null }
+  const 장면 = { skyRow: 0, skyColumn: 0, tick: 0, stadium: 0, ourTeamId: null, opponentTeamId: null }
 
   it('타석(밀기 0)은 펜스를 제자리에 둔다', () => {
     const { context, translates } = 기록컨텍스트()

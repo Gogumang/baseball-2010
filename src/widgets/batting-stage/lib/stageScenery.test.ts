@@ -16,17 +16,24 @@ import {
   resultBackdropOffsetAt,
   pitcherIdleFrameAt,
   skyColorsOf,
+  skyColumnOfInning,
   teamIconOf,
 } from '@/widgets/batting-stage/lib/stageScenery'
 
 describe('하늘 — 0x77fe8 (표 0xd37a4 · 0xd37f2)', () => {
-  it('행 0 · 1회는 #4089be → 흰색, 이닝이 갈수록 어두워진다', () => {
+  it('하늘 칸은 경기 상태 +0x6b(0부터 세는 이닝) — 1회가 칸 0 (0x3ad22 → 구장 +0x18)', () => {
+    expect(skyColumnOfInning(1)).toBe(0)
+    expect(skyColumnOfInning(9)).toBe(8)
+    expect(skyColorsOf(0, skyColumnOfInning(1))).toEqual(skyColorsOf(0, 0))
+  })
+
+  it('행 0 · 칸 1 은 #4089be → 흰색, 이닝이 갈수록 어두워진다', () => {
     expect(skyColorsOf(0, 1)).toEqual({ top: 'rgb(64, 137, 190)', bottom: 'rgb(255, 255, 255)', colorIndex: 0 })
     expect(skyColorsOf(0, 12).colorIndex).toBe(8)
     expect(skyColorsOf(1, 20).colorIndex).toBe(9)
   })
 
-  it('열은 min(이닝, 12), 행은 0~5 로 자른다', () => {
+  it('열은 min(칸, 12), 행은 0~5 로 자른다', () => {
     expect(skyColorsOf(9, 99)).toEqual(skyColorsOf(5, 12))
   })
 })

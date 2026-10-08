@@ -72,7 +72,8 @@ export interface SeasonStadium {
 export interface SceneryState {
   /** 하늘 표 행 (0~5) */
   readonly skyRow: number
-  readonly inning: number
+  /** 하늘 칸 — 구장 +0x14 = min(경기 상태 +0x6b, 12), 0부터 (`skyColumnOfInning`) */
+  readonly skyColumn: number
   /** 타석 화면이 열린 뒤 흐른 틱 — 구름·전광판 이동 */
   readonly tick: number
   /** 구장 번호 — 고르는 규칙(st+0x70)이 미확인이라 0 (추정) */
@@ -203,7 +204,7 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
 }
 
 function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
-  const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, state.inning)
+  const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, state.skyColumn)
   context.fillStyle = top
   context.fillRect(0, 0, STAGE_WIDTH, SKY_GRADIENT.top)
   const gradient = context.createLinearGradient(0, SKY_GRADIENT.top, 0, SKY_GRADIENT.bottom)

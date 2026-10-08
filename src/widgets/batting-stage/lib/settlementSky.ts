@@ -1,3 +1,5 @@
+import { skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
+
 /**
  * **정산 결과 배경의 하늘 칸** (구장객체 +0x14) — 정산 진입 0x4ea0c 꼬리(직접 뜸):
  * ```
@@ -11,7 +13,7 @@
  */
 export const SETTLEMENT_LOSS_SKY_COLUMN = 12
 
-/** 결과 배경 하늘 칸 — 이기면 경기 끝 이닝(타석 HUD 와 같은 칸 셈), 지면 12 */
-export function settlementSkyInningOf(settlement: { readonly isWin: boolean; readonly inning: number }): number {
-  return settlement.isWin ? settlement.inning : SETTLEMENT_LOSS_SKY_COLUMN
+/** 결과 배경 하늘 칸 — 이기면 경기 끝 이닝의 칸(+0x6b, 0부터 — 타석 하늘과 같은 칸), 지면 12 */
+export function settlementSkyColumnOf(settlement: { readonly isWin: boolean; readonly inning: number }): number {
+  return settlement.isWin ? skyColumnOfInning(settlement.inning) : SETTLEMENT_LOSS_SKY_COLUMN
 }
