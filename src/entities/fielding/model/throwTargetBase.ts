@@ -44,8 +44,13 @@ const NEAR_PENALTY = 22_500
 const SCORE_FLOOR = 500
 /** 커버가 없는 루로의 재송구에 쓰는 큰 값 (0xafe1e) */
 const NO_RETHROW_TICKS = 100
-/** 고르기 시작값 (0xb0164) */
-const INITIAL_BEST = 1000
+/**
+ * 고르기 시작값 = **500** (b0164: `movs r3,#0xfa ; lsls r3,#1 ; str r3,[sp,#0x1c]`) — 끝의 "아무도 점수를 못 얻었나"
+ * 비교도 같은 500 이다 (b02ae: `movs r3,#0xfa ; lsls r3,#1 ; cmp [sp,#0x1c], r3`).
+ */
+const INITIAL_BEST = 500
+/** 가장 빠른 수비 루 찾기 시작값 = 1000 (afc7e: `movs r6,#0xfa ; lsls r6,#2 ; str r6,[sp,#0x50]`) */
+const MINIMUM_DEF_TICK_START = 1000
 /** 1루수 예외가 걸리는 점수 상한 (0xb0290) */
 const FIRST_BASEMAN_SCORE_LIMIT = 19_999
 /** 태그 거리와 같은 값 — 1루선에서 이만큼 안쪽이어야 "직접 밟을 수 있다" 로 친다 (0xafd5a) */
@@ -219,7 +224,7 @@ export function describeThrowTarget(input: ThrowTargetInput): ThrowTargetDebug {
   const table = buildCandidates(input)
 
   // 루마다 수비 틱 + 가장 빠른 루 (S7 2-4)
-  let minimumDefTick = INITIAL_BEST
+  let minimumDefTick = MINIMUM_DEF_TICK_START
   let minimumBase = 0
   for (let base = 0; base < 4; base += 1) {
     table[base].defTick = defenseArrivalTicks(input, base)
