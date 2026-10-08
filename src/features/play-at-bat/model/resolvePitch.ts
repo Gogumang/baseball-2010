@@ -19,7 +19,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** 스윙 입력 — 원본 컨트롤러 0x53670 */
 export interface BattingSwing {
-  /** 키를 누른 순간의 공 프레임 F */
+  /** 키 틱 F = 경기+0xfd8 (보이던 공 틱 + 1 — `widgets/batting-stage/lib/swingWindow.keyTickOf`). 판정은 F + 2 에 난다 */
   readonly frame: number
   /** 타자 좌우 이동 fe4 (−9~9, 3 단위) */
   readonly shift: number
@@ -181,6 +181,21 @@ export function isStrikeZonePitch(pitch: Pitch): boolean {
   const point = projectToPlate(path[path.length - 1], pitch.stageSide)
   const box = STRIKE_ZONE_BOXES[pitch.stageSide] ?? STRIKE_ZONE_BOXES[0]
   return point.x >= box.x && point.x <= box.x + box.width && point.y >= box.y && point.y <= box.y + box.height
+}
+
+/**
+ * **판정 없는 스윙** — 스윙은 나갔지만 0x6aa 판정을 안 탄 공(공이 타자 근처가 아니던 헛스윙 · 키 틱 N 의 늦은 스윙).
+ * 0x12 진입 0x3dfac 는 스윙 객체 +0xe(스윙함)를 st[0x10] 에 적고(3dfbe) 사구 판정 0x35a20 은 그 칸이 서 있으면 0 —
+ * 헛스윙 스트라이크다. 굴림이 없다. 소리는 판정 없는 헛스윙에서만 0x4e21c 의 8/27 (`unjudgedWhiffSoundIdOf`), 늦은 스윙은 없다.
+ */
+export function unjudgedSwingDetailOf(contactSoundId: number | null): PitchOutcomeDetail {
+  return {
+    resolution: { kind: '스트라이크', isSwinging: true },
+    hasSwung: true,
+    isBunt: false,
+    resultCode: null,
+    contactSoundId,
+  }
 }
 
 /**
