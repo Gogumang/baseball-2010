@@ -4,6 +4,7 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_OUTING_ACTIVITIES, SEASON_OUTING_COSTS, SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES,
   SEASON_OUTING_REQUIRED_POPULARITY, checkSeasonOuting, rollSeasonOuting,
+  seasonOutingConfirmTextOf, seasonOutingRefusalTextOf,
 } from '@/widgets/season/lib/seasonOuting'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -160,5 +161,31 @@ describe('외출 결과 0xc81c — 서브 아이템 보정 (점프표 0xcbe6c)',
     const { random } = 차례난수([27])
     const 결과 = rollSeasonOuting(레코드({ money: 10, outingSubItems: 서브아이템(0) }), 50, 1, random)!
     expect(결과.teamMorale).toBe(50 + 27)
+  })
+})
+
+describe('외출 팝업 글 원문 (0xbd38)', () => {
+  it('확인 0x16 — "!C" 뒤 비용 줄 [162] + "!N" 이 먼저, 그 뒤 [161]', () => {
+    expect(seasonOutingConfirmTextOf(1)).toBe(
+      '!C!C!cFFFF00소지금 400!cFFFFFF이 소모됩니다!N[회식] 이벤트를!N진행하시겠습니까?',
+    )
+    expect(seasonOutingConfirmTextOf(4)).toBe(
+      '!C!C!cFFFF00소지금 1000!cFFFFFF이 소모됩니다!N[구단CF] 이벤트를!N진행하시겠습니까?',
+    )
+  })
+
+  it('비용이 없으면 [161] 만', () => {
+    expect(seasonOutingConfirmTextOf(3)).toBe('!C[야구교실] 이벤트를!N진행하시겠습니까?')
+  })
+
+  it('거절 글은 StrMODE 원문 — [62] 에만 필요한 인기도를 넣는다', () => {
+    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ popularity: 0 }), 50, 4))).toBe(
+      '!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 400',
+    )
+    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ popularity: 999, money: 0 }), 50, 4))).toBe('!C소지금이 부족합니다')
+    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ money: 50, illness: 0 }), 50, 2))).toBe(
+      '!C건강한 상태입니다!N입원할 필요가 없습니다',
+    )
+    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ money: 50 }), 100, 1))).toBe('!C사기 최고 상태입니다')
   })
 })

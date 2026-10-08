@@ -4,28 +4,13 @@ import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_OUTING_ACTIVITIES, SEASON_OUTING_DESCRIPTIONS, SEASON_OUTING_PLACES,
   SEASON_OUTING_REQUIRED_POPULARITY, SEASON_OUTING_SUB_ITEMS, checkSeasonOuting,
+  seasonOutingConfirmTextOf, seasonOutingRefusalTextOf,
 } from '@/widgets/season/lib/seasonOuting'
-import type { SeasonOutingPlace, SeasonOutingRefusal } from '@/widgets/season/lib/seasonOuting'
+import type { SeasonOutingPlace } from '@/widgets/season/lib/seasonOuting'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
-
-/** 가드 거절 글 — 옆 번호가 원본 StrMODE id 다. [196]·[91] 은 P4 3절이 옮겨 적은 원문이다 */
-const REFUSAL_TEXT: Readonly<Record<SeasonOutingRefusal, (required: number) => string>> = {
-  인기도부족: (required) => `인기도가 부족합니다!N필요한 인기도 : ${required}`, // StrMODE[62]
-  소지금부족: () => '소지금이 부족합니다', // StrMODE[77]
-  질병없음: () => '건강한 상태입니다!N입원할 필요가 없습니다', // StrMODE[196]
-  사기최고: () => '사기 최고 상태입니다', // StrMODE[91]
-}
-
-/**
- * 확인 팝업 id **0x16** — StrMODE[161] `"[%s] 이벤트를 진행하시겠습니까?"` 에
- * 비용이 있으면 [162] `"소지금 %s이 소모됩니다"` 가 붙는다 (P4 3절 확정).
- */
-const CONFIRM_TEXT = (activity: string, cost: number): string =>
-  `!C[${activity}] 이벤트를 진행하시겠습니까?` +
-  (cost > 0 ? `!N!cFFFF00소지금 ${seasonMoneyTextOf(cost)}!cFFFFFF이 소모됩니다` : '')
 
 export interface SeasonOutingScreenProps {
   readonly state: SeasonState
@@ -81,7 +66,7 @@ export function SeasonOutingScreen({ state, outingSubItems = [], onRun, onBack }
   const select = (index: number) => {
     const checked = checkSeasonOuting(record, teamMorale, index)
     if (!checked.ok) {
-      setNotice(REFUSAL_TEXT[checked.reason ?? '소지금부족'](checked.required ?? 0))
+      setNotice(seasonOutingRefusalTextOf(checked))
       return
     }
     setQuestion(index)
@@ -119,10 +104,8 @@ export function SeasonOutingScreen({ state, outingSubItems = [], onRun, onBack }
       )}
       {notice === null && question !== null && (
         <MessageBox
-          text={CONFIRM_TEXT(
-            SEASON_OUTING_ACTIVITIES[question],
-            checkSeasonOuting(record, teamMorale, question).cost,
-          )}
+          // 0xbd38 의 0xbdf8~0xbf00 — 비용 줄 [162] 이 먼저, [161] 원문 안 !N 그대로
+          text={seasonOutingConfirmTextOf(question)}
           buttons={['예', '아니오']}
           onAnswer={(answer) => {
             const place = question

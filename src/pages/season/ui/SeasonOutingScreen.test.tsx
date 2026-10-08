@@ -41,8 +41,10 @@ describe('시즌 외출 (상태 0xd1)', () => {
     render(<SeasonOutingScreen state={시즌({ popularity: 999, money: 50 })} onRun={onRun} onBack={vi.fn()} />)
 
     fireEvent.click(줄('번화가'))
-    expect(알림글()).toContain('[회식] 이벤트를 진행하시겠습니까?')
-    expect(알림글()).toContain('소지금 400이 소모됩니다')
+    // 0xbdf8~0xbf00 — 비용 줄 [162] 이 먼저, 그 뒤 [161] (원문 안 !N 에서 줄이 바뀐다)
+    expect(알림글()).toContain('[회식] 이벤트를')
+    expect(알림글()).toContain('진행하시겠습니까?')
+    expect(알림글().indexOf('소지금 400이 소모됩니다')).toBeLessThan(알림글().indexOf('[회식] 이벤트를'))
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onRun).toHaveBeenCalledWith('번화가', 1)

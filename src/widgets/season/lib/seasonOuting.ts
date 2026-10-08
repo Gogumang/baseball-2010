@@ -1,5 +1,7 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { SCHEDULE_ACTIVITIES } from '@/shared/config/original/modeMenus'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import {
   MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, clampTo,
 } from '@/entities/season-mode/model/seasonRecord'
@@ -163,6 +165,42 @@ export function checkSeasonOuting(
   if (place === 1 && teamMorale === MORALE_FULL) return { ok: false, reason: '사기최고', cost }
 
   return { ok: true, cost }
+}
+
+/**
+ * 가드 `0xbd38` 의 거절 팝업 글 (id 1) — 원문 그대로 (직접 떴다).
+ * ```
+ * bd6a  [62]  sprintf(StrMODE[62], 200 | 400)
+ * bdbc  [77]  sprintf(StrMODE[77], c × 100)   ; 서식 칸이 없어 원문 그대로 나온다
+ * be6e  [196] · bea2 [91]  원문 그대로
+ * ```
+ */
+export function seasonOutingRefusalTextOf(check: SeasonOutingCheckResult): string {
+  switch (check.reason) {
+    case '인기도부족':
+      return (ORIGINAL_MODE_TEXT[62] ?? '').replace('%d', String(check.required ?? 0))
+    case '질병없음':
+      return ORIGINAL_MODE_TEXT[196] ?? ''
+    case '사기최고':
+      return ORIGINAL_MODE_TEXT[91] ?? ''
+    default:
+      return ORIGINAL_MODE_TEXT[77] ?? ''
+  }
+}
+
+/**
+ * 확인 팝업 id **0x16** 글 (`0xbd38` 의 0xbdf8~0xbf00, 직접 떴다) — **비용 줄이 먼저**다.
+ * ```
+ * bdf8  글 = "!C"
+ * be02  c > 0 이면 글 += sprintf(StrMODE[162], 0x55cf4(c × 100)) + "!N"
+ * beb0  글 += sprintf(StrMODE[161], StrMODE[54 + p])
+ * ```
+ * [162] 도 "!C" 로 시작하고 [161] 은 원문 안에 "!N" 이 있다.
+ */
+export function seasonOutingConfirmTextOf(place: number): string {
+  const cost = SEASON_OUTING_COSTS[place] ?? 0
+  const costLine = cost > 0 ? `${(ORIGINAL_MODE_TEXT[162] ?? '').replace('%s', seasonMoneyTextOf(cost))}!N` : ''
+  return `!C${costLine}${(ORIGINAL_MODE_TEXT[161] ?? '').replace('%s', SEASON_OUTING_ACTIVITIES[place] ?? '')}`
 }
 
 /** 외출 한 번을 굴리고 적용한 결과 (`0xc81c`) */
