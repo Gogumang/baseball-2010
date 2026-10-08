@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, lampCountOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
+import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, lampCountOf, roundFillRectsOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
   inning: 1,
@@ -96,5 +96,30 @@ describe('alignedNumberGlyphsOf — HUD 점수 0xba719 → 0xba51c', () => {
 
   it('그림이 아직 없으면 null', () => {
     expect(alignedNumberGlyphsOf(1, { x: 0, y: 0, width: 1, height: 1 }, options(0), () => null)).toBeNull()
+  })
+})
+
+describe('roundFillRectsOf — HUD 둥근 칠 0xba0bd → 0x6b7d4', () => {
+  const cellsOf = (rects: readonly { x: number; y: number; width: number; height: number }[]) => {
+    const cells = new Set<string>()
+    for (const rect of rects) {
+      for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+        for (let y = rect.y; y < rect.y + rect.height; y += 1) cells.add(`${x},${y}`)
+      }
+    }
+    return cells
+  }
+
+  it('판 검정 (5,5,82,50) 둥글기 5 는 83×51 을 덮고 모서리마다 ㄱ자 세 칸을 비운다', () => {
+    const cells = cellsOf(roundFillRectsOf({ x: 5, y: 5, width: 82, height: 50 }, 5))
+    expect(cells.size).toBe(83 * 51 - 4 * 3)
+    for (const missing of ['5,5', '6,5', '5,6', '87,55', '86,55', '87,54']) expect(cells.has(missing)).toBe(false)
+    expect(cells.has('87,7')).toBe(true)
+  })
+
+  it('팀 줄 둥글기 3 은 모서리 한 칸씩만 비운다', () => {
+    const cells = cellsOf(roundFillRectsOf({ x: 8, y: 21, width: 36, height: 14 }, 3))
+    expect(cells.size).toBe(37 * 15 - 4)
+    expect(['8,21', '44,21', '8,35', '44,35'].some((cell) => cells.has(cell))).toBe(false)
   })
 })

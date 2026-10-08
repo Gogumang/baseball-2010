@@ -4,8 +4,8 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
 /**
  * 경기 HUD — binary.mod 0x373d0 (position-re 2차, 바이트 확인).
  * game_ui 프레임 0 을 (6,6) 에 그리고, 그 프레임의 박스가 곧 배치표다 (아래 좌표는 박스 + (6,6)).
- *   배경: 검정 (5,5,82,50) 위에 #335fcd (6,6,80,48)
- *   팀 줄: 위 (8,21,36,14) · 아래 (8,38,36,14) #222854, 공격 팀 줄 왼쪽에 #ffe500 막대
+ *   배경: 검정 (5,5,82,50) 위에 #335fcd (6,6,80,48) — 둘 다 둥글기 5 둥근 칠 (`roundFillRectsOf`)
+ *   팀 줄: 위 (8,21,36,14) · 아래 (8,38,36,14) #222854 둥글기 3, 공격 팀 줄 왼쪽에 #ffe500 막대 (x+1, y+2, 3, h−2)
  *   팀 아이콘: (13,23) · (13,40) — team_logo_ini
  *   베이스: 1루 (68,14) · 2루 (59,9) · 3루 (50,14), 주자 있으면 파트 6 (빈 베이스 파트 5 는 프레임에 있다)
  *   램프: S 파트 13 (58,24)(67,24) · B 파트 14 (58,34)(67,34)(76,34) · O 파트 15 (58,44)(67,44)
@@ -42,6 +42,9 @@ const HUD_FRAMES = './sprites/game_ui/frames'
 const HUD_ORIGIN = { x: 6, y: 6 }
 const PART = (index: number) => `./sprites/game_ui/${String(index).padStart(3, '0')}.png`
 
+const BOARD = { x: 5, y: 5, width: 82, height: 50 }
+const BOARD_ROUND = 5
+const ROW_ROUND = 3
 const ROW_TOP = { x: 8, y: 21, width: 36, height: 14 }
 const ROW_BOTTOM = { x: 8, y: 38, width: 36, height: 14 }
 const ROW_COLOR = UI_COLORS.hudRow
@@ -136,10 +139,9 @@ const INNING_DIGITS_START = 0
 
 /** `tick` = 타석이 열린 뒤 흐른 틱. 새 램프 확대 연출이 이걸로 z 를 센다 */
 export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: number): void {
-  context.fillStyle = ORIGINAL_COLORS.black
-  context.fillRect(5, 5, 82, 50)
-  context.fillStyle = ORIGINAL_COLORS.boardFill
-  context.fillRect(6, 6, 80, 48)
+  // 판: 박스 1 + (6,6) = (5,5,82,50) 검정 둥글기 5 → (+1,+1,−2,−2) #335FCD 둥글기 5 (37444~37488, 둥근 칠 0xba0bd → 0x6b7d4)
+  fillRound(context, BOARD, BOARD_ROUND, ORIGINAL_COLORS.black)
+  fillRound(context, { x: BOARD.x + 1, y: BOARD.y + 1, width: BOARD.width - 2, height: BOARD.height - 2 }, BOARD_ROUND, ORIGINAL_COLORS.boardFill)
 
   // 위 줄 = 측 0(선공, 초 공격), 아래 줄 = 측 1(후공, 말 공격). 공격 막대는 st[9] == 0 이면 위, == 1 이면 아래 (0x374e0 · 0x375b2)
   const rows = hudRowsOf(hud)
@@ -216,6 +218,50 @@ function drawZoomedLamp(
   context.imageSmoothingEnabled = wasSmoothing
 }
 
+interface PlainRect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** 기기 선 긋기(0x14006c8) 한 줄 — 두 끝을 다 칠한다. 끝이 거꾸로면 작은 쪽부터 */
+const lineRect = (x1: number, y1: number, x2: number, y2: number): PlainRect => ({
+  x: Math.min(x1, x2),
+  y: Math.min(y1, y2),
+  width: Math.abs(x2 - x1) + 1,
+  height: Math.abs(y2 - y1) + 1,
+})
+
+/**
+ * **둥근 칠 `0x6b7d4(gfx, x, y, w, h, 둥글기, 색)`** — `widgets/matchup-cards` 의 `roundFillRectsOf` 와 같은 식이다
+ * (위젯끼리 import 하지 않으려고 베꼈다). 둥글기는 7 로 자르고, R = x + w · B = y + h.
+ * ```
+ * 둥글기 ≤ 3:  칠(x+1, y+1, w−1, h−1) · 선(x+1, y, R−1, y) · 선(x+1, B, R−1, B) · 선(x, y+1, x, B−1) · 선(R, y+1, R, B−1)
+ * 둥글기 4~7:  칠(x+1, y+1, w−1, h−1) · 선(x+2, y, R−2, y) · 선(x+2, B, R−2, B) · 선(x, y+2, x, B−2) · 선(R, y+2, R, B−2)
+ * ```
+ * 그래서 둥근 칠은 (w+1) × (h+1) 칸을 덮고 모서리를 1칸(≤3) 또는 ㄱ자 3칸(4~7) 비운다.
+ */
+export function roundFillRectsOf(rect: PlainRect, round: number): PlainRect[] {
+  const { x, y, width: w, height: h } = rect
+  const right = x + w
+  const bottom = y + h
+  const inset = Math.min(7, round) <= 3 ? 1 : 2
+  const body: PlainRect[] = w - 1 > 0 && h - 1 > 0 ? [{ x: x + 1, y: y + 1, width: w - 1, height: h - 1 }] : []
+  return [
+    ...body,
+    lineRect(x + inset, y, right - inset, y),
+    lineRect(x + inset, bottom, right - inset, bottom),
+    lineRect(x, y + inset, x, bottom - inset),
+    lineRect(right, y + inset, right, bottom - inset),
+  ]
+}
+
+function fillRound(context: CanvasRenderingContext2D, rect: PlainRect, round: number, color: string): void {
+  context.fillStyle = color
+  for (const part of roundFillRectsOf(rect, round)) context.fillRect(part.x, part.y, part.width, part.height)
+}
+
 function drawTeamRow(
   context: CanvasRenderingContext2D,
   row: { x: number; y: number; width: number; height: number },
@@ -225,11 +271,11 @@ function drawTeamRow(
   scoreOffsetY: number,
   scoreAlign: number,
 ): void {
-  context.fillStyle = ROW_COLOR
-  context.fillRect(row.x, row.y, row.width, row.height)
+  // 팀 줄 #222854 둥글기 3 (374c6~374dc · 37598~375ae), 공격 막대 = 네모 칠 0x6a9f1(x + 1, y + 2, 3, h − 2) #FFE500 (374ea~37512)
+  fillRound(context, row, ROW_ROUND, ROW_COLOR)
   if (isBatting) {
     context.fillStyle = OFFENSE_BAR_COLOR
-    context.fillRect(row.x + 1, row.y + 1, OFFENSE_BAR_WIDTH, row.height - 2)
+    context.fillRect(row.x + 1, row.y + 2, OFFENSE_BAR_WIDTH, row.height - 2)
   }
   const logo = sprite(logoUrl)
   if (logo !== null) context.drawImage(logo, row.x + LOGO_OFFSET.x, row.y + LOGO_OFFSET.y)
