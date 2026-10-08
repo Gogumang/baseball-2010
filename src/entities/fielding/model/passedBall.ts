@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * `state[0x19]` 0.1% 사건 — **포수 뒤로 빠진 공(폭투·포일)** (S8 5절).
@@ -15,8 +14,7 @@ import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * cfg+0x2e 32비트 값 = 10 (파일 0x2a = 10, 0x2c = 0).
- * 원본 `rand(a, b)` 는 양끝을 포함해 10/10001 이지만, 이 저장소는 `randomIntegerBelow`(위끝 제외) 로
- * 통일돼 있어 10/10000 으로 옮긴다 — 0.1% 라는 값은 그대로다.
+ * 원본 `T > rand(0, 10000)`(위끝 제외) — 10/10000 = 0.1% (0x35058).
  */
 export const PASSED_BALL_THRESHOLD = 10
 const RANDOM_LIMIT = 10_000
@@ -26,14 +24,14 @@ export const HOME_RUN_DERBY_MODE = 7
 
 export function rollPassedBall(gameMode: number, random: RandomPort): boolean {
   if (gameMode === HOME_RUN_DERBY_MODE) return false
-  return PASSED_BALL_THRESHOLD > randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  return PASSED_BALL_THRESHOLD > random.rand(0, RANDOM_LIMIT)
 }
 
 /** 굴림이 섰을 때 실제로 공이 튀는 값 (0x3507c) */
 export interface PassedBallShot {
-  /** 화면+0xfcc 각도. rand(60, 130) 을 **부호 없이 그대로** 넣는다 */
+  /** 화면+0xfcc 각도. rand(60, 130)(0x35086, 위끝 제외 — 60~129) 을 **부호 없이 그대로** 넣는다 */
   readonly angle: number
-  /** 화면+0xfce 세기. rand(160, 280) */
+  /** 화면+0xfce 세기. rand(160, 280)(0x35096 — 160~279) */
   readonly strength: number
   /** 화면+0xfd0 수직 속도 = −100 (아래로) */
   readonly verticalSpeed: number
@@ -43,13 +41,13 @@ export interface PassedBallShot {
 export const PASSED_BALL_VERTICAL_SPEED = -100
 
 /**
- * 타격 경로는 원시각 45…135 를 **부호를 뒤집어** −135…−45 로 넣는데, 이 사건은 60…130 을 그대로 넣는다.
- * `0x9d660` 의 정규화(a > 0 → a − 360)를 거치면 −300…−230 → 페어 쐐기 밖, 즉 **홈플레이트 뒤쪽**이다.
+ * 타격 경로는 원시각 45…135 를 **부호를 뒤집어** −135…−45 로 넣는데, 이 사건은 60…129 를 그대로 넣는다.
+ * `0x9d660` 의 정규화(a > 0 → a − 360)를 거치면 −300…−231 → 페어 쐐기 밖, 즉 **홈플레이트 뒤쪽**이다.
  */
 export function passedBallShot(random: RandomPort): PassedBallShot {
   return {
-    angle: randomIntegerBelow(random, 60, 131),
-    strength: randomIntegerBelow(random, 160, 281),
+    angle: random.rand(60, 130),
+    strength: random.rand(160, 280),
     verticalSpeed: PASSED_BALL_VERTICAL_SPEED,
   }
 }

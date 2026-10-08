@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 원본 파티클 이미터 — `ptc/%03d.ptc` 51바이트 한 벌 (R5 8절 확정).
@@ -119,8 +118,7 @@ export interface ParticleEmitter {
  * 원본 `rand(n)` 0x9d468 — n ≤ 0 이면 **난수를 안 돌리고** 0, 아니면 한 번 돌려 [0, n).
  */
 function roll(random: RandomPort, limit: number): number {
-  if (limit <= 0) return 0
-  return randomIntegerBelow(random, 0, limit)
+  return random.rand9d(limit)
 }
 
 /** `값 + rand(폭+1) − (폭 >> 1)` — 원본이 흔들림을 넣는 식 (반은 산술 시프트) */

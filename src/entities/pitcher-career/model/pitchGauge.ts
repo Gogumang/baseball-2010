@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 사용자 투구 게이지 (binary.mod 0x3f500 게이지를 쓰는가 · 0x4d2ac 그리기·커서 · 0x50e08 누름 ·
@@ -86,7 +85,7 @@ export const SCATTER_MULTIPLIERS: readonly number[] = [12, 20, 25, 30]
 /** `r = rand(0,100)` 으로 흩어짐 등급 k 를 뽑는다 (0x4dcf0~0x4dd6c) */
 export function scatterRankOf(grade: number, random: RandomPort): number {
   const row = SCATTER_TABLE[Math.min(Math.max(grade, 0), SCATTER_TABLE.length - 1)]
-  const roll = randomIntegerBelow(random, 0, 100)
+  const roll = random.rand(0, 100)
   const rank = row.findIndex((cumulative) => roll < cumulative)
   return rank < 0 ? SCATTER_MULTIPLIERS.length - 1 : rank
 }
@@ -98,7 +97,7 @@ export function scatterMultiplierOf(rank: number): number {
 
 /**
  * **아직 못 채운 것**: 배율을 실제 목표점 이동으로 바꾸는 식이다.
- * 원본은 무작위 각도(`rand(1,361)`)와 반지름(결과 그림 폭/2 + `rand(-2,3)`)에 배율을 곱하고 `>>16` 한다.
+ * 원본은 무작위 각도(`rand(0, 360) + 1`, 0x4ddc0)와 반지름(결과 그림 폭/2 + `rand(-2,3)`)에 배율을 곱하고 `>>16` 한다.
  * 그 뒤 좌표계는 **투구 궤적 코드(0x4dc78 이후)** 라 이 저장소에서 해독하지 않는 주제다.
  * 채우려면 ① 결과 그림 폭 ② 궤적 좌표계의 단위가 필요하다.
  */
@@ -113,8 +112,8 @@ export interface AimScatter {
 
 export function aimScatterOf(grade: number, resultImageWidth: number | null, random: RandomPort): AimScatter {
   const rank = scatterRankOf(grade, random)
-  const angleDegrees = randomIntegerBelow(random, 1, 361)
-  const jitter = randomIntegerBelow(random, -2, 3)
+  const angleDegrees = random.rand(0, 360) + 1
+  const jitter = random.rand(-2, 3)
   return {
     rank,
     multiplier: scatterMultiplierOf(rank),

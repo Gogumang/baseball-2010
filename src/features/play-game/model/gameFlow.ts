@@ -1,7 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { atBatRecordCodeOf } from '@/entities/batting/model/swingSkills'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
@@ -1392,7 +1391,7 @@ function advanceUntilPlayerTurn(
  * c22dc  st[9](공격 측) != 1 → 끝                  ; 말 공격
  * c230a  d = 점수(측 0) − 점수(측 1) ; (u32)d > 3 → 끝   ; 후공이 0~3점 뒤지거나 동점
  * c2310  t = st[6](아웃) + 주자 수 ; t < d → 끝
- * c2318  n = rand(0, t + 1)                       ; 주자 수를 다시 정한다
+ * c2318  n = rand(d, t + 1)                       ; 주자 수를 다시 정한다 — r0 은 c230a 의 d 그대로 (d ~ t)
  * c232e  st[6] = max(0, t − n)                    ; 남은 몫이 아웃
  * c2338  0xa9250 주자 지우기
  * c2342  루 i = 0(1루)·1·2: n == 3 − i 이면 세움(n−1) · 아니면 rand(0, n + 1) == 0 일 때 세움(n−1)
@@ -1401,14 +1400,6 @@ function advanceUntilPlayerTurn(
  * 곧 9회 이후 말 공격에서 뒤진(또는 동점) 후공 팀의 내 타석 앞, `아웃 + 주자` 를 주자·아웃으로 다시 나눠
  * 끝내기 판을 차린다. n 이 0 일 때 rand(0, 1) 은 늘 0 이라 주자를 세우고 n 이 −1 이 되는 것까지 원본 그대로다.
  */
-/**
- * 원본 `0xbfa54 rand(a, b)` 그대로 — a == b 면 a, a > b 면 `b + x % (a − b)`, 아니면 `a + x % (b − a)` (bfa6a~bfa88).
- * `randomIntegerBelow` 는 a ≤ b 만 맞으므로, n 이 −1 까지 내려가 rand(0, 0)·rand(0, −1) 이 나오는 0xc22b4 는 이것으로 굴린다.
- */
-function originalRandRange(random: RandomPort, a: number, b: number): number {
-  return a > b ? randomIntegerBelow(random, b, a) : randomIntegerBelow(random, a, b)
-}
-
 /** 경기 상태 초기화 0xb6814 가 `state+0x69`(마지막 정규 이닝, 0-기준)에 넣는 값 — 9회 */
 const LAST_REGULAR_INNING_INDEX = 8
 
@@ -1421,14 +1412,14 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
   if (deficit < 0 || deficit > 3) return progress
   const total = game.outs + runnerCountOf(game.bases)
   if (total < deficit) return progress
-  let runners = randomIntegerBelow(random, 0, total + 1)
+  let runners = random.rand(deficit, total + 1)
   const outs = Math.max(0, total - runners)
   const placed: boolean[] = []
   for (let base = 0; base <= 2; base += 1) {
     if (runners === 3 - base) {
       placed.push(true)
       runners -= 1
-    } else if (originalRandRange(random, 0, runners + 1) === 0) {
+    } else if (random.rand(0, runners + 1) === 0) {
       placed.push(true)
       runners -= 1
     } else {
