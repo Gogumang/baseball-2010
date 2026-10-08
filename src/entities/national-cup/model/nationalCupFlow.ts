@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { NATIONAL_CUP_RUNNER_UP_TEXT_MONEY, nationalCupRewardOf } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonReward } from '@/entities/season-mode/model/seasonRewards'
 import type { EventReward } from '@/entities/story/model/eventReward'
@@ -120,19 +121,23 @@ export function confirmNationalCupStandings(cup: NationalCup, random: RandomPort
 }
 
 /**
- * 결과 화면 문구 `0x85e6c(UI, 우승?)` — 팝업 버퍼 `0x1552af4` 에 채우는 글이다.
+ * 결과 화면 문구 `0x85e6c(UI, 우승?)` — 팝업 버퍼 `0x1552af4` 에 `sprintf` 로 채우는 글이다 (원문 그대로, 색·줄바꿈 표시 포함).
  *
- * - 우승: StrMODE[144] `"[대한민국] 대표팀 제%d회 국가대항전 우승!!"`
- * - 그 밖: StrMODE[143] `"[대한민국] 대표팀 탈락!! [%s] 대표팀 제%d회 국가대항전 우승!!"`
+ * - 우승: StrMODE[144] `"!C[!cFFFF00대한민국!cFFFFFF] 대표팀!N제%d회 국가대항전 우승!!"` ← 제 n 회
+ * - 그 밖: StrMODE[143] `"!C[!cFFFF00대한민국!cFFFFFF] 대표팀 탈락!!N!N[!cFFFF00%s!cFFFFFF] 대표팀 제%d회!N국가대항전 우승!!"` ← 우승국 이름 · 제 n 회
  *
  * ⚠️ **원본 버그 그대로**: 결승까지 올라가 **져도** 문구는 "대표팀 탈락!!" 이다. 준우승이라는 말이 없다.
  */
 export const NATIONAL_CUP_CHAMPION_MESSAGE_ID = 144
 export const NATIONAL_CUP_ELIMINATED_MESSAGE_ID = 143
 
+/** StrMODE 원문의 `%s`·`%d` 를 차례로 채운다 (원본 `sprintf` 자리) */
+const sprintfModeText = (id: number, ...values: readonly (string | number)[]): string =>
+  values.reduce<string>((text, value) => text.replace(/%[sd]/, String(value)), ORIGINAL_MODE_TEXT[id] ?? '')
+
 export function nationalCupResultText(edition: number, isKoreaChampion: boolean, championName: string): string {
-  if (isKoreaChampion) return `[대한민국] 대표팀 제${edition}회 국가대항전 우승!!`
-  return `[대한민국] 대표팀 탈락!! [${championName}] 대표팀 제${edition}회 국가대항전 우승!!`
+  if (isKoreaChampion) return sprintfModeText(NATIONAL_CUP_CHAMPION_MESSAGE_ID, edition)
+  return sprintfModeText(NATIONAL_CUP_ELIMINATED_MESSAGE_ID, championName, edition)
 }
 
 const NOTHING: SeasonReward = { popularity: 0, reputation: 0, money: 0, gamePoint: 0, messageId: 0 }
@@ -159,11 +164,14 @@ export function careerNationalCupRewardOf(champion: number): SeasonReward {
 }
 
 /**
- * 보상 팝업 글 (나리 `0x26` · 시즌 `0x23`/`0x24`).
+ * 보상 팝업 글 (나리 `0x26` · 시즌 `0x23`/`0x24`) — StrMODE 원문에 `sprintf` 인자를 그대로 넣는다.
  *
- * ⚠️ **StrMODE[199]·[200] 의 원문을 아직 못 뽑았다** — 문서에 남은 것은 `sprintf` 에 넘기는
- * `%d` 인자뿐이다(`P5` 3a·`P4` 4b). 그래서 **문장은 웹판이 지은 것**이고 **숫자는 원본 인자 그대로**다.
- * 원문이 나오면 이 함수만 갈아 끼우면 된다.
+ * - [199] `"!C[!c00FF00국가대항전 우승!!!cFFFFFF]!N!N인기도 +%d / 평판 +%d!N소지금 +%d만!NG포인트 +%d"`
+ *   — 나리 `sprintf(StrMODE[199], 20, 30, 2000, 1000)` (1b9b8~1b9e4) · 시즌 `(30, 40, 5000, 1000)` (89ca~89f0)
+ * - [200] `"!C[!c00FF00국가대항전 준우승!!!cFFFFFF]!N!N인기도 +%d / 평판 +%d!N소지금 +%d만"`
+ *   — 시즌 `sprintf(StrMODE[200], 20, 20, 2500)` (8a26~8a44). 나리는 [200] 을 쓰지 않는다
+ *
+ * 소지금 인자는 만 원 단위라 100만원 단위 `reward.money` × 100 이다.
  *
  * ⚠️ **원본 버그 그대로**: 시즌모드 준우승(200)은 글에 **2500만**이라 적고 실제로는 **2000만**만
  * 더한다(`0x8a2e` 표시 vs `0x8b76 adds #0x14`). 그래서 글에는 `NATIONAL_CUP_RUNNER_UP_TEXT_MONEY`(25)를
@@ -171,14 +179,10 @@ export function careerNationalCupRewardOf(champion: number): SeasonReward {
  */
 export function nationalCupRewardText(reward: SeasonReward): string {
   if (reward.messageId === 0) return ''
-  const shownMoney = reward.messageId === 200 ? NATIONAL_CUP_RUNNER_UP_TEXT_MONEY : reward.money
-  const lines = [
-    reward.messageId === 199 ? '국가대항전 우승!' : '국가대항전 준우승!',
-    `인기도 +${reward.popularity} 평판 +${reward.reputation}`,
-    `소지금 +${shownMoney * 100}만원`,
-  ]
-  if (reward.gamePoint > 0) lines.push(`${reward.gamePoint} G포인트 지급`)
-  return lines.join('!N')
+  if (reward.messageId === 200) {
+    return sprintfModeText(200, reward.popularity, reward.reputation, NATIONAL_CUP_RUNNER_UP_TEXT_MONEY * 100)
+  }
+  return sprintfModeText(reward.messageId, reward.popularity, reward.reputation, reward.money * 100, reward.gamePoint)
 }
 
 /**

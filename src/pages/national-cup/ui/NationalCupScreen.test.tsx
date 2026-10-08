@@ -42,6 +42,8 @@ const 띄우기 = (
   )
 
 const 확인 = () => fireEvent.click(screen.getByRole('button', { name: '확인' }))
+/** 팝업 글은 원문 색 표시(!c)로 조각나 그려진다 — 이어 붙인 글로 본다 */
+const 글 = () => document.body.textContent ?? ''
 
 describe('경기가 남았을 때', () => {
   it('대진판(134 · 0xf3)에서 확인하면 순위표(135 · 0xf4)가 뜨고, 거기서 확인하면 경기로 넘어간다', () => {
@@ -70,9 +72,9 @@ describe('대회가 끝났을 때', () => {
     띄우기(우승, { yearIndex: 2, onFinish })
 
     확인()
-    expect(screen.getByText(/제2회 국가대항전 우승!!/)).toBeTruthy()
+    expect(글()).toContain('제2회 국가대항전 우승!!')
     확인()
-    expect(screen.getByText(/5000만원/)).toBeTruthy()
+    expect(글()).toContain('소지금 +5000만')
     확인()
 
     expect(onFinish).toHaveBeenCalledTimes(1)
@@ -87,8 +89,8 @@ describe('대회가 끝났을 때', () => {
     띄우기(결승패)
     확인()
 
-    expect(screen.getByText(/대표팀 탈락!!/)).toBeTruthy()
-    expect(screen.getByText(/\[일본\]/)).toBeTruthy()
+    expect(글()).toContain('[대한민국] 대표팀 탈락!')
+    expect(글()).toContain('[일본] 대표팀 제2회')
   })
 
   it('⚠️ 시즌모드 준우승 보상 글은 2500만인데 실제로 더하는 값은 2000만이다 (원본 버그)', () => {
@@ -97,7 +99,7 @@ describe('대회가 끝났을 때', () => {
 
     확인()
     확인()
-    expect(screen.getByText(/2500만원/)).toBeTruthy()
+    expect(글()).toContain('소지금 +2500만')
     확인()
 
     expect(onFinish.mock.calls[0][0].reward).toMatchObject({ money: 20, messageId: 200 })
@@ -134,7 +136,7 @@ describe('⚠️ 대한민국이 결승에 못 갔을 때 (원본 그대로)', (
     띄우기(결승, { random: 고정난수(0), onFinish })
 
     확인()
-    expect(screen.getByText(/\[미국\]/)).toBeTruthy()
+    expect(글()).toContain('[미국] 대표팀')
     확인()
 
     expect(onFinish).toHaveBeenCalledTimes(1)

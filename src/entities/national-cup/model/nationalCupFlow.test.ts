@@ -12,6 +12,7 @@ import {
   isSeasonNationalCupYear,
   nationalCupEditionOf,
   nationalCupResultText,
+  nationalCupRewardText,
   nationalCupRewardFor,
 } from '@/entities/national-cup/model/nationalCupFlow'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -86,12 +87,12 @@ describe('순위 화면 확인 키 0x19fdc · 0xe6f8', () => {
 
 describe('결과 문구 0x85e6c', () => {
   it('우승은 StrMODE[144] 문구다', () => {
-    expect(nationalCupResultText(2, true, '대한민국')).toBe('[대한민국] 대표팀 제2회 국가대항전 우승!!')
+    expect(nationalCupResultText(2, true, '대한민국')).toBe('!C[!cFFFF00대한민국!cFFFFFF] 대표팀!N제2회 국가대항전 우승!!')
   })
 
   it('⚠️ 원본 버그 그대로 — 결승에서 져도 "대표팀 탈락!!" 이다 (StrMODE[143])', () => {
     expect(nationalCupResultText(1, false, '일본')).toBe(
-      '[대한민국] 대표팀 탈락!! [일본] 대표팀 제1회 국가대항전 우승!!',
+      '!C[!cFFFF00대한민국!cFFFFFF] 대표팀 탈락!!N!N[!cFFFF00일본!cFFFFFF] 대표팀 제1회!N국가대항전 우승!!',
     )
   })
 })
@@ -149,6 +150,17 @@ describe('보상', () => {
     expect(보상.messageId).toBe(200)
     expect(보상.money).toBe(20)
     expect(NATIONAL_CUP_RUNNER_UP_TEXT_MONEY).toBe(25)
+    // 0x8a26~8a44 sprintf(StrMODE[200], 20, 20, 2500) — 글은 2500만
+    expect(nationalCupRewardText(보상)).toBe('!C[!c00FF00국가대항전 준우승!!!cFFFFFF]!N!N인기도 +20 / 평판 +20!N소지금 +2500만')
+  })
+
+  it('보상 팝업 글은 StrMODE[199] 원문 sprintf — 나리 (20, 30, 2000, 1000) · 시즌 (30, 40, 5000, 1000)', () => {
+    expect(nationalCupRewardText(careerNationalCupRewardOf(10))).toBe(
+      '!C[!c00FF00국가대항전 우승!!!cFFFFFF]!N!N인기도 +20 / 평판 +30!N소지금 +2000만!NG포인트 +1000',
+    )
+    expect(nationalCupRewardText(nationalCupRewardFor('시즌모드', 대회({ stage: 0, finalists: [10, 11], champion: 10 })))).toBe(
+      '!C[!c00FF00국가대항전 우승!!!cFFFFFF]!N!N인기도 +30 / 평판 +40!N소지금 +5000만!NG포인트 +1000',
+    )
   })
 
   it('풀리그에서 탈락하면 두 모드 모두 보상이 없다', () => {
