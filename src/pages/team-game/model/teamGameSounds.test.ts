@@ -41,18 +41,15 @@ describe('대타 교체 소리 (pinchHitSoundIdsOf)', () => {
     bases = { second: false, third: false },
   ) => ({ scenePinchHit, game: { bases } })
 
-  it('사람 대타는 등판음만 — 22 는 # 창을 열 때 이미 났다', () => {
-    expect(pinchHitSoundIdsOf(진행(null), 진행({ serial: 1, by: '사람', incomingIsAce: false }))).toEqual([PITCHER_ENTRY_SOUND])
+  it('사람 대타는 걸음 끝에 아무 소리도 없다 — 22 는 # 창을 열 때 이미 났고, 등판음은 0x16 "CHANGE" 뒤 0xe 에서 난다', () => {
+    expect(pinchHitSoundIdsOf(진행(null), 진행({ serial: 1, by: '사람', incomingIsAce: false }))).toEqual([])
   })
 
-  it('CPU 대타는 22 다음 등판음 — 마타자 26 · 2·3루 주자 15', () => {
-    expect(pinchHitSoundIdsOf(진행(null), 진행({ serial: 1, by: 'CPU', incomingIsAce: true }))).toEqual([
-      PITCHER_CHANGE_SOUND,
-      ACE_ENTRY_SOUND,
-    ])
+  it('CPU 대타는 걸음 끝에 22(3da88)만 — 등판음(마타자 26 · 2·3루 주자 15)은 0x16 연출 · 0xd 두 그림 뒤 화면이 낸다', () => {
+    expect(pinchHitSoundIdsOf(진행(null), 진행({ serial: 1, by: 'CPU', incomingIsAce: true }))).toEqual([PITCHER_CHANGE_SOUND])
     expect(
       pinchHitSoundIdsOf(진행(null), 진행({ serial: 1, by: 'CPU', incomingIsAce: false }, { second: false, third: true })),
-    ).toEqual([PITCHER_CHANGE_SOUND, PITCHER_ENTRY_CRISIS_SOUND])
+    ).toEqual([PITCHER_CHANGE_SOUND])
   })
 
   it('교체가 없던 걸음에는 아무 소리도 없다', () => {
@@ -69,18 +66,12 @@ describe('CPU 투수 교체 소리 (scenePitcherChangeSoundIdsOf)', () => {
     bases = { second: false, third: false },
   ) => ({ scenePitcherChange, game: { bases } })
 
-  it('22 다음 등판음 — 마투수 26 · 2·3루 주자 15 · 그 밖 14', () => {
-    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: false }))).toEqual([
-      PITCHER_CHANGE_SOUND,
-      PITCHER_ENTRY_SOUND,
-    ])
-    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: true }))).toEqual([
-      PITCHER_CHANGE_SOUND,
-      ACE_ENTRY_SOUND,
-    ])
+  it('걸음 끝에는 22 만 — 등판음(마투수 26 · 2·3루 주자 15 · 그 밖 14)은 0x16 연출 · 0xd 두 그림 뒤 화면이 낸다', () => {
+    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: false }))).toEqual([PITCHER_CHANGE_SOUND])
+    expect(scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: true }))).toEqual([PITCHER_CHANGE_SOUND])
     expect(
       scenePitcherChangeSoundIdsOf(진행(null), 진행({ serial: 1, incomingIsAce: false }, { second: true, third: false })),
-    ).toEqual([PITCHER_CHANGE_SOUND, PITCHER_ENTRY_CRISIS_SOUND])
+    ).toEqual([PITCHER_CHANGE_SOUND])
   })
 
   it('교체가 없던 걸음에는 아무 소리도 없다', () => {

@@ -1,3 +1,4 @@
+import { substitutionEntrySoundIdOf } from '@/features/play-game/model/substitutionScene'
 import { BURST_SOUND } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { BurstResolution } from '@/entities/burst-mission/model/burstMissionSession'
 import { BURST_START_SOUND } from '@/features/play-game/model/gameSounds'
@@ -107,8 +108,7 @@ export interface PitcherEntrySoundInput {
  * 교체(`scenePitcherChangeSoundIdsOf`). 간이 엔진(`0xc1ba4`)의 CPU 교체는 연출이 없어 소리도 없다.
  */
 export function pitcherEntrySoundIdOf(input: PitcherEntrySoundInput): number {
-  if (input.isAce) return ACE_ENTRY_SOUND
-  return input.bases.second || input.bases.third ? PITCHER_ENTRY_CRISIS_SOUND : PITCHER_ENTRY_SOUND
+  return substitutionEntrySoundIdOf(input)
 }
 
 /* ── 대타 교체 소리 (교체 연출 상태 0x16 을 지날 때) ─────────────────────────────── */
@@ -126,7 +126,7 @@ export interface PinchHitSoundProgress {
 }
 
 /**
- * **대타가 교체 연출(상태 0x16)을 지나 타석에 설 때 나는 소리** — 원본 순서대로.
+ * **대타 교체 걸음 끝에 나는 소리** — 교체 연출(상태 0x16) **앞**의 것만. 원본 순서대로.
  *
  * 1. CPU 대타면 먼저 **"Time!" 22**: 0xf 진입 `0x3d954` 가 `0xac228` 참을 받자마자 `0x6ea6d(소리, 0x16, −1, 0)`
  *    (3da88) 를 부르고 상태 0x16 을 예약한다 (3da94). 사람 대타는 이 22 를 `#` 교체 창 진입(0x3ae08)에서 이미
@@ -134,6 +134,9 @@ export interface PinchHitSoundProgress {
  * 2. 0x16 진입 `0x3d458` 이 대타 예약을 보고 `+0x195c` 비트0(마선수면 5)·`+0x1959` 를 세우고 → 0xd → 0xe 에서
  *    타자 그리기 `0x49e64` → `0x38b64(…, 0)` 타자 가지가 **들어온 타자**로 26/15/14 를 즉시 낸다
  *    (마선수 26 · 2루나 3루 주자 15 · 그 밖 14 — 투수 가지와 같은 고르기, `pitcherEntrySoundIdOf`).
+ *
+ * 2 의 등판음은 0x16 의 "CHANGE" 애니 17 그림 · 0xd 두 그림 **뒤**라 걸음 끝에 안 낸다 — 화면이 연출을 다 그린 뒤
+ * (`features/play-game/model/useSubstitutionScene`) 진행기가 실은 `substitutionScene.entrySoundId` 로 낸다. 여기는 1 의 22 만.
  *
  * 사람 장면을 안 지난 CPU 대타(간이 엔진 0xc1ba4)는 연출도 소리도 없다 — 진행기가 `scenePinchHit` 을 안 바꾼다.
  * ⚠️ 0x38b64 는 `[게임+0xf10]+0x64 == 0` 일 때만 낸다(38b78) — 그 칸의 뜻은 안 읽었다.
@@ -144,8 +147,7 @@ export function pinchHitSoundIdsOf(
 ): readonly number[] {
   const cue = after.scenePinchHit
   if (cue === null || cue === before.scenePinchHit) return []
-  const entry = pitcherEntrySoundIdOf({ isAce: cue.incomingIsAce, bases: after.game.bases })
-  return cue.by === 'CPU' ? [PITCHER_CHANGE_SOUND, entry] : [entry]
+  return cue.by === 'CPU' ? [PITCHER_CHANGE_SOUND] : []
 }
 
 /* ── CPU 투수 교체 소리 (사람 장면 0xf 진입 0x3d954 → 교체 연출 0x16) ───────────────── */
@@ -169,6 +171,9 @@ export interface ScenePitcherChangeSoundProgress {
  * 2. 0x16 진입 `0x3d458` 이 투수 교체 예약 `0xae9a0(수비팀, 0)`(team[+0x290])을 보고 `+0x195c` 비트1 을 세운다
  *    (0x3d58c) → 0xd → 0xe 에서 `0x38b64` 투수 가지가 **올라온 투수**로 26/15/14 를 예약한다 (`pitcherEntrySoundIdOf`).
  *
+ * 걸음 끝에는 1 의 22 만 낸다 — 2 의 등판음은 0x16 연출(17 그림)과 0xd 두 그림 뒤라 화면이 연출을 다 그린 뒤
+ * (`useSubstitutionScene`) 낸다.
+ *
  * 간이 엔진(0xc1ba4)의 CPU 교체는 연출이 없어 진행기가 `scenePitcherChange` 를 안 바꾼다 — 소리도 없다.
  */
 export function scenePitcherChangeSoundIdsOf(
@@ -177,5 +182,5 @@ export function scenePitcherChangeSoundIdsOf(
 ): readonly number[] {
   const cue = after.scenePitcherChange
   if (cue === null || cue === before.scenePitcherChange) return []
-  return [PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf({ isAce: cue.incomingIsAce, bases: after.game.bases })]
+  return [PITCHER_CHANGE_SOUND]
 }

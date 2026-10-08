@@ -133,6 +133,11 @@ import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/mo
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import {
+  SUBSTITUTION_TIME_SOUND,
+  substitutionEntrySoundIdOf,
+  type SubstitutionScene,
+} from '@/features/play-game/model/substitutionScene'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import {
   arrivalApplicationOf,
@@ -235,6 +240,11 @@ export interface GameProgress {
    * 진행기는 OK 뒤 굴림(돌발 0x8f158 · 0xac428)을 들어서는 걸음에서 미리 다 해 둔다 — 대기 동안 다른 굴림이 없어 차례는 같다.
    */
   readonly sceneConfirm?: SceneConfirmWait | null
+  /**
+   * **교체 연출 0x16** (`features/play-game/model/substitutionScene`) — 내 타석 준비의 0xe 확인 뒤 0xf 진입이 CPU 투수 교체를 냈다.
+   * 화면(`GameScreen`)이 첫 OK 뒤(`confirmsBefore`) "CHANGE" 애니를 그리고 "Time!" 22 · 0xe 등판음을 낸다. 굴림 없음.
+   */
+  readonly substitutionScene?: SubstitutionScene | null
   readonly myStats: SeasonStats
   /** 사용자 타석 인기도 점수 합 */
   readonly popularityPoints: number
@@ -1352,8 +1362,20 @@ function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgres
     if (current.burst !== null && current.burst.current !== null) return current
     const changed = changeOpponentPitcher(current, random)
     if (changed === current) return current
-    // 22 → 0x16 → 0xd → 0xe — OK 를 한 번 더 기다린다
-    current = triggerBurstForMyAtBat({ ...changed, sceneConfirm: chainSceneConfirm(changed.sceneConfirm) }, random)
+    // 22(3da88) → 0x16(3da94) — 앞 0xe 의 OK 를 다 받은 뒤 선다. 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6)
+    const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
+    const scene: SubstitutionScene = {
+      serial: (current.substitutionScene?.serial ?? 0) + 1,
+      incomingIsAce,
+      entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: changed.game.bases }),
+      timeSoundId: SUBSTITUTION_TIME_SOUND,
+      confirmsBefore: changed.sceneConfirm?.entries ?? 0,
+    }
+    // → 0xd → 0xe — OK 를 한 번 더 기다린다
+    current = triggerBurstForMyAtBat(
+      { ...changed, sceneConfirm: chainSceneConfirm(changed.sceneConfirm), substitutionScene: scene },
+      random,
+    )
   }
   return current
 }

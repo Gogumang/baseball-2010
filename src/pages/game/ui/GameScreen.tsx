@@ -17,6 +17,8 @@ import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBo
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
+import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
 import { gameHalfInningCardsOf } from '@/pages/game/lib/gameHalfInningCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -165,15 +167,14 @@ export function GameScreen({
    */
   /** 상태 0xe 소개 판 값 (0x44944) */
   const matchup = gameMatchupCardsOf(progress, career)
-  const sceneConfirm = useSceneConfirm(
-    progress.sceneConfirm,
-    !isPaused &&
-      bannerText === '' &&
-      !isMenuOpen &&
-      overlay === null &&
-      !isBenchClearing &&
-      !isHalfInningBoardOpen,
-  )
+  const isSceneUncovered =
+    !isPaused && bannerText === '' && !isMenuOpen && overlay === null && !isBenchClearing && !isHalfInningBoardOpen
+  /**
+   * **교체 연출 0x16** — 진행기가 0xe 확인 뒤 0xf 진입의 CPU 투수 교체를 실어 두면(`progress.substitutionScene`) 그 OK 를 받은 뒤
+   * "CHANGE" 애니를 그린다. 그동안은 0xd · 0xe 가 아니라 다음 대기를 세지 않는다(0x16 → 0xd → 0xe).
+   */
+  const substitution = useSubstitutionScene(progress.substitutionScene, progress.sceneConfirm, isSceneUncovered)
+  const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -362,6 +363,10 @@ export function GameScreen({
             값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).
           */}
           {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
+          {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
+          {substitution.isShown && (
+            <SubstitutionSceneOverlay key={substitution.serial} onDone={substitution.finish} />
+          )}
           {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
           {recordAlert !== undefined && <RecordAlertPanel frame={recordAlert} />}
         </div>

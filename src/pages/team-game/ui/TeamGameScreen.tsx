@@ -44,6 +44,8 @@ import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboar
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
+import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import type {
@@ -354,22 +356,32 @@ export function TeamGameScreen({
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·교체 창이 덮고 있으면 받지 않는다.
    * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
+  const isSceneUncovered =
+    isIntroDone &&
+    summary === null &&
+    !isHalfInningBoardOpen &&
+    progress.pendingBenchClearing === null &&
+    !isDefenseInPlay &&
+    !isReplaying &&
+    !isMenuOpen &&
+    overlay === null &&
+    changeWindow === null &&
+    // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c) — 닫은 뒤에야 0xe 다
+    resolution === null
+  /**
+   * **교체 연출 0x16** — 사람 `#` 교체 · 대타의 OK, 0xf 진입의 CPU 대타 · CPU 투수 교체 뒤 진행기가 싣는다(`substitutionScene`).
+   * "CHANGE" 애니를 다 그린 뒤 0xd 두 그림 → 0xe(등판음 0x38b64 · OK 대기). 그동안은 0xe 대기를 세지 않는다.
+   */
+  const substitution = useSubstitutionScene(progress.substitutionScene, progress.sceneConfirm, isSceneUncovered)
   const sceneConfirm = useSceneConfirm(
     // 진행기가 OK 를 아직 안 받은 0xe 대기 (OK 를 받으면 `confirmScene` 이 그 뒤 굴림을 돌린다)
     progress.sceneConfirmPending === true ? progress.sceneConfirm : null,
-    isIntroDone &&
-      summary === null &&
-      !isHalfInningBoardOpen &&
-      progress.pendingBenchClearing === null &&
-      !isDefenseInPlay &&
-      !isReplaying &&
-      !isMenuOpen &&
-      overlay === null &&
-      changeWindow === null &&
-      // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c) — 닫은 뒤에야 0xe 다
-      resolution === null,
+    isSceneUncovered && !substitution.isShown,
     actions.confirmScene,
   )
+  const substitutionOverlay = substitution.isShown ? (
+    <SubstitutionSceneOverlay key={substitution.serial} onDone={substitution.finish} />
+  ) : null
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
   /** 정산 배경 전용 난수 — 하늘 줄을 넘기므로 굴릴 일이 없다(꼴만 채운다). 경기 난수를 건드리지 않는다 */
   const [backdropRandom] = useState(() => createSeededRandom(0))
@@ -813,6 +825,8 @@ export function TeamGameScreen({
             />
             {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 */}
             {isMatchupShown && matchupCards}
+            {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
+            {substitutionOverlay}
             {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
             <RecordAlertPanel frame={recordAlert} />
             </div>
@@ -859,6 +873,8 @@ export function TeamGameScreen({
               ⚠️ 원본은 판 아래에 0xd 그리기(타석 장면)가 깔린다 — 웹 투구 화면에는 그 캔버스가 없어 판만 놓는다
             */}
             {isMatchupShown && <div className={styles.matchupFrame}>{matchupCards}</div>}
+            {/* 교체 연출 0x16 "CHANGE" — ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다 */}
+            {substitutionOverlay !== null && <div className={styles.matchupFrame}>{substitutionOverlay}</div>}
             {phase === '구질' && !isAwaitingConfirm && (
               <>
                 <Panel heading="1. 구질 선택" />

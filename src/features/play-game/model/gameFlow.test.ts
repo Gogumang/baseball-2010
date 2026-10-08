@@ -1387,6 +1387,32 @@ describe('상태 0xe 의 OK 대기 — 내 타석 준비(0xd → 0xe)마다 새 
   })
 })
 
+describe('교체 연출 0x16 — 0xe 확인 뒤 0xf 진입의 CPU 투수 교체(0xac428 · 3da88 · 0x3d458)', () => {
+  it('교체가 난 내 타석 준비는 대기 둘(0xe → 0x16 → 0xd → 0xe)이고, 첫 OK 뒤에 서는 연출 · "Time!" 22 · 등판음을 싣는다', () => {
+    let 본것 = 0
+    for (let seed = 1; seed <= 40 && 본것 === 0; seed += 1) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random)
+      for (let atBat = 0; atBat < 40 && !progress.game.isFinished; atBat += 1) {
+        const before = progress.substitutionScene ?? null
+        progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
+        const scene = progress.substitutionScene ?? null
+        if (scene === before) {
+          if (!progress.game.isFinished) expect(progress.sceneConfirm?.entries).toBe(1)
+          continue
+        }
+        expect(progress.sceneConfirm?.entries).toBe(2)
+        expect(scene).toMatchObject({ serial: (before?.serial ?? 0) + 1, timeSoundId: 22, confirmsBefore: 1 })
+        const bases = progress.game.bases
+        expect(scene?.entrySoundId).toBe(scene?.incomingIsAce ? 26 : bases.second || bases.third ? 15 : 14)
+        본것 += 1
+        break
+      }
+    }
+    expect(본것).toBe(1)
+  })
+})
+
 describe('내 타석의 파울 각 공도 수비 판을 돈다 — startPlayerFoulPlay (원본 메시지 0x11 → 0x13 → 0x17)', () => {
   /** 원본 표의 파울 각 패턴 전부 — (결과 코드, 패턴) */
   const 파울패턴들 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>

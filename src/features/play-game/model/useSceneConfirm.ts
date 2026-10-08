@@ -34,6 +34,11 @@ const subscribeConfirm = (listener: () => void) => {
   }
 }
 
+/** 대기 객체가 지금까지 받은 OK 수 — 교체 연출(`useSubstitutionScene`)이 "몇 번째 OK 뒤" 를 본다 */
+export function confirmedCountOf(wait: SceneConfirmWait | null | undefined): number {
+  return wait == null ? 0 : (confirmedCounts.get(wait) ?? 0)
+}
+
 /** 대기 객체가 아직 OK 를 다 못 받았는가 */
 export function isSceneConfirmAwaiting(wait: SceneConfirmWait | null | undefined): boolean {
   return wait != null && (confirmedCounts.get(wait) ?? 0) < wait.entries

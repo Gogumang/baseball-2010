@@ -22,6 +22,8 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
+import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
 import type { PitcherMatchupRecords } from '@/pages/pitching/lib/pitcherMatchupCards'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
@@ -221,6 +223,21 @@ export function PitcherGameScreen({
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·강판 물음·돌발 결과 창·감독 대사 창이 덮으면 받지 않는다.
    * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954 의 CPU 대타)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
+  /**
+   * **교체 연출 0x16** — 0xf 진입의 CPU 대타 뒤 진행기가 싣는다(`substitutionScene`). "CHANGE" 애니를 다 그린 뒤 0xd 두 그림 →
+   * 0xe(진입 0x50674 의 감독 강판 판정 · 등판음 · OK 대기). 그동안은 0xe 대기 · 감독 대사 창을 세우지 않는다.
+   */
+  const substitution = useSubstitutionScene(
+    progress.substitutionScene,
+    progress.sceneConfirm,
+    !isSceneShowing &&
+      progress.pendingDefensePlay === null &&
+      !isReplaying &&
+      !isPopupOpen &&
+      overlay === null &&
+      !asksGiveUp &&
+      resolution === null,
+  )
   const sceneConfirm = useSceneConfirm(
     // 진행기가 OK 를 아직 안 받은 0xe 대기
     progress.sceneConfirmPending === true ? progress.sceneConfirm : null,
@@ -232,7 +249,8 @@ export function PitcherGameScreen({
       !asksGiveUp &&
       // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c)
       resolution === null &&
-      progress.managerHookText === null,
+      progress.managerHookText === null &&
+      !substitution.isShown,
     actions.confirmScene,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && canPitch
@@ -632,6 +650,12 @@ export function PitcherGameScreen({
             <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
           </div>
         )}
+        {/* 교체 연출 0x16 "CHANGE" — ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다 */}
+        {substitution.isShown && (
+          <div className={styles.matchupFrame}>
+            <SubstitutionSceneOverlay key={substitution.serial} onDone={substitution.finish} />
+          </div>
+        )}
         {!asksGiveUp && !isPopupOpen && canPitch && !isAwaitingConfirm && phase === '구질' && (
           <>
             <Panel heading="1. 구질 선택" />
@@ -695,7 +719,8 @@ export function PitcherGameScreen({
         />
       )}
 
-      {progress.managerHookText !== null && (
+      {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다 */}
+      {progress.managerHookText !== null && !substitution.isShown && (
         <ManagerHookWindow
           userEventIndex={progress.managerHookText}
           onConfirm={actions.confirmManagerHook}

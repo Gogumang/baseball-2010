@@ -167,6 +167,7 @@ import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/pla
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 /**
@@ -555,6 +556,11 @@ export interface PitcherGameProgress {
    * 내는 신호다 (`pages/team-game` 의 `pinchHitSoundIdsOf` 와 같은 모양). 간이 엔진 대타는 연출이 없어 안 바꾼다.
    */
   readonly scenePinchHit: { readonly serial: number; readonly by: 'CPU'; readonly incomingIsAce: boolean } | null
+  /**
+   * **교체 연출 0x16** (`features/play-game/model/substitutionScene`) — 0xf 진입 0x3d954 의 CPU 대타가 낸 것. 화면이 "CHANGE" 애니를
+   * 그린 뒤 0xd 두 그림 → 0xe 에서 타자 등판음(0x38b64 타자 가지)을 낸다. "Time!" 22 는 걸음 끝 소리가 낸다. 굴림 없음.
+   */
+  readonly substitutionScene?: SubstitutionScene | null
   readonly log: readonly PitcherGameLogEntry[]
   readonly nextLogId: number
   /** 경기가 끝난(또는 지금 치르는) 이닝 인덱스 (0-기준) */
@@ -2070,6 +2076,17 @@ function applyOpponentCpuPinchHit(
             incomingIsAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
           }
         : progress.scenePinchHit,
+      // 3da94 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xd → 0xe 타자 등판음
+      substitutionScene: inScene
+        ? {
+            serial: (progress.substitutionScene?.serial ?? 0) + 1,
+            incomingIsAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
+            entrySoundId: substitutionEntrySoundIdOf({
+              isAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
+              bases: progress.game.bases,
+            }),
+          }
+        : progress.substitutionScene,
     },
     `${progress.game.inning}회${progress.game.half} 상대 ${(slot % BATTING_ORDER_SIZE) + 1}번 CPU 대타`,
     inScene,

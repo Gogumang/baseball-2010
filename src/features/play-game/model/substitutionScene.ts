@@ -1,5 +1,5 @@
 /**
- * **경기 장면 상태 0x16 — 교체 연출** (팀경기 · 나리 · 미션 공용 그림 — 지금은 미션 화면이 붙인다).
+ * **경기 장면 상태 0x16 — 교체 연출** (팀경기 · 나리 타자편 · 투수편 · 미션 공용 그림 — 경기 화면은 `useSubstitutionScene`).
  *
  * 들어오는 길: 교체 화면 0xb 의 OK(0x496f0) · 0xf 진입 0x3d954 의 CPU 대타 0xac228 / CPU 투수 교체 0xac428 이 참일 때
  * (3da88 22 "Time!" → 3da94 상태 0x16). 0x16 은 진입 0x3d458 과 그리기 0x4da30 만 있고 키 · 갱신이 없다(R10 표).
@@ -85,4 +85,27 @@ export interface SubstitutionScene {
   readonly incomingIsAce: boolean
   /** 0xe 에서 낼 등판음 */
   readonly entrySoundId: number
+  /**
+   * 0x16 에 들어서기 전에 낼 "Time!" 22 (3da88) — 연출을 세우는 화면이 연출 첫 그림에서 낸다. CPU 교체이고 진행기가 22 를
+   * 따로 안 낼 때만 싣는다(사람 `#` 교체는 교체 창 진입 0x3ae08 이 이미 냈다). 없으면 안 낸다.
+   */
+  readonly timeSoundId?: number
+  /**
+   * 지금 0xe 대기(`SceneConfirmWait`)가 이 연출 **앞에** 받을 OK 수 — 진행기가 OK 뒤 굴림을 0xe 에 들어서는 걸음에서 미리 다 해 둔
+   * 경우(나리 타자편 `prepareMyAtBat`: 0xe → OK → 0xf 진입 CPU 교체 → 0x16 → 0xd → 0xe) 첫 OK 를 받은 뒤에 연출이 선다.
+   * 없으면 0 — 대기를 세우는 걸음이 곧 연출을 세우는 걸음이다.
+   */
+  readonly confirmsBefore?: number
 }
+
+/** 0x38b64 의 고르기 — 마선수 26 · 2루나 3루 주자 15 · 그 밖 14 (투수 가지 · 타자 가지 같은 번호) */
+export function substitutionEntrySoundIdOf(input: {
+  readonly isAce: boolean
+  readonly bases: { readonly second: boolean; readonly third: boolean }
+}): number {
+  if (input.isAce) return 26
+  return input.bases.second || input.bases.third ? 15 : 14
+}
+
+/** 3da88 "Time!" — 0xf 진입 0x3d954 가 CPU 교체를 받자마자 0x6ea6d(소리, 0x16, −1, 0) */
+export const SUBSTITUTION_TIME_SOUND = 22

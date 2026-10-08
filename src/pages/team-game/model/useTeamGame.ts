@@ -55,7 +55,6 @@ import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
 import {
   pinchHitSoundIdsOf,
-  pitcherEntrySoundIdOf,
   scenePitcherChangeSoundIdsOf,
   stepSoundIdsOf,
 } from '@/pages/team-game/model/teamGameSounds'
@@ -290,18 +289,9 @@ export function useTeamGame(
         step((current) => cpuPickoff(current, base, random), pickoffCallSoundsOf),
       closeBurst: () => step((current) => closeBurstWindow(current)),
       specialSwingUsed: (remaining: number) => step((current) => spendOurSpecialSwing(current, remaining)),
-      changePitcher: (benchIndex: number) =>
-        step(
-          (current) => changePitcher(current, benchIndex),
-          // 교체 연출(상태 0x16)을 지나 상태 0xe 로 오면 등판음이 예약된다 (0x38b64 → 0x38c34).
-          // 올라온 투수가 마투수면 26, 2·3루에 주자가 있으면 15, 그 밖은 14 다
-          (_before, after) => [
-            pitcherEntrySoundIdOf({
-              isAce: (after.ourPitcherEntry[after.ourPitcherIndex]?.aceIndex ?? -1) >= 0,
-              bases: after.game.bases,
-            }),
-          ],
-        ),
+      // 교체 연출(상태 0x16)을 지나 상태 0xe 로 오면 등판음이 예약된다 (0x38b64 → 0x38c34) — 화면이 "CHANGE" 애니를 다 그린 뒤
+      // `substitutionScene.entrySoundId`(마투수 26 · 2·3루 주자 15 · 그 밖 14)로 낸다 (`useSubstitutionScene`)
+      changePitcher: (benchIndex: number) => step((current) => changePitcher(current, benchIndex)),
       pinchHit: (benchIndex: number) => step((current) => pinchHit(current, benchIndex)),
       // 0xe 의 OK → 메시지 1(돌발 0x8f158) → 0xf 진입 0x3d954 (CPU 교체면 22 → 0x16 → 0xe 등판음 — `step` 이 낸다)
       confirmScene: () => step((current) => confirmScene(current, random)),

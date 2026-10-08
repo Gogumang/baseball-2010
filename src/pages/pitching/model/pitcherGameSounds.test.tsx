@@ -164,7 +164,7 @@ describe('투수편 화면의 소리 배선', () => {
    * 0xf 진입 0x3d954 의 CPU 대타(3da70)가 걸리면 22 "Time!"(3da88) → 0x16 → 0xe 에서 들어온 타자 등판음
    * (0x38b64 타자 가지 — 마타자 26 · 2루나 3루 주자 15 · 그 밖 14). 대타가 안 난 걸음에는 22 가 없다.
    */
-  it('내가 던지는 타석에 CPU 대타가 서면 22 뒤 등판음 14/15 가 난다 — 대타 없는 걸음엔 22 가 없다', () => {
+  it('내가 던지는 타석에 CPU 대타가 서면 걸음 끝에 22 — 등판음 14/15 는 교체 연출 0x16 에 실어 연출 뒤 0xe 에서, 대타 없는 걸음엔 22 가 없다', () => {
     let 대타소리 = 0
     for (let seed = 1; seed <= 10 && 대타소리 === 0; seed += 1) {
       const { result, unmount } = 띄우기(seed)
@@ -188,8 +188,11 @@ describe('투수편 화면의 소리 배선', () => {
         }
         const 자리 = 녹음.played.indexOf(22)
         expect(자리).toBeGreaterThanOrEqual(0)
+        // 등판음은 걸음 끝에 안 난다 — 0x16 "CHANGE" 17 그림 · 0xd 두 그림 뒤 0xe 그리기(0x38b64 타자 가지)
+        expect(녹음.played).not.toContain(14)
+        expect(녹음.played).not.toContain(15)
         const bases = result.current.progress.game.bases
-        expect(녹음.played[자리 + 1]).toBe(bases.second || bases.third ? 15 : 14)
+        expect(result.current.progress.substitutionScene?.entrySoundId).toBe(bases.second || bases.third ? 15 : 14)
         대타소리 += 1
         break
       }

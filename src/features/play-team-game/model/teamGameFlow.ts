@@ -172,6 +172,7 @@ import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -646,6 +647,12 @@ export interface TeamGameProgress {
    * `incomingIsAce` 는 올라온 투수가 마투수인가(`0xb633c`). 간이 엔진 교체는 연출이 없어 이 칸을 안 바꾼다.
    */
   readonly scenePitcherChange: { readonly serial: number; readonly incomingIsAce: boolean } | null
+  /**
+   * **교체 연출 0x16** (`features/play-game/model/substitutionScene`) — 사람 장면에서 지난 교체 한 번(사람 `#` 투수 교체 · 대타의 OK
+   * 0x496f0, 0xf 진입 0x3d954 의 CPU 대타 · CPU 투수 교체). 화면이 "CHANGE" 애니를 그린 뒤 0xd 두 그림 → 0xe 에서 등판음(0x38b64)을
+   * 낸다. 그동안 0xe 대기를 세지 않는다. "Time!" 22 는 걸음 끝 소리(CPU)나 교체 창 진입(사람)이 낸다. 굴림 없음.
+   */
+  readonly substitutionScene?: SubstitutionScene | null
   /**
    * `0x66968`·`0x66994` 가 뽑은 **AI 팀 마투수·마타자 번호** 0~4 — 일반모드 `0x30f20` · 시즌 정규·포스트시즌
    * 0xdd 진입 `0x6548`(`seasonOpponentAces`). 굴리지 않은 경기(국가대항전 등)는 −1.
@@ -3252,6 +3259,18 @@ function prepareAtBat(progress: TeamGameProgress): TeamGameProgress {
  * 0xe 진입 0x50674 의 감독 강판 0x504cc 는 모드 1·2·8·9 에서 늘 거짓이라 굴림이 없다. 0xe 에서는 굴림이 없고
  * OK(메시지 1 → 0x50c18) 뒤에야 돌발 0x8f158 · 0xf 진입 0x3d954 가 돈다 (`confirmScene`).
  */
+/**
+ * 교체 연출 0x16 한 번 — 0x16 진입 0x3d458 이 예약을 보고 +0x195c 를 세운 뒤 0xd → 0xe 에서 0x38b64 가 들어온 선수로
+ * 등판음(마선수 26 · 2·3루 주자 15 · 그 밖 14)을 고른다. 루는 교체로 안 바뀐다.
+ */
+function substitutionSceneAfter(progress: TeamGameProgress, incomingIsAce: boolean): SubstitutionScene {
+  return {
+    serial: (progress.substitutionScene?.serial ?? 0) + 1,
+    incomingIsAce,
+    entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: progress.game.bases }),
+  }
+}
+
 function enterConfirmWait(progress: TeamGameProgress): TeamGameProgress {
   return { ...progress, sceneConfirm: enterSceneConfirm(), sceneConfirmPending: true, atBatPrepared: true }
 }
@@ -3524,6 +3543,13 @@ function judgeAutoPitcherChange(
                 defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
               )[next]?.aceIndex ?? -1) >= 0,
           },
+          substitutionScene: substitutionSceneAfter(
+            changed,
+            (pitcherEntriesOf(
+              progress,
+              defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
+            )[next]?.aceIndex ?? -1) >= 0,
+          ),
         }
       : changed,
     `${game.inning}회${game.half} ${defendingIsOurs ? '우리' : '상대'} 투수 교체 — ${current + 1}번 → ${next + 1}번`,
@@ -3714,8 +3740,13 @@ export function changePitcher(
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
   if (!availablePitchers(progress).includes(benchIndex)) return progress
+  const applied = applyPitcherChange(progress, true, benchIndex)
   const changed = appendLog(
-    applyPitcherChange(progress, true, benchIndex),
+    {
+      ...applied,
+      // 0x496f0 → 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6) → 0xe 등판음
+      substitutionScene: substitutionSceneAfter(applied, (applied.ourPitcherEntry[benchIndex]?.aceIndex ?? -1) >= 0),
+    },
     `${progress.game.inning}회${progress.game.half} 투수 교체 — ${progress.ourPitcherIndex + 1}번 → ${benchIndex + 1}번`,
     true,
   )
@@ -3867,6 +3898,8 @@ export function pinchHit(
         by: '사람',
         incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
       },
+      // 0x496f0 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xe 타자 등판음
+      substitutionScene: substitutionSceneAfter(progress, swapped.incoming.aceIndex !== NO_ACE_BATTER),
     },
     `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
@@ -4030,6 +4063,7 @@ function applyCpuPinchHit(
               by: 'CPU' as const,
               incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
             },
+            substitutionScene: substitutionSceneAfter(progress, swapped.incoming.aceIndex !== NO_ACE_BATTER),
           }
         : {}),
     },
