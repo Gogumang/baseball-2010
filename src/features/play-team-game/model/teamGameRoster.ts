@@ -7,6 +7,7 @@ import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoi
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
+  skillIdsOfBits,
   teamBatters,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
@@ -155,7 +156,10 @@ export function quickBatterFor(
   battingOrderIndex: number,
 ): QuickAtBatBatter {
   const ability = batterGameAbilities(context, teamId, battingOrderIndex)
-  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: [] }
+  const roster = teamBatters(teamId)
+  const player = roster[((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM]
+  // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 비트를 읽는다(모드 검사 없음)
+  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: skillIdsOfBits(player?.skillBits ?? 0, false) }
 }
 
 /** 간이 타석 엔진이 보는 투수 */
@@ -165,7 +169,10 @@ export function quickPitcherFor(
   rosterSlot: number,
 ): QuickAtBatPitcher {
   const ability = pitcherGameAbilities(context, teamId, rosterSlot)
-  return { control: ability[0], velocity: ability[1], stamina: ability[3], skillIds: [] }
+  const roster = teamPitchers(teamId)
+  const player = roster[((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM]
+  // 장착 스킬 — `0xb62b4(투수, n)` (투수 번호 = 비트 + 16)
+  return { control: ability[0], velocity: ability[1], stamina: ability[3], skillIds: skillIdsOfBits(player?.skillBits ?? 0, true) }
 }
 
 /** 타석 화면이 보는 타자 능력치 (0~999 그대로) */

@@ -24,6 +24,23 @@ export function teamPitchers(teamId: number): readonly RosterPlayer[] {
   return PITCHERS.slice(from, from + PITCHERS_PER_TEAM)
 }
 
+/** 투수 스킬 번호 = 비트 + 16 (`swingSkills` 머리말) */
+const PITCHER_SKILL_ID_OFFSET = 16
+const SKILL_BIT_COUNT = 32
+
+/**
+ * 레코드 +0x14 장착 스킬 비트(`0xb62b4(rec, n)` = `(+0x14 >> n) & 1`)를 0xab214 가 보는 스킬 번호로 —
+ * 타자는 비트 그대로, 투수는 비트 + 16. 0xab214 의 스킬 갈래(ab91c~)는 모드를 안 보고 두 레코드 비트를 읽으므로
+ * CPU 선수도 제 Xls 행 비트(0x1ff98 사본)대로 스킬이 걸린다.
+ */
+export function skillIdsOfBits(skillBits: number, isPitcher: boolean): readonly number[] {
+  const ids: number[] = []
+  for (let bit = 0; bit < SKILL_BIT_COUNT; bit += 1) {
+    if (((skillBits >>> bit) & 1) === 1) ids.push(isPitcher ? bit + PITCHER_SKILL_ID_OFFSET : bit)
+  }
+  return ids
+}
+
 /**
  * 능력치 순서는 히트·파워·수비·주루. 간이 타석은 히트·파워·주루만 본다 — 스윙 0xab214 가 `0xb570d(…, 1, 0x5a, 1)` 로 읽으므로
  * 밑값은 레코드의 `0xb6414(rec, k, 1)`(장비 니블 · 장착 스킬, `recordAbilityOf`)이다.
@@ -31,7 +48,8 @@ export function teamPitchers(teamId: number): readonly RosterPlayer[] {
  */
 export function quickBatterOf(player: RosterPlayer, equipment?: readonly number[]): QuickAtBatBatter {
   const ability = recordAbilityOf({ ...player, equipment: equipment ?? player.equipment }, false)
-  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: [] }
+  // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 비트를 읽는다
+  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: skillIdsOfBits(player.skillBits, false) }
 }
 
 /**
@@ -49,7 +67,8 @@ export function quickPitcherOf(player: RosterPlayer, equipment?: readonly number
     control: ability[0],
     velocity: ability[1],
     stamina: ability[3],
-    skillIds: [],
+    // 장착 스킬 — 0xab214 가 `0xb62b4(투수, n)` 로 읽는다 (투수 번호 = 비트 + 16)
+    skillIds: skillIdsOfBits(player.skillBits, true),
     ...(repertoire === undefined ? {} : { hand: pitcherHandOf(repertoire.form, false) }),
   }
 }

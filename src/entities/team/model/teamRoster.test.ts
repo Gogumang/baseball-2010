@@ -6,6 +6,7 @@ import {
   PITCHERS_PER_TEAM,
   batterAt,
   rollStartingPitcherIndex,
+  skillIdsOfBits,
   STARTING_PITCHER_CANDIDATES,
   startingPitcherOf,
   teamBatters,
@@ -43,7 +44,7 @@ describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
       hit: player.ability[0],
       power: player.ability[1],
       run: player.ability[3],
-      skillIds: [],
+      skillIds: skillIdsOfBits(player.skillBits, false),
     })
 
     const pitcher = teamPitchers(0)[0]
@@ -51,11 +52,19 @@ describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
       control: pitcher.ability[0],
       velocity: pitcher.ability[1],
       stamina: pitcher.ability[3],
-      skillIds: [],
+      skillIds: skillIdsOfBits(pitcher.skillBits, true),
       // 손 0xb63c0 = 폼(+0xb 상위 니블) & 1 — 봉은중 폼 1 → 좌투
       hand: ROSTER_PITCHER_REPERTOIRES[0].form & 1,
     })
     expect(startingPitcherOf(0).hand).toBe(1)
+  })
+})
+
+describe('skillIdsOfBits — 레코드 +0x14 비트 → 0xab214 스킬 번호', () => {
+  it('타자는 비트 그대로, 투수는 비트 + 16 (0xb62b4)', () => {
+    expect(skillIdsOfBits((1 << 8) | (1 << 13), false)).toEqual([8, 13])
+    expect(skillIdsOfBits((1 << 8) | (1 << 12), true)).toEqual([24, 28])
+    expect(skillIdsOfBits(0, true)).toEqual([])
   })
 })
 
