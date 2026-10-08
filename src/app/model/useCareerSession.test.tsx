@@ -497,7 +497,7 @@ describe('전역 경기 상태 +0x6b — 타자편 경기도 같은 칸 (0x1c47a
 })
 
 describe('대회 끝 정산 (0x1b92c)', () => {
-  it('우승 보상이 커리어에 들어가고 히든 팀이 열린 뒤 새 시즌으로 간다', () => {
+  it('우승 보상이 커리어에 들어가고 새 시즌으로 간다 — 히든 팀은 여기서 열지 않는다(134 진입 0x19f30 몫)', () => {
     const 시작 = 목표달성선수({ popularity: 100, reputation: 0, money: 0, gamePoint: 0 })
     const rendered = 띄우기(시작)
     연봉사슬끝내기(rendered)
