@@ -60,8 +60,6 @@ const ACE_STRIKE_BONUS = 10
 const PITCHER_STAT_DIVISOR = 50
 /** 볼 카운트가 이 값을 넘으면 포볼이다 — 0x9d57c 가 `볼 <= 2` 일 때만 볼을 센다 */
 const BALLS_BEFORE_WALK = 3
-/** 타석이 끝나지 않는 일은 없지만, 파울이 끝없이 이어질 때를 대비한 안전망 (원본에는 없다) */
-const MAXIMUM_PITCHES = 200
 
 /**
  * 투수 구위 등급 표 (0xd896c, 0xb74bc 가 읽는다).
@@ -322,7 +320,9 @@ export function playQuickAtBat(
   let strikes = 0
   let balls = 0
   let fouled = false
-  for (let pitch = 1; pitch <= MAXIMUM_PITCHES; pitch += 1) {
+  // 0xc262c 의 공 고리(c26be~c271c)는 상한이 없다 — 지금 타자(0xae89c)가 바뀔 때(타석이 끝날 때)까지 돈다.
+  // 파울이 이어지는 동안 끝나지 않는 것도 원본 그대로다(파울은 늘 확률이 1 보다 작아 결국 끝난다)
+  for (let pitch = 1; ; pitch += 1) {
     const done = (outcome: AtBatOutcome): QuickAtBatPlay => ({
       outcome, pitches: pitch, balls, strikes, ...(fouled ? { fouled: true as const } : {}),
     })
@@ -351,7 +351,6 @@ export function playQuickAtBat(
     strikes += 1
     if (strikes >= STRIKES_FOR_STRIKEOUT) return done({ kind: '삼진' })
   }
-  return { outcome: { kind: '삼진' }, pitches: MAXIMUM_PITCHES, balls, strikes, ...(fouled ? { fouled: true as const } : {}) }
 }
 
 /** 결과만 필요할 때 쓰는 얇은 껍데기 */
