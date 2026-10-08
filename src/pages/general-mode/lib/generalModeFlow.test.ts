@@ -93,14 +93,14 @@ describe('CLR 로 뒤로 가기', () => {
     expect(선공구장?.firstBatPhase).toBe(FIRST_BAT_PHASE.선공)
   })
 
-  it('경기정보에서는 마선수의 **마타자** 단계로 돌아간다', () => {
+  it('경기정보에서는 마선수의 **마투수** 단계로 돌아간다 — 0x313b2 의 0 을 21 진입 0x263f4 가 1 로 덮는다', () => {
     const state = createFlowState()
     const 경기정보 = { ...state, step: GENERAL_MODE_STEP.경기정보 } as typeof state
 
     const 뒤 = stepBack(경기정보)
 
     expect(뒤?.step).toBe(GENERAL_MODE_STEP.마선수)
-    expect(뒤?.acePhase).toBe(ACE_PHASE.마타자)
+    expect(뒤?.acePhase).toBe(ACE_PHASE.마투수)
   })
 })
 

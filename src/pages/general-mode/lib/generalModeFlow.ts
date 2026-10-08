@@ -133,7 +133,9 @@ export function chooseAce(state: GeneralModeFlowState, cell: number): GeneralMod
  * - 19 → 18
  * - 20 구장 단계 → 선공 단계 (**고른 구장은 그대로 적어 둔다**) · 선공 단계 → 19
  * - 21 마타자 단계 → 마투수 단계 · 마투수 단계 → 20 (진입 함수가 단계를 선공으로 되돌린다)
- * - 22 → 빠른실행이면 나감, 아니면 21 의 **마타자 단계**(`[skin+0xd0] = 0`)
+ * - 22 → 빠른실행이면 나감, 아니면 21 의 **마투수 단계** — 22 의 CLR 0x313b2 가 `[skin+0xd0] = 0`(마타자)을 쓰지만
+ *   다음 틀의 21 진입 0x263f4 가 `[skin+0xd0] = 1`(마투수) · 격자 커서 (0,0) 으로 덮는다(0x26444~0x2644e).
+ *   화면에 서는 것은 마투수 단계다
  */
 export function stepBack(state: GeneralModeFlowState): GeneralModeFlowState | null {
   switch (state.step) {
@@ -154,7 +156,8 @@ export function stepBack(state: GeneralModeFlowState): GeneralModeFlowState | nu
       return { ...state, step: GENERAL_MODE_STEP.선공구장, firstBatPhase: FIRST_BAT_PHASE.선공 }
     case GENERAL_MODE_STEP.경기정보:
       if (state.isQuickStart) return null
-      return { ...state, step: GENERAL_MODE_STEP.마선수, acePhase: ACE_PHASE.마타자 }
+      // 0x313b2 의 [skin+0xd0] = 0 은 21 진입 0x263f4 가 곧바로 1(마투수)로 덮는다
+      return { ...state, step: GENERAL_MODE_STEP.마선수, acePhase: ACE_PHASE.마투수 }
     default:
       return null
   }
