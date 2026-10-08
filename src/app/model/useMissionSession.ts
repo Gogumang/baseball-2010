@@ -180,9 +180,14 @@ interface MissionSessionInput {
   readonly nariTeamIds?: { readonly batter?: number; readonly pitcher?: number }
   /**
    * **나리 타자편 저장 선수의 `+0xa & 0x1f`** — 타자 미션 0xaa57c 의 0xb87cc · 0xb53f0(0x80 갈래 · 0xb6720)이 미션 타자를 넣는 레코드
-   * 칸 k (`MissionGameSetup.nariRecordSlot`). App 은 자기 나리 팀 레코드의 내 줄 첨자를 넘긴다(`myBatterIndexOf` — 142 · 경기 장면이
-   * 0xb8768 로 배열 첨자로 다시 매긴 값, 홈런더비 타순 `EntryRoutes` 와 같은 칸 — ⚠️ 유력: 저장 선수 +0xa 를 그 첨자로 적는 마지막
-   * 자리를 다 훑지는 않았다). 안 넘기면(내 줄이 없으면) 끝 칸 12.
+   * 칸 k (`MissionGameSetup.nariRecordSlot`). App 은 자기 나리 팀 레코드의 내 줄 첨자를 넘긴다(`myBatterIndexOf`, 홈런더비 타순
+   * `EntryRoutes` 와 같은 칸). **확정** — 0x1fc20 이 주는 선수는 `[저장+0x38]` = 0x1faa1 이 나리 팀 레코드 타자 배열에서 +0xa 가
+   * 음수(0x80)인 첫 줄의 포인터(1fb02~1fb1e)라 레코드 안 내 줄 그 자체이고, 그 +0xa 를 적는 곳은 모두 아랫 5비트 = 지금 배열
+   * 첨자다: 생성 0x17360(0xa7 → 칸 7) · 첨자 다시 매기기 0xb8768 → 0xb603c(마선수 0xb633c 가 아닌 줄 i 마다 0xb6605(rec, i) —
+   * 윗 3비트를 두고 아랫 5비트 = i, 142 진입 0x1c54a · 경기 0x3a2fa · 0x3a302 · 마선수 넣기 0xb8870 · 0xb88c8) · 타순 보상 0xb5d09
+   * (0x30 바이트 복사마다 곧바로 0xb6605(rec[x], x) — b5de4 · b5e16 · b5e44, 그 뒤 0x1faa1). 그래서 +0xa & 0x1f = 레코드 배열 첨자다.
+   * 안 넘기면(내 줄이 없으면) 끝 칸 12. ⚠️ 미해결: 내 줄이 레코드에서 사라진 경우(타순 보상 0xb5d09 의 끝 사례) 원본은 0x1faa1 이 못 찾아
+   * `[저장+0x38]` 에 옛 칸 주소가 남는다 — 그 칸 선수를 0xb53f0 이 어느 갈래로 다루는지는 안 읽어 웹은 12 로 둔다.
    */
   readonly nariBatterRecordSlot?: number
 }
