@@ -61,6 +61,11 @@ type Phase = '엔딩' | '보너스'
  * 적어 두었다. 시즌 엔딩에서도 흐르는지는 문서에 없어 지어내지 않았다
  * (`widgets/season/lib/seasonEndingLayout.ts` 의 `CREDITS_TEXT_INDEX` 주석 참고).
  * ⚠️ **근사**: 지도 그리기 인자 `1` 의 뜻을 몰라 장소 표시·커서 없이 지도 한 장만 깐다.
+ *
+ * **닿지 않는 갈래** — 그리기 `0x8bd8` 의 8c86~8cc8 은 팝업 0x2c 가 답 0 으로 닫히면 단계 + 1 · 효과기 종류 1 을 건다. 그러나 팝업 번호
+ * [app+0x248] 을 적는 0xbbef8(글, 종류, 번호, …)를 부르는 62 곳(re.py xval 0xbbef9)의 번호는 모두 0x2c 가 아닌 상수이거나 −1 이고,
+ * [app+0x248] 을 직접 적는 곳은 0xbbef8 의 bbf30 · 대기 팝업을 옮기는 0x754b6 뿐이다(대기 칸 [app+0x3ac] 도 0xbbef8 bbf10 만 적는다).
+ * 곧 팝업 0x2c 는 어디서도 안 뜬다 — 옮기지 않는다.
  */
 export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBonusReceived, onFinish }: SeasonEndingScreenProps) {
   const [phase, setPhase] = useState<Phase>('엔딩')
