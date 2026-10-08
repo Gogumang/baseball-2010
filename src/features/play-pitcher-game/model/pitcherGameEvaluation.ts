@@ -424,7 +424,9 @@ export function managerCommentIndexOf(
     return NO_ENTRY_USER_EVENT_INDEX
   }
   const section = MANAGER_TEXT_REPUTATION_LIMITS.findIndex((limit) => context.reputation < limit)
-  const sectionIndex = section < 0 ? MANAGER_TEXT_SECTION_STARTS.length - 1 : section
+  // 0x128d8~0x128f4: 평판 < 문턱인 첫 칸에서만 바꾼다 — 다 넘으면(≥ 1000) 0x12876 이 먼저 둔 구간 0(바탕 2) 그대로.
+  // 평판은 쓰는 곳마다 0~999 로 잘려 실제로는 안 닿는다(타자편 97398e8 과 같다)
+  const sectionIndex = section < 0 ? 0 : section
   const grades = isStarterTypePosition(context.positionCode)
     ? MANAGER_TEXT_GRADES_STARTER
     : MANAGER_TEXT_GRADES

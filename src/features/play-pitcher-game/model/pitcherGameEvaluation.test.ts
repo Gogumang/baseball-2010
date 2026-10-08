@@ -171,6 +171,11 @@ describe('감독 평가 글 (0x1278c)', () => {
     expect(managerCommentIndexOf({ ...선발, reputation: 800 }, 0)).toBe(29 + 2)
   })
 
+  it('문턱 [150, 450, 750, 1000] 을 다 넘으면 구간 0 바탕 2 그대로다 (0x1278c — 평판은 999 로 잘려 실제로는 안 닿는다)', () => {
+    expect(managerCommentIndexOf({ ...선발, reputation: 999 }, 0)).toBe(29 + 2)
+    expect(managerCommentIndexOf({ ...선발, reputation: 1000 }, 0)).toBe(2 + 2)
+  })
+
   it('구원이 등판조차 못 했으면 38 "오늘은 등판할 기회가 없었구나." 다', () => {
     const 번호 = managerCommentIndexOf({ ...구원, neverEntered: true }, 0)
 
