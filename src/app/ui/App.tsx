@@ -18,6 +18,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { lapPlayClock } from '@/entities/collection/model/playClock'
 import { isEveryMissionCleared } from '@/entities/mission/model/missionGoal'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { myBatterIndexOf, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
@@ -479,7 +480,11 @@ export function App() {
         // 경기정보 OK 0x3136e — +0x3c = 1 · +0x4d = 1 · 블록 = 새 경기
         onGameStart={modeSave.startGeneralGame}
         // 반 이닝 자동 저장 0x4f928 → 0x22754 — 블록만
-        onGameSave={modeSave.saveGeneralGame}
+        onGameSave={(game) => {
+          // 0x4f928 의 0x4fa9e `0x4e8b0` — 반 이닝 자동 저장(0x22754)마다 지난 시간을 칸 0(일반) 플레이 시간에
+          recordStat({ kind: '플레이시간', mode: GENERAL_STAT_MODE, elapsed: lapPlayClock() })
+          modeSave.saveGeneralGame(game)
+        }}
         // 정산 진입 0x4ea0c — 한 판 치고 끝이라 선수 정산은 없지만, 모드 1 에서도 기록 달성 G 합을 전역 G(+0x64)에
         // 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 1)` 로 획득 GP 통계(칸 0 일반)에 적는다 (fc7f196).
         // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 1)를 통계 [mgr+0xc8]+4+n 누계에 더한다.
@@ -489,6 +494,8 @@ export function App() {
           if (earned !== 0) wallet.gain(earned)
           recordStat({ kind: 'G획득', mode: GENERAL_STAT_MODE, amount: earned })
           recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+          // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 지난 시간을 칸 0(일반) 플레이 시간에 (0x22efc)
+          recordStat({ kind: '플레이시간', mode: GENERAL_STAT_MODE, elapsed: lapPlayClock() })
           modeSave.finishGeneralGame()
         }}
         // 경기진행 설정 전역 m = 0 칸 — 창을 열 때 읽고(0x5fef4) 확인 0x60376 이 되써 0x1f1b9 로 남긴다. 이어하기 경기도 이 값

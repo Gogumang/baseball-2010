@@ -11,6 +11,7 @@
  * | `+0xa8 + 2(10m + i)` (m 0~2, i 0~9) | u16 | `0x22e35(mgr, 모드, i)` — 1 더함(16비트 넘침은 0 으로) | `0x22eb5(mgr, 모드, i)` → 셀 16~46 |
  * | `+0xf4` / `+0xf8` | u32 비트 | 스킬 켜기 `0xb663c` — 모드 4 → +0xf4, 모드 3 → +0xf8 에 `1 << 스킬` OR. `0xb663c` 는 장착 `0xa4b04` 만 부르고, 그건 스킬 창(0x147b0)과 **획득 0xa4bd8**(0x10fb4 · 이벤트 0x8c460, 얻자마자 켠다)이 부른다 | 전부 수집 보상 k=5 "스킬 모두 수집"(`0x28f8a`) 하나뿐 |
  *
+ * | `+0x2c + 8i` (i 0~7) | u64 밀리초 | `0x22efc(mgr, 늘린 시간 lo, hi, 모드)` — 점프표 `0xcdaac` 로 모드 → 칸 i, 64비트로 더한다(자르지 않음). 부르는 곳은 `0x4e8b0(장면)` 하나(아래 `PLAY_TIME_MODE_SLOTS`) | 기록연감 통계 셀 0~6 `"%04d:%02d:%02d"` · 합계 `0x588d1`(여덟 칸 합) · 컬렉터 31 · 47 (`playTimeHiddenIdOf`) |
  * | `+0x106 + k` (k 0~7) | u8 | `0x22dd4(mgr, k)` — k ≤ 7 이면 1 (0x22dd6 `cmp r1,#7; bhi`) | `0x22db4(mgr, k)` (k > 7 이면 0) → 기록연감 탭 0 셀 40~47 의 달성 표시 |
  *
  * `0x22e10` 을 부르는 곳(전수): 경기 끝 `0x4ea0c` 의 0x4ec8a — 기록 달성 G 합을 G 에 더하고 `0x22c7d`(0x4ec82) 바로 뒤,
@@ -90,6 +91,22 @@ const EARNED_MODE_SLOTS: Readonly<Record<number, number>> = { 1: 0, 4: 1, 3: 2, 
 /** `+0x8c` u32 일곱 칸 (StrMAINMENU[168~174]) */
 export const GAME_POINT_EARNED_KINDS = 7
 
+/**
+ * **플레이 시간 누계 `0x4e8b0(장면)`** (직접 떴다, 0x4e8b0~0x4e9da):
+ * ```
+ * now = 0x14005c8()                                   ; 밀리초 시계 (64비트)
+ * d = now − [장면+0x19d8] − [장면+0x19e0]               ; 시작 시각 · 멈춘 시간
+ * 0x22efc(G, d, [장면+0x1104])                          ; 모드 칸에 더한다 · 0x1f1e1 저장
+ * 0x3f554(장면)                                        ; [+0x19d8] = now · [+0x19e0] = 0 — 다시 잰다
+ * 모드 3: (u64 +0x3c) / 3600000 > 9 → 0x62368(ui, 0x1f = 31, 0)   ; 열기 + 알림
+ * 모드 4: (u64 +0x34) / 3600000 > 9 → 0x62368(ui, 0x2f = 47, 0)
+ * ```
+ * - 시작 시각 `0x3f554` 를 부르는 곳은 경기 장면 적재 `0x3f584`(0x3fa3e)와 `0x4e8b0` 자신뿐이다.
+ * - 멈춘 시간 `+0x19e0`(= 0xcf << 5)을 쓰는 곳은 `0x3f554` 의 0 하나뿐이다(이진 전체에서 0xcf << 5 를 만드는 곳은 0x3f562 · 0x4e8c8 둘,
+ *   0x19d8 · 0x19e0 · 0x19dc · 0x19e4 리터럴도 없다) — **늘 0**, 멈춘 동안도 센다(원본 그대로).
+ * - `0x4e8b0` 을 부르는 곳(전수): 경기 끝 정산 `0x4ea0c` 의 끝 0x4f54a(모든 모드 — 함수의 유일한 출구 바로 앞),
+ *   홈런더비 결과 `0x4f574` 의 0x4f6be, 상태 0x18 이어하기 자동 저장 `0x4f928` 의 0x4fa9e(모드 1 · 2 · 8 · 9 만).
+ */
 export interface AnnalsStats {
   /** `+4 + n` u8 [40] — 기록달성 번호 n 의 누계 (0x22df0). 옛 저장에는 없어 0 으로 */
   readonly recordCounts: readonly number[]
@@ -104,7 +121,19 @@ export interface AnnalsStats {
   readonly pitcherEquippedSkillBits: number
   /** `+0x106 + k` u8 [8] — 달성 표시 (0x22dd4). 옛 저장에는 없어 0 으로 */
   readonly achievementMarks: readonly number[]
+  /** `+0x2c + 8i` u64 [8] — 모드 칸별 플레이 시간 밀리초 (0x22efc). 옛 저장에는 없어 0 으로 */
+  readonly playTimes?: readonly number[]
 }
+
+/** `+0x2c` u64 여덟 칸 — 합계 `0x588d1` 이 여덟 칸을 다 더한다(칸 7 은 쓰는 모드가 없다) */
+export const PLAY_TIME_SLOTS = 8
+
+/**
+ * `0x22efc` 의 모드 → 칸 (점프표 0xcdaac, 갈래마다 맨 끝 바이트 `adds r4, #…` 로 확정):
+ * 1 → 0(+0x2c) 일반 · 4 → 1(+0x34) 타자편 · 3 → 2(+0x3c) 투수편 · 2 → 3(+0x44) 시즌 · 8 · 9 → 4(+0x4c) 대전 ·
+ * 5 · 6 → 5(+0x54) 미션 · 7 → 6(+0x5c) 홈런더비. 그 밖(1~9 밖)은 무시. 기록연감 셀 0~6 · [129]~[135] 차례와 같다.
+ */
+export const PLAY_TIME_MODE_SLOTS: Readonly<Record<number, number>> = { 1: 0, 4: 1, 3: 2, 2: 3, 8: 4, 9: 4, 5: 5, 6: 5, 7: 6 }
 
 /** `+4` 마흔 칸 (`cmp r2,#0x27`) — 기록달성 40종 (StrGAME[8~47]) */
 export const RECORD_COUNT_KINDS = 40
@@ -121,6 +150,41 @@ export const EMPTY_ANNALS_STATS: AnnalsStats = {
   batterEquippedSkillBits: 0,
   pitcherEquippedSkillBits: 0,
   achievementMarks: Array.from({ length: ACHIEVEMENT_MARK_KINDS }, () => 0),
+  playTimes: Array.from({ length: PLAY_TIME_SLOTS }, () => 0),
+}
+
+/** 칸 i 의 플레이 시간 밀리초 (`+0x2c + 8i`) — 옛 저장은 0 */
+export function playTimeOf(stats: AnnalsStats, slot: number): number {
+  return stats.playTimes?.[slot] ?? 0
+}
+
+/** `0x22efc(mgr, 밀리초, 모드)` — 그 모드 칸에 더한다. 자르지 않는다 */
+export function addPlayTime(stats: AnnalsStats, mode: number, elapsed: number): AnnalsStats {
+  const slot = PLAY_TIME_MODE_SLOTS[mode]
+  if (slot === undefined) return stats
+  const playTimes = Array.from({ length: PLAY_TIME_SLOTS }, (_unused, at) => playTimeOf(stats, at) + (at === slot ? elapsed : 0))
+  return { ...stats, playTimes }
+}
+
+/** 합계 `0x588d1` 의 재료 — 여덟 칸 합 */
+export function totalPlayTimeOf(stats: AnnalsStats): number {
+  return Array.from({ length: PLAY_TIME_SLOTS }, (_unused, at) => playTimeOf(stats, at)).reduce((sum, time) => sum + time, 0)
+}
+
+/** 1시간 밀리초 `0x36ee80` */
+const HOUR_MS = 3_600_000
+/** `0x4e8b0` 이 여는 히든 — 모드 3(투수편 칸 +0x3c) 31 · 모드 4(타자편 칸 +0x34) 47 */
+const PLAY_TIME_HIDDEN_IDS: Readonly<Record<number, number>> = { 3: 31, 4: 47 }
+
+/**
+ * `0x4e8b0` 끝 — 모드 3 · 4 면 그 칸 밀리초 / 3600000 > 9(곧 10시간 이상)일 때 열 히든 id. 아니면 null.
+ * 열기 `0x62368` 은 누계를 더할 때마다 다시 부른다(이미 열렸는지는 0x62368 이 본다).
+ */
+export function playTimeHiddenIdOf(stats: AnnalsStats, mode: number): number | null {
+  const id = PLAY_TIME_HIDDEN_IDS[mode]
+  if (id === undefined) return null
+  const slot = PLAY_TIME_MODE_SLOTS[mode] as number
+  return Math.trunc(playTimeOf(stats, slot) / HOUR_MS) > 9 ? id : null
 }
 
 const isMode = (mode: number): mode is StatMode => mode === 2 || mode === 3 || mode === 4
@@ -238,6 +302,8 @@ export type AnnalsStatEvent =
   | { readonly kind: '기록달성'; readonly recordIds: readonly number[] }
   /** `0x22dd4` — 달성 표시 k (리그 1위 1·5·10회 = 0·1·2, 전부 수집 = 3~7) */
   | { readonly kind: '달성표시'; readonly index: number }
+  /** `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 밀리초를 그 모드 칸에 (`playClock.lapPlayClock`) */
+  | { readonly kind: '플레이시간'; readonly mode: number; readonly elapsed: number }
 
 /**
  * 장착 목록이 바뀐 사이에 **새로 켜진** 스킬마다 `스킬장착` 한 건 — `0xb663c` 는 이미 켜진 스킬엔 들어오지 않으니
@@ -263,6 +329,7 @@ export function applyAnnalsStat(stats: AnnalsStats, event: AnnalsStatEvent): Ann
   if (event.kind === 'G획득') return addGamePointEarned(stats, event.amount, event.mode)
   if (event.kind === '달성표시') return markAchievement(stats, event.index)
   if (event.kind === '기록달성') return addRecordCounts(stats, event.recordIds)
+  if (event.kind === '플레이시간') return addPlayTime(stats, event.mode, event.elapsed)
   return markSkillEquipped(stats, event.mode, event.skillId)
 }
 
@@ -294,5 +361,9 @@ export function normalizeAnnalsStats(raw: unknown): AnnalsStats {
       && candidate.achievementMarks.every((mark) => mark <= 0xff)
       ? candidate.achievementMarks
       : EMPTY_ANNALS_STATS.achievementMarks,
+    playTimes: Array.isArray(candidate.playTimes) && candidate.playTimes.length === PLAY_TIME_SLOTS
+      && candidate.playTimes.every((time) => Number.isFinite(time) && (time as number) >= 0)
+      ? (candidate.playTimes as number[])
+      : EMPTY_ANNALS_STATS.playTimes,
   }
 }

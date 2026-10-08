@@ -155,6 +155,7 @@ import {
   leagueUsageOf, PITCHER_LEAGUE_MODE, skillEquipStatEventsOf,
 } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { lapPlayClock } from '@/entities/collection/model/playClock'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
@@ -1211,6 +1212,8 @@ export function usePitcherLeagueSession(
       // 0x4ec82 `0x22c7d(G, 모드 3)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: gamePointReward })
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+      // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
+      recordStat({ kind: '플레이시간', mode: PITCHER_LEAGUE_MODE, elapsed: lapPlayClock() })
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
       commitWith((current) => ({
         ...settleNariCupGame(current, gamePointReward),
@@ -1260,6 +1263,8 @@ export function usePitcherLeagueSession(
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })
       // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+      // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
+      recordStat({ kind: '플레이시간', mode: PITCHER_LEAGUE_MODE, elapsed: lapPlayClock() })
       const day = applyPitcherLeagueDay(recorded, random, aceLevels)
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다. CPU 끼리의 포스트시즌 경기는
       // 여기서 돌리지 않는다 — 원본은 대진 128 의 [확인](0x13da0)에서 돌린다 (`pressPostseasonBracket`)

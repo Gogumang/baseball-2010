@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { startPlayClock } from '@/entities/collection/model/playClock'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
@@ -359,6 +360,8 @@ export function useHomeRunDerby({
     setOpponentTeamId(started.opponentTeamId)
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 첫 장면 · 다시하기 · 재도전마다 새 장면이다
     activeSound().stop()
+    // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다
+    startPlayClock()
     setSkyRow(started.skyRow)
     isLoadingRef.current = true
     setLoadingTip(LOADING_TIPS[started.loadingTipIndex] ?? null)

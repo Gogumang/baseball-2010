@@ -42,6 +42,7 @@ import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { lapPlayClock } from '@/entities/collection/model/playClock'
 
 /**
  * **홈런더비 상태 0xe 의 타자 판 값** (0x44944 — 타자 `0xae89c(팀 0)` = 모드 타자 기록 0x1fc20 의 사본).
@@ -356,6 +357,8 @@ export function EntryRoutes({
           session.actions.gainGamePoint(result.gainedGamePoint)
           // 이어 0x4f70a `0x22c7d(앱, scene+0x17f4 = 번 G, scene+0x1104 = 7)` — 기록연감 모드별 획득 G (칸 6)
           recordStat?.({ kind: 'G획득', mode: HOME_RUN_DERBY_MODE, amount: result.gainedGamePoint })
+          // 결과 0x4f574 의 0x4f6be `0x4e8b0` — 지난 시간을 칸 6(홈런더비) 플레이 시간에 (0x22efc)
+          recordStat?.({ kind: '플레이시간', mode: HOME_RUN_DERBY_MODE, elapsed: lapPlayClock() })
         }}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}

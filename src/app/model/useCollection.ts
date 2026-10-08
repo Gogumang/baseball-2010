@@ -13,7 +13,7 @@ import {
   HALL_OF_FAME_COST,
 } from '@/entities/collection/model/collection'
 import type { Collection, EndingViewer, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
-import { applyAnnalsStat, GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
+import { applyAnnalsStat, GAME_POINT_USAGE, playTimeHiddenIdOf } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -140,7 +140,13 @@ export function useCollection(
 
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
   const recordStat = useCallback((event: AnnalsStatEvent) => {
-    setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
+    setCollection((previous) => {
+      const stats = applyAnnalsStat(previous.stats, event)
+      // 0x4e8b0 끝 — 모드 3 · 4 의 그 칸이 10시간을 넘으면 히든 31 · 47 을 연다(0x62368). ⚠️ 0x62368 의 알림 창은 웹에 아직 없다
+      const hiddenId = event.kind === '플레이시간' ? playTimeHiddenIdOf(stats, event.mode) : null
+      if (hiddenId === null || previous.openedHiddenIds.includes(hiddenId)) return { ...previous, stats }
+      return { ...previous, stats, openedHiddenIds: [...previous.openedHiddenIds, hiddenId] }
+    })
   }, [])
 
   /**

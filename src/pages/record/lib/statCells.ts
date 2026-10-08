@@ -1,5 +1,5 @@
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
-import { gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf } from '@/entities/collection/model/annalsStats'
+import { gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf, playTimeOf, totalPlayTimeOf } from '@/entities/collection/model/annalsStats'
 import { STAT_NAME_FIRST_INDEX } from '@/pages/record/lib/statNames'
 
 /**
@@ -35,8 +35,8 @@ const NOT_SAVED = () => null
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, offset) => from + offset)
 
 const STAT_CELLS: ReadonlyMap<number, StatCell> = new Map<number, StatCell>([
-  // 플레이 시간 — 웹은 저장하지 않는다
-  ...range(0, 6).map((id): [number, StatCell] => [id, { nameIndex: 129 + id, valueKind: '시간', valueOf: NOT_SAVED }]),
+  // 모드별 플레이 시간 (0x4e8b0 → 0x22efc 가 쌓는다)
+  ...range(0, 6).map((id): [number, StatCell] => [id, { nameIndex: 129 + id, valueKind: '시간', valueOf: (stats) => playTimeOf(stats, id) }]),
   // 우승 횟수·친구 추천·이벤트 미션 다운 — 웹은 저장하지 않는다
   ...range(8, 12).map((id): [number, StatCell] => [id, { nameIndex: 136 + id - 8, valueKind: '횟수', valueOf: NOT_SAVED }]),
   ...range(16, 25).map((id): [number, StatCell] => [id, {
@@ -126,9 +126,27 @@ export function typeSecretDigit(state: SecretCodeState, digit: string): SecretCo
 /**
  * 통계 탭 아래 합계 (0x2fafa~0x2fb90) — 쪽 0 은 `0x588d1` 플레이 시간 합, 쪽 6·7 은 `0x58801(…, 6)`·`(…, 7)`.
  * ⚠️ **원본 버그 그대로**: `0x58801` 은 인자 4(획득 합)·5(소모 합)만 더하고 그 밖은 0 이라 쪽 6·7 은 늘 **"0G"** 다.
- * 다른 쪽은 값 글이 없다. 쪽 0 의 시간 합은 웹이 저장하지 않아 비운다.
+ * 다른 쪽은 값 글이 없다.
  */
-export function statTotalTextOf(page: number): string | null {
+export function statTotalTextOf(page: number, stats?: AnnalsStats): string | null {
   if (page === 6 || page === 7) return '0G'
+  if (page === 0 && stats !== undefined) return playTimeTotalTextOf(totalPlayTimeOf(stats))
   return null
+}
+
+/**
+ * **`0x588d1` 플레이 시간 합 글** (직접 떴다, 0x588d0~0x589e6) — 색 글 "!R!cFFFF00" 은 화면이 맡고 숫자만 낸다:
+ * ```
+ * t = Σ u64 [G+0xc8]+0x2c+8i (i 0~7) / 1000          ; 초 (0xcaa08 64비트 나눗셈)
+ * d = t / 86400 ; h = (t − d·86400) / 3600 ; m = (t − d·86400 − h·3600) / 60
+ * "!R!cFFFF00" + d + "일"(0xd2070) + h + "시간"(0xd2074) + m + "분"(0xd207c)     ; 숫자는 0 채움 없이 (0xbc73d)
+ * ```
+ * ⚠️ d·86400 · h·3600 은 32비트 곱(`muls`)을 부호 늘림해 빼지만 d < 24855 일이라 결과는 같다.
+ */
+export function playTimeTotalTextOf(totalMs: number): string {
+  const seconds = Math.trunc(totalMs / 1000)
+  const days = Math.trunc(seconds / 86400)
+  const hours = Math.trunc((seconds - days * 86400) / 3600)
+  const minutes = Math.trunc((seconds - days * 86400 - hours * 3600) / 60)
+  return `${days}일${hours}시간${minutes}분`
 }

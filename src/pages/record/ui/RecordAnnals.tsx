@@ -375,7 +375,7 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
 
       {tab === 4 && (
         // 통계 합계는 `"!R!cFFFF00…G"` 오른쪽 맞춤 (0x58870)
-        <TotalRow frames={frames} textFrames={textFrames} value={statTotalTextOf(page) ?? ''} isRightAligned />
+        <TotalRow frames={frames} textFrames={textFrames} value={statTotalTextOf(page, collection.stats) ?? ''} isRightAligned />
       )}
 
       </div>

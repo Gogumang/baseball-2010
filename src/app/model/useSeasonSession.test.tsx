@@ -1978,7 +1978,11 @@ describe('팀 경기 기록 달성 G (경기 끝 0x4ea0c 4ec5a → 0x4ec82)', ()
 
     expect(result.current.gamePoints).toBe(before + 25)
     // 이어서 0x4ec8a 0x22e10 — 이번 경기 기록달성 횟수를 누계(+4+n)에 더한다
-    expect(events).toEqual([{ kind: 'G획득', mode: 2, amount: 25 }, { kind: '기록달성', recordIds: [1] }])
+    // 끝 0x4f54a 0x4e8b0 — 지난 시간을 플레이 시간 칸(모드 2)에
+    expect(events).toEqual([
+      { kind: 'G획득', mode: 2, amount: 25 }, { kind: '기록달성', recordIds: [1] },
+      { kind: '플레이시간', mode: 2, elapsed: expect.any(Number) },
+    ])
   })
 })
 

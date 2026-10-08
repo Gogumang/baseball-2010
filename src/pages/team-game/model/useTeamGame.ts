@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { startPlayClock } from '@/entities/collection/model/playClock'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { autoRelayModeSlotOf, autoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -193,6 +194,8 @@ export function useTeamGame(
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다. 그리는 자리라
     // 자식 화면(자동진행 중계 0x21 의 33 · 인트로 61)의 효과보다 먼저다
     activeSound().stop()
+    // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
+    startPlayClock()
     // 자동진행 중계(0x21)는 화면이 한 틱씩 돌린다 — 그 사이 CLR 중단 · 속도 키를 받는다
     const live: TeamGameOptions = { ...options, liveAutoRelay: true }
     const record = autoRelayRecordPort()

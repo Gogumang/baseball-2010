@@ -92,6 +92,7 @@ import {
   BATTER_LEAGUE_MODE, leagueUsageOf, skillEquipStatEventsOf,
 } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { lapPlayClock, startPlayClock } from '@/entities/collection/model/playClock'
 import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
@@ -606,6 +607,8 @@ export function useCareerSession({
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
+      // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다
+      startPlayClock()
       // 상태 7 진입 0x39f88 → 0x53dbc 의 팁 rand(0, 73) — 경기 시작 굴림의 맨 앞(덱 1275 · 효과 1202 보다 앞, `rollSceneLoadingTip`)
       const tip = LOADING_TIPS[rollSceneLoadingTip(random)] ?? null
       // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 로딩 판부터 배경음이 없다.
@@ -820,6 +823,8 @@ export function useCareerSession({
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+      // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
+      recordStat({ kind: '플레이시간', mode: BATTER_LEAGUE_MODE, elapsed: lapPlayClock() })
       setScreen({
         kind: '경기결과',
         summary,
@@ -882,6 +887,8 @@ export function useCareerSession({
       // 0x4ec82 `0x22c7d(G, 모드 4)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointReward })
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+      // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
+      recordStat({ kind: '플레이시간', mode: BATTER_LEAGUE_MODE, elapsed: lapPlayClock() })
       // 승리 31 · 패배 32 징글 — 정규 경기 결과 화면과 같은 자리 (116 의 평가 징글은 없다)
       playSoundIds(audio, [gameResultSoundIdOf(summary.result, finished.game.playerSide)])
       setScreen({

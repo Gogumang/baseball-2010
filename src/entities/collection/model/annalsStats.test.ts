@@ -1,8 +1,9 @@
+import { lapPlayClock, startPlayClock } from '@/entities/collection/model/playClock'
 import { describe, expect, it } from 'vitest'
 import {
   addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
   gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
-  addRecordCounts, recordCountOf, RECORD_COUNT_KINDS,
+  addRecordCounts, recordCountOf, RECORD_COUNT_KINDS, addPlayTime, playTimeHiddenIdOf, totalPlayTimeOf,
 } from '@/entities/collection/model/annalsStats'
 
 /** 기록연감 통계 기록 `[mgr+0xc8]` — 0x22e35 · 0x22c29 · 0xb663c (디스어셈 확정) */
@@ -148,5 +149,40 @@ describe('기록달성 누계 0x22e10 → 0x22df0 (+4 + n, u8)', () => {
     expect(normalizeAnnalsStats({ ...saved, recordCounts: undefined }).recordCounts).toEqual(EMPTY_ANNALS_STATS.recordCounts)
     expect(normalizeAnnalsStats({ ...saved, recordCounts: Array.from({ length: 40 }, () => 256) }).recordCounts)
       .toEqual(EMPTY_ANNALS_STATS.recordCounts)
+  })
+})
+
+describe('플레이 시간 0x4e8b0 → 0x22efc', () => {
+  it('모드 → 칸은 점프표 0xcdaac — 1 → 0 · 4 → 1 · 3 → 2 · 2 → 3 · 8·9 → 4 · 5·6 → 5 · 7 → 6, 그 밖은 무시', () => {
+    let stats = EMPTY_ANNALS_STATS
+    for (const mode of [1, 4, 3, 2, 8, 9, 5, 6, 7, 0, 10]) stats = applyAnnalsStat(stats, { kind: '플레이시간', mode, elapsed: 10 })
+    expect(stats.playTimes).toEqual([10, 10, 10, 10, 20, 20, 10, 0])
+    expect(totalPlayTimeOf(stats)).toBe(90)
+  })
+
+  it('컬렉터 — 모드 3 은 31 · 모드 4 는 47, 그 칸 밀리초 / 3600000 > 9 일 때만', () => {
+    const almost = addPlayTime(EMPTY_ANNALS_STATS, 4, 36_000_000 - 1)
+    expect(playTimeHiddenIdOf(almost, 4)).toBeNull()
+    const ten = addPlayTime(almost, 4, 1)
+    expect(playTimeHiddenIdOf(ten, 4)).toBe(47)
+    // 칸이 다른 편 시간은 안 본다
+    expect(playTimeHiddenIdOf(ten, 3)).toBeNull()
+    expect(playTimeHiddenIdOf(addPlayTime(EMPTY_ANNALS_STATS, 3, 36_000_000), 3)).toBe(31)
+    expect(playTimeHiddenIdOf(addPlayTime(EMPTY_ANNALS_STATS, 2, 99_000_000), 2)).toBeNull()
+  })
+
+  it('옛 저장(칸 없음)은 0 에서 · 깨진 칸은 0 으로 읽는다', () => {
+    const { playTimes: _playTimes, ...old } = EMPTY_ANNALS_STATS
+    expect(addPlayTime(old, 1, 5).playTimes?.[0]).toBe(5)
+    expect(normalizeAnnalsStats({ playTimes: [1, 2] }).playTimes).toEqual(EMPTY_ANNALS_STATS.playTimes)
+    expect(normalizeAnnalsStats({ playTimes: [1, 2, 3, 4, 5, 6, 7, 8] }).playTimes).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+  })
+})
+
+describe('플레이 시계 — 0x3f554 시작 · 0x4e8b0 지난 시간 뒤 다시 잼', () => {
+  it('시작부터 지난 밀리초를 주고 그때부터 다시 잰다', () => {
+    startPlayClock(1000)
+    expect(lapPlayClock(4500)).toBe(3500)
+    expect(lapPlayClock(5000)).toBe(500)
   })
 })

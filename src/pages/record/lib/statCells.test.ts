@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addGamePointEarned, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
+import { addGamePointEarned, addPlayTime, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
 import {
   INITIAL_SECRET_CODE_STATE, enterAnnalsSecretCode, statCellOf, statPageCellsOf, statTotalTextOf, statValueTextOf, typeSecretDigit,
 } from '@/pages/record/lib/statCells'
@@ -33,10 +33,20 @@ describe('통계 칸 번호 = 쪽 × 8 + 줄', () => {
     expect(statCellOf(48)?.valueOf(stats)).toBe(0)
   })
 
-  it('합계는 쪽 6·7 만 — 0x58801(…, 6·7) 이 4·5 만 더해 늘 0G 다 (원본 버그)', () => {
+  it('합계 — 쪽 6·7 은 0x58801(…, 6·7) 이 4·5 만 더해 늘 0G (원본 버그) · 쪽 0 은 0x588d1 플레이 시간 합', () => {
     expect(statTotalTextOf(6)).toBe('0G')
     expect(statTotalTextOf(7)).toBe('0G')
     expect(statTotalTextOf(2)).toBeNull()
+    // 투수편 1일 2시간 3분 4초 + 일반 59초 → 1일2시간4분 (초는 버린다)
+    const played = addPlayTime(addPlayTime(EMPTY_ANNALS_STATS, 3, ((26 * 60 + 3) * 60 + 4) * 1000), 1, 59_000)
+    expect(statTotalTextOf(0, played)).toBe('1일2시간4분')
+    expect(statTotalTextOf(0, EMPTY_ANNALS_STATS)).toBe('0일0시간0분')
+  })
+
+  it('칸 0~6 은 모드별 플레이 시간 +0x2c + 8i — 0x22efc 표 0xcdaac 차례 (일반 · 타자편 · 투수편 · 시즌 · 대전 · 미션 · 더비)', () => {
+    const stats = [1, 4, 3, 2, 8, 6, 7].reduce((acc, mode, index) => addPlayTime(acc, mode, (index + 1) * 1000), EMPTY_ANNALS_STATS)
+    expect([0, 1, 2, 3, 4, 5, 6].map((cell) => statCellOf(cell)?.valueOf(stats))).toEqual([1000, 2000, 3000, 4000, 5000, 6000, 7000])
+    expect(statValueTextOf('시간', 3_723_000)).toBe('0001:02:03')
   })
 })
 

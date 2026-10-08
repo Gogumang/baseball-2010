@@ -147,6 +147,7 @@ import type { CollectionRewardRecord } from '@/entities/collection/model/collect
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { lapPlayClock } from '@/entities/collection/model/playClock'
 import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 /** 시즌모드 = 원본 모드 2 (0x22c7d 의 획득 GP 칸 3) */
@@ -2065,6 +2066,8 @@ export function useSeasonSession(
       recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: earned })
       // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 2 저장+0x8f0)를 통계 +4+n 누계에 더한다
       recordStat?.({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
+      // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 지난 시간을 칸 3(시즌) 플레이 시간에 (0x22efc)
+      recordStat?.({ kind: '플레이시간', mode: SEASON_STAT_MODE, elapsed: lapPlayClock() })
 
       // 경기 중 `0xa755c` 가 올린 평판 16칸 — 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로
       // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.
@@ -2780,9 +2783,11 @@ export function useSeasonSession(
       // 반 이닝 저장(0x4f928)은 이닝 넘김 0xb6b6c 뒤다 — 전역 경기 상태 +0x6b 가 지금 이닝이다. 경기 중 나가기(0x40140)는
       // 이 칸을 안 지우므로 나간 그 이닝이 남는다 (`liveGameState`). 이어하기 첫 진행은 블록에서 되복사한 st 의 이닝이다
       setLiveGameInningIndex(progress.game.inning - 1)
+      // 0x4f928 의 0x4fa9e `0x4e8b0` — 반 이닝 저장마다 지난 시간을 칸 3(시즌) 플레이 시간에
+      recordStat?.({ kind: '플레이시간', mode: SEASON_STAT_MODE, elapsed: lapPlayClock() })
       commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
     },
-    [commit, gameKind, ownRotationShift],
+    [commit, gameKind, ownRotationShift, recordStat],
   )
 
   /**
