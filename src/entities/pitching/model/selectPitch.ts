@@ -40,6 +40,18 @@ export const DEFAULT_REPERTOIRE: PitcherRepertoireInfo = { form: 0, pitchMask: R
 /** 마구의 제구 등급 — 0x4dbac 가 구질 22 면 굴림 없이 돌려주는 값 (4dbbc) */
 const MAGIC_PITCH_CONTROL_TIER = 5
 
+/**
+ * CPU 구질 굴림 틱 수 — 원본은 구질을 **공마다 9번** 고른다(마지막 값이 남는다).
+ *   매 틱 0x52c50: 상태 갱신 0xbc9c9(같은 상태면 틱+1) → 진입 처리 → 조작 0x498d4 → 상태 틱 처리.
+ *   0x498d4 가 CPU 조작(0x49a92, 종류 1·2)에 (상태, 틱)을 넘기고(0x537b0) 0x53874 를 부른다.
+ *   상태 0xf 면 0x53850 — 수비 쪽(+0xc ≠ 0)이면 **가드 없이** 메시지 0x644 → 0x51212 → 0x344dc(+0xfc8 = 0 부터 다시).
+ *   0xf 틱 처리 0x39c1c 는 틱 > 7 이고 +0xfc8 ≠ 0 이어야 0x10 을 예약하고, 예약은 다음 틱 0xbc9c9 에서 선다
+ *   → 0xf 는 틱 0~8 의 9 틱이고 조작은 그 9 틱 모두에서 0x344dc 를 부른다.
+ * 9번 사이에 볼카운트·주자·남은 마구가 바뀌지 않으니 마구 조건 갈래는 9번 모두 굴림이 없고(구질 22),
+ * 아니면 rand(0,6) 을 9번 굴린다. 홈런더비(모드 7, 0x344ea)는 굴림이 없다.
+ */
+const CPU_PITCH_TYPE_ROLL_TICKS = 9
+
 /** 마구 이름을 못 고를 때 쓰는 글자 — `features/play-pitcher-game` 의 사람 투구와 같은 대체값 */
 const MAGIC_PITCH_NAME = '마구'
 
@@ -98,12 +110,17 @@ export interface CpuPickoffInput {
 
 /**
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
- *   구질(0x344dc) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc, 마구면 굴림 없이 5 — 0x4dbac)
+ *   구질(0x344dc, 상태 0xf 틱 0~8 에 **9번** — `CPU_PITCH_TYPE_ROLL_TICKS`) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc, 마구면 굴림 없이 5 — 0x4dbac)
  *   → 제구 오차(0x4dc78) → 곡선
  *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번)
  * 목표 종류가 4(견제)이고 주자가 1·2명이면(`isCpuPickoff`, 0x34684) 목표점을 만들지 않고 0x34848 이
  * **견제 루**를 굴린 뒤 끝난다 — 목표점·제구 등급·제구 오차·곡선 굴림이 **없다** (`{ kind: '견제' }`).
  *   0x51214 bl 0x344dc(구질) → 0x5121e bl 0x345fc(→ 0x9eeac 종류 → 종류 4 면 0x34848 루프 → 메시지 0x10 → 0x348d6 끝)
+ * 셋은 서로 다른 메시지·틱이다 (CPU 조작 0x53874, 조작은 매 틱 상태 틱 처리보다 **먼저** 돈다):
+ *   상태 0xf  틱 0~8  0x53850 → 0x644 → 0x51212 → 0x344dc            구질 (9번, 마지막 값)
+ *   상태 0x10 틱 6    0x53824(틱 > 5) → 0x645 → 0x5121c → 0x345fc   종류·목표점 또는 견제 — 한 번뿐: 0x345fc 가
+ *                     0x11(0x34888) 이나 견제 0x17(메시지 0x10 → 0x50f68)을 예약해 다음 틱엔 0x10 이 아니다
+ *   상태 0x11 틱 10   0x4e060 의 0x4e078(틱 > 9, 한 번 표 +0x1980) → 0x4dc78   제구 등급·오차·곡선·실투
  * 등급을 목표점 뒤에 뽑는 순서와, 구속 단계(등급이 필요)를 곡선 직전에 정하는 것은 호출 흐름에서 추정했다.
  *
  * 마구(구질 22)는 투수 레코드 **+0x18(= `repertoire.magicId`)** 이 0 이 아니면 구질 칸 5 에 들어간다
@@ -159,9 +176,13 @@ export function selectPitch(
   const magicState = magic ?? { remaining: 0, ballMagicNumber: 0 }
   const isHomeRunDerby = derbyPitchType !== undefined
   const list = pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0)
-  const typeNumber = isHomeRunDerby
-    ? derbyPitchType
-    : computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
+  let typeNumber = derbyPitchType ?? 0
+  if (!isHomeRunDerby) {
+    // 상태 0xf 틱 0~8 — 0x644 마다 0x344dc 를 다시 부른다. 마지막 값이 +0xfc8 에 남는다 (`CPU_PITCH_TYPE_ROLL_TICKS`)
+    for (let tick = 0; tick < CPU_PITCH_TYPE_ROLL_TICKS; tick += 1) {
+      typeNumber = computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
+    }
+  }
   let target: WorldPoint
   if (isHomeRunDerby) {
     // 0x3460e: 모드 7 이면 종류·목표점을 굴리지 않고 존 한가운데 (0x34612~0x34644)

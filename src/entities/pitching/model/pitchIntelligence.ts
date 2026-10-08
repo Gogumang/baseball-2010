@@ -35,7 +35,11 @@ export interface PitchChoiceSituation {
   readonly balls: number
 }
 
-/** 홈런더비(모드 7) 분기(0x344ea, 굴림 없이 22 또는 1)는 `selectPitch` 의 `derbyPitchType` 이 따른다 */
+/**
+ * 0x344dc 한 번 — 마구 조건이면 굴림 없이 22, 아니면 rand(0,6) 한 번.
+ * 원본은 공마다 이것을 **9번** 부른다(상태 0xf 틱 0~8 의 메시지 0x644) — 그 횟수는 `selectPitch` 가 맞춘다.
+ * 홈런더비(모드 7) 분기(0x344ea, 굴림 없이 22 또는 1)는 `selectPitch` 의 `derbyPitchType` 이 따른다
+ */
 export function computerPitchTypeOf(situation: PitchChoiceSituation, random: RandomPort): number {
   const { list, magicCount, runnerCount, strikes, balls } = situation
   const hasMagic = list[MAGIC_SLOT] === MAGIC_PITCH

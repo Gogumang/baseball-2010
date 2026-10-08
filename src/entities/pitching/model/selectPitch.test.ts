@@ -58,6 +58,21 @@ describe('selectPitch — 원본 CPU 투구 (0x344dc → 0x9eeac → 0x345fc →
     expect(고제구, `저제구=${저제구}, 고제구=${고제구}`).toBeGreaterThan(저제구)
   })
 
+  it('구질은 공마다 9번 굴리고 마지막 값을 쓴다 — 상태 0xf 틱 0~8 의 메시지 0x644 마다 0x344dc (0x53850 · 0x39c1c)', () => {
+    const list = pitchListOf(0x1143, false)
+    let differsFromFirstRoll = false
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const choice = selectChoice(투수(60), 상황, createSeededRandom(seed))
+      const expected = createSeededRandom(seed)
+      let typeNumber = 0
+      for (let tick = 0; tick < 9; tick += 1) typeNumber = computerPitchTypeOf({ list, magicCount: 0, ...상황 }, expected)
+      expect(choice.kind === '투구' ? choice.pitchTypeNumber : -1).toBe(typeNumber)
+      if (computerPitchTypeOf({ list, magicCount: 0, ...상황 }, createSeededRandom(seed)) !== typeNumber) differsFromFirstRoll = true
+    }
+    // 첫 굴림 값과 다른 공이 있다 — 한 번만 굴리면 이 시험이 깨진다
+    expect(differsFromFirstRoll).toBe(true)
+  })
+
   it('마선수 폼(6~10)도 공을 만든다 — 싸이커 폼 6 은 좌우 반전', () => {
     const 싸이커 = ACE_PITCHER_REPERTOIRES[0]
     const pitch = selectPitch({ control: 67, velocity: 55, repertoire: 싸이커 }, 상황, createSeededRandom(5))
@@ -238,7 +253,10 @@ describe('selectPitch CPU 견제 — 0x345fc 종류 4 = 0x34848 (I-controls 4a-2
     const choice = selectChoice(투수(60), 상황2, actual, 'hard', undefined, 이삼루)
 
     const expected = createSeededRandom(seed)
-    computerPitchTypeOf({ list: pitchListOf(0x1143, false), magicCount: 0, ...상황2 }, expected)
+    // 구질은 상태 0xf 틱 0~8 에 9번 (0x644 → 0x344dc)
+    for (let tick = 0; tick < 9; tick += 1) {
+      computerPitchTypeOf({ list: pitchListOf(0x1143, false), magicCount: 0, ...상황2 }, expected)
+    }
     expect(targetKindOf('hard', 상황2, expected)).toBe(4)
     let base = 0
     do {
