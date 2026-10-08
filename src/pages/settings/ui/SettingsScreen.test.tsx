@@ -577,6 +577,20 @@ describe('환경설정 첫 화면 — OK 칸과 판 펼침·접힘', () => {
     vi.useRealTimers()
   })
 
+  it('파일 저장 0x1f1b9 는 첫 화면을 나갈 때(0x295e2) 한 번 — 값을 바꾸거나 상세 설정을 오갈 때는 안 쓴다', () => {
+    const onSave = vi.fn()
+    const onChange = vi.fn()
+    띄우기({ onSave, onChange })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(onChange).toHaveBeenCalled()
+    fireEvent.click(줄('상세 설정'))
+    fireEvent.click(줄('주루'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onSave).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
   it('CLR 도 같은 0x295e2 — 접고 나서 나간다', () => {
     vi.useFakeTimers()
     const onBack = vi.fn()

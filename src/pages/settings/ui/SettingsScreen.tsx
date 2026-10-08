@@ -39,6 +39,11 @@ interface SettingsScreenProps {
   readonly hasSavedCareer: boolean
   readonly onChange: (settings: GameSettings) => void
   /**
+   * 파일 저장 0x1f1b9 — 메인 메뉴 첫 화면을 OK 칸·CLR 로 나갈 때(0x295e2) 접기 전에 한 번 부른다. 상세 설정·모드 초기화
+   * 하위 페이지를 오갈 때는 안 부른다. 안 넘기면 저장은 `onChange` 쪽 몫이다(경기 중 "설정")
+   */
+  readonly onSave?: () => void
+  /**
    * 나만의리그 초기화 — 고르기 창 답 0 타자편 → `0x224ec(mgr, 4)` · 1 투수편 → `0x224ec(mgr, 3)` (하위 2 의 예).
    * 받는 쪽이 그 편 저장·경기 중간 저장 표시를 지우고 시즌 내 팀에서 그 편 나리 선수를 뺀다(0x223a8).
    */
@@ -101,7 +106,7 @@ function SettingsFrame({ mainMenu, onBack, slides = true }: {
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
 export function SettingsScreen({
-  settings, onChange, onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack,
+  settings, onChange, onSave, onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack,
 }: SettingsScreenProps) {
   const [cursor, setCursor] = useState(0)
   /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
@@ -166,6 +171,8 @@ export function SettingsScreen({
    */
   const leave = () => {
     if (isInGame) return onBack()
+    // 0x295e2: 0x1f1b9(저장) 뒤 접힘
+    onSave?.()
     setFold(closingFold(foldRef.current))
   }
 
