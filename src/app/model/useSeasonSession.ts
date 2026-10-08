@@ -52,6 +52,7 @@ import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
+import { applyCpuEquipment, rollCpuEquipment } from '@/entities/season-mode/model/cpuEquipment'
 import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
@@ -1049,12 +1050,12 @@ function withSceneConstructed(save: SeasonSave | null): SeasonSave | null {
  * ```
  * e = 0xa3084(SR)                 ; 연차 idx 가 9(isFinalYear)가 아니면 −1
  * e ≥ 0: 저장+0xa0+e = 1, phase = 6, 저장, 이벤트 500 → 0xd3 → 0xf5(엔딩)
- * e < 0: phase = 1 · 0xa305c(리그 초기화) · 연차 +1 · 사기 100 · CPU 9팀 +30 → 0xc9
+ * e < 0: phase = 1 · 0xa305c(리그 초기화) · 연차 +1 · 사기 100 · SR+0x187 = 0 · 0x665e8(CPU 장비) · CPU 9팀 +30 → 0xc9
  * ```
  * 리그 초기화 `0xa305c → 0xb7b34` 가 **L = SR+0x80 을 0xf8 바이트 memset** 하므로 국가대항전 플래그
  * `SR+0x12c`(= L+0xac)도 여기서 0 이 된다 — `startNextYear` 주석 참고.
  */
-function nextYearOf(save: SeasonSave): { readonly save: SeasonSave; readonly scene: SeasonSceneState } {
+function nextYearOf(save: SeasonSave, random: RandomPort): { readonly save: SeasonSave; readonly scene: SeasonSceneState } {
   const { record } = save.state
   // 0x6e0c 머리 — 마지막 해(연차 idx 9)면 새 해 대신 **엔딩**이다.
   // `judgeSeasonEnding` 이 0~4 를 돌려주는 해가 곧 `isFinalYear` 인 해라 둘은 같은 조건이다.
@@ -1071,15 +1072,24 @@ function nextYearOf(save: SeasonSave): { readonly save: SeasonSave; readonly sce
   const pitcherOrders = series === null
     ? save.league.pitcherOrders
     : pitcherOrdersAfterPostseason(series, save.league.pitcherOrders)
+  const started: SeasonSave = {
+    ...save,
+    state: startNextYear(save.state),
+    league: nextSeasonLeague(pitcherOrders),
+    playerStats: EMPTY_LEAGUE_PLAYER_STATS,
+    series: null,
+    ranking: [],
+  }
+  // 0x6ec6 `0x665e8(g, 새 연차, 내 팀)` — 연차 문턱마다 CPU 아홉 팀의 정해진 선수 장비 니블을 굴려 쓴다(`rollCpuEquipment`,
+  // 줄마다 팀마다 rand(0, 2)). 투수 칸은 레코드 차례라 새 리그(이어진 로테이션 차례)로 명단 첨자를 찾는다.
+  // ⚠️ 장비 니블이 경기 능력치(0xb6414 니블 보너스)에 닿는 길은 아직 웹 팀 경기 명단·CPU 간이 경기에 없다(내 팀 장비도 같다)
+  const equipped = applyCpuEquipment(
+    rollCpuEquipment(random, started.state.record.yearIndex, record.teamId),
+    (team) => cpuRosterOf(started, team),
+    (team, roster, recordIndex) => recordPitcherIndexOf(started, team, roster, recordIndex),
+  )
   return {
-    save: {
-      ...save,
-      state: startNextYear(save.state),
-      league: nextSeasonLeague(pitcherOrders),
-      playerStats: EMPTY_LEAGUE_PLAYER_STATS,
-      series: null,
-      ranking: [],
-    },
+    save: Object.keys(equipped).length === 0 ? started : { ...started, cpuRosters: { ...started.cpuRosters, ...equipped } },
     scene: SEASON_SCENE_STATE.관리메뉴,
   }
 }
@@ -2384,14 +2394,14 @@ export function useSeasonSession(
         state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
         cup: null,
         cupRoster: null,
-      })
+      }, random)
       commit(next.save)
       // 히든 팀은 여기서 열지 않는다 — 0xf3 갱신 0xe684 가 대진판에 있는 동안 열었다(`openCupHiddenTeams`)
       // 대회 연차(짝수 idx)는 마지막 해(9)가 아니라 엔딩 갈래에 닿지 않지만, 같은 0x6e0c 라 같게 둔다
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
       setScene(next.scene)
     },
-    [commit, gainGamePoint, recordStat, save, startEvent],
+    [commit, gainGamePoint, random, recordStat, save, startEvent],
   )
 
   /**
@@ -2511,12 +2521,12 @@ export function useSeasonSession(
       // 0xf2 진입 0xe5f8: SR+0x12c = 1 · 461 을 틀고 · 대회 초기화 · 저장 · [다음 0xf3] (e600~e64c)
       return startEvent(NATIONAL_CUP_INTRO_EVENT_ID, SEASON_SCENE_STATE.국가대항전)
     }
-    const next = nextYearOf(rewarded)
+    const next = nextYearOf(rewarded, random)
     commit(next.save)
     // 엔딩 갈래는 500 을 틀고 [다음 0xf5] (6e54~6e76)
     if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
     setScene(next.scene)
-  }, [commit, save, startEvent])
+  }, [commit, random, save, startEvent])
 
   /**
    * 이벤트 재생 0xd3 이 끝났다 (실행기 0x8cf64 의 끝 → 이전 상태 `this+0x24`).

@@ -863,6 +863,27 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.league.wins.every((wins) => wins === 0)).toBe(true)
   })
 
+  it('새 해 0x6e0c 는 CPU 아홉 팀의 장비 니블을 굴린다 (0x665e8 — 3년차면 타자 0번 부위 0 · 3번 부위 1 · 투수 둘)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    const 내명단 = result.current.roster
+
+    act(() => result.current.actions.finishSeason())
+
+    expect(result.current.state?.record.yearIndex).toBe(2)
+    for (let team = 1; team < 10; team += 1) {
+      const roster = result.current.cpuRosterOf(team)
+      // r4 = 3: 0xd0ada[0] = 0 · 0xd0abb[1] = 0 → 니블 = 0 + rand(0, 2) + 1
+      expect([1, 2]).toContain(roster.batters[0]?.equipment?.[0])
+      expect([1, 2]).toContain(roster.batters[3]?.equipment?.[1])
+      expect(roster.batters[1]?.equipment).toBeUndefined()
+    }
+    expect(result.current.roster).toEqual(내명단)
+  })
+
   it('한국시리즈 보상은 결산을 닫는 그 자리에서 더한다 — [197] 이 닫힐 때 0x85ec 가 더하고 곧장 0x87b4', () => {
     const { result } = 띄우기()
     시작(result, 0)
