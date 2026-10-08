@@ -327,6 +327,8 @@ function defenseOf(pitching: MissionCpuPitching, lead: number): HalfInningDefens
     abilitySumAt: (slot) =>
       pitcherAbilitySumOf(masterAt(slot).ability.map((value) => Math.min(999, Math.max(0, value)))),
     isSpecialPitcherAt: isAce,
+    // 소모 0xa5e14 의 비트 18 · 10 — 마스터 줄 +0x14 (Xls 행 사본). 마투수 소모는 세션이 든다
+    skillBitsAt: (slot) => masterPitcherRowAt(pitching, slot)?.skillBits ?? 0,
   }
 }
 

@@ -470,6 +470,8 @@ function defenseOf(
     // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
     // 마무리 굴림 0xac360 을 지나고(CPU 끼리라 0xb6c20 이 늘 거짓), 0xabfcc 는 고르지 않는다(ac084)
     isSpecialPitcherAt: (slot) => slot === ACE_PITCHER_SLOT && acePitcher !== undefined,
+    // 공 하나 소모 0xa5e14 의 비겁자(비트 18) · 끈기(비트 10) — 레코드 +0x14. 마투수 다섯 줄은 두 비트가 모두 0 이다(XlsACE_PIT_DATA 행 바이트 0x14~0x17)
+    skillBitsAt: (slot) => (slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? 0 : rowAt(slot).skillBits),
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합. 마투수는 0xabfcc 가 거르므로
     // 그 칸 값은 쓰이지 않는다 — 레벨 배율 먹은 네 칸을 그대로 둔다
     abilitySumAt: (slot) =>

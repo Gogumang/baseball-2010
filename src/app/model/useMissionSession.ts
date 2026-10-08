@@ -297,6 +297,7 @@ export function missionOpponentStaminaAfterPitch(
   const cost = pitchStaminaCostOf({
     pitchTypeNumber,
     batterIntimidates: batterSkillIds.includes(INTIMIDATE_SKILL_ID),
+    // 0xb62b4(마투수, 18) · (마투수, 10) — 마투수 다섯 줄 +0x14 는 두 비트가 모두 0 (XlsACE_PIT_DATA 행 바이트 0x14~0x17)
     pitcherIsCoward: false,
     pitcherEndures: false,
   })

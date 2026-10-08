@@ -271,6 +271,12 @@ export interface HalfInningDefense {
    * 0xb8a8d 가 참이라 마무리 굴림 0xac360 을 지난다. 0xabfcc 는 마선수를 고르지 않는다. 안 넘기면 아무도 아니다.
    */
   readonly isSpecialPitcherAt?: (pitcherSlot: number) => boolean
+  /**
+   * 그 칸 투수 레코드의 장착 스킬 비트 `+0x14` (u32) — 공 하나 소모 0xa5e14 가 `0xb62b4(투수, 18)`(비겁자 ×2, a5f30) ·
+   * `0xb62b4(투수, 10)`(끈기 −1, a5f52)로 본다. 붙박이 팀 줄이면 Xls 행 그대로(0x1ff98 사본 — 표 `RosterPlayer.skillBits`).
+   * 안 넘기면 0(둘 다 거짓)이다.
+   */
+  readonly skillBitsAt?: (pitcherSlot: number) => number
 }
 
 /** `roleAt` 을 안 넘긴 길 — 보직을 모른다 */
@@ -751,10 +757,16 @@ export function drainQuickPitcher(
   return stamina
 }
 
+/** 0xa5f30 `movs r1, #0x12` — 투수 스킬 18 비겁자 */
+const COWARD_SKILL_BIT = 18
+/** 0xa5f52 `movs r1, #0xa` — 투수 스킬 10 끈기 */
+const ENDURE_SKILL_BIT = 10
+
 /**
  * **공 하나**의 스태미나 소모 (0xa5e14 의 0xa5f0e~ → 0xaeb08) — 구질을 아는 사람 타석용.
- * c = 0x66ef0(구질), 타자 스킬 22 압도(`0xb62b4(현재 타자, 22)`)면 ×2.
- * 상대 CPU 투수의 스킬 18 비겁자·10 끈기는 웹 로스터에 스킬 비트(+0x14)가 없어 늘 거짓이다.
+ * c = 0x66ef0(구질), 타자 스킬 22 압도(`0xb62b4(현재 타자, 22)`, a5f12) 또는 투수 비트 18 비겁자(`0xb62b4(0xae83c(수비 팀), 18)`,
+ * a5f32)면 ×2, 투수 비트 10 끈기(a5f56)면 −1 — 투수 비트는 그 레코드 +0x14 (`defense.skillBitsAt`, 안 넘기면 둘 다 거짓).
+ * 붙박이 투수 120 줄에서 비트 18 은 아무도 없고 비트 10 은 열두 줄이다(XlsPITCHER_DATA 행 바이트 0x14~0x17).
  * 용량 X 는 `drainQuickPitcher` 와 같다 (사기·첫 투수 보너스, 0x66e44).
  */
 export function drainPitcherForPitch(
@@ -768,11 +780,12 @@ export function drainPitcherForPitch(
     defense.morale ?? 100,
     mound.usedSlots.length === 0,
   )
+  const skillBits = defense.skillBitsAt?.(mound.pitcherSlot) ?? 0
   const cost = pitchStaminaCostOf({
     pitchTypeNumber,
     batterIntimidates,
-    pitcherIsCoward: false,
-    pitcherEndures: false,
+    pitcherIsCoward: ((skillBits >>> COWARD_SKILL_BIT) & 1) === 1,
+    pitcherEndures: ((skillBits >>> ENDURE_SKILL_BIT) & 1) === 1,
   })
   return consumeStamina(mound.stamina, cost, capacity)
 }

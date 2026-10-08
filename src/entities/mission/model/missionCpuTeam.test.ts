@@ -19,7 +19,8 @@ import {
 } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
-import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import { FULL_STAMINA, consumeStamina, staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import { drainPitcherForPitch } from '@/entities/game/model/simulateHalfInning'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
@@ -299,5 +300,32 @@ describe('투수 미션의 지금 CPU 타자 — 0xae89c(공격 팀) = 타순 te
 
   it('타자 미션은 CPU 공격 팀이 없어 null', () => {
     expect(missionCpuBatterOf(startMissionCpuTeam(missionOf('타자', 1)))).toBeNull()
+  })
+})
+
+describe('투수 소모의 비겁자(비트 18) · 끈기(비트 10) — 0xa5e14 a5f32 · a5f56 가 그 레코드 +0x14 를 본다', () => {
+  const mound = { pitcherSlot: 0, stamina: FULL_STAMINA, runsAllowed: 0, pitches: 0, usedSlots: [], justChanged: false }
+  const defenseWith = (skillBits: number) => ({
+    mound,
+    pitcherSlots: [0],
+    pitcherAt: () => ({ control: 500, velocity: 500, stamina: 500, skillIds: [] }),
+    staminaAbilityAt: () => 500,
+    lead: 0,
+    skillBitsAt: () => skillBits,
+  })
+  // 용량 X = 500 + 200(첫 투수) + 250 = 950 — 소모 c 는 consumeStamina(…, c, X)
+  const drop = (skillBits: number) => FULL_STAMINA - drainPitcherForPitch(defenseWith(skillBits), mound, 1, false)
+
+  it('끈기면 직구 소모 9 − 1, 비겁자면 9 × 2, 둘 다면 2c − 1', () => {
+    expect(drop(1 << 10)).toBe(FULL_STAMINA - consumeStamina(FULL_STAMINA, 8, staminaCapacityOf(500, 100, true)))
+    expect(drop(1 << 18)).toBe(FULL_STAMINA - consumeStamina(FULL_STAMINA, 18, staminaCapacityOf(500, 100, true)))
+    expect(drop((1 << 18) | (1 << 10))).toBe(FULL_STAMINA - consumeStamina(FULL_STAMINA, 17, staminaCapacityOf(500, 100, true)))
+    expect(drop(0)).toBe(FULL_STAMINA - consumeStamina(FULL_STAMINA, 9, staminaCapacityOf(500, 100, true)))
+  })
+
+  it('붙박이 투수 120 줄 — 끈기 줄은 열둘, 비겁자 줄은 없다 (XlsPITCHER_DATA 행 바이트 0x14~0x17)', () => {
+    const rows = Array.from({ length: 15 }, (_unused, teamId) => teamPitchers(teamId)).flat()
+    expect(rows.filter((row) => ((row.skillBits >>> 10) & 1) === 1)).toHaveLength(12)
+    expect(rows.filter((row) => ((row.skillBits >>> 18) & 1) === 1)).toHaveLength(0)
   })
 })
