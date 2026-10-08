@@ -402,6 +402,25 @@ describe('selectPitch 실투 판정 0x33cbc — 사람이 칠 때도 CPU 공마�
     const 압도경계 = Array.from({ length: 100 }, (_, roll) => roll).find((roll) => !결과(roll, true)) ?? 100
     expect(압도경계 - 경계).toBe(5)
   })
+
+  it('투수 레코드 +0x14 비트 22 냉정은 실투율 −10 — 투수 `skillBits` 를 0x33dce 가 본다', () => {
+    const seed = createSeededRandom(77)
+    const 처음 = 기록난수(() => seed.rand(0, 0x40000000) / 0x40000000)
+    const 공1 = selectChoice(투수(60), 상황, 처음.random)
+    if (공1.kind !== '투구') throw new Error('견제')
+    const 마지막 = 처음.values.length - 1
+    // 구속을 낮추고 압도(+5)를 함께 걸어 p 가 10 을 넘게 한다 — 0 아래로 잘리지 않는다
+    const 결과 = (roll: number, skillBits: number) => {
+      const 재생 = [...처음.values]
+      const { random } = 기록난수(() => 재생.shift() ?? 0, new Map([[마지막, roll / 100]]))
+      const choice = selectChoice({ ...투수(60), velocity: 1, skillBits }, 상황, random, 'hard', undefined, undefined, true)
+      return choice.kind === '투구' && choice.isMistakePitch
+    }
+    const 경계 = Array.from({ length: 100 }, (_, roll) => roll).find((roll) => !결과(roll, 0)) ?? 100
+    const 냉정경계 = Array.from({ length: 100 }, (_, roll) => roll).find((roll) => !결과(roll, 1 << 22)) ?? 100
+    expect(경계).toBeGreaterThan(10)
+    expect(경계 - 냉정경계).toBe(10)
+  })
 })
 
 describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {

@@ -1764,6 +1764,19 @@ function pitcherSkillFlagsAt(
   }
 }
 
+/** 실투 판정 0x33cbc 의 투수 비트 — 33d7a 16 안정감 · 33daa 17 새가슴 · 33dce 22 냉정 */
+function mistakeSkillFlagsOf(bits: number): {
+  readonly pitcherIsSteady: boolean
+  readonly pitcherIsTimid: boolean
+  readonly pitcherIsCool: boolean
+} {
+  return {
+    pitcherIsSteady: ((bits >>> 16) & 1) === 1,
+    pitcherIsTimid: ((bits >>> 17) & 1) === 1,
+    pitcherIsCool: ((bits >>> 22) & 1) === 1,
+  }
+}
+
 /** 투수 명단 한 칸의 경기용 능력치 네 칸 (제구·구속·변화·체력) */
 function pitcherAbilitiesAt(
   progress: TeamGameProgress,
@@ -1823,6 +1836,8 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
       pitchMask: repertoire.pitchMask,
       magicId: repertoire.magicId,
     },
+    // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (`TeamEntryPitcher.skillBits`, 마투수 0)
+    ...(entry?.skillBits === undefined ? {} : { skillBits: entry.skillBits }),
   }
 }
 
@@ -2481,11 +2496,10 @@ function pitchOnce(
       effectiveVelocity: stats.velocity,
       runnerCount: runnerCountOf(progress.game.bases),
       hasSecondBaseRunner: progress.game.bases.second,
-      // 웹 로스터·마선수 표에 스킬 비트(+0x14)가 없어 타자 22 · 투수 16·17·22 를 늘 거짓으로 둔다
+      // 상대 타자의 스킬 22(0xb62b4)는 아직 안 싣는다 — 늘 거짓
       batterIntimidates: false,
-      pitcherIsSteady: false,
-      pitcherIsTimid: false,
-      pitcherIsCool: false,
+      // 우리 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (`TeamEntryPitcher.skillBits`, 마투수 0)
+      ...mistakeSkillFlagsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)?.skillBits ?? 0),
     },
     random,
   )

@@ -227,6 +227,8 @@ describe('타자 미션 마운드의 마스터 줄 투수 — 투구 엔진 입�
       gameAbility: { beforeFatigue: { control: row.ability[0], velocity: row.ability[1], breaking: row.ability[2] } },
       staminaPercent: 100,
       repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId },
+      // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22
+      skillBits: row.skillBits,
     })
     // 공마다 깎인 그 줄의 +0x2c 가 체력%(0xaebb0)로 들어간다
     let thrown = team

@@ -60,6 +60,12 @@ const MISTAKE_PITCH_FRAMES_FASTBALL = 18
 const MISTAKE_PITCH_FRAMES = 20
 const FASTBALL_TYPE_NUMBER = 1
 
+/** 실투 판정 0x33cbc 가 보는 투수 스킬 비트 — 33d7a 16 안정감 · 33daa 17 새가슴 · 33dce 22 냉정 (`mistakePitch` 머리말) */
+const STEADY_SKILL_BIT = 16
+const TIMID_SKILL_BIT = 17
+const COOL_SKILL_BIT = 22
+const hasSkillBit = (bits: number | undefined, bit: number) => (((bits ?? 0) >>> bit) & 1) === 1
+
 /** 마구 이름을 못 고를 때 쓰는 글자 — `features/play-pitcher-game` 의 사람 투구와 같은 대체값 */
 const MAGIC_PITCH_NAME = '마구'
 
@@ -281,10 +287,10 @@ export function releaseCpuPitch(
       runnerCount: situation.runnerCount,
       hasSecondBaseRunner: situation.hasSecondBaseRunner === true,
       batterIntimidates,
-      // 상대 CPU 투수의 스킬 비트(+0x14)를 웹 로스터·마선수 표가 들고 있지 않아 16·17·22 는 늘 거짓이다
-      pitcherIsSteady: false,
-      pitcherIsTimid: false,
-      pitcherIsCool: false,
+      // 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (0xb62b4) — 부르는 쪽이 안 실으면(마선수) 0
+      pitcherIsSteady: hasSkillBit(pitcher.skillBits, STEADY_SKILL_BIT),
+      pitcherIsTimid: hasSkillBit(pitcher.skillBits, TIMID_SKILL_BIT),
+      pitcherIsCool: hasSkillBit(pitcher.skillBits, COOL_SKILL_BIT),
     },
     random,
   )

@@ -319,6 +319,8 @@ export function missionCpuMoundPitcherAbilityOf(team: MissionCpuTeam): PitcherAb
     ...(repertoire === undefined
       ? {}
       : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+    // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (마스터 줄 = Xls 행 사본)
+    skillBits: row.skillBits,
   }
 }
 
