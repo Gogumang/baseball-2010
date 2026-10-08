@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
-import type { MenuItem } from '@/shared/ui'
+import { Hint, Panel, PixelScreen } from '@/shared/ui'
 import { goalsOf } from '@/entities/mission/model/missionGoal'
 import { GoalBar } from '@/entities/mission/ui/GoalBar'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
+import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
+import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
@@ -53,6 +54,11 @@ const MISSION_PITCHER_MODE = 5
 interface PitchingScreenProps {
   readonly run: PitcherRun
   readonly repertoire: readonly PitchTypeInfo[]
+  /**
+   * `repertoire` 항목마다 구질 칸 번호 0~5 (0xb6d2c, `modePitchSlotNumbersOf`) — 구질 키 0x534d8 이 이 칸을 고른다.
+   * 안 넘기면 항목 차례를 칸으로 본다.
+   */
+  readonly repertoireSlots?: readonly number[]
   /** 환경설정 [투구] 가 게이지일 때만 3단계 게이지가 뜬다 (설정 +0x2d, 0x3f500) */
   readonly usesGauge: boolean
   readonly atBat: AtBatState
@@ -130,6 +136,7 @@ interface PitchingScreenProps {
 export function PitchingScreen({
   run,
   repertoire,
+  repertoireSlots,
   usesGauge,
   atBat,
   bannerText,
@@ -308,15 +315,16 @@ export function PitchingScreen({
   const isBlockedMagic = (type: PitchTypeInfo): boolean =>
     magicRemaining !== undefined && isMagicType?.(type) === true && magicRemaining <= 0
 
-  const typeItems: MenuItem[] = repertoire.map((type) => ({
-    id: type.name,
-    label: type.name,
+  const slotChoices: PitchSlotChoice[] = repertoire.map((type, index) => ({
+    slot: repertoireSlots?.[index] ?? index,
+    name: type.name,
     detail:
       isMagicType?.(type) === true && magicRemaining !== undefined
         ? `마구 · 남은 ${magicRemaining}회${magicRemaining <= 0 ? ' (못 던짐)' : ''}`
         : `구속 ${Math.round(type.speed * 100)} · 변화 ${Math.round(
             (Math.abs(type.horizontalBreak) + Math.abs(type.verticalBreak)) * 100,
           )}`,
+    isBlocked: isBlockedMagic(type),
   }))
 
   return (
@@ -388,10 +396,10 @@ export function PitchingScreen({
       {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && (
         <>
           <Panel heading="1. 구질 선택" />
-          <MenuList
-            items={typeItems}
-            onSelect={(id) => {
-              const found = repertoire.find((type) => type.name === id)
+          <PitchSlotPicker
+            choices={slotChoices}
+            onDecide={(chosen) => {
+              const found = repertoire[slotChoices.findIndex((choice) => choice.slot === chosen)]
               if (found === undefined || isBlockedMagic(found)) return
               setPitchType(found)
               setPhase('코스')

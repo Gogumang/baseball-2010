@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
-import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
@@ -71,6 +70,8 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 // 투수 조작 부품 두 개는 투수편 화면이 이미 원본 규칙대로 만들어 둔 것을 **그대로 빌려 쓴다**
 // (같은 상태 0x10·0x11 의 조작이라 화면을 따로 만들 이유가 없다).
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
+import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
+import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
@@ -918,10 +919,10 @@ export function TeamGameScreen({
                 {(game.bases.first || game.bases.second || game.bases.third) && (
                   <Hint>견제 3·1·7 (1·2·3루)</Hint>
                 )}
-                <MenuList
-                  items={slotItems(progress.magicRemaining, pitchSlotsFor(progress))}
-                  onSelect={(id) => {
-                    const found = pitchSlotsFor(progress).find((candidate) => slotIdOf(candidate) === id)
+                <PitchSlotPicker
+                  choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
+                  onDecide={(chosen) => {
+                    const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                     if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
                     setSlot(found)
                     setPhase('코스')
@@ -1115,19 +1116,16 @@ function PinchHitWindow({ entry, currentSlot, benchIndexes, abilitiesOf, onSelec
   )
 }
 
-function slotIdOf(slot: PitchSlot): string {
-  return `${slot.slot}-${slot.typeNumber}`
-}
-
-/** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7) */
-function slotItems(magicRemaining: number, slots: readonly PitchSlot[]): MenuItem[] {
+/** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7). 빈 칸(구질 0)은 그리지 않는다 */
+function slotChoices(magicRemaining: number, slots: readonly PitchSlot[]): PitchSlotChoice[] {
   return slots
     .filter((slot) => slot.typeNumber !== 0)
     .map((slot) => ({
-      id: slotIdOf(slot),
-      label: slot.name,
-      detail: slot.isMagic
-        ? `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}`
-        : undefined,
+      slot: slot.slot,
+      name: slot.name,
+      ...(slot.isMagic
+        ? { detail: `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}` }
+        : {}),
+      isBlocked: !canSelectSlot(slot, magicRemaining),
     }))
 }

@@ -100,6 +100,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
     const index = COMMAND_SLOTS.findIndex((slot) => slot.id === kind)
     open('main', null)
     setMainCursor(nariMainCursorOnEntry(index, props.career.hasActedThisCycle, kind === '아이템'))
+    props.onReenter?.()
   }
 
   /*

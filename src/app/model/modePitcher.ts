@@ -193,3 +193,13 @@ export function modePitchMenuOf(pitcher: ModePitcher, magicRemaining = 0): reado
     })
     .filter((type): type is PitchTypeInfo => type !== undefined)
 }
+
+/**
+ * `modePitchMenuOf` 의 항목마다 구질 칸 번호 0~5 (0xb6d2c) — 빈 칸을 걸러 낸 메뉴라 칸과 차례가 어긋날 수 있다.
+ * 구질 키 0x534d8(OK → 0 · '2' → 1 · '4' → 2 · '6' → 3 · '8' → 4 · '0' → 5)가 이 칸을 고른다.
+ */
+export function modePitchSlotNumbersOf(pitcher: ModePitcher): readonly number[] {
+  return pitchSlotsOf(pitcher.repertoire)
+    .filter((slot) => slot.typeNumber !== 0)
+    .map((slot) => slot.slot)
+}

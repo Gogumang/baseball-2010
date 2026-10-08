@@ -429,7 +429,20 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
     act(() => rendered.result.current.setScreen({ kind: '외출' }))
     act(() => rendered.result.current.setScreen({ kind: '관리' }))
+    // 진입 곁가지에 500 은 없고, 같은 진입의 자동 훑기 0x1cf9c 가 다음 trigger 0 이벤트를 튼다
+    expect(rendered.result.current.screen).not.toEqual({ kind: '이벤트', eventId: 500, context: '관리' })
+  })
+
+  it('105 진입마다 자동 훑기 — 상점(111 → 110)에서 돌아오면 안 훑고, 하위 메뉴 취소(106 · 107 · 110 → 105)면 훑는다 (0x1cdec 1ce02 · 0x1cf9c)', async () => {
+    const rendered = 띄우기({ ...createCareer('훑기'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen.kind).toBe('이벤트'))
+    const firstEvent = rendered.result.current.screen
+    act(() => rendered.result.current.setScreen({ kind: '아이템', tab: '장착' }))
+    act(() => rendered.result.current.setScreen({ kind: '관리' }))
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    act(() => rendered.result.current.session.actions.reenterManagement())
+    expect(rendered.result.current.screen).toEqual(firstEvent)
   })
 
   it('관리 화면에서 연 이벤트가 첫 종류 21 로 끝나도(뒤 ≠ 113) 141 — 번호는 0xa3a85 판정', () => {

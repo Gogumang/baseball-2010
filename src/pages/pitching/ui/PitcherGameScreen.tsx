@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
-import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -27,6 +26,8 @@ import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSc
 import { pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
 import type { PitcherMatchupRecords } from '@/pages/pitching/lib/pitcherMatchupCards'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
+import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
+import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
@@ -72,7 +73,7 @@ import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
  *
  * 원본 경기 장면의 사람 조작 세 단계를 그대로 따른다 (I-controls 0절 · R10 2절):
- *   0xf  구질 고르기 — (2)(4)OK(6)(8) 다섯 자리 + '0' 마구
+ *   0xf  구질 고르기 — (2)(4)OK(6)(8) 다섯 자리 + '0' 마구, 틱 8 뒤 넘김 (`PitchSlotPicker`)
  *   0x10 코스 고르기 — 방향키
  *   0x11 게이지 — OK 한 번, 틱 10 에 놓는다 (환경설정 "투구 게이지" 가 꺼져 있으면 이 단계가 없다)
  * 그리고 0xe·0xf 에서 `#` 를 누르면 "그만 던지시겠습니까?"(StrGAME[104]) 가 뜬다.
@@ -732,10 +733,10 @@ export function PitcherGameScreen({
         {!asksGiveUp && !isPopupOpen && canPitch && !isAwaitingConfirm && phase === '구질' && (
           <>
             <Panel heading="1. 구질 선택" />
-            <MenuList
-              items={slotItems(progress.magicRemaining, pitchSlotsFor(progress))}
-              onSelect={(id) => {
-                const found = pitchSlotsFor(progress).find((candidate) => slotIdOf(candidate) === id)
+            <PitchSlotPicker
+              choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
+              onDecide={(chosen) => {
+                const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                 if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
                 setSlot(found)
                 setPhase('코스')
@@ -817,19 +818,16 @@ export function PitcherGameScreen({
   )
 }
 
-function slotIdOf(slot: PitchSlot): string {
-  return `${slot.slot}-${slot.typeNumber}`
-}
-
-/** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7) */
-function slotItems(magicRemaining: number, slots: readonly PitchSlot[]): MenuItem[] {
+/** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7). 빈 칸(구질 0)은 그리지 않는다 */
+function slotChoices(magicRemaining: number, slots: readonly PitchSlot[]): PitchSlotChoice[] {
   return slots
     .filter((slot) => slot.typeNumber !== 0)
     .map((slot) => ({
-      id: slotIdOf(slot),
-      label: slot.name,
-      detail: slot.isMagic
-        ? `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}`
-        : undefined,
+      slot: slot.slot,
+      name: slot.name,
+      ...(slot.isMagic
+        ? { detail: `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}` }
+        : {}),
+      isBlocked: !canSelectSlot(slot, magicRemaining),
     }))
 }

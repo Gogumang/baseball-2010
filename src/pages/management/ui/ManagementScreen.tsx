@@ -69,6 +69,8 @@ export interface ManagementScreenProps {
   readonly onEquipSkill?: (skillId: number, on: boolean) => void
   /** 같은 창의 슬롯 확장 — 대화 번호 6 (0x1484c) */
   readonly onExpandSkillSlots?: () => void
+  /** 하위 메뉴 106 · 107 · 110 취소로 105 에 다시 들어온다 — 세션이 진입 0x11910 · 자동 훑기 0x1cf9c 를 돈다 */
+  readonly onReenter?: () => void
   /** 메인 메뉴로 나간다. 진행 상황은 이미 저장되어 있다. */
   readonly onExit: () => void
   /**

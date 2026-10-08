@@ -12,13 +12,20 @@ import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+/** 경기 장면 틱 n 개를 흘린다 */
+const 틱 = (n: number) => act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * n))
 
 /** 미션 메뉴의 마구 칸처럼 구속·변화 0 인 항목 (`modePitchMenuOf` 와 같은 모양) */
 const 마구칸: PitchTypeInfo = { name: '스카이 포크 (남은 0회)', horizontalBreak: 0, verticalBreak: 0, speed: 0, flightSteps: [] }
 const 직구 = PITCH_TYPES[0]!
 
 function 띄우기(magicRemaining: number | undefined) {
+  vi.useFakeTimers()
   const onThrow = vi.fn()
   render(
     <PitchingScreen
@@ -51,6 +58,7 @@ describe('투수 미션 투구 화면의 마구 칸 (0x50db8)', () => {
     띄우기(0)
     expect(screen.getByText(/못 던짐/)).toBeTruthy()
     fireEvent.click(screen.getByText(마구칸.name))
+    틱(8)
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
     expect(screen.queryByText(/2\. 코스 선택/)).toBeNull()
   })
@@ -60,24 +68,28 @@ describe('투수 미션 투구 화면의 마구 칸 (0x50db8)', () => {
     expect(screen.queryByText(/못 던짐/)).toBeNull()
     expect(screen.getByText('마구 · 남은 2회')).toBeTruthy()
     fireEvent.click(screen.getByText(마구칸.name))
+    틱(8)
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
   })
 
   it('남은 0 이어도 다른 구질은 그대로 고를 수 있다', () => {
     띄우기(0)
     fireEvent.click(screen.getByText(직구.name))
+    틱(8)
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
   })
 
   it('남은 횟수를 안 넘기면(예전 부르는 쪽) 막지 않는다', () => {
     띄우기(undefined)
     fireEvent.click(screen.getByText(마구칸.name))
+    틱(8)
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
   })
 })
 
 describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x53548 로 넘긴다', () => {
   function 견제띄우기() {
+    vi.useFakeTimers()
     const onPickoffKey = vi.fn()
     render(
       <PitchingScreen
@@ -111,6 +123,7 @@ describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x5
   it('코스 고르기(상태 0x10)로 넘어가면 받지 않는다', () => {
     const onPickoffKey = 견제띄우기()
     fireEvent.click(screen.getByText(직구.name))
+    틱(8)
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
     fireEvent.keyDown(window, { key: '3' })
     expect(onPickoffKey).not.toHaveBeenCalled()

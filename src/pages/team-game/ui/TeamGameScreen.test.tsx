@@ -39,6 +39,12 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+/** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 코스 고르기(0x10)로 넘어간다 (0x39c1c) */
+const 구질고르기 = (name: string) => {
+  fireEvent.click(screen.getByText(name))
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8))
+}
+
 const 기본옵션: TeamGameOptions = {
   mode: 2,
   ourTeamId: 0,
@@ -70,16 +76,20 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 
-  it('구질을 고르면 코스 고르기로 넘어간다 (상태 0x10)', () => {
+  it('구질을 고르면 0xf 의 틱 8 에 코스 고르기로 넘어간다 (상태 0x10, 0x39c1c)', () => {
     띄우기()
     fireEvent.click(screen.getByText('FASTBALL'))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 7))
+    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
 
     expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
   })
 
   it('코스 고르기에서 CLR 이면 구질 고르기로 돌아간다 (상태 0x10 → 0xf, 0x50ee6)', () => {
     띄우기()
-    fireEvent.click(screen.getByText('FASTBALL'))
+    구질고르기('FASTBALL')
+    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
     fireEvent.keyDown(window, { key: 'Escape' })
 
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
@@ -88,7 +98,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
 
   it('게이지 설정이 꺼져 있으면 코스를 확정하는 순간 던진다 (원본 기본값)', () => {
     띄우기({}, 1) // 첫 공이 타구가 안 되는 씨앗 (경기 시작 rand(0, 2) 가 차례를 한 칸 민다)
-    fireEvent.click(screen.getByText('FASTBALL'))
+    구질고르기('FASTBALL')
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
@@ -97,7 +107,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
 
   it('게이지를 켜면 투구 결정 단계가 뜬다 (상태 0x11)', () => {
     띄우기({ gaugeSettingOn: true })
-    fireEvent.click(screen.getByText('FASTBALL'))
+    구질고르기('FASTBALL')
     fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
 
     expect(screen.getByText('3. 투구 결정')).toBeTruthy()
@@ -121,7 +131,7 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
       // 새 타자면 0xe 에서 OK 부터
       OK통과()
       if (screen.queryByText('1. 구질 선택') === null) break
-      fireEvent.click(screen.getByText('FASTBALL'))
+      구질고르기('FASTBALL')
       fireEvent.click(screen.getAllByRole('button', { name: /[◎·]/ })[0])
     }
 

@@ -339,6 +339,12 @@ interface CareerSessionInput {
 
 const NO_STAT = () => {}
 
+/**
+ * 여기서 '관리' 로 돌아오는 것은 105 진입이 아니다 — 111 상점 취소는 110 · 121 장비착용 취소는 106 하위 메뉴로 선다
+ * (`nariReturnSubMenuOf`). '성적' 은 106 칸을 근사한 웹 임시 화면이다.
+ */
+const NOT_MANAGEMENT_ENTRY_FROM: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>(['아이템', '성적'])
+
 /** 처음부터 열린 마선수 — 저장 +0x30 · +0x35 (`normalizeAceOpenSave` 가 늘 켠다) */
 const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
   pitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
@@ -1031,10 +1037,36 @@ export function useCareerSession({
     [story.events],
   )
   /**
-   * 관리 화면에 들어설 때 trigger 0 이벤트를 본다. 경기를 마치고 들어올 때만 무작위 조건(질병)을 굴리고,
-   * 이벤트 뒤 이어서 볼 때는 굴리지 않는다 — 반복 이벤트가 연달아 나오지 않게.
+   * **105 진입 한 번** — 서 있으면 아래 고리가 진입 곁가지(0x11910)와 자동 훑기(0x1cf9c)를 한 번 돈다.
+   * 상태 틀 0x1cdec 는 0xbc9c9(이번 틀에 상태가 바뀌었나)가 거짓이면 곧장 0x1d06a 로 가(0x1ce02~0x1ce0c) 진입 · 자동 훑기를
+   * **상태가 105 로 바뀐 틀에만** 한다 — 105 에 머무는 틀에는 훑지 않는다. 그리고 바뀐 틀이면 **어디서 왔든** 훑고, 훑기
+   * 0x8be80 은 늘 무작위 조건(22 질병 · 20 스킬 획득 확률)까지 굴린다. 그래서 경기 · 이벤트 끝 · 새 시즌 · 이어하기뿐 아니라
+   * 훈련 결과 창(125, 0x1b5b8) · 휴식(127, 0x1b466) · 외출 효과(126, 0x158fa) · 외출 지도 취소(112) · 장소 끝(113) ·
+   * 순위표 취소(109) · 하위 메뉴 취소(106 · 107 · 110)에서 돌아올 때도 `0xbcb49(0x69)` 로 105 에 다시 들어와 굴린다.
+   * 훑기를 건너뛰는 것은 진입이 114 · 115 를 예약한 때(0x1cfdc — 연초 115 · 부상 엔딩 500)와 새 선수 · 대결 대기뿐이다(아래).
+   *
+   * 웹은 화면이 '관리' 로 바뀐 것을 진입으로 본다. 단 상점(111 취소 → 110 · 121 취소 → 106, `nariReturnSubMenuOf`)과 웹 임시
+   * 화면 '성적'(106 칸)은 하위 메뉴로 돌아오는 길이라 105 진입이 아니다. 화면이 '관리' 인 채 105 에 다시 들어오는 길(하위 메뉴
+   * 취소 · 훈련 · 휴식 결과 창 닫기 · 필살타법 알림 닫기)은 `reenterManagement` 가 센다.
    */
-  const [managementCheck, setManagementCheck] = useState<'무작위포함' | '고정' | null>(null)
+  const [managementReentryCount, setManagementReentryCount] = useState(0)
+  const reenterManagement = useCallback(() => setManagementReentryCount((count) => count + 1), [])
+  /** 필살타법 결과 알림(125 의 알림 창)이 떠 있다 — 닫히면 105 진입 */
+  const specialSwingNoticeRef = useRef(false)
+  const managementEntryRef = useRef({ kind: screen.kind, reentryCount: managementReentryCount, isPending: false })
+  {
+    const seen = managementEntryRef.current
+    if (seen.kind !== screen.kind || seen.reentryCount !== managementReentryCount) {
+      const isArrival = seen.kind !== screen.kind && !NOT_MANAGEMENT_ENTRY_FROM.has(seen.kind)
+      const isReentry = seen.reentryCount !== managementReentryCount
+      managementEntryRef.current = {
+        kind: screen.kind,
+        reentryCount: managementReentryCount,
+        isPending: screen.kind === '관리' && (seen.isPending || isArrival || isReentry),
+      }
+    }
+  }
+  const isManagementEntry = screen.kind === '관리' && managementEntryRef.current.isPending
   /**
    * **칭호 팝업 하나** — 관리 장면 this+0x270 (줄 칭호 번호, −1 = 없음). 판정 0x1a1c0 은 관리 장면 갱신 0x1aec4 끝
    * (0x1af90~0x1afc2)에서 `this+0x274 == 1`(관리 화면 105 에 들어와 두 번째 갱신 — 진입 0x11c64 가 0 으로 둔다)이고
@@ -1043,7 +1075,7 @@ export function useCareerSession({
    * 원본은 105 에 머무는 동안 커리어가 바뀌지 않는다(훈련·휴식·상점·외출은 다른 상태로 갔다 105 로 다시 들어온다).
    * 웹은 훈련 결과 따위를 관리 화면 위 알림으로 보이므로 "105 에 있고 진입 이벤트 검사가 끝났으면" 늘 판정한 값으로 둔다.
    */
-  const pendingTitle = screen.kind === '관리' && managementCheck === null && career !== null ? nextTitleOf(career) : null
+  const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? nextTitleOf(career) : null
   // 저장을 불러오면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60) — 이벤트 본문이 도착한 뒤에
   const [shouldForgetRepeatable, setShouldForgetRepeatable] = useState(false)
   useEffect(() => {
@@ -1051,11 +1083,9 @@ export function useCareerSession({
     setShouldForgetRepeatable(false)
     setCareer(forgetRepeatableEvents(career, story.events))
   }, [shouldForgetRepeatable, career, story.events])
-  /** 연초 115 를 연 105 진입의 검사 종류 — 114 가 끝나 105 로 다시 들어올 때 같은 진입 갈래(138 · 훑기)를 잇는다 */
-  const yearStartCheckRef = useRef<'무작위포함' | '고정'>('고정')
   useEffect(() => {
-    if (managementCheck === null || screen.kind !== '관리' || career === null || story.events === null) return
-    setManagementCheck(null)
+    if (!isManagementEntry || !managementEntryRef.current.isPending || career === null || story.events === null) return
+    managementEntryRef.current = { ...managementEntryRef.current, isPending: false }
     /*
      * **새 선수 오프닝 451 이 115 보다 먼저다** (모드 3·4 공용). 진입 0x11910 이 0x11bd6 에서 `0xbcb49(115)` 로 예약해도,
      * 같은 틀에 상태 틀 0x1cdec 가 진입(점프표 0xcc728) 뒤 곧장 자동 발동 0x1cf9c 로 떨어지고, 거기 1cfa6 이
@@ -1086,40 +1116,21 @@ export function useCareerSession({
      * 1b8807f 앞의 옛 저장은 이 칸이 늘 거짓이라 불러온 뒤 한 번 더 115 를 본다 — 원본과의 차이 판단은 `hasSeenYearGoalWindow` 주석.
      */
     if (!career.hasSeenYearGoalWindow) {
-      yearStartCheckRef.current = managementCheck
       if (career.removedMinusSkillIds.length > 0) setCareer({ ...career, removedMinusSkillIds: [] })
       return setScreen({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' })
     }
-    // 경기 뒤에는 타순 이벤트가 먼저다 (0x11910 → 상태 138)
-    const orderEventId = managementCheck === '무작위포함' ? battingOrderEventId(career) : null
-    if (orderEventId !== null) return setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
-    const event = story.eventFor(career, EVENT_TRIGGER.관리, managementCheck === '무작위포함' ? random : undefined)
-    if (event !== null) setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
-  }, [managementCheck, screen.kind, career, story, random, setScreen])
+    /*
+     * 타순 138 — 진입 곁가지 끝 `r4 = 0xa4c2d(S) > 0` 이면 `0xbcb49(138)` 예약(경기 뒤만이 아니라 105 진입마다). 그런데 같은 틀의
+     * 자동 훑기는 다음 상태가 114 · 115 일 때만 건너뛰어(1cfdc) 138 예약 위에서도 돌고, 찾으면 `[다음 114, 뒤 105]` 로 예약을
+     * 덮는다(1d03a~1d048). 그래서 **훑기가 먼저**이고 138 은 훑기가 빈 진입에서만 선다(덮인 138 은 이벤트 뒤 105 재진입이 다시 세운다).
+     * 훑기 0x8be80 은 늘 무작위 조건까지 굴린다.
+     */
+    const orderEventId = battingOrderEventId(career)
+    const event = story.eventFor(career, EVENT_TRIGGER.관리, random)
+    if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
+    if (orderEventId !== null) setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
+  }, [isManagementEntry, managementReentryCount, career, story, random, setScreen])
 
-  /*
-   * **105 에 들어올 때마다** 부상 엔딩 검사 — 0x11b32~0x11b44 는 진입 0x11910 의 곧은 길 위에 있어(11910 → 11b24 사이에 갈림 없음)
-   * 어디서 105 로 들어오든(아이템 111 · 외출 112/126 · 순위표 109 취소 · 장소 113 이벤트 끝 · 성적 따위) 돈다. 웹 진입 검사
-   * (`managementCheck`, 위 고리)는 경기 · 이벤트 · 이어하기 · 새 시즌 진입에서만 세워지므로 그 밖 진입은 여기서 같은 첫 줄을 본다.
-   * 위 고리가 도는 진입(검사 값이 서 있음)은 거기서 이미 보므로 건너뛴다. 새 선수 오프닝 451 을 아직 안 봤으면 1cfa6 이 예약을
-   * 덮는 자리라 위 고리에 맡긴다(웹은 새 선수 플래그 대신 451 을 안 봤는가로 가른다). 이벤트 본문이 오기 전 진입이면 올 때까지 둔다.
-   */
-  const isAtManagement = screen.kind === '관리'
-  const wasAtManagementRef = useRef(isAtManagement)
-  const injuryEntryPendingRef = useRef(false)
-  if (wasAtManagementRef.current !== isAtManagement) {
-    wasAtManagementRef.current = isAtManagement
-    injuryEntryPendingRef.current = isAtManagement && managementCheck === null
-  }
-  useEffect(() => {
-    if (!injuryEntryPendingRef.current || !isAtManagement || career === null || story.events === null) return
-    injuryEntryPendingRef.current = false
-    if (managementCheck !== null || !career.seenEventIds.includes(String(OPENING_EVENT_ID))) return
-    if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
-    // 같은 곧은 길의 다음 줄 0x11b46~0x11bbe — 나간 마선수 대결의 결과 이벤트
-    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current)
-    if (pendingAceMatch !== null) setScreen(pendingAceMatch)
-  }, [isAtManagement, managementCheck, career, story.events, setScreen])
 
   /*
    * 140 진입 0x10df8 — 결과 이벤트를 틀며 대기 칸(g[0xec] · g[0xee] · g[0x11f] · g[0x144])을 지우고 전역기록을 저장한다(10f72).
@@ -1139,7 +1150,6 @@ export function useCareerSession({
     const next = startNextSeason(finished)
     setCareer(next)
     setScreen({ kind: '관리' })
-    setManagementCheck('고정')
   }
 
   /**
@@ -1213,7 +1223,6 @@ export function useCareerSession({
     }
     setCareer(viewed)
     setScreen({ kind: '관리' })
-    setManagementCheck('무작위포함')
   }
 
   /** 전역 기록의 히든 오픈 id 를 선수에게 옮긴다 — 더할 것이 없으면 그대로 둔다 */
@@ -1400,7 +1409,6 @@ export function useCareerSession({
       saveGame.clear()
       setCareer(createCareer(name, profile))
       setScreen({ kind: '관리' })
-      setManagementCheck('고정')
     },
 
     /** 환경설정 [나만의리그 초기화] — 저장을 지운다. 모드 저장 지우기 0x224ec(저장, 4) 가 +0x44 · +0x50 = 0 (0x225fa · 0x22602) */
@@ -1474,7 +1482,6 @@ export function useCareerSession({
       // 109 — 100 → 1(자원 적재) → 109 라 이전 상태가 1: 취소가 안 먹고 바닥 1, 배경음 4 (0x10d8c · 0x105f0)
       if (point.kind === '다음경기순위') return setScreen({ kind: '다음경기순위', fromManagement: false })
       setScreen({ kind: '관리' })
-      setManagementCheck('고정')
     },
 
     /**
@@ -1635,8 +1642,7 @@ export function useCareerSession({
         return setScreen({ kind: '이벤트', eventId: midSeasonEventId(achieved), context: '시즌' })
       }
       if (isManagementCycleOpen(career)) {
-        setScreen({ kind: '관리' })
-        return setManagementCheck('무작위포함')
+        return setScreen({ kind: '관리' })
       }
       // 관리 주기가 아니면 116 의 끝(0x12bb0)이 [114 → 109] 로 보낸다 — 이전 상태가 105 가 아니라 취소가 안 먹는다
       enterNextGameStandings(false)
@@ -1749,6 +1755,8 @@ export function useCareerSession({
       // 비용은 훈련 적용 0xa3bac 종류 4 가 G 를 빼고 0xa3cac `0x22c29(모드 4 → 1, |비용|)` 로 적는다
       if (changes === null) {
         recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: specialSwingCostOf(career) })
+        // 알림 창이 닫히면 125 틀 0x18dd8 이 105 로 — 그 105 진입(`dismissManagementNotice`)
+        specialSwingNoticeRef.current = true
         return setManagementNotice(trainingOutcomeLinesOf(outcome).join('!N'))
       }
       setManagementDetail({
@@ -1767,6 +1775,8 @@ export function useCareerSession({
       if (career === null || managementDetail === null) return
       const { afterClose } = managementDetail
       setManagementDetail(null)
+      // 창을 닫으면 125(훈련 0x1b5b8) · 127(휴식 0x1b466)이 `0xbcb49(0x69)` 로 105 에 다시 들어온다 — 진입 · 자동 훑기
+      reenterManagement()
       if (afterClose.kind === '훈련') {
         const injury = rollTrainingInjury(career, afterClose.isSpecialSwing, random)
         setCareer(injury.career)
@@ -1778,7 +1788,17 @@ export function useCareerSession({
     },
 
     /** 관리 화면 알림 상자 [확인] — 알림은 여기서만 지운다 (화면이 기억하면 같은 문구가 다시 안 뜬다) */
-    dismissManagementNotice: () => setManagementNotice(''),
+    dismissManagementNotice: () => {
+      setManagementNotice('')
+      // 필살타법 결과 알림이면 125 틀 0x18dd8 이 105 로 — 105 진입
+      if (specialSwingNoticeRef.current) {
+        specialSwingNoticeRef.current = false
+        reenterManagement()
+      }
+    },
+
+    /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 하위 메뉴 106 · 107 · 110 취소 (0x11910 진입 · 0x1cf9c 자동 훑기) */
+    reenterManagement,
 
     /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착(+0x1c4)·저장, 다음 틀에 다시 판정 */
     confirmTitle: () => {
@@ -1947,8 +1967,7 @@ export function useCareerSession({
       if (screen.context === '연초') {
         // 내장 이벤트라 본 표시·보상이 없다. 목표 창이 닫히면 0x7fe90 이 S+0x1b7 = 1 (해마다 한 번) → 뒤 105
         setCareer({ ...career, hasSeenYearGoalWindow: true })
-        setScreen({ kind: '관리' })
-        return setManagementCheck(yearStartCheckRef.current)
+        return setScreen({ kind: '관리' })
       }
       const seenIds = endingEventId === null ? viewedEventIds : viewedEventIds.filter((id) => id !== endingEventId)
       const rewarded = applyEventRewards(finishEvent(career, seenIds), rewards, random, screen.eventId)
@@ -1995,7 +2014,6 @@ export function useCareerSession({
       }
       setCareer(viewed)
       setScreen({ kind: '관리' })
-      setManagementCheck('고정')
     },
 
     /** 경기 중 [메뉴] → 나가기. StrGAME[0] "현재 이닝의 기록과 획득한 G포인트가 사라집니다" */
@@ -2134,7 +2152,6 @@ export function useCareerSession({
       // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 4 → 1, 5000)`
       recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: CONTINUE_COST_GAME_POINT })
       setScreen({ kind: '관리' })
-      setManagementCheck(continued.season === career.season ? '무작위포함' : '고정')
       return true
     },
 

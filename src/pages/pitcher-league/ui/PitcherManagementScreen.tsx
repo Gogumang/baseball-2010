@@ -69,6 +69,8 @@ export interface PitcherManagementScreenProps {
   readonly onOpenShop?: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
+  /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 세션의 `actions.reenterManagement` (`usePitcherManagementMenu` 의 `onReenter`) */
+  readonly onReenter?: () => void
   /** 가운데 판의 선수가 미끄러져 들어오는가 — 105 진입 0x11910 의 이전 상태 1 · 114 · 100 (0x8a2d8) */
   readonly centerSlidesIn?: boolean
   /**

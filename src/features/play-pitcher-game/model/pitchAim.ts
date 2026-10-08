@@ -16,6 +16,8 @@ export const KEY_RIGHT = -4
 export const KEY_OK = -5
 export const KEY_CLEAR = -16
 
+const DIGIT_ZERO = 0x30
+
 /**
  * 웹 키 이름 → 원본 키 코드. 웹에서 OK 는 Enter·Space, CLR 은 Escape·Backspace 로 받는다(다른 화면과 같은 약속).
  * 원본 키가 아닌 것은 null.
@@ -42,6 +44,52 @@ export function originalKeyCodeOf(key: string): number | null {
     default:
       return key.length === 1 && key >= '0' && key <= '9' ? key.charCodeAt(0) : null
   }
+}
+
+/* ── 0xf 구질 고르기 ──────────────────────────────────────────────────────────── */
+
+/**
+ * 구질 키 `0x534d8` → 메시지 7 의 칸 (0x50da8 이 `scene+0xfac[칸]` 의 구질을 `+0xfc8` 에 적는다).
+ *
+ * | 키 | OK · '5' | '2' · 위 | '4' · 왼 | '6' · 오른 | '8' · 아래 | '0' |
+ * |---|---|---|---|---|---|---|
+ * | 칸 | 0 | 1 | 2 | 3 | 4 | 5 (마구) |
+ *
+ * 그 밖의 키는 메시지가 없다(견제 '3'·'1'·'7' 은 이어 부르는 0x53548 몫).
+ */
+export function pitchSlotOfKey(key: string): number | null {
+  switch (originalKeyCodeOf(key)) {
+    case KEY_OK:
+    case 0x35:
+      return 0
+    case KEY_UP:
+    case 0x32:
+      return 1
+    case KEY_LEFT:
+    case 0x34:
+      return 2
+    case KEY_RIGHT:
+    case 0x36:
+      return 3
+    case KEY_DOWN:
+    case 0x38:
+      return 4
+    case DIGIT_ZERO:
+      return 5
+    default:
+      return null
+  }
+}
+
+/**
+ * **0xf → 0x10 넘김** `0x39c1c` (0xf 매 틱): 상태 틱 `[+0x2c] > 7` 이고 `+0xfc8`(고른 구질)이 0 이 아닐 때만 0x10 을 예약한다.
+ * 0xf 진입 `0x3d954` 가 `+0xfc4 = +0xfc8 · +0xfc8 = 0` 으로 지우므로(3d9b8~3d9c4) 들어설 때마다 처음부터 고른다.
+ * 그 전에 누른 키는 칸만 바꿔 적고(마지막 키가 이긴다) 넘김은 틱 8 을 기다린다.
+ */
+export const PITCH_SELECT_WAIT_TICKS = 7
+
+export function isPitchSelectionDue(tick: number, chosenSlot: number | null): boolean {
+  return tick > PITCH_SELECT_WAIT_TICKS && chosenSlot !== null
 }
 
 /* ── 0x11 게이지 · 놓기 ──────────────────────────────────────────────────────── */

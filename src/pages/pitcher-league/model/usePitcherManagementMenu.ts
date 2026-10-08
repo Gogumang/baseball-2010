@@ -116,6 +116,11 @@ export interface UsePitcherManagementMenuInput {
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
   /**
+   * 화면이 '관리' 인 채 **105 에 다시 들어온다** — 하위 메뉴 106 · 107 · 110 취소, 훈련 결과 창(125 → 0x1b5b8) · 휴식(127 →
+   * 0x1b466) · 마구 훈련(125) 뒤. 세션이 진입 0x11910 곁가지와 자동 훑기 0x1cf9c 를 돈다(상태가 바뀐 틀에만 — 0x1cdec 1ce02).
+   */
+  readonly onReenter?: () => void
+  /**
    * 처음 설 하위 메뉴 — 111 상점 취소는 110(0x13460 의 13b1e) · 121 장비착용 취소는 106(0x17ad0 의 17aee)으로 돌아온다
    * (`nariReturnSubMenuOf`). 없으면 105.
    */
@@ -177,7 +182,7 @@ export interface PitcherManagementMenu {
 const modeTextOf = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
-  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit } = input
+  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onReenter } = input
   const [kind, setKind] = useState<PitcherMenuKind>(input.initialKind ?? '관리')
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
@@ -221,7 +226,10 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       // 타입 보너스 줄 — "[" + 타입 이름(0x1400080 [2+타입]) + "]" + StrMODE[194] (0x187a8~0x187f2)
       const typeLine = outcome.typeBonus > 0 ? [`[${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}] 타입 보너스 +1`] : []
       const rows = pitcherTrainingDetailRowsOf(outcome)
-      if (rows === null) return setNotice([result, ...typeLine].join('!N'))
+      if (rows === null) {
+        onReenter?.()
+        return setNotice([result, ...typeLine].join('!N'))
+      }
       /*
        * 칸 0~3 은 타자편과 같은 상세 결과 창(0x872a1)을 띄운다 — 0x17f5c 가 모드 공용이다.
        * 창을 닫으면 콜백 0x1d63c → **부상 판정 0x1b4c4** (모드 갈림 없음, 마구가 아니라 일반 열).
@@ -233,10 +241,12 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
           const injury = rollTrainingInjury(outcome.career, false, random)
           if (injury.career !== outcome.career) onSave(injury.career)
           if (injury.notice !== null) setNotice(injury.notice)
+          // 창이 닫히면 125 → 105 (0x1b5b8 `0xbcb49(0x69)`)
+          onReenter?.()
         },
       })
     },
-    [career, onSave, random],
+    [career, onReenter, onSave, random],
   )
 
   /** 마구 훈련 (108 → 팝업 [66] → 125 → 105) */
@@ -245,12 +255,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const outcome = runPitcherTraining(career, menu, random)
       onSave(outcome.career)
       setKind('관리')
+      // 125 → 0x17f5c → 105
+      onReenter?.()
       const magic = outcome.magic
       if (magic === null) return
       // StrMODE[86] "%d/%d회" — 레벨이 오르면 그 사실을 알린다
       setNotice(magic.isLevelUp ? '마구 레벨이 올랐습니다' : `마구 훈련 ${magic.sessions}/${magic.required}회`)
     },
-    [career, onSave, random],
+    [career, onReenter, onSave, random],
   )
 
   const blockNoticeOf = useCallback(
@@ -361,12 +373,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
               const recovered = recoverAfterPitcherRest(rest.career, random)
               onSave(recovered.career)
               if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
+              // 127 → 105 (0x1b466 `0xbcb49(0x69)`)
+              onReenter?.()
             },
           })
         },
       })
     },
-    [career, onNextGame, onOuting, onSave, openOrNotice, random],
+    [career, onNextGame, onOuting, onReenter, onSave, openOrNotice, random],
   )
 
   const selectPlayerInfo = useCallback(
@@ -441,9 +455,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     // 129 취소도 **119** 로 돌아간다 (0x11f9a) — 기본정보 카드는 그대로 남는다
     if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
     if (subWindow !== null) return closeWindow()
-    if (kind !== '관리') return setKind('관리')
+    if (kind !== '관리') {
+      // 106 · 107 · 110 취소 → 105 진입
+      setKind('관리')
+      return onReenter?.()
+    }
     return onExit()
-  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, subWindow])
+  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, onReenter, subWindow])
 
   /*
    * 기본정보(119) 에서 칭호 목록(129) 을 여는 키.

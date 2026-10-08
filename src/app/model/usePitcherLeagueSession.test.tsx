@@ -1215,6 +1215,26 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
   })
 })
 
+describe('105 진입마다 한 번 훑는다 — 상태가 바뀐 틀만 (0x1cdec 1ce02 → 0x1cf9c)', () => {
+  it('105 에 머문 채 커리어가 바뀌어도 훑지 않고, 105 에 다시 들어오면(하위 메뉴 취소 · 결과 창 닫기) 훑는다', async () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트') 이벤트끝내기(result)
+    expect(result.current.scene).toBe('관리')
+    const 본것 = result.current.career!.seenEventIds
+    expect(본것).toContain('34')
+
+    // 머문 틀 — 34 를 다시 볼 수 있게 해도 훑기가 없다
+    act(() => result.current.actions.save({ ...result.current.career!, seenEventIds: 본것.filter((id) => id !== '34') }))
+    expect(result.current.scene).toBe('관리')
+    // 105 재진입 — 그 틀에 훑는다
+    act(() => result.current.actions.reenterManagement())
+    expect(result.current.story).toEqual({ eventId: 34, context: '관리', viewed: [] })
+  })
+})
+
 describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이벤트)', () => {
   it('대결로 나갔다가 이기면 resultEvents[0] 을 앞 이벤트가 모은 것과 함께 틀고, 끝나면 105 — 장소 끝 처리는 나갈 때 한 번', async () => {
     const { result } = 띄우기()

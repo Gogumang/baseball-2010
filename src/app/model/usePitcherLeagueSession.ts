@@ -322,6 +322,8 @@ export interface PitcherLeagueSession {
     readonly finishEnding: (isRegistered: boolean) => void
     /** 명예의 전당 등록이 된 그 순간 — 모드 저장을 지운다(0x62dbe → 0x224ec). 엔딩을 떠날 때까지 다시 저장하지 않는다 */
     readonly eraseSaveForHallOfFame: () => void
+    /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 하위 메뉴 취소 · 훈련 · 휴식 결과 창 닫기 (진입 0x11910 · 자동 훑기 0x1cf9c) */
+    readonly reenterManagement: () => void
     /** 111 장비 상점 · 121 장비착용을 연다 */
     readonly openShop: (tab: PitcherShopTab) => void
     /**
@@ -877,14 +879,12 @@ export function usePitcherLeagueSession(
   }, [commitWith])
 
   /**
-   * 자동 발동 한 번 — 0x8be80 → 0xadc70 (커서에서 이어 훑기). 끝까지 없으면 커서가 0 으로 되감기고 그 호출은 "없음" 이라
-   * 원본은 **다음 틀**에 처음부터 다시 훑는다 — 웹은 그 두 번째 틀까지 한 번에 본다(커서가 0 이 아니었을 때만).
+   * 자동 발동 한 번 — 0x8be80 → 0xadc70 (커서에서 이어 훑기). 끝까지 없으면 커서가 0 으로 되감기고 그 호출은 "없음" 이다.
+   * 훑기는 상태가 바뀐 틀에만 돌아(0x1cdec 1ce02) 다음 틀에 처음부터 다시 훑는 일은 없다 — 다음 진입이 0 부터 본다(타자편과 같다).
    */
   const scanAuto = useCallback(
     (current: PitcherCareer, events: readonly OriginalEvent[], trigger: number, rolling: RandomPort | undefined) => {
-      const from = cursorRef.current
-      let scan = scanPitcherEventFrom(current, events, trigger, from, rolling)
-      if (scan.event === null && from > 0) scan = scanPitcherEventFrom(current, events, trigger, 0, rolling)
+      const scan = scanPitcherEventFrom(current, events, trigger, cursorRef.current, rolling)
       cursorRef.current = scan.cursor
       return scan.event
     },
@@ -896,7 +896,7 @@ export function usePitcherLeagueSession(
    *
    * 1. **진입 0x11910 의 곁가지**(0x11b24~0x11c1c) — 부상 엔딩 → 미션 복귀 140 → **연초 115**(S+0x1b7 == 0) →
    *    **중간평가 117**(경기 수 22 · 그 해 비트 꺼짐) 중 하나를 다음 상태로 예약한다 (투수편엔 138 타순이 없다).
-   * 2. **자동 발동 0x1cf9c** — 현재 상태가 105 면 **매 틀**:
+   * 2. **자동 발동 0x1cf9c** — 현재 상태가 105 면 — **상태가 바뀐 틀에만**(1ce02 `0xbc9c9` 가 거짓이면 0x1d06a):
    *    ```
    *      1cfa6: 장면+0x165(새 선수) ≠ 0 → 0x8bde0(모드 3 → 451) · [다음 114, 뒤 105] · 플래그 지움   ; 예약을 덮는다
    *      1cfdc: 다음 상태 ∈ {114, 115} 면 건너뜀                                                  ; 115 는 막고 117 은 안 막는다
@@ -911,11 +911,22 @@ export function usePitcherLeagueSession(
    *
    * 부상 엔딩(500)은 도착 첫 줄이다(아래). 117 은 S+0xb2 == 22 && 0xa4280 == 0 (아래), 그 비트는 보상 실행기 끝(0x8cbaa)이 켠다.
    *
-   * ⚠️ 근사 — 원본은 105 에 머무는 **매 틀** 훑고, 조건 22(질병 490)는 틀마다 rand 를 굴린다. 웹은 105 에 **들어올 때**
-   *    (경기·이벤트·다른 화면에서 돌아올 때) 한 번 굴려 훑고, 105 에 머문 채 커리어가 바뀌면(훈련·아이템) 굴림 없이 다시
-   *    훑는다 — 타자편(`useCareerSession` 의 '무작위포함'/'고정')과 같은 꼴이다. 틀 수를 따라 굴리지 않으므로 질병이 원본보다 드물다.
+   * **훑기는 상태가 105 로 바뀐 틀에만 돈다** — 상태 틀 0x1cdec 는 0xbc9c9(이번 틀에 상태가 바뀌었나)가 거짓이면 곧장 0x1d06a 로
+   * 가(0x1ce02~0x1ce0c) 진입과 0x1cf9c 를 건너뛴다. 105 에 머무는 틀에는 훑지 않고, 들어온 틀에는 어디서 왔든 훑으며 0x8be80 은
+   * 늘 무작위 조건(22 질병 490 · 20 스킬 획득 확률)까지 굴린다. 그래서 경기 · 이벤트 · 외출 효과(126) · 지도 취소(112) ·
+   * 순위표 취소(109)뿐 아니라 화면이 '관리' 인 채 105 에 다시 들어오는 길 — 하위 메뉴 106 · 107 · 110 취소, 훈련 결과 창
+   * (125, 0x1b5b8) · 휴식(127, 0x1b466) · 마구 훈련(125) — 도 진입이다(`reenterManagement`). 상점에서 돌아오는 길(111 취소 → 110 ·
+   * 121 취소 → 106)은 하위 메뉴로 서므로 105 진입이 아니다.
    */
   const wasIdleAtManagementRef = useRef(false)
+  /** 화면이 '관리' 인 채 105 에 다시 들어온 수 (`reenterManagement`) — 고리가 마지막으로 본 값과 다르면 진입이다 */
+  const [managementReentryCount, setManagementReentryCount] = useState(0)
+  const seenReentryCountRef = useRef(0)
+  /** 상점(111 · 121)에서 돌아왔다 — 하위 메뉴 110 · 106 으로 서므로 105 진입이 아니다 */
+  const isFromShopRef = useRef(false)
+  if (scene === '상점') isFromShopRef.current = true
+  else if (scene !== '관리') isFromShopRef.current = false
+  const reenterManagement = useCallback(() => setManagementReentryCount((count) => count + 1), [])
   /** 112 다시 찍기(0x118e4) — 아래에서 정의되는 `enterOutingMap` 을 이 고리가 부른다 */
   const enterOutingMapRef = useRef<() => void>(() => {})
   useEffect(() => {
@@ -924,13 +935,12 @@ export function usePitcherLeagueSession(
       wasIdleAtManagementRef.current = false
       return
     }
-    const isArrival = !wasIdleAtManagementRef.current
+    const isReentry = seenReentryCountRef.current !== managementReentryCount
+    seenReentryCountRef.current = managementReentryCount
+    const isArrival = (!wasIdleAtManagementRef.current && !isFromShopRef.current) || isReentry
     wasIdleAtManagementRef.current = true
-    if (!isArrival) {
-      const event = scanAuto(career, fileEvents, EVENT_TRIGGER.관리, undefined)
-      if (event !== null) openStory({ eventId: event.id, context: '관리', viewed: [] })
-      return
-    }
+    isFromShopRef.current = false
+    if (!isArrival) return
     if (newPlayerRef.current) {
       newPlayerRef.current = false
       const opening = pitcherOpeningScanOf(fileEvents, cursorRef.current)
@@ -980,7 +990,7 @@ export function usePitcherLeagueSession(
       })
       openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
-  }, [career, commitWith, fileEvents, isOnScreen, openStory, random, scanAuto, scene, story])
+  }, [career, commitWith, fileEvents, isOnScreen, managementReentryCount, openStory, random, scanAuto, scene, story])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -2235,6 +2245,7 @@ export function usePitcherLeagueSession(
       receiveEndingBonus,
       finishEnding,
       eraseSaveForHallOfFame,
+      reenterManagement,
       openShop,
       purchase,
       closeShopGpDetail,
