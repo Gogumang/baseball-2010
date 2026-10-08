@@ -14,6 +14,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
+import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -62,10 +63,19 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
   const finishPlayback = useCallback(() => setShownPlay(play), [play])
+  /**
+   * 경기 장면 0x104 하나 — 경기를 세울 때(`startGame` → 적재 상태 8, 웹은 로딩 팁) 새로 만든다. 로딩 팁이 새로 설 때마다 하나 오른다.
+   * 그 장면이 사는 동안 아래 칸들이 판 · 타석 · 이닝을 건너 남는다(`useSceneScopedRef`)
+   */
+  const sceneSerialRef = useRef(0)
+  const wasLoadingRef = useRef(false)
+  const isLoading = session.loadingTip !== null
+  if (isLoading && !wasLoadingRef.current) sceneSerialRef.current += 1
+  wasLoadingRef.current = isLoading
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
-  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerialRef.current)
   /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
-  const sceneBuntKindRef = useRef(0)
+  const sceneBuntKindRef = useSceneScopedRef(0, sceneSerialRef.current)
 
   /** 제안 대사를 이미 보여 준 돌발 행. 판정은 진행기가 지워 주므로 여기서 셀 것이 없다 */
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)

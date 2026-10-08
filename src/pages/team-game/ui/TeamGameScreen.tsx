@@ -70,6 +70,7 @@ import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
+import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
@@ -233,7 +234,7 @@ export function TeamGameScreen({
   /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
   const flightProbeRef = useRef<(() => boolean) | null>(null)
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
-  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, options)
   const isDefenseInPlay = session.pendingDefensePlay !== null
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
   const isAwaitingConfirmRef = useRef(false)

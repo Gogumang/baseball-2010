@@ -12,6 +12,7 @@ import type { Collection } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
+import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import type { ModeBatter } from '@/app/model/modeBatter'
 import { isModeMagicPitchType, modePitchMenuOf } from '@/app/model/modePitcher'
@@ -84,10 +85,16 @@ export function MissionRoutes({
   const { missionRun, pitcherRun, actions } = session
   const batter = session.hallOfFameBatter ?? nariBatter
   const { ability } = batter
+  /**
+   * 미션 경기 장면 0x104 하나 — 미션 · 마선수 대결을 세울 때마다(`begin` · `beginAceMatch` 가 새 화면 칸을 세운다) 새로 만든다.
+   * 이 라우트는 목록 · 설명 · 결과도 그려 마운트 수명이 장면보다 길다 — 진행 화면 칸이 바뀔 때 아래 칸들을 0 으로 둔다
+   */
+  const playScreenRef = useRef<Screen | null>(null)
+  if (screen.kind === '미션진행' || screen.kind === '투수미션' || screen.kind === '마선수대결') playScreenRef.current = screen
   /** 미션 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 (`defenseHomeRunEffects`) */
-  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, playScreenRef.current)
   /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
-  const sceneBuntKindRef = useRef(0)
+  const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
 
   const overlay = missionOverlayOf(session, screen.kind === '마선수대결', defenseSceneRef)
   if (overlay !== null) return overlay
@@ -307,7 +314,8 @@ export function PitcherAceMatchRoute(
     beginRef.current(mission)
   }, [mission])
 
-  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  // 대결 하나 = 미션 장면 하나 (`beginPitcherAceMatch` 가 `mission` 마다 세운다)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, mission)
   const overlay = missionOverlayOf(session, true, defenseSceneRef)
   if (overlay !== null) return overlay
 

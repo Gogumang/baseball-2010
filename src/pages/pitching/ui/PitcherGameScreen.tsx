@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
@@ -29,6 +29,7 @@ import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
+import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { TEAMS } from '@/shared/config/original/teams'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -133,7 +134,7 @@ export function PitcherGameScreen({
   /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
-  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, options)
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   const isBenchClearing = progress.pendingBenchClearing !== null
