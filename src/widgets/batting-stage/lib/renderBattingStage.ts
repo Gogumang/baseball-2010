@@ -22,7 +22,7 @@ import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayer
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
-import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
+import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
 import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
 
@@ -163,7 +163,6 @@ export function renderBattingStage(
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
-  drawStrikeZone(context, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
   }
@@ -183,6 +182,8 @@ export function renderBattingStage(
     // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
     drawFieldMap(context, scene.hud.bases)
   }
+  // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
+  if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)
   // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
   if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
   // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
@@ -295,15 +296,42 @@ function drawBatter(
   context.restore()
 }
 
-/** 존 표시는 선이 아니라 slt_pitch 프레임 73(빨간 모서리)을 존 가운데에 찍는다 (0x35ae8) */
+/**
+ * 존 표시 0x35ae8 (직접 떴다) — 선이 아니라 slt_pitch 프레임 0x49(73, 빨간 모서리)를 찍는다.
+ * ```
+ * 35aea  상태 [+0x1c] ∈ {0xd, 0xe, 0x13} 이면 안 그린다
+ * 35b06  (w, h) = 0xba815(slt_pitch, 0x49, 종류 1)            ; 프레임 상자 37 × 37
+ * 35b12  t = 표 0xcfb7c[+0x17e1] (타자 좌우)
+ * 35b2c  x = 카메라 x + t.x + (w >> 1) − 2 ; y = 카메라 y + t.y + (h >> 1) − 2
+ * 35b68  0xba759(slt_pitch, 0x49, 종류 1, x, y)               ; 프레임 원점(−18, −18)대로
+ * ```
+ * 카메라 (−120, −70) → 앵커 우타 (122, 256) · 좌타 (117, 256), 그림 왼쪽 위 우타 (104, 238) · 좌타 (99, 238).
+ */
 const ZONE_FRAME_FOLDER = './sprites/slt_pitch/frames'
-const ZONE_FRAME_INDEX = 73
+const ZONE_FRAME_INDEX = 0x49
+const ZONE_ANCHOR_INSET = 2
+
+/** 존을 그리는 단계인가 — 0xd · 0xe(웹 '대기' 의 쉬는 동안, 근사) · 0x13('타격')에선 안 그린다. 단계를 모르면 그린다 */
+export function showsStrikeZone(phase: StagePhaseSnapshot | undefined): boolean {
+  if (phase === undefined) return true
+  if (phase.kind === '타격') return false
+  return !(phase.kind === '대기' && phase.isPaused)
+}
+
+/** 존 그림의 앵커 (프레임 원점을 더하기 전) — 존 표 왼쪽 위 + (상자 >> 1) − 2 */
+export function strikeZoneAnchorOf(side: number, frameSize: { readonly width: number; readonly height: number }): { x: number; y: number } {
+  const { zoneLeft, zoneTop } = stageLayoutOf(side)
+  return {
+    x: zoneLeft + (frameSize.width >> 1) - ZONE_ANCHOR_INSET,
+    y: zoneTop + (frameSize.height >> 1) - ZONE_ANCHOR_INSET,
+  }
+}
 
 function drawStrikeZone(context: CanvasRenderingContext2D, side: number): void {
   const frame = placedFrame(ZONE_FRAME_FOLDER, ZONE_FRAME_INDEX)
   if (frame === null) return
-  const center = toPixel({ x: 0, y: 0 }, side)
-  context.drawImage(frame.image, Math.round(center.x) + frame.offsetX, Math.round(center.y) + frame.offsetY)
+  const anchor = strikeZoneAnchorOf(side, frame.image)
+  context.drawImage(frame.image, anchor.x + frame.offsetX, anchor.y + frame.offsetY)
 }
 
 function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: number; y: number }): void {
