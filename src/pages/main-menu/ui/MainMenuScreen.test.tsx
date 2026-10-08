@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
+import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
 
 /**
  * 메인 메뉴 머리띠 — 두 단 그리기가 다 끝에 0x54d95 를 부른다.
@@ -219,5 +220,57 @@ describe('최근게임 — 전역기록 +0x3c', () => {
 
   it('마지막 모드가 나리 타자편이면 그 편으로 (장면 0x106)', () => {
     expect(최근게임(4).onNewGame).toHaveBeenCalledWith('타자편')
+  })
+})
+
+describe('[0x140006c] = 5 — 관리 메뉴 취소가 메인 메뉴를 게임시작 목록으로 바로 연다 (생성자 0x234d4 23830 · 진입 0x25b88)', () => {
+  const 바로열기 = (gameStartCursor: { current: number }, onNewGame = vi.fn()) => render(
+    <MainMenuScreen hasSavedGame={false} onNewGame={onNewGame} onSelectMode={vi.fn()}
+      onBack={vi.fn()} onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} gamePoint={0}
+      openTier={5} gameStartCursor={gameStartCursor} />,
+  )
+
+  it('하위 5 로 서고 커서는 전역 [0x1552d24] 그 칸이다 — 앞 상태가 4 가 아니라 0 으로 되감지 않는다', () => {
+    const onNewGame = vi.fn()
+    바로열기({ current: 2 }, onNewGame) // 2 = 나만의리그
+    // 아랫단 바닥 5 — 뒤로 표시가 선다
+    expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Enter' })
+    })
+    // 나만의리그 → [14] 편 고르기 창
+    expect(screen.getByText(/어떤 선수로/)).toBeTruthy()
+  })
+
+  it('CLR 은 처음 메뉴(하위 4)로 — 0x28cb0 의 0xbcb49(this+0x18, 4)', () => {
+    바로열기({ current: 3 })
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+    expect(screen.queryByRole('button', { name: '되돌아가기' })).toBeNull()
+  })
+
+  it('커서가 움직이면 전역에 고쳐 적고, 윗단에서 내려오면 0 으로 되감는다(0x25b88 앞 상태 4)', () => {
+    const cursor = { current: 2 }
+    바로열기(cursor)
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+    })
+    expect(cursor.current).toBe(3)
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Enter' })
+    })
+    expect(cursor.current).toBe(0)
+  })
+})
+
+describe('바탕 띠 연출 [0xe2] · [0xe4] — 장면이 하위 5 로 바로 설 때만 (0x2381c~0x23846)', () => {
+  it('윗단에서 내려온 아랫단은 띠가 0 — 자라지 않고 릴 줄을 처음부터 그린다(장면 객체는 memset 0 · 0x2ac4)', () => {
+    const { result } = renderHook(() => useMenuBand(true, false))
+    expect(result.current).toEqual({ spread: 0, isGrowing: false })
+  })
+
+  it('바로 선 장면은 1 에서 자라기 시작한다', () => {
+    const { result } = renderHook(() => useMenuBand(true, true))
+    expect(result.current).toEqual({ spread: 1, isGrowing: true })
   })
 })

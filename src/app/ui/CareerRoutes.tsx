@@ -130,7 +130,8 @@ export function CareerRoutes({
       onSelectSpecialSwing={actions.selectSpecialSwing}
       onEquipSkill={actions.equipSkill}
       onExpandSkillSlots={actions.expandSkillSlots}
-      onExit={() => setScreen({ kind: '메인메뉴' })}
+      // 105 취소 0x1261c 126e6~126fa: 0x375d · [0x140006c] = 5 · 장면 0x103 — 메인 메뉴를 게임시작 목록으로 바로 연다
+      onExit={() => setScreen({ kind: '메인메뉴', openTier: 5 })}
       // 114(이벤트) · 100(경기 뒤 재진입 — 경기결과) · 1(자원 적재 — 처음 선다)
       centerSlidesIn={previousKind === null || previousKind === '이벤트' || previousKind === '경기결과'}
       mainCursor={mainCursor}

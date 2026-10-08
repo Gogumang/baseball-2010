@@ -38,6 +38,7 @@ import { NEW_SAVE_LAST_PLAYED_MODE } from '@/entities/mode-save/model/modeSave'
 import { nariGameMatchOfSave } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
+import { createGameStartCursor } from '@/pages/main-menu/model/mainMenu'
 import { useAceLevels } from '@/entities/mission/model/useAceLevels'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 import { judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
@@ -147,6 +148,8 @@ export function App() {
   const sound = useSound(gameSettings.settings.soundLevel)
   const random = useMemo(() => createSeededRandom(Date.now() & 0x7fffffff), [])
   const [screen, setScreen] = useState<Screen>({ kind: '타이틀' })
+  /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
+  const gameStartCursor = useRef(createGameStartCursor()).current
   /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */
   const [isGeneralQuickStart, setGeneralQuickStart] = useState(false)
   /** 일반모드 이어하기로 올린 진행 — 있으면 준비 화면 없이 경기 장면으로 (0x213c0(앱, 1, 0) → 0x104) */
@@ -425,7 +428,8 @@ export function App() {
         session={seasonSession}
         random={random}
         gameSettings={gameSettings}
-        onExit={() => setScreen({ kind: '메인메뉴' })}
+        // 관리 메뉴 0xc9 취소(0x8f5a)는 [0x140006c] = 5 — 게임시작 목록으로 바로 연다. 그 밖의 나감은 처음 단
+        onExit={(openTier) => setScreen(openTier === undefined ? { kind: '메인메뉴' } : { kind: '메인메뉴', openTier })}
         aceSelect={aceSelect}
         // 선수영입 후보의 명예의 전당 칸 (0x1f62c · 0x1f640)
         hallOfFame={collection.collection}
@@ -512,7 +516,8 @@ export function App() {
           // 등록 목록(상태 145) 머리띠 0x54d95(skin, 9 "나만의리그 투수편", 5) 가 전역 G 를 그린다
           gamePoint: wallet.balance,
         }}
-        onExit={() => setScreen({ kind: '메인메뉴' })}
+        // 105 취소(0x126e6)는 [0x140006c] = 5 — 게임시작 목록으로 바로 연다. 그 밖의 나감은 처음 단
+        onExit={(openTier) => setScreen(openTier === undefined ? { kind: '메인메뉴' } : { kind: '메인메뉴', openTier })}
         // 마선수 대결 (SYS 8 → 투수 미션 team − 1) — 미션 세션이 투수편 내 투수(`pitcherMissionPitcher`)로 던지고
         // 이겼나를 돌려주면 투수편 세션이 140 → resultEvents[이김 ? 0 : 1] → 105 로 잇는다
         renderAceMatch={(match, onFinish) => (
@@ -537,6 +542,7 @@ export function App() {
       <EntryRoutes
         screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
+        gameStartCursor={gameStartCursor}
         hallOfFameDeletion={hallOfFameDeletion}
         recordStat={recordStat}
         // 홈런더비 타자 게터 0x1fc20 — 타자편 대결 대기(g[0x11f])면 명예 타자 대신 나리 타자

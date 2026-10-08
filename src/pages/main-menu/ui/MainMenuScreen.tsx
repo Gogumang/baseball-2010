@@ -6,7 +6,7 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
-import type { NariGameReady } from '@/pages/main-menu/model/mainMenu'
+import type { GameStartCursor, MainMenuOpenTier, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
 import {
@@ -90,6 +90,13 @@ interface MainMenuScreenProps {
    * 바닥 5 는 뒤로 표시가 있다. 안 넘기면 예전처럼 머리띠를 안 그린다.
    */
   readonly gamePoint?: number
+  /**
+   * 장면을 세울 때의 첫 단 — 전역 `[0x140006c]`(생성자 0x234d4). 5 면 게임시작 목록에서 열고 바탕 띠 연출을 켠다
+   * (나리 · 시즌 관리 메뉴 취소가 5 를 넣는다). 안 넘기면 4(처음 메뉴)
+   */
+  readonly openTier?: MainMenuOpenTier
+  /** 게임시작 목록 커서 전역 [0x1552d24] — 루트가 들고 다닌다. 안 넘기면 첫 단 5 도 0 칸에서 열고 적지 않는다 */
+  readonly gameStartCursor?: GameStartCursor
 }
 
 /** 판정을 부르는 상태 틱 (0x29520 `cmp r3,#0xa`) */
@@ -124,7 +131,7 @@ const REEL_STATE = 5
  *
  * ⚠️ 아랫단에는 **바탕 띠**(오른쪽 80px, 바닥에서 160px 올라오는 #192E74 그라데이션)가 바퀴 위·
  *    릴 글자 아래에 깔린다. 자라는 동안(넉 틱)은 릴 줄을 안 그린다 — 원본 0x254d8 그대로다.
- *    **켜지는 조건만 근사**다 (`model/useMenuBand.ts` 주석 참고).
+ *    장면이 게임시작 목록으로 바로 설 때(`openTier` 5)만 켜진다 (`model/useMenuBand.ts` 주석 참고).
  *
  * ⚠️ 원본 좌표대로 놓으면 아랫단 슬롯 5·6·7(y 360·380·400)과 **설명 판 아래 절반이 화면 밖**이다.
  *    보이는 것은 위 세 줄 + 판 윗동강뿐이다. 값을 비틀지 않았다 — `mainMenuLayout.ts` 주석 참고.
@@ -144,6 +151,8 @@ export function MainMenuScreen({
   onTopMenuTenthTick,
   overlay,
   gamePoint,
+  openTier = 4,
+  gameStartCursor,
 }: MainMenuScreenProps) {
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '나리타자편') onNewGame('타자편')
@@ -161,7 +170,8 @@ export function MainMenuScreen({
     else if (effect === '도움말') onHelp()
     else if (effect === '환경설정') onSettings()
     else onBack()
-  }, { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) })
+  }, { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) },
+  openTier, gameStartCursor)
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)
   const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
 
@@ -189,7 +199,9 @@ export function MainMenuScreen({
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
 
   // 아랫단 바탕 띠 — 자라는 동안은 릴 줄을 안 그린다 (0x254d8 이 줄 묶음을 통째로 건너뛴다)
-  const band = useMenuBand(!isWheel)
+  // 연출은 장면이 게임시작 목록으로 바로 설 때(`[0x140006c]` = 5)만 켜진다 — 생성자 0x2381c~0x23846
+  const isBandSeededRef = useRef(openTier === 5)
+  const band = useMenuBand(!isWheel, isBandSeededRef.current)
 
   const panelText = state.lockedNotice ?? selected?.description ?? ''
 

@@ -53,7 +53,8 @@ interface PitcherLeagueRouteProps {
   readonly openedHiddenIds?: readonly number[]
   /** 경기 중 메뉴 "설정" 칸 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
-  readonly onExit: () => void
+  /** 메인 메뉴로 나간다 — `openTier` 5 는 전역 [0x140006c] = 5(게임시작 목록으로 바로, 105 취소 0x126e6). 없으면 처음 단 */
+  readonly onExit: (openTier?: 5) => void
   /** 명예의 전당 등록 목록 (나리 상태 145, 모드 3) — 기록연감·칸 5 나리 타자·등록 (G·통계는 App 이 지갑으로 치른다) */
   readonly hallOfFame?: {
     readonly collection: Collection
@@ -114,7 +115,7 @@ export function PitcherLeagueRoute({
   const eventEnd = useEventEndFrame(actions.completeStory)
 
   if (career === null || scene === '등록') {
-    return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={onExit} />
+    return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create} onCancel={() => onExit()} />
   }
 
   if (scene === '경기' && gameOptions !== null) {
@@ -152,7 +153,8 @@ export function PitcherLeagueRoute({
       onNextGame={actions.openNextGameStandings}
       onOuting={actions.openOuting}
       onOpenShop={actions.openShop}
-      onExit={onExit}
+      // 105 취소 0x1261c 126e6~126fa: 0x375d · [0x140006c] = 5 · 장면 0x103 — 메인 메뉴를 게임시작 목록으로 바로 연다
+      onExit={() => onExit(5)}
       // 114(이벤트) · 100(경기 뒤 — 경기결과) · 1(처음 선다)
       centerSlidesIn={previousScene === null || previousScene === '이벤트' || previousScene === '경기결과'}
       mainCursor={mainCursor}

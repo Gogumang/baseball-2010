@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { initialMainMenu, reduceMainMenu } from '@/pages/main-menu/model/mainMenu'
-import type { MainMenuAction, MainMenuEffect, MainMenuState, NariGameReady } from '@/pages/main-menu/model/mainMenu'
+import { initialMainMenu, modeCursorOf, reduceMainMenu } from '@/pages/main-menu/model/mainMenu'
+import type {
+  GameStartCursor, MainMenuAction, MainMenuEffect, MainMenuOpenTier, MainMenuState, NariGameReady,
+} from '@/pages/main-menu/model/mainMenu'
 
 /**
  * 메뉴 상태와 화면 단위 키 입력 — 원본대로 ↑↓ 로 고르고 Enter 로 시작, Esc 로 뒤로 간다.
@@ -22,8 +24,14 @@ export function useMainMenu(
     isGeneralGameInProgress: false,
     lastPlayedMode: 1,
   },
+  /** 장면을 세울 때의 첫 단(`[0x140006c]` — 4 처음 메뉴 · 5 게임시작 목록, 생성자 0x234d4). 안 넘기면 4 */
+  openTier: MainMenuOpenTier = 4,
+  /** 게임시작 목록 커서 전역 [0x1552d24] — 첫 단 5 면 이 칸에 서고, 커서가 움직이면 고쳐 적는다. 안 넘기면 0 · 안 적는다 */
+  gameStartCursor?: GameStartCursor,
 ): { state: MainMenuState; dispatch: (action: MainMenuAction) => void } {
-  const [state, setState] = useState<MainMenuState>(() => initialMainMenu(hasSavedGame))
+  const [state, setState] = useState<MainMenuState>(
+    () => initialMainMenu(hasSavedGame, openTier, openTier === 5 ? gameStartCursor?.current ?? 0 : 0),
+  )
 
   const stateRef = useRef(state)
   stateRef.current = state
@@ -35,6 +43,8 @@ export function useMainMenu(
   isSheetOpenRef.current = isSheetOpen
   const globalRecordRef = useRef(globalRecord)
   globalRecordRef.current = globalRecord
+  const gameStartCursorRef = useRef(gameStartCursor)
+  gameStartCursorRef.current = gameStartCursor
 
   // setState 업데이터 안에서 부모 콜백을 부르면 StrictMode 가 두 번 부른다 — ref 로 읽고 한 번만 반영한다.
   const dispatchRef = useRef((action: MainMenuAction) => {
@@ -43,6 +53,7 @@ export function useMainMenu(
       stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode, nariGameReady,
     )
     stateRef.current = result.state
+    if (gameStartCursorRef.current !== undefined) gameStartCursorRef.current.current = modeCursorOf(result.state)
     setState(result.state)
     if (result.effect !== null) onEffectRef.current(result.effect)
   })

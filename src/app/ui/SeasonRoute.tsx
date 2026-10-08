@@ -70,8 +70,11 @@ interface SeasonRouteProps {
   readonly random: RandomPort
   /** 경기 중 메뉴 "설정" 칸과 자동진행 G 검사에 쓴다 */
   readonly gameSettings: ReturnType<typeof useGameSettings>
-  /** 시즌모드에서 나간다 — 메인 메뉴로 (원본은 `0xbc290(앱, 0x103)`) */
-  readonly onExit: () => void
+  /**
+   * 시즌모드에서 나간다 — 메인 메뉴로 (원본은 `0xbc290(앱, 0x103)`). `openTier` 5 는 전역 [0x140006c] = 5(게임시작 목록으로 바로 —
+   * 관리 메뉴 0xc9 취소 0x8f5a). 없으면 처음 단
+   */
+  readonly onExit: (openTier?: 5) => void
   /**
    * 마선수 오픈 플래그(`mgr[0x30..0x39]`)·레벨(`mgr[0x13a..]`)과 오픈·레벨업 처리 — 경기 전 마선수 고르기
    * 0xd7 이 일반모드 상태 21 과 **같은 전역 칸**을 본다(0xa248 의 `저장[0x30 + 칸]`). 앱의 `aceSelect` 를
@@ -259,7 +262,7 @@ export function SeasonRoute({
 
   // 저장이 없으면 팀 고르기부터다 (0xca). 팀 고르기 화면은 선수 등록 쪽 것을 그대로 쓴다
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
-    return <TeamSelectScreen title="시즌모드" onSelect={actions.chooseTeam} onCancel={onExit} />
+    return <TeamSelectScreen title="시즌모드" onSelect={actions.chooseTeam} onCancel={() => onExit()} />
   }
 
   const backToManagement = () => actions.goto(SEASON_SCENE_STATE.관리메뉴)
@@ -356,7 +359,8 @@ export function SeasonRoute({
           if (item === '다음경기') return actions.openNextGame()
           actions.goto(target)
         }}
-        onExit={onExit}
+        // 관리 메뉴 키 0x8f30 의 취소(−16) 8f5a~8f6e: 0x375d · [0x140006c] = 5 · 장면 0x103 — 게임시작 목록으로 바로 연다
+        onExit={() => onExit(5)}
         gamePoint={session.gamePoints}
         centerSlidesIn={previousScene === null || CENTER_SLIDE_FROM.includes(previousScene)}
       />

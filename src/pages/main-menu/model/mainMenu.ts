@@ -104,17 +104,34 @@ export interface MainMenuResult {
 }
 
 /**
- * 처음 메뉴(상태 4)에서 시작한다.
+ * 메인 메뉴 장면 0x103 을 세울 때의 첫 단 — 생성자 0x234d4 가 전역 `[0x140006c]`("다음 장면에서 열 하위 상태")를 본다
+ * (23802~23896, 2026-10-08 직접 떴다):
+ * ```
+ * [0x140006c] == −1          → 23908: 커서 [0x1552d24] = 0 · [this+0x28] == 0 ? 하위 0x2a : 2 (켤 때 — 타이틀 쪽)
+ * [0x140006c] ∈ {5, 0x11}    → 23830: [this+0xe1] = 1 · 띠 [0xe2] = [0xe4] = 1 · 0xbcb49(this+0x18, 그 값)
+ * [0x140006c] == 0x27        → 23882: 0xbcb49(this+0x18, 0x27)
+ * 그 밖(4 …)                 → 23858: 0xbcb49(this+0x18, 그 값)
+ * 끝에 [0x140006c] = −1 (2388e~23894)
+ * ```
+ * 장면 객체는 할당기 0x2ac4 가 0x1400428(memset 0)로 비워 주므로 앞 상태 [this+0x28] 는 0 이다 — 그래서 곧장 하위 5 로 들어온
+ * 진입 0x25b88 은 앞 상태 ≠ 4 라 커서 [0x1552d24](.bss 전역)를 **안 건드린다** — 마지막으로 게임시작 목록을 떠난 그 칸에 선다.
+ * 웹은 그 전역을 루트가 든 `GameStartCursor` 로 들고 다닌다. 나리 · 시즌 관리 메뉴의 취소(0x1261c 126e6~126fa ·
+ * 0x8f30 8f5a~8f6e)가 `[0x140006c] = 5` 로 이 길을 탄다.
+ */
+export type MainMenuOpenTier = MainMenuTier
+
+/**
+ * 처음 메뉴(상태 4)에서 시작한다 — `openTier` 5 면 게임시작 목록(하위 5)에서, 커서는 `modeCursor`(전역 [0x1552d24]) 칸.
  *
- * 게임시작 목록의 커서는 늘 0(최근게임)이다 — 진입 0x25b88 이 앞 상태가 4 면 커서 [0x1552d24] = 0 으로
+ * 처음 메뉴 → 게임시작 목록으로 내려가면 커서는 늘 0(최근게임)이다 — 진입 0x25b88 이 앞 상태가 4 면 커서 [0x1552d24] = 0 으로
  * 둔다 (R11-special-leftovers 4-2, 0x25b88 확정). 저장 유무로 커서를 옮기지 않는다.
  * 처음 메뉴 커서의 첫 자리(진입 0x24a40)는 안 읽어 **추정**으로 0번 칸(게임시작)에 둔다.
  */
-export function initialMainMenu(_hasSavedGame: boolean): MainMenuState {
+export function initialMainMenu(_hasSavedGame: boolean, openTier: MainMenuOpenTier = 4, modeCursor = 0): MainMenuState {
   return {
-    tier: 4,
+    tier: openTier,
     selectedTopId: TOP_ENTRIES[0].id,
-    selectedModeId: MODE_ENTRIES[0].id,
+    selectedModeId: (MODE_ENTRIES[modeCursor] ?? MODE_ENTRIES[0]).id,
     isPickingNariEdition: false,
     lockedNotice: null,
     generalModeWindow: null,
@@ -220,6 +237,23 @@ export function recentGameOf(
   if (lastPlayedMode === 3) return { state, effect: nariEditionEffectOf('투수편', nariGameReady) }
   if (lastPlayedMode === 4) return { state, effect: nariEditionEffectOf('타자편', nariGameReady) }
   return { state, effect: null }
+}
+
+/**
+ * 게임시작 목록 커서 전역 `[0x1552d24]`(.bss 바이트) — 장면 0x103 이 내려가도 남는다. 하위 5 진입 0x25b88(앞 상태 4)과 켤 때의
+ * 0x23908 만 0 으로 되감는다. 웹 메인 메뉴는 다른 화면을 다녀오면 다시 마운트되므로 루트가 이 값을 들고 화면이 고쳐 적는다.
+ */
+export interface GameStartCursor {
+  current: number
+}
+
+export function createGameStartCursor(): GameStartCursor {
+  return { current: 0 }
+}
+
+/** 게임시작 목록 커서 칸 번호 (`[0x1552d24]` 에 적는 값) */
+export function modeCursorOf(state: MainMenuState): number {
+  return Math.max(MODE_ENTRIES.findIndex((entry) => entry.id === state.selectedModeId), 0)
 }
 
 /** 지금 단에서 커서가 있는 칸의 id */

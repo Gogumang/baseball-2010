@@ -153,6 +153,10 @@ describe('엔딩 0xf5 배선', () => {
     expect(screen.getByTestId('화면-효과기')).toBeDefined()
     효과기넘기기()
     expect(screen.queryByTestId('화면-효과기')).toBeNull()
+
+    // 0xc9 취소(키 0x8f30 8f5a~8f6e) — [0x140006c] = 5 · 장면 0x103: 메인 메뉴를 게임시작 목록으로 바로 연다
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onExit).toHaveBeenCalledWith(5)
   })
 
   it('보너스를 받고 넘기기 전에 끄면 다시 엔딩이다 — SR+0x7b 가 서 있어 보너스 팝업 없이 넘어간다 (0x6b3c)', () => {

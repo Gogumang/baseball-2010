@@ -27,7 +27,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
-import type { NariGameReady } from '@/pages/main-menu/model/mainMenu'
+import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
@@ -122,6 +122,8 @@ interface EntryRoutesProps {
    * (`derbyHallOfFameBatterIndexOf`). 안 넘기면 대기 없음
    */
   readonly aceMatchHold?: AceMatchHoldPort
+  /** 게임시작 목록 커서 전역 [0x1552d24] — 앱이 들고 다닌다(메인 메뉴가 다시 마운트돼도 남는다). 안 넘기면 늘 0 칸 */
+  readonly gameStartCursor?: GameStartCursor
 }
 
 /** 원본 모드 번호 — 0x327b8 이 +0x3c 에 적는 값 */
@@ -135,7 +137,7 @@ export function EntryRoutes({
   screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
   onRenamePlayer, onResetEditedNames, onResetCareerEdition, careerResetBlockOf, onResetSeason, onStartGeneralMode,
   isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
-  nariGameReady, onResumeNariGame, recordStat, aceMatchHold,
+  nariGameReady, onResumeNariGame, recordStat, aceMatchHold, gameStartCursor,
 }: EntryRoutesProps) {
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
@@ -316,6 +318,9 @@ export function EntryRoutes({
 
   return (
     <MainMenuScreen
+      // 장면 0x103 생성자 0x234d4 의 [0x140006c] — 관리 메뉴 취소(5)면 게임시작 목록으로 바로 연다
+      {...(screen.kind === '메인메뉴' && screen.openTier !== undefined ? { openTier: screen.openTier } : {})}
+      {...(gameStartCursor === undefined ? {} : { gameStartCursor })}
       hasSavedGame={session.savedCareer !== null}
       isGeneralGameInProgress={isGeneralGameInProgress}
       lastPlayedMode={lastPlayedMode}

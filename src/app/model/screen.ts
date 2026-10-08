@@ -10,7 +10,11 @@ import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
 /** 지금 떠 있는 화면 하나. 화면마다 필요한 값을 같이 들고 다닌다. */
 export type Screen =
   | { readonly kind: '타이틀' }
-  | { readonly kind: '메인메뉴' }
+  /**
+   * 메인 메뉴(장면 0x103). `openTier` 는 장면을 세울 때 생성자 0x234d4 가 보는 전역 `[0x140006c]` — 5 면 게임시작 목록(하위 5)
+   * 으로 바로 열고 바탕 띠 연출을 켠다(나리 105 취소 0x126e6 · 시즌 0xc9 취소 0x8f5a). 없으면 처음 메뉴(하위 4).
+   */
+  | { readonly kind: '메인메뉴'; readonly openTier?: 5 }
   | { readonly kind: '도움말' }
   | { readonly kind: '환경설정' }
   | { readonly kind: '스페셜' }
