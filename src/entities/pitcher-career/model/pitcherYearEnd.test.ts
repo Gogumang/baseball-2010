@@ -99,6 +99,8 @@ describe('투수편 연말 사슬 (상태 136 → 130 → 131 → 132)', () => {
     // 본 번호와 상관없다 — 같은 커리어면 같은 번호
     expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [500], true))
       .toEqual(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [503], true))
+    // 판정 없음(인기도가 정확히 1000)은 −1 그대로
+    expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1000 }), [503], true)).toEqual({ kind: '엔딩', endingIndex: -1 })
   })
 })
 

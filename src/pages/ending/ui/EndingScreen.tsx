@@ -130,6 +130,8 @@ export function EndingScreen(props: EndingScreenProps) {
   }
   const question = phase === '이어하기질문' || phase === '등록질문' ? questions[phase] : null
 
+  if (endingIndex < 0) return <NoJudgementEnding />
+
   if (phase === '등록목록') {
     return (
       <HallOfFameScreen
@@ -190,6 +192,33 @@ export function EndingScreen(props: EndingScreenProps) {
           onAnswer={(index) => (index === 0 ? question.onYes() : question.onNo())}
         />
       )}
+    </RawScreen>
+  )
+}
+
+/**
+ * **판정 없음(e = −1) 엔딩** — 판정 0xa3a84 가 −1(7~13년차 인기도가 정확히 1000)인 채 엔딩 요청([0x1552adc])으로 141 에 온 화면.
+ * 141 진입 0x12300 은 e 를 고치지 않고 넘긴다. 원본이 하는 일(직접 떴다):
+ * ```
+ * 12328  e > 1 ? 배경음 0x2e : 0x34          ; 부호 있는 비교 — −1 은 부상·방출과 같은 0x34
+ * 87cca  적재 0x87c7c: [this+0x2e4] = e, e ≤ 1(부호 있음)이면 걷는 선수 갈래 — ending.pzx([this+0x2e0])는 87ca0~87cac 에서 풀고 0
+ * 87f2a  모드 2 가 아니면 전역기록 +0xa8 + e = 1 → **+0xa7** (기록연감 0x58b5c 는 +0xa0..+0xa4 · +0xa8..+0xb6 만 읽는다)
+ * 87fba  연애 엔딩은 e > 1 일 때만 — 없음
+ * 168fc  그리기: 단계([this+0xd4]) ≤ 2 면 0x882b4 — 단계 0 은 그리지 않고(882c8), 그 밖은 검정으로 칠한 뒤(882cc~882de)
+ *        나리 표 `cmp e, #9 ; bls`(88340, 부호 없음)를 넘어 은퇴 갈래 0x886ca 로 간다. 거기 886ca~886da 가 [this+0x2e0](0) 의
+ *        +8 을 읽는다 — 원본은 빈 그림 객체를 따라간다(무엇이 그려지는지는 정할 수 없다). 단계 > 2 는 제작진 그리기
+ *        0x88bb4 — 머리(88bc2~88bc8)에서 검정으로 칠하고, 그 뒤는 대조하지 않았다(제작진 자원도 e ≤ 1 갈래는 안 올린다).
+ * 1220c  키: `cmp e, #1 ; bhi`(부호 없음) → 이어하기 팝업 0x32 가 아니라 보너스 갈래. 단계 1 이면 2 로(+ 배경음 빼기),
+ *        단계 > 2 이면 `cmp e, #1 ; ble`(1226e~12274, 부호 있음)로 **아무것도 안 한다** — 보너스 0x2b · 등록 0x2d 팝업이 안 뜬다.
+ * 1bbc4  틀: 팝업이 없어 0x2b · 0x2d · 0x32 갈래를 안 탄다 — 단계만 0 → 1 · 2 → 3 으로 넘는다.
+ * ```
+ * 곧 **키가 먹지 않는 화면에 갇힌다**(원본 그대로 — 엔딩 보너스 · 명예의 전당 · 이어하기 · 메인 메뉴 어느 것도 없다).
+ * 웹은 검정 판만 그린다 — 빈 그림 객체를 따라간 원본 그림은 미해결이다.
+ */
+function NoJudgementEnding() {
+  return (
+    <RawScreen>
+      <div className={styles.blackScreen} data-part="no-judgement" />
     </RawScreen>
   )
 }

@@ -9,7 +9,6 @@ import {
   pitcherSalaryNegotiationRankOf,
   pitcherYearEndStepOf,
   PITCHER_RELEASE_ENDING,
-  PITCHER_RETIREMENT_ENDING,
   recordPitcherSeasonMvp,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
@@ -17,6 +16,7 @@ import {
   FINAL_RETIREMENT_EVENT_ID,
   GOAL_INTRO_EVENT_ID,
   goalResultEventId,
+  NO_ENDING_JUDGEMENT,
   RELEASE_EVENT_ID,
   RETIREMENT_CHOICE_EVENT_ID,
   SALARY_ACCEPT_EVENT_ID,
@@ -111,14 +111,14 @@ export function nextPitcherYearEndStep(
    * `0xa3a85([this+0xb0])` 이고 모드 갈림이 없으며, 판정 0xa3a84 안(a3a84~a3b7a)에도 모드를 보는 줄이 없다(직접 떴다).
    * 곧 투수편도 타자편 `judgeEnding` 과 같은 `judgePitcherEnding` 하나다. 500(부상 누적 > 19 → 0) · 501(7년차 인기도 ≤ 499 → 1) ·
    * 504(13년차)는 같은 판정이 고른 이벤트이고 그 사이 값을 바꾸는 보상이 없어(500 · 501 · 503 · 504 의 보상은 종류 21 하나)
-   * 예전 번호와 같다.
+   * 예전 번호와 같다. 판정 없음(−1)은 그대로 넘긴다(`NO_ENDING_JUDGEMENT` — 0x12300 은 고치지 않는다).
    */
   endingRequested = false,
 ): PitcherYearEndEventStep {
   const saw = (id: number) => viewed.includes(id)
   const sawAny = (ids: readonly number[]) => viewed.some((id) => ids.includes(id))
 
-  if (endingRequested) return { kind: '엔딩', endingIndex: judgePitcherEnding(career) ?? PITCHER_RETIREMENT_ENDING }
+  if (endingRequested) return { kind: '엔딩', endingIndex: judgePitcherEnding(career) ?? NO_ENDING_JUDGEMENT }
   if (sawAny(SALARY_RESULT_EVENT_IDS) || saw(SALARY_ACCEPT_EVENT_ID)) return { kind: '새시즌' }
   if (saw(SALARY_FIRM_EVENT_ID) || saw(SALARY_POLITE_EVENT_ID)) {
     const choice = saw(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID

@@ -133,8 +133,9 @@ export function applyPitcherEndingBonus(career: PitcherCareer, endingIndex: numb
   }
 }
 
+/** 141 키 0x1220c 의 `cmp e, #1 ; bhi` 는 부호 없는 비교라 0 · 1 만 — 판정 없음(−1)은 아니다 (타자편 `isContinuableEnding`) */
 export function isContinuablePitcherEnding(endingIndex: number): boolean {
-  return endingIndex <= CONTINUABLE_ENDING_LIMIT
+  return endingIndex >= 0 && endingIndex <= CONTINUABLE_ENDING_LIMIT
 }
 
 export function canContinueAfterPitcherEnding(career: PitcherCareer, endingIndex: number): boolean {

@@ -171,6 +171,11 @@ describe('엔딩 뒤 — 0x1220c', () => {
     expect(canContinueAfterEnding(선수({ gamePoint: 9000 }), 2)).toBe(false)
   })
 
+  it('판정 없음(−1)은 이어하기도 보너스도 없다 — 키 0x1220c 의 `cmp e,#1 ; bhi` 는 부호 없음, 보너스 팝업 갈래는 부호 있는 `ble` 로 막힌다', () => {
+    expect(canContinueAfterEnding(선수({ gamePoint: 9000 }), -1)).toBe(false)
+    expect(endingBonusOf(-1)).toBe(0)
+  })
+
   it('방출 엔딩을 이어하면 5000 G포인트를 쓰고 다음 연차로 간다 (0x1bd36, 점검 9차)', () => {
     const continued = continueAfterEnding(선수({ gamePoint: 6000, endingIndex: 1, season: 3, morale: 10 }))
 

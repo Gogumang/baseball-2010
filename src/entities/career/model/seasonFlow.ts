@@ -125,6 +125,12 @@ export function goalResultEventId(achieved: number): number {
   return 396
 }
 
+/**
+ * 판정 0xa3a84 의 −1(판정 없음 — 7~13년차 인기도가 정확히 1000 이거나 7년차 전) 을 141 이 그대로 받은 값.
+ * 141 진입 0x12300 은 `e = 0xa3a85(S)` 를 고치지 않고 엔딩 판 0x87c7c 에 넘긴다 — 그 화면은 `EndingScreen` 머리말(141 의 e = −1).
+ */
+export const NO_ENDING_JUDGEMENT = -1
+
 /** StrENDING 번호. 7년차 전에는 null */
 /** 부상 중 이만큼 경기를 치르면 부상 엔딩 (0xa3a84 의 `+0x1b6 > 19`) */
 const INJURED_GAMES_FOR_ENDING = 20
@@ -199,8 +205,12 @@ export function applyEndingBonus(career: PlayerCareer, endingIndex: number): Pla
   return { ...career, gamePoint: Math.min(MAXIMUM_GAME_POINT, career.gamePoint + endingBonusOf(endingIndex)) }
 }
 
+/**
+ * 이어하기를 묻는 엔딩인가 — 141 키 0x1220c 는 `cmp e, #1 ; bhi`(12222~12224) **부호 없는** 비교라 0 · 1 만 묻는다.
+ * 판정 없음(−1 = 0xffffffff)은 이어하기 팝업 갈래로 가지 않는다(`NO_ENDING_JUDGEMENT`).
+ */
 export function isContinuableEnding(endingIndex: number): boolean {
-  return endingIndex <= CONTINUABLE_ENDING_LIMIT
+  return endingIndex >= 0 && endingIndex <= CONTINUABLE_ENDING_LIMIT
 }
 
 export function canContinueAfterEnding(career: PlayerCareer, endingIndex: number): boolean {

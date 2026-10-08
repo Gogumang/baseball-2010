@@ -307,3 +307,15 @@ describe('명예의 전당 등록 목록(상태 145) 머리띠 — 0x15d54 → 0
     expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/frames/'))).toHaveLength(13 * 15)
   })
 })
+
+describe('판정 없음(e = −1) — 141 의 키 0x1220c 가 아무 팝업도 안 띄운다', () => {
+  it('검정 판만 그리고 누를 곳이 없다 (보너스 · 명예의 전당 · 이어하기 · 끝 모두 없음)', () => {
+    const onFinish = vi.fn()
+    const onContinue = vi.fn(() => true)
+    const { container } = 띄우기({ endingIndex: -1, bonusGamePoint: 0, isContinuable: false, onFinish, onContinue })
+    expect(container.querySelector('[data-part="no-judgement"]')).not.toBeNull()
+    expect(screen.queryByLabelText('확인')).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(onFinish).not.toHaveBeenCalled()
+  })
+})
