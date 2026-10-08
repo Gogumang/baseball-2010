@@ -593,9 +593,9 @@ function seededAfterStart(seed: number): RandomPort {
   // 경기 장면 시작 — 상태 7 장면 덱 섞기(0x3e340 → 0xb08e8) · 효과 객체(3ef6e 0x90190, 1202 번) · 상태 9 시뮬 초기화 rand(0, 2)
   createPatternDeck(random)
   rollSceneEffectInit(random)
-  // 상태 8 경기 적재 — 구장 준비 0x352e8 → 0x783b0 하늘 줄 rand(0, 6) (모드 5 · 6)
-  randomIntegerBelow(random, 0, SKY_ROW_COUNT)
   rollSimulatorInit(random)
+  // 그 뒤 상태 8 경기 적재 — 구장 준비 0x352e8 → 0x783b0 하늘 줄 rand(0, 6) (모드 5 · 6, 3fa5e 가 상태 9 끝에 8 을 예약)
+  randomIntegerBelow(random, 0, SKY_ROW_COUNT)
   return random
 }
 

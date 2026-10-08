@@ -1319,7 +1319,8 @@ export function useMissionSession({
   /**
    * **하늘 줄 — 구장 +0x10** (0x783b0, `stadiumSkyRowOf`). 미션(모드 5 · 6)은 그 밖 갈래라 rand(0, 6) — 경기 적재(상태 8 갱신
    * 0x48658 의 48774 → 구장 준비 0x352e8(354d2))가 **장면마다 한 번** 굴리고 정산 결과 그림까지 같은 줄이다. 차례는 상태 7 장면 초기화
-   * (0x3e340 — 패턴 덱 0xb08e8) 뒤 · 상태 9 경기 시작 꼬리(0x3fa0e — 0xc0dac) 앞.
+   * (0x3e340 — 패턴 덱 0xb08e8) → 상태 9 경기 시작 꼬리(0x3fa0e — 0xc0dac rand(0, 2)) → 상태 8 **뒤**다 — 갱신 표 0x52e2a 7 → 0x3e340 ·
+   * 0x52e3a 9 → 0x3f584 · 0x52e32 8 → 0x48658, 예약 3efe6(상태 7 끝) → 9 · 3fa5e(상태 9 끝) → 8.
    */
   const [skyRow, setSkyRow] = useState(0)
   const rollSkyRow = () => setSkyRow(randomIntegerBelow(random, 0, SKY_ROW_COUNT))
@@ -1397,8 +1398,9 @@ export function useMissionSession({
     // 미션(모드 5·6)도 보통 경기 장면이라 모드 점프 뒤 이 꼬리를 탄다 — 1회초 판·첫 타석 준비보다 앞.
     // 그 앞 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 이 이 장면의 패턴 덱을 섞는다(사람 · CPU 타자가 같이 쓴다)
     openScenePatternDeck(random)
-    rollSkyRow()
     rollSimulatorInit(random)
+    // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재(48774 → 0x352e8 → 0x783b0) — 하늘 줄 rand(0, 6)
+    rollSkyRow()
   }
 
   const actions = {
@@ -1463,8 +1465,9 @@ export function useMissionSession({
       dropAutoRelay()
       // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 장면 덱(0x3e340 → 0xb08e8) · 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
       openScenePatternDeck(random)
-      rollSkyRow()
       rollSimulatorInit(random)
+      // 그 뒤 상태 8 경기 적재의 하늘 줄 rand(0, 6) (`rollSkyRow` 머리말)
+      rollSkyRow()
       // 0xaa57c aa6e0 — g[0x11f] 가 서 있고 g[0xf6] = 4(나리 타자편, SYS 8 0x8d836) → 사람 칸 = 타자편 저장 팀
       // 0x1fc20 은 g[0x11f] 면 명예 타자 갈래를 안 타 늘 나리 타자편 저장 선수 — k 도 그 선수 +0xa & 0x1f
       setMissionRun(startMission(mission, {
