@@ -101,7 +101,7 @@ export function MissionRoutes({
   /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
 
-  const overlay = missionOverlayOf(session, screen.kind === '마선수대결', defenseSceneRef)
+  const overlay = missionOverlayOf(session, defenseSceneRef)
   if (overlay !== null) return overlay
 
   // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
@@ -192,8 +192,17 @@ export function MissionRoutes({
         onRetry={actions.retryBatter}
         resultBoard={resultBoardOf(session, missionRun.mission, missionRun.status, gamePoint,
           screen.kind === '마선수대결' ? BATTER_ACE_MATCH_FLAGS : undefined)}
-        // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다
-        onRestart={() => actions.begin(missionRun.mission)}
+        // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다. 0x3c98e 는 g[0x11f] 를 안 보고 모드 5·6 이면
+        // 장면 0x107 → 0x104 로 같은 미션을 다시 세운다 — g[0x11f] 는 아무도 안 내려 마선수 대결은 **같은 대결**로 다시 선다
+        // (투수편 대결 `PitcherAceMatchRoute` 와 같다)
+        onRestart={() => {
+          if (screen.kind === '마선수대결') {
+            const { kind: _kind, mission: _mission, ...pending } = screen
+            actions.beginAceMatch(missionRun.mission, pending)
+            return
+          }
+          actions.begin(missionRun.mission)
+        }}
         settings={gameSettings.settings}
         onSettingsChange={gameSettings.setSettings}
         // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
@@ -260,13 +269,11 @@ export function MissionRoutes({
  *
  * 수비 장면 득점 점수판 0x41a64(`runScoreBoard`) — 두 측 팀 · 사람 칸 · 공격 측은 미션 준비 0xaa57c 가 레코드 +2 · +3 으로 세운
  * 그대로다(`missionRunScoreBoardOf`). 두 점수는 플레이 시작 때의 경기 점수판 0xb69b0(`run.game.scores` — 타석 득점 · 자동진행
- * 반 이닝 득점이 모두 든다).
- * ⚠️ 미해결 — 마선수 대결(`isAceMatch` · 투수편 대결)은 사람 칸 팀을 나리 저장의 팀으로 바꾼다(0xaa6dc~0xaa728:
- *    g[0x11f]/g[0x176] 이고 g[0xf6] ∈ 2..4 이면 0x1f55d · 0x1f8d5 객체 +1) — 그 갈래를 안 읽어 대결에는 판을 안 넘긴다.
+ * 반 이닝 득점이 모두 든다). 사람 칸 팀은 경기[0x28 + 사람 칸] — 마선수 대결(g[0x11f]/g[0x176] 이고 g[0xf6] ∈ 2..4)이면
+ * 0xaa57c aa6dc~aa728 이 그 모드 저장 레코드 +1 의 팀으로 세운다(`missionHumanTeamIdOf` → `run.game.humanBatting.teamId`).
  */
 function missionOverlayOf(
   session: ReturnType<typeof useMissionSession>,
-  isAceMatch: boolean,
   defenseScene: MutableRefObject<DefenseSceneMemory>,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
@@ -274,9 +281,9 @@ function missionOverlayOf(
     const isPitcher = pendingDefensePlay.side === '투수'
     const run = isPitcher ? session.pitcherRun : session.missionRun
     const runScoreBoard =
-      isAceMatch || session.pitcherAceMatchMission !== null || run === null
+      run === null
         ? undefined
-        : missionRunScoreBoardOf(run.mission, {
+        : missionRunScoreBoardOf(missionWithSideTeamsOf(run.mission, run.game.humanBatting.teamId), {
             ours: run.game.scores[humanSideOf(run.mission)],
             opponents: run.game.scores[cpuSideOf(run.mission)],
           })
@@ -301,6 +308,17 @@ function missionOverlayOf(
     return <DefensePlayback ticks={session.pickoffReplay.ticks} onDone={actions.finishPickoffReplay} />
   }
   return null
+}
+
+/**
+ * 경기[0x28 + 칸] 두 측 팀 — 다른 칸은 레코드 +2 아래 4비트 그대로, 사람 칸은 0xaa57c 가 세운 팀(`MissionGame.humanBatting.teamId`:
+ * 보통 미션은 레코드 팀, 마선수 대결은 그 편 나리 저장 팀). 점수판 재료(`missionRunScoreBoardOf`)는 레코드의 `sideTeams` 를 읽는다.
+ */
+function missionWithSideTeamsOf(mission: OriginalMission, humanTeamId: number): OriginalMission {
+  const human = humanSideOf(mission)
+  if (mission.sideTeams[human] === humanTeamId) return mission
+  const other = mission.sideTeams[human === 0 ? 1 : 0]
+  return { ...mission, sideTeams: human === 0 ? [humanTeamId, other] : [other, humanTeamId] }
 }
 
 interface PitcherAceMatchRouteProps {
@@ -332,7 +350,7 @@ export function PitcherAceMatchRoute(
 
   // 대결 하나 = 미션 장면 하나 (`beginPitcherAceMatch` 가 `mission` 마다 세운다)
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, mission)
-  const overlay = missionOverlayOf(session, true, defenseSceneRef)
+  const overlay = missionOverlayOf(session, defenseSceneRef)
   if (overlay !== null) return overlay
 
   // 미션을 세우기 전(첫 그림) — 아무것도 안 그린다

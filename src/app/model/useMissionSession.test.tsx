@@ -1429,3 +1429,34 @@ describe('타자 미션 타석 화면의 타자 — 미션 타자 차례가 아�
     expect(stage.skillIds).not.toContain(22)
   })
 })
+
+/* ── 마선수 대결의 사람 칸 팀 (0xaa57c aa6dc~aa728) ───────────────────────────── */
+
+describe('마선수 대결의 사람 칸 팀 — g[0xf6] 모드 저장 레코드 +1', () => {
+  const sessionWith = (nariTeamIds?: { batter?: number; pitcher?: number }) =>
+    renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random: createSeededRandom(3), missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' }, setScreen: vi.fn(),
+        ...(nariTeamIds === undefined ? {} : { nariTeamIds }),
+      }))
+
+  it('타자편 대결(g[0xf6] = 4)은 타자편 저장 팀, 투수편 대결(3)은 투수편 저장 팀이 사람 칸에 선다', () => {
+    const batter = aceMatchMissionOf(16, '타자')
+    const pitcher = aceMatchMissionOf(16, '투수')
+    if (batter === null || pitcher === null) throw new Error('대결 미션이 없다')
+    const rendered = sessionWith({ batter: 9, pitcher: 4 })
+    act(() => rendered.result.current.actions.beginAceMatch(batter, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY }))
+    expect(rendered.result.current.missionRun?.game.humanBatting.teamId).toBe(9)
+    expect(rendered.result.current.missionRun?.game.humanPitching?.teamId).toBe(9)
+    act(() => rendered.result.current.actions.beginPitcherAceMatch(pitcher))
+    expect(rendered.result.current.pitcherRun?.game.humanBatting.teamId).toBe(4)
+  })
+
+  it('보통 미션(begin)은 레코드 팀 그대로', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자')!
+    const rendered = sessionWith({ batter: 9, pitcher: 4 })
+    act(() => rendered.result.current.actions.begin(mission))
+    expect(rendered.result.current.missionRun?.game.humanBatting.teamId).toBe(mission.sideTeams[mission.humanSide === 0 ? 0 : 1])
+  })
+})

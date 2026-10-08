@@ -32,6 +32,7 @@ import {
   withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
 import { battingRecordAt, cpuSideOf, humanSideOf, withMissionScore } from '@/entities/mission/model/missionGame'
+import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
@@ -168,6 +169,22 @@ interface MissionSessionInput {
    * 투수 미션(모드 5)의 사람 공 삼진 진동(상태 0x12 그리기 0x4ce9c 의 0x4d0d6)이 본다.
    */
   readonly isVibrationOn?: boolean
+  /**
+   * **마선수 대결의 사람 칸 팀** — 0xaa57c aa6dc~aa728: g[0x11f](타자편) · g[0x176](투수편)이 서 있으면 g[0xf6](SYS 8 이 0x8d836 에서 적은
+   * 그때 모드 — 나리 타자편 4 · 투수편 3)의 저장 레코드 +1 = 그 편 나리 저장의 팀 (`missionHumanTeamIdOf`).
+   * 웹은 그 편 나리 커리어의 `teamId` 다 — 타자편 대결(`beginAceMatch`)은 `batter`, 투수편 대결(`beginPitcherAceMatch`)은 `pitcher`.
+   * 안 넘기면(그 편 저장이 없으면) 레코드 팀 그대로다 (원본은 저장 없이 그 편 이벤트가 돌 수 없다).
+   */
+  readonly nariTeamIds?: { readonly batter?: number; readonly pitcher?: number }
+}
+
+/** g[0xf6] — SYS 8 이 0x8d836~0x8d846 에서 적는 그때 모드 (0x1552d10): 나리 투수편 3 · 타자편 4 */
+const PITCHER_EDITION_MODE = 3
+const BATTER_EDITION_MODE = 4
+
+/** 마선수 대결의 경기 세우기 재료 — 그 편 저장 팀을 모르면(저장 없음) 레코드 팀 그대로 둔다 */
+function aceMatchSetupOf(originalMode: number, savedTeamId: number | undefined): MissionGameSetup {
+  return savedTeamId === undefined ? {} : { aceMatch: { originalMode, savedTeamId } }
 }
 
 /**
@@ -379,6 +396,7 @@ export function useMissionSession({
   batterSkillIds: nariBatterSkillIds = NO_SKILLS,
   hallOfFame,
   isVibrationOn,
+  nariTeamIds,
 }: MissionSessionInput) {
   const nariPitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
   /**
@@ -1321,7 +1339,8 @@ export function useMissionSession({
       openScenePatternDeck(random)
       rollSkyRow()
       rollSimulatorInit(random)
-      setMissionRun(startMission(mission))
+      // 0xaa57c aa6e0 — g[0x11f] 가 서 있고 g[0xf6] = 4(나리 타자편, SYS 8 0x8d836) → 사람 칸 = 타자편 저장 팀
+      setMissionRun(startMission(mission, aceMatchSetupOf(BATTER_EDITION_MODE, nariTeamIds?.batter)))
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
 
@@ -1337,7 +1356,8 @@ export function useMissionSession({
     beginPitcherAceMatch: (mission: OriginalMission) => {
       if (mission.side !== '투수') return
       resetForNewMatch(mission)
-      setPitcherRun(startPitcherMission(mission))
+      // 0xaa57c aa6e0 — g[0x176] 이 서 있고 g[0xf6] = 3(나리 투수편, SYS 8 0x8d836) → 사람 칸 = 투수편 저장 팀
+      setPitcherRun(startPitcherMission(mission, aceMatchSetupOf(PITCHER_EDITION_MODE, nariTeamIds?.pitcher)))
       setPitcherAceMatchMission(mission)
     },
 

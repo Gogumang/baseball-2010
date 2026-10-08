@@ -225,7 +225,8 @@ export function App() {
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다
-  const missionBatterSkillIds = (careerSession.career ?? careerSession.savedCareer)?.equippedSkillIds
+  const missionBatterCareer = careerSession.career ?? careerSession.savedCareer
+  const missionBatterSkillIds = missionBatterCareer?.equippedSkillIds
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
@@ -242,6 +243,11 @@ export function App() {
     // 선수 고르기에서 명예 선수(+0xa5/+0xa6 ≥ 0)를 고르면 0x1fbd0 · 0x1fc20 이 이 기록을 준다.
     // 기록연감 훅은 미션 세션보다 늦게 서므로(올 클리어를 본다) 지난 그림의 값을 넘긴다 — 명전은 미션 중에 안 바뀐다
     hallOfFame: hallOfFameForMissionRef.current,
+    // 마선수 대결의 사람 칸 팀 (0xaa57c aa6dc~aa728) — g[0xf6] 모드 저장 레코드 +1 = 그 편 나리 저장의 팀
+    nariTeamIds: {
+      ...(missionBatterCareer === null || missionBatterCareer === undefined ? {} : { batter: missionBatterCareer.teamId }),
+      ...(pitcherSession.career === null || pitcherSession.career === undefined ? {} : { pitcher: pitcherSession.career.teamId }),
+    },
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다
