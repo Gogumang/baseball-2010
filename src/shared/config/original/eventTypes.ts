@@ -17,7 +17,11 @@ export interface EventChoice {
 export type EventCommand =
   | { readonly op: 'say'; readonly text: string; readonly speaker: number; readonly format: number; readonly portraits: readonly EventPortrait[] }
   | { readonly op: 'choice'; readonly portraits: readonly EventPortrait[]; readonly choices: readonly EventChoice[] }
-  | { readonly op: 'yesno'; readonly text: string; readonly yesEvent: number; readonly noEvent: number }
+  /**
+   * 예아니오 — 레코드 +4 하위 · +6 글(이 스크립트의 글표) · +8 예 · +0xa 아니오 이벤트 (파서 0xadf60).
+   * 실행 0x8d426 은 하위 0 일 때만 창을 띄우고 그 밖은 건너뛴다(0x8d432). 원본 데이터에는 이 명령이 없다.
+   */
+  | { readonly op: 'yesno'; readonly sub: number; readonly text: string; readonly yesEvent: number; readonly noEvent: number }
   | { readonly op: 'system'; readonly sub: number; readonly arg: number; readonly text?: string }
   | { readonly op: 'op4'; readonly sub: number; readonly arg: number; readonly pairs: readonly (readonly number[])[] }
   | { readonly op: 'effect'; readonly id: number }

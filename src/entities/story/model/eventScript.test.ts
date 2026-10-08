@@ -47,6 +47,19 @@ describe('stepFrom — 원작 이벤트 스크립트 진행', () => {
   it('없는 이벤트는 바로 끝이다', () => {
     expect(stepFrom(이벤트, jumpToEvent(9999)).command).toBeNull()
   })
+
+  it('예아니오는 하위 0 일 때만 멈춘다 — ≠ 0 이면 건너뛴다 (0x8d426 · 0x8d432)', () => {
+    const 질문: OriginalEvent[] = [{
+      id: 1, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
+      commands: [
+        { op: 'yesno', sub: 1, text: '건너뛴다', yesEvent: 2, noEvent: 3 },
+        { op: 'yesno', sub: 0, text: '묻는다', yesEvent: 2, noEvent: 3 },
+      ],
+    }]
+    const step = stepFrom(질문, jumpToEvent(1))
+    expect(step.command).toMatchObject({ op: 'yesno', text: '묻는다' })
+    expect(step.passed.map((command) => command.op)).toEqual(['yesno'])
+  })
 })
 
 describe('match — 마선수 대결 명령 (누락 탐색 8차)', () => {

@@ -28,7 +28,10 @@ export function findEvent(events: readonly OriginalEvent[], eventId: number): Or
 }
 
 function isStopping(command: EventCommand): command is StoppingCommand {
-  if (command.op === 'say' || command.op === 'choice' || command.op === 'yesno' || command.op === 'match') return true
+  if (command.op === 'say' || command.op === 'choice' || command.op === 'match') return true
+  // 예아니오 0x8d426 — 하위([명령+4]) 0 일 때만 창을 띄운다. ≠ 0 이면 아무것도 안 하고(0x8d432 → 0x8d906)
+  // 기다림 0x8d954 가 창이 없음([창+9] == 0)을 보고 곧바로 다음 명령으로 넘긴다(0x8dac2)
+  if (command.op === 'yesno') return command.sub === 0
   // system 0 = 알림 팝업. 다른 system 은 원작의 다른 화면을 부른다 (아직 대응 없음).
   return command.op === 'system' && command.sub === 0
 }

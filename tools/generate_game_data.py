@@ -1161,6 +1161,17 @@ def _event_portraits(portraits: list[dict]) -> list[dict]:
 
 
 def _event_command(command: dict, texts: list[str]) -> dict:
+    """
+    명령 레코드 (파서 0xadd10, 표 0xd84a0 — 레코드 +0 = 종류 u32):
+      say    0x28: +4 초상화 수 · +5 초상화 4바이트씩 · +0x1e 글 u16 · +0x20 말하는 이 u8 · +0x22 서식 u8
+      choice 0x2c: +4 · +5 초상화 · +0x1d 갈래 수 · +0x1e + 2i 글 u16 · +0x24 + 2i 갈 이벤트 u16 (갈래 셋까지)
+      system 8:    +4 하위 u8 · +6 값 u16
+      yesno  0xc:  +4 하위 u8 · +6 글 u16 · +8 예 이벤트 u16 · +0xa 아니오 이벤트 u16
+    글 번호는 **이 스크립트 파일의 글표**로 푼다 — 스크립트 재생 0x8be20 이 [mgr+0xa] = 0 으로 두므로 글 짓기
+    0x8b924(system 0 · 예아니오의 [명령+6]) 가 0xacae8([mgr+4] 스크립트 객체, 번호) 로 간다(0x8b9e8). USER_EVT(0xd4db0)는
+    코드가 짓는 평가 이벤트([mgr+0xa] = 1, 0x8a718)에서만 쓴다. 선택지 줄 0x8ba2c 는 늘 0xacad0([mgr+4]) 이다.
+    예아니오의 하위([명령+4])는 버리지 않는다 — 실행 0x8d426 은 하위 0 일 때만 창을 띄우고 ≠ 0 이면 건너뛴다(0x8d432).
+    """
     op = command['op']
     if op == 'system' and command['sub'] == 0:
         # 알림 팝업 — arg 가 대사 번호다 (0x8cf64 system 0)
@@ -1173,7 +1184,8 @@ def _event_command(command: dict, texts: list[str]) -> dict:
         return {'op': 'choice', 'portraits': _event_portraits(command['portraits']),
                 'choices': [{'text': c['textStr'] or '', 'gotoEvent': c['gotoEvent']} for c in command['choices']]}
     if op == 'yesno':
-        return {'op': 'yesno', 'text': command['textStr'] or '', 'yesEvent': command['yesEvent'], 'noEvent': command['noEvent']}
+        return {'op': 'yesno', 'sub': command['sub'], 'text': command['textStr'] or '',
+                'yesEvent': command['yesEvent'], 'noEvent': command['noEvent']}
     if op == 'match':
         return {'op': 'match', 'team': command['team'], 'resultEvents': [command['arg1'], command['arg2']]}
     return {key: value for key, value in command.items() if key not in ('textStr', 'speakerName')}

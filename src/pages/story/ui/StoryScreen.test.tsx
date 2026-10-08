@@ -233,7 +233,7 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
       ...이벤트,
       commands: [
         { op: 'say', text: '갈래?', speaker: 0, format: 0, portraits: [] },
-        { op: 'yesno', text: '정말 갈까요?', yesEvent: 2, noEvent: 3 },
+        { op: 'yesno', sub: 0, text: '정말 갈까요?', yesEvent: 2, noEvent: 3 },
       ],
     } as unknown as OriginalEvent
     const 예 = { ...이벤트, id: 2, commands: [{ op: 'say', text: '예를 골랐다', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
@@ -257,7 +257,7 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
   it('예아니오 취소(CLR)는 [아니오] (0x7514a — 키 −16 → 1)', () => {
     const 질문 = {
       ...이벤트,
-      commands: [{ op: 'yesno', text: '정말?', yesEvent: 2, noEvent: 3 }],
+      commands: [{ op: 'yesno', sub: 0, text: '정말?', yesEvent: 2, noEvent: 3 }],
     } as unknown as OriginalEvent
     const 아니오 = { ...이벤트, id: 3, commands: [{ op: 'say', text: '취소', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
     띄우기([질문, 아니오])
