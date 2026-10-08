@@ -85,3 +85,23 @@ describe('간이 엔진 명단과 CPU 대타 (0xac228 → 0xaf06c → 0xaebe4 �
     expect(random.calls()).toBe(0)
   })
 })
+
+describe('오늘 타석 결과 링 — 간이 엔진 타석의 아웃은 늘 5 (state[0x1f] 가 서지 않는다, a8a9e)', () => {
+  it('사람 판 기준은 뜬공 아웃 6 · 땅볼 아웃 5, 간이 엔진은 둘 다 5', () => {
+    const 뜬공 = { kind: '아웃', detail: '뜬공아웃' } as const
+    const 땅볼 = { kind: '아웃', detail: '땅볼아웃' } as const
+    const 사람 = recordLineupPlay(recordLineupPlay(rosterLineupOf(12), 0, 뜬공), 0, 땅볼)
+    const 간이 = recordLineupPlay(recordLineupPlay(rosterLineupOf(12), 0, 뜬공, { quickEngine: true }), 0, 땅볼, { quickEngine: true })
+
+    expect(사람.records[0]?.results).toEqual([6, 5])
+    expect(간이.records[0]?.results).toEqual([5, 5])
+  })
+
+  it('간이 엔진도 안타 · 삼진 · 볼넷 코드는 같다', () => {
+    let lineup = rosterLineupOf(12)
+    for (const outcome of [{ kind: '안타', bases: 2 }, { kind: '삼진' }, { kind: '볼넷' }, { kind: '홈런' }] as const) {
+      lineup = recordLineupPlay(lineup, 3, outcome, { quickEngine: true })
+    }
+    expect(lineup.records[3]?.results).toEqual([2, 7, 8, 4])
+  })
+})

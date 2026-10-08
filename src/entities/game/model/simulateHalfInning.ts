@@ -652,7 +652,7 @@ export function* simulateHalfInningTicks(
       ...(play.swingingStrikeOutLost === true ? { swingingStrikeOutLost: true as const } : {}),
     })
     // 타순 칸 기록(안타·홈런·타석) — 다음 CPU 대타 판정이 본다 (0xa8024)
-    if (lineup !== undefined) lineup = recordLineupPlay(lineup, order, outcome)
+    if (lineup !== undefined) lineup = recordLineupPlay(lineup, order, outcome, { quickEngine: true })
     // 타석이 끝나는 자리 — 원본은 여기서 돌발 결과비트로 판정한다 (0x8f414)
     hooks.onAtBatEnd?.({
       outcome,

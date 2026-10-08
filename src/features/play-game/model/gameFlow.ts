@@ -1790,7 +1790,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
-      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome),
+      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, { quickEngine: true }),
       pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, mound.pitcherSlot, {
         outs: outsAddedBetween(progress.game, game),
         runsAllowed: runsBattedIn,

@@ -2687,7 +2687,7 @@ function playTeammateAtBat(
       endedInningIndex: game.inning - 1,
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       // 정산 0xa8024 — 타순 칸 기록(타석·안타·홈런)이 다음 CPU 대타 판정의 재료다
-      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome),
+      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, { quickEngine: true }),
       // 같은 정산이 상대 마운드 투수 레코드에 아웃·실점·탈삼진을 쌓는다
       pitcherLines: chargeCpuPitcherLine(progress.pitcherLines, options.opponentTeamId, mound.pitcherSlot, {
         outs: outsAddedBetween(before, game),
