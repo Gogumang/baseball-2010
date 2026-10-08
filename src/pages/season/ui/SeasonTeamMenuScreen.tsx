@@ -9,7 +9,9 @@ import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 export type TeamMenuItem = (typeof TEAM_MENU)[number]
 
 /** 0x47d8 — SR+0x56 == 1 이면 켬 표 칸 1(트레이드)을 0 으로 */
-const TRADE_USED_GRAY: ReadonlySet<string> = new Set([TEAM_MENU[1]])
+const TRADE_INDEX = 1
+const TRADE_USED_GRAY: ReadonlySet<string> = new Set([TEAM_MENU[TRADE_INDEX]])
+const TRADE_USED_DISABLED: readonly number[] = [TRADE_INDEX]
 
 export interface SeasonTeamMenuScreenProps {
   readonly state: SeasonState
@@ -38,7 +40,8 @@ export interface SeasonTeamMenuScreenProps {
  * ```
  * [[this+0x78]+0x28][1] = (SR+0x56 == 1) ? 0 : 1        ; 트레이드 칸 — 이번 주기에 트레이드를 썼으면 흑백
  * ```
- * 키 0x4e40 은 이 표를 안 본다 — 흑백이어도 트레이드 0xe4 로 간다(그리기만 바꾼다).
+ * 키 0x4e40 은 이 표를 안 본다 — 커서가 칸 1 에 있으면 흑백이어도 트레이드 0xe4 로 간다. 대신 위·아래 이동 0x6c444 가
+ * 같은 표를 읽어 꺼진 칸을 건너뛴다(`useSeasonCursor` 의 `disabled`) — 커서가 그 칸에 새로 들어설 수 없다.
  * ⚠️ 원본 그대로의 어긋남(미해결): this+0x78 은 0x28 바이트짜리 0xd2e60 객체(0xf704 · 0x6bd7d)라 +0x28 은 객체 **밖**이다 —
  * 진입이 쓰는 칸 1 말고 칸 0 · 2 · 3 의 값은 힙 이웃에 달려 정할 수 없어 켠 것으로 둔다.
  */
@@ -53,6 +56,7 @@ export function SeasonTeamMenuScreen({
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: TEAM_MENU.length, onSelect: select, onCancel: onBack,
+    ...(state.record.tradeUsed === 1 ? { disabled: TRADE_USED_DISABLED } : {}),
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })

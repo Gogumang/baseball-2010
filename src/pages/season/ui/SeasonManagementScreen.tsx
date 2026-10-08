@@ -80,6 +80,8 @@ export function SeasonManagementScreen({
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: MANAGEMENT_MENU.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
+    // 0x6c444 — 꺼진 칸(켬 표 0)은 위·아래가 건너뛴다
+    disabled,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })

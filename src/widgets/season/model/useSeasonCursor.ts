@@ -22,6 +22,16 @@ export interface SeasonCursorOptions {
    */
   readonly cursor?: number
   readonly onCursorChange?: (index: number) => void
+  /**
+   * 메뉴 켬 표(메뉴 +0x28)가 0 인 칸 — 위·아래 이동 0x6c444 가 건너뛴다(직접 떴다):
+   * ```
+   * n = 켠 칸 수 (0x6c3f4)
+   * 지금 칸이 켜져 있으면 n > 1, 꺼져 있으면 n > 0 일 때만 움직인다 — 아니면 제자리
+   * 한 칸씩 옮기기(0x6be70)를 켠 칸에 닿을 때까지 되풀이 — 옮겨도 자리가 그대로면(끝에서 막힘) 처음 자리로 돌린다
+   * ```
+   * 확인 키는 이 표를 안 본다(0x8f30 · 0x4e40) — 막는 것은 이동뿐이다.
+   */
+  readonly disabled?: readonly number[]
 }
 
 export interface SeasonCursor {
@@ -30,7 +40,7 @@ export interface SeasonCursor {
 }
 
 export function useSeasonCursor({
-  count, onSelect, onCancel, isEnabled = true, cursor: heldCursor, onCursorChange,
+  count, onSelect, onCancel, isEnabled = true, cursor: heldCursor, onCursorChange, disabled = [],
 }: SeasonCursorOptions): SeasonCursor {
   const [ownCursor, setOwnCursor] = useState(0)
   const cursor = heldCursor ?? ownCursor
@@ -44,7 +54,18 @@ export function useSeasonCursor({
   }
   /** 위·아래 한 칸 — 화면이 커서를 들면 이전 값에서 셈하고, 부르는 쪽이 들면 지금 값에서 셈해 넘긴다 */
   const stepCursor = (step: number, total: number, current: number) => {
-    const next = (previous: number) => (Math.min(previous, total - 1) + step + total) % total
+    const isOn = (index: number) => !disabled.includes(index)
+    const next = (previous: number) => {
+      const start = Math.min(previous, total - 1)
+      // 0x6c444 — 켠 칸이 지금 칸 말고 없으면 제자리
+      let onCount = 0
+      for (let index = 0; index < total; index += 1) if (isOn(index)) onCount += 1
+      if (onCount <= (isOn(start) ? 1 : 0)) return start
+      let position = start
+      do position = (position + step + total) % total
+      while (!isOn(position))
+      return position
+    }
     if (heldCursor === undefined) return setOwnCursor(next)
     onCursorChange?.(next(current))
   }

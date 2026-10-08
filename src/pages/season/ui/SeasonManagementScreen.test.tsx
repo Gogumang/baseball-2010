@@ -83,6 +83,28 @@ describe('시즌 관리 메뉴 (상태 0xc9)', () => {
     expect(onSelect).toHaveBeenCalledWith('아이템', SEASON_SCENE_STATE.아이템)
   })
 
+  it('위·아래는 꺼진 칸을 건너뛴다 (0x6c444) — SR+4 면 칸 1 에서 ↓ 하면 2·3 을 넘어 아이템(4)', () => {
+    const onCursorChange = vi.fn()
+    render(
+      <SeasonManagementScreen state={시즌({ acted: true })} onSelect={vi.fn()} onExit={vi.fn()}
+        cursor={1} onCursorChange={onCursorChange} />,
+    )
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(4)
+  })
+
+  it('엔딩을 본 시즌이면 칸 4 에서 ↓ 는 꺼진 5 를 넘어 0 으로 감싼다, 칸 4 에서 ↑ 는 2·3 을 넘어 1', () => {
+    const onCursorChange = vi.fn()
+    render(
+      <SeasonManagementScreen state={시즌({ endingSeen: true })} onSelect={vi.fn()} onExit={vi.fn()}
+        cursor={4} onCursorChange={onCursorChange} />,
+    )
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(0)
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(1)
+  })
+
   it('취소(−16)는 메인 메뉴 장면(0x103)으로 나간다', () => {
     const onExit = vi.fn()
     render(<SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={onExit} />)
@@ -160,6 +182,16 @@ describe('구단관리 하위 메뉴 (상태 0xce)', () => {
     expect(아이콘필터('구장관리')).toBe('')
     fireEvent.click(screen.getByRole('button', { name: '트레이드' }))
     expect(onSelect).toHaveBeenLastCalledWith('트레이드', SEASON_SCENE_STATE.트레이드)
+  })
+
+  it('SR+0x56 == 1 이면 위·아래가 트레이드 칸을 건너뛴다 (0x6c444) — 구장관리 ↓ 는 선수영입', () => {
+    const onCursorChange = vi.fn()
+    render(
+      <SeasonTeamMenuScreen state={시즌({ tradeUsed: 1 })} onSelect={vi.fn()} onBack={vi.fn()}
+        cursor={0} onCursorChange={onCursorChange} />,
+    )
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(2)
   })
 
   it('SR+0x56 == 0 이면 다 켠 칸이다', () => {
