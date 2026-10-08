@@ -6,7 +6,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF } from '@/pages/general-mode/lib/prepareLayout'
-import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
+import { FIRST_BAT_PHASE, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 
