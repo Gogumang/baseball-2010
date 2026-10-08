@@ -6,6 +6,7 @@ import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
 import type { TeamGameOptions } from '@/pages/team-game/model/useTeamGame'
 import { pitchSlotsFor } from '@/features/play-team-game/model/teamGameFlow'
+import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -54,7 +55,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
     const strikesBefore = progress.atBat.strikes
     진동.mockClear()
     act(() =>
-      result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, courseCell: step % 9, gaugeCell: 0 }),
+      result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), gaugeCell: 0 }),
     )
     기록.push({
       strikesBefore,

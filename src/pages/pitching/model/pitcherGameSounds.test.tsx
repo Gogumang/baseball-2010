@@ -12,6 +12,7 @@ import { PITCH_RELEASE_SOUND } from '@/features/play-at-bat/model/atBatSounds'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
+import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 
 /** 무엇이 몇 번 울렸는지 적어 두는 포트 */
 function 녹음포트() {
@@ -73,7 +74,7 @@ describe('투수편 화면의 소리 배선', () => {
     expect(result.current.canPitch).toBe(true)
     녹음.played.length = 0
 
-    act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+    act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
     expect(녹음.played[0]).toBe(PITCH_RELEASE_SOUND)
 
     // 심판 콜은 난수가 정한다 — 몇 개 더 던져 볼·스트라이크 계열이 통로까지 가는지 본다
@@ -84,7 +85,7 @@ describe('투수편 화면의 소리 배선', () => {
         continue
       }
       if (!result.current.canPitch) break
-      act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+      act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
     }
     expect(녹음.played.some((id) => [16, 18, 39, 21, 24, 25].includes(id))).toBe(true)
   })
@@ -93,7 +94,7 @@ describe('투수편 화면의 소리 배선', () => {
     const { result } = 띄우기(2)
     expect(result.current.canPitch).toBe(true)
     녹음.played.length = 0
-    act(() => result.current.actions.throwPitch({ typeNumber: 22, courseCell: 4, gaugeCell: 0 }))
+    act(() => result.current.actions.throwPitch({ typeNumber: 22, gaugeCell: 0 }))
     expect(녹음.played[0]).toBe(28)
 
     // 다음 공을 던질 수 있는 자리까지 넘긴다 (인플레이면 수비 화면을 닫는다)
@@ -103,7 +104,7 @@ describe('투수편 화면의 소리 배선', () => {
     }
     if (!result.current.canPitch) return
     녹음.played.length = 0
-    act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+    act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
     expect(녹음.played[0]).toBe(PITCH_RELEASE_SOUND)
   })
 
@@ -137,7 +138,7 @@ describe('투수편 화면의 소리 배선', () => {
         continue
       }
       if (!result.current.canPitch) break
-      act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+      act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
     }
     const pending = result.current.progress.pendingDefensePlay
     expect(pending?.outcome.kind).toBe('안타')
@@ -179,7 +180,7 @@ describe('투수편 화면의 소리 배선', () => {
           // 0xe 의 OK — 그 뒤 0xf 진입 0x3d954 가 대타를 묻는다
           act(() => result.current.actions.confirmScene())
         } else if (result.current.canPitch) {
-          act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: 4, gaugeCell: 0 }))
+          act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
         } else {
           break
         }
@@ -249,7 +250,7 @@ describe('CPU 타자의 파울 각 공 판 — 판이 끝날 때 콜 (결과 코
         }
         if (!result.current.canPitch) break
         녹음.played.length = 0
-        act(() => result.current.actions.throwPitch({ typeNumber: 1, courseCell: pitch % 9, gaugeCell: 0 }))
+        act(() => result.current.actions.throwPitch({ typeNumber: 1, aim: aimAfterTicks(1, { dx: (pitch % 3) - 1, dy: 1 - Math.floor((pitch % 9) / 3) }, 11), gaugeCell: 0 }))
         expect(녹음.played).not.toContain(25)
       }
       unmount()

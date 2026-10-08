@@ -94,6 +94,7 @@ import {
 import type { LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import type { Pitch } from '@/entities/pitching/model/pitch'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -916,18 +917,13 @@ export function pitchSlotsFor(progress: PitcherGameProgress): readonly PitchSlot
 export interface PitchInput {
   /** 원본 구질 번호 1~21, 마구는 22 */
   readonly typeNumber: number
-  /** 코스 칸 0~8 */
-  readonly courseCell: number
+  /**
+   * 조준점 x · y · z — 0x10 에서 방향키로 흐른 점(`pitchAim`). 0x4dc78 이 세 칸 그대로 목표로 쓴다.
+   * 안 넘기면 0x10 진입 0x39894 의 존 중심(안 움직인 조준점)
+   */
+  readonly aim?: WorldPoint
   /** 게이지에서 누른 칸 0~9. 안 눌렀으면 0 */
   readonly gaugeCell: number
-  /**
-   * **투수 미션 조준점 흔들림 세기 0~3** — 미션 레코드 바이트 13 (`missions.ts` 의
-   * `conditionCode`, 0xaa57c → 0x39c5c). 미션이 아니면 안 넘긴다.
-   *
-   * 안 넘기거나 0 이면 조준점을 안 흔든다 — 지금까지와 똑같이 논다.
-   * ⚠️ 타자 미션은 이 값이 **전부 0** 이라 타자편에서는 아무 일도 없다 (표 확인).
-   */
-  readonly missionConditionCode?: number
 }
 
 /**
@@ -1015,16 +1011,12 @@ export function startPitch(
   const builtPitch = buildHumanPitch(
     {
       typeNumber: input.typeNumber,
-      courseCell: input.courseCell,
+      ...(input.aim === undefined ? {} : { aim: input.aim }),
       grade,
       gaugeCell: input.gaugeCell,
       stats: fatigued,
       repertoire: options.repertoire,
       side: options.stageSide ?? 1,
-      // 투수 미션일 때만 조준 흔들림 세기가 실린다 (0x39c5c)
-      ...(input.missionConditionCode === undefined
-        ? {}
-        : { missionConditionCode: input.missionConditionCode }),
     },
     random,
   )
@@ -2161,6 +2153,15 @@ function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort):
   if (pinched === progress) return progress
   // 0x16 → 0xd(지우기 건너뜀) → 0xe(강판 판정 · OK 대기) → OK 뒤 메시지 1(돌발 굴림) → 0xf 진입 (`confirmScene`)
   return prepareAtBat(pinched, random)
+}
+
+/**
+ * **코스 고르기 취소** — 상태 0x10(조준)의 CLR(−16) 가지가 경기 상태를 **0xf** 로 되돌린다
+ * (`0x50ee0~0x50ee6` `0xbcb49(…, 0xf)`). 0xf 진입 `0x3d954` 가 다시 돌아 CPU 대타 `0xac228` 를 한 번 더 묻는다
+ * (팀 경기 `returnToPitchSelection` 과 같은 자리). 화면이 조준 단계에서 구질 단계로 돌아갈 때 부른다.
+ */
+export function returnToPitchSelection(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  return enterPitchSelection(progress, random)
 }
 
 /**

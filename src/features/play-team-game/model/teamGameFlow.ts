@@ -83,6 +83,7 @@ import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import {
@@ -2367,8 +2368,11 @@ function finishBatterOutcome(
 export interface TeamPitchInput {
   /** 원본 구질 번호 1~21, 마구는 22 */
   readonly typeNumber: number
-  /** 코스 칸 0~8 */
-  readonly courseCell: number
+  /**
+   * 조준점 x · y · z — 0x10 에서 방향키로 흐른 점(`features/play-pitcher-game/model/pitchAim`). 0x4dc78 이 세 칸 그대로
+   * 목표로 쓴다. 안 넘기면 0x10 진입 0x39894 의 존 중심(안 움직인 조준점)
+   */
+  readonly aim?: WorldPoint
   /** 게이지에서 누른 칸 0~9. 안 눌렀으면 0 */
   readonly gaugeCell: number
 }
@@ -2443,7 +2447,7 @@ function pitchOnce(
   const builtPitch = buildHumanPitch(
     {
       typeNumber: input.typeNumber,
-      courseCell: input.courseCell,
+      ...(input.aim === undefined ? {} : { aim: input.aim }),
       grade,
       gaugeCell: input.gaugeCell,
       stats: fatigued,

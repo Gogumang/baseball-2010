@@ -36,7 +36,7 @@ function 상대마타자(progress: TeamGameProgress, aceIndex = 0): TeamGameProg
   }
 }
 
-const 한가운데직구 = { typeNumber: 1, courseCell: 4, gaugeCell: 0 }
+const 한가운데직구 = { typeNumber: 1, gaugeCell: 0 }
 
 describe('필살 남은 횟수 — 타순 칸 s8 팀[+0x29 + 타순], 0xaebe4 가 채운다', () => {
   it('일반 로스터 타자는 +0x18 == 0 이라 0 이다 — "0" 키가 무시된다 (0x51e14)', () => {
@@ -150,7 +150,7 @@ describe('사람 투구의 공+0x10 (0x3de10) — CPU 타석 판정의 0x34d6c �
       ),
     }
     const random = createSeededRandom(9)
-    const 마구 = startThrowPitch(마구투수, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, random)
+    const 마구 = startThrowPitch(마구투수, { typeNumber: 22, gaugeCell: 0 }, random)
     expect(마구.magicRemaining).toBe(2)
     expect(마구.lastPitch?.magicNumber).toBe(2)
     expect(마구.lastPitch?.pitcherMagicNumber).toBe(2)
@@ -168,7 +168,7 @@ describe('사람 투구의 공+0x10 (0x3de10) — CPU 타석 판정의 0x34d6c �
         slot === base.ourPitcherIndex ? { ...pitcher, repertoire: { ...pitcher.repertoire, magicId: 3 } } : pitcher,
       ),
     }
-    const 마구 = startThrowPitch(마구투수, { typeNumber: 22, courseCell: 4, gaugeCell: 0 }, createSeededRandom(9))
+    const 마구 = startThrowPitch(마구투수, { typeNumber: 22, gaugeCell: 0 }, createSeededRandom(9))
     expect(마구.magicRemaining).toBe(0)
     expect(마구.lastPitch?.magicNumber).toBe(0)
   })

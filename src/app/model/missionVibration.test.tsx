@@ -13,6 +13,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
+import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 진동 = vi.fn<(pattern: VibratePattern) => boolean>(() => true)
 const 원래진동 = Object.getOwnPropertyDescriptor(navigator, 'vibrate')
@@ -104,7 +105,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number, ac
     판정 = null
     진동.mockClear()
     // 코스를 돌려 가며 게이지 없이 직구 — 스트라이크·볼이 섞이게
-    act(() => session.handleThrow(PITCH_TYPES[0], step % 9, 0, false))
+    act(() => session.handleThrow(PITCH_TYPES[0], aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), 0, false))
     const thrown = 판정 as { strikesBefore: number; kind: PitchResolution['kind'] } | null
     기록.push({
       strikesBefore: thrown?.strikesBefore ?? -1,
