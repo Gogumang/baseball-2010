@@ -49,7 +49,8 @@ const NO_EQUIPMENT: readonly number[] = [0, 0, 0, 0]
 /** 장비 니블 네 칸 — 시즌 명단 값, 없으면 그 선수의 붙박이 표 행 (`SeasonPlayer.equipment`) */
 export function seasonPlayerEquipmentOf(player: SeasonPlayer, ownerTeamId: number, isPitcher: boolean): readonly number[] {
   if (player.equipment !== undefined) return player.equipment
-  if (player.id >= HALL_OF_FAME_FIRST_ID) return NO_EQUIPMENT
+  // 영입 선수 — 영입 0xc554 가 옮긴 기록의 니블이 처음 값이다 (기록 사본에 있을 때만, 옛 사본은 0)
+  if (player.id >= HALL_OF_FAME_FIRST_ID) return player.record?.equipment ?? NO_EQUIPMENT
   const table = isPitcher ? teamPitchers(tableTeamOf(player, ownerTeamId)) : teamBatters(tableTeamOf(player, ownerTeamId))
   return table[player.id]?.equipment ?? NO_EQUIPMENT
 }
@@ -93,16 +94,18 @@ export function seasonPlayerRecordOf(
   const batterRecord = isPitcher ? undefined : record as SeasonEntryBatterRecord | undefined
   // +0xb — 기록 사본의 바이트, 옛 사본(칸이 생기기 전)은 투수 보직(+0xb & 3, 0xb6dec)만
   const role: number = pitcherRecord?.role ?? 0
+  // 밑값 +0xc · +0x14 · 니블을 든 기록 사본 — 0x30 바이트 그대로 읽는다(니블은 시즌 명단 값, 없으면 옮긴 기록의 값)
+  const hasParts = record?.baseAbility !== undefined
   return {
     name: record?.name ?? `${isPitcher ? '투수' : '타자'} ${index + 1}번`,
     isPitcher,
-    base: record?.ability ?? [],
+    base: record?.baseAbility ?? record?.ability ?? [],
     profile: record?.profile ?? role & 3,
     specialNumber: (isPitcher ? pitcherRecord?.repertoire.magicId : batterRecord?.specialNumber) ?? 0,
-    skillBits: 0,
-    equipment: player.equipment ?? NO_EQUIPMENT,
+    skillBits: hasParts ? (record?.skillBits ?? 0) : 0,
+    equipment: player.equipment ?? (hasParts ? record?.equipment : undefined) ?? NO_EQUIPMENT,
     fieldPosition,
-    isComplete: false,
+    isComplete: hasParts,
   }
 }
 

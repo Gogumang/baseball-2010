@@ -13,6 +13,7 @@ import type {
   SeasonEntryBatterRecord, SeasonEntryPitcherRecord, SeasonEntryRecordSource,
 } from '@/entities/season-mode/model/seasonEntry'
 import { modeBatterOfHallOfFame } from '@/app/model/modeBatter'
+import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 
 /** 명전 칸 사본 — 시즌 영입 후보·경기 명단이 읽는 두 목록 */
 export type SeasonHallOfFame = Pick<Collection, 'hallOfFame' | 'hallOfFamePitchers'>
@@ -33,6 +34,7 @@ const FASTBALL_ONLY_MASK = 1
  * ⚠️ 웹 시즌 명단은 선수 기록 0x30 바이트를 들지 않아(번호·종류·수비 위치·스태미나만) 영입 때 옮긴 사본 대신 지금의 명전
  *    칸을 읽는다. 영입 뒤 명전 칸이 바뀌는 길은 삭제뿐이고 삭제는 시즌 명단에서도 그 선수를 뺀다(0x221dc)라 결과가 같다.
  *    영입 선수의 시즌 장비 구매도 0xdc → 0x2328c 가 명전 칸 +0x19·+0x1a 에 그대로 옮겨 쓰니(1933a25) 지금 칸을 읽어도 같다.
+ *    밑값 +0xc · 장착 비트 +0x14 · 니블도 함께 실어(`SeasonEntryRecordParts`) 명단 차례가 시즌 명단 니블로 0xb6414 를 다시 셈한다.
  *   투수 보직 = +0xb & 3 (0xb6dec) — 등록 0x1f654 가 +0xb 를 안 건드려 투수편 선수의 보직이 남는다.
  *     옛 명전 기록(칸이 생기기 전 등록)은 없어 싣지 않는다 — 받는 쪽은 선발로 본다.
  */
@@ -44,9 +46,18 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
       const famer = hallOfFameBatterAt(hallOfFame, slot)
       if (famer === null) return undefined
       const { ability } = modeBatterOfHallOfFame(famer)
+      const levels = famer.equipmentLevels
       return {
         name: famer.name,
         ability: [ability.hit, ability.power, ability.defense, ability.run],
+        // 밑값 +0xc · +0x14 · 니블 — 장비 니블을 든 기록만(옛 기록은 등록 때 남긴 0xb6414 값 그대로)
+        ...(levels === undefined
+          ? {}
+          : {
+              baseAbility: [famer.ability.hit, famer.ability.power, famer.ability.defense, famer.ability.run] as const,
+              skillBits: skillBitsOfIds(famer.equippedSkillIds ?? []),
+              equipment: [levels.hit, levels.power, levels.defense, levels.run],
+            }),
         // +0xb · +0x18 — 등록이 0x30 바이트를 그대로 옮긴 칸 (내외야는 등록 때 남긴 칸, 옛 기록은 0)
         profile: seasonRecordProfileOf(
           famer.look?.typeIndex ?? 0, famer.look?.handIndex ?? 0, famer.look?.skinIndex ?? 0, famer.positionIndex ?? 0,
@@ -64,9 +75,17 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
       const ability = famer.equipmentLevels === undefined
         ? famer.equippedAbility
         : equippedPitcherAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds })
+      const levels = famer.equipmentLevels
       return {
         name: famer.name,
         ability: [ability.control, ability.velocity, ability.breaking, ability.stamina],
+        ...(levels === undefined
+          ? {}
+          : {
+              baseAbility: [famer.ability.control, famer.ability.velocity, famer.ability.breaking, famer.ability.stamina] as const,
+              skillBits: skillBitsOfIds(equippedSkillIds),
+              equipment: [levels.control, levels.velocity, levels.breaking, levels.stamina],
+            }),
         repertoire: {
           name: famer.name,
           form: pitcherFormOf(famer.look.typeIndex, famer.look.handIndex),
@@ -88,9 +107,14 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
  */
 export function seasonNariPitcherRecordOf(career: PitcherCareer): SeasonEntryPitcherRecord {
   const ability = equippedPitcherAbilityOf(career)
+  const levels = career.equipmentLevels
   return {
     name: career.name,
     ability: [ability.control, ability.velocity, ability.breaking, ability.stamina],
+    // 0x30 바이트의 밑값 +0xc · 장착 비트 +0x14 · 니블 +0x19/+0x1a — 시즌 장비 창이 니블을 바꾸면 경기가 0xb6414 를 다시 셈한다
+    baseAbility: [career.ability.control, career.ability.velocity, career.ability.breaking, career.ability.stamina],
+    skillBits: skillBitsOfIds(career.equippedSkillIds),
+    equipment: [levels.control, levels.velocity, levels.breaking, levels.stamina],
     repertoire: {
       name: career.name,
       form: pitcherFormOfCareer(career),
@@ -105,9 +129,14 @@ export function seasonNariPitcherRecordOf(career: PitcherCareer): SeasonEntryPit
 /** **나리 타자 기록** — 칸 5 의 원본 `0x220ec(저장)` = 타자편 저장(칸 4)의 내 타자. 이름 rec + 1 · 0xb6414 (`modeBatterOf` 와 같다) */
 export function seasonNariBatterRecordOf(career: PlayerCareer): SeasonEntryBatterRecord {
   const ability = equippedAbilityOf(career)
+  const levels = career.equipmentLevels
   return {
     name: career.name,
     ability: [ability.hit, ability.power, ability.defense, ability.run],
+    // 0x30 바이트의 밑값 +0xc · 장착 비트 +0x14 · 니블 +0x19/+0x1a — 시즌 장비 창이 니블을 바꾸면 경기가 0xb6414 를 다시 셈한다
+    baseAbility: [career.ability.hit, career.ability.power, career.ability.defense, career.ability.run],
+    skillBits: skillBitsOfIds(career.equippedSkillIds),
+    equipment: [levels.hit, levels.power, levels.defense, levels.run],
     // +0xb (등록 0x16f28) · +0x18 고른 필살타법 — 영입 0xc554 가 통째로 옮기는 0x30 바이트의 칸
     profile: seasonRecordProfileOf(career.battingTypeIndex, career.battingSide, career.skinIndex, career.positionIndex),
     specialNumber: career.specialSwingNumber,

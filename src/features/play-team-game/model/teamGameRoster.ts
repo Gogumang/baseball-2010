@@ -555,7 +555,7 @@ export interface TeamEntryPitcherRecord {
   readonly role?: PitcherRole
   /** 그 선수의 원본 id(+0) — 있으면 리그 기록표의 표 밖 줄로 쌓는다 (`TeamEntryBatter.recordId`) */
   readonly recordId?: number
-  /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryPitcher.skillBits`). 부르는 쪽이 안 실으면 0(⚠️ 영입 선수의 장착 비트를 아직 안 싣는다) */
+  /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryPitcher.skillBits`). 시즌 명단은 기록 사본에 있으면 싣는다(옛 사본은 없어 0) */
   readonly skillBits?: number
 }
 

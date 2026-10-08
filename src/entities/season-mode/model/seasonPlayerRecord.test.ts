@@ -86,3 +86,24 @@ describe('최대 칸 0x5e864', () => {
     expect(seasonAbilityLimitsOf({ isPitcher: false, profile: 0x34 })).toEqual([800, 850, 750, 750])
   })
 })
+
+describe('영입 선수 기록 사본의 0x30 바이트 — 밑값 +0xc · +0x14 · 니블 (0xc554 가 통째로 옮긴다)', () => {
+  const 기록 = {
+    name: '나리타',
+    ability: [600, 600, 600, 600] as const,
+    baseAbility: [500, 500, 500, 500] as const,
+    skillBits: 1 << 7,
+    equipment: [2, 0, 3, 0],
+  }
+  const 나리 = { id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 기록 }
+
+  it('장비 창의 처음 니블은 옮긴 기록의 니블이다 — 시즌 명단 값이 있으면 그것', () => {
+    expect(seasonPlayerEquipmentOf(나리, 0, false)).toEqual([2, 0, 3, 0])
+    expect(seasonPlayerEquipmentOf({ ...나리, equipment: [4, 0, 0, 0] }, 0, false)).toEqual([4, 0, 0, 0])
+  })
+
+  it('카드는 밑값 · 장착 비트 · 니블을 그대로 읽는다', () => {
+    const view = seasonPlayerRecordOf(0, 나리, false, 0)
+    expect(view).toMatchObject({ base: [500, 500, 500, 500], skillBits: 1 << 7, equipment: [2, 0, 3, 0], isComplete: true })
+  })
+})

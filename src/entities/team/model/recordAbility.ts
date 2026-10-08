@@ -49,3 +49,8 @@ export function recordAbilityAt(record: AbilityRecord, slot: number, isPitcher: 
 export function recordAbilityOf(record: AbilityRecord, isPitcher: boolean): [number, number, number, number] {
   return [0, 1, 2, 3].map((slot) => recordAbilityAt(record, slot, isPitcher)) as [number, number, number, number]
 }
+
+/** 장착 스킬 번호 목록 → 레코드 `+0x14` 비트 (`0xb62b4(기록, n)` = (+0x14 >> n) & 1) */
+export function skillBitsOfIds(skillIds: readonly number[]): number {
+  return skillIds.reduce((bits, id) => (id >= 0 && id < 32 ? (bits | (1 << id)) >>> 0 : bits), 0)
+}
