@@ -163,3 +163,47 @@ describe('맞지 않은 공의 대기 — 상태 0x12 0x4e6de~0x4e730', () => {
     expect(rendered.result.current.run.remainingPitches).toBe(8)
   })
 })
+
+describe('사구 뒤 벤치 클리어링 — 0x4e740 의 종류 8 검사는 사구(v4 가 종류 2)에서 늘 거짓', () => {
+  it('rand(0, 99) ≤ 19 면 0x1e — 진입 굴림 45 번, 틱 10 이 돌았으면 8 번 더, 끝나면 0xae24c', () => {
+    const { random, calls } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.finishLoading())
+    OK(rendered)
+    calls.length = 0
+    act(() => rendered.result.current.onPitchResolved(사구))
+    act(() => {
+      vi.advanceTimersByTime(31 * millisecondsPerFrame())
+    })
+    expect(calls[0]).toEqual([0, 99])
+    expect(calls).toHaveLength(1 + 45)
+    expect(rendered.result.current.isBenchClearing).toBe(true)
+    act(() => rendered.result.current.finishBenchClearing(true))
+    expect(calls).toHaveLength(1 + 45 + 8)
+    expect(rendered.result.current.isBenchClearing).toBe(false)
+    expect(rendered.result.current.run.remainingPitches).toBe(9)
+    expect(rendered.result.current.isPaused).toBe(false)
+  })
+
+  it('rand(0, 99) > 19 면 굴림 하나만 쓰고 보통 길', () => {
+    const { random, calls } = 기록난수((lo, hi) => (lo === 0 && hi === 99 ? 20 : Math.min(lo, hi)))
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.finishLoading())
+    OK(rendered)
+    calls.length = 0
+    한구(rendered, 사구)
+    expect(calls).toEqual([[0, 99]])
+    expect(rendered.result.current.isBenchClearing).toBe(false)
+    expect(rendered.result.current.run.remainingPitches).toBe(9)
+  })
+
+  it('볼넷(v3)은 st[0xb] = 3 이라 굴리지 않는다 (0x4e748)', () => {
+    const { random, calls } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.finishLoading())
+    OK(rendered)
+    calls.length = 0
+    for (let index = 0; index < 5; index += 1) 한구(rendered, 볼)
+    expect(calls).toEqual([])
+  })
+})

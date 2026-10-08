@@ -22,6 +22,7 @@ import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import * as styles from '@/pages/home-run-derby/ui/HomeRunDerbyScreen.css'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
+import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 
 interface HomeRunDerbyScreenProps {
   /**
@@ -151,6 +152,11 @@ export function HomeRunDerbyScreen({
         <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} />
       </RawScreen>
     )
+  }
+
+  // 사구 뒤 벤치 클리어링(상태 0x1e) — 0x12 대기 끝 0x4e74c 굴림이 들어갔다. 출구는 0xae24c(`finishBenchClearing`)
+  if (session.isBenchClearing) {
+    return <BenchClearingScene onDone={session.finishBenchClearing} />
   }
 
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다

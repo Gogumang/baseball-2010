@@ -7,7 +7,7 @@ import { SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputatio
  * ## 들어가는 길 — 상태 0x12 갱신 `0x4e6d4` 의 끝 (0x4e72c~0x4e776)
  * ```
  * 4e72c: 대기 틱(경기+0x2c) ≥ 31 (st[0xb] ∈ {3,4,5} 면 31, 아니면 15) 일 때만
- * 4e740: 플레이 종류 [[+0x200]+0x118] == 8(홈런더비)      → 보통 길 (굴리지 않는다)
+ * 4e740: 플레이 종류 [[+0x200]+0x118] == 8(더비 판)        → 보통 길 (굴리지 않는다)
  * 4e748: st[0xb] ≠ 4(사구)                               → 보통 길 (굴리지 않는다)
  * 4e74c: r = rand(0, 0x63)  ; 0xbfa54 — [0, 99)           ★ 사구면 늘 한 번 굴린다
  * 4e756: r > 0x13(19)                                     → 보통 길
@@ -16,6 +16,11 @@ import { SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputatio
  * ```
  * 굴림이 돌발 검사보다 **앞**이라 돌발이 진행 중이어도 난수는 한 번 쓴다. 성공 확률은 20/99 다
  * (`rand(0, 99)` 는 0~98).
+ *
+ * **4e740 의 "종류 8" 은 사구 자리에서 늘 거짓이다 — 홈런더비도 굴린다.** 종류 칸 +0x118 은 모드가 아니라 플레이 종류다
+ * (`0xb0cb8(플레이, k)` 가 +0x118 · [+0x28]+0x26 에 k 를 쓴다). 판정 스위치 0x3dfac 의 사구 갈래 v4(0x3e1b4)가
+ * `0xb0cb8(플레이, 2)` 로 늘 2 를 써 둔 뒤 0x12 에 오므로, st[0xb] == 4 인데 종류가 8 인 때는 없다. 더비 판(종류 8)은 맞은 공의
+ * 0x17 에서만 선다. 그래서 홈런더비(모드 7)의 사구도 rand(0, 99) 를 한 번 굴리고 ≤ 19 면 0x1e 로 간다(출구 0xae24c).
  *
  * ## 상태를 바꾸는 것 — 진입 `0x3a5f0` 의 꼬리 (0x3ab4a~0x3aba6)
  * ```
@@ -32,9 +37,10 @@ import { SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputatio
  * ## 미해결
  * - **연출 화면**: 양 팀 18명이 더그아웃(표 0xcfaf8)에서 투수판(0xcfa8c)으로 몰려나와 틱 10·30·60·70·80 에
  *   동작을 바꾸고 틱 100 에 화면 전환(그리기 0x43228 = 수비 배경 + 두 팀 선수, 글·효과음 없음). 웹엔 없다.
- * - **연출이 쓰는 난수**: 진입 0x3a5f0 이 `rand` 를 일곱 자리(선수마다 도는 루프 안)에서 부르고, 틱 10 의
- *   목표점 고르기(0xa21bc 주변)도 굴린다. 같은 전역 난수라 원본은 그만큼 뒤 판정의 난수 차례가 밀리지만
- *   OK 로 건너뛰는 틱에 따라 수가 달라 웹은 옮기지 않았다 — 여기서는 들어가기 굴림 한 번만 쓴다.
+ *
+ * 연출이 쓰는 난수(진입 0x3a5f0 — 호출 자리 일곱 중 측마다 다섯이 공격 9명마다 돌아 45 번 · 틱 10 의 8 번)는 여기서 안 굴리고
+ * `features/play-game/model/benchClearingScene` 의 `rollBenchClearingEntry` · `rollBenchClearingTargets` 를 부르는 쪽이 낸다
+ * (경기 · 투수편 · 팀 · 미션 · 홈런더비 모두).
  */
 
 /** `rand(0, 0x63)` — [0, 99) */
@@ -51,15 +57,18 @@ const MAXIMUM_STAMINA = 10_000
 export interface BenchClearingGate {
   /** 이 공이 몸에 맞는 공이었나 — st[0xb] == 4 */
   readonly isHitByPitch: boolean
-  /** 홈런더비(플레이 종류 8)인가 */
+  /**
+   * 플레이 종류 [+0x118] 이 8(더비 판)인가 — 4e740 검사 그대로 둔다. 사구(v4)는 0xb0cb8(플레이, 2) 로 종류를 2 로 쓰므로
+   * 사구 자리에서는 **홈런더비를 포함해 늘 거짓**이다 — 부르는 쪽은 모두 false 를 넘긴다(위 머리말).
+   */
   readonly isHomeRunDerby: boolean
   /** 진행 중인 돌발이 있는가 — 0x8eb94 (`burst.current !== null`) */
   readonly burstInProgress: boolean
 }
 
 /**
- * 벤치 클리어링에 들어가는가 — 사구(홈런더비 아님)면 **늘 한 번** 굴린다.
- * 사구가 아니거나 홈런더비면 굴리지 않는다(난수 차례 그대로).
+ * 벤치 클리어링에 들어가는가 — 사구면 **늘 한 번** 굴린다(홈런더비도 — 위 머리말).
+ * 사구가 아니거나 플레이 종류가 8 이면 굴리지 않는다(난수 차례 그대로).
  */
 export function rollsIntoBenchClearing(gate: BenchClearingGate, random: RandomPort): boolean {
   if (gate.isHomeRunDerby || !gate.isHitByPitch) return false

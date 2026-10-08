@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { describePitchResolution } from '@/entities/at-bat/model/resolutionText'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
+import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { derbyNoContactWaitFramesOf, derbyPitchCallOf } from '@/pages/home-run-derby/lib/derbyPitchCall'
 import {
   DERBY_HOME_RUN_SOUND,
@@ -174,6 +176,13 @@ export interface HomeRunDerbySession {
   readonly pitcher: DerbyPitcher
   /** 공 하나가 끝난 뒤 띄우는 문구. 비어 있으면 안내 줄을 보여 준다 */
   readonly banner: string
+  /**
+   * **벤치 클리어링(상태 0x1e) 중** — 사구 뒤 0x12 대기 끝 0x4e74c 굴림이 들어갔다. 화면이 `BenchClearingScene` 을 띄우고
+   * 끝나면 `finishBenchClearing` 을 부른다(출구 0xae24c).
+   */
+  readonly isBenchClearing: boolean
+  /** 벤치 클리어링 연출이 끝났다 — `reachedTargetTick` = 틱 10 의 수비 목표 굴림 8 번(0x401d4)이 돌았는가 */
+  readonly finishBenchClearing: (reachedTargetTick: boolean) => void
   /** 결과를 보여 주는 동안·상태 0xe 에서 OK 를 기다리는 동안은 새 공을 안 던진다 */
   readonly isPaused: boolean
   /**
@@ -257,6 +266,9 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
   const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>(undefined)
   /** 볼 수 st[5] — 0xd 진입 0x48e9c(0xb6764)만 지운다 (`derbyPitchCallOf`) */
   const ballsRef = useRef(0)
+  /** 벤치 클리어링(상태 0x1e) 중인가 */
+  const [isBenchClearing, setIsBenchClearing] = useState(false)
+  const isBenchClearingRef = useRef(false)
   const myTeamIdRef = useRef(myTeamId)
   myTeamIdRef.current = myTeamId
   // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
@@ -499,12 +511,16 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     setIsEventZoneShown(zoneHit)
     setIsPaused(true)
     // 맞지 않은 공은 상태 0x12 — 15틱(볼넷 · 사구면 31틱) 뒤 0x4e740: 사구(st[0xb] == 4)면 벤치 클리어링 굴림
+    isHitByPitchRef.current = call.judgment === 4
     armPlayEnd(
       batted === null
         ? derbyNoContactWaitFramesOf(call.judgment) * millisecondsPerFrame()
         : batted.endTicks * millisecondsPerFrame(),
     )
   }, [])
+
+  /** 이번 공이 사구(판정 v4)였나 — 0x12 대기 끝의 벤치 클리어링 굴림 조건 */
+  const isHitByPitchRef = useRef(false)
 
   /** 판 안 소리를 공 틱에 맞춰 건다 — `fromTick` 앞의 틱은 이미 지났다 */
   const schedulePlaySounds = (batted: DerbyBattedBall, startedAt: number, fromTick: number) => {
@@ -580,38 +596,59 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
       // 0x17 끝 0x35108 — HOMERUN 글자를 끄고(0x351d0) 0x17 그리기(비거리 판)도 더는 안 돈다
       setHomeRunText(null)
       setDistanceBoard(null)
-      if (runRef.current.isFinished) {
-        const finished = derbyResultOf(runRef.current, bestRef.current)
-        setResult(finished)
-        // 결과 창 진입 0x4f574 의 4f6b0 — 구장 준비 0x352e8 을 다시 불러 하늘 줄 rand(0, 6) 을 한 번 더 굴린다(결과 배경이 이 줄)
-        if (randomRef.current !== undefined) setSkyRow(randomRef.current.rand(0, SKY_ROW_COUNT))
-        // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
-        // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
-        playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
-        // 결과에는 기록달성 목록이 없다: 0x4f710 `0x22e10` 은 나리 타자편 버퍼(0x328c8 0x213c0(mgr, 4, 0))의 이번 경기 칸을
-        // 더하는데, 더비 중엔 a780a(state[1] = 7)가 기록을 막고 game_br.sav 의 그 칸은 늘 0 이라 0 마흔이다 (annalsStats 머리말)
-        onFinishRef.current?.(finished)
-        return
+      // 0x12 갱신 0x4e740~0x4e776 — 사구(st[0xb] == 4)면 플레이 종류 [+0x118] 은 v4 의 0xb0cb8(플레이, 2) 가 쓴 2 라
+      // 8(더비 판) 검사에 안 걸린다 → 더비도 rand(0, 99) ≤ 19 면 벤치 클리어링(0x1e). 돌발 객체는 더비에 없다
+      if (isHitByPitchRef.current) {
+        isHitByPitchRef.current = false
+        const scene = randomRef.current
+        if (
+          scene !== undefined &&
+          rollsIntoBenchClearing({ isHitByPitch: true, isHomeRunDerby: false, burstInProgress: false }, scene)
+        ) {
+          // 진입 0x3a5f0 — 공격 9명 굴림 45 번 (`rollBenchClearingEntry`). 꼬리 0x3ab4a~ 의 수비 CPU 투구 수 +10 · 평판 0xa755c 는
+          // 더비에 보이는 곳이 없다(체력% 0xaebb0 은 모드 7 이면 늘 100 · 기록은 a780a 가 막는다)
+          rollBenchClearingEntry(scene)
+          isBenchClearingRef.current = true
+          setIsBenchClearing(true)
+          return
+        }
       }
-      setIsPaused(false)
-      // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)는 0xe 에서 **사람 OK 를 기다린 뒤** 0xf 를 지난다 (확정, U-89):
-      //   0xd 갱신 0x39e14 — 틱 > 0 이고 점수판 [+0xf10]+0x6c ≠ 1 이면 0xe (모드 갈림 없음)
-      //   0xe 진입 0x50674 — 강판 0x504cc 는 모드 3 이 아니면 늘 0(0x504de) → 0x23 으로 안 샌다
-      //   0xe 갱신 0x39bd4 — 모드 7 이면 아무것도 안 한다 (시간 제한·자동 진행 없음)
-      //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
-      //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
-      // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
-      //   0xd 는 늘 두 그림(`SCENE_D_FRAMES`) 머문다 — 점수판 +0x6c 는 1 이 되는 일이 없다.
-      // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
-      if (nextSceneStateRef.current === 0xd) {
-        enterScenePrepare()
-        return
-      }
-      // 보통 공(0xf)은 곧바로 다음 공 준비다
-      enterNextPitch()
+      finishPitch()
     }, delay)
   }
 
+  /** 0xae3e8 · 0xae24c 를 지난 뒤 — 화면 칸을 셈에 맞추고 다음 상태(0xf · 0xd · 0x1a)로 */
+  const finishPitch = () => {
+    if (runRef.current.isFinished) {
+      const finished = derbyResultOf(runRef.current, bestRef.current)
+      setResult(finished)
+      // 결과 창 진입 0x4f574 의 4f6b0 — 구장 준비 0x352e8 을 다시 불러 하늘 줄 rand(0, 6) 을 한 번 더 굴린다(결과 배경이 이 줄)
+      if (randomRef.current !== undefined) setSkyRow(randomRef.current.rand(0, SKY_ROW_COUNT))
+      // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
+      // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
+      playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
+      // 결과에는 기록달성 목록이 없다: 0x4f710 `0x22e10` 은 나리 타자편 버퍼(0x328c8 0x213c0(mgr, 4, 0))의 이번 경기 칸을
+      // 더하는데, 더비 중엔 a780a(state[1] = 7)가 기록을 막고 game_br.sav 의 그 칸은 늘 0 이라 0 마흔이다 (annalsStats 머리말)
+      onFinishRef.current?.(finished)
+      return
+    }
+    setIsPaused(false)
+    // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)는 0xe 에서 **사람 OK 를 기다린 뒤** 0xf 를 지난다 (확정, U-89):
+    //   0xd 갱신 0x39e14 — 틱 > 0 이고 점수판 [+0xf10]+0x6c ≠ 1 이면 0xe (모드 갈림 없음)
+    //   0xe 진입 0x50674 — 강판 0x504cc 는 모드 3 이 아니면 늘 0(0x504de) → 0x23 으로 안 샌다
+    //   0xe 갱신 0x39bd4 — 모드 7 이면 아무것도 안 한다 (시간 제한·자동 진행 없음)
+    //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
+    //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
+    // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
+    //   0xd 는 늘 두 그림(`SCENE_D_FRAMES`) 머문다 — 점수판 +0x6c 는 1 이 되는 일이 없다.
+    // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
+    if (nextSceneStateRef.current === 0xd) {
+      enterScenePrepare()
+      return
+    }
+    // 보통 공(0xf)은 곧바로 다음 공 준비다
+    enterNextPitch()
+  }
 
   const skipHomeRun = useCallback(() => {
     const play = playRef.current
@@ -649,6 +686,10 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     clearPlaySoundTimers()
     // 경기 시작 상태 9 의 0x39868 이 +0x84 · 표시(+0x1b60) · +0x19ec 를 지운다
     clearComboTimer()
+    // 새 장면 — 벤치 클리어링 연출도 버린다
+    isHitByPitchRef.current = false
+    isBenchClearingRef.current = false
+    setIsBenchClearing(false)
     // 새 장면 — 글자 칸(+0x1961~)은 new 의 0 이다
     playRef.current = null
     homeRunTextSceneRef.current = HOME_RUN_TEXT_SCENE_START
@@ -679,11 +720,22 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     restart()
   }, [restart])
 
+  /** 벤치 클리어링 출구 0xae24c — 틱 10 이 돌았으면 수비 목표 굴림 8 번(0x401d4)을 낸 뒤 보통 길(0xae24c)을 간다 */
+  const finishBenchClearing = useCallback((reachedTargetTick: boolean) => {
+    if (!isBenchClearingRef.current) return
+    isBenchClearingRef.current = false
+    setIsBenchClearing(false)
+    if (reachedTargetTick && randomRef.current !== undefined) rollBenchClearingTargets(randomRef.current)
+    finishPitch()
+  }, [])
+
   return {
     run,
     skyRow,
     pitcher: derbyPitcherOf(run.stage, aceLevels, opponentTeamId),
     banner,
+    isBenchClearing,
+    finishBenchClearing,
     isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,
     isAwaitingConfirm,
     confirm,
