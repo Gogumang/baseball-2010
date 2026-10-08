@@ -190,11 +190,11 @@ export function renderBattingStage(
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
-    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, scene.resultTick)
+    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, scene.resultTick, side)
   } else if (scene.isHomeRun) {
     drawHomeRunBanner(context, scene.homeRunTick)
   } else if (scene.resultText !== '') {
-    drawResultText(context, scene.resultText, scene.resultTick)
+    drawResultText(context, scene.resultText, scene.resultTick, side)
   }
 }
 
@@ -358,9 +358,12 @@ function drawMagicBallEffect(context: CanvasRenderingContext2D, pitch: Pitch, fr
   context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
 }
 
-/** 판정 글자 — game_judge 애니를 (117,224) 원점에 재생한다 (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다 */
-function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number): void {
-  const { x: centerX, y: centerY } = stageLayoutOf().judgeCenter
+/**
+ * 판정 글자 — game_judge 애니를 존 표 0xcfb7c[+0x17e1] 에서 잡은 원점(우타 (122,224) · 좌타 (117,224))에 재생한다
+ * (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다
+ */
+function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number, side: number): void {
+  const { x: centerX, y: centerY } = stageLayoutOf(side).judgeCenter
   const animation = judgeAnimationOf(text)
   if (animation !== null) {
     const entries = frameAnimations(JUDGE_FRAMES)?.[animation]

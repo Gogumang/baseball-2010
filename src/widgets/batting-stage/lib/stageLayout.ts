@@ -8,7 +8,7 @@ import type { Coordinate } from '@/shared/lib/geometry/coordinate'
  *   타자 앵커: 표 0xcfb2c — 우타 (184,351) · 좌타 (295,351)
  *   투수 앵커: 표 0xcfb18 — 우타 (276,258) · 좌타 (203,258)
  *   스트라이크 존 표시: 표 0xcfb7c — 우타 (226,310,33,33) · 좌타 (221,310,33,33)
- *   판정 글자 중심: (117, 224) (0x39504)
+ *   판정 글자 중심: 존 표 0xcfb7c[+0x17e1] 의 (x + w/2, y − h/2) → 우타 (122, 224) · 좌타 (117, 224) (0x39504)
  *   배경(하늘·구름·펜스·관중석)은 renderScenery · 투수 단계와 판정 애니는 stageScenery (위치 분석 6차)
  * **추정**으로 남은 것: 화면 높이 320(기기에 따라 400 이면 y 가 70 커진다).
  */
@@ -38,17 +38,17 @@ const ZONE_SIZE = 33
 /**
  * side 별 배치 — 전부 원본 표를 카메라 오프셋만큼 옮긴 값이다.
  * 존은 좌우 거울이 아니라 5px 만 다르다 — 표에 두 쪽이 따로 적혀 있다.
+ * 판정 글자 중심도 같은 존 표에서 나온다 — 0x39504 가 `카메라 x + 표.x + (w >> 1)`, `카메라 y + 표.y − (h >> 1)` (w = h = 33).
  */
 const SIDE_LAYOUTS = [
-  { batterAnchor: { x: 64, y: 281 }, pitcherAnchor: { x: 156, y: 188 }, zoneLeft: 106, zoneTop: 240 },
-  { batterAnchor: { x: 175, y: 281 }, pitcherAnchor: { x: 83, y: 188 }, zoneLeft: 101, zoneTop: 240 },
+  { batterAnchor: { x: 64, y: 281 }, pitcherAnchor: { x: 156, y: 188 }, zoneLeft: 106, zoneTop: 240, judgeCenter: { x: 122, y: 224 } },
+  { batterAnchor: { x: 175, y: 281 }, pitcherAnchor: { x: 83, y: 188 }, zoneLeft: 101, zoneTop: 240, judgeCenter: { x: 117, y: 224 } },
 ] as const
 
 /** side 를 안 타는 배치. 그라운드는 **반전 없이** 늘 같은 자리에 깔린다 (0x7725c) */
 const COMMON_LAYOUT = {
   fieldTopY: 156,
   fieldSourceX: 193,
-  judgeCenter: { x: 117, y: 224 },
 } as const
 
 export function stageLayoutOf(side: number = STAGE_SIDE) {
