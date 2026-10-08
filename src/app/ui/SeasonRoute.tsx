@@ -295,6 +295,8 @@ export function SeasonRoute({
               yearGoalWindowOf={() => ({ labelSet: SEASON_YEAR_GOAL_LABEL_SET, ...seasonGoalWindowNumbersFor(goalSource) })}
               // SYS sub 3 · 4 — 시상 370 · 371 의 타이틀 창 0x8b3bc · 376 의 MVP 창 0x8b23c (시즌 갈래)
               systemWindowTextOf={(command) => session.awardWindowTextOf(command.sub)}
+              // system 창 답 0 → 0x7fe90 (기록 +0x187 = 1 · 저장)
+              onSystemWindowConfirm={actions.confirmEventSystemWindow}
             />
           </ScreenOverlay>
         </RawScreen>

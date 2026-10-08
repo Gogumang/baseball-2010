@@ -325,6 +325,11 @@ export interface PitcherLeagueSession {
     readonly dismissOutingRecoveryNotice: () => void
     /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
     readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
+    /**
+     * 이벤트의 system 창(알림 · 올해의 목표)을 답 0 으로 닫았다 — 0x8d928~0x8d942 의 0x7fe90: 나리라 S+0x1b7 = 1 · 저장(0x22755).
+     * 하위와 상관없이 모든 system 창이다.
+     */
+    readonly confirmEventSystemWindow: () => void
     /** 이벤트가 경기 명령(마선수 대결)에 닿았다 — 대결 화면이 없을 때: 지나온 보상만 남기고 105 (근사) */
     readonly abortStoryAtMatch: (carry: StoryCarry) => void
     /** 경기 명령 → 투수 미션 레코드 team−1 로 마선수 대결 (장면 '마선수대결') */
@@ -1649,6 +1654,15 @@ export function usePitcherLeagueSession(
   )
 
   /**
+   * 이벤트 system 창 답 0 — 0x7fe90(상자): 모드 2 가 아니면 [[상자+0x150]+0x1b7] = 1, 그리고 0x22755([0x1400054], 1) 저장.
+   * 이미 켜져 있어도 원본은 저장한다 — 그때까지 준 보상이 든 커리어가 저장된다.
+   */
+  const confirmEventSystemWindow = useCallback(() => {
+    if (career === null) return
+    commit(career.hasSeenYearGoalWindow ? career : { ...career, hasSeenYearGoalWindow: true })
+  }, [career, commit])
+
+  /**
    * 경기 명령(r_event `match`) — 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229 (대상 3).
    *
    * **대결 화면이 없을 때의 근사** (`abortStoryAtMatch`): 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105.
@@ -1959,6 +1973,7 @@ export function usePitcherLeagueSession(
       closeOutingResult,
       dismissOutingRecoveryNotice,
       completeStory,
+      confirmEventSystemWindow,
       abortStoryAtMatch,
       beginAceMatch,
       finishAceMatch,

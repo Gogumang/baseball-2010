@@ -380,6 +380,21 @@ describe('시즌 이벤트 재생 0xd3', () => {
     expect(result.current.state?.record.yearGoalShown).toBe(true)
   })
 
+  it('이벤트 system 창을 답 0 으로 닫으면 0x7fe90 — 그 자리에서 SR+0x187 = 1 · 저장 (재생 끝을 기다리지 않는다)', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.chooseTeam(0))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.이벤트재생)
+    expect(result.current.state?.record.yearGoalShown).toBe(false)
+
+    act(() => result.current.actions.confirmEventSystemWindow())
+
+    expect(result.current.state?.record.yearGoalShown).toBe(true)
+    expect((store.load() as { state: { record: { yearGoalShown: boolean } } }).state.record.yearGoalShown).toBe(true)
+    // 장면은 그대로 — 재생기가 다음 명령으로 넘긴다
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.이벤트재생)
+  })
+
   it('20경기 뒤 관리 메뉴에 들어오면 100 이 G 1000 을 준다 — 한 번 받으면 다시 안 뜬다 (전역 +0xbe)', () => {
     const { result } = 띄우기()
     시작(result, 0)

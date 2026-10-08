@@ -996,6 +996,21 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
     expect(result.current.career?.seenEventIds).toEqual(['451', '1', '34'])
   })
 
+  it('이벤트 system 창을 답 0 으로 닫으면 0x7fe90 — 그 자리에서 S+0x1b7 = 1 · 저장', async () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    expect(result.current.scene).toBe('이벤트')
+    expect(result.current.career?.hasSeenYearGoalWindow).toBe(false)
+
+    act(() => result.current.actions.confirmEventSystemWindow())
+
+    expect(result.current.career?.hasSeenYearGoalWindow).toBe(true)
+    expect((store.load() as { hasSeenYearGoalWindow: boolean }).hasSeenYearGoalWindow).toBe(true)
+    expect(result.current.scene).toBe('이벤트')
+  })
+
   it('외출 지도(112)에 들어오면 trigger 1 이벤트를 틀고 끝나면 지도로 돌아온다 (401 인기도 3000)', async () => {
     const { result } = 띄우기()
     act(() => result.current.actions.create('투수', 신인))

@@ -223,6 +223,8 @@ export function PitcherLeagueRoute({
             yearGoalWindowOf={() => pitcherYearGoalWindowValuesOf(career)}
             // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 3 투수편)
             rewardNoticeContext={() => rewardNoticeContextOf(career, PITCHER_LEAGUE_MODE, random)}
+            // system 창 답 0 → 0x7fe90 (S+0x1b7 = 1 · 저장)
+            onSystemWindowConfirm={actions.confirmEventSystemWindow}
           />
           </ScreenOverlay>
         </>
