@@ -372,7 +372,11 @@ export function MissionPlayScreen({
           */}
           {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
           {isSubstituting && substitutionScene !== null && (
-            <SubstitutionSceneOverlay key={substitutionScene.serial} onDone={() => onSubstitutionSceneDone?.()} />
+            <SubstitutionSceneOverlay
+              key={substitutionScene.serial}
+              aceSlot={substitutionScene.aceSlot ?? null}
+              onDone={() => onSubstitutionSceneDone?.()}
+            />
           )}
 
           {isAwaitingConfirm && sceneConfirm.isInConfirmState && (

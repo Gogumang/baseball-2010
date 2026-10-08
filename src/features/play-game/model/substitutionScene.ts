@@ -23,8 +23,8 @@
  * 애니 9 = 프레임 79 · 80 · 81 · 82 · 83 · 84 (지연 2 · 2 · 2 · 7 · 2 · 2) — "CHANGE" 글자가 왼쪽에서 미끄러져 들어와 선다
  * (game_ui/frames/animations.json 그대로, 시험이 맞춰 본다).
  *
- * ⚠️ 미이식: 마선수 등장 컷인 0x473f0(R2 11절 — event_char 초상 · 검붉은 띠 · 사선 쓸기, 단계 22 에 끝). 들어온 선수가 마선수면
- *    원본은 같은 CHANGE 애니 위에 컷인을 그리고 컷인이 끝나야 0xd 로 간다 — 웹은 CHANGE 애니 끝에 넘긴다(근사).
+ * 들어온 선수가 마선수(+0x195c 비트 2)면 4dafa 가 같은 CHANGE 애니 위에 등장 컷인 0x473f0(`aceCutIn` — 검붉은 띠 · 배너 · 사선 쓸기 ·
+ * event_char 초상)을 그리고, 끝 비트 갈래 대신 컷인이 단계 22 에 메시지 13 을 보내 0xd 로 간다(27 그림).
  */
 
 /** game_ui 애니 9 — 0x4da30 이 0xba759(…, 9, 종류 2, …) 로 그린다 */
@@ -81,8 +81,13 @@ export function isSubstitutionSceneLastDraw(draw: number): boolean {
  */
 export interface SubstitutionScene {
   readonly serial: number
-  /** 들어온 선수가 마선수인가 — 원본은 컷인 0x473f0 을 더 그린다(⚠️ 미이식) */
+  /** 들어온 선수가 마선수인가 — 원본은 컷인 0x473f0 을 더 그린다(`aceSlot`) */
   readonly incomingIsAce: boolean
+  /**
+   * 마선수면 컷인 번호 — 0xb63a1(들어온 선수)(타자면 +5, `aceCutIn.aceCutInSlotOf`). 화면이 "CHANGE" 위에 등장 컷인 0x473f0 을 그리고
+   * 컷인이 끝나야(27 그림) 0x16 이 끝난다. 마선수가 아니면 없다.
+   */
+  readonly aceSlot?: number
   /** 0xe 에서 낼 등판음 */
   readonly entrySoundId: number
   /**

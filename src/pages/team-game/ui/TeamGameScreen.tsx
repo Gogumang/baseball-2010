@@ -380,7 +380,7 @@ export function TeamGameScreen({
     actions.confirmScene,
   )
   const substitutionOverlay = substitution.isShown ? (
-    <SubstitutionSceneOverlay key={substitution.serial} onDone={substitution.finish} />
+    <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
   ) : null
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
   /** 정산 배경 전용 난수 — 하늘 줄을 넘기므로 굴릴 일이 없다(꼴만 채운다). 경기 난수를 건드리지 않는다 */

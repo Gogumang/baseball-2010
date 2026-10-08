@@ -133,6 +133,7 @@ import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/mo
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import {
   SUBSTITUTION_TIME_SOUND,
   substitutionEntrySoundIdOf,
@@ -1367,6 +1368,10 @@ function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgres
     const scene: SubstitutionScene = {
       serial: (current.substitutionScene?.serial ?? 0) + 1,
       incomingIsAce,
+      // 0x473f0 컷인 번호 — 0xb63a1(마투수) (투수라 +5 없음)
+      ...(incomingIsAce && changed.aces !== undefined
+        ? { aceSlot: aceCutInSlotOf('투수', changed.aces.opponent.pitcher) }
+        : {}),
       entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: changed.game.bases }),
       timeSoundId: SUBSTITUTION_TIME_SOUND,
       confirmsBefore: changed.sceneConfirm?.entries ?? 0,

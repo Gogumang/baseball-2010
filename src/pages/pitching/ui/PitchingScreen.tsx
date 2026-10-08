@@ -362,7 +362,11 @@ export function PitchingScreen({
       */}
       {isRunning && substitutionScene !== null && (
         <div className={styles.matchupFrame}>
-          <SubstitutionSceneOverlay key={substitutionScene.serial} onDone={() => onSubstitutionSceneDone?.()} />
+          <SubstitutionSceneOverlay
+            key={substitutionScene.serial}
+            aceSlot={substitutionScene.aceSlot ?? null}
+            onDone={() => onSubstitutionSceneDone?.()}
+          />
         </div>
       )}
 

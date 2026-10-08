@@ -168,6 +168,7 @@ import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 /**
@@ -2085,6 +2086,10 @@ function applyOpponentCpuPinchHit(
               isAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
               bases: progress.game.bases,
             }),
+            // 0x473f0 컷인 번호 — 142 가 넣은 마타자 0xb63a1 + 5
+            ...(rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT
+              ? { aceSlot: aceCutInSlotOf('타자', teamAcesOf(progress.options, false).batter) }
+              : {}),
           }
         : progress.substitutionScene,
     },

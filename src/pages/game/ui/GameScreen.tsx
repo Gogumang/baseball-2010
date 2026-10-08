@@ -365,7 +365,7 @@ export function GameScreen({
           {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
           {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
           {substitution.isShown && (
-            <SubstitutionSceneOverlay key={substitution.serial} onDone={substitution.finish} />
+            <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
           )}
           {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
           {recordAlert !== undefined && <RecordAlertPanel frame={recordAlert} />}

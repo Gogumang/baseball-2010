@@ -173,6 +173,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -3263,11 +3264,19 @@ function prepareAtBat(progress: TeamGameProgress): TeamGameProgress {
  * 교체 연출 0x16 한 번 — 0x16 진입 0x3d458 이 예약을 보고 +0x195c 를 세운 뒤 0xd → 0xe 에서 0x38b64 가 들어온 선수로
  * 등판음(마선수 26 · 2·3루 주자 15 · 그 밖 14)을 고른다. 루는 교체로 안 바뀐다.
  */
-function substitutionSceneAfter(progress: TeamGameProgress, incomingIsAce: boolean): SubstitutionScene {
+function substitutionSceneAfter(
+  progress: TeamGameProgress,
+  /** 0x3d458 의 갈래 — 대타 예약(+0x195c 비트 0) · 투수 예약 */
+  side: '투수' | '타자',
+  /** 들어온 선수의 마선수 번호(0xb63a1) — 마선수가 아니면 음수 */
+  aceIndex: number,
+): SubstitutionScene {
+  const incomingIsAce = aceIndex >= 0
   return {
     serial: (progress.substitutionScene?.serial ?? 0) + 1,
     incomingIsAce,
     entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: progress.game.bases }),
+    ...(incomingIsAce ? { aceSlot: aceCutInSlotOf(side, aceIndex) } : {}),
   }
 }
 
@@ -3545,10 +3554,11 @@ function judgeAutoPitcherChange(
           },
           substitutionScene: substitutionSceneAfter(
             changed,
-            (pitcherEntriesOf(
+            '투수',
+            pitcherEntriesOf(
               progress,
               defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
-            )[next]?.aceIndex ?? -1) >= 0,
+            )[next]?.aceIndex ?? -1,
           ),
         }
       : changed,
@@ -3745,7 +3755,7 @@ export function changePitcher(
     {
       ...applied,
       // 0x496f0 → 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6) → 0xe 등판음
-      substitutionScene: substitutionSceneAfter(applied, (applied.ourPitcherEntry[benchIndex]?.aceIndex ?? -1) >= 0),
+      substitutionScene: substitutionSceneAfter(applied, '투수', applied.ourPitcherEntry[benchIndex]?.aceIndex ?? -1),
     },
     `${progress.game.inning}회${progress.game.half} 투수 교체 — ${progress.ourPitcherIndex + 1}번 → ${benchIndex + 1}번`,
     true,
@@ -3899,7 +3909,7 @@ export function pinchHit(
         incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
       },
       // 0x496f0 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xe 타자 등판음
-      substitutionScene: substitutionSceneAfter(progress, swapped.incoming.aceIndex !== NO_ACE_BATTER),
+      substitutionScene: substitutionSceneAfter(progress, '타자', swapped.incoming.aceIndex),
     },
     `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
@@ -4063,7 +4073,7 @@ function applyCpuPinchHit(
               by: 'CPU' as const,
               incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
             },
-            substitutionScene: substitutionSceneAfter(progress, swapped.incoming.aceIndex !== NO_ACE_BATTER),
+            substitutionScene: substitutionSceneAfter(progress, '타자', swapped.incoming.aceIndex),
           }
         : {}),
     },

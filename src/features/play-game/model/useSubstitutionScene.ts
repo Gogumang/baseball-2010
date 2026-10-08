@@ -12,6 +12,8 @@ export interface SubstitutionScenePlayback {
   readonly serial: number
   /** 들어온 선수가 마선수인가 — 0x4da30 이 컷인 0x473f0 을 그린다 */
   readonly incomingIsAce: boolean
+  /** 마선수 컷인 번호 (`SubstitutionSceneOverlay` 의 `aceSlot`) — 마선수가 아니면 null */
+  readonly aceSlot: number | null
   /** 화면이 연출을 다 그렸다(메시지 0xd) — 0xd 두 그림 뒤 0xe 그리기가 등판음을 낸다 */
   readonly finish: () => void
 }
@@ -54,7 +56,13 @@ export function useSubstitutionScene(
     window.setTimeout(() => activeSound().play(entry), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
   }, [])
 
-  return { isShown, serial: scene?.serial ?? 0, incomingIsAce: scene?.incomingIsAce ?? false, finish }
+  return {
+    isShown,
+    serial: scene?.serial ?? 0,
+    incomingIsAce: scene?.incomingIsAce ?? false,
+    aceSlot: scene?.aceSlot ?? null,
+    finish,
+  }
 }
 
 /** 다 그린 연출 — 화면이 다시 서도(수비 화면을 갔다 와도) 같은 연출을 두 번 안 그린다 */

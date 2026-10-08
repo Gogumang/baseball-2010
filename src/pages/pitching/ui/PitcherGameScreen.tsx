@@ -653,7 +653,7 @@ export function PitcherGameScreen({
         {/* 교체 연출 0x16 "CHANGE" — ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다 */}
         {substitution.isShown && (
           <div className={styles.matchupFrame}>
-            <SubstitutionSceneOverlay key={substitution.serial} onDone={substitution.finish} />
+            <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
           </div>
         )}
         {!asksGiveUp && !isPopupOpen && canPitch && !isAwaitingConfirm && phase === '구질' && (
