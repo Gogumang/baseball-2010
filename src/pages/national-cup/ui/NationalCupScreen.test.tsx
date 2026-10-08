@@ -174,6 +174,27 @@ describe('머리띠·바닥 (0x7f4ec ← 시즌 틀 0xb810 · 나리 틀 0x16928
   })
 })
 
+describe('나리 머리띠 제목 (0x169ea~0x16a00: 장면+0xcc == 4 ? 8 : 9)', () => {
+  const 그림들 = (container: HTMLElement) => [...container.querySelectorAll('img')].map((node) => node.getAttribute('src') ?? '')
+
+  it('타자편(모드 4)은 제목 8 — "나만의리그" 9 + "타자편" 10', () => {
+    const { container } = 띄우기(createNationalCup(), { mode: '나만의리그' })
+    expect(그림들(container).some((src) => src.endsWith('game_frame/010.png'))).toBe(true)
+    expect(그림들(container).some((src) => src.endsWith('game_frame/011.png'))).toBe(false)
+  })
+
+  it('투수편(모드 3)은 제목 9 — "나만의리그" 9 + "투수편" 11 (134 대진 · 135 순위 모두)', () => {
+    const { container } = render(
+      <NationalCupScreen mode="나만의리그" edition="투수편" cup={createNationalCup()} yearIndex={2} random={고정난수(0)}
+        onStartGame={vi.fn()} onFinish={vi.fn()} />,
+    )
+    expect(그림들(container).some((src) => src.endsWith('game_frame/011.png'))).toBe(true)
+    expect(그림들(container).some((src) => src.endsWith('game_frame/010.png'))).toBe(false)
+    확인()
+    expect(그림들(container).some((src) => src.endsWith('game_frame/011.png'))).toBe(true)
+  })
+})
+
 describe('나리 142 취소로 돌아왔을 때 (0x13c72 의 S+0x12c 갈래 → 135)', () => {
   it('initialStep 순위면 135 순위표부터 그리고, 확인하면 다시 142 로 넘긴다', () => {
     const onStartGame = vi.fn()

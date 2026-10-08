@@ -305,6 +305,8 @@ export function PitcherLeagueRoute({
     return (
       <NationalCupScreen
         mode="나만의리그"
+        // 머리띠 0x169ea~0x16a00: 장면+0xcc(모드) == 4 ? 8 : 9 — 투수편(모드 3)은 제목 9 "나만의리그투수편"
+        edition="투수편"
         cup={session.cup.cup}
         // 제 n 회 = (연차 idx >> 1) + 1 (0x85e6c) — 대회는 끝난 해의 연말이라 지금 시즌 − 1
         yearIndex={career.season - 1}

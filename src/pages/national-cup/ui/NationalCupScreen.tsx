@@ -47,6 +47,11 @@ export interface NationalCupScreenProps {
    * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
    */
   readonly underlay?: ReactNode
+  /**
+   * 나만의리그 편 — 나리 틀 0x16928 의 머리띠 제목(0x169ea~0x16a00)이 `장면+0xcc == 4 ? 8 : 9` 다.
+   * 모드 4(타자편)면 제목 8 "나만의리그타자편", 모드 3(투수편)이면 제목 9 "나만의리그투수편". 시즌모드는 안 본다
+   */
+  readonly edition?: '타자편' | '투수편'
 }
 
 type Step = '대진' | '순위' | '결과' | '보상'
@@ -80,7 +85,7 @@ type Step = '대진' | '순위' | '결과' | '보상'
  *   시즌 0xf4 키 0x4a18 은 −16 → 0xf3 이 있다. 134 · 0xf3 키(0x19fdc · 0xe6f8)도 확인만 본다.
  */
 export function NationalCupScreen({
-  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진', underlay,
+  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진', underlay, edition: nariEdition = '타자편',
 }: NationalCupScreenProps) {
   const [step, setStep] = useState<Step>(initialStep)
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
@@ -115,12 +120,12 @@ export function NationalCupScreen({
         <NationalCupBracket cup={current} onConfirm={confirmBracket} isConfirmable={step === '대진'} />
       )}
 
-      {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 타자편 제목(8) · 5 — 되돌아가기는 표시만 */}
+      {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 제목 장면+0xcc == 4 ? 8(타자편) : 9(투수편) · 5 — 되돌아가기는 표시만 */}
       {mode === '시즌모드'
         ? <ScreenFrame title="시즌모드" gamePoint={gamePoint}
             // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
             onBack={step === '순위' ? () => setStep('대진') : null} />
-        : <ScreenFrame title="나만의리그타자편" gamePoint={gamePoint} onBack={null} footer={5} />}
+        : <ScreenFrame title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'} gamePoint={gamePoint} onBack={null} footer={5} />}
 
       {step === '결과' && (
         <MessageBox
