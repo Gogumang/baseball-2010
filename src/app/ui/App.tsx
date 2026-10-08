@@ -454,9 +454,10 @@ export function App() {
   // 일반모드 — 준비 다섯 화면부터 경기까지 한 화면이 돌고 메인 메뉴로 돌아간다. 경기는 경기정보 OK·반 이닝마다
   // 모드 1 저장 블록에 남고(+0x4d), 경기 중 "나가기"로 나가도 남아 [13]/[최근게임] 의 이어하기로 그 자리에서 다시 선다
   if (screen.kind === '일반모드') {
-    const leaveGeneralMode = () => {
+    // 준비 단계 취소(18 · 빠른실행 22 의 CLR)만 openTier 5 — 게임시작 목록으로 바로. 경기 중 나가기 0x40140 · 결과 확인은 처음 단
+    const leaveGeneralMode = (openTier?: 5) => {
       setGeneralResume(null)
-      setScreen({ kind: '메인메뉴' })
+      setScreen(openTier === undefined ? { kind: '메인메뉴' } : { kind: '메인메뉴', openTier })
     }
     return (
       <GeneralModeScreen
@@ -499,7 +500,7 @@ export function App() {
         // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
         throwModeManual={gameSettings.settings.throwMode === '수동'}
         // 결과 화면 확인 — 정산은 위 정산 진입(0x4ea0c)이 이미 했다
-        onFinish={leaveGeneralMode}
+        onFinish={() => leaveGeneralMode()}
         onExit={leaveGeneralMode}
       />
     )

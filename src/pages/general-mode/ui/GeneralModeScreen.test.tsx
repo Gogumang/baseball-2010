@@ -60,7 +60,8 @@ describe('준비 흐름', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
 
-    expect(onExit).toHaveBeenCalled()
+    // 18 CLR 0x29d9a — 게임시작 목록(하위 5)으로 바로
+    expect(onExit).toHaveBeenCalledWith(5)
   })
 
   it('AI 팀 화면에서 CLR 하면 유저 팀 화면으로 돌아간다 (나가지 않는다)', () => {
@@ -96,7 +97,8 @@ describe('빠른실행', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
 
-    expect(onExit).toHaveBeenCalled()
+    // 빠른실행 22 CLR 0x313c4 `movs r1, #5` — 게임시작 목록(하위 5)
+    expect(onExit).toHaveBeenCalledWith(5)
   })
 })
 

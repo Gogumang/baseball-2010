@@ -72,10 +72,11 @@ export interface GeneralModeScreenProps {
    */
   readonly onSettlementEnter?: (summary: TeamGameSummary) => void
   /**
-   * 준비 첫 화면에서 CLR, 또는 경기 중 메뉴에서 나가기.
-   * 원본은 메인 메뉴 하위 상태 5(모드 목록)로 돌아간다.
+   * 메인 메뉴로 나간다. `openTier` 5 = 게임시작 목록(하위 5)으로 바로 — **준비 단계 취소**만 이 값이다:
+   * 18 의 CLR(0x29d9a `bcb49(메뉴+0x18, 5)`) · 빠른실행 22 의 CLR(0x313c4 `movs r1, #5`) 은 같은 장면 0x103 안에서
+   * 곧장 하위 5 로 간다. 경기 중 메뉴 "나가기"(0x40140)는 인자 없이 — 메인 메뉴 처음 단(하위 4)이다.
    */
-  readonly onExit: () => void
+  readonly onExit: (openTier?: 5) => void
 }
 
 /**
@@ -158,7 +159,8 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
       resumeFrom={resumeFrom}
       random={random}
       onFinish={onFinish}
-      onQuit={onExit}
+      // 경기 중 나가기 0x40140 — 메인 메뉴 처음 단
+      onQuit={() => onExit()}
       // 정산 판의 보유 GP — 자동진행은 `onSpendGamePoint` 가 없어 여전히 잠긴다
       {...(gamePoint === undefined ? {} : { gamePoint })}
       {...(onGameSave === undefined ? {} : { onHalfInningSave: onGameSave })}
@@ -192,8 +194,10 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
     ...(onGameSave === undefined ? {} : { onMatchBlockWrite: onGameSave }),
   })
   const { flow, actions } = session
+  /** 준비 단계 취소 — 18 · 빠른실행 22 의 CLR 은 게임시작 목록(하위 5)으로 (0x29d9a · 0x313c4) */
+  const cancelPrepare = () => onExit(5)
   const back = () => {
-    if (!actions.back()) onExit()
+    if (!actions.back()) cancelPrepare()
   }
 
   if (session.isPlaying) {
@@ -202,7 +206,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         options={session.gameOptions}
         random={random}
         onFinish={onFinish}
-        onQuit={onExit}
+        // 경기 중 나가기 0x40140 — 메인 메뉴 처음 단
+        onQuit={() => onExit()}
         // 정산 판의 보유 GP — 자동진행은 `onSpendGamePoint` 가 없어 여전히 잠긴다
         {...(gamePoint === undefined ? {} : { gamePoint })}
         onHalfInningSave={(save) => {
@@ -225,7 +230,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           onSelect={actions.selectUserTeam}
-          onCancel={onExit}
+          onCancel={cancelPrepare}
         />
       )
     case GENERAL_MODE_STEP.AI팀:
