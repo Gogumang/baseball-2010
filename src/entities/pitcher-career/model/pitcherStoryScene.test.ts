@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { createPitcherCareer, EMPTY_PITCHER_SEASON_STATS } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
   isPitcherEventEligible,
@@ -80,10 +80,28 @@ describe('조건 20/21 투수 갈래 (0xd8408 · 0xd8454 의 모드 3 쪽)', () 
     expect(meetsPitcherSkillCondition(투수({ releaseTrainingStreaks: 카운터(0, 8) }), 'release', 21)).toBe(false)
   })
 
-  it('미이식 갈래(전설·좌우타UP·투지)는 불발로 둔다', () => {
-    for (const value of [8, 13, 14, 15]) {
-      expect(meetsPitcherSkillCondition(투수({ season: 13, gamesPlayed: 30, morale: 0 }), 'acquire', value)).toBe(false)
-    }
+  it('410 전설(7) — 정규시즌 1위 ≥ 8 · MVP 비트 수 > 6 (0xad474)', () => {
+    expect(meetsPitcherSkillCondition(투수({ regularSeasonFirstCount: 8, mvpSeasonBits: 0x7f }), 'acquire', 8)).toBe(true)
+    expect(meetsPitcherSkillCondition(투수({ regularSeasonFirstCount: 8, mvpSeasonBits: 0x3f }), 'acquire', 8)).toBe(false)
+  })
+
+  it('436 좌타UP(12) · 437 우타UP(13) — 손(0xb63c0 폼 & 1)과 통산 승 + 세이브 ≥ 120(선발) / 200', () => {
+    const 해 = { ...EMPTY_PITCHER_SEASON_STATS, wins: 40, saves: 20 }
+    const 오른손 = 투수({ season: 2, role: 0, handIndex: 0, yearlyStats: [해], stats: 해 })
+    expect(meetsPitcherSkillCondition(오른손, 'acquire', 13)).toBe(true)
+    expect(meetsPitcherSkillCondition(오른손, 'acquire', 14)).toBe(false)
+    expect(meetsPitcherSkillCondition({ ...오른손, handIndex: 1 }, 'acquire', 14)).toBe(true)
+    expect(meetsPitcherSkillCondition({ ...오른손, role: 2 }, 'acquire', 13)).toBe(false)
+  })
+
+  it('425 투지(14) — 연차idx > 2, 지난 세 해 모두 승 ≥ 15(선발) · 426 해제는 작년 승 ≤ 6', () => {
+    const 해 = (wins: number) => ({ ...EMPTY_PITCHER_SEASON_STATS, wins })
+    const 넷째해 = 투수({ season: 4, role: 0, yearlyStats: [해(15), 해(15), 해(15)] })
+    expect(meetsPitcherSkillCondition(넷째해, 'acquire', 15)).toBe(true)
+    expect(meetsPitcherSkillCondition({ ...넷째해, yearlyStats: [해(15), 해(14), 해(15)] }, 'acquire', 15)).toBe(false)
+    expect(meetsPitcherSkillCondition({ ...넷째해, season: 3 }, 'acquire', 15)).toBe(false)
+    expect(meetsPitcherSkillCondition({ ...넷째해, skillIds: [14], yearlyStats: [해(9), 해(9), 해(6)] }, 'release', 15)).toBe(true)
+    expect(meetsPitcherSkillCondition({ ...넷째해, skillIds: [14], yearlyStats: [해(9), 해(9), 해(7)] }, 'release', 15)).toBe(false)
   })
 })
 

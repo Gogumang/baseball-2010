@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { meetsSkillAcquireCondition, meetsSkillReleaseCondition } from '@/entities/story/model/skillCondition'
+import {
+  meetsSkillAcquireCondition, meetsSkillReleaseCondition, withGameSkillCounters,
+} from '@/entities/story/model/skillCondition'
+import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
+import { EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('테스트'), ...overrides })
 /** 조건 값은 스킬 번호 + 1 이다 */
@@ -104,7 +108,55 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
   })
 })
 
+describe('조건 20 — 기록 · 카운터로 얻는 스킬 (0xad474 ~ 0xad7cc 모드 4)', () => {
+  it('7 전설 — 정규시즌 1위 ≥ 8 이고 MVP 비트(0~12) 수 > 6', () => {
+    const 전설 = 선수({ regularSeasonFirstCount: 8, mvpSeasonBits: 0b1111111 })
+    expect(meetsSkillAcquireCondition(전설, 값(7), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition({ ...전설, regularSeasonFirstCount: 7 }, 값(7), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition({ ...전설, mvpSeasonBits: 0b111111 }, 값(7), undefined)).toBe(false)
+  })
+
+  it('10 해결사 · 16 상승세 — 경기 카운터 S+0x1f0[6] > 5 · [1]+[2]+[3] > 9, 11 번트왕은 카운터를 세지 않아 불발', () => {
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 0, 6] }), 값(10), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 0, 5] }), 값(10), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 4, 3, 3] }), 값(16), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 3, 3, 3] }), 값(16), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 99, 0] }), 값(11), undefined)).toBe(false)
+  })
+
+  it('12 찬스 · 13 좌완UP · 14 우완UP · 15 제압 — 통산(지난 해 + 이번 해) 2루타 · 타점 · 안타 · 3루타와 손', () => {
+    const 해 = { ...EMPTY_SEASON_STATS, hits: 300, doubles: 60, triples: 5, runsBattedIn: 100 }
+    const 둘째해 = 선수({ season: 2, yearlyStats: [해], stats: 해 })
+    expect(meetsSkillAcquireCondition(둘째해, 값(12), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition(둘째해, 값(15), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition({ ...둘째해, battingSide: 0 }, 값(13), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition({ ...둘째해, battingSide: 0 }, 값(14), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition({ ...둘째해, battingSide: 1 }, 값(14), undefined)).toBe(true)
+    // 지난 해 칸이 없으면(첫 해) 이번 해만
+    expect(meetsSkillAcquireCondition(선수({ stats: 해 }), 값(12), undefined)).toBe(false)
+  })
+
+  it('경기 카운터 0xa690c — 전 타수 홈런이면 [1], 아니면 [2]·[3] 에 연타석 홈런, [4] 끝내기 · [6] 만루 홈런', () => {
+    const 홈런만 = withGameSkillCounters(선수(), {
+      stats: { ...EMPTY_SEASON_STATS, atBats: 2, hits: 2, homeRuns: 2 },
+      reputationCounts: { ...EMPTY_REPUTATION_COUNTS, grandSlams: 1, homeRunStreaksOfTwo: 1 },
+    })
+    expect(홈런만.gameSkillCounters).toEqual([0, 1, 0, 0, 0, 0, 1])
+    const 섞임 = withGameSkillCounters(홈런만, {
+      stats: { ...EMPTY_SEASON_STATS, atBats: 5, hits: 3, homeRuns: 3 },
+      reputationCounts: { ...EMPTY_REPUTATION_COUNTS, walkOffs: 1, homeRunStreaksOfTwo: 1, homeRunStreaksOfThree: 1 },
+    })
+    expect(섞임.gameSkillCounters).toEqual([0, 1, 1, 1, 1, 0, 1])
+  })
+})
+
 describe('조건 21 — 스킬 해제', () => {
+  it('하위 표 0xd8454 의 6~17(14 는 모드 4 갈래)은 가지고 있으면 곧 통과', () => {
+    for (const id of [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
+      expect(meetsSkillReleaseCondition(선수({ skillIds: [id] }), 값(id))).toBe(true)
+    }
+  })
+
   it('가지고 있지 않으면 뜨지 않는다', () => {
     expect(meetsSkillReleaseCondition(선수({ skillIds: [] }), 값(6))).toBe(false)
   })

@@ -1251,7 +1251,16 @@ function addReputationCounts(
   const { outcome, runsBattedIn, isWalkOff, ourScoreBefore, opponentScore } = play
   const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
   const after = ourScoreBefore + runsBattedIn
+  // G+0xe4 이어진 타석 홈런 — 코드 6(홈런 0xa8600) +1 · 코드 5(홈런 아닌 안타 0xa86c4 · 아웃 0xa8ac2) 0, 볼넷 · 사구는 그대로.
+  // 코드 6 은 +0xe4 ≤ 3 이면 +0xd4 + 4·(+0xe4) 를 올린다 — +0xdc 2 에 닿음 · +0xe0 3 에 닿음 (경기 카운터 0xa690c 의 재료)
+  const streakBefore = counts.homeRunStreak ?? 0
+  const homeRunStreak =
+    outcome.kind === '홈런' ? streakBefore + 1 : outcome.kind === '안타' || outcome.kind === '아웃' || outcome.kind === '삼진' ? 0 : streakBefore
+  const reached = outcome.kind === '홈런' ? homeRunStreak : 0
   return {
+    homeRunStreak,
+    homeRunStreaksOfTwo: (counts.homeRunStreaksOfTwo ?? 0) + (reached === 2 ? 1 : 0),
+    homeRunStreaksOfThree: (counts.homeRunStreaksOfThree ?? 0) + (reached === 3 ? 1 : 0),
     grandSlams: counts.grandSlams + (outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS ? 1 : 0),
     walkOffs: counts.walkOffs + (isWalkOff && isHit ? 1 : 0),
     buntHits: counts.buntHits,

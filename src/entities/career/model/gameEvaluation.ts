@@ -131,6 +131,15 @@ export interface ReputationCounts {
   readonly goAheadRuns: number
   /** G+0x110 — 동점 득점 (+2) */
   readonly tyingRuns: number
+  /**
+   * G+0xe4 — 이어진 타석 홈런 수. 0xa57f8 코드 6(홈런 가지 0xa8600)이 +1, 코드 5(홈런 아닌 안타 0xa86c4 · 아웃 0xa8ac2)가 0.
+   * 볼넷 · 사구는 건드리지 않는다. 평판식은 안 읽는다 — 경기 카운터(0xa690c → S+0x1f0) 재료다. 없으면 0
+   */
+  readonly homeRunStreak?: number
+  /** G+0xdc — 이어진 홈런이 2 에 닿은 횟수 (코드 6: +0xe4 ≤ 3 이면 +0xd4 + 4·(+0xe4) 를 +1) */
+  readonly homeRunStreaksOfTwo?: number
+  /** G+0xe0 — 이어진 홈런이 3 에 닿은 횟수 */
+  readonly homeRunStreaksOfThree?: number
 }
 
 export const EMPTY_REPUTATION_COUNTS: ReputationCounts = {

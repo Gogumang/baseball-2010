@@ -97,6 +97,7 @@ import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
+import { withGameSkillCounters } from '@/entities/story/model/skillCondition'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
 import {
   nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
@@ -785,7 +786,12 @@ export function useCareerSession({
       const settled = applySeasonEnd(
         applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random, aceLevels),
       )
-      const evaluated = applyGameEvaluation(settled, thisEvaluation, isEvaluated)
+      // 평가 0xa719c 안 0xa690c 가 경기 뒤 누적 카운터 S+0x1f0 을 더한다 — 정규시즌(평가하는 경기)만 (`withGameSkillCounters`)
+      const evaluated = applyGameEvaluation(
+        isEvaluated ? withGameSkillCounters(settled, summary) : settled,
+        thisEvaluation,
+        isEvaluated,
+      )
       // 116 감독 글은 진입이 +0x4a 와 **평가 뒤** 평판 +0x62 로 고른다 (0x128d2~0x12938 — 모드 4 표 39~74)
       const evaluation = {
         ...staleEvaluation,

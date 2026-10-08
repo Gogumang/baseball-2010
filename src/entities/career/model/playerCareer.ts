@@ -252,6 +252,12 @@ export interface PlayerCareer {
   /** 사이클링 히트를 친 경기 수 — 칭호 "사이클링 히트 2회 달성" */
   readonly cycleHitGames: number
   /**
+   * 경기 뒤 누적 카운터 S+0x1f0 u16[7] — 평가 0xa719c(정규시즌만) 안 0xa690c 가 경기마다 더한다(`withGameSkillCounters`).
+   * 새 시즌 0xa39a8 이 지우려다 +0x1e0 을 두 번 지워(원본 버그) **이 벌은 영영 안 지워진다**. 스킬 획득 조건 10 · 11 · 16 이 읽는다.
+   * 옛 저장에는 없다(0 으로 본다).
+   */
+  readonly gameSkillCounters?: readonly number[]
+  /**
    * 시즌 시작 때 인기도 (선수 +0x78) — 올해의 목표 "인기도 상승" 과 연봉 계산의 기준.
    * 새 시즌 전환이 `S[0x78] = 0xb6e78(S)`(지금 인기도)로 다시 뜬다 (0xa39e0).
    */

@@ -1,5 +1,5 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { equippedPitcherAbilityOf, GAMES_PER_SEASON } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedPitcherAbilityOf, GAMES_PER_SEASON, pitcherYearlyStatsOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import { seasonPitcherTrainingCountOf, seasonPitcherTrainingTotalOf } from '@/entities/pitcher-career/model/pitcherManagement'
 import {
@@ -127,8 +127,12 @@ const PITCHER_SKILL = {
   몹쓸몸: 3,
   유리몸: 4,
   무력감: 5,
+  전설: 7,
   끈기: 10,
   닥터K: 11,
+  좌타UP: 12,
+  우타UP: 13,
+  투지: 14,
   안정감: 16,
   비겁자: 18,
   깃털: 19,
@@ -138,17 +142,40 @@ const PITCHER_SKILL = {
 const FIRST_TABLE_SKILL = 2
 const LAST_TABLE_SKILL = 20
 
+/** 0xa4d51 — +0x1ca 비트 0~12 가운데 켜진 수 */
+function mvpSeasonCountOf(bits: number): number {
+  let count = 0
+  for (let bit = 0; bit <= 12; bit += 1) if ((bits & (1 << bit)) !== 0) count += 1
+  return count
+}
+const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
+
 /**
- * 하위 표에서 **투수 갈래를 아직 옮기지 못한** 스킬 — 불발로 둔다 (지어내지 않는다).
- *   (2 먹튀 · 5 무력감은 116 카운터 +0x1c0/+0x1cd · +0x1c7 와 +0x1c2 를, 3 몹쓸몸 · 4 유리몸은 훈련 0x18b86 의 +0x75/+0x76 을
- *    세게 되어 옮겼다 — 아래 식.)
- *   7 전설: +0x7a(우승 횟수 추정) — 투수 웹 칸 없음.
- *   12 좌타UP · 13 우타UP: 0xb63c0(투수 기록) 의 뜻(0xb6278 · 0xb63a0 갈래)을 다 풀지 못했다.
- *   14 투지: 지난 3년 연도 기록(0x1fa78(i) +0x24·+0x2e) — 투수 웹에 연도별 기록이 없다.
+ * 투수 통산 `0x9da28` 의 +4(Σ +0x24 세이브) · +0xe(Σ s8 +0x2e 승) — 지난 해 0x1fa78(i)(i < 연차idx)와 이번 해 0x1fbd0 을 s32 로
+ * 더해 strh, 조건은 ldrh 뒤 s16 으로 읽는다. 지난 해 기록(`yearlyStats`)이 연차만큼 없는 옛 저장은 통산(`careerStats`)으로 읽는다.
  */
-const UNPORTED_ACQUIRE: ReadonlySet<number> = new Set([7, 12, 13, 14])
-/** 해제 쪽 미이식 — 14 투지 (작년 +0x2e · +0x24, 0xada22) */
-const UNPORTED_RELEASE: ReadonlySet<number> = new Set([14])
+function pitcherSavesPlusWinsOf(career: PitcherCareer): number {
+  const years = pitcherYearlyStatsOf(career)
+  const rows = years.length >= career.season - 1 ? [...years.slice(0, career.season - 1), career.stats] : [career.careerStats]
+  const saves = toInt16(rows.reduce((total, row) => total + toInt16(row.saves), 0))
+  const wins = toInt16(rows.reduce((total, row) => total + toInt8(row.wins), 0))
+  return saves + wins
+}
+
+/** 0xb63c0(내 투수 레코드 0x1fbd0) — 마투수가 아니면 폼(2×타입 + 손) & 1 = 손(1 좌완) (b63c0~b640e) */
+const isLeftHandedPitcher = (career: PitcherCareer) => (career.handIndex & 1) === 1
+
+/** 지난 해 i(0부터)의 연도 기록 0x1fa78(i) — 없으면(옛 저장) 0 으로 본다 (⚠️ 근사) */
+function pitcherYearOf(career: PitcherCareer, yearIndex: number) {
+  const row = pitcherYearlyStatsOf(career)[yearIndex]
+  return { wins: row === undefined ? 0 : toInt8(row.wins), saves: row === undefined ? 0 : toInt16(row.saves) }
+}
+
+/** 투지 — 보직 0 이면 그 해 s8 +0x2e(승), 그 밖은 s16 +0x24(세이브) + 승 (0xad668~0xad790 · 0xada22~0xadace) */
+const fightingValueOf = (career: PitcherCareer, yearIndex: number) => {
+  const year = pitcherYearOf(career, yearIndex)
+  return career.role === 0 ? year.wins : year.saves + year.wins
+}
 /** 몹쓸몸 · 유리몸 얻기 — 실효 능력치 넷 평균 상한 `0xaf << 2` (0xad324 · 0xad3f2) */
 const WEAK_BODY_AVERAGE_LIMIT = 700
 /** 몹쓸몸 · 유리몸 해제 — u8 S+0x75 > 5 (0xad9fc) · u8 S+0x76 > 7 (0xadb18) */
@@ -203,6 +230,22 @@ function acquiresPitcherSkill(career: PitcherCareer, skill: number, random: Rand
       }
       const t = seasonPitcherTrainingTotalOf(career)
       return (g === 18 && t <= 2) || (g === 38 && t <= 4)
+    }
+    case PITCHER_SKILL.전설:
+      // 0xad474 (모드 갈림 없음): s8 +0x7a(정규시즌 1위 횟수) ≥ 8 이고 0xa4d51(+0x1ca MVP 비트 수) > 6
+      return toInt8(career.regularSeasonFirstCount) >= 8 && mvpSeasonCountOf(career.mvpSeasonBits) > 6
+    case PITCHER_SKILL.좌타UP:
+    case PITCHER_SKILL.우타UP: {
+      // 0xad53c(12) · 0xad5c8(13): 0xb63c0(내 레코드)가 12 는 거짓 · 13 은 참이어야 → 통산 (+0xe 승) + (+4 세이브) 가
+      // 보직 0(0xb6705) 이면 ≥ 120, 아니면 ≥ 200
+      if (isLeftHandedPitcher(career) !== (skill === PITCHER_SKILL.우타UP)) return false
+      return pitcherSavesPlusWinsOf(career) >= (career.role === 0 ? 120 : 200)
+    }
+    case PITCHER_SKILL.투지: {
+      // 0xad668: 연차idx > 2 → 지난 세 해(y−3 · y−2 · y−1) 모두 보직 0 이면 승 ≥ 15, 아니면 세이브 + 승 ≥ 20
+      if (yearIndex <= 2) return false
+      const limit = career.role === 0 ? 15 : 20
+      return [3, 2, 1].every((back) => fightingValueOf(career, yearIndex - back) >= limit)
     }
     case PITCHER_SKILL.무력감:
       // 0xad43a: 해제 기록 → 사기(0xa3a25) ≤ 20 → 연차idx > 2 → rand(0,100) 굴림 (앞이 막히면 안 굴린다)
@@ -260,6 +303,12 @@ function releasesPitcherSkill(career: PitcherCareer, skill: number): boolean {
   const slot = PITCHER_RELEASE_STREAK_SLOT[skill]
   // 18·19·20 — 해제 카운터 +0x70+칸 > 7 (훈련 0x18a80: 그 스킬을 **가진 채** 그 칸만 연달아 8번)
   if (slot !== undefined) return (career.releaseTrainingStreaks[slot] ?? 0) > RELEASE_STREAK_LIMIT
+  // 14 투지 (0xada22 모드 3): 연차idx > 2 → 작년(y−1) 보직 0 이면 승 ≤ 6, 아니면 세이브 + 승 ≤ 10
+  if (skill === PITCHER_SKILL.투지) {
+    const yearIndex = career.season - 1
+    if (yearIndex <= 2) return false
+    return fightingValueOf(career, yearIndex - 1) <= (career.role === 0 ? 6 : 10)
+  }
   // 6~13 · 15 · 16 · 17 — 표가 0xadc34 (통과)
   return true
 }
@@ -271,7 +320,7 @@ function releasesPitcherSkill(career: PitcherCareer, skill: number): boolean {
  *   21 (0xad9ac): 못 가졌으면 불발 → 하위 표 0xd8454[v−3]
  * ```
  * 하위 표 안의 갈림은 `[r6+8]`(모드) == 4 로 타자·투수가 갈린다 — 여기 식은 모두 모드 3 쪽이다 (직접 재역어셈).
- * 미이식 스킬은 `UNPORTED_ACQUIRE` · `UNPORTED_RELEASE` 머리글.
+ * 하위 표 투수 갈래는 모두 옮겼다(7 · 12 · 13 · 14 포함).
  */
 export function meetsPitcherSkillCondition(
   career: PitcherCareer,
@@ -283,8 +332,8 @@ export function meetsPitcherSkillCondition(
   const owns = career.skillIds.includes(skill)
   if (kind === 'acquire' ? owns : !owns) return false
   if (skill < FIRST_TABLE_SKILL || skill > LAST_TABLE_SKILL) return true
-  if (kind === 'acquire') return !UNPORTED_ACQUIRE.has(skill) && acquiresPitcherSkill(career, skill, random)
-  return !UNPORTED_RELEASE.has(skill) && releasesPitcherSkill(career, skill)
+  if (kind === 'acquire') return acquiresPitcherSkill(career, skill, random)
+  return releasesPitcherSkill(career, skill)
 }
 
 /* ── 자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) ───────────────────────────────────────────── */
