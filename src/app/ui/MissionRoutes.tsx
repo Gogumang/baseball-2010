@@ -33,7 +33,11 @@ import type { PitchControl } from '@/entities/settings/model/gameSettings'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionResultHeldOf } from '@/pages/mission-play/lib/missionResultBoard'
-import { missionRunScoreBoardOf } from '@/pages/mission-play/lib/missionRunScoreBoard'
+import { missionRunScoreBoardOf, missionScoreboardSidesOf } from '@/pages/mission-play/lib/missionRunScoreBoard'
+import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
+import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
+import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { activeSound } from '@/shared/api/audio/soundPort'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -358,6 +362,28 @@ function missionOverlayOf(
         onDone={actions.finishPickoffReplay}
         // 볼넷 · 사구 밀어내기 판(종류 2)도 이 재생 칸으로 온다 — 키 건너뛰기(0x519cc)를 받는다
         freePassPlay={isWalkPlayResult(session.pickoffReplay)}
+      />
+    )
+  }
+
+  // 미션 시작의 첫 0x18 판 — 상태 8 끝(48bf0)이 인트로 없이 보내고, 첫 반 이닝이 사람 몫이라 판이 서서 OK 를 기다린다
+  // (굴림 36 은 세션이 세울 때 썼다). 틱 2 에 징글 13(0x4f7ac). OK → 0xae3a0 → 0xd → 0xe. 제한 시간은 그 동안에도 흐르고(0xaada4),
+  // 다 되면 0x76d → 0x19 가 덮어 결과 판으로 간다.
+  // ⚠️ 미이식 — 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")(틱 ≥ 70): 첫 판의 공격 팀 타순 세 칸 · 수비 팀 지금 투수 이름을
+  //    미션 판이 아직 한 곳에 모아 들고 있지 않아 그리지 않는다. 점수판 틀 0x41440 은 그린다.
+  const board = session.halfInningBoard
+  if (board !== null && playingRun !== null && playingRun.status === '진행중') {
+    const sideMission = missionWithSideTeamsOf(playingRun.mission, playingRun.game.humanBatting.teamId)
+    return (
+      <HalfInningBoard
+        key={board.serial}
+        inning={board.inning}
+        half={board.half}
+        onTick={(tick) => {
+          if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
+        }}
+        scoreboardSides={missionScoreboardSidesOf(sideMission)}
+        onConfirm={actions.confirmHalfInningBoard}
       />
     )
   }

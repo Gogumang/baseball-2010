@@ -68,6 +68,8 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
+    // 첫 0x18 판의 OK → 0xd → 0xe
+    act(() => 세션!.actions.confirmHalfInningBoard())
 
     const shown = 받은것.at(-1)!
     expect(shown.settings).toBe(설정.settings)
@@ -77,6 +79,8 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(받은것.at(-1)?.run.status).toBe('실패')
     // 다시하기 — 새 판(진행중)이고 여전히 대결이다: 끝나면 투수편으로 이겼나를 넘긴다
     act(() => 받은것.at(-1)!.onRestart!())
+    // 다시 세운 장면도 첫 0x18 판부터
+    act(() => 세션!.actions.confirmHalfInningBoard())
     const again = 받은것.at(-1)!
     expect(again.run.mission).toBe(mission)
     expect(again.run.status).toBe('진행중')
@@ -92,12 +96,14 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     const onQuit = vi.fn()
     const setScreen = vi.fn()
     const screen: Screen = { kind: '투수편' }
+    let 세션: ReturnType<typeof useMissionSession> | null = null
 
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
         runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen,
       })
+      세션 = session
       return (
         <PitcherAceMatchRoute
           mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
@@ -106,6 +112,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
+    act(() => 세션!.actions.confirmHalfInningBoard())
     act(() => 받은것.at(-1)!.onGiveUp())
     expect(onQuit).toHaveBeenCalledTimes(1)
     expect(setScreen).toHaveBeenLastCalledWith({ kind: '메인메뉴' })
@@ -133,7 +140,12 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         />
       )
     }
-    render(<Harness />)
+    const view = render(<Harness />)
+
+    // 미션 장면은 상태 8 끝에서 곧장 첫 0x18 판 — 첫 반 이닝(CPU 공격 · 사람 수비)이 사람 몫이라 판이 OK 를 기다린다
+    expect(받은것).toHaveLength(0)
+    expect(view.getByText(/회(초|말)$/)).toBeTruthy()
+    act(() => view.getByText('확인').click())
 
     const shown = 받은것.at(-1)
     expect(shown?.run.mission).toMatchObject({ side: '투수', id: 18, name: '로제' })
@@ -150,12 +162,15 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     if (mission === null) throw new Error('투수 미션 17 이 없다')
     const 밀어내기 = { kind: 2, pitchJudgement: '볼넷', ticks: [{}] } as never
 
+    let 세션: ReturnType<typeof useMissionSession> | null = null
+
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
         runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
+      세션 = session
       return (
         <PitcherAceMatchRoute
           mission={mission!} session={{ ...session, pickoffReplay: 밀어내기 }} runner={runner} pitchControl="게이지"
@@ -164,6 +179,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
+    act(() => 세션!.actions.confirmHalfInningBoard())
     act(() => { vi.advanceTimersByTime(30 * millisecondsPerFrame()) })
     expect(재생).not.toHaveBeenCalled()
     act(() => { vi.advanceTimersByTime(2 * millisecondsPerFrame()) })
@@ -176,12 +192,15 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     if (mission === null) throw new Error('투수 미션 17 이 없다')
     const 밀어내기 = { kind: 2, pitchJudgement: '볼넷', ticks: [{}] } as never
 
+    let 세션: ReturnType<typeof useMissionSession> | null = null
+
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
         runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
+      세션 = session
       return (
         <PitcherAceMatchRoute
           mission={mission!} session={{ ...session, pickoffReplay: 밀어내기 }} runner={runner} pitchControl="게이지"
@@ -190,6 +209,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
+    act(() => 세션!.actions.confirmHalfInningBoard())
     act(() => { vi.advanceTimersByTime(10 * millisecondsPerFrame()) })
     act(() => 받은것.at(-1)?.onPopupFrozenChange?.(true))
     act(() => { vi.advanceTimersByTime(40 * millisecondsPerFrame()) })

@@ -42,6 +42,7 @@ import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
+import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
@@ -302,6 +303,8 @@ function setUpBatterMission(missionId: number) {
   act(() => {
     rendered.result.current.session.actions.begin(mission)
   })
+  // 첫 0x18 판의 OK (굴림 없음) → 0xd → 0xe
+  act(() => rendered.result.current.session.actions.confirmHalfInningBoard())
   return rendered
 }
 
@@ -557,6 +560,8 @@ function setUpBatterMissionWithSeed(mission: (typeof MISSIONS)[number], seed: nu
   act(() => {
     rendered.result.current.session.actions.begin(mission)
   })
+  // 첫 0x18 판의 OK (굴림 없음) → 0xd → 0xe
+  act(() => rendered.result.current.session.actions.confirmHalfInningBoard())
   return rendered
 }
 
@@ -584,6 +589,8 @@ function setUpPitcherMissionOf(mission: (typeof MISSIONS)[number], seed: number,
     }
   })
   act(() => rendered.result.current.session.actions.begin(mission))
+  // 첫 0x18 판의 OK (굴림 없음) → 0xd → 0xe
+  act(() => rendered.result.current.session.actions.confirmHalfInningBoard())
   return rendered
 }
 
@@ -596,6 +603,8 @@ function seededAfterStart(seed: number): RandomPort {
   rollSimulatorInit(random)
   // 그 뒤 상태 8 경기 적재 — 구장 준비 0x352e8 → 0x783b0 하늘 줄 rand(0, 6) (모드 5 · 6, 3fa5e 가 상태 9 끝에 8 을 예약)
   randomIntegerBelow(random, 0, SKY_ROW_COUNT)
+  // 상태 8 끝(48bf0) → 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 판이 서고 틱 0 의 0x3fac4 가 rand 36 개(`rollHalfInningFielders`)
+  rollHalfInningFielders(random)
   return random
 }
 
@@ -682,8 +691,8 @@ describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 �
 /* ── 견제사도 '아웃' 목표에 든다 (아웃 콜 결과 13 → 0xa7d0c → R+0x13c · 판정 0xaaa6c aacd6) ──────── */
 
 describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51b36 → 0xa7d0c(a7d52) · 판 끝 판정 0xaaa6c(ae5c4)", () => {
-  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 31 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인 — 상태 8 하늘 줄 rand(0, 6)
-  // (0x783b0)이 끼며 예전 씨앗 55 는 세이프가 됐다. 1~300 가운데 견제사는 31 · 77 · 228)
+  // 미션 12 "최강의 챔피언" 1사 1·3루 — 씨앗 290 의 1루 견제는 견제사다 (같은 씨앗의 기대 판으로 확인 — 첫 0x18 판의 굴림 36
+  // (0x3fac4)이 하늘 줄 뒤에 끼며 예전 씨앗 31 은 세이프가 됐다. 1~300 가운데 견제사는 290 하나)
   const mission12 = MISSIONS.find((row) => row.side === '투수' && row.id === 12)!
   const expectedOf = (seed: number) =>
     runPickoffPlay({
@@ -697,8 +706,8 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     })
 
   it("견제사 하나 = '아웃' 칸 +1 · 이닝 아웃 +1 — 목표가 탈삼진뿐이면 진행 중 그대로", () => {
-    expect(expectedOf(31).advance.outsAdded).toBe(1)
-    const rendered = setUpPitcherMission(12, 31)
+    expect(expectedOf(290).advance.outsAdded).toBe(1)
+    const rendered = setUpPitcherMission(12, 290)
     const before = rendered.result.current.session.pitcherRun!
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
@@ -715,7 +724,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
 
   it("'아웃' 목표가 견제사로 차면 판 끝 판정에서 바로 성공 — 0xaa928 이 상태 1 로 안 남는다", () => {
     const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { '아웃': 1 } }
-    const rendered = setUpPitcherMissionOf(아웃한개, 31)
+    const rendered = setUpPitcherMissionOf(아웃한개, 290)
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
 
@@ -1074,6 +1083,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
     if (mission === null) throw new Error('투수 미션 16 이 없다')
 
     act(() => rendered.result.current.actions.beginPitcherAceMatch(mission))
+    // 첫 0x18 판의 OK (굴림 없음)
+    act(() => rendered.result.current.actions.confirmHalfInningBoard())
     const started = rendered.result.current
     if (options.giveUp === true) act(() => rendered.result.current.actions.giveUpPitcher())
     for (let pitch = 0; pitch < 20 && rendered.result.current.pitcherRun?.status === '진행중'; pitch += 1) {
@@ -1121,8 +1132,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('실패하면 졌다', () => {
-    // 씨앗 1 — 하늘 줄 굴림이 끼며 예전 씨앗 2 는 성공 판이 됐다
-    const { status, isWin } = playPitcherAceMatch(1)
+    // 씨앗 8 — 첫 0x18 판의 굴림 36(0x3fac4)이 하늘 줄 뒤에 끼며 예전 씨앗 1 은 성공 판이 됐다(1~12 가운데 실패는 8 · 9 · 10)
+    const { status, isWin } = playPitcherAceMatch(8)
 
     expect(status).toBe('실패')
     expect(isWin).toBe(false)
@@ -1215,6 +1226,11 @@ describe('상태 0xe 의 OK 대기 — 미션(모드 5·6)도 새 타석마다 (
     const mission = MISSIONS.find((row) => row.side === '타자')
     if (mission === undefined) throw new Error('타자 미션이 없다')
     act(() => rendered.result.current.session.actions.begin(mission))
+    // 미션 시작은 먼저 첫 0x18 판이 OK 를 기다린다 — 0xe 대기는 그 뒤(0xae3a0 → 0xd → 0xe)
+    expect(rendered.result.current.session.halfInningBoard).not.toBeNull()
+    expect(rendered.result.current.session.sceneConfirm).toBeNull()
+    act(() => rendered.result.current.session.actions.confirmHalfInningBoard())
+    expect(rendered.result.current.session.halfInningBoard).toBeNull()
     const 처음 = rendered.result.current.session.sceneConfirm
     expect(처음).not.toBeNull()
     const 스트라이크 = () =>
@@ -1348,6 +1364,8 @@ describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428
       act(() => {
         rendered.result.current.session.actions.begin(mission)
       })
+      // 첫 0x18 판의 OK → 0xd → 0xe
+      act(() => rendered.result.current.session.actions.confirmHalfInningBoard())
       rendered.rerender()
       expect(rendered.result.current.session.sceneConfirm?.entries).toBe(1)
 
@@ -1515,5 +1533,79 @@ describe('자동진행 0x21 — 3아웃 뒤 판은 halfEnded 로 서서 기다�
       return
     }
     throw new Error('견제사 씨앗이 없다')
+  })
+})
+
+/* ── 미션 시작의 첫 0x18 판 (상태 8 끝 48bf0 → 0x18 · 0x4f928 틱 0 · 0x3fac4) ─────────────────── */
+
+describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 판이 서서 OK 를 기다리고 굴림 36(0x3fac4)', () => {
+  /** 세션 하나 — 난수를 바깥에서도 읽는다 */
+  const sessionOf = (seed: number, screen: Screen = { kind: '미션선택' }) => {
+    const random = createSeededRandom(seed)
+    const rendered = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(), random, missionRecord: { load: () => ({}), save: vi.fn() },
+        screen, setScreen: vi.fn(), pitcher: modePitcherOf(createPitcherCareer('판투수')),
+      }))
+    return { rendered, random }
+  }
+  /** 장면 시작 굴림(덱 → rand(0, 2) → 하늘 줄 rand(0, 6)) 뒤 첫 판 굴림 36 까지 먹인 같은 씨앗의 다음 값 */
+  const nextAfterBoard = (seed: number) => seededAfterStart(seed).next()
+  /** 첫 판 굴림이 없을 때의 다음 값 — 하늘 줄 바로 뒤 */
+  const nextAfterSky = (seed: number) => {
+    const random = createSeededRandom(seed)
+    createPatternDeck(random)
+    rollSceneEffectInit(random)
+    rollSimulatorInit(random)
+    randomIntegerBelow(random, 0, SKY_ROW_COUNT)
+    return random.next()
+  }
+
+  it.each([
+    ['타자', 1],
+    ['타자', 9],
+    ['투수', 1],
+    ['투수', 12],
+  ] as const)('%s 미션 %i — 하늘 줄 뒤 굴림 36 · 판이 서고 0xe 대기는 없다, OK 뒤에야 0xe', (side, id) => {
+    const mission = MISSIONS.find((row) => row.side === side && row.id === id)!
+    const { rendered, random } = sessionOf(4)
+    act(() => rendered.result.current.actions.begin(mission))
+
+    expect(random.next()).toBe(nextAfterBoard(4))
+    expect(nextAfterBoard(4)).not.toBe(nextAfterSky(4))
+    const run = side === '투수' ? rendered.result.current.pitcherRun! : rendered.result.current.missionRun!
+    expect(rendered.result.current.halfInningBoard).toEqual({
+      serial: 1,
+      inning: run.game.inning + 1,
+      half: run.game.offenseSide === 0 ? '초' : '말',
+    })
+    expect(rendered.result.current.sceneConfirm).toBeNull()
+
+    act(() => rendered.result.current.actions.confirmHalfInningBoard())
+    expect(rendered.result.current.halfInningBoard).toBeNull()
+    expect(rendered.result.current.sceneConfirm?.entries).toBe(1)
+  })
+
+  it('마선수 대결(타자편 · 투수편)도 미션 장면이라 같은 판 — 판이 OK 를 기다린다', () => {
+    const batter = aceMatchMissionOf(16, '타자')!
+    const pitcher = aceMatchMissionOf(16, '투수')!
+    const { rendered, random } = sessionOf(5, { kind: '투수편' })
+    act(() => rendered.result.current.actions.beginAceMatch(batter, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY }))
+    expect(random.next()).toBe(nextAfterBoard(5))
+    expect(rendered.result.current.halfInningBoard).not.toBeNull()
+    expect(rendered.result.current.sceneConfirm).toBeNull()
+
+    const second = sessionOf(5, { kind: '투수편' })
+    act(() => second.rendered.result.current.actions.beginPitcherAceMatch(pitcher))
+    expect(second.random.next()).toBe(nextAfterBoard(5))
+    expect(second.rendered.result.current.halfInningBoard).not.toBeNull()
+    act(() => second.rendered.result.current.actions.confirmHalfInningBoard())
+    expect(second.rendered.result.current.sceneConfirm?.entries).toBe(1)
+  })
+
+  it('판이 없으면 OK 는 아무것도 안 한다', () => {
+    const { rendered } = sessionOf(1)
+    act(() => rendered.result.current.actions.confirmHalfInningBoard())
+    expect(rendered.result.current.sceneConfirm).toBeNull()
   })
 })

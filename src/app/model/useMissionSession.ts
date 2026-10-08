@@ -15,6 +15,7 @@ import {
   MISSION_BATTER_MODE,
   missionDefensePlayInputOf,
   isMissionBatterUp,
+  missionFirstHalfIsHuman,
   recordSwing,
   batterMissionAutoTicks,
   startMission,
@@ -72,6 +73,7 @@ import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { hallOfFamePitcherAt } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
@@ -508,6 +510,16 @@ export function useMissionSession({
    * 제한 시간은 그 동안에도 흐른다 — 모드 5·6 의 0xaada4 는 장면 상태 갱신 뒤(0x52ed0) 상태를 안 가리고 돈다.
    */
   const [sceneConfirm, setSceneConfirm] = useState<SceneConfirmWait | null>(null)
+  /**
+   * **미션 시작의 첫 0x18 판** — 상태 8 끝(48bf0)이 인트로 없이 0x18 로 보내고, 첫 반 이닝이 사람 몫이면(0xc2198 거짓 —
+   * `missionFirstHalfIsHuman`) 판이 서서 OK 를 기다린다. 틱 0 의 4fb20 0x3fac4 가 굴림 36 개를 쓴다(세울 때 굴린다).
+   * OK(메시지 1 인자 0x18) → 0xae3a0 → 0xd → 0xe. 판이 서 있는 동안 0xe 대기는 없다. 3아웃 뒤 0x18 은 늘 0x21 이라(Q2 2e-2) 이 판은
+   * 미션 한 판에 이 하나뿐이다. `serial` 은 판마다 새로.
+   */
+  const [halfInningBoard, setHalfInningBoard] = useState<
+    { readonly serial: number; readonly inning: number; readonly half: '초' | '말' } | null
+  >(null)
+  const halfInningBoardSerialRef = useRef(0)
   /**
    * **상태 0xf 진입 `0x3d954` 신호** — 미션도 공마다 0xf 로 들어서며 CPU 교체를 묻는다(`missionCpuTeam` 머리글).
    * `'new'` 는 새 타석(0xd → 0xe 확인 뒤), `'same'` 은 같은 타석 다음 공(판정 A 의 "그 밖" · 파울로 닫힌 판 · 주자 판 끝 ae592).
@@ -1386,7 +1398,12 @@ export function useMissionSession({
     setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
     setBallMagicNumber(0)
-    resetAtBatWithConfirm(mission.start)
+    // 시작 상황(카운트)은 상태 8 끝 48c86 의 0xaae7c(…, 0xd, 0x18, 0)(aaf10)이 0x18 앞에 깐다 — 0xe 대기는 첫 0x18 판 OK 뒤
+    // (`openFirstHalfBoard` · `confirmHalfInningBoard`)
+    runner.resetAtBat(mission.start)
+    newAtBatWaitRef.current = null
+    setSceneConfirm(null)
+    setHalfInningBoard(null)
     runner.setBannerText('')
     runner.setIsPaused(false)
     setPendingDefensePlay(null)
@@ -1403,9 +1420,39 @@ export function useMissionSession({
     rollSkyRow()
   }
 
+  /**
+   * **상태 8 끝 → 첫 0x18** (48bf0 — 미션은 인트로 0xc 를 안 지난다). 부르는 쪽이 판을 세운 뒤(`startMission` · `startPitcherMission`
+   * 은 굴리지 않는다) 하늘 줄 다음에 부른다. 첫 반 이닝이 사람 몫이면 판이 서고 틱 0 의 0x3fac4 가 rand 36 개를 굴린다
+   * (`missionFirstHalfIsHuman` — 웹의 미션 · 마선수 대결은 모두 사람 몫이다).
+   * ⚠️ 사람 몫이 아니면 원본은 0x18 → 0x21 자동진행으로 가지만 그런 미션이 웹에 없어 그 길은 옮기지 않았다 — 판 없이 0xd → 0xe.
+   */
+  const openFirstHalfBoard = (run: MissionRun | PitcherRun) => {
+    if (!missionFirstHalfIsHuman(run)) {
+      enterNewAtBatConfirm()
+      return
+    }
+    rollHalfInningFielders(random)
+    halfInningBoardSerialRef.current += 1
+    setHalfInningBoard({
+      serial: halfInningBoardSerialRef.current,
+      inning: run.game.inning + 1,
+      half: run.game.offenseSide === 0 ? '초' : '말',
+    })
+  }
+
   const actions = {
     /** 수비 화면이 끝났다 — 진루·아웃·실점을 이제 먹인다 */
     finishDefensePlay,
+
+    /**
+     * **첫 0x18 판의 OK** — 메시지 1(인자 0x18) → 0x50c18 → 0xae3a0: 모드 5 · 6 이면 판정 0xaaa6c(시작에는 아무 목표도 안 차 진행 중),
+     * 경기 끝이 아니라 0xd → 0xe 에서 첫 타석 OK 를 기다린다. 굴림 없음.
+     */
+    confirmHalfInningBoard: () => {
+      if (halfInningBoard === null) return
+      setHalfInningBoard(null)
+      enterNewAtBatConfirm()
+    },
 
     /** 타자 미션의 필살 스윙이 나갔다 (0x4e136) — `BattingStage` 의 `onSpecialSwingUsed`, 인자는 줄인 뒤 남은 횟수 */
     specialSwingUsed: (remaining: number) => setBatterSpecialSwingStored(remaining),
@@ -1441,20 +1488,28 @@ export function useMissionSession({
       setPitcherAceMatchMission(null)
 
       if (mission.side === '투수') {
-        setPitcherRun(startPitcherMission(mission))
+        const started = startPitcherMission(mission)
+        setPitcherRun(started)
+        openFirstHalfBoard(started)
         setScreen({ kind: '투수미션', mission })
         return
       }
       // 0xaa57c aa7b0 — 미션 타자(0x1fc20: 명예 타자 또는 나리 타자편 저장 선수)가 드는 레코드 칸 k = +0xa & 0x1f
       const nariRecordSlot = hallOfFameBatter !== null ? HALL_OF_FAME_BATTER_RECORD_SLOT : nariBatterRecordSlot
-      setMissionRun(startMission(mission, nariRecordSlot === undefined ? {} : { nariRecordSlot }))
+      const started = startMission(mission, nariRecordSlot === undefined ? {} : { nariRecordSlot })
+      setMissionRun(started)
+      openFirstHalfBoard(started)
       setScreen({ kind: '미션진행', mission })
     },
 
     /** 이벤트 match — 공략 레코드를 치르고 결과 이벤트로 돌아간다 (이기면 `finishAceMatch` 가 클리어 칸을 올린다) */
     beginAceMatch: (mission: OriginalMission, pending: Omit<Extract<Screen, { kind: '마선수대결' }>, 'kind' | 'mission'>) => {
-        setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-        resetAtBatWithConfirm(mission.start)
+      setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
+      // 시작 상황은 0x18 앞(48c86 0xaae7c aaf10) — 0xe 대기는 첫 0x18 판 OK 뒤 (`resetForNewMatch` 와 같다)
+      runner.resetAtBat(mission.start)
+      newAtBatWaitRef.current = null
+      setSceneConfirm(null)
+      setHalfInningBoard(null)
       runner.setBannerText('')
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
@@ -1470,10 +1525,13 @@ export function useMissionSession({
       rollSkyRow()
       // 0xaa57c aa6e0 — g[0x11f] 가 서 있고 g[0xf6] = 4(나리 타자편, SYS 8 0x8d836) → 사람 칸 = 타자편 저장 팀
       // 0x1fc20 은 g[0x11f] 면 명예 타자 갈래를 안 타 늘 나리 타자편 저장 선수 — k 도 그 선수 +0xa & 0x1f
-      setMissionRun(startMission(mission, {
+      const started = startMission(mission, {
         ...aceMatchSetupOf(BATTER_EDITION_MODE, nariTeamIds?.batter),
         ...(nariBatterRecordSlot === undefined ? {} : { nariRecordSlot: nariBatterRecordSlot }),
-      }))
+      })
+      setMissionRun(started)
+      // 상태 8 끝 → 첫 0x18 판(사람 몫이라 판 · 굴림 36)
+      openFirstHalfBoard(started)
       setScreen({ kind: '마선수대결', mission, ...pending })
     },
 
@@ -1490,7 +1548,9 @@ export function useMissionSession({
       if (mission.side !== '투수') return
       resetForNewMatch(mission)
       // 0xaa57c aa6e0 — g[0x176] 이 서 있고 g[0xf6] = 3(나리 투수편, SYS 8 0x8d836) → 사람 칸 = 투수편 저장 팀
-      setPitcherRun(startPitcherMission(mission, aceMatchSetupOf(PITCHER_EDITION_MODE, nariTeamIds?.pitcher)))
+      const started = startPitcherMission(mission, aceMatchSetupOf(PITCHER_EDITION_MODE, nariTeamIds?.pitcher))
+      setPitcherRun(started)
+      openFirstHalfBoard(started)
       setPitcherAceMatchMission(mission)
     },
 
@@ -1748,6 +1808,8 @@ export function useMissionSession({
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
     sceneConfirm,
+    /** 미션 시작의 첫 0x18 판 — 서 있으면 라우트가 공수 교대 판을 그리고 OK 를 `actions.confirmHalfInningBoard` 로 */
+    halfInningBoard,
     /** 0xe 의 OK 하나 — 화면이 `useSceneConfirm` 셋째 인자로 넘긴다 (새 타석이면 0xf 진입이 CPU 교체를 묻는다) */
     confirmScene,
     /** 교체 연출 0x16 — 서 있으면 화면이 "CHANGE" 애니를 그리고 0xe 대기를 세지 않는다 */
