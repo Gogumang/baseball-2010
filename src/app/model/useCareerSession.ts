@@ -447,6 +447,20 @@ export function useCareerSession({
    * 0 으로 둔다 → 장면이 새로 서는 이어하기(`continueSaved`)와 경기 뒤(`finishGame`)에 내린다.
    */
   const matchPreparedRef = useRef(false)
+  /** 반복 이벤트 본 표시 지우기 대기 — 장면 셋업 0xf684 의 `0xacf60` (이벤트 본문이 도착한 뒤에 지운다) */
+  const [shouldForgetRepeatable, setShouldForgetRepeatable] = useState(false)
+  /** 이벤트 일정 훅의 장면 셋업(커서 0 · mgr+0x304 = 1) — 일정 훅이 아래에서 서므로 ref 로 잇는다 */
+  const storySceneSetUpRef = useRef<() => void>(() => {})
+  /**
+   * **나리 장면 0x106 이 새로 선다** — 셋업 0xf684 의 세 초기화: fb1c `0x8ce94` → `0xacf60`(반복 이벤트 본 표시 지움 · 커서
+   * reader+0x28 = 0) · fb7a mgr+0x304 = 1 · 0xfb7c 장면+0x288 = 0. 장면은 이어하기(`continueSaved`)와 **경기 뒤마다**(`finishGame` ·
+   * `finishCupGame` — 경기 장면 0x104 를 지나 0x106 이 다시 선다) · 마선수 대결 뒤 · 새 선수 등록에 선다.
+   */
+  const setUpNariScene = useCallback(() => {
+    matchPreparedRef.current = false
+    storySceneSetUpRef.current()
+    setShouldForgetRepeatable(true)
+  }, [])
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
   nariGameSaveRef.current = nariGameSave
@@ -739,8 +753,8 @@ export function useCareerSession({
   /** 경기가 끝났을 때 보상·칭호를 정산하고 결과 화면으로 넘어간다. */
   const finishGame = useCallback(
     (finished: GameProgress, currentCareer: PlayerCareer) => {
-      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 이 0 (다음 142 에서 다시 굴린다)
-      matchPreparedRef.current = false
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 이 0 (다음 142 에서 다시 굴린다) · 반복 이벤트 · 커서 · mgr+0x304
+      setUpNariScene()
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 전역기록 +0x4c + 모드(+0x50) = 0
       nariGameSaveRef.current?.clear()
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c) — 투수편 이어하기 116 의 감독 글 38 이 본다 (`liveGameState`)
@@ -814,7 +828,7 @@ export function useCareerSession({
         settlementSkyRow: stadiumSkyRowRef.current,
       })
     },
-    [aceLevels, audio, random, recordStat, setScreen],
+    [aceLevels, audio, random, recordStat, setScreen, setUpNariScene],
   )
 
   /**
@@ -838,8 +852,8 @@ export function useCareerSession({
         opponentScore: summary.opponentScore,
       })
       cupGameRef.current = null
-      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
-      matchPreparedRef.current = false
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0 · 반복 이벤트 · 커서 · mgr+0x304
+      setUpNariScene()
       // 대회 경기도 정산 진입 0x4ea0c 를 지난다 — 0x4f3d6 은 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
       // 전역 경기 상태 +0x6b — 대회 경기도 끝 이닝을 남긴다
@@ -869,7 +883,7 @@ export function useCareerSession({
         settlementPlayerSide: finished.game.playerSide, settlementSkyRow: stadiumSkyRowRef.current,
       })
     },
-    [audio, random, recordStat, setCareer, setScreen],
+    [audio, random, recordStat, setCareer, setScreen, setUpNariScene],
   )
 
   /**
@@ -1004,6 +1018,7 @@ export function useCareerSession({
   )
 
   const story = useStorySchedule(career)
+  storySceneSetUpRef.current = story.setUpScene
   /**
    * 외출 지도 [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 → 0x8cdc0 이 **들어설 때 한 번** 찍은 값(`outingPlaceSlotsOf`). 지도 그림
    * 0x7ed6c 의 [!] 와 [들어가기] 0x8ce58 이 모두 이 값을 쓴다. 웹 화면이 112 진입이 되는 때(`isOutingMapEntry`):
@@ -1076,8 +1091,7 @@ export function useCareerSession({
    * 웹은 훈련 결과 따위를 관리 화면 위 알림으로 보이므로 "105 에 있고 진입 이벤트 검사가 끝났으면" 늘 판정한 값으로 둔다.
    */
   const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? nextTitleOf(career) : null
-  // 저장을 불러오면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60) — 이벤트 본문이 도착한 뒤에
-  const [shouldForgetRepeatable, setShouldForgetRepeatable] = useState(false)
+  // 장면이 새로 서면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60, `setUpNariScene`) — 이벤트 본문이 도착한 뒤에
   useEffect(() => {
     if (!shouldForgetRepeatable || career === null || story.events === null) return
     setShouldForgetRepeatable(false)
@@ -1085,6 +1099,8 @@ export function useCareerSession({
   }, [shouldForgetRepeatable, career, story.events])
   useEffect(() => {
     if (!isManagementEntry || !managementEntryRef.current.isPending || career === null || story.events === null) return
+    // 셋업의 반복 이벤트 지우기가 아직이면 그 뒤에 훑는다 — 원본은 셋업 0xf684 가 105 진입보다 먼저다
+    if (shouldForgetRepeatable) return
     managementEntryRef.current = { ...managementEntryRef.current, isPending: false }
     /*
      * **새 선수 오프닝 451 이 115 보다 먼저다** (모드 3·4 공용). 진입 0x11910 이 0x11bd6 에서 `0xbcb49(115)` 로 예약해도,
@@ -1129,7 +1145,7 @@ export function useCareerSession({
     const event = story.eventFor(career, EVENT_TRIGGER.관리, random)
     if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
     if (orderEventId !== null) setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
-  }, [isManagementEntry, managementReentryCount, career, story, random, setScreen])
+  }, [isManagementEntry, managementReentryCount, career, story, random, setScreen, shouldForgetRepeatable])
 
 
   /*
@@ -1140,7 +1156,9 @@ export function useCareerSession({
   useEffect(() => {
     if (!isAceMatchResultScreen) return
     aceMatchPendingRef.current.clear()
-  }, [isAceMatchResultScreen])
+    // 대결(미션 장면)을 마치면 나리 장면 0x106 이 새로 선다(0xf684) — 105 진입에서 140 으로 온 길은 이어하기가 이미 세웠다(다시 해도 같다)
+    setUpNariScene()
+  }, [isAceMatchResultScreen, setUpNariScene])
 
   /**
    * 새 시즌 처리 `0x1b768` → 137 "N년차" → 105 관리 화면.
@@ -1407,6 +1425,8 @@ export function useCareerSession({
       // 104 등록 확정 0x10fb4 — 전역기록 +0x40 + 모드 = 1 · +0x4c + 모드 = 0 (0x112b2 · 0x112c0)
       nariGameSaveRef.current?.clear()
       saveGame.clear()
+      // 104 → 100 — 나리 장면이 새로 선다(커서 0 · mgr+0x304 = 1 — 새 선수라 본 표시는 비어 있다)
+      setUpNariScene()
       setCareer(createCareer(name, profile))
       setScreen({ kind: '관리' })
     },
@@ -1434,9 +1454,8 @@ export function useCareerSession({
      */
     continueSaved: () => {
       if (savedCareer === null) return
-      // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c)
-      matchPreparedRef.current = false
-      setShouldForgetRepeatable(true)
+      // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c) · 반복 이벤트 · 커서 · mgr+0x304 (0xf684)
+      setUpNariScene()
       const point = resumePointOf(savedCareer)
       // 1c24e — S+0x50 == 6|7 이 맨 앞 갈래다: 141 진입 0x12300 을 다시 밟는다. 보너스를 받은 뒤 저장이라(S+0x7b) 키 0x1220c 가
       // 보너스 팝업 없이 등록 팝업 0x2d 를 띄운다(`EndingScreen.isBonusReceived`)
@@ -1799,6 +1818,9 @@ export function useCareerSession({
 
     /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 하위 메뉴 106 · 107 · 110 취소 (0x11910 진입 · 0x1cf9c 자동 훑기) */
     reenterManagement,
+
+    /** 105 관리 메뉴 확인 키(−5 · '5') — 0x12654 가 메뉴 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
+    pressManagementConfirm: story.pressManagementConfirm,
 
     /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착(+0x1c4)·저장, 다음 틀에 다시 판정 */
     confirmTitle: () => {

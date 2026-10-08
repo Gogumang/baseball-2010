@@ -4,6 +4,7 @@ import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher
 import { seasonPitcherTrainingCountOf, seasonPitcherTrainingTotalOf } from '@/entities/pitcher-career/model/pitcherManagement'
 import {
   illnessChanceOf,
+  isIllnessCooldownBlocked,
   NARI_YEAR_START_EVENT,
   NARI_YEAR_START_EVENT_ID,
   OPENING_EVENT_ID,
@@ -15,7 +16,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 /**
  * 나만의리그 **투수편**(모드 3) 이벤트 고르기 — 판정 `0xacfbc` 의 모드 3 갈래 (A-2 · A-3 확정).
  *
- *   1. 대상 0 은 코드가 번호로 부를 때만 · 2. 모드 3 이 받는 대상은 **1·3** (타자편 1·2)
+ *   1. 대상 0 은 코드가 번호로 부를 때만 · 모드 3 이 받는 대상은 **1·3** (타자편 1·2)
+ *   2. 490 · 대상 1 · 질병 쿨다운 > 0 이면 불발 — 장면이 새로 선 뒤 관리 메뉴 확인 전(mgr+0x304)이면 안 본다 (`isIllnessCooldownBlocked`)
  *   4. 본 이벤트면 불발 · 5. trigger ↔ 화면 (0 ↔ 105 · 1 ↔ 112 · ≥2 ↔ 113)
  *   6. requiresEvent · 7. 날짜 창 (네 바이트 중 하나라도 0 이면 생략, now = 연차idx·45 + 경기 수 + 1)
  *   8. 조건 (switch 0xad1ba) — 0~3 은 `0xb6414(선수기록, i, 0)` = 투수 기록의 **제구·구속·변화·체력** 기본값,
@@ -64,7 +66,8 @@ function meetsConditions(event: OriginalEvent, career: PitcherCareer, random: Ra
         return meetsPitcherSkillCondition(career, 'release', condition.value)
       case CONDITION.질병:
         // 무작위 조건은 굴릴 수 있을 때만 — 미리 보기([!])는 굴리지 않는다
-        if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
+        // 0xadb32 — 선수 +5(질병 중)만 본다. 쿨다운은 판정 머리 ②(`isIllnessCooldownBlocked`)
+        if (random === undefined || career.isSick) return false
         return random.rand(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
       case CONDITION.아플때:
         // 0xadbe6 — 아플 때만 rand[0,100) ≤ 9 (데이터는 쓰지 않는다)
@@ -83,9 +86,12 @@ export function isPitcherEventEligible(
   career: PitcherCareer,
   trigger: number,
   random?: RandomPort,
+  /** mgr+0x304 → reader+0x34 — 장면이 새로 선 뒤 관리 메뉴 확인 키를 아직 안 눌렀다 */
+  isFreshScene = false,
 ): boolean {
   return (
     PITCHER_AUDIENCES.has(event.audience) &&
+    !isIllnessCooldownBlocked(event, career.illnessCooldown, isFreshScene) &&
     !hasSeen(career, event.id) &&
     event.trigger === trigger &&
     (event.requiresEvent === 0 || hasSeen(career, event.requiresEvent)) &&
@@ -300,9 +306,10 @@ export function scanPitcherEventFrom(
   trigger: number,
   cursor: number,
   random?: RandomPort,
+  isFreshScene = false,
 ): PitcherEventScan {
   for (let at = Math.max(0, cursor); at < events.length; at += 1) {
-    if (isPitcherEventEligible(events[at], career, trigger, random)) return { event: events[at], cursor: at }
+    if (isPitcherEventEligible(events[at], career, trigger, random, isFreshScene)) return { event: events[at], cursor: at }
   }
   return { event: null, cursor: 0 }
 }

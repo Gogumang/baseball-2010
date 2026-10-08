@@ -37,6 +37,8 @@ export interface SeasonManagementScreenProps {
   readonly onSelect: (item: ManagementMenuItem, target: SeasonSceneState) => void
   /** 취소(−16) — 원본은 `0xbc290(앱, 0x103)` 으로 **메인 메뉴 장면**으로 나간다 (P4 1b) */
   readonly onExit: () => void
+  /** 확인 키(−5 · '5') — 0x8f74~0x8f82 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */
+  readonly onConfirmKey?: () => void
   /**
    * 진입에서 띄운 예·아니오 알림 — CPU 트레이드 요청 StrMODE[203] (팝업 id 0x27, 0xec10).
    * 떠 있는 동안 메뉴는 키를 안 받는다(원본 `this+0xc0 +0x99 ≠ 0` 이면 키 무시). 답은 0x73b8 이 받는다.
@@ -67,13 +69,14 @@ export interface SeasonManagementScreenProps {
  * 배경음은 앱이 튼다 — `app/model/screenBgm` 의 `useSeasonMenuBgm`(App 이 시즌 장면 번호를 넘긴다).
  */
 export function SeasonManagementScreen({
-  state, onSelect, onExit, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
+  state, onSelect, onExit, onConfirmKey, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
 }: SeasonManagementScreenProps) {
   const { record } = state
   const disabled = disabledManagementIndexesOf(record)
   const disabledIds = new Set(disabled.map((index) => MANAGEMENT_MENU[index]))
 
   const select = (index: number) => {
+    onConfirmKey?.()
     const target = managementMenuTarget(index)
     if (target === null || disabled.includes(index)) return
     onSelect(MANAGEMENT_MENU[index], target)

@@ -71,6 +71,8 @@ export interface ManagementScreenProps {
   readonly onExpandSkillSlots?: () => void
   /** 하위 메뉴 106 · 107 · 110 취소로 105 에 다시 들어온다 — 세션이 진입 0x11910 · 자동 훑기 0x1cf9c 를 돈다 */
   readonly onReenter?: () => void
+  /** 105 메인 메뉴의 확인 키 — 0x12654 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */
+  readonly onMainConfirm?: () => void
   /** 메인 메뉴로 나간다. 진행 상황은 이미 저장되어 있다. */
   readonly onExit: () => void
   /**

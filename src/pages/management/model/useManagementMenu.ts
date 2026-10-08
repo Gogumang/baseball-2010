@@ -130,8 +130,10 @@ export function useManagementMenu(props: ManagementScreenProps) {
   }
 
   const select = (id: string) => {
-    if (playback.playingMenuId !== null || question !== null || props.detail !== null || disabledIds.has(id)) return
-    if (overlay !== null) return
+    if (playback.playingMenuId !== null || question !== null || props.detail !== null || overlay !== null) return
+    // 105 키 0x1261c — 확인(−5 · '5')이면 칸(꺼짐 · 하위 메뉴)을 보기 전에 0x12654 mgr+0x304 = 0
+    if (kind === 'main') props.onMainConfirm?.()
+    if (disabledIds.has(id)) return
     if (kind === 'main') {
       if (SUB_MENU_KINDS.includes(id)) return open(id as SubMenuKind, COMMAND_SLOTS.find((slot) => slot.id === id) ?? null)
       if (id === '휴식' && !props.isRestBlocked()) {

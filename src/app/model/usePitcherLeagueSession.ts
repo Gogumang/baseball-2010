@@ -63,6 +63,7 @@ import {
 } from '@/entities/pitcher-career/model/pitcherStoryScene'
 import {
   EVENT_TRIGGER,
+  forgetRepeatableEvents,
   markRewardedEvent,
   withOutingEventActed,
   nariSeasonEndStateOfResumeCode,
@@ -324,6 +325,8 @@ export interface PitcherLeagueSession {
     readonly eraseSaveForHallOfFame: () => void
     /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 하위 메뉴 취소 · 훈련 · 휴식 결과 창 닫기 (진입 0x11910 · 자동 훑기 0x1cf9c) */
     readonly reenterManagement: () => void
+    /** 105 관리 메뉴 확인 키(−5 · '5') — 0x12654 가 메뉴 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
+    readonly pressManagementConfirm: () => void
     /** 111 장비 상점 · 121 장비착용을 연다 */
     readonly openShop: (tab: PitcherShopTab) => void
     /**
@@ -765,10 +768,42 @@ export function usePitcherLeagueSession(
   )
 
   /**
-   * 이벤트 레코드 커서 (0xadc70 의 reader+0x28) — 105·112 자동 발동이 함께 쓴다.
-   * ⚠️ 근사: 원본 reader 는 장면이 들고 저장에 없다 — 웹은 세션 동안만 든다 (타자편 `useStorySchedule` 과 같다).
+   * 이벤트 레코드 커서 (0xadc70 의 reader+0x28) — 105·112 자동 발동이 함께 쓴다. 원본 reader 는 장면이 들고 저장에 없다 —
+   * 장면 셋업 0xf684 의 `0xacf60` 이 0 으로 둔다 (`setUpPitcherScene`).
    */
   const cursorRef = useRef(0)
+  /**
+   * mgr+0x304 — 장면 셋업(0xf684 fb7a)이 1, 105 관리 메뉴 확인 키(0x12654)가 0. 자동 훑기 0x8be80 이 reader+0x34 로 베껴
+   * 판정 ②(490 쿨다운)를 건너뛰게 한다 (`isIllnessCooldownBlocked`).
+   */
+  const freshSceneRef = useRef(true)
+  /** 반복 이벤트 본 표시 지우기 대기 — 장면 셋업의 `0xacf60`. 이 세션이 처음 화면에 설 때도 장면이 선다 */
+  const [shouldForgetRepeatable, setShouldForgetRepeatable] = useState(true)
+  /**
+   * **나리 장면 0x106 이 새로 선다** — 셋업 0xf684: fb1c `0x8ce94` → `0xacf60`(반복 이벤트 본 표시 지움 · 커서 0) · fb7a
+   * mgr+0x304 = 1. 투수편 화면에 들어설 때(메인 메뉴에서 · 이어하기)와 경기 뒤 · 경기 나가기 뒤 · 마선수 대결 뒤에 선다.
+   * (장면+0x288 은 `matchPreparedRef` 가 따로 든다.)
+   */
+  const setUpPitcherScene = useCallback(() => {
+    cursorRef.current = 0
+    freshSceneRef.current = true
+    setShouldForgetRepeatable(true)
+  }, [])
+  // 메인 메뉴 따위에서 투수편 화면으로 들어선다 — 장면 0x106 이 새로 선다(떠나면 헐린다)
+  const wasOnScreenRef = useRef(isOnScreen)
+  if (wasOnScreenRef.current !== isOnScreen) {
+    wasOnScreenRef.current = isOnScreen
+    if (isOnScreen) {
+      cursorRef.current = 0
+      freshSceneRef.current = true
+      if (!shouldForgetRepeatable) setShouldForgetRepeatable(true)
+    }
+  }
+  useEffect(() => {
+    if (!shouldForgetRepeatable || fileEvents === null) return
+    setShouldForgetRepeatable(false)
+    setCareer((current) => (current === null ? current : forgetRepeatableEvents(current, fileEvents)))
+  }, [fileEvents, shouldForgetRepeatable])
   /** 새 선수 플래그 (장면+0x165) — 등록(104)에서 100 으로 왔을 때 켜진다 (0x1c3be). 오프닝 451 을 부른다 */
   const newPlayerRef = useRef(false)
 
@@ -884,7 +919,7 @@ export function usePitcherLeagueSession(
    */
   const scanAuto = useCallback(
     (current: PitcherCareer, events: readonly OriginalEvent[], trigger: number, rolling: RandomPort | undefined) => {
-      const scan = scanPitcherEventFrom(current, events, trigger, cursorRef.current, rolling)
+      const scan = scanPitcherEventFrom(current, events, trigger, cursorRef.current, rolling, freshSceneRef.current)
       cursorRef.current = scan.cursor
       return scan.event
     },
@@ -927,10 +962,15 @@ export function usePitcherLeagueSession(
   if (scene === '상점') isFromShopRef.current = true
   else if (scene !== '관리') isFromShopRef.current = false
   const reenterManagement = useCallback(() => setManagementReentryCount((count) => count + 1), [])
+  const pressManagementConfirm = useCallback(() => {
+    freshSceneRef.current = false
+  }, [])
   /** 112 다시 찍기(0x118e4) — 아래에서 정의되는 `enterOutingMap` 을 이 고리가 부른다 */
   const enterOutingMapRef = useRef<() => void>(() => {})
   useEffect(() => {
-    const isIdle = isOnScreen && career !== null && scene === '관리' && story === null && fileEvents !== null
+    // 셋업의 반복 이벤트 지우기가 아직이면 그 뒤에 훑는다 — 원본은 셋업 0xf684 가 105 진입보다 먼저다
+    const isIdle = isOnScreen && career !== null && scene === '관리' && story === null && fileEvents !== null &&
+      !shouldForgetRepeatable
     if (!isIdle) {
       wasIdleAtManagementRef.current = false
       return
@@ -990,7 +1030,9 @@ export function usePitcherLeagueSession(
       })
       openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
-  }, [career, commitWith, fileEvents, isOnScreen, managementReentryCount, openStory, random, scanAuto, scene, story])
+  }, [
+    career, commitWith, fileEvents, isOnScreen, managementReentryCount, openStory, random, scanAuto, scene, shouldForgetRepeatable, story,
+  ])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -1147,8 +1189,9 @@ export function usePitcherLeagueSession(
   const finishCupGame = useCallback(
     (summary: PitcherGameSummary, cup: NationalCup, options: PitcherGameOptions) => {
       cupGameRef.current = null
-      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0 · 반복 이벤트 · 커서 · mgr+0x304
       matchPreparedRef.current = false
+      setUpPitcherScene()
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
       // 전역 경기 상태 +0x6b 는 대회 경기도 남긴다
@@ -1181,7 +1224,7 @@ export function usePitcherLeagueSession(
       setCupView({ cup: next, atStandings: false })
       setScene('국가대항전')
     },
-    [commitWith, random, recordStat],
+    [commitWith, random, recordStat, setUpPitcherScene],
   )
 
   const finishGame = useCallback(
@@ -1190,8 +1233,9 @@ export function usePitcherLeagueSession(
       // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (142 → 경기 → 101 → 134)
       const cupGame = cupGameRef.current
       if (cupGame !== null) return finishCupGame(summary, cupGame, gameOptions)
-      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0
+      // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0 · 반복 이벤트 · 커서 · mgr+0x304
       matchPreparedRef.current = false
+      setUpPitcherScene()
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 전역기록 +0x4c + 모드(+0x4f) = 0
       nariGameSaveRef.current?.clear()
       // 기록 달성 G 는 요약이 들고 온다 (0xa77f0 → 0x4ea0c). 강판당한 경기는 원본이 전면 차단해 0 이다
@@ -1311,7 +1355,7 @@ export function usePitcherLeagueSession(
       playSoundIds(activeSound(), [pitcherEvaluationJingleIdOf(lastEvaluation.popularityChange)])
       setScene('경기결과')
     },
-    [aceLevels, career, commit, finishCupGame, gameOptions, random, recordStat],
+    [aceLevels, career, commit, finishCupGame, gameOptions, random, recordStat, setUpPitcherScene],
   )
 
   /**
@@ -1573,6 +1617,8 @@ export function usePitcherLeagueSession(
     setGameOptions(null)
     setNextGameFromManagement(false)
     matchPreparedRef.current = false
+    // 경기를 나가면 장면 0x106 이 다시 선다 — 반복 이벤트 · 커서 · mgr+0x304 (0xf684)
+    setUpPitcherScene()
     if (career === null) return setScene('등록')
     const point = pitcherResumePointOf(career)
     if (point.kind === '이벤트') {
@@ -1590,7 +1636,7 @@ export function usePitcherLeagueSession(
       setCupView({ cup: point.cup, atStandings: false })
     }
     setScene(point.kind)
-  }, [career, startNewSeason])
+  }, [career, setUpPitcherScene, startNewSeason])
 
   /**
    * 내보이는 커리어의 G 는 **지갑 값**이다 (원본 `mgr[+0x64]` 한 칸). 관리 화면 뱃지·구질 훈련
@@ -1964,6 +2010,8 @@ export function usePitcherLeagueSession(
     (isWin: boolean) => {
       if (aceMatch === null) return
       setAceMatch(null)
+      // 대결(미션 장면)을 마치면 장면 0x106 이 새로 선다(0xf684) — 반복 이벤트 · 커서 · mgr+0x304
+      setUpPitcherScene()
       // 140 진입 0x10df8 — 대기 칸을 지우고 전역기록 저장(10f72)
       aceMatchPendingRef.current.clear()
       // 105 진입의 +0x176 갈래(0x11bb2)가 현재를 112 로 두고 0x118e4 — [!] 칸을 다시 찍는다(140 밑 지도가 이 값을 그린다)
@@ -1975,7 +2023,7 @@ export function usePitcherLeagueSession(
         carried: aceMatch.carried,
       })
     },
-    [aceMatch, enterOutingMap, openStory],
+    [aceMatch, enterOutingMap, openStory, setUpPitcherScene],
   )
 
   const quitAceMatch = useCallback(() => {
@@ -2246,6 +2294,7 @@ export function usePitcherLeagueSession(
       finishEnding,
       eraseSaveForHallOfFame,
       reenterManagement,
+      pressManagementConfirm,
       openShop,
       purchase,
       closeShopGpDetail,

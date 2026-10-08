@@ -97,6 +97,11 @@ export interface SeasonEventJudgeInput {
   readonly screenCode: number
   /** 전역 저장 +0xbe — 이벤트 100 의 G 를 이미 받았는가 */
   readonly event100Awarded: boolean
+  /**
+   * mgr+0x304 → reader+0x34 (0x8be80 이 베낀다) — 장면 0x105 셋업 0x3b14 가 1 로 두고 관리 메뉴 0xc9 확인 키(0x8f82)만 0 으로
+   * 내린다. 서 있으면 490 쿨다운 검사(ad00e~ad054)를 건너뛴다. 안 넘기면 내려간 것(0)으로 본다
+   */
+  readonly isFreshScene?: boolean
 }
 
 export interface SeasonEventJudgement {
@@ -176,7 +181,7 @@ function passesCondition(
  * 판정 `0xacfbc` 의 모드 2 차례 (acfc6~adc44, 직접 떴다):
  * ```
  * 대상 0 → 불발 · 모드 2 는 대상 4 만
- * id 490 이고 SR+0x7c(질병 쿨다운) > 0 → 불발
+ * id 490 이고 SR+0x7c(질병 쿨다운) > 0 → 불발 — 단 reader+0x34(mgr+0x304, 장면이 새로 선 뒤 0xc9 확인 전)가 서 있으면 안 본다
  * id 100 · 대상 4 · 전역 +0xbe ≠ 0 → 본 비트를 켜고(0xacf48) 불발
  * 본 이벤트 → 불발 (반복 이벤트도)
  * trigger 0 ↔ 화면 105·201 · 1 ↔ 112 · ≥2 ↔ 113
@@ -192,7 +197,7 @@ export function judgeSeasonEvent(
   const { record } = input
   const fail = { passes: false, record }
   if (event.audience !== SEASON_EVENT_AUDIENCE) return fail
-  if (event.id === ILLNESS_EVENT_ID && record.illnessCooldown > 0) return fail
+  if (input.isFreshScene !== true && event.id === ILLNESS_EVENT_ID && ((record.illnessCooldown << 24) >> 24) > 0) return fail
   if (event.id === EVENT_100_ID && input.event100Awarded) {
     return { passes: false, record: markEventSeen(record, EVENT_100_ID) }
   }

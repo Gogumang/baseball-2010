@@ -120,6 +120,8 @@ export interface UsePitcherManagementMenuInput {
    * 0x1b466) · 마구 훈련(125) 뒤. 세션이 진입 0x11910 곁가지와 자동 훑기 0x1cf9c 를 돈다(상태가 바뀐 틀에만 — 0x1cdec 1ce02).
    */
   readonly onReenter?: () => void
+  /** 105 메인 메뉴의 확인 키 — 0x12654 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */
+  readonly onMainConfirm?: () => void
   /**
    * 처음 설 하위 메뉴 — 111 상점 취소는 110(0x13460 의 13b1e) · 121 장비착용 취소는 106(0x17ad0 의 17aee)으로 돌아온다
    * (`nariReturnSubMenuOf`). 없으면 105.
@@ -182,7 +184,7 @@ export interface PitcherManagementMenu {
 const modeTextOf = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
-  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onReenter } = input
+  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onReenter, onMainConfirm } = input
   const [kind, setKind] = useState<PitcherMenuKind>(input.initialKind ?? '관리')
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
@@ -433,12 +435,16 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const select = useCallback(
     (id: string) => {
       setNotice('')
-      if (kind === '관리') return selectCommand(id as PitcherManagementCommand)
+      if (kind === '관리') {
+        // 105 키 0x1261c — 확인(−5 · '5')이면 칸을 보기 전에 0x12654 mgr+0x304 = 0
+        onMainConfirm?.()
+        return selectCommand(id as PitcherManagementCommand)
+      }
       if (kind === '선수정보') return selectPlayerInfo(id)
       if (kind === '아이템') return selectItemMenu(id)
       return selectTraining(id)
     },
-    [kind, selectCommand, selectItemMenu, selectPlayerInfo, selectTraining],
+    [kind, onMainConfirm, selectCommand, selectItemMenu, selectPlayerInfo, selectTraining],
   )
 
   const closeWindow = useCallback(() => {

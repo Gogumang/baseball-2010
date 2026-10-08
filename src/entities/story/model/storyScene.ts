@@ -17,10 +17,12 @@ import type { EventReward } from '@/entities/story/model/eventReward'
  *   날짜 창   [연차, 경기 번호] 범위. [0,0]~[0,0] 이면 언제든. 경기 번호는 "다음 경기" 로 본다 (추정)
  *   requiresEvent 이 이벤트를 본 뒤에만
  *   조건      (switch 0xd83a0, 점검 에이전트 확인) 0~3 능력치 ≥ 값(0~999) · 18 인기도 ≥ 값 ·
- *             19 평판 ≥ 값 · 22 질병 확률(0xadb32, 쿨다운 중이면 불발) · 24 이벤트를 봤다 · 25 아직 안 봤다.
+ *             19 평판 ≥ 값 · 22 질병 확률(0xadb32 — 선수 +5 질병 중이면 불발) · 24 이벤트를 봤다 · 25 아직 안 봤다.
+ *             질병 쿨다운(+0x7c)은 조건 22 가 아니라 판정 머리(②, `isIllnessCooldownBlocked`)가 본다.
  *             20/21 은 스킬 v−1 획득/해제 조건(세부 표 0xd8408·0xd8454 미해독)이라 아직 띄우지 않는다.
  *             능력치 0~3 의 순서는 StrMODE 순서(히트·파워·수비·주루)로 둔다 — 추정
- * 본 이벤트는 반복 이벤트까지 모두 막힌다 (0xacf30). 원본은 저장을 불러올 때 반복 이벤트 기록을 푼다 (0xacf60).
+ * 본 이벤트는 반복 이벤트까지 모두 막힌다 (0xacf30). 반복 이벤트의 본 표시는 나리 장면이 **새로 설 때마다**(셋업 0xf684 의
+ * fb1c `0x8ce94` → `0xacf60`) 풀린다 — 이어하기 · 경기 뒤 · 마선수 대결 뒤 (`forgetRepeatableEvents`).
  */
 export const EVENT_TRIGGER = { 관리: 0, 외출: 1 } as const
 
@@ -62,6 +64,33 @@ export function illnessChanceOf(
 }
 
 const PERCENT = 100
+
+/** 질병 이벤트 — 판정 머리 ②의 쿨다운 검사 대상 (0xad026 `0xf5 << 1`) */
+export const ILLNESS_EVENT_ID = 490
+/** ②가 보는 대상 — 1(공통, 0xad02e) · 4(시즌, 0xad052) */
+const ILLNESS_COOLDOWN_AUDIENCES: ReadonlySet<number> = new Set([1, 4])
+
+/**
+ * 판정 0xacfbc 의 ② (0xad00e~0xad054, 직접 떴다):
+ * ```
+ * [reader+0x34] == 0 && s8 선수+0x7c(질병 쿨다운) > 0 && id == 490 && 대상 ∈ {1, 4} → 불발
+ * ```
+ * reader+0x34 는 자동 훑기 0x8be80 이 mgr+0x304 에서 베껴 온다. mgr+0x304 는 장면 셋업(나리 0xf684 fb7a · 시즌 0x3b14)이
+ * **1** 로 두고, 관리 메뉴 확인 키(나리 105 0x12654 · 시즌 0xc9 0x8f82 — −5 · '5')만 0 으로 내린다. 그래서 장면이 새로 선 뒤
+ * 관리 메뉴에서 아무것도 고르기 전의 훑기에서는 쿨다운이 490 을 막지 않는다(원본 그대로). `isFreshScene` 이 mgr+0x304 다.
+ */
+export function isIllnessCooldownBlocked(
+  event: Pick<OriginalEvent, 'id' | 'audience'>,
+  illnessCooldown: number,
+  isFreshScene: boolean,
+): boolean {
+  return (
+    !isFreshScene &&
+    ((illnessCooldown << 24) >> 24) > 0 &&
+    event.id === ILLNESS_EVENT_ID &&
+    ILLNESS_COOLDOWN_AUDIENCES.has(event.audience)
+  )
+}
 
 const branchOnlyCache = new WeakMap<readonly OriginalEvent[], ReadonlySet<number>>()
 
@@ -125,7 +154,8 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
       case CONDITION.스킬해제:
         return meetsSkillReleaseCondition(career, condition.value)
       case CONDITION.질병:
-        if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
+        // 0xadb32 — 선수 +5(질병 중)만 본다. 쿨다운은 판정 머리 ②(`isIllnessCooldownBlocked`)
+        if (random === undefined || career.isSick) return false
         return random.rand(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
       default:
         return false
@@ -171,6 +201,8 @@ export function scanEventFrom(
   trigger: number,
   cursor: number,
   random?: RandomPort,
+  /** mgr+0x304 → reader+0x34 — 장면이 새로 선 뒤 관리 메뉴 확인 키를 아직 안 눌렀다 (`isIllnessCooldownBlocked`) */
+  isFreshScene = false,
 ): EventScan {
   if (trigger === EVENT_TRIGGER.관리 && !hasSeen(career, OPENING_EVENT_ID)) {
     const index = events.findIndex((event) => event.id === OPENING_EVENT_ID)
@@ -183,6 +215,7 @@ export function scanEventFrom(
     const event = events[at]
     // 판정 0xacfbc 는 본 이벤트를(0xad07e~0xad08c `0xacf30` 참이면 불발) trigger · 선행 · 날짜 · 조건보다 **먼저** 본다 —
     // 본 이벤트에는 무작위 조건(22 질병 · 20 스킬 획득 굴림)을 굴리지 않는다
+    if (isIllnessCooldownBlocked(event, career.illnessCooldown, isFreshScene)) continue
     if (!hasSeen(career, event.id) && isEligible(event, career, trigger, random)) {
       return { event, cursor: at }
     }
@@ -206,8 +239,15 @@ export function nextEventFor(
   return scanEventFrom(career, events, trigger, 0, random).event
 }
 
-/** 저장을 불러올 때 — 반복 이벤트는 다시 볼 수 있게 기록에서 지운다 (0xacf60) */
-export function forgetRepeatableEvents(career: PlayerCareer, events: readonly OriginalEvent[]): PlayerCareer {
+/**
+ * 장면이 새로 설 때 — 반복 이벤트는 다시 볼 수 있게 기록에서 지운다. 나리 장면 셋업 0xf684 의 fb1c `0x8ce94` → `0xacf60`
+ * (레코드마다 반복(+5 == 1)이고 본 표시가 서 있으면 `0xacf48(…, 0)` · 커서 reader+0x28 = 0). 장면은 이어하기와 **경기 뒤마다**
+ * (경기 장면 0x104 를 지나 0x106 이 다시 선다) · 마선수 대결 뒤에 선다. 나리 두 편 공용.
+ */
+export function forgetRepeatableEvents<C extends { readonly seenEventIds: readonly string[] }>(
+  career: C,
+  events: readonly OriginalEvent[],
+): C {
   const repeatable = new Set(events.filter((event) => event.repeatable).map((event) => String(event.id)))
   return { ...career, seenEventIds: career.seenEventIds.filter((id) => !repeatable.has(id)) }
 }

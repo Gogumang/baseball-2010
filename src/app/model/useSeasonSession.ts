@@ -431,6 +431,8 @@ export interface SeasonActions {
    * 적재 0x75fc 가 로딩 판에 팁 rand(0, 73) 을 굴린다(76cc `0x53dbd`) — `SeasonRoute` 가 들어올 때 한 번 부른다
    */
   readonly constructScene: () => void
+  /** 관리 메뉴 0xc9 의 확인 키 — 0x8f82 가 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
+  readonly pressManagementConfirm: () => void
   /**
    * 경기 화면이 이어하기 저장을 썼다 — 0xdd OK(0x847e: +0x4e = 1 · 칸 0xc 두 팀 · 0xd st · 파일) · 반 이닝 0x4f928(모드 2:
    * 칸 0xb SR · 0xc · 0xd) · 경기 장면 진입 0x3a426(+0x4e = 1 · 파일). +0x4e 를 세우고 블록을 시즌 저장에 쓴다.
@@ -1260,6 +1262,12 @@ export function useSeasonSession(
    * (4c5a~4c78). 웹은 팀을 고른 직후(`chooseTeam`)가 그 자리다. 관리 메뉴 첫 폴링이 400 을 틀고 지운다.
    */
   const newPlayerFlag = useRef(false)
+  /**
+   * mgr+0x304 — 장면 0x105 셋업 0x3b14 가 1, 관리 메뉴 0xc9 의 확인 키(0x8f82 — −5 · '5')만 0. 폴링 0x8be80 이 reader+0x34 로
+   * 베껴 판정의 490 쿨다운 검사(ad00e~ad054)를 건너뛰게 한다. 웹은 훅이 서는 때 · 들어와 장면을 세울 때(`constructScene`) ·
+   * 경기를 마치고 돌아오는 때를 셋업으로 본다
+   */
+  const freshScene = useRef(true)
 
   /**
    * 지금 들고 있는 G — **화면도 판정도 이 값 하나만 본다.**
@@ -1360,6 +1368,7 @@ export function useSeasonSession(
         teamMorale: save.state.teamMorale,
         event100Awarded,
         newPlayerFlag: newPlayerFlag.current,
+        isFreshScene: freshScene.current,
       }, random)
       eventCursor.current = polled.cursor
       if (polled.record !== record) commit({ ...save, state: { ...save.state, record: polled.record } })
@@ -2066,6 +2075,7 @@ export function useSeasonSession(
       }))
       eventCursor.current = START_SEASON_EVENT_CURSOR
       newPlayerFlag.current = false
+      freshScene.current = true
 
       // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라
       // **동점이면 선공(칸 0) 쪽이 이긴다**. 요약의 `won`(내 점수 > 상대 점수)은 동점을 패로 본다.
@@ -2220,6 +2230,15 @@ export function useSeasonSession(
   const rollSceneLoadTip = useCallback(() => {
     rollSceneLoadingTip(random)
   }, [random])
+  /** 들어와 장면 0x105 를 세운다 — 셋업 0x3b14 가 mgr+0x304 = 1, 이어서 상태 1 적재의 팁 굴림 */
+  const constructScene = useCallback(() => {
+    freshScene.current = true
+    rollSceneLoadTip()
+  }, [rollSceneLoadTip])
+  /** 관리 메뉴 0xc9 확인 키(−5 · '5') — 0x8f82 가 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
+  const pressManagementConfirm = useCallback(() => {
+    freshScene.current = false
+  }, [])
 
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
@@ -2866,7 +2885,7 @@ export function useSeasonSession(
       startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
       openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
-      playCupGame, finishCup, finishGame, constructScene: rollSceneLoadTip, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
+      playCupGame, finishCup, finishGame, constructScene, pressManagementConfirm, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
       runTraining, closeTrainingResult, enterOuting, runOuting, closeOutingResult, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, openCupHiddenTeams, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,

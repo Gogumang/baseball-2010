@@ -71,6 +71,8 @@ export interface PitcherManagementScreenProps {
   readonly onExit: () => void
   /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 세션의 `actions.reenterManagement` (`usePitcherManagementMenu` 의 `onReenter`) */
   readonly onReenter?: () => void
+  /** 105 메인 메뉴의 확인 키 — 0x12654 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */
+  readonly onMainConfirm?: () => void
   /** 가운데 판의 선수가 미끄러져 들어오는가 — 105 진입 0x11910 의 이전 상태 1 · 114 · 100 (0x8a2d8) */
   readonly centerSlidesIn?: boolean
   /**

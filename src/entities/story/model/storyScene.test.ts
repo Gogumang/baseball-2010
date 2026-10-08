@@ -223,6 +223,18 @@ describe('조건 판정 (switch 0xd83a0)', () => {
 
     expect(nextEventFor(지친선수, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 고정난수(0))?.id).not.toBe(490)
   })
+
+  it('장면이 새로 선 뒤 관리 메뉴 확인 전(mgr+0x304 = 1)이면 쿨다운이 490 을 막지 않는다 (0xad00e)', () => {
+    const 지친선수 = 오프닝을본선수({
+      morale: 5,
+      season: 2,
+      illnessCooldown: 5,
+      seenEventIds: ORIGINAL_EVENTS.filter((event) => event.id !== 490).map((event) => String(event.id)),
+    })
+
+    expect(scanEventFrom(지친선수, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0, 고정난수(0), true).event?.id).toBe(490)
+    expect(scanEventFrom(지친선수, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0, 고정난수(0), false).event?.id).not.toBe(490)
+  })
 })
 
 describe('질병 조건 22 — 사기 구간 확률 (0xadb32)', () => {

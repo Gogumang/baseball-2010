@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { nextEventFor, placeTriggerOf, scanEventFrom } from '@/entities/story/model/storyScene'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
@@ -42,17 +42,35 @@ export function useStorySchedule(career: PlayerCareer | null) {
 
   /**
    * 이벤트 레코드 커서 (0xadc70 의 reader+0x28). 원본은 **다음 호출이 지난 자리부터** 훑고,
-   * 끝까지 없으면 0 으로 되감는다 (A-1 확정). 지우는 시점이 원본 저장 어디인지는 문서에 없어
-   * 세션 동안만 들고 있다 — 불러오기 뒤 처음부터 훑는 것이 다를 수 있다 (**근사**).
+   * 끝까지 없으면 0 으로 되감는다 (A-1 확정). 장면 셋업 0xf684 의 `0xacf60` 이 0 으로 둔다 (`setUpScene`).
    */
   const cursorRef = useRef(0)
+  /**
+   * mgr+0x304 — 장면 셋업(0xf684 fb7a)이 1, 105 관리 메뉴 확인 키(0x12654)가 0. 자동 훑기 0x8be80 이 reader+0x34 로 베껴
+   * 판정 ②(490 쿨다운)를 건너뛰게 한다 (`isIllnessCooldownBlocked`).
+   */
+  const freshSceneRef = useRef(true)
 
   const eventFor = (current: PlayerCareer, trigger: number, random?: RandomPort) => {
     if (events === null) return null
-    const scan = scanEventFrom(current, events, trigger, cursorRef.current, random)
+    const scan = scanEventFrom(current, events, trigger, cursorRef.current, random, freshSceneRef.current)
     cursorRef.current = scan.cursor
     return scan.event
   }
+
+  /**
+   * **나리 장면이 새로 선다** (셋업 0xf684 — 이어하기 · 경기 뒤 · 마선수 대결 뒤): fb1c `0x8ce94` → `0xacf60` 이 커서를 0 으로,
+   * fb7a 가 mgr+0x304 = 1. 반복 이벤트 본 표시 지우기(같은 `0xacf60`)는 커리어 쪽이 한다 (`forgetRepeatableEvents`).
+   */
+  const setUpScene = useCallback(() => {
+    cursorRef.current = 0
+    freshSceneRef.current = true
+  }, [])
+
+  /** 105 관리 메뉴의 확인 키(−5 · '5') — 0x12654 가 mgr+0x304 = 0 (메뉴 칸을 보기 전에) */
+  const pressManagementConfirm = useCallback(() => {
+    freshSceneRef.current = false
+  }, [])
 
   /**
    * **112 진입의 [!] 칸 찍기 0x8cdc0 이 커서를 0 으로 되감는다** (직접 떴다): 머리 0x8cdd4 에서 reader+0x28 = 0 으로 놓고
@@ -63,5 +81,5 @@ export function useStorySchedule(career: PlayerCareer | null) {
     cursorRef.current = 0
   }
 
-  return { events, eventPlaceIds, eventFor, rewindCursor }
+  return { events, eventPlaceIds, eventFor, rewindCursor, setUpScene, pressManagementConfirm }
 }

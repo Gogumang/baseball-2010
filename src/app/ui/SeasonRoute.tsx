@@ -380,6 +380,7 @@ export function SeasonRoute({
           if (item === '다음경기') return actions.openNextGame()
           actions.goto(target)
         }}
+        onConfirmKey={actions.pressManagementConfirm}
         // 관리 메뉴 키 0x8f30 의 취소(−16) 8f5a~8f6e: 0x375d · [0x140006c] = 5 · 장면 0x103 — 게임시작 목록으로 바로 연다
         onExit={() => onExit(5)}
         gamePoint={session.gamePoints}

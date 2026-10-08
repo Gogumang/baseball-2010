@@ -98,6 +98,13 @@ describe('고르기 0xadc70 — 파일 차례로 처음 통과한 한 건, 커�
     expect(앓음.calls()).toBe(0)
   })
 
+  it('장면이 새로 선 뒤 0xc9 확인 전(mgr+0x304 = 1)에는 쿨다운이 490 을 막지 않는다 (ad00e~ad054)', () => {
+    const 새장면 = 세는난수(0)
+    const 입력 = { ...판정(markEventSeen(기본({ games: 4, illnessCooldown: 3 }), 400)), isFreshScene: true }
+    selectSeasonEvent(START_SEASON_EVENT_CURSOR, 입력, 새장면.random)
+    expect(새장면.calls()).toBe(1)
+  })
+
   it('사기가 낮으면 490 이 굴림에 걸린다', () => {
     const record = markEventSeen(기본({ games: 4 }), 400)
     expect(selectSeasonEvent(START_SEASON_EVENT_CURSOR, 판정(record, { teamMorale: 10 }), 고정난수(0)).eventId).toBe(490)
