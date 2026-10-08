@@ -115,7 +115,7 @@ import {
   isFoulEnded,
   strikesAfterPlay,
   liveRunnerCountOf,
-  passPlayGate,
+  passPlayGateBetweenTicks,
   playEndResultCode,
   someRunnerStillActive,
   type PlayEndState,
@@ -766,8 +766,13 @@ export interface DefensePlayState {
   deferredThrowReceiver: number
   /** +0x158 — 미룬 송구의 목표 루 */
   deferredThrowBase: number
-  /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 (`passPlayGate`) */
+  /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 (`passPlayGate`) — 한 그림에 서너 번 오른다(`passPlayGateBetweenTicks`) */
   endCounter: number
+  /**
+   * 이 틱 그림의 그리기 쪽 관문(0x46e3c, G3) — HOMERUN 글자가 이것을 본다. 판 시작 전 · 건너뛰기(+0xfe7) 중엔 null.
+   * 틱 끝 G2 와 다를 수 있다 — +0x120 세기로 닫히는 판은 G3 이 열리고 그 뒤 G1 · G2 에서 닫힐 수 있다.
+   */
+  drawGateOpen: boolean | null
   /** state[0xb] — 사건 코드 처리 0xb2bc4 가 마지막으로 받은 결과 코드 */
   lastEventCode: number
   /** 플레이 +0x112 — 공을 쥐었거나 공이 땅에 닿았거나 담장선을 넘었다 (6d 절) */
@@ -993,6 +998,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     deferredThrowReceiver: NONE,
     deferredThrowBase: NONE,
     endCounter: 0,
+    drawGateOpen: null,
     lastEventCode: 0,
     ballContacted: false,
     foulFlag: false,
@@ -1091,6 +1097,7 @@ export function stepDefensePlay(
   let deferredThrowReceiver = state.deferredThrowReceiver
   let deferredThrowBase = state.deferredThrowBase
   let endCounter = state.endCounter
+  let drawGateOpen = state.drawGateOpen
   let lastEventCode = state.lastEventCode
   let ballContacted = state.ballContacted
   let foulFlag = state.foulFlag
@@ -2390,11 +2397,11 @@ export function stepDefensePlay(
       someRunnerStillActive: stillActive,
     })
 
-    // ── 8. 판 진행 관문 0xb0d28 — 원본은 다음 틱 슬롯 2 머리 52502 에서 돈다. 웹은 그 틱 끝에서 본다 ──
-    // (전문은 `entities/fielding/model/playGate.ts`). 주자가 다 서고(+0x94 까지) 누가 공을 쥔 틱이 51틱 이어지면 닫힌다 —
-    // 그 51틱 동안에도 자동 진루 · CPU 송구가 돈다. 3아웃(b0dbe) · 사건 코드 11(b0db4)이면 곧바로 닫힌다.
-    // 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
-    const gate = passPlayGate({
+    // ── 8. 판 진행 관문 0xb0d28 — 이 틱 그리기 0x46e3c(G3) · 0x3f378(G4, 안 쥐었을 때) · 다음 틱 0x3f060(G1) · 슬롯 2 머리 52502(G2) ──
+    // (전문은 `entities/fielding/model/playGate.ts` — `passPlayGateBetweenTicks`). 부를 때마다 +0x120 이 오르므로 주자가 다 서고
+    // (+0x94 까지) 누가 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17 틱) 닫힌다. 그동안에도 자동 진루 · CPU 송구가 돈다.
+    // 3아웃(b0dbe) · 사건 코드 11(b0db4)이면 곧바로 닫힌다. 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
+    const gate = passPlayGateBetweenTicks({
       foulFlag,
       // 파울 갈래(b0d2c)만 본다 — 멈춤 · 담장선 넘은 뒤 떨어지는 틱 · 홈 뒤(z > 32599, −315 < 각 < −225)
       foulBall: foulFlag
@@ -2423,6 +2430,7 @@ export function stepDefensePlay(
       endCounter,
     })
     endCounter = gate.endCounter
+    drawGateOpen = gate.drawOpen
     if (!gate.open) play = { ...play, finished: true }
   }
 
@@ -2472,6 +2480,7 @@ export function stepDefensePlay(
   state.deferredThrowReceiver = deferredThrowReceiver
   state.deferredThrowBase = deferredThrowBase
   state.endCounter = endCounter
+  state.drawGateOpen = drawGateOpen
   state.lastEventCode = lastEventCode
   state.ballContacted = ballContacted
   state.foulFlag = foulFlag

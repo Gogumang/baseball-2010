@@ -34,7 +34,7 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
-import { liveRunnerCountOf, passPlayGate, someRunnerStillActive } from '@/entities/fielding/model/playGate'
+import { liveRunnerCountOf, passPlayGateBetweenTicks, someRunnerStillActive } from '@/entities/fielding/model/playGate'
 import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
@@ -80,7 +80,7 @@ import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/th
  *   그래서 고른 야수는 포구 틱에 포구 지점(x, 0, z)으로 옮겨 쥔다(타구 진행기와 같은 다리).
  * - ⚠️ 중계 이어 던지기(b4616)는 이 판에 없다 — 중계맨이 받으면 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다.
  * - 자동 추가 진루는 결과 코드가 선 뒤에도 판이 닫힐 때까지 매 틱 묻는다 — +0x111 은 "끝" 이 아니라 홈런 코드 8 이다
- *   (`playGate`). 판은 0xb0d28 대로 주자가 다 서고 공을 쥔 채 51틱 뒤에 닫힌다.
+ *   (`playGate`). 판은 0xb0d28 대로 주자가 다 서고 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17틱) 닫힌다.
  * - 사람 주루 키(0x582·0x584)·슬라이딩 키(0x585)·레이저(0x400bc)는 받지 않는다 — 미리 끝까지 돌려 재생만 한다.
  */
 
@@ -609,10 +609,10 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
       someRunnerStillActive: stillActive,
     })
 
-    // ── 9. 판 진행 관문 0xb0d28 (`playGate.passPlayGate`) — 원본은 다음 틱 슬롯 2 머리에서 돈다. 웹은 그 틱 끝에서 본다 ──
-    // 3아웃 · 처리 안 끝난 주자 · 아무도 안 쥠(종류 9 의 줍기 전 · 송구 중) → 이어 감, 공을 쥔 채 51틱(+0x120) → 닫음.
+    // ── 9. 판 진행 관문 0xb0d28 (`playGate.passPlayGateBetweenTicks`) — 이 틱 그리기 G3 · 0x3f378 G4 · 다음 틱 0x3f060 G1 · 슬롯 2 머리 G2 ──
+    // 3아웃 · 처리 안 끝난 주자 · 아무도 안 쥠(종류 9 의 줍기 전 · 송구 중) → 이어 감, 공을 쥔 채 관문 51 번(+0x120 — 그림마다 3 번, 17 틱) → 닫음.
     // state[0xb] 는 이 판의 결과 코드(9 · 13)다. 낙구·담장 결과 코드(b44f6)는 이 판에 타구가 없어 안 선다.
-    const gate = passPlayGate({
+    const gate = passPlayGateBetweenTicks({
       foulFlag: false,
       lastEventCode: resultCode ?? 0,
       outs,

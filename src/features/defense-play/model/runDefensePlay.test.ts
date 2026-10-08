@@ -1524,7 +1524,7 @@ describe('낙구 전에 아무도 못 닿는 타구 — 자르지 않은 예보(
     expect(result.advance.outsAdded).toBe(0)
     expect(result.advance.bases).toEqual({ first: true, second: true, third: false })
     expect(result.outcome).toEqual(단타)
-    // 판 진행 관문 0xb0d28: 주자가 다 서고 공을 쥔 틱부터 +0x120 이 51틱을 세고 닫는다 (예전엔 240틱 끝까지 갔다)
+    // 판 진행 관문 0xb0d28: 주자가 다 서고 공을 쥔 틱부터 +0x120 이 관문 51 번(17틱)을 세고 닫는다 (예전엔 240틱 끝까지 갔다)
     expect(result.ticks.length).toBeLessThan(100)
   })
 
@@ -1553,18 +1553,31 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
     return { state, 세기, 주자 }
   }
 
-  it('주자가 다 서고 공을 쥔 틱부터 +0x120 이 51틱을 세고, 52번째 관문에서 닫는다 (b0e46 `old > 50`)', () => {
+  it('주자가 다 서고 공을 쥔 뒤 관문을 부를 때마다 +0x120 이 오르고, 52번째 호출에서 닫는다 (b0e46 `old > 50`) — 한 그림에 G3 · G1 · G2 세 번', () => {
     const { state, 세기 } = 돌리기({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
       bases: EMPTY_BASES,
       outs: 0,
     })
-    // 마지막 틱의 세기가 52(비교 전에 old + 1 을 적는다), 그 앞 51틱은 1 씩 올랐다
-    expect(세기.at(-1)).toBe(52)
-    const 시작 = 세기.lastIndexOf(1)
-    expect(세기.slice(시작)).toEqual(Array.from({ length: 52 }, (_unused, index) => index + 1))
-    expect(state.tick).toBe(시작 + 52)
+    // 쥔 틱 끝부터 그리기 0x46e3c(G3) · 다음 그림 0x3f0b8(G1) · 슬롯 2 머리 52502(G2) — 틱마다 3 씩.
+    // 52번째 호출(old 51)은 18 번째 틱 끝의 G3 이다 — 그 그림의 HOMERUN 글자 관문부터 닫히고, G1 · G2 도 닫혀 세기는 54 로 끝난다
+    expect(세기.at(-1)).toBe(54)
+    const 시작 = 세기.lastIndexOf(3)
+    expect(세기.slice(시작)).toEqual(Array.from({ length: 18 }, (_unused, index) => (index + 1) * 3))
+    expect(state.tick).toBe(시작 + 18)
+    expect(state.drawGateOpen).toBe(false)
+  })
+
+  it('판 시작 · 안 쥔 틱은 0x3f378(G4)까지 네 번 불러도 +0x120 이 0 이다 — 쥐기 전 틱 끝의 세기는 0', () => {
+    const { 세기 } = 돌리기({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+    })
+    const 시작 = 세기.lastIndexOf(3)
+    expect(세기.slice(0, 시작).every((value) => value === 0)).toBe(true)
   })
 
   it('공이 처음 땅에 닿는 틱에 결과 코드 6 을 내고 바운드 포스(0xa95e8)를 세운다 — 쥐기 전이다', () => {

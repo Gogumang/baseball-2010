@@ -41,7 +41,8 @@ import { fireworksPortOf } from '@/widgets/batting-stage/lib/homeRunEffects'
  * 0x17 끝 0x35108   0x351d0 +0x1960 = 0 · 0x351e2 → 0x6dee4(파티클 모두 치우기)
  * ```
  * - state[0x1d] 는 사건 코드 8 처리 0xb2bd8 이 +0x111 과 함께 세운다(웹 `homeRunFlag`), +0x129 는 코드 12(웹 `play.suppressed`).
- *   그리기 쪽 관문은 갱신 뒤에 다시 부르는 0xb0d28 이라 웹 진행기의 "틱 끝 관문"(`isDefensePlayFinished`)과 같은 값이다.
+ *   그리기 쪽 관문은 갱신 뒤에 다시 부르는 0xb0d28(G3)이다 — 부를 때마다 +0x120 이 오르므로 진행기가 틱 끝에 따로 적어 둔
+ *   `drawGateOpen` 을 본다(`playGate.passPlayGateBetweenTicks`).
  * - +0x1962(유지 반짝임 셈)는 아무도 0 으로 안 되돌려 **장면 내내 이어진다**, +0x36 은 경기 상태 초기화 0xb6814(0xb687e)만 0 으로 둔다
  *   — 부르는 쪽이 경기 장면 동안 들고 다닌다(`DefenseSceneMemory`).
  * - 홈런더비(모드 7)는 이 화면이 아니다(타석 화면 — pages/home-run-derby). 여기는 일반 · 팀 · 투수 · 미션 모드의 0x17 이다.
@@ -111,7 +112,8 @@ export function defenseTickFactsOf(before: DefenseTickBefore, after: DefensePlay
     // 사건 8 은 결과 코드 8 · 12 에서만 서고 판에 한 번이다(0x9d5bc 는 +0x112 가 서기 전 한 번 — 6d 절)
     homeRunBranch: !before.homeRunEvent && after.homeRunEvent,
     displayDistance: displayDistanceWrittenAt(before.tick, after),
-    drawsText: !finished && (after.homeRunFlag || after.play.suppressed),
+    // 그리기 쪽 관문은 이 틱 플레이 틱 뒤에 부르는 G3(0x46e3c)이다 — 틱 끝 G2(`finished`)보다 +0x120 이 하나 덜 올랐을 때 본다
+    drawsText: (after.drawGateOpen ?? !finished) && (after.homeRunFlag || after.play.suppressed),
   }
 }
 

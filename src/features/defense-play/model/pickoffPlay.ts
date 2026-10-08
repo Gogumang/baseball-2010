@@ -1,5 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { liveRunnerCountOf, passPlayGate, someRunnerStillActive } from '@/entities/fielding/model/playGate'
+import { liveRunnerCountOf, passPlayGateBetweenTicks, someRunnerStillActive } from '@/entities/fielding/model/playGate'
 import { PICKOFF_PLAY_KIND, type PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { autoAdvanceDecisions } from '@/entities/fielding/model/autoAdvance'
 import { rollFumble } from '@/entities/fielding/model/fieldingErrors'
@@ -574,9 +574,9 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
       }
     }
 
-    // ── 판 진행 관문 0xb0d28 (`playGate.passPlayGate`) — 원본은 다음 틱 슬롯 2 머리에서 돈다. 웹은 그 틱 끝에서 본다 ──
-    // 3아웃 · 처리 안 끝난 주자(0xaa05c, +0x94 까지) · 공을 쥔 채 51틱(+0x120). state[0xb] 는 이 판의 결과 코드(9 · 13)다.
-    const gate = passPlayGate({
+    // ── 판 진행 관문 0xb0d28 (`playGate.passPlayGateBetweenTicks`) — 이 틱 그리기 G3 · 0x3f378 G4 · 다음 틱 0x3f060 G1 · 슬롯 2 머리 G2 ──
+    // 3아웃 · 처리 안 끝난 주자(0xaa05c, +0x94 까지) · 공을 쥔 채 관문 51 번(+0x120 — 그림마다 3 번, 17 틱). state[0xb] 는 이 판의 결과 코드(9 · 13)다.
+    const gate = passPlayGateBetweenTicks({
       foulFlag: false,
       lastEventCode: resultCode ?? 0,
       outs,

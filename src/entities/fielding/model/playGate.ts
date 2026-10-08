@@ -27,8 +27,8 @@ import { NONE, type RunnerState } from '@/entities/fielding/model/fieldingState'
  * ```
  * - `0xaa05c` = 주자마다 `!+0x96 && (!vt18 || +0x94)` 가 하나라도 있으면 참 (aa070~aa090)
  * - `0xa990c` = `0xa9598`(주자 수, +0xc) − `0xa98b4`(+0x96 선 주자 수) = 아직 안 끝난 주자 수
- * - 그래서 "주자가 다 서고 공을 쥔(또는 +0x124) 틱" 이 51틱 이어지면 52번째 관문에서 닫힌다.
- *   그 51틱 동안에도 자동 진루 · CPU 송구는 돈다.
+ * - 그래서 "주자가 다 서고 공을 쥔(또는 +0x124)" 채로 관문을 51 번 지나면 52번째 호출에서 닫힌다. 관문은 한 그림에 서너 번
+ *   불리므로(아래 `passPlayGateBetweenTicks`) 플레이 틱으로는 17 틱이다 — 그동안에도 자동 진루 · CPU 송구는 돈다.
  */
 
 /** 플레이 +0x120 세기가 넘으면 닫는 값 — `b0e54 cmp r1, #0x32 ; ble` */
@@ -111,6 +111,57 @@ export function passPlayGate(input: PlayGateInput): PlayGateResult {
   }
   if (!input.ballHeld && !input.groundRuleFlag) return { open: true, endCounter: 0 }
   return { open: counter <= PLAY_END_COUNT_LIMIT, endCounter: counter + 1 }
+}
+
+/**
+ * ============================================================================
+ * **한 그림 사이에 관문이 몇 번 불리나** — 관문 0xb0d28 은 부를 때마다 +0x120 을 올린다 (2026-10-08 직접 뜸)
+ * ============================================================================
+ * 관문을 부르는 곳은 다섯이다(리터럴 0xb0d29 — 0x3f338 · 0x3f4c0 · 0x46830 · 0x46ed8 · 0x525a0, BL 0xb0e8a 의 0xb0e88 은 부르는 곳이 없다).
+ * 0x46418(0x17 진입, 판마다 한 번)을 빼면 넷이 **매 그림** 돈다. 프레임 0x52c50 은 갱신과 그리기를 한 함수에서 잇달아 부른다
+ * (팝업 [0x140005c]+9 이 없으면 — 0x52cc6 · 0x52f20) — **갱신 한 번에 그리기 한 번**이다.
+ * ```
+ * 52e16  공용 갱신 0x3f060: 상태 ≠ 7 · 0x18 · 0x19 · 0x1a · [장면+0x1780]+0 == 0(간이 엔진 아님) · +0x1993 == 0(경기 멈춤 아님) 이면
+ *  3f0b8    관문 (G1) — 열렸고 상태 0x17 이면 장면 +0x1e4 목록마다 vt0xc(주자 틱 0xa01cc)
+ * 52e94  슬롯 2 0x524c0: +0x1993 이면 524f0 에서 통째로 건너뜀
+ *  52502    관문 (G2) — 0 이면 529f0(+0x1094 셈), 아니면 플레이 틱 vt48 · vt4c · 자동 진루 · CPU 송구
+ * 52fe6  그리기 0x46c88:
+ *  46e3c    0x33c98(0x17 이면 참) 이면 관문 (G3) — 열렸고 (state[0x1d] || +0x129) 면 HOMERUN 글자 0x40b18
+ * 5308e  0x3f378(팝업이 없으면): 상태 ≠ 7 · 0x19 · 0x1a · +0x1993 == 0 이고
+ *  3f3b2    **플레이 +0x12c(쥠) == 0 일 때만** 관문 (G4) — 열렸으면 0xa2594
+ * ```
+ * 곧 플레이 틱 N 이 끝난 뒤 틱 N+1 의 플레이 틱까지 G3(N) → G4(N, 안 쥐었을 때) → G1(N+1) → G2(N+1) 이 돈다.
+ * 공을 쥔 채 주자가 다 선 판은 그림마다 **+0x120 이 3 씩**(+0x124 가 선 채 안 쥐었으면 4 씩) 오른다 — 플레이 틱을 51 번이 아니라
+ * 17 번 더 돌고 닫힌다. 하나라도 닫히면 그 뒤 호출도 다 닫힌다(세기만 오르고 0 으로 돌릴 주자 · 쥠 변화가 없다).
+ *
+ * **키 건너뛰기(+0xfe7, 0x519cc)** 동안은 그리기 · 0x3f378 없이 52b26~52b40 이 `0x3f060(G1) → 524f8 → G2 → 플레이 틱 …` 을 한 그림 안에서
+ * 되풀이한다 — 틱 사이 호출은 G1 · G2 둘이다.
+ *
+ * 웹 진행기는 G2 를 그 틱 끝에서 본다(원본은 G1 뒤 주자 틱 0xa01cc 를 지나 다음 틱 머리에서 본다 — 웹은 주자 움직임을 플레이 틱 안에서
+ * 돌리므로 그 차례는 근사다). G3 · G4 · G1 은 플레이 틱 뒤 · 주자 틱 앞이라 틱 끝 상태 그대로다.
+ * ⚠️ 경기 멈춤(+0x1993, 레이저 번쩍임) 그림은 G3 만 도는데, 웹 진행기에 그 멈춤이 없어 옮기지 않았다.
+ */
+export interface PlayGateFrameResult extends PlayGateResult {
+  /** 그리기 0x46e3c 의 관문(G3) — 이 그림의 HOMERUN 글자를 그리는가. 건너뛰기 중엔 그리기가 없어 null */
+  readonly drawOpen: boolean | null
+}
+
+/** 플레이 틱 하나 뒤 · 다음 플레이 틱 앞의 관문 호출 전부 (`open` 은 다음 틱 머리 G2 의 값) */
+export function passPlayGateBetweenTicks(input: PlayGateInput, fastForward = false): PlayGateFrameResult {
+  let counter = input.endCounter
+  const call = (): PlayGateResult => {
+    const result = passPlayGate({ ...input, endCounter: counter })
+    counter = result.endCounter
+    return result
+  }
+  let drawOpen: boolean | null = null
+  if (!fastForward) {
+    drawOpen = call().open // G3 그리기 0x46e3c
+    if (!input.ballHeld) call() // G4 0x3f3b2 — +0x12c == 0 일 때만
+  }
+  call() // G1 공용 갱신 0x3f0b8 (건너뛰기 중엔 52b32 의 0x3f060)
+  const head = call() // G2 슬롯 2 머리 52502
+  return { open: head.open, endCounter: counter, drawOpen }
 }
 
 /**

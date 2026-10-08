@@ -7,6 +7,7 @@ import {
   isFoulEnded,
   liveRunnerCountOf,
   passPlayGate,
+  passPlayGateBetweenTicks,
   playEndResultCode,
   PLAY_END_COUNT_LIMIT,
   someRunnerStillActive,
@@ -133,6 +134,41 @@ describe('판 진행 관문 0xb0d28', () => {
       // b0e50 은 비교 전에 old + 1 을 적는다 — 닫는 관문에서도 하나 오른다
       expect(counter).toBe(PLAY_END_COUNT_LIMIT + 2)
     }
+  })
+
+  it('한 그림 사이 관문은 그리기 G3 · 0x3f378 G4(안 쥐었을 때만) · 0x3f060 G1 · 52502 G2 — 쥐면 3, +0x124 만 서면 4 씩 오른다', () => {
+    expect(passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: 0 })).toEqual({
+      open: true,
+      endCounter: 3,
+      drawOpen: true,
+    })
+    expect(passPlayGateBetweenTicks({ ...닫힘없음, groundRuleFlag: true, endCounter: 0 })).toEqual({
+      open: true,
+      endCounter: 4,
+      drawOpen: true,
+    })
+    // 건너뛰기(+0xfe7) 동안은 52b32 의 0x3f060(G1) · 524f8 의 G2 둘뿐이고 그리기가 없다
+    expect(passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: 0 }, true)).toEqual({
+      open: true,
+      endCounter: 2,
+      drawOpen: null,
+    })
+  })
+
+  it('쥔 채 주자가 다 서면 틱 끝마다 세 번 — 17틱 열리고 18번째 틱 끝 G3(old 51)부터 닫는다', () => {
+    let counter = 0
+    let openTicks = 0
+    let lastDraw: boolean | null = null
+    for (;;) {
+      const gate = passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: counter })
+      counter = gate.endCounter
+      lastDraw = gate.drawOpen
+      if (!gate.open) break
+      openTicks += 1
+    }
+    expect(openTicks).toBe(17)
+    expect(counter).toBe(54)
+    expect(lastDraw).toBe(false)
   })
 
   it('+0x111 · +0x129(홈런) 이면 안 끝난 주자가 0 일 때 닫고, 남았으면 아래 갈래로 (b0e04)', () => {
