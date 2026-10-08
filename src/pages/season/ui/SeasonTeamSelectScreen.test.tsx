@@ -28,6 +28,16 @@ describe('시즌 팀 고르기 0xca', () => {
     expect(onChoose).toHaveBeenCalledWith(9, '단장님')
   })
 
+  it('0xc8 에서 취소로 돌아오면 격자 커서는 첫 칸이다 — 0xca 진입 0x50a8 이 [this+0x98]->vt+0x14(0, 0)', () => {
+    render(<SeasonTeamSelectScreen onChoose={vi.fn()} onExit={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: TEAMS[9].name }))
+    fireEvent.keyDown(window, { key: 'Escape' }) // 이름이 비었으니 0xca 로
+
+    expect(screen.getByRole('button', { name: TEAMS[0].name }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: TEAMS[9].name }).getAttribute('aria-pressed')).toBe('false')
+  })
+
   it('잠긴 히든 칸은 힌트 [225] + [226+열] + [0] + [1] 팝업만 띄운다', () => {
     const onChoose = vi.fn()
     render(<SeasonTeamSelectScreen onChoose={onChoose} onExit={vi.fn()} />)

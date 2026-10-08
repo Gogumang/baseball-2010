@@ -52,6 +52,11 @@ export interface SeasonTeamSelectScreenProps {
  * 0xca 취소(−16)       → 메인 메뉴 (0x140006c = 5)
  * ```
  * 0xc8 은 원본에서 따로 상태지만 웹은 한 화면이 단계만 바꿔 든다 — 0xc8 의 이전·다음 상태를 보는 곳이 없다.
+ *
+ * **0xc8 에서 돌아오면 격자 커서는 0(첫 칸)이다** (직접 떴다): 격자 객체 this+0x98(vtable 0xd2ea0)은 장면 내내 남지만,
+ * 0xc8 취소 0xbc44(bc66 `movs r1, #0xca` → 0xbcb49)로 다시 들어선 0xca 의 진입 `0x50a8` 이
+ * `50d2~50e0 [this+0x98]->vt+0x14(0, 0)` — vt+0x14 = `0x6c00c`(범위 안이면 +0xc = x · +0x10 = y) — 로 커서를 (0, 0) 에 놓는다.
+ * 웹은 격자 화면이 새로 서며 0 이라 같다.
  */
 export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit }: SeasonTeamSelectScreenProps) {
   const [hint, setHint] = useState<string | null>(null)
