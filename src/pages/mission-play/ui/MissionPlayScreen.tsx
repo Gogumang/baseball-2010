@@ -337,6 +337,8 @@ export function MissionPlayScreen({
               bases: run.bases,
               ourLogoUrl: './sprites/team_logo_ini/000.png',
               opponentLogoUrl: './sprites/team_logo_ini/001.png',
+              // 위 줄 = 측 0(선공) · 아래 줄 = 측 1 (0x373d0 — 점수 0xb69b1(st, 0) · (st, 1)). 사람은 미션의 측에 앉는다
+              playerSide: humanSideOf(run.mission),
             }}
             acePitcher={
               opponent === null

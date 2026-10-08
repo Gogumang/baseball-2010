@@ -11,8 +11,8 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
-import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { BASE_WINDOW_IMAGE, RUNNER_FRAMES, baseRunnerDrawsOf, loopingAnimationStepAt, showsBaseRunners } from '@/widgets/batting-stage/lib/baseRunners'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
 import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedReadout'
@@ -23,7 +23,7 @@ import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayer
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
-import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
+import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
 import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
 
@@ -59,8 +59,9 @@ export interface StageScene {
   readonly homeRunFrame?: HomeRunTextFrame | null
   /**
    * 살아 있는 파티클. 없으면 안 그린다.
-   * ⚠️ 그리는 **순서**는 근사다 — 원본 파티클 관리자의 그리기가 타석 화면 묶음(0x50828)의
-   * 어느 자리에서 도는지 못 봤다. 여기서는 선수·공 위, 전광판·판정 글자 아래에 둔다.
+   * 그리는 자리는 장면 그리기 0x52c50 이 상태 그리기 표(0x50828 따위)를 부른 **뒤** 53050~53060 에서
+   * 파티클 관리자 [0x1400068] 의 0x6de85 · 0x6dd69 를 부르는 곳 — 전광판·판정 글자·HOMERUN 글자까지 다 그린 위,
+   * 그 뒤 0x4e35c(기록 알림·팝업) 아래다.
    */
   readonly particles?: ParticleScene | null
   /** 타자 자세 f (0xb905c) — 레이어마다 가산값을 더해 그린다 */
@@ -162,9 +163,12 @@ export function renderBattingStage(
     return
   }
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
+  // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
+  if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
+    drawBaseRunners(context, scene.hud, side, scene.tick)
+  }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
-  drawStrikeZone(context, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
   }
@@ -173,17 +177,14 @@ export function renderBattingStage(
     // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
     drawMagicBallEffect(context, scene.pitch, scene.frame)
   }
-  if (scene.particles !== null && scene.particles !== undefined) {
-    drawParticles(context, scene.particles)
-  }
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
     drawHud(context, scene.hud, scene.tick)
-    // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
-    drawFieldMap(context, scene.hud.bases)
   }
+  // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
+  if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)
   // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
   if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
   // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
@@ -193,12 +194,74 @@ export function renderBattingStage(
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
-    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, scene.resultTick)
+    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, scene.resultTick, side)
   } else if (scene.isHomeRun) {
     drawHomeRunBanner(context, scene.homeRunTick)
   } else if (scene.resultText !== '') {
-    drawResultText(context, scene.resultText, scene.resultTick)
+    drawResultText(context, scene.resultText, scene.resultTick, side)
   }
+  // 파티클은 상태 그리기가 다 끝난 뒤 — 장면 그리기 0x52c50 의 53050~53060(0x6de85 · 0x6dd69), 그 뒤 0x4e35c(기록 알림 따위)
+  if (scene.particles !== null && scene.particles !== undefined) {
+    drawParticles(context, scene.particles)
+  }
+}
+
+/** 공격 팀 번호 — 초(측 0) · 말(측 1) 중 공격 측이 사람 측(`playerSide`, 기본 1)이면 우리 팀 */
+export function offenseTeamIdOf(hud: HudState): number | null {
+  const offenseSide = hud.half === '말' ? 1 : 0
+  const teamId = offenseSide === (hud.playerSide ?? 1) ? hud.ourTeamId : hud.opponentTeamId
+  return teamId ?? null
+}
+
+/** defender.mpl 은 팀 번호가 곧 벌 번호(15벌) — 범위 밖이면 구운 벌 (`pages/defense` 의 `defenderPaletteIndexOf` 와 같은 규칙) */
+const DEFENDER_TEAM_COUNT = 15
+function runnerPaletteIndexOf(teamId: number | null): number | null {
+  if (teamId === null || !Number.isInteger(teamId) || teamId < 0 || teamId >= DEFENDER_TEAM_COUNT) return null
+  return teamId
+}
+
+function drawBaseRunners(context: CanvasRenderingContext2D, hud: HudState, side: number, tick: number): void {
+  const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
+  for (const draw of baseRunnerDrawsOf(hud.bases, side)) {
+    if (draw.kind === 'window') {
+      const image = sprite(BASE_WINDOW_IMAGE)
+      if (image === null) continue
+      if (!draw.isMirrored) {
+        context.drawImage(image, draw.x, draw.y)
+        continue
+      }
+      // 효과 0x11 · 인자 0 — 제 상자 안에서 좌우 뒤집기
+      context.save()
+      context.translate(draw.x * 2 + image.width, 0)
+      context.scale(-1, 1)
+      context.drawImage(image, draw.x, draw.y)
+      context.restore()
+      continue
+    }
+    const entries = frameAnimations(RUNNER_FRAMES)?.[draw.animation]
+    const step = entries === undefined ? null : loopingAnimationStepAt(entries, tick)
+    if (step === null) continue
+    const placed = placedFrame(RUNNER_FRAMES, step.frame, paletteIndex)
+    if (placed === null) continue
+    const x = draw.x + step.dx + placed.offsetX
+    const y = draw.y + step.dy + placed.offsetY
+    if (draw.isSilhouette) drawSilhouette(context, placed.image, x, y, '#000000')
+    else context.drawImage(placed.image, x, y)
+  }
+}
+
+/** 효과 0xc · 인자 색 — 그림 모양대로 한 색으로 칠한다(R2: 섞는 식은 미해결, 레이저 반짝임과 같은 근사) */
+function drawSilhouette(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, color: string): void {
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const layer = canvas.getContext('2d')
+  if (layer === null) return
+  layer.drawImage(image, 0, 0)
+  layer.globalCompositeOperation = 'source-in'
+  layer.fillStyle = color
+  layer.fillRect(0, 0, canvas.width, canvas.height)
+  context.drawImage(canvas, x, y)
 }
 
 /** 좌투(손 1) — 그림을 뒤집고 x 를 1 옮긴다 (0x79524 효과 0x11 · 0x38db8) */
@@ -298,15 +361,42 @@ function drawBatter(
   context.restore()
 }
 
-/** 존 표시는 선이 아니라 slt_pitch 프레임 73(빨간 모서리)을 존 가운데에 찍는다 (0x35ae8) */
+/**
+ * 존 표시 0x35ae8 (직접 떴다) — 선이 아니라 slt_pitch 프레임 0x49(73, 빨간 모서리)를 찍는다.
+ * ```
+ * 35aea  상태 [+0x1c] ∈ {0xd, 0xe, 0x13} 이면 안 그린다
+ * 35b06  (w, h) = 0xba815(slt_pitch, 0x49, 종류 1)            ; 프레임 상자 37 × 37
+ * 35b12  t = 표 0xcfb7c[+0x17e1] (타자 좌우)
+ * 35b2c  x = 카메라 x + t.x + (w >> 1) − 2 ; y = 카메라 y + t.y + (h >> 1) − 2
+ * 35b68  0xba759(slt_pitch, 0x49, 종류 1, x, y)               ; 프레임 원점(−18, −18)대로
+ * ```
+ * 카메라 (−120, −70) → 앵커 우타 (122, 256) · 좌타 (117, 256), 그림 왼쪽 위 우타 (104, 238) · 좌타 (99, 238).
+ */
 const ZONE_FRAME_FOLDER = './sprites/slt_pitch/frames'
-const ZONE_FRAME_INDEX = 73
+const ZONE_FRAME_INDEX = 0x49
+const ZONE_ANCHOR_INSET = 2
+
+/** 존을 그리는 단계인가 — 0xd · 0xe(웹 '대기' 의 쉬는 동안, 근사) · 0x13('타격')에선 안 그린다. 단계를 모르면 그린다 */
+export function showsStrikeZone(phase: StagePhaseSnapshot | undefined): boolean {
+  if (phase === undefined) return true
+  if (phase.kind === '타격') return false
+  return !(phase.kind === '대기' && phase.isPaused)
+}
+
+/** 존 그림의 앵커 (프레임 원점을 더하기 전) — 존 표 왼쪽 위 + (상자 >> 1) − 2 */
+export function strikeZoneAnchorOf(side: number, frameSize: { readonly width: number; readonly height: number }): { x: number; y: number } {
+  const { zoneLeft, zoneTop } = stageLayoutOf(side)
+  return {
+    x: zoneLeft + (frameSize.width >> 1) - ZONE_ANCHOR_INSET,
+    y: zoneTop + (frameSize.height >> 1) - ZONE_ANCHOR_INSET,
+  }
+}
 
 function drawStrikeZone(context: CanvasRenderingContext2D, side: number): void {
   const frame = placedFrame(ZONE_FRAME_FOLDER, ZONE_FRAME_INDEX)
   if (frame === null) return
-  const center = toPixel({ x: 0, y: 0 }, side)
-  context.drawImage(frame.image, Math.round(center.x) + frame.offsetX, Math.round(center.y) + frame.offsetY)
+  const anchor = strikeZoneAnchorOf(side, frame.image)
+  context.drawImage(frame.image, anchor.x + frame.offsetX, anchor.y + frame.offsetY)
 }
 
 function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: number; y: number }): void {
@@ -361,9 +451,12 @@ function drawMagicBallEffect(context: CanvasRenderingContext2D, pitch: Pitch, fr
   context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
 }
 
-/** 판정 글자 — game_judge 애니를 (117,224) 원점에 재생한다 (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다 */
-function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number): void {
-  const { x: centerX, y: centerY } = stageLayoutOf().judgeCenter
+/**
+ * 판정 글자 — game_judge 애니를 존 표 0xcfb7c[+0x17e1] 에서 잡은 원점(우타 (122,224) · 좌타 (117,224))에 재생한다
+ * (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다
+ */
+function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number, side: number): void {
+  const { x: centerX, y: centerY } = stageLayoutOf(side).judgeCenter
   const animation = judgeAnimationOf(text)
   if (animation !== null) {
     const entries = frameAnimations(JUDGE_FRAMES)?.[animation]

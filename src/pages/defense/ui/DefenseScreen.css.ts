@@ -91,3 +91,19 @@ export const overlay = style({
   pointerEvents: 'none',
   imageRendering: 'pixelated',
 })
+
+/** 작은 지도 0x395f4 한 벌 — 안쪽은 240×320 원본 절대 좌표. 반투명(효과 1 · 단계 12)은 그림마다 따로 준다 */
+export const fieldMap = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+  pointerEvents: 'none',
+})
+
+/** 작은 지도 주자 점 (game_ui 이미지 21) */
+export const fieldMapDot = style({
+  position: 'absolute',
+  imageRendering: 'pixelated',
+})

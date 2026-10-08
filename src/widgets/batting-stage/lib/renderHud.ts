@@ -4,17 +4,17 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
 /**
  * 경기 HUD — binary.mod 0x373d0 (position-re 2차, 바이트 확인).
  * game_ui 프레임 0 을 (6,6) 에 그리고, 그 프레임의 박스가 곧 배치표다 (아래 좌표는 박스 + (6,6)).
- *   배경: 검정 (5,5,82,50) 위에 #335fcd (6,6,80,48)
- *   팀 줄: 위 (8,21,36,14) · 아래 (8,38,36,14) #222854, 공격 팀 줄 왼쪽에 #ffe500 막대
+ *   배경: 검정 (5,5,82,50) 위에 #335fcd (6,6,80,48) — 둘 다 둥글기 5 둥근 칠 (`roundFillRectsOf`)
+ *   팀 줄: 위 (8,21,36,14) · 아래 (8,38,36,14) #222854 둥글기 3, 공격 팀 줄 왼쪽에 #ffe500 막대 (x+1, y+2, 3, h−2)
  *   팀 아이콘: (13,23) · (13,40) — team_logo_ini
  *   베이스: 1루 (68,14) · 2루 (59,9) · 3루 (50,14), 주자 있으면 파트 6 (빈 베이스 파트 5 는 프레임에 있다)
  *   램프: S 파트 13 (58,24)(67,24) · B 파트 14 (58,34)(67,34)(76,34) · O 파트 15 (58,44)(67,44)
  *   이닝: 박스 0 (15,8,10,9) — "회" 글자 앞
- *   점수: 숫자 프레임 20~, 자간 −3, 아래 줄은 y+3 (점검 에이전트) · 공격 막대 높이 h−2 · 위 줄 = 먼저 공격(원정)
+ *   점수: 숫자 프레임 20~ 를 0xba51c 로 (`alignedNumberGlyphsOf`) — 자간 1 · ox −3, 아래 줄은 y+3 · 공격 막대 높이 h−2 · 위 줄 = 먼저 공격(원정)
  *
  * **확정** (F-3 · 3-1): 숫자 글꼴 = `ui/num.pzx` (0x3740c → 0x330f0), 점수 **오른쪽 정렬**
  * (0x3756c 정렬 0x24 = 오른쪽+세로 가운데, 아래 줄은 오른쪽만),
- * 그리고 **새 램프 확대 연출이 있다** (0x37828) — 예전 주석의 "없음" 은 틀렸다.
+ * 그리고 **새 램프 확대 연출이 있다** (0x37828, `stepLampZoom`) — 예전 주석의 "없음" 은 틀렸다.
  */
 export interface HudState {
   readonly inning: number
@@ -42,6 +42,9 @@ const HUD_FRAMES = './sprites/game_ui/frames'
 const HUD_ORIGIN = { x: 6, y: 6 }
 const PART = (index: number) => `./sprites/game_ui/${String(index).padStart(3, '0')}.png`
 
+const BOARD = { x: 5, y: 5, width: 82, height: 50 }
+const BOARD_ROUND = 5
+const ROW_ROUND = 3
 const ROW_TOP = { x: 8, y: 21, width: 36, height: 14 }
 const ROW_BOTTOM = { x: 8, y: 38, width: 36, height: 14 }
 const ROW_COLOR = UI_COLORS.hudRow
@@ -53,65 +56,97 @@ const BASE_LIT_PART = 6
 const BASES = { first: { x: 68, y: 14 }, second: { x: 59, y: 9 }, third: { x: 50, y: 14 } } as const
 
 const LAMP_STEP = 9
+/**
+ * 램프 칸 수 = 개수를 **잘라서** 센다 — 0x376a4~0x376d0 이 [min(st[4], 2), min(st[5], 3), min(st[6], 2)] 를 칸 표로 만든다.
+ * (스트라이크 3 · 아웃 3 이 되는 순간에도 칸은 둘만 켜진다)
+ */
 const LAMPS = [
-  { part: 13, x: 58, y: 24, key: 'strikes' },
-  { part: 14, x: 58, y: 34, key: 'balls' },
-  { part: 15, x: 58, y: 44, key: 'outs' },
+  { part: 13, x: 58, y: 24, key: 'strikes', max: 2 },
+  { part: 14, x: 58, y: 34, key: 'balls', max: 3 },
+  { part: 15, x: 58, y: 44, key: 'outs', max: 2 },
 ] as const
 
+/** 램프 한 종류의 칸 수 (0x376a4~0x376d0 — 위로만 자른다) */
+export function lampCountOf(lamp: { readonly max: number }, count: number): number {
+  return count < lamp.max ? count : lamp.max
+}
+
 /**
- * 새 램프 확대 연출 (0x37828, F-3 · 3-1 확정).
- * 카운트가 바뀌면 그 종류의 타이머를 5 로 두고(0x37744), 타이머 z > 0 인 동안
- * **가장 새 램프(칸 = 개수−1)만** 효과 0x10(정수 배 확대)·배율 z 로 그린 뒤 z 를 하나 줄인다.
- * 자리는 `(x − (z−1)·w/2, y − (z−1)·h/2)` — 제자리에 가운데를 고정한 채 5배에서 1배로 줄어든다.
+ * 새 램프 확대 연출 (0x37730~0x37892, 직접 떴다). 종류 k 마다 장면에 "지난 칸 수" +0x17d4~6 · 타이머 +0x17d7~9 를 둔다.
+ * ```
+ * c = 자른 칸 수 (lampCountOf)
+ * c ≤ 0 (0x37736)        → 아무것도 안 한다 — 지난 칸 수도 타이머도 그대로(타이머가 줄지도 않는다)
+ * c > 0 이고 지난 ≠ c     → 타이머 = 5 · 지난 = c (0x37744)
+ * 칸 i = 0..c−1          → 타이머 > 0 이고 i == c−1 이면 효과 0x10 · 배율 z = 타이머로 그리고 타이머 −1 (0x37828~0x37858)
+ * ```
+ * 그래서 새 램프가 5·4·3·2·1 배로 다섯 그림 동안 줄어든다. 확대 자리는 **상자** w·h 로 `(x − ((z−1)·w >> 1), y − ((z−1)·h >> 1))`.
+ * 타석 시작 0xd 진입(0x48f08)은 **타이머만** 0 으로 지운다 — 지난 칸 수는 경기 적재 0x48658(48cc2~48cf2)이 한 번 채울 뿐이다.
+ * 원본 버그 그대로: 칸이 0 으로 내려갔다 같은 수로 다시 켜지면(지난 1 → 0 → 1) 확대가 없다.
  * 정수 배 확대라는 것은 R6 3b 확정 (프레임 그리기 0x944b5 의 e == 0x10, b > 0 → 좌표·크기 ×b).
  */
-const LAMP_ZOOM_TICKS = 5
+const LAMP_ZOOM_TIMER = 5
+/** 램프 상자 크기 — game_ui 프레임 0 의 상자 7~13 이 모두 7×7 (boxes.json) */
+const LAMP_BOX_SIZE = 7
 
 type LampKey = (typeof LAMPS)[number]['key']
 
-/** 램프 종류별 "지난 카운트"와 "타이머를 5 로 둔 틱". 원본은 게임 객체에 들고 있다 */
-const lampZoom: Record<LampKey, { count: number; startedTick: number }> = {
-  strikes: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
-  balls: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
-  outs: { count: 0, startedTick: -LAMP_ZOOM_TICKS },
+/** 한 종류의 기억 — 지난 칸 수 · 다음 그림의 타이머 · 이번 틱에 쓴 배율(같은 틱에 두 번 그려도 한 그림으로 센다) */
+export interface LampZoomMemory {
+  readonly last: number
+  readonly timer: number
+  readonly tick: number
+  readonly zoom: number
 }
-/** 틱이 거꾸로 가면 타석이 새로 열린 것이라 기억을 버린다 */
-let lastHudTick = -1
 
-/** 지금 배율 z (1 이면 보통 그리기와 같다). 틱으로 세니 한 틱에 두 번 그려도 같은 값이다 */
-function lampScaleAt(key: LampKey, count: number, tick: number): number {
-  const remembered = lampZoom[key]
-  if (remembered.count !== count) {
-    lampZoom[key] = { count, startedTick: tick }
-    return LAMP_ZOOM_TICKS
+export const INITIAL_LAMP_ZOOM: LampZoomMemory = { last: 0, timer: 0, tick: -1, zoom: 0 }
+
+/**
+ * 한 그림치 램프 확대 걸음. `zoom` > 0 이면 마지막 칸을 그 배율로 그린다(1 이면 보통과 같다).
+ * `tick` 이 지난 그림보다 작으면 타석이 새로 열린 것(0xd 진입)이라 타이머만 지운다.
+ */
+export function stepLampZoom(memory: LampZoomMemory, count: number, tick: number): LampZoomMemory {
+  if (tick === memory.tick) return memory
+  let { last, timer } = memory
+  if (tick < memory.tick) timer = 0
+  if (count <= 0) return { last, timer, tick, zoom: 0 }
+  if (last !== count) {
+    timer = LAMP_ZOOM_TIMER
+    last = count
   }
-  const scale = LAMP_ZOOM_TICKS - (tick - remembered.startedTick)
-  return Math.max(1, Math.min(LAMP_ZOOM_TICKS, scale))
+  const zoom = timer
+  return { last, timer: timer > 0 ? timer - 1 : 0, tick, zoom }
+}
+
+const lampZoom: Record<LampKey, LampZoomMemory> = {
+  strikes: INITIAL_LAMP_ZOOM,
+  balls: INITIAL_LAMP_ZOOM,
+  outs: INITIAL_LAMP_ZOOM,
 }
 
 const INNING_BOX = { x: 15, y: 8, width: 10 }
 const SCORE_DIGITS_START = 20
-const SCORE_LETTER_SPACING = -3
+/**
+ * 점수 숫자 0xba719 → 0xba51c (37552~3756c 위 · 37624~37640 아래, 직접 떴다): 박스 = 줄 상자에서 x 를 로고 앞 +3 (3751c · 375ee)
+ * 옮긴 것, 자간 1 · ox −3 · oy 0. 정렬은 위 줄 0x24(오른쪽 + 세로 가운데) · 아래 줄 4(오른쪽만, 대신 박스 y + 3 — 37614).
+ */
+const SCORE_LETTER_SPACING = 1
+const SCORE_BOX_SHIFT_X = 3
+const SCORE_OFFSET_X = -3
+const SCORE_ALIGN_TOP = 0x24
+const SCORE_ALIGN_BOTTOM = 0x4
 const BOTTOM_ROW_SCORE_OFFSET_Y = 3
 const INNING_DIGITS_START = 0
 
 /** `tick` = 타석이 열린 뒤 흐른 틱. 새 램프 확대 연출이 이걸로 z 를 센다 */
 export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: number): void {
-  if (tick < lastHudTick) {
-    for (const lamp of LAMPS) lampZoom[lamp.key] = { count: 0, startedTick: tick - LAMP_ZOOM_TICKS }
-  }
-  lastHudTick = tick
-
-  context.fillStyle = ORIGINAL_COLORS.black
-  context.fillRect(5, 5, 82, 50)
-  context.fillStyle = ORIGINAL_COLORS.boardFill
-  context.fillRect(6, 6, 80, 48)
+  // 판: 박스 1 + (6,6) = (5,5,82,50) 검정 둥글기 5 → (+1,+1,−2,−2) #335FCD 둥글기 5 (37444~37488, 둥근 칠 0xba0bd → 0x6b7d4)
+  fillRound(context, BOARD, BOARD_ROUND, ORIGINAL_COLORS.black)
+  fillRound(context, { x: BOARD.x + 1, y: BOARD.y + 1, width: BOARD.width - 2, height: BOARD.height - 2 }, BOARD_ROUND, ORIGINAL_COLORS.boardFill)
 
   // 위 줄 = 측 0(선공, 초 공격), 아래 줄 = 측 1(후공, 말 공격). 공격 막대는 st[9] == 0 이면 위, == 1 이면 아래 (0x374e0 · 0x375b2)
   const rows = hudRowsOf(hud)
-  drawTeamRow(context, ROW_TOP, rows.top.logoUrl, rows.top.score, rows.top.isBatting, 0)
-  drawTeamRow(context, ROW_BOTTOM, rows.bottom.logoUrl, rows.bottom.score, rows.bottom.isBatting, BOTTOM_ROW_SCORE_OFFSET_Y)
+  drawTeamRow(context, ROW_TOP, rows.top.logoUrl, rows.top.score, rows.top.isBatting, 0, SCORE_ALIGN_TOP)
+  drawTeamRow(context, ROW_BOTTOM, rows.bottom.logoUrl, rows.bottom.score, rows.bottom.isBatting, BOTTOM_ROW_SCORE_OFFSET_Y, SCORE_ALIGN_BOTTOM)
 
   const frame = placedFrame(HUD_FRAMES, 0)
   if (frame !== null) context.drawImage(frame.image, HUD_ORIGIN.x + frame.offsetX, HUD_ORIGIN.y + frame.offsetY)
@@ -124,8 +159,9 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
 
   for (const lamp of LAMPS) {
     const image = sprite(PART(lamp.part))
-    const count = hud[lamp.key]
-    const scale = lampScaleAt(lamp.key, count, tick)
+    const count = lampCountOf(lamp, hud[lamp.key])
+    lampZoom[lamp.key] = stepLampZoom(lampZoom[lamp.key], count, tick)
+    const scale = lampZoom[lamp.key].zoom
     if (image === null) continue
     for (let index = 0; index < count; index += 1) {
       const x = lamp.x + index * LAMP_STEP
@@ -162,7 +198,7 @@ export function hudRowsOf(hud: HudState): { readonly top: HudRow; readonly botto
   }
 }
 
-/** 정수 배 확대 — 자리 `(x − (z−1)·w/2, y − (z−1)·h/2)`, 크기 `w·z × h·z` (0x944b5) */
+/** 정수 배 확대 — 자리 `(x − ((z−1)·w >> 1), y − ((z−1)·h >> 1))` 는 상자 w·h 로(0x37828~0x3784c), 크기 `w·z × h·z` (0x944b5) */
 function drawZoomedLamp(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -174,12 +210,56 @@ function drawZoomedLamp(
   context.imageSmoothingEnabled = false
   context.drawImage(
     image,
-    x - ((scale - 1) * image.width) / 2,
-    y - ((scale - 1) * image.height) / 2,
+    x - (((scale - 1) * LAMP_BOX_SIZE) >> 1),
+    y - (((scale - 1) * LAMP_BOX_SIZE) >> 1),
     image.width * scale,
     image.height * scale,
   )
   context.imageSmoothingEnabled = wasSmoothing
+}
+
+interface PlainRect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** 기기 선 긋기(0x14006c8) 한 줄 — 두 끝을 다 칠한다. 끝이 거꾸로면 작은 쪽부터 */
+const lineRect = (x1: number, y1: number, x2: number, y2: number): PlainRect => ({
+  x: Math.min(x1, x2),
+  y: Math.min(y1, y2),
+  width: Math.abs(x2 - x1) + 1,
+  height: Math.abs(y2 - y1) + 1,
+})
+
+/**
+ * **둥근 칠 `0x6b7d4(gfx, x, y, w, h, 둥글기, 색)`** — `widgets/matchup-cards` 의 `roundFillRectsOf` 와 같은 식이다
+ * (위젯끼리 import 하지 않으려고 베꼈다). 둥글기는 7 로 자르고, R = x + w · B = y + h.
+ * ```
+ * 둥글기 ≤ 3:  칠(x+1, y+1, w−1, h−1) · 선(x+1, y, R−1, y) · 선(x+1, B, R−1, B) · 선(x, y+1, x, B−1) · 선(R, y+1, R, B−1)
+ * 둥글기 4~7:  칠(x+1, y+1, w−1, h−1) · 선(x+2, y, R−2, y) · 선(x+2, B, R−2, B) · 선(x, y+2, x, B−2) · 선(R, y+2, R, B−2)
+ * ```
+ * 그래서 둥근 칠은 (w+1) × (h+1) 칸을 덮고 모서리를 1칸(≤3) 또는 ㄱ자 3칸(4~7) 비운다.
+ */
+export function roundFillRectsOf(rect: PlainRect, round: number): PlainRect[] {
+  const { x, y, width: w, height: h } = rect
+  const right = x + w
+  const bottom = y + h
+  const inset = Math.min(7, round) <= 3 ? 1 : 2
+  const body: PlainRect[] = w - 1 > 0 && h - 1 > 0 ? [{ x: x + 1, y: y + 1, width: w - 1, height: h - 1 }] : []
+  return [
+    ...body,
+    lineRect(x + inset, y, right - inset, y),
+    lineRect(x + inset, bottom, right - inset, bottom),
+    lineRect(x, y + inset, x, bottom - inset),
+    lineRect(right, y + inset, right, bottom - inset),
+  ]
+}
+
+function fillRound(context: CanvasRenderingContext2D, rect: PlainRect, round: number, color: string): void {
+  context.fillStyle = color
+  for (const part of roundFillRectsOf(rect, round)) context.fillRect(part.x, part.y, part.width, part.height)
 }
 
 function drawTeamRow(
@@ -189,16 +269,80 @@ function drawTeamRow(
   score: number,
   isBatting: boolean,
   scoreOffsetY: number,
+  scoreAlign: number,
 ): void {
-  context.fillStyle = ROW_COLOR
-  context.fillRect(row.x, row.y, row.width, row.height)
+  // 팀 줄 #222854 둥글기 3 (374c6~374dc · 37598~375ae), 공격 막대 = 네모 칠 0x6a9f1(x + 1, y + 2, 3, h − 2) #FFE500 (374ea~37512)
+  fillRound(context, row, ROW_ROUND, ROW_COLOR)
   if (isBatting) {
     context.fillStyle = OFFENSE_BAR_COLOR
-    context.fillRect(row.x + 1, row.y + 1, OFFENSE_BAR_WIDTH, row.height - 2)
+    context.fillRect(row.x + 1, row.y + 2, OFFENSE_BAR_WIDTH, row.height - 2)
   }
   const logo = sprite(logoUrl)
   if (logo !== null) context.drawImage(logo, row.x + LOGO_OFFSET.x, row.y + LOGO_OFFSET.y)
-  drawNumber(context, score, row.x + row.width - 1, row.y + scoreOffsetY, SCORE_DIGITS_START, SCORE_LETTER_SPACING)
+  const box = { x: row.x + SCORE_BOX_SHIFT_X, y: row.y + scoreOffsetY, width: row.width, height: row.height }
+  const glyphs = alignedNumberGlyphsOf(score, box, {
+    spacing: SCORE_LETTER_SPACING, start: SCORE_DIGITS_START, align: scoreAlign, offsetX: SCORE_OFFSET_X, offsetY: 0,
+  }, numGlyphSizeOf)
+  if (glyphs === null) return
+  for (const glyph of glyphs) {
+    const image = sprite(numGlyphUrl(glyph.index))
+    if (image !== null) context.drawImage(image, glyph.x, glyph.y)
+  }
+}
+
+const numGlyphUrl = (index: number) => `./sprites/num/${String(index).padStart(3, '0')}.png`
+
+function numGlyphSizeOf(index: number): { readonly width: number; readonly height: number } | null {
+  const image = sprite(numGlyphUrl(index))
+  return image === null ? null : { width: image.width, height: image.height }
+}
+
+export interface NumberGlyphPlacement {
+  readonly index: number
+  readonly x: number
+  readonly y: number
+}
+
+/**
+ * 숫자 그리기 **0xba51c(x, y, w, h, 자간, 값, 기준, 그림, 정렬, ox, oy)** (직접 떴다, 0xba51c~0xba67a).
+ * ```
+ * x0 = x + ox ; y0 = y + oy
+ * 자리마다 Σ += 글자폭 + 자간 (끝 자리 뒤 자간까지) ; 최대높이 = max(글자높이)
+ * 정렬 & 0x4  → x0 += w − Σ                    (ba594)
+ * 정렬 & 0x20 → y0 += ceil((h − 최대높이) / 2)   (ba5a6 — 나머지를 위로 올린다)
+ * 정렬 & 0x40 → y0 += h − 최대높이              (ba5c8)
+ * 정렬 & 0x2  → x0 += (w − Σ) >> 1              (ba5dc)
+ * 높은 자리부터 그림 (기준 + 숫자) 을 (x0, y0 + 최대높이 − 글자높이) 에 — 글자 아래 맞춤 — 그리고 x0 += 글자폭 + 자간
+ * ```
+ * 그림이 아직 안 읽혔으면 null.
+ */
+export function alignedNumberGlyphsOf(
+  value: number,
+  box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  options: { readonly spacing: number; readonly start: number; readonly align: number; readonly offsetX: number; readonly offsetY: number },
+  sizeOf: (index: number) => { readonly width: number; readonly height: number } | null,
+): NumberGlyphPlacement[] | null {
+  const digits = [...String(Math.max(0, Math.trunc(value)))].map((digit) => options.start + Number(digit))
+  const sizes = digits.map(sizeOf)
+  if (sizes.some((size) => size === null)) return null
+  const known = sizes as { readonly width: number; readonly height: number }[]
+  const total = known.reduce((sum, size) => sum + size.width + options.spacing, 0)
+  const maxHeight = known.reduce((max, size) => Math.max(max, size.height), 0)
+  let x = box.x + options.offsetX
+  let y = box.y + options.offsetY
+  if ((options.align & 0x4) !== 0) x += box.width - total
+  if ((options.align & 0x20) !== 0) {
+    const gap = box.height - maxHeight
+    y += (gap >> 1) + (gap - Math.trunc(gap / 2) * 2)
+  }
+  if ((options.align & 0x40) !== 0) y += box.height - maxHeight
+  if ((options.align & 0x2) !== 0) x += (box.width - total) >> 1
+  return digits.map((index, order) => {
+    const size = known[order]
+    const glyph = { index, x, y: y + maxHeight - size.height }
+    x += size.width + options.spacing
+    return glyph
+  })
 }
 
 /** ui/num.pzx 숫자를 오른쪽 끝(rightX)에 맞춰 그린다 */

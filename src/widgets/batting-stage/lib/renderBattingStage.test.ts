@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pitcherMirrorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { offenseTeamIdOf, pitcherMirrorOf, showsStrikeZone, strikeZoneAnchorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { pitcherFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 
@@ -18,5 +18,34 @@ describe('타석 화면 일반 투수 — 폼·손 (0x9e0b8 · 0x482c8 · 0x7952
     const 단계6틱 = 11 // 단계 길이 dur+1 = 2·3·2·2·1·1 → 단계 6 은 틱 11 부터
     expect(pitcherFrameAt(2, 단계6틱)).toBe(pitcherFrameAt(3, 단계6틱))
     expect(pitcherFrameAt(2, 단계6틱)).not.toBe(pitcherFrameAt(0, 단계6틱))
+  })
+})
+
+describe('존 표시 0x35ae8', () => {
+  it('앵커 = 존 표 왼쪽 위 + (37 >> 1) − 2 — 프레임 원점 (−18, −18) 을 더하면 우타 (104, 238) · 좌타 (99, 238)', () => {
+    expect(strikeZoneAnchorOf(0, { width: 37, height: 37 })).toEqual({ x: 122, y: 256 })
+    expect(strikeZoneAnchorOf(1, { width: 37, height: 37 })).toEqual({ x: 117, y: 256 })
+  })
+
+  it('0xd · 0xe(대기 쉬는 동안) · 0x13(타격)에선 안 그린다', () => {
+    expect(showsStrikeZone({ kind: '대기', tick: 0, isPaused: true })).toBe(false)
+    expect(showsStrikeZone({ kind: '타격', tick: 0, isPaused: false })).toBe(false)
+    expect(showsStrikeZone({ kind: '대기', tick: 3, isPaused: false })).toBe(true)
+    expect(showsStrikeZone({ kind: '투구중', tick: 0, isPaused: false })).toBe(true)
+    expect(showsStrikeZone({ kind: '결과', tick: 0, isPaused: false })).toBe(true)
+    expect(showsStrikeZone(undefined)).toBe(true)
+  })
+})
+
+describe('루상 주자 팔레트 — 공격 팀', () => {
+  const hud = {
+    inning: 1, half: '초', ourScore: 0, opponentScore: 0, balls: 0, strikes: 0, outs: 0,
+    bases: { first: true, second: false, third: false }, ourLogoUrl: '', opponentLogoUrl: '', ourTeamId: 3, opponentTeamId: 7,
+  }
+
+  it('초 공격 = 측 0 — 사람이 후공(기본)이면 상대, 선공이면 우리 팀', () => {
+    expect(offenseTeamIdOf(hud)).toBe(7)
+    expect(offenseTeamIdOf({ ...hud, playerSide: 0 })).toBe(3)
+    expect(offenseTeamIdOf({ ...hud, half: '말' })).toBe(3)
   })
 })

@@ -91,6 +91,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       // 아웃된 주자도 걸어 나가는 동안은 그린다 (R3 3-4)
       isVisible: true,
       teamIndex: input.offenseTeamIndex ?? null,
+      // +0x96 = 아웃 또는 홈 밟음 (`runnerFates` — 웹 isOut 은 아웃만이라 scored 를 더한다)
+      isFinished: runner.isOut || runner.scored,
     }
   })
 

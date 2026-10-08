@@ -257,6 +257,8 @@ export interface DefenseRunner {
   readonly isVisible?: boolean
   /** 공격 팀 번호 0~14 — 주자도 `defender.pzx` 를 쓰므로 같은 팔레트 표를 탄다. 안 주면 구운 색이다 */
   readonly teamIndex?: number | null
+  /** +0x96 처리 끝 — 아웃이 됐거나 홈을 밟았다. 작은 지도(0x395f4)가 이 주자를 안 찍는다. 안 주면 아직이다 */
+  readonly isFinished?: boolean
 }
 
 /**

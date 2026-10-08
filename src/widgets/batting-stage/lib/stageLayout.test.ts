@@ -75,7 +75,11 @@ describe('타자 좌우 — side 0 우타 · 1 좌타 (0xb63c0)', () => {
 
   it('그라운드는 side 를 타지 않는다 (0x7725c 반전 없음)', () => {
     expect(stageLayoutOf(BATTER_SIDE.우타).fieldSourceX).toBe(stageLayoutOf(BATTER_SIDE.좌타).fieldSourceX)
-    expect(stageLayoutOf(BATTER_SIDE.우타).judgeCenter).toEqual(stageLayoutOf(BATTER_SIDE.좌타).judgeCenter)
+  })
+
+  it('판정 글자 중심은 존 표 0xcfb7c 를 따라 side 를 탄다 — 우타 (122, 224) · 좌타 (117, 224) (0x39504)', () => {
+    expect(stageLayoutOf(BATTER_SIDE.우타).judgeCenter).toEqual({ x: 122, y: 224 })
+    expect(stageLayoutOf(BATTER_SIDE.좌타).judgeCenter).toEqual({ x: 117, y: 224 })
   })
 
   it('모르는 side 는 좌타 배치로 떨어진다', () => {
