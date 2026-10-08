@@ -786,6 +786,23 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.league.wins.every((wins) => wins === 0)).toBe(true)
   })
 
+  it('한국시리즈 보상은 결산을 닫는 그 자리에서 더한다 — [197] 이 닫힐 때 0x85ec 가 더하고 곧장 0x87b4', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    const 전 = result.current.state!.record
+
+    act(() => result.current.actions.finishSeason({ popularity: 25, reputation: 30, money: 40, gamePoint: 0, messageId: 197 }))
+
+    const 후 = result.current.state!.record
+    expect(후.yearIndex).toBe(2)
+    expect(후.popularity).toBe(전.popularity + 25)
+    expect(후.reputation).toBe(전.reputation + 30)
+    expect(후.money).toBe(전.money + 40)
+  })
+
   it('**마지막 해(연차 idx 9)** 는 결산을 닫으면 새 해가 아니라 엔딩(0xf5)으로 간다 (0x6e0c 머리)', () => {
     const { result } = 띄우기()
     시작(result, 0)

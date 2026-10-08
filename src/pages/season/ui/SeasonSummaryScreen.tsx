@@ -57,8 +57,6 @@ export interface SeasonSummaryScreenProps {
    * null 이면 진입 효과가 아직 안 돌았다 — 아무것도 띄우지 않고 기다린다.
    */
   readonly entry: SeasonSummaryEntry | null
-  /** 한국시리즈 보상 적용 (`0x85ec` — 팝업 7 이 닫힐 때 인기도·평판·소지금을 더한다) */
-  readonly onApplyKoreanSeriesReward: (reward: SeasonReward) => void
   /**
    * 리그 1위 G 지급 — 원본은 StrMODE[223] 팝업을 띄우는 **그 자리에서** G·비트·저장을 한다(0x6a5e 팝업 뒤 0x6a64~,
    * 0x8892 뒤 0x8896~). 그래서 팝업이 뜰 때 부른다.
@@ -71,10 +69,12 @@ export interface SeasonSummaryScreenProps {
    */
   readonly onContinuePostseason?: () => void
   /**
-   * 보상까지 다 끝났다 — 다음은 `afterKoreanSeries(record)` 가 고른다
-   * (연차 idx **짝수** → 0xf2 국가대항전 안내 · 홀수 → 새 해 `0x6e0c`).
+   * 결산을 닫는다(`0x87b4`) — 연차 idx **짝수** → 0xf2 국가대항전 안내 · 홀수 → 새 해 `0x6e0c`.
+   * `reward` 는 한국시리즈 보상이다: 원본 `0x85ec` 는 보상 팝업 [197]/[198](꼬리표 9·10)이 **닫힐 때** 인기도·평판·소지금을
+   * 더하고(0x86dc~ · 0x8752~, 저장 없음) 곧장 0x87b4 로 간다. 그래서 더하기와 결산 닫기는 한 덩어리다 — 보상 팝업을 띄운 채
+   * 끄면 보상은 남지 않는다. 3위 아래(보상 없음)는 null.
    */
-  readonly onFinish: () => void
+  readonly onFinish: (reward: SeasonReward | null) => void
   /** 머리띠 G포인트 */
   readonly gamePoint?: number
 }
@@ -112,7 +112,7 @@ const NO_CHAMPION = 0xf
 export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
   const {
     record, series, postseasonRank, leagueFirstAwardedBits, entry,
-    onApplyKoreanSeriesReward, onLeagueFirstAward, onContinuePostseason, onFinish, gamePoint = 0,
+    onLeagueFirstAward, onContinuePostseason, onFinish, gamePoint = 0,
   } = props
 
   const [phase, setPhase] = useState<Phase>('대진표')
@@ -199,12 +199,11 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
           text={formatted(TEXT.champion, [championName])}
           buttons={['OK']}
           onAnswer={() => {
-            // 팝업 7 이 닫힐 때 보상이 붙는다 (0x85ec). 3위 아래는 문구도 보상도 없이 곧장 0x87b4
+            // 팝업 7 이 닫히면 0x85ec 가 순위로 [197]/[198] 을 띄운다(보상은 아직 — 그 팝업이 닫힐 때). 3위 아래는 곧장 0x87b4
             if (reward.messageId === 0) {
-              onFinish()
+              onFinish(null)
               return
             }
-            onApplyKoreanSeriesReward(reward)
             setPhase('한국시리즈보상')
           }}
         />
@@ -219,8 +218,8 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
             reward.money * MILLION_TO_TEN_THOUSAND,
           ])}
           buttons={['OK']}
-          // 꼬리표 9·10 이 닫히면 0x87b4 — 리그 1위 G 검사 없이 결산을 닫는다
-          onAnswer={onFinish}
+          // 꼬리표 9·10 이 닫히면 보상을 더하고(0x86dc~ · 0x8752~) 곧장 0x87b4 — 리그 1위 G 검사 없이 결산을 닫는다
+          onAnswer={() => onFinish(reward)}
         />
       )}
     </RawScreen>

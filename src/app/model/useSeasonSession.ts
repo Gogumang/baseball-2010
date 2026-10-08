@@ -86,7 +86,7 @@ import {
   opensSeasonAutobotBat,
 } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
-import type { LeagueFirstAward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
+import type { LeagueFirstAward, SeasonReward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import {
   SEASON_AWARD_INTRO_EVENT_ID, SEASON_MVP_LEADER_KINDS, seasonMvpResultEventId, seasonTitleResultEventId,
 } from '@/widgets/season/lib/seasonAwardEvents'
@@ -441,8 +441,11 @@ export interface SeasonActions {
    * SR+0x1bc = 1 · 저장 · 관리 메뉴 0xc9
    */
   readonly finishEnding: () => void
-  /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
-  readonly finishSeason: () => void
+  /**
+   * 결산을 닫았다(`0x87b4`) — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries).
+   * `reward` 는 [197]/[198] 팝업이 닫힐 때 0x85ec 가 더하는 한국시리즈 보상 — 더하기와 0x87b4 가 한 덩어리다
+   */
+  readonly finishSeason: (reward?: SeasonReward | null) => void
   /**
    * 이벤트 재생 0xd3 이 끝났다 — 지나온 보상(명령 7)과 본 이벤트를 받아 적용하고, 392 면 목표 결과 393~396 을
    * 이어 틀고, 아니면 돌아갈 상태로 간다.
@@ -2439,13 +2442,17 @@ export function useSeasonSession(
    * 이벤트 500("시즌모드 10년은 모두 종료") 재생(0xd3)도 시즌 이벤트 흐름이 아직 없어 건너뛰고
    * 곧장 0xf5 로 간다 — **근사다**.
    */
-  const finishSeason = useCallback(() => {
+  const finishSeason = useCallback((reward?: SeasonReward | null) => {
     if (save === null) return
-    const { record } = save.state
+    // 0x85ec 꼬리표 9·10 — 보상 팝업이 닫힐 때 인기도·평판·소지금을 더하고(저장 없음) 곧장 0x87b4 (0x86dc~ · 0x8752~)
+    const rewarded = reward === undefined || reward === null
+      ? save
+      : { ...save, state: { ...save.state, record: applySeasonReward(save.state.record, reward) } }
+    const { record } = rewarded.state
     if (isSeasonNationalCupYear(record.yearIndex)) {
       commit({
-        ...save,
-        state: { ...save.state, record: { ...record, nationalCup: true } },
+        ...rewarded,
+        state: { ...rewarded.state, record: { ...record, nationalCup: true } },
         cup: createNationalCup(),
         // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다
         cupRoster: tableRosterOf(KOREA_TEAM_ID),
@@ -2453,7 +2460,7 @@ export function useSeasonSession(
       // 0xf2 진입 0xe5f8: SR+0x12c = 1 · 461 을 틀고 · 대회 초기화 · 저장 · [다음 0xf3] (e600~e64c)
       return startEvent(NATIONAL_CUP_INTRO_EVENT_ID, SEASON_SCENE_STATE.국가대항전)
     }
-    const next = nextYearOf(save)
+    const next = nextYearOf(rewarded)
     commit(next.save)
     // 엔딩 갈래는 500 을 틀고 [다음 0xf5] (6e54~6e76)
     if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)

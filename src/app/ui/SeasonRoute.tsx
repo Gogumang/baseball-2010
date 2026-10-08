@@ -33,7 +33,7 @@ import { SEASON_PLAYABLE_EVENTS, YEAR_GOAL_EVENT_ID } from '@/entities/season-mo
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { SEASON_YEAR_GOAL_LABEL_SET } from '@/pages/story/lib/yearGoalWindow'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
-import { applySeasonReward, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
+import { judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
@@ -908,7 +908,6 @@ export function SeasonRoute({
         postseasonRank={postseasonRankOf(series, state.record.teamId)}
         leagueFirstAwardedBits={session.leagueFirstAwardedBits}
         entry={session.summaryEntry}
-        onApplyKoreanSeriesReward={(reward) => actions.updateRecord(applySeasonReward(state.record, reward))}
         onLeagueFirstAward={actions.awardLeagueFirst}
         onContinuePostseason={actions.continuePostseason}
         onFinish={actions.finishSeason}

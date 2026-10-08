@@ -35,7 +35,6 @@ const 확인 = () => fireEvent.click(screen.getByRole('button', { name: 'OK' }))
 
 describe('한국시리즈 우승 보상', () => {
   it('우승이면 [137] → [197] 인기도 +25 · 평판 +30 · 소지금 +4000만 이다', () => {
-    const onApply = vi.fn()
     const onFinish = vi.fn()
     render(
       <SeasonSummaryScreen
@@ -44,7 +43,6 @@ describe('한국시리즈 우승 보상', () => {
         postseasonRank={0}
         leagueFirstAwardedBits={0}
         entry={null}
-        onApplyKoreanSeriesReward={onApply}
         onLeagueFirstAward={vi.fn()}
         onFinish={onFinish}
       />,
@@ -55,9 +53,8 @@ describe('한국시리즈 우승 보상', () => {
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain(TEAMS[0].name)
 
     확인()
-    expect(onApply).toHaveBeenCalledWith({
-      popularity: 25, reputation: 30, money: 40, gamePoint: 0, messageId: 197,
-    })
+    // 보상은 [137] 이 닫힐 때가 아니라 [197] 이 닫힐 때 더한다 (0x85ec 꼬리표 9 갈래 0x86dc~)
+    expect(onFinish).not.toHaveBeenCalled()
     // 문구의 소지금은 만원 단위 — 40 × 100 = 4000
     const 보상글 = screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
     expect(보상글).toContain('인기도 +25')
@@ -65,11 +62,13 @@ describe('한국시리즈 우승 보상', () => {
     expect(보상글).toContain('4000만')
 
     확인()
-    expect(onFinish).toHaveBeenCalled()
+    expect(onFinish).toHaveBeenCalledWith({
+      popularity: 25, reputation: 30, money: 40, gamePoint: 0, messageId: 197,
+    })
   })
 
   it('준우승이면 [198] 15 · 15 · 1500만 이다', () => {
-    const onApply = vi.fn()
+    const onFinish = vi.fn()
     render(
       <SeasonSummaryScreen
         record={기록()}
@@ -77,32 +76,6 @@ describe('한국시리즈 우승 보상', () => {
         postseasonRank={1}
         leagueFirstAwardedBits={0}
         entry={null}
-        onApplyKoreanSeriesReward={onApply}
-        onLeagueFirstAward={vi.fn()}
-        onFinish={vi.fn()}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: '결과' }))
-    확인()
-
-    expect(onApply).toHaveBeenCalledWith({
-      popularity: 15, reputation: 15, money: 15, gamePoint: 0, messageId: 198,
-    })
-    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('1500만')
-  })
-
-  it('3위 아래면 보상 문구도 보상도 없이 바로 끝난다', () => {
-    const onApply = vi.fn()
-    const onFinish = vi.fn()
-    render(
-      <SeasonSummaryScreen
-        record={기록()}
-        series={우승시리즈()}
-        postseasonRank={2}
-        leagueFirstAwardedBits={0}
-        entry={null}
-        onApplyKoreanSeriesReward={onApply}
         onLeagueFirstAward={vi.fn()}
         onFinish={onFinish}
       />,
@@ -111,8 +84,31 @@ describe('한국시리즈 우승 보상', () => {
     fireEvent.click(screen.getByRole('button', { name: '결과' }))
     확인()
 
-    expect(onApply).not.toHaveBeenCalled()
-    expect(onFinish).toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('1500만')
+    확인()
+    expect(onFinish).toHaveBeenCalledWith({
+      popularity: 15, reputation: 15, money: 15, gamePoint: 0, messageId: 198,
+    })
+  })
+
+  it('3위 아래면 보상 문구도 보상도 없이 바로 끝난다', () => {
+    const onFinish = vi.fn()
+    render(
+      <SeasonSummaryScreen
+        record={기록()}
+        series={우승시리즈()}
+        postseasonRank={2}
+        leagueFirstAwardedBits={0}
+        entry={null}
+        onLeagueFirstAward={vi.fn()}
+        onFinish={onFinish}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    확인()
+
+    expect(onFinish).toHaveBeenCalledWith(null)
   })
 })
 
@@ -129,7 +125,6 @@ describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 �
         postseasonRank={2}
         leagueFirstAwardedBits={0}
         entry={진입(1)}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={onFinish}
       />,
@@ -163,7 +158,6 @@ describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 �
         postseasonRank={2}
         leagueFirstAwardedBits={bits}
         entry={진입(serial)}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={vi.fn()}
       />
@@ -201,7 +195,6 @@ describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 �
         postseasonRank={2}
         leagueFirstAwardedBits={0b1}
         entry={진입(1)}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={vi.fn()}
       />,
@@ -220,7 +213,6 @@ describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 �
         postseasonRank={2}
         leagueFirstAwardedBits={0}
         entry={null}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={vi.fn()}
       />,
@@ -239,7 +231,6 @@ describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 �
         postseasonRank={0}
         leagueFirstAwardedBits={0}
         entry={null}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={onFinish}
       />,
@@ -264,7 +255,6 @@ describe('0x29 가 새로 열린 결산 진입 (0x69ce → 0x6ac8 · 닫힘 0x87
         postseasonRank={2}
         leagueFirstAwardedBits={0}
         entry={{ serial: 1, opensAutobotBat: true }}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={onAward}
         onFinish={onFinish}
       />,
@@ -313,7 +303,6 @@ describe('아직 안 끝난 포스트시즌', () => {
         postseasonRank={0}
         leagueFirstAwardedBits={0}
         entry={null}
-        onApplyKoreanSeriesReward={vi.fn()}
         onLeagueFirstAward={vi.fn()}
         onContinuePostseason={onContinue}
         onFinish={vi.fn()}
@@ -332,7 +321,7 @@ describe('머리띠·바닥 (0xef — 0x853ac 끝 0x7f4ec)', () => {
   it('시즌모드 제목(그림 22) · 바닥 1 — 되돌아가기가 없다', () => {
     const { container } = render(
       <SeasonSummaryScreen record={기록()} series={우승시리즈()} postseasonRank={0} leagueFirstAwardedBits={0}
-        entry={null} onApplyKoreanSeriesReward={vi.fn()} onLeagueFirstAward={vi.fn()} onFinish={vi.fn()} />,
+        entry={null} onLeagueFirstAward={vi.fn()} onFinish={vi.fn()} />,
     )
     expect(container.querySelector('img[src*="game_frame/022"]')).not.toBeNull()
     expect(screen.queryByRole('button', { name: '되돌아가기' })).toBeNull()
