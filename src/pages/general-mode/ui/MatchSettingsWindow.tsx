@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button, MessageBox } from '@/shared/ui'
 import {
   MATCH_SETTING_KIND,
+  confirmedMatchSettings,
   hasAnyDetailSelection,
 } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -19,7 +20,7 @@ import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 export interface MatchSettingsWindowProps {
   /** 창을 열 때 저장(모드 칸 m = 0, 일반)에서 복사해 온 값 — 0x5fef4 */
   readonly settings: MatchProgressSettings
-  /** 확인창에서 "예" — 저장 칸에 되쓴다 (0x60376) */
+  /** 확인창에서 "예" — 저장 칸에 되쓴다 (0x60376). 상세 비트는 종류가 상세일 때만 바뀐다(`confirmedMatchSettings`) */
   readonly onConfirm: (settings: MatchProgressSettings) => void
   /** CLR — 창만 닫는다. **저장하지 않는다** */
   readonly onCancel: () => void
@@ -182,7 +183,8 @@ export function MatchSettingsWindow({ settings, onConfirm, onCancel }: MatchSett
           buttons={['예', '아니오']}
           onAnswer={(index) => {
             setPopup(null)
-            if (index === 0) onConfirm(draft)
+            // 0x603b0: 상세 비트는 종류가 상세(2)일 때만 되쓴다
+            if (index === 0) onConfirm(confirmedMatchSettings(settings, draft))
           }}
         />
       )}

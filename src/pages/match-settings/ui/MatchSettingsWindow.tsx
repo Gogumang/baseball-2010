@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
-import { MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
+import { MATCH_SETTING_KIND, confirmedMatchSettings } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   CHANCE_VALUE_COUNT, DETAIL_ROW, DETAIL_ROW_COUNT, INNING_VALUE_COUNT, KIND_COUNT,
@@ -55,7 +55,8 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
   const apply = (action: MatchSettingsAction) => {
     if (action.kind === '유지') return setState(action.state)
     if (action.kind === '닫기') return onClose()
-    onConfirm(action.settings)
+    // 0x603b0: 상세 비트는 종류가 상세(2)일 때만 저장 칸에 되쓴다 — 나머지는 창을 열 때의 저장 값 그대로
+    onConfirm(confirmedMatchSettings(settings, action.settings))
   }
   const press = (key: MatchSettingsKey) => apply(pressMatchSettingsKey(state, key))
   /** 커서를 그 자리로 옮기고 OK — 마우스 한 번이 원본 키 두 번을 대신한다 */

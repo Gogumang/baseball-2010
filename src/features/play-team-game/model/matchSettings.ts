@@ -172,3 +172,20 @@ export function hasAnyDetailSelection(settings: MatchProgressSettings): boolean 
     settings.defenseRunnerBits !== 0
   )
 }
+
+/**
+ * **확인창 "예" 의 되쓰기** (0x60376~0x603e8, 직접 떴다) — 창 칸에서 저장 칸으로 옮기는 것은:
+ * ```
+ * 6039c  +0x12c+m = 창 +0x2bc(종류)       603ac  +0x146+m = 창 +0x2bd(값)
+ * 603b0  종류 == 2(상세)일 때만 → +0x120+2m · +0x124+2m · +0x128+m · +0x12a+m = 창의 네 비트 묶음
+ * ```
+ * 곧 찬스·이닝으로 확인하면 상세 비트는 **저장에 있던 그대로** 남는다 — 창에서 상세에 들어가 비트를 고쳤다가
+ * 종류를 바꿔 확인해도 고친 비트는 버려진다. `saved` 는 창을 열 때(0x5fef4) 복사해 온 저장 칸 값이다.
+ */
+export function confirmedMatchSettings(
+  saved: MatchProgressSettings,
+  draft: MatchProgressSettings,
+): MatchProgressSettings {
+  if (draft.kind === MATCH_SETTING_KIND.상세) return draft
+  return { ...saved, kind: draft.kind, value: draft.value }
+}
