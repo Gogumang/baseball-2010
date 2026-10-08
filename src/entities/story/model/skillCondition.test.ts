@@ -150,6 +150,20 @@ describe('조건 20 — 기록 · 카운터로 얻는 스킬 (0xad474 ~ 0xad7cc 
   })
 })
 
+describe('바이트 칸 읽기 — 원본 그대로 넘친다', () => {
+  it('18·19·20 의 칸별 시즌 훈련 수는 u8 통산 − s8 사본 (0xad87e) — 256 회째에 0 으로 돈다', () => {
+    const 약함 = { hit: 400, power: 400, defense: 400, run: 400 }
+    // 통산 256 = u8 0, 사본 0 → 0 회로 읽혀 똑딱이(파워 훈련 0) 조건을 통과한다
+    const 넘침 = 선수({ skillIds: [], gamesPlayed: 20, ability: 약함, trainingCounts: { 파워: 256 } })
+    expect(meetsSkillAcquireCondition(넘침, 값(19), undefined)).toBe(true)
+  })
+
+  it('먹튀 해제는 s8 경기 수 · s16 합으로 읽는다 (0xad9ce)', () => {
+    // 합 32768 은 s16 로 −32768 이라 평균이 음수 — 풀리지 않는다
+    expect(meetsSkillReleaseCondition(선수({ skillIds: [2], moneyGrubberGames: 5, moneyGrubberPopularityGain: 32768 }), 값(2))).toBe(false)
+  })
+})
+
 describe('조건 21 — 스킬 해제', () => {
   it('하위 표 0xd8454 의 6~17(14 는 모드 4 갈래)은 가지고 있으면 곧 통과', () => {
     for (const id of [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {

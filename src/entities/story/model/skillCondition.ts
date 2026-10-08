@@ -1,5 +1,5 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { hasSkill, seasonTrainingCountOf, yearlyStatsOf } from '@/entities/career/model/playerCareer'
+import { hasSkill, yearlyStatsOf } from '@/entities/career/model/playerCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
@@ -122,6 +122,13 @@ function batterCareerTotalOf(career: PlayerCareer): Pick<SeasonStats, 'hits' | '
 /** 0xb63c0(내 타자 레코드 0x1fc20) — 마선수가 아니면 폼 & 1 = 좌타(웹 `battingSide` 1) */
 const isLeftHanded = (career: PlayerCareer) => career.battingSide === 1
 
+/**
+ * 칸 하나의 이번 시즌 훈련 수 — 0xad87e~0xad88a: `u8 S+0x4b+s − s8 S+0x6b+s` (18 · 19 · 20 공용). 256 회째에 0 으로 돌고 사본이
+ * 128 을 넘으면 음수로 읽힌다(원본 그대로 — 몹쓸몸 · 유리몸의 T 와 같은 읽기)
+ */
+const seasonTrainingByteCountOf = (career: PlayerCareer, menuId: string) =>
+  toUint8(career.trainingCounts[menuId] ?? 0) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
+
 /** 조건표를 옮긴 스킬 — 나머지는 아직 판정하지 않는다 */
 const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: RandomPort | undefined) => boolean>> = {
   // 3 몹쓸몸 — 0xa4f31 불발 → 평균실효 ≤ 700 이고 (g==12 && T==0 | g==28 && T≤1 | g==42 && T≤2) (0xad2e6)
@@ -181,20 +188,20 @@ const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: Rand
     !wasRemoved(career, 18) &&
     equippedAbilityOf(career).hit <= 600 &&
     career.gamesPlayed === 40 &&
-    seasonTrainingCountOf(career, TRAINING.히트) <= 1,
+    seasonTrainingByteCountOf(career, TRAINING.히트) <= 1,
   // 19 똑딱이 — 0xa4f31 불발 → 파워 실효 ≤ 600, g==20, 이번 시즌 파워 훈련 0 (0xad8c8)
   19: (career) =>
     !wasRemoved(career, 19) &&
     equippedAbilityOf(career).power <= 600 &&
     career.gamesPlayed === 20 &&
-    seasonTrainingCountOf(career, TRAINING.파워) === 0,
+    seasonTrainingByteCountOf(career, TRAINING.파워) === 0,
   // 20 에러왕 — 0xa4f31 불발 → 연차 ≥ 3, 수비 실효 ≤ 400, g==30, 이번 시즌 수비 훈련 0 (0xad93a)
   20: (career) =>
     !wasRemoved(career, 20) &&
     yearIndexOf(career) >= 3 &&
     equippedAbilityOf(career).defense <= 400 &&
     career.gamesPlayed === 30 &&
-    seasonTrainingCountOf(career, TRAINING.수비) === 0,
+    seasonTrainingByteCountOf(career, TRAINING.수비) === 0,
 }
 
 /**
@@ -208,10 +215,11 @@ const CONSECUTIVE_TRAINING_LIMIT = 7
 
 /** 해제 조건을 옮긴 스킬 */
 const RELEASE_RULES: Readonly<Record<number, (career: PlayerCareer) => boolean>> = {
-  // 2 먹튀 — 먹튀를 가진 뒤 5경기 이상이고, 경기당 인기도 변화 평균 > 3 (0xad9ce)
+  // 2 먹튀 — s8 +0x1cd(먹튀를 가진 뒤 경기 수) > 4 이고 s16 +0x1c0(그동안 인기도 변화 합) / +0x1cd > 3 (0xad9ce — ldrsb ·
+  // ldrsh, 0 쪽 버림 나눗셈 0xca7b5). 칸이 넘치면 음수로 읽힌다(원본 그대로)
   2: (career) =>
-    career.moneyGrubberGames >= 5 &&
-    Math.trunc(career.moneyGrubberPopularityGain / career.moneyGrubberGames) > 3,
+    toInt8(career.moneyGrubberGames) > 4 &&
+    Math.trunc(toInt16(career.moneyGrubberPopularityGain) / toInt8(career.moneyGrubberGames)) > 3,
   // 5 무력감 — 경기 뒤 사기 ≥ 90 인 경기가 연속 6회 (+0x1c7 > 5)
   5: (career) => career.highMoraleStreak > 5,
   // 3 몹쓸몸 — 몹쓸몸을 가진 채로 훈련 6회 (+0x75 > 5)

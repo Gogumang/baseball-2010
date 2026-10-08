@@ -1,7 +1,7 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { equippedPitcherAbilityOf, GAMES_PER_SEASON, pitcherYearlyStatsOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
-import { seasonPitcherTrainingCountOf, seasonPitcherTrainingTotalOf } from '@/entities/pitcher-career/model/pitcherManagement'
+import { seasonPitcherTrainingTotalOf } from '@/entities/pitcher-career/model/pitcherManagement'
 import {
   illnessChanceOf,
   isIllnessCooldownBlocked,
@@ -150,6 +150,10 @@ function mvpSeasonCountOf(bits: number): number {
 }
 const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
 
+/** 칸 하나의 이번 시즌 훈련 수 — `u8 S+0x4b+s − s8 S+0x6b+s` (0xad87e~0xad88a, 깃털 0xad91a 도 같은 읽기) */
+const seasonTrainingByteCountOf = (career: PitcherCareer, menuId: string) =>
+  ((career.trainingCounts[menuId] ?? 0) & 0xff) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
+
 /**
  * 투수 통산 `0x9da28` 의 +4(Σ +0x24 세이브) · +0xe(Σ s8 +0x2e 승) — 지난 해 0x1fa78(i)(i < 연차idx)와 이번 해 0x1fbd0 을 s32 로
  * 더해 strh, 조건은 ldrh 뒤 s16 으로 읽는다. 지난 해 기록(`yearlyStats`)이 연차만큼 없는 옛 저장은 통산(`careerStats`)으로 읽는다.
@@ -278,7 +282,7 @@ function acquiresPitcherSkill(career: PitcherCareer, skill: number, random: Rand
         yearIndex > 2 &&
         equippedPitcherAbilityOf(career).breaking <= 500 &&
         g === 30 &&
-        seasonPitcherTrainingCountOf(career, PITCHER_ABILITY_NAMES[2]) === 0
+        seasonTrainingByteCountOf(career, PITCHER_ABILITY_NAMES[2]) === 0
       )
     case PITCHER_SKILL.더티볼:
       // 0xad93a: 해제 기록만 보고, 모드 ≠ 4 는 곧 통과 (0xad952)
@@ -292,8 +296,9 @@ function acquiresPitcherSkill(career: PitcherCareer, skill: number, random: Rand
 function releasesPitcherSkill(career: PitcherCareer, skill: number): boolean {
   // 2 먹튀 (0xad9ce): s8 +0x1cd > 4 이고 s16 +0x1c0 / +0x1cd (0 쪽 버림, 0xca7b5) > 3
   if (skill === PITCHER_SKILL.먹튀) {
-    const games = career.moneyGrubberGames ?? 0
-    return games > 4 && Math.trunc((career.moneyGrubberPopularityGain ?? 0) / games) > 3
+    // ldrsb · ldrsh — 넘치면 음수로 읽힌다(원본 그대로)
+    const games = toInt8(career.moneyGrubberGames ?? 0)
+    return games > 4 && Math.trunc(toInt16(career.moneyGrubberPopularityGain ?? 0) / games) > 3
   }
   // 5 무력감 (0xada0e): s8 +0x1c7 > 5
   if (skill === PITCHER_SKILL.무력감) return (career.highMoraleStreak ?? 0) > 5
