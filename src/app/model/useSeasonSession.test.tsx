@@ -286,6 +286,19 @@ describe('시즌 세션', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.시즌결산)
   })
 
+  it('0xe9·0xf1 동안 phase 는 경기 끝의 2 그대로라 0xf1 에서 끄고 이어하면 0xe9 로 다시 온다 — 원본 그대로', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    act(() => result.current.actions.finishGame(요약()))
+    act(() => result.current.actions.confirmIncome(result.current.state!.record))
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기뒤마무리)
+    expect(result.current.state?.record.phase).toBe(SEASON_PHASE.경기끝)
+    expect(띄우기(store).result.current.scene).toBe(SEASON_SCENE_STATE.관중수입)
+  })
+
   it('수입을 확인하면 2경기 주기에 따라 다음이 갈린다 (afterGameNext)', () => {
     const { result } = 띄우기()
     시작(result, 0)

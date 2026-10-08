@@ -390,7 +390,9 @@ export interface SeasonActions {
   readonly runTraining: (slot: number) => void
   /** 훈련 결과 팝업 키 0xf2c8 의 확인 · 취소 — 팝업을 닫고(0x742a9) 관리 메뉴 0xc9 */
   readonly closeTrainingResult: () => void
-  /** 시즌 외출 한 번 — 굴리고 적용한다 (연출 0xe3 → 결과 0xc81c) */
+  /** 외출 지도 확인 팝업 0x16 에 "예" — 0x4a94: 장소를 넘기고 연출 0xe3 으로 */
+  readonly enterOuting: (place: number) => void
+  /** 외출 결과 0xc81c — 연출이 끝난 틀에 굴리고 적용 · SR+4 = 1 · 저장하고 결과 팝업 0x17 을 띄운다 */
   readonly runOuting: (place: number) => void
   /**
    * 경기 결과 화면 확인 — 정산 진입(`enterGameSettlement`)이 정해 둔 장면으로 간다(정규는 관중수입 0xe9). 정산 진입을
