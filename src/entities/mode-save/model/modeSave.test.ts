@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  withAceMatchCleared,
+  withAceMatchHeld,
   EMPTY_MODE_SAVE,
   normalizeModeSave,
   withGeneralGameFinished,
@@ -75,5 +77,16 @@ describe('모드 저장 칸 — 전역기록 +0x3c · +0x4d · 모드 1 블록',
       const 나리 = withNariGameStarted(EMPTY_MODE_SAVE, 3, {})
       expect(withGeneralGameFinished(나리).nariGames[3].isInProgress).toBe(true)
     })
+  })
+})
+
+describe('나간 마선수 대결 대기 — 전역기록 g[0x11f](타자편) · g[0x176](투수편) 묶음 (SYS 8 → 140)', () => {
+  it('SYS 8 이 편마다 적고 140 이 지운다 · 다시 읽어도 남는다 · 옛 세이브는 없음', () => {
+    const held = withAceMatchHeld(EMPTY_MODE_SAVE, 3, [124, 125])
+    expect(held.aceMatchPending).toEqual({ 3: [124, 125], 4: null })
+    expect(normalizeModeSave(JSON.parse(JSON.stringify(held))).aceMatchPending).toEqual({ 3: [124, 125], 4: null })
+    expect(withAceMatchCleared(held, 3).aceMatchPending).toEqual({ 3: null, 4: null })
+    expect(withAceMatchCleared(EMPTY_MODE_SAVE, 4)).toBe(EMPTY_MODE_SAVE)
+    expect(normalizeModeSave({ lastPlayedMode: 4 }).aceMatchPending).toEqual({ 3: null, 4: null })
   })
 })

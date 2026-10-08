@@ -19,6 +19,8 @@ import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
@@ -945,26 +947,48 @@ describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 
 })
 
 describe('나간 마선수 대결 (SYS 8 0x8d782~ · 0x40140 · 105 진입 0x11b46~0x11bbe · 140 0x10df8)', () => {
-  it('SYS 8 이 결과 이벤트 칸을 저장하고, 결과 이벤트(140)가 열리면 지운다', () => {
-    const rendered = 띄우기({ ...createCareer('대결'), morale: 50 })
+  /** 전역기록 대기 칸 — 모드 저장(`useModeSave`)의 타자편 손잡이와 같은 꼴 */
+  const 대기칸 = (start: readonly number[] | null = null) => {
+    const port = createMemoryAceMatchPendingPort()
+    if (start !== null) port.hold(start)
+    return port
+  }
+  const 대기띄우기 = (saved: PlayerCareer, aceMatchPending: AceMatchPendingPort) => {
+    const saveGame = 메모리저장(saved)
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen, aceMatchPending }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    return rendered
+  }
+
+  it('SYS 8 이 결과 이벤트 칸을 전역기록에 적고(커리어는 본 표시), 결과 이벤트(140)가 열리면 지운다', () => {
+    const port = 대기칸()
+    const rendered = 대기띄우기({ ...createCareer('대결'), morale: 50 }, port)
     act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 113, context: '장소' }))
     act(() => rendered.result.current.session.actions.holdAceMatch([114, 115], [113]))
-    expect(rendered.result.current.session.career?.pendingAceMatchResultEvents).toEqual([114, 115])
+    expect(port.read()).toEqual([114, 115])
     expect(rendered.result.current.session.career?.seenEventIds).toContain('113')
     act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 114, context: '대결결과' }))
-    expect(rendered.result.current.session.career?.pendingAceMatchResultEvents).toBeUndefined()
+    expect(port.read()).toBeNull()
   })
 
   it('나간 뒤 105 에 들어오면 진 결과 이벤트(resultEvents[1])를 대결결과로 띄운다 — 부상 엔딩 다음, 115 앞', async () => {
-    const rendered = 띄우기({
-      ...createCareer('대결'),
-      seenEventIds: [String(451)],
-      hasSeenYearGoalWindow: false,
-      pendingAceMatchResultEvents: [114, 115],
-    })
+    const port = 대기칸([114, 115])
+    const rendered = 대기띄우기({ ...createCareer('대결'), seenEventIds: [String(451)], hasSeenYearGoalWindow: false }, port)
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
     await waitFor(() => expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', eventId: 115, context: '대결결과' }))
-    expect(rendered.result.current.session.career?.pendingAceMatchResultEvents).toBeUndefined()
+    expect(port.read()).toBeNull()
+  })
+
+  it('대기는 전역기록이라 대결을 연 선수가 아닌 새 선수의 105 에서도 뜬다 (원본 그대로)', async () => {
+    const port = 대기칸([114, 115])
+    const rendered = 대기띄우기({ ...createCareer('새선수'), seenEventIds: [String(451)], hasSeenYearGoalWindow: false }, port)
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', eventId: 115, context: '대결결과' }))
   })
 })
 

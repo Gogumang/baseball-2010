@@ -132,7 +132,7 @@ export function App() {
     [saveGame],
   )
   const modeSave = useModeSave(modeSaveStore, legacyLastPlayedMode)
-  const { setLastPlayedMode, startNariGame, clearNariGame } = modeSave
+  const { setLastPlayedMode, startNariGame, clearNariGame, aceMatchPendingPorts } = modeSave
   // 전역기록 +0x4f · +0x50 손잡이 — 나리 두 편 세션이 142 확인·등록·정산·지우기에서 쓴다
   const pitcherNariGameSave = useMemo<NariGameSavePort>(() => ({
     start: (match) => startNariGame(NARI_PITCHER_MODE, match),
@@ -207,6 +207,10 @@ export function App() {
     readPitcherOtherModes,
     nariOpenedAces,
     pitcherNariGameSave,
+    // 나간 마선수 대결 대기 — 전역기록 g[0x170] · g[0x172] · g[0x176] · g[0x177] (선수를 새로 만들어도 남는다)
+    aceMatchPendingPorts[NARI_PITCHER_MODE],
+    // 장면 0x106 은 떠나면 헐린다 — 투수편 화면이 서 있을 때만 105 도착 고리가 돈다
+    screen.kind === '투수편',
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null)
@@ -223,6 +227,8 @@ export function App() {
     readRegularSeasonOtherModes: readBatterOtherModes,
     openedAces: nariOpenedAces,
     nariGameSave: batterNariGameSave,
+    // 나간 마선수 대결 대기 — 전역기록 g[0xec] · g[0xee] · g[0x11f] · g[0x144] (선수를 새로 만들어도 남는다)
+    aceMatchPending: aceMatchPendingPorts[NARI_BATTER_MODE],
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다

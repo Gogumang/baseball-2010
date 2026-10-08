@@ -46,9 +46,11 @@ import { missionRunScoreBoardOf } from '@/pages/mission-play/lib/missionRunScore
  * 거짓 → 0). 플래그(g[0x11f] / g[0x176])도 1 로 남아, **그 편 나리에 다시 들어올 때** 105 진입이 상태 0x70(112) → 0x8c(140)으로
  * 가고 0x10df8 이 결과(0 = 짐)로 resultEvents[1] 을 0x8bdc9 로 부른 뒤 칸들을 지운다(타자편 10ebe~10f0c · 투수편 10f0e~).
  * 그 사이 보통 미션도 플래그를 본다(0xaa57c aa6e0 사람 칸 팀 · 0x4ef3e G 건너뜀 · 결과 판 대결 꼴 · 0x4ea0c 가 결과 바이트를 덮어씀).
- * 웹: 그 대기는 그 편 커리어 칸 `pendingAceMatchResultEvents`(SYS 8 자리에서 저장)가 들고, 105 진입(타자편 `useCareerSession` ·
- * 투수편 `usePitcherLeagueSession` 의 도착 고리)이 부상 엔딩 다음에 진 결과 이벤트를 띄우며 지운다. 나가기는 보통 미션처럼
- * 메인 메뉴로 간다 — 타자편 `quitBatterMission`, 투수편 `quitPitcherMission` + 투수편 세션 `quitAceMatch`.
+ * 웹: 그 대기는 전역기록 모델(`entities/mode-save` 의 `aceMatchPending` — SYS 8 자리에서 저장)이 편마다 들고, 105 진입(타자편
+ * `useCareerSession` · 투수편 `usePitcherLeagueSession` 의 도착 고리 — 투수편 화면이 서 있을 때만)이 부상 엔딩 다음에 진 결과
+ * 이벤트를 띄우며 지운다. 선수를 지우고 새로 만들어도 남는다. 나가기는 보통 미션처럼 메인 메뉴로 간다 — 타자편
+ * `quitBatterMission`, 투수편 `quitPitcherMission` + 투수편 세션 `quitAceMatch`.
+ * ⚠️ 미이식: 대기가 서 있는 동안의 보통 미션(0xaa57c 사람 칸 팀 · 0x4ef3e G 건너뜀 · 결과 판 대결 꼴 · 0x4ea0c 결과 바이트 덮어쓰기).
  */
 /**
  * 마선수 대결의 전역 기록 칸 — 타자편 대결은 SYS 8 이 g[0x11f] = 1, 투수편 대결은 g[0x176] = 1 을 적는다.

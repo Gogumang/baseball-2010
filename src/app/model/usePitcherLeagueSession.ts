@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import { pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
@@ -361,7 +363,7 @@ export interface PitcherLeagueSession {
     readonly finishAceMatch: (isWin: boolean) => void
     /**
      * 대결 경기 중 "나가기" 0x40140 — 플래그를 안 보고 메인 메뉴(0x103)로, 저장 없음. 부르는 쪽이 메인 메뉴로 간다.
-     * 대기 칸(`pendingAceMatchResultEvents`)은 남아 다음 105 진입이 진 결과 이벤트를 띄운다.
+     * 대기 칸(전역기록 — `aceMatchPending`)은 남아 다음 105 진입이 진 결과 이벤트를 띄운다.
      */
     readonly quitAceMatch: () => void
     readonly dismissStoryNotice: () => void
@@ -618,10 +620,24 @@ export function usePitcherLeagueSession(
    * 안 넘기면 아무 데도 안 쓴다.
    */
   nariGameSave?: NariGameSavePort,
+  /**
+   * 나간 마선수 대결 대기 칸 — 원본 **전역기록** g[0x170] · g[0x172] · g[0x176] · g[0x177](투수편, `entities/mode-save`
+   * `withAceMatchHeld`). 선수를 새로 만들어도 남는다. 안 넘기면 세션 메모리에만 든다.
+   */
+  aceMatchPending?: AceMatchPendingPort,
+  /**
+   * 지금 투수편 화면(장면 0x106)이 서 있나 — 원본은 장면을 떠나면 헐고 다시 들어올 때 100 → 105 진입을 다시 돈다. 메인 메뉴 등
+   * 다른 화면에 있는 동안 105 도착 고리(부상 엔딩 · 나간 대결 · 115 · 훑기)가 돌지 않게 한다. 안 넘기면 늘 서 있다.
+   */
+  isOnScreen = true,
 ): PitcherLeagueSession {
   /** 전역기록 +0x4f 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
   nariGameSaveRef.current = nariGameSave
+  /** 나간 마선수 대결 대기(전역기록) 손잡이 — 안 넘기면 세션 메모리 */
+  const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
+  const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
+  aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
   /** 띄울 때 저장에 들어 있던 G — 다리가 갈아 끼우기 전의 값이라 첫 렌더에서 떠 둔다 */
@@ -882,7 +898,7 @@ export function usePitcherLeagueSession(
   /** 112 다시 찍기(0x118e4) — 아래에서 정의되는 `enterOutingMap` 을 이 고리가 부른다 */
   const enterOutingMapRef = useRef<() => void>(() => {})
   useEffect(() => {
-    const isIdle = career !== null && scene === '관리' && story === null && fileEvents !== null
+    const isIdle = isOnScreen && career !== null && scene === '관리' && story === null && fileEvents !== null
     if (!isIdle) {
       wasIdleAtManagementRef.current = false
       return
@@ -909,15 +925,15 @@ export function usePitcherLeagueSession(
        */
       return openStory({ eventId: INJURY_ENDING_EVENT_ID, context: '관리', viewed: [] })
     }
-    const pendingResultEvents = career.pendingAceMatchResultEvents
-    if (pendingResultEvents !== undefined) {
+    const pendingResultEvents = aceMatchPendingRef.current.read()
+    if (pendingResultEvents !== null) {
       /*
        * **나간 마선수 대결** — 진입 곁가지 0x11b6c~0x11bbe: 전역 g[0x176] 이 서 있고 모드가 4 가 아니면 현재를 112(0x70)로 ·
        * 0x7e84d(그림, 0x70) · 0x118e4([!] 칸 다시 찍기) · 다음 140. 140 진입 0x10df8 이 결과 바이트 g[0x177](SYS 8 이 적은 0 이
        * 남았다 = 짐)으로 resultEvents[1] 을 0x8bdc9 로 틀고 칸들을 지운 뒤 전역기록을 저장한다(10f72) · [다음 114, 뒤 105].
        */
       enterOutingMapRef.current()
-      commit({ ...career, pendingAceMatchResultEvents: undefined })
+      aceMatchPendingRef.current.clear()
       return openStory({ eventId: matchResultEventOf(pendingResultEvents, false), context: '대결결과', viewed: [] })
     }
     if (!career.hasSeenYearGoalWindow) {
@@ -941,7 +957,7 @@ export function usePitcherLeagueSession(
       })
       openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
-  }, [career, commit, commitWith, fileEvents, openStory, random, scanAuto, scene, story])
+  }, [career, commitWith, fileEvents, isOnScreen, openStory, random, scanAuto, scene, story])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -1867,7 +1883,8 @@ export function usePitcherLeagueSession(
        * 0x1c014 가 떠나온 줄 본 표시(0x8b0e4) · 장소 끝 처리를 한다 — 대결을 나가도 이 칸들은 저장에 남는다.
        */
       const settled = story.context === '장소' ? settlePlaceForAceMatch(career, story.context) : career
-      commit({ ...markRewardedEvent(settled, null, carry.viewedEventIds), pendingAceMatchResultEvents: command.resultEvents })
+      aceMatchPendingRef.current.hold(command.resultEvents)
+      commit(markRewardedEvent(settled, null, carry.viewedEventIds))
       setStory(null)
       setAceMatch({ mission, resultEvents: command.resultEvents, carried: carry })
       setScene('마선수대결')
@@ -1885,9 +1902,7 @@ export function usePitcherLeagueSession(
       if (aceMatch === null) return
       setAceMatch(null)
       // 140 진입 0x10df8 — 대기 칸을 지우고 전역기록 저장(10f72)
-      if (career !== null && career.pendingAceMatchResultEvents !== undefined) {
-        commit({ ...career, pendingAceMatchResultEvents: undefined })
-      }
+      aceMatchPendingRef.current.clear()
       // 105 진입의 +0x176 갈래(0x11bb2)가 현재를 112 로 두고 0x118e4 — [!] 칸을 다시 찍는다(140 밑 지도가 이 값을 그린다)
       enterOutingMap()
       openStory({
@@ -1897,7 +1912,7 @@ export function usePitcherLeagueSession(
         carried: aceMatch.carried,
       })
     },
-    [aceMatch, career, commit, enterOutingMap, openStory],
+    [aceMatch, enterOutingMap, openStory],
   )
 
   const quitAceMatch = useCallback(() => {

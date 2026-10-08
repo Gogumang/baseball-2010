@@ -41,6 +41,37 @@ export interface ModeSave {
   readonly generalGame: unknown
   /** 전역기록 +0x4f(모드 3 나리 투수편) · +0x50(모드 4 나리 타자편) */
   readonly nariGames: Readonly<Record<NariLeagueMode, NariGameSave>>
+  /**
+   * **나간 마선수 대결의 결과 이벤트 대기** — 모드 4(타자편) g[0xec] · g[0xee](결과 이벤트 이김 · 짐) · g[0x11f](대기) · g[0x144](결과
+   * 바이트), 모드 3(투수편) g[0x170] · g[0x172] · g[0x176] · g[0x177]. 없으면 null (`withAceMatchHeld` 머리 주석).
+   */
+  readonly aceMatchPending: Readonly<Record<NariLeagueMode, readonly number[] | null>>
+}
+
+/**
+ * 나간 마선수 대결 대기 칸 손잡이 — 나리 두 편 세션이 SYS 8 · 105 진입 · 140 에서 쓴다 (`useModeSave` 가 편마다 세운다)
+ */
+export interface AceMatchPendingPort {
+  /** 지금 대기 중인 결과 이벤트 둘 [이김, 짐] — 없으면 null */
+  readonly read: () => readonly number[] | null
+  /** SYS 8 — 결과 이벤트 · 대기 1 · 결과 바이트 0 · 전역기록 저장 */
+  readonly hold: (resultEvents: readonly number[]) => void
+  /** 140 진입 0x10df8 — 칸을 지우고 전역기록 저장 */
+  readonly clear: () => void
+}
+
+/** 저장소 없이 메모리에만 드는 대기 칸 — 손잡이를 안 넘긴 세션(시험)이 쓴다 */
+export function createMemoryAceMatchPendingPort(): AceMatchPendingPort {
+  let pending: readonly number[] | null = null
+  return {
+    read: () => pending,
+    hold: (resultEvents) => {
+      pending = resultEvents
+    },
+    clear: () => {
+      pending = null
+    },
+  }
 }
 
 /** 나만의리그 모드 — 3 투수편 · 4 타자편 */
@@ -70,6 +101,7 @@ export const EMPTY_MODE_SAVE: ModeSave = {
   isGeneralGameInProgress: false,
   generalGame: null,
   nariGames: { 3: NO_NARI_GAME, 4: NO_NARI_GAME },
+  aceMatchPending: { 3: null, 4: null },
 }
 
 /** 원본 모드 번호 범위 — 0x327b8 의 점프표 0xcf048 은 1~9 */
@@ -101,7 +133,18 @@ export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_
     generalGame,
     // 옛 세이브(칸 없음)는 두 편 다 경기 저장 없음 — 예전 웹처럼 [최근게임]·[14] 가 나리 관리 장면으로 간다
     nariGames: { 3: normalizeNariGame(nari[3]), 4: normalizeNariGame(nari[4]) },
+    // 옛 세이브(칸 없음)는 대기 없음
+    aceMatchPending: {
+      3: normalizeAceMatchPending(value.aceMatchPending, 3),
+      4: normalizeAceMatchPending(value.aceMatchPending, 4),
+    },
   }
+}
+
+function normalizeAceMatchPending(raw: unknown, mode: NariLeagueMode): readonly number[] | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const events = (raw as Partial<Record<string, unknown>>)[mode]
+  return Array.isArray(events) && events.every((id) => typeof id === 'number' && Number.isInteger(id)) ? events : null
 }
 
 function normalizeNariGame(raw: unknown): NariGameSave {
@@ -153,4 +196,23 @@ export function withNariGameCleared(save: ModeSave, mode: NariLeagueMode): ModeS
   const current = save.nariGames[mode]
   if (!current.isInProgress && current.match === null) return save
   return { ...save, nariGames: { ...save.nariGames, [mode]: NO_NARI_GAME } }
+}
+
+/**
+ * **SYS 8 — 마선수 대결을 열며 대기 칸을 적는다** (0x8d764~0x8d846, 직접 떴다): 타자편(0x7b971 참) g[0xf7] = 팀 − 1 ·
+ * g[0xec]/g[0xee] = 결과 이벤트 · g[0x11f] = 1 · g[0x144] = 0, 투수편(0x7b985 참) g[0x175] · g[0x170]/g[0x172] · g[0x176] = 1 ·
+ * g[0x177] = 0 → 8d84a 전역기록 저장(0x1f1b9). 전역기록이라 그 편 선수를 지우고 새로 만들어도 남는다 — 대기 플래그를 0 으로
+ * 쓰는 곳은 140 진입 0x10df8(10ee0 · 10f38) 하나다(0x11f 리터럴 · `movs #0xbb ; lsls #1` 훑기: 그 밖은 읽기 — 105 진입 0x11b50 ·
+ * 0x11b76, 0x1cfee · 0x1fc42 · 0x1fbf2 · 0x407f0 · 0x4a384 · 0x4b100 · 0x4ea0c · 0xaa57c · 0xb8680). 모드 초기화 0x224ec 도 안 지운다.
+ * 웹은 결과 바이트(SYS 8 이 0 — 짐)가 늘 0 인 채로만 대기를 읽으므로 결과 이벤트 둘만 든다. 팀 칸(g[0xf7] · g[0x175])은
+ * 웹 미션 세션이 대결 미션으로 들고 있어 여기 담지 않는다.
+ */
+export function withAceMatchHeld(save: ModeSave, mode: NariLeagueMode, resultEvents: readonly number[]): ModeSave {
+  return { ...save, aceMatchPending: { ...save.aceMatchPending, [mode]: [...resultEvents] } }
+}
+
+/** **140 진입 0x10df8** — 결과 이벤트를 틀며 대기 칸을 지우고 전역기록을 저장한다(10f72) */
+export function withAceMatchCleared(save: ModeSave, mode: NariLeagueMode): ModeSave {
+  if (save.aceMatchPending[mode] === null) return save
+  return { ...save, aceMatchPending: { ...save.aceMatchPending, [mode]: null } }
 }

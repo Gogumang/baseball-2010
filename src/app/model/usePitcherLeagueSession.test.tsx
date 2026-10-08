@@ -15,6 +15,8 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { shopItemId } from '@/features/shop/model/shopSelection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
@@ -1216,9 +1218,17 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
     expect(result.current.story?.eventId).toBe(125)
   })
 
-  it('경기 중 "나가기" 0x40140 — 저장에 남은 대기(SYS 8)로 다음 105 진입이 112 → 140 진 결과 이벤트를 띄우고 칸을 지운다', async () => {
+  /** 전역기록 대기 칸(모드 저장 투수편 손잡이)과 화면이 서 있나를 넘겨 띄운다 */
+  const 대기띄우기 = (store: JsonStorePort, port: AceMatchPendingPort, isOnScreen = true) =>
+    renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
+      store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
+      port, onScreen,
+    ), { initialProps: { onScreen: isOnScreen } })
+
+  it('경기 중 "나가기" 0x40140 — 대기(SYS 8, 전역기록)는 남고 메인 메뉴에 있는 동안은 105 진입이 안 돈다 · 다시 들어오면 140 진 결과', async () => {
     const store = 메모리저장()
-    const { result } = 띄우기(store)
+    const port = createMemoryAceMatchPendingPort()
+    const { result, rerender } = 대기띄우기(store, port)
     act(() => result.current.actions.create('투수', 신인))
     await 이벤트불러오기(result)
     첫이벤트넘기기(result)
@@ -1226,31 +1236,43 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
     act(() => result.current.actions.openOuting())
     act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
     act(() => result.current.actions.beginAceMatch({ op: 'match', team: 20, resultEvents: [124, 125] }, { rewards: [], viewedEventIds: [123] }))
-    // SYS 8 — 결과 이벤트 칸 · 지금 이벤트 본 표시를 저장한다
-    expect(store.load()).toMatchObject({ pendingAceMatchResultEvents: [124, 125] })
+    // SYS 8 — 결과 이벤트 칸(전역기록) · 지금 이벤트 본 표시(커리어)를 저장한다
+    expect(port.read()).toEqual([124, 125])
     expect((store.load() as { seenEventIds: string[] }).seenEventIds).toContain('123')
 
-    // 나가기 — 플래그를 안 보고 메인 메뉴로(저장 없음). 장면 0x106 은 다시 100 → 0x1c154 로 선다(g 0 짝수 → 105)
+    // 나가기 — 메인 메뉴로(저장 없음). 투수편 화면이 없는 동안은 105 진입이 안 돈다(장면 0x106 은 헐렸다)
+    rerender({ onScreen: false })
     act(() => result.current.actions.quitAceMatch())
     expect(result.current.aceMatch).toBeNull()
-    expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
-    expect(store.load()).toMatchObject({ pendingAceMatchResultEvents: undefined })
+    expect(result.current.story).toBeNull()
+    expect(port.read()).toEqual([124, 125])
 
-    // 다시 켜도 칸은 지워졌다 — 결과 이벤트를 다시 안 튼다
-    const 다시 = 띄우기(store).result
-    await 이벤트불러오기(다시)
-    expect(다시.current.story?.eventId).not.toBe(125)
+    // 다시 들어오면 100 → 105 진입 — 112 → 140 진 결과 이벤트 · 칸 지움
+    rerender({ onScreen: true })
+    expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
+    expect(port.read()).toBeNull()
   })
 
   it('대결 중 꺼진 저장으로 띄워도 105 진입이 진 결과 이벤트를 띄운다 (부상 엔딩 다음 · 115 앞)', async () => {
     const store = 메모리저장()
-    const 첫판 = 띄우기(store).result
+    const port = createMemoryAceMatchPendingPort()
+    const 첫판 = 대기띄우기(store, port).result
     act(() => 첫판.current.actions.create('투수', 신인))
-    act(() => 첫판.current.actions.save({
-      ...첫판.current.career!, seenEventIds: ['451'], hasSeenYearGoalWindow: false, pendingAceMatchResultEvents: [124, 125],
-    }))
-    const result = 띄우기(store).result
+    act(() => 첫판.current.actions.save({ ...첫판.current.career!, seenEventIds: ['451'], hasSeenYearGoalWindow: false }))
+    port.hold([124, 125])
+    const result = 대기띄우기(store, port).result
     await 이벤트불러오기(result)
+    expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
+  })
+
+  it('대기는 전역기록이라 선수를 새로 만들어도 남아 새 선수의 105 에서 뜬다 (원본 그대로 — 지우는 곳은 140 하나)', async () => {
+    const port = createMemoryAceMatchPendingPort()
+    port.hold([124, 125])
+    const { result } = 대기띄우기(메모리저장(), port)
+    act(() => result.current.actions.create('투수', 신인))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
+    while (result.current.scene === '이벤트' && result.current.story?.context !== '대결결과') 이벤트끝내기(result)
     expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
   })
 })

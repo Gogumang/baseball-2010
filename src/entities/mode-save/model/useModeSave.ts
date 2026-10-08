@@ -10,8 +10,10 @@ import {
   withLastPlayedMode,
   withNariGameCleared,
   withNariGameStarted,
+  withAceMatchCleared,
+  withAceMatchHeld,
 } from '@/entities/mode-save/model/modeSave'
-import type { ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchPendingPort, ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
 
 export interface ModeSaveSession {
   readonly save: ModeSave
@@ -29,6 +31,8 @@ export interface ModeSaveSession {
   readonly startNariGame: (mode: NariLeagueMode, match: object | null) => void
   /** 나리 +0x4c + 모드 = 0 — 104 등록 확정 0x112c0 · 정산 진입 0x4f3d6 · 모드 저장 지우기 0x224ec */
   readonly clearNariGame: (mode: NariLeagueMode) => void
+  /** 나간 마선수 대결 대기 칸(전역기록 g[0x11f] · g[0x176] 묶음) 손잡이 — 편마다 (`withAceMatchHeld`) */
+  readonly aceMatchPendingPorts: Readonly<Record<NariLeagueMode, AceMatchPendingPort>>
 }
 
 /**
@@ -61,11 +65,24 @@ export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAV
     [update],
   )
   const clearNariGame = useCallback((mode: NariLeagueMode) => update((current) => withNariGameCleared(current, mode)), [update])
+  // 읽기는 곧바로 고친 값(`saveRef`)을 본다 — 같은 틀에 적고 읽는 세션 고리가 렌더를 기다리지 않게
+  const aceMatchPendingPorts = useMemo(() => {
+    const portOf = (mode: NariLeagueMode): AceMatchPendingPort => ({
+      read: () => saveRef.current.aceMatchPending[mode],
+      hold: (resultEvents) => update((current) => withAceMatchHeld(current, mode, resultEvents)),
+      clear: () => update((current) => withAceMatchCleared(current, mode)),
+    })
+    return { 3: portOf(3), 4: portOf(4) }
+  }, [update])
 
   return useMemo(
     () => ({
       save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
+      aceMatchPendingPorts,
     }),
-    [save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame],
+    [
+      save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
+      aceMatchPendingPorts,
+    ],
   )
 }

@@ -2,6 +2,8 @@ import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collecti
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
+import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
@@ -265,10 +267,10 @@ function withRewardResumePatch(career: PlayerCareer, eventId: number, items: rea
  * **나간 마선수 대결의 결과 이벤트** — 105 진입 곁가지 0x11b46~0x11b6a: 전역 g[0x11f] 가 서 있고 모드가 4(타자편)면 현재를
  * 112(0x70)로 · 0x7e84d(그림, 0x70) · 0x118e4 · 다음 140(11b94~11bbe). 140 진입 0x10df8 이 결과 바이트 g[0x144](SYS 8 이 적은 0 이
  * 남았다 = 짐)로 resultEvents[1] 을 0x8bdc9 로 튼다 · [다음 114, 뒤 105]. 대기가 없으면 null.
+ * 대기는 전역기록이라 그 대결을 연 선수가 아니어도(지우고 새로 만든 선수) 그 편 105 에 들어오면 뜬다 — 원본 그대로다.
  */
-function pendingAceMatchScreenOf(career: PlayerCareer): Screen | null {
-  const resultEvents = career.pendingAceMatchResultEvents
-  if (resultEvents === undefined) return null
+function pendingAceMatchScreenOf(resultEvents: readonly number[] | null): Screen | null {
+  if (resultEvents === null) return null
   return { kind: '이벤트', eventId: matchResultEventOf(resultEvents, false), context: '대결결과', carried: EMPTY_STORY_CARRY }
 }
 
@@ -325,6 +327,11 @@ interface CareerSessionInput {
    * 안 넘기면 아무 데도 안 쓴다.
    */
   readonly nariGameSave?: NariGameSavePort
+  /**
+   * 나간 마선수 대결 대기 칸 — 원본 **전역기록** g[0xec] · g[0xee] · g[0x11f] · g[0x144](타자편, `entities/mode-save`
+   * `withAceMatchHeld`). 선수를 새로 만들어도 남는다. 안 넘기면 세션 메모리에만 든다.
+   */
+  readonly aceMatchPending?: AceMatchPendingPort
 }
 
 const NO_STAT = () => {}
@@ -375,6 +382,7 @@ export function useCareerSession({
   readRegularSeasonOtherModes,
   openedAces = DEFAULT_NARI_OPENED_ACES,
   nariGameSave,
+  aceMatchPending,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -433,6 +441,10 @@ export function useCareerSession({
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
   nariGameSaveRef.current = nariGameSave
+  /** 나간 마선수 대결 대기(전역기록) 손잡이 — 안 넘기면 세션 메모리 */
+  const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
+  const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
+  aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
 
   // 캔버스 루프에서 최신 값을 읽어야 한다 — useAtBatRunner의 atBatRef와 같은 이유다.
   const progressRef = useRef(progress)
@@ -1043,7 +1055,7 @@ export function useCareerSession({
      */
     if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
     // 나간 마선수 대결 — 곁가지 0x11b46~0x11bbe 가 112 → 140 (`pendingAceMatchScreenOf`)
-    const pendingAceMatch = pendingAceMatchScreenOf(career)
+    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current.read())
     if (pendingAceMatch !== null) return setScreen(pendingAceMatch)
     /*
      * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
@@ -1083,7 +1095,7 @@ export function useCareerSession({
     if (managementCheck !== null || !career.seenEventIds.includes(String(OPENING_EVENT_ID))) return
     if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
     // 같은 곧은 길의 다음 줄 0x11b46~0x11bbe — 나간 마선수 대결의 결과 이벤트
-    const pendingAceMatch = pendingAceMatchScreenOf(career)
+    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current.read())
     if (pendingAceMatch !== null) setScreen(pendingAceMatch)
   }, [isAtManagement, managementCheck, career, story.events, setScreen])
 
@@ -1094,10 +1106,7 @@ export function useCareerSession({
   const isAceMatchResultScreen = screen.kind === '이벤트' && screen.context === '대결결과'
   useEffect(() => {
     if (!isAceMatchResultScreen) return
-    setCareer((current) =>
-      current === null || current.pendingAceMatchResultEvents === undefined
-        ? current
-        : { ...current, pendingAceMatchResultEvents: undefined })
+    aceMatchPendingRef.current.clear()
   }, [isAceMatchResultScreen])
 
   /**
@@ -1832,9 +1841,10 @@ export function useCareerSession({
      * 0x1c014 의 0x8b0e4 가 떠나온 줄도 본 표시 · 저장한다. 대결을 나가도(0x40140) 이 칸들은 저장에 남는다.
      */
     holdAceMatch: (resultEvents: readonly number[], viewedEventIds: readonly number[]) => {
-      setCareer((current) => current === null
-        ? current
-        : { ...markRewardedEvent(current, null, viewedEventIds), pendingAceMatchResultEvents: resultEvents })
+      // 8d84a 전역기록 저장 — 대기 칸
+      aceMatchPendingRef.current.hold(resultEvents)
+      // 8d85c · 8d870 — 본 표시 · 커리어 저장
+      setCareer((current) => current === null ? current : markRewardedEvent(current, null, viewedEventIds))
     },
 
     /**
