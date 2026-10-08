@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceCursor, jumpToEvent, stepFrom } from '@/entities/story/model/eventScript'
+import { advanceCursor, jumpToEvent, skipSayCursor, stepFrom } from '@/entities/story/model/eventScript'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 
 const 이벤트: OriginalEvent[] = [
@@ -83,3 +83,42 @@ describe('match — 마선수 대결 명령 (누락 탐색 8차)', () => {
   })
 })
 
+
+describe('skipSayCursor — say 중 취소 0x8b7b0', () => {
+  const 대본: OriginalEvent[] = [{
+    id: 7, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
+    commands: [
+      { op: 'say', text: '하나', speaker: 2, format: 0, portraits: [] },
+      { op: 'sound', id: 3 },
+      { op: 'effect', id: 6 },
+      { op: 'say', text: '둘', speaker: 2, format: 0, portraits: [] },
+      { op: 'reward', items: [{ kind: 0, value: 5 }] },
+      { op: 'say', text: '셋', speaker: 2, format: 0, portraits: [] },
+      { op: 'effect', id: 1 },
+    ],
+  }]
+
+  it('say · 소리 · 효과를 건너뛰어 다음 보상(종류 7)에 선다', () => {
+    expect(skipSayCursor(대본, { eventId: 7, commandIndex: 0 })).toEqual({ eventId: 7, commandIndex: 4 })
+  })
+
+  it('뒤에 멈출 명령이 없으면 끝으로 — 마지막 명령(효과)도 안 돈다', () => {
+    const cursor = skipSayCursor(대본, { eventId: 7, commandIndex: 5 })
+    expect(cursor).toEqual({ eventId: 7, commandIndex: 7 })
+    expect(stepFrom(대본, cursor)).toMatchObject({ command: null, passed: [] })
+  })
+
+  it('system · 선택지 · 예아니오 · 4 · 경기도 멈출 명령이다 (하위와 상관없이)', () => {
+    const ops: OriginalEvent['commands'] = [
+      { op: 'system', sub: 2, arg: 0 },
+      { op: 'choice', portraits: [], choices: [] },
+      { op: 'yesno', sub: 1, text: '', yesEvent: 0, noEvent: 0 },
+      { op: 'op4', sub: 0, arg: 0, pairs: [] },
+      { op: 'match', team: 0, resultEvents: [] },
+    ]
+    ops.forEach((command) => {
+      const event: OriginalEvent = { ...대본[0], commands: [대본[0].commands[0], { op: 'sound', id: 1 }, command] }
+      expect(skipSayCursor([event], { eventId: 7, commandIndex: 0 }).commandIndex).toBe(2)
+    })
+  })
+})

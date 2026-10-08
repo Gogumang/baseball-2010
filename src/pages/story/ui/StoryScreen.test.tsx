@@ -686,3 +686,37 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
     expect(초상화판().style.bottom).toBe('185px')
   })
 })
+
+describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
+  const 취소이벤트 = {
+    ...이벤트,
+    commands: [
+      { op: 'say', text: '첫 대사', speaker: 0, format: 0, portraits: [] },
+      { op: 'say', text: '건너뛸 대사', speaker: 0, format: 0, portraits: [] },
+      { op: 'sound', id: 3 },
+      { op: 'system', sub: 0, arg: 0, text: '알림 글' },
+      { op: 'say', text: '알림 뒤 대사', speaker: 0, format: 0, portraits: [] },
+    ],
+  } as unknown as OriginalEvent
+
+  it('Escape 는 say · 소리를 건너뛰어 다음 system 에 선다 — 상자가 오르는 중에도 먹는다', () => {
+    const onComplete = vi.fn()
+    render(<StoryScreen events={[취소이벤트]} event={취소이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} />)
+    틀(1)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('알림 글')
+    // 상자는 앞 say 글 그대로 남는다 — 건너뛴 say 는 상자 글 칸을 안 쓴다
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('첫 대사')
+  })
+
+  it('뒤에 멈출 명령이 없으면 이벤트가 끝난다', () => {
+    const onComplete = vi.fn()
+    const 끝이벤트 = { ...이벤트, commands: [취소이벤트.commands[0], 취소이벤트.commands[1], { op: 'effect', id: 1 }] } as unknown as OriginalEvent
+    render(<StoryScreen events={[끝이벤트]} event={끝이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} />)
+    fireEvent.keyDown(window, { key: 'Backspace' })
+    틀(1)
+    expect(onComplete).toHaveBeenCalledWith([], [1])
+  })
+})

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { advanceCursor, jumpToEvent, stepFrom } from '@/entities/story/model/eventScript'
+import { advanceCursor, jumpToEvent, skipSayCursor, stepFrom } from '@/entities/story/model/eventScript'
 import type { EventStep } from '@/entities/story/model/eventScript'
 import { rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
@@ -59,6 +59,8 @@ export function useEventPlayback(
   isReleased: boolean
   portraits: readonly EventPortrait[]
   next: () => void
+  /** say 중 취소(−16) — 다음 보상 · system · 선택지 · 예아니오 · 4 · 경기 명령까지 건너뛴다 (0x8b7b0, `skipSayCursor`) */
+  skip: () => void
   jump: (eventId: number) => void
   /** 초상화 셋을 비운다 — 0x7f7a8 → 0x7b870 (화면효과 6 · 7 이 끝난 그리기, `drawEventBackdrop`) */
   clearPortraits: () => void
@@ -112,6 +114,7 @@ export function useEventPlayback(
   const isReleasedRef = useRef(isReleased)
   isReleasedRef.current = isReleased
   const next = () => setCursor(advanceCursor(stepRef.current.cursor))
+  const skip = () => setCursor(skipSayCursor(events, stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
   const clearPortraits = () => setPortraits([])
 
@@ -130,5 +133,5 @@ export function useEventPlayback(
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  return { step, isReleased, portraits, next, jump, clearPortraits }
+  return { step, isReleased, portraits, next, skip, jump, clearPortraits }
 }

@@ -104,7 +104,7 @@ export function StoryScreen({
       command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
   /** 막는 효과(id 4~7)를 다 기다린 걸음 — 그 걸음의 멈출 명령이 돈다 (0x8b564) */
   const [releasedKey, setReleasedKey] = useState<string | null>(null)
-  const { step, isReleased, portraits, next, jump: jumpToEvent, clearPortraits } = useEventPlayback(
+  const { step, isReleased, portraits, next, skip, jump: jumpToEvent, clearPortraits } = useEventPlayback(
     events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
   )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
@@ -225,6 +225,8 @@ export function StoryScreen({
           choices={box.isChoice ? { lines: box.slots, selected: selectedChoice } : null}
           textKey={box.key} lowerKey={lowerCount} slideIn
           onAdvance={next} isActive={isBoxActive}
+          // 0x8b7b0 — say 중 취소는 다음 보상 · system · 선택지 · 예아니오 · 4 · 경기 명령까지 say · 효과 · 소리를 건너뛴다
+          onCancel={command?.op === 'say' ? skip : undefined}
           onChoiceMove={setSelectedChoice}
           // 0x8b8b6 — [mgr+0x2bc] = [명령+0x24 + 2 × 고른 줄] · [mgr+8] = 1 → 다음 틀에 그 이벤트를 싣는다(0x8be20)
           onChoiceConfirm={(selected) => {

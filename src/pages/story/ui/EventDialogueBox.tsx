@@ -47,6 +47,11 @@ interface EventDialogueBoxProps {
   readonly onAdvance: () => void
   /** 키 · 누르기를 받는가 — 위에 다른 창이 떠 있거나 지금 명령이 say · 선택지가 아니면 끈다(0x8b804 는 say · 선택지 명령만 본다) */
   readonly isActive?: boolean
+  /**
+   * say 중 취소(CLR −16 — 웹 Escape · Backspace). 지금 명령이 say 일 때만 준다 — 0x8b804 는 say(0) 갈래에서만 −16 을
+   * 0x8b7b0 으로 넘기고, 상자 단계는 안 본다(올라오는 중에도 먹는다). 선택지 갈래는 −16 을 안 받는다.
+   */
+  readonly onCancel?: () => void
   /** 선택지 위 · 아래 — 고른 줄을 (고른 줄 ± 1) % 갈래 수 로 */
   readonly onChoiceMove?: (selected: number) => void
   /** 선택지 확인 — 고른 줄의 갈 이벤트로. 상자 단계와 상관없이 곧바로 받는다 */
@@ -64,7 +69,7 @@ const drawnState = (state: DialogueState, layout: DialogueLayout | null) => tick
  * 웹은 줄을 눌러도 그 줄을 고른다(원본에는 누르기가 없다).
  */
 export function EventDialogueBox({
-  raw, replacements = [], choices = null, slideIn, textKey, lowerKey = 0, onAdvance, isActive = true, onChoiceMove,
+  raw, replacements = [], choices = null, slideIn, textKey, lowerKey = 0, onAdvance, isActive = true, onCancel, onChoiceMove,
   onChoiceConfirm,
 }: EventDialogueBoxProps) {
   const text = useMemo(() => substituteDialogue(raw, replacements), [raw, replacements])
@@ -114,6 +119,8 @@ export function EventDialogueBox({
   onChoiceMoveRef.current = onChoiceMove
   const onChoiceConfirmRef = useRef(onChoiceConfirm)
   onChoiceConfirmRef.current = onChoiceConfirm
+  const onCancelRef = useRef(onCancel)
+  onCancelRef.current = onCancel
   const press = () => {
     const list = choicesRef.current
     if (list !== null) return onChoiceConfirmRef.current?.(list.selected)
@@ -138,6 +145,11 @@ export function EventDialogueBox({
           event.preventDefault()
           return onChoiceMoveRef.current?.((list.selected + 1) % count)
         }
+      }
+      // 0x8b8a6 — say 갈래의 −16 은 0x8b7b0 (단계와 상관없이)
+      if ((event.key === 'Escape' || event.key === 'Backspace') && list === null && onCancelRef.current !== undefined) {
+        event.preventDefault()
+        return onCancelRef.current()
       }
       if (event.key !== 'Enter' && event.key !== ' ' && event.key !== '5') return
       event.preventDefault()
