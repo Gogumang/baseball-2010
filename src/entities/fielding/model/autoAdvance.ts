@@ -164,7 +164,11 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
   const decisions: AutoAdvanceDecision[] = []
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]
-    if (runner === undefined || runner.isOut) continue
+    if (runner === undefined) continue
+    // 죽은 주자(+0x96)도 **거르지 않는다** — 루프 af93c~afa36 에는 +0x96 을 읽는 곳이 없다(직접 뜬 것). 아웃(0xa9520)과
+    // 득점(0xaa0a8) 모두 +0x96 만 세우고 목록에서 빼지 않으므로, 멈춰 선 죽은 주자도 아래 갈래를 다 거쳐 afa0e 에 닿으면
+    // vt48 과 **플레이+0x128 = 1** 을 받는다. 죽은 주자는 주자 틱 0xa01cc 가 흔들기(+0xba, 0xa03ac)·끝(+0xbb)으로만 돌아
+    // 움직이지 않으니, 부르는 쪽은 그 결정에 +0x128 만 세우고 주자는 옮기지 않는다.
     // 0xaf950~0xaf95a — `r0 = vt18(주자) ; r0 != 0 → 계속 ; 아니면 force == 0 이면 건너뜀`.
     // 곧 **루에 붙어 멈춘 주자는 언제나 보고, 달리는 중인 주자는 force 일 때만 본다.**
     // ⚠️ 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
