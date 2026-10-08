@@ -685,6 +685,9 @@ export function TeamGameScreen({
     )
   }
 
+  /** 이 공이 게이지를 쓰는가 (`0x3f500` — 게이지 켬 ∧ 마구 아님). 안 써도 0x11 은 지나 틱 10 에 놓는다 */
+  const showsGauge = options.gaugeSettingOn === true && slot?.isMagic !== true
+
   const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
     if (slot === null) return
     actions.throwPitch({ typeNumber: slot.typeNumber, ...(throwAim === null ? {} : { aim: throwAim }), gaugeCell })
@@ -948,13 +951,10 @@ export function TeamGameScreen({
                 <AimCursor
                   side={options.stageSide ?? 1}
                   onConfirm={(confirmed) => {
-                    // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 (0x3f500 의 `구질 != 22`)
-                    if (options.gaugeSettingOn === true && slot?.isMagic !== true) {
-                      setAim(confirmed)
-                      setPhase('게이지')
-                      return
-                    }
-                    throwWith(0, confirmed)
+                    // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+                    // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
+                    setAim(confirmed)
+                    setPhase('게이지')
                   }}
                   // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
                   onCancel={() => {
@@ -969,8 +969,8 @@ export function TeamGameScreen({
 
             {phase === '게이지' && (
               <>
-                <Panel heading="3. 투구 결정" />
-                <PitchGradeGauge onRelease={(gaugeCell) => throwWith(gaugeCell)} />
+                {showsGauge && <Panel heading="3. 투구 결정" />}
+                <PitchGradeGauge showsGauge={showsGauge} onRelease={(gaugeCell) => throwWith(gaugeCell)} />
               </>
             )}
           </>

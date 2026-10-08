@@ -351,6 +351,8 @@ export function PitcherGameScreen({
     setSlot(null)
     setAim(null)
   }
+  /** 이 공이 게이지를 쓰는가 (`0x3f500` — 게이지 켬 ∧ 마구 아님). 안 써도 0x11 은 지나 틱 10 에 놓는다 */
+  const showsGauge = options.gaugeSettingOn === true && slot?.isMagic !== true
   /** 투구 입력 단계를 가리는 팝업 — 원본은 그 동안 상태 틱이 멈추고(0x741a0) 단계 상태는 그대로다 */
   const isPitchInputPaused = isPopupOpen || asksGiveUp
 
@@ -755,13 +757,10 @@ export function PitcherGameScreen({
               side={progress.options.stageSide ?? 1}
               isPaused={isPitchInputPaused}
               onConfirm={(confirmed) => {
-                // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 (0x3f500 의 `구질 != 22`)
-                if (options.gaugeSettingOn && slot?.isMagic !== true) {
-                  setAim(confirmed)
-                  setPhase('게이지')
-                  return
-                }
-                throwWith(0, confirmed)
+                // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+                // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
+                setAim(confirmed)
+                setPhase('게이지')
               }}
               // CLR(0x50ee0) — 0xf 로 돌아가 0xf 진입 0x3d954 가 다시 돈다
               onCancel={() => {
@@ -774,10 +773,14 @@ export function PitcherGameScreen({
           </div>
         )}
 
-        {!isPitchInputPaused && canPitch && phase === '게이지' && <Panel heading="3. 투구 결정" />}
+        {!isPitchInputPaused && canPitch && phase === '게이지' && showsGauge && <Panel heading="3. 투구 결정" />}
         {canPitch && phase === '게이지' && (
           <div hidden={isPitchInputPaused}>
-            <PitchGradeGauge isPaused={isPitchInputPaused} onRelease={(gaugeCell) => throwWith(gaugeCell)} />
+            <PitchGradeGauge
+              isPaused={isPitchInputPaused}
+              showsGauge={showsGauge}
+              onRelease={(gaugeCell) => throwWith(gaugeCell)}
+            />
           </div>
         )}
 
