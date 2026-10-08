@@ -19,12 +19,13 @@ import {
   withInningRuns,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
-import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
+import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
   changePitcherIfNeeded,
   drainPitcherForPitch,
   drainQuickPitcher,
+  facingPitcherOf,
   simulateHalfInningTicks,
   startingMoundOf,
 } from '@/entities/game/model/simulateHalfInning'
@@ -1383,6 +1384,8 @@ export interface GameAutoRelayTick {
     readonly outcome: AtBatOutcome
     /** 파울이 났나 — 코드 0 뜬공 아웃의 중계 글(`relayCodeOf`) */
     readonly fouled: boolean
+    /** 헛스윙 세 번째 겨루기에서 진 아웃 — 결과는 '아웃' 이지만 중계 글은 5 "삼진 아웃"(c17d8, `relayCodeOf`) */
+    readonly swingingStrikeOutLost?: boolean
     /** 타석 끝 st[4] · st[5] */
     readonly strikes: number
     readonly balls: number
@@ -1608,6 +1611,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
       // ac23e~ac26e — 타석 타자가 마선수(0xae89c → 0xb633c)면 굴림 없이 안 낸다. 마타자 칸(12)은 142 가 넣은 명단에만 있다
       isAceRosterSlot: (rosterSlot) => rosterSlot === ACE_BATTER_ROSTER_SLOT,
     },
+    // 0xab214 의 전역 모드 4 · 수비(우리 팀)가 사람 팀 — 모드 3·4 라 수비 사람 −10 은 안 걸린다(0xab5c0)
+    { mode: '나만의리그', isDefenseHuman: true },
   )
   const opponentSide = 1 - progress.game.playerSide
   let runsSoFar = 0
@@ -1638,6 +1643,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
               rosterSlot: tick.appearance.rosterSlot ?? rosterSlotAt(tick.lineup ?? progress.opponentLineup, tick.battingOrderIndex),
               outcome: tick.appearance.outcome,
               fouled: tick.appearance.fouled === true,
+              swingingStrikeOutLost: tick.appearance.swingingStrikeOutLost === true,
               strikes: tick.strikes,
               balls: tick.balls,
             }
@@ -1738,22 +1744,44 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
   const pitched = perPitchDrainOf(opponentDefense, mound)
-  const play = playQuickAtBat(
-    teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)),
-    // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값을 넘긴다
-    { ...opponentDefense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(mound.stamina) },
-    { inning: progress.game.inning },
+  const order = progress.game.battingOrderIndex
+  /** 지금 타순에서 거꾸로 k 번째 타순 칸 (타순은 아홉 칸을 돈다) */
+  const orderBack = (ordersBack: number) => (((order - ordersBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+  const appearance = playQuickPlateAppearance(
+    {
+      batter: teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order)),
+      // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값과 그 체력%로 부른 피로 능력(0xb58e6)
+      pitcher: facingPitcherOf(opponentDefense, mound.pitcherSlot, staminaPercentOf(mound.stamina)),
+      situation: {
+        inning: progress.game.inning,
+        // 0xab214 는 전역 모드(0x1552d10 = 4)와 state[0x31 + 측]을 읽는다 — 모드 4 경기 준비 0x3a20a 가 내 팀을 사람 팀으로 적는다
+        mode: '나만의리그',
+        isOffenseHuman: true,
+        // 0xab966 — 수비(상대) 점수 > 공격(우리) 점수
+        isLosing: progress.game.opponentScore > progress.game.ourScore,
+        // 이 타순 칸의 오늘 타석 결과 링 (팀 객체 + 타순×0x18 + 0x34)
+        recentAtBatCodes: progress.ourLineup.records[lineupSlotOf(order)]?.results ?? [],
+      },
+      bases: progress.game.bases,
+      outs: progress.game.outs,
+      // ⚠️ 주자 신원 근사 — 루 b 의 주자를 타순에서 거꾸로 센다(`runAbilitiesOnBaseOf` 와 같다). 내 칸도 그 칸 로스터 줄의 주력이다
+      runnerRunAt: (ordersBack) => teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, orderBack(ordersBack))).run,
+      beforePitch: pitched.beforePitch,
+    },
     random,
-    { beforePitch: pitched.beforePitch },
   )
+  const play = appearance.play
   const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이 돌린다 — **간이 엔진에는 희생플라이가 없다** (E-2 확정).
-  // 사람 타석과 달리 수비 시뮬레이션이 돌지 않으므로 `quickEngine` 갈래를 쓴다.
-  const game = applyAtBatOutcome(
-    progress.game,
-    outcome,
-    advanceRunners(progress.game.bases, outcome, progress.game.outs, { quickEngine: true }),
-  )
+  // 볼넷(모든 주자 +1, c1918) · 도루(c1982) · 땅볼 진루(0xc15b8)는 `playQuickPlateAppearance` 가 먹였다
+  const game = applyAtBatOutcome(progress.game, outcome, appearance.advance)
+  // 0xc1a42~0xc1a98 — 도루에 성공한 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c. 내가 루에 있었으면 내 기록(124 타자 열 0x40)으로,
+  // 동료는 리그 기록표로(마타자 칸은 summary 가 뺀다). 포스트시즌 거르기는 커리어에 먹이는 쪽이 한다
+  const stolenSlots = appearance.stolenRunners.map(orderBack)
+  const myStolenBases = stolenSlots.filter((stolenSlot) => stolenSlot === progress.game.playerOrderIndex).length
+  const teammateSteals = stolenSlots
+    .filter((stolenSlot) => stolenSlot !== progress.game.playerOrderIndex)
+    .map((stolenSlot) => ({ teamId: progress.ourTeamId, battingOrderIndex: rosterSlotAt(progress.ourLineup, stolenSlot) }))
   const runsBattedIn = game.ourScore - progress.game.ourScore
   const slot = progress.game.battingOrderIndex
   const recorded = recordBatterAtBat(
@@ -1778,6 +1806,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       rosterSlot: rosterSlotAt(progress.ourLineup, slot),
       outcome,
       fouled: play.fouled === true,
+      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
     },
@@ -1790,7 +1819,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
-      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome),
+      ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, { quickEngine: true }),
       pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, mound.pitcherSlot, {
         outs: outsAddedBetween(progress.game, game),
         runsAllowed: runsBattedIn,
@@ -1813,6 +1842,12 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       ),
       recordIds: [...progress.recordIds, ...recorded.recordIds, ...backToBack.recordIds],
       homeRunStreak: backToBack.streak,
+      ...(myStolenBases > 0
+        ? { myStats: { ...progress.myStats, stolenBases: (progress.myStats.stolenBases ?? 0) + myStolenBases } }
+        : {}),
+      ...(teammateSteals.length > 0
+        ? { leagueStolenBases: [...(progress.leagueStolenBases ?? []), ...teammateSteals] }
+        : {}),
       // 동료 타석도 우리 팀 선수 레코드에 쌓인다 — 타순 칸이 곧 로스터 칸이다 (`batterAt` 과 같은 자리)
       leaguePlateAppearances: [
         ...progress.leaguePlateAppearances,
@@ -1850,7 +1885,8 @@ function perPitchDrainOf(
   return {
     beforePitch: () => {
       stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1)
-      return { ...defense.pitcherAt(mound.pitcherSlot), stamina: staminaPercentOf(stamina) }
+      // 0xc11f0 · 0xc1818 은 체력%로 부른 제구 · 구속(피로 0xb58e6)을 세 자리에서 본다 — 반 이닝 엔진과 같은 값
+      return facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(stamina))
     },
     stamina: () => stamina,
   }

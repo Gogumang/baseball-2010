@@ -62,6 +62,19 @@ describe('evaluateNewTitles — 원문 조건', () => {
     expect(evaluateNewTitles(선수({}, { hits: 700, runsBattedIn: 400, homeRuns: 250 }))).toContain('기록의 사나이')
   })
 
+  it('하이브리드는 통산 도루 100 · 홈런 150, 바람의 아들은 실효 주루 > 799 · 통산 도루 200 (0x1a986 · 0x1acf2)', () => {
+    expect(TITLE_NAMES[38]).toBe('하이브리드')
+    expect(TITLE_NAMES[44]).toBe('바람의 아들')
+    expect(evaluateNewTitles(선수({}, { stolenBases: 99, homeRuns: 150 }))).not.toContain('하이브리드')
+    expect(evaluateNewTitles(선수({}, { stolenBases: 100, homeRuns: 150 }))).toContain('하이브리드')
+    // 옛 저장(칸 없음)은 0
+    expect(evaluateNewTitles(선수({}, { homeRuns: 150 }))).not.toContain('하이브리드')
+    const 빠른 = { ...createCareer('테스트').ability, run: 800 }
+    expect(evaluateNewTitles(선수({ ability: 빠른 }, { stolenBases: 200 }))).toContain('바람의 아들')
+    expect(evaluateNewTitles(선수({ ability: 빠른 }, { stolenBases: 199 }))).not.toContain('바람의 아들')
+    expect(evaluateNewTitles(선수({ ability: { ...빠른, run: 799 } }, { stolenBases: 200 }))).not.toContain('바람의 아들')
+  })
+
   it('훈련 100회면 야구 머신, 200회면 꽃보다 야구', () => {
     const titles = evaluateNewTitles(선수({ trainingCounts: { 히트: 60, 파워: 50 } }))
 

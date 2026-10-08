@@ -112,11 +112,10 @@ function battingAverageValueOf(stats: SeasonStats): number {
 /**
  * 타자 칸 글 — 0x56ebc 의 비트 갈래(56f58~57098)와 숫자 찍기 0x6aff9:
  * 0 타율 0xb8e3d → 소수(v > 999 ? 3 : 0) · 1 +0x20 · 2 +0x22 · 4 +0x24 · 8 +0x26 · 0x10 +0x28 · 0x20 +0x2a · 0x40 +0x2c 는 그대로.
- * null = 웹 커리어가 세지 않는 칸 — ⚠️ 0x40 도루(+0x2c)는 비운다. 내 타자가 +0x2c 를 받는 자리는 원본에 둘이다:
- * ① 사람 경기 정산 0xa8024 의 도루 판(종류 5, a8340~a83c0) — 루를 옮긴 **주자**에게 주는데, 타자편 사람 판은 내 타석뿐이라
- * 주자는 늘 동료다. ② 동료 타석의 간이 엔진 0xc262c → 투구 판정 0xc1818 끝 도루(c1a42~c1a98) — 내가 루에 있을 때.
- * 웹 타자편 동료 타석(`gameFlow.playTeammateAtBat`)은 이 도루 굴림(`onPitchJudged`)을 돌리지 않아 ② 가 일어나지 않는다
- * (난수 순서가 걸린 엔진 일이라 여기서 고치지 않는다). 지어내지 않고 비운다.
+ * 0x40 도루(+0x2c) — 내 타자가 +0x2c 를 받는 자리는 원본에 둘이다: ① 사람 경기 정산 0xa8024 의 도루 판(종류 5, a8340~a83c0) —
+ * 루를 옮긴 **주자**에게 주는데, 타자편 사람 판은 내 타석뿐이라 주자는 늘 동료다. ② 동료 타석의 간이 엔진 0xc262c → 투구 판정
+ * 0xc1818 끝 도루(c1a42~c1a98) — 내가 루에 있을 때. 웹은 ② 를 `gameFlow.playTeammateAtBat` 이 `SeasonStats.stolenBases` 로 센다
+ * (옛 저장은 0). null = 웹 커리어가 세지 않는 칸.
  */
 export function batterYearCellTextOf(stats: SeasonStats, bit: number): string | null {
   switch (bit) {
@@ -130,6 +129,7 @@ export function batterYearCellTextOf(stats: SeasonStats, bit: number): string | 
     case 8: return String(stats.triples)
     case 0x10: return String(stats.homeRuns)
     case 0x20: return String(stats.runsBattedIn)
+    case 0x40: return String(stats.stolenBases ?? 0)
     default: return null
   }
 }
@@ -442,10 +442,10 @@ export function nariRankingSideOf(edition: NariRecordEdition): SeasonRankingSide
 
 /**
  * 타자편 순위 재료 — 열 팀 타자 명단 차례(`seasonAwards.leagueRecordsOf` 와 같은 차례)에 +0x2c 도루(`steals`)까지 채운다
- * (순위 종류 10 이 본다). 내 선수 줄은 `myLeagueRecordOf` — ⚠️ 내 도루는 0 이다(`batterYearCellTextOf` 의 ②: 웹 동료 간이 타석에 도루 굴림이 없다).
+ * (순위 종류 10 이 본다). 내 선수 줄은 `myLeagueRecordOf` 에 내 도루(`SeasonStats.stolenBases` — 동료 간이 타석의 도루, 옛 저장 0)를 얹는다.
  */
 export function nariBatterRankingRecordsOf(career: PlayerCareer): readonly LeagueRecord[] {
-  const mine = myLeagueRecordOf(career)
+  const mine = { ...myLeagueRecordOf(career), batterExtra: career.stats.stolenBases ?? 0 }
   const records: LeagueRecord[] = []
   for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
     teamBatters(teamId).forEach((player, slot) => {

@@ -42,6 +42,17 @@ export function atBatResultCodeOf(outcome: AtBatOutcome): number {
   }
 }
 
+/**
+ * **간이 엔진 타석의 링 코드** — 아웃은 늘 5 다. `state[0x1f]`(바운드 없이 잡은 아웃)를 세우는 곳은 수비 판의 포구
+ * (0xb2774)뿐이고(바이너리 전체 `strb …,#0x1f` 를 훑었다 — 간이 엔진 0xc0d00~0xc2c00 안의 것은 주자 객체 +0x78+0x1f 인 c1156 하나),
+ * 타석 머리 0xc0ee8 이 새 타자로 넘길 때 0xb68bc → 0xb67d0(b67fe)이 그 칸을 0 으로 지운다. 곧 간이 타석의 정산 0xa8024 는
+ * a8a72 에서 늘 거짓이라 코드 0 뜬공 아웃 · 헛스윙 세 번째 겨루기에서 진 아웃 · 땅볼 아웃 모두 a8a9e 의 **5** 로 간다.
+ * 웹 간이 타석은 코드 0 을 '뜬공아웃' 으로 내므로(`quickAtBat.verdictOf`) 사람 판 기준의 `atBatResultCodeOf` 로는 6 이 된다.
+ */
+export function quickAtBatResultCodeOf(outcome: AtBatOutcome): number {
+  return outcome.kind === '아웃' ? 5 : atBatResultCodeOf(outcome)
+}
+
 /** 0xa908c 넣기 — 오래된 차례 목록에 하나 더한다 */
 export function withAtBatResult(results: readonly number[] | undefined, code: number): readonly number[] {
   return [...(results ?? []), code].slice(-AT_BAT_RESULT_RING_SIZE)

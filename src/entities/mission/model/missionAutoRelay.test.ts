@@ -38,6 +38,12 @@ describe('0x21 중계 글 — 0xc25e4: 이름 + " " + 표 0x140034c[sim+0xc4 −
     expect(relayCodeOf({ kind: '아웃', detail: '뜬공아웃' }, true)).toBe(13)
   })
 
+  it('헛스윙 세 번째 겨루기에서 진 아웃은 결과가 아웃이어도 5 "삼진 아웃" (c17d8) — 파울이 났어도', () => {
+    expect(relayCodeOf({ kind: '아웃', detail: '뜬공아웃' }, false, true)).toBe(5)
+    expect(relayCodeOf({ kind: '아웃', detail: '뜬공아웃' }, true, true)).toBe(5)
+    expect(relayLineOf('김타자', relayCodeOf({ kind: '아웃', detail: '뜬공아웃' }, false, true))).toBe('김타자 삼진 아웃')
+  })
+
   it('타석마다 교체 틱(글 없음) 뒤 타석 틱 하나 — 점수는 그 틱 뒤 값', () => {
     const appearances: HalfInningPlateAppearance[] = [
       { battingOrderIndex: 0, outcome: { kind: '홈런' }, runsBattedIn: 1 },

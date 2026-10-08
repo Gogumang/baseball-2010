@@ -88,6 +88,11 @@ export interface QuickAtBatBatter {
   readonly recordSlot?: number
   /** 마선수(0xb633c = 레코드 +0xa 비트6)면 그 순번·레벨 — 0xab214 에 넘기는 보정 구조체에 히트·파워를 얹는다 (`quickSwingBoostOf`) */
   readonly ace?: QuickAceSlot
+  /**
+   * 내 육성·명전 선수(0xb6389 = 레코드 +0xa 비트7)인가 — 0xab214 가 레코드를 직접 읽어 나리(모드 3·4)의 내 선수 보너스를 건다
+   * (`SwingResultInput.isBatterOwnPlayer`). 안 넘기면 거짓
+   */
+  readonly isOwnPlayer?: boolean
 }
 
 /** 마선수 한 명의 순번(0xb63a0, 0~4)과 레벨(`mgr[0x13f/0x13a + 순번]`, 0~4) */
@@ -143,6 +148,8 @@ export interface QuickAtBatSituation {
    */
   readonly isLosing?: boolean
   readonly recentAtBatCodes?: readonly number[]
+  /** 나리 연차 idx — 0xab214 의 내 선수 보너스를 깎는다 (`SwingResultInput.careerYearIndex`). 안 넘기면 0 */
+  readonly careerYearIndex?: number
 }
 
 const trunc = Math.trunc
@@ -325,6 +332,10 @@ function verdictOf(
       pitcher: tired,
       boost: quickSwingBoostOf(batter, pitcher),
       mode: situation.mode ?? '일반',
+      // 0xab214 는 두 레코드의 비트7(0xb6389)을 직접 읽는다 — 간이 타석도 같다
+      ...(batter.isOwnPlayer === true ? { isBatterOwnPlayer: true } : {}),
+      ...(pitcher.isOwnPlayer === true ? { isPitcherOwnPlayer: true } : {}),
+      ...(situation.careerYearIndex === undefined ? {} : { careerYearIndex: situation.careerYearIndex }),
       ...(situation.isOffenseHuman === true ? { isOffenseHuman: true } : {}),
       ...(situation.isDefenseHuman === true ? { isDefenseHuman: true } : {}),
       isPitcherExhausted: pitcher.stamina === 0,

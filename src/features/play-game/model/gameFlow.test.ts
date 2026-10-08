@@ -583,12 +583,31 @@ describe('상대 타순은 이닝을 넘어 이어진다 (team+0x32 · 0xaf020 �
       const random = createSeededRandom(seed)
       let progress = startGame(random)
       while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '삼진' }, random)
-      const steals = summaryOf(progress).leagueStolenBases ?? []
+      const steals = (summaryOf(progress).leagueStolenBases ?? []).filter((steal) => steal.teamId === progress.opponentTeamId)
       if (steals.length === 0) continue
       found = true
-      expect(steals.every((steal) => steal.teamId === progress.opponentTeamId)).toBe(true)
     }
     expect(found).toBe(true)
+  })
+
+  it('동료 타석 간이 엔진도 공마다 도루를 굴린다(0xc1818 c1982) — 동료 도루는 리그 기록 재료, 내가 루에 있었으면 내 +0x2c', () => {
+    let teammateFound = false
+    let mineFound = false
+    for (let seed = 1; seed < 200 && !(teammateFound && mineFound); seed += 1) {
+      const random = createSeededRandom(seed)
+      let progress = startGame(random)
+      // 내 타석은 볼넷 — 내가 1루에 서서 동료 타석의 도루 주자가 될 수 있다
+      while (!progress.game.isFinished) progress = applyPlayerOutcome(progress, { kind: '볼넷' }, random)
+      const summary = summaryOf(progress)
+      const ours = (summary.leagueStolenBases ?? []).filter((steal) => steal.teamId === progress.ourTeamId)
+      // 내 칸(타순 4번의 로스터 칸)은 리그 기록표가 아니라 내 기록으로 간다
+      const mySlot = progress.ourLineup.rosterSlots[progress.game.playerOrderIndex]
+      expect(ours.every((steal) => steal.battingOrderIndex !== mySlot)).toBe(true)
+      if (ours.length > 0) teammateFound = true
+      if ((summary.stats.stolenBases ?? 0) > 0) mineFound = true
+    }
+    expect(teammateFound).toBe(true)
+    expect(mineFound).toBe(true)
   })
 
   it('상대 타순은 아홉 칸만 돈다 — 로스터 뒤 셋(벤치)은 CPU 대타로 들어온 한 명 말고는 안 선다', () => {

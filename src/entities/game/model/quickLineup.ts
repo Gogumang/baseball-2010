@@ -1,4 +1,4 @@
-import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
+import { atBatResultCodeOf, quickAtBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import {
   EMPTY_BATTER_GAME_RECORD,
   judgeCpuPinchHit,
@@ -57,14 +57,20 @@ export function rosterSlotAt(lineup: QuickLineup, order: number): number {
  * 타석 하나를 그 타순 칸 기록에 얹는다 (`0xa8024` 의 세 칸 — 견제가 없는 간이 타석은 늘 타구 플레이다).
  * `+0x13` 은 홈런 수다 (`pinchHitAi.BatterGameRecord.homeRuns`).
  */
-export function recordLineupPlay(lineup: QuickLineup, order: number, outcome: AtBatOutcome): QuickLineup {
+export function recordLineupPlay(
+  lineup: QuickLineup,
+  order: number,
+  outcome: AtBatOutcome,
+  /** 간이 엔진 타석인가 — 링의 아웃 코드가 늘 5 다(`quickAtBatResultCodeOf`). 안 넘기면 사람 판 기준 */
+  options: { readonly quickEngine?: boolean } = {},
+): QuickLineup {
   const slot = lineupSlotOf(order)
   const records = [...lineup.records]
   records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: isHit(outcome),
     isHomeRun: outcome.kind === '홈런',
     // 같은 정산이 오늘 타석 결과 링에도 넣는다 (0xa908c)
-    resultCode: atBatResultCodeOf(outcome),
+    resultCode: options.quickEngine === true ? quickAtBatResultCodeOf(outcome) : atBatResultCodeOf(outcome),
   })
   return { ...lineup, records }
 }

@@ -871,7 +871,9 @@ export function gainAbility(
 
 /** 경기 결과를 커리어에 반영한다. G포인트 지급과 체력 회복이 함께 일어난다. */
 export function applyGameResult(career: PlayerCareer, summary: GameSummary): PlayerCareer {
-  const playedStats = recordGamePlayed(summary.stats)
+  // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만 내 도루를 센다
+  const { stolenBases: _postseasonStolenBases, ...statsWithoutSteals } = summary.stats
+  const playedStats = recordGamePlayed(career.postseason === null ? summary.stats : statsWithoutSteals)
 
   return {
     ...career,

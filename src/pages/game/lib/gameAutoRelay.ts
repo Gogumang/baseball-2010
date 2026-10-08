@@ -34,7 +34,7 @@ export function gameAutoRelayStepsOf(ticks: readonly GameAutoRelayTick[], myName
           ? null
           : relayLineOf(
               teamBatterNameAt(progress, tick.offenseOurs, atBat.rosterSlot) ?? '',
-              relayCodeOf(atBat.outcome, atBat.fouled),
+              relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true),
             ),
       inningRuns: slots.inningRuns,
       cards: {
