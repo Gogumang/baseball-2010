@@ -53,11 +53,20 @@ const BASE_LIT_PART = 6
 const BASES = { first: { x: 68, y: 14 }, second: { x: 59, y: 9 }, third: { x: 50, y: 14 } } as const
 
 const LAMP_STEP = 9
+/**
+ * 램프 칸 수 = 개수를 **잘라서** 센다 — 0x376a4~0x376d0 이 [min(st[4], 2), min(st[5], 3), min(st[6], 2)] 를 칸 표로 만든다.
+ * (스트라이크 3 · 아웃 3 이 되는 순간에도 칸은 둘만 켜진다)
+ */
 const LAMPS = [
-  { part: 13, x: 58, y: 24, key: 'strikes' },
-  { part: 14, x: 58, y: 34, key: 'balls' },
-  { part: 15, x: 58, y: 44, key: 'outs' },
+  { part: 13, x: 58, y: 24, key: 'strikes', max: 2 },
+  { part: 14, x: 58, y: 34, key: 'balls', max: 3 },
+  { part: 15, x: 58, y: 44, key: 'outs', max: 2 },
 ] as const
+
+/** 램프 한 종류의 칸 수 (0x376a4~0x376d0 — 위로만 자른다) */
+export function lampCountOf(lamp: { readonly max: number }, count: number): number {
+  return count < lamp.max ? count : lamp.max
+}
 
 /**
  * 새 램프 확대 연출 (0x37828, F-3 · 3-1 확정).
@@ -124,7 +133,7 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
 
   for (const lamp of LAMPS) {
     const image = sprite(PART(lamp.part))
-    const count = hud[lamp.key]
+    const count = lampCountOf(lamp, hud[lamp.key])
     const scale = lampScaleAt(lamp.key, count, tick)
     if (image === null) continue
     for (let index = 0; index < count; index += 1) {

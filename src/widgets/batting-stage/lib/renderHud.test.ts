@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hudRowsOf, type HudState } from '@/widgets/batting-stage/lib/renderHud'
+import { hudRowsOf, lampCountOf, type HudState } from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
   inning: 1,
@@ -29,5 +29,14 @@ describe('hudRowsOf — 위 줄 = 측 0(선공), 아래 줄 = 측 1 (0x373d0 375
 
   it('측을 안 주면 사람 = 후공으로 본다', () => {
     expect(hudRowsOf(HUD).top.logoUrl).toBe('theirs.png')
+  })
+})
+
+describe('lampCountOf — 램프 칸 수를 자른다 (0x376a4~0x376d0)', () => {
+  it('스트라이크·아웃은 2, 볼은 3 까지만 켠다', () => {
+    expect(lampCountOf({ max: 2 }, 3)).toBe(2)
+    expect(lampCountOf({ max: 3 }, 4)).toBe(3)
+    expect(lampCountOf({ max: 2 }, 1)).toBe(1)
+    expect(lampCountOf({ max: 3 }, 0)).toBe(0)
   })
 })
