@@ -30,6 +30,7 @@ import type {
   DefensePlayResult,
 } from '@/features/defense-play/model/runDefensePlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
@@ -329,21 +330,13 @@ describe('대표 패턴 고르기 — 원본 표 안에서만 고른다', () => 
   })
 })
 
-/** next() 가 늘 같은 값인 난수 포트 — 0 이면 모든 확률 굴림이 성공하고, 1 에 가까우면 전부 실패한다 */
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+/** 굴림마다 늘 같은 비율인 난수 포트 — 0 이면 모든 확률 굴림이 성공하고, 1 에 가까우면 전부 실패한다 */
+const 고정난수 = (value: number): RandomPort => createFractionRandom(() => value)
 
-/** next() 를 차례대로 돌려주는 난수 포트 — 굴림 하나만 떼어 볼 때 쓴다 */
+/** 비율을 차례대로 돌려주는 난수 포트 — 굴림 하나만 떼어 볼 때 쓴다 */
 const 차례난수 = (values: readonly number[]): RandomPort => {
   let index = 0
-  return {
-    next: () => values[Math.min(index++, values.length - 1)],
-    nextInRange: (minimum, maximum) => (minimum + maximum) / 2,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => values[Math.min(index++, values.length - 1)])
 }
 
 /** 틱마다 같은 키를 눌러 주는 조작 — 화면이 넘겨야 하는 모양 그대로다 */
@@ -709,7 +702,7 @@ describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (
 
 describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   // 시작 0xb3fa8 은 **주자가 달려가는 루(+0x7c)의 커버가 공을 쥐고** 공 가진 야수가 내야(≤ 5)일 때만이다.
-  // 원본 코드 15 [87, 1388, 222] 씨앗 0: 투수 펌블로 튄 공을 유격수(5)가 11틱에 줍고 2루를 직접 밟으러 가는데, 2루 커버인
+  // 원본 코드 15 [87, 1388, 222] 씨앗 26: 투수 펌블로 튄 공을 유격수(5)가 11틱에 줍고 2루를 직접 밟으러 가는데, 2루 커버인
   // 그가 공을 쥔 채라 15틱에 1루 주자(1→2루, 남은 > 35%)를 두고 협살이 선다
   // (예전 장면 [85, 1203, 600] 은 3루로 간 송구가 날아가는 틱에 +0x130 만 보고 선 협살이었다 — 받는 커버가 아직 안 쥐어 원본엔 없다)
   const 협살상황 = (defenseIsCpu: boolean) =>
@@ -719,7 +712,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
       bases: 주자1루,
       outs: 0,
       defenseIsCpu,
-      random: createSeededRandom(0),
+      random: createSeededRandom(26),
     })
 
   it('수비가 CPU 일 때만 걸린다 — 사람이 수비하면 원본에서도 안 일어난다 (state[0x31+수비측])', () => {
@@ -748,7 +741,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
       bases: 주자1루,
       outs: 0,
       defenseIsCpu: true,
-      random: createSeededRandom(0),
+      random: createSeededRandom(26),
       controls: { side: '공격', keyAt: (tick) => (tick === 16 ? { key: '3' } : null) },
     })
 
@@ -778,7 +771,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
       bases: 주자1루,
       outs: 0,
       defenseIsCpu: true,
-      random: createSeededRandom(0),
+      random: createSeededRandom(26),
       controls: { side: '공격', keyAt: (tick) => (tick === 20 ? { key: '3' } : null) },
     })
 
@@ -1020,14 +1013,10 @@ describe('레이저 송구 반짝임이 화면까지 내려간다 (경기+0x19ad
     // 이 한 번이 빠져 있어서 같은 씨앗인데도 CPU 수비 쪽 난수 차례가 원본과 어긋났다.
     const 뽑은수 = (extra: Partial<DefensePlayInput>) => {
       let count = 0
-      const random: RandomPort = {
-        next: () => {
-          count += 1
-          return 0.9
-        },
-        nextInRange: (minimum, maximum) => (minimum + maximum) / 2,
-        pick: (candidates) => candidates[0],
-      }
+      const random: RandomPort = createFractionRandom(() => {
+        count += 1
+        return 0.9
+      })
       runDefensePlay({ ...공통, random, ...extra })
       return count
     }
@@ -1123,11 +1112,7 @@ describe('주루 수동/자동 — 설정 +0xbd 와 0xae690 (직접 뜬 것)', (
         seed = (seed * 1664525 + 1013904223) >>> 0
         return (seed >>> 8) / 0x1000000
       }
-      const random: RandomPort = {
-        next: 하나,
-        nextInRange: (minimum, maximum) => minimum + 하나() * (maximum - minimum),
-        pick: (candidates) => candidates[Math.floor(하나() * candidates.length)],
-      }
+      const random: RandomPort = createFractionRandom(하나)
       깊은뜬공주자3루({ runningMode: mode, random })
       return calls
     }
@@ -1343,7 +1328,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     })
 
     it('받는 것도 포구 틱 갈래다 — 펌블 굴림 b4228 을 먹고, 움직이는 송구공을 놓치면 0xb3148 로 튕긴다 (b307c → 포구 틱)', () => {
-      const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(81) })
+      const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(6221) })
 
       expect(결과.log).toContain('8틱 0루로 송구 — 11틱 도착 (CPU 결정) (0번 야수)')
       expect(결과.log).toContain('11틱 1번 야수 펌블 (0xbc2)')
@@ -1414,11 +1399,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
         seed = (seed * 1664525 + 1013904223) >>> 0
         return (seed >>> 8) / 0x1000000
       }
-      const random: RandomPort = {
-        next: 하나,
-        nextInRange: (minimum, maximum) => minimum + 하나() * (maximum - minimum),
-        pick: (candidates) => candidates[Math.floor(하나() * candidates.length)],
-      }
+      const random: RandomPort = createFractionRandom(하나)
       만루단타({ throwMode: mode, random })
       return calls
     }
@@ -1616,7 +1597,7 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
-    // 무사 1루 — 원본 코드 15 [94, 1359, 221] 씨앗 1: 2루 커버(3)가 쥔 공으로 1번 주자 1↔2루 협살이 서고, 19틱 귀루 키에
+    // 무사 1루 — 원본 코드 15 [94, 1359, 221] 씨앗 257: 2루 커버(3)가 쥔 공으로 1번 주자 1↔2루 협살이 서고, 19틱 귀루 키에
     // 2루수가 짝 1루수(2)에게 던진다. 받은 1루수가 1루로 가 닿는 31틱에 타자주자(0번)가 이미 1루에 서 있다.
     // (예전 장면 [134, 944, 944] 씨앗 12 는 2루 커버가 아직 공을 안 쥔 송구 비행 중에 협살을 세우던 웹 근사에 기대 있었다)
     const 결과 = runDefensePlay({
@@ -1625,7 +1606,7 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       bases: 주자1루,
       outs: 0,
       runAbility: 500,
-      random: createSeededRandom(1),
+      random: createSeededRandom(257),
       defenseIsCpu: true,
       controls: { side: '공격', keyAt: (tick) => (tick === 19 ? { key: '3' } : null) },
     })
@@ -1843,7 +1824,7 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
   })
 
   it('협살이 풀린 틱에 날아가던 짝 송구도 짝이 받는다 — 공을 아무도 안 쥔 채 240틱까지 가지 않는다', () => {
-    // 원본 코드 15 [87, 1388, 222] 씨앗 0 · 18틱 귀루: 유격수가 18틱에 짝 1루수에게 던진 공이 날아가는 동안 주자가 1루에 붙어
+    // 원본 코드 15 [87, 1388, 222] 씨앗 26 · 18틱 귀루: 유격수가 18틱에 짝 1루수에게 던진 공이 날아가는 동안 주자가 1루에 붙어
     // 고르기(0xb398c)가 −1 이 되며 협살이 풀린다
     // (예전 장면 [92, 955, 1159] 씨앗 173 은 2루 커버가 아직 안 쥔 공으로 협살을 세우던 웹 근사에 기대 있었다)
     const result = runDefensePlay({
@@ -1853,7 +1834,7 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       outs: 0,
       runAbility: 500,
       defenseIsCpu: true,
-      random: createSeededRandom(0),
+      random: createSeededRandom(26),
       controls: { side: '공격', keyAt: (tick) => (tick === 18 ? { key: '3' } : null) },
     })
     expect(result.rundowns).toBeGreaterThan(0)

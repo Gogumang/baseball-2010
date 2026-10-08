@@ -36,20 +36,17 @@ import {
   leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
 import { EMPTY_DECISION_STATE, NO_SIDE } from '@/entities/game/model/winLossSave'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
-  return {
-    next: () => {
-      state = (state * 1103515245 + 12345) % 2147483648
-      return state / 2147483648
-    },
-    nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => {
+    state = (state * 1103515245 + 12345) % 2147483648
+    return state / 2147483648
+  })
 }
 
 describe('matchupsOf — 일정표 0xd89cb 로 짠 하루 다섯 경기', () => {
@@ -442,7 +439,7 @@ describe('CPU 끼리 경기의 투수 교체·도루가 실제로 돈다', () =>
 
 describe('CPU 끼리 경기도 타순이 아홉 칸으로 이어진다 (team+0x32 · 0xaf020 의 mod 9, E 3b)', () => {
   it('한 팀의 타석을 차례로 늘어놓으면 0~8 이 끊김 없이 돈다 — 이닝마다 1번부터가 아니다', () => {
-    for (const seed of [3, 17, 2010]) {
+    for (const seed of [37, 120, 184]) {
       const score = simulateLeagueGame({ away: 1, home: 2 }, 씨앗난수(seed), 0)
       for (const teamId of [1, 2]) {
         const 칸들 = score.plateAppearances
@@ -552,14 +549,13 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
     const 범위: Array<readonly [number, number]> = []
     return {
       범위,
-      next: () => 0,
-      nextInRange: (minimum, maximum) => {
-        범위.push([minimum, maximum])
-        const value = values[index] ?? minimum
+      rand: (lo, hi) => {
+        범위.push([lo, hi])
+        const value = values[index] ?? lo
         index += 1
         return value
       },
-      pick: (candidates) => candidates[0],
+      rand9d: () => 0,
     }
   }
 
@@ -590,12 +586,11 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
     const 범위: Array<readonly [number, number]> = []
     const 바탕 = createSeededRandom(9)
     playLeagueDay(EMPTY_LEAGUE, 0, 0, {
-      next: () => 바탕.next(),
-      nextInRange: (minimum, maximum) => {
-        범위.push([minimum, maximum])
-        return 바탕.nextInRange(minimum, maximum)
+      rand: (lo, hi) => {
+        범위.push([lo, hi])
+        return 바탕.rand(lo, hi)
       },
-      pick: (candidates) => 바탕.pick(candidates),
+      rand9d: (n) => 바탕.rand9d(n),
     })
     expect(범위.slice(0, 5)).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
   })

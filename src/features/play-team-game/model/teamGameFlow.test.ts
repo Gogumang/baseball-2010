@@ -1,3 +1,4 @@
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
@@ -262,8 +263,8 @@ describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 
     expect(직구.pitcherJustChanged).toBe(false)
     // 깎는 데는 굴림이 없다 — 이 공에서 나간 굴림은 공 도착 0x3dfac 의 0.1% 굴림(0x35034) 하나뿐이다
     const 기준 = createSeededRandom(1)
-    기준.next()
-    expect(random.next()).toBe(기준.next())
+    기준.rand(0, 10000)
+    expect(random.rand(0, 0x7fffffff)).toBe(기준.rand(0, 0x7fffffff))
   })
 
   it('같은 공 수면 결과는 구질 소모를 따른다 — 마구(22)는 직구와 같은 9', () => {
@@ -587,7 +588,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     for (let seed = 1; seed <= 400; seed += 1) {
       const { progress } = 시작({}, seed)
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
-      const next = throwPitch(일루, { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }, createSeededRandom(seed))
+      const next = throwPitch(일루, { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }, createSeededRandom(seed * 7919))
       if (next.lastArrivalPlay?.kind === 5) {
         opened += 1
         caught += next.lastArrivalPlay.result.caughtFrom.length
@@ -604,9 +605,9 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
       const { progress } = 시작({}, seed)
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
       const pitch = { typeNumber: 첫구질(일루), courseCell: 0, gaugeCell: 0 }
-      const 미리Random = createSeededRandom(seed)
+      const 미리Random = createSeededRandom(seed * 7919)
       const 미리 = throwPitch(일루, pitch, 미리Random)
-      const 실시간Random = createSeededRandom(seed)
+      const 실시간Random = createSeededRandom(seed * 7919)
       const 붙듦 = startThrowPitch(일루, pitch, 실시간Random)
       const pending = 붙듦.pendingRunnerPlay
       if (pending == null) continue
@@ -621,7 +622,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
       expect(끝.lastArrivalPlay?.kind).toBe(미리.lastArrivalPlay?.kind)
       // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
       expect(끝.lastDefensePlay).toBe(일루.lastDefensePlay)
-      expect(실시간Random.next()).toBe(미리Random.next())
+      expect(실시간Random.rand(0, 0x7fffffff)).toBe(미리Random.rand(0, 0x7fffffff))
     }
     expect(deferred).toBeGreaterThan(0)
   })
@@ -790,20 +791,10 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
 
   it('벤치에 마투수가 없으면 굴리지 않고 0xabfcc 로 간다 — 마투수는 0xabfcc 가 고르지 않는다', () => {
     let 굴린횟수 = 0
-    const 세는난수: RandomPort = {
-      next: () => {
-        굴린횟수 += 1
-        return 0
-      },
-      nextInRange: (from: number) => {
-        굴린횟수 += 1
-        return from
-      },
-      pick: <T,>(candidates: readonly T[]) => {
-        굴린횟수 += 1
-        return candidates[0]
-      },
-    }
+    const 세는난수: RandomPort = createFractionRandom(() => {
+      굴린횟수 += 1
+      return 0
+    })
     expect(replacementPitcherIndexOf(벤치, { ...상황, saveSituation: false }, 세는난수)).toBe(벤치[0])
     expect(굴린횟수).toBe(0)
     // 마투수가 벤치 앞에 있어도 0xabfcc 는 건너뛴다 (마무리 상황 → 굴림 없음)
@@ -818,20 +809,10 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
 
   it('마무리 상황이면 난수를 아예 쓰지 않는다 (0xac360 을 건너뛴다)', () => {
     let 굴린횟수 = 0
-    const 세는난수: RandomPort = {
-      next: () => {
-        굴린횟수 += 1
-        return 0.5
-      },
-      nextInRange: (from: number, to: number) => {
-        굴린횟수 += 1
-        return from + (to - from) / 2
-      },
-      pick: <T,>(candidates: readonly T[]) => {
-        굴린횟수 += 1
-        return candidates[0]
-      },
-    }
+    const 세는난수: RandomPort = createFractionRandom(() => {
+      굴린횟수 += 1
+      return 0.5
+    })
 
     replacementPitcherIndexOf(벤치, { ...상황, saveSituation: true }, 세는난수)
 
@@ -1145,12 +1126,11 @@ function 세는난수(inner: RandomPort): RandomPort & { readonly rolls: number[
   const rolls: number[] = []
   return {
     rolls,
-    next: () => inner.next(),
-    nextInRange(minimum, maximum) {
-      rolls.push(maximum)
-      return inner.nextInRange(minimum, maximum)
+    rand(lo, hi) {
+      rolls.push(hi)
+      return inner.rand(lo, hi)
     },
-    pick: (candidates) => inner.pick(candidates),
+    rand9d: (n) => inner.rand9d(n),
   }
 }
 
@@ -1328,18 +1308,19 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
       let count = 0
       const random: RandomPort = {
         ...base,
-        nextInRange: (from: number, to: number) => {
+        rand: (from: number, to: number) => {
           count += 1
-          return base.nextInRange(from, to)
+          return base.rand(from, to)
         },
       }
       startTeamGame({ ...기본옵션, ...options }, random)
       return count
     }
     // 마투수·마타자·AI 선발·사람 선발 넉 장 (0x31058·0x3106c·0x3107a·0x31090) + 상태 9 의 시뮬 초기화 rand(0, 2) (0x3fa0e → 0xc0dac)
-    expect(굴림수({ mode: 1 })).toBe(5)
-    expect(굴림수({ mode: 1, acePitcherId: 0 })).toBe(5)
-    expect(굴림수({ mode: 1, acePitcherId: 0, aceBatterId: 0 })).toBe(5)
+    // 은 마선수와 상관없이 늘 굴린다 — 모든 굴림이 한 rand 라 경기 세우기 전체 굴림 수로 본다
+    const 기준 = 굴림수({ mode: 1 })
+    expect(굴림수({ mode: 1, acePitcherId: 0 })).toBe(기준)
+    expect(굴림수({ mode: 1, acePitcherId: 0, aceBatterId: 0 })).toBe(기준)
   })
 })
 
@@ -1461,8 +1442,8 @@ describe('시즌 평판 16칸을 경기가 채운다 (0xa8024 → 0xa755c → 0x
 })
 
 describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
-  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 1)', () => {
-    const random = createSeededRandom(1)
+  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 6)', () => {
+    const random = createSeededRandom(6)
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
@@ -1472,7 +1453,8 @@ describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
     expect(summary.ourScore).toBe(1)
     expect(summary.opponentScore).toBe(2)
     expect(summary.pitching.outsRecorded).toBe(27)
-    expect(summary.gameRecord).toEqual([0, 0, 12, 0, 0, 13, 10, 8, 3, 0, 0, 0, 0, 0, 0, 0])
+    // 16칸 값은 씨앗 6 경기의 기록이다(원본 생성기로 옮기며 씨앗 1 → 6 — 1-2 완투패 · 27아웃 · −1 → +1 은 그대로)
+    expect(summary.gameRecord).toEqual([0, 0, 13, 0, 0, 7, 7, 7, 1, 1, 0, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,
@@ -1497,17 +1479,13 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
     const inner = createSeededRandom(seed)
     const counter = { draws: 0 }
     const random: RandomPort = {
-      next: () => {
+      rand: (lo, hi) => {
         counter.draws += 1
-        return inner.next()
+        return inner.rand(lo, hi)
       },
-      nextInRange: (minimum, maximum) => {
+      rand9d: (n) => {
         counter.draws += 1
-        return inner.nextInRange(minimum, maximum)
-      },
-      pick: (candidates) => {
-        counter.draws += 1
-        return inner.pick(candidates)
+        return inner.rand9d(n)
       },
     }
     return { random, counter }
@@ -1602,7 +1580,7 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
     const 견제뒤 = pickoff(판, '3', random)
     const 소모 = counter.draws
     const 다시 = createSeededRandom(5)
-    for (let index = 0; index < 소모; index += 1) 다시.nextInRange(0, 10000)
+    for (let index = 0; index < 소모; index += 1) 다시.rand(0, 10000)
     const 기준 = throwPitch(판, 투구, 다시)
     const 견제후투구 = throwPitch(견제뒤, 투구, random)
     expect(견제후투구.lastResolution).toEqual(기준.lastResolution)
@@ -1619,9 +1597,7 @@ function 각본난수(rest: number, index = -1, hit = rest) {
     return out
   }
   return {
-    next: value,
-    nextInRange: (minimum: number, maximum: number) => minimum + value() * (maximum - minimum),
-    pick: <T,>(candidates: readonly T[]) => candidates[Math.floor(value() * candidates.length)],
+    ...createFractionRandom(value),
     calls: () => calls,
   }
 }
@@ -1689,18 +1665,18 @@ describe('마타자 0xb633d — 번트 칸을 뽑아도 친다', () => {
 })
 
 describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e, 20%)', () => {
-  /** 첫 next() 만 정해 두고 나머지는 씨앗 난수에 맡긴다 */
+  /** 첫 rand 만 정해 두고(비율 value) 나머지는 씨앗 난수에 맡긴다 */
   function 첫굴림(value: number, seed: number): RandomPort {
     const rest = createSeededRandom(seed)
+    const head = createFractionRandom(() => value)
     let first = true
     return {
-      next: () => {
-        if (!first) return rest.next()
+      rand: (lo: number, hi: number) => {
+        if (!first) return rest.rand(lo, hi)
         first = false
-        return value
+        return head.rand(lo, hi)
       },
-      nextInRange: (minimum: number, maximum: number) => rest.nextInRange(minimum, maximum),
-      pick: <T,>(items: readonly T[]) => rest.pick(items),
+      rand9d: (n: number) => rest.rand9d(n),
     }
   }
 
@@ -1739,7 +1715,7 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
 
 /**
  * 우리가 던진 공에 CPU 타자가 맞는다 — 0x35a20. 기본 배치 side 1(좌타)에서 바깥 칸 2 를 노린 공이
- * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (35: 벤치 클리어링 안 들어감 · 86: 들어감 — 공 도착 0.1% 굴림 뒤).
+ * 흩어져 상자 [271, 309] 에 닿는 씨앗을 골랐다 (182: 벤치 클리어링 안 들어감 · 2016: 들어감 — 공 도착 0.1% 굴림 뒤).
  */
 describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤치 클리어링 수비 사람 갈래)', () => {
   function 맞히기(seed: number): { 전: TeamGameProgress; 후: TeamGameProgress } {
@@ -1750,7 +1726,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   }
 
   it('밀어내기 1루 · 출루 허용 · 투수 볼넷+사구 칸', () => {
-    const { 후 } = 맞히기(35)
+    const { 후 } = 맞히기(182)
     expect(후.lastResolution).toEqual({ kind: '사구' })
     expect(후.pendingDefensePlay).toBeNull()
     expect(후.game.bases.first).toBe(true)
@@ -1760,8 +1736,8 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   })
 
   it('벤치 클리어링에 들어가면 우리 투수 스태미나 −1000 · 시즌 평판 S[1] +1 (공격측 CPU)', () => {
-    const 보통 = 맞히기(35).후
-    const 벤치 = 맞히기(86).후
+    const 보통 = 맞히기(182).후
+    const 벤치 = 맞히기(2016).후
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
@@ -1777,7 +1753,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
     const { progress } = 시작({ mode: 1 })
     const input = { typeNumber: 첫구질(progress), courseCell: 2, gaugeCell: 0 }
-    const 벤치 = startThrowPitch(progress, input, createSeededRandom(86))
+    const 벤치 = startThrowPitch(progress, input, createSeededRandom(2016))
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     expect(벤치.gameRecord).toEqual(progress.gameRecord)
@@ -2038,7 +2014,13 @@ describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)�
       },
       random,
     )
-    expect(random.rolls).toEqual([2])
+    // 모든 굴림이 한 rand 라 장면 굴림(팁 · 덱 · 효과 — 범위는 바람 따라 다르다)도 함께 적힌다.
+    // 안 넘긴 경기보다 0x30f20 넷(5, 5, 4, 4)만 적고, 마지막이 시뮬 초기화 rand(0, 2) 다
+    const 안넘김 = 세는난수(createSeededRandom(3))
+    startTeamGame({ ...기본옵션, mode: 1, season: undefined }, 안넘김)
+    expect(안넘김.rolls.slice(0, 4)).toEqual([5, 5, 4, 4])
+    expect(random.rolls).toHaveLength(안넘김.rolls.length - 4)
+    expect(random.rolls.at(-1)).toBe(2)
   })
 })
 
@@ -2490,24 +2472,19 @@ describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe �
   })
 
   it("0xe 에서 '#' 교체 창을 열어 취소하거나 투수를 바꿔도 OK 뒤 굴림은 한 번 — 안 열고 OK 한 것과 굴림 차례가 같다", () => {
-    /** 모든 굴림(next · nextInRange · pick)을 차례대로 적는다 */
+    /** 모든 굴림(rand · rand9d)을 차례대로 적는다 */
     const 적는난수 = (seed: number) => {
       const inner = createSeededRandom(seed)
       const log: string[] = []
       const random: RandomPort = {
-        next: () => {
-          const value = inner.next()
-          log.push(`next ${value}`)
+        rand: (lo, hi) => {
+          const value = inner.rand(lo, hi)
+          log.push(`rand ${lo}..${hi} ${value}`)
           return value
         },
-        nextInRange: (minimum, maximum) => {
-          const value = inner.nextInRange(minimum, maximum)
-          log.push(`range ${minimum}..${maximum} ${value}`)
-          return value
-        },
-        pick: (candidates) => {
-          const value = inner.pick(candidates)
-          log.push('pick')
+        rand9d: (n) => {
+          const value = inner.rand9d(n)
+          log.push(`rand9d ${n} ${value}`)
           return value
         },
       }

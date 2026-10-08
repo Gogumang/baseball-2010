@@ -14,20 +14,17 @@ import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 /** 정해 둔 값을 차례로 내주고, 몇 번 굴렸는지 센다 */
 function 각본(values: readonly number[]): RandomPort & { readonly used: () => number } {
   let used = 0
-  return {
-    next: () => {
-      const value = values[Math.min(used, values.length - 1)]
-      used += 1
-      return value
-    },
-    nextInRange: () => 0,
-    pick: <T,>(c: readonly T[]) => c[0],
-    used: () => used,
-  }
+  const inner = createFractionRandom(() => {
+    const value = values[Math.min(used, values.length - 1)]
+    used += 1
+    return value
+  })
+  return { ...inner, used: () => used }
 }
 
 const 한가운데: Pitch = {
@@ -109,15 +106,11 @@ describe('willSwing — 상대 타자의 판단', () => {
 describe('willSwing — 난수 굴림 차례', () => {
   function 굴림수(pitch: Pitch, situation: BatterSituation, values: readonly number[]): number {
     let used = 0
-    const random = {
-      next: () => {
-        const value = values[Math.min(used, values.length - 1)]
-        used += 1
-        return value
-      },
-      nextInRange: () => 0,
-      pick: <T,>(c: readonly T[]) => c[0],
-    }
+    const random = createFractionRandom(() => {
+      const value = values[Math.min(used, values.length - 1)]
+      used += 1
+      return value
+    })
     willSwing(pitch, 타자(500), random, situation)
     return used
   }
@@ -248,12 +241,12 @@ describe('CPU 번트 — 원본 0x3445a', () => {
   })
 
   it('번트 헛스윙도 그 공의 번트 종류를 낸다 (0x3445a)', () => {
-    // 높은 공(y 1.2)에 힘 1 타자 · 주자 있음 — 씨앗 17 은 번트 칸을 뽑고 0xab214 가 헛스윙을 낸다
+    // 높은 공(y 1.2)에 힘 1 타자 · 주자 있음 — 씨앗 40 은 번트 칸을 뽑고 0xab214 가 헛스윙을 낸다
     const 높은공: Pitch = { ...한가운데, plate: { x: 0, y: 1.2 }, controlTier: 0 }
     const thrown = pitchAgainstBatterDetailed(
       높은공,
       { hit: 1, power: 1, run: 500, defense: 500 },
-      createSeededRandom(17),
+      createSeededRandom(40),
       { control: 999, velocity: 999 },
       { ...무사주자없음, hasRunner: true },
       { previousBuntKind: 0 },

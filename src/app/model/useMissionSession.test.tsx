@@ -21,6 +21,7 @@ import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model/battedBallOutcome'
 import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
@@ -42,7 +43,6 @@ import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -165,20 +165,10 @@ describe('마선수 대결 화면 전환', () => {
 /** 뽑은 횟수를 세는 난수. 값은 늘 0 이라 뽑는 **차례**만 달라진다 */
 function countingRandom() {
   let draws = 0
-  const port: RandomPort = {
-    next: () => {
-      draws += 1
-      return 0
-    },
-    nextInRange: (minimum: number) => {
-      draws += 1
-      return minimum
-    },
-    pick: <T,>(candidates: readonly T[]) => {
-      draws += 1
-      return candidates[0] as T
-    },
-  }
+  const port: RandomPort = createFractionRandom(() => {
+    draws += 1
+    return 0
+  })
   return { port, drawn: () => draws }
 }
 
@@ -605,7 +595,7 @@ function seededAfterStart(seed: number): RandomPort {
   rollSceneEffectInit(random)
   rollSimulatorInit(random)
   // 그 뒤 상태 8 경기 적재 — 구장 준비 0x352e8 → 0x783b0 하늘 줄 rand(0, 6) (모드 5 · 6, 3fa5e 가 상태 9 끝에 8 을 예약)
-  randomIntegerBelow(random, 0, SKY_ROW_COUNT)
+  random.rand(0, SKY_ROW_COUNT)
   // 상태 8 끝(48bf0) → 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 판이 서고 틱 0 의 0x3fac4 가 rand 36 개(`rollHalfInningFielders`)
   rollHalfInningFielders(random)
   return random
@@ -709,8 +699,8 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     })
 
   it("견제사 하나 = '아웃' 칸 +1 · 이닝 아웃 +1 — 목표가 탈삼진뿐이면 진행 중 그대로", () => {
-    expect(expectedOf(47).advance.outsAdded).toBe(1)
-    const rendered = setUpPitcherMission(12, 47)
+    expect(expectedOf(102).advance.outsAdded).toBe(1)
+    const rendered = setUpPitcherMission(12, 102)
     const before = rendered.result.current.session.pitcherRun!
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
@@ -727,7 +717,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
 
   it("'아웃' 목표가 견제사로 차면 판 끝 판정에서 바로 성공 — 0xaa928 이 상태 1 로 안 남는다", () => {
     const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { '아웃': 1 } }
-    const rendered = setUpPitcherMissionOf(아웃한개, 47)
+    const rendered = setUpPitcherMissionOf(아웃한개, 102)
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
 
@@ -859,12 +849,27 @@ describe('미션 경기 시작은 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 �
     const calls: [number, number][] = []
     const port: RandomPort = {
       ...inner,
-      nextInRange: (min: number, max: number) => {
+      rand: (min: number, max: number) => {
         calls.push([min, max])
-        return inner.nextInRange(min, max)
+        return inner.rand(min, max)
       },
     }
     return { port, calls }
+  }
+  /** 장면 시작 굴림 차례(팁 → 덱 → 효과 1202 → **시뮬 초기화 rand(0, 2) 한 번** → 하늘 줄 → 첫 판 36)의 인자 기록 */
+  function 시작굴림(scenes = 1): [number, number][] {
+    const { port, calls } = 기록난수()
+    for (let scene = 0; scene < scenes; scene += 1) {
+      rollSceneLoadingTip(port)
+      createPatternDeck(port)
+      rollSceneEffectInit(port)
+      const before = calls.length
+      rollSimulatorInit(port)
+      expect(calls.slice(before)).toEqual([[0, 2]])
+      port.rand(0, SKY_ROW_COUNT)
+      rollHalfInningFielders(port)
+    }
+    return calls
   }
 
   it.each([['타자', MISSIONS.find((m) => m.side === '타자')!], ['투수', MISSIONS.find((m) => m.side === '투수')!]] as const)(
@@ -876,7 +881,7 @@ describe('미션 경기 시작은 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 �
           screen: { kind: '미션선택' }, setScreen: vi.fn(),
         }))
       act(() => rendered.result.current.actions.begin(mission))
-      expect(calls).toEqual([[0, 2]])
+      expect(calls).toEqual(시작굴림())
     })
 
   it('마선수 대결(beginAceMatch · beginPitcherAceMatch)도 한 번', () => {
@@ -890,9 +895,9 @@ describe('미션 경기 시작은 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 �
     const pitcher = aceMatchMissionOf(16, '투수')
     if (batter === null || pitcher === null) throw new Error('대결 미션이 없다')
     act(() => rendered.result.current.actions.beginAceMatch(batter, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY }))
-    expect(calls).toEqual([[0, 2]])
+    expect(calls).toEqual(시작굴림())
     act(() => rendered.result.current.actions.beginPitcherAceMatch(pitcher))
-    expect(calls).toEqual([[0, 2], [0, 2]])
+    expect(calls).toEqual(시작굴림(2))
   })
 })
 
@@ -903,17 +908,13 @@ function countedSeeded(seed: number) {
   const inner = createSeededRandom(seed)
   let draws = 0
   const port: RandomPort = {
-    next: () => {
+    rand: (minimum: number, maximum: number) => {
       draws += 1
-      return inner.next()
+      return inner.rand(minimum, maximum)
     },
-    nextInRange: (minimum: number, maximum: number) => {
-      draws += 1
-      return inner.nextInRange(minimum, maximum)
-    },
-    pick: <T,>(candidates: readonly T[]) => {
-      draws += 1
-      return inner.pick(candidates)
+    rand9d: (n: number) => {
+      if (n > 0) draws += 1
+      return inner.rand9d(n)
     },
   }
   return { port, drawn: () => draws }
@@ -1123,8 +1124,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('아웃을 잡으면(성공) 이겼다 — G 보상은 없고(0x4ef3e 의 +0x176 갈래) 투수 15번 칸만 −1 → 0 (0xa5368)', () => {
-    // 씨앗 2 — 한가운데 공으로 아웃을 잡는 판(상태 8 하늘 줄 rand(0, 6)(0x783b0)이 끼며 예전 씨앗 3 은 실패 판이 됐다)
-    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(2)
+    // 씨앗 1 — 한가운데 공으로 아웃을 잡는 판 (원본 생성기 0xbfa54 기준)
+    const { status, isWin, after, save, onGamePointReward } = playPitcherAceMatch(1)
 
     expect(status).toBe('성공')
     expect(isWin).toBe(true)
@@ -1135,9 +1136,8 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
   })
 
   it('실패하면 졌다', () => {
-    // 씨앗 1 — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73) 이 장면 시작 맨 앞에 끼며 예전 씨앗 8 은 성공 판이 됐다
-    // (1~12 가운데 실패는 1 · 3 · 5 · 6 · 7 · 10 · 11 · 12)
-    const { status, isWin } = playPitcherAceMatch(1)
+    // 씨앗 2 — 원본 생성기 0xbfa54 기준 (1~12 가운데 실패는 2 · 3 · 8 · 9 · 12)
+    const { status, isWin } = playPitcherAceMatch(2)
 
     expect(status).toBe('실패')
     expect(isWin).toBe(false)
@@ -1554,7 +1554,7 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     return { rendered, random }
   }
   /** 장면 시작 굴림(팁 rand(0, 73) → 덱 → rand(0, 2) → 하늘 줄 rand(0, 6)) 뒤 첫 판 굴림 36 까지 먹인 같은 씨앗의 다음 값 */
-  const nextAfterBoard = (seed: number) => seededAfterStart(seed).next()
+  const nextAfterBoard = (seed: number) => seededAfterStart(seed).rand(0, 0x7fffffff)
   /** 첫 판 굴림이 없을 때의 다음 값 — 하늘 줄 바로 뒤 */
   const nextAfterSky = (seed: number) => {
     const random = createSeededRandom(seed)
@@ -1562,8 +1562,8 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     createPatternDeck(random)
     rollSceneEffectInit(random)
     rollSimulatorInit(random)
-    randomIntegerBelow(random, 0, SKY_ROW_COUNT)
-    return random.next()
+    random.rand(0, SKY_ROW_COUNT)
+    return random.rand(0, 0x7fffffff)
   }
 
   it.each([
@@ -1576,7 +1576,7 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     const { rendered, random } = sessionOf(4)
     act(() => rendered.result.current.actions.begin(mission))
 
-    expect(random.next()).toBe(nextAfterBoard(4))
+    expect(random.rand(0, 0x7fffffff)).toBe(nextAfterBoard(4))
     expect(nextAfterBoard(4)).not.toBe(nextAfterSky(4))
     const run = side === '투수' ? rendered.result.current.pitcherRun! : rendered.result.current.missionRun!
     expect(rendered.result.current.halfInningBoard).toEqual({
@@ -1604,9 +1604,9 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     createPatternDeck(expected)
     rollSceneEffectInit(expected)
     rollSimulatorInit(expected)
-    randomIntegerBelow(expected, 0, SKY_ROW_COUNT)
+    expected.rand(0, SKY_ROW_COUNT)
     rollHalfInningFielders(expected)
-    expect(random.next()).toBe(expected.next())
+    expect(random.rand(0, 0x7fffffff)).toBe(expected.rand(0, 0x7fffffff))
     expect(rendered.result.current.halfInningBoard?.serial).toBe(2)
     expect(rendered.result.current.sceneConfirm).toBeNull()
   })
@@ -1646,13 +1646,13 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     const pitcher = aceMatchMissionOf(16, '투수')!
     const { rendered, random } = sessionOf(5, { kind: '투수편' })
     act(() => rendered.result.current.actions.beginAceMatch(batter, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY }))
-    expect(random.next()).toBe(nextAfterBoard(5))
+    expect(random.rand(0, 0x7fffffff)).toBe(nextAfterBoard(5))
     expect(rendered.result.current.halfInningBoard).not.toBeNull()
     expect(rendered.result.current.sceneConfirm).toBeNull()
 
     const second = sessionOf(5, { kind: '투수편' })
     act(() => second.rendered.result.current.actions.beginPitcherAceMatch(pitcher))
-    expect(second.random.next()).toBe(nextAfterBoard(5))
+    expect(second.random.rand(0, 0x7fffffff)).toBe(nextAfterBoard(5))
     expect(second.rendered.result.current.halfInningBoard).not.toBeNull()
     act(() => second.rendered.result.current.actions.confirmHalfInningBoard())
     expect(second.rendered.result.current.sceneConfirm?.entries).toBe(1)

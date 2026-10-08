@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { completeGameRecordIdsOf, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -671,8 +672,7 @@ describe('견제 — 구질 고르기(0xf)에서 3·1·7 (0x53548 → 0x50f28 �
 })
 
 /**
- * `index` 번째 next() 만 `hit` 을, 나머지는 늘 `rest` 를 내는 각본 난수 — 굴림 수도 센다.
- * nextInRange·pick 은 실투·타자 결정 길에서 쓰이지 않지만 next() 와 같은 값으로 돌린다.
+ * `index` 번째 굴림만 `hit` 비율을, 나머지는 늘 `rest` 비율을 내는 각본 난수 — 굴림 수도 센다.
  */
 function 각본난수(rest: number, index = -1, hit = rest) {
   let calls = 0
@@ -682,9 +682,7 @@ function 각본난수(rest: number, index = -1, hit = rest) {
     return out
   }
   return {
-    next: value,
-    nextInRange: (minimum: number, maximum: number) => minimum + value() * (maximum - minimum),
-    pick: <T,>(candidates: readonly T[]) => candidates[Math.floor(value() * candidates.length)],
+    ...createFractionRandom(value),
     calls: () => calls,
   }
 }
@@ -727,10 +725,11 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
   const 바깥직구 = { typeNumber: 1, courseCell: 2, gaugeCell: 0 }
   /**
    * 사구지만 벤치 클리어링 굴림이 20 이상인 씨앗 · 굴림이 19 이하인 씨앗.
-   * 벤치 클리어링 굴림 앞에 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이 하나 끼어 1179 → 86 으로 바꿨다
+   * 벤치 클리어링 굴림 앞에 공 도착 0x3dfac 의 0.1% 굴림(0x35034)이 하나 끼어 1179 → 86 으로 바꿨다.
+   * 원본 난수 생성기(0xbfa54 · 0x9d468)로 바꾸며 35 → 182 · 86 → 2016 으로 바꿨다
    */
-  const 사구씨앗 = 35
-  const 벤치씨앗 = 86
+  const 사구씨앗 = 182
+  const 벤치씨앗 = 2016
 
   it('밀어내기 1루 · R+0x148 사구 칸 · 출루 허용(state[0x88]) · 삼자범퇴 칸이 깨진다 — R+0x144 볼넷은 그대로', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
@@ -776,7 +775,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
 
     const 다봄 = resolveBenchClearing(벤치, { reachedTargetTick: true }, 씨앗(11))
     const 앞당김 = 씨앗(11)
-    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.next()
+    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.rand(0, 2)
     const 건너뜀 = resolveBenchClearing(벤치, { reachedTargetTick: false }, 앞당김)
     expect(다봄.game).toEqual(건너뜀.game)
     expect(다봄.log.map((entry) => entry.text)).toEqual(건너뜀.log.map((entry) => entry.text))
@@ -915,13 +914,16 @@ describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () =
       Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
     const 앞값 = (n: number, value: number): RandomPort => {
       const rest = 씨앗(77)
+      const 고정 = createConstantRandom(value)
       let 번 = 0
+      const 이번 = (): RandomPort => {
+        // 장면 덱 · 효과 객체 다음의 시뮬 초기화 rand(0, 2)(0x3fa0e) 하나 뒤부터 n 개
+        const 지금 = 번++ - 1
+        return 지금 >= 장면덱굴림 && 지금 < 장면덱굴림 + n ? 고정 : rest
+      }
       return {
-        ...rest,
-        next: () => {
-          const 지금 = 번++
-          return 지금 >= 장면덱굴림 && 지금 < 장면덱굴림 + n ? value : rest.next()
-        },
+        rand: (lo, hi) => 이번().rand(lo, hi),
+        rand9d: (m) => (m <= 0 ? 0 : 이번().rand9d(m)),
       }
     }
     /** 첫 타석 0xe 의 OK 까지 (OK 뒤 메시지 1 의 돌발 굴림) */
@@ -1122,8 +1124,10 @@ describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0x
     /** 첫 굴림만 고정, 나머지는 씨앗 */
     const 첫굴림 = (value: number) => {
       const rest = 씨앗(5)
+      const 고정 = createConstantRandom(value)
       let 번 = 0
-      return { ...rest, next: () => (번++ === 0 ? value : rest.next()) }
+      const 이번 = (): RandomPort => (번++ === 0 ? 고정 : rest)
+      return { rand: (lo: number, hi: number) => 이번().rand(lo, hi), rand9d: (n: number) => (n <= 0 ? 0 : 이번().rand9d(n)) }
     }
     const 첫구원 = (progress: PitcherGameProgress) => progress.ourMound.usedSlots[1] ?? progress.ourMound.pitcherSlot
     // 선발 날 목록 [나, 1, …, 7, 0] — 벤치 [1, …, 7, 0]
@@ -1139,7 +1143,7 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
 
   it('1루 주자가 있으면 타자 결정 앞에서 굴린다 — 못 맞힌 공이면 도루 판(종류 5)이 열리고, 1루 도루는 늘 세이프', () => {
     let opened = 0
-    for (let seed = 1; seed <= 400; seed += 1) {
+    for (let seed = 601; seed <= 1000; seed += 1) {
       const progress = startPitcherGame(기본옵션, 씨앗(1))
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
       const 끝 = startPitch(일루, 가운데직구, 씨앗(seed))
@@ -1162,7 +1166,7 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
 
   it('화면이 도는 갈래(`live`)는 도루 판을 붙든다(송구 키 +0x160) — 키 없이 끝내면 미리 돌린 판과 경기 · 굴림 차례가 같다', () => {
     let deferred = 0
-    for (let seed = 1; seed <= 400; seed += 1) {
+    for (let seed = 601; seed <= 1000; seed += 1) {
       const progress = startPitcherGame(기본옵션, 씨앗(1))
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
       const 미리Random = 씨앗(seed)
@@ -1179,7 +1183,7 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
       expect(끝.recordIds).toEqual(미리.recordIds)
       // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
       expect(끝.lastDefensePlay).toBe(일루.lastDefensePlay)
-      expect(실시간Random.next()).toBe(미리Random.next())
+      expect(실시간Random.rand(0, 10_000)).toBe(미리Random.rand(0, 10_000))
     }
     expect(deferred).toBeGreaterThan(0)
   })
@@ -1197,7 +1201,7 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
     if (pending == null) return
     const 끝 = resolveRunnerPlay(붙듦, runLiveRunnerPlayWithoutKeys(pending), 실시간Random)
     expect(끝.game).toEqual(미리.game)
-    expect(실시간Random.next()).toBe(미리Random.next())
+    expect(실시간Random.rand(0, 10_000)).toBe(미리Random.rand(0, 10_000))
   })
 
   it('주자가 없으면 CPU 도루 굴림이 없다 — 못 맞힌 공은 0.1% 굴림(0x35034) 하나만 더 쓴다', () => {
@@ -1212,15 +1216,17 @@ describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac
     const inner = createSeededRandom(7)
     const ranges: (readonly [number, number])[] = []
     const random: RandomPort = {
-      next: () => inner.next(),
-      nextInRange: (minimum, maximum) => {
-        ranges.push([minimum, maximum])
-        return inner.nextInRange(minimum, maximum)
+      rand: (lo, hi) => {
+        ranges.push([lo, hi])
+        return inner.rand(lo, hi)
       },
-      pick: (candidates) => inner.pick(candidates),
+      rand9d: (n) => inner.rand9d(n),
     }
     startPitcherGame(기본옵션, random)
-    expect(ranges[0]).toEqual([0, 2])
+    // 앞은 장면 덱 섞기(0x3e340 → 0xb08e8) · 효과 객체(3ef6e, 1202) — 그 바로 다음 굴림이 시뮬 초기화다
+    const 장면덱굴림 =
+      Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
+    expect(ranges[장면덱굴림]).toEqual([0, 2])
   })
 })
 

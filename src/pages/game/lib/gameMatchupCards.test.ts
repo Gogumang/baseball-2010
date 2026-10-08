@@ -9,7 +9,7 @@ import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
 
 describe('나리 타자편 상태 0xe 소개 판 값 (0x44944)', () => {
   it('투수 = 상대 마운드(이름·보직·체력 막대), 타자 = 내 선수(타순·손·시즌 줄 + 이 경기)', () => {
-    const progress = startGame(createSeededRandom(20100901))
+    const progress = startGame(createSeededRandom(20100902))
     const career = createCareer('나리')
     const { pitcher, batter, batterHand } = gameMatchupCardsOf(progress, career)
     const mound = opponentMoundOf(progress)
