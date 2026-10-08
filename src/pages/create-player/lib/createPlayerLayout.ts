@@ -4,6 +4,7 @@ import {
   POSITION_NAMES, SIDE_NAMES, SKIN_NAMES,
 } from '@/pages/management/lib/basicInfoLayout'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
+import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
 
 /**
  * 선수 등록 배치 (나만의리그 상태 0x66 — 진입 0x17360 · 갱신 0x16f28 · 그리기 **0x15f34**).
@@ -184,5 +185,8 @@ export const HINT_BOX = {
  */
 export const ACTION_ROW = { y: HINT_BOX.y + 26, leftX: INFO_BOARD.x, rightX: INFO_BOARD.x + INFO_BOARD.width } as const
 
-/** 신인 타순은 9번 — 등록 화면에 타순 선택은 없고(C-4 확정) 나만의리그 초기화 0xa4c2c 가 넣는다 */
-export const ROOKIE_BATTING_ORDER = 9
+/**
+ * 등록 화면의 타순 칸 = **8** — 등록 화면에 타순 선택은 없고(C-4 확정), 생성 0x17360 이 타자면 레코드 +0xa 에
+ * **0xa7** 을 쓴다(0x17646~0x1764c). 정보 칸 그리기는 `0xb6395(레코드) + 1` 을 찍는다(0x7cf78~0x7cf80) — 아래 5비트 7 → 8번.
+ */
+export const ROOKIE_BATTING_ORDER = ROOKIE_BATTER_SLOT + 1

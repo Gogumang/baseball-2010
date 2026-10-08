@@ -289,7 +289,6 @@ export interface PlayerCareer {
    * 줄어드는 단위는 미확인이라 경기마다 1 씩 줄인다 (추정).
    */
   readonly illnessCooldown: number
-  /** 타순 (1~9). 신인은 9번 (0xa4c2c) */
   /** 배팅 타입 첫 선택 (선수 +0xb 상위 비트) */
   readonly battingTypeIndex: number
   /** 0 내야 · 1 외야 */

@@ -23,7 +23,7 @@ const 이름넣기 = (name: string) =>
   fireEvent.change(screen.getByRole('textbox'), { target: { value: name } })
 
 describe('선수 등록 배치', () => {
-  it('정보 칸 여덟을 원본 값으로 채운다 — 타순은 보여 주기만 하는 신인 9번이다', () => {
+  it('정보 칸 여덟을 원본 값으로 채운다 — 타순은 보여 주기만 하는 신인 8번이다 (+0xa = 0xa7)', () => {
     화면()
 
     expect(screen.getByText('서울 드래곤즈')).toBeTruthy()
@@ -31,7 +31,7 @@ describe('선수 등록 배치', () => {
     expect(screen.getByText('내야')).toBeTruthy()
     expect(screen.getByText('우타')).toBeTruthy()
     expect(screen.getByText('황인')).toBeTruthy()
-    expect(screen.getByText('9')).toBeTruthy()
+    expect(screen.getByText('8')).toBeTruthy()
   })
 
   it('커서는 고른 줄의 값 칸에 놓인다 — 처음은 이름 줄 (59,200,83,17)', () => {
