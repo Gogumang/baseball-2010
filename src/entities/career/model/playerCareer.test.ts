@@ -170,8 +170,9 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
     expect(career.leaguePlayerStats.batters[leagueBatterIdOf(0, 1)]).toEqual({
       atBats: 1, hits: 1, homeRuns: 1, runsBattedIn: 2,
     })
+    // 2루타는 +0x24 에도 쌓인다 (a8520~a85ac, 6d505634)
     expect(career.leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]).toEqual({
-      atBats: 2, hits: 1, homeRuns: 0, runsBattedIn: 1,
+      atBats: 2, hits: 1, doubles: 1, homeRuns: 0, runsBattedIn: 1,
     })
   })
 
