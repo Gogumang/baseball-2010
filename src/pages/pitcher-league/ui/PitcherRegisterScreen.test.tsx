@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PitcherRegisterScreen } from '@/pages/pitcher-league/ui/PitcherRegisterScreen'
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 투수 등록 (0x66) — 고르는 줄은 타자편과 같은 다섯이고 뜻만 다르다.
@@ -55,6 +56,27 @@ describe('투수 등록 화면', () => {
     expect(눌림('TWO-SEAM')).toBe('false')
     expect(눌림('H.FAST')).toBe('false')
     expect(screen.queryByLabelText('이름')).toBeNull()
+  })
+
+  it('StrMODE[12] 안내는 0x67 에 들어온 뒤 상태 틱 ≤ 0x31(50 틀) 동안만 그린다 — 다시 들어오면 다시 보인다 (0x16690)', () => {
+    vi.useFakeTimers()
+    try {
+      화면()
+      이름넣기('테스트')
+      fireEvent.click(등록버튼())
+      expect(screen.getByText(/2가지 변화구를 선택합니다/)).toBeTruthy()
+
+      act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 0x31) })
+      expect(screen.getByText(/2가지 변화구를 선택합니다/)).toBeTruthy()
+      act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      expect(screen.queryByText(/2가지 변화구를 선택합니다/)).toBeNull()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      fireEvent.click(등록버튼())
+      expect(screen.getByText(/2가지 변화구를 선택합니다/)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('하나 이하로 OK 를 누르면 StrMODE[13] 알림, 두 개면 확인 상자다', () => {

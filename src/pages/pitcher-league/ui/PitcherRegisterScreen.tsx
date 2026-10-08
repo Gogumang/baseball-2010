@@ -3,6 +3,7 @@ import { MarkupText, MessageBox, Panel, PixelScreen, StatGrid, TextField } from 
 import type { StatEntry } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import {
@@ -68,6 +69,11 @@ type Phase = '등록' | '변화구'
 type PitchPopup = '부족' | '확인'
 
 const PITCH_HINT = ORIGINAL_MODE_TEXT[12] ?? ''
+/**
+ * StrMODE[12] 안내는 0x67 그리기 0x162bc 가 상태 틱 [this+0x2c] ≤ 0x31 일 때만 그린다(0x16690~0x166b0 → 0x55545).
+ * 상태 틱은 0xbc9c8 이 상태가 같으면 +1, 바뀌면 0 — 0x66 에서 0x67 로 들어올 때마다 0 부터 센다. 곧 들어온 뒤 50 틀 동안만 보인다.
+ */
+const PITCH_HINT_LAST_TICK = 0x31
 const PITCH_SHORTAGE_TEXT = ORIGINAL_MODE_TEXT[13] ?? ''
 const CONFIRM_TEXT = ORIGINAL_MODE_TEXT[2] ?? ''
 
@@ -83,6 +89,17 @@ export function PitcherRegisterScreen({
   const [popup, setPopup] = useState<PitchPopup | null>(null)
   /** 0x67 격자 [this+0x88] 칸 — 0~7 구질 · 8 OK. 0x10b18 이 들어올 때마다 0 에 둔다 */
   const [pitchCell, setPitchCell] = useState(0)
+  /** 0x67 상태 틱 [this+0x2c] — 들어올 때 0 */
+  const [pitchTick, setPitchTick] = useState(0)
+
+  useEffect(() => {
+    if (phase !== '변화구') return undefined
+    setPitchTick(0)
+    const timer = window.setInterval(() => {
+      setPitchTick((previous) => (previous > PITCH_HINT_LAST_TICK ? previous : previous + 1))
+    }, millisecondsPerFrame())
+    return () => window.clearInterval(timer)
+  }, [phase])
 
   const ability = rookiePitcherAbilityOf(profile.role, profile.typeIndex)
 
@@ -239,8 +256,8 @@ export function PitcherRegisterScreen({
             OK
           </button>
         </div>
-        {/* StrMODE[12] — 0x67 그리기 0x162bc 의 안내 */}
-        <MarkupText raw={PITCH_HINT} />
+        {/* StrMODE[12] — 0x67 그리기 0x162bc 의 안내, 상태 틱 ≤ 0x31 동안만 */}
+        {pitchTick <= PITCH_HINT_LAST_TICK && <MarkupText raw={PITCH_HINT} />}
       </Panel>}
 
       {/* 상자는 지금 화면 위에 얹힌다 */}
