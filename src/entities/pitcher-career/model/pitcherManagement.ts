@@ -1,6 +1,5 @@
 import { BALANCE } from '@/shared/config/original/balance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import {
   GAMES_PER_MANAGEMENT_CYCLE,
   gainPitcherAbility,
@@ -133,7 +132,7 @@ export interface PitcherTrainingOutcome {
 }
 
 function roll(random: RandomPort, range: IntegerRange): number {
-  return randomIntegerBelow(random, range.minimum, range.maximumExclusive)
+  return random.rand(range.minimum, range.maximumExclusive)
 }
 
 /** 훈련 한 번 (0x17f5c → 0xa3bad). 범위·타입 보너스 갈림은 위 모듈 주석 (디스어셈 확정) */
