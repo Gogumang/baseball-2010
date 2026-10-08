@@ -7,7 +7,8 @@ import {
 } from '@/entities/season-mode/model/stadiumItems'
 import type { StadiumKind, StadiumPurchaseRefusal } from '@/entities/season-mode/model/stadiumItems'
 import { StadiumShopWindow, stadiumItemNameOf } from '@/widgets/season/ui/StadiumShopWindow'
-import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
+import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { STADIUM_BOXES } from '@/widgets/season/lib/seasonWindowLayout'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
@@ -25,8 +26,8 @@ const REFUSAL_TEXT: Readonly<Record<StadiumPurchaseRefusal, (required: number) =
 /** StrMODE[184] — 구매 완료 (0x812c 가 띄우는 결과코드 15 팝업) */
 const PURCHASED_TEXT =
   '!C구장 아이템 구매 완료!!N자동으로 적용되며!N[구단관리]-[구장관리]!N에서 교체할 수 있습니다'
-/** StrMODE[185] — 교체 (0x7958) */
-const EQUIPPED_TEXT = (name: string) => `[${name}] 아이템을 적용합니다`
+/** StrMODE[185] `!C[!cFFFF00%s!cFFFFFF]!N아이템을 적용합니다` — 교체 (0x7958 sprintf) · 이름은 노랑, 둘째 줄에 안내 */
+const EQUIPPED_TEXT = (name: string) => fillModeText(ORIGINAL_MODE_TEXT[185] ?? '', name)
 /** StrMODE[79] — 구매 확인 (결과코드 14) */
 const PURCHASE_QUESTION = (price: number) =>
   `!C!cFFFF00소지금 ${seasonMoneyTextOf(price)}!cFFFFFF이 소모됩니다!N구매하겠습니까?`

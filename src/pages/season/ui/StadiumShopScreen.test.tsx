@@ -141,7 +141,11 @@ describe('구장관리 교체 (0x7958)', () => {
     // 보유 기록은 건드리지 않는다 — `rec[0x1b8 + 종류] = 선택칸` 한 줄이 전부다
     expect(바뀐.stadiumOwned[stadiumOwnedIndexOf('관중석', 3)]).toBe(false)
     expect(바뀐.money).toBe(0)
-    expect(알림글()).toContain('[4단 관중석] 아이템을 적용합니다')
+    // StrMODE[185] `!C[!cFFFF00%s!cFFFFFF]!N아이템을 적용합니다` — 이름은 노랑, 안내는 둘째 줄
+    expect(알림글()).toContain('[4단 관중석]아이템을 적용합니다')
+    const 이름 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')]
+      .find((node) => node.textContent === '4단 관중석') as HTMLElement | undefined
+    expect(이름?.style.color).toBe('rgb(255, 255, 0)')
   })
 })
 
