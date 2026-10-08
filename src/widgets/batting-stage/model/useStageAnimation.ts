@@ -1,11 +1,20 @@
 import { useEffect, useRef } from 'react'
-import { DEFAULT_REPERTOIRE, selectPitch } from '@/entities/pitching/model/selectPitch'
+import {
+  CPU_PITCH_TYPE_TICKS,
+  DEFAULT_REPERTOIRE,
+  cpuPitchAimOf,
+  cpuPitchTypeTickOf,
+  releaseCpuPitch,
+  windUpCpuPitchOf,
+} from '@/entities/pitching/model/selectPitch'
+import type { CpuPitchArgs } from '@/entities/pitching/model/selectPitch'
 import { aceOrderOfMagicNumber, createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -35,6 +44,10 @@ import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 const HOME_RUN_DERBY_GAME_MODE = 7
 /** 타자 스킬 22 압도 (skills.json 22) — 상대 투수 실투율 +5 */
 const INTIMIDATE_SKILL_ID = 22
+/** 0x10 의 목표 고르기 틱 — 0x53824 는 상태 틱 > 5 인 첫 틱(6)에 0x645 를 보낸다 */
+const CPU_AIM_TICK_IN_0X10 = 6
+/** 0x11 의 공 놓기 틱 — 0x4e078 은 상태 틱 > 9 인 첫 틱(10)에 0x4dc78 을 부른다 */
+const CPU_RELEASE_TICK_IN_0X11 = 10
 
 /** 투구 단계가 부르는 고리 — 타석 화면(`BattingStage`)이 채운다 */
 export interface StageHandlers {
@@ -117,6 +130,38 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       latestRef.current.skyRow === undefined ? latestRef.current.random.rand(0, SKY_ROW_COUNT) : 0
     const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
 
+    /** 이번 0xf~0x10 의 CPU 투구 굴림 — 대기에 든 시각이 바뀌면(새 공 · 견제 뒤 · 쉼) 새로 센다 */
+    let cpuPitchCycle: { startedAt: number; typeRolls: number; typeNumber: number; target: WorldPoint | null } | null = null
+    /** 0x11 에 들어서 놓기(틱 10)를 기다리는 공 — 0xf 의 마지막 구질과 0x10 의 목표점 */
+    let releasePending: { typeNumber: number; target: WorldPoint } | null = null
+    /** 그 틱에 원본이 읽는 재료 — 볼카운트 · 주자 · 마구 · 투수 (`selectPitch` 와 같은 인자) */
+    const cpuPitchArgsNow = (): CpuPitchArgs => {
+      const { pitcherAbility, hud, onPickoff } = latestRef.current
+      const bases = hud?.bases ?? { first: false, second: false, third: false }
+      return {
+        pitcher: pitcherAbility,
+        situation: pitchSituationOf(hud, latestRef.current.batterForm),
+        difficulty: 'hard',
+        magic: magicStateOf(pitcherAbility.repertoire),
+        // 견제를 받아 줄 쪽이 있을 때만 켠다 — 주자 루는 HUD 루 그대로 (원본 0xa9878 자리)
+        cpuPickoff:
+          onPickoff === undefined
+            ? undefined
+            : {
+                hasRunnerOnBase: (base) =>
+                  base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false,
+              },
+        // 실투 판정 0x33cbc 의 타자 비트 22 압도 — 0xb62b4 는 **장착** 비트라 장착 스킬 번호로 본다
+        batterIntimidates: latestRef.current.batterSkillIds.includes(INTIMIDATE_SKILL_ID),
+        // 홈런더비(모드 7)는 0x344ea 가 구질을 굴리지 않고(마투수가 나왔으면 22, 아니면 1),
+        // 0x345fc 가 종류·목표점을 굴리지 않고 존 한가운데를 노리며(0x3460e) 마구 소모(0x34894)도 건너뛴다
+        derbyPitchType:
+          latestRef.current.gameMode === HOME_RUN_DERBY_GAME_MODE
+            ? latestRef.current.derbyPitchType ?? DERBY_ORDINARY_PITCH_TYPE
+            : undefined,
+      }
+    }
+
     const advancePhase = (now: number) => {
       if (phaseRef.current === '대기') {
         if (latestRef.current.isPaused) {
@@ -125,41 +170,37 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           phaseStartedAtRef.current = now
           return
         }
-        // 0xf(9 그림) + 0x10(7 그림) 뒤 0x11 — 틱으로 센다 (`PRE_PITCH_TICKS`)
-        if (pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame()) >= PRE_PITCH_TICKS) {
-          const { pitcherAbility, random, hud, onPickoff } = latestRef.current
-          const bases = hud?.bases ?? { first: false, second: false, third: false }
-          const choice = selectPitch(
-            pitcherAbility,
-            pitchSituationOf(hud, latestRef.current.batterForm),
-            random,
-            'hard',
-            magicStateOf(pitcherAbility.repertoire),
-            // 견제를 받아 줄 쪽이 있을 때만 켠다 — 주자 루는 HUD 루 그대로 (원본 0xa9878 자리)
-            onPickoff === undefined
-              ? undefined
-              : {
-                  hasRunnerOnBase: (base) =>
-                    base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false,
-                },
-            // 실투 판정 0x33cbc 의 타자 비트 22 압도 — 0xb62b4 는 **장착** 비트라 장착 스킬 번호로 본다
-            latestRef.current.batterSkillIds.includes(INTIMIDATE_SKILL_ID),
-            // 홈런더비(모드 7)는 0x344ea 가 구질을 굴리지 않고(마투수가 나왔으면 22, 아니면 1),
-            // 0x345fc 가 종류·목표점을 굴리지 않고 존 한가운데를 노리며(0x3460e) 마구 소모(0x34894)도 건너뛴다
-            latestRef.current.gameMode === HOME_RUN_DERBY_GAME_MODE
-              ? latestRef.current.derbyPitchType ?? DERBY_ORDINARY_PITCH_TYPE
-              : undefined,
-          )
-          if (choice.kind === '견제') {
+        // 0xf(9 그림) + 0x10(7 그림) 뒤 0x11 — 틱으로 센다 (`PRE_PITCH_TICKS`). CPU 투구 굴림은 원본 틱 차례로 나눠
+        // 그 틱의 파티클 틱(프레임 끝 0x6de84)보다 앞에 굴린다 — 조작 0x498d4 는 매 틱 그리기보다 먼저 돈다:
+        //   0xf 틱 0~8 구질 0x344dc(틱마다 한 번) · 0x10 틱 6 목표 0x345fc(또는 견제) · 0x11 틱 10 놓기 0x4dc78
+        const tick = pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
+        if (cpuPitchCycle === null || cpuPitchCycle.startedAt !== phaseStartedAtRef.current) {
+          cpuPitchCycle = { startedAt: phaseStartedAtRef.current, typeRolls: 0, typeNumber: 0, target: null }
+        }
+        const cycle = cpuPitchCycle
+        const { random } = latestRef.current
+        // 0xf 틱 0~8 — 그림을 건너뛴 틱도 센다(따라잡기)
+        while (cycle.typeRolls < Math.min(CPU_PITCH_TYPE_TICKS, tick + 1)) {
+          cycle.typeNumber = cpuPitchTypeTickOf(cpuPitchArgsNow(), random)
+          cycle.typeRolls += 1
+        }
+        if (cycle.target === null && tick >= CPU_PITCH_TYPE_TICKS + CPU_AIM_TICK_IN_0X10) {
+          const aim = cpuPitchAimOf(cpuPitchArgsNow(), random)
+          if (aim.kind === '견제') {
             // 0x34848 → 메시지 0x10: 공을 안 던진다(상태 0x11 예약 0x34888 을 안 지난다).
             // 견제 판(상태 0x17)이 끝나면 원본은 같은 타석 다음 공(0xf)으로 돌아온다 — 여기서는 다시 대기로 둔다
             pitchRef.current = null
             phaseStartedAtRef.current = now
-            onPickoff?.(choice.base)
+            latestRef.current.onPickoff?.(aim.base)
             return
           }
-          pitchRef.current = choice.pitch
-          pitchTypeNumberRef.current = choice.pitchTypeNumber
+          cycle.target = aim.target
+        }
+        if (tick >= PRE_PITCH_TICKS && cycle.target !== null) {
+          // 0x11 진입 — 놓기(틱 10) 전에는 와인드업 자리만 세운다 (`windUpCpuPitchOf`)
+          pitchRef.current = windUpCpuPitchOf(cpuPitchArgsNow(), cycle.typeNumber, cycle.target)
+          pitchTypeNumberRef.current = cycle.typeNumber
+          releasePending = { typeNumber: cycle.typeNumber, target: cycle.target }
           // 0x11 진입 0x3de10 — 스윙 예약 · 판정 칸(+0xfd8 · +0xfe0 · +0xfe5)을 공마다 지운다
           swingRef.current = null
           pitchJudgedRef.current = false
@@ -168,8 +209,23 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'
           phaseStartedAtRef.current = now
+        } else {
+          return
         }
-        return
+      }
+
+      // 0x11 틱 10 — 0x4dc78: 제구 등급 · 제구 오차 · 실투 · 곡선을 굴려 와인드업 자리를 진짜 공으로 바꾼다
+      if (phaseRef.current === '투구중' && releasePending !== null) {
+        if (pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame()) < CPU_RELEASE_TICK_IN_0X11) return
+        const choice = releaseCpuPitch(
+          cpuPitchArgsNow(),
+          releasePending.typeNumber,
+          releasePending.target,
+          latestRef.current.random,
+        )
+        releasePending = null
+        pitchRef.current = choice.pitch
+        pitchTypeNumberRef.current = choice.pitchTypeNumber
       }
 
       const pitch = pitchRef.current

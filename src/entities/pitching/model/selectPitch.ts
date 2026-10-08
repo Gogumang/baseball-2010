@@ -178,29 +178,78 @@ export function selectPitch(
    */
   derbyPitchType?: number,
 ): CpuPitchChoice {
-  const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
-  const magicState = magic ?? { remaining: 0, ballMagicNumber: 0 }
-  const isHomeRunDerby = derbyPitchType !== undefined
-  const list = pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0)
+  const args: CpuPitchArgs = { pitcher, situation, difficulty, magic, cpuPickoff, batterIntimidates, derbyPitchType }
+  // 상태 0xf 틱 0~8 — 0x644 마다 0x344dc 를 다시 부른다. 마지막 값이 +0xfc8 에 남는다 (`CPU_PITCH_TYPE_ROLL_TICKS`)
   let typeNumber = derbyPitchType ?? 0
-  if (!isHomeRunDerby) {
-    // 상태 0xf 틱 0~8 — 0x644 마다 0x344dc 를 다시 부른다. 마지막 값이 +0xfc8 에 남는다 (`CPU_PITCH_TYPE_ROLL_TICKS`)
-    for (let tick = 0; tick < CPU_PITCH_TYPE_ROLL_TICKS; tick += 1) {
-      typeNumber = computerPitchTypeOf({ list, magicCount: magicState.remaining, ...situation }, random)
-    }
+  for (let tick = 0; tick < CPU_PITCH_TYPE_ROLL_TICKS; tick += 1) typeNumber = cpuPitchTypeTickOf(args, random)
+  // 상태 0x10 틱 6 — 0x345fc
+  const aim = cpuPitchAimOf(args, random)
+  if (aim.kind === '견제') return aim
+  // 상태 0x11 틱 10 — 0x4dc78
+  return releaseCpuPitch(args, typeNumber, aim.target, random)
+}
+
+/**
+ * `selectPitch` 의 재료 묶음 — 원본은 세 틱(0xf 틱 0~8 · 0x10 틱 6 · 0x11 틱 10)에서 나눠 굴린다. 타석 화면은 그 틱에
+ * 아래 세 함수를 따로 부른다(`widgets/batting-stage/model/useStageAnimation`). 인자 뜻은 `selectPitch` 와 같다
+ */
+export interface CpuPitchArgs {
+  readonly pitcher: PitcherAbility
+  readonly situation: PitchSituation
+  readonly difficulty: PitchPatternDifficulty
+  readonly magic?: MagicPitchGameState | undefined
+  readonly cpuPickoff?: CpuPickoffInput | undefined
+  readonly batterIntimidates: boolean
+  readonly derbyPitchType?: number | undefined
+}
+
+/** 0xf 진입부터 0x10 예약까지의 CPU 구질 굴림 틱 수 (0xf 틱 0~8) */
+export const CPU_PITCH_TYPE_TICKS = CPU_PITCH_TYPE_ROLL_TICKS
+
+/**
+ * **상태 0xf 틱 하나의 구질 고르기 0x344dc** (0x53850 → 0x644 → 0x51212). 홈런더비(모드 7, 0x344ea)는 굴림 없이
+ * `derbyPitchType`, 마구 조건이면 굴림 없이 22, 아니면 rand(0,6) 한 번. 마지막으로 부른 값이 그 공의 구질이다
+ */
+export function cpuPitchTypeTickOf(args: CpuPitchArgs, random: RandomPort): number {
+  if (args.derbyPitchType !== undefined) return args.derbyPitchType
+  const repertoire = args.pitcher.repertoire ?? DEFAULT_REPERTOIRE
+  const list = pitchListOf(repertoire.pitchMask, repertoire.magicId !== 0)
+  return computerPitchTypeOf({ list, magicCount: args.magic?.remaining ?? 0, ...args.situation }, random)
+}
+
+/** 0x345fc 의 결과 — 목표점, 또는 견제(목표점을 안 만든다) */
+export type CpuPitchAim = { readonly kind: '목표'; readonly target: WorldPoint } | CpuPickoffChoice
+
+/**
+ * **상태 0x10 틱 6 의 목표 고르기 0x345fc** (0x53824 → 0x645 → 0x5121c) — 종류 0x9eeac · 목표점, 또는 종류 4 견제 0x34848.
+ * 홈런더비(0x3460e)는 굴림 없이 존 한가운데
+ */
+export function cpuPitchAimOf(args: CpuPitchArgs, random: RandomPort): CpuPitchAim {
+  const { situation, cpuPickoff } = args
+  // 0x3460e: 모드 7 이면 종류·목표점을 굴리지 않고 존 한가운데 (0x34612~0x34644)
+  if (args.derbyPitchType !== undefined) return { kind: '목표', target: derbyPitchTargetOf(situation.side) }
+  const kind = targetKindOf(args.difficulty, situation, random)
+  if (cpuPickoff !== undefined && isCpuPickoff(kind, situation)) {
+    // 0x34848: 루 = rand(1,4) 를 주자 있는 루까지 반복 → 메시지 0x10 → 0x348d6(에필로그). 그 뒤 굴림은 없다
+    return { kind: '견제', base: cpuPickoffBaseOf(cpuPickoff.hasRunnerOnBase, random) }
   }
-  let target: WorldPoint
-  if (isHomeRunDerby) {
-    // 0x3460e: 모드 7 이면 종류·목표점을 굴리지 않고 존 한가운데 (0x34612~0x34644)
-    target = derbyPitchTargetOf(situation.side)
-  } else {
-    const kind = targetKindOf(difficulty, situation, random)
-    if (cpuPickoff !== undefined && isCpuPickoff(kind, situation)) {
-      // 0x34848: 루 = rand(1,4) 를 주자 있는 루까지 반복 → 메시지 0x10 → 0x348d6(에필로그). 그 뒤 굴림은 없다
-      return { kind: '견제', base: cpuPickoffBaseOf(cpuPickoff.hasRunnerOnBase, random) }
-    }
-    target = pitchTargetOf(kind, situation, random)
-  }
+  return { kind: '목표', target: pitchTargetOf(kind, situation, random) }
+}
+
+/**
+ * **상태 0x11 틱 10 의 공 놓기 0x4dc78** (0x4e078) — 제구 등급 · 제구 오차 · 실투 · 곡선. `typeNumber` 는 0xf 의 마지막
+ * 구질, `target` 은 0x10 의 목표점이다
+ */
+export function releaseCpuPitch(
+  args: CpuPitchArgs,
+  typeNumber: number,
+  target: WorldPoint,
+  random: RandomPort,
+): CpuPitchThrow {
+  const { pitcher, situation, batterIntimidates } = args
+  const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
+  const magicState = args.magic ?? { remaining: 0, ballMagicNumber: 0 }
+  const isHomeRunDerby = args.derbyPitchType !== undefined
   // 소모 0xa5e14 — 구질이 정해진 뒤 상태 0x11 진입 0x3de10(0x3dec6)에서 깎는다. 놓기 0x4dc78 의 0x4dbac · 0x34968 은 그 **뒤**
   // 체력을 본다 (`staminaPercentAfterPitch`). 난수는 쓰지 않는다
   const staminaPercent = pitcher.staminaPercentAfterPitch?.(typeNumber) ?? pitcher.staminaPercent
@@ -280,6 +329,31 @@ export function selectPitch(
       : { pitcherStaminaPercent: staminaPercent }),
   }
   return { kind: '투구', pitch, pitchTypeNumber: typeNumber, isMistakePitch: isMistake }
+}
+
+/**
+ * **0x11 틱 0~9(와인드업) 동안의 공 자리** — 놓기 0x4dc78 은 틱 10 이라 그 전에는 곡선 · 제구 오차가 아직 없다.
+ * 타석 화면이 와인드업을 그리고(투수 폼 · 손) 0x11 인지 묻는 데만 쓴다: 곡선이 비어 있고(`frameCount` 0, 공 틱 < 0 이라
+ * 그리지도 판정하지도 않는다) 존 자리는 0x10 의 목표점이다(⚠️ 독수리눈 표시가 와인드업 동안 보는 자리는 미확인).
+ * 틱 10 에 `releaseCpuPitch` 의 공으로 바꾼다
+ */
+export function windUpCpuPitchOf(args: CpuPitchArgs, typeNumber: number, target: WorldPoint): Pitch {
+  const repertoire = args.pitcher.repertoire ?? DEFAULT_REPERTOIRE
+  const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
+  const type = PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0]
+  return {
+    type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
+    plate: plateOf(target, args.situation.side),
+    breakOffset: { x: type.horizontalBreak, y: type.verticalBreak },
+    flightDurationMilliseconds: 0,
+    frameCount: 0,
+    controlTier: 0,
+    worldPath: null,
+    stageSide: args.situation.side,
+    isMagicPitch: isMagic,
+    pitcherMagicNumber: repertoire.magicId,
+    pitcherForm: repertoire.form,
+  }
 }
 
 /** 교체 틱 구질 굴림의 재료 — **내려가는** 투수(교체는 0xaf09c 가 예약만 하고 맞바꿈은 다음 확정 0xaebe4 다) */

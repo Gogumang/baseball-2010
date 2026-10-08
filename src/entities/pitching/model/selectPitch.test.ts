@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CPU_PITCH_TYPE_TICKS,
+  cpuPitchAimOf,
+  cpuPitchTypeTickOf,
   flightMillisecondsOf,
+  releaseCpuPitch,
   rollCpuPitchTypeOnPitcherChangeTick,
   selectPitch as selectChoice,
+  windUpCpuPitchOf,
 } from '@/entities/pitching/model/selectPitch'
+import type { CpuPitchArgs } from '@/entities/pitching/model/selectPitch'
 import type { CpuPitchChoice, PitchSituation } from '@/entities/pitching/model/selectPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { computerPitchTypeOf, pitchListOf, targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
@@ -520,5 +526,43 @@ describe('CPU 투수 교체 틱의 구질 굴림 — 0x3d954 가 0x16 을 예약
     const { calls, random } = 굴림기록()
     rollCpuPitchTypeOnPitcherChangeTick({ repertoire: 마구투수, magicRemaining: 2, runnerCount: 0, strikes: 1, balls: 1 }, random)
     expect(calls).toEqual([[0, 6]])
+  })
+})
+
+describe('CPU 투구 굴림을 원본 틱으로 나눈 세 걸음 — 0xf 틱 0~8 · 0x10 틱 6 · 0x11 틱 10', () => {
+  const 재료 = (seed: number): CpuPitchArgs => ({
+    pitcher: 투수(60),
+    situation: { ...상황, strikes: seed % 3, balls: seed % 4, runnerCount: seed % 2 },
+    difficulty: 'hard',
+    magic: undefined,
+    cpuPickoff: undefined,
+    batterIntimidates: false,
+  })
+
+  it('구질 9번 → 목표 → 놓기를 차례로 부르면 selectPitch 와 같은 공 · 같은 난수 자리다', () => {
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const args = 재료(seed)
+      const 한꺼번 = createSeededRandom(seed)
+      const 기대 = selectChoice(args.pitcher, args.situation, 한꺼번)
+      const 나눔 = createSeededRandom(seed)
+      let typeNumber = 0
+      for (let tick = 0; tick < CPU_PITCH_TYPE_TICKS; tick += 1) typeNumber = cpuPitchTypeTickOf(args, 나눔)
+      const aim = cpuPitchAimOf(args, 나눔)
+      if (aim.kind !== '목표') throw new Error('견제를 껐다')
+      expect(releaseCpuPitch(args, typeNumber, aim.target, 나눔)).toEqual(기대)
+      expect(나눔.rand(0, 1 << 20)).toBe(한꺼번.rand(0, 1 << 20))
+    }
+  })
+
+  it('와인드업(0x11 틱 0~9) 자리는 곡선이 없고 존 자리는 0x10 의 목표점이다 — 굴림 없음', () => {
+    const args = 재료(3)
+    const random = createSeededRandom(3)
+    for (let tick = 0; tick < CPU_PITCH_TYPE_TICKS; tick += 1) cpuPitchTypeTickOf(args, random)
+    const aim = cpuPitchAimOf(args, random)
+    if (aim.kind !== '목표') throw new Error('견제를 껐다')
+    const 와인드업 = windUpCpuPitchOf(args, 1, aim.target)
+    expect(와인드업.frameCount).toBe(0)
+    expect(와인드업.worldPath).toBeNull()
+    expect(와인드업.plate.x).toBeCloseTo((aim.target.x - ZONE_CENTERS[1].x) / 331)
   })
 })
