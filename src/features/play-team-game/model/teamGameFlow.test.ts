@@ -1457,19 +1457,19 @@ describe('시즌 평판 16칸을 경기가 채운다 (0xa8024 → 0xa755c → 0x
 })
 
 describe('한 경기를 끝까지 돌리면 16칸이 실제로 찬다', () => {
-  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 6)', () => {
-    const random = createSeededRandom(6)
+  it('자동으로 소화한 시즌 한 경기 — 16칸과 평판 등급 (seed 13)', () => {
+    const random = createSeededRandom(13)
     const 끝 = runAutoProgress(startTeamGame({ ...기본옵션, settings: 전부자동 }, random), random)
     const summary = summaryOf(끝)
 
     // 장면 덱 섞기(상태 7 0x3e340 → 0xb08e8) · 효과 객체 1202 번(3ef6e) · 경기 시작 rand(0, 2)(상태 9 0x3fa0e → 0xc0dac)와
-    // 자동진행 rand(0, 2)가 앞에 서는 차례 — 1-2 완투패 (씨앗 20100901 은 효과 객체 굴림이 든 뒤 0-7 이라 평판 비교가 안 선다)
-    // 칸 6 은 투수 끈기(비트 10) 줄(붙박이 열두 줄)의 공 소모 −1(0xa5e14 a5f56 · skillBitsAt)이 든 뒤 10 (예전 9)
-    expect(summary.ourScore).toBe(1)
+    // 자동진행 rand(0, 2)가 앞에 서는 차례 — 완투패 (씨앗 20100901 은 효과 객체 굴림이 든 뒤 0-7 이라 평판 비교가 안 선다)
+    // 헛스윙 세 번째 겨루기(0xc11f0 c1748)의 굴림 둘이 든 뒤 씨앗 6 은 2-1 완투승이라 씨앗 13(0-2 완투패)으로 옮겼다
+    expect(summary.ourScore).toBe(0)
     expect(summary.opponentScore).toBe(2)
     expect(summary.pitching.outsRecorded).toBe(27)
-    // 16칸 값은 씨앗 6 경기의 기록이다(원본 생성기로 옮기며 씨앗 1 → 6 — 1-2 완투패 · 27아웃 · −1 → +1 은 그대로)
-    expect(summary.gameRecord).toEqual([0, 0, 13, 0, 0, 7, 7, 7, 1, 1, 0, 0, 0, 0, 0, 0])
+    // 16칸 값은 씨앗 13 경기의 기록이다(원본 생성기로 옮기며 씨앗 1 → 6, 겨루기 굴림으로 → 13 — 완투패 · 27아웃 · −1 → +1 은 그대로)
+    expect(summary.gameRecord).toEqual([0, 0, 13, 0, 0, 10, 8, 5, 1, 0, 0, 0, 0, 0, 0, 0])
 
     const context = {
       opponentRuns: summary.opponentScore,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { judgePitchOf, pitchGradeOf, quickPitchOf, simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
+import { judgePitchOf, pitchGradeOf, playQuickAtBat, quickPitchOf, simulateQuickAtBat, thirdStrikeContestOf } from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
@@ -89,9 +89,23 @@ describe('quickPitchOf — 0xc11f0 투구 한 번', () => {
 })
 
 describe('simulateQuickAtBat — 타석 하나', () => {
-  it('헛스윙만 나오면 세 번째에 삼진으로 끝난다', () => {
-    // 오차를 크게 뽑아(0.99) contact 를 0 으로 만든다
-    expect(simulateQuickAtBat(타자, 투수, { inning: 1 }, 고정(0.99))).toEqual({ kind: '삼진' })
+  it('헛스윙 세 번째는 겨루기다 — rand(0, 투수 구속) > rand(0, 타자 히트) 면 삼진 (c1748~c17b4)', () => {
+    // 15회는 스윙을 강제한다. 오차를 크게 뽑아(0.99) contact 를 0 으로 만든다. 구속 900 · 히트 500 이면 891 > 495
+    const 빠른투수 = { ...투수, velocity: 900 }
+    expect(simulateQuickAtBat(타자, 빠른투수, { inning: 15 }, 고정(0.99))).toEqual({ kind: '삼진' })
+  })
+
+  it('겨루기에서 투수가 못 이기면(같아도) 삼진이 아니라 아웃이다 — 0xa7d0d, 중계 글은 5 (c17b8~c17d8)', () => {
+    // 구속·히트 500 이 같아 두 굴림이 495 로 같다 → p > b 가 아니다
+    const play = playQuickAtBat(타자, 투수, { inning: 15 }, 고정(0.99))
+    expect(play.outcome).toEqual({ kind: '아웃', detail: '뜬공아웃' })
+    expect(play.strikes).toBe(3)
+    expect(play.swingingStrikeOutLost).toBe(true)
+  })
+
+  it('겨루기 굴림은 투수 구속을 먼저, 타자 히트를 다음에 뽑는다', () => {
+    expect(thirdStrikeContestOf(타자, 투수, 순서난수([0.6, 0.5]))).toBe(true)
+    expect(thirdStrikeContestOf(타자, 투수, 순서난수([0.5, 0.6]))).toBe(false)
   })
 
   it('타석은 반드시 끝난다 — 파울만 이어져도 무한 루프에 빠지지 않는다', () => {

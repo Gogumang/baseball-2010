@@ -258,7 +258,7 @@ describe('간이 엔진은 공마다 깎는다 — 0xc262c 가 공을 던지기 
   it('바닥난 투수도 공마다 0 ↔ 100 을 오간다 — 0xaeb08 의 되살아남(원본 버그)이 공 단위로 돈다', () => {
     // 한 공(소모 9)이면 0 이 되는 스태미나에서 시작한다
     const 한공 = FULL_STAMINA - drainQuickPitcher(수비(FULL_STAMINA), startingMoundOf(0), 1)
-    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, 씨앗난수(11), undefined, undefined, 수비(한공))
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, 씨앗난수(12), undefined, undefined, 수비(한공))
     expect(result.mound?.stamina).toBe(drainQuickPitcher(수비(한공), startingMoundOf(0, 한공), result.pitches))
     expect([0, 100]).toContain(result.mound?.stamina)
   })

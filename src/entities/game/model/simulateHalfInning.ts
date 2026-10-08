@@ -72,6 +72,11 @@ export interface HalfInningPlateAppearance {
   readonly substitutionCalls?: number
   /** 이 타석에 파울이 났나 (`QuickAtBatPlay.fouled`) — 0x21 중계 글 코드가 본다 */
   readonly fouled?: true
+  /**
+   * 헛스윙 세 번째 스트라이크 겨루기에서 진 아웃(`QuickAtBatPlay.swingingStrikeOutLost`) — 결과는 '아웃' 이지만
+   * 0x21 중계 글 코드는 5 "삼진 아웃" 이다(c17d8)
+   */
+  readonly swingingStrikeOutLost?: true
 }
 
 /**
@@ -633,6 +638,7 @@ export function* simulateHalfInningTicks(
       ...(mound === undefined ? {} : { pitcherSlot: mound.pitcherSlot }),
       ...(substitutionCalls > 0 ? { substitutionCalls } : {}),
       ...(play.fouled === true ? { fouled: true as const } : {}),
+      ...(play.swingingStrikeOutLost === true ? { swingingStrikeOutLost: true as const } : {}),
     })
     // 타순 칸 기록(안타·홈런·타석) — 다음 CPU 대타 판정이 본다 (0xa8024)
     if (lineup !== undefined) lineup = recordLineupPlay(lineup, order, outcome)
