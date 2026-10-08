@@ -30,7 +30,8 @@ const 레오니 = ACE_PITCHERS[1]
 
 const 띄우기 = (aceLevels?: Readonly<Record<number, number>>) => {
   const base = startGame(createSeededRandom(20100901))
-  const progress: GameProgress = { ...base, aceOpponent: 레오니 }
+  // 경기 시작 자동진행(0x21) 중계는 이 시험의 몫이 아니다 — 곧장 내 타석
+  const progress: GameProgress = { ...base, aceOpponent: 레오니, autoRelay: null }
   const noop = () => {}
   const session = {
     loadingTip: null,

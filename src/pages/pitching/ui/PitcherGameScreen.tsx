@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
@@ -61,6 +61,12 @@ import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { MAXIMUM_GAME_POINT, STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
+import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
+import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
+import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
+import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -218,6 +224,30 @@ export function PitcherGameScreen({
   )
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
   /**
+   * **자동진행 중계(상태 0x21)** — 사람 장면 사이에 돈 간이 엔진 틱들(우리 공격 · 강판 뒤 수비)을 틱마다 한 칸씩 튼다
+   * (`progress.autoRelay`, 그리기는 미션과 같은 몫 — 모드 3 은 키 · 속도 · 배경음 · 연출 대기가 없다). 앞 판의 수비 재생 뒤, 0x18 · 0xe 앞.
+   */
+  const relay = progress.autoRelay ?? null
+  const [shownRelaySerial, setShownRelaySerial] = useState(0)
+  const finishRelay = useCallback(() => setShownRelaySerial(relay?.serial ?? 0), [relay])
+  /**
+   * 내 공의 0x12 대기 — 맞히지 못한 공은 갱신 0x4e6d4 가 상태 틱을 15(볼넷 · 사구 · 삼진이면 31) 까지 기다린 뒤 판정 A 가 다음
+   * 상태(반 이닝이 끝났으면 0x21)로 보낸다. 웹 진행기는 공 하나에 자동진행까지 돌리므로 중계를 그 틱 뒤로 민다.
+   */
+  const atBatBeforeThrowRef = useRef(progress.atBat)
+  const [pitchWaitTicks, setPitchWaitTicks] = useState(0)
+  const lastResolution = progress.lastResolution
+  const lastResolutionRef = useRef(lastResolution)
+  useEffect(() => {
+    if (lastResolutionRef.current === lastResolution) return
+    lastResolutionRef.current = lastResolution
+    if (lastResolution === null || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) return
+    if (lastResolution.kind === '타구') return
+    setPitchWaitTicks(resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, lastResolution).outcome))
+  }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay])
+  useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
+  const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
+  /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
    * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 기다리지 않는다.
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·강판 물음·돌발 결과 창·감독 대사 창이 덮으면 받지 않는다.
@@ -234,6 +264,7 @@ export function PitcherGameScreen({
       progress.pendingDefensePlay === null &&
       progress.pendingRunnerPlay == null &&
       !isReplaying &&
+      !isRelaying &&
       !isPopupOpen &&
       overlay === null &&
       !asksGiveUp &&
@@ -246,6 +277,7 @@ export function PitcherGameScreen({
       progress.pendingDefensePlay === null &&
       progress.pendingRunnerPlay == null &&
       !isReplaying &&
+      !isRelaying &&
       !isPopupOpen &&
       overlay === null &&
       !asksGiveUp &&
@@ -262,6 +294,7 @@ export function PitcherGameScreen({
     canPitch &&
     !isAwaitingConfirm &&
     !isReplaying &&
+    !isRelaying &&
     !isSceneShowing &&
     phase === '구질' &&
     !isMenuOpen &&
@@ -292,6 +325,7 @@ export function PitcherGameScreen({
     overlay === null &&
     !asksGiveUp &&
     !isReplaying &&
+    !isRelaying &&
     progress.pendingDefensePlay === null &&
     progress.pendingRunnerPlay == null &&
     progress.managerHookText === null &&
@@ -310,6 +344,8 @@ export function PitcherGameScreen({
 
   const throwWith = (gaugeCell: number) => {
     if (slot === null) return
+    // 이 공으로 끝난 타석 결과를 0x12 대기 틱(`resultWaitTicksOf`)에 쓴다 — 던지기 전 카운트
+    atBatBeforeThrowRef.current = progress.atBat
     actions.throwPitch({ typeNumber: slot.typeNumber, courseCell, gaugeCell })
     setPhase('구질')
     setSlot(null)
@@ -425,6 +461,22 @@ export function PitcherGameScreen({
   // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
   if (isReplaying) {
     return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} />
+  }
+  // 자동진행 중계(0x21) — 굴려 둔 틱을 매 틱 한 칸씩 (모드 3: 키 · 속도 · 배경음 없음)
+  if (isRelaying && relay !== null) {
+    return withRecordAlert(
+      <AutoPlayRelayReplay
+        key={relay.serial}
+        steps={pitcherAutoRelayStepsOf(relay.ticks, pitcherName ?? null)}
+        sideTeams={
+          options.playerSide === PLAYER_SIDE_FIRST_BAT
+            ? [options.ourTeamId, options.opponentTeamId]
+            : [options.opponentTeamId, options.ourTeamId]
+        }
+        humanSide={options.playerSide === PLAYER_SIDE_FIRST_BAT ? 0 : 1}
+        onDone={finishRelay}
+      />,
+    )
   }
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진행기가 이미 썼다

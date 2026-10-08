@@ -66,6 +66,23 @@ const 기본옵션: PitcherGameOptions = {
 }
 
 /**
+ * **자동진행 중계(상태 0x21)를 끝까지 흘린다** — 모드 3 은 매 틱 한 칸, 마지막 칸 다음 틱에 0x18 이라 중계 화면이 내려간다.
+ * 중계가 없으면 아무 틱도 안 흘린다.
+ */
+function 중계넘기기(): number {
+  let seen = false
+  let frames = 0
+  for (; frames < 5000; frames += 1) {
+    const showing = screen.queryByTestId('중계-공격팀') !== null
+    if (showing) seen = true
+    else if (seen) break
+    else if (frames > 2) break
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+  }
+  return frames
+}
+
+/**
  * 화면을 띄우고 경기 시작 연출을 넘긴다 — 인트로(상태 0xc)는 '5' 로 건너뛰고, 1회초 판(0x18)이 섰으면 OK.
  * 기본 옵션은 후공·선발이라 1회초 판이 선다 (진행기 `withHalfInningBoard`).
  */
@@ -175,6 +192,8 @@ describe('투수편 경기 화면', () => {
     vi.useFakeTimers()
     try {
       띄우기({ dayCounter: 3 })
+      // 등판일이 아니면 경기 전체가 자동진행(0x21) — 중계를 다 본 뒤 경기 끝 결과 판(0x18)
+      중계넘기기()
       // 경기 끝 결과 판 — 승·패·세 세 줄, 처음 10틱은 OK 가 안 먹는다
       expect(screen.getByAltText('세이브')).toBeTruthy()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
@@ -214,8 +233,9 @@ describe('투수편 경기 화면', () => {
         <PitcherGameScreen options={{ ...기본옵션, dayCounter: 3 }} random={createSeededRandom(20100901)} onFinish={onFinish}
           gamePoint={100} />,
       )
-      // 인트로(0xc)를 '5' 로 건너뛰면 경기 끝 결과 판(0x18) — 10틱 잠금 뒤 OK 로 정산(0x19)
+      // 인트로(0xc)를 '5' 로 건너뛰면 자동진행 중계(0x21) 뒤 경기 끝 결과 판(0x18) — 10틱 잠금 뒤 OK 로 정산(0x19)
       fireEvent.keyDown(window, { key: '5' })
+      중계넘기기()
       expect(screen.getByAltText('세이브')).toBeTruthy()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
       fireEvent.keyDown(window, { key: '5' })
@@ -250,7 +270,8 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })
 
-  it('선공이면 첫 장면이 우리 공격(자동)이라 판 없이 곧장 던진다', () => {
+  it('선공이면 첫 장면이 우리 공격(자동)이라 판 없이 — 그 중계(0x21)를 본 뒤 곧장 던진다', () => {
+    vi.useFakeTimers()
     render(
       <PitcherGameScreen
         options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }}
@@ -258,8 +279,10 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
         onFinish={vi.fn()}
       />,
     )
-    vi.useFakeTimers()
     fireEvent.keyDown(window, { key: '5' })
+    // 1회초 우리 공격 — 타석마다 한 틱(교체 틱 포함) · 마지막 칸 다음 틱에 0x18
+    expect(중계넘기기()).toBeGreaterThan(3)
+    expect(screen.queryByText('1회초')).toBeNull()
     OK통과()
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })

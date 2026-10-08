@@ -46,6 +46,8 @@ const 띄우기 = (wait: SceneConfirmWait) => {
   const session = createBurstSession(4)!
   const progress: GameProgress = {
     ...base,
+    // 경기 시작 자동진행(0x21) 중계는 이 시험의 몫이 아니다 — 곧장 내 타석
+    autoRelay: null,
     burst: { ...session, current: BURST_TABLES[session.table][0]! },
     lastBurstResolution: null,
     sceneConfirm: wait,

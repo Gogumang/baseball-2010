@@ -520,6 +520,12 @@ export interface PitcherGameProgress {
   readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
   /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
   readonly autoSinceHuman: boolean
+  /**
+   * **자동진행 중계(상태 0x21)의 틱들** — 사람 장면 사이에 돈 간이 엔진 0xc262c 한 번마다 한 칸(교체로 공 없이 돌아간 틱 ·
+   * 타석 하나). 화면이 틱마다 한 칸씩 중계를 튼다(`pages/auto-play-relay`). 모드 3 은 0x21 키 · 속도 · 배경음 · 연출 대기가 없어
+   * 굴린 결과를 나중에 틀어도 원본과 같다. 새 자동 묶음마다 `serial` 이 오른다.
+   */
+  readonly autoRelay?: PitcherAutoRelay | null
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
   /**
@@ -2288,14 +2294,18 @@ export function closeBurstWindow(progress: PitcherGameProgress): PitcherGameProg
 /* ── 자동 진행 ───────────────────────────────────────────────────────────────── */
 
 function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  /** 이번 걸음에 돈 자동진행(0x21) 틱들 — 사람 장면에 닿으면 중계 칸으로 싣는다 */
+  const relay: PitcherAutoRelayTick[] = []
+  const settle = (next: PitcherGameProgress): PitcherGameProgress =>
+    relay.length === 0 ? next : { ...next, autoRelay: { serial: (progress.autoRelay?.serial ?? 0) + 1, ticks: relay } }
   let current = progress
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
-    if (current.game.isFinished) return current
-    if (current.managerHookText !== null) return current
+    if (current.game.isFinished) return settle(current)
+    if (current.managerHookText !== null) return settle(current)
 
     if (current.game.half === ourHalfOf(current.game)) {
       // 우리 공격은 모드 3 에서 늘 자동진행(0x21, 0xc1eac) — 진입 0x3abf0 이 남은 돌발을 내린다 (0x8f628)
-      current = markAuto(playTeammateAtBat(withoutPendingBurst(current), random))
+      current = markAuto(playTeammateAtBat(withoutPendingBurst(current), random, relay))
       continue
     }
 
@@ -2305,7 +2315,7 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
     }
 
     if (current.onMound) {
-      if (current.atBatPrepared) return current
+      if (current.atBatPrepared) return settle(current)
       // 상태 0x18(1회초 판) → 0xd → 0xe(강판 판정 · OK 대기) 차례 — 판의 굴림이 타석 준비보다 앞이다.
       // 새 타석의 0xd 진입 0x48d50 은 state[0xe](CPU 대타 막음)를 내린다 (48eb6).
       // 돌발(0x8f158)·0xf 진입 0x3d954 는 OK 뒤다 (`confirmScene`) — 강판(0x23)이면 0xf 에 안 간다
@@ -2313,14 +2323,14 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
         withHalfInningBoard({ ...current, pinchHitUsed: false }, random),
         random,
       )
-      return {
+      return settle({
         ...prepared,
         lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
         autoSinceHuman: false,
-      }
+      })
     }
     // 내가 마운드에 없는 수비 타석도 자동진행(0x21) — 같은 진입이 남은 돌발을 내린다
-    current = markAuto(playDefensiveAtBat(withoutPendingBurst(current), random))
+    current = markAuto(playDefensiveAtBat(withoutPendingBurst(current), random, relay))
   }
   throw new Error('투수편 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
 }
@@ -2337,6 +2347,61 @@ function withoutPendingBurst(progress: PitcherGameProgress): PitcherGameProgress
 }
 
 /** 사람이 안 잡은 타석(간이 엔진)이 지났다는 표시 */
+/** 자동진행 중계 묶음 — `PitcherGameProgress.autoRelay` */
+export interface PitcherAutoRelay {
+  readonly serial: number
+  readonly ticks: readonly PitcherAutoRelayTick[]
+}
+
+/**
+ * 0x21 갱신 0x48480 의 한 걸음 = 0xc262c 한 번. 그 틱 뒤의 경기(`progress` — 중계 칸을 비운 사본)와, 타석 틱이면 그 타석.
+ * 교체 틱(0xc1ba4 가 대타 · 투수 교체를 내 공 없이 돌아감, c266c)은 `atBat` 이 null 이다.
+ */
+export interface PitcherAutoRelayTick {
+  readonly progress: PitcherGameProgress
+  /** 이 틱 앞의 경기 — 3아웃 넘김 0xb6b6c 는 다음 틱 0xc2198 이라 이 틱 그림은 앞 반 이닝 그대로다 */
+  readonly before: GameState
+  readonly atBat: {
+    /** 공격이 우리(동료 타석)인가 */
+    readonly ours: boolean
+    /** 친 타자의 타순 커서 (팀[+0x32]) */
+    readonly orderIndex: number
+    readonly outcome: AtBatOutcome
+    /** 그 타석에 파울이 났나 — 코드 0 뜬공 아웃의 중계 글이 앞 공의 13(파울)으로 남는다 (`relayCodeOf`) */
+    readonly fouled: boolean
+    /** 타석 끝 카운트 st[4] · st[5] (간이 엔진이 올린 그대로) */
+    readonly strikes: number
+    readonly balls: number
+  } | null
+}
+
+/** 그 틱 뒤 경기를 중계 칸에 싣는다 — 사본에는 중계 칸을 안 남긴다 */
+function relayTickOf(after: PitcherGameProgress, before: GameState, atBat: PitcherAutoRelayTick['atBat']): PitcherAutoRelayTick {
+  return { progress: { ...after, autoRelay: null }, before, atBat }
+}
+
+/** 그 팀 타순 커서 칸의 타자 이름 (0xb62c0 — 대타 · 마타자 칸 포함). 모르면 null */
+export function batterNameAt(progress: PitcherGameProgress, ours: boolean, orderIndex: number): string | null {
+  if (!ours) return opponentBatterOf({ ...progress, opponentOrderIndex: orderIndex }).name ?? null
+  const rosterSlot = rosterSlotAt(progress.ourLineup, orderIndex)
+  if (rosterSlot === ACE_BATTER_ROSTER_SLOT) {
+    return aceBatterPlayerOf(teamAcesOf(progress.options, true).batter)?.name ?? null
+  }
+  const roster = teamBatters(progress.options.ourTeamId)
+  return roster[rosterSlot % roster.length]?.name ?? null
+}
+
+/** 그 팀 마운드의 지금 투수 이름 (0xae83c → 0xb62c0). 우리 마운드에 내가 서 있으면 `myName` */
+export function moundPitcherNameOf(progress: PitcherGameProgress, ours: boolean, myName: string | null): string | null {
+  if (ours && progress.onMound) return myName
+  const slot = ours ? progress.ourMound.pitcherSlot : progress.opponentMound.pitcherSlot
+  if (slot === acePitcherSlotOf(ours)) {
+    const ace = teamAcePitcherOf(progress.options, ours)
+    if (ace !== undefined) return ace.player.name
+  }
+  return rosterPitcherName(ours ? progress.options.ourTeamId : progress.options.opponentTeamId, slot) ?? null
+}
+
 function markAuto(progress: PitcherGameProgress): PitcherGameProgress {
   return progress.autoSinceHuman ? progress : { ...progress, autoSinceHuman: true }
 }
@@ -2459,9 +2524,11 @@ function enterAsRelief(progress: PitcherGameProgress): PitcherGameProgress {
 function playDefensiveAtBat(
   progress: PitcherGameProgress,
   random: RandomPort,
+  /** 자동진행 중계 틱을 여기 쌓는다 (`autoRelay`) */
+  relay?: PitcherAutoRelayTick[],
 ): PitcherGameProgress {
   const { options } = progress
-  progress = runQuickSubstitutions(progress, false, random)
+  progress = runQuickSubstitutions(progress, false, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
   const mound = progress.ourMound
   const defense = ourQuickDefenseOf(progress)
   const pitched = perPitchDrainOf(defense, mound)
@@ -2493,7 +2560,7 @@ function playDefensiveAtBat(
   )
   const runs = played.game.opponentScore - before.opponentScore
   const halfChanged = played.game.half !== before.half || played.game.inning !== before.inning
-  return {
+  const result: PitcherGameProgress = {
     ...played,
     // 정산 0xa8024 — 우리 마운드 CPU 투수 레코드에 아웃·실점·탈삼진 (내 투수는 커리어가 따로 센다)
     pitcherLines: chargeCpuPitcherLine(played.pitcherLines, options.ourTeamId, mound.pitcherSlot, {
@@ -2513,16 +2580,29 @@ function playDefensiveAtBat(
       ? 0
       : Math.min(MAXIMUM_PITCHER_COUNTER, progress.ourInningRunsAllowed + runs),
   }
+  relay?.push(
+    relayTickOf(result, before, {
+      ours: false,
+      orderIndex: progress.opponentOrderIndex,
+      outcome: play.outcome,
+      fouled: play.fouled === true,
+      strikes: play.strikes,
+      balls: play.balls,
+    }),
+  )
+  return result
 }
 
 /** 동료 타석 — 투수편 주인공은 타석에 서지 않으므로 아홉 칸 모두 간이 엔진이 돈다 */
 function playTeammateAtBat(
   progress: PitcherGameProgress,
   random: RandomPort,
+  /** 자동진행 중계 틱을 여기 쌓는다 (`autoRelay`) */
+  relay?: PitcherAutoRelayTick[],
 ): PitcherGameProgress {
   const { options } = progress
   // 0xc262c 는 타석마다 먼저 0xc1ba4 — 우리(공격) CPU 대타 → 상대(수비) 투수 교체
-  progress = runQuickSubstitutions(progress, true, random)
+  progress = runQuickSubstitutions(progress, true, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
   // 동료 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발 굴림(0x8f158)·판정(0x8f414)이 없다
   const before = progress.game
   const mound = progress.opponentMound
@@ -2558,7 +2638,7 @@ function playTeammateAtBat(
     outcome,
     runs,
   )
-  return appendLog(
+  const result = appendLog(
     {
       ...progress,
       game,
@@ -2601,6 +2681,17 @@ function playTeammateAtBat(
     }`,
     false,
   )
+  relay?.push(
+    relayTickOf(result, before, {
+      ours: true,
+      orderIndex: slot,
+      outcome,
+      fouled: play.fouled === true,
+      strikes: play.strikes,
+      balls: play.balls,
+    }),
+  )
+  return result
 }
 
 /* ── 자동 타석의 교체 · 0xc1ba4 ──────────────────────────────────────────────── */
@@ -2663,6 +2754,8 @@ function runQuickSubstitutions(
   progress: PitcherGameProgress,
   battingIsOurs: boolean,
   random: RandomPort,
+  /** 교체가 난 부름마다 — 그 부름은 0x21 의 한 틱이다(공 없이 돌아감 c266c) */
+  onSubstitutionTick?: (after: PitcherGameProgress, before: GameState) => void,
 ): PitcherGameProgress {
   let current = progress
   for (let call = 0; call < MAXIMUM_QUICK_SUBSTITUTION_CALLS; call += 1) {
@@ -2671,6 +2764,7 @@ function runQuickSubstitutions(
       : applyOpponentCpuPinchHit(current, random, false)
     const changed = battingIsOurs ? changeOpponentPitcher(pinched, random) : changeOurPitcher(pinched, random)
     if (changed === current) return current
+    onSubstitutionTick?.(changed, current.game)
     current = changed
   }
   return current

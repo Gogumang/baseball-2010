@@ -48,6 +48,8 @@ describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 �
     const started = startGame(createSeededRandom(20101007))
     const base: GameProgress = {
       ...started,
+      // 경기 시작 자동진행(0x21) 중계는 이 시험의 몫이 아니다 — 곧장 내 타석
+      autoRelay: null,
       recordIds: [],
       myStats: { ...started.myStats, walks: 1 },
     }

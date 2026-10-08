@@ -107,8 +107,8 @@ export interface InningRunsBoard {
 /** 0xb6a9c 의 `cmp #0x62; bgt` — 98 이하일 때만 칸을 올린다 */
 const INNING_RUNS_RAISE_LIMIT = 0x62
 
-/** 0xb6a9c 를 `runs` 번 — 측 `side` 의 지금 이닝 칸 */
-function withInningRuns(game: GameState, side: number, runs: number): GameState {
+/** 0xb6a9c 를 `runs` 번 — 측 `side` 의 지금 이닝 칸 (자동진행 중계 칸이 반 이닝 도중의 판을 그릴 때도 쓴다) */
+export function withInningRuns(game: GameState, side: number, runs: number): GameState {
   if (runs <= 0) return game
   const board = game.inningRuns ?? { runs: [[], []] }
   const row = [...board.runs[side === 1 ? 1 : 0]]

@@ -31,6 +31,9 @@ import { batterHumanRecordCountOf, resultWaitTicksOf } from '@/pages/game/lib/ba
 import type { RecordAlertScene } from '@/pages/game/ui/GameScreen'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
+import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { gameAutoRelayStepsOf } from '@/pages/game/lib/gameAutoRelay'
 
 interface GameRouteProps {
   readonly session: ReturnType<typeof useCareerSession>
@@ -78,6 +81,18 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerialRef.current)
   /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, sceneSerialRef.current)
+
+  /**
+   * **자동진행 중계(상태 0x21)** — 내 타석 사이에 돈 동료 타석 · 상대 반 이닝(`progress.autoRelay`)을 틱마다 한 칸씩 튼다.
+   * 모드 4 는 0x21 키 · 속도 · 배경음 · 연출 대기가 없어 굴린 결과를 뒤에 틀어도 원본과 같다. 이미 튼 묶음은 (장면, serial) 로 기억한다
+   */
+  const relay = progress.autoRelay ?? null
+  const [shownRelay, setShownRelay] = useState<{ readonly scene: number; readonly serial: number } | null>(null)
+  const relayScene = sceneSerialRef.current
+  const finishRelay = useCallback(
+    () => setShownRelay(relay === null ? null : { scene: relayScene, serial: relay.serial }),
+    [relay, relayScene],
+  )
 
   /** 제안 대사를 이미 보여 준 돌발 행. 판정은 진행기가 지워 주므로 여기서 셀 것이 없다 */
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)
@@ -195,6 +210,25 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   }
   if (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady) {
     return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} />
+  }
+  // 자동진행 중계(0x21) — 앞 판의 수비 재생 뒤 · 내 공의 0x12 대기(15/31 틱)가 끝난 뒤(판정 A 가 0x21 로 보낸다), 0x18 · 0xe ·
+  // 다음 내 타석 앞. 기록 달성 알림 0x4e35c 는 0x17 말고는 늘 그리므로 중계 위에도 얹는다
+  if (relay !== null && !pitchEnd.isHolding && !(shownRelay?.scene === relayScene && shownRelay.serial === relay.serial)) {
+    return (
+      // 기록 달성 알림(`RecordAlertScreenOverlay`)은 이 틀 안의 절대 자리다
+      <div style={{ position: 'relative' }}>
+        <AutoPlayRelayReplay
+          key={`${relayScene}-${relay.serial}`}
+          steps={gameAutoRelayStepsOf(relay.ticks, career.name)}
+          sideTeams={
+            progress.game.playerSide === 0 ? [progress.ourTeamId, progress.opponentTeamId] : [progress.opponentTeamId, progress.ourTeamId]
+          }
+          humanSide={progress.game.playerSide === 0 ? 0 : 1}
+          onDone={finishRelay}
+        />
+        <RecordAlertScreenOverlay frame={recordAlert} />
+      </div>
+    )
   }
 
   // 결과가 먼저다 — 타석이 끝나며 난 판정을 보여 준 뒤에야 다음 타석 제안이 뜬다
