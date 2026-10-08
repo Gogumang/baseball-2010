@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
+import { DERBY_ORDINARY_PITCHER_ROW, derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { masterGameAbilityOf } from '@/entities/mission/model/missionCpuTeam'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { DERBY_MAGIC_PITCH_TYPE, DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { pitchListOf } from '@/entities/pitching/model/pitchIntelligence'
 
@@ -48,5 +51,28 @@ describe('홈런더비 상대 투수 (S13 5절 확정)', () => {
 
   it('단계 0 일반 투수는 레벨과 상관없다', () => {
     expect(derbyPitcherOf(0, { 0: 4, 1: 4 }).ability).toEqual(derbyPitcherOf(0).ability)
+  })
+
+  it('단계 0 은 상대 팀 v 의 마스터 투수 줄 2 다 — 0xb8c94(팀, 0, 2) 맞바꿈 뒤 칸 0 (3a524~3a538)', () => {
+    for (const team of [0, 4, 9]) {
+      const row = teamPitchers(team)[DERBY_ORDINARY_PITCHER_ROW]!
+      const pitcher = derbyPitcherOf(0, undefined, team)
+      expect(pitcher.ace).toBeNull()
+      expect(pitcher.name).toBe(row.name)
+      expect(pitcher.ability.gameAbility?.beforeFatigue).toEqual({
+        control: masterGameAbilityOf(row, true, 0),
+        velocity: masterGameAbilityOf(row, true, 1),
+        breaking: masterGameAbilityOf(row, true, 2),
+      })
+      // 체력%는 0xaebb0 모드 7 갈래가 늘 100
+      expect(pitcher.ability.staminaPercent).toBe(100)
+      expect(pitcher.ability.repertoire?.form).toBe(ROSTER_PITCHER_REPERTOIRES[team * 8 + 2]!.form)
+      // 구질은 그래도 1 고정 (0x344dc)
+      expect(pitcher.pitchType).toBe(DERBY_ORDINARY_PITCH_TYPE)
+    }
+  })
+
+  it('마투수 단계의 이름은 마투수 이름이다', () => {
+    expect(derbyPitcherOf(2, undefined, 3).name).toBe('붕붕머신')
   })
 })

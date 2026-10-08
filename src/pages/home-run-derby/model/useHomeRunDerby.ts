@@ -126,6 +126,12 @@ export interface HomeRunDerbyOptions {
    * 경기 장면 시작 굴림을 낼 난수 (`rollDerbySceneStart`). 안 넘기면 굴리지 않는다 (예전 시험용).
    */
   readonly random?: RandomPort
+  /**
+   * 내 타자편 팀 r7 = (s8) `0x1f8d5(저장, 4)` +1 바이트 — 나리 타자편 저장의 팀(웹 `career.teamId`, 마선수 대결의
+   * 사람 칸 팀과 같은 칸 — `missionHumanTeamIdOf`). 상대 팀 굴림 3a454 가 이 팀을 피한다. ⚠️ 저장이 없을 때 그 바이트 값은 미해결 —
+   * 안 넘기면 피하지 않는다.
+   */
+  readonly myTeamId?: number
 }
 
 /**
@@ -140,18 +146,23 @@ export interface HomeRunDerbyOptions {
  * 그 **뒤** 상태 8 경기 적재(0x48658 의 48774 → 구장 준비 0x352e8(354d2) → 0x783b0)가 하늘 줄 rand(0, 6) 을 굴린다 — 모드 7 은 0x783b0 의
  * 그 밖 갈래다(`stadiumSkyRowOf`). 돌려주는 값이 이 장면의 하늘 줄(구장 +0x10 = 값 mod 6)이다.
  * 차례: 갱신 표 0x52e2a 7 → 0x3e340 · 0x52e3a 9 → 0x3f584 · 0x52e32 8 → 0x48658, 예약 3efe6(상태 7 끝) → 9 · 3fa5e(상태 9 끝) → 8.
- * ⚠️ 뽑은 상대 팀(수비 팀)은 웹 더비가 그리지 않아 버린다 — 굴림 차례만 맞춘다.
+ * 뽑은 상대 팀 v(`opponentTeamId`)는 수비 팀이다 — 단계 0 투수가 그 마스터 팀의 투수 줄 2 다(`derbyPitcherOf` · `DERBY_ORDINARY_PITCHER_ROW`).
  * 돌려주는 `loadingTipIndex` 는 로딩 판이 그릴 팁 칸(`LOADING_TIPS` — StrTIP[1 + +0x315]), `skyRow` 는 하늘 줄이다.
  */
-export function rollDerbySceneStart(random: RandomPort): { readonly loadingTipIndex: number; readonly skyRow: number } {
+export function rollDerbySceneStart(
+  random: RandomPort,
+  myTeamId?: number,
+): { readonly loadingTipIndex: number; readonly skyRow: number; readonly opponentTeamId: number } {
   // 상태 7 진입 0x39f88 → 0x53dbc — 로딩 팁 rand(0, 73). 모드를 안 가려 더비도 장면마다 맨 앞에 한 번 (`rollSceneLoadingTip`)
   const loadingTipIndex = rollSceneLoadingTip(random)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 장면의 패턴 덱을 섞는다(상태 9 의 3a454 보다 앞)
   openScenePatternDeck(random)
-  random.rand(0, 9)
+  // 3a454 v = rand(0, 9) (0~8) — 3a45a `cmp r7, r0` 내 팀과 같으면 9
+  const rolledTeam = random.rand(0, 9)
+  const opponentTeamId = rolledTeam === myTeamId ? 9 : rolledTeam
   rollSimulatorInit(random)
   // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재 — 하늘 줄 rand(0, 6)
-  return { loadingTipIndex, skyRow: random.rand(0, SKY_ROW_COUNT) }
+  return { loadingTipIndex, skyRow: random.rand(0, SKY_ROW_COUNT), opponentTeamId }
 }
 
 export interface HomeRunDerbySession {
@@ -228,10 +239,14 @@ export interface HomeRunDerbySession {
  * `derbyBattedBallOf` 가 판을 돌려 홈런(슬롯 2 모드 7 갈래 0x52720) · 비거리(0xa600c) · 판 끝(공 멈춤 + 10틱)을 낸다(그 파일 머리말).
  * 판 안 굴림은 폴 충돌 rand(−25, 25) 하나뿐이다 — 야수는 쫓지도 쥐지도 않는다(공 틱 vt48 · 플레이 틱 vt4c 가 종류 8 이면 안 돈다).
  */
-export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: HomeRunDerbyOptions): HomeRunDerbySession {
+export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId }: HomeRunDerbyOptions): HomeRunDerbySession {
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
+  /** 상대 팀 v (장면 시작 굴림 3a454) — 난수가 없으면 undefined */
+  const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>(undefined)
+  const myTeamIdRef = useRef(myTeamId)
+  myTeamIdRef.current = myTeamId
   // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
   const [isPreparing, setIsPreparing] = useState(true)
   const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(false)
@@ -272,7 +287,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   /** 새 경기 장면의 시작 굴림 — 하늘 줄과 로딩 판 팁을 세운다. 난수가 없으면 아무것도 안 한다 */
   const startScene = () => {
     if (randomRef.current === undefined) return
-    const started = rollDerbySceneStart(randomRef.current)
+    const started = rollDerbySceneStart(randomRef.current, myTeamIdRef.current)
+    setOpponentTeamId(started.opponentTeamId)
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 첫 장면 · 다시하기 · 재도전마다 새 장면이다
     activeSound().stop()
     setSkyRow(started.skyRow)
@@ -638,7 +654,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   return {
     run,
     skyRow,
-    pitcher: derbyPitcherOf(run.stage, aceLevels),
+    pitcher: derbyPitcherOf(run.stage, aceLevels, opponentTeamId),
     banner,
     isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,
     isAwaitingConfirm,

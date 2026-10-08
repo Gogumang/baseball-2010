@@ -65,6 +65,10 @@ interface HomeRunDerbyScreenProps {
    * 앱(`EntryRoutes` 의 `derbyMatchupBatterOf`)이 넘긴다 — 안 넘긴 칸은 비워 둔다.
    */
   readonly matchupBatter?: Omit<MatchupBatterCard, 'isComputer'>
+  /**
+   * 내 타자편 팀 — 나리 타자편 저장의 팀(0x1f8d5(저장, 4) +1). 상대 팀 굴림 3a454 가 이 팀을 피한다 (`rollDerbySceneStart`).
+   */
+  readonly myTeamId?: number
 }
 
 /** 홈런더비 = 원본 전역 모드 7 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(자동진행 자리에 다시하기) */
@@ -98,8 +102,9 @@ export function HomeRunDerbyScreen({
   settings,
   onSettingsChange,
   matchupBatter,
+  myTeamId,
 }: HomeRunDerbyScreenProps) {
-  const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random })
+  const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId })
   const tick = useUpdateCounter()
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
@@ -294,7 +299,7 @@ export function HomeRunDerbyScreen({
               {session.isAwaitingConfirm && (
                 <DerbyMatchupCards
                   batterHand={batterSideOfForm(batterForm ?? 0)}
-                  pitcherName={ace?.name}
+                  pitcherName={pitcher.name ?? undefined}
                   batter={matchupBatter}
                 />
               )}
@@ -334,7 +339,8 @@ export function HomeRunDerbyScreen({
  * - 손: 타자 판 좌타/우타 · 판 자리 모두 0xb63c0(모드 타자) — `DerbyHud` 와 같은 폼 값.
  * - 투수 이름: 단계 ≥ 1 마투수는 0x48d50 이 마투수 기록 0x30 바이트를 통째로 복사하므로 그 기록의 이름이다
  *   (⚠️ 유력 — 0xb62c0 이 마선수 기록에서 `ACE_PLAYERS` 이름을 내는지는 0x20498 을 안 봤다).
- * ⚠️ 비운 칸: 단계 0 투수(상대 팀 투수 — 웹은 상대 팀을 버린다)의 이름, 투수 보직·좌우·방어율·탈삼진·체력 막대
+ * - 단계 0 투수 이름: 상대 팀 v(장면 시작 굴림 3a454)의 마스터 투수 줄 2 (`derbyPitcherOf` · `DERBY_ORDINARY_PITCHER_ROW`).
+ * ⚠️ 비운 칸: 투수 보직·좌우·방어율·탈삼진·체력 막대
  *   (기록 +0xb · +0x20/+0x22/+0x26, 0x66e44 · 0xb8680 — 웹에 마투수·상대 투수 기록이 없다).
  */
 function DerbyMatchupCards({

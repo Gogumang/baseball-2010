@@ -329,6 +329,8 @@ export function EntryRoutes({
         onSettingsChange={gameSettings.setSettings}
         // 상태 0xe 소개 판의 타자 판 — 모드 타자 기록(0x1fc20)에서 (`derbyMatchupBatterOf`)
         matchupBatter={derbyMatchupBatterOf(famer, career)}
+        // 상대 팀 굴림 3a454 가 피하는 내 팀 r7 = 나리 타자편 저장의 팀 (명예 타자를 골라도 같은 저장을 본다)
+        {...(career === null ? {} : { myTeamId: career.teamId })}
         onExit={leave}
       />
     )

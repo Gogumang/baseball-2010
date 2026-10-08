@@ -270,7 +270,7 @@ function masterPitcherRowAt(pitching: MissionCpuPitching, slot: number): RosterP
  * 0xb570c 는 모드를 안 가리고 첫머리(b5728)에서 이 함수를 플래그 1 로 부른다. 마스터 줄은 마선수가 아니라(+0xa 비트 6 꺼짐)
  * 레벨 배율 단계는 건너뛴다 — 시즌 레코드 카드가 쓰는 `equippedSeasonAbilityOf` 와 같은 식이다.
  */
-function masterGameAbilityOf(row: RosterPlayer, isPitcher: boolean, slot: number): number {
+export function masterGameAbilityOf(row: RosterPlayer, isPitcher: boolean, slot: number): number {
   return equippedSeasonAbilityOf(
     {
       name: row.name,
