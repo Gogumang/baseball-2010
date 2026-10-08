@@ -244,7 +244,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           userTeamId={flow.setup.userTeamId}
           aiTeamId={flow.setup.aiTeamId}
           phase={flow.firstBatPhase}
-          playerSide={flow.setup.playerSide}
+          // 선공 칸은 커서 skin+0x74 를 그린다 — 기록 rec+8 은 OK 때만 옮겨 적힌다
+          playerSide={flow.firstBatCursor}
           stadiumId={flow.setup.stadiumId}
           {...(stadiums === undefined ? {} : { stadiums })}
           onMoveFirstBat={actions.moveFirstBat}

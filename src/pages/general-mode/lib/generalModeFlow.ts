@@ -26,6 +26,7 @@ import type {
   GeneralModeSetup,
   GeneralModeStep,
 } from '@/pages/general-mode/lib/generalModeSetup'
+import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 
 export interface GeneralModeFlowState {
@@ -33,6 +34,12 @@ export interface GeneralModeFlowState {
   readonly setup: GeneralModeSetup
   /** 상태 20 의 하위 단계 `skin+0xcc` */
   readonly firstBatPhase: FirstBatPhase
+  /**
+   * 상태 20 의 선공 커서 `skin+0x74` — 20 진입 0x23ed0 이 들어올 때마다 0(유저 선공)으로 둔다(0x23f50).
+   * 기록 `rec+8` 은 단계 0 OK 때만 이 커서에서 옮겨 적는다(0x2896c) — 그래서 지난 판·지난 진입의 선공과 상관없이
+   * 커서는 늘 유저 선공에서 시작한다
+   */
+  readonly firstBatCursor: PlayerSide
   /** 상태 21 의 하위 단계 `[skin+0xd0]` */
   readonly acePhase: AcePhase
   /** 빠른실행으로 들어왔는가 (메뉴+0x14c) — 경기정보의 `*` 재굴림과 CLR 이 이것을 본다 */
@@ -48,6 +55,7 @@ export function createFlowState(
     step: isQuickStart ? GENERAL_MODE_STEP.경기정보 : GENERAL_MODE_STEP.유저팀,
     setup: options.setup ?? INITIAL_SETUP,
     firstBatPhase: FIRST_BAT_PHASE.선공,
+    firstBatCursor: PLAYER_SIDE_FIRST_BAT,
     acePhase: ACE_PHASE.마투수,
     isQuickStart,
   }
@@ -71,21 +79,26 @@ export function chooseAiTeam(state: GeneralModeFlowState, teamId: number): Gener
     setup: { ...state.setup, aiTeamId: teamId },
     step: GENERAL_MODE_STEP.선공구장,
     firstBatPhase: FIRST_BAT_PHASE.선공,
+    // 20 진입 0x23f50 — skin+0x74 = 0
+    firstBatCursor: PLAYER_SIDE_FIRST_BAT,
   }
 }
 
 /**
- * 상태 20 단계 0 에서 좌·우 — 선공 커서 `skin+0x74` 만 뒤집는다.
- * 원본은 OK 때 `rec+8 = (skin+0x74 ≠ 0)` 로 옮겨 적지만, 커서와 기록이 같은 값이라 여기서는
- * 기록을 바로 고치고 단계만 안 옮긴다.
+ * 상태 20 단계 0 에서 좌·우 — 선공 커서 `skin+0x74` 만 뒤집는다(0x28a04~0x28a0e). 기록 `rec+8` 은 안 건드린다.
  */
 export function moveFirstBat(state: GeneralModeFlowState, playerSide: PlayerSide): GeneralModeFlowState {
-  return { ...state, setup: { ...state.setup, playerSide } }
+  return { ...state, firstBatCursor: playerSide }
 }
 
-/** 상태 20 단계 0 OK — `rec+8 = (skin+0x74 ≠ 0)` 을 적고 구장 단계로 */
+/** 상태 20 단계 0 OK — `rec+8 = (skin+0x74 ≠ 0)` 을 적고 구장 단계로 (0x28a12~0x28a2a) */
 export function chooseFirstBat(state: GeneralModeFlowState, playerSide: PlayerSide): GeneralModeFlowState {
-  return { ...state, setup: { ...state.setup, playerSide }, firstBatPhase: FIRST_BAT_PHASE.구장 }
+  return {
+    ...state,
+    setup: { ...state.setup, playerSide },
+    firstBatCursor: playerSide,
+    firstBatPhase: FIRST_BAT_PHASE.구장,
+  }
 }
 
 /** 상태 20 단계 1 에서 좌·우 — 구장 커서만 옮긴다 (커서가 곧 `rec+0xc` 다) */
@@ -152,8 +165,13 @@ export function stepBack(state: GeneralModeFlowState): GeneralModeFlowState | nu
       if (state.acePhase === ACE_PHASE.마타자) {
         return { ...state, acePhase: ACE_PHASE.마투수 }
       }
-      // 상태 20 진입 0x23ed0 이 단계를 0(선공)으로 되돌리고 커서는 지난번 구장(rec+0xc)에서 시작한다
-      return { ...state, step: GENERAL_MODE_STEP.선공구장, firstBatPhase: FIRST_BAT_PHASE.선공 }
+      // 상태 20 진입 0x23ed0 이 단계를 0(선공)으로 · 선공 커서를 0 으로 되돌리고 구장 커서는 지난번 구장(rec+0xc)에서 시작한다
+      return {
+        ...state,
+        step: GENERAL_MODE_STEP.선공구장,
+        firstBatPhase: FIRST_BAT_PHASE.선공,
+        firstBatCursor: PLAYER_SIDE_FIRST_BAT,
+      }
     case GENERAL_MODE_STEP.경기정보:
       if (state.isQuickStart) return null
       // 0x313b2 의 [skin+0xd0] = 0 은 21 진입 0x263f4 가 곧바로 1(마투수)로 덮는다

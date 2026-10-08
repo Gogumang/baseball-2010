@@ -57,11 +57,30 @@ describe('앞으로 가기', () => {
   it('커서만 옮기는 손잡이는 단계를 바꾸지 않는다', () => {
     const 선공 = moveFirstBat(chooseAiTeam(chooseUserTeam(처음(), 0), 1), PLAYER_SIDE_LAST_BAT)
     expect(선공.firstBatPhase).toBe(FIRST_BAT_PHASE.선공)
-    expect(선공.setup.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+    // 좌·우는 커서 skin+0x74 만 — 기록 rec+8 은 OK 때 옮겨 적는다
+    expect(선공.firstBatCursor).toBe(PLAYER_SIDE_LAST_BAT)
+    expect(선공.setup.playerSide).toBe(PLAYER_SIDE_FIRST_BAT)
 
     const 구장 = moveStadium(chooseFirstBat(선공, PLAYER_SIDE_FIRST_BAT), 8)
     expect(구장.firstBatPhase).toBe(FIRST_BAT_PHASE.구장)
     expect(구장.setup.stadiumId).toBe(8)
+  })
+})
+
+describe('선공 커서 skin+0x74 (G8)', () => {
+  it('20 에 들어올 때마다 커서는 유저 선공(0)이다 — 진입 0x23f50, 기록 rec+8 은 그대로 남는다', () => {
+    const 후공 = chooseFirstBat(chooseAiTeam(chooseUserTeam(처음(), 0), 1), PLAYER_SIDE_LAST_BAT)
+    expect(후공.setup.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+
+    // 21 마투수에서 CLR → 20 진입
+    const 다시20 = stepBack(chooseStadium(후공, 0))!
+    expect(다시20.firstBatCursor).toBe(PLAYER_SIDE_FIRST_BAT)
+    expect(다시20.setup.playerSide).toBe(PLAYER_SIDE_LAST_BAT)
+
+    // 19 OK → 20 진입도 같다
+    const 커서옮김 = moveFirstBat(후공, PLAYER_SIDE_LAST_BAT)
+    const 다시 = chooseAiTeam(stepBack({ ...커서옮김, firstBatPhase: FIRST_BAT_PHASE.선공 })!, 2)
+    expect(다시.firstBatCursor).toBe(PLAYER_SIDE_FIRST_BAT)
   })
 })
 
