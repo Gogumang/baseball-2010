@@ -1,18 +1,13 @@
 import { useState } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox } from '@/shared/ui'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import {
-  COACH_COUNT, checkCoachHire, coachAceOf, coachEffectTextOf, coachFeeOf, coachNameOf,
-  coachRequiredPopularityOf, hireCoach,
-} from '@/entities/season-mode/model/seasonCoach'
+import { checkCoachHire, coachNameOf, hireCoach } from '@/entities/season-mode/model/seasonCoach'
 import type { CoachHireRefusal } from '@/entities/season-mode/model/seasonCoach'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { AceSelectScreen } from '@/pages/general-mode'
+import { ACE_PHASE } from '@/pages/general-mode/lib/generalModeSetup'
 
 /** StrMODE — 코치채용 문구 (J 4-3 가드 순서와 같은 번호) */
 const ALREADY_HIRED = ORIGINAL_MODE_TEXT[147] // "현재 채용중인 마선수입니다"
@@ -20,13 +15,19 @@ const NO_MONEY = ORIGINAL_MODE_TEXT[77] // "소지금이 부족합니다"
 const NO_POPULARITY = ORIGINAL_MODE_TEXT[62] // "인기도가 부족합니다 / 필요한 인기도 : %d"
 const HIRE_QUESTION = ORIGINAL_MODE_TEXT[146] // "[%s]선수를 코치로 채용하시겠습니까? 소지금 %s…"
 const HIRE_DONE = ORIGINAL_MODE_TEXT[148] // "[%s]선수를 코치로 채용하였습니다"
-const CONTRACT_LABEL = ORIGINAL_MODE_TEXT[159] // "계약금 : %s"
-const REQUIRED_LABEL = ORIGINAL_MODE_TEXT[160] // "필요 인기도 : %d"
 
 export interface CoachHireScreenProps {
   readonly state: SeasonState
-  /** 머리띠 G포인트 — 코치채용은 G 를 쓰지 않는다(보여 주기만) */
+  /** 머리띠 G포인트 — 잠긴 칸 [43] 오픈은 이 G 로 산다 */
   readonly gamePoints?: number
+  /** 전역 +0x30..0x34 — 열린 마투수 번호 0~4 (코치 칸 0~4) */
+  readonly openedAcePitcherIds: readonly number[]
+  /** 전역 +0x35..0x39 — 열린 마타자 번호 0~4 (코치 칸 5~9) */
+  readonly openedAceBatterIds: readonly number[]
+  /** 마선수 레벨 — 이름 막대 LV 표시 */
+  readonly levels?: Readonly<Record<number, number>>
+  /** [43] 팝업 0x1f 에 "예" 이고 G 가 넉넉할 때 — 받는 쪽이 G 를 빼고 오픈 플래그를 세워 저장한다 */
+  readonly onOpenAce?: (cell: number) => void
   /** 채용이 끝났다 — 소지금이 빠지고 SR+0x185 가 채워진 레코드. 저장은 부르는 쪽이 한다 */
   readonly onHire: (record: SeasonRecord) => void
   /** 취소(−16) — 구단관리(0xce)로 되돌아간다 */
@@ -35,25 +36,25 @@ export interface CoachHireScreenProps {
 
 /**
  * 코치채용 — 구단관리 하위 칸 3. 원본은 **선수단 화면 `0xd7`(그리기 0xaa24)** 을
- * `this+0x11c = 2` 로 띄운다 (P4 1b·1a 표 · R13 표). 채용은 `0xa248` 이다.
+ * `this+0x11c = 2` 로 띄운다 (P4 1b·1a 표 · R13 표). 그림은 경기 전 마선수 고르기와 같은 공용 목록 k 2 라
+ * `AceSelectScreen` 을 `mode="코치"` 로 쓴다. 칸 = 코치 칸(0~4 마투수 · 5~9 마타자).
  *
- * 계약금 1억~3.5억 · 필요 인기도 0~1000 · 가드 순서는 `entities/season-mode/model/seasonCoach.ts`
- * 가 J 4-3 그대로 들고 있다. **코치는 한 명뿐이고 바꾸면 계약금을 새로 낸다(환불 없음).**
- *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xaa24(선수단 화면)의 좌표·엔트리 목록 창 모양을 확인하지
- * 못해 다른 시즌 화면들과 같은 공용 판 목록으로 그린다. 머리띠는 0xaa24 끝이 코치채용([this+0x11c] == 2)이면
- * `0x54d95(skin, 4 "마선수선택", 5)` 로 그린다(0xad94~0xada0 — 직접 떴다. 마선수 고르기는 같은 제목 + 바닥 0x205).
+ * 키 0xa734~0xa8fe (직접 떴다):
+ * ```
+ * 전역 +0x30 + 칸 == 0 (안 열림)  칸 4·9 → StrCOMMON[42] 알림 · 그 밖 → [43] G 오픈 팝업 0x1f (`AceSelectScreen`)
+ * 열린 칸                        ① SR+0x185 == 칸 → [147]  ② 소지금 < 값×10 → [77]  ③ 인기도 < 필요 → [62]
+ *                                ④ [146] 예/아니오 팝업 0x15 → 예면 0xa248 채용 → [148]
+ * ```
+ * 계약금 1억~3.5억 · 필요 인기도 0~1000 · 가드 순서는 `entities/season-mode/model/seasonCoach.ts`.
+ * **코치는 한 명뿐이고 바꾸면 계약금을 새로 낸다(환불 없음).**
+ * 머리띠는 0xaa24 끝이 `[this+0x11c] == 2` 면 `0x54d95(skin, 4 "마선수선택", 5)` 다(0xad94~0xada0).
  */
-export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: CoachHireScreenProps) {
+export function CoachHireScreen({
+  state, gamePoints = 0, openedAcePitcherIds, openedAceBatterIds, levels, onOpenAce, onHire, onBack,
+}: CoachHireScreenProps) {
   const { record } = state
   const [notice, setNotice] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ readonly slot: number; readonly text: string } | null>(null)
-
-  const rows: readonly SeasonListRow[] = Array.from({ length: COACH_COUNT }, (_unused, slot) => ({
-    id: `코치${slot}`,
-    label: `${coachNameOf(slot)}${record.coach === slot ? ' (채용중)' : ''}`,
-    value: seasonMoneyTextOf(coachFeeOf(slot) ?? 0),
-  }))
 
   const refusalTextOf = (reason: CoachHireRefusal, required: number): string => {
     if (reason === '이미채용') return ALREADY_HIRED
@@ -62,8 +63,8 @@ export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: Coach
     return ''
   }
 
+  /** 열린 칸에서 확인 — 가드 순서 ① 이미 이 코치 ② 소지금 ③ 인기도 (0xa79c 그대로) */
   const select = (slot: number) => {
-    // 가드 순서 ① 이미 이 코치 ② 소지금 ③ 인기도 — 원본 0xa79c 그대로
     const checked = checkCoachHire(record, record.popularity, slot)
     if (!checked.ok) {
       const text = refusalTextOf(checked.reason, checked.required ?? 0)
@@ -84,55 +85,28 @@ export function CoachHireScreen({ state, gamePoints = 0, onHire, onBack }: Coach
     setNotice(fillModeText(HIRE_DONE, coachNameOf(slot)))
   }
 
-  const { cursor, moveTo } = useSeasonCursor({
-    count: rows.length,
-    onSelect: select,
-    onCancel: onBack,
-    isEnabled: notice === null && question === null,
-  })
-
-  const ace = coachAceOf(cursor)
-
   return (
-    <RawScreen>
-      {/* 공통 앞그림 0xb810 — 0xd7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
-      <SkinBackdrop kind="공무늬" />
-      {ace !== null && (
-        // 마선수 얼굴 — ace_icon 33×33 (공용 판 오른쪽 위 모서리, **근사**)
-        <img
-          alt={ace.name}
-          src={ace.iconUrl}
-          style={{ position: 'absolute', left: 180, top: 62 }}
-        />
-      )}
-      <SeasonListWindow
-        title="코치채용"
-        rows={rows}
-        cursor={cursor}
-        onMoveCursor={moveTo}
-        onSelect={select}
-        // 두 줄까지만 쓴다 — 판 아래 띠가 두 줄치라 세 줄이면 화면 아래로 넘친다(0xd7 은 상태판을 그리지 않는다).
-        // 계약금은 목록 각 줄에 이미 있으므로 효과와 필요 인기도만 아래에 적는다
-        footer={[
-          coachEffectTextOf(cursor),
-          `${fillModeText(CONTRACT_LABEL, seasonMoneyTextOf(coachFeeOf(cursor) ?? 0))}   ${fillModeText(REQUIRED_LABEL, coachRequiredPopularityOf(cursor) ?? 0)}`,
-        ].join('\n')}
-      />
-
-      {question !== null && (
+    <AceSelectScreen
+      mode="코치"
+      phase={ACE_PHASE.마투수}
+      openedAcePitcherIds={openedAcePitcherIds}
+      openedAceBatterIds={openedAceBatterIds}
+      {...(levels === undefined ? {} : { levels })}
+      {...(onOpenAce === undefined ? {} : { onOpenAce })}
+      gamePoint={gamePoints}
+      onSelect={select}
+      onCancel={onBack}
+      // 공통 앞그림 0xb810 — 0xd7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다
+      underlay={<SkinBackdrop kind="공무늬" />}
+      overlay={question !== null ? (
         <MessageBox
           text={question.text}
           buttons={['예', '아니오']}
           onAnswer={(answer) => (answer === 0 ? hire() : setQuestion(null))}
         />
-      )}
-      {notice !== null && (
+      ) : notice !== null ? (
         <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-      )}
-
-      {/* 머리띠·바닥띠 — 같은 계열 화면이 다 달고 있다 (P6 1-1). 되돌아가기는 바닥띠 쪽 하나만 둔다 */}
-      {/* 0xaa24 끝: [this+0x11c] == 2(코치채용)면 0x54d95(skin, 4 "마선수선택", 5) — 시즌모드 제목이 아니다 (0xad94~0xada0) */}
-      <ScreenFrame title="마선수선택" gamePoint={gamePoints} onBack={onBack} />
-    </RawScreen>
+      ) : null}
+    />
   )
 }

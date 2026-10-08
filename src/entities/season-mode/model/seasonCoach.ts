@@ -83,9 +83,9 @@ export type CoachHireCheck =
  *   ① 이미 이 코치 → StrMODE[147] ② 소지금 < 값×10 → StrMODE[77]
  *   ③ 인기도 < 필요 → StrMODE[62] ④ 확인 StrMODE[146] → 채용 StrMODE[148]
  *
- * ⚠️ **안 넣은 가드**: 설명서(StrHOWTO[23])는 "현재 오픈된 마선수만 코치로 채용할 수 있다" 고
- * 적지만 J 4-3 이 "오픈 안 된 마선수 거절 위치는 미확인" 이라 적었다 — 코드 자리를 모르니
- * 지어내지 않고 **열 칸 모두 고를 수 있게** 두었다.
+ * 오픈 검사는 이 앞에 있다(0xa734~0xa8fe, 직접 떴다): 전역 +0x30 + 칸 == 0 이면 이 가드까지 안 오고 칸 4·9 는
+ * StrCOMMON[42] 알림, 그 밖은 [43] G 오픈 팝업 0x1f 다 — 화면(`CoachHireScreen` → `AceSelectScreen` 코치 모드)이 맡는다.
+ * StrHOWTO[23] "현재 오픈된 마선수만 코치로 채용할 수 있다" 가 그 검사다.
  */
 export function checkCoachHire(
   record: SeasonRecord,

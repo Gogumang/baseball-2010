@@ -623,6 +623,10 @@ export function SeasonRoute({
       <CoachHireScreen
         state={state}
         gamePoints={session.gamePoints}
+        // 오픈 검사 0xa734 — 경기 전 마선수 고르기와 같은 전역 칸(+0x30 + 칸)과 [43] G 오픈
+        openedAcePitcherIds={aceSelect?.openedAcePitcherIds ?? DEFAULT_OPENED_ACE_PITCHER_IDS}
+        openedAceBatterIds={aceSelect?.openedAceBatterIds ?? DEFAULT_OPENED_ACE_BATTER_IDS}
+        {...(aceSelect === undefined ? {} : { levels: aceSelect.levels, onOpenAce: aceSelect.onOpenAce })}
         onHire={actions.updateRecord}
         onBack={backToTeamMenu}
       />

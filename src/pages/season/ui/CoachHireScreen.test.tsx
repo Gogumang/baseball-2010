@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { CoachHireScreen } from '@/pages/season/ui/CoachHireScreen'
+import { acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
+import { coachNameOf } from '@/entities/season-mode/model/seasonCoach'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 
@@ -17,29 +19,55 @@ const 상태 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonState => {
   return { ...base, record: { ...base.record, ...덮어쓰기 } }
 }
 
-const 띄우기 = (state: SeasonState) => {
+const 다열림 = [0, 1, 2, 3, 4]
+
+const 띄우기 = (state: SeasonState, 열린투수 = 다열림, 열린타자 = 다열림, onOpenAce = vi.fn()) => {
   const onHire = vi.fn()
-  render(<CoachHireScreen state={state} onHire={onHire} onBack={vi.fn()} />)
+  render(
+    <CoachHireScreen state={state} openedAcePitcherIds={열린투수} openedAceBatterIds={열린타자} gamePoints={99999}
+      onOpenAce={onOpenAce} onHire={onHire} onBack={vi.fn()} />,
+  )
   return onHire
 }
 
 const 줄고르기 = (이름: string) => fireEvent.click(screen.getByRole('button', { name: new RegExp(이름) }))
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
-describe('코치 목록', () => {
-  it('마투수 다섯·마타자 다섯이 계약금과 함께 나온다', () => {
-    띄우기(상태())
-
-    expect(screen.getByRole('button', { name: /싸이커/ }).textContent).toContain('1억')
-    expect(screen.getByRole('button', { name: /드래고나/ }).textContent).toContain('3억5000')
-    expect(screen.getByRole('button', { name: /킹타이거/ })).toBeDefined()
+describe('코치 칸 = 마선수 격자 (0xd7 this+0x11c = 2 — 그림은 공용 목록 k 2)', () => {
+  it('칸 0~4 마투수 · 5~9 마타자 — 격자 칸과 코치 칸이 같은 마선수다', () => {
+    for (let 칸 = 0; 칸 < 10; 칸 += 1) expect(acePlayerOfCell(칸)?.name).toBe(coachNameOf(칸))
   })
 
-  it('고른 칸의 보너스·필요 인기도가 아래에 나온다 (StrMODE[149]·[160])', () => {
-    띄우기(상태())
+  it('머리띠 아래 바닥은 5 — 되돌아가기만 있고 "0레벨업" 이 없다 (0xad94~0xada0)', () => {
+    const { container } = render(
+      <CoachHireScreen state={상태()} openedAcePitcherIds={다열림} openedAceBatterIds={다열림} onHire={vi.fn()} onBack={vi.fn()} />,
+    )
+    expect(container.querySelectorAll('img[data-footer-mark]')).toHaveLength(0)
+  })
+})
 
-    expect(document.body.textContent).toContain('팀 투수 변화 +8')
-    expect(document.body.textContent).toContain('필요 인기도 : 0')
+describe('오픈 검사 (0xa734~0xa8fe)', () => {
+  it('안 열린 칸은 가드 대신 [43] G 오픈 팝업 — 예면 그 칸을 연다', () => {
+    const onOpenAce = vi.fn()
+    const onHire = 띄우기(상태({ money: 9999, popularity: 9999 }), [0], [], onOpenAce)
+
+    // 칸 1(마투수 둘째)은 잠겨 있다 — 줄을 가리지 않고 힌트가 뜬다
+    fireEvent.click(screen.getAllByRole('button', { name: 'LOCK' })[0])
+    expect(screen.getByRole('button', { name: '예' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onOpenAce).toHaveBeenCalledWith(1)
+    expect(onHire).not.toHaveBeenCalled()
+  })
+
+  it('칸 4·9 는 [42] 알림 하나 — G 로 못 연다', () => {
+    const onOpenAce = vi.fn()
+    띄우기(상태({ money: 9999, popularity: 9999 }), [0, 1, 2, 3], [0, 1, 2, 3], onOpenAce)
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'LOCK' })[0])
+
+    expect(screen.queryByRole('button', { name: '예' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'OK' })).toBeDefined()
   })
 })
 

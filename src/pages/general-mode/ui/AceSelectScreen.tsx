@@ -46,8 +46,15 @@ export interface AceSelectScreenProps {
   /**
    * 하위 상태 — `'고르기'` = 상태 21(일반모드 마선수, 갱신 0x29df8) · `'레벨업'` = 상태 28(스페셜 마선수
    * 선택, 갱신 0x2af20). 28 은 OK 도 레벨업 쪽으로 가고(고르기가 없다) 두 줄을 다 오간다.
+   * `'코치'` = 시즌 선수단 0xd7 을 `this+0x11c = 2`(코치채용)로 띄운 것 — 키 0xa734~ (직접 떴다):
+   * ```
+   * r4 = 전역 +0x30 + 칸 (오픈)
+   * r4 == 0 → 0xa880 오픈 힌트 (칸 4·9 [42] 알림 · 그 밖 [43] 팝업 0x1f — 예면 G 오픈) — 줄을 가리지 않는다
+   * r4 ≠ 0 → 채용 가드 [147] · [77] · [62] → [146] (0xa79c~0xa87a) — 부르는 쪽 `onSelect`
+   * ```
+   * 바닥은 5(되돌아가기만, 0xad94~0xada0)이고 레벨업 창은 열지 않는다.
    */
-  readonly mode?: '고르기' | '레벨업'
+  readonly mode?: '고르기' | '레벨업' | '코치'
   /**
    * 레벨업 확정 (0x5fbee · 0x5fc0a) — 받는 쪽이 레벨을 올리고 G `cost` 를 뺀다.
    * 안 넘기면 `0` 키 레벨업 창을 열지 않는다.
@@ -68,6 +75,8 @@ export interface AceSelectScreenProps {
    * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
    */
   readonly underlay?: ReactNode
+  /** 화면 맨 위에 얹을 팝업 — 코치채용의 가드·확인 팝업 */
+  readonly overlay?: ReactNode
 }
 
 /**
@@ -97,7 +106,7 @@ export interface AceSelectScreenProps {
  */
 export function AceSelectScreen({
   phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0,
-  onOpenAce, onLevelUp, onSelect, onCancel, underlay,
+  onOpenAce, onLevelUp, onSelect, onCancel, underlay, overlay,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -112,6 +121,7 @@ export function AceSelectScreen({
   /** StrCOMMON[40] "최고 레벨입니다" 알림 */
   const [isMaxLevelOpen, setIsMaxLevelOpen] = useState(false)
   const isLevelUpMode = mode === '레벨업'
+  const isCoachMode = mode === '코치'
 
   useEffect(() => {
     setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
@@ -127,7 +137,7 @@ export function AceSelectScreen({
    * 상태 28 은 고르기가 없고 OK 가 레벨업 쪽이라 어느 칸이든 누를 수 있다.
    */
   const isCellSelectable = (cell: number) =>
-    isLevelUpMode || (aceRoleOfCell(cell) === phase && isCellOpen(cell))
+    isLevelUpMode || (isCoachMode ? isCellOpen(cell) : aceRoleOfCell(cell) === phase && isCellOpen(cell))
 
   /**
    * **레벨업 요청** — 상태 21 의 `0` 키(0x29efc `cmp r5,#0x30`) · 상태 28 의 OK·`0` 키(0x2b00a·0x2affc).
@@ -151,7 +161,8 @@ export function AceSelectScreen({
   const pressCell = (cell: number) => {
     if (isLevelUpMode) return requestLevelUp(cell)
     if (isCellSelectable(cell)) return onSelect(cell)
-    if (aceRoleOfCell(cell) === phase) setHintCell(cell)
+    // 코치채용(0xa79c → 0xa880)은 두 줄 모두 잠긴 칸이면 힌트다
+    if (isCoachMode || aceRoleOfCell(cell) === phase) setHintCell(cell)
   }
 
   /**
@@ -171,6 +182,7 @@ export function AceSelectScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
       if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
+      if (overlay !== undefined && overlay !== null && overlay !== false) return
       const step =
         event.key === 'ArrowRight' ? 1
         : event.key === 'ArrowLeft' ? -1
@@ -186,7 +198,7 @@ export function AceSelectScreen({
         pressCell(cursor)
         return
       }
-      if (event.key === '0') {
+      if (event.key === '0' && !isCoachMode) {
         event.preventDefault()
         requestLevelUp(cursor)
         return
@@ -275,10 +287,10 @@ export function AceSelectScreen({
             type="button"
             aria-label={open && player !== undefined ? player.name : LOCK_LABEL}
             aria-pressed={cell === cursor}
-            disabled={!isCellSelectable(cell)}
+            disabled={!isCoachMode && !isCellSelectable(cell)}
             className={`${styles.cell} ${cell === cursor ? styles.cellSelected : ''}`}
             style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
-            onClick={() => (isLevelUpMode ? requestLevelUp(cell) : onSelect(cell))}
+            onClick={() => (isLevelUpMode ? requestLevelUp(cell) : isCoachMode ? pressCell(cell) : onSelect(cell))}
             onMouseEnter={() => setCursor(cell)}
           >
             {open && player !== undefined
@@ -292,7 +304,9 @@ export function AceSelectScreen({
       {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 머리띠를 가리던 것을 제자리로 옮겼다 */}
       <div className={styles.hintLine}>
         <Hint>
-          {isLevelUpMode
+          {isCoachMode
+            ? '코치로 채용할 마선수를 고르세요 — 방향키 이동 · Enter 결정'
+            : isLevelUpMode
             ? '마선수 레벨업 — 방향키 이동 · Enter/0 레벨업'
             : `${phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정${onLevelUp === undefined ? '' : ' · 0 레벨업'}`}
         </Hint>
@@ -301,7 +315,8 @@ export function AceSelectScreen({
       {/* 머리띠(제목 8 "마선수선택")·바닥띠 — 원본 공용 목록 k 2 도 이 둘을 얹는다 (P6 1-1 · 2a-5) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
       {/* 바닥 0x205 = 가운데 "0레벨업" + 되돌아가기 — 일반모드 0x2df78 · 0x2dfe0, 시즌 0xaa24(선수단 [+0x11c] ≠ 2) 모두 */}
-      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} footer={0x205} />
+      {/* 코치채용(this+0x11c == 2)은 0x54d95(skin, 4, 5) — 되돌아가기만 (0xad94~0xada0) */}
+      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} footer={isCoachMode ? 5 : 0x205} />
 
       {/*
         **오픈 힌트 팝업** (0xa68e~0xa6dc) — 칸 4·9(드래고나·킹타이거)는 StrCOMMON[42] 알림 하나,
@@ -343,6 +358,7 @@ export function AceSelectScreen({
           onClose={() => setLevelUpCell(null)}
         />
       )}
+      {overlay}
     </RawScreen>
   )
 }
