@@ -15,6 +15,7 @@ import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
+import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -174,6 +175,8 @@ export function renderBattingStage(
   if (scene.particles !== null && scene.particles !== undefined) {
     drawParticles(context, scene.particles)
   }
+  // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
+  drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
     drawHud(context, scene.hud, scene.tick)
