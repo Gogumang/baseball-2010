@@ -48,8 +48,15 @@ export function useEventPlayback(
   carried: StoryCarry = EMPTY_STORY_CARRY,
   /** system 3·4 발표 창의 글 — 안 주면 예전처럼 지나간다 */
   windowTextOf?: (command: SystemCommand) => string | null,
+  /**
+   * 이 걸음이 아직 멈출 명령을 돌리지 않았는가 — 지나온 명령 5(id 4~7)가 끝나기를 기다린다(0x8b564, `isStepHeld`).
+   * 그동안은 초상화를 안 바꾸고(0x7f54c 는 say · 선택지 명령이 돌 때) 경기 · 끝으로도 안 나간다. 안 주면 늘 돈다.
+   */
+  isHeld?: (step: EventStep) => boolean,
 ): {
   step: EventStep
+  /** 멈출 명령이 돌고 있는가 (`isHeld` 가 거짓) */
+  isReleased: boolean
   portraits: readonly EventPortrait[]
   next: () => void
   jump: (eventId: number) => void
@@ -62,11 +69,14 @@ export function useEventPlayback(
   windowTextOfRef.current = windowTextOf
   const step = useMemo(() => stopAtWindow(stepFrom(events, cursor), windowTextOfRef.current), [events, cursor])
 
+  const isReleased = isHeld === undefined || !isHeld(step)
+
   const [portraits, setPortraits] = useState<readonly EventPortrait[]>([])
   useEffect(() => {
+    if (!isReleased) return
     const command = step.command
     if (command !== null && (command.op === 'say' || command.op === 'choice')) setPortraits(command.portraits)
-  }, [step])
+  }, [step, isReleased])
 
   // 같은 칸을 두 번 세지 않도록 커서별로 담는다 (개발 모드의 이펙트 재실행 포함).
   const rewardsByCursorRef = useRef(new Map<string, readonly EventReward[]>())
@@ -83,7 +93,7 @@ export function useEventPlayback(
   onMatchRef.current = onMatch
   const isCompletedRef = useRef(false)
   useEffect(() => {
-    if (isCompletedRef.current) return
+    if (isCompletedRef.current || !isReleased) return
     if (step.command?.op === 'match') {
       isCompletedRef.current = true
       // 경기 명령까지 지나온 보상도 담기도록 이 칸을 먼저 기록한다
@@ -95,10 +105,12 @@ export function useEventPlayback(
     isCompletedRef.current = true
     const collected = collect()
     onCompleteRef.current(collected.rewards, collected.viewedEventIds)
-  }, [step])
+  }, [step, isReleased])
 
   const stepRef = useRef(step)
   stepRef.current = step
+  const isReleasedRef = useRef(isReleased)
+  isReleasedRef.current = isReleased
   const next = () => setCursor(advanceCursor(stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
   const clearPortraits = () => setPortraits([])
@@ -108,7 +120,7 @@ export function useEventPlayback(
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const command = stepRef.current.command
-      if (command?.op !== 'system' || command.sub !== SYSTEM_YEAR_GOAL_WINDOW) return
+      if (!isReleasedRef.current || command?.op !== 'system' || command.sub !== SYSTEM_YEAR_GOAL_WINDOW) return
       if (event.key !== 'Enter' && event.key !== ' ') return
       if (event.target instanceof HTMLButtonElement) return
       event.preventDefault()
@@ -118,5 +130,5 @@ export function useEventPlayback(
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  return { step, portraits, next, jump, clearPortraits }
+  return { step, isReleased, portraits, next, jump, clearPortraits }
 }

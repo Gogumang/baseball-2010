@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  INITIAL_EVENT_BACKDROP, MANAGEMENT_PORTRAIT_BASE_Y, OUTING_MAP_PORTRAIT_BASE_Y, drawEventBackdrop, effectorPhaseAt,
-  lastEffectIdIn, portraitBaseYOf,
+  INITIAL_EVENT_BACKDROP, MANAGEMENT_PORTRAIT_BASE_Y, OUTING_MAP_PORTRAIT_BASE_Y, drawEventBackdrop, effectTimelineOf,
+  effectorPhaseAt, isBlockingEffectId, lastEffectIdIn, portraitBaseYOf,
 } from '@/pages/story/lib/eventBackdrop'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 
@@ -66,5 +66,24 @@ describe('효과 칠 — 0x8b5ac 0x8b62e~0x8b714', () => {
     const commands = [{ op: 'effect', id: 6 }, { op: 'say' }, { op: 'effect', id: 9 }] as unknown as EventCommand[]
     expect(lastEffectIdIn(commands)).toBe(9)
     expect(lastEffectIdIn([])).toBeNull()
+  })
+})
+
+describe('명령 5 기다림 0x8b564 — id 4~7 은 효과기 끝까지 다음 명령을 막는다', () => {
+  it('막는 id 는 0xf0 칸(4 · 5 · 6 · 7)뿐 — 1 · 10(0x402) · 2 · 3 · 8 · 9(0x30c)는 곧바로', () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(isBlockingEffectId)).toEqual([4, 5, 6, 7])
+  })
+
+  it('막는 효과는 끝 그리기(프레임 9) 다음 틀(10)에 다음 명령 · 다음 효과를 돌린다 — 흔들기는 안 막는다', () => {
+    const 명령 = (ids: readonly number[]) => ids.map((id) => ({ op: 'effect', id })) as unknown as EventCommand[]
+    expect(effectTimelineOf(명령([6]))).toMatchObject({ releaseFrame: 10, entries: [{ id: 6, start: 0 }] })
+    expect(effectTimelineOf(명령([6, 4]))).toMatchObject({
+      releaseFrame: 20, entries: [{ id: 6, start: 0, kind: '검정에서밝아짐' }, { id: 4, start: 10, kind: '검게어두워짐' }],
+    })
+    expect(effectTimelineOf(명령([2, 3])).releaseFrame).toBe(0)
+    expect(effectTimelineOf(명령([1])).entries).toEqual([
+      { id: 1, kind: null, color: '검정', vibrationMilliseconds: 500, start: 0 },
+    ])
+    expect(effectTimelineOf([{ op: 'sound', id: 52 }] as unknown as EventCommand[])).toEqual({ entries: [], releaseFrame: 0 })
   })
 })

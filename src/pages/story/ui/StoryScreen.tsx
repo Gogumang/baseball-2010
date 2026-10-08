@@ -8,7 +8,7 @@ import type { EventReward } from '@/entities/story/model/eventReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
-import { useScreenEffect } from '@/pages/story/model/useScreenEffect'
+import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
 import type { MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
@@ -96,31 +96,35 @@ export function StoryScreen({
     ? undefined
     : (command: SystemCommand) =>
       command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
-  const { step, portraits, next, jump, clearPortraits } =
-    useEventPlayback(events, event, onComplete, onMatch, carried, windowTextOf)
+  /** 막는 효과(id 4~7)를 다 기다린 걸음 — 그 걸음의 멈출 명령이 돈다 (0x8b564) */
+  const [releasedKey, setReleasedKey] = useState<string | null>(null)
+  const { step, isReleased, portraits, next, jump, clearPortraits } = useEventPlayback(
+    events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
+  )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
   const [backdrop, setBackdrop] = useState<EventBackdropState>(INITIAL_EVENT_BACKDROP)
   /** 0x8b6d0~0x8b6ea 로 글 · 상자를 처음으로 돌린 횟수 — 상자를 새로 세우는 열쇠 */
   const [dialogueResets, setDialogueResets] = useState(0)
   /** 0x7f7cc 로 상자 높이가 0 이 된 뒤 아직 say 상자가 오르지 않았는가 */
   const isRisePendingRef = useRef(false)
-  const effectIdRef = useRef(backdrop.effectId)
-  // '끝'(+0x10 = 2) 그리기만 [mgr+0x2c8] 을 바꾸고, id 6 · 7 이면 글 · 초상화 · 상자를 처음으로 돌린다
-  const onEffectorEnd = () => {
-    const ended = drawEventBackdrop({ effectId: effectIdRef.current, fill: null }, '끝')
-    setBackdrop((previous) => drawEventBackdrop({ ...previous, effectId: effectIdRef.current }, '끝').state)
+  // '끝'(+0x10 = 2) 그리기만 [mgr+0x2c8] 을 바꾸고, id 6 · 7 이면 글 · 초상화 · 상자를 처음으로 돌린다.
+  // 처음으로 돌리는 것은 대사 상자 객체(0x7f7d4 · 0x7f7a8 · 0x7f7cc — 모두 [mgr+0xb4])뿐이다 — 공용 창 [0x140005c] 는 안 건드린다.
+  // id 6 · 7 은 끝날 때까지 다음 명령을 막으므로(0x8b564) 이 돌리기는 늘 뒤 명령(대사 · 알림 · 예아니오 · 경기)보다 먼저다.
+  const onEffectorEnd = (endedId: number) => {
+    const ended = drawEventBackdrop({ effectId: endedId, fill: null }, '끝')
+    setBackdrop((previous) => drawEventBackdrop({ ...previous, effectId: endedId }, '끝').state)
     if (!ended.resetsDialogue) return
     clearPortraits()
     isRisePendingRef.current = true
     setDialogueResets((count) => count + 1)
   }
   // 명령 5 화면효과 — 흔들기 오프셋·덮개 (효과기 0xbd844)
-  const screenEffect = useScreenEffect(step, isVibrationOn, onEffectorEnd)
+  const screenEffect = useScreenEffect(step, isVibrationOn, onEffectorEnd, setReleasedKey)
   const effect = screenEffect.frame
-  const command = step.command
+  // 막는 효과를 기다리는 동안은 멈출 명령이 아직 돌지 않았다 — 앞 say 상자 · 초상화가 그대로다
+  const command = isReleased ? step.command : null
 
   const effectId = screenEffect.lastEffectId ?? backdrop.effectId
-  effectIdRef.current = effectId
   const passedEffectId = screenEffect.lastEffectId
   useEffect(() => {
     if (passedEffectId !== null) setBackdrop((previous) => ({ ...previous, effectId: passedEffectId }))
@@ -176,7 +180,7 @@ export function StoryScreen({
    */
   const noticeText = command?.op === 'system' && !isYearGoalWindow ? (command.text ?? null) : null
   // 앞 say 상자는 창 밑에 남는다 — 키는 창 것이다(0x8b804 는 지금 명령이 say · 선택지일 때만 받는다)
-  const shownSay =
+  const shownSay = !isReleased ||
     command?.op === 'say' || command?.op === 'yesno' || noticeText !== null || isYearGoalWindow ? lastSayRef.current : null
 
   return (
@@ -201,7 +205,8 @@ export function StoryScreen({
       {shownSay !== null && (
         <EventDialogueBox key={`${shownSay.key}:${dialogueResets}`}
           raw={shownSay.raw} replacements={shownSay.replacements}
-          slideIn={isSayRising} onAdvance={next} isActive={command?.op === 'say'} />
+          // 0x7f7cc 로 높이 0 이 된 상자는 창 밑이든 다음 say 든 다시 오른다
+          slideIn={isSayRising || isRisePendingRef.current} onAdvance={next} isActive={command?.op === 'say'} />
       )}
 
       {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={next} />}

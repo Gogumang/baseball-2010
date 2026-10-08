@@ -451,6 +451,10 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
   const 본체높이 = () =>
     screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')
   const 말 = { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }
+  /** 한 틀씩 — act 한 번 안에서는 효과기(rAF)가 푼 걸음을 끝에야 그리므로, 풀린 뒤 상자가 도는 것을 보려면 나눠 돌린다 */
+  const 틀씩 = (n: number) => {
+    for (let index = 0; index < n; index += 1) 틀()
+  }
 
   it('관리 · 연초 · 시즌 위(기본)는 135 — 판 아래 여백 320 − 135', () => {
     띄우기([말])
@@ -463,21 +467,77 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
     expect(초상화판().style.bottom).toBe('68px')
   })
 
-  it('id 6 은 도는 동안 135 · 칠 없음, 끝난 그리기부터 검정 칠 · 252 — 상자는 높이 0 에서 다시 오르고 글을 처음부터 찍는다', () => {
-    띄우기([{ op: 'effect', id: 6 }, 말])
+  it('id 6 은 끝날 때까지 뒤 say 를 막는다 — 도는 동안 앞 say 상자 · 135 · 칠 없음, 끝난 그리기에 검정 칠 · 252 · 상자 높이 0, 그다음 틀에 뒤 say (0x8b564)', () => {
+    띄우기([
+      { op: 'say', text: '앞', speaker: 0, format: 0, portraits: [] },
+      { op: 'effect', id: 6 },
+      { op: 'say', text: '뒤', speaker: 0, format: 0, portraits: [] },
+    ])
+    틀(200)
+    fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
     틀(4)
+    // 효과가 도는 동안은 명령 5 에 머문다 — 앞 say 상자가 다 오른 채 남고, 키 0x8b804 는 아무 일도 안 한다
     expect(본체높이()).toBe('55')
+    expect(대사글()).toBe('앞')
     expect(초상화판().style.bottom).toBe('185px')
     expect(칠()).toBeNull()
-    // 프레임 9 가 '끝'(+0x10 = 2) 그리기
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(대사글()).toBe('앞')
+    // 프레임 9 가 '끝'(+0x10 = 2) 그리기 — 칠 · 252 · 상자 높이 0(0x7f7cc)
     틀(6)
     expect(칠()?.style.background).toContain('0, 0, 0')
     expect(초상화판().style.bottom).toBe('68px')
     expect(Number(본체높이())).toBeLessThan(55)
+    // 그다음 틀부터 뒤 say — 상자가 다시 올라 글을 처음부터 찍는다
+    틀씩(20)
+    expect(대사글()).toBe('뒤')
+    expect(본체높이()).toBe('55')
     // 효과기가 비워진 뒤에도 [mgr+0x2c8] 은 남아 틀마다 칠한다
-    틀(20)
     expect(칠()).not.toBeNull()
     expect(초상화판().style.bottom).toBe('68px')
+  })
+
+  it('이벤트 첫 명령이 id 6 이면 끝날 때까지 상자가 없다 — 앞 글이 없으면 0x7fbc4 는 안 그린다', () => {
+    띄우기([{ op: 'effect', id: 6 }, 말])
+    틀(4)
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    틀씩(20)
+    expect(대사글()).toBe('안녕')
+  })
+
+  it('알림 창도 id 6 이 끝나 상자 · 초상화를 처음으로 돌린 뒤에 뜬다 — 처음으로 돌리기는 공용 창을 안 건드린다', () => {
+    띄우기([
+      { op: 'say', text: '앞', speaker: 0, format: 0, portraits: [] },
+      { op: 'effect', id: 6 },
+      { op: 'system', sub: 0, arg: 1, text: '알림' },
+    ])
+    틀(200)
+    fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
+    틀(4)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    틀씩(20)
+    expect(screen.getByRole('dialog').textContent).toContain('알림')
+    // 처음으로 돌린 상자는 창 밑에서 다시 올라 앞 글을 처음부터 찍는다
+    expect(대사글()).toBe('앞')
+    expect(본체높이()).toBe('55')
+  })
+
+  it('id 6 뒤 경기 명령은 효과가 끝난 뒤에 나간다', () => {
+    const 경기 = vi.fn()
+    const 이벤트들 = { ...이벤트, commands: [{ op: 'effect', id: 6 }, { op: 'match', team: 1, resultEvents: [] }] } as unknown as OriginalEvent
+    render(
+      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
+        onComplete={() => {}} onMatch={경기} />,
+    )
+    틀(5)
+    expect(경기).not.toHaveBeenCalled()
+    틀(10)
+    expect(경기).toHaveBeenCalledTimes(1)
+  })
+
+  it('흔들기(2 · 3)는 안 막는다 — 뒤 say 가 곧바로 돈다', () => {
+    띄우기([{ op: 'effect', id: 3 }, 말])
+    틀(4)
     expect(본체높이()).toBe('55')
   })
 

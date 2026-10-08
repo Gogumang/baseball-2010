@@ -1,4 +1,5 @@
 import type { EventCommand } from '@/shared/config/original/eventTypes'
+import { screenEffectCommandOf } from '@/entities/story/model/screenEffect'
 import type { ScreenEffectKind } from '@/entities/story/model/screenEffect'
 import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
 
@@ -65,10 +66,71 @@ export type EffectorPhase = '없음' | '시작' | '도는중' | '끝'
  * 흔들기는 단계 6 > 5 (프레임 6 — 0xbd9bc).
  */
 export function effectorPhaseAt(kind: ScreenEffectKind, frame: number): EffectorPhase {
-  const endingFrame = kind === '흔들기' ? 6 : 8
+  const endingFrame = effectorEndingFrameOf(kind)
   if (frame < 0 || frame > endingFrame + 1) return '없음'
   if (frame === 0) return '시작'
   return frame === endingFrame + 1 ? '끝' : '도는중'
+}
+
+/** 효과기 진행이 끝(+0x10 = 2)을 세우는 프레임 — 흔들기 6(0xbd9bc) · 밝아짐 · 어두워짐 8(0xbd918 · 0xbd908) */
+export function effectorEndingFrameOf(kind: ScreenEffectKind): number {
+  return kind === '흔들기' ? 6 : 8
+}
+
+/**
+ * **명령 5 의 기다림 0x8b564** (실행기 꼬리 0x8d90a 표 0xd4efc[3] = 0x8d9a6, 직접 떴다):
+ * ```
+ * 8b56e  id = [mgr+0x2c4]; id > 10 이면 기다린다(끝나지 않음)
+ * 8b578  (1 << id) & 0x402 (1 · 10) · & 0x30c (2 · 3 · 8 · 9) → [mgr+8] = 1 (곧바로 다음 명령)
+ * 8b586  (1 << id) & 0xf0 (4 · 5 · 6 · 7) → 효과기 [0x140007c] 가 돌고(+4 ≠ 0) +0x10 == 2(끝)일 때만 [mgr+8] = 1
+ * ```
+ * [mgr+8] 은 다음 0x8cf64 머리(0x8cf7e)에서 다음 명령으로 넘긴다. 갱신(0x8cf64)이 그리기(0x8b5ac)보다 먼저라
+ * 끝을 본 틀에 대화창은 '끝' 그리기(id 6 · 7 이면 상자 · 글 · 초상화 처음으로)를 마치고, **그다음 틀에** 다음 명령이 돈다 —
+ * 곧 id 6 · 7 의 처음으로 돌리기는 늘 뒤 명령(대사 · system 창 · 경기)보다 먼저다. 그동안 키 0x8b804 는 지금 명령이
+ * say · 선택지가 아니라 아무 일도 안 한다.
+ * ⚠️ id 0 · 11 이상은 원본에서 영영 기다리지만(0x8b56e · 0x8b58a) 원본 데이터에 없어 곧바로 넘긴다.
+ */
+export function isBlockingEffectId(id: number): boolean {
+  return id >= 4 && id <= 7
+}
+
+/** 한 걸음에 지나온 명령 5 하나 — `start` 는 그 걸음을 시작한 뒤 몇 번째 틀에 걸리는가 */
+export interface EffectTimelineEntry {
+  readonly id: number
+  /** 효과기에 거는 종류 — null 이면 효과기를 안 건드린다(id 1 진동 · 1~7 밖) */
+  readonly kind: ScreenEffectKind | null
+  readonly color: '검정' | '흰색'
+  readonly vibrationMilliseconds: number
+  readonly start: number
+}
+
+export interface EffectTimeline {
+  readonly entries: readonly EffectTimelineEntry[]
+  /** 멈출 명령(대사 · 창 · 경기 · 끝)이 도는 틀 — 0 이면 곧바로 */
+  readonly releaseFrame: number
+}
+
+/**
+ * 지나온 명령들의 명령 5 차례. 4~7 은 효과가 끝날 때까지 다음 명령을 막는다(`isBlockingEffectId`) — 프레임
+ * `start + 끝 세움 + 1` 이 '끝' 그리기, 그다음 틀에 다음 명령이 돈다. 나머지는 막지 않는다.
+ * ⚠️ 근사: 원본은 멈추지 않는 명령(소리 · 보상 · 막지 않는 효과)도 하나에 한 틀씩 쓰지만(0x8dac2 → 다음 0x8cf64) 웹은 0 틀로 둔다.
+ */
+export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimeline {
+  const entries: EffectTimelineEntry[] = []
+  let frame = 0
+  for (const command of commands) {
+    if (command.op !== 'effect') continue
+    const effect = screenEffectCommandOf(command.id)
+    entries.push({
+      id: command.id,
+      kind: effect?.kind ?? null,
+      color: effect?.color ?? '검정',
+      vibrationMilliseconds: effect?.vibrationMilliseconds ?? 0,
+      start: frame,
+    })
+    if (effect?.kind != null && isBlockingEffectId(command.id)) frame += effectorEndingFrameOf(effect.kind) + 2
+  }
+  return { entries, releaseFrame: frame }
 }
 
 /** 지나온 명령 가운데 마지막 명령 5 의 id — 없으면 null (0x8d456 이 [mgr+0x2c4] 에 넣는다) */

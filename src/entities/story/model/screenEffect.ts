@@ -3,7 +3,10 @@ import { blackStepCoverOpacityOf, colorStepCoverOpacityOf } from '@/shared/lib/s
 
 /**
  * 이벤트 명령 5 — 화면효과 (A-7 · L 1-E2). 실행기 0x8cf64 의 0x8d456 이 id 를 [this+0x2c4] 에 두고 0x8ceac 를 부른다.
- * 0x8ceac 는 `id − 1` 로 점프표 0xd4ea4 를 타고, 기다리지 않고 바로 다음 명령으로 간다 (0x8d46e → 0x8d906).
+ * 0x8ceac 는 `id − 1` 로 점프표 0xd4ea4 를 타고 효과기를 건다(0x8d46e → 0x8d906). 그 뒤 실행기 꼬리의 기다림 0x8b564
+ * (0x8d90a 표 0xd4efc[3] = 0x8d9a6)가 id 4~7 은 효과기가 끝(+0x10 = 2)을 세울 때까지 다음 명령을 막고, 나머지는 곧바로 넘긴다
+ * — 재생 차례는 `pages/story/lib/eventBackdrop` 의 `effectTimelineOf`.
+ * *(정정 2026-10-08: 예전 머리말은 "기다리지 않고 바로 다음 명령" 이라 했다 — 0x8d906 뒤 꼬리를 안 읽은 것)*
  *
  * ```
  * id 1  0x8cede  vibrate(500)                                       ; 0x3a44 — 환경설정 진동이 켜졌을 때만
