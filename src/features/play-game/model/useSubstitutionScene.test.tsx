@@ -16,6 +16,7 @@ const port: SoundPort = {
   playBgm: () => {},
   stopBgm: () => {},
   resumeBgm: () => {},
+  stop: () => {},
   currentBgm: () => null,
   setVolume: () => {},
   getVolume: () => 100,

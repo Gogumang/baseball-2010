@@ -203,7 +203,7 @@ describe('소리 포트 — 재생', () => {
     expect(fake.started).toHaveLength(1)
   })
 
-  it('효과음이 끝나면 배경음이 **원래 번호로** 돌아온다 (원본 resumeBgm 0x6eaf0 자리)', async () => {
+  it('효과음이 끝나도 배경음은 스스로 돌아오지 않는다 — 기억만 남는다 (0x6eb30 되돌리기 갈래는 죽어 있다)', async () => {
     const fake = createFakeAudio()
     const sound = createWebAudioSound(fake.options)
 
@@ -215,30 +215,56 @@ describe('소리 포트 — 재생', () => {
     expect(fake.stopped).toEqual(['sounds/033.mp3'])
 
     fake.fireEnded()
+    await Promise.resolve()
 
+    expect(fake.started).toHaveLength(2)
+    expect(sound.currentBgm()).toBe(33)
+    // 누가 resumeBgm(0x6eaf0)을 불러야 기억한 번호가 다시 난다
+    sound.resumeBgm()
     await vi.waitFor(() => expect(fake.started).toHaveLength(3))
     expect(fake.started[2]).toEqual({ url: 'sounds/033.mp3', loop: true })
-    expect(sound.currentBgm()).toBe(33)
   })
 
-  it('효과음을 잇달아 내도 마지막 하나가 끝난 뒤 한 번만 돌아온다', async () => {
+  it('stop(0x6e418) — 울리던 배경음을 끊고 기억도 잊는다', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(4)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    sound.stop()
+
+    expect(fake.stopped).toEqual(['sounds/004.mp3'])
+    expect(sound.currentBgm()).toBeNull()
+    // 같은 번호를 다시 부르면 처음부터 다시 난다
+    sound.playBgm(4)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(2))
+  })
+
+  it('stop(0x6e418) — 효과음을 끊을 때는 기억한 배경음이 남는다', async () => {
     const fake = createFakeAudio()
     const sound = createWebAudioSound(fake.options)
 
     sound.playBgm(33)
     await vi.waitFor(() => expect(fake.started).toHaveLength(1))
-    sound.play(6)
+    sound.play(11)
     await vi.waitFor(() => expect(fake.started).toHaveLength(2))
-    sound.play(20)
-    await vi.waitFor(() => expect(fake.started).toHaveLength(3))
+    sound.stop()
 
-    // 먼저 튼 타격음이 뒤늦게 끝났다고 알려도 통로를 가져간 쪽이 아니므로 되돌리지 않는다
-    fake.fireEnded(1)
-    expect(fake.started).toHaveLength(3)
+    expect(fake.stopped).toEqual(['sounds/033.mp3', 'sounds/011.mp3'])
+    expect(sound.currentBgm()).toBe(33)
+  })
 
-    fake.fireEnded(2)
-    await vi.waitFor(() => expect(fake.started).toHaveLength(4))
-    expect(fake.started[3]).toEqual({ url: 'sounds/033.mp3', loop: true })
+  it('stop(0x6e418) — 아직 받는 중인 소리도 울리지 않는다', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(1)
+    sound.stop()
+    await vi.waitFor(() => expect(fake.fetched).toEqual(['sounds/001.mp3']))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(fake.started).toHaveLength(0)
   })
 
   it('배경음이 없었으면 효과음이 끝나도 아무것도 틀지 않는다', async () => {

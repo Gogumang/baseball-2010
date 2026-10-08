@@ -10,8 +10,8 @@ import { soundFileUrl } from '@/shared/config/original/sounds'
  * `AudioContext` 가 없는 환경(jsdom·서버 렌더)에서는 **아무 소리도 내지 않고 조용히 넘어간다**.
  * 소리가 안 나는 것 때문에 게임이 멈추면 안 되므로 모든 접근을 try/catch 로 감쌌다.
  *
- * 원본 규칙 하나를 웹 쪽으로 옮겨 적었다: 효과음은 배경음을 끊지만 **끝나면 배경음으로 돌아온다**
- * (`start` 의 `onended` 주석 — 원본은 팝업이 끝나는 자리마다 `resumeBgm` 을 손으로 부른다).
+ * 효과음은 배경음을 끊고 **끝나도 배경음으로 돌아오지 않는다** — 원본 그대로다 (`SoundPort` 머리 주석:
+ * 틱 0x6eb18 의 되돌리기 갈래는 0x6eb30 `[+0x4c] == 0` 으로 죽어 있고, `resumeBgm` 0x6eaf0 은 통신 화면만 부른다).
  */
 
 /** 재생 통로를 여는 함수. 못 열면 null. */
@@ -66,6 +66,8 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
 
   /** 원본은 통로가 하나뿐이라 새 소리가 울리던 소리를 끊는다. */
   let activeSource: AudioBufferSourceNode | null = null
+  /** 마지막에 물린 소리가 반복(배경음)이었나 — 원본 미디어 +0x11 비트 0 (`stop` 이 본다) */
+  let lastLoop = false
   /** 늦게 도착한 소리가 이미 지나간 장면에서 울리지 않게 하는 표 */
   let playToken = 0
 
@@ -121,9 +123,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     activeSource = null
   }
 
-  /**
-   * 원본 `0x6eaf0 resumeBgm` 의 몸통. 아래 `play` 도 효과음이 끝나면 이것을 밟는다.
-   */
+  /** 원본 `0x6eaf0 resumeBgm` 의 몸통 */
   const resumeRemembered = () => {
     if (rememberedBgmId === null || volume === 0) return
     playingBgmId = rememberedBgmId
@@ -135,6 +135,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     if (!ctx || !master) return
     playToken += 1
     const token = playToken
+    lastLoop = loop
     stopActive()
     void loadBuffer(id, ctx).then((buffer) => {
       if (!buffer || token !== playToken || !master) return
@@ -144,17 +145,10 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
         source.buffer = buffer
         source.loop = loop
         source.connect(master)
-        if (!loop) {
-          // ── 효과음이 끝나면 기억해 둔 배경음으로 돌아간다 ──
-          // 원본은 통로가 하나뿐이라 효과음이 배경음을 끊고, **팝업이 끝나는 자리마다 손으로**
-          // `0x6eaf0 resumeBgm` 을 부른다 (20여 곳). 웹은 효과음이 끝나는 시각을 브라우저가
-          // 알려 주므로 그 자리를 여기서 자동으로 밟는다 — **이 되돌리기 시점은 근사다**.
-          // 그래야 효과음 하나가 배경음을 영구히 죽이지 않는다.
-          source.onended = () => {
-            if (token !== playToken) return
-            activeSource = null
-            resumeRemembered()
-          }
+        // 효과음이 끝나면 통로가 비기만 한다 — 기억한 배경음을 스스로 되돌리지 않는다 (머리 주석)
+        source.onended = () => {
+          if (token !== playToken) return
+          activeSource = null
         }
         source.start()
         activeSource = source
@@ -183,10 +177,19 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     stopBgm: () => {
       // 원본 0x6e438: 기억한 번호와 울리는 번호가 같을 때만 멈춘다.
       if (rememberedBgmId !== null && rememberedBgmId === playingBgmId) {
+        // 아직 받는 중인 배경음도 울리지 않게 표를 넘긴다
+        playToken += 1
         stopActive()
         playingBgmId = null
       }
       rememberedBgmId = null
+    },
+
+    stop: () => {
+      // 원본 0x6e418: 물린 소리가 반복이면 기억한 배경음도 잊고, 지금 소리를 끊는다. 아직 받는 중인 소리도 울리지 않게 표를 넘긴다
+      if (lastLoop) rememberedBgmId = null
+      playToken += 1
+      stopActive()
     },
 
     resumeBgm: resumeRemembered,

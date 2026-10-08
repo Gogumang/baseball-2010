@@ -22,6 +22,7 @@ function 녹음포트() {
     playBgm: () => {},
     stopBgm: () => {},
     resumeBgm: () => {},
+    stop: () => {},
     currentBgm: () => null,
     setVolume: () => {},
     getVolume: () => 100,

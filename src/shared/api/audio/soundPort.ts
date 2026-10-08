@@ -6,7 +6,9 @@
  *
  * 원본 규칙 중 일부러 옮겨 온 것:
  * - **소리 통로가 하나뿐**이다. 0x6e9d4 는 새 소리를 틀기 전에 울리던 것을 멈춘다(0x6e258).
- *   그래서 효과음 하나가 배경음을 끊고, 팝업이 끝나면 `resumeBgm` 으로 배경음을 되돌린다.
+ *   그래서 효과음 하나가 배경음을 끊고, **끊긴 배경음은 스스로 돌아오지 않는다** — 틱 0x6eb18 의 되돌리기 갈래
+ *   (0x6eb30 `[+0x4c] == 0` 이면 건너뜀)는 +0x4c 를 쓰는 곳이 없어 죽어 있고, `resumeBgm`(0x6eaf0)을 부르는 27곳은
+ *   모두 통신 화면이다. 배경음은 다음에 누가 `playBgm` 을 부를 때 다시 난다.
  * - **소리 크기가 0 이면 아무것도 울리지 않는다.** 다만 배경음이면 번호는 기억해 둔다
  *   (0x6ea76 `ldr r3,[r0,#0x40]; cmp r3,#0` → 0x6ea86 `str r6,[r0,#0x28]`).
  *   나중에 소리를 켜고 `resumeBgm` 을 부르면 그 번호가 울린다.
@@ -51,6 +53,18 @@ export interface SoundPort {
   /** 배경음 멈추기 (원본 0x6e438). */
   stopBgm(): void
 
+  /**
+   * 울리는 소리 끊기 (원본 `0x6e418`, 직접 떴다):
+   * ```
+   * 6e420  [+0x30] = −1                 ; 예약 칸 비우기
+   * 6e424  ldrb [미디어+0x11] ; bpl      ; 지금 물린 소리가 반복(배경음)이면
+   * 6e42a  [+0x28] = −1                 ;   기억한 배경음도 잊는다
+   * 6e42e  0x6e258(미디어)               ; 울리던 소리를 끊는다
+   * ```
+   * `stopBgm` 과 달리 번호를 견주지 않고 **효과음이든 배경음이든 지금 것을 끊는다**. 효과음을 끊을 때는 기억한 배경음이 남는다.
+   */
+  stop(): void
+
   /** 기억해 둔 배경음을 다시 튼다 — 팝업·일시정지 뒤 복귀 (원본 0x6eaf0). */
   resumeBgm(): void
 
@@ -66,13 +80,21 @@ export interface SoundPort {
 export function createSilentSound(): SoundPort {
   let volume = 0
   let bgmId: number | null = null
+  /** 마지막에 넣은 소리가 반복(배경음)이었나 — 원본 미디어 +0x11 비트 0 */
+  let lastLoop = false
   return {
-    play: () => {},
+    play: () => {
+      lastLoop = false
+    },
     playBgm: (id) => {
       bgmId = id
+      lastLoop = true
     },
     stopBgm: () => {
       bgmId = null
+    },
+    stop: () => {
+      if (lastLoop) bgmId = null
     },
     resumeBgm: () => {},
     currentBgm: () => bgmId,

@@ -37,6 +37,7 @@ function 녹음포트() {
       bgm = null
     },
     resumeBgm: () => {},
+    stop: () => {},
     currentBgm: () => bgm,
     setVolume: () => {},
     getVolume: () => 100,
