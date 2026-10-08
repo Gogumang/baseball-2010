@@ -199,6 +199,8 @@ export function CareerRoutes({
                 random,
                 // 경기 중 구장 하늘 줄 그대로 (0x783b0 — 경기를 세울 때 한 번)
                 ...(screen.settlementSkyRow === undefined ? {} : { skyRow: screen.settlementSkyRow }),
+                // 구장 객체도 방금 끝난 경기 장면의 것 그대로 (다음 경기를 세울 때까지 세션이 든다)
+                stadium: session.sceneStadium,
               },
             })}
         />
@@ -216,6 +218,7 @@ export function CareerRoutes({
           // 대회 경기도 정산 0x4ea0c 꼬리를 지난다 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           settlement={{
             inning: screen.settlementInning, playerSide: screen.settlementPlayerSide, random, skyRow: screen.settlementSkyRow,
+            stadium: session.sceneStadium,
           }}
         />
       )

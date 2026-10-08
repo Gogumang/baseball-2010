@@ -4,6 +4,7 @@ import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { opponentPitcherAbilityOf, opponentStaminaPercentAfterPitchOf } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
+import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { ScreenOverlay } from '@/shared/ui'
@@ -84,6 +85,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerialRef.current)
   /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, sceneSerialRef.current)
+  /** 수비 재생 · 중계 바탕 0x35218 의 팔레트 줄 — 수비 구장 +0xc(0x39fdc 모드 4 의 0x788f8, 0~9 는 타석 줄과 같다) */
+  const grassPalette = sceneFieldPaletteOf(session.sceneStadium)
 
   /**
    * **자동진행 중계(상태 0x21)** — 내 타석 사이에 돈 동료 타석 · 상대 반 이닝(`progress.autoRelay`)을 틱마다 한 칸씩 튼다.
@@ -198,6 +201,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       <DefensePlayback
         input={progress.pendingDefensePlay}
         side="공격"
+        // 바탕 0x35218 — 수비 구장 +0xc 줄(0x39fdc 모드 4)
+        grassPalette={grassPalette}
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={{
           sides: humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId),
@@ -212,7 +217,9 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     )
   }
   if (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady) {
-    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} />
+    return (
+      <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} grassPalette={grassPalette} />
+    )
   }
   // 자동진행 중계(0x21) — 앞 판의 수비 재생 뒤 · 내 공의 0x12 대기(15/31 틱)가 끝난 뒤(판정 A 가 0x21 로 보낸다), 0x18 · 0xe ·
   // 다음 내 타석 앞. 기록 달성 알림 0x4e35c 는 0x17 말고는 늘 그리므로 중계 위에도 얹는다
@@ -227,6 +234,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
             progress.game.playerSide === 0 ? [progress.ourTeamId, progress.opponentTeamId] : [progress.opponentTeamId, progress.ourTeamId]
           }
           humanSide={progress.game.playerSide === 0 ? 0 : 1}
+          grassPalette={grassPalette}
           onDone={finishRelay}
         />
         <RecordAlertScreenOverlay frame={recordAlert} />
@@ -263,6 +271,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         bannerText={runner.bannerText}
         // 구장 하늘 줄 — 경기를 세울 때(0x783b0) 한 번 정했다
         skyRow={session.stadiumSkyRow}
+        // 구장 객체 — 경기를 세울 때(0x39fdc 모드 4) 정했다
+        sceneStadium={session.sceneStadium}
         random={random}
         onPitchResolved={handlePitchResolved}
         sceneBuntKind={sceneBuntKindRef.current}

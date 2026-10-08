@@ -8,6 +8,8 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
+import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
@@ -89,6 +91,11 @@ interface GameScreenProps {
    * 수비 재생으로 화면이 내려갔다 다시 서도 같은 줄이다. 안 주면 타석 화면이 그림을 세울 때 굴린다(예전 근사)
    */
   readonly skyRow?: number
+  /**
+   * 이 경기의 타석 구장 객체 — 셋업 0x39fdc 모드 4 갈래(`nariSceneStadium`): +0x70 펜스 프레임 · +0xc 바닥 팔레트 줄.
+   * 안 주면 0번 구장 · 기본색
+   */
+  readonly sceneStadium?: SceneStadium | null
   /** 경기 중 기록 달성 알림 0x4e35c 의 이번 그림 (`useRecordAlert`, 부르는 쪽이 든다). 안 넘기면 안 그린다 */
   readonly recordAlert?: RecordAlertFrame
   /** 알림을 든 쪽에 이 화면의 팝업 · 장면 갈래를 알린다 (`RecordAlertScene`) — 바뀔 때마다 */
@@ -130,6 +137,7 @@ export function GameScreen({
   onSpecialSwingUsed,
   sceneBuntKind,
   skyRow,
+  sceneStadium = null,
   recordAlert,
   onRecordAlertSceneChange,
 }: GameScreenProps) {
@@ -334,6 +342,9 @@ export function GameScreen({
             // 0xe(OK 대기)에서도 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
             isPaused={isPaused || isMenuOpen || overlay !== null || sceneConfirm.isAwaiting}
             {...(skyRow === undefined ? {} : { skyRow })}
+            // 구장 객체(0x39fdc 모드 4 — 홈 팀 · 대회 2/8) — 펜스 프레임 +0x70 · 바닥 팔레트 줄 +0xc
+            {...(sceneStadium === null ? {} : { stadium: sceneStadium.stadium })}
+            fieldPalette={sceneFieldPaletteOf(sceneStadium)}
             random={random}
             // 필살타법 '0' (0x535a4 → 0x51dee → 0x34c74). 레벨이 아니라 **고른 번호**(+0x18)를 넘긴다 —
             // 0 이면(아직 안 고름) '0' 키가 무시된다

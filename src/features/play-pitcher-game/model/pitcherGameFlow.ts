@@ -295,6 +295,11 @@ export interface PitcherGameOptions {
    * 국가대항전 경기인가 (S+0x12c = L+0xac) — 0xa56dc 기록 게이트와 0xa4f60 의 −2(맞바꿈 없음)가 본다. 안 넘기면 거짓
    */
   readonly isNationalCup?: boolean
+  /**
+   * 국가대항전 남은 단계 L+0xad — 경기 장면 셋업 0x39fdc 모드 3 갈래(3a190)가 구장을 `> 1 ? 2 : 8` 로 고른다
+   * (`nariSceneStadium`). 국가대항전이 아니면 생략
+   */
+  readonly nationalCupStage?: number
   /** 투수 능력치 0~999 (제구·구속·변화·체력) */
   readonly stats: PitcherStats
   /** 체력 실효 능력치 — 스태미나 용량 X 의 바탕 (`0xb6415(P, 3, 1)`) */

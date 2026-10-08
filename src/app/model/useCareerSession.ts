@@ -147,6 +147,8 @@ import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { nariSceneStadium } from '@/features/play-team-game/model/sceneStadium'
+import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import {
@@ -440,6 +442,11 @@ export function useCareerSession({
    */
   const [stadiumSkyRow, setStadiumSkyRow] = useState(0)
   const stadiumSkyRowRef = useRef(0)
+  /**
+   * 이 경기 장면의 두 구장 객체 — 셋업 0x39fdc 모드 3·4 갈래(`nariSceneStadium`): 홈(측 1) 팀, 국가대항전이면 풀리그 2 · 결승 8.
+   * 타석 펜스 프레임(+0x70)과 바닥 · 수비 바탕 팔레트 줄(+0xc). 정산 결과 그림도 같은 구장이다. 경기를 세우기 전엔 null
+   */
+  const [sceneStadium, setSceneStadium] = useState<SceneStadium | null>(null)
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄이 읽는다 */
   const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
   /** 143 경기 전 엔트리 보기 (진입 0x16af8 · 키 0x1457c) — 142 위에 선다. 없으면 null */
@@ -621,6 +628,11 @@ export function useCareerSession({
       )
       progressRef.current = started
       setProgress(started)
+      // 상태 9 의 0x39fdc 모드 4 갈래 — 홈(측 1) 팀 구장, 대회(S+0x12c)면 L+0xad > 1 ? 2 : 8. 리그 팀 0~9 · 상수라 굴림 없음
+      setSceneStadium(nariSceneStadium(
+        playerSide === PLAYER_SIDE_LAST_BAT ? started.ourTeamId : started.opponentTeamId,
+        cupGameRef.current?.stage ?? null,
+      ))
       // 적재(상태 8)의 구장 준비 0x352e8 → 0x783b0 — 이 경기 내내 같은 하늘 줄
       const skyRow = stadiumSkyRowOf({ mode: BATTER_LEAGUE_MODE, dayCounter: skyDayCounter }) ?? 0
       stadiumSkyRowRef.current = skyRow
@@ -2239,6 +2251,7 @@ export function useCareerSession({
     pendingTitle,
     loadingTip,
     stadiumSkyRow,
+    sceneStadium,
     matchAces,
     /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
     entryView: screen.kind === '경기준비' ? entryView : null,

@@ -539,6 +539,8 @@ function cupGameOptionsOf(
     dayCounter: cup.day,
     isPostseason: false,
     isNationalCup: true,
+    // L+0xad — 0x39fdc 모드 3 갈래의 구장 2(풀리그) · 8(결승)
+    nationalCupStage: cup.stage,
     positionCode: pitcherCupPositionCodeOf(teams),
     stamina: FULL_STAMINA,
     ourPitcherOrder: gameMyPitcherOrderOf(teams.korea.pitchers ?? []),

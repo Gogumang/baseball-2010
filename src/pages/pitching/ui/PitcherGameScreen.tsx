@@ -56,6 +56,7 @@ import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { nariSceneStadium, sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
@@ -356,6 +357,15 @@ export function PitcherGameScreen({
 
   // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
   const scoreboardSides = humanVsComputerSidesOf(options.playerSide, options.ourTeamId, options.opponentTeamId)
+  /**
+   * 구장 객체 — 셋업 0x39fdc 모드 3 갈래: 홈(측 1) 팀, 국가대항전이면 풀리그 2 · 결승 8. 굴림 없음.
+   * 수비 재생 · 중계 바탕(0x35218)은 수비 구장 +0xc 줄, 정산 결과 배경은 타석 구장 +0x70 · +0xc 로 그린다
+   */
+  const sceneStadium = nariSceneStadium(
+    options.playerSide === PLAYER_SIDE_FIRST_BAT ? options.opponentTeamId : options.ourTeamId,
+    options.nationalCupStage ?? null,
+  )
+  const grassPalette = sceneFieldPaletteOf(sceneStadium)
 
   /**
    * **경기 중 기록 달성 알림 0x4e35c** — 프레임 0x52c50 이 상태 0x17(수비 인플레이)만 빼고 늘 그리므로 내가 던지는 화면에도 뜬다.
@@ -444,6 +454,7 @@ export function PitcherGameScreen({
       <DefensePlayback
         input={progress.pendingDefensePlay}
         side="수비"
+        grassPalette={grassPalette}
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
@@ -456,6 +467,7 @@ export function PitcherGameScreen({
     return (
       <DefensePlayback
         runnerPlay={progress.pendingRunnerPlay}
+        grassPalette={grassPalette}
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         onDone={actions.finishRunnerPlay}
       />
@@ -463,7 +475,9 @@ export function PitcherGameScreen({
   }
   // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
   if (isReplaying) {
-    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} />
+    return (
+      <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} grassPalette={grassPalette} />
+    )
   }
   // 자동진행 중계(0x21) — 굴려 둔 틱을 매 틱 한 칸씩 (모드 3: 키 · 속도 · 배경음 없음)
   if (isRelaying && relay !== null) {
@@ -477,6 +491,7 @@ export function PitcherGameScreen({
             : [options.opponentTeamId, options.ourTeamId]
         }
         humanSide={options.playerSide === PLAYER_SIDE_FIRST_BAT ? 0 : 1}
+        grassPalette={grassPalette}
         onDone={finishRelay}
       />,
     )
@@ -584,6 +599,9 @@ export function PitcherGameScreen({
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isHumanWin)}
             // 하늘 줄 = 구장 +0x10 — 0x783b0 모드 3: 나리 저장 +0xb2(리그 날짜 g) mod 6, 굴림 없음. 배경 난수는 꼴만 채운다
             skyRow={stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0}
+            // 결과 배경 0x40ff0 → 0x78578 — 경기 장면의 타석 구장 그대로(펜스 +0x70 · 바닥 줄 +0xc)
+            stadium={sceneStadium.stadium}
+            fieldPalette={grassPalette}
             random={backdropRandom}
             // 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 결과 그림 0x4a384 의 효과 · 파티클 틱은 경기 난수로 돈다
             settlement={{

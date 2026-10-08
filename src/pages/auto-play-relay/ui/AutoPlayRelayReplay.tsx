@@ -10,6 +10,8 @@ interface AutoPlayRelayReplayProps {
   /** 마지막 칸 다음 틱 — 0xc2198 이 거짓이라 상태 0x18 로 */
   readonly onDone: () => void
   readonly missionBatterName?: string | null
+  /** 바탕 그림(0x35218 · 수비 구장 +0xc) 팔레트 줄 — 없으면 기본색 */
+  readonly grassPalette?: number | null
 }
 
 /**
@@ -19,7 +21,9 @@ interface AutoPlayRelayReplayProps {
  * 배경음(진입 0x3abf0)도 없다 — 사람이 도중에 바꿀 것이 없어 굴린 결과를 뒤에 틀어도 원본과 한 틱도 안 다르다(사이에 다른 굴림도 없다).
  * 마지막 칸을 그린 다음 틱에 0xc2198 이 거짓을 내 +0x1784 = 0 · 상태 0x18 이다.
  */
-export function AutoPlayRelayReplay({ steps, sideTeams, humanSide, onDone, missionBatterName }: AutoPlayRelayReplayProps) {
+export function AutoPlayRelayReplay({
+  steps, sideTeams, humanSide, onDone, missionBatterName, grassPalette = null,
+}: AutoPlayRelayReplayProps) {
   const [index, setIndex] = useState(-1)
   /** 틱 콜백이 한 그림 안에 몰려 와도 칸을 하나씩 넘기도록 ref 로 센다 */
   const indexRef = useRef(-1)
@@ -42,6 +46,7 @@ export function AutoPlayRelayReplay({ steps, sideTeams, humanSide, onDone, missi
       sideTeams={sideTeams}
       humanSide={humanSide}
       missionBatterName={missionBatterName}
+      grassPalette={grassPalette}
     />
   )
 }
