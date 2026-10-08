@@ -77,6 +77,18 @@ export const INITIAL_SETUP: GeneralModeSetup = {
   acePitcherId: NO_ACE,
 }
 
+/**
+ * 구장 목록(10열 × 1줄, 꼴 0x10 — 20 진입 0x23f28 `0x6c4bd(목록, 10, 1, 1, 0x10)`)의 좌·우 한 칸.
+ * 0x6bead: 꼴 0x10 이고 `x + dx` 가 [0, 10) 밖이면(0x6bdc4) `x = (x + dx + 10) mod 10` 으로 **감는다**, 안이면 그대로 옮긴다.
+ * 빠른실행 뒤 rec+0xc 가 히든 팀 번호 10~14 로 남아 커서가 범위 밖에서 시작해도 같은 식이라 오른쪽이면
+ * (x + 11) mod 10 · 왼쪽이면 (x + 9) mod 10 칸으로 튄다(원본 그대로).
+ */
+export function stadiumCursorAfter(stadiumId: number, step: number): number {
+  const next = stadiumId + step
+  if (next < 0 || next >= STADIUM_COUNT) return (next + STADIUM_COUNT) % STADIUM_COUNT
+  return next
+}
+
 /* ── 단계 (메인 메뉴 하위 상태) ─────────────────────────────────────────────────── */
 
 /** 메인 메뉴 장면 0x103 의 하위 상태 번호를 그대로 쓴다 (P6 1-2) */

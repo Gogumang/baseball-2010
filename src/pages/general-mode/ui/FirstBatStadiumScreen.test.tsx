@@ -69,13 +69,26 @@ describe('단계 1 — 구장 고르기', () => {
     expect(onMoveStadium).toHaveBeenCalledWith(4)
   })
 
-  it('커서는 끝에서 멈춘다 — 감싸지 않는다', () => {
+  it('커서는 끝에서 감는다 — 목록 꼴 0x10 (0x6bead)', () => {
     const onMoveStadium = vi.fn()
     구장단계({ stadiumId: STADIUM_COUNT - 1, onMoveStadium })
 
     fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(onMoveStadium).toHaveBeenLastCalledWith(0)
 
-    expect(onMoveStadium).toHaveBeenCalledWith(STADIUM_COUNT - 1)
+    cleanup()
+    구장단계({ stadiumId: 0, onMoveStadium })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(onMoveStadium).toHaveBeenLastCalledWith(STADIUM_COUNT - 1)
+  })
+
+  it('⚠️ 빠른실행 뒤 남은 히든 구장 번호(12)에서 시작하면 오른쪽은 (12 + 11) mod 10 = 3 으로 튄다 (원본 그대로)', () => {
+    const onMoveStadium = vi.fn()
+    구장단계({ stadiumId: 12, onMoveStadium })
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    expect(onMoveStadium).toHaveBeenCalledWith(3)
   })
 
   it('OK 면 rec+0xc 에 적고 다음 단계로 간다', () => {

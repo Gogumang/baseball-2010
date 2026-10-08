@@ -6,7 +6,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF } from '@/pages/general-mode/lib/prepareLayout'
-import { FIRST_BAT_PHASE, STADIUM_COUNT } from '@/pages/general-mode/lib/generalModeSetup'
+import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 
@@ -95,8 +95,8 @@ export function FirstBatStadiumScreen({
       }
       if (step !== 0) {
         event.preventDefault()
-        // 원본 목록 커서는 끝에서 멈춘다 (0x7a2xx)
-        return onMoveStadium(Math.min(STADIUM_COUNT - 1, Math.max(0, stadiumId + step)))
+        // 구장 목록은 꼴 0x10 — 끝에서 감는다 (0x6bead)
+        return onMoveStadium(stadiumCursorAfter(stadiumId, step))
       }
       if (event.key === 'Enter') {
         event.preventDefault()
@@ -196,13 +196,13 @@ export function FirstBatStadiumScreen({
         <>
           <button type="button" aria-label="이전 구장" className={styles.sideButton}
             style={{ left: FIRST_BAT_LAYOUT.arrow.leftX, top: FIRST_BAT_LAYOUT.arrow.y, width: 7, height: 10 }}
-            onClick={() => onMoveStadium(Math.max(0, stadiumId - 1))}>
+            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))}>
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
               style={{ left: 0, top: 0 }} />
           </button>
           <button type="button" aria-label="다음 구장" className={styles.sideButton}
             style={{ left: FIRST_BAT_LAYOUT.arrow.rightX, top: FIRST_BAT_LAYOUT.arrow.y, width: 7, height: 10 }}
-            onClick={() => onMoveStadium(Math.min(STADIUM_COUNT - 1, stadiumId + 1))}>
+            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))}>
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
               style={{ left: 0, top: 0, transform: 'scaleX(-1)' }} />
           </button>
