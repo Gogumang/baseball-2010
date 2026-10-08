@@ -2440,6 +2440,8 @@ export function useSeasonSession(
           dayCounter: cup.day,
           opponentDayCounter: cup.day === 0 ? 0 : 1,
           opponentPitcherOrder: nationalCupOpponentPitcherOrderOf(cup.day),
+          // L+0xad — 경기 준비 0x352e8 모드 2 갈래의 구장 2(풀리그) · 8(결승)
+          nationalCupStage: cup.stage,
         },
       }, null)
     },

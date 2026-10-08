@@ -185,7 +185,7 @@ import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { TEAMS } from '@/shared/config/original/teams'
-import { rollSceneStadium } from '@/features/play-team-game/model/sceneStadium'
+import { rollSceneStadium, seasonNationalCupSceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 
 /**
@@ -412,6 +412,11 @@ export interface TeamGameOptions {
    * 경기 안에서도 rand(0, 10) 둘). 안 넘기면 구장 객체를 안 채운다(그림은 0번 구장 · 기본색, 굴림 없음).
    */
   readonly stadiumId?: number
+  /**
+   * **시즌 국가대항전의 남은 단계** L+0xad (모드 2 · SR+0x12c). 경기 준비 `0x352e8` 의 모드 2 갈래가 대회면 구장을
+   * `> 1 ? 2 : 8` 로 놓고 그 줄로 바닥을 다시 싣는다(`seasonNationalCupSceneStadium` — 상수라 굴림 없음). 대회가 아니면 생략
+   */
+  readonly nationalCupStage?: number
 }
 
 export interface TeamGameLogEntry {
@@ -1199,6 +1204,11 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
  * 다른 모드 갈래(시즌 · 나리 · 미션 · 더비)는 이 칸을 안 쓰므로 웹도 null 로 둔다.
  */
 function sceneStadiumOf(options: TeamGameOptions, random: RandomPort): SceneStadium | null {
+  // 시즌 국가대항전 — 0x39fdc 모드 2 갈래는 구장을 안 건드리고 상태 8 경기 준비 0x352e8(35318~3538c)이 2 · 8 로 놓는다.
+  // 상수라 굴림이 없어 여기서 같이 채운다(난수열 그대로)
+  if (options.mode === TEAM_GAME_MODE.시즌) {
+    return options.nationalCupStage === undefined ? null : seasonNationalCupSceneStadium(options.nationalCupStage)
+  }
   if (options.stadiumId === undefined) return null
   if (options.mode !== TEAM_GAME_MODE.일반 && !isVersusMode(options.mode)) return null
   return rollSceneStadium(random, options.stadiumId)

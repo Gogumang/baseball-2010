@@ -114,6 +114,17 @@ describe('startTeamGame — 3f856 0x39fdc 는 상태 7(덱 · 효과) 뒤 · 3fa
     expect(경기.sceneStadium).toBeNull()
   })
 
+  it('시즌 국가대항전(모드 2 · L+0xad)은 0x352e8 의 2 · 8 — 굴림 없음, 대회 아닌 경기와 난수열이 같다', () => {
+    const 대회 = recorded(씨앗)
+    const 결승 = startTeamGame({ ...일반모드(undefined), mode: 2, nationalCupStage: 1 }, 대회.random)
+    const 정규 = recorded(씨앗)
+    startTeamGame({ ...일반모드(undefined), mode: 2 }, 정규.random)
+    expect(결승.sceneStadium).toEqual({ stadium: 8, defenseStadium: 0, paletteRow: 1 })
+    expect(대회.calls).toEqual(정규.calls)
+    expect(startTeamGame({ ...일반모드(undefined), mode: 2, nationalCupStage: 3 }, recorded(씨앗).random).sceneStadium?.stadium)
+      .toBe(2)
+  })
+
   it('이어하기도 상태 9 를 다시 탄다 — 블록의 st+0x30 으로 또 굴린다', () => {
     const 첫 = startTeamGame(일반모드(12), createSeededRandom(씨앗))
     const 저장 = 첫.halfInningSave
