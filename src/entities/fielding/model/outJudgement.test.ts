@@ -61,6 +61,19 @@ describe('아웃 판정 0xb36d0 — 0/1/2/3 을 갈라서 돌려준다', () => {
     })
   })
 
+  it('플레이 종류가 비트표 0x58d = {0, 2, 3, 7, 8, 10} 이면 곧바로 0 — 밀어내기 판(종류 2)은 태그 거리여도 아웃이 없다 (b36e8~b36f4)', () => {
+    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 2, 335, { targetBase: 3 }), 400)]
+    const 야수 = 루에선야수(3, 3)
+    for (const kind of [0, 2, 3, 7, 8, 10]) {
+      const 문 = 문맥(야수, 주자, 3)
+      expect(judgeOut({ ...문, play: { ...문.play, kind }, skipRunnerIndexes: [0] })).toEqual({ kind: OUT_KIND.NONE, runnerIndex: NONE })
+    }
+    for (const kind of [1, 4, 5, 9]) {
+      const 문 = 문맥(야수, 주자, 3)
+      expect(judgeOut({ ...문, play: { ...문.play, kind }, skipRunnerIndexes: [0] }).kind).toBe(OUT_KIND.TAG)
+    }
+  })
+
   it('2a 가 3a 를 덮어쓴다 — 밀려 있는 주자는 달려가는 루(+0x7c)를 밟은 야수에게 루 아웃 (0xb3890)', () => {
     // 1루 주자가 2루로 뛰는 중, 공 쥔 야수가 2루를 밟고 있다.
     // 주자관리 vt10(0xa9f60)은 `산 주자 수 > [주자+0x8c]` — **닿은 루**가 아직 1이라 참이다.

@@ -483,7 +483,12 @@ export function useMissionSession({
    * 출구 0xae24c 뒤에야 사구가 보통 길(밀어내기·정산)을 간다 — `finishBenchClearing`.
    */
   const [pendingBenchClearing, setPendingBenchClearing] = useState<
-    { readonly run: PitcherRun; readonly outcome: AtBatOutcome } | null
+    {
+      readonly run: PitcherRun
+      readonly outcome: AtBatOutcome
+      /** 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤 0x17 로 재생한다 */
+      readonly walkReplay?: DefensePlayResult | null
+    } | null
   >(null)
   /**
    * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
@@ -849,6 +854,10 @@ export function useMissionSession({
         return
       }
 
+      // 볼넷 · 사구 — 판정 A 0xae24c 가 밀어내기 판(종류 2, 0x17)으로 보낸다. 진루는 보통 길과 같아 판은 재생만 한다
+      if (play !== null && arrivalApplicationOf(play) === 'freePass' && play.result.ticks.length > 0) {
+        setPickoffReplay(play.result)
+      }
       setMissionRun((previous) => {
         if (previous === null) return previous
         const swung = hasSwung ? recordSwing(previous) : previous
@@ -1180,9 +1189,17 @@ export function useMissionSession({
       if (entersBenchClearing) {
         // 진입 0x3a5f0 — 공격 9명 자리·목표 굴림 45 번이 곧바로 나간다. 사구는 연출이 끝날 때까지 붙든다
         rollBenchClearingEntry(random)
-        setPendingBenchClearing({ run: nextRun, outcome })
+        setPendingBenchClearing({
+          run: nextRun,
+          outcome,
+          walkReplay: play !== null && arrivalApplicationOf(play) === 'freePass' ? play.result : null,
+        })
         setPitcherRun(nextRun)
         return
+      }
+      // 볼넷 · 사구 — 밀어내기 판(종류 2, 0x17)을 재생한다. 진루는 아래 보통 길과 같다
+      if (play !== null && arrivalApplicationOf(play) === 'freePass' && play.result.ticks.length > 0) {
+        setPickoffReplay(play.result)
       }
       nextRun =
         play !== null && arrivalApplicationOf(play) === 'batterRuns'
@@ -1391,6 +1408,8 @@ export function useMissionSession({
       if (pending === null) return
       setPendingBenchClearing(null)
       if (reachedTargetTick) rollBenchClearingTargets(random)
+      // 출구 0xae24c → 0x17 밀어내기 판
+      if (pending.walkReplay != null && pending.walkReplay.ticks.length > 0) setPickoffReplay(pending.walkReplay)
       setPitcherRun(settlePitcherRun(applyPitcherOutcome(pending.run, pending.outcome, { random })))
       resetAtBatWithConfirm()
     },

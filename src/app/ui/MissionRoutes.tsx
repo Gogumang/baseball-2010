@@ -17,6 +17,7 @@ import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
@@ -316,7 +317,14 @@ function missionOverlayOf(
 
   // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
   if (session.pickoffReplay !== null) {
-    return <DefensePlayback ticks={session.pickoffReplay.ticks} onDone={actions.finishPickoffReplay} />
+    return (
+      <DefensePlayback
+        ticks={session.pickoffReplay.ticks}
+        onDone={actions.finishPickoffReplay}
+        // 볼넷 · 사구 밀어내기 판(종류 2)도 이 재생 칸으로 온다 — 키 건너뛰기(0x519cc)를 받는다
+        freePassPlay={isWalkPlayResult(session.pickoffReplay)}
+      />
+    )
   }
 
   // 자동진행 중계(상태 0x21) — 사람 반 이닝이 3아웃으로 끝나(`halfEnded`) 결과 띠 · 수비 · 주자 판이 다 돈 뒤 0x18 → 0x21.

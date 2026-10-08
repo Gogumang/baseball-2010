@@ -34,7 +34,7 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
-import { runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { arrivalApplicationOf, runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
 import { rollPassedBall } from '@/entities/fielding/model/passedBall'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
@@ -802,7 +802,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     expect(rolls).toBe(1)
   })
 
-  it('볼넷·사구 + 도루면 판이 없다 — 0x3dfac 스위치(0x3e1cc)가 종류를 2(밀어내기)로 덮어쓴다', () => {
+  it('볼넷·사구 + 도루면 도루 판이 없다 — 0x3dfac 스위치(0x3e1cc)가 종류를 2(밀어내기)로 덮어쓰고 그 판은 재생만 한다', () => {
     for (const [resolution, outcomeAfter] of [
       [{ kind: '볼' }, { kind: '볼넷' }],
       [{ kind: '사구' }, { kind: '사구' }],
@@ -811,12 +811,32 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       const 시작 = startGame(random)
       const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
       const { progress: 뒤, play, interrupted } = arrivePitch(출발, { resolution, outcomeAfter }, random)
-      expect(play).toBeNull()
+      // 밀어내기 판(종류 2) — 주자 판으로 먹이지 않는다(진루는 타석 결과의 보통 길이 낸다)
+      expect(play?.kind).toBe(2)
+      expect(play !== null && arrivalApplicationOf(play)).toBe('freePass')
+      // 1루 도루 주자는 밀리는 사슬이라 2루로 · 타자주자 1루
+      expect(play?.result.advance).toEqual({ bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 0 })
       expect(interrupted).toBe(false)
       expect(뒤.stealingFrom).toEqual([])
       expect(뒤.game.bases).toEqual(출발.game.bases)
       expect(뒤.recordIds).toEqual(출발.recordIds)
     }
+  })
+
+  it('볼넷은 밀어내기 판(종류 2)을 재생 칸에 넣고 진루는 보통 길 그대로 — 판 안 굴림이 없어 경기 난수 차례가 같다', () => {
+    const 시작 = startGame(createSeededRandom(4))
+    const 놓음 = { ...시작, game: { ...시작.game, bases: { first: true, second: false, third: true } } }
+    const 판있음 = createSeededRandom(11)
+    const { progress: 뒤, play } = arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판있음)
+    const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, 판있음, { arrivalPlay: play })
+    expect(끝.lastDefensePlay).toBe(play?.result)
+    // 판의 진루 = 보통 길의 밀어내기 (내 타석 뒤 동료 타석은 자동진행이 이어 돈다)
+    expect(play?.result.advance).toEqual({ bases: { first: true, second: true, third: true }, runsScored: 0, outsAdded: 0 })
+    // 판이 없던 예전 길과 굴림 수가 같다 — 다음 굴림이 같은 값
+    const 판없음 = createSeededRandom(11)
+    arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판없음)
+    startPlayerOutcome(뒤, { kind: '볼넷' }, 판없음)
+    expect(판있음.next()).toBe(판없음.next())
   })
 
   it('삼진 + 도루면 판은 아웃 + 1 로 열린다 — 0x3e15e 가 판 앞에서 state[6]++', () => {

@@ -90,6 +90,13 @@ interface DefensePlaybackProps {
    * (`lib/defenseHomeRunEffects`). 부르는 쪽이 경기(장면) 하나 동안 들고 있는 ref 를 넘긴다. 안 주면 판마다 장면 new 의 0 이다.
    */
   readonly sceneMemory?: { current: DefenseSceneMemory }
+  /**
+   * 재생 갈래(`ticks`)가 **볼넷 · 사구 밀어내기 판**(종류 2, `features/defense-play/model/walkPlay`)인가.
+   * - 타자주자(칸 0)가 달리지만 홈런 비행이 아니다 — 득점 점수판을 보통 갈래로 센다.
+   * - state[0xb] ∈ {3, 4} 라 판 동안 · 닫힌 뒤 갱신에 온 키가 0x519cc 를 지나 +0xfe7 을 세우고 52b26 이 그 그림 안에서
+   *   판 끝 · +0x1094 셈을 다 돌아 0x35108 로 끝낸다 — 키를 받은 그림에서 재생을 끝낸다.
+   */
+  readonly freePassPlay?: boolean
   readonly children?: React.ReactNode
 }
 
@@ -125,6 +132,7 @@ export function DefensePlayback({
   grassPalette = null,
   runScoreBoard,
   sceneMemory,
+  freePassPlay = false,
   children,
 }: DefensePlaybackProps) {
   if (input !== undefined) {
@@ -147,6 +155,7 @@ export function DefensePlayback({
       onDone={onDone}
       grassPalette={grassPalette}
       runScoreBoard={runScoreBoard}
+      freePassPlay={freePassPlay}
     >
       {children}
     </RecordedPlayback>
@@ -158,6 +167,7 @@ interface RecordedPlaybackProps {
   readonly onDone: (result?: DefensePlayResult) => void
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
+  readonly freePassPlay: boolean
   readonly children?: React.ReactNode
 }
 
@@ -235,7 +245,7 @@ function stepRecordedBoard(
  * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
  * ⚠️ 0x357e0(결과 코드 24~26)은 재생 틱에 없어 "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
  */
-function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, children }: RecordedPlaybackProps) {
+function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePassPlay, children }: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
@@ -244,8 +254,22 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, children
   if (tallyRef.current === null || tallyRef.current.ticks !== ticks) {
     tallyRef.current = { ticks, tally: EMPTY_RECORDED_TALLY }
   }
-  // 타자주자(칸 0)가 달리는 재생 = 홈런 비행 — 웹 재생 갈래의 다른 판(견제·도루·폭투)은 타자주자를 안 싣는다
-  const isHomeRun = ticks[0]?.runners.some((runner) => runner.index === 0) === true
+  // 타자주자(칸 0)가 달리는 재생 = 홈런 비행 — 웹 재생 갈래의 다른 판(견제·도루·폭투)은 타자주자를 안 싣는다.
+  // 밀어내기 판(종류 2)은 타자주자를 싣지만 홈런이 아니다(0x357e0 은 결과 코드 24~26)
+  const isHomeRun = !freePassPlay && ticks[0]?.runners.some((runner) => runner.index === 0) === true
+  /** 0x519cc 키 건너뛰기를 받았다 — 그 그림 안에서 0x35108 까지 끝난다 */
+  const [skipped, setSkipped] = useState(false)
+  useEffect(() => {
+    setSkipped(false)
+    if (!freePassPlay) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      // 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x519cc — 원본이 아는 키만
+      if (originalKeyOf(event.key) === null) return
+      setSkipped(true)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [freePassPlay, ticks])
   const holder = tallyRef.current
   while (ticks.length > 0 && !holder.tally.ended && holder.tally.nextIndex <= update) {
     const at = holder.tally.nextIndex
@@ -253,7 +277,7 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, children
     if (view === undefined) break
     holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex)
   }
-  const isFinished = ticks.length === 0 || holder.tally.ended
+  const isFinished = ticks.length === 0 || holder.tally.ended || skipped
 
   useEffect(() => {
     if (isFinished) onDone()

@@ -329,8 +329,9 @@ export interface GameProgress {
    * **벤치 클리어링 연출 중**(상태 0x1e). 사구 타석이 20/99 굴림에 걸리면 진입(0x3a5f0)의 굴림 45 번까지 쓰고
    * 여기 사구 결과를 붙든 채 멈춘다 — 밀어내기 주루·정산·다음 타석은 화면이 연출을 끝내고
    * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
+   * `arrivalPlay` 는 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤에 재생한다.
    */
-  readonly pendingBenchClearing: { readonly outcome: AtBatOutcome } | null
+  readonly pendingBenchClearing: { readonly outcome: AtBatOutcome; readonly arrivalPlay?: PitchArrivalPlay | null } | null
   /**
    * **1회초 판**(상태 0x18 교대 가지가 OK 를 기다림) — 섰으면 그 판, 아니면 null. 화면은 첫 타석 앞에 띄운다.
    * 모드 4 에서 판이 설 수 있는 것은 이 하나뿐이다 (`withFirstInningBoard` 머리말).
@@ -660,7 +661,8 @@ export function startPlayerOutcome(
   if (cleared !== progress) {
     // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
     rollBenchClearingEntry(random)
-    return { ...cleared, pendingBenchClearing: { outcome } }
+    const arrivalPlay = options.arrivalPlay ?? null
+    return { ...cleared, pendingBenchClearing: arrivalPlay === null ? { outcome } : { outcome, arrivalPlay } }
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
@@ -764,7 +766,11 @@ export function resolveBenchClearing(
   if (pending === null) return progress
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
   const cleared = { ...progress, pendingBenchClearing: null }
-  const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs })
+  // 출구 0xae24c → 0x17 밀어내기 판 — 연출 뒤에 재생한다
+  const playback =
+    homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs }) ??
+    pending.arrivalPlay?.result ??
+    null
   return finishPlayerOutcome(cleared, pending.outcome, random, null, playback)
 }
 
@@ -1927,7 +1933,8 @@ export function arrivePitch(
     random,
   )
   if (play === null) return { progress: cleared, play: null, interrupted: false }
-  if (arrivalApplicationOf(play) === 'batterRuns') return { progress: cleared, play, interrupted: false }
+  // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPlayerOutcome` 의 `arrivalPlay`)이 먹인다 — 밀어내기 판은 재생 칸에만
+  if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: cleared, play, interrupted: false }
 
   let next = withRunnerOnlyPlay(cleared, play.result)
   const recordIds = gatedOffenseRecords(play.recordIds)
@@ -1943,6 +1950,7 @@ function describeArrivalPlay(play: PitchArrivalPlay): string {
   const runs = play.result.advance.runsScored
   const tail = runs > 0 ? ` (${runs}점)` : ''
   if (play.kind === 9) return `폭투·포일${tail}`
+  if (play.kind === 2) return `밀어내기${tail}`
   if (play.result.caughtFrom.length > 0) return `도루 실패 — 아웃${tail}`
   if (play.result.stolenFrom.length > 0) return `도루 성공${tail}`
   return `도루${tail}`

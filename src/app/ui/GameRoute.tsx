@@ -15,7 +15,9 @@ import type { useGameSettings } from '@/app/model/useGameSettings'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
+import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
@@ -86,6 +88,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    * 뜨면 그 예약을 0x1b 로 덮는다. 같은 걸음에 0xe 를 두 번 지나면(CPU 투수 교체 뒤 다시 굴려 뜬 돌발) 두 OK 를 다 받은 뒤다.
    */
   const isAwaitingConfirm = useIsSceneConfirmAwaiting(progress.sceneConfirm)
+  /** 팝업이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 아래 알림 장면 칸을 밀어내기 판 대기도 본다 */
+  const alertSceneFrozenRef = useRef(false)
   const proposal = burst !== null && burst.current !== null && burst.current !== shownProposal && !isAwaitingConfirm
     ? burst.current
     : null
@@ -105,8 +109,16 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    *   (`batterHumanRecordCountOf`). 화면이 서기 전 미리 돈 자동 타석 몫(후공 · 내 앞 타순)도 줄에 넣어 첫 공 끝에 띄운다.
    * - 경기 중 메뉴 · 조작방법 · 설정이 떠 있으면 멈춘다(GameScreen 이 알려 준다).
    */
-  const isDefenseShown = progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0)
+  // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 화면을 둔다
+  const isReplayReady = useFreePassPlayStart(
+    play !== null && play !== shownPlay ? play : null,
+    progress.pendingBenchClearing !== null,
+    alertSceneFrozenRef.current,
+  )
+  const isDefenseShown =
+    progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady)
   const [alertScene, setAlertScene] = useState<RecordAlertScene>({ isFrozen: false, key: 'play' })
+  alertSceneFrozenRef.current = alertScene.isFrozen
   const reportAlertScene = useCallback((scene: RecordAlertScene) => {
     setAlertScene((previous) => (previous.isFrozen === scene.isFrozen && previous.key === scene.key ? previous : scene))
   }, [])
@@ -181,8 +193,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       />
     )
   }
-  if (play !== null && play !== shownPlay && play.ticks.length > 0) {
-    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
+  if (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady) {
+    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} />
   }
 
   // 결과가 먼저다 — 타석이 끝나며 난 판정을 보여 준 뒤에야 다음 타석 제안이 뜬다

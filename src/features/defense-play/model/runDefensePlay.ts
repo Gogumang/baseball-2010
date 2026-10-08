@@ -1063,8 +1063,8 @@ export function isDefensePlayFinished(state: DefensePlayState): boolean {
  * 공 도착 0x3dfac 의 판정 스위치(표 0xcffb4)가 v = 3(볼넷) · 4(사구)면 0x3e1b4 에서 0xb0cb8(플레이, 2)로 판 종류를 2(밀어내기)로 두고
  * 3e1d4~3e1e8 이 메시지 0xbba(v) 를 보낸다(그 처리 51a56 이 state[0xb] 를 v 로 적는다). 판정 A 0xae24c 가 ae344~ae35c 에서
  * `state[0xb]` 3 · 4 를 보고 상태 **0x17** 로 보낸다 — 곧 이 키 갈래는 볼넷 · 사구 뒤 주자가 밀려 가는 판에서 판을 건너뛰는 키다.
- * ⚠️ 웹에는 밀어내기 판(종류 2) 진행기가 없다 — 볼넷 · 사구는 판 없이 고정 밀어내기로 먹인다(`pitchArrivalPlay` 머리글 미해결).
- *    그래서 이 진행기의 `lastEventCode` 는 3 · 4 가 될 일이 없고, 이 두 항은 그 판이 옮겨질 때를 위한 원본 조건이다.
+ * 밀어내기 판(종류 2)은 이 타구 진행기가 아니라 `walkPlay`(주자 판 진행기)가 미리 돌려 재생한다 — 그래서 이 진행기의 `lastEventCode` 는
+ * 3 · 4 가 될 일이 없고, 그 판의 키 건너뛰기는 재생 화면이 `freePassPlay` 로 받는다(`DefensePlayback`).
  */
 export function acceptsFastForwardKey(state: Pick<DefensePlayState, 'homeRunFlag' | 'play' | 'lastEventCode'>): boolean {
   return state.homeRunFlag || state.play.suppressed || state.lastEventCode === 3 || state.lastEventCode === 4

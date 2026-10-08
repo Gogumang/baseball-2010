@@ -138,6 +138,9 @@ export interface OutJudgement {
 
 export const NO_OUT: OutJudgement = { kind: OUT_KIND.NONE, runnerIndex: NONE }
 
+/** 0xb3970 = 0x58d — 아웃 판정을 아예 안 하는 플레이 종류의 비트표 (0 · 2 밀어내기 · 3 · 7 · 8 홈런더비 · 10) */
+const NO_OUT_PLAY_KINDS_MASK = 0x58d
+
 /**
  * 주자관리 `vt10` = `0xa9f60` — "주자 i 가 아직 밀려 있나".
  * `0..i` 중 살아 있는 주자 수가 주자 i 의 **마지막으로 닿은 루(+0x8c)** 보다 많으면 참.
@@ -186,6 +189,8 @@ export interface OutJudgementInput extends DefenseContext {
 /** 아웃 판정 한 번 (0xb36d0). 아웃이 하나 나면 거기서 멈추고 돌려준다 */
 export function judgeOut(input: OutJudgementInput): OutJudgement {
   const { play, fielders, runners } = input
+  // b36e8~b36f4: 플레이 종류(+0x118) ≤ 10 이고 비트표 0x58d = {0, 2, 3, 7, 8, 10} 에 들면 곧바로 0 — 밀어내기 판(종류 2)은 아웃이 없다
+  if (play.kind >= 0 && play.kind <= 10 && ((1 << play.kind) & NO_OUT_PLAY_KINDS_MASK) !== 0) return NO_OUT
   const skip = input.skipRunnerIndexes ?? []
   // 0xb0c90 = 야수[P+0x130] — "이 플레이의 야수"
   const fielder = fielders[play.ballHolderSlot]

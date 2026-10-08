@@ -486,7 +486,11 @@ export interface PitcherGameProgress {
    * 쓰고 여기 사구 결과를 붙든 채 멈춘다 — 밀어내기 주루·정산·다음 타석은 화면이 연출을 끝내고
    * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
    */
-  readonly pendingBenchClearing: { readonly outcome: AtBatOutcome } | null
+  readonly pendingBenchClearing: {
+    readonly outcome: AtBatOutcome
+    /** 이 사구 공이 연 밀어내기 판(종류 2, `arrivePitcherPitch`) — 연출 뒤 0x17 로 재생한다 */
+    readonly arrivalPlay?: PitchArrivalPlay | null
+  } | null
   /**
    * 마지막으로 **OK 를 기다리며 선** 공수 교대 판(상태 0x18 교대 가지) — 화면은 `serial` 이 바뀌면 판을 띄운다.
    * 모드 3 에서는 1회초 판(인트로 0xc 끝 → 0x18)만 설 수 있다 — `withHalfInningBoard` 머리말.
@@ -1136,9 +1140,9 @@ export function startPitch(
   if (settled !== arrived) {
     // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
     rollBenchClearingEntry(random)
-    return { ...settled, pendingBenchClearing: { outcome } }
+    return { ...settled, pendingBenchClearing: play === null ? { outcome } : { outcome, arrivalPlay: play } }
   }
-  return finishNonPlayOutcome(settled, outcome, random)
+  return finishNonPlayOutcome(settled, outcome, random, play)
 }
 
 /** 공 도착 한 걸음의 결과 */
@@ -1208,7 +1212,8 @@ function arrivePitcherPitch(
   const cleared = withoutSteal(progress)
   if (play === null) return { progress: cleared, play: null, interrupted: false }
   const opened: PitcherGameProgress = { ...cleared, lastArrivalPlay: play }
-  if (arrivalApplicationOf(play) === 'batterRuns') return { progress: opened, play, interrupted: false }
+  // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPitch`)이 먹인다 — 밀어내기 판(종류 2)은 재생 칸에만
+  if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 
   const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
   let next = withMyRunnerPlay(opened, play.result, settles).progress
@@ -1225,6 +1230,7 @@ function describeArrivalPlay(play: PitchArrivalPlay): string {
   const runs = play.result.advance.runsScored
   const tail = runs > 0 ? ` (${runs}실점)` : ''
   if (play.kind === 9) return `폭투·포일${tail}`
+  if (play.kind === 2) return `밀어내기${tail}`
   if (play.result.caughtFrom.length > 0) return `상대 도루 실패 — 아웃${tail}`
   if (play.result.stolenFrom.length > 0) return `상대 도루 성공${tail}`
   return `상대 도루${tail}`
@@ -1263,9 +1269,13 @@ function finishNonPlayOutcome(
   progress: PitcherGameProgress,
   outcome: AtBatOutcome,
   random: RandomPort,
+  /** 이 공이 연 판 — 볼넷 · 사구 밀어내기 판(종류 2)이면 재생 칸에 넣는다(진루는 아래 보통 길과 같다) */
+  arrival: PitchArrivalPlay | null = null,
 ): PitcherGameProgress {
   // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
-  const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs })
+  const playback =
+    homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs }) ??
+    (arrival !== null && arrivalApplicationOf(arrival) === 'freePass' ? arrival.result : null)
   return advance(
     applyDefensivePlay(progress, outcome, true, progress.atBat.balls, null, playback),
     random,
@@ -1287,7 +1297,7 @@ export function resolveBenchClearing(
   const pending = progress.pendingBenchClearing
   if (pending === null) return progress
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
-  return finishNonPlayOutcome({ ...progress, pendingBenchClearing: null }, pending.outcome, random)
+  return finishNonPlayOutcome({ ...progress, pendingBenchClearing: null }, pending.outcome, random, pending.arrivalPlay ?? null)
 }
 
 /**

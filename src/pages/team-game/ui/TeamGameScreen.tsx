@@ -70,6 +70,8 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
@@ -338,7 +340,14 @@ export function TeamGameScreen({
    * 견제 판(또는 홈런 비행)을 재생하는 동안은 원본도 상태 0x17 이라 0xf 키를 안 받는다.
    * ('3' 은 공격 중이면 도루 키지만 도루는 사람이 칠 차례에만 열려 서로 겹치지 않는다 — `stealableBases`.)
    */
-  const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0
+  // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 화면을 둔다
+  const isReplayReady = useFreePassPlayStart(
+    play !== null && play !== shownPlay ? play : null,
+    progress.pendingBenchClearing !== null,
+    // 경기 중 메뉴(0x741a0 팝업)가 떠 있으면 0x12 상태 틱이 멈춘다 (0x52cc6)
+    isMenuOpen,
+  )
+  const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
   /**
    * **상태 0xe — 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`). 새 타석·반 이닝 시작·교체 연출 뒤·교체 창
    * 취소 뒤마다 진행기가 대기를 싣는다. 공격이든 수비든 같다 — 0x532b0 은 조작 객체의 공수(+0xc)를 안 본다.
@@ -574,6 +583,7 @@ export function TeamGameScreen({
         ticks={play.ticks}
         grassPalette={seasonStadium?.grassPalette ?? null}
         onDone={finishPlayback}
+        freePassPlay={isWalkPlayResult(play)}
       />
     )
   }

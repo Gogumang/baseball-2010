@@ -9,7 +9,7 @@ import {
   rollPassedBall,
   type PassedBallStrikeout,
 } from '@/entities/fielding/model/passedBall'
-import { canStartSteal, pitchPlayKindOf, STEAL_PLAY_KIND, type StealBase } from '@/entities/fielding/model/stealStart'
+import { canStartSteal, pitchPlayKindOf, type StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { stealPlayRecordIdsOf } from '@/entities/game/model/gameRecords'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
@@ -19,6 +19,7 @@ import {
   type PassedBallPlayResult,
 } from '@/features/defense-play/model/passedBallPlay'
 import { runStealPlay, stealCallSoundIdOf, type StealPlayResult } from '@/features/defense-play/model/stealPlay'
+import { runWalkPlay, type WalkPlayResult } from '@/features/defense-play/model/walkPlay'
 
 /**
  * **투구 하나에 붙는 주자 판** — 사람 경기에서 공이 날아가는 동안(상태 0x11) 출발한 도루와, 공이 도착한
@@ -51,8 +52,9 @@ import { runStealPlay, stealCallSoundIdOf, type StealPlayResult } from '@/featur
  * 0x51408(판 끝 메시지가 **판정 결과로 덮어쓴다**). 판 끝 판정 B 0xae3e8 은 v 를 안 읽고 state[0xc] 만 본다:
  * 종류 4·5 → state[0xc] == 5 && 종류 5 면 0xd(새 타석) 아니면 0xf · 종류 9 → state[0xc] == 5 면 0xd 아니면 0xf(정산 0xa8024
  * 건너뜀) · 아웃 > 2 → 0x18. 그래서:
- * - **볼넷·사구 + 도루**: 0x3e0e4 가 종류 5 를 세워도 스위치 0x3e1cc 가 종류 2(밀어내기 판)로 덮어쓴다 — 도루 판은 없다
- *   (`runPitchArrivalPlay` 가 null). 출발한 주자는 밀어내기 판에서 리드(0x3d7b8, 0x4657e 고리는 종류를 안 가른다)를 탄다.
+ * - **볼넷·사구**: 0x3e0e4 가 종류 5 를 세웠든 9 굴림(v ≠ 3·4 라 안 선다)이든 스위치 0x3e1cc 가 종류 2(밀어내기 판)로 덮어쓴다
+ *   — 판정 A 0xae24c 가 그 판(상태 0x17)으로 보낸다(`walkPlay`). 출발한 주자는 그 판에서 리드(0x3d7b8 — 종류 2 의 도루 주자는
+ *   틱 0)를 타고, 밀리지 않으면 제 루로 돌아간다(0x46664).
  * - **삼진 + 도루(1아웃 이하)**: 삼진 아웃이 판 앞에서 붙어 판은 **아웃 + 1** 로 열린다(`playOutsOf`). 판에서 셋째 아웃이 나도
  *   삼진은 그대로다(이미 센 아웃). 종류 9 에서 삼진이 선(1루 주자 && 아웃 ≤ 1) 판도 같다. 낫아웃은 판정 칸을 0 으로 지워 아웃이 없다.
  * - **볼·스트라이크 + 판에서 3아웃**: 카운트는 이미 올랐고 판정 B 가 0x18(공수 교대)로 보낸다 — 그 타석은 끊긴다.
@@ -65,8 +67,8 @@ import { runStealPlay, stealCallSoundIdOf, type StealPlayResult } from '@/featur
  * - `PitchArrivalPlayInput.outs` 는 **이 투구 전의 아웃 수**(종류 고르기 0x3e0ee 가 읽는 값)다. 부르는 쪽은 판의 advance 를
  *   이 아웃 수 위에 주자 판으로 먼저 먹이고, 타석이 끝났으면(삼진) 그 뒤 보통 길로 삼진 아웃을 더한다 — 판을 연 아웃 수
  *   (투구 전 + 1)에 판 아웃을 더한 것과 합이 같다. 판 아웃은 셋째 아웃에서 멈추므로 이 순서로 3아웃을 넘지 않는다.
- * - ⚠️ 미해결: 밀어내기 판(종류 2)은 웹에 판 엔진이 없다 — 볼넷·사구 + 도루면 출발한 주자의 리드 rand(0,9)·밀리지 않는
- *   도루 주자(예: 2루 단독 + 볼넷)의 진루를 안 옮긴다. 볼넷·사구는 보통 길(고정 밀어내기)로만 간다.
+ * - 밀어내기 판(종류 2)은 `walkPlay` 가 돈다 — 난수가 없고 진루 결과는 보통 길(밀어내기)과 같아, 부르는 쪽은 경기 상태를
+ *   보통 길로 먹이고 이 판은 재생 칸에만 넣는다(`arrivalApplicationOf` 가 `'freePass'`). 사구 벤치 클리어링(0x1e)이 서면 그 뒤에 재생한다.
  */
 
 /** 0x9d57c 투구 판정 — E 4b: 1 스트라이크 · 2 볼 · 3 볼넷 · 4 사구 · 5 삼진 */
@@ -174,11 +176,19 @@ export type PitchArrivalPlay =
       /** 0xa8024 @a83c6·@a83de 의 후보 (게이트 전) */
       readonly recordIds: readonly number[]
     }
+  | {
+      /** 볼넷 · 사구 밀어내기 판 (0x3e1b4 0xb0cb8(플레이, 2)) — 판정 콜 · 판 기록이 없다 */
+      readonly kind: 2
+      readonly result: WalkPlayResult
+      readonly strikeout: 'none'
+      readonly callSoundId: null
+      readonly recordIds: readonly number[]
+    }
 
 /**
  * 공 도착 한 번. **난수 차례**: `rollPassedBall` 1번(모드 7 제외) → 종류 9 면 `passedBallShot` 2번 → 판 안의 굴림
- * (펌블 · 악송구 · 특수 송구) / 종류 5 면 판 안의 굴림(도루 주자마다 리드 rand(0,9) · 악송구 · 특수 송구).
- * 판이 안 열리면 null.
+ * (펌블 · 악송구 · 특수 송구) / 종류 5 면 판 안의 굴림(도루 주자마다 리드 rand(0,9) · 악송구 · 특수 송구) /
+ * 종류 2(볼넷 · 사구)는 굴림 없음. 판이 안 열리면 null.
  */
 export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: RandomPort): PitchArrivalPlay | null {
   const passedBall = rollPassedBall(input.gameMode, random)
@@ -188,9 +198,25 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
     stealing: input.stealingFrom.length > 0,
     outs: input.outs,
   })
+  // 0x3e1cc — 볼넷·사구면 판정 칸 스위치가 종류를 2(밀어내기)로 덮어쓴다 — 0x3e062 의 종류 9 는 v ≠ 3·4 일 때만이라
+  // 여기 오는 것은 종류 없음 · 종류 5(도루) 둘뿐이고, 어느 쪽이든 밀어내기 판이 열린다
+  if (input.pitchJudgement === PITCH_JUDGEMENT.WALK || input.pitchJudgement === PITCH_JUDGEMENT.HIT_BY_PITCH) {
+    const result = runWalkPlay({
+      bases: input.bases,
+      outs: input.outs,
+      pitchJudgement: input.pitchJudgement,
+      stealingFrom: input.stealingFrom,
+      defenseAbilities: input.defenseAbilities,
+      runAbilities: input.runAbilities,
+      runAbility: input.runAbility,
+      runnerTeamGrade: input.runnerTeamGrade,
+      aceIndexes: input.aceIndexes,
+      defenseTeamIndex: input.defenseTeamIndex,
+      offenseTeamIndex: input.offenseTeamIndex,
+    })
+    return { kind: 2, result, strikeout: 'none', callSoundId: null, recordIds: [] }
+  }
   if (kind === null) return null
-  // 0x3e1cc — 볼넷·사구면 판정 칸 스위치가 종류를 2(밀어내기)로 덮어쓴다. 도루 판(종류 5)은 열리지 않는다
-  if (kind === STEAL_PLAY_KIND && isFreePassJudgement(input.pitchJudgement)) return null
   const strikeout =
     kind === PASSED_BALL_PLAY_KIND
       ? passedBallStrikeoutOf({
@@ -242,11 +268,6 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
   }
 }
 
-/** 0x3e1ae·0x3e1b4 — 볼넷(3)·사구(4)는 판정 칸 스위치가 플레이 종류를 2 로 덮어쓴다 */
-function isFreePassJudgement(pitchJudgement: number): boolean {
-  return pitchJudgement === PITCH_JUDGEMENT.WALK || pitchJudgement === PITCH_JUDGEMENT.HIT_BY_PITCH
-}
-
 /**
  * 판을 여는 아웃 수 — 0x3e15e 가 삼진(v == 5)이면 판 앞에서 state[6]++ 한다. 도루 판(5)은 1아웃 이하 삼진만 열리고,
  * 폭투 판(9)은 삼진이 선 판(`'strikeoutStands'`)만 아웃이 붙는다(낫아웃은 0x3e0aa 가 판정 칸을 0 으로 지워 스위치를 건너뛴다).
@@ -278,13 +299,16 @@ export function stealRecordIdsOf(result: Pick<StealPlayResult, 'stolenFrom' | 'c
 /**
  * 판이 끝난 뒤 타석 결과를 어떻게 먹이나 — 부르는 진행기 공용 규칙.
  * - `'runnerOnly'`: 판의 advance 를 주자 판(견제와 같은 꼴, 타순 그대로)으로 먼저 먹이고, 타석이 끝났으면
- *   (볼넷·사구·삼진) 그 뒤 보통 길로 타석 결과를 먹인다.
+ *   (삼진) 그 뒤 보통 길로 타석 결과를 먹인다.
  * - `'batterRuns'`: 낫아웃 — 판의 advance 가 곧 이 타석의 진루다(타자주자 포함). 삼진 기록은 그대로.
+ * - `'freePass'`: 볼넷 · 사구 밀어내기 판(종류 2) — advance 를 먹이지 않는다. 타석 결과(볼넷 · 사구)를 보통 길로 먹이면
+ *   진루가 판과 같다(판정 B → 정산 0xa8024 → 0xd). 판은 재생 칸에만 넣는다.
  *
  * 판에서 3아웃이 나는 것은 볼·스트라이크(카운트만 오른 공)뿐이다 — 판정 B 0xae3e8 이 0x18 로 보내 그 타석은 끊긴다
  * (다음 이닝 같은 타자부터 — ⚠️ 정산 0xa8024 가 종류 5 에서 타순을 미는지는 안 읽었다). 삼진은 판 앞에서 아웃이 붙고
  * (위 머리말), 볼넷·사구는 도루 판이 안 열린다.
  */
-export function arrivalApplicationOf(play: PitchArrivalPlay): 'runnerOnly' | 'batterRuns' {
+export function arrivalApplicationOf(play: PitchArrivalPlay): 'runnerOnly' | 'batterRuns' | 'freePass' {
+  if (play.kind === 2) return 'freePass'
   return play.kind === 9 && play.strikeout === 'batterRuns' ? 'batterRuns' : 'runnerOnly'
 }

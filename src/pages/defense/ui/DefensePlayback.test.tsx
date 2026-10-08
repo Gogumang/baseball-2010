@@ -7,6 +7,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { registerContact } from '@/entities/batting/model/battedContact'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
+import { runWalkPlay } from '@/features/defense-play/model/walkPlay'
 import {
   acceptsFastForwardKey,
   isDefensePlayFinished,
@@ -54,6 +55,29 @@ describe('수비 재생', () => {
     const { container } = render(<DefensePlayback ticks={[틱(), 틱(), 틱()]} onDone={onDone} />)
 
     expect(container.firstChild).not.toBeNull()
+    expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('볼넷 · 사구 밀어내기 판(종류 2)은 키가 오면 그 그림에서 끝난다 — 0x519cc(state[0xb] ∈ {3, 4}) → +0xfe7 → 0x35108', () => {
+    const 밀어내기 = runWalkPlay({ bases: 주자1루, outs: 0, pitchJudgement: 3 })
+    const 가만히 = vi.fn()
+    render(<DefensePlayback ticks={밀어내기.ticks} onDone={가만히} freePassPlay />)
+    expect(가만히).not.toHaveBeenCalled()
+    cleanup()
+    const 눌렀다 = vi.fn()
+    render(<DefensePlayback ticks={밀어내기.ticks} onDone={눌렀다} freePassPlay />)
+    act(() => {
+      fireEvent.keyDown(window, { key: '5' })
+    })
+    expect(눌렀다).toHaveBeenCalled()
+  })
+
+  it('밀어내기 판이 아닌 재생(견제 · 도루 · 폭투)은 키를 받지 않는다', () => {
+    const onDone = vi.fn()
+    render(<DefensePlayback ticks={[틱(), 틱(), 틱()]} onDone={onDone} />)
+    act(() => {
+      fireEvent.keyDown(window, { key: '5' })
+    })
     expect(onDone).not.toHaveBeenCalled()
   })
 })

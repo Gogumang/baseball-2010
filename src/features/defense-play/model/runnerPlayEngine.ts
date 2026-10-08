@@ -17,6 +17,7 @@ import {
   progressPercent,
   stepToward,
   ticksToReach,
+  type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
 import {
   AI_STATE,
@@ -119,6 +120,11 @@ export interface RunnerPlayEngineInput {
   readonly ballOnGround: boolean
   /** 없으면 처음부터 `play.ballHolderSlot` 이 쥐고 있다 */
   readonly chase?: LooseBallChase
+  /**
+   * 아무도 손에 안 쥔 채 땅에 놓인 공의 자리 — 종류 2(밀어내기)는 0xa276c 가 공 첫 점을 0xd7c24(투수판)에 두고 쥐기를 안 부른다.
+   * 없으면 공은 공 가진 야수(+0x130) 자리에 그린다.
+   */
+  readonly restingBall?: WorldPoint
   readonly random?: RandomPort
   readonly defenseIsCpu?: boolean
   readonly throwMode?: ManualAutoMode
@@ -512,7 +518,10 @@ export function runRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayEngineRes
     ticks.push(
       viewStateOf({
         tick,
-        ball: chase !== null ? chase.trajectory.pointAt(tick) : (fielders[play.ballHolderSlot]?.position ?? basePosition(0)),
+        ball:
+          chase !== null
+            ? chase.trajectory.pointAt(tick)
+            : (input.restingBall ?? fielders[play.ballHolderSlot]?.position ?? basePosition(0)),
         ballIsFlying: chase !== null,
         fielders,
         runners: runnerStates(),

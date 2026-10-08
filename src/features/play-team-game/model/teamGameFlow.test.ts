@@ -1733,7 +1733,8 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
     // 연출(상태 0x1e)에서 붙든다 — 끝나면 보통 길(밀어내기 1루)
-    expect(벤치.pendingBenchClearing).toEqual({ side: '수비', outcome: { kind: '사구' } })
+    // 이 사구 공이 연 밀어내기 판(종류 2)은 연출 뒤에 재생하려고 함께 붙든다
+    expect(벤치.pendingBenchClearing).toMatchObject({ side: '수비', outcome: { kind: '사구' }, arrivalPlay: { kind: 2 } })
     expect(resolveBenchClearing(벤치, { reachedTargetTick: false }, createSeededRandom(1)).game.bases.first).toBe(true)
     // 수비가 사람이라 상대(공격) 투수 투구 수는 건드리지 않는다
     expect(벤치.opponentPitcherCounters).toEqual(보통.opponentPitcherCounters)

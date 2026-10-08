@@ -28,6 +28,8 @@ import { CourseGrid } from '@/pages/pitching/ui/CourseGrid'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
@@ -206,7 +208,13 @@ export function PitcherGameScreen({
    * 코스·게이지 단계는 원본도 다른 상태(0x10·0x11)라 받지 않는다. 그 루에 주자가 없으면 진행기가 키를 먹고 끝낸다.
    */
   // 견제 판(또는 홈런 비행)을 재생하는 동안은 원본도 상태 0x17 이라 0xf 키를 안 받는다
-  const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0
+  // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 화면을 둔다
+  const isReplayReady = useFreePassPlayStart(
+    play !== null && play !== shownPlay ? play : null,
+    progress.pendingBenchClearing !== null,
+    isPopupOpen,
+  )
+  const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
    * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 기다리지 않는다.
@@ -384,7 +392,7 @@ export function PitcherGameScreen({
   }
   // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
   if (isReplaying) {
-    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} />
+    return <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} />
   }
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진행기가 이미 썼다

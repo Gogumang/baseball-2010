@@ -756,7 +756,8 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     expect(보통.stamina - 벤치.stamina).toBe(1000)
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     // 밀어내기 주루·정산은 연출이 끝나야 돈다 — 그 동안 다음 공이 안 나간다
-    expect(벤치.pendingBenchClearing).toEqual({ outcome: { kind: '사구' } })
+    // 이 사구 공이 연 밀어내기 판(종류 2)은 연출 뒤에 재생하려고 함께 붙든다
+    expect(벤치.pendingBenchClearing).toMatchObject({ outcome: { kind: '사구' }, arrivalPlay: { kind: 2 } })
     expect(벤치.game).toEqual(progress.game)
     expect(isPitchTurn(벤치)).toBe(false)
 
