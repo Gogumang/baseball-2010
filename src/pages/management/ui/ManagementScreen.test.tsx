@@ -397,6 +397,22 @@ describe('관리 메뉴 [this+0x8c] 커서 — 루트가 들고 105 진입 0x119
     expect(screen.getByRole('button', { name: '다음경기' })).toBeTruthy()
   })
 
+  it('106 칸 1 → 121 장비착용에서 돌아오면 106 장비착용 칸(0x17ad0 17aee → 0x6a · 0x11530 은 이전 ≠ 105 면 커서를 안 건드린다)', () => {
+    const mainCursor = createNariMainMenuCursor()
+    const onOpenPlayerInfo = vi.fn()
+    render(<ManagementScreen {...propsWith({ mainCursor, onOpenPlayerInfo })} />)
+    clickCommand('선수정보')
+    clickCommand('장비착용')
+    expect(onOpenPlayerInfo).toHaveBeenCalledWith('장비착용')
+    cleanup()
+
+    render(<ManagementScreen {...propsWith({ mainCursor })} />)
+    expect(screen.getByRole('button', { name: '장비착용' }).getAttribute('aria-current')).toBe('true')
+    // 106 취소 → 105 — 선수정보 칸
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: '선수정보' }).getAttribute('aria-current')).toBe('true')
+  })
+
   it('화면 안 행동(휴식 127)으로 행동함이 서면, 결과 창이 걷힌 뒤 105 진입이 첫 칸으로', () => {
     const mainCursor = { current: 2 }
     const { rerender } = render(<ManagementScreen {...propsWith({ mainCursor })} />)

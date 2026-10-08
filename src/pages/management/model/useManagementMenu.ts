@@ -156,9 +156,14 @@ export function useManagementMenu(props: ManagementScreenProps) {
       return props.onOpenShop(id)
     }
     if (id === '기본정보') return setIsShowingBasicInfo(true)
+    // ⚠️ 미해결: 원본 106 칸 4 [기록실] 은 팝업 0x80(StrMODE[74] 두 갈래) → 124 선수 기록 목록(편집기 0x5761c · 0x5cfec / 0x5796c,
+    // R4 2c)이다 — 웹 타자편은 아직 순위표 창으로 근사한다(투수편 `PitcherRecordPanel` 도 근사)
     if (id === '기록실' || id === '필살타법') return setOverlay(id)
     // 아이템/스킬(하위 상태 122) — 스킬 장착 창. 세션이 장착을 받지 않으면 예전처럼 바깥에 맡긴다
     if (id === '아이템/스킬' && props.onEquipSkill !== undefined) return setOverlay(id)
+    // 106 칸 1 → 121 장비착용(키 0x13010) — 그 취소는 106 으로 돌아온다(0x17ad0 의 17aee → 0x6a). 106 진입 0x11530 은 이전이 105 가
+    // 아니라 커서를 안 건드린다 — 장비착용 칸 그대로
+    if (id === '장비착용') leaveNariSubMenu(mainCursor, '선수정보', slots.findIndex((slot) => slot.id === id))
     props.onOpenPlayerInfo(id)
   }
 

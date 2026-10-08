@@ -195,10 +195,15 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const menu = usePitcherManagementMenu({
     ...props,
     ...(returned === null ? {} : { initialKind: returned.kind }),
-    // 110 확인 → 111(키 0x11478) — 상점 취소는 110 으로 돌아온다(0x13460 의 13b1e). 커서는 고른 칸 그대로
+    // 110 확인 → 111(키 0x11478) · 106 칸 1 → 121(키 0x13010) — 그 취소는 하위 메뉴로 돌아온다(0x13460 의 13b1e → 110 ·
+    // 0x17ad0 의 17aee → 106). 커서는 고른 칸 그대로
     ...(onOpenShop === undefined ? {} : {
       onOpenShop: (tab: PitcherShopTab) => {
-        if (tab !== '착용') leaveNariSubMenu(mainCursor, '아이템', PITCHER_COMMAND_BAR.아이템.findIndex((slot) => slot.id === tab))
+        if (tab === '착용') {
+          leaveNariSubMenu(mainCursor, '선수정보', PITCHER_COMMAND_BAR.선수정보.findIndex((slot) => slot.id === '장비착용'))
+        } else {
+          leaveNariSubMenu(mainCursor, '아이템', PITCHER_COMMAND_BAR.아이템.findIndex((slot) => slot.id === tab))
+        }
         onOpenShop(tab)
       },
     }),

@@ -242,6 +242,7 @@ export function CareerRoutes({
           gpDetail={session.shopGpDetail}
           onCloseGpDetail={actions.closeShopGpDetail}
           onPurchase={actions.purchase}
+          // 111 취소 → 110 · 121(장비착용) 취소 → 106 — 관리 화면이 다시 열릴 때 그 하위 메뉴 그 칸에 선다(`nariReturnSubMenuOf`)
           onBack={backToManagement}
         />
       )

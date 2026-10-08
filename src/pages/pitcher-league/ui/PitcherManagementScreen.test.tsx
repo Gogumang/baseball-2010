@@ -640,7 +640,7 @@ describe('[아이템] 110 하위 메뉴 → 111 장비 상점 · [장비착용] 
   })
 })
 
-describe('111 상점 취소 → 110 (0x13460 13b1e — 110 진입 0x107e0 은 커서를 안 건드린다)', () => {
+describe('하위 메뉴로 돌아오기 — 111 → 110 · 121 → 106 · 하위 창 → 106 (0x107e0 · 0x11530 은 커서를 안 건드린다)', () => {
   const 다시띄우기 = (mainCursor: ReturnType<typeof createNariMainMenuCursor>, onOpenShop: (tab: PitcherShopTab) => void) =>
     render(
       <PitcherManagementScreen career={투수({ hasActedThisCycle: true })} random={난수} onSave={() => {}} onNextGame={() => {}}
@@ -669,6 +669,32 @@ describe('111 상점 취소 → 110 (0x13460 13b1e — 110 진입 0x107e0 은 �
 
     다시띄우기(mainCursor, onOpenShop)
     expect(칸이름들()).toHaveLength(6)
+  })
+
+  it('121 장비착용 취소 → 106 장비착용 칸 (0x17ad0 17aee → 0x6a · 0x11530 은 이전 ≠ 105 면 커서를 안 건드린다)', () => {
+    const mainCursor = createNariMainMenuCursor()
+    const onOpenShop = vi.fn()
+    다시띄우기(mainCursor, onOpenShop)
+    누르기('선수정보')
+    누르기('장비착용')
+    expect(onOpenShop).toHaveBeenLastCalledWith('착용')
+    cleanup()
+
+    다시띄우기(mainCursor, onOpenShop)
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
+    expect(커서칸()).toBe('장비착용')
+  })
+
+  it('하위 창(124 기록실)에서 106 으로 돌아오면 그 칸 그대로 — 하위 창이 커맨드 줄을 덮었다 걷혀도 첫 칸이 아니다', () => {
+    다시띄우기(createNariMainMenuCursor(), vi.fn())
+    누르기('선수정보')
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(커서칸()).toBe('기록실')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(칸이름들()).toEqual([])
+    누르기('되돌아가기')
+    expect(커서칸()).toBe('기록실')
   })
 })
 

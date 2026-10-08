@@ -386,7 +386,7 @@ export function PitcherLeagueRoute({
         gpDetail={shopGpDetail}
         onCloseGpDetail={actions.closeShopGpDetail}
         onPurchase={(itemId) => actions.purchase(itemId, openedHiddenIds)}
-        // 111 취소 → 110 — 관리 화면이 다시 열릴 때 아이템 하위 메뉴 그 칸에 선다(`nariReturnSubMenuOf`). 121 취소 → 106 은 아직 105 부터다 (근사)
+        // 111 취소 → 110 · 121 취소 → 106 — 관리 화면이 다시 열릴 때 그 하위 메뉴 그 칸에 선다(`nariReturnSubMenuOf`)
         onBack={() => actions.goto('관리')}
       />
     )
