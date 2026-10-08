@@ -40,3 +40,13 @@ export const relayLine = style({
   overflow: 'hidden',
   pointerEvents: 'none',
 })
+
+/** 운동장 배경 한 장 (0x78930 — defense.pzx 를 카메라 오프셋에) */
+export const fieldBackground = style({
+  position: 'absolute',
+  imageRendering: 'pixelated',
+  pointerEvents: 'none',
+})
+
+/** 오른쪽 반 — 0x78930 이 같은 그림을 효과 0x11(좌우 뒤집기)로 (x + 폭 − 1) 에 */
+export const fieldBackgroundMirrored = style([fieldBackground, { transform: 'scaleX(-1)' }])

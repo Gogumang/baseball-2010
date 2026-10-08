@@ -96,6 +96,16 @@ function batterProfileOf(teamId: number, entry: TeamEntryBatter): number | null 
 }
 
 /**
+ * 타자 손 `0xb63c0`(1 좌타 · 0 우타) — 마타자는 마선수 표, 그 밖은 레코드 +0xb 폼 니블. ⚠️ 표 밖 선수(영입한 명전 · 나리)는
+ * 웹 명단에 폼 칸이 없어 우타(0)로 둔다.
+ */
+export function teamBatterHandOf(teamId: number, entry: TeamEntryBatter): number {
+  if (entry.aceIndex >= 0) return batterHandOf(0, entry.aceIndex)
+  const profile = batterProfileOf(teamId, entry)
+  return profile === null ? 0 : batterHandOf(profile)
+}
+
+/**
  * **팀경기 상태 0xe 의 소개 판 값** (0x44944) — 투수 `0xae83c(수비 팀)` · 타자 `0xae89c(공격 팀)` 레코드에서.
  * - 팀 글자 `0xb6c20(st, 측)`: 우리가 치면 타자 PLAYER · 투수 COM, 던지면 반대.
  * - 투수: 이름 · 보직 `+0xb & 3` · 손 0xb63c0(폼 & 1, 마투수 표) · 체력 막대(용량 0x66e44 · % 0xaebb0) ·
@@ -117,13 +127,7 @@ export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMat
     ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
     : progress.ourPitcherEntry[progress.ourPitcherIndex]
 
-  const profile = batterEntry === undefined ? null : batterProfileOf(battingTeam, batterEntry)
-  const batterHand =
-    batterEntry === undefined
-      ? 0
-      : batterEntry.aceIndex >= 0
-        ? batterHandOf(0, batterEntry.aceIndex)
-        : profile === null ? 0 : batterHandOf(profile)
+  const batterHand = batterEntry === undefined ? 0 : teamBatterHandOf(battingTeam, batterEntry)
 
   const pitcherBase = records === undefined || pitcherEntry === undefined
     ? null

@@ -9,6 +9,9 @@ import { LINE_SCORE_AT } from '@/widgets/line-score/lib/lineScoreLayout'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import * as styles from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen.css'
+import { relayFieldBackgroundAt } from '@/pages/auto-play-relay/lib/relayFieldBackground'
+import { DEFENSE_BACKGROUND_HEIGHT, DEFENSE_BACKGROUND_URL, DEFENSE_BACKGROUND_WIDTH } from '@/pages/defense/lib/defenseView'
+import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 
 /** "공격팀(%s)" 의 %s — st[0x31 + st[9]] == 0(사람 칸)이면 "PLAYER"(0xd0724), 아니면 "COM"(0xd072c) */
 export const OFFENSE_LABEL = { player: 'PLAYER', computer: 'COM' } as const
@@ -91,6 +94,27 @@ interface AutoPlayRelayScreenProps {
    * 미션 · 나리편은 안 넘긴다.
    */
   readonly overlay?: ReactNode
+  /**
+   * 배경 위 · 점수판 아래에 그리는 운동장 그림 — 팀경기(모드 ∈ {1, 2, 8, 9} · 속도 ≠ 2)의 주자 · 투수 · 포수 · 타자
+   * (0x4258c 머리 425bc~42812, `pages/team-game` 의 `TeamRelayFigures`).
+   */
+  readonly field?: ReactNode
+  /** 시즌 홈 경기 잔디 팔레트 (`0x7885c` — 수비 화면과 같은 배경 그림). 없으면 구운 그림 */
+  readonly grassPalette?: number | null
+}
+
+/** 운동장 배경 — 0x41230 → 0x411e0 → 0x78930 (`relayFieldBackgroundAt`) */
+function RelayFieldBackground({ grassPalette }: { readonly grassPalette: number | null }) {
+  const url = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
+  const at = relayFieldBackgroundAt()
+  const size = { width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }
+  return (
+    <>
+      <img className={styles.fieldBackground} style={{ left: at.x, top: at.y, ...size }} src={url} alt=""
+        data-testid="중계-배경" />
+      <img className={styles.fieldBackgroundMirrored} style={{ left: at.mirroredX, top: at.y, ...size }} src={url} alt="" />
+    </>
+  )
 }
 
 /**
@@ -112,15 +136,23 @@ interface AutoPlayRelayScreenProps {
  * - 점수판 0x41c18 은 `widgets/line-score` — 이닝별 칸 st[0x6c..] 은 틱 꼴이 싣는다(`MissionAutoRelayStep.inningRuns`), 깜빡임의
  *   틱은 이 상태에 들어와 돈 틱 [장면+0x2c](`useSceneTick`). 중계 칸이 이닝별 칸을 안 들면(목록 꼴) 점수판을 안 그린다.
  *
- * ⚠️ 미이식(그림): 배경(운동장 전경)은 안 그린다.
+ * - 배경: 그림마다 먼저 0x41230 이 수비 운동장(defense.pzx)을 투수판에 맞춘 카메라 자리에 깐다(`relayFieldBackgroundAt`) — 모드를
+ *   안 가린다.
  */
 export function AutoPlayRelayScreen({
-  step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay,
+  step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay, field, grassPalette = null,
 }: AutoPlayRelayScreenProps) {
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
   const tick = useSceneTick((next) => onTick(next), !isPaused)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
-  if (step === null) return <RawScreen>{overlay ?? null}</RawScreen>
+  if (step === null) {
+    return (
+      <RawScreen>
+        <RelayFieldBackground grassPalette={grassPalette} />
+        {overlay ?? null}
+      </RawScreen>
+    )
+  }
 
   const offenseTeam = sideTeams[step.offenseSide]
   const label = step.offenseSide === humanSide ? OFFENSE_LABEL.player : OFFENSE_LABEL.computer
@@ -129,6 +161,8 @@ export function AutoPlayRelayScreen({
   const cards = step.cards
   return (
     <RawScreen>
+      <RelayFieldBackground grassPalette={grassPalette} />
+      {field ?? null}
       {/* 점수판 0x41c18(경기, 14, 10) — 이닝별 점수 줄 */}
       {step.inningRuns !== undefined && (
         <LineScoreBoard

@@ -61,17 +61,37 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
     expect(screen.getByTestId('중계-글')).toBeTruthy()
   })
 
-  it('←/4 · →/6 이 속도를 0..2 안에서 바꾼다 — 2 면 안내 띠 · 속도 칸이 없다', () => {
+  it('←/4 · →/6 이 속도를 0..2 안에서 바꾼다 — 2 여도 안내 띠 · 속도 칸은 서고(42ab2 · 42bbe 는 모드만 본다) 운동장 그림만 없다', () => {
     띄우기()
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')
     fireEvent.keyDown(window, { key: '6' })
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
+    expect(screen.getByTestId('중계-투수')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(screen.queryByTestId('중계-속도')).toBeNull()
+    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('2')
+    expect(screen.queryByTestId('중계-투수')).toBeNull()
+    expect(screen.queryByTestId('중계-타자')).toBeNull()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: '4' })
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
+  })
+
+  it('운동장 그림 (0x4258c 425bc~42812) — 배경 위에 투수(프레임 17) · 포수(90) · 타자(좌타 7 / 우타 10) · 주자(0)', async () => {
+    띄우기()
+    // 원점 표를 읽을 때까지 기다린다
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByTestId('중계-배경')).toBeTruthy()
+    let 주자봤다 = false
+    for (let frame = 0; frame < 8 * 80 && !주자봤다; frame += 1) {
+      흘리기(1)
+      주자봤다 = screen.queryByTestId('중계-주자-1') !== null
+    }
+    expect(screen.getByTestId('중계-투수').dataset.frame).toBe('17')
+    expect(screen.getByTestId('중계-포수').dataset.frame).toBe('90')
+    expect(['7', '10']).toContain(screen.getByTestId('중계-타자').dataset.frame)
+    expect(주자봤다).toBe(true)
+    expect(screen.getByTestId('중계-주자-1').dataset.frame).toBe('0')
   })
 
   it('3아웃 뒤 반 이닝을 넘기는 틱에 "CHANGE" 가 선다 (sim+0x9d = 10)', () => {

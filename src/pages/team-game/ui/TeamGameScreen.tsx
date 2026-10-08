@@ -658,6 +658,7 @@ export function TeamGameScreen({
         onStop={actions.stopAutoRelay}
         sideTeams={options.playerSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId]}
         humanSide={options.playerSide}
+        grassPalette={seasonStadium?.grassPalette ?? null}
       />
     )
   }
