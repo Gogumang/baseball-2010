@@ -335,43 +335,7 @@ export function panelClipOf(height: number, fullHeight: number): { readonly y: n
 /** 첫 화면 격자 1열×7행(0x259fc `vtbl+0x10(1, 7, 1, 0x20, 0)`) — 줄 여섯 + OK 칸. 플래그 0x20 = 세로만 감긴다 */
 export const MAIN_MENU_CURSOR_COUNT = ROW_COUNT + 1
 
-/**
- * **설명 띠** 0x55544(skin, 글) — 환경설정 첫 화면(0x59e64)·상세 설정(0x5a310)이 판 뒤 끝에 부른다 (직접 떴다):
- * ```
- * Y = H − 0x2d = 275 · 알파 a = 200
- * x = 0 .. [skin+0x8a] − 1 마다 세로줄 0x6a905(x, Y) ~ (x, Y + 0x22), 색 (a << 24) | 0x192e74
- *   x > 80 부터는 줄마다 a −= 3, a ≤ 0 이면 멈춘다                               ; 0x55572~0x555aa
- * [skin+0x88](자라는 중)이면 [+0x8a] ×= 4, 0x9f 를 넘으면 160 · [+0x88] = 0   ; 0x555b6~0x555d2
- * 아니면(다 자람) 글이 있으면 흰 글 0xba269(글, 5, Y + 5)                        ; 0x555d4~0x555f6
- * ```
- * 다시 펴는 계기: 공용 페이지 0x593c8 머리 0x59462~0x5948c 가 커서 격자의 바뀜 표시([격자+0x25])가 서 있으면
- * [skin+0x88] = 1 · [+0x8a] = 1 (그때 흔들기 [skin+0x2c8]·[+0x2cc] 도 세운다 — 흔들기는 아직 안 옮겼다).
- * 글: 첫 화면 StrMAINMENU[0x20 + 커서] · 상세 설정 [0x26 + 커서].
- */
-export const DESCRIPTION_BAND = {
-  y: SCREEN.height - 0x2d,
-  height: 0x22,
-  color: { r: 0x19, g: 0x2e, b: 0x74 },
-  alpha: 200,
-  /** 이 x 까지는 알파 200 그대로 */
-  solidUntil: 80,
-  alphaStep: 3,
-  maxSpread: 160,
-  text: { x: 5, dy: 5 },
-} as const
-
-/** 다시 편 뒤 `ticks` 번째 그림의 띠 폭과 자라는 중인지 — 1 · 4 · 16 · 64 를 그리고 160 에 멈춘다 */
-export function descriptionBandAt(ticks: number): { readonly spread: number; readonly isGrowing: boolean } {
-  let spread = 1
-  for (let tick = 0; tick < ticks; tick += 1) {
-    if (spread * 4 > 0x9f) return { spread: DESCRIPTION_BAND.maxSpread, isGrowing: false }
-    spread *= 4
-  }
-  return { spread, isGrowing: true }
-}
-
-/** 알파가 0 아래로 내려가 줄을 멈추는 x — 80 + ⌈200/3⌉ */
-export const DESCRIPTION_BAND_FADE_END = DESCRIPTION_BAND.solidUntil + Math.ceil(DESCRIPTION_BAND.alpha / DESCRIPTION_BAND.alphaStep)
+/** 설명 띠 0x55544 자체는 `shared/ui/DescriptionBand` 에 있다 — 환경설정은 0x593c8 머리 0x59462~0x5948c(격자 바뀜)에서 다시 편다 */
 
 /** 첫 화면 줄 설명 StrMAINMENU[0x20 + 커서] (커서 0~5) */
 export const SETTINGS_DESCRIPTIONS = [

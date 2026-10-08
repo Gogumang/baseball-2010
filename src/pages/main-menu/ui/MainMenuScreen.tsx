@@ -20,6 +20,7 @@ import {
 } from '@/pages/main-menu/lib/mainMenuLayout'
 import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
 import { DescriptionPanel } from '@/pages/main-menu/ui/DescriptionPanel'
+import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { MenuBand } from '@/pages/main-menu/ui/MenuBand'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
@@ -219,7 +220,17 @@ export function MainMenuScreen({
 
   /** 하위 목록 상태 번호 — 표(0xceaf2 슬롯 · 0xcea00/0xcea48 글자 · 0xcea6c 제목)를 이 번호로 색인한다 */
   const reelState = state.tier
-  const panelText = state.lockedNotice ?? selected?.description ?? ''
+  /**
+   * 판 안 글칸은 처음 메뉴(하위 4) 0x24ff0 만 쓴다 — 하위 5·9 는 판(0x256fc)에 글을 안 쓰고 설명 띠 0x55544 로 쓴다.
+   * 잠긴 칸 안내(`lockedNotice`)는 원본 팝업 자리의 웹판 근사라 두 단 다 판 안에 그대로 둔다.
+   */
+  const panelText = state.lockedNotice ?? (isWheel ? selected?.description ?? '' : '')
+  /**
+   * 하위 목록 설명 띠 — 0x2524c 끝 0x257f2~0x25860: 바탕 띠가 자라는 중(`[this+0xe2]`)이 아니고 상태가 4 가 아니면
+   * `0x55545([this+0x120], StrMAINMENU[기준 + 커서])` — 기준은 하위 5 → 6 · 9 → 0x18 (6 → 0x10, 나머지는 글 없음).
+   * 다시 펴는 계기는 커서를 옮기는 0x25366~0x25370 의 `[skin+0x88] = 1 · [+0x8a] = 1` 이라 커서를 씨앗으로 쓴다.
+   */
+  const bandText = isWheel ? null : selected?.description ?? ''
 
   const sizeOf = (frames: ReturnType<typeof useFrameOrigins>, frame: number) =>
     frames?.[pad(frame)] ?? null
@@ -363,6 +374,7 @@ export function MainMenuScreen({
         headingSize.height,
         MENU_PANEL_HEADING_COLOR,
       )}
+      {bandText !== null && !band.isGrowing && <DescriptionBand text={bandText} seed={cursor} />}
       <div
         className={styles.description}
         style={{
