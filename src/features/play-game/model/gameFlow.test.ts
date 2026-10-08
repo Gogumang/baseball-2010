@@ -1452,9 +1452,11 @@ describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스�
   })
 
   it('돌발이 진행 중(0x8eb94)이면 건너뛴다 — 3d9fc', () => {
-    const random = createSeededRandom(11)
+    // 첫 타석에 돌발이 떠 있는 씨앗을 고른다 (경기 시작 굴림 차례가 바뀌어도 시험 뜻이 그대로 남게)
+    let seed = 1
+    while (seed < 200 && startGame(createSeededRandom(seed)).burst?.current == null) seed += 1
+    const random = createSeededRandom(seed)
     const 시작 = startGame(random)
-    // 씨앗 11 은 첫 타석에 돌발이 떠 있다
     expect(시작.burst?.current).toBeTruthy()
     const 진행중: GameProgress = { ...시작, opponentMound: { ...시작.opponentMound, stamina: 0, justChanged: false } }
     const { progress: 뒤, play } = arrivePitch(진행중, { resolution: { kind: '볼' }, outcomeAfter: null }, random)

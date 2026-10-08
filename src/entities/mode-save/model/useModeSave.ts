@@ -13,9 +13,20 @@ import {
   withAceMatchCleared,
   withAceMatchHeld,
   withAceMatchResultWritten,
+  withGeneralMatchSettings,
+  withMatchSettingsSeen,
   aceMatchHoldOf,
 } from '@/entities/mode-save/model/modeSave'
-import type { AceMatchHoldPort, AceMatchPendingPort, ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
+import type {
+  AceMatchHoldPort, AceMatchPendingPort, ModeMatchSettings, ModeSave, NariLeagueMode,
+} from '@/entities/mode-save/model/modeSave'
+
+/** 전역기록 +0x11e 손잡이 — 일반 22 · 시즌 0xdd 가 함께 본다. 읽기는 곧바로 고친 값을 본다 */
+export interface MatchSettingsSeenPort {
+  readonly read: () => boolean
+  /** +0x11e = 1 · 저장 (0x31682 · 0x6548) */
+  readonly markSeen: () => void
+}
 
 export interface ModeSaveSession {
   readonly save: ModeSave
@@ -37,6 +48,10 @@ export interface ModeSaveSession {
   readonly aceMatchPendingPorts: Readonly<Record<NariLeagueMode, AceMatchPendingPort>>
   /** 미션 쪽 대기 칸 손잡이 — g[0x11f] · g[0x176] · g[0xf6] 읽기와 정산 0x4ea0c 의 결과 바이트 덮어쓰기 */
   readonly aceMatchHoldPort: AceMatchHoldPort
+  /** 일반모드 설정 창 확인 0x60376 — 전역 m = 0 칸에 되쓰고 저장 */
+  readonly setGeneralMatchSettings: (settings: ModeMatchSettings) => void
+  /** 전역기록 +0x11e 손잡이 */
+  readonly matchSettingsSeenPort: MatchSettingsSeenPort
 }
 
 /**
@@ -84,14 +99,23 @@ export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAV
     writeResult: (isWon) => update((current) => withAceMatchResultWritten(current, isWon)),
   }), [update])
 
+  const setGeneralMatchSettings = useCallback(
+    (settings: ModeMatchSettings) => update((current) => withGeneralMatchSettings(current, settings)),
+    [update],
+  )
+  const matchSettingsSeenPort = useMemo<MatchSettingsSeenPort>(() => ({
+    read: () => saveRef.current.matchSettingsSeen,
+    markSeen: () => update(withMatchSettingsSeen),
+  }), [update])
+
   return useMemo(
     () => ({
       save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
-      aceMatchPendingPorts, aceMatchHoldPort,
+      aceMatchPendingPorts, aceMatchHoldPort, setGeneralMatchSettings, matchSettingsSeenPort,
     }),
     [
       save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
-      aceMatchPendingPorts, aceMatchHoldPort,
+      aceMatchPendingPorts, aceMatchHoldPort, setGeneralMatchSettings, matchSettingsSeenPort,
     ],
   )
 }
