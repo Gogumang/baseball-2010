@@ -36,11 +36,17 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
   /** 메인 메뉴에서 **빠른실행**을 잡고 들어왔는가 (메뉴+0x14c) */
   readonly isQuickStart?: boolean
   /**
-   * 저장에서 읽어 온 경기진행 설정 (모드 칸 m = **0**, 일반모드).
-   * 안 넘기면 `FULL_PLAY_SETTINGS`("모든 이닝을 직접 플레이") 다 — 원본 저장의 참 기본값은
-   * 종류 0(찬스)·값 0 이지만 그러면 득점권 타석만 잡게 된다 (matchSettings 의 웹판 판단).
+   * 전역기록에서 읽어 온 경기진행 설정 (모드 칸 m = **0**, 일반모드 — 창을 열 때 0x5fef4 가 이 칸에서 복사한다).
+   * 안 넘기면 `FULL_PLAY_SETTINGS`(이닝 · 전체) — 새 저장의 값이다(생성자 0x9f26c 의 0x9f404~0x9f42c).
    */
   readonly initialSettings?: MatchProgressSettings
+  /** 설정 창 확인 0x60376 — 받는 쪽이 전역 m = 0 칸에 되쓰고 저장한다(0x1f1b9). 다음 판 · 이어하기가 이 값을 읽는다 */
+  readonly onSettingsConfirm?: (settings: MatchProgressSettings) => void
+  /**
+   * 전역기록 +0x11e 손잡이 — 22 진입 0x3163c~0x31688: 모드 1 이고 0 이면 설정 창을 저절로 열고(0x5fef5(skin, 1))
+   * 1 을 쓴 뒤 저장한다. 시즌 0xdd 진입 0x6548 과 같은 칸이다. 안 넘기면 저절로 열지 않는다
+   */
+  readonly matchSettingsSeen?: MatchSettingsSeenSlot
   /** 환경설정 "투구 게이지" (설정 +0x2d) — 원본 기본값은 꺼짐 */
   readonly gaugeSettingOn?: boolean
   /** 환경설정 "주루" 가 수동인가 (설정 +0xbd) */
@@ -59,6 +65,12 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
    * [최근게임]·[13] 이어하기가 방금 세운 1회초 0:0 경기를 연다(원본 버그 그대로).
    */
   readonly onMatchBlockWrite?: (block: TeamGameProgress) => void
+}
+
+/** 전역기록 +0x11e 한 칸 — 읽기 · 1 쓰기(저장까지) */
+export interface MatchSettingsSeenSlot {
+  readonly read: () => boolean
+  readonly markSeen: () => void
 }
 
 /** 상태 23 엔트리 편집 한 판 (편집 객체 [메뉴+0x120]) */
@@ -122,8 +134,8 @@ export interface GeneralModeSession {
  */
 export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSession {
   const {
-    random, isQuickStart = false, initialSettings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels,
-    openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds, onMatchBlockWrite,
+    random, isQuickStart = false, initialSettings, onSettingsConfirm, matchSettingsSeen, gaugeSettingOn, runningModeManual,
+    throwModeManual, aceLevels, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds, onMatchBlockWrite,
   } = options
 
   /**
@@ -148,6 +160,21 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   const [rolls, setRolls] = useState<TeamSetupRolls | null>(initial.rolls)
   const [settings, setSettings] = useState<MatchProgressSettings>(initialSettings ?? FULL_PLAY_SETTINGS)
   const [isSettingsOpen, setSettingsOpen] = useState(false)
+  /**
+   * 22 진입의 +0x11e 검사 (0x3163c~0x31688) — 23 에서 돌아온 길(0x314ce)도 이 자리로 뛰지만 그때는 이미 1 이다.
+   * 0 이면 창을 열고 1 · 저장. 빠른실행은 처음부터 22 라 첫 그림 뒤 한 번 돈다(아래 effect)
+   */
+  const seenSlotRef = useRef(matchSettingsSeen)
+  seenSlotRef.current = matchSettingsSeen
+  const checkMatchSettingsSeen = useCallback(() => {
+    const slot = seenSlotRef.current
+    if (slot === undefined || slot.read()) return
+    setSettingsOpen(true)
+    slot.markSeen()
+  }, [])
+  useEffect(() => {
+    if (initial.flow.step === GENERAL_MODE_STEP.경기정보) checkMatchSettingsSeen()
+  }, [initial.flow.step, checkMatchSettingsSeen])
   const [isPlaying, setPlaying] = useState(false)
   const [entryEdit, setEntryEdit] = useState<GeneralModeEntryEdit | null>(null)
   /**
@@ -215,10 +242,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         setUserEntryRoster(null)
         setRolls(rollsOf(next.setup, random))
         bumpBlockWrite()
+        checkMatchSettingsSeen()
       }
       setFlow(next)
     },
-    [flow, random, bumpBlockWrite],
+    [flow, random, bumpBlockWrite, checkMatchSettingsSeen],
   )
 
   const back = useCallback(() => {
@@ -337,9 +365,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         if (!isRespinning) setSettingsOpen(true)
       },
       closeSettings: () => setSettingsOpen(false),
+      // 확인 0x60376 — 전역 m = 0 칸에 되쓰고 0x1f1b9 로 파일까지
       applySettings: (next: MatchProgressSettings) => {
         setSettings(next)
         setSettingsOpen(false)
+        onSettingsConfirm?.(next)
       },
       start: () => {
         if (!isRespinning) setPlaying(true)
@@ -352,7 +382,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
     }),
-    [respin, isRespinning, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked],
+    [
+      respin, isRespinning, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked,
+      onSettingsConfirm,
+    ],
   )
 
   const gameOptions = useMemo(

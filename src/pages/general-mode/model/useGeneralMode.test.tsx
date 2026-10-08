@@ -209,3 +209,57 @@ describe('경기정보 OK 없이도 모드 1 블록이 새 경기로 바뀐다 �
     expect(write.mock.calls.length).toBe(처음횟수 + 1)
   })
 })
+
+describe('경기진행 설정 — 전역 m = 0 칸 · +0x11e (G2 · G4)', () => {
+  const 칸 = (처음값: boolean) => {
+    let seen = 처음값
+    return { read: () => seen, markSeen: vi.fn(() => { seen = true }) }
+  }
+
+  it('+0x11e 가 0 이면 22 에 들어오며 설정 창을 저절로 열고 1 을 쓴다 (0x3163c~0x31688)', () => {
+    const random = createSeededRandom(씨앗)
+    const slot = 칸(false)
+    const { result } = renderHook(() => useGeneralMode({ random, isQuickStart: true, ...열림, matchSettingsSeen: slot }))
+
+    expect(result.current.isSettingsOpen).toBe(true)
+    expect(slot.markSeen).toHaveBeenCalledTimes(1)
+  })
+
+  it('이미 봤으면(시즌 0xdd 가 먼저 봤어도 같은 칸) 저절로 열지 않는다', () => {
+    const random = createSeededRandom(씨앗)
+    const slot = 칸(true)
+    const { result } = renderHook(() => useGeneralMode({ random, isQuickStart: true, ...열림, matchSettingsSeen: slot }))
+
+    expect(result.current.isSettingsOpen).toBe(false)
+    expect(slot.markSeen).not.toHaveBeenCalled()
+  })
+
+  it('준비 단계를 거쳐 21 마타자 OK 로 22 에 들어올 때도 같은 검사를 한다', () => {
+    const random = createSeededRandom(씨앗)
+    const slot = 칸(false)
+    const { result } = renderHook(() => useGeneralMode({ random, ...열림, matchSettingsSeen: slot }))
+    expect(result.current.isSettingsOpen).toBe(false)
+
+    act(() => result.current.actions.selectUserTeam(0))
+    act(() => result.current.actions.selectAiTeam(1))
+    act(() => result.current.actions.selectFirstBat(0))
+    act(() => result.current.actions.selectStadium(0))
+    act(() => result.current.actions.selectAce(0))
+    act(() => result.current.actions.selectAce(5))
+
+    expect(result.current.isSettingsOpen).toBe(true)
+    expect(slot.markSeen).toHaveBeenCalledTimes(1)
+  })
+
+  it('확인 0x60376 은 받는 쪽에 넘겨 전역 칸에 되쓰게 한다 — 다음 판은 그 값을 읽는다', () => {
+    const random = createSeededRandom(씨앗)
+    const onSettingsConfirm = vi.fn()
+    const { result } = renderHook(() => useGeneralMode({ random, isQuickStart: true, ...열림, onSettingsConfirm }))
+    const 설정 = { kind: 0, value: 1, battingOrderBits: 0, pitchingInningBits: 0, offenseRunnerBits: 0, defenseRunnerBits: 0 }
+
+    act(() => result.current.actions.applySettings(설정))
+
+    expect(onSettingsConfirm).toHaveBeenCalledWith(설정)
+    expect(result.current.gameOptions.settings).toEqual(설정)
+  })
+})

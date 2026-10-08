@@ -190,6 +190,8 @@ export function App() {
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
   const seasonSession = useSeasonSession(
     seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
+    // 전역기록 +0x11e — 0xdd 진입 0x6548 과 일반 22 진입 0x3163c 가 같은 칸을 본다
+    modeSave.matchSettingsSeenPort,
   )
   // 142 경기 준비 0x1c46c 가 내 마타자·마투수를 열린 것 중에서 굴린다 (0x9f604 · 0x9f650, 825865d)
   const nariOpenedAces = useMemo(
@@ -478,6 +480,11 @@ export function App() {
           recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
           modeSave.finishGeneralGame()
         }}
+        // 경기진행 설정 전역 m = 0 칸 — 창을 열 때 읽고(0x5fef4) 확인 0x60376 이 되써 0x1f1b9 로 남긴다. 이어하기 경기도 이 값
+        initialSettings={modeSave.save.generalMatchSettings}
+        onMatchSettingsConfirm={modeSave.setGeneralMatchSettings}
+        // 전역기록 +0x11e — 22 에 처음 들어오면 설정 창을 저절로 연다. 시즌 0xdd 와 같은 칸
+        matchSettingsSeen={modeSave.matchSettingsSeenPort}
         // 진입 창 [13] 의 빠른실행 (this+0x14c) — 1~6 단계를 건너뛰고 경기정보로
         isQuickStart={isGeneralQuickStart}
         openedHiddenTeamIds={collection.collection.openedHiddenIds}

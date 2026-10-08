@@ -31,6 +31,12 @@
  * 경기정보 OK 와 반 이닝 자동 저장 0x4f928 이 파일에 쓰는 그 블록(두 팀 · 경기 상태 · 팀 레코드 · 기록달성 횟수 — 근거는
  * `features/play-team-game` 의 `TEAM_GAME_RESUME_SAVE`). 이 칸은 그 진행을 **모른 채로**(unknown) 담기만 한다 —
  * 읽어서 경기로 세우는 것은 페이지(`pages/general-mode`)의 몫이다.
+ *
+ * ## +0x12c+0 계열 — 일반모드(m = 0) 경기진행 설정 · +0x11e 설정 창 본 표시
+ * 일반모드 경기정보 22 의 설정 창은 열 때 0x5fef4 가 m = 0 칸에서 읽고, 확인 0x60376 이 되쓰고 0x1f1b9 가 파일에 남긴다 —
+ * 그래서 다음 판 · 다음 실행에도 남는다. +0x11e 는 22 진입 0x3163c~0x31688 과 시즌 0xdd 진입 0x6548 이 **같은 칸**을 본다:
+ * 0 이면 설정 창을 저절로 열고 1 을 쓴 뒤 저장한다 — 두 모드 중 먼저 들어간 쪽에서 한 번만 뜬다.
+ * (시즌 칸 m = 1 은 웹에서 아직 시즌 저장 `matchSettings` 가 든다 — useSeasonSession 머리 참고.)
  */
 export interface ModeSave {
   /** 전역기록 +0x3c — 마지막으로 시작한 모드 (새 저장은 1 — 생성자 0x9f26c) */
@@ -58,6 +64,42 @@ export interface ModeSave {
    * (0x407f0 4090c · 0x4b100 4b344)을 이 값으로 고른다. 없으면 0.
    */
   readonly aceMatchMode: number
+  /** 전역기록 +0x12c+0 · +0x146+0 · +0x120 · +0x124 · +0x128 · +0x12a — 일반모드 경기진행 설정 (새 저장은 이닝 · 전체) */
+  readonly generalMatchSettings: ModeMatchSettings
+  /** 전역기록 +0x11e — 경기진행 설정 창을 한 번 봤는가 (일반 22 · 시즌 0xdd 가 함께 본다) */
+  readonly matchSettingsSeen: boolean
+}
+
+/**
+ * 경기진행 설정 한 모드 칸 — `features/play-team-game` 의 `MatchProgressSettings` 와 같은 꼴(엔티티는 기능 층을 못 읽어
+ * 여기 따로 적는다)
+ */
+export interface ModeMatchSettings {
+  /** +0x12c+m — 0 찬스 · 1 이닝 · 2 상세 */
+  readonly kind: number
+  /** +0x146+m */
+  readonly value: number
+  /** +0x120+2m */
+  readonly battingOrderBits: number
+  /** +0x124+2m */
+  readonly pitchingInningBits: number
+  /** +0x128+m */
+  readonly offenseRunnerBits: number
+  /** +0x12a+m */
+  readonly defenseRunnerBits: number
+}
+
+/**
+ * 새 저장의 경기진행 설정 — 생성자 0x9f26c 의 0x9f404~0x9f42c 가 m = 0 · 1 모두 +0x12c+m = 1(이닝) · +0x146+m = 0(전체) ·
+ * 상세 비트 0 을 넣는다(직접 떴다)
+ */
+export const NEW_SAVE_MATCH_SETTINGS: ModeMatchSettings = {
+  kind: 1,
+  value: 0,
+  battingOrderBits: 0,
+  pitchingInningBits: 0,
+  offenseRunnerBits: 0,
+  defenseRunnerBits: 0,
 }
 
 /**
@@ -147,6 +189,9 @@ export const EMPTY_MODE_SAVE: ModeSave = {
   aceMatchPending: { 3: null, 4: null },
   aceMatchWon: { 3: false, 4: false },
   aceMatchMode: 0,
+  generalMatchSettings: NEW_SAVE_MATCH_SETTINGS,
+  // 생성자 0x9f26c 가 +0x11e 를 건드리지 않고 앞서 0xe44 바이트를 0 으로 민다 — 0
+  matchSettingsSeen: false,
 }
 
 /** 원본 모드 번호 범위 — 0x327b8 의 점프표 0xcf048 은 1~9 */
@@ -189,7 +234,39 @@ export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_
     aceMatchMode: typeof value.aceMatchMode === 'number' && Number.isInteger(value.aceMatchMode)
       ? value.aceMatchMode
       : legacyAceMatchModeOf(value.aceMatchPending),
+    // 옛 세이브(칸 없음)는 새 저장 값 — 일반모드 설정은 예전 웹이 저장하지 않았다
+    generalMatchSettings: normalizeModeMatchSettings(value.generalMatchSettings),
+    matchSettingsSeen: value.matchSettingsSeen === true,
   }
+}
+
+const MATCH_SETTING_FIELDS = [
+  'kind', 'value', 'battingOrderBits', 'pitchingInningBits', 'offenseRunnerBits', 'defenseRunnerBits',
+] as const
+
+function normalizeModeMatchSettings(raw: unknown): ModeMatchSettings {
+  if (raw === null || typeof raw !== 'object') return NEW_SAVE_MATCH_SETTINGS
+  const value = raw as Partial<Record<keyof ModeMatchSettings, unknown>>
+  const isValid = MATCH_SETTING_FIELDS.every((field) => Number.isInteger(value[field]))
+  if (!isValid) return NEW_SAVE_MATCH_SETTINGS
+  return {
+    kind: value.kind as number,
+    value: value.value as number,
+    battingOrderBits: value.battingOrderBits as number,
+    pitchingInningBits: value.pitchingInningBits as number,
+    offenseRunnerBits: value.offenseRunnerBits as number,
+    defenseRunnerBits: value.defenseRunnerBits as number,
+  }
+}
+
+/** 일반모드 설정 창 확인 0x60376 — m = 0 칸을 되쓴다(0x1f1b9 로 파일까지) */
+export function withGeneralMatchSettings(save: ModeSave, settings: ModeMatchSettings): ModeSave {
+  return { ...save, generalMatchSettings: settings }
+}
+
+/** +0x11e = 1 — 일반 22 진입 0x31682 · 시즌 0xdd 진입 0x6548 이 설정 창을 저절로 열며 쓰고 저장한다 */
+export function withMatchSettingsSeen(save: ModeSave): ModeSave {
+  return save.matchSettingsSeen ? save : { ...save, matchSettingsSeen: true }
 }
 
 function normalizeAceMatchPending(raw: unknown, mode: NariLeagueMode): readonly number[] | null {
