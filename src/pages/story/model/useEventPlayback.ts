@@ -83,6 +83,8 @@ export function useEventPlayback(
   isHeld?: (step: EventStep) => boolean,
   /** 보상 명령 7 의 알림(0x8d4c4 · 0x8beb8) — 안 주면 예전처럼 보상은 창 없이 지나간다 */
   rewardNoticeOf?: RewardNoticeOf,
+  /** 올해의 목표 창을 키(OK · '5')로 닫을 때 — 안 주면 곧바로 다음 명령. 주면 그쪽이 다음 명령까지 맡는다 */
+  closeYearGoalWindow?: () => void,
 ): {
   step: EventStep
   /** 멈출 명령이 돌고 있는가 (`isHeld` 가 거짓) */
@@ -166,6 +168,8 @@ export function useEventPlayback(
 
   const stepRef = useRef(step)
   stepRef.current = step
+  const closeYearGoalWindowRef = useRef(closeYearGoalWindow)
+  closeYearGoalWindowRef.current = closeYearGoalWindow
   const isReleasedRef = useRef(isReleased)
   isReleasedRef.current = isReleased
   const next = () => setCursor(advanceCursor(stepRef.current.cursor))
@@ -182,6 +186,7 @@ export function useEventPlayback(
       if (event.key !== 'Enter' && event.key !== ' ') return
       if (event.target instanceof HTMLButtonElement) return
       event.preventDefault()
+      if (closeYearGoalWindowRef.current !== undefined) return closeYearGoalWindowRef.current()
       setCursor(advanceCursor(stepRef.current.cursor))
     }
     window.addEventListener('keydown', onKeyDown)

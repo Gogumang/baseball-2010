@@ -1704,6 +1704,14 @@ export function useCareerSession({
       setScreen({ kind: '이벤트', eventId, context: '장소' })
     },
 
+    /**
+     * 이벤트의 system 창(알림 · 올해의 목표)을 답 0 으로 닫았다 — 0x8d928~0x8d942 의 0x7fe90: S+0x1b7 = 1 · 저장(0x22755).
+     * 하위와 상관없이 모든 system 창이다. 웹 저장은 커리어가 바뀔 때마다라 이미 켜져 있으면 바뀌는 것이 없다.
+     */
+    confirmEventSystemWindow: () => {
+      setCareer((previous) => (previous === null || previous.hasSeenYearGoalWindow ? previous : { ...previous, hasSeenYearGoalWindow: true }))
+    },
+
     completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
       if (career === null || screen.kind !== '이벤트') return
       if (screen.context === '연초') {

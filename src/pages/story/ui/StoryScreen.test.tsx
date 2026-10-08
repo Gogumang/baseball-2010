@@ -766,3 +766,43 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
     expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
   })
 })
+
+describe('StoryScreen — system 창 답 0 은 0x7fe90 (목표 창 봤음 · 저장)', () => {
+  const 창이벤트 = {
+    ...이벤트,
+    commands: [
+      { op: 'system', sub: 0, arg: 0, text: '알림 글' },
+      { op: 'yesno', sub: 0, text: '묻는다', yesEvent: 1, noEvent: 1 },
+    ],
+  } as unknown as OriginalEvent
+
+  it('알림을 OK 로 닫으면 부르고, 예아니오는 안 부른다', () => {
+    const onSystemWindowConfirm = vi.fn()
+    render(<StoryScreen events={[창이벤트]} event={창이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={() => {}} onMatch={() => {}} onSystemWindowConfirm={onSystemWindowConfirm} />)
+    fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
+    expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: '예' }))
+    expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('알림을 CLR 로 닫아도 답 0 이다 (0x751c2~0x751ec)', () => {
+    const onSystemWindowConfirm = vi.fn()
+    render(<StoryScreen events={[창이벤트]} event={창이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={() => {}} onMatch={() => {}} onSystemWindowConfirm={onSystemWindowConfirm} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('올해의 목표 창(system 1)을 키로 닫아도 부른다', () => {
+    const onSystemWindowConfirm = vi.fn()
+    const onComplete = vi.fn()
+    const 목표 = { ...이벤트, commands: [{ op: 'system', sub: 1, arg: 0 }] } as unknown as OriginalEvent
+    render(<StoryScreen events={[목표]} event={목표} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} onSystemWindowConfirm={onSystemWindowConfirm}
+      yearGoalWindowOf={() => ({ labelSet: 0 as const, current: [0, 0, 0, 0, 0], goals: [260, 44, 3, 22, 50] })} />)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+})

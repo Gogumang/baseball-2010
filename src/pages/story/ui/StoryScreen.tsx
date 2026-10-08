@@ -99,13 +99,20 @@ interface StoryScreenProps {
    * 안 주면 예전처럼 보상은 창 없이 지나간다.
    */
   readonly rewardNoticeContext?: () => RewardNoticeContext
+  /**
+   * **system 창을 답 0 으로 닫았다** — 기다림 0x8d91c(0x8d928~0x8d942)가 창 [창+0x21c] == 0 이면 0x7fe90(상자)을 부른다:
+   * 나리면 선수 +0x1b7(올해의 목표 창을 봤다) · 시즌모드면 기록 +0x187 = 1, 그리고 저장 0x22755([0x1400054], 1).
+   * system 창은 하위와 상관없이 모두다 — 알림(0 · 3 · 4 · 5, OK · CLR 모두 답 0)과 올해의 목표 창(1, OK · '5' 가 답 0).
+   * 예아니오(0x8d954) · 보상(0x8daa0)은 안 부른다. 안 넘기면 아무 일도 없다.
+   */
+  readonly onSystemWindowConfirm?: () => void
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
   systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
-  rewardNoticeContext,
+  rewardNoticeContext, onSystemWindowConfirm,
 }: StoryScreenProps) {
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
@@ -117,6 +124,7 @@ export function StoryScreen({
   const { step, isReleased, rewardNotice, portraits, next, skip, jump: jumpToEvent, clearPortraits } = useEventPlayback(
     events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
     rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
+    () => closeSystemWindow(),
   )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
   const [backdrop, setBackdrop] = useState<EventBackdropState>(INITIAL_EVENT_BACKDROP)
@@ -210,6 +218,11 @@ export function StoryScreen({
   // 상자는 창 밑에도 남는다 — 키는 창 것이다(0x8b804 는 지금 명령이 say · 선택지일 때만 받는다)
   const isBoxActive = command?.op === 'say' || command?.op === 'choice'
   const choiceCommand = command?.op === 'choice' ? command : null
+  /** system 창의 답 0 — 0x7fe90(목표 창 봤음 · 저장) 뒤 다음 명령 (창이 다 닫히면 0x8d91c 가 넘긴다) */
+  const closeSystemWindow = () => {
+    onSystemWindowConfirm?.()
+    next()
+  }
 
   return (
     <div className={styles.overlay}
@@ -246,12 +259,12 @@ export function StoryScreen({
           }} />
       )}
 
-      {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={next} />}
+      {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={closeSystemWindow} />}
 
       {noticeText !== null && (
         // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
         <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={next} />
+          text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={closeSystemWindow} />
       )}
 
       {command?.op === 'reward' && rewardNotice?.kind === '알림' && (
