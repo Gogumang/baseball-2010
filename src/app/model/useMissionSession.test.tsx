@@ -1481,3 +1481,39 @@ describe('타자 미션의 미션 타자 레코드 칸 — 나리 저장 선수 
     expect(rendered.result.current.missionRun?.game.humanBatting.records[12]).toBe(5)
   })
 })
+
+/* ── 자동진행 0x21 — 틱마다 한 타석 (stepAutoRelay) ───────────────────────────── */
+
+describe('자동진행 0x21 — 3아웃 뒤 판은 halfEnded 로 서서 기다리고, 중계 틱마다 한 칸씩 굴린다', () => {
+  it('견제 3아웃 → 굴리기 전엔 halfEnded · 틱마다 중계 칸 · 끝나면 halfEnded 가 내린다', () => {
+    const mission = MISSIONS.find((row) => row.side === '타자' && row.id === 3)!
+    for (let seed = 1; seed < 400; seed += 1) {
+      const probe = setUpBatterMissionWithSeed(mission, seed)
+      act(() => probe.result.current.session.actions.cpuPickoff(3))
+      if (probe.result.current.session.pickoffReplay?.advance.outsAdded !== 1) {
+        probe.unmount()
+        continue
+      }
+      const ended = probe.result.current.session.missionRun!
+      // 자동진행은 아직 안 굴렀다 — 0x18 → 0x21 을 기다린다
+      expect(ended.game.halfEnded).toBe(true)
+      expect(probe.result.current.session.autoRelayStep).toBeNull()
+      act(() => probe.result.current.session.stepAutoRelay())
+      const first = probe.result.current.session.autoRelayStep
+      expect(first).not.toBeNull()
+      expect(probe.result.current.session.missionRun!.game.halfEnded).toBe(true)
+      expect(probe.result.current.session.missionRun!.game.scores).toEqual(first!.scores)
+      let ticks = 1
+      while (probe.result.current.session.missionRun!.game.halfEnded && ticks < 500) {
+        act(() => probe.result.current.session.stepAutoRelay())
+        ticks += 1
+      }
+      expect(probe.result.current.session.missionRun!.game.halfEnded).toBe(false)
+      expect(probe.result.current.session.autoRelayStep).toBeNull()
+      expect(ticks).toBeGreaterThan(3)
+      probe.unmount()
+      return
+    }
+    throw new Error('견제사 씨앗이 없다')
+  })
+})

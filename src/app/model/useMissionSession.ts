@@ -16,7 +16,7 @@ import {
   missionDefensePlayInputOf,
   isMissionBatterUp,
   recordSwing,
-  runBatterMissionAutoHalves,
+  batterMissionAutoTicks,
   startMission,
   tick as tickMission,
 } from '@/entities/mission/model/missionRun'
@@ -27,11 +27,12 @@ import {
   judgePitcherRun,
   MISSION_PITCHER_MODE,
   recordPitch,
-  runPitcherMissionAutoHalves,
+  pitcherMissionAutoTicks,
   startPitcherMission,
   withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
 import { battingRecordAt, cpuSideOf, humanSideOf, withMissionScore } from '@/entities/mission/model/missionGame'
+import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { RosterPlayer } from '@/shared/config/original/roster'
@@ -431,6 +432,26 @@ export function useMissionSession({
   const missionRunRef = useRef(missionRun)
   missionRunRef.current = missionRun
   const [pitcherRun, setPitcherRun] = useState<PitcherRun | null>(null)
+  const pitcherRunRef = useRef(pitcherRun)
+  pitcherRunRef.current = pitcherRun
+  /**
+   * **자동진행 0x21 의 틱 묶음** — 사람 반 이닝이 3아웃으로 끝나면(`game.halfEnded`) 0x18 → 0x21 로 가서 갱신 0x48480 이 **틱마다**
+   * 0xc2198 → 0xc262c 를 한 번 부른다(타석 하나 또는 교체 부름 하나). 웹은 중계 화면(`AutoPlayRelayScreen`)의 틱마다 `stepAutoRelay`
+   * 가 이 묶음을 한 칸 굴린다(`batterMissionAutoTicks` · `pitcherMissionAutoTicks`) — 굴림이 그 틱에 나가고, 중계 도중 제한 시간이
+   * 다 되면(0xaada4 → 실패) 다음 틱을 안 불러 남은 타석은 굴리지 않는다. 첫 틱에 그때 판으로 세운다.
+   */
+  const autoTicksRef = useRef<
+    | { readonly side: '타자'; readonly ticks: Generator<MissionAutoRelayStep, MissionRun, void> }
+    | { readonly side: '투수'; readonly ticks: Generator<MissionAutoRelayStep, PitcherRun, void> }
+    | null
+  >(null)
+  /** 중계 칸 sim+0xb0 · +0xc4 — 마지막으로 굴린 틱의 중계 (`MissionAutoRelayStep`). 아직 안 굴렸으면 null */
+  const [autoRelayStep, setAutoRelayStep] = useState<MissionAutoRelayStep | null>(null)
+  /** 새 경기 — 굴리던 자동진행을 버린다 */
+  const dropAutoRelay = () => {
+    autoTicksRef.current = null
+    setAutoRelayStep(null)
+  }
   /** 타자 미션 상대 마투수의 레코드 스태미나 +0x2c — 새 경기마다 10000 (`missionOpponentStaminaAfterPitch`) */
   const opponentMoundStamina = missionAceMoundStaminaOf(missionRun)
   const [pendingDefensePlay, setPendingDefensePlay] = useState<PendingMissionDefense | null>(null)
@@ -493,10 +514,11 @@ export function useMissionSession({
    */
   const newAtBatWaitRef = useRef<SceneConfirmWait | null>(null)
   /**
-   * 타자 미션 판이 3아웃으로 끝났으면 0x18 → 자동진행 반 이닝(CPU 공격 · 미션 타자 차례 전까지의 사람 칸 공격)을 돌린다
-   * (`runBatterMissionAutoHalves`). 난수는 다음 0xe · 0xf 앞이다.
+   * 타자 미션 판이 3아웃으로 끝나도 여기서는 자동진행을 굴리지 않는다 — `game.halfEnded` 가 선 채로 0x18 → 0x21 을 기다리고,
+   * 중계 화면이 틱마다 `stepAutoRelay` 로 한 타석씩 굴린다(CPU 공격 · 미션 타자 차례 전까지의 사람 칸 공격, `batterMissionAutoTicks`).
+   * 난수는 다음 0xe · 0xf 앞이다(중계가 0xe 확인 대기보다 먼저 돈다).
    */
-  const settleBatterRun = (run: MissionRun): MissionRun => runBatterMissionAutoHalves(run, random, aceLevels)
+  const settleBatterRun = (run: MissionRun): MissionRun => run
   /** 새 타석 0xd → 0xe — OK 를 기다린 뒤 0xf 로 간다 */
   const enterNewAtBatConfirm = () => {
     const wait = enterSceneConfirm()
@@ -1090,7 +1112,7 @@ export function useMissionSession({
       if (interrupted) {
         // 판에서 3아웃 — 이 타석은 끊긴다 (판정 B 0xae3e8 아웃 > 2 → 0x18)
         resetAtBatWithConfirm()
-        setPitcherRun(runPitcherMissionAutoHalves(checkPitchExhausted(nextRun), random))
+        setPitcherRun(settlePitcherRun(checkPitchExhausted(nextRun)))
         return
       }
     }
@@ -1173,7 +1195,7 @@ export function useMissionSession({
       // 판정 A 의 "그 밖" — 같은 타석 다음 공(0xf)
       signalPitchSelection('same')
     }
-    setPitcherRun(runPitcherMissionAutoHalves(nextRun, random))
+    setPitcherRun(settlePitcherRun(nextRun))
   }
 
   /**
@@ -1221,7 +1243,7 @@ export function useMissionSession({
         setPitcherRun((previous) =>
           previous === null
             ? previous
-            : runPitcherMissionAutoHalves(applyPitcherOutcome(previous, pending.outcome, { played }), random),
+            : settlePitcherRun(applyPitcherOutcome(previous, pending.outcome, { played })),
         )
         resetAtBatWithConfirm()
         runner.setIsPaused(false)
@@ -1275,8 +1297,63 @@ export function useMissionSession({
   const [skyRow, setSkyRow] = useState(0)
   const rollSkyRow = () => setSkyRow(randomIntegerBelow(random, 0, SKY_ROW_COUNT))
 
+  /**
+   * 투수 미션 판이 3아웃으로 끝나도 여기서는 자동진행을 굴리지 않는다 — 타자 미션(`settleBatterRun`)과 같이 중계 화면이 틱마다
+   * `stepAutoRelay` 로 굴린다(사람 칸 팀이 치는 반 이닝, `pitcherMissionAutoTicks`).
+   */
+  const settlePitcherRun = (run: PitcherRun): PitcherRun => run
+
+  /**
+   * **자동진행 0x21 의 틱 하나** — 중계 화면(`AutoPlayRelayScreen`)이 틱마다 부른다 (0x48480: 모드 5·6 은 속도 칸을 안 보고 매 틱 한 걸음).
+   * - 굴릴 틱이 있으면 그 틱(0xc262c 한 번)을 굴리고 중계 칸을 싣는다. 점수판 0xb69b0 · 이닝 · 공격 측은 그 틱에 바뀐다 — 판에도 바로 싣는다
+   *   (중계 도중 제한 시간이 다 되면 그 자리 그대로 결과로 간다).
+   * - 묶음이 끝나면(0xc2198 이 거짓 — 경기 끝 · 미션 타자 차례 · 사람 수비 반 이닝) 끝난 판을 싣는다 — `halfEnded` 가 내려 0x18 → 0xd.
+   *   그 사이 흐른 제한 시간(`remainingSeconds`)은 살아 있는 판의 값을 둔다.
+   * - 판이 이미 끝났으면(중계 도중 시간 초과 → 실패) 굴리지 않고 묶음을 버린다.
+   */
+  const stepAutoRelay = () => {
+    const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
+    const run = isPitcherSide ? pitcherRunRef.current : missionRunRef.current
+    if (run === null || !run.game.halfEnded) return
+    if (run.status !== '진행중') {
+      dropAutoRelay()
+      return
+    }
+    let current = autoTicksRef.current
+    if (current === null || current.side !== (isPitcherSide ? '투수' : '타자')) {
+      current = isPitcherSide
+        ? { side: '투수', ticks: pitcherMissionAutoTicks(run as PitcherRun, random) }
+        : { side: '타자', ticks: batterMissionAutoTicks(run as MissionRun, random, aceLevels) }
+      autoTicksRef.current = current
+    }
+    if (current.side === '투수') {
+      const next = current.ticks.next()
+      if (next.done !== true) {
+        const step = next.value
+        setAutoRelayStep(step)
+        setPitcherRun((previous) => (previous === null ? previous : withAutoRelayStep(previous, step)))
+        return
+      }
+      dropAutoRelay()
+      const finished = next.value
+      setPitcherRun((previous) => (previous === null || previous.status !== '진행중' ? previous : { ...finished, remainingSeconds: previous.remainingSeconds }))
+      return
+    }
+    const next = current.ticks.next()
+    if (next.done !== true) {
+      const step = next.value
+      setAutoRelayStep(step)
+      setMissionRun((previous) => (previous === null ? previous : withAutoRelayStep(previous, step)))
+      return
+    }
+    dropAutoRelay()
+    const finished = next.value
+    setMissionRun((previous) => (previous === null || previous.status !== '진행중' ? previous : { ...finished, remainingSeconds: previous.remainingSeconds }))
+  }
+
   /** 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것 */
   const resetForNewMatch = (mission: OriginalMission) => {
+    dropAutoRelay()
     // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
     setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
@@ -1314,7 +1391,7 @@ export function useMissionSession({
       if (pending === null) return
       setPendingBenchClearing(null)
       if (reachedTargetTick) rollBenchClearingTargets(random)
-      setPitcherRun(runPitcherMissionAutoHalves(applyPitcherOutcome(pending.run, pending.outcome, { random }), random))
+      setPitcherRun(settlePitcherRun(applyPitcherOutcome(pending.run, pending.outcome, { random })))
       resetAtBatWithConfirm()
     },
 
@@ -1354,6 +1431,7 @@ export function useMissionSession({
       setPendingBenchClearing(null)
       stealingFromRef.current = []
       setStealingFrom([])
+      dropAutoRelay()
       // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 장면 덱(0x3e340 → 0xb08e8) · 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
       openScenePatternDeck(random)
       rollSkyRow()
@@ -1515,7 +1593,7 @@ export function useMissionSession({
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])
       if (result.ticks.length > 0) setPickoffReplay(result)
       // 판정 B 0xae3e8 의 견제 가지는 아웃 ≤ 2 든 3아웃이든 정산 0xa8024 를 부른다 (ae5a8)
-      setPitcherRun(runPitcherMissionAutoHalves(withPitcherMissionRunnerResult(pitcherRun, result, true), random))
+      setPitcherRun(settlePitcherRun(withPitcherMissionRunnerResult(pitcherRun, result, true)))
       // 3아웃 — 이 타석은 끊긴다 (아웃 > 2 → 0x18). 아니면 같은 타석 0xf (ae592)
       if (interrupted) resetAtBatWithConfirm()
       else signalPitchSelection('same')
@@ -1650,7 +1728,19 @@ export function useMissionSession({
     random,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
     opponentStaminaPercent: staminaPercentOf(opponentMoundStamina),
+    /** 자동진행 0x21 의 마지막 중계 칸 — 중계 화면이 그린다 (`stepAutoRelay`) */
+    autoRelayStep,
+    /** 자동진행 0x21 의 틱 하나를 굴린다 — 중계 화면이 틱마다 부른다 */
+    stepAutoRelay,
   }
+}
+
+/** 중계 틱 하나의 점수판 0xb69b0 · 이닝 st[0x6b] · 공격 측 st[9] 를 판에 싣는다 — `halfEnded` 는 선 채로 (자동진행 중) */
+function withAutoRelayStep<T extends MissionRun | PitcherRun>(run: T, step: MissionAutoRelayStep): T {
+  return {
+    ...run,
+    game: { ...run.game, scores: [step.scores[0], step.scores[1]], inning: step.inning, offenseSide: step.offenseSide },
+  } as T
 }
 
 /** 3아웃 — 판이 끊기고 0x18 · 자동진행 반 이닝(`runBatterMissionAutoHalves` · `runPitcherMissionAutoHalves`)으로 간다 */

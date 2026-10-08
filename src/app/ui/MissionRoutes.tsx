@@ -17,6 +17,9 @@ import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
+import type { MissionRun } from '@/entities/mission/model/missionRun'
+import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
@@ -101,7 +104,11 @@ export function MissionRoutes({
   /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
 
-  const overlay = missionOverlayOf(session, defenseSceneRef)
+  const playingRun =
+    screen.kind === '투수미션' ? session.pitcherRun
+      : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun
+        : null
+  const overlay = missionOverlayOf(session, defenseSceneRef, playingRun, runner.bannerText)
   if (overlay !== null) return overlay
 
   // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
@@ -275,6 +282,10 @@ export function MissionRoutes({
 function missionOverlayOf(
   session: ReturnType<typeof useMissionSession>,
   defenseScene: MutableRefObject<DefenseSceneMemory>,
+  /** 지금 장면의 판 — 자동진행 0x21 중계를 띄울지 본다 */
+  playingRun: MissionRun | PitcherRun | null,
+  /** 결과 띠(상태 0x12) — 내려간 뒤에야 0x18 → 0x21 */
+  bannerText: string,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   if (pendingDefensePlay !== null) {
@@ -306,6 +317,20 @@ function missionOverlayOf(
   // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
   if (session.pickoffReplay !== null) {
     return <DefensePlayback ticks={session.pickoffReplay.ticks} onDone={actions.finishPickoffReplay} />
+  }
+
+  // 자동진행 중계(상태 0x21) — 사람 반 이닝이 3아웃으로 끝나(`halfEnded`) 결과 띠 · 수비 · 주자 판이 다 돈 뒤 0x18 → 0x21.
+  // 0xd → 0xe 확인 대기와 결과 판(자동진행 중 경기가 끝난 실패 포함)보다 먼저다. 그 동안 제한 시간은 세션 타이머 그대로 흐르고,
+  // 다 되면(실패) 판이 끝나 이 화면이 곧장 내려간다 — 남은 타석은 안 굴린다(`stepAutoRelay`).
+  if (playingRun !== null && playingRun.game.halfEnded && playingRun.status === '진행중' && bannerText === '') {
+    return (
+      <AutoPlayRelayScreen
+        step={session.autoRelayStep}
+        onTick={session.stepAutoRelay}
+        sideTeams={missionWithSideTeamsOf(playingRun.mission, playingRun.game.humanBatting.teamId).sideTeams}
+        humanSide={humanSideOf(playingRun.mission)}
+      />
+    )
   }
   return null
 }
@@ -350,7 +375,9 @@ export function PitcherAceMatchRoute(
 
   // 대결 하나 = 미션 장면 하나 (`beginPitcherAceMatch` 가 `mission` 마다 세운다)
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, mission)
-  const overlay = missionOverlayOf(session, defenseSceneRef)
+  const overlay = missionOverlayOf(
+    session, defenseSceneRef, session.pitcherAceMatchMission === mission ? session.pitcherRun : null, runner.bannerText,
+  )
   if (overlay !== null) return overlay
 
   // 미션을 세우기 전(첫 그림) — 아무것도 안 그린다
