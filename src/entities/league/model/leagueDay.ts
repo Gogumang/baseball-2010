@@ -405,9 +405,9 @@ export interface CpuGamePrepRolls {
  * (R4 3c 의 일반모드 굴림 넷과 같은 함수들).
  */
 export function rollCpuGamePrep(random: RandomPort): CpuGamePrepRolls {
-  const stadium = Math.trunc(random.nextInRange(0, 4))
-  const x = Math.trunc(random.nextInRange(0, 5))
-  const y = Math.trunc(random.nextInRange(0, 5))
+  const stadium = random.rand(0, 4)
+  const x = random.rand(0, 5)
+  const y = random.rand(0, 5)
   const pitcherB = rollOpponentAceIndex(y, random)
   const batterB = rollOpponentAceIndex(x, random)
   return { stadium, teamA: { batter: x, pitcher: y }, teamB: { batter: batterB, pitcher: pitcherB } }

@@ -41,7 +41,7 @@ export interface QuickStartOpenState {
 
 /** `bfa55(0, n)` 균등 뽑기 — [0, n) 정수 */
 function uniform(random: RandomPort, count: number): number {
-  return Math.trunc(random.nextInRange(0, count))
+  return random.rand(0, count)
 }
 
 /**

@@ -84,10 +84,10 @@ const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: Rand
     const gain = toInt16(career.seasonPopularityGain)
     return (g === 14 && gain <= 15) || (g === 32 && gain <= 35)
   },
-  // 5 무력감 — 0xa4f31 불발 → 사기 ≤ 20, 연차 ≥ 3, rand[0,100) ≥ 70 (30%) (0xad43a — 앞이 막히면 안 굴린다)
+  // 5 무력감 — 0xa4f31 불발 → 사기 ≤ 20, 연차 ≥ 3, rand(0,100) > 69 (30%, 0xad46c `cmp r0, #0x45 ; ble`) (0xad43a — 앞이 막히면 안 굴린다)
   5: (career, random) =>
     !wasRemoved(career, 5) &&
-    career.morale <= 20 && yearIndexOf(career) >= 3 && random !== undefined && random.nextInRange(0, 100) >= 70,
+    career.morale <= 20 && yearIndexOf(career) >= 3 && random !== undefined && random.rand(0, 100) > 69,
   // 추가 조건이 없는 것들 (0xad9a2)
   6: () => true, // 행운
   8: () => true, // 의외성

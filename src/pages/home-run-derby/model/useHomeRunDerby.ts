@@ -28,7 +28,6 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
@@ -149,10 +148,10 @@ export function rollDerbySceneStart(random: RandomPort): { readonly loadingTipIn
   const loadingTipIndex = rollSceneLoadingTip(random)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 장면의 패턴 덱을 섞는다(상태 9 의 3a454 보다 앞)
   openScenePatternDeck(random)
-  random.nextInRange(0, 9)
+  random.rand(0, 9)
   rollSimulatorInit(random)
   // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재 — 하늘 줄 rand(0, 6)
-  return { loadingTipIndex, skyRow: randomIntegerBelow(random, 0, SKY_ROW_COUNT) }
+  return { loadingTipIndex, skyRow: random.rand(0, SKY_ROW_COUNT) }
 }
 
 export interface HomeRunDerbySession {
@@ -536,7 +535,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
         const finished = derbyResultOf(runRef.current, bestRef.current)
         setResult(finished)
         // 결과 창 진입 0x4f574 의 4f6b0 — 구장 준비 0x352e8 을 다시 불러 하늘 줄 rand(0, 6) 을 한 번 더 굴린다(결과 배경이 이 줄)
-        if (randomRef.current !== undefined) setSkyRow(randomIntegerBelow(randomRef.current, 0, SKY_ROW_COUNT))
+        if (randomRef.current !== undefined) setSkyRow(randomRef.current.rand(0, SKY_ROW_COUNT))
         // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
         // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
         playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
@@ -625,7 +624,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
    * ⚠️ 복사는 웹에 상대 팀 기록이 없어 굴림 차례만 맞춘다 (뜻은 미해결 — 마투수로 덮인 상대 투수 칸을 팀의 r 번째 투수로 되돌리는 것으로 보인다).
    */
   const retryFromResult = useCallback(() => {
-    if (runRef.current.stage > 0 && randomRef.current !== undefined) randomRef.current.nextInRange(1, 4)
+    if (runRef.current.stage > 0 && randomRef.current !== undefined) randomRef.current.rand(1, 4)
     restart()
   }, [restart])
 

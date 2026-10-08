@@ -73,7 +73,7 @@ export const ACE_PER_ROLE = 5
  * 하나씩 얻는다**. 고치지 말 것.
  */
 export function rollOpponentAceIndex(playerAceIndex: number, random: RandomPort): number {
-  const value = Math.trunc(random.nextInRange(0, ACE_PER_ROLE))
+  const value = random.rand(0, ACE_PER_ROLE)
   // 원본은 사람이 고른 번호를 ldrb 로 읽는다 — −1(없음)은 0xff 가 되어 절대 같아지지 않는다
   if (value !== (playerAceIndex & 0xff)) return value
   return value !== 0 ? value - 1 : ACE_PER_ROLE - 1

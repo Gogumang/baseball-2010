@@ -69,7 +69,7 @@ export const STARTING_PITCHER_CANDIDATES = 4
  * (0xb8c80 → 0xb5ca8 — `entities/pitcher-career/model/pitcherRotation.rotationSlotOf`).
  */
 export function rollStartingPitcherIndex(random: RandomPort): number {
-  return Math.trunc(random.nextInRange(0, STARTING_PITCHER_CANDIDATES))
+  return random.rand(0, STARTING_PITCHER_CANDIDATES)
 }
 
 /**

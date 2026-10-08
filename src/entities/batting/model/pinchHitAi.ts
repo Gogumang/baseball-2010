@@ -177,6 +177,6 @@ export function judgeCpuPinchHit(input: CpuPinchHitInput, random: RandomPort): n
   const count = input.strikes + input.balls
   if (count > 0) permille >>= count + 1
 
-  if (Math.trunc(random.nextInRange(0, PERMILLE)) >= permille) return -1
-  return Math.trunc(random.nextInRange(0, bench))
+  if (random.rand(0, PERMILLE) >= permille) return -1
+  return random.rand(0, bench)
 }

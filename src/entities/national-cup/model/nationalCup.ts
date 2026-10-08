@@ -256,6 +256,7 @@ export function otherMatchOf(cup: NationalCup): readonly [number, number] | null
  * `rand(0,2) == 0` 이면 `L+0xaf`(2위), 아니면 `L+0xae`(1위)가 우승이다.
  */
 export function coinFlipChampion(cup: NationalCup, random: RandomPort): NationalCup {
-  const roll = Math.trunc(random.nextInRange(0, 2))
+  // 0xb859c — 동전 0xbfaa0 = rand(0, 2)
+  const roll = random.rand(0, 2)
   return { ...cup, champion: roll === 0 ? cup.finalists[1] : cup.finalists[0] }
 }

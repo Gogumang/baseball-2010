@@ -126,7 +126,7 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
         return meetsSkillReleaseCondition(career, condition.value)
       case CONDITION.질병:
         if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
-        return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
+        return random.rand(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
       default:
         return false
     }

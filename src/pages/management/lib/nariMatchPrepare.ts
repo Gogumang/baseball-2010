@@ -71,7 +71,7 @@ export interface NariMatchAces {
 /** `0x9f604` / `0x9f650` — 칸 0..4 를 차례로 보며 열린 것만 쌓고 `bfa55(0, 개수)` 로 하나. 없으면 −1 */
 function rollOpenedAce(random: RandomPort, opened: readonly number[]): number {
   const list = Array.from({ length: ACE_SLOTS }, (_unused, slot) => slot).filter((slot) => opened.includes(slot))
-  const index = Math.trunc(random.nextInRange(0, list.length))
+  const index = random.rand(0, list.length)
   return list.length === 0 ? NO_NARI_ACE : list[index]
 }
 
@@ -168,7 +168,7 @@ const STADIUM_COUNT = 10
  */
 export function rollNariMatchStadium(random: RandomPort, homeTeamId: number): number {
   if (homeTeamId <= LAST_HOME_STADIUM_TEAM) return homeTeamId
-  return Math.trunc(random.nextInRange(0, STADIUM_COUNT))
+  return random.rand(0, STADIUM_COUNT)
 }
 
 export interface NariMatchInfoInput {

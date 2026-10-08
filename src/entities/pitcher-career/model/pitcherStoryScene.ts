@@ -65,11 +65,11 @@ function meetsConditions(event: OriginalEvent, career: PitcherCareer, random: Ra
       case CONDITION.질병:
         // 무작위 조건은 굴릴 수 있을 때만 — 미리 보기([!])는 굴리지 않는다
         if (random === undefined || career.isSick || career.illnessCooldown > 0) return false
-        return random.nextInRange(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
+        return random.rand(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
       case CONDITION.아플때:
         // 0xadbe6 — 아플 때만 rand[0,100) ≤ 9 (데이터는 쓰지 않는다)
         if (random === undefined || !career.isSick) return false
-        return random.nextInRange(0, PERCENT) <= SICK_CHANCE_MAXIMUM
+        return random.rand(0, PERCENT) <= SICK_CHANCE_MAXIMUM
       default:
         // 4~17 · 26 이상은 통과 (0xad1ba 점프표)
         return true
@@ -201,7 +201,7 @@ function acquiresPitcherSkill(career: PitcherCareer, skill: number, random: Rand
     case PITCHER_SKILL.무력감:
       // 0xad43a: 해제 기록 → 사기(0xa3a25) ≤ 20 → 연차idx > 2 → rand(0,100) 굴림 (앞이 막히면 안 굴린다)
       if (wasRemoved(career, skill) || career.morale > HELPLESS_MORALE_LIMIT || yearIndex <= HELPLESS_YEAR_ABOVE) return false
-      return random !== undefined && random.nextInRange(0, PERCENT_ROLL) > HELPLESS_ROLL_ABOVE
+      return random !== undefined && random.rand(0, PERCENT_ROLL) > HELPLESS_ROLL_ABOVE
     case PITCHER_SKILL.끈기: {
       // 0xad4ac: 0xb6415(기록, 3, 1) > 599 (체력 실효) 이고 통산 +8(투구 수) ≥ 6000
       return equippedPitcherAbilityOf(career).stamina > 599 && toInt16(career.careerStats.pitches) >= 6000

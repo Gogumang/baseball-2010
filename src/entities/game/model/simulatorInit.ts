@@ -25,5 +25,5 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  *   (`장면+0x1784` 리터럴 8곳은 시뮬이 아니라 장면 자신의 바이트 칸이다 — 0x21 진입 0x3abf0 이 1 을 쓴다.)
  */
 export function rollSimulatorInit(random: RandomPort): void {
-  random.nextInRange(0, 2)
+  random.rand(0, 2)
 }

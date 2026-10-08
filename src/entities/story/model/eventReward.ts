@@ -129,7 +129,7 @@ function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPo
         // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
         illnessName: reward.value > 0
           ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
-          : random === undefined ? ILLNESS_NAMES[0] : random.pick(ILLNESS_NAMES),
+          : random === undefined ? ILLNESS_NAMES[0] : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
       }
     default:
       return career
