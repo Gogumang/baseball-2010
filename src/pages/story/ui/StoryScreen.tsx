@@ -11,6 +11,9 @@ import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
 import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
+import { RewardSkillWindow } from '@/pages/story/ui/RewardSkillWindow'
+import { rewardNoticeOf } from '@/entities/story/model/rewardNotice'
+import type { RewardNoticeContext } from '@/entities/story/model/rewardNotice'
 import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
@@ -90,12 +93,19 @@ interface StoryScreenProps {
    * 안 넘기면 거짓.
    */
   readonly isOverOutingMap?: boolean
+  /**
+   * 보상 명령 7 의 알림 맥락(모드 · 선수 · 난수 — `rewardNoticeContextOf`). 주면 보상마다 원본 알림 창(0x8beb8 글 → 0x74ef4
+   * 종류 1, 첫 종류 4 면 스킬 창 0x741a0)을 띄우고 확인까지 기다린다(0x8daa0). 종류 11 은 그 자리에서 굴린다.
+   * 안 주면 예전처럼 보상은 창 없이 지나간다.
+   */
+  readonly rewardNoticeContext?: () => RewardNoticeContext
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
   systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
+  rewardNoticeContext,
 }: StoryScreenProps) {
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
@@ -104,8 +114,9 @@ export function StoryScreen({
       command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
   /** 막는 효과(id 4~7)를 다 기다린 걸음 — 그 걸음의 멈출 명령이 돈다 (0x8b564) */
   const [releasedKey, setReleasedKey] = useState<string | null>(null)
-  const { step, isReleased, portraits, next, skip, jump: jumpToEvent, clearPortraits } = useEventPlayback(
+  const { step, isReleased, rewardNotice, portraits, next, skip, jump: jumpToEvent, clearPortraits } = useEventPlayback(
     events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
+    rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
   )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
   const [backdrop, setBackdrop] = useState<EventBackdropState>(INITIAL_EVENT_BACKDROP)
@@ -241,6 +252,18 @@ export function StoryScreen({
         // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
         <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
           text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={next} />
+      )}
+
+      {command?.op === 'reward' && rewardNotice?.kind === '알림' && (
+        // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)이면 다음 명령
+        <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+          text={rewardNotice.text} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={next} />
+      )}
+
+      {command?.op === 'reward' && rewardNotice?.kind === '스킬' && (
+        // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054)
+        <RewardSkillWindow key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+          text={rewardNotice.text} gained={rewardNotice.gained} onClose={next} />
       )}
 
       {command?.op === 'yesno' && (

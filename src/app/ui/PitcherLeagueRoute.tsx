@@ -17,6 +17,8 @@ import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
+import { PITCHER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
 import { pitcherYearGoalWindowValuesOf } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
@@ -219,6 +221,8 @@ export function PitcherLeagueRoute({
             }
             // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
             yearGoalWindowOf={() => pitcherYearGoalWindowValuesOf(career)}
+            // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 3 투수편)
+            rewardNoticeContext={() => rewardNoticeContextOf(career, PITCHER_LEAGUE_MODE, random)}
           />
           </ScreenOverlay>
         </>

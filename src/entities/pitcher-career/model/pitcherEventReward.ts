@@ -87,7 +87,10 @@ function applyReward(career: PitcherCareer, reward: EventReward, random: RandomP
         illnessCooldown: ILLNESS_COOLDOWN,
         isSick: true,
         illnessRemaining: ILLNESS_DURATION,
-        illnessName: random === undefined ? ILLNESS_NAMES[0] : random.pick(ILLNESS_NAMES),
+        // 값 > 0 은 알림 글 0x8beb8 이 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 다시 안 굴린다
+        illnessName: reward.value > 0
+          ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
+          : random === undefined ? ILLNESS_NAMES[0] : random.pick(ILLNESS_NAMES),
       }
     case EVENT_REWARD_KIND.모든능력치:
       return PITCHER_ABILITY_ORDER.reduce((current, key) => raisePitcherAbility(current, key, reward.value), career)

@@ -125,7 +125,11 @@ function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPo
         isSick: true,
         // 질병 남은 기간 — 표 0xd4d98 = 0,3,3,3,3 (누락 탐색 7차)
         illnessRemaining: ILLNESS_DURATION,
-        illnessName: random === undefined ? ILLNESS_NAMES[0] : random.pick(ILLNESS_NAMES),
+        // 값 > 0 은 알림 글 0x8beb8 이 이미 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 0x8c718 은 그 번호를 건다.
+        // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
+        illnessName: reward.value > 0
+          ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
+          : random === undefined ? ILLNESS_NAMES[0] : random.pick(ILLNESS_NAMES),
       }
     default:
       return career

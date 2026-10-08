@@ -14,6 +14,8 @@ import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
+import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { RecordScreen } from '@/pages/record/ui/RecordScreen'
 import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
@@ -244,6 +246,8 @@ export function CareerRoutes({
             }
             // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
             yearGoalWindowOf={() => yearGoalWindowValuesOf(career)}
+            // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 4 타자편)
+            rewardNoticeContext={() => rewardNoticeContextOf(career, BATTER_LEAGUE_MODE, random)}
           />
           </ScreenOverlay>
         </>

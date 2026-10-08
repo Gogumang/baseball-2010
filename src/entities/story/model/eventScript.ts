@@ -13,7 +13,13 @@ export interface EventCursor {
   readonly commandIndex: number
 }
 
-export type StoppingCommand = Extract<EventCommand, { op: 'say' | 'choice' | 'yesno' | 'match' }> | Extract<EventCommand, { op: 'system' }>
+/**
+ * 멈추는 명령. 보상(reward)은 `stepFrom` 이 멈추지 않고 지나가지만, 재생기가 알림 창을 띄울 때(0x8d4c4 → 기다림 0x8daa0)
+ * 그 자리에서 끊어 멈춘 명령으로 둔다(`pages/story/model/useEventPlayback`).
+ */
+export type StoppingCommand =
+  | Extract<EventCommand, { op: 'say' | 'choice' | 'yesno' | 'match' | 'reward' }>
+  | Extract<EventCommand, { op: 'system' }>
 
 export interface EventStep {
   readonly cursor: EventCursor

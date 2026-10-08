@@ -720,3 +720,49 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
     expect(onComplete).toHaveBeenCalledWith([], [1])
   })
 })
+
+describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', () => {
+  const 맥락 = () => ({ mode: 4 as const, years: 0, illness: 0, salaryBase: 10, random: { next: () => 0, nextInRange: () => 0, pick: <T,>(items: readonly T[]) => items[0] } })
+  const 보상이벤트 = {
+    ...이벤트,
+    commands: [
+      { op: 'reward', items: [{ kind: 0, value: 5 }, { kind: 2, value: -3 }] },
+      { op: 'reward', items: [{ kind: 4, value: 7 }] },
+      { op: 'say', text: '끝 대사', speaker: 0, format: 0, portraits: [] },
+    ],
+  } as unknown as OriginalEvent
+
+  it('보통 보상은 공용 알림(OK)을 띄우고 확인까지 기다린다 — 첫 종류 4 는 스킬 창', () => {
+    const onComplete = vi.fn()
+    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={onComplete} onMatch={() => {}} rewardNoticeContext={맥락} />)
+    const 알림 = screen.getByRole('dialog', { name: '알림' })
+    expect(알림.textContent).toContain('인기도 + 5')
+    expect(알림.textContent).toContain('사기 -3')
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    fireEvent.click(within(알림).getByRole('button', { name: 'OK' }))
+    const 스킬창 = screen.getByTestId('스킬-보상-창')
+    expect(스킬창.querySelector('img')?.getAttribute('data-frame')).toBe('370')
+    expect(스킬창.textContent).toContain('"행운"')
+    expect(스킬창.textContent).toContain('스킬을 획득하였습니다.')
+    // 열림(6 → … → 100) 뒤 OK 로 닫는다 — 닫힘(240 → 120 → 60) 이 끝나야 다음 명령
+    틀(6)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByTestId('스킬-보상-창')).toBeTruthy()
+    틀(2)
+    expect(screen.queryByTestId('스킬-보상-창')).toBeNull()
+    대사넘기기()
+    틀(1)
+    expect(onComplete).toHaveBeenCalledWith(
+      [{ kind: 0, value: 5 }, { kind: 2, value: -3 }, { kind: 4, value: 7 }], [1],
+    )
+  })
+
+  it('맥락을 안 주면 예전처럼 창 없이 지나간다', () => {
+    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={() => {}} onMatch={() => {}} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    틀(2)
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
+  })
+})
