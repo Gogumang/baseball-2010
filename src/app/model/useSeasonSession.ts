@@ -103,10 +103,10 @@ import {
   applySeasonTraining, rollSeasonTraining, seasonTrainingResultOf,
 } from '@/widgets/season/lib/seasonTrainingResult'
 import type { SeasonTrainingResult } from '@/widgets/season/lib/seasonTrainingResult'
-import { SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES } from '@/widgets/season/lib/seasonOuting'
+import { rollSeasonOuting } from '@/widgets/season/lib/seasonOuting'
 import {
   NATIONAL_CUP_INTRO_EVENT_ID, OPENING_EVENT_ID, SEASON_FINAL_EVENT_ID, SEASON_GOAL_INTRO_EVENT_ID, START_SEASON_EVENT_CURSOR,
-  YEAR_GOAL_EVENT_ID, applySeasonEventRewards, clearRepeatableSeen, cureIllnessAtHospital, cursorAfterCalling,
+  YEAR_GOAL_EVENT_ID, applySeasonEventRewards, clearRepeatableSeen, cursorAfterCalling,
   illnessPenaltyFieldOf, markEventSeen, opensSeasonGoalWindow, pollSeasonEvents, seasonEventFollowUpOf,
   tickAfterAnyGame,
 } from '@/entities/season-mode/model/seasonEventFlow'
@@ -134,7 +134,6 @@ import {
   FULL_PITCHER_STAMINA, SEASON_SHOP_TEXT, SEASON_STAMINA_ITEM, applySeasonGpItem, applySeasonSubItem, seasonGpItemPriceOf,
   seasonShopTextOf,
 } from '@/entities/season-mode/model/seasonItemShop'
-import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -953,9 +952,6 @@ function normalizeGameSave(raw: unknown): SeasonGameSaveBlock | null {
     : 0
   return { progress: value.progress, kind, ownRotationShift: shift }
 }
-
-/** 시즌 외출 장소 표에서 **병원** 칸 (StrMODE[54+p] = 친선경기·회식·입원·야구교실·구단CF) */
-const HOSPITAL_PLACE = SEASON_OUTING_PLACES.indexOf('병원')
 
 /**
  * 저장에서 읽은 것을 쓸 수 있는 모양으로 만든다.
@@ -2399,46 +2395,19 @@ export function useSeasonSession(
   }, [])
 
   /**
-   * 시즌 외출 (결과 `0xc81c`, P4 3절 표).
+   * 시즌 외출 (결과 `0xc81c` — `rollSeasonOuting`).
    * 사기 난수는 [a, b) 이고 **친선경기(0)·야구교실(3)은 부호를 뒤집는다**(0xc8b0).
-   * 소지금은 정액이지만 친선경기만 `rand(8,11)` 을 굴린다.
+   * 서브 아이템(SR+0x5d+p)이 있으면 점프표 0xcbe6c 의 보정을 부호 뒤집기 뒤에 더한다.
    */
   const runOuting = useCallback(
     (place: number) => {
       if (save === null) return
-      const effect = SEASON_OUTING_EFFECTS[place]
-      if (effect === undefined) return
       const { record, teamMorale } = save.state
-
-      const rolled = random.rand(effect.moraleRange[0], effect.moraleRange[1])
-      const moraleChange = effect.negatesMorale ? -rolled : rolled
-      const money = effect.moneyRange === undefined
-        ? effect.money
-        : random.rand(effect.moneyRange[0], effect.moneyRange[1])
-      const popularity = effect.popularityRange === undefined
-        ? 0
-        : random.rand(effect.popularityRange[0], effect.popularityRange[1])
-      const reputation = effect.reputationRange === undefined
-        ? 0
-        : random.rand(effect.reputationRange[0], effect.reputationRange[1])
-
-      // 입원(장소 2)이면 치료를 굴린다 — `rand(0,101) ≤ 89` 이거나 여유 칸이 0 이면 낫는다 (0xcc6a)
-      const cured = place === HOSPITAL_PLACE ? cureIllnessAtHospital(record, random).record : record
-
+      const outcome = rollSeasonOuting(record, teamMorale, place, random)
+      if (outcome === null) return
       commit({
         ...save,
-        state: {
-          ...save.state,
-          teamMorale: clampTo(teamMorale + moraleChange, MORALE_LIMIT),
-          record: {
-            ...cured,
-            // 비용은 가드가 본 것과 같은 표를 쓴다 — 효과의 money 가 이미 음수라 따로 빼지 않는다
-            money: clampTo(record.money + money, MONEY_LIMIT),
-            popularity: clampTo(record.popularity + popularity, POPULARITY_LIMIT),
-            reputation: clampTo(record.reputation + reputation, REPUTATION_LIMIT),
-            acted: true,
-          },
-        },
+        state: { ...save.state, teamMorale: outcome.teamMorale, record: { ...outcome.record, acted: true } },
       })
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },

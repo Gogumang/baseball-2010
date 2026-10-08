@@ -3,8 +3,9 @@ import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_OUTING_ACTIVITIES, SEASON_OUTING_COSTS, SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES,
-  SEASON_OUTING_REQUIRED_POPULARITY, checkSeasonOuting,
+  SEASON_OUTING_REQUIRED_POPULARITY, checkSeasonOuting, rollSeasonOuting,
 } from '@/widgets/season/lib/seasonOuting'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 시즌 외출 5종 — P4 3절(가드 0xbd38 · 효과 0xc81c) 확정값을 못박는다.
@@ -95,5 +96,69 @@ describe('시즌 외출 가드 0xbd38', () => {
     // 나리 외출에는 부상 가드가 있지만 시즌 가드 0xbd38 에는 없다 — 네 가지뿐이다.
     const 통과 = checkSeasonOuting(레코드({ illness: 3, money: 50, popularity: 999 }), 50, 3)
     expect(통과).toEqual({ ok: true, cost: 0 })
+  })
+})
+
+/** 굴림을 차례로 돌려주고 받은 구간을 적어 두는 난수 */
+const 차례난수 = (값들: readonly number[]) => {
+  const 굴림: [number, number][] = []
+  let i = 0
+  const random: RandomPort = {
+    rand: (lo, hi) => {
+      굴림.push([lo, hi])
+      return 값들[i++] ?? lo
+    },
+    rand9d: () => 0,
+  }
+  return { random, 굴림 }
+}
+
+const 서브아이템 = (place: number) => [0, 1, 2, 3, 4].map((p) => p === place)
+
+describe('외출 결과 0xc81c — 서브 아이템 보정 (점프표 0xcbe6c)', () => {
+  it('친선경기: 사기 굴림 → 소지금 굴림, 서브 아이템이면 소지금 +5 (사기 −m 은 그대로)', () => {
+    const { random, 굴림 } = 차례난수([15, 9])
+    const 결과 = rollSeasonOuting(레코드({ money: 10, outingSubItems: 서브아이템(0) }), 50, 0, random)!
+    expect(굴림).toEqual([[14, 19], [8, 11]])
+    expect(결과.record.money).toBe(10 + 9 + 5)
+    expect(결과.teamMorale).toBe(50 - 15)
+  })
+
+  it('회식: 서브 아이템이면 사기 +4 를 더한다', () => {
+    const { random } = 차례난수([27])
+    const 결과 = rollSeasonOuting(레코드({ money: 10, outingSubItems: 서브아이템(1) }), 50, 1, random)!
+    expect(결과.teamMorale).toBe(50 + 27 + 4)
+    expect(결과.record.money).toBe(10 - 4)
+  })
+
+  it('입원: 서브 아이템이면 소지금 +5(비용 상쇄) · 사기 +1, 그 뒤 치료를 굴린다', () => {
+    const { random, 굴림 } = 차례난수([4, 0])
+    const 결과 = rollSeasonOuting(레코드({ money: 10, illness: 2, illnessSlack: 3, outingSubItems: 서브아이템(2) }), 50, 2, random)!
+    expect(굴림).toEqual([[3, 6], [0, 101]])
+    expect(결과.record.money).toBe(10)
+    expect(결과.teamMorale).toBe(50 + 4 + 1)
+    expect(결과.record.illness).toBe(0)
+  })
+
+  it('야구교실: 보정 인기도 +1 · 평판 +1 은 뒤집지 않고, 사기는 −m', () => {
+    const { random, 굴림 } = 차례난수([9, 2, 4])
+    const 결과 = rollSeasonOuting(레코드({ popularity: 100, reputation: 100, outingSubItems: 서브아이템(3) }), 50, 3, random)!
+    expect(굴림).toEqual([[8, 11], [1, 4], [3, 6]])
+    expect(결과.record.popularity).toBe(100 + 2 + 1)
+    expect(결과.record.reputation).toBe(100 + 4 + 1)
+    expect(결과.teamMorale).toBe(50 - 9)
+  })
+
+  it('구단CF: 서브 아이템이면 인기도 +2', () => {
+    const { random } = 차례난수([2, 5])
+    const 결과 = rollSeasonOuting(레코드({ popularity: 500, money: 20, outingSubItems: 서브아이템(4) }), 50, 4, random)!
+    expect(결과.record.popularity).toBe(500 + 5 + 2)
+    expect(결과.record.money).toBe(20 - 10)
+  })
+
+  it('다른 장소의 서브 아이템은 보지 않는다 (SR+0x5d+p 한 칸만)', () => {
+    const { random } = 차례난수([27])
+    const 결과 = rollSeasonOuting(레코드({ money: 10, outingSubItems: 서브아이템(0) }), 50, 1, random)!
+    expect(결과.teamMorale).toBe(50 + 27)
   })
 })

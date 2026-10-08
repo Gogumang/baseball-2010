@@ -1,5 +1,10 @@
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import { SCHEDULE_ACTIVITIES } from '@/shared/config/original/modeMenus'
+import {
+  MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, clampTo,
+} from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
+import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventFlow'
 
 /**
  * 시즌 외출 5종 (장면 0x105 상태 **0xd1** 지도 → 가드 0xbd38 → 결과 0xc81c) 의 표.
@@ -12,7 +17,7 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
  * 부상 개념이 없어 부상 검사가 없다.
  *
  * ⚠️ **본래 자리는 `entities/season-mode/model` 이다** — 이번 작업의 담당 폴더가 아니라
- * 여기 두었다. 굴림·적용은 난수가 필요해 여기서 하지 않는다(표와 가드만).
+ * 여기 두었다. 굴림·적용(`rollSeasonOuting`)은 난수를 받아서 한다.
  */
 
 /** `rand(a, b)` = **[a, b)**. 문서의 "14~18" 은 `[14, 19)` 다 */
@@ -159,3 +164,59 @@ export function checkSeasonOuting(
 
   return { ok: true, cost }
 }
+
+/** 외출 한 번을 굴리고 적용한 결과 (`0xc81c`) */
+export interface SeasonOutingOutcome {
+  readonly record: SeasonRecord
+  readonly teamMorale: number
+}
+
+/**
+ * **외출 결과 `0xc81c`** — 굴림 · 서브 아이템 보정 · 적용 · 입원 치료 (직접 떴다).
+ *
+ * ```
+ * c84e  m = rand(0xcbbf6[2p], 0xcbbf6[2p+1])           ; 사기 굴림 — 늘 먼저
+ * c86a  SR+0x5d+p ≠ 0 이면 점프표 0xcbe6c[p]:            ; 서브 아이템 보정 (모두 0 으로 시작)
+ *         p0 소지금 +5 · p1 사기 +4 · p2 소지금 +5 · 사기 +1 · p3 인기도 +1 · 평판 +1 · p4 인기도 +2
+ * c8b0  p == 0 · 3 이면 m = −m                          ; 보정은 뒤집지 않는다
+ * c8c8  p0 소지금 = rand(8, 11) · p3 인기도 = rand(1, 4) → 평판 = rand(3, 6) · p4 인기도 = rand(4, 7)
+ * c902  인기도 SR+0x48 = clamp(인기도 + 굴림 + 보정, 0, 9999)
+ * c92c  평판 SR+0x62   = clamp(평판 + 굴림 + 보정, 0, 999)
+ * c952  소지금 SR+2    = clamp(소지금 + 기본(0xcbc00[p] · p0 은 굴림) + 보정, 0, 9999)
+ * c96a  팀 사기 +2     = clamp(사기 + m + 보정, 0, 100)
+ * cc6a  p == 2 이면 치료 굴림 (`cureIllnessAtHospital`)
+ * ```
+ * 보유 플래그는 `SeasonRecord.outingSubItems[p]` (SR+0x5d+p).
+ */
+export function rollSeasonOuting(
+  record: SeasonRecord,
+  teamMorale: number,
+  place: number,
+  random: RandomPort,
+): SeasonOutingOutcome | null {
+  const effect = SEASON_OUTING_EFFECTS[place]
+  if (effect === undefined) return null
+  const bonus = record.outingSubItems[place] === true ? SEASON_OUTING_SUB_ITEMS[place] : undefined
+
+  const rolled = random.rand(effect.moraleRange[0], effect.moraleRange[1])
+  const morale = effect.negatesMorale ? -rolled : rolled
+  const money = effect.moneyRange === undefined ? effect.money : random.rand(effect.moneyRange[0], effect.moneyRange[1])
+  const popularity = effect.popularityRange === undefined ? 0 : random.rand(effect.popularityRange[0], effect.popularityRange[1])
+  const reputation = effect.reputationRange === undefined ? 0 : random.rand(effect.reputationRange[0], effect.reputationRange[1])
+
+  const applied: SeasonRecord = {
+    ...record,
+    popularity: clampTo(record.popularity + popularity + (bonus?.popularity ?? 0), POPULARITY_LIMIT),
+    reputation: clampTo(record.reputation + reputation + (bonus?.reputation ?? 0), REPUTATION_LIMIT),
+    money: clampTo(record.money + money + (bonus?.money ?? 0), MONEY_LIMIT),
+  }
+  // 입원(장소 2)이면 치료를 굴린다 — `rand(0,101) ≤ 89` 이거나 여유 칸이 0 이면 낫는다 (0xcc6a)
+  const cured = place === HOSPITAL_PLACE ? cureIllnessAtHospital(applied, random).record : applied
+  return {
+    record: cured,
+    teamMorale: clampTo(teamMorale + morale + (bonus?.morale ?? 0), MORALE_LIMIT),
+  }
+}
+
+/** 장소 2 = 병원 [입원] */
+const HOSPITAL_PLACE = 2
