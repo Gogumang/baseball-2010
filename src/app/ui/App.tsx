@@ -132,7 +132,7 @@ export function App() {
     [saveGame],
   )
   const modeSave = useModeSave(modeSaveStore, legacyLastPlayedMode)
-  const { setLastPlayedMode, startNariGame, clearNariGame, aceMatchPendingPorts } = modeSave
+  const { setLastPlayedMode, startNariGame, clearNariGame, aceMatchPendingPorts, aceMatchHoldPort } = modeSave
   // 전역기록 +0x4f · +0x50 손잡이 — 나리 두 편 세션이 142 확인·등록·정산·지우기에서 쓴다
   const pitcherNariGameSave = useMemo<NariGameSavePort>(() => ({
     start: (match) => startNariGame(NARI_PITCHER_MODE, match),
@@ -260,6 +260,14 @@ export function App() {
     },
     // 타자 미션 0xb53f0 의 k = 나리 타자편 저장 선수 +0xa & 0x1f — 자기 나리 팀 레코드의 내 줄 첨자 (홈런더비 타순과 같은 칸)
     ...(missionBatterRecordSlot < 0 ? {} : { nariBatterRecordSlot: missionBatterRecordSlot }),
+    // 나간 마선수 대결 대기(g[0x11f] · g[0x176] · g[0xf6]) — 서 있으면 보통 미션도 대결 꼴이다
+    aceMatchHold: aceMatchHoldPort,
+    // 대기 중 미션 결과 판을 닫으면 g[0xf6] 편의 장면 0x106 으로(0x4b100 4b344~4b376) — 100 → 0x1c154 이어하기 → 105 진입이 140 을 띄운다
+    onReturnToNari: (mode) => {
+      if (mode === NARI_PITCHER_MODE) return setScreen({ kind: '투수편' })
+      if (careerSession.savedCareer !== null) return careerSession.actions.continueSaved()
+      setScreen({ kind: '팀선택' })
+    },
   })
   // 투수편이 연 히든(장비 컬렉터 20·24·28·32)도 같은 전역 표 `app+0xc0` 에 모은다 (0x62368)
   // 시즌 결산이 연 전역 해금(0x29)도 같은 전역 표에 모은다

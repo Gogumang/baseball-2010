@@ -269,9 +269,11 @@ function withRewardResumePatch(career: PlayerCareer, eventId: number, items: rea
  * 남았다 = 짐)로 resultEvents[1] 을 0x8bdc9 로 튼다 · [다음 114, 뒤 105]. 대기가 없으면 null.
  * 대기는 전역기록이라 그 대결을 연 선수가 아니어도(지우고 새로 만든 선수) 그 편 105 에 들어오면 뜬다 — 원본 그대로다.
  */
-function pendingAceMatchScreenOf(resultEvents: readonly number[] | null): Screen | null {
+function pendingAceMatchScreenOf(port: AceMatchPendingPort): Screen | null {
+  const resultEvents = port.read()
   if (resultEvents === null) return null
-  return { kind: '이벤트', eventId: matchResultEventOf(resultEvents, false), context: '대결결과', carried: EMPTY_STORY_CARRY }
+  // 140 진입 0x10e40 — 결과 바이트 g[0x144](SYS 8 이 0, 대기 중 미션 정산 0x4ea0c 가 덮어쓴다)로 resultEvents[이김 ? 0 : 1]
+  return { kind: '이벤트', eventId: matchResultEventOf(resultEvents, port.isWon()), context: '대결결과', carried: EMPTY_STORY_CARRY }
 }
 
 /** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
@@ -1055,7 +1057,7 @@ export function useCareerSession({
      */
     if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
     // 나간 마선수 대결 — 곁가지 0x11b46~0x11bbe 가 112 → 140 (`pendingAceMatchScreenOf`)
-    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current.read())
+    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current)
     if (pendingAceMatch !== null) return setScreen(pendingAceMatch)
     /*
      * 105 진입 0x11910 곁가지(0x11b24~): S+0x1b7 == 0(올해 목표 창 아직 안 봄) → **115 연초** 가 138 보다 먼저다.
@@ -1095,7 +1097,7 @@ export function useCareerSession({
     if (managementCheck !== null || !career.seenEventIds.includes(String(OPENING_EVENT_ID))) return
     if (judgeEnding(career) === 0) return setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
     // 같은 곧은 길의 다음 줄 0x11b46~0x11bbe — 나간 마선수 대결의 결과 이벤트
-    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current.read())
+    const pendingAceMatch = pendingAceMatchScreenOf(aceMatchPendingRef.current)
     if (pendingAceMatch !== null) setScreen(pendingAceMatch)
   }, [isAtManagement, managementCheck, career, story.events, setScreen])
 

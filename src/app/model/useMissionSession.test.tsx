@@ -13,7 +13,7 @@ import {
 } from '@/app/model/useMissionSession'
 import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import { applyOutcome, isMissionBatterUp, startMission } from '@/entities/mission/model/missionRun'
-import { battingRecordAt } from '@/entities/mission/model/missionGame'
+import { battingRecordAt, missionHumanTeamIdOf } from '@/entities/mission/model/missionGame'
 import { masterBatterAbilityOf } from '@/entities/mission/model/missionCpuTeam'
 import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
@@ -1626,5 +1626,94 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     const { rendered } = sessionOf(1)
     act(() => rendered.result.current.actions.confirmHalfInningBoard())
     expect(rendered.result.current.sceneConfirm).toBeNull()
+  })
+})
+
+/* ── 나간 마선수 대결 대기가 서 있는 동안의 보통 미션 (g[0x11f] · g[0x176] · g[0xf6]) ─────────────────── */
+
+describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c aa6dc · 0x4ef3e · 0x4ea0c 4efc6 · 0x407f0 4090c)', () => {
+  function playHeldPitcherMission(seed: number, hold: { batter: boolean; pitcher: boolean; originalMode: number }) {
+    const save = vi.fn()
+    const missionRecord: MissionRecordPort = { load: () => ({}), save }
+    const onGamePointReward = vi.fn()
+    const onReturnToNari = vi.fn()
+    const writeResult = vi.fn()
+    const setScreen = vi.fn()
+    const random = createSeededRandom(seed)
+    const pitcher = modePitcherOf(createPitcherCareer('투수'))
+    const screen: Screen = { kind: '미션선택' }
+    const rendered = renderHook(() => {
+      const runner = useAtBatRunner()
+      return useMissionSession({
+        runner, random, missionRecord, screen, setScreen, onGamePointReward, pitcher,
+        nariTeamIds: { batter: 5, pitcher: 6 },
+        aceMatchHold: { read: () => hold, writeResult },
+        onReturnToNari,
+      })
+    })
+    const mission = MISSIONS.find((candidate) => candidate.side === '투수' && candidate.id === 1)
+    if (mission === undefined) throw new Error('투수 미션 1 이 없다')
+    act(() => rendered.result.current.actions.begin(mission))
+    const started = rendered.result.current.pitcherRun
+    act(() => rendered.result.current.actions.confirmHalfInningBoard())
+    for (let pitch = 0; pitch < 60 && rendered.result.current.pitcherRun?.status === '진행중'; pitch += 1) {
+      const session = rendered.result.current
+      if (session.pendingDefensePlay !== null) {
+        act(() => session.actions.finishDefensePlay())
+        continue
+      }
+      if (session.pendingBenchClearing !== null) {
+        act(() => session.actions.finishBenchClearing(false))
+        continue
+      }
+      act(() => session.handleThrow(PITCH_TYPES[0], 4, 9, true))
+    }
+    const status = rendered.result.current.pitcherRun?.status
+    setScreen.mockClear()
+    act(() => rendered.result.current.actions.finishPitcher())
+    const after = rendered.result.current
+    rendered.unmount()
+    return { mission, started, status, after, save, onGamePointReward, onReturnToNari, writeResult, setScreen }
+  }
+
+  it('사람 칸 = g[0xf6] 편 나리 저장의 팀 · 판을 닫으면 결과 바이트를 덮어쓰고 G 없이 그 편 장면으로', () => {
+    // 한가운데 직구로 깨는 첫 씨앗 — 장면 앞 굴림 차례가 바뀌어도 성공 판을 고른다(판정 자체는 이 시험의 몫이 아니다)
+    const played = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+      .map((seed) => playHeldPitcherMission(seed, { batter: true, pitcher: false, originalMode: 4 }))
+      .find((candidate) => candidate.status === '성공')
+    if (played === undefined) throw new Error('씨앗 1~12 에 성공 판이 없다')
+
+    // 0xaa57c aa6e0 — g[0x11f] 가 서 있어 m = g[0xf6] = 4 → 타자편 저장 팀
+    expect(played.started?.game.humanBatting.teamId).toBe(5)
+    expect(played.status).toBe('성공')
+    // 4efc6~4f018 — 서 있는 대기의 결과 바이트 = 이 판 성공
+    expect(played.writeResult).toHaveBeenCalledWith(true)
+    // 0xa5368 은 플래그를 안 보고 클리어 횟수를 올린다
+    expect(played.save).toHaveBeenCalledWith({ [`투수:${played.mission.id}`]: 1 })
+    expect(played.onReturnToNari).toHaveBeenCalledWith(4)
+    expect(played.setScreen).not.toHaveBeenCalledWith({ kind: '미션선택' })
+    // 0x4ef3e — 대기 중엔 G 를 건너뛴다
+    expect(played.onGamePointReward).not.toHaveBeenCalled()
+    expect(played.after.pitcherRun).toBeNull()
+  })
+
+  it('g[0xf6] 이 3 · 4 가 아니면(140 이 다른 편 대기를 남긴 채 0 으로 지움) 판을 닫는 키가 아무 일도 안 한다 — 원본 그대로', () => {
+    const played = playHeldPitcherMission(1, { batter: false, pitcher: true, originalMode: 0 })
+
+    // 사람 칸 팀도 레코드 그대로(aa704 m = 0)
+    expect(played.started?.game.humanBatting.teamId).toBe(missionHumanTeamIdOf(played.mission))
+    expect(played.onReturnToNari).not.toHaveBeenCalled()
+    expect(played.writeResult).not.toHaveBeenCalled()
+    expect(played.setScreen).not.toHaveBeenCalled()
+    expect(played.after.pitcherRun).not.toBeNull()
+  })
+
+  it('대기가 없으면 예전처럼 목록으로 — 결과 바이트는 안 쓴다', () => {
+    const played = playHeldPitcherMission(1, { batter: false, pitcher: false, originalMode: 0 })
+
+    expect(played.started?.game.humanBatting.teamId).toBe(missionHumanTeamIdOf(played.mission))
+    expect(played.writeResult).not.toHaveBeenCalled()
+    expect(played.onReturnToNari).not.toHaveBeenCalled()
+    expect(played.setScreen).toHaveBeenCalledWith({ kind: '미션선택' })
   })
 })

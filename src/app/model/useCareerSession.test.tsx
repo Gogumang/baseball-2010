@@ -1004,6 +1004,13 @@ describe('나간 마선수 대결 (SYS 8 0x8d782~ · 0x40140 · 105 진입 0x11b
     expect(port.read()).toBeNull()
   })
 
+  it('대기 중 미션 정산(0x4ea0c 4efc6)이 결과 바이트를 이김으로 덮었으면 140 은 resultEvents[0] 을 띄운다 (0x10e40)', async () => {
+    const port = { ...대기칸([114, 115]), isWon: () => true }
+    const rendered = 대기띄우기({ ...createCareer('대결'), seenEventIds: [String(451)], hasSeenYearGoalWindow: false }, port)
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen).toMatchObject({ kind: '이벤트', eventId: 114, context: '대결결과' }))
+  })
+
   it('대기는 전역기록이라 대결을 연 선수가 아닌 새 선수의 105 에서도 뜬다 (원본 그대로)', async () => {
     const port = 대기칸([114, 115])
     const rendered = 대기띄우기({ ...createCareer('새선수'), seenEventIds: [String(451)], hasSeenYearGoalWindow: false }, port)

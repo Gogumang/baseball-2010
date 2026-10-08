@@ -106,6 +106,8 @@ import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/mi
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { missionResultEarnedOf } from '@/pages/mission-play/lib/missionResultBoard'
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
+import { NO_ACE_MATCH_HOLD, isAceMatchHeld } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
@@ -192,6 +194,19 @@ interface MissionSessionInput {
    * `[저장+0x38]` 에 옛 칸 주소가 남는다 — 그 칸 선수를 0xb53f0 이 어느 갈래로 다루는지는 안 읽어 웹은 12 로 둔다.
    */
   readonly nariBatterRecordSlot?: number
+  /**
+   * **나간 마선수 대결 대기 칸** (전역기록 g[0x11f] 타자편 · g[0x176] 투수편 · g[0xf6] 그때 모드 — `entities/mode-save`). 대기가 서
+   * 있는 동안은 **보통 미션도 대결 꼴**로 돈다(직접 떴다): 사람 칸 팀 0xaa57c aa6dc~aa728 · 선수 게터 0x1fc20(+0x11f) · 0x1fbd0(+0x176)
+   * 가 명예 선수 대신 나리 선수 · 정산 0x4ea0c 의 G 건너뜀 4ef3e · 결과 바이트 덮어쓰기 4efc6~4f018 · 결과 판 0x4a384 대결 꼴 ·
+   * 결과 판 키 0x407f0 4090c / 0x4b100 4b344 가 목록 대신 g[0xf6] 의 장면으로. 안 넘기면 대기가 없다.
+   */
+  readonly aceMatchHold?: AceMatchHoldPort
+  /**
+   * 대기 중 보통 미션의 결과 판을 닫았다 — 0x407f0 4090c: g[0xf6] ∈ {3, 4} 면 0x140006c = 0x69 · 전환 → 0x4b100 4b344~4b376 이
+   * 전역 모드 = g[0xf6] · 장면 0x106(나리, 0x140006c 는 안 읽고 100 → 0x1c154 이어하기) — 그 편 105 진입이 140 결과 이벤트를 띄운다.
+   * 부르는 쪽이 그 편으로 들어간다
+   */
+  readonly onReturnToNari?: (mode: 3 | 4) => void
 }
 
 /**
@@ -210,6 +225,18 @@ const BATTER_EDITION_MODE = 4
 /** 마선수 대결의 경기 세우기 재료 — 그 편 저장 팀을 모르면(저장 없음) 레코드 팀 그대로 둔다 */
 function aceMatchSetupOf(originalMode: number, savedTeamId: number | undefined): MissionGameSetup {
   return savedTeamId === undefined ? {} : { aceMatch: { originalMode, savedTeamId } }
+}
+
+/**
+ * **대기 중 보통 미션의 사람 칸 팀** — 0xaa57c aa6dc~aa728(직접 떴다): g[0x11f] || g[0x176] 이면 m = (s8) g[0xf6] — 2 면 시즌 SR 팀,
+ * 3 · 4 면 0x1f8d5(저장, m) 나리 레코드 팀, 그 밖(140 이 지운 0)은 레코드 팀 그대로. 웹은 그 편 나리 커리어의 팀이다.
+ * (g[0xf6] = 2 는 SYS 8 이 시즌에서 대기를 안 세워 대기와 함께 설 수 없다.)
+ */
+function heldAceMatchSetupOf(hold: AceMatchHold, nariTeamIds: MissionSessionInput['nariTeamIds']): MissionGameSetup {
+  if (!isAceMatchHeld(hold)) return {}
+  if (hold.originalMode === BATTER_EDITION_MODE) return aceMatchSetupOf(BATTER_EDITION_MODE, nariTeamIds?.batter)
+  if (hold.originalMode === PITCHER_EDITION_MODE) return aceMatchSetupOf(PITCHER_EDITION_MODE, nariTeamIds?.pitcher)
+  return {}
 }
 
 /**
@@ -423,7 +450,11 @@ export function useMissionSession({
   isVibrationOn,
   nariTeamIds,
   nariBatterRecordSlot,
+  aceMatchHold,
+  onReturnToNari,
 }: MissionSessionInput) {
+  /** 지금 대기 칸 — 전역기록이라 렌더마다 읽는다 */
+  const hold = aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD
   const nariPitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
   /**
    * **미션 선수 고르기 결과** (하위 17 0x29a54 · 칸 코드 0x5eae0) — 편과 명전 번호(+0xa5 투수 · +0xa6 타자, 나리면 null).
@@ -579,21 +610,25 @@ export function useMissionSession({
    * 던지는 투수 = 선수 게터 0x1fbd0: 모드 5 · 전역기록 +0x176 == 0(투수편 마선수 대결이 아님) · +0xa5 ≥ 0 이면
    * 명예 투수(0x1f62c), 그 밖은 나리 투수(`pitcher` 입력).
    */
+  const isPitcherHeld = hold.pitcher
   const hallOfFamePitcher = useMemo(() => {
-    if (pitcherAceMatchMission !== null || hallOfFame === undefined) return null
+    // 0x1fbd0 — g[0x176](투수편 대기)이 서 있으면 보통 미션도 명예 투수 갈래를 안 탄다
+    if (pitcherAceMatchMission !== null || isPitcherHeld || hallOfFame === undefined) return null
     if (player?.side !== '투수' || player.hallOfFameIndex === null) return null
     const famer = hallOfFamePitcherAt(hallOfFame, player.hallOfFameIndex)
     return famer === null ? null : modePitcherOfHallOfFame(famer)
-  }, [hallOfFame, pitcherAceMatchMission, player])
+  }, [hallOfFame, isPitcherHeld, pitcherAceMatchMission, player])
   const pitcher = hallOfFamePitcher ?? nariPitcher
   const pitcherMagicRemaining = modePitcherMagicRemainingOf(pitcherMagicStored, pitcher)
   /**
    * 치는 명예 타자 = 선수 게터 0x1fc20: 모드 6 · 전역기록 +0x11f == 0(마선수 대결이 아님) · +0xa6 ≥ 0 이면 0x1f640.
    * null 이면 나리 타자 — 화면은 앱이 넘긴 `modeBatterOf` 를 쓴다.
    */
+  const isBatterHeld = hold.batter
   const hallOfFameBatter = useMemo(
-    () => (screen.kind === '마선수대결' || hallOfFame === undefined ? null : hallOfFameModeBatterOf(player, hallOfFame)),
-    [hallOfFame, player, screen.kind],
+    // 0x1fc20 — g[0x11f](타자편 대기)이 서 있으면 보통 미션도 명예 타자 갈래를 안 탄다
+    () => (screen.kind === '마선수대결' || isBatterHeld || hallOfFame === undefined ? null : hallOfFameModeBatterOf(player, hallOfFame)),
+    [hallOfFame, isBatterHeld, player, screen.kind],
   )
   const batterSkillIds = hallOfFameBatter?.skillIds ?? nariBatterSkillIds
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
@@ -1310,7 +1345,8 @@ export function useMissionSession({
     const key = missionKeyOf(mission)
     const previous = clearCounts[key] ?? 0
     const reward = missionRewardOf(mission.stage, previous)
-    if (reward > 0) onGamePointReward?.(reward)
+    // 정산 0x4ea0c 4ef3e — g[0x11f] · g[0x176] 중 하나라도 서 있으면 G 를 건너뛴다(횟수는 0xa5368 이 플래그 없이 올린다)
+    if (reward > 0 && !isAceMatchHeld(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD)) onGamePointReward?.(reward)
     const next = { ...clearCounts, [key]: Math.min(MAXIMUM_CLEARS, previous + 1) }
     setClearCounts(next)
     missionRecord.save(next)
@@ -1320,6 +1356,27 @@ export function useMissionSession({
    * **마선수 대결을 이겼을 때** — 0xa5368(obj, 1) 이 g[0x11f]·g[0x176] 을 안 보고 `[obj+0xbd] = team − 1 ≤ 15` 면
    * 그 편의 클리어 칸을 올린다(−1 에서 시작, 99 상한). 보상 G 는 0x4ef3e 가 건너뛴다 (`entities/mission/model/aceMatchClear`).
    */
+  /**
+   * 보통 미션 결과 판을 떠난다 — 정산 0x4ea0c 의 몫(G · 횟수 `rememberCleared`, 결과 바이트 4efc6~4f018)을 하고 갈 곳을 고른다.
+   * 대기(g[0x11f] · g[0x176])가 없으면 미션 목록, 서 있으면 결과 판 키 0x407f0 4090c 대로 g[0xf6] ∈ {3, 4} 의 나리 장면
+   * (`onReturnToNari`). **g[0xf6] 이 3 · 4 가 아니면(한 편 140 이 다른 편 대기를 남긴 채 g[0xf6] 을 0 으로 지웠을 때) 그 키가 아무 일도
+   * 안 해 판에 갇힌다 — 원본 그대로** 판을 안 닫고 거짓을 돌려준다.
+   * ⚠️ 근사: 원본은 판이 서는 정산 진입에서 G · 결과 바이트를 적는다. 웹은 판을 떠날 때 적는다(보이는 값은 같다).
+   */
+  const leaveMissionResult = (mission: OriginalMission, status: string): boolean => {
+    const held = aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD
+    if (!isAceMatchHeld(held)) {
+      rememberCleared(mission, status)
+      setScreen({ kind: '미션선택' })
+      return true
+    }
+    if (held.originalMode !== PITCHER_EDITION_MODE && held.originalMode !== BATTER_EDITION_MODE) return false
+    rememberCleared(mission, status)
+    aceMatchHold?.writeResult(status === '성공')
+    onReturnToNari?.(held.originalMode)
+    return true
+  }
+
   const rememberAceMatchCleared = (mission: OriginalMission) => {
     const key = aceMatchClearKeyOf(mission)
     if (key === null) return
@@ -1487,8 +1544,10 @@ export function useMissionSession({
       // 목록에서 고른 보통 미션 — 투수편 대결 표시는 내린다
       setPitcherAceMatchMission(null)
 
+      // 0xaa57c aa6dc~aa728 — 대기(g[0x11f] · g[0x176])가 서 있으면 보통 미션도 사람 칸을 g[0xf6] 편 나리 저장의 팀으로
+      const heldSetup = heldAceMatchSetupOf(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD, nariTeamIds)
       if (mission.side === '투수') {
-        const started = startPitcherMission(mission)
+        const started = startPitcherMission(mission, heldSetup)
         setPitcherRun(started)
         openFirstHalfBoard(started)
         setScreen({ kind: '투수미션', mission })
@@ -1496,7 +1555,7 @@ export function useMissionSession({
       }
       // 0xaa57c aa7b0 — 미션 타자(0x1fc20: 명예 타자 또는 나리 타자편 저장 선수)가 드는 레코드 칸 k = +0xa & 0x1f
       const nariRecordSlot = hallOfFameBatter !== null ? HALL_OF_FAME_BATTER_RECORD_SLOT : nariBatterRecordSlot
-      const started = startMission(mission, nariRecordSlot === undefined ? {} : { nariRecordSlot })
+      const started = startMission(mission, { ...heldSetup, ...(nariRecordSlot === undefined ? {} : { nariRecordSlot }) })
       setMissionRun(started)
       openFirstHalfBoard(started)
       setScreen({ kind: '미션진행', mission })
@@ -1569,6 +1628,8 @@ export function useMissionSession({
     finishPitcherAceMatch: (): boolean | null => {
       if (pitcherRun === null || pitcherAceMatchMission === null) return null
       const isWin = pitcherRun.status === '성공'
+      // 정산 0x4ea0c 4efc6~4f018 — 서 있는 대기마다 결과 바이트를 이 판 결과로(다른 편 대기도)
+      aceMatchHold?.writeResult(isWin)
       if (isWin) rememberAceMatchCleared(pitcherAceMatchMission)
       setPitcherRun(null)
       setPitcherAceMatchMission(null)
@@ -1584,6 +1645,8 @@ export function useMissionSession({
      */
     finishAceMatch: () => {
       if (missionRun === null || screen.kind !== '마선수대결') return
+      // 정산 0x4ea0c 4efc6~4f018 — 서 있는 대기마다 결과 바이트를 이 판 결과로(다른 편 대기도)
+      aceMatchHold?.writeResult(missionRun.status === '성공')
       if (missionRun.status === '성공') rememberAceMatchCleared(screen.mission)
       const eventId = matchResultEventOf(screen.resultEvents, missionRun.status === '성공')
       setMissionRun(null)
@@ -1750,19 +1813,20 @@ export function useMissionSession({
       if (pitcherRun !== null) setPitcherRun({ ...pitcherRun, status: '실패' })
     },
 
-    /** 결과 판(0x19) "아니오"·CLR — 0x140006c = 1 → 장면 0x107 상태 1(미션 목록) */
+    /**
+     * 결과 판(0x19) "아니오"·CLR — 0x140006c = 1 → 장면 0x107 상태 1(미션 목록). 대기가 서 있으면 판이 대결 꼴이라 어느 키든
+     * g[0xf6] 의 나리 장면으로 간다(`leaveMissionResult`).
+     */
     finishBatter: () => {
       if (missionRun === null) return
-      rememberCleared(missionRun.mission, missionRun.status)
+      if (!leaveMissionResult(missionRun.mission, missionRun.status)) return
       setMissionRun(null)
-      setScreen({ kind: '미션선택' })
     },
 
     finishPitcher: () => {
       if (pitcherRun === null) return
-      rememberCleared(pitcherRun.mission, pitcherRun.status)
+      if (!leaveMissionResult(pitcherRun.mission, pitcherRun.status)) return
       setPitcherRun(null)
-      setScreen({ kind: '미션선택' })
     },
 
     /**
@@ -1805,6 +1869,8 @@ export function useMissionSession({
 
   return {
     missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
+    /** 지금 대기 칸 (g[0x11f] · g[0x176] · g[0xf6]) — 결과 판이 대결 꼴인지 본다 */
+    aceMatchHold: hold,
     player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,

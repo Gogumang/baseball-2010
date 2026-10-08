@@ -12,8 +12,10 @@ import {
   withNariGameStarted,
   withAceMatchCleared,
   withAceMatchHeld,
+  withAceMatchResultWritten,
+  aceMatchHoldOf,
 } from '@/entities/mode-save/model/modeSave'
-import type { AceMatchPendingPort, ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchHoldPort, AceMatchPendingPort, ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
 
 export interface ModeSaveSession {
   readonly save: ModeSave
@@ -33,6 +35,8 @@ export interface ModeSaveSession {
   readonly clearNariGame: (mode: NariLeagueMode) => void
   /** 나간 마선수 대결 대기 칸(전역기록 g[0x11f] · g[0x176] 묶음) 손잡이 — 편마다 (`withAceMatchHeld`) */
   readonly aceMatchPendingPorts: Readonly<Record<NariLeagueMode, AceMatchPendingPort>>
+  /** 미션 쪽 대기 칸 손잡이 — g[0x11f] · g[0x176] · g[0xf6] 읽기와 정산 0x4ea0c 의 결과 바이트 덮어쓰기 */
+  readonly aceMatchHoldPort: AceMatchHoldPort
 }
 
 /**
@@ -71,18 +75,23 @@ export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAV
       read: () => saveRef.current.aceMatchPending[mode],
       hold: (resultEvents) => update((current) => withAceMatchHeld(current, mode, resultEvents)),
       clear: () => update((current) => withAceMatchCleared(current, mode)),
+      isWon: () => saveRef.current.aceMatchWon[mode],
     })
     return { 3: portOf(3), 4: portOf(4) }
   }, [update])
+  const aceMatchHoldPort = useMemo<AceMatchHoldPort>(() => ({
+    read: () => aceMatchHoldOf(saveRef.current),
+    writeResult: (isWon) => update((current) => withAceMatchResultWritten(current, isWon)),
+  }), [update])
 
   return useMemo(
     () => ({
       save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
-      aceMatchPendingPorts,
+      aceMatchPendingPorts, aceMatchHoldPort,
     }),
     [
       save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
-      aceMatchPendingPorts,
+      aceMatchPendingPorts, aceMatchHoldPort,
     ],
   )
 }

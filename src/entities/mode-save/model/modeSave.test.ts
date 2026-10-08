@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aceMatchHoldOf,
   withAceMatchCleared,
   withAceMatchHeld,
+  withAceMatchResultWritten,
   EMPTY_MODE_SAVE,
   normalizeModeSave,
   withGeneralGameFinished,
@@ -88,5 +90,27 @@ describe('나간 마선수 대결 대기 — 전역기록 g[0x11f](타자편) ·
     expect(withAceMatchCleared(held, 3).aceMatchPending).toEqual({ 3: null, 4: null })
     expect(withAceMatchCleared(EMPTY_MODE_SAVE, 4)).toBe(EMPTY_MODE_SAVE)
     expect(normalizeModeSave({ lastPlayedMode: 4 }).aceMatchPending).toEqual({ 3: null, 4: null })
+  })
+
+  it('g[0xf6] — SYS 8 이 그때 모드로 적고, 140 은 어느 편이든 0 으로 지운다(다른 편 대기가 남아도)', () => {
+    const 둘 = withAceMatchHeld(withAceMatchHeld(EMPTY_MODE_SAVE, 4, [114, 115]), 3, [124, 125])
+    expect(aceMatchHoldOf(둘)).toEqual({ batter: true, pitcher: true, originalMode: 3 })
+    const 타자만 = withAceMatchCleared(둘, 3)
+    expect(aceMatchHoldOf(타자만)).toEqual({ batter: true, pitcher: false, originalMode: 0 })
+    expect(normalizeModeSave(JSON.parse(JSON.stringify(둘))).aceMatchMode).toBe(3)
+    // 옛 세이브(칸 없음) — 대기 편으로 메운다
+    expect(normalizeModeSave({ aceMatchPending: { 3: [124, 125] } }).aceMatchMode).toBe(3)
+  })
+
+  it('결과 바이트 — SYS 8 이 0, 정산 0x4ea0c 4efc6~4f018 이 서 있는 대기마다 그 판 결과로 덮고, 140 이 0 으로', () => {
+    const 타자 = withAceMatchHeld(EMPTY_MODE_SAVE, 4, [114, 115])
+    expect(타자.aceMatchWon).toEqual({ 3: false, 4: false })
+    const 이김 = withAceMatchResultWritten(타자, true)
+    // 대기가 없는 편(투수편)은 안 건드린다
+    expect(이김.aceMatchWon).toEqual({ 3: false, 4: true })
+    expect(normalizeModeSave(JSON.parse(JSON.stringify(이김))).aceMatchWon).toEqual({ 3: false, 4: true })
+    expect(withAceMatchResultWritten(이김, false).aceMatchWon[4]).toBe(false)
+    expect(withAceMatchCleared(이김, 4).aceMatchWon[4]).toBe(false)
+    expect(withAceMatchResultWritten(EMPTY_MODE_SAVE, true)).toBe(EMPTY_MODE_SAVE)
   })
 })

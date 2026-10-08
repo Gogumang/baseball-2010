@@ -946,12 +946,14 @@ export function usePitcherLeagueSession(
     if (pendingResultEvents !== null) {
       /*
        * **나간 마선수 대결** — 진입 곁가지 0x11b6c~0x11bbe: 전역 g[0x176] 이 서 있고 모드가 4 가 아니면 현재를 112(0x70)로 ·
-       * 0x7e84d(그림, 0x70) · 0x118e4([!] 칸 다시 찍기) · 다음 140. 140 진입 0x10df8 이 결과 바이트 g[0x177](SYS 8 이 적은 0 이
-       * 남았다 = 짐)으로 resultEvents[1] 을 0x8bdc9 로 틀고 칸들을 지운 뒤 전역기록을 저장한다(10f72) · [다음 114, 뒤 105].
+       * 0x7e84d(그림, 0x70) · 0x118e4([!] 칸 다시 찍기) · 다음 140. 140 진입 0x10df8 이 결과 바이트 g[0x177](SYS 8 이 적은 0 —
+       * 짐, 대기 중 미션을 치렀으면 그 판 결과)로 resultEvents[이김 ? 0 : 1] 을 0x8bdc9 로 틀고 칸들을 지운 뒤 전역기록을 저장한다(10f72) · [다음 114, 뒤 105].
        */
+      // 결과 바이트 g[0x177] — SYS 8 이 0, 대기 중 미션 정산 0x4ea0c 가 그 판 성공 여부로 덮어쓴다 (`withAceMatchResultWritten`)
+      const isWon = aceMatchPendingRef.current.isWon()
       enterOutingMapRef.current()
       aceMatchPendingRef.current.clear()
-      return openStory({ eventId: matchResultEventOf(pendingResultEvents, false), context: '대결결과', viewed: [] })
+      return openStory({ eventId: matchResultEventOf(pendingResultEvents, isWon), context: '대결결과', viewed: [] })
     }
     if (!career.hasSeenYearGoalWindow) {
       // 115 진입 0x16aac: 0x8a681 로 내장 이벤트를 세우고 `0xa4ee9(S)` — 마이너스 스킬 해제 기록 +0x1d0~+0x1d7 을 지운다

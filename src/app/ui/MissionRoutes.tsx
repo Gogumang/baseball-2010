@@ -54,7 +54,9 @@ import { activeSound } from '@/shared/api/audio/soundPort'
  * `useCareerSession` · 투수편 `usePitcherLeagueSession` 의 도착 고리 — 투수편 화면이 서 있을 때만)이 부상 엔딩 다음에 진 결과
  * 이벤트를 띄우며 지운다. 선수를 지우고 새로 만들어도 남는다. 나가기는 보통 미션처럼 메인 메뉴로 간다 — 타자편
  * `quitBatterMission`, 투수편 `quitPitcherMission` + 투수편 세션 `quitAceMatch`.
- * ⚠️ 미이식: 대기가 서 있는 동안의 보통 미션(0xaa57c 사람 칸 팀 · 0x4ef3e G 건너뜀 · 결과 판 대결 꼴 · 0x4ea0c 결과 바이트 덮어쓰기).
+ * 대기가 서 있는 동안의 보통 미션도 원본대로 대결 꼴이다 — 사람 칸 팀 0xaa57c aa6e0 · 명예 선수 대신 나리 선수(0x1fc20 · 0x1fbd0) ·
+ * G 건너뜀 0x4ef3e · 결과 판 대결 꼴 0x4a384 · 결과 바이트 덮어쓰기 0x4ea0c 4efc6~4f018 · 판을 닫으면 g[0xf6] 의 나리 편으로
+ * (0x407f0 4090c · 0x4b100 4b344) — `useMissionSession` 의 `aceMatchHold` · `onReturnToNari`, App 이 그 편으로 들어간다.
  */
 /**
  * 마선수 대결의 전역 기록 칸 — 타자편 대결은 SYS 8 이 g[0x11f] = 1, 투수편 대결은 g[0x176] = 1 을 적는다.
@@ -63,14 +65,21 @@ import { activeSound } from '@/shared/api/audio/soundPort'
 const BATTER_ACE_MATCH_FLAGS = { flag11f: true, flag176: false } as const
 const PITCHER_ACE_MATCH_FLAGS = { flag11f: false, flag176: true } as const
 
-/** 결과 판의 번 G · 보유 G (0x4ea0c 가 더한 뒤 — `missionResultHeldOf`) */
+/**
+ * 결과 판의 번 G · 보유 G (0x4ea0c 가 더한 뒤 — `missionResultHeldOf`). 판의 대결 꼴은 전역 칸 g[0x11f] · g[0x176] 을 그대로 본다 —
+ * 대기가 서 있으면 보통 미션 판도 대결 꼴이다(0x4a384 · 0x407f0 · 0x4ef3e). 대결이면 그 편 칸은 SYS 8 이 세웠다.
+ */
 function resultBoardOf(
   session: ReturnType<typeof useMissionSession>,
   mission: OriginalMission,
   status: string,
   gamePoint: number | undefined,
-  aceMatch?: { readonly flag11f: boolean; readonly flag176: boolean },
+  ownFlags?: { readonly flag11f: boolean; readonly flag176: boolean },
 ) {
+  const hold = session.aceMatchHold
+  const aceMatch = ownFlags === undefined && !hold.batter && !hold.pitcher
+    ? undefined
+    : { flag11f: (ownFlags?.flag11f ?? false) || hold.batter, flag176: (ownFlags?.flag176 ?? false) || hold.pitcher }
   const earnedGamePoint = session.resultEarnedGamePointOf(mission, status, aceMatch !== undefined)
   return {
     earnedGamePoint,

@@ -46,6 +46,46 @@ export interface ModeSave {
    * 바이트), 모드 3(투수편) g[0x170] · g[0x172] · g[0x176] · g[0x177]. 없으면 null (`withAceMatchHeld` 머리 주석).
    */
   readonly aceMatchPending: Readonly<Record<NariLeagueMode, readonly number[] | null>>
+  /**
+   * **결과 바이트** g[0x144](타자편) · g[0x177](투수편) — 이겼는가. SYS 8 이 0(짐)으로 적고, 정산 진입 0x4ea0c 의 4efc6~4f018 이
+   * **그 편 대기가 서 있으면 어느 미션이든** 그 판의 성공 여부([미션+0xbc])로 덮어쓴다 — 대기 중 보통 미션을 깨면 이긴 것이 된다
+   * (원본 그대로). 140 진입 0x10df8 이 이 값으로 resultEvents[이김 ? 0 : 1] 을 고르고 0 으로 지운다.
+   */
+  readonly aceMatchWon: Readonly<Record<NariLeagueMode, boolean>>
+  /**
+   * **g[0xf6]** — SYS 8 이 0x8d836~0x8d846 에서 적는 그때 모드(나리 투수편 3 · 타자편 4), 140 진입 0x10df8 이 0 으로 지운다
+   * (10efe 타자편 · 10f56 투수편 갈래 모두). 대기가 서 있는 동안 미션이 사람 칸 팀(0xaa57c aa6e0)과 결과 판 뒤 돌아갈 장면
+   * (0x407f0 4090c · 0x4b100 4b344)을 이 값으로 고른다. 없으면 0.
+   */
+  readonly aceMatchMode: number
+}
+
+/**
+ * 대기 중 미션이 보는 전역기록 칸 — g[0x11f](타자편 대기) · g[0x176](투수편 대기) · g[0xf6](그때 모드)
+ */
+export interface AceMatchHold {
+  readonly batter: boolean
+  readonly pitcher: boolean
+  readonly originalMode: number
+}
+
+/** 미션 쪽 손잡이 — 대기 칸을 읽고, 정산 진입 0x4ea0c 가 결과 바이트를 덮어쓴다 (`withAceMatchResultWritten`) */
+export interface AceMatchHoldPort {
+  readonly read: () => AceMatchHold
+  readonly writeResult: (isWon: boolean) => void
+}
+
+/** 대기가 없다 — 손잡이를 안 넘긴 미션 세션(시험)이 쓴다 */
+export const NO_ACE_MATCH_HOLD: AceMatchHold = { batter: false, pitcher: false, originalMode: 0 }
+
+/** g[0x11f] · g[0x176] 중 하나라도 서 있나 — 0x4ef3e · 0x4a384 · 0x407f0 · 0x4b100 · 0xaa57c 가 보는 조건 */
+export function isAceMatchHeld(hold: AceMatchHold): boolean {
+  return hold.batter || hold.pitcher
+}
+
+/** 모드 저장에서 대기 칸을 읽는다 */
+export function aceMatchHoldOf(save: ModeSave): AceMatchHold {
+  return { batter: save.aceMatchPending[4] !== null, pitcher: save.aceMatchPending[3] !== null, originalMode: save.aceMatchMode }
 }
 
 /**
@@ -58,6 +98,8 @@ export interface AceMatchPendingPort {
   readonly hold: (resultEvents: readonly number[]) => void
   /** 140 진입 0x10df8 — 칸을 지우고 전역기록 저장 */
   readonly clear: () => void
+  /** 결과 바이트(g[0x144] · g[0x177]) — 이겼는가. 대기가 없으면 거짓 */
+  readonly isWon: () => boolean
 }
 
 /** 저장소 없이 메모리에만 드는 대기 칸 — 손잡이를 안 넘긴 세션(시험)이 쓴다 */
@@ -71,6 +113,7 @@ export function createMemoryAceMatchPendingPort(): AceMatchPendingPort {
     clear: () => {
       pending = null
     },
+    isWon: () => false,
   }
 }
 
@@ -102,6 +145,8 @@ export const EMPTY_MODE_SAVE: ModeSave = {
   generalGame: null,
   nariGames: { 3: NO_NARI_GAME, 4: NO_NARI_GAME },
   aceMatchPending: { 3: null, 4: null },
+  aceMatchWon: { 3: false, 4: false },
+  aceMatchMode: 0,
 }
 
 /** 원본 모드 번호 범위 — 0x327b8 의 점프표 0xcf048 은 1~9 */
@@ -138,6 +183,12 @@ export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_
       3: normalizeAceMatchPending(value.aceMatchPending, 3),
       4: normalizeAceMatchPending(value.aceMatchPending, 4),
     },
+    // 옛 세이브(칸 없음)는 SYS 8 이 적은 0(짐) 그대로
+    aceMatchWon: { 3: aceMatchWonOf(value.aceMatchWon, 3), 4: aceMatchWonOf(value.aceMatchWon, 4) },
+    // 옛 세이브(칸 없음) — 대기가 하나면 그 편, 둘이면 알 수 없어 타자편(4)으로 둔다(웹 전용 메움)
+    aceMatchMode: typeof value.aceMatchMode === 'number' && Number.isInteger(value.aceMatchMode)
+      ? value.aceMatchMode
+      : legacyAceMatchModeOf(value.aceMatchPending),
   }
 }
 
@@ -145,6 +196,17 @@ function normalizeAceMatchPending(raw: unknown, mode: NariLeagueMode): readonly 
   if (raw === null || typeof raw !== 'object') return null
   const events = (raw as Partial<Record<string, unknown>>)[mode]
   return Array.isArray(events) && events.every((id) => typeof id === 'number' && Number.isInteger(id)) ? events : null
+}
+
+function aceMatchWonOf(raw: unknown, mode: NariLeagueMode): boolean {
+  if (raw === null || typeof raw !== 'object') return false
+  return (raw as Partial<Record<string, unknown>>)[mode] === true
+}
+
+function legacyAceMatchModeOf(raw: unknown): number {
+  if (normalizeAceMatchPending(raw, 4) !== null) return 4
+  if (normalizeAceMatchPending(raw, 3) !== null) return 3
+  return 0
 }
 
 function normalizeNariGame(raw: unknown): NariGameSave {
@@ -208,11 +270,43 @@ export function withNariGameCleared(save: ModeSave, mode: NariLeagueMode): ModeS
  * 웹 미션 세션이 대결 미션으로 들고 있어 여기 담지 않는다.
  */
 export function withAceMatchHeld(save: ModeSave, mode: NariLeagueMode, resultEvents: readonly number[]): ModeSave {
-  return { ...save, aceMatchPending: { ...save.aceMatchPending, [mode]: [...resultEvents] } }
+  return {
+    ...save,
+    aceMatchPending: { ...save.aceMatchPending, [mode]: [...resultEvents] },
+    aceMatchWon: { ...save.aceMatchWon, [mode]: false },
+    // 8d836~8d846 — g[0xf6] = 그때 모드
+    aceMatchMode: mode,
+  }
 }
 
-/** **140 진입 0x10df8** — 결과 이벤트를 틀며 대기 칸을 지우고 전역기록을 저장한다(10f72) */
+/**
+ * **140 진입 0x10df8** — 결과 이벤트를 틀며 대기 칸을 지우고 전역기록을 저장한다(10f72). 타자편 갈래 10ec6~10f0c 는
+ * g[0xec] · g[0xee] · g[0x11f] · g[0x144] · **g[0xf6]** · g[0xf7], 투수편 갈래 10f0e~ 는 g[0x170] · g[0x172] · g[0x176] · g[0x177] ·
+ * **g[0xf6]**(10f56) · g[0x175] 를 0 으로 — g[0xf6] 은 다른 편 대기가 남아 있어도 지운다(원본 그대로).
+ */
 export function withAceMatchCleared(save: ModeSave, mode: NariLeagueMode): ModeSave {
   if (save.aceMatchPending[mode] === null) return save
-  return { ...save, aceMatchPending: { ...save.aceMatchPending, [mode]: null } }
+  return {
+    ...save,
+    aceMatchPending: { ...save.aceMatchPending, [mode]: null },
+    aceMatchWon: { ...save.aceMatchWon, [mode]: false },
+    aceMatchMode: 0,
+  }
+}
+
+/**
+ * **정산 진입 0x4ea0c 의 결과 바이트 덮어쓰기** (4efc6~4f018, 직접 떴다) — 모드 5·6(미션 · 마선수 대결) 끝마다:
+ * ```
+ * 4efc6  g[0x11f] ≠ 0 → g[0x144] = [미션+0xbc](이 판 성공?) · 0x1f1b9 전역기록 저장
+ * 4eff6  g[0x176] ≠ 0 → g[0x177] = [미션+0xbc] · 0x1f1b9
+ * ```
+ * 어느 미션인지 안 가린다 — 대기 중 보통 미션도 그 편 결과 바이트를 덮는다.
+ */
+export function withAceMatchResultWritten(save: ModeSave, isWon: boolean): ModeSave {
+  const won = {
+    3: save.aceMatchPending[3] === null ? save.aceMatchWon[3] : isWon,
+    4: save.aceMatchPending[4] === null ? save.aceMatchWon[4] : isWon,
+  }
+  if (won[3] === save.aceMatchWon[3] && won[4] === save.aceMatchWon[4]) return save
+  return { ...save, aceMatchWon: won }
 }

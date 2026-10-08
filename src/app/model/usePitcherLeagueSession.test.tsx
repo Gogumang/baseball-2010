@@ -1292,6 +1292,19 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
     expect(result.current.story).toEqual({ eventId: 125, context: '대결결과', viewed: [] })
   })
 
+  it('대기 중 미션 정산(0x4ea0c 4eff6)이 g[0x177] 을 이김으로 덮었으면 140 은 resultEvents[0] 을 띄운다 (0x10e40)', async () => {
+    const store = 메모리저장()
+    const base = createMemoryAceMatchPendingPort()
+    const port = { ...base, isWon: () => true }
+    const 첫판 = 대기띄우기(store, port).result
+    act(() => 첫판.current.actions.create('투수', 신인))
+    act(() => 첫판.current.actions.save({ ...첫판.current.career!, seenEventIds: ['451'], hasSeenYearGoalWindow: false }))
+    port.hold([124, 125])
+    const result = 대기띄우기(store, port).result
+    await 이벤트불러오기(result)
+    expect(result.current.story).toEqual({ eventId: 124, context: '대결결과', viewed: [] })
+  })
+
   it('대기는 전역기록이라 선수를 새로 만들어도 남아 새 선수의 105 에서 뜬다 (원본 그대로 — 지우는 곳은 140 하나)', async () => {
     const port = createMemoryAceMatchPendingPort()
     port.hold([124, 125])
