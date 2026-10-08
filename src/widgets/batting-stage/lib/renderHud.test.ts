@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, lampCountOf, roundFillRectsOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
+import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, inningGlyphsOf, lampCountOf, roundFillRectsOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
   inning: 1,
@@ -121,5 +121,21 @@ describe('roundFillRectsOf — HUD 둥근 칠 0xba0bd → 0x6b7d4', () => {
     const cells = cellsOf(roundFillRectsOf({ x: 8, y: 21, width: 36, height: 14 }, 3))
     expect(cells.size).toBe(37 * 15 - 4)
     expect(['8,21', '44,21', '8,35', '44,35'].some((cell) => cells.has(cell))).toBe(false)
+  })
+})
+
+describe('inningGlyphsOf — HUD 이닝 0xba689 → 0xba51c', () => {
+  // num.pzx 000~009: "1" 은 4×10, 나머지는 8×10
+  const sizeOf = (index: number) => ({ width: index === 1 ? 4 : 8, height: 10 })
+
+  it('상자 0 (9,2,10,9) + (6,6) 의 오른끝 x = 25 에 자간 0 으로 오른쪽 맞춤, y = 8', () => {
+    expect(inningGlyphsOf(3, sizeOf)).toEqual([{ index: 3, x: 17, y: 8 }])
+    expect(inningGlyphsOf(1, sizeOf)).toEqual([{ index: 1, x: 21, y: 8 }])
+    expect(inningGlyphsOf(12, sizeOf)).toEqual([{ index: 1, x: 13, y: 8 }, { index: 2, x: 17, y: 8 }])
+  })
+
+  it('글자는 아래 맞춤 — 키 다른 숫자는 최대 높이에 바닥을 맞춘다', () => {
+    const tall = (index: number) => ({ width: 8, height: index === 1 ? 9 : 10 })
+    expect(inningGlyphsOf(12, tall)).toEqual([{ index: 1, x: 9, y: 9 }, { index: 2, x: 17, y: 8 }])
   })
 })
