@@ -13,6 +13,13 @@ export const field = style({
   background: ORIGINAL_COLORS.black,
 })
 
+/** 줌 펀치(0xbb43c)가 통째로 늘리는 층 — 바탕 · 선수 · 공 · 결과 판 */
+export const zoomLayer = style({
+  position: 'absolute',
+  inset: 0,
+  imageRendering: 'pixelated',
+})
+
 /** stadium/defense.pzx 310×500 두 장 (오른쪽은 좌우 반전) */
 export const background = style({
   position: 'absolute',

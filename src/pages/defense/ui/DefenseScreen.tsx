@@ -31,6 +31,12 @@ import {
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
+import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
+
+/** 판정 글자 그림 (game_judge.pzx, 게임+0x101c) */
+const JUDGE_FRAMES = './sprites/game_judge/frames'
+/** 0x46844 의 큰 OUT 은 자리에서 60 위 (468e2 `subs r3, #0x3c`) */
+const BIG_OUT_RAISE = 60
 
 /** 한 번에 몰아서 따라갈 틱 수 상한 — 탭이 잠들었다 돌아와도 한 프레임에 다 돌지 않게 막는다 */
 const MAX_CATCH_UP_TICKS = 30
@@ -165,6 +171,32 @@ export function DefenseScreen({
     y: toScreenY(point.z) + offset.y,
   })
 
+  /**
+   * 레이저 줌 펀치 0xbb84c → 0xbb43c — 원본 사각형(화면 W·100/s × H·100/s, 중심 = 바탕 좌표 + 카메라 오프셋, 화면 안으로 자름)을
+   * 화면 전체로 늘린다. 결과 판(큰 OUT)까지 늘린다(`laserPresentation`).
+   */
+  const zoom = state.zoom ?? null
+  const zoomRect =
+    zoom === null || zoom.percent === 100
+      ? null
+      : zoomSourceRect(zoom, offset, { width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT })
+  const zoomStyle =
+    zoomRect === null
+      ? undefined
+      : {
+          transformOrigin: '0 0',
+          transform: `scale(${styles.SCREEN_WIDTH / zoomRect.width}, ${styles.SCREEN_HEIGHT / zoomRect.height}) translate(${-zoomRect.x}px, ${-zoomRect.y}px)`,
+        }
+  /** 결과 판 0x46844 의 자리 — 공 가진 야수(+0x1088)의 그림 자리, 없으면 화면 가운데 (46866) */
+  const bigOut = state.bigOut ?? null
+  const bigOutHolder = bigOut === null ? undefined : state.fielders.find((fielder) => fielder.slot === bigOut.holderSlot)
+  const bigOutPoint =
+    bigOut === null
+      ? null
+      : bigOutHolder === undefined
+        ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 }
+        : screenOf(bigOutHolder)
+
   const ballGround = screenOf(state.ball)
   const ballPoint = { x: ballGround.x, y: ballGround.y - toScreenY(state.ball.height) }
 
@@ -197,6 +229,7 @@ export function DefenseScreen({
   return (
     <RawScreen>
       <div className={styles.field} data-testid="defense-field">
+        <div className={styles.zoomLayer} style={zoomStyle} data-testid="defense-zoom" data-zoom={zoom?.percent ?? 100}>
         <img
           className={styles.background}
           style={{ left: offset.x, top: offset.y, width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }}
@@ -244,6 +277,19 @@ export function DefenseScreen({
             <ActorSprite folder={DEADLY_EFFECT_FRAMES} frame={state.flash.step} />
           </div>
         )}
+
+        {/* 결과 판 0x46844 — 레이저 연출 뒤 아웃(코드 13)이면 game_judge 애니 2 "큰 OUT" 을 (x, y − 60) 에 */}
+        {bigOut !== null && bigOutPoint !== null && (
+          <div
+            className={styles.actor}
+            style={{ left: bigOutPoint.x, top: bigOutPoint.y - BIG_OUT_RAISE }}
+            data-testid="defense-big-out"
+            data-frame={bigOut.frame}
+          >
+            <ActorSprite folder={JUDGE_FRAMES} frame={bigOut.frame} />
+          </div>
+        )}
+        </div>
       </div>
       {children}
     </RawScreen>

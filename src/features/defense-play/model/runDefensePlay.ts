@@ -1,3 +1,13 @@
+import {
+  JUDGE_POPUP_START,
+  NO_ZOOM_PUNCH,
+  postJudgeMessage,
+  startZoomPunch,
+  stepJudgePopup,
+  stepZoomPunch,
+  type JudgePopupState,
+  type ZoomPunchState,
+} from '@/features/defense-play/model/laserPresentation'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import {
   battedBallTrajectory,
@@ -761,6 +771,10 @@ export interface DefensePlayState {
   laserStep: number
   /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1(그리기)이 내린다 */
   gamePaused: boolean
+  /** 줌 펀치 전역 0x15606d8 — 연출 0x4403c 단계 1 의 0xbb39d 가 켜고 그리기마다 0xbb84c 가 돈다 (`laserPresentation`) */
+  zoomPunch: ZoomPunchState
+  /** 결과 판 0x46844 의 칸 — 메시지 0xbba 가 타이머를 세우고 그리기마다 큰 OUT(+0x1998)을 본다 (`laserPresentation`) */
+  judgePopup: JudgePopupState
   /** 앞 틱 끝 G2 앞의 +0x120 (`PlayGateFrameResult.counterBeforeHead`) — 이 틱 머리에서 멈추면 G2 를 안 부른 것으로 되돌린다 */
   counterBeforeHead: number
   /** 협살 기록칸 P+0x1ec~+0x1f3 (0xb3a04). 대상이 −1 이면 협살 중이 아니다 */
@@ -1012,6 +1026,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     laserArmed: false,
     laserStep: -1,
     gamePaused: false,
+    zoomPunch: NO_ZOOM_PUNCH,
+    judgePopup: JUDGE_POPUP_START,
     counterBeforeHead: 0,
     rundown: NO_RUNDOWN,
     rundownThrowArrival: -1,
@@ -1139,6 +1155,8 @@ export function stepDefensePlay(
   let laserArmed = state.laserArmed
   let laserStep = state.laserStep
   let gamePaused = state.gamePaused
+  let zoomPunch = state.zoomPunch
+  let judgePopup = state.judgePopup
   /** 이 틱 머리(그림 F 의 슬롯 2 머리)에서 0x400bc 가 경기를 멈췄는가 */
   let pausedThisTick = false
   /** 이 틱이 멈춘 그림 F+1 인가 — 머리에서 이미 +0x1993 이 서 있다(0x3f060 의 목록 틱 · 슬롯 2 가 통째로 없다) */
@@ -2461,6 +2479,8 @@ export function stepDefensePlay(
     // b4562 vt44 = 0xb2bc4 — 모든 코드를 state[0xb] 에 적고 표 0xd87a0 대로 칸을 세운다
     if (resultCode !== 0) {
       lastEventCode = resultCode
+      // 51a56 — 메시지 0xbba(코드): 결과 판 타이머 10 · 코드 · 공 가진 야수(플레이+0x130)
+      judgePopup = postJudgeMessage(judgePopup, resultCode, play.ballHolderSlot)
       // 메시지 0xbba → 표 0xd0488: 6·10 → 0x51d32·0x51d24 → 0xa5ffc 사건 6 · 8·12 → 0x51c82 → 0xa5fec 사건 8 ·
       // 13 → 0x51b36 … 0x51bf2 → 0xa7d0c 사건 0xd. 판 끝 정산 0xa8024 가 이 사건들로 타자 결과를 낸다(`playOutcome`)
       if (resultCode === 6 || resultCode === 10) hitEvent = true
@@ -2518,20 +2538,42 @@ export function stepDefensePlay(
 
     }
 
+    // ── 7a. 결과 판 0x46844 — 이 그림의 그리기 46de4 (0x4403c 보다 앞) ──
+    const popup = stepJudgePopup(judgePopup)
+    judgePopup = popup.next
+
     // ── 7b. 레이저 연출 0x4403c — 이 그림의 그리기 46e08(관문 G3 46e3c 보다 앞) ──
     // 단계 0: 애니 되감기 · +0x1997 = +0x19ad = +0x19ae = 0 · 단계 1 → 1: 줌 0xbb39d · +0x1993 = 0 · 단계 2 → 2: 단계 3 →
-    // 3: 단계 −1 · +0x1990 = 0 · +0x1998 = +0x1999 = 1. ⚠️ 줌 펀치 0xbb39d · 큰 OUT(+0x1998 → 0x46844) 그림은 웹에 없다.
+    // 3: 단계 −1 · +0x1990 = 0 · +0x1998 = +0x1999 = 1.
     if (laserStep === 0) {
       laserConfirmed = false
       laserShining = false
+      judgePopup = { ...judgePopup, shown: false }
       laserStep = 1
     } else if (laserStep === 1) {
+      // 44146 — 0xbb39d(100, H.x, H.z − H.y, 1, 0): H = 0xb0c91(플레이) 공 가진 야수
+      const holder = fielders[play.ballHolderSlot]
+      if (holder !== undefined) zoomPunch = startZoomPunch(holder.position)
       gamePaused = false
       laserStep = 2
     } else if (laserStep === 2) {
       laserStep = 3
     } else if (laserStep === 3) {
+      judgePopup = { ...judgePopup, bigOutArmed: true, bigOutRecord: true }
       laserStep = -1
+    }
+    // ── 7c. 줌 펀치 0xbb84c — 그리기 46e24 (0x4403c 뒤) ──
+    const zoom = stepZoomPunch(zoomPunch)
+    zoomPunch = zoom.next
+    if (zoom.frame !== null || popup.bigOut !== null) {
+      const drawn = ticks[ticks.length - 1]
+      if (drawn !== undefined) {
+        ticks[ticks.length - 1] = {
+          ...drawn,
+          ...(zoom.frame === null ? {} : { zoom: zoom.frame }),
+          ...(popup.bigOut === null ? {} : { bigOut: popup.bigOut }),
+        }
+      }
     }
 
     // ── 8. 판 진행 관문 0xb0d28 — 이 틱 그리기 0x46e3c(G3) · 0x3f378(G4, 안 쥐었을 때) · 다음 틱 0x3f060(G1) · 슬롯 2 머리 52502(G2) ──
@@ -2618,6 +2660,8 @@ export function stepDefensePlay(
   state.laserArmed = laserArmed
   state.laserStep = laserStep
   state.gamePaused = gamePaused
+  state.zoomPunch = zoomPunch
+  state.judgePopup = judgePopup
   state.counterBeforeHead = counterBeforeHead
   state.rundown = rundown
   state.rundownThrowArrival = rundownThrowArrival

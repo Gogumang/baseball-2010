@@ -336,6 +336,16 @@ export interface DefenseViewState {
    */
   readonly laserShiningSlot?: number | null
   /**
+   * 레이저 연출 단계 1 의 **줌 펀치**(0xbb84c → 0xbb43c) — 이 그림을 그린 뒤 화면을 늘리는 배율(110 · 110 · 105 · 100%)과 중심(바탕 그림 좌표).
+   * 늘리는 것은 결과 판까지다(`features/defense-play/model/laserPresentation`). 없으면 그대로.
+   */
+  readonly zoom?: { readonly percent: number; readonly centerX: number; readonly centerY: number } | null
+  /**
+   * 결과 판 0x46844 의 **큰 OUT** — game_judge 애니 2 의 이 그림 프레임과, 자리를 정하는 공 가진 야수 칸(−1 이면 화면 가운데).
+   * 야수 그림 자리에서 y − 60 에 그린다.
+   */
+  readonly bigOut?: { readonly frame: number; readonly holderSlot: number } | null
+  /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
    */

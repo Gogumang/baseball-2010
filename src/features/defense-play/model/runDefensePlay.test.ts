@@ -570,6 +570,52 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     expect(state.laserThrow).toBe(true)
     expect(state.laserArmed).toBe(false)
   })
+
+  it('단계 1 의 줌 펀치(0xbb39d → 0xbb84c)가 그림 F+1 부터 110 · 110 · 105 · 100% 로 화면을 늘리고, 단계 3 뒤 아웃(13)은 큰 OUT 을 그린다', () => {
+    let state = startDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(fixturePatternFor(단타)),
+      bases: 주자1루,
+      outs: 0,
+      random: 차례난수([0, 0, 0.999, 0]),
+      controls: 계속누름('수비', '2'),
+    })
+    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '2', isRepeat: false })
+    const F = Number(state.log.find((line) => line.includes('레이저 발사 (0x400bc)'))!.split('틱')[0])
+    const 배율 = state.ticks.filter((view) => view.zoom != null).map((view) => [view.tick, view.zoom!.percent])
+    expect(배율).toEqual([
+      [F + 1, 110],
+      [F + 2, 110],
+      [F + 3, 105],
+      [F + 4, 100],
+    ])
+    // 중심 = 공 가진 야수의 바탕 그림 좌표 (x·620/40000, (z − y)/65)
+    const 중심 = state.ticks.find((view) => view.zoom != null)!.zoom!
+    const 쥔야수 = state.ticks.find((view) => view.tick === F + 1)!.fielders
+    expect(쥔야수.some((fielder) => Math.trunc((fielder.x * 620) / 40000) === 중심.centerX)).toBe(true)
+    // 이 판은 아웃이 없어 결과 판(0x46844)에 코드 13 이 안 온다 — 큰 OUT 도 없다
+    expect(state.ticks.some((view) => view.bigOut != null)).toBe(false)
+  })
+
+  it('큰 OUT 은 결과 판 타이머(메시지 0xbba 의 10 그림) 안에서만 — 뜬공 아웃(13) 뒤 레이저 단계 3 이 +0x1998 을 세운 그림부터 남은 타이머만큼 애니 2', () => {
+    // 원본 표 코드 0 첫 패턴 [92, 698, 565, 0] — 12틱 뜬공 아웃(메시지 13 · 타이머 10) 뒤 15틱 레이저 발사(단계 0 이 +0x1997 = 0),
+    // 18틱 그리기의 단계 3 이 +0x1998 을 세워 19 · 20 · 21틱에 애니 2 의 35 · 35 · 36 을 투수(0) 자리에 그리고 타이머가 다한다
+    const pattern: BattedBallPattern = [92, 698, 565, 0]
+    let state = startDefensePlay({
+      outcome: { kind: '아웃', detail: '땅볼아웃' },
+      trajectory: battedBallTrajectory(pattern),
+      bases: 주자1루,
+      outs: 0,
+      random: 차례난수([0, 0, 0.999, 0]),
+      controls: 계속누름('수비', '2'),
+    })
+    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '2', isRepeat: false })
+    expect(state.ticks.filter((view) => view.bigOut != null).map((view) => [view.tick, view.bigOut!.frame, view.bigOut!.holderSlot])).toEqual([
+      [19, 35, 0],
+      [20, 35, 0],
+      [21, 36, 0],
+    ])
+  })
 })
 
 describe('2루 커버가 아닌 키스톤 야수 자리 — 0xb1c90 의 0xb203a (매 틱, 송구 없음)', () => {
