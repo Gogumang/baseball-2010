@@ -18,13 +18,6 @@ interface MenuListProps {
   readonly items: readonly MenuItem[]
   readonly onSelect: (id: string) => void
   /**
-   * 커서를 그리는 방식.
-   *   `'목록'`   — 웹판 기본. 왼쪽에 ▶ 를 찍고 고른 줄 배경을 바꾼다.
-   *   `'선택지'` — **원본 대사 창의 선택지 갈래**(0x7fd22): 화살표도 배경도 없고
-   *                고른 줄 글자만 노랑 RGB(255,255,0) 으로 칠한다 (R14 3-4 표 dlg+0xe4).
-   */
-  readonly cursorStyle?: '목록' | '선택지'
-  /**
    * 처음 그릴 때의 커서 칸 (기본 0). 메뉴 객체를 버리지 않고 다시 띄우는 원본 화면용이다 —
    * 예: 경기 중 메뉴는 [조작방법]·[설정]에서 돌아올 때 커서를 그대로 둔다(0x3ca36 · 0x3cb0e).
    */
@@ -41,7 +34,6 @@ interface MenuListProps {
 export function MenuList({
   items,
   onSelect,
-  cursorStyle = '목록',
   initialIndex = 0,
   onCursorChange,
 }: MenuListProps) {
@@ -107,12 +99,12 @@ export function MenuList({
   }, [])
 
   return (
-    <ul className={cursorStyle === '선택지' ? styles.choiceList : styles.list} role="listbox">
+    <ul className={styles.list} role="listbox">
       {items.map((item, index) => (
         <li key={item.id}>
           <button
             type="button"
-            className={cursorStyle === '선택지' ? styles.choiceItem : styles.item}
+            className={styles.item}
             role="option"
             aria-selected={index === selectedIndex}
             disabled={item.isDisabled === true}
@@ -122,10 +114,7 @@ export function MenuList({
               onSelect(item.id)
             }}
           >
-            {/* 원본 선택지 갈래는 화살표를 안 그린다 — 고른 줄 색만 바뀐다 (0x7fd22) */}
-            {cursorStyle === '목록' && (
-              <span className={styles.cursor}>{index === selectedIndex ? '▶' : ''}</span>
-            )}
+            <span className={styles.cursor}>{index === selectedIndex ? '▶' : ''}</span>
             {item.iconUrl !== undefined && (
               <img className={styles.icon} src={item.iconUrl} alt="" aria-hidden />
             )}
