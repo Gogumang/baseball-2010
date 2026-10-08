@@ -236,6 +236,12 @@ export interface CpuBatterTraits {
    * 안 휘두른 공은 이 값을 그대로 돌려준다(`CpuPitchOutcome.buntKind`). 없으면 0 (장면 new).
    */
   readonly previousBuntKind?: number
+  /**
+   * 던지는 사람 투수의 체력% `0xaebb0` — **이번 공을 깎은 뒤** 값(0x11 진입 0x3dec6 → 0xa5e14 가 스윙보다 앞).
+   * 0xab214 의 ab838 이 `[sp+0xc8] == 0` 이면 B · C 에 +2000 을 더한다(사람 타석 `resolvePitch` 와 같은 칸).
+   * 안 넘기면 지치지 않은 것으로 본다.
+   */
+  readonly pitcherStaminaPercent?: number
 }
 
 /** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
@@ -422,7 +428,8 @@ export function pitchAgainstBatterDetailed(
       isOffenseHuman: false,
       isDefenseHuman: traits.swingMode !== undefined,
       boost,
-      isPitcherExhausted: false,
+      // ab838 — 투수 체력% 0 이면 B · C 에 +2000
+      isPitcherExhausted: traits.pitcherStaminaPercent === 0,
       batterSkillIds: [],
       pitcherSkillIds: [],
       // 0xab214 는 투수·타자 레코드로 손(0xb63c0)·칸(0xb6394)을 바로 읽는다. 투수 손은 공에 실린 폼·+0x18 로,

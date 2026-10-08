@@ -2544,6 +2544,8 @@ function pitchOnce(
       playsFoulBall: true,
       // 장면 +0xfdc — 안 휘두른 공은 앞 공의 값이 남는다(0x34436 은 휘두를 때만 쓴다)
       previousBuntKind: progress.sceneBuntKind ?? 0,
+      // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
+      pitcherStaminaPercent: staminaPercent,
     },
   )
   const resolution = thrown.resolution

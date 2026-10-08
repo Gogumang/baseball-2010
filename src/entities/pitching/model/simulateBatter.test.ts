@@ -375,6 +375,17 @@ describe('pitchAgainstBatter', () => {
 
     expect(a).toEqual(b)
   })
+
+  it('던진 투수의 깎은 뒤 체력%가 0 이면 ab838 이 B · C 에 +2000 — 같은 씨앗에서 결과가 갈리고 1% 면 예전과 같다', () => {
+    const 백번 = (pitcherStaminaPercent?: number) => {
+      const random = createSeededRandom(20100901)
+      return Array.from({ length: 100 }, () =>
+        pitchAgainstBatter(한가운데, 타자(500), random, undefined, undefined, { pitcherStaminaPercent }),
+      )
+    }
+    expect(백번(1)).toEqual(백번())
+    expect(백번(0)).not.toEqual(백번())
+  })
 })
 
 /**
