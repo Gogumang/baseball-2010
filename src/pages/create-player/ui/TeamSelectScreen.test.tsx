@@ -86,6 +86,17 @@ describe('팀 고르기', () => {
     expect(onSelect).toHaveBeenLastCalledWith(5)
   })
 
+  it('숫자 2 · 4 · 6 · 8 은 ↑ ← → ↓, 5 는 OK 다 — 격자 숫자키 꼴 1 (0x6c031 · 표 0xd2e7c)', () => {
+    const onSelect = vi.fn()
+    띄우기({ onSelect })
+
+    // 0 → '6' 1 → '8' 6 → '4' 5 → '2' 0 → '4' 4(같은 줄 감기)
+    for (const key of ['6', '8', '4', '2', '4']) fireEvent.keyDown(window, { key })
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(onSelect).toHaveBeenLastCalledWith(4)
+  })
+
   it('칸마다 파란 바탕 그림(slt_frame 0)을 깐다', () => {
     const { container } = 띄우기()
 

@@ -86,16 +86,22 @@ export function TeamSelectScreen({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const direction = event.key === 'ArrowRight' ? 'right' : event.key === 'ArrowLeft' ? 'left'
-        : event.key === 'ArrowDown' ? 'down' : event.key === 'ArrowUp' ? 'up' : null
+      // 장면 키(나만의리그 0x14114 · 시즌 0xca 0x8da4 · 트레이드 0xe4 0x8250 · 일반모드 18 0x29b38 · 19 0x29c98)는
+      // 모두 키 [this+0x40] 을 걸러 내지 않고 격자 vt+0x18(0x6c299 → 0x6c521 → 0x6c031)에 그대로 넘긴다 —
+      // 숫자키 꼴 1 이라 '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK(−5) 로 돌아온다 (표 0xd2e7c).
+      const direction = event.key === 'ArrowRight' || event.key === '6' ? 'right'
+        : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
+        : event.key === 'ArrowDown' || event.key === '8' ? 'down'
+        : event.key === 'ArrowUp' || event.key === '2' ? 'up' : null
       if (direction !== null) {
         event.preventDefault()
         return setCursor((previous) => moveGridCursor(gridShape, previous, direction))
       }
-      if (event.key === 'Enter' && isTeamOpen(cursor, openedHiddenIds)) {
+      const isOk = event.key === 'Enter' || event.key === '5'
+      if (isOk && isTeamOpen(cursor, openedHiddenIds)) {
         event.preventDefault()
         onSelect(cursor)
-      } else if (event.key === 'Enter' && onSelectLocked !== undefined) {
+      } else if (isOk && onSelectLocked !== undefined) {
         event.preventDefault()
         onSelectLocked(cursor)
       }
