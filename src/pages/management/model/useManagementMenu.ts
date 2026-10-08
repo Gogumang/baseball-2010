@@ -54,7 +54,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
    * 119 에서 '0' 으로 열고, 취소·'0' 이면 119 로 (키 0x1b654).
    */
   const [abilityDetailOffset, setAbilityDetailOffset] = useState<number | null>(null)
-  /** 선수정보 하위 메뉴에서 관리 화면 위에 띄우는 창 — 기록실 0x7f070 · 필살타법 0x803d4 */
+  /** 선수정보 하위 메뉴에서 관리 화면 위에 띄우는 창 — 기록실(팝업 0x80 → 124) · 필살타법 0x803d4 */
   const [overlay, setOverlay] = useState<ManagementOverlay | null>(null)
   /** 예/아니오 질문 (StrMODE[85] 훈련 · [90] 휴식) */
   const [question, setQuestion] = useState<{ text: string; onYes: () => void } | null>(null)
@@ -156,19 +156,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
       return props.onOpenShop(id)
     }
     if (id === '기본정보') return setIsShowingBasicInfo(true)
-    /*
-     * ⚠️ 미해결: 원본 106 칸 4 [기록실] 은 팝업 0x80(StrMODE[74] 두 갈래, 그리기 0x19448 · 키 0x196ec — 좌우로 +0x166, 확인 →
-     * 장면+0x164 = +0x166) → **124** 다 — 웹 타자편은 아직 순위표 창으로 근사한다(투수편 `PitcherRecordPanel` 도 근사).
-     * 124 를 직접 뜬 것(2026-10-08):
-     *   진입 0x116d4 = 0x5761c(편집기 [장면+0xd8], +0x164 == 0, 모드 ≠ 4, s8 S[1], [sp] s8 S[0xb3]) → 0x5570d(편집기, +0xfc, +0xf0).
-     *     +0x164 == 0 이면 0x5761c 가 **내 선수의 연도별 기록**으로 팀을 만든다 — 타자편 0x1fa8d(저장, i)(지난 해 i 기록, i < S[0xb3])
-     *     → 0xb5379 · 이어 0x1fc21(올해) / 투수편 0x1fa79 → 0xb53a5 · 0x1fbd1. 0x5561c 셋째 인자 0 이라 **보기 전용**이다.
-     *     ≠ 0 이면 팀을 만들지 않는다.
-     *   키 0x1463c: CLR → 106(0x6a). 그 뒤 +0x164 == 0 이면 '0' · '*' 를 버리고 나머지는 0x55864(편집기) — 상세 창 · 탭 뒤집기가 없다.
-     *     ≠ 0 이면 0x5787d — 좌우('4' · '6')로 쪽 [편집기+0x444] 를 0 ~ 4(타자) / 5(투수) 사이로 옮긴다.
-     *   그리기 0x16778: +0x164 ≠ 0 이면 0x5796c(쪽 판 — 칸 배치 미해독), 아니면 0x5cfec(기본 엔트리 목록).
-     * 웹은 연도별 기록(0x1fa8c · 0x1fa78 칸)을 저장하지 않고 두 판 그림도 미해독이라 아직 못 옮겼다.
-     */
+    // 106 칸 4 [기록실] → 팝업 0x80 · 124 (`pages/nari-record-room`) · 칸 3 [필살타법] → 0x7b
     if (id === '기록실' || id === '필살타법') return setOverlay(id)
     // 아이템/스킬(하위 상태 122) — 스킬 장착 창. 세션이 장착을 받지 않으면 예전처럼 바깥에 맡긴다
     if (id === '아이템/스킬' && props.onEquipSkill !== undefined) return setOverlay(id)

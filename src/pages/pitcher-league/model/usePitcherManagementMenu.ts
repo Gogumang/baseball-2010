@@ -46,8 +46,6 @@ import {
   PITCHER_PLAYER_INFO_SLOTS,
   PITCH_WINDOW_CHOICES,
   PITCH_WINDOW_TABS,
-  RECORD_WINDOW_CHOICES,
-  RECORD_WINDOW_TABS,
   trainingQuestionOf,
   trainingResultOf,
   useQuestionOf,
@@ -131,8 +129,6 @@ export interface PitcherManagementMenu {
   readonly pitchWindowTab: number
   /** 창 안에서 탭을 바꾼다 (원본은 좌우 키로 `+0x166` 을 토글한다) */
   readonly changePitchTab: (tab: number) => void
-  /** 기록실 창의 갈래 (장면 +0x164) — 0 엔트리 목록 · 1 나리 판 성적 */
-  readonly recordWindowTab: number
   /** 123 창 탭 1 — 마구 칸 i(0~3) 고르기 */
   readonly selectMagicCell: (cellIndex: number) => void
   /** 123 창 탭 2 — 구질 고르기 */
@@ -192,8 +188,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
    */
   const [abilityDetailOffset, setAbilityDetailOffset] = useState<number | null>(null)
   const [pitchWindowTab, setPitchWindowTab] = useState<number>(PITCH_WINDOW_TABS.마구)
-  /** 기록실 창의 갈래 (장면 +0x164 — 팝업 0x80 이 정한다) */
-  const [recordWindowTab, setRecordWindowTab] = useState<number>(RECORD_WINDOW_TABS.엔트리)
   const [notice, setNotice] = useState('')
   const [question, setQuestion] = useState<PitcherMenuQuestion | null>(null)
   const [choice, setChoice] = useState<PitcherMenuChoice | null>(null)
@@ -386,19 +380,10 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (id === '아이템/스킬') return setSubWindow('아이템/스킬')
       if (id === '구질') return openPitchWindow(false)
       /*
-       * [기록실] — StrMODE[74] 두 갈래 팝업(0x80)이 `장면+0x164` 를 정하고 **124** 로 간다.
-       * 0 이면 기본 엔트리 목록(0x5cfec), 그 밖이면 나리 판 목록(0x5796c) 이다 (R4 2c).
-       * ⚠️ 두 갈래의 **이름표**는 문서에 없어 하는 일로 적었다 (`RECORD_WINDOW_CHOICES`).
+       * [기록실] — 팝업 0x80(그리기 0x19448 · 키 0x196ec)이 `장면+0x164` 를 정하고 **124** 로 간다. 팝업 · 124 는 타자편과 같은
+       * 장면 0x106 의 상태라 `pages/nari-record-room` 이 다 들고, 이 창 칸은 그것이 떠 있는 동안이다(취소 → 106).
        */
-      return openChoice({
-        text: PITCHER_MANAGEMENT_TEXT.chooseRecord,
-        labels: RECORD_WINDOW_CHOICES,
-        onChoose: (index) => {
-          setRecordWindowTab(index === 0 ? RECORD_WINDOW_TABS.엔트리 : RECORD_WINDOW_TABS.성적)
-          setChoice(null)
-          setSubWindow('기록실')
-        },
-      })
+      return setSubWindow('기록실')
     },
     [onOpenShop, openChoice, openPitchWindow, openOrNotice],
   )
@@ -658,7 +643,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     subWindow,
     pitchWindowTab,
     changePitchTab: setPitchWindowTab,
-    recordWindowTab,
     selectMagicCell,
     selectPitchCell,
     isTitleWindowOpen,

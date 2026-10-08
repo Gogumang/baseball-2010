@@ -16,7 +16,8 @@ import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard
 import { PitcherBasicInfoPanel } from '@/pages/pitcher-league/ui/PitcherBasicInfoPanel'
 import { PitcherRepertoirePanel } from '@/pages/pitcher-league/ui/PitcherRepertoirePanel'
 import { PitcherMagicTrainingPanel } from '@/pages/pitcher-league/ui/PitcherMagicTrainingPanel'
-import { PitcherRecordPanel } from '@/pages/pitcher-league/ui/PitcherRecordPanel'
+import { NariRecordPickPopup, NariRecordView } from '@/pages/nari-record-room'
+import type { RecordRoomPick } from '@/pages/nari-record-room'
 import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScreen'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
@@ -213,6 +214,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
    * 화면 안 행동(훈련 125 · 휴식 127 — S+4 = 1)은 그 상태를 거쳐 105 로 다시 들어온다 — 그 진입이 행동함이라 커서를 첫 칸으로.
    * 행동함이 막 서면, 결과 창 · 하위 창이 걷혀 관리 메뉴만 남는 때에 그 진입을 친다(타자편 `useManagementMenu` 와 같다).
    */
+  /** 124 — 팝업 0x80 에서 고른 [장면+0x164]. null 이면 124 가 아니다 */
+  const [recordPick, setRecordPick] = useState<RecordRoomPick | null>(null)
   const wasActed = useRef(career.hasActedThisCycle)
   const [awaitingEntry, setAwaitingEntry] = useState(false)
   const isIdleMain = menu.kind === '관리' && menu.subWindow === null && menu.detail === null && menu.question === null
@@ -228,6 +231,12 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   })
 
   // 구질 훈련(상태 108 의 구질 탭)은 이미 있는 창을 그대로 쓴다 — 새로 만들지 않는다
+  // 124 그림 0x16778 — 목록 판과 머리띠만(관리 화면은 없다). 취소 → 106
+  if (menu.subWindow === '기록실' && recordPick !== null) {
+    return <NariRecordView edition="투수" career={career} pick={recordPick} gamePoint={career.gamePoint}
+      onBack={() => { setRecordPick(null); menu.closeWindow() }} />
+  }
+
   if (menu.subWindow === '구질훈련') {
     return (
       <PitchTrainingScreen
@@ -239,7 +248,9 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   }
 
   const isBasicInfo = menu.subWindow === '기본정보'
-  const isMenuShown = menu.subWindow === null
+  // 106 칸 4 [기록실] 의 팝업 0x80 은 106 화면 위에 뜬다 — 124 로 가면 `NariRecordView` 가 화면을 덮는다
+  const isRecordRoom = menu.subWindow === '기록실'
+  const isMenuShown = menu.subWindow === null || isRecordRoom
   return (
     <RawScreen>
       {/*
@@ -251,7 +262,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!isRecordRoom && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
             morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
@@ -271,7 +282,6 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
               onSelectPitch={menu.selectPitchCell}
             />
           )}
-          {menu.subWindow === '기록실' && <PitcherRecordPanel career={career} tab={menu.recordWindowTab} />}
           {menu.subWindow === '마구훈련' && (
             <PitcherMagicTrainingPanel career={career} cursor={menu.magicTrainingCursor}
               onMoveCursor={menu.moveMagicTrainingCursor} onConfirm={menu.confirmMagicTrainingCell} />
@@ -319,6 +329,9 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       */}
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
         footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} />
+
+      {/* 106 칸 4 [기록실] — 팝업 0x80(0x19448) → 124(0x116d4 · 0x1463c · 0x16778), 취소는 106 */}
+      {isRecordRoom && <NariRecordPickPopup onChoose={setRecordPick} onCancel={menu.closeWindow} />}
 
       {/*
         칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1). 기본정보(119) 위에 겹쳐 뜨고

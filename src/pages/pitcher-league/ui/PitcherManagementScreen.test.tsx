@@ -348,30 +348,39 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     expect((onSave.mock.calls[0][0] as PitcherCareer).selectedPitchType).toBe(1)
   })
 
-  it('[기록실] 은 StrMODE[74] 두 갈래 팝업(0x80)을 거쳐 124 로 간다', () => {
+  it('[기록실] 은 StrMODE[74] 팝업(0x80, 0x19448)을 거쳐 124 로 간다 — 첫 칸 "개인기록"(img_text 106)이 고른 채로 뜬다', () => {
     화면()
 
     누르기('선수정보')
     누르기('기록실')
-    expect(screen.getByText('보고 싶은 기록을 선택해주세요')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '기록실' }).textContent).toContain('보고 싶은 기록을')
+    // 팝업은 106 위에 뜬다 — 커맨드 줄이 그대로 있다
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
+    expect(칸('개인기록').getAttribute('aria-pressed')).toBe('true')
 
-    // 장면+0x164 = 0 → 기본 엔트리 목록 창(0x5cfec) 자리 — 주인공이 투수 0번(선발)이다
-    누르기('팀 엔트리')
-    expect(screen.getByText('투수 엔트리')).toBeTruthy()
-    expect(screen.getByText('0 테스트')).toBeTruthy()
-    expect(screen.queryByText('1년차 성적')).toBeNull()
+    // [장면+0x164] = 0 → 0x5cfec 연도별 기록(보기 전용) — 투수 열 표 0xd1a28 첫 넷, 줄 1 = 올해
+    누르기('개인기록')
+    expect(screen.getByRole('group', { name: '개인기록 투수' })).toBeTruthy()
+    expect(screen.getByAltText('방어')).toBeTruthy()
+    expect(screen.getByTestId('개인기록-칸-0-승')).toBeTruthy()
+    expect(칸이름들()).toEqual([])
   })
 
-  it('두 번째 갈래는 나리 판 목록(0x5796c) 자리 — 내 투수 성적이다', () => {
+  it('두 번째 칸 "순위기록"(img_text 360)은 0x5796c 나리 판 순위 — 투수편은 방어율 쪽부터', () => {
     화면()
 
     누르기('선수정보')
     누르기('기록실')
-    누르기('선수 성적')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
 
-    expect(screen.getByText('1년차 성적')).toBeTruthy()
-    expect(screen.getByText('통산 성적')).toBeTruthy()
-    expect(screen.queryByText('투수 엔트리')).toBeNull()
+    expect(screen.getByRole('group', { name: '순위기록 투수 방어율' })).toBeTruthy()
+    // 0x5787d — 오른쪽으로 쪽을 넘긴다
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('group', { name: '순위기록 투수 승' })).toBeTruthy()
+    // 취소 → 106
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
   })
 
   it('[기본정보] 는 능력치와 보직 한계를 보여 준다 (상태 119)', () => {
@@ -601,12 +610,13 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     // 106 칸 4 [기록실]
     for (let i = 0; i < 4; i += 1) 키('ArrowDown')
     키('Enter')
-    expect(screen.getByText('보고 싶은 기록을 선택해주세요')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '기록실' })).toBeTruthy()
 
     키('ArrowRight')
     키('Enter')
 
-    expect(screen.queryByText('보고 싶은 기록을 선택해주세요')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '기록실' })).toBeNull()
+    expect(screen.getByRole('group', { name: '순위기록 투수 방어율' })).toBeTruthy()
   })
 })
 

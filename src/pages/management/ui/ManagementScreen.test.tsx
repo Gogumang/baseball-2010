@@ -447,3 +447,36 @@ describe('관리 메뉴 [this+0x8c] 커서 — 루트가 들고 105 진입 0x119
     expect(screen.getByRole('button', { name: '선수정보' }).getAttribute('aria-current')).toBe('true')
   })
 })
+
+describe('106 칸 4 [기록실] — 팝업 0x80 → 124 (0x116d4 · 0x1463c · 0x16778)', () => {
+  it('팝업은 106 위에 뜨고, 확인하면 연도별 기록(타자 열 표 0xd1a08) · 취소는 106 으로', () => {
+    const career = { ...createCareer('테스터'), yearlyStats: [{ ...createCareer('테스터').stats, atBats: 300, hits: 90 }] }
+    render(<ManagementScreen {...propsWith({ career })} />)
+    clickCommand('선수정보')
+    clickCommand('기록실')
+    expect(screen.getByRole('dialog', { name: '기록실' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('group', { name: '개인기록 타자' })).toBeTruthy()
+    // 줄 0 = 1년차(0x1fa8c 칸 0) · 줄 1 = 올해
+    expect(screen.getByTestId('개인기록-칸-0-타율').textContent).toBe('.300')
+    expect(screen.getByTestId('개인기록-칸-1-타율').textContent).toBe('.000')
+    // 0x1463c — '0' · '*' 는 버린다(상세 창 · 탭 뒤집기 없음)
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByRole('group', { name: '개인기록 타자' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: '개인기록 타자' })).toBeNull()
+    expect(screen.getByRole('button', { name: '기록실' })).toBeTruthy()
+  })
+
+  it('오른쪽 칸 "순위기록"은 나리 판 순위(0x5796c) — 타자편은 타율 쪽부터', () => {
+    render(<ManagementScreen {...propsWith({})} />)
+    clickCommand('선수정보')
+    clickCommand('기록실')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(screen.getByRole('group', { name: '순위기록 타자 타율' })).toBeTruthy()
+  })
+})

@@ -16,7 +16,8 @@ import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 import { BasicInfoCard } from '@/pages/management/ui/BasicInfoCard'
 import { DetailPopup, DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { batterAbilityDetailViewOf } from '@/pages/management/lib/abilityDetail'
-import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
+import { NariRecordPickPopup, NariRecordView } from '@/pages/nari-record-room'
+import type { RecordRoomPick } from '@/pages/nari-record-room'
 // 리그 전적을 경기 결과에 잇는 일은 팀 리드 담당이라, 그때까지는 빈 리그(전부 0승 0패)를 보여 준다
 import { SpecialSwingWindow } from '@/widgets/special-swing/ui/SpecialSwingWindow'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
@@ -101,6 +102,14 @@ export function ManagementScreen(props: ManagementScreenProps) {
   const labelWidths = Object.fromEntries(
     slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
   )
+  /** 124 — 팝업 0x80 에서 고른 [장면+0x164]. null 이면 124 가 아니다 */
+  const [recordPick, setRecordPick] = useState<RecordRoomPick | null>(null)
+
+  // 124 그림 0x16778 은 목록 판과 머리띠만 그린다 — 관리 화면(상태판 · 커맨드 줄)은 없다. 취소 → 106
+  if (menu.overlay === '기록실' && recordPick !== null) {
+    return <NariRecordView edition="타자" career={career} pick={recordPick} gamePoint={career.gamePoint}
+      onBack={() => { setRecordPick(null); menu.closeOverlay() }} />
+  }
 
   return (
     <RawScreen>
@@ -155,7 +164,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
           표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. 120 은 0x16928 "그 밖"이라 5, 그 밖 상태도 5 */}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
         footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} />
-      {menu.overlay === '기록실' && <StandingsWindow league={career.league} onClose={menu.closeOverlay} />}
+      {/* 106 칸 4 [기록실] — 팝업 0x80(0x19448) → 124(0x116d4 · 0x1463c · 0x16778), 취소는 106 */}
+      {menu.overlay === '기록실' && <NariRecordPickPopup onChoose={setRecordPick} onCancel={menu.closeOverlay} />}
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
       {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (
         <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay} />
