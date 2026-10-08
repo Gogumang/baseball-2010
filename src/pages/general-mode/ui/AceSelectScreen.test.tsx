@@ -171,12 +171,32 @@ describe('오픈 힌트 팝업', () => {
     expect(container.textContent).not.toContain('마선수 오픈 힌트')
   })
 
-  it('다른 줄(지금 단계가 아닌 줄)의 잠긴 칸에서는 아무것도 안 뜬다', () => {
-    const { container } = 띄우기({ openedAcePitcherIds: [0], openedAceBatterIds: [] })
+  it('상태 21 은 ↑ ↓ · 2 · 8 을 격자에 안 넘겨 줄이 안 바뀐다 (0x29e74~0x29e80)', () => {
+    const onSelect = vi.fn()
+    const { container } = 띄우기({ openedAcePitcherIds: [0], openedAceBatterIds: [], onSelect })
 
-    누르기(['ArrowDown', 'Enter'])
+    누르기(['ArrowDown', '8', 'ArrowUp', '2', 'Enter'])
 
+    expect(onSelect).toHaveBeenCalledWith(0)
     expect(container.textContent).not.toContain('마선수 오픈 힌트')
+  })
+
+  it('상태 21 격자는 꼴 0x10 — ← 는 같은 줄 끝으로 감고, 4 · 6 은 ← →, 5 는 OK (0x263f4)', () => {
+    const onSelect = vi.fn()
+    띄우기({ openedAcePitcherIds: [0, 3], onSelect })
+
+    // 칸 0 ← → 칸 4 · '4' → 칸 3 · '6' '4' → 칸 3 · '5' OK
+    누르기(['ArrowLeft', '4', '6', '4', '5'])
+    expect(onSelect).toHaveBeenCalledWith(3)
+  })
+
+  it('상태 28(mode 레벨업) 격자는 꼴 0x20 — ↓ 는 아랫줄에서 윗줄로 감고 ← 는 칸 0 에서 멈춘다 (0x262c8)', () => {
+    const onLevelUp = vi.fn()
+    띄우기({ mode: '레벨업', openedAcePitcherIds: [0, 1, 2, 3, 4], openedAceBatterIds: [0, 1, 2, 3, 4], onLevelUp, gamePoint: 0 })
+
+    // 칸 0 ← 0 · '8' → 5 · ↓ → 0(감기) · → 1 · '5' = OK → 칸 1 레벨업 창
+    누르기(['ArrowLeft', '8', 'ArrowDown', 'ArrowRight', '5'])
+    expect(screen.getByRole('dialog', { name: '마선수 레벨업' }).textContent).toContain(acePlayerOfCell(1)?.name ?? '없음')
   })
 })
 

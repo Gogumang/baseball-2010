@@ -12,6 +12,8 @@ import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
+import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const IMG_TEXT_FRAME = './sprites/img_text/frames'
@@ -77,6 +79,17 @@ export interface AceSelectScreenProps {
   readonly underlay?: ReactNode
   /** 화면 맨 위에 얹을 팝업 — 코치채용의 가드·확인 팝업 */
   readonly overlay?: ReactNode
+}
+
+/**
+ * 격자 [메뉴+0x74] 의 꼴 — 진입이 `vt+0x1c(격자, 5열, 2줄, 숫자키 꼴 1, 꼴)` 로 짓는다(직접 떴다):
+ * - 상태 21 진입 0x263f4(0x26408~0x26418): 꼴 **0x10** — 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다.
+ * - 상태 28 진입 0x262c8(0x262dc~0x262ea): 꼴 **0x20** — 세로는 감고 가로는 끝에서 멈춘다.
+ * (진입 표 0xcf06c 는 상태 − 2 번째 칸: [19] 0x263f4 · [26] 0x262c8.)
+ */
+const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShape>> = {
+  고르기: { columns: ACE_LAYOUT.grid.columns, rows: ACE_LAYOUT.grid.rows, wrapsColumns: true, wrapsRows: false },
+  레벨업: { columns: ACE_LAYOUT.grid.columns, rows: ACE_LAYOUT.grid.rows, wrapsColumns: false, wrapsRows: true },
 }
 
 /**
@@ -183,17 +196,35 @@ export function AceSelectScreen({
       // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
       if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
       if (overlay !== undefined && overlay !== null && overlay !== false) return
-      const step =
-        event.key === 'ArrowRight' ? 1
-        : event.key === 'ArrowLeft' ? -1
-        : event.key === 'ArrowDown' ? ACE_LAYOUT.grid.columns
-        : event.key === 'ArrowUp' ? -ACE_LAYOUT.grid.columns
-        : 0
-      if (step !== 0) {
-        event.preventDefault()
-        return setCursor((previous) => Math.min(cellCount - 1, Math.max(0, previous + step)))
+      if (!isCoachMode) {
+        // 상태 21 (0x29df8): ↑ ↓ '2' '8' 은 격자에 안 넘긴다(0x29e74~0x29e80) — 그 키를 받는 갈래도 없어 아무 일이 없다.
+        // 그 밖의 키는 격자 vt+0x18(0x6c031, 숫자키 꼴 1)이 '4' '6' 을 ← →, '5' 를 OK 로 바꾼다.
+        // 상태 28 (0x2af20): 모든 키를 격자에 넘긴다(0x2af68~0x2af72) — '2' '8' 도 ↑ ↓.
+        const direction: AnnalsDirection | null =
+          event.key === 'ArrowRight' || event.key === '6' ? 'right'
+          : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
+          : event.key === 'ArrowDown' || event.key === '8' ? 'down'
+          : event.key === 'ArrowUp' || event.key === '2' ? 'up'
+          : null
+        if (direction !== null) {
+          event.preventDefault()
+          if (!isLevelUpMode && (direction === 'up' || direction === 'down')) return
+          return setCursor((previous) => moveGridCursor(ACE_GRID_SHAPES[mode === '레벨업' ? '레벨업' : '고르기'], previous, direction))
+        }
+      } else {
+        // ⚠️ 코치채용(시즌 0xd7 키 0xa734~)의 격자 꼴은 아직 안 떴다 — 칸 번호대로 끝에서 멈추는 근사 그대로
+        const step =
+          event.key === 'ArrowRight' ? 1
+          : event.key === 'ArrowLeft' ? -1
+          : event.key === 'ArrowDown' ? ACE_LAYOUT.grid.columns
+          : event.key === 'ArrowUp' ? -ACE_LAYOUT.grid.columns
+          : 0
+        if (step !== 0) {
+          event.preventDefault()
+          return setCursor((previous) => Math.min(cellCount - 1, Math.max(0, previous + step)))
+        }
       }
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' || (event.key === '5' && !isCoachMode)) {
         event.preventDefault()
         pressCell(cursor)
         return
