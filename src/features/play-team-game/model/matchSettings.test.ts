@@ -122,9 +122,11 @@ describe('경기진행 설정 — 상세', () => {
 })
 
 describe('모드별 분기', () => {
-  it('대전(8·9)은 이닝idx ≤ 5 일 때만 설정을 본다 — 그 밖은 사람 조작 (추정)', () => {
+  it('대전(8·9)은 설정을 안 본다 — 자동진행 표시가 없으면 늘 사람 조작 (c1f04 → c2186)', () => {
     const 찬스 = { ...빈설정, value: CHANCE_VALUE.공격득점권 }
-    expect(isHumanControlled(찬스, 상황({ mode: 8, inningIndex: 5 }))).toBe(false)
+    expect(isHumanControlled(찬스, 상황({ mode: 8, inningIndex: 5 }))).toBe(true)
+    expect(isHumanControlled(찬스, 상황({ mode: 9, inningIndex: 0 }))).toBe(true)
+    expect(isHumanControlled({ ...빈설정, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터 }, 상황({ mode: 8, inningIndex: 0 }))).toBe(true)
     expect(isHumanControlled(찬스, 상황({ mode: 8, inningIndex: 6 }))).toBe(true)
     expect(isHumanControlled(찬스, 상황({ mode: 9, inningIndex: 6 }))).toBe(true)
   })

@@ -84,11 +84,13 @@ export interface MatchControlContext {
 /**
  * 지금 타석을 **사람이 조작하는가** (`0xc1e04`).
  *
- * 이 설정 분기는 점프표 `0xd90c0` 의 **상황 0·1·7·8** 에서만 탄다.
- * 상황 = `[상태+1] − 1` 이고 `[상태+1]` 은 경기 장면이 들고 있는 **게임 모드**다
- * (R10 이 `st[1] ∈ {5,6}` 을 모드 검사로 쓴다) → 상황 0·1·7·8 = **모드 1·2·8·9**,
- * 곧 J-4 의 팀 능력치 마스크 0x306 과 같은 네 모드다 (**추정** — 점프표 칸 이름은 문서에 없다).
- * 상황 7·8(대전)만 `이닝idx ≤ 5` 조건이 따로 붙는데, 대전 자동진행이 6회까지만인 것과 맞는다.
+ * 점프표 `0xd90c0`(상황 = 모드 − 1) — 모드 1·2 → `c1f20`, 모드 8·9 → `c1f04` (2026-10-08 직접 뜸):
+ * ```
+ * c1f20  sim+0x9f → 0(사람) · sim+0xa0 → 1(자동) · 아니면 c1f3c 설정 분기(아래 찬스 · 이닝 · 상세)
+ * c1f04  이닝idx(st+0x6b) > 5 → 0 · sim+0x9f → 0 · sim+0xa0 → 1(c1f38) · 아니면 c2186 → [sp+0xc] = 0(사람)
+ * ```
+ * 곧 **설정을 보는 것은 모드 1·2 뿐**이고, 대전(8·9)은 자동진행 표시(sim+0xa0)가 없으면 늘 사람이 잡는다 — 경기진행 설정을
+ * 아예 안 본다(대전 경기정보에서는 설정 창도 안 열린다, R4 4절). 두 표시는 부르는 쪽(`isHumanTurn`)이 먼저 본다.
  */
 export function isHumanControlled(
   settings: MatchProgressSettings,
@@ -99,9 +101,8 @@ export function isHumanControlled(
   if (mode !== TEAM_GAME_MODE.일반 && mode !== TEAM_GAME_MODE.시즌 && !isVersusMode(mode)) {
     return true
   }
-  // ⚠️ 대전(8·9)은 이닝idx ≤ 5 일 때만 설정을 본다. 그 밖에서 무엇을 하는지는 문서에 없어
-  //    **사람 조작**으로 둔다 (자동진행이 6회까지만인 것과 맞춘 **추정**).
-  if (isVersusMode(mode) && context.inningIndex > 5) return true
+  // 대전(8·9) c1f04 — 자동진행 표시가 없으면 c2186 이 [sp+0xc] = 0 을 돌려준다: 설정을 안 보고 늘 사람 조작
+  if (isVersusMode(mode)) return true
 
   switch (settings.kind) {
     case MATCH_SETTING_KIND.찬스:
