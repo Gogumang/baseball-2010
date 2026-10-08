@@ -2,7 +2,6 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { applySkillReward, isMinusSkill, isSkillEquipped, MAXIMUM_MORALE, MINUS_SKILL_IDS } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
 
 /**
@@ -192,7 +191,7 @@ function applyEffect<T extends GpItemCareer>(rules: GpItemRules<T>, career: T, i
 const LOTTERY_EFFECT_OF: Readonly<Record<string, number>> = { 엄마상: 4, 메디카상: 7, 우정상: 6 }
 
 function drawLottery<T extends GpItemCareer>(rules: GpItemRules<T>, career: T, random: RandomPort): GpItemResultOf<T> {
-  const prize = lotteryPrizeOf(randomIntegerBelow(random, 0, LOTTERY_ROLL_RANGE))
+  const prize = lotteryPrizeOf(random.rand(0, LOTTERY_ROLL_RANGE))
   const counted: T = {
     ...career,
     lotteryPurchases: Math.min(MAXIMUM_LOTTERY_PURCHASES, career.lotteryPurchases + 1),
@@ -203,7 +202,7 @@ function drawLottery<T extends GpItemCareer>(rules: GpItemRules<T>, career: T, r
     return { career: { ...counted, money }, lotteryPrize: prize }
   }
   const effectId =
-    prize === '아차상' ? randomIntegerBelow(random, 0, RANDOM_ABILITY_ITEM_COUNT) : LOTTERY_EFFECT_OF[prize]
+    prize === '아차상' ? random.rand(0, RANDOM_ABILITY_ITEM_COUNT) : LOTTERY_EFFECT_OF[prize]
   return { career: applyEffect(rules, counted, effectId), lotteryPrize: prize, prizeItemId: effectId }
 }
 

@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import { PLATE_DEPTH, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
@@ -63,7 +62,7 @@ const FLIP_CHANCE = 3
 const PICKOFF_BASE_LOW = 1
 const PICKOFF_BASE_HIGH = 4
 
-const signed = (random: RandomPort, value: number) => (randomIntegerBelow(random, 0, 2) === 0 ? value : -value)
+const signed = (random: RandomPort, value: number) => (random.rand(0, 2) === 0 ? value : -value)
 
 /**
  * 목표 종류 4 가 **정말로 견제로 가는가** — 0x34684~0x3469a 의 갈림 그대로.
@@ -89,7 +88,7 @@ export function cpuPickoffBaseOf(
 ): 1 | 2 | 3 {
   // 원본에는 없는 안전망 — 부르는 쪽이 `isCpuPickoff` 를 안 걸렀을 때 무한 루프를 막는다
   for (let guard = 0; guard < 1000; guard += 1) {
-    const base = randomIntegerBelow(random, PICKOFF_BASE_LOW, PICKOFF_BASE_HIGH)
+    const base = random.rand(PICKOFF_BASE_LOW, PICKOFF_BASE_HIGH)
     if (hasRunnerOnBase(base)) return base as 1 | 2 | 3
   }
   throw new Error('cpuPickoffBaseOf: 주자가 있는 루가 없다 — isCpuPickoff 로 먼저 걸러야 한다')
@@ -119,8 +118,8 @@ export function pitchTargetOf(kind: number, situation: TargetSituation, random: 
     kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
   switch (effective) {
     case 0: {
-      const x = center.x + randomIntegerBelow(random, -INNER, INNER)
-      const y = center.y + randomIntegerBelow(random, -INNER, INNER)
+      const x = center.x + random.rand(-INNER, INNER)
+      const y = center.y + random.rand(-INNER, INNER)
       return { x, y, z: PLATE_DEPTH }
     }
     case 2:
@@ -128,17 +127,17 @@ export function pitchTargetOf(kind: number, situation: TargetSituation, random: 
     case PICKOFF_KIND: {
       const [minimumX, maximumX] = effective === 2 ? CORNER_X : EDGE_X
       const [minimumY, maximumY] = effective === 2 ? CORNER_Y : EDGE_Y
-      const dx = randomIntegerBelow(random, minimumX, maximumX)
-      const dy = randomIntegerBelow(random, minimumY, maximumY)
+      const dx = random.rand(minimumX, maximumX)
+      const dy = random.rand(minimumY, maximumY)
       const x = center.x + signed(random, dx)
       const y = center.y + signed(random, dy)
       return { x, y, z: PLATE_DEPTH }
     }
     default: {
-      const dx = randomIntegerBelow(random, OUTSIDE_X[0], OUTSIDE_X[1])
-      const dy = randomIntegerBelow(random, OUTSIDE_Y[0], OUTSIDE_Y[1])
+      const dx = random.rand(OUTSIDE_X[0], OUTSIDE_X[1])
+      const dy = random.rand(OUTSIDE_Y[0], OUTSIDE_Y[1])
       let direction = situation.batterSide === 0 ? 1 : -1
-      if (randomIntegerBelow(random, 0, FLIP_CHANCE) === 0) direction = -direction
+      if (random.rand(0, FLIP_CHANCE) === 0) direction = -direction
       const y = center.y + signed(random, dy)
       return { x: center.x + dx * direction, y, z: PLATE_DEPTH }
     }
@@ -188,16 +187,16 @@ export function applyMissionAimShake(
   const shake = MISSION_AIM_SHAKES[conditionCode] ?? null
   if (shake === null) return { x, y, z: aim.z }
   // 원본은 `rand(0,100) <= 50` 이라 51% 다 (⚠️ 원본 그대로)
-  if (randomIntegerBelow(random, 0, 100) > shake.chancePercent) return { x, y, z: aim.z }
+  if (random.rand(0, 100) > shake.chancePercent) return { x, y, z: aim.z }
 
   if (shake.teleport) {
-    x = randomIntegerBelow(random, center.x - shake.shakeX, center.x + shake.shakeX)
-    y = randomIntegerBelow(random, center.y - shake.shakeY, center.y + shake.shakeY)
+    x = random.rand(center.x - shake.shakeX, center.x + shake.shakeX)
+    y = random.rand(center.y - shake.shakeY, center.y + shake.shakeY)
     return { x, y, z: aim.z }
   }
-  x += randomIntegerBelow(random, -shake.shakeX, shake.shakeX)
+  x += random.rand(-shake.shakeX, shake.shakeX)
   // 세기 1 은 가로만 흔든다 (shakeY = 0 이라 난수도 뽑지 않는다 — 원본도 세로 갈래를 건너뛴다)
-  if (shake.shakeY !== 0) y += randomIntegerBelow(random, -shake.shakeY, shake.shakeY)
+  if (shake.shakeY !== 0) y += random.rand(-shake.shakeY, shake.shakeY)
   return { x, y, z: aim.z }
 }
 
@@ -225,14 +224,14 @@ export function applyControlError(target: WorldPoint, input: ControlErrorInput, 
       : applyMissionAimShake(target, input.missionAim.conditionCode, input.missionAim.side, random)
   const row = ERROR_ROWS[Math.max(0, Math.min(input.tier, ERROR_ROWS.length - 1))]
   const aimIndex = input.isComputer ? input.tier + COMPUTER_AIM_OFFSET : (input.aimIndex ?? 0)
-  const roll = randomIntegerBelow(random, 0, 100)
+  const roll = random.rand(0, 100)
   const column = row.findIndex((percent) => roll < percent)
   const coefficient = ERROR_COEFFICIENTS[column < 0 ? ERROR_COEFFICIENTS.length - 1 : column]
   const half = input.tier === 0 ? AIM_HALF_WIDTHS[0] : AIM_HALF_WIDTHS[Math.min(aimIndex, AIM_HALF_WIDTHS.length - 1)]
-  const angle = randomIntegerBelow(random, 0, 360) + 1
-  const dx = Math.abs(coefficient * ((half + randomIntegerBelow(random, -2, 3)) * sineSixteen(angle))) >> SIXTEEN_BITS
-  const dy = Math.abs(coefficient * ((half + randomIntegerBelow(random, -2, 3)) * cosineSixteen(angle))) >> SIXTEEN_BITS
-  const x = randomIntegerBelow(random, 0, 2) !== 0 ? aim.x - dx : aim.x + dx
-  const y = randomIntegerBelow(random, 0, 2) !== 0 ? aim.y - dy : aim.y + dy
+  const angle = random.rand(0, 360) + 1
+  const dx = Math.abs(coefficient * ((half + random.rand(-2, 3)) * sineSixteen(angle))) >> SIXTEEN_BITS
+  const dy = Math.abs(coefficient * ((half + random.rand(-2, 3)) * cosineSixteen(angle))) >> SIXTEEN_BITS
+  const x = random.rand(0, 2) !== 0 ? aim.x - dx : aim.x + dx
+  const y = random.rand(0, 2) !== 0 ? aim.y - dy : aim.y + dy
   return { x, y, z: aim.z }
 }

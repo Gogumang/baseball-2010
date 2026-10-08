@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
@@ -106,6 +105,6 @@ export function rollCpuSteal(input: CpuStealInput, random: RandomPort): StealBas
   if (target === null) return null
   const speed = runnerSpeedOf(input.runAbilityOf(target.base), input.runnerTeamGrade ?? 0)
   const column = cpuStealSpeedColumnOf(speed)
-  const roll = randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  const roll = random.rand(0, RANDOM_LIMIT)
   return CPU_STEAL_TABLE[target.row][column] >= roll ? target.base : null
 }

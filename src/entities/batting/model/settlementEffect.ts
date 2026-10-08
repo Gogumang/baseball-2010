@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import {
   FIREWORK_SLOT_COUNT,
   respawnFireworkSlot,
@@ -146,8 +145,8 @@ export function enterSettlementEffect(input: SettlementEffectInput, random: Rand
 
 /** 0x90190(객체, 0, 0) → 0x8fe58 종류 0 — 2 + 200 × 6 번 */
 function createRain(random: RandomPort): SceneRain {
-  const gravity = randomIntegerBelow(random, 1, 3)
-  const wind = randomIntegerBelow(random, -3, 4)
+  const gravity = random.rand(1, 3)
+  const wind = random.rand(-3, 4)
   const rain: SceneRain = {
     wind,
     windStep: 1,
@@ -179,15 +178,15 @@ function spawnDrop(wind: number, random: RandomPort): RainDrop {
   const reach = 30 * Math.abs(wind)
   const x =
     wind < 0
-      ? randomIntegerBelow(random, 0, SCREEN_WIDTH + reach)
+      ? random.rand(0, SCREEN_WIDTH + reach)
       : wind > 0
-        ? randomIntegerBelow(random, -reach, SCREEN_WIDTH)
-        : randomIntegerBelow(random, -30, SCREEN_WIDTH + 30)
-  const y = randomIntegerBelow(random, -60, 20)
-  const length = randomIntegerBelow(random, 20, 40)
-  const ground = randomIntegerBelow(random, SCREEN_HEIGHT - 50, SCREEN_HEIGHT + 20) & 0xffff
-  const alphaStep = randomIntegerBelow(random, 5, 10)
-  const delay = randomIntegerBelow(random, 0, 20)
+        ? random.rand(-reach, SCREEN_WIDTH)
+        : random.rand(-30, SCREEN_WIDTH + 30)
+  const y = random.rand(-60, 20)
+  const length = random.rand(20, 40)
+  const ground = random.rand(SCREEN_HEIGHT - 50, SCREEN_HEIGHT + 20) & 0xffff
+  const alphaStep = random.rand(5, 10)
+  const delay = random.rand(0, 20)
   return { x, y, vx: 0, vy: 0, alpha: 0, alphaStep, length, delay, ground, isDrawn: false }
 }
 

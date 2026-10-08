@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { PITCH_PATTERNS } from '@/shared/config/original/pitchPatterns'
 import type { PitchPatternDifficulty } from '@/shared/config/original/pitchPatterns'
 
@@ -42,7 +41,7 @@ export function computerPitchTypeOf(situation: PitchChoiceSituation, random: Ran
   const hasMagic = list[MAGIC_SLOT] === MAGIC_PITCH
   const isMagicMoment = runnerCount > 1 || strikes === 2 || (strikes === 0 && (balls === 0 || balls === 3))
   if (hasMagic && magicCount > 0 && isMagicMoment) return MAGIC_PITCH
-  let type = list[randomIntegerBelow(random, 0, LIST_SIZE)] ?? 0
+  let type = list[random.rand(0, LIST_SIZE)] ?? 0
   if (type === MAGIC_PITCH && magicCount < 1) type = 0
   return type || FASTBALL
 }
@@ -73,7 +72,7 @@ export function targetKindOf(difficulty: PitchPatternDifficulty, situation: Coun
       candidate[2] === situation.outs &&
       candidate[8] === column,
   )
-  const roll = randomIntegerBelow(random, 0, 10_000)
+  const roll = random.rand(0, 10_000)
   if (row === undefined) return 0
   let cumulative = 0
   for (let kind = 0; kind < TARGET_KIND_COUNT; kind += 1) {

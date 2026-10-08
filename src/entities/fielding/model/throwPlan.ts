@@ -9,7 +9,6 @@ import { AI_STATE, NONE, type FielderState } from '@/entities/fielding/model/fie
 import { SINE_HUNDRED_TABLE } from '@/shared/config/original/trigonometryTables'
 import { atan2Degrees, cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /** 악송구 수평 속도 하한 (a186e: ≤ 99 → 100) */
 const MINIMUM_THROW_SPEED = 100
@@ -182,8 +181,8 @@ export function errantThrowFlight(
   else if (vertical > 500) vertical = Math.trunc((vertical * 5) / 6)
   else if (horizontal > 1200) horizontal = Math.trunc((horizontal * 6) / 7)
   else if (horizontal > 900) horizontal = Math.trunc((horizontal * 8) / 9)
-  const magnitude = randomIntegerBelow(random, 0, 22 - Math.trunc(horizontal / 150))
-  const sign = ERRANT_DIRECTION_SIGNS[randomIntegerBelow(random, 0, 2)] ?? 1
+  const magnitude = random.rand(0, 22 - Math.trunc(horizontal / 150))
+  const sign = ERRANT_DIRECTION_SIGNS[random.rand(0, 2)] ?? 1
   const direction = flight.direction + sign * magnitude
   return {
     horizontalSpeed: horizontal,
@@ -218,7 +217,7 @@ export function rollLongThrowWobble(
   random: RandomPort,
 ): boolean | null {
   if (horizontalDistance(fielder.position, point) <= LONG_THROW_DISTANCE) return null
-  return randomIntegerBelow(random, 0, 10_000) < (special ? 100 : 0) + LONG_THROW_WOBBLE_BASE
+  return random.rand(0, 10_000) < (special ? 100 : 0) + LONG_THROW_WOBBLE_BASE
 }
 
 /** 흔들린 긴 송구의 수평 속도 · 수직 속도 · 방향 — a173c · a17e4 의 h · w 에 85% (a19a6~a19be) */

@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * ============================================================================
@@ -118,8 +117,8 @@ export function initHomeRunFireworks<E>(): HomeRunFireworks<E> {
 
 /** 0x8f97c(칸, 0, 0, 0) — 인자 꺼짐(+0x20 == 0): 자리를 굴린다 (x 먼저, y 다음) · 기다림 50. 경기 정산 0x4f4cc 도 이것으로 깐다 */
 export function respawnFireworkSlot<E>(random: RandomPort): FireworkSlot<E> {
-  const x = randomIntegerBelow(random, 40, SCREEN_WIDTH - 40)
-  const y = randomIntegerBelow(random, SCREEN_HEIGHT + 50, SCREEN_HEIGHT + 100)
+  const x = random.rand(40, SCREEN_WIDTH - 40)
+  const y = random.rand(SCREEN_HEIGHT + 50, SCREEN_HEIGHT + 100)
   return { state: 1, x, y, delay: RESPAWN_DELAY, linger: 0, burst: null }
 }
 
@@ -158,7 +157,7 @@ function tickSlot<E>(
       return { alive: true, next: { ...slot, delay: 0, state: 2 } }
     }
     case 2: {
-      const roll = randomIntegerBelow(random, 0, 2)
+      const roll = random.rand(0, 2)
       const id = roll === 0 ? FIREWORK_PARTICLES.burstA : FIREWORK_PARTICLES.burstB
       const burst = port.emit(id, slot.x, slot.y - BURST_RISE, FIREWORK_PARTICLES.image)
       return { alive: true, next: { ...slot, state: 3, burst } }

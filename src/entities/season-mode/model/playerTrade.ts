@@ -3,7 +3,6 @@ import {
 } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -156,7 +155,7 @@ export function tradeSuccessRate(input: TradeRateInput): number {
  * 아니면 d170 에서 this+0x148 을 본다). 난수 하나가 늘 나간다.
  */
 export function rollTradeSuccess(random: RandomPort, rate: number, isForced = false): boolean {
-  const drawn = randomIntegerBelow(random, 1, 101)
+  const drawn = random.rand(1, 101)
   return drawn < rate || isForced
 }
 

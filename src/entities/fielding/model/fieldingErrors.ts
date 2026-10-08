@@ -1,7 +1,6 @@
 import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
 import { throwErrorBiasOf } from '@/entities/fielding/model/fieldingState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 수비 실수 세 가지 — 펌블(0xb401c 안 0xb41d0) · 악송구(0xa1828) · 필살수비 발동(0x66b30/0x66be4).
@@ -34,7 +33,7 @@ export function fumbleChanceOf(defenseAbility: number): number {
  * 예전 웹은 멈춘 공이면 굴리지 않아 그 뒤 난수 차례가 하나씩 밀렸다.
  */
 export function rollFumble(defenseAbility: number, ballIsMoving: boolean, random: RandomPort): boolean {
-  const roll = randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  const roll = random.rand(0, RANDOM_LIMIT)
   return ballIsMoving && fumbleChanceOf(defenseAbility) > roll
 }
 
@@ -71,11 +70,11 @@ export function rollThrowError(
   random: RandomPort,
 ): ThrowErrorResult {
   const threshold = throwErrorChanceOf(defenseAbility, special)
-  if (randomIntegerBelow(random, 0, RANDOM_LIMIT) >= threshold) return NO_THROW_ERROR
+  if (random.rand(0, RANDOM_LIMIT) >= threshold) return NO_THROW_ERROR
   return {
     errant: true,
-    speedDelta: randomIntegerBelow(random, -50, special ? 0 : 51),
-    verticalDelta: randomIntegerBelow(random, -49, special ? 0 : 50),
+    speedDelta: random.rand(-50, special ? 0 : 51),
+    verticalDelta: random.rand(-49, special ? 0 : 50),
   }
 }
 
@@ -113,7 +112,7 @@ export function rollSpecialDefense(
   options: SpecialDefenseOptions = {},
 ): { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean } {
   const threshold = specialDefenseThresholdOf(defenseAbility, options)
-  if (randomIntegerBelow(random, 0, 1000) < threshold) return { jumpUnlocked: true, slideUnlocked: false }
-  const second = randomIntegerBelow(random, 0, 1000) < threshold
+  if (random.rand(0, 1000) < threshold) return { jumpUnlocked: true, slideUnlocked: false }
+  const second = random.rand(0, 1000) < threshold
   return { jumpUnlocked: false, slideUnlocked: second }
 }

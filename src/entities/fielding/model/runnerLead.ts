@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { basePosition, stepToward } from '@/entities/fielding/model/fieldGeometry'
 import type { RunnerState } from '@/entities/fielding/model/fieldingState'
 import { stealTargetBaseOf } from '@/entities/fielding/model/stealStart'
@@ -93,13 +92,13 @@ export function runnerLeadOf(runner: Pick<RunnerState, 'startBase' | 'targetBase
   const index = ((base % 4) + 4) % 4
   const walkLike = input.playKind === 2 || input.playKind === 3
   if (input.playKind === 4) {
-    const roll = input.random === undefined ? 0 : randomIntegerBelow(input.random, 0, 100)
+    const roll = input.random === undefined ? 0 : input.random.rand(0, 100)
     const extra = roll <= 0 ? PICKOFF_EXTRA_TICKS : 0
     return { ticks: PICKOFF_LEAD_TICKS[index] + extra, leadTargetBase, restoredTargetBase: base }
   }
   if (input.stealing) {
     if (walkLike) return { ticks: 0, leadTargetBase, restoredTargetBase: null }
-    const roll = input.random === undefined ? 0 : randomIntegerBelow(input.random, 0, 9)
+    const roll = input.random === undefined ? 0 : input.random.rand(0, 9)
     const extra = roll <= STEAL_EXTRA_FLOOR_BELOW ? STEAL_EXTRA_FLOOR : roll
     return { ticks: STEAL_LEAD_TICKS[index] + extra, leadTargetBase, restoredTargetBase: runner.targetBase }
   }

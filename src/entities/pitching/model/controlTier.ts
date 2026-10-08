@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /** 제구 250 단위 행 × 누적 % (표 0xd896c) */
 const TIER_ROWS: readonly (readonly number[])[] = [
@@ -17,7 +16,7 @@ const LAST_TIER = 3
  */
 export function controlTierOf(control: number, isNotExhausted: boolean, random: RandomPort): number {
   const row = TIER_ROWS[Math.min(Math.trunc(control / CONTROL_ROW_WIDTH), TIER_ROWS.length - 1)]
-  const roll = randomIntegerBelow(random, 0, 10_000)
+  const roll = random.rand(0, 10_000)
   const index = row.findIndex((percent) => roll < percent * 100)
   if (index < 0) return LAST_TIER
   return isNotExhausted ? index + 1 : Math.max(0, index - 1)

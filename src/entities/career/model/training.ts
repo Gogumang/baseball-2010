@@ -1,6 +1,5 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { BALANCE } from '@/shared/config/original/balance'
 import { countTraining, gainAbility, gainMorale, isSkillEquipped, spendCycleAction } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -88,7 +87,7 @@ const WEAK_BODY_SKILL = BALANCE.training.weakBodySkillId
  */
 
 function roll(random: RandomPort, range: IntegerRange): number {
-  return randomIntegerBelow(random, range.minimum, range.maximumExclusive)
+  return random.rand(range.minimum, range.maximumExclusive)
 }
 
 const isSpecialSwingMenu = (menu: TrainingMenu) => menu.abilities.length === 0

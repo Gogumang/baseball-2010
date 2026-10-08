@@ -1,7 +1,6 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 도루 (binary.mod 0xc1818 안에서 쓰는 표 0xd9064 — 바이트로 직접 읽어 확인).
@@ -68,7 +67,7 @@ export function quickEngineSteal(
 ): QuickStealResult {
   const base = quickStealBaseOf(bases)
   if (base === null) return { bases, stolen: 0 }
-  if (randomIntegerBelow(random, 0, RANDOM_LIMIT) >= stealChanceOf(leadRunner)) {
+  if (random.rand(0, RANDOM_LIMIT) >= stealChanceOf(leadRunner)) {
     return { bases, stolen: 0 }
   }
   return {

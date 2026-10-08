@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputation'
 
 /**
@@ -64,7 +63,7 @@ export interface BenchClearingGate {
  */
 export function rollsIntoBenchClearing(gate: BenchClearingGate, random: RandomPort): boolean {
   if (gate.isHomeRunDerby || !gate.isHitByPitch) return false
-  const rolled = randomIntegerBelow(random, 0, ROLL_RANGE)
+  const rolled = random.rand(0, ROLL_RANGE)
   if (rolled > ROLL_LIMIT) return false
   return !gate.burstInProgress
 }

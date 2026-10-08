@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 휴식·입원 뒤 회복 판정 (0x1b308 휴식 — 질병 60% · 부상 30%, G 2-2 확정).
@@ -47,7 +46,7 @@ export function rollRecovery<TCareer extends RecoverableCareer>(
   let next = career
   const recoveries: string[] = []
   if (next.isSick) {
-    const roll = randomIntegerBelow(random, 0, PERCENT)
+    const roll = random.rand(0, PERCENT)
     if (roll >= chance.illness && next.illnessRemaining > 0) {
       next = { ...next, illnessRemaining: next.illnessRemaining - 1 }
     } else {
@@ -57,7 +56,7 @@ export function rollRecovery<TCareer extends RecoverableCareer>(
   }
   if (next.isInjured) {
     const remaining = Math.max(0, next.injuryRemaining - 1)
-    const roll = randomIntegerBelow(random, 0, PERCENT)
+    const roll = random.rand(0, PERCENT)
     if (roll < chance.injury || remaining === 0) {
       recoveries.push('부상에서 회복 되었습니다.')
       // 부상에서 회복되면 누적 경기 수도 0 으로 (G-2)

@@ -9,7 +9,6 @@ import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
 import { pitcherHiddenOpenTextOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **보상 명령 7 의 알림** — 실행 0x8d4c4 · 글 0x8beb8 · 기다림 0x8daa0 (직접 떴다).
@@ -189,7 +188,7 @@ function buildRewardText(
       if (value < 0) {
         text += sprintf(MODE_TEXT[206], MODE_TEXT[185 + ctx.illness] ?? '')
       } else {
-        const rolled = randomIntegerBelow(ctx.random, 0, ILLNESS_COUNT)
+        const rolled = ctx.random.rand(0, ILLNESS_COUNT)
         text += sprintf(MODE_TEXT[207], MODE_TEXT[186 + rolled] ?? '')
         resolved.push({ kind: item.kind, value: rolled + 1 })
         return

@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 마구 (binary.mod 0xb6d2c 구질 칸 · 0x50da8 사람 고르기 · 0x344dc CPU 고르기 · 0x3de10 공에 싣기 ·
@@ -193,7 +192,7 @@ export function magicSpeedRowOf(number: number, form: number): number {
 export function magicPitchDisplaySpeedOf(number: number, form: number, random: RandomPort): number {
   const row = MAGIC_SPEED_RANGES[magicSpeedRowOf(number, form)]
   if (row === undefined) return 0
-  return randomIntegerBelow(random, row[0], row[1] + 1)
+  return random.rand(row[0], row[1] + 1)
 }
 
 /**

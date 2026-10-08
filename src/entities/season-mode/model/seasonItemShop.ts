@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { MONEY_LIMIT, MORALE_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
@@ -180,7 +179,7 @@ export function applySeasonGpItem<R extends GpRecord>(
   const raiseMorale = () => clampTo(teamMorale + MORALE_GAIN, MORALE_LIMIT)
   switch (slot) {
     case 0: {
-      const roll = randomIntegerBelow(random, 0, LOTTERY_RANGE)
+      const roll = random.rand(0, LOTTERY_RANGE)
       let rank = 0
       while (rank <= 6 && (LOTTERY_CUMULATIVE[rank] ?? 0) * 100 <= roll) rank += 1
       if (rank <= LOTTERY_LAST_PRIZE) {

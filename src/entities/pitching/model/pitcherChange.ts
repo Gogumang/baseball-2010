@@ -2,7 +2,6 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **경기 중 CPU 투수 교체** (binary.mod 0xc1ba4 → 0xac428 판정 · 0xabfcc 새 투수 · 0xac360 마무리 굴림
@@ -196,7 +195,7 @@ export interface CloserRollInput {
 export function rollsCloser(input: CloserRollInput, random: RandomPort): boolean {
   if (input.bothTeamsAreCpu === true) return false
   const index = closerRollIndexOf(input)
-  return randomIntegerBelow(random, 0, 100) < (CLOSER_ROLL_PERCENTS[index] ?? 0)
+  return random.rand(0, 100) < (CLOSER_ROLL_PERCENTS[index] ?? 0)
 }
 
 /**

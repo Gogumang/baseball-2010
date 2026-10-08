@@ -10,7 +10,6 @@ import type { OutingEffect, OutingFunction, OutingRange, RolledOutingEffect } fr
 import { HOSPITAL_RECOVERY, REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
 import type { RecoverableCareer } from '@/entities/career/model/recovery'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { applyOutingSubItems, outingSubItemIdOf, SUB_ITEMS } from '@/entities/career/model/subItems'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
@@ -85,7 +84,7 @@ const clamp = (value: number, maximum: number) => Math.min(maximum, Math.max(0, 
 
 function rollRange(random: RandomPort, [first, second]: OutingRange): number {
   const sign = first < 0 ? -1 : 1
-  return sign * randomIntegerBelow(random, Math.abs(first), Math.abs(second))
+  return sign * random.rand(Math.abs(first), Math.abs(second))
 }
 
 /** 효과 표의 난수를 뽑는다 — 순서 인기도 → 평판 → 사기 (0x1524c · 0x1526e · 0x1528e, G 3-2 확정) */
@@ -227,7 +226,7 @@ export function runRest(career: PlayerCareer, random: RandomPort): { career: Pla
   if (restBlockReasonOf(career) !== null) {
     throw new Error(`휴식할 수 없습니다 (${restBlockReasonOf(career)})`)
   }
-  const moraleGain = randomIntegerBelow(random, REST_MORALE_RANGE.minimum, REST_MORALE_RANGE.maximumExclusive)
+  const moraleGain = random.rand(REST_MORALE_RANGE.minimum, REST_MORALE_RANGE.maximumExclusive)
   return { career: gainMorale(spendCycleAction(career), moraleGain), moraleGain }
 }
 

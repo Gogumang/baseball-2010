@@ -1,6 +1,5 @@
 import { BALANCE } from '@/shared/config/original/balance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { applySwingSkills } from '@/entities/batting/model/swingSkills'
 import type { SwingSituation } from '@/entities/batting/model/swingSkills'
 import { NO_SWING_BOOST } from '@/entities/batting/model/swingBoost'
@@ -259,7 +258,7 @@ function finishFactors(
 /** 원본 난수 순서: 번트용 rand(0,100) → contact → B → C → 15/18 경계 (→ 홈런더비만 18 에서 rand(0,2)) */
 export function swingResultOf(input: SwingResultInput, random: RandomPort): SwingResult {
   const factors = swingFactorsOf(input)
-  const buntRoll = randomIntegerBelow(random, 0, 100)
+  const buntRoll = random.rand(0, 100)
 
   if (input.buntKind > 0) {
     const horizontal = Math.abs(clampError(input.horizontalError))
@@ -271,18 +270,18 @@ export function swingResultOf(input: SwingResultInput, random: RandomPort): Swin
     return { kind: '타구', code, isSolid: true }
   }
 
-  if (randomIntegerBelow(random, 0, 10_000) >= factors.contact) return { kind: '헛스윙' }
+  if (random.rand(0, 10_000) >= factors.contact) return { kind: '헛스윙' }
   const solid = Math.min(factors.solid, SOLID_CAP)
   const homeRun = Math.min(factors.homeRun, HOME_RUN_CAP)
-  if (randomIntegerBelow(random, 0, 10_000) < solid) {
-    if (randomIntegerBelow(random, 0, 10_000) < homeRun) return { kind: '타구', code: 24, isSolid: true }
+  if (random.rand(0, 10_000) < solid) {
+    if (random.rand(0, 10_000) < homeRun) return { kind: '타구', code: 24, isSolid: true }
     const lineDriveLimit = trunc((homeRun * 120) / trunc((10_000 - homeRun) / 100))
-    if (randomIntegerBelow(random, 0, 10_000) >= lineDriveLimit) return { kind: '타구', code: 15, isSolid: true }
+    if (random.rand(0, 10_000) >= lineDriveLimit) return { kind: '타구', code: 15, isSolid: true }
     // 홈런더비는 18 자리에서 한 번 더 굴린다 — rand(0,2) == 1 이면 24 (0xabf18~0xabf2a)
-    if (input.mode === '홈런더비' && randomIntegerBelow(random, 0, 2) === 1) return { kind: '타구', code: 24, isSolid: true }
+    if (input.mode === '홈런더비' && random.rand(0, 2) === 1) return { kind: '타구', code: 24, isSolid: true }
     return { kind: '타구', code: 18, isSolid: true }
   }
-  const roll = randomIntegerBelow(random, 0, 10_000) - BALANCE.swing.foulPercent * 100
+  const roll = random.rand(0, 10_000) - BALANCE.swing.foulPercent * 100
   if (roll < 0) return { kind: '타구', code: 9, isSolid: true }
   return roll - BALANCE.swing.outPercent * 100 < 0
     ? { kind: '타구', code: 0, isSolid: false }

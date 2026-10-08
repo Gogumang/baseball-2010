@@ -2,7 +2,6 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { isSkillEquipped, MAXIMUM_ABILITY } from '@/entities/career/model/playerCareer'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -147,7 +146,7 @@ export function rollTrainingInjury<T extends TrainingInjuryCareer>(
   random: RandomPort,
 ): { career: T; notice: string | null } {
   if (career.isInjured) return { career, notice: null }
-  const roll = randomIntegerBelow(random, 0, INJURY_ROLL_RANGE)
+  const roll = random.rand(0, INJURY_ROLL_RANGE)
   if (roll >= trainingInjuryChanceOf(career, isSpecialSwing) * 100) return { career, notice: null }
   return {
     career: { ...career, isInjured: true, injuryRemaining: INJURY_DURATION },

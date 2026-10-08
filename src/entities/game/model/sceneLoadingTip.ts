@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 
 /**
@@ -20,5 +19,5 @@ import { LOADING_TIPS } from '@/shared/config/loadingTips'
  * 돌려주는 값은 `LOADING_TIPS` 의 칸 번호(= StrTIP 칸 − 1)다.
  */
 export function rollSceneLoadingTip(random: RandomPort): number {
-  return randomIntegerBelow(random, 0, LOADING_TIPS.length)
+  return random.rand(0, LOADING_TIPS.length)
 }

@@ -11,7 +11,6 @@
  */
 
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 능력치 → 등급 0~7 (0xbbe98) — 원본은 수비·주루·투구 어디서나 이 한 함수를 쓴다.
@@ -58,8 +57,8 @@ export function specialDefenseChanceOf(input: SpecialDefenseInput): number {
  */
 export function rollSpecialDefense(input: SpecialDefenseInput, random: RandomPort): SpecialDefenseCatch | null {
   const threshold = specialDefenseChanceOf(input)
-  if (randomIntegerBelow(random, 0, CHANCE_LIMIT) < threshold) return '점프캐치'
-  if (randomIntegerBelow(random, 0, CHANCE_LIMIT) < threshold) return '슬라이딩캐치'
+  if (random.rand(0, CHANCE_LIMIT) < threshold) return '점프캐치'
+  if (random.rand(0, CHANCE_LIMIT) < threshold) return '슬라이딩캐치'
   return null
 }
 
@@ -101,7 +100,7 @@ export function laserThrowChanceOf(input: LaserThrowInput): number {
 
 /** 0x66a8c — rand(0,1000) < 기준 */
 export function rollLaserThrow(input: LaserThrowInput, random: RandomPort): boolean {
-  return randomIntegerBelow(random, 0, CHANCE_LIMIT) < laserThrowChanceOf(input)
+  return random.rand(0, CHANCE_LIMIT) < laserThrowChanceOf(input)
 }
 
 /**

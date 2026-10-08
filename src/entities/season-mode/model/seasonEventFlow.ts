@@ -1,4 +1,3 @@
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_SEASON_EVENTS } from '@/shared/config/original/seasonEvents'
 import type { SeasonOriginalEvent } from '@/shared/config/original/seasonEvents'
@@ -155,7 +154,7 @@ function passesCondition(
     case 22:
       // SR+5 ≠ 0 이면 굴리지 않고 불발. p 가 0 이어도 rand 는 돈다 (adbd2 `rand(0,100) < p`)
       if (record.illness !== 0) return false
-      return randomIntegerBelow(random, 0, 100) < illnessChancePercentOf(input.teamMorale)
+      return random.rand(0, 100) < illnessChancePercentOf(input.teamMorale)
     // 23 — 모드 2 는 불발 (0xadbe6)
     case 23:
       return false
@@ -484,7 +483,7 @@ export function applySeasonEventRewards(
         // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
         const kind = reward.value > 0
           ? reward.value
-          : reward.value === 0 ? randomIntegerBelow(random, 0, ILLNESS_KIND_COUNT) + 1 : reward.value
+          : reward.value === 0 ? random.rand(0, ILLNESS_KIND_COUNT) + 1 : reward.value
         record = kind > 0
           ? { ...record, illness: kind, illnessSlack: ILLNESS_SLACK_TABLE[kind] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
           : { ...record, illness: 0, illnessSlack: ILLNESS_SLACK_TABLE[0] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
@@ -519,7 +518,7 @@ export interface IllnessCureResult {
  * 낫지 못해도 여유 칸이 0 이 되면 다음엔 반드시 낫는다.
  */
 export function cureIllnessAtHospital(record: SeasonRecord, random: RandomPort): IllnessCureResult {
-  const roll = randomIntegerBelow(random, 0, 101)
+  const roll = random.rand(0, 101)
   if (roll <= HOSPITAL_CURE_THRESHOLD || record.illnessSlack === 0) {
     return {
       record: { ...record, illness: 0, illnessSlack: 0, illnessCooldown: ILLNESS_COOLDOWN },

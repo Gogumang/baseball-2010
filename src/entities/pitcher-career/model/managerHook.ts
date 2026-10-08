@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -109,7 +108,7 @@ export function judgeManagerHook(
 
   const column = Math.min(Math.max(Math.trunc(input.reputation / 100), 0), HOOK_PERCENT_TABLE[0].length - 1)
   const tone = managerToneOf(input.reputation)
-  const rolls = (row: number) => randomIntegerBelow(random, 0, 10_000) < HOOK_PERCENT_TABLE[row][column] * 100
+  const rolls = (row: number) => random.rand(0, 10_000) < HOOK_PERCENT_TABLE[row][column] * 100
 
   let next = flags
   if (input.staminaPercent === 0 && !flags.rolledAtZeroStamina) {

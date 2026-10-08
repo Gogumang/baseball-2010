@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /** 방향을 붙이는 결과 코드 — 파울·땅볼·빗맞음·라이너·강타·홈런성 묶음의 첫 칸 */
 const DIRECTED_CODES: ReadonlySet<number> = new Set([0, 3, 9, 15, 18, 21, 24])
@@ -33,7 +32,7 @@ export function hitDirectionOf(input: HitDirectionInput, random: RandomPort): nu
   let timingClass = lateness < EARLY_LIMIT ? 1 : lateness > LATE_LIMIT ? 2 : 0
   if (timingClass !== 0 && input.batterSide === 1) timingClass = 3 - timingClass
   const [low, high] = DIRECTION_BOUNDS[timingClass]
-  const roll = randomIntegerBelow(random, 0, DIRECTION_ROLL_RANGE)
+  const roll = random.rand(0, DIRECTION_ROLL_RANGE)
   if (roll > high) return 2
   if (roll < low) return 1
   return 0

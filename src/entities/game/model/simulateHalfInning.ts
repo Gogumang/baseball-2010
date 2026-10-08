@@ -24,7 +24,6 @@ import {
   staminaPercentOf,
 } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
 import {
   recordLineupPlay,
@@ -618,7 +617,7 @@ export function* simulateHalfInningTicks(
     // **원본은 아웃 ≤1 이면 주자가 없어도 난수를 먼저 뽑고**, 그 뒤에 주자·3루 조건을 본다 (E 3g).
     // 앞서 웹은 진루 가능할 때만 뽑아서 같은 시드로도 뒤가 어긋났다.
     if (isGroundOut && outs < OUTS_PER_INNING - 1) {
-      const rolled = randomIntegerBelow(random, 0, 10_000) <= GROUND_OUT_ADVANCE_LIMIT
+      const rolled = random.rand(0, 10_000) <= GROUND_OUT_ADVANCE_LIMIT
       if (rolled && canAdvanceOnGroundOut(bases, outs)) bases = advanceOnGroundOut(bases)
     }
     outs += advanced.outsAdded

@@ -1,7 +1,6 @@
 import { horizontalDistance, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { BATTED_BALL_PHYSICS } from '@/shared/config/original/battedBallPatterns'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { cosineSixteen, integerSquareRoot, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import { TANGENT_TABLE } from '@/shared/config/original/trigonometryTables'
 
@@ -605,7 +604,7 @@ function applyCollision(
     if (events.poleTick === -1) events.poleTick = tick
     // 0xbfa54 rand(−25, 25). 난수를 안 주면 굴리지 않고 0 으로 둔다(웹 규약 — `trajectoryWithRandom` 이 다시 돈다)
     rolls.count += 1
-    const offset = random === undefined ? 0 : randomIntegerBelow(random, -25, 25)
+    const offset = random === undefined ? 0 : random.rand(-25, 25)
     body.angle = result.angle + offset
     body.x = result.x
     body.y = result.y

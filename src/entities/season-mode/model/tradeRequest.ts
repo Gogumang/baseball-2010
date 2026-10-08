@@ -5,7 +5,6 @@ import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -105,13 +104,13 @@ export function rollTradeRequest(
   roster: SeasonTeamRoster,
   opponentRosterOf: (teamId: number) => SeasonTeamRoster = tableRosterOf,
 ): TradeRequestRoll {
-  if (randomIntegerBelow(random, 0, TRADE_REQUEST_ROLL_RANGE) >= TRADE_REQUEST_THRESHOLD) {
+  if (random.rand(0, TRADE_REQUEST_ROLL_RANGE) >= TRADE_REQUEST_THRESHOLD) {
     return { request: NO_TRADE_REQUEST, record }
   }
   const counted: SeasonRecord = { ...record, tradeRequestCount: record.tradeRequestCount + 1 }
 
-  let opponentTeamId = randomIntegerBelow(random, 0, LEAGUE_TEAM_COUNT)
-  while (opponentTeamId === record.teamId) opponentTeamId = randomIntegerBelow(random, 0, LEAGUE_TEAM_COUNT)
+  let opponentTeamId = random.rand(0, LEAGUE_TEAM_COUNT)
+  while (opponentTeamId === record.teamId) opponentTeamId = random.rand(0, LEAGUE_TEAM_COUNT)
 
   // A — 상대 선수가 나리·명전이면 탭부터 다시 (리그 열 팀 레코드에는 없어 한 번에 끝난다)
   const opponentRoster = opponentRosterOf(opponentTeamId)
@@ -119,8 +118,8 @@ export function rollTradeRequest(
   let opponentIndex: number
   let opponent: SeasonPlayer | undefined
   do {
-    tab = randomIntegerBelow(random, 0, 2)
-    opponentIndex = randomIntegerBelow(random, 0, rangeOf(tab))
+    tab = random.rand(0, 2)
+    opponentIndex = random.rand(0, rangeOf(tab))
     opponent = tradeTabPlayersOf(opponentRoster, tab)[opponentIndex]
   } while (opponent !== undefined && tradeRefusalOf(opponent) !== null)
 
@@ -130,7 +129,7 @@ export function rollTradeRequest(
   const limit = rangeOf(tab)
   // B — 뽑고 나서 n 을 본다: 0..limit 로 limit + 1 번
   for (let tries = 0; ; tries += 1) {
-    const myIndex = randomIntegerBelow(random, 0, limit)
+    const myIndex = random.rand(0, limit)
     const player = mine[myIndex]
     // 웹 명단은 늘 8·12 명 이상이라 비는 칸은 없다 (원본은 0xb5695 가 0 을 돌려 그 +0x1b 를 읽는다)
     const fits = player !== undefined

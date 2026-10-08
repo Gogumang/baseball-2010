@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
@@ -95,7 +94,7 @@ export interface PatternDeck {
 function shuffledOrder(size: number, random: RandomPort): number[] {
   const order = Array.from({ length: size }, (_unused, index) => index)
   for (let index = 0; index < size; index += 1) {
-    const other = randomIntegerBelow(random, 0, size)
+    const other = random.rand(0, size)
     if (other !== index) [order[index], order[other]] = [order[other], order[index]]
   }
   return order
@@ -118,7 +117,7 @@ export function createPatternDeck(random: RandomPort): PatternDeck {
 export function randomPattern(code: number, random: RandomPort): BattedBallPattern {
   const patterns = BATTED_BALL_PATTERNS[code]
   if (patterns === undefined || patterns.length === 0) throw new Error(`타구 패턴이 없는 결과 코드입니다: ${code}`)
-  return patterns[randomIntegerBelow(random, 0, patterns.length)]
+  return patterns[random.rand(0, patterns.length)]
 }
 
 /**
@@ -166,7 +165,7 @@ export const SCENE_EFFECT_INIT_ROLL_COUNT = 2 + EFFECT_PARTICLE_COUNT * 6
  * 8f65e  종류 0 (조건 없이 여섯 번): x = 바람 > 0 ? rand(−30|바람|, W) : 바람 < 0 ? rand(0, W + 30|바람|) : rand(−30, W + 30) ·
  *        +8 = rand(−60, 20) · +0x10 = rand(20, 40) · +0x14 = rand(H − 50, H + 20) · +0xf = rand(5, 10) · +0x12 = rand(0, 20)
  * ```
- * (rand 0xbfa54 는 범위와 무관하게 LCG 를 한 번 돌린다 — 웹은 `randomIntegerBelow` 하나 = `next()` 하나.)
+ * (rand 0xbfa54 는 범위와 무관하게 LCG 를 한 번 돌린다 — 웹도 `rand` 하나가 한 걸음이다.)
  * **그 값은 아무 데도 안 쓰인다**: 객체를 굴리고 그리는 틱 0x901a0(← HOMERUN 글자 0x40b18 의 0x40faa · 결과 화면 0x4a384)은 머리 901a8 에서
  * +8 이 0 이면 곧장 끝난다(904c0). +8 을 1 로 세우는 곳은 모두 0x90190 으로 **다시 깐 직후**다 — 홈런 0x51d1e · 0x527be(종류 2) ·
  * 경기 정산 0x4ea0c 의 0x4f4d8(종류 2) · 0x4f52a(**종류 0 을 새로 깔아** — 다시 1202 번 · 비). 다시 부르면 0x8fe58 이 0x8fc70 으로
@@ -175,17 +174,17 @@ export const SCENE_EFFECT_INIT_ROLL_COUNT = 2 + EFFECT_PARTICLE_COUNT * 6
  * (홈런 효과 종류 2 는 `homeRunFireworks`).
  */
 export function rollSceneEffectInit(random: RandomPort): void {
-  randomIntegerBelow(random, 1, 3)
-  const wind = randomIntegerBelow(random, -3, 4)
+  random.rand(1, 3)
+  const wind = random.rand(-3, 4)
   for (let index = 0; index < EFFECT_PARTICLE_COUNT; index += 1) {
-    if (wind > 0) randomIntegerBelow(random, -30 * Math.abs(wind), EFFECT_SCREEN_WIDTH)
-    else if (wind < 0) randomIntegerBelow(random, 0, EFFECT_SCREEN_WIDTH + 30 * Math.abs(wind))
-    else randomIntegerBelow(random, -30, EFFECT_SCREEN_WIDTH + 30)
-    randomIntegerBelow(random, -60, 20)
-    randomIntegerBelow(random, 20, 40)
-    randomIntegerBelow(random, EFFECT_SCREEN_HEIGHT - 50, EFFECT_SCREEN_HEIGHT + 20)
-    randomIntegerBelow(random, 5, 10)
-    randomIntegerBelow(random, 0, 20)
+    if (wind > 0) random.rand(-30 * Math.abs(wind), EFFECT_SCREEN_WIDTH)
+    else if (wind < 0) random.rand(0, EFFECT_SCREEN_WIDTH + 30 * Math.abs(wind))
+    else random.rand(-30, EFFECT_SCREEN_WIDTH + 30)
+    random.rand(-60, 20)
+    random.rand(20, 40)
+    random.rand(EFFECT_SCREEN_HEIGHT - 50, EFFECT_SCREEN_HEIGHT + 20)
+    random.rand(5, 10)
+    random.rand(0, 20)
   }
 }
 
@@ -304,7 +303,7 @@ export function displayPatternOf(
   random: RandomPort,
 ): BattedBallPattern {
   const list = displayPatternListOf(deck, kind)
-  const index = randomIntegerBelow(random, 0, list.length)
+  const index = random.rand(0, list.length)
   const shown = list[index] ?? BATTED_BALL_PATTERNS[0][(deck.orders[0] ?? [0])[0]]
   return [shown[0], shown[1], shown[2], (shown[3] & HEIGHT_SIGN_FLAG) | (shot[3] & LANDING_CHASE_FLAG)]
 }
@@ -344,7 +343,7 @@ const LANDING_CHASE_FLAG = 2
  */
 export function launchPatternOf(code: number, drawn: BattedBallPattern, random: RandomPort): BattedBallPattern {
   if (!SPECIAL_LAUNCH_CODES.includes(code)) return drawn
-  if (randomIntegerBelow(random, 0, SPECIAL_LAUNCH_ROLL) > SPECIAL_LAUNCH_LIMIT) return drawn
-  const [angle, speed, height] = SPECIAL_LAUNCHES[randomIntegerBelow(random, 0, SPECIAL_LAUNCHES.length)]
+  if (random.rand(0, SPECIAL_LAUNCH_ROLL) > SPECIAL_LAUNCH_LIMIT) return drawn
+  const [angle, speed, height] = SPECIAL_LAUNCHES[random.rand(0, SPECIAL_LAUNCHES.length)]
   return [angle, speed, height, drawn[3] & LANDING_CHASE_FLAG]
 }

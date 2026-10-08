@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 필살타법 성공 판정 (경기 `0x34c74` → 타구 처리 `0x517e6` — H2 2-2 확정).
@@ -39,7 +38,7 @@ export function specialSwingPercentOf(swingNumber: number, isAceBatter = false):
 export function rollSpecialSwing(swingNumber: number, random: RandomPort, isAceBatter = false): boolean {
   const percent = specialSwingPercentOf(swingNumber, isAceBatter)
   if (percent <= 0) return false
-  return percent * 10 > randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  return percent * 10 > random.rand(0, RANDOM_LIMIT)
 }
 
 /**

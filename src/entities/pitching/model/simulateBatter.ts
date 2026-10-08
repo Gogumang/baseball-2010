@@ -8,7 +8,6 @@ import { timingOf } from '@/entities/batting/model/swingTiming'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import { contactOfPattern, drawScenePattern, launchPatternOf } from '@/entities/batting/model/battedBallOutcome'
 import { provisionalOutcomeOf, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -112,15 +111,15 @@ export function cpuSwingChoiceOf(
     situation.hasRunner,
   )
   // 0x9f224 — rand(0,100), 위끝 제외
-  const drawn = battingPatternChoiceOf(odds, randomIntegerBelow(random, 0, 100))
+  const drawn = battingPatternChoiceOf(odds, random.rand(0, 100))
   // 0x34376 — 실투면 뽑은 것을 버리고 0(치기)
   const choice = isMistakePitch ? '치기' : drawn
   if (choice === '지켜보기') return null
 
   const zone = swingZoneOf(pitch.plate)
   // 히트가 높을수록 덜 쫓는다. 원본 비교는 `rand > 문턱` 이면 그만둔다 = 같으면 쫓는다.
-  if (zone === 3 && randomIntegerBelow(random, 0, 10000) > 250 - truncated(ability.hit / 4)) return null
-  if (zone === 2 && randomIntegerBelow(random, 0, 10000) > 2000 - truncated((ability.hit * 3) / 2)) {
+  if (zone === 3 && random.rand(0, 10000) > 250 - truncated(ability.hit / 4)) return null
+  if (zone === 2 && random.rand(0, 10000) > 2000 - truncated((ability.hit * 3) / 2)) {
     return null
   }
   return choice
@@ -153,7 +152,7 @@ const BUNT_KIND_LIMIT = 4
  */
 export function cpuBuntKindOf(choice: CpuSwingChoice, isMagicBatter: boolean, random: RandomPort): number {
   if (choice !== '번트' || isMagicBatter) return 0
-  return randomIntegerBelow(random, BUNT_KIND_MINIMUM, BUNT_KIND_LIMIT)
+  return random.rand(BUNT_KIND_MINIMUM, BUNT_KIND_LIMIT)
 }
 
 /** 0x34468 의 마타자 필살 판단에 드는 값 */
@@ -297,14 +296,14 @@ const TIMING_OFFSETS_WIDE: readonly number[] = [0, 1, -1]
  */
 export function cpuSwingTimingOffsetOf(hit: number, random: RandomPort, isMistakePitch = false): number {
   const k = isMistakePitch ? MISTAKE_TIMING_K : truncated(hit / 4) + TIMING_BASE
-  if (randomIntegerBelow(random, 0, 10000) < k) {
-    return TIMING_OFFSETS_EXACT[randomIntegerBelow(random, 0, TIMING_OFFSETS_EXACT.length)]
+  if (random.rand(0, 10000) < k) {
+    return TIMING_OFFSETS_EXACT[random.rand(0, TIMING_OFFSETS_EXACT.length)]
   }
   const second = truncated((k * SECOND_TIMING_NUMERATOR) / SECOND_TIMING_DENOMINATOR)
-  if (randomIntegerBelow(random, 0, 10000) < second) {
-    return TIMING_OFFSETS_LATE[randomIntegerBelow(random, 0, TIMING_OFFSETS_LATE.length)]
+  if (random.rand(0, 10000) < second) {
+    return TIMING_OFFSETS_LATE[random.rand(0, TIMING_OFFSETS_LATE.length)]
   }
-  return TIMING_OFFSETS_WIDE[randomIntegerBelow(random, 0, TIMING_OFFSETS_WIDE.length)]
+  return TIMING_OFFSETS_WIDE[random.rand(0, TIMING_OFFSETS_WIDE.length)]
 }
 /** 투수편 투수 능력치를 아직 넘겨받지 않아 쓰는 기본값 (추정) */
 const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }

@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
 
 /**
@@ -97,5 +96,5 @@ export function mistakePercentOf(input: Omit<MistakePitchInput, 'isMagicPitch'>)
 export function isMistakePitch(input: MistakePitchInput, random: RandomPort): boolean {
   if (input.isMagicPitch) return false
   const p = mistakePercentOf(input)
-  return p > randomIntegerBelow(random, 0, 100)
+  return p > random.rand(0, 100)
 }

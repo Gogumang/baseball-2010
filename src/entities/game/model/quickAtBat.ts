@@ -2,7 +2,6 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { swingResultOf } from '@/entities/batting/model/swingResult'
 import { BALANCE } from '@/shared/config/original/balance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 원본 간이 타석 (binary.mod 0xc262c 루프 · 0xc11f0 스윙 · 0xc1818 투구 판정 — 전부 디스어셈 대조).
@@ -110,7 +109,7 @@ const trunc = Math.trunc
 export function pitchGradeOf(ability: number, stamina: number, random: RandomPort): number {
   const band = Math.min(PITCH_GRADE_TABLE.length - 1, Math.max(0, trunc(ability / PITCH_GRADE_BAND)))
   const row = PITCH_GRADE_TABLE[band]
-  const rolled = randomIntegerBelow(random, 0, RANDOM_LIMIT)
+  const rolled = random.rand(0, RANDOM_LIMIT)
   const index = row.findIndex((percent) => rolled < percent * 100)
   const found = index === -1 ? row.length - 1 : index
   const graded = stamina !== 0 ? found + 1 : Math.max(found - 1, 0)
@@ -131,21 +130,21 @@ export function quickPitchOf(
   situation: QuickAtBatSituation,
   random: RandomPort,
 ): QuickPitch {
-  let spreadX = randomIntegerBelow(random, SPREAD_RANGE.minimum, SPREAD_RANGE.maximumExclusive)
-  let spreadY = randomIntegerBelow(random, SPREAD_RANGE.minimum, SPREAD_RANGE.maximumExclusive)
+  let spreadX = random.rand(SPREAD_RANGE.minimum, SPREAD_RANGE.maximumExclusive)
+  let spreadY = random.rand(SPREAD_RANGE.minimum, SPREAD_RANGE.maximumExclusive)
   let power = BASE_POWER
 
   // 투수 구속이 타자 히트를 누르면 스윙 자체가 힘을 잃는다
-  if (randomIntegerBelow(random, 0, RANDOM_LIMIT) <= WEAK_SWING_GATE) {
-    const pitcherRoll = randomIntegerBelow(random, 0, pitcher.velocity)
-    const batterRoll = randomIntegerBelow(random, 0, batter.hit)
+  if (random.rand(0, RANDOM_LIMIT) <= WEAK_SWING_GATE) {
+    const pitcherRoll = random.rand(0, pitcher.velocity)
+    const batterRoll = random.rand(0, batter.hit)
     if (batterRoll < pitcherRoll) power = 0
   }
 
   // 타자 파워가 투수 제구를 누르면 코스가 가운데로 3 씩 당겨진다
-  if (randomIntegerBelow(random, 0, RANDOM_LIMIT) <= TIGHT_COURSE_GATE) {
-    const pitcherRoll = randomIntegerBelow(random, 0, pitcher.control)
-    const batterRoll = randomIntegerBelow(random, 0, batter.power)
+  if (random.rand(0, RANDOM_LIMIT) <= TIGHT_COURSE_GATE) {
+    const pitcherRoll = random.rand(0, pitcher.control)
+    const batterRoll = random.rand(0, batter.power)
     if (pitcherRoll < batterRoll) {
       spreadX = Math.abs(spreadX) - TIGHT_COURSE_GAIN
       spreadY = Math.abs(spreadY) - TIGHT_COURSE_GAIN
@@ -162,8 +161,8 @@ export function quickPitchOf(
   }
 
   // 부호를 각각 다시 뽑는다. 원본 호출은 디컴파일에서 인자가 날아가 rand(0,2) 로 본다 (추정)
-  if (randomIntegerBelow(random, 0, 2) === 0) spreadX = -spreadX
-  if (randomIntegerBelow(random, 0, 2) === 0) spreadY = -spreadY
+  if (random.rand(0, 2) === 0) spreadX = -spreadX
+  if (random.rand(0, 2) === 0) spreadY = -spreadY
 
   return { spreadX, spreadY, power }
 }
@@ -193,7 +192,7 @@ export function judgePitchOf(
   const aceBonus = pitcher.isAce === true ? ACE_STRIKE_BONUS : 0
   const bonus = aceBonus + trunc((pitcher.control + pitcher.velocity) / PITCHER_STAT_DIVISOR)
   const threshold = STRIKE_ZONE_BASE - bonus
-  const isInsideZone = randomIntegerBelow(random, 0, 100) > threshold
+  const isInsideZone = random.rand(0, 100) > threshold
   if (!isInsideZone) return balls <= BALLS_BEFORE_WALK - 1 ? '볼' : '포볼'
   return strikes <= STRIKES_FOR_STRIKEOUT - 2 ? '스트라이크' : '삼진'
 }
@@ -250,8 +249,8 @@ function verdictOf(
 
   // 땅볼은 주력으로 내야안타를 가른다. 지면 평범한 아웃이다
   if (swing.code === GROUND_BALL_CODE) {
-    const rolled = randomIntegerBelow(random, 0, RANDOM_LIMIT)
-    const speed = randomIntegerBelow(random, 0, batter.run)
+    const rolled = random.rand(0, RANDOM_LIMIT)
+    const speed = random.rand(0, batter.run)
     return rolled < speed
       ? { kind: '끝', outcome: { kind: '안타', bases: 1 } }
       : { kind: '끝', outcome: { kind: '아웃', detail: '땅볼아웃' } }
@@ -263,8 +262,8 @@ function verdictOf(
 
   if (swing.code === HIT_CODES.single || swing.code === HIT_CODES.double) {
     // 주력이 이기면 한 루 더 간다 (안타 → 2루타, 2루타 → 3루타)
-    const rolled = randomIntegerBelow(random, 0, EXTRA_BASE_LIMIT)
-    const speed = randomIntegerBelow(random, 0, batter.run)
+    const rolled = random.rand(0, EXTRA_BASE_LIMIT)
+    const speed = random.rand(0, batter.run)
     const code = rolled < speed ? swing.code + 3 : swing.code
     const bases = Math.min(3, trunc((code - HIT_CODES.single) / 3) + 1) as 1 | 2 | 3
     return { kind: '끝', outcome: { kind: '안타', bases } }
@@ -328,7 +327,7 @@ export function playQuickAtBat(
     })
     const pitcher = hooks.beforePitch?.() ?? startingPitcher
     const isSwing =
-      randomIntegerBelow(random, 0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
+      random.rand(0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
     if (!isSwing) {
       const judged = judgePitchOf(pitcher, strikes, balls, random)
       // 볼·스트라이크를 가른 뒤 도루를 굴린다 (0xc1818 안, E-5). 타석을 끝내는 투구에서도 돈다

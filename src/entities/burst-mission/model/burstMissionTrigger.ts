@@ -2,7 +2,6 @@ import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissio
 import type { BaseState } from '@/entities/game/model/baseState'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * 돌발미션 발동 판정 (0x8f158 → 후보 고르기 0x8f000 — K 4절 1-2·1-6, 확정).
@@ -145,7 +144,7 @@ export function isRowEligible(row: BurstMissionRow, context: BurstTriggerContext
 
 /** 확률 검사 0x8ec64 — `rand(0,1000)/10 < b9`. 나눗셈은 0 쪽 버림이라 0~99 와 b9 를 비교한다 */
 export function rollChance(chancePercent: number, random: RandomPort): boolean {
-  return Math.trunc(randomIntegerBelow(random, 0, 1000) / 10) < chancePercent
+  return Math.trunc(random.rand(0, 1000) / 10) < chancePercent
 }
 
 /**
@@ -161,5 +160,5 @@ export function rollBurstRow(
     (row) => isRowEligible(row, context) && rollChance(row.chancePercent, random),
   )
   if (candidates.length === 0) return null
-  return candidates[randomIntegerBelow(random, 0, candidates.length)] ?? null
+  return candidates[random.rand(0, candidates.length)] ?? null
 }
