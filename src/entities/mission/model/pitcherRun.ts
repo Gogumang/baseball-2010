@@ -14,7 +14,20 @@ import type { MissionRun, MissionStatus } from '@/entities/mission/model/mission
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates, chargedRunsOfFates } from '@/features/defense-play/model/runnerFates'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { missionCpuAfterPlateAppearance, startMissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
+import {
+  insertMissionAceBatter,
+  isMissionCpuBatterAce,
+  missionCpuAfterPlateAppearance,
+  startMissionCpuTeam,
+} from '@/entities/mission/model/missionCpuTeam'
+import {
+  cpuSideOf,
+  flipMissionHalf,
+  isMissionGameOver,
+  simulateHumanTeamAutoHalf,
+  startMissionGame,
+  withMissionScore,
+} from '@/entities/mission/model/missionGame'
 
 /**
  * 투수편 미션 진행.
@@ -63,6 +76,7 @@ export function startPitcherMission(mission: OriginalMission): PitcherRun {
     totalOuts: 0,
     allowed: { runs: 0, hits: 0, walks: 0, baserunner: 0 },
     cpu: startMissionCpuTeam(mission),
+    game: startMissionGame(mission),
   }
 }
 
@@ -143,6 +157,9 @@ function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: Pitcher
     bases: isInningOver ? EMPTY_BASES : advance.bases,
     outs: isInningOver ? 0 : outs,
     outsAdded: advance.outsAdded,
+    /** 점수판 득점 (0xa5c34) — CPU 측 점수 */
+    runsScored: advance.runsScored,
+    isInningOver,
     /** 기록할 결과 — 판을 돈 타구는 판 끝 정산(0xa8024)이 낸 것 */
     outcome: settled,
     /** 정산(0xa8024)이 보는 주자 목록 — 이닝 정리보다 앞이다 */
@@ -208,8 +225,50 @@ export function applyPitcherOutcome(
     allowed,
     // 같은 정산 0xa8024 가 CPU 타자의 타순 칸 기록(+0x12 · +0x13 · +0x14)을 올리고 0xaf020 이 타순을 넘긴다
     cpu: missionCpuAfterPlateAppearance(run.cpu, settled),
+    game: withHalfEnd(withMissionScore(run.game, cpuSideOf(run.mission), defense.runsScored), defense.isInningOver),
   }
-  return { ...next, status: judgeStatus(next) }
+  return { ...next, status: judgeStatus(next, defense.outsAtSettlement) }
+}
+
+/** 사람 반 이닝이 3아웃으로 끝났다 — 0x18 · 자동진행(`runPitcherMissionAutoHalves`)을 기다린다 */
+export function withHalfEnd(game: PitcherRun['game'], isInningOver: boolean): PitcherRun['game'] {
+  return isInningOver ? { ...game, halfEnded: true } : game
+}
+
+/**
+ * **투수 미션의 3아웃 뒤** — 0x18 진입 0x3ac90 → 0x4f928 → 0xc2198 → 자동진행 0x21 → 0x18 → 0xd (`missionGame` 머리글).
+ *
+ * 1. 반 이닝 넘김 0xb6b6c (경기 끝은 그 타석의 판정 0xaaa6c aad20 이 이미 봤다 — 끝났으면 판이 진행 중이 아니라 여기 안 온다).
+ * 2. 사람 칸 팀이 치는 반 이닝 — 0xc1e04 모드 5 는 수비 투수가 CPU 줄이라 통째로 자동이다(`simulateHumanTeamAutoHalf`).
+ *    그 사이 경기가 끝나면(c21d6 — 끝내기 · 콜드 · 9회 3아웃) 판정 없이 0x19 → 미션 객체 +0xbc 가 안 서 **실패**.
+ * 3. 다시 반 이닝 넘김 + c2248 미션 판정 0xaaa6c (경기가 안 끝났으니 목표 · 한도 그대로 — 지금 판에 바뀌는 칸이 없다).
+ * 4. 사람이 수비하는 새 반 이닝 — 빈 루 · 0아웃 (0xaae7c 는 이전 상태 0x18 · 시작 이닝일 때만 시작 상황을 깔고, 여기는 늘 다른 이닝).
+ *    그 0xd 의 0xaae7c(r7 = 1, aafca~)가 새 이닝이면(+0x24 ≠ st[0x6b], 시작 이닝부터 8 이닝 안) 지금 타순 레코드에 마타자를 다시 끼운다.
+ * 사람이 수비 중이 아니거나 판이 끝났으면 그대로 돌려준다. 난수: 2 의 간이 엔진 굴림(타석마다 0xc1ba4 교체 판정 · 0xc262c 공).
+ */
+export function runPitcherMissionAutoHalves(run: PitcherRun, random: RandomPort): PitcherRun {
+  if (!run.game.halfEnded) return run
+  const settled: PitcherRun = { ...run, game: { ...run.game, halfEnded: false } }
+  if (settled.status !== '진행중') return settled
+  const auto = simulateHumanTeamAutoHalf(flipMissionHalf(settled.game), random)
+  if (auto.gameEnded) return { ...settled, game: auto.game, status: '실패' }
+  const game = flipMissionHalf(auto.game)
+  const judged: PitcherRun = { ...settled, game, bases: EMPTY_BASES, outs: 0 }
+  const status = judgeStatus(judged, 0)
+  if (status !== '진행중') return { ...judged, status }
+  return { ...judged, ...reinsertedAce(judged) }
+}
+
+/** 0xd 의 0xaae7c 마타자 다시 끼우기 (ab072~ab0f4) — 새 이닝 첫 0xd 에 한 번, 시작 이닝부터 8 이닝 안 */
+function reinsertedAce(run: PitcherRun): Pick<PitcherRun, 'cpu' | 'game'> {
+  const { mission, game, cpu } = run
+  if (mission.opponentAce <= 0 || game.aceCheckedInning === game.inning) return { cpu, game }
+  const checked = { ...game, aceCheckedInning: game.inning }
+  const sinceStart = game.inning - (mission.start.inning - 1)
+  if (sinceStart < 0 || sinceStart > 8) return { cpu, game: checked }
+  const batting = cpu.batting
+  if (batting === null || isMissionCpuBatterAce(cpu)) return { cpu, game: checked }
+  return { cpu: { ...cpu, batting: insertMissionAceBatter(batting) }, game: checked }
 }
 
 /*
@@ -237,18 +296,30 @@ export function applyPitcherOutcome(
  * 진행 중인 판을 판 끝 판정 0xaaa6c 의 순서(실패 한도 → 목표 → 남은 기회)로 다시 잰다 — 정산이 칸을 고친 뒤
  * (낫아웃 보정 a8cfc 등) 판정이 도는 갈래를 위해 내보낸다. 이미 끝난 판은 그대로다.
  */
-export function judgePitcherRun(run: PitcherRun): PitcherRun {
-  return run.status === '진행중' ? { ...run, status: judgeStatus(run) } : run
+export function judgePitcherRun(run: PitcherRun, outs: number = run.game.halfEnded ? OUTS_PER_INNING : run.outs): PitcherRun {
+  return run.status === '진행중' ? { ...run, status: judgeStatus(run, outs) } : run
 }
 
-/** 이닝으로 목표를 재는 미션(노히트노런·퍼펙트게임)은 (9 − 시작 이닝 + 1) × 3 아웃을 잡으면 성공이다. */
-function judgeStatus(run: PitcherRun): MissionStatus {
+/**
+ * **판 끝 미션 판정 0xaaa6c 의 모드 5 갈래** (aab9c~aad20) — `outs` 는 판정 때 state[6](3아웃 판이면 3).
+ * ```
+ * aac48  +0xa1 아래(실점) · +0xa2 아래(피안타) · +0xa3(출루 허용) 한도가 모두 있으면: 경기 끝(0xb68fc)이 아니면 상태 ≥ 1(아직)
+ * aac76~ 목표 칸(0xaa928) · 실패 한도(0xaa940) · 목표가 다 안 찼으면 타석 · 투구 수 한도
+ * aad20  경기 끝이고 아직(1)이면 실패(2)
+ * ```
+ * 노히트노런(13) · 퍼펙트게임(14)은 첫 줄이 서는 미션이다 — 이닝 수를 세지 않고 **한도가 깨지지 않은 채 경기가 끝나면** 성공이다
+ * (예: 9회초 3아웃에 사람 칸(홈)이 앞서 있으면 끝). 목표 칸 +0xa4(아웃)이 둘 다 0 이라 aabd6 갈래는 어느 미션에서도 안 선다.
+ */
+function judgeStatus(run: PitcherRun, outs: number): MissionStatus {
   if (run.progress.brokenConditions.length > 0) return '실패'
 
+  const gameOver = isMissionGameOver(run.game, outs)
+  const limits = run.mission.failLimits
+  const waitsForGameEnd = limits.runs > 0 && limits.hits > 0 && limits.baserunners > 0
   const inningGoal = inningGoalOf(run.mission)
-  const isDone =
-    inningGoal !== null ? run.totalOuts >= inningGoal * OUTS_PER_INNING : isCleared(run.mission, run.progress)
+  const isDone = (!waitsForGameEnd || gameOver) && (inningGoal !== null || isCleared(run.mission, run.progress))
   if (isDone) return '성공'
+  if (gameOver) return '실패'
   return isOutOfChances(run.remainingPlateAppearances, run.remainingPitches) ? '실패' : '진행중'
 }
 

@@ -14,6 +14,8 @@ import { runnerFatesWithoutPlay, type RunnerFate } from '@/features/defense-play
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { missionCpuAfterRuns, startMissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
+import { startMissionGame } from '@/entities/mission/model/missionGame'
+import type { MissionGame } from '@/entities/mission/model/missionGame'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -45,6 +47,8 @@ export interface MissionRun {
    * 타자 미션은 CPU 수비 투수진(실점 A·B), 투수 미션은 CPU 공격 타선(타순 칸 기록)을 든다.
    */
   readonly cpu: MissionCpuTeam
+  /** 경기의 이닝 · 공수 · 점수판과 자동진행 반 이닝이 쓰는 팀 (`missionGame`) */
+  readonly game: MissionGame
 }
 
 const OUTS_PER_INNING = 3
@@ -65,6 +69,7 @@ export function startMission(mission: OriginalMission): MissionRun {
     bases: mission.start.runners,
     outs: mission.start.outs,
     cpu: startMissionCpuTeam(mission),
+    game: startMissionGame(mission),
   }
 }
 

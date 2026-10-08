@@ -92,7 +92,9 @@ describe('미션 CPU 팀 — 0xaa57c 가 세운 다른 칸 팀 (레코드 +2 · 
 
     const ace = startMissionCpuTeam(missionOf('투수', 18))
     expect(ace.batting?.order).toBe(3)
-    expect(ace.batting?.lineup.rosterSlots.slice(0, 10)).toEqual([0, 1, 2, MISSION_ACE_ROSTER_SLOT, 4, 5, 6, 7, 8, 3])
+    // 명단(team+0xe)은 레코드 차례 그대로, 레코드 3 에 마타자 · 레코드 9 에 옛 3번 줄 (옛 9번 줄은 끝)
+    expect(ace.batting?.lineup.rosterSlots.slice(0, 10)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(ace.batting?.records.slice(0, 10)).toEqual([0, 1, 2, MISSION_ACE_ROSTER_SLOT, 4, 5, 6, 7, 8, 3])
     expect(isMissionCpuBatterAce(ace)).toBe(true)
   })
 })

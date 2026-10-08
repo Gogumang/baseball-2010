@@ -19,7 +19,10 @@ import {
   startPitcherMission,
   inningGoalOf,
   OUTS_PER_INNING,
+  runPitcherMissionAutoHalves,
 } from '@/entities/mission/model/pitcherRun'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCHER_MISSIONS } from '@/entities/mission/model/missionGoal'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { missionDefensePlayInputOf } from '@/entities/mission/model/missionRun'
@@ -169,17 +172,37 @@ describe('이닝 단위 미션 — 노히트노런 · 퍼펙트게임', () => {
     expect(inningGoalOf(혼이실린)).toBeNull()
   })
 
-  it('아웃을 3×이닝만큼 잡으면 성공이다', () => {
+  /**
+   * 원본 판정 0xaaa6c aac48 — 실점 · 피안타 · 출루 허용 한도가 모두 선 미션은 **경기가 끝나야**(0xb68fc) 성공이다. 이닝 수를 세지 않는다.
+   * 13번은 사람 칸(홈)이 2-0 으로 앞선 5회초부터 — 사람 칸 팀이 치는 말은 자동진행(간이 엔진)이 돌고, 9회초 3아웃에 홈이 앞서 있어 끝난다.
+   */
+  it('사람이 막는 반 이닝마다 자동진행이 말을 돌리고, 9회초 3아웃에 경기가 끝나며 성공이다', () => {
+    const random = createSeededRandom(3)
     let run = startPitcherMission(노히트노런)
     for (let i = 0; i < 5 * OUTS_PER_INNING - 1; i += 1) {
-      run = applyPitcherOutcome(run, { kind: '삼진' })
+      run = runPitcherMissionAutoHalves(applyPitcherOutcome(run, { kind: '삼진' }), random)
       expect(run.status, `${i + 1}번째 아웃`).toBe('진행중')
     }
+    // 4회말 · … · 8회말을 지나 9회초 — 이닝 st[0x6b] 는 0부터 8
+    expect(run.game).toMatchObject({ inning: 8, offenseSide: 0 })
+    expect(run.game.scores[1]).toBeGreaterThanOrEqual(2)
 
     run = applyPitcherOutcome(run, { kind: '삼진' })
 
     expect(run.totalOuts).toBe(15)
     expect(run.status).toBe('성공')
+  })
+
+  it('3아웃이면 0x18 을 기다린다 — 자동진행 반 이닝을 돌린 뒤 다음 이닝 빈 루 · 0아웃', () => {
+    let run = startPitcherMission(노히트노런)
+    for (let i = 0; i < OUTS_PER_INNING; i += 1) run = applyPitcherOutcome(run, { kind: '삼진' })
+    expect(run.game.halfEnded).toBe(true)
+    expect(run.game).toMatchObject({ inning: 4, offenseSide: 0 })
+
+    const after = runPitcherMissionAutoHalves(run, createSeededRandom(3))
+    expect(after.game).toMatchObject({ inning: 5, offenseSide: 0, halfEnded: false })
+    expect(after.outs).toBe(0)
+    expect(after.bases).toEqual({ first: false, second: false, third: false })
   })
 
   it('안타를 맞으면 노히트노런은 즉시 실패다', () => {
@@ -213,11 +236,12 @@ describe('이닝 단위 미션 — 노히트노런 · 퍼펙트게임', () => {
     expect(run.status).toBe('실패')
   })
 
-  it('아웃만 쌓이면 퍼펙트게임도 성공한다', () => {
+  it('아웃만 쌓이면 퍼펙트게임도 성공한다 — 9회초 3아웃 경기 끝', () => {
+    const random = createSeededRandom(5)
     let run = startPitcherMission(퍼펙트)
     // 사람 수비 · 송구 기본 수동이라 키 없이는 땅볼에 아무도 안 던진다(0xb1c90) — 뜬 채로 잡히는 공으로 아웃을 쌓는다
     for (let i = 0; i < 6 * OUTS_PER_INNING; i += 1) {
-      run = applyPitcherOutcome(run, 잡히는뜬공())
+      run = runPitcherMissionAutoHalves(applyPitcherOutcome(run, 잡히는뜬공()), random)
     }
 
     expect(run.status).toBe('성공')
@@ -441,5 +465,46 @@ describe("'아웃'(R+0x13c)은 아웃 콜마다 1 — 삼진 0xa7c4c · 아웃 �
   it('삼진은 1 (0xa7c4c a7cc4)', () => {
     const run = applyPitcherOutcome(일이루(0), { kind: '삼진' })
     expect(run.progress.counts['아웃']).toBe(1)
+  })
+})
+
+describe('투수 미션의 이닝 넘김 — 0x18 · 자동진행 · 0xaae7c (`runPitcherMissionAutoHalves`)', () => {
+  const 미션 = (id: number) => MISSIONS.find((mission) => mission.side === '투수' && mission.id === id)!
+
+  it('새 이닝 첫 0xd 의 0xaae7c 가 지금 타순 레코드에 마타자를 다시 끼운다 — 그 칸 필살 남은 칸은 −1', () => {
+    // 로제(18) — 1회말 CPU 공격, 마타자는 시작 타순 3
+    const started = startPitcherMission(미션(18))
+    const batting = started.cpu.batting!
+    const moved: PitcherRun = {
+      ...started,
+      cpu: { ...started.cpu, batting: { ...batting, order: 5, specialSwing: { 5: 2 } } },
+      game: { ...started.game, halfEnded: true },
+    }
+    const after = runPitcherMissionAutoHalves(moved, createSeededRandom(2))
+    expect(after.game).toMatchObject({ inning: 1, offenseSide: 1, aceCheckedInning: 1 })
+    expect(after.cpu.batting?.records[5]).toBe(-1)
+    expect(after.cpu.batting?.records[9]).toBe(5)
+    // 처음 끼운 마타자(레코드 3)는 그대로 — 둘이 된다
+    expect(after.cpu.batting?.records[3]).toBe(-1)
+    expect(after.cpu.batting?.specialSwing[5]).toBeUndefined()
+  })
+
+  it('마타자가 아닌 미션은 끼우지 않는다', () => {
+    const started = startPitcherMission(미션(2))
+    const after = runPitcherMissionAutoHalves({ ...started, game: { ...started.game, halfEnded: true } }, createSeededRandom(2))
+    expect(after.cpu.batting?.records).toEqual(started.cpu.batting?.records)
+    expect(after.game.aceCheckedInning).toBe(-1)
+  })
+
+  it('9회초 3아웃에 사람 칸(홈)이 앞서 경기가 끝나면 목표가 덜 찼어도 실패다 — 0xaaa6c aad20', () => {
+    // 깔끔한 마무리(1) — 9회초, 사람 칸 홈. 목표(아웃 · 탈삼진)를 다 못 채운 채 3아웃
+    let run = startPitcherMission(미션(1))
+    run = applyPitcherOutcome(run, 잡히는뜬공())
+    run = applyPitcherOutcome(run, 잡히는뜬공())
+    expect(run.status).toBe('진행중')
+    // 홈 3 : 원정 1
+    expect(run.game.scores).toEqual([1, 3])
+    run = applyPitcherOutcome(run, 잡히는뜬공())
+    expect(run.status).toBe('실패')
   })
 })

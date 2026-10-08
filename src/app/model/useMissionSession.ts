@@ -25,11 +25,14 @@ import {
   judgePitcherRun,
   MISSION_PITCHER_MODE,
   recordPitch,
+  runPitcherMissionAutoHalves,
   startPitcherMission,
+  withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
+import { cpuSideOf, withMissionScore } from '@/entities/mission/model/missionGame'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
-import { inningGoalOf, isCleared, recordSteal, withOutCalls } from '@/entities/mission/model/missionGoal'
+import { isCleared, recordSteal, withOutCalls } from '@/entities/mission/model/missionGoal'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
   arrivalApplicationOf,
@@ -107,6 +110,7 @@ import {
   missionCpuBatterAbilityOf,
   missionCpuBatterOf,
   missionCpuMoundPitcherAbilityOf,
+  withMissionCpuSpecialSwing,
   missionCpuAtNewPlateAppearance,
 } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
@@ -352,8 +356,6 @@ const MISSION_STAGE_SIDE = 1
 const MISSION_STAMINA_PERCENT = 100
 
 const NO_SKILLS: readonly number[] = []
-/** 팀 new 0xb891c — 필살 남은 칸 모두 −1 */
-const NO_SPECIAL_SWING_SLOTS: Readonly<Record<number, number>> = {}
 
 /** 미션 모드 한 판 — 타자편(MissionRun)과 투수편(PitcherRun)을 함께 다룬다. */
 export function useMissionSession({
@@ -422,7 +424,7 @@ export function useMissionSession({
   >(null)
   /**
    * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
-   * 이 칸은 타자 미션의 내 타자 칸이다 — 투수 미션 상대 타자 칸은 타순마다 `opponentSpecialSwingStored` 가 든다.
+   * 이 칸은 타자 미션의 내 타자 칸이다 — 투수 미션 상대 타자 칸은 타순마다 CPU 타선(`MissionCpuBatting.specialSwing`)이 든다.
    */
   const [batterSpecialSwingStored, setBatterSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
   /**
@@ -464,10 +466,6 @@ export function useMissionSession({
     enterNewAtBatConfirm()
     runner.resetAtBat(count)
   }
-  /** 투수 미션 CPU 타자의 필살 남은 칸 s8 팀[+0x29 + 타순] — 타순 칸(0~8)마다. 없는 칸은 −1(안 채움) */
-  const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState<Readonly<Record<number, number>>>(
-    NO_SPECIAL_SWING_SLOTS,
-  )
   /**
    * **투수 미션 마구 남은 칸** s8 팀[+0x28] — −1 = 안 채움(팀 new 0xb891c). 0xaebe4 가 미션 투수로 채우고
    * (`modePitcherMagicRemainingOf`) 코스 확정 0x50e9c 가 줄인다. 미션 한 판(새 경기)마다 −1 로 돌아간다.
@@ -924,7 +922,7 @@ export function useMissionSession({
     const specialSwing = isAceBatter
       ? missionOpponentSpecialSwingOf(
           pitcherRun.mission,
-          opponentSpecialSwingStored[batterOrderSlot] ?? UNFILLED_SPECIAL_SWING,
+          pitcherRun.cpu.batting?.specialSwing[batterOrderSlot] ?? UNFILLED_SPECIAL_SWING,
           aceLevels,
         )
       : null
@@ -966,14 +964,14 @@ export function useMissionSession({
     const resolution = thrown.resolution
     const foulContact = thrown.foulContact
     // 0x4e136 — 필살 스윙이 나간 틱에 남은 −1 (헛스윙도). 마타자가 아니면 null 이라 칸을 안 건드린다
-    if (thrown.specialSwingRemaining !== null) {
-      const remaining = thrown.specialSwingRemaining
-      setOpponentSpecialSwingStored((previous) => ({ ...previous, [batterOrderSlot]: remaining }))
-    }
+    const cpuAfterSwing =
+      thrown.specialSwingRemaining === null
+        ? pitcherRun.cpu
+        : withMissionCpuSpecialSwing(pitcherRun.cpu, batterOrderSlot, thrown.specialSwingRemaining)
 
     // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c)
     let nextRun = recordPitch(
-      { ...pitcherRun, cpu: missionCpuAfterPitch(pitcherRun.cpu, { pitchTypeNumber: typeNumber, batterIntimidates: false }) },
+      { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: false }) },
       grade === MAX_GAUGE_GRADE,
     )
     // 이 공 **전** 스트라이크 — 0x9d57c 의 st[4] (삼진 진동이 본다)
@@ -1029,7 +1027,7 @@ export function useMissionSession({
       if (interrupted) {
         // 판에서 3아웃 — 이 타석은 끊긴다 (판정 B 0xae3e8 아웃 > 2 → 0x18)
         resetAtBatWithConfirm()
-        setPitcherRun(checkPitchExhausted(nextRun))
+        setPitcherRun(runPitcherMissionAutoHalves(checkPitchExhausted(nextRun), random))
         return
       }
     }
@@ -1112,7 +1110,7 @@ export function useMissionSession({
       // 판정 A 의 "그 밖" — 같은 타석 다음 공(0xf)
       signalPitchSelection('same')
     }
-    setPitcherRun(nextRun)
+    setPitcherRun(runPitcherMissionAutoHalves(nextRun, random))
   }
 
   /**
@@ -1158,7 +1156,9 @@ export function useMissionSession({
       if (pending.side === '투수') {
         // `played.runnerFates`(주자별 +0x95·+0x96)로 실점 R+0x128 · 출루 허용 R+0x130 을 원본대로 센다
         setPitcherRun((previous) =>
-          previous === null ? previous : applyPitcherOutcome(previous, pending.outcome, { played }),
+          previous === null
+            ? previous
+            : runPitcherMissionAutoHalves(applyPitcherOutcome(previous, pending.outcome, { played }), random),
         )
         resetAtBatWithConfirm()
         runner.setIsPaused(false)
@@ -1209,7 +1209,6 @@ export function useMissionSession({
     // 새 경기 — 0xaae7c 가 저장된 마투수 레코드(+0x2c = 10000)를 다시 베낀다
     setOpponentMoundStamina(FULL_STAMINA)
     setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-    setOpponentSpecialSwingStored(NO_SPECIAL_SWING_SLOTS)
     setPitcherMagicStored(UNFILLED_SPECIAL_SWING)
     setBallMagicNumber(0)
     resetAtBatWithConfirm(mission.start)
@@ -1244,7 +1243,7 @@ export function useMissionSession({
       if (pending === null) return
       setPendingBenchClearing(null)
       if (reachedTargetTick) rollBenchClearingTargets(random)
-      setPitcherRun(applyPitcherOutcome(pending.run, pending.outcome, { random }))
+      setPitcherRun(runPitcherMissionAutoHalves(applyPitcherOutcome(pending.run, pending.outcome, { random }), random))
       resetAtBatWithConfirm()
     },
 
@@ -1275,8 +1274,7 @@ export function useMissionSession({
     beginAceMatch: (mission: OriginalMission, pending: Omit<Extract<Screen, { kind: '마선수대결' }>, 'kind' | 'mission'>) => {
       setOpponentMoundStamina(FULL_STAMINA)
       setBatterSpecialSwingStored(UNFILLED_SPECIAL_SWING)
-      setOpponentSpecialSwingStored(NO_SPECIAL_SWING_SLOTS)
-      resetAtBatWithConfirm(mission.start)
+        resetAtBatWithConfirm(mission.start)
       runner.setBannerText('')
       runner.setIsPaused(false)
       setPendingDefensePlay(null)
@@ -1438,7 +1436,7 @@ export function useMissionSession({
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])
       if (result.ticks.length > 0) setPickoffReplay(result)
       // 판정 B 0xae3e8 의 견제 가지는 아웃 ≤ 2 든 3아웃이든 정산 0xa8024 를 부른다 (ae5a8)
-      setPitcherRun(withPitcherMissionRunnerResult(pitcherRun, result, true))
+      setPitcherRun(runPitcherMissionAutoHalves(withPitcherMissionRunnerResult(pitcherRun, result, true), random))
       // 3아웃 — 이 타석은 끊긴다 (아웃 > 2 → 0x18). 아니면 같은 타석 0xf (ae592)
       if (interrupted) resetAtBatWithConfirm()
       else signalPitchSelection('same')
@@ -1635,14 +1633,19 @@ function withPitcherMissionRunnerResult(run: PitcherRun, result: DefensePlayResu
   const outs = run.outs + advance.outsAdded
   const isInningOver = outs >= MISSION_OUTS_PER_INNING
   const charged = settles ? chargedRunsOfFates(result.runnerFates, Math.min(MISSION_OUTS_PER_INNING, outs)) : 0
-  return judgedAfterRunnerPlay({
-    ...run,
-    progress: withOutCalls(run.progress, outCallsOf(run, advance.outsAdded)),
-    bases: isInningOver ? EMPTY_BASES : advance.bases,
-    outs: isInningOver ? 0 : outs,
-    totalOuts: run.totalOuts + advance.outsAdded,
-    allowed: { ...run.allowed, runs: run.allowed.runs + charged },
-  })
+  return judgedAfterRunnerPlay(
+    {
+      ...run,
+      progress: withOutCalls(run.progress, outCallsOf(run, advance.outsAdded)),
+      bases: isInningOver ? EMPTY_BASES : advance.bases,
+      outs: isInningOver ? 0 : outs,
+      totalOuts: run.totalOuts + advance.outsAdded,
+      allowed: { ...run.allowed, runs: run.allowed.runs + charged },
+      // 판의 득점도 점수판 득점 0xa5c34 — CPU 측. 3아웃이면 0x18 · 자동진행을 기다린다
+      game: withHalfEnd(withMissionScore(run.game, cpuSideOf(run.mission), advance.runsScored), isInningOver),
+    },
+    Math.min(MISSION_OUTS_PER_INNING, outs),
+  )
 }
 
 /**
@@ -1696,16 +1699,17 @@ export function withPitcherNotOut(run: PitcherRun, outcome: AtBatOutcome, play: 
     outs: isInningOver ? 0 : outs,
     totalOuts: run.totalOuts + advance.outsAdded,
     allowed: { ...struck.allowed, runs: run.allowed.runs + charged },
+    // 점수판 득점은 판의 것 — 삼진 길(`applyPitcherOutcome`)은 득점이 없다
+    game: withHalfEnd(withMissionScore(run.game, cpuSideOf(run.mission), advance.runsScored), isInningOver),
   }
-  const afterRuns = judgedAfterRunnerPlay(moved)
-  return afterRuns.status === '실패' ? afterRuns : judgePitcherRun(moved)
+  return judgedAfterRunnerPlay(moved, Math.min(MISSION_OUTS_PER_INNING, outs))
 }
 
 /**
  * 판 끝 미션 판정 0xaaa6c 중 주자 판이 바꿀 수 있는 갈래 — 실점 한도(+0xa1 ↔ R+0x128) → 실패 · 이닝 목표 → 성공 ·
  * 목표 칸(주자 판의 아웃이 '아웃' R+0x13c 에 든다, `outCallsOf`)이 다 차면 → 성공.
  */
-function judgedAfterRunnerPlay(run: PitcherRun): PitcherRun {
+function judgedAfterRunnerPlay(run: PitcherRun, outs: number): PitcherRun {
   const limit = run.mission.failLimits.runs
   if (limit > 0 && run.allowed.runs >= limit) {
     const broken = run.progress.brokenConditions.includes('무실점')
@@ -1713,9 +1717,6 @@ function judgedAfterRunnerPlay(run: PitcherRun): PitcherRun {
       : [...run.progress.brokenConditions, '무실점']
     return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
   }
-  const inningGoal = inningGoalOf(run.mission)
-  if (inningGoal !== null) {
-    return run.totalOuts >= inningGoal * MISSION_OUTS_PER_INNING ? { ...run, status: '성공' } : run
-  }
-  return isCleared(run.mission, run.progress) ? { ...run, status: '성공' } : run
+  // 나머지는 판 끝 판정 그대로 — 경기 끝(0xb68fc) · 노히트노런 · 퍼펙트게임 · 목표 칸 · 남은 기회 (`judgePitcherRun`)
+  return judgePitcherRun({ ...run, status: '진행중' }, outs)
 }

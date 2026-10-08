@@ -20,8 +20,10 @@ import type { MissionRun } from '@/entities/mission/model/missionRun'
 import {
   applyPitcherOutcome,
   recordPitch,
+  runPitcherMissionAutoHalves,
   startPitcherMission,
 } from '@/entities/mission/model/pitcherRun'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { MISSIONS } from '@/shared/config/original/missions'
 import type { OriginalMission } from '@/shared/config/original/missions'
@@ -65,10 +67,12 @@ function playIdealBatter(mission: OriginalMission): MissionRun {
 }
 
 function playIdealPitcher(mission: OriginalMission): PitcherRun {
+  // 3아웃 뒤 사람 칸 팀이 치는 반 이닝은 자동진행(간이 엔진)이 돈다 — 씨앗 고정
+  const random = createSeededRandom(1)
   let run = startPitcherMission(mission)
   for (let plate = 0; plate < MAXIMUM_PLATE_APPEARANCES && run.status === '진행중'; plate += 1) {
     for (let pitch = 0; pitch < PITCHES_PER_STRIKEOUT; pitch += 1) run = recordPitch(run, true)
-    run = applyPitcherOutcome(run, STRIKEOUT)
+    run = runPitcherMissionAutoHalves(applyPitcherOutcome(run, STRIKEOUT), random)
   }
   return run
 }

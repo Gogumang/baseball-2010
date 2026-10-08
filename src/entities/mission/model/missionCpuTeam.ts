@@ -130,10 +130,19 @@ export interface MissionCpuPitching {
 /** 투수 미션(모드 5) — CPU 공격 타선 */
 export interface MissionCpuBatting {
   readonly teamId: number
-  /** 명단 — 칸마다 마스터 줄(팀 안 0~11) · 마타자 칸은 `MISSION_ACE_ROSTER_SLOT` */
+  /**
+   * `team+0xe` 명단 — 칸마다 **레코드 번호**(팀 타자 레코드 배열 칸, 앞 아홉이 타순 · 그 뒤가 벤치). 대타 0xaebe4 는 이 목록만 맞바꾼다.
+   */
   readonly lineup: QuickLineup
+  /**
+   * 레코드 칸마다 든 선수 — 마스터 줄(팀 안 0~11) 또는 마타자(`MISSION_ACE_ROSTER_SLOT`). 0xaae7c 의 0xb53f0(레코드 9 에 베낌) ·
+   * 0xb8cb8(레코드 두 칸 맞바꿈)은 목록이 아니라 이 배열을 바꾼다.
+   */
+  readonly records: readonly number[]
   /** `team+0x32` 지금 타순 칸 (0~8, 0xaf020 이 타석마다 (+1) mod 9) */
   readonly order: number
+  /** 필살 남은 칸 s8 `team+0x29 + 타순` — 타순 칸마다, 없는 칸은 −1(안 채움, 팀 new 0xb891c) */
+  readonly specialSwing: Readonly<Record<number, number>>
 }
 
 export interface MissionCpuTeam {
@@ -156,44 +165,82 @@ function missionSlotOf(mission: OriginalMission): number {
 /** `0x66864` 의 모드 6 갈래 — +0xbd 가 3 · 7 이면 CPU 투수 교체를 막는다 */
 const PITCHER_CHANGE_BLOCKED_SLOTS: readonly number[] = [3, 7]
 
+/**
+ * **CPU 팀 투수진** — 0xaa57c aa8a0 `0xb8c94(다른 칸 팀, 0, 레코드 +6 아래 4비트)` 로 명부 투수 0 ↔ 시작 칸(줄째 바뀌어 보직·능력치가
+ * 따라간다). 마스터 줄 +0x2c 는 모두 10000. 타자 미션은 사람 타석의 수비, 투수 미션은 사람 칸 팀이 치는 자동진행 반 이닝의 수비다.
+ */
+export function startMissionCpuPitching(mission: OriginalMission): MissionCpuPitching {
+  const start = MISSION_CPU_START[missionKeyOf(mission)] ?? { pitcherSlot: 0, battingOrder: 0 }
+  const roster = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
+  roster[0] = start.pitcherSlot
+  roster[start.pitcherSlot] = 0
+  return {
+    teamId: cpuTeamIdOf(mission),
+    roster,
+    mound: { pitcherSlot: 0, stamina: FULL_STAMINA, runsAllowed: 0, pitches: 0, usedSlots: [], justChanged: false },
+    inningRunsAllowed: 0,
+    ourRuns: 0,
+  }
+}
+
 /** 미션 한 판의 CPU 팀 — 경기 준비 0xaa57c · 0xd 메시지 0xaae7c 뒤의 모습 */
 export function startMissionCpuTeam(mission: OriginalMission): MissionCpuTeam {
   const start = MISSION_CPU_START[missionKeyOf(mission)] ?? { pitcherSlot: 0, battingOrder: 0 }
   const hasAce = mission.opponentAce > 0
   const teamId = cpuTeamIdOf(mission)
   if (mission.side === '타자') {
-    // 명부 투수 0 ↔ 시작 칸 (0xb8c94) — 줄째 바뀌어 그 투수의 보직·능력치가 따라간다
-    const roster = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
-    roster[0] = start.pitcherSlot
-    roster[start.pitcherSlot] = 0
+    const pitching = startMissionCpuPitching(mission)
     // 마투수 — 명부 8번에 베낀 뒤 0 ↔ 8 (aafca~ab06e). 0번에 섰던 투수는 팀 객체(8명) 밖으로 나간다
-    if (hasAce) roster[0] = MISSION_ACE_ROSTER_SLOT
-    return {
-      pitching: {
-        teamId,
-        roster,
-        // 마스터 줄 +0x2c 는 모두 10000, 마투수 레코드도 10000 (P1 3-0)
-        mound: { pitcherSlot: 0, stamina: FULL_STAMINA, runsAllowed: 0, pitches: 0, usedSlots: [], justChanged: false },
-        inningRunsAllowed: 0,
-        ourRuns: 0,
-      },
-      batting: null,
-      pinchHitBlocked: false,
-    }
+    const roster = hasAce ? [MISSION_ACE_ROSTER_SLOT, ...pitching.roster.slice(1)] : pitching.roster
+    return { pitching: { ...pitching, roster }, batting: null, pinchHitBlocked: false }
   }
-  const base = rosterLineupOf(BATTERS_PER_TEAM)
   const order = lineupSlotOf(start.battingOrder)
-  const rosterSlots = [...base.rosterSlots]
-  if (hasAce) {
-    // 명부 9번에 마타자(0xb53f0 — 옛 9번은 끝, 팀 객체 밖) → 지금 타순 ↔ 9 (0xb8cb8)
-    rosterSlots[QUICK_LINEUP_SIZE] = rosterSlots[order]
-    rosterSlots[order] = MISSION_ACE_ROSTER_SLOT
+  const batting: MissionCpuBatting = {
+    teamId,
+    // 명단은 레코드 차례 그대로 (0xb891c)
+    lineup: rosterLineupOf(BATTERS_PER_TEAM),
+    records: Array.from({ length: BATTERS_PER_TEAM }, (_unused, record) => record),
+    order,
+    specialSwing: {},
   }
   return {
     pitching: null,
-    batting: { teamId, lineup: { ...base, rosterSlots }, order },
+    // 마타자 — 첫 0xd 의 0xaae7c(aafca~)가 지금 타순 레코드에 끼운다
+    batting: hasAce ? insertMissionAceBatter(batting) : batting,
     pinchHitBlocked: false,
   }
+}
+
+/**
+ * **0xaae7c 의 마타자 끼우기** (ab078~ab0f4, 모드 5 · 수비가 사람) — `0xb53f0(명부, 마타자, 0)` 으로 레코드 9 에 저장된 마타자를 통째
+ * 베끼고(옛 9 번 줄은 끝) `0xb8cb8(팀, team+0x32, 9)` 로 **레코드 [지금 타순 번호] ↔ 레코드 9** 를 맞바꾼 뒤 `0xaea84(팀, 1)` —
+ * +0x295 를 세워 확정 0xaebe4(aee4c)가 그 타순 칸의 필살 남은 칸을 −1(0xae9e8)로 되돌린다(다음 타석 앞에 다시 채운다).
+ * 인자가 목록 칸이 아니라 **레코드 번호**(= 타순 숫자)라, 목록이 레코드 차례 그대로인 칸이면 지금 타자가 마타자가 된다.
+ */
+export function insertMissionAceBatter(batting: MissionCpuBatting): MissionCpuBatting {
+  const records = [...batting.records]
+  const target = batting.order
+  records[QUICK_LINEUP_SIZE] = records[target] ?? target
+  records[target] = MISSION_ACE_ROSTER_SLOT
+  const specialSwing = { ...batting.specialSwing }
+  delete specialSwing[lineupSlotOf(batting.order)]
+  return { ...batting, records, specialSwing }
+}
+
+/** 0x4e136 — 필살 스윙이 나간 틱에 그 타순 칸의 남은 횟수를 줄인 값으로 */
+export function withMissionCpuSpecialSwing(team: MissionCpuTeam, order: number, remaining: number): MissionCpuTeam {
+  const batting = team.batting
+  if (batting === null) return team
+  return {
+    ...team,
+    batting: { ...batting, specialSwing: { ...batting.specialSwing, [lineupSlotOf(order)]: remaining } },
+  }
+}
+
+/** 명단 칸이 가리키는 레코드에 든 선수 (마스터 줄 또는 마타자 표지) */
+function batterRecordAt(batting: MissionCpuBatting, order: number): number {
+  const record = rosterSlotAt(batting.lineup, order)
+  return batting.records[record] ?? record
 }
 
 /** 마운드에 지금 마투수가 서 있는가 — 아니면 상대 투수는 마선수가 아니다 */
@@ -205,7 +252,7 @@ export function isMissionCpuMoundAce(team: MissionCpuTeam): boolean {
 /** 지금 타순에 선 CPU 타자가 마타자인가 */
 export function isMissionCpuBatterAce(team: MissionCpuTeam): boolean {
   const batting = team.batting
-  return batting !== null && rosterSlotAt(batting.lineup, batting.order) === MISSION_ACE_ROSTER_SLOT
+  return batting !== null && batterRecordAt(batting, batting.order) === MISSION_ACE_ROSTER_SLOT
 }
 
 /** 그 팀 투수 칸의 마스터 줄 (팀 안 0~7) — 마투수 칸이면 null */
@@ -281,7 +328,7 @@ export function missionCpuBatterOf(
 ): { readonly order: number; readonly isAce: boolean; readonly row: RosterPlayer | null } | null {
   const batting = team.batting
   if (batting === null) return null
-  const rosterSlot = rosterSlotAt(batting.lineup, batting.order)
+  const rosterSlot = batterRecordAt(batting, batting.order)
   if (rosterSlot === MISSION_ACE_ROSTER_SLOT) return { order: batting.order, isAce: true, row: null }
   return { order: batting.order, isAce: false, row: teamBatters(batting.teamId)[rosterSlot] ?? null }
 }
@@ -305,7 +352,7 @@ export function missionCpuBatterAbilityOf(team: MissionCpuTeam): BatterAbility |
 }
 
 /** 팀 투수 칸의 0xac428 · 0xabfcc 재료 — 리그 `defenseOf` · 타자편 `quickDefenseOf` 와 같은 모양 */
-function defenseOf(pitching: MissionCpuPitching, lead: number): HalfInningDefense {
+export function missionPitchingDefenseOf(pitching: MissionCpuPitching, lead: number): HalfInningDefense {
   const masters = teamPitchers(pitching.teamId)
   const isAce = (slot: number) => pitching.roster[slot] === MISSION_ACE_ROSTER_SLOT
   const masterAt = (slot: number) => masters[pitching.roster[slot] ?? slot] ?? masters[0]
@@ -386,7 +433,7 @@ export function missionCpuAfterPitch(
   const isAce = pitching.roster[mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
   const stamina = isAce
     ? mound.stamina
-    : drainPitcherForPitch(defenseOf(pitching, 0), mound, pitch.pitchTypeNumber, pitch.batterIntimidates)
+    : drainPitcherForPitch(missionPitchingDefenseOf(pitching, 0), mound, pitch.pitchTypeNumber, pitch.batterIntimidates)
   return {
     ...team,
     pinchHitBlocked: false,
@@ -439,7 +486,7 @@ export function enterMissionPitchSelection(
     const isAceMound = pitching.roster[pitching.mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
     const mound = isAceMound ? { ...pitching.mound, stamina: situation.aceStamina } : pitching.mound
     const after = changePitcherIfNeeded(
-      defenseOf({ ...pitching, mound }, lead),
+      missionPitchingDefenseOf({ ...pitching, mound }, lead),
       mound,
       {
         // state[0x6b] — 0xaa57c 가 레코드 +3 아래 4비트로 적는다. ⚠️ 웹 미션은 이닝을 넘기지 않아 시작 이닝 그대로다
@@ -477,6 +524,6 @@ export function enterMissionPitchSelection(
   return {
     // state[0xe] = 1 (ac33e)
     team: { ...team, pinchHitBlocked: true, batting: { ...batting, lineup: pinch.lineup } },
-    substitution: { kind: '대타', incomingIsAce: pinch.incomingRosterSlot === MISSION_ACE_ROSTER_SLOT },
+    substitution: { kind: '대타', incomingIsAce: batting.records[pinch.incomingRosterSlot] === MISSION_ACE_ROSTER_SLOT },
   }
 }
