@@ -8,7 +8,7 @@ import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
  * 흐름: 투구 비행(0x11) 에서 맞았다고 판정되면 0x13 으로 갔다가 **늘 인플레이(0x17)** 로 나간다.
  * 붙잡아 두는 시간은 감상 플래그 `+0x199a` 가 고른다.
  *   - 켜졌으면(큰 타구): 공 틱이 `0x406a4` 문턱을 넘을 때까지 기다린다. **OK(−5)·'5' 로 건너뛴다.**
- *   - 꺼졌으면: **틱 8** 에 바로 넘어간다.
+ *   - 꺼졌으면: **틱 8** 에 넘어간다(키로 못 건너뛴다). 결과 코드 ≤ 2 인 땅에 닿는 타구는 그보다 이를 수 있다(`earlyHitPauseTickOf`).
  *
  * 그리기(0x4cb1c)의 공 그림은 타구 궤적 쪽이라 문서가 읽지 않았고, 웹 타석 화면에도 타구 그림이
  * 없다 — 여기서는 **화면을 붙잡아 두는 시간만** 옮긴다 (연출 내용은 빠져 있다).
@@ -59,24 +59,77 @@ export function isBigHit({ resultCode, poleTick, carryScale }: BigHitInput): boo
 }
 
 /**
- * 원본 각 `+0xfcc` 가 −0x7e..−0x36 인 구간. 원본은 수평각을 부호 뒤집어 −135..−45 로 넣으므로
- * 웹 패턴의 각(45~135)으로는 **54~126**, 곧 파울선 쪽을 뺀 가운데 부채꼴이다.
+ * 원본 각 `+0xfcc` 가 **−0x7e < 각 < −0x36**(경계 미포함)인 구간 (0x406a4 406ae~406b6: `각 + 0x36 < 0` · `각 + 0x7e > 0`).
+ * 원본은 수평각을 부호 뒤집어 넣으므로 웹 패턴의 각(45~135)으로는 **54 < 각 < 126**, 곧 파울선 쪽을 뺀 가운데 부채꼴이다.
  */
-const CENTER_ANGLE = { minimum: 54, maximum: 126 }
+const CENTER_ANGLE = { exclusiveMinimum: 54, exclusiveMaximum: 126 }
 /** `[+0x204]+0xaa0 − 7` 의 7 */
 const LANDING_MARGIN = 7
 
 /**
- * 큰 타구를 붙잡아 두는 틱 = `0x406a4` 문턱 (R10 4절).
- * 가운데 부채꼴이면 `낙구틱 − 7`, 아니면 **그 값의 절반**이다.
- *
- * ⚠️ 문서가 "아니면 그 값 ÷ 2" 라고만 적어 "그 값" 이 `낙구틱 − 7` 인지 `낙구틱` 인지 갈린다.
- * 바로 앞 식을 가리키는 것으로 읽어 `(낙구틱 − 7) / 2` 로 두었다 — 이 갈래는 **근사다**.
+ * 큰 타구를 붙잡아 두는 틱 = `0x406a4` 문턱 (직접 뜸):
+ * ```
+ * 406ac  각 = s16 경기+0xfcc
+ * 406b0  각 + 0x36 < 0 이고 각 + 0x7e > 0 → [[경기+0x204]+0xaa0] − 7        ; 가운데 — 낙구틱 − 7
+ * 406cc  아니면                           → [[경기+0x204]+0xaa0] >> 1       ; 낙구틱의 절반(빼기 없음)
+ * ```
+ * 0x406e8 은 `문턱 ≤ 공 틱` 이면 넘기므로 음수 문턱은 첫 틱에 넘는다 — 자르지 않는다.
  */
 export function bigHitHoldTicksOf(angle: number, landingTick: number): number {
-  const full = landingTick - LANDING_MARGIN
-  const isCenter = angle >= CENTER_ANGLE.minimum && angle <= CENTER_ANGLE.maximum
-  return Math.max(0, isCenter ? full : Math.trunc(full / 2))
+  const isCenter = angle > CENTER_ANGLE.exclusiveMinimum && angle < CENTER_ANGLE.exclusiveMaximum
+  return isCenter ? landingTick - LANDING_MARGIN : landingTick >> 1
+}
+
+/** 플래그가 꺼진 갈래의 이른 넘김이 보는 결과 코드 상한 — 0x4071a `+0xfd4 ≤ 2`(부호 없는 비교) */
+const EARLY_RESULT_CODE_MAX = 2
+/** 이른 넘김의 기준점 0xcfaa4 = (25068, 0, 23275) — 거리는 x·z 둘만 본다(0xbf9f0) */
+const EARLY_REFERENCE = { x: 25068, z: 23275 } as const
+/** 거리 ÷ 265(0x109) 가 40~55 (0x40780 `− 0x28 ≤ 0xf` 부호 없는 비교) */
+const EARLY_DISTANCE_DIVISOR = 265
+const EARLY_DISTANCE_MIN = 40
+const EARLY_DISTANCE_SPAN = 15
+
+/** 정수 제곱근(내림) — 0x6c64d 자리 */
+const integerSquareRoot = (value: number) => Math.floor(Math.sqrt(value))
+
+/**
+ * **공 경로 땅 번호 +0x1090** — 0x13 진입 0x3d720 이 부르는 0x33e34 가 [경기+0xf2c] 공의 점 i 마다
+ * 높이를 `y − 400` 으로 옮기고 599 이하면 `(6 × (y − 400) + 2400) / 10` 으로 줄인 값(33e9c~33ed8 — 곧 `trunc(6y / 10)`)이
+ * **처음 0 이 된 i** 를 적는다(33f44~33f52). 없으면 −1.
+ */
+export function groundPathIndexOf(trajectory: { readonly length: number; pointAt(tick: number): { readonly y: number } }): number {
+  for (let index = 0; index < trajectory.length; index += 1) {
+    const y = trajectory.pointAt(index).y
+    const adjusted = y - 400 > 599 ? y - 400 : Math.trunc((6 * (y - 400) + 2400) / 10)
+    if (adjusted === 0) return index
+  }
+  return -1
+}
+
+/**
+ * 플래그가 꺼진 갈래의 **이른 넘김 틱** (0x406e8 4071a~40784, 직접 뜸):
+ * ```
+ * 4071a  +0xfd4(결과 코드) ≤ 2 (부호 없음)
+ * 40724  g = +0x1090 ≠ −1 이고 g == 공 틱(+0x1098) + 1
+ * 40744  p = [경기+0xf2c] 공의 g 번째 점(0xa25b0)
+ * 40774  isqrt((p.x − 25068)² + (p.z − 23275)²) ÷ 265 − 40 ≤ 15 (부호 없음)   → 넘긴다
+ * ```
+ * 곧 조건이 맞으면 공 틱 g − 1 에 넘긴다(틱 8 보다 이르면). 맞지 않으면 null.
+ * ⚠️ [경기+0xf2c] 는 타구 순간 0x50faa 가 같은 타격점 0xcfb64 = (20000, 1000, 30000) 에 놓고 0x51408 51722 가 같은 vt44 로
+ *    쏘는 공이다 — 판 공 [경기+0x204] 와 같은 궤적으로 본다(유력 — 그 공의 세계 충돌 깔기는 따로 확인하지 않았다).
+ */
+export function earlyHitPauseTickOf(
+  resultCode: number,
+  trajectory: { readonly length: number; pointAt(tick: number): { readonly x: number; readonly y: number; readonly z: number } },
+): number | null {
+  if (resultCode < 0 || resultCode > EARLY_RESULT_CODE_MAX) return null
+  const ground = groundPathIndexOf(trajectory)
+  if (ground < 1) return null
+  const point = trajectory.pointAt(ground)
+  const distance = integerSquareRoot((point.x - EARLY_REFERENCE.x) ** 2 + (point.z - EARLY_REFERENCE.z) ** 2)
+  const scaled = Math.trunc(distance / EARLY_DISTANCE_DIVISOR) - EARLY_DISTANCE_MIN
+  if (scaled < 0 || scaled > EARLY_DISTANCE_SPAN) return null
+  return ground - 1
 }
 
 export interface HitPauseInput extends BigHitInput {
@@ -84,12 +137,26 @@ export interface HitPauseInput extends BigHitInput {
   readonly angle: number
   /** 낙구 틱 (원본 공 +0xaa0) */
   readonly landingTick: number
+  /** 플래그가 꺼진 갈래의 이른 넘김 틱 (`earlyHitPauseTickOf`). 없으면 null */
+  readonly earlyTick?: number | null
 }
 
 /** 상태 0x13 이 화면을 붙잡아 두는 틱 수. */
 export function hitPauseTicksOf(input: HitPauseInput): number {
-  if (!isBigHit(input)) return SHORT_HIT_TICKS
+  if (!isBigHit(input)) {
+    // 0x40714 상태 틱 == 8 이면 넘김 — 그 전에 이른 넘김 조건이 서면 그 틱(0x4071a~0x40784)
+    const early = input.earlyTick ?? null
+    return early !== null && early < SHORT_HIT_TICKS ? early : SHORT_HIT_TICKS
+  }
   return bigHitHoldTicksOf(input.angle, input.landingTick)
+}
+
+/**
+ * 상태 0x13 의 **OK(−5)·'5' 건너뛰기** — 0x406e8 40708~40712 는 플래그 `+0x199a` 가 켜진 갈래에만 키를 본다.
+ * 꺼진 타구(틱 8 · 이른 넘김)는 키로 못 건너뛴다.
+ */
+export function canSkipHitPause(watchesBigHit: boolean): boolean {
+  return watchesBigHit
 }
 
 /**
@@ -102,7 +169,7 @@ export function hitPauseTicksOf(input: HitPauseInput): number {
  */
 export function pauseInputOf(resultCode: number, deck: PatternDeck): HitPauseInput {
   const pattern = lastDrawnPattern(deck, resultCode)
-  if (pattern === null) return { resultCode, angle: 90, landingTick: 0, poleTick: 0, carryScale: 0 }
+  if (pattern === null) return { resultCode, angle: 90, landingTick: 0, poleTick: 0, carryScale: 0, earlyTick: null }
   const trajectory = battedBallTrajectory(pattern)
   return {
     resultCode,
@@ -110,5 +177,6 @@ export function pauseInputOf(resultCode: number, deck: PatternDeck): HitPauseInp
     landingTick: trajectory.landingTick,
     poleTick: trajectory.poleTick,
     carryScale: trajectory.carryScale,
+    earlyTick: earlyHitPauseTickOf(resultCode, trajectory),
   }
 }

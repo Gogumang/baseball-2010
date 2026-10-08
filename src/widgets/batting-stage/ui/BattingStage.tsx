@@ -8,7 +8,7 @@ import { createPatternDeck, lastDrawnPattern, scenePatternDeckOf } from '@/entit
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
-import { hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
+import { canSkipHitPause, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import {
   BIG_HIT_PARTICLE,
   HIT_PARTICLE_IMAGE,
@@ -358,6 +358,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         isHomeRun,
         // 큰 타구 감상이 끝나는 자리에 016 을 쏜다 (0x4cb1c → 0x4cd14)
         bigHitAt: watchesBigHit ? contact : null,
+        watchesBigHit,
         resultText,
         buntKind: sceneBuntKindRef.current,
       }
@@ -401,8 +402,13 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     const isFlying = (now: number) => phaseRef.current === '투구중' && pitchRef.current !== null && frameNow(now) >= 0
     return {
       swing: (now: number) => {
-        // 상태 0x13 은 OK(−5)·'5' 로 건너뛴다 (0x406e8). 그때 스윙 키는 건너뛰기로만 쓰인다
-        if (phaseRef.current === '타격') return commitHit(now)
+        // 상태 0x13 은 감상 플래그(+0x199a)가 켜진 큰 타구만 OK(−5)·'5' 로 건너뛴다 (0x406e8 40708~40712).
+        // 꺼진 타구(틱 8)는 키를 안 본다. 어느 쪽이든 스윙 키는 이 단계에서 스윙이 아니다
+        if (phaseRef.current === '타격') {
+          const pending = pendingHitRef.current
+          if (pending !== null && canSkipHitPause(pending.watchesBigHit)) commitHit(now)
+          return
+        }
         if (!isFlying(now)) return
         // 0x51dce — 스윙 키는 번트 자세여도 +0xfdc = 0 을 쓴다
         sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindRef.current, { kind: '스윙' })

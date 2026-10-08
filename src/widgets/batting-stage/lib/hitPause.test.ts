@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   bigHitHoldTicksOf,
+  canSkipHitPause,
+  earlyHitPauseTickOf,
+  groundPathIndexOf,
   carryScaleOf,
   CARRY_THRESHOLD,
   hitPauseTicksOf,
@@ -60,19 +63,58 @@ describe('상태 0x13 이 붙잡아 두는 틱', () => {
     expect(hitPauseTicksOf({ ...큰타구, resultCode: 15, angle: 90, landingTick: 40 })).toBe(SHORT_HIT_TICKS)
   })
 
-  it('가운데 부채꼴(54~126)이면 낙구틱 − 7 까지 기다린다', () => {
+  it('가운데 부채꼴(54 < 각 < 126, 경계 미포함 — 0x406a4)이면 낙구틱 − 7 까지 기다린다', () => {
     expect(hitPauseTicksOf({ ...큰타구, angle: 90, landingTick: 40 })).toBe(33)
-    expect(bigHitHoldTicksOf(54, 40)).toBe(33)
-    expect(bigHitHoldTicksOf(126, 40)).toBe(33)
+    expect(bigHitHoldTicksOf(55, 40)).toBe(33)
+    expect(bigHitHoldTicksOf(125, 40)).toBe(33)
   })
 
-  it('파울선 쪽이면 그 절반이다', () => {
-    expect(bigHitHoldTicksOf(45, 40)).toBe(16)
-    expect(bigHitHoldTicksOf(135, 41)).toBe(17)
+  it('경계(54 · 126)와 파울선 쪽이면 낙구틱 >> 1 이다 — 7 을 빼지 않는다', () => {
+    expect(bigHitHoldTicksOf(54, 40)).toBe(20)
+    expect(bigHitHoldTicksOf(126, 40)).toBe(20)
+    expect(bigHitHoldTicksOf(45, 40)).toBe(20)
+    expect(bigHitHoldTicksOf(135, 41)).toBe(20)
   })
 
-  it('낙구가 너무 이르면 음수로 내려가지 않는다', () => {
-    expect(bigHitHoldTicksOf(90, 3)).toBe(0)
+  it('문턱을 자르지 않는다 — 음수 문턱은 첫 틱에 넘는다(0x406e8 `문턱 ≤ 공 틱`)', () => {
+    expect(bigHitHoldTicksOf(90, 3)).toBe(-4)
+  })
+})
+
+describe('플래그가 꺼진 갈래의 이른 넘김 (0x406e8 4071a~40784)', () => {
+  /** 점 목록을 손으로 깐 궤적 — i 번째 점 */
+  const 궤적 = (points: readonly { x: number; y: number; z: number }[]) => ({
+    length: points.length,
+    pointAt: (tick: number) => points[Math.max(0, Math.min(tick, points.length - 1))],
+  })
+  /** 거리 ÷ 265 = 45 인 땅 점 (x 만 벌린다) */
+  const 땅 = { x: 25068 + 265 * 45, y: 0, z: 23275 }
+
+  it('땅 번호는 trunc(6y/10) 이 처음 0 이 된 점이다 (0x33e34) — |y| ≤ 1', () => {
+    expect(groundPathIndexOf(궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: 2, z: 0 }, { x: 0, y: 1, z: 0 }]))).toBe(2)
+    expect(groundPathIndexOf(궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: -1, z: 0 }]))).toBe(1)
+    expect(groundPathIndexOf(궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: -2, z: 0 }]))).toBe(-1)
+  })
+
+  it('결과 코드 ≤ 2 이고 땅 점 거리 ÷ 265 가 40~55 면 땅 번호 − 1 틱에 넘긴다', () => {
+    const 공 = 궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: 300, z: 0 }, { x: 0, y: 100, z: 0 }, 땅])
+    expect(earlyHitPauseTickOf(2, 공)).toBe(2)
+    expect(hitPauseTicksOf({ resultCode: 2, poleTick: -1, carryScale: 0, angle: 90, landingTick: 3, earlyTick: 2 })).toBe(2)
+  })
+
+  it('결과 코드 3 이상 · 거리 밖이면 틱 8 그대로', () => {
+    const 공 = 궤적([{ x: 0, y: 900, z: 0 }, 땅])
+    expect(earlyHitPauseTickOf(3, 공)).toBeNull()
+    expect(earlyHitPauseTickOf(0, 궤적([{ x: 0, y: 900, z: 0 }, { ...땅, x: 25068 + 265 * 56 }]))).toBeNull()
+    expect(earlyHitPauseTickOf(0, 궤적([{ x: 0, y: 900, z: 0 }, { ...땅, x: 25068 + 265 * 39 }]))).toBeNull()
+    expect(hitPauseTicksOf({ resultCode: 1, poleTick: -1, carryScale: 0, angle: 90, landingTick: 3, earlyTick: 12 })).toBe(
+      SHORT_HIT_TICKS,
+    )
+  })
+
+  it('OK·5 건너뛰기는 큰 타구(+0x199a)에서만 된다', () => {
+    expect(canSkipHitPause(true)).toBe(true)
+    expect(canSkipHitPause(false)).toBe(false)
   })
 })
 

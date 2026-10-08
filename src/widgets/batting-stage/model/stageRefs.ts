@@ -47,6 +47,8 @@ export interface PendingHit {
    * 감상 플래그 `+0x199a` 가 꺼진 타구면 null 이라 아무것도 안 쏜다.
    */
   readonly bigHitAt: { readonly x: number; readonly y: number } | null
+  /** 감상 플래그 `+0x199a` — 켜졌을 때만 OK·'5' 로 건너뛴다 (0x406e8 40708) */
+  readonly watchesBigHit: boolean
   readonly resultText: string
   /** 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트) — 인플레이로 넘길 때 함께 알린다 */
   readonly buntKind: number
