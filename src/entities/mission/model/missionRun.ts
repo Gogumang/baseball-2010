@@ -12,6 +12,8 @@ import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { runnerFatesWithoutPlay, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { missionCpuAfterRuns, startMissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
+import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -38,6 +40,11 @@ export interface MissionRun {
   readonly bases: BaseState
   /** 현재 아웃 */
   readonly outs: number
+  /**
+   * 상대 CPU 팀 — 0xaa57c 가 세운 다른 칸 팀과 0xf 진입 0x3d954 의 CPU 교체가 보는 칸들 (`missionCpuTeam`).
+   * 타자 미션은 CPU 수비 투수진(실점 A·B), 투수 미션은 CPU 공격 타선(타순 칸 기록)을 든다.
+   */
+  readonly cpu: MissionCpuTeam
 }
 
 const OUTS_PER_INNING = 3
@@ -57,6 +64,7 @@ export function startMission(mission: OriginalMission): MissionRun {
     remainingSwings: limitOrNull(mission.swingLimit),
     bases: mission.start.runners,
     outs: mission.start.outs,
+    cpu: startMissionCpuTeam(mission),
   }
 }
 
@@ -217,7 +225,7 @@ export function advanceSituation(
   random?: RandomPort,
   /** 화면이 이미 다 돌린 수비 플레이. 주면 여기서 다시 굴리지 않는다 */
   played?: DefensePlayResult,
-): { bases: BaseState; outs: number; runsScored: number; outcome: AtBatOutcome } {
+): { bases: BaseState; outs: number; runsScored: number; outcome: AtBatOutcome; inningEnded: boolean } {
   const play = missionPlay(run.bases, run.outs, outcome, { random, played })
   const advance = play.advance
   const outs = run.outs + advance.outsAdded
@@ -227,9 +235,10 @@ export function advanceSituation(
       outs: run.mission.start.outs,
       runsScored: advance.runsScored,
       outcome: play.outcome,
+      inningEnded: true,
     }
   }
-  return { bases: advance.bases, outs, runsScored: advance.runsScored, outcome: play.outcome }
+  return { bases: advance.bases, outs, runsScored: advance.runsScored, outcome: play.outcome, inningEnded: false }
 }
 
 /** 배트를 냈다 (헛스윙·파울 포함). 스윙 제한이 있는 미션만 줄어든다. */
@@ -268,7 +277,13 @@ export function applyOutcome(
     isBunt,
     runnerCountOf(run.bases),
   )
-  const advanced: MissionRun = { ...run, bases: situation.bases, outs: situation.outs }
+  const advanced: MissionRun = {
+    ...run,
+    bases: situation.bases,
+    outs: situation.outs,
+    // 점수판 득점 0xa5c34 → CPU 수비 투수의 실점 A·B, 3아웃이면 이닝 교대 0xa5b00 의 A = 0
+    cpu: missionCpuAfterRuns(run.cpu, situation.runsScored, situation.inningEnded),
+  }
   const remaining =
     run.remainingPlateAppearances === null ? null : run.remainingPlateAppearances - 1
 
@@ -323,13 +338,15 @@ export function applySteal(run: MissionRun): MissionRun {
  * ⚠️ 악송구로 들어온 득점은 타점이 아니라 목표에 안 들고, 화면 점수(시작 점수 + 타점)에도 안 보인다 — 웹 미션은
  *    득점 칸을 따로 들지 않는다(근사).
  */
-export function applyPickoff(run: MissionRun, advance: AdvanceResult): MissionRun {
+export function applyPickoff<T extends MissionRun>(run: T, advance: AdvanceResult): T {
   if (run.status !== '진행중') return run
   const outs = run.outs + advance.outsAdded
+  // 판의 득점도 점수판 득점 0xa5c34 라 CPU 수비 투수의 실점 A·B 에 든다 (타자 미션)
+  const cpu = missionCpuAfterRuns(run.cpu, advance.runsScored, outs >= OUTS_PER_INNING)
   if (outs >= OUTS_PER_INNING) {
-    return { ...run, bases: run.mission.start.runners, outs: run.mission.start.outs }
+    return { ...run, bases: run.mission.start.runners, outs: run.mission.start.outs, cpu }
   }
-  return { ...run, bases: advance.bases, outs }
+  return { ...run, bases: advance.bases, outs, cpu }
 }
 
 /** 도루 실패 — 주자가 죽는다 */
@@ -338,7 +355,12 @@ export function failSteal(run: MissionRun): MissionRun {
   const bases = { ...run.bases, first: false }
   const outs = run.outs + 1
   if (outs >= OUTS_PER_INNING) {
-    return { ...run, bases: run.mission.start.runners, outs: run.mission.start.outs }
+    return {
+      ...run,
+      bases: run.mission.start.runners,
+      outs: run.mission.start.outs,
+      cpu: missionCpuAfterRuns(run.cpu, 0, true),
+    }
   }
   return { ...run, bases, outs }
 }

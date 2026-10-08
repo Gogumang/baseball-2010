@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
-import { missionBatterSpecialSwingRemainingOf, missionOpponent, missionPitcherAbility } from '@/app/model/useMissionSession'
+import { missionBatterSpecialSwingRemainingOf, missionMoundOpponent, missionMoundPitcherAbility } from '@/app/model/useMissionSession'
 import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen, MissionBriefing } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
@@ -146,8 +146,8 @@ export function MissionRoutes({
         run={missionRun}
         ability={ability}
         batterSkillIds={batter.skillIds}
-        pitcherAbility={missionPitcherAbility(missionRun.mission, session.aceLevels, session.opponentStaminaPercent)}
-        opponent={missionOpponent(missionRun.mission)}
+        pitcherAbility={missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent)}
+        opponent={missionMoundOpponent(missionRun)}
         atBat={runner.atBat}
         isPaused={runner.isPaused}
         bannerText={runner.bannerText}

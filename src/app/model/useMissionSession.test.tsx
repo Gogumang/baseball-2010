@@ -20,6 +20,7 @@ import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model/battedBallOutcome'
 import type { MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
@@ -1266,5 +1267,62 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
       rendered.unmount()
     }
     expect(파울판).toBeGreaterThan(0)
+  })
+})
+
+describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428 · `missionCpuTeam`)', () => {
+  it("3점 홈런으로 CPU 투수의 이닝 실점이 3 이 되면 다음 타석 0xe 뒤에 바꾼다 — 22 'Time!' · 등판음 14 · OK 를 두 번 받는다", () => {
+    vi.useFakeTimers()
+    try {
+      const played: number[] = []
+      const sound = { ...createSilentSound(), play: (id: number) => played.push(id) }
+      const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
+      let screen: Screen = { kind: '미션선택' }
+      const setScreen = vi.fn((next: Screen) => {
+        screen = next
+      })
+      const rendered = renderHook(() => {
+        const runner = useAtBatRunner()
+        return {
+          runner,
+          session: useMissionSession({ runner, random: createSeededRandom(7), missionRecord, screen, setScreen, sound }),
+        }
+      })
+      // '미스터 타점왕' — 1회 1사 2·3루, 4타점 목표. 상대 팀 8 의 4번째 선발(마스터 3번)이 던진다
+      const mission = MISSIONS.find((row) => row.side === '타자' && row.id === 9)!
+      act(() => {
+        rendered.result.current.session.actions.begin(mission)
+      })
+      rendered.rerender()
+      expect(rendered.result.current.session.sceneConfirm?.entries).toBe(1)
+
+      act(() => {
+        rendered.result.current.session.handleMissionPitch({
+          resolution: { kind: '타구', outcome: { kind: '홈런' } },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: null,
+        })
+      })
+      const afterHomeRun = rendered.result.current.session.missionRun!
+      expect(afterHomeRun.status).toBe('진행중')
+      expect(afterHomeRun.cpu.pitching).toMatchObject({ inningRunsAllowed: 3, ourRuns: 3, mound: { pitcherSlot: 0 } })
+      // 결과 띠가 떠 있는 동안은 0xd 앞 — 아직 안 묻는다
+      expect(played).not.toContain(22)
+
+      played.length = 0
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+      const changed = rendered.result.current.session.missionRun!
+      expect(changed.cpu.pitching?.mound.pitcherSlot).not.toBe(0)
+      expect(changed.cpu.pitching?.mound.justChanged).toBe(true)
+      expect(played).toEqual([22, 14])
+      // 0x16 → 0xd → 0xe — 같은 걸음의 둘째 0xe
+      expect(rendered.result.current.session.sceneConfirm?.entries).toBe(2)
+      rendered.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

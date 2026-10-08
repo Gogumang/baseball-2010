@@ -96,7 +96,14 @@ import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/missi
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
-import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import {
+  enterMissionPitchSelection,
+  isMissionCpuMoundAce,
+  missionCpuAfterPitch,
+  missionCpuAtNewPlateAppearance,
+} from '@/entities/mission/model/missionCpuTeam'
+import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 interface MissionSessionInput {
@@ -234,6 +241,27 @@ export function missionPitcherAbility(
     : pitcherAbilityOf({ ...opponent, ability }, undefined, staminaPercent)
 }
 
+/**
+ * **지금 마운드의 상대 마투수** — 타자 미션의 마투수는 CPU 투수 교체(0xf 진입 0x3d954 → 0xac428)로 내려갈 수 있다
+ * (`missionCpuTeam` — 0x66864 가 막는 것은 레오니 · 발렌타인 미션뿐). 내려가면 마선수가 아니다.
+ */
+export function missionMoundOpponent(run: MissionRun): AcePlayer | null {
+  return isMissionCpuMoundAce(run.cpu) ? missionOpponent(run.mission) : null
+}
+
+/**
+ * **지금 마운드 투수의 능력치** — 마투수가 서 있으면 `missionPitcherAbility`, 아니면 붙박이 투수 값이 없는 웹 미션의
+ * 평범한 투수(`DEFAULT_PITCHER_ABILITY`, 마투수가 아닌 미션 상대와 같은 근사).
+ * ⚠️ 근사: 원본은 마스터 팀 줄의 능력치로 던진다 — 교체 판정·소모는 그 줄을 보지만(`missionCpuTeam`) 투구 엔진은 아직 안 본다.
+ */
+export function missionMoundPitcherAbility(
+  run: MissionRun,
+  aceLevels?: Readonly<Record<number, number>>,
+  staminaPercent?: number,
+): PitcherAbility {
+  return isMissionCpuMoundAce(run.cpu) ? missionPitcherAbility(run.mission, aceLevels, staminaPercent) : DEFAULT_PITCHER_ABILITY
+}
+
 /** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (0xa5f0e) */
 const INTIMIDATE_SKILL_ID = 22
 /**
@@ -247,10 +275,10 @@ const MISSION_TEAM_MORALE = 100
  * (0x1f824)를 0xb521c 로 팀 칸 8 에 통째(0x30, +0x2c 포함 — 다섯 줄 모두 10000) 베끼고 0xb8c94 로 0번과 맞바꿔 세우므로
  * 경기마다 10000 에서 선다. 이미 마운드에 그 마투수가 있으면 다시 베끼지 않아 깎인 값이 이어진다.
  * CPU 투수 교체 0xac428 을 미션 객체(0x66864)가 막는 것은 **칸 3·7(레오니·발렌타인)뿐**이다 — 드래고나(칸 11)는
- * 안 막는다(아래 "미션 장면의 상태 0xf 진입" 머리글). 용량의 체력은 `0xb6415(P, 3, 1)` = 레벨 배율 먹은 넷째 칸(마선수 표에 스킬 비트 없음).
- * ⚠️ 첫 투수 +200 (0xaeb08 의 `team+0x26 − team+0x33 == 1`) 이 0xb521c 로 끼운 마투수에게 서는지는 못 읽었다 —
- *    교체가 없으니 선 것으로 둔다(나만의리그 `drainPitcherForPitch` 와 같은 셈). 마선수가 아닌 미션 상대는 붙박이
- *    투수 값이 없어(`DEFAULT_PITCHER_ABILITY`) 깎지 않는다.
+ * 안 막는다(`entities/mission/model/missionCpuTeam`). 용량의 체력은 `0xb6415(P, 3, 1)` = 레벨 배율 먹은 넷째 칸(마선수 표에 스킬 비트 없음).
+ * 첫 투수 +200 (0xaeb08 의 `team+0x26 − team+0x33 == 1`) 은 선다 — 0xaae7c 의 마투수 갈래(0xb521c · 0xb8c94 · 0xaea84)는 팀 객체의
+ * +0x26 · +0x33 을 안 고쳐 0xb891c 때의 8 − 7 = 1 그대로다. 마투수가 내려가면 세션이 이 소모를 멈추고, 마선수가 아닌 마운드
+ * 투수의 소모는 CPU 팀이 마스터 줄 능력치로 든다(`missionCpuAfterPitch`).
  */
 export function missionOpponentStaminaAfterPitch(
   stamina: number,
@@ -384,8 +412,9 @@ export function useMissionSession({
   /**
    * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
    * 타자 미션은 내 타자 칸, 투수 미션은 상대 타자 칸이다.
-   * ⚠️ 근사: 웹 미션은 상대 타선·타순을 들고 있지 않고 모든 상대 타석을 같은 선수(마타자 미션이면 그 마타자)로
-   *    본다 — 그래서 칸도 하나다. 원본 미션 팀에서 마타자가 몇 번 타순에 서는지는 아직 안 읽었다.
+   * ⚠️ 근사: 웹 미션은 상대 타석을 모두 같은 선수(마타자 미션이면 그 마타자)로 친다 — 그래서 칸도 하나다.
+   *    원본 마타자는 0xaae7c 가 레코드 +7 아래 4비트 타순 칸에 세운다(`missionCpuTeam` — 타순 · 타순 칸 기록은 CPU 대타
+   *    판정에만 들고, 투구 엔진의 타자 능력치는 아직 그 칸을 안 본다).
    */
   const [batterSpecialSwingStored, setBatterSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
   /**
@@ -395,9 +424,25 @@ export function useMissionSession({
    * 제한 시간은 그 동안에도 흐른다 — 모드 5·6 의 0xaada4 는 장면 상태 갱신 뒤(0x52ed0) 상태를 안 가리고 돈다.
    */
   const [sceneConfirm, setSceneConfirm] = useState<SceneConfirmWait | null>(null)
+  /**
+   * **상태 0xf 진입 `0x3d954` 신호** — 미션도 공마다 0xf 로 들어서며 CPU 교체를 묻는다(`missionCpuTeam` 머리글).
+   * `'new'` 는 새 타석(0xd → 0xe 확인 뒤), `'same'` 은 같은 타석 다음 공(판정 A 의 "그 밖" · 파울로 닫힌 판 · 주자 판 끝 ae592).
+   * 진행이 다 먹인 뒤의 판을 봐야 해서 아래 효과가 그린 뒤에 돈다.
+   */
+  const [pitchSelectionEntry, setPitchSelectionEntry] = useState<
+    { readonly serial: number; readonly kind: 'new' | 'same' } | null
+  >(null)
+  const handledPitchSelectionRef = useRef(0)
+  const signalPitchSelection = (kind: 'new' | 'same') =>
+    setPitchSelectionEntry((previous) => ({ serial: (previous?.serial ?? 0) + 1, kind }))
+  /** 새 타석 0xd → 0xe — OK 를 기다린 뒤 0xf 로 간다 */
+  const enterNewAtBatConfirm = () => {
+    setSceneConfirm(enterSceneConfirm())
+    signalPitchSelection('new')
+  }
   /** 타석을 새로 세운다 — 0xd → 0xe 라 OK 를 기다린다 */
   const resetAtBatWithConfirm = (count?: { balls: number; strikes: number }) => {
-    setSceneConfirm(enterSceneConfirm())
+    enterNewAtBatConfirm()
     runner.resetAtBat(count)
   }
   const [opponentSpecialSwingStored, setOpponentSpecialSwingStored] = useState(UNFILLED_SPECIAL_SWING)
@@ -465,6 +510,53 @@ export function useMissionSession({
   }, [isBatterRunning, isPitcherRunning])
 
   /**
+   * **상태 0xf 진입 `0x3d954`** — 미션 CPU 교체 (`entities/mission/model/missionCpuTeam`).
+   * 타자 미션(모드 6)은 CPU 투수 교체 0xac428, 투수 미션(모드 5)은 CPU 대타 0xac228 — 나리 타자편 · 투수편과 같은 자리(3da3e ·
+   * 3da70)의 같은 함수다. 나면 22 "Time!"(3da88) → 교체 연출 0x16 → 0xd(지우기 건너뜀) → 0xe 에서 들어온 선수의 등판음
+   * (0x38b64 — 마선수 26 · 2·3루 주자 15 · 그 밖 14)을 내고 **OK 를 한 번 더** 기다린 뒤 0xf 재진입 — 그때는 state[0xd]
+   * (교체 직후) · state[0xe](대타 막음)가 서 있어 굴림 없이 지나므로 다시 묻지 않는다.
+   * ⚠️ 근사(때): 새 타석이면 원본은 0xe 의 OK **뒤에** 묻는데, 웹은 0xe 대기를 세울 때(타자 미션은 결과 띠가 걷힐 때) 미리 묻고
+   *    OK 를 두 번 받게 한다 — 대기 동안 다른 굴림이 없어 굴림 차례는 같지만 22 · 등판음이 OK 보다 먼저 난다.
+   *    같은 타석 다음 공이면 공 결과를 먹인 바로 뒤에 물어 22 가 심판 콜과 붙는다(원본은 결과 상태 0x12 가 끝난 뒤).
+   * ⚠️ 미이식: 교체 연출(0x16)의 그림 — 미션 화면(`MissionPlayScreen` · `PitchingScreen`)에 그 판이 아직 없다.
+   */
+  useEffect(() => {
+    const entry = pitchSelectionEntry
+    if (entry === null || entry.serial === handledPitchSelectionRef.current) return
+    const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
+    // 타자 미션의 새 타석은 결과 띠(0x12 → 0xd)가 걷혀야 0xd · 0xe 다
+    if (!isPitcherSide && runner.bannerText !== '') return
+    handledPitchSelectionRef.current = entry.serial
+    const run = isPitcherSide ? pitcherRun : missionRun
+    if (run === null || run.status !== '진행중') return
+    // 새 타석 0xd(0x48d50 48eb6)가 state[0xe] 를 내린다
+    const cpu = entry.kind === 'new' ? missionCpuAtNewPlateAppearance(run.cpu) : run.cpu
+    const { team, substitution } = enterMissionPitchSelection(
+      cpu,
+      {
+        mission: run.mission,
+        runnerCount: runnerCountOf(run.bases),
+        balls: runner.atBatRef.current.balls,
+        strikes: runner.atBatRef.current.strikes,
+        aceStamina: opponentMoundStamina,
+      },
+      random,
+    )
+    if (team !== run.cpu) {
+      if (isPitcherSide) setPitcherRun((previous) => (previous === null ? previous : { ...previous, cpu: team }))
+      else setMissionRun((previous) => (previous === null ? previous : { ...previous, cpu: team }))
+    }
+    if (substitution === null) return
+    playSoundIds(audio, [
+      PITCHER_CHANGE_SOUND,
+      pitcherEntrySoundIdOf({ isAce: substitution.incomingIsAce, bases: run.bases }),
+    ])
+    // 0x16 → 0xd → 0xe — 새 타석이면 같은 걸음의 둘째 0xe, 같은 타석이면 새 대기
+    setSceneConfirm((previous) => (entry.kind === 'new' ? chainSceneConfirm(previous) : enterSceneConfirm()))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pitchSelectionEntry, runner.bannerText])
+
+  /**
    * 타자 미션의 공 하나.
    *
    * 공이 손을 떠날 때(0x3dec6) 상대 마투수 투구 소모 0xa5e14 가 돈다 — 모드 갈래가 없어(0x3de10~0x3dec8 ·
@@ -483,8 +575,23 @@ export function useMissionSession({
       // 견제는 공이 아니라 구질이 오지 않는다 (`PitchOutcomeDetail.pitchTypeNumber`)
       const pitchTypeNumber = detail.pitchTypeNumber
       if (pitchingRun !== null && pitchTypeNumber !== undefined) {
-        setOpponentMoundStamina((stamina) =>
-          missionOpponentStaminaAfterPitch(stamina, pitchingRun.mission, pitchTypeNumber, batterSkillIds, aceLevels),
+        // 마투수가 내려갔으면 그 스태미나는 더 안 깎인다 — 마운드 투수의 소모는 CPU 팀이 든다
+        if (isMissionCpuMoundAce(pitchingRun.cpu)) {
+          setOpponentMoundStamina((stamina) =>
+            missionOpponentStaminaAfterPitch(stamina, pitchingRun.mission, pitchTypeNumber, batterSkillIds, aceLevels),
+          )
+        }
+        // 0xa5e14 — state[0xd] · state[0xe] 내림 · 마운드 투수 투구 수 · 스태미나 (`missionCpuAfterPitch`)
+        setMissionRun((previous) =>
+          previous === null
+            ? previous
+            : {
+                ...previous,
+                cpu: missionCpuAfterPitch(previous.cpu, {
+                  pitchTypeNumber,
+                  batterIntimidates: batterSkillIds.includes(INTIMIDATE_SKILL_ID),
+                }),
+              },
         )
       }
       const hasSwung = detail.hasSwung
@@ -579,6 +686,8 @@ export function useMissionSession({
             previous === null ? previous : checkSwingsExhausted(recordSwing(previous)),
           )
         }
+        // 판정 A 0xae24c 의 "그 밖" — 같은 타석 다음 공(0xf)
+        signalPitchSelection('same')
         return
       }
 
@@ -614,7 +723,7 @@ export function useMissionSession({
         return applyMissionOutcome(swung, outcome, detail.isBunt)
       })
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
-      setSceneConfirm(enterSceneConfirm())
+      enterNewAtBatConfirm()
       runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase))
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -793,7 +902,11 @@ export function useMissionSession({
     // 0x4e136 — 필살 스윙이 나간 틱에 남은 −1 (헛스윙도). 마타자가 아니면 null 이라 칸을 안 건드린다
     if (thrown.specialSwingRemaining !== null) setOpponentSpecialSwingStored(thrown.specialSwingRemaining)
 
-    let nextRun = recordPitch(pitcherRun, grade === MAX_GAUGE_GRADE)
+    // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c)
+    let nextRun = recordPitch(
+      { ...pitcherRun, cpu: missionCpuAfterPitch(pitcherRun.cpu, { pitchTypeNumber: typeNumber, batterIntimidates: false }) },
+      grade === MAX_GAUGE_GRADE,
+    )
     // 이 공 **전** 스트라이크 — 0x9d57c 의 st[4] (삼진 진동이 본다)
     const strikesBefore = runner.atBatRef.current.strikes
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
@@ -927,6 +1040,8 @@ export function useMissionSession({
       resetAtBatWithConfirm()
     } else {
       nextRun = checkPitchExhausted(nextRun)
+      // 판정 A 의 "그 밖" — 같은 타석 다음 공(0xf)
+      signalPitchSelection('same')
     }
     setPitcherRun(nextRun)
   }
@@ -954,6 +1069,7 @@ export function useMissionSession({
         } else {
           setMissionRun((previous) => (previous === null ? previous : checkSwingsExhausted(previous)))
         }
+        signalPitchSelection('same')
         runner.setIsPaused(false)
         return
       }
@@ -985,7 +1101,7 @@ export function useMissionSession({
           : applyMissionOutcome(previous, pending.outcome, pending.isBunt, random, played),
       )
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
-      setSceneConfirm(enterSceneConfirm())
+      enterNewAtBatConfirm()
       runner.pauseWithBanner(describeOutcomeBanner(settled, pending.runnersOnBase))
     },
     [audio, random, runner],
@@ -1196,6 +1312,8 @@ export function useMissionSession({
       setMissionRun((previous) => (previous === null ? previous : applyPickoff(previous, result.advance)))
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])
       if (result.ticks.length > 0) setPickoffReplay(result)
+      // 견제 판 끝 0xae3e8 ae592 → 0xf (⚠️ 3아웃이면 원본은 0x18 → 새 타석이다 — 웹은 타석을 안 끊는다, 예전 그대로)
+      signalPitchSelection('same')
     },
 
     /**
@@ -1220,8 +1338,7 @@ export function useMissionSession({
      * ⚠️ 근사: 수비 아홉 칸·주자 주루는 미션 타구와 같은 진행기 기본값이다(레코드에 팀·타순이 없다).
      * 견제사는 아웃 콜(결과 13 → 0xa7d0c)이 R+0x13c 를 올려 '아웃' 목표에도 든다 — 판 끝 판정 0xaaa6c(ae5c4)가 바로 본다
      * (`outCallsOf`).
-     * ⚠️ 미해결(미이식): 같은 타석으로 돌아가면 0xf 진입 0x3d954 가 CPU 대타 0xac228 을 다시 묻는다 —
-     *    파일 아래 "미션 장면의 상태 0xf 진입" 머리글. 웹 미션은 상대 타선이 없어 묻지 않는다.
+     * 같은 타석으로 돌아가면 0xf 진입 0x3d954 가 CPU 대타 0xac228 을 다시 묻는다 (`missionCpuTeam`, 위 0xf 진입 효과).
      * 판정 콜(세이프 17 · 견제사 62/20)은 판을 연 자리에서 낸다 (CPU 견제와 같은 근사).
      */
     pickoff: (webKey: string) => {
@@ -1249,8 +1366,9 @@ export function useMissionSession({
       if (result.ticks.length > 0) setPickoffReplay(result)
       // 판정 B 0xae3e8 의 견제 가지는 아웃 ≤ 2 든 3아웃이든 정산 0xa8024 를 부른다 (ae5a8)
       setPitcherRun(withPitcherMissionRunnerResult(pitcherRun, result, true))
-      // 3아웃 — 이 타석은 끊긴다 (아웃 > 2 → 0x18)
+      // 3아웃 — 이 타석은 끊긴다 (아웃 > 2 → 0x18). 아니면 같은 타석 0xf (ae592)
       if (interrupted) resetAtBatWithConfirm()
+      else signalPitchSelection('same')
     },
 
     /** 견제 판 재생이 끝났다 */
@@ -1410,40 +1528,10 @@ function withBatterNotOut(run: MissionRun, outcome: AtBatOutcome, isBunt: boolea
   if (run.status !== '진행중') return run
   const struck = applyMissionOutcome(run, outcome, isBunt)
   const moved = applyPickoff(run, play.result.advance)
-  return { ...struck, bases: moved.bases, outs: moved.outs }
+  // 판의 득점(점수판 0xa5c34)은 CPU 수비 투수의 실점 A·B 로 — 삼진 길에는 득점이 없다
+  return { ...struck, bases: moved.bases, outs: moved.outs, cpu: moved.cpu }
 }
 
-/**
- * **미션 장면의 상태 0xf 진입 `0x3d954`** — 모드 5·6 에서 실제로 하는 일 (직접 재역어셈, 3d9ca~3da94 · 0x66864 · 0xac228).
- * 0xf 로는 새 타석의 0xe 확인 · 판정 A 0xae24c 의 "그 밖"(볼·스트라이크·파울) · 견제/도루 판 끝 ae592 가 모두 들어오므로
- * **공마다** 돈다. 웹 미션 세션에는 이 자리가 없다.
- *
- * ```
- * 3d9cc  r4 = 0x66864()                       ; 미션 가림막 — 아래 투수 교체 갈래에만 쓴다
- * 3d9e4  수비 팀이 CPU(state[0x31 + state[0xa]] == 1)
- *          돌발 진행 중(0x8eb94) → 건너뜀 · r4 == 0 → 건너뜀
- *          그 밖 → 0xac428(…) CPU 투수 교체                      ; 모드 6(타자 미션)
- *        아니면(수비가 사람)
- *          돌발 진행 중 → 건너뜀
- *          그 밖 → 0xac228([장면+0x21c], [장면+0x220], [장면+0x20c], state) CPU 대타 ; 모드 5(투수 미션) — 가림막 없음
- * 3da74  참이면 22 "Time!"(3da88) · 0x16 예약(3da94) → 0xd → 0xe(돌발 0x8f158 다시) → 0xf 재진입
- *
- * 0x66864: 모드 5·6 이 아니면 1. 모드 6 이면 미션 객체 +0xbd(고른 칸) == 3 또는 7 일 때만 0, 모드 5 면 수비가 사람일 때 0.
- * ```
- * - **모드 5(투수 미션)** — CPU 대타 0xac228 을 공마다 묻는다. 막는 칸(`state[0xe]`(ac234) · 벤치 [팀+0x28c] > 0 ·
- *   지금 타자 마선수 아님 0xb633d · 그 타순 칸 +0x13 홈런 0 · +0x12 안타 ≤ 1 · **+0x14 타석 ≥ 2** · 장비 니블 넷 0)이 모두 열려야
- *   `rand(0, 1000)`(0xbfa54) 을 굴리고, 들면 `rand(0, 벤치)` 로 0xaf06c 교체 · state[0xe] = 1. 칸 하나라도 닫히면 굴림이 없다.
- *   투수편 이식(`pitcherGameFlow.enterPitchSelection` · `applyOpponentCpuPinchHit`)과 같은 함수다.
- * - **모드 6(타자 미션)** — CPU 투수 교체 0xac428 을 공마다 묻는다. 0x66864 가 막는 것은 칸 3·7(스토리 4 레오니 · 8 발렌타인)
- *   뿐이고, 칸 11(12 드래고나)·마투수 없는 미션은 막지 않는다(마선수 대결의 +0xbd 값은 안 읽었다). 마투수는 0xac4f2 갈래(이닝 실점 > 2 ·
- *   경기 실점 > 3 · 체력 ≤ 39%), 그 밖은 보직·이닝·리드 갈래(`judgePitcherChange`).
- *
- * ⚠️ 미해결(미이식): 두 갈래 모두 미션 레코드 +2 의 두 팀(0xaa6c8~0xaa76c 의 0xb891c 팀 채우기)의 실제 명단 —
- *    타순 칸 기록·벤치 수·보직·저장된 체력(+0x2c) — 을 본다. 웹 미션은 상대 타선·투수진을 들고 있지 않아(모든 상대 타석이
- *    같은 선수, 마선수가 아닌 상대 투수는 `DEFAULT_PITCHER_ABILITY`) 판정 입력도, 들어올 선수도 지을 수 없다. 그래서 옮기지 않았다.
- *    원본에서 이 갈래가 굴림을 쓰는 것은 모드 5 에서 같은 타자가 세 번째 타석에 설 때(+0x14 ≥ 2)부터, 모드 6 에서는 교체 판정이
- *    참일 때(마무리 굴림 0xac360 · 새 투수 0xabfcc)뿐이다.
- */
 /**
  * **투수 미션의 주자 판**(종류 5 도루 · 9 폭투·포일)을 먹인다 — 3아웃이면 다음 이닝(빈 루 · 0아웃, `advanceDefense` 와 같다).
  * 잡은 아웃은 이닝 목표(`totalOuts`)에 든다.

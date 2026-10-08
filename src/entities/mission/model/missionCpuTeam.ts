@@ -1,0 +1,378 @@
+import type { OriginalMission } from '@/shared/config/original/missions'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { missionKeyOf } from '@/entities/mission/model/missionGoal'
+import { quickPitcherOf, teamPitchers } from '@/entities/team/model/teamRoster'
+import { changePitcherIfNeeded, drainPitcherForPitch } from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
+import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import {
+  QUICK_LINEUP_SIZE,
+  lineupSlotOf,
+  recordLineupPlay,
+  rosterLineupOf,
+  rosterSlotAt,
+  tryQuickCpuPinchHit,
+} from '@/entities/game/model/quickLineup'
+import type { QuickLineup } from '@/entities/game/model/quickLineup'
+import type { RandomPort } from '@/shared/api/random/randomPort'
+
+/**
+ * **미션 상대 CPU 팀** — 미션 경기 준비 `0xaa57c`(모드 5·6)가 세운 다른 칸 팀과, 그 팀의 CPU 교체가 보는 칸들.
+ *
+ * 원본 미션도 보통 경기 장면(0x104)이라 상태 0xf 진입 `0x3d954` 가 **공마다** CPU 교체를 묻는다 (직접 재역어셈 3d9ca~3da94):
+ * ```
+ * 3d9cc  r4 = 0x66864()
+ * 3d9e4  수비 팀이 CPU(state[0x31 + state[0xa]] == 1)
+ *          돌발 진행 중(0x8eb94) 또는 r4 == 0 → 건너뜀
+ *          그 밖 → 0xac428([장면+0x21c], 수비 팀 [장면+0x224], 주자관리 [장면+0x20c], state, R, 0, 0, 0)   ; 3da3e
+ *        아니면(수비가 사람)
+ *          돌발 진행 중 → 건너뜀
+ *          그 밖 → 0xac228([장면+0x21c], 공격 팀 [장면+0x220], 주자관리, state)                       ; 3da70
+ * 3da74  참이면 22 "Time!"(3da88) · 0x16 예약(3da94) → 0xd(이전 0x16 이라 지우기 건너뜀, 48e94) → 0xe → 0xf 재진입
+ * 66864  모드 5·6 이 아니면 1 · 모드 6 이면 미션 객체 +0xbd ∈ {3, 7} 일 때 0 · 모드 5 면 수비가 사람일 때 0
+ * ```
+ * 부르는 함수는 **다른 모드와 같다** — 0xac428 은 나리 타자편(`features/play-game` `changeOpponentPitcher`)과 같은 3da3e 자리,
+ * 0xac228 은 나리 투수편(`features/play-pitcher-game` `enterPitchSelection`)과 같은 3da70 자리다. 그래서 판정은 공용 부품
+ * (`changePitcherIfNeeded` · `tryQuickCpuPinchHit`)을 그대로 쓴다. 미션이 다른 것은 **팀과 그 칸**뿐이다:
+ * - 모드 6(타자 미션) — 수비가 CPU 라 0xac428 투수 교체. 모드 5(투수 미션) — 수비가 사람이라 0xac228 대타(가림막 안 봄).
+ * - 미션 객체 +0xbd = 고른 레코드 번호 = `id − 1` (보통 미션은 목록 칸, 마선수 대결은 SYS 8 이 team − 1 로 적는다 — 0xa5268 이
+ *   ≤ 13 이면 그 줄, ≥ 15 면 한 줄 앞). 0x66864 가 막는 것은 **타자 4(레오니) · 8(발렌타인)** 둘뿐이다.
+ *
+ * 팀(직접 재역어셈 0xaa57c · 0xb8680 · 0x1ff98 · 0xaae7c):
+ * - aa72a~aa76c `0xb891c(팀객체[칸], 모드, 팀, −1)` — 다른 칸 팀 = 레코드 +2 아래 4비트(`sideTeams[1 − humanSide]`).
+ *   명부 0xb8680 은 모드 5·6 이면(b86e2) 마선수 대결이고 원래 모드가 시즌이 아닐 때 말고는 **마스터 팀**
+ *   `0x1f8c0(저장, 팀)` = Xls 줄 그대로(0x1ff98 이 팀마다 투수 8 · 타자 12 줄을 통째 복사, 투수 +0x2c 는 모두 10000).
+ *   마스터 팀은 미션 끝 정산 0x4ea0c(모드 5·6 갈래 4ef18) · 다시하기 · 나가기가 `0x20094(앱, 5)` → 0x1ff98 로 다시 싣는다
+ *   → 미션마다 새 줄에서 선다(아래 맞바꾸기가 다음 미션으로 이어지지 않는다).
+ * - aa87c~aa8ac 다른 칸 팀+0x32(타순) = 레코드 +7 아래 4비트 · `0xb8c94(다른 칸, 0, 레코드 +6 아래 4비트)` = 명부 투수
+ *   0번 ↔ 그 칸 맞바꾸기 → 그 투수가 선발이다.
+ * - 마선수 미션(레코드 +8 윗 4비트 > 0)은 0xd 메시지 0xaae7c(aafca~)가 마선수를 끼운다 — 모드 6 이면 마투수를 명부 투수
+ *   8번(0xb521c, 옛 8번은 끝)에 베끼고 0 ↔ 8 맞바꿈, 모드 5 면 마타자를 명부 타자 9번(0xb53f0)에 베끼고 지금 타순 ↔ 9 맞바꿈.
+ *   팀 객체의 투수 수 +0x26 · 벤치 +0x33 · +0x28c 는 0xb891c 때 값 그대로다(0xaae7c 는 안 고친다).
+ */
+
+/** 마선수가 들어선 명부 칸 표시 — 마스터 팀 줄이 아니다 */
+export const MISSION_ACE_ROSTER_SLOT = -1
+
+/** 팀 객체 투수 칸 수 — 마스터 팀 투수 8 줄 (`team+0x26`) */
+const PITCHERS_PER_TEAM = 8
+/** 마스터 팀 타자 12 줄 — 벤치 `team+0x28c` = 12 − 9 */
+const BATTERS_PER_TEAM = 12
+
+/**
+ * 레코드 +6 · +7 의 **아래 4비트**(다른 칸 = CPU 팀) — 시작 투수 칸(0xb8c94)과 타순(team+0x32).
+ * 생성기(`shared/config/original/missions`)가 싣지 않는 칸이라 원본 표(`base/extracted/Xls*_MISSION.json` 줄 바이트 6 · 7)에서
+ * 옮겨 적었다. 윗 4비트는 사람 칸 몫이다(타순 · 레코드 +1 비트 0 일 때만 쓰는 투수 칸 — 원본 표는 모두 비트 0 이 꺼져 있다).
+ * 열쇠는 `missionKeyOf`.
+ */
+export const MISSION_CPU_START: Readonly<Record<string, { readonly pitcherSlot: number; readonly battingOrder: number }>> = {
+  '타자:1': { pitcherSlot: 3, battingOrder: 0 },
+  '타자:2': { pitcherSlot: 3, battingOrder: 0 },
+  '타자:3': { pitcherSlot: 3, battingOrder: 2 },
+  '타자:4': { pitcherSlot: 2, battingOrder: 1 },
+  '타자:5': { pitcherSlot: 1, battingOrder: 0 },
+  '타자:6': { pitcherSlot: 7, battingOrder: 2 },
+  '타자:7': { pitcherSlot: 1, battingOrder: 0 },
+  '타자:8': { pitcherSlot: 2, battingOrder: 1 },
+  '타자:9': { pitcherSlot: 3, battingOrder: 1 },
+  '타자:10': { pitcherSlot: 4, battingOrder: 1 },
+  '타자:11': { pitcherSlot: 0, battingOrder: 0 },
+  '타자:12': { pitcherSlot: 0, battingOrder: 3 },
+  '타자:13': { pitcherSlot: 0, battingOrder: 0 },
+  '타자:14': { pitcherSlot: 0, battingOrder: 0 },
+  '타자:16': { pitcherSlot: 0, battingOrder: 3 },
+  '타자:17': { pitcherSlot: 0, battingOrder: 3 },
+  '타자:18': { pitcherSlot: 0, battingOrder: 3 },
+  '타자:19': { pitcherSlot: 0, battingOrder: 3 },
+  '타자:20': { pitcherSlot: 0, battingOrder: 3 },
+  '투수:1': { pitcherSlot: 6, battingOrder: 6 },
+  '투수:2': { pitcherSlot: 4, battingOrder: 8 },
+  '투수:3': { pitcherSlot: 2, battingOrder: 4 },
+  '투수:4': { pitcherSlot: 3, battingOrder: 0 },
+  '투수:5': { pitcherSlot: 2, battingOrder: 0 },
+  '투수:6': { pitcherSlot: 2, battingOrder: 0 },
+  '투수:7': { pitcherSlot: 0, battingOrder: 2 },
+  '투수:8': { pitcherSlot: 0, battingOrder: 0 },
+  '투수:9': { pitcherSlot: 0, battingOrder: 0 },
+  '투수:10': { pitcherSlot: 0, battingOrder: 2 },
+  '투수:11': { pitcherSlot: 0, battingOrder: 1 },
+  '투수:12': { pitcherSlot: 0, battingOrder: 0 },
+  '투수:13': { pitcherSlot: 0, battingOrder: 2 },
+  '투수:14': { pitcherSlot: 0, battingOrder: 2 },
+  '투수:16': { pitcherSlot: 0, battingOrder: 3 },
+  '투수:17': { pitcherSlot: 0, battingOrder: 3 },
+  '투수:18': { pitcherSlot: 0, battingOrder: 3 },
+  '투수:19': { pitcherSlot: 0, battingOrder: 3 },
+  '투수:20': { pitcherSlot: 0, battingOrder: 3 },
+}
+
+/** 타자 미션(모드 6) — CPU 수비 투수진 */
+export interface MissionCpuPitching {
+  /** CPU 팀 번호 (`sideTeams[1 − humanSide]`) */
+  readonly teamId: number
+  /** 팀 투수 칸(0~7)마다 마스터 줄(팀 안 0~7) — 마투수 칸은 `MISSION_ACE_ROSTER_SLOT` */
+  readonly roster: readonly number[]
+  /** 지금 마운드 — `pitcherSlot` 은 팀 투수 칸 */
+  readonly mound: HalfInningMound
+  /** A `+0x284` — 지금 투수의 이번 이닝 실점 (이닝 교대 0xa5b00 · 교체 0xaec64 가 0) */
+  readonly inningRunsAllowed: number
+  /** 사람 팀이 낸 점수(점수판) — 리드(0xb69b0 수비 − 공격)의 우리 쪽 = 시작 점수 + 이 값 */
+  readonly ourRuns: number
+}
+
+/** 투수 미션(모드 5) — CPU 공격 타선 */
+export interface MissionCpuBatting {
+  readonly teamId: number
+  /** 명단 — 칸마다 마스터 줄(팀 안 0~11) · 마타자 칸은 `MISSION_ACE_ROSTER_SLOT` */
+  readonly lineup: QuickLineup
+  /** `team+0x32` 지금 타순 칸 (0~8, 0xaf020 이 타석마다 (+1) mod 9) */
+  readonly order: number
+}
+
+export interface MissionCpuTeam {
+  readonly pitching: MissionCpuPitching | null
+  readonly batting: MissionCpuBatting | null
+  /** `state[0xe]` — CPU 대타 막음. 대타가 세우고(ac33e) 공마다(0xa5e14 a5e7c)·새 타석 0xd(48eb6)가 내린다 */
+  readonly pinchHitBlocked: boolean
+}
+
+/** 사람 칸 아닌 쪽 팀 번호 — 레코드 +2 아래 4비트 */
+function cpuTeamIdOf(mission: OriginalMission): number {
+  return mission.sideTeams[mission.humanSide === 0 ? 1 : 0]
+}
+
+/** 미션 객체 +0xbd — 고른 레코드 번호 (`id − 1`, 위 머리글) */
+function missionSlotOf(mission: OriginalMission): number {
+  return mission.id - 1
+}
+
+/** `0x66864` 의 모드 6 갈래 — +0xbd 가 3 · 7 이면 CPU 투수 교체를 막는다 */
+const PITCHER_CHANGE_BLOCKED_SLOTS: readonly number[] = [3, 7]
+
+/** 미션 한 판의 CPU 팀 — 경기 준비 0xaa57c · 0xd 메시지 0xaae7c 뒤의 모습 */
+export function startMissionCpuTeam(mission: OriginalMission): MissionCpuTeam {
+  const start = MISSION_CPU_START[missionKeyOf(mission)] ?? { pitcherSlot: 0, battingOrder: 0 }
+  const hasAce = mission.opponentAce > 0
+  const teamId = cpuTeamIdOf(mission)
+  if (mission.side === '타자') {
+    // 명부 투수 0 ↔ 시작 칸 (0xb8c94) — 줄째 바뀌어 그 투수의 보직·능력치가 따라간다
+    const roster = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
+    roster[0] = start.pitcherSlot
+    roster[start.pitcherSlot] = 0
+    // 마투수 — 명부 8번에 베낀 뒤 0 ↔ 8 (aafca~ab06e). 0번에 섰던 투수는 팀 객체(8명) 밖으로 나간다
+    if (hasAce) roster[0] = MISSION_ACE_ROSTER_SLOT
+    return {
+      pitching: {
+        teamId,
+        roster,
+        // 마스터 줄 +0x2c 는 모두 10000, 마투수 레코드도 10000 (P1 3-0)
+        mound: { pitcherSlot: 0, stamina: FULL_STAMINA, runsAllowed: 0, pitches: 0, usedSlots: [], justChanged: false },
+        inningRunsAllowed: 0,
+        ourRuns: 0,
+      },
+      batting: null,
+      pinchHitBlocked: false,
+    }
+  }
+  const base = rosterLineupOf(BATTERS_PER_TEAM)
+  const order = lineupSlotOf(start.battingOrder)
+  const rosterSlots = [...base.rosterSlots]
+  if (hasAce) {
+    // 명부 9번에 마타자(0xb53f0 — 옛 9번은 끝, 팀 객체 밖) → 지금 타순 ↔ 9 (0xb8cb8)
+    rosterSlots[QUICK_LINEUP_SIZE] = rosterSlots[order]
+    rosterSlots[order] = MISSION_ACE_ROSTER_SLOT
+  }
+  return {
+    pitching: null,
+    batting: { teamId, lineup: { ...base, rosterSlots }, order },
+    pinchHitBlocked: false,
+  }
+}
+
+/** 마운드에 지금 마투수가 서 있는가 — 아니면 상대 투수는 마선수가 아니다 */
+export function isMissionCpuMoundAce(team: MissionCpuTeam): boolean {
+  const pitching = team.pitching
+  return pitching !== null && pitching.roster[pitching.mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
+}
+
+/** 지금 타순에 선 CPU 타자가 마타자인가 */
+export function isMissionCpuBatterAce(team: MissionCpuTeam): boolean {
+  const batting = team.batting
+  return batting !== null && rosterSlotAt(batting.lineup, batting.order) === MISSION_ACE_ROSTER_SLOT
+}
+
+/** 팀 투수 칸의 0xac428 · 0xabfcc 재료 — 리그 `defenseOf` · 타자편 `quickDefenseOf` 와 같은 모양 */
+function defenseOf(pitching: MissionCpuPitching, lead: number): HalfInningDefense {
+  const masters = teamPitchers(pitching.teamId)
+  const isAce = (slot: number) => pitching.roster[slot] === MISSION_ACE_ROSTER_SLOT
+  const masterAt = (slot: number) => masters[pitching.roster[slot] ?? slot] ?? masters[0]
+  return {
+    mound: pitching.mound,
+    pitcherSlots: pitching.roster.map((_master, slot) => slot),
+    pitcherAt: (slot) => quickPitcherOf(masterAt(slot)),
+    // 투수 능력치 칸 3 = 체력 — 소모(0x66e44 용량)에만 쓴다. 마투수 소모는 세션이 따로 들어 여기서 안 부른다
+    staminaAbilityAt: (slot) => masterAt(slot).ability[3],
+    // 벤치 줄의 +0x2c — 마스터 줄은 모두 10000 이고 미션 한 판 안에서는 벤치가 안 던진다
+    staminaAt: () => FULL_STAMINA,
+    lead,
+    // 0x66e44 의 V = 0x1f9a8(앱, 모드, 팀) — 모드 5·6·7 은 0x1fa1e(늘 0)라 V 가 없어 사기 100
+    morale: 100,
+    // 0xb6c20 — 미션은 사람 칸 0 · 다른 칸 1 (aa658·aa666)
+    bothTeamsAreCpu: false,
+    // 보직은 줄째 따라간다 — 마스터 줄 +0xb & 3 (팀 안 차례 0,0,0,0,1,1,1,2). 마투수 칸은 표 밖이라 없다
+    roleAt: (slot) => (isAce(slot) ? undefined : rosterPitcherRoleOf(pitching.roster[slot] ?? slot)),
+    abilitySumAt: (slot) =>
+      pitcherAbilitySumOf(masterAt(slot).ability.map((value) => Math.min(999, Math.max(0, value)))),
+    isSpecialPitcherAt: isAce,
+  }
+}
+
+const MAXIMUM_COUNTER = 99
+
+/**
+ * **점수판 득점** — 득점 처리 0xa5c34 가 1점마다 수비 투수의 A(+0x284) · B(+0x280)를 올린다(99 에서 멈춤, P7 E1).
+ * 타자 미션에서만 뜻이 있다(CPU 가 수비). `inningEnded` 면 이어서 이닝 교대 0xa5b00 이 A 를 0 으로 —
+ * ⚠️ 웹 미션은 3아웃이면 시작 상황으로 돌아가므로(`advanceSituation` 의 추정) 그 자리를 이닝 교대로 본다.
+ */
+export function missionCpuAfterRuns(team: MissionCpuTeam, runs: number, inningEnded: boolean): MissionCpuTeam {
+  const pitching = team.pitching
+  if (pitching === null || (runs <= 0 && !inningEnded)) return team
+  const inningRuns = Math.min(MAXIMUM_COUNTER, pitching.inningRunsAllowed + runs)
+  return {
+    ...team,
+    pitching: {
+      ...pitching,
+      mound: { ...pitching.mound, runsAllowed: Math.min(MAXIMUM_COUNTER, pitching.mound.runsAllowed + runs) },
+      inningRunsAllowed: inningEnded ? 0 : inningRuns,
+      ourRuns: pitching.ourRuns + Math.max(0, runs),
+    },
+  }
+}
+
+/**
+ * **CPU 공격 타석 정산** — 0xa8024 가 그 타순 칸 기록(안타 +0x12 · 홈런 +0x13 · 타석 +0x14)을 올리고, 타석이 끝났으니
+ * 0xaf020 이 타순을 (+1) mod 9 로 넘긴다. 투수 미션에서만 뜻이 있다(CPU 가 공격).
+ */
+export function missionCpuAfterPlateAppearance(team: MissionCpuTeam, outcome: AtBatOutcome): MissionCpuTeam {
+  const batting = team.batting
+  if (batting === null) return team
+  return {
+    ...team,
+    batting: {
+      ...batting,
+      lineup: recordLineupPlay(batting.lineup, batting.order, outcome),
+      order: lineupSlotOf(batting.order + 1),
+    },
+  }
+}
+
+/**
+ * **공 하나** — 투구 처리 0xa5e14 (모드 갈래 없음, 0x3dec6). state[0xd](a5e72) · state[0xe](a5e7c)를 내리고, 던진 투수의
+ * 투구 수 +0x27c 를 올리고 스태미나를 깎는다(0xaeb08). 투수 미션은 사람이 던지므로 막음 칸만 내린다.
+ * 마투수 스태미나는 세션이 따로 든다(`missionOpponentStaminaAfterPitch`) — 여기서는 판정 때 받는다.
+ */
+export function missionCpuAfterPitch(
+  team: MissionCpuTeam,
+  pitch: { readonly pitchTypeNumber: number; readonly batterIntimidates: boolean },
+): MissionCpuTeam {
+  const pitching = team.pitching
+  if (pitching === null) return team.pinchHitBlocked ? { ...team, pinchHitBlocked: false } : team
+  const mound = pitching.mound
+  const isAce = pitching.roster[mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
+  const stamina = isAce
+    ? mound.stamina
+    : drainPitcherForPitch(defenseOf(pitching, 0), mound, pitch.pitchTypeNumber, pitch.batterIntimidates)
+  return {
+    ...team,
+    pinchHitBlocked: false,
+    pitching: {
+      ...pitching,
+      mound: { ...mound, stamina, pitches: Math.min(MAXIMUM_COUNTER * 100, mound.pitches + 1), justChanged: false },
+    },
+  }
+}
+
+/** 새 타석 0xd(0x48d50 48eb6) — state[0xe] 를 내린다 (앞 상태가 0x16 이면 건너뛰지만 그 길은 0xf 재진입이라 여기 안 온다) */
+export function missionCpuAtNewPlateAppearance(team: MissionCpuTeam): MissionCpuTeam {
+  return team.pinchHitBlocked ? { ...team, pinchHitBlocked: false } : team
+}
+
+/** 0xf 진입에서 난 CPU 교체 — 소리(22 · 등판음)와 0x16 → 0xd → 0xe 를 부르는 쪽이 잇는다 */
+export interface MissionCpuSubstitution {
+  readonly kind: '투수교체' | '대타'
+  /** 들어온 선수가 마선수인가 — 등판음 0x38b64 의 26 */
+  readonly incomingIsAce: boolean
+}
+
+export interface MissionPitchSelectionSituation {
+  readonly mission: OriginalMission
+  /** 주자 수 (0xa9598) */
+  readonly runnerCount: number
+  readonly balls: number
+  readonly strikes: number
+  /** 마투수가 마운드면 그 스태미나 +0x2c (세션 `missionOpponentStaminaAfterPitch` 값). 아니면 안 본다 */
+  readonly aceStamina: number
+}
+
+/**
+ * **상태 0xf 진입 `0x3d954`** — 공 하나를 고르기 전마다 (위 머리글). 바꾸면 바뀐 팀과 무엇이 났는지, 아니면 받은 팀 그대로.
+ * 난수: 모드 5 는 0xac228 의 막는 칸이 다 열려야 `rand(0, 1000)`, 들면 `rand(0, 벤치)`. 모드 6 은 0xac360 이 벤치에
+ * 마선수가 있을 때만 구르는데 미션 팀 벤치에는 마선수가 없어(마투수는 0번 칸) 굴림이 없다.
+ */
+export function enterMissionPitchSelection(
+  team: MissionCpuTeam,
+  situation: MissionPitchSelectionSituation,
+  random: RandomPort,
+): { readonly team: MissionCpuTeam; readonly substitution: MissionCpuSubstitution | null } {
+  const unchanged = { team, substitution: null }
+  const { mission } = situation
+  const pitching = team.pitching
+  if (pitching !== null) {
+    // 0x66864 — 모드 6 은 +0xbd ∈ {3, 7} 이면 막는다
+    if (PITCHER_CHANGE_BLOCKED_SLOTS.includes(missionSlotOf(mission))) return unchanged
+    const lead = mission.start.opponentScore - (mission.start.ourScore + pitching.ourRuns)
+    const isAceMound = pitching.roster[pitching.mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
+    const mound = isAceMound ? { ...pitching.mound, stamina: situation.aceStamina } : pitching.mound
+    const after = changePitcherIfNeeded(
+      defenseOf({ ...pitching, mound }, lead),
+      mound,
+      {
+        // state[0x6b] — 0xaa57c 가 레코드 +3 아래 4비트로 적는다. ⚠️ 웹 미션은 이닝을 넘기지 않아 시작 이닝 그대로다
+        inningIndex: mission.start.inning - 1,
+        lead,
+        runnerCount: situation.runnerCount,
+        inningRunsAllowed: pitching.inningRunsAllowed,
+        random,
+        // 3da34 — 일곱째 인자 0, `[sp+4]`(모드 3) · `[sp+8]`(강제) 0
+        minimumBench: 0,
+      },
+    )
+    if (after === mound) return unchanged
+    return {
+      team: { ...team, pitching: { ...pitching, mound: after, inningRunsAllowed: 0 } },
+      substitution: { kind: '투수교체', incomingIsAce: pitching.roster[after.pitcherSlot] === MISSION_ACE_ROSTER_SLOT },
+    }
+  }
+  const batting = team.batting
+  if (batting === null) return unchanged
+  const pinch = tryQuickCpuPinchHit(
+    batting.lineup,
+    batting.order,
+    {
+      alreadyUsedThisGame: team.pinchHitBlocked,
+      runnerCount: situation.runnerCount,
+      strikes: situation.strikes,
+      balls: situation.balls,
+      // 0xae89c(공격 팀) 마선수(0xb633c) — 마타자 칸이면 굴림 없이 안 낸다
+      batterIsAce: isMissionCpuBatterAce(team),
+    },
+    random,
+  )
+  if (pinch === null) return unchanged
+  return {
+    // state[0xe] = 1 (ac33e)
+    team: { ...team, pinchHitBlocked: true, batting: { ...batting, lineup: pinch.lineup } },
+    substitution: { kind: '대타', incomingIsAce: pinch.incomingRosterSlot === MISSION_ACE_ROSTER_SLOT },
+  }
+}

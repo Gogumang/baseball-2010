@@ -14,6 +14,7 @@ import type { MissionRun, MissionStatus } from '@/entities/mission/model/mission
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates, chargedRunsOfFates } from '@/features/defense-play/model/runnerFates'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { missionCpuAfterPlateAppearance, startMissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 
 /**
  * 투수편 미션 진행.
@@ -61,6 +62,7 @@ export function startPitcherMission(mission: OriginalMission): PitcherRun {
     outs: mission.start.outs,
     totalOuts: 0,
     allowed: { runs: 0, hits: 0, walks: 0, baserunner: 0 },
+    cpu: startMissionCpuTeam(mission),
   }
 }
 
@@ -204,6 +206,8 @@ export function applyPitcherOutcome(
     outs: defense.outs,
     totalOuts,
     allowed,
+    // 같은 정산 0xa8024 가 CPU 타자의 타순 칸 기록(+0x12 · +0x13 · +0x14)을 올리고 0xaf020 이 타순을 넘긴다
+    cpu: missionCpuAfterPlateAppearance(run.cpu, settled),
   }
   return { ...next, status: judgeStatus(next) }
 }
