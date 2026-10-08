@@ -142,6 +142,11 @@ describe('연봉 협상 (0x8d05a, 0x8cac0)', () => {
     expect(applySalaryChange(선수({ popularity: 1000, popularityAtSeasonStart: 0, salary: 848 }), 3).salary).toBe(879)
     expect(applySalaryChange(career, 8).salary).toBe(110)
   })
+
+  it('연봉 칸 +0x1c8 은 u16 — 0xa4fd8 strh 로 65536 을 넘으면 감긴다(상한에 붙지 않는다)', () => {
+    // base = 1 + 60000 · +30% → 60001 + 18000 = 78001 → 78001 − 65536
+    expect(applySalaryChange(선수({ popularity: 0, popularityAtSeasonStart: 0, salary: 60000 }), 0).salary).toBe(78001 - 65536)
+  })
 })
 
 describe('중간평가 칭호 — 0x11e84', () => {

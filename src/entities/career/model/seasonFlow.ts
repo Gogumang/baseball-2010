@@ -272,8 +272,8 @@ export function salaryResultEventId(choiceEventId: number, rank: number): number
 /** 보상 20 의 값 → 연봉 변동률(%) */
 const SALARY_RATE: readonly number[] = [30, 20, 10, -20, 20, 10, 5, -10, 0]
 
-/** 연봉은 u16 (+0x1c8) */
-const MAXIMUM_SALARY = 65_535
+/** 연봉 칸 +0x1c8 은 u16 — 쓰기 0xa4fd8 이 자르지 않고 `strh` 로 넣어 65536 을 넘으면 아래 16비트만 남는다(감긴다) */
+const SALARY_MASK = 0xffff
 
 /**
  * 연봉협상에 필요한 칸 — 타자편 `PlayerCareer` 와 투수편 `PitcherCareer` 가 같은 커리어 칸
@@ -299,10 +299,11 @@ export function salaryOfferOf(career: SalaryHolder): { readonly raise: number; r
 /**
  * 연봉 = base ± trunc(base × 변동률 / 100), base = max(1, trunc(인기도 상승/4)) + 이전 연봉 (0x8cac0).
  * 단위는 원본 그대로 100만원 한 칸이다 (관리 화면이 ×100 해서 만원으로 보여 준다).
+ * 새 값은 0xa4fd8 `strh` 로 쓰여 u16 으로 감긴다(상한에 붙지 않는다 — 원본 그대로).
  */
 export function applySalaryChange<C extends SalaryHolder>(career: C, code: number): C {
   const base = salaryOfferOf(career).salary
   const rate = SALARY_RATE[code] ?? 0
   const change = Math.sign(rate) * Math.trunc((base * Math.abs(rate)) / 100)
-  return { ...career, salary: Math.min(MAXIMUM_SALARY, base + change) }
+  return { ...career, salary: (base + change) & SALARY_MASK }
 }
