@@ -23,6 +23,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { hiddenTeamHintOf } from '@/pages/season/ui/SeasonTeamSelectScreen'
 
 /** StrMODE — 트레이드 문구 [163]~[175] · CPU 요청 [204]·[205]·[216] */
 const CHOOSE_ACQUIRED = ORIGINAL_MODE_TEXT[163] // "상대 팀에서 우리 팀으로 영입할 선수를 선택합니다"
@@ -31,7 +32,21 @@ const REFUSE_CAREER = ORIGINAL_MODE_TEXT[165] // "나만의 리그 선수는 트
 const REFUSE_HALL_OF_FAME = ORIGINAL_MODE_TEXT[166] // "명예의 전당 선수는 트레이드 할 수 없습니다"
 const COST_LABEL = ORIGINAL_MODE_TEXT[167] // "트레이드 비용 :"
 const BOOST_FIRST_TEXT = 168 // [168] 기본 진행 · [169] +50% · [170] +20%
-const TRADE_QUESTION = ORIGINAL_MODE_TEXT[171] // "트레이드를 하시겠습니까?"
+const TRADE_QUESTION = ORIGINAL_MODE_TEXT[171] // "!C트레이드를 하시겠습니까?"
+const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // "!cFFFF00G포인트!cFFFFFF가 소모됩니다"
+
+/**
+ * 0xe7 확인(−5 · '5') 이 띄우는 [171] 팝업 글 — 0xc6ae~0xc736 (직접 떴다). 버퍼는 "!C"(0xcc210) 로 시작한다:
+ * ```
+ * 칸 0      "!C" + [171]
+ * 칸 1 · 2  "!C" + 비용표 0xcbbed[칸] × 100 (0xbc73c 정수 이어 붙이기) + [172] + "!N"(0xcbbe0) + [171]
+ * ```
+ * 칸 0 은 [171] 도 "!C" 로 시작해 "!C" 가 둘이다 — 원본 그대로.
+ */
+export function tradeQuestionTextOf(boost: number): string {
+  if (boost === 0) return `!C${TRADE_QUESTION}`
+  return `!C${tradeBoostCostOf(boost)}${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
+}
 const TRADE_SUCCESS = ORIGINAL_MODE_TEXT[174] // "트레이드 성공!!!"
 const TRADE_FAILURE = ORIGINAL_MODE_TEXT[175] // "트레이드 실패!!!"
 /** 진행 가드 0xd3e6~0xd45c — [65] G 부족(팝업 (2, 2) 예/아니오) · [77] 소지금 부족(팝업 (1, 1) 확인) */
@@ -73,6 +88,9 @@ type TradeStep =
   | { readonly kind: '보상'; readonly teamId: number; readonly acquired: number }
   | { readonly kind: '확인'; readonly teamId: number; readonly acquired: number; readonly given: number }
 
+/** 0xe4 에서 트레이드할 수 있는 팀 칸의 끝 — 칸 > 9(히든 팀)는 힌트만 (0x82c2 `cmp r2, #9`) */
+const LAST_TRADE_TEAM = 9
+
 /** 지금 떠 있는 예·아니오 팝업 — 진행 [171] (id 0x18) · 요청 취소 [216] (id 0x2e) · G 부족 [65] (id 2) */
 type TradeQuestion = '진행' | '요청취소' | 'G부족'
 
@@ -100,6 +118,8 @@ export interface TradeScreenProps {
   readonly onCancelRequest?: () => void
   /** 취소(−16) — 구단관리(0xce)로 되돌아간다 */
   readonly onBack: () => void
+  /** 전역 저장 +0x70 + 칸 — 0xe4 히든 칸 힌트 글이 해금에 따라 [0] 줄을 넣고 뺀다 */
+  readonly openedHiddenIds?: readonly number[]
 }
 
 /**
@@ -124,7 +144,8 @@ export interface TradeScreenProps {
  * ```
  *
  * **팀 고르기(0xe4)** 는 선수 등록 쪽 `TeamSelectScreen` 을 그대로 빌려 쓴다
- * (⚠️ 원본 목록은 **내 팀을 뺀** 9팀이다 — 격자에서 뺄 수 없어 고르면 무시한다, **근사**).
+ * 키 0x8250 이 칸 == SR+1(내 팀)이면 아무것도 안 하고 칸 > 9 면 히든 힌트를 띄우므로 칸 번호는 15팀 격자 그대로다
+ * (⚠️ 0xe4 그림이 내 팀 칸을 어떻게 그리는지는 확인하지 못했다).
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xe5·0xe6 의 엔트리 목록 창(0x5cfec)과 0xe7 의 진행 화면
  * (0xd4e8) 좌표를 확인하지 못해 다른 시즌 화면과 같은 공용 판 목록으로 그린다.
@@ -134,7 +155,7 @@ export interface TradeScreenProps {
  */
 export function TradeScreen({
   state, roster, opponentRosterOf = tableRosterOf, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest,
-  onBack,
+  onBack, openedHiddenIds = [],
 }: TradeScreenProps) {
   const { record } = state
   const forced = request !== null && request.isRequested ? request : null
@@ -145,6 +166,8 @@ export function TradeScreen({
   // ed+0x33f — 목록이 보여 주는 탭. 0xe5·0xe6 진입마다 this+0x154 로 다시 선다
   const [listTab, setListTab] = useState<number>(() => forced?.tab ?? TRADE_REQUEST_TAB.투수)
   const [boost, setBoost] = useState(0)
+  /** 0xe4 히든 칸 힌트 팝업 글 */
+  const [hiddenHint, setHiddenHint] = useState<string | null>(null)
   const [question, setQuestion] = useState<TradeQuestion | null>(null)
   // SR+0x56(이번 주기에 트레이드를 썼다)은 여기서 막지 않는다 — 구단관리 키 0x4e40 은 켬 표를 안 보고 칸 1 이면 0xe4 로
   // 오고, 0xe4 진입 0x4774 도 그 칸을 안 본다. 막는 것은 구단관리 위·아래 이동 0x6c444 가 꺼진 칸을 건너뛰는 것뿐이다
@@ -203,9 +226,17 @@ export function TradeScreen({
     if (next.kind === '보상') setNotice(REQUEST_GIVEN)
   }
 
+  /**
+   * 0xe4 확인 — 키 0x8250 (0x82a4~0x8382, 직접 떴다):
+   * ```
+   * 칸 == SR+1(내 팀)  → 아무것도 안 한다
+   * 칸 > 9            → 히든 팀 힌트 팝업 (1, 1, 1) — 0xca 와 같은 글(`hiddenTeamHintOf`), 열린 팀도 못 고른다
+   * 그 밖             → this+0x158 = 칸 · 0xe5
+   * ```
+   */
   const chooseTeam = (teamId: number) => {
-    // 원본 목록에는 내 팀이 없다 — 격자에서 뺄 수 없어 고르면 아무 일도 안 한다 (근사)
     if (teamId === record.teamId) return
+    if (teamId > LAST_TRADE_TEAM) return setHiddenHint(hiddenTeamHintOf(teamId, openedHiddenIds))
     // 0xe4 진입 0x4774 가 20바이트를 지워 트레이드 탭은 0(투수)이다 — 0xe5 진입이 그 탭으로 목록을 연다
     setTradeTab(TRADE_REQUEST_TAB.투수)
     setListTab(TRADE_REQUEST_TAB.투수)
@@ -363,7 +394,10 @@ export function TradeScreen({
 
   if (step.kind === '팀' && notice === null) {
     return (
-      <TeamSelectScreen title="시즌모드" gamePoint={gamePoints} onSelect={chooseTeam} onCancel={onBack} />
+      <TeamSelectScreen title="시즌모드" gamePoint={gamePoints} openedHiddenIds={openedHiddenIds}
+        onSelect={chooseTeam} onSelectLocked={chooseTeam} onCancel={onBack}
+        overlay={hiddenHint !== null
+          && <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />} />
     )
   }
 
@@ -414,7 +448,7 @@ export function TradeScreen({
 
       {question !== null && (
         <MessageBox
-          text={question === '진행' ? TRADE_QUESTION : question === 'G부족' ? LACK_GAME_POINT : REQUEST_CANCEL_QUESTION}
+          text={question === '진행' ? tradeQuestionTextOf(boost) : question === 'G부족' ? LACK_GAME_POINT : REQUEST_CANCEL_QUESTION}
           buttons={['예', '아니오']}
           onAnswer={answerQuestion}
         />

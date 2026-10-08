@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { TradeScreen } from '@/pages/season/ui/TradeScreen'
+import { TradeScreen, tradeQuestionTextOf } from '@/pages/season/ui/TradeScreen'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
@@ -315,6 +315,17 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     expect(rolls).toEqual([])
   })
 
+  it('[171] 팝업 글 — 칸 0 은 "!C" + [171], 비용 칸은 "!C" + 비용 + [172] + "!N" + [171] (0xc6ae~0xc736)', () => {
+    expect(tradeQuestionTextOf(0)).toBe('!C!C트레이드를 하시겠습니까?')
+    expect(tradeQuestionTextOf(1)).toBe('!C2000!cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
+    expect(tradeQuestionTextOf(2)).toBe('!C1000!cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
+
+    확인까지()
+    누르기(/\+20%/)
+    expect(알림글()).toContain('1000G포인트가 소모됩니다')
+    expect(알림글()).toContain('트레이드를 하시겠습니까?')
+  })
+
   it('+50% 칸은 2000G 를 쓴다 (성공·실패와 상관없이 나간다)', () => {
     const { onTrade } = 확인까지({ random: 고정난수(100) })
 
@@ -322,6 +333,37 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     누르기('예')
 
     expect(onTrade.mock.calls[0][0].gamePointCost).toBe(2000)
+  })
+})
+
+describe('0xe4 팀 고르기 키 0x8250', () => {
+  it('히든 칸(> 9)은 힌트 팝업만 — 0xca 와 같은 글이고 트레이드로 안 넘어간다', () => {
+    띄우기(상태())
+
+    fireEvent.click(screen.getAllByRole('button', { name: '???' })[0])
+
+    expect(알림글()).toContain('히든 팀 오픈 힌트')
+    expect(알림글()).toContain('선택 할 수 없는 팀입니다')
+    누르기('확인')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('열린 히든 팀도 못 고른다 — 힌트에서 [0] 줄만 빠진다', () => {
+    띄우기(상태(), { openedHiddenIds: [14] })
+
+    누르기(TEAMS[14].name)
+
+    expect(알림글()).toContain('마선수 총출동')
+    expect(알림글()).not.toContain('선택 할 수 없는 팀입니다')
+  })
+
+  it('내 팀 칸(SR+1)은 아무 일도 안 한다', () => {
+    띄우기(상태())
+
+    누르기(TEAMS[MY_TEAM].name)
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getAllByRole('button', { name: TEAMS[OPPONENT].name }).length).toBeGreaterThan(0)
   })
 })
 
