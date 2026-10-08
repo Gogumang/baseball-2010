@@ -58,8 +58,9 @@ export interface StageScene {
   readonly homeRunFrame?: HomeRunTextFrame | null
   /**
    * 살아 있는 파티클. 없으면 안 그린다.
-   * ⚠️ 그리는 **순서**는 근사다 — 원본 파티클 관리자의 그리기가 타석 화면 묶음(0x50828)의
-   * 어느 자리에서 도는지 못 봤다. 여기서는 선수·공 위, 전광판·판정 글자 아래에 둔다.
+   * 그리는 자리는 장면 그리기 0x52c50 이 상태 그리기 표(0x50828 따위)를 부른 **뒤** 53050~53060 에서
+   * 파티클 관리자 [0x1400068] 의 0x6de85 · 0x6dd69 를 부르는 곳 — 전광판·판정 글자·HOMERUN 글자까지 다 그린 위,
+   * 그 뒤 0x4e35c(기록 알림·팝업) 아래다.
    */
   readonly particles?: ParticleScene | null
   /** 타자 자세 f (0xb905c) — 레이어마다 가산값을 더해 그린다 */
@@ -171,9 +172,6 @@ export function renderBattingStage(
     // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
     drawMagicBallEffect(context, scene.pitch, scene.frame)
   }
-  if (scene.particles !== null && scene.particles !== undefined) {
-    drawParticles(context, scene.particles)
-  }
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   if (scene.hud !== null) {
@@ -196,6 +194,10 @@ export function renderBattingStage(
     drawHomeRunBanner(context, scene.homeRunTick)
   } else if (scene.resultText !== '') {
     drawResultText(context, scene.resultText, scene.resultTick, side)
+  }
+  // 파티클은 상태 그리기가 다 끝난 뒤 — 장면 그리기 0x52c50 의 53050~53060(0x6de85 · 0x6dd69), 그 뒤 0x4e35c(기록 알림 따위)
+  if (scene.particles !== null && scene.particles !== undefined) {
+    drawParticles(context, scene.particles)
   }
 }
 
