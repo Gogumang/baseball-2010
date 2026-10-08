@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
-import { rollSceneStadium, rollStadiumNumber, sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
+import {
+  generalMatchInfoStage, nariSceneStadium, nationalCupStadiumOf, placedMatchInfoStadium, placedPaletteRowOf, rollDerbySceneStadium,
+  rollSceneStadium, rollStadiumNumber, sceneFieldPaletteOf, seasonNationalCupSceneStadium,
+} from '@/features/play-team-game/model/sceneStadium'
 import { resumeTeamGame, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 
@@ -122,5 +125,64 @@ describe('startTeamGame — 3f856 0x39fdc 는 상태 7(덱 · 효과) 뒤 · 3fa
 
     expect(calls.slice(k, k + 3)).toEqual([[0, 10], [0, 10], [0, 2]])
     expect(이어.sceneStadium?.paletteRow).toBe(0x211a1818)
+  })
+})
+
+describe('0x78688 · 0x788f8 — 표 0xd377c · 0xd39e4 를 놓인 구장으로', () => {
+  it('0~9 는 0xcfd0c 와 같은 줄', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(placedPaletteRowOf)).toEqual([-1, 0, 1, 2, 0, -1, -1, 0, 1, 2])
+  })
+})
+
+describe('나만의리그 0x39fdc 모드 3·4 갈래 0x3a0e8 — 홈 팀 · 대회 2/8, 굴림 없음', () => {
+  it('정규 · 포스트시즌은 홈(측 1) 팀 번호가 구장', () => {
+    expect(nariSceneStadium(3, null)).toEqual({ stadium: 3, defenseStadium: 0, paletteRow: 2 })
+    expect(nariSceneStadium(0, null).paletteRow).toBe(-1)
+  })
+
+  it('국가대항전은 남은 단계 > 1 이면 2, 결승(1)이면 8', () => {
+    expect(nationalCupStadiumOf(4)).toBe(2)
+    expect(nationalCupStadiumOf(2)).toBe(2)
+    expect(nationalCupStadiumOf(1)).toBe(8)
+    expect(nariSceneStadium(5, 3)).toEqual({ stadium: 2, defenseStadium: 0, paletteRow: 1 })
+    expect(nariSceneStadium(5, 1)).toEqual({ stadium: 8, defenseStadium: 0, paletteRow: 1 })
+  })
+})
+
+describe('시즌 국가대항전 0x352e8 모드 2 갈래 — 2/8', () => {
+  it('풀리그 2 · 결승 8 — 두 줄 다 표[2] = 표[8] = 1', () => {
+    expect(seasonNationalCupSceneStadium(2)).toEqual({ stadium: 2, defenseStadium: 0, paletteRow: 1 })
+    expect(seasonNationalCupSceneStadium(1)).toEqual({ stadium: 8, defenseStadium: 0, paletteRow: 1 })
+  })
+})
+
+describe('홈런더비 0x39fdc 모드 7 갈래 — 내 팀으로 두 구장', () => {
+  it('팀 0~9 는 굴림 없음', () => {
+    const { random, calls } = recorded(씨앗)
+    expect(rollDerbySceneStadium(random, 6)).toEqual({ stadium: 6, defenseStadium: 6, paletteRow: -1 })
+    expect(calls).toEqual([])
+  })
+
+  it('팀 > 9 면 타석 → 수비 rand(0, 10) 둘 · 줄은 굴린 타석 구장으로', () => {
+    const { random, calls } = recorded(씨앗)
+    const 구장 = rollDerbySceneStadium(random, 12)
+    const 따로 = createSeededRandom(씨앗)
+    expect(calls).toEqual([[0, 10], [0, 10]])
+    expect(구장.stadium).toBe(따로.rand(0, 10))
+    expect(구장.defenseStadium).toBe(따로.rand(0, 10))
+    expect(구장.paletteRow).toBe(placedPaletteRowOf(구장.stadium))
+  })
+})
+
+describe('경기정보 미리보기 무대', () => {
+  it('시즌 0xdd · 나리 142 — 0x78688 의 줄', () => {
+    expect(placedMatchInfoStadium(7)).toEqual({ stadium: 7, paletteRow: 0 })
+  })
+
+  it('일반모드 22 — 줄은 표 0xce9d8[st+0x30] (10~14 는 −1 · −1 · 9 · 12 · 15)', () => {
+    expect(generalMatchInfoStage(3, 3)).toEqual({ stadium: 3, paletteRow: 2 })
+    expect(generalMatchInfoStage(4, 12)).toEqual({ stadium: 4, paletteRow: 9 })
+    expect(generalMatchInfoStage(4, 10)).toEqual({ stadium: 4, paletteRow: -1 })
+    expect(generalMatchInfoStage(4, 14)).toEqual({ stadium: 4, paletteRow: 15 })
   })
 })
