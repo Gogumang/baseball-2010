@@ -13,6 +13,8 @@ import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { PITCHER_TYPE_BONUS_ABILITY } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { subItemMoraleRelief, subItemSlotTrainingBonus } from '@/entities/career/model/subItems'
+import { applyPitchTypeTraining } from '@/entities/pitcher-career/model/pitchTraining'
+import type { PitchTrainingProgress } from '@/entities/pitcher-career/model/pitchTraining'
 
 /**
  * 투수편 **관리 주기·훈련** — 타자편과 다른 점만 모았다.
@@ -262,6 +264,60 @@ function runMagicTraining(
     magic: { sessions, required, isLevelUp },
     career: countPitcherTraining(trained, menu.id),
   }
+}
+
+/** 구질 훈련(108 탭 2)의 사기 감소 굴림 `bfa55(6,10)` — 0x1836a */
+const PITCH_TYPE_MORALE_RANGE: IntegerRange = { minimum: 6, maximumExclusive: 10 }
+/** 훈련 칸 4 — 마구와 구질 훈련이 같은 칸 [sp+0x40] = 4 로 0x17f5c 를 돈다(훈련 수 +0x4b+4) */
+const MAGIC_TRAINING_MENU = PITCHER_TRAINING_MENUS[PITCHER_TRAINING_MENUS.length - 1]
+
+export interface PitchTypeTrainingOutcome {
+  readonly progress: PitchTrainingProgress
+  readonly rolledMoraleLoss: number
+  readonly moraleLoss: number
+  readonly career: PitcherCareer
+}
+
+/**
+ * **구질 훈련 한 번** — 108 탭 2 확인 [예] → 125 → 훈련 0x17f5c 칸 4 의 탭 2 갈래(0x17fd0 `[[this+0xe0]+0x188] == 2` →
+ * 0x1836a, 직접 떴다):
+ * ```
+ * 1836a  사기 감소 = bfa55(6,10)
+ * 18384  병아리(장착 0xa4bf8 0) −1 · 몹쓸몸(장착 3) +2 · 자동안마기(기록 +0x5c) −1
+ * 18408  0xa3bad(S, 5, 0, 사기 감소, 행, 열)        ; `applyPitchTypeTraining` 뒤 사기 a3a44(사기 − 감소)
+ * 18474  알림 글 — 단계 > 열/2 면 StrMODE[88], 아니면 [89] "해당 구질 %d/%d회 훈련" · "사기 n 하락" (`pitchTypeTrainingLinesOf`)
+ * 18a5c  훈련 수 +0x4b+4 += 1 · 해제 카운터 · 몹쓸몸/유리몸 카운터
+ * 18bd8  칸 4 → 알림 창 0xbbef9(코드 4) → 18d66 S+4 = 1(행동함) · 저장 → 창이 닫히면 125 틀 0x18dd8 이 105
+ * ```
+ */
+export function runPitchTypeTraining(
+  career: PitcherCareer,
+  row: number,
+  column: number,
+  random: RandomPort,
+): PitchTypeTrainingOutcome {
+  const rolledMoraleLoss = roll(random, PITCH_TYPE_MORALE_RANGE)
+  const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
+  const applied = applyPitchTypeTraining(career, row, column)
+  const trained = spendPitcherCycleAction(gainPitcherMorale(applied.career, -moraleLoss))
+  return {
+    progress: applied.progress,
+    rolledMoraleLoss,
+    moraleLoss,
+    career: countPitcherTraining(trained, MAGIC_TRAINING_MENU.id),
+  }
+}
+
+/**
+ * 구질 훈련 알림 글 (0x18474~0x1858c) — 첫 줄 StrMODE[88] "구질 훈련 완료!" / [89] "해당 구질 %d/%d회 훈련", 다음 줄 사기.
+ * ⚠️ 원본은 그 뒤에 병아리 · 몹쓸몸 · 자동안마기 "효과" 줄(0x185a8~0x186c2 — 이름 표 [0x1552cf8] 0x37 · 0x3a · 0x845d5)을
+ *    붙이는데 그 줄과 색 표시는 옮기지 않았다 — 타자편 `trainingOutcomeLinesOf` 와 같은 근사 글이다.
+ */
+export function pitchTypeTrainingLinesOf(outcome: PitchTypeTrainingOutcome): string[] {
+  const head = outcome.progress.isLearned
+    ? ['구질 훈련 완료!', '[선수정보]에서 사용 여부 변경 가능']
+    : [`해당 구질 ${outcome.progress.sessions}/${outcome.progress.required}회 훈련`]
+  return [...head, `사기 -${outcome.moraleLoss}`]
 }
 
 /** 몹쓸몸 · 유리몸 보유 비트 — 투수 비트 0~7 은 타자와 같은 공통 스킬이다(2 먹튀 · 5 무력감과 같은 짝) */

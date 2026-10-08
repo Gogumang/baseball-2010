@@ -333,19 +333,23 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     unmount()
   })
 
-  it('123 창 탭 2 — 구질을 고르면 StrMODE[73] 을 묻고, 이미 쓰는 구질은 [72] 로 막는다', () => {
+  it('123 창 탭 2 — 칸 단계로 막고([71]) 목록에 있으면 [72], 고르면 그 행 비트를 하나로 바꾼다 (0x17df8 · 0x17bf4)', () => {
     const onSave = vi.fn()
-    화면({ onSave })
+    // 행 0 의 TWO-SEAM(2) · H.FAST(3) 둘 다 마스크에 — 목록 칸 1 에는 번호가 큰 H.FAST 만 남는다(0xb6d2c)
+    화면({ onSave, career: 투수({ pitchMask: 0b110, pitchTrainingStages: [1, 1, 0, 0, 0, 0, 0, 0] }) })
 
     누르기('선수정보')
     누르기('구질')
     누르기('구질')
 
-    // 등록이 무조건 주는 FASTBALL (0xb6d5e)
-    누르기('FASTBALL')
+    누르기('H.FAST')
+    expect(screen.getByText('현재 사용 중인 구질입니다')).toBeTruthy()
+    누르기('CUT FAST')
+    expect(screen.getByText('트레이닝 완료 후 사용할 수 있습니다')).toBeTruthy()
+    누르기('TWO-SEAM')
     expect(screen.getByText('해당 구질을 사용하시겠습니까?')).toBeTruthy()
     fireEvent.click(칸('예'))
-    expect((onSave.mock.calls[0][0] as PitcherCareer).selectedPitchType).toBe(1)
+    expect((onSave.mock.calls[0][0] as PitcherCareer).pitchMask).toBe(0b10)
   })
 
   it('[기록실] 은 StrMODE[74] 팝업(0x80, 0x19448)을 거쳐 124 로 간다 — 첫 칸 "개인기록"(img_text 106)이 고른 채로 뜬다', () => {

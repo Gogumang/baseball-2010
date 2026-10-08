@@ -21,6 +21,8 @@ import {
   magicTrainingCursorOf,
   PITCHER_TYPE_NAMES,
   pitcherTrainingBlockReasonOf,
+  pitchTypeTrainingLinesOf,
+  runPitchTypeTraining,
   runPitcherTraining,
 } from '@/entities/pitcher-career/model/pitcherManagement'
 import type {
@@ -30,15 +32,14 @@ import type {
 import {
   magicNumberOfCell,
   magicSelectBlockReasonOf,
-  pitchTypeSelectBlockReasonOf,
+  pitchCellSelectBlockReasonOf,
   selectMagicPitch,
-  selectPitchType,
+  selectPitchCell,
 } from '@/entities/pitcher-career/model/pitchSelection'
 import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
 import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles'
 import { abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
-import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
   PITCHER_COMMAND_SLOTS,
   PITCHER_ITEM_SLOTS,
@@ -138,8 +139,8 @@ export interface PitcherManagementMenu {
   readonly changePitchTab: (tab: number) => void
   /** 123 창 탭 1 — 마구 칸 i(0~3) 고르기 */
   readonly selectMagicCell: (cellIndex: number) => void
-  /** 123 창 탭 2 — 구질 고르기 */
-  readonly selectPitchCell: (typeNumber: number) => void
+  /** 123 창 탭 2 — 구질 칸(행, 열) 고르기 */
+  readonly selectPitchCell: (row: number, column: number) => void
   /** 기본정보(119) 위에 띄운 칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1) */
   readonly isTitleWindowOpen: boolean
   readonly closeTitleWindow: () => void
@@ -167,8 +168,8 @@ export interface PitcherManagementMenu {
   readonly answerQuestion: (isYes: boolean) => void
   readonly chooseOption: (index: number) => void
   readonly closeWindow: () => void
-  /** 구질 훈련 창(108)이 돌려준 커리어를 저장한다 */
-  readonly saveTrainedPitch: (career: PitcherCareer) => void
+  /** 구질 훈련 창(108 탭 2)에서 확인 [예] — 125 의 훈련 한 번(0x17f5c 탭 2 갈래) 뒤 알림을 띄우고 105 로 */
+  readonly trainPitch: (row: number, column: number) => void
   /** 108 마구 창(탭 1)의 격자 커서 — 진입 0x17730 이 `min(L, 3)` 에 둔다 */
   readonly magicTrainingCursor: number
   readonly moveMagicTrainingCursor: (cell: number) => void
@@ -605,17 +606,19 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     [career, onSave],
   )
 
-  /** 123 창 탭 2 — 구질 하나를 고른다 (StrMODE[72]·[73]) */
-  const selectPitchCell = useCallback(
-    (typeNumber: number) => {
+  /**
+   * 123 창 탭 2 — 표 0xcc390 의 칸(행, 열)을 고른다 (키 0x17df8): 목록에 있으면 StrMODE[72] · 덜 배웠으면 [71] ·
+   * 그 밖 [73] 확인 → 그 행 비트를 지우고 하나만 켠다(0x17bf4 — `selectPitchCell`)
+   */
+  const choosePitchCell = useCallback(
+    (row: number, column: number) => {
       setNotice('')
-      const reason = pitchTypeSelectBlockReasonOf(career, typeNumber)
+      const reason = pitchCellSelectBlockReasonOf(career, row, column)
       if (reason === '사용중') return setNotice(PITCHER_MANAGEMENT_TEXT.pitchAlreadyInUse)
-      // 창에는 가진 구질만 놓이므로 '미보유' 는 원본에도 없는 길이다
-      if (reason !== null) return setNotice(`${pitchTypeNameOf(typeNumber)} 을(를) 아직 배우지 않았습니다`)
+      if (reason !== null) return setNotice(PITCHER_MANAGEMENT_TEXT.magicNeedsTraining)
       return setQuestion({
         text: PITCHER_MANAGEMENT_TEXT.pitchUseQuestion,
-        onYes: () => onSave(selectPitchType(career, typeNumber)),
+        onYes: () => onSave(selectPitchCell(career, row, column)),
       })
     },
     [career, onSave],
@@ -641,11 +644,21 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     return () => window.removeEventListener('keydown', onKey)
   }, [closeDetail, detail])
 
-  const saveTrainedPitch = useCallback(
-    (trained: PitcherCareer) => {
-      onSave(trained)
+  /**
+   * 108 탭 2 확인 [예] → 125 → 0x17f5c(탭 2 갈래 0x1836a — `runPitchTypeTraining`) → 알림 창(코드 4) → 닫히면 125 틀 0x18dd8 이
+   * **105** 로. 창(108)은 떠나므로 하위 창을 닫고 알림은 관리 화면 위에 띄운다. 105 진입은 알림이 닫히기 전에 친다(근사 — 알림을
+   * 관리 화면 알림 상자로 보이는 다른 훈련 길과 같다).
+   */
+  const trainPitch = useCallback(
+    (row: number, column: number) => {
+      const outcome = runPitchTypeTraining(career, row, column, random)
+      onSave(outcome.career)
+      setSubWindow(null)
+      setKind('관리')
+      setNotice(pitchTypeTrainingLinesOf(outcome).join('!N'))
+      onReenter?.()
     },
-    [onSave],
+    [career, onReenter, onSave, random],
   )
 
   /** 0xa4b04 켜기는 0xb663c 가 곧바로 저장(0x1f1e1)한다 — 웹은 `onSave` 가 저장이다 */
@@ -668,7 +681,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     pitchWindowTab,
     changePitchTab: setPitchWindowTab,
     selectMagicCell,
-    selectPitchCell,
+    selectPitchCell: choosePitchCell,
     isTitleWindowOpen,
     closeTitleWindow: () => setIsTitleWindowOpen(false),
     abilityDetailOffset,
@@ -688,7 +701,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     answerQuestion,
     chooseOption,
     closeWindow,
-    saveTrainedPitch,
+    trainPitch,
     magicTrainingCursor,
     moveMagicTrainingCursor: setMagicTrainingCursor,
     confirmMagicTrainingCell,

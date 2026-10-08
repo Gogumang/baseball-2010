@@ -3,16 +3,12 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { magicPitchCountOf, magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
 import {
-  FASTBALL_TYPE_NUMBER,
   MAGIC_PITCH_CELL_NUMBERS,
+  isInPitchList,
+  isPitchCellLearned,
   magicSelectBlockReasonOf,
-  pitchTypeSelectBlockReasonOf,
 } from '@/entities/pitcher-career/model/pitchSelection'
-import {
-  PITCH_TRAINING_TABLE,
-  hasPitchType,
-  pitchTypeNameOf,
-} from '@/entities/pitcher-career/model/pitchTraining'
+import { PITCH_TRAINING_TABLE, pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { PITCH_WINDOW_CHOICES, PITCH_WINDOW_TABS } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
 
@@ -23,8 +19,8 @@ import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
  * 원본 123 은 "쓸 것을 **고르는**" 창이다 — 칸을 고르면
  *   마구: StrMODE[69] 사용 중 · [71] 트레이닝 완료 후 · [70] "[이름] 을 사용하시겠습니까?"
  *   구질: StrMODE[72] 사용 중 · [73] "해당 구질을 사용하시겠습니까?"
- * 고른 값은 커리어의 `selectedMagicNumber`(레코드 +0x18)·`selectedPitchType` 에 담긴다
- * (구질 쪽 원본 칸은 미확인 — `pitchSelection.ts` 주석).
+ * 마구는 레코드 +0x18(`selectedMagicNumber`), 구질은 표 0xcc390 의 칸을 골라 그 행의 마스크 +0x1c 비트를 하나로 바꾼다
+ * (0x17bf4 — `selectPitchCell`). 구질 칸은 4행 × 5열 표 그대로다(커서 0x190 행 · 0x194 열).
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 원본은 4칸 격자에 커서를 두고 확인 키로 고르지만
  * 여기서는 투수편 관례대로 줄 버튼으로 같은 고르기만 한다. 확인 팝업(예/아니오)은
@@ -38,17 +34,13 @@ interface PitcherRepertoirePanelProps {
   readonly onChangeTab: (tab: number) => void
   /** 마구 칸 i(0~3)를 고른다 — 막히면 화면이 StrMODE 글만 띄운다 */
   readonly onSelectMagic: (cellIndex: number) => void
-  /** 구질 하나를 고른다 */
-  readonly onSelectPitch: (typeNumber: number) => void
+  /** 구질 칸(행, 열)을 고른다 */
+  readonly onSelectPitch: (row: number, column: number) => void
 }
 
 export function PitcherRepertoirePanel({
   career, tab, onChangeTab, onSelectMagic, onSelectPitch,
 }: PitcherRepertoirePanelProps) {
-  const owned = [
-    FASTBALL_TYPE_NUMBER,
-    ...PITCH_TRAINING_TABLE.flat().filter((typeNumber) => hasPitchType(career, typeNumber)),
-  ]
   const form = pitcherFormOfCareer(career)
 
   return (
@@ -102,19 +94,22 @@ export function PitcherRepertoirePanel({
       ) : (
         <>
           <div className={styles.pitchList}>
-            {owned.map((typeNumber) => {
-              const isUsing = pitchTypeSelectBlockReasonOf(career, typeNumber) === '사용중'
-              return (
-                <button key={typeNumber} type="button"
-                  aria-pressed={isUsing}
-                  className={`${styles.pitchChip} ${isUsing ? styles.pitchChipSelected : ''}`}
-                  onClick={() => onSelectPitch(typeNumber)}>
-                  {pitchTypeNameOf(typeNumber)}
-                </button>
-              )
-            })}
+            {PITCH_TRAINING_TABLE.map((types, row) =>
+              types.map((typeNumber, column) => {
+                const isUsing = isInPitchList(career, typeNumber)
+                const isLocked = !isPitchCellLearned(career, row, column)
+                return (
+                  <button key={typeNumber} type="button"
+                    aria-pressed={isUsing}
+                    className={`${styles.pitchChip} ${isUsing ? styles.pitchChipSelected : ''} ${isLocked ? styles.pitchChipLocked : ''}`}
+                    onClick={() => onSelectPitch(row, column)}>
+                    {pitchTypeNameOf(typeNumber)}
+                  </button>
+                )
+              }),
+            )}
           </div>
-          <Hint>FASTBALL 은 등록이 무조건 준다 — 나머지는 배운 구질이다 (마스크 +0x1c)</Hint>
+          <Hint>한 계열(행)에 구질 하나 — 고르면 그 행의 다른 구질은 빠진다 (0x17bf4)</Hint>
         </>
       )}
     </Panel>

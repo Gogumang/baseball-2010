@@ -313,19 +313,15 @@ export interface PitcherCareer {
    * 에서 골라 넣는다. 번호 4 는 폼에 따라 샤이닝·캐넌·미라지로 이름만 갈린다 (H2 2절).
    */
   readonly selectedMagicNumber: number
-  /**
-   * 고른 구질 — 123 창 탭 2 (StrMODE[72] "현재 사용 중인 구질입니다" · [73] "해당 구질을
-   * 사용하시겠습니까?"). 0 이면 고른 적이 없다.
-   *
-   * ⚠️ **원본 저장 칸을 못 찾았다**: 경기의 구질 칸 6개는 0xb6d2c 가 **마스크 +0x1c 만** 보고 만들고
-   * (H2 3-1), 0x17cec 의 탭 2 가지가 무엇을 쓰는지는 해독 문서에 없다. 그래서 이 칸은 아직
-   * **경기로 넘어가지 않는다** — 원본 칸이 밝혀지면 여기를 그 칸으로 바꾸면 된다.
-   */
-  readonly selectedPitchType: number
   /** 이번 레벨에 쌓은 마구 훈련 횟수 (타자 필살타법 +0x200 자리) */
   readonly magicSessions: number
-  /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 (커리어 +0x208, J 3-2) */
+  /** 구질 훈련 단계 8칸 — 0 없음 · 1 기본 습득 · 2 상위 습득 · 3 히든 습득 (커리어 +0x208 + 칸·4 + 1, J 3-2) */
   readonly pitchTrainingStages: readonly number[]
+  /**
+   * 구질 훈련 **횟수** 8칸 — 커리어 +0x208 + 칸·4 + 0 (s8). 훈련 적용 0xa3bac 종류 5 가 한 번에 1 씩 쌓고 필요 횟수
+   * (0xd80de [2, 4, 5])가 차면 0 으로 돌리며 단계를 올린다(`applyPitchTypeTraining`). 옛 저장에는 없어 0 으로 본다.
+   */
+  readonly pitchTrainingCounts?: readonly number[]
   /** 히든 변화구 계열이 열렸는가 (커리어 +0x204+행, 이벤트 30~33) */
   readonly hiddenPitchRows: readonly boolean[]
   /** 스태미나 +0x2c (0~10000). 시즌 시작 0xb6cc4 가 10000 으로 둔다 */
@@ -523,9 +519,8 @@ export function createPitcherCareer(
     skinIndex: profile.skinIndex,
     pitchMask: rookiePitchMaskOf(profile.breakingPitchSlots),
     magicLevel: 0,
-    // 신인은 마구도 고른 구질도 없다 (레코드 +0x18 = 0)
+    // 신인은 마구가 없다 (레코드 +0x18 = 0)
     selectedMagicNumber: 0,
-    selectedPitchType: 0,
     magicSessions: 0,
     pitchTrainingStages: rookiePitchTrainingStagesOf(profile.breakingPitchSlots),
     hiddenPitchRows: new Array<boolean>(HIDDEN_PITCH_ROW_COUNT).fill(false),
