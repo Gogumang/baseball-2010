@@ -155,3 +155,57 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
     }
   })
 })
+
+describe('경기정보 OK 없이도 모드 1 블록이 새 경기로 바뀐다 — 0x30f20 · 0x2a370 → 0x22755 (원본 버그 그대로)', () => {
+  const 블록쓰기빠른실행 = () => {
+    const random = createSeededRandom(씨앗)
+    const write = vi.fn()
+    return {
+      random,
+      write,
+      ...renderHook(() => useGeneralMode({ random, isQuickStart: true, ...열림, onMatchBlockWrite: write })),
+    }
+  }
+
+  it('22 들어옴(0x30f20, 31134) — 그때 세운 두 팀의 1회초 0:0 진행을 쓴다. 굴림은 이미 끝나 난수를 더 안 먹는다', () => {
+    const { result, write, random } = 블록쓰기빠른실행()
+    expect(write).toHaveBeenCalled()
+    const 블록 = write.mock.calls.at(-1)?.[0]
+    const 따로 = createSeededRandom(씨앗)
+    const setup = rollQuickStart(따로, 열림)
+    rollTeamSetup(setup.acePitcherId, setup.aceBatterId, 따로)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+
+    expect(블록.game.inning).toBe(1)
+    expect(블록.game.half).toBe('초')
+    expect(블록.game.ourScore).toBe(0)
+    expect(블록.game.opponentScore).toBe(0)
+    expect(블록.options.ourTeamId).toBe(result.current.flow.setup.userTeamId)
+    expect(블록.options.opponentTeamId).toBe(result.current.flow.setup.aiTeamId)
+    expect(블록.ourPitcherIndex).toBe(result.current.gameOptions.startingPitcherSlots?.ours)
+    expect(블록.opponentAcePitcherIndex).toBe(result.current.gameOptions.opponentAces?.pitcher)
+  })
+
+  it('23 나감(0x2a370, 2a45a) — 고친 명단으로 다시 쓴다. 들어가기·편집만으로는 안 쓴다', () => {
+    const { result, write } = 블록쓰기빠른실행()
+    const 처음횟수 = write.mock.calls.length
+    act(() => result.current.actions.openEntry(true))
+    for (const key of ['확인', '아래', '확인'] as const) act(() => result.current.actions.pressEntryKey(key))
+    expect(write.mock.calls.length).toBe(처음횟수)
+    const 편집기선발 = result.current.entryEdit?.lists.pitchers[0]?.name
+    act(() => result.current.actions.pressEntryKey('취소'))
+
+    expect(result.current.entryEdit).toBeNull()
+    expect(write.mock.calls.length).toBe(처음횟수 + 1)
+    const 블록 = write.mock.calls.at(-1)?.[0]
+    expect(블록.ourPitcherEntry[블록.ourPitcherIndex]?.name).toBe(편집기선발)
+  })
+
+  it('CPU 팀 보기만 하고 나가도 쓴다 — 나가는 세 갈래 모두 2a3cc 로 모인다', () => {
+    const { result, write } = 블록쓰기빠른실행()
+    const 처음횟수 = write.mock.calls.length
+    act(() => result.current.actions.openEntry(false))
+    act(() => result.current.actions.pressEntryKey('취소'))
+    expect(write.mock.calls.length).toBe(처음횟수 + 1)
+  })
+})

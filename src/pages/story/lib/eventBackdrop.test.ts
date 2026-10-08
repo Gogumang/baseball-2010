@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   INITIAL_EVENT_BACKDROP, MANAGEMENT_PORTRAIT_BASE_Y, OUTING_MAP_PORTRAIT_BASE_Y, drawEventBackdrop, effectTimelineOf,
-  clearsDialogueBeforeMatch, effectorPhaseAt, isBlockingEffectId, lastEffectIdIn, portraitBaseYOf,
+  clearsDialogueBeforeMatch, effectorPhaseAt, isBlockingEffectId, lastEffectIdIn, portraitBaseYOf, soundTimelineOf,
 } from '@/pages/story/lib/eventBackdrop'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 
@@ -102,5 +102,18 @@ describe('0x8d9c2 — id 6 이 끝나고 바로 뒤가 경기 명령이면 상�
     expect(clearsDialogueBeforeMatch(7, 경기)).toBe(false)
     expect(clearsDialogueBeforeMatch(6, { op: 'sound', id: 1 })).toBe(false)
     expect(clearsDialogueBeforeMatch(6, null)).toBe(false)
+  })
+})
+
+describe('소리 명령의 틀 — soundTimelineOf (명령 하나에 한 틀, 막는 효과는 끝까지)', () => {
+  it('소리는 앞 명령 수만큼 뒤 틀에 돈다', () => {
+    expect(soundTimelineOf([{ op: 'sound', id: 41 }, { op: 'sound', id: 35 }])).toEqual([
+      { id: 41, start: 0 }, { id: 35, start: 1 },
+    ])
+  })
+
+  it('막는 효과 뒤 소리는 효과 타임라인의 다음 틀과 같다', () => {
+    const commands: EventCommand[] = [{ op: 'effect', id: 4 }, { op: 'sound', id: 35 }]
+    expect(soundTimelineOf(commands)).toEqual([{ id: 35, start: effectTimelineOf(commands).releaseFrame - 1 }])
   })
 })

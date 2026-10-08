@@ -121,6 +121,24 @@ export interface EffectTimeline {
  * ⚠️ 보상(명령 7)은 원본에서 보상 알림 창(0x8beb8 글 → 0xbbef8 → 0x74ef4 종류 1 · 첫 종류 4 는 0x741a0)을 띄우고 확인까지 기다린다
  * (0x8daa0). 웹은 그 창을 아직 안 옮겨 한 틀로 둔다.
  */
+/** 지나온 명령 가운데 소리(명령 6)가 도는 틀 — `effectTimelineOf` 와 같은 셈(명령 하나에 한 틀, 막는 효과는 끝까지) */
+export function soundTimelineOf(commands: readonly EventCommand[]): readonly { readonly id: number; readonly start: number }[] {
+  const sounds: { id: number; start: number }[] = []
+  let frame = 0
+  for (const command of commands) {
+    if (command.op === 'sound') sounds.push({ id: command.id, start: frame })
+    frame += commandFramesOf(command)
+  }
+  return sounds
+}
+
+/** 명령 하나가 차지하는 틀 — 막는 효과(4~7)는 효과기 '끝' 다음 틀까지, 그 밖은 한 틀 */
+function commandFramesOf(command: EventCommand): number {
+  if (command.op !== 'effect') return 1
+  const effect = screenEffectCommandOf(command.id)
+  return effect?.kind != null && isBlockingEffectId(command.id) ? effectorEndingFrameOf(effect.kind) + 2 : 1
+}
+
 export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimeline {
   const entries: EffectTimelineEntry[] = []
   let frame = 0
@@ -138,7 +156,7 @@ export function effectTimelineOf(commands: readonly EventCommand[]): EffectTimel
       start: frame,
       commandIndex,
     })
-    frame += effect?.kind != null && isBlockingEffectId(command.id) ? effectorEndingFrameOf(effect.kind) + 2 : 1
+    frame += commandFramesOf(command)
   })
   return { entries, releaseFrame: frame }
 }

@@ -61,7 +61,10 @@ export interface GeneralModeScreenProps {
    * **경기정보 OK** (0x3136e) — 새 경기의 첫 저장. 받는 쪽이 +0x3c = 1 · +0x4d = 1 · 블록 = 이 진행을 쓴다.
    */
   readonly onGameStart?: (save: TeamGameProgress) => void
-  /** **반 이닝 자동 저장** (0x4f928 → 0x22754) — 블록만 고쳐 쓴다. 이어하기 경기도 같다 */
+  /**
+   * **블록만 고쳐 쓴다** — 반 이닝 자동 저장(0x4f928 → 0x22754, 이어하기 경기도 같다), 그리고 경기정보 22 들어옴·재굴림 끝의
+   * 0x30f20 과 엔트리 편집 23 나감의 0x2a370(둘 다 0x22755) — OK 없이 나가도 블록은 새 경기로 바뀐다(원본 그대로)
+   */
   readonly onGameSave?: (save: TeamGameProgress) => void
   /**
    * **정산 진입** (0x4ea0c) — 받는 쪽이 이 자리에서 정산(기록 달성 G · 통계)을 하고 +0x4d 를 지운다(0x4f3d6).
@@ -185,6 +188,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
     ...(throwModeManual === undefined ? {} : { throwModeManual }),
     // 고르기 화면 LV 와 같은 칸이 경기 속 마선수 배율·마구 횟수도 정한다 (0xb6414 · 0xaebe4)
     ...(aceLevels === undefined ? {} : { aceLevels }),
+    // 0x30f20(22 들어옴 · 재굴림 끝) · 0x2a370(23 나감)도 0x22755 로 블록만 쓴다 — 반 이닝 저장과 같은 손잡이
+    ...(onGameSave === undefined ? {} : { onMatchBlockWrite: onGameSave }),
   })
   const { flow, actions } = session
   const back = () => {

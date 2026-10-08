@@ -1053,7 +1053,12 @@ function pitcherStaminasOf(
   })
 }
 
-export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
+/**
+ * **경기 세우기 0x30f20 이 만든 두 팀·st** — 경기 장면을 열기 전의 첫 진행(저장 블록 칸 0x32·0x33 에 거는 그것).
+ * 마선수·선발을 아직 안 굴렸으면 여기서 굴린다(`opponentAces` · `startingPitcherSlots` 를 받았으면 굴림 없음).
+ * 일반모드 경기정보(22)는 들어올 때·`*` 재굴림 끝·엔트리 편집(23) 나갈 때 이것을 블록에 쓴다(0x30f20 · 0x2a370 → 0x22755).
+ */
+export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
   const opponentAces = opponentAceIndexesOf(options, random)
   const startingSlots = startingPitcherSlotsOf(options, random)
   // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870).
@@ -1153,6 +1158,11 @@ export function startTeamGame(options: TeamGameOptions, random: RandomPort): Tea
     log: [],
     nextLogId: 1,
   }
+  return initial
+}
+
+export function startTeamGame(options: TeamGameOptions, random: RandomPort): TeamGameProgress {
+  const initial = teamGameStartPointOf(options, random)
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드 — 마선수·선발 굴림 0x30f20 뒤, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
   openScenePatternDeck(random)

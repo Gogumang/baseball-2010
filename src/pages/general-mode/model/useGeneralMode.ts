@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
-import { rollTeamSetup } from '@/features/play-team-game/model/teamGameFlow'
+import { rollTeamSetup, teamGameStartPointOf } from '@/features/play-team-game/model/teamGameFlow'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
-import type { TeamGameOptions, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameOptions, TeamGameProgress, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { swapWithStarter } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
@@ -49,6 +49,16 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly throwModeManual?: boolean
   /** 마선수 레벨 열 칸 (전역 `mgr[0x13a..0x143]`) — 경기 옵션 `aceLevels` 로 그대로 넘긴다 */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * **모드 1 저장 블록을 새로 세운 경기로 덮어쓴다** (+0x3c · +0x4d 는 안 건드린다) — 경기정보 OK 없이도 쓴다:
+   * - 상태 22 들어옴·`*` 재굴림 끝의 `0x30f20` — 30f70 `0x213c0(앱, 1, 0)` → 30f92 `0x1fdec` → 31100~3112c
+   *   `0x1fdb0(저장, 0x32, 팀, 0/1)` · `(저장, 0x33, st, 0)` → 31134 `0x22755(저장, 1)`(파일 쓰기) → 3113c `0x1f1b9`
+   * - 상태 23 엔트리 편집 나감 `0x2a370` — 2a3d6 두 팀 `0xb8769` → 2a428~2a456 같은 칸 0x32 · 0x33 → 2a45a `0x22755(저장, 1)`
+   *
+   * +0x4d 를 0 으로 쓰는 곳은 정산 진입(0x4f3d6) 하나라, 이어하기가 살아 있던 채로 새로하기 → 22 → OK 없이 나가면
+   * [최근게임]·[13] 이어하기가 방금 세운 1회초 0:0 경기를 연다(원본 버그 그대로).
+   */
+  readonly onMatchBlockWrite?: (block: TeamGameProgress) => void
 }
 
 /** 상태 23 엔트리 편집 한 판 (편집 객체 [메뉴+0x120]) */
@@ -113,7 +123,7 @@ export interface GeneralModeSession {
 export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSession {
   const {
     random, isQuickStart = false, initialSettings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels,
-    openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
+    openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds, onMatchBlockWrite,
   } = options
 
   /**
@@ -141,11 +151,16 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   const [isPlaying, setPlaying] = useState(false)
   const [entryEdit, setEntryEdit] = useState<GeneralModeEntryEdit | null>(null)
   /**
+   * 블록 쓰기 차례 — `0x30f20`(22 들어옴 · 재굴림 끝) · `0x2a370`(23 나감)마다 하나 올린다. 쓰기는 그 차례의 기록이
+   * 화면에 선 뒤(effect) 그때의 경기 옵션으로 세운다. 빠른실행은 처음부터 22 라 1 로 연다
+   */
+  const [blockWriteSerial, setBlockWriteSerial] = useState(initial.rolls === null ? 0 : 1)
+  const bumpBlockWrite = useCallback(() => setBlockWriteSerial((serial) => serial + 1), [])
+  /**
    * 유저 팀 레코드(저장 칸 `0x1f875(저장, 쪽)`)를 엔트리 편집이 고친 것. 원본은 상태 22 들어옴 `0x314b0` 이
    * 이전 상태가 23 이 아닐 때마다 `0x30f20` 으로 경기를 새로 세우므로(314c8 `cmp [메뉴+0x28], #0x17`)
    * 21 로 물러났다 오거나 재굴림하면 고친 것이 사라진다 — 웹도 그때 비운다.
-   * 나갈 때 `0x2a370` 이 두 팀을 저장 칸 0x32·0x33(이어하기 칸과 같은 자리, R10)에 적는다 — 웹은 경기정보 OK 가 넘기는
-   * 첫 진행(`GeneralModeScreen.onGameStart`)에 고친 명단이 이미 들어 있어 따로 적지 않는다.
+   * 나갈 때 `0x2a370` 이 두 팀을 저장 칸 0x32·0x33(이어하기 칸과 같은 자리, R10)에 적고 파일을 쓴다 — `onMatchBlockWrite`.
    */
   const [userEntryRoster, setUserEntryRoster] = useState<SeasonTeamRoster | null>(null)
 
@@ -186,9 +201,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       setFlow((current) => withSetup(current, setup))
       setRespinBuilt(null)
       setRespinTick(null)
+      bumpBlockWrite()
     }, millisecondsPerFrame())
     return () => window.clearTimeout(timer)
-  }, [respinTick, flow.setup, random])
+  }, [respinTick, flow.setup, random, bumpBlockWrite])
   const isRespinning = respinTick !== null
 
   /** 상태 21 OK — 마타자를 고르면 22 로 들어가며 0x30f20 이 굴린다 */
@@ -198,10 +214,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       if (next.step === GENERAL_MODE_STEP.경기정보 && flow.step !== GENERAL_MODE_STEP.경기정보) {
         setUserEntryRoster(null)
         setRolls(rollsOf(next.setup, random))
+        bumpBlockWrite()
       }
       setFlow(next)
     },
-    [flow, random],
+    [flow, random, bumpBlockWrite],
   )
 
   const back = useCallback(() => {
@@ -271,10 +288,14 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         lists = seasonEntryListsOf({ ...source, roster: swapped })
       }
       // 0x2a370: 1 이거나, 2 이면서 CPU 팀, 3 이면서 유저 팀이면 → 밀기 → 상태 22 (22 들어옴은 23 에서 왔으면 아무것도 안 한다)
-      if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) return setEntryEdit(null)
+      if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) {
+        // 2a3cc~2a45a — 나가는 세 갈래 모두 두 팀을 블록 칸 0x32 · 0x33 에 걸고 0x22755 로 파일을 쓴다
+        bumpBlockWrite()
+        return setEntryEdit(null)
+      }
       setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    [entryEdit, entrySourceOf, rolls],
+    [entryEdit, entrySourceOf, rolls, bumpBlockWrite],
   )
 
   const pointEntryCursorAction = useCallback(
@@ -347,6 +368,16 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     }),
     [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels, rolls, userEntryRoster],
   )
+
+  // 블록 쓰기 — 0x30f20 / 0x2a370 이 세운 두 팀·st(경기정보 OK 가 쓸 첫 진행과 같은 것). 굴림은 이미 `rolls` 에 있어 난수를 안 먹는다
+  const blockWriteRef = useRef({ gameOptions, onMatchBlockWrite, random })
+  blockWriteRef.current = { gameOptions, onMatchBlockWrite, random }
+  useEffect(() => {
+    if (blockWriteSerial === 0) return
+    const { gameOptions: options, onMatchBlockWrite: write, random: port } = blockWriteRef.current
+    if (write === undefined || options.opponentAces === undefined || options.startingPitcherSlots === undefined) return
+    write(teamGameStartPointOf(options, port))
+  }, [blockWriteSerial])
 
   return {
     flow, entryEdit, userStarterName, cpuMatchInfo, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,

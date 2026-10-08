@@ -5,6 +5,7 @@ import type { EventCommand, OriginalEvent } from '@/shared/config/original/event
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
+import { useEventSounds } from '@/pages/story/model/useEventSounds'
 import type {
   EventChoiceConfirmHandler, EventCompleteHandler, EventRewardHandler, MatchCommand, SystemCommand,
 } from '@/pages/story/model/useEventPlayback'
@@ -172,6 +173,8 @@ export function StoryScreen({
   }
   // 명령 5 화면효과 — 흔들기 오프셋·덮개 (효과기 0xbd844)
   const screenEffect = useScreenEffect(step, isVibrationOn, onEffectorEnd, setReleasedKey)
+  // 명령 6 소리 — 지나온 명령이 도는 틀에 (0x8d470)
+  useEventSounds(step)
   const effect = screenEffect.frame
   // 막는 효과를 기다리는 동안은 멈출 명령이 아직 돌지 않았다 — 앞 say 상자 · 초상화가 그대로다
   const command = isReleased ? step.command : null
