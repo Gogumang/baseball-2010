@@ -79,12 +79,17 @@ export function useSceneEnterSound(sound: SoundPort, screenKind: string, soundId
  * 앞서 튼 번호와 같아도 그 사이 누가 기억한 배경음을 지웠으면(경기 장면 0x3e350 의 소리 끊기 0x6e418) 다시 튼다 —
  * 관리 화면(4) → 경기 → 관리 화면(4) 에서 4 가 다시 나야 한다.
  */
-export function useSceneBgm(sound: SoundPort, bgmId: number | null): void {
+export function useSceneBgm(sound: SoundPort, bgmId: number | null, restartSerial = 0): void {
   const lastRef = useRef<number | null>(null)
+  const restartRef = useRef(restartSerial)
   useEffect(() => {
     if (bgmId === null) return
-    if (bgmId === lastRef.current && sound.currentBgm() === bgmId) return
+    // 다시 틀기 표가 올랐다(`screenBgm` 의 `restartsMenuBgm`) — 같은 번호도 끊고 처음부터 (0x6ea6c → 0x6e9d4)
+    const restarts = restartSerial !== restartRef.current
+    restartRef.current = restartSerial
+    if (!restarts && bgmId === lastRef.current && sound.currentBgm() === bgmId) return
     lastRef.current = bgmId
+    if (restarts) sound.stop()
     sound.playBgm(bgmId)
-  }, [sound, bgmId])
+  }, [sound, bgmId, restartSerial])
 }

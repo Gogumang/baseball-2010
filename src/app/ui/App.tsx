@@ -26,7 +26,7 @@ import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
-import { screenBgmOf, screenEnterSoundOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { screenEnterSoundOf, usePitcherLeagueBgm, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
@@ -218,7 +218,9 @@ export function App() {
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null)
-  useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgmOf(screen))
+  // 메인 메뉴는 환경설정에서 돌아올 때(0x24a40) · 게임시작 목록으로 새로 설 때(0x25b88) 1 을 처음부터 다시 튼다
+  const screenBgm = useScreenBgm(screen)
+  useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm, screenBgm.restartSerial)
   // 시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4 (위 화면 표 뒤에 돌아야 이긴다)
   useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene)
   const careerSession = useCareerSession({

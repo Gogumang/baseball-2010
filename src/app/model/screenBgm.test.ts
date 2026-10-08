@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { pitcherLeagueBgmOf, screenBgmOf, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { pitcherLeagueBgmOf, restartsMenuBgm, screenBgmOf, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
 import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
@@ -147,5 +148,48 @@ describe('경기 장면 — 0x3e340 의 맨 앞 0x3e350 이 소리를 끊고 시
     remembered = null
     rerender({ bgm: 4 })
     expect(played).toEqual([4, 4])
+  })
+})
+
+describe('메인 메뉴 아래 화면 — 상태 7 · 8 · 13 · 하위 목록은 진입 표 0xcea84 의 빈 칸이라 1 이 이어진다', () => {
+  it('도움말 · 환경설정 · 스페셜 · 나리편선택은 배경음을 안 바꾼다', () => {
+    for (const kind of ['도움말', '환경설정', '스페셜', '나리편선택'] as const) expect(screenBgmOf({ kind })).toBeNull()
+    expect(screenBgmOf({ kind: '메인메뉴' })).toBe(1)
+  })
+
+  it('환경설정에서 돌아올 때(0x24a40 이전 8) · 게임시작 목록으로 새로 설 때(0x25b88 이전 ≠ 4)만 1 을 처음부터', () => {
+    expect(restartsMenuBgm('환경설정', { kind: '메인메뉴' })).toBe(true)
+    expect(restartsMenuBgm('도움말', { kind: '메인메뉴' })).toBe(false)
+    expect(restartsMenuBgm('스페셜', { kind: '메인메뉴' })).toBe(false)
+    expect(restartsMenuBgm('관리', { kind: '메인메뉴', openTier: 5 })).toBe(true)
+    expect(restartsMenuBgm('메인메뉴', { kind: '메인메뉴', openTier: 5 })).toBe(false)
+  })
+
+  it('훅 — 메뉴 → 환경설정 → 메뉴면 1 을 끊고 다시 튼다, 도움말을 다녀오면 그대로', () => {
+    const played: string[] = []
+    let remembered: number | null = null
+    const port = {
+      ...createSilentSound(),
+      playBgm: (id: number) => {
+        played.push(`틀기 ${id}`)
+        remembered = id
+      },
+      stop: () => {
+        played.push('끊기')
+        remembered = null
+      },
+      currentBgm: () => remembered,
+    }
+    const { rerender } = renderHook(({ screen }: { screen: Screen }) => {
+      const bgm = useScreenBgm(screen)
+      useSceneBgm(port, bgm.bgm, bgm.restartSerial)
+    }, { initialProps: { screen: { kind: '메인메뉴' } as Screen } })
+    expect(played).toEqual(['틀기 1'])
+    rerender({ screen: { kind: '도움말' } })
+    rerender({ screen: { kind: '메인메뉴' } })
+    expect(played).toEqual(['틀기 1'])
+    rerender({ screen: { kind: '환경설정' } })
+    rerender({ screen: { kind: '메인메뉴' } })
+    expect(played).toEqual(['틀기 1', '끊기', '틀기 1'])
   })
 })

@@ -30,7 +30,8 @@ import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
  */
 export const SCREEN_BGM = {
   메인메뉴: 1,
-  나리편선택: 3,
+  // 도움말 · 환경설정 · 스페셜 · 나리편선택은 없다 — 모두 장면 0x103 안의 상태(7 · 8 · 13 · 하위 목록)라 진입이 상태 표
+  // 0xcea84 의 아무것도 안 하는 칸이다. 메뉴의 1 이 이어진다 (설정에서 돌아올 때만 0x24a40 이 1 을 처음부터 — `useScreenBgm`)
   팀선택: 3,
   선수등록: 3,
   시즌모드: 3,
@@ -38,9 +39,6 @@ export const SCREEN_BGM = {
   일반모드: 3,
   미션선택: 3,
   // 홈런더비는 없다 — 선수 고르기는 장면 0x103 하위 16(메뉴 안)이라 메뉴의 1 이 이어지고, 경기는 0x3e350 이 끊는다
-  스페셜: 3,
-  도움말: 3,
-  환경설정: 3,
   관리: 4,
   // 109 진입 0x10d8c: 이전 ≠ 105 면 배경음 4. 105(관리, 4)에서 오면 이미 4 라 그대로다
   다음경기순위: 4,
@@ -91,6 +89,34 @@ export function endingBgmOf(endingIndex: number): number {
  */
 export function seasonEndingBgmOf(endingIndex: number | null): number {
   return endingIndex === 0 ? ENDING_SAD_BGM : SCREEN_BGM.엔딩
+}
+
+/**
+ * 메인 메뉴(장면 0x103)에 들어설 때 배경음 1 을 **처음부터** 다시 트는가 — 같은 1 이 돌고 있어도 끊고 다시 튼다
+ * (0x6ea6c 는 같은 번호도 0x6e9d4 가 울리던 것을 끊고 새로 튼다).
+ * - 상태 4(처음 메뉴) 진입 0x24a40 의 24a8c~24aa2: 이전 상태가 0(타이틀) 또는 8(환경설정)이면 `0x6ea6d(소리, 1, −1, 1)`.
+ *   타이틀에서는 울리던 것이 없어 들리는 것이 같으니 **환경설정에서 돌아올 때**만 갈린다.
+ * - 상태 5(게임시작 목록) 진입 0x25b88 의 25c24~25c38: 이전 상태 ≠ 4 면 0x6e418 로 끊고 1 — 웹은 `openTier` 5 로
+ *   장면을 새로 세울 때(나리 105 취소 0x126e6 · 시즌 0xc9 취소 0x8f5a)다. 메뉴 안에서 4 → 5 로 내려갈 때는 안 다시 튼다.
+ */
+export function restartsMenuBgm(previousKind: Screen['kind'] | null, screen: Screen): boolean {
+  if (screen.kind !== '메인메뉴' || previousKind === '메인메뉴') return false
+  return previousKind === '환경설정' || screen.openTier === 5
+}
+
+/**
+ * 최상위 화면의 배경음과 **다시 틀기 표** — 화면이 바뀐 그리기에서 `restartsMenuBgm` 이 참이면 표가 하나 오른다.
+ * `useSceneBgm` 이 표가 오르면 같은 번호라도 끊고 처음부터 튼다.
+ */
+export function useScreenBgm(screen: Screen): { readonly bgm: number | null; readonly restartSerial: number } {
+  const [previousKind, setPreviousKind] = useState<Screen['kind'] | null>(null)
+  const [restartSerial, setRestartSerial] = useState(0)
+  // 그리는 중에 앞 값과 견줘 고친다 (`usePitcherLeagueBgm` 과 같은 꼴 — 효과 한 틀 늦지 않게)
+  if (screen.kind !== previousKind) {
+    setPreviousKind(screen.kind)
+    if (restartsMenuBgm(previousKind, screen)) setRestartSerial((serial) => serial + 1)
+  }
+  return { bgm: screenBgmOf(screen), restartSerial }
 }
 
 /** 이 화면에서 틀 배경음. 바꾸지 않는 화면이면 null */
