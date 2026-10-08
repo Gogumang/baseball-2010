@@ -717,7 +717,7 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
       onComplete={onComplete} onMatch={() => {}} />)
     fireEvent.keyDown(window, { key: 'Backspace' })
     틀(1)
-    expect(onComplete).toHaveBeenCalledWith([], [1])
+    expect(onComplete).toHaveBeenCalledWith([], [1], null)
   })
 })
 
@@ -756,7 +756,7 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
     대사넘기기()
     틀(1)
     expect(onComplete).toHaveBeenCalledWith(
-      [{ kind: 0, value: 5 }, { kind: 2, value: -3 }, { kind: 4, value: 7 }], [1],
+      [{ kind: 0, value: 5 }, { kind: 2, value: -3 }, { kind: 4, value: 7 }], [1], null,
     )
   })
 
@@ -818,7 +818,7 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1, [1]], [[{ kind: 1, value: 2 }], 1, [1]]])
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
     expect(onReward).toHaveBeenCalledTimes(2)
-    expect(onComplete).toHaveBeenCalledWith([], [1])
+    expect(onComplete).toHaveBeenCalledWith([], [1], null)
   })
 
   it('첫 종류 7 은 0x62368 의 히든 오픈 알림 창을 그 명령이 기다린다 — 뒤 보상의 글은 앞 보상을 준 뒤 값을 읽는다', () => {
@@ -867,7 +867,7 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     expect(onReward).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(onComplete).toHaveBeenCalledTimes(1)
-    expect(onComplete).toHaveBeenCalledWith([], [1])
+    expect(onComplete).toHaveBeenCalledWith([], [1], 1)
     expect(screen.queryByText('뒤 대사')).toBeNull()
   })
 
@@ -886,7 +886,7 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     // 지나온 명령(앞 보상)을 한 틀씩 돌린 뒤 그 명령이 돈다
     틀(2)
     expect(onComplete).toHaveBeenCalledTimes(1)
-    expect(onComplete).toHaveBeenCalledWith([{ kind: 0, value: 5 }], [1])
+    expect(onComplete).toHaveBeenCalledWith([{ kind: 0, value: 5 }], [1], 1)
   })
 
   it('보상을 준 뒤에도 끝 · 경기로 넘기는 보상은 비어 있다 — 결과 이벤트로 이어도 다시 안 준다', () => {

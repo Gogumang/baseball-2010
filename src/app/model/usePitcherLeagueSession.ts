@@ -334,7 +334,7 @@ export interface PitcherLeagueSession {
      */
     readonly giveStoryReward: (items: readonly EventReward[], eventId: number, viewedEventIds?: readonly number[]) => void
     /** 이벤트 재생이 끝났다 — 지나온 보상과 본 이벤트 번호 (114 틀 0x1c014) */
-    readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
+    readonly completeStory: (rewards: readonly EventReward[], viewedEventIds: readonly number[], endingEventId?: number | null) => void
     /**
      * 이벤트의 system 창(알림 · 올해의 목표)을 답 0 으로 닫았다 — 0x8d928~0x8d942 의 0x7fe90: 나리라 S+0x1b7 = 1 · 저장(0x22755).
      * 하위와 상관없이 모든 system 창이다.
@@ -1328,7 +1328,7 @@ export function usePitcherLeagueSession(
    *   (128 포스트시즌 대진은 131 과 132 사이 — 아래 `pressPostseason` · `closePostseasonPopup`)
    */
   const continueYearEnd = useCallback(
-    (current: PitcherCareer, viewed: readonly number[]) => {
+    (current: PitcherCareer, viewed: readonly number[], endingRequested = false) => {
       if (viewed.includes(NATIONAL_CUP_EVENT.출전)) {
         // 463 출전 — 상태 133 이 0xb7bf1(L) 로 대회를 세우고(+0xbc4 대표팀 마스터 복사 · +0xbe0 첫날 상대) 모드 3 갈래
         // 0xb521d(대표팀, 내 투수, 1) 로 내 칸 k 에 내 투수 복사본을 넣고 134 를 줄에 넣는다. 134 의 틀 0x1b92c 머리가 들어온
@@ -1346,7 +1346,7 @@ export function usePitcherLeagueSession(
       if (viewed.includes(NATIONAL_CUP_EVENT.거절) || viewed.includes(NATIONAL_CUP_EVENT.탈락)) {
         return startNewSeason(current)
       }
-      const step = nextPitcherYearEndStep(current, viewed)
+      const step = nextPitcherYearEndStep(current, viewed, endingRequested)
       if (step.kind === '포스트시즌') {
         // 131 뒤 128 진입 0x120a4 — 정규시즌 우승 보상을 아직 안 받았고 1위면 팝업 0xb
         yearEndViewedRef.current = viewed
@@ -1653,21 +1653,28 @@ export function usePitcherLeagueSession(
    *   그 밖    뒤 = 105
    * G 보상(종류 10)은 한 줄마다 0x8c6e2 `0x22c7d(값, 모드 3)` 로 획득 GP 통계에 적는다.
    */
+  /**
+   * 재생 끝(114 끝 0x1c014). `endingEventId` 는 첫 종류 21 로 끝난 이벤트(0x8d4ce — [0x1552adc] = 1)다: 그 이벤트만 본 표시를
+   * 안 하고(0x8cf8c 를 안 지난다) 거친 다른 이벤트는 0x8b0e4 가 본 표시한다. 엔딩은 그 칸으로 간다(`nextPitcherYearEndStep`).
+   */
   const completeStory = useCallback(
-    (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
+    (rewards: readonly EventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {
       if (career === null || story === null) return
       const rewarded =
         story.context === '연말'
           ? finishPitcherYearEndEvent(career, story.eventId, rewards)
           : applyPitcherEventRewards(career, rewards, random, story.eventId)
-      const viewed = finishPitcherEvent(rewarded, viewedEventIds)
+      const viewed = finishPitcherEvent(
+        rewarded,
+        endingEventId === null ? viewedEventIds : viewedEventIds.filter((id) => id !== endingEventId),
+      )
       rewards
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
       const hiddenNotice = hiddenOpenNoticeOf(rewards)
       if (hiddenNotice !== '') setStoryNotice(hiddenNotice)
       setStory(null)
-      if (story.context === '연말') return continueYearEnd(viewed, [...story.viewed, ...viewedEventIds])
+      if (story.context === '연말') return continueYearEnd(viewed, [...story.viewed, ...viewedEventIds], endingEventId !== null)
       if (story.context === '연초') {
         // 내장 이벤트라 본 표시는 없다. 목표 창이 닫히면 0x7fe90 이 S+0x1b7 = 1 (해마다 한 번)
         commit({ ...rewarded, hasSeenYearGoalWindow: true })

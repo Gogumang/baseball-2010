@@ -77,7 +77,10 @@ function 이벤트끝내기(result: 판, ...고른것: number[]) {
   const story = result.current.story!
   const viewed = [story.eventId, ...고른것]
   const rewards: EventReward[] = viewed.flatMap((id) => rewardsIn(이벤트(id)?.commands ?? []))
-  act(() => result.current.actions.completeStory(rewards, viewed))
+  // 첫 종류 21 로 끝나는 이벤트면 재생기가 그 번호를 셋째 값으로 넘긴다 ([0x1552adc] — 0x8d4ce)
+  const 끝 = viewed[viewed.length - 1]
+  const 엔딩 = (이벤트(끝)?.commands ?? []).some((command) => command.op === 'reward' && command.items[0]?.kind === 21) ? 끝 : null
+  act(() => result.current.actions.completeStory(rewards, viewed, 엔딩))
   return viewed
 }
 

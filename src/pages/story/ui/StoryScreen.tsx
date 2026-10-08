@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
 import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
-import type { EventReward } from '@/entities/story/model/eventReward'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
-import type { EventRewardHandler, MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
+import type { EventCompleteHandler, EventRewardHandler, MatchCommand, SystemCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
 import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
@@ -58,7 +57,8 @@ interface StoryScreenProps {
   readonly skinIndex?: number
   /** 0 타격형 · 1 장타형. 장타형이면 초상화 애니가 **+8** 이다 (V2 정정) */
   readonly battingTypeIndex?: number
-  readonly onComplete: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void
+  /** 재생 끝 — 셋째 값은 첫 종류 21 로 끝낸 이벤트(엔딩 요청 [0x1552adc], 그 이벤트는 본 표시 안 함) · 보통 끝이면 null */
+  readonly onComplete: EventCompleteHandler
   /** 경기 명령 — 마선수 대결로 나간다 */
   readonly onMatch: (command: MatchCommand, carry: StoryCarry) => void
   /** 대결에서 돌아온 결과 이벤트라면 앞 이벤트가 모은 보상·기록 */

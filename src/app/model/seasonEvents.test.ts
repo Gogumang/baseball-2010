@@ -57,9 +57,15 @@ describe('nextSeasonStep — 연말 이벤트 연결', () => {
     expect(nextSeasonStep(선수(), [380, 383])).toEqual({ kind: '새시즌' })
   })
 
-  it('은퇴 선택(502 → 496 → 503)은 엔딩 판정표로, 방출(501)은 엔딩 1 로 끝난다', () => {
-    expect(nextSeasonStep(선수({ season: 8, popularity: 1600 }), [502, 496, 503])).toEqual({ kind: '엔딩', endingIndex: 5 })
-    expect(nextSeasonStep(선수({ season: 7, popularity: 10 }), [501])).toEqual({ kind: '엔딩', endingIndex: 1 })
+  it('은퇴 선택(502 → 496 → 503)은 엔딩 판정표로, 방출(501)은 엔딩 1 로 끝난다 — 141 진입 0xa3a85 가 새로 판정', () => {
+    expect(nextSeasonStep(선수({ season: 8, popularity: 1600 }), [502, 496, 503], true)).toEqual({ kind: '엔딩', endingIndex: 5 })
+    expect(nextSeasonStep(선수({ season: 7, popularity: 10 }), [501], true)).toEqual({ kind: '엔딩', endingIndex: 1 })
+    // 부상 누적 > 19 면 연차와 상관없이 0 (0xa3a84 첫 줄)
+    expect(nextSeasonStep(선수({ season: 3, injuredGamesPlayed: 20 }), [500], true)).toEqual({ kind: '엔딩', endingIndex: 0 })
+  })
+
+  it('엔딩은 본 번호가 아니라 [0x1552adc](첫 종류 21 로 끝남)로 간다 — 엔딩 이벤트 번호만 있고 요청이 없으면 엔딩이 아니다', () => {
+    expect(nextSeasonStep(선수({ season: 8, popularity: 1600 }), [502, 496, 503]).kind).not.toBe('엔딩')
   })
 })
 

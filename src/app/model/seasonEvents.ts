@@ -2,11 +2,9 @@ import type { PlayerCareer, SeasonEndState } from '@/entities/career/model/playe
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   achievedGoalCount,
-  ENDING_EVENT_IDS,
   GOAL_INTRO_EVENT_ID,
   goalResultEventId,
   judgeEnding,
-  RELEASE_EVENT_ID,
   SALARY_ACCEPT_EVENT_ID,
   SALARY_FIRM_EVENT_ID,
   SALARY_POLITE_EVENT_ID,
@@ -45,9 +43,7 @@ const TITLE_RESULT_EVENT_IDS = [371, 372, 373, 374]
 /** 376·377 — MVP 결과 (0x8b370) */
 const MVP_RESULT_EVENT_IDS = [376, 377]
 const SALARY_RESULT_EVENT_IDS = [384, 385, 386, 387, 388, 389, 390, 391]
-const INJURY_ENDING_EVENT_ID = 500
-const INJURY_ENDING = 0
-const RELEASE_ENDING = 1
+/** 0xa3a84 가 판정 없음(−1)일 때 웹이 띄우는 은퇴식 엔딩 — 원본 141 의 e = −1 화면은 미해결 */
 const RETIREMENT_ENDING = 2
 /**
  * 연봉협상 등급 k (0xa4d78, B-5 확정) — 타자편(모드 4) 갈래.
@@ -154,18 +150,15 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
 /**
  * 연말 이벤트 연결 (누락 탐색 에이전트: 0x10bb0 · 0x8d0dc · 0x10c54 · 0x8d05a).
  * 선택지로 이어진 이벤트까지 본 번호 목록으로 다음 단계를 정한다.
+ *
+ * **엔딩**은 본 번호가 아니라 `endingRequested`([0x1552adc]) — 재생이 첫 종류 21 로 끝났는가(0x8d4ce)로 간다. 114 끝 0x1c014
+ * (1c088)가 그 칸을 보고 141 로 가고, 141 진입 0x12300 이 엔딩 번호를 `0xa3a85(S)` 로 **새로 판정한다**(`judgeEnding`).
+ * 500(부상 누적 > 19 → 0) · 501(7년차 인기도 ≤ 499 → 1)은 같은 판정이 고른 이벤트라 그 번호도 판정과 같다.
  */
-export function nextSeasonStep(career: PlayerCareer, viewed: readonly number[]): SeasonStep {
+export function nextSeasonStep(career: PlayerCareer, viewed: readonly number[], endingRequested = false): SeasonStep {
   const saw = (id: number) => viewed.includes(id)
 
-  if (viewed.some((id) => ENDING_EVENT_IDS.has(id))) {
-    const endingIndex = saw(INJURY_ENDING_EVENT_ID)
-      ? INJURY_ENDING
-      : saw(RELEASE_EVENT_ID)
-        ? RELEASE_ENDING
-        : (judgeEnding(career) ?? RETIREMENT_ENDING)
-    return { kind: '엔딩', endingIndex }
-  }
+  if (endingRequested) return { kind: '엔딩', endingIndex: judgeEnding(career) ?? RETIREMENT_ENDING }
   if (viewed.some((id) => SALARY_RESULT_EVENT_IDS.includes(id)) || saw(SALARY_ACCEPT_EVENT_ID)) {
     return { kind: '새시즌' }
   }

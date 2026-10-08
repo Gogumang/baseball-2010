@@ -249,6 +249,27 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
   })
 })
 
+describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 끝 0x1c014 → 141', () => {
+  it('엔딩은 그 칸으로 가고 번호는 141 진입 0xa3a85 가 새로 판정한다 — 그 이벤트(503)만 본 표시가 없다', () => {
+    const rendered = 띄우기(목표달성선수({ season: 8, popularity: 1600 }))
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 502, context: '시즌' }))
+    act(() => rendered.result.current.session.actions.completeScene([], [502, 496, 503], 503))
+
+    expect(rendered.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
+    // 0x8cf8c 를 안 지나 503 은 본 표시가 없고, 선택지로 떠나온 502 · 496 은 끝 0x8b0e4 가 켠다
+    const seen = rendered.result.current.session.career!.seenEventIds
+    expect(seen).toEqual(expect.arrayContaining(['502', '496']))
+    expect(seen).not.toContain('503')
+  })
+
+  it('엔딩 요청 없이 끝나면(보통 끝) 엔딩 이벤트 번호가 있어도 엔딩이 아니다 — 본 번호를 엔딩 판정에 안 쓴다', () => {
+    const rendered = 띄우기(목표달성선수({ season: 8, popularity: 1600 }))
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 502, context: '시즌' }))
+    act(() => rendered.result.current.session.actions.completeScene([], [502, 496, 503], null))
+    expect(rendered.result.current.screen.kind).not.toBe('엔딩')
+  })
+})
+
 describe('전역 경기 상태 +0x6b — 타자편 경기도 같은 칸 (0x1c47a · 0x3a200 · 0xb6b6c)', () => {
   it('142 진입이 0 으로 되돌리고, 경기 중 나가면 그 이닝이 남는다', () => {
     const rendered = 띄우기({ ...createCareer('상태'), gamesPlayed: 4 })

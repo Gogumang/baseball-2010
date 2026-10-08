@@ -427,6 +427,14 @@ describe('시즌 이벤트 재생 0xd3', () => {
     expect(그밖.phase).toBe(다시.current.state?.record.phase)
   })
 
+  it('첫 종류 21 로 끝난 재생(0x8d4ce)은 그 이벤트만 본 표시를 안 한다 — 0xd3 끝 0x78f0 의 0x8b0e4 는 떠나온 줄만 켠다', () => {
+    const { result } = 띄우기()
+    act(() => result.current.actions.chooseTeam(0))
+    const 지금 = result.current.eventPlayback!.eventId
+    act(() => result.current.actions.finishSeasonEvent([], [지금], 지금))
+    expect(result.current.state?.record.seenEvents).not.toContain(지금)
+  })
+
   it('20경기 뒤 관리 메뉴에 들어오면 100 이 G 1000 을 준다 — 한 번 받으면 다시 안 뜬다 (전역 +0xbe)', () => {
     const { result } = 띄우기()
     시작(result, 0)

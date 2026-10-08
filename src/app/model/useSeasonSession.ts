@@ -438,7 +438,11 @@ export interface SeasonActions {
    * 이벤트 재생 0xd3 이 끝났다 — 지나온 보상(명령 7)과 본 이벤트를 받아 적용하고, 392 면 목표 결과 393~396 을
    * 이어 틀고, 아니면 돌아갈 상태로 간다.
    */
-  readonly finishSeasonEvent: (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => void
+  readonly finishSeasonEvent: (
+    rewards: readonly SeasonEventReward[],
+    viewedEventIds: readonly number[],
+    endingEventId?: number | null,
+  ) => void
   /**
    * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 2 갈래). 그 끝이 본 표시
    * (지금 이벤트 · 떠나온 이벤트 0x8b0e4) · 이벤트별 phase(8ccc8)를 하고 저장한다. `StoryScreen.onReward` 로 잇는다.
@@ -2494,10 +2498,12 @@ export function useSeasonSession(
    * ⚠️ 안 옮긴 것: 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
    */
   const finishSeasonEvent = useCallback(
-    (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[]) => {
+    (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {
       const playback = eventPlayback
       if (save === null || playback === null) return
-      const fileEvents = viewedEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID)
+      // 첫 종류 21(s_event 500)로 끝났으면 그 이벤트만 본 표시를 안 한다 — 0x8d4ce 는 0x8cf8c 를 안 지나고, 0xd3 끝 0x78f0 의
+      // 0x8b0e4 가 떠나온 이벤트 줄만 켠다. [0x1552adc] 는 0xe9ac(ec04)가 지우기만 한다 — 엔딩 0xf5 는 500 을 튼 쪽이 줄에 넣었다
+      const fileEvents = viewedEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID && id !== endingEventId)
       let record = fileEvents.reduce(markEventSeen, save.state.record)
       if ([playback.eventId, ...viewedEventIds].some(opensSeasonGoalWindow)) record = { ...record, yearGoalShown: true }
       const applied = applySeasonEventRewards({ ...save.state, record }, rewards, playback.eventId, random)

@@ -27,9 +27,13 @@ const opensRewardWindow = (notice: RewardNotice) => notice.kind === '알림' || 
  *                  → 0x8d8ee: 0x8a380(관리자 비우기) · 1(끝남)을 돌려준다   ; 보통 재생 끝 0x8d1b6 → 0x8d4e2 와 같은 꼬리
  * ```
  * 0x8c460 을 부르지 않는다(그 명령의 다른 항목도 안 준다) · 창이 없다 · 뒤 명령도 돌지 않는다. 보통 끝(마지막 명령 다음,
- * 0x8cf8c)과 달리 지금 이벤트의 본 표시(0xacf49) · 저장(0x8cfc0)도 이 자리에서는 하지 않는다 — 웹은 본 이벤트를 끝
- * (`onComplete`)에 모아 넘기므로 그대로 넘긴다(⚠️ 근사 — 웹은 이 목록으로 엔딩 [0x1552adc] 을 대신 본다).
- * 데이터의 종류 21(r_event 500 · 501 · 503 · 504, s_event 500)은 모두 그 이벤트의 마지막 명령이다.
+ * 0x8cf8c)과 달리 **지금 이벤트의 본 표시(0xacf49)를 하지 않는다**. 0x8a380 은 떠나온 이벤트 줄(수 [mgr+0x39e])을 안 비워
+ * — 0x39f 까지만 지운다 — 재생을 연 쪽의 끝(나리 114 0x1c014 · 시즌 0xd3 0x78f0)이 0x8b0e4 로 **선택지로 떠나온 이벤트는
+ * 본 표시하고 저장한다**. 엔딩은 본 이벤트가 아니라 [0x1552adc] 로 간다 — 나리 114 끝 1c088(이전 상태가 113 이 아니면) ·
+ * 장면 틀 0x1cdec(1d056)가 그 칸을 지우고 141 로, 시즌 0xe9ac(ec04)는 지우기만 한다(시즌 엔딩은 0xf5 를 줄에 넣어 둔 쪽이 간다).
+ * 141 의 엔딩 번호는 진입 0x12300 이 `0xa3a85(S)` 로 새로 판정한다(본 이벤트를 안 본다).
+ * 웹은 이 자리의 이벤트 번호를 끝(`onComplete` 셋째 값 `endingEventId`)에 넘긴다 — 부르는 쪽이 그 이벤트만 빼고 본 표시하고
+ * 엔딩으로 간다. 데이터의 종류 21(r_event 500 · 501 · 503 · 504, s_event 500)은 모두 그 이벤트의 마지막 명령이다.
  */
 const endsPlayback = (command: RewardCommand) => command.items[0]?.kind === EVENT_REWARD_KIND.엔딩진입
 
@@ -86,6 +90,17 @@ const rewardsOfStep = (step: EventStep): readonly EventReward[] =>
 export type EventRewardHandler = (items: readonly EventReward[], eventId: number, viewedEventIds: readonly number[]) => void
 
 /**
+ * 재생이 끝났다 — 끝에 모아 넘기는 보상 · 이 재생에서 거친 이벤트 · 엔딩 요청.
+ * `endingEventId` 는 첫 종류 21 로 끝났을 때 그 이벤트다(0x8d4ce — [0x1552adc] = 1). 원본은 그 이벤트만 본 표시를 안 하고
+ * 거친 다른 이벤트(선택지로 떠나온 줄)는 끝 0x8b0e4 가 본 표시한다. 보통 끝이면 null.
+ */
+export type EventCompleteHandler = (
+  rewards: readonly EventReward[],
+  viewedEventIds: readonly number[],
+  endingEventId: number | null,
+) => void
+
+/**
  * 이벤트 한 편을 원본 명령 순서대로 재생한다.
  * 대사·선택지는 초상화 묶음을 통째로 바꾸고(0x7f54c), 알림·예아니오는 앞 초상화를 그대로 둔다.
  * 선택지가 다른 이벤트를 가리키면 화면을 닫지 않고 그 이벤트로 이어 간다.
@@ -100,7 +115,8 @@ export type EventRewardHandler = (items: readonly EventReward[], eventId: number
 export function useEventPlayback(
   events: readonly OriginalEvent[],
   startEvent: OriginalEvent,
-  onComplete: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => void,
+  /** `endingEventId` — 첫 종류 21 로 재생이 끝났으면 그 이벤트([0x1552adc] = 1, 본 표시 없음), 보통 끝이면 null */
+  onComplete: EventCompleteHandler,
   onMatch: (command: MatchCommand, carry: StoryCarry) => void,
   carried: StoryCarry = EMPTY_STORY_CARRY,
   /** system 3·4 발표 창의 글 — 안 주면 예전처럼 지나간다 */
@@ -177,9 +193,12 @@ export function useEventPlayback(
    * 창을 안 띄우는 보상은 주고 곧바로 다음 명령으로 — 세션의 커리어가 바뀐 다음 렌더에 다음 걸음(과 그 글)을 짓는다.
    */
   const rewardedCursorsRef = useRef(new WeakSet<EventCursor>())
+  /** 첫 종류 21 로 끝낸 이벤트 — [0x1552adc] 자리 (`EventCompleteHandler`) */
+  const endingEventIdRef = useRef<number | null>(null)
   useEffect(() => {
     if (!isReleased || step.command?.op !== 'reward' || !endsPlayback(step.command)) return
-    // 0x8d4ce — 주지 않고 재생 끝(이 이벤트의 끝 커서 — 뒤 명령은 지나온 명령에도 안 든다)
+    // 0x8d4ce — [0x1552adc] = 1 · 주지 않고 재생 끝(이 이벤트의 끝 커서 — 뒤 명령은 지나온 명령에도 안 든다)
+    endingEventIdRef.current = step.cursor.eventId
     const event = findEvent(events, step.cursor.eventId)
     setCursor({ eventId: step.cursor.eventId, commandIndex: event?.commands.length ?? step.cursor.commandIndex + 1 })
   }, [events, step, isReleased])
@@ -221,7 +240,7 @@ export function useEventPlayback(
     if (step.command !== null) return
     isCompletedRef.current = true
     const collected = collect()
-    onCompleteRef.current(collected.rewards, collected.viewedEventIds)
+    onCompleteRef.current(collected.rewards, collected.viewedEventIds, endingEventIdRef.current)
   }, [step, isReleased])
 
   const stepRef = useRef(step)

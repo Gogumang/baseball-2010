@@ -15,7 +15,6 @@ import {
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { achievedPitcherGoalCount } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import {
-  ENDING_EVENT_IDS,
   FINAL_RETIREMENT_EVENT_ID,
   GOAL_INTRO_EVENT_ID,
   goalResultEventId,
@@ -106,11 +105,19 @@ export function pitcherYearEndEventIdOf(career: PitcherCareer): number {
  * 타자편 `app/model/seasonEvents.nextSeasonStep` 과 같은 꼴이고, 그 사이에 130·131(370~377)이 든다.
  * 늦은 단계부터 본다 — 앞 단계 번호가 `viewed` 에 남아 있어도 뒤 단계가 이긴다.
  */
-export function nextPitcherYearEndStep(career: PitcherCareer, viewed: readonly number[]): PitcherYearEndEventStep {
+export function nextPitcherYearEndStep(
+  career: PitcherCareer,
+  viewed: readonly number[],
+  /**
+   * [0x1552adc] — 재생이 첫 종류 21 로 끝났는가(0x8d4ce). 엔딩은 본 번호가 아니라 이 칸으로 간다(114 끝 0x1c014 1c088 → 141).
+   * ⚠️ 엔딩 번호는 아래처럼 본 번호로 고른다 — 원본 141 진입 0x12300 은 `0xa3a85(S)` 하나로 새로 판정한다(투수 갈래 대조는 미해결).
+   */
+  endingRequested = false,
+): PitcherYearEndEventStep {
   const saw = (id: number) => viewed.includes(id)
   const sawAny = (ids: readonly number[]) => viewed.some((id) => ids.includes(id))
 
-  if (viewed.some((id) => ENDING_EVENT_IDS.has(id))) {
+  if (endingRequested) {
     const endingIndex = saw(INJURY_ENDING_EVENT_ID)
       ? INJURY_ENDING
       : saw(RELEASE_EVENT_ID)

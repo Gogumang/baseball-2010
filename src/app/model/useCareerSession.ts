@@ -1059,7 +1059,7 @@ export function useCareerSession({
     setScreen({ kind: '이벤트', eventId: yearEndEventId(finished), context: '시즌' })
   }
 
-  const continueSeason = (viewed: PlayerCareer, viewedEventIds: readonly number[]) => {
+  const continueSeason = (viewed: PlayerCareer, viewedEventIds: readonly number[], endingRequested = false) => {
     // ── 국가대표 이벤트(461~464)는 연말 사슬 밖이다. 상태 133 이 따로 예약한 것이라 먼저 가른다 ──
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.출전)) {
       // 463 출전 — 상태 133 이 `0xb7bf1(L)` 로 대회를 세우고 순위 화면 134 를 줄에 넣는다.
@@ -1080,7 +1080,7 @@ export function useCareerSession({
       return startNewSeason(viewed)
     }
 
-    const step = nextSeasonStep(viewed, viewedEventIds)
+    const step = nextSeasonStep(viewed, viewedEventIds, endingRequested)
     if (step.kind === '포스트시즌') return enterPostseason(viewed)
     if (step.kind === '이벤트') {
       // 상태 함수가 이벤트를 틀기 전에 하는 일 — 131 은 375 앞에서 MVP 비트를 남긴다
@@ -1793,7 +1793,13 @@ export function useCareerSession({
       setCareer(withRewardResumePatch(marked, eventId))
     },
 
-    completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[]) => {
+    /**
+     * 재생 끝(114 끝 0x1c014). `endingEventId` 는 첫 종류 21 로 끝난 이벤트(0x8d4ce — [0x1552adc] = 1)다: 그 이벤트는 본 표시를
+     * 안 하고(0x8cf8c 를 안 지난다) 거친 다른 이벤트는 0x8b0e4 가 본 표시한다. 엔딩은 그 칸으로 간다(`nextSeasonStep`).
+     * ⚠️ 웹은 엔딩 이벤트(500 · 501 · 503 · 504)를 시즌 끝 사슬('시즌')에서만 튼다 — 원본 1c088 은 이전 상태가 113(장소)이 아닌
+     * 114 끝마다, 틀 0x1cdec 는 어느 상태에서나 그 칸을 본다.
+     */
+    completeScene: (rewards: readonly EventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {
       if (career === null || screen.kind !== '이벤트') return
       if (screen.context === '연초') {
         // 내장 이벤트라 본 표시·보상이 없다. 목표 창이 닫히면 0x7fe90 이 S+0x1b7 = 1 (해마다 한 번) → 뒤 105
@@ -1801,7 +1807,8 @@ export function useCareerSession({
         setScreen({ kind: '관리' })
         return setManagementCheck(yearStartCheckRef.current)
       }
-      const rewarded = applyEventRewards(finishEvent(career, viewedEventIds), rewards, random, screen.eventId)
+      const seenIds = endingEventId === null ? viewedEventIds : viewedEventIds.filter((id) => id !== endingEventId)
+      const rewarded = applyEventRewards(finishEvent(career, seenIds), rewards, random, screen.eventId)
       // 보상 19(0x8ca7e)는 타순 칸이 아니라 레코드를 고친다 — `0xb5d09(내 팀, 내 칸, 값 − 1)` 로 셋이 돈다
       const orderMoves = applyBattingOrderRewards(
         career,
@@ -1831,7 +1838,7 @@ export function useCareerSession({
         setCareer(visited)
         return setScreen({ kind: '관리' })
       }
-      if (screen.context === '시즌') return continueSeason(viewed, viewedEventIds)
+      if (screen.context === '시즌') return continueSeason(viewed, viewedEventIds, endingEventId !== null)
       setCareer(viewed)
       if (screen.context === '외출진입') return setScreen({ kind: '외출' })
       setScreen({ kind: '관리' })

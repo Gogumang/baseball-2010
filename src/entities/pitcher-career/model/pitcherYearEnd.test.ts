@@ -78,14 +78,16 @@ describe('투수편 연말 사슬 (상태 136 → 130 → 131 → 132)', () => {
     expect(nextPitcherYearEndStep(투수({ stats: 좋은성적 }), [...앞, 381])).toEqual({ kind: '이벤트', eventId: 385 })
   })
 
-  it('연봉 결과·수락 뒤는 새 시즌, 엔딩 이벤트 뒤는 엔딩이다', () => {
+  it('연봉 결과·수락 뒤는 새 시즌, 엔딩 요청([0x1552adc] — 첫 종류 21) 뒤는 엔딩이다', () => {
     expect(nextPitcherYearEndStep(투수(), [380, 383])).toEqual({ kind: '새시즌' })
     expect(nextPitcherYearEndStep(투수(), [380, 381, 387])).toEqual({ kind: '새시즌' })
-    expect(nextPitcherYearEndStep(투수({ season: 7, popularity: 100 }), [501])).toEqual({ kind: '엔딩', endingIndex: 1 })
-    expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [502, 496, 503])).toEqual({
+    expect(nextPitcherYearEndStep(투수({ season: 7, popularity: 100 }), [501], true)).toEqual({ kind: '엔딩', endingIndex: 1 })
+    expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [502, 496, 503], true)).toEqual({
       kind: '엔딩',
       endingIndex: 5,
     })
+    // 엔딩은 본 번호가 아니라 그 칸으로 간다
+    expect(nextPitcherYearEndStep(투수({ season: 9, popularity: 1600 }), [502, 496, 503]).kind).not.toBe('엔딩')
   })
 })
 
