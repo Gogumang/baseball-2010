@@ -42,21 +42,25 @@ describe('엔딩 글 StrENDING[15 + 결과]', () => {
   })
 })
 
-describe('엔딩 보너스 StrMODE[214]', () => {
-  it('결과 2 는 표값 6 × 1000 = 6000 G 다', () => {
+describe('엔딩 보너스 StrMODE[214] — 키 0x6b3c 는 SR+0x7b 만 본다', () => {
+  it('결과 2 는 표값 6 × 1000 = 6000 G 다 — 팝업 0x2b 를 닫으면 onBonusReceived, 엔딩 화면으로 돌아온다', () => {
     const onFinish = vi.fn()
-    render(<SeasonEndingScreen endingIndex={2} onFinish={onFinish} />)
+    const onBonusReceived = vi.fn()
+    render(<SeasonEndingScreen endingIndex={2} onBonusReceived={onBonusReceived} onFinish={onFinish} />)
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
 
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('6000 G포인트')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
-    expect(onFinish).toHaveBeenCalled()
+    expect(onBonusReceived).toHaveBeenCalledTimes(1)
+    // 닫는 것만으로는 넘어가지 않는다 — 다음 키가 SR+0x7b 가 선 0x6b3c 로 단계 1
+    expect(onFinish).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
   })
 
-  it('결과 0 은 보너스가 0 이라 알림 없이 끝난다', () => {
+  it('SR+0x7b 가 서 있으면(판정 0 은 진입 0x6be8 이 세운다) 알림 없이 넘긴다 (6b52~6b6e)', () => {
     const onFinish = vi.fn()
-    render(<SeasonEndingScreen endingIndex={0} onFinish={onFinish} />)
+    render(<SeasonEndingScreen endingIndex={0} isBonusReceived onFinish={onFinish} />)
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
 
@@ -80,15 +84,5 @@ describe('연출', () => {
     // t ≥ 7 이면 p 가 110 에 걸려 r = D
     expect(endingIrisRadiusOf(7, D)).toBe(D)
     expect(endingIrisRadiusOf(20, D)).toBe(D)
-  })
-
-  it('엔딩을 본 표시(SR+0x1bc)를 한 번만 알린다', () => {
-    const onEndingSeen = vi.fn()
-    const { rerender } = render(
-      <SeasonEndingScreen endingIndex={3} onEndingSeen={onEndingSeen} onFinish={vi.fn()} />,
-    )
-    rerender(<SeasonEndingScreen endingIndex={3} onEndingSeen={onEndingSeen} onFinish={vi.fn()} />)
-
-    expect(onEndingSeen).toHaveBeenCalledTimes(1)
   })
 })

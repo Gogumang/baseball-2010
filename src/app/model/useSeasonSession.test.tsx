@@ -16,7 +16,7 @@ import { PRE_GAME_ACE_PHASE, SQUAD_PURPOSE } from '@/entities/season-mode/model/
 import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
-import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
+import { GAME_POINT_LIMIT, judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -804,7 +804,7 @@ describe('시즌 끝 사슬', () => {
     }
   })
 
-  it('엔딩을 보면 SR+0x1bc 가 서고, 다시 띄우면 관리 메뉴로 온다 (0x8bd8 → 0xcb)', () => {
+  it('엔딩을 넘기면 SR+0x1bc 가 서고 관리 메뉴 0xc9 로, 다시 띄우면 관리 메뉴로 온다 (0x8bd8 8ccc~8d2c → 0xcb)', () => {
     const store = 메모리저장()
     const 첫판 = 띄우기(store)
     시작(첫판.result, 0)
@@ -812,13 +812,51 @@ describe('시즌 끝 사슬', () => {
       ...첫판.result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9,
     }))
     act(() => 첫판.result.current.actions.finishSeason())
+    이벤트넘기기(첫판.result)
+    expect(첫판.result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
+    // 그리기만으로는 SR+0x1bc 가 안 선다 — 끄면 phase 6 그대로 엔딩으로 돌아온다
+    expect(첫판.result.current.state?.record.endingSeen).toBe(false)
+    expect(띄우기(store).result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
 
-    act(() => 첫판.result.current.actions.markEndingSeen())
+    act(() => 첫판.result.current.actions.finishEnding())
 
     expect(첫판.result.current.state?.record.endingSeen).toBe(true)
+    expect(첫판.result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
     const 둘째판 = 띄우기(store)
     expect(둘째판.result.current.state?.record.phase).toBe(SEASON_PHASE.엔딩)
     expect(둘째판.result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+  })
+
+  it('엔딩 보너스 — 판정 0 은 진입 0x6be8 이 SR+0x7b = 1 · 저장, 그 밖은 팝업 0x2b 닫힘이 G · SR+0x7b · 통계 (0x8bd8)', () => {
+    for (const [popularity, endingIndex, bonus] of [[100, 0, 0], [900, 1, 3000]] as const) {
+      const store = 메모리저장()
+      const 통계: unknown[] = []
+      const { result } = renderHook(() => useSeasonSession(store, createSeededRandom(20100901), null, undefined, (event) => {
+        통계.push(event)
+      }))
+      시작(result, 0)
+      act(() => result.current.actions.confirmIncome({
+        ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9, popularity,
+      }))
+      act(() => result.current.actions.finishSeason())
+      이벤트넘기기(result)
+      expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
+      expect(judgeSeasonEnding(result.current.state!.record)).toBe(endingIndex)
+      // 진입 6c12 — r5 == 0 이면 SR+0x7b = 1 · 저장
+      expect(result.current.state?.record.endingBonusReceived).toBe(endingIndex === 0)
+      expect(store.load()).toMatchObject({ state: { record: { endingBonusReceived: endingIndex === 0 } } })
+
+      const 앞G = result.current.gamePoints
+      act(() => result.current.actions.receiveEndingBonus())
+      expect(result.current.state?.record.endingBonusReceived).toBe(true)
+      expect(result.current.gamePoints).toBe(앞G + bonus)
+      expect(통계.filter((event) => (event as { kind: string }).kind === 'G획득')).toEqual(
+        bonus === 0 ? [] : [{ kind: 'G획득', mode: 2, amount: bonus }],
+      )
+      // 다시 받지 않는다
+      act(() => result.current.actions.receiveEndingBonus())
+      expect(result.current.gamePoints).toBe(앞G + bonus)
+    }
   })
 
   it('국가대항전 경기는 평가를 안 탄다 — 인기도·평판·사기가 그대로다 (0x4ea0c 4f216)', () => {

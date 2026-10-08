@@ -882,11 +882,11 @@ export function SeasonRoute({
         // ⚠️ 원본은 판정값 e 를 `저장+0xa0+e` 에 남기지만 그 전역 저장 칸이 웹에 없다 — **근사다**.
         // 손댄 세이브 등으로 10년차가 아닌 채 phase 6 이면 0(비 인기 구단)으로 둔다
         endingIndex={judgeSeasonEnding(state.record) ?? 0}
-        onEndingSeen={actions.markEndingSeen}
-        // 엔딩·보너스까지 보고 나면 **메인 메뉴로 나간다**. 0xf5 의 키 처리 `0x6b3c` 가
-        // 보너스를 준 뒤 어디로 가는지는 문서(P4 1a·J 4-8 · P6 4b)에 없어 확인하지 못했다 —
-        // 시즌은 여기서 끝이고 SR+0x1bc 가 섰으니 다시 들어와도 관리 메뉴다. **근사다**
-        onFinish={onExit}
+        // SR+0x7b — 판정 0 은 진입 0x6be8 이, 그 밖은 보너스 팝업 0x2b 닫힘(0x8bd8)이 세운다. 서 있으면 키 0x6b3c 가 팝업 없이 넘긴다
+        isBonusReceived={state.record.endingBonusReceived}
+        onBonusReceived={actions.receiveEndingBonus}
+        // 키 0x6b3c → 단계 1 → 전환이 끝나면 0x8bd8 8ccc~8d2c: SR+0x1bc = 1 · 저장 · **관리 메뉴 0xc9**(메인 메뉴가 아니다)
+        onFinish={actions.finishEnding}
       />
     )
   }

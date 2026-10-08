@@ -82,7 +82,7 @@ import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCup
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import {
-  SEASON_AUTOBOT_BAT_HIDDEN_ID, applySeasonBurstRewards, applySeasonReward, GAME_POINT_LIMIT, judgeSeasonEnding,
+  SEASON_AUTOBOT_BAT_HIDDEN_ID, applySeasonBurstRewards, applySeasonReward, ENDING_BONUS_GAME_POINTS, GAME_POINT_LIMIT, judgeSeasonEnding,
   opensSeasonAutobotBat,
 } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
@@ -152,6 +152,8 @@ import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGam
 
 /** 시즌모드 = 원본 모드 2 (0x22c7d 의 획득 GP 칸 3) */
 const SEASON_STAT_MODE = 2
+/** 엔딩 보너스 표 0xcbc2e 의 단위 — 0x8bd8 8c1a `movs #0xfa ; lsls #2` × 표값 */
+const ENDING_BONUS_UNIT = 1000
 
 /**
  * 시즌 모드 한 판 (원본 게임 모드 2, 장면 0x105).
@@ -431,8 +433,16 @@ export interface SeasonActions {
   readonly spendGamePoint: (cost: number) => void
   /** 구장 히든 아이템을 연다 (0x81d0 컬렉터 해금 — `app[0xe0 + …] = 1`) */
   readonly openStadiumItems: (unlockIds: readonly number[]) => void
-  /** 엔딩을 봤다 — SR+0x1bc = 1 로 켜고 저장한다 (0x8bd8, R13 2절) */
-  readonly markEndingSeen: () => void
+  /**
+   * 엔딩 보너스 팝업 0x2b 를 닫았다 — 0x8bd8 의 8bf4~8c84: G += 0xcbc2e[e] × 1000(99999 상한) · 전역기록 저장 · SR+0x7b = 1 ·
+   * 저장 · `0x22c7d(보너스, 2)` 통계. 이미 받았으면 아무것도 안 한다
+   */
+  readonly receiveEndingBonus: () => void
+  /**
+   * 엔딩을 넘겼다 — 키 0x6b3c 가 SR+0x7b 가 선 채로 단계 1 로 넘기고, 0x8bd8 의 8ccc~8d2c 가 그 화면 전환이 끝나면
+   * SR+0x1bc = 1 · 저장 · 관리 메뉴 0xc9
+   */
+  readonly finishEnding: () => void
   /** 결산을 닫았다 — 국가대항전 연차면 대회, 아니면 새 해 (afterKoreanSeries) */
   readonly finishSeason: () => void
   /**
@@ -1321,10 +1331,14 @@ export function useSeasonSession(
       return
     }
 
-    // 10년차 엔딩 0xf5 진입 0x6be8 — 엔딩 판정 0xa3085 로 배경음을 예약한다(0 → 52 · 그 밖 46, `seasonEndingBgmOf`).
-    // ⚠️ 같은 진입의 r5 == 0 갈래 SR+0x7b = 1 · 저장(6c16~6c2e)은 웹 시즌 레코드에 그 칸이 없어 옮기지 않았다
+    // 10년차 엔딩 0xf5 진입 0x6be8 — 엔딩 판정 0xa3085 가 0(비 인기 구단 — 보너스 표 0xcbc2e[0] = 0)이면 SR+0x7b = 1 · 저장
+    // (6c12~6c2e) — 키 0x6b3c 가 보너스 팝업 없이 넘긴다. 이어서 배경음을 예약한다(0 → 52 · 그 밖 46, `seasonEndingBgmOf`)
     if (scene === SEASON_SCENE_STATE.엔딩) {
-      activeSound().playBgm(seasonEndingBgmOf(judgeSeasonEnding(record)))
+      const endingIndex = judgeSeasonEnding(record)
+      if (endingIndex === 0 && !record.endingBonusReceived) {
+        commit({ ...save, state: { ...save.state, record: { ...record, endingBonusReceived: true } } })
+      }
+      activeSound().playBgm(seasonEndingBgmOf(endingIndex))
       return
     }
 
@@ -2626,10 +2640,38 @@ export function useSeasonSession(
     })
   }, [])
 
-  /** 엔딩을 그리기 시작하면 SR+0x1bc 를 켜고 저장한다 (0x8bd8 안 0x8cf0~0x8d00) */
-  const markEndingSeen = useCallback(() => {
-    if (save === null || save.state.record.endingSeen) return
-    commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
+  /**
+   * 엔딩 보너스 팝업 0x2b 닫힘 — 0x8bd8(직접 떴다):
+   * ```
+   * 8bf0  [팝업+0x248] == 0x2b && 답 [+0x21c] == 0 → 답 = −1
+   * 8c0e  e = 0xa3085(SR) ; 보너스 = 0xcbc2e[e] × 1000
+   * 8c34  G(+0x64) += 보너스 → 0~99999 ; 0x1f1b9 전역기록 저장
+   * 8c54  SR+0x7b = 1 ; 0x1fded · 0x22755(저장, 1)
+   * 8c70  0x22c7d(보너스, 2)(모드 2 G 획득 통계) ; 0x1f1e1(통계 저장)
+   * ```
+   */
+  const receiveEndingBonus = useCallback(() => {
+    if (save === null || save.state.record.endingBonusReceived) return
+    const endingIndex = judgeSeasonEnding(save.state.record)
+    const bonus = (ENDING_BONUS_GAME_POINTS[endingIndex ?? 0] ?? 0) * ENDING_BONUS_UNIT
+    gainGamePoint(bonus)
+    commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingBonusReceived: true } } })
+    recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: bonus })
+  }, [commit, gainGamePoint, recordStat, save])
+
+  /**
+   * 엔딩을 넘긴다 — 키 0x6b3c 의 SR+0x7b ≠ 0 갈래(6b52~6b6e)가 단계 [this+0x140] 를 1 로 올리고 화면 전환(종류 1)을 건 뒤,
+   * 0x8bd8 의 8ccc~8d2c 가 팝업 없이 단계 1 이고 전환이 끝나면 **SR+0x1bc = 1** · 저장(0x1fded · 0x22755) · 0xbcb49(0xc9) ·
+   * 전환(종류 2). 곧 엔딩 뒤는 메인 메뉴가 아니라 관리 메뉴 0xc9 이고, SR+0x1bc 는 이때 선다 — 그 전에 끄면 phase 6 이라
+   * 다시 들어오면 0xf5 로 온다(보너스를 받았으면 SR+0x7b 가 서 있어 팝업 없이).
+   * ⚠️ 근사: 웹은 두 화면 전환(1500ms)을 기다리지 않고 곧바로 넘긴다.
+   */
+  const finishEnding = useCallback(() => {
+    if (save === null) return
+    if (!save.state.record.endingSeen) {
+      commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
+    }
+    setScene(SEASON_SCENE_STATE.관리메뉴)
   }, [commit, save])
 
   /**
@@ -2756,7 +2798,7 @@ export function useSeasonSession(
       playCupGame, finishCup, finishGame, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
       runTraining, closeTrainingResult, runOuting, nextSeasonEndStep, awardLeagueFirst, spendGamePoint, finishSeason,
-      openStadiumItems, markEndingSeen, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
+      openStadiumItems, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
     },
   }
 }

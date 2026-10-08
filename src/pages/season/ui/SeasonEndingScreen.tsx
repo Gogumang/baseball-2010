@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { MAP_FRAME, MAP_FRAMES } from '@/shared/config/outingPlaces'
@@ -23,11 +23,16 @@ export interface SeasonEndingScreenProps {
    */
   readonly endingIndex: number
   /**
-   * 엔딩을 봤다는 표시 — 원본 그리기 `0x8bd8` 안에서 **SR+0x1bc = 1** 을 켜고 저장한다 (R13 2절).
-   * 그 칸이 서면 진입 분기(0xcb)가 무조건 관리 메뉴로 보내고, 연초 목표 상태 0xd4 도 막힌다.
+   * SR+0x7b — 엔딩 보너스를 받았는가. 키 `0x6b3c` 는 서 있으면 보너스 팝업 없이 넘기고(6b52~6b6e), 아니면 팝업 0x2b 를 띄운다.
+   * 판정 0 은 진입 `0x6be8` 이 이미 세워 둔다(6c12~6c2e).
    */
-  readonly onEndingSeen?: () => void
-  /** 보너스까지 받고 끝 — 원본은 대전모드(메인 메뉴)로 나간다 */
+  readonly isBonusReceived?: boolean
+  /** 보너스 팝업 0x2b 를 닫았다 — G · SR+0x7b · 저장 · 통계는 부르는 쪽 (`0x8bd8` 8bf0~8c84) */
+  readonly onBonusReceived?: () => void
+  /**
+   * 엔딩을 넘겼다 — SR+0x7b 가 선 채로 키를 누르면 단계 1 · 전환 뒤 `0x8bd8` 8ccc~8d2c 가 SR+0x1bc = 1 · 저장 · 관리 메뉴 0xc9
+   * (부르는 쪽)
+   */
   readonly onFinish: () => void
 }
 
@@ -56,16 +61,8 @@ type Phase = '엔딩' | '보너스'
  * (`widgets/season/lib/seasonEndingLayout.ts` 의 `CREDITS_TEXT_INDEX` 주석 참고).
  * ⚠️ **근사**: 지도 그리기 인자 `1` 의 뜻을 몰라 장소 표시·커서 없이 지도 한 장만 깐다.
  */
-export function SeasonEndingScreen({ endingIndex, onEndingSeen, onFinish }: SeasonEndingScreenProps) {
+export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBonusReceived, onFinish }: SeasonEndingScreenProps) {
   const [phase, setPhase] = useState<Phase>('엔딩')
-
-  // SR+0x1bc 는 엔딩을 그리기 시작할 때 한 번만 켠다 (0x8bd8)
-  const seenRef = useRef(false)
-  useEffect(() => {
-    if (seenRef.current) return
-    seenRef.current = true
-    onEndingSeen?.()
-  }, [onEndingSeen])
 
   /** 원이 화면을 다 덮으면(t ≥ 7) 연출이 끝난다 — 그 뒤로는 움직이는 것이 없다 */
   const tick = Math.min(useUpdateCounter(), ENDING_IRIS.fullTick)
@@ -129,7 +126,8 @@ export function SeasonEndingScreen({ endingIndex, onEndingSeen, onFinish }: Seas
           type="button"
           className={styles.pressArea}
           aria-label="확인"
-          onClick={() => (bonus > 0 ? setPhase('보너스') : onFinish())}
+          // 키 0x6b3c — SR+0x7b 만 본다(보너스 값은 안 본다)
+          onClick={() => (isBonusReceived ? onFinish() : setPhase('보너스'))}
         />
       )}
 
@@ -137,7 +135,11 @@ export function SeasonEndingScreen({ endingIndex, onEndingSeen, onFinish }: Seas
         <MessageBox
           text={BONUS_TEXT.replace('%d', String(bonus))}
           buttons={['OK']}
-          onAnswer={onFinish}
+          // 팝업 0x2b 닫힘 — 보너스를 받고 엔딩 화면으로 돌아온다. 다음 키가 SR+0x7b 가 선 0x6b3c 로 넘긴다
+          onAnswer={() => {
+            onBonusReceived?.()
+            setPhase('엔딩')
+          }}
         />
       )}
     </RawScreen>

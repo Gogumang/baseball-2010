@@ -94,7 +94,7 @@ describe('엔딩 0xf5 배선', () => {
     expect(screen.getByLabelText('원형 전환')).toBeDefined()
   })
 
-  it('엔딩 보너스까지 보고 나면 **메인 메뉴로 나간다**', () => {
+  it('보너스 팝업 0x2b 를 닫고 다음 키로 넘기면 **관리 메뉴 0xc9** 로 간다 — SR+0x1bc 는 그때 선다 (0x8bd8 8ccc~8d2c)', () => {
     const onExit = vi.fn()
     const store = 메모리저장(세이브(레코드({
       phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
@@ -107,17 +107,44 @@ describe('엔딩 0xf5 배선', () => {
     // 판정 1 → 표값 3 × 1000 = 3000 G (StrMODE[214])
     expect(알림글()).toContain('3000 G포인트')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    // 받은 표시(SR+0x7b)와 G 는 저장에 — 엔딩 본 표시(SR+0x1bc)는 아직이다
+    expect(store.load()).toMatchObject({ state: { record: { endingBonusReceived: true, endingSeen: false } } })
+    expect(document.body.textContent).toContain('지역 인기 구단')
 
-    expect(onExit).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    expect(onExit).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
+    expect(store.load()).toMatchObject({ state: { record: { endingSeen: true } } })
   })
 
-  it('엔딩을 그리면 SR+0x1bc 가 서서 다음에 들어올 때는 관리 메뉴다 (0x8bd8 → 0xcb)', () => {
+  it('보너스를 받고 넘기기 전에 끄면 다시 엔딩이다 — SR+0x7b 가 서 있어 보너스 팝업 없이 넘어간다 (0x6b3c)', () => {
     const store = 메모리저장(세이브(레코드({
       phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
       // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
       seenEvents: [400, 1, 5, 100],
     })))
     render(<시즌화면 store={store} onExit={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    cleanup()
+
+    render(<시즌화면 store={store} onExit={vi.fn()} />)
+
+    expect(document.body.textContent).toContain('지역 인기 구단')
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+    expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
+  })
+
+  it('엔딩을 넘기면 SR+0x1bc 가 서서 다음에 들어올 때는 관리 메뉴다 (0x8bd8 → 0xcb)', () => {
+    const store = 메모리저장(세이브(레코드({
+      phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900, endingBonusReceived: true,
+      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+      seenEvents: [400, 1, 5, 100],
+    })))
+    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
     cleanup()
 
     render(<시즌화면 store={store} onExit={vi.fn()} />)

@@ -134,11 +134,18 @@ export interface SeasonRecord {
   /** SR+0x1b8 / +0x1b9 / +0x1ba — 지금 장착한 관중석 · 전광판 · 잔디 칸 */
   readonly stadiumEquipped: readonly number[]
   /**
-   * SR+0x1bc — **엔딩까지 본 다 끝난 시즌** 표시 (R13 2절 — 문서 등급 **유력**).
-   * 10년차 엔딩 그리기 `0x8bd8` 이 켜고 저장한다. 서 있으면 진입 분기(0xcb)가
-   * phase 를 보기 전에 무조건 관리 메뉴로 보내고, 연초 목표 상태(0xd4)도 막는다.
+   * SR+0x1bc — **엔딩까지 본 다 끝난 시즌** 표시.
+   * 10년차 엔딩 그리기 `0x8bd8` 의 8ccc~8d2c 가 보너스를 받고 키로 넘긴 단계 1 의 화면 전환이 끝날 때 켜고 저장한 뒤 관리 메뉴
+   * 0xc9 로 간다(직접 떴다). 서 있으면 진입 분기(0xcb)가 phase 를 보기 전에 무조건 관리 메뉴로 보내고, 연초 목표 상태(0xd4)도 막는다.
    */
   readonly endingSeen: boolean
+  /**
+   * SR+0x7b — **엔딩 보너스를 받았다** (나리 S+0x7b 와 같은 뜻, 직접 떴다). 쓰는 곳 둘:
+   * 엔딩 0xf5 진입 0x6be8 의 6c12~6c2e(판정 0 이면 1 · 저장 — 보너스 표 0xcbc2e[0] 이 0 이다)와 보너스 팝업 0x2b 를 닫는
+   * 0x8bd8 의 8c54~8c5c(G += 0xcbc2e[e] × 1000 · 전역기록 저장 뒤 1 · 저장). 읽는 곳은 0xf5 의 키 0x6b3c 하나 — 서 있으면
+   * 보너스 팝업 없이 단계 1 로 넘기고(6b52~6b6e), 아니면 팝업 0x2b(StrMODE[214]). 0 으로 쓰는 곳은 없다(바이너리 전체 `adds #0x7b ; strb` 훑기 — 2b77ae0).
+   */
+  readonly endingBonusReceived: boolean
 }
 
 /**
@@ -293,6 +300,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       stadiumEquipped: zeros(STADIUM_EQUIPPED_SIZE),
       // SR+0x1bc — 새 시즌은 `0x204e0` 초기화 값(0)으로 남는다
       endingSeen: false,
+      // SR+0x7b — 새 시즌 레코드의 처음 값 0 (따로 쓰는 곳 없음)
+      endingBonusReceived: false,
     },
     teamMorale: MORALE_LIMIT,
     teamAbilities: initialTeamAbilities(),
