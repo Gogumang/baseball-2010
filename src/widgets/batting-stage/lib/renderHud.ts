@@ -36,6 +36,11 @@ export interface HudState {
    * 안 주면 1(사람 = 후공) — 예전 그림(위 = 상대)과 같다.
    */
   readonly playerSide?: number
+  /**
+   * 루상 주자의 **경기용 주력** 0xb570d(ctx, 3, 주자 선수, 1, 90, 1) — 상태 0xe 의 주루 칸(0x35b94 35f74, `runPipDrawsOf`)이 쓴다.
+   * 주자가 누구인지 웹 경기 상태가 아직 들고 있지 않아 부르는 쪽이 아는 루만 채운다. 없는 루는 칸을 안 그린다
+   */
+  readonly runnerRunAbilities?: Partial<Record<'first' | 'second' | 'third', number>>
 }
 
 const HUD_FRAMES = './sprites/game_ui/frames'

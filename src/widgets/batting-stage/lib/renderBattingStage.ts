@@ -18,7 +18,18 @@ import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settleme
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
-import { BASE_WINDOW_IMAGE, RUNNER_FRAMES, baseRunnerDrawsOf, loopingAnimationStepAt, showsBaseRunners } from '@/widgets/batting-stage/lib/baseRunners'
+import {
+  BASE_WINDOW_IMAGE,
+  RUNNER_FRAMES,
+  RUN_PIP_IMAGE,
+  baseRunnerDrawsOf,
+  grayRunPipPixel,
+  loopingAnimationStepAt,
+  runPipDrawsOf,
+  runnerBoxAnchorOf,
+  showsBaseRunners,
+  type BaseKey,
+} from '@/widgets/batting-stage/lib/baseRunners'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
 import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedReadout'
@@ -171,7 +182,7 @@ export function renderBattingStage(
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
-    drawBaseRunners(context, scene.hud, side, scene.tick)
+    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase))
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
@@ -229,7 +240,22 @@ function runnerPaletteIndexOf(teamId: number | null): number | null {
   return teamId
 }
 
-function drawBaseRunners(context: CanvasRenderingContext2D, hud: HudState, side: number, tick: number): void {
+/**
+ * 주루 칸을 그리는 상태 0xe — 웹은 쉬는 '대기'(0xd · 0xe 확인 대기 · 메뉴)로 본다 (⚠️ 근사: 0xd 를 못 가른다, `softKeyLabels` 와 같은 한계)
+ */
+function isRunPipState(phase: StagePhaseSnapshot | undefined): boolean {
+  return phase?.kind === '대기' && phase.isPaused
+}
+
+const RUNNER_BASE_OF_ANIMATION: readonly BaseKey[] = ['first', 'second', 'third']
+
+function drawBaseRunners(
+  context: CanvasRenderingContext2D,
+  hud: HudState,
+  side: number,
+  tick: number,
+  showsRunPips: boolean,
+): void {
   const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
   for (const draw of baseRunnerDrawsOf(hud.bases, side)) {
     if (draw.kind === 'window') {
@@ -256,7 +282,49 @@ function drawBaseRunners(context: CanvasRenderingContext2D, hud: HudState, side:
     const y = draw.y + step.dy + placed.offsetY
     if (draw.isSilhouette) drawSilhouette(context, placed.image, x, y, '#000000')
     else context.drawImage(placed.image, x, y)
+    // 35f4e~3604c — 같은 애니 칸의 상자(0x93e7d)를 상자 점에서 잡아 주루 칸을 잇따라 넣는다
+    const base = RUNNER_BASE_OF_ANIMATION[draw.animation]
+    const runAbility = base === undefined ? undefined : hud.runnerRunAbilities?.[base]
+    if (!showsRunPips || base === undefined || runAbility === undefined) continue
+    const anchor = runnerBoxAnchorOf(base, side)
+    const box = {
+      x: anchor.x + step.dx + placed.offsetX,
+      y: anchor.y + step.dy + placed.offsetY,
+      width: placed.image.width,
+      height: placed.image.height,
+    }
+    drawRunPips(context, runPipDrawsOf(base, box, runAbility))
   }
+}
+
+function drawRunPips(context: CanvasRenderingContext2D, pips: ReturnType<typeof runPipDrawsOf>): void {
+  const image = sprite(RUN_PIP_IMAGE)
+  if (image === null) return
+  for (const pip of pips) {
+    if (!pip.isEmpty) context.drawImage(image, pip.x, pip.y)
+    else drawGrayed(context, image, pip.x, pip.y)
+  }
+}
+
+/** 효과 0xa — 그림을 픽셀마다 원본 회색 식(0x97f01)으로 바꿔 그린다 (`grayRunPipPixel`) */
+function drawGrayed(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number): void {
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const layer = canvas.getContext('2d')
+  if (layer === null) return
+  layer.drawImage(image, 0, 0)
+  const pixels = layer.getImageData(0, 0, canvas.width, canvas.height)
+  const data = pixels.data
+  for (let offset = 0; offset < data.length; offset += 4) {
+    if (data[offset + 3] === 0) continue
+    const gray = grayRunPipPixel(data[offset], data[offset + 1], data[offset + 2])
+    data[offset] = gray.r
+    data[offset + 1] = gray.g
+    data[offset + 2] = gray.b
+  }
+  layer.putImageData(pixels, 0, 0)
+  context.drawImage(canvas, x, y)
 }
 
 /** 효과 0xc · 인자 색 — 그림 모양대로 한 색으로 칠한다(R2: 섞는 식은 미해결, 레이저 반짝임과 같은 근사) */
