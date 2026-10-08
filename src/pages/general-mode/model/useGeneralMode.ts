@@ -30,6 +30,7 @@ import {
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
+import { readSetupRecord, writeSetupRecord } from '@/pages/general-mode/model/setupRecord'
 
 export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly random: RandomPort
@@ -146,9 +147,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   const [initial] = useState(() => {
     const created = createFlowState({
       isQuickStart,
-      ...(isQuickStart
-        ? { setup: rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }) }
-        : {}),
+      // 준비 기록 skin+0xbc 는 앱 전역이다 — 새로하기는 지난 판 기록에서 시작한다(`setupRecord`)
+      setup: isQuickStart
+        ? rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds })
+        : readSetupRecord(),
     })
     return {
       flow: created,
@@ -156,6 +158,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     }
   })
   const [flow, setFlow] = useState<GeneralModeFlowState>(initial.flow)
+  // 갱신 함수 끝의 되쓰기 — 화면이 고친 기록(빠른실행 굴림 · 재굴림 포함)이 다음 판까지 남는다
+  useEffect(() => {
+    writeSetupRecord(flow.setup)
+  }, [flow.setup])
   /** 0x30f20 이 굴린 넷 — 상태 22 에 들어올 때마다(23 에서 돌아온 것 말고) 새로 굴린다 */
   const [rolls, setRolls] = useState<TeamSetupRolls | null>(initial.rolls)
   const [settings, setSettings] = useState<MatchProgressSettings>(initialSettings ?? FULL_PLAY_SETTINGS)
