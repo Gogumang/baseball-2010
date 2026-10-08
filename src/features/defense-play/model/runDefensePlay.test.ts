@@ -556,7 +556,7 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     const 틱마다: { tick: number; paused: boolean; step: number; counter: number }[] = []
     while (!isDefensePlayFinished(state)) {
       state = stepDefensePlay(state, { key: '2', isRepeat: false })
-      틱마다.push({ tick: state.tick - 1, paused: state.gamePaused, step: state.laserStep, counter: state.endCounter })
+      틱마다.push({ tick: state.tick - 1, paused: state.gamePaused, step: state.scene.effectStep, counter: state.endCounter })
     }
     const 발사 = state.log.find((line) => line.includes('레이저 발사 (0x400bc)'))
     expect(발사).toBeDefined()
@@ -919,6 +919,76 @@ describe('화면 스냅샷 배선 — 번쩍임 · 마선수 그림 · 팀 팔�
     expect(번쩍임.length).toBeGreaterThan(0)
     // 방향 값은 슬라이딩 캐치 동작 번호 0xf~0x12 와 같은 칸을 쓴다
     expect(번쩍임.every((틱) => (틱.flash?.direction ?? 0) >= 0xf && (틱.flash?.direction ?? 0) <= 0x12)).toBe(true)
+  })
+})
+
+describe('필살 포구 연출 B · C 와 결과 판 — 슬롯 2 머리 켜기 · 그리기 0x441c4 · 0x44398 · 0x46844 (defenseScene)', () => {
+  const 점프캐치 = (scene?: DefensePlayInput['scene']) =>
+    runDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory([126, 674, 811, 0]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0, 0.9]),
+      scene,
+    })
+  const 그림 = (result: DefensePlayResult) =>
+    result.ticks
+      .filter((view) => view.flash != null || view.judgeText != null || view.bigOut != null)
+      .map((view) => [view.tick, view.flash?.step ?? null, view.judgeText?.frame ?? null, view.bigOut?.frame ?? null])
+
+  it('동작 시작(포구 13 − 8 = 5틱)의 다음 그림에 켜져 단계 0 이 +0x1997 = 0 — 포구(13) 결과 판은 글자 없이 기다리다 B 끝(16) 뒤 큰 OUT', () => {
+    const 결과 = 점프캐치()
+    expect(결과.catchTick).toBe(13)
+    expect(그림(결과)).toEqual([
+      [13, 0, null, null],
+      [14, 1, null, null],
+      [15, 2, null, null],
+      [16, 3, null, null],
+      [17, null, null, 35],
+      [18, null, null, 35],
+      [19, null, null, 36],
+      [20, null, null, 36],
+      [21, null, null, 37],
+      [22, null, null, 37],
+    ])
+    // 단계 6 의 줌이 그림 12 부터
+    expect(결과.ticks.filter((view) => view.zoom != null).map((view) => [view.tick, view.zoom!.percent])).toEqual([
+      [12, 110],
+      [13, 110],
+      [14, 105],
+      [15, 100],
+    ])
+    // B 는 +0x1999 를 안 세운다 — 필살송구 아웃 표시가 없다
+    expect(결과.laserOutFlag).toBe(false)
+    expect(결과.scene).toMatchObject({ effectStep: -1, jumpFlash: false, deadlyAnim: { frameIndex: 3, ended: true } })
+  })
+
+  it('같은 경기의 다음 판은 앞 판의 scene 을 받는다 — 번쩍임은 안 되감긴 애니의 끝 칸 3 한 그림, 큰 OUT 은 앞 판에 남은 +0x1998 로 포구 그림부터', () => {
+    const 첫판 = 점프캐치()
+    // 첫 판의 큰 OUT 은 타이머(10)에 끊겨 끝 비트를 못 봤다 — +0x1998 이 남는다
+    expect(첫판.scene.popup).toMatchObject({ bigOutArmed: true, shown: false })
+    // 투구가 +0x1997 = 1 · 애니 2 되감기, 그 뒤 B 단계 0 이 다시 0 — 포구 그림(13)의 코드 13 결과 판이 남은 +0x1998 로 곧바로 큰 OUT
+    expect(그림(점프캐치(첫판.scene))).toEqual([
+      [13, 3, null, 35],
+      [14, null, null, 35],
+      [15, null, null, 36],
+      [16, null, null, 36],
+      [17, null, null, 37],
+      [18, null, null, 37],
+      [19, null, null, 38],
+      [20, null, null, 38],
+      [21, null, null, 37],
+      [22, null, null, 37],
+    ])
+  })
+
+  it('보통 땅볼 아웃은 아웃 판정 틱에 보통 판정 글자 OUT(코드 13 → 애니 1)을 공 가진 야수 자리에 그린다', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    const 글자 = 결과.ticks.filter((view) => view.judgeText != null)
+    expect(글자.length).toBe(10)
+    expect(글자.map((view) => view.judgeText!.frame)).toEqual([35, 35, 37, 37, 38, 37, 37, 36, 39, 39])
+    expect(결과.ticks.some((view) => view.bigOut != null)).toBe(false)
   })
 })
 

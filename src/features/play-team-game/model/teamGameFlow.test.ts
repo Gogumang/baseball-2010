@@ -2253,21 +2253,28 @@ describe('36 필살송구 아웃 — 결과 코드 0xd(그 판의 아웃 판정)
     throw new Error('붙들린 수비 판을 못 찾았다')
   }
 
-  it('안타 타석이라도 레이저 판에 아웃이 나면 36 — 타석 결과가 아니라 판의 아웃이다', () => {
+  it('안타 타석이라도 결과 판이 state[0x8b] 를 세운 판에 아웃이 나면 36 — 타석 결과가 아니라 판의 아웃이다', () => {
     const { progress, random } = 수비판()
     const 안타판 = {
       ...progress,
       pendingDefensePlay: { ...progress.pendingDefensePlay!, outcome: { kind: '안타', bases: 1 } as const },
     }
     const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
-    const 레이저 = { ...결과, laserThrow: true, advance: { ...결과.advance, outsAdded: 1, runsScored: 0 } }
+    const 레이저 = { ...결과, laserThrow: true, laserOutFlag: true, advance: { ...결과.advance, outsAdded: 1, runsScored: 0 } }
     expect(resolveDefensePlay(안타판, 레이저, random).recordIds).toContain(36)
+  })
+
+  it('레이저 송구가 나갔어도 결과 판이 state[0x8b] 를 안 세웠으면(코드 13 결과 판이 큰 OUT 을 못 그림) 36 이 없다', () => {
+    const { progress, random } = 수비판()
+    const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
+    const 표시없음 = { ...결과, laserThrow: true, laserOutFlag: false, advance: { ...결과.advance, outsAdded: 1, runsScored: 0 } }
+    expect(resolveDefensePlay(progress, 표시없음, random).recordIds).not.toContain(36)
   })
 
   it('아웃 타석이라도 판에 아웃이 없으면(에러로 삶) 36 이 없다', () => {
     const { progress, random } = 수비판()
     const 결과 = runDefensePlay(progress.pendingDefensePlay!.input)
-    const 아웃없음 = { ...결과, laserThrow: true, advance: { ...결과.advance, outsAdded: 0, runsScored: 0 } }
+    const 아웃없음 = { ...결과, laserThrow: true, laserOutFlag: true, advance: { ...결과.advance, outsAdded: 0, runsScored: 0 } }
     const 아웃타석 = {
       ...progress,
       pendingDefensePlay: { ...progress.pendingDefensePlay!, outcome: { kind: '아웃', detail: '땅볼아웃' } as const },

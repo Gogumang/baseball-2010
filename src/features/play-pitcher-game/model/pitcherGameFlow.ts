@@ -52,6 +52,7 @@ import type { BaseState } from '@/entities/game/model/baseState'
 import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
+  laserThrowOutRecordOf,
   passesRecordTeamGate,
   strikeoutRecordIdsOf,
   threePitchInningRecordIdsOf,
@@ -67,6 +68,7 @@ import {
   withPredictedOutcome,
 } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
@@ -454,6 +456,11 @@ export interface PitcherGameProgress {
    * `pendingDefensePlay` 쪽으로 가고, 다 본 뒤에는 **여기 남기지 않는다** — 남기면 한 번 더 튼다.
    */
   readonly lastDefensePlay: DefensePlayResult | null
+  /**
+   * **수비 장면 연출 칸** — 결과 판 +0x1997~+0x1999 · 연출 단계 · deadly_effect 애니 · 줌 (`defenseScene`). 원본은 경기 장면
+   * 객체 칸이라 판마다 안 지워진다 — 판 결과의 `scene` 을 받아 두었다가 다음 판(타구 · 주자 · 견제)에 넘긴다. 없으면 경기 첫 판.
+   */
+  readonly defenseScene?: DefenseScene
   /**
    * **이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 투수편은 늘 CPU 공격이라 투구마다 CPU 타자 결정(0x34334)
    * 바로 앞에서 `0x520de` 를 굴려 넣는다(`rollCpuStealStart`). 공이 도착하면(0x3dfac) 도루 판(종류 5)을 열거나
@@ -1213,12 +1220,13 @@ function arrivePitcherPitch(
       offenseIsCpu: true,
       throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
       buntKind: pitch.buntKind ?? 0,
+      scene: progress.defenseScene,
     },
     random,
   )
   const cleared = withoutSteal(progress)
   if (play === null) return { progress: cleared, play: null, interrupted: false }
-  const opened: PitcherGameProgress = { ...cleared, lastArrivalPlay: play }
+  const opened: PitcherGameProgress = { ...cleared, lastArrivalPlay: play, defenseScene: play.result.scene }
   // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPitch`)이 먹인다 — 밀어내기 판(종류 2)은 재생 칸에만
   if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 
@@ -1359,6 +1367,7 @@ export function resolveDefensePlay(
         pendingDefensePlay: null,
         atBat: applyPitchResolution(progress.atBat, { kind: '파울' }),
         lastDefensePlay: playback ?? progress.lastDefensePlay,
+        defenseScene: result.scene,
       },
       random,
     )
@@ -1366,7 +1375,7 @@ export function resolveDefensePlay(
   // 파울 각 공을 낙구 전에 잡은 판(파울 뜬공 아웃)은 타석 칸에 결과가 없다 — 판 끝 정산의 뜬공 아웃이 타석 결과다
   const atBatOutcome = progress.atBat.outcome ?? result.outcome ?? null
   // 타석이 안 끝났는데 붙들려 있을 수는 없다 — 그래도 칸은 비워 경기가 멈추지 않게 한다
-  if (atBatOutcome === null) return { ...progress, pendingDefensePlay: null }
+  if (atBatOutcome === null) return { ...progress, pendingDefensePlay: null, defenseScene: result.scene }
   // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — 타석에 실린 결과는 타석을 끝낸 임시 값이다(`battedContact`)
   const outcome = recordedOutcomeOf(progress.pendingDefensePlay, result)
   return advance(
@@ -1428,6 +1437,7 @@ export function pickoff(
     // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
     defenseIsCpu: false,
     throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
+    scene: progress.defenseScene,
   })
 
   // 0xa8d98 — 종류 4 는 R+0x138 을 안 올린다 (그대로 돌려받는다)
@@ -1484,7 +1494,7 @@ function withMyRunnerPlay(
     advanceResult.bases.first !== bases.first ||
     advanceResult.bases.second !== bases.second ||
     advanceResult.bases.third !== bases.third
-  let next: PitcherGameProgress = { ...progress, lastDefensePlay: result }
+  let next: PitcherGameProgress = { ...progress, lastDefensePlay: result, defenseScene: result.scene }
   if (!changed) return { progress: next, changed }
   const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
   let decision = progress.decision
@@ -1571,6 +1581,7 @@ function defensePlayInputOf(
     // 반대로 **송구는 여기서만 환경설정이 먹는다** — `0xae6c8` 의 첫 항(`경기[0x31 + 수비측] == 1`)이
     // 사람 수비라 거짓이므로 설정 +0xf4 혼자가 답을 정한다. 원본 기본값은 **수동**이다.
     throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
+    scene: progress.defenseScene,
   }
 }
 
@@ -1714,6 +1725,13 @@ function applyDefensivePlay(
         }),
       ]
     : []
+  // 36 필살송구 아웃 — 정산 0xa8024(a80f8~a8116)은 모드를 안 가리고, 게이트 0xa77f0 은 수비 팀이 사람이면 36 을 들인다.
+  // 표시 state[0x8b] 는 수비 화면 결과 판 0x46844 가 레이저 연출 뒤 코드 13 결과 판에서 세운다(`DefensePlayResult.laserOutFlag`)
+  if (defensePlay !== null) {
+    newRecordIds.push(
+      ...laserThrowOutRecordOf({ laserThrowFlag: defensePlay.laserOutFlag, outsInPlay: applied.outsAdded }).recordIds,
+    )
+  }
   // 25 삼구 삼자범퇴 (0xa7d0c) — 반 이닝을 공 셋으로 3아웃
   if (inningEnded) {
     newRecordIds.push(
@@ -1729,6 +1747,7 @@ function applyDefensivePlay(
     moundStrikeouts,
     moundStrikeoutCombo,
     lastDefensePlay: playback ?? progress.lastDefensePlay,
+    defenseScene: defensePlay?.scene ?? progress.defenseScene,
     atBatPitches: 0,
     recordIds: recordsAllowed(progress)
       ? [...progress.recordIds, ...newRecordIds]

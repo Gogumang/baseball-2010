@@ -272,19 +272,24 @@ export function defenderPaletteIndexOf(teamIndex: number | null | undefined): nu
 }
 
 /**
- * 공 잡는 순간 번쩍임 (R2 2절).
+ * 필살 포구 번쩍임 (R2 2절 — `features/defense-play/model/defenseScene`).
  * A(0x4403c)는 줌 펀치만 하고 **그리지 않으므로** 여기 종류에 없다.
  */
 export interface DefenseFlash {
-  /** 'b' = 0x441c4 (공 +0x1f7) · 'c' = 0x44398 (공 +0x1f8) */
+  /** 'b' = 0x441c4 (플레이 +0x1f7 필살 점프 캐치) · 'c' = 0x44398 (플레이 +0x1f8 필살 슬라이딩 캐치) */
   readonly kind: 'b' | 'c'
   /** deadly_effect 애니 0 의 칸 0~3 */
   readonly step: number
-  /** 공 +0xa8 방향 0xf 아래 · 0x10 위 · 0x11 왼 · 0x12 오른 — kind 'c' 에서만 쓴다 */
+  /** +0x1996 = 공 가진 야수 +0xa8 동작 0xf 아래 · 0x10 위 · 0x11 왼 · 0x12 오른 — kind 'c' 에서만 쓴다 */
   readonly direction?: number
+  /**
+   * 그리는 점 — 공 가진 야수(0xb0c91 = 플레이+0x130)의 +0x20 월드 (x, z − y). 없으면 공 화면점에 그린다(옛 스냅샷).
+   */
+  readonly x?: number
+  readonly z?: number
 }
 
-/** 번쩍임을 공 화면점에서 얼마나 옮겨 그리나 (R2 2절 표) */
+/** 번쩍임을 기준점에서 얼마나 옮겨 그리나 (R2 2절 표) */
 export function flashOffsetOf(flash: DefenseFlash): { readonly x: number; readonly y: number } {
   if (flash.kind === 'b') return { x: 0, y: -50 }
   switch (flash.direction) {
@@ -345,6 +350,11 @@ export interface DefenseViewState {
    * 야수 그림 자리에서 y − 60 에 그린다.
    */
   readonly bigOut?: { readonly frame: number; readonly holderSlot: number } | null
+  /**
+   * 결과 판 0x46844 의 **보통 판정 글자** — 0x393b4(x, y − 30, v, 1, 0) 가 그리기 목록에 넣고 0x46844 꼬리가 그린 game_judge
+   * 애니 칸(SAFE · OUT · FOUL · GROUND RULE DOUBLE …)과 dx · dy, 자리를 정하는 공 가진 야수 칸(−1 이면 화면 가운데).
+   */
+  readonly judgeText?: { readonly frame: number; readonly dx: number; readonly dy: number; readonly holderSlot: number } | null
   /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.

@@ -213,61 +213,11 @@ describe('팀 번호 (C-1 — 그림 색 갈아 끼우기)', () => {
 })
 
 describe('공 자리 번쩍임 (R2 2절 — deadly_effect)', () => {
-  /** 추적 야수(칸 0)가 아래쪽으로 슬라이딩 캐치를 하는 틱 */
-  const 슬라이딩_포구 = (memory: ActionMemory) => ({
-    ...기본(memory),
-    chaserSlot: 0,
-    catchKind: CATCH_KIND.SLIDE,
-  })
-
-  /** 추적 야수(칸 0)가 점프 캐치를 하는 틱 */
-  const 점프_포구 = (memory: ActionMemory) => ({
-    ...기본(memory),
-    chaserSlot: 0,
-    catchKind: CATCH_KIND.JUMP,
-  })
-
-  it('보통 포구면 번쩍임이 없다 — 켜짐 칸은 종류 3·4 에서만 선다 (0xd87f4)', () => {
-    expect(viewStateOf(기본()).flash).toBeNull()
-    expect(viewStateOf({ ...기본(), chaserSlot: 0, catchKind: CATCH_KIND.LOW }).flash).toBeNull()
-    expect(viewStateOf({ ...기본(), chaserSlot: 0, catchKind: CATCH_KIND.CHEST }).flash).toBeNull()
-    expect(viewStateOf({ ...기본(), chaserSlot: 0, catchKind: CATCH_KIND.GROUNDER }).flash).toBeNull()
-  })
-
-  it('필살 점프 캐치는 번쩍임 B 다 (플레이+0x1f7 → 0x441c4, 공 위 −50)', () => {
-    const view = viewStateOf(점프_포구(new Map()))
-
-    expect(view.fielders[0].action).toBe(FIELDER_ACTION.jumpCatch)
-    expect(view.flash).toEqual({ kind: 'b', step: 0 })
-    expect(flashOffsetOf(view.flash!)).toEqual({ x: 0, y: -50 })
-  })
-
-  it('번쩍임 칸은 틱마다 한 칸씩 넘어가고 마지막(3)에서 멈춘다', () => {
-    const memory: ActionMemory = new Map()
-    const 칸들 = [0, 1, 2, 3, 4, 5].map(
-      (tick) => viewStateOf({ ...점프_포구(memory), tick }).flash?.step,
-    )
-
-    expect(칸들).toEqual([0, 1, 2, 3, 3, 3])
-  })
-
-  it('필살 슬라이딩 캐치는 번쩍임 C 다 — 방향은 포구 동작 번호다 (플레이+0x1f8 → 0x44398)', () => {
-    const memory: ActionMemory = new Map()
-    const view = viewStateOf(슬라이딩_포구(memory))
-
-    // 공이 홈 쪽(z 큰 쪽)에 있으니 아래 방향 슬라이딩 캐치 0xf — +0xa8 의 0xf 와 같은 값이다
-    expect(view.fielders[0].action).toBe(FIELDER_ACTION.slideCatchDown)
-    expect(view.flash).toEqual({ kind: 'c', step: 0, direction: 0xf })
-    expect(flashOffsetOf(view.flash!)).toEqual({ x: 0, y: 10 })
-  })
-
-  it('번쩍임이 꺼졌다 다시 켜지면 칸이 0 부터 다시 돈다', () => {
-    const memory: ActionMemory = new Map()
-    viewStateOf({ ...점프_포구(memory), tick: 0 })
-    viewStateOf({ ...점프_포구(memory), tick: 1 })
-    viewStateOf({ ...기본(memory), tick: 2 })
-    const 다시 = viewStateOf({ ...점프_포구(memory), tick: 3 })
-
-    expect(다시.flash).toEqual({ kind: 'b', step: 0 })
+  it('스냅샷은 번쩍임을 고르지 않는다 — 필살 포구 동작 중이어도 null, 연출 단계 기계(`defenseScene`)가 그린 그림에만 실린다', () => {
+    for (const catchKind of [CATCH_KIND.LOW, CATCH_KIND.CHEST, CATCH_KIND.GROUNDER, CATCH_KIND.JUMP, CATCH_KIND.SLIDE]) {
+      expect(viewStateOf({ ...기본(), chaserSlot: 0, catchKind }).flash).toBeNull()
+    }
+    expect(flashOffsetOf({ kind: 'b', step: 0 })).toEqual({ x: 0, y: -50 })
+    expect(flashOffsetOf({ kind: 'c', step: 0, direction: 0xf })).toEqual({ x: 0, y: 10 })
   })
 })

@@ -30,6 +30,7 @@ import {
   withPredictedOutcome,
 } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
@@ -719,6 +720,11 @@ export interface TeamGameProgress {
    */
   readonly lastDefensePlay: DefensePlayResult | null
   /**
+   * **수비 장면 연출 칸** — 결과 판 +0x1997~+0x1999 · 연출 단계 · deadly_effect 애니 · 줌 (`defenseScene`). 원본은 경기 장면
+   * 객체 칸이라 판마다 안 지워진다 — 판 결과의 `scene` 을 받아 두었다가 다음 판(타구 · 주자 · 견제)에 넘긴다. 없으면 경기 첫 판.
+   */
+  readonly defenseScene?: DefenseScene
+  /**
    * **이번 투구에 출발한 주자들의 루** — state[0x14 + 루] (도루 메시지 0x583 → `0xa9bd4`).
    * 사람 공격은 공이 나는 동안(상태 0x11) 키 '3'·'2'·'1' 로 쌓이고(`startSteal`, 난수 없음), CPU 공격은 투구마다
    * CPU 타자 결정(0x34334) 바로 앞에서 `0x520de` 를 굴려 넣는다(`rollCpuStealStart`). 공이 도착하면(0x3dfac)
@@ -1263,10 +1269,9 @@ function withHalfInningPitches(tally: TeamRecordTally, game: GameState, pitches:
  *   state[0x8b] = 1 (46892~46932), 정산이 이 플레이 아웃 이벤트 > 0 이면 36 (0xa80f8~0xa8116).
  *   결과 코드 0xd 는 **타석 결과가 아니다** — 플레이 틱 b4540 에서 그 틱의 아웃 판정 vt90(0xb36d0)이 아웃을 내면
  *   곧바로 vt44(13)·vt54(13) 로 보내는 "아웃이 났다" 코드다(포스·태그·뜬공 포구 모두, `runDefensePlay` 의
- *   `runOutJudgement` 주석). 그래서 안타 타석이라도 레이저 뒤 주자가 잡히면 서고, 아웃 타석이라도 아웃이 없으면
- *   안 선다 — 레이저 송구가 난 판(`laserThrow`)에 아웃이 있으면 세운다.
- *   ⚠️ 미해결: 팝업 차례 — 레이저 연출이 끝나기 **전** 아웃 팝업(+0x1997 = 1)이나 그 뒤 다른 코드 팝업(세이프 9 등)이
- *   +0x1998·+0x1999 를 지우는 경우는 틱별 결과 코드를 진행기가 내주지 않아 가리지 못한다.
+ *   `runOutJudgement` 주석). 진행기가 결과 판을 그림마다 돌려 그 표시(`DefensePlayResult.laserOutFlag`)를 낸다 —
+ *   레이저 연출 단계 3 이 +0x1998 · +0x1999 를 세운 뒤 +0x1997 이 0 인 채 코드 13 결과 판이 타이머 안에 있어야 서고,
+ *   그 사이 다른 코드 판(세이프 9 등 — 보통 갈래)이 오면 지워져 안 선다. 앞 판에서 남은 +0x1999 로도 선다(`defenseScene`).
  * 상대 타석은 공격 팀이 사람이 아니라 백투백 카운터 `ctx+0x162` 를 0 으로 (0xa794c · 5-4).
  */
 function withOurDefenseRecords(
@@ -1281,8 +1286,8 @@ function withOurDefenseRecords(
     readonly balls: number
     /** 반 이닝 투구 수 (`ctx+0x16c`) — 이 타석의 공까지 든 값 */
     readonly halfInningPitches: number
-    /** 이 플레이에서 레이저 송구가 나갔는가 (`DefensePlayResult.laserThrow`) */
-    readonly laserThrow: boolean
+    /** state[0x8b] — 결과 판 큰 OUT 이 +0x1999 를 보고 세운 필살송구 아웃 표시 (`DefensePlayResult.laserOutFlag`) */
+    readonly laserOutFlag: boolean
   },
 ): TeamGameProgress {
   const tally = progress.recordTally
@@ -1300,8 +1305,8 @@ function withOurDefenseRecords(
         })
       : []),
     ...laserThrowOutRecordOf({
-      // 결과 코드 0xd(그 판의 아웃 판정) — 타석 결과 '아웃' 이 아니다
-      laserThrowFlag: play.laserThrow && play.outsAdded > 0,
+      // state[0x8b] — 결과 판 0x46844 가 레이저 연출 뒤 코드 13(그 판의 아웃 판정) 결과 판에서 세운 표시
+      laserThrowFlag: play.laserOutFlag,
       outsInPlay: play.outsAdded,
     }).recordIds,
     ...multiOutPlayRecordIdsOf({ outsInPlay: play.outsAdded, strikeoutWhileRunning: false }),
@@ -2160,6 +2165,7 @@ function batterDefenseInputOf(
     isUncatchable: options.isUncatchable,
     // 장면 +0xfdc — 번트면 도루 안 한 주자의 판 시작 리드가 +3 틱 (0x3d7b8)
     buntKind: options.buntKind ?? 0,
+    scene: progress.defenseScene,
   }
 }
 
@@ -2205,6 +2211,7 @@ function finishBatterOutcome(
     gameRecord: withSeasonRecord(progress, '공격', offense.codes),
     ourHitBases: withHitBases(progress.ourHitBases, slot, offense.hitBases),
     lastDefensePlay: playback,
+    defenseScene: defensePlay?.scene ?? progress.defenseScene,
     atBat: createAtBat(),
     atBatPrepared: false,
     // 다음 타석 시작 0x48d50 → 0xa5bcc 가 ctx+0x160 을 지운다
@@ -2711,6 +2718,7 @@ function defensiveDefenseInputOf(
     // 반대로 **송구는 여기서만 환경설정이 먹는다** — 0xae6c8 의 첫 항(`경기[0x31 + 수비측] == 1`)이
     // 사람 수비라 거짓이다. 안 넘기면 원본 기본값인 수동이다
     throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
+    scene: progress.defenseScene,
   }
 }
 
@@ -2781,6 +2789,7 @@ function finishDefensiveAtBat(
     }),
     opponentOrderIndex: applied.opponentOrderIndex,
     lastDefensePlay: playback ?? progress.lastDefensePlay,
+    defenseScene: defensePlay?.scene ?? progress.defenseScene,
     atBat: createAtBat(),
     atBatPrepared: false,
     // 득점 처리 0xa5c34 가 1점마다 수비 팀 A·B 를 올린다 (P7 E1)
@@ -2823,7 +2832,7 @@ function finishDefensiveAtBat(
     atBatPitches: progress.recordTally.atBatPitches,
     balls: progress.atBat.balls,
     halfInningPitches: halfInningPitchesOf(progress.recordTally, before),
-    laserThrow: defensePlay?.laserThrow ?? false,
+    laserOutFlag: defensePlay?.laserOutFlag ?? false,
   })
 
   const resolved = mine
@@ -2870,7 +2879,8 @@ export function resolveDefensePlay(
 ): TeamGameProgress {
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
-  const cleared = { ...progress, pendingDefensePlay: null }
+  // 판이 남긴 수비 장면 연출 칸은 다음 판으로 (`defenseScene`)
+  const cleared = { ...progress, pendingDefensePlay: null, defenseScene: result.scene }
   // 파울로 닫힌 판 — 같은 타석이 이어진다(정산 없음)
   if (result.foulEnded === true) return afterFoulPlay(cleared, pending.side, random)
   if (pending.side === '공격') {
@@ -2912,6 +2922,7 @@ export function pickoff(progress: TeamGameProgress, webKey: string, random: Rand
     // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
     defenseIsCpu: false,
     throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
+    scene: progress.defenseScene,
   })
   return applyPickoffPlay(progress, result, '수비', random)
 }
@@ -2946,6 +2957,7 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
     // 수비는 CPU 다 — 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
     defenseIsCpu: true,
+    scene: progress.defenseScene,
   })
   return applyPickoffPlay(progress, result, '공격', random)
 }
@@ -3042,11 +3054,13 @@ function applyPickoffPlay(
   const recorded: TeamGameProgress = humanDefends
     ? {
         ...progress,
+        defenseScene: result.scene,
         lastDefensePlay: result,
         opponentEntryRecords: withPlateAppearance(progress.opponentEntryRecords, progress.opponentOrderIndex, null),
       }
     : {
         ...progress,
+        defenseScene: result.scene,
         lastDefensePlay: result,
         ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, before.battingOrderIndex, null),
       }
@@ -3145,12 +3159,13 @@ function arriveTeamPitch(
           }),
       // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공은 앞 공의 값 — `sceneBuntKind`)
       buntKind: pitch.buntKind ?? 0,
+      scene: progress.defenseScene,
     },
     random,
   )
   const cleared = withoutSteal(progress)
   if (play === null) return { progress: cleared, play: null, interrupted: false }
-  const opened: TeamGameProgress = { ...cleared, lastArrivalPlay: play }
+  const opened: TeamGameProgress = { ...cleared, lastArrivalPlay: play, defenseScene: play.result.scene }
   // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽이 먹인다 — 밀어내기 판(종류 2)은 재생 칸에만
   if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 

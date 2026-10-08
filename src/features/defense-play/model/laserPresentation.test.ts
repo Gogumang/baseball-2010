@@ -66,3 +66,53 @@ describe('결과 판 0x46844 — 큰 OUT 칸 바꾸기', () => {
     expect(rest[2].next).toMatchObject({ timer: 0, bigOutArmed: false, shown: true })
   })
 })
+
+describe('결과 판 0x46844 — 보통 판정 글자 0x393b4(x, y − 30, v, 1, 0)', () => {
+  const 글자칸 = (code: number, draws = 10) => {
+    let state = postJudgeMessage(JUDGE_POPUP_START, code, 2)
+    const frames: (number | null)[] = []
+    for (let draw = 0; draw < draws; draw += 1) {
+      const step = stepJudgePopup(state)
+      frames.push(step.text?.frame ?? null)
+      state = step.next
+    }
+    return frames
+  }
+
+  it('넘긴 뒤 그린다 — SAFE(코드 9 → 애니 5: 8/2 · 10/2 · 10/5 · 11/1 · 39/0)의 첫 그림은 이미 한 번 넘긴 칸이다', () => {
+    expect(글자칸(9)).toEqual([8, 10, 10, 10, 10, 10, 10, 10, 11, 39])
+  })
+
+  it('OUT(코드 11 · 13 → 애니 1)은 타이머 10 그림 안에 끝 칸 39 에서 멈춘다', () => {
+    expect(글자칸(13)).toEqual([35, 35, 37, 37, 38, 37, 37, 36, 39, 39])
+    expect(글자칸(11)).toEqual(글자칸(13))
+  })
+
+  it('표 0xcfe90 이 0x394d6 으로 보내는 6 · 8 · 12 는 아무것도 안 그린다 — 타이머만 준다', () => {
+    for (const code of [6, 8, 12]) expect(글자칸(code)).toEqual(Array.from({ length: 10 }, () => null))
+  })
+
+  it('FOUL(코드 7 → 애니 4)은 칸마다 dy 를 0x93c45 가 자리에 더한다 · 자리 야수는 메시지의 +0x1088', () => {
+    let state = postJudgeMessage(JUDGE_POPUP_START, 7, 5)
+    const texts = []
+    for (let draw = 0; draw < 8; draw += 1) {
+      const step = stepJudgePopup(state)
+      texts.push(step.text)
+      state = step.next
+    }
+    expect(texts.map((text) => text?.dy)).toEqual([0, 0, 0, 1, 1, 3, 3, 0])
+    expect(texts.every((text) => text?.holderSlot === 5)).toBe(true)
+  })
+
+  it('메시지가 오면 그 코드의 애니를 되감는다(51a8c 0x39578) — 같은 판의 두 번째 OUT 은 처음부터', () => {
+    let state = postJudgeMessage(JUDGE_POPUP_START, 13, 2)
+    for (let draw = 0; draw < 5; draw += 1) state = stepJudgePopup(state).next
+    state = postJudgeMessage(state, 13, 3)
+    expect(stepJudgePopup(state).text).toEqual({ frame: 35, dx: 0, dy: 0, holderSlot: 3 })
+  })
+
+  it('+0x1997 = 0 · 코드 13 이면 큰 OUT 갈래라 보통 글자를 안 그린다', () => {
+    const state = { ...postJudgeMessage(JUDGE_POPUP_START, 13, 2), shown: false }
+    expect(stepJudgePopup(state).text).toBeNull()
+  })
+})

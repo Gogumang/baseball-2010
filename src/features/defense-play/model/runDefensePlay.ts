@@ -1,13 +1,11 @@
+import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import {
-  JUDGE_POPUP_START,
-  NO_ZOOM_PUNCH,
-  postJudgeMessage,
-  startZoomPunch,
-  stepJudgePopup,
-  stepZoomPunch,
-  type JudgePopupState,
-  type ZoomPunchState,
-} from '@/features/defense-play/model/laserPresentation'
+  drawDefenseScene,
+  enterDefenseScene,
+  fireLaser,
+  turnOnDeadlyFlash,
+  type DefenseScene,
+} from '@/features/defense-play/model/defenseScene'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import {
   battedBallTrajectory,
@@ -52,7 +50,7 @@ import {
   rollFumble,
   rollSpecialDefense,
 } from '@/entities/fielding/model/fieldingErrors'
-import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
+import { CATCH_KIND, type BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
@@ -323,6 +321,12 @@ export interface DefensePlayInput {
   readonly throwMode?: ManualAutoMode
   /** 사람 조작 (I-controls 0절 상태 0x17 표). 안 주면 전부 자동이다 */
   readonly controls?: DefensePlayControls
+  /**
+   * **앞 판에서 넘어온 수비 장면 연출 칸** (`defenseScene` — 결과 판 +0x1997~+0x1999 · 연출 단계 · deadly_effect 애니 · 줌).
+   * 원본은 경기 장면 객체 칸이라 판마다 안 지워진다. 경기 흐름이 앞 판 결과의 `scene` 을 넘긴다 — 안 주면 경기 첫 판(장면을
+   * 막 만든 상태)이다. 진행(아웃 · 진루 · 난수)에는 안 닿고 그림 · 필살송구 아웃 기록(state[0x8b])에만 닿는다.
+   */
+  readonly scene?: DefenseScene
 
   // ── 아래 셋은 **그림에만 쓰인다** — 진행(아웃·진루·난수)에는 한 톨도 안 닿는다 ──
 
@@ -476,6 +480,14 @@ export interface DefensePlayResult {
   readonly specialDefense: { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean }
   /** 사람이 반짝임 창 안에 키를 넣어 레이저 송구가 나갔는가 (플레이+0x1f4) */
   readonly laserThrow: boolean
+  /**
+   * **state[0x8b] — 정산 0xa8024 가 보는 필살송구 아웃 표시.** 결과 판 0x46844 가 큰 OUT 을 그리며 +0x1999 를 보고 세운다
+   * (46922~46932, 레이저 연출 단계 3 뒤 코드 13 결과 판). 판 끝 정산이 이 판 아웃 사건 > 0 이면 기록 36 (`laserThrowOutRecordOf`).
+   * 앞 판에서 남은 +0x1998 · +0x1999(`scene`)로도 선다.
+   */
+  readonly laserOutFlag: boolean
+  /** 판이 끝났을 때의 수비 장면 연출 칸 — 다음 판의 입력 `scene` 으로 넘긴다 */
+  readonly scene: DefenseScene
   /**
    * 협살(AI 상태 8)이 몇 번 걸렸는가 — 0xb3a94. `defenseIsCpu` 를 줘야 돈다.
    * 진행기를 안 돌린 결과(견제 · 도루 · 폭투 판의 다른 진행기)에는 없다.
@@ -652,6 +664,9 @@ function leadRunnersForBattedBall(runners: readonly MutableRunner[], input: Defe
 /** 타구 판의 플레이 종류 (0x3e11a 이후 상태 0x13 → 0x17) */
 const BATTED_BALL_PLAY_KIND = 1
 
+/** 슬롯 2 머리 52546 — [sp+0x14] = 0xae61c(판 종류 ∉ 마스크 0x58c = 2 · 3 · 7 · 8 · 10)가 거짓이면 필살 포구 연출을 안 켠다 */
+const DEADLY_FLASH_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
+
 /**
  * **한 플레이가 도는 동안 바뀌는 것 전부** — 지금까지 `runDefensePlay` 루프 안의 `let` 변수였던 것들이다.
  *
@@ -767,14 +782,19 @@ export interface DefensePlayState {
    * 던지고 vt64(0) 으로 내린다(내야 → 내야 송구 b2ee6 도 내린다).
    */
   laserArmed: boolean
-  /** 장면 +0x1992 — 레이저 연출 0x4403c 의 단계(−1 쉼 · 0~3). −1 일 때만 슬롯 2 머리 524c4 가 0x523bc · 0x4e858 · 0x400bc 를 돈다 */
-  laserStep: number
-  /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1(그리기)이 내린다 */
+  /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1 · 0x441c4 · 0x44398 끝(그리기)이 내린다 */
   gamePaused: boolean
-  /** 줌 펀치 전역 0x15606d8 — 연출 0x4403c 단계 1 의 0xbb39d 가 켜고 그리기마다 0xbb84c 가 돈다 (`laserPresentation`) */
-  zoomPunch: ZoomPunchState
-  /** 결과 판 0x46844 의 칸 — 메시지 0xbba 가 타이머를 세우고 그리기마다 큰 OUT(+0x1998)을 본다 (`laserPresentation`) */
-  judgePopup: JudgePopupState
+  /**
+   * 수비 장면 연출 칸 (`defenseScene`) — 결과 판 0x46844 · 연출 단계 +0x1992(−1 일 때만 슬롯 2 머리 524c4 가 0x523bc · 0x4e858 ·
+   * 0x400bc 를 돈다) · 레이저 0x4403c · 필살 포구 B 0x441c4 · C 0x44398 · 줌 펀치
+   */
+  scene: DefenseScene
+  /** 플레이+0x1f7 — 필살 점프 캐치 동작이 걸렸다(0xd87f4 종류 3, b4178). 예보 vt34(0xb3b38) · B 끝이 내린다 */
+  deadlyJumpArmed: boolean
+  /** 플레이+0x1f8 — 필살 슬라이딩 캐치 동작이 걸렸다(종류 4, b4198). C · B 끝이 내린다 */
+  deadlySlideArmed: boolean
+  /** state[0x8b] — 결과 판이 큰 OUT 을 그리며 +0x1999 를 보고 세운다 (46932) */
+  laserOutFlag: boolean
   /** 앞 틱 끝 G2 앞의 +0x120 (`PlayGateFrameResult.counterBeforeHead`) — 이 틱 머리에서 멈추면 G2 를 안 부른 것으로 되돌린다 */
   counterBeforeHead: number
   /** 협살 기록칸 P+0x1ec~+0x1f3 (0xb3a04). 대상이 −1 이면 협살 중이 아니다 */
@@ -1024,10 +1044,13 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     laserRolled: false,
     laserThrow: false,
     laserArmed: false,
-    laserStep: -1,
     gamePaused: false,
-    zoomPunch: NO_ZOOM_PUNCH,
-    judgePopup: JUDGE_POPUP_START,
+    // 0x17 진입 0x46418 — 결과 판 타이머 −1. 타구 판은 늘 투구(0x10 · 0x11)를 지나 왔다
+    scene: enterDefenseScene(input.scene, true),
+    deadlyJumpArmed: false,
+    deadlySlideArmed: false,
+    // state[0x8b] — 타석 시작 0x3b084 · 반 이닝 0x3ac90 의 0xb67d0 이 지운다. 판 안에서 세운 값은 그 판 정산이 쓰고 지운다
+    laserOutFlag: false,
     counterBeforeHead: 0,
     rundown: NO_RUNDOWN,
     rundownThrowArrival: -1,
@@ -1153,10 +1176,11 @@ export function stepDefensePlay(
   let laserRolled = state.laserRolled
   let laserThrow = state.laserThrow
   let laserArmed = state.laserArmed
-  let laserStep = state.laserStep
   let gamePaused = state.gamePaused
-  let zoomPunch = state.zoomPunch
-  let judgePopup = state.judgePopup
+  let scene = state.scene
+  let deadlyJumpArmed = state.deadlyJumpArmed
+  let deadlySlideArmed = state.deadlySlideArmed
+  let laserOutFlag = state.laserOutFlag
   /** 이 틱 머리(그림 F 의 슬롯 2 머리)에서 0x400bc 가 경기를 멈췄는가 */
   let pausedThisTick = false
   /** 이 틱이 멈춘 그림 F+1 인가 — 머리에서 이미 +0x1993 이 서 있다(0x3f060 의 목록 틱 · 슬롯 2 가 통째로 없다) */
@@ -1562,6 +1586,9 @@ export function stepDefensePlay(
     },
   ): void => {
     receivingThrow = false
+    // 고르기 vt34 = 0xb3b38(b3da4) 가 플레이+0x1f7 = 0 을 늘 적는다. ⚠️ +0x1f8 은 b3dac 의 r0 가 0 일 때만 지우는데 그 r0 의
+    // 뜻을 다 못 읽어 옮기지 않았다 — C 끝(0x44564)이 어차피 지운다
+    deadlyJumpArmed = false
     trajectory = spliceTrajectory(trajectory, tick, next)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
     const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
@@ -1767,7 +1794,7 @@ export function stepDefensePlay(
     // 주자 수(0xa9598) 관문은 따로 옮기지 않았다 — 이 진행기의 `runners` 에는 타자주자가 늘
     // 들어 있어 타구 플레이에서는 언제나 참이다.
     // 슬롯 2 머리 524c4: +0x1992 == −1(레이저 연출이 쉴 때)일 때만 0x523bc · 0x4e858 · 0x400bc 를 돈다
-    if (input.random !== undefined && !uncatchable && laserStep === -1) {
+    if (input.random !== undefined && !uncatchable && scene.effectStep === -1) {
       const ticksSinceCatch = tick - catchTick
       const windowOpen = isLaserWindowOpen({
         ticksSinceCatch,
@@ -1814,10 +1841,10 @@ export function stepDefensePlay(
     // G3). 연출 0x4403c(그리기 46e08)가 단계 0 에서 +0x1997 · +0x19ad · +0x19ae 를 내리고 단계 1 에서 줌 0xbb39d 와 함께 +0x1993 = 0 —
     // 곧 **발사한 그림의 슬롯 2 와 다음 그림의 갱신 전부**가 빠진다. 송구는 그 뒤 그림의 플레이 틱(사람 목표 b4660)이 +0x1f4 로 던진다.
     // +0x1993 을 세우는 곳은 0x400bc 하나다(0x441c4 · 0x44398 은 내리기만 한다) — 멈춤은 레이저 송구 판에만 선다.
-    if (laserStep === -1 && !pausedAtHead && laserConfirmed && play.manualThrowBase !== NONE && play.held) {
+    if (scene.effectStep === -1 && !pausedAtHead && laserConfirmed && play.manualThrowBase !== NONE && play.held) {
       const holder = fielders[play.ballHolderSlot]
       if (holder !== undefined && holder.holdingBall && holder.actionRemainingTicks <= 0) {
-        laserStep = 0
+        scene = fireLaser(scene)
         gamePaused = true
         laserArmed = true
         pausedThisTick = true
@@ -1830,6 +1857,12 @@ export function stepDefensePlay(
     // 멈춘 그림은 슬롯 2(포구 · 송구 · 협살 · 자동 진루 · CPU 송구)가 없다 — 그림(5 절)은 그대로 남긴다
     slot2: {
     if (gamePaused) break slot2
+
+    // ── 0d. 필살 포구 연출 켜기 — 슬롯 2 머리 5256c~525dc (관문 G2 52502 가 열리고 판 종류가 마스크 0x58c 밖일 때) ──
+    // 플레이+0x1f7 이면 +0x1994(B), 아니고 +0x1f8 이면 +0x1995(C) — 단계가 −1 이면 0. 켜짐 칸은 앞 그림 플레이 틱의 동작 시작이 세웠다
+    if (!play.finished && !DEADLY_FLASH_BLOCKED_PLAY_KINDS.includes(play.kind)) {
+      scene = turnOnDeadlyFlash(scene, { jump: deadlyJumpArmed, slide: deadlySlideArmed })
+    }
 
     // ── 1. 포구 ──
     // 포구 틱 갈래 전체(b4074~b42ce: 동작 시작 · 펌블 굴림 · 필살타법 표시 · 결과 코드 9 · 쥐기)는 플레이 틱 0xb401c 머리
@@ -1844,6 +1877,12 @@ export function stepDefensePlay(
     // 아웃 판정 0xb36d0 의 종류 거르개 0x58d 에 6(홈런 — 0xb2bd8 의 0xb0cb8(6))이 없는 것은 원본 그대로다 — 쥔 야수가 없으니
     // 그 판정은 아무도 죽이지 못한다. 0xb2c58(vt54)도 사건 7 · 12 에만 야수 동작 0xf 를 주고 8 에는 안 준다(그대로 쫓는다)
     const catchGateOpen = !play.held && !homeRunFlag && !groundRuleFlag && !play.suppressed && !foulFlag
+    // b4134~b419c — 공 틱이 동작 시작 틱(플레이+0x176)이면 포구 종류(+0x16c)대로 동작을 걸고, 표 0xd87f4 의 종류 3 은
+    // 플레이+0x1f7 = 1(필살 점프 캐치) · 종류 4 는 +0x1f8 = 1(필살 슬라이딩 캐치)
+    if (catchGateOpen && tick === play.actionStartTick) {
+      if (play.catchKind === CATCH_KIND.JUMP) deadlyJumpArmed = true
+      if (play.catchKind === CATCH_KIND.SLIDE) deadlySlideArmed = true
+    }
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
     if (tick === catchTick && catchGateOpen && uncatchable) {
       // b4228 — 펌블 굴림 rand(0, 10000) 은 필살타법 표시를 보기(b4246) 전에 늘 먹는다
@@ -2480,7 +2519,7 @@ export function stepDefensePlay(
     if (resultCode !== 0) {
       lastEventCode = resultCode
       // 51a56 — 메시지 0xbba(코드): 결과 판 타이머 10 · 코드 · 공 가진 야수(플레이+0x130)
-      judgePopup = postJudgeMessage(judgePopup, resultCode, play.ballHolderSlot)
+      scene = { ...scene, popup: postJudgeMessage(scene.popup, resultCode, play.ballHolderSlot) }
       // 메시지 0xbba → 표 0xd0488: 6·10 → 0x51d32·0x51d24 → 0xa5ffc 사건 6 · 8·12 → 0x51c82 → 0xa5fec 사건 8 ·
       // 13 → 0x51b36 … 0x51bf2 → 0xa7d0c 사건 0xd. 판 끝 정산 0xa8024 가 이 사건들로 타자 결과를 낸다(`playOutcome`)
       if (resultCode === 6 || resultCode === 10) hitEvent = true
@@ -2538,40 +2577,38 @@ export function stepDefensePlay(
 
     }
 
-    // ── 7a. 결과 판 0x46844 — 이 그림의 그리기 46de4 (0x4403c 보다 앞) ──
-    const popup = stepJudgePopup(judgePopup)
-    judgePopup = popup.next
-
-    // ── 7b. 레이저 연출 0x4403c — 이 그림의 그리기 46e08(관문 G3 46e3c 보다 앞) ──
-    // 단계 0: 애니 되감기 · +0x1997 = +0x19ad = +0x19ae = 0 · 단계 1 → 1: 줌 0xbb39d · +0x1993 = 0 · 단계 2 → 2: 단계 3 →
-    // 3: 단계 −1 · +0x1990 = 0 · +0x1998 = +0x1999 = 1.
-    if (laserStep === 0) {
+    // ── 7. 수비 화면 그리기 0x46c88 의 연출 몫 — 결과 판 0x46844(46de4) → 레이저 0x4403c(46e08) → 필살 포구 B 0x441c4(46e0e) ·
+    //       C 0x44398(46e14) → 줌 펀치 0xbb84c(46e24). 셋은 연출 단계 +0x1992 를 함께 쓴다 (`defenseScene`) ──
+    const holderView = ticks[ticks.length - 1]?.fielders.find((fielder) => fielder.slot === play.ballHolderSlot)
+    const drawn = drawDefenseScene(scene, {
+      holderSlot: play.ballHolderSlot,
+      holder: fielders[play.ballHolderSlot]?.position,
+      holderAction: holderView?.action,
+    })
+    scene = drawn.scene
+    // 46932 — 큰 OUT 첫 그림이 +0x1999 를 보고 state[0x8b] = 1
+    if (drawn.recordsLaserOut) laserOutFlag = true
+    // 4412e — 레이저 단계 0: +0x19ad · +0x19ae = 0
+    if (drawn.laserStepZero) {
       laserConfirmed = false
       laserShining = false
-      judgePopup = { ...judgePopup, shown: false }
-      laserStep = 1
-    } else if (laserStep === 1) {
-      // 44146 — 0xbb39d(100, H.x, H.z − H.y, 1, 0): H = 0xb0c91(플레이) 공 가진 야수
-      const holder = fielders[play.ballHolderSlot]
-      if (holder !== undefined) zoomPunch = startZoomPunch(holder.position)
-      gamePaused = false
-      laserStep = 2
-    } else if (laserStep === 2) {
-      laserStep = 3
-    } else if (laserStep === 3) {
-      judgePopup = { ...judgePopup, bigOutArmed: true, bigOutRecord: true }
-      laserStep = -1
     }
-    // ── 7c. 줌 펀치 0xbb84c — 그리기 46e24 (0x4403c 뒤) ──
-    const zoom = stepZoomPunch(zoomPunch)
-    zoomPunch = zoom.next
-    if (zoom.frame !== null || popup.bigOut !== null) {
-      const drawn = ticks[ticks.length - 1]
-      if (drawn !== undefined) {
+    if (drawn.unpaused) gamePaused = false
+    // 44330 · 44564 — B · C 끝: 플레이+0x1f4 = +0x1f8 = +0x1f7 = 0
+    if (drawn.flashEnded) {
+      laserArmed = false
+      deadlyJumpArmed = false
+      deadlySlideArmed = false
+    }
+    if (drawn.zoom !== null || drawn.bigOut !== null || drawn.judgeText !== null || drawn.flash !== null) {
+      const view = ticks[ticks.length - 1]
+      if (view !== undefined) {
         ticks[ticks.length - 1] = {
-          ...drawn,
-          ...(zoom.frame === null ? {} : { zoom: zoom.frame }),
-          ...(popup.bigOut === null ? {} : { bigOut: popup.bigOut }),
+          ...view,
+          ...(drawn.zoom === null ? {} : { zoom: drawn.zoom }),
+          ...(drawn.bigOut === null ? {} : { bigOut: drawn.bigOut }),
+          ...(drawn.judgeText === null ? {} : { judgeText: drawn.judgeText }),
+          ...(drawn.flash === null ? {} : { flash: drawn.flash }),
         }
       }
     }
@@ -2658,10 +2695,11 @@ export function stepDefensePlay(
   state.laserRolled = laserRolled
   state.laserThrow = laserThrow
   state.laserArmed = laserArmed
-  state.laserStep = laserStep
   state.gamePaused = gamePaused
-  state.zoomPunch = zoomPunch
-  state.judgePopup = judgePopup
+  state.scene = scene
+  state.deadlyJumpArmed = deadlyJumpArmed
+  state.deadlySlideArmed = deadlySlideArmed
+  state.laserOutFlag = laserOutFlag
   state.counterBeforeHead = counterBeforeHead
   state.rundown = rundown
   state.rundownThrowArrival = rundownThrowArrival
@@ -2748,6 +2786,8 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     errantThrow: state.errantThrow,
     specialDefense: state.specialDefense,
     laserThrow: state.laserThrow,
+    laserOutFlag: state.laserOutFlag,
+    scene: state.scene,
     rundowns: state.rundowns,
     rundownOuts: state.rundownOuts,
     // 진행기 주자 배열이 곧 원본 목록 순서다 — 0 = 타자주자, 그 뒤 찬 루 오름차순 (`createPlayRunners`)

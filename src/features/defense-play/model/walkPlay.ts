@@ -1,4 +1,5 @@
 import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import {
   createFielders,
   createRunner,
@@ -77,6 +78,8 @@ export interface WalkPlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
+  /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
+  readonly scene?: DefenseScene
 }
 
 export interface WalkPlayResult extends RunnerPlayEngineResult {
@@ -172,6 +175,7 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    scene: input.scene,
   })
   return { ...result, pitchJudgement: input.pitchJudgement }
 }

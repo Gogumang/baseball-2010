@@ -32,6 +32,8 @@ import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
+import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { cpuSpecialThrowOf, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
@@ -131,6 +133,11 @@ export interface PickoffPlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
+  /**
+   * 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`). 견제는 투구(0x10 · 0x11)를 안 지나 +0x1997 · 판정 애니를
+   * 되감지 않는 것으로 본다(유력 — 견제 키 0xf → 0x17 길을 다 뜨지 않았다)
+   */
+  readonly scene?: DefenseScene
 }
 
 export interface PickoffPlayResult extends DefensePlayResult {
@@ -210,6 +217,12 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
   let endCounter = 0
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 결과 메시지 0xbba */
   let outJudgedThisTick = false
+  /** 이번 틱 플레이 틱이 보낼 결과 메시지 0xbba 의 코드 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다(b4562 에서 한 번) */
+  let tickMessageCode = 0
+  /** 수비 장면 연출 칸 — 0x17 진입 0x46418 이 결과 판 타이머를 −1 로 (`defenseScene`) */
+  let scene = enterDefenseScene(input.scene, false)
+  /** state[0x8b] — 결과 판 큰 OUT 이 +0x1999 를 보고 세운다 */
+  let laserOutFlag = false
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
@@ -388,6 +401,7 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
 
   for (let tick = 0; tick <= MAXIMUM_TICKS && !play.finished; tick += 1) {
     outJudgedThisTick = false
+    tickMessageCode = 0
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
     fielders = fielders.map((fielder) =>
       fielder.holdingBall && fielder.actionRemainingTicks > 0
@@ -448,6 +462,8 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
         play = { ...play, ballHolderSlot: receiver, catchFielderSlot: receiver, held: true, wantsThrow: true }
         log.push(`${tick}틱 ${receiver}번 야수가 공을 쥐었다`)
         runOutJudgement(tick)
+        // b4292 — 발밑 루에 산 주자가 서 있는 포구는 결과 코드 9 (판 결과 칸은 첫 번째만 적지만 메시지는 포구마다 간다)
+        if (onBase !== undefined && isAtTarget(onBase.state)) tickMessageCode = 9
         if (resultCode === null && onBase !== undefined && isAtTarget(onBase.state)) {
           resultCode = PICKOFF_RESULT.SAFE
           log.push(`${tick}틱 ${footBase}루 세이프 (결과 9)`)
@@ -560,6 +576,30 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
       cpuThrowDecision(tick)
     }
 
+    // ── 결과 메시지 0xbba(b4562) → 51a56 결과 판 칸 · 그리고 이 그림의 수비 화면 그리기 0x46c88 의 연출 몫 (`defenseScene`) ──
+    if (outJudgedThisTick) tickMessageCode = 13
+    if (tickMessageCode !== 0) scene = { ...scene, popup: postJudgeMessage(scene.popup, tickMessageCode, play.ballHolderSlot) }
+    {
+      const view = ticks[ticks.length - 1]
+      const drawn = drawDefenseScene(scene, {
+        holderSlot: play.ballHolderSlot,
+        holder: fielders[play.ballHolderSlot]?.position,
+        holderAction: view?.fielders.find((fielder) => fielder.slot === play.ballHolderSlot)?.action,
+      })
+      scene = drawn.scene
+      if (drawn.recordsLaserOut) laserOutFlag = true
+      // ⚠️ 이 판은 레이저 발사 · 경기 멈춤(+0x1993)을 안 옮겼다 — 앞 판에서 이어진 연출이 내리는 칸(unpaused · flashEnded)은 볼 것이 없다
+      if (view !== undefined && (drawn.zoom !== null || drawn.bigOut !== null || drawn.judgeText !== null || drawn.flash !== null)) {
+        ticks[ticks.length - 1] = {
+          ...view,
+          ...(drawn.zoom === null ? {} : { zoom: drawn.zoom }),
+          ...(drawn.bigOut === null ? {} : { bigOut: drawn.bigOut }),
+          ...(drawn.judgeText === null ? {} : { judgeText: drawn.judgeText }),
+          ...(drawn.flash === null ? {} : { flash: drawn.flash }),
+        }
+      }
+    }
+
     // ── 틱 끝 b45a0 — 사건(펌블)이 있었으면 플레이.vt70 = 0xb3148: 공을 그 야수에게서 튕겨 다시 쏘고 vt24(1) · vt34 ──
     const fumbledBall = chase
     if (ballEventThisTick && fumbledBall !== null && !play.finished) {
@@ -612,6 +652,8 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
     errantThrow,
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
+    laserOutFlag,
+    scene,
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)

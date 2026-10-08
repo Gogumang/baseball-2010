@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { basePosition, runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import {
   AI_STATE,
@@ -138,6 +139,8 @@ export interface StealPlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
+  /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
+  readonly scene?: DefenseScene
 }
 
 export interface StealPlayResult extends RunnerPlayEngineResult {
@@ -215,6 +218,7 @@ export function runStealPlay(input: StealPlayInput): StealPlayResult {
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    scene: input.scene,
   })
 
   const stolenFrom: StealBase[] = []

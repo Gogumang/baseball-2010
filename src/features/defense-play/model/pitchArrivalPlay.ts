@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { rollCpuSteal, type CpuStealInput } from '@/entities/fielding/model/cpuSteal'
@@ -156,6 +157,8 @@ export interface PitchArrivalPlayInput {
    *   **앞 공의 값이 그대로 남는다** — 부르는 쪽은 아직 이 공의 번트 종류만 넘기고 안 휘두른 공은 0 으로 둔다.
    */
   readonly buntKind?: number
+  /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) — 열린 판이 이어받고 결과의 `scene` 으로 돌려준다 */
+  readonly scene?: DefenseScene
 }
 
 export type PitchArrivalPlay =
@@ -213,6 +216,7 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
       aceIndexes: input.aceIndexes,
       defenseTeamIndex: input.defenseTeamIndex,
       offenseTeamIndex: input.offenseTeamIndex,
+      scene: input.scene,
     })
     return { kind: 2, result, strikeout: 'none', callSoundId: null, recordIds: [] }
   }
@@ -239,6 +243,7 @@ export function runPitchArrivalPlay(input: PitchArrivalPlayInput, random: Random
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    scene: input.scene,
   }
   if (kind === PASSED_BALL_PLAY_KIND) {
     const shot = passedBallShot(random)

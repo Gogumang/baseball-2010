@@ -97,6 +97,7 @@ import {
 } from '@/features/defense-play/model/runDefensePlay'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
@@ -297,6 +298,11 @@ export interface GameProgress {
    * `pendingDefensePlay` 쪽으로 가고, 다 본 뒤에는 **여기 남기지 않는다** — 남기면 한 번 더 튼다.
    */
   readonly lastDefensePlay: DefensePlayResult | null
+  /**
+   * **수비 장면 연출 칸** — 결과 판 +0x1997~+0x1999 · 연출 단계 · deadly_effect 애니 · 줌 (`defenseScene`). 원본은 경기 장면
+   * 객체 칸이라 판마다 안 지워진다 — 판 결과의 `scene` 을 받아 두었다가 다음 판(타구 · 주자 · 견제)에 넘긴다. 없으면 경기 첫 판.
+   */
+  readonly defenseScene?: DefenseScene
   /**
    * **지금 화면이 실시간으로 돌리고 있는 타구.** 차 있으면 이 경기는 "수비 진행 중" 이고,
    * 타석 결과(안타/아웃 코드)만 정해졌을 뿐 **진루·아웃·득점은 아직 하나도 안 먹였다**.
@@ -586,7 +592,13 @@ export function applyPlayerOutcome(
   // 이 갈래는 아직 아무것도 안 보여 줬으므로 돌린 결과를 그대로 재생거리로 넘긴다 (예전 그대로).
   const result = runDefensePlay(pending)
   // 판 끝 정산(0xa8024)이 낸 결과로 적는다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
-  return finishPlayerOutcome({ ...started, pendingDefensePlay: null }, recordedOutcomeOf(pending, result), random, result, result)
+  return finishPlayerOutcome(
+    { ...started, pendingDefensePlay: null, defenseScene: result.scene },
+    recordedOutcomeOf(pending, result),
+    random,
+    result,
+    result,
+  )
 }
 
 export interface PlayerOutcomeOptions {
@@ -756,11 +768,17 @@ export function resolveDefensePlay(
   if (pending === null) return progress
   // 파울로 닫힌 판 — 판 끝 판정 B 0xae3e8 ae568 이 정산 0xa8024 를 건너뛰고 0xf(같은 타석 다음 공)로, 0x35108 이
   // 0xa975c(주자를 판 앞 자리로)를 부른다 — 경기 상태는 그대로다. 스트라이크(0xb6b58)와 연속 파울(0xa7dbc)은 타석 칸을 든 세션이 센다
-  if (result.foulEnded === true) return { ...progress, pendingDefensePlay: null }
+  if (result.foulEnded === true) return { ...progress, pendingDefensePlay: null, defenseScene: result.scene }
   // 이 타석에서 앞서 난 연속 파울 기록(32·33) — 파울 각 공을 낙구 전에 잡아(파울 뜬공 아웃) 판이 타석을 끝낼 때 넘겨받는다
   progress = withFoulRecords(progress, options.foulRecordIds)
   // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
-  return finishPlayerOutcome({ ...progress, pendingDefensePlay: null }, recordedOutcomeOf(pending, result), random, result, null)
+  return finishPlayerOutcome(
+    { ...progress, pendingDefensePlay: null, defenseScene: result.scene },
+    recordedOutcomeOf(pending, result),
+    random,
+    result,
+    null,
+  )
 }
 
 /**
@@ -860,6 +878,7 @@ function defensePlayInputOf(
     isUncatchable: options.isUncatchable,
     // 장면 +0xfdc — 번트면 도루 안 한 주자의 판 시작 리드가 +3 틱 (0x3d7b8)
     buntKind: options.buntKind ?? 0,
+    scene: progress.defenseScene,
   }
 }
 
@@ -1963,14 +1982,17 @@ export function arrivePitch(
       // 장면 +0xfdc — 못 맞힌 번트면 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
       // (키 없는 공은 앞 공의 값 — 타석 화면이 장면 +0xfdc 를 들고 낸다, `BattingStage.sceneBuntKind`)
       buntKind: pitch.buntKind ?? 0,
+      scene: progress.defenseScene,
     },
     random,
   )
   if (play === null) return { progress: cleared, play: null, interrupted: false }
+  // 판이 남긴 수비 장면 연출 칸은 다음 판으로 (`defenseScene`)
+  const opened: GameProgress = { ...cleared, defenseScene: play.result.scene }
   // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPlayerOutcome` 의 `arrivalPlay`)이 먹인다 — 밀어내기 판은 재생 칸에만
-  if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: cleared, play, interrupted: false }
+  if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 
-  let next = withRunnerOnlyPlay(cleared, play.result)
+  let next = withRunnerOnlyPlay(opened, play.result)
   const recordIds = gatedOffenseRecords(play.recordIds)
   if (recordIds.length > 0) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
   next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play)}`, true)
@@ -2012,7 +2034,7 @@ function runAbilitiesOnBaseOf(progress: GameProgress): Partial<Record<0 | 1 | 2 
  */
 function withRunnerOnlyPlay(progress: GameProgress, result: DefensePlayResult): GameProgress {
   const before = progress.game
-  let next: GameProgress = { ...progress, lastDefensePlay: result }
+  let next: GameProgress = { ...progress, lastDefensePlay: result, defenseScene: result.scene }
   const advance = result.advance
   const changed =
     advance.outsAdded > 0 ||
@@ -2091,6 +2113,7 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     runningMode: progress.runningModeManual ? '수동' : '자동',
     // 수비는 CPU 다 — 슬롯 2 의 0xae6c8 첫 항(경기[0x31 + 수비측] == 1)이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
     defenseIsCpu: true,
+    scene: progress.defenseScene,
   })
 
   // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·홈런 가지도 안 선다 (pinchHitAi 게이트)

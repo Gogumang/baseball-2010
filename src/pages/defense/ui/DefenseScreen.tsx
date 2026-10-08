@@ -37,6 +37,8 @@ import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
 const JUDGE_FRAMES = './sprites/game_judge/frames'
 /** 0x46844 의 큰 OUT 은 자리에서 60 위 (468e2 `subs r3, #0x3c`) */
 const BIG_OUT_RAISE = 60
+/** 0x46844 의 보통 판정 글자는 자리에서 30 위 (468c8 `subs r2, #0x1e`) */
+const JUDGE_TEXT_RAISE = 30
 
 /** 한 번에 몰아서 따라갈 틱 수 상한 — 탭이 잠들었다 돌아와도 한 프레임에 다 돌지 않게 막는다 */
 const MAX_CATCH_UP_TICKS = 30
@@ -188,17 +190,20 @@ export function DefenseScreen({
           transform: `scale(${styles.SCREEN_WIDTH / zoomRect.width}, ${styles.SCREEN_HEIGHT / zoomRect.height}) translate(${-zoomRect.x}px, ${-zoomRect.y}px)`,
         }
   /** 결과 판 0x46844 의 자리 — 공 가진 야수(+0x1088)의 그림 자리, 없으면 화면 가운데 (46866) */
+  const popupPointOf = (holderSlot: number) => {
+    const holder = state.fielders.find((fielder) => fielder.slot === holderSlot)
+    return holder === undefined ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 } : screenOf(holder)
+  }
   const bigOut = state.bigOut ?? null
-  const bigOutHolder = bigOut === null ? undefined : state.fielders.find((fielder) => fielder.slot === bigOut.holderSlot)
-  const bigOutPoint =
-    bigOut === null
-      ? null
-      : bigOutHolder === undefined
-        ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 }
-        : screenOf(bigOutHolder)
+  const bigOutPoint = bigOut === null ? null : popupPointOf(bigOut.holderSlot)
+  const judgeText = state.judgeText ?? null
+  const judgeTextPoint = judgeText === null ? null : popupPointOf(judgeText.holderSlot)
 
   const ballGround = screenOf(state.ball)
   const ballPoint = { x: ballGround.x, y: ballGround.y - toScreenY(state.ball.height) }
+  const flash = state.flash ?? null
+  const flashBase =
+    flash !== null && flash.x !== undefined && flash.z !== undefined ? screenOf({ x: flash.x, z: flash.z }) : ballPoint
 
   /**
    * 그리는 차례는 z 오름차순으로 둔다 — 홈 쪽(z 큰 쪽)이 앞에 오게 하려는 것이다.
@@ -265,20 +270,19 @@ export function DefenseScreen({
           <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
         </div>
 
-        {state.flash != null && (
+        {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
+        {judgeText !== null && judgeTextPoint !== null && (
           <div
             className={styles.actor}
-            style={{
-              left: ballPoint.x + flashOffsetOf(state.flash).x,
-              top: ballPoint.y + flashOffsetOf(state.flash).y,
-            }}
-            data-testid="defense-flash"
+            style={{ left: judgeTextPoint.x + judgeText.dx, top: judgeTextPoint.y - JUDGE_TEXT_RAISE + judgeText.dy }}
+            data-testid="defense-judge-text"
+            data-frame={judgeText.frame}
           >
-            <ActorSprite folder={DEADLY_EFFECT_FRAMES} frame={state.flash.step} />
+            <ActorSprite folder={JUDGE_FRAMES} frame={judgeText.frame} />
           </div>
         )}
 
-        {/* 결과 판 0x46844 — 레이저 연출 뒤 아웃(코드 13)이면 game_judge 애니 2 "큰 OUT" 을 (x, y − 60) 에 */}
+        {/* 결과 판 0x46844 — 레이저 · 필살 포구 연출 뒤 아웃(코드 13)이면 game_judge 애니 2 "큰 OUT" 을 (x, y − 60) 에 */}
         {bigOut !== null && bigOutPoint !== null && (
           <div
             className={styles.actor}
@@ -287,6 +291,20 @@ export function DefenseScreen({
             data-frame={bigOut.frame}
           >
             <ActorSprite folder={JUDGE_FRAMES} frame={bigOut.frame} />
+          </div>
+        )}
+
+        {/* 필살 포구 연출 B 0x441c4 · C 0x44398(그리기 46e0e · 46e14 — 결과 판 뒤) — 공 가진 야수 자리에서 B 는 y − 50, C 는 방향대로 ±10 */}
+        {state.flash != null && (
+          <div
+            className={styles.actor}
+            style={{
+              left: flashBase.x + flashOffsetOf(state.flash).x,
+              top: flashBase.y + flashOffsetOf(state.flash).y,
+            }}
+            data-testid="defense-flash"
+          >
+            <ActorSprite folder={DEADLY_EFFECT_FRAMES} frame={state.flash.step} />
           </div>
         )}
         </div>

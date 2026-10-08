@@ -116,6 +116,32 @@ describe('주자와 번쩍임', () => {
     띄우기()
     expect(screen.queryByTestId('defense-flash')).toBeNull()
   })
+
+  it('번쩍임에 점(공 가진 야수 x · z − y)이 실려 오면 그 자리에 놓는다 — C 는 방향 0x12 면 x + 10', () => {
+    띄우기({ ...기본_상태, flash: { kind: 'c', step: 0, direction: 0x12, x: 20000, z: 24500 } })
+
+    const pitcher = screen.getByTestId('defense-fielder-0')
+    const flash = screen.getByTestId('defense-flash')
+    expect(Number.parseInt(flash.style.left, 10)).toBe(Number.parseInt(pitcher.style.left, 10) + 10)
+    expect(flash.style.top).toBe(pitcher.style.top)
+  })
+
+  it('결과 판의 보통 판정 글자는 공 가진 야수 자리에서 30 위 + dy (0x46844 → 0x393b4)', () => {
+    띄우기({ ...기본_상태, judgeText: { frame: 6, dx: 0, dy: 3, holderSlot: 0 } })
+
+    const pitcher = screen.getByTestId('defense-fielder-0')
+    const text = screen.getByTestId('defense-judge-text')
+    expect(text.dataset.frame).toBe('6')
+    expect(text.style.left).toBe(pitcher.style.left)
+    expect(Number.parseInt(text.style.top, 10)).toBe(Number.parseInt(pitcher.style.top, 10) - 30 + 3)
+  })
+
+  it('자리 야수가 −1(없음)이면 화면 가운데에 그린다 (46866)', () => {
+    띄우기({ ...기본_상태, judgeText: { frame: 8, dx: 0, dy: 0, holderSlot: -1 } })
+
+    const text = screen.getByTestId('defense-judge-text')
+    expect(text.style.left).toBe('120px')
+  })
 })
 
 describe('좌·우 그림 (S12 8절 — 좌우 반전이 아니다)', () => {
