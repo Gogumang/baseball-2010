@@ -90,6 +90,12 @@ describe('4국 순위 0xb7f0c', () => {
   it('승·패가 모두 같으면 원래 차례(한·일·쿠·미)가 앞선다', () => {
     expect(nationalCupRankingOf(createNationalCup())).toEqual([10, 11, 12, 13])
   })
+
+  it('교환정렬(b7f9c~b8014)이라 같은 성적의 차례가 원래 차례를 안 지킬 수 있다 — 2라운드 뒤 미·쿠·일·한', () => {
+    // 승 [0,1,1,2] · 패 [2,1,1,0] (한·일·쿠·미). 선택정렬이면 미·일·쿠·한이지만 원본은 i 와 j 를 그 자리에서 바로 맞바꾼다
+    const cup = 승패를넣은대회(createNationalCup(), [0, 1, 1, 2], [2, 1, 1, 0])
+    expect(nationalCupRankingOf(cup)).toEqual([13, 12, 11, 10])
+  })
 })
 
 describe('승패 기록 0xb76dc / 0xb77e0', () => {

@@ -109,28 +109,32 @@ export function matchTeamOf(cup: NationalCup, stage: number, slot: number): numb
 }
 
 /**
- * 4국 순위 `0xb7f0c(L, k)` — 승 내림차순, 같으면 패 오름차순. 둘 다 같으면 **원래 차례**
- * (= 한·일·쿠·미) 가 앞선다. 원본은 교환정렬이고 `i < j` 자리를 지킨다.
+ * 4국 순위 `0xb7f0c(L, k)` — 승 내림차순, 같으면 패 오름차순. 상대전적 비교는 없다.
+ *
+ * 원본은 **교환정렬**이다 (b7f9c~b8014): 칸 i 를 두고 j = i+1..3 을 차례로 보며, j 가 더 나으면
+ * (승이 많거나, 승이 같고 패가 적으면) **그 자리에서 바로** i·j 의 승·패·팀을 맞바꾼다.
+ * 가장 나은 칸을 찾아 한 번에 바꾸는 선택정렬과 달리, 바뀐 뒤의 i 로 남은 j 를 계속 비교하므로
+ * 같은 성적끼리의 차례가 원래 차례(한·일·쿠·미)를 지키지 않는다.
+ * 예) 승 [0,1,1,2] · 패 [2,1,1,0] → 원본 미·쿠·일·한 (선택정렬이면 미·일·쿠·한).
  *
  * `entities/league` 의 `rankingOf`(0xb79d8)와 달리 상대전적 비교가 없어 **색인 버그도 없다**.
  */
 export function nationalCupRankingOf(cup: NationalCup): number[] {
-  const order = cup.teams.map((_unused, index) => index)
+  const order = [...cup.teams]
   const wins = [...cup.wins]
   const losses = [...cup.losses]
 
   for (let i = 0; i < order.length - 1; i += 1) {
-    let best = i
     for (let j = i + 1; j < order.length; j += 1) {
-      if (wins[best] < wins[j]) best = j
-      else if (wins[best] === wins[j] && losses[best] > losses[j]) best = j
+      const isBetter = wins[i] < wins[j] || (wins[i] === wins[j] && losses[i] > losses[j])
+      if (!isBetter) continue
+      ;[wins[i], wins[j]] = [wins[j], wins[i]]
+      ;[losses[i], losses[j]] = [losses[j], losses[i]]
+      ;[order[i], order[j]] = [order[j], order[i]]
     }
-    ;[wins[i], wins[best]] = [wins[best], wins[i]]
-    ;[losses[i], losses[best]] = [losses[best], losses[i]]
-    ;[order[i], order[best]] = [order[best], order[i]]
   }
 
-  return order.map((index) => cup.teams[index])
+  return order
 }
 
 const replaced = (values: readonly number[], index: number, value: number) =>
