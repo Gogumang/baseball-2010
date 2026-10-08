@@ -31,6 +31,7 @@ import {
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
+import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
 import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
 
 /** 판정 글자 그림 (game_judge.pzx, 게임+0x101c) */
@@ -293,6 +294,9 @@ export function DefenseScreen({
             <ActorSprite folder={JUDGE_FRAMES} frame={bigOut.frame} />
           </div>
         )}
+
+        {/* 작은 지도 0x395f4(장면, 0x1e, 0x1e) — 0x46c88 의 0x46e02, 결과 판(0x46844) 뒤 · 번쩍임(0x4403c~) 앞 */}
+        <DefenseFieldMap runners={state.runners} />
 
         {/* 필살 포구 연출 B 0x441c4 · C 0x44398(그리기 46e0e · 46e14 — 결과 판 뒤) — 공 가진 야수 자리에서 B 는 y − 50, C 는 방향대로 ±10 */}
         {state.flash != null && (

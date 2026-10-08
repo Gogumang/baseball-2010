@@ -11,7 +11,6 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
-import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
@@ -177,8 +176,6 @@ export function renderBattingStage(
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
     drawHud(context, scene.hud, scene.tick)
-    // 전광판과 별개로 원본이 타석 중에 그리는 작은 지도 (0x395f4) — 루상 주자가 여기 보인다
-    drawFieldMap(context, scene.hud.bases)
   }
   // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
   if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)

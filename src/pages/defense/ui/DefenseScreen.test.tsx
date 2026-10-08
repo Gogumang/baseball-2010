@@ -301,3 +301,20 @@ describe('레이저 송구 반짝임', () => {
     expect(screen.queryByTestId('defense-flash')).toBeNull()
   })
 })
+
+describe('작은 지도 0x395f4 (0x46e02 — 앵커 (30, 30))', () => {
+  const 주자 = (index: number, x: number, z: number, isFinished = false) => ({
+    index, x, z, action: RUNNER_ACTION.stand, actionTick: 0, base: 0, isAdvancing: false, isFinished,
+  })
+
+  it('처리 끝(+0x96) 아닌 주자만 점을 찍는다 — 카메라와 상관없이 화면 좌표', () => {
+    띄우기({ ...기본_상태, runners: [주자(0, 25946, 24175), 주자(1, 20000, 19170, true)] })
+    expect(screen.getByTestId('defense-field-map')).toBeTruthy()
+    const dots = screen.getAllByTestId('defense-field-map-dot')
+    expect(dots).toHaveLength(1)
+    // 1루 = 중심 (30 + 23, 30 + 2) 에서 (6, 5) 당김
+    expect(dots[0]!.style.left).toBe('47px')
+    expect(dots[0]!.style.top).toBe('27px')
+    expect(dots[0]!.style.opacity).toBe('0.75')
+  })
+})
