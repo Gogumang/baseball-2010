@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { describePitchResolution } from '@/entities/at-bat/model/resolutionText'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { derbyNoContactWaitFramesOf, derbyPitchCallOf } from '@/pages/home-run-derby/lib/derbyPitchCall'
 import {
   DERBY_HOME_RUN_SOUND,
   derbyBattedBallOf,
@@ -39,15 +40,16 @@ import {
   type HomeRunTextWindow,
 } from '@/widgets/batting-stage/lib/homeRunBanner'
 
-/** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
-const BANNER_MILLISECONDS = 1_500
-
 /**
  * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
- * 안 맞은 공은 알림 시간만. 난수를 안 쓰는 미리 보기다 — 폴에 맞는 공은 판 시작 굴림으로 다시 깐 궤적의 끝을 쓴다(`onPitchResolved`).
+ * 안 맞은 공은 상태 0x12 의 대기(`derbyNoContactWaitFramesOf` — 15틱, 볼넷 · 사구면 31틱, 0x4e6de~0x4e730).
+ * `balls` = 이 공 앞의 볼 수 st[5] (볼넷 판정에 쓴다). 난수를 안 쓰는 미리 보기다 — 폴에 맞는 공은 판 시작 굴림으로
+ * 다시 깐 궤적의 끝을 쓴다(`onPitchResolved`).
  */
-export function resultHoldMillisecondsOf(detail: PitchOutcomeDetail): number {
-  if (detail.pattern === undefined) return BANNER_MILLISECONDS
+export function resultHoldMillisecondsOf(detail: PitchOutcomeDetail, balls = 0): number {
+  if (detail.pattern === undefined) {
+    return derbyNoContactWaitFramesOf(derbyPitchCallOf(detail.resolution, balls).judgment) * millisecondsPerFrame()
+  }
   return derbyBattedBallOf(detail.pattern).endTicks * millisecondsPerFrame()
 }
 
@@ -229,7 +231,15 @@ export interface HomeRunDerbySession {
  *
  * 원본은 공 하나가 끝날 때마다 0xae24c(맞지 않은 공 — 상태 0x12 끝 0x4e78c)·0xae3e8(맞은 공 — 인플레이 0x17 끝 0x52a52)
  * 로 들어가 기회를 하나 쓴다 — 두 함수의 모드 7 갈래는 볼카운트를 건드리지 않으므로(0xae26a · 0xae408 에서 일반 갈래로 안 간다)
- * **던진 공은 무엇이든 기회 한 번**이다. 그래서 볼카운트가 없다.
+ * **던진 공은 무엇이든 기회 한 번**이다. 다만 판정 스위치 0x3dfac 는 볼 수 st[5] 를 그대로 올려(스트라이크만 모드 7 이면 안 센다)
+ * 심판 콜이 그 칸을 본다 — `derbyPitchCallOf`.
+ *
+ * ⚠️ 미해결 — **볼넷 · 사구 뒤 다음 타자 예약**: v3 · v4(0x3e1ae · 0x3e1b4)가 `0xaf020(공격 팀, 0)` 으로 +0x291 = 1 ·
+ * +0x293 = (+0x32 + 1) mod 9 를 세우고, 다음 0xd 진입 0x48d50 이 48ddc `0xaebe4(팀, 0)` 에서 +0x293 ≤ 8 이면 타순 +0x32 를
+ * 그 칸으로 넘긴다(aec8c~aecaa → aedee). 0x48d50 에는 모드 7 이 타순을 모드 타자(0x3a55e 의 +0xa & 0x1f)로 되돌리는 곳이 없다 —
+ * 그래서 원본은 볼넷 · 사구 뒤 단계가 오르거나 보너스를 열면 **타순 다음 칸 타자**(내 팀 r7 마스터 명부 쪽 줄로 보인다)가 친다.
+ * 그 칸이 누구인지(0xb87cd 가 모드 타자를 팀 객체에 어떻게 넣는지 · 팀 +0xe 타순 표)와 타석 그림 · 능력치가 그 기록을 따르는지는
+ * 아직 안 떠서 옮기지 않았다 — 웹은 늘 모드 타자다.
  *
  * **번트**도 같다 (90408d8 로 키가 열렸다): 번트 판정 0x51226(0x51108 안)·타구 시작 0x51408 에 모드 갈림이 없고,
  * 맞은 번트(파울 포함)는 인플레이 끝에서 0xae3e8 로 와 "홈런 아닌 공" 하나가 된다 — 기회 −1 · 직전 홈런이면 콤보 0(페어 번트는 판이 낙구 비거리를 더한다).
@@ -245,6 +255,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
   const [isPaused, setIsPaused] = useState(false)
   /** 상대 팀 v (장면 시작 굴림 3a454) — 난수가 없으면 undefined */
   const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>(undefined)
+  /** 볼 수 st[5] — 0xd 진입 0x48e9c(0xb6764)만 지운다 (`derbyPitchCallOf`) */
+  const ballsRef = useRef(0)
   const myTeamIdRef = useRef(myTeamId)
   myTeamIdRef.current = myTeamId
   // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
@@ -345,6 +357,14 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
   }
   const isAwaitingConfirmRef = useRef(isAwaitingConfirm)
 
+  /**
+   * 상태 0xd 진입 0x48d50 이 진행에 하는 일 — 모드 7 · 단계 > 0 이면 마투수 표 0xcfce8[단계 − 1] 레코드를 지금 투수에
+   * 0x30 바이트 복사(48d8e~48dd4), 볼카운트 지우기 0x48e9c(`0xb6764`). 첫 공 앞의 0xd 도 같은 진입이다.
+   */
+  const enterSceneD = () => {
+    ballsRef.current = 0
+  }
+
   /** 상태 0xd — `SCENE_D_FRAMES` 갱신 뒤 0xe 로 간다 (0x39e14) */
   const prepareTimerRef = useRef<number | null>(null)
   const clearPrepareTimer = () => {
@@ -361,6 +381,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
   }
   /** 상태 0xd 로 들어선다 — 아직 OK 를 받지 않는다. 로딩 판이 서 있으면 시계는 `finishLoading` 이 건다 */
   const enterScenePrepare = () => {
+    enterSceneD()
     isAwaitingConfirmRef.current = false
     clearConfirmLockTimer()
     setIsAwaitingConfirm(false)
@@ -437,9 +458,11 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
 
     // **타구 순간 소리** (0x515de~0x5164a) — 강 5 · 보통 6 · 약 59 · 큰 타구 7 · 헛스윙 8.
     // 고르는 것은 `features/play-at-bat/model/atBatSounds` 가 이미 했고 여기는 울리기만 한다.
-    // ⚠️ 심판 콜은 안 낸다 — 홈런더비는 볼·스트라이크를 세지 않아(H-2) 판정 스위치가 보는
-    //    볼카운트 자체가 없고, 어느 갈래로 들어가는지도 문서에 없다.
-    playSoundIds(audioRef.current, [detail.contactSoundId])
+    // **심판 콜** — 판정 스위치 0x3dfac · 화면 0x51a56 은 모드를 안 가린다: 스트라이크 · 헛스윙 18, 볼 16, 0xd 뒤 넷째 볼부터 24,
+    // 사구 23 (`derbyPitchCallOf` 머리말). 볼 수 st[5] 는 0xd 진입만 지운다
+    const call = derbyPitchCallOf(detail.resolution, ballsRef.current)
+    ballsRef.current = call.balls
+    playSoundIds(audioRef.current, [detail.contactSoundId, call.soundId])
 
     // **맞은 공은 홈런더비 판(종류 8)을 돈다** (2026-10-07 직접 뜸 — `derbyBattedBall` 머리말). 원본은 모드 7 도 맞은 공이면
     // 각과 무관하게(파울 · 번트 포함) 판(상태 0x17)을 돌고 그 끝 0x52a52 → 0xae3e8 모드 7 갈래로 간다(H-2). 판 시작은 폴 충돌
@@ -475,7 +498,12 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     applyPlayResult(current, detail.resolution, batted, zoneHit)
     setIsEventZoneShown(zoneHit)
     setIsPaused(true)
-    armPlayEnd(batted === null ? BANNER_MILLISECONDS : batted.endTicks * millisecondsPerFrame())
+    // 맞지 않은 공은 상태 0x12 — 15틱(볼넷 · 사구면 31틱) 뒤 0x4e740: 사구(st[0xb] == 4)면 벤치 클리어링 굴림
+    armPlayEnd(
+      batted === null
+        ? derbyNoContactWaitFramesOf(call.judgment) * millisecondsPerFrame()
+        : batted.endTicks * millisecondsPerFrame(),
+    )
   }, [])
 
   /** 판 안 소리를 공 틱에 맞춰 건다 — `fromTick` 앞의 틱은 이미 지났다 */
@@ -536,7 +564,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     setBanner(parts.join(' · '))
   }
 
-  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) 시계 */
+  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 */
   const armPlayEnd = (delay: number) => {
     clearTimer()
     timerRef.current = window.setTimeout(() => {
