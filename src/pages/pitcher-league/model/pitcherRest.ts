@@ -1,5 +1,4 @@
 import { BALANCE } from '@/shared/config/original/balance'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
 import { gainPitcherMorale, spendPitcherCycleAction } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -50,7 +49,7 @@ export interface PitcherRestOutcome {
 export function runPitcherRest(career: PitcherCareer, random: RandomPort): PitcherRestOutcome {
   const blockReason = pitcherRestBlockReasonOf(career)
   if (blockReason !== null) throw new Error(`휴식할 수 없습니다 (${blockReason})`)
-  const moraleGain = randomIntegerBelow(random, REST_MORALE_RANGE.minimum, REST_MORALE_RANGE.maximumExclusive)
+  const moraleGain = random.rand(REST_MORALE_RANGE.minimum, REST_MORALE_RANGE.maximumExclusive)
   return { career: gainPitcherMorale(spendPitcherCycleAction(career), moraleGain), moraleGain }
 }
 

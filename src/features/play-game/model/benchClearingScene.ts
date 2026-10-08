@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **벤치 클리어링 연출** — 경기 장면 상태 0x1e 의 진입·갱신·키 (R10 6절, 디스어셈 대조 2026-10-05).
@@ -73,25 +72,25 @@ const OFFENSE_PLAYERS = 9
 /** 진입 0x3a5f0 의 굴림 45 번 — 값은 그림(선수 자리·목표)에만 쓰여 버린다 */
 export function rollBenchClearingEntry(random: RandomPort): void {
   for (let index = OFFENSE_PLAYERS - 1; index >= 0; index -= 1) {
-    randomIntegerBelow(random, 0, 200)
-    randomIntegerBelow(random, 100, 300)
-    randomIntegerBelow(random, 200, 400)
+    random.rand(0, 200)
+    random.rand(100, 300)
+    random.rand(200, 400)
     // 측 0 · 측 1 갈래가 목표 표 칸만 다르고 굴림 범위·차례는 같다
-    randomIntegerBelow(random, -1000, 1000)
-    randomIntegerBelow(random, -1000, 8000)
+    random.rand(-1000, 1000)
+    random.rand(-1000, 8000)
   }
 }
 
 /** 틱 10 에 수비 8명 목표를 다시 줄 때의 굴림 8 번 (0x401d4) */
 export function rollBenchClearingTargets(random: RandomPort): void {
-  randomIntegerBelow(random, 1000, 2000)
-  randomIntegerBelow(random, 2000, 3000)
-  randomIntegerBelow(random, 1000, 1500)
-  randomIntegerBelow(random, 2500, 3000)
-  randomIntegerBelow(random, 1000, 1500)
-  randomIntegerBelow(random, 2500, 3000)
-  randomIntegerBelow(random, 0, 2000)
-  randomIntegerBelow(random, 0, 2000)
+  random.rand(1000, 2000)
+  random.rand(2000, 3000)
+  random.rand(1000, 1500)
+  random.rand(2500, 3000)
+  random.rand(1000, 1500)
+  random.rand(2500, 3000)
+  random.rand(0, 2000)
+  random.rand(0, 2000)
 }
 
 /** 수비 목표 굴림이 나가는 틱 */

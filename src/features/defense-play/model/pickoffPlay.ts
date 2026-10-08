@@ -34,7 +34,6 @@ import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import {
   cpuSpecialThrowOf,
   type DefenseKeyPress,
@@ -449,7 +448,7 @@ function* pickoffPlaySteps(
     const base = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
     if (base === NONE) return
     const cpuSpecial =
-      base === 0 && input.random !== undefined && isSpecialThrow(base, randomIntegerBelow(input.random, 0, 100))
+      base === 0 && input.random !== undefined && isSpecialThrow(base, input.random.rand(0, 100))
     if (sendToBase(tick, base, ' (CPU 결정)', cpuSpecial)) play = { ...play, wantsThrow: false }
   }
 

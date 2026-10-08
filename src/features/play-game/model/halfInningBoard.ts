@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **공수 교대 판** — 경기 장면 상태 0x18 의 교대 가지 (진입 0x3ac90 · 갱신 0x4f928 · 그리기 0x4fe9c, R10 5절).
@@ -46,10 +45,10 @@ const SLOW_STEP_LAST_INDEX = 5
 export function rollHalfInningFielders(random: RandomPort): void {
   for (let index = FIELDER_COUNT - 1; index >= 0; index -= 1) {
     const slow = index <= SLOW_STEP_LAST_INDEX
-    randomIntegerBelow(random, slow ? 160 : 300, slow ? 240 : 400)
-    randomIntegerBelow(random, 0, 200)
-    randomIntegerBelow(random, 100, 300)
-    randomIntegerBelow(random, slow ? 160 : 300, slow ? 240 : 400)
+    random.rand(slow ? 160 : 300, slow ? 240 : 400)
+    random.rand(0, 200)
+    random.rand(100, 300)
+    random.rand(slow ? 160 : 300, slow ? 240 : 400)
   }
 }
 

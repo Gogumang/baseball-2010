@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { autoSlideRunnerIndexes, SLIDING_SPEED_BONUS, type SlidingRunner } from '@/entities/defense-controls/model/sliding'
 import {
   autoAdvanceDecisions,
@@ -459,7 +458,7 @@ function* runnerPlaySteps(
     const base = chooseThrowTargetBase({ ...contextAt(tick), activeRunnerCount: active, outs })
     if (base === NONE) return
     const cpuSpecial =
-      base === 0 && input.random !== undefined && isSpecialThrow(base, randomIntegerBelow(input.random, 0, 100))
+      base === 0 && input.random !== undefined && isSpecialThrow(base, input.random.rand(0, 100))
     if (sendToBase(tick, base, false, cpuSpecial)) play = { ...play, wantsThrow: false }
   }
 

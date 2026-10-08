@@ -5,7 +5,6 @@ import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import { forecastCatch, type CatchForecastOptions } from '@/features/defense-play/model/catchForecast'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **판 도중 깐 공을 누가 언제 줍나** — 타구가 없는 판(견제 `pickoffPlay` · 도루/폭투 `runnerPlayEngine`)이 쓰는 뒤처리.
@@ -88,7 +87,7 @@ export function bounceOffFielder(
   const speed = Math.max(Math.trunc((point.speed * 60) / 100), 300)
   const verticalSpeed = Math.min(Math.trunc((point.verticalSpeed * 30) / 100), 100)
   // rand(−20, 20) — 난수가 없으면 굴리지 않고 0 (이 진행기들의 규약)
-  const turn = random === undefined ? 0 : randomIntegerBelow(random, -20, 20)
+  const turn = random === undefined ? 0 : random.rand(-20, 20)
   const angle = point.angle + turn
   const ball = launchTrajectory({ from, speed, verticalSpeed, angle, random, body: chase.body })
   return { ball, speed, verticalSpeed, angle }

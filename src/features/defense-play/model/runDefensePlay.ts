@@ -18,7 +18,6 @@ import {
 import { displayPatternOf, isFairAngle, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import {
   inPlayCommandOf,
   type ControlSide,
@@ -1658,7 +1657,7 @@ export function stepDefensePlay(
     const speed = Math.max(Math.trunc((point.speed * 60) / 100), 300)
     const verticalSpeed = Math.min(Math.trunc((point.verticalSpeed * 30) / 100), 100)
     // rand(−20, 20) — 난수가 없으면 굴리지 않고 0 (이 진행기의 규약)
-    const turn = input.random === undefined ? 0 : randomIntegerBelow(input.random, -20, 20)
+    const turn = input.random === undefined ? 0 : input.random.rand(-20, 20)
     const holder = fielders[chaserSlot]
     const next = launchTrajectory({
       from: holder.position,
@@ -1692,7 +1691,7 @@ export function stepDefensePlay(
     if (base === NONE) return
     // afad2: 홈(0)을 골랐을 때**만** rand(0,100) — 0xb2c90 이 실패해도 굴림은 먹는다
     const cpuSpecial =
-      base === 0 && input.random !== undefined && isSpecialThrow(base, randomIntegerBelow(input.random, 0, 100))
+      base === 0 && input.random !== undefined && isSpecialThrow(base, input.random.rand(0, 100))
     if (sendToBase(play.ballHolderSlot, base, 'CPU', cpuSpecial)) play = { ...play, wantsThrow: false }
   }
 
@@ -1888,7 +1887,7 @@ export function stepDefensePlay(
     // 필살타법 성공 타구(비트 4)는 야수가 쥐지 않고 지나친다 — 포구 자체를 건너뛴다 (0xaf180·0xbc3)
     if (tick === catchTick && catchGateOpen && uncatchable) {
       // b4228 — 펌블 굴림 rand(0, 10000) 은 필살타법 표시를 보기(b4246) 전에 늘 먹는다
-      if (input.random !== undefined) randomIntegerBelow(input.random, 0, 10_000)
+      if (input.random !== undefined) input.random.rand(0, 10_000)
       // 필살타법 타구 — 공 속성 목록 +0x5c 의 비트 4(0xaf180) 때문에 포구 틱 갈래가 쥐기 대신 메시지 0xbc3 · 사건(sp+0x24) = 1
       // (b4250). 그 0xbc3 에는 처리기가 없고, 틱 끝 b45a4 의 사건 갈래가 공을 그 야수에게서 튕겨 다시 쏜다(0xb3148)
       ballEventThisTick = true

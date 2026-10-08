@@ -22,7 +22,6 @@ import { settlementSkyColumnOf } from '@/widgets/batting-stage/lib/settlementSky
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
@@ -102,7 +101,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
     // (미션 · 홈런더비도 세션이 장면마다 한 번 굴린 rand(0, 6) 을 넘긴다 — 홈런더비는 결과 진입 0x4f574 에서 한 번 더).
     // 그리는 그림마다 넘겨받은 줄을 읽는다. ⚠️ 안 넘기는 화면만 예전대로 그림을 세울 때 여기서 굴린다(장면당 한 번이 아니다)
     const fallbackSkyRow =
-      latestRef.current.skyRow === undefined ? randomIntegerBelow(latestRef.current.random, 0, SKY_ROW_COUNT) : 0
+      latestRef.current.skyRow === undefined ? latestRef.current.random.rand(0, SKY_ROW_COUNT) : 0
     const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
 
     const advancePhase = (now: number) => {

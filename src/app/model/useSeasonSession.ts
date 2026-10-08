@@ -130,7 +130,6 @@ import type { LeagueBatterLine, LeaguePitcherLine } from '@/entities/league/mode
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
 import { NO_ROSTER_SLOT, entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import {
   FULL_PITCHER_STAMINA, SEASON_SHOP_TEXT, SEASON_STAMINA_ITEM, applySeasonGpItem, applySeasonSubItem, seasonGpItemPriceOf,
@@ -1365,7 +1364,7 @@ export function useSeasonSession(
     if (scene === SEASON_SCENE_STATE.투수시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.투수, step.next)
     // 0xed 0xe7ac — 0x8dd61(evmgr) 가 표 0xd4f34 에서 rand(0..6) 으로 MVP 순위 종류를 고른 뒤 376 을 튼다
     if (scene === SEASON_SCENE_STATE.최우수선수) {
-      seasonMvpKind.current = SEASON_MVP_LEADER_KINDS[randomIntegerBelow(random, 0, SEASON_MVP_LEADER_KINDS.length)] ?? null
+      seasonMvpKind.current = SEASON_MVP_LEADER_KINDS[random.rand(0, SEASON_MVP_LEADER_KINDS.length)] ?? null
       return startEvent(SEASON_AWARD_INTRO_EVENT_ID.MVP, step.next)
     }
   }, [commit, event100Awarded, openedHiddenIds, random, save, scene, startEvent, tradeRequest.isRequested])
@@ -2417,17 +2416,17 @@ export function useSeasonSession(
       if (effect === undefined) return
       const { record, teamMorale } = save.state
 
-      const rolled = randomIntegerBelow(random, effect.moraleRange[0], effect.moraleRange[1])
+      const rolled = random.rand(effect.moraleRange[0], effect.moraleRange[1])
       const moraleChange = effect.negatesMorale ? -rolled : rolled
       const money = effect.moneyRange === undefined
         ? effect.money
-        : randomIntegerBelow(random, effect.moneyRange[0], effect.moneyRange[1])
+        : random.rand(effect.moneyRange[0], effect.moneyRange[1])
       const popularity = effect.popularityRange === undefined
         ? 0
-        : randomIntegerBelow(random, effect.popularityRange[0], effect.popularityRange[1])
+        : random.rand(effect.popularityRange[0], effect.popularityRange[1])
       const reputation = effect.reputationRange === undefined
         ? 0
-        : randomIntegerBelow(random, effect.reputationRange[0], effect.reputationRange[1])
+        : random.rand(effect.reputationRange[0], effect.reputationRange[1])
 
       // 입원(장소 2)이면 치료를 굴린다 — `rand(0,101) ≤ 89` 이거나 여유 칸이 0 이면 낫는다 (0xcc6a)
       const cured = place === HOSPITAL_PLACE ? cureIllnessAtHospital(record, random).record : record

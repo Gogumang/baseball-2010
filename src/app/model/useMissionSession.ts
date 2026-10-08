@@ -72,7 +72,6 @@ import { hallOfFameModeBatterOf } from '@/app/model/modeBatter'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
@@ -1433,7 +1432,7 @@ export function useMissionSession({
    * 0x52e3a 9 → 0x3f584 · 0x52e32 8 → 0x48658, 예약 3efe6(상태 7 끝) → 9 · 3fa5e(상태 9 끝) → 8.
    */
   const [skyRow, setSkyRow] = useState(0)
-  const rollSkyRow = () => setSkyRow(randomIntegerBelow(random, 0, SKY_ROW_COUNT))
+  const rollSkyRow = () => setSkyRow(random.rand(0, SKY_ROW_COUNT))
 
   /**
    * 투수 미션 판이 3아웃으로 끝나도 여기서는 자동진행을 굴리지 않는다 — 타자 미션(`settleBatterRun`)과 같이 중계 화면이 틱마다

@@ -14,7 +14,6 @@ import {
   type ThrowLaunch,
 } from '@/entities/fielding/model/throwPlan'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 
 /**
  * **송구 공 쏘기** — 던지기 0xa1620(또는 레이저 0xa222c)가 공을 놓고 쏜 뒤, 송구 0xb2e38 이 같은 공을 세계 0xbfed0 으로 깔고
@@ -84,7 +83,7 @@ export function launchThrow(input: ThrowLaunchInput): ThrownBall {
   const bounce = input.laser !== true && input.bounce === true
   if (bounce) {
     // a1802 0xbfaa0 = rand(0, 2) — 난수가 없으면 굴리지 않고 0(φ − 1)
-    const turnsLeft = input.random !== undefined && randomIntegerBelow(input.random, 0, 2) !== 0
+    const turnsLeft = input.random !== undefined && input.random.rand(0, 2) !== 0
     launch = bounceThrowLaunchOf(thrower, target, turnsLeft)
   } else if (input.laser !== true && input.random !== undefined) {
     error = rollThrowError(input.ability, special, input.random)

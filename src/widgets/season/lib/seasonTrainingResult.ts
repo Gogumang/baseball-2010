@@ -1,5 +1,4 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { MORALE_LIMIT } from '@/entities/season-mode/model/seasonRecord'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
@@ -46,13 +45,13 @@ export function rollSeasonTraining(random: RandomPort, slot: number, items: Trai
   const gains = [0, 0, 0, 0]
   let moraleLoss: number
   if (slot === HELL_TRAINING_INDEX) {
-    moraleLoss = randomIntegerBelow(random, HELL_TRAINING_MORALE_LOSS_RANGE[0], HELL_TRAINING_MORALE_LOSS_RANGE[1])
+    moraleLoss = random.rand(HELL_TRAINING_MORALE_LOSS_RANGE[0], HELL_TRAINING_MORALE_LOSS_RANGE[1])
     for (let index = 0; index < gains.length; index += 1) {
-      gains[index] = randomIntegerBelow(random, HELL_TRAINING_GAIN_RANGE[0], HELL_TRAINING_GAIN_RANGE[1])
+      gains[index] = random.rand(HELL_TRAINING_GAIN_RANGE[0], HELL_TRAINING_GAIN_RANGE[1])
     }
   } else {
-    gains[slot] = randomIntegerBelow(random, TRAINING_GAIN_RANGE[0], TRAINING_GAIN_RANGE[1])
-    moraleLoss = randomIntegerBelow(random, TRAINING_MORALE_LOSS_RANGE[0], TRAINING_MORALE_LOSS_RANGE[1])
+    gains[slot] = random.rand(TRAINING_GAIN_RANGE[0], TRAINING_GAIN_RANGE[1])
+    moraleLoss = random.rand(TRAINING_MORALE_LOSS_RANGE[0], TRAINING_MORALE_LOSS_RANGE[1])
   }
   const bonuses = gains.map((_gain, index) =>
     trainedSlotsOf(slot).includes(index) && items.trainingSubItems[index] === true ? TRAINING_SUB_ITEM_GAIN : 0)
