@@ -190,6 +190,8 @@ export interface StageRefs {
   readonly heldResultRef: MutableRefObject<((now: number) => void) | null>
   /** '결과' 단계(0x12)가 서 있을 그림 수 — 결과를 세울 때 정한다 (`resultPhaseTicksOf`) */
   readonly resultTicksRef: MutableRefObject<number>
+  /** 지금 '결과' 가 맞은 공 뒤 인플레이(0x17) 자리인가 — 아니면 상태 0x12 (`StagePhaseSnapshot.isInPlay`) */
+  readonly isInPlayResultRef: MutableRefObject<boolean>
   /** 살아 있는 파티클 이미터 목록 (원본 파티클 관리자 [0x1400068]) */
   readonly particlesRef: MutableRefObject<ParticleScene>
   readonly pointerDownAtRef: MutableRefObject<number>
@@ -222,6 +224,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     pitchJudgedRef: useRef(false),
     heldResultRef: useRef<((now: number) => void) | null>(null),
     resultTicksRef: useRef(RESULT_PHASE_TICKS),
+    isInPlayResultRef: useRef(false),
     particlesRef: useRef<ParticleScene>(createParticleScene()),
     pointerDownAtRef: useRef(0),
     latestRef,
