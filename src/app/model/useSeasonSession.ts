@@ -18,7 +18,8 @@ import {
   seasonHumanWonOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
-import { applyGameIncome } from '@/entities/season-mode/model/seasonAttendance'
+import { applyGameIncome, settleGameIncome } from '@/entities/season-mode/model/seasonAttendance'
+import { seasonGameEvaluationLineOf } from '@/entities/season-mode/model/seasonGameEvaluation'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { TRADE_TAB, swapTradedPlayers } from '@/entities/season-mode/model/playerTrade'
 import type { TradeSettlement, TradeSwap } from '@/entities/season-mode/model/playerTrade'
@@ -265,6 +266,11 @@ export interface SeasonSession {
   readonly trainingResult: SeasonTrainingResult | null
   /** 외출 연출 0xe3 의 장소 [gfx+0x184] (0x4a94 가 넘긴 this+0xf8) — 그 장면이 아니면 null */
   readonly outingPlace: number | null
+  /**
+   * 0xe9(0xdea0)가 쌓은 평가 내장 이벤트 — 기록 줄(구내매점을 줄이기 전 레코드로 지은 글)과 0x8a6fc 에서 구내매점이 끝났는가.
+   * 0xe9 에 들어온 틀에 만든다. 그 장면이 아니면 null
+   */
+  readonly incomeEvaluation: SeasonIncomeEvaluation | null
   /** 외출 결과 팝업 0x17 글 (0xc81c) — 떠 있는 동안 상태는 0xe3 그대로, 닫으면 0xc9. 없으면 null */
   readonly outingResultText: string | null
   /**
@@ -302,6 +308,12 @@ export interface SeasonEquipPurchase {
   readonly money: number
   /** 새 니블 네 칸 */
   readonly equipment: readonly number[]
+}
+
+/** 0xe9 의 평가 내장 이벤트 재료 (`seasonGameEvaluationLineOf` · `settleGameIncome`) */
+export interface SeasonIncomeEvaluation {
+  readonly line: string
+  readonly storeExpired: boolean
 }
 
 export interface SeasonActions {
@@ -1202,6 +1214,7 @@ export function useSeasonSession(
   const [trainingResult, setTrainingResult] = useState<SeasonTrainingResult | null>(null)
   const [outingPlace, setOutingPlace] = useState<number | null>(null)
   const [outingResultText, setOutingResultText] = useState<string | null>(null)
+  const [incomeEvaluation, setIncomeEvaluation] = useState<SeasonIncomeEvaluation | null>(null)
   /** 0xed 진입 0xe7ac → 0x8dd60 이 굴린 시즌 MVP 순위 종류(표 0xd4f34 의 rand(0..6)) — 376 창 · 378/379 가 읽는다 */
   const seasonMvpKind = useRef<LeaderKind | null>(null)
   /** 관리 메뉴·구단관리 메뉴 객체의 커서 — 장면 생성(0x3b14)에서 0, 상태를 오가도 남는다 */
@@ -1311,8 +1324,18 @@ export function useSeasonSession(
     enteredScene.current = scene
     // 결산을 떠나면 그 진입은 끝났다 — 다시 들어올 때 지난 진입 값을 새 진입으로 읽지 않게 비운다
     if (scene !== SEASON_SCENE_STATE.시즌결산) setSummaryEntry(null)
+    if (scene !== SEASON_SCENE_STATE.관중수입) setIncomeEvaluation(null)
     if (save === null) return
     const { record } = save.state
+
+    // 0xe9 갱신 0xdea0 — 기록 줄을 지어(구내매점 "(+200)" 은 줄이기 전 SR+0x55) 0x8a6fc 로 평가 이벤트를 쌓는다. 그 안에서
+    // 구내매점 SR+0x55 가 하나 줄고(R13 10절) e120~e130 이 저장한다 — phase 는 경기 끝의 2 그대로라 이어하면 0xe9 를 다시 탄다
+    if (scene === SEASON_SCENE_STATE.관중수입) {
+      const settlement = settleGameIncome(record)
+      setIncomeEvaluation({ line: seasonGameEvaluationLineOf(record), storeExpired: settlement.storeExpired })
+      commit({ ...save, state: { ...save.state, record: settlement.record } })
+      return
+    }
 
     if (scene === SEASON_SCENE_STATE.관리메뉴 || scene === SEASON_SCENE_STATE.외출지도) {
       // 0xc9 진입 0x4efc: SR+0x1bc == 0 이면 phase = 3 · 저장 (4f78~4f9c)
@@ -2021,7 +2044,14 @@ export function useSeasonSession(
       // 경기 끝 꼬리 4f374~4f3b2 — 갈래와 상관없이 SR+0x54(목표점 보기)·SR+0x7c(질병 쿨다운)를 하나씩 줄인다.
       // 그 뒤 장면 0x105 를 **새로 만든다**(0x3b14): 반복 이벤트(490)의 본 비트를 지우고(0x8ce94) 이벤트 관리자
       // (커서)와 새 선수 플래그(this+0xf9)도 새로 선다.
-      const played: SeasonRecord = clearRepeatableSeen(tickAfterAnyGame({ ...record, gameRecord: summary.gameRecord }))
+      //
+      // 4f15a~4f19a — 모드 2 경기마다 SR+0x1bd = 내 칸 점수 · SR+0x1be = 상대 칸 점수(바이트, 0xe9 기록 줄이 s8 로 읽는다)
+      const played: SeasonRecord = clearRepeatableSeen(tickAfterAnyGame({
+        ...record,
+        gameRecord: summary.gameRecord,
+        lastGameScore: (summary.ourScore << 24) >> 24,
+        lastGameConceded: (summary.opponentScore << 24) >> 24,
+      }))
       eventCursor.current = START_SEASON_EVENT_CURSOR
       newPlayerFlag.current = false
 
@@ -2805,6 +2835,7 @@ export function useSeasonSession(
     trainingResult,
     outingPlace,
     outingResultText,
+    incomeEvaluation,
     awardWindowTextOf: (sub: number) =>
       save === null || eventPlayback === null
         ? null

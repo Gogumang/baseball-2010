@@ -118,6 +118,12 @@ export interface SeasonRecord {
   /** SR+0x1b0 / +0x1b4 — 직전 경기 관중 수 */
   readonly lastAttendance: number
   /**
+   * SR+0x1bd / SR+0x1be (s8) — 직전 경기 내 팀 득점 · 실점. 경기 끝 0x4ea0c 의 4f15a~4f19a 가 모드 2 경기마다
+   * `0xb69b0(경기, 내 칸)` · `0xb69b0(경기, 1 − 내 칸)` 를 바이트로 쓴다. 0xe9 의 기록 줄(`seasonGameEvaluationLineOf`)이 읽는다
+   */
+  readonly lastGameScore: number
+  readonly lastGameConceded: number
+  /**
    * SR+0x1c0 ~ +0x20f — **같은 날 리그 다섯 경기의 대진·점수** (s32 × 20 = A[5] · B[5] · scoreA[5] · scoreB[5]).
    * 경기 끝 CPU 경기 `0xc2a48` 이 끝에서(c2be0~c2c14) **모드 2 이고 국가대항전(L+0xac)·포스트시즌(L+0x34)이
    * 아닐 때만** 자기 표(경기 객체 +8, 0x50 바이트)를 통째로 복사한다 — 뜻은 `entities/league` 의 `LeagueDayBoard`.
@@ -294,6 +300,8 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
       // SR+0x187 = 0 (0x57c4)
       yearGoalShown: false,
       lastAttendance: 0,
+      lastGameScore: 0,
+      lastGameConceded: 0,
       dayBoard: emptySeasonDayBoard(),
       tradeRequestCount: 0,
       stadiumOwned: falses(STADIUM_OWNED_SIZE),

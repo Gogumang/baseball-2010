@@ -1,95 +1,75 @@
 import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
+import { STORE_EXPIRED_USER_EVENT } from '@/entities/season-mode/model/seasonAttendance'
 import {
-  STORE_EXPIRED_USER_EVENT, STORE_INCOME_BONUS, settleGameIncome,
-} from '@/entities/season-mode/model/seasonAttendance'
-import type { IncomeSettlement } from '@/entities/season-mode/model/seasonAttendance'
+  SEASON_EVALUATION_GAUGE_DIVISOR, seasonGameEvaluationExpressionOf,
+} from '@/entities/season-mode/model/seasonGameEvaluation'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
-import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
-import { incomeTextOf, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
-import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
-import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
+import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
+import { messageGameNumberOf } from '@/pages/management/lib/managementLayout'
+import { SeasonEventUnderlay } from '@/pages/season/ui/SeasonEventUnderlay'
 
 export interface GameIncomeScreenProps {
-  /** 경기가 끝난 직후의 레코드 — 수입은 경기 장면 셋업(0xa34b8)이 이미 소지금에 더했다 */
+  /** 0xe9 진입 뒤의 레코드 — 구내매점 SR+0x55 는 이미 줄었다(0x8a6fc) */
   readonly record: SeasonRecord
-  /**
-   * 확인(−5) — 구내매점 카운터를 줄인 레코드를 넘긴다.
-   * 원본은 그 뒤 포스트시즌이면 (경기수 0 ? 0xee : 0xef), 아니면 0xf1 로 간다 (그 사이에 이벤트 0xd3).
-   */
-  readonly onConfirm: (settlement: IncomeSettlement) => void
+  readonly teamMorale: number
+  readonly gamePoint: number
+  /** 0xdea0 이 지은 기록 줄 (`seasonGameEvaluationLineOf` — 구내매점을 줄이기 전 레코드로) */
+  readonly line: string
+  /** 0x8a6fc 에서 SR+0x55 가 0 이 됐는가 — 이벤트 끝에 system sub 5 → StrUSER_EVT[113] 창 */
+  readonly storeExpired: boolean
+  /** 변화 창 아래 올해의 목표 표 (0x8656c 시즌 갈래) */
+  readonly goals: YearGoalWindowSource
+  /** 이벤트 끝 — 0xdea0 이 걸어 둔 다음 상태(0xf1 · 포스트시즌 0xee/0xef)로 */
+  readonly onDone: () => void
 }
 
 /**
- * 경기 뒤 관중·수입 정산 창 (장면 0x105 상태 **0xe9**, 갱신 `0xdea0`).
- * 표시 문구는 J 4-7 의 `"관중: N명"` · `"수입: X만"` · 구내매점 `"(+200)"` 이다. **계산은 여기서 안 한다** —
- * 경기 장면 셋업 0x39fdc 모드 2 갈래가 `0xa34b8` 로 이미 수입을 소지금에 더했고(`applyGameIncome`), 0xdea0 은
- * +0x1b4 관중 · +0x66 수입 · 소지금을 읽어 보여 준다.
+ * **경기 뒤 0xe9 → 0xd3 평가 내장 이벤트** (`entities/season-mode/model/seasonGameEvaluation` 머리말).
+ * 0xe9(0xdea0)는 그림도 키도 없이 이벤트를 쌓고 곧장 0xd3 으로 넘긴다 — 웹은 그 0xd3 재생을 이 화면이 맡는다.
+ * 재생은 나리 116 과 같은 `EvaluationEventPlayer`(명령 1 say → 명령 2 변화 창)이고, 밑그림은 0x8b5ac 의 공 무늬 · 상태판
+ * ([이벤트+0xb] = 1 — 막 치른 경기) · 머리띠다(`SeasonEventUnderlay`). 시즌은 연속 기록이 없고(명령 3 없음) 감독 글도 없다
+ * (글 번호 50000 — 대사 = 기록 줄). 구내매점이 이 경기로 끝났으면 마지막 명령 system sub 5 가 StrUSER_EVT[113] 창을 연다.
  *
- * 규칙은 `entities/season-mode/model/seasonAttendance.ts` 가 전부 가진다 — 여기서는 부르고 보여 준다.
- * 같은 화면이 부르는 `0x8a6fc` 에서 **구내매점 카운터 SR+0x55 가 1 줄고**, 0 이 되는 경기의 끝에
- * StrUSER_EVT[113] 만료 안내가 붙는다 (R13 10절 확정).
- *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xdea0 의 좌표가 안 풀려 공용 판 목록으로 그린다.
+ * ⚠️ 0xd3 이 끝난 한 틀(0xa09c 의 공통 틀 — 앞 상태 0xe9 라 칸 없음)은 그리지 않는다.
  */
-export function GameIncomeScreen({ record, onConfirm }: GameIncomeScreenProps) {
-  const settlement = settleGameIncome(record)
-  const [isExpiredShown, setExpiredShown] = useState(false)
+export function GameIncomeScreen({ record, teamMorale, gamePoint, line, storeExpired, goals, onDone }: GameIncomeScreenProps) {
+  const [isExpiryOpen, setExpiryOpen] = useState(false)
+  // 0x86531(gfx, S+7, 사기, S+0x4a, 인기도, S+0x64, 평판) — 0xdea0 이 넘기는 차례 (e07c~e0d0)
+  const changeValues = {
+    changes: [record.lastMoraleChange, record.lastPopularityChange, record.lastReputationGrade],
+    currents: [teamMorale, record.popularity, record.reputation],
+  } as const
 
-  const storeBonus = record.storeGames > 0 ? STORE_INCOME_BONUS : 0
-  const rows: readonly SeasonListRow[] = [
-    { id: '관중', label: '관중', value: `${settlement.attendance}명` },
-    {
-      id: '수입',
-      label: '수입',
-      // 구내매점(StrMODE[128] "1년간 경기 수입 +200만")이 붙으면 원본도 "(+200)" 을 덧붙인다
-      value: `${incomeTextOf(settlement.income)}${storeBonus === 0 ? '' : ` (+${storeBonus * MILLION_TO_TEN_THOUSAND})`}`,
-    },
-    { id: '소지금', label: '소지금', value: seasonMoneyTextOf(settlement.record.money) },
-  ]
+  const underlay = <SeasonEventUnderlay record={record} teamMorale={teamMorale} gamePoint={gamePoint} isPreviousGame />
 
-  const confirm = () => {
-    // 구내매점 기간이 이 경기로 끝났으면 만료 안내를 먼저 띄운다 (StrUSER_EVT[113])
-    if (settlement.storeExpired && !isExpiredShown) {
-      setExpiredShown(true)
-      return
-    }
-    onConfirm(settlement)
+  // ⚠️ 근사: 원본은 [113] 창 밑에 마지막 say 상자(0x7fbc4)가 남는다 — 재생기가 변화 창을 닫은 단계를 밖에 안 내줘 밑그림만 남긴다
+  if (isExpiryOpen) {
+    return (
+      <RawScreen>
+        {underlay}
+        <MessageBox text={ORIGINAL_USER_EVENTS[STORE_EXPIRED_USER_EVENT] ?? ''} buttons={['확인']} onAnswer={onDone} />
+      </RawScreen>
+    )
   }
-
-  const isNoticeOpen = settlement.storeExpired && isExpiredShown
-  const { cursor, moveTo } = useSeasonCursor({
-    count: rows.length,
-    onSelect: confirm,
-    onCancel: confirm,
-    isEnabled: !isNoticeOpen,
-  })
 
   return (
     <RawScreen>
-      {/* 공통 앞그림 0xb810 — 0xe9 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
-      <SkinBackdrop kind="공무늬" />
-      <SeasonListWindow
-        title="경기 수입"
-        rows={rows}
-        cursor={cursor}
-        onMoveCursor={moveTo}
-        onSelect={confirm}
-        onBack={confirm}
-        backLabel="확인"
-        footer={'관중이 많을수록 수입이 늘어난다'}
+      <EvaluationEventPlayer
+        underlay={underlay}
+        dialogue={line}
+        dialogueExpression={seasonGameEvaluationExpressionOf(record.lastPopularityChange)}
+        changeValues={changeValues}
+        goals={goals}
+        year={record.yearIndex + 1}
+        game={messageGameNumberOf(record.games, record.inPostseason, true)}
+        streak=""
+        streakExpression={0}
+        gauge={{ popularityChange: record.lastPopularityChange, divisor: SEASON_EVALUATION_GAUGE_DIVISOR }}
+        onDone={() => (storeExpired ? setExpiryOpen(true) : onDone())}
       />
-
-      {isNoticeOpen && (
-        <MessageBox
-          text={ORIGINAL_USER_EVENTS[STORE_EXPIRED_USER_EVENT] ?? ''}
-          buttons={['확인']}
-          onAnswer={() => onConfirm(settlement)}
-        />
-      )}
     </RawScreen>
   )
 }

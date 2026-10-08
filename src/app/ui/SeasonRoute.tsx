@@ -988,10 +988,18 @@ export function SeasonRoute({
   }
 
   if (scene === SEASON_SCENE_STATE.관중수입) {
+    // 0xe9 는 그리기가 없다 — 진입 틀에 이벤트를 쌓기 전 한 틀은 빈 화면
+    if (session.incomeEvaluation === null) return <RawScreen>{null}</RawScreen>
     return (
       <GameIncomeScreen
         record={state.record}
-        onConfirm={(settlement) => actions.confirmIncome(settlement.record)}
+        teamMorale={state.teamMorale}
+        gamePoint={session.gamePoints}
+        line={session.incomeEvaluation.line}
+        storeExpired={session.incomeEvaluation.storeExpired}
+        goals={{ labelSet: SEASON_YEAR_GOAL_LABEL_SET, ...seasonGoalWindowNumbersFor(goalSource) }}
+        // 0xd3 이 끝나면 0xdea0 이 걸어 둔 다음 상태로 — 구내매점은 0xe9 진입이 이미 줄였다
+        onDone={() => actions.confirmIncome(state.record)}
       />
     )
   }

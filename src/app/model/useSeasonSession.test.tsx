@@ -179,6 +179,26 @@ describe('시즌 세션', () => {
     expect(result.current.state?.record.acted).toBe(false)
   })
 
+  it('0xe9 진입 0xdea0 — 득점·실점 SR+0x1bd/0x1be 로 기록 줄을 짓고, 구내매점 SR+0x55 를 하나 줄여 저장한다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, storeGames: 1 }))
+    act(() => result.current.actions.playNextGame())
+
+    act(() => result.current.actions.finishGame(요약({ ourScore: 4, opponentScore: 7 })))
+
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관중수입)
+    expect(result.current.state?.record.lastGameScore).toBe(4)
+    expect(result.current.state?.record.lastGameConceded).toBe(7)
+    // "(+200)" 은 줄이기 전 값으로 본다 — 줄인 뒤 0 이 되면 이벤트 끝에 [113] 창
+    expect(result.current.incomeEvaluation?.line).toMatch(/^득점: 4 \/ 실점: 7 \/ 경기패배!!N/)
+    expect(result.current.incomeEvaluation?.line).toMatch(/\(\+200\)만$/)
+    expect(result.current.incomeEvaluation?.storeExpired).toBe(true)
+    expect(result.current.state?.record.storeGames).toBe(0)
+    expect((store.load() as { state: { record: { storeGames: number } } }).state.record.storeGames).toBe(0)
+  })
+
   it('정규시즌 경기 끝에 오늘 리그 점수표를 SR+0x1c0 에 담는다 — 내 경기 줄만 −1 (0xc2a48 c2be0)', () => {
     const { result } = 띄우기()
     시작(result, 0)
