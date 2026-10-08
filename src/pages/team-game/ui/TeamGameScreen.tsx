@@ -869,14 +869,6 @@ export function TeamGameScreen({
             {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
             <RecordAlertPanel frame={recordAlert} />
             </div>
-            <Hint>
-              {(game.battingOrderIndex % 9) + 1}번 {currentBatterEntry(progress)?.name ?? '타자'} ·
-              탭·Space·5 스윙 · ←→(4·6) 타자 이동
-              {(currentBatterEntry(progress)?.aceIndex ?? -1) < 0 && ' · 8·7·9(Shift)·길게 눌러 번트'}
-              {isStealable.includes(1) && ' · 3 도루(1루)'}
-              {isStealable.includes(2) && ' · 2 도루(2루)'}
-              {isStealable.includes(3) && ' · 1 도루(3루)'}
-            </Hint>
           </div>
         ) : canPitch ? (
           <>

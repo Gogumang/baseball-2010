@@ -146,12 +146,33 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
 })
 
 describe('팀 경기 화면 — 공격(타석) 차례', () => {
+  /** 0xe 의 투수·타자 소개 판 0x44944 가 설 때까지 틱을 흘린다 */
+  const 소개판까지 = () => {
+    for (let 틱 = 0; 틱 < 40 && screen.queryByTestId('타자판') === null; 틱 += 1) {
+      act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    }
+  }
+  /** 소개 판의 타자 칸 — 이름(0xb62c0)과 타순 숫자(팀 +0x32 + 1, num 그림 번호) */
+  const 타자칸 = () => {
+    const 판 = screen.getByTestId('타자판')
+    return {
+      name: 판.querySelector('[data-testid="이름"]')?.textContent ?? null,
+      order: [...판.querySelectorAll<HTMLElement>('[data-testid="타순"]')].map((node) => node.dataset.image),
+    }
+  }
+
   it('선공이면 1회초가 우리 공격이라 타석이 뜬다', () => {
-    띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    vi.useFakeTimers()
+    render(
+      <TeamGameScreen options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }} random={createSeededRandom(20100901)}
+        onFinish={vi.fn()} onQuit={vi.fn()} />,
+    )
+    판닫기()
 
     expect(screen.getByText('타석')).toBeTruthy()
-    // 안내줄은 타순 칸과 **명단에 선 타자 이름**을 적는다 (대타가 붙은 뒤로는 이름이 바뀐다)
-    expect(screen.getByText(/1번 /)).toBeTruthy()
+    // 0xe 소개 판의 타자 칸이 타순 1번과 **명단에 선 타자 이름**을 적는다 (대타가 붙은 뒤로는 이름이 바뀐다)
+    소개판까지()
+    expect(타자칸()).toEqual({ name: '박택용', order: ['31'] })
     // 같은 화면에 투구 단계가 함께 뜨지 않는다 — 공수는 번갈아 돈다
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
   })
@@ -172,7 +193,9 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
     fireEvent.click(screen.getByText('메디카 (마타자)'))
 
     expect(screen.queryByText('타자 교체')).toBeNull()
-    expect(screen.getByText(/1번 메디카/)).toBeTruthy()
+    // 대타가 서면 0xe 로 돌아와 소개 판이 다시 선다 — 같은 타순 1번에 메디카
+    소개판까지()
+    expect(타자칸()).toEqual({ name: '메디카', order: ['31'] })
   })
 })
 
