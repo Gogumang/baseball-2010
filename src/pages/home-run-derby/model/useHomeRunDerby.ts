@@ -10,6 +10,7 @@ import {
   type DerbyBattedBall,
 } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
+import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import {
   COMBO_DISPLAY_FRAMES,
@@ -131,8 +132,8 @@ export interface HomeRunDerbyOptions {
   readonly random?: RandomPort
   /**
    * 내 타자편 팀 r7 = (s8) `0x1f8d5(저장, 4)` +1 바이트 — 나리 타자편 저장의 팀(웹 `career.teamId`, 마선수 대결의
-   * 사람 칸 팀과 같은 칸 — `missionHumanTeamIdOf`). 상대 팀 굴림 3a454 가 이 팀을 피한다. ⚠️ 저장이 없을 때 그 바이트 값은 미해결 —
-   * 안 넘기면 피하지 않는다.
+   * 사람 칸 팀과 같은 칸 — `missionHumanTeamIdOf`). 상대 팀 굴림 3a454 가 이 팀을 피한다. 저장이 없으면 그 바이트는 0 이다
+   * (`DERBY_NO_BATTER_SAVE_TEAM_ID` — 0x213c0 이 새 버퍼를 0 으로 세우고 0x20ac4 는 파일이 없으면 안 쓴다). 안 넘기면 그 값이다.
    */
   readonly myTeamId?: number
 }
@@ -142,7 +143,7 @@ export interface HomeRunDerbyOptions {
  * 효과 객체 1202(`openScenePatternDeck`) 뒤, 상태 9 갱신 0x3f584 의 공통 꼬리 차례 그대로:
  * ```
  * 3f856  0x39fdc(scene, 7)  → 모드 7 갈래 3a43e:
- *          3a44e  r7 = (s8) 0x1f8d5(저장, 4)+1          ; 내 타자편 팀
+ *          3a44e  r7 = (s8) 0x1f8d5(저장, 4)+1          ; 내 타자편 팀 — 저장이 없으면 0 (`DERBY_NO_BATTER_SAVE_TEAM_ID`)
  *          3a454  v = rand(0, 9) → sp+0x18 ; v == r7 이면 9   ; 상대 팀 — 0xb6bd5(ctx, 1, v) · 팀 객체 0xb891c
  * 3fa0e  0xc0dac 시뮬 초기화 → c0df6 rand(0, 2)          ; `rollSimulatorInit` (dcfcef7)
  * ```
@@ -154,7 +155,7 @@ export interface HomeRunDerbyOptions {
  */
 export function rollDerbySceneStart(
   random: RandomPort,
-  myTeamId?: number,
+  myTeamId: number = DERBY_NO_BATTER_SAVE_TEAM_ID,
 ): { readonly loadingTipIndex: number; readonly skyRow: number; readonly opponentTeamId: number } {
   // 상태 7 진입 0x39f88 → 0x53dbc — 로딩 팁 rand(0, 73). 모드를 안 가려 더비도 장면마다 맨 앞에 한 번 (`rollSceneLoadingTip`)
   const loadingTipIndex = rollSceneLoadingTip(random)
@@ -260,7 +261,13 @@ export interface HomeRunDerbySession {
  * `derbyBattedBallOf` 가 판을 돌려 홈런(슬롯 2 모드 7 갈래 0x52720) · 비거리(0xa600c) · 판 끝(공 멈춤 + 10틱)을 낸다(그 파일 머리말).
  * 판 안 굴림은 폴 충돌 rand(−25, 25) 하나뿐이다 — 야수는 쫓지도 쥐지도 않는다(공 틱 vt48 · 플레이 틱 vt4c 가 종류 8 이면 안 돈다).
  */
-export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId }: HomeRunDerbyOptions): HomeRunDerbySession {
+export function useHomeRunDerby({
+  bestDistance,
+  onFinish,
+  aceLevels,
+  random,
+  myTeamId = DERBY_NO_BATTER_SAVE_TEAM_ID,
+}: HomeRunDerbyOptions): HomeRunDerbySession {
   /** HUD 가 그리는 진행 — 셈(`runRef`)은 공이 맞은 순간 하고, 이 칸은 판 끝 · 0x12 대기 끝에 따라 맞춘다 */
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [isPaused, setIsPaused] = useState(false)

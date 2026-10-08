@@ -16,6 +16,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
 
 /** 무엇이 울렸는지 적어 두는 포트 */
 function 녹음포트() {
@@ -98,6 +99,15 @@ describe('단계 0 상대 투수 — 0x39fdc 모드 7 갈래 3a454 의 상대 �
     expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 4 : lo)).random, 4).opponentTeamId).toBe(9)
     expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 4 : lo)).random, 3).opponentTeamId).toBe(4)
     expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 4 : lo)).random).opponentTeamId).toBe(4)
+  })
+
+  it('나리 타자편 저장이 없으면 r7 = 0 이라 0 이 나오면 9 다 (0x213c0 이 0 으로 세운 버퍼 · 0x20ac4 는 파일이 없으면 안 쓴다)', () => {
+    expect(DERBY_NO_BATTER_SAVE_TEAM_ID).toBe(0)
+    expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random).opponentTeamId).toBe(9)
+    expect(
+      rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random, DERBY_NO_BATTER_SAVE_TEAM_ID).opponentTeamId,
+    ).toBe(9)
+    expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random, 3).opponentTeamId).toBe(0)
   })
 
   it('단계 0 투수는 그 팀의 투수 줄 2 다', () => {

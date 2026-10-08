@@ -11,6 +11,7 @@ import { nariBatterOf } from '@/app/model/useCollection'
 import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
 import type { AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
 import { derbyHallOfFameBatterIndexOf } from '@/pages/home-run-derby/lib/derbyModeBatter'
+import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
 import type { HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -344,8 +345,9 @@ export function EntryRoutes({
         onSettingsChange={gameSettings.setSettings}
         // 상태 0xe 소개 판의 타자 판 — 모드 타자 기록(0x1fc20)에서 (`derbyMatchupBatterOf`)
         matchupBatter={derbyMatchupBatterOf(famer, career)}
-        // 상대 팀 굴림 3a454 가 피하는 내 팀 r7 = 나리 타자편 저장의 팀 (명예 타자를 골라도 같은 저장을 본다)
-        {...(career === null ? {} : { myTeamId: career.teamId })}
+        // 상대 팀 굴림 3a454 가 피하는 내 팀 r7 = 나리 타자편 저장의 팀 (명예 타자를 골라도 같은 저장을 본다).
+        // 저장이 없으면 0x213c0 이 0 으로 세운 버퍼의 바이트라 0 (`DERBY_NO_BATTER_SAVE_TEAM_ID`)
+        myTeamId={career === null ? DERBY_NO_BATTER_SAVE_TEAM_ID : career.teamId}
         onExit={leave}
       />
     )

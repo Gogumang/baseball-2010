@@ -67,6 +67,7 @@ interface HomeRunDerbyScreenProps {
   readonly matchupBatter?: Omit<MatchupBatterCard, 'isComputer'>
   /**
    * 내 타자편 팀 — 나리 타자편 저장의 팀(0x1f8d5(저장, 4) +1). 상대 팀 굴림 3a454 가 이 팀을 피한다 (`rollDerbySceneStart`).
+   * 저장이 없으면 0 (`DERBY_NO_BATTER_SAVE_TEAM_ID`) — 안 넘기면 그 값이다.
    */
   readonly myTeamId?: number
 }
