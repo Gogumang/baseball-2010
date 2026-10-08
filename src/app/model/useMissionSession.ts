@@ -1586,6 +1586,14 @@ export function useMissionSession({
       setLastSide(pick.side)
     },
 
+    /**
+     * 미션 목록(장면 0x107)의 CLR 0x1e8d0 — `[0x140006c] = 0x11` · 장면 0x103 → 생성자 0x234d4 가 하위 17(선수 고르기)을 다시 연다.
+     * 고른 선수를 내려 고르기 창부터 다시 띄운다
+     */
+    returnToPlayerPick: () => {
+      setPlayer(null)
+    },
+
     begin: (mission: OriginalMission) => {
       setLastSide(mission.side)
       resetForNewMatch(mission)

@@ -148,6 +148,11 @@ export function MissionRoutes({
   // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 · 투구 화면을 둔다
   // 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 타석 · 투구 화면이 알린다
   const [isPopupFrozen, setPopupFrozen] = useState(false)
+  /**
+   * 지금 선수 고르기(하위 17)가 미션 목록 CLR 의 `[0x140006c] = 0x11` 로 장면을 새로 세운 것인가 — 생성자가 띠를 1 로 세웠다.
+   * 메인 메뉴에서 들어오면 이 라우트가 새로 서므로 거짓에서 시작한다
+   */
+  const [isPickSceneRebuilt, setPickSceneRebuilt] = useState(false)
   const isFreePassReady = useFreePassPlayStart(
     session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
   )
@@ -172,12 +177,18 @@ export function MissionRoutes({
   // 0x5eb8c 칸 채우기)·갱신 0x29a54(0x62569 키 → 표 0xcec00)·그리기 0x2dec8 어디에도 0x25d78·0x74ef5·문자열 0x702b5 호출이 없다.
   // ⚠️ 미해결: 바탕 0x58371 의 내부는 안 읽어 명예의 전당 화면 바탕 그대로 둔다.
   if (screen.kind === '미션선택' && session.player === null) {
+    // 결과 0(되돌아가기)은 표 0xcec00 → 하위 5 게임시작 목록(0x29a92) — 장면을 새로 세우지 않아 커서 [0x1552d24] 는 그 칸 그대로다.
+    // 메인 메뉴에서 내려왔으면 띠는 이미 다 자랐고, 미션 목록 CLR(0x11 로 장면을 새로 세움)로 왔으면 생성자가 1 로 세운 채라
+    // 하위 5 에서 처음 자란다(하위 17 그리기 0x2dec8 은 0x2524c 를 안 불러 띠가 안 자란다)
+    const leaveToGameStartList = () => setScreen(isPickSceneRebuilt
+      ? { kind: '메인메뉴', openTier: 5 }
+      : { kind: '메인메뉴', openTier: 5, isBandGrown: true })
     return (
       <HallOfFameScreen
         {...(gamePoint === undefined ? {} : { frame: { title: '미션모드' as const, gamePoint } })}
         collection={hallOfFame}
-        mode={{ kind: '선수고르기', nari, onPick: actions.choosePlayer, onCancel: () => setScreen({ kind: '메인메뉴' }) }}
-        onBack={() => setScreen({ kind: '메인메뉴' })}
+        mode={{ kind: '선수고르기', nari, onPick: actions.choosePlayer, onCancel: leaveToGameStartList }}
+        onBack={leaveToGameStartList}
       />
     )
   }
@@ -190,7 +201,12 @@ export function MissionRoutes({
       // 고른 선수가 편을 정한다 — 목록 안에서 편을 바꾸는 길은 원본에 없다
       canSwitchSide={session.player === null}
       onSelect={(mission) => setScreen({ kind: '미션설명', mission })}
-      onBack={() => setScreen({ kind: '메인메뉴' })}
+      // CLR 0x1e8d0: [0x140006c] = 0x11 · 장면 0x103 — 메인 메뉴가 아니라 선수 고르기(하위 17)가 띠 연출과 함께 다시 선다
+      onBack={() => {
+        setPickSceneRebuilt(true)
+        actions.returnToPlayerPick()
+        setScreen({ kind: '미션선택' })
+      }}
     />
   )
 
