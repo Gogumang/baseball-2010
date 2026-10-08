@@ -4,7 +4,7 @@ import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import {
   TRADE_BOOST_COUNT, markTradeUsed, rollTradeSuccess,
-  tradeBoostCostOf, tradeSuccessRate, withTradeMoney,
+  tradeBoostCostOf, tradeMoneyChangeOf, tradeSuccessRate, withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
@@ -34,6 +34,9 @@ const BOOST_FIRST_TEXT = 168 // [168] 기본 진행 · [169] +50% · [170] +20%
 const TRADE_QUESTION = ORIGINAL_MODE_TEXT[171] // "트레이드를 하시겠습니까?"
 const TRADE_SUCCESS = ORIGINAL_MODE_TEXT[174] // "트레이드 성공!!!"
 const TRADE_FAILURE = ORIGINAL_MODE_TEXT[175] // "트레이드 실패!!!"
+/** 진행 가드 0xd3e6~0xd45c — [65] G 부족(팝업 (2, 2) 예/아니오) · [77] 소지금 부족(팝업 (1, 1) 확인) */
+const LACK_GAME_POINT = ORIGINAL_MODE_TEXT[65] // "G포인트가 부족합니다. 구매 페이지로 이동하시겠습니까?"
+const LACK_MONEY = ORIGINAL_MODE_TEXT[77] // "소지금이 부족합니다"
 /** 0xe5 진입 0x5cd0 — 요청이면 [163] 대신 [204] "상대 팀에서 제시한 보상 선수입니다" */
 const REQUEST_ACQUIRED = ORIGINAL_MODE_TEXT[204]
 /** 0xe6 진입 0x5b28 — 요청이면 [164] 대신 [205] "상대 팀에서 원하는 우리 팀의 선수 입니다" */
@@ -70,8 +73,8 @@ type TradeStep =
   | { readonly kind: '보상'; readonly teamId: number; readonly acquired: number }
   | { readonly kind: '확인'; readonly teamId: number; readonly acquired: number; readonly given: number }
 
-/** 지금 떠 있는 예·아니오 팝업 — 진행 [171] (id 0x18) 또는 요청 취소 [216] (id 0x2e) */
-type TradeQuestion = '진행' | '요청취소'
+/** 지금 떠 있는 예·아니오 팝업 — 진행 [171] (id 0x18) · 요청 취소 [216] (id 0x2e) · G 부족 [65] (id 2) */
+type TradeQuestion = '진행' | '요청취소' | 'G부족'
 
 export interface TradeScreenProps {
   readonly state: SeasonState
@@ -274,11 +277,29 @@ export function TradeScreen({
     setDone('결과')
   }
 
+  /**
+   * [171] 에 "예" — 진행 가드 0xd3e6~0xd45c (직접 떴다). 걸리면 진행도 굴림도 SR+0x56 도 없이 0xe7 에 남는다:
+   * ```
+   * G(전역 +0x64) < 비용표 0xcbbed[칸] × 100      → [65] 팝업 (2, 2)   ; 예 → 0xfa G 충전 (0xd47a~0xd4a4)
+   * d < 0 이고 소지금 SR+2 < −d                   → [77] 팝업 (1, 1)
+   * 그 밖                                         → this+0x160 = 1 (진행) · +0x164 = 0 · +0x168 = 0
+   * ```
+   * d 는 성공 때 소지금에 더할 그 값이다(`tradeMoneyChangeOf`). 요청이면 비용 칸이 0 이라 G 가드는 늘 지나지만 d 가드는 같다.
+   * 웹에는 G 충전 0xfa 가 없어 [65] 의 "예" 도 충전하지 않고 0xe7 에 남는 길로 둔다(시즌 트레이닝 [65] 과 같다).
+   */
+  const proceedTrade = () => {
+    if (step.kind !== '확인' || acquiredEntry === null || givenEntry === null) return
+    if (gamePoints < tradeBoostCostOf(boost)) return setQuestion('G부족')
+    const moneyChange = tradeMoneyChangeOf(givenEntry.grade, acquiredEntry.grade)
+    if (moneyChange < 0 && record.money < -moneyChange) return setNotice(LACK_MONEY)
+    runTrade()
+  }
+
   const answerQuestion = (answer: number) => {
     const which = question
     setQuestion(null)
     if (answer !== 0) return
-    if (which === '진행') return runTrade()
+    if (which === '진행') return proceedTrade()
     if (which === '요청취소') onCancelRequest?.()
   }
 
@@ -393,7 +414,7 @@ export function TradeScreen({
 
       {question !== null && (
         <MessageBox
-          text={question === '진행' ? TRADE_QUESTION : REQUEST_CANCEL_QUESTION}
+          text={question === '진행' ? TRADE_QUESTION : question === 'G부족' ? LACK_GAME_POINT : REQUEST_CANCEL_QUESTION}
           buttons={['예', '아니오']}
           onAnswer={answerQuestion}
         />

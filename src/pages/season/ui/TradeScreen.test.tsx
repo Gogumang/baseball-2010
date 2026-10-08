@@ -121,7 +121,8 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
   })
 
   it('⚠️ 0xe6 에서 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로다 (원본 그대로 — 0x727c 는 this+0x154 를 본다)', () => {
-    const { onTrade } = 띄우기(상태(), { random: 고정난수(1) })
+    // 소지금은 넉넉히 — 내 선수가 낮아 d < 0 이면 진행 가드 [77] 이 먼저 걸린다
+    const { onTrade } = 띄우기(상태({ money: 9999 }), { random: 고정난수(1) })
     상대팀고르기() // 투수 탭
     누르기(teamPitchers(OPPONENT)[1].name)
     누르기('타자') // 0xe6 목록만 타자로
@@ -252,6 +253,68 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     expect(settlement.swap).toBeUndefined()
   })
 
+  /** 굴림을 세는 난수 — 가드에 걸리면 굴리지 않는다 */
+  const 세는난수 = () => {
+    const rolls: number[][] = []
+    const random: RandomPort = {
+      rand: (lo, hi) => {
+        rolls.push([lo, hi])
+        return lo
+      },
+      rand9d: (n) => {
+        rolls.push([n])
+        return 0
+      },
+    }
+    return { random, rolls }
+  }
+
+  it('진행 가드 0xd41e — G < 비용표 × 100 이면 [65] (예/아니오) 만 띄우고 굴림·진행·SR+0x56 이 없다', () => {
+    const { random, rolls } = 세는난수()
+    const { onTrade } = 확인까지({ random, gamePoints: 1999 })
+
+    누르기(/\+50%/)
+    누르기('예')
+
+    expect(알림글()).toContain('G포인트가 부족합니다')
+    누르기('예')
+    expect(onTrade).not.toHaveBeenCalled()
+    expect(rolls).toEqual([])
+    // 0xe7 에 남는다 — 비용 칸이 그대로 보인다
+    expect(screen.getByRole('button', { name: /기본 진행/ })).toBeDefined()
+  })
+
+  it('G 가 비용과 같으면 지난다 (cmp 비용, G · ble)', () => {
+    const { onTrade } = 확인까지({ random: 고정난수(100), gamePoints: 2000 })
+
+    누르기(/\+50%/)
+    누르기('예')
+
+    expect(onTrade).toHaveBeenCalledTimes(1)
+  })
+
+  it('진행 가드 0xd436 — d < 0 이고 소지금 < −d 면 [77] (확인) 만 띄우고 굴림이 없다', () => {
+    const 내타자 = teamBatters(MY_TEAM)
+    const 상대타자 = teamBatters(OPPONENT)
+    const 내칸 = 내타자.reduce((best, entry, index) => (entry.grade < 내타자[best].grade ? index : best), 0)
+    const 상대칸 = 상대타자.reduce((best, entry, index) => (entry.grade > 상대타자[best].grade ? index : best), 0)
+    const d = (내타자[내칸].grade - 상대타자[상대칸].grade) * 10 * 2
+    // 시험 전제 — 새 시즌 소지금 50 으로는 모자란다
+    expect(d).toBeLessThan(-50)
+
+    const { random, rolls } = 세는난수()
+    const { onTrade, onFinish } = 확인까지({ random }, 상대칸, 내칸)
+
+    누르기(/기본 진행/)
+    누르기('예')
+
+    expect(알림글()).toContain('소지금이 부족합니다')
+    누르기('확인')
+    expect(onTrade).not.toHaveBeenCalled()
+    expect(onFinish).not.toHaveBeenCalled()
+    expect(rolls).toEqual([])
+  })
+
   it('+50% 칸은 2000G 를 쓴다 (성공·실패와 상관없이 나간다)', () => {
     const { onTrade } = 확인까지({ random: 고정난수(100) })
 
@@ -285,7 +348,8 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
   })
 
   it('다른 줄을 눌러도 요청 칸으로 진행하고 [205] → 확인 단계, 성공이 강제된다 (뽑기 100 이어도)', () => {
-    const { onTrade, onFinish } = 띄우기(상태({ tradeUsed: 1 }), { request: 요청, random: 고정난수(100) })
+    // 요청도 진행 가드 [77] 을 지난다 — 소지금은 넉넉히
+    const { onTrade, onFinish } = 띄우기(상태({ tradeUsed: 1, money: 9999 }), { request: 요청, random: 고정난수(100) })
 
     누르기('확인')
     누르기(teamBatters(OPPONENT)[0].name)
