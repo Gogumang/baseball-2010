@@ -13,6 +13,8 @@ import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
+import { derbyDisplayDistanceAt } from '@/entities/home-run-derby/model/derbyBattedBall'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
@@ -219,6 +221,8 @@ export function HomeRunDerbyScreen({
             isPaused={session.isPaused || overlay !== null}
             // 결과 창(0x45c18)은 창 뒤에 구름·구장(+0x17e2 만큼 가라앉는다)만 그린다
             isResultBackdrop={isResultShown}
+            // HOMERUN 글자는 판의 홈런 틱에 더비 칸(0x5279a — 단계만 0)으로 켠다. 타석 임시 결과로는 안 켠다
+            homeRunText={session.homeRunText}
             random={random}
             onPitchResolved={(detail) => session.onPitchResolved(detail)}
           />
@@ -241,6 +245,15 @@ export function HomeRunDerbyScreen({
                 isEventZoneShown={session.isEventZoneShown}
                 tick={tick}
                 shownCombo={session.shownCombo}
+                distanceBoardValue={
+                  session.distanceBoard === null
+                    ? null
+                    : derbyDisplayDistanceAt(
+                        session.distanceBoard.batted,
+                        Math.floor((performance.now() - session.distanceBoard.startedAt) / millisecondsPerFrame()),
+                        session.distanceBoard.previous,
+                      )
+                }
                 // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
                 batterSide={batterSideOfForm(batterForm ?? 0)}
               />

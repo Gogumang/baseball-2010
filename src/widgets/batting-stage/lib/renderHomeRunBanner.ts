@@ -8,7 +8,7 @@
  */
 import { GAME_EFFECT_FRAMES, GAME_EFFECT_IMAGE, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
-import { homeRunBurstFrameAt, homeRunLettersAt } from '@/widgets/batting-stage/lib/homeRunBanner'
+import { homeRunBurstFrameAt, homeRunLettersAt, type HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 
 /** 밝힌 글자는 몇 장 안 되니(글자 7 × 밝기 2) 만들어 두고 다시 쓴다 */
 const brightCache = new Map<string, CanvasImageSource>()
@@ -43,24 +43,19 @@ function brightened(image: HTMLImageElement, amount: number): CanvasImageSource 
   return result
 }
 
-/** tick = 연출이 켜진 뒤 흐른 틱 */
+/** tick = 연출이 켜진 뒤 흐른 틱 (일반 홈런 — 칸 5+i · 셈 0 에서 켠 연출) */
 export function drawHomeRunBanner(context: CanvasRenderingContext2D, tick: number): void {
-  // 단계 1·2·3 은 화면 가운데에 game_effect 프레임 18·19·20 을 먼저 깔고 글자를 그 위에 얹는다
-  const burst = homeRunBurstFrameAt(tick)
-  if (burst !== null) {
-    const frame = placedFrame(GAME_EFFECT_FRAMES, burst)
-    if (frame !== null) {
-      context.drawImage(
-        frame.image,
-        Math.floor(STAGE_WIDTH / 2) + frame.offsetX,
-        Math.floor(STAGE_HEIGHT / 2) + frame.offsetY,
-      )
-    }
-  }
+  drawHomeRunTextFrame(context, { letters: homeRunLettersAt(tick), burstFrame: homeRunBurstFrameAt(tick) })
+}
 
+/**
+ * 그림 한 번(0x40b18) — 글자를 먼저 그리고, 단계 1·2·3 이면 **그 위에** 화면 가운데 game_effect 프레임 18·19·20 을 얹는다
+ * (글자 고리 0x40bca~0x40d7a 가 끝난 뒤 0x40d7c~0x40de4 — 2026-10-07 직접 뜸. 예전 웹은 프레임을 먼저 깔았다).
+ */
+export function drawHomeRunTextFrame(context: CanvasRenderingContext2D, frame: HomeRunTextFrame): void {
   const smoothing = context.imageSmoothingEnabled
   context.imageSmoothingEnabled = false
-  for (const letter of homeRunLettersAt(tick)) {
+  for (const letter of frame.letters) {
     const image = sprite(GAME_EFFECT_IMAGE(letter.image))
     if (image === null) continue
     const source = letter.brighten > 0 ? brightened(image, letter.brighten) : image
@@ -73,4 +68,15 @@ export function drawHomeRunBanner(context: CanvasRenderingContext2D, tick: numbe
     )
   }
   context.imageSmoothingEnabled = smoothing
+
+  if (frame.burstFrame !== null) {
+    const placed = placedFrame(GAME_EFFECT_FRAMES, frame.burstFrame)
+    if (placed !== null) {
+      context.drawImage(
+        placed.image,
+        Math.floor(STAGE_WIDTH / 2) + placed.offsetX,
+        Math.floor(STAGE_HEIGHT / 2) + placed.offsetY,
+      )
+    }
+  }
 }

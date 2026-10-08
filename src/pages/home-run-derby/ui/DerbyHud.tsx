@@ -3,8 +3,8 @@ import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/m
 import type { DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 import { isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
 import {
-  COMBO_DISPLAY, EVENT_ZONE_SPOT, HUD_PANEL,
-  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf,
+  COMBO_DISPLAY, DISTANCE_BOARD, EVENT_ZONE_SPOT, HUD_PANEL,
+  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, distanceBoardGlyphsOf, totalDistanceGlyphsOf,
 } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import type { HudGlyph } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyHud.css'
@@ -24,6 +24,11 @@ interface DerbyHudProps {
   readonly shownCombo?: number | null
   /** 치는 타자의 손 (0xb63c0 — 0 우타 · 1 좌타). 콤보 표시를 왼쪽(좌타)·오른쪽(우타) 어디에 그릴지 가른다 */
   readonly batterSide?: number
+  /**
+   * 더비 판(0x17)이 도는 동안 비거리 판 0x36cd4 가 보이는 표시 비거리 +0x36 — 판이 없으면 null.
+   * 부르는 쪽이 판의 공 틱에 맞춰 `derbyDisplayDistanceAt` 으로 넘긴다.
+   */
+  readonly distanceBoardValue?: number | null
 }
 
 const spriteSrcOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
@@ -51,7 +56,7 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
  * 공 번호 = `(보너스 중 ? 최대 콤보 : 10) − 남은 기회 + 1`, 최고 칸은 누적이 넘으면 노란 글자로 바뀐다.
  */
 export function DerbyHud({
-  run, bestDistance, isEventZoneShown, tick, shownCombo = null, batterSide = 0,
+  run, bestDistance, isEventZoneShown, tick, shownCombo = null, batterSide = 0, distanceBoardValue = null,
 }: DerbyHudProps) {
   // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
   const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
@@ -95,6 +100,19 @@ export function DerbyHud({
               data-testid="콤보숫자"
             />
           ))}
+        </>
+      )}
+
+      {/* 비거리 판 (0x36cd4) — 더비 판(0x17) 동안 화면 위 가운데 "___M", 숫자는 표시 비거리 +0x36 */}
+      {distanceBoardValue !== null && (
+        <>
+          <img
+            className={styles.sprite}
+            style={{ left: DISTANCE_BOARD.x, top: DISTANCE_BOARD.y }}
+            src={spriteSrcOf(DISTANCE_BOARD.folder, DISTANCE_BOARD.frame)}
+            alt="비거리 판"
+          />
+          <Glyphs glyphs={distanceBoardGlyphsOf(distanceBoardValue)} testId="비거리판" />
         </>
       )}
 

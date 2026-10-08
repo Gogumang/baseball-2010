@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
+import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -136,6 +137,13 @@ interface BattingStageProps {
    * 팀경기 정산(0x19) 갱신 0x4b100 은 사람 팀이 이겼을 때만 +3 이라 부르는 쪽이 넘긴다.
    */
   readonly resultBackdropOffsetOf?: (tick: number) => number
+  /**
+   * **부르는 쪽이 모는 HOMERUN 글자** (원본 +0x1960 · 그리기 0x40b18). 넘기면(null 포함) 이 화면은 타석 임시 결과로 글자를
+   * 켜지 않고 이 창대로만 그린다 — null 이면 지금 글자가 없다. 안 넘기면 예전처럼 홈런 결과에 일반 홈런 연출(칸 5+i)을 켠다.
+   * 홈런더비는 판의 홈런 틱에 `derbyHomeRunTextOn` 칸으로 켜고, 관문이 닫히는 틱(0x40b18 을 부르는 0x46c88 의 조건)이나
+   * 키 건너뛰기(0x519cc 의 +0x1960 = 0)에서 끝을 넘긴다.
+   */
+  readonly homeRunText?: HomeRunTextWindow | null
   readonly random: RandomPort
   /**
    * **고른 필살타법 번호** (선수 레코드 +0x18, 1~4). 레벨(+0x201)이 아니다 — 경기는 이 번호만 본다

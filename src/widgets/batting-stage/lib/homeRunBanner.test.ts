@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  HOME_RUN_TEXT_SCENE_START,
+  derbyHomeRunTextOn,
+  generalHomeRunTextOn,
+  homeRunTextAfterDraws,
   HOME_RUN_FLASH_CYCLE_TICKS,
   HOME_RUN_FLY_IN_END_TICK,
   HOME_RUN_HOLD_START_TICK,
@@ -101,5 +105,45 @@ describe('단계 4 — 14틱 주기 반짝임', () => {
     const lit = homeRunLettersAt(28).find((letter) => letter.brighten > 0)
     expect(lit).toMatchObject({ index: 0, y: BASE_Y - 5, brighten: 140, scale: 1 })
     expect(homeRunLettersAt(28)[1]).toMatchObject({ y: BASE_Y, brighten: 0 })
+  })
+})
+
+describe('0x40b18 그림 한 번씩 — 원본 칸(+0x1961 · +0x1963 · +0x1962 · +0x1964+i) 그대로', () => {
+  it('일반 홈런(칸 5+i · 셈 0 · 반짝임 셈 0)은 틱 셈과 같은 그림이다 — 글자 다음에 가운데 프레임', () => {
+    const on = generalHomeRunTextOn(HOME_RUN_TEXT_SCENE_START)
+    for (let tick = 0; tick < 60; tick += 1) {
+      const { frame } = homeRunTextAfterDraws(on, tick + 1)
+      expect(frame?.letters).toEqual(homeRunLettersAt(tick))
+      expect(frame?.burstFrame).toEqual(homeRunBurstFrameAt(tick))
+    }
+  })
+
+  it('홈런더비(0x5279a — 단계만 0)는 칸 0 제자리에서 시작한다 — 첫 그림부터 일곱 글자, 셈이 0 이면 두 그림 뒤 흔들기', () => {
+    const on = derbyHomeRunTextOn(HOME_RUN_TEXT_SCENE_START)
+    const 첫 = homeRunTextAfterDraws(on, 1)
+    expect(첫.frame?.letters).toHaveLength(7)
+    expect(첫.frame?.letters.every((letter) => letter.scale === 1 && letter.brighten === 0)).toBe(true)
+    expect(첫.frame?.burstFrame).toBeNull()
+    expect(homeRunTextAfterDraws(on, 2).frame?.burstFrame).toBeNull()
+    // 단계 1·2·3 은 2그림씩 → 3 · 5 · 7 번째 그림이 각 단계의 첫 그림
+    expect(homeRunTextAfterDraws(on, 3).frame?.burstFrame).toBe(18)
+    expect(homeRunTextAfterDraws(on, 5).frame?.burstFrame).toBe(19)
+    expect(homeRunTextAfterDraws(on, 7).frame?.burstFrame).toBe(20)
+    expect(homeRunTextAfterDraws(on, 9).state.stage).toBe(4)
+    expect(homeRunTextAfterDraws(on, 9).frame?.letters.filter((letter) => letter.brighten === 140)).toHaveLength(1)
+  })
+
+  it('더비는 +0x1963 을 안 지운다 — 앞 연출이 셈 1 을 남겼으면 날아 들어오기는 한 그림뿐', () => {
+    const 남은 = { ...HOME_RUN_TEXT_SCENE_START, stepCounter: 1 }
+    const on = derbyHomeRunTextOn(남은)
+    expect(homeRunTextAfterDraws(on, 2).frame?.burstFrame).toBe(18)
+  })
+
+  it('반짝임 셈 +0x1962 는 아무도 안 지운다 — 다음 연출의 유지 단계는 남은 셈에서 이어 반짝인다', () => {
+    const 앞 = homeRunTextAfterDraws(derbyHomeRunTextOn(HOME_RUN_TEXT_SCENE_START), 12).state
+    expect(앞.flashCounter).toBe(4)
+    const 다음 = homeRunTextAfterDraws(derbyHomeRunTextOn(앞), 9)
+    const 반짝 = 다음.frame?.letters.findIndex((letter) => letter.brighten === 140)
+    expect(반짝).toBe(2)
   })
 })

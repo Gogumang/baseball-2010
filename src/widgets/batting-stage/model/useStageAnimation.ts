@@ -14,6 +14,7 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import { clearParticles, tickParticles } from '@/entities/particle/model/particleScene'
+import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -244,6 +245,13 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         resultText: phaseRef.current === '결과' ? resultTextRef.current : '',
         isHomeRun,
         homeRunTick: isHomeRun ? pitchTickAt(now, homeRunStartedAt, tickLength) : 0,
+        // 부르는 쪽이 모는 글자 창이 있으면 그 칸대로만 그린다 (홈런더비 — `BattingStage` 의 `homeRunText`)
+        homeRunFrame:
+          latestRef.current.homeRunText === undefined
+            ? undefined
+            : latestRef.current.homeRunText === null
+              ? null
+              : homeRunTextFrameAt(latestRef.current.homeRunText, now, tickLength),
         swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType),
         bodyType,
         batterSkinIndex: latestRef.current.batterSkinIndex,

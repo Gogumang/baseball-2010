@@ -5,6 +5,7 @@ import { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, SCENE_D_FRAMES, useHomeR
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /** 홈런 결과 코드 하나 — `outcomeOfPattern` 의 마지막 갈래 */
 const 홈런코드 = 24
@@ -320,5 +321,49 @@ describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 
     calls.length = 0
     act(() => rendered.result.current.retryFromResult())
     expect(calls).toEqual([[1, 4], [0, 9], [0, 2]])
+  })
+})
+
+describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너뛰기', () => {
+  /** `performance.now()` 를 손으로 모는 시계 — 판 틱(공 틱 0 = onPitchResolved)을 정확히 맞춘다 */
+  function 시계() {
+    let now = 1000
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    return {
+      get now() {
+        return now
+      },
+      흘리기(ms: number) {
+        now += ms
+        act(() => {
+          vi.advanceTimersByTime(ms)
+        })
+      },
+      spy,
+    }
+  }
+
+  it('홈런이면 홈런 틱에 글자 창을 켜고 관문이 닫히는 틱에 끝낸다 — 비거리 판은 판 내내, 판 끝에 둘 다 끈다', () => {
+    const 째깍 = 시계()
+    const rendered = 띄우기()
+    const 판 = derbyBattedBallOf(홈런.pattern!)
+    const 시작 = 째깍.now
+    act(() => rendered.result.current.onPitchResolved(홈런))
+    const ms = millisecondsPerFrame()
+    expect(rendered.result.current.homeRunText?.startedAt).toBe(시작 + 판.homeRunTicks[0]! * ms)
+    expect(rendered.result.current.homeRunText?.endsAt).toBe(시작 + 판.closeTick * ms)
+    expect(rendered.result.current.distanceBoard?.startedAt).toBe(시작)
+    expect(rendered.result.current.distanceBoard?.previous).toBe(0)
+    째깍.흘리기(판.endTicks * ms + 1)
+    expect(rendered.result.current.homeRunText).toBeNull()
+    expect(rendered.result.current.distanceBoard).toBeNull()
+    째깍.spy.mockRestore()
+  })
+
+  it('홈런 아닌 맞은 공도 비거리 판은 뜨고 글자는 없다', () => {
+    const rendered = 띄우기()
+    act(() => rendered.result.current.onPitchResolved(번트))
+    expect(rendered.result.current.homeRunText).toBeNull()
+    expect(rendered.result.current.distanceBoard).not.toBeNull()
   })
 })

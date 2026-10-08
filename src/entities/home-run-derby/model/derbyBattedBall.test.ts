@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { DERBY_PLAY_CLOSE_TICKS, derbyBallStopTickOf, derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import {
+  DERBY_PLAY_CLOSE_TICKS,
+  derbyBallStopTickOf,
+  derbyBattedBallOf,
+  derbyDisplayDistanceAt,
+} from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DERBY_DISTANCE_LIMIT, derbyDistanceOf } from '@/entities/home-run-derby/model/derbyRules'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
@@ -118,5 +123,18 @@ describe('판 끝 — 관문 0xb0d28 의 +0x125 갈래(공.vt18 멈춤) 뒤 10�
     expect(공.trajectory.isStoppedAt?.(멈춘틱 - 1)).toBe(false)
     expect(멈춘틱).toBe(공.trajectory.length - 1)
     expect(공.endTicks).toBe(멈춘틱 + DERBY_PLAY_CLOSE_TICKS)
+  })
+})
+
+describe('비거리 판 0x36cd4 의 숫자 — 표시 비거리 +0x36 을 틱마다 다시 쓴다 (526d0)', () => {
+  it('낙구 틱까지 지금 점 비거리를 따라 쓰고, 그 뒤로는 낙구 점 값이 남는다', () => {
+    const 공 = derbyBattedBallOf(빠른홈런)
+    const 낙구 = 공.trajectory.landingTick
+    expect(공.displayDistanceTicks.map((written) => written.tick)).toEqual(
+      Array.from({ length: Math.min(낙구, 공.closeTick - 1) }, (_unused, index) => index + 1),
+    )
+    expect(derbyDisplayDistanceAt(공, 0, 37)).toBe(37)
+    expect(derbyDisplayDistanceAt(공, 3, 37)).toBe(derbyDistanceOf(공.trajectory.pointAt(3)))
+    expect(derbyDisplayDistanceAt(공, 공.endTicks, 37)).toBe(공.displayDistance)
   })
 })

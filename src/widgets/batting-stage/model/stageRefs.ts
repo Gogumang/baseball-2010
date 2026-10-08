@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
+import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
@@ -89,6 +90,8 @@ export interface StageLatest {
   readonly isPaused: boolean
   /** 참이면 결과 창 뒤 배경만 그린다 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly isResultBackdrop?: boolean
+  /** 부르는 쪽이 모는 HOMERUN 글자 창 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly homeRunText?: HomeRunTextWindow | null
   /** 결과 창 뒤 배경의 틱별 +0x17e2 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly resultBackdropOffsetOf?: (tick: number) => number
   readonly random: RandomPort

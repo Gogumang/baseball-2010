@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf,
-} from '@/pages/home-run-derby/lib/derbyHudLayout'
+  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf, DISTANCE_BOARD, distanceBoardGlyphsOf } from '@/pages/home-run-derby/lib/derbyHudLayout'
 
 describe('콤보 표시 배치 (0x4585c)', () => {
   it('좌타는 trainning 애니 1(칸 3·4·5·6)을 (0, H/2) 에 그리고, 끝 칸 전에는 숫자가 없다', () => {
@@ -70,5 +69,19 @@ describe('HUD 본문 배치 (0x45a54)', () => {
   it('누적이 최고를 넘을 때만 최고 칸이 노랑이다 (같으면 흰색)', () => {
     expect(bestDistanceGlyphsOf(300, 301)[0].src).toBe(n(83))
     expect(bestDistanceGlyphsOf(300, 300)[0].src).toBe(n(3))
+  })
+})
+
+describe('비거리 판 0x36cd4 — trainning 프레임 11 을 (W/2 − 20, 10) 에, 숫자는 덮어쓴 상자 (100, 14, 24, 11) 오른쪽 맞춤', () => {
+  it('판 자리', () => {
+    expect([DISTANCE_BOARD.x, DISTANCE_BOARD.y]).toEqual([100, 10])
+  })
+
+  it('흰 숫자(num 0~9)를 상자 오른끝 124 에 맞춘다 — "1" 만 폭 4', () => {
+    expect(distanceBoardGlyphsOf(123)).toEqual([
+      { src: './sprites/num/001.png', left: 124 - 20, top: 14 },
+      { src: './sprites/num/002.png', left: 124 - 16, top: 14 },
+      { src: './sprites/num/003.png', left: 124 - 8, top: 14 },
+    ])
   })
 })

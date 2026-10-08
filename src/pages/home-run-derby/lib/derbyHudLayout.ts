@@ -120,6 +120,41 @@ export function totalDistanceGlyphsOf(totalDistance: number): HudGlyph[] {
 }
 
 /**
+ * **비거리 판 — 원본 `0x36cd4`** (2026-10-07 직접 뜸, 0x36cd4~0x36dc6).
+ * ```
+ * 36cea  플레이+0x118 == 8(더비 판) || 장면+0x1960(HOMERUN 글자) 일 때만
+ * 36d1a  0xba815(rect, trainning, 11, 종류 1)                 ; 프레임 11 의 합집합 상자 → 폭 40
+ * 36d3a  0x94a64(상자, 프레임 11, 0, 0)                        ; 상자 0 = (3, 2, 24, 11)
+ * 36d7c  0xba759(trainning, 11, 종류 1, W/2 − 폭/2, 10, …)      ; 판 "___M" (40×16)
+ * 36da0  상자.x = W/2 − 폭/2 · 상자.y = 14                      ; ⚠️ 상자 x·y 를 **더하지 않고 덮는다** — 원본 그대로
+ * 36dc6  0xba719(상자, 자간 0, +0x36, 기준 0, num 이미지, 정렬 4)  ; 표시 비거리 — 흰 숫자, 오른쪽 맞춤
+ * ```
+ * 부르는 곳은 0x17 그리기 0x46c88(0x46cb6) · 공 그리기 0x36dfc(0x37388) — 둘 다 상태 0x17 에서만 돈다. 인자(x, y)는 안 읽는다.
+ */
+export const DISTANCE_BOARD = {
+  folder: './sprites/trainning/frames',
+  frame: 11,
+  width: 40,
+  x: SCREEN_WIDTH / 2 - 40 / 2,
+  y: 10,
+  /** 숫자 상자 — 폭 · 높이는 상자 0 (24×11), 자리는 판 왼쪽 위 x · y = 14 */
+  numberBox: { x: SCREEN_WIDTH / 2 - 40 / 2, y: 14, width: 24, height: 11 },
+} as const
+
+/** 비거리 판 숫자 (0xba719 → 0xba51c, 자간 0, 기준 0 흰색, 정렬 4) */
+export function distanceBoardGlyphsOf(displayDistance: number): HudGlyph[] {
+  const digits = digitsOf(displayDistance)
+  const { numberBox } = DISTANCE_BOARD
+  let left = numberBox.x + numberBox.width - digits.reduce((total, digit) => total + hudDigitWidthOf(digit), 0)
+  return digits.map((digit) => {
+    // 글자 높이가 모두 10 이라 아래 맞춤(0xba628)을 해도 위 = 상자 y
+    const placed = { src: numSrcOf(HUD_DIGIT_BASE.white + digit), left, top: numberBox.y }
+    left += hudDigitWidthOf(digit)
+    return placed
+  })
+}
+
+/**
  * **콤보 표시 — 원본 `0x4585c` 그대로** (직접 떴다, 0x4585c~0x45a20).
  *
  * 그리는 그림은 `ui/combo.pzx` 가 **아니라 `ui/trainning.pzx`** 다. 장면 +0x19e8 은 적재 0x486a2~0x486ca 가

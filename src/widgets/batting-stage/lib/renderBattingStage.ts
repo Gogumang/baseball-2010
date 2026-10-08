@@ -11,7 +11,8 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
 import { drawFieldMap } from '@/widgets/batting-stage/lib/renderFieldMap'
-import { drawHomeRunBanner } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
+import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
+import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
@@ -45,6 +46,11 @@ export interface StageScene {
   readonly isHomeRun: boolean
   /** 홈런 연출이 켜진 뒤 흐른 틱 */
   readonly homeRunTick: number
+  /**
+   * 부르는 쪽이 칸을 들고 모는 HOMERUN 글자의 이번 그림(`BattingStage` 의 `homeRunText`). 있으면 `isHomeRun` 대신 이것을 그린다.
+   * null 이면 이 그림에는 글자가 없다(관문이 닫혔거나 아직 홈런 틱 전). undefined 면 예전 길(`isHomeRun`)이다.
+   */
+  readonly homeRunFrame?: HomeRunTextFrame | null
   /**
    * 살아 있는 파티클. 없으면 안 그린다.
    * ⚠️ 그리는 **순서**는 근사다 — 원본 파티클 관리자의 그리기가 타석 화면 묶음(0x50828)의
@@ -149,7 +155,10 @@ export function renderBattingStage(
     drawFieldMap(context, scene.hud.bases)
   }
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
-  if (scene.isHomeRun) {
+  if (scene.homeRunFrame !== undefined) {
+    if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
+    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, scene.resultTick)
+  } else if (scene.isHomeRun) {
     drawHomeRunBanner(context, scene.homeRunTick)
   } else if (scene.resultText !== '') {
     drawResultText(context, scene.resultText, scene.resultTick)

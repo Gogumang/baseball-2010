@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { describePitchResolution } from '@/entities/at-bat/model/resolutionText'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
-import { DERBY_HOME_RUN_SOUND, derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
+import {
+  DERBY_HOME_RUN_SOUND,
+  derbyBattedBallOf,
+  type DerbyBattedBall,
+} from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import {
@@ -23,6 +27,13 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
+import {
+  HOME_RUN_TEXT_SCENE_START,
+  derbyHomeRunTextOn,
+  homeRunTextAfterDraws,
+  type HomeRunTextState,
+  type HomeRunTextWindow,
+} from '@/widgets/batting-stage/lib/homeRunBanner'
 
 /** 공 하나의 결과를 보여 주는 시간 — 타석 화면들이 쓰는 값과 같다 (원본에 없는 웹판 연출) */
 const BANNER_MILLISECONDS = 1_500
@@ -51,6 +62,51 @@ export const CONFIRM_LOCK_FRAMES = 3
  * 0x785a8 이 받는 객체는 0x41230 의 [장면+0xf10]). 그래서 늘 **틱 0(진입)·틱 1(예약)** 두 그림 뒤 0xe 다.
  */
 export const SCENE_D_FRAMES = 2
+
+/**
+ * **더비 홈런의 HOMERUN 글자 창** — 홈런 갈래 0x5279a~0x527ac 는 +0x1961(단계) = 0 · +0x1960 = 1 만 쓴다(`derbyHomeRunTextOn`).
+ * 글자는 0x17 그리기 0x46c88 이 `관문 0xb0d28 열림 && state[0x1d]` 일 때 부르는 0x40b18 이 그리므로 **홈런 틱 h … 관문이 닫히기 전 틱**에만
+ * 보이고(그 뒤 10틱은 안 그림), 키 건너뛰기(0x519cc)는 그 그림의 갱신보다 먼저 +0x1960 = 0 이라 키 틱 k 의 그림부터 없다.
+ * 폴 뒤 담장선에서 홈런 갈래를 한 번 더 지나면 그 틱에 단계가 다시 0 이다. `scene` = 앞 연출이 남긴 칸(+0x1963 · +0x1962 · 글자 칸).
+ * `startedAt` = 판을 넘겨받은 시각(공 틱 0). 홈런이 아니면 창이 없고 칸도 그대로다.
+ */
+export function derbyHomeRunTextOf(
+  batted: DerbyBattedBall,
+  startedAt: number,
+  scene: HomeRunTextState,
+  millisecondsPerTick: number,
+): { readonly window: HomeRunTextWindow | null; readonly after: HomeRunTextState } {
+  const homeRunTick = batted.homeRunTicks[0]
+  if (homeRunTick === undefined) return { window: null, after: scene }
+  const lastDrawTick = batted.closeTick - 1
+  const draws = Math.max(0, lastDrawTick - homeRunTick + 1)
+  const restartDraws = batted.homeRunTicks
+    .slice(1)
+    .filter((tick) => tick <= lastDrawTick)
+    .map((tick) => tick - homeRunTick + 1)
+  const on = derbyHomeRunTextOn(scene)
+  return {
+    window: {
+      startedAt: startedAt + homeRunTick * millisecondsPerTick,
+      endsAt: startedAt + (lastDrawTick + 1) * millisecondsPerTick,
+      on,
+      restartDraws,
+    },
+    after: homeRunTextAfterDraws(on, draws, restartDraws).state,
+  }
+}
+
+/**
+ * **비거리 판 0x36cd4** 이 지금 보는 판 — 0x17 그리기 0x46c88(0x46cb6)이 플레이+0x118 == 8(더비 판) 이면 판 내내 그린다.
+ * 숫자는 표시 비거리 +0x36 이라 공이 나는 동안 틱마다 따라 오른다(`derbyDisplayDistanceAt`, `previous` = 앞 공이 남긴 값).
+ */
+export interface DerbyDistanceBoard {
+  /** 판을 넘겨받은 시각(공 틱 0) — `performance.now()` 기준 ms */
+  readonly startedAt: number
+  readonly batted: DerbyBattedBall
+  /** 이 판이 다시 쓰기 전의 +0x36 */
+  readonly previous: number
+}
 
 export interface HomeRunDerbyOptions {
   /** 저장된 최고 비거리 (저장 +0x5c, u16) */
@@ -112,6 +168,11 @@ export interface HomeRunDerbySession {
   readonly shownCombo: number | null
   /** 판이 끝났으면 결과, 아니면 null */
   readonly result: DerbyResult | null
+  /** 타석 화면에 넘길 HOMERUN 글자 창 (`BattingStage` 의 `homeRunText`) — 더비 판의 홈런 틱에 켠다. 없으면 null */
+  readonly homeRunText: HomeRunTextWindow | null
+  /** 지금 돌고 있는 더비 판의 비거리 판(0x36cd4). 판이 없으면 null */
+  readonly distanceBoard: DerbyDistanceBoard | null
+
   readonly onPitchResolved: (detail: PitchOutcomeDetail) => void
   /** 경기 중 메뉴 [다시하기] 예 — 새 경기 장면 (0x3c98e 모드 7 갈래, `restart` 머리말) */
   readonly restart: () => void
@@ -144,6 +205,18 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
   const [isEventZoneShown, setIsEventZoneShown] = useState(false)
   const [shownCombo, setShownCombo] = useState<number | null>(null)
   const [result, setResult] = useState<DerbyResult | null>(null)
+  const [homeRunText, setHomeRunText] = useState<HomeRunTextWindow | null>(null)
+  const [distanceBoard, setDistanceBoard] = useState<DerbyDistanceBoard | null>(null)
+  /** 장면의 글자 칸(+0x1961~+0x196a) — 더비는 앞 연출이 남긴 셈에서 이어 센다. 장면을 새로 세우면(다시하기) 0 */
+  const homeRunTextSceneRef = useRef<HomeRunTextState>(HOME_RUN_TEXT_SCENE_START)
+  /** 지금 도는 판 — 키 건너뛰기가 다시 셈하는 재료 */
+  const playRef = useRef<{
+    readonly startedAt: number
+    readonly batted: DerbyBattedBall
+    readonly runBefore: DerbyRun
+    readonly isEventZoneHit: boolean
+    readonly textSceneBefore: HomeRunTextState
+  } | null>(null)
 
   // 캔버스 루프에서 불리는 콜백이라 최신 값은 전부 ref 로 읽는다 (StrictMode 가 업데이터를 두 번 돌린다)
   const runRef = useRef(run)
@@ -301,41 +374,84 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     // 필살타법은 더비 타석에 번호가 없어(`HomeRunDerbyScreen` 이 `specialSwingNumber` 를 안 넘김) 0x517e6 굴림 차례 문제가 없다.
     // 홈런 = 땅에 닿기 전에 담장선 · 폴을 넘은 페어 공(0x52720). 예전 웹은 타석의 임시 결과(`provisionalOutcomeOf`)로 정했다
     const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current)
-    const isHomeRun = batted?.isHomeRun ?? false
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // ⚠️ 근사(때): 공 틱 0 을 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 때)로 센다
-    // ⚠️ 미이식: 같은 홈런 갈래의 HOMERUN 글자(+0x1960 = 1 · 단계 +0x1961 = 0, 0x5279a~0x527ac — 글자 칸 +0x1964+i 는 안 써
-    //    날아 들어오기 없이 제자리부터)는 타석 화면(`BattingStage`, widgets)이 타석 임시 결과로 켠다. 0x90191(…, 2, 1) 은
-    //    홈런 효과 객체 종류 2 켜기(일반 홈런 0x51d1e 와 같음, 모든 모드 미이식) — `derbyBattedBall` 머리말
+    // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.
+    // ⚠️ 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 아직 안 옮겼다 — entities/batting `homeRunFireworks` 머리말
     clearPlaySoundTimers()
+    const startedAt = performance.now()
     if (batted !== null) {
-      const soundTicks = [
-        ...batted.homeRunTicks.map((tick) => ({ tick, soundId: DERBY_HOME_RUN_SOUND })),
-        ...(batted.foulCallTick === null ? [] : [{ tick: batted.foulCallTick, soundId: FOUL_CALL_SOUND }]),
-      ]
-      for (const { tick, soundId } of soundTicks) {
-        playSoundTimersRef.current.push(
-          window.setTimeout(() => playSoundIds(audioRef.current, [soundId]), tick * millisecondsPerFrame()),
-        )
+      schedulePlaySounds(batted, startedAt, 0)
+      playRef.current = {
+        startedAt,
+        batted,
+        runBefore: current,
+        isEventZoneHit: isEventZoneHit({ pattern: detail.pattern ?? null }),
+        textSceneBefore: homeRunTextSceneRef.current,
       }
+      showPlay(batted)
+    } else {
+      playRef.current = null
+      setHomeRunText(null)
+      setDistanceBoard(null)
     }
     // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc) — 패턴 플래그 & 2 (+0x127)
     const zoneHit = isEventZoneHit({ pattern: detail.pattern ?? null })
+    applyPlayResult(current, detail.resolution, batted, zoneHit)
+    setIsEventZoneShown(zoneHit)
+    setIsPaused(true)
+    armPlayEnd(batted === null ? BANNER_MILLISECONDS : batted.endTicks * millisecondsPerFrame())
+  }, [])
 
-    const next = applyDerbyPitch(current, {
+  /** 판 안 소리를 공 틱에 맞춰 건다 — `fromTick` 앞의 틱은 이미 지났다 */
+  const schedulePlaySounds = (batted: DerbyBattedBall, startedAt: number, fromTick: number) => {
+    const soundTicks = [
+      ...batted.homeRunTicks.map((tick) => ({ tick, soundId: DERBY_HOME_RUN_SOUND })),
+      ...(batted.foulCallTick === null ? [] : [{ tick: batted.foulCallTick, soundId: FOUL_CALL_SOUND }]),
+    ].filter(({ tick }) => tick >= fromTick)
+    const elapsed = performance.now() - startedAt
+    for (const { tick, soundId } of soundTicks) {
+      playSoundTimersRef.current.push(
+        window.setTimeout(
+          () => playSoundIds(audioRef.current, [soundId]),
+          Math.max(0, tick * millisecondsPerFrame() - elapsed),
+        ),
+      )
+    }
+  }
+
+  /** HOMERUN 글자 창 · 비거리 판을 이 판으로 — 글자 칸은 판 앞에 남은 칸에서 셈한다 */
+  const showPlay = (batted: DerbyBattedBall) => {
+    const play = playRef.current
+    if (play === null) return
+    const text = derbyHomeRunTextOf(batted, play.startedAt, play.textSceneBefore, millisecondsPerFrame())
+    homeRunTextSceneRef.current = text.after
+    setHomeRunText(text.window)
+    setDistanceBoard({ startedAt: play.startedAt, batted, previous: play.runBefore.lastDistance })
+  }
+
+  /** 0xae3e8/0xae24c 모드 7 갈래 — 이 판의 홈런 · 비거리로 진행을 셈하고 알림 문구를 단다 */
+  const nextSceneStateRef = useRef<number>(0xf)
+  const applyPlayResult = (
+    before: DerbyRun,
+    resolution: PitchOutcomeDetail['resolution'],
+    batted: DerbyBattedBall | null,
+    zoneHit: boolean,
+  ) => {
+    const isHomeRun = batted?.isHomeRun ?? false
+    const next = applyDerbyPitch(before, {
       isHomeRun,
       distance: batted?.distance ?? 0,
       displayDistance: batted?.displayDistance ?? null,
       isEventZoneHit: zoneHit,
     })
     // 0xae3e8/0xae24c 가 돌려주는 다음 상태 — 0xd(→ 0xe OK 대기) · 0xf · 0x1a
-    const nextSceneState = derbySceneStateAfter(current, next)
+    nextSceneStateRef.current = derbySceneStateAfter(before, next)
     runRef.current = next
     setRun(next)
-    setIsEventZoneShown(zoneHit)
 
     // 홈런이면 판이 낸 홈런으로 적는다 — 타석의 임시 결과(판 앞 예측)와 갈릴 수 있다(폴 뒤 굴림 · 폴 뒤 바운드로 넘는 공)
-    const parts = [describePitchResolution(isHomeRun ? { kind: '타구', outcome: { kind: '홈런' } } : detail.resolution)]
+    const parts = [describePitchResolution(isHomeRun ? { kind: '타구', outcome: { kind: '홈런' } } : resolution)]
     if (isHomeRun) parts.push(`${next.lastDistance}M`)
     // 콤보 문구는 지운 뒤의 콤보(+0x39)가 아니라 **표시값 +0x84** 를 본다 — 원본 HUD 0x4585c 가 읽는 칸이다.
     // 원본은 이 값을 다음 공 준비(상태 0xf)에서 띄우므로, 판이 끝나 0xf 를 안 지나면(마지막 공) 띄우지 않는다.
@@ -343,13 +459,19 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     if (shouldShowComboAtNextPitch(next)) parts.push(`${next.comboDisplay} COMBO`)
     if (zoneHit) parts.push('EVENT ZONE!')
     setBanner(parts.join(' · '))
-    setIsPaused(true)
+  }
 
+  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) 시계 */
+  const armPlayEnd = (delay: number) => {
     clearTimer()
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
+      playRef.current = null
       setBanner('')
       setIsEventZoneShown(false)
+      // 0x17 끝 0x35108 — HOMERUN 글자를 끄고(0x351d0) 0x17 그리기(비거리 판)도 더는 안 돈다
+      setHomeRunText(null)
+      setDistanceBoard(null)
       if (runRef.current.isFinished) {
         const finished = derbyResultOf(runRef.current, bestRef.current)
         setResult(finished)
@@ -371,14 +493,15 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
       // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
       //   0xd 는 늘 두 그림(`SCENE_D_FRAMES`) 머문다 — 점수판 +0x6c 는 1 이 되는 일이 없다.
       // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
-      if (nextSceneState === 0xd) {
+      if (nextSceneStateRef.current === 0xd) {
         enterScenePrepare()
         return
       }
       // 보통 공(0xf)은 곧바로 다음 공 준비다
       enterNextPitch()
-    }, batted === null ? BANNER_MILLISECONDS : batted.endTicks * millisecondsPerFrame())
-  }, [])
+    }, delay)
+  }
+
 
   /**
    * **다시하기 = 경기 장면을 새로 세운다 (확정)**. 경기 중 메뉴 [다시하기](0x3c706 → StrGAME[7] 질문 → 하위 3) 의 예
@@ -392,6 +515,11 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     clearPlaySoundTimers()
     // 경기 시작 상태 9 의 0x39868 이 +0x84 · 표시(+0x1b60) · +0x19ec 를 지운다
     clearComboTimer()
+    // 새 장면 — 글자 칸(+0x1961~)은 new 의 0 이다
+    playRef.current = null
+    homeRunTextSceneRef.current = HOME_RUN_TEXT_SCENE_START
+    setHomeRunText(null)
+    setDistanceBoard(null)
     setShownCombo(null)
     // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다
     enterScenePrepare()
@@ -427,6 +555,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random }: H
     isEventZoneShown,
     shownCombo,
     result,
+    homeRunText,
+    distanceBoard,
     onPitchResolved,
     restart,
     retryFromResult,

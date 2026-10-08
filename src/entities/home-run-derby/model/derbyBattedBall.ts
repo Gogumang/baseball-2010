@@ -64,14 +64,19 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * - 표시 비거리 +0x36 (526d0): aa0 ≥ t 인 틱마다 지금 점으로 다시 쓴다 — 홈런 · 파울 가리지 않고 **낙구 틱 점의 비거리**가 남는다
  *   (`displayDistance`). 더하는 값(`distance`)과 달리 두 번 더한 공도 한 번 값이다. 쓰는 곳은 이 526d0 · 일반 갈래 0x5297a ·
  *   초기화 0xb687e 뿐이라 안 맞은 공은 앞 값을 그대로 둔다. 읽는 곳은 비거리 판 그리기 0x36cd4(플레이+0x118 == 8 이거나 +0x1960 이면
- *   trainning.pzx 프레임 11 을 (W/2 − 폭/2, 10) 에, 그 밑 +0x36 숫자 — ← 0x37388 · 0x46cb6). ⚠️ 그 판 그리기는 미이식.
+ *   trainning.pzx 프레임 11 을 (W/2 − 폭/2, 10) 에, 그 밑 +0x36 숫자 — ← 0x37388 · 0x46cb6). 판은 상태 0x17 그리기(0x46c88)에서만
+ *   불려 판 내내(관문이 닫힌 뒤 10틱까지) 보이고, 숫자는 틱마다 다시 쓴 값을 따라 오른다(`displayDistanceTicks` ·
+ *   `derbyDisplayDistanceAt` → pages/home-run-derby `DerbyHud` 의 비거리 판).
  * - HOMERUN 글자 (재검증): 이 갈래는 +0x1961(단계) = [sp+0x10](= 0xb68dc 결과 = 0) · +0x1960 = 1 만 쓴다(0x5279a~0x527ac).
  *   일반 홈런 0x51cd8 과 달리 **+0x1963(틱 셈) = 0 · 글자 칸 +0x1964+i = 5+i 를 안 쓴다** — 칸을 쓰는 곳은 0x51cf6 · 그리기 0x40b18 뿐이고
  *   더비 장면은 일반 홈런 갈래를 안 지나 칸이 장면 new 의 0 그대로다 → 날아 들어오기 없이 0 칸(제자리)부터, 단계 0 은 (2 − 남은 +0x1963) 그림.
- *   글자를 끄는 곳은 0x17 끝 0x35108(0x351d0) · 위 키 건너뛰기. ⚠️ 미이식: 그리기는 widgets/batting-stage 가 타석 임시 결과로 켠다(구역 밖).
+ *   글자를 끄는 곳은 0x17 끝 0x35108(0x351d0) · 위 키 건너뛰기. 그리기 0x40b18 은 0x46c88 이 `관문 0xb0d28 열림 && (state[0x1d] ||
+ *   +0x129)` 일 때만 부르므로(0x46e2e~0x46e5c) 글자는 홈런 틱 h … closeTick − 1 에만 보인다. 타석 화면(`BattingStage` 의 `homeRunText`)이
+ *   이 창으로 그린다 — 단계 셈은 widgets/batting-stage `homeRunBanner` 의 `derbyHomeRunTextOn` · `homeRunTextAfterDraws`.
  * - 0x90191([0x1400064], 2, 1) 뒤 +8 = +9 = 1 (0x527b4~0x527c0): 장면 효과 객체(0x90190 → 0x8fe58)를 **종류 2(알갱이 칸 7)** 로 다시
- *   깔고 켠다 — 일반 홈런 0x51d1e · 0x4f4d8 과 같은 홈런 효과다. 켜지면 틱 0x901a0(← 0x40b18 의 0x40fb4 · 0x4a384)이 돌아 난수를 쓴다.
- *   ⚠️ 미이식(모든 모드 공통 — 일반 홈런 0x51d1e 도 웹에 없다): 종류 2 깔기 · 틱 굴림 수는 아직 안 셌다.
+ *   깔고 켠다 — 일반 홈런 0x51d1e 와 같은 홈런 효과다(0x4f4d8 은 홈런이 아니라 경기 정산 0x4ea0c 갈래다 — entities/batting
+ *   `homeRunFireworks` 머리말). 틱 0x901a0 은 0x40b18 이 **HOMERUN 글자 유지 단계(+0x1961 ≥ 4)를 그린 뒤**(0x40faa)에만 부른다.
+ *   ⚠️ 미이식(난수): 알갱이 틱 · 파티클 굴림은 `homeRunFireworks` 머리말의 미해결 때문에 아직 진행기에 안 붙였다.
  * - 관문 0xb0d28: 파울 표시 +0x110 · 사건 코드 11 · 주자 · 아웃 갈래는 사건이 없어 안 서고, +0x125 갈래가 공.vt18(멈춤)에서 닫는다.
  *   공 틱은 0x3f060 이 관문이 열려 있을 때만 올리므로(0x3f3b2 → 0xa2594) 위 갈래는 t = 1 … (처음 멈춘 틱 − 1)에서 돈다.
  *   닫힌 뒤 529f0 이 +0x1094 10틱 → 0xbb9 → 52a52 0xae3e8 모드 7 갈래(`applyDerbyPitch`).
@@ -107,6 +112,13 @@ export interface DerbyBattedBall {
    * 닫히고, 그 뒤 10틱(`DERBY_PLAY_CLOSE_TICKS`)에 장면이 0xbb9 로 넘긴다.
    */
   readonly endTicks: number
+  /** 판 진행 관문 0xb0d28 이 닫히는 공 틱 — 공이 처음 멈춘 틱(`derbyBallStopTickOf`). 위 갈래는 t = 1 … closeTick − 1 에서 돈다 */
+  readonly closeTick: number
+  /**
+   * 표시 비거리 +0x36 을 다시 쓴 틱과 값 (526d0 — 관문이 열린 동안 aa0 ≥ t 인 틱마다). 비거리 판 0x36cd4 가 틱마다 이 칸을 읽어
+   * **공이 나는 동안 숫자가 따라 오른다**. 비어 있으면 앞 값 그대로다(`derbyDisplayDistanceAt`).
+   */
+  readonly displayDistanceTicks: readonly { readonly tick: number; readonly value: number }[]
 }
 
 /** 공+0x68 이 처음으로 멈춘 점(vt18)에 닿는 틱. 끝까지 안 멈추면 마지막 점의 틱 */
@@ -125,8 +137,23 @@ export function derbyBallStopTickOf(trajectory: BattedBallTrajectory): number {
  */
 export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPort): DerbyBattedBall {
   const trajectory = trajectoryWithRandom(battedBallTrajectory(pattern), random)
+  return derbyPlayOf(pattern, trajectory)
+}
+
+/** 틱 t 에 비거리 판 0x36cd4 가 읽는 표시 비거리 +0x36 — 그 틱까지 마지막으로 쓴 값, 없으면 `previous`(앞 공의 값) */
+export function derbyDisplayDistanceAt(batted: DerbyBattedBall, tick: number, previous: number): number {
+  let value = previous
+  for (const written of batted.displayDistanceTicks) {
+    if (written.tick > tick) break
+    value = written.value
+  }
+  return value
+}
+
+/** 판 하나를 공 틱 1 … closeTick − 1 로 돈다 */
+function derbyPlayOf(pattern: BattedBallPattern, trajectory: BattedBallTrajectory): DerbyBattedBall {
   const landingTick = trajectory.landingTick
-  const stopTick = derbyBallStopTickOf(trajectory)
+  const closeTick = derbyBallStopTickOf(trajectory)
   // 0xb68dc — 더비는 state[0x19] = 0(0x35034 가 모드 7 이면 굴리지 않음) · state[0x1f] = 0(쥐는 이가 없음)이라 쏜 각 state[0x1c] 그대로
   const isFoul = !isFairAngle(pattern[0])
 
@@ -135,9 +162,13 @@ export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPor
   const homeRunTicks: number[] = []
   let foulCallTick: number | null = null
   let displayDistance: number | null = null
-  for (let tick = 1; tick < stopTick; tick += 1) {
+  const displayDistanceTicks: { tick: number; value: number }[] = []
+  for (let tick = 1; tick < closeTick; tick += 1) {
     // 526d0 — 아직 낙구 전(aa0 ≥ t)이면 state[0x36] = 지금 점 비거리 (홈런 · 파울 가리지 않음)
-    if (landingTick >= tick) displayDistance = derbyDistanceOf(trajectory.pointAt(tick))
+    if (landingTick >= tick) {
+      displayDistance = derbyDistanceOf(trajectory.pointAt(tick))
+      displayDistanceTicks.push({ tick, value: displayDistance })
+    }
     // 52720 — 담장선 틱(aa4)이 낙구 이전이거나, 폴 틱(ab0)이 낙구 이전
     const reachesHomeRun =
       (trajectory.fenceTick === tick && landingTick >= tick) ||
@@ -164,6 +195,8 @@ export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPor
     displayDistance,
     homeRunTicks,
     foulCallTick,
-    endTicks: stopTick + DERBY_PLAY_CLOSE_TICKS,
+    endTicks: closeTick + DERBY_PLAY_CLOSE_TICKS,
+    closeTick,
+    displayDistanceTicks,
   }
 }
