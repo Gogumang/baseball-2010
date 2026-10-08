@@ -30,8 +30,9 @@ import type { PitcherScene, PitcherStoryContext } from '@/app/model/usePitcherLe
  */
 export const SCREEN_BGM = {
   메인메뉴: 1,
-  // 도움말 · 환경설정 · 스페셜 · 나리편선택은 없다 — 모두 장면 0x103 안의 상태(7 · 8 · 13 · 하위 목록)라 진입이 상태 표
-  // 0xcea84 의 아무것도 안 하는 칸이다. 메뉴의 1 이 이어진다 (설정에서 돌아올 때만 0x24a40 이 1 을 처음부터 — `useScreenBgm`)
+  // 도움말 · 스페셜 · 나리편선택은 없다 — 모두 장면 0x103 안의 상태(7 · 13 · 하위 목록)라 진입이 상태 표
+  // 0xcea84 의 아무것도 안 하는 칸이다. 메뉴의 1 이 이어진다. 환경설정(8)은 진입 0x259fc 가 소리를 끊는다(`stopsSoundOnEnter`) —
+  // 그래서 돌아올 때 0x24a40 이 1 을 처음부터 다시 튼다(`useScreenBgm`)
   팀선택: 3,
   선수등록: 3,
   시즌모드: 3,
@@ -294,6 +295,25 @@ export function useSeasonMenuBgm(sound: SoundPort, isActive: boolean, scene: num
  * 브라우저 자동 재생 막기(`useSound` 머리 주석)에도 걸리지 않는다.
  */
 export const SCREEN_ENTER_SOUND = {} as const satisfies Partial<Record<Screen['kind'], number>>
+
+/**
+ * 들어설 때 울리던 소리를 끊는 화면 — 환경설정(하위 8) 진입 0x259fc 의 끝 0x25aac~0x25ab6 `0x6e419(소리)` (= 0x6e418 소리 끊기,
+ * 기억한 배경음도 잊는다). 하위 페이지(0x20 · 0x21)에서 돌아오는 진입도 같은 끝을 지나지만 그때는 이미 끊긴 뒤다.
+ */
+export function stopsSoundOnEnter(screen: Screen): boolean {
+  return screen.kind === '환경설정'
+}
+
+/** 화면이 바뀌어 `stopsSoundOnEnter` 화면에 들어선 그리기에서 한 번 `sound.stop()` */
+export function useSceneEnterStop(sound: SoundPort, screen: Screen): void {
+  const lastKindRef = useRef<Screen['kind'] | null>(null)
+  const stops = stopsSoundOnEnter(screen)
+  useEffect(() => {
+    if (lastKindRef.current === screen.kind) return
+    lastKindRef.current = screen.kind
+    if (stops) sound.stop()
+  }, [sound, screen.kind, stops])
+}
 
 /** 이 화면에 들어설 때 낼 효과음. 없으면 null */
 export function screenEnterSoundOf(screen: Screen): number | null {

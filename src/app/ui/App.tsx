@@ -26,7 +26,9 @@ import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
-import { screenEnterSoundOf, usePitcherLeagueBgm, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import {
+  screenEnterSoundOf, usePitcherLeagueBgm, useSceneEnterStop, useScreenBgm, useSeasonMenuBgm,
+} from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
@@ -158,6 +160,8 @@ export function App() {
   const [generalResume, setGeneralResume] = useState<TeamGameProgress | null>(null)
   // 화면에 들어설 때 한 번 나는 소리 (`SCREEN_ENTER_SOUND` — 지금은 없다. 로고 음성 0 은 `EntryRoutes` 의 onLogoVoice)
   useSceneEnterSound(sound, screen.kind, screenEnterSoundOf(screen))
+  // 환경설정 진입 0x259fc 끝의 소리 끊기 0x6e419
+  useSceneEnterStop(sound, screen)
 
   const runner = useAtBatRunner()
   // 마선수 오픈 플래그 — 원본 전역 기록 `mgr[0x30..0x39]`

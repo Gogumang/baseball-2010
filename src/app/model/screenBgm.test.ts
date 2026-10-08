@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { pitcherLeagueBgmOf, restartsMenuBgm, screenBgmOf, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { pitcherLeagueBgmOf, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
@@ -162,6 +162,19 @@ describe('메인 메뉴 아래 화면 — 상태 7 · 8 · 13 · 하위 목록�
   it('도움말 · 환경설정 · 스페셜 · 나리편선택은 배경음을 안 바꾼다', () => {
     for (const kind of ['도움말', '환경설정', '스페셜', '나리편선택'] as const) expect(screenBgmOf({ kind })).toBeNull()
     expect(screenBgmOf({ kind: '메인메뉴' })).toBe(1)
+  })
+
+  it('환경설정 진입 0x259fc 는 끝에서 소리를 끊는다(0x6e419) — 다른 메뉴 아래 화면은 안 끊는다', () => {
+    expect(stopsSoundOnEnter({ kind: '환경설정' })).toBe(true)
+    expect(stopsSoundOnEnter({ kind: '도움말' })).toBe(false)
+    const stops: string[] = []
+    const port = { ...createSilentSound(), stop: () => stops.push('끊기') }
+    const { rerender } = renderHook(({ screen }: { screen: Screen }) => useSceneEnterStop(port, screen), {
+      initialProps: { screen: { kind: '메인메뉴' } as Screen },
+    })
+    rerender({ screen: { kind: '환경설정' } })
+    rerender({ screen: { kind: '환경설정' } })
+    expect(stops).toEqual(['끊기'])
   })
 
   it('환경설정에서 돌아올 때(0x24a40 이전 8) · 게임시작 목록으로 새로 설 때(0x25b88 이전 ≠ 4)만 1 을 처음부터', () => {
