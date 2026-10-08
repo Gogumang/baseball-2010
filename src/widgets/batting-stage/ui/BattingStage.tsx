@@ -560,7 +560,14 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         buntRef.current = released
         sceneBuntKindRef.current = 0
       },
+      /**
+       * 좌우 이동 '4'/'6' (0x53470 → 0x6a4 → 0x50f86) — 0x53470 은 상태 0xf · 0x10 · 0x11 의 키 함수에서만 불린다.
+       * 웹 '대기'(0xf + 0x10, 타석이 끝나 쉬는 동안 제외) · '투구중'(0x11)만 받고 0x13 · 결과에서는 무시한다.
+       */
       moveBatter: (direction: -1 | 1) => {
+        const phase = phaseRef.current
+        const takesShift = phase === '투구중' || (phase === '대기' && !latestRef.current.isPaused)
+        if (!takesShift) return
         shiftRef.current = nextBatterShift(shiftRef.current, direction)
       },
       /**
