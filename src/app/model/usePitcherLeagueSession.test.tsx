@@ -374,7 +374,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       act(() => 첫판.result.current.actions.save({ ...첫판.result.current.career!, season: 2, gamesPlayed: 45, seasonEndState }))
       const 판 = 띄우기(store).result
       act(() => 판.current.actions.giveStoryReward(items, eventId, viewed))
-      return { 받은뒤: 판.current.career!, 저장: store.load() as 커리어, 다시: 띄우기(store).result }
+      return { 받은뒤: 판.current.career!, 저장: store.load() as 커리어, 다시: 띄우기(store).result, store }
     }
 
     // 393 보상 창에서 끊김 — 392 를 다시 틀지 않고 130(370)부터: 목표 보상이 겹치지 않는다
@@ -388,6 +388,8 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(거절.저장.seasonEndState).toBe(137)
     expect(거절.다시.current.scene).toBe('관리')
     expect(거절.다시.current.career).toMatchObject({ season: 3, seasonEndState: null, reputation: 거절.받은뒤.reputation })
+    // 0x1b768 은 그 자리(1b894~1b8a4)에서 저장한다 — 띄우기만 해도 저장이 새 시즌이다
+    expect(거절.store.load()).toMatchObject({ season: 3, seasonEndState: null })
 
     // 463 출전 — 대회가 저장에 들고 이어하기는 134 대진판, 134 첫 틀이 칭호 8
     const 출전 = 끊고다시(132, 463, [{ kind: 1, value: 10 }], [461, 463])

@@ -748,6 +748,21 @@ export function usePitcherLeagueSession(
     ])
   }, [resumePoint.kind, store])
 
+  /**
+   * 이어하기로 새 시즌 처리를 했으면(`resumePoint` '새시즌' — 1c25e S+0x50 == 0x11 → 0x1b768) 그 자리에서 저장한다 — 한 번만.
+   * 0x1b768 은 연차 + 1 · 소지금 · S+0x50 = 1 · 기록 칸 정리 뒤 1b894~1b8a4 에서 `0x1fded · 0x22755([0x1400054], 1)` 로
+   * **곧바로 저장하고** 화면 전환(0xbdae9) · +0x289 = 1(→ 137) 을 건다(직접 떴다). 예전 웹은 띄울 때 메모리에만 두어, 다른 저장
+   * 없이 끄면 저장이 앞 해(S+0x50 = 0x11) 그대로 남았다.
+   */
+  const resumedNewSeasonRef = useRef(false)
+  useEffect(() => {
+    if (resumedNewSeasonRef.current || resumePoint.kind !== '새시즌') return
+    resumedNewSeasonRef.current = true
+    const started = resumed.current?.career
+    if (started === null || started === undefined) return
+    store.save(started)
+  }, [resumePoint.kind, store])
+
   const commitWith = useCallback(
     (update: (current: PitcherCareer) => PitcherCareer) => {
       setCareer((current) => {
