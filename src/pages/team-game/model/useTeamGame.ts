@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -174,9 +175,12 @@ export function useTeamGame(
    */
   resumeFrom?: TeamGameProgress,
 ): TeamGameSession {
-  const [progress, setProgress] = useState<TeamGameProgress>(() =>
-    resumeFrom === undefined ? startTeamGame(options, random) : resumeTeamGame(resumeFrom, random),
-  )
+  const [progress, setProgress] = useState<TeamGameProgress>(() => {
+    // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 모드를 안 가려 새 경기 · 이어하기 모두
+    // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 웹 팀경기는 팁 판을 안 그려 값은 버린다
+    rollSceneLoadingTip(random)
+    return resumeFrom === undefined ? startTeamGame(options, random) : resumeTeamGame(resumeFrom, random)
+  })
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 소리를 내면

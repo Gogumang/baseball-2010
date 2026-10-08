@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   closeBurstWindow,
@@ -99,9 +100,12 @@ export function usePitcherGame(
   /** 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 없으면 켬 (`BattingStage` 와 같다) */
   isVibrationOn?: boolean,
 ): PitcherGameSession {
-  const [progress, setProgress] = useState<PitcherGameProgress>(() =>
-    startPitcherGame(options, random),
-  )
+  const [progress, setProgress] = useState<PitcherGameProgress>(() => {
+    // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 의 덱 1275 보다 먼저 (`rollSceneLoadingTip`).
+    // 웹 투수편은 팁 판을 안 그려 값은 버린다
+    rollSceneLoadingTip(random)
+    return startPitcherGame(options, random)
+  })
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 내면 StrictMode 가
