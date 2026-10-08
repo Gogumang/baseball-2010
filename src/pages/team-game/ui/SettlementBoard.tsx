@@ -17,6 +17,8 @@ import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import { SettlementEffectCanvas } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import type { SettlementEffectLayers } from '@/widgets/batting-stage/model/stageRefs'
 
 const GAME_UI = './sprites/game_ui'
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
@@ -56,6 +58,11 @@ export interface SettlementBoardProps {
   readonly versusWinBonus?: number
   /** 기본 화면에서 '0' 이 아닌 키 → 메시지 0x3f3 (정산을 나간다) */
   readonly onExit: () => void
+  /**
+   * 정산 효과 층 — 밑의 타석 캔버스(`BattingStage` 의 `settlement.layers`)와 같은 묶음. 원본 그리기 0x4a384 차례대로
+   * 비 층은 진 판 덮개(4a404) 바로 위 · 띠(4a448) 아래(효과 틱 0x4a452), 파티클 층은 판 맨 위(프레임 끝 0x6dd69)에 깐다.
+   */
+  readonly effectLayers?: SettlementEffectLayers
 }
 
 /**
@@ -66,6 +73,7 @@ export interface SettlementBoardProps {
  */
 export function SettlementBoard({
   mode, isWin, side0Score, side1Score, scoreboardSides, recordIds, gamePoints, heldGamePoints, versusWinBonus, onExit,
+  effectLayers,
 }: SettlementBoardProps) {
   const [isPanelOpen, setPanelOpen] = useState(false)
   const rows = settlementRecordRowsOf(recordIds)
@@ -109,6 +117,8 @@ export function SettlementBoard({
         <div className={styles.fill}
           style={{ background: '#000000', opacity: colorStepCoverOpacityOf(SETTLEMENT_LOSE_DIM_STEP) }} />
       )}
+      {/* 4a452 효과 틱 0x901a0 — 정산 비(종류 0)를 덮개 위 · 띠 아래에 그린다 */}
+      {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.rain} />}
       {/* 4a448 — 띠 · game_ui 프레임 8 · YOU WIN / YOU LOSE */}
       <div className={styles.block} style={{
         left: SETTLEMENT_BAND.x, top: SETTLEMENT_BAND.y, width: SETTLEMENT_BAND.width, height: SETTLEMENT_BAND.height,
@@ -225,6 +235,8 @@ export function SettlementBoard({
             x={panel.okButton.x} y={panel.okButton.y} />
         </>
       )}
+      {/* 프레임 끝 0x6dd69 — 파티클(밤 승리 불꽃)은 판까지 다 그린 뒤 맨 위 */}
+      {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.particles} />}
     </div>
   )
 }

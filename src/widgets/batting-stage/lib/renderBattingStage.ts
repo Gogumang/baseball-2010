@@ -358,6 +358,19 @@ function drawResultText(context: CanvasRenderingContext2D, text: string, resultT
   context.fillText(text, centerX, centerY)
 }
 
+/**
+ * 정산 효과 층 한 장 — 판이 깐 캔버스(`SettlementEffectLayers`)를 비우고 비 또는 파티클을 그린다.
+ * 비 층은 효과 틱 0x4a452 자리(진 판 덮개 위 · 띠 아래), 파티클 층은 프레임 끝 0x6dd69 자리(판 맨 위)다.
+ */
+export function renderSettlementLayer(
+  context: CanvasRenderingContext2D,
+  content: { readonly rain?: SceneRain | null; readonly particles?: ParticleScene | null },
+): void {
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+  if (content.rain !== null && content.rain !== undefined) drawRain(context, content.rain)
+  if (content.particles !== null && content.particles !== undefined) drawParticles(context, content.particles)
+}
+
 /** 비 그리기 — 빗방울 0x8f8ec(선, 0xc7c7c7 · 짙기 +0xe) · 튐 0x8fb08(흰 점, 수명 3 은 가로선 ±2 도) */
 function drawRain(context: CanvasRenderingContext2D, rain: SceneRain): void {
   const { lines, dots, bars } = rainDrawingOf(rain)

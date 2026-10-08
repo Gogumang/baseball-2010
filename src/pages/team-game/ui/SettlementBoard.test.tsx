@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
+import { createRef } from 'react'
 
 afterEach(() => {
   cleanup()
@@ -33,6 +34,19 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     // 닫힌 판에서 '0' 이 아닌 키 → 메시지 0x3f3
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  it('정산 효과 층은 원본 0x4a384 차례 — 비는 진 판 덮개 바로 위(띠 아래), 파티클은 판 맨 위', () => {
+    const layers = { rain: createRef<HTMLCanvasElement>(), particles: createRef<HTMLCanvasElement>() }
+    render(<SettlementBoard {...기본} isWin={false} onExit={vi.fn()} effectLayers={layers} />)
+    const children = Array.from(screen.getByTestId('정산-판').children)
+    const rain = layers.rain.current
+    const particles = layers.particles.current
+    expect(rain).not.toBeNull()
+    expect(particles).not.toBeNull()
+    // 0 = 4a404 덮개, 1 = 효과 틱 0x4a452 의 비, 2 = 4a448 띠 …, 끝 = 프레임 끝 0x6dd69 파티클
+    expect(children.indexOf(rain as HTMLCanvasElement)).toBe(1)
+    expect(children[children.length - 1]).toBe(particles)
   })
 
   it('점수판 틀 0x41440 을 (W/2 − 120, H/2 − 80) = (0, 80) 에', () => {

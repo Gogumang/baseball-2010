@@ -41,6 +41,7 @@ import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBa
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
@@ -358,6 +359,8 @@ export function TeamGameScreen({
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canBat || canPitch)
   /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (정산 갈래 주석) */
   const [backdropRandom] = useState(() => createSeededRandom(0))
+  /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
+  const settlementLayers = useSettlementEffectLayers()
   isAwaitingConfirmRef.current = isAwaitingConfirm
   isInConfirmStateRef.current = sceneConfirm.isInConfirmState
   /** 0xd 두 그림을 지나 0xe 에 들어섰으면 소개 판을 그린다 (0x4d9ec → 0x44944) */
@@ -503,6 +506,7 @@ export function TeamGameScreen({
               side1Score: ourSide === 1 ? summary.ourScore : summary.opponentScore,
               inning: progress.game.inning,
               random,
+              layers: settlementLayers,
             }}
             onPitchResolved={() => {}}
           />
@@ -518,6 +522,7 @@ export function TeamGameScreen({
             // [app+0x64] — 정산 진입(0x4ea0c)이 번 G 를 더한 뒤의 값. 부르는 쪽이 `onSettlementEnter` 에서 더한다
             {...(gamePoint === undefined ? {} : { heldGamePoints: gamePoint })}
             onExit={() => onFinish(summary)}
+            effectLayers={settlementLayers}
           />
         </div>
       </PixelScreen>

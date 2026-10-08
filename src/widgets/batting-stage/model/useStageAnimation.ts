@@ -9,7 +9,7 @@ import { lastSwingFrameOf } from '@/entities/batting/model/swingTiming'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
-import { renderBattingStage } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { renderBattingStage, renderSettlementLayer } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
@@ -274,6 +274,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         pitcherMagicNumber: pitch?.pitcherMagicNumber ?? repertoire?.magicId ?? 0,
       })
 
+      const settlementRain = settlementEffect?.kind === 'rain' ? settlementEffect.rain : null
       renderBattingStage(context, {
         pitcherForm,
         pitcherHand,
@@ -301,8 +302,9 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
         acePitcher: latestRef.current.acePitcher,
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
         tick: nowTick,
-        particles: particlesRef.current,
-        rain: settlementEffect?.kind === 'rain' ? settlementEffect.rain : null,
+        // 판이 효과 층을 깔았으면 배경 캔버스에는 배경만 — 비 · 파티클은 아래에서 그 층에 그린다
+        particles: settlement?.layers === undefined ? particlesRef.current : null,
+        rain: settlement?.layers === undefined ? settlementRain : null,
         resultBackdropOffsetY:
           backdropStartedAt === null
             ? null
@@ -322,6 +324,14 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           isScoreboardOn: latestRef.current.isScoreboardOn,
         },
       })
+      // 정산 효과 층 — 비는 효과 틱 0x4a452 자리(진 판 덮개 위 · 띠 아래), 파티클은 프레임 끝 0x6dd69 자리(판 맨 위)
+      const layers = settlement?.layers
+      if (layers !== undefined) {
+        const rainContext = layers.rain.current?.getContext('2d') ?? null
+        if (rainContext !== null) renderSettlementLayer(rainContext, { rain: settlementRain })
+        const particleContext = layers.particles.current?.getContext('2d') ?? null
+        if (particleContext !== null) renderSettlementLayer(particleContext, { particles: particlesRef.current })
+      }
 
       animationHandle = requestAnimationFrame(frame)
     }

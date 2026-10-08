@@ -123,6 +123,19 @@ export interface SettlementEffectSource {
   readonly inning: number
   /** 경기 난수 — 효과 깔기 · 틱 · 파티클 틱 */
   readonly random: RandomPort
+  /**
+   * 효과를 그릴 **판 쪽 캔버스 두 장** (`useSettlementEffectLayers`). 원본 그리기 차례 0x4a384 는
+   * 배경(0x40ff0) → 진 판 덮개(4a404) → **효과 틱 0x4a452(비)** → 띠 · 승패 그림 · 판(4a448~) → 프레임 끝 **0x6dd69(파티클)** 라
+   * 비는 덮개 위 · 띠 아래, 파티클(불꽃)은 판 맨 위다. 판이 DOM 이라 그 사이에 끼울 캔버스를 판이 깔고 타석 캔버스는 배경만 그린다.
+   * 안 넘기면 둘 다 배경 캔버스(판 아래)에 그린다.
+   */
+  readonly layers?: SettlementEffectLayers
+}
+
+/** 정산 효과 층 — `rain` 은 진 판 덮개 바로 위, `particles` 는 판 맨 위에 판이 까는 240×320 캔버스 */
+export interface SettlementEffectLayers {
+  readonly rain: RefObject<HTMLCanvasElement>
+  readonly particles: RefObject<HTMLCanvasElement>
 }
 
 export interface StageRefs {

@@ -49,6 +49,7 @@ import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { MAXIMUM_GAME_POINT, STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
@@ -128,6 +129,8 @@ export function PitcherGameScreen({
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
   /** 정산 배경 전용 난수 — 경기 난수를 건드리지 않는다 (팀경기 `TeamGameScreen` 정산 갈래와 같다) */
   const [backdropRandom] = useState(() => createSeededRandom(0))
+  /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
+  const settlementLayers = useSettlementEffectLayers()
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   const isBenchClearing = progress.pendingBenchClearing !== null
@@ -480,6 +483,7 @@ export function PitcherGameScreen({
               side1Score: ourSide === 1 ? summary.ourScore : summary.opponentScore,
               inning: progress.game.inning,
               random,
+              layers: settlementLayers,
             }}
             onPitchResolved={() => {}}
           />
@@ -496,6 +500,7 @@ export function PitcherGameScreen({
               ? {}
               : { heldGamePoints: Math.min(MAXIMUM_GAME_POINT, Math.max(0, gamePoint + earned)) })}
             onExit={() => onFinish(summary)}
+            effectLayers={settlementLayers}
           />
         </div>
       </PixelScreen>,
