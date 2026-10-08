@@ -25,12 +25,13 @@ describe('124 첫 갈래 — 연도별 기록 (0x5761c · 0x5c984)', () => {
     expect(PITCHER_YEAR_COLUMNS.map((column) => column.labelFrame)).toEqual([171, 213, 214, 215, 216, 217, 181, 218, 219])
   })
 
-  it('타자 칸 — 타율은 소수(v > 999 ? 3 : 0) · 그 밖은 레코드 값 그대로 · 도루는 웹이 안 세어 빈 칸', () => {
+  it('타자 칸 — 타율은 소수(v > 999 ? 3 : 0) · 그 밖은 레코드 값 그대로 · 도루 +0x2c(옛 저장 0)', () => {
     const stats = { ...EMPTY_SEASON_STATS, atBats: 200, hits: 63, doubles: 11, triples: 2, homeRuns: 9, runsBattedIn: 40 }
     expect(batterYearCellTextOf(stats, 0)).toBe('.315')
     expect(batterYearCellTextOf({ ...stats, hits: 200 }, 0)).toBe('1.00')
     expect([0x10, 1, 2, 4, 8, 0x20].map((bit) => batterYearCellTextOf(stats, bit))).toEqual(['9', '200', '63', '11', '2', '40'])
-    expect(batterYearCellTextOf(stats, 0x40)).toBeNull()
+    expect(batterYearCellTextOf(stats, 0x40)).toBe('0')
+    expect(batterYearCellTextOf({ ...stats, stolenBases: 3 }, 0x40)).toBe('3')
   })
 
   it('투수 칸 — 방어율은 소수((v > 100 ? v × 10 : v), 3) · 이닝은 아웃 / 3 · 사사구는 +0x2a', () => {
@@ -141,5 +142,11 @@ describe('124 둘째 갈래 — 나리 판 순위 재료', () => {
     const records = nariBatterRankingRecordsOf(career)
     expect(records.filter((record) => record.isMine)).toHaveLength(1)
     expect(records.every((record) => record.batterExtra === 0)).toBe(true)
+  })
+
+  it('내 선수 줄의 도루(종류 10)는 내 시즌 줄 +0x2c — 동료 간이 타석에서 내가 뛴 도루', () => {
+    const base = createCareer('선수')
+    const career = { ...base, stats: { ...base.stats, stolenBases: 5 } }
+    expect(nariBatterRankingRecordsOf(career).find((record) => record.isMine)?.batterExtra).toBe(5)
   })
 })

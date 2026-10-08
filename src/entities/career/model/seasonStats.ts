@@ -12,6 +12,11 @@ export interface SeasonStats {
   readonly runsBattedIn: number
   readonly walks: number
   readonly strikeouts: number
+  /**
+   * 레코드 +0x2c 도루 — 타자편 내 선수가 받는 자리는 동료 타석 간이 엔진 0xc1818 끝(c1a42~c1a98)의 도루뿐이다(내가 루에 있을 때).
+   * 기록실 124 타자 열 0x40 · 나리 순위 종류 10 이 읽는다. 옛 저장에는 없어 0 으로 본다.
+   */
+  readonly stolenBases?: number
 }
 
 export const EMPTY_SEASON_STATS: SeasonStats = {
@@ -62,6 +67,9 @@ export function mergeStats(left: SeasonStats, right: SeasonStats): SeasonStats {
     runsBattedIn: left.runsBattedIn + right.runsBattedIn,
     walks: left.walks + right.walks,
     strikeouts: left.strikeouts + right.strikeouts,
+    ...(left.stolenBases === undefined && right.stolenBases === undefined
+      ? {}
+      : { stolenBases: (left.stolenBases ?? 0) + (right.stolenBases ?? 0) }),
   }
 }
 
