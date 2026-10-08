@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -68,9 +68,13 @@ interface MainMenuScreenProps {
   /** 그 갈래의 곧장 경기 — 0x213c0(앱, m, 0) → 장면 0x104. 안 넘기면 `onNewGame` 으로 간다 */
   readonly onResumeNariGame?: (edition: '타자편' | '투수편') => void
   readonly onSelectMode: (mode: GameMode) => void
-  readonly onBack: () => void
-  /** 원작 처음 메뉴의 [도움말] (StrMAINMENU[2]) */
+  /** 원작 처음 메뉴의 [도움말] (StrMAINMENU[2]) — 하위 7 */
   readonly onHelp: () => void
+  /**
+   * 원작 처음 메뉴의 [게임문의] (StrMAINMENU[209]) — 하위 10. 진입 0x2668c 가 도움말 뷰어를 장 6 쪽 보기로 열고
+   * `[뷰어+0x45c]` = 1 로 장 이동을 잠근다(오프라인). 안 넘기면 OK 해도 아무 일 없다
+   */
+  readonly onInquiry?: () => void
   /** 원작 처음 메뉴의 [환경설정] (StrMAINMENU[3]) */
   readonly onSettings: () => void
   /** 원작 처음 메뉴의 [스페셜] (StrMAINMENU[1]) */
@@ -97,6 +101,16 @@ interface MainMenuScreenProps {
   readonly openTier?: MainMenuOpenTier
   /** 게임시작 목록 커서 전역 [0x1552d24] — 루트가 들고 다닌다. 안 넘기면 첫 단 5 도 0 칸에서 열고 적지 않는다 */
   readonly gameStartCursor?: GameStartCursor
+  /**
+   * 처음 메뉴 바퀴 커서 `[this+0xe8]` — 장면 객체 값이라 같은 장면 안(스페셜·도움말·환경설정·랭킹·게임문의)을 다녀오면
+   * 그 칸에 서고, 장면을 새로 세우면(0x104~0x107 을 다녀옴) 0 이다. 루트가 들고 다닌다. 안 넘기면 늘 0 칸
+   */
+  readonly topMenuCursor?: GameStartCursor
+  /**
+   * `openTier` 5 로 서되 생성자를 안 지난 것 — 같은 장면의 하위 16·17(홈런더비·미션 선수 고르기)에서 CLR 로 돌아왔다.
+   * 띠 `[0xe4]` 는 내려올 때 이미 다 자랐으므로 펼쳐진 채로 선다
+   */
+  readonly isBandGrown?: boolean
 }
 
 /** 판정을 부르는 상태 틱 (0x29520 `cmp r3,#0xa`) */
@@ -110,8 +124,6 @@ const frameSrc = (folder: string, frame: number) => `${folder}/frames/${pad(fram
 /** 통짜 이미지 (main_ui/NNN) — 설명 판이 이쪽이다 */
 const imageSrc = (frame: number) => `${MAIN_UI}/${pad(frame)}.png`
 
-/** 웹이 내려가는 하위 목록은 아직 **상태 5(게임시작)** 하나다 — 표는 상태로 색인한다 */
-const REEL_STATE = 5
 
 /**
  * 메인 메뉴 — 원작대로 **두 단**이다. 윗단(하위 상태 4, 처음 메뉴)에서 [게임시작] 을 고르면
@@ -144,8 +156,8 @@ export function MainMenuScreen({
   nariGameReady,
   onResumeNariGame,
   onSelectMode,
-  onBack,
   onHelp,
+  onInquiry,
   onSettings,
   onSpecial,
   onTopMenuTenthTick,
@@ -153,7 +165,13 @@ export function MainMenuScreen({
   gamePoint,
   openTier = 4,
   gameStartCursor,
+  topMenuCursor,
+  isBandGrown = false,
 }: MainMenuScreenProps) {
+  // 아랫단 바탕 띠 — 처음 메뉴 OK 로 내려올 때마다(0x294b8) · 장면이 하위 5 로 바로 설 때(생성자 0x2381c) 1 부터 자란다.
+  // 자라는 동안은 릴 줄을 안 그리고(0x254d8) 하위 5·9 갱신이 키를 버린다([0xe2] ≠ 0 — 0x28cc2 · 0x28ae0)
+  const [tier, setTier] = useState(openTier)
+  const band = useMenuBand(tier !== 4, isBandGrown)
   const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '나리타자편') onNewGame('타자편')
     else if (effect === '나리투수편') onNewGame('투수편')
@@ -169,9 +187,10 @@ export function MainMenuScreen({
     else if (effect === '스페셜') onSpecial()
     else if (effect === '도움말') onHelp()
     else if (effect === '환경설정') onSettings()
-    else onBack()
+    else if (effect === '게임문의') onInquiry?.()
   }, { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) },
-  openTier, gameStartCursor)
+  openTier, gameStartCursor, topMenuCursor, band.isGrowing)
+  if (state.tier !== tier) setTier(state.tier)
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)
   const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
 
@@ -198,11 +217,8 @@ export function MainMenuScreen({
   /** 도는 동안은 **돌기 전 배열**을 그린다 (회전은 마지막 틱에 한 번 일어난다) */
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
 
-  // 아랫단 바탕 띠 — 자라는 동안은 릴 줄을 안 그린다 (0x254d8 이 줄 묶음을 통째로 건너뛴다)
-  // 연출은 장면이 게임시작 목록으로 바로 설 때(`[0x140006c]` = 5)만 켜진다 — 생성자 0x2381c~0x23846
-  const isBandSeededRef = useRef(openTier === 5)
-  const band = useMenuBand(!isWheel, isBandSeededRef.current)
-
+  /** 하위 목록 상태 번호 — 표(0xceaf2 슬롯 · 0xcea00/0xcea48 글자 · 0xcea6c 제목)를 이 번호로 색인한다 */
+  const reelState = state.tier
   const panelText = state.lockedNotice ?? selected?.description ?? ''
 
   const sizeOf = (frames: ReturnType<typeof useFrameOrigins>, frame: number) =>
@@ -251,8 +267,8 @@ export function MainMenuScreen({
   })
 
   // ── 아랫단 세로 릴 ──
-  const reelFrames = MENU_REEL_ITEM_FRAMES[REEL_STATE]
-  const reelRow = menuReelSlotRowOf(REEL_STATE)
+  const reelFrames = MENU_REEL_ITEM_FRAMES[reelState] ?? []
+  const reelRow = menuReelSlotRowOf(reelState)
   const reelFrameList = menuReelFrameListOf(reelFrames)
   /** ↑(−1) 면 +, ↓(−2) 면 − 로 민다 (0x2534c) */
   const scroll = turn.direction === null
@@ -302,7 +318,7 @@ export function MainMenuScreen({
     ? null
     : menuPanelLabelTopLeftOf(panelLabelSize.width, panelLabelSize.height)
   /** 판 왼쪽 위 회색 제목 — 하위 목록(0x257cc)에만 있다 */
-  const headingFrame = isWheel ? null : menuPanelHeadingFrameOf(REEL_STATE)
+  const headingFrame = isWheel ? null : menuPanelHeadingFrameOf(reelState)
   const headingSize = headingFrame === null ? null : sizeOf(textOrigins, headingFrame)
 
   return (
@@ -409,11 +425,13 @@ export function MainMenuScreen({
         />
       )}
 
-      {/* 취소 — 아랫단이면 윗단으로, 윗단이면 타이틀로 (원본은 CLR 키다, 버튼은 웹 임시).
-          머리띠를 그리면 아랫단은 바닥띠 뒤로 표시(바닥 5)가 같은 일을 하므로 이 임시 버튼은 윗단에만 둔다 */}
-      {(gamePoint === undefined || isWheel) && <button type="button" data-turn={`${turn.direction}/${turn.counter}/${turn.fromCursor}/${scroll}`} className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
-        {state.tier === 5 ? '‹ 처음 메뉴' : '‹ 타이틀'}
-      </button>}
+      {/* 취소 — 아랫단이면 윗단으로 (원본은 CLR 키다, 버튼은 웹 임시). 머리띠를 그리면 바닥띠 뒤로 표시(바닥 5)가 같은 일을 한다.
+          처음 메뉴(하위 4)는 CLR 을 안 보므로(0x29454) 타이틀로 가는 단추는 없다 */}
+      {gamePoint === undefined && !isWheel && (
+        <button type="button" className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
+          ‹ 처음 메뉴
+        </button>
+      )}
 
       {overlay}
     </RawScreen>

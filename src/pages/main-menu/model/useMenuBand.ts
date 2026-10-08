@@ -1,18 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import {
-  MENU_BAND_GROW_TICKS, MENU_BAND_MAX_SPREAD, menuBandStateAt,
-} from '@/pages/main-menu/lib/mainMenuLayout'
+import { MENU_BAND_GROW_TICKS, menuBandStateAt } from '@/pages/main-menu/lib/mainMenuLayout'
 import type { MenuBandState } from '@/pages/main-menu/lib/mainMenuLayout'
 
-/** 다 자란 뒤의 상태 — `[메뉴+0xe4]` 는 160 에 머무르고 `[메뉴+0xe2]` 는 0 이다 */
-const GROWN: MenuBandState = { spread: MENU_BAND_MAX_SPREAD, isGrowing: false }
-
-/**
- * 연출이 안 켜진 장면 — 할당기 0x2ac4 가 장면 객체를 0x1400428(memset 0)로 비우므로 `[0xe4]` = `[0xe2]` = 0 이다.
- * 그리기 0x253e8 은 i = 0 한 줄(y = 높이, 화면 바로 밖)만 긋고, 0x254e4 의 ×4 는 0 에 머문다 — 띠는 안 보이고 릴 줄은 그린다.
- */
-const NEVER_SEEDED: MenuBandState = { spread: 0, isGrowing: false }
+/** 처음 메뉴(하위 4) — 띠를 그리지 않는다 */
+const CLOSED: MenuBandState = { spread: 0, isGrowing: false }
 
 /**
  * 아랫단 바탕 띠가 자라는 연출 (`[메뉴+0xe4]` · `[메뉴+0xe2]`).
@@ -20,46 +12,48 @@ const NEVER_SEEDED: MenuBandState = { spread: 0, isGrowing: false }
  * 원본은 **갱신 한 번에 한 칸**씩 ×4 로 키운다 (0x254e4). 웹판도 rAF 가 아니라 원본 틱
  * `millisecondsPerFrame()` 으로 센다 — `useMenuTurn` 과 같은 방식이다.
  *
- * **언제 켜지는가** — 원본은 장면을 만들 때 전역 `[0x140006c]` 가 5 나 0x11 이면 `[0xe2] = [0xe4] = 1` 을 넣고
- * (0x2381c~0x23846), 그 밖에는 손대지 않는다(장면 객체는 0 으로 비워져 나온다 — 할당기 0x2ac4 → memset 0x1400428).
- * 곧 **"게임시작 목록으로 바로 열어라" 로 장면이 설 때만**(`isSeeded` — 관리 메뉴 취소 등) 연출이 돌고, 윗단 바퀴에서 OK 로
- * 내려온 경우에는 `[0xe4]` 가 0 이라 띠가 아예 안 보인다.
+ * **언제 1 로 되돌리는가** — `[0xe2] = 1 · [0xe4] = 1` 을 넣는 곳은 둘이다 (예전 주석의 "0x23846·0x254e6·0x25512 뿐" 은
+ * 처음 메뉴 OK 의 `adds r3,#0xe2 ; strb ; adds r3,#2 ; strh` 를 놓쳤다 — 0x294b8 을 직접 떴다):
+ * - 장면 생성자 0x2381c~0x23846: 전역 `[0x140006c]` 가 5 나 0x11 이면 (관리 메뉴 취소 · 미션 목록 CLR)
+ * - **처음 메뉴 OK 0x294b8~0x294c2**: `adds r3,#0xe2 ; strb 1 ; adds r3,#2 ; strh 1` — 칸이 무엇이든 OK 마다
+ * 그래서 처음 메뉴에서 [게임시작]·[랭킹] 으로 내려갈 때마다 띠는 1 에서 다시 자란다. 다 자라면 0x25512 가 `[0xe2]` = 0.
+ * 0x2524c 는 하위 5·6·9 그리기만 부르므로 하위 16·17(선수 고르기)에 있는 동안은 자라지 않는다.
  *
- * 한 번 다 자란 `[0xe4]` 를 0 으로 되돌리는 코드는 **없다**(.text 전체에서 0xe4 를 쓰는 곳은
- * 0x23846·0x254e6·0x25512 뿐이다). 그래서 윗단으로 올라갔다가 다시 내려오면 띠는 **연출 없이
- * 처음부터 다 펼쳐진 채로** 나온다 — `hasGrownRef` 가 그 자리다.
- *
- * ⚠️ 0x11 로 세우는 길은 웹에 없다(그 값을 쓰는 곳 미확인).
+ * `isOpen` 이 거짓 → 참으로 바뀔 때마다(처음 메뉴 OK 로 내려옴) 1 부터 다시 자란다.
+ * 처음부터 열려 있으면(장면이 하위 5 로 바로 섬) `startsGrown` 이 거짓일 때만 자라고, 참이면(같은 장면의 하위 16·17 에서 CLR 로
+ * 돌아옴 — 생성자를 안 지나 `[0xe4]` 는 앞서 다 자란 160 그대로) 처음부터 다 펼쳐져 있다.
  */
-export function useMenuBand(isOpen: boolean, isSeeded: boolean): MenuBandState {
-  // 첫 그림부터 0 이어야 한다 — 다 자란 값으로 시작하면 효과가 돌기 전 한 장이 활짝 펼쳐져 번쩍인다
-  const hasGrownRef = useRef(false)
-  const [tick, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!isOpen || !isSeeded) return undefined
-    if (hasGrownRef.current) {
-      setTick(MENU_BAND_GROW_TICKS)
-      return undefined
+export function useMenuBand(isOpen: boolean, startsGrown = false): MenuBandState {
+  const [tick, setTick] = useState(() => (isOpen && startsGrown ? MENU_BAND_GROW_TICKS : 0))
+  /** 몇 번째로 열렸는가 — 바뀔 때마다 자라기를 새로 센다 */
+  const [opening, setOpening] = useState(0)
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  // 렌더 중에 되감는다 — 효과에서 되감으면 내려온 첫 장이 다 자란 띠로 한 번 번쩍이고 그 사이 키가 샌다
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) {
+      setTick(0)
+      setOpening((count) => count + 1)
     }
+  }
 
-    setTick(0)
+  const isGrowing = isOpen && tick < MENU_BAND_GROW_TICKS
+  useEffect(() => {
+    if (!isGrowing) return undefined
     const startedAt = performance.now()
     let handle = 0
     const step = (now: number) => {
       // rAF 가 startedAt 직전 타임스탬프로 들어올 때가 있어 0 아래로는 안 내려가게 막는다
       const next = Math.max(0, Math.floor((now - startedAt) / millisecondsPerFrame()))
       setTick(next)
-      if (next >= MENU_BAND_GROW_TICKS) {
-        hasGrownRef.current = true
-        return
-      }
+      if (next >= MENU_BAND_GROW_TICKS) return
       handle = requestAnimationFrame(step)
     }
     handle = requestAnimationFrame(step)
     return () => cancelAnimationFrame(handle)
-  }, [isOpen, isSeeded])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 열릴 때마다 한 번 센다
+  }, [opening, isOpen])
 
-  if (!isSeeded) return NEVER_SEEDED
-  return hasGrownRef.current ? GROWN : menuBandStateAt(tick)
+  // 닫혀 있으면(처음 메뉴) 띠는 안 그리고 키도 안 막는다 — 처음 메뉴 갱신 0x29454 는 [0xe2] 를 안 본다
+  return isOpen ? menuBandStateAt(tick) : CLOSED
 }

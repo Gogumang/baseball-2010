@@ -6,19 +6,47 @@ import type { MainMenuEntry } from '@/shared/config/original/mainMenu'
  * (갱신 점프표 0xcefa4 = 상태−2 로 점프, H-modes 1절):
  *   4 = 처음 메뉴 (게임시작·스페셜·도움말·환경설정·랭킹·게임문의 — 갱신 0x29454, 진입 0x24a40)
  *   5 = 게임시작 목록 (최근게임~미션모드 — 갱신 0x28cb0, 진입 0x25b88)
- * 둘 다 같은 판 0x24b1c(반원 바퀴)를 그리고, 5 는 그 위에 하위 목록 0x2524c 를 더 그린다
- * (F-ui-layout 4-0·4-2 · P6-screens 2d).
+ *   9 = 랭킹 모드 목록 (다섯 칸 — 갱신 0x28ad4, 진입 0x23d98, 그리기 0x285dc)
+ * 셋 다 같은 판 0x24b1c(반원 바퀴)를 그리고, 5·9 는 그 위에 하위 목록 0x2524c(this, 5|9) 를 더 그린다
+ * (F-ui-layout 4-0·4-2 · P6-screens 2d · 9 는 P6 1-2 U-94 정정).
  */
-export type MainMenuTier = 4 | 5
+export type MainMenuTier = 4 | 5 | 9
 
-/** 처음 메뉴 6칸. 순서는 StrMAINMENU [0]~[4]·[209] 그대로다. */
-export const TOP_ENTRIES: readonly MainMenuEntry[] = TOP_MENU
+/**
+ * 처음 메뉴 6칸. 순서는 StrMAINMENU [0]~[4]·[209] 그대로다.
+ * 공용 설정(`shared/config/original/mainMenu`)은 [랭킹]·[게임문의] 를 아직 안 만든 칸(isAvailable false)으로 적어 두었다 —
+ * 지금은 둘 다 들어간다: 랭킹 = 하위 9 모드 목록(오프라인, OK 부터 서버 🌐), 게임문의 = 하위 10 도움말 뷰어 장 6.
+ * 공용 설정은 이 쪽에서 덮어 연다.
+ */
+export const TOP_ENTRIES: readonly MainMenuEntry[] = TOP_MENU.map((entry) =>
+  entry.id === '랭킹' || entry.id === '게임문의' ? { ...entry, isAvailable: true } : entry)
+
+/**
+ * **랭킹 모드 목록**(하위 9) 다섯 칸 — 진입 0x23d98 이 항목 글자 표 0xcea00(img_text 9·12·15·18·20)을 `[0x1552d28]` 로,
+ * 개수 5 를 `[this+0xe9]` 에 넣는다. 판 안 큰 글자는 0x2524c 의 표 0xceb37 = main_ui 프레임 [7, 8, 9, 10, 13],
+ * 설명은 0x2583e 의 `StrMAINMENU[0x18 + 커서]` = [24]~[28] (원문 그대로 — 홈런더비 칸 설명이 "훈련모드" 다).
+ * OK 는 `[skin+0xe6]` = 커서 · 하위 37(랭킹 모드별 화면 → 38 서버 🌐) — 웹은 통신이 없다 (`RANKING_SERVER_NOTICE`).
+ */
+export const RANKING_ENTRIES: readonly MainMenuEntry[] = [
+  { id: '랭킹일반모드', labelFrame: 7, isAvailable: true, description: '일반모드의!N순위를 확인합니다' }, // [24]
+  { id: '랭킹나만의리그', labelFrame: 8, isAvailable: true, description: '나만의 리그의!N순위를 확인합니다' }, // [25]
+  { id: '랭킹시즌모드', labelFrame: 9, isAvailable: true, description: '시즌모드의!N순위를 확인합니다' }, // [26]
+  { id: '랭킹대전모드', labelFrame: 10, isAvailable: true, description: '대전모드의!N순위를 확인합니다' }, // [27]
+  { id: '랭킹홈런더비', labelFrame: 13, isAvailable: true, description: '훈련모드의!N순위를 확인합니다' }, // [28]
+]
+
+/**
+ * ⚠️ **웹판 근사**: 랭킹 목록 OK 는 하위 37(모드별 화면 · 아이디 등록) → 38(서버 218.145.70.37:32206 접속 🌐) 이다.
+ * 웹은 서버가 없어 그 자리에 이 안내만 띄우고 목록에 남는다 — 원본 글이 아니다.
+ */
+export const RANKING_SERVER_NOTICE = '!C랭킹은 서버 통신이!N필요해 볼 수 없습니다'
 
 /** 게임시작 목록 7칸. 순서는 StrMAINMENU [6]~[12] 그대로다. */
 export const MODE_ENTRIES: readonly MainMenuEntry[] = GAME_START_MENU
 
 export function entriesOf(tier: MainMenuTier): readonly MainMenuEntry[] {
-  return tier === 4 ? TOP_ENTRIES : MODE_ENTRIES
+  if (tier === 4) return TOP_ENTRIES
+  return tier === 9 ? RANKING_ENTRIES : MODE_ENTRIES
 }
 
 export interface MainMenuState {
@@ -26,6 +54,8 @@ export interface MainMenuState {
   readonly tier: MainMenuTier
   readonly selectedTopId: string
   readonly selectedModeId: string
+  /** 랭킹 모드 목록(하위 9) 커서 칸 — 원본은 게임시작 목록과 같은 전역 `[0x1552d24]` 를 쓴다 */
+  readonly selectedRankingId: string
   /**
    * 나만의리그 편 고르기 창 [14] — 하위 상태 13. 게임시작 목록 [나만의리그] 가 곧바로 하위 13 으로 간다
    * (0x28cb0 표 0xcebb0[2] = 13 → 0x28d9a). **저장을 지울지 묻는 창은 없다** — [15] 는 0x296f0(일반모드) 안에만 있다.
@@ -85,7 +115,7 @@ export type MainMenuAction =
 
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
 export type MainMenuEffect =
-  | '미션' | '홈런더비' | '시즌모드' | '일반모드' | '타이틀로'
+  | '미션' | '홈런더비' | '시즌모드' | '일반모드'
   /** 나만의리그 [14] 답 0 · 1 — 모드 4 타자편 · 모드 3 투수편 (0x2464c) → 0x327b8 모드 3·4 갈래의 장면 0x106 */
   | '나리타자편' | '나리투수편'
   /** 같은 갈래의 "곧장 경기" — `+0x40+m && +0x4c+m` 이면 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 (0x328b4) */
@@ -94,8 +124,8 @@ export type MainMenuEffect =
   | '일반모드빠른실행'
   /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 */
   | '일반모드경기이어하기'
-  /** 처음 메뉴에서 갈라지는 화면들 — 원본 하위 상태 6 · 9 · 8 (P6-screens 1-2 · F-ui-layout 4-0) */
-  | '스페셜' | '도움말' | '환경설정'
+  /** 처음 메뉴에서 갈라지는 화면들 — 원본 하위 상태 6 스페셜 · 7 도움말 · 8 환경설정 · 10 게임문의 (표 0xcebdc, 0x294a2) */
+  | '스페셜' | '도움말' | '환경설정' | '게임문의'
   | null
 
 export interface MainMenuResult {
@@ -125,13 +155,18 @@ export type MainMenuOpenTier = MainMenuTier
  *
  * 처음 메뉴 → 게임시작 목록으로 내려가면 커서는 늘 0(최근게임)이다 — 진입 0x25b88 이 앞 상태가 4 면 커서 [0x1552d24] = 0 으로
  * 둔다 (R11-special-leftovers 4-2, 0x25b88 확정). 저장 유무로 커서를 옮기지 않는다.
- * 처음 메뉴 커서의 첫 자리(진입 0x24a40)는 안 읽어 **추정**으로 0번 칸(게임시작)에 둔다.
+ *
+ * 처음 메뉴 바퀴 커서 `[this+0xe8]`(장면 객체 바이트)는 진입 0x24a40 이 안 건드리고 0x237b6 · 0x24bfa 만 쓴다 — 장면을 새로 세우면
+ * (memset 0) 0 이고, 같은 장면 안의 하위 6~10(스페셜·도움말·환경설정·랭킹·게임문의)을 다녀오면 떠난 그 칸이다. `topCursor` 가 그 값이다.
  */
-export function initialMainMenu(_hasSavedGame: boolean, openTier: MainMenuOpenTier = 4, modeCursor = 0): MainMenuState {
+export function initialMainMenu(
+  _hasSavedGame: boolean, openTier: MainMenuOpenTier = 4, modeCursor = 0, topCursor = 0,
+): MainMenuState {
   return {
     tier: openTier,
-    selectedTopId: TOP_ENTRIES[0].id,
+    selectedTopId: (TOP_ENTRIES[topCursor] ?? TOP_ENTRIES[0]).id,
     selectedModeId: (MODE_ENTRIES[modeCursor] ?? MODE_ENTRIES[0]).id,
+    selectedRankingId: RANKING_ENTRIES[0].id,
     isPickingNariEdition: false,
     lockedNotice: null,
     generalModeWindow: null,
@@ -256,9 +291,25 @@ export function modeCursorOf(state: MainMenuState): number {
   return Math.max(MODE_ENTRIES.findIndex((entry) => entry.id === state.selectedModeId), 0)
 }
 
+/**
+ * 하위 목록 전역 커서 `[0x1552d24]` 에 지금 적혀 있을 값 — 하위 5 는 게임시작 목록 칸, 하위 9 는 랭킹 칸
+ * (진입 0x23d98 이 앞 상태 4 면 같은 전역을 0 으로 되감는다). 처음 메뉴(하위 4)는 전역을 안 건드리므로 null.
+ */
+export function listCursorOf(state: MainMenuState): number | null {
+  if (state.tier === 5) return modeCursorOf(state)
+  if (state.tier === 9) return Math.max(RANKING_ENTRIES.findIndex((entry) => entry.id === state.selectedRankingId), 0)
+  return null
+}
+
+/** 처음 메뉴 바퀴 커서 `[this+0xe8]` 칸 번호 */
+export function topCursorOf(state: MainMenuState): number {
+  return Math.max(TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId), 0)
+}
+
 /** 지금 단에서 커서가 있는 칸의 id */
 export function selectedIdOf(state: MainMenuState): string {
-  return state.tier === 4 ? state.selectedTopId : state.selectedModeId
+  if (state.tier === 4) return state.selectedTopId
+  return state.tier === 9 ? state.selectedRankingId : state.selectedModeId
 }
 
 /**
@@ -277,14 +328,13 @@ export function isEntryEnabled(entry: MainMenuEntry, _hasSavedGame: boolean): bo
  *   (R11-special-leftovers 4-1, 갱신 0x28cb0 / 0x28dcc).
  *   ⚠️ **근사**: 원본은 전역기록 +0x42(시즌 커리어 있음)가 0 이 아니면 상태 15(통신 대전)로 들어간다.
  *   웹판은 통신이 없어 늘 막히므로 같은 문구를 늘 띄운다.
- * - **랭킹·게임문의**: 원작이 못 들어가는 칸을 어떻게 보이는지(흐리게? 안내 문구?)는 문서에 없다
- *   (해당 하위 상태 번호도 미확인) → 지금 웹 방식(흐리게 + 눌러도 아무 일 없음)을 그대로 둔다. **근사**.
+ * 처음 메뉴의 [랭킹]·[게임문의] 는 이제 둘 다 들어간다(`TOP_ENTRIES`) — 안내도 없이 막히는 칸은 지금 없다.
  */
 export function lockedNoticeOf(entry: MainMenuEntry): string | null {
   return entry.id === '대전모드' ? SEASON_FIRST_NOTICE : null
 }
 
-/** 안내도 없이 막히는 칸만 흐리게 그린다 (랭킹·게임문의 — 근사, 위 `lockedNoticeOf` 참고) */
+/** 안내도 없이 막히는 칸만 흐리게 그린다 (웹판에 아직 못 만든 칸 — 지금은 없다, 위 `lockedNoticeOf` 참고) */
 export function isEntryDimmed(entry: MainMenuEntry, hasSavedGame: boolean): boolean {
   return !isEntryEnabled(entry, hasSavedGame) && lockedNoticeOf(entry) === null
 }
@@ -321,8 +371,10 @@ export function reduceMainMenu(
   }
 
   const entries = entriesOf(state.tier)
-  const select = (id: string): MainMenuState =>
-    state.tier === 4 ? { ...state, selectedTopId: id } : { ...state, selectedModeId: id }
+  const select = (id: string): MainMenuState => {
+    if (state.tier === 4) return { ...state, selectedTopId: id }
+    return state.tier === 9 ? { ...state, selectedRankingId: id } : { ...state, selectedModeId: id }
+  }
 
   switch (action.type) {
     case '모드선택': {
@@ -339,9 +391,10 @@ export function reduceMainMenu(
     case '시작':
       return start(state, hasSavedGame, isGeneralGameInProgress, lastPlayedMode, nariGameReady)
     case '뒤로':
-      // 게임시작 목록의 CLR(−16) 은 처음 메뉴로 돌아간다 — 0x28cb0 의 `0xbcb49(this+0x18, 4)` (확정)
-      if (state.tier === 5) return stay({ ...state, tier: 4 })
-      return { state, effect: '타이틀로' }
+      // 게임시작 목록·랭킹 목록의 CLR(−16) 은 처음 메뉴로 돌아간다 — 0x28cb0 · 0x28ad4 의 `0xbcb49(this+0x18, 4)` (확정).
+      // 처음 메뉴 갱신 0x29454 는 CLR 을 아예 안 본다(키 −1~−5 · '2'·'4'·'5'·'6'·'8' 만) — 타이틀로 돌아가는 길은 없다
+      if (state.tier !== 4) return stay({ ...state, tier: 4 })
+      return stay(state)
     default:
       return stay(state)
   }
@@ -364,17 +417,22 @@ function start(
   }
 
   if (state.tier === 4) {
-    // 처음 메뉴 → 하위 상태: 게임시작 5 · 스페셜 6 · 환경설정 8 · 도움말 9
-    // (5 = R11 4-1 진입 0x25b88 "앞 상태가 4", 6·9 = P6-screens 1-2, 8 = F-ui-layout 4-0/P6 5절)
+    // 처음 메뉴 OK → 표 0xcebdc[커서] = 게임시작 5 · 스페셜 6 · 도움말 7 · 환경설정 8 · 랭킹 9 · 게임문의 10 (0x294a2 확정)
     if (entry.id === '게임시작') {
       // 진입 0x25b88: 앞 상태가 4 면 커서를 0(최근게임)으로 되돌린다 (확정)
       return { state: { ...state, tier: 5, selectedModeId: MODE_ENTRIES[0].id }, effect: null }
     }
+    // 진입 0x23d98: 앞 상태가 4 면 같은 전역 커서 [0x1552d24] 를 0 으로 · 개수 5 · 표 0xcea00
+    if (entry.id === '랭킹') return { state: { ...state, tier: 9, selectedRankingId: RANKING_ENTRIES[0].id }, effect: null }
     if (entry.id === '스페셜') return { state, effect: '스페셜' }
     if (entry.id === '도움말') return { state, effect: '도움말' }
     if (entry.id === '환경설정') return { state, effect: '환경설정' }
+    if (entry.id === '게임문의') return { state, effect: '게임문의' }
     return { state, effect: null }
   }
+
+  // 랭킹 목록 OK → [skin+0xe6] = 커서 · 하위 37 (0x28b34~0x28b4c) — 웹은 서버가 없어 안내만 (근사)
+  if (state.tier === 9) return { state: { ...state, lockedNotice: RANKING_SERVER_NOTICE }, effect: null }
 
   if (entry.id === '최근게임') return recentGameOf(state, lastPlayedMode, isGeneralGameInProgress, nariGameReady)
   if (entry.id === '미션모드') return { state, effect: '미션' }

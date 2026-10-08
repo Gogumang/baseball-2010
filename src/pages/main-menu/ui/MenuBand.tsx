@@ -38,6 +38,7 @@ export function MenuBand({ spread }: { readonly spread: number }) {
       width={SCREEN_WIDTH}
       height={SCREEN_HEIGHT}
       aria-hidden="true"
+      data-band-spread={spread}
     />
   )
 }

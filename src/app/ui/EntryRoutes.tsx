@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { MessageBox } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
@@ -27,6 +27,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
+import { createGameStartCursor } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
@@ -161,6 +162,12 @@ export function EntryRoutes({
   const [derbyPick, setDerbyPick] = useState<HallOfFamePlayerPick | null>(null)
   /** 홈런더비 최고 비거리 (저장 +0x5c) — 원본은 게임 전체 저장에 두므로 커리어와 따로 둔다 */
   const derbyStore = useMemo(() => createLocalStorageJsonStore(DERBY_BEST_KEY), [])
+  /**
+   * 처음 메뉴 바퀴 커서 `[this+0xe8]` — 장면 0x103 객체 값이라 같은 장면 안(스페셜 6 · 도움말 7 · 환경설정 8 · 랭킹 9 · 게임문의 10)을
+   * 다녀오면 그 칸에 선다(진입 0x24a40 은 안 건드린다). 다른 장면(0x104~0x107)으로는 늘 [게임시작](0 칸)에서 하위 5 를 거쳐 나가므로
+   * 돌아와 장면을 새로 세울 때(memset 0)와 값이 같다 — 이 컴포넌트가 내려가 0 으로 돌아와도 원본과 같다.
+   */
+  const topMenuCursor = useRef(createGameStartCursor()).current
   const [derbyBest, setDerbyBest] = useState(() => {
     const saved = derbyStore.load()
     const value = (saved as { bestDistance?: unknown } | null)?.bestDistance
@@ -172,8 +179,11 @@ export function EntryRoutes({
   }
 
   if (screen.kind === '도움말') {
-    // 도움말(상태 7) 그리기 0x2fc8c: 판 0x58371 · 뷰어 0x639a5 · 머리띠 0x54d95(skin, 0, 5) — 제목 0 이라 G 도 그린다
-    return <HelpScreen gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
+    // 도움말(상태 7)·게임문의(상태 10) 그리기 0x2fc8c: 판 0x58371 · 뷰어 0x639a5 · 머리띠 0x54d95(skin, 0, 5) — 제목 0 이라 G 도.
+    // 게임문의 진입 0x2668c 는 뷰어를 장 6 쪽 보기로 열고 [뷰어+0x45c] = 1 로 장 이동을 잠근다 — 서버 없이 도는 화면이다
+    return screen.isInquiry === true
+      ? <HelpScreen chapter={6} isChapterLocked gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
+      : <HelpScreen gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
   }
 
   if (screen.kind === '스페셜') {
@@ -340,7 +350,9 @@ export function EntryRoutes({
     <MainMenuScreen
       // 장면 0x103 생성자 0x234d4 의 [0x140006c] — 관리 메뉴 취소(5)면 게임시작 목록으로 바로 연다
       {...(screen.kind === '메인메뉴' && screen.openTier !== undefined ? { openTier: screen.openTier } : {})}
+      {...(screen.kind === '메인메뉴' && screen.isBandGrown === true ? { isBandGrown: true } : {})}
       {...(gameStartCursor === undefined ? {} : { gameStartCursor })}
+      topMenuCursor={topMenuCursor}
       hasSavedGame={session.savedCareer !== null}
       isGeneralGameInProgress={isGeneralGameInProgress}
       lastPlayedMode={lastPlayedMode}
@@ -384,8 +396,8 @@ export function EntryRoutes({
         if (mode !== '미션') return
         setScreen({ kind: '미션선택' })
       }}
-      onBack={() => setScreen({ kind: '타이틀' })}
       onHelp={() => setScreen({ kind: '도움말' })}
+      onInquiry={() => setScreen({ kind: '도움말', isInquiry: true })}
       onSettings={() => setScreen({ kind: '환경설정' })}
       onSpecial={() => setScreen({ kind: '스페셜' })}
       onTopMenuTenthTick={claimReward}

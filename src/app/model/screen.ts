@@ -14,8 +14,17 @@ export type Screen =
    * 메인 메뉴(장면 0x103). `openTier` 는 장면을 세울 때 생성자 0x234d4 가 보는 전역 `[0x140006c]` — 5 면 게임시작 목록(하위 5)
    * 으로 바로 열고 바탕 띠 연출을 켠다(나리 105 취소 0x126e6 · 시즌 0xc9 취소 0x8f5a). 없으면 처음 메뉴(하위 4).
    */
-  | { readonly kind: '메인메뉴'; readonly openTier?: 5 }
-  | { readonly kind: '도움말' }
+  | {
+      readonly kind: '메인메뉴'
+      readonly openTier?: 5
+      /**
+       * 생성자를 안 지나고 같은 장면 0x103 의 하위 16·17(홈런더비·미션 선수 고르기)에서 CLR 로 하위 5 에 돌아왔다 —
+       * 바탕 띠 `[0xe4]` 는 이미 다 자랐다. `openTier` 5 와 함께만 쓴다
+       */
+      readonly isBandGrown?: true
+    }
+  /** 도움말 뷰어 — 처음 메뉴 [도움말](하위 7) · `isInquiry` 면 [게임문의](하위 10, 진입 0x2668c: 장 6 쪽 보기 · 장 잠금) */
+  | { readonly kind: '도움말'; readonly isInquiry?: true }
   | { readonly kind: '환경설정' }
   | { readonly kind: '스페셜' }
   /**

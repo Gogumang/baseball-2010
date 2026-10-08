@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SEASON_FIRST_NOTICE } from '@/shared/config/original/mainMenu'
 import {
-  MODE_ENTRIES, RESTART_MODE_STATE, TOP_ENTRIES, generalModeEntryCursorOf, initialMainMenu, isEntryEnabled,
+  MODE_ENTRIES, RANKING_ENTRIES, RANKING_SERVER_NOTICE, RESTART_MODE_STATE, TOP_ENTRIES, generalModeEntryCursorOf, initialMainMenu, isEntryEnabled,
   reduceMainMenu, selectedIdOf,
 } from '@/pages/main-menu/model/mainMenu'
 import type { MainMenuState } from '@/pages/main-menu/model/mainMenu'
@@ -61,20 +61,31 @@ describe('처음 메뉴 (하위 상태 4) — 원작의 윗단', () => {
     expect(간곳('환경설정')).toBe('환경설정')
   })
 
-  it('윗단에서 취소하면 타이틀로 간다', () => {
-    expect(reduceMainMenu(initialMainMenu(false), { type: '뒤로' }, false).effect).toBe('타이틀로')
+  it('윗단은 CLR 을 안 본다 — 타이틀로 가는 길이 없다 (0x29454 는 −1~−5 · 숫자만)', () => {
+    const 결과 = reduceMainMenu(initialMainMenu(false), { type: '뒤로' }, false)
+    expect(결과.effect).toBeNull()
+    expect(결과.state).toEqual(initialMainMenu(false))
   })
 
-  it('랭킹·게임문의는 커서가 지나가되 시작해도 아무 데도 안 간다 (근사 — 원본 처리 미해독)', () => {
-    for (const id of ['랭킹', '게임문의']) {
-      const 고름 = 고르기(initialMainMenu(false), id, false)
-      expect(selectedIdOf(고름)).toBe(id)
+  it('랭킹은 하위 9 모드 목록(다섯 칸, 커서 0) · 게임문의는 하위 10 — 표 0xcebdc (0x294a2)', () => {
+    const 랭킹 = reduceMainMenu(고르기(initialMainMenu(false), '랭킹', false), { type: '시작' }, false)
+    expect(랭킹.effect).toBeNull()
+    expect(랭킹.state.tier).toBe(9)
+    expect(selectedIdOf(랭킹.state)).toBe('랭킹일반모드')
+    expect(RANKING_ENTRIES.map((entry) => entry.labelFrame)).toEqual([7, 8, 9, 10, 13])
+    // OK 는 하위 37 → 38 서버 — 웹은 안내만 띄우고 남는다 (근사) · CLR 은 처음 메뉴로, 바퀴 커서는 랭킹 그대로
+    const 서버 = reduceMainMenu(랭킹.state, { type: '시작' }, false)
+    expect(서버.state.lockedNotice).toBe(RANKING_SERVER_NOTICE)
+    const 닫음 = reduceMainMenu(서버.state, { type: '시작' }, false).state
+    const 윗단 = reduceMainMenu(닫음, { type: '뒤로' }, false).state
+    expect(윗단.tier).toBe(4)
+    expect(selectedIdOf(윗단)).toBe('랭킹')
 
-      const 시작 = reduceMainMenu(고름, { type: '시작' }, false)
-      expect(시작.effect).toBeNull()
-      expect(시작.state.lockedNotice).toBeNull()
-      expect(시작.state.tier).toBe(4)
-    }
+    expect(reduceMainMenu(고르기(initialMainMenu(false), '게임문의', false), { type: '시작' }, false).effect).toBe('게임문의')
+  })
+
+  it('바퀴 커서 [this+0xe8] 는 같은 장면 안을 다녀오면 그 칸에 선다 — initialMainMenu 의 topCursor', () => {
+    expect(selectedIdOf(initialMainMenu(false, 4, 0, 3))).toBe('환경설정')
   })
 
   it('윗단도 끝에서 한 바퀴 돈다', () => {
