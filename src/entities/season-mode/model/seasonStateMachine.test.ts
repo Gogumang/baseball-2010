@@ -156,13 +156,13 @@ describe('시즌 끝 이벤트 사슬', () => {
   })
 })
 
-describe('관리 메뉴·구단관리·시즌정보 커서 진입 갈래 (0x4efc · 0x47d8 · 0x4d58)', () => {
-  const 커서 = { management: 4, teamMenu: 2, seasonInfo: 3 }
+describe('관리 메뉴·구단관리·시즌정보·아이템 커서 진입 갈래 (0x4efc · 0x47d8 · 0x4d58 · 0x4d04)', () => {
+  const 커서 = { management: 4, teamMenu: 2, seasonInfo: 3, itemMenu: 1 }
   const 기록 = { acted: false, endingSeen: false }
 
   it('관리 메뉴: SR+4 가 서 있고 이전이 0xd8·0xce·0xd0 이 아니면 0 으로', () => {
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.트레이닝, { ...기록, acted: true }))
-      .toEqual({ management: 0, teamMenu: 2, seasonInfo: 3 })
+      .toEqual({ management: 0, teamMenu: 2, seasonInfo: 3, itemMenu: 1 })
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.구단관리, { ...기록, acted: true }))
       .toBe(커서)
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.트레이닝, 기록)).toBe(커서)
@@ -170,23 +170,29 @@ describe('관리 메뉴·구단관리·시즌정보 커서 진입 갈래 (0x4efc
 
   it('관리 메뉴: SR+0x1bc(엔딩 본 시즌)면 이전 상태와 상관없이 0', () => {
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.관리메뉴, SEASON_SCENE_STATE.다음경기, { ...기록, endingSeen: true }))
-      .toEqual({ management: 0, teamMenu: 2, seasonInfo: 3 })
+      .toEqual({ management: 0, teamMenu: 2, seasonInfo: 3, itemMenu: 1 })
   })
 
   it('구단관리: 이전이 관리 메뉴일 때만 0', () => {
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.구단관리, SEASON_SCENE_STATE.관리메뉴, 기록))
-      .toEqual({ management: 4, teamMenu: 0, seasonInfo: 3 })
+      .toEqual({ management: 4, teamMenu: 0, seasonInfo: 3, itemMenu: 1 })
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.구단관리, SEASON_SCENE_STATE.트레이드, 기록)).toBe(커서)
   })
 
   it('시즌정보: 이전이 관리 메뉴일 때만 0 — 구단정보·아이템·선수 고르기에서 돌아오면 자리가 남는다', () => {
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.시즌정보, SEASON_SCENE_STATE.관리메뉴, 기록))
-      .toEqual({ management: 4, teamMenu: 2, seasonInfo: 0 })
+      .toEqual({ management: 4, teamMenu: 2, seasonInfo: 0, itemMenu: 1 })
     expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.시즌정보, SEASON_SCENE_STATE.선수고르기, 기록)).toBe(커서)
   })
 
-  it('장면 생성은 셋 다 0 · 요청 "예" 는 칸 1', () => {
-    expect(INITIAL_SEASON_MENU_CURSORS).toEqual({ management: 0, teamMenu: 0, seasonInfo: 0 })
+  it('아이템 메뉴(0x4d04): 이전이 관리 메뉴일 때만 0 — 상점·선수 고르기에서 돌아오면 자리가 남는다', () => {
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.아이템, SEASON_SCENE_STATE.관리메뉴, 기록))
+      .toEqual({ management: 4, teamMenu: 2, seasonInfo: 3, itemMenu: 0 })
+    expect(menuCursorsOnEnter(커서, SEASON_SCENE_STATE.아이템, SEASON_SCENE_STATE.선수고르기, 기록)).toBe(커서)
+  })
+
+  it('장면 생성은 넷 다 0 · 요청 "예" 는 칸 1', () => {
+    expect(INITIAL_SEASON_MENU_CURSORS).toEqual({ management: 0, teamMenu: 0, seasonInfo: 0, itemMenu: 0 })
     expect(TRADE_REQUEST_MENU_CURSOR).toBe(1)
   })
 })

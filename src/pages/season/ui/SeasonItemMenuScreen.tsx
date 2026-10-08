@@ -21,6 +21,12 @@ export interface SeasonItemMenuScreenProps {
   readonly onBack: () => void
   /** 머리띠 G포인트 (저장 +0x64) */
   readonly gamePoint?: number
+  /**
+   * 메뉴 객체 this+0x88 의 커서 — 장면이 사는 동안 남는다. 0x4d04 는 **이전 상태가 0xc9 일 때만** (0,0) 으로 지워
+   * 상점·선수 고르기에서 돌아오면 고른 칸에 그대로 있다 (`menuCursorsOnEnter`). 안 주면 화면이 0 부터 들고 있다.
+   */
+  readonly cursor?: number
+  readonly onCursorChange?: (index: number) => void
 }
 
 /**
@@ -32,14 +38,18 @@ export interface SeasonItemMenuScreenProps {
  * 그리기는 공통 틀(`SeasonCommonFrame`) — 커맨드 줄 하위 칸(표 0xd47b0 · 0xd47b8: 100 장착아이템 · 288 구장아이템 ·
  * 105 서브아이템 · 110 GP아이템)과 부모 칸 아이템.
  */
-export function SeasonItemMenuScreen({ state, onSelect, onBack, gamePoint = 0 }: SeasonItemMenuScreenProps) {
+export function SeasonItemMenuScreen({
+  state, onSelect, onBack, gamePoint = 0, cursor: heldCursor, onCursorChange,
+}: SeasonItemMenuScreenProps) {
 
   const select = (index: number) => {
     const entry = SEASON_ITEM_MENU[index]
     if (entry === undefined) return
     onSelect(entry, entry.target, entry.windowKind)
   }
-  const { cursor, moveTo } = useSeasonCursor({ count: SEASON_ITEM_MENU.length, onSelect: select, onCancel: onBack })
+  const { cursor, moveTo } = useSeasonCursor({
+    count: SEASON_ITEM_MENU.length, onSelect: select, onCancel: onBack, cursor: heldCursor, onCursorChange,
+  })
 
   return (
     <RawScreen>

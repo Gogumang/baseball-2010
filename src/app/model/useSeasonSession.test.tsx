@@ -2025,7 +2025,7 @@ describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.트레이드영입선수)
 
     // 7440~7484 — 관리 메뉴·구단관리 커서를 칸 1 로
-    expect(result.current.menuCursors).toEqual({ management: 1, teamMenu: 1, seasonInfo: 0 })
+    expect(result.current.menuCursors).toEqual({ management: 1, teamMenu: 1, seasonInfo: 0, itemMenu: 0 })
 
     // 결과를 닫으면 플래그를 지우고 관리 메뉴로 — 알림은 다시 안 뜬다
     act(() => result.current.actions.closeTradeResult())
@@ -2054,7 +2054,7 @@ describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
     act(() => result.current.actions.cancelTradeRequest())
 
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.구단관리)
-    expect(result.current.menuCursors).toEqual({ management: 1, teamMenu: 1, seasonInfo: 0 })
+    expect(result.current.menuCursors).toEqual({ management: 1, teamMenu: 1, seasonInfo: 0, itemMenu: 0 })
   })
 
   it('아니오면 요청을 버린다 (0x7490: this+0x148 = 0)', () => {

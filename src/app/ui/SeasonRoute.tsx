@@ -751,6 +751,8 @@ export function SeasonRoute({
     return (
       <SeasonItemMenuScreen
         state={state}
+        cursor={session.menuCursors.itemMenu}
+        onCursorChange={(index) => actions.moveMenuCursor('itemMenu', index)}
         // 0xdc 는 칸마다 다른 창(0x5f3c)을 연다 — 칸 1 구장(종류 4) · 2 서브아이템(1) · 3 GP(2).
         // 칸 0 장착아이템은 먼저 선수 고르기 0xdf(this+0x110 = 1, 키 0x4da4)다
         onSelect={(_item, target, windowKind) => {

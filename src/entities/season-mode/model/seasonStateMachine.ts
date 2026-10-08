@@ -188,10 +188,12 @@ export interface SeasonMenuCursors {
   readonly teamMenu: number
   /** this+0x74 시즌정보 4칸 (0x3b14 가 `0x6c219(메뉴, 4, 1, 1)` 로 만든다) */
   readonly seasonInfo: number
+  /** this+0x88 아이템 하위 메뉴 4칸 (0x3b14 0x3c1a~ 가 만든다) */
+  readonly itemMenu: number
 }
 
 /** 장면 생성 — 0x6c219 로 만든 메뉴는 커서 (0,0) */
-export const INITIAL_SEASON_MENU_CURSORS: SeasonMenuCursors = { management: 0, teamMenu: 0, seasonInfo: 0 }
+export const INITIAL_SEASON_MENU_CURSORS: SeasonMenuCursors = { management: 0, teamMenu: 0, seasonInfo: 0, itemMenu: 0 }
 
 /**
  * CPU 트레이드 요청 [203] 에 "예" (0x73b8 7440~7484) — 두 메뉴 커서를 칸 1(관리 메뉴 구단관리 · 구단관리 트레이드)에 둔다:
@@ -206,6 +208,7 @@ export const TRADE_REQUEST_MENU_CURSOR = 1
  *                     SR+0x1bc ≠ 0                         → 관리 메뉴 커서 (0,0) · 스크롤 0
  * 0x47d8 (0xce 진입)  이전 == 0xc9                          → 구단관리 커서 (0,0) · 스크롤 0
  * 0x4d58 (0xcd 진입)  이전 == 0xc9                          → 시즌정보 커서 (0,0) · 스크롤 0 (메뉴 vt+0x14(0,0) · +0x2c/+0x30 = 0)
+ * 0x4d04 (0xd0 진입)  이전 == 0xc9                          → 아이템 메뉴 커서 (0,0) · 스크롤 0 — 상점·선수 고르기에서 돌아오면 남는다
  * ```
  * 곧 관리 메뉴에서 구단관리로 들어가면 늘 맨 위에서 시작하고, 트레이드·영입 같은 하위 화면에서 돌아오면 자리가 남는다.
  */
@@ -227,6 +230,9 @@ export function menuCursorsOnEnter(
   }
   if (entered === SEASON_SCENE_STATE.시즌정보 && previous === SEASON_SCENE_STATE.관리메뉴) {
     return { ...cursors, seasonInfo: 0 }
+  }
+  if (entered === SEASON_SCENE_STATE.아이템 && previous === SEASON_SCENE_STATE.관리메뉴) {
+    return { ...cursors, itemMenu: 0 }
   }
   return cursors
 }
