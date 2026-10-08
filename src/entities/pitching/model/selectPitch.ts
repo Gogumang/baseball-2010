@@ -7,6 +7,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { controlTierOf } from '@/entities/pitching/model/controlTier'
 import { cpuPitchStatsOf } from '@/entities/pitching/model/pitcherGameStats'
 import { pitchSpeedStageOf } from '@/entities/pitching/model/pitchSpeedStage'
+import { rollDisplaySpeedKmh } from '@/entities/pitching/model/displaySpeed'
 import { computerPitchTypeOf, pitchListOf } from '@/entities/pitching/model/pitchIntelligence'
 import type { CountSituation } from '@/entities/pitching/model/pitchIntelligence'
 import { targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
@@ -123,7 +124,7 @@ export interface CpuPickoffInput {
 /**
  * CPU 투구 — 원본 순서 그대로 난수를 뽑는다:
  *   구질(0x344dc, 상태 0xf 틱 0~8 에 **9번** — `CPU_PITCH_TYPE_ROLL_TICKS`) → 목표 종류(0x9eeac) → 목표점(0x345fc) → 제구 등급(0xb74bc, 마구면 굴림 없이 5 — 0x4dbac)
- *   → 제구 오차(0x4dc78)
+ *   → 표시 구속(0x34968, rand 한 번 — `displaySpeed`) → 제구 오차(0x4dc78)
  *   → 실투 판정(0x33cbc, 0x4dea0 — 마구가 아니면 rand(0,100) 한 번) → 곡선(0x9e3c9, 실투면 한가운데 · N 18/20)
  * 목표 종류가 4(견제)이고 주자가 1·2명이면(`isCpuPickoff`, 0x34684) 목표점을 만들지 않고 0x34848 이
  * **견제 루**를 굴린 뒤 끝난다 — 목표점·제구 등급·제구 오차·곡선 굴림이 **없다** (`{ kind: '견제' }`).
@@ -269,6 +270,11 @@ export function releaseCpuPitch(
   const controlTier = isMagic
     ? MAGIC_PITCH_CONTROL_TIER
     : controlTierOf(stats.control, gameStats.isNotExhausted, random)
+  // 0x34968(4dcc2) — 표시 구속 [+0x19a0] 을 등급 **뒤** · 흩어짐 **앞**에 한 번 굴린다 (`displaySpeed`)
+  const displaySpeedKmh = rollDisplaySpeedKmh(
+    { typeNumber, stats, controlTier, magicNumber: repertoire.magicId, form: repertoire.form },
+    random,
+  )
   const aimedTarget = applyControlError(target, { tier: controlTier, isComputer: true }, random)
   // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
@@ -321,6 +327,7 @@ export function releaseCpuPitch(
     controlTier,
     worldPath,
     stageSide: situation.side,
+    displaySpeedKmh,
     magicNumber: magicState.ballMagicNumber,
     // 던질 때 값 — 0x46fa8 은 구질 22 일 때만 경기+0x1080 을 쓰고, 새 투구 준비 0x3d954 가 0 으로 지운다.
     // 0x3b55e 도 날아가는 도중 1 을 쓰지만(마구 1·4, 경로 번호 8 부터) 그건 그릴 때 magicBallKindAtPath 가 덮는다

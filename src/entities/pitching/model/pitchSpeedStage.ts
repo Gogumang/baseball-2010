@@ -31,13 +31,21 @@ const FORMULAS: Readonly<Record<string, Formula>> = {
 /** 구질 1~21 → 식 (표 0x66c98) */
 const FORMULA_OF_TYPE = 'AABDCCDEFABDCCDEFBDCF'
 
-export function pitchSpeedStageOf(typeIndex: number, stats: PitchingStats, controlTier: number): number {
+/**
+ * 구속 rank 0~7 — 0x34968 이 0x66d54(구질, a0, a1, a2) 로 얻는 값 (0x66c98 식 → 0xbbe98 문턱 125·250·375·525·675·825·925).
+ * 0x34968 은 이것을 표시 구속 0x66dc0(구질, rank) 에 넘기고(`displaySpeed`), rank/2 를 구속 단계로 돌려준다
+ */
+export function pitchSpeedRankOf(typeIndex: number, stats: PitchingStats, controlTier: number): number {
   const percent = TIER_PERCENT[Math.max(0, Math.min(controlTier, TIER_PERCENT.length - 1))]
   const scale = (value: number) => Math.min(MAXIMUM_STAT, t((value * percent) / 100))
   const formula = FORMULAS[FORMULA_OF_TYPE[typeIndex] ?? 'A']
   const speed = Math.max(0, Math.min(MAXIMUM_STAT, formula(scale(stats.control), scale(stats.velocity), scale(stats.breaking))))
   const rank = RANK_LIMITS.findIndex((limit) => speed <= limit)
-  return t((rank < 0 ? RANK_LIMITS.length : rank) / 2)
+  return rank < 0 ? RANK_LIMITS.length : rank
+}
+
+export function pitchSpeedStageOf(typeIndex: number, stats: PitchingStats, controlTier: number): number {
+  return t(pitchSpeedRankOf(typeIndex, stats, controlTier) / 2)
 }
 
 /** 공이 나는 틱 수 N (투구 레코드 frames) */

@@ -62,6 +62,11 @@ export interface Pitch {
    * 이미 깎았다. 없으면 타석 화면이 넘긴 `PitcherAbility.staminaPercent` 다.
    */
   readonly pitcherStaminaPercent?: number
+  /**
+   * **표시 구속(km/h) `경기+0x19a0`** — 놓기 0x4dc78 이 제구 등급 뒤 · 흩어짐 앞에 0x34968 로 굴린 값 (`displaySpeed`).
+   * 상태 0x12 의 "Km" 판(0x4ca02)이 그린다. 와인드업 자리 공(놓기 전)에는 없다.
+   */
+  readonly displaySpeedKmh?: number
 }
 
 /** 투수 레코드에서 온 폼·구질 (pitcherRepertoires) */

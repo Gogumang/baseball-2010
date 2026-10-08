@@ -22,6 +22,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { ACE_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import { createMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
+import { magicPitchDisplaySpeedOf } from '@/entities/pitcher-career/model/magicPitch'
 
 const 상황: PitchSituation = { strikes: 0, balls: 0, outs: 0, runnerCount: 0, batterSide: 1, side: 1 }
 const 투수 = (control: number, pitchMask = 0x1143) => ({ control, velocity: 60, repertoire: { form: 0, pitchMask, magicId: 0 } })
@@ -170,6 +171,9 @@ describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de1
     ).toBe(22)
     const kind = targetKindOf('hard', 마구상황, expected)
     const target = pitchTargetOf(kind, 마구상황, expected)
+    // 표시 구속 0x34968 — 마구는 표 0xcfda8 에서 rand(하한, 상한 + 1) 한 번 (흩어짐 앞)
+    const 구속 = magicPitchDisplaySpeedOf(repertoire.magicId, repertoire.form, expected)
+    expect(pitch.displaySpeedKmh).toBe(구속)
     applyControlError(target, { tier: 5, isComputer: true }, expected)
     // 제구 등급 굴림(0xb74bc)도 실투 굴림(0x33cbc)도 없다 — 두 난수열이 같은 자리에 서 있다
     expect(actual.rand(0, 0x7fffffff)).toBe(expected.rand(0, 0x7fffffff))
