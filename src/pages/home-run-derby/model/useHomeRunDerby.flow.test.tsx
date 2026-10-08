@@ -15,6 +15,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 
 /** 무엇이 울렸는지 적어 두는 포트 */
 function 녹음포트() {
@@ -205,5 +206,50 @@ describe('사구 뒤 벤치 클리어링 — 0x4e740 의 종류 8 검사는 사�
     calls.length = 0
     for (let index = 0; index < 5; index += 1) 한구(rendered, 볼)
     expect(calls).toEqual([])
+  })
+})
+
+describe('화면 갱신 때 — 셈은 판 끝 0xae3e8 · 마투수는 0xd 진입 0x48d50', () => {
+  it('맞은 공의 판 동안 기회 · 누적 칸은 그대로고 판 끝에 바뀐다', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    OK(rendered)
+    act(() => rendered.result.current.onPitchResolved(홈런))
+    expect(rendered.result.current.run.remainingPitches).toBe(10)
+    expect(rendered.result.current.run.totalDistance).toBe(0)
+    act(() => {
+      vi.advanceTimersByTime(derbyBattedBallOf(홈런.pattern!).endTicks * millisecondsPerFrame())
+    })
+    expect(rendered.result.current.run.remainingPitches).toBe(9)
+    expect(rendered.result.current.run.totalDistance).toBeGreaterThan(0)
+  })
+
+  it('사구 뒤 벤치 클리어링 동안도 기회 칸은 그대로 — 출구 0xae24c 에서 센다', () => {
+    const { random } = 기록난수()
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
+    act(() => rendered.result.current.finishLoading())
+    OK(rendered)
+    act(() => rendered.result.current.onPitchResolved(사구))
+    act(() => {
+      vi.advanceTimersByTime(31 * millisecondsPerFrame())
+    })
+    expect(rendered.result.current.isBenchClearing).toBe(true)
+    expect(rendered.result.current.run.remainingPitches).toBe(10)
+    act(() => rendered.result.current.finishBenchClearing(false))
+    expect(rendered.result.current.run.remainingPitches).toBe(9)
+  })
+
+  it('단계를 올린 공의 판 동안은 앞 투수 그대로 — 판 끝 0xd 에서 마투수가 선다', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    OK(rendered)
+    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [125, 1463, 1234, 0] }
+    for (let index = 0; index < 9 && rendered.result.current.run.stage === 0; index += 1) {
+      act(() => rendered.result.current.onPitchResolved(큰홈런))
+      expect(rendered.result.current.pitcher.ace).toBeNull()
+      act(() => {
+        vi.advanceTimersByTime(resultHoldMillisecondsOf(큰홈런) + 1)
+      })
+    }
+    expect(rendered.result.current.run.stage).toBe(1)
+    expect(rendered.result.current.pitcher.ace?.name).toBe('레오니')
   })
 })

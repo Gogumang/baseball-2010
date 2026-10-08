@@ -101,12 +101,10 @@ describe('홈런더비 한 판', () => {
     const rendered = 띄우기()
     act(() => rendered.result.current.onPitchResolved(헛스윙))
     expect(rendered.result.current.isPaused).toBe(true)
-    expect(rendered.result.current.banner).not.toBe('')
     act(() => {
       vi.advanceTimersByTime(2_000)
     })
     expect(rendered.result.current.isPaused).toBe(false)
-    expect(rendered.result.current.banner).toBe('')
   })
 
   it('10구를 다 쓰면 결과가 나오고 onFinish 가 한 번 불린다 (콤보가 없을 때)', () => {
@@ -136,11 +134,12 @@ describe('홈런더비 한 판', () => {
     const rendered = 띄우기()
     for (let index = 0; index < 8; index += 1) 한구(rendered, 헛스윙)
     한구(rendered, 홈런)
-    act(() => rendered.result.current.onPitchResolved(홈런))
+    한구(rendered, 홈런)
 
     expect(rendered.result.current.run.combo).toBe(0)
     expect(rendered.result.current.run.isBonusGame).toBe(true)
-    expect(rendered.result.current.banner).toContain('1 COMBO')
+    expect(rendered.result.current.run.comboDisplay).toBe(1)
+    // 보너스를 열면 0xd → 0xe 라 아직 0xf(표시 켜기)가 아니다
     expect(rendered.result.current.shownCombo).toBeNull()
   })
 
@@ -149,11 +148,11 @@ describe('홈런더비 한 판', () => {
     for (let index = 0; index < 8; index += 1) 한구(rendered, 헛스윙)
     한구(rendered, 홈런)
     act(() => rendered.result.current.onPitchResolved(홈런))
-    expect(rendered.result.current.run.isBonusGame).toBe(true)
     expect(rendered.result.current.shownCombo).toBeNull()
     act(() => {
       vi.advanceTimersByTime(resultHoldMillisecondsOf(홈런) + SCENE_D_FRAMES * 62)
     })
+    expect(rendered.result.current.run.isBonusGame).toBe(true)
     // 0xd → 0xe: OK 를 기다리는 동안은 아직 0xf 가 아니다
     expect(rendered.result.current.isAwaitingConfirm).toBe(true)
     expect(rendered.result.current.isPaused).toBe(true)
@@ -260,12 +259,15 @@ describe('홈런더비 한 판', () => {
 
   it('이벤트 존은 친 공의 패턴 플래그 & 2 로만 정해진다 (플레이 +0x127, 0xb07c8)', () => {
     const rendered = 띄우기()
-    act(() => rendered.result.current.onPitchResolved({ ...홈런, pattern: [118, 961, 1367, 2] }))
+    const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
+    act(() => rendered.result.current.onPitchResolved(존홈런))
     expect(rendered.result.current.isEventZoneShown).toBe(true)
-    expect(rendered.result.current.run.bonusGamePoint).toBe(200)
+    // 보너스 G 칸은 판 끝(0xae3e8)에 바뀐다
+    expect(rendered.result.current.run.bonusGamePoint).toBe(0)
     act(() => {
-      vi.advanceTimersByTime(2_000)
+      vi.advanceTimersByTime(resultHoldMillisecondsOf(존홈런) + 1)
     })
+    expect(rendered.result.current.run.bonusGamePoint).toBe(200)
     // 플래그 0 패턴(같은 홈런)은 존이 없다
     act(() => rendered.result.current.onPitchResolved(홈런))
     expect(rendered.result.current.isEventZoneShown).toBe(false)

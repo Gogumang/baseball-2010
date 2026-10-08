@@ -83,4 +83,14 @@ describe('홈런더비 HUD (0x45a54)', () => {
     expect(screen.getByAltText('Combo').getAttribute('src')).toBe('./sprites/trainning/frames/006.png')
     expect(screen.getAllByTestId('콤보숫자').map((node) => node.getAttribute('src'))).toEqual(['./sprites/num/072.png'])
   })
+
+  it('더비 판(0x17) 동안은 판 · 공 번호 · 최고 · 현재 칸을 안 그리고 비거리 판만 얹는다 (0x46c88 은 0x4c4bc 를 안 부른다)', () => {
+    render(
+      <DerbyHud run={createDerbyRun()} bestDistance={0} isEventZoneShown={false} tick={0} distanceBoardValue={37} isPlayShown />,
+    )
+    expect(screen.queryByAltText('홈런더비 판')).toBeNull()
+    expect(그림들('공번호')).toEqual([])
+    expect(그림들('현재비거리')).toEqual([])
+    expect(screen.getByAltText('비거리 판')).toBeTruthy()
+  })
 })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BigResult, Hint, PixelScreen } from '@/shared/ui'
+import { PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
@@ -10,7 +10,6 @@ import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
-import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import { derbyDisplayDistanceAt } from '@/entities/home-run-derby/model/derbyBattedBall'
@@ -178,14 +177,14 @@ export function HomeRunDerbyScreen({
 
   const { run, pitcher } = session
   const ace = pitcher.ace
+  // 판(0x17) 그리기 0x46c88 은 0x4c4bc(타석 화면 · HUD 0x45a54)를 안 부른다 — 판 동안은 HUD 가 없다
+  const isPlayShown = session.distanceBoard !== null
 
   return (
     <>
       <PixelScreen
         title="홈런더비"
-        badge={
-          isResultShown ? undefined : `${derbyBallNumberOf(run)} / ${derbyBallCountOf(run)}구${run.isBonusGame ? ' · 보너스' : ''}`
-        }
+        // 공 번호는 HUD 의 공 아이콘(0x45a54)만 그린다 — 웹 전용 배지를 두지 않는다
         // 결과 창(상태 0x1a)은 키 0x40a08 이 예·아니오만 받는다 — 경기 중 메뉴를 안 띄운다
         rightKey={
           isResultShown
@@ -284,6 +283,7 @@ export function HomeRunDerbyScreen({
           ) : (
             <>
               <DerbyHud
+                isPlayShown={isPlayShown}
                 run={run}
                 bestDistance={bestDistance}
                 isEventZoneShown={session.isEventZoneShown}
@@ -309,16 +309,6 @@ export function HomeRunDerbyScreen({
                   batter={matchupBatter}
                 />
               )}
-
-              <div className={styles.overlay}>
-                {session.banner === '' ? (
-                  <Hint>
-                    {run.isBonusGame ? '보너스 게임' : '10구 안에 멀리 쳐라'} · 누적 {run.totalDistance}M
-                  </Hint>
-                ) : (
-                  <BigResult>{session.banner}</BigResult>
-                )}
-              </div>
             </>
           )}
         </div>

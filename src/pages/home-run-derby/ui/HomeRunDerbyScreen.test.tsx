@@ -50,10 +50,11 @@ describe('홈런더비 화면', () => {
     expect(받은팁).toEqual([LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(1))]])
   })
 
-  it('제목과 남은 공 표시가 뜬다 — 첫 공은 1 / 10구', () => {
+  it('제목이 뜨고, 공 번호는 HUD 공 아이콘(0x45a54)만 그린다 — 웹 전용 배지 · 안내 줄이 없다', () => {
     띄우기()
     expect(screen.getByText('홈런더비')).toBeTruthy()
-    expect(screen.getByText('1 / 10구')).toBeTruthy()
+    expect(screen.queryByText('1 / 10구')).toBeNull()
+    expect(screen.queryByText(/10구 안에 멀리 쳐라/)).toBeNull()
   })
 
   it('첫 공 앞 0xd 두 그림 뒤 상태 0xe 에서 소개 판(0x44944)을 띄운다 — 투수 판 COM · 타자 판 PLAYER', async () => {
@@ -108,8 +109,8 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 1 — 자동진행 자리에 다시
 
     const 예 = screen.getAllByRole('option').find((option) => option.textContent?.endsWith('예'))
     fireEvent.click(예!)
-    // 처음부터 다시 — 첫 공으로 돌아온다
-    expect(screen.getByText('1 / 10구')).toBeTruthy()
+    // 처음부터 다시 — 첫 공으로 돌아온다 (HUD 공 번호 1/10)
+    expect(screen.getAllByTestId('공번호')[0]?.getAttribute('src')).toBe('./sprites/num/001.png')
     // 새 경기 장면 — 로딩 판도 다시 선다(상태 7 진입 0x39f88)
     expect(받은팁).toHaveLength(2)
   })

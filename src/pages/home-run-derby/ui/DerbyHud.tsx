@@ -29,6 +29,11 @@ interface DerbyHudProps {
    * 부르는 쪽이 판의 공 틱에 맞춰 `derbyDisplayDistanceAt` 으로 넘긴다.
    */
   readonly distanceBoardValue?: number | null
+  /**
+   * 더비 판(0x17)이 도는 중인가 — 0x17 그리기 0x46c88 은 타석 화면 그리기 0x4c4bc(HUD 0x45a54 · 콤보 0x4585c 를 부르는 곳)를
+   * 안 부르고 비거리 판 0x36cd4 만 얹는다. 그래서 판 동안은 판 · 공 번호 · 최고 · 현재 칸과 콤보를 안 그린다.
+   */
+  readonly isPlayShown?: boolean
 }
 
 const spriteSrcOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
@@ -56,7 +61,7 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
  * 공 번호 = `(보너스 중 ? 최대 콤보 : 10) − 남은 기회 + 1`, 최고 칸은 누적이 넘으면 노란 글자로 바뀐다.
  */
 export function DerbyHud({
-  run, bestDistance, isEventZoneShown, tick, shownCombo = null, batterSide = 0, distanceBoardValue = null,
+  run, bestDistance, isEventZoneShown, tick, shownCombo = null, batterSide = 0, distanceBoardValue = null, isPlayShown = false,
 }: DerbyHudProps) {
   // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
   const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
@@ -67,22 +72,26 @@ export function DerbyHud({
 
   return (
     <div className={styles.hud}>
-      {/* 판 — trainning 합성 프레임 2 (0x45abc) */}
-      <img
-        className={styles.sprite}
-        style={{ left: HUD_PANEL.x, top: HUD_PANEL.y }}
-        src={spriteSrcOf(HUD_PANEL.folder, HUD_PANEL.frame)}
-        alt="홈런더비 판"
-      />
-      {/* 공 번호 / 공 수 (0x3608c) */}
-      <Glyphs glyphs={ballCounterGlyphsOf(derbyBallNumberOf(run), derbyBallCountOf(run))} testId="공번호" />
-      {/* 최고 칸 — 누적이 넘으면 노랑 (0x45b3a) */}
-      <Glyphs glyphs={bestDistanceGlyphsOf(bestDistance, run.totalDistance)} testId="최고기록" />
-      {/* 현재 칸 — 누적 비거리 (0x45bd8) */}
-      <Glyphs glyphs={totalDistanceGlyphsOf(run.totalDistance)} testId="현재비거리" />
+      {!isPlayShown && (
+        <>
+          {/* 판 — trainning 합성 프레임 2 (0x45abc) */}
+          <img
+            className={styles.sprite}
+            style={{ left: HUD_PANEL.x, top: HUD_PANEL.y }}
+            src={spriteSrcOf(HUD_PANEL.folder, HUD_PANEL.frame)}
+            alt="홈런더비 판"
+          />
+          {/* 공 번호 / 공 수 (0x3608c) */}
+          <Glyphs glyphs={ballCounterGlyphsOf(derbyBallNumberOf(run), derbyBallCountOf(run))} testId="공번호" />
+          {/* 최고 칸 — 누적이 넘으면 노랑 (0x45b3a) */}
+          <Glyphs glyphs={bestDistanceGlyphsOf(bestDistance, run.totalDistance)} testId="최고기록" />
+          {/* 현재 칸 — 누적 비거리 (0x45bd8) */}
+          <Glyphs glyphs={totalDistanceGlyphsOf(run.totalDistance)} testId="현재비거리" />
+        </>
+      )}
 
       {/* 콤보 표시 (0x4585c) — trainning.pzx "Combo" 글자가 미끄러져 오고, 끝 칸에 닿으면 큰 숫자(num 70~)가 붙는다 */}
-      {comboPlacement !== null && (
+      {!isPlayShown && comboPlacement !== null && (
         <>
           <img
             className={styles.sprite}

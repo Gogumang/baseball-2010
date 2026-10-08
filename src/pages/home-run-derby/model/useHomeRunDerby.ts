@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { describePitchResolution } from '@/entities/at-bat/model/resolutionText'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
@@ -170,12 +169,15 @@ export function rollDerbySceneStart(
 }
 
 export interface HomeRunDerbySession {
+  /**
+   * HUD(0x45a54)가 그리는 진행 칸. 원본은 공 하나의 셈(0xae3e8 · 0xae24c)을 **판(0x17) 끝 · 상태 0x12 대기 끝**에서 하므로
+   * 기회 · 공 번호 · 누적 · 콤보 칸은 그때 바뀐다 — 공이 맞은 순간이 아니다. 판 동안은 HUD 를 아예 안 그린다(`DerbyHud` 의 `isPlayShown`).
+   */
   readonly run: DerbyRun
   /** 이 장면의 하늘 줄 (구장 +0x10 — 장면 시작 · 결과 진입에 굴린 rand(0, 6)). 난수가 없으면 undefined */
   readonly skyRow: number | undefined
+  /** 마운드의 투수 — 마투수 복사는 상태 0xd 진입 0x48d50(48d8e~48dd4)이 한다. 단계가 오른 공의 판 동안은 앞 투수 그대로다 */
   readonly pitcher: DerbyPitcher
-  /** 공 하나가 끝난 뒤 띄우는 문구. 비어 있으면 안내 줄을 보여 준다 */
-  readonly banner: string
   /**
    * **벤치 클리어링(상태 0x1e) 중** — 사구 뒤 0x12 대기 끝 0x4e74c 굴림이 들어갔다. 화면이 `BenchClearingScene` 을 띄우고
    * 끝나면 `finishBenchClearing` 을 부른다(출구 0xae24c).
@@ -259,11 +261,13 @@ export interface HomeRunDerbySession {
  * 판 안 굴림은 폴 충돌 rand(−25, 25) 하나뿐이다 — 야수는 쫓지도 쥐지도 않는다(공 틱 vt48 · 플레이 틱 vt4c 가 종류 8 이면 안 돈다).
  */
 export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId }: HomeRunDerbyOptions): HomeRunDerbySession {
+  /** HUD 가 그리는 진행 — 셈(`runRef`)은 공이 맞은 순간 하고, 이 칸은 판 끝 · 0x12 대기 끝에 따라 맞춘다 */
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
-  const [banner, setBanner] = useState('')
   const [isPaused, setIsPaused] = useState(false)
   /** 상대 팀 v (장면 시작 굴림 3a454) — 난수가 없으면 undefined */
   const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>(undefined)
+  /** 마운드에 선 투수의 단계 — 상태 0xd 진입 0x48d50 이 마투수를 복사할 때만 바뀐다 */
+  const [moundStage, setMoundStage] = useState(0)
   /** 볼 수 st[5] — 0xd 진입 0x48e9c(0xb6764)만 지운다 (`derbyPitchCallOf`) */
   const ballsRef = useRef(0)
   /** 벤치 클리어링(상태 0x1e) 중인가 */
@@ -291,9 +295,9 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     readonly textSceneBefore: HomeRunTextState
   } | null>(null)
 
-  // 캔버스 루프에서 불리는 콜백이라 최신 값은 전부 ref 로 읽는다 (StrictMode 가 업데이터를 두 번 돌린다)
+  // 캔버스 루프에서 불리는 콜백이라 최신 값은 전부 ref 로 읽는다 (StrictMode 가 업데이터를 두 번 돌린다).
+  // `runRef` 가 셈의 원본이다 — 화면 칸 `run` 은 판 끝에야 따라오므로 그림마다 되덮지 않는다
   const runRef = useRef(run)
-  runRef.current = run
   const bestRef = useRef(bestDistance)
   bestRef.current = bestDistance
   const onFinishRef = useRef(onFinish)
@@ -374,6 +378,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
    * 0x30 바이트 복사(48d8e~48dd4), 볼카운트 지우기 0x48e9c(`0xb6764`). 첫 공 앞의 0xd 도 같은 진입이다.
    */
   const enterSceneD = () => {
+    setMoundStage(runRef.current.stage)
     ballsRef.current = 0
   }
 
@@ -507,7 +512,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     }
     // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc) — 패턴 플래그 & 2 (+0x127)
     const zoneHit = isEventZoneHit({ pattern: detail.pattern ?? null })
-    applyPlayResult(current, detail.resolution, batted, zoneHit)
+    applyPlayResult(current, batted, zoneHit)
     setIsEventZoneShown(zoneHit)
     setIsPaused(true)
     // 맞지 않은 공은 상태 0x12 — 15틱(볼넷 · 사구면 31틱) 뒤 0x4e740: 사구(st[0xb] == 4)면 벤치 클리어링 굴림
@@ -549,11 +554,13 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     setDistanceBoard({ startedAt: play.startedAt, batted, previous: play.runBefore.lastDistance })
   }
 
-  /** 0xae3e8/0xae24c 모드 7 갈래 — 이 판의 홈런 · 비거리로 진행을 셈하고 알림 문구를 단다 */
+  /**
+   * 0xae3e8/0xae24c 모드 7 갈래 — 이 판의 홈런 · 비거리로 진행을 셈한다. 셈은 판 시작에 미리 해 두고(난수를 안 쓴다)
+   * 화면 칸(`run`)은 판 끝 `armPlayEnd` 에서 맞춘다.
+   */
   const nextSceneStateRef = useRef<number>(0xf)
   const applyPlayResult = (
     before: DerbyRun,
-    resolution: PitchOutcomeDetail['resolution'],
     batted: DerbyBattedBall | null,
     zoneHit: boolean,
   ) => {
@@ -567,17 +574,6 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     // 0xae3e8/0xae24c 가 돌려주는 다음 상태 — 0xd(→ 0xe OK 대기) · 0xf · 0x1a
     nextSceneStateRef.current = derbySceneStateAfter(before, next)
     runRef.current = next
-    setRun(next)
-
-    // 홈런이면 판이 낸 홈런으로 적는다 — 타석의 임시 결과(판 앞 예측)와 갈릴 수 있다(폴 뒤 굴림 · 폴 뒤 바운드로 넘는 공)
-    const parts = [describePitchResolution(isHomeRun ? { kind: '타구', outcome: { kind: '홈런' } } : resolution)]
-    if (isHomeRun) parts.push(`${next.lastDistance}M`)
-    // 콤보 문구는 지운 뒤의 콤보(+0x39)가 아니라 **표시값 +0x84** 를 본다 — 원본 HUD 0x4585c 가 읽는 칸이다.
-    // 원본은 이 값을 다음 공 준비(상태 0xf)에서 띄우므로, 판이 끝나 0xf 를 안 지나면(마지막 공) 띄우지 않는다.
-    // 그래서 보너스 게임을 여는 마지막 정규 공 홈런은 콤보(+0x39)가 0 이어도 올린 콤보를 띄운다.
-    if (shouldShowComboAtNextPitch(next)) parts.push(`${next.comboDisplay} COMBO`)
-    if (zoneHit) parts.push('EVENT ZONE!')
-    setBanner(parts.join(' · '))
   }
 
   /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 */
@@ -591,7 +587,6 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
       // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
       if (playRef.current !== null) setEffectsClearedAt(performance.now())
       playRef.current = null
-      setBanner('')
       setIsEventZoneShown(false)
       // 0x17 끝 0x35108 — HOMERUN 글자를 끄고(0x351d0) 0x17 그리기(비거리 판)도 더는 안 돈다
       setHomeRunText(null)
@@ -619,6 +614,8 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
 
   /** 0xae3e8 · 0xae24c 를 지난 뒤 — 화면 칸을 셈에 맞추고 다음 상태(0xf · 0xd · 0x1a)로 */
   const finishPitch = () => {
+    // 0xae3e8 · 0xae24c — 기회 · 공 번호 · 누적 · 콤보 칸이 여기서 바뀐다
+    setRun(runRef.current)
     if (runRef.current.isFinished) {
       const finished = derbyResultOf(runRef.current, bestRef.current)
       setResult(finished)
@@ -669,7 +666,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     showPlay(skipped)
     // 두 번 더할 갈래가 키 뒤였으면 비거리가 달라진다 — 판 앞 진행에서 다시 셈한다(원본도 0xae3e8 은 판 끝에서 돈다)
     if (skipped.distance !== play.batted.distance || skipped.displayDistance !== play.batted.displayDistance) {
-      applyPlayResult(play.runBefore, { kind: '타구', outcome: { kind: '홈런' } }, skipped, play.isEventZoneHit)
+      applyPlayResult(play.runBefore, skipped, play.isEventZoneHit)
     }
     armPlayEnd(Math.max(0, play.startedAt + skipped.endTicks * millisecondsPerFrame() - now))
   }, [])
@@ -699,12 +696,11 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
     // 새 경기 장면의 상태 7 · 9 · 8 — 같은 시작 굴림 (0x39fdc 모드 7 의 +0x6b = 0 도 다시) · 로딩 판
     resetLiveGameState()
     startScene()
-    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다 (로딩 판이 서 있으면 다 그린 뒤 0xd 시계)
-    enterScenePrepare()
     const fresh = createDerbyRun()
     runRef.current = fresh
     setRun(fresh)
-    setBanner('')
+    // 경기 시작과 같이 적재 8 → 0xd → 0xe 로 와서 OK 를 기다린다 (로딩 판이 서 있으면 다 그린 뒤 0xd 시계)
+    enterScenePrepare()
     setIsPaused(false)
     setIsEventZoneShown(false)
     setResult(null)
@@ -732,8 +728,7 @@ export function useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myT
   return {
     run,
     skyRow,
-    pitcher: derbyPitcherOf(run.stage, aceLevels, opponentTeamId),
-    banner,
+    pitcher: derbyPitcherOf(moundStage, aceLevels, opponentTeamId),
     isBenchClearing,
     finishBenchClearing,
     isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,
