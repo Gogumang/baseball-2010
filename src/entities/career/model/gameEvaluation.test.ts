@@ -99,6 +99,9 @@ describe('감독 평가 글 — 0x1278c', () => {
 
   it('타자는 타순과 무관하게 같은 칸을 쓴다 — 2배 규칙은 투수편만 (0x1283c)', () => {
     expect(managerCommentIndexOf(선수({ reputation: 800, battingOrder: 3 }), 3)).toBe(66 + 5)
+    // 0x1278c: 문턱 [150, 450, 750, 1000] 을 다 넘으면 구간 0 바탕 39 (평판은 999 로 잘려 실제로는 안 닿는다)
+    expect(managerCommentIndexOf(선수({ reputation: 999, battingOrder: 3 }), 3)).toBe(66 + 5)
+    expect(managerCommentIndexOf(선수({ reputation: 1000, battingOrder: 3 }), 3)).toBe(39 + 5)
   })
 })
 
