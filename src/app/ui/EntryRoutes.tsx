@@ -220,7 +220,8 @@ export function EntryRoutes({
     return (
       <TeamSelectScreen
         title="나만의리그타자편"
-        openedHiddenIds={session.savedCareer?.openedHiddenIds}
+        // 히든 팀 열림은 커리어가 아니라 전역 기록 +0x70 + idx 다 — 투수편(App 의 PitcherCreateFlow)과 같은 출처
+        openedHiddenIds={collection.openedHiddenIds}
         onSelect={(teamId) => setScreen({ kind: '선수등록', teamId })}
         onCancel={() => setScreen({ kind: '메인메뉴' })}
       />
