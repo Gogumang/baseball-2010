@@ -74,7 +74,7 @@ import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
  * 원본 경기 장면의 사람 조작 세 단계를 그대로 따른다 (I-controls 0절 · R10 2절):
  *   0xf  구질 고르기 — (2)(4)OK(6)(8) 다섯 자리 + '0' 마구
  *   0x10 코스 고르기 — 방향키
- *   0x11 게이지 — OK 한 번 (환경설정 "투구 게이지" 가 꺼져 있으면 이 단계가 없다)
+ *   0x11 게이지 — OK 한 번, 틱 10 에 놓는다 (환경설정 "투구 게이지" 가 꺼져 있으면 이 단계가 없다)
  * 그리고 0xe·0xf 에서 `#` 를 누르면 "그만 던지시겠습니까?"(StrGAME[104]) 가 뜬다.
  *
  * ⚠️ 원본 코스 커서의 칸 수·좌표는 해독 문서에 없다 — 설명서 <투구 조작> 2단계를 따라 3×3 격자로 둔다
@@ -769,7 +769,7 @@ export function PitcherGameScreen({
         {!asksGiveUp && !isPopupOpen && canPitch && phase === '게이지' && (
           <>
             <Panel heading="3. 투구 결정" />
-            <PitchGradeGauge onPress={throwWith} />
+            <PitchGradeGauge onRelease={throwWith} />
           </>
         )}
 

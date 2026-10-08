@@ -955,7 +955,7 @@ export function TeamGameScreen({
             {phase === '게이지' && (
               <>
                 <Panel heading="3. 투구 결정" />
-                <PitchGradeGauge onPress={throwWith} />
+                <PitchGradeGauge onRelease={throwWith} />
               </>
             )}
           </>

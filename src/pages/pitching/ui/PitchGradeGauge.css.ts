@@ -28,11 +28,3 @@ export const outline = style({
   border: `2px solid ${theme.color.line}`,
   background: 'rgba(0, 0, 0, 0.35)',
 })
-
-export const hint = style({
-  position: 'absolute',
-  left: 0,
-  bottom: 0,
-  fontSize: '11px',
-  color: theme.color.inkDim,
-})

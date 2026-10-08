@@ -32,7 +32,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
- *   1. 구질 선택  2. 코스 선택  3. 투구 결정(게이지)
+ *   1. 구질 선택  2. 코스 선택  3. 투구 결정(게이지 — OK 로 칸을 정하고 틱 10 에 놓는다)
  *
  * ⚠️ 게이지가 넘겨 주는 것은 **누른 칸 g(0~9)** 하나다 — 원본에는 PERFECT/GOOD/BAD 라는
  * 글자도 판정도 없다 (S5 U-15 확정, 누름 0x50e08). 등급 t = max(g−4, 1) 은 부르는 쪽
@@ -296,7 +296,7 @@ export function PitchingScreen({
     )
   }
 
-  /** 게이지에서 누른 칸 g 를 그대로 넘긴다 (0x50e08 — 칸이 1~9 가 아니면 부르는 쪽이 무시한다) */
+  /** 게이지가 놓을 때(틱 10) 정한 칸 g 를 그대로 넘긴다 (0x50e08 — 못 정했으면 0) */
   const throwPitch = (gaugeCell: number) => {
     if (pitchType === null) return
     onThrow(pitchType, courseCell, gaugeCell, true)
@@ -425,7 +425,7 @@ export function PitchingScreen({
         <>
           {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
           <Panel heading="3. 투구 결정" />
-          <PitchGradeGauge onPress={throwPitch} />
+          <PitchGradeGauge onRelease={throwPitch} />
         </>
       )}
     </PixelScreen>
