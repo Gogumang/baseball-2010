@@ -83,12 +83,28 @@ export const OPEN_TEAM_COUNT = 10
 export const gridRowCountOf = (count: number) => Math.ceil(count / GRID.columns)
 
 /**
- * 나만의리그 팀 고르기 격자 [this+0x70] 의 꼴 — 장면 셋업 0xf6c2~0xf6e6 이 `new(0x3c)` → 0x6c219(vtable 0xd2ea0) 뒤
- * `vtable+0x1c(격자, 5, 3, 1, 0x10)` 로 짓는다. 꼴 **0x10** = 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다 (0x6bead).
+ * 팀 고르기 15칸 격자의 꼴 — **원본의 팀 격자는 모두 `vtable+0x1c(격자, 5열, 3줄, 숫자키 꼴 1, 꼴 0x10)`** 이다
+ * (격자 = `new(0x3c)` → 0x6c219, vtable 0xd2ea0 — vt+0x1c = 0x6c4bd 가 0x6bfe1 로 넘기고 막힌 칸 표 [+0x28] 을 모두 1 로 채운다):
+ * ```
+ * 나만의리그 0x65 [this+0x70]      장면 셋업 0xf6c2~0xf6e6
+ * 시즌 0xca · 트레이드 0xe4 [this+0x98]  시즌 장면 셋업 0x3b14 의 0x3d28~0x3d50 (키 0x8da4 · 0x8250 이 같은 격자를 돈다)
+ * 일반모드 18 · 19 [메뉴+0x74]     진입 0x23e08(0x23e1c~0x23e2c) · 0x23e70(0x23e94) — 진입마다 다시 짓는다
+ * (스페셜 에디트 상태 29 는 10팀이라 5×2 · 꼴 0x10 — `special-edit` 의 EDIT_GRID_SHAPE)
+ * ```
+ * 꼴 비트 (커서 옮기기 0x6bead · 키 0x6c031 · 짓기 0x6bfe1 을 직접 떴다):
+ * - **0x10** 가로로 넘치면(0x6bdc4) `x = (x + dx + 열) % 열` — 같은 줄 반대쪽. 없으면 0 ~ 열−1 로 자른다.
+ * - **0x20** 세로로 넘치면(0x6bde0) `y = (y + dy + 줄) % 줄`. 없으면 자른다.
+ * - **0x100** 0x10 으로 가로가 감길 때 줄 > 1 이면 세로로 부호(dx) 한 칸 더 옮긴다(되부름 깊이 1 까지 — 줄을 넘겨 이어 가기).
+ * - **0x200** 0x20 으로 세로가 감길 때 열 > 1 이면 가로로 부호(dy) 한 칸 더 옮긴다.
+ * - 셋째 인자(숫자키 꼴, +4) 1 = 숫자 '2' '4' '5' '6' '8' 을 ↑ ← OK → ↓ 로(표 0xd2e7c), 2·3 = 숫자로 칸을 바로 고른다.
+ * 팀 격자는 0x10 만이라 `AnnalsGridShape`(0x10 · 0x20)로 그대로 옮겨진다. 대전(통신) 팀 고르기는 웹에 화면이 없다.
  */
-export const MY_LEAGUE_TEAM_GRID_SHAPE: AnnalsGridShape = {
+export const TEAM_GRID_SHAPE: AnnalsGridShape = {
   columns: GRID.columns, rows: TEAM_COUNT / GRID.columns, wrapsColumns: true, wrapsRows: false,
 }
+
+/** 나만의리그 팀 고르기 [this+0x70] — `TEAM_GRID_SHAPE` 와 같다 (0xf6c2~0xf6e6) */
+export const MY_LEAGUE_TEAM_GRID_SHAPE: AnnalsGridShape = TEAM_GRID_SHAPE
 
 /**
  * 격자 칸 i 의 왼쪽 위 (그리기 `0x7a571`, S9 3-2·4-3 확정).

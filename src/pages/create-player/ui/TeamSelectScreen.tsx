@@ -7,7 +7,7 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
-  TEAM_COUNT, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen,
+  TEAM_COUNT, TEAM_GRID_SHAPE, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
@@ -49,8 +49,8 @@ interface TeamSelectScreenProps {
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 */
   readonly gamePoint?: number
   /**
-   * 격자 꼴 — 나만의리그는 `MY_LEAGUE_TEAM_GRID_SHAPE`(꼴 0x10, 가로 감기). 안 넘기면 칸 번호대로 끝에서 멈춘다
-   * (다른 모드의 격자 꼴은 아직 확정하지 않았다).
+   * 격자 꼴 — 안 넘기면 `TEAM_GRID_SHAPE`(5×3 · 꼴 0x10: 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다).
+   * 나만의리그 0x65 · 시즌 0xca · 트레이드 0xe4 · 일반모드 18·19 가 모두 이 꼴이다(셋업 주소는 `TEAM_GRID_SHAPE`).
    */
   readonly gridShape?: AnnalsGridShape
   readonly onSelect: (teamId: number) => void
@@ -77,7 +77,7 @@ interface TeamSelectScreenProps {
  *     확정했지만(아래 `TeamAbilityChart`), 값 도형을 채우는 호출은 못 짚었다.
  */
 export function TeamSelectScreen({
-  openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape, onSelect, onSelectLocked, onCancel, overlay,
+  openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape = TEAM_GRID_SHAPE, onSelect, onSelectLocked, onCancel, overlay,
 }: TeamSelectScreenProps) {
   const [cursor, setCursor] = useState(0)
 
@@ -86,22 +86,11 @@ export function TeamSelectScreen({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const step =
-        event.key === 'ArrowRight' ? 1
-        : event.key === 'ArrowLeft' ? -1
-        : event.key === 'ArrowDown' ? GRID.columns
-        : event.key === 'ArrowUp' ? -GRID.columns
-        : 0
-      if (step !== 0 && gridShape !== undefined) {
+      const direction = event.key === 'ArrowRight' ? 'right' : event.key === 'ArrowLeft' ? 'left'
+        : event.key === 'ArrowDown' ? 'down' : event.key === 'ArrowUp' ? 'up' : null
+      if (direction !== null) {
         event.preventDefault()
-        const direction = event.key === 'ArrowRight' ? 'right' : event.key === 'ArrowLeft' ? 'left'
-          : event.key === 'ArrowDown' ? 'down' : 'up'
         return setCursor((previous) => moveGridCursor(gridShape, previous, direction))
-      }
-      if (step !== 0) {
-        event.preventDefault()
-        // 원본 격자는 끝에서 멈춘다 — 감싸지 않는다 (0x7a2xx 커서 이동)
-        return setCursor((previous) => Math.min(TEAM_COUNT - 1, Math.max(0, previous + step)))
       }
       if (event.key === 'Enter' && isTeamOpen(cursor, openedHiddenIds)) {
         event.preventDefault()

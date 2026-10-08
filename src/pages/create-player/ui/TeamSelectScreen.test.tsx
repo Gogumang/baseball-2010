@@ -66,14 +66,24 @@ describe('팀 고르기', () => {
     expect(onSelect).toHaveBeenCalledWith(1)
   })
 
-  it('격자 커서는 끝에서 멈춘다 — 감싸지 않는다', () => {
+  it('꼴을 안 넘겨도 원본 팀 격자 꼴 0x10 이다 — 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다 (시즌 0x3d50 · 일반 0x23e2c)', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })
 
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(4)
 
-    expect(onSelect).toHaveBeenCalledWith(0)
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(0)
+
+    // 0 → 5 → 10 → 10(끝에서 멈춤) → ↑ 5
+    for (let step = 0; step < 3; step += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelect).toHaveBeenLastCalledWith(5)
   })
 
   it('칸마다 파란 바탕 그림(slt_frame 0)을 깐다', () => {
