@@ -11,6 +11,14 @@ import {
 } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
 import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
+import {
+  confirmDerbyNextBatter,
+  createDerbyLineup,
+  derbyLineupBatterOf,
+  derbyModeBatterPositionOf,
+  reserveDerbyNextBatter,
+} from '@/entities/home-run-derby/model/derbyLineup'
+import type { DerbyLineup, DerbyLineupBatter } from '@/entities/home-run-derby/model/derbyLineup'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import {
   COMBO_DISPLAY_FRAMES,
@@ -134,8 +142,14 @@ export interface HomeRunDerbyOptions {
    * 내 타자편 팀 r7 = (s8) `0x1f8d5(저장, 4)` +1 바이트 — 나리 타자편 저장의 팀(웹 `career.teamId`, 마선수 대결의
    * 사람 칸 팀과 같은 칸 — `missionHumanTeamIdOf`). 상대 팀 굴림 3a454 가 이 팀을 피한다. 저장이 없으면 그 바이트는 0 이다
    * (`DERBY_NO_BATTER_SAVE_TEAM_ID` — 0x213c0 이 새 버퍼를 0 으로 세우고 0x20ac4 는 파일이 없으면 안 쓴다). 안 넘기면 그 값이다.
+   * 공격 팀(팀 0)도 이 팀의 마스터 명부다 — 볼넷 · 사구 뒤 타순 다음 칸 타자가 이 팀의 줄이다(`derbyLineup`).
    */
   readonly myTeamId?: number
+  /**
+   * 모드 타자가 든 명부 칸 k = 0xb6394(0x1fc20(앱)) — 나리 저장 선수면 나리 팀 레코드의 내 줄 첨자, 명예 타자면 0
+   * (`DERBY_HALL_OF_FAME_BATTER_SLOT`). 경기를 세울 때 팀+0x32 가 이 칸이다(3a550). 안 넘기면 0.
+   */
+  readonly modeBatterSlot?: number
 }
 
 /**
@@ -179,6 +193,13 @@ export interface HomeRunDerbySession {
   readonly skyRow: number | undefined
   /** 마운드의 투수 — 마투수 복사는 상태 0xd 진입 0x48d50(48d8e~48dd4)이 한다. 단계가 오른 공의 판 동안은 앞 투수 그대로다 */
   readonly pitcher: DerbyPitcher
+  /**
+   * 지금 타자 0xae89c(팀 0) — 모드 타자 칸이면 `isModeBatter`, 아니면 내 팀 r7 의 마스터 타자 줄(`derbyLineup`).
+   * 볼넷 · 사구가 예약한 다음 타순은 상태 0xd 진입(48ddc 0xaebe4)에서만 넘어간다.
+   */
+  readonly batter: DerbyLineupBatter
+  /** 모드 타자 사본의 수비 위치 — 0xb53f0 이 옛 [k] 마스터 줄의 +0x1c 를 남긴다(`derbyModeBatterPositionOf`) */
+  readonly modeBatterPosition: number | undefined
   /**
    * **벤치 클리어링(상태 0x1e) 중** — 사구 뒤 0x12 대기 끝 0x4e74c 굴림이 들어갔다. 화면이 `BenchClearingScene` 을 띄우고
    * 끝나면 `finishBenchClearing` 을 부른다(출구 0xae24c).
@@ -246,12 +267,9 @@ export interface HomeRunDerbySession {
  * **던진 공은 무엇이든 기회 한 번**이다. 다만 판정 스위치 0x3dfac 는 볼 수 st[5] 를 그대로 올려(스트라이크만 모드 7 이면 안 센다)
  * 심판 콜이 그 칸을 본다 — `derbyPitchCallOf`.
  *
- * ⚠️ 미해결 — **볼넷 · 사구 뒤 다음 타자 예약**: v3 · v4(0x3e1ae · 0x3e1b4)가 `0xaf020(공격 팀, 0)` 으로 +0x291 = 1 ·
- * +0x293 = (+0x32 + 1) mod 9 를 세우고, 다음 0xd 진입 0x48d50 이 48ddc `0xaebe4(팀, 0)` 에서 +0x293 ≤ 8 이면 타순 +0x32 를
- * 그 칸으로 넘긴다(aec8c~aecaa → aedee). 0x48d50 에는 모드 7 이 타순을 모드 타자(0x3a55e 의 +0xa & 0x1f)로 되돌리는 곳이 없다 —
- * 그래서 원본은 볼넷 · 사구 뒤 단계가 오르거나 보너스를 열면 **타순 다음 칸 타자**(내 팀 r7 마스터 명부 쪽 줄로 보인다)가 친다.
- * 그 칸이 누구인지(0xb87cd 가 모드 타자를 팀 객체에 어떻게 넣는지 · 팀 +0xe 타순 표)와 타석 그림 · 능력치가 그 기록을 따르는지는
- * 아직 안 떠서 옮기지 않았다 — 웹은 늘 모드 타자다.
+ * **볼넷 · 사구 뒤 다음 타자** — v3 · v4(0x3e1ae · 0x3e1b4)가 `0xaf020(공격 팀, 0)` 으로 다음 타순을 예약하고 다음 0xd 진입
+ * 0x48d50 의 48ddc `0xaebe4(팀, 0)` 이 타순 +0x32 를 넘긴다. 모드 7 은 타순을 되돌리지 않아 그 뒤로는 **내 팀 r7 마스터 명부의
+ * 다음 칸 타자**가 친다(`derbyLineup` 머리말 — 원본 그대로). 화면이 `batter` 로 능력치 · 스킬 · 그림 · 소개 판을 그 줄로 바꾼다.
  *
  * **번트**도 같다 (90408d8 로 키가 열렸다): 번트 판정 0x51226(0x51108 안)·타구 시작 0x51408 에 모드 갈림이 없고,
  * 맞은 번트(파울 포함)는 인플레이 끝에서 0xae3e8 로 와 "홈런 아닌 공" 하나가 된다 — 기회 −1 · 직전 홈런이면 콤보 0(페어 번트는 판이 낙구 비거리를 더한다).
@@ -267,6 +285,7 @@ export function useHomeRunDerby({
   aceLevels,
   random,
   myTeamId = DERBY_NO_BATTER_SAVE_TEAM_ID,
+  modeBatterSlot = 0,
 }: HomeRunDerbyOptions): HomeRunDerbySession {
   /** HUD 가 그리는 진행 — 셈(`runRef`)은 공이 맞은 순간 하고, 이 칸은 판 끝 · 0x12 대기 끝에 따라 맞춘다 */
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
@@ -282,6 +301,17 @@ export function useHomeRunDerby({
   const isBenchClearingRef = useRef(false)
   const myTeamIdRef = useRef(myTeamId)
   myTeamIdRef.current = myTeamId
+  const modeBatterSlotRef = useRef(modeBatterSlot)
+  modeBatterSlotRef.current = modeBatterSlot
+  /** 공격 팀 타순 — 셈(예약 포함)은 ref, 화면 칸은 0xd 에서 타순이 넘어갈 때 맞춘다 */
+  const lineupRef = useRef<DerbyLineup>(createDerbyLineup(myTeamId, modeBatterSlot))
+  const [lineup, setLineup] = useState<DerbyLineup>(lineupRef.current)
+  /** 경기 초기화 0x39fdc 모드 7 — 팀 0 을 새로 세워 타순을 모드 타자 칸 k 로 */
+  const startLineup = () => {
+    const fresh = createDerbyLineup(myTeamIdRef.current, modeBatterSlotRef.current)
+    lineupRef.current = fresh
+    setLineup(fresh)
+  }
   // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
   const [isPreparing, setIsPreparing] = useState(true)
   const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(false)
@@ -386,6 +416,12 @@ export function useHomeRunDerby({
    */
   const enterSceneD = () => {
     setMoundStage(runRef.current.stage)
+    // 48ddc 0xaebe4(공격 팀, 0) — 볼넷 · 사구가 예약한 다음 타순(+0x291 · +0x293)을 여기서 확정한다. 모드 7 도 되돌리지 않는다
+    const confirmed = confirmDerbyNextBatter(lineupRef.current)
+    if (confirmed !== lineupRef.current) {
+      lineupRef.current = confirmed
+      setLineup(confirmed)
+    }
     ballsRef.current = 0
   }
 
@@ -486,6 +522,8 @@ export function useHomeRunDerby({
     // 사구 23 (`derbyPitchCallOf` 머리말). 볼 수 st[5] 는 0xd 진입만 지운다
     const call = derbyPitchCallOf(detail.resolution, ballsRef.current)
     ballsRef.current = call.balls
+    // 볼넷 v3 → 사구 v4 0x3e1b4 `0xaf020(공격 팀, 0)` — 다음 타순 예약. 확정은 다음 0xd 진입(`enterSceneD`)
+    if (call.judgment === 3 || call.judgment === 4) lineupRef.current = reserveDerbyNextBatter(lineupRef.current)
     playSoundIds(audioRef.current, [detail.contactSoundId, call.soundId])
 
     // **맞은 공은 홈런더비 판(종류 8)을 돈다** (2026-10-07 직접 뜸 — `derbyBattedBall` 머리말). 원본은 모드 7 도 맞은 공이면
@@ -703,6 +741,8 @@ export function useHomeRunDerby({
     // 새 경기 장면의 상태 7 · 9 · 8 — 같은 시작 굴림 (0x39fdc 모드 7 의 +0x6b = 0 도 다시) · 로딩 판
     resetLiveGameState()
     startScene()
+    // 0x39fdc 가 팀 0 도 새로 세운다 — 타순은 다시 모드 타자 칸
+    startLineup()
     const fresh = createDerbyRun()
     runRef.current = fresh
     setRun(fresh)
@@ -736,6 +776,8 @@ export function useHomeRunDerby({
     run,
     skyRow,
     pitcher: derbyPitcherOf(moundStage, aceLevels, opponentTeamId),
+    batter: derbyLineupBatterOf(lineup),
+    modeBatterPosition: derbyModeBatterPositionOf(lineup),
     isBenchClearing,
     finishBenchClearing,
     isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,

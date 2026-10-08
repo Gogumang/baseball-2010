@@ -16,6 +16,7 @@ import { derbyDisplayDistanceAt } from '@/entities/home-run-derby/model/derbyBat
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
+import { derbyMasterBatterOf } from '@/entities/home-run-derby/model/derbyLineup'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import * as styles from '@/pages/home-run-derby/ui/HomeRunDerbyScreen.css'
@@ -70,6 +71,11 @@ interface HomeRunDerbyScreenProps {
    * 저장이 없으면 0 (`DERBY_NO_BATTER_SAVE_TEAM_ID`) — 안 넘기면 그 값이다.
    */
   readonly myTeamId?: number
+  /**
+   * 모드 타자가 든 명부 칸 k = 0xb6394(모드 타자 기록) — 나리 팀 레코드의 내 줄 첨자, 명예 타자면 0. 첫 타순이 이 칸이고,
+   * 볼넷 · 사구 뒤 0xd 를 지나면 내 팀 r7 마스터 명부의 다음 칸 타자가 친다(`derbyLineup`). 안 넘기면 0.
+   */
+  readonly modeBatterSlot?: number
 }
 
 /** 홈런더비 = 원본 전역 모드 7 — 경기 중 메뉴 표 0xcfcfc 의 **행 1**(자동진행 자리에 다시하기) */
@@ -104,8 +110,9 @@ export function HomeRunDerbyScreen({
   onSettingsChange,
   matchupBatter,
   myTeamId,
+  modeBatterSlot,
 }: HomeRunDerbyScreenProps) {
-  const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId })
+  const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId, modeBatterSlot })
   const tick = useUpdateCounter()
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
@@ -178,6 +185,34 @@ export function HomeRunDerbyScreen({
 
   const { run, pitcher } = session
   const ace = pitcher.ace
+  // 지금 타자 0xae89c(팀 0) — 볼넷 · 사구 뒤 0xd 를 지나 타순이 넘어갔으면 내 팀 r7 의 마스터 타자 줄이 친다. 능력치(0xab214) ·
+  // 장착 스킬(실투 0x33d52 등) · 그림(타석 교대 0x47cc8 이 다시 싣는다) · 소개 판 모두 그 줄 것이다
+  const master =
+    session.batter.isModeBatter || session.batter.row === null ? null : derbyMasterBatterOf(session.batter.row)
+  const stageBatter =
+    master === null
+      ? { ability, form: batterForm, skinIndex: batterSkinIndex, equipmentLevels: batterEquipmentLevels, skillIds: batterSkillIds }
+      : {
+          ability: master.ability,
+          form: master.form,
+          skinIndex: master.skinIndex,
+          equipmentLevels: master.equipmentLevels,
+          skillIds: master.skillIds,
+        }
+  // 소개 판 0x44944 의 타자 판 — 타순은 팀+0x32, 모드 타자의 수비는 0xb53f0 이 남긴 옛 [k] 줄의 것.
+  // ⚠️ 미해결: 마스터 줄의 타율 · 홈런 · 타점(+0x20~)은 웹 명부에 없는 칸이라 비운다
+  const stageMatchupBatter: Omit<MatchupBatterCard, 'isComputer'> =
+    master === null
+      ? {
+          ...matchupBatter,
+          battingOrder: session.batter.order,
+          ...(session.modeBatterPosition === undefined ? {} : { position: session.modeBatterPosition }),
+        }
+      : {
+          name: master.name,
+          battingOrder: session.batter.order,
+          ...(master.position === undefined ? {} : { position: master.position }),
+        }
   // 판(0x17) 그리기 0x46c88 은 0x4c4bc(타석 화면 · HUD 0x45a54)를 안 부른다 — 판 동안은 HUD 가 없다
   const isPlayShown = session.distanceBoard !== null
 
@@ -234,11 +269,11 @@ export function HomeRunDerbyScreen({
             // 하늘 줄 — 세션이 장면 시작 · 결과 진입 0x4f574 에 굴린 구장 +0x10
             skyRow={session.skyRow}
             key={stageSerial}
-            batterAbility={ability}
-            batterForm={batterForm}
-            batterSkinIndex={batterSkinIndex}
-            batterEquipmentLevels={batterEquipmentLevels}
-            batterSkillIds={batterSkillIds}
+            batterAbility={stageBatter.ability}
+            batterForm={stageBatter.form}
+            batterSkinIndex={stageBatter.skinIndex}
+            batterEquipmentLevels={stageBatter.equipmentLevels}
+            batterSkillIds={stageBatter.skillIds}
             pitcherAbility={pitcher.ability}
             aceLevels={aceLevels}
             swingMode="홈런더비"
@@ -300,14 +335,14 @@ export function HomeRunDerbyScreen({
                       )
                 }
                 // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
-                batterSide={batterSideOfForm(batterForm ?? 0)}
+                batterSide={batterSideOfForm(stageBatter.form ?? 0)}
               />
               {/* 0xe 그리기 0x4d9ec 는 타석 화면(0x4c4bc — HUD 0x45a54 포함) 다음에 0x44944 를 그린다 → HUD 위 */}
               {session.isAwaitingConfirm && (
                 <DerbyMatchupCards
-                  batterHand={batterSideOfForm(batterForm ?? 0)}
+                  batterHand={batterSideOfForm(stageBatter.form ?? 0)}
                   pitcherName={pitcher.name ?? undefined}
-                  batter={matchupBatter}
+                  batter={stageMatchupBatter}
                 />
               )}
             </>
@@ -333,7 +368,7 @@ export function HomeRunDerbyScreen({
  * 홈런더비에서 원본이 채우는 값 중 웹이 아는 것만 넣는다:
  * - 팀 글자: 0x39fdc 모드 7 갈래가 `0xb6c19(st, 0, 0)` · `0xb6c19(st, 1, 1)`(3a4a6~3a4bc) — 내 타자편 팀 0 은 PLAYER,
  *   상대 팀 1 은 COM 이다. 타자 판(st[9])이 모드 타자가 든 팀 0, 투수 판(st[0xa])이 팀 1 이다.
- * - 손: 타자 판 좌타/우타 · 판 자리 모두 0xb63c0(모드 타자) — `DerbyHud` 와 같은 폼 값.
+ * - 손: 타자 판 좌타/우타 · 판 자리 모두 0xb63c0(지금 타자 0xae89c — 볼넷 · 사구 뒤 넘어간 마스터 줄이면 그 줄) — `DerbyHud` 와 같은 폼 값.
  * - 투수 이름: 단계 ≥ 1 마투수는 0x48d50 이 마투수 기록 0x30 바이트를 통째로 복사하므로 그 기록의 이름이다
  *   (⚠️ 유력 — 0xb62c0 이 마선수 기록에서 `ACE_PLAYERS` 이름을 내는지는 0x20498 을 안 봤다).
  * - 단계 0 투수 이름: 상대 팀 v(장면 시작 굴림 3a454)의 마스터 투수 줄 2 (`derbyPitcherOf` · `DERBY_ORDINARY_PITCHER_ROW`).

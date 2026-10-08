@@ -12,6 +12,7 @@ import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
 import type { AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
 import { derbyHallOfFameBatterIndexOf } from '@/pages/home-run-derby/lib/derbyModeBatter'
 import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
+import { DERBY_HALL_OF_FAME_BATTER_SLOT, DERBY_MISSING_BATTER_SLOT } from '@/entities/home-run-derby/model/derbyLineup'
 import type { HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -43,11 +44,11 @@ import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 
 /**
- * **홈런더비 상태 0xe 의 타자 판 값** (0x44944 — 타자 `0xae89c(팀 0)` = 모드 타자 기록 0x1fc20).
- * - 나리 타자편 저장(0x213c0(앱, 4, 0))의 내 선수 레코드: 이름 · 수비 `+0x1c & 0xf`(내 팀 레코드의 내 줄) ·
- *   타순 `팀+0x32` = `0xb6394(기록)` = `+0xa & 0x1f`(142·경기 장면이 0xb8768 로 배열 첨자로 다시 매긴 내 칸) ·
- *   시즌 줄 `career.stats`(웹이 내 레코드 +0x20~ 대신 세는 칸) — 기록 게이트 0xa56dc 는 모드 7 에서 거짓이라 더비 중에는 안 오른다.
- * - 명예 타자 기록(0x1f640)은 이름만 — ⚠️ 웹 명전 기록에 수비·시즌 줄 칸이 없어 비운다(미해결).
+ * **홈런더비 상태 0xe 의 타자 판 값** (0x44944 — 타자 `0xae89c(팀 0)` = 모드 타자 기록 0x1fc20 의 사본).
+ * - 나리 타자편 저장(0x213c0(앱, 4, 0))의 내 선수 레코드: 이름 · 시즌 줄 `career.stats`(웹이 내 레코드 +0x20~ 대신 세는 칸) —
+ *   기록 게이트 0xa56dc 는 모드 7 에서 거짓이라 더비 중에는 안 오른다.
+ * - 명예 타자 기록(0x1f640)은 이름만 — ⚠️ 웹 명전 기록에 시즌 줄 칸이 없어 비운다(미해결).
+ * 타순(팀+0x32)과 수비(0xb53f0 이 남긴 옛 [k] 마스터 줄의 +0x1c)는 화면이 타순(`derbyLineup`)에서 채운다.
  * ⚠️ 미해결: 오늘 타석 기록(링) — 더비 타석이 정산 0xa8024 를 지나는지 안 읽어 비운다.
  */
 function derbyMatchupBatterOf(
@@ -56,15 +57,18 @@ function derbyMatchupBatterOf(
 ): Omit<MatchupBatterCard, 'isComputer'> | undefined {
   if (famer !== null) return { name: famer.name }
   if (career === null || career === undefined) return undefined
-  const record = nariTeamRecordOf(nariTeamsOf(career), career.teamId)
-  const index = myBatterIndexOf(record)
-  const position = record.batters[index]?.position
-  return {
-    name: career.name,
-    ...(index < 0 ? {} : { battingOrder: index }),
-    ...(position === undefined ? {} : { position }),
-    ...batterCardStatsOf(career.stats),
-  }
+  return { name: career.name, ...batterCardStatsOf(career.stats) }
+}
+
+/**
+ * **모드 타자가 든 명부 칸 k** = 3a550 의 `0xb6394(0x1fc20(앱))` = 기록 +0xa & 0x1f — 나리 저장 선수면 나리 팀 레코드의 내 줄 첨자
+ * (142 · 경기 장면이 0xb8768 로 다시 매긴 칸, 미션 `nariBatterRecordSlot` 과 같은 값), 명예 타자면 0. 내 줄이 없으면 끝 칸 12(미해결).
+ */
+function derbyModeBatterSlotOf(famer: object | null, career: PlayerCareer | null | undefined): number {
+  if (famer !== null) return DERBY_HALL_OF_FAME_BATTER_SLOT
+  if (career === null || career === undefined) return DERBY_HALL_OF_FAME_BATTER_SLOT
+  const index = myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(career), career.teamId))
+  return index < 0 ? DERBY_MISSING_BATTER_SLOT : index
 }
 
 interface EntryRoutesProps {
@@ -355,6 +359,8 @@ export function EntryRoutes({
         onSettingsChange={gameSettings.setSettings}
         // 상태 0xe 소개 판의 타자 판 — 모드 타자 기록(0x1fc20)에서 (`derbyMatchupBatterOf`)
         matchupBatter={derbyMatchupBatterOf(famer, career)}
+        // 공격 팀 타순의 첫 칸 = 모드 타자 칸 k (3a550) — 볼넷 · 사구 뒤로는 내 팀 r7 마스터 명부의 다음 칸이 친다
+        modeBatterSlot={derbyModeBatterSlotOf(famer, career)}
         // 상대 팀 굴림 3a454 가 피하는 내 팀 r7 = 나리 타자편 저장의 팀 (명예 타자를 골라도 같은 저장을 본다).
         // 저장이 없으면 0x213c0 이 0 으로 세운 버퍼의 바이트라 0 (`DERBY_NO_BATTER_SAVE_TEAM_ID`)
         myTeamId={career === null ? DERBY_NO_BATTER_SAVE_TEAM_ID : career.teamId}

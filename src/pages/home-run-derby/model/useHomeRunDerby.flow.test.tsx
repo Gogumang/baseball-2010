@@ -14,7 +14,7 @@ import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
 
@@ -144,6 +144,38 @@ describe('심판 콜 — 판정 스위치 0x3dfac · 화면 0x51a56 은 모드�
     한구(rendered, 볼)
     // 보너스 한 구가 마지막 공이라 결과 소리가 뒤따른다
     expect(녹음.played[0]).toBe(16)
+  })
+})
+
+describe('볼넷 · 사구 뒤 다음 타자 — 0xaf020 예약 · 0xd 진입 0xaebe4 확정 (derbyLineup)', () => {
+  it('볼넷이 나도 0xd 까지는 모드 타자 — 보너스를 연 0xd 뒤로는 내 팀 마스터 명부 다음 칸', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, myTeamId: 4, modeBatterSlot: 6 }))
+    OK(rendered)
+    expect(rendered.result.current.batter).toEqual({ isModeBatter: true, order: 6 })
+    expect(rendered.result.current.modeBatterPosition).toBe(teamBatters(4)[6]!.position! & 0xf)
+    한구(rendered, 홈런)
+    한구(rendered, 홈런)
+    // 넷째 볼부터 볼넷(v3) — 예약은 한 번뿐(+0x291), 타자는 그대로
+    for (let index = 0; index < 8; index += 1) {
+      한구(rendered, 볼)
+      if (index < 7) expect(rendered.result.current.batter.isModeBatter).toBe(true)
+    }
+    expect(rendered.result.current.run.isBonusGame).toBe(true)
+    expect(rendered.result.current.batter).toEqual({ isModeBatter: false, order: 7, row: teamBatters(4)[7] })
+  })
+
+  it('사구(v4)도 예약하고, 다시하기는 타순을 k 로 되돌린다', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, myTeamId: 2, modeBatterSlot: 8 }))
+    OK(rendered)
+    한구(rendered, 사구)
+    한구(rendered, 홈런)
+    한구(rendered, 홈런)
+    for (let index = 0; index < 7; index += 1) 한구(rendered, 헛스윙)
+    expect(rendered.result.current.run.isBonusGame).toBe(true)
+    // (8 + 1) mod 9 = 0
+    expect(rendered.result.current.batter).toEqual({ isModeBatter: false, order: 0, row: teamBatters(2)[0] })
+    act(() => rendered.result.current.restart())
+    expect(rendered.result.current.batter).toEqual({ isModeBatter: true, order: 8 })
   })
 })
 
