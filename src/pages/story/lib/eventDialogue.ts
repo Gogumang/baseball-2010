@@ -1,3 +1,5 @@
+import { FONT_SPACING, measurePixelTextWidth } from '@/shared/lib/font'
+
 /**
  * **이벤트 재생기 say 명령의 대사 상자** — 공용 대사 창 0x7fbc4 / 상자 0x7fad0 (직접 떴다 · R14 3-4 와 같은 창 클래스 0x7b7b8).
  *
@@ -23,7 +25,8 @@
  * 키    114 0x13b88 → 0x8b804 (확인 −5 · '5'): 단계 1 → 2 (그 쪽을 다 보인다) · 3 → 0x7f7f4 (첫 줄 += 3, 단계 1) · 4 → 다음 명령
  * ```
  * 바이트는 원본 글 CP949 다 — 한글 2 · 영문 1, `!N` · `!C` · `!L` · `!R` 2, `!cRRGGBB` 8 (안 보이는 표시도 찍기 시간을 먹는다).
- * 줄 나누기는 0x6ef4c 그대로(`wrapHelpText` 와 같은 규칙) — 글자 폭 한글 9 · 영문 5 · 자간 1 은 **유력**(0x6ecd0 미해독, I 문서).
+ * 줄 나누기는 0x6ef4c 그대로(`wrapHelpText` 와 같은 규칙). 글꼴은 0x7fc32 의 0x6ecd0 이 고른 앱 전역 글꼴 [[0x1400070]+0x3c]
+ * (자간 1 · 줄간 3) — 글자 폭은 0x6f2e4 → 0x9c52c 로 잰 한 글자 폭(`measurePixelTextWidth`: 한글 9 · 영문 5 · 못 그리는 글자 0).
  * ⚠️ 장식 프레임 21 의 그림과 원점(−48, −8)은 mode_ui origins 그대로다.
  */
 
@@ -99,9 +102,8 @@ export interface DialogueLayout {
   readonly totalBytes: number
 }
 
-const HANGUL_ADVANCE = 9
-const ASCII_ADVANCE = 5
-const LETTER_GAP = 1
+/** 0x6ecd0 — 글상자는 앱 전역 글꼴(자간 +0x66 = 1) */
+const LETTER_GAP = FONT_SPACING.app.letterGap
 
 const byteSizeOf = (character: string) => ((character.codePointAt(0) ?? 0) >= 0x80 ? 2 : 1)
 
@@ -154,7 +156,7 @@ export function layoutDialogue(raw: string, maxWidth: number = EVENT_DIALOGUE.te
       }
     }
     const character = raw[index]
-    const advance = byteSizeOf(character) === 2 ? HANGUL_ADVANCE : ASCII_ADVANCE
+    const advance = measurePixelTextWidth(character)
     const width = advance + (x > 0 ? LETTER_GAP : 0)
     if (maxWidth - x - width < 0 && x > 0) {
       // 넘치면 이 글자 앞에서 줄을 닫는다 — 다음 쪽 끝 바이트는 이 글자의 자리다 (0x6f216 `+0x44 = 0`)

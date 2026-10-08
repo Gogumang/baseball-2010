@@ -37,6 +37,14 @@ describe('줄 나누기 0x6ef4c — 글자 단위, 한글 9 · 영문 5 · 자�
     expect(글(wrapHelpText('가'.repeat(17)))).toEqual(['가'.repeat(16), '가'])
   })
 
+  it('글자 폭은 0x9c52c 한 글자 폭 — 못 그리는 기호는 0(줄 첫 글자가 아니면 자간 1 만), \'·\' 은 영문 \'.\' 폭 5', () => {
+    // 159 + 3×(0 + 1) = 162 ≤ 162
+    expect(글(wrapHelpText('가'.repeat(16) + '★★★'))).toEqual(['가'.repeat(16) + '★★★'])
+    // 9 + 14×10 = 149 · '·' 둘 = 161 · 셋째 167 > 162
+    expect(글(wrapHelpText('가'.repeat(15) + '··'))).toEqual(['가'.repeat(15) + '··'])
+    expect(글(wrapHelpText('가'.repeat(15) + '···'))).toEqual(['가'.repeat(15) + '··', '·'])
+  })
+
   it('영문도 낱말이 아니라 글자에서 끊는다 (5 + 26×6 = 161 → 27자, 28자째 다음 줄)', () => {
     expect(글(wrapHelpText('a'.repeat(28)))).toEqual(['a'.repeat(27), 'a'])
   })

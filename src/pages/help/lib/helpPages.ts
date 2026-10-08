@@ -1,4 +1,5 @@
 import { ORIGINAL_HOWTO } from '@/shared/config/original/howto'
+import { FONT_SPACING, LINE_HEIGHT, measurePixelTextWidth } from '@/shared/lib/font'
 import { GAME_VERSION, HELP_CHAPTER_LENGTHS } from '@/shared/config/helpSections'
 
 /**
@@ -44,16 +45,14 @@ export const HELP_TEXT_BOX = {
   /** `0x6ef4c` 인자 sp+8 — 그릴 줄 수 */
   visibleLines: 11,
   /**
-   * 줄 높이 — `0x6ef4c` 인자 sp+0x10 = −1 이라 글꼴 기본값(높이 11 + 줄간)이다.
-   * ⚠️ 유력: 이 뷰어가 앱 전역 글꼴(줄간 3 → 14)을 쓴다고 본다(R5 5절). 글꼴 객체를 고르는 0x6ecd0(ctx, 1) 은 안 읽었다.
+   * 줄 높이 — `0x6ef4c` 인자 sp+0x10 = −1 이라 글꼴 기본값(높이 +0x6c 11 + 줄간 +0x67)이다. 0x58750 · 0x635d0 의
+   * 0x6ecd0(상자, 1) 이 앱 전역 글꼴 [[0x1400070]+0x3c](줄간 3)을 고르므로 14 다.
    */
-  lineHeight: 14,
+  lineHeight: LINE_HEIGHT + FONT_SPACING.app.lineGap,
 } as const
 
-/** 글자 폭 — 한글 9 · 영문/공백 5, 자간 1 (앱 전역 글꼴, R5 5절 — 유력) */
-const HANGUL_ADVANCE = 9
-const ASCII_ADVANCE = 5
-const LETTER_GAP = 1
+/** 자간 — 0x6ecd0 이 고른 앱 전역 글꼴의 +0x66 = 1 */
+const LETTER_GAP = FONT_SPACING.app.letterGap
 
 export type HelpTextAlign = '왼' | '가운데' | '오른'
 
@@ -66,11 +65,6 @@ export interface HelpTextSegment {
 export interface HelpTextLine {
   readonly segments: readonly HelpTextSegment[]
   readonly align: HelpTextAlign
-}
-
-const isHangul = (character: string) => {
-  const code = character.codePointAt(0) ?? 0
-  return code >= 0x80
 }
 
 /**
@@ -129,7 +123,8 @@ export function wrapHelpText(raw: string, maxWidth: number = HELP_TEXT_BOX.width
       }
     }
     const character = raw[index]
-    const advance = isHangul(character) ? HANGUL_ADVANCE : ASCII_ADVANCE
+    // 한 글자 폭 0x6f2e4 → 0x9c52c — 한글 9 · 영문/공백 5 · 못 그리는 글자(2350자 밖 · 기호) 0
+    const advance = measurePixelTextWidth(character)
     const width = advance + (x > 0 ? LETTER_GAP : 0)
     if (maxWidth - x - width < 0 && x > 0) {
       // 넘치면 이 글자 앞에서 줄을 닫고 다음 줄 첫 글자로 다시 잰다 (0x6f216 `+0x44 = 0`)
