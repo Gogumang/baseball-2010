@@ -1367,12 +1367,12 @@ export function useSeasonSession(
     // 0xeb 0xe854 · 0xec 0xe900 — 0x8dad5(evmgr, 0xc · 0xd) 로 타이틀 칸을 채우고 370 · 371 을 튼다(이전 = 다음 상태, 다음 = 0xd3)
     if (scene === SEASON_SCENE_STATE.타자시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.타자, step.next)
     if (scene === SEASON_SCENE_STATE.투수시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.투수, step.next)
-    // 0xed 0xe7ac — 0x8dd61(evmgr) 가 표 0xd4f34 에서 rand(0..6) 으로 MVP 순위 종류를 고른 뒤 376 을 튼다
+    // 0xed 0xe7ac — 0x8dd61(evmgr) 가 표 0xd4f34 에서 rand(0..6) 으로 MVP 순위 종류를 고른 뒤(빈 순위표면 다시) 376 을 튼다
     if (scene === SEASON_SCENE_STATE.최우수선수) {
-      seasonMvpKind.current = SEASON_MVP_LEADER_KINDS[random.rand(0, SEASON_MVP_LEADER_KINDS.length)] ?? null
+      seasonMvpKind.current = rollSeasonMvpKind(save, recordSourceNow(), random)
       return startEvent(SEASON_AWARD_INTRO_EVENT_ID.MVP, step.next)
     }
-  }, [commit, event100Awarded, openedHiddenIds, random, save, scene, startEvent, tradeRequest.isRequested])
+  }, [commit, event100Awarded, openedHiddenIds, random, recordSourceNow, save, scene, startEvent, tradeRequest.isRequested])
 
   const chooseTeam = useCallback(
     (teamId: number) => {
@@ -2871,6 +2871,25 @@ function seasonTitlesOf(save: SeasonSave, recordOf: SeasonEntryRecordSource | un
     isMine: record.teamId === save.state.record.teamId,
   }))
   return judgeTitles(records, isPitcher ? '시즌투수' : '타자')
+}
+
+/**
+ * 0x8dd60 8dd9a~8ddf0 — 표 0xd4f34(일곱 칸)에서 `rand(0, 7)` 로 종류를 고르고 순위표 0x9d789(…, 종류, 2, 1)를 세워
+ * 칸 수 0x9da19 가 0 이면(그 종류 1위가 없으면) **다시 굴린다**(8ddc8 고리). 빈 순위표마다 rand 한 번이 더 든다.
+ * ⚠️ 원본은 일곱 종류가 모두 비면 끝없이 돈다 — 웹은 그때만 첫 굴림 하나로 멈춘다(정규시즌을 치른 리그에선 닿지 않는다).
+ */
+function rollSeasonMvpKind(
+  save: SeasonSave,
+  recordOf: SeasonEntryRecordSource | undefined,
+  random: RandomPort,
+): LeaderKind | null {
+  const source = seasonAwardSourceOf(save, recordOf)
+  const hasLeader = (kind: LeaderKind) => leaderOf(seasonLeagueRecordsOf(source, isPitcherLeaderKind(kind)), kind) !== null
+  const anyLeader = SEASON_MVP_LEADER_KINDS.some(hasLeader)
+  for (;;) {
+    const kind = SEASON_MVP_LEADER_KINDS[random.rand(0, SEASON_MVP_LEADER_KINDS.length)] ?? null
+    if (kind === null || !anyLeader || hasLeader(kind)) return kind
+  }
 }
 
 /** 0x8dd60 — 고른 종류의 1위가 MVP 칸(evt+0x370 팀 · +0x374 이름), 그 팀이 내 팀이면 +0x388 */
