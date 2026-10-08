@@ -306,6 +306,37 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
     expect(rendered.result.current.session.career?.seenEventIds).not.toContain('500')
   })
 
+  it('부상 엔딩 검사는 105 에 들어올 때마다다 — 진입 검사(경기 · 이벤트 뒤)가 아닌 아이템 · 외출에서 돌아와도 500 (0x11b32 는 진입의 곧은 길)', async () => {
+    const rendered = 띄우기({
+      ...createCareer('부상'),
+      season: 3,
+      isInjured: true,
+      injuredGamesPlayed: 20,
+      seenEventIds: [String(451)],
+      hasSeenYearGoalWindow: true,
+    })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 500, context: '관리' }))
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    act(() => rendered.result.current.setScreen({ kind: '관리' }))
+    expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 500, context: '관리' })
+  })
+
+  it('부상 누적 19 면 다른 진입에서도 500 이 없다', async () => {
+    const rendered = 띄우기({
+      ...createCareer('부상'),
+      season: 3,
+      isInjured: true,
+      injuredGamesPlayed: 19,
+      seenEventIds: [String(451)],
+      hasSeenYearGoalWindow: true,
+    })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    act(() => rendered.result.current.setScreen({ kind: '관리' }))
+    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+  })
+
   it('관리 화면에서 연 이벤트가 첫 종류 21 로 끝나도(뒤 ≠ 113) 141 — 번호는 0xa3a85 판정', () => {
     const rendered = 띄우기(목표달성선수({ season: 9, popularity: 1000 }))
     act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 500, context: '관리' }))

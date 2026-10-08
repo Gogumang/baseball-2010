@@ -1045,6 +1045,27 @@ export function useCareerSession({
     if (event !== null) setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
   }, [managementCheck, screen.kind, career, story, random, setScreen])
 
+  /*
+   * **105 에 들어올 때마다** 부상 엔딩 검사 — 0x11b32~0x11b44 는 진입 0x11910 의 곧은 길 위에 있어(11910 → 11b24 사이에 갈림 없음)
+   * 어디서 105 로 들어오든(아이템 111 · 외출 112/126 · 순위표 109 취소 · 장소 113 이벤트 끝 · 성적 따위) 돈다. 웹 진입 검사
+   * (`managementCheck`, 위 고리)는 경기 · 이벤트 · 이어하기 · 새 시즌 진입에서만 세워지므로 그 밖 진입은 여기서 같은 첫 줄을 본다.
+   * 위 고리가 도는 진입(검사 값이 서 있음)은 거기서 이미 보므로 건너뛴다. 새 선수 오프닝 451 을 아직 안 봤으면 1cfa6 이 예약을
+   * 덮는 자리라 위 고리에 맡긴다(웹은 새 선수 플래그 대신 451 을 안 봤는가로 가른다). 이벤트 본문이 오기 전 진입이면 올 때까지 둔다.
+   */
+  const isAtManagement = screen.kind === '관리'
+  const wasAtManagementRef = useRef(isAtManagement)
+  const injuryEntryPendingRef = useRef(false)
+  if (wasAtManagementRef.current !== isAtManagement) {
+    wasAtManagementRef.current = isAtManagement
+    injuryEntryPendingRef.current = isAtManagement && managementCheck === null
+  }
+  useEffect(() => {
+    if (!injuryEntryPendingRef.current || !isAtManagement || career === null || story.events === null) return
+    injuryEntryPendingRef.current = false
+    if (managementCheck !== null || !career.seenEventIds.includes(String(OPENING_EVENT_ID))) return
+    if (judgeEnding(career) === 0) setScreen({ kind: '이벤트', eventId: INJURY_ENDING_EVENT_ID, context: '관리' })
+  }, [isAtManagement, managementCheck, career, story.events, setScreen])
+
   /**
    * 새 시즌 처리 `0x1b768` → 137 "N년차" → 105 관리 화면.
    * MVP 비트(career+0x1ca)는 여기서가 아니라 상태 131 이 375 를 틀기 전에 남긴다 (`enterSeasonEvent`).
