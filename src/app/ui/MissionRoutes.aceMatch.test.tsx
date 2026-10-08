@@ -17,6 +17,7 @@ interface 받은속성 {
   onRestart?: () => void
   settings?: unknown
   onSettingsChange?: unknown
+  onPopupFrozenChange?: (isFrozen: boolean) => void
 }
 const 받은것: 받은속성[] = []
 vi.mock('@/pages/pitching/ui/PitchingScreen', () => ({
@@ -168,5 +169,35 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     act(() => { vi.advanceTimersByTime(2 * millisecondsPerFrame()) })
     expect(재생).toHaveBeenCalled()
     expect(재생.mock.lastCall?.[0]).toMatchObject({ freePassPlay: true })
+  })
+  it('일시정지 팝업(메뉴 · 조작방법 · 설정)이 떠 있는 동안은 0x12 대기 틱이 멈춘다 (0x52cc6)', () => {
+    vi.useFakeTimers()
+    const mission = aceMatchMissionOf(17, '투수')
+    if (mission === null) throw new Error('투수 미션 17 이 없다')
+    const 밀어내기 = { kind: 2, pitchJudgement: '볼넷', ticks: [{}] } as never
+
+    function Harness() {
+      const runner = useAtBatRunner()
+      const session = useMissionSession({
+        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        setScreen: vi.fn(),
+      })
+      return (
+        <PitcherAceMatchRoute
+          mission={mission!} session={{ ...session, pickoffReplay: 밀어내기 }} runner={runner} pitchControl="게이지"
+          gameSettings={설정 as never} onFinish={vi.fn()} onQuit={vi.fn()}
+        />
+      )
+    }
+    render(<Harness />)
+    act(() => { vi.advanceTimersByTime(10 * millisecondsPerFrame()) })
+    act(() => 받은것.at(-1)?.onPopupFrozenChange?.(true))
+    act(() => { vi.advanceTimersByTime(40 * millisecondsPerFrame()) })
+    expect(재생).not.toHaveBeenCalled()
+    act(() => 받은것.at(-1)?.onPopupFrozenChange?.(false))
+    act(() => { vi.advanceTimersByTime(19 * millisecondsPerFrame()) })
+    expect(재생).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(3 * millisecondsPerFrame()) })
+    expect(재생).toHaveBeenCalled()
   })
 })

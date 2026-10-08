@@ -116,6 +116,11 @@ interface MissionPlayScreenProps {
   readonly onSubstitutionSceneDone?: () => void
   /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 타석 그림이 굴린다 */
   readonly skyRow?: number
+  /**
+   * 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있는지 바뀔 때마다 — 그동안 0x12 상태 틱이 멈춘다(0x52cc6).
+   * 밀어내기 판의 0x1f 틱 대기(`useFreePassPlayStart`)를 든 쪽이 받는다 (나만의리그 `GameScreen` 의 `RecordAlertScene.isFrozen` 과 같다)
+   */
+  readonly onPopupFrozenChange?: (isFrozen: boolean) => void
 }
 
 /**
@@ -158,6 +163,7 @@ export function MissionPlayScreen({
   substitutionScene = null,
   onSubstitutionSceneDone,
   skyRow,
+  onPopupFrozenChange,
 }: MissionPlayScreenProps) {
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
@@ -175,6 +181,11 @@ export function MissionPlayScreen({
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  // 일시정지 팝업 0x741a0(메뉴 · 그 하위 조작방법 · 설정)이 떠 있으면 0x12 상태 틱이 멈춘다 (0x52cc6) — 든 쪽에 알린다
+  const isPopupFrozen = isMenuOpen || overlay !== null
+  useEffect(() => {
+    onPopupFrozenChange?.(isPopupFrozen)
+  }, [isPopupFrozen, onPopupFrozenChange])
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
   /** [미션+0xbc] — 결과 판 · 정산 효과의 "이겼나" (0x4ea0c 4ef2a · 0x4a384 4a3ea) */

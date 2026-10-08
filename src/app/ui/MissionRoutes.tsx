@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
@@ -127,7 +127,11 @@ export function MissionRoutes({
       : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun
         : null
   // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 · 투구 화면을 둔다
-  const isFreePassReady = useFreePassPlayStart(session.pickoffReplay, session.pendingBenchClearing !== null)
+  // 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 타석 · 투구 화면이 알린다
+  const [isPopupFrozen, setPopupFrozen] = useState(false)
+  const isFreePassReady = useFreePassPlayStart(
+    session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
+  )
   const overlay = missionOverlayOf(
     session, defenseSceneRef, playingRun, runner.bannerText, isFreePassReady,
     missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
@@ -240,6 +244,7 @@ export function MissionRoutes({
         substitutionScene={session.substitutionScene}
         // 하늘 줄 — 장면을 세울 때 한 번 굴린 구장 +0x10 (0x783b0 rand(0, 6))
         skyRow={session.skyRow}
+        onPopupFrozenChange={setPopupFrozen}
         onSubstitutionSceneDone={session.finishSubstitutionScene}
       />
     )
@@ -277,6 +282,7 @@ export function MissionRoutes({
         substitutionScene={session.substitutionScene}
         // 하늘 줄 — 장면을 세울 때 한 번 굴린 구장 +0x10 (0x783b0 rand(0, 6))
         skyRow={session.skyRow}
+        onPopupFrozenChange={setPopupFrozen}
         onSubstitutionSceneDone={session.finishSubstitutionScene}
         // 결과 판 0x4a384 의 배경 · 정산 효과(0x4ea0c 꼬리 — 모드를 안 가린다)는 경기 난수로
         random={random}
@@ -432,7 +438,11 @@ export function PitcherAceMatchRoute(
   // 대결 하나 = 미션 장면 하나 (`beginPitcherAceMatch` 가 `mission` 마다 세운다)
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, mission)
   // 볼넷 · 사구 밀어내기 판은 0x12 대기(0x1f 틱) 뒤 — 보통 미션과 같다
-  const isFreePassReady = useFreePassPlayStart(session.pickoffReplay, session.pendingBenchClearing !== null)
+  // 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 타석 · 투구 화면이 알린다
+  const [isPopupFrozen, setPopupFrozen] = useState(false)
+  const isFreePassReady = useFreePassPlayStart(
+    session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
+  )
   const overlay = missionOverlayOf(
     session, defenseSceneRef, session.pitcherAceMatchMission === mission ? session.pitcherRun : null, runner.bannerText,
     isFreePassReady,
@@ -473,6 +483,7 @@ export function PitcherAceMatchRoute(
       onSceneConfirm={session.confirmScene}
       substitutionScene={session.substitutionScene}
       skyRow={session.skyRow}
+      onPopupFrozenChange={setPopupFrozen}
       onSubstitutionSceneDone={session.finishSubstitutionScene}
       onFinish={() => {
         const isWin = actions.finishPitcherAceMatch()

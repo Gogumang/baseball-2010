@@ -120,6 +120,11 @@ interface PitchingScreenProps {
    * 효과 · 파티클 틱이 쓴다. 안 넘기면 결과 판에 배경 · 효과가 없다.
    */
   readonly random?: RandomPort
+  /**
+   * 일시정지 팝업 0x741a0(메뉴 · 조작방법 · 설정)이 떠 있는지 바뀔 때마다 — 그동안 0x12 상태 틱이 멈춘다(0x52cc6).
+   * 밀어내기 판의 0x1f 틱 대기(`useFreePassPlayStart`)를 든 쪽(MissionRoutes)이 받는다
+   */
+  readonly onPopupFrozenChange?: (isFrozen: boolean) => void
 }
 
 export function PitchingScreen({
@@ -142,6 +147,7 @@ export function PitchingScreen({
   onSubstitutionSceneDone,
   skyRow,
   random,
+  onPopupFrozenChange,
   onRestart,
   settings,
   onSettingsChange,
@@ -164,6 +170,9 @@ export function PitchingScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 일시정지 팝업(0x741a0)이 떠 있는가 — 경기 중 메뉴 또는 그 하위 [조작방법] 뷰어. 경기 키가 안 간다 */
   const isPopupOpen = isMenuOpen || overlay !== null
+  useEffect(() => {
+    onPopupFrozenChange?.(isPopupOpen)
+  }, [isPopupOpen, onPopupFrozenChange])
   const isRunning = run.status === '진행중'
   // 결과 배경 캔버스의 난수 — 하늘 줄은 세션이 장면마다 한 번 굴린 `skyRow` 를 넘기므로 여기서 굴리지 않는다(넘기지 않은
   // 화면만 이 따로 든 난수로 굴린다 — 경기 난수에 새지 않게)
