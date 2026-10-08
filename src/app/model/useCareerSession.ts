@@ -454,6 +454,15 @@ export function useCareerSession({
   progressRef.current = progress
   const careerRef = useRef(career)
   careerRef.current = career
+  const rawCareerRef = useRef(rawCareer)
+  rawCareerRef.current = rawCareer
+  /**
+   * **메모리에만 있는 커리어** — 원본이 그 자리에서 모드 저장(0x22755)을 안 부르는 변경이 만든 값. 저장 고리가 이 값이면 쓰지 않는다
+   * (그 뒤 다른 변경이 새 값을 만들면 원본의 다음 저장처럼 통째로 쓴다). 메인 메뉴를 다녀오면 원본은 0x213c0(앱, 4, 0) 으로
+   * 파일에서 다시 올리므로 사라진다 — 웹 재진입(`continueSaved` · `resumeInterruptedGame`)도 `savedCareer` 에서 다시 선다.
+   * 쓰는 자리: 경기 중 돌발 보상 0x8e34c(`closeBurstResult`).
+   */
+  const unsavedCareerRef = useRef<PlayerCareer | null>(null)
   /**
    * 지금 타석의 공 수·연속 파울 (`atBatPitchTally`). 타석 결과(`AtBatState`)에 남지 않아 따로 든다 —
    * 타석이 끝나거나 경기를 세우거나 나갈 때 비운다.
@@ -501,16 +510,19 @@ export function useCareerSession({
   // 원본은 저장(0x22755)을 부르는 자리가 67곳으로 정해져 있다(re.py xref 0x22754). 이벤트 재생 중에는 보상 명령마다(0x8c460 끝 —
   // 0x8b0e4 · 0x8cd44), system 창 답 0(0x7fe90), 경기 명령(0x8d870), 마지막 명령 뒤 끝(0x8cfc0)과 114 끝 처리(0x1c014)가
   // 저장한다 — 웹 커리어가 이벤트 중에 바뀌는 자리(보상 · 목표 창 · 끝)가 모두 그 자리라 이 자리에서는 원본보다 잦지 않다
-  // (`giveEventReward`). ⚠️ 다른 장면 전수 대조는 안 했다.
+  // (`giveEventReward`). 관리 장면(0x106) 안의 저장 안 하는 변경(122 스킬 켬/끔 0x147b0 의 3·4 → 0xa4b04 만 · 129 칭호 등)은
+  // 메인 메뉴로 나가는 길이 늘 105 진입 0x11910(119a2 — 조건 없이 저장)을 지나므로 웹이 곧바로 써도 재진입 결과가 같다.
+  // 장면 밖으로 저장 없이 나가는 길은 경기 중 나가기 0x40140 하나라, 경기 중 변경(돌발 보상 0x8e34c)만 `unsavedCareerRef` 로 뺀다.
   /** 명예의 전당 등록으로 저장을 지운 뒤 엔딩을 떠날 때까지 — 다시 저장하지 않는다 (`eraseSaveForHallOfFame`) */
   const isSaveErasedRef = useRef(false)
   useEffect(() => {
     if (career === null || isSaveErasedRef.current) return
+    if (rawCareer !== null && rawCareer === unsavedCareerRef.current) return
     // 판정 없음(e = −1) 엔딩은 141 이 저장하지 않는다 — 엔딩 칸을 비운 114 끝의 커리어가 남는다 (`savedCareerOf`)
     const persisted = savedCareerOf(career)
     saveGame.save(persisted)
     setSavedCareer(persisted)
-  }, [career, saveGame])
+  }, [career, rawCareer, saveGame])
 
   /**
    * **커리어 칸 ↔ 지갑 다리.**
@@ -1363,7 +1375,15 @@ export function useCareerSession({
       const cleared = { ...current, lastBurstResolution: null }
       progressRef.current = cleared
       setProgress(cleared)
-      setCareer((player) => (player === null ? player : applyBurstRewards(player, resolution.deltas)))
+      // 0x8e34c 는 내 선수 레코드(0x1fa2d)에 더하기만 하고 저장하지 않는다 — 경기 끝 정산 0x4ea0c 의 저장(4f3c0)이 함께 쓴다.
+      // 경기 중 나가기(0x40140)는 저장이 없어 다시 들어오면(0x213c0 재적재) 이 보상이 없다 — StrGAME[0] "획득한 G포인트가 사라집니다"
+      const player = rawCareerRef.current
+      if (player === null) return
+      const rewarded = applyBurstRewards(player, resolution.deltas)
+      if (rewarded === player) return
+      unsavedCareerRef.current = rewarded
+      rawCareerRef.current = rewarded
+      setCareer(rewarded)
     },
     /**
      * 보상 G — 미션 클리어(0x4ef72)·홈런더비 결과(0x4f6cc) 둘 다 원본은 **전역 +0x64** 에 쌓는다.
