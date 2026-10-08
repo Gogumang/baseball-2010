@@ -79,6 +79,9 @@ export const CONFIRM_LOCK_FRAMES = 3
  */
 export const SCENE_D_FRAMES = 2
 
+/** 0xd 진입의 타석 등장음 — 메시지 0xbc1 → 0x522d2 의 "그 밖" 14 (더비 타자는 마선수가 아니고 주자가 없다) */
+export const DERBY_AT_BAT_ENTRY_SOUND = 14
+
 /**
  * **더비 홈런의 HOMERUN 글자 창** — 홈런 갈래 0x5279a~0x527ac 는 +0x1961(단계) = 0 · +0x1960 = 1 만 쓴다(`derbyHomeRunTextOn`).
  * 글자는 0x17 그리기 0x46c88 이 `관문 0xb0d28 열림 && state[0x1d]` 일 때 부르는 0x40b18 이 그리므로 **홈런 틱 h … 관문이 닫히기 전 틱**에만
@@ -433,6 +436,11 @@ export function useHomeRunDerby({
   }
   const armScenePrepare = () => {
     clearPrepareTimer()
+    // 0xd 첫 그림 — 0x48d50 의 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음(모드 갈림 없음). 더비의 0xd 는 첫 공 앞 ·
+    // 단계가 오를 때 · 보너스를 열 때뿐이라 교체 연출 0x16 을 안 거친다. 타자는 모드 타자(나리 · 명전 기록 — 마선수 비트 0x40 없음)라
+    // 26 이 아니고, 주자를 두는 판이 없어 14 다.
+    // ⚠️ 볼넷 · 사구 뒤 원본은 주자를 세우는지(2·3루면 15) 안 떴다 — 웹 더비에는 주자 칸이 없다
+    playSoundIds(audioRef.current, [DERBY_AT_BAT_ENTRY_SOUND])
     prepareTimerRef.current = window.setTimeout(() => {
       prepareTimerRef.current = null
       setIsPreparing(false)

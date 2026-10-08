@@ -1485,9 +1485,11 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
  * 그래서 돌발 굴림이 상대 투수 교체보다 **앞**이고, 돌발이 뜨면 교체는 보지 않는다.
  */
 function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgress {
-  // 0xd → 0xe (0x39e14) — 사람 OK 를 기다린다 (0x532b0)
+  // 0xd → 0xe (0x39e14) — 사람 OK 를 기다린다 (0x532b0). 0x16 을 안 거친 0xd 라 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음:
+  // 타자는 나리 선수다 — 생성 0x17360 이 +0xa = 0xa0 으로 적어 마선수 비트(0x40, 0xb633c)가 없다 → 2·3루 주자 15 · 그 밖 14
+  const atBatEntrySoundId = substitutionEntrySoundIdOf({ isAce: false, bases: progress.game.bases })
   return enterPitchSelection(
-    triggerBurstForMyAtBat({ ...progress, sceneConfirm: enterSceneConfirm() }, random),
+    triggerBurstForMyAtBat({ ...progress, sceneConfirm: enterSceneConfirm(atBatEntrySoundId) }, random),
     random,
     true,
   )

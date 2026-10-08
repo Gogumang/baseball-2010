@@ -248,6 +248,8 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
     expect(뒤.game.bases.first).toBe(true)
     // 다음 타자는 0xe 에 서서 OK 를 기다린다 — 아직 안 묻는다
     expect(뒤.sceneConfirmPending).toBe(true)
+    // 0x16 을 안 거친 0xd — 메시지 0xbc1 → 0x522d2 의 타석 등장음(1루 주자뿐이라 마타자 26 이 아니면 14)
+    expect([14, 26]).toContain(뒤.sceneConfirm?.atBatEntrySoundId)
     expect(뒤.opponentPitcherIndex).toBe(판.opponentPitcherIndex)
     // OK 뒤 0xf 진입 0x3d954 가 바꾼다 — 새 타석이라 카운트는 0-0
     const 확인 = confirmScene(뒤, random)
@@ -447,6 +449,8 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
     // 0x496f0 → 교체 연출 0x16 — 화면이 "CHANGE" 를 그린 뒤 0xe 에서 등판음(마투수 26 · 2·3루 15 · 그 밖 14)
     expect(바꾼뒤.substitutionScene).toEqual({ serial: 1, incomingIsAce: false, entrySoundId: 14 })
     expect(바꾼뒤.sceneConfirm).not.toBe(progress.sceneConfirm)
+    // 0x16 → 0xd 는 0x522d2 가 이전 상태 0x16 을 보고 메시지 0xbc1 의 타석 등장음을 안 낸다
+    expect(바꾼뒤.sceneConfirm?.atBatEntrySoundId).toBeUndefined()
   })
 
   it('구원 투수는 첫 투수 보너스(0x66e44 +200)를 못 받아 한 공에 더 깎인다 (0xaeb08, P1 3-2)', () => {

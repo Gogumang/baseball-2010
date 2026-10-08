@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { activeSound } from '@/shared/api/audio/soundPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
@@ -21,6 +22,9 @@ export const SCENE_CONFIRM_READY_FRAMES = SCENE_PREPARE_FRAMES + SCENE_CONFIRM_L
 
 /** 0xe 의 OK — 원본 키 −5(OK)·'5'(0x35) (0x532b0). 웹은 Enter·스페이스도 OK 로 받는다 (타석 화면 스윙 키와 같은 묶음) */
 const CONFIRM_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
+
+/** 타석 등장음을 이미 낸 대기 — 화면이 다시 서도(메뉴를 열었다 닫아도) 두 번 안 낸다 */
+const announcedWaits = new WeakSet<SceneConfirmWait>()
 
 /** 대기 객체마다 받은 OK 수 — 화면이 다시 서도 남는다 (진행 상태가 같은 객체를 들고 있는 동안) */
 const confirmedCounts = new WeakMap<SceneConfirmWait, number>()
@@ -98,6 +102,11 @@ export function useSceneConfirm(
   useEffect(() => {
     isUnlockedRef.current = false
     if (!acceptsConfirm || wait == null) return
+    // 0xd 첫 그림 — 메시지 0xbc1(0x522d2)의 타석 등장음. 대기 하나에 한 번(첫 0xe 몫이라 OK 를 받기 전에만)
+    if (confirmed === 0 && wait.atBatEntrySoundId !== undefined && !announcedWaits.has(wait)) {
+      announcedWaits.add(wait)
+      activeSound().play(wait.atBatEntrySoundId)
+    }
     const frame = millisecondsPerFrame()
     const entered = window.setTimeout(() => setEnteredKey({ wait, confirmed }), SCENE_PREPARE_FRAMES * frame)
     const unlocked = window.setTimeout(() => {

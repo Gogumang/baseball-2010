@@ -38,11 +38,27 @@ export interface SceneConfirmWait {
    * 내면 0x16 → 0xd → 0xe 로 **한 번 더** 와 다시 기다린다 (같은 걸음 안이라 2).
    */
   readonly entries: number
+  /**
+   * **타석 등장음** — 이 대기의 첫 0xe 가 교체 연출 0x16 을 거치지 않은 0xd 진입이면 그 소리(마타자 26 · 2·3루 주자 15 ·
+   * 그 밖 14). 화면(`useSceneConfirm`)이 대기를 받기 시작할 때(0xd 첫 그림) 한 번 낸다. 없으면 안 낸다.
+   * ```
+   * 48ecc  0xd 진입 0x48d50: 메시지 0xbc1, 인자 = 0xb633c(0xae89d(공격 팀)) — 지금 타자가 마선수인가 (늘 보낸다)
+   * 522d2  메시지 처리 0x51408 의 0xbc1 갈래:
+   *          [장면+0x1780]+0(간이 엔진 진행 중) ≠ 0 → 끝
+   *          이전 상태 [장면+0x28] == 0x16(교체 연출) → 끝        ; 교체 뒤는 0x38b64 의 등판음이 따로 난다
+   *          인자 ≠ 0 → 0x6ea6d(소리, 0x1a = 26)                  ; 마타자
+   *          0xa97a0(필드, 2) || 0xa97a0(필드, 3) → 15             ; 2루나 3루에 주자
+   *          그 밖 → 14                                           ; 모두 즉시(0x6ea6c)
+   * ```
+   * 간이 엔진 · 자동진행 중계는 0xd 를 안 지나 대기가 없다 — 0x21 이 끝나면 0xc2198 이 sim+0 을 0 으로 내려(c2290) 다음 사람
+   * 타석의 0xd 는 소리를 낸다.
+   */
+  readonly atBatEntrySoundId?: number
 }
 
-/** 새로 0xe 에 들어섰다 — 앞 대기는 이미 OK 를 받은 뒤다 */
-export function enterSceneConfirm(): SceneConfirmWait {
-  return { entries: 1 }
+/** 새로 0xe 에 들어섰다 — 앞 대기는 이미 OK 를 받은 뒤다. 0x16 을 안 거친 0xd 면 타석 등장음을 싣는다 */
+export function enterSceneConfirm(atBatEntrySoundId?: number): SceneConfirmWait {
+  return atBatEntrySoundId === undefined ? { entries: 1 } : { entries: 1, atBatEntrySoundId }
 }
 
 /**
@@ -50,5 +66,7 @@ export function enterSceneConfirm(): SceneConfirmWait {
  * 다시 왔을 때. 앞 대기가 없으면 새 대기와 같다.
  */
 export function chainSceneConfirm(previous: SceneConfirmWait | null | undefined): SceneConfirmWait {
-  return { entries: (previous?.entries ?? 0) + 1 }
+  // 앞 대기의 첫 0xe 가 새 타석이었으면 그 등장음은 그대로 첫 0xe 몫이다 — 둘째 0xe(0x16 뒤)는 소리가 없다
+  const entries = (previous?.entries ?? 0) + 1
+  return previous?.atBatEntrySoundId === undefined ? { entries } : { entries, atBatEntrySoundId: previous.atBatEntrySoundId }
 }

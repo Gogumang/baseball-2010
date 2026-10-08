@@ -123,7 +123,8 @@ describe('심판 콜 — 판정 스위치 0x3dfac · 화면 0x51a56 은 모드�
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
     OK(rendered)
     한구(rendered, 헛스윙)
-    expect(녹음.played).toEqual([8, 18])
+    // 14 는 첫 0xd 의 타석 등장음(메시지 0xbc1 → 0x522d2)
+    expect(녹음.played).toEqual([14, 8, 18])
     녹음.played.length = 0
     for (let index = 0; index < 5; index += 1) 한구(rendered, 볼)
     expect(녹음.played).toEqual([16, 16, 16, 24, 24])

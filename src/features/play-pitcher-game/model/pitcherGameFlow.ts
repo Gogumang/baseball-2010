@@ -2053,7 +2053,12 @@ function resolveBurstFor(
  * 타석 준비 — 상태 0xe 진입 0x50674 의 **감독 강판 판정**. 강판되면 0x23 으로 빠져 기다리지 않는다.
  * 아니면 0xe 에 서서 사람 OK 를 기다린다 — 돌발 발동 판정(0xe → 0xf 의 메시지 1)과 0xf 진입은 OK 뒤다 (`confirmScene`).
  */
-function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+function prepareAtBat(
+  progress: PitcherGameProgress,
+  random: RandomPort,
+  /** 교체 연출 0x16 뒤의 0xd 인가 — 그러면 0x522d2 가 이전 상태 0x16 을 보고 메시지 0xbc1 의 타석 등장음을 안 낸다 */
+  afterSubstitution = false,
+): PitcherGameProgress {
   const { options } = progress
   const bases = progress.game.bases
   const hook = judgeManagerHook(
@@ -2077,10 +2082,18 @@ function prepareAtBat(progress: PitcherGameProgress, random: RandomPort): Pitche
     }
   }
 
-  // 강판이 아니면 0xe 에 머물러 사람 OK 를 기다린다 (0x532b0) — 그 뒤가 메시지 1 의 돌발 굴림이다
+  // 강판이 아니면 0xe 에 머물러 사람 OK 를 기다린다 (0x532b0) — 그 뒤가 메시지 1 의 돌발 굴림이다.
+  // 0x16 을 안 거친 0xd 라 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음(상대 타자가 142 가 넣은 마타자면 26 · 2·3루 주자 15 · 14).
+  // ⚠️ 강판(0xe 진입 0x504cc → 0x23)이 나도 원본은 앞선 0xd 에서 이 소리를 낸다 — 웹은 대기를 안 세워 그 갈래는 안 낸다(미이식)
+  const atBatEntrySoundId = afterSubstitution
+    ? undefined
+    : substitutionEntrySoundIdOf({
+        isAce: rosterSlotAt(progress.opponentLineup, progress.opponentOrderIndex) === ACE_BATTER_ROSTER_SLOT,
+        bases,
+      })
   return {
     ...progress,
-    sceneConfirm: enterSceneConfirm(),
+    sceneConfirm: enterSceneConfirm(atBatEntrySoundId),
     sceneConfirmPending: true,
     hookFlags: hook.flags,
     atBatPrepared: true,
@@ -2176,8 +2189,8 @@ function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort):
   if (progress.burst !== null && progress.burst.current !== null) return progress
   const pinched = applyOpponentCpuPinchHit(progress, random, true)
   if (pinched === progress) return progress
-  // 0x16 → 0xd(지우기 건너뜀) → 0xe(강판 판정 · OK 대기) → OK 뒤 메시지 1(돌발 굴림) → 0xf 진입 (`confirmScene`)
-  return prepareAtBat(pinched, random)
+  // 0x16 → 0xd(지우기 건너뜀 · 0xbc1 등장음 없음) → 0xe(강판 판정 · OK 대기) → OK 뒤 메시지 1(돌발 굴림) → 0xf 진입 (`confirmScene`)
+  return prepareAtBat(pinched, random, true)
 }
 
 /**

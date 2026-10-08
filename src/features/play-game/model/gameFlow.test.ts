@@ -1381,6 +1381,9 @@ describe('상태 0xe 의 OK 대기 — 내 타석 준비(0xd → 0xe)마다 새 
     const progress = startGame(createSeededRandom(20100901))
     expect(isPlayerTurn(progress.game)).toBe(true)
     expect(progress.sceneConfirm?.entries).toBeGreaterThanOrEqual(1)
+    // 메시지 0xbc1 → 0x522d2 의 타석 등장음 — 나리 선수는 마선수가 아니라 2·3루 주자 15 · 그 밖 14
+    const 등장음 = (bases: { second: boolean; third: boolean }) => (bases.second || bases.third ? 15 : 14)
+    expect(progress.sceneConfirm?.atBatEntrySoundId).toBe(등장음(progress.game.bases))
     const after = applyPlayerOutcome(progress, { kind: '삼진' }, createSeededRandom(3))
     if (!after.game.isFinished) {
       expect(after.sceneConfirm).not.toBe(progress.sceneConfirm)
@@ -1404,6 +1407,10 @@ describe('교체 연출 0x16 — 0xe 확인 뒤 0xf 진입의 CPU 투수 교체(
           continue
         }
         expect(progress.sceneConfirm?.entries).toBe(2)
+        // 첫 0xe 는 새 타석이라 메시지 0xbc1 의 등장음을 실었고, 둘째(0x16 뒤)는 같은 대기가 그것을 넘겨받을 뿐이다
+        expect(progress.sceneConfirm?.atBatEntrySoundId).toBe(
+          progress.game.bases.second || progress.game.bases.third ? 15 : 14,
+        )
         expect(scene).toMatchObject({ serial: (before?.serial ?? 0) + 1, timeSoundId: 22, confirmsBefore: 1 })
         const bases = progress.game.bases
         expect(scene?.entrySoundId).toBe(scene?.incomingIsAce ? 26 : bases.second || bases.third ? 15 : 14)

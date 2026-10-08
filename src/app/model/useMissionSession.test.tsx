@@ -530,6 +530,8 @@ describe('타자 미션 CPU 견제 3아웃 — 판정 B 0xae3e8 아웃 > 2 → 0
     for (let seed = 1; seed < 400 && found === null; seed += 1) {
       const probe = setUpBatterMissionWithSeed(mission, seed)
       const confirmBefore = probe.result.current.session.sceneConfirm
+      // 새 타석 대기는 메시지 0xbc1 → 0x522d2 의 타석 등장음을 단다 — 나리 타자 · 3루 주자라 15
+      expect(confirmBefore?.atBatEntrySoundId).toBe(15)
       act(() => probe.result.current.session.actions.cpuPickoff(3))
       const after = probe.result.current.session.missionRun!
       if (probe.result.current.session.pickoffReplay?.advance.outsAdded === 1) {

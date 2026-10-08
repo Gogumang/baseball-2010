@@ -5,6 +5,7 @@ import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, useSceneConfirm } fro
 import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -112,5 +113,46 @@ describe('상태 0xe 의 OK 대기 (0x532b0 · 0x49a26)', () => {
     act(() => result.current.confirm())
     expect(result.current.isAwaiting).toBe(false)
     expect(result.current.isInConfirmState).toBe(false)
+  })
+})
+
+describe('타석 등장음 — 0xd 진입 메시지 0xbc1 → 0x522d2 (마타자 26 · 2·3루 주자 15 · 그 밖 14)', () => {
+  const 통로 = () => {
+    const played: number[] = []
+    setActiveSound({ ...createSilentSound(), play: (id: number) => { played.push(id) } })
+    return played
+  }
+  afterEach(() => setActiveSound(null))
+
+  it('대기를 받기 시작한 그림(0xd 첫 그림)에 한 번 — 덮개가 걷힐 때까지 기다리고, 다시 덮였다 걷혀도 또 안 낸다', () => {
+    const played = 통로()
+    const wait = enterSceneConfirm(15)
+    const { rerender } = renderHook(({ canAccept }: { canAccept: boolean }) => useSceneConfirm(wait, canAccept), {
+      initialProps: { canAccept: false },
+    })
+    expect(played).toEqual([])
+    rerender({ canAccept: true })
+    expect(played).toEqual([15])
+    rerender({ canAccept: false })
+    rerender({ canAccept: true })
+    expect(played).toEqual([15])
+  })
+
+  it('등장음이 없는 대기(교체 연출 0x16 뒤 · 교체 창 취소)는 소리가 없다', () => {
+    const played = 통로()
+    renderHook(() => useSceneConfirm(enterSceneConfirm(), true))
+    expect(played).toEqual([])
+  })
+
+  it('같은 걸음의 둘째 0xe(0x16 뒤)는 첫 0xe 몫의 소리를 다시 안 낸다', () => {
+    const played = 통로()
+    const wait = chainSceneConfirm(enterSceneConfirm(26))
+    expect(wait).toEqual({ entries: 2, atBatEntrySoundId: 26 })
+    const { result } = renderHook(() => useSceneConfirm(wait, true))
+    expect(played).toEqual([26])
+    잠금풀기()
+    키('5')
+    expect(result.current.isAwaiting).toBe(true)
+    expect(played).toEqual([26])
   })
 })

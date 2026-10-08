@@ -116,7 +116,7 @@ import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/missio
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
-import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -433,6 +433,28 @@ const MISSION_STAGE_SIDE = 1
 
 const NO_SKILLS: readonly number[] = []
 
+/** 0x16 을 안 거친 0xd 로 선 새 타석 대기 — 내놓을 때 타석 등장음을 단다 */
+const freshAtBatWaits = new WeakSet<SceneConfirmWait>()
+/** 지금 판으로 고른 대기의 타석 등장음 — 그리기마다 고친다 */
+const atBatEntrySoundOf = new WeakMap<SceneConfirmWait, number>()
+/**
+ * 대기 하나에 내놓는 객체 하나 — 화면은 받은 OK 수를 객체로 세므로(`useSceneConfirm`) 판이 바뀌어도(견제로 주자가 바뀌는 등)
+ * 같은 객체여야 한다. 등장음은 화면이 0xd 를 그리기 시작할 때 읽는 그때의 값이다.
+ */
+const announcedWaits = new WeakMap<SceneConfirmWait, SceneConfirmWait>()
+function announcedWaitOf(wait: SceneConfirmWait): SceneConfirmWait {
+  const known = announcedWaits.get(wait)
+  if (known !== undefined) return known
+  const announced: SceneConfirmWait = {
+    entries: wait.entries,
+    get atBatEntrySoundId() {
+      return atBatEntrySoundOf.get(wait)
+    },
+  }
+  announcedWaits.set(wait, announced)
+  return announced
+}
+
 /** 미션 모드 한 판 — 타자편(MissionRun)과 투수편(PitcherRun)을 함께 다룬다. */
 export function useMissionSession({
   runner,
@@ -583,6 +605,8 @@ export function useMissionSession({
   /** 새 타석 0xd → 0xe — OK 를 기다린 뒤 0xf 로 간다 */
   const enterNewAtBatConfirm = () => {
     const wait = enterSceneConfirm()
+    // 0x16 을 안 거친 0xd — 메시지 0xbc1 의 타석 등장음을 단다(`sceneConfirm` 을 내놓을 때 그때의 판으로 고른다)
+    freshAtBatWaits.add(wait)
     newAtBatWaitRef.current = wait
     setSceneConfirm(wait)
   }
@@ -1965,6 +1989,24 @@ export function useMissionSession({
       ? []
       : ([1, 2, 3] as const).filter((base) => startHumanSteal(missionRun.bases, stealingFrom, base) !== stealingFrom)
 
+  /**
+   * **타석 등장음** — 0xd 진입 0x48d50 의 48ecc 메시지 0xbc1 → 0x522d2 (`SceneConfirmWait.atBatEntrySoundId`). 진행이 판을 다
+   * 먹인 뒤(3아웃 뒤의 자동진행 중계까지 지난 뒤) 화면이 0xd 를 그리기 시작할 때의 판으로 고른다 — 대기 객체는 그 동안 같다.
+   * 투수 미션 · 투수편 마선수 대결은 CPU 타자(0xae89c — 마타자 칸이면 26), 타자 미션은 나리 선수라 마선수가 아니다.
+   */
+  const isPitcherSideNow = screen.kind === '투수미션' || pitcherAceMatchMission !== null
+  const announcingRun = isPitcherSideNow ? pitcherRun : missionRun
+  const atBatEntrySoundId =
+    announcingRun === null
+      ? null
+      : substitutionEntrySoundIdOf({
+          isAce: isPitcherSideNow && pitcherRun !== null && missionCpuBatterOf(pitcherRun.cpu)?.isAce === true,
+          bases: announcingRun.bases,
+        })
+  if (sceneConfirm !== null && atBatEntrySoundId !== null) atBatEntrySoundOf.set(sceneConfirm, atBatEntrySoundId)
+  const announcedSceneConfirm =
+    sceneConfirm !== null && freshAtBatWaits.has(sceneConfirm) ? announcedWaitOf(sceneConfirm) : sceneConfirm
+
   return {
     missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
     /** 지금 대기 칸 (g[0x11f] · g[0x176] · g[0xf6]) — 결과 판이 대결 꼴인지 본다 */
@@ -1972,8 +2014,8 @@ export function useMissionSession({
     player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
-    /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
-    sceneConfirm,
+    /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 (새 타석이면 메시지 0xbc1 의 타석 등장음을 실었다) */
+    sceneConfirm: announcedSceneConfirm,
     /** 경기 장면 로딩 판의 팁 글(StrTIP[1 + rand(0, 73)]) — 서 있으면 라우트가 로딩 판을 그리고 끝나면 `actions.finishLoading` */
     loadingTip,
     /** 미션 시작의 첫 0x18 판 — 서 있으면 라우트가 공수 교대 판을 그리고 OK 를 `actions.confirmHalfInningBoard` 로 */

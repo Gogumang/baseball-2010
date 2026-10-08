@@ -258,6 +258,9 @@ describe('강판', () => {
     for (let seed = 1; seed <= 40; seed += 1) {
       const 대기 = startPitcherGame(기본옵션, 씨앗(seed))
       if (대기.sceneConfirmPending !== true) continue
+      // 새 타석 0xd — 메시지 0xbc1 → 0x522d2 의 타석 등장음(마타자 26 · 2·3루 주자 15 · 그 밖 14)
+      const 루 = 대기.game.bases
+      expect([루.second || 루.third ? 15 : 14, 26]).toContain(대기.sceneConfirm?.atBatEntrySoundId)
       // 0xe 에서 "아니오" 는 진행기에 아무 일도 없다 — 그 뒤 OK 는 안 열고 OK 한 것과 같은 굴림이다
       const 바로 = 각본난수(0.3)
       const 그냥 = confirmScene(대기, 바로)

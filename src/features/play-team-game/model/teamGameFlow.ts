@@ -3463,12 +3463,19 @@ function runAbilitiesOnBaseOf(
  */
 function prepareAtBat(progress: TeamGameProgress): TeamGameProgress {
   // 0xd → 0xe (0x39e14) — 사람 OK 를 기다린다 (0x532b0). 굴림은 OK 뒤(`confirmScene`)
-  return enterConfirmWait({
+  const prepared = enterConfirmWait({
     ...progress,
     cpuPinchHitUsed: false,
     // 같은 0x48d50 의 타석 초기화 0xa5bcc — 연속 파울 ctx+0x15f · 타석 투구 수 ctx+0x161 = 0
     recordTally: { ...progress.recordTally, foulStreak: 0, atBatPitches: 0 },
   })
+  // 0x16 을 안 거친 0xd — 48ecc 메시지 0xbc1(공격 팀 지금 타자 0xae89d 가 마선수인가) → 0x522d2 의 타석 등장음 26 · 15 · 14
+  const batter = isOurOffense(progress) ? currentBatterEntry(progress) : progress.opponentEntry[progress.opponentOrderIndex]
+  const atBatEntrySoundId = substitutionEntrySoundIdOf({
+    isAce: (batter?.aceIndex ?? NO_ACE_BATTER) !== NO_ACE_BATTER,
+    bases: progress.game.bases,
+  })
+  return { ...prepared, sceneConfirm: enterSceneConfirm(atBatEntrySoundId) }
 }
 
 /**
