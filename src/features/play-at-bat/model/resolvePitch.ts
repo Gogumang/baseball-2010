@@ -98,7 +98,6 @@ export interface PitchOutcomeDetail {
 
 /** 존 좌표 1.0 이 원본 픽셀 몇 개인가 — 33px 존의 절반 (stageLayout 과 같은 값) */
 const ZONE_HALF_PIXELS = 16.5
-const SPECIAL_PITCH = 'SPECIAL'
 
 /** 판정 기준점 (표 0xcfb54) — side 0 · 1 */
 const SWEET_SPOTS = [
@@ -201,7 +200,7 @@ export function resolvePitch(
     {
       horizontalError: error.horizontal,
       verticalError: error.vertical,
-      timing: timingOf(swing.frame, pitch.frameCount, pitch.type === SPECIAL_PITCH),
+      timing: timingOf(swing.frame, pitch.frameCount, pitch.isMagicPitch === true),
       buntKind: swing.buntKind,
       controlTier: pitch.controlTier,
       batter: context.batter,

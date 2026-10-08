@@ -285,6 +285,8 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
     controlTier: input.grade,
     worldPath,
     stageSide: side,
+    // 경기+0xfc8 == 0x16 — 0x34be0 의 마구 타이밍 폭 · 이펙트 세 곳이 이 칸으로 연다
+    isMagicPitch: isMagic,
   }
 }
 

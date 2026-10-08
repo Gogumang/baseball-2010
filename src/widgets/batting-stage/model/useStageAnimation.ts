@@ -36,7 +36,6 @@ const HOME_RUN_DERBY_GAME_MODE = 7
 const WIND_UP_MILLISECONDS = 850
 /** 결과 문구를 보여주는 시간 */
 const RESULT_DISPLAY_MILLISECONDS = 1150
-const SPECIAL_PITCH = 'SPECIAL'
 /** 타자 스킬 22 압도 (skills.json 22) — 상대 투수 실투율 +5 */
 const INTIMIDATE_SKILL_ID = 22
 
@@ -176,7 +175,7 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
           finishPitch({ frame: bunt.frame, shift: shiftRef.current, buntKind: bunt.kind }, now)
           return
         }
-        if (frame > lastSwingFrameOf(pitch.frameCount, pitch.type === SPECIAL_PITCH)) {
+        if (frame > lastSwingFrameOf(pitch.frameCount, pitch.isMagicPitch === true)) {
           finishPitch(null, now)
           return
         }

@@ -6,8 +6,6 @@ import {
   vibrationMillisecondsOf,
 } from '@/entities/defense-controls/model/vibration'
 
-/** 마구(구질 0x16) — 0x34be0 이 타이밍 폭을 22·12 로 바꾼다 (`resolvePitch` 와 같은 거름) */
-const SPECIAL_PITCH = 'SPECIAL'
 /** 0x9d57c 가 5(삼진)를 내는 그 전 스트라이크 수 — `st[4] > 1` */
 const STRIKEOUT_STRIKES_BEFORE = 2
 
@@ -28,7 +26,8 @@ const STRIKEOUT_STRIKES_BEFORE = 2
 export function pitchVibrationMillisecondsOf(
   detail: PitchOutcomeDetail,
   swingFrame: number | null,
-  pitch: { readonly frameCount: number; readonly type: string },
+  /** `isMagicPitch` — 마구(구질 0x16)면 0x34be0 이 타이밍 폭을 22·12 로 바꾼다 (`resolvePitch` 와 같은 거름) */
+  pitch: { readonly frameCount: number; readonly isMagicPitch?: boolean },
   strikesBefore: number | null = null,
 ): number {
   if (detail.resolution.kind === '사구') return HIT_BY_PITCH_VIBRATION_MILLISECONDS
@@ -36,5 +35,5 @@ export function pitchVibrationMillisecondsOf(
     return strikesBefore !== null && strikesBefore >= STRIKEOUT_STRIKES_BEFORE ? STRIKEOUT_VIBRATION_MILLISECONDS : 0
   }
   if (detail.resultCode === null || swingFrame === null) return 0
-  return vibrationMillisecondsOf(timingOf(swingFrame, pitch.frameCount, pitch.type === SPECIAL_PITCH))
+  return vibrationMillisecondsOf(timingOf(swingFrame, pitch.frameCount, pitch.isMagicPitch === true))
 }

@@ -3,6 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { MAGIC_PITCH_SLOT, MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
   COURSE_GRID,
   GAUGE_CELL_COUNT,
@@ -306,5 +307,32 @@ describe('미션 조준 흔들림 전달', () => {
     const 안흔든공 = 던지기()
 
     expect(Math.abs(흔든공.plate.x - 안흔든공.plate.x)).toBeGreaterThan(0)
+  })
+})
+
+describe('구질 칸 이름은 원본 이름표 [0x140026c] 칸 그대로 — t ≥ 16 도 (16 SF … 21 KNUCKLE)', () => {
+  it('구질 하나씩 — 그 칸 이름이 이름표 칸 t (16 SF · 17 S.CHANGEUP · 18 GYRO · 19 P.SINKER · 20 P.SLIDER · 21 KNUCKLE)', () => {
+    const names: string[] = []
+    for (let t = 1; t <= 21; t += 1) {
+      const slot = pitchSlotsOf({ pitchMask: 1 << (t - 1), form: 0, magicNumber: 0 }).find((each) => each.typeNumber === t)!
+      expect(slot.name).toBe(pitchTypeNameOf(t))
+      names.push(slot.name)
+    }
+    expect(names.slice(15)).toEqual(['SF', 'S.CHANGEUP', 'GYRO', 'P.SINKER', 'P.SLIDER', 'KNUCKLE'])
+  })
+
+  it('마구 공은 isMagicPitch — 0x34be0 의 타이밍 폭 22 · 12 가 이름이 아니라 구질 22 로 걸린다', () => {
+    const pitch = buildHumanPitch(
+      {
+        typeNumber: MAGIC_PITCH_TYPE_NUMBER,
+        stats: { control: 500, velocity: 500, breaking: 500, stamina: 500 },
+        repertoire: 레퍼토리,
+        side: 0,
+        courseCell: 4,
+        grade: 3,
+      } as Parameters<typeof buildHumanPitch>[0],
+      createSeededRandom(1),
+    )
+    expect(pitch.isMagicPitch).toBe(true)
   })
 })
