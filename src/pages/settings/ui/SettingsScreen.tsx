@@ -16,13 +16,14 @@ import {
   FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
   OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_ICONS,
   SETTINGS_FRAME, SOUND_BARS, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION,
-  MAIN_MENU_CURSOR_COUNT, SCREEN,
+  MAIN_MENU_CURSOR_COUNT, SCREEN, SETTINGS_DESCRIPTIONS, DETAIL_DESCRIPTIONS,
   bottomAlignOffset, closingFold, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold,
   openingFold, panelClipOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
+import { DescriptionBand } from '@/pages/settings/ui/DescriptionBand'
 
 const SLT_FRAME = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -386,6 +387,9 @@ export function SettingsScreen({
       </button>
       </PanelClip>
 
+      {/* 설명 띠 0x55544 — StrMAINMENU[0x20 + 커서]. OK 칸이거나 경기 중이면 안 그린다 (0x59e64 앞 갈래) */}
+      {!isInGame && !isOkSelected && <DescriptionBand text={SETTINGS_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />}
+
       {/* 머리띠 되돌아가기 = CLR (0x295e2) */}
       <SettingsFrame mainMenu={mainMenu} onBack={leave} slides={!hasReturned} />
 
@@ -570,6 +574,8 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
       })}
       {/* 이 페이지에는 아래 OK 단추가 없다 — 나가는 길은 CLR(머리띠 되돌아가기)뿐이다 */}
       </PanelClip>
+      {/* 설명 띠 0x5a310 — StrMAINMENU[0x26 + 커서], 조건 없이 */}
+      <DescriptionBand text={DETAIL_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
     </RawScreen>
   )
