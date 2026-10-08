@@ -12,13 +12,17 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import {
   SEASON_RANKING_SIZE, moveRankingPage, rankingCategoriesOf, seasonRankingValueTextOf,
 } from '@/entities/season-mode/model/seasonRecordRanking'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   OPEN_YEAR_RECORD_VIEW, RECORD_ROOM_PICK, RECORD_ROOM_PICK_LABEL_FRAMES, RECORD_ROOM_PICK_LABELS, RECORD_ROOM_PICK_TITLE_ID,
-  VISIBLE_YEAR_COLUMNS, VISIBLE_YEAR_ROWS, YEAR_NUMBER_HEADER_FRAME, advanceYearSlide, batterYearCellTextOf, batterYearRowsOf,
-  nariRankingEntriesOf, nariRankingSideOf, pitcherYearCellTextOf, pitcherYearRowsOf, pressYearRecordKey, yearColumnsOf,
-  yearSlideOffsetOf, yearTopRowOf,
+  VISIBLE_YEAR_COLUMNS, YEAR_NUMBER_HEADER_FRAME, YEAR_TABLE_LAYOUT, advanceYearSlide, batterYearCellNumberOf, batterYearCellTextOf,
+  batterYearRowsOf, nariRankingEntriesOf, nariRankingSideOf, pitcherYearCellNumberOf, pitcherYearCellTextOf, pitcherYearRowsOf,
+  pressYearRecordKey, visibleYearRowCountOf, yearArrowBlinkOf, yearCellDrawingOf, yearColumnsOf, yearCursorIsInsetOf,
+  yearLabelOffsetOf, yearNumberGlyphsOf, yearSlideOffsetOf,
 } from '@/pages/nari-record-room/lib/nariRecordRoom'
-import type { NariRecordEdition, RecordRoomPick, YearRecordKey, YearRecordView } from '@/pages/nari-record-room/lib/nariRecordRoom'
+import type {
+  NariRecordEdition, RecordRoomPick, YearCellNumber, YearRecordKey, YearRecordView,
+} from '@/pages/nari-record-room/lib/nariRecordRoom'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -52,10 +56,14 @@ export function NariRecordView(props: NariRecordViewProps) {
     return <NariRankingScreen edition={props.edition} career={props.career} title={title} gamePoint={props.gamePoint} onBack={props.onBack} />
   }
   return props.edition === '타자'
-    ? <YearRecordScreen edition="타자" rows={batterYearRowsOf(props.career).map((stats) => (bit: number) => batterYearCellTextOf(stats, bit))}
-      title={title} gamePoint={props.gamePoint} onBack={props.onBack} />
-    : <YearRecordScreen edition="투수" rows={pitcherYearRowsOf(props.career).map((stats) => (bit: number) => pitcherYearCellTextOf(stats, bit))}
-      title={title} gamePoint={props.gamePoint} onBack={props.onBack} />
+    ? <YearRecordScreen edition="타자" title={title} gamePoint={props.gamePoint} onBack={props.onBack}
+      rows={batterYearRowsOf(props.career).map((stats) => ({
+        textOf: (bit: number) => batterYearCellTextOf(stats, bit), numberOf: (bit: number) => batterYearCellNumberOf(stats, bit),
+      }))} />
+    : <YearRecordScreen edition="투수" title={title} gamePoint={props.gamePoint} onBack={props.onBack}
+      rows={pitcherYearRowsOf(props.career).map((stats) => ({
+        textOf: (bit: number) => pitcherYearCellTextOf(stats, bit), numberOf: (bit: number) => pitcherYearCellNumberOf(stats, bit),
+      }))} />
 }
 
 export interface NariRecordPickPopupProps {
@@ -118,24 +126,34 @@ export function NariRecordPickPopup({ onChoose, onCancel }: NariRecordPickPopupP
   )
 }
 
-/**
- * 목록 창 자리 — 0x5c984: 판 0x55e60(…, 120, H/2 + 5, 210, 220) → (15, 55, 210, 220), 첫 열 x = W/2 − 100 = 20,
- * 머리 줄 y = H/2 − 0x66 = 58, 열 사이 3 · 머리 줄 아래 10 · 줄 사이 3 (0x56ebc 인자 3 · 10).
- * 넘기는 열 한 칸 폭 36 은 밀기 표 끝값 39(= 폭 + 틈 3, 한 번에 한 열)에서 셈했다.
- * ⚠️ 근사: 칸 바탕 그림(편집기 [+0x324] 의 프레임 0x17 · 0x1b · 0x22 · 0x23)은 어느 그림 묶음인지 못 찾아 칸 높이 14 · 번호 열 폭 24 로
- *    두고, 커서 줄 테두리(0x56234 · 0x563dc)와 위아래 화살(0x20 · 0x21)은 단순한 선 · 글로 그린다.
- */
-const PANEL = { x: 15, y: 55, width: 210, height: 220 } as const
-const YEAR_TABLE = { x: 20, headerY: 58, numberWidth: 24, columnWidth: 36, gap: 3, cellHeight: 14, headerGap: 10 } as const
-const STAT_X = YEAR_TABLE.x + YEAR_TABLE.numberWidth + YEAR_TABLE.gap
-const COLUMN_STEP = YEAR_TABLE.columnWidth + YEAR_TABLE.gap
-const FIRST_ROW_Y = YEAR_TABLE.headerY + YEAR_TABLE.cellHeight + YEAR_TABLE.headerGap
-const ROW_STEP = YEAR_TABLE.cellHeight + YEAR_TABLE.gap
+const GAME_UI_FRAMES = './sprites/game_ui/frames'
+const SLT_FRAME = './sprites/slt_frame'
+const NUM = './sprites/num'
+const imageOf = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
+/** game_ui 프레임 — 번호 칸 0x1b(25×15) · 넘기는 칸 0x23(36×15) */
+const NUMBER_CELL_FRAME = 0x1b
+const STAT_CELL_FRAME = 0x23
+/** slt_frame 이미지 — ◀ 20(5×8, 뒤집으면 ▶) · ▲ 0x20 · ▼ 0x21 (13×8) */
+const SIDE_ARROW_IMAGE = 20
+const UP_ARROW_IMAGE = 0x20
+const DOWN_ARROW_IMAGE = 0x21
+/** 커서 색 — 0x56234 의 0xffff00 · 0x80ffff00(알파 0x80) */
+const CURSOR_COLOR = '#ffff00'
+const CURSOR_INSET_COLOR = 'rgba(255, 255, 0, 0.502)'
+/** 0x6aff8 의 점 — 흰(0x1400748(255, 255, 255)) 점 두 개를 위아래로 */
+const DOT_COLOR = '#ffffff'
+
+const pixel = { position: 'absolute', pointerEvents: 'none' } as const
+
+/** 줄 하나 — 칸 글(접근성 · 시험) · 칸 숫자(0x6aff8 입력). null 은 웹이 세지 않는 칸(비운다) */
+interface YearRow {
+  readonly textOf: (bit: number) => string | null
+  readonly numberOf: (bit: number) => YearCellNumber | null
+}
 
 interface YearRecordScreenProps {
   readonly edition: NariRecordEdition
-  /** 줄마다 칸 글 — null 은 웹이 세지 않는 칸(비운다) */
-  readonly rows: readonly ((bit: number) => string | null)[]
+  readonly rows: readonly YearRow[]
   readonly title: '나만의리그타자편' | '나만의리그투수편'
   readonly gamePoint: number
   readonly onBack: () => void
@@ -143,9 +161,35 @@ interface YearRecordScreenProps {
 
 const YEAR_KEYS: Readonly<Record<string, YearRecordKey>> = {
   ArrowUp: '위', 2: '위', ArrowDown: '아래', 8: '아래', ArrowLeft: '왼', 4: '왼', ArrowRight: '오른', 6: '오른',
+  Enter: '기타', 5: '기타', 1: '기타', 3: '기타', 7: '기타', 9: '기타', '#': '기타',
 }
 
-/** 124 첫 갈래 — 0x5cfec → 0x5c984 (고정 "연차" 열 0x5658c + 넘기는 열 0x56ebc 넷) */
+/** 머리 글 img_text — 0x5650c 가 (x, 56, 폭, 15) 가운데에 (img_text 크기는 origins.json) */
+function YearLabel({ frame, x, width, alt }: { readonly frame: number; readonly x: number; readonly width: number; readonly alt: string }) {
+  const origins = useFrameOrigins(IMG_TEXT)
+  const size = origins?.[String(frame).padStart(3, '0')]
+  const offset = size === undefined ? { x: 0, y: 3 } : yearLabelOffsetOf(width, size.width, size.height)
+  return <img alt={alt} src={frameSrc(frame)} style={{ ...pixel, left: x + offset.x, top: YEAR_TABLE_LAYOUT.labelY + offset.y }} />
+}
+
+/** 둥글기 1 테두리 0x6aa65 — (w + 1)×(h + 1), 네 모서리 점은 빈다 */
+function RoundedBorder({ x, y, width, height, color }: {
+  readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string
+}) {
+  const line = (left: number, top: number, w: number, h: number) => (
+    <span style={{ ...pixel, left, top, width: w, height: h, background: color }} />
+  )
+  return (
+    <div data-testid="개인기록-커서">
+      {line(x + 1, y, width - 1, 1)}
+      {line(x + 1, y + height, width - 1, 1)}
+      {line(x, y + 1, 1, height - 1)}
+      {line(x + width, y + 1, 1, height - 1)}
+    </div>
+  )
+}
+
+/** 124 첫 갈래 — 0x5cfec → 0x5c984 (고정 "연차" 열 0x5658c + 넘기는 열 0x56ebc 넷). 배치는 `YEAR_TABLE_LAYOUT` 머리말 */
 function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecordScreenProps) {
   const columns = yearColumnsOf(edition)
   const [view, setView] = useState<YearRecordView>(OPEN_YEAR_RECORD_VIEW)
@@ -154,12 +198,12 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // 0x1463c: 취소 → 106 · '0' · '*' 는 버린다 · 확인은 보기 전용이라 아무 일도 없다
+      // 0x1463c: 취소 → 106 · '0' · '*' 는 버린다 · 그 밖은 0x55864 로 간다(보기 전용이라 확인은 [+0x40c] 만 센다)
       if (isCancelKey(event.key)) latest.current.onBack()
       else {
         const key = YEAR_KEYS[event.key]
         if (key !== undefined) setView((held) => pressYearRecordKey(held, key, latest.current.rowCount))
-        else if (!['0', '*', 'Enter', '5'].includes(event.key)) return
+        else if (!['0', '*'].includes(event.key)) return
       }
       event.preventDefault()
       event.stopPropagation()
@@ -176,53 +220,80 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
     return () => window.clearInterval(timer)
   }, [isSliding, columns.length])
 
+  const layout = YEAR_TABLE_LAYOUT
   const offset = yearSlideOffsetOf(view, columns.length)
-  const top = yearTopRowOf(view.cursor, rows.length)
-  const visibleRows = rows.slice(top, top + VISIBLE_YEAR_ROWS)
-  // 0x5cdae: 첫 열 − 1 부터 첫 열 + 보이는 열 까지 그리고 판 밖은 잘린다
+  const visibleCount = visibleYearRowCountOf(rows.length)
+  const visibleRows = rows.slice(view.top, view.top + visibleCount)
+  const rowY = (offsetRow: number) => layout.firstRowY + offsetRow * layout.rowStep
+  const blink = yearArrowBlinkOf(view)
+  // 0x5cdae: 첫 열 − 1 부터 첫 열 + 보이는 열 까지 그리고 자르기 밖은 잘린다
   const drawn = columns
     .map((column, index) => ({ column, index }))
     .filter(({ index }) => index >= view.firstColumn - 1 && index <= view.firstColumn + VISIBLE_YEAR_COLUMNS)
-  const clipWidth = VISIBLE_YEAR_COLUMNS * COLUMN_STEP
+  const cursorRow = view.cursor - view.top
+  const isInset = yearCursorIsInsetOf(view)
 
   return (
     <RawScreen>
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`개인기록 ${edition}`}>
-        <div className={windowStyles.window} style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }} />
-        <img className={windowStyles.layer} alt="연차" src={frameSrc(YEAR_NUMBER_HEADER_FRAME)}
-          style={{ left: YEAR_TABLE.x + YEAR_TABLE.numberWidth / 2, top: YEAR_TABLE.headerY + 2, transform: 'translateX(-50%)' }} />
+        <div className={windowStyles.window} style={{ left: layout.panel.x, top: layout.panel.y, width: layout.panel.width, height: layout.panel.height }} />
+        {rows.length > 1 && (
+          <>
+            <img alt="위" src={imageOf(SLT_FRAME, UP_ARROW_IMAGE)} style={{ ...pixel, left: layout.arrowX, top: layout.upArrowY - blink }} />
+            <img alt="아래" src={imageOf(SLT_FRAME, DOWN_ARROW_IMAGE)} style={{ ...pixel, left: layout.arrowX, top: layout.downArrowY + blink }} />
+          </>
+        )}
+        <YearLabel frame={YEAR_NUMBER_HEADER_FRAME} x={layout.numberX} width={layout.numberWidth} alt="연차" />
         {visibleRows.map((_row, offsetRow) => (
-          <span key={top + offsetRow} className={styles.title}
-            style={{ left: YEAR_TABLE.x, top: FIRST_ROW_Y + offsetRow * ROW_STEP, width: YEAR_TABLE.numberWidth }}>
-            {top + offsetRow + 1}
-          </span>
+          <div key={view.top + offsetRow} aria-label={String(view.top + offsetRow + 1)}>
+            <img alt="" src={imageOf(GAME_UI_FRAMES, NUMBER_CELL_FRAME)} style={{ ...pixel, left: layout.numberX, top: rowY(offsetRow) }} />
+            {yearNumberGlyphsOf(view.top + offsetRow + 1).map((glyph, index) => (
+              <img key={index} alt="" src={imageOf(NUM, glyph.frame)}
+                style={{ ...pixel, left: layout.numberX + glyph.x, top: rowY(offsetRow) + 3 }} />
+            ))}
+          </div>
         ))}
-        <div style={{ position: 'absolute', left: STAT_X, top: YEAR_TABLE.headerY, width: clipWidth, height: PANEL.height, overflow: 'hidden' }}>
+        {view.firstColumn !== 0 && (
+          <img alt="앞 열" src={imageOf(SLT_FRAME, SIDE_ARROW_IMAGE)}
+            style={{ ...pixel, left: layout.statX - blink - 5, top: layout.sideArrowY }} />
+        )}
+        {view.firstColumn + VISIBLE_YEAR_COLUMNS !== columns.length && (
+          <img alt="다음 열" src={imageOf(SLT_FRAME, SIDE_ARROW_IMAGE)}
+            style={{ ...pixel, left: layout.statX + layout.clip.width + blink - 5, top: layout.sideArrowY, transform: 'scaleX(-1)' }} />
+        )}
+        <div style={{ ...pixel, left: layout.clip.x, top: layout.clip.y, width: layout.clip.width, height: layout.clip.height, overflow: 'hidden' }}>
           {drawn.map(({ column, index }) => {
-            const left = (index - view.firstColumn) * COLUMN_STEP + offset
+            const left = layout.statX - layout.clip.x + (index - view.firstColumn) * layout.columnStep + offset
             return (
-              <div key={column.bit} data-testid={`개인기록-열-${column.label}`} style={{ position: 'absolute', left, top: 0, width: YEAR_TABLE.columnWidth }}>
-                <img className={windowStyles.layer} alt={column.label} src={frameSrc(column.labelFrame)}
-                  style={{ left: YEAR_TABLE.columnWidth / 2, top: 2, transform: 'translateX(-50%)' }} />
-                {visibleRows.map((cellOf, offsetRow) => (
-                  <span key={top + offsetRow} className={styles.title} data-testid={`개인기록-칸-${top + offsetRow}-${column.label}`}
-                    style={{ left: 0, top: FIRST_ROW_Y - YEAR_TABLE.headerY + offsetRow * ROW_STEP, width: YEAR_TABLE.columnWidth, textAlign: 'right' }}>
-                    {cellOf(column.bit) ?? ''}
-                  </span>
-                ))}
+              <div key={column.bit} data-testid={`개인기록-열-${column.label}`} style={{ ...pixel, left, top: -layout.clip.y }}>
+                <YearLabel frame={column.labelFrame} x={0} width={layout.statWidth} alt={column.label} />
+                {visibleRows.map((row, offsetRow) => {
+                  const number = row.numberOf(column.bit)
+                  const drawing = number === null ? null : yearCellDrawingOf(number)
+                  const top = rowY(offsetRow)
+                  return (
+                    <div key={view.top + offsetRow} data-testid={`개인기록-칸-${view.top + offsetRow}-${column.label}`}
+                      aria-label={row.textOf(column.bit) ?? ''}>
+                      <img alt="" src={imageOf(GAME_UI_FRAMES, STAT_CELL_FRAME)} style={{ ...pixel, left: 0, top }} />
+                      {drawing?.glyphs.map((glyph, glyphIndex) => (
+                        <img key={glyphIndex} alt="" src={imageOf(NUM, glyph.frame)} style={{ ...pixel, left: glyph.x, top: top + 3 }} />
+                      ))}
+                      {drawing?.dots.map((dot, dotIndex) => (
+                        <span key={dotIndex} style={{ ...pixel, left: dot.x, top: top + dot.y, width: 1, height: 2, background: DOT_COLOR }} />
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
         </div>
-        {view.cursor >= top && view.cursor < top + VISIBLE_YEAR_ROWS && (
-          <div data-testid="개인기록-커서" style={{
-            position: 'absolute', boxSizing: 'border-box', pointerEvents: 'none',
-            left: YEAR_TABLE.x - 1, top: FIRST_ROW_Y + (view.cursor - top) * ROW_STEP - 2,
-            width: STAT_X + clipWidth - YEAR_TABLE.x, height: YEAR_TABLE.cellHeight + 2,
-            border: `1px solid ${ORIGINAL_COLORS.highlightYellow}`,
-          }} />
-        )}
+        {cursorRow >= 0 && cursorRow < visibleCount && (isInset
+          ? <RoundedBorder x={layout.numberX + 1} y={rowY(cursorRow) + 1} width={layout.cursorWidth - 2} height={layout.cellHeight - 2}
+            color={CURSOR_INSET_COLOR} />
+          : <RoundedBorder x={layout.numberX} y={rowY(cursorRow)} width={layout.cursorWidth} height={layout.cellHeight}
+            color={CURSOR_COLOR} />)}
       </div>
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} />
     </RawScreen>

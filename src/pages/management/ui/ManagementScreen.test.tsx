@@ -459,8 +459,8 @@ describe('106 칸 4 [기록실] — 팝업 0x80 → 124 (0x116d4 · 0x1463c · 0
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByRole('group', { name: '개인기록 타자' })).toBeTruthy()
     // 줄 0 = 1년차(0x1fa8c 칸 0) · 줄 1 = 올해
-    expect(screen.getByTestId('개인기록-칸-0-타율').textContent).toBe('.300')
-    expect(screen.getByTestId('개인기록-칸-1-타율').textContent).toBe('.000')
+    expect(screen.getByTestId('개인기록-칸-0-타율').getAttribute('aria-label')).toBe('.300')
+    expect(screen.getByTestId('개인기록-칸-1-타율').getAttribute('aria-label')).toBe('.000')
     // 0x1463c — '0' · '*' 는 버린다(상세 창 · 탭 뒤집기 없음)
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.getByRole('group', { name: '개인기록 타자' })).toBeTruthy()

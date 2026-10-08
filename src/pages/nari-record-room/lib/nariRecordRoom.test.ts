@@ -5,6 +5,7 @@ import { EMPTY_PITCHER_SEASON_STATS, createPitcherCareer } from '@/entities/pitc
 import {
   BATTER_YEAR_COLUMNS, OPEN_YEAR_RECORD_VIEW, PITCHER_YEAR_COLUMNS, advanceYearSlide, batterYearCellTextOf, batterYearRowsOf,
   nariBatterRankingRecordsOf, pitcherYearCellTextOf, pitcherYearRowsOf, pressYearRecordKey, yearSlideOffsetOf,
+  visibleYearRowCountOf, yearArrowBlinkOf, yearCellDrawingOf, yearCursorIsInsetOf, yearLabelOffsetOf, yearNumberGlyphsOf,
 } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import type { YearRecordView } from '@/pages/nari-record-room/lib/nariRecordRoom'
 
@@ -78,12 +79,59 @@ describe('124 첫 갈래 키 — 0x55864 보기 전용 · [편집기+0x337] 열 
     expect(밀기끝까지(pressYearRecordKey({ ...OPEN_YEAR_RECORD_VIEW, firstColumn: 4 }, '오른', 2), 9).view.firstColumn).toBe(5)
   })
 
-  it('미는 동안은 키를 통째로 건너뛴다 (0x5587c) · 위아래는 끝에서 멈춘다', () => {
+  it('미는 동안은 키를 건너뛰고 [+0x40c] 만 센다 (0x55868 · 0x5587c) · 위아래는 꼴 0x20 이라 끝에서 감는다', () => {
     const sliding = pressYearRecordKey(OPEN_YEAR_RECORD_VIEW, '오른', 3)
-    expect(pressYearRecordKey(sliding, '아래', 3)).toBe(sliding)
-    expect(pressYearRecordKey(OPEN_YEAR_RECORD_VIEW, '위', 3).cursor).toBe(0)
-    const bottom = pressYearRecordKey(pressYearRecordKey(pressYearRecordKey(OPEN_YEAR_RECORD_VIEW, '아래', 3), '아래', 3), '아래', 3)
-    expect(bottom.cursor).toBe(2)
+    const held = pressYearRecordKey(sliding, '아래', 3)
+    expect(held).toEqual({ ...sliding, keyPresses: 2 })
+    expect(pressYearRecordKey(OPEN_YEAR_RECORD_VIEW, '위', 3).cursor).toBe(2)
+    const wrapped = [1, 2, 3].reduce((view) => pressYearRecordKey(view, '아래', 3), OPEN_YEAR_RECORD_VIEW)
+    expect(wrapped.cursor).toBe(0)
+    expect(pressYearRecordKey(OPEN_YEAR_RECORD_VIEW, '기타', 3)).toEqual({ ...OPEN_YEAR_RECORD_VIEW, keyPresses: 1 })
+  })
+
+  it('윗줄은 커서가 보이는 10줄을 벗어날 때만 옮긴다 (0x6c2bd) — 감아 내려가면 맨 위 · 감아 올라가면 끝 10줄', () => {
+    const up = pressYearRecordKey(OPEN_YEAR_RECORD_VIEW, '위', 15)
+    expect([up.cursor, up.top]).toEqual([14, 5])
+    // 14 → 13 은 보이는 줄 [5, 15) 안이라 윗줄 그대로 (웹 편집기의 "커서 − 9" 가 아니다)
+    const inside = pressYearRecordKey(up, '위', 15)
+    expect([inside.cursor, inside.top]).toEqual([13, 5])
+    const down = pressYearRecordKey(up, '아래', 15)
+    expect([down.cursor, down.top]).toEqual([0, 0])
+    expect(visibleYearRowCountOf(3)).toBe(3)
+  })
+})
+
+describe('124 칸 그림 — 0x5c984 · 0x5658c · 0x56ebc · 0x6aff8 · 0xba51c', () => {
+  it('번호 열 — num 0x1e + 숫자를 25 칸 가운데 (x += (25 − 합) >> 1)', () => {
+    expect(yearNumberGlyphsOf(1)).toEqual([{ frame: 31, x: 10 }])
+    expect(yearNumberGlyphsOf(12)).toEqual([{ frame: 31, x: 7 }, { frame: 32, x: 11 }])
+  })
+
+  it('넘기는 칸 숫자 — 자릿수 −1 은 오른쪽 자리(x + 24)부터 7 씩 왼쪽으로, 0 도 한 자리', () => {
+    expect(yearCellDrawingOf({ value: 0, digits: -1, isDecimal: false })).toEqual({ glyphs: [{ frame: 20, x: 24 }], dots: [] })
+    expect(yearCellDrawingOf({ value: 105, digits: -1, isDecimal: false }).glyphs)
+      .toEqual([{ frame: 25, x: 24 }, { frame: 20, x: 17 }, { frame: 21, x: 10 }])
+  })
+
+  it('소수점 갈래 — 타율 315 는 ".315" · 1000 은 "1.00" · 방어율 3510 은 "3.51" (점은 그 자리 왼쪽 3, 뒤 자리 3 더 밀림)', () => {
+    expect(yearCellDrawingOf({ value: 315, digits: 0, isDecimal: true })).toEqual({
+      glyphs: [{ frame: 25, x: 24 }, { frame: 21, x: 17 }, { frame: 23, x: 10 }], dots: [{ x: 7, y: 11 }],
+    })
+    expect(yearCellDrawingOf({ value: 1000, digits: 3, isDecimal: true })).toEqual({
+      glyphs: [{ frame: 20, x: 24 }, { frame: 20, x: 17 }, { frame: 21, x: 7 }], dots: [{ x: 14, y: 11 }],
+    })
+    expect(yearCellDrawingOf({ value: 3510, digits: 3, isDecimal: true }).glyphs.map((glyph) => glyph.frame - 20)).toEqual([1, 5, 3])
+  })
+
+  it('머리 글은 (x, 56, 폭, 15) 가운데 — 가로 내림 · 세로 올림', () => {
+    expect(yearLabelOffsetOf(25, 20, 10)).toEqual({ x: 2, y: 3 })
+    expect(yearLabelOffsetOf(36, 21, 10)).toEqual({ x: 7, y: 3 })
+  })
+
+  it('화살 깜빡 · 커서 꼴은 키 수 [+0x40c] % 8 을 본다 (≤ 4 · ≤ 3)', () => {
+    const at = (keyPresses: number) => ({ ...OPEN_YEAR_RECORD_VIEW, keyPresses })
+    expect([0, 4, 5, 7, 8].map((n) => yearArrowBlinkOf(at(n)))).toEqual([2, 2, 0, 0, 2])
+    expect([0, 3, 4, 8].map((n) => yearCursorIsInsetOf(at(n)))).toEqual([true, true, false, true])
   })
 })
 
