@@ -166,6 +166,15 @@ describe('구질 훈련 (108 탭 2 → 0x17f5c 의 0x1836a 갈래)', () => {
     expect(runPitchTypeTraining(구질투수({ skillIds: [0] }), 0, 2, 최소).moraleLoss).toBe(5)
   })
 
+  it('해제 카운터 +0x70~0x74 는 칸 4 라 다섯 칸 모두 0 — 0x18a5c → 0x18b70 (마구 훈련도 같다)', () => {
+    const 쌓인 = 구질투수({ skillIds: [20], releaseTrainingStreaks: [3, 0, 0, 0, 0] })
+    expect(runPitchTypeTraining(쌓인, 0, 2, 최소).career.releaseTrainingStreaks).toEqual([0, 0, 0, 0, 0])
+    const 마구 = runPitcherTraining(
+      투수({ skillIds: [20], releaseTrainingStreaks: [3, 0, 0, 0, 0], gamePoint: 5000, popularity: 5000 }), 메뉴('마구'), 최소,
+    )
+    expect(마구.career.releaseTrainingStreaks).toEqual([0, 0, 0, 0, 0])
+  })
+
   it('알림 글 — 덜 찼으면 StrMODE[89] "%d/%d회", 차면 [88] "구질 훈련 완료!"', () => {
     const 한번 = runPitchTypeTraining(구질투수(), 0, 2, 최소)
     expect(pitchTypeTrainingLinesOf(한번)).toEqual(['해당 구질 1/4회 훈련', '사기 -6'])

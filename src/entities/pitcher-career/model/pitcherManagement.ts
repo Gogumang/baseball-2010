@@ -262,7 +262,8 @@ function runMagicTraining(
     rolledGain: 0,
     rolledMoraleLoss,
     magic: { sessions, required, isLevelUp },
-    career: countPitcherTraining(trained, menu.id),
+    // 0x18a5c 칸 4 — 해제 카운터 짝(칸 0 · 2 · 3)에 안 맞아 0x18b70 이 다섯 칸을 0 으로
+    career: countReleaseTrainingStreak(countPitcherTraining(trained, menu.id), MAGIC_TRAINING_SLOT),
   }
 }
 
@@ -270,6 +271,8 @@ function runMagicTraining(
 const PITCH_TYPE_MORALE_RANGE: IntegerRange = { minimum: 6, maximumExclusive: 10 }
 /** 훈련 칸 4 — 마구와 구질 훈련이 같은 칸 [sp+0x40] = 4 로 0x17f5c 를 돈다(훈련 수 +0x4b+4) */
 const MAGIC_TRAINING_MENU = PITCHER_TRAINING_MENUS[PITCHER_TRAINING_MENUS.length - 1]
+/** 훈련 칸 4 ([sp+0x40]) — 마구 · 구질 훈련 */
+const MAGIC_TRAINING_SLOT = 4
 
 export interface PitchTypeTrainingOutcome {
   readonly progress: PitchTrainingProgress
@@ -304,7 +307,7 @@ export function runPitchTypeTraining(
     progress: applied.progress,
     rolledMoraleLoss,
     moraleLoss,
-    career: countPitcherTraining(trained, MAGIC_TRAINING_MENU.id),
+    career: countReleaseTrainingStreak(countPitcherTraining(trained, MAGIC_TRAINING_MENU.id), MAGIC_TRAINING_SLOT),
   }
 }
 
@@ -363,8 +366,9 @@ const RELEASE_STREAK_SLOTS = 5
 const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
 
 /**
- * 능력치 훈련 뒤 해제 카운터 `+0x70 + 칸` (0x18b5a · 0x18b70) — 맞는 짝이면 그 칸 +1, 아니면 다섯 칸 모두 0.
- * ⚠️ 미해결: 마구 칸(상태 0x78 창)이 이 자리(0x17f5c 의 0x18a5c 뒤)를 지나는지 못 짚었다 — 마구 훈련은 건드리지 않는다.
+ * 훈련 뒤 해제 카운터 `+0x70 + 칸` (0x18b5a · 0x18b70) — 맞는 짝이면 그 칸 +1, 아니면 다섯 칸 모두 0.
+ * 마구(0x17fd8 갈래 — 0x18350 `b 0x18a5c`) · 구질 훈련(0x1836a 갈래 — 0x186c2)도 끝에 0x18a5c 를 지나 칸 4 로 여기를 돈다 —
+ * 칸 4 는 어느 짝에도 없어 다섯 칸이 0 이 된다(직접 떴다).
  */
 export function countReleaseTrainingStreak(career: PitcherCareer, slot: number): PitcherCareer {
   const counts = career.releaseTrainingStreaks ?? new Array<number>(RELEASE_STREAK_SLOTS).fill(0)
