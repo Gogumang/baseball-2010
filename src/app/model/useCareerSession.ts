@@ -2037,7 +2037,13 @@ export function useCareerSession({
       if (screen.context === '외출진입') {
         // 114 끝 0x1c014 → 0x8b0e4(1c02e)의 0x8b12c — 112 에서 연 이벤트도 행동함(S+4)을 켜고 저장한다. 뒤 112 라 장소 끝
         // 처리(외출 수)는 없다. 지금 이벤트 번호는 연 이벤트로 본다(외출 진입 이벤트는 440~444 가 아니다)
-        setCareer(withOutingEventActed(viewed, true, screen.eventId))
+        const acted = withOutingEventActed(viewed, true, screen.eventId)
+        setCareer(acted)
+        // 114 → 112 — 상태가 바뀐 틀이라 112 진입 0x118e4(0x8cdc0 이 커서를 0 으로) 뒤 자동 발동 0x1cf9c 가 화면 112 로 다시
+        // 훑는다(0x8be80 — 무작위 조건까지). 찾으면 또 [다음 114, 뒤 112]
+        story.rewindCursor()
+        const again = story.eventFor(acted, EVENT_TRIGGER.외출, random)
+        if (again !== null) return setScreen({ kind: '이벤트', eventId: again.id, context: '외출진입' })
         return setScreen({ kind: '외출' })
       }
       setCareer(viewed)

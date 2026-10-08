@@ -1799,7 +1799,7 @@ export function usePitcherLeagueSession(
    * **외출 지도(112)의 자동 발동** — 0x1cf9c 는 현재 상태가 112 일 때도 같은 훑기를 화면코드 112 로 돈다
    * (trigger 1: 10 "병원이…?" · 401 인기도 3000). 찾으면 `[다음 114, 뒤 112]` — 끝나면 지도로 돌아온다.
    * 웹의 '외출' 장면은 112 지도와 113 장소를 함께 그려, 효과 팝업이 떠 있지 않을 때를 112 로 본다.
-   * 굴림은 105 와 같은 근사(들어올 때만 rand 를 넘긴다 — trigger 1 이벤트엔 무작위 조건이 없다).
+   * 훑기는 **상태가 112 로 바뀐 틀에만** 돈다(0x1cdec 1ce02 — 105 와 같다). 머무는 동안 커리어가 바뀌어도 다시 훑지 않는다.
    */
   const wasIdleAtMapRef = useRef(false)
   useEffect(() => {
@@ -1811,7 +1811,8 @@ export function usePitcherLeagueSession(
     }
     const isArrival = !wasIdleAtMapRef.current
     wasIdleAtMapRef.current = true
-    const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, isArrival ? random : undefined)
+    if (!isArrival) return
+    const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, random)
     if (event !== null) openStory({ eventId: event.id, context: '지도', viewed: [] })
   }, [career, fileEvents, openStory, outingResult, random, scanAuto, scene, story])
 
