@@ -1171,9 +1171,8 @@ export function useCareerSession({
     }
     if (viewedEventIds.includes(NATIONAL_CUP_EVENT.거절) || viewedEventIds.includes(NATIONAL_CUP_EVENT.탈락)) {
       // 464 거절은 `S+0x12c = 0` 으로 바로 새 시즌이다 (P5 요약, 확정).
-      // 462 탈락은 원본이 상태 105(관리 화면)로만 적혀 있고 새 시즌 처리(`0x1b768`)가 안 보이는데,
-      // 그러면 연말 사슬이 안 닫혀 웹에서는 그 해에 갇힌다. 대회 끝(`0x1b92c`)이 우승·탈락 두 갈래
-      // **모두** `0x1b768` 로 가는 것과 짝을 맞춰 여기서도 새 시즌으로 넘긴다 — **근사다**.
+      // 462 탈락도 원본대로 새 시즌이다 — 114 틀 0x1c014 의 1c0a0~1c0b8 이 뒤 상태가 105 여도 관리자 +0x305/+0x306 이
+      // 서 있으면 새 시즌 처리 `0x1b768` 로 간다(462 는 +0x306 갈래). 예전 "근사" 주석은 이 갈래를 못 본 것이다.
       return startNewSeason(viewed)
     }
 

@@ -1432,9 +1432,10 @@ export function usePitcherLeagueSession(
    * ```
    * 국가대표 판정의 목표 단계 3 은 투수 갈래(0xa3e56 표 그대로)다 — `achievedPitcherGoalCount(_, '국가대표')`.
    *
-   * ⚠️ 미해결·근사 (타자편 `useCareerSession.continueSeason` 과 같은 자리):
+   * 대회 갈래 (타자편 `useCareerSession.continueSeason` 과 같은 자리):
    *   - 463 출전 → 134 국가대항전 대진판 → 135 → 142 → 대표팀으로 던지는 경기 → 결과·보상 → 새 시즌 (8eceab3).
-   *   - 462 탈락: 원본은 뒤 = 105 로만 적혀 있고 새 시즌 처리가 안 보인다 — 타자편과 같이 새 시즌으로 넘긴다.
+   *   - 462 탈락: 원본대로 새 시즌 — 114 틀 0x1c014 의 1c0a0~1c0b8 이 뒤 = 105 여도 관리자 +0x305/+0x306 이 서 있으면
+   *     새 시즌 처리 0x1b768 로 간다(462 는 +0x306 갈래).
    *   (128 포스트시즌 대진은 131 과 132 사이 — 아래 `pressPostseason` · `closePostseasonPopup`)
    */
   const continueYearEnd = useCallback(
@@ -1452,7 +1453,7 @@ export function usePitcherLeagueSession(
         setCupView({ cup, atStandings: false })
         return setScene('국가대항전')
       }
-      // 464 거절은 S+0x12c = 0 으로 곧 새 시즌 (P5) · 462 탈락은 근사 (위 머리글)
+      // 464 거절은 S+0x12c = 0 으로 곧 새 시즌 (P5) · 462 탈락은 114 틀 1c0a0~1c0b8 의 관리자 +0x306 갈래로 0x1b768 (위 머리글)
       if (viewed.includes(NATIONAL_CUP_EVENT.거절) || viewed.includes(NATIONAL_CUP_EVENT.탈락)) {
         return startNewSeason(current)
       }
