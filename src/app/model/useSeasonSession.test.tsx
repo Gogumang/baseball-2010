@@ -750,6 +750,46 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.state?.record.phase).toBe(SEASON_PHASE.결산)
   })
 
+  it('포스트시즌이 시작되면 SR+0xb2(경기 수)는 0 — 시상 사슬 중에 끄고 이어하면 남은 시상으로 돌아온다 (0xb80a8 b811c · 0xcb)', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    expect(result.current.state?.record.games).toBe(0)
+    이벤트넘기기(result, 2)
+    expect(result.current.state?.record.phase).toBe(0xc)
+
+    // phase 0xc 가 저장에 남았다 — 진입 분기가 g == 0 이라 phase 를 보고 0xeb 로 가고, 그 진입이 곧장 370 을 다시 튼다
+    expect(띄우기(store).result.current.eventPlayback).toMatchObject({ eventId: 370, returnScene: SEASON_SCENE_STATE.투수시상 })
+  })
+
+  it('포스트시즌 사람 경기 정산은 CPU 경기를 돌리지 않는다 — 0xc2760 은 결산 0xef 키 0x9dc8 에서만', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
+      act(() => result.current.actions.continuePostseason())
+    }
+    if (result.current.pendingGame === null) return
+    const 전 = result.current.series!
+    act(() => result.current.actions.choosePreGameAce(0))
+    act(() => result.current.actions.choosePreGameAce(5))
+    if (result.current.isMatchSettingsOpen) act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.startPendingGame())
+    const options = result.current.gameOptions!
+    act(() => result.current.actions.finishGame(요약({ opponentTeamId: options.opponentTeamId })))
+
+    const 뒤 = result.current.series!
+    // 내 시리즈 한 경기만 쌓였다 — 끝났어도 다음 라운드는 아직 0승 0패로 기다린다
+    expect(뒤.wins[0] + 뒤.wins[1] === 전.wins[0] + 전.wins[1] + 1 || (뒤.wins[0] === 0 && 뒤.wins[1] === 0)).toBe(true)
+    expect(result.current.state?.record.games).toBe(뒤.round === '종료' ? 0 : 뒤.wins[0] + 뒤.wins[1])
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.시즌결산)
+  })
+
   it('시상 창 글은 system 3 · 4 일 때만 — 370 은 타자 타이틀 세 칸(0x8b3bc), 376 은 축하 줄 없는 MVP 창(시즌 갈래)', () => {
     const { result } = 띄우기()
     시작(result, 0)

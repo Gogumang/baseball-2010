@@ -35,7 +35,7 @@ import type { LeagueAbilityContext, LeagueTeamRecord } from '@/entities/league/m
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 import {
-  advancePostseason, postseasonPitcherOrderOf, postseasonSideOf, postseasonStarterSlotOf,
+  advancePostseason, postseasonGameOf, postseasonPitcherOrderOf, postseasonSideOf, postseasonStarterSlotOf,
 } from '@/entities/league/model/league'
 import {
   SEASON_MODE, advanceRotation, cpuGameRotationAdvances, rotationSlotOf,
@@ -1702,7 +1702,8 @@ export function useSeasonSession(
    *     싣고 경기정보·CPU 엔트리 화면이 같은 값을 본다. 다시 0xd7 → 0xdd 로 들어오면 다시 굴린다(원본 그대로).
    *   - 두 팀 명단 세우기(0xb891c)·로테이션(0xb8c80)은 웹에서는 경기를 세울 때(`startTeamGame`) 한다.
    *   - 6850: `SR+0xb2 == 0`(시즌 첫날)이면 열 팀 투수 전원 10000 (`withSeasonFirstDayStamina`, 모듈 머리 주석).
-   *     포스트시즌은 날짜가 45 를 넘어 계속 오르므로(0xb818c 머리 L+0x32++) 닿지 않는다. 국가대항전 첫날도 이 고리를
+   *     포스트시즌도 SR+0xb2 = L+0x32 가 시리즈마다 0 부터라(0xb80a8 b811c · 0xb7724 b777a −1 · 0xb818c +1) 시리즈 첫 경기면
+   *     이 고리를 돈다 — L+0x34 를 보지 않는다(6850~6860 직접 떴다). 국가대항전 첫날도 이 고리를
    *     돌지만 대회 중 0x1f9a9 는 상대국 슬롯을 돌려주므로 리그 팀은 안 바뀐다 — 웹은 건너뛴다.
    *
    * **투수 스태미나 (P1 3절 · 직접 떴다)** — 투수 레코드 +0x2c 는 경기용 칸이 아니라 **시즌 내내 이어지는 값**이다.
@@ -1723,8 +1724,8 @@ export function useSeasonSession(
           : { ...pending, options: { ...pending.options, opponentAces: rollOpponentAces(aces.pitcher, aces.batter, random) } },
       )
       const firstTime = current.matchSettingsSeen !== true
-      const firstDay = pending.kind !== '국가대항전' && !current.state.record.inPostseason
-        && current.state.record.games === 0
+      // 6850 은 SR+0xb2 만 본다 — 포스트시즌도 시리즈 첫 경기(g = 0)면 열 팀을 채운다(`postseasonDayOf`)
+      const firstDay = pending.kind !== '국가대항전' && current.state.record.games === 0
       if (firstTime || firstDay) {
         const seen = firstTime ? { ...current, matchSettingsSeen: true } : current
         commit(firstDay ? withSeasonFirstDayStamina(seen) : seen)
@@ -2031,7 +2032,7 @@ export function useSeasonSession(
             series: advanced,
             state: {
               ...current.state,
-              record: { ...played, postseasonChampion: advanced.champion ?? NO_CHAMPION },
+              record: { ...played, games: postseasonDayOf(advanced), postseasonChampion: advanced.champion ?? NO_CHAMPION },
             },
           })
           return { next: SEASON_SCENE_STATE.시즌결산, jingle: null }
@@ -2199,6 +2200,9 @@ export function useSeasonSession(
               ...settled,
               regularSeasonFirsts: settled.regularSeasonFirsts + (end.isRegularSeasonFirst ? 1 : 0),
               inPostseason: true,
+              // SR+0xb2 = L+0x32 — 포스트시즌 시작 0xb80a8 이 0 으로 둔다(b811c). 그래서 0xe9 가 (0 ? 0xee : 0xef) 로 가고,
+              // 시상 사슬 중에 끄고 이어하면 진입 분기 0xcb 가 phase 로 남은 시상을 다시 잡는다 (`postseasonDayOf`)
+              games: 0,
               postseasonChampion: NO_CHAMPION,
             },
           },
@@ -2291,7 +2295,7 @@ export function useSeasonSession(
       series: advanced,
       state: {
         ...save.state,
-        record: { ...save.state.record, postseasonChampion: advanced.champion ?? NO_CHAMPION },
+        record: { ...save.state.record, games: postseasonDayOf(advanced), postseasonChampion: advanced.champion ?? NO_CHAMPION },
       },
     })
   }, [aceLevels, commit, enterPreGameSquad, optionsFor, random, save])
@@ -2865,6 +2869,15 @@ function seasonTitlesOf(save: SeasonSave, recordOf: SeasonEntryRecordSource | un
     isMine: record.teamId === save.state.record.teamId,
   }))
   return judgeTitles(records, isPitcher ? '시즌투수' : '타자')
+}
+
+/**
+ * 포스트시즌 중 `SR+0xb2`(= L+0x32, 웹 `record.games`) — 그 시리즈에서 치른 경기 수다. 대진 0xb80a8 이 0(b811c), 시리즈가
+ * 끝나는 승 0xb7724 가 −1(b777a), 하루 끝 0xb818c 가 +1(b819a) → 새 시리즈 첫날과 한국시리즈가 끝난 뒤는 0.
+ * 진입 분기 0xcb(≠ 0 이면 0xef) · 0xe9(0 ? 0xee : 0xef) · 6850 첫날 스태미나 · 메시지줄(0 이면 45)이 이 값을 본다.
+ */
+function postseasonDayOf(series: PostseasonSeries): number {
+  return series.round === '종료' ? 0 : postseasonGameOf(series)
 }
 
 /**
