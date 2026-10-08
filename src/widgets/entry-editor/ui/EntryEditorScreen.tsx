@@ -42,6 +42,11 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
    * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
    */
   readonly underlay?: ReactNode
+  /**
+   * 머리띠 바닥 — 안 주면 탭대로 0xf / 0x17. 시즌 0xdf 목적 3(선수영입 자리 고르기)은 그리기 0xb010 이 탭과 상관없이 7
+   * (되돌아가기 + "0상세정보") 을 넘긴다.
+   */
+  readonly footer?: number
 }
 
 /** 판 (15, 55, 210, 220) — P6 2f 의 0x5c984 공용 판 (유력) */
@@ -66,7 +71,7 @@ const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
  *    줄에는 이름·수비 위치 글자만 적는다. 화면 밀기(0xbdae9, 1000) 연출도 없다.
  */
 export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace>({
-  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, onKey, onMoveCursor, onCloseAceLocked,
+  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, footer, onKey, onMoveCursor, onCloseAceLocked,
 }: EntryEditorScreenProps<B, P>) {
   useEffect(() => {
     if (isAceLocked) return undefined
@@ -167,7 +172,7 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
       {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
           표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}
       <ScreenFrame title={title ?? (isPitcherTab ? '투수엔트리' : '타자엔트리')} gamePoint={gamePoint}
-        onBack={() => onKey('취소')} footer={isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자} />
+        onBack={() => onKey('취소')} footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)} />
 
       {isAceLocked && (
         <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />

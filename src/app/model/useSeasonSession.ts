@@ -178,6 +178,11 @@ export interface SeasonSession {
    * 화면이 낸 칸(`TradeSwap`)은 이 차례라 `finishTrade` 가 명단 첨자로 되돌린다
    */
   readonly tradeRoster: SeasonTeamRoster
+  /**
+   * 내 팀 투수 **레코드 칸 k → 명단 첨자** (`tradeRoster` 를 늘어세운 그 차례) — 선수영입 자리 고르기(0xdf 목적 3)가 레코드
+   * 차례로 보이고 0xc554 가 레코드 칸 k 에 끼워넣으므로, 명단에 걸 때 첨자로 되돌린다
+   */
+  readonly pitcherRecordOrder: readonly number[]
   /** 영입한 명전 선수의 기록을 찾아 준다(기록연감 명전 칸) — 순위표 이름·경기 명단이 같은 것을 본다. 없으면 undefined */
   readonly recordSource: () => SeasonEntryRecordSource | undefined
   readonly tradeRosterOf: (teamId: number) => SeasonTeamRoster
@@ -2806,6 +2811,7 @@ export function useSeasonSession(
     cpuRosterOf: (teamId: number) => cpuRosterOf(save, teamId),
     recordSource: recordSourceNow,
     tradeRoster: save === null ? EMPTY_ROSTER : tradeRecordRosterOf(save, save.state.record.teamId, save.roster),
+    pitcherRecordOrder: save === null ? [] : recordPitcherOrderOf(save, save.state.record.teamId, save.roster.pitchers.length),
     tradeRosterOf: (teamId: number) =>
       save === null ? cpuRosterOf(save, teamId) : tradeRecordRosterOf(save, teamId, cpuRosterOf(save, teamId)),
     playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,

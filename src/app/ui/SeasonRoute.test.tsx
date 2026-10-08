@@ -532,9 +532,9 @@ describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 
     const store = 띄우기()
 
     fireEvent.click(슬롯(2))
-    const 자리 = screen.getAllByRole('button').find((button) => /#0/.test(button.textContent ?? ''))
-    expect(자리).toBeTruthy()
-    fireEvent.click(자리!)
+    // 0xdf 목적 3 — 들어올 때 [179] 를 닫고, 투수 레코드 칸 0(커서 0)에서 확인
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByTestId('엔트리-줄-0'))
 
     const saved = store.load() as { roster: { pitchers: { id: number }[] } }
     expect(saved.roster.pitchers[0]?.id).toBe(0xb5)
@@ -562,13 +562,17 @@ describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기
     return store
   }
   const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
-  const 자리0 = () => screen.getAllByRole('button').find((button) => /#0/.test(button.textContent ?? ''))
+  /** 0xdf 목적 3 — [179] 를 닫고 레코드 칸 0(커서 0)에서 확인 */
+  const 자리0 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    return screen.getByTestId('엔트리-줄-0')
+  }
 
   it('나리 투수를 고르면 자리 고르기(0xdf)로 가고 id 0xfe · +0xa 0x80(칸 번호 갈아끼움) · 기록 사본으로 끼워 넣는다', () => {
     const store = 띄우기()
 
     fireEvent.click(슬롯(0))
-    fireEvent.click(자리0()!)
+    fireEvent.click(자리0())
 
     const saved = store.load() as { roster: { pitchers: { id: number; kindByte: number; stamina: number; record?: unknown }[] } }
     expect(saved.roster.pitchers[0]).toMatchObject({ id: 0xfe, kindByte: 0x80, stamina: 10000, record: 나리투수 })
@@ -585,7 +589,7 @@ describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기
     const store = 띄우기()
 
     fireEvent.click(슬롯(5))
-    fireEvent.click(자리0()!)
+    fireEvent.click(자리0())
     const saved = store.load() as { roster: { batters: { id: number; kindByte: number; record?: unknown }[] } }
     expect(saved.roster.batters[0]).toMatchObject({ id: 0xfe, kindByte: 0xa0, record: 나리타자 })
   })

@@ -279,23 +279,30 @@ export interface RecruitResult {
  *
  * (`0xb6cc4`·`0xb8e28` 이 원본 레코드의 무엇을 더 만지는지는 해독되지 않았다 — 여기서는
  * 스태미나만 채운다. 값을 지어내지 않으려고 나머지는 건드리지 않았다.)
+ *
+ * **자리 `slot` 은 팀 레코드 배열의 칸 차례**다 (직접 떴다): 0xc554 가 자리 목록 객체 `[this+0xa8]+0x41c` 의 커서
+ * (`+0xc + +0x10 × +0x14`)를 `0xb6605` 로 +0xa 하위 5비트에 적고, 끼워넣기 0xb521c 는 그 5비트(`0xb6395` · 나리는
+ * `0xb6721(P, 0x80)` 의 같은 5비트)를 다시 읽어 `0xb51fc(T, k)` — **레코드 칸 k** — 에 넣는다. 투수 레코드 배열은 경기
+ * 준비마다 로테이션 0xb5ca8 로 섞인 차례라 웹 명단(로테이션 전 자리 차례) 첨자와 다를 수 있다 — 그 첨자를
+ * `rosterIndex` 로 따로 받는다(없으면 `slot`, 타자는 섞이지 않아 늘 같다). 밀려난 선수는 레코드 맨 끝 = 명단 맨 끝이다.
  */
 export function recruitPlayer(
   roster: SeasonTeamRoster,
   source: SeasonPlayer,
   asPitcher: boolean,
   slot: number,
+  rosterIndex: number = slot,
 ): RecruitResult {
   const renumbered = withSlot(source, slot)
   if (asPitcher) {
     const player = { ...renumbered, stamina: RECRUIT_PITCHER_STAMINA }
     return {
-      roster: { ...roster, pitchers: insertPitcher(roster.pitchers, player, slot) },
+      roster: { ...roster, pitchers: insertPitcher(roster.pitchers, player, rosterIndex) },
       source: player,
     }
   }
   return {
-    roster: { ...roster, batters: insertBatter(roster.batters, renumbered, slot) },
+    roster: { ...roster, batters: insertBatter(roster.batters, renumbered, rosterIndex) },
     source: renumbered,
   }
 }

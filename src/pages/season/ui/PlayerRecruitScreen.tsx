@@ -3,8 +3,10 @@ import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
-  hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitPlayer, slotOf,
+  hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitPlayer,
 } from '@/entities/season-mode/model/playerRecruit'
+import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
+import { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 import type { RecruitResult, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
@@ -24,17 +26,18 @@ const CHOOSE_SLOT = ORIGINAL_MODE_TEXT[179] ?? ''
 const RECRUIT_DONE = ORIGINAL_MODE_TEXT[180] ?? ''
 
 export interface PlayerRecruitScreenProps {
+  /** 내 팀 (SR[1]) — 자리 목록은 `0x1f9a9(저장, 모드, SR[1])` 내 팀 레코드다 */
+  readonly teamId: number
+  /** 내 팀 명단 (로테이션 전 자리 차례 — 저장의 `roster`) */
   readonly roster: SeasonTeamRoster
+  /**
+   * 투수 **레코드 칸 k → 명단 첨자** — 팀 레코드의 투수 배열은 경기 준비마다 로테이션 0xb5ca8 로 섞여 있다
+   * (세션 `tradeRoster` 와 같은 차례). 자리 목록은 이 차례로 보이고 0xc554 는 레코드 칸 k 에 끼워넣는다. 없으면 같은 차례.
+   */
+  readonly pitcherRecordOrder?: readonly number[]
   /** 영입 후보 네 갈래 (나리 투수·타자, 명예 투수 4칸·타자 8칸) */
   readonly list: RecruitListInput
-  /**
-   * 팀 명단에 보일 이름. 원본 선수 레코드의 이름 칸은 아직 안 풀려서
-   * 없으면 `투수 N번`·`타자 N번`(칸 번호 `+0xa & 0x1f`)으로 적는다 (**근사**).
-   */
-  readonly rosterNames?: {
-    readonly pitchers: readonly string[]
-    readonly batters: readonly string[]
-  }
+  readonly gamePoint?: number
   /**
    * 영입이 끝났다 — 바뀐 로스터와 **고쳐진 원본 기록**(0xb6604 의 부작용)을 함께 넘긴다. 원본은 여기서 저장(0x1fded)하고
    * [180] 팝업을 띄운다 — 화면을 떠나는 것은 그 팝업을 닫은 뒤(`onDone`)다.
@@ -73,8 +76,8 @@ export interface RecruitCandidateActions {
  * 자리 고르기는 원본에서 **공용 선수 고르기 0xdf 의 목적 3**(`this+0x110 = 3`, `entities/season-mode/model/playerPick.ts`)이다 —
  * 시즌정보 선수정보(목적 2)·장착아이템(목적 1)과 같은 상태·같은 목록 창을 쓰고, 목적 3 만 다른 점은: 탭이 영입 후보 종류로
  * 정해지고 '*'(탭 뒤집기)를 목록에 안 넘기며(0x6fe0) · 들어올 때 StrMODE[179] 를 띄우고 · 바닥이 7 이고 · 취소가 0xe2,
- * 확인이 영입 확정 0xc4ea 다. 웹은 목적 1·2 를 `SeasonPlayerPickScreen`(엔트리 목록 창)으로 그리지만 목적 3 은 아직 이
- * 화면 안에서 공용 판 목록으로 근사한다 — 후보 종류의 배열만 보이므로 탭 뒤집기가 없는 것은 원본과 같다.
+ * 확인이 영입 확정 0xc4ea 다. 웹도 목적 1·2 와 같은 `SeasonPlayerPickScreen`(엔트리 목록 창)을 `isRecruitSlot` 으로 꽂는다.
+ * 목록은 내 팀 **레코드 차례**(투수는 로테이션으로 섞인 차례)이고 고른 커서가 곧 0xc554 의 레코드 칸 k 다.
  * `docs/re/S6-season-cleanup.md` 4절 · `docs/re/R13-season-leftovers.md` 9절 확정.
  *
  * **비용도 인기도 조건도 없다.** 중복 검사만 통과하면 시즌 중 아무 때나 영입할 수 있다.
@@ -84,10 +87,10 @@ export interface RecruitCandidateActions {
  *   - 투수 쪽은 밀려난 선수의 칸 번호를 고쳐 주는 줄이 **빠져 있다** (S6 4-4).
  *   - 확정할 때 저장된 원본 기록의 칸 번호가 실제로 바뀐다 (`withSlot` 의 부작용).
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xe340(그리기)의 좌표를 못 찾아 공용 판 목록으로 그린다.
+ * ⚠️ 근사: `renderCandidates` 없이 띄운 1단계(후보 목록)는 공용 판 목록이다 — 앱은 명예의 전당 목록을 꽂는다.
  */
 export function PlayerRecruitScreen({
-  roster, list, rosterNames, onRecruit, onDone, onBack, renderCandidates,
+  teamId, roster, pitcherRecordOrder, list, gamePoint = 0, onRecruit, onDone, onBack, renderCandidates,
 }: PlayerRecruitScreenProps) {
   const [step, setStep] = useState<{ readonly candidate: RecruitCandidate; readonly isPitcher: boolean } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -106,15 +109,13 @@ export function PlayerRecruitScreen({
 
   /** 2단계 — 바꿀 자리 (0xdf, this+0x110 = 3) */
   const chosen = step
-  const slotPlayers = chosen === null ? [] : chosen.isPitcher ? roster.pitchers : roster.batters
-  const slotNames = chosen === null
-    ? []
-    : chosen.isPitcher ? (rosterNames?.pitchers ?? []) : (rosterNames?.batters ?? [])
-  const slotRows: readonly SeasonListRow[] = slotPlayers.map((player, index) => ({
-    id: `자리${index}`,
-    label: slotNames[index] ?? `${chosen?.isPitcher === true ? '투수' : '타자'} ${slotOf(player) + 1}번`,
-    value: `#${index}`,
-  }))
+  /** 레코드 칸 k → 명단 첨자 */
+  const rosterPitcherIndexOf = (recordSlot: number): number => pitcherRecordOrder?.[recordSlot] ?? recordSlot
+  /** 레코드 차례 명단 — 0x5561c(ed, &팀, …) 가 그리는 그 배열 */
+  const recordRoster: SeasonTeamRoster = {
+    ...roster,
+    pitchers: roster.pitchers.map((player, k) => roster.pitchers[rosterPitcherIndexOf(k)] ?? player),
+  }
 
   /** this+0x110 = 3 · 상태 0xdf — 들어옴 0x5980 이 StrMODE[179] 를 띄운다 */
   const enterSlotStep = (chosenStep: { readonly candidate: RecruitCandidate; readonly isPitcher: boolean }) => {
@@ -147,9 +148,11 @@ export function PlayerRecruitScreen({
     return undefined
   }
 
+  /** 0xc3e8 확인 → 0xc4ea: 자리 = 목록 커서(레코드 칸 k) */
   const selectSlot = (index: number) => {
-    if (chosen === null) return
-    const result = recruitPlayer(roster, chosen.candidate.player, chosen.isPitcher, index)
+    if (chosen === null || isRecruited) return
+    const rosterIndex = chosen.isPitcher ? rosterPitcherIndexOf(index) : index
+    const result = recruitPlayer(roster, chosen.candidate.player, chosen.isPitcher, index, rosterIndex)
     // 0xc4ea~0xc608 — 영입·저장 뒤 [180] (팝업 0x19). 자리 목록(0xdf) 위에 뜬다
     setNotice(RECRUIT_DONE)
     setRecruited(true)
@@ -162,20 +165,39 @@ export function PlayerRecruitScreen({
     onCancel: onBack,
     isEnabled: step === null && notice === null && renderCandidates === undefined,
   })
-  const slotCursor = useSeasonCursor({
-    count: slotRows.length,
-    onSelect: selectSlot,
-    onCancel: () => setStep(null),
-    isEnabled: step !== null && notice === null,
-  })
+
+  const noticeBox = notice === null ? null : (
+    <MessageBox text={notice} buttons={['확인']} onAnswer={() => {
+      setNotice(null)
+      // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
+      if (isRecruited) onDone()
+    }} />
+  )
+
+  // 2단계 — 공용 선수 고르기 0xdf 목적 3: 탭은 후보 종류로 고정(0x5980), '*' 막힘 · 바닥 7 (0x6fe0 · 0xb010)
+  if (chosen !== null) {
+    return (
+      <SeasonPlayerPickScreen
+        teamId={teamId}
+        roster={recordRoster}
+        initialTab={chosen.isPitcher ? ENTRY_TAB.투수 : ENTRY_TAB.타자}
+        gamePoint={gamePoint}
+        isRecruitSlot
+        overlay={noticeBox}
+        onPick={(_tab, index) => selectSlot(index)}
+        // 0xc3e8 취소 → 목적 3 은 0xe2
+        onBack={() => setStep(null)}
+      />
+    )
+  }
 
   return (
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xe2 · 0xdf 는 공 무늬 0x5fd61 을 먼저 깐다 (명전 목록 renderCandidates 는 제 바탕을 깐다) */}
-      {!(step === null && renderCandidates !== undefined) && <SkinBackdrop kind="공무늬" />}
-      {step === null && renderCandidates !== undefined ? (
+      {renderCandidates === undefined && <SkinBackdrop kind="공무늬" />}
+      {renderCandidates !== undefined ? (
         renderCandidates({ choose: chooseCandidate, back: onBack })
-      ) : step === null ? (
+      ) : (
         <SeasonListWindow
           title="선수영입"
           rows={listRows}
@@ -185,25 +207,9 @@ export function PlayerRecruitScreen({
           onBack={onBack}
           footer={'나만의리그 육성선수와 명예의 전당 선수를 데려온다\n비용도 인기도 조건도 없다'}
         />
-      ) : (
-        <SeasonListWindow
-          title="자리 고르기"
-          rows={slotRows}
-          cursor={slotCursor.cursor}
-          onMoveCursor={slotCursor.moveTo}
-          onSelect={selectSlot}
-          onBack={() => setStep(null)}
-          footer={'고른 자리의 선수는 맨 끝으로 밀린다 (빠지지 않는다)'}
-        />
       )}
 
-      {notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => {
-          setNotice(null)
-          // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
-          if (isRecruited) onDone()
-        }} />
-      )}
+      {noticeBox}
     </RawScreen>
   )
 }

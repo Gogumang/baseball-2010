@@ -701,7 +701,11 @@ export function SeasonRoute({
     const careerBatter = nariRecruitOf(nariRecords?.타자, false)
     return (
       <PlayerRecruitScreen
+        teamId={state.record.teamId}
         roster={roster}
+        // 자리 고르기 0xdf 목적 3 은 내 팀 레코드 차례(투수는 로테이션으로 섞인 차례) — 고른 칸 k 를 명단 첨자로
+        pitcherRecordOrder={session.pitcherRecordOrder}
+        gamePoint={session.gamePoints}
         // 영입 후보는 나만의리그 선수·명예의 전당에서 온다. 명예의 전당은 기록연감 칸(c3e66c1)에서 싣는다.
         // 나리 두 칸(0x22168·0x220ec — 투수편·타자편 저장의 내 선수)은 그 기록을 id 0xfe 선수로 통째 옮긴다
         list={{ careerPitcher: careerPitcher, careerBatter: careerBatter, ...recruits }}

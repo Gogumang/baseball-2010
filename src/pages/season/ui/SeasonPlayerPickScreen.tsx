@@ -26,9 +26,17 @@ export interface SeasonPlayerPickScreenProps {
   /** 취소(−16) — 목적 1 → 0xd0 · 2 → 0xcd (0xc3e8) */
   readonly onBack: () => void
   readonly gamePoint?: number
-  /** 목록 위에 얹는 알림 — 목적 1 의 StrMODE[220] (나리 선수 장비 거절) */
+  /** 목록 위에 얹는 알림 — 목적 1 의 StrMODE[220] (나리 선수 장비 거절) · 목적 3 의 [179]/[180] */
   readonly overlay?: ReactNode
+  /**
+   * 목적 3(선수영입 자리 고르기) — 목록 키 0x6fe0 이 '*'(탭 뒤집기)를 목록에 안 넘기고(탭이 후보 종류로 고정),
+   * 그리기 0xb010 의 바닥이 7 이다.
+   */
+  readonly isRecruitSlot?: boolean
 }
+
+/** 0xb010 — 목적 3 의 바닥 7 (되돌아가기 + "0상세정보") */
+const RECRUIT_SLOT_FOOTER = 7
 
 /** 목록 칸 — 이름·능력치는 `playerFaceOf`, 타자는 수비 위치(+0x1c & 0xf) */
 function pickListsOf(teamId: number, roster: SeasonTeamRoster): SeasonEntryLists {
@@ -44,8 +52,8 @@ function pickListsOf(teamId: number, roster: SeasonTeamRoster): SeasonEntryLists
 
 /**
  * **공용 선수 고르기** (장면 0x105 상태 **0xdf**, 들어옴 0x5980 · 키 0xc3e8 + 목록 키 0x6fe0 → 0x55864 · 그리기 0xb010)
- * — 목적 `this+0x110` 1(장착아이템) · 2(시즌정보 선수정보)에 쓰는 모양. 목적 3(선수영입 자리 고르기)은 `PlayerRecruitScreen` 이
- * 같은 상태를 근사로 들고 있다.
+ * — 목적 `this+0x110` 1(장착아이템) · 2(시즌정보 선수정보) · 3(선수영입 자리 고르기, `PlayerRecruitScreen` 이
+ * `isRecruitSlot` 으로 꽂는다)이 같은 판이다.
  *
  * 직접 떴다:
  * ```
@@ -67,7 +75,7 @@ function pickListsOf(teamId: number, roster: SeasonTeamRoster): SeasonEntryLists
  * ⚠️ 근사: 0x557c1 의 열 표(0xcbd74 …) 내용은 안 풀었다 — 줄에는 엔트리 편집과 같이 이름·수비 위치만 적는다.
  */
 export function SeasonPlayerPickScreen({
-  teamId, roster, initialTab, onPick, onBack, gamePoint = 0, overlay,
+  teamId, roster, initialTab, onPick, onBack, gamePoint = 0, overlay, isRecruitSlot = false,
 }: SeasonPlayerPickScreenProps) {
   const [editor, setEditor] = useState<EntryEditorState>(() => ({ ...openEntryEditor(false), tab: initialTab }))
   const lists = pickListsOf(teamId, roster)
@@ -81,8 +89,10 @@ export function SeasonPlayerPickScreen({
       return
     }
     if (key === '취소') return onBack()
+    // 0x6fe0 — 목적 3 이면 '*' 는 목록에 안 간다
+    if (isRecruitSlot && key === '별') return
     setEditor((current) => pressEntryKey(current, lists, key).state)
-  }, [editor, lists, onBack, onPick, overlay])
+  }, [editor, isRecruitSlot, lists, onBack, onPick, overlay])
 
   return (
     <EntryEditorScreen
@@ -92,6 +102,7 @@ export function SeasonPlayerPickScreen({
       isAceLocked={false}
       gamePoint={gamePoint}
       overlay={overlay}
+      {...(isRecruitSlot ? { footer: RECRUIT_SLOT_FOOTER } : {})}
       // 공통 앞그림 0xb810 — 0xdf 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다
       underlay={<SkinBackdrop kind="공무늬" />}
       onKey={onKey}

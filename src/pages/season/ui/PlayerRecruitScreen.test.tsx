@@ -33,7 +33,7 @@ const 후보 = (): RecruitListInput => ({
 
 const 띄우기 = (roster = 로스터(), list = 후보()) => {
   const onRecruit = vi.fn()
-  render(<PlayerRecruitScreen roster={roster} list={list} onRecruit={onRecruit} onDone={vi.fn()} onBack={vi.fn()} />)
+  render(<PlayerRecruitScreen teamId={0} roster={roster} list={list} onRecruit={onRecruit} onDone={vi.fn()} onBack={vi.fn()} />)
   return onRecruit
 }
 
@@ -82,21 +82,38 @@ describe('선수영입 목록 (상태 0xe2)', () => {
   })
 })
 
-describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
-  it('투수를 고르면 팀 투수 자리 목록이 나온다', () => {
+describe('자리 고르기와 확정 (0xdf 목적 3 → 0xc554)', () => {
+  /** 자리 목록 줄 k (공용 선수 고르기 판 — 엔트리 목록 창) */
+  const 자리 = (k: number) => screen.getByTestId(`엔트리-줄-${k}`)
+  /** 자리 고르기에 들어와 StrMODE[179] 를 닫는다 */
+  const 자리로 = (후보이름: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 후보이름 }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+  }
+  /** 바닥 표시 — 0xf 는 [3, 1](#타자), 0x17 은 [2, 1](#투수), 7 은 [1](상세정보만) */
+  const 바닥 = () => [...document.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
+  /** 커서를 k 로 옮기고 확인 */
+  const 고르기 = (k: number) => {
+    fireEvent.click(자리(k))
+    fireEvent.click(자리(k))
+  }
+
+  it('투수를 고르면 투수 탭(후보 종류로 고정)의 내 팀 투수 목록이 나온다 — 바닥 7', () => {
     띄우기()
+    자리로('나리투수 나리투수')
 
-    fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
-
-    expect(screen.getByRole('group', { name: '자리 고르기' })).toBeTruthy()
-    expect(줄글().slice(0, 3)).toEqual(['투수 1번 #0', '투수 2번 #1', '투수 3번 #2'])
+    expect(screen.getAllByTestId(/^엔트리-줄-/)).toHaveLength(3)
+    expect(screen.queryByTestId('엔트리-하위탭')).toBeNull() // 투수 탭
+    expect(바닥()).toEqual([1])
+    // 0x6fe0 — 목적 3 은 '*'(탭 뒤집기)를 목록에 안 넘긴다
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.queryByTestId('엔트리-하위탭')).toBeNull()
   })
 
   it('⚠️ 영입은 교체가 아니라 끼워넣기다 — 자리 수가 늘고 밀려난 선수는 맨 끝으로 간다', () => {
     const onRecruit = 띄우기()
-
-    fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
-    fireEvent.click(screen.getByRole('button', { name: '투수 2번 #1' }))
+    자리로('나리투수 나리투수')
+    고르기(1)
 
     const [result, asPitcher] = onRecruit.mock.calls[0] as [RecruitResult, boolean]
     expect(asPitcher).toBe(true)
@@ -108,13 +125,26 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('선수 영입을 완료하였습니다')
   })
 
+  it('자리는 레코드 차례(로테이션으로 섞인 투수 차례)의 칸 k 다 — 명단에는 그 칸의 첨자로 끼운다', () => {
+    const onRecruit = vi.fn()
+    // 레코드 칸 0·1·2 = 명단 첨자 1·2·0
+    render(<PlayerRecruitScreen teamId={0} roster={로스터()} pitcherRecordOrder={[1, 2, 0]} list={후보()}
+      onRecruit={onRecruit} onDone={vi.fn()} onBack={vi.fn()} />)
+    자리로('나리투수 나리투수')
+    고르기(0)
+
+    const [result] = onRecruit.mock.calls[0] as [RecruitResult, boolean]
+    // 레코드 칸 0 에 앉은 선수(명단 첨자 1, id 2)가 밀려나고 새 선수가 그 자리에 — 칸 번호는 레코드 칸 0
+    expect(result.roster.pitchers.map((player) => player.id)).toEqual([1, 0xfe, 3, 2])
+    expect(result.roster.pitchers[1].kindByte & 0x1f).toBe(0)
+  })
+
   it('[180] 을 닫아야 구단관리로 간다 (0xc5e4 팝업 0x19 → 0x6fe0 → 0xce)', () => {
     const onDone = vi.fn()
-    render(<PlayerRecruitScreen roster={로스터()} list={후보()} onRecruit={vi.fn()} onDone={onDone} onBack={vi.fn()} />)
+    render(<PlayerRecruitScreen teamId={0} roster={로스터()} list={후보()} onRecruit={vi.fn()} onDone={onDone} onBack={vi.fn()} />)
 
-    fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
-    fireEvent.click(screen.getByRole('button', { name: '투수 2번 #1' }))
+    자리로('나리투수 나리투수')
+    고르기(1)
     expect(onDone).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
@@ -123,9 +153,8 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
 
   it('⚠️ 투수 쪽은 밀려난 선수의 칸 번호를 고치는 줄이 빠져 있다 (S6 4-4)', () => {
     const onRecruit = 띄우기()
-
-    fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
-    fireEvent.click(screen.getByRole('button', { name: '투수 2번 #1' }))
+    자리로('나리투수 나리투수')
+    고르기(1)
 
     const [result] = onRecruit.mock.calls[0] as [RecruitResult, boolean]
     const 칸번호 = (index: number) => result.roster.pitchers[index].kindByte & 0x1f
@@ -134,11 +163,11 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
     expect(칸번호(3)).toBe(1)
   })
 
-  it('타자 쪽은 밀려난 선수의 칸 번호를 마지막으로 고쳐 준다', () => {
+  it('타자 쪽은 밀려난 선수의 칸 번호를 마지막으로 고쳐 준다 — 탭은 타자로 고정', () => {
     const onRecruit = 띄우기()
-
-    fireEvent.click(screen.getByRole('button', { name: '나리타자 나리타자' }))
-    fireEvent.click(screen.getByRole('button', { name: '타자 1번 #0' }))
+    자리로('나리타자 나리타자')
+    expect(screen.getByTestId('엔트리-하위탭')).toBeTruthy() // 타자 탭
+    fireEvent.keyDown(window, { key: 'Enter' })
 
     const [result, asPitcher] = onRecruit.mock.calls[0] as [RecruitResult, boolean]
     expect(asPitcher).toBe(false)
@@ -147,14 +176,15 @@ describe('자리 고르기와 확정 (0xdf → 0xc554)', () => {
   })
 
   it('자리 고르기에 들어오면 StrMODE[179] 를 띄운다 (0x5980 목적 3) — 팝업이 먼저 키를 먹는다', () => {
-    띄우기()
+    const onRecruit = 띄우기()
 
     fireEvent.click(screen.getByRole('button', { name: '나리투수 나리투수' }))
 
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('해당 선수가 영입될')
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
-    expect(screen.getByRole('group', { name: '자리 고르기' })).toBeTruthy()
+    expect(screen.getAllByTestId(/^엔트리-줄-/)).toHaveLength(3)
+    expect(onRecruit).not.toHaveBeenCalled()
   })
 
   it('자리 고르기에서 취소하면 목록으로 되돌아간다 (0xdf 취소 → 0xe2)', () => {
@@ -175,6 +205,7 @@ describe('원본 후보 목록을 꽂으면 (0xe1dc 목록 종류 0 → 키 0xe3
     const roster = { ...로스터(), pitchers: [...로스터().pitchers, 선수(0xb4, PLAYER_KIND.일반투수 | 3)] }
     render(
       <PlayerRecruitScreen
+        teamId={0}
         roster={roster}
         list={후보()}
         onRecruit={vi.fn()}
@@ -193,6 +224,6 @@ describe('원본 후보 목록을 꽂으면 (0xe1dc 목록 종류 0 → 키 0xe3
     expect(answers[0]).toContain('이미 영입된 선수 입니다')
     fireEvent.click(screen.getByRole('button', { name: '새선수' }))
     expect(answers[1]).toBeUndefined()
-    expect(screen.getByText('자리 고르기')).toBeTruthy()
+    expect(screen.getByTestId('엔트리-하위탭')).toBeTruthy() // 자리 고르기 — 타자 탭
   })
 })
