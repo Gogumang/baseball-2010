@@ -1131,12 +1131,12 @@ export function useCareerSession({
     setScreen({ kind: '이벤트', eventId: yearEndEventId(finished), context: '시즌' })
   }
 
-  /** 엔딩 141 로 — 번호는 141 진입 0x12300 의 `0xa3a85(S)` 판정이다 */
+  /**
+   * 엔딩 141 로 — 번호는 141 진입 0x12300 의 `0xa3a85(S)` 판정이다. 진입은 S+0x50 = 6 을 메모리에만 쓰고 커리어를 저장하지 않는다
+   * (저장은 엔딩 칸을 비운 채 — `savedCareerOf`). 보너스는 팝업 0x2b 를 닫을 때 준다(`receiveEndingBonus`)
+   */
   const enterEnding = (viewed: PlayerCareer, endingIndex: number) => {
-    // 엔딩 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다
-    setCareer(applyEndingBonus({ ...viewed, endingIndex }, endingIndex))
-    // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드)` — 웹은 보너스를 이 자리에서 준다
-    recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: endingBonusOf(endingIndex) })
+    setCareer({ ...viewed, endingIndex })
     setScreen({ kind: '엔딩', endingIndex })
   }
 
@@ -1392,6 +1392,13 @@ export function useCareerSession({
       // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c)
       matchPreparedRef.current = false
       setShouldForgetRepeatable(true)
+      const point = resumePointOf(savedCareer)
+      // 1c24e — S+0x50 == 6|7 이 맨 앞 갈래다: 141 진입 0x12300 을 다시 밟는다. 보너스를 받은 뒤 저장이라(S+0x7b) 키 0x1220c 가
+      // 보너스 팝업 없이 등록 팝업 0x2d 를 띄운다(`EndingScreen.isBonusReceived`)
+      if (point.kind === '엔딩') {
+        setCareer(savedCareer)
+        return setScreen({ kind: '엔딩', endingIndex: point.endingIndex })
+      }
       const lastGame = savedCareer.lastGame
       if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {
         // 116 진입 0x1278c 다시 — 카운터를 한 번 더 쓰고(겹쳐 쌓임) 평가 창을 다시 띄운다
@@ -1411,7 +1418,6 @@ export function useCareerSession({
           streakNotices: streakEventOf(replayed).notices,
         })
       }
-      const point = resumePointOf(savedCareer)
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
       if (point.kind === '새시즌') return startNewSeason(savedCareer)
       if (point.kind === '이벤트') {
@@ -2063,6 +2069,18 @@ export function useCareerSession({
       }
       const missing = finish.openedTeams.filter((id) => !rewarded.openedHiddenIds.includes(id))
       startNewSeason({ ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, ...missing] })
+    },
+
+    /**
+     * 엔딩 보너스 팝업 0x2b 를 닫았다 — 141 틀 0x1bbc4 의 1bbf4~1bc70: e = 0xa3a85(S) 로 보너스 0xcc40c[e] × 1000 을 전역 G 에
+     * 더하고(99999 상한) `0x22c7d(보너스, 모드)` 통계 · 전역기록 저장 · **S+0x7b = 1** · 커리어 저장(141 진입이 메모리에 쓴 S+0x50
+     * = 6 째 — 다시 켜면 141 로 돌아온다, `resumePointOf`) 뒤 등록 팝업 0x2d.
+     */
+    receiveEndingBonus: () => {
+      if (career === null || career.endingIndex === null || career.endingBonusReceived === true) return
+      const endingIndex = career.endingIndex
+      setCareer({ ...applyEndingBonus(career, endingIndex), endingBonusReceived: true })
+      recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: endingBonusOf(endingIndex) })
     },
 
     /** 부상·방출 엔딩 뒤 5000 G포인트로 이어한다 (StrMODE[221]). 모자라면 false */

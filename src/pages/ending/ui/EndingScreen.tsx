@@ -30,6 +30,16 @@ interface EndingScreenProps {
   readonly seenEventIds?: readonly string[]
   /** 엔딩 보너스(0이면 부상·방출 엔딩) */
   readonly bonusGamePoint: number
+  /**
+   * 보너스를 이미 받았나 — 커리어 S+0x7b. 키 0x1220c(12276~12284)는 S+0x7b ≠ 0 이거나 보너스가 0 이면 보너스 팝업 0x2b 없이
+   * 등록 팝업 0x2d 를 띄운다. 141 로 이어하기(0x1c154 의 S+0x50 == 6)로 다시 들어온 엔딩이 이 길이다.
+   */
+  readonly isBonusReceived?: boolean
+  /**
+   * 보너스 팝업 0x2b 를 닫을 때 (0x1bbc4 의 1bbf4~1bc70) — 전역 G += 보너스 · 0x22c7d 통계 · 전역기록 저장 · S+0x7b = 1 ·
+   * 커리어 저장(141 진입이 메모리에 쓴 S+0x50 = 6 째)을 부르는 쪽이 한다
+   */
+  readonly onBonusReceived?: () => void
   readonly isContinuable: boolean
   /**
    * 명예의 전당 등록 목록 (나리 상태 145) — StrMODE[215] "예" 로 들어간다. `onRegister(칸)` 은 고른 빈 칸(없으면 첫 빈 칸)으로
@@ -159,7 +169,7 @@ export function EndingScreen(props: EndingScreenProps) {
   const onPress = phase === '엔딩'
     ? () => setPhase(isContinuable ? '이어하기질문' : '제작진')
     : phase === '제작진'
-      ? () => setPhase(bonusGamePoint > 0 ? '보너스' : '등록질문')
+      ? () => setPhase(bonusGamePoint > 0 && props.isBonusReceived !== true ? '보너스' : '등록질문')
       : undefined
 
   const romanceEndingIndex = romanceEndingIndexOf(endingIndex, seenEventIds)
@@ -181,7 +191,10 @@ export function EndingScreen(props: EndingScreenProps) {
         <MessageBox
           text={TEXT.bonus.replace('%d', String(bonusGamePoint))}
           buttons={['OK']}
-          onAnswer={() => setPhase('등록질문')}
+          onAnswer={() => {
+            props.onBonusReceived?.()
+            setPhase('등록질문')
+          }}
         />
       )}
       {phase === '안내' && <MessageBox text={message} buttons={['OK']} onAnswer={onFinish} />}

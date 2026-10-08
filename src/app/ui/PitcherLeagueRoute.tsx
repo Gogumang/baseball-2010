@@ -294,6 +294,9 @@ export function PitcherLeagueRoute({
         endingIndex={endingIndex}
         seenEventIds={career.seenEventIds}
         bonusGamePoint={pitcherEndingBonusOf(endingIndex)}
+        // S+0x7b — 141 로 이어하기한 엔딩은 보너스를 이미 받았다. 팝업 0x2b 를 닫을 때 보너스 · S+0x7b · 저장 (1bbf4~1bc70)
+        isBonusReceived={career.endingBonusReceived === true}
+        onBonusReceived={actions.receiveEndingBonus}
         isContinuable={isContinuablePitcherEnding(endingIndex)}
         // 선수 애니 바탕은 모드 3 이면 0 으로 고정이다 (endingLayout `endingWalkInAnimationOf`)
         walkInLook={{

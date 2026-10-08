@@ -189,8 +189,13 @@ export type PitcherResumePoint =
   | { readonly kind: '포스트시즌' }
   /** 경기 뒤(2) 116 이 포스트시즌 중 g == 0 이라 136 으로 — 웹은 시즌 끝 화면(136 자리) */
   | { readonly kind: '시즌종료' }
-  /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 (엔딩 141 도 웹은 아직 여기다) */
+  /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 */
   | { readonly kind: '관리' }
+  /**
+   * S+0x50 == 6|7(1c24e~1c25c) → 141 엔딩 — 보너스 팝업 0x2b 를 닫으며 저장한 커리어(`savedCareerOf`)다. 141 진입 0x12300 을
+   * 다시 밟는다
+   */
+  | { readonly kind: '엔딩' }
   /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표 (S+0x50 == 4 이거나 g 홀수). 이전 상태가 1 이라 취소가 안 먹는다 */
   | { readonly kind: '다음경기순위' }
   /** S+0x50 == 0x11(464 거절 보상 0x8ccba — `seasonEndState` 137) → 1c25e 새 시즌 0x1b768 */
@@ -207,13 +212,14 @@ export type PitcherResumePoint =
  * 116 끝 0x12b74: S+0xb4 ≠ 0 이면 S+0xb2(= L+0x32) == 0 → [114 → 136], 아니면 [114 → 128]
  * ```
  * S+0x50 == 2(116 진입 0x1278c)이고 재료(`lastGame`)가 있으면 116 을 다시 띄운다. 재료가 없는 옛 저장은 예전처럼 대진이 있는데
- * 사슬 상태가 아니면 116 의 끝처럼 g 로 가른다. 엔딩 141 은 웹 투수편이 따로 돌아가지 않는다. 국가대항전(S+0x12c)은 저장의 대회로 134.
+ * 사슬 상태가 아니면 116 의 끝처럼 g 로 가른다. 엔딩 141 은 보너스를 받은 저장만 엔딩 칸을 들어 141 로 간다. 국가대항전(S+0x12c)은 저장의 대회로 134.
  * 대진이 없으면 맨 끝 갈래(1c38e~1c3b6): S+0x50 == 4(109 진입 0x10db0)면 109, null(1 · 2 · 3)이면 g 짝수 105 · 홀수 109 —
  * 2 는 116 의 끝(0x12b98)이 같은 g 짝홀로 가른다 (타자편 `resumePointOf` 머리 주석에 S+0x50 쓰는 곳 표).
  */
 export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint {
-  // 판정 없음(−1) 엔딩은 저장에 엔딩 칸이 비어(`savedCareerOf`) 이 줄에 오지 않는다 — 114 끝 저장의 S+0x50 으로 간다
-  if (career.endingIndex !== null) return { kind: '관리' }
+  // 1c24e — S+0x50 == 6|7 → 141. 보너스 팝업 0x2b 를 닫은(1bc6e 저장) 엔딩만 저장에 엔딩 칸이 든다(`savedCareerOf`) — 그 전에
+  // 끊겼으면(판정 없음 · 부상 · 방출 · 보너스 전) 114 끝 저장의 S+0x50 으로 간다
+  if (career.endingIndex !== null) return { kind: '엔딩' }
   // 1c25e — 0x11 은 6|7 바로 다음, 2(116)보다 앞에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
   if (career.seasonEndState === 137) return { kind: '새시즌' }
   if (career.seasonEndState === 116 && career.lastGame !== undefined) return { kind: '경기결과' }

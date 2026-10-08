@@ -314,6 +314,8 @@ export interface PitcherLeagueSession {
     readonly retire: () => void
     /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기. 모자라면 false */
     readonly continueAfterEnding: () => boolean
+    /** 엔딩 141 의 보너스 팝업 0x2b 를 닫았다 — 보너스 · S+0x7b = 1 · 저장 (1bbf4~1bc70) */
+    readonly receiveEndingBonus: () => void
     /** 엔딩을 다 본 뒤 — 선수를 지운다 (145 틀이 메인 메뉴로 나가는 자리) */
     readonly finishEnding: () => void
     /** 111 장비 상점 · 121 장비착용을 연다 */
@@ -684,7 +686,9 @@ export function usePitcherLeagueSession(
               : resumePoint.kind === '경기결과'
                 ? '경기결과'
                 // 0x1c154 그 밖 갈래 S+0x12c → 134 — 저장의 대회로 대진판부터
-                : resumePoint.kind === '국가대항전' ? '국가대항전' : '관리',
+                : resumePoint.kind === '국가대항전' ? '국가대항전'
+                  // 1c24e S+0x50 == 6 → 141 — 보너스를 받은 저장(S+0x7b)이라 키 0x1220c 가 등록 팝업 0x2d 로 간다
+                  : resumePoint.kind === '엔딩' ? '엔딩' : '관리',
   )
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() =>
@@ -1344,16 +1348,28 @@ export function usePitcherLeagueSession(
     [commit],
   )
 
-  /** 엔딩 141 로 — 보너스는 엔딩을 띄울 때 준다 (0x1220c). 부상·방출은 0 이다 */
+  /**
+   * 엔딩 141 로 — 진입 0x12300 은 S+0x50 = 6 을 메모리에만 쓰고 커리어를 저장하지 않는다(저장은 엔딩 칸을 비운 채 —
+   * `savedCareerOf`). 보너스는 팝업 0x2b 를 닫을 때 준다(`receiveEndingBonus`)
+   */
   const enterEnding = useCallback(
     (finished: PitcherCareer, endingIndex: number) => {
-      commit(applyPitcherEndingBonus({ ...finished, endingIndex }, endingIndex))
-      // 보너스 팝업이 닫힐 때 0x1bc4a `0x22c7d(보너스, 모드 3)` — 웹은 보너스를 이 자리에서 준다
-      recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(endingIndex) })
+      commit({ ...finished, endingIndex })
       setScene('엔딩')
     },
-    [commit, recordStat],
+    [commit],
   )
+
+  /**
+   * 엔딩 보너스 팝업 0x2b 를 닫았다 — 141 틀 0x1bbc4 의 1bbf4~1bc70(모드 3 · 4 공용): 보너스 0xcc40c[e] × 1000 을 전역 G 에 더하고
+   * `0x22c7d(보너스, 모드 3)` 통계 · 전역기록 저장 · **S+0x7b = 1** · 커리어 저장(S+0x50 = 6 째 — 다시 켜면 141, `pitcherResumePointOf`)
+   */
+  const receiveEndingBonus = useCallback(() => {
+    if (career === null || career.endingIndex === null || career.endingBonusReceived === true) return
+    const endingIndex = career.endingIndex
+    commit({ ...applyPitcherEndingBonus(career, endingIndex), endingBonusReceived: true })
+    recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: pitcherEndingBonusOf(endingIndex) })
+  }, [career, commit, recordStat])
 
   /** 연말 사슬의 이벤트 하나를 튼다 — 들어가기 전에 상태 함수가 하는 일(375 앞 MVP 판정 131)을 먼저 */
   const openYearEndEvent = useCallback(
@@ -2131,6 +2147,7 @@ export function usePitcherLeagueSession(
       continueCareer,
       retire,
       continueAfterEnding,
+      receiveEndingBonus,
       finishEnding,
       openShop,
       purchase,

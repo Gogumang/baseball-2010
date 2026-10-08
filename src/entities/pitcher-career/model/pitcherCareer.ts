@@ -409,6 +409,8 @@ export interface PitcherCareer {
   readonly hasSeenYearGoalWindow: boolean
   readonly yearGoalEventDone: boolean
   readonly endingIndex: number | null
+  /** **엔딩 보너스를 받았나** — 커리어 S+0x7b (타자편 `PlayerCareer.endingBonusReceived` 와 같은 칸 · 같은 141 틀) */
+  readonly endingBonusReceived?: boolean
   readonly league: League
   /**
    * **열 팀 나리 팀 레코드** (`entities/career/model/nariTeamRecord`) — 저장 블록 `[저장+0xb8] + 4 + 0x1c·팀`. 142 마선수 넣기가

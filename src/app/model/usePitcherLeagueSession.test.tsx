@@ -826,8 +826,36 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(본것.slice(-3)).toEqual([502, 496, 503])
     expect(result.current.scene).toBe('엔딩')
     expect(result.current.career?.endingIndex).toBe(5)
-    // 엔딩 보너스 0xcc40c[5] = 12000 G 를 띄울 때 준다 (0x1220c)
+    // 엔딩 보너스 0xcc40c[5] = 12000 G 는 보너스 팝업 0x2b 를 닫을 때 준다 (1bbf4~1bc4a)
+    expect(result.current.career?.gamePoint).toBe(0)
+    act(() => result.current.actions.receiveEndingBonus())
     expect(result.current.career?.gamePoint).toBe(12_000)
+    expect(result.current.career?.endingBonusReceived).toBe(true)
+  })
+
+  it('은퇴 엔딩은 보너스 팝업 0x2b 를 닫을 때 S+0x7b = 1 · S+0x50 = 6 째 저장 — 다시 켜면 141 로, 보너스는 다시 안 준다', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store).result
+    act(() => 첫판.current.actions.create('투수', 신인))
+    act(() => 첫판.current.actions.save({
+      ...첫판.current.career!, season: 9, gamesPlayed: 45, popularity: 1600, gamePoint: 0, seasonEndState: 132,
+    }))
+    const result = 띄우기(store).result
+    expect(result.current.story?.eventId).toBe(502)
+    act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
+    expect(result.current.scene).toBe('엔딩')
+    expect(result.current.career?.endingIndex).toBe(5)
+    // 141 진입은 저장하지 않는다 — 보너스 전에 끄면 114 끝 저장(132)으로 502 를 다시 튼다
+    expect(store.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
+    expect(띄우기(store).result.current.story?.eventId).toBe(502)
+
+    act(() => result.current.actions.receiveEndingBonus())
+    expect(store.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true, gamePoint: 12_000 })
+    const 다시 = 띄우기(store).result
+    expect(다시.current.scene).toBe('엔딩')
+    expect(다시.current.career?.endingIndex).toBe(5)
+    act(() => 다시.current.actions.receiveEndingBonus())
+    expect(다시.current.career?.gamePoint).toBe(12_000)
   })
 
   it('판정 없음(e = −1) 엔딩은 저장하지 않는다 — 141 은 S+0x50 = 6 을 메모리에만 써 다시 켜면 114 끝 저장(132)으로 502 를 다시 튼다', () => {

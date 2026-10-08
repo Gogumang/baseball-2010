@@ -92,7 +92,11 @@ describe('이어하기 분기 0x1c154 — S+0x50(seasonEndState)', () => {
     expect(resumePointOf(선수({ seasonEndState: 128, postseason: 대진 }))).toEqual({ kind: '포스트시즌' })
     expect(resumePointOf(선수({ postseason: 대진 }))).toEqual({ kind: '시즌종료' })
     expect(resumePointOf(선수())).toEqual({ kind: '관리' })
-    expect(resumePointOf(선수({ seasonEndState: 132, endingIndex: 1 }))).toEqual({ kind: '관리' })
+  })
+
+  it('S+0x50 == 6(1c24e) → 141 — 보너스 팝업을 닫으며 저장한 엔딩 칸이 있으면 엔딩으로 간다', () => {
+    expect(resumePointOf(선수({ seasonEndState: 132, endingIndex: 5, endingBonusReceived: true })))
+      .toEqual({ kind: '엔딩', endingIndex: 5 })
   })
 
   it('연봉 보상 뒤(S+0x50 = 0xa — 웹 133) 0x1c154 1c2a2: 판정 1 → 501 · 연차idx 12 → 504 · 짝수 → 133 · 홀수 → 새 시즌', () => {

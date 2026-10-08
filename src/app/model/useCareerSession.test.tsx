@@ -257,6 +257,37 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(다시.result.current.session.career?.endingIndex).toBeNull()
   })
 
+  it('은퇴 엔딩은 보너스 팝업 0x2b 를 닫을 때(1bbf4~1bc70) 보너스 · S+0x7b = 1 · S+0x50 = 6 째 저장 — 다시 켜면 141, 보너스는 한 번', () => {
+    const saveGame = 메모리저장(목표달성선수({ season: 9, popularity: 1600, seasonEndState: 132, gamePoint: 0 }))
+    const 처음 = 열기(saveGame)
+    expect(처음.result.current.screen).toEqual({ kind: '이벤트', eventId: 502, context: '시즌' })
+    act(() => 처음.result.current.session.actions.completeScene([], [502, 496, 503], 503))
+    expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
+    // 141 진입은 저장하지 않고 보너스도 아직이다
+    expect(처음.result.current.session.career?.gamePoint).toBe(0)
+    expect(saveGame.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
+    expect(열기(saveGame).result.current.screen).toEqual({ kind: '이벤트', eventId: 502, context: '시즌' })
+
+    act(() => 처음.result.current.session.actions.receiveEndingBonus())
+    expect(처음.result.current.session.career?.gamePoint).toBe(12_000)
+    expect(saveGame.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true, gamePoint: 12_000 })
+
+    const 다시 = 열기(saveGame)
+    act(() => 다시.result.current.session.actions.continueSaved())
+    expect(다시.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
+    act(() => 다시.result.current.session.actions.receiveEndingBonus())
+    expect(다시.result.current.session.career?.gamePoint).toBe(12_000)
+  })
+
+  it('부상 · 방출 엔딩(e = 0 · 1)도 141 은 저장하지 않는다 — 이어하기 팝업 0x32 "아니오"(1be46)는 메인 메뉴라 114 끝 저장이 남는다', () => {
+    const saveGame = 메모리저장(목표달성선수({ season: 7, popularity: 400, seasonEndState: 132 }))
+    const 처음 = 열기(saveGame)
+    expect(처음.result.current.screen).toEqual({ kind: '이벤트', eventId: 501, context: '시즌' })
+    act(() => 처음.result.current.session.actions.completeScene([], [501], 501))
+    expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 1 })
+    expect(saveGame.load()).toMatchObject({ endingIndex: null, seasonEndState: 132 })
+  })
+
   it('선택지 확인(0x8b804 → 0x8b0e4) — 떠나온 줄을 본 표시하고 저장한다 · 장소에서 연 이벤트면 행동함(S+4)', () => {
     const saveGame = 메모리저장(목표달성선수({ seasonEndState: 132 }))
     const 처음 = 열기(saveGame)

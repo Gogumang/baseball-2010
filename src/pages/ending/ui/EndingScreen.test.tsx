@@ -218,6 +218,25 @@ describe('엔딩 흐름', () => {
     expect(onFinish).toHaveBeenCalled()
   })
 
+  it('보너스 팝업 0x2b 를 닫을 때 onBonusReceived · 이미 받았으면(S+0x7b) 보너스 없이 등록 팝업 0x2d (0x1220c 12276~12284)', () => {
+    const onBonusReceived = vi.fn()
+    띄우기({ onBonusReceived })
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onBonusReceived).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(onBonusReceived).toHaveBeenCalledTimes(1)
+    cleanup()
+
+    const again = vi.fn()
+    띄우기({ isBonusReceived: true, onBonusReceived: again })
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.queryByText(/3000 G포인트/)).toBeNull()
+    expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
+    expect(again).not.toHaveBeenCalled()
+  })
+
   it('등록을 묻는 팝업에 아니오면 곧장 끝낸다 — StrMODE[219] 는 목록의 취소다 (0x1bbc4)', () => {
     const onFinish = vi.fn()
     띄우기({ onFinish, bonusGamePoint: 0 })

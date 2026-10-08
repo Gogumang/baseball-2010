@@ -91,8 +91,13 @@ export type ResumePoint =
   | { readonly kind: '포스트시즌' }
   /** S+0x50 == 2(경기 뒤) → 116 → g == 0 이면 [114 → 136] — 45번째 경기 뒤 · 내 시리즈가 끝난 경기 뒤 */
   | { readonly kind: '시즌종료' }
-  /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 (엔딩 141 도 웹은 아직 여기다) */
+  /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 */
   | { readonly kind: '관리' }
+  /**
+   * S+0x50 == 6|7(1c24e~1c25c) → 141 엔딩 — 보너스 팝업 0x2b 를 닫으며 저장한 커리어(`savedCareerOf`)다. 141 진입 0x12300 을 다시
+   * 밟는다(S+0x50 = 6 · e = 0xa3a85(S) · 배경음 · 엔딩 판). e 는 같은 S 로 다시 판정하므로 저장한 번호와 같다
+   */
+  | { readonly kind: '엔딩'; readonly endingIndex: number }
   /** 그 밖 갈래의 나머지 → 109 다음경기 앞 순위표. 이전 상태가 1(자원 적재)이라 취소가 안 먹는다 */
   | { readonly kind: '다음경기순위' }
   /** S+0x50 == 0x11(464 거절 보상 0x8ccba — `seasonEndState` 137) → 1c25e 새 시즌 0x1b768 */
@@ -124,7 +129,8 @@ export type ResumePoint =
  * 116 의 끝(0x12b74)으로 옮긴다: 대진이 있으면 g(= L+0x32) == 0 → 136, 아니면 128 · 대진이 없으면 g 짝수 105 · 홀수 109.
  * 웹의 116 대응은 결과 화면이라 다시 못 띄우므로 그 다음 화면으로 돌아간다(⚠️ 116 · 114 를 다시 보이지 않는 것은 근사).
  * 132 뒤 국가대표 133·국가대항전 134 는 S+0x50 을 안 바꾼다(0x1a090·0x19f30 머리 확인) — 연봉 결과(384~391)의 보상 20 이
- * 0xa 로 바꿔 둔 뒤라 이어하기는 0xa 갈래로 133 을 다시 밟는다(아래). 엔딩 141(S+0x50 = 6, 0x1230e)은 웹이 아직 따로 돌아가지 않는다.
+ * 0xa 로 바꿔 둔 뒤라 이어하기는 0xa 갈래로 133 을 다시 밟는다(아래). 엔딩 141(S+0x50 = 6, 0x1230e)은 보너스 팝업을 닫으며
+ * 저장한 커리어만 엔딩 칸을 든다(`savedCareerOf`) — 그 칸이 있으면 141 로 간다.
  *
  * **0xa 갈래 (1c2a2~1c344, 직접 떴다)** — 연봉 보상 뒤 끊긴 자리:
  * ```
@@ -138,9 +144,9 @@ export type ResumePoint =
  * ⚠️ 1c30e~1c342 의 `0x76705(this+0xe8, 0x23, 0xbe, 0x1e)` · `0x7dfad(this+0xe0)` · +0x158/+0x15c 칸 복사는 그림 쪽이라 옮기지 않았다.
  */
 export function resumePointOf(career: PlayerCareer): ResumePoint {
-  // 엔딩 141 은 S+0x50 = 6(0x1230e) 갈래다 — 웹 이어하기는 엔딩으로 돌아가지 않는다(예전 그대로 관리 화면). 판정 없음(−1)은
-  // 저장에 엔딩 칸이 비어 이 줄에 오지 않는다(`savedCareerOf`) — 114 끝 저장의 S+0x50 으로 간다
-  if (career.endingIndex !== null) return { kind: '관리' }
+  // 1c24e — S+0x50 == 6|7 → 141. 보너스 팝업 0x2b 를 닫은(1bc6e 저장) 엔딩만 저장에 엔딩 칸이 든다(`savedCareerOf`) — 그 전에
+  // 끊겼으면(판정 없음 · 부상 · 방출 · 보너스 전) 114 끝 저장의 S+0x50 으로 간다
+  if (career.endingIndex !== null) return { kind: '엔딩', endingIndex: career.endingIndex }
   // 1c25e — 0x11 은 6|7 바로 다음에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
   if (career.seasonEndState === 137) return { kind: '새시즌' }
   switch (career.seasonEndState) {

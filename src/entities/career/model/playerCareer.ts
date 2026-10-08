@@ -279,6 +279,12 @@ export interface PlayerCareer {
   /** 선수 생활이 끝났으면 StrENDING 번호 */
   readonly endingIndex: number | null
   /**
+   * **엔딩 보너스를 받았나** — 커리어 S+0x7b. 141 틀 0x1bbc4 가 보너스 팝업 0x2b 를 닫을 때만 1 로 쓰고(1bc5a~1bc60) 곧 커리어를
+   * 저장한다(1bc64~1bc70). 읽는 곳은 141 키 0x1220c(12276~12284) 하나 — 서 있으면 보너스 없이 등록 팝업 0x2d 다. 지우는 곳은 없다
+   * (바이너리 전체 `adds #0x7b ; ldrb/strb` 훑기: 0x1227a 읽기 · 0x1bc5e 쓰기, 0x6b4a · 0x6c1a · 0x8c5a 는 시즌모드 쪽). 없으면 0.
+   */
+  readonly endingBonusReceived?: boolean
+  /**
    * 질병 이벤트 쿨다운 (선수 +0x7c). 질병에 걸리거나 나으면 20 이 되고, 0 보다 크면 이벤트 490 이 막힌다.
    * 줄어드는 단위는 미확인이라 경기마다 1 씩 줄인다 (추정).
    */
