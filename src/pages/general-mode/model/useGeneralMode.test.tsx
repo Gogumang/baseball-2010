@@ -303,3 +303,54 @@ describe('준비 기록 skin+0xbc 는 앱 전역이다 — 스킨은 앱 초기�
     expect(readSetupRecord().stadiumId).toBe(12)
   })
 })
+
+describe('22 진입 0x314b0 의 무대 구장 0x78664(무대, st+0x30) — 구장 > 9 면 rand(0, 10) 하나 더', () => {
+  const 경기정보까지 = (구장: number) => {
+    const random = createSeededRandom(씨앗)
+    const hook = renderHook(() => useGeneralMode({ random, ...열림 }))
+    const { actions } = hook.result.current
+    act(() => actions.selectUserTeam(2))
+    act(() => hook.result.current.actions.selectAiTeam(4))
+    act(() => hook.result.current.actions.selectFirstBat(0))
+    // 원본은 커서가 곧 rec+0xc — 빠른실행이 남긴 히든 팀 번호 따위가 그대로 올 수 있다
+    act(() => hook.result.current.actions.moveStadium(구장))
+    act(() => hook.result.current.actions.selectAce(0))
+    act(() => hook.result.current.actions.selectAce(5))
+    return { random, ...hook }
+  }
+
+  it('구장 0~9 면 무대+0x70 = 구장, 굴림 없음', () => {
+    const { random, result } = 경기정보까지(6)
+    const 따로 = createSeededRandom(씨앗)
+    rollTeamSetup(0, 0, 따로)
+
+    expect(result.current.matchInfoStadium).toBe(6)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+  })
+
+  it('구장 12 면 0x30f20 넷 뒤에 rand(0, 10) — 그 값이 무대 구장이다', () => {
+    const { random, result } = 경기정보까지(12)
+    const 따로 = createSeededRandom(씨앗)
+    rollTeamSetup(0, 0, 따로)
+    const 구장 = 따로.rand(0, 10)
+
+    expect(result.current.matchInfoStadium).toBe(구장)
+    // 기록 rec+0xc 는 그대로 12 — 굴린 값은 무대에만 들어간다
+    expect(result.current.flow.setup.stadiumId).toBe(12)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+  })
+
+  it('23 에서 돌아올 때는 무대를 새로 안 만든다 (314c8 → 3163c)', () => {
+    const { random, result } = 경기정보까지(12)
+    const 구장 = result.current.matchInfoStadium
+    act(() => result.current.actions.openEntry(true))
+    act(() => result.current.actions.pressEntryKey('취소'))
+    expect(result.current.entryEdit).toBeNull()
+    const 따로 = createSeededRandom(씨앗)
+    rollTeamSetup(0, 0, 따로)
+    따로.rand(0, 10)
+
+    expect(result.current.matchInfoStadium).toBe(구장)
+    expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+  })
+})
