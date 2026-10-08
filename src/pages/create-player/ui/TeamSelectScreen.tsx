@@ -4,6 +4,7 @@ import { RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
@@ -62,7 +63,20 @@ interface TeamSelectScreenProps {
   readonly onCancel: () => void
   /** 화면 위에 얹을 팝업 — 같은 무대(RawScreen) 맨 위에 그린다 */
   readonly overlay?: ReactNode
+  /**
+   * 어둡게 덮는 칸 — 공용 목록 0x63b14 의 마지막 인자(칸 그리기 0x7a570 넷째 인자). 시즌 트레이드 0xe4(그림 0xa14c)만 내 팀
+   * (s8)SR[1] 을 넘기고 그 밖(0xca 등)은 −1 이다. `TEAM_COVER_STEP` 참고.
+   */
+  readonly coveredTeamId?: number
 }
+
+/**
+ * 칸 그리기 0x7a570 의 덮기 칸 (직접 떴다, 0x7b342~0x7b38c): 칸 번호 == 넷째 인자이면 로고(0x66431 이 칸 + (2, 2) 에 그린 것)
+ * 뒤에 그 로고 그림의 (폭 >> 1, 높이 >> 1) 를 **칸 자리 (x, y)** 에 검정 덮기 [0x15605d4](x, y, w, h, **7**) — 화면을 7/16 남긴다.
+ * 로고 77×76 → 38×38 이라 웹 로고 칸(CELL_LOGO_SIZE)과 같고, 자리는 로고보다 (−2, −2) 다.
+ */
+const TEAM_COVER_STEP = 7
+const TEAM_COVER_OFFSET = -2
 
 /**
  * 팀 고르기 (나만의리그 상태 **0x65** — 진입 0x10790 · 그리기 0x14114 → 공용 목록 0x63b15 의 k=0,
@@ -78,6 +92,7 @@ interface TeamSelectScreenProps {
  */
 export function TeamSelectScreen({
   openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape = TEAM_GRID_SHAPE, onSelect, onSelectLocked, onCancel, overlay,
+  coveredTeamId = -1,
 }: TeamSelectScreenProps) {
   const [cursor, setCursor] = useState(0)
 
@@ -190,6 +205,16 @@ export function TeamSelectScreen({
                     height: CELL_LOGO_SIZE,
                   }} />
               : <span className={styles.centeredText} style={{ left: 0, top: 14, width: GRID.cell }}>?</span>}
+            {open && index === coveredTeamId && (
+              <span className={styles.layer} data-testid="팀칸-덮기" style={{
+                left: (GRID.cell - CELL_LOGO_SIZE) / 2 + TEAM_COVER_OFFSET,
+                top: (GRID.cell - CELL_LOGO_SIZE) / 2 + TEAM_COVER_OFFSET,
+                width: CELL_LOGO_SIZE,
+                height: CELL_LOGO_SIZE,
+                background: ORIGINAL_COLORS.black,
+                opacity: blackStepCoverOpacityOf(TEAM_COVER_STEP),
+              }} />
+            )}
             {index === cursor && (
               <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
                 style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }} />

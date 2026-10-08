@@ -148,7 +148,7 @@ export interface TradeScreenProps {
  *
  * **팀 고르기(0xe4)** 는 선수 등록 쪽 `TeamSelectScreen` 을 그대로 빌려 쓴다
  * 키 0x8250 이 칸 == SR+1(내 팀)이면 아무것도 안 하고 칸 > 9 면 히든 힌트를 띄우므로 칸 번호는 15팀 격자 그대로다
- * (⚠️ 0xe4 그림이 내 팀 칸을 어떻게 그리는지는 확인하지 못했다).
+ * (내 팀 칸은 그림 0xa14c → 칸 그리기 0x7a570 이 로고 위를 검정 덮기 단계 7 로 어둡게 한다 — `TeamSelectScreen.coveredTeamId`).
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xe5·0xe6 의 엔트리 목록 창(0x5cfec)과 0xe7 의 진행 화면
  * (0xd4e8) 좌표를 확인하지 못해 다른 시즌 화면과 같은 공용 판 목록으로 그린다.
@@ -398,6 +398,8 @@ export function TradeScreen({
   if (step.kind === '팀' && notice === null) {
     return (
       <TeamSelectScreen title="시즌모드" gamePoint={gamePoints} openedHiddenIds={openedHiddenIds}
+        // 그림 0xa14c — 공용 목록 0x63b15 의 마지막 인자 (s8)[[this+0xa0]+1] = 내 팀: 그 칸 로고를 검정 덮기 단계 7 로 어둡게
+        coveredTeamId={record.teamId}
         onSelect={chooseTeam} onSelectLocked={chooseTeam} onCancel={onBack}
         overlay={hiddenHint !== null
           && <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />} />

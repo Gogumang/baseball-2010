@@ -94,6 +94,15 @@ const 타자로 = () => {
 }
 
 describe('0xe4 팀 고르기', () => {
+  it('내 팀 칸만 로고 위를 검정 덮기 단계 7(9/16 검정)로 어둡게 한다 — 그림 0xa14c → 0x7a570', () => {
+    띄우기(상태())
+
+    const 덮기 = screen.getAllByTestId('팀칸-덮기')
+    expect(덮기).toHaveLength(1)
+    expect(덮기[0].closest('button')?.getAttribute('aria-label')).toBe(TEAMS[MY_TEAM].name)
+    expect(Number(덮기[0].style.opacity)).toBeCloseTo(9 / 16)
+  })
+
   it('팀 격자가 먼저 뜬다 (선수 등록 화면을 빌려 쓴다)', () => {
     띄우기(상태())
 
