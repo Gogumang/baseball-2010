@@ -131,6 +131,14 @@ describe('구장 아이템 상점 — 구매 확정 (0x812c)', () => {
 })
 
 describe('구장관리 교체 (0x7958)', () => {
+  it('구장관리(0xea)만 구장 미리보기(0xb158)를 깐다 — 상점은 없다', () => {
+    띄우기(레코드(), { mode: '구장관리' })
+    expect(screen.getByTestId('구장-미리보기')).toBeTruthy()
+    cleanup()
+    띄우기(레코드())
+    expect(screen.queryByTestId('구장-미리보기')).toBeNull()
+  })
+
   it('⚠️ 원본 버그: 가드가 하나도 없어 **안 산 칸도 그대로 끼워진다**', () => {
     const onChange = 띄우기(레코드({ popularity: 0, money: 0 }), { mode: '구장관리' })
 

@@ -293,3 +293,28 @@ export function seasonStadiumOf(record: SeasonRecord): SeasonStadiumScene {
     grassPalette: grassPaletteRowOf(record.stadiumEquipped[2] ?? 0),
   }
 }
+
+/**
+ * **구장관리 0xea 미리보기** 의 구장 칸 — 진입 `0xe4d0` · 키 `0x7958` (직접 떴다).
+ * ```
+ * 0xe4d0  0x78741(구장, (s8)rec[0x1b8]) ; 구장+0x89 = 0 ; 구장+0x8a = (s8)rec[0x1b9] ; 0x76ba5(구장, 1)
+ *         0x786c9(구장, rec[0x1ba] − 1, 1)                      ; 잔디 팔레트 (0→−1 · 1→0 · 2→1 · 그밖 2)
+ * 0x7958  창 키 0x819ad 뒤 — 칸 목록에 포커스가 있고 취소가 아니면 지금 종류의 **커서 칸**으로 그 한 칸만 갈아 끼운다:
+ *         종류 0 → 0x78741(구장, 칸) · 종류 1 → 구장+0x8a = 칸 (둘 다 0x76ba5(구장, 1)) · 종류 2 → 0x786c9(구장, 칸 − 1, 1)
+ *         취소(포커스 있음) 7a8c~7afc → 위 진입과 같이 저장값으로 되돌린다
+ * ```
+ * 관중 단계 +0x89 는 늘 0(빈 좌석)이다. `preview` 가 없으면 저장값 그대로다.
+ */
+export function stadiumPreviewOf(
+  record: SeasonRecord,
+  preview?: { readonly kind: StadiumKind; readonly slot: number },
+): SeasonStadiumScene {
+  const slotOf = (kind: StadiumKind) =>
+    preview !== undefined && preview.kind === kind ? preview.slot : (record.stadiumEquipped[STADIUM_KINDS.indexOf(kind)] ?? 0)
+  return {
+    stand: slotOf('관중석'),
+    crowd: 0,
+    board: slotOf('전광판'),
+    grassPalette: grassPaletteRowOf(slotOf('잔디')),
+  }
+}

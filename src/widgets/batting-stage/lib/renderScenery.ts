@@ -391,3 +391,75 @@ function drawField(context: CanvasRenderingContext2D, grassPalette: number | nul
     0, STAGE_LAYOUT.fieldTopY + offsetY, STAGE_WIDTH, field.height,
   )
 }
+
+/**
+ * **구장 미리보기** — 시즌 장면 0x105 상태 0xea(구장관리) 그리기 `0xb158` (직접 떴다):
+ * ```
+ * b15a  구장 = [this+0x10c] ; 구장+4 = −165 · 구장+8 = −80     ; 틀마다 카메라를 다시 놓는다 (진입 0xe4d0 의 (−84, −80) 을 덮는다)
+ * b172  0x77fe8(구장, 0)      ; 하늘·구름 — 구름 흐르기 0x78448 · 전광판 흐르기 0x77fb4 는 이 상태에서 안 부른다
+ * b17e  0x77494(구장, 0, 0)   ; 시즌 구장 (관중 ppl 없음)
+ * b188  0x7725c(구장, 0)      ; 바닥
+ * b196  0x83378(창, 틱)       ; 그 위에 아이템 창 — 하늘 조명 0x78490 은 안 그린다
+ * ```
+ * 그림 함수는 경기 배경(`drawScenery` 의 시즌 구장 길)과 같고 카메라만 (−120, −70) 대신 (−165, −80) 이다. 하늘 0x77fe8 은 구장+4 에서
+ * 폭 480 으로 칠하므로 화면을 다 덮는다.
+ *
+ * ⚠️ 미해결(근사):
+ * - 하늘 칸 구장+0x18 은 0x783b0 이 `[0x1552d0c]+0x6b`(마지막 경기 상태의 이닝)를 읽는다 — 웹은 그 값을 안 들어 부르는 쪽이 넘긴다.
+ * - 구름 자리(구장 안 구름 칸)와 전광판 글자 자리(+0x8c)는 마지막으로 흐른 값 그대로인데 웹은 처음 값(틱 0)으로 둔다.
+ * - 전광판 칸 3 의 팀 아이콘(구장+0x80 · +0x84)은 이 장면에서 누가 채우는지 못 찾아 안 그린다.
+ * - 바닥 0x7725c 의 x 는 구장+0x60(타자 손)에 따라 1 줄어드는데 그 값도 못 찾았다 — 경기 배경과 같이 무시한다.
+ */
+export const STADIUM_PREVIEW_CAMERA = { x: -165, y: -80 } as const
+
+export interface StadiumPreviewState {
+  readonly skyRow: number
+  readonly skyColumn: number
+  readonly seasonStadium: SeasonStadium
+  /** 환경설정 전광판(+0x3a) — OFF 면 전광판 글자를 안 그린다 (0x77726). 생략하면 켠 것 */
+  readonly isScoreboardOn?: boolean
+}
+
+export function drawStadiumPreview(context: CanvasRenderingContext2D, state: StadiumPreviewState): void {
+  const dx = STADIUM_PREVIEW_CAMERA.x - CAMERA.x
+  const dy = STADIUM_PREVIEW_CAMERA.y - CAMERA.y
+  context.fillStyle = ORIGINAL_COLORS.black
+  context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
+
+  // 하늘 0x77fe8 — 구장+8 에서 80 단색 · 108 그라데이션 · 60 단색 (가로는 480 이라 화면을 다 덮는다)
+  const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, state.skyColumn)
+  const skyTop = SKY_GRADIENT.top + dy
+  const skyBottom = SKY_GRADIENT.bottom + dy
+  context.fillStyle = top
+  context.fillRect(0, 0, STAGE_WIDTH, skyTop)
+  const gradient = context.createLinearGradient(0, skyTop, 0, skyBottom)
+  gradient.addColorStop(0, top)
+  gradient.addColorStop(1, bottom)
+  context.fillStyle = gradient
+  context.fillRect(0, skyTop, STAGE_WIDTH, skyBottom - skyTop)
+  context.fillStyle = bottom
+  context.fillRect(0, skyBottom, STAGE_WIDTH, SKY_GRADIENT.end - SKY_GRADIENT.bottom)
+
+  context.save()
+  context.translate(dx, dy)
+  if (isCloudVisible(colorIndex)) drawClouds(context, 0, cloudPaletteRowOf(colorIndex))
+  // 시즌 구장 0x77494 — 팀 아이콘(칸 3)은 위 미해결이라 뺀다
+  const season = state.seasonStadium
+  const fence = seasonFenceFramesOf(season.stand, season.crowd)
+  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.standFrame))
+  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.crowdFrame))
+  const board = seasonBoardFrameOf(season.board)
+  drawAtFenceAnchor(context, placedFrame(board.folder, board.frame))
+  if (state.isScoreboardOn !== false) drawScoreboardText(context, seasonScoreboardBoxOf(season.board) ?? undefined, 0)
+  context.restore()
+
+  // 바닥 0x7725c — 그림 x 는 구장+4 를 따라 옮겨 간다(원본 쪽 자르기 시작점이 −dx 만큼 오른쪽)
+  const field = fieldBackground(season.grassPalette)
+  if (field === null) return
+  const sourceX = STAGE_LAYOUT.fieldSourceX - dx
+  context.drawImage(
+    field,
+    sourceX, 0, STAGE_WIDTH, field.height,
+    0, STAGE_LAYOUT.fieldTopY + dy, STAGE_WIDTH, field.height,
+  )
+}

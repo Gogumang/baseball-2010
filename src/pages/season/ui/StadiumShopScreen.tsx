@@ -3,8 +3,10 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
   STADIUM_KINDS, STADIUM_SLOT_COUNTS, buyStadiumItem, checkStadiumPurchase, equipStadiumItem,
-  stadiumCollectorUnlocks,
+  stadiumCollectorUnlocks, stadiumPreviewOf,
 } from '@/entities/season-mode/model/stadiumItems'
+import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { StadiumPreviewCanvas } from '@/pages/season/ui/StadiumPreviewCanvas'
 import type { StadiumKind, StadiumPurchaseRefusal } from '@/entities/season-mode/model/stadiumItems'
 import { StadiumShopWindow, stadiumItemNameOf } from '@/widgets/season/ui/StadiumShopWindow'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
@@ -22,6 +24,9 @@ const REFUSAL_TEXT: Readonly<Record<StadiumPurchaseRefusal, (required: number) =
   인기도부족: (required) => `인기도가 부족합니다. 필요한 인기도 : ${required}`, // StrMODE[62]
   소지금부족: () => '소지금이 부족합니다', // StrMODE[77]
 }
+
+/** 전역 게임 모드 [0x1552d10] — 시즌 2 (0x783b0 의 하늘 줄 갈래) */
+const SEASON_MODE = 2
 
 /** StrMODE[184] — 구매 완료 (0x812c 가 띄우는 결과코드 15 팝업) */
 const PURCHASED_TEXT =
@@ -107,6 +112,20 @@ export function StadiumShopScreen({
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xea · 0xdc 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
+      {/*
+        구장관리 0xea 그리기 0xb158 — 아이템 창 0x83378 앞에 구장 미리보기(0x77fe8 · 0x77494 · 0x7725c). 진입 0xe4d0 이 저장값으로
+        세우고 키 0x7958 이 지금 종류의 커서 칸으로 그 한 칸만 갈아 끼운다(`stadiumPreviewOf`). 하늘 줄은 0x783b0 모드 2 갈래 —
+        SR+0xb2(경기 수) mod 6. ⚠️ 미해결: 하늘 칸은 [0x1552d0c]+0x6b(마지막 경기 상태의 이닝)라 웹이 안 들어 0 으로 둔다.
+        ⚠️ 근사: 웹은 칸 목록 포커스를 따로 두지 않아(종류는 눌러서 바꾼다) 늘 지금 종류의 커서 칸을 끼워 보인다.
+        상점(0xdc 종류 4)의 미리보기(0xb1f8)는 아직 없다.
+      */}
+      {mode === '구장관리' && (
+        <StadiumPreviewCanvas state={{
+          skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: record.games }) ?? 0,
+          skyColumn: 0,
+          seasonStadium: stadiumPreviewOf(record, { kind, slot }),
+        }} />
+      )}
       <StadiumShopWindow
         record={record}
         kind={kind}
