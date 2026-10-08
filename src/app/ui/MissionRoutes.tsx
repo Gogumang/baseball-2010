@@ -208,6 +208,8 @@ export function MissionRoutes({
         onPickoffKey={actions.pickoff}
         // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
         sceneConfirm={session.sceneConfirm}
+        // 결과 판 0x4a384 의 배경 · 정산 효과(0x4ea0c 꼬리 — 모드를 안 가린다)는 경기 난수로
+        random={random}
       />
     )
   }
@@ -330,6 +332,8 @@ export function PitcherAceMatchRoute(
       }}
       // 결과 판 0x4a384 — g[0x176] 이 서 있어 앞부분(띠 · YOU WIN/LOSE)만, G 보상 없음
       resultBoard={resultBoardOf(session, pitcherRun.mission, pitcherRun.status, undefined, PITCHER_ACE_MATCH_FLAGS)}
+      // 대결도 정산 0x4ea0c 꼬리를 지난다 — 배경 · 정산 효과는 경기 난수로
+      random={session.random}
     />
   )
 }

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
+import { createRef } from 'react'
 
 afterEach(cleanup)
 
@@ -24,6 +25,14 @@ describe('미션 결과 판 (0x4a384 모드 5·6 · 키 0x407f0)', () => {
     expect(screen.getByTestId('미션-재도전-커서').dataset.answer).toBe('아니오')
     fireEvent.keyDown(window, { key: '5' })
     expect(onExit).toHaveBeenCalledWith('목록')
+  })
+
+  it('정산 효과 층은 원본 0x4a384 차례 — 비는 실패 덮개 바로 위(띠 아래), 파티클은 판 맨 위', () => {
+    const layers = { rain: createRef<HTMLCanvasElement>(), particles: createRef<HTMLCanvasElement>() }
+    render(<MissionResultBoard isSuccess={false} earnedGamePoint={0} onExit={vi.fn()} effectLayers={layers} />)
+    const children = Array.from(screen.getByTestId('미션-결과-판').children)
+    expect(children.indexOf(layers.rain.current as HTMLCanvasElement)).toBe(1)
+    expect(children[children.length - 1]).toBe(layers.particles.current)
   })
 
   it('예 그대로 OK 면 다시', () => {

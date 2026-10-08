@@ -20,6 +20,13 @@ import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMen
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { STARTING_ABILITY } from '@/entities/career/model/playerCareer'
+import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 투구 화면. 원작 설명서 <투구 조작>의 세 단계를 그대로 따른다:
@@ -97,6 +104,11 @@ interface PitchingScreenProps {
    * **상태 0xe 의 OK 대기** — 세션이 새 타석마다 싣는다 (`useMissionSession.sceneConfirm`). 안 넘기면 기다리지 않는다
    */
   readonly sceneConfirm?: SceneConfirmWait | null
+  /**
+   * **경기 난수** — 결과 판(경기 상태 0x19)의 배경 · 정산 효과(0x4ea0c 꼬리: 성공이면 밤하늘일 때 불꽃, 실패면 비)와 그림마다
+   * 효과 · 파티클 틱이 쓴다. 안 넘기면 결과 판에 배경 · 효과가 없다.
+   */
+  readonly random?: RandomPort
 }
 
 export function PitchingScreen({
@@ -114,6 +126,7 @@ export function PitchingScreen({
   resultBoard,
   onPickoffKey,
   sceneConfirm: sceneConfirmWait,
+  random,
   onRestart,
   settings,
   onSettingsChange,
@@ -137,6 +150,11 @@ export function PitchingScreen({
   /** 일시정지 팝업(0x741a0)이 떠 있는가 — 경기 중 메뉴 또는 그 하위 [조작방법] 뷰어. 경기 키가 안 간다 */
   const isPopupOpen = isMenuOpen || overlay !== null
   const isRunning = run.status === '진행중'
+  // ⚠️ 웹 타석 그림이 세울 때 굴리는 하늘 줄 rand(0, 6)(추정 대체)이 경기 난수에 새지 않게 결과 배경은 따로 든 난수로 세운다
+  //    (팀경기 · 투수편 정산과 같은 근사 — 원본은 경기 내내 같은 구장객체)
+  const [backdropRandom] = useState(() => createSeededRandom(0))
+  /** 정산 효과 층(비 · 파티클) — 결과 배경 타석 캔버스와 미션 결과 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
+  const settlementLayers = useSettlementEffectLayers()
 
   /**
    * 원본 공용 키 처리 `0x498d4` 의 '\*'(소프트키1 −6 도 '\*' 로 읽는다, 498e8) — 경기 상태 0xd~0x15 면 경기 중 메뉴를 연다.
@@ -177,13 +195,47 @@ export function PitchingScreen({
   const goals = goalsOf(run.mission, run.progress)
 
   if (run.status !== '진행중') {
+    // [미션+0xbc] — 0x4ea0c 4ef2a · 0x4a384 4a3ea 의 "이겼나"
+    const isSuccess = run.status === '성공'
     return (
       <PixelScreen title={run.mission.name}>
         <GoalBar goals={goals} />
         {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
         <div className={styles.matchupFrame}>
+          {/*
+            0x4a384 머리 — 모드를 안 가리고 구름 0x78448 · 배경 0x40ff0(+0x17e2)을 먼저 그린다(선수 · 공 · HUD 없음). 갱신 0x4b100 은
+            모드 5·6 이면 r7 = [미션+0xbc] — 성공한 판만 구장이 틱마다 3 씩 가라앉는다. 정산 효과 0x4ea0c 꼬리(4f41a~)는 경기 난수로
+          */}
+          {random !== undefined && (
+            <BattingStage
+              // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
+              batterAbility={STARTING_ABILITY}
+              pitcherAbility={DEFAULT_PITCHER_ABILITY}
+              swingMode="일반"
+              gameMode={MISSION_PITCHER_MODE}
+              isEagleEyeEnabled={false}
+              hud={null}
+              acePitcher={null}
+              isPaused
+              isResultBackdrop
+              resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isSuccess)}
+              random={backdropRandom}
+              settlement={{
+                isWin: isSuccess,
+                // 경기 상태 두 측 점수 — 수비 재생 점수판과 같은 근사(우리 = 시작 점수, 상대 = 시작 점수 + 허용 실점). 차이만 쓴다
+                side0Score: run.mission.start.opponentScore + run.allowed.runs,
+                side1Score: run.mission.start.ourScore,
+                // 하늘 칸 — 미션 시작 이닝(⚠️ 미션 안 이닝 넘김은 웹 미션이 안 따른다)
+                inning: run.mission.start.inning,
+                random,
+                layers: settlementLayers,
+              }}
+              onPitchResolved={() => {}}
+            />
+          )}
           <MissionResultBoard
-            isSuccess={run.status === '성공'}
+            isSuccess={isSuccess}
+            {...(random === undefined ? {} : { effectLayers: settlementLayers })}
             earnedGamePoint={resultBoard?.earnedGamePoint ?? 0}
             {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
             {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}

@@ -14,6 +14,8 @@ import {
 import type { MissionResultExit, MissionResultKeyAction } from '@/pages/mission-play/lib/missionResultBoard'
 import * as styles from '@/pages/mission-play/ui/MissionResultBoard.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
+import { SettlementEffectCanvas } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import type { SettlementEffectLayers } from '@/widgets/batting-stage/model/stageRefs'
 
 const GAME_UI = './sprites/game_ui'
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
@@ -39,15 +41,23 @@ export interface MissionResultBoardProps {
    * 마선수 대결은 0x4b100 이 원래 모드로 돌려보내므로 부르는 쪽이 어느 값이든 대결 끝으로 다룬다.
    */
   readonly onExit: (exit: MissionResultExit) => void
+  /**
+   * 정산 효과 층 — 밑의 결과 배경 타석 캔버스(`BattingStage` 의 `settlement.layers`)와 같은 묶음. 0x4ea0c 꼬리(4f41a~)는 모드를
+   * 안 가려 미션도 성공 = 이김(밤이면 불꽃) · 실패 = 비를 깐다. 원본 그리기 0x4a384 차례대로 비 층은 실패 덮개(4a404) 바로 위 ·
+   * 띠(4a448) 아래(효과 틱 0x4a452), 파티클 층은 판 맨 위(프레임 끝 0x6dd69)다.
+   */
+  readonly effectLayers?: SettlementEffectLayers
 }
 
 /**
  * **미션 결과 판** (경기 상태 0x19 그리기 0x4a384 의 모드 5·6 갈래 · 키 0x407f0) — 좌표·흐름은 `lib/missionResultBoard` 머리말.
  * 앞부분(실패 덮개 · 띠 · game_ui 프레임 8 · YOU WIN/LOSE)은 팀경기 정산 판과 같은 그림이라 그 자리 값을 쓴다.
- * ⚠️ 미해결 — 배경: 0x4a384 첫머리의 구름 0x78448 · 0x40ff0(장면, +0x17e2) 는 정산 판처럼 안 옮겼다(UNRESOLVED U-97) —
- *    판은 밑에 깔린 타석 화면 위 240×320 에 겹친다.
+ * 배경(0x4a384 첫머리의 구름 0x78448 · 0x40ff0(장면, +0x17e2))은 밑에 깔린 타석 캔버스가 결과 배경으로 그린다 — 판은 그 위
+ * 240×320 에 겹친다.
  */
-export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldGamePoint, onExit }: MissionResultBoardProps) {
+export function MissionResultBoard({
+  isSuccess, aceMatch, earnedGamePoint, heldGamePoint, onExit, effectLayers,
+}: MissionResultBoardProps) {
   const [answer, setAnswer] = useState(MISSION_RETRY_DEFAULT_ANSWER)
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const resultOrigins = useFrameOrigins(RESULT_FRAMES)
@@ -90,6 +100,8 @@ export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldG
         <div className={styles.fill}
           style={{ background: '#000000', opacity: colorStepCoverOpacityOf(SETTLEMENT_LOSE_DIM_STEP) }} />
       )}
+      {/* 4a452 효과 틱 0x901a0 — 정산 비(종류 0)를 덮개 위 · 띠 아래에 그린다 */}
+      {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.rain} />}
       {/* 4a448 — 띠 · game_ui 프레임 8 · result 0 "YOU WIN" / 1 "YOU LOSE" */}
       <div className={styles.block} style={{
         left: SETTLEMENT_BAND.x, top: SETTLEMENT_BAND.y, width: SETTLEMENT_BAND.width, height: SETTLEMENT_BAND.height,
@@ -168,6 +180,8 @@ export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldG
         <button type="button" className={styles.hitArea} aria-label="확인"
           style={{ left: 0, top: 0, width: 240, height: 320 }} onClick={() => act('확인', answer)} />
       )}
+      {/* 프레임 끝 0x6dd69 — 파티클(밤 성공 불꽃)은 판까지 다 그린 뒤 맨 위 (누르기는 밑의 단추로 흘린다) */}
+      {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.particles} />}
     </div>
   )
 }

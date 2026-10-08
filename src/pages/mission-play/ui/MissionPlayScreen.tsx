@@ -24,6 +24,8 @@ import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -143,6 +145,10 @@ export function MissionPlayScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
+  /** [미션+0xbc] — 결과 판 · 정산 효과의 "이겼나" (0x4ea0c 4ef2a · 0x4a384 4a3ea) */
+  const isSuccess = run.status === '성공'
+  /** 정산 효과 층(비 · 파티클) — 결과 배경 타석 캔버스와 미션 결과 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
+  const settlementLayers = useSettlementEffectLayers()
   /**
    * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0, 모드 갈림 없음). 결과 연출·메뉴·조작방법·설정이 덮으면
    * 받지 않는다. ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
@@ -294,6 +300,28 @@ export function MissionPlayScreen({
             // 0xe(OK 대기)에서도 공이 안 나간다
             isPaused={isPaused || isOver || overlay !== null || isAwaitingConfirm}
             random={random}
+            /*
+              경기 상태 0x19 — 결과 그림 0x4a384 는 모드를 안 가리고 구름 0x78448 · 배경 0x40ff0(+0x17e2)만 그린다(선수 · 공 · HUD 없음).
+              갱신 0x4b100 은 모드 5·6 이면 r7 = [미션+0xbc] — 성공한 판만 구장이 틱마다 3 씩 150 까지 가라앉는다.
+              정산 진입 0x4ea0c 꼬리(4f41a~)는 모드를 안 가린다 — 성공(4ef36 [sp+0x50] = 1)이면 밤하늘일 때 불꽃, 실패(4efb4 = 0)면
+              비(|0xb69b0(0) − (1)| × 30). 효과 · 파티클 틱은 경기 난수로 그림마다 돈다
+            */
+            isResultBackdrop={isOver}
+            resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isSuccess)}
+            {...(!isOver
+              ? {}
+              : {
+                  settlement: {
+                    isWin: isSuccess,
+                    // 경기 상태 두 측 점수 — 위 HUD 와 같은 근사(웹 미션은 득점 칸을 따로 안 든다). 차이의 절댓값만 쓴다
+                    side0Score: run.mission.start.opponentScore,
+                    side1Score: run.mission.start.ourScore + (run.progress.counts['타점'] ?? 0),
+                    // 하늘 칸 — 타석 하늘과 같은 미션 시작 이닝(⚠️ 미션 안 이닝 넘김은 웹 미션이 안 따른다)
+                    inning: run.mission.start.inning,
+                    random,
+                    layers: settlementLayers,
+                  },
+                })}
             aceLevels={aceLevels}
             onPitchResolved={onPitchResolved}
             onPickoff={onPickoff}
@@ -329,7 +357,8 @@ export function MissionPlayScreen({
           {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
           {isOver && (
             <MissionResultBoard
-              isSuccess={run.status === '성공'}
+              isSuccess={isSuccess}
+              effectLayers={settlementLayers}
               earnedGamePoint={resultBoard?.earnedGamePoint ?? 0}
               {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
               {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}

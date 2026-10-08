@@ -211,8 +211,15 @@ export function useStageAnimation(refs: StageRefs, finishPitch: FinishPitch, com
 
     const frame = (now: number) => {
       const isBackdrop = latestRef.current.isResultBackdrop === true
-      if (!isBackdrop) backdropStartedAt = null
-      else if (backdropStartedAt === null) backdropStartedAt = now
+      if (!isBackdrop) {
+        if (settlementEffect !== undefined) {
+          // 정산을 나가 같은 타석 화면이 다시 경기로 돈다(미션 재도전) — 0x4b100 4b3b6 이 나갈 때 파티클을 다 치운다(0x6dee4,
+          // 굴림 없음). 효과 객체는 경기 중에 안 돌고(0x901a0 은 정산 그림 · 홈런 글자만 부른다) 다음 정산 진입 0x4ea0c 가 다시 깐다
+          clearParticles(particlesRef.current)
+          settlementEffect = undefined
+        }
+        backdropStartedAt = null
+      } else if (backdropStartedAt === null) backdropStartedAt = now
       // 결과 창(상태 0x1a)에는 투구·파티클 갱신이 없다 — 투구 단계를 멈추고 파티클 틱도 그 자리에 묶어 둔다
       if (!isBackdrop) advancePhase(now)
 

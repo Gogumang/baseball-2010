@@ -1370,6 +1370,8 @@ export function useMissionSession({
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 */
     sceneConfirm,
+    /** 경기 난수 — 결과 판 0x4a384 의 정산 효과가 쓴다 (투수편 마선수 대결 화면 `PitcherAceMatchRoute`) */
+    random,
     /** 타자 미션 상대 마투수의 체력% `0xaebb0` = trunc(+0x2c / 100) — `missionPitcherAbility` 셋째 인자 */
     opponentStaminaPercent: staminaPercentOf(opponentMoundStamina),
   }
