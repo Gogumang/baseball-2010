@@ -16,6 +16,11 @@ import {
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { RosterPlayer } from '@/shared/config/original/roster'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import { equippedSeasonAbilityOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 
 /**
  * **미션 상대 CPU 팀** — 미션 경기 준비 `0xaa57c`(모드 5·6)가 세운 다른 칸 팀과, 그 팀의 CPU 교체가 보는 칸들.
@@ -200,6 +205,70 @@ export function isMissionCpuMoundAce(team: MissionCpuTeam): boolean {
 export function isMissionCpuBatterAce(team: MissionCpuTeam): boolean {
   const batting = team.batting
   return batting !== null && rosterSlotAt(batting.lineup, batting.order) === MISSION_ACE_ROSTER_SLOT
+}
+
+/** 그 팀 투수 칸의 마스터 줄 (팀 안 0~7) — 마투수 칸이면 null */
+function masterPitcherRowAt(pitching: MissionCpuPitching, slot: number): RosterPlayer | null {
+  const row = pitching.roster[slot] ?? slot
+  if (row === MISSION_ACE_ROSTER_SLOT) return null
+  return teamPitchers(pitching.teamId)[row] ?? null
+}
+
+/**
+ * **`0xb6415(레코드, k, 1)`** — 마스터 줄(Xls 행 0x30 바이트 사본, 0x1ff98)의 기본값에 장비 니블 · 장착 스킬(+0x14)을 얹은 값.
+ * 0xb570c 는 모드를 안 가리고 첫머리(b5728)에서 이 함수를 플래그 1 로 부른다. 마스터 줄은 마선수가 아니라(+0xa 비트 6 꺼짐)
+ * 레벨 배율 단계는 건너뛴다 — 시즌 레코드 카드가 쓰는 `equippedSeasonAbilityOf` 와 같은 식이다.
+ */
+function masterGameAbilityOf(row: RosterPlayer, isPitcher: boolean, slot: number): number {
+  return equippedSeasonAbilityOf(
+    {
+      name: row.name,
+      isPitcher,
+      base: row.ability,
+      profile: row.profile,
+      skillBits: row.skillBits,
+      equipment: row.equipment,
+      fieldPosition: 0,
+      isComplete: true,
+    },
+    slot,
+  )
+}
+
+/** 원본 0~999 를 투구 엔진 0~100 칸으로 — 나리 타자편 `opponentPitcherAbilityOf` 와 같은 나눗셈 */
+const STAGE_PITCHER_DIVISOR = 10
+
+/**
+ * **타자 미션 마운드의 마스터 줄 투수가 던지는 능력치** — 마투수가 서 있거나 CPU 수비 팀이 없으면 null(부르는 쪽이 마투수 값을 쓴다).
+ *
+ * 사람 타석의 투수는 수비 팀의 지금 투수 `0xae83c(팀)` → `0xb89dc(팀, team[0])` — 0xaa57c 가 0xb8c94 로 선발 칸(레코드 +6 아래 4비트)을
+ * 0번에 세운 마스터 줄이고, CPU 투수 교체 0xac428 뒤에는 바뀐 줄이다. 투구 AI · 스윙 판정(0x34968 · 0x4dbac · 0xab214)은 0xb570c 를
+ * 투수 체력% 0xaebb0(= 마운드 +0x2c / 100)로 부른다:
+ * - 0xb570c 는 b5728 에서 0xb6415(P, k, 1) — 장비 · 스킬 보정(`masterGameAbilityOf`)을 먹인 값으로 시작한다.
+ * - 모드 갈래(b573a~)는 2(시즌) · 3·4(나리)만 탄다 — 모드 6 은 곧장 b58e6(피로)으로 가고, 팀 능력치 마스크 {1, 2, 8, 9} 에도 없다.
+ *   그래서 피로 앞 값이 위 보정값이다(`gameAbility.beforeFatigue`). 피로는 투구 AI 가 `staminaPercent` 로 먹인다.
+ * 폼 · 보유 구질 · 마구 번호는 같은 줄의 +0xb · +0x1c · +0x18 (`ROSTER_PITCHER_REPERTOIRES`, 전역 번호 팀 × 8 + 줄).
+ */
+export function missionCpuMoundPitcherAbilityOf(team: MissionCpuTeam): PitcherAbility | null {
+  const pitching = team.pitching
+  if (pitching === null) return null
+  const slot = pitching.mound.pitcherSlot
+  const row = masterPitcherRowAt(pitching, slot)
+  if (row === null) return null
+  const control = masterGameAbilityOf(row, true, 0)
+  const velocity = masterGameAbilityOf(row, true, 1)
+  const breaking = masterGameAbilityOf(row, true, 2)
+  const repertoire = ROSTER_PITCHER_REPERTOIRES[pitching.teamId * PITCHERS_PER_TEAM + (pitching.roster[slot] ?? slot)]
+  return {
+    control: Math.round(control / STAGE_PITCHER_DIVISOR),
+    velocity: Math.round(velocity / STAGE_PITCHER_DIVISOR),
+    breaking: Math.round(breaking / STAGE_PITCHER_DIVISOR),
+    gameAbility: { beforeFatigue: { control, velocity, breaking } },
+    staminaPercent: staminaPercentOf(pitching.mound.stamina),
+    ...(repertoire === undefined
+      ? {}
+      : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+  }
 }
 
 /** 팀 투수 칸의 0xac428 · 0xabfcc 재료 — 리그 `defenseOf` · 타자편 `quickDefenseOf` 와 같은 모양 */

@@ -101,6 +101,7 @@ import {
   enterMissionPitchSelection,
   isMissionCpuMoundAce,
   missionCpuAfterPitch,
+  missionCpuMoundPitcherAbilityOf,
   missionCpuAtNewPlateAppearance,
 } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
@@ -250,16 +251,18 @@ export function missionMoundOpponent(run: MissionRun): AcePlayer | null {
 }
 
 /**
- * **지금 마운드 투수의 능력치** — 마투수가 서 있으면 `missionPitcherAbility`, 아니면 붙박이 투수 값이 없는 웹 미션의
- * 평범한 투수(`DEFAULT_PITCHER_ABILITY`, 마투수가 아닌 미션 상대와 같은 근사).
- * ⚠️ 근사: 원본은 마스터 팀 줄의 능력치로 던진다 — 교체 판정·소모는 그 줄을 보지만(`missionCpuTeam`) 투구 엔진은 아직 안 본다.
+ * **지금 마운드 투수의 능력치** — 마투수가 서 있으면 `missionPitcherAbility`(셋째 인자 = 마투수 체력%), 아니면 마운드에 선
+ * 마스터 팀 줄의 0xb570c 재료(`missionCpuMoundPitcherAbilityOf` — 장비·스킬 보정 · 레퍼토리 · 그 줄의 체력%).
+ * 사람 타석은 수비 팀 지금 투수 0xae83c 가 던진다 — 마투수가 아닌 미션(선발 칸 = 레코드 +6 아래 4비트)도, 마투수가 교체로
+ * 내려간 뒤(0xac428)도 그 줄이다. CPU 팀이 없을 때만(웹에 그런 미션은 없다) 예전 기본값.
  */
 export function missionMoundPitcherAbility(
   run: MissionRun,
   aceLevels?: Readonly<Record<number, number>>,
   staminaPercent?: number,
 ): PitcherAbility {
-  return isMissionCpuMoundAce(run.cpu) ? missionPitcherAbility(run.mission, aceLevels, staminaPercent) : DEFAULT_PITCHER_ABILITY
+  if (isMissionCpuMoundAce(run.cpu)) return missionPitcherAbility(run.mission, aceLevels, staminaPercent)
+  return missionCpuMoundPitcherAbilityOf(run.cpu) ?? DEFAULT_PITCHER_ABILITY
 }
 
 /** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (0xa5f0e) */

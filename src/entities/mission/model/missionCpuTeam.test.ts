@@ -12,12 +12,15 @@ import {
   missionCpuAfterPlateAppearance,
   missionCpuAfterRuns,
   missionCpuAtNewPlateAppearance,
+  missionCpuMoundPitcherAbilityOf,
   startMissionCpuTeam,
 } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 
 const missionOf = (side: OriginalMission['side'], id: number): OriginalMission => {
   const found = MISSIONS.find((mission) => mission.side === side && mission.id === id)
@@ -207,5 +210,54 @@ describe('투수 미션 CPU 대타 — 0xf 진입 0x3d954 → 0xac228 (3da70, �
     for (let index = 0; index < 18; index += 1) team = missionCpuAfterPlateAppearance(team, 아웃)
     expect(isMissionCpuBatterAce(team)).toBe(true)
     expect(enterMissionPitchSelection(team, 상황(mission), 굴림금지).substitution).toBeNull()
+  })
+})
+
+describe('타자 미션 마운드의 마스터 줄 투수 — 투구 엔진 입력 (0xae83c → 0xb570c)', () => {
+  it('선발 칸(레코드 +6)의 마스터 줄이 0xb6415(P, k, 1) 값 · 레퍼토리 · 체력%로 던진다', () => {
+    // 타자 6 — 팀 9 의 마스터 7번(마무리)이 선발
+    const team = startMissionCpuTeam(missionOf('타자', 6))
+    const row = teamPitchers(9)[7]
+    const repertoire = ROSTER_PITCHER_REPERTOIRES[9 * 8 + 7]
+    expect(missionCpuMoundPitcherAbilityOf(team)).toEqual({
+      control: Math.round(row.ability[0] / 10),
+      velocity: Math.round(row.ability[1] / 10),
+      breaking: Math.round(row.ability[2] / 10),
+      gameAbility: { beforeFatigue: { control: row.ability[0], velocity: row.ability[1], breaking: row.ability[2] } },
+      staminaPercent: 100,
+      repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId },
+    })
+    // 공마다 깎인 그 줄의 +0x2c 가 체력%(0xaebb0)로 들어간다
+    let thrown = team
+    for (let index = 0; index < 120; index += 1) {
+      thrown = missionCpuAfterPitch(thrown, { pitchTypeNumber: 1, batterIntimidates: false })
+    }
+    expect(missionCpuMoundPitcherAbilityOf(thrown)?.staminaPercent).toBe(Math.trunc((thrown.pitching?.mound.stamina ?? 0) / 100))
+    expect(missionCpuMoundPitcherAbilityOf(thrown)?.staminaPercent).toBeLessThan(100)
+  })
+
+  it('외인구단(팀 14) 줄은 장비 니블을 얹는다 — 0xb6494', () => {
+    // 타자 14 — 팀 14, 선발 칸 0. 부위 0 니블 3 → 제구 + 0xd8890[2]
+    const team = startMissionCpuTeam(missionOf('타자', 14))
+    expect(team.pitching?.teamId).toBe(14)
+    const row = teamPitchers(14)[0]
+    const ability = missionCpuMoundPitcherAbilityOf(team)
+    expect(row.equipment[0]).toBe(3)
+    expect(ability?.gameAbility?.beforeFatigue.control).toBeGreaterThan(row.ability[0])
+    expect(ability?.gameAbility?.beforeFatigue.velocity).toBe(row.ability[1])
+  })
+
+  it('마투수가 서 있으면 null — 부르는 쪽이 마투수 값을 쓴다. 교체로 내려가면 들어온 마스터 줄', () => {
+    const mission = missionOf('타자', 12)
+    const team = startMissionCpuTeam(mission)
+    expect(missionCpuMoundPitcherAbilityOf(team)).toBeNull()
+    const changed = enterMissionPitchSelection(team, { ...상황(mission), aceStamina: 3900 }, 굴림금지).team
+    const slot = changed.pitching?.mound.pitcherSlot ?? 0
+    const row = teamPitchers(14)[changed.pitching?.roster[slot] ?? slot]
+    expect(missionCpuMoundPitcherAbilityOf(changed)?.gameAbility?.beforeFatigue.velocity).toBeGreaterThanOrEqual(row.ability[1])
+  })
+
+  it('투수 미션은 CPU 수비 팀이 없어 null', () => {
+    expect(missionCpuMoundPitcherAbilityOf(startMissionCpuTeam(missionOf('투수', 1)))).toBeNull()
   })
 })
