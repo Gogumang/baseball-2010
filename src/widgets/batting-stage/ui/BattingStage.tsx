@@ -33,6 +33,7 @@ import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
+import { keyTickOf } from '@/widgets/batting-stage/lib/swingWindow'
 import { buntStanceAfterBuntKey, buntStanceAfterSwingKey, sceneBuntKindAfterKey } from '@/widgets/batting-stage/lib/buntStance'
 import { canSpecialSwing, remainingAfterSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
@@ -398,6 +399,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
 
   const actions = useMemo(() => {
     const frameNow = (now: number) => ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
+    /** 키가 읽히는 틱 = 경기+0xfd8 — 보이던 공 틱 + 1 (`keyTickOf`) */
+    const keyTickNow = (now: number) => keyTickOf(frameNow(now))
     // 스윙·번트는 공이 나는 동안(상태 0x11)만 받는다 — 릴리스 전에는 무시한다
     const isFlying = (now: number) => phaseRef.current === '투구중' && pitchRef.current !== null && frameNow(now) >= 0
     return {
@@ -415,11 +418,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         // 번트 자세면 스윙이 안 나가고(0xb9374 가 S+8 을 보고 그냥 돌아간다) 판정 F(+0xfd8)만 이 틱으로 바뀐다
         const bunt = buntRef.current
         if (bunt !== null) {
-          buntRef.current = buntStanceAfterSwingKey(bunt, frameNow(now))
+          buntRef.current = buntStanceAfterSwingKey(bunt, keyTickNow(now))
           return
         }
         swingStartedAtRef.current = now
-        finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0 }, now)
+        finishPitch({ frame: keyTickNow(now), shift: shiftRef.current, buntKind: 0 }, now)
       },
       /**
        * 번트 키 '7'/'8'/'9' (0x535a4 → 메시지 0x6a7 → 0x51e48). 상태 0x11 · S+4 가 아니면 무시하고, 지금 타자가
@@ -433,7 +436,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
           buntKind: kind,
           isAceBatter: aceBatterIndex >= 0,
         })
-        buntRef.current = buntStanceAfterBuntKey(buntRef.current, kind, frameNow(now), aceBatterIndex >= 0)
+        buntRef.current = buntStanceAfterBuntKey(buntRef.current, kind, keyTickNow(now), aceBatterIndex >= 0)
       },
       moveBatter: (direction: -1 | 1) => {
         shiftRef.current = nextBatterShift(shiftRef.current, direction)
@@ -457,11 +460,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
         if (bunt !== null) {
           // 번트 자세면 스윙은 안 나가고(0xb9374) 판정 F(+0xfd8)만 이 틱으로 바뀐다.
           // ⚠️ 미해결: 원본은 S+0x10 = 필살 번호가 남은 채 번트 판정(0x51226)으로 간다 — 그 쓰임은 안 옮겼다
-          buntRef.current = buntStanceAfterSwingKey(bunt, frameNow(now))
+          buntRef.current = buntStanceAfterSwingKey(bunt, keyTickNow(now))
           return
         }
         swingStartedAtRef.current = now
-        finishPitch({ frame: frameNow(now), shift: shiftRef.current, buntKind: 0, isSpecial: true }, now)
+        finishPitch({ frame: keyTickNow(now), shift: shiftRef.current, buntKind: 0, isSpecial: true }, now)
       },
     }
   }, [commitHit, finishPitch, specialSwingNumber, aceBatterIndex, specialSwingRemaining, onSpecialSwingUsed])
