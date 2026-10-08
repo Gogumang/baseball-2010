@@ -25,6 +25,21 @@ import {
 import type { HomeRunScoreBoard } from '@/pages/defense/lib/runScoreBoard'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { RunScoreBoard } from '@/pages/defense/ui/RunScoreBoard'
+import { createParticleScene, type ParticleScene } from '@/entities/particle/model/particleScene'
+import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
+import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
+import {
+  DEFENSE_SCENE_START,
+  defenseEffectsOf,
+  defenseTickFactsOf,
+  endDefenseEffects,
+  sceneMemoryOf,
+  stepDefenseEffects,
+  tickBeforeOf,
+  type DefenseEffects,
+  type DefenseSceneMemory,
+} from '@/pages/defense/lib/defenseHomeRunEffects'
+import { DefenseDistanceBoard, DefenseHomeRunText, DefenseParticles } from '@/pages/defense/ui/DefenseEffectsLayer'
 
 /** 수비 장면 득점 점수판 0x41a64 의 재료 — 플레이가 시작될 때의 경기 (`lib/runScoreBoard`) */
 export interface RunScoreBoardSource {
@@ -68,8 +83,16 @@ interface DefensePlaybackProps {
    * 홈런 갈래(간격 min(40/n, 20)로 1점씩), 아니면 보통 갈래로 센다 (`lib/runScoreBoard` 머리말).
    */
   readonly runScoreBoard?: RunScoreBoardSource
+  /**
+   * 경기 장면 동안 남는 HOMERUN 글자 칸(+0x1962 반짝임 셈 …)과 표시 비거리 +0x36 — 실시간 갈래의 홈런 연출이 판마다 이어 쓴다
+   * (`lib/defenseHomeRunEffects`). 부르는 쪽이 경기(장면) 하나 동안 들고 있는 ref 를 넘긴다. 안 주면 판마다 장면 new 의 0 이다.
+   */
+  readonly sceneMemory?: { current: DefenseSceneMemory }
   readonly children?: React.ReactNode
 }
+
+/** 판이 닫힌 뒤 붙든 갱신의 파티클 틱 — 탭이 잠들었다 돌아와도 한 번에 이만큼만 따라잡는다 */
+const MAX_CLOSED_CATCH_UP = 30
 
 /** 원작 경기 루프는 한 갱신에 한 틱이다 (0xc2198) */
 const UPDATES_PER_TICK = 1
@@ -101,6 +124,7 @@ export function DefensePlayback({
   holdUpdates = DEFAULT_HOLD_UPDATES,
   grassPalette = null,
   runScoreBoard,
+  sceneMemory,
   children,
 }: DefensePlaybackProps) {
   if (input !== undefined) {
@@ -112,6 +136,7 @@ export function DefensePlayback({
         holdUpdates={holdUpdates}
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoard}
+        sceneMemory={sceneMemory}
       >
         {children}
       </LivePlayback>
@@ -260,6 +285,7 @@ interface LivePlaybackProps {
   readonly holdUpdates: number
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
+  readonly sceneMemory?: { current: DefenseSceneMemory }
   readonly children?: React.ReactNode
 }
 
@@ -275,7 +301,9 @@ interface RunScoreBoardView {
  * 여기서는 `keydown` 을 줄 세워 두고 **한 틱에 한 개씩** 진행기에 먹인다.
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
-function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScoreBoard, children }: LivePlaybackProps) {
+function LivePlayback({
+  input, side, onDone, holdUpdates, grassPalette, runScoreBoard, sceneMemory, children,
+}: LivePlaybackProps) {
   const update = useUpdateCounter(true)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
@@ -296,6 +324,20 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScore
   const [view, setView] = useState<DefenseViewState | null>(null)
   const [runBoard, setRunBoard] = useState<RunScoreBoardView | null>(null)
   const [finishedAt, setFinishedAt] = useState<number | null>(null)
+  /**
+   * 홈런 연출(HOMERUN 글자 · 홈런 효과 · 파티클 · 비거리 판 — `lib/defenseHomeRunEffects`). 원본 한 그림 = 진행기 한 틱이라 틱마다
+   * 갱신(홈런 갈래) → 그리기(글자 · 유지 그림의 효과 틱) → 파티클 틱 차례로 돌고, 판이 닫힌 뒤 붙든 갱신에도 파티클 틱은 돈다.
+   * 난수는 진행기와 같은 경기 난수(`input.random`)다 — 진행기 굴림 뒤에 그 그림의 효과 · 파티클 굴림이 든다.
+   */
+  const effectsRef = useRef<DefenseEffects>(defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START))
+  const particlesRef = useRef<ParticleScene>(createParticleScene())
+  /** 판이 닫힌 뒤 파티클 틱을 돌린 마지막 갱신 */
+  const closedUpdateRef = useRef<number | null>(null)
+  const [effectsView, setEffectsView] = useState<{
+    readonly text: HomeRunTextFrame | null
+    readonly distanceBoard: number | null
+    readonly version: number
+  }>({ text: null, distanceBoard: null, version: 0 })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -317,8 +359,12 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScore
       pressesRef.current = []
       fumbleSoundPlayedRef.current = false
       runBoardTimerRef.current = 0
+      effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
+      particlesRef.current = createParticleScene()
+      closedUpdateRef.current = null
       setView(null)
       setRunBoard(null)
+      setEffectsView({ text: null, distanceBoard: null, version: 0 })
       setFinishedAt(null)
     }
     const state = stateRef.current
@@ -329,10 +375,20 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScore
     let running = state
     let moved = false
     let board: RunScoreBoardView | null = null
+    const effectsPorts = { particles: particlesRef.current, random: input.random, configOf: particleConfigOf }
+    let effectsFrame: ReturnType<typeof stepDefenseEffects> | null = null
     while (running.tick < wanted && !isDefensePlayFinished(running)) {
       const runsBefore = running.held.scoreboardRuns
+      const tickBefore = tickBeforeOf(running)
       running = stepDefensePlay(running, pressesRef.current.shift() ?? null)
       moved = true
+      // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
+      effectsFrame = stepDefenseEffects(
+        effectsRef.current,
+        defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running)),
+        effectsPorts,
+      )
+      effectsRef.current = effectsFrame.effects
       // 득점 점수판 0x41a64 — 점수판에 1점 오를 때마다(메시지 0x13) 타이머 20, 그 틱 그리기부터 센다.
       // 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
       if (runScoreBoard !== undefined) {
@@ -365,27 +421,48 @@ function LivePlayback({ input, side, onDone, holdUpdates, grassPalette, runScore
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     }
     stateRef.current = running
+    // 판이 닫힌 뒤 붙든 갱신 — 갱신은 529f0 으로 빠지고(판 칸 · 글자 없음) 프레임 끝 파티클 틱만 돈다. 진행기가 닫은 갱신은 위에서 돌았다
+    if (!moved && isDefensePlayFinished(running)) {
+      // 갱신을 건너뛴 만큼 따라잡는다(진행기 틱과 같은 상한)
+      const closedFrames = Math.min(update - (closedUpdateRef.current ?? update - 1), MAX_CLOSED_CATCH_UP)
+      for (let frame = 0; frame < closedFrames; frame += 1) {
+        effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts)
+        effectsRef.current = effectsFrame.effects
+      }
+    }
+    closedUpdateRef.current = update
     if (moved) {
       setView(running.ticks[running.ticks.length - 1] ?? null)
       setRunBoard(board)
     }
+    if (effectsFrame !== null) {
+      const drawn = effectsFrame
+      setEffectsView((previous) => ({ text: drawn.text, distanceBoard: drawn.distanceBoard, version: previous.version + 1 }))
+    }
     if (isDefensePlayFinished(running) && finishedAt === null) setFinishedAt(update)
-  }, [update, input, side, finishedAt, runScoreBoard])
+  }, [update, input, side, finishedAt, runScoreBoard, sceneMemory])
 
   const isFinished = finishedAt !== null && update >= finishedAt + holdUpdates
 
   useEffect(() => {
     if (!isFinished) return
+    // 0x17 끝 0x35108 — 글자를 끄고 파티클을 치운다. 장면에 남는 칸(글자 칸 · +0x36)은 부르는 쪽 ref 로 돌려준다
+    effectsRef.current = endDefenseEffects(effectsRef.current, particlesRef.current)
+    if (sceneMemory !== undefined) sceneMemory.current = sceneMemoryOf(effectsRef.current)
     const state = stateRef.current
     onDone(state === null ? undefined : defensePlayResultOf(state))
-  }, [isFinished, onDone])
+  }, [isFinished, onDone, sceneMemory])
 
   if (view === null) return null
+  // 0x46c88 차례 — 비거리 판(0x46cb6) → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62), 그 뒤 프레임 끝 파티클(0x6dd68)
   return (
     <DefenseScreen state={view} grassPalette={grassPalette}>
+      {effectsView.distanceBoard !== null && <DefenseDistanceBoard value={effectsView.distanceBoard} />}
+      {effectsView.text !== null && <DefenseHomeRunText frame={effectsView.text} />}
       {runScoreBoard !== undefined && runBoard !== null && finishedAt === null && (
         <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />
       )}
+      <DefenseParticles scene={particlesRef.current} version={effectsView.version} />
       {children}
     </DefenseScreen>
   )

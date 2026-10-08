@@ -73,3 +73,14 @@ export const runScoreDigit = style({
   imageRendering: 'pixelated',
   pointerEvents: 'none',
 })
+
+/** 0x17 그리기 위에 얹는 층(비거리 판 · HOMERUN 글자 · 파티클) — 240×320 원본 화면 좌표 그대로 */
+export const overlay = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+  pointerEvents: 'none',
+  imageRendering: 'pixelated',
+})

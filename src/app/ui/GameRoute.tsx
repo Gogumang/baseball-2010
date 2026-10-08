@@ -13,6 +13,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -61,6 +62,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
   const finishPlayback = useCallback(() => setShownPlay(play), [play])
+  /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
+  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
 
   /** 제안 대사를 이미 보여 준 돌발 행. 판정은 진행기가 지워 주므로 여기서 셀 것이 없다 */
   const [shownProposal, setShownProposal] = useState<BurstMissionRow | null>(null)
@@ -160,6 +163,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
             : [progress.game.opponentScore, progress.game.ourScore],
           battingSide: progress.game.half === '초' ? 0 : 1,
         }}
+        sceneMemory={defenseSceneRef}
         onDone={session.actions.finishDefensePlay}
       />
     )

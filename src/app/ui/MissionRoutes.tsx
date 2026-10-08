@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
+import type { MutableRefObject, ReactNode } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { missionBatterSpecialSwingRemainingOf, missionOpponent, missionPitcherAbility } from '@/app/model/useMissionSession'
@@ -11,6 +11,7 @@ import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import type { ModeBatter } from '@/app/model/modeBatter'
 import { isModeMagicPitchType, modePitchMenuOf } from '@/app/model/modePitcher'
@@ -83,8 +84,10 @@ export function MissionRoutes({
   const { missionRun, pitcherRun, actions } = session
   const batter = session.hallOfFameBatter ?? nariBatter
   const { ability } = batter
+  /** 미션 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 (`defenseHomeRunEffects`) */
+  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
 
-  const overlay = missionOverlayOf(session, screen.kind === '마선수대결')
+  const overlay = missionOverlayOf(session, screen.kind === '마선수대결', defenseSceneRef)
   if (overlay !== null) return overlay
 
   // 미션 모드로 들어오면 먼저 선수를 고른다 (하위 17 — 진입 0x2613c · 갱신 0x29a54). 결과 0(되돌아가기)은
@@ -233,7 +236,11 @@ export function MissionRoutes({
  * ⚠️ 미해결 — 마선수 대결(`isAceMatch` · 투수편 대결)은 사람 칸 팀을 나리 저장의 팀으로 바꾼다(0xaa6dc~0xaa728:
  *    g[0x11f]/g[0x176] 이고 g[0xf6] ∈ 2..4 이면 0x1f55d · 0x1f8d5 객체 +1) — 그 갈래를 안 읽어 대결에는 판을 안 넘긴다.
  */
-function missionOverlayOf(session: ReturnType<typeof useMissionSession>, isAceMatch: boolean): ReactNode | null {
+function missionOverlayOf(
+  session: ReturnType<typeof useMissionSession>,
+  isAceMatch: boolean,
+  defenseScene: MutableRefObject<DefenseSceneMemory>,
+): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   if (pendingDefensePlay !== null) {
     const isPitcher = pendingDefensePlay.side === '투수'
@@ -251,6 +258,7 @@ function missionOverlayOf(session: ReturnType<typeof useMissionSession>, isAceMa
         input={pendingDefensePlay.input}
         side={isPitcher ? '수비' : '공격'}
         runScoreBoard={runScoreBoard}
+        sceneMemory={defenseScene}
         onDone={actions.finishDefensePlay}
       />
     )
@@ -295,7 +303,8 @@ export function PitcherAceMatchRoute(
     beginRef.current(mission)
   }, [mission])
 
-  const overlay = missionOverlayOf(session, true)
+  const defenseSceneRef = useRef<DefenseSceneMemory>(DEFENSE_SCENE_START)
+  const overlay = missionOverlayOf(session, true, defenseSceneRef)
   if (overlay !== null) return overlay
 
   // 미션을 세우기 전(첫 그림) — 아무것도 안 그린다
