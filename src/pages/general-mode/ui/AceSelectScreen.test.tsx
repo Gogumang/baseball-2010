@@ -190,6 +190,15 @@ describe('오픈 힌트 팝업', () => {
     expect(onSelect).toHaveBeenCalledWith(3)
   })
 
+  it('코치채용(시즌 0xd7) 격자는 장면 생성자 0x3cc8 의 꼴 0x10 — 모든 키를 격자에 넘겨 2·4·6·8 도 움직이고 5 는 OK', () => {
+    const onSelect = vi.fn()
+    띄우기({ mode: '코치', onSelect })
+
+    // 칸 0 ← → 4(감기) · '8' → 9 · ↓ → 9(세로는 멈춤) · '6' → 5(감기) · '5' OK
+    누르기(['ArrowLeft', '8', 'ArrowDown', '6', '5'])
+    expect(onSelect).toHaveBeenCalledWith(5)
+  })
+
   it('상태 28(mode 레벨업) 격자는 꼴 0x20 — ↓ 는 아랫줄에서 윗줄로 감고 ← 는 칸 0 에서 멈춘다 (0x262c8)', () => {
     const onLevelUp = vi.fn()
     띄우기({ mode: '레벨업', openedAcePitcherIds: [0, 1, 2, 3, 4], openedAceBatterIds: [0, 1, 2, 3, 4], onLevelUp, gamePoint: 0 })

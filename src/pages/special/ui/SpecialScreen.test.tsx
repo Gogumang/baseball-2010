@@ -380,6 +380,14 @@ describe('명예의 전당 등록 목록 — 나리 상태 145 (0x62568 목록 �
     expect(screen.getByText(/타자 슬롯 4개가 오픈됩니다/)).toBeTruthy()
   })
 
+  it('격자는 생성자 0xf810 의 5×3 꼴 0x10 · 막힘 칸 10 — 진입이 커서를 칸 0 에 세운다 (vt+0x14(0, 0))', () => {
+    const { 슬롯 } = 열기등록()
+    expect(슬롯(0).getAttribute('aria-current')).toBe('true')
+    // '8' → 5 · ↓ → 10 은 막혀 제자리 5 · '4' → 같은 줄 끝 9 (감기)
+    for (const key of ['8', 'ArrowDown', '4']) fireEvent.keyDown(window, { key })
+    expect(슬롯(9).getAttribute('aria-current')).toBe('true')
+  })
+
   it('되돌아가기는 StrMODE[219] "나중에 등록" — 예면 나간다', () => {
     const { onLater } = 열기등록()
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
@@ -452,6 +460,20 @@ describe('미션 선수 고르기 — 메인 메뉴 하위 17 (0x2613c 목록 �
     fireEvent.click(슬롯(10))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(onPick).not.toHaveBeenCalled()
+  })
+
+  it('시즌 선수영입(0xe2) 격자는 생성자 0x3d60 의 5×3 꼴 0x10 — 막힌 칸이 없어 안 쓰는 칸 10 에도 선다', () => {
+    const onPick = vi.fn()
+    render(
+      <HallOfFameScreen
+        collection={EMPTY_COLLECTION}
+        listOwner="시즌"
+        mode={{ kind: '선수고르기', nari: { 투수: null, 타자: null }, onPick, onCancel: vi.fn() }}
+        onBack={vi.fn()}
+      />,
+    )
+    for (const key of ['ArrowDown', '8']) fireEvent.keyDown(window, { key })
+    expect(screen.getByRole('button', { name: '11번 슬롯' }).getAttribute('aria-current')).toBe('true')
   })
 
   it('말풍선은 뜨지 않고, 되돌아가기는 결과 0 (0x6286e)', () => {

@@ -3,16 +3,17 @@ import { MarkupText } from '@/shared/ui/MarkupText/MarkupText'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   DESCRIPTION_BAND, DESCRIPTION_BAND_FADE_END, descriptionBandAt,
-} from '@/pages/settings/lib/settingsLayout'
-import * as styles from '@/pages/settings/ui/SettingsScreen.css'
+} from '@/shared/ui/DescriptionBand/descriptionBandLayout'
+import * as styles from '@/shared/ui/DescriptionBand/DescriptionBand.css'
 
 const { r, g, b } = DESCRIPTION_BAND.color
 const rgba = (alpha: number) => `rgba(${r}, ${g}, ${b}, ${alpha / 255})`
 
 /**
- * 환경설정 설명 띠 0x55544 (`settingsLayout.ts` 의 `DESCRIPTION_BAND`). `seed` 가 바뀔 때마다 1 부터 다시 편다 —
- * 커서 격자가 바뀐 그림(0x59462)이다. 세로줄 알파는 80 까지 200, 그 뒤 줄마다 3 씩 빠지는 것을 그라데이션 한 장으로 그린다.
- * ⚠️ 유력: 화면에 들어선 첫 그림에서도 격자 바뀜 표시가 서 있다고 보고 펴며 시작한다 (진입의 [격자+0x25] 는 안 읽었다).
+ * 설명 띠 0x55544 (`descriptionBandLayout.ts` 의 `DESCRIPTION_BAND`). `seed` 가 바뀔 때마다 1 부터 다시 편다 —
+ * 부르는 쪽이 [skin+0x88] = 1 · [+0x8a] = 1 을 세우는 계기다. 세로줄 알파는 80 까지 200, 그 뒤 줄마다 3 씩 빠지는 것을
+ * 그라데이션 한 장으로 그린다. 글이 비면(0x555d4 의 null 갈래) 띠만 그린다.
+ * ⚠️ 유력: 띠가 화면에 처음 나타난 그림에서도 펴며 시작한다 (진입 때 [skin+0x8a] 값은 안 읽었다).
  */
 export function DescriptionBand({ text, seed }: { readonly text: string; readonly seed: number }) {
   const [ticks, setTicks] = useState(0)
@@ -34,8 +35,8 @@ export function DescriptionBand({ text, seed }: { readonly text: string; readonl
   return (
     <>
       <div
-        className={styles.descriptionBand}
-        data-band-spread={band.spread}
+        className={styles.band}
+        data-description-band={band.spread}
         style={{
           top: DESCRIPTION_BAND.y,
           width,
@@ -46,8 +47,8 @@ export function DescriptionBand({ text, seed }: { readonly text: string; readonl
           backgroundRepeat: 'no-repeat',
         }}
       />
-      {!band.isGrowing && (
-        <div className={styles.descriptionText}
+      {!band.isGrowing && text !== '' && (
+        <div className={styles.text}
           style={{ left: DESCRIPTION_BAND.text.x, top: DESCRIPTION_BAND.y + DESCRIPTION_BAND.text.dy }}>
           <MarkupText raw={text} />
         </div>

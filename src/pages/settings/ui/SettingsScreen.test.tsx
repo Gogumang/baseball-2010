@@ -654,7 +654,7 @@ describe('설명 띠 0x55544 — y 275 · 1 → 4 → 16 → 64 → 160 으로 �
   it('첫 화면은 StrMAINMENU[0x20 + 커서] — 커서가 바뀌면 1 부터 다시 편다, OK 칸이면 안 그린다', () => {
     vi.useFakeTimers()
     const { container } = 띄우기()
-    const 띠 = () => container.querySelector('[data-band-spread]')?.getAttribute('data-band-spread') ?? null
+    const 띠 = () => container.querySelector('[data-description-band]')?.getAttribute('data-description-band') ?? null
     expect(띠()).toBe('1')
     expect(screen.queryByText('배경음과 효과음의 크기를', { exact: false })).toBeNull()
     다섯틱()
@@ -678,6 +678,6 @@ describe('설명 띠 0x55544 — y 275 · 1 → 4 → 16 → 64 → 160 으로 �
 
   it('경기 중 "설정" 은 띠가 없다', () => {
     const { container } = 띄우기({ mainMenu: undefined })
-    expect(container.querySelector('[data-band-spread]')).toBeNull()
+    expect(container.querySelector('[data-description-band]')).toBeNull()
   })
 })

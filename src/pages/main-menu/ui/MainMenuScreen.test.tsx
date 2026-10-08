@@ -19,10 +19,16 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/** 띠가 다 자랄 만큼(넉 틱 넘게) 시계를 돌린다 */
-const 틱지남 = () => act(() => {
-  vi.advanceTimersByTime(1000)
-})
+/**
+ * 띠가 다 자랄 만큼(넉 틱 넘게) 시계를 돌린다 — 설명 띠는 그림마다 다음 틱을 거니 act 를 나눠 돌린다
+ */
+const 틱지남 = () => {
+  for (let step = 0; step < 6; step += 1) {
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+  }
+}
 
 /** 키 하나를 누르고 띠가 다 자랄 때까지 기다린다 */
 const 누르기 = (key: string) => {
@@ -354,6 +360,29 @@ describe('처음 메뉴 키 (0x29454) — CLR 은 안 보고, ←→·숫자도 
     누르기('Enter')
     expect(onSettings).toHaveBeenCalledTimes(1)
     expect(top.current).toBe(3)
+  })
+
+  it('하위 목록 설명은 판이 아니라 설명 띠 0x55545 — 바탕 띠가 다 자란 뒤 1 부터 펴고, 커서를 옮기면 다시 편다', () => {
+    const { container } = 메뉴({ gamePoint: 0 })
+    const 설명띠 = () => container.querySelector('[data-description-band]')?.getAttribute('data-description-band') ?? null
+    // 처음 메뉴(하위 4)는 띠 없이 판 안에 쓴다
+    expect(설명띠()).toBeNull()
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Enter' })
+    })
+    // 바탕 띠가 자라는 동안([this+0xe2]) 은 설명 띠를 안 그린다
+    expect(설명띠()).toBeNull()
+    틱지남()
+    expect(설명띠()).toBe('160')
+    const 글 = screen.getByText('마지막으로 진행한 게임', { exact: false })
+    expect(글.closest('[style]')?.getAttribute('style')).toContain('top: 280px')
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+    })
+    expect(설명띠()).toBe('1')
+    expect(screen.queryByText('원하는 팀을 선택해', { exact: false })).toBeNull()
+    틱지남()
+    expect(screen.getByText('원하는 팀을 선택해', { exact: false })).toBeTruthy()
   })
 
   it('[랭킹] 은 하위 9 모드 목록 — 설명 [24]~, OK 는 서버 안내(근사), CLR 은 처음 메뉴', () => {

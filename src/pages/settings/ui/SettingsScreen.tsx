@@ -24,7 +24,7 @@ import {
 import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
-import { DescriptionBand } from '@/pages/settings/ui/DescriptionBand'
+import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 
 const SLT_FRAME = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'

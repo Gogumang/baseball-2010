@@ -63,6 +63,11 @@ interface DetailWindowProps {
    * 나리 상세 창은 0x8a0a4 가 막대를 따로 늘 그리므로 거짓으로 둔다.
    */
   readonly hidesEmptyMessages?: boolean
+  /**
+   * 뒤 어둡게의 검정 몫 — 창을 공용 창 0x741a0 으로 띄우는 자리(시즌 훈련 결과)는 0x746cc 가 덮는다(`POPUP_DIM_OPACITY`).
+   * 안 주면 안 덮는다(지금까지와 같다).
+   */
+  readonly dimOpacity?: number
 }
 
 /**
@@ -70,7 +75,7 @@ interface DetailWindowProps {
  * 두 모드 공용 창(0x872d4)이라 줄(이름표 포함)만 받는다 — 투수편은 이름표 340~343 으로 세운 줄을 넘긴다.
  */
 export function DetailWindow({
-  rows, messages, onClose, scrollOffset = 0, tableYOffset = DETAIL_Y_OFFSET, hidesEmptyMessages = false,
+  rows, messages, onClose, scrollOffset = 0, tableYOffset = DETAIL_Y_OFFSET, hidesEmptyMessages = false, dimOpacity,
 }: DetailWindowProps) {
   const messageBox = detailMessageBoxOf(tableYOffset)
   const showsMessages = !hidesEmptyMessages || messages.length > 0
@@ -85,7 +90,8 @@ export function DetailWindow({
   }
 
   return (
-    <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={onClose}>
+    <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={onClose}
+      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
       <div className={styles.window} style={{ left: DETAIL_WINDOW.x, top: DETAIL_WINDOW.y, width: DETAIL_WINDOW.width, height: DETAIL_WINDOW.height }} />
       <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
         style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />

@@ -11,6 +11,7 @@ import type { TeamRelayFigures as TeamRelayFiguresValue } from '@/pages/team-gam
 import { TeamRelayFigures } from '@/pages/team-game/ui/TeamRelayFigures'
 import { effectOpacityOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { AUTO_RELAY_SPEED_MAX, autoRelaySpeed, setAutoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
+import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 
 /** 화면 240×320 */
 const SCREEN_WIDTH = 240
@@ -50,9 +51,9 @@ const CHANGE_SIZE = { width: 98, height: 19 } as const
 /**
  * 질문 창 뒤 어둡게 — 경기 장면은 [창+0x24f] = 1(0x3301c)이라 창을 연 그림에 한 번만 0x746cc 가 검정 단계 5 = (5 + 1)/16 로 덮는다
  * (+0x24d 를 지움). 그 뒤로는 장면을 안 그려(0x52efe — [+0x250] 도 그 그림에 지워진다) 멈춘 장면 + 어둡게 위에 창만 그린다.
- * ⚠️ 단계 5 의 칠하기([0x15605d0]) 본문은 미해독 — 이벤트 장면 창과 같은 6/16 으로 둔다.
+ * 단계 5 의 칠하기([0x15605d0] = 0x9b3f4)는 색 몫 (단계 + 1)/16 = 6/16 이다 (`POPUP_DIM_OPACITY`).
  */
-const GAME_POPUP_DIM_OPACITY = 6 / 16
+const GAME_POPUP_DIM_OPACITY = POPUP_DIM_OPACITY
 
 /** 부호 있는 바이트로 줄인다 — sim+0x9d 는 `strb` · `lsls #0x18` 로 비교하는 바이트다 */
 function signedByte(value: number): number {
