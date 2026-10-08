@@ -12,7 +12,7 @@ import type { PitcherScene } from '@/app/model/usePitcherLeagueSession'
  * 4  관리 화면         시즌(0x105)·나만의리그(0x106) 관리
  * 33 경기              0x104 상태 0x21 (0x3abf0 · 0x48480 · 0x4258c)
  * 40 이벤트(대화)      0x106 상태 114 · 0x105 상태 211
- * 46 엔딩              0x106 상태 141 · 0x105 상태 245 예약
+ * 46 엔딩              0x106 상태 141 · 0x105 상태 245 예약 (141 은 e ≤ 1 이면 52 — `endingBgmOf`)
  * ```
  *
  * `null` 은 **배경음을 바꾸지 않는 화면**이다 — 끄지 않고 울리던 것을 그대로 둔다.
@@ -64,8 +64,24 @@ export const SCREEN_BGM = {
  */
 const POSTSEASON_REENTRY_BGM = 4
 
+/** 엔딩 141 에서 부상 · 방출 · 판정 없음(e ≤ 1) 쪽 배경음 0x34 */
+const ENDING_SAD_BGM = 52
+/**
+ * 나리 엔딩 141 의 배경음 — 진입 0x12300 이 e = 0xa3a85(S) 를 구한 뒤(12310) 곧바로:
+ * ```
+ * 12328  cmp e, #1 ; bgt 12332      ; 부호 있는 비교 — e = −1(판정 없음) · 0(부상) · 1(방출)은 0x34
+ * 1232e  r1 = 0x34                  ; 그 밖(은퇴 2~9)은 12334 r1 = 0x2e
+ * 1233c  0x6ea6d(소리, r1, −1, 1)    ; 반복 즉시 재생
+ * ```
+ * 모드 갈림이 없어 타자편 · 투수편 같다.
+ */
+export function endingBgmOf(endingIndex: number): number {
+  return endingIndex <= 1 ? ENDING_SAD_BGM : SCREEN_BGM.엔딩
+}
+
 /** 이 화면에서 틀 배경음. 바꾸지 않는 화면이면 null */
 export function screenBgmOf(screen: Screen): number | null {
+  if (screen.kind === '엔딩') return endingBgmOf(screen.endingIndex)
   if (screen.kind === '포스트시즌') return screen.fromReentry === true ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
   const table: Partial<Record<string, number>> = SCREEN_BGM
   return table[screen.kind] ?? null
@@ -79,9 +95,15 @@ export function screenBgmOf(screen: Screen): number | null {
  * 105 관리 화면도 타자편과 같은 틀 0x1aec4(모드 갈림 없음)다: 첫 틀(+0x2c == 2)에 이전 상태가 {100, 116, 132, 125, 126,
  * 114, 134, 1, 112} 면 `0x6ea6d(소리, 4, −1, 1)`(1aef4~1af02) — 관리 화면 배경음 4. 111 상점·112 외출은 105 에서 들어가
  * 배경음을 안 건드려 그 4 가 이어진다(타자편 `SCREEN_BGM` 의 아이템·외출 4 와 같다).
+ * 141 엔딩은 타자편과 같은 진입 0x12300(모드 갈림 없음) — `endingBgmOf`(e ≤ 1 이면 52, 그 밖 46).
  * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
  */
-export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: boolean): number | null {
+export function pitcherLeagueBgmOf(
+  scene: PitcherScene,
+  postseasonFromReentry: boolean,
+  endingIndex: number | null = null,
+): number | null {
+  if (scene === '엔딩' && endingIndex !== null) return endingBgmOf(endingIndex)
   if (scene === '포스트시즌') return postseasonFromReentry ? POSTSEASON_REENTRY_BGM : SCREEN_BGM.이벤트
   if (scene === '다음경기순위') return SCREEN_BGM.다음경기순위
   if (scene === '관리') return SCREEN_BGM.관리
@@ -99,7 +121,11 @@ export function pitcherLeagueBgmOf(scene: PitcherScene, postseasonFromReentry: b
  * 128 을 떠나면(경기 · 132 연말) 그 표시는 지워진다 — 다시 128 에 오면 경기 뒤 116 → 114 길이다. 142 경기 준비는
  * 배경음을 안 바꾸고(null) 취소하면 128 로 돌아오므로 그동안은 표시를 둔다.
  */
-export function usePitcherLeagueBgm(isActive: boolean, scene: PitcherScene): number | null {
+export function usePitcherLeagueBgm(
+  isActive: boolean,
+  scene: PitcherScene,
+  endingIndex: number | null = null,
+): number | null {
   const [wasActive, setWasActive] = useState(false)
   const [fromReentry, setFromReentry] = useState(false)
   // 그리는 중에 앞 값과 견줘 고친다 (React 의 "이전 렌더 값으로 상태 고치기" — 효과 한 틀 늦지 않게)
@@ -111,7 +137,7 @@ export function usePitcherLeagueBgm(isActive: boolean, scene: PitcherScene): num
     setFromReentry(false)
   }
   // 위에서 상태를 고쳤으면 React 가 이 그리기를 버리고 곧바로 다시 그린다 — 돌려주는 값은 고친 상태로 다시 구한다
-  return isActive ? pitcherLeagueBgmOf(scene, fromReentry) : null
+  return isActive ? pitcherLeagueBgmOf(scene, fromReentry, endingIndex) : null
 }
 
 /** 시즌 관리 메뉴 상태 0xc9 · 장면 생성 뒤 첫 상태(진입 분기) 0xcb */

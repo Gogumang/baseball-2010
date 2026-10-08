@@ -88,3 +88,19 @@ describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록�
     expect(played).toEqual([4, 4])
   })
 })
+
+describe('엔딩 141 배경음 — 진입 0x12300 의 12328 `cmp e,#1 ; bgt` (부호 있음)', () => {
+  it('e ≤ 1(−1 판정 없음 · 0 부상 · 1 방출)이면 0x34, 그 밖은 0x2e', () => {
+    expect(screenBgmOf({ kind: '엔딩', endingIndex: -1 })).toBe(52)
+    expect(screenBgmOf({ kind: '엔딩', endingIndex: 0 })).toBe(52)
+    expect(screenBgmOf({ kind: '엔딩', endingIndex: 1 })).toBe(52)
+    expect(screenBgmOf({ kind: '엔딩', endingIndex: 2 })).toBe(46)
+    expect(screenBgmOf({ kind: '엔딩', endingIndex: 9 })).toBe(46)
+  })
+
+  it('투수편도 같은 진입이다 (모드 갈림 없음)', () => {
+    expect(pitcherLeagueBgmOf('엔딩', false, -1)).toBe(52)
+    expect(pitcherLeagueBgmOf('엔딩', false, 0)).toBe(52)
+    expect(pitcherLeagueBgmOf('엔딩', false, 5)).toBe(46)
+  })
+})

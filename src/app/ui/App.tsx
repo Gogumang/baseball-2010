@@ -209,7 +209,7 @@ export function App() {
     pitcherNariGameSave,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
-  const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene)
+  const pitcherBgm = usePitcherLeagueBgm(screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null)
   useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgmOf(screen))
   // 시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4 (위 화면 표 뒤에 돌아야 이긴다)
   useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene)
