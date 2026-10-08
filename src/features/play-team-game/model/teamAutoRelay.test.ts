@@ -51,8 +51,8 @@ describe('자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다 —
     const { current, 걸음틱 } = 끝까지중계(시작, random)
     expect(current.game.isFinished).toBe(true)
     expect(current.autoRelay ?? null).toBeNull()
-    // 걸음마다 타석 틱 하나와 그 앞 교체 틱들
-    expect(걸음틱.every((count) => count >= 1)).toBe(true)
+    // 걸음마다 0xc262c 한 번 — 교체 틱이든 타석 틱이든 하나
+    expect(걸음틱.every((count) => count === 1)).toBe(true)
     const 요약 = summaryOf(current)
     const 한번에요약 = summaryOf(한번에)
     expect([요약.ourScore, 요약.opponentScore]).toEqual([한번에요약.ourScore, 한번에요약.opponentScore])
@@ -102,6 +102,23 @@ describe('자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다 —
     expect(사람.atBatPrepared).toBe(true)
     // 이어하기(장면 초기화 0xc0e60)도 sim+0x9f 를 되살린다
     expect(resumeTeamGame(사람, createSeededRandom(2)).autoProgressFlag).toBe('stopped')
+  })
+
+  it('교체 틱(0xc262c 의 c266c — 공 없이 돌아감)도 한 걸음이라, 그 뒤 CLR 로 멈추면 그 타석은 간이 엔진이 안 굴린다', () => {
+    const random = createSeededRandom(1)
+    let current = startTeamGame({ ...기본옵션, settings: 전부자동, liveAutoRelay: true }, random)
+    // 씨앗 1 은 36 걸음째(0-기준 35)가 교체 틱이다
+    for (let step = 0; step < 36; step += 1) current = stepAutoRelay(current, random)
+    const 교체틱 = current.autoRelay?.ticks
+    expect(교체틱).toHaveLength(1)
+    expect(교체틱?.[0]?.atBat).toBeNull()
+    const 앞경기 = current.game
+    const 사람 = stepAutoRelay(stopAutoRelay(current), random)
+    expect(사람.autoRelay ?? null).toBeNull()
+    expect(isHumanTurn(사람)).toBe(true)
+    // 그 타석은 아직 안 굴렀다 — 같은 반 이닝 · 같은 아웃 · 같은 점수
+    expect([사람.game.inning, 사람.game.half, 사람.game.outs]).toEqual([앞경기.inning, 앞경기.half, 앞경기.outs])
+    expect([사람.game.ourScore, 사람.game.opponentScore]).toEqual([앞경기.ourScore, 앞경기.opponentScore])
   })
 
   it('30G 자동진행 — sim+0xa0 = 1 로 중계에 들어서고, 일반·시즌은 경기 끝까지 · 대전은 7회 앞에서 사람에게 넘긴다', () => {

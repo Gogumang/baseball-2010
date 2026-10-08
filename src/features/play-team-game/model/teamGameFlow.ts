@@ -798,8 +798,8 @@ export interface TeamGameProgress {
 }
 
 /**
- * **자동진행 중계 한 걸음** — `stepAutoRelay` 한 번에 돈 0xc262c 틱들(교체 틱 · 타석 틱). 원본은 0xc262c 한 번이 갱신 한 번이라
- * 화면은 이 틱들을 갱신마다 한 칸씩 그린다.
+ * **자동진행 중계 한 걸음** — `stepAutoRelay` 한 번에 돈 0xc262c 틱(교체 틱 또는 타석 틱 하나 — 막 들어선 자리는 없음).
+ * 원본은 0xc262c 한 번이 갱신 한 번이라 화면은 걸음마다 한 칸 그린다.
  */
 export interface TeamAutoRelay {
   readonly serial: number
@@ -4472,10 +4472,9 @@ function enterAutoRelay(progress: TeamGameProgress): TeamGameProgress {
  * 4852e  참 → 0xc262c(sim)     ; 간이 타석 하나 또는 교체 틱 하나
  * 48538  거짓 → +0x1784 = 0 · 0xbcb48(…, 0x18) · 경기 끝 아니면 0xc0ee8 · 0xc22b4 (굴림 없음) · 0x6e418 배경음 끔
  * ```
- * 웹 간이 타석은 교체 판정(0xc1ba4)과 타석을 한 번에 굴리므로 한 걸음이 0xc262c 여러 번(교체 틱 + 타석 틱)이다 — 굴림 차례는
- * 같고, 화면이 틱들을 갱신마다 한 칸씩 그린다. 거짓이면 중계를 걷고 평소처럼 다음 사람 타석을 세운다(0x18 을 지나 저장 · 판 없음).
- *
- * ⚠️ 근사: 교체 틱과 그 뒤 타석 틱 사이에 CLR 로 멈추면 원본은 타석을 안 굴리지만 웹은 이미 굴렸다(타석 뒤에 멈춘다).
+ * 한 걸음 = 0xc262c **한 번**(`playAutoTick`) — 교체 판정 0xc1ba4 가 참이면 공 없이 돌아가는 교체 틱(c266c), 거짓이면 타석 틱.
+ * 그래서 교체 틱과 그 뒤 타석 틱 사이에도 0xc2198 이 한 번 돌아 CLR 중단(sim+0x9f)을 본다 — 멈추면 그 타석은 간이 엔진이 아니라
+ * 사람 타석이 굴린다(원본 그대로). 거짓이면 중계를 걷고 평소처럼 다음 사람 타석을 세운다(0x18 을 지나 저장 · 판 없음).
  */
 export function stepAutoRelay(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
   const relay = progress.autoRelay
@@ -4486,7 +4485,7 @@ export function stepAutoRelay(progress: TeamGameProgress, random: RandomPort): T
     return advance(outside, random)
   }
   const ticks: TeamAutoRelayTick[] = []
-  const played = playAutoAtBat(outside, random, ticks)
+  const played = playAutoTick(outside, random, ticks)
   const flipped = played.game.inning !== outside.game.inning || played.game.half !== outside.game.half
   return {
     ...played,
@@ -4540,16 +4539,30 @@ function withoutBurstOnHalfFlip(progress: TeamGameProgress): TeamGameProgress {
   return withoutPendingBurst(progress)
 }
 
-/** 자동 타석 하나 (간이 엔진, 상태 0x21) — 지났다는 표시를 남긴다 */
-function playAutoAtBat(
-  progress: TeamGameProgress,
-  random: RandomPort,
-  /** 중계 틱을 여기 쌓는다 (`stepAutoRelay`) */
-  relay?: TeamAutoRelayTick[],
-): TeamGameProgress {
-  const played = isOurOffense(progress)
-    ? playAutoOffenseAtBat(progress, random, relay)
-    : playAutoDefenseAtBat(progress, random, relay)
+/**
+ * 자동 타석 하나 (간이 엔진, 상태 0x21 — 화면 없이 한꺼번에 굴리는 길) — 교체 틱들(0xc262c 의 c266c)을 다 지나 공을 던질 때까지.
+ * 지났다는 표시를 남긴다.
+ */
+function playAutoAtBat(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const battingIsOurs = isOurOffense(progress)
+  const ready = runQuickSubstitutions(progress, battingIsOurs, random)
+  const played = battingIsOurs ? playAutoOffenseAtBat(ready, random) : playAutoDefenseAtBat(ready, random)
+  return played.autoSinceHuman ? played : { ...played, autoSinceHuman: true }
+}
+
+/**
+ * **0xc262c 한 번** (중계 한 걸음, `stepAutoRelay`) — 머리의 0xc1ba4(CPU 대타 0xc1c50 · CPU 투수 교체 0xc1ce2)가 참이면 공 없이
+ * 돌아가는 교체 틱(c266c `bne c2732`), 거짓이면 그 자리에서 타석 하나. 굴림 차례는 `playAutoAtBat` 과 같다 — 걸음 사이의
+ * 0xc2198 은 굴리지 않는다. 교체 틱도 상태 0x21 을 지난 것이라 표시(`autoSinceHuman`)를 남긴다.
+ */
+function playAutoTick(progress: TeamGameProgress, random: RandomPort, relay: TeamAutoRelayTick[]): TeamGameProgress {
+  const battingIsOurs = isOurOffense(progress)
+  let played = quickSubstitutionCall(progress, battingIsOurs, random)
+  if (played !== progress) {
+    relay.push(relayTickOf(played, progress.game, null))
+  } else {
+    played = battingIsOurs ? playAutoOffenseAtBat(progress, random, relay) : playAutoDefenseAtBat(progress, random, relay)
+  }
   return played.autoSinceHuman ? played : { ...played, autoSinceHuman: true }
 }
 
@@ -4603,36 +4616,35 @@ function withHalfInningBoard(progress: TeamGameProgress, random: RandomPort): Te
  * 판정한다** — 투수만 바뀐 부름 뒤에는 대타 굴림(`rand(0,1000)`)이 한 번 더 돈다. 둘 다 안 바뀌어야 공을 던진다.
  * 두 칸은 공이 나가야(0xa5e14) 내려가므로 이 고리는 많아야 세 번 돈다.
  */
-function runQuickSubstitutions(
-  progress: TeamGameProgress,
-  battingIsOurs: boolean,
-  random: RandomPort,
-  /** 교체가 난 0xc262c 한 번(공 없이 돌아감, c266c) — 중계 교체 틱 */
-  onSubstitutionTick?: (after: TeamGameProgress, before: GameState) => void,
-): TeamGameProgress {
+function runQuickSubstitutions(progress: TeamGameProgress, battingIsOurs: boolean, random: RandomPort): TeamGameProgress {
   let current = progress
   for (let call = 0; call < MAXIMUM_QUICK_SUBSTITUTION_CALLS; call += 1) {
-    const pinched = applyCpuPinchHit(current, battingIsOurs, random)
-    const changed = judgeAutoPitcherChange(pinched, !battingIsOurs, random)
+    const changed = quickSubstitutionCall(current, battingIsOurs, random)
     if (changed === current) return current
-    onSubstitutionTick?.(changed, current.game)
     current = changed
   }
   return current
 }
 
+/** 0xc1ba4 한 번 — CPU 대타(공격 팀, 0xc1c50) 뒤 CPU 투수 교체(수비 팀, 0xc1ce2). 아무것도 안 바뀌면 같은 객체 */
+function quickSubstitutionCall(progress: TeamGameProgress, battingIsOurs: boolean, random: RandomPort): TeamGameProgress {
+  const pinched = applyCpuPinchHit(progress, battingIsOurs, random)
+  const changed = judgeAutoPitcherChange(pinched, !battingIsOurs, random)
+  return changed === progress ? progress : changed
+}
+
 /** `runQuickSubstitutions` 이 도는 상한 — 대타 한 번 · 투수 한 번 · 마지막 빈 부름 */
 const MAXIMUM_QUICK_SUBSTITUTION_CALLS = 3
 
-/** 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0) */
+/**
+ * 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0). 0xc262c 머리의 교체 판정 0xc1ba4(우리가 공격 중이면
+ * **상대 투수**를 본다)는 부르는 쪽이 먼저 다 지났다(`playAutoAtBat` · `playAutoTick`).
+ */
 function playAutoOffenseAtBat(
   progress: TeamGameProgress,
   random: RandomPort,
   relay?: TeamAutoRelayTick[],
 ): TeamGameProgress {
-  // 0xc262c 는 타석마다 먼저 0xc1ba4 를 부른다 — CPU 대타(공격 팀, 0xc1c50) 뒤 CPU 투수 교체(0xc1ce2).
-  // 우리가 공격 중이면 **상대 투수**를 본다
-  progress = runQuickSubstitutions(progress, true, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
   // 이어 c26b6 0xa5bcc 가 대타 홈런 칸 ctx+0x160 을 지운다 — 간이 엔진 타석은 기록 5 를 못 낸다
   if (progress.pinchHitHomeRunHalf !== null) progress = { ...progress, pinchHitHomeRunHalf: null }
   const { options } = progress
@@ -4730,8 +4742,7 @@ function playAutoDefenseAtBat(
   random: RandomPort,
   relay?: TeamAutoRelayTick[],
 ): TeamGameProgress {
-  // 0xc1ba4 안 차례 그대로 — CPU 대타(공격 = 상대 팀, 0xc1c50) 뒤 **우리 투수** 교체 판정(0xc1ce2)
-  progress = runQuickSubstitutions(progress, false, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
+  // 0xc1ba4(CPU 대타 = 상대 팀 · **우리 투수** 교체 판정)는 부르는 쪽이 먼저 다 지났다
   const { options } = progress
   const pitcher = entryQuickPitcherOf(progress, options.ourTeamId, progress.ourPitcherIndex)
   const drain = quickPitcherDrainOf(

@@ -5,7 +5,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
-import type { TeamAutoRelay as TeamAutoRelayState, TeamAutoRelayTick, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamAutoRelay as TeamAutoRelayState, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { teamAutoRelayEntryStepOf, teamAutoRelayStepOf } from '@/pages/team-game/lib/teamAutoRelay'
 import { AUTO_RELAY_SPEED_MAX, autoRelaySpeed, setAutoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
 
@@ -80,7 +80,6 @@ interface TeamAutoRelayProps {
  * - 작은 다이아몬드 · 주자 그림(0x79d10, 표 0xd0028) · 투수/타자 그림(0x79b48)과 배경은 안 그린다(그림 짝을 아직 못 맞췄다).
  * - 프레임 33 의 효과 (1, 0xc) · 세모의 흐림 효과 (1, 6)은 불투명도로 근사했다.
  * - 질문 창이 떠 있는 동안은 갱신 · 그리기 셈(sim+0x9d)을 멈춘다(원본 팝업 동안의 장면 갱신은 안 읽었다).
- * - 웹 한 걸음은 교체 틱들과 타석 틱을 한 번에 굴린다 — 틱 그림은 갱신마다 한 칸씩 내지만 CLR 은 그 걸음의 타석 뒤에 먹는다.
  */
 export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }: TeamAutoRelayProps) {
   const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
@@ -92,8 +91,6 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
   const isAskingRef = useRef(false)
   isAskingRef.current = isAsking
   const [sceneTick, setSceneTick] = useState(0)
-  /** 이번 걸음에서 아직 안 그린 틱들 */
-  const queueRef = useRef<TeamAutoRelayTick[]>([])
   /** sim+0x9c · sim+0x9d */
   const waitRef = useRef({ armed: false, count: 0 })
   const isDoneRef = useRef(false)
@@ -142,18 +139,15 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide }
       // 0xc2198 머리 — sim+0x9c · +0x9d 를 지운다
       wait.armed = false
       wait.count = 0
-      let next = queueRef.current.shift()
-      if (next === undefined) {
-        const relay = onStep()
-        if (relay === null) {
-          // 0xc2198 거짓 — +0x1784 = 0 · 상태 0x18 · 0x6e418 배경음 끔
-          isDoneRef.current = true
-          audio.stopBgm()
-          return
-        }
-        queueRef.current = [...relay.ticks]
-        next = queueRef.current.shift()
+      // 걸음 하나 = 0xc262c 한 번(교체 틱 또는 타석 틱)
+      const relay = onStep()
+      if (relay === null) {
+        // 0xc2198 거짓 — +0x1784 = 0 · 상태 0x18 · 0x6e418 배경음 끔
+        isDoneRef.current = true
+        audio.stopBgm()
+        return
       }
+      const next = relay.ticks[0]
       if (next !== undefined) {
         if (next.halfFlipped && !fast) {
           wait.armed = true
