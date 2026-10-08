@@ -138,7 +138,7 @@ export function MissionRoutes({
   if (screen.kind === '미션진행' || screen.kind === '투수미션' || screen.kind === '마선수대결') playScreenRef.current = screen
   /** 미션 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, playScreenRef.current)
-  /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
+  /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
 
   const playingRun =

@@ -400,11 +400,6 @@ export interface PitcherGameProgress {
   readonly sceneConfirmPending?: boolean
   readonly lastPitch: Pitch | null
   readonly lastResolution: PitchResolution | null
-  /**
-   * 장면 +0xfdc — 마지막으로 쓴 번트 종류(0 스윙 · 1~3 번트). CPU 타자가 휘두를 때만 쓰고(0x34436) 장면 new 의 0 에서 시작한다.
-   * 안 휘두른 공의 주자 판(도루 리드 0x3d7b8)이 이 남은 값을 본다. 없으면 0
-   */
-  readonly sceneBuntKind?: number
   /** 이닝별 실점 표 (`0xb6988`) — 감독 강판 3번 사유가 읽는다 */
   readonly inningRuns: readonly number[]
   readonly decision: DecisionState
@@ -1093,8 +1088,6 @@ export function startPitch(
       careerYearIndex: options.careerYearIndex ?? 0,
       // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
       playsFoulBall: true,
-      // 장면 +0xfdc — 안 휘두른 공은 앞 공의 값이 남는다
-      previousBuntKind: progress.sceneBuntKind ?? 0,
       // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
       pitcherStaminaPercent: staminaPercent,
     },
@@ -1123,7 +1116,6 @@ export function startPitch(
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
-    sceneBuntKind: thrown.buntKind ?? 0,
   }
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다.
@@ -1259,7 +1251,8 @@ interface PitcherPitchArrival {
  *   안 오르는 갈래다(0xa8d98). 웹은 주자 판 뒤 보통 삼진 길(`applyDefensivePlay`)로 타자 수를 센다.
  * - 번트 종류(장면 +0xfdc): `simulateBatter` 가 낸 이 공의 값(`thrown.buntKind`)을 주자 판에 싣는다 — 도루 판 리드 0x3d7b8 이
  *   도루 안 한 주자에게 +3 틱을 더한다.
- *   번트 헛스윙은 그 공의 종류를, 안 휘두른 공은 앞 공의 값(쓰는 곳 0x34436 은 휘두를 때만 — `sceneBuntKind`)을 낸다.
+ *   번트 헛스윙은 그 공의 종류를, 안 휘두른 공은 0 을 낸다 — 0x11 진입 0x3de10(3deb8 0x340dc)이 공마다 +0xfd8 · +0xfdc · +0xfe0 을
+ *   memset 하고 CPU 타석에서 쓰는 곳 0x34436 은 휘두를 때만이다.
  *
  * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
  */

@@ -489,8 +489,9 @@ export interface TeamGameProgress {
   readonly options: TeamGameOptions
   readonly game: GameState
   /**
-   * 장면 +0xfdc — 마지막으로 쓴 번트 종류(0 스윙 · 1~3 번트). CPU 타자는 휘두를 때만(0x34436), 사람은 번트 · 스윙 키가 쓴다.
-   * 장면 new 의 0 에서 시작하고 공수가 바뀌어도 남는다. 안 휘두른 공의 주자 판(도루 리드 0x3d7b8)이 본다. 없으면 0
+   * 장면 +0xfdc — 지난 공의 번트 종류(0 스윙 · 1~3 번트). CPU 타자는 휘두를 때만(0x34436), 사람은 번트 · 스윙 키가 쓴다 — 둘 다
+   * 상태 0x11 안이고, 0x11 진입 0x3de10(3deb8 0x340dc)이 공마다 0 으로 지우므로 안 휘두른 공은 0 이다. 공 없이 도는 견제 판만 지난 공의
+   * 값을 그대로 본다(0x11 을 안 지난다). 없으면 0
    */
   readonly sceneBuntKind?: number
   /**
@@ -2542,8 +2543,6 @@ function pitchOnce(
       swingMode: '일반',
       // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
       playsFoulBall: true,
-      // 장면 +0xfdc — 안 휘두른 공은 앞 공의 값이 남는다(0x34436 은 휘두를 때만 쓴다)
-      previousBuntKind: progress.sceneBuntKind ?? 0,
       // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
       pitcherStaminaPercent: staminaPercent,
     },
@@ -3325,7 +3324,7 @@ function arriveTeamPitch(
             offenseIsCpu: true,
             throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),
           }),
-      // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공은 앞 공의 값 — `sceneBuntKind`)
+      // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공은 0 — 0x11 진입의 memset)
       buntKind: pitch.buntKind ?? 0,
       scene: progress.defenseScene,
     },

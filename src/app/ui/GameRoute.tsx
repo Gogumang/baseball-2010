@@ -82,7 +82,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   wasLoadingRef.current = isLoading
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerialRef.current)
-  /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 앞 공의 값이 남는다(`BattingStage.sceneBuntKind`) */
+  /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, sceneSerialRef.current)
 
   /**

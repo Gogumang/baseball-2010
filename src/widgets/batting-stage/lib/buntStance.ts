@@ -55,10 +55,26 @@ export type SceneBuntKey =
 /**
  * **사람 키가 쓰는 장면 +0xfdc** (직접 뜸 — `BattingStage` 의 `sceneBuntKind` 주석):
  * 스윙 0x51dce · 필살 0x51e2c 는 0, 번트 0x51e84 는 마선수가 아니면 종류(마선수면 키 자체를 무시 — 그대로).
- * 키가 없는 공은 아무도 안 써 앞 공의 값이 남는다.
+ * 키가 없는 공은 0 이다 — 키는 모두 상태 0x11 안이고 그 진입 0x3de10(3deb8 0x340dc)이 공마다 +0xfdc 를 memset 한다(`BattingStage`).
  * ⚠️ 같은 갱신 안에서 번트 키를 두 번 눌러 예약(+0xfe0)을 지우는 갈래(51e98 → 0)는 옮기지 않았다 — 웹 키는 틱 예약을 따로 안 든다.
  */
 export function sceneBuntKindAfterKey(previous: number, key: SceneBuntKey): number {
   if (key.kind !== '번트') return 0
   return key.isAceBatter ? previous : key.buntKind
+}
+
+/** 장면 +0xfdc 와 그 칸을 마지막으로 지운 공 (`sceneBuntKindOnPitch`) */
+export interface SceneBuntMemory<P> {
+  readonly pitch: P | null
+  readonly kind: number
+}
+
+/**
+ * **공마다 +0xfdc 를 지운다** — 상태 0x11 진입 0x3de10 의 3deb8 `0x340dc` = `memset(장면+0xfd8, 0, 12)`(memset 0x1400428)가
+ * +0xfd8 · +0xfdc · +0xfe0 을 0 으로 둔다. 갈래가 없어 사람 · CPU 타석 모두 공마다다. 그래서 키(모두 0x11 안)를 안 누른 공은 0 이다.
+ * 새 공(`pitch` 가 지난번과 다른 공)이면 0 으로 지우고 그 공을 기억한다. 공이 없으면(견제 0x34848 → 0x10 — 0x11 을 안 지난다) 그대로다.
+ */
+export function sceneBuntKindOnPitch<P>(memory: SceneBuntMemory<P>, pitch: P | null): SceneBuntMemory<P> {
+  if (pitch === null || pitch === memory.pitch) return memory
+  return { pitch, kind: 0 }
 }

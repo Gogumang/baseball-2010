@@ -232,12 +232,12 @@ describe('CPU 번트 — 원본 0x3445a', () => {
     ).toBe(0)
   })
 
-  it('안 휘두른 공은 장면 +0xfdc 에 앞 공의 번트 종류가 남는다 — 0x34436 은 휘두를 때만 쓴다', () => {
+  it('안 휘두른 공은 장면 +0xfdc 가 0 이다 — 0x11 진입 0x3de10(3deb8 0x340dc)이 공마다 memset 하고 0x34436 은 휘두를 때만 쓴다', () => {
     const 지켜봄 = Array.from({ length: 40 }, (_unused, index) =>
-      pitchAgainstBatterDetailed(크게빠진공, 타자(500), createSeededRandom(index + 1), undefined, 무사주자없음, { previousBuntKind: 2 }),
+      pitchAgainstBatterDetailed(크게빠진공, 타자(500), createSeededRandom(index + 1), undefined, 무사주자없음),
     ).filter((thrown) => thrown.resolution.kind === '볼')
     expect(지켜봄.length).toBeGreaterThan(0)
-    expect(지켜봄.every((thrown) => thrown.buntKind === 2)).toBe(true)
+    expect(지켜봄.every((thrown) => thrown.buntKind === 0)).toBe(true)
   })
 
   it('번트 헛스윙도 그 공의 번트 종류를 낸다 (0x3445a)', () => {
@@ -249,7 +249,6 @@ describe('CPU 번트 — 원본 0x3445a', () => {
       createSeededRandom(40),
       { control: 999, velocity: 999 },
       { ...무사주자없음, hasRunner: true },
-      { previousBuntKind: 0 },
     )
     expect(thrown.resolution).toEqual({ kind: '스트라이크', isSwinging: true })
     expect(thrown.buntKind).toBeGreaterThan(0)
