@@ -14,6 +14,11 @@ afterEach(cleanup)
 const 그림 = (name: string) => screen.getByRole('button', { name }).querySelector('img')
 
 describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
+  it('뒤 어둡게의 검정 몫을 주면 그 값으로 덮는다 (0x746cc 의 [0x15605d0] 단계)', () => {
+    render(<MessageBox text="알림" buttons={['OK']} dimOpacity={6 / 16} onAnswer={vi.fn()} />)
+    expect(screen.getByRole('dialog').style.background).toBe('rgba(0, 0, 0, 0.375)')
+  })
+
   it('알림은 프레임 0 "OK" 한 장뿐이다 — "확인" 글자가 아니다', () => {
     render(<MessageBox text="알림" buttons={['확인']} onAnswer={vi.fn()} />)
 

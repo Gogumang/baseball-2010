@@ -291,6 +291,8 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
     틀()
     const 창 = screen.getByRole('dialog')
     expect(창.textContent).toContain('아이템')
+    // 이벤트 장면은 [창+0x24f] = 0 — 떠 있는 그리기마다 검정 (5 + 1)/16 로 덮는다 (0x746cc)
+    expect(창.style.background).toBe('rgba(0, 0, 0, 0.375)')
     expect(within(창).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['OK'])
     // 0x8b5ac 는 창이 떠 있어도 0x7fbc4 로 앞 say 를 그린다 — 다시 오르지도, 글을 다시 찍지도 않는다
     expect(대사글()).toContain('아이템을 볼까?')

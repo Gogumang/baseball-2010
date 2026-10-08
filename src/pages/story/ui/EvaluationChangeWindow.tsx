@@ -9,6 +9,7 @@ import {
 } from '@/pages/story/lib/evaluationChangeWindow'
 import type { EvaluationChangeValues } from '@/pages/story/lib/evaluationChangeWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
+import { EVENT_WINDOW_DIM_OPACITY } from '@/pages/story/lib/eventDialogue'
 
 const MODE_UI = './sprites/mode_ui/frames'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -38,7 +39,7 @@ export interface EvaluationChangeWindowProps {
  * **경기 평가 변화 창** — 이벤트 system sub 2 (그리기 0x86c90, 배치는 `pages/story/lib/evaluationChangeWindow`).
  * 240×320 화면 좌표 그대로 이야기 덮개 위에 놓는다. 닫기는 원본 OK(−5) · '5' — 웹은 Enter · Space · '5' 와 누르기.
  * ⚠️ 공용 창 0x55e61 의 그림은 웹 공용 근사(`GameWindow.css` window)다 — 올해의 목표 창과 같다.
- * ⚠️ 미해결: 팝업이 떠 있는 동안 앞 대사 창이 밑에 남아 그려지는지는 확인하지 않았다 — 웹은 창만 그린다.
+ * 창이 떠 있는 동안에도 0x8b5ac 가 틀마다 0x7fbc4 로 앞 say 상자를 그린다(`EvaluationEventPlayer` 가 남긴다) — 창 뒤 어둡게가 그 위를 덮는다.
  */
 export function EvaluationChangeWindow({ values, goals, year, game, onClose }: EvaluationChangeWindowProps) {
   const modeUiOrigins = useFrameOrigins(MODE_UI)
@@ -58,7 +59,9 @@ export function EvaluationChangeWindow({ values, goals, year, game, onClose }: E
   }, [onClose])
 
   return (
-    <div className={windowStyles.overlay} data-testid="경기-평가-변화-창" role="dialog" aria-label="경기 평가 변화" onClick={onClose}>
+    // 뒤 어둡게 — 이벤트 장면의 창은 떠 있는 그리기마다 검정 6/16 (0x746cc, `EVENT_WINDOW_DIM_OPACITY`)
+    <div className={windowStyles.overlay} data-testid="경기-평가-변화-창" role="dialog" aria-label="경기 평가 변화" onClick={onClose}
+      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
         <filter id={navyFilterId} colorInterpolationFilters="sRGB">
           {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색 — 올해의 목표 창과 같은 1차식 */}

@@ -4,6 +4,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import { YEAR_GOAL_BOXES, YEAR_GOAL_MODE_UI_FRAME, yearGoalWindowLayoutOf } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
+import { EVENT_WINDOW_DIM_OPACITY } from '@/pages/story/lib/eventDialogue'
 
 const MODE_UI = './sprites/mode_ui/frames'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -23,7 +24,9 @@ export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalW
   const layout = yearGoalWindowLayoutOf(values)
   const { window: area } = YEAR_GOAL_BOXES
   return (
-    <div className={windowStyles.overlay} data-testid="올해의-목표-창" onClick={onClose}>
+    // 뒤 어둡게 — 이벤트 장면의 창은 떠 있는 그리기마다 검정 6/16 (0x746cc, `EVENT_WINDOW_DIM_OPACITY`)
+    <div className={windowStyles.overlay} data-testid="올해의-목표-창" onClick={onClose}
+      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
         <filter id={navyFilterId} colorInterpolationFilters="sRGB">
           {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색. 255 → 41·73·165, 239 → 16·36·107 이 되는 1차식 */}

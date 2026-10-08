@@ -14,7 +14,7 @@ import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
-import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
+import { EVENT_WINDOW_DIM_OPACITY, SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
 import {
   INITIAL_EVENT_BACKDROP, clearsDialogueBeforeMatch, drawEventBackdrop, portraitBaseYOf,
 } from '@/pages/story/lib/eventBackdrop'
@@ -238,14 +238,14 @@ export function StoryScreen({
       {noticeText !== null && (
         // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
         <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={noticeText} buttons={NOTICE_BUTTONS} onAnswer={next} />
+          text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={next} />
       )}
 
       {command?.op === 'yesno' && (
         // 0x74ef4 종류 2 — 0x749d5 를 안 불러 처음 커서는 [예]. CLR 은 1 [아니오](0x7514a~0x75174: 키 −16 → 1).
         // 답 0 → [mgr+0x2bc] = 예 이벤트([명령+8]) · 1 → 아니오 이벤트([명령+0xa]) (0x8d954~0x8d9a2)
         <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={command.text} buttons={YES_NO_BUTTONS}
+          text={command.text} buttons={YES_NO_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
           onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)} />
       )}
 

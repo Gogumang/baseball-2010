@@ -45,6 +45,11 @@ interface MessageBoxProps {
    * 예: 일반모드 [13] 은 −1(0x29760~0x2977c). 안 주면 지금까지처럼 마지막 칸이다.
    */
   readonly cancelAnswer?: number
+  /**
+   * 뒤 어둡게의 검정 몫 (0x746cc 의 0x74704~0x7474a — 창이 떠 있는 그리기마다 [0x15605d0](0, 0, W, H, 검정, 단계 5) =
+   * 검정 (5 + 1)/16, 장면이 세운 [창+0x24f] → [창+0x24e] 가 0 일 때). 안 주면 지금까지의 공용 근사다.
+   */
+  readonly dimOpacity?: number
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
 }
@@ -139,7 +144,7 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 }
 
 export function MessageBox({
-  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, onAnswer,
+  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, onAnswer,
 }: MessageBoxProps) {
   /** 격자 열 수 — 안 주면 버튼이 한 줄이다 */
   const columns = Math.max(1, grid?.columns ?? buttons.length)
@@ -270,7 +275,8 @@ export function MessageBox({
   }
 
   return (
-    <div className={styles.dim} role="dialog" aria-label="알림">
+    <div className={styles.dim} role="dialog" aria-label="알림"
+      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
       <div className={styles.box} ref={boxRef} style={boxStyle}>
         <div className={styles.text} style={contentStyle}>
           <MarkupText raw={text} />
