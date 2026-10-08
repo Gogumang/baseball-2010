@@ -124,6 +124,8 @@ const SKY_GRADIENT = { top: 10, bottom: 118, end: 178 }
 const CLOUD_COUNT = 3
 /** 하늘을 단색으로 칠하고 조명도 안 그리는 구장 번호 (0x78046 · 0x784c6 `cmp #8`) */
 const FLAT_SKY_STADIUM = 8
+/** 구장 8 의 하늘 단색 — 0x7806e `0x1400748(0xc6, 0xd4, 0xd7)` */
+const FLAT_SKY_COLOR = 'rgb(198, 212, 215)'
 /** 좌타 펜스 기준점 (−121 − 10, −70 + 3) */
 const FENCE_ANCHOR = { x: CAMERA.x - 1 - 10, y: CAMERA.y + 3 }
 const MISSION_TEAM_ICON = 11
@@ -203,15 +205,28 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
   const colorIndex = drawSky(context, state)
-  if (isCloudVisible(colorIndex)) drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
+  // 구장 8 은 하늘 0x77fe8 이 단색만 칠하고 구름 갈래까지 가지 않는다(78088 → 783a8)
+  if (state.stadium !== FLAT_SKY_STADIUM && isCloudVisible(colorIndex)) {
+    drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
+  }
   const offsetY = state.offsetY ?? 0
   drawFence(context, state, offsetY)
   drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY)
   if (offsetY === 0) drawSkyLight(context, state, colorIndex)
 }
 
+/**
+ * 하늘 0x77fe8 — 구장 +0x70 == 8 이면(78040~78088) 화면 전체 (0, 0, W, H) 를 RGB(0xc6, 0xd4, 0xd7) 한 색으로 칠하고 끝난다
+ * (그라데이션 · 구름 없음). 그 밖은 표 0xd37a4 줄 · 칸의 두 색으로 위 단색 · 그라데이션 · 아래 단색.
+ * 돌려주는 색 칸은 구름 · 하늘 조명이 쓴다(구장 8 은 둘 다 안 그린다).
+ */
 function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
   const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, state.skyColumn)
+  if (state.stadium === FLAT_SKY_STADIUM) {
+    context.fillStyle = FLAT_SKY_COLOR
+    context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
+    return colorIndex
+  }
   context.fillStyle = top
   context.fillRect(0, 0, STAGE_WIDTH, SKY_GRADIENT.top)
   const gradient = context.createLinearGradient(0, SKY_GRADIENT.top, 0, SKY_GRADIENT.bottom)
