@@ -1574,6 +1574,8 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
       lineup: progress.opponentLineup,
       batterOf: (rosterSlot) => teamBatterAt(progress, false, rosterSlot),
       pinchHitUsed: progress.pinchHitUsed,
+      // ac23e~ac26e — 타석 타자가 마선수(0xae89c → 0xb633c)면 굴림 없이 안 낸다. 마타자 칸(12)은 142 가 넣은 명단에만 있다
+      isAceRosterSlot: (rosterSlot) => rosterSlot === ACE_BATTER_ROSTER_SLOT,
     },
   )
   const opponentSide = 1 - progress.game.playerSide
@@ -1912,7 +1914,12 @@ function applyOurCpuPinchHit(progress: GameProgress, random: RandomPort): GamePr
   const pinch = tryQuickCpuPinchHit(
     progress.ourLineup,
     slot,
-    { alreadyUsedThisGame: progress.pinchHitUsed, runnerCount: runnerCountOf(progress.game.bases) },
+    {
+      alreadyUsedThisGame: progress.pinchHitUsed,
+      runnerCount: runnerCountOf(progress.game.bases),
+      // ac23e~ac26e — 타석 타자가 마선수(0xae89c → 0xb633c)면 굴림 없이 안 낸다
+      batterIsAce: rosterSlotAt(progress.ourLineup, slot) === ACE_BATTER_ROSTER_SLOT,
+    },
     random,
   )
   if (pinch === null) return progress

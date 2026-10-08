@@ -2163,7 +2163,8 @@ function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort):
  * 그 타순 칸의 돌발 조건 기록(+0x12 안타 · +0x13 홈런 자리, `opponentBatterLogs`)도 들어온 선수 것(빈 기록)이 된다.
  * 카운트는 이어받는다 — 0x16 → 0xd 가 카운트 지우기(0xb6764)·타석 초기화(0xa5bcc)를 건너뛴다 (48e94).
  *
- * ⚠️ 원본이 보는 마선수 비트(0xb633d)·장비 레벨 니블(+0x19·+0x1a)은 웹 리그 로스터에 없다 — 늘 0 이라 결과가 같다.
+ * 타석 타자가 마선수(ac23e~ac26e: 0xae89c → 0xb633c)면 굴림 없이 안 낸다 — 웹에서 마선수 타자는 142 가 넣은 마타자 칸
+ * (`ACE_BATTER_ROSTER_SLOT`)뿐이다. 장비 레벨 니블(+0x19·+0x1a)은 웹 리그 로스터에 없다 — 늘 0 이라 결과가 같다.
  */
 function applyOpponentCpuPinchHit(
   progress: PitcherGameProgress,
@@ -2186,6 +2187,8 @@ function applyOpponentCpuPinchHit(
     },
     random,
   )
+      // ac23e~ac26e — 타석 타자가 마선수면 굴림 없이 0
+      batterIsAce: rosterSlotAt(progress.opponentLineup, slot) === ACE_BATTER_ROSTER_SLOT,
   if (pinch === null) return progress
   const opponentBatterLogs = { ...progress.opponentBatterLogs }
   delete opponentBatterLogs[slot]
@@ -2781,7 +2784,12 @@ function applyTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomP
   const pinch = tryQuickCpuPinchHit(
     progress.ourLineup,
     slot,
-    { alreadyUsedThisGame: progress.pinchHitUsed, runnerCount: runnerCountOf(progress.game.bases) },
+    {
+      alreadyUsedThisGame: progress.pinchHitUsed,
+      runnerCount: runnerCountOf(progress.game.bases),
+      // ac23e~ac26e — 타석 타자가 마선수면 굴림 없이 0
+      batterIsAce: rosterSlotAt(progress.ourLineup, slot) === ACE_BATTER_ROSTER_SLOT,
+    },
     random,
   )
   if (pinch === null) return progress
