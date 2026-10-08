@@ -22,7 +22,7 @@ const 기본옵션: TeamGameOptions = {
   settings: { ...FULL_PLAY_SETTINGS, kind: MATCH_SETTING_KIND.상세, value: 0 },
 }
 
-const 소리 = { playBgm: vi.fn<(id: number) => void>(), stopBgm: vi.fn<() => void>() }
+const 소리 = { playBgm: vi.fn<(id: number) => void>(), stop: vi.fn<() => void>() }
 
 let 기록: AutoRelayRecordPort
 
@@ -31,8 +31,8 @@ beforeEach(() => {
   setAutoRelayRecordPort(기록)
   setAutoRelaySpeed(0)
   소리.playBgm.mockClear()
-  소리.stopBgm.mockClear()
-  setActiveSound({ ...createSilentSound(), playBgm: 소리.playBgm, stopBgm: 소리.stopBgm })
+  소리.stop.mockClear()
+  setActiveSound({ ...createSilentSound(), playBgm: 소리.playBgm, stop: 소리.stop })
 })
 afterEach(() => {
   cleanup()
@@ -141,7 +141,8 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
     expect(screen.queryByTestId('중계-공격팀')).toBeNull()
     // 설정이 모두 자동이어도 sim+0x9f 가 이겨 사람 장면(0xe OK 대기)이다
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
-    expect(소리.stopBgm).toHaveBeenCalled()
+    // 0x4856c — 0x6e418 소리 끊기
+    expect(소리.stop).toHaveBeenCalled()
     // 0xc0ea8(sim, 1) — 전역기록 +0x14d + m(시즌 칸 1)에도 쓴다
     expect(기록.read().stopped).toEqual([false, true, false])
   })
