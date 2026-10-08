@@ -69,8 +69,9 @@ export interface StealStartInput {
  * - 앞 주자가 서 있으면 **바로 앞 루가 비어야** 한다 (`r6 + 1 < r7`). 1·2루에서 1루 주자만은 못 뛴다.
  * - 앞 주자가 이미 출발했으면 **뛸 수 있다** (`r6 < r7`, 앞으로 가는 중). 겹도루다.
  *
- * ⚠️ "앞으로 가는 중" `!0x9fe80` 은 함수 머리(목표 루·닿은 루·이전 목표 루를 홈 4 로 고쳐 비교)만 읽었다 —
- * 출발한 주자를 "앞으로" 로 본 것은 **유력**이다. 이 갈래 밖(뒤로 가는 주자 · 3루 예외)은 투구 중에 안 생긴다.
+ "앞으로 가는 중" `!0x9fe80` 은 끝까지 떴다(`autoAdvance.isHeadingBack`) — 출발한 주자는 +0x7c(닿은 루 + 1) > +0x8c 라
+ * 9feb2 에 안 걸리고 9fed0 에서 0 이 되어 "앞으로" 다(확정). 이 갈래 밖(뒤로 가는 주자 · 3루 예외)은 투구 중에 안 생긴다.
+ * 판 중 주자(+0x8c · +0x7c · 방향)로 일반화한 같은 함수가 `autoAdvance.isPathClear` 다 — 자동 진루 0xaf918 이 그것을 쓴다.
  */
 export function canStartSteal(input: StealStartInput, base: StealBase): boolean {
   if (!isStealAllowedInPlayKind(input.playKind ?? 1)) return false

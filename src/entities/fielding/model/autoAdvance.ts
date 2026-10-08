@@ -1,4 +1,4 @@
-import { basePosition, ticksToReach } from '@/entities/fielding/model/fieldGeometry'
+import { basePosition, isSamePoint, ticksToReach } from '@/entities/fielding/model/fieldGeometry'
 import {
   isRunnerStopped,
   NONE,
@@ -69,18 +69,82 @@ export interface AutoAdvanceInput extends DefenseContext {
   /** 인자 force — 멈춘 주자까지 강제로 본다 */
   readonly force?: boolean
   /**
-   * 0xa9924 "앞길이 비었나" — 바로 앞 루에 다른 주자가 없어야 한다.
-   * 주자 목록만으로 판단할 수 있어 기본 구현을 두되, 바깥에서 갈아 끼울 수 있게 열어 둔다.
+   * 주자의 원본 `+0x84`(직전 목표 루) — 앞길 검사 0xa9924 가 부르는 방향 판정 0x9fe80 이 본다(`isHeadingBack`).
+   * 안 주면 `+0x8c`(마지막으로 닿은 루)로 본다 — 원본은 주자를 세울 때(vt88 0xa0820)와 도착할 때(0xa040c) 둘 다
+   * `+0x84 = +0x8c` 로 적으므로, 멈춰 선 주자에게는 같은 값이다.
    */
+  readonly previousTargetOf?: (runnerIndex: number) => number
+  /** 앞길 검사를 갈아 끼운다(시험용). 안 주면 원본 0xa9924 그대로(`isPathClear`) */
   readonly isPathClear?: (runner: RunnerState, runners: readonly RunnerState[]) => boolean
 }
 
-/** 기본 앞길 검사 — 가려는 루를 목표로 삼은 다른 주자가 없으면 비었다고 본다 */
-function defaultPathClear(runner: RunnerState, runners: readonly RunnerState[]): boolean {
-  const next = runner.startBase + 1
-  return !runners.some(
-    (other) => other.index !== runner.index && !other.isOut && other.targetBase === next,
-  )
+/**
+ * **방향 판정 `0x9fe80(주자)`** — 참이면 "뒤로(또는 제자리로) 가는 중", 거짓이면 "앞으로 가는 중" (직접 뜬 것, 9fe80~9ff16).
+ * ```
+ * 9fe86  t = +0x7c(달려가는 루) ; g = +0x8c(닿은 루) ; p = +0x84(직전 목표 루)
+ * 9fe92  t == 0 && g == 3 → t = 4 ;  p == 0 && g == 3 → p = 4 ;  t == 3 && g == 0 → g = 4     ; 홈 = 0 = 4
+ * 9feb2  t < g → 1
+ * 9feb6  +0x3a == 0 && t == g && p > t → 1         ; +0x3a = 이동체 0xbf0dc 가 틱 끝에 적는 "멈춤"(vt18) 값
+ * 9fec8  g == t && g == p → 1
+ * 9fed0  t != g → 0
+ * 9fed4  0xbc124(위치 +0x20, 이동 목표점 +0x2c) = (두 점이 다르다) → 그 값        ; 0xbc124 = !0xbc0f4(같은 점)
+ * ```
+ * ⚠️ **근사 둘**: `+0x3a`(앞 틱 끝의 멈춤 값)는 지금의 `isRunnerStopped` 로, 이동 목표점 `+0x2c` 는 `basePosition(+0x7c)` 로
+ * 본다(웹 주자는 목표 루 좌표로만 걷는다 — `isRunnerStopped` 와 같은 근사).
+ */
+export function isHeadingBack(runner: RunnerState, previousTarget: number): boolean {
+  let target = runner.targetBase
+  let touched = runner.startBase
+  let previous = previousTarget
+  if (target === 0 && touched === 3) target = 4
+  if (previous === 0 && touched === 3) previous = 4
+  if (target === 3 && touched === 0) touched = 4
+  if (target < touched) return true
+  if (!isRunnerStopped(runner) && target === touched && previous > target) return true
+  if (touched === target && touched === previous) return true
+  if (target !== touched) return false
+  return !isSamePoint(runner.position, basePosition(runner.targetBase))
+}
+
+/**
+ * **앞길 검사 `0xa9924(주자관리, i)`** — 목록에서 내 바로 앞선 산 주자와 부딪히지 않는가 (직접 뜬 것, a9924~a999e).
+ * ```
+ * a9930  r6 = 주자[i].+0x8c                        ; 내가 마지막으로 닿은 루
+ * a9932  f = 0xa97d4(관리, i)                       ; 목록 번호 i+1 부터 처음 만나는 산(+0x96 == 0) 주자. 없으면 → 1
+ * a993e  r7 = f.+0x8c ; 끝 = 0xb6238(f) (= r7 > 1 ? r7 − 1 : r7) ; 앞으로 = !0x9fe80(f)   (0x9ff20)
+ * a9954  f.vt18() 참(멈춰 섰다):  r6+1 < r7 → 1 ; r6+1 < 끝 → 1 ; 그 밖 → a998e
+ *        거짓(달리는 중):         r6 < r7 && 앞으로 → 1 ; r6 < 끝 && !앞으로 → 1
+ *                                 r6 == 3 → (r7 == 3 && 앞으로) ; 그 밖 → a998e
+ * a998e  r6 == 0 → 1 , 아니면 0                      ; 타자주자는 늘 통과
+ * ```
+ * 도루 출발(0xa9bd4 → `stealStart.canStartSteal`)과 자동 진루(0xaf918 af9fe)가 같은 함수를 쓴다.
+ */
+export function isPathClear(
+  runner: RunnerState,
+  runners: readonly RunnerState[],
+  previousTargetOf: (runnerIndex: number) => number = (index) =>
+    runners.find((candidate) => candidate.index === index)?.startBase ?? NONE,
+): boolean {
+  const mine = runner.startBase
+  // 0xa97d4 — 목록 번호 i+1 부터 오름차순으로 처음 만나는 산 주자
+  let front: RunnerState | undefined
+  for (const other of runners) {
+    if (other.index <= runner.index || other.isOut) continue
+    if (front === undefined || other.index < front.index) front = other
+  }
+  if (front === undefined) return true
+  const frontBase = front.startBase
+  const frontEnd = frontBase > 1 ? frontBase - 1 : frontBase
+  const forward = !isHeadingBack(front, previousTargetOf(front.index))
+  if (isRunnerStopped(front)) {
+    if (mine + 1 < frontBase) return true
+    if (mine + 1 < frontEnd) return true
+    return mine === 0
+  }
+  if (mine < frontBase && forward) return true
+  if (mine < frontEnd && !forward) return true
+  if (mine === 3) return frontBase === 3 && forward
+  return mine === 0
 }
 
 /**
@@ -91,7 +155,9 @@ function defaultPathClear(runner: RunnerState, runners: readonly RunnerState[]):
  */
 export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdvanceDecision[] {
   const { play, runners } = input
-  const pathClear = input.isPathClear ?? defaultPathClear
+  const pathClear =
+    input.isPathClear ??
+    ((runner: RunnerState, all: readonly RunnerState[]) => isPathClear(runner, all, input.previousTargetOf))
   const decisions: AutoAdvanceDecision[] = []
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]

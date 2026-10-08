@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
+import { basePosition, runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import {
   autoAdvanceDecisions,
   AUTO_ADVANCE_TICK_MARGIN,
   beatsThrow,
   clearsRequirement,
+  isHeadingBack,
+  isPathClear,
   requiredBasePinOf,
   requiredBasesOnBounce,
   requiredBasesOnFlyCatch,
@@ -247,5 +249,49 @@ describe('주자 틱 a028c — 요구 루(+0x88)를 밟기 전에는 그 너머�
   })
   it('이미 요구 루 너머에 닿은 주자는 닿은 루에 선다 (+0x8c > +0x88)', () => {
     expect(requiredBasePinOf(createRunner(1, 3, 300, { startBase: 3, targetBase: 4, requiredBase: 2 }))).toBe(3)
+  })
+})
+
+describe('앞길 검사 0xa9924 · 방향 판정 0x9fe80 — 원본 갈래 그대로', () => {
+  /** 루 from 에서 to 로 막 출발한 주자 (위치는 아직 출발 루) */
+  const 출발 = (index: number, from: number, to: number): RunnerState =>
+    createRunner(index, from, 주력500, { targetBase: to })
+  /** 루 b 에 멈춰 선 주자 */
+  const 선 = (index: number, b: number): RunnerState => createRunner(index, b, 주력500)
+
+  it('0x9fe80 — 앞으로(+0x7c > +0x8c)는 0 · 뒤로(+0x7c < +0x8c)는 1 · 루에 멈춰 선 주자(+0x84 == +0x8c)는 1', () => {
+    expect(isHeadingBack(출발(1, 1, 2), 1)).toBe(false)
+    expect(isHeadingBack(출발(1, 2, 1), 2)).toBe(true)
+    expect(isHeadingBack(선(1, 2), 2)).toBe(true)
+    // 3루 → 홈은 +0x7c 4(또는 0) — 9fe92 가 0 을 4 로 고쳐 앞으로다
+    expect(isHeadingBack(출발(1, 3, 0), 3)).toBe(false)
+    // 제 루로 되돌아가는 중(+0x7c == +0x8c, 위치 ≠ 목표점)은 1
+    const 귀루: RunnerState = { ...선(1, 1), position: { ...basePosition(1), x: basePosition(1).x + 600 } }
+    expect(isHeadingBack(귀루, 2)).toBe(true)
+  })
+
+  it('앞 주자가 서 있으면 바로 앞 루가 비어야 한다 (r6+1 < r7) — 타자주자(r6 == 0)는 늘 통과', () => {
+    expect(isPathClear(선(1, 1), [선(0, 0), 선(1, 1), 선(2, 2)])).toBe(false)
+    expect(isPathClear(선(1, 1), [선(0, 0), 선(1, 1), 선(2, 3)])).toBe(true)
+    expect(isPathClear(선(0, 0), [선(0, 0), 선(1, 1)])).toBe(true)
+  })
+
+  it('앞 주자가 앞으로 달리는 중이면 r6 < r7 로 통과 — 예전 근사("그 루를 목표로 삼은 주자가 없다")와 다른 자리', () => {
+    // 2루 주자가 3루로 막 출발했다 — 1루 주자는 2루로 갈 수 있다(예전 근사도 통과)
+    expect(isPathClear(선(1, 1), [선(0, 0), 선(1, 1), 출발(2, 2, 3)])).toBe(true)
+    // 3루 주자가 홈으로 달리는 중 — 2루 주자(r6 2 < r7 3)도 통과
+    expect(isPathClear(선(1, 2), [선(0, 0), 선(1, 2), 출발(2, 3, 4)])).toBe(true)
+    // 앞 주자가 아직 내 루(+0x8c == r6)를 떠나는 중이면 막힌다 — r6 < r7 이 거짓
+    expect(isPathClear(선(1, 1), [선(0, 0), 선(1, 1), 출발(2, 1, 2)])).toBe(false)
+    // 만루 단타 꼴: 1·2·3루 주자가 모두 출발했으면 1루 주자의 앞(2루 주자, +0x8c 2)은 앞으로 — 통과.
+    // 예전 근사("내 다음 루를 목표로 삼은 산 주자가 없다")는 2루 주자의 목표가 3 이라 같은 답이지만,
+    // 2루 주자가 3루에 닿아(+0x8c 3) 홈으로 다시 출발한 뒤 1루 주자가 3루를 노리면 예전 근사는 막지 않고 원본도 통과한다
+    expect(isPathClear(출발(1, 1, 2), [선(0, 0), 출발(1, 1, 2), 출발(2, 2, 3)])).toBe(true)
+  })
+
+  it('죽은 주자는 건너뛰고 그다음 산 주자를 본다 (0xa97d4 의 +0x96)', () => {
+    const 죽은 = { ...선(2, 2), isOut: true }
+    expect(isPathClear(선(1, 1), [선(0, 0), 선(1, 1), 죽은, 선(3, 3)])).toBe(true)
+    expect(isPathClear(선(1, 2), [선(0, 0), 선(1, 2), 죽은, 선(3, 3)])).toBe(false)
   })
 })

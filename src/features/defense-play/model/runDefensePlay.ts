@@ -2201,6 +2201,8 @@ export function stepDefensePlay(
         ...contextAt(tick),
         play: { ...play, finished: homeRunFlag },
         force: true,
+        // 앞길 검사 0xa9924 의 방향 판정 0x9fe80 이 보는 +0x84
+        previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
       })
       for (const decision of decisions) {
         const runner = runners[decision.runnerIndex]
