@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { DialogueBox, Hint, MarkupText, MenuList, Panel } from '@/shared/ui'
 import type { MenuItem } from '@/shared/ui'
@@ -8,6 +9,22 @@ import {
   REPLAY_CONFIRM,
 } from '@/features/play-team-game/model/inGameMenu'
 import type { InGameMenuAction } from '@/features/play-team-game/model/inGameMenu'
+import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
+import * as styles from '@/features/play-team-game/ui/InGameMenu.css'
+
+/**
+ * 창 뒤 어둡게 — 경기 장면 생성자 0x3301c 가 [창+0x24f] = 1 · [창+0x24c] = 1 을 세운다. 일시정지 창 0x741a0 이 띄울 때
+ * (0x74228) [창+0x24f] 를 [창+0x24e] 로 옮기므로 0x746cc 는 **한 번** — 연 그림에 검정 단계 5 = 6/16 — 덮고
+ * [창+0x24d] = 0 으로 끈다. 메뉴 동안 경기를 다시 안 그려 그 한 겹이 멈춘 그림 위에 남는다 (`popupDim`).
+ */
+function DimmedMenu({ children }: { readonly children: ReactNode }) {
+  return (
+    <>
+      <div className={styles.dim} data-testid="경기-메뉴-어둡게" style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
+      <div className={styles.front}>{children}</div>
+    </>
+  )
+}
 
 /**
  * StrGAME[3]/[4] — "자동진행을 하시겠습니까? %d G포인트가 소모됩니다" (R10 7절 116행에 원문이 있다).
@@ -102,12 +119,12 @@ export function InGameMenu({
 
   if (notice !== null) {
     return (
-      <>
+      <DimmedMenu>
         <DialogueBox>
           <MarkupText raw={notice} />
         </DialogueBox>
         <MenuList key="알림" items={[{ id: '확인', label: '확인' }]} onSelect={() => setNotice(null)} />
-      </>
+      </DimmedMenu>
     )
   }
 
@@ -119,7 +136,7 @@ export function InGameMenu({
           ? REPLAY_CONFIRM
           : autoProgressConfirmOf(autoProgressCost)
     return (
-      <>
+      <DimmedMenu>
         <DialogueBox>
           <MarkupText raw={text} />
         </DialogueBox>
@@ -141,7 +158,7 @@ export function InGameMenu({
             onAutoProgress?.(autoProgressCost)
           }}
         />
-      </>
+      </DimmedMenu>
     )
   }
 
@@ -153,7 +170,7 @@ export function InGameMenu({
   }))
 
   return (
-    <>
+    <DimmedMenu>
       <Panel heading="경기 중 메뉴" />
       {/* 질문 창 목록과 다른 객체다 — 같은 자리라도 새로 세워 커서를 섞지 않는다 */}
       <MenuList
@@ -192,6 +209,6 @@ export function InGameMenu({
         }}
       />
       <Hint>* 다시 눌러 계속</Hint>
-    </>
+    </DimmedMenu>
   )
 }
