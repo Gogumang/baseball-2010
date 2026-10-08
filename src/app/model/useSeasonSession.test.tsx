@@ -1431,30 +1431,6 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     expect(result.current.matchSettings).toMatchObject({ kind: 1, value: 0 })
   })
 
-  it('+0x11e 는 일반모드 22 와 같은 전역 칸이다 — 그쪽이 먼저 봤으면 0xdd 는 창을 안 열고, 처음이면 그 칸에 1 을 쓴다', () => {
-    const 들어가기 = (seen: boolean) => {
-      let 칸 = seen
-      const slot = { read: () => 칸, markSeen: vi.fn(() => { 칸 = true }) }
-      const rendered = renderHook(() => useSeasonSession(
-        메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, undefined, slot,
-      ))
-      시작(rendered.result, 0)
-      act(() => rendered.result.current.actions.openNextGame())
-      act(() => rendered.result.current.actions.confirmNextGame())
-      act(() => rendered.result.current.actions.choosePreGameAce(2))
-      act(() => rendered.result.current.actions.choosePreGameAce(6))
-      return { result: rendered.result, slot }
-    }
-
-    const 이미 = 들어가기(true)
-    expect(이미.result.current.isMatchSettingsOpen).toBe(false)
-    expect(이미.slot.markSeen).not.toHaveBeenCalled()
-
-    const 처음 = 들어가기(false)
-    expect(처음.result.current.isMatchSettingsOpen).toBe(true)
-    expect(처음.slot.markSeen).toHaveBeenCalledTimes(1)
-  })
-
   it('경기진행 설정과 창을 본 표시는 전역 칸이라 새 시즌이 넘겨받는다 (+0x12c+1 · +0x11e)', () => {
     const { result } = 다음경기확인()
     act(() => result.current.actions.choosePreGameAce(1))

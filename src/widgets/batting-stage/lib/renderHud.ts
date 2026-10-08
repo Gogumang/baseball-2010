@@ -30,6 +30,12 @@ export interface HudState {
   /** 펜스 팀 아이콘용 팀 번호 — 없으면 11 번 아이콘 (원본도 모드 5·6 은 11) */
   readonly ourTeamId?: number
   readonly opponentTeamId?: number
+  /**
+   * 사람 팀이 앉은 측 (0 = 선공 · 1 = 후공, 경기 상태 `playerSide`). HUD 위 줄은 **측 0(선공)**, 아래 줄은 측 1 이다
+   * (0x373d0 37516~37548 위 = 로고 +0x1054 · 0xb69b1(st, 0) / 375e8~37620 아래 = +0x1058 · 0xb69b1(st, 1)).
+   * 안 주면 1(사람 = 후공) — 예전 그림(위 = 상대)과 같다.
+   */
+  readonly playerSide?: number
 }
 
 const HUD_FRAMES = './sprites/game_ui/frames'
@@ -102,10 +108,10 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
   context.fillStyle = ORIGINAL_COLORS.boardFill
   context.fillRect(6, 6, 80, 48)
 
-  // 위 줄 = 원정(초 공격), 아래 줄 = 홈(말 공격) — 플레이어 팀은 홈이다
-  const isHomeBatting = hud.half === '말'
-  drawTeamRow(context, ROW_TOP, hud.opponentLogoUrl, hud.opponentScore, !isHomeBatting, 0)
-  drawTeamRow(context, ROW_BOTTOM, hud.ourLogoUrl, hud.ourScore, isHomeBatting, BOTTOM_ROW_SCORE_OFFSET_Y)
+  // 위 줄 = 측 0(선공, 초 공격), 아래 줄 = 측 1(후공, 말 공격). 공격 막대는 st[9] == 0 이면 위, == 1 이면 아래 (0x374e0 · 0x375b2)
+  const rows = hudRowsOf(hud)
+  drawTeamRow(context, ROW_TOP, rows.top.logoUrl, rows.top.score, rows.top.isBatting, 0)
+  drawTeamRow(context, ROW_BOTTOM, rows.bottom.logoUrl, rows.bottom.score, rows.bottom.isBatting, BOTTOM_ROW_SCORE_OFFSET_Y)
 
   const frame = placedFrame(HUD_FRAMES, 0)
   if (frame !== null) context.drawImage(frame.image, HUD_ORIGIN.x + frame.offsetX, HUD_ORIGIN.y + frame.offsetY)
@@ -133,6 +139,27 @@ export function drawHud(context: CanvasRenderingContext2D, hud: HudState, tick: 
   }
 
   drawNumber(context, hud.inning, INNING_BOX.x + INNING_BOX.width, INNING_BOX.y, INNING_DIGITS_START)
+}
+
+/** HUD 한 줄에 그릴 것 — 팀 로고 · 점수 · 공격 막대 */
+export interface HudRow {
+  readonly logoUrl: string
+  readonly score: number
+  readonly isBatting: boolean
+}
+
+const PLAYER_SIDE_LAST_BAT = 1
+
+/** 위 줄 = 측 0(선공), 아래 줄 = 측 1(후공). 사람 팀이 어느 측인지는 `playerSide` 로 고른다 */
+export function hudRowsOf(hud: HudState): { readonly top: HudRow; readonly bottom: HudRow } {
+  const ours = { logoUrl: hud.ourLogoUrl, score: hud.ourScore }
+  const theirs = { logoUrl: hud.opponentLogoUrl, score: hud.opponentScore }
+  const isPlayerFirst = (hud.playerSide ?? PLAYER_SIDE_LAST_BAT) !== PLAYER_SIDE_LAST_BAT
+  const isSide1Batting = hud.half === '말'
+  return {
+    top: { ...(isPlayerFirst ? ours : theirs), isBatting: !isSide1Batting },
+    bottom: { ...(isPlayerFirst ? theirs : ours), isBatting: isSide1Batting },
+  }
 }
 
 /** 정수 배 확대 — 자리 `(x − (z−1)·w/2, y − (z−1)·h/2)`, 크기 `w·z × h·z` (0x944b5) */

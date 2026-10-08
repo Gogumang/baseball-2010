@@ -328,6 +328,8 @@ export function GameScreen({
               opponentLogoUrl: smallLogoUrlOf(progress.opponentTeamId),
               ourTeamId: career.teamId,
               opponentTeamId: progress.opponentTeamId,
+              // 위 줄 = 측 0(선공) — 사람 팀이 앉은 측 (0x373d0)
+              playerSide: progress.game.playerSide,
             }}
             isEagleEyeEnabled={isEagleEyeEnabled}
             acePitcher={

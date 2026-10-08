@@ -829,6 +829,8 @@ export function TeamGameScreen({
                 opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
                 ourTeamId: options.ourTeamId,
                 opponentTeamId: options.opponentTeamId,
+                // 위 줄 = 측 0(선공) — 사람 팀이 앉은 측 (0x373d0)
+                playerSide: game.playerSide,
               }}
               isEagleEyeEnabled={false}
               // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
