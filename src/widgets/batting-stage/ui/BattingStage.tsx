@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
-import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
+import { resolvePitch, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
+import { unjudgedWhiffSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
 import { createPatternDeck, lastDrawnPattern, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
@@ -30,10 +31,10 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBat
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
-import type { AcePitcherFrames, StageHud } from '@/widgets/batting-stage/model/stageRefs'
+import type { AcePitcherFrames, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
-import { keyTickOf } from '@/widgets/batting-stage/lib/swingWindow'
+import { acceptsBattingKey, keyTickOf } from '@/widgets/batting-stage/lib/swingWindow'
 import { RESULT_PHASE_TICKS, resultPhaseTicksOf } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import { buntStanceAfterBuntKey, buntStanceAfterSwingKey, sceneBuntKindAfterKey, sceneBuntKindOnPitch } from '@/widgets/batting-stage/lib/buntStance'
 import { canSpecialSwing, remainingAfterSpecialSwing } from '@/entities/batting/model/specialSwing'
@@ -257,7 +258,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     batterSkillIds,
     recentAtBatCodes,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, swingStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, particlesRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, swingRef, heldResultRef, particlesRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -316,11 +317,12 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     }
     const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
     // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms, 삼진은 0x4d0d6 의 100ms.
-    // 환경설정 진동(+0x3b)이 켜졌을 때만. HUD 는 이 공 전 볼카운트다
-    vibrate(
-      pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch, latest.hud?.strikes ?? null),
-      latest.isVibrationOn !== false,
-    )
+    // 환경설정 진동(+0x3b)이 켜졌을 때만. HUD 는 이 공 전 볼카운트다. 맞은 공은 판정 순간, 나머지는 결과(0x12)를 세울 때 울린다
+    const vibrateNow = () =>
+      vibrate(
+        pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch, latest.hud?.strikes ?? null),
+        latest.isVibrationOn !== false,
+      )
     // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
     const pitchTypeNumber = pitchTypeNumberRef.current
     const result =
@@ -347,13 +349,14 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     }
     if (scene !== undefined) scene.deck = result.deck
     else deckRef.current = result.deck
-    buntRef.current = null
     const resultText = describeResolution(result.detail)
     // 홈런이면 판정 글자 대신 HOMERUN 글자 연출을 켠다 (원본 0x51cd8 의 +0x1960, 사운드 11 은 웹에 없음)
     const isHomeRun = isHomeRunResolution(result.detail)
 
     // 맞은 공이면 인플레이(0x17) 앞에 **상태 0x13** 을 한 번 거친다. 헛스윙·볼은 0x12 라 그냥 결과다.
     if (result.detail.resultCode !== null) {
+      vibrateNow()
+      buntRef.current = null
       const pauseInput = pauseInputOf(result.detail.resultCode, result.deck)
       const watchesBigHit = isBigHit(pauseInput)
       // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 맞은 틱의 공 자리로 본다 (근사)
@@ -382,13 +385,73 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       return
     }
 
-    resultTextRef.current = resultText
+    // 맞지 않은 스윙(헛스윙 · 번트 헛맞음)은 0x51226 이 0x51840 으로 끝나 상태를 안 바꾼다 — 공 끝(틱 N + 1, 0x4e24e)의
+    // 0x12 에서 결과가 선다. 그때까지 들고 있는다(`endPitch`). 안 친 공은 이미 공 끝이라 곧바로 세운다
+    const show = (at: number) => {
+      vibrateNow()
+      showResult(result.detail, pitch, isUncatchable, at)
+    }
+    if (swing !== null) heldResultRef.current = show
+    else show(now)
+  }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
+
+  /** 결과(0x12)를 세운다 — 문구 · 결과 길이 · 알림 */
+  const showResult = (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable: boolean, now: number) => {
+    const latest = latestRef.current
+    buntRef.current = null
+    const isHomeRun = isHomeRunResolution(detail)
+    resultTextRef.current = describeResolution(detail)
     homeRunStartedAtRef.current = isHomeRun ? now : -1
-    resultTicksRef.current = resultPhaseTicksOf(result.detail.resolution, latest.hud)
+    resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
     phaseRef.current = '결과'
     phaseStartedAtRef.current = now
-    latest.onPitchResolved(result.detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
-  }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
+    latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
+  }
+
+  /**
+   * **공 끝** — 0x4e060 의 4e24e: 공 틱 > N 이고 맞지 않았으면 0x12. 판정을 들고 있으면 그 결과, 스윙은 나갔는데 판정이 없었으면
+   * (공이 타자 근처가 아니던 헛스윙 · 키 틱 N 의 늦은 스윙) 굴림 없는 헛스윙 스트라이크, 아니면 안 친 공 판정(사구 · 볼 · 스트라이크)이다.
+   */
+  const endPitch = useCallback(
+    (now: number) => {
+      const held = heldResultRef.current
+      if (held !== null) {
+        heldResultRef.current = null
+        held(now)
+        return
+      }
+      const pitch = pitchRef.current
+      if (pitch === null) return
+      const swing = swingRef.current
+      if (swing !== null && swing.isReleased) {
+        // 판정 없는 헛스윙은 판정 틱에 0x4e21c 가 8/27 을 냈다 — 웹은 결과와 함께 싣는다(소리 때는 근사)
+        const soundId = swing.isUnjudgedWhiff ? unjudgedWhiffSoundIdOf(aceBatterIndex >= 0) : null
+        const pitchTypeNumber = pitchTypeNumberRef.current
+        const detail = unjudgedSwingDetailOf(soundId)
+        const latest = latestRef.current
+        const withType = pitchTypeNumber === null ? detail : { ...detail, pitchTypeNumber }
+        vibrate(
+          pitchVibrationMillisecondsOf(withType, swing.frame, pitch, latest.hud?.strikes ?? null),
+          latest.isVibrationOn !== false,
+        )
+        showResult(withType, pitch, false, now)
+        return
+      }
+      finishPitch(null, now)
+    },
+    [aceBatterIndex, finishPitch],
+  )
+
+  /** 스윙이 나가는 틱(F + 1, 0x4e0ce) — 필살이면 남은 횟수 −1 (0x4e136: S+0x10 ≠ 0 && 남은 > 0, 결과와 무관) */
+  const releaseSwing = useCallback(
+    (swing: SwingReservation) => {
+      if (!swing.isSpecial) return
+      if (specialSwingRemaining !== undefined && specialSwingRemaining > 0) {
+        onSpecialSwingUsed?.(remainingAfterSpecialSwing(specialSwingRemaining))
+      }
+    },
+    [specialSwingRemaining, onSpecialSwingUsed],
+  )
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
   const commitHit = useCallback((now: number) => {
@@ -420,6 +483,17 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     const keyTickNow = (now: number) => keyTickOf(frameNow(now))
     // 스윙·번트는 공이 나는 동안(상태 0x11)만 받는다 — 릴리스 전에는 무시한다
     const isFlying = (now: number) => phaseRef.current === '투구중' && pitchRef.current !== null && frameNow(now) >= 0
+    /**
+     * 0x51db6 · 0x51dee 의 S+4 — 키 틱 F 가 1~N 이고(`acceptsBattingKey`) 이 공에 스윙이 아직 안 나갔을 때만.
+     * 스윙이 나가면 0xb915c 가 S+4 를 내리고 +0xe 가 서 있어 0xb933c 가 다시 안 세운다 — 공마다 한 번이다.
+     * 같은 그림 안에서 다시 누르면(예약이 아직 안 풀림) 0x51db6 이 같은 틱으로 다시 적는다.
+     */
+    const takesKey = (now: number) => {
+      const pitch = pitchRef.current
+      if (pitch === null || !acceptsBattingKey(frameNow(now), pitch.frameCount)) return false
+      const swing = swingRef.current
+      return swing === null || !swing.isReleased
+    }
     return {
       swing: (now: number) => {
         // 상태 0x13 은 감상 플래그(+0x199a)가 켜진 큰 타구만 OK(−5)·'5' 로 건너뛴다 (0x406e8 40708~40712).
@@ -429,7 +503,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
           if (pending !== null && canSkipHitPause(pending.watchesBigHit)) commitHit(now)
           return
         }
-        if (!isFlying(now)) return
+        if (!isFlying(now) || !takesKey(now)) return
         // 0x51dce — 스윙 키는 번트 자세여도 +0xfdc = 0 을 쓴다
         sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindOfThisPitch(), { kind: '스윙' })
         // 번트 자세면 스윙이 안 나가고(0xb9374 가 S+8 을 보고 그냥 돌아간다) 판정 F(+0xfd8)만 이 틱으로 바뀐다
@@ -438,8 +512,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
           buntRef.current = buntStanceAfterSwingKey(bunt, keyTickNow(now))
           return
         }
-        swingStartedAtRef.current = now
-        finishPitch({ frame: keyTickNow(now), shift: shiftRef.current, buntKind: 0 }, now)
+        // 0x51db6: 예약 +0xfe0 = 1 · +0xfd8 = 지금 틱 — 스윙은 다음 갱신(F + 1)에 나가고 F + 2 에 판정한다(`useStageAnimation`)
+        swingRef.current = { frame: keyTickNow(now), isSpecial: false, isReleased: false, isUnjudgedWhiff: false }
       },
       /**
        * 번트 키 '7'/'8'/'9' (0x535a4 → 메시지 0x6a7 → 0x51e48). 상태 0x11 · S+4 가 아니면 무시하고, 지금 타자가
@@ -464,15 +538,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
        * 타자 +0x18 을 쓰는 것만 다르다 (0x51e40). 상태 0x11(공이 나는 중)·S+4 가 아니면 무시한다.
        */
       specialSwing: (now: number) => {
-        if (!isFlying(now)) return
+        if (!isFlying(now) || !takesKey(now)) return
         // 0x51e14: 남은 횟수 0xaea30 이 0 이면 무시 — 번호(+0x18)가 0 이면 늘 0 이다
         if (!canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)) return
         // 0x51e2c — 필살 키도 +0xfdc = 0
         sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindOfThisPitch(), { kind: '필살' })
-        // 0x4e136: 예약이 풀리는 틱에 S+0x10 ≠ 0 이고 남은 > 0 이면 −1 (결과와 무관 — 번트 자세라 스윙이 안 나가도)
-        if (specialSwingRemaining !== undefined && specialSwingRemaining > 0) {
-          onSpecialSwingUsed?.(remainingAfterSpecialSwing(specialSwingRemaining))
-        }
         const bunt = buntRef.current
         if (bunt !== null) {
           // 번트 자세면 스윙은 안 나가고(0xb9374) 판정 F(+0xfd8)만 이 틱으로 바뀐다.
@@ -480,11 +550,11 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
           buntRef.current = buntStanceAfterSwingKey(bunt, keyTickNow(now))
           return
         }
-        swingStartedAtRef.current = now
-        finishPitch({ frame: keyTickNow(now), shift: shiftRef.current, buntKind: 0, isSpecial: true }, now)
+        // 0x51dee: 일반 스윙과 같은 예약에 S+0x10 = 타자 +0x18. 남은 횟수 −1 은 예약이 풀리는 틱(0x4e136, `releaseSwing`)
+        swingRef.current = { frame: keyTickNow(now), isSpecial: true, isReleased: false, isUnjudgedWhiff: false }
       },
     }
-  }, [commitHit, finishPitch, specialSwingNumber, aceBatterIndex, specialSwingRemaining, onSpecialSwingUsed])
+  }, [commitHit, specialSwingNumber, aceBatterIndex, specialSwingRemaining])
 
   // 공이 나는 동안(상태 0x11)인가 — 도루 키(0x53610)를 받는 화면이 묻는다. 스윙·번트 키의 `isFlying` 과 같은 판정이다
   useEffect(() => {
@@ -498,7 +568,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     }
   }, [flightProbeRef, phaseRef, pitchRef, phaseStartedAtRef])
 
-  useStageAnimation(refs, finishPitch, commitHit)
+  useStageAnimation(refs, { judgePitch: finishPitch, endPitch, commitHit, releaseSwing })
   const pointerHandlers = useStageControls(refs, actions)
 
   return (
