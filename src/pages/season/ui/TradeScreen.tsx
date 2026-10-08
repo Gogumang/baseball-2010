@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -23,6 +23,8 @@ import { TEAMS } from '@/shared/config/original/teams'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { MarkupText } from '@/shared/ui'
 import { hiddenTeamHintOf } from '@/pages/season/ui/SeasonTeamSelectScreen'
 
 /** StrMODE — 트레이드 문구 [163]~[175] · CPU 요청 [204]·[205]·[216] */
@@ -47,6 +49,7 @@ export function tradeQuestionTextOf(boost: number): string {
   if (boost === 0) return `!C${TRADE_QUESTION}`
   return `!C${tradeBoostCostOf(boost)}${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
 }
+const TRADE_PROGRESS = ORIGINAL_MODE_TEXT[173] // "트레이드 진행 중"
 const TRADE_SUCCESS = ORIGINAL_MODE_TEXT[174] // "트레이드 성공!!!"
 const TRADE_FAILURE = ORIGINAL_MODE_TEXT[175] // "트레이드 실패!!!"
 /** 진행 가드 0xd3e6~0xd45c — [65] G 부족(팝업 (2, 2) 예/아니오) · [77] 소지금 부족(팝업 (1, 1) 확인) */
@@ -173,12 +176,15 @@ export function TradeScreen({
   // 오고, 0xe4 진입 0x4774 도 그 칸을 안 본다. 막는 것은 구단관리 위·아래 이동 0x6c444 가 꺼진 칸을 건너뛰는 것뿐이다
   // (`SeasonTeamMenuScreen` 의 `disabled`). CPU 요청은 0xc9 → 0xe5 로 바로 가 [204] 부터 띄운다
   const [notice, setNotice] = useState<string | null>(() => (forced !== null ? REQUEST_ACQUIRED : null))
-  /** 결과 알림을 닫으면 관리 메뉴(0xc9)로 나간다 */
-  const [isDone, setDone] = useState<'결과' | null>(null)
+  /**
+   * 0xe7 단계 this+0x160 — 0 고르기 · 1 진행(게이지, [173]) · 2 성공 [174] · 3 실패 [175].
+   * 진행 가드를 지나면 1 이 되고(0xd45e), 게이지가 다 차는 틀(0xcecc)에 굴려 2·3 으로 간다.
+   */
+  const [progress, setProgress] = useState<'진행' | '성공' | '실패' | null>(null)
 
   const isPitcher = tradeTab === TRADE_REQUEST_TAB.투수
   const isListPitcher = listTab === TRADE_REQUEST_TAB.투수
-  const isBusy = question !== null || notice !== null
+  const isBusy = question !== null || notice !== null || progress !== null
 
   const opponentRoster = step.kind === '팀' ? null : opponentRosterOf(step.teamId)
   /** 트레이드 탭(this+0x154)의 두 명단 — 고른 칸이 가리키는 선수 */
@@ -304,8 +310,7 @@ export function TradeScreen({
         },
       } : {}),
     })
-    setNotice(isSuccess ? TRADE_SUCCESS : TRADE_FAILURE)
-    setDone('결과')
+    setProgress(isSuccess ? '성공' : '실패')
   }
 
   /**
@@ -323,7 +328,8 @@ export function TradeScreen({
     if (gamePoints < tradeBoostCostOf(boost)) return setQuestion('G부족')
     const moneyChange = tradeMoneyChangeOf(givenEntry.grade, acquiredEntry.grade)
     if (moneyChange < 0 && record.money < -moneyChange) return setNotice(LACK_MONEY)
-    runTrade()
+    // this+0x160 = 1 · +0x164 = 0 · +0x168 = 0 — 굴림은 게이지가 다 찬 틀에 (`TradeProgress`)
+    setProgress('진행')
   }
 
   const answerQuestion = (answer: number) => {
@@ -334,10 +340,7 @@ export function TradeScreen({
     if (which === '요청취소') onCancelRequest?.()
   }
 
-  const closeNotice = () => {
-    setNotice(null)
-    if (isDone === '결과') onFinish()
-  }
+  const closeNotice = () => setNotice(null)
 
   const listEntries = shownEntries
   const listSelect = step.kind === '영입' ? chooseAcquired : chooseGiven
@@ -454,9 +457,100 @@ export function TradeScreen({
         />
       )}
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={closeNotice} />}
+      {progress !== null && (
+        <TradeProgress stage={progress} onComplete={runTrade} onFinish={onFinish} />
+      )}
 
       {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리다 */}
       <ScreenFrame title="시즌모드" gamePoint={gamePoints} onBack={backOneStep} />
     </RawScreen>
+  )
+}
+
+/**
+ * 진행 게이지 판 — ⚠️ 판 자리·크기는 그림 자료([gfx+0x120] 의 사각, 0x94a65)에서 오는데 풀지 못했다 — **근사**.
+ * 게이지 끝(this+0x164 의 상한)도 그 사각의 너비라 이 값을 쓴다.
+ */
+const PROGRESS_BOX = { x: 40, y: 150, width: 160, height: 12 } as const
+/** 0xcecc — 갱신마다 this+0x164 += 2 */
+const PROGRESS_STEP = 2
+
+interface TradeProgressProps {
+  readonly stage: '진행' | '성공' | '실패'
+  /** 게이지가 다 찬 틀 — 0xcf24 가 G 를 빼고 굴려 단계 2·3 으로 */
+  readonly onComplete: () => void
+  /** 단계 2·3 에서 확인(−5 · '5')·취소(−16) — 0xc7ba: 요청 플래그 0 · 0xc9 */
+  readonly onFinish: () => void
+}
+
+/**
+ * 0xe7 진행 연출 (갱신 0xcf24 → 0xcecc · 키 0xc66c 단계 1~3 · 그림 0xd4e8 의 0xdc42~0xde58, 직접 떴다):
+ * ```
+ * 판   (0x18, 0x34, 0x7c) 사각 · 게이지 (0x47, 0xdb, 0) 너비 this+0x164 · 밑줄 (0x3a, 0xc5, 0) 1px
+ *      게이지 > 2 면 안쪽 윗줄 (0x85, 0xe9, 0x1c) 5px
+ * 단계 1  [173] + "." × this+0x168 (틀 수 & 3 == 0 마다 +1, 4 에서 0) — 흰 글, 판 위 22px
+ *         0xcecc: this+0x164 += 2, 너비에 닿으면 참 → 굴림
+ *         키 확인 · '5' · 취소 → this+0x164 = 너비 (다음 틀에 끝난다)
+ * 단계 2  [174] 노랑 (0xff, 0xff, 0)    단계 3  [175] 빨강 (0xff, 0, 0)
+ *         키 확인 · '5' · 취소 → 0xc9
+ * ```
+ */
+function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
+  const update = useUpdateCounter(stage === '진행')
+  const [isSkipped, setSkipped] = useState(false)
+  const isCompleted = useRef(false)
+  const gauge = stage !== '진행' || isSkipped
+    ? PROGRESS_BOX.width
+    : Math.min((update + 1) * PROGRESS_STEP, PROGRESS_BOX.width)
+
+  // 다 찬 틀에 한 번만 굴린다 — 건너뛰기면 그다음 틀
+  const latest = useRef(onComplete)
+  latest.current = onComplete
+  const [skippedAt, setSkippedAt] = useState<number | null>(null)
+  useEffect(() => {
+    if (stage !== '진행' || isCompleted.current) return
+    const isFull = (update + 1) * PROGRESS_STEP >= PROGRESS_BOX.width
+    const isSkipDone = skippedAt !== null && update > skippedAt
+    if (!isFull && !isSkipDone) return
+    isCompleted.current = true
+    latest.current()
+  }, [stage, update, skippedAt])
+
+  /** 단계 1 의 확인·취소 — this+0x164 = 너비 (0xc76e~0xc7b6) */
+  const skip = () => {
+    setSkipped(true)
+    setSkippedAt((current) => current ?? update)
+  }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!['Enter', ' ', '5', 'Escape', 'Backspace'].includes(event.key)) return
+      event.preventDefault()
+      if (stage === '진행') return skip()
+      onFinish()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [stage, update, onFinish])
+
+  const dots = '.'.repeat(Math.floor(update / 4) % 4)
+  const text = stage === '진행'
+    ? `!C!cFFFFFF${TRADE_PROGRESS}${dots}`
+    : stage === '성공' ? `!C!cFFFF00${TRADE_SUCCESS}` : `!C!cFF0000${TRADE_FAILURE}`
+  const box = PROGRESS_BOX
+  return (
+    <div role="status" aria-label="트레이드 진행" onClick={() => (stage === '진행' ? skip() : onFinish())}
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}>
+      <div style={{ position: 'absolute', left: box.x, top: box.y - 22, width: box.width }}>
+        <MarkupText raw={text} />
+      </div>
+      <div style={{ position: 'absolute', left: box.x, top: box.y, width: box.width, height: box.height, background: 'rgb(24, 52, 124)' }} />
+      <div data-testid="트레이드-게이지"
+        style={{ position: 'absolute', left: box.x, top: box.y, width: gauge, height: box.height, background: 'rgb(71, 219, 0)' }} />
+      <div style={{ position: 'absolute', left: box.x, top: box.y + box.height - 1, width: gauge, height: 1, background: 'rgb(58, 197, 0)' }} />
+      {gauge > 2 && (
+        <div style={{ position: 'absolute', left: box.x + 1, top: box.y + 1, width: gauge - 2, height: 5, background: 'rgb(133, 233, 28)' }} />
+      )}
+    </div>
   )
 }

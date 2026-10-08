@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { TradeScreen, tradeQuestionTextOf } from '@/pages/season/ui/TradeScreen'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
@@ -16,7 +17,13 @@ import { createConstantRandom } from '@/shared/api/random/fractionRandom'
  * 성공률·비용은 J 4-4 확정이고, 나리·명예 선수 거절(StrMODE[165]/[166])도 함께 본다.
  */
 
-afterEach(cleanup)
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
+})
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const MY_TEAM = 0
 const OPPONENT = 1
@@ -64,7 +71,18 @@ const 띄우기 = (
   return { onTrade, onBack, onFinish, onCancelRequest }
 }
 
-const 누르기 = (이름: string | RegExp) => fireEvent.click(screen.getByRole('button', { name: 이름 }))
+/** 0xe7 진행 게이지(0xcecc, 틀마다 +2)가 다 찰 만큼 틀을 보낸다 — 누를 때마다 보내 둔다 */
+const 틀보내기 = () => act(() => {
+  vi.advanceTimersByTime(millisecondsPerFrame() * 120)
+})
+const 누르기 = (이름: string | RegExp) => {
+  fireEvent.click(screen.getByRole('button', { name: 이름 }))
+  틀보내기()
+}
+/** 단계 2·3 의 결과 글 [174]/[175] — 판 위에 그린다(팝업이 아니다) */
+const 결과글 = () => screen.getByRole('status', { name: '트레이드 진행' }).textContent ?? ''
+/** 단계 2·3 확인 — 0xc7ba → 0xc9 */
+const 결과닫기 = () => fireEvent.keyDown(window, { key: 'Enter' })
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 /** 0xe4 → 0xe5 : 상대 팀을 고른다 — 0x4774 가 탭을 0(투수)으로 지워 투수 목록으로 열린다 */
@@ -201,7 +219,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
 
     누르기(/기본 진행/)
     누르기('예')
-    누르기('확인')
+    결과닫기()
 
     expect(onFinish).toHaveBeenCalledTimes(1)
     expect(onBack).not.toHaveBeenCalled()
@@ -230,7 +248,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     누르기(/기본 진행/)
     누르기('예')
 
-    expect(알림글()).toContain('성공')
+    expect(결과글()).toContain('성공')
     const settlement = onTrade.mock.calls[0][0]
     expect(settlement.isSuccess).toBe(true)
     expect(settlement.record.tradeUsed).toBe(1)
@@ -246,7 +264,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     누르기(/기본 진행/)
     누르기('예')
 
-    expect(알림글()).toContain('실패')
+    expect(결과글()).toContain('실패')
     const settlement = onTrade.mock.calls[0][0]
     expect(settlement.isSuccess).toBe(false)
     expect(settlement.record.tradeUsed).toBe(1)
@@ -336,6 +354,50 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   })
 })
 
+describe('0xe7 진행 연출 (0xcecc · 0xc66c 단계 1~3)', () => {
+  it('[171] 예 → [173] 진행 중 게이지가 틀마다 2 씩 차고, 다 찬 틀에 굴려 [174]/[175] 를 판 위에 쓴다', () => {
+    const 굴림: number[][] = []
+    const random: RandomPort = { rand: (lo, hi) => (굴림.push([lo, hi]), lo), rand9d: () => 0 }
+    띄우기(상태(), { random })
+    상대팀고르기()
+    fireEvent.click(screen.getByRole('button', { name: teamPitchers(OPPONENT)[0].name }))
+    fireEvent.click(screen.getByRole('button', { name: teamPitchers(MY_TEAM)[0].name }))
+    fireEvent.click(screen.getByRole('button', { name: /기본 진행/ }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    // 가드를 지난 그 자리 — 아직 굴리지 않았다
+    expect(결과글()).toContain('트레이드 진행 중')
+    expect(굴림).toEqual([])
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 10)
+    })
+    const 너비 = (screen.getByTestId('트레이드-게이지') as HTMLElement).style.width
+    expect(Number.parseInt(너비, 10)).toBeGreaterThan(2)
+    expect(Number.parseInt(너비, 10)).toBeLessThan(160)
+    expect(굴림).toEqual([])
+
+    틀보내기()
+    expect(굴림).toEqual([[1, 101]])
+    expect(결과글()).toMatch(/성공|실패/)
+  })
+
+  it('진행 중 확인 키는 게이지를 채워 다음 틀에 끝낸다 (0xc76e → this+0x164 = 너비)', () => {
+    const { onTrade } = 띄우기(상태(), { random: 고정난수(1) })
+    상대팀고르기()
+    fireEvent.click(screen.getByRole('button', { name: teamPitchers(OPPONENT)[0].name }))
+    fireEvent.click(screen.getByRole('button', { name: teamPitchers(MY_TEAM)[0].name }))
+    fireEvent.click(screen.getByRole('button', { name: /기본 진행/ }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onTrade).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 2)
+    })
+    expect(onTrade).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('0xe4 팀 고르기 키 0x8250', () => {
   it('히든 칸(> 9)은 힌트 팝업만 — 0xca 와 같은 글이고 트레이드로 안 넘어간다', () => {
     띄우기(상태())
@@ -408,7 +470,7 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
     expect(settlement.record.tradeUsed).toBe(1)
     // 요청 칸끼리 맞바꾼다 — 내 3번 자리와 상대 2번
     expect(settlement.swap).toEqual({ opponentTeamId: OPPONENT, tab: 1, myIndex: 3, opponentIndex: 2 })
-    누르기('확인')
+    결과닫기()
     expect(onFinish).toHaveBeenCalledTimes(1)
   })
 
