@@ -452,6 +452,11 @@ function* pickoffPlaySteps(
     if (sendToBase(tick, base, ' (CPU 결정)', cpuSpecial)) play = { ...play, wantsThrow: false }
   }
 
+  // ── 0x46766 — 0x17 진입 0x46418 끝: 관문 0xb0d28 이 열려 있으면 `0xaf8c0(제어기, 1)` 한 번(주루 설정 갈림 없음).
+  //    결정마다 +0x128 = 1(afa0e). 목표는 바로 뒤 4677a~467a4 가 종류 4 면 산 주자 넷 모두 vt48(+0x8c) 로 되돌리므로
+  //    (위 2 절 "제 루로 돌아오는 중") 견제 판에서는 남지 않는다 — 여기서도 목표를 안 바꾼다. 굴림 없음.
+  if (autoAdvanceDecisions({ ...contextAt(0), force: true }).length > 0) play = { ...play, wantsThrow: true }
+
   for (let tick = 0; tick <= MAXIMUM_TICKS && !play.finished; tick += 1) {
     const press = yield tick
     outJudgedThisTick = false
@@ -564,13 +569,12 @@ function* pickoffPlaySteps(
     // 결과 코드(9·13)가 선 뒤에도 돈다 — 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이 열려 있으면 매 틱 부르고, 결과 코드를
     // 안 본다(예전 "결과가 선 뒤 주자가 더 뛰는지 모름" 근사는 +0x111 을 끝 표시로 읽은 탓 — +0x111 은 홈런 코드 8 이다)
     if (!play.finished && autoBaserunningEnabled) {
-      const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
+      // 52660 `0xaf8c0(제어기, 0)` — force = 0: 멈춘 주자(제 목표 루에 선 주자)만 본다. force = 1 은 판 시작 0x46766 한 번
+      const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: false })
       for (const decision of decisions) {
         const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
         if (runner === undefined || runner.state.isOut || runner.state.scored) continue
         if (decision.toBase > HOME_BASE) continue
-        // 타구 진행기와 같은 근사 — 목표 루에 닿아 있을 때만 묻는다
-        if (!isAtTarget(runner.state)) continue
         runner.state = {
           ...runner.state,
           legStart: runner.state.position,

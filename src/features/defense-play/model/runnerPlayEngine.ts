@@ -462,6 +462,17 @@ function* runnerPlaySteps(
     if (sendToBase(tick, base, false, cpuSpecial)) play = { ...play, wantsThrow: false }
   }
 
+  // ── 0x46766 — 0x17 진입 0x46418 끝: 판 진행 관문 0xb0d28 이 열려 있으면 `0xaf8c0(제어기, 1)` 을 **한 번**, 주루 설정
+  //    갈림(0xae690) 없이 부른다(타구 진행기 `applyPlayStartAutoAdvance` 와 같은 자리). force = 1 이라 리드 뒤 달리는 주자까지 본다.
+  //    결정마다 +0x128 = 1(afa0e), 목표가 바뀌는 주자만 새 구간(vt48 은 같은 목표면 그대로). 굴림 없음.
+  for (const decision of autoAdvanceDecisions({ ...contextAt(0), force: true })) {
+    play = { ...play, wantsThrow: true }
+    const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
+    if (runner === undefined || decision.toBase === runner.state.targetBase) continue
+    startLeg(runner, decision.toBase)
+    log.push(`판 시작 ${runner.state.index}번 주자 자동 진루 → ${decision.toBase}루`)
+  }
+
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
     const press = yield tick
     outJudgedThisTick = false
@@ -565,13 +576,12 @@ function* runnerPlaySteps(
     // ── 4. 자동 추가 진루 0xaf918 · 자동 슬라이딩 0xb030c ──
     // 결과 코드(9·13)가 선 뒤에도 돈다 — 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이 열려 있으면 매 틱 부르고 결과 코드를 안 본다
     if (!play.finished && autoBaserunningEnabled) {
-      const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: true })
+      // 52660 `0xaf8c0(제어기, 0)` — force = 0: 멈춘 주자(제 목표 루에 선 주자)만 본다. force = 1 은 판 시작 0x46766 한 번
+      const decisions = autoAdvanceDecisions({ ...contextAt(tick), force: false })
       for (const decision of decisions) {
         const runner = runners.find((candidate) => candidate.state.index === decision.runnerIndex)
         if (runner === undefined || runner.state.isOut || runner.state.scored) continue
         if (decision.toBase > HOME_BASE) continue
-        // 타구 진행기와 같은 근사 — 목표 루에 닿아 있을 때만 묻는다
-        if (!isAtTarget(runner.state)) continue
         startLeg(runner, decision.toBase)
         // afa0e: 한 루 더 보내면 플레이+0x128 = 1
         play = { ...play, wantsThrow: true }
