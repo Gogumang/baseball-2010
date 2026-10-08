@@ -18,6 +18,7 @@ import type { Collection } from '@/entities/collection/model/collection'
 import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
 import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
@@ -125,8 +126,10 @@ export function MissionRoutes({
     screen.kind === '투수미션' ? session.pitcherRun
       : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun
         : null
+  // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 · 투구 화면을 둔다
+  const isFreePassReady = useFreePassPlayStart(session.pickoffReplay, session.pendingBenchClearing !== null)
   const overlay = missionOverlayOf(
-    session, defenseSceneRef, playingRun, runner.bannerText,
+    session, defenseSceneRef, playingRun, runner.bannerText, isFreePassReady,
     missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
   )
   if (overlay !== null) return overlay
@@ -305,6 +308,8 @@ function missionOverlayOf(
   playingRun: MissionRun | PitcherRun | null,
   /** 결과 띠(상태 0x12) — 내려간 뒤에야 0x18 → 0x21 */
   bannerText: string,
+  /** 재생 칸의 판을 세워도 되나 — 밀어내기 판(종류 2)은 0x12 대기 0x1f 틱 뒤 (`useFreePassPlayStart`) */
+  isFreePassReady: boolean,
   /** 미션 타자 이름 (`missionBatterNameOf`) — 0x21 DUE UP 의 그 선수 줄 */
   missionBatterName?: string | null,
 ): ReactNode | null {
@@ -336,7 +341,9 @@ function missionOverlayOf(
   }
 
   // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
-  if (session.pickoffReplay !== null) {
+  // 볼넷 · 사구 밀어내기 판(종류 2)도 이 칸으로 오는데 0x12 갱신 0x4e6d4 가 0x1f 틱 기다린 뒤 판정 A 0xae24c 가 0x17 로 보낸다
+  // (사구 벤치 클리어링 뒤면 출구에서 곧장) — 그동안은 아래로 내려가 타석 · 투구 화면을 그린다
+  if (session.pickoffReplay !== null && isFreePassReady) {
     return (
       <DefensePlayback
         ticks={session.pickoffReplay.ticks}
@@ -424,8 +431,11 @@ export function PitcherAceMatchRoute(
 
   // 대결 하나 = 미션 장면 하나 (`beginPitcherAceMatch` 가 `mission` 마다 세운다)
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, mission)
+  // 볼넷 · 사구 밀어내기 판은 0x12 대기(0x1f 틱) 뒤 — 보통 미션과 같다
+  const isFreePassReady = useFreePassPlayStart(session.pickoffReplay, session.pendingBenchClearing !== null)
   const overlay = missionOverlayOf(
     session, defenseSceneRef, session.pitcherAceMatchMission === mission ? session.pitcherRun : null, runner.bannerText,
+    isFreePassReady,
   )
   if (overlay !== null) return overlay
 

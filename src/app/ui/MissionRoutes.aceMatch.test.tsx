@@ -7,6 +7,7 @@ import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf } from '@/entities/story/model/aceMatch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /** 투구 화면이 받은 속성 — 그림은 여기서 볼 것이 아니라 갈아 끼운다 */
 interface 받은속성 {
@@ -25,11 +26,21 @@ vi.mock('@/pages/pitching/ui/PitchingScreen', () => ({
   },
 }))
 
+const 재생 = vi.fn()
+vi.mock('@/pages/defense/ui/DefensePlayback', () => ({
+  DefensePlayback: (props: unknown) => {
+    재생(props)
+    return null
+  },
+}))
+
 const { PitcherAceMatchRoute } = await import('@/app/ui/MissionRoutes')
 
 afterEach(() => {
   cleanup()
   받은것.length = 0
+  재생.mockClear()
+  vi.useRealTimers()
 })
 
 const 설정 = { settings: { pitchControl: '게이지' }, setSettings: vi.fn() }
@@ -130,5 +141,32 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(finished?.run.status).toBe('실패')
     act(() => finished?.onFinish())
     expect(onFinish).toHaveBeenCalledWith(false)
+  })
+
+  it('볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기 0x1f 틱 뒤에 재생 칸을 연다 — 그동안 투구 화면 (0x4e6d4 → 0xae24c)', () => {
+    vi.useFakeTimers()
+    const mission = aceMatchMissionOf(17, '투수')
+    if (mission === null) throw new Error('투수 미션 17 이 없다')
+    const 밀어내기 = { kind: 2, pitchJudgement: '볼넷', ticks: [{}] } as never
+
+    function Harness() {
+      const runner = useAtBatRunner()
+      const session = useMissionSession({
+        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        setScreen: vi.fn(),
+      })
+      return (
+        <PitcherAceMatchRoute
+          mission={mission!} session={{ ...session, pickoffReplay: 밀어내기 }} runner={runner} pitchControl="게이지"
+          gameSettings={설정 as never} onFinish={vi.fn()} onQuit={vi.fn()}
+        />
+      )
+    }
+    render(<Harness />)
+    act(() => { vi.advanceTimersByTime(30 * millisecondsPerFrame()) })
+    expect(재생).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(2 * millisecondsPerFrame()) })
+    expect(재생).toHaveBeenCalled()
+    expect(재생.mock.lastCall?.[0]).toMatchObject({ freePassPlay: true })
   })
 })
