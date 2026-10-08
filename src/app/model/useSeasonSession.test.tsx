@@ -389,6 +389,28 @@ describe('시즌 관리 커맨드', () => {
     expect(후.record.acted).toBe(true)
   })
 
+  it('외출은 0x4a94 → 연출 0xe3 → 결과 0xc81c(팝업 0x17 · SR+4 = 1) → 팝업을 닫으면 0xc9', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    const 전 = result.current.state!
+
+    act(() => result.current.actions.enterOuting(3))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.외출연출)
+    expect(result.current.outingPlace).toBe(3)
+    // 연출 동안은 굴리지도 적용하지도 않는다
+    expect(result.current.state).toEqual(전)
+    expect(result.current.outingResultText).toBeNull()
+
+    act(() => result.current.actions.runOuting(3))
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.외출연출)
+    expect(result.current.state!.record.acted).toBe(true)
+    expect(result.current.outingResultText).toMatch(/^!C인기도 \d/)
+
+    act(() => result.current.actions.closeOutingResult())
+    expect(result.current.scene).toBe(SEASON_SCENE_STATE.관리메뉴)
+    expect(result.current.outingResultText).toBeNull()
+  })
+
   it('회식은 사기를 올리고 소지금 4 를 깎는다 — 사기가 깎여 있을 때 보인다', () => {
     const { result } = 띄우기()
     시작(result, 0)

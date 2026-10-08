@@ -189,3 +189,37 @@ describe('외출 팝업 글 원문 (0xbd38)', () => {
     expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ money: 50 }), 100, 1))).toBe('!C사기 최고 상태입니다')
   })
 })
+
+describe('외출 결과 팝업 0x17 글 (0xc9a8~0xcd76)', () => {
+  it('친선경기 — 소지금 줄(×100 "만") 다음 사기 줄, 사기 줄 끝에는 !N 이 없다', () => {
+    const { random } = 차례난수([15, 9])
+    expect(rollSeasonOuting(레코드({ money: 10 }), 50, 0, random)!.text).toBe(
+      '!C소지금 900만!c00CC00상승!cFFFFFF하였습니다!N사기 15!cFF0000하락!cFFFFFF하였습니다',
+    )
+  })
+
+  it('야구교실 + 서브 아이템 — 인기도 · 평판 줄에 보정 "(+1)", 끝에 아이템 이름 · [195]', () => {
+    const { random } = 차례난수([9, 2, 4])
+    expect(rollSeasonOuting(레코드({ outingSubItems: 서브아이템(3) }), 50, 3, random)!.text).toBe(
+      '!C인기도 3(+1)!c00CC00상승!cFFFFFF하였습니다!N평판 5(+1)!c00CC00상승!cFFFFFF하였습니다!N' +
+      '사기 9!cFF0000하락!cFFFFFF하였습니다!N!N!cFFFF00야구교본 효과',
+    )
+  })
+
+  it('입원 + 서브 아이템 — 소지금 0만(+500)하락(굴린 값 −5 의 부호) · 나았으면 [206] 질병 이름', () => {
+    const { random } = 차례난수([4, 0])
+    expect(rollSeasonOuting(레코드({ money: 10, illness: 3, illnessSlack: 2, outingSubItems: 서브아이템(2) }), 50, 2, random)!.text).toBe(
+      '!C소지금 0만(+500)!cFF0000하락!cFFFFFF하였습니다!N사기 5(+1)!c00CC00상승!cFFFFFF하였습니다' +
+      '!N!N!C다음 질병이 치료되었습니다!N[!cFFFF00식중독!cFFFFFF]' +
+      '!N!N!cFFFF00보험증서 효과',
+    )
+  })
+
+  it('입원에서 못 나으면 치료 줄이 없다', () => {
+    const { random } = 차례난수([4, 100])
+    const 결과 = rollSeasonOuting(레코드({ money: 10, illness: 1, illnessSlack: 2 }), 50, 2, random)!
+    expect(결과.text).toBe('!C소지금 500만!cFF0000하락!cFFFFFF하였습니다!N사기 4!c00CC00상승!cFFFFFF하였습니다')
+    expect(결과.record.illness).toBe(1)
+    expect(결과.record.illnessSlack).toBe(1)
+  })
+})

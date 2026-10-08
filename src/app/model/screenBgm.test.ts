@@ -69,7 +69,8 @@ describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록�
   })
 
   it('목록 밖(0xcd 시즌정보 · 0xce 구단관리 · 0xd8 다음경기 · 0xf1 마무리)이면 안 바꾼다', () => {
-    for (const from of [0xcd, 0xce, 0xd8, 0xf1, 0xd0]) expect(seasonMenuBgmOf(from)).toBeNull()
+    // 0xd1 외출 지도의 취소 — 외출은 이제 0xe3 을 거쳐 온다
+    for (const from of [0xcd, 0xce, 0xd8, 0xf1, 0xd0, 0xd1]) expect(seasonMenuBgmOf(from)).toBeNull()
   })
 
   it('훅 — 시즌모드에 들어서며 0xc9 면 틀고, 목록 밖에서 돌아오면 안 튼다', () => {

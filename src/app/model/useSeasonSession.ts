@@ -262,6 +262,10 @@ export interface SeasonSession {
    * (웹은 0xcf 화면 안에서 띄운다) 닫으면 0xc9. 없으면 null
    */
   readonly trainingResult: SeasonTrainingResult | null
+  /** 외출 연출 0xe3 의 장소 [gfx+0x184] (0x4a94 가 넘긴 this+0xf8) — 그 장면이 아니면 null */
+  readonly outingPlace: number | null
+  /** 외출 결과 팝업 0x17 글 (0xc81c) — 떠 있는 동안 상태는 0xe3 그대로, 닫으면 0xc9. 없으면 null */
+  readonly outingResultText: string | null
   /**
    * 시상 이벤트 370 · 371 · 376 의 system 3 · 4 발표 창 글(0x8b3bc · 0x8b23c — 시즌 갈래). 지금 트는 이벤트가 그 셋이 아니거나
    * 창 종류가 아니면 null
@@ -397,6 +401,8 @@ export interface SeasonActions {
   readonly enterOuting: (place: number) => void
   /** 외출 결과 0xc81c — 연출이 끝난 틀에 굴리고 적용 · SR+4 = 1 · 저장하고 결과 팝업 0x17 을 띄운다 */
   readonly runOuting: (place: number) => void
+  /** 결과 팝업 0x17 을 닫았다 — 0xce0c: SR+4 = 1 · 0xc9 */
+  readonly closeOutingResult: () => void
   /**
    * 경기 결과 화면 확인 — 정산 진입(`enterGameSettlement`)이 정해 둔 장면으로 간다(정규는 관중수입 0xe9). 정산 진입을
    * 거치지 않았으면 여기서 정산한다
@@ -1184,6 +1190,8 @@ export function useSeasonSession(
   /** 관리 메뉴 진입의 요청 알림 [203] (팝업 0x27) 이 떠 있는가 */
   const [isTradeRequestAlertOpen, setTradeRequestAlertOpen] = useState(false)
   const [trainingResult, setTrainingResult] = useState<SeasonTrainingResult | null>(null)
+  const [outingPlace, setOutingPlace] = useState<number | null>(null)
+  const [outingResultText, setOutingResultText] = useState<string | null>(null)
   /** 0xed 진입 0xe7ac → 0x8dd60 이 굴린 시즌 MVP 순위 종류(표 0xd4f34 의 rand(0..6)) — 376 창 · 378/379 가 읽는다 */
   const seasonMvpKind = useRef<LeaderKind | null>(null)
   /** 관리 메뉴·구단관리 메뉴 객체의 커서 — 장면 생성(0x3b14)에서 0, 상태를 오가도 남는다 */
@@ -2424,10 +2432,18 @@ export function useSeasonSession(
     setScene(SEASON_SCENE_STATE.관리메뉴)
   }, [])
 
+  /** 0x4a94 — 확인 팝업 0x16 에 "예": [gfx+0x184] = 장소 · 0xe3 (진입 0x5184 → 0x85074 연출) */
+  const enterOuting = useCallback((place: number) => {
+    setOutingResultText(null)
+    setOutingPlace(place)
+    setScene(SEASON_SCENE_STATE.외출연출)
+  }, [])
+
   /**
-   * 시즌 외출 (결과 `0xc81c` — `rollSeasonOuting`).
+   * 외출 결과 `0xc81c` (`rollSeasonOuting`) — 0xce0c 가 연출 끝(0x84e58)을 본 틀에 부른다.
    * 사기 난수는 [a, b) 이고 **친선경기(0)·야구교실(3)은 부호를 뒤집는다**(0xc8b0).
    * 서브 아이템(SR+0x5d+p)이 있으면 점프표 0xcbe6c 의 보정을 부호 뒤집기 뒤에 더한다.
+   * 끝(0xcd76~0xcda2)에서 결과 팝업 0x17 을 열고 SR+4 = 1 · 저장(0x1fded · 0x22755) — 상태는 0xe3 그대로다.
    */
   const runOuting = useCallback(
     (place: number) => {
@@ -2439,10 +2455,18 @@ export function useSeasonSession(
         ...save,
         state: { ...save.state, teamMorale: outcome.teamMorale, record: { ...outcome.record, acted: true } },
       })
-      setScene(SEASON_SCENE_STATE.관리메뉴)
+      setOutingPlace(place)
+      setOutingResultText(outcome.text)
     },
     [commit, random, save],
   )
+
+  /** 0xce0c — 팝업 0x17 이 닫히면(답 0 · 0x14) SR+4 = 1 · 0xc9. SR+4 는 0xc81c 가 이미 켜 두었다 */
+  const closeOutingResult = useCallback(() => {
+    setOutingResultText(null)
+    setOutingPlace(null)
+    setScene(SEASON_SCENE_STATE.관리메뉴)
+  }, [])
 
   /**
    * 리그 1위 G 지급 (`0x6900` → `0x87e8`). 받은 칸은 **전역 저장 +0x145 비트**라
@@ -2769,6 +2793,8 @@ export function useSeasonSession(
     eventPlayback,
     tradeRequest,
     trainingResult,
+    outingPlace,
+    outingResultText,
     awardWindowTextOf: (sub: number) =>
       save === null || eventPlayback === null
         ? null
@@ -2788,7 +2814,7 @@ export function useSeasonSession(
       closeEntryAceLocked,
       playCupGame, finishCup, finishGame, constructScene: rollSceneLoadTip, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
       continuePostseason,
-      runTraining, closeTrainingResult, runOuting, awardLeagueFirst, spendGamePoint, finishSeason,
+      runTraining, closeTrainingResult, enterOuting, runOuting, closeOutingResult, awardLeagueFirst, spendGamePoint, finishSeason,
       openStadiumItems, openCupHiddenTeams, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
     },
   }

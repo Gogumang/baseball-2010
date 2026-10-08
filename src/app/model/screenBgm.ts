@@ -247,10 +247,9 @@ const SEASON_MENU_BGM_FROM: ReadonlySet<number> = new Set([0xcb, 0xcc, 0xe3, 0xd
  * - 0xcf 트레이닝: 웹은 0xde 연출과 결과 팝업을 0xcf 화면 안에서 띄우고 닫으면 0xc9 로 간다(원본 0xde → 0xc9).
  *   ⚠️ 0xcf 에서 취소로 돌아올 때도 4 를 다시 부른다 — 원본은 안 부르지만 그때 이미 4 가 돌고 있어(0xc9 → 0xcf 는 배경음을
  *   안 바꾼다) 같은 번호라 그대로 이어진다.
- * - 0xd1 외출 지도: 웹은 외출 결과 0xe3 을 지도 위에 띄우고 닫으면 0xc9 로 간다(원본 0xe3 → 0xc9).
  * - 0xe1 경기: 원본은 경기 장면 0x104 를 나와 장면 0x105 를 새로 지으므로 0xcb 를 지난다.
  */
-const SEASON_MENU_BGM_WEB_STAND_INS: ReadonlySet<number> = new Set([0xca, 0xc8, 0xcf, 0xd1, 0xe1])
+const SEASON_MENU_BGM_WEB_STAND_INS: ReadonlySet<number> = new Set([0xca, 0xc8, 0xcf, 0xe1])
 
 /**
  * 관리 메뉴 0xc9 에 들어설 때 틀 배경음 — 이전 상태가 목록에 들면 4, 아니면 null(안 바꾼다).

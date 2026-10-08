@@ -28,6 +28,8 @@ import { MatchSettingsWindow } from '@/pages/match-settings'
 import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { SeasonTeamSelectScreen } from '@/pages/season/ui/SeasonTeamSelectScreen'
 import { MessageBox, RawScreen, ScreenOverlay } from '@/shared/ui'
+import { SeasonOutingMap } from '@/pages/season/ui/SeasonOutingMap'
+import { SeasonOutingPopup } from '@/pages/season/ui/SeasonOutingPopup'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { SEASON_PLAYABLE_EVENTS, YEAR_GOAL_EVENT_ID } from '@/entities/season-mode/model/seasonEventFlow'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
@@ -764,9 +766,26 @@ export function SeasonRoute({
         state={state}
         cursor={outingCursor}
         onCursorChange={setOutingCursor}
-        onRun={(_place, index) => actions.runOuting(index)}
+        // 0x4a94 — 확인 팝업 0x16 에 "예": 장소를 넘기고 연출 0xe3 으로
+        onRun={(_place, index) => actions.enterOuting(index)}
         onBack={backToManagement}
       />
+    )
+  }
+
+  // 외출 연출 0xe3 (진입 0x5184 · 키 0x4944 · 갱신 0xce0c · 그리기 0xa06c = 지도 0x7ea64(gfx, p, 0) → 가운데 정렬판 0x84ea0).
+  // 연출이 끝난 틀에 결과 0xc81c 가 굴리고 팝업 0x17 을 띄운다 — 팝업은 연출이 놓인 판 위에 뜨고, 닫으면 0xc9
+  if (scene === SEASON_SCENE_STATE.외출연출 && session.outingPlace !== null) {
+    const place = session.outingPlace
+    const resultText = session.outingResultText
+    return (
+      <RawScreen>
+        <SeasonOutingMap selected={place} hour={new Date().getHours()} />
+        <SeasonOutingPopup place={place} onFinished={() => actions.runOuting(place)} />
+        {resultText !== null && (
+          <MessageBox text={resultText} buttons={['확인']} onAnswer={actions.closeOutingResult} />
+        )}
+      </RawScreen>
     )
   }
 
