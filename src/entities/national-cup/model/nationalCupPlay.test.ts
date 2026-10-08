@@ -8,19 +8,16 @@ import {
 import { createNationalCup, endNationalCupDay } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
 
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
-  return {
-    next: () => {
-      state = (state * 1103515245 + 12345) % 2147483648
-      return state / 2147483648
-    },
-    nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => {
+    state = (state * 1103515245 + 12345) % 2147483648
+    return state / 2147483648
+  })
 }
 
 describe('국가대항전 CPU 경기 선발 — 같은 레코드를 같은 k 로 두 번 맞바꿔 제자리 (0xc2c4c c2d18~c2d40 · 0x1f570)', () => {

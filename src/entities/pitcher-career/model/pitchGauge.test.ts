@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import {
   GAUGE_FRAME,
@@ -17,11 +18,7 @@ import {
   usesGauge,
 } from '@/entities/pitcher-career/model/pitchGauge'
 
-const fixedRandom = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+const fixedRandom = (value: number): RandomPort => createConstantRandom(value)
 
 describe('게이지를 쓰는가 (0x3f500)', () => {
   const on = { defenseIsHuman: true, gaugeSettingOn: true, pitchTypeNumber: 1 }

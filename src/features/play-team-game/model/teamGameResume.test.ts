@@ -49,17 +49,13 @@ function 세는난수(seed: number): { random: RandomPort; count: () => number }
   let calls = 0
   return {
     random: {
-      next: () => {
+      rand: (lo, hi) => {
         calls += 1
-        return inner.next()
+        return inner.rand(lo, hi)
       },
-      nextInRange: (minimum, maximum) => {
+      rand9d: (n) => {
         calls += 1
-        return inner.nextInRange(minimum, maximum)
-      },
-      pick: (candidates) => {
-        calls += 1
-        return inner.pick(candidates)
+        return inner.rand9d(n)
       },
     } as RandomPort,
     count: () => calls,

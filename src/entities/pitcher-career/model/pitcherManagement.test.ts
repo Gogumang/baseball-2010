@@ -12,6 +12,7 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...createPitcherCareer('테스트'),
@@ -24,11 +25,7 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
 const 메뉴 = (id: string) => PITCHER_TRAINING_MENUS.find((menu) => menu.id === id)!
 
 function 고정난수(position: number): RandomPort {
-  return {
-    next: () => position,
-    nextInRange: (minimum, maximum) => minimum + position * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  }
+  return createConstantRandom(position)
 }
 const 최소 = 고정난수(0)
 const 최대 = 고정난수(0.999)
@@ -70,11 +67,7 @@ describe('능력 훈련 (0x17f5c → 0x186c4 · 0xa3bad, 모드 갈림은 디스
   it('사기 감소를 먼저, 상승을 다음에 굴린다 (0x186c4 → 0x18704)', () => {
     const 차례 = [0, 0.999]
     let index = 0
-    const 순서난수: RandomPort = {
-      next: () => 차례[index++],
-      nextInRange: (minimum, maximum) => minimum + 차례[index++] * (maximum - minimum),
-      pick: (candidates) => candidates[0],
-    }
+    const 순서난수: RandomPort = createFractionRandom(() => 차례[index++])
     const before = 투수({ typeIndex: 1 })
     const outcome = runPitcherTraining(before, 메뉴('구속'), 순서난수)
 

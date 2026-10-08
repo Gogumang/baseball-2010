@@ -1,3 +1,4 @@
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   BOUNCE_THROW_DISTANCE,
@@ -12,20 +13,12 @@ import {
 } from '@/entities/fielding/model/fieldingErrors'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-const 고정 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
-/** next() 를 차례대로 돌려주는 포트 */
+/** 굴림마다 values 를 차례대로 쓰는 포트 (끝나면 마지막 값) */
 const 차례 = (values: readonly number[]): RandomPort => {
   let index = 0
-  return {
-    next: () => values[Math.min(index++, values.length - 1)],
-    nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => values[Math.min(index++, values.length - 1)])
 }
 
 describe('펌블 — 표 0xd87d4', () => {
@@ -56,7 +49,7 @@ describe('펌블 — 표 0xd87d4', () => {
 
   it('멈춘 공이어도 굴림은 먹는다 — b4228 의 rand 는 멈춤(b4236)보다 앞이다', () => {
     let 굴림 = 0
-    const 세는 = { next: () => (굴림++, 0), nextInRange: (minimum: number) => minimum, pick: <T,>(candidates: readonly T[]) => candidates[0] }
+    const 세는 = createFractionRandom(() => (굴림++, 0))
     rollFumble(100, false, 세는)
     expect(굴림).toBe(1)
   })

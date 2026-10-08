@@ -9,6 +9,7 @@ import {
 } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 const 옵션: TeamGameOptions = {
   mode: 2,
@@ -18,20 +19,21 @@ const 옵션: TeamGameOptions = {
   season: { illness: 0, morale: 100, coach: -1 },
 }
 
-/** 첫 next() 만 정하고 나머지는 씨앗에 맡긴다 — 굴림 수도 센다 */
+/** 첫 굴림만 비율로 정하고 나머지는 씨앗에 맡긴다 — 굴림 수도 센다 */
 function 첫굴림(value: number, seed: number) {
   const rest = createSeededRandom(seed)
   let first = true
   const counter = { count: 0 }
+  const 고정 = createConstantRandom(value)
+  const 이번 = (): RandomPort => {
+    counter.count += 1
+    if (!first) return rest
+    first = false
+    return 고정
+  }
   const random: RandomPort = {
-    next: () => {
-      counter.count += 1
-      if (!first) return rest.next()
-      first = false
-      return value
-    },
-    nextInRange: (minimum, maximum) => rest.nextInRange(minimum, maximum),
-    pick: (items) => rest.pick(items),
+    rand: (lo, hi) => 이번().rand(lo, hi),
+    rand9d: (n) => (n <= 0 ? 0 : 이번().rand9d(n)),
   }
   return { random, counter }
 }
@@ -54,7 +56,7 @@ describe('팀 경기 벤치 클리어링 연출 (상태 0x1e) — 우리 타자�
 
     const 다봄 = resolveBenchClearing(들어감, { reachedTargetTick: true }, createSeededRandom(13))
     const 앞당김 = createSeededRandom(13)
-    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.next()
+    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.rand(0, 2)
     const 건너뜀 = resolveBenchClearing(들어감, { reachedTargetTick: false }, 앞당김)
 
     expect(다봄.pendingBenchClearing).toBeNull()

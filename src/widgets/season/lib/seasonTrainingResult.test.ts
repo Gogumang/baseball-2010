@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
   applySeasonTraining, rollSeasonTraining, scrollSeasonTrainingMessages, seasonTrainingMessagesOf, seasonTrainingResultOf,
 } from '@/widgets/season/lib/seasonTrainingResult'
 
 /** 차례로 값을 내는 난수 — 굴림 차례를 못박는다 */
 const 차례난수 = (values: readonly number[]): RandomPort & { calls: number } => {
-  const port = { calls: 0, next: () => values[port.calls++] ?? 0 }
-  return port as RandomPort & { calls: number }
+  const port: RandomPort & { calls: number } = { calls: 0, ...createFractionRandom((): number => values[port.calls++] ?? 0) }
+  return port
 }
 
 const 아이템없음 = { trainingSubItems: [false, false, false, false], massager: false }

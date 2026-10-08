@@ -22,9 +22,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** `rand(0, 2)` 가 늘 같은 값을 내도록 고정한다 */
 const 고정난수 = (value: number): RandomPort => ({
-  next: () => 0,
-  nextInRange: () => value,
-  pick: (candidates) => candidates[0],
+  rand: () => value,
+  rand9d: () => value,
 })
 
 const 승패를넣은대회 = (cup: NationalCup, wins: readonly number[], losses: readonly number[]): NationalCup => ({

@@ -87,9 +87,8 @@ function counted(seed: number): { readonly port: RandomPort; readonly draws: () 
   let draws = 0
   return {
     port: {
-      next: () => { draws += 1; return inner.next() },
-      nextInRange: (minimum, maximum) => { draws += 1; return inner.nextInRange(minimum, maximum) },
-      pick: (candidates) => { draws += 1; return inner.pick(candidates) },
+      rand: (lo, hi) => { draws += 1; return inner.rand(lo, hi) },
+      rand9d: (n) => { if (n > 0) draws += 1; return inner.rand9d(n) },
     },
     draws: () => draws,
   }

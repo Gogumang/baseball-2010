@@ -7,6 +7,7 @@ import { runTraining } from '@/entities/career/model/training'
 import { runRest } from '@/entities/career/model/outing'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 선수 = createCareer('테스트')
 
@@ -37,11 +38,7 @@ describe('상세정보 결과 창 — 0x872a0 · 0x872d4', () => {
   })
 
   describe('변화량은 굴린 값 그대로 — 전후 차이가 아니다 (0x18c58 · 0x18d14 · 0x18fb4)', () => {
-    const 고정 = (position: number): RandomPort => ({
-      next: () => position,
-      nextInRange: (minimum, maximum) => minimum + position * (maximum - minimum),
-      pick: (candidates) => candidates[0],
-    })
+    const 고정 = (position: number): RandomPort => createFractionRandom(() => position)
     const 메뉴 = (id: string) => TRAINING_MENUS.find((menu) => menu.id === id)!
     const 변화 = (rows: ReturnType<typeof detailRowsOf>) => rows.map((row) => row.change)
 

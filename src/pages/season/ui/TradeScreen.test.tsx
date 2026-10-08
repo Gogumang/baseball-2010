@@ -9,6 +9,7 @@ import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecrui
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 /**
  * 트레이드 네 칸 (0xe4 팀 고르기 → 0xe5 영입 선수 → 0xe6 보상 선수 → 0xe7 확인·진행).
@@ -37,11 +38,7 @@ const 명단 = (덮어쓰기: Partial<SeasonTeamRoster> = {}): SeasonTeamRoster 
 })
 
 /** 뽑기를 정해 놓은 난수 — `bfa55(1,101)` */
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => (value - 1) / 100,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+const 고정난수 = (value: number): RandomPort => createConstantRandom((value - 0.5) / 100)
 
 const 띄우기 = (
   state: SeasonState,

@@ -32,12 +32,14 @@ const 설정: ParticleConfig = {
 function 세는난수(): RandomPort & { calls: number } {
   const random = {
     calls: 0,
-    next: () => {
+    rand: (lo: number, hi: number) => {
       random.calls += 1
+      return Math.min(lo, hi)
+    },
+    rand9d: (n: number) => {
+      if (n > 0) random.calls += 1
       return 0
     },
-    nextInRange: (minimum: number) => minimum,
-    pick: <T,>(candidates: readonly T[]) => candidates[0],
   }
   return random
 }

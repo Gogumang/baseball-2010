@@ -443,8 +443,11 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
 describe('경기 장면 시작의 로딩 팁 — 상태 7 진입 0x39f88 → 0x53dbc 의 rand(0, 73) 이 굴림 맨 앞', () => {
   it('142 확인 뒤 첫 굴림이 팁이다 — 덱 1275 · 효과 1202(startGame)보다 앞', () => {
     const seeded = createSeededRandom(20100901)
-    const values: number[] = []
-    const random = { ...seeded, next: () => { const value = seeded.next(); values.push(value); return value } }
+    const rolls: { lo: number; hi: number; value: number }[] = []
+    const random = {
+      ...seeded,
+      rand: (lo: number, hi: number) => { const value = seeded.rand(lo, hi); rolls.push({ lo, hi, value }); return value },
+    }
     const saveGame = 메모리저장({ ...createCareer('팁'), gamesPlayed: 4 })
     const rendered = renderHook(() => {
       const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
@@ -454,11 +457,12 @@ describe('경기 장면 시작의 로딩 팁 — 상태 7 진입 0x39f88 → 0x5
     act(() => rendered.result.current.session.actions.continueSaved())
     act(() => rendered.result.current.session.actions.runCommand('다음경기'))
     act(() => rendered.result.current.session.actions.confirmNextGameStandings())
-    const before = values.length
+    const before = rolls.length
     act(() => rendered.result.current.session.actions.confirmMatchPrepare())
 
-    expect(values.length).toBeGreaterThan(before + 1)
-    expect(rendered.result.current.session.loadingTip).toBe(LOADING_TIPS[Math.floor(values[before] * LOADING_TIPS.length)])
+    expect(rolls.length).toBeGreaterThan(before + 1)
+    expect(rolls[before]).toMatchObject({ lo: 0, hi: LOADING_TIPS.length })
+    expect(rendered.result.current.session.loadingTip).toBe(LOADING_TIPS[rolls[before].value])
   })
 })
 
@@ -1633,7 +1637,7 @@ describe('나리 팀 레코드로 경기를 세운다 — 0x39fdc 의 0xb891c(te
     const random = createSeededRandom(77)
     const aces = { ours: { batter: 1, pitcher: 0 }, opponent: { batter: 2, pitcher: 3 } }
     const progress = startGame(random, 3, 8, 4, PLAYER_SIDE_LAST_BAT, 5, false, undefined, aces, lineup)
-    return { progress, next: random.next() }
+    return { progress, next: random.rand(0, 0x7fffffff) }
   }
 
   it('레코드가 예전 근사(붙박이 표 + 9번 마타자)와 같으면 경기·난수가 한 톨도 안 바뀐다', () => {

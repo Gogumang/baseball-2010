@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
   cupMatchInfoOf,
   NO_NARI_ACE, batterMatchInfoOf, nariGameMatchOfSave, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
@@ -7,18 +8,17 @@ import {
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 
-/** next() 가 차례로 이 값들을 내는 난수 — 부른 횟수와 구간을 적는다 */
+/** 차례로 이 비율들을 내는 난수 — 부른 횟수와 구간을 적는다 */
 const 차례난수 = (values: readonly number[]) => {
   const calls: [number, number][] = []
   let index = 0
-  const next = () => values[index++] ?? 0
+  const inner = createFractionRandom(() => values[index++] ?? 0)
   const random: RandomPort = {
-    next,
-    nextInRange: (minimum, maximum) => {
+    rand: (minimum, maximum) => {
       calls.push([minimum, maximum])
-      return minimum + next() * (maximum - minimum)
+      return inner.rand(minimum, maximum)
     },
-    pick: (candidates) => candidates[0],
+    rand9d: (n) => inner.rand9d(n),
   }
   return { random, calls }
 }
@@ -75,13 +75,13 @@ describe('142 경기정보 다섯 줄 (0x5dcc0 모드 2~4 갈래)', () => {
 describe('142 구장 0x78664 — 홈 팀 > 9 일 때만 rand(0, 10)', () => {
   it('기본 열 팀은 굴리지 않고 그 팀 번호, 대회 팀(10~13)은 한 번 굴린다', () => {
     let calls = 0
+    const inner = createFractionRandom(() => 0.5)
     const random: RandomPort = {
-      next: () => 0.5,
-      nextInRange: (min, max) => {
+      rand: (min, max) => {
         calls += 1
-        return min + (max - min) * 0.5
+        return inner.rand(min, max)
       },
-      pick: (list) => list[0],
+      rand9d: (n) => inner.rand9d(n),
     }
     expect(rollNariMatchStadium(random, 9)).toBe(9)
     expect(calls).toBe(0)

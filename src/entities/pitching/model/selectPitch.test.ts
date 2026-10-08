@@ -4,7 +4,7 @@ import type { CpuPitchChoice, PitchSituation } from '@/entities/pitching/model/s
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { computerPitchTypeOf, pitchListOf, targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
 import { applyControlError, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
@@ -117,7 +117,7 @@ describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de1
     const target = pitchTargetOf(kind, 마구상황, expected)
     applyControlError(target, { tier: 5, isComputer: true }, expected)
     // 제구 등급 굴림(0xb74bc)도 실투 굴림(0x33cbc)도 없다 — 두 난수열이 같은 자리에 서 있다
-    expect(actual.next()).toBe(expected.next())
+    expect(actual.rand(0, 0x7fffffff)).toBe(expected.rand(0, 0x7fffffff))
   })
 
   it('남은 횟수가 0 이면 마구가 나오지 않는다 (0x34518 · 0x3456c)', () => {
@@ -213,12 +213,12 @@ describe('selectPitch CPU 견제 — 0x345fc 종류 4 = 0x34848 (I-controls 4a-2
     expect(targetKindOf('hard', 상황2, expected)).toBe(4)
     let base = 0
     do {
-      base = randomIntegerBelow(expected, 1, 4)
+      base = expected.rand(1, 4)
     } while (!이삼루.hasRunnerOnBase(base))
 
     expect(choice).toEqual({ kind: '견제', base })
     // 그 뒤 굴림이 없다 — 두 난수열이 같은 자리에 서 있다
-    expect(actual.next()).toBe(expected.next())
+    expect(actual.rand(0, 0x7fffffff)).toBe(expected.rand(0, 0x7fffffff))
   })
 
   it('견제를 안 켜면(옵션 없음) 같은 시드에서 예전처럼 공을 던진다 — 종류 4 → 1 (알려진 어긋남)', () => {
@@ -274,24 +274,18 @@ describe('selectPitch 실투 판정 0x33cbc — 사람이 칠 때도 CPU 공마�
   /** 굴림 값을 적어 두고, 지정한 차례만 바꿔 다시 내는 난수 */
   function 기록난수(base: () => number, 바꿀: Map<number, number> = new Map()) {
     const values: number[] = []
-    const random = {
-      next: () => {
-        const index = values.length
-        const value = 바꿀.get(index) ?? base()
-        values.push(value)
-        return value
-      },
-      nextInRange: () => {
-        throw new Error('nextInRange 는 안 쓴다')
-      },
-      pick: <T,>(candidates: readonly T[]) => candidates[0],
-    }
+    const random = createFractionRandom(() => {
+      const index = values.length
+      const value = 바꿀.get(index) ?? base()
+      values.push(value)
+      return value
+    })
     return { random, values }
   }
 
   it('마구가 아니면 곡선 뒤 rand(0,100) 을 한 번 더 굴린다 — 그 굴림이 0 이면 실투, 99 면 아니다', () => {
     const seed = createSeededRandom(77)
-    const 처음 = 기록난수(() => seed.next())
+    const 처음 = 기록난수(() => seed.rand(0, 0x40000000) / 0x40000000)
     const 공1 = selectChoice(투수(60), 상황, 처음.random)
     expect(공1.kind).toBe('투구')
     const 마지막 = 처음.values.length - 1
@@ -310,7 +304,7 @@ describe('selectPitch 실투 판정 0x33cbc — 사람이 칠 때도 CPU 공마�
 
   it('타자 압도(스킬 22)는 실투율 +5 — 굴림 값 7.x% 에서 갈린다 (구속 600·등급 그대로 p 를 넘는다)', () => {
     const seed = createSeededRandom(77)
-    const 처음 = 기록난수(() => seed.next())
+    const 처음 = 기록난수(() => seed.rand(0, 0x40000000) / 0x40000000)
     const 공1 = selectChoice(투수(60), 상황, 처음.random)
     if (공1.kind !== '투구') throw new Error('견제')
     const 마지막 = 처음.values.length - 1
@@ -335,9 +329,8 @@ describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
       let count = 0
       return {
         get count() { return count },
-        next: () => { count += 1; return inner.next() },
-        nextInRange: inner.nextInRange,
-        pick: inner.pick,
+        rand: (lo: number, hi: number) => { count += 1; return inner.rand(lo, hi) },
+        rand9d: inner.rand9d,
       }
     }
     const 보통 = 세는난수()
@@ -365,9 +358,8 @@ describe('홈런더비 구질 (0x344dc 의 0x344ea 모드 7 갈래)', () => {
     let count = 0
     return {
       get count() { return count },
-      next: () => { count += 1; return inner.next() },
-      nextInRange: inner.nextInRange,
-      pick: inner.pick,
+      rand: (lo: number, hi: number) => { count += 1; return inner.rand(lo, hi) },
+      rand9d: inner.rand9d,
     }
   }
   const 마투수 = { control: 67, velocity: 55, repertoire: ACE_PITCHER_REPERTOIRES[1] }

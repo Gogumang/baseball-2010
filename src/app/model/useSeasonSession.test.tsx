@@ -148,7 +148,10 @@ describe('시즌 세션', () => {
   it('장면 0x105 를 세울 때마다 상태 1 적재 0x75fc 가 팁 rand(0, 73) 하나 — 들어올 때(constructScene) · 경기 결과를 닫고 돌아올 때 그 장면 맨 앞', () => {
     const seeded = createSeededRandom(20100901)
     let calls = 0
-    const random = { ...seeded, next: () => { calls += 1; return seeded.next() } }
+    const random = {
+      rand: (lo: number, hi: number) => { calls += 1; return seeded.rand(lo, hi) },
+      rand9d: (n: number) => { calls += 1; return seeded.rand9d(n) },
+    }
     const { result } = renderHook(() => useSeasonSession(메모리저장(), random))
     const before = calls
     act(() => result.current.actions.constructScene())
@@ -1323,7 +1326,7 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
     act(() => result.current.actions.choosePreGameAce(5))
     const random = createSeededRandom(20100901)
     // 첫 관리 메뉴 폴링(400 → 연초 목표 → 1)에서 490 의 조건 22 가 굴린 한 번 (사기 100 이라 p = 0 이어도 돈다)
-    random.next()
+    random.rand(0, 100)
     rollOpponentAces(0, 0, random)
     expect(result.current.pendingGame?.options.opponentAces).toEqual(rollOpponentAces(0, 0, random))
   })
@@ -1978,13 +1981,12 @@ describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
     const seeded = createSeededRandom(20100901)
     let queue: number[] = []
     const random = {
-      next: () => (queue.length > 0 ? queue.shift()! : seeded.next()),
-      nextInRange: (minimum: number, maximum: number) => seeded.nextInRange(minimum, maximum),
-      pick: <T,>(candidates: readonly T[]) => seeded.pick(candidates),
+      rand: (lo: number, hi: number) => (queue.length > 0 ? queue.shift()! : seeded.rand(lo, hi)),
+      rand9d: (n: number) => seeded.rand9d(n),
     }
-    /** [값, 아래, 위) — randomIntegerBelow 가 그 값을 내는 next() */
+    /** [값, 아래, 위) — rand(아래, 위) 가 차례로 낼 값 */
     const script = (draws: readonly (readonly [number, number, number])[]) => {
-      queue = draws.map(([value, low, high]) => (value - low + 0.5) / (high - low))
+      queue = draws.map(([value]) => value)
     }
     return { random, script }
   }

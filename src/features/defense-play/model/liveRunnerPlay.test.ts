@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { DefenseKeyPress, DefensePlayControls } from '@/features/defense-play/model/runDefensePlay'
@@ -22,21 +23,14 @@ const 수비키 = (presses: Readonly<Record<number, string>>): DefensePlayContro
   keyAt: (tick) => (presses[tick] === undefined ? null : { key: presses[tick] }),
 })
 
-/** next() 를 0.5 로만 주는 난수 — 굴림 수를 센다 */
+/** 비율 0.5 로만 굴리는 난수 — 굴림 수를 센다 */
 function 세는난수(): RandomPort & { readonly count: () => number } {
   let rolls = 0
-  return {
-    next: () => {
-      rolls += 1
-      return 0.5
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return (minimum + maximum) / 2
-    },
-    pick: (candidates) => candidates[0],
-    count: () => rolls,
-  }
+  const inner = createFractionRandom(() => {
+    rolls += 1
+    return 0.5
+  })
+  return { ...inner, count: () => rolls }
 }
 
 describe('판 중 사람 송구 키 — 상태 0x17 키 0x53420 → 0x533c8 → 메시지 0x588 → vt60 0xb3118 → +0x160 (판 종류 무관)', () => {
@@ -135,7 +129,7 @@ describe('실시간 손잡이 — 화면이 한 틱씩 키를 먹여도 미리 �
     const 키없음 = runLiveRunnerPlayWithoutKeys({ kind: 'arrival', opened: 다시 })
     expect(키없음.advance).toEqual(미리?.result.advance)
     expect(키없음.ticks.length).toBe(미리?.result.ticks.length)
-    expect(다시Random.next()).toBe(미리Random.next())
+    expect(다시Random.rand(0, 0x7fffffff)).toBe(미리Random.rand(0, 0x7fffffff))
   })
 
   it('굴림 수 — 판 시작(0.1% · 도루 리드)은 열 때, 판 안의 굴림(악송구 · 펌블)은 틱을 돌 때다', () => {

@@ -10,17 +10,14 @@ import type { PostseasonSeries } from '@/entities/league/model/league'
 import { rollCpuGamePrep, simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
-  return {
-    next: () => {
-      state = (state * 1103515245 + 12345) % 2147483648
-      return state / 2147483648
-    },
-    nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => {
+    state = (state * 1103515245 + 12345) % 2147483648
+    return state / 2147483648
+  })
 }
 
 const 순위 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -111,12 +108,11 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     const 바탕 = createSeededRandom(seed)
     const 범위: Array<readonly [number, number]> = []
     const port: RandomPort = {
-      next: () => 바탕.next(),
-      nextInRange: (minimum, maximum) => {
-        범위.push([minimum, maximum])
-        return 바탕.nextInRange(minimum, maximum)
+      rand: (lo, hi) => {
+        범위.push([lo, hi])
+        return 바탕.rand(lo, hi)
       },
-      pick: (candidates) => 바탕.pick(candidates),
+      rand9d: (n) => 바탕.rand9d(n),
     }
     return { port, 범위 }
   }

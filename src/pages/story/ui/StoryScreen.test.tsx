@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -758,7 +759,7 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
 })
 
 describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', () => {
-  const 맥락 = () => ({ mode: 4 as const, years: 0, illness: 0, salaryBase: 10, random: { next: () => 0, nextInRange: () => 0, pick: <T,>(items: readonly T[]) => items[0] } })
+  const 맥락 = () => ({ mode: 4 as const, years: 0, illness: 0, salaryBase: 10, random: createFractionRandom(() => 0) })
   const 보상이벤트 = {
     ...이벤트,
     commands: [
@@ -833,7 +834,7 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
 })
 
 describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c4 → 0x8c460)', () => {
-  const 고정난수 = { next: () => 0, nextInRange: () => 0, pick: <T,>(items: readonly T[]) => items[0] }
+  const 고정난수 = createFractionRandom(() => 0)
 
   it('창을 띄운 그 걸음에 그 명령 보상을 준다 — 확인 전이다. 끝에 넘기는 보상은 비어 있다', () => {
     const 보상이벤트 = {

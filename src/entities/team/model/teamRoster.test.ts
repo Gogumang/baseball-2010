@@ -1,4 +1,5 @@
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   BATTERS_PER_TEAM,
@@ -60,11 +61,7 @@ describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
 
 describe('선발 투수 무작위 — 0xb8c94(팀, 0, bfa54(0,4)) (S13 1-4b)', () => {
   /** 늘 같은 값을 내는 가짜 난수 — 0~1 을 그대로 돌려준다 */
-  const 고정난수 = (value: number): RandomPort => ({
-    next: () => value,
-    nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  })
+  const 고정난수 = (value: number): RandomPort => createConstantRandom(value)
 
   it('로스터 앞 4명 중 하나를 고른다 — 0~3 균등', () => {
     expect(rollStartingPitcherIndex(고정난수(0))).toBe(0)

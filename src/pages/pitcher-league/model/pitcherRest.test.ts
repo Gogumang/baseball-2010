@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
@@ -18,8 +19,8 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...overrides,
 })
 
-const 최소 = { next: () => 0, nextInRange: (minimum: number) => minimum, pick: <T,>(c: readonly T[]) => c[0] }
-const 최대 = { ...최소, next: () => 0.999 }
+const 최소 = createConstantRandom(0)
+const 최대 = createConstantRandom(0.999)
 
 describe('투수편 휴식 — 사기 회복 (0x18e3c)', () => {
   it('사기가 10~15 오르고 주기 행동 한 칸을 쓴다', () => {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { hitDirectionOf } from '@/entities/batting/model/hitDirection'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
-const 고정 = (value: number): RandomPort => ({ next: () => value, nextInRange: () => 0, pick: (items) => items[0] })
+const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('hitDirectionOf — 0x5141c', () => {
   it('번트 코드에는 방향을 붙이지 않고 난수도 쓰지 않는다', () => {

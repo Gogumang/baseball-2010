@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
@@ -35,17 +36,13 @@ const 기본 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
   ...덮어쓰기,
 })
 
-/** next() 가 고정값을 돌려주는 난수 — randomIntegerBelow 가 `min + floor(next × 폭)` 을 쓴다 */
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: <T,>(candidates: readonly T[]) => candidates[0],
-})
+/** 고정 비율을 내는 난수 — rand(a, b) = `a + floor(비율 × 폭)` */
+const 고정난수 = (value: number): RandomPort => createFractionRandom(() => value)
 
 /** 몇 번 불렸는지 세는 난수 */
 const 세는난수 = (value: number) => {
   let calls = 0
-  const random: RandomPort = { ...고정난수(value), next: () => { calls += 1; return value } }
+  const random: RandomPort = createFractionRandom(() => { calls += 1; return value })
   return { random, calls: () => calls }
 }
 
@@ -216,7 +213,7 @@ describe('보상 0x8c460 모드 2', () => {
   })
 
   it('질병 11 의 값 > 0 은 알림 글이 굴려 적은 번호 — 다시 안 굴린다 (0x8c718)', () => {
-    const 굴림 = { next: () => { throw new Error('굴리면 안 된다') } } as unknown as Parameters<typeof applySeasonEventRewards>[3]
+    const 굴림 = createFractionRandom(() => { throw new Error('굴리면 안 된다') }) as unknown as Parameters<typeof applySeasonEventRewards>[3]
     expect(applySeasonEventRewards(상태(), [{ kind: 11, value: 2 }], 490, 굴림).state.record.illness).toBe(2)
   })
 

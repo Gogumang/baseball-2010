@@ -67,15 +67,14 @@ describe('홈런더비 판(종류 8) 하나 — 슬롯 2 모드 7 갈래 0x526ca
       const seeded = createSeededRandom(7)
       let 굴림 = 0
       const random = {
-        next: () => {
+        rand: (lo: number, hi: number) => {
           굴림 += 1
-          return seeded.next()
+          return seeded.rand(lo, hi)
         },
-        nextInRange: (minimum: number, maximum: number) => {
+        rand9d: (n: number) => {
           굴림 += 1
-          return seeded.nextInRange(minimum, maximum)
+          return seeded.rand9d(n)
         },
-        pick: seeded.pick,
       }
       derbyBattedBallOf(pattern, random)
       return 굴림

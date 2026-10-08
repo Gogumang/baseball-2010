@@ -24,9 +24,8 @@ import { NATIONAL_CUP_RUNNER_UP_TEXT_MONEY } from '@/entities/season-mode/model/
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 const 고정난수 = (value: number): RandomPort => ({
-  next: () => 0,
-  nextInRange: () => value,
-  pick: (candidates) => candidates[0],
+  rand: () => value,
+  rand9d: () => value,
 })
 
 const 대회 = (overrides: Partial<NationalCup>): NationalCup => ({ ...createNationalCup(), ...overrides })

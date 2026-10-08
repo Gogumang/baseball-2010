@@ -13,12 +13,14 @@ function 세는난수(seed = 1): RandomPort & { calls: number } {
   const inner = createSeededRandom(seed)
   const random = {
     calls: 0,
-    next: () => {
+    rand: (lo: number, hi: number) => {
       random.calls += 1
-      return inner.next()
+      return inner.rand(lo, hi)
     },
-    nextInRange: (minimum: number, maximum: number) => inner.nextInRange(minimum, maximum),
-    pick: <T,>(candidates: readonly T[]) => inner.pick(candidates),
+    rand9d: (n: number) => {
+      random.calls += 1
+      return inner.rand9d(n)
+    },
   }
   return random
 }

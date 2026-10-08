@@ -17,15 +17,12 @@ import {
   LASER_WINDOW_TICKS,
 } from '@/entities/defense-controls/model/laserThrow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 /** 0 ~ 999 를 차례로 내놓는 난수 — rand(0,1000) 의 결과를 그대로 지정한다 */
 const 차례로 = (values: readonly number[]): RandomPort => {
   let index = 0
-  return {
-    next: () => (values[index++] ?? 0) / 1000,
-    nextInRange: (minimum, maximum) => minimum + ((values[index++] ?? 0) / 1000) * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => (values[index++] ?? 0) / 1000)
 }
 
 /** 등급 g 한가운데를 고르는 능력치 (0xbbe98 문턱: 125·250·375·525·675·825·925) */

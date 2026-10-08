@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { controlTierOf } from '@/entities/pitching/model/controlTier'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
-const 고정 = (value: number): RandomPort => ({ next: () => value, nextInRange: () => 0, pick: (items) => items[0] })
+const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('controlTierOf — 0xb74bc', () => {
   it('제구 300 은 [4,12,60,95,100] 행이다', () => {

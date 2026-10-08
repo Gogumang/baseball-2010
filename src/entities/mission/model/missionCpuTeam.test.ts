@@ -33,13 +33,10 @@ const missionOf = (side: OriginalMission['side'], id: number): OriginalMission =
 
 /** 굴리면 안 되는 자리 — 한 번이라도 굴리면 실패 */
 const 굴림금지: RandomPort = {
-  next: () => {
+  rand: () => {
     throw new Error('굴림이 없어야 한다')
   },
-  nextInRange: () => {
-    throw new Error('굴림이 없어야 한다')
-  },
-  pick: () => {
+  rand9d: () => {
     throw new Error('굴림이 없어야 한다')
   },
 }
@@ -50,14 +47,13 @@ function 정해진난수(values: readonly number[]): RandomPort & { readonly rol
   let index = 0
   return {
     rolls,
-    next: () => 0,
-    nextInRange(minimum, maximum) {
-      rolls.push([minimum, maximum])
+    rand(lo, hi) {
+      rolls.push([lo, hi])
       const value = values[index] ?? 0
       index += 1
       return value
     },
-    pick: (candidates) => candidates[0] as never,
+    rand9d: () => 0,
   }
 }
 

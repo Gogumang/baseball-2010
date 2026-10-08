@@ -15,12 +15,9 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정난수 = (value: number): RandomPort => createConstantRandom(value)
 
 const 기본 = {
   ...EMPTY_MOUND_COUNTERS,
@@ -297,17 +294,10 @@ describe('새 투수 고르기 앞의 갈림길 0xac5d8', () => {
   /** 굴린 횟수를 세는 고정 난수 */
   const 세는 = (value: number) => {
     let calls = 0
-    const random: RandomPort = {
-      next: () => {
-        calls += 1
-        return value
-      },
-      nextInRange: (minimum, maximum) => {
-        calls += 1
-        return minimum + value * (maximum - minimum)
-      },
-      pick: (candidates) => candidates[0],
-    }
+    const random: RandomPort = createFractionRandom(() => {
+      calls += 1
+      return value
+    })
     return { random, calls: () => calls }
   }
 
@@ -367,11 +357,7 @@ describe('새 투수 고르기 앞의 갈림길 0xac5d8', () => {
     const 벤치 = [{ index: 2 }, { index: 4, isSpecialPitcher: true }, { index: 8, isOwnPlayer: true }]
     let 차례 = 0
     const 값 = [0, 0, 0.99]
-    const random: RandomPort = {
-      next: () => 값[Math.min(차례++, 값.length - 1)],
-      nextInRange: (minimum, maximum) => minimum + 값[Math.min(차례++, 값.length - 1)] * (maximum - minimum),
-      pick: (candidates) => candidates[0],
-    }
+    const random: RandomPort = createFractionRandom(() => 값[Math.min(차례++, 값.length - 1)])
     expect(
       replacementPitcherSlotOf(벤치, { ...기본상황, saveSituation: false, excludeOwnPlayers: true }, random),
     ).toBe(2)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { RUNNER_PLAY_RESULT } from '@/features/defense-play/model/runnerPlayEngine'
 import { isStealPlayResult, runStealPlay, stealCallSoundIdOf } from '@/features/defense-play/model/stealPlay'
@@ -8,15 +9,10 @@ import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 function 세는난수(ratio: number): RandomPort & { readonly count: () => number } {
   let rolls = 0
   return {
-    next: () => {
+    ...createFractionRandom(() => {
       rolls += 1
       return ratio
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return minimum + ratio * (maximum - minimum)
-    },
-    pick: (candidates) => candidates[0],
+    }),
     count: () => rolls,
   }
 }

@@ -7,6 +7,7 @@ import {
 } from '@/entities/season-mode/model/tradeRequest'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 /**
  * CPU 트레이드 요청 0x93c8 (경기 뒤 마무리 0xf1 진입 0x953c) — 직접 뜬 굴림 차례를 그대로 따르는지 본다.
@@ -14,21 +15,17 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 const MY_TEAM = 0
 
-/** [값, 아래, 위) 차례대로 `randomIntegerBelow` 가 그 값을 내게 하는 난수. 다 쓰면 터진다 */
+/** [값, 아래, 위) 차례대로 `rand(아래, 위)` 가 그 값을 내게 하는 난수. 다 쓰면 터진다 */
 function 차례난수(draws: readonly (readonly [number, number, number])[]): RandomPort & { readonly used: () => number } {
   let index = 0
   return {
-    next: () => {
+    ...createFractionRandom(() => {
       const draw = draws[index]
       if (draw === undefined) throw new Error(`난수 ${index} 번째가 더 필요하다`)
       index += 1
       const [value, low, high] = draw
       return (value - low + 0.5) / (high - low)
-    },
-    nextInRange: () => {
-      throw new Error('쓰지 않는다')
-    },
-    pick: (candidates) => candidates[0],
+    }),
     used: () => index,
   }
 }

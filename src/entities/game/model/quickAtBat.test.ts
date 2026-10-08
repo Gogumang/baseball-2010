@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { judgePitchOf, pitchGradeOf, quickPitchOf, simulateQuickAtBat } from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 타자: QuickAtBatBatter = { hit: 500, power: 500, run: 500, skillIds: [] }
 const 투수: QuickAtBatPitcher = { control: 500, velocity: 500, stamina: 90, skillIds: [] }
@@ -12,14 +13,12 @@ function 순서난수(values: readonly number[]): RandomPort & { readonly draws:
   let index = 0
   return {
     draws,
-    next: () => {
+    ...createFractionRandom(() => {
       const value = values[Math.min(index, values.length - 1)] ?? 0
       index += 1
       draws.push(value)
       return value
-    },
-    nextInRange: (minimum, maximum) => minimum + 0.5 * (maximum - minimum),
-    pick: (candidates) => candidates[0],
+    }),
   }
 }
 const 고정 = (value: number): RandomPort => 순서난수([value])
@@ -104,15 +103,11 @@ describe('simulateQuickAtBat — 타석 하나', () => {
   it('능력이 높을수록 안타가 늘어난다 — 확률표가 아니라 원본 판정을 쓴다는 증거', () => {
     const 쳐낸비율 = (batter: QuickAtBatBatter) => {
       let seed = 12345
-      const random: RandomPort = {
-        // 결정론적인 값 뽑기 (선형 합동)
-        next: () => {
-          seed = (seed * 1103515245 + 12345) % 2147483648
-          return seed / 2147483648
-        },
-        nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-        pick: (candidates) => candidates[0],
-      }
+      // 결정론적인 값 뽑기 (선형 합동)
+      const random: RandomPort = createFractionRandom(() => {
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        return seed / 2147483648
+      })
       let hits = 0
       for (let index = 0; index < 400; index += 1) {
         const outcome = simulateQuickAtBat(batter, 투수, { inning: 1 }, random)
@@ -165,11 +160,7 @@ describe('judgePitchOf — 스윙하지 않는 투구 (0xc1818 → 0x9d57c)', ()
 describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
   it('약한 투수를 만나면 볼넷이 나온다 — 판정 경로가 살아 있다는 증거', () => {
     let seed = 20100901
-    const random: RandomPort = {
-      next: () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 },
-      nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-      pick: (candidates) => candidates[0],
-    }
+    const random: RandomPort = createFractionRandom(() => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 })
     const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
     let walks = 0
     for (let index = 0; index < 2000; index += 1) {
@@ -181,11 +172,7 @@ describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
 
   it('15회에는 스윙만 한다 — 볼넷으로 끝나지 않는다 (0xc262c, 0-기준 0xe)', () => {
     let seed = 7
-    const random: RandomPort = {
-      next: () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 },
-      nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-      pick: (candidates) => candidates[0],
-    }
+    const random: RandomPort = createFractionRandom(() => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 })
     const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
     const 결과들 = Array.from({ length: 500 }, () => simulateQuickAtBat(타자, 약한투수, { inning: 15 }, random))
 

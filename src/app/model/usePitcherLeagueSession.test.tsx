@@ -12,6 +12,7 @@ import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGa
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { shopItemId } from '@/features/shop/model/shopSelection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -1648,14 +1649,10 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
 
   it('또또상품권은 **한 번만** 굴린다 — 알림과 저장이 같은 결과다', () => {
     let rolls = 0
-    const 세는난수 = {
-      next: () => {
-        rolls += 1
-        return 0
-      },
-      nextInRange: (minimum: number) => minimum,
-      pick: <T,>(candidates: readonly T[]) => candidates[0],
-    }
+    const 세는난수 = createFractionRandom(() => {
+      rolls += 1
+      return 0
+    })
     const { result } = renderHook(() => usePitcherLeagueSession(메모리저장(), 세는난수, false))
     act(() => result.current.actions.create('투수', 신인))
     act(() => result.current.actions.save({ ...result.current.career!, gamePoint: 1000, money: 0 }))

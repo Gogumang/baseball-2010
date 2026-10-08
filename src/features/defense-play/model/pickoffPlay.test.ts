@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
@@ -14,15 +15,10 @@ import {
 function 세는난수(ratio: number): RandomPort & { readonly count: () => number } {
   let rolls = 0
   return {
-    next: () => {
+    ...createFractionRandom(() => {
       rolls += 1
       return ratio
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return minimum + ratio * (maximum - minimum)
-    },
-    pick: (candidates) => candidates[0],
+    }),
     count: () => rolls,
   }
 }
@@ -44,11 +40,7 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
     // 리드 굴림 셋(주자마다 0) → 악송구 굴림(0.9, 아님)
     const 차례 = [0, 0, 0, 0.9]
     let i = 0
-    const 정한난수: RandomPort = {
-      next: () => 차례[Math.min(i++, 차례.length - 1)],
-      nextInRange: (minimum, maximum) => minimum + 차례[Math.min(i++, 차례.length - 1)] * (maximum - minimum),
-      pick: (candidates) => candidates[0],
-    }
+    const 정한난수: RandomPort = createFractionRandom(() => 차례[Math.min(i++, 차례.length - 1)])
     const result = runPickoffPlay({ targetBase: 1, bases: 만루, outs: 1, offenseIsCpu: true, random: 정한난수 })
     expect(result.ticks[0].runners[0]).not.toMatchObject({ x: basePosition(1).x, z: basePosition(1).z })
     expect(result.resultCode).toBe(PICKOFF_RESULT.OUT)
@@ -154,18 +146,14 @@ describe('견제를 받은 야수의 CPU 송구 결정 — 슬롯 2 의 0xafa60 
       const results: (number | null)[] = []
       for (let seed = 0; seed < 300; seed += 1) {
         const inner = createSeededRandom(seed)
-        const random = {
-          next: () => {
+        const random: RandomPort = {
+          rand: (a, b) => {
             calls += 1
-            return inner.next()
+            return inner.rand(a, b)
           },
-          nextInRange: (a: number, b: number) => {
+          rand9d: (n) => {
             calls += 1
-            return inner.nextInRange(a, b)
-          },
-          pick: <T,>(c: readonly T[]) => {
-            calls += 1
-            return inner.pick(c)
+            return inner.rand9d(n)
           },
         }
         const result = runPickoffPlay({ targetBase: ((seed % 3) + 1) as 1 | 2 | 3, bases: 만루, outs: seed % 3, random, defenseIsCpu })

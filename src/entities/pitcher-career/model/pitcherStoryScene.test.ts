@@ -98,7 +98,7 @@ describe('먹튀 2 · 무력감 5 — 116 카운터를 세게 되어 두 편 공
 
   it('무력감 얻기: 사기 ≤ 20 · 연차idx > 2 뒤에만 rand(0,100) > 69 를 굴린다', () => {
     let rolls = 0
-    const 굴림 = (value: number) => ({ nextInRange: () => { rolls += 1; return value } }) as never
+    const 굴림 = (value: number) => ({ rand: () => { rolls += 1; return value } }) as never
     expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 20 }), 'acquire', 6, 굴림(70))).toBe(true)
     expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 20 }), 'acquire', 6, 굴림(69))).toBe(false)
     expect(rolls).toBe(2)

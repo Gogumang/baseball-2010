@@ -6,6 +6,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 직구 = (overrides: Partial<Pitch> = {}): Pitch => ({
   type: 'FASTBALL',
@@ -27,7 +28,7 @@ const 상황: BattingContext = {
   situation: { inning: 1, isLosing: false, runnerCount: 0, hasSecondBaseRunner: false, pitcherSide: 0, batterSide: 0, balls: 0, strikes: 0, batterOrderIndex: 0, recentAtBatCodes: [] },
 }
 
-const 고정 = (value: number): RandomPort => ({ next: () => value, nextInRange: () => 0, pick: (items) => items[0] })
+const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('plateErrorOf — 도착점 − 기준점 + 좌우 이동 (위치 분석 4차 2절)', () => {
   it('존 가운데 공은 오차 0, 오른쪽으로 옮기면 그만큼 더한다', () => {
@@ -60,13 +61,10 @@ describe('resolvePitch — 스윙하지 않은 경우', () => {
 const 도착 = (x: number, y: number, stageSide: number) =>
   직구({ worldPath: [{ x: 19501, y: 1110, z: 24500 }, { x, y, z: 29705 }], stageSide })
 const 안굴림: RandomPort = {
-  next: () => {
+  rand: () => {
     throw new Error('사구 판정은 난수를 쓰지 않는다')
   },
-  nextInRange: () => {
-    throw new Error('사구 판정은 난수를 쓰지 않는다')
-  },
-  pick: () => {
+  rand9d: () => {
     throw new Error('사구 판정은 난수를 쓰지 않는다')
   },
 }
@@ -178,15 +176,11 @@ describe('resolvePitch — 보정 구조체 0x34d6c 를 판정에 싣는다', ()
   /** 앞 몇 개만 정하고 나머지는 0.5 */
   const 앞값 = (values: readonly number[]): RandomPort => {
     let index = 0
-    return {
-      next: () => {
-        const value = values[index] ?? 0.5
-        index += 1
-        return value
-      },
-      nextInRange: () => 0,
-      pick: (items) => items[0],
-    }
+    return createFractionRandom(() => {
+      const value = values[index] ?? 0.5
+      index += 1
+      return value
+    })
   }
   const 덱 = () => createPatternDeck(createSeededRandom(7))
   const 필살 = { batterHit: 220, batterPower: 220, pitcherVelocity: 0, pitcherControl: 0, solidPercent: 20, homeRunPercent: 9 }
@@ -205,14 +199,10 @@ describe('resolvePitch — 필살 성공 굴림 0x34c74 → 0x517e6', () => {
   /** 뽑은 횟수를 센다. 값은 늘 같은 v */
   const 세는 = (value: number) => {
     let count = 0
-    const random: RandomPort = {
-      next: () => {
-        count += 1
-        return value
-      },
-      nextInRange: () => 0,
-      pick: (items) => items[0],
-    }
+    const random: RandomPort = createFractionRandom(() => {
+      count += 1
+      return value
+    })
     return { random, count: () => count }
   }
   const 덱 = () => createPatternDeck(createSeededRandom(11))
@@ -277,10 +267,13 @@ describe('2스트라이크 번트 파울(판정 11)도 판을 도는 파울 각 
       const seeded = createSeededRandom(seed)
       let count = 0
       const random: RandomPort = {
-        ...seeded,
-        next: () => {
+        rand: (lo, hi) => {
           count += 1
-          return seeded.next()
+          return seeded.rand(lo, hi)
+        },
+        rand9d: (n) => {
+          count += 1
+          return seeded.rand9d(n)
         },
       }
       return { random, count: () => count }

@@ -9,14 +9,11 @@ import {
   specialSwingPercentOf,
 } from '@/entities/batting/model/specialSwing'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 /** 필살타법 성공 판정 (0x34c74 → 0x517e6 — H2 2-2 확정) */
 
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+const 고정난수 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('성공 확률 표 0xcfdbe', () => {
   it('번호 1~5 가 15·20·25·25·30 % 다 (색인 = 번호 − 1, 0x34cb0)', () => {

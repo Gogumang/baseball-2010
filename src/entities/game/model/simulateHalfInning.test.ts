@@ -12,6 +12,7 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { recordLineupPlay, rosterLineupOf } from '@/entities/game/model/quickLineup'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 타자 = (hit: number): QuickAtBatBatter => ({ hit, power: hit, run: hit, skillIds: [] })
 const 투수 = (control: number): QuickAtBatPitcher => ({
@@ -24,14 +25,10 @@ const 투수 = (control: number): QuickAtBatPitcher => ({
 /** 결정론적인 선형 합동 난수 — 같은 씨앗이면 항상 같은 경기가 나온다 */
 function 씨앗난수(seed: number): RandomPort {
   let state = seed
-  return {
-    next: () => {
-      state = (state * 1103515245 + 12345) % 2147483648
-      return state / 2147483648
-    },
-    nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => {
+    state = (state * 1103515245 + 12345) % 2147483648
+    return state / 2147483648
+  })
 }
 
 describe('simulateHalfInning — 3아웃까지 원본 타석 엔진을 돌린다', () => {
@@ -282,11 +279,7 @@ describe('투수편(모드 3)의 0xac428 — [sp+4] 내 투수 건너뛰기 · [
   /** 차례대로 내주는 next() 값 — 다 쓰면 마지막 값을 되풀이 */
   const 차례 = (values: readonly number[]) => {
     let calls = 0
-    const random: RandomPort = {
-      next: () => values[Math.min(calls++, values.length - 1)],
-      nextInRange: (minimum, maximum) => minimum + (maximum - minimum) / 2,
-      pick: (candidates) => candidates[0],
-    }
+    const random: RandomPort = createFractionRandom(() => values[Math.min(calls++, values.length - 1)])
     return { random, calls: () => calls }
   }
   const 상황 = (random: RandomPort) => ({
@@ -368,7 +361,7 @@ describe('CPU 대타 0xac228 은 마선수 타자를 바꾸지 않는다 (0xb633
 })
 
 describe('새 투수 고르기의 마무리 갈래 — 능력 합 0xb5b50 (ac0be)', () => {
-  const 고정난수: RandomPort = { next: () => 0.5, nextInRange: (minimum) => minimum, pick: (items) => items[0] }
+  const 고정난수: RandomPort = createConstantRandom(0.5)
   /** 마운드 0(선발) · 벤치 6·7 둘 다 마무리 — 중간계투가 없어 평소에도 마무리 갈래로 간다 */
   const 수비 = (abilitySumAt?: (slot: number) => number): HalfInningDefense => ({
     mound: startingMoundOf(0),

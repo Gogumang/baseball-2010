@@ -7,6 +7,7 @@ import { outingBlockReasonOf, restBlockReasonOf } from '@/entities/career/model/
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({
   ...createCareer('테스트'),
@@ -22,11 +23,7 @@ const 입원 = OUTING_PLACES.flatMap((place) => place.functions).find((f) => f.i
 
 const 고정난수 = (values: number[]): RandomPort => {
   let index = 0
-  return {
-    next: () => values[index++ % values.length],
-    nextInRange: (minimum) => minimum,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => values[index++ % values.length])
 }
 
 describe('부상·질병 능력치 감소', () => {

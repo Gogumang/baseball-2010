@@ -73,7 +73,8 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
   it('OK 뒤 정산 — 배경 캔버스 위에 정산 판, 효과 층은 판 안(비는 덮개 위 · 파티클은 맨 위), 그리기 전엔 경기 난수를 안 쓴다', () => {
     vi.useFakeTimers()
     const random = createSeededRandom(1)
-    const next = vi.spyOn(random, 'next')
+    const rand = vi.spyOn(random, 'rand')
+    const rand9d = vi.spyOn(random, 'rand9d')
     const { container } = render(
       <GameResultScreen summary={요약({ result: '패', ourScore: 1, opponentScore: 4 })} gamePointReward={0} newTitles={[]}
         career={createCareer('선수')} onContinue={vi.fn()} settlement={{ inning: 9, playerSide: 1, random }} />,
@@ -89,7 +90,8 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
     expect(board.children[board.children.length - 1]).toBe(boardCanvases[1])
     expect(container.querySelectorAll('canvas').length).toBe(3)
     // jsdom 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다
-    expect(next).not.toHaveBeenCalled()
+    expect(rand).not.toHaveBeenCalled()
+    expect(rand9d).not.toHaveBeenCalled()
   })
 
   it('점수는 측 0(선공)이 왼쪽 — 사람 팀이 선공이면 우리 점수가 왼쪽', () => {

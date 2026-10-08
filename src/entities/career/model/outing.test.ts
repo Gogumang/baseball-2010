@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   outingBlockReasonOf,
@@ -16,8 +17,8 @@ function 선수(overrides: Partial<PlayerCareer> = {}): PlayerCareer {
   return { ...createCareer('테스트'), morale: 50, ...overrides }
 }
 
-const 최소 = { next: () => 0, nextInRange: (minimum: number) => minimum, pick: <T,>(candidates: readonly T[]) => candidates[0] }
-const 최대 = { ...최소, next: () => 0.999 }
+const 최소 = createConstantRandom(0)
+const 최대 = createConstantRandom(0.999)
 
 function 기능(name: string) {
   for (const place of OUTING_PLACES) {

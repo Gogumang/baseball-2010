@@ -1,18 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 
 describe('공수 교대 판 틱 0 의 야수 걸음 (0x3fac4)', () => {
   it('아홉 명(i = 8..0) × 넷 = 36 번 굴린다', () => {
     let count = 0
-    const random: RandomPort = {
-      next: () => {
-        count += 1
-        return 0.5
-      },
-      nextInRange: () => 0,
-      pick: (items) => items[0],
-    }
+    const random: RandomPort = createFractionRandom(() => {
+      count += 1
+      return 0.5
+    })
     rollHalfInningFielders(random)
     expect(count).toBe(36)
   })

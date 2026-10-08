@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import { outingBlockReasonOf, outingBlockTextOf, runOuting } from '@/entities/career/model/outing'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -11,7 +12,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
  * 입원 회복 0x1575c)를 돈다. 그래서 같은 난수면 같은 칸이 같은 값만큼 움직여야 한다.
  */
 
-const 최소 = { next: () => 0, nextInRange: (minimum: number) => minimum, pick: <T,>(candidates: readonly T[]) => candidates[0] }
+const 최소 = createConstantRandom(0)
 
 function 기능(name: string) {
   const found = OUTING_PLACES.flatMap((place) => place.functions).find((f) => f.name === name)

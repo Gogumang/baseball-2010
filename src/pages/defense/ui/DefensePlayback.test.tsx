@@ -22,6 +22,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTED_BALL_PATTERNS, type BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { openPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 
@@ -197,7 +198,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
     })
     try {
       // 굴림이 늘 0 을 내는 난수 — 펌블 기준(만분율)보다 작아 **반드시** 펌블이 난다
-      const 늘0: RandomPort = { next: () => 0, nextInRange: (minimum) => minimum, pick: (c) => c[0] }
+      const 늘0: RandomPort = createFractionRandom(() => 0)
       const onDone = vi.fn()
       render(<DefensePlayback input={{ ...타구(단타, 주자1루), random: 늘0 }} onDone={onDone} />)
       끝까지(onDone)

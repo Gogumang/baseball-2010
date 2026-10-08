@@ -5,14 +5,13 @@ import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
-/** 정해 둔 값을 차례로 내는 난수 — next() 를 몇 번 불렀는지 센다 */
+/** 정해 둔 값을 차례로 내는 난수 — 몇 번 굴렸는지 센다 */
 const 난수 = (values: readonly number[]) => {
   let index = 0
   const random: RandomPort & { calls: () => number } = {
-    next: () => values[index++] ?? 0,
-    nextInRange: (minimum, maximum) => minimum + (values[index++] ?? 0) * (maximum - minimum),
-    pick: (candidates) => candidates[Math.floor((values[index++] ?? 0) * candidates.length)],
+    ...createFractionRandom(() => values[index++] ?? 0),
     calls: () => index,
   }
   return random

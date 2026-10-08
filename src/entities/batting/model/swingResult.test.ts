@@ -4,6 +4,7 @@ import type { SwingResultInput } from '@/entities/batting/model/swingResult'
 import { NO_SWING_BOOST } from '@/entities/batting/model/swingBoost'
 import type { SwingBoost } from '@/entities/batting/model/swingBoost'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 기본입력 = (overrides: Partial<SwingResultInput> = {}): SwingResultInput => ({
   horizontalError: 0,
@@ -25,19 +26,13 @@ const 기본입력 = (overrides: Partial<SwingResultInput> = {}): SwingResultInp
 function 순서난수(values: readonly number[]): RandomPort & { readonly draws: number[] } {
   const draws: number[] = []
   let index = 0
-  return {
-    draws,
-    next: () => {
-      const value = values[index] ?? 0
-      index += 1
-      draws.push(value)
-      return value
-    },
-    nextInRange: () => {
-      throw new Error('판정은 next 만 쓴다')
-    },
-    pick: (candidates) => candidates[0],
-  }
+  const inner = createFractionRandom(() => {
+    const value = values[index] ?? 0
+    index += 1
+    draws.push(value)
+    return value
+  })
+  return { ...inner, draws }
 }
 
 describe('swingFactorsOf — 0xab214 중간값 (디컴파일 대조)', () => {

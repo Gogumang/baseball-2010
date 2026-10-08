@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { MAGIC_PITCH_SLOT, MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
@@ -20,7 +21,7 @@ import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-ga
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
 /** 난수를 안 쓰는 갈래를 볼 때 쓰는 고정 난수 */
-const 고정: RandomPort = { next: () => 0, nextInRange: (minimum) => minimum, pick: (c) => c[0] }
+const 고정: RandomPort = createConstantRandom(0)
 
 /** 직구 + 기본 변화구 몇 개 + 마구 1(파이어 볼) */
 const 레퍼토리: PitcherRepertoire = { pitchMask: 0b101_0111, form: 0, magicNumber: 1 }

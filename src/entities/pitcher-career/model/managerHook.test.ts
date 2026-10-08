@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
@@ -12,11 +13,7 @@ import {
 } from '@/entities/pitcher-career/model/managerHook'
 
 /** 0xbfa54 의 `rand(0,10000)` 이 늘 같은 값을 내도록 고정한다 */
-const fixedRandom = (roll: number): RandomPort => ({
-  next: () => roll / 10_000,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+const fixedRandom = (roll: number): RandomPort => createConstantRandom(roll / 10_000)
 
 const alwaysHits = fixedRandom(0)
 const neverHits = fixedRandom(9_999)

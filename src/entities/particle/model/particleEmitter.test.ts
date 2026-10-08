@@ -1,3 +1,4 @@
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   createEmitter,
@@ -34,7 +35,7 @@ const 고정설정 = (덮어쓰기: Partial<ParticleConfig> = {}): ParticleConfi
 })
 
 /** 늘 0 을 내는 난수 — `rand(n)` 이 0 이 되어 흔들림이 하한으로 고정된다 */
-const 난수0: RandomPort = { next: () => 0, nextInRange: (minimum) => minimum, pick: (candidates) => candidates[0] }
+const 난수0: RandomPort = createConstantRandom(0)
 
 describe('입자 만들기 0x6d56c', () => {
   it('첫 틱에 emit 개를 만들고 누계를 센다', () => {
@@ -109,14 +110,10 @@ describe('입자 갱신 0x6d878', () => {
 function 세는난수(): { readonly random: RandomPort; readonly count: () => number } {
   let calls = 0
   return {
-    random: {
-      next: () => {
-        calls += 1
-        return 0
-      },
-      nextInRange: (minimum) => minimum,
-      pick: (candidates) => candidates[0],
-    },
+    random: createFractionRandom(() => {
+      calls += 1
+      return 0
+    }),
     count: () => calls,
   }
 }

@@ -91,9 +91,8 @@ describe('홈런더비 마투수 난입 — 표 0xcfce8 = [1,2,3,4] (S13 5절 �
 describe('AI 팀 마선수 번호 0x66968 · 0x66994', () => {
   /** rand(0,5) 가 낼 값을 정해 주는 난수 */
   const 굴림 = (value: number): RandomPort => ({
-    next: () => 0,
-    nextInRange: (_minimum, maximum) => Math.min(value, maximum - 1),
-    pick: (candidates) => candidates[0] as never,
+    rand: (_lo, hi) => Math.min(value, hi - 1),
+    rand9d: () => 0,
   })
 
   it('사람과 다른 번호가 나오면 그대로 쓴다', () => {

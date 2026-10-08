@@ -6,13 +6,10 @@ import {
 } from '@/entities/game/model/steal'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 주자 = (run: number): BatterAbility => ({ hit: 0, power: 0, defense: 0, run })
-const 고정 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정 = (value: number): RandomPort => createFractionRandom(() => value)
 
 describe('도루 — 원본 표 0xd9064', () => {
   it('주력 100 마다 줄이 바뀌고 표값이 그대로 확률이다', () => {
@@ -69,17 +66,10 @@ describe('간이 엔진 도루 — 성공만 있고 실패가 없다 (0xc1818)',
 
   it('3루 주자가 있으면 난수를 뽑지도 않는다', () => {
     let 뽑은횟수 = 0
-    const 세는난수: RandomPort = {
-      next: () => {
-        뽑은횟수 += 1
-        return 0
-      },
-      nextInRange: (minimum) => {
-        뽑은횟수 += 1
-        return minimum
-      },
-      pick: (candidates) => candidates[0],
-    }
+    const 세는난수: RandomPort = createFractionRandom(() => {
+      뽑은횟수 += 1
+      return 0
+    })
     quickEngineSteal({ first: true, second: false, third: true }, 주자(900), 세는난수)
 
     expect(뽑은횟수).toBe(0)

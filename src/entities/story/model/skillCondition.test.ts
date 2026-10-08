@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { meetsSkillAcquireCondition, meetsSkillReleaseCondition } from '@/entities/story/model/skillCondition'
@@ -20,7 +21,7 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
   })
 
   it('그 해 해제한 마이너스 스킬(+0x1d0, 0xa4f31)은 2·3·4·5·18·19·20 의 하위 조건이 맨 앞에서 막는다', () => {
-    const 항상 = { next: () => 0, nextInRange: () => 99, pick: <T,>(c: readonly T[]) => c[0] }
+    const 항상 = createConstantRandom(0.99)
     const 약함 = { hit: 400, power: 400, defense: 400, run: 400 }
     const 경우: readonly (readonly [number, Partial<PlayerCareer>])[] = [
       [2, { season: 3, gamesPlayed: 14, seasonPopularityGain: 0 }],
@@ -59,8 +60,8 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
   })
 
   it('5 무력감은 사기 ≤ 20 · 연차 인덱스 ≥ 3 · 30% 를 본다', () => {
-    const 항상 = { next: () => 0, nextInRange: () => 99, pick: <T,>(c: readonly T[]) => c[0] }
-    const 절대 = { next: () => 0, nextInRange: () => 0, pick: <T,>(c: readonly T[]) => c[0] }
+    const 항상 = createConstantRandom(0.99)
+    const 절대 = createConstantRandom(0)
     const 지친선수 = 선수({ skillIds: [], morale: 20, season: 4 })
 
     expect(meetsSkillAcquireCondition(지친선수, 값(5), 항상)).toBe(true)

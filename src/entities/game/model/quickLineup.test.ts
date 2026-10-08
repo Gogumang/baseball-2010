@@ -8,17 +8,16 @@ import {
 } from '@/entities/game/model/quickLineup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-/** nextInRange 가 차례로 내놓을 값을 정해 둔 난수 — 몇 번 불렸는지도 센다 */
+/** rand 가 차례로 내놓을 값을 정해 둔 난수 — 몇 번 불렸는지도 센다 */
 function 정해진난수(values: readonly number[]): RandomPort & { readonly calls: () => number } {
   let index = 0
   return {
-    next: () => 0,
-    nextInRange: () => {
+    rand: () => {
       const value = values[index] ?? 0
       index += 1
       return value
     },
-    pick: (candidates) => candidates[0],
+    rand9d: () => 0,
     calls: () => index,
   }
 }

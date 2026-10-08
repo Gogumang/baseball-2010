@@ -7,6 +7,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
 import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 /** 투수편 상세 결과 창 — 0x872a1 두 모드 공용, 이름표·한계만 모드 3 갈래 */
 
@@ -18,11 +19,7 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? [],
 })
 const 메뉴 = (id: string) => PITCHER_TRAINING_MENUS.find((menu) => menu.id === id)!
-const 고정 = (position: number): RandomPort => ({
-  next: () => position,
-  nextInRange: (minimum, maximum) => minimum + position * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정 = (position: number): RandomPort => createConstantRandom(position)
 
 describe('투수 훈련 결과 창 (0x18c58~0x18d4e)', () => {
   it('이름표 340~343 · 84, 현재값 0xb6415(기록,k,1) · 최대값 보직 한계 · 사기 100', () => {

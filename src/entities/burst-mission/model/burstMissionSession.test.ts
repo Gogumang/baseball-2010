@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import {
   MAXIMUM_BURSTS_PER_GAME,
   canTriggerBurst,
@@ -15,11 +16,7 @@ import type { BurstTriggerContext } from '@/entities/burst-mission/model/burstMi
 import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-const 언제나통과 = (): RandomPort => ({
-  next: () => 0,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+const 언제나통과 = (): RandomPort => createConstantRandom(0)
 
 const 상황: BurstTriggerContext = {
   isHumanTeamBatting: true,

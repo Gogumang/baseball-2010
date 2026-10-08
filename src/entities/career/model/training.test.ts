@@ -4,6 +4,7 @@ import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 // 신인은 병아리(0)·의외성(8) 을 갖고 시작한다. 기본 규칙만 볼 때는 스킬을 비워 둔다
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({
@@ -16,13 +17,9 @@ const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({
 })
 const 메뉴 = (id: string) => TRAINING_MENUS.find((menu) => menu.id === id)!
 
-/** nextInRange 를 [최소, 최대) 안의 같은 위치로 고정한다 — 0 이면 최솟값, 0.999 면 최댓값 */
+/** rand(lo, hi) 를 [최소, 최대) 안의 같은 위치로 고정한다 — 0 이면 최솟값, 0.999 면 최댓값 */
 function 고정난수(position: number): RandomPort {
-  return {
-    next: () => position,
-    nextInRange: (minimum, maximum) => minimum + position * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  }
+  return createConstantRandom(position)
 }
 const 최소 = 고정난수(0)
 const 최대 = 고정난수(0.999)
@@ -86,11 +83,7 @@ describe('능력치 훈련 — 0x17f5c (원본 규칙)', () => {
 
   it('사기(0x186c4)를 먼저 굴리고 상승(0x18704)을 다음에 굴린다', () => {
     const 차례: number[] = [0, 0.999]
-    const 순서난수: RandomPort = {
-      next: () => 차례.shift()!,
-      nextInRange: (minimum, maximum) => minimum + 차례.shift()! * (maximum - minimum),
-      pick: (candidates) => candidates[0],
-    }
+    const 순서난수: RandomPort = createFractionRandom(() => 차례.shift()!)
 
     const outcome = runTraining(선수({ battingTypeIndex: 1 }), 메뉴('히트'), 순서난수)
 

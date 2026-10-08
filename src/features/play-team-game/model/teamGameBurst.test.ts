@@ -71,7 +71,7 @@ describe('남은 돌발을 판정 없이 내린다 (0x8f628) — 팀 경기(시�
       const random = createSeededRandom(99)
       let current = start
       for (let out = 0; out < 3; out += 1) current = applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
-      return { current, next: random.next() }
+      return { current, next: random.rand(0, 0x7fffffff) }
     }
     const 가 = 세아웃(progress)
     const 나 = 세아웃(없음)

@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -23,15 +24,10 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...overrides,
 })
 
-const 고정 = (position: number): RandomPort => ({
-  next: () => position,
-  nextInRange: (minimum, maximum) => minimum + position * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정 = (position: number): RandomPort => createConstantRandom(position)
 const 안씀: RandomPort = {
-  next: () => { throw new Error('난수를 쓰면 안 된다') },
-  nextInRange: () => { throw new Error('난수를 쓰면 안 된다') },
-  pick: () => { throw new Error('난수를 쓰면 안 된다') },
+  rand: () => { throw new Error('난수를 쓰면 안 된다') },
+  rand9d: () => { throw new Error('난수를 쓰면 안 된다') },
 }
 
 describe('투수 서브 아이템 (창 종류 1 — 0x1364e · 0x14c8c 모드 갈림 없음)', () => {

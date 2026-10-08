@@ -13,17 +13,16 @@ import {
 } from '@/entities/batting/model/battedBallOutcome'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
-const 고정 = (value: number): RandomPort => ({ next: () => value, nextInRange: () => 0, pick: (items) => items[0] })
+const 고정 = (value: number): RandomPort => createFractionRandom(() => value)
 
-/** rand(a, b) 를 차례대로 내주는 난수 — `randomIntegerBelow` 는 next() 를 [a, b) 로 늘인다 */
+/** 비율을 차례대로 내주는 난수 — rand(a, b) 는 비율 하나를 [a, b) 로 늘인다 */
 const 차례 = (...values: number[]): RandomPort & { readonly used: () => number } => {
   let index = 0
   return {
-    next: () => values[index++] ?? 0,
-    nextInRange: () => 0,
-    pick: (items) => items[0],
+    ...createFractionRandom(() => values[index++] ?? 0),
     used: () => index,
   }
 }
@@ -179,7 +178,10 @@ describe('장면 초기화 0x3e340 — 덱 섞기 3ed76 뒤 효과 객체 3ef6e 
   it('rand 2 + 200 × 6 = 1202 번을 덱 섞기 바로 뒤에 굴린다 — 값은 버려진다', () => {
     let 수 = 0
     const 씨 = createSeededRandom(5)
-    const random: RandomPort = { ...씨, next: () => { 수 += 1; return 씨.next() } }
+    const random: RandomPort = {
+      rand: (lo, hi) => { 수 += 1; return 씨.rand(lo, hi) },
+      rand9d: (n) => { 수 += 1; return 씨.rand9d(n) },
+    }
     rollSceneEffectInit(random)
     expect(SCENE_EFFECT_INIT_ROLL_COUNT).toBe(1202)
     expect(수).toBe(1202)

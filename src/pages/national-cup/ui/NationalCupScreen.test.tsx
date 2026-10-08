@@ -15,9 +15,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 afterEach(cleanup)
 
 const 고정난수 = (value: number): RandomPort => ({
-  next: () => 0,
-  nextInRange: () => value,
-  pick: (candidates) => candidates[0],
+  rand: () => value,
+  rand9d: () => value,
 })
 
 const 띄우기 = (

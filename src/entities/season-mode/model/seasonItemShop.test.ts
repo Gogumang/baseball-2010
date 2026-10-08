@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
@@ -7,11 +8,7 @@ import {
 } from '@/entities/season-mode/model/seasonItemShop'
 
 const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({ ...startNewSeason(0, '테스터').record, ...덮어쓰기 })
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0] as never,
-})
+const 고정난수 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('시즌 서브아이템 상점 0xdc 종류 1 — 키 0x957c · 적용 0x7d90 결과 0xc', () => {
   it('가드 차례 — 보유 [78] → 소지금 (값 × 10 > 소지금) [77] → 확인 [79]', () => {

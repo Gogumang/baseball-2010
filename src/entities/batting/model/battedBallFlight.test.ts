@@ -13,18 +13,15 @@ import {
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 /** 원본 패턴 표에서 그대로 꺼낸 항목들 — 값을 지어내지 않는다 */
 const 가운데담장면 = BATTED_BALL_PATTERNS[0][0] // [90, 810, 1592, 0] 결과 코드 0
 const 가운데홈런 = BATTED_BALL_PATTERNS[24][0] // [90, 815, 1592, 0] 결과 코드 24
 const 폴홈런 = BATTED_BALL_PATTERNS[24][18] // [45, 1402, 991, 0]
 
-/** rand 굴림을 정해 두는 난수 — randomIntegerBelow(r, −25, 25) 가 `값` 이 되게 */
-const 굴림 = (값: number): RandomPort => ({
-  next: () => (값 + 25) / 50,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+/** rand 굴림을 정해 두는 난수 — rand(−25, 25) 가 `값` 이 되게 */
+const 굴림 = (값: number): RandomPort => createConstantRandom((값 + 25) / 50)
 
 describe('타구 궤적 — 원본 세계 0xbfed0 (공 vtable 0xd7afc)', () => {
   it('시작점은 원본 배팅 지점 (20000, 1000, 30000) 이고 각은 패턴 각의 부호를 뒤집는다 (0xb0b01)', () => {

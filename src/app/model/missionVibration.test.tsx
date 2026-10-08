@@ -36,17 +36,13 @@ function 센난수(seed: number) {
   const inner = createSeededRandom(seed)
   let draws = 0
   const port: RandomPort = {
-    next: () => {
+    rand: (lo: number, hi: number) => {
       draws += 1
-      return inner.next()
+      return inner.rand(lo, hi)
     },
-    nextInRange: (minimum: number, maximum: number) => {
-      draws += 1
-      return inner.nextInRange(minimum, maximum)
-    },
-    pick: <T,>(candidates: readonly T[]) => {
-      draws += 1
-      return inner.pick(candidates)
+    rand9d: (n: number) => {
+      if (n > 0) draws += 1
+      return inner.rand9d(n)
     },
   }
   return { port, drawn: () => draws }

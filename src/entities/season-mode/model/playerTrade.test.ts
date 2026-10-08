@@ -9,6 +9,7 @@ import {
   withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 /**
  * 트레이드 성공률·비용 (0xcf24) — `docs/re/J-modes-rules.md` 4-4 확정.
@@ -24,11 +25,7 @@ const 선수 = (덮어쓰기: Partial<SeasonPlayer> = {}): SeasonPlayer => ({
 })
 
 /** 뽑기를 정해 놓은 난수 — `bfa55(1,101)` 이 값 하나만 준다 */
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => (value - 1) / 100,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-})
+const 고정난수 = (value: number): RandomPort => createConstantRandom((value - 0.5) / 100)
 
 const 성공률 = (덮어쓰기: Partial<Parameters<typeof tradeSuccessRate>[0]> = {}) =>
   tradeSuccessRate({ myGrade: 0, opponentGrade: 0, myPenalty: 0, opponentPenalty: 0, boost: 0, ...덮어쓰기 })
@@ -109,9 +106,9 @@ describe('성공 판정 — bfa55(1,101) < r', () => {
   })
 
   it('강제 성공이어도 뽑기 하나는 먼저 나간다 (d160 → d16c → d170)', () => {
-    const next = vi.fn(() => 0.5)
-    rollTradeSuccess({ next, nextInRange: vi.fn(), pick: vi.fn() }, 3, true)
-    expect(next).toHaveBeenCalledTimes(1)
+    const rand = vi.fn(() => 50)
+    rollTradeSuccess({ rand, rand9d: vi.fn() }, 3, true)
+    expect(rand).toHaveBeenCalledTimes(1)
   })
 })
 

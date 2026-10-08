@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -7,9 +8,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** 장비·서브는 난수를 안 쓴다 — 쓰면 터지게 둔다 */
 const 무작위: RandomPort = {
-  next: () => { throw new Error('난수를 쓰면 안 된다') },
-  nextInRange: () => { throw new Error('난수를 쓰면 안 된다') },
-  pick: () => { throw new Error('난수를 쓰면 안 된다') },
+  rand: () => { throw new Error('난수를 쓰면 안 된다') },
+  rand9d: () => { throw new Error('난수를 쓰면 안 된다') },
 }
 
 /** 투수편 상점 고르기 — 타자편과 같은 StrMODE 글(76·77·78·62·79·80·81·92) */
@@ -75,11 +75,7 @@ describe('투수 장비착용 (121)', () => {
 })
 
 describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
-  const 고정 = (position: number): RandomPort => ({
-    next: () => position,
-    nextInRange: (minimum, maximum) => minimum + position * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  })
+  const 고정 = (position: number): RandomPort => createConstantRandom(position)
 
   it('서브: 살 수 있으면 StrMODE[79] 로 묻고, 사면 소지금이 줄고 보유가 선다', () => {
     expect(pitcherPurchaseQuestionOf(투수(), shopItemId('서브', 1)))

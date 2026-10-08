@@ -15,14 +15,11 @@ import {
 import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 고정난수 = (values: number[]): RandomPort => {
   let index = 0
-  return {
-    next: () => values[index++ % values.length],
-    nextInRange: (minimum) => minimum,
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => values[index++ % values.length])
 }
 
 const 상황 = (patch: Partial<BurstTriggerContext> = {}): BurstTriggerContext => ({
@@ -151,10 +148,10 @@ describe('b4 아웃 · b5 점수차 · b6·b7 기록 검사', () => {
 
 describe('확률 주사위 (0x8ec64)', () => {
   it('rand(0,1000)/10 < b9 — 999 는 99 가 되어 100% 행만 통과한다', () => {
-    // next() 0.999 → rand = 999 → 99
+    // 비율 0.999 → rand = 999 → 99
     expect(rollChance(100, 고정난수([0.999]))).toBe(true)
     expect(rollChance(99, 고정난수([0.999]))).toBe(false)
-    // next() 0 → rand = 0 → 0
+    // 비율 0 → rand = 0 → 0
     expect(rollChance(1, 고정난수([0]))).toBe(true)
     expect(rollChance(0, 고정난수([0]))).toBe(false)
   })

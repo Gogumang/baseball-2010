@@ -1,3 +1,4 @@
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   applyControlError,
@@ -10,14 +11,10 @@ import {
 import { PLATE_DEPTH, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
-/** next() 가 차례로 values 를 돌려준다 — randomIntegerBelow(a, b) = a + floor(v × (b − a)) */
+/** 굴림마다 values 를 차례로 쓴다 — rand(a, b) = a + floor(v × (b − a)) */
 const 차례난수 = (values: number[]): RandomPort => {
   let index = 0
-  return {
-    next: () => values[index++] ?? 0,
-    nextInRange: (minimum, maximum) => minimum + (values[index++] ?? 0) * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => values[index++] ?? 0)
 }
 const C = ZONE_CENTERS[1]
 

@@ -6,22 +6,16 @@ import {
   type FireworksParticlePort,
 } from '@/entities/batting/model/homeRunFireworks'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 /** 굴림 수를 세는 난수 — 늘 같은 비율 */
 function 세는난수(ratio = 0.25): RandomPort & { count: () => number } {
   let rolls = 0
-  return {
-    next: () => {
-      rolls += 1
-      return ratio
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return minimum + ratio * (maximum - minimum)
-    },
-    pick: (items) => items[0],
-    count: () => rolls,
-  }
+  const inner = createFractionRandom(() => {
+    rolls += 1
+    return ratio
+  })
+  return { ...inner, count: () => rolls }
 }
 
 /** 이미터를 번호로 돌려주고, `finishAfter` 틱 뒤에 끝나는 가짜 관리자 */

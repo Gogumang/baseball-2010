@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isMistakePitch, mistakePercentOf } from '@/entities/pitching/model/mistakePitch'
 import type { MistakePitchInput } from '@/entities/pitching/model/mistakePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 보통: MistakePitchInput = {
   isMagicPitch: false,
@@ -18,12 +19,10 @@ const 보통: MistakePitchInput = {
 function 각본(value: number): RandomPort & { readonly used: () => number } {
   let used = 0
   return {
-    next: () => {
+    ...createFractionRandom(() => {
       used += 1
       return value
-    },
-    nextInRange: () => 0,
-    pick: <T,>(c: readonly T[]) => c[0],
+    }),
     used: () => used,
   }
 }

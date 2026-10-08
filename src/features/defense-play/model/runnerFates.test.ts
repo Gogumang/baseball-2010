@@ -4,6 +4,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { representativePatternOf } from '@/features/defense-play/model/representativePattern'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import {
@@ -81,7 +82,7 @@ describe('주자 운명 목록 — 정산 0xa8024 가 읽는 +0x95·+0x96', () =
 
   it('견제: 타자주자 없이 찬 루 오름차순, 리드 5틱에서 돌아온 주자는 아무 표시도 없다', () => {
     // 리드 덧틱 굴림 rand(0,100) 이 0 이 아니게 (0 이면 10틱 리드라 1루 주자가 태그된다)
-    const 난수 = { next: () => 0.9, nextInRange: (a: number, b: number) => a + 0.9 * (b - a), pick: <T,>(c: readonly T[]) => c[0] }
+    const 난수 = createConstantRandom(0.9)
     const 결과 = runPickoffPlay({ targetBase: 1, bases: 주자13루, outs: 0, offenseIsCpu: true, random: 난수 })
     expect(결과.runnerFates).toEqual([fate(1, false, false), fate(3, false, false)])
   })

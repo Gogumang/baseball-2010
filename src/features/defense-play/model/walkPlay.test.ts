@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { advanceRunners, EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { arrivalApplicationOf, runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { acceptsWalkPlaySkipKey, isWalkPlayResult, runWalkPlay } from '@/features/defense-play/model/walkPlay'
@@ -7,18 +8,11 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
 
 function 세는난수(): RandomPort & { readonly count: () => number } {
   let rolls = 0
-  return {
-    next: () => {
-      rolls += 1
-      return 0.5
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return minimum + 0.5 * (maximum - minimum)
-    },
-    pick: (candidates) => candidates[0],
-    count: () => rolls,
-  }
+  const inner = createFractionRandom(() => {
+    rolls += 1
+    return 0.5
+  })
+  return { ...inner, count: () => rolls }
 }
 
 const 루 = (first: boolean, second: boolean, third: boolean): BaseState => ({ first, second, third })

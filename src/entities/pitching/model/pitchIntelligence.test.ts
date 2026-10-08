@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { computerPitchTypeOf, pitchListOf, targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정난수 = (value: number): RandomPort => createFractionRandom(() => value)
 
 describe('보유 구질 목록 — 0xb6d2c', () => {
   it('비트 t−1 이 켜진 구질 t 를 SLOT[t] 칸에 넣고, 뒤 비트가 덮는다', () => {

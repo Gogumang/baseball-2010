@@ -20,6 +20,7 @@ import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 import { TOTAL_EVENT_COUNT } from '@/shared/config/original/eventMeta'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 function 선수(overrides: Partial<PlayerCareer> = {}): PlayerCareer {
   return { ...createCareer('테스트'), ...overrides }
@@ -28,11 +29,7 @@ function 선수(overrides: Partial<PlayerCareer> = {}): PlayerCareer {
 const 오프닝을본선수 = (overrides: Partial<PlayerCareer> = {}) =>
   선수({ seenEventIds: [String(OPENING_EVENT_ID)], ...overrides })
 
-const 고정난수 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + (maximum - minimum) * value,
-  pick: (candidates) => candidates[0],
-})
+const 고정난수 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('원본 r_event 이벤트 데이터', () => {
   it('해독한 이벤트가 전부 들어 있다', () => {

@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 
 const 세는난수 = () => {
   const calls: number[] = []
-  const random: RandomPort = {
-    next: () => {
-      calls.push(1)
-      return 0.5
-    },
-    nextInRange: () => 0,
-    pick: (items) => items[0],
-  }
+  const random: RandomPort = createFractionRandom(() => {
+    calls.push(1)
+    return 0.5
+  })
   return { calls, random }
 }
 

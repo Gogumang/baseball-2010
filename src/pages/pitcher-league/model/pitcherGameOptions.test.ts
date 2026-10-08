@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import {
   pitcherGameOptionsOf,
   pitcherGameOutcomeOf,
@@ -20,11 +21,7 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => {
   return { ...base, ...overrides, equippedSkillIds: overrides.equippedSkillIds ?? overrides.skillIds ?? base.equippedSkillIds }
 }
 
-const 난수: RandomPort = {
-  next: () => 0.5,
-  nextInRange: (minimum, maximum) => (minimum + maximum) / 2,
-  pick: (candidates) => candidates[0],
-}
+const 난수: RandomPort = createConstantRandom(0.5)
 
 describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
   it('팀·상대·측을 채운다 — 상대는 일정표(0xd89cb)가 정한다', () => {

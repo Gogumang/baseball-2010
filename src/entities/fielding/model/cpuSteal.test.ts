@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import {
   CPU_STEAL_TABLE,
@@ -13,15 +14,10 @@ import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 function 고정난수(value: number): RandomPort & { readonly count: () => number } {
   let rolls = 0
   return {
-    next: () => {
+    ...createFractionRandom(() => {
       rolls += 1
       return value / 1000
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return minimum + (value / 1000) * (maximum - minimum)
-    },
-    pick: (candidates) => candidates[0],
+    }),
     count: () => rolls,
   }
 }

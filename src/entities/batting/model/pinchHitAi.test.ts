@@ -13,14 +13,13 @@ function 정해진난수(values: readonly number[]): RandomPort & { readonly rol
   let index = 0
   return {
     rolls,
-    next: () => 0,
-    nextInRange(_minimum, maximum) {
+    rand(_minimum, maximum) {
       rolls.push(maximum)
       const value = values[index] ?? 0
       index += 1
       return Math.min(value, maximum - 1)
     },
-    pick: (candidates) => candidates[0] as never,
+    rand9d: () => 0,
   }
 }
 

@@ -19,6 +19,7 @@ import {
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 /**
  * 원본 표(`Xls{BATTER,PITCHER,SEASON}_BURST`)를 **그대로 두고** 보는 검사다.
@@ -28,11 +29,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 const 모든행 = [...BURST_TABLES.BATTER, ...BURST_TABLES.PITCHER, ...BURST_TABLES.SEASON]
 
 /** 늘 통과하는 주사위 — `rand(0,1000)` 이 0 이 되어 0 < b9 면 언제나 발동한다 */
-const 항상통과난수: RandomPort = {
-  next: () => 0,
-  nextInRange: (minimum) => minimum,
-  pick: (candidates) => candidates[0],
-}
+const 항상통과난수: RandomPort = createConstantRandom(0)
 
 const 상황 = (patch: Partial<BurstTriggerContext> = {}): BurstTriggerContext => ({
   isHumanTeamBatting: true,

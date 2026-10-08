@@ -4,14 +4,11 @@ import { createFielders } from '@/entities/fielding/model/fieldingState'
 import { throwLaunchOf, throwTicksTo, thrownWith } from '@/entities/fielding/model/throwPlan'
 import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/throwLaunch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
 /** 늘 같은 값을 내는 난수 — 0.999 면 악송구 · 흔들림 굴림이 모두 빗나간다 */
-const 고정 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (min, max) => min + Math.floor(value * (max - min)),
-  pick: (candidates) => candidates[0],
-})
+const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
 describe('송구 공 쏘기 — 0xa1620 · 세계 0xbfed0 · 받는 점 끼워 넣기 b2f9c', () => {
   it('보통 송구는 점[T − 1] 이 받는 점 (목표 x, 1000, 목표 z) 이다 — 속도 칸은 세계가 깐 그대로', () => {
@@ -54,17 +51,10 @@ describe('송구 공 쏘기 — 0xa1620 · 세계 0xbfed0 · 받는 점 끼워 �
 
   it('레이저(0xa222c)는 굴림이 없다 — 난수를 줘도 하나도 안 먹고 받는 점을 끼워 넣는다', () => {
     let 굴림 = 0
-    const 세는난수: RandomPort = {
-      next: () => {
-        굴림 += 1
-        return 0
-      },
-      nextInRange: (min) => {
-        굴림 += 1
-        return min
-      },
-      pick: (candidates) => candidates[0],
-    }
+    const 세는난수: RandomPort = createFractionRandom(() => {
+      굴림 += 1
+      return 0
+    })
     const 투수 = { ...야수들[0], throwSpeed: 2000 }
     const 홈 = basePosition(0)
     const 이루 = basePosition(2)
@@ -76,17 +66,11 @@ describe('송구 공 쏘기 — 0xa1620 · 세계 0xbfed0 · 받는 점 끼워 �
 
   it('원바운드(a17fc)는 앙각만 20400 으로 줄여 받는 점 앞에 떨어지고, rand(0, 2) 하나로 φ ± 1 · 공+0xaac 라 끼워 넣지 않는다', () => {
     let 굴림 = 0
-    const 세는난수 = (value: number): RandomPort => ({
-      next: () => {
+    const 세는난수 = (value: number): RandomPort =>
+      createFractionRandom(() => {
         굴림 += 1
         return value
-      },
-      nextInRange: (min, max) => {
-        굴림 += 1
-        return min + Math.floor(value * (max - min))
-      },
-      pick: (candidates) => candidates[0],
-    })
+      })
     // 깊은 중견수(8)가 홈으로 — 거리 25445 > 20400, 특수라 +0xdc = +0xd8
     const 중견수 = thrownWith({ ...야수들[8], position: { x: 20_000, y: 0, z: 4_000 } }, true)
     const 홈 = basePosition(0)

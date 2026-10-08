@@ -6,17 +6,16 @@ import {
 } from '@/entities/game/model/benchClearing'
 import { recordSeasonGameEvent, clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 
-/** next() 를 몇 번 불렀는지 세는 고정 난수 */
+/** 굴림을 몇 번 했는지 세는 고정 난수 */
 function 고정(value: number): RandomPort & { calls: number } {
   const random = {
     calls: 0,
-    next() {
+    ...createFractionRandom(() => {
       random.calls += 1
       return value
-    },
-    nextInRange: () => 0,
-    pick: <T,>(items: readonly T[]) => items[0],
+    }),
   }
   return random
 }

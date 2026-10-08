@@ -33,12 +33,27 @@ import type { BaseState } from '@/entities/game/model/baseState'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
 import { arrivalApplicationOf, runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
 import { rollPassedBall } from '@/entities/fielding/model/passedBall'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { isFairAngle, SCENE_EFFECT_INIT_ROLL_COUNT } from '@/entities/batting/model/battedBallOutcome'
+
+/** 굴림마다 onDraw(lo, hi) 를 부르는 감싸개 — 씨앗을 움직이는 굴림만 센다(rand9d(n ≤ 0) 은 안 굴린다) */
+function 세며(random: RandomPort, onDraw: (lo: number, hi: number) => void): RandomPort {
+  return {
+    rand: (lo, hi) => {
+      onDraw(lo, hi)
+      return random.rand(lo, hi)
+    },
+    rand9d: (n) => {
+      if (n > 0) onDraw(0, n)
+      return random.rand9d(n)
+    },
+  }
+}
 
 /** 장면 초기화 0x3e340 의 패턴 덱 섞기 0xb0614 — 코드마다 i = 0..n−1 에 rand(0, n) 하나 (경기 시작마다, 상태 9 굴림보다 앞) */
 /** 장면 초기화 0x3e340 의 굴림 — 덱 섞기 3ed76(패턴 수 합) + 효과 객체 3ef6e(1202) */
@@ -476,11 +491,7 @@ describe('환경설정 "주루" 가 나만의리그 타자편에도 먹는다 (�
         seed = (seed * 1664525 + 1013904223) >>> 0
         return (seed >>> 8) / 0x1000000
       }
-      const random = {
-        next: 하나,
-        nextInRange: (minimum: number, maximum: number) => minimum + 하나() * (maximum - minimum),
-        pick: <T,>(candidates: readonly T[]) => candidates[Math.floor(하나() * candidates.length)],
-      }
+      const random = createFractionRandom(하나)
       const 시작 = 내타석({ first: true, second: true, third: true }, 0, manual)
       const 진행중 = startPlayerOutcome(시작, { kind: '안타', bases: 1 }, random, { pattern: 땅볼 })
       runDefensePlay({ ...진행중.pendingDefensePlay!, random })
@@ -783,17 +794,10 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const random = createSeededRandom(5)
     const 시작 = startGame(random)
     let rolls = 0
-    const 세는: RandomPort = {
-      next: () => {
-        rolls += 1
-        return 0.5
-      },
-      nextInRange: (minimum, maximum) => {
-        rolls += 1
-        return minimum + 0.5 * (maximum - minimum)
-      },
-      pick: (candidates) => candidates[0],
-    }
+    const 세는: RandomPort = createFractionRandom(() => {
+      rolls += 1
+      return 0.5
+    })
     const 볼 = arrivePitch(시작, { resolution: { kind: '볼' }, outcomeAfter: null }, 세는)
     expect(볼.play).toBeNull()
     expect(볼.progress).toBe(시작)
@@ -836,7 +840,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const 판없음 = createSeededRandom(11)
     arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판없음)
     startPlayerOutcome(뒤, { kind: '볼넷' }, 판없음)
-    expect(판있음.next()).toBe(판없음.next())
+    expect(판있음.rand(0, 0x7fffffff)).toBe(판없음.rand(0, 0x7fffffff))
   })
 
   it('삼진 + 도루면 판은 아웃 + 1 로 열린다 — 0x3e15e 가 판 앞에서 state[6]++', () => {
@@ -1033,18 +1037,18 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     const progress = startGame(createSeededRandom(20100901))
     return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
   }
-  /** 첫 next() 만 정해 두고 나머지는 씨앗 난수에 맡긴다 */
-  function 첫굴림(value: number, seed: number) {
+  /** 첫 굴림만 비율로 정해 두고 나머지는 씨앗 난수에 맡긴다 */
+  function 첫굴림(value: number, seed: number): RandomPort {
     const rest = createSeededRandom(seed)
-    let first = true
+    const first = createConstantRandom(value)
+    let used = false
     return {
-      next: () => {
-        if (!first) return rest.next()
-        first = false
-        return value
+      rand: (lo, hi) => {
+        if (used) return rest.rand(lo, hi)
+        used = true
+        return first.rand(lo, hi)
       },
-      nextInRange: (minimum: number, maximum: number) => rest.nextInRange(minimum, maximum),
-      pick: <T,>(items: readonly T[]) => rest.pick(items),
+      rand9d: (n) => (used ? rest.rand9d(n) : first.rand9d(n)),
     }
   }
 
@@ -1062,7 +1066,7 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     const 시작 = 내타석(EMPTY_BASES, 0)
     let 굴림 = 0
     const 첫 = 첫굴림(0, 6)
-    const 세는 = { ...첫, next: () => { 굴림 += 1; return 첫.next() } }
+    const 세는 = 세며(첫, () => { 굴림 += 1 })
     const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 세는)
 
     // 들어가기 굴림 1 + 진입 0x3a5f0 의 45 — 밀어내기 주루·다음 타석은 아직 안 돌았다
@@ -1080,7 +1084,7 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     const 다봄 = resolveBenchClearing(들어감, { reachedTargetTick: true }, createSeededRandom(11))
     // 건너뛴 쪽에 같은 난수를 8 번 앞당겨 주면 둘이 똑같이 흘러가야 한다
     const 앞당김 = createSeededRandom(11)
-    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.next()
+    for (let 번 = 0; 번 < 8; 번 += 1) 앞당김.rand(0, 1)
     const 건너뜀 = resolveBenchClearing(들어감, { reachedTargetTick: false }, 앞당김)
 
     expect(다봄.pendingBenchClearing).toBeNull()
@@ -1146,20 +1150,9 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
   const 세는난수 = (seed: number) => {
     const inner = createSeededRandom(seed)
     const counter = { draws: 0 }
-    const random: RandomPort = {
-      next: () => {
-        counter.draws += 1
-        return inner.next()
-      },
-      nextInRange: (minimum, maximum) => {
-        counter.draws += 1
-        return inner.nextInRange(minimum, maximum)
-      },
-      pick: (candidates) => {
-        counter.draws += 1
-        return inner.pick(candidates)
-      },
-    }
+    const random: RandomPort = 세며(inner, () => {
+      counter.draws += 1
+    })
     return { random, counter }
   }
   const 주자 = (progress: GameProgress, bases: BaseState): GameProgress => ({
@@ -1216,8 +1209,8 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     const { random, counter } = 세는난수(5)
     cpuPickoff(판, 1, random)
     const 다시 = createSeededRandom(5)
-    for (let index = 0; index < counter.draws; index += 1) 다시.nextInRange(0, 10000)
-    expect(random.nextInRange(0, 10000)).toBe(다시.nextInRange(0, 10000))
+    for (let index = 0; index < counter.draws; index += 1) 다시.rand(0, 10000)
+    expect(random.rand(0, 10000)).toBe(다시.rand(0, 10000))
   })
 })
 
@@ -1249,13 +1242,16 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
   /** 장면 덱 섞기(0x3e340 → 0xb08e8, 코드마다 패턴 수만큼 rand) 다음 n 개는 고정값, 나머지는 씨앗 77 */
   const 앞값 = (n: number, value: number): RandomPort => {
     const rest = createSeededRandom(77)
+    const fixed = createConstantRandom(value)
     let 번 = 0
+    const 고정칸 = () => {
+      const 지금 = 번++
+      // 장면 초기화 굴림과 시뮬 초기화 rand(0, 2) 하나 다음부터 n 개
+      return 지금 >= 장면덱굴림 + 1 && 지금 < 장면덱굴림 + 1 + n
+    }
     return {
-      ...rest,
-      next: () => {
-        const 지금 = 번++
-        return 지금 >= 장면덱굴림 && 지금 < 장면덱굴림 + n ? value : rest.next()
-      },
+      rand: (lo, hi) => (고정칸() ? fixed.rand(lo, hi) : rest.rand(lo, hi)),
+      rand9d: (k) => (k <= 0 ? 0 : 고정칸() ? fixed.rand9d(k) : rest.rand9d(k)),
     }
   }
 
@@ -1272,11 +1268,11 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
     const 세우기 = (n: number, value: number) => startGame(앞값(n, value), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
     // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
     expect(세우기(36, 0.001)).toEqual(세우기(36, 0.999))
-    // 경기를 세우는 동안 쓴 굴림 = 장면 덱 섞기 + 효과 객체 1202 + 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
+    // 경기를 세우는 동안 쓴 굴림 = 장면 덱 섞기 + 효과 객체 1202 + 시뮬 초기화 rand(0, 2) + 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
     let 수 = 0
     const 씨 = createSeededRandom(77)
-    startGame({ ...씨, next: () => { 수 += 1; return 씨.next() } }, 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
-    expect(수).toBe(장면덱굴림 + 36)
+    startGame(세며(씨, () => { 수 += 1 }), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+    expect(수).toBe(장면덱굴림 + 1 + 36)
   })
 })
 
@@ -1299,28 +1295,20 @@ describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac
   it('startGame 의 첫 굴림은 rand(0, 2) 다 — 1회초 판·동료 타석보다 앞', () => {
     const inner = createSeededRandom(7)
     const ranges: (readonly [number, number])[] = []
-    const random: RandomPort = {
-      next: () => inner.next(),
-      nextInRange: (minimum, maximum) => {
-        ranges.push([minimum, maximum])
-        return inner.nextInRange(minimum, maximum)
-      },
-      pick: (candidates) => inner.pick(candidates),
-    }
+    const random: RandomPort = 세며(inner, (lo, hi) => {
+      ranges.push([lo, hi])
+    })
     startGame(random)
-    expect(ranges[0]).toEqual([0, 2])
+    // 장면 초기화 0x3e340 의 굴림(덱 섞기 + 효과 1202) 바로 다음 — 상태 9 의 첫 굴림
+    expect(ranges[장면덱굴림]).toEqual([0, 2])
   })
 })
 
 describe('자동진행이 내 차례에서 멈출 때 0xc22b4 — 모드 4 의 9회 이후 말 끝내기 판', () => {
-  /** next() 를 정해진 차례로 내는 난수 — 쓴 횟수를 센다 */
+  /** 비율을 정해진 차례로 내는 난수 — 쓴 횟수를 센다 */
   const 차례난수 = (values: readonly number[]) => {
     let index = 0
-    const random: RandomPort = {
-      next: () => values[index++] ?? 0,
-      nextInRange: (minimum, maximum) => minimum + (values[index++] ?? 0) * (maximum - minimum),
-      pick: (candidates) => candidates[0],
-    }
+    const random: RandomPort = createFractionRandom(() => values[index++] ?? 0)
     return { random, used: () => index }
   }
   const 판 = (game: Partial<GameProgress['game']>): GameProgress => {
@@ -1340,8 +1328,8 @@ describe('자동진행이 내 차례에서 멈출 때 0xc22b4 — 모드 4 의 9
     }
   }
 
-  it('아웃 + 주자 = t 를 rand(0, t+1) 주자와 남은 아웃으로 다시 나눈다 — 루마다 n == 3 − i 이거나 rand(0, n+1) == 0 이면 세운다', () => {
-    // t = 1 + 1 = 2 · n = ⌊0.7×3⌋ = 2 → 아웃 0 · 1루 rand(0,3)=0 세움(n 1) · 2루 rand(0,2)=1 안 세움 · 3루 n == 1 세움
+  it('아웃 + 주자 = t 를 rand(d, t+1) 주자와 남은 아웃으로 다시 나눈다 — 루마다 n == 3 − i 이거나 rand(0, n+1) == 0 이면 세운다', () => {
+    // d = 1 · t = 1 + 1 = 2 · n = 1 + ⌊0.7×2⌋ = 2 → 아웃 0 · 1루 rand(0,3)=0 세움(n 1) · 2루 rand(0,2)=1 안 세움 · 3루 n == 1 세움
     const { random, used } = 차례난수([0.7, 0, 0.9])
     const 뒤 = withAutoStopLateInningSetup(판({}), random)
     expect(뒤.game.outs).toBe(0)
@@ -1350,9 +1338,9 @@ describe('자동진행이 내 차례에서 멈출 때 0xc22b4 — 모드 4 의 9
   })
 
   it('n 이 0 이어도 rand(0, 1) 은 늘 0 이라 1루를 세우고 n 이 음수로 내려간다 (원본 그대로)', () => {
-    // t = 2 · n = 0 → 아웃 2 · 1루 rand(0,1)=0 세움(n −1) · 2루 rand(0,0)=0 세움(n −2) · 3루 rand(0,−1)=−1 안 세움
+    // 동점(d = 0) · t = 2 · n = rand(0, 3) = 0 → 아웃 2 · 1루 rand(0,1)=0 세움(n −1) · 2루 rand(0,0)=0 세움(n −2) · 3루 rand(0,−1)=−1 안 세움
     const { random } = 차례난수([0, 0, 0, 0])
-    const 뒤 = withAutoStopLateInningSetup(판({}), random)
+    const 뒤 = withAutoStopLateInningSetup(판({ ourScore: 3 }), random)
     expect(뒤.game.outs).toBe(2)
     expect(뒤.game.bases).toEqual({ first: true, second: true, third: false })
   })

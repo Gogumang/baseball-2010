@@ -57,7 +57,7 @@ describe('자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다 —
     const 한번에요약 = summaryOf(한번에)
     expect([요약.ourScore, 요약.opponentScore]).toEqual([한번에요약.ourScore, 한번에요약.opponentScore])
     expect(요약.gameRecord).toEqual(한번에요약.gameRecord)
-    expect(random.next()).toBe(한번에Random.next())
+    expect(random.rand(0, 0x7fffffff)).toBe(한번에Random.rand(0, 0x7fffffff))
   })
 
   it('3아웃을 낸 타석 다음 걸음 첫 틱이 반 이닝 넘김(0xb6b6c — CHANGE 대기를 거는 틱)이다', () => {
@@ -136,7 +136,7 @@ describe('자동진행 중계(상태 0x21)를 화면이 한 틱씩 돌린다 —
       expect(current.game.isFinished).toBe(한번에.game.isFinished)
       expect(current.game.inning).toBe(한번에.game.inning)
       expect([current.game.ourScore, current.game.opponentScore]).toEqual([한번에.game.ourScore, 한번에.game.opponentScore])
-      expect(random.next()).toBe(한번에Random.next())
+      expect(random.rand(0, 0x7fffffff)).toBe(한번에Random.rand(0, 0x7fffffff))
     }
   })
 })

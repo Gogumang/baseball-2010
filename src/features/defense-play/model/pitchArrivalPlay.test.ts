@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import {
   arrivalApplicationOf,
@@ -17,15 +18,10 @@ import {
 function 세는난수(ratio: number): RandomPort & { readonly count: () => number } {
   let rolls = 0
   return {
-    next: () => {
+    ...createFractionRandom(() => {
       rolls += 1
       return ratio
-    },
-    nextInRange: (minimum, maximum) => {
-      rolls += 1
-      return minimum + ratio * (maximum - minimum)
-    },
-    pick: (candidates) => candidates[0],
+    }),
     count: () => rolls,
   }
 }

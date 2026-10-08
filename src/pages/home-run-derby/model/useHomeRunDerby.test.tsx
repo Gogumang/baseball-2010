@@ -7,7 +7,6 @@ import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { randomIntegerBelow } from '@/shared/lib/random/originalRandom'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model/battedBallOutcome'
@@ -284,36 +283,47 @@ describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 
   function 기록난수() {
     const calls: [number, number][] = []
     const random = {
-      next: () => 0,
-      nextInRange: (min: number, max: number) => {
-        calls.push([min, max])
-        return min
+      rand: (lo: number, hi: number) => {
+        calls.push([lo, hi])
+        return Math.min(lo, hi)
       },
-      pick: <T,>(items: readonly T[]) => items[0],
+      rand9d: () => 0,
     }
     return { random, calls }
   }
+  /** 장면 시작 한 번의 굴림(팁 → 덱 → 효과 → rand(0, 9) → rand(0, 2) → 하늘 줄) — 같은 가짜로 `rollDerbySceneStart` 를 돌려 적는다 */
+  function 장면굴림(): [number, number][] {
+    const { random, calls } = 기록난수()
+    rollDerbySceneStart(random)
+    return calls
+  }
+  const 한장면 = 장면굴림()
+
+  it('장면 시작 굴림에 rand(0, 9) → rand(0, 2) 가 이어 든다', () => {
+    const at = 한장면.findIndex(([lo, hi]) => lo === 0 && hi === 9)
+    expect(한장면.slice(at, at + 2)).toEqual([[0, 9], [0, 2]])
+  })
 
   it('들어서면 한 번 — 다시 그려도 더 굴리지 않는다', () => {
     const { random, calls } = 기록난수()
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
-    expect(calls).toEqual([[0, 9], [0, 2]])
+    expect(calls).toEqual(한장면)
     rendered.rerender()
-    expect(calls).toEqual([[0, 9], [0, 2]])
+    expect(calls).toEqual(한장면)
   })
 
   it('다시하기도 새 장면이라 같은 둘을 또 굴린다', () => {
     const { random, calls } = 기록난수()
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
     act(() => rendered.result.current.restart())
-    expect(calls).toEqual([[0, 9], [0, 2], [0, 9], [0, 2]])
+    expect(calls).toEqual([...한장면, ...한장면])
   })
 
   it('결과 창 [예]는 단계 0 이면 다시하기와 같다 (0x40a5e 단계 ≤ 0 → 0x40a98)', () => {
     const { random, calls } = 기록난수()
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
     act(() => rendered.result.current.retryFromResult())
-    expect(calls).toEqual([[0, 9], [0, 2], [0, 9], [0, 2]])
+    expect(calls).toEqual([...한장면, ...한장면])
   })
 
   it('결과 창 [예]는 단계 > 0 이면 rand(1, 4) 를 먼저 하나 굴린다 (0x40a7e)', () => {
@@ -325,7 +335,7 @@ describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 
     expect(rendered.result.current.run.stage).toBe(1)
     calls.length = 0
     act(() => rendered.result.current.retryFromResult())
-    expect(calls).toEqual([[1, 4], [0, 9], [0, 2]])
+    expect(calls).toEqual([[1, 4], ...한장면])
   })
 })
 
@@ -450,9 +460,9 @@ describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () 
     expect(loadingTipIndex).toBe(rollSceneLoadingTip(expected))
     createPatternDeck(expected)
     rollSceneEffectInit(expected)
-    randomIntegerBelow(expected, 0, 9)
-    randomIntegerBelow(expected, 0, 2)
-    expect(skyRow).toBe(randomIntegerBelow(expected, 0, 6))
-    expect(random.next()).toBe(expected.next())
+    expected.rand(0, 9)
+    expected.rand(0, 2)
+    expect(skyRow).toBe(expected.rand(0, 6))
+    expect(random.rand(0, 0x7fffffff)).toBe(expected.rand(0, 0x7fffffff))
   })
 })

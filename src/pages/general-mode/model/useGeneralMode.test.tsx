@@ -59,7 +59,7 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
     expect(앞당김.ourPitcherIndex).toBe(예전.ourPitcherIndex)
     expect(앞당김.opponentPitcherIndex).toBe(예전.opponentPitcherIndex)
     expect(앞당김.game).toEqual(예전.game)
-    expect(random.next()).toBe(예전난수.next())
+    expect(random.rand(0, 0x7fffffff)).toBe(예전난수.rand(0, 0x7fffffff))
   })
 
   it('경기정보 CPU 칸에 굴린 선발·마선수가 나온다 (0xb51fd · 0xb56b5 · 0xb56e1)', () => {

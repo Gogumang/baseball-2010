@@ -19,12 +19,9 @@ import {
   startsPassedBallPlay,
 } from '@/entities/fielding/model/passedBall'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
-const 고정 = (value: number): RandomPort => ({
-  next: () => value,
-  nextInRange: (minimum, maximum) => minimum + value * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
 

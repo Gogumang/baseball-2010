@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createFielders } from '@/entities/fielding/model/fieldingState'
 import {
   chooseRelaySlot,
@@ -51,9 +52,7 @@ describe('악송구 갈래 0xa1620 (a1868~a1908)', () => {
   const 차례 = (values: number[]): RandomPort & { readonly used: () => number } => {
     let i = 0
     return {
-      next: () => values[i++] ?? 0,
-      nextInRange: () => 0,
-      pick: (c) => c[0],
+      ...createFractionRandom(() => values[i++] ?? 0),
       used: () => i,
     }
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { NO_ACE } from '@/pages/general-mode/lib/generalModeSetup'
 import { quickStartTeamCandidates, rollQuickStart } from '@/pages/general-mode/lib/quickStart'
@@ -9,12 +10,7 @@ import { quickStartTeamCandidates, rollQuickStart } from '@/pages/general-mode/l
 /** `bfa55(0, n)` 을 흉내 낸다 — 미리 정한 [0,1) 값을 차례로 돌려준다 */
 function 정해진난수(values: readonly number[]): RandomPort {
   let cursor = 0
-  const take = () => values[cursor++] ?? 0
-  return {
-    next: take,
-    nextInRange: (minimum, maximum) => minimum + take() * (maximum - minimum),
-    pick: (candidates) => candidates[0],
-  }
+  return createFractionRandom(() => values[cursor++] ?? 0)
 }
 
 describe('빠른실행 후보 목록', () => {
@@ -60,11 +56,7 @@ describe('빠른실행 굴림', () => {
 
   it('열린 마선수가 하나도 없어도 bfa55(0, 0) 이 난수 하나씩을 쓴다 — 늘 다섯 번 굴린다', () => {
     let 쓴수 = 0
-    const 세기: RandomPort = {
-      next: () => { 쓴수 += 1; return 0 },
-      nextInRange: (minimum) => { 쓴수 += 1; return minimum },
-      pick: (candidates) => candidates[0],
-    }
+    const 세기: RandomPort = createFractionRandom(() => { 쓴수 += 1; return 0 })
     rollQuickStart(세기)
     expect(쓴수).toBe(5)
   })

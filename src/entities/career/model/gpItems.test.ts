@@ -3,14 +3,11 @@ import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { BATTER_GP_ITEMS, abilityLimitOf, gpItemNoticeOf, lotteryPrizeOf, applyGpItem, purchaseGpItem } from '@/entities/career/model/gpItems'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('테스트'), ...overrides })
-/** nextInRange(0, 10000) 이 roll 을 돌려준다 */
-const 고정난수 = (roll: number): RandomPort => ({
-  next: () => roll / 10000,
-  nextInRange: (minimum, maximum) => minimum + (roll / 10000) * (maximum - minimum),
-  pick: (candidates) => candidates[0],
-})
+/** rand(0, 10000) 이 roll 을 돌려준다 */
+const 고정난수 = (roll: number): RandomPort => createConstantRandom(roll / 10000)
 const 보통 = 고정난수(0)
 
 describe('GP 아이템 (타자, 0xa4488)', () => {
@@ -106,7 +103,7 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
 
   it('아차상은 능력치 아이템 0~3 중 하나다 — bfa55(0,4) (0xa46ec)', () => {
     const base = { hit: 100, power: 100, defense: 100, run: 100 }
-    const 아차 = { ...고정난수(9999), next: () => 0.9999 }
+    const 아차 = createConstantRandom(0.9999)
     expect(applyGpItem(선수({ ability: base, skillIds: [] }), 5, 아차).career.ability).toEqual({ ...base, run: 110 })
   })
 
