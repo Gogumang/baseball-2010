@@ -1127,6 +1127,17 @@ export function startPitch(
       playsFoulBall: true,
       // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
       pitcherStaminaPercent: staminaPercent,
+      // 0xab214 ab91c~ — 상대 지금 타자 레코드 +0x14 (`0xb62b4(타자, n)` — 붙박이 줄은 Xls 행, 마타자는 제 행)
+      batterSkillIds: quickBatterOfTeam(options, false, opponentRosterSlotOf(progress)).skillIds,
+      skillSituation: {
+        inning: progress.game.inning,
+        // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
+        isLosing: progress.game.ourScore > progress.game.opponentScore,
+        runnerCount: runnerCountOf(progress.game.bases),
+        hasSecondBaseRunner: progress.game.bases.second,
+        // 이 타순 칸의 오늘 타석 결과 링 (팀 객체 + 타순×0x18 + 0x34)
+        recentAtBatCodes: progress.opponentLineup.records[lineupSlotOf(progress.opponentOrderIndex)]?.results ?? [],
+      },
     },
   )
   const resolution = thrown.resolution

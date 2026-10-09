@@ -3,7 +3,7 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ACE_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 
 /**
@@ -140,5 +140,8 @@ export function pitcherAbilityOf(
     gameAbility: { beforeFatigue: { control: record[0], velocity: record[1], breaking: record[2] } },
     ...(staminaPercent === undefined ? {} : { staminaPercent }),
     ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+    // 사람 타석 0xab214 의 스킬 갈래가 마투수 레코드 +0x14(XlsACE_PIT 행 그대로)를 `0xb62b4` 로 읽는다 — 실투 판정 비트
+    // (`skillBits`)는 따로 싣지 않는다(미해결)
+    skillIds: aceSkillIdsOf(ace),
   }
 }

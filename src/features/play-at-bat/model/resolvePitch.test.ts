@@ -356,3 +356,29 @@ describe('2스트라이크 번트 파울(판정 11)도 판을 도는 파울 각 
     expect(찾음).toBe(true)
   })
 })
+
+describe('resolvePitch — 수비 투수 스킬 (0xab214 ab91c~ 가 투수 레코드 +0x14 를 0xb62b4 로 읽는다)', () => {
+  const 클린업 = {
+    ...상황,
+    batter: { hit: 800, power: 800, run: 300, defense: 300 },
+    situation: { ...상황.situation, batterOrderIndex: 3, hasSecondBaseRunner: true, runnerCount: 1 },
+  }
+  const 여러번 = (context: BattingContext) => {
+    const random = createSeededRandom(23)
+    let deck = createPatternDeck(random)
+    return Array.from({ length: 300 }, () => {
+      const result = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 0 }, context, deck, random)
+      deck = result.deck
+      return result.detail.resultCode
+    })
+  }
+  // 비트 15 · 17 · 19 → 투수 스킬 31(클린업 홈런성 −10) · 33(2루 주자 잘 맞음 −5) · 35
+  const 비트 = (1 << 15) | (1 << 17) | (1 << 19)
+
+  it('레코드 비트를 투수 번호(비트 + 16)로 읽어 판정에 싣는다', () => {
+    const 스킬 = 여러번({ ...클린업, pitcher: { ...클린업.pitcher, skillBits: 비트 } })
+    expect(스킬).not.toEqual(여러번(클린업))
+    // 번호를 직접 든 능력치(마투수 `aceSkillIdsOf`)도 같다
+    expect(여러번({ ...클린업, pitcher: { ...클린업.pitcher, skillIds: [31, 33, 35] } })).toEqual(스킬)
+  })
+})

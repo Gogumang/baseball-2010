@@ -35,7 +35,7 @@ import {
 import { battingRecordAt, cpuSideOf, humanSideOf, withMissionScore } from '@/entities/mission/model/missionGame'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { skillIdsOfBits, teamBatters } from '@/entities/team/model/teamRoster'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
@@ -56,6 +56,8 @@ import {
   FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf,
 } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import type { CpuSwingSkillSituation } from '@/entities/pitching/model/simulateBatter'
+import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
@@ -115,7 +117,7 @@ import { missionResultEarnedOf } from '@/pages/mission-play/lib/missionResultBoa
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { NO_ACE_MATCH_HOLD, isAceMatchHeld } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
@@ -1194,6 +1196,9 @@ export function useMissionSession({
         pitcherStaminaPercent,
         // 파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파울 뜬공 아웃(13), 아니면 판이 닫힌 뒤 스트라이크(0x35108 → 0xb6b58)
         playsFoulBall: true,
+        // 0xab214 ab91c~ — 지금 CPU 타자 레코드 +0x14 (`0xb62b4(타자, n)` — 마스터 줄은 Xls 행 사본, 마타자는 제 행)
+        batterSkillIds: missionCpuBatterSkillIdsOf(pitcherRun, cpuBatter),
+        skillSituation: missionCpuSwingSituationOf(pitcherRun),
       },
     )
     const resolution = thrown.resolution
@@ -2196,6 +2201,35 @@ function missionCpuAfterThrow(
     batterIntimidates: skillIds.includes(INTIMIDATE_SKILL_ID),
     ...(aceStamina === undefined ? {} : { aceStamina }),
   })
+}
+
+/** 투수 미션 지금 CPU 타자의 0xab214 스킬 번호 — 마타자 칸이면 미션 마선수 행(`aceSkillIdsOf`), 아니면 마스터 줄 +0x14 */
+function missionCpuBatterSkillIdsOf(
+  run: MissionRun,
+  cpuBatter: ReturnType<typeof missionCpuBatterOf>,
+): readonly number[] {
+  if (cpuBatter === null) return []
+  if (cpuBatter.isAce) {
+    const ace = missionOpponent(run.mission)
+    return ace === null ? [] : aceSkillIdsOf(ace)
+  }
+  return skillIdsOfBits(cpuBatter.row?.skillBits ?? 0, false)
+}
+
+/**
+ * 투수 미션 CPU 타자 스윙 0xab214 의 스킬 갈래가 보는 상황 — 이닝(`st[0x6b]` + 1) · 공격(CPU) 팀이 지는가(ab966: 수비 점수 >
+ * 공격 점수) · 주자 · 2루 · 이 타순 칸의 오늘 타석 결과 링
+ */
+function missionCpuSwingSituationOf(run: MissionRun): CpuSwingSkillSituation {
+  const offense = run.game.offenseSide
+  const batting = run.cpu.batting
+  return {
+    inning: run.game.inning + 1,
+    isLosing: run.game.scores[offense === 0 ? 1 : 0] > run.game.scores[offense],
+    runnerCount: runnerCountOf(run.bases),
+    hasSecondBaseRunner: run.bases.second,
+    recentAtBatCodes: batting === null ? [] : batting.lineup.records[lineupSlotOf(batting.order)]?.results ?? [],
+  }
 }
 
 /** 지금 타자의 장착 스킬 — 미션 타자면 세션이 받은 것, 마스터 줄이면 그 줄 +0x14 의 켜진 비트 (0xb62b4(타자, n) — 압도 22) */

@@ -109,6 +109,11 @@ export interface PitcherAbility {
    * 본다. 붙박이 표 줄은 Xls 행 사본 그대로(`RosterPlayer.skillBits`). 없으면 0 (마선수 표에는 스킬 비트가 없다)
    */
   readonly skillBits?: number
+  /**
+   * 사람 타석 스윙 판정 0xab214 의 스킬 갈래(ab91c~)가 `0xb62b4(투수, n)` 로 읽는 **투수 스킬 번호**(비트 + 16)를 직접 든 값 —
+   * 마투수(`aceSkillIdsOf`, XlsACE_PIT 행 +0x14)처럼 `skillBits` 를 따로 싣지 않는 능력치가 쓴다. 없으면 `skillBits` 에서 낸다
+   */
+  readonly skillIds?: readonly number[]
 }
 
 export const DEFAULT_PITCHER_ABILITY: PitcherAbility = {

@@ -85,7 +85,7 @@ import {
 } from '@/entities/game/model/benchClearing'
 import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
-import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
@@ -159,7 +159,7 @@ import type {
   TeamEntryPitcher,
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
-import { rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
+import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import {
   backToBackRecordOf,
@@ -1763,6 +1763,23 @@ function entryBatterIntimidatesAt(progress: TeamGameProgress, teamId: number, sl
   return (((entryBattersOf(progress, teamId)[slot]?.skillBits ?? 0) >>> INTIMIDATE_SKILL_BIT) & 1) === 1
 }
 
+/**
+ * 명단 타자의 0xab214 스킬 번호 — 스윙 판정의 스킬 갈래(ab91c~)가 모드 검사 없이 `0xb62b4(타자, n)` 로 레코드 +0x14 를 읽는다.
+ * 붙박이 · 기록 줄은 `TeamEntryBatter.skillBits`, 마타자(0xb53f0 이 XlsACE_BAT 행을 통째 베낀 레코드)는 `aceSkillIdsOf`
+ */
+export function entryBatterSkillIdsOf(entry: TeamEntryBatter | undefined): readonly number[] {
+  if (entry === undefined) return []
+  const ace = entry.aceIndex >= 0 ? ACE_BATTERS[entry.aceIndex] : undefined
+  return ace !== undefined ? aceSkillIdsOf(ace) : skillIdsOfBits(entry.skillBits ?? 0, false)
+}
+
+/** 명단 투수의 0xab214 스킬 번호(비트 + 16) — 마투수(0xb521c 가 XlsACE_PIT 행을 베낀 레코드)는 `aceSkillIdsOf` */
+export function entryPitcherSkillIdsOf(entry: TeamEntryPitcher | undefined): readonly number[] {
+  if (entry === undefined) return []
+  const ace = entry.aceIndex >= 0 ? ACE_PITCHERS[entry.aceIndex] : undefined
+  return ace !== undefined ? aceSkillIdsOf(ace) : skillIdsOfBits(entry.skillBits ?? 0, true)
+}
+
 /** 간이 타석 엔진이 보는 타자 — 히트·파워·주루만 쓴다 */
 function entryQuickBatterOf(
   progress: TeamGameProgress,
@@ -1776,8 +1793,8 @@ function entryQuickBatterOf(
     hit: ability[0],
     power: ability[1],
     run: ability[3],
-    // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 +0x14 를 모드 검사 없이 읽는다
-    skillIds: skillIdsOfBits(entry?.skillBits ?? 0, false),
+    // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 +0x14 를 모드 검사 없이 읽는다 (마타자는 제 행)
+    skillIds: entryBatterSkillIdsOf(entry),
     // 기록으로 선 표 밖 타자(영입한 명전 · 나리)는 레코드 +0xa 비트7(0xb6389) — 0xab214 의 내 선수 갈래가 레코드를 직접 읽는다
     ...(entry !== undefined && aceIndex < 0 && entry.rosterSlot === NO_ROSTER_SLOT ? { isOwnPlayer: true } : {}),
     // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (k = 레벨·5 + 순번, `quickSwingBoostOf`)
@@ -1797,8 +1814,8 @@ function entryQuickPitcherOf(
     control: ability[0],
     velocity: ability[1],
     stamina: ability[3],
-    // 장착 스킬 — `0xb62b4(투수, n)` (투수 번호 = 비트 + 16). 마투수 줄은 비트를 안 든다
-    skillIds: skillIdsOfBits(entry?.skillBits ?? 0, true),
+    // 장착 스킬 — `0xb62b4(투수, n)` (투수 번호 = 비트 + 16). 마투수는 제 행(XlsACE_PIT +0x14)
+    skillIds: entryPitcherSkillIdsOf(entry),
     // 손 0xb63c0 — 마투수(+0xa 비트6)는 폼 7·9·10 이 0, 그 밖은 폼 & 1 (0xab214 의 스킬 13·14)
     ...(entry === undefined ? {} : { hand: pitcherHandOf(entry.repertoire.form, entry.aceIndex >= 0) }),
     // 0xc11f0 c1278 — 마투수면 보정 구조체 out+4 · +6 에 D[0xce/0x9c + 2k] (레벨 = mgr[0x13a + 순번])
@@ -1982,6 +1999,8 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
     },
     // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (`TeamEntryPitcher.skillBits`, 마투수 0)
     ...(entry?.skillBits === undefined ? {} : { skillBits: entry.skillBits }),
+    // 사람 타석 스윙 0xab214 의 투수 스킬 — 마투수는 제 행 (`entryPitcherSkillIdsOf`)
+    skillIds: entryPitcherSkillIdsOf(entry),
   }
 }
 
@@ -2723,6 +2742,17 @@ function pitchOnce(
       playsFoulBall: true,
       // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
       pitcherStaminaPercent: staminaPercent,
+      // 0xab214 ab91c~ — 상대 지금 타자 레코드 +0x14 (`0xb62b4(타자, n)`, 마타자는 제 행)
+      batterSkillIds: entryBatterSkillIdsOf(entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]),
+      skillSituation: {
+        inning: progress.game.inning,
+        // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
+        isLosing: progress.game.ourScore > progress.game.opponentScore,
+        runnerCount: runnerCountOf(progress.game.bases),
+        hasSecondBaseRunner: progress.game.bases.second,
+        // 이 타순 칸의 오늘 타석 결과 링 (팀 객체 + 타순×0x18 + 0x34)
+        recentAtBatCodes: progress.opponentEntryRecords[progress.opponentOrderIndex]?.results ?? [],
+      },
     },
   )
   const resolution = thrown.resolution

@@ -2,7 +2,7 @@ import { derbyAcePitcherOf, pitcherAbilityOf } from '@/entities/game/model/aceOp
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { DERBY_MAGIC_PITCH_TYPE, DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
-import { PITCHERS_PER_TEAM, teamPitchers } from '@/entities/team/model/teamRoster'
+import { PITCHERS_PER_TEAM, skillIdsOfBits, teamPitchers } from '@/entities/team/model/teamRoster'
 import { masterGameAbilityOf } from '@/entities/mission/model/missionCpuTeam'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 
@@ -59,6 +59,8 @@ function ordinaryDerbyPitcherOf(opponentTeamId: number): { readonly name: string
       ...(repertoire === undefined
         ? {}
         : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+      // 사람 타석 0xab214 의 스킬 갈래 — 그 줄 레코드 +0x14(Xls 행 사본)를 `0xb62b4(투수, n)` 로 읽는다
+      skillIds: skillIdsOfBits(row.skillBits, true),
     },
   }
 }
