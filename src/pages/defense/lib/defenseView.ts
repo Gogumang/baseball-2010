@@ -225,6 +225,18 @@ export interface DefenseBall extends WorldPoint {
    * 야수가 쥔 공도 손에 붙어 안 움직여 멈춘 것으로 본다(관문 파울 갈래와 같은 읽기 — 유력). 안 주면 거짓.
    */
   readonly isStopped?: boolean
+  /** 플레이 +0x12c — 야수가 쥐고 있다. 공 그리기 0x36dfc 가 공 · 그림자를 안 그린다(36e90). 안 주면 거짓 */
+  readonly isHeld?: boolean
+  /**
+   * 담장을 넘어 사라졌다 — 공+0x68(재생 틱)이 낙구 aa0 + 2 와 담장선 aa4 + 6 을 **둘 다** 넘었고, 담장선이 있거나(aa4 > 0, 36e5c)
+   * 홈런(+0x111, 36e32)이다. 0x36dfc 가 공 · 그림자를 안 그린다(36e9e). 안 주면 거짓
+   */
+  readonly isBeyondFence?: boolean
+}
+
+/** 0x36dfc 가 공(과 그림자)을 그리는가 — 36e86~36ea4: 홈런 뒤 · 담장 뒤가 아니고 쥔 공(+0x12c)이 아닐 때 */
+export function isBallDrawn(ball: DefenseBall): boolean {
+  return ball.isHeld !== true && ball.isBeyondFence !== true
 }
 
 /** 야수 한 명 */

@@ -28,6 +28,7 @@ import {
   defenderPaletteIndexOf,
   fielderSpriteOf,
   flashOffsetOf,
+  isBallDrawn,
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
@@ -271,9 +272,12 @@ export function DefenseScreen({
         */}
         {actors.map((actor) => actor.node)}
 
-        <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
-          <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
-        </div>
+        {/* 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다 */}
+        {isBallDrawn(state.ball) && (
+          <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
+            <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
+          </div>
+        )}
 
         {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
         {judgeText !== null && judgeTextPoint !== null && (

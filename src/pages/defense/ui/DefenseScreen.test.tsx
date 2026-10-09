@@ -121,6 +121,23 @@ describe('카메라 — 진입 맞춤 0x46418 · 멈춤 0x3f060(3f0a4 경기 멈
   })
 })
 
+describe('공을 안 그리는 그림 (0x36dfc 36e86~36ea4)', () => {
+  it('쥔 공(+0x12c)은 안 그린다', () => {
+    띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isHeld: true } })
+    expect(screen.queryByTestId('defense-ball')).toBeNull()
+  })
+
+  it('담장 뒤로 사라진 공은 안 그린다', () => {
+    띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isBeyondFence: true } })
+    expect(screen.queryByTestId('defense-ball')).toBeNull()
+  })
+
+  it('그 밖은 그린다', () => {
+    띄우기()
+    expect(screen.getByTestId('defense-ball')).toBeTruthy()
+  })
+})
+
 describe('주자와 번쩍임', () => {
   it('주자는 동작 표대로 그리고, 안 보이는 주자는 빠진다', () => {
     띄우기({

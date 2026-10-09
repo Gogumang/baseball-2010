@@ -19,6 +19,7 @@ import {
   cpuSpecialThrowOf,
   defenseAbilitiesOf,
   isBattedBallInPlay,
+  isBallBeyondFence,
   isDefensePlayFinished,
   runDefensePlay,
   startDefensePlay,
@@ -827,6 +828,34 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(결과.log.some((line) => line.includes('잡았다'))).toBe(false)
     expect(결과.outcome).toEqual({ kind: '홈런' })
     expect(결과.advance).toEqual({ bases: EMPTY_BASES, runsScored: 1, outsAdded: 0 })
+  })
+
+  it('담장을 넘은 공은 낙구 + 2 · 담장선 + 6 을 다 지나면 안 그리고, 홈런 칸이 스냅샷에 실린다 (0x36dfc 36e2a~36ea4 · 0x3f0f0)', () => {
+    const 궤적 = battedBallTrajectory([118, 961, 1367, 2])
+    const 결과 = runDefensePlay({ outcome: 삼루타, trajectory: 궤적, bases: EMPTY_BASES, outs: 0, defenseIsCpu: true })
+    const 사라짐 = Math.max(궤적.landingTick + 2, 궤적.fenceTick + 6)
+
+    결과.ticks.forEach((view, tick) => {
+      expect(view.ball.isBeyondFence).toBe(tick > 사라짐)
+    })
+    // 홈런 칸(+0x111)은 담장선 틱의 사건 코드 처리(다음 그림)부터 선다
+    expect(결과.ticks[궤적.fenceTick + 1].homeRunFlag).toBe(true)
+    expect(결과.ticks[궤적.fenceTick - 1].homeRunFlag).toBe(false)
+  })
+})
+
+describe('공 사라짐 판정 0x36dfc (36e2a~36e80)', () => {
+  it('담장선이 있거나 홈런이면, 낙구 + 2 와 담장선 + 6 을 둘 다 넘은 틱부터다', () => {
+    expect(isBallBeyondFence(40, 32, 29, false)).toBe(true)
+    expect(isBallBeyondFence(35, 32, 29, false)).toBe(false)
+    expect(isBallBeyondFence(36, 32, 29, false)).toBe(true)
+    expect(isBallBeyondFence(34, 40, 10, false)).toBe(false)
+    expect(isBallBeyondFence(43, 40, 10, false)).toBe(true)
+  })
+
+  it('담장선이 없으면(−1) 홈런 칸이 설 때만 본다', () => {
+    expect(isBallBeyondFence(100, 30, -1, false)).toBe(false)
+    expect(isBallBeyondFence(100, 30, -1, true)).toBe(true)
   })
 })
 

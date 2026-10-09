@@ -42,6 +42,10 @@ export interface ViewStateInput {
   /** 플레이 +0x111(홈런) · +0x129(폴 홈런) — 카메라 0x3f0f0 이 본다. 안 주면 거짓 */
   readonly homeRunFlag?: boolean
   readonly poleHomeRunFlag?: boolean
+  /** 플레이 +0x12c(쥠) — 공 그리기 0x36dfc 가 공 · 그림자를 안 그린다. 안 주면 거짓 */
+  readonly ballHeld?: boolean
+  /** 공이 담장 뒤로 사라졌다(0x36dfc 36e2a~36e80 — `DefenseBall.isBeyondFence`). 안 주면 거짓 */
+  readonly ballBeyondFence?: boolean
   /** 이 그림은 카메라가 안 움직인다(머리에서 경기 멈춤 +0x1993 — 0x3f0a4). 안 주면 움직인다 */
   readonly cameraFrozen?: boolean
   readonly fielders: readonly FielderState[]
@@ -111,6 +115,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       height: input.ball.y,
       isFlying: input.ballIsFlying,
       isStopped: input.ballStopped === true,
+      isHeld: input.ballHeld === true,
+      isBeyondFence: input.ballBeyondFence === true,
     },
     fielders,
     runners,

@@ -857,6 +857,20 @@ export interface DefensePlayState {
 }
 
 /**
+ * 공이 담장 뒤로 사라졌나 — 0x17 공 그리기 0x36dfc 머리(36e2a~36ea4, 직접 뜸):
+ * ```
+ * 36e2a  r7 = P+0x111(홈런) && 공+0x68 > 공+0xaa0 + 2 && 공+0x68 > 공+0xaa4 + 6
+ * 36e5c  r6 = 공+0xaa4 > 0   && 공+0x68 > 공+0xaa0 + 2 && 공+0x68 > 공+0xaa4 + 6
+ * 36e86  그린다 = !r7 && 공 그림 있음 && !P+0x12c(쥠) && !r6
+ * ```
+ * 공+0x68 · aa0 · aa4 는 웹에서 판 틱 · `ballLandingTick` · `trajectory.fenceTick`(다시 쏜 공은 판 틱으로 옮긴 값 — 비교는 같다).
+ * aa4 > 0 은 "담장선 넘는 틱이 있다" 로 읽는다(웹은 없으면 −1).
+ */
+export function isBallBeyondFence(tick: number, landingTick: number, fenceTick: number, homeRunFlag: boolean): boolean {
+  return (fenceTick > 0 || homeRunFlag) && tick > landingTick + 2 && tick > fenceTick + 6
+}
+
+/**
  * 타구 하나를 **시작 상태**로 세운다 — 포구 예보 · 필살수비 굴림 · 커버 배정까지.
  *
  * ⚠️ 난수는 여기서 **필살수비 굴림(최대 2번)만** 돈다. 펌블·악송구·레이저는 틱 안에서 돈다 —
@@ -2307,6 +2321,9 @@ export function stepDefensePlay(
           (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
         homeRunFlag,
         poleHomeRunFlag: play.suppressed,
+        // 공 그리기 0x36dfc — 쥔 공(+0x12c)과 담장 뒤로 사라진 공은 공 · 그림자를 안 그린다
+        ballHeld: play.held,
+        ballBeyondFence: isBallBeyondFence(tick, ballLandingTick, trajectory.fenceTick, homeRunFlag),
         // 머리에서 경기 멈춤(+0x1993)이 서 있던 그림(레이저 발사 다음 그림) — 0x3f060 이 3f0a4 에서 돌아가 카메라가 안 움직인다
         cameraFrozen: pausedAtHead,
         fielders,
