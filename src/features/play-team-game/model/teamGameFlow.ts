@@ -3597,7 +3597,7 @@ function withoutSteal(progress: TeamGameProgress): TeamGameProgress {
  * 루별 주자 주루 (경기용 칸 3) — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 —
  * 공격 팀 타순 칸)대로다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(타순을 거꾸로 센다)로 본다.
  */
-export function runAbilitiesOnBaseOf(
+function runAbilitiesOnBaseOf(
   progress: TeamGameProgress,
   humanSide: ControlSide,
 ): Partial<Record<0 | 1 | 2 | 3, number>> {
@@ -3613,6 +3613,19 @@ export function runAbilitiesOnBaseOf(
     if (runner !== null) runs[base] = runAbilityFor(progress, teamId, runner)
   }
   return runs
+}
+
+/**
+ * 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74)이 0xb570d(ctx, 3, 주자, 1, 90, 1) 로 읽는다.
+ * 사람이 치는 타석(우리 공격)의 주자는 우리 팀 신원(`runAbilitiesOnBaseOf`)대로다.
+ */
+export function runnerRunAbilitiesOf(progress: TeamGameProgress): Partial<Record<'first' | 'second' | 'third', number>> {
+  const runs = runAbilitiesOnBaseOf(progress, isOurOffense(progress) ? '공격' : '수비')
+  return {
+    ...(runs[1] === undefined ? {} : { first: runs[1] }),
+    ...(runs[2] === undefined ? {} : { second: runs[2] }),
+    ...(runs[3] === undefined ? {} : { third: runs[3] }),
+  }
 }
 
 /* ── 타석 준비 · 돌발 ─────────────────────────────────────────────────────────── */

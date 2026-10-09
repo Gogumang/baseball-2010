@@ -22,6 +22,7 @@ import {
   opponentMagicStateOf,
   pitchSlotsFor,
   pitchersOfRecordOf,
+  runnerRunAbilitiesOf,
   specialSwingRemainingAt,
   substitutionDetailAbilities,
 } from '@/features/play-team-game/model/teamGameFlow'
@@ -859,6 +860,8 @@ export function TeamGameScreen({
                 opponentTeamId: options.opponentTeamId,
                 // 위 줄 = 측 0(선공) — 사람 팀이 앉은 측 (0x373d0)
                 playerSide: game.playerSide,
+                // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자의 경기용 주력
+                runnerRunAbilities: runnerRunAbilitiesOf(progress),
               }}
               isEagleEyeEnabled={false}
               // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다

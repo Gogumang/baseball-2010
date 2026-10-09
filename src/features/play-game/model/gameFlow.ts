@@ -1218,6 +1218,19 @@ export function ourRunnerRunsOnBaseOf(progress: GameProgress): Partial<Record<1 
 }
 
 /**
+ * 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74)이 0xb570d(ctx, 3, 주자, 1, 90, 1) 로 읽는다.
+ * 루에 선 내가면 내 선수 능력치(`myRunAbility`)다.
+ */
+export function runnerRunAbilitiesOf(progress: GameProgress): Partial<Record<'first' | 'second' | 'third', number>> {
+  const runs = ourRunnerRunsOnBaseOf(progress)
+  return {
+    ...(runs[1] === undefined ? {} : { first: runs[1] }),
+    ...(runs[2] === undefined ? {} : { second: runs[2] }),
+    ...(runs[3] === undefined ? {} : { third: runs[3] }),
+  }
+}
+
+/**
  * 명단 칸의 선수 — 마타자 칸(`ACE_BATTER_ROSTER_SLOT`)이면 142 가 넣은 마타자, 아니면 로스터 붙박이 선수.
  */
 /**

@@ -18,6 +18,7 @@ import {
   throwOpponentPitch,
   withAutoStopLateInningSetup,
   ourRunnerRunsOnBaseOf,
+  runnerRunAbilitiesOf,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -1564,5 +1565,7 @@ describe('루에 선 주자의 신원 — 원본 주자 목록대로 (0xa93ac ·
       game: { ...walked.game, bases: { first: true, second: false, third: false }, runners: { first: me, second: null, third: null } },
     }
     expect(ourRunnerRunsOnBaseOf(mineOnFirst)[1]).toBe(777)
+    // 타석 화면 0x35b94 상태 0xe 주루 칸도 같은 값 — 빈 루는 안 채운다
+    expect(runnerRunAbilitiesOf(mineOnFirst)).toEqual({ first: 777 })
   })
 })
