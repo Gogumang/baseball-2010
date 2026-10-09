@@ -36,6 +36,9 @@ import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
+import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
 /**
  * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
@@ -207,6 +210,8 @@ export function PitchingScreen({
   }, [run.mission, missionInningIndex])
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
+  /** 구질 · 조준 · 게이지 그림 재료 — 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
+  const inputOverlayRef = usePitchInputOverlayRef()
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
   /** 0x10 에서 확정한 조준점 — 게이지(0x11) 뒤 놓을 때 쓴다 */
   const [aim, setAim] = useState<WorldPoint | null>(null)
@@ -357,6 +362,18 @@ export function PitchingScreen({
   const isBlockedMagic = (type: PitchTypeInfo): boolean =>
     magicRemaining !== undefined && isMagicType?.(type) === true && magicRemaining <= 0
 
+  /** 구질 번호 t (이름표 칸 + 1, 마구 22) — 장면 위 그림 재료 */
+  const typeNumberOf = (type: PitchTypeInfo | null): number => {
+    if (type === null) return 0
+    if (isMagicType?.(type) === true) return MAGIC_TYPE_NUMBER
+    return PITCH_TYPES.findIndex((candidate) => candidate === type || candidate.name === type.name) + 1
+  }
+  const slotTypeNumbers = [0, 0, 0, 0, 0, 0]
+  repertoire.forEach((type, index) => {
+    const slot = repertoireSlots?.[index] ?? index
+    if (slot >= 0 && slot < slotTypeNumbers.length) slotTypeNumbers[slot] = typeNumberOf(type)
+  })
+
   const slotChoices: PitchSlotChoice[] = repertoire.map((type, index) => ({
     slot: repertoireSlots?.[index] ?? index,
     name: type.name,
@@ -468,6 +485,7 @@ export function PitchingScreen({
             {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
             isPaused={isAwaitingConfirm}
             isFrozen={isPopupOpen}
+            inputOverlayRef={inputOverlayRef}
           >
             {matchupCards}
             {substitutionOverlay}
@@ -481,6 +499,9 @@ export function PitchingScreen({
           <PitchSlotPicker
             choices={slotChoices}
             isPaused={isPopupOpen}
+            {...(stage === undefined
+              ? {}
+              : { overlay: { ref: inputOverlayRef, typeNumbers: slotTypeNumbers, magicRemaining: magicRemaining ?? 0 } })}
             onDecide={(chosen) => {
               const index = slotChoices.findIndex((choice) => choice.slot === chosen)
               const found = repertoire[index]
@@ -498,6 +519,7 @@ export function PitchingScreen({
           <AimCursor
             side={aimSide}
             isPaused={isPopupOpen}
+            {...(stage === undefined ? {} : { overlay: { ref: inputOverlayRef, typeNumber: typeNumberOf(pitchType) } })}
             {...(onAimTick === undefined ? {} : { onTick: onAimTick })}
             onConfirm={(confirmed) => {
               // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
@@ -522,7 +544,14 @@ export function PitchingScreen({
       {phase === '게이지' && (
         <div hidden={isPopupOpen}>
           {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
-          <PitchGradeGauge isPaused={isPopupOpen} showsGauge={showsGauge} onRelease={throwPitch} />
+          <PitchGradeGauge
+            isPaused={isPopupOpen}
+            showsGauge={showsGauge}
+            onRelease={throwPitch}
+            {...(stage === undefined || aim === null
+              ? {}
+              : { overlay: { ref: inputOverlayRef, aim, aimSide, gaugeSettingOn: usesGauge } })}
+          />
         </div>
       )}
     </PixelScreen>

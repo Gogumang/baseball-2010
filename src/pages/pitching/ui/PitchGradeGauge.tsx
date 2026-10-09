@@ -17,6 +17,9 @@ import {
 } from '@/pages/pitching/lib/pitchGaugeSprite'
 import type { GaugeFrame } from '@/pages/pitching/lib/pitchGaugeSprite'
 import * as styles from '@/pages/pitching/ui/PitchGradeGauge.css'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
+import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
 interface PitchGradeGaugeProps {
   /**
@@ -32,6 +35,16 @@ interface PitchGradeGaugeProps {
    * 아무것도 안 그리고 누름도 안 받은 채 틱 10 에 칸 0 으로 놓는다(등급은 놓기 0x4dbac 가 제구·체력 표로 뽑는다). 기본 참
    */
   readonly showsGauge?: boolean
+  /**
+   * 장면 위 게이지(0x4d2ac — 목표점의 slt_pitch 원)의 재료를 실을 칸 — 확정한 조준점 · 투영 칸 · 환경설정 게이지(+0x2d).
+   * 넘기면 이 단추는 원을 그리지 않고 누름만 받는다
+   */
+  readonly overlay?: {
+    readonly ref: PitchInputOverlayRef
+    readonly aim: WorldPoint
+    readonly aimSide: number
+    readonly gaugeSettingOn: boolean
+  }
 }
 
 const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
@@ -49,7 +62,7 @@ const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
  * ⚠️ 미이식: t 가 선 뒤 0x4d53c~0x4d69e 가 덧그리는 것(그림 플래그 8 의 멈춘 커서 · 레코드 비트에 걸린 칸 그림 · t == 5 의 덧그림)은
  * 멈춘 커서 원 하나로만 옮겼다.
  */
-export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true }: PitchGradeGaugeProps) {
+export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true, overlay }: PitchGradeGaugeProps) {
   /** 0x11 상태 틱 `[+0x2c]` */
   const tickRef = useRef(0)
   /** 커서 `+0x17bc` */
@@ -61,6 +74,21 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   /** 결과 원 틱 `+0x17c4` */
   const [resultTick, setResultTick] = useState(0)
   const releasedRef = useRef(false)
+  usePublishedOverlay(
+    overlay?.ref,
+    overlay === undefined
+      ? null
+      : {
+          kind: '게이지',
+          aim: overlay.aim,
+          aimSide: overlay.aimSide,
+          showsGauge,
+          gaugeSettingOn: overlay.gaugeSettingOn,
+          cursor,
+          pressed,
+          decidedTicks: resultTick,
+        },
+  )
   const onReleaseRef = useRef(onRelease)
   onReleaseRef.current = onRelease
 
@@ -112,6 +140,14 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   if (!showsGauge) return null
 
   const isDecided = isDecidedCell(pressed)
+  // 원은 장면이 그린다 — 단추는 누름만
+  if (overlay !== undefined) {
+    return (
+      <button type="button" className={styles.gauge} onClick={press} aria-label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}>
+        OK
+      </button>
+    )
+  }
   const circle = (frame: GaugeFrame, offsetY = 0) =>
     frame.color === null ? (
       <span

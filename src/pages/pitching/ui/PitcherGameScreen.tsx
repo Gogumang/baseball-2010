@@ -76,6 +76,7 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -165,6 +166,8 @@ export function PitcherGameScreen({
   const isSceneShowing = !isIntroDone || isHalfInningBoardOpen || isBenchClearing || summary !== null
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
+  /** 구질 · 조준 · 게이지 그림 재료 — 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
+  const inputOverlayRef = usePitchInputOverlayRef()
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -795,6 +798,7 @@ export function PitcherGameScreen({
           {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
           isPaused={isAwaitingConfirm}
           isFrozen={isPitchInputPaused}
+          inputOverlayRef={inputOverlayRef}
         >
           {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
@@ -809,6 +813,11 @@ export function PitcherGameScreen({
             <PitchSlotPicker
               choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
               isPaused={isPitchInputPaused}
+              overlay={{
+                ref: inputOverlayRef,
+                typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
+                magicRemaining: progress.magicRemaining,
+              }}
               onDecide={(chosen) => {
                 const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                 if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
@@ -825,6 +834,7 @@ export function PitcherGameScreen({
             <AimCursor
               side={progress.options.stageSide ?? 1}
               isPaused={isPitchInputPaused}
+              overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
               onConfirm={(confirmed) => {
                 // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
                 // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
@@ -849,6 +859,16 @@ export function PitcherGameScreen({
               isPaused={isPitchInputPaused}
               showsGauge={showsGauge}
               onRelease={(gaugeCell) => throwWith(gaugeCell)}
+              {...(aim === null
+                ? {}
+                : {
+                    overlay: {
+                      ref: inputOverlayRef,
+                      aim,
+                      aimSide: progress.options.stageSide ?? 1,
+                      gaugeSettingOn: options.gaugeSettingOn === true,
+                    },
+                  })}
             />
           </div>
         )}
@@ -916,6 +936,13 @@ function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
   }
   const profile = batter.profile ?? 0
   return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamIndex }
+}
+
+/** 칸 0..5 의 구질 번호 (경기 +0xfac + 4·칸) — 장면 위 구질 목록 재료 */
+function slotTypeNumbersOf(slots: readonly PitchSlot[]): number[] {
+  const numbers = [0, 0, 0, 0, 0, 0]
+  for (const slot of slots) if (slot.slot >= 0 && slot.slot < numbers.length) numbers[slot.slot] = slot.typeNumber
+  return numbers
 }
 
 /** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7). 빈 칸(구질 0)은 그리지 않는다 */

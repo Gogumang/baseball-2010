@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isPitchSelectionDue, pitchSlotOfKey } from '@/features/play-pitcher-game/model/pitchAim'
 import * as styles from '@/pages/pitching/ui/PitchSlotPicker.css'
+import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
+import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
 /** 구질 칸 하나 — 칸 번호는 0xb6d2c 의 칸 0~5 (5 = 마구) */
 export interface PitchSlotChoice {
@@ -19,6 +22,11 @@ interface PitchSlotPickerProps {
   readonly onDecide: (slot: number) => void
   /** 일시정지 팝업(0x741a0)이 떠 있으면 틱도 키도 멈춘다 */
   readonly isPaused?: boolean
+  /**
+   * 장면 위 구질 목록(0x4c4bc 4c528~)의 재료를 실을 칸 — 칸 0..5 의 구질 번호(+0xfac)와 남은 마구(0xaea11).
+   * 장면(`PitcherSideStage`)이 그림마다 읽는다. 안 넘기면 싣지 않는다
+   */
+  readonly overlay?: { readonly ref: PitchInputOverlayRef; readonly typeNumbers: readonly number[]; readonly magicRemaining: number }
 }
 
 /** 칸 → 키 (0x534d8) */
@@ -36,9 +44,16 @@ const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
  *
  * 견제 '3' · '1' · '7'(0x53548)은 같은 상태의 다른 키라 부르는 쪽이 따로 받는다.
  */
-export function PitchSlotPicker({ choices, onDecide, isPaused = false }: PitchSlotPickerProps) {
+export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay }: PitchSlotPickerProps) {
   /** 0xf 상태 틱 `[+0x2c]` */
   const tickRef = useRef(0)
+  const [tick, setTick] = useState(0)
+  usePublishedOverlay(
+    overlay?.ref,
+    overlay === undefined
+      ? null
+      : ({ kind: '구질', typeNumbers: overlay.typeNumbers, magicRemaining: overlay.magicRemaining, tick } satisfies PitchInputOverlay),
+  )
   /** 고른 칸 (`+0xfc8` 이 서 있는 자리) */
   const [chosen, setChosen] = useState<number | null>(null)
   const chosenRef = useRef<number | null>(null)
@@ -51,6 +66,7 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false }: PitchSl
     const handle = window.setInterval(() => {
       if (isDoneRef.current) return
       tickRef.current += 1
+      setTick(tickRef.current)
       if (!isPitchSelectionDue(tickRef.current, chosenRef.current)) return
       isDoneRef.current = true
       propsRef.current.onDecide(chosenRef.current as number)
