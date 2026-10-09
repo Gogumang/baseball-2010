@@ -2307,6 +2307,8 @@ export function stepDefensePlay(
           (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
         homeRunFlag,
         poleHomeRunFlag: play.suppressed,
+        // 머리에서 경기 멈춤(+0x1993)이 서 있던 그림(레이저 발사 다음 그림) — 0x3f060 이 3f0a4 에서 돌아가 카메라가 안 움직인다
+        cameraFrozen: pausedAtHead,
         fielders,
         runners: runners.map((runner) => runner.state),
         catchKind: tick >= play.actionStartTick && tick <= catchTick ? play.catchKind : null,

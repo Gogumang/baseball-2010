@@ -42,6 +42,8 @@ export interface ViewStateInput {
   /** 플레이 +0x111(홈런) · +0x129(폴 홈런) — 카메라 0x3f0f0 이 본다. 안 주면 거짓 */
   readonly homeRunFlag?: boolean
   readonly poleHomeRunFlag?: boolean
+  /** 이 그림은 카메라가 안 움직인다(머리에서 경기 멈춤 +0x1993 — 0x3f0a4). 안 주면 움직인다 */
+  readonly cameraFrozen?: boolean
   readonly fielders: readonly FielderState[]
   readonly runners: readonly RunnerState[]
   /** 이번 틱에 포구 동작 중이면 그 종류, 아니면 null */
@@ -119,6 +121,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     cameraTarget: null,
     homeRunFlag: input.homeRunFlag === true,
     poleHomeRunFlag: input.poleHomeRunFlag === true,
+    cameraFrozen: input.cameraFrozen === true,
   }
 }
 

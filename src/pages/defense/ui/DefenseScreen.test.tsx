@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import {
@@ -9,6 +9,7 @@ import {
   RUNNER_ACTION,
   type DefenseViewState,
 } from '@/pages/defense/lib/defenseView'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 수비 화면 (R3-field-view 1~6절).
@@ -86,6 +87,31 @@ describe('월드 좌표 → 화면 좌표', () => {
 
     // 6500 월드 = 6500 × 500 / 32500 = 100px
     expect(바닥 - 띄운).toBe(100)
+  })
+})
+
+describe('카메라 멈춤 (0x3f060 — 3f0a4 경기 멈춤 · 3f0b8 관문 G1)', () => {
+  /** 투수판에 맞춘 뒤 대상을 1루 쪽으로 옮겨 갱신 몇 번을 흘린다 — 투수 그림이 화면에서 얼마나 밀렸나 */
+  const 흘린_뒤_투수_x = (cameraFrozen: boolean): number => {
+    vi.useFakeTimers()
+    try {
+      const view = render(<DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 20000, z: 24500 } }} />)
+      view.rerender(
+        <DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 26000, z: 24500 }, cameraFrozen }} />,
+      )
+      for (let i = 0; i < 5; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      return Number.parseInt(screen.getByTestId('defense-fielder-0').style.left, 10)
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  it('멈춘 그림에서는 대상이 바뀌어도 카메라가 그 자리에 선다', () => {
+    expect(흘린_뒤_투수_x(true)).toBe(120)
+  })
+
+  it('안 멈춘 그림이면 따라간다 — 투수가 왼쪽으로 밀린다', () => {
+    expect(흘린_뒤_투수_x(false)).toBeLessThan(120)
   })
 })
 

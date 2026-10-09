@@ -161,7 +161,9 @@ export function DefenseScreen({
   if (cameraRef.current === null) {
     cameraRef.current = { update, state: centerOn(bounds, target) }
   } else if (cameraRef.current.update !== update) {
-    const ticks = Math.min(Math.max(update - cameraRef.current.update, 0), MAX_CATCH_UP_TICKS)
+    // 경기 멈춤(+0x1993) · 판이 닫힌 그림은 0x3f060 이 대상 · 따라가기 앞에서 돌아간다(3f0a4 · 3f0ea) — 카메라가 그 자리에 선다
+    const ticks =
+      state.cameraFrozen === true ? 0 : Math.min(Math.max(update - cameraRef.current.update, 0), MAX_CATCH_UP_TICKS)
     let moved = cameraRef.current.state
     for (let i = 0; i < ticks; i += 1) moved = stepCamera(bounds, moved, target, followPercent)
     cameraRef.current = { update, state: moved }
