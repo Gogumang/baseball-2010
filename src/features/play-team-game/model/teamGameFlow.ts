@@ -425,6 +425,7 @@ export interface TeamGameOptions {
   readonly stageSide?: number
   /**
    * **구장** = 경기 상태 st+0x30 (s8) — 모드 1 은 경기 세우기 `0x30f20` 의 310ec 가 준비 기록 rec+0xc 를 옮겨 적는다.
+   * 대전 8·9 는 `0x30be0` 의 30d98 이 측 1(사람) 팀 번호를 그대로 적는다(`sceneStadium.versusStadiumIdOf`).
    * 있으면 경기 장면 셋업 `0x39fdc` 모드 1·8·9 갈래가 두 구장 객체를 이 값으로 채운다(`rollSceneStadium` — 9 보다 크면
    * 경기 안에서도 rand(0, 10) 둘). 안 넘기면 구장 객체를 안 채운다(그림은 0번 구장 · 기본색, 굴림 없음).
    */
