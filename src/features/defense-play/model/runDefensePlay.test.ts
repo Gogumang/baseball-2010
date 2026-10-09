@@ -2006,3 +2006,77 @@ describe('희생 [sp+8] · 번트 타구 state[0x13] — 정산 a83e2 · a88e0 �
     expect(hasBit(bits, BURST_RESULT_BIT.번트진루)).toBe(false)
   })
 })
+
+describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) · "!"(+0xb8 · +0xc0) (그림만, 난수 차례 그대로)', () => {
+  const 틱 = (결과: DefensePlayResult, tick: number) => 결과.ticks.find((view) => view.tick === tick)
+  const 야수 = (결과: DefensePlayResult, tick: number, slot: number) =>
+    틱(결과, tick)?.fielders.find((fielder) => fielder.slot === slot)
+
+  it('쥐기 전에는 고리가 없고, 투수가 쥔 틱(6)부터 공 가진 야수 칸에 뜬다 — 사람 공격이면 애니 3', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    expect(틱(결과, 5)?.holderMark).toBeNull()
+    expect(틱(결과, 6)?.holderMark).toEqual({ slot: 0, anim: 3 })
+  })
+
+  it('CPU 공격이면 애니 1, 이름 판 선수는 공 가진 칸의 것을 싣는다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      defenseIsCpu: true,
+      offenseIsCpu: true,
+      fielderPlates: [{ name: '선발', pitcherRole: 0 }],
+    })
+    expect(틱(결과, 6)?.holderMark).toEqual({ slot: 0, anim: 1 })
+    expect(틱(결과, 6)?.holderPlate).toEqual({ name: '선발', pitcherRole: 0 })
+  })
+
+  it('펌블한 틱의 그림이 +0xb8 = 6 을 보고, 다음 틱부터 야수 틱이 하나씩 줄인다 (b4280 · a12da)', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+    })
+    expect(야수(결과, 5, 0)?.fumbleTicks).toBe(0)
+    expect(야수(결과, 6, 0)?.fumbleTicks).toBe(6)
+    expect(야수(결과, 7, 0)?.fumbleTicks).toBe(5)
+    expect(야수(결과, 11, 0)?.fumbleTicks).toBe(1)
+    expect(야수(결과, 12, 0)?.fumbleTicks).toBe(0)
+  })
+
+  it('악송구를 던진 야수는 +0xc0 = 4 (a1908)', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      controls: 계속누름('수비', '8'),
+      random: 차례난수([0.9, 0.9, 0, 0.9]),
+    })
+    expect(결과.errantThrow).toBe(true)
+    expect(야수(결과, 9, 0)?.throwErrorTicks).toBe(4)
+    expect(야수(결과, 10, 0)?.throwErrorTicks).toBe(3)
+  })
+
+  it('부착 효과 칸을 더해도 진행 · 난수 차례는 그대로다 — 같은 판을 두 번 돌리면 로그가 같다', () => {
+    const 한번 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+    })
+    const 두번 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+      fielderPlates: [{ name: 'x', pitcherRole: 0 }],
+    })
+    expect(두번.log).toEqual(한번.log)
+  })
+})

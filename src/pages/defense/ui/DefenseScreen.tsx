@@ -33,6 +33,8 @@ import {
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
 import { DefenseHolderMark } from '@/pages/defense/ui/DefenseHolderMark'
+import { DefensePlayerEffect } from '@/pages/defense/ui/DefensePlayerEffect'
+import { playerEffectMarksOf } from '@/pages/defense/lib/playerEffectMarks'
 import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
 
 /** 판정 글자 그림 (game_judge.pzx, 게임+0x101c) */
@@ -233,6 +235,11 @@ export function DefenseScreen({
           isLaserShining={state.laserShiningSlot === fielder.slot}
         />
       ),
+    })),
+    // player_effect 부착 효과(0x43278 · 0x43a0c) — 같은 그리기 목록에 깊이 키로 들어간다. 같은 깊이면 선수 그림 뒤(위)다
+    ...playerEffectMarksOf(state).map((mark) => ({
+      z: mark.zKey,
+      node: <DefensePlayerEffect key={`effect-${mark.key}`} mark={mark} point={screenOf(mark)} update={update} />,
     })),
   ].sort((a, b) => a.z - b.z)
 

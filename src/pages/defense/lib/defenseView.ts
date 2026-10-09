@@ -238,6 +238,19 @@ export interface DefenseFielder {
   readonly aceIndex?: number | null
   /** 수비 팀 번호 0~14 — 그림 색을 갈아 끼우는 데 쓴다. 안 주면 구운 색 그대로다 (C-1) */
   readonly teamIndex?: number | null
+
+  // ── player_effect 부착 효과 칸 (0x43278 이 본다 — `playerEffectMarksOf`). 안 주면 아무것도 안 붙는다 ──
+
+  /** +0xb0 — 가슴 높이 포구(7, 0xa1490) · 점프 캐치(0xe, 0xa14ac) 세터가 세우고 동작 끝(0xa143e)에 지운다 → 애니 4 */
+  readonly catchFlag?: boolean
+  /** +0xb4 동작 잠금 — 필살타법 타구에 맞은 야수 15(0xa1e60). > 0 이면 애니 4 + 머리 위 애니 15 */
+  readonly lockTicks?: number
+  /** +0xb8 — 펌블(b4280)이 6 으로 세우고 야수 틱이 잠금 없을 때 −1. > 0 이면 "!"(애니 13) */
+  readonly fumbleTicks?: number
+  /** +0xc0 — 악송구(a1908) · 원바운드(a17fc) · 아무도 못 받는 송구(예보 b188e, 던진 야수)가 4. > 0 이면 "!" */
+  readonly throwErrorTicks?: number
+  /** 달리기 먼지 자국 (vt6c~vt84) — 이번 그림에 찍을 점(바닥 x, z − y)과 player_effect 프레임. 없으면 null */
+  readonly dustTrail?: { readonly x: number; readonly z: number; readonly frame: number } | null
 }
 
 /** 주자 한 명 */
@@ -259,6 +272,11 @@ export interface DefenseRunner {
   readonly teamIndex?: number | null
   /** +0x96 처리 끝 — 아웃이 됐거나 홈을 밟았다. 작은 지도(0x395f4)가 이 주자를 안 찍는다. 안 주면 아직이다 */
   readonly isFinished?: boolean
+  /**
+   * 슬라이딩 먼지 방향 — 주자 +0xb8(슬라이딩 중, 0x9ff39)이 서 있을 때 0x9ff40 이 주는 1~4, 아니면 0.
+   * 그리기 0x43b18 이 1 → player_effect 애니 5 · 2 → 6 · 3 → 8 · 4 → 7 을 주자 자리에 붙인다.
+   */
+  readonly slideDirection?: number
 }
 
 /**

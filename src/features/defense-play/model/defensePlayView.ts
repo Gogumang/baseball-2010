@@ -8,6 +8,12 @@ import {
 } from '@/entities/fielding/model/fieldGeometry'
 import { NONE, type FielderState, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import {
+  DUST_TRAIL_OFF,
+  slideDustDirectionOf,
+  stepDustTrail,
+  type DustTrailState,
+} from '@/features/defense-play/model/playerEffects'
+import {
   FIELDER_ACTION,
   HOLDER_MARK_ANIM,
   RUNNER_ACTION,
@@ -71,11 +77,27 @@ export interface ViewStateInput {
   readonly holderMark?: HolderMark | null
   /** 고리와 같이 그리는 이름 판에 적을 선수. 고리가 없으면 버린다 */
   readonly holderPlate?: HolderPlate | null
+  /** 칸별 야수 +0xb8(펌블 표시) — 진행기가 센다. 안 주면 0 */
+  readonly fumbleTicks?: readonly number[]
+  /** 칸별 야수 +0xc0(송구 실수 표시) — 진행기가 센다. 안 주면 0 */
+  readonly throwErrorTicks?: readonly number[]
+  /** 주자 칸 → +0x84(직전 목표 루). 슬라이딩 먼지 방향 0x9ff40 의 0x9fe80 이 본다. 안 주면 +0x8c(닿은 루) */
+  readonly previousTargetOf?: (runnerIndex: number) => number
 }
+
+/**
+ * 야수마다의 달리기 먼지 자국 상태 — 그리기가 돌리는 칸이라 스냅샷 한 장마다 한 걸음 간다.
+ * 진행기마다 판 하나 동안 들고 있는 `previousActions` 에 붙여 둔다(따로 넘길 칸을 늘리지 않으려고).
+ */
+const dustTrailsOf = new WeakMap<ActionMemory, DustTrailState[]>()
 
 export function viewStateOf(input: ViewStateInput): DefensePlayView {
   const fielders: DefenseFielder[] = input.fielders.map((fielder) => {
     const action = fielderActionOf(fielder, input)
+    const trails = dustTrailsOf.get(input.previousActions) ?? []
+    dustTrailsOf.set(input.previousActions, trails)
+    const trail = stepDustTrail(trails[fielder.slot] ?? DUST_TRAIL_OFF, action, fielder.position)
+    trails[fielder.slot] = trail.state
     return {
       slot: fielder.slot,
       x: fielder.position.x,
@@ -84,6 +106,15 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       actionTick: tickSince(input.previousActions, `f${fielder.slot}`, action, input.tick),
       aceIndex: aceIndexOf(input.aceIndexes, fielder.slot),
       teamIndex: input.defenseTeamIndex ?? null,
+      // +0xb0 — 세우는 곳이 가슴 높이(7) · 점프(0xe) 포구 세터뿐이고 동작이 끝나면 지운다 (근사: 지금 동작이 그 둘이면 선 것으로 본다)
+      catchFlag: action === FIELDER_ACTION.catchChest || action === FIELDER_ACTION.jumpCatch,
+      lockTicks: fielder.actionLockTicks,
+      fumbleTicks: input.fumbleTicks?.[fielder.slot] ?? 0,
+      throwErrorTicks: input.throwErrorTicks?.[fielder.slot] ?? 0,
+      dustTrail:
+        trail.mark === null
+          ? null
+          : { x: trail.mark.point.x, z: trail.mark.point.z - trail.mark.point.y, frame: trail.mark.frame },
     }
   })
 
@@ -102,6 +133,10 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       teamIndex: input.offenseTeamIndex ?? null,
       // +0x96 = 아웃 또는 홈 밟음 (`runnerFates` — 웹 isOut 은 아웃만이라 scored 를 더한다)
       isFinished: runner.isOut || runner.scored,
+      // 0x43b0a: 주자 +0xb8(슬라이딩 중)이면 0x9ff40 방향
+      slideDirection: runner.sliding
+        ? slideDustDirectionOf(runner, input.previousTargetOf?.(runner.index) ?? runner.startBase)
+        : 0,
     }
   })
 

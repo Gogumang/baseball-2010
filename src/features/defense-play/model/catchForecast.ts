@@ -54,6 +54,11 @@ export interface CatchForecast {
    * AI 0xb 로 공점(aa4 − 2)의 (x, 0, z) 에 간다(+0x90). 점프 · 슬라이딩 틱은 최소에 안 든다. 아니면 null
    */
   readonly fenceChasePoint: WorldPoint | null
+  /**
+   * 두 번째 패스(b1878)로 넘어갔나 — 그 자리 b188a~b1892 가 **공 가진 야수(+0x130, 0xb0c90)의 +0xc0 = 4** 를 적는다.
+   * 그림 0x438c4 의 "!"(애니 13)만 본다. `secondPass` 를 안 준 예보(a = 1)는 늘 거짓
+   */
+  readonly secondPassStarted: boolean
 }
 
 /** 아무도 못 잡을 때 원본이 쓰는 큰 값 (플레이 +0x11c 초기값) */
@@ -209,6 +214,7 @@ export function forecastCatch(
     earliestCatchTick: ticks.length === 0 ? NO_CATCH_TICK : Math.min(...ticks),
     point: trajectory.pointAt(choice.catchTick),
     fenceChasePoint: fenceChasePointOf(trajectory, table),
+    secondPassStarted: options.secondPass !== undefined && !firstPass,
   }
 }
 
