@@ -90,7 +90,7 @@ describe('월드 좌표 → 화면 좌표', () => {
   })
 })
 
-describe('카메라 멈춤 (0x3f060 — 3f0a4 경기 멈춤 · 3f0b8 관문 G1)', () => {
+describe('카메라 — 진입 맞춤 0x46418 · 멈춤 0x3f060(3f0a4 경기 멈춤 · 3f0b8 관문 G1)', () => {
   /** 투수판에 맞춘 뒤 대상을 1루 쪽으로 옮겨 갱신 몇 번을 흘린다 — 투수 그림이 화면에서 얼마나 밀렸나 */
   const 흘린_뒤_투수_x = (cameraFrozen: boolean): number => {
     vi.useFakeTimers()
@@ -105,6 +105,12 @@ describe('카메라 멈춤 (0x3f060 — 3f0a4 경기 멈춤 · 3f0b8 관문 G1)'
       vi.useRealTimers()
     }
   }
+
+  it('진입 맞춤(466e0~46708)은 공 (x, z) 다 — 높이를 안 뺀다', () => {
+    띄우기({ ...기본_상태, ball: { x: 20000, z: 24500, height: 6500, isFlying: true } })
+    // 높이를 뺐다면 카메라가 100px 위를 봐 투수가 296 에 놓였을 것이다
+    expect(screen.getByTestId('defense-fielder-0').style.top).toBe('196px')
+  })
 
   it('멈춘 그림에서는 대상이 바뀌어도 카메라가 그 자리에 선다', () => {
     expect(흘린_뒤_투수_x(true)).toBe(120)

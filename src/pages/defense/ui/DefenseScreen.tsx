@@ -157,9 +157,11 @@ export function DefenseScreen({
   const target = cameraTargetOf(state)
 
   // 진입 때는 즉시 가운데 맞춤(vt10, 0x466d0), 그 뒤로는 갱신마다 followPercent 씩 따라간다.
+  // 진입 0x46418 의 맞춤(466e0~46708)은 공 점 0xa25d4 의 **(x, z)** 다 — 갱신 0x3f060 과 달리 높이를 안 뺀다.
+  // (따로 정한 대상 `cameraTarget` 이 있으면 그것 — 원본 진입에는 없는 칸이라 상태 0x18 · 시험용이다)
   const cameraRef = useRef<{ update: number; state: CameraState } | null>(null)
   if (cameraRef.current === null) {
-    cameraRef.current = { update, state: centerOn(bounds, target) }
+    cameraRef.current = { update, state: centerOn(bounds, state.cameraTarget ?? { x: state.ball.x, z: state.ball.z }) }
   } else if (cameraRef.current.update !== update) {
     // 경기 멈춤(+0x1993) · 판이 닫힌 그림은 0x3f060 이 대상 · 따라가기 앞에서 돌아간다(3f0a4 · 3f0ea) — 카메라가 그 자리에 선다
     const ticks =
