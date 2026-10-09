@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
@@ -35,6 +37,8 @@ export interface NariMatchInfoScreenProps {
   readonly onCancel: () => void
   /** '4'/왼 → 143 내 팀(장면+0x164 = 1) · '6'/오른 → 143 상대 팀(0). 안 넘기면 키를 안 받는다 */
   readonly onEntry?: (isMyTeam: boolean) => void
+  /** 바탕 — 142 진입 0x1c46c 의 무대를 0x5fd04 가 흐려 떠 둔 그림(나리 틀 0x16928 의 `0x581dc(스킨, 0, 0)`). 없으면 바탕 없음 */
+  readonly stage?: MatchInfoStadiumState | null
 }
 
 /**
@@ -48,7 +52,7 @@ export interface NariMatchInfoScreenProps {
  * ⚠️ 미해결: 0x63b15 넷째 인자(이전 ≠ 143)의 줄 나타남 애니는 안 옮겼다. 화면 밀기(0xbdae9 종류 8)는 라우트가 `NariScreenPush` 로 건다.
  */
 export function NariMatchInfoScreen({
-  lines, myTeamId, opponentTeamId, playerSide, edition, gamePoint, onStart, onCancel, onEntry,
+  lines, myTeamId, opponentTeamId, playerSide, edition, gamePoint, onStart, onCancel, onEntry, stage = null,
 }: NariMatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -86,6 +90,7 @@ export function NariMatchInfoScreen({
 
   return (
     <RawScreen>
+      <MatchInfoStadiumBackdrop stage={stage} />
       {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
       {[
         { anchor: anchorA, frame: 157 },

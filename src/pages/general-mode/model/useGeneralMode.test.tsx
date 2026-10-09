@@ -338,6 +338,18 @@ describe('22 진입 0x314b0 의 무대 구장 0x78664(무대, st+0x30) — 구�
     // 기록 rec+0xc 는 그대로 12 — 굴린 값은 무대에만 들어간다
     expect(result.current.flow.setup.stadiumId).toBe(12)
     expect(random.rand(0, 0x7fffffff)).toBe(따로.rand(0, 0x7fffffff))
+    // 0x5fd04 의 바탕 — 구장은 굴린 값, 줄은 표 0xce9d8[12] = 9 (굴린 값이 아니라 st+0x30 첨자)
+    expect(result.current.matchInfoStage).toMatchObject({ stadium: 구장, fieldPalette: 9, gameMode: 1 })
+  })
+
+  it('경기정보 바탕 — 측 0 · 측 1 팀 아이콘 · 하늘 줄 = 측 0 팀 mod 6 (0x783b0 모드 1)', () => {
+    const { result } = 경기정보까지(3)
+    const { setup } = result.current.flow
+    const side0 = setup.playerSide === 0 ? setup.userTeamId : setup.aiTeamId
+    const side1 = setup.playerSide === 0 ? setup.aiTeamId : setup.userTeamId
+    expect(result.current.matchInfoStage).toEqual({
+      stadium: 3, fieldPalette: 2, skyRow: side0 % 6, side0TeamId: side0, side1TeamId: side1, gameMode: 1,
+    })
   })
 
   it('23 에서 돌아올 때는 무대를 새로 안 만든다 (314c8 → 3163c)', () => {

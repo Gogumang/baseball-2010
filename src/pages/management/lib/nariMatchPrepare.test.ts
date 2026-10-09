@@ -3,7 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
   cupMatchInfoOf,
-  NO_NARI_ACE, batterMatchInfoOf, nariGameMatchOfSave, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
+  NO_NARI_ACE, batterMatchInfoOf, nariGameMatchOfSave, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage, rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -87,6 +87,27 @@ describe('142 구장 0x78664 — 홈 팀 > 9 일 때만 rand(0, 10)', () => {
     expect(calls).toBe(0)
     expect(rollNariMatchStadium(random, 10)).toBe(5)
     expect(calls).toBe(1)
+  })
+})
+
+describe('142 경기정보 바탕 무대 — 0x78664 · 0x78688 · 0x783b0', () => {
+  it('정규 — 홈(측 1) 팀이 구장 · 줄은 표 0xd377c · 하늘 줄은 나리 저장 +0xb2 mod 6 · 굴림 없음', () => {
+    let calls = 0
+    const random: RandomPort = { rand: (min) => { calls += 1; return min }, rand9d: () => 0 }
+    const stage = rollNariMatchInfoStage(random, { mode: 4, myTeamId: 3, opponentTeamId: 7, mySide: 1, dayCounter: 8 })
+    expect(stage).toEqual({ stadium: 3, fieldPalette: 2, skyRow: 2, side0TeamId: 7, side1TeamId: 3, gameMode: 4 })
+    expect(calls).toBe(0)
+    // 원정이면 상대 홈 — 표[7] = 0
+    expect(rollNariMatchInfoStage(random, { mode: 3, myTeamId: 3, opponentTeamId: 7, mySide: 0, dayCounter: 0 }))
+      .toMatchObject({ stadium: 7, fieldPalette: 0, side0TeamId: 3, side1TeamId: 7 })
+  })
+
+  it('대회 — 대표팀 홈이라 rand(0, 10) 한 번, 그 구장으로 줄을 읽는다', () => {
+    const calls: [number, number][] = []
+    const random: RandomPort = { rand: (min, max) => { calls.push([min, max]); return 6 }, rand9d: () => 0 }
+    const stage = rollNariMatchInfoStage(random, { mode: 4, myTeamId: 10, opponentTeamId: 11, mySide: 1, dayCounter: 0 })
+    expect(calls).toEqual([[0, 10]])
+    expect(stage).toMatchObject({ stadium: 6, fieldPalette: null, side1TeamId: 10 })
   })
 })
 

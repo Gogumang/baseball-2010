@@ -164,7 +164,8 @@ import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium } from '@/pages/management/lib/nariMatchPrepare'
+import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage } from '@/pages/management/lib/nariMatchPrepare'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import {
   nariTeamRecordOf, nariTeamsOf, recordMatchAcesOf, recordTeamAcesOf, seatNariMatchAces,
 } from '@/entities/career/model/nariTeamRecord'
@@ -245,6 +246,8 @@ export interface PitcherLeagueSession {
   readonly nextGameFromManagement: boolean
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄 */
   readonly matchAces: NariMatchAces | null
+  /** 142 진입 0x1c46c 가 세운 무대로 0x5fd04 가 떠 둔 경기정보 바탕 (`rollNariMatchInfoStage`). 142 에 들어온 적이 없으면 null */
+  readonly matchInfoStage: MatchInfoStadiumState | null
   /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
   readonly entryView: NariEntryView | null
   /** 지금 경기를 세울 옵션. 경기 장면이 아니면 null */
@@ -1141,6 +1144,7 @@ export function usePitcherLeagueSession(
 
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 */
   const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
+  const [matchInfoStage, setMatchInfoStage] = useState<MatchInfoStadiumState | null>(null)
   /**
    * 장면+0x288 — 142 의 마선수 넣기를 장면마다 한 번만 (1c566~1c572 · 1c668). 장면 셋업 0xfb7c 가 0 으로 둔다 →
    * 이 세션이 서는 때(이어하기)와 경기 뒤(`finishGame`)에 내린다.
@@ -1173,9 +1177,20 @@ export function usePitcherLeagueSession(
         }
       })
     }
+    // 1c7ae~1c87c — 무대 · 구장 0x78664(무대, 홈 팀) · 0x5fd04. 리그 팀은 0~9 라 굴리지 않는다(마선수 굴림 뒤 자리)
+    if (career !== null) {
+      const options = pitcherGameOptionsOf(career, { gaugeSettingOn, throwModeManual })
+      setMatchInfoStage(rollNariMatchInfoStage(random, {
+        mode: PITCHER_LEAGUE_MODE,
+        myTeamId: career.teamId,
+        opponentTeamId: options.opponentTeamId,
+        mySide: options.playerSide,
+        dayCounter: options.dayCounter,
+      }))
+    }
     setEntryView(null)
     setScene('경기준비')
-  }, [commitWith, openedAces, random])
+  }, [career, commitWith, gaugeSettingOn, openedAces, random, throwModeManual])
 
   /**
    * 경기 뒤 정산 — 성적·스태미나·전적을 넣고, 같은 날 나머지 네 경기를 돌린 뒤
@@ -2109,6 +2124,7 @@ export function usePitcherLeagueSession(
     scene,
     nextGameFromManagement,
     matchAces,
+    matchInfoStage,
     entryView: scene === '경기준비' ? entryView : null,
     gameOptions,
     shopTab,
@@ -2255,7 +2271,14 @@ export function usePitcherLeagueSession(
           }))
         }
         matchPreparedRef.current = true
-        rollNariMatchStadium(random, nationalCupSideOf(cup, matchup.myTeam) === 1 ? matchup.myTeam : matchup.opponent)
+        setMatchInfoStage(rollNariMatchInfoStage(random, {
+          mode: PITCHER_LEAGUE_MODE,
+          myTeamId: matchup.myTeam,
+          opponentTeamId: matchup.opponent,
+          mySide: nationalCupSideOf(cup, matchup.myTeam),
+          // 대회 중 나리 저장 +0xb2 = L+0x32 = 대회 날짜
+          dayCounter: cup.day,
+        }))
         setEntryView(null)
         setMatchAces(null)
         setCupView(null)

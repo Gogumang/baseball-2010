@@ -324,6 +324,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             isRespinning={session.isRespinning}
             userStarterName={session.userStarterName}
             cpuMatchInfo={session.cpuMatchInfo}
+            // 22 진입 0x314b0 → 0x5fd04 가 떠 둔 구장 바탕
+            stage={session.matchInfoStage}
             onStart={actions.start}
             onOpenSettings={actions.openSettings}
             onRespin={actions.respin}

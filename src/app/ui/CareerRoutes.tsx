@@ -349,7 +349,7 @@ export function CareerRoutes({
       return (
         <NariScreenPush view={pushView}>
           <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-            playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint}
+            playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint} stage={session.matchInfoStage}
             onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
         </NariScreenPush>
       )
