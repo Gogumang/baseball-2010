@@ -2,6 +2,8 @@ import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROTATION_SIZE, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel } from '@/entities/mission/model/aceLevel'
+import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -154,6 +156,25 @@ export interface SeasonEntryInput {
   readonly acePitcherId: number
   /** 0x6548 이 넣은 마타자 0..4 (없으면 −1) */
   readonly aceBatterId: number
+  /**
+   * 마선수 레벨 열 칸(전역 `mgr[0x13a..0x143]`, `useAceLevels().levels`) — 마선수 두 줄의 능력치 `0xb6415(rec, k, 1)` 첫 단계
+   * 레벨 배율(b6438 `v · 0xd88aa[mgr[0x13a + 순번]] / 100`)이 본다. 안 넘기면 모두 Lv1
+   */
+  readonly aceLevels?: Readonly<Record<number, number>> | undefined
+}
+
+/**
+ * 마선수 줄의 칸 값 — 0xe0 상세 창 도형이 다른 줄과 같이 `0xb6415(레코드, k, 1)` 을 읽는다(`playerFaceOf` 주석). 마선수 레코드는
+ * 0xb521c · 0xb53f0 이 XlsACE 행을 통째 베낀 것이라 레벨 배율 → 장비 니블(모두 0) → 장착 스킬(+0x14) 단계를 먹는다
+ * (`aceRecordAbilityAtLevel`)
+ */
+function aceFaceAbilityOf(
+  ace: AcePlayer,
+  order: number,
+  levels: Readonly<Record<number, number>> | undefined,
+): readonly number[] {
+  const { hit, power, defense, run } = aceRecordAbilityAtLevel(ace, aceLevelOf(levels, aceLevelSlotOf(ace.role, order + 1)))
+  return [hit, power, defense, run]
 }
 
 /** 0xe0 에 들어왔을 때 편집기 목록 — 로테이션을 돈 투수 배열과 마선수 두 칸을 끼운 모양 */
@@ -175,16 +196,21 @@ export function seasonEntryListsOf(input: SeasonEntryInput): SeasonEntryLists {
   )
   const acePitcher = ACE_PITCHERS[input.acePitcherId]
   if (acePitcher !== undefined) {
-    const { hit, power, defense, run } = acePitcher.ability
     pitchers = seatAce(pitchers, ACE_PITCHER_SLOT, {
-      name: acePitcher.name, ability: [hit, power, defense, run], isAce: true, rosterIndex: NOT_IN_ROSTER,
+      name: acePitcher.name,
+      ability: aceFaceAbilityOf(acePitcher, input.acePitcherId, input.aceLevels),
+      isAce: true,
+      rosterIndex: NOT_IN_ROSTER,
     })
   }
   const aceBatter = ACE_BATTERS[input.aceBatterId]
   if (aceBatter !== undefined) {
-    const { hit, power, defense, run } = aceBatter.ability
     batters = seatAce(batters, ACE_BATTER_SLOT, {
-      name: aceBatter.name, ability: [hit, power, defense, run], isAce: true, position: 0, rosterIndex: NOT_IN_ROSTER,
+      name: aceBatter.name,
+      ability: aceFaceAbilityOf(aceBatter, input.aceBatterId, input.aceLevels),
+      isAce: true,
+      position: 0,
+      rosterIndex: NOT_IN_ROSTER,
     })
   }
   return { batters, pitchers }
