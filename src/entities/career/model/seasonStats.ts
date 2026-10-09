@@ -51,6 +51,17 @@ export function recordAtBat(
   }
 }
 
+/**
+ * **레코드 +0x20~+0x2c 줄을 뺀 값** — 정산 0xa8024 가 타자 게이트 sp+0x34 = 0xa56dc(ctx, 지금 타자, 0) 가 참일 때만 올리는 칸:
+ * +0x20 타수(a887e) · +0x22 안타(a84b2) · +0x24 2루타(a8556) · +0x26 3루타(a8592) · +0x28 홈런(a85e0) · +0x2a 타점(a8974) ·
+ * +0x2c 도루(a8362 · c1a42). 모드 3·4 갈래 0xa571c 는 포스트시즌(시즌 객체 +0xb4)이면 거짓이라 이 칸들이 안 오른다.
+ * 웹만 세는 칸(경기 · 타석 · 볼넷 · 삼진 — 레코드에 자리가 없다)은 그대로 둔다.
+ */
+export function withoutRecordLine(stats: SeasonStats): SeasonStats {
+  const { stolenBases: _gated, ...rest } = stats
+  return { ...rest, atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, runsBattedIn: 0 }
+}
+
 export function recordGamePlayed(stats: SeasonStats): SeasonStats {
   return { ...stats, games: stats.games + 1 }
 }

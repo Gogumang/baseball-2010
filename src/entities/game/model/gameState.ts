@@ -2,6 +2,8 @@ import { BALANCE } from '@/shared/config/original/balance'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
+import { EMPTY_BASE_RUNNERS, effectiveRunnersOf, runnersAfterPlay } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
 
 export const INNINGS_PER_GAME = 9
 /*
@@ -79,6 +81,11 @@ export interface GameState {
   readonly half: InningHalf
   readonly outs: number
   readonly bases: BaseState
+  /**
+   * **루에 선 주자의 신원**(공격 팀 타순 칸) — 원본 주자 목록(sim+0x80, `baseRunners.ts`). 루 상황(`bases`)과 어긋나거나 없으면
+   * (옛 저장 · 신원을 안 고친 길) 예전 근사(지금 타순에서 거꾸로 센다)로 본다 — `runnersOfGame`.
+   */
+  readonly runners?: BaseRunners
   readonly ourScore: number
   readonly opponentScore: number
   /** 우리 팀 타순 커서. 이닝이 바뀌어도 이어진다. */
@@ -225,16 +232,30 @@ export function applyAtBatOutcome(
   game: GameState,
   outcome: AtBatOutcome,
   precomputed?: AdvanceResult,
+  /**
+   * 주자 신원 — 간이 타석처럼 이미 셈한 신원(`runners`)이나, 수비 진행기 판의 살아남은 주자(`survivorsFromBase`).
+   * 안 주면 결과 종류로 타자가 나갔는지 보고 앞선 주자부터 앉힌다(`runnersAfterPlay`).
+   */
+  runnerHint?: RunnerHint,
 ): GameState {
   if (game.isFinished || game.half !== ourHalfOf(game)) return game
 
   const advance = precomputed ?? advanceRunners(game.bases, outcome, game.outs)
   const outs = game.outs + advance.outsAdded
+  const runners =
+    runnerHint?.runners ??
+    runnersAfterPlay(runnersOfGame(game), advance.bases, {
+      batter: battingSlotOf(game.battingOrderIndex),
+      batterReached: outcome.kind === '안타' || outcome.kind === '볼넷' || outcome.kind === '사구',
+      runsScored: advance.runsScored,
+      ...(runnerHint?.survivorsFromBase === undefined ? {} : { survivorsFromBase: runnerHint.survivorsFromBase }),
+    })
   const afterAtBat: GameState = withInningRuns(
     {
       ...game,
       outs,
       bases: advance.bases,
+      runners,
       ourScore: game.ourScore + advance.runsScored,
       battingOrderIndex: (game.battingOrderIndex + 1) % BATTING_ORDER_SIZE,
     },
@@ -253,6 +274,25 @@ export function applyAtBatOutcome(
   return game.half === '초' ? endTopHalf(afterAtBat) : endBottomHalf(afterAtBat)
 }
 
+/** `applyAtBatOutcome` 의 주자 신원 실마리 */
+export interface RunnerHint {
+  readonly runners?: BaseRunners
+  readonly survivorsFromBase?: readonly number[]
+}
+
+/** 타순 커서 → 타순 칸 (0~8) */
+function battingSlotOf(order: number): number {
+  return ((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+}
+
+/**
+ * 지금 루에 선 주자의 신원(공격 팀 타순 칸) — 들고 있는 신원이 루 상황과 맞으면 그것, 아니면 예전 근사(지금 타순 커서에서
+ * 거꾸로 b 번째가 b 루). 투수편 거울(`pitcherGameState`)처럼 상대 공격이면 `order` 에 상대 타순 커서를 넘긴다.
+ */
+export function runnersOfGame(game: GameState, order = game.battingOrderIndex): BaseRunners {
+  return effectiveRunnersOf(game.bases, game.runners, (ordersBack) => battingSlotOf(order - ordersBack))
+}
+
 /** 경기 상태를 0xb68fc 가 보는 칸으로 — 측으로 원정 · 홈 점수를 가른다. `outs` 를 주면 그 아웃 수로 본다 */
 export function endSituationOf(game: GameState, outs = game.outs): GameEndSituation {
   return { inning: game.inning, half: game.half, outs, awayScore: awayScoreOf(game), homeScore: homeScoreOf(game) }
@@ -265,7 +305,7 @@ export function endSituationOf(game: GameState, outs = game.outs): GameEndSituat
 function endTopHalf(game: GameState): GameState {
   const isOver = isGameOverAt(endSituationOf(game, OUTS_PER_HALF_INNING))
 
-  return withFinalOffenseSide({ ...game, half: '말', outs: 0, bases: EMPTY_BASES, isFinished: isOver }, 0)
+  return withFinalOffenseSide({ ...game, half: '말', outs: 0, bases: EMPTY_BASES, runners: EMPTY_BASE_RUNNERS, isFinished: isOver }, 0)
 }
 
 /**
@@ -282,6 +322,7 @@ function endBottomHalf(game: GameState): GameState {
       half: '초',
       outs: 0,
       bases: EMPTY_BASES,
+      runners: EMPTY_BASE_RUNNERS,
       isFinished: isLastInning,
     },
     1,

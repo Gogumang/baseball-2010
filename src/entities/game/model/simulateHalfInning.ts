@@ -1,5 +1,6 @@
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
+import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher, QuickAtBatSituation } from '@/entities/game/model/quickAtBat'
 import { runnerCountOf } from '@/entities/game/model/baseState'
@@ -441,6 +442,8 @@ export function* simulateHalfInningTicks(
   swing?: HalfInningSwingContext,
 ): Generator<HalfInningTick, HalfInningResult, void> {
   let bases = EMPTY_BASES
+  /** 루에 선 주자의 타순 커서 — 원본 주자 목록(sim+0x80, `baseRunners.ts`). 반 이닝은 빈 루에서 시작한다 */
+  let runners = EMPTY_BASE_RUNNERS
   let outs = 0
   let runs = 0
   let hits = 0
@@ -586,12 +589,10 @@ export function* simulateHalfInningTicks(
         },
         bases,
         outs,
-        /**
-         * ⚠️ 주자 신원 근사(`playQuickPlateAppearance`) — 반 이닝 엔진은 타순 커서에서 거꾸로 센다
-         * (팀 경기 주자 판의 `teamGameFlow.runAbilitiesOnBaseOf` 도 같은 근사를 쓴다). 이닝 첫 타석처럼
-         * 거꾸로 셀 타자가 모자라면 0번으로 막는다.
-         */
-        runnerRunAt: (ordersBack) => batterOn(Math.max(0, order - ordersBack)).run,
+        runners,
+        batterId: order,
+        // 도루 판정의 앞선 주자 주력 — 그 주자 타순 커서에 선 타자(c19a0)
+        runnerRunOf: (cursor) => batterOn(cursor).run,
         ...(defense === undefined || mound === undefined
           ? {}
           : {
@@ -605,9 +606,8 @@ export function* simulateHalfInningTicks(
       random,
     )
     const play = appearance.play
-    // 0xc1a42 — 루를 옮긴 주자마다 (같은 근사로 타순 커서 − 거꾸로 센 수)
-    for (const ordersBack of appearance.stolenRunners) {
-      const cursor = Math.max(0, order - ordersBack)
+    // 0xc1a42 — 루를 옮긴 주자마다 (그 주자의 타순 커서)
+    for (const cursor of appearance.stolenRunners) {
       stolenBases.push({
         battingOrderIndex: cursor,
         ...(lineup === undefined ? {} : { rosterSlot: rosterSlotAt(lineup, cursor) }),
@@ -636,6 +636,7 @@ export function* simulateHalfInningTicks(
     // 볼넷 진루 · 도루 · 땅볼 진루는 `playQuickPlateAppearance` 가 먹였다
     const advanced = appearance.advance
     bases = advanced.bases
+    runners = appearance.runners
     outs += advanced.outsAdded
     // 3아웃이 되는 순간 들어오던 주자는 득점으로 치지 않는다
     const scored = outs >= OUTS_PER_INNING && advanced.outsAdded > 0 ? 0 : advanced.runsScored

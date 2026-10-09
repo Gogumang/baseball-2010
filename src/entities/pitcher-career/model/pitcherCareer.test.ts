@@ -18,7 +18,9 @@ import {
   setPitcherSkillEquipped,
   startNextPitcherSeason,
   unclampedGamePitcherAbilityOf,
+  withPitcherGameLeagueRecords,
 } from '@/entities/pitcher-career/model/pitcherCareer'
+import { leagueBatterIdOf } from '@/entities/league/model/leaguePlayerStats'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
@@ -341,5 +343,20 @@ describe('0xa4f60 의 −2 는 국가대항전(S+0x12c)만 — 포스트시즌�
     const 시리즈 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7]), wins: [1, 0] as [number, number] }
     const 준비 = prepareMyPitcherMatch({ ...선발, gamesPlayed: 45, postseason: 시리즈 })
     expect(준비.positionCode).toBe(1)
+  })
+})
+
+describe('투수편 사람 경기 도루 — 리그 타자 기록표 +0x2c (0xa56dc 모드 3 갈래 0xa571c)', () => {
+  it('정규시즌이면 쌓고 포스트시즌(+0xb4)이면 거른다', () => {
+    const career = createPitcherCareer('테스트')
+    const steals = [{ teamId: 3, battingOrderIndex: 5 }, { teamId: 3, battingOrderIndex: 5 }]
+    const id = leagueBatterIdOf(3, 5)
+    const regular = withPitcherGameLeagueRecords(career, career, undefined, steals)
+    expect(regular.leaguePlayerStats.batters[id]?.steals).toBe(2)
+    const postseason: PitcherCareer = {
+      ...career,
+      postseason: { round: '플레이오프', qualifiers: [0, 1, 2, 3], teams: [1, 0], wins: [1, 0], winsNeeded: 3, champion: null },
+    }
+    expect(withPitcherGameLeagueRecords(postseason, career, undefined, steals).leaguePlayerStats.batters[id]).toBeUndefined()
   })
 })

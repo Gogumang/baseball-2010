@@ -9,6 +9,10 @@ import {
   resultOf,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
+import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import { runnersOfGame } from '@/entities/game/model/gameState'
+import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -75,7 +79,7 @@ import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
-import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
+import { chargedRunsOfFates, runnerFatesWithoutPlay, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
@@ -585,6 +589,13 @@ export interface PitcherGameProgress {
    * 간이 타석마다 아웃·실점·삼진을 그 순간 마운드 투수에게 쌓고, 투구 수는 교체·경기 끝에 그 마운드의 `pitches` 를 얹는다.
    */
   readonly pitcherLines: readonly GamePitcherLine[]
+  /**
+   * **리그 타자 기록표 도루 +0x2c 재료** — 모드 3 의 기록 게이트 0xa56dc(점프표 0xd8204 → 0xa571c)는 시즌 객체 0x1fa2d 의
+   * +0x12c(국가대항전) · +0xb4(포스트시즌)가 0 이면 마선수(0xb633d)만 거짓이라, 투수편 정규시즌 경기도 주자 레코드 +0x2c 를 올린다:
+   * 간이 타석 도루(0xc1a42~0xc1a98 — 주자마다 0xa56dc(ctx, 주자, 0)) · 사람 수비의 도루 판(0xa8340~0xa83c0 — 게이트는 지금 타자).
+   * 포스트시즌 · 국가대항전 거르기는 커리어에 먹이는 쪽이 한다. 옛 진행은 없다
+   */
+  readonly leagueStolenBases?: readonly LeagueStolenBase[]
   /** 우리·상대 지금 투수의 **이번 이닝 실점 A**(`+0x284`) — 반 이닝 교대 `0xa5b00`·교체 `0xaec64` 가 0 으로 */
   readonly ourInningRunsAllowed: number
   readonly opponentInningRunsAllowed: number
@@ -1331,6 +1342,25 @@ function arrivePitcherPitch(
   return applyPitcherArrival(graded, runOpenedPitchArrivalPlay(opened))
 }
 
+/**
+ * 도루 판(종류 5) 정산의 리그 기록 — 0xa8024 0xa8340~0xa83c0 (R8 5-2): 잡힌 도루 주자가 하나라도 있으면 아무도 안 쌓고, 게이트
+ * sp+0x34 = 0xa56dc(ctx, **지금 타자**, 0)(마타자 타석이면 아무도 안 쌓인다 — 원본 그대로), 루를 옮긴 도루 주자 r 마다 마선수가
+ * 아니면 +0x2c. 주자는 판 앞 루의 신원(`GameState.runners`)이다.
+ */
+function withStealPlayLeagueSteals(
+  next: PitcherGameProgress,
+  before: PitcherGameProgress,
+  play: PitchArrivalPlay,
+): PitcherGameProgress {
+  if (play.kind !== 5 || play.result.caughtFrom.length > 0 || play.result.stolenFrom.length === 0) return next
+  if (rosterSlotAt(before.opponentLineup, before.opponentOrderIndex) === ACE_BATTER_ROSTER_SLOT) return next
+  const runners = runnersOfGame(before.game, before.opponentOrderIndex)
+  const stolen = play.result.stolenFrom
+    .map((from) => runnerOnBase(runners, from as 1 | 2 | 3))
+    .filter((runner): runner is number => runner !== null)
+  return withLeagueSteals(next, false, stolen)
+}
+
 /** 다 돈 공 도착 판을 경기에 먹인다 — `arrivePitcherPitch` 의 뒷부분. 실시간으로 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다 */
 function applyPitcherArrival(progress: PitcherGameProgress, play: PitchArrivalPlay): PitcherPitchArrival {
   const before = progress.game
@@ -1341,6 +1371,7 @@ function applyPitcherArrival(progress: PitcherGameProgress, play: PitchArrivalPl
 
   const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
   let next = withMyRunnerPlay(opened, play.result, settles, play.shownLive === true).progress
+  next = withStealPlayLeagueSteals(next, progress, play)
   // 0xa77f0 — 24(도루 저지)는 수비 계열이라 사람 수비에서 지난다. 8(도루)은 공격 계열이라 버려진다
   const recordIds = play.recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true }))
   if (recordIds.length > 0 && recordsAllowed(next)) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
@@ -1376,16 +1407,18 @@ function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] 
 }
 
 /**
- * 루별 주자 주루 — 0 은 지금 타자(낫아웃 타자주자).
- * ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다 — 1루 = 직전 타자 · 2루 = 그 앞 · 3루 = 그 앞으로
- * 상대 타순을 거꾸로 센다 (타자편 `gameFlow`·팀 경기와 같은 근사). 대타가 들어온 칸은 지금 그 칸의 로스터 선수다.
+ * 루별 주자 주루 — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 — 상대 타순 칸)대로
+ * 그 칸에 지금 선 로스터 선수다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(상대 타순을 거꾸로 센다)로 본다.
  */
 function runAbilitiesOnBaseOf(progress: PitcherGameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
-  const runOf = (slotsBack: number) => {
-    const slot = (((progress.opponentOrderIndex - slotsBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-    return opponentBatterAbility(progress.options, rosterSlotAt(progress.opponentLineup, slot)).run
+  const runOf = (slot: number) => opponentBatterAbility(progress.options, rosterSlotAt(progress.opponentLineup, slot)).run
+  const runners = runnersOfGame(progress.game, progress.opponentOrderIndex)
+  const runs: Partial<Record<0 | 1 | 2 | 3, number>> = { 0: runOf(progress.opponentOrderIndex) }
+  for (const base of [1, 2, 3] as const) {
+    const runner = runnerOnBase(runners, base)
+    if (runner !== null) runs[base] = runOf(runner)
   }
-  return { 0: runOf(0), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
+  return runs
 }
 
 /** 인플레이가 아닌 타석 끝(삼진·볼넷·사구·홈런) — 0xae24c 의 보통 길 뒤 0x17(밀어내기)·정산 0xa8024 */
@@ -1625,7 +1658,9 @@ function withMyRunnerPlay(
     defenseScene: result.scene,
   }
   if (!changed) return { progress: next, changed }
-  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
+  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult, {
+    survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
+  })
   let decision = progress.decision
   for (let run = 1; run <= applied.runsScored; run += 1) {
     decision = applyRunScoredFor(progress, decision, run, true)
@@ -1752,6 +1787,8 @@ function applyDefensivePlay(
    * 있으면 이 타석은 간이 엔진 타석이다(결과 링 아웃 = 5).
    */
   quickAdvance?: AdvanceResult,
+  /** 간이 엔진 타석이 민 주자 신원(상대 타순 칸) — `quickAdvance` 와 함께 */
+  quickRunners?: BaseRunners,
 ): PitcherGameProgress {
   const before = progress.game
   const advanceResult =
@@ -1759,7 +1796,17 @@ function applyDefensivePlay(
     quickAdvance ??
     // 간이 엔진이 돌린 타석 — **원본 간이 엔진에는 희생플라이가 없다** (E-2 확정)
     advanceRunners(before.bases, outcome, before.outs, { quickEngine: true })
-  const applied = applyOpponentAtBat(before, progress.opponentOrderIndex, outcome, advanceResult)
+  const applied = applyOpponentAtBat(
+    before,
+    progress.opponentOrderIndex,
+    outcome,
+    advanceResult,
+    defensePlay !== null
+      ? { survivorsFromBase: survivorsFromBaseOfFates(defensePlay.runnerFates) }
+      : quickRunners === undefined
+        ? undefined
+        : { runners: quickRunners },
+  )
   const slot = progress.opponentOrderIndex
   const previousLog = progress.opponentBatterLogs[slot] ?? { hits: 0, homeRuns: 0 }
   const hit = isHit(outcome)
@@ -2608,9 +2655,10 @@ function playDefensiveAtBat(
       },
       bases: progress.game.bases,
       outs: progress.game.outs,
-      // ⚠️ 주자 신원 근사 — 루 b 의 주자를 상대 타순에서 거꾸로 센다
-      runnerRunAt: (ordersBack) =>
-        quickBatterOfTeam(options, false, rosterSlotAt(progress.opponentLineup, orderBackOf(order, ordersBack))).run,
+      // 루에 선 주자의 신원(상대 타순 칸) — 도루 판정은 앞선 주자의 주력
+      runners: runnersOfGame(progress.game, order),
+      batterId: lineupSlotOf(order),
+      runnerRunOf: (runner) => quickBatterOfTeam(options, false, rosterSlotAt(progress.opponentLineup, runner)).run,
       beforePitch: pitched.beforePitch,
     },
     random,
@@ -2633,6 +2681,7 @@ function playDefensiveAtBat(
     null,
     null,
     appearance.advance,
+    appearance.runners,
   )
   const runs = played.game.opponentScore - before.opponentScore
   const halfChanged = played.game.half !== before.half || played.game.inning !== before.inning
@@ -2656,8 +2705,10 @@ function playDefensiveAtBat(
       ? 0
       : Math.min(MAXIMUM_PITCHER_COUNTER, progress.ourInningRunsAllowed + runs),
   }
+  // 0xc1a42 — 간이 타석 도루 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c (상대 팀 주자)
+  const withSteals = withLeagueSteals(result, false, appearance.stolenRunners)
   relay?.push(
-    relayTickOf(result, before, {
+    relayTickOf(withSteals, before, {
       ours: false,
       orderIndex: progress.opponentOrderIndex,
       outcome: play.outcome,
@@ -2667,7 +2718,7 @@ function playDefensiveAtBat(
       balls: play.balls,
     }),
   )
-  return result
+  return withSteals
 }
 
 /** 동료 타석 — 투수편 주인공은 타석에 서지 않으므로 아홉 칸 모두 간이 엔진이 돈다 */
@@ -2703,9 +2754,10 @@ function playTeammateAtBat(
       },
       bases: before.bases,
       outs: before.outs,
-      // ⚠️ 주자 신원 근사 — 루 b 의 주자를 우리 타순에서 거꾸로 센다
-      runnerRunAt: (ordersBack) =>
-        quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, orderBackOf(order, ordersBack))).run,
+      // 루에 선 주자의 신원(우리 타순 칸) — 도루 판정은 앞선 주자의 주력
+      runners: runnersOfGame(before, order),
+      batterId: lineupSlotOf(order),
+      runnerRunOf: (runner) => quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, runner)).run,
       beforePitch: pitched.beforePitch,
     },
     random,
@@ -2713,8 +2765,8 @@ function playTeammateAtBat(
   const play = appearance.play
   const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이다 — 희생플라이가 없다 (E-2 확정). 볼넷 모든 주자 +1 · 도루 · 땅볼 진루는
-  // `playQuickPlateAppearance` 가 먹였다. 투수편 레코드 표에는 타자 도루 칸이 없다(리그 기록표를 안 든다)
-  const game = applyAtBatOutcome(before, outcome, appearance.advance)
+  // `playQuickPlateAppearance` 가 먹였다. 도루 +0x2c 는 리그 기록 재료로 (`leagueStolenBases`)
+  const game = applyAtBatOutcome(before, outcome, appearance.advance, { runners: appearance.runners })
   const runs = game.ourScore - before.ourScore
   let decision = progress.decision
   for (let run = 1; run <= runs; run += 1) {
@@ -2772,8 +2824,10 @@ function playTeammateAtBat(
     }`,
     false,
   )
+  // 0xc1a42 — 간이 타석 도루 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c (우리 팀 주자)
+  const withSteals = withLeagueSteals(result, true, appearance.stolenRunners)
   relay?.push(
-    relayTickOf(result, before, {
+    relayTickOf(withSteals, before, {
       ours: true,
       orderIndex: slot,
       outcome,
@@ -2783,7 +2837,7 @@ function playTeammateAtBat(
       balls: play.balls,
     }),
   )
-  return result
+  return withSteals
 }
 
 /* ── 자동 타석의 교체 · 0xc1ba4 ──────────────────────────────────────────────── */
@@ -2791,9 +2845,20 @@ function playTeammateAtBat(
 /** 원본 실점 카운터 A·B 는 99 에서 자른다 (P7 E1) */
 const MAXIMUM_PITCHER_COUNTER = 99
 
-/** 타순 커서에서 거꾸로 k 번째 타순 칸 — 타순은 아홉 칸을 돈다 */
-function orderBackOf(order: number, ordersBack: number): number {
-  return (((order - ordersBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+/**
+ * 도루한 주자(타순 칸)들을 리그 기록 재료로 얹는다 — 0xa56dc 모드 3 갈래는 마선수(0xb633d)만 거른다(마타자 칸 빼기).
+ * 주자의 선수는 그 타순 칸에 지금 선 명단 선수다.
+ */
+function withLeagueSteals(progress: PitcherGameProgress, ours: boolean, runners: readonly number[]): PitcherGameProgress {
+  const lineup = ours ? progress.ourLineup : progress.opponentLineup
+  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
+  const steals: LeagueStolenBase[] = []
+  for (const runner of runners) {
+    const rosterSlot = rosterSlotAt(lineup, runner)
+    if (rosterSlot === ACE_BATTER_ROSTER_SLOT) continue
+    steals.push({ teamId, battingOrderIndex: rosterSlot })
+  }
+  return steals.length === 0 ? progress : { ...progress, leagueStolenBases: [...(progress.leagueStolenBases ?? []), ...steals] }
 }
 
 /**
@@ -3205,6 +3270,8 @@ export interface PitcherGameSummary {
    * 판정이 내 투수(`MY_PITCHER_NUMBER`)를 가리키면 부르는 쪽이 건너뛴다(내 기록은 `seasonDelta`).
    */
   readonly leaguePitchers: GameLeaguePitchers
+  /** 리그 타자 기록표 도루 +0x2c 재료 (`PitcherGameProgress.leagueStolenBases`) — 정규시즌만 쌓는 것은 부르는 쪽 몫 */
+  readonly leagueStolenBases: readonly LeagueStolenBase[]
 }
 
 /**
@@ -3297,6 +3364,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
       ours: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
       opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
     },
+    leagueStolenBases: progress.leagueStolenBases ?? [],
     leaguePitchers: {
       lines: chargeCpuPitcherLine(
         chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {

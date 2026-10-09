@@ -17,6 +17,8 @@ import {
   resolveBenchClearing,
   throwOpponentPitch,
   withAutoStopLateInningSetup,
+  ourRunnerRunsOnBaseOf,
+  runnerRunAbilitiesOf,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -1547,5 +1549,23 @@ describe('내 타석의 파울 각 공도 수비 판을 돈다 — startPlayerFo
     }
     expect(파울).toBeGreaterThan(0)
     expect(뜬공아웃).toBeGreaterThan(0)
+  })
+})
+
+describe('루에 선 주자의 신원 — 원본 주자 목록대로 (0xa93ac · 0xc0fb4)', () => {
+  it('내가 루에 서면 주력은 내 선수 능력치다(0xb570d(ctx, 3, 나, …)) — 내 칸 로스터 줄 값이 아니다', () => {
+    const random = createSeededRandom(1)
+    const progress = startGame(random, 0, PLAYER_BATTING_ORDER_INDEX + 1, undefined, undefined, 0, false, undefined, undefined, undefined, 777)
+    expect(progress.myRunAbility).toBe(777)
+    const me = progress.game.playerOrderIndex
+    // 내가 볼넷으로 나가 1루 — 신원이 내 타순 칸이다
+    const walked = applyPlayerOutcome(progress, { kind: '볼넷' }, random)
+    const mineOnFirst: GameProgress = {
+      ...walked,
+      game: { ...walked.game, bases: { first: true, second: false, third: false }, runners: { first: me, second: null, third: null } },
+    }
+    expect(ourRunnerRunsOnBaseOf(mineOnFirst)[1]).toBe(777)
+    // 타석 화면 0x35b94 상태 0xe 주루 칸도 같은 값 — 빈 루는 안 채운다
+    expect(runnerRunAbilitiesOf(mineOnFirst)).toEqual({ first: 777 })
   })
 })

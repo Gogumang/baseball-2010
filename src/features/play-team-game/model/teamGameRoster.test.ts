@@ -50,3 +50,19 @@ describe('명단 능력치는 레코드의 0xb6414(rec, k, 1) — 장비 니블 
     expect(pitchers[1]!.ability).toEqual(teamPitchers(0)[0]!.ability)
   })
 })
+
+describe('명단 타자의 장착 스킬 비트 — 0xab214 가 0xb62b4(타자, n)로 레코드 +0x14 를 읽는다', () => {
+  it('붙박이 표 줄은 Xls 행 비트, 기록으로 선 영입 선수는 그 기록의 비트를 든다', () => {
+    expect(rosterEntryBattersOf(0).map((batter) => batter.skillBits)).toEqual(teamBatters(0).map((player) => player.skillBits))
+    const order: TeamEntryOrder = {
+      batters: [
+        { rosterSlot: 3, position: 1 },
+        { rosterSlot: -1, position: 2, record: { name: '명전', ability: [500, 500, 500, 500], recordId: 0xb4, skillBits: 1 << 22 } },
+      ],
+      pitchers: [0],
+    }
+    const entry = entryBattersOfOrder(0, order)
+    expect(entry[0]?.skillBits).toBe(teamBatters(0)[3]?.skillBits)
+    expect(entry[1]?.skillBits).toBe(1 << 22)
+  })
+})

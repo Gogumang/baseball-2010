@@ -38,6 +38,7 @@ import {
   EMPTY_SEASON_STATS,
   mergeStats,
   recordGamePlayed,
+  withoutRecordLine,
 } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
@@ -871,9 +872,10 @@ export function gainAbility(
 
 /** 경기 결과를 커리어에 반영한다. G포인트 지급과 체력 회복이 함께 일어난다. */
 export function applyGameResult(career: PlayerCareer, summary: GameSummary): PlayerCareer {
-  // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만 내 도루를 센다
-  const { stolenBases: _postseasonStolenBases, ...statsWithoutSteals } = summary.stats
-  const playedStats = recordGamePlayed(career.postseason === null ? summary.stats : statsWithoutSteals)
+  // 레코드 +0x20~+0x2c(타수 · 안타 · 2루타 · 3루타 · 홈런 · 타점 · 도루)는 정산 0xa8024 의 타자 게이트 0xa56dc 가 참일 때만 오르고,
+  // 모드 4 갈래 0xa571c 는 포스트시즌(시즌 객체 +0xb4)이면 거짓이다 — 포스트시즌 경기는 내 타격 줄을 시즌 · 통산에 안 쌓는다
+  const regularSeason = career.postseason === null
+  const playedStats = recordGamePlayed(regularSeason ? summary.stats : withoutRecordLine(summary.stats))
 
   return {
     ...career,
@@ -897,12 +899,13 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 정규시즌 경기만 (0xa56dc 의 포스트시즌 거짓)
     leaguePlayerStats: recordHumanGamePitchers(
       recordLeagueStolenBases(
-        recordLeaguePlateAppearances(career.leaguePlayerStats, summary.leaguePlateAppearances ?? []),
+        // 동료 · 상대 타석의 레코드 줄도 같은 게이트(0xa56dc — 타자마다)라 포스트시즌이면 안 쌓인다
+        recordLeaguePlateAppearances(career.leaguePlayerStats, regularSeason ? summary.leaguePlateAppearances ?? [] : []),
         // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만
-        career.postseason === null ? summary.leagueStolenBases ?? [] : [],
+        regularSeason ? summary.leagueStolenBases ?? [] : [],
       ),
       summary.leaguePitchers,
-      career.postseason === null,
+      regularSeason,
     ),
     // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 남는다 — 준비 0x1c46c 가 g == 0 이면 열 팀을 10000 으로 채운 뒤다
     ...(summary.pitcherStaminas === undefined

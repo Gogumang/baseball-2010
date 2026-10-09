@@ -1,5 +1,5 @@
 import { applyAtBatOutcome, opponentHalfOf } from '@/entities/game/model/gameState'
-import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
+import type { GameState, PlayerSide, RunnerHint } from '@/entities/game/model/gameState'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import type { AdvanceResult } from '@/entities/game/model/baseState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -56,12 +56,14 @@ export function applyOpponentAtBat(
   opponentOrderIndex: number,
   outcome: AtBatOutcome,
   precomputed?: AdvanceResult,
+  /** 주자 신원 실마리 (`applyAtBatOutcome`) — 상대 타순 칸으로 든다 */
+  runnerHint?: RunnerHint,
 ): OpponentAtBatResult {
   if (game.isFinished || game.half !== opponentHalfOf(game)) {
     return { game, opponentOrderIndex, runsScored: 0, outsAdded: 0 }
   }
   const advance = precomputed ?? advanceRunners(game.bases, outcome, game.outs)
-  const next = applyAtBatOutcome(mirrorOf(game, opponentOrderIndex), outcome, advance)
+  const next = applyAtBatOutcome(mirrorOf(game, opponentOrderIndex), outcome, advance, runnerHint)
   return {
     game: {
       ...next,
@@ -92,8 +94,9 @@ export function applyOpponentRunnerPlay(
   game: GameState,
   opponentOrderIndex: number,
   advance: AdvanceResult,
+  runnerHint?: RunnerHint,
 ): OpponentAtBatResult {
-  const applied = applyOpponentAtBat(game, opponentOrderIndex, RUNNER_PLAY_PLACEHOLDER, advance)
+  const applied = applyOpponentAtBat(game, opponentOrderIndex, RUNNER_PLAY_PLACEHOLDER, advance, runnerHint)
   return { ...applied, opponentOrderIndex }
 }
 

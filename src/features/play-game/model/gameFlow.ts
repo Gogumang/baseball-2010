@@ -19,6 +19,8 @@ import {
   withInningRuns,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
+import { runnersOfGame } from '@/entities/game/model/gameState'
+import { runnerOnBase } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
@@ -117,7 +119,7 @@ import {
   tryTriggerBurst,
 } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
-import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
+import { batterRunnerSafeOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -387,6 +389,11 @@ export interface GameProgress {
    * (`arrivePitch`) 도루 판(종류 5)을 열거나 그냥 지워진다. 인플레이 타구면 타구 판의 리드(0x3d7b8)가 이 칸을 본다.
    */
   readonly stealingFrom: readonly StealBase[]
+  /**
+   * **내 선수의 주력** `0xb570d(ctx, 3, 나, 1, 0x5a, 1)` — 모드 4 는 팀 정액 · 코치를 안 타 피로 없는 실효값(`effectiveAbilityOf`)이다.
+   * 루에 선 주자가 나면(간이 타석 도루 판정 c19a0 · 주자 판 주루) 이 값을 쓴다. 없으면(옛 시험) 내 타순 칸 로스터 줄 값.
+   */
+  readonly myRunAbility?: number
 }
 
 /** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
@@ -476,6 +483,8 @@ export function startGame(
    * 안 넘기면 붙박이 표 차례에 마타자를 넣는다(예전 그대로).
    */
   ourRecordLineup?: QuickLineup,
+  /** 내 선수의 주력 (`GameProgress.myRunAbility`) — 첫 내 차례 앞 동료 타석의 도루 판정부터 본다 */
+  myRunAbility?: number,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
   const opponentAces = aces?.opponent ?? NO_GAME_ACES
@@ -541,6 +550,7 @@ export function startGame(
     halfInningBoard: null,
     specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
     stealingFrom: [],
+    ...(myRunAbility === undefined ? {} : { myRunAbility }),
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
@@ -943,7 +953,13 @@ function finishPlayerOutcome(
    */
   playback: DefensePlayResult | null,
 ): GameProgress {
-  const nextGame = applyAtBatOutcome(progress.game, outcome, defensePlay?.advance)
+  // 수비 진행기를 돈 판이면 살아남은 주자로 신원을 앉힌다
+  const nextGame = applyAtBatOutcome(
+    progress.game,
+    outcome,
+    defensePlay?.advance,
+    defensePlay === null ? undefined : { survivorsFromBase: survivorsFromBaseOfFates(defensePlay.runnerFates) },
+  )
   const runsBattedIn = nextGame.ourScore - progress.game.ourScore
   const outsInPlay =
     defensePlay?.advance.outsAdded ??
@@ -1179,7 +1195,39 @@ export function opponentMoundOf(progress: GameProgress): {
  * 누상 주자가 누구인지 `GameState` 가 들고 있지 않은 것도 `stealBase` 와 같은 한계다.
  */
 function runnerRunAbilityOf(progress: GameProgress): number {
-  return teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, progress.game.battingOrderIndex)).run
+  return ourRunnerRunOf(progress, lineupSlotOf(progress.game.battingOrderIndex))
+}
+
+/**
+ * 우리 타순 칸 주자의 주력 `0xb570d(ctx, 3, 주자, 1, 0x5a, 1)` — 내 칸이면 내 선수 능력치(`myRunAbility`), 그 밖은 명단 칸 선수.
+ */
+function ourRunnerRunOf(progress: GameProgress, orderSlot: number): number {
+  if (orderSlot === progress.game.playerOrderIndex && progress.myRunAbility !== undefined) return progress.myRunAbility
+  return teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, orderSlot)).run
+}
+
+/** 루별 주자 주력 (루 1~3, 빈 루는 없다) — 0x35b94 상태 0xe 주루 칸 · 주자 판이 읽는다 */
+export function ourRunnerRunsOnBaseOf(progress: GameProgress): Partial<Record<1 | 2 | 3, number>> {
+  const runners = runnersOfGame(progress.game)
+  const runs: Partial<Record<1 | 2 | 3, number>> = {}
+  for (const base of [1, 2, 3] as const) {
+    const runner = runnerOnBase(runners, base)
+    if (runner !== null) runs[base] = ourRunnerRunOf(progress, runner)
+  }
+  return runs
+}
+
+/**
+ * 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74)이 0xb570d(ctx, 3, 주자, 1, 90, 1) 로 읽는다.
+ * 루에 선 내가면 내 선수 능력치(`myRunAbility`)다.
+ */
+export function runnerRunAbilitiesOf(progress: GameProgress): Partial<Record<'first' | 'second' | 'third', number>> {
+  const runs = ourRunnerRunsOnBaseOf(progress)
+  return {
+    ...(runs[1] === undefined ? {} : { first: runs[1] }),
+    ...(runs[2] === undefined ? {} : { second: runs[2] }),
+    ...(runs[3] === undefined ? {} : { third: runs[3] }),
+  }
 }
 
 /**
@@ -1477,7 +1525,9 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
     }
   }
   const bases: BaseState = { first: placed[0] === true, second: placed[1] === true, third: placed[2] === true }
-  return { ...progress, game: { ...game, outs, bases } }
+  // 굴려 세운 루에 누가 섰는지는 옮기지 않았다 — 신원을 버려 예전 근사(타순을 거꾸로 센다)로 본다
+  const { runners: _unknownRunners, ...rest } = game
+  return { ...progress, game: { ...rest, outs, bases } }
 }
 
 /**
@@ -1745,8 +1795,6 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   const mound = progress.opponentMound
   const pitched = perPitchDrainOf(opponentDefense, mound)
   const order = progress.game.battingOrderIndex
-  /** 지금 타순에서 거꾸로 k 번째 타순 칸 (타순은 아홉 칸을 돈다) */
-  const orderBack = (ordersBack: number) => (((order - ordersBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
   const appearance = playQuickPlateAppearance(
     {
       batter: teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order)),
@@ -1764,8 +1812,10 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       },
       bases: progress.game.bases,
       outs: progress.game.outs,
-      // ⚠️ 주자 신원 근사 — 루 b 의 주자를 타순에서 거꾸로 센다(`runAbilitiesOnBaseOf` 와 같다). 내 칸도 그 칸 로스터 줄의 주력이다
-      runnerRunAt: (ordersBack) => teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, orderBack(ordersBack))).run,
+      // 루에 선 주자의 신원(우리 타순 칸) — 내가 루에 있으면 내 주력
+      runners: runnersOfGame(progress.game),
+      batterId: lineupSlotOf(order),
+      runnerRunOf: (runner) => ourRunnerRunOf(progress, runner),
       beforePitch: pitched.beforePitch,
     },
     random,
@@ -1774,10 +1824,10 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이 돌린다 — **간이 엔진에는 희생플라이가 없다** (E-2 확정).
   // 볼넷(모든 주자 +1, c1918) · 도루(c1982) · 땅볼 진루(0xc15b8)는 `playQuickPlateAppearance` 가 먹였다
-  const game = applyAtBatOutcome(progress.game, outcome, appearance.advance)
+  const game = applyAtBatOutcome(progress.game, outcome, appearance.advance, { runners: appearance.runners })
   // 0xc1a42~0xc1a98 — 도루에 성공한 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c. 내가 루에 있었으면 내 기록(124 타자 열 0x40)으로,
   // 동료는 리그 기록표로(마타자 칸은 summary 가 뺀다). 포스트시즌 거르기는 커리어에 먹이는 쪽이 한다
-  const stolenSlots = appearance.stolenRunners.map(orderBack)
+  const stolenSlots = appearance.stolenRunners
   const myStolenBases = stolenSlots.filter((stolenSlot) => stolenSlot === progress.game.playerOrderIndex).length
   const teammateSteals = stolenSlots
     .filter((stolenSlot) => stolenSlot !== progress.game.playerOrderIndex)
@@ -2299,15 +2349,11 @@ function withoutSteal(progress: GameProgress): GameProgress {
 }
 
 /**
- * 루별 주자 주루 — ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다. 1루 주자 = 직전 타자 ·
- * 2루 = 그 앞 · 3루 = 그 앞으로 타순을 거꾸로 세어 꺼낸다 (예전 도루 표 굴림과 같은 근사).
+ * 루별 주자 주루 — 루에 선 주자의 신원(`GameState.runners`, 원본 주자 목록)대로 그 주자의 주력. 0 = 지금 타자(나).
+ * 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(타순을 거꾸로 센다)로 본다.
  */
 function runAbilitiesOnBaseOf(progress: GameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
-  const runOf = (slotsBack: number) => {
-    const slot = (progress.game.battingOrderIndex - slotsBack + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-    return teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, slot)).run
-  }
-  return { 0: runnerRunAbilityOf(progress), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
+  return { 0: runnerRunAbilityOf(progress), ...ourRunnerRunsOnBaseOf(progress) }
 }
 
 /**
@@ -2327,7 +2373,9 @@ function withRunnerOnlyPlay(progress: GameProgress, result: DefensePlayResult): 
   if (!changed) return next
   // 결과 코드는 precomputed 가 있으면 안 읽는다
   const game: GameState = {
-    ...applyAtBatOutcome(before, RUNNER_PLAY_OUTCOME_PLACEHOLDER, advance),
+    ...applyAtBatOutcome(before, RUNNER_PLAY_OUTCOME_PLACEHOLDER, advance, {
+      survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
+    }),
     battingOrderIndex: before.battingOrderIndex,
   }
   const runs = game.ourScore - before.ourScore
