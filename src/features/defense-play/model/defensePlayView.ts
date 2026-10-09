@@ -82,6 +82,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       slot: fielder.slot,
       x: fielder.position.x,
       z: fielder.position.z,
+      // 그림 · 결과 판 자리는 (x, z − y) — 야수 높이는 원본에서도 늘 0 이다(`DefenseFielder.y`)
+      y: fielder.position.y,
       action,
       actionTick: tickSince(input.previousActions, `f${fielder.slot}`, action, input.tick),
       aceIndex: aceIndexOf(input.aceIndexes, fielder.slot),

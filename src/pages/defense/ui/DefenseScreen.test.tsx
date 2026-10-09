@@ -52,6 +52,17 @@ describe('월드 좌표 → 화면 좌표', () => {
     expect(pitcher.style.top).toBe('196px')
   })
 
+  it('야수 그림 · 결과 판 자리는 (x, z − y) 다 (0x43278 432f0 · 0x46844)', () => {
+    띄우기({
+      ...기본_상태,
+      fielders: [{ slot: 0, x: 20000, z: 24500, y: 6500, action: FIELDER_ACTION.stand, actionTick: 0 }],
+      judgeText: { frame: 0, dx: 0, dy: 0, holderSlot: 0 },
+    })
+    // 6500 월드 = 100px 위 — 카메라는 공(같은 점)에 맞아 있어 땅점은 196 이다
+    expect(screen.getByTestId('defense-fielder-0').style.top).toBe('96px')
+    expect(screen.getByTestId('defense-judge-text').style.top).toBe(`${96 - 30}px`)
+  })
+
   it('1루 쪽(x 큰 쪽) 야수는 오른쪽에 놓인다', () => {
     띄우기({
       ...기본_상태,

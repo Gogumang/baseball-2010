@@ -186,6 +186,8 @@ export function DefenseScreen({
     x: toScreenX(point.x) + offset.x,
     y: toScreenY(point.z) + offset.y,
   })
+  /** 야수 그림 자리 — 0x43278(432f0~43318)이 0xb94b4(카메라, x, z − y)로 투영한다. 결과 판 0x46844 도 이 자리를 쓴다 */
+  const fielderScreenOf = (fielder: DefenseFielder) => screenOf({ x: fielder.x, z: fielder.z - (fielder.y ?? 0) })
 
   /**
    * 레이저 줌 펀치 0xbb84c → 0xbb43c — 원본 사각형(화면 W·100/s × H·100/s, 중심 = 바탕 좌표 + 카메라 오프셋, 화면 안으로 자름)을
@@ -206,7 +208,7 @@ export function DefenseScreen({
   /** 결과 판 0x46844 의 자리 — 공 가진 야수(+0x1088)의 그림 자리, 없으면 화면 가운데 (46866) */
   const popupPointOf = (holderSlot: number) => {
     const holder = state.fielders.find((fielder) => fielder.slot === holderSlot)
-    return holder === undefined ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 } : screenOf(holder)
+    return holder === undefined ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 } : fielderScreenOf(holder)
   }
   const bigOut = state.bigOut ?? null
   const bigOutPoint = bigOut === null ? null : popupPointOf(bigOut.holderSlot)
@@ -239,7 +241,7 @@ export function DefenseScreen({
           <Fielder
             key={`fielder-${fielder.slot}`}
             fielder={fielder}
-            point={screenOf(fielder)}
+            point={fielderScreenOf(fielder)}
             // 레이저 송구 반짝임은 **공 쥔 야수 한 명**만 빨갛게 한다 (0x43406~0x4342c)
             isLaserShining={state.laserShiningSlot === fielder.slot}
           />

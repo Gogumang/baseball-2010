@@ -245,6 +245,12 @@ export interface DefenseFielder {
   readonly slot: number
   readonly x: number
   readonly z: number
+  /**
+   * 높이(야수 +0x24). 그림 · 결과 판 자리는 (x, z − y) 다(0x43278 의 432f0~43318 — 0xb94b4(카메라, x, z − y)). 안 주면 0.
+   * 원본에서도 늘 0 이다 — 이동체 틱 0xbf0dc 의 높이 식(bf204~bf226: y = +0x18 + v·t − g·t²/2, 0 아래 자름)에 수직 속도
+   * v(+0x40)를 넣는 0xbec78(속도, v)를 야수는 v = 0 으로만 부른다(a0dca 판 시작 · a155c 송구 뒤). 그래도 식대로 싣는다.
+   */
+  readonly y?: number
   /** FIELDER_ACTION */
   readonly action: number
   /** 그 동작이 걸린 뒤 흐른 갱신 횟수 (한 칸 = 1틱) */
