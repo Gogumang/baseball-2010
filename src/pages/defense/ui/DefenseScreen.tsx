@@ -34,6 +34,7 @@ import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
 import { DefenseHolderMark } from '@/pages/defense/ui/DefenseHolderMark'
 import { DefensePlayerEffect } from '@/pages/defense/ui/DefensePlayerEffect'
+import { DefenseLaserTrail } from '@/pages/defense/ui/DefenseLaserTrail'
 import { playerEffectMarksOf } from '@/pages/defense/lib/playerEffectMarks'
 import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
 
@@ -299,6 +300,21 @@ export function DefenseScreen({
         <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
           <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
         </div>
+
+        {/* 레이저 잔상 0x37076 — 장면 +0x1991 동안 궤적 첫 점에서 공까지 */}
+        {state.laserTrailFrom != null && (
+          <DefenseLaserTrail
+            folder={BALL_FRAMES}
+            frame={ballFrameOf(state.ball.height)}
+            from={(() => {
+              const ground = screenOf(state.laserTrailFrom)
+              return { x: ground.x, y: ground.y - toScreenY(state.laserTrailFrom.height) }
+            })()}
+            ball={ballPoint}
+            ballHeight={toScreenY(state.ball.height)}
+            ballGroundY={ballGround.y}
+          />
+        )}
 
         {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
         {judgeText !== null && judgeTextPoint !== null && (

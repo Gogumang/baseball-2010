@@ -87,6 +87,8 @@ export interface ViewStateInput {
   readonly runnerAceIndexes?: readonly (number | null)[]
   /** 타석 교대 때 실린 주자 마선수 그림 번호 (`loadedRunnerAceOf`) */
   readonly runnerAceSprite?: number | null
+  /** 레이저 잔상(장면 +0x1991)이 서 있으면 지금 공 궤적의 t = 0 점(월드 x · y 높이 · z) */
+  readonly laserTrailFrom?: WorldPoint | null
 }
 
 /**
@@ -157,6 +159,10 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     laserShiningSlot: laserShiningSlotOf(input.laserShiningSlot),
     cameraTarget: null,
     runnerAceSprite: input.runnerAceSprite ?? null,
+    laserTrailFrom:
+      input.laserTrailFrom == null
+        ? null
+        : { x: input.laserTrailFrom.x, z: input.laserTrailFrom.z, height: input.laserTrailFrom.y },
     holderMark: input.holderMark ?? null,
     holderPlate: input.holderMark == null ? null : (input.holderPlate ?? null),
   }

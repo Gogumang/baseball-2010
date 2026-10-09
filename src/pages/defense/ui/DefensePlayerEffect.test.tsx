@@ -67,3 +67,29 @@ describe('마선수 주자 그림 (0x79d10)', () => {
     expect(screen.getByTestId('defense-runner-1').getAttribute('data-folder')).toBe('./sprites/defender/frames')
   })
 })
+
+describe('레이저 잔상 (0x37076)', () => {
+  const 잔상상태 = (height: number): DefenseViewState => ({
+    ball: { x: 20000, z: 24500, height, isFlying: true },
+    fielders: [],
+    runners: [],
+    laserTrailFrom: { x: 20000, z: 30000, height: 0 },
+  })
+
+  it('공이 떠 있으면 공 그림 뒤에 반투명 잔상을 늘어놓는다 — 공에 가까울수록 진하다', async () => {
+    render(<DefenseScreen state={잔상상태(3000)} isRunning={false} />)
+    await act(async () => {})
+    const stamps = screen.getAllByTestId('defense-laser-trail')
+    expect(stamps.length).toBeGreaterThan(1)
+    const levels = stamps.map((stamp) => Number(stamp.getAttribute('data-level')))
+    expect(levels).toEqual([...levels].sort((a, b) => a - b))
+    const ball = screen.getByTestId('defense-ball')
+    expect(ball.compareDocumentPosition(stamps[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('공이 바닥이면(높이 투영 0) 잔상이 없다', async () => {
+    render(<DefenseScreen state={잔상상태(0)} isRunning={false} />)
+    await act(async () => {})
+    expect(screen.queryAllByTestId('defense-laser-trail')).toEqual([])
+  })
+})

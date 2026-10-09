@@ -422,6 +422,11 @@ export interface DefenseViewState {
    */
   readonly runnerAceSprite?: number | null
   /**
+   * **레이저 잔상** (공 그리기 0x36dfc 의 0x37076~0x3724a) — 장면 +0x1991 이 서 있으면 지금 공 궤적의 t = 0 점(0xa25b1(공, 0)).
+   * 화면이 그 점에서 공까지 공 그림을 반투명으로 늘어놓는다(`laserTrailMarksOf`). 없으면 null
+   */
+  readonly laserTrailFrom?: { readonly x: number; readonly z: number; readonly height: number } | null
+  /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
    */

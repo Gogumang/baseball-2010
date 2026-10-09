@@ -823,6 +823,13 @@ export interface DefensePlayState {
    * 던지고 vt64(0) 으로 내린다(내야 → 내야 송구 b2ee6 도 내린다).
    */
   laserArmed: boolean
+  /**
+   * **그림 전용** 장면 +0x1991 — 레이저 발사 0x400bc 가 세우고, 슬롯 2 의 5254c 가 포구 관문 0xb4c9d(동작 시작 틱 − 1 == 공 틱)에서
+   * 내린다(그 그림의 필살 포구 켜기도 건너뛴다). 서 있으면 공 그리기 0x37076 이 잔상을 그린다
+   */
+  laserTrailOn: boolean
+  /** **그림 전용** 지금 공 궤적의 t = 0 점(0xa25b1(공, 0)) — 판 시작 · 다시 쏘기 · 송구가 새 궤적을 깔 때마다 바뀐다 */
+  ballSegmentStart: WorldPoint
   /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1 · 0x441c4 · 0x44398 끝(그리기)이 내린다 */
   gamePaused: boolean
   /**
@@ -1098,6 +1105,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     laserRolled: false,
     laserThrow: false,
     laserArmed: false,
+    laserTrailOn: false,
+    ballSegmentStart: input.trajectory.pointAt(0),
     gamePaused: false,
     // 0x17 진입 0x46418 — 결과 판 타이머 −1. 타구 판은 늘 투구(0x10 · 0x11)를 지나 왔다
     scene: enterDefenseScene(input.scene, true),
@@ -1232,6 +1241,8 @@ export function stepDefensePlay(
   let laserRolled = state.laserRolled
   let laserThrow = state.laserThrow
   let laserArmed = state.laserArmed
+  let laserTrailOn = state.laserTrailOn
+  let ballSegmentStart = state.ballSegmentStart
   let gamePaused = state.gamePaused
   let scene = state.scene
   let deadlyJumpArmed = state.deadlyJumpArmed
@@ -1650,6 +1661,7 @@ export function stepDefensePlay(
     // 뜻을 다 못 읽어 옮기지 않았다 — C 끝(0x44564)이 어차피 지운다
     deadlyJumpArmed = false
     trajectory = spliceTrajectory(trajectory, tick, next)
+    ballSegmentStart = next.pointAt(0)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
     const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
       ...options,
@@ -1915,6 +1927,7 @@ export function stepDefensePlay(
         scene = fireLaser(scene)
         gamePaused = true
         laserArmed = true
+        laserTrailOn = true
         pausedThisTick = true
         // 앞 틱 끝에서 센 G2(52502)는 524e6 뒤라 원본은 부르지 않았다
         endCounter = state.counterBeforeHead
@@ -1928,7 +1941,11 @@ export function stepDefensePlay(
 
     // ── 0d. 필살 포구 연출 켜기 — 슬롯 2 머리 5256c~525dc (관문 G2 52502 가 열리고 판 종류가 마스크 0x58c 밖일 때) ──
     // 플레이+0x1f7 이면 +0x1994(B), 아니고 +0x1f8 이면 +0x1995(C) — 단계가 −1 이면 0. 켜짐 칸은 앞 그림 플레이 틱의 동작 시작이 세웠다
-    if (!play.finished && !DEADLY_FLASH_BLOCKED_PLAY_KINDS.includes(play.kind)) {
+    // 5254c — +0x1991(레이저 잔상) && 0xb4c9d(포구 대기 · 동작 시작 틱 − 1 == 공 틱)면 +0x1991 = 0 · 이 그림의 켜기를 건너뛴다(525de).
+    // 근사: 0xb4c9d 의 vt50 은 "아직 안 쥠" 으로 본다
+    if (laserTrailOn && !play.held && tick === play.actionStartTick - 1) {
+      laserTrailOn = false
+    } else if (!play.finished && !DEADLY_FLASH_BLOCKED_PLAY_KINDS.includes(play.kind)) {
       scene = turnOnDeadlyFlash(scene, { jump: deadlyJumpArmed, slide: deadlySlideArmed })
     }
 
@@ -2387,6 +2404,8 @@ export function stepDefensePlay(
         holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
         fumbleTicks: fumbleMarks,
         throwErrorTicks: throwErrorMarks,
+        // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
+        laserTrailFrom: laserTrailOn ? ballSegmentStart : null,
         runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
         runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
@@ -2789,6 +2808,8 @@ export function stepDefensePlay(
   state.laserRolled = laserRolled
   state.laserThrow = laserThrow
   state.laserArmed = laserArmed
+  state.laserTrailOn = laserTrailOn
+  state.ballSegmentStart = ballSegmentStart
   state.gamePaused = gamePaused
   state.scene = scene
   state.deadlyJumpArmed = deadlyJumpArmed

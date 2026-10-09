@@ -2095,3 +2095,25 @@ describe('마선수 주자 (runnerAces — 0x43aa8 · 0x483a0)', () => {
     expect(첫그림?.runnerAceSprite).toBe(3)
   })
 })
+
+describe('레이저 잔상 칸 (장면 +0x1991 — 그림 0x37076)', () => {
+  it('발사한 그림부터 서고, 받을 야수의 동작 시작 한 틱 전(0xb4c9d)에 내린다 — 송구 뒤에는 송구 첫 점에서 잇는다', () => {
+    let state = startDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(fixturePatternFor(단타)),
+      bases: 주자1루,
+      outs: 0,
+      random: 차례난수([0, 0, 0.999, 0]),
+      controls: 계속누름('수비', '2'),
+    })
+    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '2', isRepeat: false })
+    const F = Number(state.log.find((line) => line.includes('레이저 발사 (0x400bc)'))!.split('틱')[0])
+    const 잔상 = state.ticks.filter((view) => view.laserTrailFrom != null).map((view) => view.tick)
+    expect(잔상[0]).toBe(F)
+    // 연속 구간이고, 송구(F + 2) 뒤에 끝난다
+    expect(잔상).toEqual(Array.from({ length: 잔상.length }, (_, index) => F + index))
+    expect(잔상.at(-1)!).toBeGreaterThan(F + 2)
+    const 송구뒤 = state.ticks.find((view) => view.tick === F + 3)!
+    expect(송구뒤.laserTrailFrom).not.toEqual(state.ticks.find((view) => view.tick === F)!.laserTrailFrom)
+  })
+})
