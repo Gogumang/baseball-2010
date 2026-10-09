@@ -47,7 +47,7 @@ export function PostseasonScreen({
     <>
       <PostseasonBracket series={series} nextLabel="다음" onNext={popup === null ? onConfirm : undefined}
         frame={<ScreenFrame title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'} gamePoint={gamePoint}
-          onBack={null} footer={1} />} />
+          onBack={null} footer={1} slides={false} />} />
       {popup !== null && (
         <MessageBox text={postseasonPopupTextOf(popup)} buttons={['OK']} onAnswer={onClosePopup} />
       )}

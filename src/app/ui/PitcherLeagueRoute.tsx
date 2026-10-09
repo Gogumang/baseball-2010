@@ -188,7 +188,7 @@ export function PitcherLeagueRoute({
             teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
             onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}}
             // 나리 틀 0x16928 은 142~144 면 142 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
-            underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} />
+            underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} slides={false} />
         </NariScreenPush>
       )
     }
@@ -243,7 +243,7 @@ export function PitcherLeagueRoute({
             <SkinBackdrop kind="공무늬" />
             <PitcherStatusBoard career={career} />
             {story.context === '관리' && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
-            <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} />
+            <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} slides={false} />
           </>
         )
       }

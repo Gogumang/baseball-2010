@@ -167,7 +167,7 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {/* 기본정보(119)·칭호(129 — 0x198fc 가 0x166cc 를 먼저 그린다)는 바닥 0x87 "#닉네임"·"0상세정보"·되돌아가기 (0x166f2).
           표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. 120 은 0x16928 "그 밖"이라 5, 그 밖 상태도 5 */}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} />
+        footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false} />
       {/* 106 칸 4 [기록실] — 팝업 0x80(0x19448) → 124(0x116d4 · 0x1463c · 0x16778), 취소는 106 */}
       {menu.overlay === '기록실' && <NariRecordPickPopup onChoose={setRecordPick} onCancel={menu.closeOverlay} />}
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}

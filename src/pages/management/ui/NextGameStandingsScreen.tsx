@@ -40,7 +40,7 @@ export function NextGameStandingsScreen({
     <RawScreen>
       <StandingsWindow league={league} onClose={onConfirm} />
       <ScreenFrame title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'} gamePoint={gamePoint}
-        onBack={isFromManagement ? onCancel : null} />
+        onBack={isFromManagement ? onCancel : null} slides={false} />
     </RawScreen>
   )
 }

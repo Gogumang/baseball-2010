@@ -332,7 +332,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         105 는 메인 메뉴로, 그 아래 화면은 한 단계 위로.
       */}
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} />
+        footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false} />
 
       {/* 106 칸 4 [기록실] — 팝업 0x80(0x19448) → 124(0x116d4 · 0x1463c · 0x16778), 취소는 106 */}
       {isRecordRoom && <NariRecordPickPopup onChoose={setRecordPick} onCancel={menu.closeWindow} />}

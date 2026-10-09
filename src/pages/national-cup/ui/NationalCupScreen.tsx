@@ -198,7 +198,7 @@ export function NationalCupScreen({
         ? <ScreenFrame title="시즌모드" gamePoint={gamePoint}
             // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
             onBack={step === '순위' ? () => setStep('대진') : null} />
-        : <ScreenFrame title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'} gamePoint={gamePoint} onBack={null} footer={5} />}
+        : <ScreenFrame title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'} gamePoint={gamePoint} onBack={null} footer={5} slides={false} />}
 
       {entryPopup !== null && (
         <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />

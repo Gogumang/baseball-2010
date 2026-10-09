@@ -273,7 +273,7 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
           : <RoundedBorder x={layout.numberX} y={rowY(cursorRow)} width={layout.cursorWidth} height={layout.cellHeight}
             color={CURSOR_COLOR} />)}
       </div>
-      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} />
+      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
     </RawScreen>
   )
 }
@@ -353,7 +353,7 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
           )
         })}
       </div>
-      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} />
+      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
     </RawScreen>
   )
 }

@@ -493,3 +493,15 @@ describe('106 칸 4 [기록실] — 팝업 0x80 → 124 (0x116d4 · 0x1463c · 0
     expect(screen.getByRole('group', { name: '순위기록 타자 타율' })).toBeTruthy()
   })
 })
+
+describe('머리띠 미끄러짐 [skin+0x84] — 나리 105 는 세우지 않는다 (0x63b14 를 부르는 그림은 101 · 142 · 145 뿐)', () => {
+  it('관리 화면은 첫 그림부터 머리띠가 다 내려온 자리다', async () => {
+    const { ScreenFrame } = await import('@/widgets/screen-frame/ui/ScreenFrame')
+    const coinTop = () => (screen.getByTestId('머리띠-G').querySelector('[data-badge-coin]') as HTMLElement).style.top
+    const { unmount } = render(<ScreenFrame title="나만의리그타자편" gamePoint={0} onBack={null} slides={false} />)
+    const settled = coinTop()
+    unmount()
+    render(<ManagementScreen {...propsWith({})} />)
+    expect(coinTop()).toBe(settled)
+  })
+})
