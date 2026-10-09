@@ -457,7 +457,20 @@ export function applyOutcome(
   return judgedAtGameEnd(judged, situation.inningEnded ? OUTS_PER_INNING : situation.outs)
 }
 
-/** 시간을 흘린다. 0이 되면 실패다. 투수편도 같은 규칙이다. */
+/**
+ * 시간을 흘린다. **남은 초가 1 이 되는 순간 실패**다 — 실제로 쓸 수 있는 시간은 한도 − 1 초. 투수편도 같은 규칙이다 (직접 재역어셈):
+ * ```
+ * 0xaada4  (장면 갱신 0x52c50 의 52ed0 — 모드 5 · 6 이면 상태를 안 가리고 매 틀)
+ * aadb2    미션 상태 +0x1c == 0(목표 다 참)이면 돌아감 · aadca 상태 = 1
+ * aadf4    시간 한도(레코드 +0xb · +0xc) > 0 일 때만:
+ * aae02      벽시계 0x14005c8 − 시작 [st+0xac] > 1000ms 면 남은 초 [0x1552af0] −1 · 0xa5bb0(시작 다시 잼)
+ * aae38      0xaa940(미션, 1, 남은 초) — 남은 초 > 0 이고 1 ≥ 남은 초면 상태 2(실패) → aae4a 메시지 0x76d
+ * ```
+ * 남은 초는 한 번에 1 씩만 줄어 0 까지 가지 않는다 — 화면의 초도 1 에서 멈춘다.
+ * 시작 시각은 상태 9 갱신 0x3f584 가 적는다(3f718 남은 초 = 한도 · 3f8c0 미션 객체 0xaa57c 상태 1 · 3fa16 0xa5bb0) — 상태 8 의
+ * 동기 적재 **앞**이라, 그 틀 끝 0xaada4 는 적재에 1초가 넘게 걸리면 곧바로 1초를 뺀다(한 틀에 한 번이라 1초뿐).
+ * ⚠️ 웹 로딩 판(`LoadingTip`) 길이는 단말 적재 시간이 아니라 근사라 그 1초는 안 뺀다 — 타이머는 로딩 판이 끝난 뒤부터 센다.
+ */
 export function tick<T extends MissionRun>(run: T, elapsedSeconds: number): T {
   if (run.status !== '진행중' || run.remainingSeconds === null) return run
 
@@ -465,9 +478,12 @@ export function tick<T extends MissionRun>(run: T, elapsedSeconds: number): T {
   return {
     ...run,
     remainingSeconds: remaining,
-    status: remaining <= 0 ? '실패' : '진행중',
+    status: remaining <= LAST_SECOND ? '실패' : '진행중',
   }
 }
+
+/** 0xaa940(미션, 1, 남은 초) — 남은 초가 이 값에 닿으면 실패 */
+const LAST_SECOND = 1
 
 /** 도루할 수 있는가 — 1루 주자가 있고 2루가 비어 있어야 한다 (StrHOWTO[2] 1루→2루) */
 export function canSteal(run: MissionRun): boolean {
