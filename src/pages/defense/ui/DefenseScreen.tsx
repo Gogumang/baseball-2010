@@ -16,7 +16,6 @@ import {
 import {
   BALL_FRAMES,
   DEADLY_EFFECT_FRAMES,
-  DEFENDER_FRAMES,
   DEFENSE_BACKGROUND_HEIGHT,
   DEFENSE_BACKGROUND_URL,
   DEFENSE_BACKGROUND_WIDTH,
@@ -29,6 +28,7 @@ import {
   fielderSpriteOf,
   flashOffsetOf,
   runnerFrameOf,
+  runnerSpriteFolderOf,
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
@@ -222,7 +222,14 @@ export function DefenseScreen({
       .filter((runner) => runner.isVisible !== false)
       .map((runner) => ({
         z: runner.z,
-        node: <Runner key={`runner-${runner.index}`} runner={runner} point={screenOf(runner)} />,
+        node: (
+          <Runner
+            key={`runner-${runner.index}`}
+            runner={runner}
+            point={screenOf(runner)}
+            loadedAce={state.runnerAceSprite ?? null}
+          />
+        ),
       })),
     ...state.fielders.map((fielder) => ({
       z: fielder.z,
@@ -371,23 +378,29 @@ function Fielder({
 function Runner({
   runner,
   point,
+  loadedAce = null,
 }: {
   readonly runner: DefenseRunner
   readonly point: { readonly x: number; readonly y: number }
+  /** 타석 교대 때 실린 주자 마선수 그림 (0x483a0) */
+  readonly loadedAce?: number | null
 }) {
   const frame = runnerFrameOf(runner.action, runner.actionTick, runner.base, runner.isAdvancing)
+  // 0x79d10 — 마선수 주자는 실린 마선수 그림(+0x1c, 팔레트 없음), 아니면 defender(+0xc, 팀 팔레트). 프레임은 둘 다 vt40 날값
+  const sprite = runnerSpriteFolderOf(runner, loadedAce)
   return (
     <div
       className={styles.actor}
       style={{ left: point.x, top: point.y }}
       data-testid={`defense-runner-${runner.index}`}
       data-frame={frame}
+      data-folder={sprite.folder}
     >
-      {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정) */}
+      {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정). 마선수 그림도 같은 125장 짜임이다 */}
       <ActorSprite
-        folder={DEFENDER_FRAMES}
+        folder={sprite.folder}
         frame={frame}
-        paletteIndex={defenderPaletteIndexOf(runner.teamIndex)}
+        paletteIndex={sprite.isAce ? null : defenderPaletteIndexOf(runner.teamIndex)}
       />
     </div>
   )

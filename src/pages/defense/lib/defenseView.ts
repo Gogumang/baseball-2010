@@ -277,6 +277,10 @@ export interface DefenseRunner {
    * 그리기 0x43b18 이 1 → player_effect 애니 5 · 2 → 6 · 3 → 8 · 4 → 7 을 주자 자리에 붙인다.
    */
   readonly slideDirection?: number
+  /**
+   * 주자 +0x9c ≠ −1 — 마선수 주자. 그림은 이 주자의 것이 아니라 장면에 **하나 실린** 그림(`runnerAceSprite`)이다(0x79d10).
+   */
+  readonly isAce?: boolean
 }
 
 /**
@@ -413,6 +417,11 @@ export interface DefenseViewState {
    */
   readonly holderPlate?: HolderPlate | null
   /**
+   * 마선수 주자를 그릴 그림판 — 타석 교대 0x483a0 이 실은 타자 마선수 번호 0~4(`ACE_BATTER_DEFENDER_FRAMES`). 없으면 null.
+   * `isAce` 인 주자는 모두 이 그림 하나로 그린다(원본 그대로) · 팔레트 없음 · 프레임은 vt40 날값 그대로.
+   */
+  readonly runnerAceSprite?: number | null
+  /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
    */
@@ -430,6 +439,20 @@ export function cameraTargetOf(state: DefenseViewState): WorldPoint {
     if (batterRunner !== undefined) return { x: batterRunner.x, z: batterRunner.z }
   }
   return { x: state.ball.x, z: state.ball.z - state.ball.height }
+}
+
+/**
+ * 주자 한 명을 그릴 그림판 (0x79d10) — 마선수 주자(+0x9c ≠ −1)는 실린 마선수 그림(팔레트 없음), 아니면 `defender.pzx`.
+ * 마선수 주자인데 실린 그림이 없으면(웹에서만 나는 경우) 보통 그림으로 둔다.
+ */
+export function runnerSpriteFolderOf(runner: DefenseRunner, loadedAce: number | null | undefined): {
+  readonly folder: string
+  readonly isAce: boolean
+} {
+  if (runner.isAce === true && loadedAce != null && loadedAce >= 0 && loadedAce <= 4) {
+    return { folder: ACE_BATTER_DEFENDER_FRAMES[loadedAce], isAce: true }
+  }
+  return { folder: DEFENDER_FRAMES, isAce: false }
 }
 
 /** 야수 한 명을 그릴 그림판과 프레임 (0x79b48 의 a 갈래 + 프레임 +17) */

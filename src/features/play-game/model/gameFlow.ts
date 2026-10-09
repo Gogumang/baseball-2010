@@ -919,6 +919,8 @@ function defensePlayInputOf(
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
     // 공 가진 야수 이름 판(0x43cb0) — 같은 칸 고르기로 상대 야수 · 지금 마운드 투수
     fielderPlates: opponentFielderPlatesOf(progress),
+    // 마선수 주자 그림(0x79d10 · 적재 0x483a0) — 우리 타자 · 루 위 주자 중 142 가 넣은 마타자 칸
+    runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
     // 이 공이 나는 동안 출발한 도루 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 15·14 + rand(0,9) 틱 몰아 돌린다
     stealingFrom: progress.stealingFrom,
@@ -1224,6 +1226,32 @@ function runnerRunAbilityOf(progress: GameProgress): number {
 function ourRunnerRunOf(progress: GameProgress, orderSlot: number): number {
   if (orderSlot === progress.game.playerOrderIndex && progress.myRunAbility !== undefined) return progress.myRunAbility
   return teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, orderSlot)).run
+}
+
+/**
+ * 우리 타순 칸의 마선수 번호 — 명단 칸이 마타자 칸(`ACE_BATTER_ROSTER_SLOT`)이면 실린 마타자 번호(0xb63a0), 아니면 null.
+ * 내 선수 칸은 마선수가 아니다.
+ */
+function ourOrderAceOf(progress: GameProgress, orderSlot: number): number | null {
+  if (orderSlot === progress.game.playerOrderIndex) return null
+  if (rosterSlotAt(progress.ourLineup, orderSlot) !== ACE_BATTER_ROSTER_SLOT) return null
+  const ace = progress.aces?.ours.batter
+  return ace === undefined || ace < 0 ? null : ace
+}
+
+/** 이 타석 타자 · 루 위 주자의 마선수 번호 (`runnerAces`) */
+function ourRunnerAcesOf(progress: GameProgress) {
+  const runners = runnersOfGame(progress.game)
+  const onBase = (base: 1 | 2 | 3) => {
+    const runner = runnerOnBase(runners, base)
+    return runner === null ? null : ourOrderAceOf(progress, runner)
+  }
+  return {
+    batter: ourOrderAceOf(progress, progress.game.battingOrderIndex),
+    first: onBase(1),
+    second: onBase(2),
+    third: onBase(3),
+  }
 }
 
 /** 루별 주자 주력 (루 1~3, 빈 루는 없다) — 0x35b94 상태 0xe 주루 칸 · 주자 판이 읽는다 */

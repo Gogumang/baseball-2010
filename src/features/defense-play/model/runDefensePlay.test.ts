@@ -2080,3 +2080,18 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
     expect(두번.log).toEqual(한번.log)
   })
 })
+
+describe('마선수 주자 (runnerAces — 0x43aa8 · 0x483a0)', () => {
+  it('1루 주자가 마선수면 그 주자 칸(1)에 표시가 붙고, 타자가 아니므로 그 주자의 그림이 실린다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      runnerAces: { batter: null, first: 3 },
+    })
+    const 첫그림 = 결과.ticks[0]
+    expect(첫그림?.runners.map((runner) => runner.isAce)).toEqual([false, true])
+    expect(첫그림?.runnerAceSprite).toBe(3)
+  })
+})

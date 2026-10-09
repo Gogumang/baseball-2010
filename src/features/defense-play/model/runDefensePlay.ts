@@ -127,6 +127,7 @@ import {
   type PlayEndState,
 } from '@/entities/fielding/model/playGate'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import {
   FUMBLE_MARK_TICKS,
   THROW_ERROR_MARK_TICKS,
@@ -363,6 +364,11 @@ export interface DefensePlayInput {
    * 칸 1~8 은 그 칸 야수(이름 + 수비 코드 +0x1c & 0xf). 안 주면 고리만 그리고 판은 없다.
    */
   readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /**
+   * 공격 팀 주자 · 타자의 **마선수 번호** (타자 마선수 0~4) — 주자 그림 0x79d10 이 마선수 그림으로 그린다(`runnerAces` 머리말).
+   * 안 주면 모두 보통 주자 그림이다.
+   */
+  readonly runnerAces?: RunnerAces
 }
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
@@ -2381,6 +2387,8 @@ export function stepDefensePlay(
         holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
         fumbleTicks: fumbleMarks,
         throwErrorTicks: throwErrorMarks,
+        runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+        runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,

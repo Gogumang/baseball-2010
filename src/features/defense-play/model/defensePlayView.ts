@@ -83,6 +83,10 @@ export interface ViewStateInput {
   readonly throwErrorTicks?: readonly number[]
   /** 주자 칸 → +0x84(직전 목표 루). 슬라이딩 먼지 방향 0x9ff40 의 0x9fe80 이 본다. 안 주면 +0x8c(닿은 루) */
   readonly previousTargetOf?: (runnerIndex: number) => number
+  /** 주자 칸 → 마선수 번호(+0x9c), 아니면 null (`runnerAces`). 안 주면 아무도 마선수가 아니다 */
+  readonly runnerAceIndexes?: readonly (number | null)[]
+  /** 타석 교대 때 실린 주자 마선수 그림 번호 (`loadedRunnerAceOf`) */
+  readonly runnerAceSprite?: number | null
 }
 
 /**
@@ -137,6 +141,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       slideDirection: runner.sliding
         ? slideDustDirectionOf(runner, input.previousTargetOf?.(runner.index) ?? runner.startBase)
         : 0,
+      // 0x43aa8 — 주자 +0x9c ≠ −1
+      isAce: input.runnerAceIndexes?.[runner.index] != null,
     }
   })
 
@@ -150,6 +156,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     // 레이저 반짝임은 그릴 칸 하나로 끝이다 — 고르는 조건은 진행기 몫이다(0x43406~0x4342c)
     laserShiningSlot: laserShiningSlotOf(input.laserShiningSlot),
     cameraTarget: null,
+    runnerAceSprite: input.runnerAceSprite ?? null,
     holderMark: input.holderMark ?? null,
     holderPlate: input.holderMark == null ? null : (input.holderPlate ?? null),
   }
