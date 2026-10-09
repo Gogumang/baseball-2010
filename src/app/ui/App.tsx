@@ -230,6 +230,8 @@ export function App() {
     aceMatchPendingPorts[NARI_PITCHER_MODE],
     // 장면 0x106 은 떠나면 헐린다 — 투수편 화면이 서 있을 때만 105 도착 고리가 돈다
     screen.kind === '투수편',
+    // 정규시즌 우승 팝업 0xb 닫힘의 0x62369(0x29 · 0x32) 알림 창
+    hiddenOpenNotice.announce,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(
@@ -254,6 +256,8 @@ export function App() {
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels: aceLevels.levels,
     readRegularSeasonOtherModes: readBatterOtherModes,
+    // 정규시즌 우승 팝업 0xb 닫힘의 0x62369(0x29 · 0x22) 알림 창
+    announceHiddenOpen: hiddenOpenNotice.announce,
     openedAces: nariOpenedAces,
     nariGameSave: batterNariGameSave,
     // 나간 마선수 대결 대기 — 전역기록 g[0xec] · g[0xee] · g[0x11f] · g[0x144] (선수를 새로 만들어도 남는다)

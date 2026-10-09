@@ -51,6 +51,7 @@ import {
   popupAfterChampion,
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
+  regularSeasonOpenedHiddenIds,
 } from '@/entities/career/model/postseasonFlow'
 import type { PostseasonPopup, RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { applyPitcherEventRewards, finishPitcherEvent } from '@/entities/pitcher-career/model/pitcherEventReward'
@@ -694,6 +695,8 @@ export function usePitcherLeagueSession(
    * 다른 화면에 있는 동안 105 도착 고리(부상 엔딩 · 나간 대결 · 115 · 훑기)가 돌지 않게 한다. 안 넘기면 늘 서 있다.
    */
   isOnScreen = true,
+  /** 공용 창에 히든 오픈 알림 (0x62368 → 0x74ef5) — 새로 연 k 만 넘긴다. 정규시즌 우승 팝업 0xb 닫힘이 쓴다 */
+  announceHiddenOpen?: (ids: readonly number[]) => void,
 ): PitcherLeagueSession {
   /** 전역기록 +0x4f 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
@@ -2089,7 +2092,11 @@ export function usePitcherLeagueSession(
   const closePostseasonPopup = useCallback(() => {
     if (career === null || scene !== '포스트시즌' || postseasonPopup === null) return
     if (postseasonPopup.kind === '정규시즌우승') {
-      commit(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.투수편, readRegularSeasonOtherModes?.()))
+      const otherModes = readRegularSeasonOtherModes?.()
+      const rewarded = applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.투수편, otherModes)
+      commit(rewarded)
+      // 0x15c4e · 0x15c76 의 0x62369 — 새로 열었으면 공용 창 알림 (0x29 먼저, 투수편 0x32 는 대기)
+      announceHiddenOpen?.(regularSeasonOpenedHiddenIds(career, rewarded, otherModes))
       return setPostseasonPopup(null)
     }
     if (postseasonPopup.kind === '우승발표') {
@@ -2098,7 +2105,7 @@ export function usePitcherLeagueSession(
       return finishPostseason(career)
     }
     finishPostseason(applyKoreanSeriesReward(career))
-  }, [career, commit, finishPostseason, postseasonPopup, readRegularSeasonOtherModes, scene])
+  }, [announceHiddenOpen, career, commit, finishPostseason, postseasonPopup, readRegularSeasonOtherModes, scene])
 
   const reset = useCallback(() => {
     // 모드 초기화 0x2c9c4 → 모드 저장 지우기 0x224ec(저장, 3) — +0x43 · +0x4f = 0 (0x225c4 · 0x225ca)
