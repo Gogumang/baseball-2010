@@ -127,6 +127,45 @@ describe('카메라 — 진입 맞춤 0x46418 · 멈춤 0x3f060(3f0a4 경기 멈
   })
 })
 
+describe('그리기 목록 차례 0xbe810 (키 오름차순 · 같은 키는 먼저 넣은 것 뒤)', () => {
+  const 차례 = (): string[] =>
+    Array.from(screen.getByTestId('defense-zoom').querySelectorAll('[data-testid]'))
+      .map((node) => node.getAttribute('data-testid') ?? '')
+      .filter((id) => /^defense-(fielder|runner|ball)/.test(id) && id !== 'defense-ball-shadow')
+
+  it('야수 z · 주자 z + 1 · 공 z 오름차순이다 — 홈 쪽이 위', () => {
+    띄우기({
+      ...기본_상태,
+      ball: { x: 20000, z: 26000, height: 0, isFlying: true },
+      fielders: [
+        { slot: 0, x: 20000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
+        { slot: 8, x: 20000, z: 15000, action: FIELDER_ACTION.stand, actionTick: 0 },
+        { slot: 1, x: 20000, z: 30000, action: FIELDER_ACTION.stand, actionTick: 0 },
+      ],
+      runners: [{ index: 0, x: 21000, z: 24500, action: RUNNER_ACTION.run, actionTick: 0, base: 1, isAdvancing: true }],
+    })
+    expect(차례()).toEqual([
+      'defense-fielder-8',
+      'defense-fielder-0',
+      'defense-runner-0',
+      'defense-ball',
+      'defense-fielder-1',
+    ])
+  })
+
+  it('같은 키면 먼저 넣은 것이 아래다 — 야수는 칸 8 → 0 차례로 넣고, 공은 맨 나중에 넣는다', () => {
+    띄우기({
+      ...기본_상태,
+      ball: { x: 20000, z: 24500, height: 0, isFlying: true },
+      fielders: [
+        { slot: 3, x: 21000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
+        { slot: 5, x: 19000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
+      ],
+    })
+    expect(차례()).toEqual(['defense-fielder-5', 'defense-fielder-3', 'defense-ball'])
+  })
+})
+
 describe('공을 안 그리는 그림 (0x36dfc 36e86~36ea4)', () => {
   it('쥔 공(+0x12c)은 안 그린다 — 그림자도 없다', () => {
     띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isHeld: true } })

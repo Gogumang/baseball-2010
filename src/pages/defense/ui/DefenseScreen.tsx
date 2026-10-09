@@ -213,30 +213,52 @@ export function DefenseScreen({
     flash !== null && flash.x !== undefined && flash.z !== undefined ? screenOf({ x: flash.x, z: flash.z }) : ballPoint
 
   /**
-   * 그리는 차례는 z 오름차순으로 둔다 — 홈 쪽(z 큰 쪽)이 앞에 오게 하려는 것이다.
-   * 원본은 야수 9명 → 주자 순서로 고정해 그리지만(0x43278 · 0x43a0c), 그러면
-   * 외야수가 내야수를 가린다. 겹칠 일이 드문 곳이라 화면 쪽에서 정한다.
+   * 그리기 목록 0xbe810(장면 +0x234) — 넣을 때 **키 오름차순 자리**에 끼우고(be85a~be86a: 처음으로 `새 키 < 그 칸 키` 인 칸 앞),
+   * 같은 키는 **먼저 넣은 것 뒤**에 놓인다. 0xbe6a0 이 0 번부터 그려 뒤 칸이 위다. 넣는 차례와 키(직접 뜸):
+   * ```
+   * 0x43278  야수 — 칸 8 → 0 내림차순(439be `subs` · `bmi`), 키 = 야수 z(+0x28, 43484)
+   * 0x43a0c  주자 — 목록 0 번부터 오름차순(+0xbb 면 건너뜀), 키 = 주자 z + 1(43aec)
+   * 0x36dfc  공 — 키 = 공 z(36f62)
+   * ```
+   * 그래서 홈 쪽(z 큰 쪽)이 앞이고, 같은 줄이면 주자가 야수 위, 공은 같은 z 의 야수 · 주자보다 늦게 넣어 위다.
+   * `Array.prototype.sort` 는 안정 정렬이라 넣는 차례대로 늘어놓고 키로 정렬하면 같은 자리가 된다.
    */
-  const actors: { readonly z: number; readonly node: ReactNode }[] = [
-    ...state.runners
+  const actors: { readonly key: number; readonly node: ReactNode }[] = [
+    ...[...state.fielders]
+      .sort((a, b) => b.slot - a.slot)
+      .map((fielder) => ({
+        key: fielder.z,
+        node: (
+          <Fielder
+            key={`fielder-${fielder.slot}`}
+            fielder={fielder}
+            point={screenOf(fielder)}
+            // 레이저 송구 반짝임은 **공 쥔 야수 한 명**만 빨갛게 한다 (0x43406~0x4342c)
+            isLaserShining={state.laserShiningSlot === fielder.slot}
+          />
+        ),
+      })),
+    ...[...state.runners]
       .filter((runner) => runner.isVisible !== false)
+      .sort((a, b) => a.index - b.index)
       .map((runner) => ({
-        z: runner.z,
+        key: runner.z + 1,
         node: <Runner key={`runner-${runner.index}`} runner={runner} point={screenOf(runner)} />,
       })),
-    ...state.fielders.map((fielder) => ({
-      z: fielder.z,
-      node: (
-        <Fielder
-          key={`fielder-${fielder.slot}`}
-          fielder={fielder}
-          point={screenOf(fielder)}
-          // 레이저 송구 반짝임은 **공 쥔 야수 한 명**만 빨갛게 한다 (0x43406~0x4342c)
-          isLaserShining={state.laserShiningSlot === fielder.slot}
-        />
-      ),
-    })),
-  ].sort((a, b) => a.z - b.z)
+    // 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다
+    ...(isBallDrawn(state.ball)
+      ? [
+          {
+            key: state.ball.z,
+            node: (
+              <div key="ball" className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
+                <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ].sort((a, b) => a.key - b.key)
 
   return (
     <RawScreen>
@@ -283,15 +305,8 @@ export function DefenseScreen({
             />
           ))}
 
-        {/* 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
+        {/* 그리기 목록 차례 — 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
         {actors.map((actor) => actor.node)}
-
-        {/* 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다 */}
-        {isBallDrawn(state.ball) && (
-          <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
-            <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
-          </div>
-        )}
 
         {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
         {judgeText !== null && judgeTextPoint !== null && (
