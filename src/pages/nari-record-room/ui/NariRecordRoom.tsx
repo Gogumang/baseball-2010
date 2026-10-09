@@ -14,7 +14,9 @@ import {
 } from '@/entities/season-mode/model/seasonRecordRanking'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  OPEN_YEAR_RECORD_VIEW, RECORD_ROOM_PICK, RECORD_ROOM_PICK_LABEL_FRAMES, RECORD_ROOM_PICK_LABELS, RECORD_ROOM_PICK_TITLE_ID,
+  OPEN_YEAR_RECORD_VIEW, RECORD_ROOM_PICK, RECORD_ROOM_PICK_CELL_SIZE, RECORD_ROOM_PICK_CELLS, RECORD_ROOM_PICK_DIM_LABEL_COLOR,
+  RECORD_ROOM_PICK_LABEL_FRAMES, RECORD_ROOM_PICK_LABEL_GAP, RECORD_ROOM_PICK_LABELS, RECORD_ROOM_PICK_TITLE_ID,
+  recordRoomPickIconOffsetOf, recordRoomPickLabelXOf,
   VISIBLE_YEAR_COLUMNS, YEAR_NUMBER_HEADER_FRAME, YEAR_TABLE_LAYOUT, advanceYearSlide, batterYearCellNumberOf, batterYearCellTextOf,
   batterYearRowsOf, nariRankingEntriesOf, nariRankingSideOf, pitcherYearCellNumberOf, pitcherYearCellTextOf, pitcherYearRowsOf,
   pressYearRecordKey, visibleYearRowCountOf, yearArrowBlinkOf, yearCellDrawingOf, yearColumnsOf, yearCursorIsInsetOf,
@@ -48,7 +50,9 @@ export type NariRecordViewProps = {
 /**
  * **상태 124** — 그림 0x16778: +0x164 ≠ 0 이면 0x5796c(순위기록), 아니면 0x5cfec(개인기록) · 머리띠 0x7f4ed.
  * 화면을 덮는다. 키는 잡는 단계에서 다 가져간다(관리 메뉴가 같은 키를 받지 않게).
- * ⚠️ 머리띠 0x7f4ed 는 124 진입이 바닥비트를 새로 세우지 않아 앞 상태 것을 그린다 — 웹은 편 제목 · 되돌아가기(기본 5)로 둔다.
+ * 머리띠 0x7f4ed 의 제목 · 바닥은 124 진입이 아니라 **앞그림 0x16a34 끝의 0x16928** 이 틀마다 세운다 — 124(0x7c)는 0x76 · 0x65 ·
+ * 0x6d · 0x80 어느 갈래도 아니라 기본 갈래 0x169ea = 0x7f53c(hdr, [장면+0xcc] == 4 ? 8 : 9, **5**, 0): 편 제목 · 바닥 5(되돌아가기).
+ * 앞그림은 장면 틀 0x1cdec 의 0x1d332 가 상태와 상관없이 부르고 그리기표(0xcc884 → 0x16778)보다 앞이라 첫 그림부터 이 값이다.
  */
 export function NariRecordView(props: NariRecordViewProps) {
   const title = props.edition === '타자' ? '나만의리그타자편' : '나만의리그투수편'
@@ -75,7 +79,8 @@ export interface NariRecordPickPopupProps {
 
 /**
  * 팝업 0x80 그림 0x19448 · 키 0x196ec — 시즌 0xf334 · 0xf5d4 와 같은 꼴에 글만 106 "개인기록" · 360 "순위기록".
- * ⚠️ 근사: 칸 그림 0x858fd(6 / 10) 의 그림 묶음은 안 풀었다 — 시즌 창(`SeasonRecordPickPopup`)처럼 칸 테두리만 그린다.
+ * 칸 그림 0x858fd = `ui/mode_icon.pzx` 프레임 6 · 10 — 고른 칸은 `mode_icon.mpl` 첫 벌(주황, `icon_selected_N`), 아닌 칸은 pzx 제
+ * 팔레트. 칸 글은 고른 칸 그대로 · 아닌 칸 단색 회색(`RECORD_ROOM_PICK_CELLS` 머리말). 칸 테두리는 없다.
  */
 export function NariRecordPickPopup({ onChoose, onCancel }: NariRecordPickPopupProps) {
   /** [장면+0x166] — 팝업을 열 때 0 (130d4~130dc) */
@@ -98,10 +103,8 @@ export function NariRecordPickPopup({ onChoose, onCancel }: NariRecordPickPopupP
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
-  const cells = [
-    { value: RECORD_ROOM_PICK.개인기록, x: 120 - 0x38 },
-    { value: RECORD_ROOM_PICK.순위기록, x: 120 + 0x18 },
-  ]
+  const labelOrigins = useFrameOrigins(IMG_TEXT)
+  const cells = [RECORD_ROOM_PICK.개인기록, RECORD_ROOM_PICK.순위기록].map((value) => ({ value, ...RECORD_ROOM_PICK_CELLS[value] }))
   return (
     <div role="dialog" aria-label="기록실">
       <div className={windowStyles.window} style={{ left: 120 - 0x54 - 6, top: 160 - 0x28 - 8, width: 0x54 * 2 + 12, height: 100 }} />
@@ -111,20 +114,43 @@ export function NariRecordPickPopup({ onChoose, onCancel }: NariRecordPickPopupP
       </div>
       {cells.map((cell) => {
         const isOn = cell.value === pick
+        const icon = recordRoomPickIconOffsetOf(MODE_ICON_SIZE, MODE_ICON_SIZE)
+        const labelFrame = RECORD_ROOM_PICK_LABEL_FRAMES[cell.value]
+        const labelSrc = frameSrc(labelFrame)
+        const labelSize = labelOrigins?.[String(labelFrame).padStart(3, '0')]
+        const labelX = labelSize === undefined ? 0 : recordRoomPickLabelXOf(labelSize.width)
+        const labelTop = RECORD_ROOM_PICK_CELL_SIZE + RECORD_ROOM_PICK_LABEL_GAP
         return (
           <button key={cell.value} type="button" aria-pressed={isOn} aria-label={RECORD_ROOM_PICK_LABELS[cell.value]}
             className={windowStyles.layer}
-            style={{ left: cell.x, top: 160, width: 32, height: 48, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto' }}
+            style={{
+              left: cell.x, top: cell.y, width: RECORD_ROOM_PICK_CELL_SIZE, height: labelTop + (labelSize?.height ?? 0),
+              background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto', overflow: 'visible',
+            }}
             onClick={() => (isOn ? onConfirm() : onToggle())}>
-            <span style={{ position: 'absolute', left: 0, top: 0, width: 32, height: 32, boxSizing: 'border-box', border: `1px solid ${isOn ? ORIGINAL_COLORS.text : '#b2b2b2'}` }} />
-            <img alt="" src={frameSrc(RECORD_ROOM_PICK_LABEL_FRAMES[cell.value])}
-              style={{ position: 'absolute', left: 16, top: 36, transform: 'translateX(-50%)', filter: isOn ? undefined : 'brightness(0.7)' }} />
+            <img alt="" data-testid={`기록실-칸-${cell.value}`} src={isOn ? selectedModeIconOf(cell.iconFrame) : modeIconOf(cell.iconFrame)}
+              style={{ ...pixel, left: icon.x, top: icon.y }} />
+            {isOn || labelSize === undefined
+              ? <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
+              : (
+                // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
+                <span style={{
+                  ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
+                  background: RECORD_ROOM_PICK_DIM_LABEL_COLOR, maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
+                  maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
+                }} />
+              )}
           </button>
         )
       })}
     </div>
   )
 }
+
+/** `ui/mode_icon.pzx` 그림 · 33×33. mpl 첫 벌(주황)로 칠한 사본은 tools/generate_management_sprites.py 가 만든다 */
+const MODE_ICON_SIZE = 33
+const modeIconOf = (frame: number) => `./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`
+const selectedModeIconOf = (frame: number) => `./sprites/management/icon_selected_${frame}.png`
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const SLT_FRAME = './sprites/slt_frame'
@@ -172,7 +198,17 @@ function YearLabel({ frame, x, width, alt }: { readonly frame: number; readonly 
   return <img alt={alt} src={frameSrc(frame)} style={{ ...pixel, left: x + offset.x, top: YEAR_TABLE_LAYOUT.labelY + offset.y }} />
 }
 
-/** 둥글기 1 테두리 0x6aa65 — (w + 1)×(h + 1), 네 모서리 점은 빈다 */
+/**
+ * 둥글기 1 테두리 0x6aa65 — (w + 1)×(h + 1), 네 모서리 점은 빈다.
+ *
+ * 커서 0x56234 의 나머지 두 갈래는 124 에서 서지 않는다 (직접 떴다):
+ * - **두 그림 번쩍임** — [skin+0x2cc] ≠ −1 이면 그 그림은 바깥 불투명 노랑으로 그리고 [skin+0x2c8] + 1 > 1 에서 −1 로 돌린다.
+ *   [+0x2cc] 는 부팅 0x2ed8 → 0x53b24 → 0x5390c 가 −1 · [+0x2c8] = 0 으로 두고, 쓰는 곳은 다른 목록 그림 0x58d10(0x639a4) ·
+ *   0x593c8(메인 메뉴 0x2db28~ · 경기 0x3cdd0) · 0x63c5e 가 [목록+0x25] 일 때 [skin+0x8c] 를 넣는 것뿐이다(바이너리 전체 `#0xb3 << 2`
+ *   전수). 124 의 편집기는 그 전역 skin([장면+0xd8])이라 그 화면들이 남긴 번쩍임이 있을 때만 뜬다 — 106 → 팝업 0x80 → 124 길에는 없다.
+ * - **둘째 테두리 0x563dc**(0x5cf8c) — (s8)[편집기+0x330] 이 −1 이면 곧장 돌아간다. 0x5561c 는 셋째 인자(편집 가능)가 0 이면
+ *   +0x330 = −1 · +0x418 = −1 로 두고, 124 진입 0x116d4 는 0 으로 부른다(보기 전용) — 바꿀 줄 반투명 빨강 0x80ff0000 은 안 그린다.
+ */
 function RoundedBorder({ x, y, width, height, color }: {
   readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string
 }) {

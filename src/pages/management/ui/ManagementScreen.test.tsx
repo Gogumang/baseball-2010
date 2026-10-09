@@ -470,6 +470,19 @@ describe('106 칸 4 [기록실] — 팝업 0x80 → 124 (0x116d4 · 0x1463c · 0
     expect(screen.getByRole('button', { name: '기록실' })).toBeTruthy()
   })
 
+  it('칸 그림 0x858fd 는 mode_icon 6 · 10 — 고른 칸만 mpl 첫 벌(주황) 사본, 아닌 칸은 pzx 제 팔레트', () => {
+    render(<ManagementScreen {...propsWith({})} />)
+    clickCommand('선수정보')
+    clickCommand('기록실')
+    const iconOf = (cell: number) => screen.getByTestId(`기록실-칸-${cell}`).getAttribute('src')
+    expect(iconOf(0)).toBe('./sprites/management/icon_selected_6.png')
+    expect(iconOf(1)).toBe('./sprites/mode_icon/010.png')
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(iconOf(0)).toBe('./sprites/mode_icon/006.png')
+    expect(iconOf(1)).toBe('./sprites/management/icon_selected_10.png')
+  })
+
   it('오른쪽 칸 "순위기록"은 나리 판 순위(0x5796c) — 타자편은 타율 쪽부터', () => {
     render(<ManagementScreen {...propsWith({})} />)
     clickCommand('선수정보')

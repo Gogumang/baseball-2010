@@ -6,6 +6,7 @@ import {
   BATTER_YEAR_COLUMNS, OPEN_YEAR_RECORD_VIEW, PITCHER_YEAR_COLUMNS, advanceYearSlide, batterYearCellTextOf, batterYearRowsOf,
   nariBatterRankingRecordsOf, pitcherYearCellTextOf, pitcherYearRowsOf, pressYearRecordKey, yearSlideOffsetOf,
   visibleYearRowCountOf, yearArrowBlinkOf, yearCellDrawingOf, yearCursorIsInsetOf, yearLabelOffsetOf, yearNumberGlyphsOf,
+  RECORD_ROOM_PICK_CELLS, recordRoomPickIconOffsetOf, recordRoomPickLabelXOf,
 } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import type { YearRecordView } from '@/pages/nari-record-room/lib/nariRecordRoom'
 
@@ -148,5 +149,18 @@ describe('124 둘째 갈래 — 나리 판 순위 재료', () => {
     const base = createCareer('선수')
     const career = { ...base, stats: { ...base.stats, stolenBases: 5 } }
     expect(nariBatterRankingRecordsOf(career).find((record) => record.isMine)?.batterExtra).toBe(5)
+  })
+})
+
+describe('팝업 0x80 칸 그림 0x858fd (0x19448 · 0xb9c5c 꼴 0x22)', () => {
+  it('칸은 (W/2 − 0x38, H/2) · (W/2 + 0x18, H/2) 32×32 — 프레임 6 · 10', () => {
+    expect(RECORD_ROOM_PICK_CELLS).toEqual([{ x: 64, y: 160, iconFrame: 6 }, { x: 144, y: 160, iconFrame: 10 }])
+  })
+
+  it('33×33 아이콘은 가로 몫 + 나머지로 −1, 세로 몫으로 0 — 칸 글은 (32 − 폭)/2 몫', () => {
+    expect(recordRoomPickIconOffsetOf(33, 33)).toEqual({ x: -1, y: 0 })
+    expect(recordRoomPickIconOffsetOf(29, 29)).toEqual({ x: 2, y: 1 })
+    expect(recordRoomPickLabelXOf(27)).toBe(2)
+    expect(recordRoomPickLabelXOf(36)).toBe(-2)
   })
 })
