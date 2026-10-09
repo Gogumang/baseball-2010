@@ -125,8 +125,31 @@ describe('구장 아이템 상점 — 구매 확정 (0x812c)', () => {
 
     칸고르기('관중석 4단 관중석')
     fireEvent.click(screen.getByRole('button', { name: '예' }))
+    // 0x81d0 은 구매 완료 팝업(결과코드 15)이 닫힐 때 돈다
+    expect(onUnlock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
 
     expect(onUnlock).toHaveBeenCalledWith([13])
+    // 0x62368 → 공용 창 StrCOMMON[139] "히든 아이템 오픈!!" [트로피컬] + [141] "시즌모드에서 사용가능합니다"
+    expect(알림글()).toContain('히든 아이템 오픈!!')
+    expect(알림글()).toContain('트로피컬')
+    expect(알림글()).toContain('시즌모드에서')
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
+  })
+
+  it('이미 열린 컬렉터 칸은 0x61f5c 가 걸러 다시 열지도 알리지도 않는다', () => {
+    const onUnlock = vi.fn()
+    let record = 레코드({ popularity: 9999, money: 9999 })
+    record = 보유하게(보유하게(보유하게(record, '관중석', 0), '관중석', 1), '관중석', 2)
+    띄우기(record, { onUnlock, isHiddenOpen: (id) => id === 13 })
+
+    칸고르기('관중석 4단 관중석')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    expect(onUnlock).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
   })
 })
 
