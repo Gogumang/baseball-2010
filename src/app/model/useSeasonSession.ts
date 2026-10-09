@@ -82,7 +82,7 @@ import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderSc
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
-import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
+import { advanceNationalCupDay, nationalCupAbilityContextOf } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import {
@@ -2148,7 +2148,15 @@ export function useSeasonSession(
         // 요약의 상대 투수 끝 스태미나(표 칸 차례)가 그 값이다
         commit({
           ...current,
-          cup: advanceNationalCupDay(cup, winner, loser, random, summary.opponentPitcherStaminas),
+          // CPU 경기도 모드 2 의 0xb570c — 팀 정액(마스터 상대국 값) · 코치가 붙는다 (`nationalCupAbilityContextOf`)
+          cup: advanceNationalCupDay(
+            cup,
+            winner,
+            loser,
+            random,
+            summary.opponentPitcherStaminas,
+            nationalCupAbilityContextOf(SEASON_MODE, current.state.record.coach),
+          ),
           state: { ...current.state, record: played },
         })
         return { next: SEASON_SCENE_STATE.국가대항전, jingle: null }

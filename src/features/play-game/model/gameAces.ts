@@ -29,7 +29,7 @@ import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { ACE_BATTER_ROSTER_SLOT, ACE_PITCHER_RECORD_STAMINA, ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 
@@ -81,11 +81,12 @@ export function gameAcePitcherOf(
   const player = acePitcherPlayerOf(index)
   if (player === undefined) return undefined
   const level = aceLevelOf(levels, aceLevelSlotOf('투수', index + 1))
-  const ability = aceAbilityAtLevel(player.ability, level)
+  // 0xb6415(rec, k, 1) — 레벨 배율 뒤 장착 스킬(발렌타인 냉정 22 = 제구 + 1/10)
+  const ability = aceRecordAbilityAtLevel(player, level)
   return {
     player,
     // 0xc11f0 c1278 — 마투수면 보정 구조체 out+4 · +6 에 D[0xce/0x9c + 2k] (k = 레벨·5 + 순번, `quickSwingBoostOf`)
-    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [], ace: { order: index, level } },
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: aceSkillIdsOf(player), ace: { order: index, level } },
     control: ability.hit,
     velocity: ability.power,
     breaking: ability.defense,
@@ -101,9 +102,9 @@ export function gameAceBatterOf(
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
   const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
-  const ability = aceAbilityAtLevel(player.ability, level)
+  const ability = aceRecordAbilityAtLevel(player, level)
   // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (`quickSwingBoostOf`)
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: [], ace: { order: index, level } }
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(player), ace: { order: index, level } }
 }
 
 /**

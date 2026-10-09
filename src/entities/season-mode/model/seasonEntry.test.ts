@@ -152,3 +152,75 @@ describe('명단 차례는 저장 명단의 장비 니블을 싣는다 — 팀 �
     expect(order.batters).toEqual([{ rosterSlot: 4, position: 5, equipment: [0, 2, 0, 0] }, { rosterSlot: 0, position: 2 }])
   })
 })
+
+describe('0xe0 목록 능력치 = 레코드 0xb6415(rec, k, 1) — 상세 창 0x5b798 → 도형 0x5aefc(팀객체 0)', () => {
+  const 나리기록 = {
+    name: '나리타',
+    ability: [600, 550, 550, 550] as const,
+    baseAbility: [500, 500, 500, 500] as const,
+    skillBits: 1 << 7,
+    equipment: [2, 0, 0, 0],
+  }
+
+  it('붙박이 선수도 시즌 명단의 장비 니블을 얹는다 (니블 없으면 표 밑값 그대로)', () => {
+    const 표 = teamBatters(0)[4]!
+    const lists = seasonEntryListsOf({
+      teamId: 0,
+      roster: {
+        pitchers: [],
+        batters: [
+          { id: 4, kindByte: 4, fieldPosition: 0, stamina: 0, equipment: [0, 2, 0, 0] },
+          { id: 4, kindByte: 4, fieldPosition: 0, stamina: 0 },
+        ],
+      },
+      dayCounter: 0,
+      acePitcherId: -1,
+      aceBatterId: -1,
+    })
+    expect(lists.batters[0]?.ability).toEqual([
+      표.ability[0],
+      Math.min(표.ability[1]! + equipmentBonusOf(2), 999),
+      표.ability[2],
+      표.ability[3],
+    ])
+    expect(lists.batters[1]?.ability).toEqual(표.ability)
+  })
+
+  it('국가대항전 대한민국(10) 8번 박지혁 · 11번 이태호는 수비불가 20 이라 수비가 100 깎여 보인다 (b6512)', () => {
+    const lists = seasonEntryListsOf({ teamId: 10, roster: tableRosterOf(10), dayCounter: 0, acePitcherId: -1, aceBatterId: -1 })
+    for (const slot of [8, 11]) {
+      const 표 = teamBatters(10)[slot]!
+      expect(표.skillBits & (1 << 20)).not.toBe(0)
+      expect(lists.batters[slot]?.ability).toEqual([표.ability[0], 표.ability[1], Math.max(표.ability[2]! - 100, 0), 표.ability[3]])
+    }
+  })
+
+  it('외인구단(14)은 표 행 니블(+0x19 · +0x1a)이 얹혀 보인다', () => {
+    const lists = seasonEntryListsOf({ teamId: 14, roster: tableRosterOf(14), dayCounter: 0, acePitcherId: -1, aceBatterId: -1 })
+    const 표 = teamBatters(14)[0]!
+    expect(표.equipment.some((nibble) => nibble > 0)).toBe(true)
+    expect(lists.batters[0]?.ability).not.toEqual(표.ability)
+  })
+
+  it('영입 선수는 옮긴 밑값 · +0x14 · 지금 니블로 다시 센다 — 시즌에 바꾼 니블이 얹힌다', () => {
+    const lists = seasonEntryListsOf({
+      teamId: 0,
+      roster: {
+        pitchers: [],
+        batters: [
+          { id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 나리기록 },
+          { id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 나리기록, equipment: [0, 5, 0, 0] },
+          { id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: { name: '옛', ability: [1, 2, 3, 4] as const } },
+        ],
+      },
+      dayCounter: 0,
+      acePitcherId: -1,
+      aceBatterId: -1,
+    })
+    // 전설 7 = +50 네 칸 · 니블 2 는 히트에
+    expect(lists.batters[0]?.ability).toEqual([500 + equipmentBonusOf(2) + 50, 550, 550, 550])
+    expect(lists.batters[1]?.ability).toEqual([550, 500 + equipmentBonusOf(5) + 50, 550, 550])
+    // 밑값 칸이 없는 옛 사본은 영입 때 값 그대로
+    expect(lists.batters[2]?.ability).toEqual([1, 2, 3, 4])
+  })
+})

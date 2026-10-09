@@ -18,7 +18,7 @@ import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -366,6 +366,8 @@ export interface MissionAcePitcher {
   readonly staminaAbility: number
   /** 이름 0xb62c0 — 0x21 중계의 "PITCHER" 판(0x420dc)이 쓴다 */
   readonly name?: string
+  /** 레코드 +0x14 장착 스킬 비트 — XlsACE_PIT_DATA 행 그대로 (`acePlayers.skillBits`) */
+  readonly skillBits?: number
 }
 
 /** 타자 미션의 마투수 (마투수 미션이 아니면 undefined) */
@@ -376,11 +378,13 @@ export function missionAcePitcherOf(
   if (mission.side !== '타자' || mission.opponentAce <= 0) return undefined
   const ace = ACE_PITCHERS[mission.opponentAce - 1]
   if (ace === undefined) return undefined
-  const ability = aceAbilityAtLevel(ace.ability, aceLevelOf(aceLevels, aceLevelSlotOf('투수', mission.opponentAce)))
+  // 0xb6415(rec, k, 1) — 레벨 배율 뒤 장착 스킬(발렌타인 냉정 22 = 제구 + 1/10)
+  const ability = aceRecordAbilityAtLevel(ace, aceLevelOf(aceLevels, aceLevelSlotOf('투수', mission.opponentAce)))
   return {
-    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: [] },
+    quick: { control: ability.hit, velocity: ability.power, stamina: ability.run, skillIds: aceSkillIdsOf(ace) },
     staminaAbility: ability.run,
     name: ace.name,
+    skillBits: ace.skillBits,
   }
 }
 
@@ -421,7 +425,8 @@ export function missionPitchingDefenseOf(
       pitcherAbilitySumOf(masterAt(slot).ability.map((value) => Math.min(999, Math.max(0, value)))),
     isSpecialPitcherAt: isAce,
     // 소모 0xa5e14 의 비트 18 · 10 — 마스터 줄 +0x14 (Xls 행 사본). 마투수 소모는 세션이 든다
-    skillBitsAt: (slot) => masterPitcherRowAt(pitching, slot)?.skillBits ?? 0,
+    skillBitsAt: (slot) =>
+      isAce(slot) && options.ace !== undefined ? options.ace.skillBits ?? 0 : masterPitcherRowAt(pitching, slot)?.skillBits ?? 0,
     ...(options.pitcherChangeBlocked === true ? { pitcherChangeBlocked: true } : {}),
   }
 }

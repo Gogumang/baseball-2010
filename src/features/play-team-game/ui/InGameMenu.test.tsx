@@ -172,3 +172,19 @@ describe('경기 중 메뉴 숫자키 — 목록 0x6bfe1(1열, 4|5줄, 숫자키
     expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
   })
 })
+
+describe('경기 중 메뉴 — 창 뒤 어둡게 (0x741a0 · 0x746cc, 경기 생성자 0x3301c 의 [창+0x24f] = 1)', () => {
+  it('메뉴 뒤를 검정 단계 5 = 6/16 한 겹으로 덮는다', () => {
+    render(<InGameMenu mode={6} onContinue={vi.fn()} />)
+
+    const dim = screen.getByTestId('경기-메뉴-어둡게')
+    expect(dim.style.background).toBe(`rgba(0, 0, 0, ${6 / 16})`)
+  })
+
+  it('질문 창에서도 같은 한 겹이다', () => {
+    render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={vi.fn()} />)
+
+    fireEvent.click(screen.getByText('다시하기'))
+    expect(screen.getAllByTestId('경기-메뉴-어둡게')).toHaveLength(1)
+  })
+})

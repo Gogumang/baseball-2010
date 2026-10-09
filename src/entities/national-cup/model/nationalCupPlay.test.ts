@@ -4,6 +4,7 @@ import { STARTING_PITCHER_CANDIDATES } from '@/entities/team/model/teamRoster'
 import {
   advanceNationalCupDay,
   nationalCupStartingPitcherIndex,
+  nationalCupAbilityContextOf,
   playCpuNationalCupGame,
 } from '@/entities/national-cup/model/nationalCupPlay'
 import { createNationalCup, endNationalCupDay } from '@/entities/national-cup/model/nationalCup'
@@ -76,6 +77,23 @@ describe('CPU 끼리 한 경기 0xc2dac', () => {
       if (가득.firstSlotRuns !== 지침.firstSlotRuns || 가득.secondSlotRuns !== 지침.secondSlotRuns) 달라짐 += 1
     }
     // 탈진(0)한 투수진은 결과를 바꾼다 — 값이 실제로 쓰인다
+    expect(달라짐).toBeGreaterThan(0)
+  })
+
+  it('시즌모드는 0xb570c 모드 2 갈래 — 팀 정액(마스터 상대국 XlsTEAM_DATA) · 코치가 붙는다 (b592c · b5a74)', () => {
+    const 갈래 = nationalCupAbilityContextOf(2, 4)
+    expect(갈래).toEqual({ mode: 2, coach: 4 })
+    let 달라짐 = 0
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const 시즌 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1, undefined, 갈래)
+      const 직접난수 = createSeededRandom(seed)
+      rollSimulatorInit(직접난수)
+      const 직접 = simulateLeagueGame({ away: 11, home: 11 }, 직접난수, 1, undefined, { sharedRoster: true, abilityContext: 갈래 })
+      expect([시즌.firstSlotRuns, 시즌.secondSlotRuns]).toEqual([직접.homeRuns, 직접.awayRuns])
+      const 갈래없음 = playCpuNationalCupGame(12, 13, 11, createSeededRandom(seed), 1)
+      if (갈래없음.firstSlotRuns !== 시즌.firstSlotRuns || 갈래없음.secondSlotRuns !== 시즌.secondSlotRuns) 달라짐 += 1
+    }
+    // 일본(640·550·620·620)은 T > 300 이라 정액이 크다 — 결과가 실제로 바뀐다
     expect(달라짐).toBeGreaterThan(0)
   })
 

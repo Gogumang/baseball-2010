@@ -1,4 +1,5 @@
 import { simulateLeagueGame } from '@/entities/league/model/leagueDay'
+import type { LeagueAbilityContext } from '@/entities/league/model/leagueDay'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -31,6 +32,24 @@ import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
  */
 export function nationalCupStartingPitcherIndex(cup: NationalCup): number {
   return rotationSlotOf(cup.day === 0 ? 0 : 1)
+}
+
+/**
+ * **시즌모드 국가대항전 CPU 경기의 경기용 능력치 갈래** — 간이 타석 0xab214 · 0xc11f0 이 읽는 `0xb570d(팀레코드, k, 선수, 1, 0x5a, 1)`.
+ * ```
+ * b572c   모드 = [0x1552d10] — 시즌 안의 대회라 2 그대로
+ * b5804   시즌 가지: [팀레코드+0] == s8 [S+1](시즌 팀 0~9) 일 때만 질병·보직·사기 — 나라(11~13)는 늘 다르다 → 없음
+ * b592c   [sp+8](플래그 1) ≠ 0 ∧ (1 << 모드) & 0x306 → 팀 정액 v += (17·T − 5100)/100, T = 팀레코드 +4 · +6 · +8 · +0xa
+ * b5a74   코치 — 모드 2 ∧ S+0x185 ≥ 0, 팀 검사 없음
+ * ```
+ * 팀레코드는 0xb8680 → `0x1f570` 이 대회 중 팀 10 이 아니면 모두 돌려주는 `base+0x934` 이고, 그 머리 0xc 바이트(팀 번호 · 사기 ·
+ * 능력 넷)는 `0x20648` → `0x1fe5c`(1fe74 memcpy 0xc)가 **마스터 `[g+0xac] + 0xac0 + 팀·0x1c`(0x1f8c0)** 에서 베낀 것이다.
+ * 시즌 기록(`[g+0xb4]`, 트레이닝이 올리는 10팀 표)이 아니라 마스터라 T 는 그날 사람 경기 상대국의 XlsTEAM_DATA 열 2~5 그대로다 —
+ * `teamAbilities` 를 비워 `cpuPitcherGameAbilityOf` · `cpuBatterGameAbilityOf` 가 `TEAMS` 값을 쓰게 한다.
+ * 나리(모드 3·4)는 0x306 밖이고 코치도 모드 2 만이라 갈래가 없다 — 그쪽은 이 값을 넘기지 않는다.
+ */
+export function nationalCupAbilityContextOf(mode: number, coach: number): LeagueAbilityContext {
+  return { mode, coach }
 }
 
 export interface NationalCupGameResult {
@@ -69,6 +88,8 @@ export function playCpuNationalCupGame(
   startingPitcherSlot: number,
   /** 그날 사람 경기가 끝났을 때 상대국 레코드의 투수 칸별 스태미나 `+0x2c` (두 팀이 같이 쓴다). 안 넘기면 10000 */
   startingStaminas?: readonly number[],
+  /** 경기용 능력치 0xb570c 의 모드 갈래 — `nationalCupAbilityContextOf`. 안 넘기면 팀 정액·코치가 없다(나리 모드 3·4) */
+  abilityContext?: LeagueAbilityContext,
 ): NationalCupGameResult {
   // c2ede — 간이 시뮬 초기화 0xc0dac 의 rand(0, 2) 가 준비 0xc2c4c(c2eee, 굴림 없음)보다 먼저다
   rollSimulatorInit(random)
@@ -78,7 +99,7 @@ export function playCpuNationalCupGame(
     startingPitcherSlot,
     // 레코드가 하나라 한 표만 넘기면 된다 — `sharedRoster` 면 away 표를 두 팀이 같이 쓴다
     startingStaminas === undefined ? undefined : { away: startingStaminas },
-    { sharedRoster: true },
+    { sharedRoster: true, ...(abilityContext === undefined ? {} : { abilityContext }) },
   )
   // 칸 1(a, 말) 이 더 많이 냈을 때만 a 승 — 동점이면 b 승이다 (원본 그대로)
   const winner = score.homeRuns > score.awayRuns ? a : b
@@ -106,6 +127,8 @@ export function advanceNationalCupDay(
    * 같은 날 CPU 경기의 두 나라가 이 레코드를 그대로 쓴다. 안 넘기면 10000 에서 선다.
    */
   opponentPitcherStaminas?: readonly number[],
+  /** 같은 날 CPU 경기의 경기용 능력치 갈래 (`playCpuNationalCupGame`) — 시즌모드만 `nationalCupAbilityContextOf` */
+  abilityContext?: LeagueAbilityContext,
 ): NationalCup {
   const afterHuman = recordNationalCupResult(cup, humanWinner, humanLoser)
 
@@ -123,6 +146,7 @@ export function advanceNationalCupDay(
             random,
             nationalCupStartingPitcherIndex(afterHuman),
             opponentPitcherStaminas,
+            abilityContext,
           )
           return recordNationalCupResult(afterHuman, result.winner, result.loser)
         })()

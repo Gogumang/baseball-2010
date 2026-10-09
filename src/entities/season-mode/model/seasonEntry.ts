@@ -80,6 +80,15 @@ export function tableRosterOf(teamId: number): SeasonTeamRoster {
 /**
  * 시즌 명단 선수의 이름·능력치 — 리그 선수(id < 0xb4)는 그 선수의 붙박이 표 팀(`tableTeamOf` — 트레이드로 옮겨 온
  * 선수는 옛 팀) 표의 id 번째에서 빌려 온다. 영입해 온 나리·명예 선수는 기록 사본, 그것도 없으면 `투수 N번` 이다.
+ *
+ * **능력치는 레코드의 `0xb6415(rec, k, 1)`** 다 — 0xe0 그림 0xb074 → 목록 창 0x5cfec(0x5c984) 의 '0' 상세 창
+ * `0x5b798(skin, 종류, 팀[+0x14 | +0x18] + 커서·0x30)`(0x5cf90~0x5cfc8, 투수 3 · 타자 2)이 능력치 도형
+ * `0x5aefc(…, 레코드, …, 팀객체 0)` 을 부르고, 도형은 팀 객체가 0 이라 0xb570d 대신
+ * `0xb6415(레코드, k, 1)`(0x5b234 · 투수 0x5b322) 를 칸 값으로, `0xb6415(레코드, k, 0)`(0x5b248 · 0x5b336) 를
+ * 견줄 밑값으로 읽는다(0x5b5ba: 밑값과 같으면 보통 · 밑값이 크면 빨강 · 작으면 초록 글씨).
+ * 그래서 붙박이 선수도 **밑값이 아니라 장비 니블(+0x19 · +0x1a — 시즌 명단 `equipment`, 없으면 표 행) · 장착 스킬(+0x14)을
+ * 얹은 값**이고(`recordAbilityOf`), 영입 선수는 옮겨 온 0x30 바이트의 밑값 · +0x14 · 지금 니블로 다시 센다 — 영입 뒤 시즌
+ * 장비 창이 니블을 바꾸면 그 값이 얹힌다. 밑값 칸이 없는 옛 기록 사본은 영입 때의 `0xb6414(…, 1)` 값 그대로다.
  */
 export function playerFaceOf(
   teamId: number,
@@ -90,9 +99,20 @@ export function playerFaceOf(
   const team = tableTeamOf(player, teamId)
   const table = isPitcher ? teamPitchers(team) : teamBatters(team)
   const found = player.id < HALL_OF_FAME_FIRST_ID ? table[player.id] : undefined
-  if (found !== undefined) return { name: found.name, ability: found.ability }
-  // 영입 때 옮긴 기록 사본(나리 선수)은 그 이름(rec + 1)·능력치로
-  if (player.record !== undefined) return { name: player.record.name, ability: player.record.ability }
+  if (found !== undefined) {
+    const equipment = player.equipment ?? found.equipment
+    return { name: found.name, ability: recordAbilityOf({ ability: found.ability, skillBits: found.skillBits, equipment }, isPitcher) }
+  }
+  // 영입 때 옮긴 기록 사본(나리 선수)은 그 이름(rec + 1)·0x30 바이트로
+  const record = player.record
+  if (record !== undefined) {
+    if (record.baseAbility === undefined) return { name: record.name, ability: record.ability }
+    const equipment = player.equipment ?? record.equipment ?? []
+    return {
+      name: record.name,
+      ability: recordAbilityOf({ ability: record.baseAbility, skillBits: record.skillBits ?? 0, equipment }, isPitcher),
+    }
+  }
   return { name: `${isPitcher ? '투수' : '타자'} ${index + 1}번`, ability: [] }
 }
 

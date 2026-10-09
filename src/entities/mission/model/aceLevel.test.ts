@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import {
   ACE_LEVEL_ABILITY_PERCENT,
   ACE_LEVEL_UP_COST_THOUSANDS,
   INITIAL_ACE_LEVEL,
   INITIAL_ACE_LEVEL_SAVE,
   aceLevelRecordOf,
+  aceRecordAbilityAtLevel,
+  aceSkillIdsOf,
   aceLevelUpCostOf,
   aceLevelUpOutcomeOf,
   aceLevelUpRowsOf,
@@ -114,5 +117,22 @@ describe('레벨업 창 다섯 줄 (0x5f394)', () => {
     expect(rows.map((row) => row.label)).toEqual(['제구', '구속', '변화', '체력', '마구'])
     expect(rows[0]).toEqual({ label: '제구', current: 699, next: 777 })
     expect(rows[4]).toEqual({ label: '마구', current: 6, next: 7 })
+  })
+})
+
+describe('마선수 레코드 +0x14 장착 스킬', () => {
+  const 마선수 = (name: string) => ACE_PLAYERS.find((ace) => ace.name === name)!
+
+  it('타자는 비트 그대로, 투수는 비트 + 16 이 간이 타석 스킬 번호다', () => {
+    expect(aceSkillIdsOf(마선수('메디카'))).toEqual([1, 8, 13])
+    expect(aceSkillIdsOf(마선수('발렌타인'))).toEqual([32, 38])
+  })
+
+  it('0xb6414 플래그 1 — 발렌타인만 냉정 22 로 제구에 1/10 이 붙고, 킹타이거는 타자라 안 붙는다', () => {
+    // 발렌타인 Lv5(배율 100) 제구 700 → 770, 나머지 칸은 그대로
+    expect(aceRecordAbilityAtLevel(마선수('발렌타인'), 4)).toEqual({ hit: 770, power: 600, defense: 800, run: 280 })
+    // Lv1 배율 60 → 420 → 462
+    expect(aceRecordAbilityAtLevel(마선수('발렌타인'), 0).hit).toBe(462)
+    expect(aceRecordAbilityAtLevel(마선수('킹타이거'), 4)).toEqual(마선수('킹타이거').ability)
   })
 })
