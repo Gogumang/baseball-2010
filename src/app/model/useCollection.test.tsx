@@ -26,6 +26,17 @@ describe('기록연감 히든 오픈 — 전역 표 app+0xc0 하나', () => {
     expect((store.saved as { openedHiddenIds: number[] }).openedHiddenIds).toEqual([20, 24])
   })
 
+  it('미션 편별 올클리어가 연 id 를 모은다 — 이미 열렸으면 그대로 (0x62368 셋째 인자 0)', () => {
+    const store = 메모리저장()
+    const { result } = renderHook(() => useCollection(store, null))
+
+    act(() => result.current.openHidden(21))
+    act(() => result.current.openHidden(21))
+
+    expect(result.current.collection.openedHiddenIds).toEqual([21])
+    expect((store.saved as { openedHiddenIds: number[] }).openedHiddenIds).toEqual([21])
+  })
+
   it('이미 있는 id 는 두 번 넣지 않고, 다 있으면 같은 객체를 돌려준다', () => {
     const collection = { ...normalizeCollection(null), openedHiddenIds: [3, 20] }
 

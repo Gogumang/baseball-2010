@@ -77,9 +77,18 @@ describe('goalNamesFor', () => {
   })
 
   it('홈런은 안타에도 홈런에도 해당한다', () => {
-    // 그라운드홈런은 원본이 홈런 쪽에서 센다 (0xaa0a8, E-8) — 수비 시뮬이 없어 모든 홈런을 함께 센다
-    expect(goalNamesFor({ kind: '홈런' }, 1)).toEqual(['안타', '홈런', '그라운드홈런', '타점'])
-    expect(goalNamesFor({ kind: '홈런' }, 4, false, 3)).toEqual(['안타', '홈런', '그라운드홈런', '만루홈런', '타점'])
+    expect(goalNamesFor({ kind: '홈런' }, 1)).toEqual(['안타', '홈런', '타점'])
+  })
+
+  it('그라운드홈런은 판 안 홈인(state[0x25], 0xaa1e2)일 때만 — 담장 홈런은 안 든다 (a84cc)', () => {
+    expect(goalNamesFor({ kind: '홈런' }, 1, false, true)).toEqual(['안타', '홈런', '그라운드홈런', '타점'])
+    expect(goalNamesFor({ kind: '홈런' }, 1, false, false)).not.toContain('그라운드홈런')
+  })
+
+  it('만루홈런은 그 판 득점이 4 일 때 — 정산 득점 switch 4번 칸 (a8690)', () => {
+    expect(goalNamesFor({ kind: '홈런' }, 4)).toEqual(['안타', '홈런', '만루홈런', '타점'])
+    expect(goalNamesFor({ kind: '홈런' }, 3)).not.toContain('만루홈런')
+    expect(goalNamesFor({ kind: '안타', bases: 3 }, 4)).not.toContain('만루홈런')
   })
 
   it('타점이 있으면 타점 목표가 잡힌다', () => {
@@ -270,7 +279,7 @@ describe("'번트' 는 번트 안타만 — R+0xf4 는 정산 안타 갈래의 a
 
   it('아웃으로 끝난 번트(희생번트 포함)는 안 든다', () => {
     expect(goalNamesFor({ kind: '아웃', detail: '땅볼아웃' }, 0, true)).not.toContain('번트')
-    const progress = recordOutcome(createProgress(), { kind: '아웃', detail: '땅볼아웃' }, 0, true, 1)
+    const progress = recordOutcome(createProgress(), { kind: '아웃', detail: '땅볼아웃' }, 0, true)
     expect(isCleared(번트달인, progress)).toBe(false)
   })
 })

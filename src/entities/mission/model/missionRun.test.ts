@@ -196,10 +196,13 @@ describe('tick — 제한 시간', () => {
     expect(run.status).toBe('진행중')
   })
 
-  it('시간이 다 되면 실패다', () => {
-    const run = tick(startMission(사이클링), 사이클링.timeLimitSeconds)
+  it('남은 초가 1 이 되는 순간 실패다 — 0xaa940(미션, 1, 남은 초) (aae38), 실제 한도 − 1 초', () => {
+    const almost = tick(startMission(사이클링), 사이클링.timeLimitSeconds - 2)
+    expect(almost.remainingSeconds).toBe(2)
+    expect(almost.status).toBe('진행중')
 
-    expect(run.remainingSeconds).toBe(0)
+    const run = tick(almost, 1)
+    expect(run.remainingSeconds).toBe(1)
     expect(run.status).toBe('실패')
   })
 

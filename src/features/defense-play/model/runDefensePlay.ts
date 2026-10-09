@@ -456,6 +456,12 @@ export interface DefensePlayResult {
    */
   readonly sacrifice?: boolean
   /**
+   * **그라운드 홈런 state[0x25]** — 주자 틱 0xaa0a8 이 홈에 막 닿은 주자(+0x8c == 4)가 이번 타자(+0x98)이고 담장 홈런 state[0x1d](코드 8) ·
+   * 폴 홈런 state[0xf](코드 12)가 둘 다 0 일 때만 세운다(aa1e2~aa1fe — 바로 득점 · 보류 둘 다). 정산 a84cc~a84e8 이 이때만 미션
+   * 그라운드홈런 칸 R+0xcc(사건 4)를 올린다. 담장을 넘긴 홈런은 타자주자가 홈을 돌아도 서지 않는다.
+   */
+  readonly groundHomeRun?: boolean
+  /**
    * **아웃 판정(0xb36d0)이 마지막으로 적은 아웃이 태그였나** — 원본 `state[0x87]`.
    *
    * 아웃 콜을 62("잡아서·태그해서 낸 아웃")로 낼지 20(루에서 잡은 포스 아웃)으로 낼지를
@@ -732,6 +738,8 @@ export interface DefensePlayState {
   hitEvent: boolean
   homeRunEvent: boolean
   outEvents: number
+  /** state[0x25] — 타자주자가 판 안에서 홈을 밟았고 그때 홈런 사건(8 · 12)이 없었다 (0xaa1e2, `DefensePlayResult.groundHomeRun`) */
+  groundHomeRun: boolean
   /** 포구 틱 — 펌블이 나면 15틱 뒤로 밀린다 */
   catchTick: number
   fumbled: boolean
@@ -1042,6 +1050,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     hitEvent: false,
     homeRunEvent: false,
     outEvents: 0,
+    groundHomeRun: false,
     catchTick,
     fumbled: false,
     errantThrow: false,
@@ -1174,6 +1183,7 @@ export function stepDefensePlay(
   let hitEvent = state.hitEvent
   let homeRunEvent = state.homeRunEvent
   let outEvents = state.outEvents
+  let groundHomeRun = state.groundHomeRun
   let catchTick = state.catchTick
   let fumbled = state.fumbled
   let errantThrow = state.errantThrow
@@ -2425,6 +2435,8 @@ export function stepDefensePlay(
         })
         // 바로 득점 0xaa1b0 — 메시지 0x13(주자 칸)
         if (held.scoreboardRuns > scoredBefore) runInsThisTick.push(runner.state.index)
+        // aa1de~aa1fe — 홈에 닿은 주자가 이번 타자(+0x98)이고 담장 · 폴 홈런 사건이 없으면 state[0x25] = 1 (그라운드 홈런)
+        if (runner.state.isBatterRunner && !homeRunEvent) groundHomeRun = true
         log.push(`${tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${held.heldRuns} / 득점 ${held.scoreboardRuns}`)
       }
     }
@@ -2696,6 +2708,7 @@ export function stepDefensePlay(
   state.hitEvent = hitEvent
   state.homeRunEvent = homeRunEvent
   state.outEvents = outEvents
+  state.groundHomeRun = groundHomeRun
   state.catchTick = catchTick
   state.trajectory = trajectory
   state.uncatchable = uncatchable
@@ -2796,6 +2809,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     outcome: foulEnded ? undefined : settledBatterOutcomeOf(settleInput),
     ...((state.input.buntKind ?? 0) !== 0 ? { buntBall: true } : {}),
     ...(!foulEnded && isSacrificeOf(settleInput) ? { sacrifice: true } : {}),
+    ...(!foulEnded && state.groundHomeRun ? { groundHomeRun: true } : {}),
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
     throwArrivalTick: state.firstThrowArrivalTick,

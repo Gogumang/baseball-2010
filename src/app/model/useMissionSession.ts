@@ -734,7 +734,8 @@ export function useMissionSession({
   )
 
   // 미션 제한 시간. 타자편·투수편 모두 진행 중일 때만 1초씩 흘린다.
-  // 로딩 판(상태 7 · 9 · 8 의 적재) 동안은 경기 상태 틱이 안 돌아 흐르지 않는다 — 첫 0x18 판부터 흐른다(0xaada4)
+  // 로딩 판(상태 7 · 9 · 8 의 적재) 동안은 흐르지 않는다 — 원본 시작 시각은 상태 9 의 0xa5bb0(3fa16)이 적고 상태 8 적재가 1초를
+  // 넘기면 그 틀 끝 0xaada4 가 1초를 곧바로 빼지만, 웹 로딩 판 길이는 근사라 그 1초는 안 뺀다(`tick` 머리글). 남은 초 1 에서 실패(0xaa940)
   const isLoading = loadingTip !== null
   const isBatterRunning = !isLoading && (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
   const isPitcherRunning =

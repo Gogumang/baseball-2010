@@ -3,7 +3,7 @@ import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { createProgress, isCleared, recordOutcome, recordSteal } from '@/entities/mission/model/missionGoal'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
-import { EMPTY_BASES, advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
+import { EMPTY_BASES, advanceRunners } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -150,6 +150,8 @@ export interface MissionPlay {
   readonly outcome: AtBatOutcome
   /** 원본 목록 순서(`[타자주자?, 1루?, 2루?, 3루?]`)의 운명 — `features/defense-play/model/runnerFates` */
   readonly runnerFates: readonly RunnerFate[]
+  /** 판 안 그라운드 홈런 state[0x25] (0xaa1e2 — `DefensePlayResult.groundHomeRun`). 판을 안 도는 결과는 늘 거짓 */
+  readonly groundHomeRun: boolean
 }
 
 /**
@@ -167,6 +169,7 @@ export function missionPlay(
       advance: advanceRunners(bases, outcome, outs),
       outcome,
       runnerFates: runnerFatesWithoutPlay(bases, outcome),
+      groundHomeRun: false,
     }
   }
   const played =
@@ -174,7 +177,12 @@ export function missionPlay(
     runDefensePlay(missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode))
   // 기록은 판 끝 정산 결과 — 묶인 패턴 없이 결과만 넘겨받은 호출(시험·옛 호출)만 넘겨받은 결과 그대로다
   const settled = contactOfOutcome(outcome) === undefined ? outcome : (played.outcome ?? outcome)
-  return { advance: played.advance, outcome: settled, runnerFates: played.runnerFates }
+  return {
+    advance: played.advance,
+    outcome: settled,
+    runnerFates: played.runnerFates,
+    groundHomeRun: played.groundHomeRun === true,
+  }
 }
 
 /**
@@ -266,6 +274,8 @@ export function advanceSituation(
   inningEnded: boolean
   /** 정산 0xa8024 가 읽는 주자 목록의 운명 — 신원을 앉히는 실마리 (`missionRunnersAfterPlay`) */
   runnerFates: readonly RunnerFate[]
+  /** 판 안 그라운드 홈런 state[0x25] — 정산 a84cc 가 이때만 미션 그라운드홈런 칸을 올린다 */
+  groundHomeRun: boolean
 } {
   const play = missionPlay(run.bases, run.outs, outcome, { random, played })
   const advance = play.advance
@@ -278,6 +288,7 @@ export function advanceSituation(
       outcome: play.outcome,
       inningEnded: true,
       runnerFates: play.runnerFates,
+      groundHomeRun: play.groundHomeRun,
     }
   }
   return {
@@ -287,6 +298,7 @@ export function advanceSituation(
     outcome: play.outcome,
     inningEnded: false,
     runnerFates: play.runnerFates,
+    groundHomeRun: play.groundHomeRun,
   }
 }
 
@@ -353,10 +365,62 @@ export function recordSwing<T extends MissionRun>(run: T): T {
   return { ...run, remainingSwings: run.remainingSwings - 1 }
 }
 
-/** 타석이 끝나지 않았는데 스윙을 다 썼으면 실패다. */
+/**
+ * **남은 기회로 목표를 못 채우면 그 자리에서 실패** — 판정 0xaaa6c 모드 6 갈래가 타석 한도(aab82) · 스윙 한도(aab9a → aad1c)마다
+ * 부르는 0xaa958(미션, 센 수, 한도) (직접 재역어셈, aa958~aaa5a):
+ * ```
+ * aa960  한도 ≤ 0 이거나 모드(+0x10[1]) == 5(투수편)면 돌아감
+ * aa98a  남은 기회 = 한도 − 센 수
+ * aa994  달성 9칸 = [안타 합 R+0xb4..0xc0, 단타 +0xb4, 2루타 +0xb8, 3루타 +0xbc, 홈런 +0xc0, 만루 +0xc8, 그라운드 +0xcc, 번트 +0xf4, 도루 +0x10c]
+ * aa9dc  필요 9칸 = 행 [+0xa6, +0xa1 아래, +0xa0 위, +0xa0 아래, +0xa3 아래, +0xa2 위, +0xa2 아래, +0xa4 위, +0xa4 아래]
+ * aaa20  필요 > 0 인 칸마다 필요 합 += 필요 · 달성 합 += 달성 ; (필요 − 달성) > 남은 기회면 상태 2(실패)
+ * aaa44  min(필요 합, 한도) − 달성 합 > 남은 기회면 상태 2
+ * ```
+ * 타점 칸은 안 본다. 달성은 필요를 넘어도 깎지 않는다(원본 그대로). 목표가 다 찼으면(상태 0, aab5a) 이 판정 전에 성공으로 간다.
+ * 판정은 판 끝(0xae3e8)뿐 아니라 공마다(0xae24c · 0xae3a0)도 돈다.
+ */
+const CHANCE_GOALS: readonly string[] = ['안타', '단타', '2루타', '3루타', '홈런', '만루홈런', '그라운드홈런', '번트', '도루']
+
+export function isOutOfGoalChances(
+  mission: OriginalMission,
+  progress: MissionProgress,
+  used: number,
+  limit: number | null,
+): boolean {
+  if (limit === null || limit <= 0 || mission.side !== '타자') return false
+  const remaining = limit - used
+  let requiredSum = 0
+  let achievedSum = 0
+  for (const name of CHANCE_GOALS) {
+    const required = mission.goalCounts[name] ?? 0
+    if (required <= 0) continue
+    const achieved = progress.counts[name] ?? 0
+    requiredSum += required
+    achievedSum += achieved
+    if (required - achieved > remaining) return true
+  }
+  return Math.min(requiredSum, limit) - achievedSum > remaining
+}
+
+/** 타석 한도 · 스윙 한도 둘 다로 0xaa958 을 돈다 (aab82 · aab9a) */
+function isOutOfAnyGoalChances(run: MissionRun, remainingPlateAppearances: number | null): boolean {
+  const plateLimit = limitOrNull(run.mission.plateAppearanceLimit)
+  const swingLimit = limitOrNull(run.mission.swingLimit)
+  return (
+    (plateLimit !== null &&
+      remainingPlateAppearances !== null &&
+      isOutOfGoalChances(run.mission, run.progress, plateLimit - remainingPlateAppearances, plateLimit)) ||
+    (swingLimit !== null &&
+      run.remainingSwings !== null &&
+      isOutOfGoalChances(run.mission, run.progress, swingLimit - run.remainingSwings, swingLimit))
+  )
+}
+
+/** 타석이 끝나지 않았는데 스윙을 다 썼거나, 남은 스윙으로 목표를 못 채우면(0xaa958) 실패다. */
 export function checkSwingsExhausted<T extends MissionRun>(run: T): T {
   if (run.status !== '진행중' || run.remainingSwings === null) return run
-  return run.remainingSwings <= 0 ? { ...run, status: '실패' } : run
+  if (run.remainingSwings <= 0) return { ...run, status: '실패' }
+  return isOutOfAnyGoalChances(run, run.remainingPlateAppearances) ? { ...run, status: '실패' } : run
 }
 
 /**
@@ -379,7 +443,7 @@ export function applyOutcome(
   const counts = isMissionBatterUp(run)
   // 목표는 판 끝 정산(0xa8024 → 미션 판정 0xaaa6c)이 낸 결과로 센다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
   const progress = counts
-    ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, runnerCountOf(run.bases))
+    ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, situation.groundHomeRun)
     : run.progress
   const advanced: MissionRun = {
     ...run,
@@ -403,7 +467,9 @@ export function applyOutcome(
   }
   const isOutOfChances =
     (remaining !== null && remaining <= 0) ||
-    (run.remainingSwings !== null && run.remainingSwings <= 0)
+    (run.remainingSwings !== null && run.remainingSwings <= 0) ||
+    // 0xaa958 — 남은 타석 · 스윙으로 목표를 못 채우면 그 자리에서 실패
+    isOutOfAnyGoalChances({ ...run, progress }, remaining)
   const judged: MissionRun = {
     ...advanced,
     progress,
@@ -413,7 +479,20 @@ export function applyOutcome(
   return judgedAtGameEnd(judged, situation.inningEnded ? OUTS_PER_INNING : situation.outs)
 }
 
-/** 시간을 흘린다. 0이 되면 실패다. 투수편도 같은 규칙이다. */
+/**
+ * 시간을 흘린다. **남은 초가 1 이 되는 순간 실패**다 — 실제로 쓸 수 있는 시간은 한도 − 1 초. 투수편도 같은 규칙이다 (직접 재역어셈):
+ * ```
+ * 0xaada4  (장면 갱신 0x52c50 의 52ed0 — 모드 5 · 6 이면 상태를 안 가리고 매 틀)
+ * aadb2    미션 상태 +0x1c == 0(목표 다 참)이면 돌아감 · aadca 상태 = 1
+ * aadf4    시간 한도(레코드 +0xb · +0xc) > 0 일 때만:
+ * aae02      벽시계 0x14005c8 − 시작 [st+0xac] > 1000ms 면 남은 초 [0x1552af0] −1 · 0xa5bb0(시작 다시 잼)
+ * aae38      0xaa940(미션, 1, 남은 초) — 남은 초 > 0 이고 1 ≥ 남은 초면 상태 2(실패) → aae4a 메시지 0x76d
+ * ```
+ * 남은 초는 한 번에 1 씩만 줄어 0 까지 가지 않는다 — 화면의 초도 1 에서 멈춘다.
+ * 시작 시각은 상태 9 갱신 0x3f584 가 적는다(3f718 남은 초 = 한도 · 3f8c0 미션 객체 0xaa57c 상태 1 · 3fa16 0xa5bb0) — 상태 8 의
+ * 동기 적재 **앞**이라, 그 틀 끝 0xaada4 는 적재에 1초가 넘게 걸리면 곧바로 1초를 뺀다(한 틀에 한 번이라 1초뿐).
+ * ⚠️ 웹 로딩 판(`LoadingTip`) 길이는 단말 적재 시간이 아니라 근사라 그 1초는 안 뺀다 — 타이머는 로딩 판이 끝난 뒤부터 센다.
+ */
 export function tick<T extends MissionRun>(run: T, elapsedSeconds: number): T {
   if (run.status !== '진행중' || run.remainingSeconds === null) return run
 
@@ -421,9 +500,12 @@ export function tick<T extends MissionRun>(run: T, elapsedSeconds: number): T {
   return {
     ...run,
     remainingSeconds: remaining,
-    status: remaining <= 0 ? '실패' : '진행중',
+    status: remaining <= LAST_SECOND ? '실패' : '진행중',
   }
 }
+
+/** 0xaa940(미션, 1, 남은 초) — 남은 초가 이 값에 닿으면 실패 */
+const LAST_SECOND = 1
 
 /** 도루할 수 있는가 — 1루 주자가 있고 2루가 비어 있어야 한다 (StrHOWTO[2] 1루→2루) */
 export function canSteal(run: MissionRun): boolean {

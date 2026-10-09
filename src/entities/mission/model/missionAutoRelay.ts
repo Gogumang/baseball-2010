@@ -24,7 +24,7 @@ import type { MissionInningRuns } from '@/entities/mission/model/missionScoreboa
  *
  * **제한 시간은 이 동안에도 흐른다** — 장면 갱신 0x52c50 은 상태 갱신(0x21 이면 52e84 → 0x48480) 뒤 52ed0 에서 모드 5·6 이면
  * 상태를 안 가리고 0xaada4(미션 객체)를 부른다: 진행 중이고 시간 한도(레코드 +0xb·+0xc)가 있으면 벽시계 0x14005c8 − 시작 [st+0xac] 이
- * 1000ms 를 넘을 때마다 남은 초(0x1552af0)−− · 0xa5bb0(시작 다시 잼) → 0xaa940 한도 판정(0 이 되면 실패 2 → 메시지 0x76d).
+ * 1000ms 를 넘을 때마다 남은 초(0x1552af0)−− · 0xa5bb0(시작 다시 잼) → 0xaa940(미션, 1, 남은 초) 한도 판정(남은 초가 1 이 되면 실패 2 → 메시지 0x76d — 실제 한도 − 1 초).
  * 그래서 중계가 도는 틱 수 × 한 틱(환경설정 [속도])만큼 시간이 줄어든다.
  */
 export interface MissionAutoRelayStep {

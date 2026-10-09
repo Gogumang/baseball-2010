@@ -339,7 +339,7 @@ export function App() {
     // 0x62368 의 알림 창 — 플레이 시간 히든 31 · 47 (0x4e8b0)
     hiddenOpenNotice.announce,
   )
-  const { recordStat: recordCollectionStat } = collection
+  const { recordStat: recordCollectionStat, openHidden: openCollectionHidden } = collection
   hallOfFameForMissionRef.current = collection.collection
   const pitcherEditionFirsts = pitcherSession.career?.regularSeasonFirstCount ?? 0
   const batterEditionFirsts = (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0
@@ -361,7 +361,6 @@ export function App() {
       globalOpenedHiddenIds: collection.collection.openedHiddenIds,
     },
   }
-  const { openHidden: openCollectionHidden } = collection
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
     openHiddenRef.current = openCollectionHidden

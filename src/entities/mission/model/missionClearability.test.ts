@@ -36,6 +36,8 @@ const DOUBLE: AtBatOutcome = { kind: '안타', bases: 2 }
 const TRIPLE: AtBatOutcome = { kind: '안타', bases: 3 }
 const HOME_RUN: AtBatOutcome = { kind: '홈런' }
 const STRIKEOUT: AtBatOutcome = { kind: '삼진' }
+/** 원본 패턴 표 코드 20 칸 2 — 굴림 없이 1사 빈 루에서 판 안 그라운드 홈런(state[0x25])이 난다 */
+const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [67, 1150, 600, 2], resultCode: 20 })
 const PITCHES_PER_STRIKEOUT = 3
 const MAXIMUM_PLATE_APPEARANCES = 30
 
@@ -48,8 +50,8 @@ const findMission = (side: '타자' | '투수', id: number): OriginalMission => 
 /** 미션마다 가장 이상적인 타석 결과 순서 */
 function idealBatterOutcomes(mission: OriginalMission): AtBatOutcome[] {
   if (mission.goals.includes('사이클링히트')) return [SINGLE, DOUBLE, TRIPLE, HOME_RUN]
-  // 그라운드홈런은 이제 홈런으로 센다 (E-8)
-  if (mission.goals.includes('그라운드홈런')) return [HOME_RUN]
+  // 그라운드홈런은 판 안 홈인만 센다 (0xaa1e2) — 원본 패턴 표 코드 20 의 [67, 1150, 600] 은 1사 빈 루에서 타자주자가 홈까지 돈다
+  if (mission.goals.includes('그라운드홈런')) return [INSIDE_THE_PARK_HOME_RUN]
   if (mission.goals.includes('2루타')) return [DOUBLE, HOME_RUN]
   return Array.from({ length: MAXIMUM_PLATE_APPEARANCES }, () => HOME_RUN)
 }
@@ -178,6 +180,17 @@ describe('시작 상황 — 레코드 3·4·5번 바이트', () => {
     expect(run.status).toBe('성공')
   })
 
+  it('타자 11번 — 담장을 넘긴 홈런은 그라운드홈런이 아니다, 판 안에서 홈을 돈 홈런만 (0xaa1e2 · a84cc)', () => {
+    const fence = applyOutcome(startMission(findMission('타자', 11)), HOME_RUN)
+    expect(fence.progress.counts['홈런']).toBe(1)
+    expect(fence.progress.counts['그라운드홈런'] ?? 0).toBe(0)
+    expect(fence.status).toBe('진행중')
+
+    const inside = applyOutcome(startMission(findMission('타자', 11)), INSIDE_THE_PARK_HOME_RUN)
+    expect(inside.progress.counts['그라운드홈런']).toBe(1)
+    expect(inside.status).toBe('성공')
+  })
+
   it('주자가 없으면 홈런은 만루홈런이 아니다', () => {
     const run = applyOutcome(startMission(findMission('타자', 6)), HOME_RUN)
 
@@ -199,10 +212,26 @@ describe('판정 규칙', () => {
     expect(checkSwingsExhausted(run).status).toBe('실패')
   })
 
-  it('스윙이 남아 있으면 실패가 아니다', () => {
-    const run = recordSwing(startMission(findMission('타자', 10)))
+  it('스윙이 남아 있고 남은 스윙으로 목표를 채울 수 있으면 실패가 아니다', () => {
+    // 타자 12번 — 스윙 3 · 만루홈런 1. 한 번 휘둘러도 남은 2 번으로 채울 수 있다
+    const run = recordSwing(startMission(findMission('타자', 12)))
 
     expect(checkSwingsExhausted(run).status).toBe('진행중')
+  })
+
+  it('남은 스윙으로 목표를 못 채우면 그 자리에서 실패다 — 0xaa958 (aab9a)', () => {
+    // 타자 10번 — 스윙 3 · 안타 3. 안타 없이 한 번 휘두르면 필요 3 − 달성 0 > 남은 2
+    const run = recordSwing(startMission(findMission('타자', 10)))
+
+    expect(checkSwingsExhausted(run).status).toBe('실패')
+  })
+
+  it('남은 타석으로 목표를 못 채우면 그 타석에서 실패다 — 0xaa958 (aab82)', () => {
+    // 타자 13번 — 3타석 · 홈런 3. 첫 타석이 단타면 필요 3 − 달성 0 > 남은 2
+    const run = applyOutcome(startMission(findMission('타자', 13)), SINGLE)
+
+    expect(run.remainingPlateAppearances).toBe(2)
+    expect(run.status).toBe('실패')
   })
 
   it('"3번의 타석을 모두 홈런" 은 홈런 3개가 필요하다', () => {

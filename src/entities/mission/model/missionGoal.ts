@@ -149,14 +149,19 @@ export function isCleared(mission: OriginalMission, progress: MissionProgress): 
   return judgedGoalsOf(mission, progress).every((goal) => goal.achieved >= goal.required)
 }
 
-const FULL_BASES = 3
+/** 만루홈런 — 정산 0xa8024 의 득점 switch(a8622)에서 그 판 득점 [sp+0x28] 이 4 인 칸 */
+const GRAND_SLAM_RUNS = 4
 
-/** 타석 결과가 어떤 목표에 해당하는지. 원본 목표 이름을 그대로 쓴다. */
+/**
+ * 타석 결과가 어떤 목표에 해당하는지. 원본 목표 이름을 그대로 쓴다.
+ *
+ * `groundHomeRun` — 판 안 그라운드 홈런 state[0x25] (진행기 `DefensePlayResult.groundHomeRun`, 0xaa1e2).
+ */
 export function goalNamesFor(
   outcome: AtBatOutcome,
   runsBattedIn: number,
   isBunt = false,
-  runnersBefore = 0,
+  groundHomeRun = false,
 ): string[] {
   const names: string[] = []
 
@@ -174,12 +179,13 @@ export function goalNamesFor(
   }
   if (outcome.kind === '홈런') {
     names.push('안타', '홈런')
-    // 원본은 타자주자가 **플레이 중 홈에 닿으면** 홈런으로 세고 그라운드홈런 수도 함께 올린다
-    // (0xaa0a8 → state+0x25, E-8 확정). 웹 타구 근사에는 장내 홈런을 만들 길이 없어
-    // 수비 시뮬레이션이 들어올 때까지는 **담장 넘긴 홈런도 그라운드홈런으로 친다** —
-    // 앞서 3루타를 그라운드홈런으로 세던 것보다 원본에 가깝다(원본은 3루타를 절대 안 센다).
-    names.push('그라운드홈런')
-    if (runnersBefore === FULL_BASES) names.push('만루홈런')
+    // **그라운드홈런(R+0xcc)은 판 안 홈인만** 센다 (직접 재역어셈): 주자 틱 0xaa0a8 aa1e2~aa1fe 가 홈에 닿은 주자가 이번
+    // 타자(+0x98)이고 담장 홈런 state[0x1d](코드 8) · 폴 홈런 state[0xf](코드 12)가 둘 다 0 일 때만 state[0x25] = 1,
+    // 정산 a84cc~a84e8 이 그때만 0xa57f8(R, 4) — 담장을 넘긴 홈런은 안 든다. 예전 웹은 모든 홈런을 셌다.
+    if (groundHomeRun) names.push('그라운드홈런')
+    // **만루홈런(R+0xc8)은 그 판 득점이 4 일 때** — 정산 a85be 홈런 수 [sp+0x24] > 0 이면 a8622 득점 [sp+0x28](사건 0xf 수)
+    // switch 의 4번 칸 a8690 이 0xa57f8(R, 3). 투구 전 주자 수가 아니라 점수판에 오른 득점을 본다 (원본 그대로)
+    if (runsBattedIn === GRAND_SLAM_RUNS) names.push('만루홈런')
   }
   if (runsBattedIn > 0) names.push('타점')
 
@@ -291,10 +297,10 @@ export function recordOutcome(
   outcome: AtBatOutcome,
   runsBattedIn: number,
   isBunt = false,
-  runnersBefore = 0,
+  groundHomeRun = false,
 ): MissionProgress {
   const counts = { ...progress.counts }
-  for (const name of goalNamesFor(outcome, runsBattedIn, isBunt, runnersBefore)) {
+  for (const name of goalNamesFor(outcome, runsBattedIn, isBunt, groundHomeRun)) {
     counts[name] = (counts[name] ?? 0) + (name === '타점' ? runsBattedIn : 1)
   }
   return { ...progress, counts, plateAppearances: progress.plateAppearances + 1 }
@@ -316,7 +322,8 @@ export function isMissionSideAllCleared(counts: Readonly<Record<string, number>>
  */
 export const MISSION_ALL_CLEAR_HIDDEN_ID: Readonly<Record<OriginalMission['side'], number>> = { 타자: 0x25, 투수: 0x15 }
 
-/** 선택 목록의 미션(타자·투수 28개)을 모두 깼는가 — 히든 오픈 조건 (0xa5184) */
+/** 선택 목록의 미션(타자·투수 28개)을 모두 깼는가 — 수집 보상 k = 3 의 조건 (`judgeCollectionReward`) */
 export function isEveryMissionCleared(clearedKeys: readonly string[]): boolean {
   return [...BATTER_MISSIONS, ...PITCHER_MISSIONS].every((mission) => clearedKeys.includes(missionKeyOf(mission)))
 }
+
