@@ -3468,7 +3468,7 @@ interface TeamPitchArrival {
  *   판을 붙들어(`pendingRunnerPlay`) 화면이 한 틱씩 돌리게 하고 `resolveRunnerPlay` 가 잇는다(`liveRunnerPlay`). 밀어내기(종류 2)는
  *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다. ⚠️ 사람 공격 쪽 판의 주루 키(0x5331c)는 아직 안 받는다(미리 돌린다).
  *
- * ⚠️ 근사: 루에 선 주자가 누구인지 웹 `GameState` 가 모른다 — 1·2·3루 주자 = 타순 1·2·3칸 앞 타자(`runAbilitiesOnBaseOf`).
+ * - 루별 주루: 루에 선 주자의 신원(`GameState.runners`, 원본 주자 목록)대로 그 팀 타순 칸 선수(`runAbilitiesOnBaseOf`).
  * ⚠️ 미해결: 주자 속도의 팀 등급(전역 모드 1·2·8, R3 4절)은 팀 경기의 다른 판(타구·견제)처럼 안 싣는다(0).
  * ⚠️ 미해결: 종류 5 판 정산 0xa8024 의 기록 칸(투수 아웃 수·평판·리그 기록)은 견제 판처럼 손대지 않았다.
  *

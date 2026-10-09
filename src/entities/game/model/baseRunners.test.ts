@@ -3,8 +3,10 @@ import {
   EMPTY_BASE_RUNNERS,
   effectiveRunnersOf,
   runnersAfterPlay,
+  runnersBehindCursor,
   runnersFitBases,
   shiftRunners,
+  survivorsWithoutPlayOf,
 } from '@/entities/game/model/baseRunners'
 import { applyAtBatOutcome, createGame, runnersOfGame } from '@/entities/game/model/gameState'
 
@@ -56,5 +58,31 @@ describe('주자 신원 — 원본 주자 목록(sim+0x80 · 0xa93ac 0번에 끼
     game = applyAtBatOutcome(game, { kind: '삼진' })
     expect(runnersOfGame(game)).toEqual({ first: null, second: 1, third: 0 })
     expect(EMPTY_BASE_RUNNERS).toEqual({ first: null, second: null, third: null })
+  })
+})
+
+describe('루 상황 세우기 0xa9a10 — 찬 루를 3 → 1 루로 세며 k 번째 루에 커서 − k', () => {
+  it('만루면 3루 = 바로 앞 타자 · 2루 = 둘 앞 · 1루 = 셋 앞, 0 칸 아래는 9 로 돈다', () => {
+    expect(runnersBehindCursor({ first: true, second: true, third: true }, 1)).toEqual({ first: 7, second: 8, third: 0 })
+  })
+
+  it('빈 루는 건너뛰고 k 를 안 올린다 — 1·3루면 3루 = 커서 − 1 · 1루 = 커서 − 2', () => {
+    expect(runnersBehindCursor({ first: true, second: false, third: true }, 5)).toEqual({ first: 3, second: null, third: 4 })
+    expect(runnersBehindCursor({ first: false, second: true, third: false }, 5)).toEqual({ first: null, second: 4, third: null })
+  })
+})
+
+describe('진행기를 안 도는 결과의 신원 — 정산 0xa8024 가 보는 목록(삼진 · 볼넷 · 사구 · 홈런)', () => {
+  it('볼넷은 타자주자가 0번에 들고 밀린 주자만 간다 — 1·3루면 3루 주자는 그대로, 타자는 1루 · 1루 주자는 2루', () => {
+    const game = { ...createGame(2, 0), bases: { first: true, second: false, third: true }, runners: { first: 4, second: null, third: 6 } }
+    const after = applyAtBatOutcome(game, { kind: '볼넷' })
+    expect(after.runners).toEqual({ first: game.battingOrderIndex % 9, second: 4, third: 6 })
+  })
+
+  it('만루 사구는 3루 주자가 홈을 밟고 나머지가 한 루씩, 삼진은 루의 주자가 그대로', () => {
+    expect(survivorsWithoutPlayOf({ first: true, second: true, third: true }, '사구')).toEqual([0, 1, 2])
+    expect(survivorsWithoutPlayOf({ first: false, second: true, third: true }, '삼진')).toEqual([2, 3])
+    expect(survivorsWithoutPlayOf({ first: true, second: true, third: true }, '홈런')).toEqual([])
+    expect(survivorsWithoutPlayOf({ first: true, second: false, third: false }, '아웃')).toBeNull()
   })
 })

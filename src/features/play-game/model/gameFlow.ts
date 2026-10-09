@@ -20,7 +20,7 @@ import {
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { runnersOfGame } from '@/entities/game/model/gameState'
-import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import { runnerOnBase, runnersBehindCursor } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
@@ -1493,7 +1493,7 @@ function advanceUntilPlayerTurn(
  * c232e  st[6] = max(0, t − n)                    ; 남은 몫이 아웃
  * c2338  0xa9250 주자 지우기
  * c2342  루 i = 0(1루)·1·2: n == 3 − i 이면 세움(n−1) · 아니면 rand(0, n + 1) == 0 일 때 세움(n−1)
- * c237a  0xa9a9c(주자관리, 공격 팀, 수비 팀, 1루, 2루, 3루)  ; 앞 타자들로 주자를 세운다 (굴림 없음)
+ * c237a  0xa9a9c(주자관리, 공격 팀, 수비 팀, 1루, 2루, 3루)  ; 0xa9a10 — 앞선 찬 루부터 바로 앞 타자 · 그 앞 타자 … (굴림 없음)
  * ```
  * 곧 9회 이후 말 공격에서 뒤진(또는 동점) 후공 팀의 내 타석 앞, `아웃 + 주자` 를 주자·아웃으로 다시 나눠
  * 끝내기 판을 차린다. n 이 0 일 때 rand(0, 1) 은 늘 0 이라 주자를 세우고 n 이 −1 이 되는 것까지 원본 그대로다.
@@ -1525,9 +1525,9 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
     }
   }
   const bases: BaseState = { first: placed[0] === true, second: placed[1] === true, third: placed[2] === true }
-  // 굴려 세운 루에 누가 섰는지는 옮기지 않았다 — 신원을 버려 예전 근사(타순을 거꾸로 센다)로 본다
-  const { runners: _unknownRunners, ...rest } = game
-  return { ...progress, game: { ...rest, outs, bases } }
+  // c237a 0xa9a9c → 0xa9a10(주자관리, 공격 팀 sim+0x74, 수비 팀 sim+0x78, 루표) — 찬 루를 3 → 1 루로 세며 k 번째 루에
+  // 공격 팀 지금 타자 칸(team+0x32 = 내 칸)에서 거꾸로 k 번째 타순 칸을 세운다 (`runnersBehindCursor`). 굴림 없음
+  return { ...progress, game: { ...game, outs, bases, runners: runnersBehindCursor(bases, game.battingOrderIndex) } }
 }
 
 /**

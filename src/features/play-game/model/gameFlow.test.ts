@@ -1372,6 +1372,14 @@ describe('자동진행이 내 차례에서 멈출 때 0xc22b4 — 모드 4 의 9
     expect(used()).toBe(3)
   })
 
+  it('세운 루의 신원은 0xa9a10 — 앞선 찬 루부터 내 칸 바로 앞 타자 · 그 앞 타자 (3루 = 커서 − 1 · 1루 = 커서 − 2)', () => {
+    const { random } = 차례난수([0.7, 0, 0.9])
+    const 앞 = 판({})
+    const 뒤 = withAutoStopLateInningSetup(앞, random)
+    const 칸 = (back: number) => (((앞.game.battingOrderIndex - back) % 9) + 9) % 9
+    expect(뒤.game.runners).toEqual({ first: 칸(2), second: null, third: 칸(1) })
+  })
+
   it('n 이 0 이어도 rand(0, 1) 은 늘 0 이라 1루를 세우고 n 이 음수로 내려간다 (원본 그대로)', () => {
     // 동점(d = 0) · t = 2 · n = rand(0, 3) = 0 → 아웃 2 · 1루 rand(0,1)=0 세움(n −1) · 2루 rand(0,0)=0 세움(n −2) · 3루 rand(0,−1)=−1 안 세움
     const { random } = 차례난수([0, 0, 0, 0])
