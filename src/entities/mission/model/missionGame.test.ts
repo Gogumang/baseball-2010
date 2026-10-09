@@ -8,6 +8,7 @@ import {
   humanRecordsOf,
   missionHumanRecordSlotOf,
   missionHumanTeamIdOf,
+  missionTeamIdsOf,
   startMissionGame,
 } from '@/entities/mission/model/missionGame'
 import { startMission } from '@/entities/mission/model/missionRun'
@@ -40,6 +41,14 @@ describe('사람 칸 팀 — 0xaa57c aa6c2~aa734 (마선수 대결이면 그 편
     expect(run.game.humanBatting.teamId).toBe(7)
     // CPU 수비(자동진행 반 이닝)는 레코드의 다른 칸 팀
     expect(run.game.cpuAutoPitching?.teamId).toBe(mission.sideTeams[mission.humanSide === 0 ? 1 : 0])
+  })
+
+  it('HUD 작은 로고 팀 경기[0x28 + 칸] — 사람 칸은 대결이면 바뀐 팀, CPU 칸은 레코드 그대로 (0x48658 48a38~48a74)', () => {
+    const mission = missionOf('투수', 16)
+    const cpuTeam = mission.sideTeams[mission.humanSide === 0 ? 1 : 0]
+    expect(missionTeamIdsOf(startPitcherMission(mission))).toEqual({ human: missionHumanTeamIdOf(mission), cpu: cpuTeam })
+    const run = startPitcherMission(mission, { aceMatch: { originalMode: 3, savedTeamId: 7 } })
+    expect(missionTeamIdsOf(run)).toEqual({ human: 7, cpu: cpuTeam })
   })
 
   it('g[0xf6] 가 2..4 밖이면(aa708 · aa70e) 레코드 팀 그대로다', () => {

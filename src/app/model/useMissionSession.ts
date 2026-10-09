@@ -56,11 +56,13 @@ import {
 } from '@/features/defense-play/model/pitchArrivalPlay'
 import { chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import {
+  missionDefenseAbilitiesOf,
+  missionPlayAbilitiesOf,
   missionRunAbilitiesOnBaseOf,
   missionRunnerRunAbilitiesOf,
   missionRunnersAfterPlay,
 } from '@/entities/mission/model/missionRunners'
-import type { MissionSpecialRunners } from '@/entities/mission/model/missionRunners'
+import type { MissionPlayAbilities, MissionSpecialRunners } from '@/entities/mission/model/missionRunners'
 import { ACE_BATTERS, missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import {
   FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf,
@@ -584,16 +586,29 @@ export function useMissionSession({
   } | null>(null)
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
-   * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판을 열거나 지워진다. 키와 같은 틱에 공이 도착할 수 있어
+   * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판이 읽는다. 키와 같은 틱에 공이 도착할 수 있어
    * 진행 칸은 ref 로 든다(화면 표시는 state).
+   *
+   * **화면 표시(st[0x15 + i] — 그 루 주자를 안 그린다)는 판정 때 지우지 않는다** (직접 재역어셈):
+   * - 0xf 진입 `0x3d954` 3d966~3d976 — `for i in 0..3: st[0x14 + i] = 0 ; st[0xa4 + i] = 0`. 이 칸을 지우는 곳은 여기다.
+   * - 판 시작 리드 `0x3d7b8` 3d8c6~3d8d2 — 판 종류가 **1(타구)** 일 때만 도루 주자의 st[0x14 + 루] = 0. 도루(5) · 폭투(9) ·
+   *   밀어내기(2) 판은 안 지운다.
+   * 그래서 공 도착 → 결과 띠 → 도루 판 재생 → (같은 타석이면 0xf, 새 타석이면 0xd · 0xe 를 지나 0xf) 까지 출발 루는 비어 보인다.
+   * 새 타석 0xe 동안에는 출발 루에 새로 선 주자도 안 그린다(원본 그대로 — 0xe 그리기도 같은 칸을 본다).
+   * 웹은 판 입력용 ref 는 판정 때 거두고(`takeStealingFrom` — 다음 공 전에 0xf 가 지우므로 같다), 표시는 0xf 진입(`askPitchSelection`)과
+   * 타구 판 시작(`clearStealDisplay`)에서 지운다.
    */
   const [stealingFrom, setStealingFrom] = useState<readonly StealBase[]>([])
   const stealingFromRef = useRef(stealingFrom)
   const takeStealingFrom = () => {
     const taken = stealingFromRef.current
     stealingFromRef.current = []
-    if (taken.length > 0) setStealingFrom([])
     return taken
+  }
+  /** 표시 칸 st[0x15 + i] 를 지운다 — 0xf 진입 0x3d954 · 타구 판 시작 0x3d7b8(종류 1) */
+  const clearStealDisplay = () => {
+    stealingFromRef.current = []
+    setStealingFrom((previous) => (previous.length === 0 ? previous : []))
   }
   /**
    * **벤치 클리어링 연출(상태 0x1e)이 붙들고 있는 사구** — 투수 미션 전용.
@@ -740,6 +755,15 @@ export function useMissionSession({
       ...(aceBatterRun === undefined ? {} : { aceBatterRun }),
     }
   }
+  /** 수비 판에 먹이는 수비 아홉 칸 · 루별 주루 — 미션 타구 · 공 도착 · 견제 판이 같은 값을 쓴다 (`missionPlayAbilitiesOf`) */
+  const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities =>
+    missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission))
+  /** 견제 판 꼴 — 견제는 타자주자가 없어 루 1~3 만 */
+  const pickoffAbilitiesOf = (run: MissionRun) => {
+    const { defenseAbilities, runAbilities } = playAbilitiesOf(run)
+    const { 0: _batter, ...onBase } = runAbilities
+    return { defenseAbilities, runAbilities: onBase }
+  }
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -780,6 +804,8 @@ export function useMissionSession({
    *   ⚠️ 근사(때): 원본은 결과 상태 0x12 가 끝난 뒤 0xf 로 들어서 22 가 그때 난다 — 웹은 심판 콜과 붙는다. 그 사이 굴림은 없다.
    */
   const askPitchSelection = (kind: 'new' | 'same') => {
+    // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e · 3da70)보다 앞이다
+    clearStealDisplay()
     const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
     const run = isPitcherSide ? pitcherRun : missionRun
     if (run === null || run.status !== '진행중') return
@@ -906,13 +932,15 @@ export function useMissionSession({
       ) {
         const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, detail.foulContact)
         const foulStealing = takeStealingFrom()
+        // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
+        clearStealDisplay()
         playSoundIds(audio, [detail.contactSoundId])
         // 배트를 냈다 — 스윙 수는 휘두른 자리에서 준다. 다 썼는지는 판이 파울로 닫힌 뒤 본다
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
         setPendingDefensePlay({
           side: '타자',
           input: {
-            ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random),
+            ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random, undefined, undefined, playAbilitiesOf(foulRun)),
             stealingFrom: foulStealing,
             buntKind,
             // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
@@ -945,9 +973,9 @@ export function useMissionSession({
                 stealingFrom: stealing,
                 bases: current.bases,
                 outs: current.outs,
-                // 루별 주루 — 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로 0xb570d(ctx, 3, 주자, 1, 90, 1), 0 은 지금 타자
-                // (`missionRunAbilitiesOnBaseOf`). 아홉 칸 수비는 미션 타구(`missionDefensePlayInputOf`)와 같은 진행기 기본값(500)이다
-                runAbilities: missionRunAbilitiesOnBaseOf(current, specialRunnersRef.current(current.mission)),
+                // 루별 주루 — 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로 0xb570d(ctx, 3, 주자, 1, 90, 1), 0 은 지금 타자.
+                // 아홉 칸 수비는 CPU 수비 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)
+                ...playAbilitiesOf(current),
                 // 타자 미션은 수비가 CPU · 공격이 사람. 주루 설정은 안 넘긴다(기본 자동 — 견제와 같다)
                 defenseIsCpu: true,
                 offenseIsCpu: false,
@@ -1005,10 +1033,12 @@ export function useMissionSession({
         // 스윙 수만 먼저 줄이고 **루·아웃·목표는 한 톨도 건드리지 않는다** — 수비 화면이
         // 다 돈 뒤 `finishDefensePlay` 가 한 번에 먹인다 (원본도 0x17 이 도는 동안 0xf 로 안 간다)
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
+        // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
+        clearStealDisplay()
         setPendingDefensePlay({
           side: '타자',
           input: {
-            ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random),
+            ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random, undefined, undefined, playAbilitiesOf(current)),
             isUncatchable,
             // 공이 나는 동안 출발한 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
             stealingFrom: stealing,
@@ -1306,6 +1336,8 @@ export function useMissionSession({
             outs: pitcherRun.outs,
             // 루별 주루 — CPU 타선 주자 신원대로, 0 은 지금 타자(낫아웃 타자주자)
             runAbilities: pitcherRunAbilities,
+            // 아홉 칸 수비 — 사람 칸 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)
+            defenseAbilities: missionDefenseAbilitiesOf(pitcherRun),
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: throwModeManual === false ? '자동' : '수동',
@@ -1360,7 +1392,15 @@ export function useMissionSession({
       setPendingDefensePlay({
         side: '투수',
         input: {
-          ...missionDefensePlayInputOf(nextRun.bases, nextRun.outs, foulOutcome, random, MISSION_PITCHER_MODE, throwModeManual),
+          ...missionDefensePlayInputOf(
+            nextRun.bases,
+            nextRun.outs,
+            foulOutcome,
+            random,
+            MISSION_PITCHER_MODE,
+            throwModeManual,
+            playAbilitiesOf(nextRun),
+          ),
           stealingFrom,
           // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
           strikes: strikesBefore,
@@ -1389,6 +1429,7 @@ export function useMissionSession({
             MISSION_PITCHER_MODE,
             // 사람이 수비다 — 환경설정 송구(+0xf4)가 그대로 0xae6c8 의 답이 된다
             throwModeManual,
+            playAbilitiesOf(nextRun),
           ),
           // 0x517e6 — 마타자 필살이 성공한 타구는 필살타법 표시 속성 4(0xaf180 — 송구 공과 무관)가 서서 야수가 쥐지 못한다
           isUncatchable: thrown.isUncatchable,
@@ -1900,7 +1941,7 @@ export function useMissionSession({
      * 판은 바로 다 돌려 진루·아웃을 먹이고(`applyPickoff`), 화면은 `pickoffReplay` 를 재생한다(나만의리그와 같은 꼴).
      * 남은 타석·스윙은 그대로다 — 공을 안 던졌다. 볼카운트도 그대로지만, 견제사로 3아웃이면 판정 B 0xae3e8 이 0x18 로 보내
      * 이 타석이 끊기고 다음은 새 타석(0xd → 0xe)이다.
-     * 수비 능력치·주루는 미션 타구(`missionDefensePlayInputOf`)와 같은 기본값이다: 아홉 칸 기본 능력치, 사람 공격,
+     * 수비 능력치·주루는 미션 타구와 같은 값이다(`missionPlayAbilitiesOf` — CPU 수비 팀 레코드 0xb0fb4 · 주자 신원의 주력), 사람 공격,
      * 주루 설정은 안 넘긴다(진행기 기본 = 자동) — 미션 세션에는 환경설정 "주루" 가 들어오지 않는다(근사, 타구와 같다).
      *
      * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
@@ -1923,6 +1964,8 @@ export function useMissionSession({
         // 슬롯 2 의 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a · 4dec1e1 의 타자편 cpuPickoff 와 같다).
         // 송구 설정(+0xf4)은 둘째 항이라 안 넘긴다
         defenseIsCpu: true,
+        // 수비 아홉 칸(CPU 팀 레코드, 0xb0fb4) · 루별 주루(사람 칸 팀 주자 신원)
+        ...pickoffAbilitiesOf(current),
       })
       const interrupted = current.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
       setMissionRun((previous) => (previous === null ? previous : settleBatterRun(applyPickoff(previous, result.advance, result.runnerFates))))
@@ -1953,7 +1996,7 @@ export function useMissionSession({
      * 판은 투수편 `pickoff`(4dec1e1)와 같은 입력이다: 사람 수비 · 환경설정 "송구"(+0xf4)가 0xae6c8 의 답, 공격은 CPU.
      * 끝은 판정 B 0xae3e8 — 아웃 ≤ 2 면 같은 타석 0xf(ae592), 정산 0xa8024 는 늘(ae5a8) → 실점은 주자 운명으로 센다.
      * 3아웃이면 0x18 — 타석이 끊긴다. 견제는 투구가 아니라 투구 수·볼카운트·마구 칸을 안 건드린다.
-     * ⚠️ 근사: 수비 아홉 칸·주자 주루는 미션 타구와 같은 진행기 기본값이다(레코드에 팀·타순이 없다).
+     * 수비 아홉 칸·주자 주루는 미션 타구와 같은 값이다(`missionPlayAbilitiesOf` — 사람 칸 팀 레코드 0xb0fb4 · CPU 주자 신원의 주력).
      * 견제사는 아웃 콜(결과 13 → 0xa7d0c)이 R+0x13c 를 올려 '아웃' 목표에도 든다 — 판 끝 판정 0xaaa6c(ae5c4)가 바로 본다
      * (`outCallsOf`).
      * 같은 타석으로 돌아가면 0xf 진입 0x3d954 가 CPU 대타 0xac228 을 다시 묻는다 (`missionCpuTeam`, 위 0xf 진입 효과).
@@ -1978,6 +2021,8 @@ export function useMissionSession({
         // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다
         defenseIsCpu: false,
         throwMode: throwModeManual === false ? '자동' : '수동',
+        // 수비 아홉 칸(사람 칸 팀 레코드, 0xb0fb4) · 루별 주루(CPU 타선 주자 신원)
+        ...pickoffAbilitiesOf(pitcherRun),
       })
       const interrupted = pitcherRun.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])

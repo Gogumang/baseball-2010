@@ -27,7 +27,7 @@ export interface HudState {
   readonly bases: { readonly first: boolean; readonly second: boolean; readonly third: boolean }
   readonly ourLogoUrl: string
   readonly opponentLogoUrl: string
-  /** 펜스 팀 아이콘용 팀 번호 — 없으면 11 번 아이콘 (원본도 모드 5·6 은 11) */
+  /** 펜스 팀 아이콘 · 루상 주자 팔레트용 팀 번호 — 없으면 11 번 아이콘. 모드 5·6(미션)은 번호가 있어도 펜스는 11 (0x77974 77ae4~77af0) */
   readonly ourTeamId?: number
   readonly opponentTeamId?: number
   /**

@@ -28,7 +28,7 @@ import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSc
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
-import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
+import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 
@@ -142,6 +142,9 @@ interface MissionPlayScreenProps {
  * 행은 "모드 5~7 → 1" 이라 5·6 어느 쪽이든 같은 칸이 나온다.
  */
 const MISSION_BATTER_MODE = 6
+/** `team_logo_ini` 작은 로고 — 팀 경기 · 타자편 화면과 같은 경로 */
+const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+
 type MenuOverlay = '조작방법' | '설정'
 
 export function MissionPlayScreen({
@@ -192,6 +195,7 @@ export function MissionPlayScreen({
     setLiveGameInningIndex(missionInningIndex)
   }, [run.mission, missionInningIndex])
   /** 경기 점수판 0xb69b0(st[0x7e] · st[0x7f]) — 사람 칸 · CPU 칸. 타석 득점 · 자동진행 반 이닝 득점이 모두 든다(`run.game.scores`) */
+  const teamIds = missionTeamIdsOf(run)
   const humanScore = run.game.scores[humanSideOf(run.mission)]
   const cpuScore = run.game.scores[cpuSideOf(run.mission)]
 
@@ -344,7 +348,7 @@ export function MissionPlayScreen({
             isVibrationOn={settings?.isVibrationOn}
             pitcherAbility={pitcherAbility}
             isEagleEyeEnabled={false}
-            // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0)을 HUD 에 보인다. 미션 팀 로고는 레코드에 없어 기본 두 팀을 쓴다 (추정)
+            // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0 · 팀 st[0x28 + 칸])을 HUD 에 보인다
             hud={{
               inning: run.game.inning + 1,
               half: run.game.offenseSide === 0 ? '초' : '말',
@@ -356,8 +360,12 @@ export function MissionPlayScreen({
               bases: run.bases,
               ...(runnerRunAbilities === undefined ? {} : { runnerRunAbilities }),
               ...(stealingFrom === undefined ? {} : { hiddenRunnerBases: stealingFrom }),
-              ourLogoUrl: './sprites/team_logo_ini/000.png',
-              opponentLogoUrl: './sprites/team_logo_ini/001.png',
+              // 경기[0x28 + 칸] 팀의 작은 로고 (0x48658 48a38~48a74 → 장면+0x1054 · +0x1058) — 사람 칸 · CPU 칸 (`missionTeamIdsOf`)
+              ourLogoUrl: smallLogoUrlOf(teamIds.human),
+              opponentLogoUrl: smallLogoUrlOf(teamIds.cpu),
+              // 루상 주자 팔레트(0x35b94 — 주자 +0xac 팀) · 펜스 아이콘(0x77974 — 모드 5 · 6 은 77ae4~77af0 에서 늘 11)
+              ourTeamId: teamIds.human,
+              opponentTeamId: teamIds.cpu,
               // 위 줄 = 측 0(선공) · 아래 줄 = 측 1 (0x373d0 — 점수 0xb69b1(st, 0) · (st, 1)). 사람은 미션의 측에 앉는다
               playerSide: humanSideOf(run.mission),
             }}

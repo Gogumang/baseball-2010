@@ -334,8 +334,10 @@ function drawTeamIcons(
   state: SceneryState,
   boxes: readonly (readonly number[])[],
 ): void {
+  // 0x77974 77ad6~77af0 · 77b4a~77b64 — 14 → 10, 10 이상 → 11 을 고른 뒤 **전역 모드 5 · 6(미션)이면 늘 11** 로 덮는다
+  const isMissionMode = state.gameMode === 5 || state.gameMode === 6
   const icons = [state.ourTeamId, state.opponentTeamId].map((teamId) =>
-    teamId === null ? MISSION_TEAM_ICON : teamIconOf(teamId),
+    teamId === null || isMissionMode ? MISSION_TEAM_ICON : teamIconOf(teamId),
   )
   TEAM_ICON_BOXES.forEach((boxIndex, index) => {
     const box = boxes[boxIndex]

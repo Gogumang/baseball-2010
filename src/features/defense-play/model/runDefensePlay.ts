@@ -199,6 +199,12 @@ export interface DefensePlayInput {
   /** 주자들의 주루 능력치. 기본 500 */
   readonly runAbility?: number
   /**
+   * **루별 주자 주루** (0 = 타자주자, 1~3 = 그 루에서 출발한 주자). 없는 루는 `runAbility` 다.
+   * 원본은 주자마다 제 레코드로 속도를 잡는다 — 타자주자 만들기 0xa93ac 의 a9462 `0xb570c(팀, 3, 타자, 90)` 이
+   * 주자+0xa4 에 적고, 루에 선 주자는 제 타석에서 만든 그 칸을 그대로 들고 간다(I-controls 3a).
+   */
+  readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
+  /**
    * 이번 투구에 출발한 도루 주자들의 루 — state[0x14 + 루] (`0xa9bd4`). 판이 열릴 때 `0x3d7b8` 이 이 주자들은
    * 다음 루를 목표로 `0xcffa8`[루] + rand(0,9)(2 이하 → 3) 틱, 나머지는 `0xcffb0`[루] 틱 몰아 돌린다.
    * 안 주면 아무도 출발 안 했다.
@@ -555,7 +561,7 @@ export interface MutableRunner {
  */
 function createPlayRunners(
   bases: BaseState,
-  speed: number,
+  speedOf: (fromBase: number) => number,
   firstBaseException: FirstBaseException | null = null,
 ): MutableRunner[] {
   // 포스 사슬 머리 — 타자주자는 1루로 간다 (0xa93ac 가 +0x88 = 1)
@@ -572,7 +578,7 @@ function createPlayRunners(
     const minimumBase = pushed === null || index === 0 ? chained : pushed[index] ? fromBase + 1 : fromBase
     const targetBase = minimumBase > fromBase ? fromBase + 1 : fromBase
     return {
-      state: createRunner(index, fromBase, speed, { targetBase, isBatterRunner: index === 0 }),
+      state: createRunner(index, fromBase, speedOf(fromBase), { targetBase, isBatterRunner: index === 0 }),
       minimumBase,
       previousTarget: fromBase,
       counted: false,
@@ -888,7 +894,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   let trajectory = input.trajectory
   const abilities =
     input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
-  const speed = runnerSpeedOf(input.runAbility ?? DEFAULT_ABILITY)
+  const speedOf = (fromBase: number) =>
+    runnerSpeedOf(input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY)
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
 
   let fielders = createFielders(abilities)
@@ -970,7 +977,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   // 0xa9e44 의 1루 주자 예외 (a9ed6) — 2아웃 전 잡힐 뜬공이면 1루 주자는 포스 목표를 안 받는다
   const runners = createPlayRunners(
     input.bases,
-    speed,
+    speedOf,
     onTheFly && input.outs !== 2 ? { stealingFrom: input.stealingFrom ?? [] } : null,
   )
 

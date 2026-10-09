@@ -164,3 +164,28 @@ describe('견제를 받은 야수의 CPU 송구 결정 — 슬롯 2 의 0xafa60 
     expect(굴림(true)).toEqual(굴림(false))
   })
 })
+
+describe('견제 판 루별 주자 주루', () => {
+  it('runAbilities 가 그 루 주자의 속도를 정한다 — 같은 값이면 runAbility 와 같은 판', () => {
+    const 같은 = runPickoffPlay({ targetBase: 1, bases: 만루, outs: 1, offenseIsCpu: true, random: createSeededRandom(7), runAbility: 700 })
+    const 루별 = runPickoffPlay({
+      targetBase: 1,
+      bases: 만루,
+      outs: 1,
+      offenseIsCpu: true,
+      random: createSeededRandom(7),
+      runAbilities: { 1: 700, 2: 700, 3: 700 },
+    })
+    expect(루별.ticks).toEqual(같은.ticks)
+    const 느린 = runPickoffPlay({
+      targetBase: 1,
+      bases: 만루,
+      outs: 1,
+      offenseIsCpu: true,
+      random: createSeededRandom(7),
+      runAbility: 700,
+      runAbilities: { 1: 0 },
+    })
+    expect(느린.ticks).not.toEqual(같은.ticks)
+  })
+})
