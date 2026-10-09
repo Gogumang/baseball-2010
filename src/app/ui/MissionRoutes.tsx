@@ -248,6 +248,8 @@ export function MissionRoutes({
         onPickoff={actions.cpuPickoff}
         // 도루 출발 (0x53610 → 0x583 → 0xa9bd4) — 판정은 공이 도착할 때 도루 판(종류 5)이 한다
         stealableBases={session.stealableBases}
+        // 상태 0xe 주루 칸 — 루에 선 주자의 신원대로 (`missionRunnerRunAbilitiesOf`)
+        runnerRunAbilities={session.missionRunnerRunAbilities}
         onSteal={actions.steal}
         // 경기 중 "나가기" — 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음). 마선수 대결도 플래그를 안 보고 같은
         // 길이다 — 진 결과 이벤트는 다음 타자편 105 진입이 띄운다 (파일 머리 "마선수 대결의 경기 중 나가기" 주석)

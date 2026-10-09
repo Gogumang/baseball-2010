@@ -31,6 +31,10 @@ import type { MissionAutoHalf, MissionGame } from '@/entities/mission/model/miss
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import { drainMissionAutoTicks } from '@/entities/mission/model/missionAutoRelay'
 import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineup'
+import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
+import { survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import { missionRunnersAfterPlay, missionRunnersOf, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -55,6 +59,10 @@ export interface MissionRun {
   readonly remainingSwings: number | null
   /** 누상 주자 */
   readonly bases: BaseState
+  /**
+   * **루에 선 주자의 신원** — 사람이 맡은 반 이닝의 공격 팀 타순 칸(`missionRunners`). 없거나 루와 어긋나면(옛 판) 예전 근사로 본다
+   */
+  readonly runners?: BaseRunners
   /** 현재 아웃 */
   readonly outs: number
   /**
@@ -75,6 +83,8 @@ export function limitOrNull(limit: number): number | null {
 
 /** `setup` — 마선수 대결이면 사람 칸 팀을 바꾼다 (`missionHumanTeamIdOf`, 0xaa57c aa6dc~aa728) */
 export function startMission(mission: OriginalMission, setup: MissionGameSetup = {}): MissionRun {
+  const cpu = startMissionCpuTeam(mission)
+  const game = startMissionGame(mission, setup)
   return {
     mission,
     progress: createProgress(),
@@ -83,9 +93,11 @@ export function startMission(mission: OriginalMission, setup: MissionGameSetup =
     remainingPlateAppearances: limitOrNull(mission.plateAppearanceLimit),
     remainingSwings: limitOrNull(mission.swingLimit),
     bases: mission.start.runners,
+    // 시작 주자 — 0xaae7c aafbc → 0xa9a10: 앞선 찬 루부터 지금 타자 칸에서 거꾸로 1 · 2 · 3 번째 타순 칸
+    runners: missionStartRunnersOf({ mission, bases: mission.start.runners, game, cpu }),
     outs: mission.start.outs,
-    cpu: startMissionCpuTeam(mission),
-    game: startMissionGame(mission, setup),
+    cpu,
+    game,
   }
 }
 
@@ -246,7 +258,15 @@ export function advanceSituation(
   random?: RandomPort,
   /** 화면이 이미 다 돌린 수비 플레이. 주면 여기서 다시 굴리지 않는다 */
   played?: DefensePlayResult,
-): { bases: BaseState; outs: number; runsScored: number; outcome: AtBatOutcome; inningEnded: boolean } {
+): {
+  bases: BaseState
+  outs: number
+  runsScored: number
+  outcome: AtBatOutcome
+  inningEnded: boolean
+  /** 정산 0xa8024 가 읽는 주자 목록의 운명 — 신원을 앉히는 실마리 (`missionRunnersAfterPlay`) */
+  runnerFates: readonly RunnerFate[]
+} {
   const play = missionPlay(run.bases, run.outs, outcome, { random, played })
   const advance = play.advance
   const outs = run.outs + advance.outsAdded
@@ -257,9 +277,17 @@ export function advanceSituation(
       runsScored: advance.runsScored,
       outcome: play.outcome,
       inningEnded: true,
+      runnerFates: play.runnerFates,
     }
   }
-  return { bases: advance.bases, outs, runsScored: advance.runsScored, outcome: play.outcome, inningEnded: false }
+  return {
+    bases: advance.bases,
+    outs,
+    runsScored: advance.runsScored,
+    outcome: play.outcome,
+    inningEnded: false,
+    runnerFates: play.runnerFates,
+  }
 }
 
 /**
@@ -356,6 +384,12 @@ export function applyOutcome(
   const advanced: MissionRun = {
     ...run,
     bases: situation.bases,
+    // 판의 살아남은 주자로 신원을 민다 — 지금 타자 칸은 판 앞 타순(정산 뒤 0xaf020 이 넘긴다)
+    runners: missionRunnersAfterPlay(run, { bases: situation.bases, inningOver: situation.inningEnded }, {
+      batterReached: isBatterReachedKind(situation.outcome.kind),
+      runsScored: situation.runsScored,
+      survivorsFromBase: survivorsFromBaseOfFates(situation.runnerFates),
+    }),
     outs: situation.outs,
     // 점수판 득점 0xa5c34 → CPU 수비 투수의 실점 A·B, 3아웃이면 이닝 교대 0xa5b00 의 A = 0
     cpu: missionCpuAfterRuns(run.cpu, situation.runsScored, situation.inningEnded),
@@ -402,7 +436,9 @@ export function applySteal(run: MissionRun): MissionRun {
 
   const progress = recordSteal(run.progress)
   const bases = { ...run.bases, first: false, second: true }
-  return { ...run, bases, progress, status: isCleared(run.mission, progress) ? '성공' : '진행중' }
+  const before = missionRunnersOf(run)
+  const runners = { ...before, first: null, second: before.first }
+  return { ...run, bases, runners, progress, status: isCleared(run.mission, progress) ? '성공' : '진행중' }
 }
 
 /**
@@ -416,16 +452,26 @@ export function applySteal(run: MissionRun): MissionRun {
  * ⚠️ 악송구로 들어온 득점은 타점이 아니라 목표에 안 들고, 화면 점수(시작 점수 + 타점)에도 안 보인다 — 웹 미션은
  *    득점 칸을 따로 들지 않는다(근사).
  */
-export function applyPickoff<T extends MissionRun>(run: T, advance: AdvanceResult): T {
+export function applyPickoff<T extends MissionRun>(
+  run: T,
+  advance: AdvanceResult,
+  /** 판의 주자 운명 — 살아남은 주자로 신원을 앉힌다(낫아웃 판이면 타자주자 0 포함). 안 주면 앞선 주자부터 앉히는 근사 */
+  runnerFates?: readonly RunnerFate[],
+): T {
   if (run.status !== '진행중') return run
   const outs = run.outs + advance.outsAdded
   // 판의 득점도 점수판 득점 0xa5c34 라 CPU 수비 투수의 실점 A·B 에 든다 (타자 미션)
   const isInningOver = outs >= OUTS_PER_INNING
   const cpu = missionCpuAfterRuns(run.cpu, advance.runsScored, isInningOver)
   const game = afterHumanPlateAppearance(run.game, run.mission, null, advance.runsScored, isInningOver)
+  const runners = missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
+    batterReached: runnerFates?.some((fate) => fate.fromBase === 0 && !fate.retired) === true,
+    runsScored: advance.runsScored,
+    ...(runnerFates === undefined ? {} : { survivorsFromBase: survivorsFromBaseOfFates(runnerFates) }),
+  })
   const moved: T = isInningOver
-    ? { ...run, bases: EMPTY_BASES, outs: 0, cpu, game }
-    : { ...run, bases: advance.bases, outs, cpu, game }
+    ? { ...run, bases: EMPTY_BASES, runners, outs: 0, cpu, game }
+    : { ...run, bases: advance.bases, runners, outs, cpu, game }
   return judgedAtGameEnd(moved, outs)
 }
 
@@ -439,6 +485,7 @@ export function failSteal(run: MissionRun): MissionRun {
       {
         ...run,
         bases: EMPTY_BASES,
+        runners: EMPTY_BASE_RUNNERS,
         outs: 0,
         cpu: missionCpuAfterRuns(run.cpu, 0, true),
         game: afterHumanPlateAppearance(run.game, run.mission, null, 0, true),
@@ -446,7 +493,7 @@ export function failSteal(run: MissionRun): MissionRun {
       outs,
     )
   }
-  return { ...run, bases, outs }
+  return { ...run, bases, runners: { ...missionRunnersOf(run), first: null }, outs }
 }
 
 /** 반 이닝을 몇 번까지 자동으로 돌리나 — 경기 끝(연장도 결국 끝난다) 전에 멈출 일이 없게 넉넉히 */
@@ -529,7 +576,15 @@ export function* batterMissionAutoTicks(
     }
     if (humanHalf.gameEnded) return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, status: '실패' }
     if (humanHalf.stoppedBeforeNari) {
-      return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching }, bases: humanHalf.bases, outs: humanHalf.outs }
+      // 간이 엔진이 민 주자 신원(타순 칸)을 그대로 이어받는다 — 사람 칸 팀 타선이 미션 타자 앞까지 세운 주자
+      return {
+        ...run,
+        game,
+        cpu: { ...run.cpu, pitching: cpuPitching },
+        bases: humanHalf.bases,
+        runners: humanHalf.runners,
+        outs: humanHalf.outs,
+      }
     }
   }
   return { ...run, game, cpu: { ...run.cpu, pitching: cpuPitching } }
@@ -537,4 +592,9 @@ export function* batterMissionAutoTicks(
 
 export function giveUp(run: MissionRun): MissionRun {
   return run.status === '진행중' ? { ...run, status: '실패' } : run
+}
+
+/** 타자가 살아 나간 결과 종류 — 안타 · 볼넷 · 사구 (운명이 없을 때만 본다) */
+function isBatterReachedKind(kind: AtBatOutcome['kind']): boolean {
+  return kind === '안타' || kind === '볼넷' || kind === '사구'
 }

@@ -271,6 +271,8 @@ export function App() {
     // 투수편 세션은 시작할 때 저장을 올려 두므로 `career` 가 곧 저장된 투수다 (`modePitcherOf`)
     pitcher: pitcherMissionPitcher,
     ...(missionBatterSkillIds === undefined ? {} : { batterSkillIds: missionBatterSkillIds }),
+    // 루에 선 미션 타자의 주력 (0xb570d(ctx, 3, 나, 1, 90, 1)) — 라우트가 치는 타자로 넘기는 `modeBatterOf` 와 같은 값
+    batterRunAbility: modeBatterOf(missionBatterCareer ?? null).ability.run,
     // 선수 고르기에서 명예 선수(+0xa5/+0xa6 ≥ 0)를 고르면 0x1fbd0 · 0x1fc20 이 이 기록을 준다.
     // 기록연감 훅은 미션 세션보다 늦게 서므로(올 클리어를 본다) 지난 그림의 값을 넘긴다 — 명전은 미션 중에 안 바뀐다
     hallOfFame: hallOfFameForMissionRef.current,

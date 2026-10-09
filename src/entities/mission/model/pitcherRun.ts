@@ -13,7 +13,9 @@ import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { limitOrNull, missionPlay } from '@/entities/mission/model/missionRun'
 import type { MissionRun, MissionStatus } from '@/entities/mission/model/missionRun'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { baserunnerAllowedOfFates, chargedRunsOfFates } from '@/features/defense-play/model/runnerFates'
+import { baserunnerAllowedOfFates, chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
+import { missionRunnersAfterPlay, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   insertMissionAceBatter,
@@ -67,6 +69,8 @@ export { inningGoalOf, OUTS_PER_INNING } from '@/entities/mission/model/missionG
 
 /** `setup` — 마선수 대결이면 사람 칸 팀을 바꾼다 (`missionHumanTeamIdOf`, 0xaa57c aa6dc~aa728) */
 export function startPitcherMission(mission: OriginalMission, setup: MissionGameSetup = {}): PitcherRun {
+  const cpu = startMissionCpuTeam(mission)
+  const game = startMissionGame(mission, setup)
   return {
     mission,
     progress: createProgress(),
@@ -77,11 +81,13 @@ export function startPitcherMission(mission: OriginalMission, setup: MissionGame
     remainingPitches: limitOrNull(mission.pitchLimit),
     perfectGauges: 0,
     bases: mission.start.runners,
+    // 시작 주자 — 0xaae7c aafbc → 0xa9a10: 앞선 찬 루부터 CPU 공격 팀 지금 타자 칸에서 거꾸로 1 · 2 · 3 번째 타순 칸
+    runners: missionStartRunnersOf({ mission, bases: mission.start.runners, game, cpu }),
     outs: mission.start.outs,
     totalOuts: 0,
     allowed: { runs: 0, hits: 0, walks: 0, baserunner: 0 },
-    cpu: startMissionCpuTeam(mission),
-    game: startMissionGame(mission, setup),
+    cpu,
+    game,
   }
 }
 
@@ -160,6 +166,12 @@ function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: Pitcher
   const isInningOver = outs >= OUTS_PER_INNING
   return {
     bases: isInningOver ? EMPTY_BASES : advance.bases,
+    // 판의 살아남은 주자로 CPU 타선 신원을 민다 — 지금 타자 칸은 판 앞 타순(정산 뒤 0xaf020 이 넘긴다)
+    runners: missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
+      batterReached: settled.kind === '안타' || settled.kind === '볼넷' || settled.kind === '사구',
+      runsScored: advance.runsScored,
+      survivorsFromBase: survivorsFromBaseOfFates(runnerFates),
+    }),
     outs: isInningOver ? 0 : outs,
     outsAdded: advance.outsAdded,
     /** 점수판 득점 (0xa5c34) — CPU 측 점수 */
@@ -225,6 +237,7 @@ export function applyPitcherOutcome(
     remainingPlateAppearances: remainingPlate,
     perfectGauges: 0,
     bases: defense.bases,
+    runners: defense.runners,
     outs: defense.outs,
     totalOuts,
     allowed,
@@ -269,7 +282,7 @@ export function* pitcherMissionAutoTicks(run: PitcherRun, random: RandomPort): G
   const auto = yield* simulateHumanTeamAutoHalfTicks(flipMissionHalf(settled.game), random)
   if (auto.gameEnded) return { ...settled, game: auto.game, status: '실패' }
   const game = flipMissionHalf(auto.game)
-  const judged: PitcherRun = { ...settled, game, bases: EMPTY_BASES, outs: 0 }
+  const judged: PitcherRun = { ...settled, game, bases: EMPTY_BASES, runners: EMPTY_BASE_RUNNERS, outs: 0 }
   const status = judgeStatus(judged, 0)
   if (status !== '진행중') return { ...judged, status }
   return { ...judged, ...reinsertedAce(judged) }
