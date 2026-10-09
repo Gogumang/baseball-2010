@@ -276,6 +276,8 @@ export function App() {
     onGamePointReward: careerSession.actions.gainGamePoint,
     // 정산 4ef86 — 편별 올클리어면 히든 37 · 21 을 열고 알림 창 (0x62368)
     openHidden,
+    // 정산 끝 0x4e8b0 — 모드 5 · 6 플레이 시간 (칸 +0x54)
+    recordStat,
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
     // 환경설정 진동 (저장 +0x3b) — 투수 미션·투수편 마선수 대결의 사람 공 삼진 진동(0x4d0d6)이 본다
