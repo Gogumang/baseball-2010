@@ -244,6 +244,11 @@ export interface CpuBatterTraits {
    */
   readonly batterSkillIds?: readonly number[]
   /**
+   * **던지는 사람 투수 레코드 +0x14 의 장착 스킬 번호**(비트 + 16) — 같은 스킬 갈래가 `0xb62b4(투수, n)` 로 읽는다(모드 검사 없음).
+   * 나리 · 미션 투수는 장착 비트(`PitcherCareer.equippedSkillIds`), 팀 경기 명단 투수는 제 줄 비트(마투수는 제 행). 안 넘기면 없음
+   */
+  readonly pitcherSkillIds?: readonly number[]
+  /**
    * 그 스킬들이 보는 경기 상황(이닝 · 공격 팀이 지는가(ab966: 수비 점수 > 공격 점수) · 주자 · 2루 · 타자 결과 링 · 타자 레코드 칸
    * 0xb6394). 볼카운트는 `situation` 의 것을, 손은 공 · 화면 배치를 쓴다. 안 넘기면 1회 · 이기는 중 · 주자 없음 · 빈 링 · 칸 0
    */
@@ -447,10 +452,9 @@ export function pitchAgainstBatterDetailed(
       boost,
       // ab838 — 투수 체력% 0 이면 B · C 에 +2000
       isPitcherExhausted: traits.pitcherStaminaPercent === 0,
-      // 0xab214 ab91c~ — 두 레코드 +0x14 를 `0xb62b4` 로 읽는다(모드 검사 없음). CPU 타자 쪽은 부르는 쪽이 싣는다.
-      // ⚠️ 사람 투수(내 투수) 쪽 비트는 아직 안 싣는다 — 미해결
+      // 0xab214 ab91c~ — 두 레코드 +0x14 를 `0xb62b4` 로 읽는다(모드 검사 없음). CPU 타자 · 사람 투수 둘 다 부르는 쪽이 싣는다
       batterSkillIds: traits.batterSkillIds ?? [],
-      pitcherSkillIds: [],
+      pitcherSkillIds: traits.pitcherSkillIds ?? [],
       // 0xab214 는 투수·타자 레코드로 손(0xb63c0)·칸(0xb6394)을 바로 읽는다. 투수 손은 공에 실린 폼·+0x18 로,
       // 타자 손은 화면 배치(`stageSide` = 0x3b084 의 0xb63c1(타자))로 둔다. 볼카운트는 state+4·+5(이 공 앞)
       situation: {

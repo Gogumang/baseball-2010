@@ -270,7 +270,7 @@ describe('투수 미션의 지금 CPU 타자 — 0xae89c(공격 팀) = 타순 te
     // 투수 2 — 팀 6, 시작 타순 8
     const team = startMissionCpuTeam(missionOf('투수', 2))
     const rows = teamBatters(6)
-    expect(missionCpuBatterOf(team)).toEqual({ order: 8, isAce: false, row: rows[8] })
+    expect(missionCpuBatterOf(team)).toEqual({ order: 8, isAce: false, row: rows[8], rosterSlot: 8 })
     expect(missionCpuBatterAbilityOf(team)).toEqual({
       hit: rows[8].ability[0],
       power: rows[8].ability[1],
@@ -278,12 +278,12 @@ describe('투수 미션의 지금 CPU 타자 — 0xae89c(공격 팀) = 타순 te
       run: rows[8].ability[3],
     })
     const next = missionCpuAfterPlateAppearance(team, 아웃)
-    expect(missionCpuBatterOf(next)).toEqual({ order: 0, isAce: false, row: rows[0] })
+    expect(missionCpuBatterOf(next)).toEqual({ order: 0, isAce: false, row: rows[0], rosterSlot: 0 })
   })
 
   it('마타자 칸이면 isAce · 능력치 null(부르는 쪽이 마선수 값), 다음 타순은 마스터 줄', () => {
     const team = startMissionCpuTeam(missionOf('투수', 18))
-    expect(missionCpuBatterOf(team)).toEqual({ order: 3, isAce: true, row: null })
+    expect(missionCpuBatterOf(team)).toEqual({ order: 3, isAce: true, row: null, rosterSlot: MISSION_ACE_ROSTER_SLOT })
     expect(missionCpuBatterAbilityOf(team)).toBeNull()
     const next = missionCpuAfterPlateAppearance(team, 아웃)
     expect(missionCpuBatterOf(next)?.row).toBe(teamBatters(14)[4])

@@ -298,6 +298,20 @@ export interface TeamEntryBatter {
    * ⚠️ 마타자는 XlsACE_BAT 행의 +0x14 를 아직 안 뽑아 없다(0)
    */
   readonly skillBits?: number
+  /**
+   * 레코드 칸 `0xb6394` = `+0xa & 0x1f` — 경기 장면 셋업 0x39fdc(3a2fa · 3a302)가 두 팀에 0xb8768 → 0xb603c 를 불러 마선수
+   * 아닌 줄을 **경기 시작 때의 레코드 첨자**로 다시 매기고(0xb6605), 마타자는 XlsACE_BAT 순번(+0xa = 0x40 + 순번) 그대로다.
+   * 대타 0xaebe4 는 명단 칸(team+0xe)만 맞바꿔 레코드 +0xa 는 그대로라 선수를 따라간다. 0xab214 의 투수 스킬 31(0xabcd8)이
+   * 2·3·4 를 본다. 경기를 세울 때(`withEntryRecordSlots`) 단다 — 없으면 0
+   */
+  readonly recordSlot?: number
+}
+
+/**
+ * 경기 시작 명단에 레코드 칸 0xb6394 를 단다 — 마선수 아닌 줄은 첨자(0xb603c), 마타자는 순번 (`TeamEntryBatter.recordSlot`)
+ */
+export function withEntryRecordSlots(entry: readonly TeamEntryBatter[]): readonly TeamEntryBatter[] {
+  return entry.map((batter, index) => ({ ...batter, recordSlot: batter.aceIndex >= 0 ? batter.aceIndex : index }))
 }
 
 /** 리그 로스터 선수가 아니다 (마타자 — `0x1f84c` 로 저장에서 꺼낸 레코드) */

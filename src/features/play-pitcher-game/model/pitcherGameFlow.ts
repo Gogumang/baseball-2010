@@ -31,6 +31,7 @@ import {
 import type { GameAcePitcher, GameAceSetup, GameTeamAces } from '@/features/play-game/model/gameAces'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import {
+  BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
   batterAt,
   teamBatters,
@@ -338,6 +339,11 @@ export interface PitcherGameOptions {
   readonly pitcherIsTimid?: boolean
   /** 투수 비트 22 냉정 (스킬 38) — 실투율 −10 (0x33dca) */
   readonly pitcherIsCool?: boolean
+  /**
+   * 내 투수 레코드 +0x14 의 **장착 스킬 번호**(투수 비트 + 16, `skillIdsOfBits(비트, 투수)`) — CPU 타자 스윙 0xab214 의
+   * 스킬 갈래(ab91c~)와 간이 타석이 모드 검사 없이 `0xb62b4(투수, n)` 로 읽는다. 안 넘기면 없음
+   */
+  readonly pitcherSkillIds?: readonly number[]
   /** 라이벌전인가 (경기 뒤 사기 ×2) */
   readonly isRivalGame?: boolean
   /** 행운 스킬 (경기 뒤 사기 +1) */
@@ -1094,6 +1100,8 @@ export function startPitch(
     : aimedPitch
 
   const batter = opponentBatterAbility(options, opponentRosterSlotOf(progress))
+  // 지금 상대 타자 레코드 — 0xab214 스킬 갈래가 +0x14 · 칸 0xb6394 를 읽는다
+  const opponentBatter = quickBatterOfTeam(options, false, opponentRosterSlotOf(progress))
   // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
   // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`)
   const stealingFrom = rollCpuStealStart(
@@ -1128,8 +1136,13 @@ export function startPitch(
       // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
       pitcherStaminaPercent: staminaPercent,
       // 0xab214 ab91c~ — 상대 지금 타자 레코드 +0x14 (`0xb62b4(타자, n)` — 붙박이 줄은 Xls 행, 마타자는 제 행)
-      batterSkillIds: quickBatterOfTeam(options, false, opponentRosterSlotOf(progress)).skillIds,
+      batterSkillIds: opponentBatter.skillIds,
+      // 같은 갈래가 던지는 내 투수 레코드 +0x14 도 `0xb62b4(투수, n)` 로 읽는다 — 장착 스킬(비트 + 16)
+      pitcherSkillIds: options.pitcherSkillIds ?? [],
       skillSituation: {
+        // 투수 스킬 31(0xabcd8)의 `0xb6394(타자)` = +0xa & 0x1f — 경기 준비 0xb8768 → 0xb603c 가 마선수 아닌 줄을 레코드 첨자로
+        // 다시 매기고(붙박이 칸), 마타자는 제 순번 그대로
+        batterOrderIndex: opponentBatter.ace?.order ?? opponentRosterSlotOf(progress) % BATTERS_PER_TEAM,
         inning: progress.game.inning,
         // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
         isLosing: progress.game.ourScore > progress.game.opponentScore,
@@ -3026,7 +3039,8 @@ function quickDefenseOf(
     control: options.stats.control,
     velocity: options.stats.velocity,
     stamina: options.stats.stamina,
-    skillIds: [],
+    // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(투수, n)` 로 내 투수 레코드 +0x14 를 읽는다 (모드 검사 없음)
+    skillIds: options.pitcherSkillIds ?? [],
     // 내 육성 투수 — 레코드 +0xa 비트7(0xb6389). 간이 타석에 서면 스트라이크존 기준 −10(c182a · c1880) · 0xab214 내 선수 보너스
     isOwnPlayer: true,
   }

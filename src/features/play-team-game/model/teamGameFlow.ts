@@ -151,6 +151,7 @@ import {
   rosterEntryBattersOf,
   rosterEntryPitchersOf,
   withAceBatter,
+  withEntryRecordSlots,
   withAcePitcher,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type {
@@ -1110,17 +1111,18 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
   // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870).
   // 엔트리 편집기가 고친 차례가 있으면 그 차례가 곧 팀 레코드다 (0xb891c 는 첨자만 든다)
   const ourOrder = options.ourEntryOrder
-  const ourEntry = withAceBatter(
+  // 경기 장면 셋업 0x39fdc 가 두 팀 레코드 +0xa 를 첨자로 다시 매긴다(0xb8768 → 0xb603c) — `withEntryRecordSlots`
+  const ourEntry = withEntryRecordSlots(withAceBatter(
     ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
     options.aceBatterId ?? NO_ACE_BATTER,
-  )
+  ))
   // 상대 팀도 그 팀 레코드 차례로 선다 (0xb8680 → 0x1f570 — 트레이드로 바뀐 CPU 팀이면 바뀐 레코드)
-  const opponentEntry = withAceBatter(
+  const opponentEntry = withEntryRecordSlots(withAceBatter(
     options.opponentEntryOrder === undefined
       ? rosterEntryBattersOf(options.opponentTeamId)
       : entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder),
     opponentAces.batter,
-  )
+  ))
   // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
   const ourPitcherEntry = withAcePitcher(
     ourOrder === undefined
@@ -2745,7 +2747,11 @@ function pitchOnce(
       pitcherStaminaPercent: staminaPercent,
       // 0xab214 ab91c~ — 상대 지금 타자 레코드 +0x14 (`0xb62b4(타자, n)`, 마타자는 제 행)
       batterSkillIds: entryBatterSkillIdsOf(entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]),
+      // 같은 갈래가 던지는 우리 투수 레코드 +0x14 도 `0xb62b4(투수, n)` 로 읽는다 — 명단 투수 비트 + 16 (마투수는 제 행)
+      pitcherSkillIds: entryPitcherSkillIdsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)),
       skillSituation: {
+        // 투수 스킬 31(0xabcd8)의 `0xb6394(타자)` — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
+        batterOrderIndex: entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.recordSlot ?? 0,
         inning: progress.game.inning,
         // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
         isLosing: progress.game.ourScore > progress.game.opponentScore,

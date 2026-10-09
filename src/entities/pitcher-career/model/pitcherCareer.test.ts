@@ -1,6 +1,7 @@
 import { opponentOf, rotateLeaguePitchers, startPostseason } from '@/entities/league/model/league'
 import { describe, expect, it } from 'vitest'
 import {
+  equippedPitcherSkillIdsOf,
   GAMES_PER_SEASON,
   applyPitcherGameResult,
   applyPitcherLeagueDay,
@@ -376,5 +377,12 @@ describe('투수편 사람 경기 타석 — 리그 타자 기록표 +0x20~+0x2a
       postseason: { round: '플레이오프', qualifiers: [0, 1, 2, 3], teams: [1, 0], wins: [1, 0], winsNeeded: 3, champion: null },
     }
     expect(withPitcherGameLeagueRecords(postseason, career, undefined, [], appearances).leaguePlayerStats.batters[id]).toBeUndefined()
+  })
+})
+
+describe('equippedPitcherSkillIdsOf — 장착 비트(+0x14)를 0xab214 의 투수 스킬 번호(비트 + 16)로', () => {
+  it('비트 번호마다 +16, 번호 순 · 겹침 없음', () => {
+    expect(equippedPitcherSkillIdsOf({ equippedSkillIds: [22, 8, 15, 8] })).toEqual([24, 31, 38])
+    expect(equippedPitcherSkillIdsOf({ equippedSkillIds: [] })).toEqual([])
   })
 })

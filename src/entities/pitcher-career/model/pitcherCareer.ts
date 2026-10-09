@@ -1,4 +1,6 @@
 import { BALANCE } from '@/shared/config/original/balance'
+import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
+import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import {
   EMPTY_LEAGUE,
   advancePostseason,
@@ -653,6 +655,14 @@ export function hasPitcherSkill(career: PitcherCareer, skillId: number): boolean
  */
 export function isPitcherSkillEquipped(career: Pick<PitcherCareer, 'equippedSkillIds'>, skillId: number): boolean {
   return isSkillEquipped(career, skillId)
+}
+
+/**
+ * 장착 비트(선수기록 +0x14)를 스윙 판정 0xab214 의 **투수 스킬 번호**(비트 + 16)로 — 스킬 갈래(ab91c~)가 모드 검사 없이
+ * `0xb62b4(투수, n)` 로 읽는다 (`skillIdsOfBits(비트, 투수)`). 나리 투수 · 미션(명전) 투수가 던지는 CPU 타석이 쓴다
+ */
+export function equippedPitcherSkillIdsOf(record: Pick<PitcherCareer, 'equippedSkillIds'>): readonly number[] {
+  return skillIdsOfBits(skillBitsOfIds(record.equippedSkillIds), true)
 }
 
 /**

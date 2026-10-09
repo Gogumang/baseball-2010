@@ -1,5 +1,6 @@
 import {
   equippedPitcherAbilityOf,
+  equippedPitcherSkillIdsOf,
   isPitcherSkillEquipped,
   pitcherFormOfCareer,
 } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -79,6 +80,11 @@ export interface ModePitcher {
   readonly isCoward: boolean
   /** 소모 0xa5e14 — 투수 스킬 10 끈기 (−1) */
   readonly endures: boolean
+  /**
+   * 장착 비트(+0x14)의 **투수 스킬 번호**(비트 + 16) — CPU 타자 스윙 0xab214 의 스킬 갈래(ab91c~)가 모드 검사 없이
+   * `0xb62b4(투수, n)` 로 읽는다 (`equippedPitcherSkillIdsOf`)
+   */
+  readonly skillIds: readonly number[]
 }
 
 /** 체력 100% — `stats` 는 피로 없는 값이다 */
@@ -114,6 +120,7 @@ function rookieModePitcher(): ModePitcher {
     isTimid: false,
     isCool: false,
     hasSpiritSkill: false,
+    skillIds: [],
   }
 }
 
@@ -136,6 +143,7 @@ function modePitcherFromRecord(
     isTimid: isPitcherSkillEquipped(record, TIMID_SKILL),
     isCool: isPitcherSkillEquipped(record, COOL_SKILL),
     hasSpiritSkill: isPitcherSkillEquipped(record, SPIRIT_SKILL),
+    skillIds: equippedPitcherSkillIdsOf(record),
   }
 }
 
