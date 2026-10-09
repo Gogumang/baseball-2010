@@ -209,6 +209,30 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
     expect(applyGameResult(createCareer('선수'), { ...summary, stats: EMPTY_SEASON_STATS }).stats.stolenBases).toBeUndefined()
   })
 
+  it('포스트시즌 경기는 레코드 +0x20~+0x2c 줄(타수 · 안타 · 장타 · 홈런 · 타점)을 내 시즌 · 통산 · 동료 줄에 안 쌓는다 (0xa56dc 0xa571c)', () => {
+    const 내줄 = { ...EMPTY_SEASON_STATS, plateAppearances: 4, atBats: 3, hits: 2, doubles: 1, homeRuns: 1, runsBattedIn: 3, walks: 1, strikeouts: 1 }
+    const summary = {
+      result: '승',
+      stats: 내줄,
+      recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 3,
+      leaguePlateAppearances: [타석(0, 1, { kind: '홈런' }, 2)],
+    } as unknown as GameSummary
+    const 가을 = {
+      ...createCareer('선수'),
+      postseason: { round: '한국시리즈', teams: [0, 3], wins: [0, 0], winsNeeded: 4 } as unknown as PlayerCareer['postseason'],
+    }
+    const after = applyGameResult(가을, summary)
+    expect(after.stats).toMatchObject({ games: 1, atBats: 0, hits: 0, doubles: 0, homeRuns: 0, runsBattedIn: 0 })
+    expect(after.careerStats).toMatchObject({ atBats: 0, hits: 0, homeRuns: 0 })
+    // 레코드에 자리가 없는 웹 칸(타석 · 볼넷 · 삼진)은 그대로 센다
+    expect(after.stats).toMatchObject({ plateAppearances: 4, walks: 1, strikeouts: 1 })
+    expect(after.leaguePlayerStats.batters[leagueBatterIdOf(0, 1)]).toBeUndefined()
+    // 정규시즌은 쌓는다
+    expect(applyGameResult(createCareer('선수'), summary).stats).toMatchObject({ atBats: 3, hits: 2, homeRuns: 1, runsBattedIn: 3 })
+  })
+
   it('리그 밖 경기(칸이 없는 요약)는 표를 건드리지 않는다', () => {
     const summary = { result: '승', stats: EMPTY_SEASON_STATS, recordIds: [], ourTeamId: 0, opponentTeamId: 3 } as unknown as GameSummary
 
