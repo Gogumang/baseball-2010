@@ -1965,12 +1965,13 @@ export function useSeasonSession(
         isUserTeam,
         teamId: source.teamId,
         editor: openEntryEditor(isUserTeam),
-        lists: seasonEntryListsOf(source),
+        // 마선수 두 줄 능력치 0xb6415(rec, k, 1) 의 레벨 배율 — 전역 mgr[0x13a..]
+        lists: seasonEntryListsOf({ ...source, aceLevels }),
         isAceLocked: false,
       })
       setScene(SEASON_SCENE_STATE.엔트리편집)
     },
-    [pendingGame, save, userEntrySourceOf],
+    [aceLevels, pendingGame, save, userEntrySourceOf],
   )
 
   /**
@@ -1992,7 +1993,7 @@ export function useSeasonSession(
         // 국가대항전은 대표팀 슬롯 +0x918 — 대회 내내 남는다
         commit(pendingGame.kind === '국가대항전' ? { ...save, cupRoster: roster } : { ...save, roster })
         // 명단 첨자를 새 명단에 맞춰 다시 세운다 (줄 순서는 같다)
-        lists = seasonEntryListsOf({ ...source, roster })
+        lists = seasonEntryListsOf({ ...source, roster, aceLevels })
       }
       if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) {
         setEntryEdit(null)
@@ -2001,7 +2002,7 @@ export function useSeasonSession(
       }
       setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    [commit, entryEdit, pendingGame, save, userEntrySourceOf],
+    [aceLevels, commit, entryEdit, pendingGame, save, userEntrySourceOf],
   )
 
   const pointEntryCursorAction = useCallback(

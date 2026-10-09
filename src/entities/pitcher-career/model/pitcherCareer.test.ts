@@ -360,3 +360,21 @@ describe('투수편 사람 경기 도루 — 리그 타자 기록표 +0x2c (0xa5
     expect(withPitcherGameLeagueRecords(postseason, career, undefined, steals).leaguePlayerStats.batters[id]).toBeUndefined()
   })
 })
+
+describe('투수편 사람 경기 타석 — 리그 타자 기록표 +0x20~+0x2a (0xa8024 의 0xa56dc 모드 3 갈래)', () => {
+  it('정규시즌이면 쌓고 포스트시즌(+0xb4)이면 거른다', () => {
+    const career = createPitcherCareer('테스트')
+    const appearances = [
+      { teamId: 3, battingOrderIndex: 5, outcome: { kind: '홈런' as const }, runsBattedIn: 2 },
+      { teamId: 3, battingOrderIndex: 5, outcome: { kind: '볼넷' as const }, runsBattedIn: 0 },
+    ]
+    const id = leagueBatterIdOf(3, 5)
+    const regular = withPitcherGameLeagueRecords(career, career, undefined, [], appearances)
+    expect(regular.leaguePlayerStats.batters[id]).toMatchObject({ atBats: 1, hits: 1, homeRuns: 1, runsBattedIn: 2 })
+    const postseason: PitcherCareer = {
+      ...career,
+      postseason: { round: '플레이오프', qualifiers: [0, 1, 2, 3], teams: [1, 0], wins: [1, 0], winsNeeded: 3, champion: null },
+    }
+    expect(withPitcherGameLeagueRecords(postseason, career, undefined, [], appearances).leaguePlayerStats.batters[id]).toBeUndefined()
+  })
+})

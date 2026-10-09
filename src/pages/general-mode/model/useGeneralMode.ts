@@ -316,11 +316,12 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         teamId: source.teamId,
         // 0x2648c: 0x5561c(ed, &팀, 메뉴+0xec ≠ 0, 1, 1) — CPU 팀은 보기 전용, 첫 탭은 투수
         editor: openEntryEditor(isUserTeam),
-        lists: seasonEntryListsOf(source),
+        // 마선수 두 줄 능력치 0xb6415(rec, k, 1) 의 레벨 배율 — 전역 mgr[0x13a..]
+        lists: seasonEntryListsOf({ ...source, aceLevels }),
         isAceLocked: false,
       })
     },
-    [entrySourceOf],
+    [aceLevels, entrySourceOf],
   )
 
   const pressEntryKeyAction = useCallback(
@@ -336,7 +337,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
           ...swapped,
           pitchers: swapWithStarter(swapped.pitchers, rolls?.startingPitcherSlots.ours ?? 0),
         })
-        lists = seasonEntryListsOf({ ...source, roster: swapped })
+        lists = seasonEntryListsOf({ ...source, roster: swapped, aceLevels })
       }
       // 0x2a370: 1 이거나, 2 이면서 CPU 팀, 3 이면서 유저 팀이면 → 밀기 → 상태 22 (22 들어옴은 23 에서 왔으면 아무것도 안 한다)
       if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) {
@@ -346,7 +347,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       }
       setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    [entryEdit, entrySourceOf, rolls, bumpBlockWrite],
+    [aceLevels, entryEdit, entrySourceOf, rolls, bumpBlockWrite],
   )
 
   const pointEntryCursorAction = useCallback(

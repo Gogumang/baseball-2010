@@ -493,3 +493,36 @@ describe('pitchAgainstBatterDetailed — CPU 마타자 필살 (0x34488 → 0x4e1
     expect(a).toEqual(b.resolution)
   })
 })
+
+describe('CPU 타자 스킬 — 0xab214 ab91c~ 가 타자 레코드 +0x14 를 0xb62b4 로 읽는다(모드 검사 없음)', () => {
+  /** 같은 씨앗 · 같은 공으로 스킬만 바꿔 던진 결과들 — 스킬 판정은 굴리지 않아 굴림 차례가 같다 */
+  function 결과들(traits: Parameters<typeof pitchAgainstBatterDetailed>[5]): string[] {
+    const out: string[] = []
+    for (let seed = 1; seed <= 300; seed += 1) {
+      const thrown = pitchAgainstBatterDetailed(한가운데, 타자(700), createSeededRandom(seed), undefined, 무사주자없음, traits)
+      const r = thrown.resolution
+      out.push(r.kind === '타구' ? `타구:${JSON.stringify(r.outcome)}` : r.kind)
+    }
+    return out
+  }
+
+  it('타자 스킬을 실으면 B · C 가중이 바뀌어 결과가 갈린다', () => {
+    const 없음 = 결과들({})
+    // 18 (잘 맞음 −10%) · 19 (홈런성 −10%)
+    const 약함 = 결과들({ batterSkillIds: [18, 19] })
+    expect(약함).not.toEqual(없음)
+  })
+
+  it('상황을 타는 스킬은 넘긴 상황대로 — 17 하락세는 결과 링 맨 앞 두 칸이 아웃(5~7)이고 개수 > 2 일 때만', () => {
+    const 없음 = 결과들({})
+    const 상황 = (recentAtBatCodes: readonly number[]) => ({
+      inning: 1,
+      isLosing: false,
+      runnerCount: 0,
+      hasSecondBaseRunner: false,
+      recentAtBatCodes,
+    })
+    expect(결과들({ batterSkillIds: [17], skillSituation: 상황([5, 6]) })).toEqual(없음)
+    expect(결과들({ batterSkillIds: [17], skillSituation: 상황([5, 6, 1]) })).not.toEqual(없음)
+  })
+})

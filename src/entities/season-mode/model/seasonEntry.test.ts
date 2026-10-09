@@ -7,6 +7,7 @@ import { swapEntryBatters, swapEntryPitchers } from '@/entities/season-mode/mode
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
+import { aceLevelSlotOf, aceRecordAbilityAtLevel } from '@/entities/mission/model/aceLevel'
 
 /** 시즌 0xe0 이 보는 명단 — 시즌 세이브 명단 + 0x6548 이 넣은 마선수 + 로테이션 */
 
@@ -32,6 +33,21 @@ describe('시즌 엔트리 명단', () => {
     expect(lists.batters).toHaveLength(13)
     expect(lists.batters[9]).toMatchObject({ name: ACE_BATTERS[2]?.name, isAce: true, position: 0 })
     expect(lists.batters[12]?.name).toBe(teamBatters(0)[9]?.name)
+  })
+
+  it('마선수 두 줄도 0xb6415(rec, k, 1) — 레벨 배율 · 장착 스킬 단계를 먹은 값이다 (표 값 그대로가 아니다)', () => {
+    const 발렌타인 = ACE_PITCHERS.findIndex((ace) => ace.name === '발렌타인')
+    const lv1 = seasonEntryListsOf({ teamId: 0, roster: tableRosterOf(0), dayCounter: 0, acePitcherId: 발렌타인, aceBatterId: 2 })
+    // 제구 700 → Lv1 60% = 420 → 냉정 22(+0x14 = 0x410000)가 제구 += 제구 / 10 = 462 (b64e6)
+    expect(lv1.pitchers[8]?.ability[0]).toBe(462)
+    const ace = ACE_BATTERS[2]!
+    const 레벨 = { [aceLevelSlotOf('타자', 3)]: 4, [aceLevelSlotOf('투수', 발렌타인 + 1)]: 4 }
+    const lv5 = seasonEntryListsOf({
+      teamId: 0, roster: tableRosterOf(0), dayCounter: 0, acePitcherId: 발렌타인, aceBatterId: 2, aceLevels: 레벨,
+    })
+    const 기대 = aceRecordAbilityAtLevel(ace, 4)
+    expect(lv5.batters[9]?.ability).toEqual([기대.hit, 기대.power, 기대.defense, 기대.run])
+    expect(lv5.pitchers[8]?.ability[0]).toBeGreaterThan(462)
   })
 
   it('투수 탭 0번 = 그날 선발 — 표의 로테이션 칸(g % 4)과 같다', () => {

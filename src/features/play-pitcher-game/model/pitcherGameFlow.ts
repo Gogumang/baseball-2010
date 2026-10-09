@@ -9,7 +9,7 @@ import {
   resultOf,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
-import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import { runnersOfGame } from '@/entities/game/model/gameState'
 import { runnerOnBase } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
@@ -596,6 +596,13 @@ export interface PitcherGameProgress {
    * 포스트시즌 · 국가대항전 거르기는 커리어에 먹이는 쪽이 한다. 옛 진행은 없다
    */
   readonly leagueStolenBases?: readonly LeagueStolenBase[]
+  /**
+   * **리그 타자 기록표 타석 줄 재료**(+0x20 타수 · +0x22 안타 · +0x24 2루타 · +0x26 3루타 · +0x28 홈런 · +0x2a 타점) — 정산
+   * 0xa8024 는 sp+0x34 = 0xa56dc(ctx, 공격 팀 지금 타자, 0) 이 참이면 그 타자 레코드에 쌓는다. 모드 3 갈래(0xa571c)는 정규시즌이면
+   * 마선수(0xb633d)만 거짓이라 상대 타자(내가 던진 타석 · 간이 수비 타석) · 동료 타자(간이 타석) 모두 쌓인다. 마타자 칸은 뺀다.
+   * 포스트시즌 · 국가대항전 거르기는 커리어에 먹이는 쪽이 한다. 옛 진행은 없다
+   */
+  readonly leaguePlateAppearances?: readonly LeaguePlateAppearance[]
   /** 우리·상대 지금 투수의 **이번 이닝 실점 A**(`+0x284`) — 반 이닝 교대 `0xa5b00`·교체 `0xaec64` 가 0 으로 */
   readonly ourInningRunsAllowed: number
   readonly opponentInningRunsAllowed: number
@@ -1120,6 +1127,17 @@ export function startPitch(
       playsFoulBall: true,
       // ab838 — 이번 공을 깎은 뒤 체력% 가 0 이면 B · C 에 +2000
       pitcherStaminaPercent: staminaPercent,
+      // 0xab214 ab91c~ — 상대 지금 타자 레코드 +0x14 (`0xb62b4(타자, n)` — 붙박이 줄은 Xls 행, 마타자는 제 행)
+      batterSkillIds: quickBatterOfTeam(options, false, opponentRosterSlotOf(progress)).skillIds,
+      skillSituation: {
+        inning: progress.game.inning,
+        // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
+        isLosing: progress.game.ourScore > progress.game.opponentScore,
+        runnerCount: runnerCountOf(progress.game.bases),
+        hasSecondBaseRunner: progress.game.bases.second,
+        // 이 타순 칸의 오늘 타석 결과 링 (팀 객체 + 타순×0x18 + 0x34)
+        recentAtBatCodes: progress.opponentLineup.records[lineupSlotOf(progress.opponentOrderIndex)]?.results ?? [],
+      },
     },
   )
   const resolution = thrown.resolution
@@ -1957,6 +1975,8 @@ function applyDefensivePlay(
     atBat: createAtBat(),
     atBatPrepared: false,
     endedInningIndex: applied.game.inning - 1,
+    // 정산 0xa8024 — 0xa56dc(ctx, 지금 타자, 0) 이면 상대 타자 레코드 +0x20~+0x2a (마타자 칸은 거짓)
+    ...withLeaguePlateAppearance(progress, false, slot, outcome, applied.runsScored),
   }
 
   // 0x8f414 는 사람 장면의 타석 끝(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)에서만 돈다 — 내가 던진 타석만.
@@ -2818,6 +2838,8 @@ function playTeammateAtBat(
       opponentInningRunsAllowed: halfChanged
         ? 0
         : Math.min(MAXIMUM_PITCHER_COUNTER, progress.opponentInningRunsAllowed + runs),
+      // 간이 타석도 같은 0xa8024 — 0xa56dc(ctx, 지금 타자, 0) 이면 동료 타자 레코드 +0x20~+0x2a (마타자 칸은 거짓)
+      ...withLeaguePlateAppearance(progress, true, slot, outcome, runs),
     },
     `${before.inning}회${before.half} ${(slot % BATTING_ORDER_SIZE) + 1}번 — ${describeOutcome(outcome)}${
       runs > 0 ? ` (${runs}점)` : ''
@@ -2859,6 +2881,28 @@ function withLeagueSteals(progress: PitcherGameProgress, ours: boolean, runners:
     steals.push({ teamId, battingOrderIndex: rosterSlot })
   }
   return steals.length === 0 ? progress : { ...progress, leagueStolenBases: [...(progress.leagueStolenBases ?? []), ...steals] }
+}
+
+/**
+ * 타석 하나를 리그 타석 줄 재료로 얹는다 — 0xa8024 의 sp+0x34 게이트(0xa56dc 모드 3 갈래)는 마선수만 거른다(마타자 칸 빼기).
+ * 타자는 그 타순 칸에 지금 선 명단 선수, 타점은 이 플레이의 득점이다. 펼쳐 넣을 칸만 돌려준다
+ */
+function withLeaguePlateAppearance(
+  progress: PitcherGameProgress,
+  ours: boolean,
+  orderSlot: number,
+  outcome: AtBatOutcome,
+  runsBattedIn: number,
+): Pick<PitcherGameProgress, 'leaguePlateAppearances'> {
+  const rosterSlot = rosterSlotAt(ours ? progress.ourLineup : progress.opponentLineup, orderSlot)
+  if (rosterSlot === ACE_BATTER_ROSTER_SLOT) return { leaguePlateAppearances: progress.leaguePlateAppearances }
+  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
+  return {
+    leaguePlateAppearances: [
+      ...(progress.leaguePlateAppearances ?? []),
+      { teamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn },
+    ],
+  }
 }
 
 /**
@@ -3272,6 +3316,8 @@ export interface PitcherGameSummary {
   readonly leaguePitchers: GameLeaguePitchers
   /** 리그 타자 기록표 도루 +0x2c 재료 (`PitcherGameProgress.leagueStolenBases`) — 정규시즌만 쌓는 것은 부르는 쪽 몫 */
   readonly leagueStolenBases: readonly LeagueStolenBase[]
+  /** 리그 타자 기록표 타석 줄 재료 (`PitcherGameProgress.leaguePlateAppearances`) — 정규시즌만 쌓는 것은 부르는 쪽 몫 */
+  readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
 }
 
 /**
@@ -3365,6 +3411,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
       opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
     },
     leagueStolenBases: progress.leagueStolenBases ?? [],
+    leaguePlateAppearances: progress.leaguePlateAppearances ?? [],
     leaguePitchers: {
       lines: chargeCpuPitcherLine(
         chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {

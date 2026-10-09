@@ -29,6 +29,8 @@ describe('pitcherAbilityOf', () => {
       gameAbility: { beforeFatigue: { control: 670, velocity: 550, breaking: 820 } },
       // 싸이커 레코드: 폼 6 · 마구 5 · 구질 마스크 0x410b (1·2·4·9·15)
       repertoire: { form: 6, pitchMask: 0x410b, magicId: 5 },
+      // 사람 타석 0xab214 의 투수 스킬 — XlsACE_PIT 행 +0x14 = 0x9002 (비트 1 · 12 · 15 → 번호 + 16)
+      skillIds: [17, 28, 31],
     })
   })
 

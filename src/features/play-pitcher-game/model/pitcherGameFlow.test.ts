@@ -131,6 +131,22 @@ describe('리그 타자 기록표 도루 +0x2c — 모드 3 의 0xa56dc(0xa571c)
   })
 })
 
+describe('리그 타자 기록표 타석 줄 +0x20~+0x2a — 정산 0xa8024 의 0xa56dc(모드 3 갈래 0xa571c)', () => {
+  it('간이 타석의 양 팀 타자를 그 팀 로스터 칸으로 쌓을 재료로 낸다 — 마타자 칸은 뺀다', () => {
+    const 끝 = startPitcherGame({ ...기본옵션, dayCounter: 3, role: PITCHER_ROLE.starter }, 씨앗(1))
+    const 타석 = summaryOf(끝).leaguePlateAppearances
+    const 우리 = 타석.filter((appearance) => appearance.teamId === 기본옵션.ourTeamId)
+    const 상대 = 타석.filter((appearance) => appearance.teamId === 기본옵션.opponentTeamId)
+    expect(우리.length).toBeGreaterThanOrEqual(24)
+    expect(상대.length).toBeGreaterThanOrEqual(24)
+    expect(우리.length + 상대.length).toBe(타석.length)
+    expect(타석.every((appearance) => appearance.battingOrderIndex >= 0 && appearance.battingOrderIndex < 12)).toBe(true)
+    // 타점 합은 점수판 점수와 같다 (간이 엔진의 득점은 모두 타석에서 난다)
+    const 우리타점 = 우리.reduce((sum, appearance) => sum + appearance.runsBattedIn, 0)
+    expect(우리타점).toBe(끝.game.ourScore)
+  })
+})
+
 describe('등판', () => {
   it('선발은 날짜 카운터가 짝수인 날에만 등판한다 (2경기마다)', () => {
     expect(startsToday({ ...기본옵션, dayCounter: 2 })).toBe(true)

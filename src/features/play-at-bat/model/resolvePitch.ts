@@ -14,6 +14,7 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import { projectToPlate } from '@/entities/pitching/model/pitchCurve'
 import { cpuPitchStatsOf } from '@/entities/pitching/model/pitcherGameStats'
+import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -94,6 +95,14 @@ export interface PitchOutcomeDetail {
    * 타석 화면(`BattingStage`)이 CPU 공에 채운다. 견제는 공이 아니라 여기 오지 않는다.
    */
   readonly pitchTypeNumber?: number
+}
+
+/**
+ * 던지는 투수의 0xab214 스킬 번호 — 마투수처럼 번호를 직접 든 능력치(`PitcherAbility.skillIds`, `aceSkillIdsOf`)면 그것,
+ * 아니면 레코드 +0x14 비트(`skillBits`)를 투수 번호(비트 + 16)로
+ */
+function pitcherSkillIdsOf(pitcher: PitcherAbility): readonly number[] {
+  return pitcher.skillIds ?? skillIdsOfBits(pitcher.skillBits ?? 0, true)
 }
 
 /** 존 좌표 1.0 이 원본 픽셀 몇 개인가 — 33px 존의 절반 (stageLayout 과 같은 값) */
@@ -265,7 +274,8 @@ export function resolvePitch(
       // ab838 `[sp+0xc8] == 0` 이면 B·C 에 2000 (같은 체력% 인자)
       isPitcherExhausted: !pitcherStats.isNotExhausted,
       batterSkillIds: context.batterSkillIds,
-      pitcherSkillIds: [],
+      // 0xab214 ab91c~ — 수비 투수 레코드 +0x14 도 `0xb62b4(투수, n)` 로 읽는다(모드 검사 없음, 번호 = 비트 + 16)
+      pitcherSkillIds: pitcherSkillIdsOf(context.pitcher),
       situation: context.situation,
     },
     random,

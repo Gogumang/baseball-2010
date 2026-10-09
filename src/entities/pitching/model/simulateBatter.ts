@@ -2,6 +2,7 @@ import { isInsideStrikeZone } from '@/shared/lib/geometry/coordinate'
 import { isPitchInHitByPitchBox } from '@/entities/pitching/model/hitByPitch'
 import { swingResultOf } from '@/entities/batting/model/swingResult'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
+import type { SwingSituation } from '@/entities/batting/model/swingSkills'
 import { pitcherBoostSideOf, swingBoostOf } from '@/entities/batting/model/swingBoost'
 import { remainingAfterSpecialSwing, rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { timingOf } from '@/entities/batting/model/swingTiming'
@@ -237,6 +238,27 @@ export interface CpuBatterTraits {
    * 안 넘기면 지치지 않은 것으로 본다.
    */
   readonly pitcherStaminaPercent?: number
+  /**
+   * **CPU 타자 레코드 +0x14 의 장착 스킬 번호** — 0xab214 의 스킬 갈래(ab91c~)가 모드 검사 없이 `0xb62b4(타자, n)` 로 읽는다
+   * (`skillIdsOfBits(비트, 타자)` — 붙박이 표 줄은 Xls 행 그대로, 마타자는 `aceSkillIdsOf`). 안 넘기면 없음
+   */
+  readonly batterSkillIds?: readonly number[]
+  /**
+   * 그 스킬들이 보는 경기 상황(이닝 · 공격 팀이 지는가(ab966: 수비 점수 > 공격 점수) · 주자 · 2루 · 타자 결과 링 · 타자 레코드 칸
+   * 0xb6394). 볼카운트는 `situation` 의 것을, 손은 공 · 화면 배치를 쓴다. 안 넘기면 1회 · 이기는 중 · 주자 없음 · 빈 링 · 칸 0
+   */
+  readonly skillSituation?: CpuSwingSkillSituation
+}
+
+/** CPU 타자 스윙 판정 0xab214 의 스킬 갈래가 보는 경기 상황 (`CpuBatterTraits.skillSituation`) */
+export interface CpuSwingSkillSituation {
+  readonly inning: number
+  readonly isLosing: boolean
+  readonly runnerCount: number
+  readonly hasSecondBaseRunner: boolean
+  readonly recentAtBatCodes: readonly number[]
+  /** 타자 레코드 칸 0xb6394 = +0xa & 0x1f — 투수 스킬 31 만 본다 */
+  readonly batterOrderIndex?: number
 }
 
 /** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
@@ -425,12 +447,20 @@ export function pitchAgainstBatterDetailed(
       boost,
       // ab838 — 투수 체력% 0 이면 B · C 에 +2000
       isPitcherExhausted: traits.pitcherStaminaPercent === 0,
-      batterSkillIds: [],
+      // 0xab214 ab91c~ — 두 레코드 +0x14 를 `0xb62b4` 로 읽는다(모드 검사 없음). CPU 타자 쪽은 부르는 쪽이 싣는다.
+      // ⚠️ 사람 투수(내 투수) 쪽 비트는 아직 안 싣는다 — 미해결
+      batterSkillIds: traits.batterSkillIds ?? [],
       pitcherSkillIds: [],
       // 0xab214 는 투수·타자 레코드로 손(0xb63c0)·칸(0xb6394)을 바로 읽는다. 투수 손은 공에 실린 폼·+0x18 로,
-      // 타자 손은 화면 배치(`stageSide` = 0x3b084 의 0xb63c1(타자))로 둔다. 타자 레코드 칸(스킬 31)은 몰라 0 이다.
-      // ⚠️ 지금은 두 스킬 목록이 비어 있어(CPU 타자·사람 투수 스킬 비트 미이식) 이 상황이 결과를 바꾸지 않는다
-      situation: { ...NEUTRAL_SITUATION, pitcherSide: pitcherHandOfPitch(pitch), batterSide: pitch.stageSide },
+      // 타자 손은 화면 배치(`stageSide` = 0x3b084 의 0xb63c1(타자))로 둔다. 볼카운트는 state+4·+5(이 공 앞)
+      situation: {
+        ...NEUTRAL_SITUATION,
+        ...traits.skillSituation,
+        balls: situation.balls,
+        strikes: situation.strikes,
+        pitcherSide: pitcherHandOfPitch(pitch),
+        batterSide: pitch.stageSide,
+      },
     },
     random,
   )
@@ -491,7 +521,7 @@ export function pitchAgainstBatterDetailed(
 }
 
 const ZONE_HALF_PIXELS = 16.5
-const NEUTRAL_SITUATION = {
+const NEUTRAL_SITUATION: SwingSituation = {
   inning: 1,
   isLosing: false,
   runnerCount: 0,
