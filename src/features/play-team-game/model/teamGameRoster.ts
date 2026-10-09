@@ -292,6 +292,12 @@ export interface TeamEntryBatter {
    * (`LeaguePlayerStats.recordBatters`)로 센다. 마선수는 없다
    */
   readonly recordId?: number
+  /**
+   * 레코드 `+0x14` 장착 스킬 비트 — 간이 타석 스윙 0xab214 의 스킬 갈래(ab91c~)가 모드 검사 없이 `0xb62b4(타자, n)` 로 읽는다.
+   * 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 기록으로 선 영입 선수는 그 기록의 비트(옛 사본은 없어 0).
+   * ⚠️ 마타자는 XlsACE_BAT 행의 +0x14 를 아직 안 뽑아 없다(0)
+   */
+  readonly skillBits?: number
 }
 
 /** 리그 로스터 선수가 아니다 (마타자 — `0x1f84c` 로 저장에서 꺼낸 레코드) */
@@ -312,6 +318,7 @@ export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[]
     position: player.position ?? 0,
     aceIndex: NO_ACE_BATTER,
     rosterSlot,
+    skillBits: player.skillBits,
   }))
 }
 
@@ -542,6 +549,8 @@ export interface TeamEntryBatterRecord {
   readonly ability: readonly [number, number, number, number]
   /** 그 선수의 원본 id(+0) — 있으면 리그 기록표의 표 밖 줄로 쌓는다 (`TeamEntryBatter.recordId`) */
   readonly recordId?: number
+  /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryBatter.skillBits`). 시즌 명단은 기록 사본에 있으면 싣는다(옛 사본은 없어 0) */
+  readonly skillBits?: number
 }
 
 /** 붙박이 표 밖 투수의 기록 — `TeamEntryBatterRecord` 주석과 같다 */
@@ -595,7 +604,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
   return order.batters.map((batter, index) => {
     const position = batter.position & 0xf
     if (batter.record !== undefined) {
-      const { recordId } = batter.record
+      const { recordId, skillBits } = batter.record
       return {
         name: batter.record.name,
         ability: batter.record.ability,
@@ -603,6 +612,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
         aceIndex: NO_ACE_BATTER,
         rosterSlot: NO_ROSTER_SLOT,
         ...(recordId === undefined ? {} : { recordId }),
+        ...(skillBits === undefined ? {} : { skillBits }),
       }
     }
     if (isForeignTable(batter.tableTeamId, teamId)) {
@@ -617,6 +627,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
         aceIndex: NO_ACE_BATTER,
         rosterSlot: batter.rosterSlot,
         tableTeamId: batter.tableTeamId,
+        skillBits: player?.skillBits ?? 0,
       }
     }
     const rosterSlot = slots[index] ?? 0
@@ -630,6 +641,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
       position,
       aceIndex: NO_ACE_BATTER,
       rosterSlot,
+      skillBits: player?.skillBits ?? 0,
     }
   })
 }

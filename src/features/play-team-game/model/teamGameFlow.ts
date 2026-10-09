@@ -23,7 +23,7 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoires'
 import type { BatterAbility } from '@/entities/batting/model/batter'
-import { PITCHERS_PER_TEAM, rollStartingPitcherIndex } from '@/entities/team/model/teamRoster'
+import { PITCHERS_PER_TEAM, rollStartingPitcherIndex, skillIdsOfBits } from '@/entities/team/model/teamRoster'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { applyOpponentAtBat, applyOpponentRunnerPlay } from '@/features/play-pitcher-game/model/pitcherGameState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
@@ -1740,6 +1740,17 @@ function entryStageAbilityOf(
   return { hit: ability[0], power: ability[1], defense: ability[2], run: ability[3] }
 }
 
+/** 타자 스킬 22 압도 — 레코드 +0x14 비트 (`0xb62b4(타자, 22)`) */
+const INTIMIDATE_SKILL_BIT = 22
+
+/**
+ * 그 명단 칸 타자가 **압도(스킬 22)** 를 달았나 — 공 하나 소모 0xa5e14(×2) · 실투 판정 0x33cbc(+5)가 공격 팀 지금 타자의
+ * `0xb62b4(타자, 22)` 로 본다 (`TeamEntryBatter.skillBits`, 마타자 0)
+ */
+function entryBatterIntimidatesAt(progress: TeamGameProgress, teamId: number, slot: number): boolean {
+  return (((entryBattersOf(progress, teamId)[slot]?.skillBits ?? 0) >>> INTIMIDATE_SKILL_BIT) & 1) === 1
+}
+
 /** 간이 타석 엔진이 보는 타자 — 히트·파워·주루만 쓴다 */
 function entryQuickBatterOf(
   progress: TeamGameProgress,
@@ -1747,12 +1758,16 @@ function entryQuickBatterOf(
   slot: number,
 ): QuickAtBatBatter {
   const ability = entryAbilitiesAt(progress, teamId, slot)
-  const aceIndex = entryBattersOf(progress, teamId)[slot]?.aceIndex ?? NO_ACE_BATTER
+  const entry = entryBattersOf(progress, teamId)[slot]
+  const aceIndex = entry?.aceIndex ?? NO_ACE_BATTER
   return {
     hit: ability[0],
     power: ability[1],
     run: ability[3],
-    skillIds: [],
+    // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 +0x14 를 모드 검사 없이 읽는다
+    skillIds: skillIdsOfBits(entry?.skillBits ?? 0, false),
+    // 기록으로 선 표 밖 타자(영입한 명전 · 나리)는 레코드 +0xa 비트7(0xb6389) — 0xab214 의 내 선수 갈래가 레코드를 직접 읽는다
+    ...(entry !== undefined && aceIndex < 0 && entry.rosterSlot === NO_ROSTER_SLOT ? { isOwnPlayer: true } : {}),
     // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (k = 레벨·5 + 순번, `quickSwingBoostOf`)
     ...(aceIndex >= 0 ? { ace: { order: aceIndex, level: aceBatterLevelOf(progress, aceIndex) } } : {}),
   }
@@ -1770,7 +1785,8 @@ function entryQuickPitcherOf(
     control: ability[0],
     velocity: ability[1],
     stamina: ability[3],
-    skillIds: [],
+    // 장착 스킬 — `0xb62b4(투수, n)` (투수 번호 = 비트 + 16). 마투수 줄은 비트를 안 든다
+    skillIds: skillIdsOfBits(entry?.skillBits ?? 0, true),
     // 손 0xb63c0 — 마투수(+0xa 비트6)는 폼 7·9·10 이 0, 그 밖은 폼 & 1 (0xab214 의 스킬 13·14)
     ...(entry === undefined ? {} : { hand: pitcherHandOf(entry.repertoire.form, entry.aceIndex >= 0) }),
     // 0xc11f0 c1278 — 마투수면 보정 구조체 out+4 · +6 에 D[0xce/0x9c + 2k] (레벨 = mgr[0x13a + 순번])
@@ -2154,8 +2170,7 @@ function withFoulRecords(progress: TeamGameProgress, isFoul: boolean): TeamGameP
  *   c = 0x66ef0(구질), 타자 스킬 22 압도 또는 투수 스킬 18 이면 ×2, 투수 스킬 10 이면 −1.
  * 용량 X 는 간이 타석 쪽(`quickPitcherDrainOf`)과 같은 입력이다 — 상대 팀 사기 100 · 첫 투수 보너스(0x66e44).
  *
- * ⚠️ 미해결: 타자 스킬 22 압도 — 팀 경기 명단(`TeamEntryBatter`)에 스킬 비트(+0x14)가 없어 늘 거짓이다.
- *    상대 CPU 투수 스킬 18·10 도 같은 까닭으로 늘 거짓.
+ * 타자 스킬 22 압도는 지금 타자 레코드 +0x14(`TeamEntryBatter.skillBits`, `entryBatterIntimidatesAt`)로 본다.
  * 구질이 없으면(`PitchOutcomeDetail.pitchTypeNumber` 를 안 실은 호출) 깎지 않는다. 난수는 쓰지 않는다.
  */
 function throwOpponentPitch(progress: TeamGameProgress, pitchTypeNumber: number | undefined): TeamGameProgress {
@@ -2192,7 +2207,8 @@ function opponentStaminaAfterPitch(progress: TeamGameProgress, pitchTypeNumber: 
     staminaAbility: opponentPitcherStaminaAbility(progress),
     teamMorale: 100,
     isFirstPitcher: progress.opponentUsedPitchers.length === 0,
-    batterIntimidates: false,
+    // 공격 팀 지금 타자(우리)의 0xb62b4(타자, 22) 압도
+    batterIntimidates: entryBatterIntimidatesAt(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
     ...pitcherSkillFlagsAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
   })
 }
@@ -2563,8 +2579,8 @@ function pitchOnce(
     // 0xaeb08 `team+0x26 − team+0x33 == 1` — 마운드를 밟은 투수가 지금 투수 하나뿐일 때만 첫 투수 보너스(0x66e44 +200).
     // 교체로 올라온 구원 투수는 받지 않는다 (P1 3-2, 상대 쪽 `throwOpponentPitch` 와 같은 식)
     isFirstPitcher: progress.ourUsedPitchers.length === 0,
-    // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다
-    batterIntimidates: false,
+    // 상대 지금 타자의 0xb62b4(타자, 22) 압도 — 레코드 +0x14 (`TeamEntryBatter.skillBits`)
+    batterIntimidates: entryBatterIntimidatesAt(progress, options.opponentTeamId, progress.opponentOrderIndex),
     ...pitcherSkillFlagsAt(progress, options.ourTeamId, progress.ourPitcherIndex),
   })
   const fatigued = fatiguedStatsOf(stats, stamina)
@@ -2620,8 +2636,8 @@ function pitchOnce(
       effectiveVelocity: stats.velocity,
       runnerCount: runnerCountOf(progress.game.bases),
       hasSecondBaseRunner: progress.game.bases.second,
-      // 상대 타자의 스킬 22(0xb62b4)는 아직 안 싣는다 — 늘 거짓
-      batterIntimidates: false,
+      // 상대 지금 타자의 스킬 22 압도(0xb62b4) — 레코드 +0x14 (`TeamEntryBatter.skillBits`)
+      batterIntimidates: entryBatterIntimidatesAt(progress, options.opponentTeamId, progress.opponentOrderIndex),
       // 우리 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (`TeamEntryPitcher.skillBits`, 마투수 0)
       ...mistakeSkillFlagsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)?.skillBits ?? 0),
     },
@@ -4644,13 +4660,15 @@ function quickPitcherDrainOf(
   isFirstPitcher: boolean,
   /** 수비 투수 레코드 +0x14 의 비겁자 · 끈기 (`pitcherSkillFlagsAt`) */
   skillFlags: { readonly pitcherIsCoward: boolean; readonly pitcherEndures: boolean },
+  /** 이 타석 타자의 스킬 22 압도 — 0xa5e14 a5f32 의 0xb62b4(공격 팀 지금 타자, 22) (`entryBatterIntimidatesAt`) */
+  batterIntimidates: boolean,
   /** 그 공의 체력%로 부른 제구 · 구속 (`entryQuickTiredOf`) — 없으면 피로 없이 */
   tiredAt?: (staminaPercent: number) => { readonly control: number; readonly velocity: number } | undefined,
 ): QuickPitcherDrain {
   const capacity = staminaCapacityOf(staminaAbility, teamMorale, isFirstPitcher)
   const cost = pitchStaminaCostOf({
     pitchTypeNumber: 1,
-    batterIntimidates: false,
+    batterIntimidates,
     ...skillFlags,
   })
   let current = stamina
@@ -4905,6 +4923,7 @@ function playAutoOffenseAtBat(
     100,
     progress.opponentUsedPitchers.length === 0,
     pitcherSkillFlagsAt(progress, options.opponentTeamId, pitcherSlot),
+    entryBatterIntimidatesAt(progress, options.ourTeamId, before.battingOrderIndex),
     tiredAt,
   )
   const order = before.battingOrderIndex
@@ -5021,6 +5040,7 @@ function playAutoDefenseAtBat(
     ourTeamMoraleOf(progress.options),
     progress.ourUsedPitchers.length === 0,
     pitcherSkillFlagsAt(progress, options.ourTeamId, pitcherSlot),
+    entryBatterIntimidatesAt(progress, options.opponentTeamId, progress.opponentOrderIndex),
     tiredAt,
   )
   const before = progress.game

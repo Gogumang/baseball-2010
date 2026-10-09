@@ -55,6 +55,7 @@ import type {
   TeamEntryPitcher,
 } from '@/features/play-team-game/model/teamGameRoster'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
 import type {
   TeamGameOptions,
   TeamGameProgress,
@@ -837,8 +838,8 @@ export function TeamGameScreen({
               onSpecialSwingUsed={(remaining) => actions.specialSwingUsed(remaining)}
               // "#TIME"(0x4c940) — 사람 공격이라 n = 벤치 타자 수 팀[+0x28c]. 팀 경기(모드 1·2·8·9)는 0x38984 가 통과한다
               timeKeyCount={progress.ourBenchBatters}
-              // ⚠️ 미해결: `batterSkillIds` 를 안 넘긴다 — 팀 경기 명단(`TeamEntryBatter`)·로스터 표에 선수 스킬 비트(+0x14)가
-              //    없다. 그래서 실투 판정 0x33cbc 의 타자 비트 22 압도(+5)와 0xa5e14 의 압도 ×2 가 늘 거짓이다
+              // 지금 타자의 레코드 +0x14 장착 스킬(`TeamEntryBatter.skillBits` — 표 줄은 Xls 행, 영입 선수는 기록 사본, 마타자 0)
+              batterSkillIds={skillIdsOfBits(currentBatterEntry(progress)?.skillBits ?? 0, false)}
               gameMode={options.mode}
               // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
               isScoreboardOn={settings?.isScoreboardOn}

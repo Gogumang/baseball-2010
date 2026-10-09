@@ -331,7 +331,13 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
         : {
             rosterSlot: NOT_IN_ROSTER,
             position,
-            record: { name: record.name, ability: seasonRecordAbilityOf(record, player.equipment, false), recordId: player.id },
+            record: {
+              name: record.name,
+              ability: seasonRecordAbilityOf(record, player.equipment, false),
+              recordId: player.id,
+              // 장착 비트(+0x14) — 간이 타석 0xab214 의 스킬 판정이 본다(옛 사본은 없다)
+              ...(record.skillBits === undefined ? {} : { skillBits: record.skillBits }),
+            },
           }
     }),
     pitchers: roster.pitchers.map((player) => {
