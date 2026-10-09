@@ -133,9 +133,11 @@ import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedC
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
 import {
+  holderMarkOf,
   viewStateOf,
   type ActionMemory,
   type DefensePlayView,
+  type HolderPlate,
 } from '@/features/defense-play/model/defensePlayView'
 
 /**
@@ -351,6 +353,11 @@ export interface DefensePlayInput {
   readonly defenseTeamIndex?: number
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number
+  /**
+   * 수비 칸별 **이름 판에 적을 선수** (0x43cb0 의 오른쪽 아래 판). 칸 0 은 지금 마운드 투수(이름 + 보직 +0xb & 3),
+   * 칸 1~8 은 그 칸 야수(이름 + 수비 코드 +0x1c & 0xf). 안 주면 고리만 그리고 판은 없다.
+   */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
 }
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
@@ -390,6 +397,26 @@ export function defenseAbilitiesOf(
     filled[slot] = true
   }
   return abilities
+}
+
+/**
+ * 수비 아홉 칸의 **이름 판 선수** (`fielderPlates`) — 칸을 고르는 법은 `defenseAbilitiesOf` 와 같다
+ * (자리 코드 − 1 칸, 겹치면 앞 선수). 칸 0 은 지금 마운드 투수다.
+ */
+export function defenseFielderPlatesOf(
+  lineup: readonly { readonly name: string; readonly position?: number }[],
+  pitcher: { readonly name: string; readonly role?: number } | undefined,
+): (HolderPlate | null)[] {
+  const plates: (HolderPlate | null)[] = Array.from({ length: FIELDER_COUNT }, () => null)
+  if (pitcher !== undefined) plates[0] = { name: pitcher.name, pitcherRole: pitcher.role }
+  for (const player of lineup) {
+    const code = (player.position ?? 0) & 0xf
+    const slot = code - 1
+    if (slot < 1 || slot >= FIELDER_COUNT) continue
+    if (plates[slot] !== null) continue
+    plates[slot] = { name: player.name, positionCode: code }
+  }
+  return plates
 }
 
 /** 이번 틱에 눌린 키 한 개 — 경기 장면 `this+0x38` 에 해당한다 */
@@ -770,6 +797,12 @@ export interface DefensePlayState {
   runInsThisTick: readonly number[]
   /** 경기+0x19ad(반짝임) */
   laserShining: boolean
+  /**
+   * **그림 전용** — 쥐기 0xb2710 이 마지막으로 적은 플레이+0x130(공 가진 야수). 한 번도 안 쥐었으면 −1 이고, 이것이
+   * −1 이 아니면 경기+0x19ac(쥐기 메시지 0x15)도 서 있다. 웹 `play.ballHolderSlot` 은 송구가 나가는 순간 받을 야수로
+   * 바뀌지만(근사) 원본 +0x130 은 받는 야수가 쥘 때까지 던진 야수다 — 고리(0x43cb0)는 이쪽을 본다.
+   */
+  grabbedSlot: number
   /** 경기+0x19ae(레이저 확정) */
   laserConfirmed: boolean
   /** 경기+0x19af — 한 플레이에 한 번만 굴린다 */
@@ -1050,6 +1083,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     slidingSoundThisTick: false,
     runInsThisTick: [],
     laserShining: false,
+    grabbedSlot: NONE,
     laserConfirmed: false,
     laserRolled: false,
     laserThrow: false,
@@ -1182,6 +1216,7 @@ export function stepDefensePlay(
   let slidingSoundThisTick = false
   const runInsThisTick: number[] = []
   let laserShining = state.laserShining
+  let grabbedSlot = state.grabbedSlot
   let laserConfirmed = state.laserConfirmed
   let laserRolled = state.laserRolled
   let laserThrow = state.laserThrow
@@ -1954,6 +1989,8 @@ export function stepDefensePlay(
       // 뜬공 아웃(0xb3834, 결과 1)은 이 한 번에만 날 수 있다. 결과가 1 이면 b2770 이 0xa9620(리터치) · 0xa95c0 을 부르고
       // state[0x1f] = 1 이다(0xb2774). 악송구 공·튕긴 공을 줍는 쥐기에는 +0x112 가 이미 서 있어 뜬공 아웃이 없다
       play = { ...play, held: true, wantsThrow: true }
+      // 쥐기 0xb2710 — +0x130 = 이 야수 · 메시지 0x15(경기+0x19ac = 1) — 그림의 고리(0x43cb0)만 본다
+      grabbedSlot = chaserSlot
       // 쥐기 0xb2710 — +0x127 = 0
       landingChase = false
       log.push(`${tick}틱 ${chaserSlot}번 야수가 잡았다 (종류 ${play.catchKind})`)
@@ -2091,6 +2128,7 @@ export function stepDefensePlay(
               : fielder,
         )
         play = { ...play, ballHolderSlot: to, held: true }
+        grabbedSlot = to
         rundownThrowArrival = -1
         rundownThrowTo = NONE
       }
@@ -2316,6 +2354,14 @@ export function stepDefensePlay(
         // 공 쥔 야수(플레이+0x130) · 반짝임 켜짐 · deadly_effect A(+0x1990)가 안 돎.
         // A 는 **그리지 않는 줌 펀치**라 웹판에 상태 자체가 없다(R2 2절) — 셋째 조건은 늘 참으로 둔다(근사).
         laserShiningSlot: laserShining && play.held ? play.ballHolderSlot : NONE,
+        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac(쥔 적 있음) · +0x130 · 공격 주체 · +0x19ad
+        holderMark: holderMarkOf({
+          grabbed: grabbedSlot !== NONE,
+          holderSlot: grabbedSlot,
+          offenseIsCpu: input.offenseIsCpu === true,
+          isShining: laserShining,
+        }),
+        holderPlate: grabbedSlot === NONE ? null : (input.fielderPlates?.[grabbedSlot] ?? null),
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
@@ -2688,6 +2734,7 @@ export function stepDefensePlay(
   state.throwFromSlot = throwFromSlot
   state.throwReleaseTick = throwReleaseTick
   state.throwReceiverSlot = throwReceiverSlot
+  state.grabbedSlot = grabbedSlot
   state.receivingThrow = receivingThrow
   state.throwCount = throwCount
   state.firstThrowBase = firstThrowBase

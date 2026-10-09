@@ -32,6 +32,7 @@ import {
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
+import { DefenseHolderMark } from '@/pages/defense/ui/DefenseHolderMark'
 import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
 
 /** 판정 글자 그림 (game_judge.pzx, 게임+0x101c) */
@@ -200,6 +201,9 @@ export function DefenseScreen({
   const judgeText = state.judgeText ?? null
   const judgeTextPoint = judgeText === null ? null : popupPointOf(judgeText.holderSlot)
 
+  const holderMark = state.holderMark ?? null
+  const holderFielder = holderMark === null ? undefined : state.fielders.find((fielder) => fielder.slot === holderMark.slot)
+
   const ballGround = screenOf(state.ball)
   const ballPoint = { x: ballGround.x, y: ballGround.y - toScreenY(state.ball.height) }
   const flash = state.flash ?? null
@@ -265,6 +269,17 @@ export function DefenseScreen({
              (R3 1-3 은 대상을 "공 (x, z−높이)" 하나로만 적는다), 고르는 식이 든 궤적 코드
              0xb3b38·0xb401c 는 아직 안 읽었다. **모르는 것을 그리느니 안 그린다.**
         */}
+        {/* 공 가진 야수 고리 + 이름 판 0x43cb0 — 0x46cbc, 야수 목록(0x43278) 앞에 곧바로 그린다 */}
+        {holderMark !== null && (
+          <DefenseHolderMark
+            mark={holderMark}
+            plate={state.holderPlate ?? null}
+            fielderPoint={holderFielder === undefined ? null : screenOf(holderFielder)}
+            update={update}
+            screen={{ width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT }}
+          />
+        )}
+
         {actors.map((actor) => actor.node)}
 
         <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">

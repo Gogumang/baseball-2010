@@ -8,6 +8,7 @@ import {
 import { createFielders, createRunner, NONE } from '@/entities/fielding/model/fieldingState'
 import {
   aceIndexesWithOriginalBug,
+  holderMarkOf,
   viewStateOf,
   type ActionMemory,
 } from '@/features/defense-play/model/defensePlayView'
@@ -219,5 +220,36 @@ describe('공 자리 번쩍임 (R2 2절 — deadly_effect)', () => {
     }
     expect(flashOffsetOf({ kind: 'b', step: 0 })).toEqual({ x: 0, y: -50 })
     expect(flashOffsetOf({ kind: 'c', step: 0, direction: 0xf })).toEqual({ x: 0, y: 10 })
+  })
+})
+
+describe('공 가진 야수 고리 (0x43cb0)', () => {
+  const 고리 = (over: Partial<Parameters<typeof holderMarkOf>[0]> = {}) =>
+    holderMarkOf({ grabbed: true, holderSlot: 4, offenseIsCpu: false, isShining: false, ...over })
+
+  it('공격이 사람이면 애니 3(빨강), CPU 면 1(하늘)', () => {
+    expect(고리()).toEqual({ slot: 4, anim: 3 })
+    expect(고리({ offenseIsCpu: true })).toEqual({ slot: 4, anim: 1 })
+  })
+
+  it('레이저 반짝임(+0x19ad)이면 공격 주체와 상관없이 애니 2(노랑)', () => {
+    expect(고리({ isShining: true })?.anim).toBe(2)
+    expect(고리({ isShining: true, offenseIsCpu: true })?.anim).toBe(2)
+  })
+
+  it('이 판에 아무도 안 쥐었으면(+0x19ac == 0) 없다 · 공 가진 야수가 없어도 없다', () => {
+    expect(고리({ grabbed: false })).toBeNull()
+    expect(고리({ holderSlot: NONE })).toBeNull()
+  })
+
+  it('스냅샷에 실리고, 고리가 없으면 이름 판도 버린다', () => {
+    const 판 = { name: '유격수', positionCode: 6 }
+    expect(viewStateOf({ ...기본(), holderMark: { slot: 5, anim: 3 }, holderPlate: 판 })).toMatchObject({
+      holderMark: { slot: 5, anim: 3 },
+      holderPlate: 판,
+    })
+    const 없음 = viewStateOf({ ...기본(), holderPlate: 판 })
+    expect(없음.holderMark).toBeNull()
+    expect(없음.holderPlate).toBeNull()
   })
 })

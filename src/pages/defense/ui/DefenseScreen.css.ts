@@ -107,3 +107,17 @@ export const fieldMapDot = style({
   position: 'absolute',
   imageRendering: 'pixelated',
 })
+
+/** 공 가진 야수 이름 판(0x43cb0)의 이름 — 0xba411 정렬 0x22(가로 · 세로 가운데) */
+export const holderName = style({
+  position: 'absolute',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '11px',
+  lineHeight: '13px',
+  whiteSpace: 'nowrap',
+  overflow: 'visible',
+  color: '#FFFFFF',
+  pointerEvents: 'none',
+})

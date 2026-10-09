@@ -9,8 +9,11 @@ import {
 import { NONE, type FielderState, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import {
   FIELDER_ACTION,
+  HOLDER_MARK_ANIM,
   RUNNER_ACTION,
   type DefenseFielder,
+  type HolderMark,
+  type HolderPlate,
   type DefenseRunner,
   type DefenseViewState,
 } from '@/pages/defense/lib/defenseView'
@@ -24,6 +27,8 @@ import {
  * 동작 번호는 R3 2-1(야수 vt44 = 0xa1234) · R3 8-1(주자 vt40 = 0xa0070) 의 표를 따른다.
  * 어느 틱에 어느 칸을 쓰는지는 원본 동작 큐를 안 읽었으므로 **움직이는 방향에서 뽑아 쓴다(근사)**.
  */
+
+export type { HolderMark, HolderPlate }
 
 /** 진행기가 내주는 한 틱 — 화면이 쓰는 스냅샷에 틱 번호만 붙였다 */
 export interface DefensePlayView extends DefenseViewState {
@@ -62,6 +67,10 @@ export interface ViewStateInput {
   readonly defenseTeamIndex?: number | null
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number | null
+  /** 공 가진 야수 고리 (0x43cb0) — 진행기가 `holderMarkOf` 로 고른다. 안 주면 없다 */
+  readonly holderMark?: HolderMark | null
+  /** 고리와 같이 그리는 이름 판에 적을 선수. 고리가 없으면 버린다 */
+  readonly holderPlate?: HolderPlate | null
 }
 
 export function viewStateOf(input: ViewStateInput): DefensePlayView {
@@ -106,7 +115,40 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     // 레이저 반짝임은 그릴 칸 하나로 끝이다 — 고르는 조건은 진행기 몫이다(0x43406~0x4342c)
     laserShiningSlot: laserShiningSlotOf(input.laserShiningSlot),
     cameraTarget: null,
+    holderMark: input.holderMark ?? null,
+    holderPlate: input.holderMark == null ? null : (input.holderPlate ?? null),
   }
+}
+
+/**
+ * 공 가진 야수 고리를 띄울지와 그 애니 (0x43cb0 머리 0x43cb0~0x43d28, 직접 뜬 것).
+ * ```
+ * 43cc6: [[경기+0x200]+0x118](플레이 종류) == 8 이면 끝        ; 더비 판 종류 — 웹 수비 판에는 없는 종류다
+ * 43cd4: H = 0xb0c91(플레이) = 야수[플레이+0x130] ; 없으면 끝
+ * 43cfc: 경기+0x19ac == 0 이면 끝                              ; 쥐기 0xb2710 의 메시지 0x15 가 세움, 0x17 진입 0x467de 가 지움
+ * 43ce2: 애니 = state[0x31 + state[9]] == 0 (공격이 사람) ? 3 : 1
+ * 43d1c: 경기+0x19ad(레이저 반짝임)면 애니 = 2
+ * ```
+ * ⚠️ 레이저 반짝임 야수 칠하기(0x43406)와 달리 deadly_effect A(+0x1990)를 **안 본다**.
+ */
+export function holderMarkOf(input: {
+  /** 경기+0x19ac — 이 판에 누가 한 번이라도 쥐었나 */
+  readonly grabbed: boolean
+  /** 플레이+0x130 — 마지막으로 쥔 야수 칸. 없으면 −1 */
+  readonly holderSlot: number
+  /** state[0x31 + state[9]] == 1 */
+  readonly offenseIsCpu: boolean
+  /** 경기+0x19ad */
+  readonly isShining: boolean
+}): HolderMark | null {
+  if (!input.grabbed) return null
+  if (!Number.isInteger(input.holderSlot) || input.holderSlot < 0 || input.holderSlot > 8) return null
+  const anim = input.isShining
+    ? HOLDER_MARK_ANIM.shining
+    : input.offenseIsCpu
+      ? HOLDER_MARK_ANIM.cpuOffense
+      : HOLDER_MARK_ANIM.humanOffense
+  return { slot: input.holderSlot, anim }
 }
 
 /** 반짝일 야수 칸 고르기 — 0~8 밖이면 아무도 안 반짝이는 것으로 본다(−1 이 "없음" 이다) */

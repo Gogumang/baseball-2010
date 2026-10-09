@@ -95,6 +95,7 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import {
   defenseAbilitiesOf,
+  defenseFielderPlatesOf,
   isBattedBallInPlay,
   recordedOutcomeOf,
   runDefensePlay,
@@ -916,6 +917,8 @@ function defensePlayInputOf(
     outs: progress.game.outs,
     // 수비는 상대 팀이다 — 로스터의 수비 자리 코드로 아홉 칸을 채운다
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
+    // 공 가진 야수 이름 판(0x43cb0) — 같은 칸 고르기로 상대 야수 · 지금 마운드 투수
+    fielderPlates: opponentFielderPlatesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
     // 이 공이 나는 동안 출발한 도루 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 15·14 + rand(0,9) 틱 몰아 돌린다
     stealingFrom: progress.stealingFrom,
@@ -1091,6 +1094,23 @@ function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
       defense: player.ability[2],
     })),
     ace === undefined ? pitcher?.ability[2] : ace.breaking,
+  )
+}
+
+/**
+ * 수비 아홉 칸의 이름 판 선수 — `opponentDefenseAbilitiesOf` 와 같은 칸 고르기다.
+ * 칸 0 은 지금 마운드 투수(보직 = 레코드 +0xb & 3). 마선수 투수는 웹에 레코드 +0xb 가 없어 보직을 안 넘긴다 → 판 없음.
+ */
+function opponentFielderPlatesOf(progress: GameProgress) {
+  const ace = moundAcePitcherOf(progress, false)
+  const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
+  return defenseFielderPlatesOf(
+    teamBatters(progress.opponentTeamId),
+    ace !== undefined
+      ? { name: ace.player.name }
+      : pitcher === undefined
+        ? undefined
+        : { name: pitcher.name, role: pitcher.profile & 3 },
   )
 }
 
