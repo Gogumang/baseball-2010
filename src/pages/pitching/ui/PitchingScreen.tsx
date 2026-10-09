@@ -486,6 +486,8 @@ export function PitchingScreen({
             isPaused={isAwaitingConfirm}
             isFrozen={isPopupOpen}
             inputOverlayRef={inputOverlayRef}
+            // "#TIME" 없음 — '#' 교체 검사 0x38984 가 미션(모드 5 · 6)을 막는다(38984~38a20)
+            timeKeyCount={null}
           >
             {matchupCards}
             {substitutionOverlay}

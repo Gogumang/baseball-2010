@@ -70,7 +70,7 @@ import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
-import { opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { opponentBatterOf, ourBenchPitcherCountOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -799,6 +799,8 @@ export function PitcherGameScreen({
           isPaused={isAwaitingConfirm}
           isFrozen={isPitchInputPaused}
           inputOverlayRef={inputOverlayRef}
+          // "#TIME" 0x4c92e — 0x38984 는 모드 3 을 안 막는다('#' 가 강판 물음을 연다). n = 수비팀(우리)[+0x33] 벤치 투수 수
+          timeKeyCount={ourBenchPitcherCountOf(progress)}
         >
           {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />

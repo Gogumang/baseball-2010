@@ -14,6 +14,8 @@ import {
   closeManagerHookWindow,
   confirmScene,
   MY_PITCHER_SLOT,
+  ourBenchPitcherCountOf,
+  ourPitcherOrderOf,
   earnedRunAverageOf,
   giveUpPitching,
   isPitchTurn,
@@ -1384,5 +1386,17 @@ describe('투수편 간이 타석(동료 · 내가 없는 수비)은 원본 간�
       expect(링).not.toContain(6)
       expect(링).toContain(5)
     }
+  })
+})
+
+describe('"#TIME" 의 벤치 투수 수 — 팀[+0x33] (b896c 명부 − 1, 마운드를 밟으면 −1)', () => {
+  it('경기 시작 — 명단에서 마운드의 투수를 뺀 수', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(20100901))
+    const expected =
+      ourPitcherOrderOf(progress.options).filter(
+        (slot) => slot !== progress.ourMound.pitcherSlot && !progress.ourMound.usedSlots.includes(slot),
+      ).length
+    expect(ourBenchPitcherCountOf(progress)).toBe(expected)
+    expect(ourBenchPitcherCountOf(progress)).toBe(ourPitcherOrderOf(progress.options).length - 1 - progress.ourMound.usedSlots.length)
   })
 })
