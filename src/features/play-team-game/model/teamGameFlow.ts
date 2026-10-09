@@ -243,7 +243,19 @@ const BATTING_ORDER_SIZE = 9
 const REGULATION_LAST_INNING_INDEX = 8
 
 export interface TeamGameOptions {
-  /** 원본 게임 모드 — 1 일반 · 2 시즌 · 8·9 대전 */
+  /**
+   * 원본 게임 모드 — 1 일반 · 2 시즌 · 8·9 대전.
+   *
+   * **팀 경기 두 팀의 조작 칸 state[0x31 + 측]**(0 사람 · 1 CPU, `0xb6c18`) — 경기를 세우는 세 곳을 직접 떴다:
+   * ```
+   * 일반 0x30f20   310bc 0xb6c18(st, 사람 측 [sp+0x18], 0) ; 310c8 0xb6c18(st, 다른 측 [sp+0x14], 1)
+   * 대전 0x30be0   30d74 0xb6c18(st, 1, 0)                  ; 30d7e 0xb6c18(st, 0, 1)      — 측 1 사람 · 측 0 CPU 로 박힌다
+   * 시즌 0x6548    6630 0xb6c18(st, 사람 측 [sp+0x10], 0) — 같은 꼴
+   * ```
+   * 곧 **대전모드(8·9)의 상대 팀도 CPU**(state = 1)다 — 대전 상대 데이터를 내려받아도 조작은 CPU 다. 그래서 간이 타석 0xab214 의
+   * 사람 팀 보정(수비 사람 −10 · 0xab5c0)은 일반 · 시즌과 같이 **우리 팀이 수비일 때만** 걸리고, 웹은 우리 팀을 사람 · 상대를 CPU 로
+   * 넘긴다(대전 화면은 웹에 아직 없다 — 이 근거로 두 갈래를 나누지 않았다).
+   */
   readonly mode: number
   readonly ourTeamId: number
   readonly opponentTeamId: number
@@ -4934,7 +4946,8 @@ function playAutoOffenseAtBat(
       pitcher,
       situation: {
         inning: before.inning,
-        // 팀 경기 모드 1·2·8·9 는 0xab214 판정 묶음 '일반' — 공격(우리 팀)이 사람 팀이다(state[0x31 + 측] == 0, 자동진행이어도)
+        // 팀 경기 모드 1·2·8·9 는 0xab214 판정 묶음 '일반' — 공격(우리 팀)이 사람 팀이다(state[0x31 + 측] == 0, 자동진행이어도).
+        // 상대 팀은 어느 모드든 CPU 다(`TeamGameOptions.mode` 주석 — 조작 칸)
         mode: '일반',
         isOffenseHuman: true,
         // 0xab966 — 수비(상대) 점수 > 공격(우리) 점수
@@ -5052,7 +5065,8 @@ function playAutoDefenseAtBat(
       pitcher,
       situation: {
         inning: before.inning,
-        // 판정 묶음 '일반' — 수비(우리 팀)가 사람 팀이라 자동진행이어도 hit · power 쪽 −10(0xab5c0)
+        // 판정 묶음 '일반' — 수비(우리 팀)가 사람 팀이라 자동진행이어도 hit · power 쪽 −10(0xab5c0). 상대 공격 팀은 대전모드
+        // (8·9)에서도 CPU 라 우리 자동 타석에 −10 이 걸리지 않는다(`TeamGameOptions.mode` 주석 — 조작 칸)
         mode: '일반',
         isDefenseHuman: true,
         // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
