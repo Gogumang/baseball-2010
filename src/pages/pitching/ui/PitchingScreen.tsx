@@ -36,6 +36,8 @@ import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
@@ -224,6 +226,23 @@ export function PitchingScreen({
     onPopupFrozenChange?.(isPopupOpen)
   }, [isPopupOpen, onPopupFrozenChange])
   const isRunning = run.status === '진행중'
+  /**
+   * 공이 날거나 0x12 인 동안 남은 틱 — 원본은 그동안 상태 0x11 · 0x12 라 다음 공의 구질 키 · 견제 · 0xe 의 OK 를 안 받는다.
+   * 세션은 놓는 순간 판정까지 내므로 놓은 뒤 남은 비행 + 0x12 대기를 센다 (`pitchSceneBusyTicksOf`). 장면이 없으면 0
+   */
+  const lastThrow = stage?.lastThrow ?? null
+  const [busyTicks, setBusyTicks] = useState(0)
+  const [busyThrow, setBusyThrow] = useState(lastThrow)
+  if (busyThrow !== lastThrow) {
+    setBusyThrow(lastThrow)
+    setBusyTicks(
+      lastThrow !== null && passesHeldResult(lastThrow.resolution)
+        ? pitchSceneBusyTicksOf(lastThrow.pitch.frameCount, lastThrow.resultTicks)
+        : 0,
+    )
+  }
+  useSceneTick(() => setBusyTicks((left) => Math.max(0, left - 1)), busyTicks > 0 && !isPopupOpen)
+  const isPitchSceneBusy = busyTicks > 0
   // 결과 배경 캔버스의 난수 — 하늘 줄은 세션이 장면마다 한 번 굴린 `skyRow` 를 넘기므로 여기서 굴리지 않는다(넘기지 않은
   // 화면만 이 따로 든 난수로 굴린다 — 경기 난수에 새지 않게)
   const [backdropRandom] = useState(() => createSeededRandom(0))
@@ -253,14 +272,19 @@ export function PitchingScreen({
   // 교체 연출 0x16 동안은 0xd · 0xe 가 아니다 — 연출이 끝난 뒤부터 0xd 두 그림을 센다
   const sceneConfirm = useSceneConfirm(
     sceneConfirmWait,
-    isRunning && bannerText === '' && !isPopupOpen && substitutionScene === null,
+    isRunning && bannerText === '' && !isPopupOpen && substitutionScene === null && !isPitchSceneBusy,
     onSceneConfirm,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && run.status === '진행중'
 
   // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)·0xe(OK 대기)는 키를 안 받는다
   const acceptsPickoff =
-    onPickoffKey !== undefined && phase === '구질' && isRunning && !isAwaitingConfirm && !isPopupOpen
+    onPickoffKey !== undefined &&
+    phase === '구질' &&
+    isRunning &&
+    !isAwaitingConfirm &&
+    !isPopupOpen &&
+    !isPitchSceneBusy
   useEffect(() => {
     if (!acceptsPickoff || onPickoffKey === undefined) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -495,8 +519,8 @@ export function PitchingScreen({
         )
       })()}
 
-      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && <Panel heading="1. 구질 선택" />}
-      {phase === '구질' && !isAwaitingConfirm && (
+      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && <Panel heading="1. 구질 선택" />}
+      {phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && (
         <div hidden={isPopupOpen}>
           <PitchSlotPicker
             choices={slotChoices}

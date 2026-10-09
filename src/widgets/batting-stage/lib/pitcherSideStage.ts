@@ -88,3 +88,11 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
 export function passesHeldResult(resolution: PitchResolution): boolean {
   return resolution.kind !== '타구' && resolution.kind !== '파울'
 }
+
+/**
+ * 공을 놓은 틱(0x11 틱 10)부터 장면이 다시 '대기' 로 돌아올 때까지의 틱 — 남은 0x11(공 틱 N + 1 까지) + 0x12 대기.
+ * 원본은 그동안 상태가 0x11 · 0x12 라 구질 키(0xf) · 견제 · '#' · 0xe 의 OK 를 받지 않는다 (키 갈래 0x53580 은 상태별 표).
+ */
+export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number): number {
+  return PITCHER_RELEASE_TICKS - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + 1 + resultTicks
+}

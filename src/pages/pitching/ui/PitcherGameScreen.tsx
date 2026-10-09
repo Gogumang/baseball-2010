@@ -76,6 +76,7 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
 /**
@@ -249,6 +250,8 @@ export function PitcherGameScreen({
   /**
    * 내 공의 0x12 대기 — 맞히지 못한 공은 갱신 0x4e6d4 가 상태 틱을 15(볼넷 · 사구 · 삼진이면 31) 까지 기다린 뒤 판정 A 가 다음
    * 상태(반 이닝이 끝났으면 0x21)로 보낸다. 웹 진행기는 공 하나에 자동진행까지 돌리므로 중계를 그 틱 뒤로 민다.
+   * 웹 진행기는 놓는 순간(0x11 틱 10) 판정까지 내므로 남은 0x11 비행(공 틱 N + 1 까지)도 함께 센다(`pitchSceneBusyTicksOf`) —
+   * 그동안은 원본도 0x11 · 0x12 라 다음 공의 구질 키 · 견제 · '#' · 0xe 의 OK 를 안 받는다.
    */
   const atBatBeforeThrowRef = useRef(progress.atBat)
   const [pitchWaitTicks, setPitchWaitTicks] = useState(0)
@@ -262,10 +265,12 @@ export function PitcherGameScreen({
     if (lastResolution === null || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) return
     if (lastResolution.kind === '타구') return
     const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, lastResolution).outcome)
-    setPitchWaitTicks(waitTicks)
+    setPitchWaitTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks))
     setHeldResultTicks(waitTicks)
-  }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay])
+  }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay, progress.lastPitch])
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
+  /** 공이 날거나 0x12 인 동안 — 원본 상태 0x11 · 0x12 */
+  const isPitchSceneBusy = pitchWaitTicks > 0
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
@@ -285,6 +290,7 @@ export function PitcherGameScreen({
       progress.pendingRunnerPlay == null &&
       !isReplaying &&
       !isRelaying &&
+      !isPitchSceneBusy &&
       !isPopupOpen &&
       overlay === null &&
       !asksGiveUp &&
@@ -298,6 +304,7 @@ export function PitcherGameScreen({
       progress.pendingRunnerPlay == null &&
       !isReplaying &&
       !isRelaying &&
+      !isPitchSceneBusy &&
       !isPopupOpen &&
       overlay === null &&
       !asksGiveUp &&
@@ -315,6 +322,7 @@ export function PitcherGameScreen({
     !isAwaitingConfirm &&
     !isReplaying &&
     !isRelaying &&
+    !isPitchSceneBusy &&
     !isSceneShowing &&
     phase === '구질' &&
     !isMenuOpen &&
@@ -346,6 +354,7 @@ export function PitcherGameScreen({
     !asksGiveUp &&
     !isReplaying &&
     !isRelaying &&
+    !isPitchSceneBusy &&
     progress.pendingDefensePlay === null &&
     progress.pendingRunnerPlay == null &&
     progress.managerHookText === null &&
@@ -664,7 +673,7 @@ export function PitcherGameScreen({
           isAwaitingConfirm && !isPopupOpen
             ? // 0xe — OK 를 받는다 (0x532b0). 강판 물음은 '#' 키로 연다 (위 `acceptsGiveUpKey`)
               { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
-            : canPitch && !isPopupOpen
+            : canPitch && !isPopupOpen && !isPitchSceneBusy
               ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
               : undefined
         }
@@ -809,8 +818,10 @@ export function PitcherGameScreen({
             <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
           )}
         </PitcherSideStage>
-        {!isPitchInputPaused && canPitch && !isAwaitingConfirm && phase === '구질' && <Panel heading="1. 구질 선택" />}
-        {canPitch && !isAwaitingConfirm && phase === '구질' && (
+        {!isPitchInputPaused && canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질' && (
+          <Panel heading="1. 구질 선택" />
+        )}
+        {canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질' && (
           <div hidden={isPitchInputPaused}>
             <PitchSlotPicker
               choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}

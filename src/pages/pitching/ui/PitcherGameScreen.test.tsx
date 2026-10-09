@@ -172,6 +172,9 @@ describe('투수편 경기 화면', () => {
     틱(9)
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
     틱(1)
+    // 놓았다 — 남은 0x11 비행과 0x12 대기 동안은 원본도 다음 공 입력을 안 받는다
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    틱(80)
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
