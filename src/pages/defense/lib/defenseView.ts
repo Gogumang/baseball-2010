@@ -215,8 +215,16 @@ export function runnerFrameOf(
 export interface DefenseBall extends WorldPoint {
   /** 월드 단위 높이 */
   readonly height: number
-  /** 공.vt18 — 날아가는 중인가. 멈추면 카메라가 타자주자를 본다 */
+  /**
+   * 진행기가 보는 "아직 날아가는 중(포구 · 송구 도착 전)" 표시. **카메라는 이것을 안 본다** — 0x3f060 은 공.vt18(멈춤)과
+   * 홈런 칸만 본다(`cameraTargetOf`). 옛 화면이 "날지 않으면 타자주자" 로 읽던 칸이다.
+   */
   readonly isFlying: boolean
+  /**
+   * 공.vt18 = 0xa27f0 — **멈췄는가**(지금 점의 속도 · 수직 속도 워드가 0, 목표가 있으면 목표점에 닿음 — I-controls 2b).
+   * 야수가 쥔 공도 손에 붙어 안 움직여 멈춘 것으로 본다(관문 파울 갈래와 같은 읽기 — 유력). 안 주면 거짓.
+   */
+  readonly isStopped?: boolean
 }
 
 /** 야수 한 명 */
@@ -362,15 +370,27 @@ export interface DefenseViewState {
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
    */
   readonly cameraTarget?: WorldPoint | null
+  /** 플레이 +0x111 — 사건 코드 8(홈런). 안 주면 거짓 */
+  readonly homeRunFlag?: boolean
+  /** 플레이 +0x129 — 사건 코드 12(폴 홈런). 안 주면 거짓 */
+  readonly poleHomeRunFlag?: boolean
 }
 
 /**
- * 카메라가 볼 점 (0x3f060).
- * 공이 날아가는 중이면 공 (x, z − 높이), 멈췄으면 타자주자(주자 0).
+ * 카메라가 볼 점 (0x3f060 — 3f0f0~3f1be, 직접 뜸).
+ * ```
+ * 3f0f0  P = [장면+0x200] ; P+0x111(홈런) || P+0x129(폴 홈런) 이 아니면 → 3f194
+ * 3f106  [장면+0x204](공).vt18()(멈춤) 거짓이면 → 3f194
+ * 3f11c  주자 = 0xa9564([장면+0x20c], 0)(목록 0번 = 타자주자) ; 대상 = (주자+0x20 x, 주자+0x28 z)   ; 높이를 안 뺀다
+ * 3f194  공 점 0xa25d4(공) ; 대상 = (x, z − y)
+ * 3f1c0  카메라 vt20(대상) · vt28(따라가기)
+ * ```
+ * 곧 **홈런 · 폴 홈런 판에서 공이 멈췄을 때만** 타자주자를 보고, 그 밖은 늘 공 (x, z − 높이) 다 —
+ * 보통 타구는 공이 멈춰도(포구 · 송구가 끝나도) 공을 본다.
  */
 export function cameraTargetOf(state: DefenseViewState): WorldPoint {
   if (state.cameraTarget != null) return state.cameraTarget
-  if (!state.ball.isFlying) {
+  if ((state.homeRunFlag === true || state.poleHomeRunFlag === true) && state.ball.isStopped === true) {
     const batterRunner = state.runners.find((runner) => runner.index === 0)
     if (batterRunner !== undefined) return { x: batterRunner.x, z: batterRunner.z }
   }

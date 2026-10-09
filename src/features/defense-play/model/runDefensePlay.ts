@@ -2300,6 +2300,13 @@ export function stepDefensePlay(
           uncatchable
             ? tick < trajectory.landingTick
             : tick < catchTick || (throwArrivalTick >= 0 && tick < throwArrivalTick),
+        // 카메라 0x3f060 — 홈런(+0x111) · 폴 홈런(+0x129) 판에서 공.vt18(멈춤)이면 타자주자를 본다.
+        // 멈춤은 관문 파울 갈래와 같은 읽기다 — 쥔 공은 손에 붙어 안 움직인다(유력)
+        ballStopped:
+          play.held ||
+          (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
+        homeRunFlag,
+        poleHomeRunFlag: play.suppressed,
         fielders,
         runners: runners.map((runner) => runner.state),
         catchKind: tick >= play.actionStartTick && tick <= catchTick ? play.catchKind : null,

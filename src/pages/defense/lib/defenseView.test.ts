@@ -161,8 +161,19 @@ describe('카메라가 볼 점', () => {
     expect(cameraTargetOf(base)).toEqual({ x: 20000, z: 21500 })
   })
 
-  it('공이 멈추면 타자주자(주자 0)를 본다', () => {
-    expect(cameraTargetOf({ ...base, ball: { ...base.ball, isFlying: false } })).toEqual({ x: 25946, z: 24500 })
+  it('보통 타구는 공이 멈춰도 공을 본다 — 타자주자로 넘어가는 것은 홈런 판뿐이다 (0x3f0f0)', () => {
+    const stopped = { ...base, ball: { ...base.ball, isFlying: false, isStopped: true } }
+    expect(cameraTargetOf(stopped)).toEqual({ x: 20000, z: 21500 })
+  })
+
+  it('홈런(+0x111) · 폴 홈런(+0x129) 판에서 공이 멈추면(vt18) 타자주자(주자 0)를 본다 — 높이를 안 뺀다', () => {
+    const stopped = { ...base, ball: { ...base.ball, isStopped: true } }
+    expect(cameraTargetOf({ ...stopped, homeRunFlag: true })).toEqual({ x: 25946, z: 24500 })
+    expect(cameraTargetOf({ ...stopped, poleHomeRunFlag: true })).toEqual({ x: 25946, z: 24500 })
+  })
+
+  it('홈런 판이라도 공이 아직 움직이면 공을 본다', () => {
+    expect(cameraTargetOf({ ...base, homeRunFlag: true })).toEqual({ x: 20000, z: 21500 })
   })
 
   it('따로 정한 대상이 있으면 그것이 먼저다 (경기 끝 직전 투수판)', () => {

@@ -37,6 +37,11 @@ export interface ViewStateInput {
   readonly tick: number
   readonly ball: WorldPoint
   readonly ballIsFlying: boolean
+  /** 공.vt18(멈춤) — 카메라가 홈런 판에서 타자주자로 넘어가는 조건(0x3f106). 안 주면 거짓 */
+  readonly ballStopped?: boolean
+  /** 플레이 +0x111(홈런) · +0x129(폴 홈런) — 카메라 0x3f0f0 이 본다. 안 주면 거짓 */
+  readonly homeRunFlag?: boolean
+  readonly poleHomeRunFlag?: boolean
   readonly fielders: readonly FielderState[]
   readonly runners: readonly RunnerState[]
   /** 이번 틱에 포구 동작 중이면 그 종류, 아니면 null */
@@ -98,7 +103,13 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
 
   return {
     tick: input.tick,
-    ball: { x: input.ball.x, z: input.ball.z, height: input.ball.y, isFlying: input.ballIsFlying },
+    ball: {
+      x: input.ball.x,
+      z: input.ball.z,
+      height: input.ball.y,
+      isFlying: input.ballIsFlying,
+      isStopped: input.ballStopped === true,
+    },
     fielders,
     runners,
     // 필살 포구 번쩍임(deadly_effect B · C)은 진행기가 연출 단계 기계로 그린 그림에만 싣는다 (`defenseScene`)
@@ -106,6 +117,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     // 레이저 반짝임은 그릴 칸 하나로 끝이다 — 고르는 조건은 진행기 몫이다(0x43406~0x4342c)
     laserShiningSlot: laserShiningSlotOf(input.laserShiningSlot),
     cameraTarget: null,
+    homeRunFlag: input.homeRunFlag === true,
+    poleHomeRunFlag: input.poleHomeRunFlag === true,
   }
 }
 
