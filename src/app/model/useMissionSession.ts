@@ -2063,6 +2063,8 @@ export function useMissionSession({
     /** 조준(0x10)의 CLR — 0xf 로 돌아가 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다 */
     returnToPitchSelection: () => askPitchSelection('same'),
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
+    /** 타자 미션: 이번 공에 출발한 주자의 루 (st[0x14 + 루]) — 타석 화면이 그 주자를 루에 안 그린다 */
+    stealingFrom,
     /**
      * 타자 미션 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74 `0xb570d(ctx, 3, 주자, 1, 90, 1)`).
      * 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로다 (`missionRunnerRunAbilitiesOf`)

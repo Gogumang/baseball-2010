@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   baseRunnerDrawsOf,
+  createRunnerAnimationClock,
   grayRunPipPixel,
+  halfShadeRunnerPixel,
   loopingAnimationStepAt,
   runPipCountOf,
   runPipDrawsOf,
   runnerBoxAnchorOf,
   showsBaseRunners,
+  stepRunnerAnimationClock,
 } from '@/widgets/batting-stage/lib/baseRunners'
 import { BATTER_SIDE } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -88,3 +91,31 @@ describe('상태 0xe 주루 칸 — 0x35b94 의 35f4e~3604c', () => {
   })
 })
 
+
+describe('루상 주자 애니 시계 — 장면 +0xf24 애니 0~2 (0x35b94 의 0x93d91 진행 뒤 0x93cfd 켜기)', () => {
+  it('첫 부름은 칸 0 을 그리고, 그 뒤 부를 때마다 한 칸씩 — 주자가 없는 루 · 숨긴 루는 안 나아간다', () => {
+    const clock = createRunnerAnimationClock()
+    const bases = { first: true, second: true, third: false }
+    expect(stepRunnerAnimationClock(clock, bases, [], 1)).toEqual([0, 0, null])
+    expect(stepRunnerAnimationClock(clock, bases, [2], 3)).toEqual([3, null, null])
+    expect(stepRunnerAnimationClock(clock, { first: true, second: true, third: true }, [], 1)).toEqual([4, 1, 0])
+  })
+
+  it('타석 화면이 다시 서도(같은 시계) 이어진다 — 되감는 곳이 없다', () => {
+    const clock = createRunnerAnimationClock()
+    stepRunnerAnimationClock(clock, { first: true, second: false, third: false }, [], 10)
+    expect(stepRunnerAnimationClock(clock, { first: true, second: false, third: false }, [], 1)).toEqual([10, null, null])
+  })
+})
+
+describe('효과 0xc 한 픽셀 0x98351 — ((c & 0xf7de) >> 1) + ((인자 & 0xf7de) >> 1)', () => {
+  it('인자 0 이면 565 채널마다 반(내림) — 흰색은 반쯤 어두운 회색, 검정은 검정', () => {
+    expect(halfShadeRunnerPixel(255, 255, 255)).toEqual({ r: 123, g: 125, b: 123 })
+    expect(halfShadeRunnerPixel(0, 0, 0)).toEqual({ r: 0, g: 0, b: 0 })
+    expect(halfShadeRunnerPixel(248, 0, 0)).toEqual({ r: 123, g: 0, b: 0 })
+  })
+
+  it('인자 색과 반반 섞는다 — 인자 흰색(0xffff)이면 검정이 반 밝기', () => {
+    expect(halfShadeRunnerPixel(0, 0, 0, 0xffff)).toEqual({ r: 123, g: 125, b: 123 })
+  })
+})

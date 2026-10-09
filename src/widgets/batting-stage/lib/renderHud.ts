@@ -39,9 +39,14 @@ export interface HudState {
   /**
    * 루상 주자의 **경기용 주력** 0xb570d(ctx, 3, 주자 선수, 1, 90, 1) — 상태 0xe 의 주루 칸(0x35b94 35f74, `runPipDrawsOf`)이 쓴다.
    * 타자편 · 팀 경기 화면이 경기 상태의 주자 신원(`GameState.runners`, 원본 주자 목록)대로 채운다(내 선수면 내 능력치).
-   * 신원이 없는 화면(미션 · 홈런더비)은 안 채운다 — 없는 루는 칸을 안 그린다
+   * 타자 미션도 신원(`MissionRun.runners`)대로 채운다. 홈런더비는 주자가 없다 — 없는 루는 칸을 안 그린다
    */
   readonly runnerRunAbilities?: Partial<Record<'first' | 'second' | 'third', number>>
+  /**
+   * 경기 st[0x15 + i] — 이번 공에 **도루를 출발한 주자**의 루(1~3, 0xa9bd4 a9c30 이 세우고 0xf 진입 0x3d954 가 지운다).
+   * 0x35b94 는 그 루의 주자를 안 그리고 애니도 안 돌린다. 안 주면 아무도 안 뛰었다
+   */
+  readonly hiddenRunnerBases?: readonly number[]
 }
 
 const HUD_FRAMES = './sprites/game_ui/frames'

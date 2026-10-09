@@ -9,17 +9,26 @@ import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabe
  * 35bd2  (px, py) = 투수 앵커 표 0xcfb18[+0x17e1] 투영 + 카메라 ; y0 = py − 0x2f ; 깊이 = 투수판 z(24500) − 1
  * 35c14  w = game_ui 이미지 22(+0x58) 폭 (34)
  * 루 i = 0..2:
- *   35c36  p = 0xa97a1(주자 관리, i + 1) ; p 없거나 경기 st[0x15 + i] ≠ 0 이면 건너뜀
- *   35c62  애니 i(장면 +0xf24 = defender.pzx, 팔레트 = p+0xac 팀) 한 칸 진행(0x93d91) · 안 돌면 반복으로 켬(0x93cfd(애니, 1))
+ *   35c36  p = 0xa97a1(주자 관리, i + 1) ; p 없거나 경기 st[0x15 + i] ≠ 0 이면 건너뜀(진행도 안 한다)
+ *          st[0x14 + 루] = 이번 공에 **도루를 출발한 주자** 표시 — 0xa9bd4(a9c30, 사람 키 0x583 · CPU 0x520de 의 52208)가 세우고
+ *          0xf 진입 0x3d954(3d966~3d976, st[0x14..0x17] 넷)와 0xd · 0xf 의 0x35650 → 0xb68bc(st[0x14..0x16])가 지운다 → 공이 나는
+ *          동안 뛰기 시작한 주자는 루에 안 그린다 (`HudState.hiddenRunnerBases`)
+ *   35c62  애니 i = 0x79e3d(장면 +0xf24 수비수 그림 묶음, i, 마선수 주자(p+0x9c ≠ −1)면 +0x1c 마선수 묶음 · 아니면 +0xc defender.pzx)
+ *          를 한 칸 진행(0x93d91) 한 **뒤** 0x93cfd(애니, 1) 로 반복을 켠다(이미 돌면 아무것도 안 한다)
  *   35c9e  상태 [+0x1c] == 0x13 이면 그리지 않는다(진행만)
  *   i = 0: 이미지 22 를 (W − w − 3, y0 + 7) · 애니 0 을 (W − (w >> 1) − 3, y0 + 7 + 0x18)
- *   i = 1: 애니 1 을 (px − (좌타 ? 0x1b : 5), py − 0x12) 에 **효과 0xc · 인자 0**(검정 실루엣 — 유력)
+ *   i = 1: 애니 1 을 (px − (좌타 ? 0x1b : 5), py − 0x12) 에 **효과 0xc · 인자 0** — 반쯤 어둡게(`halfShadeRunnerPixel`)
  *   i = 2: 이미지 22 를 효과 0x11(좌우 뒤집기)로 (3, y0 + 7) · 애니 2 를 ((w >> 1) + 3, y0 + 7 + 0x18)
  *   모두 그리기 목록(+0x234, 0xbe905 · 0xbe8a5)에 깊이 24499 로 넣는다.
  *   35f6e  상태 0xe 면 주자 곁에 주루 칸(game_ui 이미지 0x61) 넷을 더 넣는다 — `runPipDrawsOf`
  * ```
- * 애니는 0x93c45 가 칸의 (dx, dy) 만큼 비켜 그리고, 칸 길이는 max(1, 지연) 그림이다. 원본은 장면에 애니 셋을 들고 그릴 때마다 한 칸씩
- * 돌린다(루에 주자가 있을 때만) — 웹은 타석 화면 틱으로 센다(근사). 경기 st[0x15 + i] 칸은 웹에 없어 늘 0 으로 본다.
+ * 애니는 0x93c45 가 칸의 (dx, dy) 만큼 비켜 그리고, 칸 길이는 max(1, 지연) 그림이다. **애니 시계**(`RunnerAnimationClock`)는 경기 장면
+ * 수명이다: defender.pzx 묶음(장면 +0x1068)은 상태 8 의 0x48658(48958 0xbbd0d)이 한 번 싣고 장면 해제 0x332b8(3399a)만 버린다 —
+ * 타석 교대 0x47cc8 은 +0xf24 에 같은 묶음을 다시 걸 뿐(0x79cb5)이라 애니 객체가 그대로다. 애니 0~2 를 꺼내는 0x79e3d 는 0x35b94
+ * 하나만 부르고 반복으로 켠 애니는 0x93d90 이 멈추지 않는다 → 루 i 의 애니는 **그 루에 (숨김 없이) 주자가 선 채 0x35b94 가 불린
+ * 그림 수**만큼 한 칸씩 나아가고 장면이 끝날 때까지 되감기지 않는다(주자가 바뀌어도, 타석 · 이닝을 건너도 이어진다). 첫 부름은 진행(0x93d90:
+ * 안 도는 애니는 그대로)이 아무것도 안 하고 켜기(0x93cfd: 칸 틱 [1] = 0, 칸 [0] 은 그대로)만 해 첫 칸 0 을 그린다.
+ * 마선수 주자의 +0x1c 묶음(ace/defender_*)은 웹에 없어 defender 그림으로 그린다(⚠️ 미이식).
  */
 
 /** game_ui 이미지 22 — 1·3루 쪽 작은 창(34×35) */
@@ -69,6 +78,38 @@ export function baseRunnerDrawsOf(bases: BaseRunnerBases, side: number): BaseRun
     draws.push({ kind: 'runner', animation: 2, x: (BASE_WINDOW_WIDTH >> 1) + SCREEN_MARGIN, y: runnerY, isSilhouette: false })
   }
   return draws
+}
+
+/**
+ * **루상 주자 애니 시계** — 장면 +0xf24 묶음의 애니 0 · 1 · 2 가 0x35b94 에서 불린 수(`calls`, 루 1 · 2 · 3). 경기 장면 하나 동안
+ * 남는다 — 부르는 쪽이 장면 수명의 칸(`useSceneScopedRef`)으로 넘기면 타석 화면이 다시 서도 이어진다.
+ */
+export interface RunnerAnimationClock {
+  readonly calls: [number, number, number]
+}
+
+export function createRunnerAnimationClock(): RunnerAnimationClock {
+  return { calls: [0, 0, 0] }
+}
+
+/**
+ * 0x35b94 를 `frames` 번 더 불렀다 — 루에 주자가 있고 숨김(st[0x15 + i])이 아닌 루의 애니만 한 칸씩 나아간다.
+ * 돌려주는 값은 루마다 **지금 그릴 진행 수**(첫 부름은 0 — 진행이 켜기보다 앞이다), 안 그리는 루는 null.
+ */
+export function stepRunnerAnimationClock(
+  clock: RunnerAnimationClock,
+  bases: BaseRunnerBases,
+  hiddenBases: readonly number[],
+  frames: number,
+): readonly [number | null, number | null, number | null] {
+  const steps: (number | null)[] = [null, null, null]
+  const occupied = [bases.first, bases.second, bases.third]
+  for (let index = 0; index < 3; index += 1) {
+    if (occupied[index] !== true || hiddenBases.includes(index + 1)) continue
+    clock.calls[index] = (clock.calls[index] ?? 0) + Math.max(0, frames)
+    steps[index] = Math.max(0, (clock.calls[index] ?? 0) - 1)
+  }
+  return [steps[0] ?? null, steps[1] ?? null, steps[2] ?? null]
 }
 
 /** 반복 애니의 지금 칸 — 칸 길이 max(1, 지연) 그림 (0x93d90). 표가 비면 null */
@@ -154,6 +195,29 @@ export function runPipDrawsOf(
     }
   }
   return draws
+}
+
+/**
+ * **효과 0xc 한 픽셀** — 팔레트 픽셀 함수 0x98351(등록 0x30b2~0x30c0: `0x985ed(0xc, 0x9af71)` · `0x9869d(0xc, 0x98351, 0x983d1)`, 직접 떴다):
+ * ```
+ * 98394  c = 팔레트[칸]                          ; 565
+ * 9839e  out = ((c & 0xf7de) >> 1) + ((인자 & 0xf7de) >> 1)   ; 채널마다 아랫 비트를 떼고 반씩 — 인자 색과 반반 섞기
+ * ```
+ * 2루 주자는 인자 0 이라 **채널마다 반(내림)** — 검정 실루엣이 아니라 반쯤 어두운 그림이다. 8비트 RGB 를 565 로 보고 섞어 다시 편다.
+ */
+export function halfShadeRunnerPixel(
+  red: number,
+  green: number,
+  blue: number,
+  argument = 0,
+): { r: number; g: number; b: number } {
+  const source = ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3)
+  const mixed = ((source & 0xf7de) >> 1) + ((argument & 0xf7de) >> 1)
+  const five = (value: number) => (value << 3) | (value >> 2)
+  const r5 = (mixed >> 11) & 0x1f
+  const g6 = (mixed >> 5) & 0x3f
+  const b5 = mixed & 0x1f
+  return { r: five(r5), g: (g6 << 2) | (g6 >> 4), b: five(b5) }
 }
 
 /** 효과 0xa 한 픽셀 (0x97f01) — 8비트 RGB 를 565 로 보고 회색 g(5비트)를 내 다시 8비트로 편다 */

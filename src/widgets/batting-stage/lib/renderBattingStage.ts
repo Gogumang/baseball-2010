@@ -24,6 +24,7 @@ import {
   RUN_PIP_IMAGE,
   baseRunnerDrawsOf,
   grayRunPipPixel,
+  halfShadeRunnerPixel,
   loopingAnimationStepAt,
   runPipDrawsOf,
   runnerBoxAnchorOf,
@@ -54,6 +55,10 @@ export interface StageScene {
   readonly pitcherTick: number | null
   /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 구름 */
   readonly tick: number
+  /**
+   * 루상 주자 애니 1 · 2 · 3 루의 지금 진행 수 — 장면에 남는 애니 시계(`stepRunnerAnimationClock`). 안 주면 `tick`(시험 · 옛 호출)
+   */
+  readonly runnerAnimationSteps?: readonly (number | null)[]
   /** 판정 글자가 뜬 뒤 흐른 틱 */
   readonly resultTick: number
   readonly scenery: Omit<SceneryState, 'tick' | 'skyColumn' | 'ourTeamId' | 'opponentTeamId'>
@@ -182,7 +187,7 @@ export function renderBattingStage(
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
-    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase))
+    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
@@ -255,9 +260,17 @@ function drawBaseRunners(
   side: number,
   tick: number,
   showsRunPips: boolean,
+  runnerAnimationSteps?: readonly (number | null)[],
 ): void {
   const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
-  for (const draw of baseRunnerDrawsOf(hud.bases, side)) {
+  // st[0x15 + i] — 도루를 출발한 주자의 루는 창도 주자도 안 그린다 (35c4a 가 그 루의 몸통을 통째로 건너뛴다)
+  const hidden = hud.hiddenRunnerBases ?? []
+  const shownBases = {
+    first: hud.bases.first && !hidden.includes(1),
+    second: hud.bases.second && !hidden.includes(2),
+    third: hud.bases.third && !hidden.includes(3),
+  }
+  for (const draw of baseRunnerDrawsOf(shownBases, side)) {
     if (draw.kind === 'window') {
       const image = sprite(BASE_WINDOW_IMAGE)
       if (image === null) continue
@@ -274,13 +287,14 @@ function drawBaseRunners(
       continue
     }
     const entries = frameAnimations(RUNNER_FRAMES)?.[draw.animation]
-    const step = entries === undefined ? null : loopingAnimationStepAt(entries, tick)
+    const clockStep = runnerAnimationSteps === undefined ? tick : runnerAnimationSteps[draw.animation]
+    const step = entries === undefined || clockStep === null || clockStep === undefined ? null : loopingAnimationStepAt(entries, clockStep)
     if (step === null) continue
     const placed = placedFrame(RUNNER_FRAMES, step.frame, paletteIndex)
     if (placed === null) continue
     const x = draw.x + step.dx + placed.offsetX
     const y = draw.y + step.dy + placed.offsetY
-    if (draw.isSilhouette) drawSilhouette(context, placed.image, x, y, '#000000')
+    if (draw.isSilhouette) drawHalfShaded(context, placed.image, x, y)
     else context.drawImage(placed.image, x, y)
     // 35f4e~3604c — 같은 애니 칸의 상자(0x93e7d)를 상자 점에서 잡아 주루 칸을 잇따라 넣는다
     const base = RUNNER_BASE_OF_ANIMATION[draw.animation]
@@ -327,17 +341,24 @@ function drawGrayed(context: CanvasRenderingContext2D, image: HTMLImageElement, 
   context.drawImage(canvas, x, y)
 }
 
-/** 효과 0xc · 인자 색 — 그림 모양대로 한 색으로 칠한다(R2: 섞는 식은 미해결, 레이저 반짝임과 같은 근사) */
-function drawSilhouette(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, color: string): void {
+/** 효과 0xc · 인자 0 — 픽셀마다 원본 반반 섞기(0x98351)로 채널을 반으로 (`halfShadeRunnerPixel`) */
+function drawHalfShaded(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number): void {
   const canvas = document.createElement('canvas')
   canvas.width = image.width
   canvas.height = image.height
   const layer = canvas.getContext('2d')
   if (layer === null) return
   layer.drawImage(image, 0, 0)
-  layer.globalCompositeOperation = 'source-in'
-  layer.fillStyle = color
-  layer.fillRect(0, 0, canvas.width, canvas.height)
+  const pixels = layer.getImageData(0, 0, canvas.width, canvas.height)
+  const data = pixels.data
+  for (let offset = 0; offset < data.length; offset += 4) {
+    if (data[offset + 3] === 0) continue
+    const shaded = halfShadeRunnerPixel(data[offset] ?? 0, data[offset + 1] ?? 0, data[offset + 2] ?? 0)
+    data[offset] = shaded.r
+    data[offset + 1] = shaded.g
+    data[offset + 2] = shaded.b
+  }
+  layer.putImageData(pixels, 0, 0)
   context.drawImage(canvas, x, y)
 }
 
