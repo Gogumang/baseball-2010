@@ -31,7 +31,7 @@ import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateM
  * 구단정보 0xd5 는 `pages/season/ui/SeasonTeamInfoScreen`(카드 0x7ba44 팀 갈래 0x7bf9c + 정보 칸 0x7c450),
  * 아이템 0xd6 은 `SeasonOwnedItemsScreen`(아이템 창 0x8453c 종류 5 — 보유 서브아이템 보기),
  * 기록순위는 `SeasonRecordPickPopup`(창 0x80) → `SeasonRecordRankScreen`(0xdb, 리그 개인 순위표 0x9d789 · 그림 0x5796c).
- * ⚠️ 미해결: 기록순위 창 칸 그림 0x858fd(6 / 10)의 그림 묶음.
+ * 기록순위 창 칸 그림 0x858fd(6 / 10) = `ui/mode_icon` (`widgets/record-pick-popup`).
  */
 
 /** 0x9008 의 칸 → 하는 일 */

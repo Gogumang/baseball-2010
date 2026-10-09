@@ -45,42 +45,7 @@ export type RecordRoomPick = (typeof RECORD_ROOM_PICK)[keyof typeof RECORD_ROOM_
 export const RECORD_ROOM_PICK_LABEL_FRAMES: readonly [number, number] = [106, 360]
 export const RECORD_ROOM_PICK_LABELS: readonly [string, string] = ['개인기록', '순위기록']
 
-/**
- * **팝업 0x80 칸 그림 0x858fd(그림 객체, 칸, 프레임, 팔레트)** (직접 떴다, 0x19448 · 0x858fc · 0x7dfac):
- * ```
- * 칸 0 = (W/2 − 0x38, H/2, 0x20, 0x20) 프레임 6 · 칸 1 = (W/2 + 0x18, H/2, 0x20, 0x20) 프레임 10
- * 0x913e5([그림+0x30], 팔레트)                     ; 고른 칸 0(mpl 첫 벌) · 아닌 칸 −1(pzx 제 팔레트) — [장면+0x166] 로 가른다
- * 0xb9d35([[[그림+0x2c]+8]+8][프레임], 칸, 꼴 0x22) ; 0xb9c5c: x += (w − iw)/2 몫 + 나머지 · y += (h − ih)/2 몫
- * ```
- * 그림 묶음 [그림+0x2c] · [그림+0x30] 은 0x7dfac 가 비었으면 싣는다 — `ui/mode_icon.pzx` · 팔레트 `ui/mode_icon.mpl`
- * (105 진입 0x11910 · 팝업을 여는 0x19774 등이 부른다). 33×33 아이콘이라 칸보다 1 넓다 → (칸 x − 1, 칸 y).
- * 칸 글 img_text 는 (칸 x + (0x20 − 글 폭)/2 몫, 칸 y + 0x20 + 4) — 고른 칸은 그대로, 아닌 칸은 효과 0xb 단색 RGB(0xb2, 0xb2, 0xb2).
- */
-export const RECORD_ROOM_PICK_CELLS: readonly { readonly x: number; readonly y: number; readonly iconFrame: number }[] = [
-  { x: 120 - 0x38, y: 160, iconFrame: 6 },
-  { x: 120 + 0x18, y: 160, iconFrame: 10 },
-]
-export const RECORD_ROOM_PICK_CELL_SIZE = 0x20
-/** 칸 글 아래 틈 (0x19534 `adds r7, r3, #4`) */
-export const RECORD_ROOM_PICK_LABEL_GAP = 4
-/** 아닌 칸 글 단색 — 0x1400748(0xb2, 0xb2, 0xb2) · 효과 0xb */
-export const RECORD_ROOM_PICK_DIM_LABEL_COLOR = '#b2b2b2'
-
-/** 0xb9c5c 꼴 0x22 — 가로: (칸 − 그림)/2 몫 + 나머지(C 나눗셈) · 세로: (칸 − 그림)/2 몫 */
-export function recordRoomPickIconOffsetOf(imageWidth: number, imageHeight: number): { readonly x: number; readonly y: number } {
-  const dx = RECORD_ROOM_PICK_CELL_SIZE - imageWidth
-  const dy = RECORD_ROOM_PICK_CELL_SIZE - imageHeight
-  // `| 0` 은 C 나눗셈처럼 0 쪽으로 자른다(−0 도 0 으로)
-  return { x: ((dx / 2) | 0) + (dx % 2), y: (dy / 2) | 0 }
-}
-
-/** 칸 글 x — 0x19518~0x19526 `(칸 폭 − 글 폭) / 2` 몫 */
-export function recordRoomPickLabelXOf(labelWidth: number): number {
-  return ((RECORD_ROOM_PICK_CELL_SIZE - labelWidth) / 2) | 0
-}
-
-/** 팝업 제목 StrMODE[74] "보고 싶은 기록을 선택해주세요" (0x1947a) */
-export const RECORD_ROOM_PICK_TITLE_ID = 74
+/** 팝업 그림 · 칸 자리는 시즌 0xf334 와 같은 꼴이라 `widgets/record-pick-popup` 이 함께 쓴다 */
 
 export type NariRecordEdition = '타자' | '투수'
 

@@ -375,8 +375,12 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '기록순위' }))
+    // 칸 그림 0x858fd — mode_icon 6 · 10, 고른 칸만 mpl 첫 벌(주황) 사본 ([장면+0x16c] ≠ 0 이면 칸 0)
+    const iconOf = (cell: number) => screen.getByTestId(`기록순위-칸-${cell}`).getAttribute('src')
+    expect([iconOf(0), iconOf(1)]).toEqual(['./sprites/management/icon_selected_6.png', './sprites/mode_icon/010.png'])
     키('ArrowRight')
     expect(screen.getByRole('button', { name: '투수기록' }).getAttribute('aria-pressed')).toBe('true')
+    expect([iconOf(0), iconOf(1)]).toEqual(['./sprites/mode_icon/006.png', './sprites/management/icon_selected_10.png'])
     키('Enter')
     expect(screen.getByRole('group', { name: '기록순위 투수 방어율' })).toBeTruthy()
     키('ArrowLeft') // 쪽 0 에서 멈춘다

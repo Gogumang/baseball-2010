@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { MarkupText, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
-import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
@@ -14,9 +14,7 @@ import {
 } from '@/entities/season-mode/model/seasonRecordRanking'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  OPEN_YEAR_RECORD_VIEW, RECORD_ROOM_PICK, RECORD_ROOM_PICK_CELL_SIZE, RECORD_ROOM_PICK_CELLS, RECORD_ROOM_PICK_DIM_LABEL_COLOR,
-  RECORD_ROOM_PICK_LABEL_FRAMES, RECORD_ROOM_PICK_LABEL_GAP, RECORD_ROOM_PICK_LABELS, RECORD_ROOM_PICK_TITLE_ID,
-  recordRoomPickIconOffsetOf, recordRoomPickLabelXOf,
+  OPEN_YEAR_RECORD_VIEW, RECORD_ROOM_PICK, RECORD_ROOM_PICK_LABEL_FRAMES, RECORD_ROOM_PICK_LABELS,
   VISIBLE_YEAR_COLUMNS, YEAR_NUMBER_HEADER_FRAME, YEAR_TABLE_LAYOUT, advanceYearSlide, batterYearCellNumberOf, batterYearCellTextOf,
   batterYearRowsOf, nariRankingEntriesOf, nariRankingSideOf, pitcherYearCellNumberOf, pitcherYearCellTextOf, pitcherYearRowsOf,
   pressYearRecordKey, visibleYearRowCountOf, yearArrowBlinkOf, yearCellDrawingOf, yearColumnsOf, yearCursorIsInsetOf,
@@ -78,79 +76,23 @@ export interface NariRecordPickPopupProps {
 }
 
 /**
- * 팝업 0x80 그림 0x19448 · 키 0x196ec — 시즌 0xf334 · 0xf5d4 와 같은 꼴에 글만 106 "개인기록" · 360 "순위기록".
- * 칸 그림 0x858fd = `ui/mode_icon.pzx` 프레임 6 · 10 — 고른 칸은 `mode_icon.mpl` 첫 벌(주황, `icon_selected_N`), 아닌 칸은 pzx 제
- * 팔레트. 칸 글은 고른 칸 그대로 · 아닌 칸 단색 회색(`RECORD_ROOM_PICK_CELLS` 머리말). 칸 테두리는 없다.
+ * 팝업 0x80 그림 0x19448 · 키 0x196ec — 시즌 0xf334 · 0xf5d4 와 같은 꼴에 글만 106 "개인기록" · 360 "순위기록"
+ * (`widgets/record-pick-popup` 머리말). 고른 칸은 [장면+0x166] == 0 이면 칸 0.
  */
 export function NariRecordPickPopup({ onChoose, onCancel }: NariRecordPickPopupProps) {
   /** [장면+0x166] — 팝업을 열 때 0 (130d4~130dc) */
   const [pick, setPick] = useState<RecordRoomPick>(RECORD_ROOM_PICK.개인기록)
-  const onToggle = () => setPick((held) => (held === RECORD_ROOM_PICK.개인기록 ? RECORD_ROOM_PICK.순위기록 : RECORD_ROOM_PICK.개인기록))
-  const onConfirm = () => onChoose(pick)
-  const latest = useRef({ onToggle, onConfirm, onCancel })
-  latest.current = { onToggle, onConfirm, onCancel }
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
-      if (isCancelKey(event.key)) current.onCancel()
-      else if (['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)) current.onToggle()
-      else if (event.key === 'Enter' || event.key === '5') current.onConfirm()
-      else return
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [])
-
-  const labelOrigins = useFrameOrigins(IMG_TEXT)
-  const cells = [RECORD_ROOM_PICK.개인기록, RECORD_ROOM_PICK.순위기록].map((value) => ({ value, ...RECORD_ROOM_PICK_CELLS[value] }))
   return (
-    <div role="dialog" aria-label="기록실">
-      <div className={windowStyles.window} style={{ left: 120 - 0x54 - 6, top: 160 - 0x28 - 8, width: 0x54 * 2 + 12, height: 100 }} />
-      {/* "!C보고 싶은 기록을!N선택해주세요" — 두 줄 가운데 */}
-      <div className={styles.title} style={{ left: 120 - 0x54, top: 160 - 0x28, width: 0x54 * 2, whiteSpace: 'normal' }}>
-        <MarkupText raw={ORIGINAL_MODE_TEXT[RECORD_ROOM_PICK_TITLE_ID] ?? ''} />
-      </div>
-      {cells.map((cell) => {
-        const isOn = cell.value === pick
-        const icon = recordRoomPickIconOffsetOf(MODE_ICON_SIZE, MODE_ICON_SIZE)
-        const labelFrame = RECORD_ROOM_PICK_LABEL_FRAMES[cell.value]
-        const labelSrc = frameSrc(labelFrame)
-        const labelSize = labelOrigins?.[String(labelFrame).padStart(3, '0')]
-        const labelX = labelSize === undefined ? 0 : recordRoomPickLabelXOf(labelSize.width)
-        const labelTop = RECORD_ROOM_PICK_CELL_SIZE + RECORD_ROOM_PICK_LABEL_GAP
-        return (
-          <button key={cell.value} type="button" aria-pressed={isOn} aria-label={RECORD_ROOM_PICK_LABELS[cell.value]}
-            className={windowStyles.layer}
-            style={{
-              left: cell.x, top: cell.y, width: RECORD_ROOM_PICK_CELL_SIZE, height: labelTop + (labelSize?.height ?? 0),
-              background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto', overflow: 'visible',
-            }}
-            onClick={() => (isOn ? onConfirm() : onToggle())}>
-            <img alt="" data-testid={`기록실-칸-${cell.value}`} src={isOn ? selectedModeIconOf(cell.iconFrame) : modeIconOf(cell.iconFrame)}
-              style={{ ...pixel, left: icon.x, top: icon.y }} />
-            {isOn || labelSize === undefined
-              ? <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
-              : (
-                // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
-                <span style={{
-                  ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
-                  background: RECORD_ROOM_PICK_DIM_LABEL_COLOR, maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
-                  maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-                }} />
-              )}
-          </button>
-        )
-      })}
-    </div>
+    <RecordPickPopup ariaLabel="기록실" testIdPrefix="기록실" selected={pick}
+      cells={[
+        { label: RECORD_ROOM_PICK_LABELS[0], labelFrame: RECORD_ROOM_PICK_LABEL_FRAMES[0] },
+        { label: RECORD_ROOM_PICK_LABELS[1], labelFrame: RECORD_ROOM_PICK_LABEL_FRAMES[1] },
+      ]}
+      onToggle={() => setPick((held) => (held === RECORD_ROOM_PICK.개인기록 ? RECORD_ROOM_PICK.순위기록 : RECORD_ROOM_PICK.개인기록))}
+      onConfirm={() => onChoose(pick)}
+      onCancel={onCancel} />
   )
 }
-
-/** `ui/mode_icon.pzx` 그림 · 33×33. mpl 첫 벌(주황)로 칠한 사본은 tools/generate_management_sprites.py 가 만든다 */
-const MODE_ICON_SIZE = 33
-const modeIconOf = (frame: number) => `./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`
-const selectedModeIconOf = (frame: number) => `./sprites/management/icon_selected_${frame}.png`
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const SLT_FRAME = './sprites/slt_frame'
