@@ -116,6 +116,21 @@ describe('리그 투수 차례·레코드 스태미나', () => {
   })
 })
 
+describe('리그 타자 기록표 도루 +0x2c — 모드 3 의 0xa56dc(0xa571c)는 정규시즌이면 마선수만 거른다', () => {
+  it('간이 타석 도루 주자(양 팀)를 그 팀 로스터 칸으로 쌓을 재료로 낸다 (0xc1a42)', () => {
+    let found = false
+    for (let seed = 1; seed < 40 && !found; seed += 1) {
+      const 끝 = startPitcherGame({ ...기본옵션, dayCounter: 3, role: PITCHER_ROLE.starter }, 씨앗(seed))
+      const 도루 = summaryOf(끝).leagueStolenBases
+      if (도루.length === 0) continue
+      found = true
+      expect(도루.every((steal) => steal.teamId === 기본옵션.ourTeamId || steal.teamId === 기본옵션.opponentTeamId)).toBe(true)
+      expect(도루.every((steal) => steal.battingOrderIndex >= 0)).toBe(true)
+    }
+    expect(found).toBe(true)
+  })
+})
+
 describe('등판', () => {
   it('선발은 날짜 카운터가 짝수인 날에만 등판한다 (2경기마다)', () => {
     expect(startsToday({ ...기본옵션, dayCounter: 2 })).toBe(true)

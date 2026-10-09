@@ -23,8 +23,8 @@ import {
   staminaTableAfterHumanGame,
 } from '@/entities/pitcher-career/model/leaguePitcherRecords'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
-import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
-import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import { EMPTY_LEAGUE_PLAYER_STATS, recordLeagueStolenBases } from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePlayerStats, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
@@ -990,8 +990,15 @@ export function withPitcherGameLeagueRecords(
   before: PitcherCareer,
   after: PitcherCareer,
   pitchers: GameLeaguePitchers | undefined,
+  /**
+   * 이 경기 도루(리그 타자 기록표 +0x2c 재료) — 모드 3 의 0xa56dc 갈래(0xa571c)는 포스트시즌(+0xb4)이면 거짓이라 정규시즌만 쌓는다
+   * (국가대항전 경기는 이 길을 안 탄다)
+   */
+  stolenBases: readonly LeagueStolenBase[] = [],
 ): PitcherCareer {
-  const leaguePlayerStats = recordHumanGamePitchers(after.leaguePlayerStats, pitchers, before.postseason === null)
+  const regularSeason = before.postseason === null
+  const withPitchers = recordHumanGamePitchers(after.leaguePlayerStats, pitchers, regularSeason)
+  const leaguePlayerStats = regularSeason ? recordLeagueStolenBases(withPitchers, stolenBases) : withPitchers
   return leaguePlayerStats === after.leaguePlayerStats ? after : { ...after, leaguePlayerStats }
 }
 

@@ -1275,6 +1275,8 @@ export function usePitcherLeagueSession(
           summary.pitcherStaminas,
         ),
         summary.leaguePitchers,
+        // 간이 타석 · 도루 판의 도루 — 리그 타자 기록표 +0x2c (0xa56dc 모드 3 갈래, 정규시즌만)
+        summary.leagueStolenBases,
       )
       // 경기 끝 0x4ea0c: 기록 달성 G 를 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 3)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: outcome.gamePointReward })
