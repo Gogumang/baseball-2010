@@ -77,6 +77,9 @@ import {
   HALL_OF_FAME_FIRST_ID, removeCareerPlayerFromRoster, removeHallOfFamerFromRoster, tableTeamOf,
 } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { placedMatchInfoStadium, rollStadiumNumber } from '@/features/play-team-game/model/sceneStadium'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
+import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
@@ -247,6 +250,11 @@ export interface SeasonSession {
   readonly pendingGame: PendingSeasonGame | null
   /** 경기진행 설정 창(0x5fef4)이 열려 있는가 — 경기정보 0xdd 의 메뉴+0x2ba */
   readonly isMatchSettingsOpen: boolean
+  /**
+   * 0xdd 진입 0x6548 이 세운 무대로 0x5fd04 가 떠 둔 경기정보 바탕(`MatchInfoStadiumBackdrop`) — 홈(측 1) 팀 구장(대표팀이면
+   * rand(0, 10)) · 표 0xd377c 줄 · 하늘 줄(SR+0xb2) · 두 팀 아이콘. 0xe0 에서 돌아올 때는 다시 안 뜬다. 0xdd 밖이면 null
+   */
+  readonly matchInfoStage: MatchInfoStadiumState | null
   /** 시즌 칸(m = 1)의 경기진행 설정 — 경기 옵션 `settings` 로 간다 */
   readonly matchSettings: MatchProgressSettings
   /** 엔트리 편집 0xe0 — 그 장면이 아니면 null */
@@ -1214,6 +1222,7 @@ export function useSeasonSession(
   const [preGameAces, setPreGameAces] = useState<PreGameAces>(PRE_GAME_ACES_START)
   const [pendingGame, setPendingGame] = useState<PendingSeasonGame | null>(null)
   const [isMatchSettingsOpen, setIsMatchSettingsOpen] = useState(false)
+  const [matchInfoStage, setMatchInfoStage] = useState<MatchInfoStadiumState | null>(null)
   /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 웹은 세션 상태에 둔다(근사) */
   const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
   /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 세션 상태, 앱이 기록연감 해금 목록에 합친다 */
@@ -1796,6 +1805,9 @@ export function useSeasonSession(
           ? pending
           : { ...pending, options: { ...pending.options, opponentAces: rollOpponentAces(aces.pitcher, aces.batter, random) } },
       )
+      // 67dc~6834 — 무대 new · 0x78664(무대, 홈 팀) · +0x80/+0x84 · 0x78688(무대, 홈 팀, 1) · 0x5fd04(스킨, 무대).
+      // 홈은 측 1 팀 — 대회면 대표팀(10~13)이라 rand(0, 10) 하나(마선수 굴림 뒤), 정규 · 포스트시즌은 0~9 라 안 굴린다
+      setMatchInfoStage(seasonMatchInfoStageOf(pending.options, random))
       // +0x11e — 일반모드 22 가 먼저 봤으면 전역 칸이 이미 1 이다
       const firstTime = current.matchSettingsSeen !== true && matchSettingsSeenSlot?.read() !== true
       if (firstTime) matchSettingsSeenSlot?.markSeen()
@@ -2861,6 +2873,7 @@ export function useSeasonSession(
     preGameAces,
     pendingGame,
     isMatchSettingsOpen,
+    matchInfoStage,
     matchSettings: (save ?? carriedGlobals.current)?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
     entryEdit,
     matchInfoStarterName,
@@ -3239,5 +3252,23 @@ function goalBracketOf(series: PostseasonSeries | null): GoalPostseasonBracket {
       [second ?? null, playoffLower],
       [third ?? null, fourth ?? null],
     ],
+  }
+}
+
+/**
+ * 시즌 0xdd 진입 0x6548(67dc~6834)의 무대 — 경기정보 바탕(`MatchInfoStadiumBackdrop`)의 재료.
+ * 구장 = 0x78664(무대, 홈 팀)(> 9 면 rand(0, 10)) · 줄 = 0x78688 의 표 0xd377c · 하늘 줄 = 0x783b0 모드 2(SR+0xb2 mod 6).
+ */
+function seasonMatchInfoStageOf(options: TeamGameOptions, random: RandomPort): MatchInfoStadiumState {
+  const side0TeamId = options.playerSide === PLAYER_SIDE_LAST_BAT ? options.opponentTeamId : options.ourTeamId
+  const side1TeamId = options.playerSide === PLAYER_SIDE_LAST_BAT ? options.ourTeamId : options.opponentTeamId
+  const placed = placedMatchInfoStadium(rollStadiumNumber(random, side1TeamId))
+  return {
+    stadium: placed.stadium,
+    fieldPalette: placed.paletteRow < 0 ? null : placed.paletteRow,
+    skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: options.dayCounter ?? 0 }) ?? 0,
+    side0TeamId,
+    side1TeamId,
+    gameMode: SEASON_MODE,
   }
 }

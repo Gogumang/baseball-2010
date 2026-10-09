@@ -576,6 +576,8 @@ export function SeasonRoute({
           opponentTeamId={options.opponentTeamId}
           playerSide={options.playerSide}
           gamePoint={session.gamePoints}
+          // 0xdd 진입 0x6548 → 0x5fd04 가 떠 둔 구장 바탕 (공통 앞그림 0xb810 이 0xdd 면 0x581dc 로 찍는다)
+          stage={session.matchInfoStage}
           onStart={() => {
             // 설정 창이 열려 있으면 키가 모두 창으로 간다 (0x83f2 메뉴+0x2ba)
             if (!session.isMatchSettingsOpen) actions.startPendingGame()
