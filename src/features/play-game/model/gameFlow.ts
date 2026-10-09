@@ -1793,11 +1793,12 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   // 동료 타석은 자동진행(0x21) 안의 간이 타석이라 상태 0xf 를 안 지난다 — 돌발 굴림(0x8f158)·판정(0x8f414) 없음
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
-  const pitched = perPitchDrainOf(opponentDefense, mound)
   const order = progress.game.battingOrderIndex
+  const batter = teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order))
+  const pitched = perPitchDrainOf(opponentDefense, mound, batter)
   const appearance = playQuickPlateAppearance(
     {
-      batter: teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order)),
+      batter,
       // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값과 그 체력%로 부른 피로 능력(0xb58e6)
       pitcher: facingPitcherOf(opponentDefense, mound.pitcherSlot, staminaPercentOf(mound.stamina)),
       situation: {
@@ -1922,6 +1923,9 @@ const MAXIMUM_PITCHER_COUNTER = 99
 /** 팀 투수 여덟 칸 (`team+0x0c`) — 벤치는 여기서 마운드와 이미 쓴 투수를 뺀 나머지다 */
 const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_TEAM }, (_unused, slot) => slot)
 
+/** 타자 스킬 22 압도 — 간이 타석 0xa5e14 소모 ×2 */
+const QUICK_INTIMIDATE_SKILL_ID = 22
+
 /**
  * 간이 타석의 공 하나를 던지기 앞 — `0xc262c` 의 공 고리는 c26be 0xa5c2d → **c26c8 0xa5e14(소모)** → c26d4 경로 굴림
  * 차례라, 공 하나가 보는 체력%(0xaebb0)는 그 공의 소모까지 먹은 값이다 (반 이닝 엔진 `beforePitch` 와 같다, d9d376c).
@@ -1930,11 +1934,14 @@ const ALL_PITCHER_SLOTS: readonly number[] = Array.from({ length: PITCHERS_PER_T
 function perPitchDrainOf(
   defense: HalfInningDefense,
   mound: HalfInningMound,
+  /** 이 타석 타자 — 0xa5e14 가 `0xb62b4(지금 타자, 22)` 압도면 소모 ×2 */
+  batter: Pick<QuickAtBatBatter, 'skillIds'>,
 ): { readonly beforePitch: () => QuickAtBatPitcher; readonly stamina: () => number } {
   let stamina = mound.stamina
+  const batterIntimidates = batter.skillIds.includes(QUICK_INTIMIDATE_SKILL_ID)
   return {
     beforePitch: () => {
-      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1)
+      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1, batterIntimidates)
       // 0xc11f0 · 0xc1818 은 체력%로 부른 제구 · 구속(피로 0xb58e6)을 세 자리에서 본다 — 반 이닝 엔진과 같은 값
       return facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(stamina))
     },

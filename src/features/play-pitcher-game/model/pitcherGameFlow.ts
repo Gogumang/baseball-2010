@@ -217,6 +217,8 @@ const MAXIMUM_AUTO_STEPS = 2_000
 const MAXIMUM_LOG_LENGTH = 40
 const OUTS_PER_INNING = 3
 const BATTING_ORDER_SIZE = 9
+/** 타자 스킬 22 압도 — 0xa5e14 소모 ×2 · 실투 0x33cbc +5 (`0xb62b4(타자, 22)`) */
+const INTIMIDATE_SKILL_ID = 22
 
 /**
  * 웹판에는 상대·동료 투수의 등번호가 없다. 승·패·세이브 판정은 "누구인지" 만 가리면 되므로
@@ -1020,6 +1022,10 @@ export function startPitch(
   // 스태미나 소모 0xa5e14 — 상태 0x11 **진입** 0x3de10 의 0x3dec6 이다. 놓기 0x4dc78(0x11 의 틱 10)보다 앞이라
   // 등급 굴림 0x4dbac(4dcba) · 피로 능력치 0x34968(4dcc2) · CPU 타자 스윙 0xab214(ab548 · ab582 · ab838)가 모두
   // **이번 공을 깎은 뒤**의 체력을 본다. 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
+  // 지금 상대 타자 레코드 — 0xa5e14 · 실투 0x33cbc 가 +0x14 의 압도 22 를, 0xab214 스킬 갈래가 +0x14 · 칸 0xb6394 를 읽는다
+  // (붙박이 줄은 Xls 행 그대로, 마타자는 XlsACE_BAT 행 — 모드 갈래 없음)
+  const opponentBatter = quickBatterOfTeam(options, false, opponentRosterSlotOf(progress))
+  const opponentIntimidates = opponentBatter.skillIds.includes(INTIMIDATE_SKILL_ID)
   const stamina = drainStamina({
     stamina: progress.stamina,
     typeNumber: input.typeNumber,
@@ -1027,8 +1033,8 @@ export function startPitch(
     teamMorale: options.teamMorale,
     // 선발로 나왔으면 아직 교체가 없는 "첫 투수" 다. 구원으로 올라오면 +200 이 없다
     isFirstPitcher: startsToday(options),
-    // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다 — 채우려면 타자 스킬 표가 필요하다
-    batterIntimidates: false,
+    // 0xa5e14 a5f0e — `0xb62b4(공격 팀 지금 타자, 22)` 압도면 ×2
+    batterIntimidates: opponentIntimidates,
     pitcherIsCoward: options.pitcherIsCoward === true,
     pitcherEndures: options.pitcherEndures === true,
   })
@@ -1080,8 +1086,8 @@ export function startPitch(
       effectiveVelocity: options.stats.velocity,
       runnerCount: runnerCountOf(progress.game.bases),
       hasSecondBaseRunner: progress.game.bases.second,
-      // 상대 타자의 스킬 22(0xb62b4)를 웹 로스터가 들고 있지 않아 늘 거짓이다 (drainStamina 와 같다)
-      batterIntimidates: false,
+      // 지금 상대 타자의 압도 22 (+5) — drainStamina 와 같은 값
+      batterIntimidates: opponentIntimidates,
       pitcherIsSteady: options.pitcherIsSteady === true,
       pitcherIsTimid: options.pitcherIsTimid === true,
       pitcherIsCool: options.pitcherIsCool === true,
@@ -1100,8 +1106,6 @@ export function startPitch(
     : aimedPitch
 
   const batter = opponentBatterAbility(options, opponentRosterSlotOf(progress))
-  // 지금 상대 타자 레코드 — 0xab214 스킬 갈래가 +0x14 · 칸 0xb6394 를 읽는다
-  const opponentBatter = quickBatterOfTeam(options, false, opponentRosterSlotOf(progress))
   // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
   // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`)
   const stealingFrom = rollCpuStealStart(
@@ -2668,12 +2672,13 @@ function playDefensiveAtBat(
   progress = runQuickSubstitutions(progress, false, random, (after, before) => relay?.push(relayTickOf(after, before, null)))
   const mound = progress.ourMound
   const defense = ourQuickDefenseOf(progress)
-  const pitched = perPitchDrainOf(defense, mound)
   const order = progress.opponentOrderIndex
+  const batter = quickBatterOfTeam(options, false, opponentRosterSlotOf(progress))
+  const pitched = perPitchDrainOf(defense, mound, batter)
   // 내가 마운드에 없는 수비 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발을 굴리지 않는다
   const appearance = playQuickPlateAppearance(
     {
-      batter: quickBatterOfTeam(options, false, opponentRosterSlotOf(progress)),
+      batter,
       // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값과 그 체력%로 부른 피로 능력(0xb58e6)
       pitcher: facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina)),
       situation: {
@@ -2768,12 +2773,13 @@ function playTeammateAtBat(
   const before = progress.game
   const mound = progress.opponentMound
   const defense = opponentQuickDefenseOf(progress)
-  const pitched = perPitchDrainOf(defense, mound)
   const order = before.battingOrderIndex
+  // 대타가 들어오면 그 타순 칸에 선 선수가 바뀐다 — 명단(`team+0xe`)에서 고른다
+  const batter = quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, order))
+  const pitched = perPitchDrainOf(defense, mound, batter)
   const appearance = playQuickPlateAppearance(
     {
-      // 대타가 들어오면 그 타순 칸에 선 선수가 바뀐다 — 명단(`team+0xe`)에서 고른다
-      batter: quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, order)),
+      batter,
       // 간이 엔진이 보는 투수 체력은 체력%(0xaebb0)다 — 마운드의 살아 있는 값과 그 체력%로 부른 피로 능력(0xb58e6)
       pitcher: facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina)),
       situation: {
@@ -2918,6 +2924,9 @@ function withLeaguePlateAppearance(
   }
 }
 
+/** 타자 스킬 22 압도 — 간이 타석 0xa5e14 소모 ×2 */
+const QUICK_INTIMIDATE_SKILL_ID = 22
+
 /**
  * 간이 타석의 공 하나를 던지기 앞 — `0xc262c` 의 공 고리는 c26be 0xa5c2d → **c26c8 0xa5e14(소모)** → c26d4 경로 굴림
  * 차례라, 공 하나가 보는 체력%(0xaebb0)는 그 공의 소모까지 먹은 값이다 (반 이닝 엔진 `beforePitch` 와 같다, d9d376c).
@@ -2926,11 +2935,14 @@ function withLeaguePlateAppearance(
 function perPitchDrainOf(
   defense: HalfInningDefense,
   mound: HalfInningMound,
+  /** 이 타석 타자 — 0xa5e14 가 `0xb62b4(지금 타자, 22)` 압도면 소모 ×2 */
+  batter: Pick<QuickAtBatBatter, 'skillIds'>,
 ): { readonly beforePitch: () => QuickAtBatPitcher; readonly stamina: () => number } {
   let stamina = mound.stamina
+  const batterIntimidates = batter.skillIds.includes(QUICK_INTIMIDATE_SKILL_ID)
   return {
     beforePitch: () => {
-      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1)
+      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1, batterIntimidates)
       // 0xc11f0 · 0xc1818 은 체력%로 부른 제구 · 구속(피로 0xb58e6)을 세 자리에서 본다 — 반 이닝 엔진과 같은 값
       return facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(stamina))
     },

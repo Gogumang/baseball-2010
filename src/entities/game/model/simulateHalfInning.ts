@@ -324,6 +324,8 @@ const MAXIMUM_COUNTER = 99
  * (P1 3-1 확정). 그래서 투구 하나의 기본 소모는 늘 9 다.
  */
 const QUICK_PITCH_TYPE = 1
+/** 타자 스킬 22 압도 — 0xa5e14 소모 ×2 (`0xb62b4(지금 타자, 22)`) */
+const INTIMIDATE_SKILL_ID = 22
 
 export interface HalfInningPitching {
   /** 이 이닝 전까지 이어지던 연속 삼진 수 */
@@ -598,7 +600,12 @@ export function* simulateHalfInningTicks(
           : {
               beforePitch: () => {
                 const current = mound as HalfInningMound
-                pitchStamina = drainQuickPitcher(defense, { ...current, stamina: pitchStamina ?? current.stamina }, 1)
+                pitchStamina = drainQuickPitcher(
+                  defense,
+                  { ...current, stamina: pitchStamina ?? current.stamina },
+                  1,
+                  batterOn(order).skillIds.includes(INTIMIDATE_SKILL_ID),
+                )
                 return facingPitcherOf(defense, current.pitcherSlot, staminaPercentOf(pitchStamina))
               },
             }),
@@ -870,10 +877,15 @@ export function drainQuickPitcher(
   defense: HalfInningDefense,
   mound: HalfInningMound,
   pitchCount: number,
+  /**
+   * 공격 팀 지금 타자의 압도 22 — 0xa5e14 a5efc~a5f12 가 `0xb62b4(0xae89c(팀[st[9]]), 22)` 로 지금 타자 레코드 +0x14 를 본다
+   * (모드 갈래 없음 · 간이 엔진도 같은 함수). 참이면 ×2. 안 넘기면 거짓
+   */
+  batterIntimidates = false,
 ): number {
   let stamina = mound.stamina
   for (let pitch = 0; pitch < pitchCount; pitch += 1) {
-    stamina = drainPitcherForPitch(defense, { ...mound, stamina }, QUICK_PITCH_TYPE, false)
+    stamina = drainPitcherForPitch(defense, { ...mound, stamina }, QUICK_PITCH_TYPE, batterIntimidates)
   }
   return stamina
 }

@@ -1684,13 +1684,17 @@ const UNFILLED_SPECIAL_SWINGS: readonly number[] = Array.from({ length: BATTING_
 
 /** 마선수 레코드 +0x18 = 순번 + 5 (H2 4-1) */
 const ACE_SPECIAL_NUMBER_OFFSET = 5
+/** 0xaebe4 가 보는 타자 비트 23 무자비(필살 +1) · 투수 비트 23 혼신(마구 +2) — 둘 다 `0xb62b4(P, 0x17)` */
+const RUTHLESS_SKILL_BIT = 23
+const SPIRIT_SKILL_BIT = 23
 
 /**
  * 명단 한 칸 타자의 **한 경기 필살 횟수** — 타석 교대 0xaebe4 가 채우는 값 (`specialSwingCountOf`).
  *   마타자: s8 0xd84fa[레벨] — 레벨 = 전역 기록 `mgr[0x13f + 순번]` (`options.aceLevels`, 양 팀 모두 같은 전역 칸)
  *   그 밖:  `+0x18 == 0 → 0` — 팀 경기 명단은 리그 로스터와 마선수뿐이고 일반 레코드 +0x18 은 모두 0 이다 (H2 4-2)
- * ⚠️ 미해결: 스킬 23 무자비 +1 (0xb62b4(B, 0x17)) — 팀 경기 명단(`TeamEntryBatter`)·로스터 표·마선수 표에
- *    스킬 비트(+0x14)가 없어 늘 거짓으로 둔다.
+ * 스킬 23 무자비 +1 은 `0xb62b4(B, 0x17)` — 명단 줄 레코드 +0x14(`TeamEntryBatter.skillBits`, 마타자는 XlsACE_BAT 행)로 본다
+ * (마타자 다섯 줄 모두 비트 23 이 꺼져 있다).
+ * ⚠️ 기록으로 선 표 밖 타자(영입한 명전 · 나리)의 +0x18 은 0 이 아닐 수 있는데 웹 명단에 그 칸이 없어 0 으로 본다.
  */
 function specialSwingCountFor(progress: TeamGameProgress, batter: TeamEntryBatter | undefined): number {
   if (batter === undefined || batter.aceIndex === NO_ACE_BATTER) return 0
@@ -1698,7 +1702,7 @@ function specialSwingCountFor(progress: TeamGameProgress, batter: TeamEntryBatte
     swingNumber: batter.aceIndex + ACE_SPECIAL_NUMBER_OFFSET,
     isAceBatter: true,
     aceLevel: aceBatterLevelOf(progress, batter.aceIndex),
-    hasRuthlessSkill: false,
+    hasRuthlessSkill: (((batter.skillBits ?? 0) >>> RUTHLESS_SKILL_BIT) & 1) === 1,
   })
 }
 
@@ -4131,7 +4135,7 @@ function benchIndexesOf(
  * 마운드에 오를 때 한 번** 주어지고 이닝이 바뀌어도 다시 차지 않는다.
  * 쓰기 0xae9c4 는 지금 투수 +0x18 이 0 이면 칸을 안 건드리지만, 읽기 0xaea10 도 그때 0 을 주므로 0 과 같다.
  *
- * ⚠️ 미해결: 스킬 23 혼신(+2) — 팀 경기 명단(`TeamEntryPitcher`)·로스터·마선수 표에 스킬 비트(+0x14)가 없어 늘 거짓.
+ * 스킬 23 혼신(+2)은 `0xb62b4(P, 0x17)` — 명단 줄 레코드 +0x14(`TeamEntryPitcher.skillBits`, 마투수는 XlsACE_PIT 행)로 본다.
  */
 function magicCountOfPitcher(
   pitcher: TeamEntryPitcher | undefined,
@@ -4144,7 +4148,7 @@ function magicCountOfPitcher(
     isAce,
     // 레벨 = 전역 기록 mgr[0x13a + 순번] — 마투수는 열 칸 중 앞 다섯 (aeec8~aeee4)
     aceLevel: isAce ? aceLevelOf(aceLevels, aceLevelSlotOf('투수', pitcher.aceIndex + 1)) : 0,
-    hasSpiritSkill: false,
+    hasSpiritSkill: (((pitcher.skillBits ?? 0) >>> SPIRIT_SKILL_BIT) & 1) === 1,
   })
 }
 
