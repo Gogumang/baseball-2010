@@ -41,6 +41,9 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
+import type { PitchingStageSource } from '@/pages/pitching/ui/PitchingScreen'
+import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
+import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -298,6 +301,8 @@ export function MissionRoutes({
         atBat={runner.atBat}
         bannerText={runner.bannerText}
         onThrow={session.handleThrow}
+        // 타석 장면 — 마지막 공 · 마운드 미션 투수 · 지금 CPU 타자 (`PitcherSideStage`)
+        stage={pitchingStageOf(session, pitcherRun)}
         // 조준(0x10)의 틱 0x39c5c — 투수 미션 흔들림은 경기 난수로 · CLR 은 0xf 진입을 다시
         onAimTick={session.aimTick}
         onReturnToPitchSelection={session.returnToPitchSelection}
@@ -564,6 +569,7 @@ export function PitcherAceMatchRoute(
       atBat={runner.atBat}
       bannerText={runner.bannerText}
       onThrow={session.handleThrow}
+      stage={pitchingStageOf(session, pitcherRun)}
       onAimTick={session.aimTick}
       onReturnToPitchSelection={session.returnToPitchSelection}
       // 경기 중 메뉴 나가기 0x40140 — +0x176 이 서 있어도 보통 미션과 같이 메인 메뉴(장면 0x103)로 간다(저장 없음). 진 결과
@@ -598,4 +604,23 @@ export function PitcherAceMatchRoute(
       random={session.random}
     />
   )
+}
+
+/**
+ * 투수 미션 타석 장면 재료 — 마운드는 미션 투수(폼 · 손 0xb63c0 = 폼 & 1), 타석은 지금 CPU 타자 0xae89c 의 명단 줄
+ * (폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 팀). ⚠️ 근사: 마타자 칸은 레코드 폼이 웹 표에 없어 0 으로 둔다,
+ * 미션 투수 레코드의 장비 니블(0x10810 → 0x79790)은 웹 미션 투수 값에 없어 맨몸으로 그린다.
+ */
+function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: PitcherRun): PitchingStageSource {
+  const form = session.pitcher.repertoire.form
+  const batter = missionCpuBatterOf(run.cpu)
+  const profile = batter?.row?.profile ?? 0
+  return {
+    lastThrow: session.lastPitcherThrow,
+    pitcherForm: form,
+    pitcherHand: pitcherHandOf(form, false),
+    batterForm: profile >> 4,
+    batterSkinIndex: (profile >> 2) & 3,
+    batterTeamIndex: run.cpu.batting?.teamId ?? 0,
+  }
 }
