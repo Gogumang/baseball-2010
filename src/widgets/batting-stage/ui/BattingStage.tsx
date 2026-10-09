@@ -87,6 +87,12 @@ interface BattingStageProps {
   readonly batterSkillIds?: readonly number[]
   readonly recentAtBatCodes?: readonly number[]
   /**
+   * **사람 타자 레코드 칸 `0xb6394`** = `+0xa & 0x1f` — 스윙 판정 0xab214 의 투수 스킬 31(0xabcd8)이 2 · 3 · 4 면 C −10%.
+   * 타순이 아니라 레코드 칸이다: 경기 장면 셋업 0x39fdc(3a2fa · 3a302)의 0xb8768 → 0xb603c 가 마선수 아닌 줄을 배열 첨자로 다시
+   * 매기고(0xb6605), 마타자는 순번 그대로, 레코드 맞바꿈 0xb5e98 은 +0xa 를 그대로 옮긴다. 안 넘기면 0
+   */
+  readonly batterRecordSlot?: number
+  /**
    * **시즌 구장 세 값** — `{ stand: 관중석 칸, crowd: 관중 단계, board: 전광판 칸 }`.
    * 넘기면 배경을 시즌 구장 0x77494 로 그려 **장착한 전광판**이 뒤에 선다.
    *
@@ -266,7 +272,7 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
+export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -278,6 +284,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     batterTeamIndex: batterTeamIndex ?? props.hud?.ourTeamId ?? 0,
     batterSkillIds,
     recentAtBatCodes,
+    batterRecordSlot,
     // 필살 남은 횟수 표시 0x38a30 이 그림마다 읽는다
     specialSwingRemaining,
   })
@@ -313,8 +320,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       mode: latest.swingMode,
       batterSkillIds: latest.batterSkillIds,
       // 0xab214 는 투수 레코드로 손 0xb63c0 을 바로 읽는다(스킬 13 좌완UP · 14 우완UP) — 던진 공이 그 투수의 폼·+0x18 을 든다.
-      // ⚠️ 다섯째 인자(타자 레코드 칸 0xb6394, 투수 스킬 31)는 이 화면이 타자 레코드를 몰라 0 — 미해결
-      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch),
+      // 다섯째 인자는 타자 레코드 칸 0xb6394(투수 스킬 31) — 부르는 쪽이 그 모드의 레코드 칸을 넘긴다(`batterRecordSlot`)
+      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch, latest.batterRecordSlot),
       // 내 선수 보너스·계수는 비트7(육성·명전)만 본다 — 마선수(비트6) 등판은 해당하지 않는다 (0xb6389).
       // 마구 번호(+0x18) 1~4 를 가진 투수는 비트7 이다 (일반 레코드 +0x18 은 모두 0 — H2 4-2)
       isBatterOwnPlayer,

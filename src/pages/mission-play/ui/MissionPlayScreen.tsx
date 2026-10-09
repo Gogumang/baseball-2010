@@ -43,6 +43,8 @@ interface MissionPlayScreenProps {
    * 압도 22 면 CPU 실투율 +5 (0x33d52). 안 넘기면 스킬 없음.
    */
   readonly batterSkillIds?: readonly number[]
+  /** 타자 레코드 칸 0xb6394 (투수 스킬 31) — `missionStageBatterOf().recordSlot`. 안 넘기면 0 */
+  readonly batterRecordSlot?: number
   readonly pitcherAbility: PitcherAbility
   /** 마투수 미션의 상대. 일반 투수면 null */
   readonly opponent: AcePlayer | null
@@ -136,6 +138,7 @@ export function MissionPlayScreen({
   ability,
   batterName,
   batterSkillIds,
+  batterRecordSlot,
   pitcherAbility,
   opponent,
   atBat,
@@ -309,6 +312,7 @@ export function MissionPlayScreen({
             skyRow={skyRow}
             batterAbility={ability}
             batterSkillIds={batterSkillIds}
+            batterRecordSlot={batterRecordSlot}
             // 판정 묶음 '미션' = 모드 6(타자 미션) — 공격(사람) +100 (0xab5c0)
             swingMode="미션"
             // 미션은 나리 타자편 저장의 선수(등록 타자 rec[0xa] 0xa0 — 비트7)가 친다. 내 선수 보너스는 모드 3·4 에서만

@@ -6,6 +6,7 @@ import {
   MISSION_NARI_RECORD_FALLBACK,
   battingRecordAt,
   humanRecordsOf,
+  missionHumanRecordSlotOf,
   missionHumanTeamIdOf,
   startMissionGame,
 } from '@/entities/mission/model/missionGame'
@@ -79,5 +80,23 @@ describe('미션 타자의 레코드 칸 — 0xb87cc → 0xb53f0(0x80 갈래) ·
     expect(game.humanBatting.records).toEqual(humanRecordsOf(game.humanBatting.order, 0))
     // 투수 미션은 사람 칸 타선에 아무도 안 넣는다
     expect(startMissionGame(missionOf('투수', 1), { nariRecordSlot: 0 }).humanBatting.records).not.toContain(N)
+  })
+})
+
+describe('사람 칸 타자의 레코드 칸 0xb6394 — 맞바꿈 0xb5e98 은 +0xa 를 그대로 옮긴다(투수 스킬 31)', () => {
+  it('미션 타자는 시작 타순 칸에 서도 k, 마스터 줄은 제 칸, 끝으로 밀린 옛 [k] 는 12', () => {
+    const records = humanRecordsOf(3, 1)
+    const game = { humanRecordSlot: 1 }
+    expect(missionHumanRecordSlotOf(game, records[3])).toBe(1)
+    expect(missionHumanRecordSlotOf(game, records[1])).toBe(3)
+    expect(missionHumanRecordSlotOf(game, records[4])).toBe(4)
+    expect(missionHumanRecordSlotOf(game, records[12])).toBe(12)
+  })
+
+  it('타자 미션을 세우면 k 를 든다 — 모르면 12', () => {
+    const mission = MISSIONS.find((candidate) => candidate.side === '타자')
+    if (mission === undefined) throw new Error('타자 미션이 없다')
+    expect(startMissionGame(mission, { nariRecordSlot: 2 }).humanRecordSlot).toBe(2)
+    expect(startMissionGame(mission).humanRecordSlot).toBe(MISSION_NARI_RECORD_FALLBACK)
   })
 })

@@ -278,6 +278,9 @@ export function HomeRunDerbyScreen({
             batterSkinIndex={stageBatter.skinIndex}
             batterEquipmentLevels={stageBatter.equipmentLevels}
             batterSkillIds={stageBatter.skillIds}
+            // 투수 스킬 31 의 0xb6394 — 3a53c~3a550 이 모드 타자 P 를 칸 k(+0xa & 0x1f)에 넣고(0xb87cc → 0xb8768 다시 매김) 팀+0x32 =
+            // 0xb6394(P) = k 로 선다. 그 뒤 마스터 줄도 배열 첨자 = 타순 칸이라 늘 지금 타순 팀+0x32 와 같다
+            batterRecordSlot={session.batter.order}
             pitcherAbility={pitcher.ability}
             aceLevels={aceLevels}
             swingMode="홈런더비"

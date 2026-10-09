@@ -34,7 +34,7 @@ import {
   startPitcherMission,
   withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
-import { battingRecordAt, cpuSideOf, humanSideOf, withMissionScore } from '@/entities/mission/model/missionGame'
+import { battingRecordAt, cpuSideOf, humanSideOf, missionHumanRecordSlotOf, withMissionScore } from '@/entities/mission/model/missionGame'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import { skillIdsOfBits, teamBatters } from '@/entities/team/model/teamRoster'
@@ -2181,13 +2181,23 @@ export function missionHumanBatterOf(
 export function missionStageBatterOf(
   run: MissionRun,
   missionBatter: { readonly ability: BatterAbility; readonly skillIds: readonly number[]; readonly specialSwingNumber?: number },
-): { readonly ability: BatterAbility; readonly skillIds: readonly number[]; readonly specialSwingNumber: number; readonly name?: string } {
+): {
+  readonly ability: BatterAbility
+  readonly skillIds: readonly number[]
+  readonly specialSwingNumber: number
+  readonly name?: string
+  /** 타자 레코드 칸 0xb6394 — 스윙 0xab214 의 투수 스킬 31 (`missionHumanRecordSlotOf`) */
+  readonly recordSlot: number
+} {
   const batter = missionHumanBatterOf(run)
+  // 투수 미션은 사람이 안 친다 — 0
+  const recordSlot = run.mission.side === '타자' ? missionHumanRecordSlotOf(run.game, battingRecordAt(run.game.humanBatting)) : 0
   if (batter.isMissionBatter || batter.row === null) {
     return {
       ability: missionBatter.ability,
       skillIds: missionBatter.skillIds,
       specialSwingNumber: missionBatter.specialSwingNumber ?? 0,
+      recordSlot,
     }
   }
   return {
@@ -2195,6 +2205,7 @@ export function missionStageBatterOf(
     skillIds: missionBatterSkillIdsOf(run, missionBatter.skillIds),
     specialSwingNumber: 0,
     name: batter.row.name,
+    recordSlot,
   }
 }
 

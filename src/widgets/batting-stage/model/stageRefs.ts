@@ -127,6 +127,8 @@ export interface StageLatest {
   readonly batterSkillIds: readonly number[]
   /** 최근 타석 기록 코드 — 스킬 16·17 조건 */
   readonly recentAtBatCodes: readonly number[]
+  /** 타자 레코드 칸 `0xb6394` = +0xa & 0x1f — 투수 스킬 31(0xabcd8)이 본다 (`BattingStageProps.batterRecordSlot`) */
+  readonly batterRecordSlot: number
   /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
   /**

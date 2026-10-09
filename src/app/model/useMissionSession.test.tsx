@@ -1474,7 +1474,8 @@ describe('타자 미션 타석 화면의 타자 — 미션 타자 차례가 아�
     const 빠르게 = MISSIONS.find((m) => m.side === '타자' && m.id === 10)!
     const run = startMission(빠르게)
     expect(isMissionBatterUp(run)).toBe(true)
-    expect(missionStageBatterOf(run, 미션타자)).toEqual(미션타자)
+    // 레코드 칸 0xb6394 는 미션 타자 k — 모르면 끝 칸 12
+    expect(missionStageBatterOf(run, 미션타자)).toEqual({ ...미션타자, recordSlot: 12 })
   })
 
   it('다음 타순 마스터 타자면 그 줄의 0xb6415 능력치 · 이름 · +0x14 스킬, 필살 0', () => {
