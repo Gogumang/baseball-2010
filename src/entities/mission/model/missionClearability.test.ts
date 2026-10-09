@@ -212,10 +212,26 @@ describe('판정 규칙', () => {
     expect(checkSwingsExhausted(run).status).toBe('실패')
   })
 
-  it('스윙이 남아 있으면 실패가 아니다', () => {
-    const run = recordSwing(startMission(findMission('타자', 10)))
+  it('스윙이 남아 있고 남은 스윙으로 목표를 채울 수 있으면 실패가 아니다', () => {
+    // 타자 12번 — 스윙 3 · 만루홈런 1. 한 번 휘둘러도 남은 2 번으로 채울 수 있다
+    const run = recordSwing(startMission(findMission('타자', 12)))
 
     expect(checkSwingsExhausted(run).status).toBe('진행중')
+  })
+
+  it('남은 스윙으로 목표를 못 채우면 그 자리에서 실패다 — 0xaa958 (aab9a)', () => {
+    // 타자 10번 — 스윙 3 · 안타 3. 안타 없이 한 번 휘두르면 필요 3 − 달성 0 > 남은 2
+    const run = recordSwing(startMission(findMission('타자', 10)))
+
+    expect(checkSwingsExhausted(run).status).toBe('실패')
+  })
+
+  it('남은 타석으로 목표를 못 채우면 그 타석에서 실패다 — 0xaa958 (aab82)', () => {
+    // 타자 13번 — 3타석 · 홈런 3. 첫 타석이 단타면 필요 3 − 달성 0 > 남은 2
+    const run = applyOutcome(startMission(findMission('타자', 13)), SINGLE)
+
+    expect(run.remainingPlateAppearances).toBe(2)
+    expect(run.status).toBe('실패')
   })
 
   it('"3번의 타석을 모두 홈런" 은 홈런 3개가 필요하다', () => {

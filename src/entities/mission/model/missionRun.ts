@@ -349,10 +349,62 @@ export function recordSwing<T extends MissionRun>(run: T): T {
   return { ...run, remainingSwings: run.remainingSwings - 1 }
 }
 
-/** 타석이 끝나지 않았는데 스윙을 다 썼으면 실패다. */
+/**
+ * **남은 기회로 목표를 못 채우면 그 자리에서 실패** — 판정 0xaaa6c 모드 6 갈래가 타석 한도(aab82) · 스윙 한도(aab9a → aad1c)마다
+ * 부르는 0xaa958(미션, 센 수, 한도) (직접 재역어셈, aa958~aaa5a):
+ * ```
+ * aa960  한도 ≤ 0 이거나 모드(+0x10[1]) == 5(투수편)면 돌아감
+ * aa98a  남은 기회 = 한도 − 센 수
+ * aa994  달성 9칸 = [안타 합 R+0xb4..0xc0, 단타 +0xb4, 2루타 +0xb8, 3루타 +0xbc, 홈런 +0xc0, 만루 +0xc8, 그라운드 +0xcc, 번트 +0xf4, 도루 +0x10c]
+ * aa9dc  필요 9칸 = 행 [+0xa6, +0xa1 아래, +0xa0 위, +0xa0 아래, +0xa3 아래, +0xa2 위, +0xa2 아래, +0xa4 위, +0xa4 아래]
+ * aaa20  필요 > 0 인 칸마다 필요 합 += 필요 · 달성 합 += 달성 ; (필요 − 달성) > 남은 기회면 상태 2(실패)
+ * aaa44  min(필요 합, 한도) − 달성 합 > 남은 기회면 상태 2
+ * ```
+ * 타점 칸은 안 본다. 달성은 필요를 넘어도 깎지 않는다(원본 그대로). 목표가 다 찼으면(상태 0, aab5a) 이 판정 전에 성공으로 간다.
+ * 판정은 판 끝(0xae3e8)뿐 아니라 공마다(0xae24c · 0xae3a0)도 돈다.
+ */
+const CHANCE_GOALS: readonly string[] = ['안타', '단타', '2루타', '3루타', '홈런', '만루홈런', '그라운드홈런', '번트', '도루']
+
+export function isOutOfGoalChances(
+  mission: OriginalMission,
+  progress: MissionProgress,
+  used: number,
+  limit: number | null,
+): boolean {
+  if (limit === null || limit <= 0 || mission.side !== '타자') return false
+  const remaining = limit - used
+  let requiredSum = 0
+  let achievedSum = 0
+  for (const name of CHANCE_GOALS) {
+    const required = mission.goalCounts[name] ?? 0
+    if (required <= 0) continue
+    const achieved = progress.counts[name] ?? 0
+    requiredSum += required
+    achievedSum += achieved
+    if (required - achieved > remaining) return true
+  }
+  return Math.min(requiredSum, limit) - achievedSum > remaining
+}
+
+/** 타석 한도 · 스윙 한도 둘 다로 0xaa958 을 돈다 (aab82 · aab9a) */
+function isOutOfAnyGoalChances(run: MissionRun, remainingPlateAppearances: number | null): boolean {
+  const plateLimit = limitOrNull(run.mission.plateAppearanceLimit)
+  const swingLimit = limitOrNull(run.mission.swingLimit)
+  return (
+    (plateLimit !== null &&
+      remainingPlateAppearances !== null &&
+      isOutOfGoalChances(run.mission, run.progress, plateLimit - remainingPlateAppearances, plateLimit)) ||
+    (swingLimit !== null &&
+      run.remainingSwings !== null &&
+      isOutOfGoalChances(run.mission, run.progress, swingLimit - run.remainingSwings, swingLimit))
+  )
+}
+
+/** 타석이 끝나지 않았는데 스윙을 다 썼거나, 남은 스윙으로 목표를 못 채우면(0xaa958) 실패다. */
 export function checkSwingsExhausted<T extends MissionRun>(run: T): T {
   if (run.status !== '진행중' || run.remainingSwings === null) return run
-  return run.remainingSwings <= 0 ? { ...run, status: '실패' } : run
+  if (run.remainingSwings <= 0) return { ...run, status: '실패' }
+  return isOutOfAnyGoalChances(run, run.remainingPlateAppearances) ? { ...run, status: '실패' } : run
 }
 
 /**
@@ -393,7 +445,9 @@ export function applyOutcome(
   }
   const isOutOfChances =
     (remaining !== null && remaining <= 0) ||
-    (run.remainingSwings !== null && run.remainingSwings <= 0)
+    (run.remainingSwings !== null && run.remainingSwings <= 0) ||
+    // 0xaa958 — 남은 타석 · 스윙으로 목표를 못 채우면 그 자리에서 실패
+    isOutOfAnyGoalChances({ ...run, progress }, remaining)
   const judged: MissionRun = {
     ...advanced,
     progress,
