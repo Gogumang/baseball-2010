@@ -9,6 +9,7 @@ import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { batterMatchInfoOf, cupMatchInfoOf } from '@/pages/management/lib/nariMatchPrepare'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
@@ -199,6 +200,8 @@ export function CareerRoutes({
                 random,
                 // 경기 중 구장 하늘 줄 그대로 (0x783b0 — 경기를 세울 때 한 번)
                 ...(screen.settlementSkyRow === undefined ? {} : { skyRow: screen.settlementSkyRow }),
+                // 구장 객체도 방금 끝난 경기 장면의 것 그대로 (다음 경기를 세울 때까지 세션이 든다)
+                stadium: session.sceneStadium,
               },
             })}
         />
@@ -216,6 +219,7 @@ export function CareerRoutes({
           // 대회 경기도 정산 0x4ea0c 꼬리를 지난다 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           settlement={{
             inning: screen.settlementInning, playerSide: screen.settlementPlayerSide, random, skyRow: screen.settlementSkyRow,
+            stadium: session.sceneStadium,
           }}
         />
       )
@@ -334,7 +338,9 @@ export function CareerRoutes({
           <NariScreenPush view={pushView}>
             <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
               teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
-              onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}} />
+              onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}}
+              // 나리 틀 0x16928 은 142~144 면 142 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
+              underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} />
           </NariScreenPush>
         )
       }
@@ -346,7 +352,7 @@ export function CareerRoutes({
       return (
         <NariScreenPush view={pushView}>
           <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-            playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint}
+            playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint} stage={session.matchInfoStage}
             onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
         </NariScreenPush>
       )

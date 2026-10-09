@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
-  drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
+  drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
 // 전광판 흐르는 글자 (0x77fb4, R2-game-effects.md 6절): 상자 폭+2 에서 시작해 틱당 1px 씩
@@ -127,5 +127,89 @@ describe('drawScenery — 결과 창 밀기 offsetY (0x45c18 → 0x78578(구장,
     drawScenery(context, { ...장면, offsetY: 40 })
     expect(translates).toEqual([[0, 40]])
     expect(fills).toEqual(기준.fills)
+  })
+})
+
+// 0x77fe8 의 78040~78088: 구장 +0x70 == 8 이면 화면 전체를 RGB(0xc6, 0xd4, 0xd7) 로 칠하고 끝 — 그라데이션 · 구름 없음.
+describe('drawScenery — 구장 8 하늘 단색 (0x78046)', () => {
+  function 기록컨텍스트() {
+    const fills: { readonly style: string; readonly rect: readonly number[] }[] = []
+    let gradients = 0
+    const context = {
+      fillStyle: '',
+      fillRect(...rect: number[]) {
+        fills.push({ style: String(this.fillStyle), rect })
+      },
+      createLinearGradient: () => {
+        gradients += 1
+        return { addColorStop: () => {} }
+      },
+      save: () => {},
+      restore: () => {},
+      translate: () => {},
+      scale: () => {},
+      drawImage: () => {},
+      beginPath: () => {},
+      rect: () => {},
+      clip: () => {},
+    }
+    return { context: context as unknown as CanvasRenderingContext2D, fills, gradients: () => gradients }
+  }
+  const 장면 = { skyRow: 0, skyColumn: 0, tick: 0, ourTeamId: null, opponentTeamId: null }
+
+  it('구장 8 — 검정 지우기 뒤 (0, 0, 240, 320) 한 색 하나, 그라데이션 없음', () => {
+    const { context, fills, gradients } = 기록컨텍스트()
+    drawScenery(context, { ...장면, stadium: 8 })
+    expect(fills.slice(1)).toEqual([{ style: 'rgb(198, 212, 215)', rect: [0, 0, 240, 320] }])
+    expect(gradients()).toBe(0)
+  })
+
+  it('구장 7 — 그라데이션 하늘 그대로', () => {
+    const { context, fills, gradients } = 기록컨텍스트()
+    drawScenery(context, { ...장면, stadium: 7 })
+    expect(fills.length).toBe(4)
+    expect(gradients()).toBe(1)
+  })
+})
+
+// 0x5fd04 → 0x581dc(스킨, 무대, 1): 흰 화면 → 0x78578(무대, 0, 1) — 카메라 y −68(경기 −70)이라 구장 묶음이 2 내려간다.
+describe('drawMatchInfoStadium — 경기정보 바탕의 날 그림', () => {
+  function 기록컨텍스트() {
+    const fills: { readonly style: string; readonly rect: readonly number[] }[] = []
+    const translates: [number, number][] = []
+    const context = {
+      fillStyle: '',
+      fillRect(...rect: number[]) {
+        fills.push({ style: String(this.fillStyle), rect })
+      },
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      save: () => {},
+      restore: () => {},
+      translate: (x: number, y: number) => translates.push([x, y]),
+      scale: () => {},
+      drawImage: () => {},
+      beginPath: () => {},
+      rect: () => {},
+      clip: () => {},
+    }
+    return { context: context as unknown as CanvasRenderingContext2D, fills, translates }
+  }
+  const 무대 = { stadium: 3, fieldPalette: 2, skyRow: 0, side0TeamId: 1, side1TeamId: 2, gameMode: 1 }
+
+  it('흰색으로 지우고 하늘(위 단색 끝 10 + 2) · 구장 묶음 2 내림', () => {
+    const { context, fills, translates } = 기록컨텍스트()
+    drawMatchInfoStadium(context, 무대)
+    expect(fills[0]).toEqual({ style: '#fff', rect: [0, 0, 240, 320] })
+    expect(fills[1]?.rect).toEqual([0, 0, 240, 12])
+    expect(translates).toEqual([[0, 2]])
+  })
+
+  it('구장 8 — 흰색 뒤 하늘 단색 한 칸', () => {
+    const { context, fills } = 기록컨텍스트()
+    drawMatchInfoStadium(context, { ...무대, stadium: 8 })
+    expect(fills.slice(0, 2)).toEqual([
+      { style: '#fff', rect: [0, 0, 240, 320] },
+      { style: 'rgb(198, 212, 215)', rect: [0, 0, 240, 320] },
+    ])
   })
 })

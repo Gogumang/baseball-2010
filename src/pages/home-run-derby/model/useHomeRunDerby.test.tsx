@@ -467,4 +467,23 @@ describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () 
     expect(skyRow).toBe(expected.rand(0, 6))
     expect(random.rand(0, 0x7fffffff)).toBe(expected.rand(0, 0x7fffffff))
   })
+
+  it('3a476 · 3a496 — 내 팀 0~9 면 구장 = 내 팀, 굴림 없음 · 줄은 표 0xd377c', () => {
+    const { stadium } = rollDerbySceneStart(createSeededRandom(21), 3)
+    expect(stadium).toEqual({ stadium: 3, defenseStadium: 3, paletteRow: 2 })
+  })
+
+  it('내 팀 > 9 면 rand(0, 9) 뒤 · rand(0, 2) 앞에 rand(0, 10) 둘', () => {
+    const calls: [number, number][] = []
+    const random = {
+      rand: (lo: number, hi: number) => {
+        calls.push([lo, hi])
+        return lo
+      },
+      rand9d: () => 0,
+    }
+    rollDerbySceneStart(random, 12)
+    const at = calls.findIndex(([lo, hi]) => lo === 0 && hi === 9)
+    expect(calls.slice(at, at + 4)).toEqual([[0, 9], [0, 10], [0, 10], [0, 2]])
+  })
 })

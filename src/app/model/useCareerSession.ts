@@ -101,7 +101,7 @@ import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { withGameSkillCounters } from '@/entities/story/model/skillCondition'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
 import {
-  nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchStadium,
+  nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage,
 } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
@@ -147,6 +147,9 @@ import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { nariSceneStadium } from '@/features/play-team-game/model/sceneStadium'
+import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import {
@@ -440,6 +443,13 @@ export function useCareerSession({
    */
   const [stadiumSkyRow, setStadiumSkyRow] = useState(0)
   const stadiumSkyRowRef = useRef(0)
+  /**
+   * 이 경기 장면의 두 구장 객체 — 셋업 0x39fdc 모드 3·4 갈래(`nariSceneStadium`): 홈(측 1) 팀, 국가대항전이면 풀리그 2 · 결승 8.
+   * 타석 펜스 프레임(+0x70)과 바닥 · 수비 바탕 팔레트 줄(+0xc). 정산 결과 그림도 같은 구장이다. 경기를 세우기 전엔 null
+   */
+  const [sceneStadium, setSceneStadium] = useState<SceneStadium | null>(null)
+  /** 142 진입 0x1c46c 가 세운 무대로 0x5fd04 가 떠 둔 경기정보 바탕 (`rollNariMatchInfoStage`). 142 에 들어온 적이 없으면 null */
+  const [matchInfoStage, setMatchInfoStage] = useState<MatchInfoStadiumState | null>(null)
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄이 읽는다 */
   const [matchAces, setMatchAces] = useState<NariMatchAces | null>(null)
   /** 143 경기 전 엔트리 보기 (진입 0x16af8 · 키 0x1457c) — 142 위에 선다. 없으면 null */
@@ -621,6 +631,11 @@ export function useCareerSession({
       )
       progressRef.current = started
       setProgress(started)
+      // 상태 9 의 0x39fdc 모드 4 갈래 — 홈(측 1) 팀 구장, 대회(S+0x12c)면 L+0xad > 1 ? 2 : 8. 리그 팀 0~9 · 상수라 굴림 없음
+      setSceneStadium(nariSceneStadium(
+        playerSide === PLAYER_SIDE_LAST_BAT ? started.ourTeamId : started.opponentTeamId,
+        cupGameRef.current?.stage ?? null,
+      ))
       // 적재(상태 8)의 구장 준비 0x352e8 → 0x783b0 — 이 경기 내내 같은 하늘 줄
       const skyRow = stadiumSkyRowOf({ mode: BATTER_LEAGUE_MODE, dayCounter: skyDayCounter }) ?? 0
       stadiumSkyRowRef.current = skyRow
@@ -714,6 +729,17 @@ export function useCareerSession({
           const nariTeams = seatNariMatchAces(nariTeamsOf(current), current.teamId, nextOpponentOf(current), aces)
           return { ...current, nariTeams }
         })
+      }
+      // 1c7ae~1c87c — 무대 · 구장 0x78664(무대, 홈 팀) · 0x5fd04. 리그 팀은 0~9 라 굴리지 않는다(마선수 굴림 뒤 자리)
+      const prepared = careerRef.current
+      if (prepared !== null && prepared !== undefined) {
+        setMatchInfoStage(rollNariMatchInfoStage(random, {
+          mode: BATTER_LEAGUE_MODE,
+          myTeamId: prepared.teamId,
+          opponentTeamId: nextOpponentOf(prepared),
+          mySide: leagueGamePlayerSideOf(prepared),
+          dayCounter: leagueDayCounterOf(prepared),
+        }))
       }
       // 0x1c54a — 두 팀 칸 번호를 다시 매긴다(0xb8768): 타순 = 레코드 안 내 줄 첨자 + 1
       setCareer((current) => {
@@ -2143,7 +2169,14 @@ export function useCareerSession({
       }
       matchPreparedRef.current = true
       // 홈 팀 = 후공 측(0xb7844 L+0xac 갈래 — 대진 칸 0). 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
-      rollNariMatchStadium(random, nationalCupSideOf(cup, matchup.myTeam) === 1 ? matchup.myTeam : matchup.opponent)
+      setMatchInfoStage(rollNariMatchInfoStage(random, {
+        mode: BATTER_LEAGUE_MODE,
+        myTeamId: matchup.myTeam,
+        opponentTeamId: matchup.opponent,
+        mySide: nationalCupSideOf(cup, matchup.myTeam),
+        // 대회 중 나리 저장 +0xb2 = L+0x32 = 대회 날짜
+        dayCounter: cup.day,
+      }))
       setEntryView(null)
       setScreen({ kind: '경기준비', cup: { matchup, cup } })
     },
@@ -2239,6 +2272,8 @@ export function useCareerSession({
     pendingTitle,
     loadingTip,
     stadiumSkyRow,
+    sceneStadium,
+    matchInfoStage,
     matchAces,
     /** 143 경기 전 엔트리 보기 — 142(`경기준비`) 위에 선다 */
     entryView: screen.kind === '경기준비' ? entryView : null,

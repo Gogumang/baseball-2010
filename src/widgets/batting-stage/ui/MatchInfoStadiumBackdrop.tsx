@@ -1,0 +1,68 @@
+import { useEffect, useRef } from 'react'
+import { drawMatchInfoStadium } from '@/widgets/batting-stage/lib/renderScenery'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
+import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
+import { finishSkinBackdropOnCanvas } from '@/shared/lib/screen565/screen565'
+
+/** 그림이 다 실렸는지 가늠하는 표본 간격 — 날 그림이 바뀌었을 때만 흐리기를 다시 한다 */
+const SAMPLE_STEP = 97
+
+function checksumOf(context: CanvasRenderingContext2D): number {
+  const { data } = context.getImageData(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
+  let sum = 0
+  for (let index = 0; index < data.length; index += SAMPLE_STEP * 4) {
+    sum = (sum * 31 + data[index] + (data[index + 1] << 8) + (data[index + 2] << 16)) >>> 0
+  }
+  return sum
+}
+
+/**
+ * **경기정보 화면의 바탕** — `0x5fd04` 가 무대를 그려 흐리기 · 3줄 선 · 흰 단계 3 을 한 뒤 떠 둔 버퍼(`0x581dc(스킨, 무대, 1)`)를
+ * 그림마다 (0, 0) 에 찍는다(`drawMatchInfoStadium` 머리말). 원본은 들어올 때 한 번 뜨므로 구름 · 전광판이 안 흐른다.
+ * 웹은 스프라이트가 늦게 실리므로 날 그림(흐리기 앞)이 바뀔 때마다 다시 뜬다 — 다 실린 뒤로는 같은 그림이다.
+ * `stage` 가 없으면(그 진입을 안 지났으면) 아무것도 안 그린다.
+ */
+export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoStadiumState | null | undefined }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const stageRef = useRef(stage)
+  stageRef.current = stage
+  /** 값이 같으면 같은 그림 — 부르는 쪽이 객체를 새로 만들어도 다시 뜨지 않는다 */
+  const stageKey = stage === null || stage === undefined ? null : JSON.stringify(stage)
+
+  useEffect(() => {
+    if (stageKey === null) return undefined
+    let frame = 0
+    let lastChecksum: number | null = null
+    let raw: CanvasRenderingContext2D | null = null
+    try {
+      const offscreen = document.createElement('canvas')
+      offscreen.width = STAGE_WIDTH
+      offscreen.height = STAGE_HEIGHT
+      raw = offscreen.getContext('2d', { willReadFrequently: true })
+    } catch {
+      raw = null
+    }
+    const draw = () => {
+      const target = canvasRef.current?.getContext('2d') ?? null
+      const current = stageRef.current
+      if (raw !== null && target !== null && current !== null && current !== undefined) {
+        drawMatchInfoStadium(raw, current)
+        const checksum = checksumOf(raw)
+        if (checksum !== lastChecksum) {
+          lastChecksum = checksum
+          target.drawImage(raw.canvas, 0, 0)
+          finishSkinBackdropOnCanvas(target, STAGE_WIDTH, STAGE_HEIGHT)
+        }
+      }
+      frame = requestAnimationFrame(draw)
+    }
+    draw()
+    return () => cancelAnimationFrame(frame)
+  }, [stageKey])
+
+  if (stage === null || stage === undefined) return null
+  return (
+    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="경기정보-구장"
+      data-stadium={stage.stadium} style={{ position: 'absolute', left: 0, top: 0 }} />
+  )
+}

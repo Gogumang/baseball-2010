@@ -1044,6 +1044,26 @@ describe('시즌 끝 사슬', () => {
     expect(후.record.gameRecord).toEqual(기록)
   })
 
+  it('국가대항전 0xdd 진입은 무대 구장 0x78664(무대, 홈 대표팀)를 rand(0, 10) 로 굴린다 (0x6548 67f6) — 경기는 L+0xad 구장', () => {
+    const { result } = 띄우기()
+    시작(result, 3)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    act(() => result.current.actions.playCupGame(10, 11))
+    const stage = result.current.matchInfoStage
+    expect(stage).not.toBeNull()
+    // 굴린 구장(0~9)으로 표 0xd377c 를 읽는다 · 아이콘은 측 0 · 측 1 팀
+    expect(stage!.stadium).toBeGreaterThanOrEqual(0)
+    expect(stage!.stadium).toBeLessThan(10)
+    expect([stage!.side0TeamId, stage!.side1TeamId].sort()).toEqual([10, 11])
+    expect(stage!.gameMode).toBe(2)
+    // 경기 옵션은 대회 단계를 싣는다 — 경기 준비 0x352e8 이 2 · 8 로 놓는다
+    expect(result.current.pendingGame?.options.nationalCupStage).toBe(result.current.cup?.stage)
+  })
+
   it('국가대항전 내 팀은 시즌 팀이 아니라 대한민국(10)이고, 이긴 경기가 대한민국 승으로 쌓인다 (0x6548 65e2)', () => {
     const { result } = 띄우기()
     시작(result, 3)

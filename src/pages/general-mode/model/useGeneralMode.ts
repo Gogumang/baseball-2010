@@ -3,7 +3,9 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import { rollTeamSetup, teamGameStartPointOf } from '@/features/play-team-game/model/teamGameFlow'
-import { rollStadiumNumber } from '@/features/play-team-game/model/sceneStadium'
+import { generalMatchInfoStage, rollStadiumNumber } from '@/features/play-team-game/model/sceneStadium'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
+import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
 import type { TeamGameOptions, TeamGameProgress, TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow'
 import type { PlayerSide } from '@/entities/game/model/gameState'
@@ -99,6 +101,11 @@ export interface GeneralModeSession {
    * 경기정보 구장 미리보기 `0x5fd04` 가 그리는 구장이다(웹은 아직 미리보기를 안 그린다). 상태 22 에 들어온 적이 없으면 null
    */
   readonly matchInfoStadium: number | null
+  /**
+   * 그 무대로 0x5fd04 가 떠 둔 경기정보 바탕(`MatchInfoStadiumBackdrop`) — 구장 · 표 0xce9d8[st+0x30] 줄 · 하늘 줄 · 두 팀 아이콘.
+   * 22 진입 때 한 번 떠 두므로 재굴림이 팀 · 기록을 바꿔도 그대로다(원본 그대로). 22 에 들어온 적이 없으면 null
+   */
+  readonly matchInfoStage: MatchInfoStadiumState | null
   readonly settings: MatchProgressSettings
   /** 경기 장면(0x104)으로 넘어갔는가 */
   readonly isPlaying: boolean
@@ -159,7 +166,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         : readSetupRecord(),
     })
     const entry = created.step === GENERAL_MODE_STEP.경기정보 ? matchInfoEntryOf(created.setup, random) : null
-    return { flow: created, rolls: entry?.rolls ?? null, stadium: entry?.stadium ?? null }
+    return { flow: created, rolls: entry?.rolls ?? null, stadium: entry?.stadium ?? null, stage: entry?.stage ?? null }
   })
   const [flow, setFlow] = useState<GeneralModeFlowState>(initial.flow)
   // 갱신 함수 끝의 되쓰기 — 화면이 고친 기록(빠른실행 굴림 · 재굴림 포함)이 다음 판까지 남는다
@@ -170,6 +177,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   const [rolls, setRolls] = useState<TeamSetupRolls | null>(initial.rolls)
   /** 22 진입 무대의 구장 +0x70 — 진입마다(23 에서 돌아온 것 말고) 새로 만든다. 재굴림 끝(31290)은 무대를 안 만든다 */
   const [matchInfoStadium, setMatchInfoStadium] = useState<number | null>(initial.stadium)
+  const [matchInfoStage, setMatchInfoStage] = useState<MatchInfoStadiumState | null>(initial.stage)
   const [settings, setSettings] = useState<MatchProgressSettings>(initialSettings ?? FULL_PLAY_SETTINGS)
   const [isSettingsOpen, setSettingsOpen] = useState(false)
   /**
@@ -255,6 +263,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
         const entry = matchInfoEntryOf(next.setup, random)
         setRolls(entry.rolls)
         setMatchInfoStadium(entry.stadium)
+        setMatchInfoStage(entry.stage)
         bumpBlockWrite()
         checkMatchSettingsSeen()
       }
@@ -427,7 +436,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   }, [blockWriteSerial])
 
   return {
-    flow, entryEdit, userStarterName, cpuMatchInfo, matchInfoStadium, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,
+    flow, entryEdit, userStarterName, cpuMatchInfo, matchInfoStadium, matchInfoStage, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,
   }
 }
 
@@ -451,10 +460,30 @@ function rollsOf(setup: GeneralModeSetup, random: RandomPort): TeamSetupRolls {
  * ```
  * 재굴림 끝(31290)은 0x30f20 만 부르고 무대를 새로 안 만든다 — 구장은 그때 안 굴린다(원본 그대로).
  */
+/** 전역 모드 [0x1552d10] — 메뉴 하위 12 가 299ac 에서 1 로 적는다 (0x783b0 · 0x78490 이 본다) */
+const GENERAL_MODE = 1
+
 function matchInfoEntryOf(
   setup: GeneralModeSetup,
   random: RandomPort,
-): { readonly rolls: TeamSetupRolls; readonly stadium: number } {
+): { readonly rolls: TeamSetupRolls; readonly stadium: number; readonly stage: MatchInfoStadiumState } {
   const rolls = rollsOf(setup, random)
-  return { rolls, stadium: rollStadiumNumber(random, setup.stadiumId) }
+  const stadium = rollStadiumNumber(random, setup.stadiumId)
+  // 무대+0x80 · +0x84 = 0xb6bdc(st, 1) · (st, 0) — 0x30f20 이 앉힌 측 1 · 측 0 팀
+  const side0TeamId = setup.playerSide === 0 ? setup.userTeamId : setup.aiTeamId
+  const side1TeamId = setup.playerSide === 0 ? setup.aiTeamId : setup.userTeamId
+  const placed = generalMatchInfoStage(stadium, setup.stadiumId)
+  return {
+    rolls,
+    stadium,
+    stage: {
+      stadium: placed.stadium,
+      fieldPalette: placed.paletteRow < 0 ? null : placed.paletteRow,
+      // 0x5fd04 의 0x783b0 — 모드 1 은 0xb6bdc(st, 0) = 측 0 팀 mod 6
+      skyRow: stadiumSkyRowOf({ mode: GENERAL_MODE, side0TeamId }) ?? 0,
+      side0TeamId,
+      side1TeamId,
+      gameMode: GENERAL_MODE,
+    },
+  }
 }
