@@ -11,7 +11,9 @@ import {
   TICKS_PER_ACTION_FRAME,
   type DefenseFielder,
   type DefenseViewState,
+  BALL_SHADOW_RIM_COLOR,
   ballFrameOf,
+  ballShadowOf,
   cameraTargetOf,
   fielderActionFrameOf,
   fielderFrameOf,
@@ -204,5 +206,31 @@ describe('공 그림', () => {
     // 11칸을 넘지 않는다 — 011~022 는 불꽃 공, 023~033 은 날개 공(둘 다 마구 그림)이라
     // 보통 공에 섞여 나오면 안 된다
     expect(ballFrameOf(99999)).toBeLessThan(11)
+  })
+})
+
+describe('공 그림자 0x356f8 (← 0x36dfc 37268)', () => {
+  const 검정 = { r: 0, g: 0, b: 0 }
+  const 회색 = BALL_SHADOW_RIM_COLOR
+
+  it('공중 공(화면 높이 > 0)은 s = 3 — 검정 4×4 와 모서리를 뗀 회색 선 넷', () => {
+    expect(ballShadowOf({ x: 100, y: 200 }, 10)).toEqual([
+      { x: 99, y: 199, width: 4, height: 4, color: 검정 },
+      { x: 98, y: 200, width: 1, height: 2, color: 회색 },
+      { x: 103, y: 200, width: 1, height: 2, color: 회색 },
+      { x: 100, y: 198, width: 2, height: 1, color: 회색 },
+      { x: 100, y: 203, width: 2, height: 1, color: 회색 },
+    ])
+  })
+
+  it('땅 공(화면 높이 0)은 s = 5 — 검정 6×6', () => {
+    const [칠] = ballShadowOf({ x: 100, y: 200 }, 0)
+    expect(칠).toEqual({ x: 98, y: 198, width: 6, height: 6, color: 검정 })
+  })
+
+  it('화면 높이가 음수이거나 땅점 화면 y 가 1 보다 작으면 안 그린다 (36fc0 · 36fce)', () => {
+    expect(ballShadowOf({ x: 100, y: 200 }, -1)).toEqual([])
+    expect(ballShadowOf({ x: 100, y: 0 }, 5)).toEqual([])
+    expect(ballShadowOf({ x: 100, y: 1 }, 5)).not.toEqual([])
   })
 })

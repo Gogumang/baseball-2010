@@ -24,6 +24,7 @@ import {
   type DefenseRunner,
   type DefenseViewState,
   ballFrameOf,
+  ballShadowOf,
   cameraTargetOf,
   defenderPaletteIndexOf,
   fielderSpriteOf,
@@ -262,14 +263,27 @@ export function DefenseScreen({
         />
 
         {/*
-          공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3).
-
-          ⚠️ **공 그림자는 그리지 않는다.** 예전에는 ball.pzx 023~033 을 "납작한 그림자"로 알고
-             바닥에 깔았는데, 그 칸들은 그림자가 아니라 **날개 달린 마구 공**이라 공 양옆에
-             검은 날개가 붙어 보였다. 원본이 공 그림자를 그린다는 근거는 문서 어디에도 없고
-             (R3 1-3 은 대상을 "공 (x, z−높이)" 하나로만 적는다), 고르는 식이 든 궤적 코드
-             0xb3b38·0xb401c 는 아직 안 읽었다. **모르는 것을 그리느니 안 그린다.**
+          공 그림자 0x356f8 — 0x36dfc(37268)가 땅점 (x, z) 자리에 검정 (s+1)² 칸 + 회색 테두리 넷을 **곧바로** 칠한다
+          (공중 s = 3 · 땅 s = 5). 그리기 목록보다 먼저라 모든 야수 · 주자 · 공 아래다. ball.pzx 023~033(날개 달린 마구 공)은
+          그림자가 아니다 — 예전에 그것을 깔던 것과 다르다.
         */}
+        {isBallDrawn(state.ball) &&
+          ballShadowOf(ballGround, toScreenY(state.ball.height)).map((piece, index) => (
+            <div
+              key={index}
+              className={styles.ballShadowPiece}
+              style={{
+                left: piece.x,
+                top: piece.y,
+                width: piece.width,
+                height: piece.height,
+                background: `rgb(${piece.color.r}, ${piece.color.g}, ${piece.color.b})`,
+              }}
+              data-testid="defense-ball-shadow"
+            />
+          ))}
+
+        {/* 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
         {actors.map((actor) => actor.node)}
 
         {/* 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다 */}

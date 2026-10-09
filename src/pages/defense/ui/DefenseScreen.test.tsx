@@ -67,7 +67,7 @@ describe('월드 좌표 → 화면 좌표', () => {
     expect(first.dataset.frame).toBe('27')
   })
 
-  it('공은 높이만큼 위로 올라간다 — 그림자는 그리지 않는다', () => {
+  it('공은 높이만큼 위로 올라간다 — 그림자는 땅점에 남는다', () => {
     // 카메라를 못 박아 둬야 높이만 비교된다 (안 박으면 대상이 z−높이라 카메라도 같이 움직인다)
     const 고정_카메라 = { x: 20000, z: 24500 }
     const 공 = (height: number): DefenseViewState => ({
@@ -78,8 +78,10 @@ describe('월드 좌표 → 화면 좌표', () => {
 
     띄우기(공(0))
     const 바닥 = Number.parseInt(screen.getByTestId('defense-ball').style.top, 10)
-    // 날개 달린 마구 그림(ball.pzx 023~033)을 그림자로 잘못 깔던 것을 걷어냈다
-    expect(screen.queryByTestId('defense-ball-shadow')).toBeNull()
+    // 땅 공(화면 높이 0)의 그림자는 s = 5 — 검정 6×6 은 땅점에서 (−2, −2)
+    const 땅그림자 = screen.getAllByTestId('defense-ball-shadow')[0]
+    expect(땅그림자.style.width).toBe('6px')
+    expect(Number.parseInt(땅그림자.style.top, 10)).toBe(바닥 - 2)
 
     cleanup()
     띄우기(공(6500))
@@ -87,6 +89,10 @@ describe('월드 좌표 → 화면 좌표', () => {
 
     // 6500 월드 = 6500 × 500 / 32500 = 100px
     expect(바닥 - 띄운).toBe(100)
+    // 그림자는 공을 따라 오르지 않는다 — 공중 공은 s = 3, 검정 4×4 가 땅점에서 (−1, −1)
+    const 공중그림자 = screen.getAllByTestId('defense-ball-shadow')[0]
+    expect(공중그림자.style.width).toBe('4px')
+    expect(Number.parseInt(공중그림자.style.top, 10)).toBe(바닥 - 1)
   })
 })
 
@@ -122,9 +128,10 @@ describe('카메라 — 진입 맞춤 0x46418 · 멈춤 0x3f060(3f0a4 경기 멈
 })
 
 describe('공을 안 그리는 그림 (0x36dfc 36e86~36ea4)', () => {
-  it('쥔 공(+0x12c)은 안 그린다', () => {
+  it('쥔 공(+0x12c)은 안 그린다 — 그림자도 없다', () => {
     띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isHeld: true } })
     expect(screen.queryByTestId('defense-ball')).toBeNull()
+    expect(screen.queryByTestId('defense-ball-shadow')).toBeNull()
   })
 
   it('담장 뒤로 사라진 공은 안 그린다', () => {

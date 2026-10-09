@@ -465,3 +465,55 @@ const BALL_MAX_FRAME = 10
 export function ballFrameOf(height: number): number {
   return Math.min(Math.trunc(height / BALL_HEIGHT_PER_FRAME) + BALL_GROUND_FRAME, BALL_MAX_FRAME)
 }
+
+/** 공 그림자 한 조각 — 화면 좌표 사각(선은 폭 · 높이 1) */
+export interface BallShadowPiece {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: { readonly r: number; readonly g: number; readonly b: number }
+}
+
+/** 그림자 테두리 회색 0x1400748(100, 100, 100) (35738) */
+export const BALL_SHADOW_RIM_COLOR = { r: 100, g: 100, b: 100 } as const
+const BALL_SHADOW_FILL_COLOR = { r: 0, g: 0, b: 0 } as const
+/** 공중 공의 그림자 크기 (36fbc) · 땅 공(화면 높이 0)의 크기 (36fda) */
+export const BALL_SHADOW_SIZE_AIR = 3
+export const BALL_SHADOW_SIZE_GROUND = 5
+
+/**
+ * **공 그림자** — 0x36dfc 의 37268 이 부르는 0x356f8(x, y, s) (직접 뜸). 공 땅점 (x, z)의 화면 자리에 그린다.
+ * ```
+ * 36fba  s = 3 ; 화면 높이 h(0xb94b4(카메라, 0, y)) < 0 이면 그림자 없음(3736c)
+ * 36fc6  땅점 화면 y(ff0 + z 투영) < 1 이면 그림자 없음
+ * 36fd4  h == 0(땅)이면 s = 5
+ * 37268  0x356f8(땅점 화면 x, 땅점 화면 y, s)
+ * 356f8  x0 = x − (s >> 1) · y0 = y − (s >> 1) ; 색 0(검정) ; 기기 사각 칠 0x14006e8(x0, y0, s + 1, s + 1)
+ * 35734  s > 2 면 색 (100, 100, 100) ; 기기 선 0x14006c8 넷(두 끝 다 칠한다):
+ *          (x0 − 1, y0 + 1)–(x0 − 1, y0 + s − 1) · (x0 + s + 1, y0 + 1)–(x0 + s + 1, y0 + s − 1)
+ *          (x0 + 1, y0 − 1)–(x0 + s − 1, y0 − 1) · (x0 + 1, y0 + s + 1)–(x0 + s − 1, y0 + s + 1)
+ * ```
+ * 그리기 목록(0xbe6a0)이 아니라 **곧바로 화면에** 칠하므로 목록으로 그리는 야수 · 주자 · 공보다 아래다.
+ * 공을 안 그리는 그림(`isBallDrawn` 거짓)에는 그림자도 없다(36ef8 → 3736c).
+ */
+export function ballShadowOf(
+  ground: { readonly x: number; readonly y: number },
+  screenHeight: number,
+): readonly BallShadowPiece[] {
+  if (screenHeight < 0 || ground.y < 1) return []
+  const size = screenHeight === 0 ? BALL_SHADOW_SIZE_GROUND : BALL_SHADOW_SIZE_AIR
+  const x0 = ground.x - (size >> 1)
+  const y0 = ground.y - (size >> 1)
+  const pieces: BallShadowPiece[] = [{ x: x0, y: y0, width: size + 1, height: size + 1, color: BALL_SHADOW_FILL_COLOR }]
+  if (size > 2) {
+    const rim = BALL_SHADOW_RIM_COLOR
+    pieces.push(
+      { x: x0 - 1, y: y0 + 1, width: 1, height: size - 1, color: rim },
+      { x: x0 + size + 1, y: y0 + 1, width: 1, height: size - 1, color: rim },
+      { x: x0 + 1, y: y0 - 1, width: size - 1, height: 1, color: rim },
+      { x: x0 + 1, y: y0 + size + 1, width: size - 1, height: 1, color: rim },
+    )
+  }
+  return pieces
+}

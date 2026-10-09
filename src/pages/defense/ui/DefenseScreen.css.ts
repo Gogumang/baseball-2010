@@ -39,6 +39,12 @@ export const paintedSprite = style({
   pointerEvents: 'none',
 })
 
+/** 공 그림자 0x356f8 한 조각 (검정 사각 · 회색 테두리 선) — 화면 좌표 그대로 */
+export const ballShadowPiece = style({
+  position: 'absolute',
+  pointerEvents: 'none',
+})
+
 /** 야수·주자·공 한 칸 — 크기 0 인 기준점이고 그림은 원점만큼 비껴 놓인다 */
 export const actor = style({
   position: 'absolute',
