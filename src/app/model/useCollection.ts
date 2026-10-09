@@ -5,7 +5,6 @@ import {
   mergeSeasonEndingIntoCollection,
   mergeTitlesIntoCollection,
   normalizeCollection,
-  openHiddenForMissions,
   registerHallOfFame,
   registerHallOfFamePitcher,
   deleteHallOfFame,
@@ -26,6 +25,7 @@ import {
 } from '@/entities/collection/model/collectionRewards'
 
 const NO_IDS: readonly number[] = []
+const NO_ANNOUNCE = () => {}
 
 /** 등록 비용을 치르는 전역 G 지갑 `mgr[+0x64]` 의 두 칸 */
 export interface HallOfFameWallet {
@@ -65,16 +65,24 @@ export function mergeOpenedHiddenIds(collection: Collection, openedHiddenIds: re
 export function useCollection(
   store: JsonStorePort,
   career: PlayerCareer | null,
-  isEveryMissionCleared: boolean,
   pitcherOpenedHiddenIds: readonly number[] = NO_IDS,
   pitcherEnding: EndingViewer | null = null,
   pitcherTitleIds: readonly string[] = NO_TITLES,
   seasonEndingIndex: number | null = null,
+  /** 공용 창에 히든 오픈 알림을 띄운다 (0x62368 → 0x74ef5) — 새로 연 k 만 온다 */
+  announceHiddenOpen: (ids: readonly number[]) => void = NO_ANNOUNCE,
 ) {
   const [collection, setCollection] = useState<Collection>(() => normalizeCollection(store.load()))
   /** 판정이 읽는 지금 값 — 팝업을 닫고 곧바로 다시 판정할 때 렌더를 기다리지 않는다 */
   const collectionRef = useRef(collection)
   collectionRef.current = collection
+  /** 통계의 지금 값 — 한 틀에 사건이 여럿 와도 문턱을 더한 뒤 값으로 본다 */
+  const statsRef = useRef(collection.stats)
+  statsRef.current = collection.stats
+  const announceRef = useRef(announceHiddenOpen)
+  announceRef.current = announceHiddenOpen
+  /** 이번 렌더 전에 이미 연 k — 같은 틀에 두 번 불려도 창을 한 번만 띄운다 */
+  const openingRef = useRef<Set<number>>(new Set())
 
   // 투수편 칭호 — 0xa40e0 이 투수편 기록연감 비트(+0xec)에 켠다
   useEffect(() => {
@@ -101,10 +109,6 @@ export function useCollection(
     setCollection((previous) =>
       mergeEndingIntoCollection(previous, { endingIndex: pitcherEndingIndex, seenEventIds: pitcherSeenEventIds }))
   }, [pitcherEndingIndex, pitcherSeenEventIds])
-
-  useEffect(() => {
-    setCollection((previous) => openHiddenForMissions(previous, isEveryMissionCleared))
-  }, [isEveryMissionCleared])
 
   useEffect(() => {
     store.save(collection)
@@ -138,16 +142,29 @@ export function useCollection(
     setCollection((previous) => syncHallOfFameEquipment(previous, side, recordId, nibbles))
   }, [])
 
+  /**
+   * **`0x62368(ui, k, 0)` — 히든 k 를 열고 알림 창** (직접 떴다). 셋째 인자 0 이라 이미 열린 k(0x61f5c)면 아무것도 안 한다.
+   * 새로 열면 전역 해금표(`app+0xc0`, 웹 `openedHiddenIds`)에 켜고 공용 창에 글을 띄운다(`hiddenOpenNoticeTextOf`).
+   * 새로 열었으면 참 — 원본도 새로 열었을 때만 0 이 아닌 값을 돌려준다.
+   */
+  const openHidden = useCallback((id: number): boolean => {
+    if (collectionRef.current.openedHiddenIds.includes(id) || openingRef.current.has(id)) return false
+    openingRef.current.add(id)
+    setCollection((previous) =>
+      previous.openedHiddenIds.includes(id) ? previous : { ...previous, openedHiddenIds: [...previous.openedHiddenIds, id] })
+    announceRef.current([id])
+    return true
+  }, [])
+
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
   const recordStat = useCallback((event: AnnalsStatEvent) => {
-    setCollection((previous) => {
-      const stats = applyAnnalsStat(previous.stats, event)
-      // 0x4e8b0 끝 — 모드 3 · 4 의 그 칸이 10시간을 넘으면 히든 31 · 47 을 연다(0x62368). ⚠️ 0x62368 의 알림 창은 웹에 아직 없다
-      const hiddenId = event.kind === '플레이시간' ? playTimeHiddenIdOf(stats, event.mode) : null
-      if (hiddenId === null || previous.openedHiddenIds.includes(hiddenId)) return { ...previous, stats }
-      return { ...previous, stats, openedHiddenIds: [...previous.openedHiddenIds, hiddenId] }
-    })
-  }, [])
+    setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
+    statsRef.current = applyAnnalsStat(statsRef.current, event)
+    if (event.kind !== '플레이시간') return
+    // 0x4e8b0 끝 — 모드 3 · 4 의 그 칸이 10시간을 넘으면 0x62368(ui, 31 · 47, 0) — 열기 + 알림 창. 문턱은 더한 뒤 값으로 본다
+    const hiddenId = playTimeHiddenIdOf(statsRef.current, event.mode)
+    if (hiddenId !== null) openHidden(hiddenId)
+  }, [openHidden])
 
   /**
    * **전부 수집 보상** — 메인 메뉴 하위 4 갱신 0x29454 가 그 상태 열 번째 갱신([this+0x2c] == 10)에서 부른다:
@@ -190,6 +207,7 @@ export function useCollection(
 
   return {
     collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, recordStat, claimCollectionReward,
+    openHidden,
   }
 }
 

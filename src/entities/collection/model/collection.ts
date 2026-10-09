@@ -196,14 +196,6 @@ export function mergeTitlesIntoCollection(collection: Collection, titleIds: read
   return missing.length === 0 ? collection : { ...collection, titles: [...collection.titles, ...missing] }
 }
 
-/** 미션 올 클리어 → 타자 헬멧 레벨 9 (0xa5184 — 모드 6 이면 id 37) */
-const MISSION_ALL_CLEAR_HIDDEN_ID = 37
-
-export function openHiddenForMissions(collection: Collection, isAllCleared: boolean): Collection {
-  if (!isAllCleared || collection.openedHiddenIds.includes(MISSION_ALL_CLEAR_HIDDEN_ID)) return collection
-  return { ...collection, openedHiddenIds: [...collection.openedHiddenIds, MISSION_ALL_CLEAR_HIDDEN_ID] }
-}
-
 /** 타자 칸 i 의 선수 (칸 번호를 따라 찾는다) */
 export function hallOfFameBatterAt(collection: Pick<Collection, 'hallOfFame'>, slot: number): HallOfFamer | null {
   return collection.hallOfFame.find((famer, index) => (famer.slot ?? index) === slot) ?? null
