@@ -16,6 +16,7 @@ import { hiddenTeamHintMessage } from '@/pages/general-mode/lib/hiddenTeam'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import { MessageBox } from '@/shared/ui'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { TEAMS } from '@/shared/config/original/teams'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
@@ -312,6 +313,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             onKey={actions.pressEntryKey}
             onMoveCursor={actions.pointEntryCursor}
             onCloseAceLocked={actions.closeEntryAceLocked}
+            // 그림 0x2e070 도 22 진입이 떠 둔 구장 바탕(0x581dc(skin, [메뉴+0xb8], 0))을 먼저 깐다
+            underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
           />
         )
       }

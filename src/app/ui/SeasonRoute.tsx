@@ -20,6 +20,7 @@ import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { AceSelectScreen } from '@/pages/general-mode'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
   DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
@@ -616,6 +617,8 @@ export function SeasonRoute({
         onKey={actions.pressEntryKey}
         onMoveCursor={actions.pointEntryCursor}
         onCloseAceLocked={actions.closeEntryAceLocked}
+        // 공통 앞그림 0xb810 은 0xe0 에서도 0xdd 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
+        underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
       />
     )
   }
