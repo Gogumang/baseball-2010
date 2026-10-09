@@ -122,6 +122,8 @@ export interface PickoffPlayInput {
   readonly defenseAbilities?: readonly number[]
   /** 주자들의 주루 능력치 */
   readonly runAbility?: number
+  /** 루별 주자 주루 (1~3). 없는 루는 `runAbility` — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 들고 있다 */
+  readonly runAbilities?: Partial<Record<1 | 2 | 3, number>>
   /** 주면 악송구 굴림(0xa1828)이 돈다 */
   readonly random?: RandomPort
   /** `0xae690` 앞 항 — 공격이 CPU 인가 (자동 진루 제어기 0xaf918 을 켜는 조건) */
@@ -208,7 +210,7 @@ function* pickoffPlaySteps(
   ticks: DefensePlayView[],
 ): Generator<number, PickoffPlayResult, DefenseKeyPress | null> {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
-  const speed = runnerSpeedOf(input.runAbility ?? DEFAULT_ABILITY)
+  const speedOf = (base: 1 | 2 | 3) => runnerSpeedOf(input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY)
   const autoBaserunningEnabled = input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const targetBase = input.targetBase
   const log: string[] = []
@@ -240,7 +242,7 @@ function* pickoffPlaySteps(
   ;([1, 2, 3] as const).forEach((base) => {
     const occupied = base === 1 ? input.bases.first : base === 2 ? input.bases.second : input.bases.third
     if (!occupied) return
-    const runner = createRunner(runners.length + 1, base, speed, { isBatterRunner: false })
+    const runner = createRunner(runners.length + 1, base, speedOf(base), { isBatterRunner: false })
     const lead = runnerLeadOf(runner, { playKind: PICKOFF_PLAY_KIND, stealing: false, random: input.random })
     runners.push({ state: applyRunnerLead(runner, lead), counted: false })
   })

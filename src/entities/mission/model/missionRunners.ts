@@ -149,3 +149,78 @@ export function missionRunnerRunAbilitiesOf(
     ...(runs[3] === undefined ? {} : { third: runs[3] }),
   }
 }
+
+/** 수비 아홉 칸 (0 투수 … 8 중견) */
+const FIELDER_COUNT = 9
+/** 경기용 칸 2 = 수비 */
+const DEFENSE_SLOT = 2
+
+/** 미션 경기에서 수비 판이 보는 두 팀 — 사람 칸 팀 타선과 (타자 미션이면) CPU 팀 타선 */
+export interface MissionDefenseSituation {
+  readonly mission: Pick<OriginalMission, 'side'>
+  readonly game: Pick<MissionGame, 'humanBatting' | 'cpuAutoBatting'>
+}
+
+/**
+ * **수비 판의 아홉 칸 수비 능력치** — 플레이 vt20 `0xb0fb4` (상태 0x17 판 시작, 직접 재역어셈):
+ * ```
+ * b1018  칸 i = 0..8:
+ * b1032    i == 0 → 선수 찾기를 건너뛴다(r5 = 0)
+ * b103e    j = 0..팀+0x10 − 1:  레코드 = 0xb8a35(수비 팀, j) ; (레코드+0x1c & 0xf) − 1 == i 인 **첫** 레코드 (b1184 → 야수+0xec)
+ * b106a    g = 선수 있으면 0xbbe98(0xb570d(ctx, 2, 선수, 90, 1)) + 1, 없으면 2
+ * b10d0    팀 보너스는 전역 모드 1 · 2 · 8 · 9 만 — 미션(5 · 6)은 없다
+ * ```
+ * 수비 팀은 `팀[st[0xa]]` — 타자 미션(모드 6)은 CPU 팀(`game.cpuAutoBatting`), 투수 미션(모드 5)은 사람 칸 팀(`game.humanBatting`,
+ * 0xaa57c 의 aa7f2 갈래라 미션 선수를 타자 명부에 안 넣는다). 두 팀 다 레코드 배열은 마스터 줄 그대로다.
+ * 능력치는 `0xb570c` 첫머리 b5728 의 `0xb6415(선수, 2, 1)`(장비 니블 · 장착 스킬) — 모드 5 · 6 은 모드 갈래 · 팀 능력치 마스크를 안 타고
+ * 체력 인자 90 은 피로 감소가 없다(`masterGameAbilityOf`, `missionRunnerRunAt` 과 같은 길).
+ *
+ * 레코드의 자리 니블은 대타 확정 0xaebe4(aecac~, R4 1c)가 **새 타자 ↔ 옛 타자** 로 맞바꾼다 — 벤치 줄은 니블이 0 이라
+ * 지금 타순 칸 s 에 선 레코드가 시작 때 칸 s 레코드의 자리를 갖고, 타순 밖 레코드는 0(어느 칸에도 안 맞는다)이 된다.
+ * 대타는 명단(`lineup`)만 바꾸므로 명단에서 그대로 읽는다.
+ *
+ * ⚠️ **칸 0(투수)**: 원본은 선수를 찾지 않아 g = 2 고정 · 야수+0xec 가 비어 있다(펌블 표 b41e4 는 선수가 없으면 0). 진행기는 칸 0 도
+ * 능력치 하나로 등급을 잡으므로 이 둘을 한 값으로 나타낼 수 없다 — 진행기 기본값(500)으로 둔다(다른 모드는 투수 칸 2 를 넣는다 —
+ * `defenseAbilitiesOf` 주석. 둘 다 원본과 다르다, 진행기 쪽 숙제).
+ * ⚠️ 찾는 레코드가 미션 타자 · 마타자 표지면(수비 팀에는 안 생긴다) 진행기 기본값이다.
+ */
+export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[] {
+  const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_RUN_ABILITY)
+  const defense = run.mission.side === '타자' ? run.game.cpuAutoBatting : run.game.humanBatting
+  if (defense === null) return abilities
+  const roster = teamBatters(defense.teamId)
+  const rowOf = (record: number) => defense.records[record] ?? record
+  const positionOfRow = (row: number) => (roster[row]?.position ?? 0) & 0xf
+  // 레코드 → 자리 니블 — 타순 칸 s 에 선 레코드는 시작 때 칸 s 레코드(= 레코드 s)의 자리, 나머지는 0
+  const positions = new Map<number, number>()
+  for (let order = 0; order < QUICK_LINEUP_SLOTS; order += 1) {
+    positions.set(rosterSlotAt(defense.lineup, order), positionOfRow(rowOf(order)))
+  }
+  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
+  for (let record = 0; record < defense.records.length; record += 1) {
+    const slot = (positions.get(record) ?? 0) - 1
+    if (slot < 1 || slot >= FIELDER_COUNT || filled[slot]) continue
+    filled[slot] = true
+    const row = rowOf(record)
+    const player = row === MISSION_NARI_RECORD || row === MISSION_ACE_ROSTER_SLOT ? undefined : roster[row]
+    if (player !== undefined) abilities[slot] = masterGameAbilityOf(player, false, DEFENSE_SLOT)
+  }
+  return abilities
+}
+
+/** 타순 아홉 칸 */
+const QUICK_LINEUP_SLOTS = 9
+
+/** 미션 수비 판에 먹이는 능력치 — 아홉 칸 수비와 루별 주루(0 = 타자주자) */
+export interface MissionPlayAbilities {
+  readonly defenseAbilities: readonly number[]
+  readonly runAbilities: Partial<Record<0 | 1 | 2 | 3, number>>
+}
+
+/** 수비 판(타구 · 견제 · 공 도착 · 밀어내기)이 읽는 능력치 한 벌 — `missionDefenseAbilitiesOf` + `missionRunAbilitiesOnBaseOf` */
+export function missionPlayAbilitiesOf(
+  run: MissionRunnerSituation & MissionDefenseSituation,
+  special: MissionSpecialRunners = {},
+): MissionPlayAbilities {
+  return { defenseAbilities: missionDefenseAbilitiesOf(run), runAbilities: missionRunAbilitiesOnBaseOf(run, special) }
+}

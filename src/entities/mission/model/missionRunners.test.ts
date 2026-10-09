@@ -4,6 +4,8 @@ import { applyOutcome, applyPickoff, startMission } from '@/entities/mission/mod
 import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import {
   missionBatterSlotOf,
+  missionDefenseAbilitiesOf,
+  missionPlayAbilitiesOf,
   missionRunAbilitiesOnBaseOf,
   missionRunnerRunAbilitiesOf,
   missionRunnerRunAt,
@@ -116,5 +118,58 @@ describe('자동진행이 미션 타자 앞에서 멈추면 간이 엔진이 세
       }
     }
     expect(found).toBeGreaterThan(0)
+  })
+})
+
+describe('미션 수비 판 아홉 칸 수비 — 0xb0fb4 (수비 팀 레코드의 자리 니블 − 1 칸, 0xb570c(팀, 2, 선수, 90, 1))', () => {
+  const expectedOf = (teamId: number) => {
+    const abilities = Array.from({ length: 9 }, () => 500)
+    teamBatters(teamId).forEach((player) => {
+      const slot = ((player.position ?? 0) & 0xf) - 1
+      if (slot >= 1 && slot < 9) abilities[slot] = masterGameAbilityOf(player, false, 2)
+    })
+    return abilities
+  }
+
+  it('타자 미션은 CPU 팀(수비) 마스터 줄 — 칸 0(투수)은 원본이 선수를 안 찾아 진행기 기본값', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자')!
+    const run = startMission(mission)
+    const cpuTeamId = run.game.cpuAutoBatting!.teamId
+    const abilities = missionDefenseAbilitiesOf(run)
+    expect(abilities).toEqual(expectedOf(cpuTeamId))
+    expect(abilities[0]).toBe(500)
+  })
+
+  it('투수 미션은 사람 칸 팀(수비) 마스터 줄', () => {
+    const mission = MISSIONS.find((m) => m.side === '투수')!
+    const run = startPitcherMission(mission)
+    expect(missionDefenseAbilitiesOf(run)).toEqual(expectedOf(run.game.humanBatting.teamId))
+  })
+
+  it('대타가 들어선 타순 칸은 새 타자가 옛 타자의 자리를 받는다 (0xaebe4 aecac~ — 자리 니블 맞바꿈)', () => {
+    const mission = MISSIONS.find((m) => m.side === '투수')!
+    const run = startPitcherMission(mission)
+    const batting = run.game.humanBatting
+    const roster = teamBatters(batting.teamId)
+    // 타순 칸 0 의 선수를 벤치 레코드 9 로 바꾼다
+    const rosterSlots = [...batting.lineup.rosterSlots]
+    rosterSlots[0] = 9
+    rosterSlots[9] = 0
+    const swapped = { ...run, game: { ...run.game, humanBatting: { ...batting, lineup: { ...batting.lineup, rosterSlots } } } }
+    const slot = ((roster[0]!.position ?? 0) & 0xf) - 1
+    const abilities = missionDefenseAbilitiesOf(swapped)
+    if (slot >= 1) expect(abilities[slot]).toBe(masterGameAbilityOf(roster[9]!, false, 2))
+    // 나머지 칸은 그대로
+    expect(abilities.filter((_v, index) => index !== slot)).toEqual(
+      expectedOf(batting.teamId).filter((_v, index) => index !== slot),
+    )
+  })
+
+  it('수비 판 능력치 한 벌 — 루별 주루는 주자 신원대로', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자' && countOf(m.start.runners) >= 1)!
+    const run = startMission(mission)
+    const abilities = missionPlayAbilitiesOf(run)
+    expect(abilities.runAbilities).toEqual(missionRunAbilitiesOnBaseOf(run))
+    expect(abilities.defenseAbilities).toEqual(missionDefenseAbilitiesOf(run))
   })
 })

@@ -10,6 +10,7 @@ import {
   FIELDER_COUNT,
   FIELDER_START_POSITIONS,
   basePosition,
+  runnerSpeedOf,
 } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
@@ -2004,5 +2005,19 @@ describe('희생 [sp+8] · 번트 타구 state[0x13] — 정산 a83e2 · a88e0 �
       runnersAdvanced: 결과.sacrifice,
     })
     expect(hasBit(bits, BURST_RESULT_BIT.번트진루)).toBe(false)
+  })
+})
+
+describe('루별 주자 주루 — 주자마다 제 레코드의 속도 (0xa93ac a9462 → 주자+0xa4)', () => {
+  it('runAbilities 의 루 값이 그 루에서 출발한 주자 속도가 되고, 없는 루는 runAbility 다', () => {
+    const state = startDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([102, 866, 910, 0]),
+      bases: 주자1루,
+      outs: 0,
+      runAbility: 300,
+      runAbilities: { 1: 900 },
+    })
+    expect(state.runners.map((runner) => runner.state.speed)).toEqual([runnerSpeedOf(300), runnerSpeedOf(900)])
   })
 })

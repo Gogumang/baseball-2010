@@ -35,6 +35,7 @@ import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { missionRunnersAfterPlay, missionRunnersOf, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
+import type { MissionPlayAbilities } from '@/entities/mission/model/missionRunners'
 
 /**
  * 미션 한 판의 진행 상태.
@@ -122,9 +123,8 @@ export function startMission(mission: OriginalMission, setup: MissionGameSetup =
  * **돌고**, 안 주면 지금까지처럼 결정론이다. 미션 화면(`app/model/useMissionSession`)이 아직
  * 난수를 넘겨 주지 않아 기본값은 "안 굴림" 이다.
  *
- * ⚠️ **수비 능력치·주루는 못 넘긴다**: 미션 레코드(`OriginalMission`)에는 팀도 타순도 없어
- * 아홉 칸을 채울 근거가 없다. 그래서 진행기 기본값(등급 3 = 500)이 그대로 쓰인다 — **근사다**.
- * 협살도 마찬가지로 수비가 CPU 인지 알 길이 없어(원본은 `state[0x31+수비측]`) 돌리지 않는다.
+ * 수비 능력치·루별 주루는 `options.abilities`(`missionPlayAbilitiesOf` — 수비 팀 레코드 0xb0fb4 · 주자 레코드 0xa93ac)로 받는다.
+ * 안 주면(시험 · 옛 호출) 진행기 기본값(등급 3 = 500)이다. 미션 화면(`useMissionSession`)은 판을 직접 돌려 `played` 로 넘긴다.
  */
 export function missionAdvance(
   bases: BaseState,
@@ -138,6 +138,8 @@ export function missionAdvance(
      * 그대로 쓴다 — 한 타구에 두 번 굴리면 난수 차례가 어긋난다 (`gameFlow.resolveDefensePlay` 와 같은 자리).
      */
     readonly played?: DefensePlayResult
+    /** 수비 아홉 칸 · 루별 주루 (`missionPlayAbilitiesOf`) */
+    readonly abilities?: MissionPlayAbilities
   } = {},
 ): AdvanceResult {
   return missionPlay(bases, outs, outcome, options).advance
@@ -174,7 +176,9 @@ export function missionPlay(
   }
   const played =
     options.played ??
-    runDefensePlay(missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode))
+    runDefensePlay(
+      missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode, undefined, options.abilities),
+    )
   // 기록은 판 끝 정산 결과 — 묶인 패턴 없이 결과만 넘겨받은 호출(시험·옛 호출)만 넘겨받은 결과 그대로다
   const settled = contactOfOutcome(outcome) === undefined ? outcome : (played.outcome ?? outcome)
   return {
@@ -213,6 +217,11 @@ export function missionDefensePlayInputOf(
    * 이 값과 상관이 없다 — 그래서 아래도 투수편에만 싣는다.
    */
   throwModeManual?: boolean,
+  /**
+   * 수비 아홉 칸 · 루별 주루 (`missionPlayAbilitiesOf`) — 판 시작 0xb0fb4 의 수비 팀 레코드 · 0xa93ac 의 주자 레코드.
+   * 안 주면(시험 · 옛 호출) 진행기 기본값(500)이다.
+   */
+  abilities?: MissionPlayAbilities,
 ): DefensePlayInput {
   // 투수편 미션은 사람이 수비다 — 공격이 CPU 라 `0xae690` 의 첫 항이 서서 늘 자동 진루이고,
   // 협살(AI 상태 8)은 `state[0x31 + 수비측] == 1` 이 아니라 안 돈다 (S8 1-4). 타자편은 그 반대다.
@@ -231,6 +240,9 @@ export function missionDefensePlayInputOf(
     gameMode: gameMode ?? MISSION_BATTER_MODE,
     defenseIsCpu: !isPitcherSide,
     offenseIsCpu: isPitcherSide,
+    ...(abilities === undefined
+      ? {}
+      : { defenseAbilities: abilities.defenseAbilities, runAbilities: abilities.runAbilities }),
     // 사람이 수비하는 투수편에서만 환경설정 송구가 먹는다 (0xae6c8 의 앞 항이 거짓)
     ...(isPitcherSide ? { throwMode: throwModeManual === false ? '자동' : '수동' } : {}),
   }
