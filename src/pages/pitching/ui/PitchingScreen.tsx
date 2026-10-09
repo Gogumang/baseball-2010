@@ -36,6 +36,7 @@ import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -47,7 +48,13 @@ import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay
  * 미션 장면도 경기 장면 0x104 라 같은 그리기 표 0xd05a0 을 탄다. 구장은 생성자 값 0(모드 5 는 셋업 0x39fdc 가 안 채운다).
  */
 export interface PitchingStageSource {
-  readonly lastThrow: { readonly pitch: Pitch; readonly resolution: PitchResolution; readonly resultTicks: number } | null
+  readonly lastThrow: {
+    readonly pitch: Pitch
+    readonly resolution: PitchResolution
+    readonly resultTicks: number
+    /** CPU 타자의 스윙 프레임 · 번트 종류 (휘두르지 않았으면 null) */
+    readonly cpuSwing?: CpuSwingPose | null
+  } | null
   readonly pitcherForm: number
   readonly pitcherHand: number
   readonly batterForm: number
@@ -482,6 +489,7 @@ export function PitchingScreen({
             pitch={stage.lastThrow?.pitch ?? null}
             resolution={stage.lastThrow?.resolution ?? null}
             resultTicks={stage.lastThrow?.resultTicks ?? 0}
+            cpuSwing={stage.lastThrow?.cpuSwing ?? null}
             // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0) — 타자 미션 화면과 같은 근사(미션 팀 로고는 기본 두 팀)
             hud={{
               inning: run.game.inning + 1,

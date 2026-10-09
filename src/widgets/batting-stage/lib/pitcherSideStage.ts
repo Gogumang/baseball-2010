@@ -96,3 +96,12 @@ export function passesHeldResult(resolution: PitchResolution): boolean {
 export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number): number {
   return PITCHER_RELEASE_TICKS - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + 1 + resultTicks
 }
+
+/**
+ * CPU 타자가 스윙을 거는 장면 틱 — 0x11 갱신 0x4e0dc: 공 틱 [+0x1098] ≥ 스윙 프레임 F(+0xfd8) 인 틱에 스윙 객체의
+ * vtable +0x14 · +0x18 을 부른다. 공 틱은 놓은 틱(상태 틱 10)에서 `PITCHER_RELEASE_TICKS − 10` 지난 뒤 0 이다
+ * (`pitcherSideStageFrameOf` 와 같은 셈). ⚠️ 근사: 한 틱 안의 갱신 차례(공 틱 +1 과 스윙 검사)는 공 틱 0 이 그려지는 틱으로 맞췄다.
+ */
+export function cpuSwingTickOf(releaseTick: number, swingFrame: number): number {
+  return releaseTick - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + Math.max(0, swingFrame)
+}

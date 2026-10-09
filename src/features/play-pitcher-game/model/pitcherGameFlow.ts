@@ -84,7 +84,8 @@ import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-control
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import { contactOfOutcome, registerContact } from '@/entities/batting/model/battedContact'
-import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
@@ -414,6 +415,8 @@ export interface PitcherGameProgress {
    */
   readonly sceneConfirmPending?: boolean
   readonly lastPitch: Pitch | null
+  /** 마지막 공에 CPU 타자가 휘둘렀으면 그 스윙 프레임 · 번트 종류 — 타석 장면의 타자 자세(0x4e0dc → 0x49e64) */
+  readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
   /** 이닝별 실점 표 (`0xb6988`) — 감독 강판 3번 사유가 읽는다 */
   readonly inningRuns: readonly number[]
@@ -1158,6 +1161,7 @@ export function startPitch(
     atBatPitches: progress.atBatPitches + 1,
     halfInningPitches: progress.halfInningPitches + 1,
     lastPitch: pitch,
+    lastCpuSwing: cpuSwingPoseOf(thrown),
     lastResolution: resolution,
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,

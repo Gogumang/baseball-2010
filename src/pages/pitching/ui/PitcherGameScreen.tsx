@@ -775,6 +775,7 @@ export function PitcherGameScreen({
           pitch={progress.lastPitch}
           resolution={progress.lastResolution}
           resultTicks={heldResultTicks}
+          cpuSwing={progress.lastCpuSwing ?? null}
           hud={{
             inning: progress.game.inning,
             half: progress.game.half,

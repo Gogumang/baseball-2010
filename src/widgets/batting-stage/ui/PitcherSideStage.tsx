@@ -8,8 +8,10 @@ import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { bodyTypeOf, NO_EQUIPMENT, NO_PITCHER_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
-import { batterFrameNow, describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
-import { passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
+import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
+import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
@@ -19,6 +21,11 @@ interface PitcherSideStageProps {
   readonly pitch: Pitch | null
   /** 그 공의 판정 — 0x12 를 지나는지 · 판정 글자 */
   readonly resolution: PitchResolution | null
+  /**
+   * 그 공에 CPU 타자가 휘둘렀으면 스윙 프레임 F(+0xfd8) · 번트 종류(+0xfdc). 0x11 갱신 0x4e0dc 가 공 틱 ≥ F 인 틱에
+   * 스윙 객체 vtable +0x14(스윙) · +0x18(번트)을 건다 — 타자 그림 0x49e64 가 그 자세를 그린다
+   */
+  readonly cpuSwing?: CpuSwingPose | null
   /** 0x12 대기 틱 (0x4e6d4 — `resultWaitTicksOf`) */
   readonly resultTicks: number
   readonly hud: HudState | null
@@ -61,7 +68,7 @@ interface PitcherSideStageProps {
  *
  * 구질 목록 · 조준 · 게이지는 `inputOverlayRef` 로 받아 장면 안에 그린다 · "#TIME" 은 `timeKeyCount` ·
  * 필살 남은 횟수(0x38a30)는 사람 수비면 원본도 안 그린다(38a42).
- * ⚠️ 미이식: CPU 타자의 스윙 자세(0x49e64 의 스윙 객체)는 대기 자세로만 그린다.
+ * CPU 타자는 `cpuSwing` 의 스윙 프레임에 닿은 틱부터 스윙(번트면 번트) 자세다.
  */
 export function PitcherSideStage(props: PitcherSideStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -76,6 +83,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     /** 화면이 설 때 있던 공 — 수비 화면에서 돌아와 다시 서도 같은 공을 또 날리지 않는다 */
     let shownPitch: Pitch | null = latestRef.current.pitch
     let releaseTick: number | null = null
+    /** 지금 공의 CPU 스윙 — 화면이 설 때 있던 공은 다시 날리지 않으므로 그 스윙도 없다 */
+    let shownSwing: CpuSwingPose | null = null
     let pausedSinceTick = 0
     let wasPaused = false
     /** 팝업 동안 멈춘 시간 — 장면 틱에서 뺀다 */
@@ -96,6 +105,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       if (current.pitch !== shownPitch) {
         shownPitch = current.pitch
         releaseTick = current.pitch === null ? null : nowTick
+        shownSwing = current.cpuSwing ?? null
       }
       if (current.isPaused && !wasPaused) pausedSinceTick = nowTick
       wasPaused = current.isPaused
@@ -112,6 +122,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       })
       const bodyType = bodyTypeOf(current.batterForm)
       const isIdle = stage.phase.kind === '대기'
+      // 스윙은 이 공이 날거나 0x12 인 동안만 — 대기로 돌아오면 대기 자세
+      const swingTick =
+        releaseTick === null || shownSwing === null || isIdle ? null : cpuSwingTickOf(releaseTick, shownSwing.frame)
       const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
       // 0x4c92e — "#TIME" 은 상태 0xe · 0xf 만
       const isTimeState = isIdle && (current.isPaused || pitchInput?.kind === '구질')
@@ -127,7 +140,12 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         homeRunTick: 0,
         isEagleEyeEnabled: false,
         shift: 0,
-        swingFrame: batterFrameNow(sceneNow, -1, false, bodyType),
+        swingFrame: batterFrameAt({
+          tick: nowTick,
+          swingTick: swingTick,
+          isBunting: swingTick !== null && shownSwing !== null && shownSwing.buntKind !== 0 && nowTick >= swingTick && !isIdle,
+          bodyType,
+        }),
         bodyType,
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,

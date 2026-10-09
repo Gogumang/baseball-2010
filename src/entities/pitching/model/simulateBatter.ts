@@ -262,6 +262,17 @@ export interface CpuSwingSkillSituation {
 }
 
 /** `pitchAgainstBatterDetailed` 의 결과 — 필살 칸을 부르는 쪽에 돌려준다 */
+/** 타석 장면이 그리는 CPU 타자의 스윙 — 스윙 프레임 F(+0xfd8) · 번트 종류(+0xfdc, 0 이면 스윙) */
+export interface CpuSwingPose {
+  readonly frame: number
+  readonly buntKind: number
+}
+
+/** 휘두른 공이면 장면 스윙 재료, 아니면 null */
+export function cpuSwingPoseOf(outcome: CpuPitchOutcome): CpuSwingPose | null {
+  return outcome.swingFrame === undefined ? null : { frame: outcome.swingFrame, buntKind: outcome.buntKind ?? 0 }
+}
+
 export interface CpuPitchOutcome {
   readonly resolution: PitchResolution
   /** 이번 스윙이 필살인가 (S+0x10 ≠ 0) */
@@ -287,6 +298,11 @@ export interface CpuPitchOutcome {
    * +3 틱 · 필살수비 관문(50fc8)이 굴림 없음으로 보며, 정산 0xa8024 가 번트 타구(결과비트 B6 · 희생)로 센다.
    */
   readonly buntKind?: number
+  /**
+   * 스윙 프레임 F = 장면 +0xfd8 (0x340f8 — N − 2 + d). 휘두른 공만 있다. 0x11 갱신 0x4e0dc 가 공 틱 [+0x1098] ≥ F 인 틱에
+   * 스윙 객체 [+0xf9c] 의 vtable +0x14(스윙) · +0x18(번트, +0xfdc ≠ 0)을 건다 — 타석 장면의 CPU 타자 자세가 본다
+   */
+  readonly swingFrame?: number
 }
 
 /** 스윙 프레임 F = N − 2 + d — d = 0 이 타이밍 100 이다 (0x34be0) */
@@ -471,6 +487,7 @@ export function pitchAgainstBatterDetailed(
     specialSwingRemaining: remainingAfter,
     isUncatchable,
     buntKind,
+    swingFrame: frame,
   })
   // 헛스윙은 0x5135c → 0x51840 — 필살 굴림이 없다. 번트 헛스윙도 0x3445a 가 쓴 번트 종류가 남는다
   if (result.kind === '헛스윙') return swung({ kind: '스트라이크', isSwinging: true }, false)
