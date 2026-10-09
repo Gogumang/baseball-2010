@@ -71,6 +71,12 @@ interface DefenseScreenProps {
    * 수비 바탕은 `[app+0x1104] == 2`(시즌) 이고 홈경기일 때만 바뀐다.
    */
   readonly grassPalette?: number | null
+  /**
+   * 그림자 위 · 선수 아래에 깔 것 — 비거리 판 0x36cd4 자리다. 0x46c88 머리(46cb6)가 그리기 목록보다 먼저 곧바로 칠하고(바탕은
+   * 프레임 0x52c50 의 0x41230 → 0x411e0 이 그 앞), 공 그리기 0x36dfc 끝(37388)이 그림자 뒤에 한 번 더 칠한다 — 곧 바탕 · 그림자
+   * 위, 야수 · 주자 · 공 아래이고 줌 펀치(46e24 0xbb84c)가 함께 늘린다.
+   */
+  readonly underActors?: ReactNode
   /** 화면 위에 얹을 것 — 조작 버튼·점수판 같은 것 */
   readonly children?: ReactNode
 }
@@ -150,6 +156,7 @@ export function DefenseScreen({
   followPercent = CAMERA_FOLLOW_PERCENT,
   isRunning = true,
   grassPalette = null,
+  underActors,
   children,
 }: DefenseScreenProps) {
   const update = useUpdateCounter(isRunning)
@@ -304,6 +311,8 @@ export function DefenseScreen({
               data-testid="defense-ball-shadow"
             />
           ))}
+
+        {underActors}
 
         {/* 그리기 목록 차례 — 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
         {actors.map((actor) => actor.node)}

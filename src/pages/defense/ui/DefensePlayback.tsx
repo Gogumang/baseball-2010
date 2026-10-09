@@ -645,10 +645,16 @@ function LivePlayback({
   }, [ended, onDone, sceneMemory])
 
   if (view === null) return null
-  // 0x46c88 차례 — 비거리 판(0x46cb6) → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62), 그 뒤 프레임 끝 파티클(0x6dd68)
+  // 0x46c88 차례 — 비거리 판(0x46cb6, 선수 아래 · 줌 안) → 선수 · 공 → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62),
+  // 그 뒤 프레임 끝 파티클(0x6dd68)
   return (
-    <DefenseScreen state={closed ? frozenCamera(view) : view} grassPalette={grassPalette}>
-      {effectsView.distanceBoard !== null && <DefenseDistanceBoard value={effectsView.distanceBoard} />}
+    <DefenseScreen
+      state={closed ? frozenCamera(view) : view}
+      grassPalette={grassPalette}
+      underActors={
+        effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined
+      }
+    >
       {effectsView.text !== null && <DefenseHomeRunText frame={effectsView.text} />}
       {runScoreBoard !== undefined && runBoard !== null && !ended && (
         <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />

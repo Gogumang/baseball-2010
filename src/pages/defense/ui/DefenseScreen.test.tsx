@@ -166,6 +166,17 @@ describe('그리기 목록 차례 0xbe810 (키 오름차순 · 같은 키는 먼
   })
 })
 
+describe('비거리 판 자리 (0x46cb6 — 그리기 목록보다 먼저)', () => {
+  it('줌 층 안, 공 그림자 뒤 · 야수 앞에 깐다', () => {
+    render(<DefenseScreen state={기본_상태} isRunning={false} underActors={<div data-testid="아래판" />} />)
+    const 줌 = screen.getByTestId('defense-zoom')
+    const ids = Array.from(줌.querySelectorAll('[data-testid]')).map((node) => node.getAttribute('data-testid'))
+    const 판 = ids.indexOf('아래판')
+    expect(판).toBeGreaterThan(ids.lastIndexOf('defense-ball-shadow'))
+    expect(판).toBeLessThan(ids.indexOf('defense-fielder-0'))
+  })
+})
+
 describe('공을 안 그리는 그림 (0x36dfc 36e86~36ea4)', () => {
   it('쥔 공(+0x12c)은 안 그린다 — 그림자도 없다', () => {
     띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isHeld: true } })
