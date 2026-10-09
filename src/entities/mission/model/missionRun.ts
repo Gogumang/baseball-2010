@@ -3,7 +3,7 @@ import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { createProgress, isCleared, recordOutcome, recordSteal } from '@/entities/mission/model/missionGoal'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
-import { EMPTY_BASES, advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
+import { EMPTY_BASES, advanceRunners } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isBattedBallInPlay, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -138,6 +138,8 @@ export interface MissionPlay {
   readonly outcome: AtBatOutcome
   /** 원본 목록 순서(`[타자주자?, 1루?, 2루?, 3루?]`)의 운명 — `features/defense-play/model/runnerFates` */
   readonly runnerFates: readonly RunnerFate[]
+  /** 판 안 그라운드 홈런 state[0x25] (0xaa1e2 — `DefensePlayResult.groundHomeRun`). 판을 안 도는 결과는 늘 거짓 */
+  readonly groundHomeRun: boolean
 }
 
 /**
@@ -155,6 +157,7 @@ export function missionPlay(
       advance: advanceRunners(bases, outcome, outs),
       outcome,
       runnerFates: runnerFatesWithoutPlay(bases, outcome),
+      groundHomeRun: false,
     }
   }
   const played =
@@ -162,7 +165,12 @@ export function missionPlay(
     runDefensePlay(missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode))
   // 기록은 판 끝 정산 결과 — 묶인 패턴 없이 결과만 넘겨받은 호출(시험·옛 호출)만 넘겨받은 결과 그대로다
   const settled = contactOfOutcome(outcome) === undefined ? outcome : (played.outcome ?? outcome)
-  return { advance: played.advance, outcome: settled, runnerFates: played.runnerFates }
+  return {
+    advance: played.advance,
+    outcome: settled,
+    runnerFates: played.runnerFates,
+    groundHomeRun: played.groundHomeRun === true,
+  }
 }
 
 /**
@@ -246,7 +254,15 @@ export function advanceSituation(
   random?: RandomPort,
   /** 화면이 이미 다 돌린 수비 플레이. 주면 여기서 다시 굴리지 않는다 */
   played?: DefensePlayResult,
-): { bases: BaseState; outs: number; runsScored: number; outcome: AtBatOutcome; inningEnded: boolean } {
+): {
+  bases: BaseState
+  outs: number
+  runsScored: number
+  outcome: AtBatOutcome
+  inningEnded: boolean
+  /** 판 안 그라운드 홈런 state[0x25] — 정산 a84cc 가 이때만 미션 그라운드홈런 칸을 올린다 */
+  groundHomeRun: boolean
+} {
   const play = missionPlay(run.bases, run.outs, outcome, { random, played })
   const advance = play.advance
   const outs = run.outs + advance.outsAdded
@@ -257,9 +273,17 @@ export function advanceSituation(
       runsScored: advance.runsScored,
       outcome: play.outcome,
       inningEnded: true,
+      groundHomeRun: play.groundHomeRun,
     }
   }
-  return { bases: advance.bases, outs, runsScored: advance.runsScored, outcome: play.outcome, inningEnded: false }
+  return {
+    bases: advance.bases,
+    outs,
+    runsScored: advance.runsScored,
+    outcome: play.outcome,
+    inningEnded: false,
+    groundHomeRun: play.groundHomeRun,
+  }
 }
 
 /**
@@ -351,7 +375,7 @@ export function applyOutcome(
   const counts = isMissionBatterUp(run)
   // 목표는 판 끝 정산(0xa8024 → 미션 판정 0xaaa6c)이 낸 결과로 센다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
   const progress = counts
-    ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, runnerCountOf(run.bases))
+    ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, situation.groundHomeRun)
     : run.progress
   const advanced: MissionRun = {
     ...run,
