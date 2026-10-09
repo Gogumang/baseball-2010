@@ -178,6 +178,9 @@ export function App() {
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
+  /** 미션 편별 올클리어 히든(0x4ef84 → 0x62368)을 여는 곳 — 기록연감 훅이 선 뒤 아래에서 꽂는다 (`recordStatRef` 와 같은 까닭) */
+  const openHiddenForMissionRef = useRef<(hiddenId: number) => void>(() => {})
+  const openHiddenForMission = useCallback((hiddenId: number) => openHiddenForMissionRef.current(hiddenId), [])
   /** 시즌 팀 경기가 영입한 명전 선수를 그 기록으로 세울 때 읽는 명전 칸 — 위 ref 와 같은 값 */
   const readHallOfFame = useCallback(() => hallOfFameForMissionRef.current, [])
   /**
@@ -262,6 +265,8 @@ export function App() {
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
     onGamePointReward: careerSession.actions.gainGamePoint,
+    // 정산 0x4ea0c 4ef84 — 그 편 미션 14개를 다 깼으면 타자편 37 · 투수편 21 을 전역 해금표에 연다
+    onMissionSideAllCleared: openHiddenForMission,
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
     // 환경설정 진동 (저장 +0x3b) — 투수 미션·투수편 마선수 대결의 사람 공 삼진 진동(0x4d0d6)이 본다
@@ -312,7 +317,6 @@ export function App() {
   const collection = useCollection(
     collectionStore,
     careerSession.career,
-    everyMissionCleared,
     sharedOpenedHiddenIds,
     // 엔딩 적재 0x87c7c 는 두 편 공용 — 투수편 엔딩·연애 엔딩도 기록연감 칸에 켠다
     pitcherSession.career,
@@ -320,7 +324,7 @@ export function App() {
     pitcherSession.career?.titleIds,
     seasonEndingIndex,
   )
-  const { recordStat: recordCollectionStat } = collection
+  const { recordStat: recordCollectionStat, openHidden: openCollectionHidden } = collection
   hallOfFameForMissionRef.current = collection.collection
   const pitcherEditionFirsts = pitcherSession.career?.regularSeasonFirstCount ?? 0
   const batterEditionFirsts = (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0
@@ -344,7 +348,8 @@ export function App() {
   }
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
-  }, [recordCollectionStat])
+    openHiddenForMissionRef.current = openCollectionHidden
+  }, [recordCollectionStat, openCollectionHidden])
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds

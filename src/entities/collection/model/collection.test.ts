@@ -18,7 +18,6 @@ import {
   mergeCareerIntoCollection,
   mergeEndingIntoCollection,
   normalizeCollection,
-  openHiddenForMissions,
   registerHallOfFame,
 } from '@/entities/collection/model/collection'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -62,11 +61,6 @@ describe('히든 오픈 — 전역 기록 (game_o.sav)', () => {
   it('선수가 연 히든 id 를 모은다', () => {
     const merged = mergeCareerIntoCollection(EMPTY_COLLECTION, 선수({ openedHiddenIds: [36, 43] }))
     expect(merged.openedHiddenIds).toEqual([36, 43])
-  })
-
-  it('미션을 모두 깨면 헬멧 레벨 9(id 37)가 열린다 (0xa5184)', () => {
-    expect(openHiddenForMissions(EMPTY_COLLECTION, true).openedHiddenIds).toEqual([37])
-    expect(openHiddenForMissions(EMPTY_COLLECTION, false)).toBe(EMPTY_COLLECTION)
   })
 
   it('예전 기록에 필드가 없으면 빈 목록이다', () => {

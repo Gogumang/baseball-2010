@@ -306,7 +306,22 @@ export function recordOutcome(
   return { ...progress, counts, plateAppearances: progress.plateAppearances + 1 }
 }
 
-/** 선택 목록의 미션(타자·투수 28개)을 모두 깼는가 — 히든 오픈 조건 (0xa5184) */
+/** 선택 목록의 미션(타자·투수 28개)을 모두 깼는가 — 수집 보상 k = 3 의 조건 (`judgeCollectionReward`) */
 export function isEveryMissionCleared(clearedKeys: readonly string[]): boolean {
   return [...BATTER_MISSIONS, ...PITCHER_MISSIONS].every((mission) => clearedKeys.includes(missionKeyOf(mission)))
+}
+
+/**
+ * **편별 올클리어 히든** — 정산 0x4ea0c 의 미션 갈래(직접 재역어셈, 4ef84~4efaa): 성공이면(실패 갈래 4efb0 은 건너뜀 · G 를 건너뛰는
+ * 대기 g[0x11f] · g[0x176] 갈래도 4ef84 로 온다) `0xa5184(미션)` 이 참일 때 `0x62368(ui, 모드 6 ? 0x25 : 0x15, 0)`.
+ * 0xa5184 는 지금 편(+0xbf == 6 이면 타자 칸 0, 아니면 투수 칸 1)의 클리어 횟수 칸 전역 +0x150 + 편×16 + i 를 i = 0..13 만
+ * 보아 모두 > 0 이면 참 — 그 편 미션 14개다. 타자편 → id 37(헬멧 레벨 9) · 투수편 → id 21.
+ * 0x62368 셋째 인자 0 은 이미 열렸으면(0x61f5c) 아무 일도 안 하고, 아니면 열고 알림 창(0x74ef5, StrCOMMON[139] + 쓰는 곳 줄)을 띄운다.
+ */
+export const MISSION_SIDE_ALL_CLEAR_HIDDEN_ID: Readonly<Record<OriginalMission['side'], number>> = { 타자: 37, 투수: 21 }
+
+/** 그 편 미션 14개를 다 깼으면 열 히든 id, 아니면 null (0xa5184) */
+export function missionSideAllClearHiddenIdOf(side: OriginalMission['side'], clearedKeys: readonly string[]): number | null {
+  const missions = side === '타자' ? BATTER_MISSIONS : PITCHER_MISSIONS
+  return missions.every((mission) => clearedKeys.includes(missionKeyOf(mission))) ? MISSION_SIDE_ALL_CLEAR_HIDDEN_ID[side] : null
 }

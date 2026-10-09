@@ -7,6 +7,7 @@ import {
   goalsOf,
   isCleared,
   isEveryMissionCleared,
+  missionSideAllClearHiddenIdOf,
   missionKeyOf,
   recordOutcome,
   requiredCountOf,
@@ -243,6 +244,17 @@ describe('투수편 목표 판정', () => {
     const progress = recordPitcherOutcome(createProgress(), { kind: '삼진' }, 3)
 
     expect(progress.counts['MAX게이지']).toBe(3)
+  })
+})
+
+describe('편별 올클리어 히든 — 0x4ef84 0xa5184 는 지금 편 칸 0~13 만 본다', () => {
+  it('타자편 14개를 다 깨면 37, 투수편 14개면 21 — 다른 편은 안 봐도 된다', () => {
+    const batter = BATTER_MISSIONS.map(missionKeyOf)
+    const pitcher = PITCHER_MISSIONS.map(missionKeyOf)
+    expect(missionSideAllClearHiddenIdOf('타자', batter)).toBe(37)
+    expect(missionSideAllClearHiddenIdOf('투수', batter)).toBeNull()
+    expect(missionSideAllClearHiddenIdOf('투수', pitcher)).toBe(21)
+    expect(missionSideAllClearHiddenIdOf('타자', batter.slice(1))).toBeNull()
   })
 })
 

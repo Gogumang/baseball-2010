@@ -5,7 +5,6 @@ import {
   mergeSeasonEndingIntoCollection,
   mergeTitlesIntoCollection,
   normalizeCollection,
-  openHiddenForMissions,
   registerHallOfFame,
   registerHallOfFamePitcher,
   deleteHallOfFame,
@@ -65,7 +64,6 @@ export function mergeOpenedHiddenIds(collection: Collection, openedHiddenIds: re
 export function useCollection(
   store: JsonStorePort,
   career: PlayerCareer | null,
-  isEveryMissionCleared: boolean,
   pitcherOpenedHiddenIds: readonly number[] = NO_IDS,
   pitcherEnding: EndingViewer | null = null,
   pitcherTitleIds: readonly string[] = NO_TITLES,
@@ -103,10 +101,6 @@ export function useCollection(
   }, [pitcherEndingIndex, pitcherSeenEventIds])
 
   useEffect(() => {
-    setCollection((previous) => openHiddenForMissions(previous, isEveryMissionCleared))
-  }, [isEveryMissionCleared])
-
-  useEffect(() => {
     store.save(collection)
   }, [collection, store])
 
@@ -136,6 +130,14 @@ export function useCollection(
   /** 시즌 장비 창 0x7d90 → 0x2328c — 명예 선수가 산 장비 니블을 명전 기록에도 (`syncHallOfFameEquipment`) */
   const syncSeasonHallOfFameEquipment = useCallback((side: HallOfFameSide, recordId: number, nibbles: readonly number[]) => {
     setCollection((previous) => syncHallOfFameEquipment(previous, side, recordId, nibbles))
+  }, [])
+
+  /**
+   * 히든 id 하나를 전역 표 `app+0xc0` 에 연다 (0x62368 셋째 인자 0 — 이미 열렸으면 아무 일도 안 한다). 미션 편별 올클리어
+   * (0x4ef84 — `missionSideAllClearHiddenIdOf`)가 쓴다. ⚠️ 새로 열 때 원본이 띄우는 알림 창(0x74ef5)은 웹에 아직 없다
+   */
+  const openHidden = useCallback((hiddenId: number) => {
+    setCollection((previous) => mergeOpenedHiddenIds(previous, [hiddenId]))
   }, [])
 
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
@@ -190,6 +192,7 @@ export function useCollection(
 
   return {
     collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, recordStat, claimCollectionReward,
+    openHidden,
   }
 }
 

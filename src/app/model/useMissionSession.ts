@@ -3,7 +3,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner, describePitchResolution } from '@/entities/at-bat/model/resolutionText'
-import { missionKeyOf } from '@/entities/mission/model/missionGoal'
+import { missionKeyOf, missionSideAllClearHiddenIdOf } from '@/entities/mission/model/missionGoal'
 import { matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import {
@@ -149,6 +149,11 @@ interface MissionSessionInput {
    * 육성 선수가 없으면 받아 갈 곳이 없으므로 넘기지 않아도 된다.
    */
   readonly onGamePointReward?: (amount: number) => void
+  /**
+   * 그 편 미션 14개를 다 깬 판의 정산 — 정산 0x4ea0c 4ef84 `0xa5184` 참이면 `0x62368(ui, 타자 37 · 투수 21, 0)`
+   * (`missionSideAllClearHiddenIdOf`). 이미 열렸는지는 받는 쪽이 본다 — 성공 판마다 부른다
+   */
+  readonly onMissionSideAllCleared?: (hiddenId: number) => void
   /** 소리 통로 (원본 사운드 객체 `[0x1400058]`). 안 넘기면 아무 소리도 안 난다 */
   readonly sound?: SoundPort
   /**
@@ -466,6 +471,7 @@ export function useMissionSession({
   screen,
   setScreen,
   onGamePointReward,
+  onMissionSideAllCleared,
   sound,
   throwModeManual,
   aceLevels,
@@ -1437,7 +1443,18 @@ export function useMissionSession({
     const next = { ...clearCounts, [key]: Math.min(MAXIMUM_CLEARS, previous + 1) }
     setClearCounts(next)
     missionRecord.save(next)
+    openSideAllClearHidden(mission.side, next)
     return earned
+  }
+
+  /**
+   * 정산 0x4ea0c 4ef84~4efaa — 성공 판이면(G 를 건너뛰는 대기 · 마선수 대결 갈래도 여기로 온다) 0xa5368 이 횟수를 올린 **뒤**
+   * 지금 편 칸 0~13 이 모두 > 0 인지(0xa5184) 보고 그 편 올클리어 히든을 연다. 28개가 아니라 편 하나다
+   */
+  const openSideAllClearHidden = (side: OriginalMission['side'], counts: MissionClearCounts) => {
+    const cleared = Object.entries(counts).filter(([, count]) => count > 0).map(([key]) => key)
+    const hiddenId = missionSideAllClearHiddenIdOf(side, cleared)
+    if (hiddenId !== null) onMissionSideAllCleared?.(hiddenId)
   }
 
   /**
@@ -1463,10 +1480,12 @@ export function useMissionSession({
 
   const rememberAceMatchCleared = (mission: OriginalMission) => {
     const key = aceMatchClearKeyOf(mission)
-    if (key === null) return
+    // 4ef84 는 대결 성공에도 돈다 — 칸이 안 오른 대결(team > 16)도 그 편 0~13 칸을 본다
+    if (key === null) return openSideAllClearHidden(mission.side, clearCounts)
     const next = { ...clearCounts, [key]: aceMatchClearCountAfterWin(clearCounts[key]) }
     setClearCounts(next)
     missionRecord.save(next)
+    openSideAllClearHidden(mission.side, next)
   }
 
   /**
