@@ -37,6 +37,17 @@ export interface ViewStateInput {
   readonly tick: number
   readonly ball: WorldPoint
   readonly ballIsFlying: boolean
+  /** 공.vt18(멈춤) — 카메라가 홈런 판에서 타자주자로 넘어가는 조건(0x3f106). 안 주면 거짓 */
+  readonly ballStopped?: boolean
+  /** 플레이 +0x111(홈런) · +0x129(폴 홈런) — 카메라 0x3f0f0 이 본다. 안 주면 거짓 */
+  readonly homeRunFlag?: boolean
+  readonly poleHomeRunFlag?: boolean
+  /** 플레이 +0x12c(쥠) — 공 그리기 0x36dfc 가 공 · 그림자를 안 그린다. 안 주면 거짓 */
+  readonly ballHeld?: boolean
+  /** 공이 담장 뒤로 사라졌다(0x36dfc 36e2a~36e80 — `DefenseBall.isBeyondFence`). 안 주면 거짓 */
+  readonly ballBeyondFence?: boolean
+  /** 이 그림은 카메라가 안 움직인다(머리에서 경기 멈춤 +0x1993 — 0x3f0a4). 안 주면 움직인다 */
+  readonly cameraFrozen?: boolean
   readonly fielders: readonly FielderState[]
   readonly runners: readonly RunnerState[]
   /** 이번 틱에 포구 동작 중이면 그 종류, 아니면 null */
@@ -71,6 +82,8 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       slot: fielder.slot,
       x: fielder.position.x,
       z: fielder.position.z,
+      // 그림 · 결과 판 자리는 (x, z − y) — 야수 높이는 원본에서도 늘 0 이다(`DefenseFielder.y`)
+      y: fielder.position.y,
       action,
       actionTick: tickSince(input.previousActions, `f${fielder.slot}`, action, input.tick),
       aceIndex: aceIndexOf(input.aceIndexes, fielder.slot),
@@ -98,7 +111,15 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
 
   return {
     tick: input.tick,
-    ball: { x: input.ball.x, z: input.ball.z, height: input.ball.y, isFlying: input.ballIsFlying },
+    ball: {
+      x: input.ball.x,
+      z: input.ball.z,
+      height: input.ball.y,
+      isFlying: input.ballIsFlying,
+      isStopped: input.ballStopped === true,
+      isHeld: input.ballHeld === true,
+      isBeyondFence: input.ballBeyondFence === true,
+    },
     fielders,
     runners,
     // 필살 포구 번쩍임(deadly_effect B · C)은 진행기가 연출 단계 기계로 그린 그림에만 싣는다 (`defenseScene`)
@@ -106,6 +127,9 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     // 레이저 반짝임은 그릴 칸 하나로 끝이다 — 고르는 조건은 진행기 몫이다(0x43406~0x4342c)
     laserShiningSlot: laserShiningSlotOf(input.laserShiningSlot),
     cameraTarget: null,
+    homeRunFlag: input.homeRunFlag === true,
+    poleHomeRunFlag: input.poleHomeRunFlag === true,
+    cameraFrozen: input.cameraFrozen === true,
   }
 }
 

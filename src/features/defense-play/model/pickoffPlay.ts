@@ -603,6 +603,8 @@ function* pickoffPlaySteps(
         tick,
         ball: chase !== null ? chase.trajectory.pointAt(tick) : (fielders[play.ballHolderSlot]?.position ?? basePosition(targetBase)),
         ballIsFlying: chase !== null,
+        // 공 그리기 0x36dfc(36e90) — 쥔 공(+0x12c)은 공 · 그림자를 안 그린다
+        ballHeld: play.held,
         fielders,
         runners: runnerStates(),
         catchKind: null,

@@ -6,7 +6,12 @@ import { drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunB
 import { drawParticles, preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 
-/** 비거리 판 0x36cd4 — 그리기 0x46c88 의 머리(0x46cb6)라 야수 · 주자 위, 글자 · 점수판 아래다 */
+/**
+ * 비거리 판 0x36cd4 — 그리기 0x46c88 의 머리(0x46cb6)가 그리기 목록보다 **먼저** 곧바로 칠하므로 바탕 · 공 그림자 위,
+ * 야수 · 주자 · 공 **아래**다(목록은 46dd0 0xbe6a0 이 나중에 그린다). 줌 펀치(46e24) 앞이라 함께 늘어난다 —
+ * `DefenseScreen` 의 `underActors` 로 줌 층 안에 깐다. (0x36cd4 는 받은 x · y 를 안 쓰고 W/2 − 폭/2 · 10 에 그린다 —
+ * 공 그리기 끝 37388 이 한 번 더 부르지만 같은 자리다.)
+ */
 export function DefenseDistanceBoard({ value }: { readonly value: number }) {
   return (
     <div className={styles.overlay} data-testid="수비-비거리판" data-value={value}>

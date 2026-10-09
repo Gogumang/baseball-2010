@@ -215,8 +215,28 @@ export function runnerFrameOf(
 export interface DefenseBall extends WorldPoint {
   /** 월드 단위 높이 */
   readonly height: number
-  /** 공.vt18 — 날아가는 중인가. 멈추면 카메라가 타자주자를 본다 */
+  /**
+   * 진행기가 보는 "아직 날아가는 중(포구 · 송구 도착 전)" 표시. **카메라는 이것을 안 본다** — 0x3f060 은 공.vt18(멈춤)과
+   * 홈런 칸만 본다(`cameraTargetOf`). 옛 화면이 "날지 않으면 타자주자" 로 읽던 칸이다.
+   */
   readonly isFlying: boolean
+  /**
+   * 공.vt18 = 0xa27f0 — **멈췄는가**(지금 점의 속도 · 수직 속도 워드가 0, 목표가 있으면 목표점에 닿음 — I-controls 2b).
+   * 야수가 쥔 공도 손에 붙어 안 움직여 멈춘 것으로 본다(관문 파울 갈래와 같은 읽기 — 유력). 안 주면 거짓.
+   */
+  readonly isStopped?: boolean
+  /** 플레이 +0x12c — 야수가 쥐고 있다. 공 그리기 0x36dfc 가 공 · 그림자를 안 그린다(36e90). 안 주면 거짓 */
+  readonly isHeld?: boolean
+  /**
+   * 담장을 넘어 사라졌다 — 공+0x68(재생 틱)이 낙구 aa0 + 2 와 담장선 aa4 + 6 을 **둘 다** 넘었고, 담장선이 있거나(aa4 > 0, 36e5c)
+   * 홈런(+0x111, 36e32)이다. 0x36dfc 가 공 · 그림자를 안 그린다(36e9e). 안 주면 거짓
+   */
+  readonly isBeyondFence?: boolean
+}
+
+/** 0x36dfc 가 공(과 그림자)을 그리는가 — 36e86~36ea4: 홈런 뒤 · 담장 뒤가 아니고 쥔 공(+0x12c)이 아닐 때 */
+export function isBallDrawn(ball: DefenseBall): boolean {
+  return ball.isHeld !== true && ball.isBeyondFence !== true
 }
 
 /** 야수 한 명 */
@@ -225,6 +245,12 @@ export interface DefenseFielder {
   readonly slot: number
   readonly x: number
   readonly z: number
+  /**
+   * 높이(야수 +0x24). 그림 · 결과 판 자리는 (x, z − y) 다(0x43278 의 432f0~43318 — 0xb94b4(카메라, x, z − y)). 안 주면 0.
+   * 원본에서도 늘 0 이다 — 이동체 틱 0xbf0dc 의 높이 식(bf204~bf226: y = +0x18 + v·t − g·t²/2, 0 아래 자름)에 수직 속도
+   * v(+0x40)를 넣는 0xbec7c(속도, v)를 야수는 v = 0 으로만 부른다(a0dca 판 시작 · a155c 송구 뒤). 그래도 식대로 싣는다.
+   */
+  readonly y?: number
   /** FIELDER_ACTION */
   readonly action: number
   /** 그 동작이 걸린 뒤 흐른 갱신 횟수 (한 칸 = 1틱) */
@@ -362,15 +388,36 @@ export interface DefenseViewState {
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
    */
   readonly cameraTarget?: WorldPoint | null
+  /**
+   * 이 그림에서 카메라가 **안 움직인다** — 0x3f060 이 대상 · 따라가기(3f1c0 vt20 · vt28)까지 가지 않는 그림이다(직접 뜸):
+   * ```
+   * 3f0a4  장면 +0x1993(경기 멈춤 — 레이저 발사 0x400bc 다음 그림) → 돌아감
+   * 3f0b8  판 진행 관문 0xb0d28(G1) 이 닫혔으면 r6 = 0 → 3f0ea 에서 돌아감(상태 0x17 은 0x33c98 참)
+   * ```
+   * 진행기는 멈춘 그림(머리에서 +0x1993)에 싣고, 재생 화면은 판이 닫힌 뒤(마지막 그림 다음 갱신부터) 싣는다. 안 주면 움직인다.
+   */
+  readonly cameraFrozen?: boolean
+  /** 플레이 +0x111 — 사건 코드 8(홈런). 안 주면 거짓 */
+  readonly homeRunFlag?: boolean
+  /** 플레이 +0x129 — 사건 코드 12(폴 홈런). 안 주면 거짓 */
+  readonly poleHomeRunFlag?: boolean
 }
 
 /**
- * 카메라가 볼 점 (0x3f060).
- * 공이 날아가는 중이면 공 (x, z − 높이), 멈췄으면 타자주자(주자 0).
+ * 카메라가 볼 점 (0x3f060 — 3f0f0~3f1be, 직접 뜸).
+ * ```
+ * 3f0f0  P = [장면+0x200] ; P+0x111(홈런) || P+0x129(폴 홈런) 이 아니면 → 3f194
+ * 3f106  [장면+0x204](공).vt18()(멈춤) 거짓이면 → 3f194
+ * 3f11c  주자 = 0xa9564([장면+0x20c], 0)(목록 0번 = 타자주자) ; 대상 = (주자+0x20 x, 주자+0x28 z)   ; 높이를 안 뺀다
+ * 3f194  공 점 0xa25d4(공) ; 대상 = (x, z − y)
+ * 3f1c0  카메라 vt20(대상) · vt28(따라가기)
+ * ```
+ * 곧 **홈런 · 폴 홈런 판에서 공이 멈췄을 때만** 타자주자를 보고, 그 밖은 늘 공 (x, z − 높이) 다 —
+ * 보통 타구는 공이 멈춰도(포구 · 송구가 끝나도) 공을 본다.
  */
 export function cameraTargetOf(state: DefenseViewState): WorldPoint {
   if (state.cameraTarget != null) return state.cameraTarget
-  if (!state.ball.isFlying) {
+  if ((state.homeRunFlag === true || state.poleHomeRunFlag === true) && state.ball.isStopped === true) {
     const batterRunner = state.runners.find((runner) => runner.index === 0)
     if (batterRunner !== undefined) return { x: batterRunner.x, z: batterRunner.z }
   }
@@ -402,21 +449,77 @@ export function fielderSpriteOf(fielder: DefenseFielder): FielderSprite {
 }
 
 /**
- * 공 그림 프레임.
+ * 공 그림 프레임 — 0x17 공 그리기 0x36dfc(36efa~36f56, 직접 뜸).
  *
- * ball.pzx 는 **공 종류 3 × 크기 11칸**이다 (`ballFrameOf(path, i, 종류)` = 크기 + 11×종류, 0x358fc):
+ * ball.pzx 는 **공 종류 3 × 크기 11칸**이다 (그림 = 크기 + 11 × 종류):
  *   - 000~010 보통 야구공 (2×2 → 12×12)
  *   - 011~022 **불꽃 공** — 마구 1 "파이어 볼" 쪽 그림
  *   - 023~033 **날개 달린 공** — 또 다른 마구 그림 (가로로 길다, 최대 33×11)
  *
- * ⚠️ 예전 주석은 011~022 를 "세로로 늘어난 것", 023~033 을 "납작한 그림자"라고 적어 뒀는데
- *    **둘 다 틀렸다**. 그림을 직접 펼쳐 보면 불꽃과 날개다. 그 오해 때문에 수비 화면이
- *    날개 공을 공 그림자로 깔아, 공 양옆에 검은 날개가 붙어 보였다.
- *
- * 고르는 식은 공 궤적 코드(0xb3b38·0xb401c) 안이라 읽지 않았다 —
- * 여기서는 500 월드 단위마다 한 칸 굵어지는 것으로 근사한다.
+ * ```
+ * 36efa  크기 = 0xca7b4(공 높이 y, 2000) + 4 ; 크기 > 10 이면 10           ; 아래 자르기는 없다
+ * 36f3a  그림 = 크기 + 11 × [경기+0x1080]                                     ; 0xbe8d4 로 그리기 목록에
+ * ```
+ * 경기+0x1080(공 그림 종류)은 0x17 진입 0x46418 이 끝(467fe)에서 **0 으로 둔다** — 그 뒤 0x17 동안 쓰는 곳이 없다
+ * (쓰는 곳 전수 R2 14-1: 0x3d78e · 0x3d988 · 0x467fe 는 0, 마구 갈래 0x4725c · 0x4736e · 0x3b55e 는 타석 그리기 0x4d64c ·
+ * 0x3b2f4 안). 그래서 수비 화면의 공은 늘 보통 공(종류 0)이고, 땅에 있어도 004 부터다(000~003 은 안 쓴다).
  */
-export const BALL_HEIGHT_PER_FRAME = 500
+export const BALL_HEIGHT_PER_FRAME = 2000
+/** 땅(높이 0)의 크기 칸 (36f06 `adds r0, #4`) */
+export const BALL_GROUND_FRAME = 4
+const BALL_MAX_FRAME = 10
 export function ballFrameOf(height: number): number {
-  return Math.max(0, Math.min(10, Math.trunc(height / BALL_HEIGHT_PER_FRAME)))
+  return Math.min(Math.trunc(height / BALL_HEIGHT_PER_FRAME) + BALL_GROUND_FRAME, BALL_MAX_FRAME)
+}
+
+/** 공 그림자 한 조각 — 화면 좌표 사각(선은 폭 · 높이 1) */
+export interface BallShadowPiece {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: { readonly r: number; readonly g: number; readonly b: number }
+}
+
+/** 그림자 테두리 회색 0x1400748(100, 100, 100) (35738) */
+export const BALL_SHADOW_RIM_COLOR = { r: 100, g: 100, b: 100 } as const
+const BALL_SHADOW_FILL_COLOR = { r: 0, g: 0, b: 0 } as const
+/** 공중 공의 그림자 크기 (36fbc) · 땅 공(화면 높이 0)의 크기 (36fda) */
+export const BALL_SHADOW_SIZE_AIR = 3
+export const BALL_SHADOW_SIZE_GROUND = 5
+
+/**
+ * **공 그림자** — 0x36dfc 의 37268 이 부르는 0x356f8(x, y, s) (직접 뜸). 공 땅점 (x, z)의 화면 자리에 그린다.
+ * ```
+ * 36fba  s = 3 ; 화면 높이 h(0xb94b4(카메라, 0, y)) < 0 이면 그림자 없음(3736c)
+ * 36fc6  땅점 화면 y(ff0 + z 투영) < 1 이면 그림자 없음
+ * 36fd4  h == 0(땅)이면 s = 5
+ * 37268  0x356f8(땅점 화면 x, 땅점 화면 y, s)
+ * 356f8  x0 = x − (s >> 1) · y0 = y − (s >> 1) ; 색 0(검정) ; 기기 사각 칠 0x14006e8(x0, y0, s + 1, s + 1)
+ * 35734  s > 2 면 색 (100, 100, 100) ; 기기 선 0x14006c8 넷(두 끝 다 칠한다):
+ *          (x0 − 1, y0 + 1)–(x0 − 1, y0 + s − 1) · (x0 + s + 1, y0 + 1)–(x0 + s + 1, y0 + s − 1)
+ *          (x0 + 1, y0 − 1)–(x0 + s − 1, y0 − 1) · (x0 + 1, y0 + s + 1)–(x0 + s − 1, y0 + s + 1)
+ * ```
+ * 그리기 목록(0xbe6a0)이 아니라 **곧바로 화면에** 칠하므로 목록으로 그리는 야수 · 주자 · 공보다 아래다.
+ * 공을 안 그리는 그림(`isBallDrawn` 거짓)에는 그림자도 없다(36ef8 → 3736c).
+ */
+export function ballShadowOf(
+  ground: { readonly x: number; readonly y: number },
+  screenHeight: number,
+): readonly BallShadowPiece[] {
+  if (screenHeight < 0 || ground.y < 1) return []
+  const size = screenHeight === 0 ? BALL_SHADOW_SIZE_GROUND : BALL_SHADOW_SIZE_AIR
+  const x0 = ground.x - (size >> 1)
+  const y0 = ground.y - (size >> 1)
+  const pieces: BallShadowPiece[] = [{ x: x0, y: y0, width: size + 1, height: size + 1, color: BALL_SHADOW_FILL_COLOR }]
+  if (size > 2) {
+    const rim = BALL_SHADOW_RIM_COLOR
+    pieces.push(
+      { x: x0 - 1, y: y0 + 1, width: 1, height: size - 1, color: rim },
+      { x: x0 + size + 1, y: y0 + 1, width: 1, height: size - 1, color: rim },
+      { x: x0 + 1, y: y0 - 1, width: size - 1, height: 1, color: rim },
+      { x: x0 + 1, y: y0 + size + 1, width: size - 1, height: 1, color: rim },
+    )
+  }
+  return pieces
 }

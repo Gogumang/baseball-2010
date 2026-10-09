@@ -24,10 +24,12 @@ import {
   type DefenseRunner,
   type DefenseViewState,
   ballFrameOf,
+  ballShadowOf,
   cameraTargetOf,
   defenderPaletteIndexOf,
   fielderSpriteOf,
   flashOffsetOf,
+  isBallDrawn,
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
@@ -69,6 +71,12 @@ interface DefenseScreenProps {
    * 수비 바탕은 `[app+0x1104] == 2`(시즌) 이고 홈경기일 때만 바뀐다.
    */
   readonly grassPalette?: number | null
+  /**
+   * 그림자 위 · 선수 아래에 깔 것 — 비거리 판 0x36cd4 자리다. 0x46c88 머리(46cb6)가 그리기 목록보다 먼저 곧바로 칠하고(바탕은
+   * 프레임 0x52c50 의 0x41230 → 0x411e0 이 그 앞), 공 그리기 0x36dfc 끝(37388)이 그림자 뒤에 한 번 더 칠한다 — 곧 바탕 · 그림자
+   * 위, 야수 · 주자 · 공 아래이고 줌 펀치(46e24 0xbb84c)가 함께 늘린다.
+   */
+  readonly underActors?: ReactNode
   /** 화면 위에 얹을 것 — 조작 버튼·점수판 같은 것 */
   readonly children?: ReactNode
 }
@@ -148,6 +156,7 @@ export function DefenseScreen({
   followPercent = CAMERA_FOLLOW_PERCENT,
   isRunning = true,
   grassPalette = null,
+  underActors,
   children,
 }: DefenseScreenProps) {
   const update = useUpdateCounter(isRunning)
@@ -157,11 +166,15 @@ export function DefenseScreen({
   const target = cameraTargetOf(state)
 
   // 진입 때는 즉시 가운데 맞춤(vt10, 0x466d0), 그 뒤로는 갱신마다 followPercent 씩 따라간다.
+  // 진입 0x46418 의 맞춤(466e0~46708)은 공 점 0xa25d4 의 **(x, z)** 다 — 갱신 0x3f060 과 달리 높이를 안 뺀다.
+  // (따로 정한 대상 `cameraTarget` 이 있으면 그것 — 원본 진입에는 없는 칸이라 상태 0x18 · 시험용이다)
   const cameraRef = useRef<{ update: number; state: CameraState } | null>(null)
   if (cameraRef.current === null) {
-    cameraRef.current = { update, state: centerOn(bounds, target) }
+    cameraRef.current = { update, state: centerOn(bounds, state.cameraTarget ?? { x: state.ball.x, z: state.ball.z }) }
   } else if (cameraRef.current.update !== update) {
-    const ticks = Math.min(Math.max(update - cameraRef.current.update, 0), MAX_CATCH_UP_TICKS)
+    // 경기 멈춤(+0x1993) · 판이 닫힌 그림은 0x3f060 이 대상 · 따라가기 앞에서 돌아간다(3f0a4 · 3f0ea) — 카메라가 그 자리에 선다
+    const ticks =
+      state.cameraFrozen === true ? 0 : Math.min(Math.max(update - cameraRef.current.update, 0), MAX_CATCH_UP_TICKS)
     let moved = cameraRef.current.state
     for (let i = 0; i < ticks; i += 1) moved = stepCamera(bounds, moved, target, followPercent)
     cameraRef.current = { update, state: moved }
@@ -173,6 +186,8 @@ export function DefenseScreen({
     x: toScreenX(point.x) + offset.x,
     y: toScreenY(point.z) + offset.y,
   })
+  /** 야수 그림 자리 — 0x43278(432f0~43318)이 0xb94b4(카메라, x, z − y)로 투영한다. 결과 판 0x46844 도 이 자리를 쓴다 */
+  const fielderScreenOf = (fielder: DefenseFielder) => screenOf({ x: fielder.x, z: fielder.z - (fielder.y ?? 0) })
 
   /**
    * 레이저 줌 펀치 0xbb84c → 0xbb43c — 원본 사각형(화면 W·100/s × H·100/s, 중심 = 바탕 좌표 + 카메라 오프셋, 화면 안으로 자름)을
@@ -193,7 +208,7 @@ export function DefenseScreen({
   /** 결과 판 0x46844 의 자리 — 공 가진 야수(+0x1088)의 그림 자리, 없으면 화면 가운데 (46866) */
   const popupPointOf = (holderSlot: number) => {
     const holder = state.fielders.find((fielder) => fielder.slot === holderSlot)
-    return holder === undefined ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 } : screenOf(holder)
+    return holder === undefined ? { x: styles.SCREEN_WIDTH >> 1, y: styles.SCREEN_HEIGHT >> 1 } : fielderScreenOf(holder)
   }
   const bigOut = state.bigOut ?? null
   const bigOutPoint = bigOut === null ? null : popupPointOf(bigOut.holderSlot)
@@ -207,30 +222,52 @@ export function DefenseScreen({
     flash !== null && flash.x !== undefined && flash.z !== undefined ? screenOf({ x: flash.x, z: flash.z }) : ballPoint
 
   /**
-   * 그리는 차례는 z 오름차순으로 둔다 — 홈 쪽(z 큰 쪽)이 앞에 오게 하려는 것이다.
-   * 원본은 야수 9명 → 주자 순서로 고정해 그리지만(0x43278 · 0x43a0c), 그러면
-   * 외야수가 내야수를 가린다. 겹칠 일이 드문 곳이라 화면 쪽에서 정한다.
+   * 그리기 목록 0xbe810(장면 +0x234) — 넣을 때 **키 오름차순 자리**에 끼우고(be85a~be86a: 처음으로 `새 키 < 그 칸 키` 인 칸 앞),
+   * 같은 키는 **먼저 넣은 것 뒤**에 놓인다. 0xbe6a0 이 0 번부터 그려 뒤 칸이 위다. 넣는 차례와 키(직접 뜸):
+   * ```
+   * 0x43278  야수 — 칸 8 → 0 내림차순(439be `subs` · `bmi`), 키 = 야수 z(+0x28, 43484)
+   * 0x43a0c  주자 — 목록 0 번부터 오름차순(+0xbb 면 건너뜀), 키 = 주자 z + 1(43aec)
+   * 0x36dfc  공 — 키 = 공 z(36f62)
+   * ```
+   * 그래서 홈 쪽(z 큰 쪽)이 앞이고, 같은 줄이면 주자가 야수 위, 공은 같은 z 의 야수 · 주자보다 늦게 넣어 위다.
+   * `Array.prototype.sort` 는 안정 정렬이라 넣는 차례대로 늘어놓고 키로 정렬하면 같은 자리가 된다.
    */
-  const actors: { readonly z: number; readonly node: ReactNode }[] = [
-    ...state.runners
+  const actors: { readonly key: number; readonly node: ReactNode }[] = [
+    ...[...state.fielders]
+      .sort((a, b) => b.slot - a.slot)
+      .map((fielder) => ({
+        key: fielder.z,
+        node: (
+          <Fielder
+            key={`fielder-${fielder.slot}`}
+            fielder={fielder}
+            point={fielderScreenOf(fielder)}
+            // 레이저 송구 반짝임은 **공 쥔 야수 한 명**만 빨갛게 한다 (0x43406~0x4342c)
+            isLaserShining={state.laserShiningSlot === fielder.slot}
+          />
+        ),
+      })),
+    ...[...state.runners]
       .filter((runner) => runner.isVisible !== false)
+      .sort((a, b) => a.index - b.index)
       .map((runner) => ({
-        z: runner.z,
+        key: runner.z + 1,
         node: <Runner key={`runner-${runner.index}`} runner={runner} point={screenOf(runner)} />,
       })),
-    ...state.fielders.map((fielder) => ({
-      z: fielder.z,
-      node: (
-        <Fielder
-          key={`fielder-${fielder.slot}`}
-          fielder={fielder}
-          point={screenOf(fielder)}
-          // 레이저 송구 반짝임은 **공 쥔 야수 한 명**만 빨갛게 한다 (0x43406~0x4342c)
-          isLaserShining={state.laserShiningSlot === fielder.slot}
-        />
-      ),
-    })),
-  ].sort((a, b) => a.z - b.z)
+    // 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다
+    ...(isBallDrawn(state.ball)
+      ? [
+          {
+            key: state.ball.z,
+            node: (
+              <div key="ball" className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
+                <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ].sort((a, b) => a.key - b.key)
 
   return (
     <RawScreen>
@@ -257,19 +294,30 @@ export function DefenseScreen({
         />
 
         {/*
-          공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3).
-
-          ⚠️ **공 그림자는 그리지 않는다.** 예전에는 ball.pzx 023~033 을 "납작한 그림자"로 알고
-             바닥에 깔았는데, 그 칸들은 그림자가 아니라 **날개 달린 마구 공**이라 공 양옆에
-             검은 날개가 붙어 보였다. 원본이 공 그림자를 그린다는 근거는 문서 어디에도 없고
-             (R3 1-3 은 대상을 "공 (x, z−높이)" 하나로만 적는다), 고르는 식이 든 궤적 코드
-             0xb3b38·0xb401c 는 아직 안 읽었다. **모르는 것을 그리느니 안 그린다.**
+          공 그림자 0x356f8 — 0x36dfc(37268)가 땅점 (x, z) 자리에 검정 (s+1)² 칸 + 회색 테두리 넷을 **곧바로** 칠한다
+          (공중 s = 3 · 땅 s = 5). 그리기 목록보다 먼저라 모든 야수 · 주자 · 공 아래다. ball.pzx 023~033(날개 달린 마구 공)은
+          그림자가 아니다 — 예전에 그것을 깔던 것과 다르다.
         */}
-        {actors.map((actor) => actor.node)}
+        {isBallDrawn(state.ball) &&
+          ballShadowOf(ballGround, toScreenY(state.ball.height)).map((piece, index) => (
+            <div
+              key={index}
+              className={styles.ballShadowPiece}
+              style={{
+                left: piece.x,
+                top: piece.y,
+                width: piece.width,
+                height: piece.height,
+                background: `rgb(${piece.color.r}, ${piece.color.g}, ${piece.color.b})`,
+              }}
+              data-testid="defense-ball-shadow"
+            />
+          ))}
 
-        <div className={styles.actor} style={{ left: ballPoint.x, top: ballPoint.y }} data-testid="defense-ball">
-          <ActorSprite folder={BALL_FRAMES} frame={ballFrameOf(state.ball.height)} />
-        </div>
+        {underActors}
+
+        {/* 그리기 목록 차례 — 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
+        {actors.map((actor) => actor.node)}
 
         {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
         {judgeText !== null && judgeTextPoint !== null && (

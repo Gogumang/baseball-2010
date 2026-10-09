@@ -311,8 +311,10 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     if (isFinished) onDone()
   }, [isFinished, onDone])
 
-  const state = ticks[index]
-  if (state === undefined) return null
+  const tickState = ticks[index]
+  if (tickState === undefined) return null
+  // 마지막 틱(관문이 닫힌 틱) 뒤 갱신 — 0x3f060 의 G1(3f0b8)이 닫혀 카메라가 선다
+  const state = Math.floor(update / UPDATES_PER_TICK) > lastIndex ? frozenCamera(tickState) : tickState
   let board: readonly [number, number] | null = null
   if (runScoreBoard !== undefined && holder.tally.visible && !holder.tally.ended) {
     const runs = holder.tally.runs
@@ -394,8 +396,10 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     if (isFinished) onDone(stepper.result())
   }, [isFinished, onDone, stepper])
 
-  const state = ticks[Math.min(Math.max(0, seen), lastIndex)]
-  if (state === undefined) return null
+  const tickState = ticks[Math.min(Math.max(0, seen), lastIndex)]
+  if (tickState === undefined) return null
+  // 판이 닫힌 뒤 갱신 — 0x3f060 의 G1(3f0b8)이 닫혀 카메라가 선다
+  const state = stepper.finished && seen > lastIndex ? frozenCamera(tickState) : tickState
   let board: readonly [number, number] | null = null
   if (runScoreBoard !== undefined && holder.tally.visible && !holder.tally.ended) {
     const runs = holder.tally.runs
@@ -461,6 +465,8 @@ function LivePlayback({
   /** +0x1094 — 관문이 닫힌 뒤 지난 갱신 수 (판 시작 0) */
   const closedCountRef = useRef(0)
   const [view, setView] = useState<DefenseViewState | null>(null)
+  /** 판이 닫힌 뒤 갱신(+0x1094 셈)에 들었다 — 0x3f060 의 G1(3f0b8)이 닫혀 카메라가 선다 */
+  const [closed, setClosed] = useState(false)
   const [runBoard, setRunBoard] = useState<RunScoreBoardView | null>(null)
   /** 0x35108(0x17 끝)을 지났다 — 닫힌 뒤 11 번째 갱신, 홈런 점수판이 선 홈런 타구는 내려갈 때까지 더, 키 건너뛰기면 그 그림 */
   const [ended, setEnded] = useState(false)
@@ -507,6 +513,7 @@ function LivePlayback({
       particlesRef.current = createParticleScene()
       closedUpdateRef.current = null
       setEnded(false)
+      setClosed(false)
       setView(null)
       setRunBoard(null)
       setEffectsView({ text: null, distanceBoard: null, version: 0 })
@@ -598,6 +605,7 @@ function LivePlayback({
     } else if (!moved && finished) {
       // 판이 닫힌 뒤 갱신 — 갱신은 529f0(+0x1094 셈, 판 칸 · 글자 없음), 그리기는 비거리 판 · 득점 점수판, 프레임 끝 파티클 틱.
       // 진행기가 닫은 갱신은 위에서 돌았다. 갱신을 건너뛴 만큼 따라잡는다(진행기 틱과 같은 상한)
+      setClosed(true)
       const closedFrames = Math.min(update - (closedUpdateRef.current ?? update - 1), MAX_CLOSED_CATCH_UP)
       for (let frame = 0; frame < closedFrames; frame += 1) {
         closedCountRef.current += 1
@@ -637,10 +645,16 @@ function LivePlayback({
   }, [ended, onDone, sceneMemory])
 
   if (view === null) return null
-  // 0x46c88 차례 — 비거리 판(0x46cb6) → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62), 그 뒤 프레임 끝 파티클(0x6dd68)
+  // 0x46c88 차례 — 비거리 판(0x46cb6, 선수 아래 · 줌 안) → 선수 · 공 → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62),
+  // 그 뒤 프레임 끝 파티클(0x6dd68)
   return (
-    <DefenseScreen state={view} grassPalette={grassPalette}>
-      {effectsView.distanceBoard !== null && <DefenseDistanceBoard value={effectsView.distanceBoard} />}
+    <DefenseScreen
+      state={closed ? frozenCamera(view) : view}
+      grassPalette={grassPalette}
+      underActors={
+        effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined
+      }
+    >
       {effectsView.text !== null && <DefenseHomeRunText frame={effectsView.text} />}
       {runScoreBoard !== undefined && runBoard !== null && !ended && (
         <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />
@@ -649,6 +663,15 @@ function LivePlayback({
       {children}
     </DefenseScreen>
   )
+}
+
+/**
+ * 판이 닫힌 뒤 그림 — 0x3f060 이 3f0b8 관문(G1)에서 닫혀 대상 · 따라가기(3f1c0)까지 안 가므로 카메라가 그 자리에 선다.
+ * ⚠️ 원본은 G2 만 닫히고 G1 은 열린 그림이 하나 있을 수 있다(+0x120 세기가 그 사이에서 50 을 넘을 때) — 웹 진행기는 그 그림을
+ *    만들지 않으므로(`playGate` 머리말의 틱 · 그림 맞추기 미해결) 마지막 그림 다음부터 세운다.
+ */
+function frozenCamera(state: DefenseViewState): DefenseViewState {
+  return state.cameraFrozen === true ? state : { ...state, cameraFrozen: true }
 }
 
 /**

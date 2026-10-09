@@ -11,7 +11,9 @@ import {
   TICKS_PER_ACTION_FRAME,
   type DefenseFielder,
   type DefenseViewState,
+  BALL_SHADOW_RIM_COLOR,
   ballFrameOf,
+  ballShadowOf,
   cameraTargetOf,
   fielderActionFrameOf,
   fielderFrameOf,
@@ -161,8 +163,19 @@ describe('카메라가 볼 점', () => {
     expect(cameraTargetOf(base)).toEqual({ x: 20000, z: 21500 })
   })
 
-  it('공이 멈추면 타자주자(주자 0)를 본다', () => {
-    expect(cameraTargetOf({ ...base, ball: { ...base.ball, isFlying: false } })).toEqual({ x: 25946, z: 24500 })
+  it('보통 타구는 공이 멈춰도 공을 본다 — 타자주자로 넘어가는 것은 홈런 판뿐이다 (0x3f0f0)', () => {
+    const stopped = { ...base, ball: { ...base.ball, isFlying: false, isStopped: true } }
+    expect(cameraTargetOf(stopped)).toEqual({ x: 20000, z: 21500 })
+  })
+
+  it('홈런(+0x111) · 폴 홈런(+0x129) 판에서 공이 멈추면(vt18) 타자주자(주자 0)를 본다 — 높이를 안 뺀다', () => {
+    const stopped = { ...base, ball: { ...base.ball, isStopped: true } }
+    expect(cameraTargetOf({ ...stopped, homeRunFlag: true })).toEqual({ x: 25946, z: 24500 })
+    expect(cameraTargetOf({ ...stopped, poleHomeRunFlag: true })).toEqual({ x: 25946, z: 24500 })
+  })
+
+  it('홈런 판이라도 공이 아직 움직이면 공을 본다', () => {
+    expect(cameraTargetOf({ ...base, homeRunFlag: true })).toEqual({ x: 20000, z: 21500 })
   })
 
   it('따로 정한 대상이 있으면 그것이 먼저다 (경기 끝 직전 투수판)', () => {
@@ -183,12 +196,41 @@ describe('deadly_effect 자리', () => {
 })
 
 describe('공 그림', () => {
-  it('높이가 오르면 굵어지고 10 에서 멈춘다', () => {
-    expect(ballFrameOf(0)).toBe(0)
-    expect(ballFrameOf(1200)).toBe(2)
+  it('땅에서 4칸, 높이 2000 마다 한 칸 굵어지고 10 에서 멈춘다 (36efa~36f10)', () => {
+    expect(ballFrameOf(0)).toBe(4)
+    expect(ballFrameOf(1999)).toBe(4)
+    expect(ballFrameOf(2000)).toBe(5)
+    expect(ballFrameOf(11999)).toBe(9)
+    expect(ballFrameOf(12000)).toBe(10)
     expect(ballFrameOf(99999)).toBe(10)
     // 11칸을 넘지 않는다 — 011~022 는 불꽃 공, 023~033 은 날개 공(둘 다 마구 그림)이라
     // 보통 공에 섞여 나오면 안 된다
     expect(ballFrameOf(99999)).toBeLessThan(11)
+  })
+})
+
+describe('공 그림자 0x356f8 (← 0x36dfc 37268)', () => {
+  const 검정 = { r: 0, g: 0, b: 0 }
+  const 회색 = BALL_SHADOW_RIM_COLOR
+
+  it('공중 공(화면 높이 > 0)은 s = 3 — 검정 4×4 와 모서리를 뗀 회색 선 넷', () => {
+    expect(ballShadowOf({ x: 100, y: 200 }, 10)).toEqual([
+      { x: 99, y: 199, width: 4, height: 4, color: 검정 },
+      { x: 98, y: 200, width: 1, height: 2, color: 회색 },
+      { x: 103, y: 200, width: 1, height: 2, color: 회색 },
+      { x: 100, y: 198, width: 2, height: 1, color: 회색 },
+      { x: 100, y: 203, width: 2, height: 1, color: 회색 },
+    ])
+  })
+
+  it('땅 공(화면 높이 0)은 s = 5 — 검정 6×6', () => {
+    const [칠] = ballShadowOf({ x: 100, y: 200 }, 0)
+    expect(칠).toEqual({ x: 98, y: 198, width: 6, height: 6, color: 검정 })
+  })
+
+  it('화면 높이가 음수이거나 땅점 화면 y 가 1 보다 작으면 안 그린다 (36fc0 · 36fce)', () => {
+    expect(ballShadowOf({ x: 100, y: 200 }, -1)).toEqual([])
+    expect(ballShadowOf({ x: 100, y: 0 }, 5)).toEqual([])
+    expect(ballShadowOf({ x: 100, y: 1 }, 5)).not.toEqual([])
   })
 })

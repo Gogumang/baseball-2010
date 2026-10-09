@@ -621,6 +621,8 @@ function* runnerPlaySteps(
             ? chase.trajectory.pointAt(tick)
             : (input.restingBall ?? fielders[play.ballHolderSlot]?.position ?? basePosition(0)),
         ballIsFlying: chase !== null,
+        // 공 그리기 0x36dfc(36e90) — 쥔 공(+0x12c)은 공 · 그림자를 안 그린다
+        ballHeld: play.held,
         fielders,
         runners: runnerStates(),
         catchKind: null,

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import {
@@ -9,6 +9,7 @@ import {
   RUNNER_ACTION,
   type DefenseViewState,
 } from '@/pages/defense/lib/defenseView'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 수비 화면 (R3-field-view 1~6절).
@@ -51,6 +52,17 @@ describe('월드 좌표 → 화면 좌표', () => {
     expect(pitcher.style.top).toBe('196px')
   })
 
+  it('야수 그림 · 결과 판 자리는 (x, z − y) 다 (0x43278 432f0 · 0x46844)', () => {
+    띄우기({
+      ...기본_상태,
+      fielders: [{ slot: 0, x: 20000, z: 24500, y: 6500, action: FIELDER_ACTION.stand, actionTick: 0 }],
+      judgeText: { frame: 0, dx: 0, dy: 0, holderSlot: 0 },
+    })
+    // 6500 월드 = 100px 위 — 카메라는 공(같은 점)에 맞아 있어 땅점은 196 이다
+    expect(screen.getByTestId('defense-fielder-0').style.top).toBe('96px')
+    expect(screen.getByTestId('defense-judge-text').style.top).toBe(`${96 - 30}px`)
+  })
+
   it('1루 쪽(x 큰 쪽) 야수는 오른쪽에 놓인다', () => {
     띄우기({
       ...기본_상태,
@@ -66,7 +78,7 @@ describe('월드 좌표 → 화면 좌표', () => {
     expect(first.dataset.frame).toBe('27')
   })
 
-  it('공은 높이만큼 위로 올라간다 — 그림자는 그리지 않는다', () => {
+  it('공은 높이만큼 위로 올라간다 — 그림자는 땅점에 남는다', () => {
     // 카메라를 못 박아 둬야 높이만 비교된다 (안 박으면 대상이 z−높이라 카메라도 같이 움직인다)
     const 고정_카메라 = { x: 20000, z: 24500 }
     const 공 = (height: number): DefenseViewState => ({
@@ -77,8 +89,10 @@ describe('월드 좌표 → 화면 좌표', () => {
 
     띄우기(공(0))
     const 바닥 = Number.parseInt(screen.getByTestId('defense-ball').style.top, 10)
-    // 날개 달린 마구 그림(ball.pzx 023~033)을 그림자로 잘못 깔던 것을 걷어냈다
-    expect(screen.queryByTestId('defense-ball-shadow')).toBeNull()
+    // 땅 공(화면 높이 0)의 그림자는 s = 5 — 검정 6×6 은 땅점에서 (−2, −2)
+    const 땅그림자 = screen.getAllByTestId('defense-ball-shadow')[0]
+    expect(땅그림자.style.width).toBe('6px')
+    expect(Number.parseInt(땅그림자.style.top, 10)).toBe(바닥 - 2)
 
     cleanup()
     띄우기(공(6500))
@@ -86,6 +100,109 @@ describe('월드 좌표 → 화면 좌표', () => {
 
     // 6500 월드 = 6500 × 500 / 32500 = 100px
     expect(바닥 - 띄운).toBe(100)
+    // 그림자는 공을 따라 오르지 않는다 — 공중 공은 s = 3, 검정 4×4 가 땅점에서 (−1, −1)
+    const 공중그림자 = screen.getAllByTestId('defense-ball-shadow')[0]
+    expect(공중그림자.style.width).toBe('4px')
+    expect(Number.parseInt(공중그림자.style.top, 10)).toBe(바닥 - 1)
+  })
+})
+
+describe('카메라 — 진입 맞춤 0x46418 · 멈춤 0x3f060(3f0a4 경기 멈춤 · 3f0b8 관문 G1)', () => {
+  /** 투수판에 맞춘 뒤 대상을 1루 쪽으로 옮겨 갱신 몇 번을 흘린다 — 투수 그림이 화면에서 얼마나 밀렸나 */
+  const 흘린_뒤_투수_x = (cameraFrozen: boolean): number => {
+    vi.useFakeTimers()
+    try {
+      const view = render(<DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 20000, z: 24500 } }} />)
+      view.rerender(
+        <DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 26000, z: 24500 }, cameraFrozen }} />,
+      )
+      for (let i = 0; i < 5; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      return Number.parseInt(screen.getByTestId('defense-fielder-0').style.left, 10)
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  it('진입 맞춤(466e0~46708)은 공 (x, z) 다 — 높이를 안 뺀다', () => {
+    띄우기({ ...기본_상태, ball: { x: 20000, z: 24500, height: 6500, isFlying: true } })
+    // 높이를 뺐다면 카메라가 100px 위를 봐 투수가 296 에 놓였을 것이다
+    expect(screen.getByTestId('defense-fielder-0').style.top).toBe('196px')
+  })
+
+  it('멈춘 그림에서는 대상이 바뀌어도 카메라가 그 자리에 선다', () => {
+    expect(흘린_뒤_투수_x(true)).toBe(120)
+  })
+
+  it('안 멈춘 그림이면 따라간다 — 투수가 왼쪽으로 밀린다', () => {
+    expect(흘린_뒤_투수_x(false)).toBeLessThan(120)
+  })
+})
+
+describe('그리기 목록 차례 0xbe810 (키 오름차순 · 같은 키는 먼저 넣은 것 뒤)', () => {
+  const 차례 = (): string[] =>
+    Array.from(screen.getByTestId('defense-zoom').querySelectorAll('[data-testid]'))
+      .map((node) => node.getAttribute('data-testid') ?? '')
+      .filter((id) => /^defense-(fielder|runner|ball)/.test(id) && id !== 'defense-ball-shadow')
+
+  it('야수 z · 주자 z + 1 · 공 z 오름차순이다 — 홈 쪽이 위', () => {
+    띄우기({
+      ...기본_상태,
+      ball: { x: 20000, z: 26000, height: 0, isFlying: true },
+      fielders: [
+        { slot: 0, x: 20000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
+        { slot: 8, x: 20000, z: 15000, action: FIELDER_ACTION.stand, actionTick: 0 },
+        { slot: 1, x: 20000, z: 30000, action: FIELDER_ACTION.stand, actionTick: 0 },
+      ],
+      runners: [{ index: 0, x: 21000, z: 24500, action: RUNNER_ACTION.run, actionTick: 0, base: 1, isAdvancing: true }],
+    })
+    expect(차례()).toEqual([
+      'defense-fielder-8',
+      'defense-fielder-0',
+      'defense-runner-0',
+      'defense-ball',
+      'defense-fielder-1',
+    ])
+  })
+
+  it('같은 키면 먼저 넣은 것이 아래다 — 야수는 칸 8 → 0 차례로 넣고, 공은 맨 나중에 넣는다', () => {
+    띄우기({
+      ...기본_상태,
+      ball: { x: 20000, z: 24500, height: 0, isFlying: true },
+      fielders: [
+        { slot: 3, x: 21000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
+        { slot: 5, x: 19000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0 },
+      ],
+    })
+    expect(차례()).toEqual(['defense-fielder-5', 'defense-fielder-3', 'defense-ball'])
+  })
+})
+
+describe('비거리 판 자리 (0x46cb6 — 그리기 목록보다 먼저)', () => {
+  it('줌 층 안, 공 그림자 뒤 · 야수 앞에 깐다', () => {
+    render(<DefenseScreen state={기본_상태} isRunning={false} underActors={<div data-testid="아래판" />} />)
+    const 줌 = screen.getByTestId('defense-zoom')
+    const ids = Array.from(줌.querySelectorAll('[data-testid]')).map((node) => node.getAttribute('data-testid'))
+    const 판 = ids.indexOf('아래판')
+    expect(판).toBeGreaterThan(ids.lastIndexOf('defense-ball-shadow'))
+    expect(판).toBeLessThan(ids.indexOf('defense-fielder-0'))
+  })
+})
+
+describe('공을 안 그리는 그림 (0x36dfc 36e86~36ea4)', () => {
+  it('쥔 공(+0x12c)은 안 그린다 — 그림자도 없다', () => {
+    띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isHeld: true } })
+    expect(screen.queryByTestId('defense-ball')).toBeNull()
+    expect(screen.queryByTestId('defense-ball-shadow')).toBeNull()
+  })
+
+  it('담장 뒤로 사라진 공은 안 그린다', () => {
+    띄우기({ ...기본_상태, ball: { ...기본_상태.ball, isBeyondFence: true } })
+    expect(screen.queryByTestId('defense-ball')).toBeNull()
+  })
+
+  it('그 밖은 그린다', () => {
+    띄우기()
+    expect(screen.getByTestId('defense-ball')).toBeTruthy()
   })
 })
 
