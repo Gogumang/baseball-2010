@@ -60,3 +60,4 @@
   - ⚠️ 알고 둘 것: 원본 bfa54 는 `>>> 1` 탓에 짧은 고리(63601 · 90400 · 3677 · 1752 · 1681 · 923 · 358)로 빨려 든다 — 원본은 저장마다
     시계로 고리를 끊지만 웹은 안 끊으므로 오래 저장 없이 이어지면 원본보다 쉽게 같은 수열이 되풀이된다. 결정대로 그대로 둔다.
   - 근거 · 구현 메모: E 머리(씨앗 쓰기 전수) · FOR-IMPLEMENTER G-6 · 웹 `shared/lib/random/originalRandom.ts` 머리 주석.
+  - **이식 완료 (2026-10-08~09, 웹 ddd001f · 68eac39 · 2e07a82 · dff3303 · 37d4d67 · c4fe429 · cc4829f · 1a5c9b6)**: RandomPort 를 rand(lo, hi) · rand9d(n) 둘로 바꾸고 mulberry32 · next · nextInRange · pick 를 걷었다. bfa54 는 `min(lo, hi) + s mod |hi − lo|`(0xca848 부호 없는 나머지, 위끝 제외) · lo == hi 면 lo(그래도 한 걸음). 부팅 씨앗은 Date.now() 아래 32비트(원본 0x2ed8 = 밀리초 시계 0x14005c8). 바이너리의 rand 호출 240 곳(리터럴 0xbfa55 · 0xbfaa1 · 0x9d469)을 훑어 웹 인자를 원본 상수 인자와 대조했고, 어긋났던 넷(뒤로 빠진 공 0x3507c rand(60, 130) · rand(160, 280) · 끝내기 판 0xc22b4 rand(d, t + 1) · 흩어짐 각 0x4ddc0 rand(0, 360) + 1 · 입자 0x6d56c · 0x6d878 · 0x6dad0 rand9d)을 원본으로 고쳤다(68eac39). 씨앗 고정 시험은 사건을 그대로 두고 씨앗만 다시 골랐다(1a5c9b6).
