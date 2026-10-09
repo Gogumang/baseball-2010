@@ -172,3 +172,29 @@ export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMat
     },
   }
 }
+
+/**
+ * **사람이 던지는 타석 장면의 그림 재료** (`PitcherSideStage`) — 타자 `0xae89c(공격 팀 = 상대)` · 투수 `0xae83c(수비 팀 = 우리)`.
+ * 타자: 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀. 마타자는 손 표 0xd88b0 만 — ⚠️ 몸통 0 근사
+ * (`stageBatterOf` 와 같은 한계). 표 밖 선수(영입한 명전·나리)는 웹 명단에 폼 칸이 없어 0.
+ * 투수: 폼 · 손 0xb63c0. ⚠️ 우리 마투수의 마선수 그림 · 장비 겹(0x79790)은 웹 명단에 칸이 없어 평범한 맨몸 투수로 그린다.
+ */
+export function teamPitcherSideStageOf(progress: TeamGameProgress): {
+  readonly batterForm: number
+  readonly batterSkinIndex: number
+  readonly batterTeamIndex: number
+  readonly pitcherForm: number
+  readonly pitcherHand: number
+} {
+  const teamId = progress.options.opponentTeamId
+  const batter = progress.opponentEntry[progress.opponentOrderIndex]
+  const pitcher = progress.ourPitcherEntry[progress.ourPitcherIndex]
+  const pitcherForm = pitcher?.repertoire.form ?? 0
+  const pitcherHand = pitcher === undefined ? 0 : pitcherHandOf(pitcherForm, pitcher.aceIndex >= 0)
+  if (batter === undefined) return { batterForm: 0, batterSkinIndex: 0, batterTeamIndex: teamId, pitcherForm, pitcherHand }
+  if (batter.aceIndex >= 0) {
+    return { batterForm: teamBatterHandOf(teamId, batter), batterSkinIndex: 0, batterTeamIndex: teamId, pitcherForm, pitcherHand }
+  }
+  const profile = batterProfileOf(teamId, batter) ?? 0
+  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamId, pitcherForm, pitcherHand }
+}

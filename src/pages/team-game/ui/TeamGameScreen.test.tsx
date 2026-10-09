@@ -118,6 +118,9 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    // 놓았다 — 남은 0x11 비행과 0x12 대기 동안은 원본도 다음 공 입력을 안 받는다
+    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 80))
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
@@ -172,6 +175,12 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
       if (screen.queryByText('1. 구질 선택') === null) break
       구질고르기('FASTBALL')
       조준확정후놓기()
+      // 남은 0x11 비행 · 0x12 대기 동안은 다음 공을 안 받는다 — 수비 화면이 뜨면 거기서 멈춘다
+      for (let 틱 = 0; 틱 < 80; 틱 += 1) {
+        if (container.querySelector(`img[src="${DEFENSE_BACKGROUND_URL}"]`) !== null) break
+        if (screen.queryByText('1. 구질 선택') !== null) break
+        act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+      }
     }
 
     expect(screen.queryByText('1. 구질 선택')).toBeNull()

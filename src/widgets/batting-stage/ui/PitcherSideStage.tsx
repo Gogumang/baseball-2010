@@ -5,6 +5,7 @@ import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
+import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { bodyTypeOf, NO_EQUIPMENT, NO_PITCHER_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
@@ -41,6 +42,8 @@ interface PitcherSideStageProps {
   readonly stadium: number
   readonly fieldPalette: number | null
   readonly skyRow: number
+  /** 시즌 홈경기 구장 (0x77494) — 있으면 배경이 시즌 구장으로 갈린다 */
+  readonly seasonStadium?: SeasonStadium
   readonly gameMode: number
   readonly isScoreboardOn?: boolean
   /** 0xd · 0xe 대기(확인 · 소개 판) — 쉬는 '대기' */
@@ -167,6 +170,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           fieldPalette: current.fieldPalette,
           gameMode: current.gameMode,
           isScoreboardOn: current.isScoreboardOn,
+          ...(current.seasonStadium === undefined ? {} : { seasonStadium: current.seasonStadium }),
         },
       })
       handle = requestAnimationFrame(frame)
