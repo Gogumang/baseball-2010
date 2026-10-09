@@ -21,7 +21,11 @@ export function batterFrameNow(now: number, swingStartedAt: number, isBunting: b
 
 /** 캔버스 한가운데 띄우는 판정 문구. */
 export function describeResolution(detail: PitchOutcomeDetail): string {
-  const { resolution } = detail
+  return describePitchResolution(detail.resolution)
+}
+
+/** 판정 하나의 문구 — 공 판정만 아는 화면(사람이 던지는 타석 `PitcherSideStage`)이 쓴다 */
+export function describePitchResolution(resolution: PitchOutcomeDetail['resolution']): string {
 
   switch (resolution.kind) {
     case '볼':

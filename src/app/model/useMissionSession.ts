@@ -3,6 +3,8 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner, describePitchResolution } from '@/entities/at-bat/model/resolutionText'
+import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
+import type { Pitch } from '@/entities/pitching/model/pitch'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { runnerCountOf } from '@/entities/game/model/baseState'
@@ -112,6 +114,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { missionResultEarnedOf } from '@/pages/mission-play/lib/missionResultBoard'
+import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { NO_ACE_MATCH_HOLD, isAceMatchHeld } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
@@ -526,6 +529,15 @@ export function useMissionSession({
    * 화면이 재생을 마치면 비운다 (`actions.finishPickoffReplay`)
    */
   const [pickoffReplay, setPickoffReplay] = useState<DefensePlayResult | null>(null)
+  /**
+   * 투수 미션에서 마지막으로 던진 공 — 타석 장면(`PitcherSideStage`)이 그림으로만 다시 날린다(굴림 없음).
+   * `resultTicks` 는 0x12 대기 0x4e6d4(15, 볼넷 · 사구 · 삼진이면 31)
+   */
+  const [lastPitcherThrow, setLastPitcherThrow] = useState<{
+    readonly pitch: Pitch
+    readonly resolution: PitchResolution
+    readonly resultTicks: number
+  } | null>(null)
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
    * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판을 열거나 지워진다. 키와 같은 틱에 공이 도착할 수 있어
@@ -1212,6 +1224,7 @@ export function useMissionSession({
     runner.setBannerText(resolution.kind === '타구' || foulContact !== undefined ? '' : describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
+    setLastPitcherThrow({ pitch, resolution, resultTicks: resultWaitTicksOf(outcome) })
     // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다.
     // 사람 수비라 송구는 환경설정이 먹는다 — 판은 키 없는 사람 수비로 미리 다 돌려 재생한다 (견제와 같은 근사)
     const play = arrivesUnhit(resolution)
@@ -2029,6 +2042,8 @@ export function useMissionSession({
     aceMatchHold: hold,
     player, hallOfFameBatter,
     missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, handleMissionPitch, handleThrow, actions,
+    /** 투수 미션의 마지막 공 — 타석 장면이 그림으로만 다시 날린다 */
+    lastPitcherThrow,
     /** 조준(0x10)의 틱 하나 0x39c5c — 화면 `AimCursor` 의 onTick (투수 미션 흔들림은 경기 난수) */
     aimTick,
     /** 조준(0x10)의 CLR — 0xf 로 돌아가 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다 */

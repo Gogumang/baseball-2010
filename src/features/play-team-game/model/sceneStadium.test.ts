@@ -4,7 +4,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import {
   generalMatchInfoStage, nariSceneStadium, nationalCupStadiumOf, placedMatchInfoStadium, placedPaletteRowOf, rollDerbySceneStadium,
-  rollSceneStadium, rollStadiumNumber, sceneFieldPaletteOf, seasonNationalCupSceneStadium,
+  rollSceneStadium, rollStadiumNumber, sceneFieldPaletteOf, seasonNationalCupSceneStadium, versusStadiumIdOf,
 } from '@/features/play-team-game/model/sceneStadium'
 import { resumeTeamGame, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
@@ -195,5 +195,16 @@ describe('경기정보 미리보기 무대', () => {
     expect(generalMatchInfoStage(4, 12)).toEqual({ stadium: 4, paletteRow: 9 })
     expect(generalMatchInfoStage(4, 10)).toEqual({ stadium: 4, paletteRow: -1 })
     expect(generalMatchInfoStage(4, 14)).toEqual({ stadium: 4, paletteRow: 15 })
+  })
+})
+
+describe('대전모드 st+0x30 — 0x30be0 30d98 이 측 1(사람) 팀 번호를 그대로 적는다', () => {
+  it('열 팀 · 히든 팀 번호는 그대로 (굴림 없음 — 9 를 넘으면 장면 셋업이 굴린다)', () => {
+    expect(versusStadiumIdOf(3)).toBe(3)
+    expect(versusStadiumIdOf(12)).toBe(12)
+  })
+
+  it('strb / ldrsb — 아래 바이트를 부호 있게 읽는다', () => {
+    expect(versusStadiumIdOf(0x1ff)).toBe(-1)
   })
 })

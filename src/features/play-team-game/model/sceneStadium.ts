@@ -60,6 +60,27 @@ export function rollSceneStadium(random: RandomPort, stadiumId: number): SceneSt
   return { stadium, defenseStadium, paletteRow: STADIUM_PALETTE_ROWS[stadiumId] ?? -1 }
 }
 
+/**
+ * **대전모드(8·9)의 st+0x30** — 대전 경기 세우기 `0x30be0` (2026-10-09 직접 뜸):
+ * ```
+ * 30bea  모드 = 인자 r1 == 0 ? 8 : 9
+ * 30c24  t0 = s16 [0x1f890(app, 0) + 4]   (모드 9 면 0x1f8a8)  ; app+0xc0(8) · +0xc4(9) 의 0x1c 바이트 칸 0 의 +4 = 팀
+ * 30c64  t1 = s16 [0x1f890(app, 1) + 4]   (모드 9 면 0x1f8a8)  ; 칸 1
+ * 30c8c  [sp+0x3c] 의 바이트 0 = t0 → 30ca8 [[this+0x120]+0xc8] 에 그 낱말(바이트 0 = t0)
+ * 30d74  0xb6c18(st, 1, 0) · 30d7e 0xb6c18(st, 0, 1)        ; 측 1 사람 · 측 0 CPU
+ * 30d8a  0xb6bd4(st, 1, t0) · 30d94 0xb6bd4(st, 0, t1)      ; 측 1 = t0 · 측 0 = t1
+ * 30d98  st+0x30 = (s8) t0                                   ; ldrsb [sp+0x3c] → strb [st+0x30]
+ * ```
+ * 곧 대전의 구장은 고르는 화면이 없고 **측 1(후공 · 사람) 팀 번호가 그대로 st+0x30** 이다. 굴림 없음.
+ * 장면 셋업 0x39fdc 의 모드 1·8·9 갈래(`rollSceneStadium`)가 이 값으로 두 구장 객체를 채우므로, 팀 번호가 9 를 넘으면
+ * (히든 팀 10~14) 경기 안에서 rand(0, 10) 둘을 굴리고 바닥 줄은 표 0xcfd0c 밖을 읽는다 — 일반모드 빠른실행과 같은 원본 그대로다.
+ * 웹에는 대전 화면이 아직 없다 — 생기면 `TeamGameOptions.stadiumId` 에 이 값을 넘긴다.
+ */
+export function versusStadiumIdOf(homeHumanTeamId: number): number {
+  // strb/ldrsb — 팀 번호의 아래 바이트를 부호 있게
+  return (homeHumanTeamId << 24) >> 24
+}
+
 /** 팔레트 줄 → 그림 칠하기 칸 (−1 기본색 = null). 표 밖 줄은 웹 팔레트에 없어 그리는 쪽이 기본색으로 둔다 */
 export function sceneFieldPaletteOf(scene: SceneStadium | null | undefined): number | null {
   if (scene === null || scene === undefined || scene.paletteRow < 0) return null

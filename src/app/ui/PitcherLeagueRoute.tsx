@@ -126,6 +126,8 @@ export function PitcherLeagueRoute({
       <PitcherGameScreen
         options={gameOptions}
         pitcherName={career.name}
+        // 마운드 내 투수 그림의 장비 겹 (0x108f8 모드 ≠ 4 → 0x79368 · 0x10810 → 0x79790)
+        pitcherEquipmentLevels={career.equipmentLevels}
         // 정산 판(0x4a384) 보유 GP 줄 — 전역 G [app+0x64] (커리어 칸은 지갑과 다리로 이어진다). 판이 이 경기 G 를 더해 보인다
         gamePoint={career.gamePoint}
         random={random}

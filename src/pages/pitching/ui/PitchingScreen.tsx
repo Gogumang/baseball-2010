@@ -32,6 +32,23 @@ import { STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { Pitch } from '@/entities/pitching/model/pitch'
+import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
+import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
+import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+
+/**
+ * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
+ * 미션 장면도 경기 장면 0x104 라 같은 그리기 표 0xd05a0 을 탄다. 구장은 생성자 값 0(모드 5 는 셋업 0x39fdc 가 안 채운다).
+ */
+export interface PitchingStageSource {
+  readonly lastThrow: { readonly pitch: Pitch; readonly resolution: PitchResolution; readonly resultTicks: number } | null
+  readonly pitcherForm: number
+  readonly pitcherHand: number
+  readonly batterForm: number
+  readonly batterSkinIndex: number
+  readonly batterTeamIndex: number
+}
 
 /**
  * 투구 화면. 원본 경기 상태 셋을 그대로 따른다 (나리 투수편 `PitcherGameScreen` 과 같다):
@@ -145,6 +162,8 @@ interface PitchingScreenProps {
    * 밀어내기 판의 0x1f 틱 대기(`useFreePassPlayStart`)를 든 쪽(MissionRoutes)이 받는다
    */
   readonly onPopupFrozenChange?: (isFrozen: boolean) => void
+  /** 타석 장면 재료 — 있으면 구질 · 조준 · 게이지 위에 캔버스 장면을 깐다(소개 판 · "CHANGE" 는 그 위). 없으면 예전 패널만 */
+  readonly stage?: PitchingStageSource
 }
 
 export function PitchingScreen({
@@ -175,6 +194,7 @@ export function PitchingScreen({
   onRestart,
   settings,
   onSettingsChange,
+  stage,
 }: PitchingScreenProps) {
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
@@ -394,26 +414,66 @@ export function PitchingScreen({
 
       {/*
         0xe — 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 를 그린다(모드 검사 없음). 내가 던지므로 투수 PLAYER · 타자 COM.
-        ⚠️ 원본은 판 아래 0xd 그리기(타석 장면)가 깔리지만 웹 투구 화면엔 그 캔버스가 없다. 웹 미션 상태에 없는 칸은 비운다.
+        웹 미션 상태에 없는 칸은 비운다. 교체 연출 0x16 — 0x4da30 의 "CHANGE" 애니.
+        둘 다 타석 장면(0xd 그리기 · `PitcherSideStage`) 위에 얹힌다 — 장면 재료가 없으면 판만 놓는다.
       */}
-      {/*
-        교체 연출 0x16 — 0x4da30 의 "CHANGE" 애니. ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다.
-      */}
-      {isRunning && substitutionScene !== null && (
-        <div className={styles.matchupFrame}>
+      {(() => {
+        const substitutionOverlay = isRunning && substitutionScene !== null && (
           <SubstitutionSceneOverlay
             key={substitutionScene.serial}
             aceSlot={substitutionScene.aceSlot ?? null}
             onDone={() => onSubstitutionSceneDone?.()}
           />
-        </div>
-      )}
-
-      {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
-        <div className={styles.matchupFrame}>
+        )
+        const matchupCards = !isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
           <SceneMatchupCards batterHand={0} pitcher={{ isComputer: false }} batter={{ isComputer: true }} />
-        </div>
-      )}
+        )
+        if (stage === undefined) {
+          return (
+            <>
+              {substitutionOverlay && <div className={styles.matchupFrame}>{substitutionOverlay}</div>}
+              {matchupCards && <div className={styles.matchupFrame}>{matchupCards}</div>}
+            </>
+          )
+        }
+        return (
+          <PitcherSideStage
+            pitch={stage.lastThrow?.pitch ?? null}
+            resolution={stage.lastThrow?.resolution ?? null}
+            resultTicks={stage.lastThrow?.resultTicks ?? 0}
+            // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0) — 타자 미션 화면과 같은 근사(미션 팀 로고는 기본 두 팀)
+            hud={{
+              inning: run.game.inning + 1,
+              half: run.game.offenseSide === 0 ? '초' : '말',
+              ourScore: run.game.scores[humanSideOf(run.mission)],
+              opponentScore: run.game.scores[cpuSideOf(run.mission)],
+              balls: atBat.balls,
+              strikes: atBat.strikes,
+              outs: run.outs,
+              bases: run.bases,
+              ourLogoUrl: './sprites/team_logo_ini/000.png',
+              opponentLogoUrl: './sprites/team_logo_ini/001.png',
+              playerSide: humanSideOf(run.mission),
+            }}
+            batterForm={stage.batterForm}
+            batterSkinIndex={stage.batterSkinIndex}
+            batterTeamIndex={stage.batterTeamIndex}
+            pitcherForm={stage.pitcherForm}
+            pitcherHand={stage.pitcherHand}
+            // 미션은 구장 생성자 값 0 · 바닥 줄 기본 — 타자 미션 화면(`MissionPlayScreen`)과 같다
+            stadium={0}
+            fieldPalette={null}
+            skyRow={skyRow ?? 0}
+            gameMode={MISSION_PITCHER_MODE}
+            {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
+            isPaused={isAwaitingConfirm}
+            isFrozen={isPopupOpen}
+          >
+            {matchupCards}
+            {substitutionOverlay}
+          </PitcherSideStage>
+        )
+      })()}
 
       {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && <Panel heading="1. 구질 선택" />}
       {phase === '구질' && !isAwaitingConfirm && (
