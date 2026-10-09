@@ -6,6 +6,7 @@ import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt, skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
 
+import { heldBallTickOf } from '@/widgets/batting-stage/lib/heldBall'
 import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
 import {
   FASTBALL_FLAME_ANIMATION,
@@ -193,9 +194,13 @@ export function renderBattingStage(
     drawBall(context, scene.pitch, scene.frame)
     // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
     drawMagicBallEffect(context, scene.pitch, scene.frame)
+  } else if (scene.pitch !== null) {
+    // 0x12 그리기 0x4ce9c 도 0x3b2f4 를 불러 공을 마지막 점에 그대로 둔다 — 0x11 이 아니라 마구 이펙트는 없다 (`heldBall`)
+    const heldTick = heldBallTickOf(scene.stagePhase, scene.pitch.frameCount)
+    if (heldTick !== null) drawBall(context, scene.pitch, heldTick)
   }
   // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 · 마구 이펙트 다음이다. 공이 다 온 틱(N)부터라
-  // 웹이 공을 안 그리는 0x12 에서도 돈다 (`fastballFlame`)
+  // 0x12 에서도 마지막 점의 공 위에 돈다 (`fastballFlame`)
   if (scene.pitch !== null) drawFastballFlame(context, scene.pitch, scene.frame, scene.stagePhase)
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
