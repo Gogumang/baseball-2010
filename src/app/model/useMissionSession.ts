@@ -570,16 +570,29 @@ export function useMissionSession({
   } | null>(null)
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
-   * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판을 열거나 지워진다. 키와 같은 틱에 공이 도착할 수 있어
+   * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판이 읽는다. 키와 같은 틱에 공이 도착할 수 있어
    * 진행 칸은 ref 로 든다(화면 표시는 state).
+   *
+   * **화면 표시(st[0x15 + i] — 그 루 주자를 안 그린다)는 판정 때 지우지 않는다** (직접 재역어셈):
+   * - 0xf 진입 `0x3d954` 3d966~3d976 — `for i in 0..3: st[0x14 + i] = 0 ; st[0xa4 + i] = 0`. 이 칸을 지우는 곳은 여기다.
+   * - 판 시작 리드 `0x3d7b8` 3d8c6~3d8d2 — 판 종류가 **1(타구)** 일 때만 도루 주자의 st[0x14 + 루] = 0. 도루(5) · 폭투(9) ·
+   *   밀어내기(2) 판은 안 지운다.
+   * 그래서 공 도착 → 결과 띠 → 도루 판 재생 → (같은 타석이면 0xf, 새 타석이면 0xd · 0xe 를 지나 0xf) 까지 출발 루는 비어 보인다.
+   * 새 타석 0xe 동안에는 출발 루에 새로 선 주자도 안 그린다(원본 그대로 — 0xe 그리기도 같은 칸을 본다).
+   * 웹은 판 입력용 ref 는 판정 때 거두고(`takeStealingFrom` — 다음 공 전에 0xf 가 지우므로 같다), 표시는 0xf 진입(`askPitchSelection`)과
+   * 타구 판 시작(`clearStealDisplay`)에서 지운다.
    */
   const [stealingFrom, setStealingFrom] = useState<readonly StealBase[]>([])
   const stealingFromRef = useRef(stealingFrom)
   const takeStealingFrom = () => {
     const taken = stealingFromRef.current
     stealingFromRef.current = []
-    if (taken.length > 0) setStealingFrom([])
     return taken
+  }
+  /** 표시 칸 st[0x15 + i] 를 지운다 — 0xf 진입 0x3d954 · 타구 판 시작 0x3d7b8(종류 1) */
+  const clearStealDisplay = () => {
+    stealingFromRef.current = []
+    setStealingFrom((previous) => (previous.length === 0 ? previous : []))
   }
   /**
    * **벤치 클리어링 연출(상태 0x1e)이 붙들고 있는 사구** — 투수 미션 전용.
@@ -775,6 +788,8 @@ export function useMissionSession({
    *   ⚠️ 근사(때): 원본은 결과 상태 0x12 가 끝난 뒤 0xf 로 들어서 22 가 그때 난다 — 웹은 심판 콜과 붙는다. 그 사이 굴림은 없다.
    */
   const askPitchSelection = (kind: 'new' | 'same') => {
+    // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e · 3da70)보다 앞이다
+    clearStealDisplay()
     const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
     const run = isPitcherSide ? pitcherRun : missionRun
     if (run === null || run.status !== '진행중') return
@@ -901,6 +916,8 @@ export function useMissionSession({
       ) {
         const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, detail.foulContact)
         const foulStealing = takeStealingFrom()
+        // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
+        clearStealDisplay()
         playSoundIds(audio, [detail.contactSoundId])
         // 배트를 냈다 — 스윙 수는 휘두른 자리에서 준다. 다 썼는지는 판이 파울로 닫힌 뒤 본다
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
@@ -1000,6 +1017,8 @@ export function useMissionSession({
         // 스윙 수만 먼저 줄이고 **루·아웃·목표는 한 톨도 건드리지 않는다** — 수비 화면이
         // 다 돈 뒤 `finishDefensePlay` 가 한 번에 먹인다 (원본도 0x17 이 도는 동안 0xf 로 안 간다)
         if (hasSwung) setMissionRun((previous) => (previous === null ? previous : recordSwing(previous)))
+        // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
+        clearStealDisplay()
         setPendingDefensePlay({
           side: '타자',
           input: {

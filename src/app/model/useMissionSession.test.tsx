@@ -421,6 +421,36 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
     rendered.unmount()
   })
 
+  it('출발 루 표시 st[0x15 + i] 는 판정 때가 아니라 다음 0xf 진입(0x3d954 3d966~3d976)에서 지워진다', () => {
+    const rendered = setUpBatterMission(5)
+    act(() => {
+      rendered.result.current.session.actions.steal(1)
+    })
+    expect(rendered.result.current.session.stealingFrom).toEqual([1])
+
+    act(() => {
+      rendered.result.current.runner.setBannerText('볼')
+    })
+    act(() => {
+      rendered.result.current.session.handleMissionPitch({
+        resolution: { kind: '볼' },
+        hasSwung: false,
+        isBunt: false,
+        resultCode: null,
+      })
+    })
+    // 도루 판(종류 5)은 표시를 안 지운다 — 결과 띠 · 판 재생 동안 1루는 비어 보인다
+    expect(rendered.result.current.session.pickoffReplay).not.toBeNull()
+    expect(rendered.result.current.session.stealingFrom).toEqual([1])
+
+    // 결과 띠가 걷히면(0x12 끝) 0xf 진입 — 그때 지운다
+    act(() => {
+      rendered.result.current.runner.setBannerText('')
+    })
+    expect(rendered.result.current.session.stealingFrom).toEqual([])
+    rendered.unmount()
+  })
+
   it('출발하지 않은 공은 판이 없다 — 루 그대로', () => {
     const rendered = setUpBatterMission(5)
     const before = rendered.result.current.session.missionRun!
