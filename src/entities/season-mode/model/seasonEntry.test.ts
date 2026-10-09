@@ -186,6 +186,22 @@ describe('0xe0 목록 능력치 = 레코드 0xb6415(rec, k, 1) — 상세 창 0x
     expect(lists.batters[1]?.ability).toEqual(표.ability)
   })
 
+  it('국가대항전 대한민국(10) 8번 박지혁 · 11번 이태호는 수비불가 20 이라 수비가 100 깎여 보인다 (b6512)', () => {
+    const lists = seasonEntryListsOf({ teamId: 10, roster: tableRosterOf(10), dayCounter: 0, acePitcherId: -1, aceBatterId: -1 })
+    for (const slot of [8, 11]) {
+      const 표 = teamBatters(10)[slot]!
+      expect(표.skillBits & (1 << 20)).not.toBe(0)
+      expect(lists.batters[slot]?.ability).toEqual([표.ability[0], 표.ability[1], Math.max(표.ability[2]! - 100, 0), 표.ability[3]])
+    }
+  })
+
+  it('외인구단(14)은 표 행 니블(+0x19 · +0x1a)이 얹혀 보인다', () => {
+    const lists = seasonEntryListsOf({ teamId: 14, roster: tableRosterOf(14), dayCounter: 0, acePitcherId: -1, aceBatterId: -1 })
+    const 표 = teamBatters(14)[0]!
+    expect(표.equipment.some((nibble) => nibble > 0)).toBe(true)
+    expect(lists.batters[0]?.ability).not.toEqual(표.ability)
+  })
+
   it('영입 선수는 옮긴 밑값 · +0x14 · 지금 니블로 다시 센다 — 시즌에 바꾼 니블이 얹힌다', () => {
     const lists = seasonEntryListsOf({
       teamId: 0,
