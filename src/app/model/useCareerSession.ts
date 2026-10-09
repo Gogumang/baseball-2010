@@ -56,6 +56,7 @@ import {
   popupAfterChampion,
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
+  regularSeasonOpenedHiddenIds,
 } from '@/entities/career/model/postseasonFlow'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
@@ -325,6 +326,8 @@ interface CareerSessionInput {
    * +0x7a · 시즌모드 시즌 기록 +0x7a · 전역 해금표 `app+0xc0`. 팝업을 닫을 때 읽는다. 안 넘기면 검사를 건너뛴다.
    */
   readonly readRegularSeasonOtherModes?: () => RegularSeasonOtherModes | undefined
+  /** 공용 창에 히든 오픈 알림 (0x62368 → 0x74ef5) — 새로 연 k 만 넘긴다. 정규시즌 우승 팝업 0xb 닫힘이 쓴다 */
+  readonly announceHiddenOpen?: (ids: readonly number[]) => void
   /**
    * 열린 마선수 로컬 번호 (전역 저장 +0x30.. 마투수 · +0x35.. 마타자, `useAceOpen`). 142 진입 0x1c46c 가 여기서
    * 내 팀 마선수를 굴린다(0x9f604 · 0x9f650). 안 넘기면 기본 개방 둘(마투수 0 · 마타자 0)이다.
@@ -394,6 +397,7 @@ export function useCareerSession({
   recordStat = NO_STAT,
   aceLevels,
   readRegularSeasonOtherModes,
+  announceHiddenOpen,
   openedAces = DEFAULT_NARI_OPENED_ACES,
   nariGameSave,
   aceMatchPending,
@@ -2136,7 +2140,11 @@ export function useCareerSession({
       const popup = screen.popup
       if (popup.kind === '정규시즌우승') {
         // 팝업 0xb — 보상을 얹고 128 에 머문다
-        setCareer(applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.타자편, readRegularSeasonOtherModes?.()))
+        const otherModes = readRegularSeasonOtherModes?.()
+        const rewarded = applyRegularSeasonReward(career, REGULAR_SEASON_HIDDEN_ID.타자편, otherModes)
+        setCareer(rewarded)
+        // 0x15c4e · 0x15c76 의 0x62369 — 새로 열었으면 공용 창 알림 (0x29 먼저, 타자편 0x22 는 대기)
+        announceHiddenOpen?.(regularSeasonOpenedHiddenIds(career, rewarded, otherModes))
         return setScreen({ ...screen, popup: null })
       }
       if (popup.kind === '우승발표') {

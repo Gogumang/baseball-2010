@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -11,6 +12,8 @@ import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGa
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
+import { useHiddenOpenNotice } from '@/app/model/useHiddenOpenNotice'
+import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { EMPTY_COLLECTION, hallOfFameRecordIdOf, pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { hasCareerPlayerInSeasonTeam, isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
 import { careerResetTargetOf, judgeModeReset } from '@/entities/settings/model/modeReset'
@@ -175,9 +178,14 @@ export function App() {
    * 세션들에는 이 고정 콜백을 넘기고 기록연감이 선 뒤 진짜 함수를 꽂는다.
    */
   const recordStatRef = useRef<(event: AnnalsStatEvent) => void>(() => {})
+  /** 히든 오픈 알림 공용 창 [0x140005c] (0x62368 → 0x74ef5) — 어느 화면 위에도 뜬다 */
+  const hiddenOpenNotice = useHiddenOpenNotice()
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
+  /** `0x62368(ui, k, 0)` — 기록연감 훅의 열기 + 알림. 미션 세션이 그보다 먼저 서므로 `recordStatRef` 처럼 꽂는다 */
+  const openHiddenRef = useRef<(id: number) => boolean>(() => false)
+  const openHidden = useCallback((id: number) => openHiddenRef.current(id), [])
   /** 시즌 팀 경기가 영입한 명전 선수를 그 기록으로 세울 때 읽는 명전 칸 — 위 ref 와 같은 값 */
   const readHallOfFame = useCallback(() => hallOfFameForMissionRef.current, [])
   /**
@@ -222,6 +230,8 @@ export function App() {
     aceMatchPendingPorts[NARI_PITCHER_MODE],
     // 장면 0x106 은 떠나면 헐린다 — 투수편 화면이 서 있을 때만 105 도착 고리가 돈다
     screen.kind === '투수편',
+    // 정규시즌 우승 팝업 0xb 닫힘의 0x62369(0x29 · 0x32) 알림 창
+    hiddenOpenNotice.announce,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(
@@ -246,6 +256,8 @@ export function App() {
     // 같은 날 CPU 끼리 경기·포스트시즌 CPU 경기의 마선수 배율(0xd88aa)도 전역 레벨 칸을 본다
     aceLevels: aceLevels.levels,
     readRegularSeasonOtherModes: readBatterOtherModes,
+    // 정규시즌 우승 팝업 0xb 닫힘의 0x62369(0x29 · 0x22) 알림 창
+    announceHiddenOpen: hiddenOpenNotice.announce,
     openedAces: nariOpenedAces,
     nariGameSave: batterNariGameSave,
     // 나간 마선수 대결 대기 — 전역기록 g[0xec] · g[0xee] · g[0x11f] · g[0x144] (선수를 새로 만들어도 남는다)
@@ -262,6 +274,10 @@ export function App() {
   const mission = useMissionSession({
     runner, random, missionRecord, screen, setScreen, sound,
     onGamePointReward: careerSession.actions.gainGamePoint,
+    // 정산 4ef86 — 편별 올클리어면 히든 37 · 21 을 열고 알림 창 (0x62368)
+    openHidden,
+    // 정산 끝 0x4e8b0 — 모드 5 · 6 플레이 시간 (칸 +0x54)
+    recordStat,
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
     // 환경설정 진동 (저장 +0x3b) — 투수 미션·투수편 마선수 대결의 사람 공 삼진 진동(0x4d0d6)이 본다
@@ -314,13 +330,14 @@ export function App() {
   const collection = useCollection(
     collectionStore,
     careerSession.career,
-    everyMissionCleared,
     sharedOpenedHiddenIds,
     // 엔딩 적재 0x87c7c 는 두 편 공용 — 투수편 엔딩·연애 엔딩도 기록연감 칸에 켠다
     pitcherSession.career,
     // 투수편 칭호도 기록연감 칭호 칸(투수편 비트 +0xec)에 켠다 (0xa40e0)
     pitcherSession.career?.titleIds,
     seasonEndingIndex,
+    // 0x62368 의 알림 창 — 플레이 시간 히든 31 · 47 (0x4e8b0)
+    hiddenOpenNotice.announce,
   )
   const { recordStat: recordCollectionStat } = collection
   hallOfFameForMissionRef.current = collection.collection
@@ -344,9 +361,11 @@ export function App() {
       globalOpenedHiddenIds: collection.collection.openedHiddenIds,
     },
   }
+  const { openHidden: openCollectionHidden } = collection
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
-  }, [recordCollectionStat])
+    openHiddenRef.current = openCollectionHidden
+  }, [recordCollectionStat, openCollectionHidden])
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds
@@ -401,6 +420,26 @@ export function App() {
     mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
   }
 
+  /**
+   * 히든 오픈 알림 공용 창 — 0x62368 이 0x74ef5(종류 1, OK)로 띄운다. 원본 창은 어느 장면 위에도 그려지므로 모든 화면 위에 얹는다.
+   * 닫히면 대기 글이 있으면 그 글로 다시 선다(0x75440).
+   */
+  const withHiddenOpenNotice = (routes: ReactNode) => (
+    <>
+      {routes}
+      {hiddenOpenNotice.text !== null && (
+        <ScreenOverlay>
+          <MessageBox
+            key={hiddenOpenNotice.serial}
+            text={hiddenOpenNotice.text}
+            buttons={['확인']}
+            onAnswer={hiddenOpenNotice.close}
+          />
+        </ScreenOverlay>
+      )}
+    </>
+  )
+
   // 미션 모드는 메인 메뉴에서 들어가 선수 고르기(하위 17)부터 띄운다 — 육성·명예 선수가 다 없으면 원본대로
   // 고르기 창에서 막힌다(StrCOMMON[38]·[39]). 고른 선수의 편이 투수(모드 5)/타자(모드 6) 미션을 정한다.
   if (MISSION_SCREENS.includes(screen.kind)) {
@@ -416,7 +455,7 @@ export function App() {
         },
       },
     }
-    return (
+    return withHiddenOpenNotice(
       <MissionRoutes
         screen={screen}
         setScreen={setScreen}
@@ -443,7 +482,7 @@ export function App() {
 
   // 시즌모드는 나만의리그 커리어와 아예 다른 저장·흐름이다 (원본 장면 0x105)
   if (screen.kind === '시즌모드') {
-    return (
+    return withHiddenOpenNotice(
       <SeasonRoute
         session={seasonSession}
         random={random}
@@ -474,7 +513,7 @@ export function App() {
       setGeneralResume(null)
       setScreen(openTier === undefined ? { kind: '메인메뉴' } : { kind: '메인메뉴', openTier })
     }
-    return (
+    return withHiddenOpenNotice(
       <GeneralModeScreen
         random={random}
         {...(generalResume === null ? {} : { resumeGame: generalResume })}
@@ -534,7 +573,7 @@ export function App() {
 
   // 나만의리그 투수편은 타자편 커리어와 다른 저장·흐름이다 (원본 모드 3, 장면 0x106)
   if (screen.kind === '투수편') {
-    return (
+    return withHiddenOpenNotice(
       <PitcherLeagueRoute
         session={pitcherSession}
         random={random}
@@ -570,7 +609,7 @@ export function App() {
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {
-    return (
+    return withHiddenOpenNotice(
       <EntryRoutes
         screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
         collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
@@ -647,7 +686,7 @@ export function App() {
     )
   }
 
-  return (
+  return withHiddenOpenNotice(
     <CareerRoutes
       screen={screen}
       setScreen={setScreen}

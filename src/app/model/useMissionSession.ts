@@ -5,7 +5,9 @@ import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner, describePitchResolution } from '@/entities/at-bat/model/resolutionText'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import { missionKeyOf } from '@/entities/mission/model/missionGoal'
+import { isMissionSideAllCleared, MISSION_ALL_CLEAR_HIDDEN_ID, missionKeyOf } from '@/entities/mission/model/missionGoal'
+import { lapPlayClock, startPlayClock } from '@/entities/collection/model/playClock'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import {
@@ -160,6 +162,16 @@ interface MissionSessionInput {
    * 육성 선수가 없으면 받아 갈 곳이 없으므로 넘기지 않아도 된다.
    */
   readonly onGamePointReward?: (amount: number) => void
+  /**
+   * `0x62368(ui, k, 0)` — 전역 해금표에 히든 k 를 열고 공용 창에 알림(이미 열렸으면 아무것도 안 한다). 정산의 편별 올클리어
+   * (4ef86)가 부른다. 새로 열었으면 참
+   */
+  readonly openHidden?: (id: number) => boolean
+  /**
+   * 기록연감 통계 `[mgr+0xc8]` 에 한 건 쌓는다 — 정산 0x4ea0c 끝의 플레이 시간 누계 0x4e8b0(모드 5 · 6 → 칸 +0x54).
+   * 안 넘기면 아무것도 안 쌓는다
+   */
+  readonly recordStat?: (event: AnnalsStatEvent) => void
   /** 소리 통로 (원본 사운드 객체 `[0x1400058]`). 안 넘기면 아무 소리도 안 난다 */
   readonly sound?: SoundPort
   /**
@@ -482,6 +494,8 @@ export function useMissionSession({
   screen,
   setScreen,
   onGamePointReward,
+  openHidden,
+  recordStat,
   sound,
   throwModeManual,
   aceLevels,
@@ -1473,8 +1487,8 @@ export function useMissionSession({
    * 보상은 이번 클리어를 더하기 **전** 횟수로 계산하므로 다시 깰수록 줄어든다.
    * 원본은 99 회에서 센 것을 멈춘다.
    */
-  const rememberCleared = (mission: OriginalMission, status: string): number => {
-    if (status !== '성공') return 0
+  const rememberCleared = (mission: OriginalMission, status: string): { readonly earned: number; readonly counts: MissionClearCounts } => {
+    if (status !== '성공') return { earned: 0, counts: clearCounts }
     const key = missionKeyOf(mission)
     const previous = clearCounts[key] ?? 0
     const reward = missionRewardOf(mission.stage, previous)
@@ -1484,7 +1498,7 @@ export function useMissionSession({
     const next = { ...clearCounts, [key]: Math.min(MAXIMUM_CLEARS, previous + 1) }
     setClearCounts(next)
     missionRecord.save(next)
-    return earned
+    return { earned, counts: next }
   }
 
   /**
@@ -1508,12 +1522,13 @@ export function useMissionSession({
     return true
   }
 
-  const rememberAceMatchCleared = (mission: OriginalMission) => {
+  const rememberAceMatchCleared = (mission: OriginalMission): MissionClearCounts => {
     const key = aceMatchClearKeyOf(mission)
-    if (key === null) return
+    if (key === null) return clearCounts
     const next = { ...clearCounts, [key]: aceMatchClearCountAfterWin(clearCounts[key]) }
     setClearCounts(next)
     missionRecord.save(next)
+    return next
   }
 
   /**
@@ -1537,13 +1552,21 @@ export function useMissionSession({
     isSettledRef.current = true
     const isWin = run.status === '성공'
     const aceMission = missionRun !== null ? (screen.kind === '마선수대결' ? screen.mission : null) : pitcherAceMatchMission
+    let countsAfter = clearCounts
     if (aceMission !== null) {
       // 대결은 0x4ef3e 가 G 를 건너뛰고, 0xa5368 은 +0xbd(team − 1) ≤ 15 일 때만 그 편 칸을 올린다
-      if (isWin) rememberAceMatchCleared(aceMission)
+      if (isWin) countsAfter = rememberAceMatchCleared(aceMission)
       setSettledEarned(0)
     } else {
-      setSettledEarned(rememberCleared(run.mission, run.status))
+      const cleared = rememberCleared(run.mission, run.status)
+      countsAfter = cleared.counts
+      setSettledEarned(cleared.earned)
     }
+    // 4ef84~4efae — 성공이면(대기로 G 를 건너뛴 판도) 그 편 올클리어 0xa5184 를 보고 0x62368(ui, 모드 6 ? 37 : 21, 0)
+    const side: OriginalMission['side'] = missionRun !== null ? '타자' : '투수'
+    if (isWin && isMissionSideAllCleared(countsAfter, side)) openHidden?.(MISSION_ALL_CLEAR_HIDDEN_ID[side])
+    // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 모든 모드를 센다: 모드 5 · 6 은 0x22efc 의 미션 칸 +0x54 (점프표 0xcdaac)
+    recordStat?.({ kind: '플레이시간', mode: side === '타자' ? MISSION_BATTER_MODE : MISSION_PITCHER_MODE, elapsed: lapPlayClock() })
     // 0x4efc6~0x4f018 — 서 있는 대기마다(대결이면 SYS 8 이 세운 그 편 칸도) 결과 바이트를 이 판 결과로. g[0xf6] 은 안 본다
     if (isAceMatchHeld(aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD)) aceMatchHold?.writeResult(isWin)
     // 결과 징글 — 0x4ea0c 의 모드 표 0xd0428[5 · 6] = 0x4ef18 이 [sp+0x50] 을 [미션+0xbc](성공?)로 덮고(4ef36 · 4efb4),
@@ -1645,6 +1668,8 @@ export function useMissionSession({
     audio.stop()
     openScenePatternDeck(random)
     rollSimulatorInit(random)
+    // 같은 꼬리 0x3fa3e 의 0x3f554 — 플레이 시계를 지금부터 잰다(정산 0x4e8b0 이 모드 5 · 6 칸에 더한다)
+    startPlayClock()
     // 상태 9 끝 3fa5e 가 예약한 상태 8 경기 적재(48774 → 0x352e8 → 0x783b0) — 하늘 줄 rand(0, 6)
     rollSkyRow()
   }
@@ -1769,6 +1794,8 @@ export function useMissionSession({
       audio.stop()
       openScenePatternDeck(random)
       rollSimulatorInit(random)
+      // 0x3fa3e 의 0x3f554 — 플레이 시계 (`resetForNewMatch` 와 같다)
+      startPlayClock()
       // 그 뒤 상태 8 경기 적재의 하늘 줄 rand(0, 6) (`rollSkyRow` 머리말)
       rollSkyRow()
       // 0xaa57c aa6e0 — g[0x11f] 가 서 있고 g[0xf6] = 4(나리 타자편, SYS 8 0x8d836) → 사람 칸 = 타자편 저장 팀

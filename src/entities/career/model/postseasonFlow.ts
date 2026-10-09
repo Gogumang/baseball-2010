@@ -136,7 +136,8 @@ export function popupAfterChampion(career: PostseasonCareerFields, champion: num
  * 셋 다 `s8` 로 읽는다. 시즌모드 결산 0x6900 의 같은 검사와 달리 **여기는 열린 뒤에도 끝내지 않고** 0x15c54 의
  * 자기 모드 해금(`REGULAR_SEASON_HIDDEN_ID`)으로 이어간다. 다른 두 저장의 값은 `otherModes` 로 받는다 —
  * 안 넘기면(부르는 쪽이 아직 그 저장을 못 읽으면) 0x29 검사를 건너뛴다.
- * ⚠️ 해금 알림(0x62369 가 띄우는 글)은 웹에서 이 자리에 따로 띄우지 않는다 — id 만 남긴다.
+ * 두 0x62369 는 저마다 새로 열면 공용 창에 알림을 띄운다 — 부르는 쪽이 `regularSeasonOpenedHiddenIds` 로 새로 연 k 를 차례대로
+ * 받아 창에 넣는다(0x29 가 먼저 뜨고 자기 모드 것은 대기했다가 닫으면 뜬다).
  */
 export function applyRegularSeasonReward<T extends PostseasonCareerFields>(
   career: T,
@@ -155,6 +156,19 @@ export function applyRegularSeasonReward<T extends PostseasonCareerFields>(
   if (signedByteOf(career.regularSeasonFirstCount) <= REGULAR_SEASON_HIDDEN_COUNT_ABOVE) return withAutobot
   if (withAutobot.openedHiddenIds.includes(hiddenId)) return withAutobot
   return { ...withAutobot, openedHiddenIds: [...withAutobot.openedHiddenIds, hiddenId] }
+}
+
+/**
+ * 팝업 0xb 닫힘에서 **새로 연** 히든 k — 0x15c4e(0x29) · 0x15c76(자기 모드) 차례. 0x62368 셋째 인자 0 은 전역 해금표에 이미 있으면
+ * 창을 안 띄우므로(0x61f5c) 전역 표에 있던 k 는 뺀다.
+ */
+export function regularSeasonOpenedHiddenIds(
+  before: Pick<PostseasonCareerFields, 'openedHiddenIds'>,
+  after: Pick<PostseasonCareerFields, 'openedHiddenIds'>,
+  otherModes?: Pick<RegularSeasonOtherModes, 'globalOpenedHiddenIds'>,
+): readonly number[] {
+  const global = otherModes?.globalOpenedHiddenIds ?? []
+  return after.openedHiddenIds.filter((id) => !before.openedHiddenIds.includes(id) && !global.includes(id))
 }
 
 /** 해금 0x29 = 히든 칸 (1, 1, 2) = StrITEM[20] "오토봇 배트" (R13 §11 표) */

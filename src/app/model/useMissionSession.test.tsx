@@ -57,9 +57,11 @@ const SIKER_TEAM = 16
 const WIN_EVENT_ID = 114
 const LOSE_EVENT_ID = 115
 
-function setUpSession() {
+type SessionExtra = Pick<Parameters<typeof useMissionSession>[0], 'openHidden' | 'recordStat'>
+
+function setUpSession(counts: Readonly<Record<string, number>> = {}, extra: SessionExtra = {}) {
   const save = vi.fn()
-  const missionRecord: MissionRecordPort = { load: () => ({}), save }
+  const missionRecord: MissionRecordPort = { load: () => counts, save }
   const random = createSeededRandom(1)
   let screen: Screen = { kind: '관리' }
   const setScreen = vi.fn((next: Screen) => {
@@ -70,7 +72,7 @@ function setUpSession() {
     const runner = useAtBatRunner()
     return {
       runner,
-      session: useMissionSession({ runner, random, missionRecord, screen, setScreen }),
+      session: useMissionSession({ runner, random, missionRecord, screen, setScreen, ...extra }),
     }
   })
 
@@ -78,8 +80,8 @@ function setUpSession() {
 }
 
 /** 대결을 시작하고 타구 하나로 끝낸다 */
-function playAceMatch(hit: boolean) {
-  const { rendered, screenNow, save } = setUpSession()
+function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {}, extra: SessionExtra = {}) {
+  const { rendered, screenNow, save } = setUpSession(counts, extra)
   const mission = aceMatchMissionOf(SIKER_TEAM)
   if (mission === null) throw new Error('싸이커 공략 레코드가 없다')
 
@@ -158,6 +160,31 @@ describe('마선수 대결 화면 전환', () => {
 
     expect(status).toBe('성공')
     expect(save).toHaveBeenCalledWith({ '타자:16': 0 })
+  })
+
+  it('성공 정산은 대결이어도 편별 올클리어 0xa5184 를 보고 0x62368(37) — 지면 안 본다 (4ef84~4efae)', () => {
+    const allBatter = Object.fromEntries(MISSIONS.filter((mission) => mission.side === '타자' && mission.stage > 0)
+      .map((mission) => [`타자:${mission.id}`, 1]))
+    const opened: number[] = []
+    const openHidden = (id: number) => {
+      opened.push(id)
+      return true
+    }
+    playAceMatch(false, allBatter, { openHidden })
+    expect(opened).toEqual([])
+    playAceMatch(true, allBatter, { openHidden })
+    expect(opened).toEqual([37])
+    // 한 칸이라도 0 이면 안 연다
+    opened.length = 0
+    playAceMatch(true, { ...allBatter, '타자:14': 0 }, { openHidden })
+    expect(opened).toEqual([])
+  })
+
+  it('정산 끝 0x4e8b0 — 이기든 지든 플레이 시간을 모드 6 칸에 한 번 쌓는다 (0x4f54a)', () => {
+    const recordStat = vi.fn()
+    playAceMatch(false, {}, { recordStat })
+    expect(recordStat).toHaveBeenCalledTimes(1)
+    expect(recordStat).toHaveBeenCalledWith(expect.objectContaining({ kind: '플레이시간', mode: 6 }))
   })
 })
 

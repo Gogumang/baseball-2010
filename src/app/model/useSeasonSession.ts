@@ -2744,7 +2744,7 @@ export function useSeasonSession(
   /**
    * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
    * 원본 자리가 전역 저장이라 시즌 세이브가 아니라 세션 칸에 쌓는다 (위 `openedStadiumIds` 주석).
-   * ⚠️ 안 옮긴 것 — 해금 알림 `0x62368` (StrCOMMON[139] + [141] "시즌모드에서 사용가능합니다").
+   * 해금 알림 창(`0x62368` → StrCOMMON[139] + [141])은 상점 화면이 완료 팝업을 닫을 때 띄운다(`StadiumShopScreen`).
    */
   const openStadiumItems = useCallback((unlockIds: readonly number[]) => {
     setOpenedStadiumIds((opened) => {

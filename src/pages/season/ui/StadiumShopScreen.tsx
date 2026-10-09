@@ -15,6 +15,7 @@ import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { STADIUM_BOXES } from '@/widgets/season/lib/seasonWindowLayout'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 
 /** 가드 문구 — 원본 StrMODE (S3 4절). 웹에 StrMODE 표가 없어 다른 화면들처럼 글을 그대로 적는다 */
 const REFUSAL_TEXT: Readonly<Record<StadiumPurchaseRefusal, (required: number) => string>> = {
@@ -48,7 +49,7 @@ export interface StadiumShopScreenProps {
   readonly isHiddenOpen?: (unlockId: number) => boolean
   /** 사거나 바꾼 뒤의 레코드. 저장(0x22755)은 부르는 쪽이 한다 */
   readonly onChange: (record: SeasonRecord) => void
-  /** 컬렉터 해금 id (관중석 13 · 전광판 16) 가 열렸다 — 0x81d0 */
+  /** 컬렉터 해금 id (관중석 13 · 전광판 16) 를 새로 열었다 — 구매 완료 팝업이 닫힐 때 0x81d0 */
   readonly onUnlock?: (unlockIds: readonly number[]) => void
   /** 취소(−16) — 상점은 아이템 메뉴로, 구장관리는 구단관리(0xce)로 되돌아간다 */
   readonly onBack: () => void
@@ -68,6 +69,10 @@ export function StadiumShopScreen({
 }: StadiumShopScreenProps) {
   const [kind, setKind] = useState<StadiumKind>(STADIUM_KINDS[0])
   const [notice, setNotice] = useState<string | null>(null)
+  /** 구매 완료 팝업(결과코드 15)이 닫힐 때 0x81d0 이 볼 레코드 — 산 그 판의 것 */
+  const [purchased, setPurchased] = useState<SeasonRecord | null>(null)
+  /** 0x81d0 의 0x62368 이 공용 창에 띄운 히든 오픈 글 — 떠 있는 것 하나 + 대기 하나 (0x74ef4 +0x2a4) */
+  const [hiddenNotices, setHiddenNotices] = useState<readonly string[]>([])
   const [question, setQuestion] = useState<{ readonly kind: StadiumKind; readonly slot: number; readonly text: string } | null>(null)
 
   const select = (nextKind: StadiumKind, nextSlot: number) => {
@@ -93,9 +98,22 @@ export function StadiumShopScreen({
     setQuestion(null)
     onChange(bought)
     setNotice(PURCHASED_TEXT)
-    // 0x81d0 — 완료 팝업이 닫힐 때 기본 4칸을 다 모았으면 컬렉터 해금(13·16)
-    const unlocked = stadiumCollectorUnlocks(bought)
-    if (unlocked.length > 0) onUnlock?.(unlocked)
+    setPurchased(bought)
+  }
+
+  /**
+   * 알림 닫힘. 구매 완료(결과코드 15)였으면 **0x81d0** — `0xa38c5(rec, 0)` 참이면 `0x62369(g, 13, 0)`, `0xa38c5(rec, 1)` 참이면
+   * `0x62369(g, 16, 0)`. 0x62368 은 이미 열린 k(0x61f5c)면 아무것도 안 하고, 새로 열면 공용 창에 StrCOMMON[139] + [141] 을 띄운다
+   * (둘째는 창이 떠 있어 대기했다가 첫 창이 닫히면 뜬다).
+   */
+  const closeNotice = () => {
+    setNotice(null)
+    if (purchased === null) return
+    setPurchased(null)
+    const opened = stadiumCollectorUnlocks(purchased).filter((id) => !isHiddenOpen(id))
+    if (opened.length === 0) return
+    onUnlock?.(opened)
+    setHiddenNotices(opened.map(hiddenOpenNoticeTextOf).filter((text): text is string => text !== null))
   }
 
   // 칸 커서는 원본 목록 둘 중 `[win+0x19c]`(칸) 쪽이다. 종류(`[win+0x198]`)는 눌러서 바꾼다
@@ -105,7 +123,7 @@ export function StadiumShopScreen({
     count: slotCount,
     onSelect: (index) => select(kind, index),
     onCancel: onBack,
-    isEnabled: notice === null && question === null,
+    isEnabled: notice === null && question === null && hiddenNotices.length === 0,
   })
 
   return (
@@ -157,7 +175,15 @@ export function StadiumShopScreen({
         />
       )}
       {question === null && notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
+        <MessageBox text={notice} buttons={['확인']} onAnswer={closeNotice} />
+      )}
+      {question === null && notice === null && hiddenNotices[0] !== undefined && (
+        <MessageBox
+          key={hiddenNotices.length}
+          text={hiddenNotices[0]}
+          buttons={['확인']}
+          onAnswer={() => setHiddenNotices((shown) => shown.slice(1))}
+        />
       )}
     </RawScreen>
   )

@@ -7,6 +7,8 @@ import {
   goalsOf,
   isCleared,
   isEveryMissionCleared,
+  isMissionSideAllCleared,
+  MISSION_ALL_CLEAR_HIDDEN_ID,
   missionKeyOf,
   recordOutcome,
   requiredCountOf,
@@ -292,5 +294,17 @@ describe('목표 글에 없는 목표 칸도 판정한다 — 0xaaa6c 는 행+0x
   it('화면 띠(goalsOf 이름 → GoalBar)는 목표 글 그대로다 — 글에 없는 칸은 안 보인다 (0x36714)', () => {
     expect(goalsOf(투혼, createProgress()).map((goal) => goal.name)).toEqual(['MAX게이지', '탈삼진'])
     expect(goalsOf(사이클, createProgress()).map((goal) => goal.name)).toEqual(['사이클링히트'])
+  })
+})
+
+describe('편별 올클리어 0xa5184 → 0x62368(모드 6 ? 37 : 21)', () => {
+  const allOf = (side: '타자' | '투수') =>
+    Object.fromEntries((side === '타자' ? BATTER_MISSIONS : PITCHER_MISSIONS).map((mission) => [missionKeyOf(mission), 1]))
+
+  it('그 편 목록 14칸(번호 1~14)이 모두 > 0 이어야 참 — 다른 편은 안 본다', () => {
+    expect(isMissionSideAllCleared(allOf('타자'), '타자')).toBe(true)
+    expect(isMissionSideAllCleared(allOf('타자'), '투수')).toBe(false)
+    expect(isMissionSideAllCleared({ ...allOf('투수'), '투수:14': 0 }, '투수')).toBe(false)
+    expect(MISSION_ALL_CLEAR_HIDDEN_ID).toEqual({ 타자: 37, 투수: 21 })
   })
 })
