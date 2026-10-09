@@ -194,9 +194,12 @@ describe('deadly_effect 자리', () => {
 })
 
 describe('공 그림', () => {
-  it('높이가 오르면 굵어지고 10 에서 멈춘다', () => {
-    expect(ballFrameOf(0)).toBe(0)
-    expect(ballFrameOf(1200)).toBe(2)
+  it('땅에서 4칸, 높이 2000 마다 한 칸 굵어지고 10 에서 멈춘다 (36efa~36f10)', () => {
+    expect(ballFrameOf(0)).toBe(4)
+    expect(ballFrameOf(1999)).toBe(4)
+    expect(ballFrameOf(2000)).toBe(5)
+    expect(ballFrameOf(11999)).toBe(9)
+    expect(ballFrameOf(12000)).toBe(10)
     expect(ballFrameOf(99999)).toBe(10)
     // 11칸을 넘지 않는다 — 011~022 는 불꽃 공, 023~033 은 날개 공(둘 다 마구 그림)이라
     // 보통 공에 섞여 나오면 안 된다

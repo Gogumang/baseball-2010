@@ -431,21 +431,25 @@ export function fielderSpriteOf(fielder: DefenseFielder): FielderSprite {
 }
 
 /**
- * 공 그림 프레임.
+ * 공 그림 프레임 — 0x17 공 그리기 0x36dfc(36efa~36f56, 직접 뜸).
  *
- * ball.pzx 는 **공 종류 3 × 크기 11칸**이다 (`ballFrameOf(path, i, 종류)` = 크기 + 11×종류, 0x358fc):
+ * ball.pzx 는 **공 종류 3 × 크기 11칸**이다 (그림 = 크기 + 11 × 종류):
  *   - 000~010 보통 야구공 (2×2 → 12×12)
  *   - 011~022 **불꽃 공** — 마구 1 "파이어 볼" 쪽 그림
  *   - 023~033 **날개 달린 공** — 또 다른 마구 그림 (가로로 길다, 최대 33×11)
  *
- * ⚠️ 예전 주석은 011~022 를 "세로로 늘어난 것", 023~033 을 "납작한 그림자"라고 적어 뒀는데
- *    **둘 다 틀렸다**. 그림을 직접 펼쳐 보면 불꽃과 날개다. 그 오해 때문에 수비 화면이
- *    날개 공을 공 그림자로 깔아, 공 양옆에 검은 날개가 붙어 보였다.
- *
- * 고르는 식은 공 궤적 코드(0xb3b38·0xb401c) 안이라 읽지 않았다 —
- * 여기서는 500 월드 단위마다 한 칸 굵어지는 것으로 근사한다.
+ * ```
+ * 36efa  크기 = 0xca7b4(공 높이 y, 2000) + 4 ; 크기 > 10 이면 10           ; 아래 자르기는 없다
+ * 36f3a  그림 = 크기 + 11 × [경기+0x1080]                                     ; 0xbe8d4 로 그리기 목록에
+ * ```
+ * 경기+0x1080(공 그림 종류)은 0x17 진입 0x46418 이 끝(467fe)에서 **0 으로 둔다** — 그 뒤 0x17 동안 쓰는 곳이 없다
+ * (쓰는 곳 전수 R2 14-1: 0x3d78e · 0x3d988 · 0x467fe 는 0, 마구 갈래 0x4725c · 0x4736e · 0x3b55e 는 타석 그리기 0x4d64c ·
+ * 0x3b2f4 안). 그래서 수비 화면의 공은 늘 보통 공(종류 0)이고, 땅에 있어도 004 부터다(000~003 은 안 쓴다).
  */
-export const BALL_HEIGHT_PER_FRAME = 500
+export const BALL_HEIGHT_PER_FRAME = 2000
+/** 땅(높이 0)의 크기 칸 (36f06 `adds r0, #4`) */
+export const BALL_GROUND_FRAME = 4
+const BALL_MAX_FRAME = 10
 export function ballFrameOf(height: number): number {
-  return Math.max(0, Math.min(10, Math.trunc(height / BALL_HEIGHT_PER_FRAME)))
+  return Math.min(Math.trunc(height / BALL_HEIGHT_PER_FRAME) + BALL_GROUND_FRAME, BALL_MAX_FRAME)
 }
