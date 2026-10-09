@@ -120,7 +120,7 @@ import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { NO_ACE_MATCH_HOLD, isAceMatchHeld } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
+import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
@@ -278,7 +278,8 @@ export function missionOpponentAbility(
   const opponent = missionOpponent(mission)
   if (opponent === null) return null
   const level = aceLevelOf(aceLevels, aceLevelSlotOf(opponent.role, mission.opponentAce))
-  return aceAbilityAtLevel(opponent.ability, level)
+  // 0xb6415(rec, k, 1) — 레벨 배율 뒤 장착 스킬 단계까지(발렌타인 냉정 22, `aceRecordAbilityAtLevel`)
+  return aceRecordAbilityAtLevel(opponent, level)
 }
 
 /** 필살 남은 칸의 "아직 안 채움" — 타석 교대 0xaebe4 가 음수일 때만 채운다 (H2 1-2) */
@@ -307,19 +308,27 @@ export function missionBatterSpecialSwingRemainingOf(
  * **투수 미션 상대 마타자의 필살** — 0x34468 이 보는 번호·남은 횟수와 0x34d6c 의 순번·레벨.
  * 마타자 미션이 아니면 null (일반 CPU 타자는 S+0x10 을 쓰지 않는다 — Q1 5절).
  * 남은 칸이 −1 이면 0xaebe4 처럼 s8 0xd84fa[레벨] 로 채운다 (레벨 = `mgr[0x13f + 순번]`).
- * ⚠️ 마타자 레코드의 스킬 23 무자비(+1)는 웹 마선수 표에 스킬 비트가 없어 늘 거짓이다.
+ * 스킬 23 무자비(+1)는 마타자 레코드 +0x14(XlsACE_BAT 행 그대로)의 비트 23 이다 — 다섯 줄 모두 꺼져 있어 늘 거짓이지만 행 비트로 본다.
  */
 export function missionOpponentSpecialSwingOf(
   mission: OriginalMission,
   stored: number,
   aceLevels?: Readonly<Record<number, number>>,
 ): { readonly swingNumber: number; readonly remaining: number; readonly aceOrder: number; readonly aceLevel: number } | null {
-  if (mission.side !== '투수' || missionOpponent(mission) === null) return null
+  const opponent = missionOpponent(mission)
+  if (mission.side !== '투수' || opponent === null) return null
   const aceOrder = mission.opponentAce - 1
   const swingNumber = aceOrder + ACE_SPECIAL_NUMBER_OFFSET
   const aceLevel = aceLevelOf(aceLevels, aceLevelSlotOf('타자', mission.opponentAce))
   const remaining =
-    stored >= 0 ? stored : specialSwingCountOf({ swingNumber, isAceBatter: true, aceLevel, hasRuthlessSkill: false })
+    stored >= 0
+      ? stored
+      : specialSwingCountOf({
+          swingNumber,
+          isAceBatter: true,
+          aceLevel,
+          hasRuthlessSkill: aceSkillIdsOf(opponent).includes(RUTHLESS_SKILL_ID),
+        })
   return { swingNumber, remaining, aceOrder, aceLevel }
 }
 
@@ -334,10 +343,10 @@ export function missionPitcherAbility(
   staminaPercent?: number,
 ): PitcherAbility {
   const opponent = missionOpponent(mission)
-  const ability = missionOpponentAbility(mission, aceLevels)
-  return opponent === null || ability === null
-    ? DEFAULT_PITCHER_ABILITY
-    : pitcherAbilityOf({ ...opponent, ability }, undefined, staminaPercent)
+  if (opponent === null) return DEFAULT_PITCHER_ABILITY
+  // 레벨 배율만 먹인 값을 넘긴다 — 장착 스킬 단계(냉정 22)는 `pitcherAbilityOf` 가 `gameAbility` 에 먹인다(두 번 먹이지 않는다)
+  const level = aceLevelOf(aceLevels, aceLevelSlotOf(opponent.role, mission.opponentAce))
+  return pitcherAbilityOf({ ...opponent, ability: aceAbilityAtLevel(opponent.ability, level) }, undefined, staminaPercent)
 }
 
 /**
@@ -365,6 +374,9 @@ export function missionMoundPitcherAbility(
 
 /** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (0xa5f0e) */
 const INTIMIDATE_SKILL_ID = 22
+/** 0xa5e14 가 보는 투수 비트 — 18 비겁자(×2) · 10 끈기(−1) */
+const COWARD_SKILL_BIT = 18
+const ENDURE_SKILL_BIT = 10
 /**
  * 미션 마투수 용량 0x66e44(V, P, 첫 투수)의 사기 — V = `0x1f9a8(app, 모드, 팀)` 이 모드 5·6·7 이면 표 0xcd7e0 의
  * 0x1fa1e(늘 0)로 가서 V 가 없다 → 사기 100.
@@ -376,7 +388,7 @@ const MISSION_TEAM_MORALE = 100
  * (0x1f824)를 0xb521c 로 팀 칸 8 에 통째(0x30, +0x2c 포함 — 다섯 줄 모두 10000) 베끼고 0xb8c94 로 0번과 맞바꿔 세우므로
  * 경기마다 10000 에서 선다. 이미 마운드에 그 마투수가 있으면 다시 베끼지 않아 깎인 값이 이어진다.
  * CPU 투수 교체 0xac428 을 미션 객체(0x66864)가 막는 것은 **칸 3·7(레오니·발렌타인)뿐**이다 — 드래고나(칸 11)는
- * 안 막는다(`entities/mission/model/missionCpuTeam`). 용량의 체력은 `0xb6415(P, 3, 1)` = 레벨 배율 먹은 넷째 칸(마선수 표에 스킬 비트 없음).
+ * 안 막는다(`entities/mission/model/missionCpuTeam`). 용량의 체력은 `0xb6415(P, 3, 1)` = 레벨 배율 먹은 넷째 칸(레벨 배율 뒤 장착 스킬 단계 — 냉정 22 는 제구만이라 체력은 그대로).
  * 첫 투수 +200 (0xaeb08 의 `team+0x26 − team+0x33 == 1`) 은 선다 — 0xaae7c 의 마투수 갈래(0xb521c · 0xb8c94 · 0xaea84)는 팀 객체의
  * +0x26 · +0x33 을 안 고쳐 0xb891c 때의 8 − 7 = 1 그대로다. 마투수가 내려가면 세션이 이 소모를 멈추고, 마선수가 아닌 마운드
  * 투수의 소모는 CPU 팀이 마스터 줄 능력치로 든다(`missionCpuAfterPitch`).
@@ -390,12 +402,13 @@ export function missionOpponentStaminaAfterPitch(
 ): number {
   const ability = missionOpponent(mission) === null ? null : missionOpponentAbility(mission, aceLevels)
   if (ability === null) return stamina
+  const opponentSkillBits = missionOpponent(mission)?.skillBits ?? 0
   const cost = pitchStaminaCostOf({
     pitchTypeNumber,
     batterIntimidates: batterSkillIds.includes(INTIMIDATE_SKILL_ID),
-    // 0xb62b4(마투수, 18) · (마투수, 10) — 마투수 다섯 줄 +0x14 는 두 비트가 모두 0 (XlsACE_PIT_DATA 행 바이트 0x14~0x17)
-    pitcherIsCoward: false,
-    pitcherEndures: false,
+    // 0xb62b4(마투수, 18) · (마투수, 10) — 레코드 +0x14 = XlsACE_PIT_DATA 행 바이트 0x14~0x17 (다섯 줄 모두 두 비트가 0)
+    pitcherIsCoward: ((opponentSkillBits >>> COWARD_SKILL_BIT) & 1) === 1,
+    pitcherEndures: ((opponentSkillBits >>> ENDURE_SKILL_BIT) & 1) === 1,
   })
   return consumeStamina(stamina, cost, staminaCapacityOf(ability.run, MISSION_TEAM_MORALE, true))
 }
@@ -1055,12 +1068,16 @@ export function useMissionSession({
     // 스태미나 소모 0xa5e14 — 0x11 진입 0x3de10 의 0x3dec6(모드 갈래 없음)이라 놓기 0x4dc78 의 등급 0x4dbac · 피로 0x34968 과
     // CPU 타자 스윙 0xab214 가 **깎은 뒤** 체력을 본다. 용량 0x66e44 의 사기는 모드 5 라 100(`MISSION_TEAM_MORALE`), 첫 투수 +200 은
     // 선다 — 0xb8820 이 투수를 넣으며 team+0x26 · +0x33 을 함께 +1 해 `+0x26 − +0x33 == 1` 그대로다(b884a~b885a)
+    // 공격 팀 지금 타자의 압도 22 — 0xa5e14(×2) · 실투 0x33cbc(+5)가 `0xb62b4(타자, 22)` 로 레코드 +0x14 를 본다(모드 갈래 없음).
+    // 마스터 줄은 Xls 행 사본, 마타자는 XlsACE_BAT 행 그대로(킹타이거 22 — `missionCpuBatterSkillIdsOf`)
+    const cpuBatterIntimidates = missionCpuBatterSkillIdsOf(pitcherRun, missionCpuBatterOf(pitcherRun.cpu)).includes(
+      INTIMIDATE_SKILL_ID,
+    )
     const pitcherStamina = consumeStamina(
       pitcherStaminaStored ?? pitcher.stamina,
       pitchStaminaCostOf({
         pitchTypeNumber: typeNumber,
-        // ⚠️ CPU 타자의 압도 22 — 실투 판정과 같이 늘 거짓으로 둔다(아래 `isMistakePitch` 주석)
-        batterIntimidates: false,
+        batterIntimidates: cpuBatterIntimidates,
         pitcherIsCoward: pitcher.isCoward,
         pitcherEndures: pitcher.endures,
       }),
@@ -1120,8 +1137,8 @@ export function useMissionSession({
         effectiveVelocity: pitcher.stats.velocity,
         runnerCount: runnerCountOf(pitcherRun.bases),
         hasSecondBaseRunner: pitcherRun.bases.second,
-        // ⚠️ 마타자 레코드의 스킬 비트(+0x14)가 웹 마선수 표에 없어 압도 22 는 거짓으로 둔다
-        batterIntimidates: false,
+        // 지금 CPU 타자의 압도 22 (+5) — 위 소모와 같은 값
+        batterIntimidates: cpuBatterIntimidates,
         // 미션 투수의 장착 비트 0xb62b4 — 32 안정감 · 33 새가슴 · 38 냉정 (투수 비트 16·17·22)
         pitcherIsSteady: pitcher.isSteady,
         pitcherIsTimid: pitcher.isTimid,
@@ -1150,7 +1167,7 @@ export function useMissionSession({
     // CPU 타자 결정 0x34334 의 h 는 **경기용 히트** 0xb570d(ctx, 0, 타자, 1, 90, 1) 다 (ce462ce).
     // 미션 모드 5 에서 0xb570c 는 나만의리그 갈래(모드 3·4)도 시즌 갈래(2)도 안 타고, 체력 인자 90 은
     // 감소가 없고, 팀 능력치 마스크 {1,2,8,9} 에도 없다 → 0xb6414 값을 0..999 로 자른 것이다.
-    // ⚠️ 미해결: 마타자의 0xb6414 스킬 보정(+0x14, 플래그 1)은 마선수 표에 스킬 비트가 없어 못 붙인다(마스터 줄은 붙인다).
+    // 마타자의 0xb6414 스킬 보정(+0x14, 플래그 1)은 `missionOpponentAbility`(`aceRecordAbilityAtLevel`)가 먹인다(마스터 줄도 붙인다).
     const batterAbility = {
       ...rawBatter,
       hit: gameAbilityOf({
@@ -1254,7 +1271,7 @@ export function useMissionSession({
     // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c).
     // MAX게이지(R+0x158)는 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래만 센다 — 낫아웃 판(종류 9 · 타자주자)은 v 를 0 으로 지워 건너뛴다
     let nextRun = recordPitch(
-      { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: false }) },
+      { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: cpuBatterIntimidates }) },
       grade === MAX_GAUGE_GRADE &&
         countsTopGradePitch(resolution.kind === '스트라이크', play !== null && arrivalApplicationOf(play) === 'batterRuns'),
     )

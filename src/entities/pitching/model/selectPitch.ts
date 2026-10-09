@@ -298,7 +298,7 @@ export function releaseCpuPitch(
       runnerCount: situation.runnerCount,
       hasSecondBaseRunner: situation.hasSecondBaseRunner === true,
       batterIntimidates,
-      // 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (0xb62b4) — 부르는 쪽이 안 실으면(마선수) 0
+      // 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (0xb62b4) — 마투수도 제 행(`pitcherAbilityOf`). 안 실으면 0
       pitcherIsSteady: hasSkillBit(pitcher.skillBits, STEADY_SKILL_BIT),
       pitcherIsTimid: hasSkillBit(pitcher.skillBits, TIMID_SKILL_BIT),
       pitcherIsCool: hasSkillBit(pitcher.skillBits, COOL_SKILL_BIT),

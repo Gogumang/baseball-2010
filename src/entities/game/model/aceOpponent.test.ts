@@ -31,6 +31,8 @@ describe('pitcherAbilityOf', () => {
       repertoire: { form: 6, pitchMask: 0x410b, magicId: 5 },
       // 사람 타석 0xab214 의 투수 스킬 — XlsACE_PIT 행 +0x14 = 0x9002 (비트 1 · 12 · 15 → 번호 + 16)
       skillIds: [17, 28, 31],
+      // 같은 +0x14 — CPU 투구 실투 판정 0x33cbc 의 비트 16 · 17 · 22
+      skillBits: 0x9002,
     })
   })
 

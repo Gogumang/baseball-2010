@@ -1760,7 +1760,7 @@ const INTIMIDATE_SKILL_BIT = 22
 
 /**
  * 그 명단 칸 타자가 **압도(스킬 22)** 를 달았나 — 공 하나 소모 0xa5e14(×2) · 실투 판정 0x33cbc(+5)가 공격 팀 지금 타자의
- * `0xb62b4(타자, 22)` 로 본다 (`TeamEntryBatter.skillBits`, 마타자 0)
+ * `0xb62b4(타자, 22)` 로 본다 (`TeamEntryBatter.skillBits`, 마타자는 XlsACE_BAT 행 — 킹타이거 22)
  */
 function entryBatterIntimidatesAt(progress: TeamGameProgress, teamId: number, slot: number): boolean {
   return (((entryBattersOf(progress, teamId)[slot]?.skillBits ?? 0) >>> INTIMIDATE_SKILL_BIT) & 1) === 1
@@ -1914,7 +1914,7 @@ const ENDURE_SKILL_BIT = 10
 
 /**
  * 공 하나 소모 0xa5e14 의 투수 비트 — `0xb62b4(0xae83c(수비 팀), 18)`(a5f32 비겁자 ×2) · `(…, 10)`(a5f56 끈기 −1).
- * 그 칸 레코드 +0x14 (`TeamEntryPitcher.skillBits` — 붙박이 줄은 Xls 행 그대로, 마투수 0).
+ * 그 칸 레코드 +0x14 (`TeamEntryPitcher.skillBits` — 붙박이 줄은 Xls 행 그대로, 마투수는 XlsACE_PIT 행).
  */
 function pitcherSkillFlagsAt(
   progress: TeamGameProgress,
@@ -2000,7 +2000,7 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
       pitchMask: repertoire.pitchMask,
       magicId: repertoire.magicId,
     },
-    // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (`TeamEntryPitcher.skillBits`, 마투수 0)
+    // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (`TeamEntryPitcher.skillBits`, 마투수는 제 행)
     ...(entry?.skillBits === undefined ? {} : { skillBits: entry.skillBits }),
     // 사람 타석 스윙 0xab214 의 투수 스킬 — 마투수는 제 행 (`entryPitcherSkillIdsOf`)
     skillIds: entryPitcherSkillIdsOf(entry),
@@ -2672,7 +2672,7 @@ function pitchOnce(
       hasSecondBaseRunner: progress.game.bases.second,
       // 상대 지금 타자의 스킬 22 압도(0xb62b4) — 레코드 +0x14 (`TeamEntryBatter.skillBits`)
       batterIntimidates: entryBatterIntimidatesAt(progress, options.opponentTeamId, progress.opponentOrderIndex),
-      // 우리 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (`TeamEntryPitcher.skillBits`, 마투수 0)
+      // 우리 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (`TeamEntryPitcher.skillBits`, 마투수는 제 행)
       ...mistakeSkillFlagsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)?.skillBits ?? 0),
     },
     random,

@@ -1346,8 +1346,9 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
 
   it('투수 미션: CPU 타자의 파울 각 공(`playsFoulBall`)도 판을 붙든다 — 볼카운트는 판이 닫힐 때까지 그대로', () => {
     let 파울판 = 0
-    // 장면 초기화의 효과 객체 1202 번(3ef6e)이 끼며 1~8 에는 파울 각 공이 없어졌다 — 씨앗 11 이 첫 공에 낸다
-    for (let seed = 1; seed <= 12 && 파울판 === 0; seed += 1) {
+    // 장면 초기화의 효과 객체 1202 번(3ef6e)이 끼며 1~8 에는 파울 각 공이 없어졌고, 킹타이거(미션 12)의 압도 22 가 소모 ×2 ·
+    // 실투 +5 를 걸며 11 도 비켜 갔다 — 씨앗 17 이 낸다
+    for (let seed = 1; seed <= 17 && 파울판 === 0; seed += 1) {
       const rendered = setUpPitcherMission(12, seed)
       for (let pitch = 0; pitch < 40 && rendered.result.current.session.pitcherRun?.status === '진행중'; pitch += 1) {
         const session = rendered.result.current.session
