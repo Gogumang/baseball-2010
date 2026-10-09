@@ -37,6 +37,7 @@ import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
+import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -57,7 +58,11 @@ export interface PitchingStageSource {
   } | null
   readonly pitcherForm: number
   readonly pitcherHand: number
+  /** 미션 투수 장비 겹 (0x10810 → 0x79790) — 없으면 맨몸 */
+  readonly pitcherEquipment?: PitcherEquipment
   readonly batterForm: number
+  /** 타자 손 0xb63c0 — 마타자는 표 0xd88b0. 없으면 폼의 낮은 비트 */
+  readonly batterSide?: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
 }
@@ -509,6 +514,8 @@ export function PitchingScreen({
             batterTeamIndex={stage.batterTeamIndex}
             pitcherForm={stage.pitcherForm}
             pitcherHand={stage.pitcherHand}
+            {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
+            {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
             // 미션은 구장 생성자 값 0 · 바닥 줄 기본 — 타자 미션 화면(`MissionPlayScreen`)과 같다
             stadium={0}
             fieldPalette={null}

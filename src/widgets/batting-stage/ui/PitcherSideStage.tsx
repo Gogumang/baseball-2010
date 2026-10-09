@@ -34,6 +34,10 @@ interface PitcherSideStageProps {
   readonly batterForm: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
+  /**
+   * 타자 손 0xb63c0 (화면 배치 +0x17e1) — 안 주면 폼의 낮은 비트. 마타자는 폼이 아니라 표 0xd88b0 이라 부르는 쪽이 준다
+   */
+  readonly batterSide?: number
   /** 마운드의 내 투수 — 폼(단계 표) · 손(좌투 뒤집기) · 장비 겹(0x79790) */
   readonly pitcherForm: number
   readonly pitcherHand: number
@@ -153,7 +157,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,
         batterEquipment: NO_EQUIPMENT,
-        side: batterSideOfForm(current.batterForm),
+        side: current.batterSide ?? batterSideOfForm(current.batterForm),
         hud: current.hud,
         acePitcher: null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
