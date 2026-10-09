@@ -106,7 +106,7 @@ export interface PitcherAbility {
   readonly staminaPercentAfterPitch?: (pitchTypeNumber: number) => number
   /**
    * 투수 레코드 **+0x14 장착 스킬 비트** — 실투 판정 0x33cbc 가 `0xb62b4(투수, 16 · 17 · 22)`(32 안정감 · 33 새가슴 · 38 냉정)로
-   * 본다. 붙박이 표 줄은 Xls 행 사본 그대로(`RosterPlayer.skillBits`). 없으면 0 (마선수 표에는 스킬 비트가 없다)
+   * 본다. 붙박이 표 줄은 Xls 행 사본 그대로(`RosterPlayer.skillBits`), 마투수는 XlsACE_PIT 행 그대로(`AcePlayer.skillBits`). 없으면 0
    */
   readonly skillBits?: number
   /**

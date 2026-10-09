@@ -152,6 +152,7 @@ import {
   rosterEntryBattersOf,
   rosterEntryPitchersOf,
   withAceBatter,
+  withEntryRecordSlots,
   withAcePitcher,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type {
@@ -1113,17 +1114,18 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
   // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870).
   // 엔트리 편집기가 고친 차례가 있으면 그 차례가 곧 팀 레코드다 (0xb891c 는 첨자만 든다)
   const ourOrder = options.ourEntryOrder
-  const ourEntry = withAceBatter(
+  // 경기 장면 셋업 0x39fdc 가 두 팀 레코드 +0xa 를 첨자로 다시 매긴다(0xb8768 → 0xb603c) — `withEntryRecordSlots`
+  const ourEntry = withEntryRecordSlots(withAceBatter(
     ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
     options.aceBatterId ?? NO_ACE_BATTER,
-  )
+  ))
   // 상대 팀도 그 팀 레코드 차례로 선다 (0xb8680 → 0x1f570 — 트레이드로 바뀐 CPU 팀이면 바뀐 레코드)
-  const opponentEntry = withAceBatter(
+  const opponentEntry = withEntryRecordSlots(withAceBatter(
     options.opponentEntryOrder === undefined
       ? rosterEntryBattersOf(options.opponentTeamId)
       : entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder),
     opponentAces.batter,
-  )
+  ))
   // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
   const ourPitcherEntry = withAcePitcher(
     ourOrder === undefined
@@ -1685,13 +1687,17 @@ const UNFILLED_SPECIAL_SWINGS: readonly number[] = Array.from({ length: BATTING_
 
 /** 마선수 레코드 +0x18 = 순번 + 5 (H2 4-1) */
 const ACE_SPECIAL_NUMBER_OFFSET = 5
+/** 0xaebe4 가 보는 타자 비트 23 무자비(필살 +1) · 투수 비트 23 혼신(마구 +2) — 둘 다 `0xb62b4(P, 0x17)` */
+const RUTHLESS_SKILL_BIT = 23
+const SPIRIT_SKILL_BIT = 23
 
 /**
  * 명단 한 칸 타자의 **한 경기 필살 횟수** — 타석 교대 0xaebe4 가 채우는 값 (`specialSwingCountOf`).
  *   마타자: s8 0xd84fa[레벨] — 레벨 = 전역 기록 `mgr[0x13f + 순번]` (`options.aceLevels`, 양 팀 모두 같은 전역 칸)
  *   그 밖:  `+0x18 == 0 → 0` — 팀 경기 명단은 리그 로스터와 마선수뿐이고 일반 레코드 +0x18 은 모두 0 이다 (H2 4-2)
- * ⚠️ 미해결: 스킬 23 무자비 +1 (0xb62b4(B, 0x17)) — 팀 경기 명단(`TeamEntryBatter`)·로스터 표·마선수 표에
- *    스킬 비트(+0x14)가 없어 늘 거짓으로 둔다.
+ * 스킬 23 무자비 +1 은 `0xb62b4(B, 0x17)` — 명단 줄 레코드 +0x14(`TeamEntryBatter.skillBits`, 마타자는 XlsACE_BAT 행)로 본다
+ * (마타자 다섯 줄 모두 비트 23 이 꺼져 있다).
+ * ⚠️ 기록으로 선 표 밖 타자(영입한 명전 · 나리)의 +0x18 은 0 이 아닐 수 있는데 웹 명단에 그 칸이 없어 0 으로 본다.
  */
 function specialSwingCountFor(progress: TeamGameProgress, batter: TeamEntryBatter | undefined): number {
   if (batter === undefined || batter.aceIndex === NO_ACE_BATTER) return 0
@@ -1699,7 +1705,7 @@ function specialSwingCountFor(progress: TeamGameProgress, batter: TeamEntryBatte
     swingNumber: batter.aceIndex + ACE_SPECIAL_NUMBER_OFFSET,
     isAceBatter: true,
     aceLevel: aceBatterLevelOf(progress, batter.aceIndex),
-    hasRuthlessSkill: false,
+    hasRuthlessSkill: (((batter.skillBits ?? 0) >>> RUTHLESS_SKILL_BIT) & 1) === 1,
   })
 }
 
@@ -1761,7 +1767,7 @@ const INTIMIDATE_SKILL_BIT = 22
 
 /**
  * 그 명단 칸 타자가 **압도(스킬 22)** 를 달았나 — 공 하나 소모 0xa5e14(×2) · 실투 판정 0x33cbc(+5)가 공격 팀 지금 타자의
- * `0xb62b4(타자, 22)` 로 본다 (`TeamEntryBatter.skillBits`, 마타자 0)
+ * `0xb62b4(타자, 22)` 로 본다 (`TeamEntryBatter.skillBits`, 마타자는 XlsACE_BAT 행 — 킹타이거 22)
  */
 function entryBatterIntimidatesAt(progress: TeamGameProgress, teamId: number, slot: number): boolean {
   return (((entryBattersOf(progress, teamId)[slot]?.skillBits ?? 0) >>> INTIMIDATE_SKILL_BIT) & 1) === 1
@@ -1915,7 +1921,7 @@ const ENDURE_SKILL_BIT = 10
 
 /**
  * 공 하나 소모 0xa5e14 의 투수 비트 — `0xb62b4(0xae83c(수비 팀), 18)`(a5f32 비겁자 ×2) · `(…, 10)`(a5f56 끈기 −1).
- * 그 칸 레코드 +0x14 (`TeamEntryPitcher.skillBits` — 붙박이 줄은 Xls 행 그대로, 마투수 0).
+ * 그 칸 레코드 +0x14 (`TeamEntryPitcher.skillBits` — 붙박이 줄은 Xls 행 그대로, 마투수는 XlsACE_PIT 행).
  */
 function pitcherSkillFlagsAt(
   progress: TeamGameProgress,
@@ -2001,7 +2007,7 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
       pitchMask: repertoire.pitchMask,
       magicId: repertoire.magicId,
     },
-    // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (`TeamEntryPitcher.skillBits`, 마투수 0)
+    // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (`TeamEntryPitcher.skillBits`, 마투수는 제 행)
     ...(entry?.skillBits === undefined ? {} : { skillBits: entry.skillBits }),
     // 사람 타석 스윙 0xab214 의 투수 스킬 — 마투수는 제 행 (`entryPitcherSkillIdsOf`)
     skillIds: entryPitcherSkillIdsOf(entry),
@@ -2673,7 +2679,7 @@ function pitchOnce(
       hasSecondBaseRunner: progress.game.bases.second,
       // 상대 지금 타자의 스킬 22 압도(0xb62b4) — 레코드 +0x14 (`TeamEntryBatter.skillBits`)
       batterIntimidates: entryBatterIntimidatesAt(progress, options.opponentTeamId, progress.opponentOrderIndex),
-      // 우리 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (`TeamEntryPitcher.skillBits`, 마투수 0)
+      // 우리 투수 레코드 +0x14 의 비트 16 안정감 · 17 새가슴 · 22 냉정 (`TeamEntryPitcher.skillBits`, 마투수는 제 행)
       ...mistakeSkillFlagsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)?.skillBits ?? 0),
     },
     random,
@@ -2748,7 +2754,11 @@ function pitchOnce(
       pitcherStaminaPercent: staminaPercent,
       // 0xab214 ab91c~ — 상대 지금 타자 레코드 +0x14 (`0xb62b4(타자, n)`, 마타자는 제 행)
       batterSkillIds: entryBatterSkillIdsOf(entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]),
+      // 같은 갈래가 던지는 우리 투수 레코드 +0x14 도 `0xb62b4(투수, n)` 로 읽는다 — 명단 투수 비트 + 16 (마투수는 제 행)
+      pitcherSkillIds: entryPitcherSkillIdsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)),
       skillSituation: {
+        // 투수 스킬 31(0xabcd8)의 `0xb6394(타자)` — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
+        batterOrderIndex: entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.recordSlot ?? 0,
         inning: progress.game.inning,
         // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
         isLosing: progress.game.ourScore > progress.game.opponentScore,
@@ -4129,7 +4139,7 @@ function benchIndexesOf(
  * 마운드에 오를 때 한 번** 주어지고 이닝이 바뀌어도 다시 차지 않는다.
  * 쓰기 0xae9c4 는 지금 투수 +0x18 이 0 이면 칸을 안 건드리지만, 읽기 0xaea10 도 그때 0 을 주므로 0 과 같다.
  *
- * ⚠️ 미해결: 스킬 23 혼신(+2) — 팀 경기 명단(`TeamEntryPitcher`)·로스터·마선수 표에 스킬 비트(+0x14)가 없어 늘 거짓.
+ * 스킬 23 혼신(+2)은 `0xb62b4(P, 0x17)` — 명단 줄 레코드 +0x14(`TeamEntryPitcher.skillBits`, 마투수는 XlsACE_PIT 행)로 본다.
  */
 function magicCountOfPitcher(
   pitcher: TeamEntryPitcher | undefined,
@@ -4142,7 +4152,7 @@ function magicCountOfPitcher(
     isAce,
     // 레벨 = 전역 기록 mgr[0x13a + 순번] — 마투수는 열 칸 중 앞 다섯 (aeec8~aeee4)
     aceLevel: isAce ? aceLevelOf(aceLevels, aceLevelSlotOf('투수', pitcher.aceIndex + 1)) : 0,
-    hasSpiritSkill: false,
+    hasSpiritSkill: (((pitcher.skillBits ?? 0) >>> SPIRIT_SKILL_BIT) & 1) === 1,
   })
 }
 

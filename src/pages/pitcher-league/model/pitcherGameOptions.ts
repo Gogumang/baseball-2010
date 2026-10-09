@@ -11,6 +11,7 @@ import { isMyStartDay } from '@/entities/pitcher-career/model/pitcherRotation'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   equippedPitcherAbilityOf,
+  equippedPitcherSkillIdsOf,
   isPitcherSkillEquipped,
   nextPitcherOpponentOf,
   pitcherFormOfCareer,
@@ -144,6 +145,8 @@ export function pitcherGameOptionsOf(
     pitcherIsSteady: isPitcherSkillEquipped(career, STEADY_SKILL),
     pitcherIsTimid: isPitcherSkillEquipped(career, TIMID_SKILL),
     pitcherIsCool: isPitcherSkillEquipped(career, COOL_SKILL),
+    // 0xab214 ab91c~ — CPU 타자 스윙 · 간이 타석이 `0xb62b4(내 투수, n)` 로 장착 비트(+0x14)를 읽는다(비트 + 16)
+    pitcherSkillIds: equippedPitcherSkillIdsOf(career),
     isRivalGame: settings.isRivalGame,
     hasLuckSkill: isPitcherSkillEquipped(career, LUCK_SKILL),
     stageSide: settings.stageSide,

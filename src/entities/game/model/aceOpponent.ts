@@ -140,8 +140,9 @@ export function pitcherAbilityOf(
     gameAbility: { beforeFatigue: { control: record[0], velocity: record[1], breaking: record[2] } },
     ...(staminaPercent === undefined ? {} : { staminaPercent }),
     ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
-    // 사람 타석 0xab214 의 스킬 갈래가 마투수 레코드 +0x14(XlsACE_PIT 행 그대로)를 `0xb62b4` 로 읽는다 — 실투 판정 비트
-    // (`skillBits`)는 따로 싣지 않는다(미해결)
+    // 사람 타석 0xab214 의 스킬 갈래가 마투수 레코드 +0x14(XlsACE_PIT 행 그대로)를 `0xb62b4` 로 읽는다
     skillIds: aceSkillIdsOf(ace),
+    // 같은 +0x14 를 CPU 투구의 실투 판정 0x33cbc 도 `0xb62b4(투수, 16 · 17 · 22)` 로 본다 — 붕붕머신 16 안정감 · 발렌타인 16 · 22 냉정
+    skillBits: ace.skillBits,
   }
 }

@@ -891,6 +891,8 @@ export function TeamGameScreen({
               timeKeyCount={progress.ourBenchBatters}
               // 지금 타자의 레코드 +0x14 장착 스킬(`TeamEntryBatter.skillBits` — 표 줄은 Xls 행, 영입 선수는 기록 사본, 마타자는 제 행)
               batterSkillIds={entryBatterSkillIdsOf(currentBatterEntry(progress))}
+              // 투수 스킬 31 의 0xb6394 — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
+              batterRecordSlot={currentBatterEntry(progress)?.recordSlot ?? 0}
               gameMode={options.mode}
               // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
               isScoreboardOn={settings?.isScoreboardOn}

@@ -525,4 +525,18 @@ describe('CPU 타자 스킬 — 0xab214 ab91c~ 가 타자 레코드 +0x14 를 0x
     expect(결과들({ batterSkillIds: [17], skillSituation: 상황([5, 6]) })).toEqual(없음)
     expect(결과들({ batterSkillIds: [17], skillSituation: 상황([5, 6, 1]) })).not.toEqual(없음)
   })
+
+  it('던지는 사람 투수 스킬(비트 + 16)도 같은 갈래가 읽는다 — 31 은 타자 레코드 칸 0xb6394 가 2 · 3 · 4 일 때만', () => {
+    const 없음 = 결과들({})
+    const 칸 = (batterOrderIndex: number) => ({
+      inning: 1,
+      isLosing: false,
+      runnerCount: 0,
+      hasSecondBaseRunner: false,
+      recentAtBatCodes: [],
+      batterOrderIndex,
+    })
+    expect(결과들({ pitcherSkillIds: [31], skillSituation: 칸(5) })).toEqual(없음)
+    expect(결과들({ pitcherSkillIds: [31], skillSituation: 칸(3) })).not.toEqual(없음)
+  })
 })

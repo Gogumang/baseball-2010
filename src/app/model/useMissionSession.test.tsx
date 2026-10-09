@@ -1373,8 +1373,9 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
 
   it('투수 미션: CPU 타자의 파울 각 공(`playsFoulBall`)도 판을 붙든다 — 볼카운트는 판이 닫힐 때까지 그대로', () => {
     let 파울판 = 0
-    // 장면 초기화의 효과 객체 1202 번(3ef6e)이 끼며 1~8 에는 파울 각 공이 없어졌다 — 씨앗 11 이 첫 공에 낸다
-    for (let seed = 1; seed <= 12 && 파울판 === 0; seed += 1) {
+    // 장면 초기화의 효과 객체 1202 번(3ef6e)이 끼며 1~8 에는 파울 각 공이 없어졌고, 킹타이거(미션 12)의 압도 22 가 소모 ×2 ·
+    // 실투 +5 를 걸며 11 도 비켜 갔다 — 씨앗 17 이 낸다
+    for (let seed = 1; seed <= 17 && 파울판 === 0; seed += 1) {
       const rendered = setUpPitcherMission(12, seed)
       for (let pitch = 0; pitch < 40 && rendered.result.current.session.pitcherRun?.status === '진행중'; pitch += 1) {
         const session = rendered.result.current.session
@@ -1501,7 +1502,8 @@ describe('타자 미션 타석 화면의 타자 — 미션 타자 차례가 아�
     const 빠르게 = MISSIONS.find((m) => m.side === '타자' && m.id === 10)!
     const run = startMission(빠르게)
     expect(isMissionBatterUp(run)).toBe(true)
-    expect(missionStageBatterOf(run, 미션타자)).toEqual(미션타자)
+    // 레코드 칸 0xb6394 는 미션 타자 k — 모르면 끝 칸 12
+    expect(missionStageBatterOf(run, 미션타자)).toEqual({ ...미션타자, recordSlot: 12 })
   })
 
   it('다음 타순 마스터 타자면 그 줄의 0xb6415 능력치 · 이름 · +0x14 스킬, 필살 0', () => {

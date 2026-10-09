@@ -63,6 +63,12 @@ export interface MissionGame {
   readonly aceCheckedInning: number
   /** 사람 칸 팀의 타선 — 투수 미션의 자동진행 반 이닝이 친다 (레코드 +7 윗 4비트 타순) */
   readonly humanBatting: MissionTeamBatting
+  /**
+   * **타자 미션의 미션 타자 레코드 칸 k** = P+0xa & 0x1f (`humanRecordsOf` 의 k) — 0xb53f0 이 P 를 [k] 에 넣고 0xb8768 이 그 첨자로
+   * 다시 매긴 뒤, aa7e8 0xb8cb8 → 0xb5e98 맞바꿈은 0x30 바이트를 통째 옮겨 +0xa 를 안 고친다. 그래서 시작 타순 칸에 선 P 의
+   * 0xb6394 는 여전히 k 다 (투수 스킬 31 이 본다). 투수 미션은 없다
+   */
+  readonly humanRecordSlot?: number
   /** 투수 미션의 CPU 수비 — 사람 칸 팀이 치는 자동진행 반 이닝에 던진다 (선발 = 레코드 +6 아래 4비트, 0xb8c94) */
   readonly cpuAutoPitching: MissionCpuPitching | null
   /** 타자 미션의 CPU 타선 — CPU 가 치는 자동진행 반 이닝 (타순 = 레코드 +7 아래 4비트) */
@@ -120,9 +126,7 @@ export const MISSION_NARI_RECORD_FALLBACK = 12
  */
 export function humanRecordsOf(startOrder: number, nariRecordSlot: number = MISSION_NARI_RECORD_FALLBACK): number[] {
   const records = Array.from({ length: BATTERS_PER_TEAM }, (_unused, record) => record)
-  const k = Number.isInteger(nariRecordSlot) && nariRecordSlot >= 0 && nariRecordSlot <= BATTERS_PER_TEAM
-    ? nariRecordSlot
-    : MISSION_NARI_RECORD_FALLBACK
+  const k = missionRecordSlotOf(nariRecordSlot)
   // b54a2 · b54fa — 한 칸 늘리고 옛 k 를 맨 끝으로 (k = 12 면 늘린 빈 칸이 제자리로)
   records.push(records[k] ?? k)
   // b550c — k 에 미션 타자
@@ -138,6 +142,23 @@ export function humanRecordsOf(startOrder: number, nariRecordSlot: number = MISS
 function slotRunnersOf(runners: BaseRunners): BaseRunners {
   const slot = (cursor: number | null) => (cursor === null ? null : lineupSlotOf(cursor))
   return { first: slot(runners.first), second: slot(runners.second), third: slot(runners.third) }
+}
+
+/** 미션 타자가 드는 레코드 칸 k — 0..12 밖이면 끝 칸 12 (`humanRecordsOf`) */
+function missionRecordSlotOf(nariRecordSlot: number = MISSION_NARI_RECORD_FALLBACK): number {
+  return Number.isInteger(nariRecordSlot) && nariRecordSlot >= 0 && nariRecordSlot <= BATTERS_PER_TEAM
+    ? nariRecordSlot
+    : MISSION_NARI_RECORD_FALLBACK
+}
+
+/**
+ * 사람 칸 팀 선수(`battingRecordAt` 의 값)의 레코드 칸 0xb6394 (타자 미션) — 미션 타자는 k, 마스터 줄 m 은 m(0xb8768 이 첨자로
+ * 매긴 값이 맞바꿈 0xb5e98 을 따라간다), 0xb53f0 이 끝으로 밀어낸 옛 [k] 줄만 b54da `0xb6604(레코드[k], 수 − 1)` 로 끝 칸 12
+ */
+export function missionHumanRecordSlotOf(game: Pick<MissionGame, 'humanRecordSlot'>, player: number): number {
+  const k = game.humanRecordSlot ?? MISSION_NARI_RECORD_FALLBACK
+  if (player === MISSION_NARI_RECORD) return k
+  return player === k ? BATTERS_PER_TEAM : player
 }
 
 /** 타순 아홉 칸 — 0x42364 의 0xae914 가 (팀[+0x32] + i) mod 9 */
@@ -247,6 +268,7 @@ export function startMissionGame(mission: OriginalMission, setup: MissionGameSet
       records: humanRecords,
       order: humanOrder,
     },
+    ...(isBatterMission ? { humanRecordSlot: missionRecordSlotOf(setup.nariRecordSlot) } : {}),
     cpuAutoPitching: isBatterMission ? null : startMissionCpuPitching(mission),
     cpuAutoBatting: isBatterMission
       ? {

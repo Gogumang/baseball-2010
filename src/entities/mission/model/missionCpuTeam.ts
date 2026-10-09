@@ -330,12 +330,18 @@ export function missionCpuMoundPitcherAbilityOf(team: MissionCpuTeam): PitcherAb
  */
 export function missionCpuBatterOf(
   team: MissionCpuTeam,
-): { readonly order: number; readonly isAce: boolean; readonly row: RosterPlayer | null } | null {
+): {
+  readonly order: number
+  readonly isAce: boolean
+  readonly row: RosterPlayer | null
+  /** 마스터 줄의 팀 안 칸(0~11) — 레코드 +0xa 아랫 5비트(0xb6394). 마타자 칸은 `MISSION_ACE_ROSTER_SLOT` */
+  readonly rosterSlot: number
+} | null {
   const batting = team.batting
   if (batting === null) return null
   const rosterSlot = batterRecordAt(batting, batting.order)
-  if (rosterSlot === MISSION_ACE_ROSTER_SLOT) return { order: batting.order, isAce: true, row: null }
-  return { order: batting.order, isAce: false, row: teamBatters(batting.teamId)[rosterSlot] ?? null }
+  if (rosterSlot === MISSION_ACE_ROSTER_SLOT) return { order: batting.order, isAce: true, row: null, rosterSlot }
+  return { order: batting.order, isAce: false, row: teamBatters(batting.teamId)[rosterSlot] ?? null, rosterSlot }
 }
 
 /**

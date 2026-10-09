@@ -319,6 +319,9 @@ export function GameScreen({
             // 스윙 결과 0xab214 는 0xb62b4 = 장착 비트(+0x14)만 본다 — 보유 전부가 아니다
             batterSkillIds={career.equippedSkillIds}
             recentAtBatCodes={progress.recentAtBatCodes}
+            // 투수 스킬 31 의 0xb6394(내 선수) — 0xb53f1 이 내 선수를 칸 +0xa & 0x1f 에 앉히고 0xb8768 이 그 첨자로 다시 매긴다
+            // (142 진입 0x1c54a 도 타순 = 레코드 안 내 줄 첨자 + 1 로 읽는다) — 곧 내 타순 칸
+            batterRecordSlot={progress.game.playerOrderIndex}
             pitcherAbility={pitcherAbility}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
             aceLevels={aceLevels}

@@ -87,7 +87,9 @@ export interface TeamGameAbilityContext {
  * b645e  v = v · s8 0xd88aa[lv] / 100  ; 0 쪽 버림, 자르지 않는다. 0xd88aa = [60,70,80,90,100]
  * ```
  * 모드·플래그·칸을 가리지 않으니 팀 경기(모드 1·2·8·9)의 마선수도 이 배율 **뒤에** 시즌·팀 보정을 먹는다.
- * 마선수가 아니면(순번 −1) 그대로다.
+ * 배율 뒤에는 같은 0xb6415(rec, k, 1) 의 장비 니블(b6494 — 마선수 열 줄 모두 0) · 장착 스킬(b64b0~b6512, 레코드 +0x14 = XlsACE 행
+ * 비트) 단계를 그대로 지난다 — 발렌타인 냉정 22 가 제구에 1/10 을 얹는다(`aceRecordAbilityAtLevel` 와 같은 단계).
+ * 마선수가 아니면(순번 −1) 그대로다(붙박이 줄의 `ability` 는 이미 0xb6414 값).
  */
 export function aceLeveledAbility(
   ability: readonly [number, number, number, number],
@@ -97,12 +99,15 @@ export function aceLeveledAbility(
 ): readonly [number, number, number, number] {
   if (aceIndex < 0) return ability
   const level = aceLevelOf(levels, aceLevelSlotOf(role, aceIndex + 1))
-  return [
+  const scaled: [number, number, number, number] = [
     applyAceLevelRate(ability[0], level),
     applyAceLevelRate(ability[1], level),
     applyAceLevelRate(ability[2], level),
     applyAceLevelRate(ability[3], level),
   ]
+  const ace = (role === '투수' ? ACE_PITCHERS : ACE_BATTERS)[aceIndex]
+  if (ace === undefined) return scaled
+  return recordAbilityOf({ ability: scaled, skillBits: ace.skillBits, equipment: [] }, role === '투수')
 }
 
 function teamAbilitiesOf(context: TeamGameAbilityContext, teamId: number): readonly number[] {
@@ -294,10 +299,24 @@ export interface TeamEntryBatter {
   readonly recordId?: number
   /**
    * 레코드 `+0x14` 장착 스킬 비트 — 간이 타석 스윙 0xab214 의 스킬 갈래(ab91c~)가 모드 검사 없이 `0xb62b4(타자, n)` 로 읽는다.
-   * 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 기록으로 선 영입 선수는 그 기록의 비트(옛 사본은 없어 0).
-   * ⚠️ 마타자는 XlsACE_BAT 행의 +0x14 를 아직 안 뽑아 없다(0)
+   * 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 기록으로 선 영입 선수는 그 기록의 비트(옛 사본은 없어 0),
+   * 마타자는 0xb53f0 이 통째 베낀 XlsACE_BAT 행 그대로(`withAceBatter` — 킹타이거 압도 22)
    */
   readonly skillBits?: number
+  /**
+   * 레코드 칸 `0xb6394` = `+0xa & 0x1f` — 경기 장면 셋업 0x39fdc(3a2fa · 3a302)가 두 팀에 0xb8768 → 0xb603c 를 불러 마선수
+   * 아닌 줄을 **경기 시작 때의 레코드 첨자**로 다시 매기고(0xb6605), 마타자는 XlsACE_BAT 순번(+0xa = 0x40 + 순번) 그대로다.
+   * 대타 0xaebe4 는 명단 칸(team+0xe)만 맞바꿔 레코드 +0xa 는 그대로라 선수를 따라간다. 0xab214 의 투수 스킬 31(0xabcd8)이
+   * 2·3·4 를 본다. 경기를 세울 때(`withEntryRecordSlots`) 단다 — 없으면 0
+   */
+  readonly recordSlot?: number
+}
+
+/**
+ * 경기 시작 명단에 레코드 칸 0xb6394 를 단다 — 마선수 아닌 줄은 첨자(0xb603c), 마타자는 순번 (`TeamEntryBatter.recordSlot`)
+ */
+export function withEntryRecordSlots(entry: readonly TeamEntryBatter[]): readonly TeamEntryBatter[] {
+  return entry.map((batter, index) => ({ ...batter, recordSlot: batter.aceIndex >= 0 ? batter.aceIndex : index }))
 }
 
 /** 리그 로스터 선수가 아니다 (마타자 — `0x1f84c` 로 저장에서 꺼낸 레코드) */
@@ -361,6 +380,8 @@ export function withAceBatter(
     position: 0,
     aceIndex,
     rosterSlot: NO_ROSTER_SLOT,
+    // 레코드 +0x14 — 0xb53f0 이 XlsACE_BAT 행을 통째 베낀다 (압도 22 · 0xab214 스킬 갈래)
+    skillBits: ace.skillBits,
   }
   const out = [...entry]
   const seated = out[BATTING_ORDER_SLOTS]
@@ -437,8 +458,9 @@ export interface TeamEntryPitcher {
   /** 붙박이 표 밖 투수(영입한 명전·나리)의 원본 id — `TeamEntryBatter.recordId` 주석 */
   readonly recordId?: number
   /**
-   * 레코드 `+0x14` 장착 스킬 비트 — 공 하나 소모 0xa5e14 가 `0xb62b4(투수, 18)`(비겁자 ×2) · `(…, 10)`(끈기 −1)로 본다.
-   * 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 마투수 다섯 줄은 두 비트 모두 0. 없으면 0.
+   * 레코드 `+0x14` 장착 스킬 비트 — 공 하나 소모 0xa5e14 가 `0xb62b4(투수, 18)`(비겁자 ×2) · `(…, 10)`(끈기 −1)로, 실투 판정
+   * 0x33cbc 가 16 안정감 · 17 새가슴 · 22 냉정으로 본다. 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 마투수는 0xb521c 가
+   * 통째 베낀 XlsACE_PIT 행 그대로(`withAcePitcher` — 붕붕머신 16 · 발렌타인 16 · 22, 18 · 10 은 다섯 줄 모두 0). 없으면 0.
    */
   readonly skillBits?: number
 }
@@ -729,6 +751,8 @@ export function withAcePitcher(
     },
     aceIndex,
     orderIndex: NO_ACE_BATTER,
+    // 레코드 +0x14 — 0xb521c 가 XlsACE_PIT 행을 통째 베낀다 (실투 16 · 17 · 22 · 소모 18 · 10)
+    skillBits: ace.skillBits,
   }
   const out = [...entry]
   const seated = out[PITCHER_ENTRY_ACE_SLOT]

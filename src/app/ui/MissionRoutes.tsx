@@ -229,6 +229,7 @@ export function MissionRoutes({
         run={missionRun}
         ability={stageBatter.ability}
         batterSkillIds={stageBatter.skillIds}
+        batterRecordSlot={stageBatter.recordSlot}
         batterName={stageBatter.name}
         pitcherAbility={{
           ...missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent),

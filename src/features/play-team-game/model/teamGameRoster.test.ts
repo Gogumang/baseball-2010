@@ -1,23 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import {
   PITCHER_ENTRY_ACE_SLOT,
+  aceLeveledAbility,
   entryBattersOfOrder,
   entryPitchersOfOrder,
   rosterEntryBattersOf,
   rosterEntryPitchersOf,
+  withAceBatter,
   withAcePitcher,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type { TeamEntryOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 
 describe('투수 명단의 레코드 +0x14 스킬 비트 — 공 하나 소모 0xa5e14 의 비겁자(18) · 끈기(10)', () => {
-  it('붙박이 줄은 Xls 행 비트 그대로, 마투수는 0', () => {
+  it('붙박이 줄은 Xls 행 비트 그대로, 마투수 · 마타자는 XlsACE 행 비트 그대로 (0xb521c · 0xb53f0 이 통째 베낀다)', () => {
     const entry = rosterEntryPitchersOf(0)
     expect(entry.map((pitcher) => pitcher.skillBits)).toEqual(teamPitchers(0).map((player) => player.skillBits))
     // 전역 투수 0 번(팀 0 칸 0)은 끈기 줄이다 (104811f)
     expect(((entry[0]!.skillBits ?? 0) >>> 10) & 1).toBe(1)
-    expect(withAcePitcher(entry, 0)[PITCHER_ENTRY_ACE_SLOT]!.skillBits ?? 0).toBe(0)
+    expect(withAcePitcher(entry, 0)[PITCHER_ENTRY_ACE_SLOT]!.skillBits).toBe(ACE_PITCHERS[0]!.skillBits)
+    // 발렌타인(마투수 3) 0x410000 — 실투 16 안정감 · 22 냉정 / 킹타이거(마타자 4) 0x401200 — 압도 22
+    expect(withAcePitcher(entry, 3)[PITCHER_ENTRY_ACE_SLOT]!.skillBits).toBe(0x410000)
+    expect(withAceBatter(rosterEntryBattersOf(0), 4)[9]!.skillBits).toBe(0x401200)
   })
 })
 
@@ -64,5 +70,15 @@ describe('명단 타자의 장착 스킬 비트 — 0xab214 가 0xb62b4(타자, 
     const entry = entryBattersOfOrder(0, order)
     expect(entry[0]?.skillBits).toBe(teamBatters(0)[3]?.skillBits)
     expect(entry[1]?.skillBits).toBe(1 << 22)
+  })
+})
+
+describe('마선수 경기 능력치 aceLeveledAbility — 0xb6415(rec, k, 1): 레벨 배율 뒤 장착 스킬 단계', () => {
+  it('발렌타인(마투수 3) 냉정 22 — Lv1 60% 제구 420 에 1/10 을 얹어 462, 다른 칸은 배율만', () => {
+    const valentine = ACE_PITCHERS[3]!
+    const raw = [valentine.ability.hit, valentine.ability.power, valentine.ability.defense, valentine.ability.run] as const
+    const leveled = aceLeveledAbility(raw, '투수', 3, {})
+    expect(leveled[0]).toBe(Math.trunc((raw[0] * 60) / 100) + Math.trunc(Math.trunc((raw[0] * 60) / 100) / 10))
+    expect(leveled[1]).toBe(Math.trunc((raw[1] * 60) / 100))
   })
 })
