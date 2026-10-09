@@ -485,3 +485,16 @@ export function simulateHumanTeamAutoHalf(
   const { steps, result } = drainMissionAutoTicks(simulateHumanTeamAutoHalfTicks(game, random))
   return { ...result, relay: steps }
 }
+
+/**
+ * **경기[0x28 + 칸] — 두 칸의 팀 번호** (0xaa57c aa72a 의 `0xb6bd4(st, 칸, 팀)`). 사람 칸은 `humanBatting.teamId`(마선수 대결이면
+ * 그 편 나리 저장 팀 — `missionHumanTeamIdOf`), 다른 칸은 레코드 +2 아래 4비트 그대로.
+ * 경기 적재 0x48658 이 이 번호로 HUD 작은 로고(48a38~48a74 — `team_logo_ini` 그림[0xb6bdc(st, 0)] → 장면+0x1054,
+ * [0xb6bdc(st, 1)] → +0x1058, 두 번호가 같으면 같은 그림)를 싣고, 타석 HUD 0x373d0 이 위 줄 = 측 0 · 아래 줄 = 측 1 로 그린다.
+ */
+export function missionTeamIdsOf(run: {
+  readonly mission: OriginalMission
+  readonly game: Pick<MissionGame, 'humanBatting'>
+}): { readonly human: number; readonly cpu: number } {
+  return { human: run.game.humanBatting.teamId, cpu: run.mission.sideTeams[cpuSideOf(run.mission)] }
+}

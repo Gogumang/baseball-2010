@@ -34,7 +34,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
-import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
+import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 
 /**
@@ -71,6 +71,8 @@ type MenuOverlay = '조작방법' | '설정'
  * (모드 5~7 → 1: 자동진행 자리에 다시하기). 미션 장면도 경기 장면 0x104 라 '*' 가 같은 메뉴를 연다.
  */
 const MISSION_PITCHER_MODE = 5
+/** `team_logo_ini` 작은 로고 — 팀 경기 · 타자편 화면과 같은 경로 */
+const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
 interface PitchingScreenProps {
   readonly run: PitcherRun
@@ -267,6 +269,7 @@ export function PitchingScreen({
   }, [acceptsPickoff, onPickoffKey])
 
   const goals = goalsOf(run.mission, run.progress)
+  const teamIds = missionTeamIdsOf(run)
 
   if (run.status !== '진행중') {
     // [미션+0xbc] — 0x4ea0c 4ef2a · 0x4a384 4a3ea 의 "이겼나"
@@ -441,7 +444,7 @@ export function PitchingScreen({
             pitch={stage.lastThrow?.pitch ?? null}
             resolution={stage.lastThrow?.resolution ?? null}
             resultTicks={stage.lastThrow?.resultTicks ?? 0}
-            // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0) — 타자 미션 화면과 같은 근사(미션 팀 로고는 기본 두 팀)
+            // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0 · 팀 st[0x28 + 칸]) — 타자 미션 화면과 같다
             hud={{
               inning: run.game.inning + 1,
               half: run.game.offenseSide === 0 ? '초' : '말',
@@ -451,8 +454,12 @@ export function PitchingScreen({
               strikes: atBat.strikes,
               outs: run.outs,
               bases: run.bases,
-              ourLogoUrl: './sprites/team_logo_ini/000.png',
-              opponentLogoUrl: './sprites/team_logo_ini/001.png',
+              // 경기[0x28 + 칸] 팀의 작은 로고 (0x48658 48a38~48a74 → 장면+0x1054 · +0x1058) — 사람 칸 · CPU 칸 (`missionTeamIdsOf`)
+              ourLogoUrl: smallLogoUrlOf(teamIds.human),
+              opponentLogoUrl: smallLogoUrlOf(teamIds.cpu),
+              // 루상 주자 팔레트(0x35b94 — 주자 +0xac 팀) · 펜스 아이콘(0x77974 — 모드 5 · 6 은 77ae4~77af0 에서 늘 11)
+              ourTeamId: teamIds.human,
+              opponentTeamId: teamIds.cpu,
               playerSide: humanSideOf(run.mission),
             }}
             batterForm={stage.batterForm}
