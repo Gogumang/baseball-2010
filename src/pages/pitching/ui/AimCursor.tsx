@@ -12,6 +12,8 @@ import {
 import type { AimDirection, AimKeyAction } from '@/features/play-pitcher-game/model/pitchAim'
 import { ZONE_HALF_WORLD } from '@/features/play-pitcher-game/model/pitcherPitch'
 import * as styles from '@/pages/pitching/ui/AimCursor.css'
+import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
+import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
 interface AimCursorProps {
   /** 존 중심 표 0xcfbcc 의 칸 — 진행기가 투구에 쓰는 side 와 같다 */
@@ -27,6 +29,11 @@ interface AimCursorProps {
   readonly onCancel?: () => void
   /** 일시정지 팝업(0x741a0)이 떠 있으면 틱도 키도 멈춘다 */
   readonly isPaused?: boolean
+  /**
+   * 장면 위 조준 그림(0x4d780 — 조준점의 애니 0 · 구질 이름)의 재료를 실을 칸. 넘기면 아래 작은 조준판은 숨긴다
+   * (조준점 값은 그대로 들고 있다)
+   */
+  readonly overlay?: { readonly ref: PitchInputOverlayRef; readonly typeNumber: number }
 }
 
 /** 화면 칸 — 자르기 범위(x ±600 · y ±400)를 이 배율로 줄여 그린다 */
@@ -55,10 +62,17 @@ const KEYPAD: readonly { readonly key: string; readonly label: string }[] = [
  * - OK · '5' 는 확정(0x50e9c → 0x11), CLR 은 0xf 로(0x50ee0). 둘 다 방향을 지운 뒤 그 틱의 0x39c5c 를 한 번 더 지난다.
  *   ⚠️ 근사: 한 틱 안에서 메시지 8 과 0x39c5c 의 앞뒤는 안 봤다 — 웹은 지운 방향으로 한 번 더 돈 뒤 넘긴다.
  *
- * ⚠️ 원본 조준 그림(`ui/slt_pitch.raw` 반투명 원 · 투영 0xbe3d8)은 옮기지 않았다 — 자르기 범위 · 존 · 점만 그린다.
+ * 원본 조준 그림은 장면 위다 — `overlay` 를 넘기면 장면(`widgets/batting-stage/lib/pitchInputOverlay`)이 조준점의 투영(0xbe3d8,
+ * `projectToScreen`) 자리에 slt_pitch 애니 0 을, 존 위에 구질 이름을 그린다. 여기 작은 판은 그때 숨기고 키패드만 남긴다.
  */
-export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false }: AimCursorProps) {
+export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false, overlay }: AimCursorProps) {
   const [aim, setAim] = useState<WorldPoint>(() => aimStartOf(side))
+  /** 0x10 에 든 뒤 그림 수 — 애니 0 칸 */
+  const [drawTick, setDrawTick] = useState(0)
+  usePublishedOverlay(
+    overlay?.ref,
+    overlay === undefined ? null : { kind: '조준', aim, aimSide: side, typeNumber: overlay.typeNumber, tick: drawTick },
+  )
   const aimRef = useRef(aim)
   const directionRef = useRef<AimDirection>(AIM_STILL)
   const isDoneRef = useRef(false)
@@ -79,7 +93,9 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false 
   useEffect(() => {
     if (isPaused) return
     const handle = window.setInterval(() => {
-      if (!isDoneRef.current) tickRef.current()
+      if (isDoneRef.current) return
+      tickRef.current()
+      setDrawTick((previous) => previous + 1)
     }, millisecondsPerFrame())
     return () => window.clearInterval(handle)
   }, [isPaused])
@@ -124,6 +140,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false 
         className={styles.field}
         style={{ width: `${boxWidth}px`, height: `${boxHeight}px` }}
         data-testid="조준판"
+        hidden={overlay !== undefined}
       >
         <span
           className={styles.zone}

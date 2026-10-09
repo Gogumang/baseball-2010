@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cpuSwingTickOf,
   HUMAN_PITCH_RELEASE_STATE_TICK,
   passesHeldResult,
   pitcherSideStageFrameOf,
@@ -64,5 +65,11 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
     expect(passesHeldResult({ kind: '스트라이크', isSwinging: true })).toBe(true)
     expect(passesHeldResult({ kind: '사구' })).toBe(true)
     expect(passesHeldResult({ kind: '파울' })).toBe(false)
+  })
+
+  it('CPU 스윙은 공 틱이 스윙 프레임 F 에 닿는 장면 틱에 건다 (0x4e0dc)', () => {
+    const release = 50
+    const swingTick = cpuSwingTickOf(release, 18)
+    expect(pitcherSideStageFrameOf(clock(swingTick, release)).ballFrame).toBe(18)
   })
 })

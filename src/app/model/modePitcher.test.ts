@@ -34,6 +34,11 @@ describe('투수 미션 투수 — 0x213c0 모드 5→3 나리 투수편 저장 
     expect(modePitcherOf(냉정).stats.control).toBe(999)
   })
 
+  it('장비 니블은 장면 투수 그림의 장비 겹 재료로 남는다 (0x108f8 → 0x10810 → 0x79790)', () => {
+    const levels = { control: 2, velocity: 0, breaking: 5, stamina: 1 }
+    expect(modePitcherOf({ ...투수, equipmentLevels: levels }).equipmentLevels).toEqual(levels)
+  })
+
   it('스태미나 재료 — 시작 +0x2c 는 저장된 투수 값(0xb8820 → 0xb521c 통째 사본) · 용량 체력 0xb6415(P, 3, 1) · 비겁자 18 · 끈기 10', () => {
     const 지친 = { ...투수, stamina: 3500, equippedSkillIds: [18, 10] }
     const pitcher = modePitcherOf(지친)

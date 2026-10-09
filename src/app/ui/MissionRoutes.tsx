@@ -45,6 +45,8 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import type { PitchingStageSource } from '@/pages/pitching/ui/PitchingScreen'
 import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
+import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -614,20 +616,25 @@ export function PitcherAceMatchRoute(
 }
 
 /**
- * 투수 미션 타석 장면 재료 — 마운드는 미션 투수(폼 · 손 0xb63c0 = 폼 & 1), 타석은 지금 CPU 타자 0xae89c 의 명단 줄
- * (폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 팀). ⚠️ 근사: 마타자 칸은 레코드 폼이 웹 표에 없어 0 으로 둔다,
- * 미션 투수 레코드의 장비 니블(0x10810 → 0x79790)은 웹 미션 투수 값에 없어 맨몸으로 그린다.
+ * 투수 미션 타석 장면 재료 — 마운드는 미션 투수(폼 · 손 0xb63c0 = 폼 & 1 · 장비 겹 — 0x108f8 이 선수 게터 0x1fbd0 의 기록 사본을
+ * 0x10810 에 넘겨 니블로 0x79790), 타석은 지금 CPU 타자 0xae89c 의 명단 줄(폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 팀).
+ * 마타자 칸은 미션 상대 마선수(`opponentAce` − 1)의 XlsACE_BAT_DATA +0xb · 손 표 0xd88b0.
+ * ⚠️ 미이식: 마타자 폼 4~8 의 마타자 그림(0x78ab0) — 웹 타자 겹은 보통 몸통뿐이다.
  */
 function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: PitcherRun): PitchingStageSource {
   const form = session.pitcher.repertoire.form
   const batter = missionCpuBatterOf(run.cpu)
-  const profile = batter?.row?.profile ?? 0
+  const aceIndex = batter?.isAce === true ? run.mission.opponentAce - 1 : -1
+  const profile = aceIndex >= 0 ? aceBatterProfileOf(aceIndex) : (batter?.row?.profile ?? 0)
+  const equipment = session.pitcher.equipmentLevels
   return {
     lastThrow: session.lastPitcherThrow,
     pitcherForm: form,
     pitcherHand: pitcherHandOf(form, false),
+    ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),
     batterForm: profile >> 4,
     batterSkinIndex: (profile >> 2) & 3,
+    ...(aceIndex >= 0 ? { batterSide: batterHandOf(profile, aceIndex) } : {}),
     batterTeamIndex: run.cpu.batting?.teamId ?? 0,
   }
 }

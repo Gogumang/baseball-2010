@@ -79,6 +79,12 @@ export interface ModePitcher {
   readonly isCoward: boolean
   /** 소모 0xa5e14 — 투수 스킬 10 끈기 (−1) */
   readonly endures: boolean
+  /**
+   * 장비 니블 (레코드 `rec[0x19]` · `rec[0x1a]` 상·하위 = 제구 · 구속 · 변화 · 체력) — 경기 장면 셋업 0x108f8 이 모드 ≠ 4 면
+   * 투수 그림 0x79368 을 세우고 0x10810 이 선수 게터 0x1fbd0(모드 5 = 이 미션 투수)의 기록 사본 니블로 0x79790 겹을 싣는다.
+   * 없으면(등록 전 대체 투수 · 옛 명전 기록) 맨몸
+   */
+  readonly equipmentLevels?: PitcherAbility
 }
 
 /** 체력 100% — `stats` 는 피로 없는 값이다 */
@@ -121,10 +127,11 @@ function rookieModePitcher(): ModePitcher {
 function modePitcherFromRecord(
   equippedAbility: PitcherAbility,
   repertoire: { readonly pitchMask: number; readonly form: number; readonly magicNumber: number },
-  record: { readonly equippedSkillIds: readonly number[] },
+  record: { readonly equippedSkillIds: readonly number[]; readonly equipmentLevels?: PitcherAbility },
   stamina: number,
 ): ModePitcher {
   return {
+    ...(record.equipmentLevels === undefined ? {} : { equipmentLevels: record.equipmentLevels }),
     stats: fatiguedStatsOf(equippedAbility, MISSION_STAMINA),
     ability: equippedAbility,
     stamina,
@@ -171,7 +178,7 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
       form: pitcherFormOf(famer.look.typeIndex, famer.look.handIndex),
       magicNumber: famer.selectedMagicNumber ?? 0,
     },
-    { equippedSkillIds },
+    { equippedSkillIds, ...(famer.equipmentLevels === undefined ? {} : { equipmentLevels: famer.equipmentLevels }) },
     // ⚠️ 미해결: 명전 기록 +0x2c 는 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값인데 웹 명전 기록(`HallOfFamePitcher`)이
     //    그 칸을 안 남긴다 — 남길 때까지 10000 으로 둔다
     MISSION_STAMINA,

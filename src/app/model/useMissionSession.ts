@@ -65,7 +65,8 @@ import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOp
 import {
   FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf,
 } from '@/entities/pitcher-career/model/pitcherStamina'
-import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import type { CpuSwingSkillSituation } from '@/entities/pitching/model/simulateBatter'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
@@ -565,6 +566,8 @@ export function useMissionSession({
     readonly pitch: Pitch
     readonly resolution: PitchResolution
     readonly resultTicks: number
+    /** CPU 타자가 휘둘렀으면 스윙 프레임 · 번트 종류 — 장면의 타자 자세 */
+    readonly cpuSwing: CpuSwingPose | null
   } | null>(null)
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
@@ -1271,7 +1274,7 @@ export function useMissionSession({
     runner.setBannerText(resolution.kind === '타구' || foulContact !== undefined ? '' : describePitchResolution(resolution))
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
-    setLastPitcherThrow({ pitch, resolution, resultTicks: resultWaitTicksOf(outcome) })
+    setLastPitcherThrow({ pitch, resolution, resultTicks: resultWaitTicksOf(outcome), cpuSwing: cpuSwingPoseOf(thrown) })
     // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다.
     // 사람 수비라 송구는 환경설정이 먹는다 — 판은 키 없는 사람 수비로 미리 다 돌려 재생한다 (견제와 같은 근사)
     const play = arrivesUnhit(resolution)

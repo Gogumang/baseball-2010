@@ -49,7 +49,13 @@ import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/Settlement
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
-import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import type {
   TeamEntryBatter,
@@ -205,6 +211,41 @@ export function TeamGameScreen({
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /** 구질 · 조준 · 게이지 그림 재료 — 사람 수비 타석 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
+  const inputOverlayRef = usePitchInputOverlayRef()
+  /**
+   * 내 공의 남은 0x11 비행 + 0x12 대기 (`pitchSceneBusyTicksOf`) — 그동안은 원본도 상태 0x11 · 0x12 라 다음 공의 구질 키 ·
+   * 견제 · '#' · 0xe 의 OK 를 안 받는다. 0x12 길이는 0x4e6d4 의 15(타석 끝 31) — 장면이 공을 마지막 점에 두는 틱이기도 하다.
+   * 진행기는 놓는 순간(0x11 틱 10) 판정까지 내므로 던질 때 표시해 둔 공의 판정이 들어오면 센다
+   */
+  const atBatBeforeThrowRef = useRef(progress.atBat)
+  const isThrowPendingRef = useRef(false)
+  const [pitchBusyTicks, setPitchBusyTicks] = useState(0)
+  const [heldResultTicks, setHeldResultTicks] = useState(0)
+  const pitchBusyTicksRef = useRef(0)
+  pitchBusyTicksRef.current = pitchBusyTicks
+  useEffect(() => {
+    if (!isThrowPendingRef.current) return
+    isThrowPendingRef.current = false
+    const thrown = progress.lastResolution
+    if (
+      thrown === null ||
+      session.pendingDefensePlay !== null ||
+      progress.pendingRunnerPlay != null ||
+      !passesHeldResult(thrown)
+    ) {
+      setHeldResultTicks(0)
+      return
+    }
+    const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, thrown).outcome)
+    setHeldResultTicks(waitTicks)
+    setPitchBusyTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks))
+  }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, progress.pendingRunnerPlay])
+  useSceneTick(
+    () => setPitchBusyTicks((left) => Math.max(0, left - 1)),
+    pitchBusyTicks > 0 && !isMenuOpen && overlay !== '조작방법',
+  )
+  const isPitchSceneBusy = pitchBusyTicks > 0
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
   /** 경기 시작 인트로(상태 0xc)를 다 봤는가 — 모드 1·2 만 선다 (대전 8·9 는 없다) */
@@ -297,6 +338,8 @@ export function TeamGameScreen({
         // OK 를 받을 때 돌리므로(`confirmScene`), 0xe 에서 열어 확정·취소해도 다시 선 0xe 의 OK 뒤 한 번뿐이다.
         // 0xd(대기가 보인 뒤 두 그림)는 0x4994a 의 상태 범위 밖이라 안 열린다
         if (isAwaitingConfirmRef.current && !isInConfirmStateRef.current) return
+        // 내 공이 날거나 0x12 인 동안(상태 0x11 · 0x12)도 범위 밖
+        if (pitchBusyTicksRef.current > 0) return
         if (session.canChangePitcher) return setChangeWindow('투수')
         if (session.canPinchHit) return setChangeWindow('대타')
         return
@@ -378,6 +421,7 @@ export function TeamGameScreen({
     !isMenuOpen &&
     overlay === null &&
     changeWindow === null &&
+    !isPitchSceneBusy &&
     // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c) — 닫은 뒤에야 0xe 다
     resolution === null
   /**
@@ -442,6 +486,7 @@ export function TeamGameScreen({
     !isSceneCovering &&
     !isDefenseInPlay &&
     phase === '구질' &&
+    !isPitchSceneBusy &&
     !isMenuOpen &&
     overlay === null &&
     changeWindow === null &&
@@ -709,6 +754,8 @@ export function TeamGameScreen({
 
   const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
     if (slot === null) return
+    atBatBeforeThrowRef.current = progress.atBat
+    isThrowPendingRef.current = true
     actions.throwPitch({ typeNumber: slot.typeNumber, ...(throwAim === null ? {} : { aim: throwAim }), gaugeCell })
     setPhase('구질')
     setSlot(null)
@@ -942,13 +989,50 @@ export function TeamGameScreen({
             </div>
 
             {/*
-              0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 투수·타자 소개 판 0x44944 를 띄운다.
-              ⚠️ 원본은 판 아래에 0xd 그리기(타석 장면)가 깔린다 — 웹 투구 화면에는 그 캔버스가 없어 판만 놓는다
+              사람 수비 타석 장면 — 원본은 누가 던지든 같은 프레임 0x52c50 · 그리기 표 0xd05a0 이 구장 · 투수 0x38d1c · 타자 0x49e64 ·
+              주자 0x35b94 · HUD 0x4c4bc 를 그린다(`widgets/batting-stage/lib/pitcherSideStage`). 그 위에 0xe 소개 판 0x44944 ·
+              0x16 "CHANGE" 가 얹히고, 구질 목록 · 조준 · 게이지는 장면 안에 그린다
             */}
-            {isMatchupShown && <div className={styles.matchupFrame}>{matchupCards}</div>}
-            {/* 교체 연출 0x16 "CHANGE" — ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다 */}
-            {substitutionOverlay !== null && <div className={styles.matchupFrame}>{substitutionOverlay}</div>}
-            {phase === '구질' && !isAwaitingConfirm && (
+            <PitcherSideStage
+              pitch={progress.lastPitch}
+              resolution={progress.lastResolution}
+              resultTicks={heldResultTicks}
+              cpuSwing={progress.lastCpuSwing ?? null}
+              hud={{
+                inning: game.inning,
+                half: game.half,
+                ourScore: game.ourScore,
+                opponentScore: game.opponentScore,
+                balls: progress.atBat.balls,
+                strikes: progress.atBat.strikes,
+                outs: game.outs,
+                bases: game.bases,
+                ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
+                opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
+                ourTeamId: options.ourTeamId,
+                opponentTeamId: options.opponentTeamId,
+                playerSide: game.playerSide,
+                runnerRunAbilities: runnerRunAbilitiesOf(progress),
+              }}
+              {...teamPitcherSideStageOf(progress)}
+              stadium={sceneStadium?.stadium ?? 0}
+              fieldPalette={fieldPalette}
+              skyRow={stadiumSkyRow ?? 0}
+              {...(seasonStadium === undefined ? {} : { seasonStadium })}
+              gameMode={options.mode}
+              {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
+              isPaused={visibleBurstLines !== null || isAwaitingConfirm}
+              isFrozen={isPopupOpen}
+              inputOverlayRef={inputOverlayRef}
+              // "#TIME" 0x4c940 — 사람 수비라 n = 우리 팀[+0x33] 벤치 투수 수. 팀 경기는 0x38984 가 통과한다
+              timeKeyCount={session.benchPitchers.length}
+            >
+              {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 */}
+              {isMatchupShown && matchupCards}
+              {/* 교체 연출 0x16 "CHANGE" (0x4da30) */}
+              {substitutionOverlay}
+            </PitcherSideStage>
+            {phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && (
               <>
                 <Panel heading="1. 구질 선택" />
                 {(game.bases.first || game.bases.second || game.bases.third) && (
@@ -957,6 +1041,11 @@ export function TeamGameScreen({
                 <PitchSlotPicker
                   choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
                   isPaused={isPopupOpen}
+                  overlay={{
+                    ref: inputOverlayRef,
+                    typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
+                    magicRemaining: progress.magicRemaining,
+                  }}
                   onDecide={(chosen) => {
                     const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                     if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
@@ -973,6 +1062,7 @@ export function TeamGameScreen({
                 <AimCursor
                   side={options.stageSide ?? 1}
                   isPaused={isPopupOpen}
+                  overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
                   onConfirm={(confirmed) => {
                     // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
                     // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
@@ -997,6 +1087,16 @@ export function TeamGameScreen({
                   isPaused={isPopupOpen}
                   showsGauge={showsGauge}
                   onRelease={(gaugeCell) => throwWith(gaugeCell)}
+                  {...(aim === null
+                    ? {}
+                    : {
+                        overlay: {
+                          ref: inputOverlayRef,
+                          aim,
+                          aimSide: options.stageSide ?? 1,
+                          gaugeSettingOn: options.gaugeSettingOn === true,
+                        },
+                      })}
                 />
               </>
             )}
@@ -1015,8 +1115,8 @@ export function TeamGameScreen({
       </PixelScreen>
 
       {/*
-        투구 화면(우리 수비)은 240×320 캔버스가 없다 — 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c 를 화면 기둥 좌표로 얹는다.
-        타석 화면은 위 타석 캔버스 판 위에 그린다
+        투구 화면(우리 수비)은 타석 장면(`PitcherSideStage`) 아래에 패널이 이어져 — 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c 를
+        화면 기둥 좌표로 얹는다(예전 자리 그대로). 타석 화면은 위 타석 캔버스 판 위에 그린다
       */}
       {canPitch && !canBat && <RecordAlertScreenOverlay frame={recordAlert} />}
 
@@ -1169,4 +1269,11 @@ function slotChoices(magicRemaining: number, slots: readonly PitchSlot[]): Pitch
         : {}),
       isBlocked: !canSelectSlot(slot, magicRemaining),
     }))
+}
+
+/** 칸 0..5 의 구질 번호 (경기 +0xfac + 4·칸) — 장면 위 구질 목록 재료 */
+function slotTypeNumbersOf(slots: readonly PitchSlot[]): number[] {
+  const numbers = [0, 0, 0, 0, 0, 0]
+  for (const slot of slots) if (slot.slot >= 0 && slot.slot < numbers.length) numbers[slot.slot] = slot.typeNumber
+  return numbers
 }

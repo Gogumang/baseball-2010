@@ -5,19 +5,28 @@ import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
+import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { bodyTypeOf, NO_EQUIPMENT, NO_PITCHER_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
-import { batterFrameNow, describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
-import { passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
+import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
+import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
+import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
 interface PitcherSideStageProps {
   /** 이 화면에서 마지막으로 던진 공(진행기 `lastPitch`). 화면이 설 때 이미 있던 공은 다시 날리지 않는다 */
   readonly pitch: Pitch | null
   /** 그 공의 판정 — 0x12 를 지나는지 · 판정 글자 */
   readonly resolution: PitchResolution | null
+  /**
+   * 그 공에 CPU 타자가 휘둘렀으면 스윙 프레임 F(+0xfd8) · 번트 종류(+0xfdc). 0x11 갱신 0x4e0dc 가 공 틱 ≥ F 인 틱에
+   * 스윙 객체 vtable +0x14(스윙) · +0x18(번트)을 건다 — 타자 그림 0x49e64 가 그 자세를 그린다
+   */
+  readonly cpuSwing?: CpuSwingPose | null
   /** 0x12 대기 틱 (0x4e6d4 — `resultWaitTicksOf`) */
   readonly resultTicks: number
   readonly hud: HudState | null
@@ -25,6 +34,10 @@ interface PitcherSideStageProps {
   readonly batterForm: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
+  /**
+   * 타자 손 0xb63c0 (화면 배치 +0x17e1) — 안 주면 폼의 낮은 비트. 마타자는 폼이 아니라 표 0xd88b0 이라 부르는 쪽이 준다
+   */
+  readonly batterSide?: number
   /** 마운드의 내 투수 — 폼(단계 표) · 손(좌투 뒤집기) · 장비 겹(0x79790) */
   readonly pitcherForm: number
   readonly pitcherHand: number
@@ -33,12 +46,24 @@ interface PitcherSideStageProps {
   readonly stadium: number
   readonly fieldPalette: number | null
   readonly skyRow: number
+  /** 시즌 홈경기 구장 (0x77494) — 있으면 배경이 시즌 구장으로 갈린다 */
+  readonly seasonStadium?: SeasonStadium
   readonly gameMode: number
   readonly isScoreboardOn?: boolean
   /** 0xd · 0xe 대기(확인 · 소개 판) — 쉬는 '대기' */
   readonly isPaused: boolean
   /** 일시정지 팝업(0x741a0) — 장면 틱이 멈춘다(0x52cc6). 그림은 그 자리에 둔다 */
   readonly isFrozen?: boolean
+  /**
+   * 사람 투구 UI 의 그림 재료 — 구질 · 조준 · 게이지 단추가 싣는다(`pitchInputOverlay`). 그림마다 읽어 장면 안에 그린다
+   * (원본 0x4c4bc · 0x4d780 · 0x4d2ac). 공이 날거나 0x12 인 동안은 안 그린다
+   */
+  readonly inputOverlayRef?: { readonly current: PitchInputOverlay | null }
+  /**
+   * "#TIME" 의 벤치 수 n — 사람 수비면 수비팀[+0x33](벤치 투수, 0x4c940). '#' 교체 검사 0x38984 가 거짓인 화면(미션)은 null.
+   * 상태 0xe(쉬는 대기) · 0xf(구질 목록이 실린 동안)에만 그린다
+   */
+  readonly timeKeyCount?: number | null
   /** 장면 위에 얹는 UI (소개 판 · 교체 연출 · 조준 그림 따위) — 원본도 상태 그리기가 장면 다음에 그린다 */
   readonly children?: ReactNode
 }
@@ -48,8 +73,9 @@ interface PitcherSideStageProps {
  * 투수 · 타자 · 주자 · HUD · 존 · 소프트키를 그린다 (`lib/pitcherSideStage` 머리말: 0x52c50 의 그리기 표는 모드를 안 가린다).
  * 공 판정 · 스윙 키는 받지 않는다 — 진행기가 이미 정한 공을 그림으로만 다시 날린다(굴림 없음).
  *
- * ⚠️ 미이식: CPU 타자의 스윙 자세(0x49e64 의 스윙 객체)는 대기 자세로만 그린다 · "#TIME"(0x4c940 — 사람 수비면 수비팀[+0x33]) ·
- * 필살 남은 횟수(0x38a30)는 안 그린다 · 조준 그림(slt_pitch 반투명 원)은 `AimCursor` 가 따로 그린다.
+ * 구질 목록 · 조준 · 게이지는 `inputOverlayRef` 로 받아 장면 안에 그린다 · "#TIME" 은 `timeKeyCount` ·
+ * 필살 남은 횟수(0x38a30)는 사람 수비면 원본도 안 그린다(38a42).
+ * CPU 타자는 `cpuSwing` 의 스윙 프레임에 닿은 틱부터 스윙(번트면 번트) 자세다.
  */
 export function PitcherSideStage(props: PitcherSideStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -64,6 +90,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     /** 화면이 설 때 있던 공 — 수비 화면에서 돌아와 다시 서도 같은 공을 또 날리지 않는다 */
     let shownPitch: Pitch | null = latestRef.current.pitch
     let releaseTick: number | null = null
+    /** 지금 공의 CPU 스윙 — 화면이 설 때 있던 공은 다시 날리지 않으므로 그 스윙도 없다 */
+    let shownSwing: CpuSwingPose | null = null
     let pausedSinceTick = 0
     let wasPaused = false
     /** 팝업 동안 멈춘 시간 — 장면 틱에서 뺀다 */
@@ -84,6 +112,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       if (current.pitch !== shownPitch) {
         shownPitch = current.pitch
         releaseTick = current.pitch === null ? null : nowTick
+        shownSwing = current.cpuSwing ?? null
       }
       if (current.isPaused && !wasPaused) pausedSinceTick = nowTick
       wasPaused = current.isPaused
@@ -99,6 +128,13 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pausedSinceTick,
       })
       const bodyType = bodyTypeOf(current.batterForm)
+      const isIdle = stage.phase.kind === '대기'
+      // 스윙은 이 공이 날거나 0x12 인 동안만 — 대기로 돌아오면 대기 자세
+      const swingTick =
+        releaseTick === null || shownSwing === null || isIdle ? null : cpuSwingTickOf(releaseTick, shownSwing.frame)
+      const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
+      // 0x4c92e — "#TIME" 은 상태 0xe · 0xf 만
+      const isTimeState = isIdle && (current.isPaused || pitchInput?.kind === '구질')
       const isResult = stage.phase.kind === '결과'
       renderBattingStage(context, {
         pitch: stage.phase.kind === '대기' ? null : pitch,
@@ -111,24 +147,34 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         homeRunTick: 0,
         isEagleEyeEnabled: false,
         shift: 0,
-        swingFrame: batterFrameNow(sceneNow, -1, false, bodyType),
+        swingFrame: batterFrameAt({
+          tick: nowTick,
+          swingTick: swingTick,
+          isBunting: swingTick !== null && shownSwing !== null && shownSwing.buntKind !== 0 && nowTick >= swingTick && !isIdle,
+          bodyType,
+        }),
         bodyType,
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,
         batterEquipment: NO_EQUIPMENT,
-        side: batterSideOfForm(current.batterForm),
+        side: current.batterSide ?? batterSideOfForm(current.batterForm),
         hud: current.hud,
         acePitcher: null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,
         pitcherHand: current.pitcherHand,
         stagePhase: stage.phase,
+        pitchInput,
+        timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,
+        // 필살 남은 횟수 0x38a30 은 38a42 에서 0x33fe4(수비 조작 사람)면 바로 끝 — 사람이 던지는 장면엔 없다
+        specialSwingRemaining: null,
         scenery: {
           skyRow: current.skyRow,
           stadium: current.stadium,
           fieldPalette: current.fieldPalette,
           gameMode: current.gameMode,
           isScoreboardOn: current.isScoreboardOn,
+          ...(current.seasonStadium === undefined ? {} : { seasonStadium: current.seasonStadium }),
         },
       })
       handle = requestAnimationFrame(frame)

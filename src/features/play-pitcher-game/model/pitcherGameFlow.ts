@@ -84,7 +84,8 @@ import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-control
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import { contactOfOutcome, registerContact } from '@/entities/batting/model/battedContact'
-import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
@@ -414,6 +415,8 @@ export interface PitcherGameProgress {
    */
   readonly sceneConfirmPending?: boolean
   readonly lastPitch: Pitch | null
+  /** 마지막 공에 CPU 타자가 휘둘렀으면 그 스윙 프레임 · 번트 종류 — 타석 장면의 타자 자세(0x4e0dc → 0x49e64) */
+  readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
   /** 이닝별 실점 표 (`0xb6988`) — 감독 강판 3번 사유가 읽는다 */
   readonly inningRuns: readonly number[]
@@ -1158,6 +1161,7 @@ export function startPitch(
     atBatPitches: progress.atBatPitches + 1,
     halfInningPitches: progress.halfInningPitches + 1,
     lastPitch: pitch,
+    lastCpuSwing: cpuSwingPoseOf(thrown),
     lastResolution: resolution,
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
@@ -3111,6 +3115,18 @@ function myBenchIndexOf(progress: PitcherGameProgress): number {
     (slot) => slot !== mound.pitcherSlot && !mound.usedSlots.includes(slot),
   )
   return bench.indexOf(MY_PITCHER_SLOT)
+}
+
+/**
+ * 우리 팀 벤치 투수 수 `팀[+0x33]` — 팀 세우기 b896c 가 명부 투수 수 − 1 로 두고, 투수가 마운드를 밟을 때마다(0xaec1e~aec32) 하나 준다.
+ * 웹은 명단 차례에서 지금 마운드와 내려간 투수를 뺀 수다(`myBenchIndexOf` 와 같은 셈). 타석 장면의 "#TIME"(0x4c940 — 사람 수비면
+ * 수비팀[+0x33])이 본다.
+ */
+export function ourBenchPitcherCountOf(progress: PitcherGameProgress): number {
+  const mound = progress.ourMound
+  return ourPitcherOrderOf(progress.options).filter(
+    (slot) => slot !== mound.pitcherSlot && !mound.usedSlots.includes(slot),
+  ).length
 }
 
 /** 우리 수비 자동 타석의 `0xac428`(0xc1ce2) — 우리 CPU 투수를 바꿀지 본다 */

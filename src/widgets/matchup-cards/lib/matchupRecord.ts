@@ -81,6 +81,18 @@ export function batterCardStatsOf(
   return { battingAverage: battingAverageValueOf(line), homeRuns: line.homeRuns, runsBattedIn: line.runsBattedIn }
 }
 
+/**
+ * 마타자 다섯(메디카 · 어거지죠 · 로제 · 크라이져 · 킹타이거) 레코드 +0xb — `data/XlsACE_BAT_DATA.zt1` 을 풀어(머리 0x20 뒤 0x30 바이트씩)
+ * 읽은 값. 윗니블(폼) 4~8 · 피부 `(>> 2) & 3` 0. 경기 장면 셋업 0x10810 이 `rec[0xb] >> 4` 를 타자 그림에 넘기고, 몸통 적재
+ * 0x78ab0 은 그 값 − 4 (0~4) 로 마타자 그림 다섯 중 하나를 고른다(표 0xd3adc).
+ */
+export const ACE_BATTER_PROFILES: readonly number[] = [0x42, 0x52, 0x62, 0x72, 0x82]
+
+/** 마타자 순번의 레코드 +0xb (`ACE_BATTER_PROFILES`) — 없으면 0 */
+export function aceBatterProfileOf(aceIndex: number): number {
+  return ACE_BATTER_PROFILES[aceIndex] ?? 0
+}
+
 /** 마타자 순번(0xb63a0 = 0~4)별 손 — 표 0xd88b0 [1, 0, 0, 0, 1] (b63ea) */
 const ACE_BATTER_HANDS: readonly number[] = [1, 0, 0, 0, 1]
 

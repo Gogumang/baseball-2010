@@ -70,12 +70,14 @@ import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
-import { opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { opponentBatterOf, ourBenchPitcherCountOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
-import { batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
+import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -165,6 +167,8 @@ export function PitcherGameScreen({
   const isSceneShowing = !isIntroDone || isHalfInningBoardOpen || isBenchClearing || summary !== null
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
+  /** 구질 · 조준 · 게이지 그림 재료 — 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
+  const inputOverlayRef = usePitchInputOverlayRef()
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
@@ -246,6 +250,8 @@ export function PitcherGameScreen({
   /**
    * 내 공의 0x12 대기 — 맞히지 못한 공은 갱신 0x4e6d4 가 상태 틱을 15(볼넷 · 사구 · 삼진이면 31) 까지 기다린 뒤 판정 A 가 다음
    * 상태(반 이닝이 끝났으면 0x21)로 보낸다. 웹 진행기는 공 하나에 자동진행까지 돌리므로 중계를 그 틱 뒤로 민다.
+   * 웹 진행기는 놓는 순간(0x11 틱 10) 판정까지 내므로 남은 0x11 비행(공 틱 N + 1 까지)도 함께 센다(`pitchSceneBusyTicksOf`) —
+   * 그동안은 원본도 0x11 · 0x12 라 다음 공의 구질 키 · 견제 · '#' · 0xe 의 OK 를 안 받는다.
    */
   const atBatBeforeThrowRef = useRef(progress.atBat)
   const [pitchWaitTicks, setPitchWaitTicks] = useState(0)
@@ -259,10 +265,12 @@ export function PitcherGameScreen({
     if (lastResolution === null || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) return
     if (lastResolution.kind === '타구') return
     const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, lastResolution).outcome)
-    setPitchWaitTicks(waitTicks)
+    setPitchWaitTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks))
     setHeldResultTicks(waitTicks)
-  }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay])
+  }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay, progress.lastPitch])
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
+  /** 공이 날거나 0x12 인 동안 — 원본 상태 0x11 · 0x12 */
+  const isPitchSceneBusy = pitchWaitTicks > 0
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
@@ -282,6 +290,7 @@ export function PitcherGameScreen({
       progress.pendingRunnerPlay == null &&
       !isReplaying &&
       !isRelaying &&
+      !isPitchSceneBusy &&
       !isPopupOpen &&
       overlay === null &&
       !asksGiveUp &&
@@ -295,6 +304,7 @@ export function PitcherGameScreen({
       progress.pendingRunnerPlay == null &&
       !isReplaying &&
       !isRelaying &&
+      !isPitchSceneBusy &&
       !isPopupOpen &&
       overlay === null &&
       !asksGiveUp &&
@@ -312,6 +322,7 @@ export function PitcherGameScreen({
     !isAwaitingConfirm &&
     !isReplaying &&
     !isRelaying &&
+    !isPitchSceneBusy &&
     !isSceneShowing &&
     phase === '구질' &&
     !isMenuOpen &&
@@ -343,6 +354,7 @@ export function PitcherGameScreen({
     !asksGiveUp &&
     !isReplaying &&
     !isRelaying &&
+    !isPitchSceneBusy &&
     progress.pendingDefensePlay === null &&
     progress.pendingRunnerPlay == null &&
     progress.managerHookText === null &&
@@ -661,7 +673,7 @@ export function PitcherGameScreen({
           isAwaitingConfirm && !isPopupOpen
             ? // 0xe — OK 를 받는다 (0x532b0). 강판 물음은 '#' 키로 연다 (위 `acceptsGiveUpKey`)
               { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
-            : canPitch && !isPopupOpen
+            : canPitch && !isPopupOpen && !isPitchSceneBusy
               ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
               : undefined
         }
@@ -763,6 +775,7 @@ export function PitcherGameScreen({
           pitch={progress.lastPitch}
           resolution={progress.lastResolution}
           resultTicks={heldResultTicks}
+          cpuSwing={progress.lastCpuSwing ?? null}
           hud={{
             inning: progress.game.inning,
             half: progress.game.half,
@@ -795,6 +808,9 @@ export function PitcherGameScreen({
           {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
           isPaused={isAwaitingConfirm}
           isFrozen={isPitchInputPaused}
+          inputOverlayRef={inputOverlayRef}
+          // "#TIME" 0x4c92e — 0x38984 는 모드 3 을 안 막는다('#' 가 강판 물음을 연다). n = 수비팀(우리)[+0x33] 벤치 투수 수
+          timeKeyCount={ourBenchPitcherCountOf(progress)}
         >
           {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
@@ -803,12 +819,19 @@ export function PitcherGameScreen({
             <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
           )}
         </PitcherSideStage>
-        {!isPitchInputPaused && canPitch && !isAwaitingConfirm && phase === '구질' && <Panel heading="1. 구질 선택" />}
-        {canPitch && !isAwaitingConfirm && phase === '구질' && (
+        {!isPitchInputPaused && canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질' && (
+          <Panel heading="1. 구질 선택" />
+        )}
+        {canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질' && (
           <div hidden={isPitchInputPaused}>
             <PitchSlotPicker
               choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
               isPaused={isPitchInputPaused}
+              overlay={{
+                ref: inputOverlayRef,
+                typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
+                magicRemaining: progress.magicRemaining,
+              }}
               onDecide={(chosen) => {
                 const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
                 if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
@@ -825,6 +848,7 @@ export function PitcherGameScreen({
             <AimCursor
               side={progress.options.stageSide ?? 1}
               isPaused={isPitchInputPaused}
+              overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
               onConfirm={(confirmed) => {
                 // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
                 // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
@@ -849,6 +873,16 @@ export function PitcherGameScreen({
               isPaused={isPitchInputPaused}
               showsGauge={showsGauge}
               onRelease={(gaugeCell) => throwWith(gaugeCell)}
+              {...(aim === null
+                ? {}
+                : {
+                    overlay: {
+                      ref: inputOverlayRef,
+                      aim,
+                      aimSide: progress.options.stageSide ?? 1,
+                      gaugeSettingOn: options.gaugeSettingOn === true,
+                    },
+                  })}
             />
           </div>
         )}
@@ -902,20 +936,35 @@ const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(tea
 
 /**
  * 타석에 선 상대 타자의 그림 재료 — 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀(헬멧 · 몸통 벌).
- * 마타자는 레코드 대신 손 표 0xd88b0 만 쓴다 — ⚠️ 근사: 몸통 종류는 0(밸런서)으로 둔다(마타자 레코드 폼 미해독).
+ * 마타자는 XlsACE_BAT_DATA 레코드 +0xb(`aceBatterProfileOf`)의 폼 · 피부, 손은 표 0xd88b0.
+ * ⚠️ 미이식: 폼 4~8 이면 몸통 적재 0x78ab0 이 마타자 그림 다섯(폼 − 4)을 싣는다 — 웹 타자 겹은 보통 타자 몸통뿐이다.
  */
 function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
   readonly batterForm: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
+  readonly batterSide?: number
 } {
   const batter = opponentBatterOf(progress)
   const teamIndex = progress.options.opponentTeamId
   if (batter.aceIndex !== undefined) {
-    return { batterForm: batterHandOf(0, batter.aceIndex), batterSkinIndex: 0, batterTeamIndex: teamIndex }
+    const profile = aceBatterProfileOf(batter.aceIndex)
+    return {
+      batterForm: profile >> 4,
+      batterSkinIndex: (profile >> 2) & 3,
+      batterTeamIndex: teamIndex,
+      batterSide: batterHandOf(profile, batter.aceIndex),
+    }
   }
   const profile = batter.profile ?? 0
   return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamIndex }
+}
+
+/** 칸 0..5 의 구질 번호 (경기 +0xfac + 4·칸) — 장면 위 구질 목록 재료 */
+function slotTypeNumbersOf(slots: readonly PitchSlot[]): number[] {
+  const numbers = [0, 0, 0, 0, 0, 0]
+  for (const slot of slots) if (slot.slot >= 0 && slot.slot < numbers.length) numbers[slot.slot] = slot.typeNumber
+  return numbers
 }
 
 /** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7). 빈 칸(구질 0)은 그리지 않는다 */

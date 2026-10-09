@@ -83,7 +83,8 @@ import {
   rollsIntoBenchClearing,
   staminaAfterBenchClearing,
 } from '@/entities/game/model/benchClearing'
-import { pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { aceLevelOf, aceLevelSlotOf, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
@@ -761,6 +762,8 @@ export interface TeamGameProgress {
   readonly opponentSpecialSwingRemaining: readonly number[]
   readonly pitchCount: number
   readonly lastPitch: Pitch | null
+  /** 우리가 던진 마지막 공에 CPU 타자가 휘둘렀으면 스윙 프레임 · 번트 종류 — 사람 수비 타석 장면의 타자 자세(0x4e0dc) */
+  readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
   /**
    * **재생만 하면 되는** 장면 — 매 틱 스냅샷이 들어 있어 화면은 이것만 받아 그리면 된다.
@@ -2801,6 +2804,7 @@ function pitchOnce(
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
     sceneBuntKind: thrown.buntKind ?? 0,
+    lastCpuSwing: cpuSwingPoseOf(thrown),
   }
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다

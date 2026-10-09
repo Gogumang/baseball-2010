@@ -36,16 +36,33 @@ import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
+import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
+import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
 /**
  * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
  * 미션 장면도 경기 장면 0x104 라 같은 그리기 표 0xd05a0 을 탄다. 구장은 생성자 값 0(모드 5 는 셋업 0x39fdc 가 안 채운다).
  */
 export interface PitchingStageSource {
-  readonly lastThrow: { readonly pitch: Pitch; readonly resolution: PitchResolution; readonly resultTicks: number } | null
+  readonly lastThrow: {
+    readonly pitch: Pitch
+    readonly resolution: PitchResolution
+    readonly resultTicks: number
+    /** CPU 타자의 스윙 프레임 · 번트 종류 (휘두르지 않았으면 null) */
+    readonly cpuSwing?: CpuSwingPose | null
+  } | null
   readonly pitcherForm: number
   readonly pitcherHand: number
+  /** 미션 투수 장비 겹 (0x10810 → 0x79790) — 없으면 맨몸 */
+  readonly pitcherEquipment?: PitcherEquipment
   readonly batterForm: number
+  /** 타자 손 0xb63c0 — 마타자는 표 0xd88b0. 없으면 폼의 낮은 비트 */
+  readonly batterSide?: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
 }
@@ -207,6 +224,8 @@ export function PitchingScreen({
   }, [run.mission, missionInningIndex])
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
+  /** 구질 · 조준 · 게이지 그림 재료 — 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
+  const inputOverlayRef = usePitchInputOverlayRef()
   const [pitchType, setPitchType] = useState<PitchTypeInfo | null>(null)
   /** 0x10 에서 확정한 조준점 — 게이지(0x11) 뒤 놓을 때 쓴다 */
   const [aim, setAim] = useState<WorldPoint | null>(null)
@@ -219,6 +238,23 @@ export function PitchingScreen({
     onPopupFrozenChange?.(isPopupOpen)
   }, [isPopupOpen, onPopupFrozenChange])
   const isRunning = run.status === '진행중'
+  /**
+   * 공이 날거나 0x12 인 동안 남은 틱 — 원본은 그동안 상태 0x11 · 0x12 라 다음 공의 구질 키 · 견제 · 0xe 의 OK 를 안 받는다.
+   * 세션은 놓는 순간 판정까지 내므로 놓은 뒤 남은 비행 + 0x12 대기를 센다 (`pitchSceneBusyTicksOf`). 장면이 없으면 0
+   */
+  const lastThrow = stage?.lastThrow ?? null
+  const [busyTicks, setBusyTicks] = useState(0)
+  const [busyThrow, setBusyThrow] = useState(lastThrow)
+  if (busyThrow !== lastThrow) {
+    setBusyThrow(lastThrow)
+    setBusyTicks(
+      lastThrow !== null && passesHeldResult(lastThrow.resolution)
+        ? pitchSceneBusyTicksOf(lastThrow.pitch.frameCount, lastThrow.resultTicks)
+        : 0,
+    )
+  }
+  useSceneTick(() => setBusyTicks((left) => Math.max(0, left - 1)), busyTicks > 0 && !isPopupOpen)
+  const isPitchSceneBusy = busyTicks > 0
   // 결과 배경 캔버스의 난수 — 하늘 줄은 세션이 장면마다 한 번 굴린 `skyRow` 를 넘기므로 여기서 굴리지 않는다(넘기지 않은
   // 화면만 이 따로 든 난수로 굴린다 — 경기 난수에 새지 않게)
   const [backdropRandom] = useState(() => createSeededRandom(0))
@@ -248,14 +284,19 @@ export function PitchingScreen({
   // 교체 연출 0x16 동안은 0xd · 0xe 가 아니다 — 연출이 끝난 뒤부터 0xd 두 그림을 센다
   const sceneConfirm = useSceneConfirm(
     sceneConfirmWait,
-    isRunning && bannerText === '' && !isPopupOpen && substitutionScene === null,
+    isRunning && bannerText === '' && !isPopupOpen && substitutionScene === null && !isPitchSceneBusy,
     onSceneConfirm,
   )
   const isAwaitingConfirm = sceneConfirm.isAwaiting && run.status === '진행중'
 
   // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)·0xe(OK 대기)는 키를 안 받는다
   const acceptsPickoff =
-    onPickoffKey !== undefined && phase === '구질' && isRunning && !isAwaitingConfirm && !isPopupOpen
+    onPickoffKey !== undefined &&
+    phase === '구질' &&
+    isRunning &&
+    !isAwaitingConfirm &&
+    !isPopupOpen &&
+    !isPitchSceneBusy
   useEffect(() => {
     if (!acceptsPickoff || onPickoffKey === undefined) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -357,6 +398,18 @@ export function PitchingScreen({
   const isBlockedMagic = (type: PitchTypeInfo): boolean =>
     magicRemaining !== undefined && isMagicType?.(type) === true && magicRemaining <= 0
 
+  /** 구질 번호 t (이름표 칸 + 1, 마구 22) — 장면 위 그림 재료 */
+  const typeNumberOf = (type: PitchTypeInfo | null): number => {
+    if (type === null) return 0
+    if (isMagicType?.(type) === true) return MAGIC_TYPE_NUMBER
+    return PITCH_TYPES.findIndex((candidate) => candidate === type || candidate.name === type.name) + 1
+  }
+  const slotTypeNumbers = [0, 0, 0, 0, 0, 0]
+  repertoire.forEach((type, index) => {
+    const slot = repertoireSlots?.[index] ?? index
+    if (slot >= 0 && slot < slotTypeNumbers.length) slotTypeNumbers[slot] = typeNumberOf(type)
+  })
+
   const slotChoices: PitchSlotChoice[] = repertoire.map((type, index) => ({
     slot: repertoireSlots?.[index] ?? index,
     name: type.name,
@@ -441,6 +494,7 @@ export function PitchingScreen({
             pitch={stage.lastThrow?.pitch ?? null}
             resolution={stage.lastThrow?.resolution ?? null}
             resultTicks={stage.lastThrow?.resultTicks ?? 0}
+            cpuSwing={stage.lastThrow?.cpuSwing ?? null}
             // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0) — 타자 미션 화면과 같은 근사(미션 팀 로고는 기본 두 팀)
             hud={{
               inning: run.game.inning + 1,
@@ -460,6 +514,8 @@ export function PitchingScreen({
             batterTeamIndex={stage.batterTeamIndex}
             pitcherForm={stage.pitcherForm}
             pitcherHand={stage.pitcherHand}
+            {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
+            {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
             // 미션은 구장 생성자 값 0 · 바닥 줄 기본 — 타자 미션 화면(`MissionPlayScreen`)과 같다
             stadium={0}
             fieldPalette={null}
@@ -468,6 +524,9 @@ export function PitchingScreen({
             {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
             isPaused={isAwaitingConfirm}
             isFrozen={isPopupOpen}
+            inputOverlayRef={inputOverlayRef}
+            // "#TIME" 없음 — '#' 교체 검사 0x38984 가 미션(모드 5 · 6)을 막는다(38984~38a20)
+            timeKeyCount={null}
           >
             {matchupCards}
             {substitutionOverlay}
@@ -475,12 +534,15 @@ export function PitchingScreen({
         )
       })()}
 
-      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && <Panel heading="1. 구질 선택" />}
-      {phase === '구질' && !isAwaitingConfirm && (
+      {!isPopupOpen && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && <Panel heading="1. 구질 선택" />}
+      {phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && (
         <div hidden={isPopupOpen}>
           <PitchSlotPicker
             choices={slotChoices}
             isPaused={isPopupOpen}
+            {...(stage === undefined
+              ? {}
+              : { overlay: { ref: inputOverlayRef, typeNumbers: slotTypeNumbers, magicRemaining: magicRemaining ?? 0 } })}
             onDecide={(chosen) => {
               const index = slotChoices.findIndex((choice) => choice.slot === chosen)
               const found = repertoire[index]
@@ -498,6 +560,7 @@ export function PitchingScreen({
           <AimCursor
             side={aimSide}
             isPaused={isPopupOpen}
+            {...(stage === undefined ? {} : { overlay: { ref: inputOverlayRef, typeNumber: typeNumberOf(pitchType) } })}
             {...(onAimTick === undefined ? {} : { onTick: onAimTick })}
             onConfirm={(confirmed) => {
               // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
@@ -522,7 +585,14 @@ export function PitchingScreen({
       {phase === '게이지' && (
         <div hidden={isPopupOpen}>
           {/* 원본에는 결과 글자가 없다 — 작아지는 원 한 장뿐이라 안내 문구도 붙이지 않는다 (S5 U-15) */}
-          <PitchGradeGauge isPaused={isPopupOpen} showsGauge={showsGauge} onRelease={throwPitch} />
+          <PitchGradeGauge
+            isPaused={isPopupOpen}
+            showsGauge={showsGauge}
+            onRelease={throwPitch}
+            {...(stage === undefined || aim === null
+              ? {}
+              : { overlay: { ref: inputOverlayRef, aim, aimSide, gaugeSettingOn: usesGauge } })}
+          />
         </div>
       )}
     </PixelScreen>

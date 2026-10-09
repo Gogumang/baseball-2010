@@ -42,6 +42,8 @@ import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayer
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
+import { drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
 import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
@@ -154,6 +156,11 @@ export interface StageScene {
   readonly timeKeyCount?: number | null
   /** 필살 남은 횟수 0xaea30(공격 팀) — 0x38a30 이 타자 옆에 "0:SP×n" 을 그린다 (`specialSwingBadge`). 없거나 null 이면 안 그린다 */
   readonly specialSwingRemaining?: number | null
+  /**
+   * 사람 투구 UI (구질 목록 0xf · 조준 0x10 · 게이지 0x11) — 상태 그리기가 장면 위에 그리는 것 (`pitchInputOverlay`).
+   * 구질 목록이면 존 자리(0x4c53c)에 존 대신 그린다
+   */
+  readonly pitchInput?: PitchInputOverlay | null
 }
 
 export function renderBattingStage(
@@ -179,6 +186,9 @@ export function renderBattingStage(
     return
   }
   const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
+  const pitchInput = scene.pitchInput ?? null
+  // 0x4d780 이 바로 그리는 판 · 덮개 — 그리기 목록(선수)보다 먼저
+  drawPitchInputUnderlay(context, pitchInput, side)
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
@@ -202,12 +212,16 @@ export function renderBattingStage(
   if (scene.pitch !== null) drawFastballFlame(context, scene.pitch, scene.frame, scene.stagePhase)
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
+  // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — ⚠️ 깊이 정렬 대신 선수 다음
+  drawPitchInputSprites(context, pitchInput, side)
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
     drawHud(context, scene.hud, scene.tick)
   }
   // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
-  if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)
+  // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
+  if (pitchInput?.kind === '구질') drawPitchMenu(context, pitchInput, side)
+  else if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)
   // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
   if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
   // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
