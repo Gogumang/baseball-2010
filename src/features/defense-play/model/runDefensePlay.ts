@@ -797,12 +797,6 @@ export interface DefensePlayState {
   runInsThisTick: readonly number[]
   /** 경기+0x19ad(반짝임) */
   laserShining: boolean
-  /**
-   * **그림 전용** — 쥐기 0xb2710 이 마지막으로 적은 플레이+0x130(공 가진 야수). 한 번도 안 쥐었으면 −1 이고, 이것이
-   * −1 이 아니면 경기+0x19ac(쥐기 메시지 0x15)도 서 있다. 웹 `play.ballHolderSlot` 은 송구가 나가는 순간 받을 야수로
-   * 바뀌지만(근사) 원본 +0x130 은 받는 야수가 쥘 때까지 던진 야수다 — 고리(0x43cb0)는 이쪽을 본다.
-   */
-  grabbedSlot: number
   /** 경기+0x19ae(레이저 확정) */
   laserConfirmed: boolean
   /** 경기+0x19af — 한 플레이에 한 번만 굴린다 */
@@ -1083,7 +1077,6 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     slidingSoundThisTick: false,
     runInsThisTick: [],
     laserShining: false,
-    grabbedSlot: NONE,
     laserConfirmed: false,
     laserRolled: false,
     laserThrow: false,
@@ -1216,7 +1209,6 @@ export function stepDefensePlay(
   let slidingSoundThisTick = false
   const runInsThisTick: number[] = []
   let laserShining = state.laserShining
-  let grabbedSlot = state.grabbedSlot
   let laserConfirmed = state.laserConfirmed
   let laserRolled = state.laserRolled
   let laserThrow = state.laserThrow
@@ -1989,8 +1981,6 @@ export function stepDefensePlay(
       // 뜬공 아웃(0xb3834, 결과 1)은 이 한 번에만 날 수 있다. 결과가 1 이면 b2770 이 0xa9620(리터치) · 0xa95c0 을 부르고
       // state[0x1f] = 1 이다(0xb2774). 악송구 공·튕긴 공을 줍는 쥐기에는 +0x112 가 이미 서 있어 뜬공 아웃이 없다
       play = { ...play, held: true, wantsThrow: true }
-      // 쥐기 0xb2710 — +0x130 = 이 야수 · 메시지 0x15(경기+0x19ac = 1) — 그림의 고리(0x43cb0)만 본다
-      grabbedSlot = chaserSlot
       // 쥐기 0xb2710 — +0x127 = 0
       landingChase = false
       log.push(`${tick}틱 ${chaserSlot}번 야수가 잡았다 (종류 ${play.catchKind})`)
@@ -2128,7 +2118,6 @@ export function stepDefensePlay(
               : fielder,
         )
         play = { ...play, ballHolderSlot: to, held: true }
-        grabbedSlot = to
         rundownThrowArrival = -1
         rundownThrowTo = NONE
       }
@@ -2354,14 +2343,16 @@ export function stepDefensePlay(
         // 공 쥔 야수(플레이+0x130) · 반짝임 켜짐 · deadly_effect A(+0x1990)가 안 돎.
         // A 는 **그리지 않는 줌 펀치**라 웹판에 상태 자체가 없다(R2 2절) — 셋째 조건은 늘 참으로 둔다(근사).
         laserShiningSlot: laserShining && play.held ? play.ballHolderSlot : NONE,
-        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac(쥔 적 있음) · +0x130 · 공격 주체 · +0x19ad
+        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac · +0x130 · 공격 주체 · +0x19ad.
+        // +0x19ac 는 쥐기 0xb2710 의 메시지 0x15(0x51872)만 세우고 0x17 진입이 지운다 = 이 판에 한 번이라도 쥐었나(`everHeld`).
+        // +0x130 은 쥐기뿐 아니라 고르기 0xb3b38(b3e40)도 적는다 — 송구가 나가면 받을 야수로 바로 옮는다(`ballHolderSlot`)
         holderMark: holderMarkOf({
-          grabbed: grabbedSlot !== NONE,
-          holderSlot: grabbedSlot,
+          grabbed: play.everHeld,
+          holderSlot: play.ballHolderSlot,
           offenseIsCpu: input.offenseIsCpu === true,
           isShining: laserShining,
         }),
-        holderPlate: grabbedSlot === NONE ? null : (input.fielderPlates?.[grabbedSlot] ?? null),
+        holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
@@ -2734,7 +2725,6 @@ export function stepDefensePlay(
   state.throwFromSlot = throwFromSlot
   state.throwReleaseTick = throwReleaseTick
   state.throwReceiverSlot = throwReceiverSlot
-  state.grabbedSlot = grabbedSlot
   state.receivingThrow = receivingThrow
   state.throwCount = throwCount
   state.firstThrowBase = firstThrowBase
