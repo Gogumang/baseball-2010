@@ -7,6 +7,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
@@ -268,6 +269,9 @@ export function HomeRunDerbyScreen({
           <BattingStage
             // 하늘 줄 — 세션이 장면 시작 · 결과 진입 0x4f574 에 굴린 구장 +0x10
             skyRow={session.skyRow}
+            // 구장 객체 둘(0x39fdc 모드 7 — 내 팀 r7) — 타석 +0x70 펜스 프레임 · +0xc 바닥 팔레트 줄
+            {...(session.sceneStadium === null ? {} : { stadium: session.sceneStadium.stadium })}
+            fieldPalette={sceneFieldPaletteOf(session.sceneStadium)}
             key={stageSerial}
             batterAbility={stageBatter.ability}
             batterForm={stageBatter.form}

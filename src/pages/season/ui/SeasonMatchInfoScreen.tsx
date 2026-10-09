@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
@@ -36,6 +38,8 @@ export interface SeasonMatchInfoScreenProps {
   readonly onCancel: () => void
   /** '4'/왼 → 유저 팀(true) · '6'/오른 → CPU 팀(false) 엔트리 편집 0xe0 (this+0x120) */
   readonly onOpenEntry?: (isUserTeam: boolean) => void
+  /** 바탕 — 0xdd 진입 0x6548 의 무대를 0x5fd04 가 흐려 떠 둔 그림(공통 앞그림 0xb810 의 `0x581dc(스킨, 0, 0)`). 없으면 바탕 없음 */
+  readonly stage?: MatchInfoStadiumState | null
 }
 
 /**
@@ -48,7 +52,7 @@ export interface SeasonMatchInfoScreenProps {
  * '6' 은 0 CPU 팀(보기 전용).
  */
 export function SeasonMatchInfoScreen({
-  lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry,
+  lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry, stage = null,
 }: SeasonMatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -89,6 +93,7 @@ export function SeasonMatchInfoScreen({
 
   return (
     <RawScreen>
+      <MatchInfoStadiumBackdrop stage={stage} />
       {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
       {[
         { anchor: anchorA, frame: 157 },

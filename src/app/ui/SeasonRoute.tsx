@@ -20,6 +20,7 @@ import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { AceSelectScreen } from '@/pages/general-mode'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
   DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
@@ -576,6 +577,8 @@ export function SeasonRoute({
           opponentTeamId={options.opponentTeamId}
           playerSide={options.playerSide}
           gamePoint={session.gamePoints}
+          // 0xdd 진입 0x6548 → 0x5fd04 가 떠 둔 구장 바탕 (공통 앞그림 0xb810 이 0xdd 면 0x581dc 로 찍는다)
+          stage={session.matchInfoStage}
           onStart={() => {
             // 설정 창이 열려 있으면 키가 모두 창으로 간다 (0x83f2 메뉴+0x2ba)
             if (!session.isMatchSettingsOpen) actions.startPendingGame()
@@ -614,6 +617,8 @@ export function SeasonRoute({
         onKey={actions.pressEntryKey}
         onMoveCursor={actions.pointEntryCursor}
         onCloseAceLocked={actions.closeEntryAceLocked}
+        // 공통 앞그림 0xb810 은 0xe0 에서도 0xdd 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
+        underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
       />
     )
   }

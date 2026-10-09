@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
+import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
@@ -54,7 +56,10 @@ export interface MatchInfoScreenProps {
   /** 유저 팀 "선발" — 0x30f20 의 0↔k 뒤(엔트리 편집이 고쳤으면 그것)의 투수 0번 */
   readonly userStarterName?: string | null
   /** CPU 칸 — 0x30f20 이 세운 AI 팀의 선발·마선수 */
-  readonly cpuMatchInfo?: CpuMatchInfo | null
+  readonly cpuMatchInfo?: CpuMatchInfo | null  /**
+   * 바탕 — 22 진입 0x314b0 의 무대를 0x5fd04 가 흐려 떠 둔 그림(그리기 0x2e0c4 의 `0x581dc(스킨, 0, 0)`). 없으면 바탕 없음
+   */
+  readonly stage?: MatchInfoStadiumState | null
 }
 
 /**
@@ -72,7 +77,7 @@ export interface MatchInfoScreenProps {
  */
 export function MatchInfoScreen({
   setup, isQuickStart = false, isSettingsOpen = false, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
-  userStarterName = null, cpuMatchInfo = null,
+  userStarterName = null, cpuMatchInfo = null, stage = null,
 }: MatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -119,6 +124,7 @@ export function MatchInfoScreen({
 
   return (
     <RawScreen>
+      <MatchInfoStadiumBackdrop stage={stage} />
       {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
       {[
         { anchor: anchorA, frame: 157 },

@@ -12,6 +12,7 @@ import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
@@ -183,7 +184,9 @@ export function PitcherLeagueRoute({
         <NariScreenPush view={pushView}>
           <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
             teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
-            onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}} />
+            onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}}
+            // 나리 틀 0x16928 은 142~144 면 142 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
+            underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} />
         </NariScreenPush>
       )
     }
@@ -195,7 +198,7 @@ export function PitcherLeagueRoute({
     return (
       <NariScreenPush view={pushView}>
         <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-          playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint}
+          playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint} stage={session.matchInfoStage}
           onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
       </NariScreenPush>
     )

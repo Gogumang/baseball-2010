@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { MAGIC_PITCH_SLOT, MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_SLOT, MAGIC_PITCH_TYPE_NUMBER, magicPitchRecordIndexOf } from '@/entities/pitcher-career/model/magicPitch'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
@@ -17,7 +17,7 @@ import {
   pitchSlotsOf,
 } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { PitcherRepertoire, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
+import { ZONE_CENTERS, pitchPathOf } from '@/entities/pitching/model/pitchCurve'
 import { aimAfterTicks, aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
@@ -218,6 +218,23 @@ describe('사람 투구 만들기', () => {
     expect(공.type).toBe('파이어 볼')
     expect(공.breakOffset).toEqual({ x: 0, y: 0 })
     expect((공.worldPath ?? []).length).toBeGreaterThan(0)
+  })
+
+  it('마구 구속 단계는 0 이고 레코드는 0x9e944 번호다 — 0x66d54 마구면 rank 0 · 0x9e669 구질 22 면 단계 칸 0', () => {
+    for (let magicNumber = 1; magicNumber <= 4; magicNumber += 1) {
+      for (let form = 0; form <= 5; form += 1) {
+        const repertoire = { ...레퍼토리, magicNumber, form }
+        const 공 = buildHumanPitch(
+          { typeNumber: MAGIC_PITCH_TYPE_NUMBER, grade: 5, gaugeCell: 0, stats: 능력, repertoire, side: 1 },
+          씨앗(11),
+        )
+        const path = 공.worldPath ?? []
+        const recordIndex = magicPitchRecordIndexOf(magicNumber, form) ?? -1
+        expect(path).toEqual(
+          pitchPathOf({ typeNumber: MAGIC_PITCH_TYPE_NUMBER, form, speedStage: 0, recordIndex, target: path[path.length - 1] }),
+        )
+      }
+    }
   })
 
   it('등급이 높을수록 노린 칸에서 덜 벗어난다 (표 0xcfd60)', () => {

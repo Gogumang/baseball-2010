@@ -77,8 +77,9 @@ export interface SceneryState {
   /** 타석 화면이 열린 뒤 흐른 틱 — 구름·전광판 이동 */
   readonly tick: number
   /**
-   * 구장 번호 = 구장 객체 +0x70. 모드 1·8·9 는 장면 셋업 0x39fdc 가 st+0x30 으로 채운다(9 보다 크면 rand(0, 10) —
-   * `features/play-team-game/model/sceneStadium`). 그 밖의 모드는 아직 0 이다(그 갈래들의 규칙은 미확인)
+   * 구장 번호 = 구장 객체 +0x70. 모드 1·8·9 는 장면 셋업 0x39fdc 가 st+0x30 으로(9 보다 크면 rand(0, 10)), 3·4 는 홈 팀 ·
+   * 대회 2/8, 7 은 내 팀, 시즌 대회는 0x352e8 이 2/8 로 채운다(`features/play-team-game/model/sceneStadium`).
+   * 시즌 정규 · 미션은 생성자 값 0 이다
    */
   readonly stadium: number
   /**
@@ -124,6 +125,8 @@ const SKY_GRADIENT = { top: 10, bottom: 118, end: 178 }
 const CLOUD_COUNT = 3
 /** 하늘을 단색으로 칠하고 조명도 안 그리는 구장 번호 (0x78046 · 0x784c6 `cmp #8`) */
 const FLAT_SKY_STADIUM = 8
+/** 구장 8 의 하늘 단색 — 0x7806e `0x1400748(0xc6, 0xd4, 0xd7)` */
+const FLAT_SKY_COLOR = 'rgb(198, 212, 215)'
 /** 좌타 펜스 기준점 (−121 − 10, −70 + 3) */
 const FENCE_ANCHOR = { x: CAMERA.x - 1 - 10, y: CAMERA.y + 3 }
 const MISSION_TEAM_ICON = 11
@@ -203,15 +206,28 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
   const colorIndex = drawSky(context, state)
-  if (isCloudVisible(colorIndex)) drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
+  // 구장 8 은 하늘 0x77fe8 이 단색만 칠하고 구름 갈래까지 가지 않는다(78088 → 783a8)
+  if (state.stadium !== FLAT_SKY_STADIUM && isCloudVisible(colorIndex)) {
+    drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
+  }
   const offsetY = state.offsetY ?? 0
   drawFence(context, state, offsetY)
   drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY)
   if (offsetY === 0) drawSkyLight(context, state, colorIndex)
 }
 
+/**
+ * 하늘 0x77fe8 — 구장 +0x70 == 8 이면(78040~78088) 화면 전체 (0, 0, W, H) 를 RGB(0xc6, 0xd4, 0xd7) 한 색으로 칠하고 끝난다
+ * (그라데이션 · 구름 없음). 그 밖은 표 0xd37a4 줄 · 칸의 두 색으로 위 단색 · 그라데이션 · 아래 단색.
+ * 돌려주는 색 칸은 구름 · 하늘 조명이 쓴다(구장 8 은 둘 다 안 그린다).
+ */
 function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
   const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, state.skyColumn)
+  if (state.stadium === FLAT_SKY_STADIUM) {
+    context.fillStyle = FLAT_SKY_COLOR
+    context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
+    return colorIndex
+  }
   context.fillStyle = top
   context.fillRect(0, 0, STAGE_WIDTH, SKY_GRADIENT.top)
   const gradient = context.createLinearGradient(0, SKY_GRADIENT.top, 0, SKY_GRADIENT.bottom)
@@ -469,4 +485,92 @@ export function drawStadiumPreview(context: CanvasRenderingContext2D, state: Sta
     sourceX, 0, STAGE_WIDTH, field.height,
     0, STAGE_LAYOUT.fieldTopY + dy, STAGE_WIDTH, field.height,
   )
+}
+
+/**
+ * **경기정보 구장 미리보기** — 도우미 `0x5fd04(스킨, 무대)` 가 무대를 세운 뒤 `0x581dc(스킨, 무대, 1)` 로 화면을 떠 둔다(직접 떴다):
+ * ```
+ * 5fd0a  0x76b6c(무대)            ; 바닥 stadium/attack 을 무대+0xc 줄로
+ * 5fd16  0x76ba4(무대, 0)         ; 일반 구장 그림(펜스 · 관중 · 전광판)
+ * 5fd1e  0x783b0(무대)            ; 하늘 줄 +0x10 — 모드 1 측 0 팀 · 2 시즌 +0xb2 · 3·4 나리 +0xb2 (mod 6), 칸 +0x18 = 경기 상태 +0x6b
+ * 5fd28  0x76fc4(무대, 1)         ; 하늘 칸 = min(+0x18, 12) · 구름
+ * 5fd36  무대+4 = −120 · 무대+8 = −68  ; 카메라 (경기는 −70)
+ * 5fd40  0x581dc(스킨, 무대, 1):
+ *   581f6  0x6a735(gfx, RGB(255, 255, 255))     ; 화면 흰색
+ *   58210  0x78578(무대, 0, 1)                  ; 하늘 0x77fe8 → 일반 구장 0x77974 → 바닥 0x7725c → 하늘 조명 0x78490
+ *   58218  0xbdd65(1) · 3줄 선(알파 0x10) · [0x15605d0] 흰 단계 3 · 0xbda01 로 [0x1552ae4] 에 떠 둔다 → [skin+0x450]
+ * ```
+ * 떠 두면 무대는 버리고(3162a · 683e · 1c888) 그림마다 `0x581dc(스킨, 0, 0)` 이 그 버퍼를 (0, 0) 에 찍는다 — 구름 · 전광판이 안 흐른다.
+ * 부르는 곳: 일반모드 22 진입 0x314b0(3161e) · 시즌 0xdd 진입 0x6548(682e) · 나리 142 진입 0x1c46c(1c87c).
+ * 그리는 곳: 0xb810(시즌 0xdd · 0xe0 · 0xe1) · 0x16928(나리 142~144) · 0x2e070 · 0x2e0c4(일반모드 22 · 23).
+ *
+ * 이 함수는 `0x78578` 까지(흐리기 앞)를 그린다. 팀 아이콘 박스 0 = 무대+0x84(측 0 팀) · 박스 1 = +0x80(측 1 팀).
+ * 경기 상태 +0x6b 는 세 진입 모두 앞에서 0xb6814 로 지운 뒤라 하늘 칸 0 이다.
+ */
+export const MATCH_INFO_STADIUM_CAMERA = { x: -120, y: -68 } as const
+
+export interface MatchInfoStadiumState {
+  /** 무대 +0x70 — 펜스 프레임 · 하늘 단색(8) */
+  readonly stadium: number
+  /** 무대 +0xc — 바닥 팔레트 줄 (null 기본색) */
+  readonly fieldPalette: number | null
+  /** 하늘 줄 +0x10 (`stadiumSkyRowOf`) */
+  readonly skyRow: number
+  /** 무대 +0x84 — 측 0(선공) 팀 */
+  readonly side0TeamId: number
+  /** 무대 +0x80 — 측 1(후공) 팀 */
+  readonly side1TeamId: number
+  /** 전역 모드 — 하늘 조명 0x78490 이 5 · 6 · 7 이면 안 그린다 */
+  readonly gameMode: number
+  /** 환경설정 전광판(+0x3a) — OFF 면 전광판 글자를 안 그린다. 생략하면 켠 것 */
+  readonly isScoreboardOn?: boolean
+}
+
+export function drawMatchInfoStadium(context: CanvasRenderingContext2D, state: MatchInfoStadiumState): void {
+  const dy = MATCH_INFO_STADIUM_CAMERA.y - CAMERA.y
+  const scenery: SceneryState = {
+    skyRow: state.skyRow,
+    skyColumn: 0,
+    tick: 0,
+    stadium: state.stadium,
+    fieldPalette: state.fieldPalette,
+    ourTeamId: state.side0TeamId,
+    opponentTeamId: state.side1TeamId,
+    gameMode: state.gameMode,
+    ...(state.isScoreboardOn === undefined ? {} : { isScoreboardOn: state.isScoreboardOn }),
+  }
+  // 0x581dc 581f6 — 화면 흰색
+  context.fillStyle = '#fff'
+  context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
+
+  // 하늘 0x77fe8 — 구장 8 이면 화면 전체 단색, 그 밖은 구장+8 에서 위 단색 · 그라데이션 · 아래 단색
+  const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, 0)
+  const isFlatSky = state.stadium === FLAT_SKY_STADIUM
+  if (isFlatSky) {
+    context.fillStyle = FLAT_SKY_COLOR
+    context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
+  } else {
+    const skyTop = SKY_GRADIENT.top + dy
+    const skyBottom = SKY_GRADIENT.bottom + dy
+    context.fillStyle = top
+    context.fillRect(0, 0, STAGE_WIDTH, skyTop)
+    const gradient = context.createLinearGradient(0, skyTop, 0, skyBottom)
+    gradient.addColorStop(0, top)
+    gradient.addColorStop(1, bottom)
+    context.fillStyle = gradient
+    context.fillRect(0, skyTop, STAGE_WIDTH, skyBottom - skyTop)
+    context.fillStyle = bottom
+    context.fillRect(0, skyBottom, STAGE_WIDTH, SKY_GRADIENT.end - SKY_GRADIENT.bottom)
+  }
+
+  context.save()
+  context.translate(0, dy)
+  if (!isFlatSky && isCloudVisible(colorIndex)) drawClouds(context, 0, cloudPaletteRowOf(colorIndex))
+  // 일반 구장 0x77974 — 펜스 프레임 · 팀 아이콘 · 관중 · 전광판(틱 0)
+  drawFenceParts(context, scenery)
+  context.restore()
+  // 바닥 0x7725c — 무대+0xc 줄
+  drawField(context, state.fieldPalette, dy)
+  // 하늘 조명 0x78490(무대, 0, 1)
+  drawSkyLight(context, scenery, colorIndex)
 }
