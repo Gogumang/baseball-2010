@@ -1,6 +1,7 @@
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher, QuickAtBatSituation } from '@/entities/game/model/quickAtBat'
 import { runnerCountOf } from '@/entities/game/model/baseState'
@@ -145,6 +146,8 @@ export interface HalfInningResult {
   readonly stoppedBeforeBatter?: boolean
   /** 멈춘 자리(또는 3아웃)의 루 */
   readonly bases?: BaseState
+  /** 그 루에 선 주자의 신원 — 반 이닝 타순 커서(`battingOrderIndex` 와 같은 셈, 원본 주자 목록 sim+0x80) */
+  readonly runners?: BaseRunners
 }
 
 /* ── 공격 쪽: 명단과 CPU 대타 (0xc1ba4 → 0xac228 → 0xaebe4) ───────────────────── */
@@ -726,6 +729,7 @@ export function* simulateHalfInningTicks(
     gameEnded,
     ...(stoppedBeforeBatter ? { stoppedBeforeBatter } : {}),
     bases,
+    runners,
   }
 }
 

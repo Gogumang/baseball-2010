@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
+import type { MutableRefObject } from 'react'
+import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
 import { resolvePitch, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
@@ -152,6 +154,12 @@ interface BattingStageProps {
    * 같은 캔버스를 그대로 쓰므로 구름·전광판 흐름은 타석에서 이어진다. 안 넘기면 타석 화면이다.
    */
   readonly isResultBackdrop?: boolean
+  /**
+   * **루상 주자 애니 시계** — 원본은 장면 +0xf24 의 애니 0~2 를 경기 장면이 사는 동안 들고 0x35b94 가 부를 때마다 한 칸씩 돌린다
+   * (`RunnerAnimationClock`). 부르는 쪽이 장면 수명의 칸(`useSceneScopedRef(createRunnerAnimationClock(), 장면)`)을 넘기면 판 ·
+   * 타석으로 화면이 다시 서도 이어진다. 안 넘기면 이 화면이 사는 동안만 센다
+   */
+  readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
   /**
    * 결과 창 뒤 배경의 틱 t(0 = 들어선 틱) +0x17e2 — 안 넘기면 홈런더비 결과 창(0x3c0b8, 틱마다 +5)이다.
    * 팀경기 정산(0x19) 갱신 0x4b100 은 사람 팀이 이겼을 때만 +3 이라 부르는 쪽이 넘긴다.

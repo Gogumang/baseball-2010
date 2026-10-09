@@ -1292,7 +1292,7 @@ interface PitcherPitchArrival {
  *   붙들어(`pendingRunnerPlay`) 화면이 한 틱씩 돌리고 `resolveRunnerPlay` 가 잇는다(`liveRunnerPlay`). 밀어내기(종류 2)는
  *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다.
  *
- * ⚠️ 근사: 루에 선 주자 = 상대 타순 1·2·3칸 앞 타자(`runAbilitiesOnBaseOf`).
+ * - 루별 주루: 루에 선 주자의 신원(`GameState.runners`, 원본 주자 목록)대로 그 상대 타순 칸 선수(`runAbilitiesOnBaseOf`).
  * ⚠️ 미해결: 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — R+0x138(타자 수)이
  *   안 오르는 갈래다(0xa8d98). 웹은 주자 판 뒤 보통 삼진 길(`applyDefensivePlay`)로 타자 수를 센다.
  * - 번트 종류(장면 +0xfdc): `simulateBatter` 가 낸 이 공의 값(`thrown.buntKind`)을 주자 판에 싣는다 — 도루 판 리드 0x3d7b8 이

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { MutableRefObject } from 'react'
+import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -95,6 +97,15 @@ interface MissionPlayScreenProps {
   /** 지금 출발시킬 수 있는 루 (`canStartSteal`). 안 넘기면 도루 입구가 없다 */
   readonly stealableBases?: readonly StealBase[]
   /**
+   * 루별 주자 주력 — 타석 화면 0x35b94 상태 0xe 주루 칸(35f74 `0xb570d(ctx, 3, 주자, 1, 90, 1)`). 루에 선 주자의 신원(사람 칸 팀
+   * 타순 칸)대로 세션이 셈한다. 안 넘기면 주루 칸을 안 그린다
+   */
+  readonly runnerRunAbilities?: Partial<Record<'first' | 'second' | 'third', number>>
+  /** st[0x15 + i] — 이번 공에 도루를 출발한 주자의 루(세션 `stealingFrom`). 그 주자는 루에 안 그린다 */
+  readonly stealingFrom?: readonly number[]
+  /** 루상 주자 애니 시계 — 미션 장면 수명(`BattingStage.runnerAnimationClock`) */
+  readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
+  /**
    * 경기 중 메뉴 **"다시하기"** (표 0xcfcfc 행 1 · StrGAME[7], `0x3c706`).
    * 미션·홈런더비 행만 자동진행 자리에 이 칸이 온다. 안 넘기면 칸이 잠긴다.
    */
@@ -155,6 +166,9 @@ export function MissionPlayScreen({
   resultBoard,
   onSteal,
   stealableBases = [],
+  runnerRunAbilities,
+  stealingFrom,
+  runnerAnimationClock,
   onRestart,
   settings,
   onSettingsChange,
@@ -318,6 +332,7 @@ export function MissionPlayScreen({
             specialSwingRemaining={specialSwingRemaining}
             onSpecialSwingUsed={onSpecialSwingUsed}
             sceneBuntKind={sceneBuntKind}
+            {...(runnerAnimationClock === undefined ? {} : { runnerAnimationClock })}
             gameMode={MISSION_BATTER_MODE}
             // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
             isScoreboardOn={settings?.isScoreboardOn}
@@ -335,6 +350,8 @@ export function MissionPlayScreen({
               strikes: atBat.strikes,
               outs: run.outs,
               bases: run.bases,
+              ...(runnerRunAbilities === undefined ? {} : { runnerRunAbilities }),
+              ...(stealingFrom === undefined ? {} : { hiddenRunnerBases: stealingFrom }),
               ourLogoUrl: './sprites/team_logo_ini/000.png',
               opponentLogoUrl: './sprites/team_logo_ini/001.png',
               // 위 줄 = 측 0(선공) · 아래 줄 = 측 1 (0x373d0 — 점수 0xb69b1(st, 0) · (st, 1)). 사람은 미션의 측에 앉는다

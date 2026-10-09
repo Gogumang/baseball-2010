@@ -14,6 +14,7 @@ import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
+import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -76,6 +77,11 @@ export interface StageLatest {
   readonly pitcherAbility: PitcherAbility
   readonly isEagleEyeEnabled: boolean
   readonly hud: StageHud | null
+  /**
+   * 루상 주자 애니 시계 — 경기 장면 수명의 칸(`useSceneScopedRef`)을 넘기면 타석 화면이 다시 서도 이어진다 (`RunnerAnimationClock`).
+   * 안 넘기면 이 화면이 사는 동안만 센다
+   */
+  readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
   readonly acePitcher: AcePitcherFrames | null
   readonly canBunt: boolean
   /** 타자 폼 (원본 rec[0xb] 윗니블 = 2 × 타입 + 손). 몸통·자세표를 `폼 >> 1` 로 고른다 */

@@ -52,7 +52,13 @@ import {
   startHumanSteal,
   type PitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
-import { chargedRunsOfFates } from '@/features/defense-play/model/runnerFates'
+import { chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import {
+  missionRunAbilitiesOnBaseOf,
+  missionRunnerRunAbilitiesOf,
+  missionRunnersAfterPlay,
+} from '@/entities/mission/model/missionRunners'
+import type { MissionSpecialRunners } from '@/entities/mission/model/missionRunners'
 import { missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import {
   FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf,
@@ -177,6 +183,11 @@ interface MissionSessionInput {
   readonly pitcher?: ModePitcher
   /** 타자 미션에서 치는 타자의 장착 스킬 (`modeBatterOf(...).skillIds`) — 압도 22 가 마투수 투구 소모를 ×2 한다 */
   readonly batterSkillIds?: readonly number[]
+  /**
+   * 타자 미션에서 치는 나리 타자의 경기용 주력 (`modeBatterOf(...).ability.run`) — 루에 선 미션 타자의 도루 판 · 주루 칸이 읽는다
+   * (`missionRunners`). 명예 타자를 고르면 그 선수 값이 대신한다. 안 넘기면 진행기 기본값(500)
+   */
+  readonly batterRunAbility?: number
   /**
    * 명예의 전당 (전역기록 +0x880 투수 · +0x940 타자). 미션 선수 고르기에서 명예 선수를 고르면(+0xa5/+0xa6 ≥ 0)
    * 선수 게터 0x1fbd0 · 0x1fc20 이 이 기록을 준다 — `pitcher`·`batterSkillIds` 대신 그 선수의 값이다.
@@ -476,6 +487,7 @@ export function useMissionSession({
   aceLevels,
   pitcher: pitcherInput,
   batterSkillIds: nariBatterSkillIds = NO_SKILLS,
+  batterRunAbility: nariBatterRunAbility,
   hallOfFame,
   isVibrationOn,
   nariTeamIds,
@@ -685,6 +697,19 @@ export function useMissionSession({
     [hallOfFame, isBatterHeld, player, screen.kind],
   )
   const batterSkillIds = hallOfFameBatter?.skillIds ?? nariBatterSkillIds
+  /**
+   * 루에 선 미션 타자 · 마타자의 경기용 주력 (`missionRunners`) — 나머지 칸은 마스터 줄 0xb6415(선수, 3, 1).
+   * 판을 먹이는 콜백들이 늘 지금 값을 보게 ref 로 든다
+   */
+  const missionBatterRunAbility = hallOfFameBatter?.ability.run ?? nariBatterRunAbility
+  const specialRunnersRef = useRef<(mission: OriginalMission) => MissionSpecialRunners>(() => ({}))
+  specialRunnersRef.current = (mission) => {
+    const aceBatterRun = mission.side === '투수' ? missionOpponentAbility(mission, aceLevels)?.run : undefined
+    return {
+      ...(missionBatterRunAbility === undefined ? {} : { missionBatterRun: missionBatterRunAbility }),
+      ...(aceBatterRun === undefined ? {} : { aceBatterRun }),
+    }
+  }
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
@@ -889,8 +914,10 @@ export function useMissionSession({
                 stealingFrom: stealing,
                 bases: current.bases,
                 outs: current.outs,
-                // 타자 미션은 수비가 CPU · 공격이 사람 — 아홉 칸·주루는 미션 타구(`missionDefensePlayInputOf`)와 같은
-                // 진행기 기본값(500)이다(레코드에 팀·타순이 없다, 근사). 주루 설정은 안 넘긴다(기본 자동 — 견제와 같다)
+                // 루별 주루 — 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로 0xb570d(ctx, 3, 주자, 1, 90, 1), 0 은 지금 타자
+                // (`missionRunAbilitiesOnBaseOf`). 아홉 칸 수비는 미션 타구(`missionDefensePlayInputOf`)와 같은 진행기 기본값(500)이다
+                runAbilities: missionRunAbilitiesOnBaseOf(current, specialRunnersRef.current(current.mission)),
+                // 타자 미션은 수비가 CPU · 공격이 사람. 주루 설정은 안 넘긴다(기본 자동 — 견제와 같다)
                 defenseIsCpu: true,
                 offenseIsCpu: false,
                 // 장면 +0xfdc — 못 맞힌 번트의 번트 종류. 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
@@ -1174,10 +1201,10 @@ export function useMissionSession({
       : null
     // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
     // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`).
-    // ⚠️ 근사: 미션 레코드에 상대 타선이 없어 주자 주루는 진행기 기본값(500)이다 — 0x520de 의 표 칸은 주자 속도
-    //    300~383 이면 늘 1 이라(`cpuSteal` 머리말) 주루와 무관하게 같은 확률이다
+    // 주자 주루는 루에 선 CPU 타선 주자의 신원대로(`missionRunAbilitiesOnBaseOf` — 마스터 줄 0xb6415(선수, 3, 1) · 마타자 레벨 배율)
+    const pitcherRunAbilities = missionRunAbilitiesOnBaseOf(pitcherRun, specialRunnersRef.current(pitcherRun.mission))
     const stealingFrom = rollCpuStealStart(
-      { bases: pitcherRun.bases, offenseIsCpu: true, runAbilityOf: () => MISSION_DEFAULT_RUN_ABILITY },
+      { bases: pitcherRun.bases, offenseIsCpu: true, runAbilityOf: (base) => pitcherRunAbilities[base] ?? 0 },
       random,
     )
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
@@ -1240,6 +1267,8 @@ export function useMissionSession({
             stealingFrom,
             bases: pitcherRun.bases,
             outs: pitcherRun.outs,
+            // 루별 주루 — CPU 타선 주자 신원대로, 0 은 지금 타자(낫아웃 타자주자)
+            runAbilities: pitcherRunAbilities,
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: throwModeManual === false ? '자동' : '수동',
@@ -1846,7 +1875,7 @@ export function useMissionSession({
         defenseIsCpu: true,
       })
       const interrupted = current.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
-      setMissionRun((previous) => (previous === null ? previous : settleBatterRun(applyPickoff(previous, result.advance))))
+      setMissionRun((previous) => (previous === null ? previous : settleBatterRun(applyPickoff(previous, result.advance, result.runnerFates))))
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])
       if (result.ticks.length > 0) setPickoffReplay(result)
       // 견제 판 끝 판정 B 0xae3e8 — 아웃 > 2 면 0x18(이 타석은 끊기고 다음은 새 타석 0xd → 0xe), 아니면 같은 타석 0xf(ae592).
@@ -2054,6 +2083,14 @@ export function useMissionSession({
     /** 조준(0x10)의 CLR — 0xf 로 돌아가 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다 */
     returnToPitchSelection: () => askPitchSelection('same'),
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
+    /** 타자 미션: 이번 공에 출발한 주자의 루 (st[0x14 + 루]) — 타석 화면이 그 주자를 루에 안 그린다 */
+    stealingFrom,
+    /**
+     * 타자 미션 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74 `0xb570d(ctx, 3, 주자, 1, 90, 1)`).
+     * 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로다 (`missionRunnerRunAbilitiesOf`)
+     */
+    missionRunnerRunAbilities:
+      missionRun === null ? {} : missionRunnerRunAbilitiesOf(missionRun, specialRunnersRef.current(missionRun.mission)),
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 (새 타석이면 메시지 0xbc1 의 타석 등장음을 실었다) */
     sceneConfirm: announcedSceneConfirm,
     /** 경기 장면 로딩 판의 팁 글(StrTIP[1 + rand(0, 73)]) — 서 있으면 라우트가 로딩 판을 그리고 끝나면 `actions.finishLoading` */
@@ -2109,8 +2146,6 @@ function withAutoRelayStep<T extends MissionRun | PitcherRun>(run: T, step: Miss
 
 /** 3아웃 — 판이 끊기고 0x18 · 자동진행 반 이닝(`runBatterMissionAutoHalves` · `runPitcherMissionAutoHalves`)으로 간다 */
 const MISSION_OUTS_PER_INNING = 3
-/** 진행기 기본 주루(등급 3 = 500) — 미션 레코드에 팀·타순이 없어 미션 타구도 이 값을 쓴다 (`missionDefensePlayInputOf`) */
-const MISSION_DEFAULT_RUN_ABILITY = 500
 /** 도루 판 정산 0xa8024 @a83c6 의 기록 8(도루) — 루를 옮긴 도루 주자마다 하나 (`stealRecordIdsOf`) */
 const STEAL_RECORD_ID = 8
 
@@ -2124,7 +2159,7 @@ const STEAL_RECORD_ID = 8
  */
 function withMissionRunnerPlay(run: MissionRun, play: PitchArrivalPlay): MissionRun {
   if (run.status !== '진행중') return run
-  const moved = applyPickoff(run, play.result.advance)
+  const moved = applyPickoff(run, play.result.advance, play.result.runnerFates)
   // 도루 칸 R+0x10c(코드 0x10 ≤ 0x13)는 지금 타석에 미션 타자가 섰을 때만 든다 (0xa57f8 a5844 — `isMissionBatterUp`)
   const steals = isMissionBatterUp(run) ? play.recordIds.filter((id) => id === STEAL_RECORD_ID).length : 0
   if (steals === 0) return moved
@@ -2140,12 +2175,13 @@ function withMissionRunnerPlay(run: MissionRun, play: PitchArrivalPlay): Mission
 function withBatterNotOut(run: MissionRun, outcome: AtBatOutcome, isBunt: boolean, play: PitchArrivalPlay): MissionRun {
   if (run.status !== '진행중') return run
   const struck = applyMissionOutcome(run, outcome, isBunt)
-  const moved = applyPickoff(run, play.result.advance)
+  const moved = applyPickoff(run, play.result.advance, play.result.runnerFates)
   // 판의 득점(점수판 0xa5c34)은 CPU 수비 투수의 실점 A·B 로 — 삼진 길에는 득점이 없다. 타순 · 타석 칸은 삼진 정산(struck) 것,
   // 점수 · 반 이닝 끝은 판의 것. 판 끝 판정의 경기 끝(폭투 끝내기 등)은 판 쪽이 낸다
   const merged: MissionRun = {
     ...struck,
     bases: moved.bases,
+    runners: moved.runners,
     outs: moved.outs,
     cpu: moved.cpu,
     game: { ...struck.game, scores: moved.game.scores, halfEnded: moved.game.halfEnded },
@@ -2284,6 +2320,12 @@ function withPitcherMissionRunnerResult(run: PitcherRun, result: DefensePlayResu
       ...run,
       progress: withOutCalls(run.progress, outCallsOf(run, advance.outsAdded)),
       bases: isInningOver ? EMPTY_BASES : advance.bases,
+      // 판의 살아남은 주자로 CPU 타선 신원을 민다 (주자만 움직인 판 — 타순은 그대로)
+      runners: missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
+        batterReached: false,
+        runsScored: advance.runsScored,
+        survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
+      }),
       outs: isInningOver ? 0 : outs,
       totalOuts: run.totalOuts + advance.outsAdded,
       allowed: { ...run.allowed, runs: run.allowed.runs + charged },
@@ -2342,6 +2384,12 @@ export function withPitcherNotOut(run: PitcherRun, outcome: AtBatOutcome, play: 
     status: '진행중',
     progress: withOutCalls(struck.progress, outCallsOf(run, advance.outsAdded) - struckOuts),
     bases: isInningOver ? EMPTY_BASES : advance.bases,
+    // 낫아웃 판의 살아남은 주자(타자주자 0 포함)로 신원을 민다 — 지금 타자 칸은 판 앞 타순
+    runners: missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
+      batterReached: false,
+      runsScored: advance.runsScored,
+      survivorsFromBase: survivorsFromBaseOfFates(play.result.runnerFates),
+    }),
     outs: isInningOver ? 0 : outs,
     totalOuts: run.totalOuts + advance.outsAdded,
     allowed: { ...struck.allowed, runs: run.allowed.runs + charged },

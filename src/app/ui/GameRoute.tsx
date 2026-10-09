@@ -16,6 +16,7 @@ import type { useGameSettings } from '@/app/model/useGameSettings'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
+import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -85,6 +86,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerialRef.current)
   /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, sceneSerialRef.current)
+  /** 장면 +0xf24 의 루상 주자 애니 0~2 — 장면이 사는 동안 0x35b94 가 부를 때마다 돈다 (`RunnerAnimationClock`) */
+  const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), sceneSerialRef.current)
   /** 수비 재생 · 중계 바탕 0x35218 의 팔레트 줄 — 수비 구장 +0xc(0x39fdc 모드 4 의 0x788f8, 0~9 는 타석 줄과 같다) */
   const grassPalette = sceneFieldPaletteOf(session.sceneStadium)
 
@@ -276,6 +279,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         random={random}
         onPitchResolved={handlePitchResolved}
         sceneBuntKind={sceneBuntKindRef.current}
+        runnerAnimationClock={runnerAnimationClockRef}
         onQuit={session.actions.quitGame}
         onSteal={session.actions.stealBase}
         // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다

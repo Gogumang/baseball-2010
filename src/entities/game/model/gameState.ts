@@ -2,7 +2,7 @@ import { BALANCE } from '@/shared/config/original/balance'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
-import { EMPTY_BASE_RUNNERS, effectiveRunnersOf, runnersAfterPlay } from '@/entities/game/model/baseRunners'
+import { EMPTY_BASE_RUNNERS, effectiveRunnersOf, runnersAfterPlay, survivorsWithoutPlayOf } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 
 export const INNINGS_PER_GAME = 9
@@ -248,7 +248,7 @@ export function applyAtBatOutcome(
       batter: battingSlotOf(game.battingOrderIndex),
       batterReached: outcome.kind === '안타' || outcome.kind === '볼넷' || outcome.kind === '사구',
       runsScored: advance.runsScored,
-      ...(runnerHint?.survivorsFromBase === undefined ? {} : { survivorsFromBase: runnerHint.survivorsFromBase }),
+      ...survivorsOf(game.bases, outcome, runnerHint),
     })
   const afterAtBat: GameState = withInningRuns(
     {
@@ -278,6 +278,21 @@ export function applyAtBatOutcome(
 export interface RunnerHint {
   readonly runners?: BaseRunners
   readonly survivorsFromBase?: readonly number[]
+}
+
+/**
+ * 신원을 앉힐 살아남은 주자 — 넘겨받은 운명(`survivorsFromBase`)이 없고 결과 코드를 넘겨받지 않았으면(`precomputed` 없이 온 결과도
+ * 같다) 진행기를 안 도는 결과(삼진 · 볼넷 · 사구 · 홈런)의 정산 목록(`survivorsWithoutPlayOf`)으로. 주자만 움직인 판의 자리표
+ * 결과는 늘 운명을 싣는다.
+ */
+function survivorsOf(
+  bases: BaseState,
+  outcome: AtBatOutcome,
+  runnerHint: RunnerHint | undefined,
+): { readonly survivorsFromBase?: readonly number[] } {
+  if (runnerHint?.survivorsFromBase !== undefined) return { survivorsFromBase: runnerHint.survivorsFromBase }
+  const survivors = survivorsWithoutPlayOf(bases, outcome.kind)
+  return survivors === null ? {} : { survivorsFromBase: survivors }
 }
 
 /** 타순 커서 → 타순 칸 (0~8) */

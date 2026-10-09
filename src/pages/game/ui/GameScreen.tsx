@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { MutableRefObject } from 'react'
+import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -86,6 +88,8 @@ interface GameScreenProps {
    * `onPitchResolved` 넷째 인자로 돌려준다. 부르는 쪽이 경기 장면 동안 들고 있다가 다시 넘긴다. 안 주면 타석 화면이 스스로 든다.
    */
   readonly sceneBuntKind?: number
+  /** 루상 주자 애니 시계 — 경기 장면 수명(`BattingStage.runnerAnimationClock`). 안 주면 타석 화면이 사는 동안만 센다 */
+  readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
   /**
    * 이 경기 구장의 하늘 줄 +0x10 (0x783b0 모드 4 — 나리 저장 +0xb2 mod 6). 경기를 세울 때 정한 값을 경기 내내 넘긴다 —
    * 수비 재생으로 화면이 내려갔다 다시 서도 같은 줄이다. 안 주면 타석 화면이 그림을 세울 때 굴린다(예전 근사)
@@ -136,6 +140,7 @@ export function GameScreen({
   onBenchClearingDone,
   onSpecialSwingUsed,
   sceneBuntKind,
+  runnerAnimationClock,
   skyRow,
   sceneStadium = null,
   recordAlert,
@@ -335,6 +340,8 @@ export function GameScreen({
               playerSide: progress.game.playerSide,
               // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자 주력, 내가면 내 능력치
               runnerRunAbilities: runnerRunAbilitiesOf(progress),
+              // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입이 지운다)
+              hiddenRunnerBases: progress.stealingFrom,
             }}
             isEagleEyeEnabled={isEagleEyeEnabled}
             acePitcher={
@@ -360,6 +367,7 @@ export function GameScreen({
             })}
             onSpecialSwingUsed={onSpecialSwingUsed}
             sceneBuntKind={sceneBuntKind}
+            {...(runnerAnimationClock === undefined ? {} : { runnerAnimationClock })}
             // 0xab214 의 내 선수 보너스 — 모드 4 에서 rec = 0x1f8d4(저장, 4) = [저장+0xbc]+0x11c 의 rec[0xa] 비트7(육성)이
             // 서고(0xb6389, ab3d6), 연차 idx 는 같은 레코드 +0xb3 (ab3f2) — 커리어 연차는 1부터라 1 을 뺀다
             isBatterOwnPlayer

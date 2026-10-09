@@ -1,7 +1,9 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { quickBatterOf, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
-import { rosterLineupOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
+import { lineupSlotOf, rosterLineupOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
+import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { simulateHalfInningTicks } from '@/entities/game/model/simulateHalfInning'
 import type { HalfInningPlateAppearance, HalfInningTick } from '@/entities/game/model/simulateHalfInning'
@@ -130,6 +132,12 @@ export function humanRecordsOf(startOrder: number, nariRecordSlot: number = MISS
   records[startOrder] = records[k]
   records[k] = atOrder
   return records
+}
+
+/** 간이 엔진 타순 커서 신원 → 타순 칸 (0~8) */
+function slotRunnersOf(runners: BaseRunners): BaseRunners {
+  const slot = (cursor: number | null) => (cursor === null ? null : lineupSlotOf(cursor))
+  return { first: slot(runners.first), second: slot(runners.second), third: slot(runners.third) }
 }
 
 /** 타순 아홉 칸 — 0x42364 의 0xae914 가 (팀[+0x32] + i) mod 9 */
@@ -309,6 +317,8 @@ export interface MissionAutoHalf {
   readonly runs: number
   readonly outs: number
   readonly bases: BaseState
+  /** 그 루에 선 주자의 신원 — 공격 타선의 타순 칸(0~8). 간이 엔진 주자 목록 그대로 (`simulateHalfInningTicks`) */
+  readonly runners: BaseRunners
   /** c21d6 — 경기 끝(끝내기 · 콜드 · 9회 3아웃) */
   readonly gameEnded: boolean
   /** 미션 타자 차례라 멈췄다 (타자 미션의 사람 칸 팀 공격만) */
@@ -438,6 +448,7 @@ export function* simulateMissionAutoHalfTicks(
     runs: result.runs,
     outs: result.outs,
     bases: result.bases ?? EMPTY_BASES,
+    runners: slotRunnersOf(result.runners ?? EMPTY_BASE_RUNNERS),
     gameEnded: result.gameEnded === true || isMissionGameOver({ ...game, scores }, result.outs),
     stoppedBeforeNari: result.stoppedBeforeBatter === true,
   }

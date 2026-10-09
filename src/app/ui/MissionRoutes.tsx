@@ -25,6 +25,7 @@ import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
+import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import type { ModeBatter } from '@/app/model/modeBatter'
 import { isModeMagicPitchType, modePitchMenuOf, modePitchSlotNumbersOf } from '@/app/model/modePitcher'
@@ -143,6 +144,8 @@ export function MissionRoutes({
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, playScreenRef.current)
   /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
   const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
+  /** 장면 +0xf24 의 루상 주자 애니 0~2 — 미션 장면이 사는 동안 0x35b94 가 부를 때마다 돈다 (`RunnerAnimationClock`) */
+  const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), playScreenRef.current)
 
   const playingRun =
     screen.kind === '투수미션' ? session.pitcherRun
@@ -251,6 +254,10 @@ export function MissionRoutes({
         onPickoff={actions.cpuPickoff}
         // 도루 출발 (0x53610 → 0x583 → 0xa9bd4) — 판정은 공이 도착할 때 도루 판(종류 5)이 한다
         stealableBases={session.stealableBases}
+        // 상태 0xe 주루 칸 — 루에 선 주자의 신원대로 (`missionRunnerRunAbilitiesOf`)
+        runnerRunAbilities={session.missionRunnerRunAbilities}
+        stealingFrom={session.stealingFrom}
+        runnerAnimationClock={runnerAnimationClockRef}
         onSteal={actions.steal}
         // 경기 중 "나가기" — 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음). 마선수 대결도 플래그를 안 보고 같은
         // 길이다 — 진 결과 이벤트는 다음 타자편 105 진입이 띄운다 (파일 머리 "마선수 대결의 경기 중 나가기" 주석)

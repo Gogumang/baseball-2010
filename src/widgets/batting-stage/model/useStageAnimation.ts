@@ -39,6 +39,7 @@ import { isBallInSwingReach, nextFlightEvent, swingReleaseTickOf } from '@/widge
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
+import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
@@ -94,6 +95,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
     let animationHandle = 0
     const openedAt = performance.now()
+    /**
+     * 루상 주자 애니 시계(장면 +0xf24 의 애니 0~2) — 부르는 쪽이 경기 장면 수명의 칸을 넘기면 그것, 아니면 이 화면이 사는 동안.
+     * `runnerTick` 은 이 화면에서 마지막으로 센 틱 — 첫 그림이 0x35b94 첫 부름이다
+     */
+    const localRunnerClock = createRunnerAnimationClock()
+    let runnerTick = -1
     // 파티클 파트 그림은 연출이 뜨기 전에 받아 둬야 첫 연출이 보인다
     preloadPtcParts()
 
@@ -418,6 +425,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       })
 
       const settlementRain = settlementEffect?.kind === 'rain' ? settlementEffect.rain : null
+      // 0x35b94 는 타석 상태 그림(0x13 포함)마다 한 번 — 루에 (숨김 없이) 주자가 선 애니만 한 칸씩 (`stepRunnerAnimationClock`)
+      const runnerFrames = runnerTick < 0 ? 1 : nowTick - runnerTick
+      runnerTick = nowTick
+      const stageHud = latestRef.current.hud
+      const runnerAnimationSteps =
+        stageHud === null || isBackdrop
+          ? undefined
+          : stepRunnerAnimationClock(
+              latestRef.current.runnerAnimationClock?.current ?? localRunnerClock,
+              stageHud.bases,
+              stageHud.hiddenRunnerBases ?? [],
+              runnerFrames,
+            )
       renderBattingStage(context, {
         pitcherForm,
         pitcherHand,
@@ -445,6 +465,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         acePitcher: latestRef.current.acePitcher,
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
         tick: nowTick,
+        ...(runnerAnimationSteps === undefined ? {} : { runnerAnimationSteps }),
         // 판이 효과 층을 깔았으면 배경 캔버스에는 배경만 — 비 · 파티클은 아래에서 그 층에 그린다
         particles: settlement?.layers === undefined ? particlesRef.current : null,
         rain: settlement?.layers === undefined ? settlementRain : null,
