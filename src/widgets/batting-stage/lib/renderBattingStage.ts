@@ -106,17 +106,10 @@ export interface StageScene {
    * 마운드에 선 투수의 **장착 장비 등급** (0x79790 적재 · 0x79524 여섯 칸).
    * 안 넘기면 맨몸 투수라 지금까지와 똑같이 바탕 f · f+22 두 겹만 그린다.
    *
-   * ⚠️ 지금 이 칸을 채워 주는 화면이 **하나도 없고, 타석 화면은 원본에도 채울 자리가 아니다.**
-   * 원본 경기 장면(0x108f8)은 그림 한 칸만 세우고 모드로 갈린다 — 모드 4(타자편)면 타자 그림,
-   * **아니면 투수 그림**이다. 그러니 장비를 입은 투수 그림은 **모드 3 투수편의 "내 투수"** 뿐이고,
+   * 타석 화면(타자편)은 원본에도 채울 자리가 아니다 — 원본 경기 장면(0x108f8)은 그림 한 칸만 세우고 모드로 갈린다:
+   * 모드 4(타자편)면 타자 그림, **아니면 투수 그림**이다. 그러니 장비를 입은 투수 그림은 **모드 3 투수편의 "내 투수"** 뿐이고,
    * 타석 화면 마운드의 상대 투수는 그 객체가 아니다 (`batterLayers.pitcherEquipmentOf` 주석).
-   *
-   * 웹에서 이 칸을 채우려면 먼저 두 가지가 있어야 한다:
-   *   1. 투수편 상점 — **이제 있다**: 투수편 장비 상점·장비착용(d15c14d, `features/shop/model/pitcherShopSelection`)이
-   *      `PitcherCareer.equipmentLevels` 니블을 채운다.
-   *   2. **투수편 경기 화면의 투수 그림** — `pages/pitching/PitcherGameScreen` 은 캔버스 없이
-   *      패널로만 그려서 `BattingStage` 를 아예 쓰지 않는다. 남은 것은 이것 하나다.
-   * 그것이 생기면 `batterLayers.pitcherEquipmentOf(career.equipmentLevels)` 한 줄이면 된다.
+   * 채우는 곳: 투수편 경기 화면의 타석 장면 `PitcherSideStage` — `pitcherEquipmentOf(career.equipmentLevels)`.
    */
   readonly pitcherEquipment?: PitcherEquipment
   /**

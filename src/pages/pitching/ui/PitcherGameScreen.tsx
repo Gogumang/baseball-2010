@@ -70,6 +70,12 @@ import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
+import { opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
+import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
+import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -118,6 +124,11 @@ interface PitcherGameScreenProps {
    * 비운다 (`pitcherMatchupCardsOf`).
    */
   readonly matchupRecords?: PitcherMatchupRecords
+  /**
+   * 내 투수의 장비 니블 (`PitcherCareer.equipmentLevels`) — 장면 셋업 0x108f8 이 모드 ≠ 4 면 세우는 투수 그림(0x79368)에
+   * 0x10810 이 부위마다 0x79790 으로 장비 겹을 싣는다. 안 주면 맨몸 투수다.
+   */
+  readonly pitcherEquipmentLevels?: PitcherAbility
 }
 
 export function PitcherGameScreen({
@@ -130,6 +141,7 @@ export function PitcherGameScreen({
   pitcherName,
   matchupRecords,
   gamePoint,
+  pitcherEquipmentLevels,
 }: PitcherGameScreenProps) {
   const session = usePitcherGame(options, random, settings?.isVibrationOn)
   const { progress, canPitch, summary, actions } = session
@@ -237,6 +249,8 @@ export function PitcherGameScreen({
    */
   const atBatBeforeThrowRef = useRef(progress.atBat)
   const [pitchWaitTicks, setPitchWaitTicks] = useState(0)
+  /** 마지막 공의 0x12 길이 — 타석 장면(`PitcherSideStage`)이 공을 마지막 점에 두는 틱 수 */
+  const [heldResultTicks, setHeldResultTicks] = useState(0)
   const lastResolution = progress.lastResolution
   const lastResolutionRef = useRef(lastResolution)
   useEffect(() => {
@@ -244,7 +258,9 @@ export function PitcherGameScreen({
     lastResolutionRef.current = lastResolution
     if (lastResolution === null || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) return
     if (lastResolution.kind === '타구') return
-    setPitchWaitTicks(resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, lastResolution).outcome))
+    const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, lastResolution).outcome)
+    setPitchWaitTicks(waitTicks)
+    setHeldResultTicks(waitTicks)
   }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay])
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
@@ -737,21 +753,56 @@ export function PitcherGameScreen({
         )}
 
         {/*
-          0xe — 구질 고르기(0xf)는 OK 뒤다. 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 를 그린다(모드 검사 없음).
-          내가 던지므로 투수 PLAYER · 타자 COM. ⚠️ 원본은 판 아래 0xd 그리기(타석 장면)가 깔리지만 웹 투구 화면엔 그 캔버스가 없다.
-          값은 `pitcherMatchupCardsOf` (내 투수 · 상대 타자).
+          타석 장면 — 원본은 누가 던지든 같은 프레임 0x52c50 이 같은 상태 그리기(0xd 0x4db2c · 0xe 0x4d9ec · 0xf 0x4d9b0 ·
+          0x10 0x4d780 · 0x11 0x4d2ac · 0x12 0x4ce9c)로 구장 · 투수 0x38d1c · 타자 0x49e64 · 주자 0x35b94 · HUD 0x4c4bc 를 그린다
+          (`widgets/batting-stage/lib/pitcherSideStage`). 그 위에 상태별 판이 얹힌다:
+          0xe — 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 (모드 검사 없음 — 내가 던지므로 투수 PLAYER · 타자 COM).
+          0x16 — 교체 연출 "CHANGE" (0x4da30).
         */}
-        {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
-          <div className={styles.matchupFrame}>
+        <PitcherSideStage
+          pitch={progress.lastPitch}
+          resolution={progress.lastResolution}
+          resultTicks={heldResultTicks}
+          hud={{
+            inning: progress.game.inning,
+            half: progress.game.half,
+            ourScore: progress.game.ourScore,
+            opponentScore: progress.game.opponentScore,
+            balls: progress.atBat.balls,
+            strikes: progress.atBat.strikes,
+            outs: progress.game.outs,
+            bases: progress.game.bases,
+            ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
+            opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
+            ourTeamId: options.ourTeamId,
+            opponentTeamId: options.opponentTeamId,
+            playerSide: progress.game.playerSide,
+          }}
+          {...stageBatterOf(progress)}
+          pitcherForm={options.repertoire.form}
+          // 내 투수 손 0xb63c0 = 폼 & 1 (마투수 아님)
+          pitcherHand={pitcherHandOf(options.repertoire.form, false)}
+          // 내 투수가 마운드에 있을 때만 — 강판 뒤 마운드는 다른 투수다
+          {...(pitcherEquipmentLevels === undefined || !progress.onMound
+            ? {}
+            : { pitcherEquipment: pitcherEquipmentOf(pitcherEquipmentLevels) })}
+          // 타석 구장 +0x70 · 바닥 줄 +0xc — 셋업 0x39fdc 모드 3 갈래 (정산 배경과 같은 구장)
+          stadium={sceneStadium.stadium}
+          fieldPalette={grassPalette}
+          // 하늘 줄 = 구장 +0x10 — 0x783b0 모드 3: 리그 날짜 g mod 6
+          skyRow={stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0}
+          gameMode={PITCHER_CAREER_MODE}
+          {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
+          isPaused={isAwaitingConfirm}
+          isFrozen={isPitchInputPaused}
+        >
+          {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
-          </div>
-        )}
-        {/* 교체 연출 0x16 "CHANGE" — ⚠️ 원본은 그 아래 타석 그림이 깔리지만 웹 투구 화면엔 그 캔버스가 없다 */}
-        {substitution.isShown && (
-          <div className={styles.matchupFrame}>
+          )}
+          {substitution.isShown && (
             <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
-          </div>
-        )}
+          )}
+        </PitcherSideStage>
         {!isPitchInputPaused && canPitch && !isAwaitingConfirm && phase === '구질' && <Panel heading="1. 구질 선택" />}
         {canPitch && !isAwaitingConfirm && phase === '구질' && (
           <div hidden={isPitchInputPaused}>
@@ -844,6 +895,27 @@ export function PitcherGameScreen({
       )}
     </div>
   )
+}
+
+/** 작은 팀 로고 (team_logo_ini) — 팀 경기 HUD 와 같은 그림 */
+const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+
+/**
+ * 타석에 선 상대 타자의 그림 재료 — 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀(헬멧 · 몸통 벌).
+ * 마타자는 레코드 대신 손 표 0xd88b0 만 쓴다 — ⚠️ 근사: 몸통 종류는 0(밸런서)으로 둔다(마타자 레코드 폼 미해독).
+ */
+function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
+  readonly batterForm: number
+  readonly batterSkinIndex: number
+  readonly batterTeamIndex: number
+} {
+  const batter = opponentBatterOf(progress)
+  const teamIndex = progress.options.opponentTeamId
+  if (batter.aceIndex !== undefined) {
+    return { batterForm: batterHandOf(0, batter.aceIndex), batterSkinIndex: 0, batterTeamIndex: teamIndex }
+  }
+  const profile = batter.profile ?? 0
+  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamIndex }
 }
 
 /** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7). 빈 칸(구질 0)은 그리지 않는다 */
