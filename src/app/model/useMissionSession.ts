@@ -1566,6 +1566,11 @@ export function useMissionSession({
     // 4ef84~4efae — 성공이면(대기로 G 를 건너뛴 판도) 그 편 올클리어 0xa5184 를 보고 0x62368(ui, 모드 6 ? 37 : 21, 0)
     const side: OriginalMission['side'] = missionRun !== null ? '타자' : '투수'
     if (isWin && isMissionSideAllCleared(countsAfter, side)) openHidden?.(MISSION_ALL_CLEAR_HIDDEN_ID[side])
+    // 기록연감 G획득 · 기록달성은 **쌓지 않는다** (확정) — 0x4ea0c 4eb60~4eb6a 가 모드([장면+0x1104]) − 5 ≤ 1 이면 곧바로
+    // 4ecde 로 뛰어 기록 G 합(4ebe0~4ec36) · G 더하기(4ec5a) · `0x22c7d`(4ec82) · `0x22e11`(4ec8a) · 0x1fd45 · 0x1f1e1 을 통째로 건너뛰고,
+    // 미션 갈래 0x4ef18~0x4f018 은 G 를 더하기만 한다(4ef82 `str [g,#0x64]`) — `0x22c7d` 를 부르는 곳(전수: 0x8afa · 0x8c76 · 0x1bb14 ·
+    // 0x1bc4a · 0x293e6 · 0x4ec82 · 0x4ee90/0x4eeba(대전 8·9 갈래) · 0x4f708 · 0x8c6e2)에 미션 갈래가 없다. 미션 칸(모드 5·6 → 칸 5)
+    // GP 통계는 메인 메뉴 달성 팝업 0x292f8(k = 3·4·7 → 293dc `movs r2,#6`)만 쌓는다(`collectionRewardStatModeOf`)
     // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 모든 모드를 센다: 모드 5 · 6 은 0x22efc 의 미션 칸 +0x54 (점프표 0xcdaac)
     recordStat?.({ kind: '플레이시간', mode: side === '타자' ? MISSION_BATTER_MODE : MISSION_PITCHER_MODE, elapsed: lapPlayClock() })
     // 0x4efc6~0x4f018 — 서 있는 대기마다(대결이면 SYS 8 이 세운 그 편 칸도) 결과 바이트를 이 판 결과로. g[0xf6] 은 안 본다
