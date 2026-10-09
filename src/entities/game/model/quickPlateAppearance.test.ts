@@ -21,7 +21,9 @@ describe('playQuickPlateAppearance — 간이 타석 하나를 주자까지 (0xc
         situation: { inning: 1 },
         bases: { first: false, second: true, third: false },
         outs: 0,
-        runnerRunAt: () => 500,
+        runners: { first: null, second: 7, third: null },
+        batterId: 0,
+        runnerRunOf: () => 500,
       },
       차례난수([0.9, 0, 0.99, 0.9, 0, 0.99, 0.9, 0, 0.99, 0.9, 0], 0),
     )
@@ -29,9 +31,11 @@ describe('playQuickPlateAppearance — 간이 타석 하나를 주자까지 (0xc
     expect(result.play.outcome).toEqual({ kind: '볼넷' })
     expect(result.advance).toEqual({ bases: { first: true, second: false, third: true }, runsScored: 0, outsAdded: 0 })
     expect(result.stolenRunners).toEqual([])
+    // 2루 주자(7번 칸)는 3루로, 타자(0번 칸)는 1루로
+    expect(result.runners).toEqual({ first: 0, second: null, third: 7 })
   })
 
-  it('판정 길 공마다 도루를 굴려 성공한 주자를 거꾸로 센 수로 낸다 (c1982~c1ade)', () => {
+  it('판정 길 공마다 도루를 굴려 성공한 주자를 그 신원으로 낸다 — 주력도 그 주자 것 (c1982~c1ade)', () => {
     // 첫 공: 판정 길(0.9) · 존 밖(0) = 볼 → 도루 굴림 0 → 1루 주자(직전 타자) 2루로. 그 뒤 루킹 삼진
     const result = playQuickPlateAppearance(
       {
@@ -40,14 +44,36 @@ describe('playQuickPlateAppearance — 간이 타석 하나를 주자까지 (0xc
         situation: { inning: 1 },
         bases: { first: true, second: false, third: false },
         outs: 0,
-        runnerRunAt: (ordersBack) => (ordersBack === 1 ? 500 : 0),
+        runners: { first: 5, second: null, third: null },
+        batterId: 6,
+        runnerRunOf: (runner) => (runner === 5 ? 500 : 0),
       },
       차례난수([0.9, 0, 0]),
     )
 
     expect(result.play.outcome).toEqual({ kind: '삼진' })
     expect(result.steals).toBe(1)
-    expect(result.stolenRunners).toEqual([1])
+    expect(result.stolenRunners).toEqual([5])
     expect(result.advance.bases).toEqual({ first: false, second: true, third: false })
+    expect(result.runners).toEqual({ first: null, second: 5, third: null })
+  })
+
+  it('도루 판정 주력은 실제로 앞선 주자의 것이다 — 타순에서 거꾸로 센 타자가 아니다', () => {
+    // 1루 주자는 4번 칸(주력 0 → 도루 확률 표 첫 칸). 거꾸로 센 근사라면 직전 타자(5번 칸, 주력 999)를 봤다
+    const 굴림 = [0.9, 0, 0.5]
+    const result = playQuickPlateAppearance(
+      {
+        batter: 타자,
+        pitcher: 투수,
+        situation: { inning: 1 },
+        bases: { first: true, second: false, third: false },
+        outs: 0,
+        runners: { first: 3, second: null, third: null },
+        batterId: 5,
+        runnerRunOf: (runner) => (runner === 3 ? 0 : 999),
+      },
+      차례난수(굴림),
+    )
+    expect(result.steals).toBe(0)
   })
 })

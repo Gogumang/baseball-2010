@@ -9,6 +9,9 @@ import {
   resultOf,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
+import { runnersOfGame } from '@/entities/game/model/gameState'
+import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -75,7 +78,7 @@ import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
-import { chargedRunsOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
+import { chargedRunsOfFates, runnerFatesWithoutPlay, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
@@ -1371,16 +1374,18 @@ function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] 
 }
 
 /**
- * 루별 주자 주루 — 0 은 지금 타자(낫아웃 타자주자).
- * ⚠️ **근사**: 웹 `GameState` 는 루에 선 주자가 누구인지 모른다 — 1루 = 직전 타자 · 2루 = 그 앞 · 3루 = 그 앞으로
- * 상대 타순을 거꾸로 센다 (타자편 `gameFlow`·팀 경기와 같은 근사). 대타가 들어온 칸은 지금 그 칸의 로스터 선수다.
+ * 루별 주자 주루 — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 — 상대 타순 칸)대로
+ * 그 칸에 지금 선 로스터 선수다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(상대 타순을 거꾸로 센다)로 본다.
  */
 function runAbilitiesOnBaseOf(progress: PitcherGameProgress): Partial<Record<0 | 1 | 2 | 3, number>> {
-  const runOf = (slotsBack: number) => {
-    const slot = (((progress.opponentOrderIndex - slotsBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-    return opponentBatterAbility(progress.options, rosterSlotAt(progress.opponentLineup, slot)).run
+  const runOf = (slot: number) => opponentBatterAbility(progress.options, rosterSlotAt(progress.opponentLineup, slot)).run
+  const runners = runnersOfGame(progress.game, progress.opponentOrderIndex)
+  const runs: Partial<Record<0 | 1 | 2 | 3, number>> = { 0: runOf(progress.opponentOrderIndex) }
+  for (const base of [1, 2, 3] as const) {
+    const runner = runnerOnBase(runners, base)
+    if (runner !== null) runs[base] = runOf(runner)
   }
-  return { 0: runOf(0), 1: runOf(1), 2: runOf(2), 3: runOf(3) }
+  return runs
 }
 
 /** 인플레이가 아닌 타석 끝(삼진·볼넷·사구·홈런) — 0xae24c 의 보통 길 뒤 0x17(밀어내기)·정산 0xa8024 */
@@ -1620,7 +1625,9 @@ function withMyRunnerPlay(
     defenseScene: result.scene,
   }
   if (!changed) return { progress: next, changed }
-  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult)
+  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult, {
+    survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
+  })
   let decision = progress.decision
   for (let run = 1; run <= applied.runsScored; run += 1) {
     decision = applyRunScoredFor(progress, decision, run, true)
@@ -1747,6 +1754,8 @@ function applyDefensivePlay(
    * 있으면 이 타석은 간이 엔진 타석이다(결과 링 아웃 = 5).
    */
   quickAdvance?: AdvanceResult,
+  /** 간이 엔진 타석이 민 주자 신원(상대 타순 칸) — `quickAdvance` 와 함께 */
+  quickRunners?: BaseRunners,
 ): PitcherGameProgress {
   const before = progress.game
   const advanceResult =
@@ -1754,7 +1763,17 @@ function applyDefensivePlay(
     quickAdvance ??
     // 간이 엔진이 돌린 타석 — **원본 간이 엔진에는 희생플라이가 없다** (E-2 확정)
     advanceRunners(before.bases, outcome, before.outs, { quickEngine: true })
-  const applied = applyOpponentAtBat(before, progress.opponentOrderIndex, outcome, advanceResult)
+  const applied = applyOpponentAtBat(
+    before,
+    progress.opponentOrderIndex,
+    outcome,
+    advanceResult,
+    defensePlay !== null
+      ? { survivorsFromBase: survivorsFromBaseOfFates(defensePlay.runnerFates) }
+      : quickRunners === undefined
+        ? undefined
+        : { runners: quickRunners },
+  )
   const slot = progress.opponentOrderIndex
   const previousLog = progress.opponentBatterLogs[slot] ?? { hits: 0, homeRuns: 0 }
   const hit = isHit(outcome)
@@ -2603,9 +2622,10 @@ function playDefensiveAtBat(
       },
       bases: progress.game.bases,
       outs: progress.game.outs,
-      // ⚠️ 주자 신원 근사 — 루 b 의 주자를 상대 타순에서 거꾸로 센다
-      runnerRunAt: (ordersBack) =>
-        quickBatterOfTeam(options, false, rosterSlotAt(progress.opponentLineup, orderBackOf(order, ordersBack))).run,
+      // 루에 선 주자의 신원(상대 타순 칸) — 도루 판정은 앞선 주자의 주력
+      runners: runnersOfGame(progress.game, order),
+      batterId: lineupSlotOf(order),
+      runnerRunOf: (runner) => quickBatterOfTeam(options, false, rosterSlotAt(progress.opponentLineup, runner)).run,
       beforePitch: pitched.beforePitch,
     },
     random,
@@ -2628,6 +2648,7 @@ function playDefensiveAtBat(
     null,
     null,
     appearance.advance,
+    appearance.runners,
   )
   const runs = played.game.opponentScore - before.opponentScore
   const halfChanged = played.game.half !== before.half || played.game.inning !== before.inning
@@ -2698,9 +2719,10 @@ function playTeammateAtBat(
       },
       bases: before.bases,
       outs: before.outs,
-      // ⚠️ 주자 신원 근사 — 루 b 의 주자를 우리 타순에서 거꾸로 센다
-      runnerRunAt: (ordersBack) =>
-        quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, orderBackOf(order, ordersBack))).run,
+      // 루에 선 주자의 신원(우리 타순 칸) — 도루 판정은 앞선 주자의 주력
+      runners: runnersOfGame(before, order),
+      batterId: lineupSlotOf(order),
+      runnerRunOf: (runner) => quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, runner)).run,
       beforePitch: pitched.beforePitch,
     },
     random,
@@ -2709,7 +2731,7 @@ function playTeammateAtBat(
   const outcome = play.outcome
   // 동료 타석은 원본도 간이 엔진(0xc262c)이다 — 희생플라이가 없다 (E-2 확정). 볼넷 모든 주자 +1 · 도루 · 땅볼 진루는
   // `playQuickPlateAppearance` 가 먹였다. 투수편 레코드 표에는 타자 도루 칸이 없다(리그 기록표를 안 든다)
-  const game = applyAtBatOutcome(before, outcome, appearance.advance)
+  const game = applyAtBatOutcome(before, outcome, appearance.advance, { runners: appearance.runners })
   const runs = game.ourScore - before.ourScore
   let decision = progress.decision
   for (let run = 1; run <= runs; run += 1) {
@@ -2785,11 +2807,6 @@ function playTeammateAtBat(
 
 /** 원본 실점 카운터 A·B 는 99 에서 자른다 (P7 E1) */
 const MAXIMUM_PITCHER_COUNTER = 99
-
-/** 타순 커서에서 거꾸로 k 번째 타순 칸 — 타순은 아홉 칸을 돈다 */
-function orderBackOf(order: number, ordersBack: number): number {
-  return (((order - ordersBack) % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-}
 
 /**
  * 간이 타석의 공 하나를 던지기 앞 — `0xc262c` 의 공 고리는 c26be 0xa5c2d → **c26c8 0xa5e14(소모)** → c26d4 경로 굴림

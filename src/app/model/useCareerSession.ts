@@ -133,7 +133,7 @@ import {
 import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
-import { rollTrainingInjury } from '@/entities/career/model/condition'
+import { effectiveAbilityOf, rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
 import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
 import { advanceStreaks, evaluateGame, managerCommentIndexOf, streakEventOf } from '@/entities/career/model/gameEvaluation'
@@ -604,6 +604,11 @@ export function useCareerSession({
       ourRecordLineup?: QuickLineup,
       /** 나리 저장 +0xb2 — 구장 하늘 줄(0x783b0 모드 4)이 본다. 정규 · 포스트시즌은 `dayCounter`, 국가대항전은 대회 날짜(L+0x32) */
       skyDayCounter = dayCounter,
+      /**
+       * 내 선수 주력 `0xb570d(ctx, 3, 나, 1, 0x5a, 1)` — 모드 4 는 팀 정액 · 코치를 안 타 피로 없는 실효값이다. 루에 선 내가
+       * 간이 타석 도루 판정(c19a0) · 주자 판 주루에 쓰인다 (`GameProgress.myRunAbility`)
+       */
+      myRunAbility?: number,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
@@ -617,7 +622,7 @@ export function useCareerSession({
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
-        ourRecordLineup,
+        ourRecordLineup, myRunAbility,
       )
       progressRef.current = started
       setProgress(started)
@@ -681,6 +686,8 @@ export function useCareerSession({
           ...(aceLevels === undefined ? {} : { levels: aceLevels }),
         },
       mine === undefined ? undefined : nariQuickLineupOf(mine),
+      undefined,
+      current === null || current === undefined ? undefined : effectiveAbilityOf(current).run,
     )
   }, [aceLevels, startMatch])
 
@@ -751,6 +758,7 @@ export function useCareerSession({
       nariQuickLineupOf(teams.korea),
       // 대회 중 나리 저장 +0xb2 = L+0x32 는 대회 날짜다(0xb7bf0 이 0 으로 놓고 하루 끝마다 +1)
       cup.day,
+      effectiveAbilityOf(current).run,
     )
   }
 

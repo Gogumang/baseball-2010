@@ -136,3 +136,11 @@ export function batterRunnerSafeOfFates(fates: readonly RunnerFate[]): boolean {
   if (first === undefined) return false
   return (first.fromBase === 0 && !first.retired) || first.scored
 }
+
+/**
+ * **판이 끝나고 루에 남은 주자**(득점도 처리 끝도 아닌)의 투구 때 루 — 0 = 타자주자. 주자 신원을 다음 루에 앉히는 실마리
+ * (`gameState.applyAtBatOutcome` 의 `survivorsFromBase`). 보류됐다 날아간 득점의 주자는 `scored` 라 빠진다.
+ */
+export function survivorsFromBaseOfFates(fates: readonly RunnerFate[]): readonly number[] {
+  return fates.filter((fate) => !fate.retired && !fate.scored).map((fate) => fate.fromBase)
+}
