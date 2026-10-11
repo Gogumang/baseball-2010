@@ -16,7 +16,6 @@ import {
 import {
   BALL_FRAMES,
   DEADLY_EFFECT_FRAMES,
-  DEFENDER_FRAMES,
   DEFENSE_BACKGROUND_HEIGHT,
   DEFENSE_BACKGROUND_URL,
   DEFENSE_BACKGROUND_WIDTH,
@@ -31,9 +30,14 @@ import {
   flashOffsetOf,
   isBallDrawn,
   runnerFrameOf,
+  runnerSpriteFolderOf,
 } from '@/pages/defense/lib/defenseView'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
+import { DefenseHolderMark } from '@/pages/defense/ui/DefenseHolderMark'
+import { DefensePlayerEffect } from '@/pages/defense/ui/DefensePlayerEffect'
+import { DefenseLaserTrail } from '@/pages/defense/ui/DefenseLaserTrail'
+import { playerEffectMarksOf } from '@/pages/defense/lib/playerEffectMarks'
 import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
 
 /** 판정 글자 그림 (game_judge.pzx, 게임+0x101c) */
@@ -215,6 +219,9 @@ export function DefenseScreen({
   const judgeText = state.judgeText ?? null
   const judgeTextPoint = judgeText === null ? null : popupPointOf(judgeText.holderSlot)
 
+  const holderMark = state.holderMark ?? null
+  const holderFielder = holderMark === null ? undefined : state.fielders.find((fielder) => fielder.slot === holderMark.slot)
+
   const ballGround = screenOf(state.ball)
   const ballPoint = { x: ballGround.x, y: ballGround.y - toScreenY(state.ball.height) }
   const flash = state.flash ?? null
@@ -252,8 +259,21 @@ export function DefenseScreen({
       .sort((a, b) => a.index - b.index)
       .map((runner) => ({
         key: runner.z + 1,
-        node: <Runner key={`runner-${runner.index}`} runner={runner} point={screenOf(runner)} />,
+        node: (
+          <Runner
+            key={`runner-${runner.index}`}
+            runner={runner}
+            point={screenOf(runner)}
+            loadedAce={state.runnerAceSprite ?? null}
+          />
+        ),
       })),
+    // player_effect 부착 효과(0x43278 · 0x43a0c) — 야수 · 주자를 그리며 같은 그리기 목록에 깊이 키로 넣는다(공 0x36dfc 보다 먼저).
+    // 같은 키면 먼저 넣은 선수 그림 뒤(위)다
+    ...playerEffectMarksOf(state).map((mark) => ({
+      key: mark.zKey,
+      node: <DefensePlayerEffect key={`effect-${mark.key}`} mark={mark} point={screenOf(mark)} update={update} />,
+    })),
     // 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다
     ...(isBallDrawn(state.ball)
       ? [
@@ -316,8 +336,34 @@ export function DefenseScreen({
 
         {underActors}
 
+        {/* 공 가진 야수 고리 + 이름 판 0x43cb0 — 0x46cbc, 비거리 판 뒤 · 야수 목록(0x43278) 앞에 곧바로 그린다 */}
+        {holderMark !== null && (
+          <DefenseHolderMark
+            mark={holderMark}
+            plate={state.holderPlate ?? null}
+            fielderPoint={holderFielder === undefined ? null : fielderScreenOf(holderFielder)}
+            update={update}
+            screen={{ width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT }}
+          />
+        )}
+
         {/* 그리기 목록 차례 — 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
         {actors.map((actor) => actor.node)}
+
+        {/* 레이저 잔상 0x37076 — 장면 +0x1991 동안 궤적 첫 점에서 공까지 */}
+        {state.laserTrailFrom != null && (
+          <DefenseLaserTrail
+            folder={BALL_FRAMES}
+            frame={ballFrameOf(state.ball.height)}
+            from={(() => {
+              const ground = screenOf(state.laserTrailFrom)
+              return { x: ground.x, y: ground.y - toScreenY(state.laserTrailFrom.height) }
+            })()}
+            ball={ballPoint}
+            ballHeight={toScreenY(state.ball.height)}
+            ballGroundY={ballGround.y}
+          />
+        )}
 
         {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
         {judgeText !== null && judgeTextPoint !== null && (
@@ -397,23 +443,29 @@ function Fielder({
 function Runner({
   runner,
   point,
+  loadedAce = null,
 }: {
   readonly runner: DefenseRunner
   readonly point: { readonly x: number; readonly y: number }
+  /** 타석 교대 때 실린 주자 마선수 그림 (0x483a0) */
+  readonly loadedAce?: number | null
 }) {
   const frame = runnerFrameOf(runner.action, runner.actionTick, runner.base, runner.isAdvancing)
+  // 0x79d10 — 마선수 주자는 실린 마선수 그림(+0x1c, 팔레트 없음), 아니면 defender(+0xc, 팀 팔레트). 프레임은 둘 다 vt40 날값
+  const sprite = runnerSpriteFolderOf(runner, loadedAce)
   return (
     <div
       className={styles.actor}
       style={{ left: point.x, top: point.y }}
       data-testid={`defense-runner-${runner.index}`}
       data-frame={frame}
+      data-folder={sprite.folder}
     >
-      {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정) */}
+      {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정). 마선수 그림도 같은 125장 짜임이다 */}
       <ActorSprite
-        folder={DEFENDER_FRAMES}
+        folder={sprite.folder}
         frame={frame}
-        paletteIndex={defenderPaletteIndexOf(runner.teamIndex)}
+        paletteIndex={sprite.isAce ? null : defenderPaletteIndexOf(runner.teamIndex)}
       />
     </div>
   )

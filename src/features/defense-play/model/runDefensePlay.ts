@@ -127,15 +127,23 @@ import {
   type PlayEndState,
 } from '@/entities/fielding/model/playGate'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
+import {
+  FUMBLE_MARK_TICKS,
+  THROW_ERROR_MARK_TICKS,
+  tickMarkCounter,
+} from '@/features/defense-play/model/playerEffects'
 import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defense-play/model/throwLaunch'
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
 import {
+  holderMarkOf,
   viewStateOf,
   type ActionMemory,
   type DefensePlayView,
+  type HolderPlate,
 } from '@/features/defense-play/model/defensePlayView'
 
 /**
@@ -357,6 +365,16 @@ export interface DefensePlayInput {
   readonly defenseTeamIndex?: number
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number
+  /**
+   * 수비 칸별 **이름 판에 적을 선수** (0x43cb0 의 오른쪽 아래 판). 칸 0 은 지금 마운드 투수(이름 + 보직 +0xb & 3),
+   * 칸 1~8 은 그 칸 야수(이름 + 수비 코드 +0x1c & 0xf). 안 주면 고리만 그리고 판은 없다.
+   */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /**
+   * 공격 팀 주자 · 타자의 **마선수 번호** (타자 마선수 0~4) — 주자 그림 0x79d10 이 마선수 그림으로 그린다(`runnerAces` 머리말).
+   * 안 주면 모두 보통 주자 그림이다.
+   */
+  readonly runnerAces?: RunnerAces
 }
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
@@ -396,6 +414,26 @@ export function defenseAbilitiesOf(
     filled[slot] = true
   }
   return abilities
+}
+
+/**
+ * 수비 아홉 칸의 **이름 판 선수** (`fielderPlates`) — 칸을 고르는 법은 `defenseAbilitiesOf` 와 같다
+ * (자리 코드 − 1 칸, 겹치면 앞 선수). 칸 0 은 지금 마운드 투수다.
+ */
+export function defenseFielderPlatesOf(
+  lineup: readonly { readonly name: string; readonly position?: number }[],
+  pitcher: { readonly name: string; readonly role?: number } | undefined,
+): (HolderPlate | null)[] {
+  const plates: (HolderPlate | null)[] = Array.from({ length: FIELDER_COUNT }, () => null)
+  if (pitcher !== undefined) plates[0] = { name: pitcher.name, pitcherRole: pitcher.role }
+  for (const player of lineup) {
+    const code = (player.position ?? 0) & 0xf
+    const slot = code - 1
+    if (slot < 1 || slot >= FIELDER_COUNT) continue
+    if (plates[slot] !== null) continue
+    plates[slot] = { name: player.name, positionCode: code }
+  }
+  return plates
 }
 
 /** 이번 틱에 눌린 키 한 개 — 경기 장면 `this+0x38` 에 해당한다 */
@@ -784,6 +822,10 @@ export interface DefensePlayState {
   runInsThisTick: readonly number[]
   /** 경기+0x19ad(반짝임) */
   laserShining: boolean
+  /** **그림 전용** 야수 +0xb8(펌블 표시, 칸별) — 펌블 b4280 이 6, 야수 틱 a12da 가 잠금 없을 때 −1 */
+  fumbleMarks: number[]
+  /** **그림 전용** 야수 +0xc0(송구 실수 표시, 칸별) — 악송구 a1908 · 원바운드 a17fc · 예보 두 번째 패스 b188e 가 4, a12e6 이 −1 */
+  throwErrorMarks: number[]
   /** 경기+0x19ae(레이저 확정) */
   laserConfirmed: boolean
   /** 경기+0x19af — 한 플레이에 한 번만 굴린다 */
@@ -795,6 +837,13 @@ export interface DefensePlayState {
    * 던지고 vt64(0) 으로 내린다(내야 → 내야 송구 b2ee6 도 내린다).
    */
   laserArmed: boolean
+  /**
+   * **그림 전용** 장면 +0x1991 — 레이저 발사 0x400bc 가 세우고, 슬롯 2 의 5254c 가 포구 관문 0xb4c9d(동작 시작 틱 − 1 == 공 틱)에서
+   * 내린다(그 그림의 필살 포구 켜기도 건너뛴다). 서 있으면 공 그리기 0x37076 이 잔상을 그린다
+   */
+  laserTrailOn: boolean
+  /** **그림 전용** 지금 공 궤적의 t = 0 점(0xa25b1(공, 0)) — 판 시작 · 다시 쏘기 · 송구가 새 궤적을 깔 때마다 바뀐다 */
+  ballSegmentStart: WorldPoint
   /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1 · 0x441c4 · 0x44398 끝(그리기)이 내린다 */
   gamePaused: boolean
   /**
@@ -1080,10 +1129,14 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     slidingSoundThisTick: false,
     runInsThisTick: [],
     laserShining: false,
+    fumbleMarks: Array.from({ length: FIELDER_COUNT }, () => 0),
+    throwErrorMarks: Array.from({ length: FIELDER_COUNT }, () => 0),
     laserConfirmed: false,
     laserRolled: false,
     laserThrow: false,
     laserArmed: false,
+    laserTrailOn: false,
+    ballSegmentStart: input.trajectory.pointAt(0),
     gamePaused: false,
     // 0x17 진입 0x46418 — 결과 판 타이머 −1. 타구 판은 늘 투구(0x10 · 0x11)를 지나 왔다
     scene: enterDefenseScene(input.scene, true),
@@ -1213,10 +1266,14 @@ export function stepDefensePlay(
   let slidingSoundThisTick = false
   const runInsThisTick: number[] = []
   let laserShining = state.laserShining
+  let fumbleMarks = state.fumbleMarks
+  let throwErrorMarks = state.throwErrorMarks
   let laserConfirmed = state.laserConfirmed
   let laserRolled = state.laserRolled
   let laserThrow = state.laserThrow
   let laserArmed = state.laserArmed
+  let laserTrailOn = state.laserTrailOn
+  let ballSegmentStart = state.ballSegmentStart
   let gamePaused = state.gamePaused
   let scene = state.scene
   let deadlyJumpArmed = state.deadlyJumpArmed
@@ -1491,6 +1548,10 @@ export function stepDefensePlay(
       })
     }
     if (thrown.errant) errantThrow = true
+    // a1908(악송구) · a17fc(원바운드) — 던진 야수 +0xc0 = 4 (그림 0x438c4 의 "!")
+    if (thrown.errant || thrown.bounce) {
+      throwErrorMarks = throwErrorMarks.map((value, slot) => (slot === fromSlot ? THROW_ERROR_MARK_TICKS : value))
+    }
     const firstReceiver = relayed ? plan.toSlot : coverSlot
     throwBase = base
     throwArrivalTick = -1
@@ -1631,6 +1692,7 @@ export function stepDefensePlay(
     // 뜻을 다 못 읽어 옮기지 않았다 — C 끝(0x44564)이 어차피 지운다
     deadlyJumpArmed = false
     trajectory = spliceTrajectory(trajectory, tick, next)
+    ballSegmentStart = next.pointAt(0)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
     const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
       ...options,
@@ -1638,6 +1700,11 @@ export function stepDefensePlay(
       slideUnlocked: state.specialDefense.slideUnlocked,
       chaseToLanding: landingChase,
     })
+    // b188a — 송구 예보(a = 0)가 궤적 끝까지 못 줍고 두 번째 패스로 가면 그때의 +0x130(= 던진 야수, b307c 앞)의 +0xc0 = 4
+    if (forecast.secondPassStarted && options.thrownSlot !== undefined) {
+      const thrower = options.thrownSlot
+      throwErrorMarks = throwErrorMarks.map((value, slot) => (slot === thrower ? THROW_ERROR_MARK_TICKS : value))
+    }
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
     const caughtAt = next.pointAt(catchTick - tick)
@@ -1754,6 +1821,9 @@ export function stepDefensePlay(
     const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
     // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱(야수 · 주자)이 없다
     if (!pausedAtHead) {
+      // a12da · a12e6 — 잠금이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 표시만 본다)
+      fumbleMarks = fumbleMarks.map((value, slot) => tickMarkCounter(value, lockedThisTick[slot] === true))
+      throwErrorMarks = throwErrorMarks.map((value, slot) => tickMarkCounter(value, lockedThisTick[slot] === true))
       fielders = fielders.map((fielder) =>
         fielder.actionLockTicks > 0
           ? { ...fielder, actionLockTicks: fielder.actionLockTicks - 1 }
@@ -1888,6 +1958,7 @@ export function stepDefensePlay(
         scene = fireLaser(scene)
         gamePaused = true
         laserArmed = true
+        laserTrailOn = true
         pausedThisTick = true
         // 앞 틱 끝에서 센 G2(52502)는 524e6 뒤라 원본은 부르지 않았다
         endCounter = state.counterBeforeHead
@@ -1901,7 +1972,11 @@ export function stepDefensePlay(
 
     // ── 0d. 필살 포구 연출 켜기 — 슬롯 2 머리 5256c~525dc (관문 G2 52502 가 열리고 판 종류가 마스크 0x58c 밖일 때) ──
     // 플레이+0x1f7 이면 +0x1994(B), 아니고 +0x1f8 이면 +0x1995(C) — 단계가 −1 이면 0. 켜짐 칸은 앞 그림 플레이 틱의 동작 시작이 세웠다
-    if (!play.finished && !DEADLY_FLASH_BLOCKED_PLAY_KINDS.includes(play.kind)) {
+    // 5254c — +0x1991(레이저 잔상) && 0xb4c9d(포구 대기 · 동작 시작 틱 − 1 == 공 틱)면 +0x1991 = 0 · 이 그림의 켜기를 건너뛴다(525de).
+    // 근사: 0xb4c9d 의 vt50 은 "아직 안 쥠" 으로 본다
+    if (laserTrailOn && !play.held && tick === play.actionStartTick - 1) {
+      laserTrailOn = false
+    } else if (!play.finished && !DEADLY_FLASH_BLOCKED_PLAY_KINDS.includes(play.kind)) {
       scene = turnOnDeadlyFlash(scene, { jump: deadlyJumpArmed, slide: deadlySlideArmed })
     }
 
@@ -1947,6 +2022,7 @@ export function stepDefensePlay(
         trajectory.isStoppedAt === undefined ? tick < trajectory.length - 1 : !trajectory.isStoppedAt(tick)
       if (rollFumble(abilities[chaserSlot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
         fumbled = true
+        fumbleMarks = fumbleMarks.map((value, slot) => (slot === chaserSlot ? FUMBLE_MARK_TICKS : value))
         // b4280: 야수+0xb8 = 6(놓침 동작) · 메시지 0xbc2 · 사건(sp+0x24) = 1 — 쥐지 않는다. 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 로
         // 공을 그 야수 자리에서 지금 점의 속도·각으로 다시 쏘고 새 예보로 줍는 야수를 다시 고른다(아래 `relaunchFromFielder`)
         ballEventThisTick = true
@@ -2359,6 +2435,23 @@ export function stepDefensePlay(
         // 공 쥔 야수(플레이+0x130) · 반짝임 켜짐 · deadly_effect A(+0x1990)가 안 돎.
         // A 는 **그리지 않는 줌 펀치**라 웹판에 상태 자체가 없다(R2 2절) — 셋째 조건은 늘 참으로 둔다(근사).
         laserShiningSlot: laserShining && play.held ? play.ballHolderSlot : NONE,
+        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac · +0x130 · 공격 주체 · +0x19ad.
+        // +0x19ac 는 쥐기 0xb2710 의 메시지 0x15(0x51872)만 세우고 0x17 진입이 지운다 = 이 판에 한 번이라도 쥐었나(`everHeld`).
+        // +0x130 은 쥐기뿐 아니라 고르기 0xb3b38(b3e40)도 적는다 — 송구가 나가면 받을 야수로 바로 옮는다(`ballHolderSlot`)
+        holderMark: holderMarkOf({
+          grabbed: play.everHeld,
+          holderSlot: play.ballHolderSlot,
+          offenseIsCpu: input.offenseIsCpu === true,
+          isShining: laserShining,
+        }),
+        holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
+        fumbleTicks: fumbleMarks,
+        throwErrorTicks: throwErrorMarks,
+        // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
+        laserTrailFrom: laserTrailOn ? ballSegmentStart : null,
+        runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+        runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
+        previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
@@ -2733,6 +2826,8 @@ export function stepDefensePlay(
   state.throwFromSlot = throwFromSlot
   state.throwReleaseTick = throwReleaseTick
   state.throwReceiverSlot = throwReceiverSlot
+  state.fumbleMarks = fumbleMarks
+  state.throwErrorMarks = throwErrorMarks
   state.receivingThrow = receivingThrow
   state.throwCount = throwCount
   state.firstThrowBase = firstThrowBase
@@ -2759,6 +2854,8 @@ export function stepDefensePlay(
   state.laserRolled = laserRolled
   state.laserThrow = laserThrow
   state.laserArmed = laserArmed
+  state.laserTrailOn = laserTrailOn
+  state.ballSegmentStart = ballSegmentStart
   state.gamePaused = gamePaused
   state.scene = scene
   state.deadlyJumpArmed = deadlyJumpArmed

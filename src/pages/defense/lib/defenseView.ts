@@ -264,6 +264,19 @@ export interface DefenseFielder {
   readonly aceIndex?: number | null
   /** 수비 팀 번호 0~14 — 그림 색을 갈아 끼우는 데 쓴다. 안 주면 구운 색 그대로다 (C-1) */
   readonly teamIndex?: number | null
+
+  // ── player_effect 부착 효과 칸 (0x43278 이 본다 — `playerEffectMarksOf`). 안 주면 아무것도 안 붙는다 ──
+
+  /** +0xb0 — 가슴 높이 포구(7, 0xa1490) · 점프 캐치(0xe, 0xa14ac) 세터가 세우고 동작 끝(0xa143e)에 지운다 → 애니 4 */
+  readonly catchFlag?: boolean
+  /** +0xb4 동작 잠금 — 필살타법 타구에 맞은 야수 15(0xa1e60). > 0 이면 애니 4 + 머리 위 애니 15 */
+  readonly lockTicks?: number
+  /** +0xb8 — 펌블(b4280)이 6 으로 세우고 야수 틱이 잠금 없을 때 −1. > 0 이면 "!"(애니 13) */
+  readonly fumbleTicks?: number
+  /** +0xc0 — 악송구(a1908) · 원바운드(a17fc) · 아무도 못 받는 송구(예보 b188e, 던진 야수)가 4. > 0 이면 "!" */
+  readonly throwErrorTicks?: number
+  /** 달리기 먼지 자국 (vt6c~vt84) — 이번 그림에 찍을 점(바닥 x, z − y)과 player_effect 프레임. 없으면 null */
+  readonly dustTrail?: { readonly x: number; readonly z: number; readonly frame: number } | null
 }
 
 /** 주자 한 명 */
@@ -285,6 +298,15 @@ export interface DefenseRunner {
   readonly teamIndex?: number | null
   /** +0x96 처리 끝 — 아웃이 됐거나 홈을 밟았다. 작은 지도(0x395f4)가 이 주자를 안 찍는다. 안 주면 아직이다 */
   readonly isFinished?: boolean
+  /**
+   * 슬라이딩 먼지 방향 — 주자 +0xb8(슬라이딩 중, 0x9ff39)이 서 있을 때 0x9ff40 이 주는 1~4, 아니면 0.
+   * 그리기 0x43b18 이 1 → player_effect 애니 5 · 2 → 6 · 3 → 8 · 4 → 7 을 주자 자리에 붙인다.
+   */
+  readonly slideDirection?: number
+  /**
+   * 주자 +0x9c ≠ −1 — 마선수 주자. 그림은 이 주자의 것이 아니라 장면에 **하나 실린** 그림(`runnerAceSprite`)이다(0x79d10).
+   */
+  readonly isAce?: boolean
 }
 
 /**
@@ -347,6 +369,32 @@ export const LASER_SHINE_COLOR = { r: 255, g: 0, b: 0 } as const
  */
 export const LASER_SHINE_EFFECT_KIND = 12
 
+/**
+ * 공 가진 야수 고리 (0x43cb0) — game_ui 애니 번호. 0x43cf4~0x43d28:
+ * `state[0x31 + state[9]] == 0`(공격이 사람)이면 3, 아니면 1, 그리고 경기+0x19ad(레이저 반짝임)면 2 로 덮는다.
+ */
+export const HOLDER_MARK_ANIM = { cpuOffense: 1, shining: 2, humanOffense: 3 } as const
+
+export interface HolderMark {
+  /** 공 가진 야수의 수비 칸 (플레이+0x130) */
+  readonly slot: number
+  /** game_ui 애니 1(하늘) · 2(노랑, 반짝임) · 3(빨강) */
+  readonly anim: number
+}
+
+/**
+ * 이름 판에 적을 것 — 0x43e3e: 야수 +0x88(수비 칸) == 0 이면 **지금 마운드 투수**(0xae83d(팀[state[0xa]]))의
+ * 보직(0xb6ded → 0xb6705 = 레코드 +0xb & 3 — 대결 판의 0xb6704 와 **같은 함수**다, 썽크일 뿐)으로 0x545e8,
+ * 아니면 야수 +0xec 선수 레코드의 `+0x1c & 0xf` 로 0x54590 을 부른다. 이름은 같은 레코드의 0xb62c1.
+ */
+export interface HolderPlate {
+  readonly name: string
+  /** 칸 0(투수)일 때 — 레코드 +0xb & 3 (0 선발 · 1 중계 · 2 구원) */
+  readonly pitcherRole?: number
+  /** 칸 1~8 일 때 — 레코드 +0x1c & 0xf */
+  readonly positionCode?: number
+}
+
 /** 화면 한 틱치 스냅샷 */
 export interface DefenseViewState {
   readonly ball: DefenseBall
@@ -383,6 +431,27 @@ export interface DefenseViewState {
    * 애니 칸(SAFE · OUT · FOUL · GROUND RULE DOUBLE …)과 dx · dy, 자리를 정하는 공 가진 야수 칸(−1 이면 화면 가운데).
    */
   readonly judgeText?: { readonly frame: number; readonly dx: number; readonly dy: number; readonly holderSlot: number } | null
+  /**
+   * **공 가진 야수 고리** — 0x43cb0(그리기 0x46c88 의 0x46cbc, 비거리 판 뒤 · 야수 목록 앞에 곧바로 그린다).
+   * 경기+0x19ac(쥐기 0xb2710 의 메시지 0x15 가 1 로 세우고 0x17 진입 0x467de 가 0 으로 내린다)가 서 있고
+   * 공 가진 야수(플레이+0x130, 0xb0c91)가 있을 때만 뜬다. 고르는 쪽은 진행기다(`holderMarkOf`).
+   */
+  readonly holderMark?: HolderMark | null
+  /**
+   * 고리와 같이 그리는 **오른쪽 아래 이름 판** — 공 가진 야수의 선수 이름과 수비 칸 표시(0x43e3e~0x43fc2).
+   * 고리가 없으면 판도 없다. 판을 그릴지(칸 아이콘 > 0)는 화면 쪽이 표(0x54590 · 0x545e8)로 정한다.
+   */
+  readonly holderPlate?: HolderPlate | null
+  /**
+   * 마선수 주자를 그릴 그림판 — 타석 교대 0x483a0 이 실은 타자 마선수 번호 0~4(`ACE_BATTER_DEFENDER_FRAMES`). 없으면 null.
+   * `isAce` 인 주자는 모두 이 그림 하나로 그린다(원본 그대로) · 팔레트 없음 · 프레임은 vt40 날값 그대로.
+   */
+  readonly runnerAceSprite?: number | null
+  /**
+   * **레이저 잔상** (공 그리기 0x36dfc 의 0x37076~0x3724a) — 장면 +0x1991 이 서 있으면 지금 공 궤적의 t = 0 점(0xa25b1(공, 0)).
+   * 화면이 그 점에서 공까지 공 그림을 반투명으로 늘어놓는다(`laserTrailMarksOf`). 없으면 null
+   */
+  readonly laserTrailFrom?: { readonly x: number; readonly z: number; readonly height: number } | null
   /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
@@ -422,6 +491,20 @@ export function cameraTargetOf(state: DefenseViewState): WorldPoint {
     if (batterRunner !== undefined) return { x: batterRunner.x, z: batterRunner.z }
   }
   return { x: state.ball.x, z: state.ball.z - state.ball.height }
+}
+
+/**
+ * 주자 한 명을 그릴 그림판 (0x79d10) — 마선수 주자(+0x9c ≠ −1)는 실린 마선수 그림(팔레트 없음), 아니면 `defender.pzx`.
+ * 마선수 주자인데 실린 그림이 없으면(웹에서만 나는 경우) 보통 그림으로 둔다.
+ */
+export function runnerSpriteFolderOf(runner: DefenseRunner, loadedAce: number | null | undefined): {
+  readonly folder: string
+  readonly isAce: boolean
+} {
+  if (runner.isAce === true && loadedAce != null && loadedAce >= 0 && loadedAce <= 4) {
+    return { folder: ACE_BATTER_DEFENDER_FRAMES[loadedAce], isAce: true }
+  }
+  return { folder: DEFENDER_FRAMES, isAce: false }
 }
 
 /** 야수 한 명을 그릴 그림판과 프레임 (0x79b48 의 a 갈래 + 프레임 +17) */

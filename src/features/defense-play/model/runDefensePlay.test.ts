@@ -2050,3 +2050,114 @@ describe('루별 주자 주루 — 주자마다 제 레코드의 속도 (0xa93ac
     expect(state.runners.map((runner) => runner.state.speed)).toEqual([runnerSpeedOf(300), runnerSpeedOf(900)])
   })
 })
+
+describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) · "!"(+0xb8 · +0xc0) (그림만, 난수 차례 그대로)', () => {
+  const 틱 = (결과: DefensePlayResult, tick: number) => 결과.ticks.find((view) => view.tick === tick)
+  const 야수 = (결과: DefensePlayResult, tick: number, slot: number) =>
+    틱(결과, tick)?.fielders.find((fielder) => fielder.slot === slot)
+
+  it('쥐기 전에는 고리가 없고, 투수가 쥔 틱(6)부터 공 가진 야수 칸에 뜬다 — 사람 공격이면 애니 3', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    expect(틱(결과, 5)?.holderMark).toBeNull()
+    expect(틱(결과, 6)?.holderMark).toEqual({ slot: 0, anim: 3 })
+  })
+
+  it('CPU 공격이면 애니 1, 이름 판 선수는 공 가진 칸의 것을 싣는다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      defenseIsCpu: true,
+      offenseIsCpu: true,
+      fielderPlates: [{ name: '선발', pitcherRole: 0 }],
+    })
+    expect(틱(결과, 6)?.holderMark).toEqual({ slot: 0, anim: 1 })
+    expect(틱(결과, 6)?.holderPlate).toEqual({ name: '선발', pitcherRole: 0 })
+  })
+
+  it('펌블한 틱의 그림이 +0xb8 = 6 을 보고, 다음 틱부터 야수 틱이 하나씩 줄인다 (b4280 · a12da)', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+    })
+    expect(야수(결과, 5, 0)?.fumbleTicks).toBe(0)
+    expect(야수(결과, 6, 0)?.fumbleTicks).toBe(6)
+    expect(야수(결과, 7, 0)?.fumbleTicks).toBe(5)
+    expect(야수(결과, 11, 0)?.fumbleTicks).toBe(1)
+    expect(야수(결과, 12, 0)?.fumbleTicks).toBe(0)
+  })
+
+  it('악송구를 던진 야수는 +0xc0 = 4 (a1908)', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      controls: 계속누름('수비', '8'),
+      random: 차례난수([0.9, 0.9, 0, 0.9]),
+    })
+    expect(결과.errantThrow).toBe(true)
+    expect(야수(결과, 9, 0)?.throwErrorTicks).toBe(4)
+    expect(야수(결과, 10, 0)?.throwErrorTicks).toBe(3)
+  })
+
+  it('부착 효과 칸을 더해도 진행 · 난수 차례는 그대로다 — 같은 판을 두 번 돌리면 로그가 같다', () => {
+    const 한번 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+    })
+    const 두번 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: 차례난수([0.9, 0, 0.9]),
+      fielderPlates: [{ name: 'x', pitcherRole: 0 }],
+    })
+    expect(두번.log).toEqual(한번.log)
+  })
+})
+
+describe('마선수 주자 (runnerAces — 0x43aa8 · 0x483a0)', () => {
+  it('1루 주자가 마선수면 그 주자 칸(1)에 표시가 붙고, 타자가 아니므로 그 주자의 그림이 실린다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      runnerAces: { batter: null, first: 3 },
+    })
+    const 첫그림 = 결과.ticks[0]
+    expect(첫그림?.runners.map((runner) => runner.isAce)).toEqual([false, true])
+    expect(첫그림?.runnerAceSprite).toBe(3)
+  })
+})
+
+describe('레이저 잔상 칸 (장면 +0x1991 — 그림 0x37076)', () => {
+  it('발사한 그림부터 서고, 받을 야수의 동작 시작 한 틱 전(0xb4c9d)에 내린다 — 송구 뒤에는 송구 첫 점에서 잇는다', () => {
+    let state = startDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(fixturePatternFor(단타)),
+      bases: 주자1루,
+      outs: 0,
+      random: 차례난수([0, 0, 0.999, 0]),
+      controls: 계속누름('수비', '2'),
+    })
+    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '2', isRepeat: false })
+    const F = Number(state.log.find((line) => line.includes('레이저 발사 (0x400bc)'))!.split('틱')[0])
+    const 잔상 = state.ticks.filter((view) => view.laserTrailFrom != null).map((view) => view.tick)
+    expect(잔상[0]).toBe(F)
+    // 연속 구간이고, 송구(F + 2) 뒤에 끝난다
+    expect(잔상).toEqual(Array.from({ length: 잔상.length }, (_, index) => F + index))
+    expect(잔상.at(-1)!).toBeGreaterThan(F + 2)
+    const 송구뒤 = state.ticks.find((view) => view.tick === F + 3)!
+    expect(송구뒤.laserTrailFrom).not.toEqual(state.ticks.find((view) => view.tick === F)!.laserTrailFrom)
+  })
+})
