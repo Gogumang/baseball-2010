@@ -623,6 +623,7 @@ export function App() {
         onLogoVoice={() => sound.play(0)}
         hallOfFameDeletion={hallOfFameDeletion}
         recordStat={recordStat}
+        openHidden={openHidden}
         // 홈런더비 타자 게터 0x1fc20 — 타자편 대결 대기(g[0x11f])면 명예 타자 대신 나리 타자
         aceMatchHold={aceMatchHoldPort}
         onRenamePlayer={editedNames.rename}

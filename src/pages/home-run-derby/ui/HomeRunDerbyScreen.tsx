@@ -56,6 +56,8 @@ interface HomeRunDerbyScreenProps {
   readonly gamePoint: number
   /** 한 판이 끝났을 때. 최고 기록 갱신과 G 지급은 부르는 쪽이 한다 */
   readonly onFinish?: (result: DerbyResult) => void
+  /** 판 끝 누적 비거리 > 1999 의 히든 39 열기 (0x52a14 `0x62368`) — `useHomeRunDerby` 의 `onOpenHidden` */
+  readonly onOpenHidden?: (id: number) => void
   /** 결과 화면에서 "아니오" — 메인 메뉴로 (전역 0x140006c = 4) */
   readonly onExit: () => void
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
@@ -112,8 +114,11 @@ export function HomeRunDerbyScreen({
   matchupBatter,
   myTeamId,
   modeBatterSlot,
+  onOpenHidden,
 }: HomeRunDerbyScreenProps) {
-  const session = useHomeRunDerby({ bestDistance, onFinish, aceLevels, random, myTeamId, modeBatterSlot })
+  const session = useHomeRunDerby({
+    bestDistance, onFinish, aceLevels, random, myTeamId, modeBatterSlot, ...(onOpenHidden === undefined ? {} : { onOpenHidden }),
+  })
   const tick = useUpdateCounter()
   const menu = useInGameMenuState()
   const isMenuOpen = menu.isOpen
