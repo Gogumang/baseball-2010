@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
+import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import {
   EMPTY_RECORD_ALERT, drawRecordAlert, enqueueRecordAlert, flushRecordAlertQueue,
@@ -78,6 +79,10 @@ export function useRecordAlert(
   const tickedKeyRef = useRef(sceneStateKey)
   const stateTickRef = useRef(0)
   const [frame, setFrame] = useState<RecordAlertFrame>(NO_FRAME)
+  /** 0xa77f0 끝 a7922 `0x62234(ui, k)` — 기록이 새로 들어올 때마다 (`RecordAchievedContext`) */
+  const onRecordAchieved = useContext(RecordAchievedContext)
+  const onRecordAchievedRef = useRef(onRecordAchieved)
+  onRecordAchievedRef.current = onRecordAchieved
   const hasPitchEnd = pitchEnd !== undefined
   const serial = pitchEnd?.serial
 
@@ -89,6 +94,8 @@ export function useRecordAlert(
     }
     const added = recordIds.slice(seenRef.current)
     seenRef.current = recordIds.length
+    // 0xa77f0 은 기록을 세는 그 자리에서 곧바로 0x62234 를 부른다 — 알림 줄(0x4e600 시점)과 상관없이 들어온 차례대로
+    for (const recordId of added) onRecordAchievedRef.current(recordId)
     const flushOptions = {
       isPitcherRemoved: removedRef.current,
       isSettled: hasPitchEnd ? settledBeforeRef.current : settledRef.current,

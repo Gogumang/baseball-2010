@@ -52,6 +52,10 @@ import { SEASON_PHASE } from '@/entities/season-mode/model/seasonStateMachine'
 import { nariSeasonRecordsOf } from '@/app/model/seasonHallOfFameRecords'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { useEditedNames } from '@/entities/player-name/model/useEditedNames'
+import { aceCellOfUnlock, recordUnlockIdOf } from '@/entities/collection/model/recordUnlock'
+import { recordUnlockNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
+import { isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
+import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -438,8 +442,33 @@ export function App() {
    * 히든 오픈 알림 공용 창 — 0x62368 이 0x74ef5(종류 1, OK)로 띄운다. 원본 창은 어느 장면 위에도 그려지므로 모든 화면 위에 얹는다.
    * 닫히면 대기 글이 있으면 그 글로 다시 선다(0x75440).
    */
+  /**
+   * **기록달성 누계 해금 `0x62234(ui, k)`** — 경기 중 기록 k 를 셀 때마다(0xa77f0 끝 a7922). 문턱은 통계 누계 `+4 + k`(지난
+   * 경기까지)를 본다(`recordUnlockIdOf`). 마선수(id 0~7)는 마선수 칸을, 그 밖은 전역 해금표를 켜고 이미 켜져 있으면(0x61f5c)
+   * 아무것도 안 한다. 켰으면 0x1f1b9 저장 뒤 공용 창 0x74ef5 에 StrCOMMON[140|138|139] 한 줄(쓰는 곳 줄 없음)
+   */
+  const aceOpenSaveRef = useRef(aceOpen.save)
+  aceOpenSaveRef.current = aceOpen.save
+  const { readStats: readCollectionStats, openHiddenQuietly } = collection
+  const { open: openAceCellFlag } = aceOpen
+  const { announceText: announceHiddenText } = hiddenOpenNotice
+  const unlockByRecord = useCallback((recordId: number) => {
+    const id = recordUnlockIdOf(readCollectionStats(), recordId)
+    if (id === null) return
+    const cell = aceCellOfUnlock(id)
+    if (cell !== null) {
+      if (isAceCellOpen(aceOpenSaveRef.current, cell)) return
+      aceOpenSaveRef.current = { cells: aceOpenSaveRef.current.cells.map((open, at) => (at === cell ? true : open)) }
+      openAceCellFlag(cell)
+    } else if (!openHiddenQuietly(id)) {
+      return
+    }
+    const text = recordUnlockNoticeTextOf(id)
+    if (text !== null) announceHiddenText(text)
+  }, [announceHiddenText, openAceCellFlag, openHiddenQuietly, readCollectionStats])
+
   const withHiddenOpenNotice = (routes: ReactNode) => (
-    <>
+    <RecordAchievedContext.Provider value={unlockByRecord}>
       {routes}
       {hiddenOpenNotice.text !== null && (
         <ScreenOverlay>
@@ -451,7 +480,7 @@ export function App() {
           />
         </ScreenOverlay>
       )}
-    </>
+    </RecordAchievedContext.Provider>
   )
 
   // 미션 모드는 메인 메뉴에서 들어가 선수 고르기(하위 17)부터 띄운다 — 육성·명예 선수가 다 없으면 원본대로

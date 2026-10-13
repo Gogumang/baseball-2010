@@ -183,6 +183,8 @@ export function useCollection(
     if (counted.hiddenId !== null) openHidden(counted.hiddenId)
   }, [openHidden])
 
+  const readStats = useCallback(() => statsRef.current, [])
+
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
   const recordStat = useCallback((event: AnnalsStatEvent) => {
     setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
@@ -243,7 +245,7 @@ export function useCollection(
     collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, recordStat, claimCollectionReward,
     openHidden, openHiddenQuietly, recordSeasonRegularWin,
     /** 기록달성 누계 해금 0x62234 가 문턱에 견주는 지금 통계 (렌더를 기다리지 않는다) */
-    readStats: () => statsRef.current,
+    readStats,
   }
 }
 
