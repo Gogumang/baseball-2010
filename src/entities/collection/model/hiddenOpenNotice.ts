@@ -18,6 +18,9 @@ import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
  * 이름 0x61e8c (k ≤ 12, 표를 StrCOMMON 으로 바꿔 읽는다 — 0x61f40 `cmp r2,#0xc; bgt`): 0~3 → StrCOMMON[k + 0x10] ·
  * 4~7 → [k + 0x11](마선수, 싸이커 15 · 메디카 20 은 건너뜀) · 8~12 → [k + 2](히든 팀 대한민국 … 외인구단).
  * k ≤ 12 는 0x623fc 에서 곧장 창으로 가 "!N!N" · 쓰는 곳 줄이 없다.
+ * 어느 구간에도 안 드는 k(< 0 · ≥ 51)는 r1 = −1 로 0x702b5 를 불러 [표+8] = 0x100 을 적고 0(NULL)을 돌려받는다(0x702b6~0x702c8)
+ * — ⚠️ 미확인: 그 NULL 을 받은 sprintf 가 무엇을 쓰는지는 안 읽었다. 웹은 null 로 두고 창을 안 띄운다.
+ * 대전 승리 팝업 0x4b100(4b28c)도 같은 함수를 비트 0..50 으로 부른다(`versusWinPopupTextOf`).
  *
  * 웹에 StrCOMMON 표가 없어 쓰는 줄을 원문 그대로 적는다.
  */

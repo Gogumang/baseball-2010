@@ -127,17 +127,23 @@ const VERSUS_ITEM_LAST_BIT = 0x32
  * ```
  * [장면+0x17e8](기록 판이 열려 있음) && 모드 8·9 일 때만 이 갈래 (4b17a~4b190)
  * 틱 [장면+0x2c] == 0x14 && 0x4a350()(사람 팀이 이김) 일 때:
- *   종류 0: 글 = "!C추가 " + u64 값(0xbc73d) + "GP 획득"          → 0x74ef5([0x140005c], 글, 1, 0, 0)
+ *   종류 0: 글 = "!C추가 " + 아래 32비트(0xbc73d) + "GP 획득"       → 0x74ef5([0x140005c], 글, 1, 0, 0)
  *   종류 1: i = 0..50 마다 값 & (1 << i)(0xcaa29) 이면
  *           글 += "!C!cffff00" + 0x61e8c(skin, StrITEM, i) + "오픈!N"
  *           글이 비지 않았으면 → 0x74ef5([0x140005c], 글, 1, 0, 0)
  * ```
- * 0x61e8c 는 히든 오픈 알림과 같은 이름 함수다 — i ≤ 12(마선수 · 히든 팀)는 StrCOMMON 이름이라 웹이 짓지 못한다.
- * ⚠️ 미확인: i ≤ 12 · 51 이상 표 밖 이름은 빈 글로 둔다(0x61e8c 의 StrCOMMON 갈래 안 읽음) · 0xbc73d 가 부호 없는 10진인지는 안 읽었다.
+ * 0x61e8c 는 히든 오픈 알림과 같은 이름 함수다(`hiddenNameOf`) — i ≤ 12 는 61f40 `cmp r2,#0xc; bgt` 로 표를 StrCOMMON([0x1552cf8])
+ * 으로 바꿔 0~3 → [i + 0x10] · 4~7 → [i + 0x11] · 8~12 → [i + 2] (마선수 · 히든 팀), 그 위는 StrITEM 구간표. 비트는 0..50 만 보므로
+ * 표 밖(r1 = −1 → 0x702b5 가 0 을 돌려줌)에는 닿지 않는다.
+ *
+ * 숫자 0xbc73d → 0xbc6c0(글, r1, r2): **r1(u64 의 아래 32비트)만 부호 있는 정수로** 쓰고 r2(위 32비트)는 안 본다.
+ * 음수면 '-'(0xbc694) 뒤 −r1 로 다시 부르고, 아니면 0x6c805(v, 10)(10 으로 나눠 0 이 될 때까지 센 수)+1 자리를 앞자리부터
+ * (v / 10^k) % 10 + '0' 으로 붙인다 — 10진, 0 채움 · 자리 구분 쉼표 없음, 0 은 "0".
+ * ⚠️ 미확인(원본 버그 후보): 아래 32비트가 −2147483648 이면 −r1 도 음수라 원본은 끝없이 '-' 를 붙인다 — 웹은 "-2147483648" 로 둔다.
  * 창을 띄우지 않으면 null.
  */
 export function versusWinPopupTextOf(reward: VersusWinReward, itemNameOf: (id: number) => string | null): string | null {
-  if (reward.kind === 0) return `!C추가 ${reward.value.toString()}GP 획득`
+  if (reward.kind === 0) return `!C추가 ${BigInt.asIntN(32, reward.value).toString()}GP 획득`
   if (reward.kind !== 1) return null
   let text = ''
   for (let bit = 0; bit <= VERSUS_ITEM_LAST_BIT; bit += 1) {
