@@ -106,6 +106,47 @@ export const SETTLEMENT_INFO_POINT = {
 /** 대전모드(8·9) — 0x4aa88 `mode − 8 ≤ 1` */
 export const isVersusMode = (mode: number) => mode === 8 || mode === 9
 
+/**
+ * 대전모드(8·9) 승리 보상 — 전역 저장 칸 (`0x1f1d9()` = G). 모드 8 은 종류 (s8) G+0x114 · 값 u64 G+0xf8,
+ * 모드 9 는 종류 (s8) G+0x115 · 값 u64 G+0x100 (0x4b19e~0x4b1d6). 서버가 채우는 칸이라 웹에는 값이 없다 (🌐).
+ */
+export interface VersusWinReward {
+  /** 0 = 값이 GP · 1 = 값이 히든 아이템 비트 묶음 (그 밖은 창 없음) */
+  readonly kind: number
+  readonly value: bigint
+}
+
+/** 0x4b1f8 — 정산 상태 틱 [장면+0x2c] 가 이 값인 갱신에서만 승리 팝업을 본다 */
+export const VERSUS_WIN_POPUP_TICK = 0x14
+
+/** 0x4b262~0x4b2a6 — 비트 0..50 을 본다 (`cmp r6, #0x32; ble`) */
+const VERSUS_ITEM_LAST_BIT = 0x32
+
+/**
+ * **대전 승리 팝업 글 — 0x4b100 의 4b1f8~4b2d4** (직접 떴다):
+ * ```
+ * [장면+0x17e8](기록 판이 열려 있음) && 모드 8·9 일 때만 이 갈래 (4b17a~4b190)
+ * 틱 [장면+0x2c] == 0x14 && 0x4a350()(사람 팀이 이김) 일 때:
+ *   종류 0: 글 = "!C추가 " + u64 값(0xbc73d) + "GP 획득"          → 0x74ef5([0x140005c], 글, 1, 0, 0)
+ *   종류 1: i = 0..50 마다 값 & (1 << i)(0xcaa29) 이면
+ *           글 += "!C!cffff00" + 0x61e8c(skin, StrITEM, i) + "오픈!N"
+ *           글이 비지 않았으면 → 0x74ef5([0x140005c], 글, 1, 0, 0)
+ * ```
+ * 0x61e8c 는 히든 오픈 알림과 같은 이름 함수다 — i ≤ 12(마선수 · 히든 팀)는 StrCOMMON 이름이라 웹이 짓지 못한다.
+ * ⚠️ 미확인: i ≤ 12 · 51 이상 표 밖 이름은 빈 글로 둔다(0x61e8c 의 StrCOMMON 갈래 안 읽음) · 0xbc73d 가 부호 없는 10진인지는 안 읽었다.
+ * 창을 띄우지 않으면 null.
+ */
+export function versusWinPopupTextOf(reward: VersusWinReward, itemNameOf: (id: number) => string | null): string | null {
+  if (reward.kind === 0) return `!C추가 ${reward.value.toString()}GP 획득`
+  if (reward.kind !== 1) return null
+  let text = ''
+  for (let bit = 0; bit <= VERSUS_ITEM_LAST_BIT; bit += 1) {
+    if ((reward.value & (1n << BigInt(bit))) === 0n) continue
+    text += `!C!cffff00${itemNameOf(bit) ?? ''}오픈!N`
+  }
+  return text === '' ? null : text
+}
+
 /** 기록 판 높이 — 182, 대전모드에서 이겼으면 202 (0x4aa84~0x4aa9e) */
 export function settlementPanelHeightOf(mode: number, isWin: boolean): number {
   return isVersusMode(mode) && isWin ? 0xca : 0xb6

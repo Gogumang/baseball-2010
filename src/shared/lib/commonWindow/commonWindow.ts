@@ -20,3 +20,13 @@ export const CommonWindowOpenContext = createContext(false)
 export function useIsCommonWindowOpen(): boolean {
   return useContext(CommonWindowOpenContext)
 }
+
+/**
+ * **공용 창에 글을 띄운다 — 0x74ef5([0x140005c], 글, 종류 1, 0, 0)**. 히든 오픈 알림과 같은 창 · 같은 줄(떠 있는 것 하나 + 대기 하나)이다.
+ * 앱이 창을 들고 있지 않은 자리(시험 등)에서는 아무것도 안 한다.
+ */
+export const CommonWindowPushContext = createContext<(text: string) => void>(() => undefined)
+
+export function useCommonWindowPush(): (text: string) => void {
+  return useContext(CommonWindowPushContext)
+}

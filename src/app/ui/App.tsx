@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CommonWindowOpenContext } from '@/shared/lib/commonWindow/commonWindow'
+import { CommonWindowOpenContext, CommonWindowPushContext } from '@/shared/lib/commonWindow/commonWindow'
 import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -428,7 +428,9 @@ export function App() {
    */
   const withHiddenOpenNotice = (routes: ReactNode) => (
     <>
-      <CommonWindowOpenContext.Provider value={hiddenOpenNotice.text !== null}>{routes}</CommonWindowOpenContext.Provider>
+      <CommonWindowOpenContext.Provider value={hiddenOpenNotice.text !== null}>
+        <CommonWindowPushContext.Provider value={hiddenOpenNotice.push}>{routes}</CommonWindowPushContext.Provider>
+      </CommonWindowOpenContext.Provider>
       {hiddenOpenNotice.text !== null && (
         <ScreenOverlay>
           <MessageBox

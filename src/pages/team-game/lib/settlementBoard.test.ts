@@ -71,3 +71,19 @@ describe('팀경기 정산 판 0x4a384 (그 밖 모드 갈래 0x4a948)', () => {
     expect(settlementKeyActionOf('4', true)).toBeNull()
   })
 })
+
+describe('대전 승리 팝업 글 — 0x4b100 4b20a~4b2d4', () => {
+  it('종류 0 은 "!C추가 " + 값 + "GP 획득"', async () => {
+    const { versusWinPopupTextOf } = await import('@/pages/team-game/lib/settlementBoard')
+    expect(versusWinPopupTextOf({ kind: 0, value: 1500n }, () => null)).toBe('!C추가 1500GP 획득')
+  })
+
+  it('종류 1 은 켜진 비트 0..50 마다 "!C!cffff00" + 이름 + "오픈!N", 비면 창 없음 · 그 밖 종류도 없음', async () => {
+    const { versusWinPopupTextOf } = await import('@/pages/team-game/lib/settlementBoard')
+    const nameOf = (id: number) => `이름${id}`
+    expect(versusWinPopupTextOf({ kind: 1, value: (1n << 13n) | (1n << 50n) | (1n << 51n) }, nameOf))
+      .toBe('!C!cffff00이름13오픈!N!C!cffff00이름50오픈!N')
+    expect(versusWinPopupTextOf({ kind: 1, value: 1n << 51n }, nameOf)).toBeNull()
+    expect(versusWinPopupTextOf({ kind: 2, value: 5n }, nameOf)).toBeNull()
+  })
+})

@@ -10,8 +10,12 @@ import {
   NO_RECORD_TEXT, SETTLEMENT_BAND, SETTLEMENT_INFO_BAR, SETTLEMENT_INFO_POINT, SETTLEMENT_LOSE_DIM_STEP,
   SETTLEMENT_RESULT_SPRITE, SETTLEMENT_SCORE, SETTLEMENT_SCROLL_TRACK, SETTLEMENT_TITLE_BAR, SETTLEMENT_VISIBLE_ROWS,
   isVersusMode, recordCountTextOf, scrollSettlementRecords, settlementKeyActionOf, settlementPanelHeightOf,
-  settlementPanelLayoutOf, settlementRecordRowsOf, startSettlementScroll, versusRewardTextOf,
+  settlementPanelLayoutOf, settlementRecordRowsOf, startSettlementScroll, versusRewardTextOf, versusWinPopupTextOf,
+  VERSUS_WIN_POPUP_TICK,
 } from '@/pages/team-game/lib/settlementBoard'
+import type { VersusWinReward } from '@/pages/team-game/lib/settlementBoard'
+import { useCommonWindowPush, useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
+import { hiddenItemNameOf } from '@/entities/collection/model/hiddenOpenNotice'
 import * as styles from '@/pages/team-game/ui/SettlementBoard.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
@@ -56,6 +60,11 @@ export interface SettlementBoardProps {
    * 안 주면 흐르는 글을 비운다(칸은 그린다).
    */
   readonly versusWinBonus?: number
+  /**
+   * 대전모드(8·9) 승리 보상 종류 · 값 — 정산 틱 0x14 에 기록 판이 열려 있고 이겼으면 공용 창에 띄운다(`versusWinPopupTextOf`).
+   * 서버가 채우는 전역 칸이라(🌐) 안 주면 창이 없다.
+   */
+  readonly versusReward?: VersusWinReward
   /** 기본 화면에서 '0' 이 아닌 키 → 메시지 0x3f3 (정산을 나간다) */
   readonly onExit: () => void
   /**
@@ -73,9 +82,17 @@ export interface SettlementBoardProps {
  */
 export function SettlementBoard({
   mode, isWin, side0Score, side1Score, scoreboardSides, recordIds, gamePoints, heldGamePoints, versusWinBonus, onExit,
-  effectLayers,
+  effectLayers, versusReward,
 }: SettlementBoardProps) {
   const [isPanelOpen, setPanelOpen] = useState(false)
+  const pushCommonWindow = useCommonWindowPush()
+  // 0x4b100 은 [장면+0x17e8](기록 판) && 모드 8·9 일 때 틱 [장면+0x2c] == 0x14 에서 이겼으면 승리 팝업을 공용 창에 띄운다
+  // (4b17a~4b2d4). 틱은 들어선 그림이 0 이고, 공용 창이 떠 있는 동안 경기 장면 0x52c50 은 상태 바꿈(틱 +1)을 건너뛴다(52cc6)
+  useSceneTick((tick) => {
+    if (tick !== VERSUS_WIN_POPUP_TICK || !isPanelOpen || !isVersusMode(mode) || !isWin || versusReward === undefined) return
+    const text = versusWinPopupTextOf(versusReward, hiddenItemNameOf)
+    if (text !== null) pushCommonWindow(text)
+  }, !useIsCommonWindowOpen())
   const rows = settlementRecordRowsOf(recordIds)
   const [scroll, setScroll] = useState(() => startSettlementScroll(rows.length))
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)

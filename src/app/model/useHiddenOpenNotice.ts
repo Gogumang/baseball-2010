@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import {
-  announceHiddenOpens, closeHiddenOpenWindow, EMPTY_HIDDEN_OPEN_WINDOW,
+  announceHiddenOpens, closeHiddenOpenWindow, EMPTY_HIDDEN_OPEN_WINDOW, pushHiddenOpenWindow,
 } from '@/entities/collection/model/hiddenOpenNotice'
 import type { HiddenOpenWindow } from '@/entities/collection/model/hiddenOpenNotice'
 
@@ -18,9 +18,13 @@ export function useHiddenOpenNotice() {
     if (ids.length === 0) return
     setWindow((current) => announceHiddenOpens(current, ids))
   }, [])
+  /** 히든 오픈 말고 다른 글을 같은 공용 창에 — 대전 승리 팝업(0x4b100 4b254 · 4b2d4) */
+  const push = useCallback((text: string) => {
+    setWindow((current) => pushHiddenOpenWindow(current, text))
+  }, [])
   const close = useCallback(() => {
     setWindow(closeHiddenOpenWindow)
     setSerial((previous) => previous + 1)
   }, [])
-  return { text: window.shown, serial, announce, close }
+  return { text: window.shown, serial, announce, push, close }
 }
