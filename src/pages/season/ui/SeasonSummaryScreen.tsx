@@ -161,7 +161,7 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
       <SkinBackdrop kind="공무늬" />
       <PostseasonBracketWindow series={series} />
       {/* 대진표 0x853ac 끝의 0x7f4ec — 공통 틀 0xb810 이 0xef 에 맡긴 (제목 10 시즌모드, 바닥 1 — 되돌아가기 없음) */}
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={1} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={1} slides={false} />
 
       <div className={styles.caption} style={{ left: 0, top: 276, width: 240 }}>
         {isFinished

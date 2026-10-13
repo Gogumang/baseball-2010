@@ -351,7 +351,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
           닫기
         </button>
       ) : (
-        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} slides={false} />
       )}
     </>
   )

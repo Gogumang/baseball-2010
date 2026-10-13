@@ -628,6 +628,8 @@ export function SeasonRoute({
         onCloseAceLocked={actions.closeEntryAceLocked}
         // 공통 앞그림 0xb810 은 0xe0 에서도 0xdd 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
         underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
+        // 그림 0xb074 는 공용 목록 0x63b14 를 안 불러 [skin+0x84] 를 세우지 않는다 — 머리띠는 다 내려온 자리
+        slides={false}
       />
     )
   }

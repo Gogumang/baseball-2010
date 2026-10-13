@@ -27,7 +27,7 @@ export function useHiddenOpenNotice() {
     if (ids.length === 0) return
     update((current) => announceHiddenOpens(current, ids, then))
   }, [update])
-  /** 글을 그대로 띄운다 — 0x62234(기록달성 누계 해금)처럼 0x62368 과 글이 다른 자리 */
+  /** 글을 그대로 띄운다 — 0x62234(기록달성 누계 해금)·대전 승리 팝업(0x4b100 4b254 · 4b2d4)처럼 0x62368 과 글이 다른 자리 (`push` 도 같다) */
   const announceText = useCallback((text: string) => {
     update((current) => pushHiddenOpenWindow(current, text))
   }, [update])
@@ -37,5 +37,5 @@ export function useHiddenOpenNotice() {
     setSerial((previous) => previous + 1)
     then?.()
   }, [update])
-  return { text: window.shown, serial, announce, announceText, close }
+  return { text: window.shown, serial, announce, announceText, push: announceText, close }
 }

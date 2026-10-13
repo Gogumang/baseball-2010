@@ -122,7 +122,7 @@ export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBa
           </>
         )}
       </div>
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
     </RawScreen>
   )
 }

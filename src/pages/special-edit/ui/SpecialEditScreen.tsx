@@ -55,12 +55,19 @@ interface SpecialEditScreenProps {
  */
 export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditScreenProps) {
   const [state, setState] = useState(createSpecialEditState)
+  // 머리띠 미끄러짐 [skin+0x84] 는 상태 29 진입 0x24804(24846) 와 그림 0x2e1e0 의 공용 목록 0x63b14(상태 틱 0 인 첫 그림)만 세운다.
+  // 하위 0 ↔ 1 ↔ 2 는 [skin+0xe6] 만 바뀌고 상태 틱은 이어지므로 다시 미끄러지지 않는다 — 처음 선 하위 0 에서만 미끄러진다
+  const [hasLeftTeamSelect, setLeftTeamSelect] = useState(false)
+  useEffect(() => {
+    if (state.step !== SPECIAL_EDIT_STEP.팀고르기) setLeftTeamSelect(true)
+  }, [state.step])
 
   if (state.step === SPECIAL_EDIT_STEP.팀고르기) {
     return (
       <EditTeamSelect
         cursor={state.gridCursor}
         gamePoint={gamePoint}
+        slides={!hasLeftTeamSelect}
         onMove={(direction) => setState((previous) => moveEditGrid(previous, direction))}
         onPoint={(index) => setState((previous) => pointEditGrid(previous, index))}
         onChoose={() => setState((previous) => chooseEditTeam(previous))}
@@ -80,6 +87,7 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
       isAceLocked={false}
       gamePoint={gamePoint}
       title="팀선택"
+      slides={false}
       onKey={onKey}
       onMoveCursor={(index) => setState((previous) => ({ ...previous, editor: pointEntryCursor(previous.editor, lists, index) }))}
       onCloseAceLocked={() => undefined}
@@ -104,6 +112,8 @@ interface EditTeamSelectProps {
   readonly onPoint: (index: number) => void
   readonly onChoose: () => void
   readonly onBack: () => void
+  /** 머리띠가 미끄러져 들어오는가 — 상태 29 에 처음 선 하위 0 만 (`ScreenFrame` 의 `slides`) */
+  readonly slides: boolean
 }
 
 /** 격자 키 — 방향키와 숫자 2·4·6·8 (격자 키 처리 0x6c299 의 표 0xd2e7c) */
@@ -116,7 +126,7 @@ const ARROW_DIRECTIONS: Readonly<Record<string, AnnalsDirection>> = {
  * 딱지 157 "PLAYER" · 159 "ABILITY", 격자 `0x79ed5(…, 9, 120, 182, …, 40, 5열, 행 = 10/5)`.
  * 팀 0~9 는 늘 열려 있어 잠김 그림이 없다.
  */
-function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack }: EditTeamSelectProps) {
+function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, slides }: EditTeamSelectProps) {
   const team = TEAMS[cursor] ?? TEAMS[0]
 
   useEffect(() => {
@@ -200,7 +210,7 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack }
       })}
 
       {/* 머리띠 0x54d95(skin, 1 "팀선택", 5 되돌아가기) — 0x2e224 */}
-      <ScreenFrame title="팀선택" gamePoint={gamePoint} onBack={onBack} footer={5} />
+      <ScreenFrame title="팀선택" gamePoint={gamePoint} onBack={onBack} footer={5} slides={slides} />
     </RawScreen>
   )
 }

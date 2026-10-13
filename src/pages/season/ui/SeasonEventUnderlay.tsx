@@ -33,7 +33,7 @@ export function SeasonEventUnderlay({ record, teamMorale, gamePoint, isPreviousG
     <>
       <SkinBackdrop kind="공무늬" />
       <SeasonStatusPanel record={record} teamMorale={teamMorale} isPreviousGame={isPreviousGame} />
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={5} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={5} slides={false} />
     </>
   )
 }

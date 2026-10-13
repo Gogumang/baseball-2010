@@ -125,7 +125,7 @@ export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultB
         확인
       </Button>
 
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} slides={false} />
     </RawScreen>
   )
 }

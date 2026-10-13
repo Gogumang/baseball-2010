@@ -62,7 +62,7 @@ export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, 
         취소
       </Button>
 
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isFromManagement ? onCancel : null} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isFromManagement ? onCancel : null} slides={false} />
     </RawScreen>
   )
 }

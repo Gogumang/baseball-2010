@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { createRef } from 'react'
@@ -91,3 +91,50 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     expect(screen.queryByTestId('정산-흐르는-글')).toBeNull()
   })
 })
+
+describe('대전 승리 팝업 — 0x4b100 4b1f8~4b2d4 (틱 0x14 · 기록 판 열림 · 이김)', () => {
+  const renderWithWindow = async (props: Partial<Parameters<typeof SettlementBoard>[0]>) => {
+    const { CommonWindowPushContext } = await import('@/shared/lib/commonWindow/commonWindow')
+    const { millisecondsPerFrame } = await import('@/shared/config/frameRate')
+    const push = vi.fn()
+    render(
+      <CommonWindowPushContext.Provider value={push}>
+        <SettlementBoard {...기본} mode={8} onExit={vi.fn()} {...props} />
+      </CommonWindowPushContext.Provider>,
+    )
+    const frames = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+    return { push, frames }
+  }
+  it('기록 판이 열린 채 틱 20 에 이겼으면 "!C추가 …GP 획득" 을 띄운다', async () => {
+    vi.useFakeTimers()
+    try {
+      const { push, frames } = await renderWithWindow({ versusReward: { kind: 0, value: 300n } })
+      fireEvent.keyDown(window, { key: '0' })
+      frames(19)
+      expect(push).not.toHaveBeenCalled()
+      frames(1)
+      expect(push).toHaveBeenCalledExactlyOnceWith('!C추가 300GP 획득')
+      frames(30)
+      expect(push).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('틱 20 에 기록 판이 닫혀 있거나 졌으면 띄우지 않는다', async () => {
+    vi.useFakeTimers()
+    try {
+      const closed = await renderWithWindow({ versusReward: { kind: 0, value: 300n } })
+      closed.frames(25)
+      expect(closed.push).not.toHaveBeenCalled()
+      cleanup()
+      const lost = await renderWithWindow({ isWin: false, versusReward: { kind: 0, value: 300n } })
+      fireEvent.keyDown(window, { key: '0' })
+      lost.frames(25)
+      expect(lost.push).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+

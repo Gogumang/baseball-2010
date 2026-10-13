@@ -105,6 +105,8 @@ export function SeasonPlayerPickScreen({
       {...(isRecruitSlot ? { footer: RECRUIT_SLOT_FOOTER } : {})}
       // 공통 앞그림 0xb810 — 0xdf 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다
       underlay={<SkinBackdrop kind="공무늬" />}
+      // 0xdf 그림은 공용 목록 0x63b14 를 안 부른다 — 머리띠가 미끄러지지 않는다 (시즌 0x63b14 는 0xca · 0xd7 · 0xdd · 0xe2 · 0xe4 뿐)
+      slides={false}
       onKey={onKey}
       onMoveCursor={(index) => setEditor((current) => pointEntryCursor(current, lists, index))}
       onCloseAceLocked={() => undefined}

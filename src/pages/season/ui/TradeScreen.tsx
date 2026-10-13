@@ -464,7 +464,7 @@ export function TradeScreen({
       )}
 
       {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리다 */}
-      <ScreenFrame title="시즌모드" gamePoint={gamePoints} onBack={backOneStep} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoints} onBack={backOneStep} slides={false} />
     </RawScreen>
   )
 }
