@@ -183,6 +183,9 @@ export function App() {
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
+  /** 시즌 정규시즌 승리 수 +0xbf (0x9f6f0) — 기록연감 훅이 선 뒤 꽂는다 (`recordStatRef` 와 같은 까닭) */
+  const recordSeasonRegularWinRef = useRef<() => void>(() => {})
+  const recordSeasonRegularWin = useCallback(() => recordSeasonRegularWinRef.current(), [])
   /** `0x62368(ui, k, 0)` — 기록연감 훅의 열기 + 알림. 미션 세션이 그보다 먼저 서므로 `recordStatRef` 처럼 꽂는다 */
   const openHiddenRef = useRef<(id: number) => boolean>(() => false)
   const openHidden = useCallback((id: number) => openHiddenRef.current(id), [])
@@ -205,6 +208,8 @@ export function App() {
     seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
     // 전역기록 +0x11e — 0xdd 진입 0x6548 과 일반 22 진입 0x3163c 가 같은 칸을 본다
     modeSave.matchSettingsSeenPort,
+    // 정산 0x4ea0c 의 정규시즌 승리 수 +0xbf → 100 이면 히든 45 (0x9f6f0 · 0x62368)
+    recordSeasonRegularWin,
   )
   // 142 경기 준비 0x1c46c 가 내 마타자·마투수를 열린 것 중에서 굴린다 (0x9f604 · 0x9f650, 825865d)
   const nariOpenedAces = useMemo(
@@ -364,7 +369,8 @@ export function App() {
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
     openHiddenRef.current = openCollectionHidden
-  }, [recordCollectionStat, openCollectionHidden])
+    recordSeasonRegularWinRef.current = collection.recordSeasonRegularWin
+  }, [recordCollectionStat, openCollectionHidden, collection.recordSeasonRegularWin])
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds

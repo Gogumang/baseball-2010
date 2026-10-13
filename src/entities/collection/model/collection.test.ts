@@ -19,6 +19,7 @@ import {
   mergeEndingIntoCollection,
   normalizeCollection,
   registerHallOfFame,
+  countSeasonRegularWin,
 } from '@/entities/collection/model/collection'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -235,5 +236,24 @@ describe('컬렉터 해금 — 0x14a74 가 네 부위를 다 보고 전역 표 a
   it('투수편: 20 + 4t', () => {
     const career = { ...createPitcherCareer('철완'), ownedEquipment: 일곱칸(0) }
     expect(pitcherCollectorHiddenIdsOf(career)).toEqual([20])
+  })
+})
+
+describe('정산 0x4ea0c 시즌 정규시즌 승리 수 +0xbf (0x9f6f0)', () => {
+  it('하나씩 올리고 100 에서 멈춘다 — 100 이 된 승리부터 히든 45', () => {
+    const at98 = { ...EMPTY_COLLECTION, seasonRegularWinCount: 98 }
+    const at99 = countSeasonRegularWin(at98)
+    expect(at99.collection.seasonRegularWinCount).toBe(99)
+    expect(at99.hiddenId).toBeNull()
+    const at100 = countSeasonRegularWin(at99.collection)
+    expect(at100.collection.seasonRegularWinCount).toBe(100)
+    expect(at100.hiddenId).toBe(45)
+    expect(countSeasonRegularWin(at100.collection).collection.seasonRegularWinCount).toBe(100)
+    expect(countSeasonRegularWin(EMPTY_COLLECTION).collection.seasonRegularWinCount).toBe(1)
+  })
+
+  it('저장에서 읽을 때 0~100 만 믿는다', () => {
+    expect(normalizeCollection({ ...EMPTY_COLLECTION, seasonRegularWinCount: 7 }).seasonRegularWinCount).toBe(7)
+    expect(normalizeCollection({ ...EMPTY_COLLECTION, seasonRegularWinCount: 101 }).seasonRegularWinCount).toBeUndefined()
   })
 })
