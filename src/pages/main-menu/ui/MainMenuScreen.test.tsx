@@ -38,8 +38,9 @@ const 누르기 = (key: string) => {
   틱지남()
 }
 
-const 띄우기 = (gamePoint?: number) => render(
+const 띄우기 = (gamePoint?: number, headerSlides?: boolean) => render(
   <MainMenuScreen
+    {...(headerSlides === undefined ? {} : { headerSlides })}
     hasSavedGame={false}
     onNewGame={vi.fn()}
     onSelectMode={vi.fn()}
@@ -91,6 +92,18 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
     expect(container.querySelector('svg')).toBe(band)
+  })
+  /** 머리띠 판 윗변 y — 다 내려오면 30 − 38 = −8 (`headerTopOf`) */
+  const 머리띠y = (container: HTMLElement) => Number(container.querySelector('svg rect')?.getAttribute('y'))
+
+  it('타이틀 갱신 0x245f8 에서 왔을 때만 머리띠가 미끄러진다 — [skin+0x84] = 1 · [+0x86] = 1 → 하위 4', () => {
+    const { container } = 띄우기(50, true)
+    expect(머리띠y(container)).toBe(1 - 38)
+  })
+
+  it('그 밖 길(하위 16·17 에서 CLR · 다른 장면이 메뉴를 새로 세움)은 다 내려온 자리에 선다 — 하위 4·5 들어옴 · 생성자는 +0x84 를 안 쓴다', () => {
+    const { container } = 띄우기(50)
+    expect(머리띠y(container)).toBe(30 - 38)
   })
 })
 
