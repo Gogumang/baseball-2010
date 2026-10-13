@@ -1,6 +1,7 @@
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
 
 /**
  * **상태 0x13 (19) = 배트에 맞은 직후 짧은 연출** (R10 4절 확정 · R15 9절 확정).
@@ -14,8 +15,6 @@ import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
  * 없다 — 여기서는 **화면을 붙잡아 두는 시간만** 옮긴다 (연출 내용은 빠져 있다).
  */
 
-/** 0x392ac 이 보는 결과 코드 — 홈런성(가운데·좌·우) */
-const BIG_HIT_CODES: ReadonlySet<number> = new Set([24, 25, 26])
 /** 원본 `공+0xac0` 눈금의 상한 (E 2-1b) */
 export const CARRY_SCALE_MAX = 160
 /** 0x392ac 의 `> 111` */
@@ -52,10 +51,8 @@ export interface BigHitInput {
  *
  * 원본이 실제로 보는 칸은 폴 틱 `+0xab0` · 눈금 `+0xac0` 둘이다(R15 9-1) — 담장 틱 `+0xaa4` 는 안 본다.
  */
-export function isBigHit({ resultCode, poleTick, carryScale }: BigHitInput): boolean {
-  if (poleTick >= 0) return false
-  if (resultCode === null || !BIG_HIT_CODES.has(resultCode)) return false
-  return carryScale > CARRY_THRESHOLD
+export function isBigHit(input: BigHitInput): boolean {
+  return isBigHitWatch(input)
 }
 
 /**

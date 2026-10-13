@@ -44,6 +44,9 @@ import {
   type DefenseSceneMemory,
 } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { DefenseDistanceBoard, DefenseHomeRunText, DefenseParticles } from '@/pages/defense/ui/DefenseEffectsLayer'
+import { ballParticleShotsOf, type BallParticleShot } from '@/pages/defense/lib/ballParticles'
+import { cameraBoundsOf, centerOn, screenOffsetOf } from '@/pages/defense/lib/defenseCamera'
+import * as screenStyles from '@/pages/defense/ui/DefenseScreen.css'
 import {
   startLiveRunnerPlay,
   type LiveRunnerPlay,
@@ -480,6 +483,8 @@ function LivePlayback({
   const particlesRef = useRef<ParticleScene>(createParticleScene())
   /** 마지막으로 돈 갱신 — 판이 닫힌 뒤 건너뛴 갱신을 따라잡는다 */
   const closedUpdateRef = useRef<number | null>(null)
+  /** 화면(`DefenseScreen`)이 마지막으로 그린 카메라 오프셋 (+0xfec, +0xff0) — 공 그리기 파티클의 화면 좌표 */
+  const cameraOffsetRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
   const [effectsView, setEffectsView] = useState<{
     readonly text: HomeRunTextFrame | null
     readonly distanceBoard: number | null
@@ -512,6 +517,7 @@ function LivePlayback({
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
       particlesRef.current = createParticleScene()
       closedUpdateRef.current = null
+      cameraOffsetRef.current = null
       setEnded(false)
       setClosed(false)
       setView(null)
@@ -533,6 +539,25 @@ function LivePlayback({
         runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
       ]
       return { scores: runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, drawn.hidden) }
+    }
+
+    /**
+     * 이 그림의 공 그리기 0x36dfc 가 쏠 파티클 (`lib/ballParticles`) — 화면 좌표는 카메라 오프셋을 더한 것이다.
+     * 원본 카메라는 그 그림의 0x3f060(목록 틱, 플레이 틱 앞)이 옮긴 자리다. 웹 화면은 갱신마다 앞 그림의 대상으로 카메라를 옮긴 뒤
+     * 그리므로 **이 갱신에 화면이 적은 오프셋**이 같은 자리다. 첫 그림(아직 안 그림)은 화면 진입의 가운데 맞춤(공 (x, z))과 같다.
+     * ⚠️ 한 갱신에 여러 틱을 따라잡으면 그 틱들은 같은 오프셋으로 쏜다(근사).
+     */
+    const ballShotsOf = (drawn: DefenseViewState | undefined): readonly BallParticleShot[] => {
+      if (drawn === undefined) return []
+      const offset =
+        cameraOffsetRef.current ??
+        screenOffsetOf(
+          centerOn(
+            cameraBoundsOf(screenStyles.SCREEN_WIDTH, screenStyles.SCREEN_HEIGHT),
+            drawn.cameraTarget ?? { x: drawn.ball.x, z: drawn.ball.z },
+          ),
+        )
+      return ballParticleShotsOf(drawn, offset)
     }
 
     // 한 갱신 = 한 틱. 프레임을 건너뛴 만큼은 따라잡는다
@@ -568,7 +593,7 @@ function LivePlayback({
         skippedNow = true
       } else {
         // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
-        effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts)
+        effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts, ballShotsOf(running.ticks[running.ticks.length - 1]))
         effectsRef.current = effectsFrame.effects
         // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
         board = drawBoard(running.held.scoreboardRuns)
@@ -613,7 +638,8 @@ function LivePlayback({
           endsNow = true
           break
         }
-        effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts)
+        // 닫힌 뒤 그림도 공을 그린다 — 마지막 그림의 공 · 조건 그대로(카메라는 서 있다)
+        effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts, ballShotsOf(running.ticks[running.ticks.length - 1]))
         effectsRef.current = effectsFrame.effects
         board = drawBoard(running.held.scoreboardRuns)
       }
@@ -651,6 +677,7 @@ function LivePlayback({
     <DefenseScreen
       state={closed ? frozenCamera(view) : view}
       grassPalette={grassPalette}
+      cameraOffsetRef={cameraOffsetRef}
       underActors={
         effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined
       }

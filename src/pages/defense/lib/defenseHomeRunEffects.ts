@@ -5,9 +5,10 @@ import {
   type HomeRunFireworks,
 } from '@/entities/batting/model/homeRunFireworks'
 import { isFoulEnded } from '@/entities/fielding/model/playGate'
-import { clearParticles, tickParticles, type ParticleScene } from '@/entities/particle/model/particleScene'
+import { clearParticles, emitParticles, tickParticles, type ParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import type { DefensePlayState } from '@/features/defense-play/model/runDefensePlay'
+import type { BallParticleShot } from '@/pages/defense/lib/ballParticles'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   drawHomeRunTextOnce,
@@ -77,10 +78,15 @@ export interface DefenseEffects {
   readonly fireworks: HomeRunFireworks<number> | null
   /** +0x36 */
   readonly displayDistance: number
+  /**
+   * 공+0xab4 — 공 그리기의 튐 파티클(0x37042)이 1 로 세우고 0x17 진입 0x46734 가 0 으로 내린다. 읽는 곳은 못 찾았다
+   * (`lib/ballParticles` 머리말) ⚠️ 미확인. 안 주면 거짓
+   */
+  readonly ballBounced?: boolean
 }
 
 export function defenseEffectsOf(memory: DefenseSceneMemory): DefenseEffects {
-  return { textOn: false, text: memory.textScene, fireworks: null, displayDistance: memory.displayDistance }
+  return { textOn: false, text: memory.textScene, fireworks: null, displayDistance: memory.displayDistance, ballBounced: false }
 }
 
 export function sceneMemoryOf(effects: DefenseEffects): DefenseSceneMemory {
@@ -166,8 +172,10 @@ export function stepDefenseEffects(
   effects: DefenseEffects,
   facts: DefenseTickFacts | null,
   ports: DefenseEffectsPorts,
+  ballShots: readonly BallParticleShot[] = [],
 ): DefenseEffectsFrame {
   let { textOn, text, fireworks, displayDistance } = effects
+  let ballBounced = effects.ballBounced === true
   // 갱신 — 0x51cd8 · 0x51d0c
   if (facts?.homeRunBranch === true) {
     text = generalHomeRunTextOn(text)
@@ -178,6 +186,11 @@ export function stepDefenseEffects(
   if (facts !== null && facts.displayDistance !== null) displayDistance = facts.displayDistance
   // 그리기 — 0x36cd4 는 +0x1960 만 본다
   const distanceBoard = textOn ? displayDistance : null
+  // 그리기 — 공 0x36dfc 의 큰 타구 · 튐 파티클 (그리기 목록을 채울 때 — HOMERUN 글자 0x40b18 의 효과 틱보다 앞)
+  for (const shot of ballShots) {
+    if (shot.bounce) ballBounced = true
+    emitParticles(ports.particles, ports.configOf(shot.id), shot.x, shot.y, shot.img)
+  }
   // 그리기 — 0x40b18 (0x40b22: +0x1960 이 꺼졌으면 아무것도 안 한다)
   let textFrame: HomeRunTextFrame | null = null
   if (facts?.drawsText === true && textOn) {
@@ -192,7 +205,7 @@ export function stepDefenseEffects(
   }
   // 프레임 끝 — 0x6de84
   if (ports.random !== undefined) tickParticles(ports.particles, ports.random)
-  return { effects: { textOn, text, fireworks, displayDistance }, text: textFrame, distanceBoard }
+  return { effects: { textOn, text, fireworks, displayDistance, ballBounced }, text: textFrame, distanceBoard }
 }
 
 /**
@@ -216,7 +229,7 @@ export function updateDefenseEffectsWithoutDraw(effects: DefenseEffects, facts: 
     fireworks = initHomeRunFireworks<number>()
   }
   if (facts.displayDistance !== null) displayDistance = facts.displayDistance
-  return { textOn, text, fireworks, displayDistance }
+  return { ...effects, textOn, text, fireworks, displayDistance }
 }
 
 /** 0x17 끝 0x35108 — 글자를 끄고(0x351d0) 파티클을 치운다(0x6dee4) */
