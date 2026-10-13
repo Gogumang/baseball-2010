@@ -463,6 +463,12 @@ export interface TeamEntryPitcher {
    * 통째 베낀 XlsACE_PIT 행 그대로(`withAcePitcher` — 붕붕머신 16 · 발렌타인 16 · 22, 18 · 10 은 다섯 줄 모두 0). 없으면 0.
    */
   readonly skillBits?: number
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸(제구 · 구속 · 변화 · 체력 = 모자 · 글러브 · 아대 · 신발) — 타석 교대 0x47cc8 이 마운드 투수가
+   * 마투수(0xb633c)가 아니면 48138~4816a 에서 이 니블 − 1 로 투수 그림 0x79790 장비 겹을 싣는다. 표 줄은 Xls 행(또는 시즌 명단 니블),
+   * 마투수는 안 쓴다. 없으면 맨몸(⚠️ 미확인: 기록으로 선 영입 투수는 웹 기록 사본에 니블이 없다)
+   */
+  readonly equipment?: readonly number[]
 }
 
 /**
@@ -493,6 +499,7 @@ export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher
   return teamPitchers(teamId).map((player, slot) => ({
     name: player.name,
     ability: rowAbilityOf(player, true),
+    equipment: player.equipment,
     repertoire: rosterRepertoireOf(teamId, slot),
     aceIndex: NO_ACE_BATTER,
     orderIndex: slot,
@@ -668,6 +675,11 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
   })
 }
 
+/** 장비 니블 칸 — 있을 때만 싣는다 */
+function equipmentOf(equipment: readonly number[] | undefined): { readonly equipment?: readonly number[] } {
+  return equipment === undefined ? {} : { equipment }
+}
+
 /** 고친 차례로 세운 투수 명단 — 0번이 저장 레코드의 0번이다 (선발 칸은 부르는 쪽이 정한다) */
 export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryPitcher[] {
   const table = teamPitchers(teamId)
@@ -689,6 +701,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
       return {
         name: player?.name ?? '',
         ability: rowAbilityOf(player, true, pitcher.equipment),
+        ...equipmentOf(pitcher.equipment ?? player?.equipment),
         repertoire: rosterRepertoireOf(tableTeamId, pitcher.tableSlot),
         aceIndex: NO_ACE_BATTER,
         orderIndex,
@@ -715,6 +728,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
     return {
       name: player?.name ?? '',
       ability: rowAbilityOf(player, true),
+      ...equipmentOf(player?.equipment),
       repertoire: rosterRepertoireOf(teamId, slot),
       aceIndex: NO_ACE_BATTER,
       orderIndex,

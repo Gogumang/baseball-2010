@@ -122,6 +122,10 @@ export interface StageScene {
    * 모드 4(타자편)면 타자 그림, **아니면 투수 그림**이다. 그러니 장비를 입은 투수 그림은 **모드 3 투수편의 "내 투수"** 뿐이고,
    * 타석 화면 마운드의 상대 투수는 그 객체가 아니다 (`batterLayers.pitcherEquipmentOf` 주석).
    * 채우는 곳: 투수편 경기 화면의 타석 장면 `PitcherSideStage` — `pitcherEquipmentOf(career.equipmentLevels)`.
+   *
+   * *(정정 2026-10-14)* 경기 장면 마운드 그림(장면 +0xf1c)은 타석 교대 0x47cc8 이 따로 다시 싣는다 — 마운드 투수가 마투수가 아니면
+   * 48138~4816a 가 **그 투수 레코드**의 니블 − 1 로 0x79790 을 부른다(모드를 안 가린다). 그래서 팀 경기 사람 수비 장면도 명단 투수
+   * 니블로 채운다(`teamPitcherSideStageOf`). ⚠️ 미이식: 사람 타석(`BattingStage`)의 CPU 투수 장비 겹은 아직 안 넘긴다.
    */
   readonly pitcherEquipment?: PitcherEquipment
   /**

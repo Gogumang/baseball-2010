@@ -14,6 +14,7 @@ import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
+import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
@@ -47,6 +48,10 @@ interface PitcherSideStageProps {
   readonly pitcherForm: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
+  /**
+   * 마운드의 마투수 그림 — 타석 교대 0x482fc 의 적재 0x793b0 이 순번 0xb63a0 으로 `ace/pitcher_*` 를 싣는다. 없으면 평범한 투수
+   */
+  readonly acePitcher?: AcePitcherFrames | null
   /** 구장 +0x70 · 바닥 줄 +0xc · 하늘 줄 +0x10 */
   readonly stadium: number
   readonly fieldPalette: number | null
@@ -166,7 +171,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         batterEquipment: NO_EQUIPMENT,
         side: current.batterSide ?? batterSideOfForm(current.batterForm),
         hud: current.hud,
-        acePitcher: null,
+        acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,
         pitcherHand: current.pitcherHand,
