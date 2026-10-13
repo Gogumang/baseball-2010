@@ -47,6 +47,11 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
    * (되돌아가기 + "0상세정보") 을 넘긴다.
    */
   readonly footer?: number
+  /**
+   * 머리띠가 미끄러져 들어오는가 (`ScreenFrame` 의 `slides`). 안 주면 미끄러진다 — 나리 143 엔트리 보기(그림 0x16738)는 [skin+0x84] 를
+   * 세우는 0x63b14 를 안 불러 false 를 넘긴다
+   */
+  readonly slides?: boolean
 }
 
 /** 판 (15, 55, 210, 220) — P6 2f 의 0x5c984 공용 판 (유력) */
@@ -71,7 +76,7 @@ const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
  *    줄에는 이름·수비 위치 글자만 적는다. 화면 밀기(0xbdae9, 1000) 연출도 없다.
  */
 export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace>({
-  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, footer, onKey, onMoveCursor, onCloseAceLocked,
+  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, footer, slides, onKey, onMoveCursor, onCloseAceLocked,
 }: EntryEditorScreenProps<B, P>) {
   useEffect(() => {
     if (isAceLocked) return undefined
@@ -172,7 +177,7 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
       {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
           표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}
       <ScreenFrame title={title ?? (isPitcherTab ? '투수엔트리' : '타자엔트리')} gamePoint={gamePoint}
-        onBack={() => onKey('취소')} footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)} />
+        onBack={() => onKey('취소')} footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)} slides={slides} />
 
       {isAceLocked && (
         <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />

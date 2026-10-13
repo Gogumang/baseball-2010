@@ -118,6 +118,11 @@ export interface StageLatest {
   readonly isPaused: boolean
   /** 참이면 결과 창 뒤 배경만 그린다 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly isResultBackdrop?: boolean
+  /**
+   * 공용 창 [0x140005c] 이 떠 있다 — 경기 장면 0x52c50 이 52cc6 에서 상태 바꿈 · 키 · 갱신을 건너뛰고 그리기만 한다
+   * (`shared/lib/commonWindow`). 결과 배경 +0x17e2 (갱신 0x4b100) 가 그동안 안 오른다. 없으면 거짓
+   */
+  readonly isSceneFrozen?: boolean
   /** 부르는 쪽이 모는 HOMERUN 글자 창 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly homeRunText?: HomeRunTextWindow | null
   /** 효과를 치운 시각 — `BattingStage` 의 같은 이름 props 주석 참고 */

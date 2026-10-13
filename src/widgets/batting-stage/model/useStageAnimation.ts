@@ -28,6 +28,8 @@ import { tickParticles } from '@/entities/particle/model/particleScene'
 import { enterSettlementEffect, tickSettlementEffect, type SettlementEffect } from '@/entities/batting/model/settlementEffect'
 import { skyColorsOf, skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
 import { settlementSkyColumnOf } from '@/widgets/batting-stage/lib/settlementSky'
+import { frozenClockNowOf, observeFrozenClock, startFrozenClock } from '@/widgets/batting-stage/lib/frozenClock'
+import type { FrozenClock } from '@/widgets/batting-stage/lib/frozenClock'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
@@ -329,8 +331,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let stageEffects = NO_STAGE_EFFECTS
     /** 경기 정산 효과 — 결과 배경의 첫 그림에서 한 번 깐다(0x4ea0c). 깔기 전이면 undefined, 끈 효과면 null */
     let settlementEffect: SettlementEffect | null | undefined
-    /** 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null */
-    let backdropStartedAt: number | null = null
+    /**
+     * 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null.
+     * 공용 창이 떠 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신 0x4b100 을 건너뛰어 +0x17e2 가 안 오르므로 시계가 선다
+     * (그리기는 늘 돌아 구름 · 정산 효과는 그대로 흐른다 — `frozenClock`)
+     */
+    let backdropClock: FrozenClock | null = null
     /**
      * '대기' 에서 쉬기 시작한 시각 — 쉬는 동안은 단계 시작 시각을 그림마다 되밀어 틱이 늘 0 이라 따로 센다.
      * 0xe 진입 0x50674 가 필살 횟수 표시의 애니(game_ui 애니 5)를 되감아 거는 자리다 (`specialSwingBadge`).
@@ -360,8 +366,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           clearParticles(particlesRef.current)
           settlementEffect = undefined
         }
-        backdropStartedAt = null
-      } else if (backdropStartedAt === null) backdropStartedAt = now
+        backdropClock = null
+      } else {
+        backdropClock = observeFrozenClock(backdropClock ?? startFrozenClock(now), now, latestRef.current.isSceneFrozen === true)
+      }
       // 결과 창(상태 0x1a)에는 투구·파티클 갱신이 없다 — 투구 단계를 멈추고 파티클 틱도 그 자리에 묶어 둔다
       if (!isBackdrop) advancePhase(now)
 
@@ -473,10 +481,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         // 구장객체 +0x18 = 12 → 0x76fc5(구장, 0) 으로 마지막 칸(밤)에 둔다
         skyColumn: settlement === undefined ? null : settlementSkyColumnOf(settlement),
         resultBackdropOffsetY:
-          backdropStartedAt === null
+          backdropClock === null
             ? null
             : (latestRef.current.resultBackdropOffsetOf ?? resultBackdropOffsetAt)(
-                pitchTickAt(now, backdropStartedAt, tickLength),
+                pitchTickAt(frozenClockNowOf(backdropClock, now), backdropClock.startedAt, tickLength),
               ),
         resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
         // 0x4c4bc 의 상태 갈래 재료 — 웹 단계 · 그 단계에 든 뒤 틱 · 쉬는 중(0xd · 0xe 대기 따위)

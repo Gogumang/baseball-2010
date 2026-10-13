@@ -340,7 +340,7 @@ export function CareerRoutes({
               teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
               onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}}
               // 나리 틀 0x16928 은 142~144 면 142 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
-              underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} />
+              underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} slides={false} />
           </NariScreenPush>
         )
       }

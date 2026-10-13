@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
-import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import {
   SEASON_RANKING_SIZE, rankingCategoriesOf, seasonRankingValueTextOf,
 } from '@/entities/season-mode/model/seasonRecordRanking'
@@ -15,9 +15,7 @@ const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
 
-/** 팝업 제목 StrMODE[74] "보고 싶은 기록을 선택해주세요" */
-const RECORD_PICK_TITLE_ID = 74
-/** 두 칸 글 img_text — 392 "타자기록" · 393 "투수기록" (0xf3fa · 0xf502) */
+/** 두 칸 글 img_text — 392 "타자기록" · 393 "투수기록" (그림 객체 +8 의 +0x620 · +0x624 — 0xf3fa · 0xf502) */
 const PICK_LABEL_FRAMES = { 타자: 392, 투수: 393 } as const
 /** 머리 글 img_text — 136 "순위" · 27 "이름" · 235 "팀명" (0x57a76 · 0x57ab2 · 0x57aec) */
 const HEADER_FRAMES = [136, 27, 235] as const
@@ -37,56 +35,24 @@ export interface SeasonRecordPickPopupProps {
 }
 
 /**
- * **기록순위 창** (팝업 id 0x80, 그리기 0xf334 · 키 0xf5d4 — 직접 떴다).
+ * **기록순위 창** (팝업 id 0x80, 그리기 0xf334 · 키 0xf5d4 — 직접 떴다). 나리 기록실 0x19448 과 같은 꼴
+ * (`widgets/record-pick-popup` 머리말 — 두 함수를 명령 단위로 견줬다):
  * ```
  * 0xf334  제목 StrMODE[74] 흰 글 (W/2 − 0x54, H/2 − 0x28) · 칸 둘 32×32 (W/2 − 0x38, H/2) · (W/2 + 0x18, H/2)
- *         칸 그림 0x858fd(…, 6 / 10, 고른 칸 아니면 −1) · 그 아래 h + 4 에 img_text 392 · 393 가운데
- *         고른 칸 글은 그대로, 아닌 칸 글은 (0xb2, 0xb2, 0xb2) 효과 0xb(단색)
+ *         칸 그림 0x858fd([장면+0xc0], 칸, 6 / 10, 팔레트) — `ui/mode_icon` 프레임 6 · 10, 고른 칸 팔레트 0(mpl 첫 벌) · 아닌 칸 −1
+ *         (f3bc~f3d6 · f4c2~f4de: [장면+0x16c] ≠ 0 이면 칸 0 이 고른 칸) · 그 아래 h + 4 에 img_text 392 · 393 가운데
+ *         (그림 객체 +8 의 +0x620 · +0x624), 고른 칸 글은 그대로, 아닌 칸 글은 (0xb2, 0xb2, 0xb2) 효과 0xb(단색)
  * 0xf5d4  취소 → 닫기 · 좌·우(−3·−4) · '4' · '6' → 뒤집기 · 확인(−5 · '5') → 닫기 · 0xdb
  * ```
- * ⚠️ 근사: 칸 그림 0x858fd(6 / 10) 의 그림 묶음은 안 풀었다 — 칸 테두리만 그린다.
  */
 export function SeasonRecordPickPopup({ side, onToggle, onConfirm, onCancel }: SeasonRecordPickPopupProps) {
-  const latest = useRef({ onToggle, onConfirm, onCancel })
-  latest.current = { onToggle, onConfirm, onCancel }
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
-      if (isCancelKey(event.key)) current.onCancel()
-      else if (['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)) current.onToggle()
-      else if (event.key === 'Enter' || event.key === '5') current.onConfirm()
-      else return
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [])
-
-  const cells = [
-    { side: '타자' as const, x: 120 - 0x38 },
-    { side: '투수' as const, x: 120 + 0x18 },
-  ]
   return (
-    <div role="dialog" aria-label="기록순위">
-      <div className={windowStyles.window} style={{ left: 120 - 0x54 - 6, top: 160 - 0x28 - 8, width: 0x54 * 2 + 12, height: 100 }} />
-      <div className={styles.title} style={{ left: 120 - 0x54, top: 160 - 0x28, width: 0x54 * 2 }}>
-        {ORIGINAL_MODE_TEXT[RECORD_PICK_TITLE_ID] ?? ''}
-      </div>
-      {cells.map((cell) => {
-        const isOn = cell.side === side
-        return (
-          <button key={cell.side} type="button" aria-pressed={isOn} aria-label={`${cell.side}기록`}
-            className={windowStyles.layer}
-            style={{ left: cell.x, top: 160, width: 32, height: 48, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto' }}
-            onClick={() => (isOn ? onConfirm() : onToggle())}>
-            <span style={{ position: 'absolute', left: 0, top: 0, width: 32, height: 32, boxSizing: 'border-box', border: `1px solid ${isOn ? ORIGINAL_COLORS.text : '#b2b2b2'}` }} />
-            <img alt="" src={frameSrc(PICK_LABEL_FRAMES[cell.side])}
-              style={{ position: 'absolute', left: 16, top: 36, transform: 'translateX(-50%)', filter: isOn ? undefined : 'brightness(0.7)' }} />
-          </button>
-        )
-      })}
-    </div>
+    <RecordPickPopup ariaLabel="기록순위" testIdPrefix="기록순위" selected={side === '타자' ? 0 : 1}
+      cells={[
+        { label: '타자기록', labelFrame: PICK_LABEL_FRAMES.타자 },
+        { label: '투수기록', labelFrame: PICK_LABEL_FRAMES.투수 },
+      ]}
+      onToggle={onToggle} onConfirm={onConfirm} onCancel={onCancel} />
   )
 }
 

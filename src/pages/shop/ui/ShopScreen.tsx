@@ -146,7 +146,7 @@ export function ShopScreenView({
         isKeyEnabled={pending === null && blockNotice === null && !isNoticeOpen && !isDetailOpen}
         partTabs={partNames === undefined ? undefined : { names: partNames, current: part, onChange: changePart }}
       />
-      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} />
+      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
       {pending !== null && (
         <MessageBox text={pending.question} buttons={['예', '아니오']}
           onAnswer={(index) => {

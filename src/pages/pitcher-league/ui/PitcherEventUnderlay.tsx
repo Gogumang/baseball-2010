@@ -16,7 +16,7 @@ export function PitcherEventUnderlay({ career, isPreviousGame = false }: {
     <>
       <SkinBackdrop kind="공무늬" />
       <PitcherStatusBoard career={career} isPreviousGame={isPreviousGame} />
-      <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} />
+      <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} slides={false} />
     </>
   )
 }
