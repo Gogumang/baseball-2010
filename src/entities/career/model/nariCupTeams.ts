@@ -22,6 +22,10 @@ import { advanceRotation } from '@/entities/pitcher-career/model/pitcherRotation
  * ```
  * 대표팀 칸은 대회 내내 이어지고(내 선수 · 투수 차례), 상대국 칸은 날마다 마스터에서 다시 선다. 경기는 0xb891c 가 이 두 칸으로 팀을
  * 세우고(타순 = 타자 배열 차례 · 선발 = 투수 0번), 143 엔트리 보기(0x1f9a9)도 이 두 칸을 보인다.
+ * 경기 장면 0x39fdc(직접 떴다): 3a0f0~3a162 가 S+0x12c 면 두 팀 = 0xb7614(L, L+0xad, 0/1), 팀 10 을 우리 쪽에 두고(3a148),
+ * 3a2cc · 3a2f4 의 0xb891c(모드 4) → 0xb8680 점프표 0xd8a30 → 0x1f989 → 0x1f8f8 이 팀 10 을 +0xbc4 로 읽는다. 3a2fa 0xb8768 이
+ * 두 팀을 배열 첨자로 다시 매겨 내 레코드 칸 0xb6394 = 대표팀 안 내 첨자(`nariCupBattingOrderOf` − 1), 동료도 첨자다
+ * (`nariQuickLineupOf` 의 `recordSlots`).
  */
 export interface NariCupTeams {
   /** +0xbc4 대표팀(팀 10) — 내 선수가 낀 타자 배열 · 투수 차례(`pitchers`) */

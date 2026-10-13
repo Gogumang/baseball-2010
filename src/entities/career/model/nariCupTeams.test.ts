@@ -6,7 +6,7 @@ import {
   nextNariCupDayTeams,
   prepareNariCupMatch,
 } from '@/entities/career/model/nariCupTeams'
-import { MY_RECORD_SLOT } from '@/entities/career/model/nariTeamRecord'
+import { MY_RECORD_SLOT, nariQuickLineupOf } from '@/entities/career/model/nariTeamRecord'
 
 describe('국가대항전 대회 레코드 두 칸 — +0xbc4 대표팀 · +0xbe0 상대국 (0xb7bf0 · 133 · 0x1c46c · 0xb818c)', () => {
   it('대표팀은 마스터 팀 10 에 내 선수를 내 칸에 넣고(0xb53f1 0x80 갈래) 그 칸 선수는 위치 0 으로 맨 끝', () => {
@@ -16,6 +16,16 @@ describe('국가대항전 대회 레코드 두 칸 — +0xbc4 대표팀 · +0xbe
     expect(nariCupBattingOrderOf(teams)).toBe(8)
     expect(teams.opponentTeamId).toBe(11)
     expect(teams.opponent.batters[7]?.slot).toBe(7)
+  })
+
+  it('레코드 칸 0xb6394 — 경기 장면 3a2fa 의 0xb8768 이 대표팀 배열을 다시 매겨 내 칸 = 타순 − 1, 밀려난 옛 칸 선수는 끝 첨자', () => {
+    const teams = createNariCupTeams(2, 12)
+    const lineup = nariQuickLineupOf(teams.korea)
+    expect((nariCupBattingOrderOf(teams) ?? 0) - 1).toBe(2)
+    expect(lineup.recordSlots?.[2]).toBe(2)
+    // 붙박이 칸 2 였던 선수는 맨 끝(12)으로 가 그 첨자를 받는다 — 붙박이 칸 2 가 아니다
+    expect(lineup.rosterSlots.at(-1)).toBe(2)
+    expect(lineup.recordSlots?.at(-1)).toBe(teams.korea.batters.length - 1)
   })
 
   it('142 는 대회 날짜 g ≠ 0 이면 두 칸 투수 0~3 을 한 칸 돌리고, 하루 끝은 상대국 칸만 마스터에서 새로', () => {

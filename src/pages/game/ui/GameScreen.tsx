@@ -320,7 +320,10 @@ export function GameScreen({
             batterSkillIds={career.equippedSkillIds}
             recentAtBatCodes={progress.recentAtBatCodes}
             // 투수 스킬 31 의 0xb6394(내 선수) — 0xb53f1 이 내 선수를 칸 +0xa & 0x1f 에 앉히고 0xb8768 이 그 첨자로 다시 매긴다
-            // (142 진입 0x1c54a 도 타순 = 레코드 안 내 줄 첨자 + 1 로 읽는다) — 곧 내 타순 칸
+            // (142 진입 0x1c54a 도 타순 = 레코드 안 내 줄 첨자 + 1 로 읽는다) — 곧 내 타순 칸.
+            // 국가대항전도 같다(직접 떴다): 0x39fdc 3a0f0~3a162 가 S+0x12c 면 두 팀을 대진 0xb7614(L, L+0xad, 0/1)로 고르고 팀 10 을 우리
+            // 쪽(r6)에 두며, 0xb891c → 0xb8680(모드 4) → 0x1f989 → 0x1f8f8 이 팀 10 을 대표팀 칸 +0xbc4 로 읽는다. 3a2fa 0xb8768 이
+            // 그 배열을 다시 매기므로 내 칸 = 대표팀 안 내 첨자 = `nariCupBattingOrderOf` − 1 = playerOrderIndex
             batterRecordSlot={progress.game.playerOrderIndex}
             pitcherAbility={pitcherAbility}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
