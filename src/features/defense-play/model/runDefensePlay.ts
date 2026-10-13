@@ -2741,6 +2741,45 @@ export function stepDefensePlay(
     drawGateOpen = gate.drawOpen
     if (!gate.open) play = { ...play, finished: true }
 
+    // ── 9. 카메라 0x3f060 의 키 건너뛰기 부수효과 (3f106~3f192, 직접 뜸) ──
+    // ```
+    // 3f0b8  G1 이 열렸고(r6 = 1) 0x33c98(0x17) 이면 목록 틱(3f0da) 뒤 카메라:
+    // 3f0f0  플레이 +0x111(홈런) || +0x129(폴 홈런) 이고 공.vt18(멈춤)이면 대상 = 주자 0(0xa9565(주자관리, 0)) —
+    // 3f164  +0xfe7(건너뛰기) ≠ 0 && 주자 0 +0x7c(목표 루) == 4 && +0x8c(닿은 루) == 4 →
+    // 3f17e    +0xfe7 = 0 · 메시지 0x13(인자 0) 곧바로(0xbfbad) → 0x51fb8: 점수 +1(0xb6a9c) · 주자 0 +0x95 = +0x96 = 1 ·
+    //          0x357e0 && +0xfe7 == 0 이면 홈런 점수판 갈래(52030)
+    // 52b36  +0xfe7 이 내려갔으면 52b26 되풀이를 멈추고 그 그림을 그대로 그린다(52b42 → 그리기)
+    // ```
+    // 건너뛰는 동안 0x3f060 은 52b26(슬롯 2 뒤)에서 돈다 — 웹의 이 틱 끝 G1 자리다. 원본은 타자주자가 목록 틱에서 홈에 닿는 바로 그
+    // 그림에 이 메시지로 1점을 올리고, 같은 그림 뒤의 득점 0xaa0a8 은 +0x96 이라 건너뛴다(aa0e6). 웹은 득점(6 절)을 이 틱 안에서
+    // 먼저 셌으므로 그 1점이 곧 이 메시지 몫이다 — 새로 올리지 않고 건너뛰기만 푼다(화면이 이 틱의 0x13 을 홈런 갈래로 받는다).
+    // 이미 앞 틱에 들어온 타자주자면 원본은 1점을 또 올린다(원본 그대로) — 다만 그때는 0xa990c == 0 이라 G1 이 닫혀 실제로는 안 닿는다.
+    // ⚠️ 같은 그림에 다른 주자도 홈에 닿으면 원본은 이 메시지(타자주자)가 먼저 · 그 주자의 0xaa0a8 메시지가 다음 그림이지만,
+    //    웹은 6 절이 앞선 주자부터 이 틱에 다 센다 — 홈런 점수판 칸의 차례가 다를 수 있다(미확인 — 타자주자가 앞 주자와 같은 그림에
+    //    닿는 판을 못 봤다).
+    const cameraBallStopped =
+      play.held || (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick))
+    const firstRunner = runners[0]
+    if (
+      fastForward &&
+      gate.listTickOpen === true &&
+      (homeRunFlag || play.suppressed) &&
+      cameraBallStopped &&
+      firstRunner !== undefined &&
+      firstRunner.state.targetBase === 4 &&
+      firstRunner.state.startBase === 4
+    ) {
+      fastForward = false
+      if (!runInsThisTick.includes(firstRunner.state.index)) {
+        // 앞 틱에 이미 센 타자주자 — 0xb6a9c 가 1점을 또 올린다(원본 그대로)
+        firstRunner.counted = true
+        firstRunner.state = { ...firstRunner.state, scored: true }
+        held = { ...held, scoreboardRuns: held.scoreboardRuns + 1 }
+        runInsThisTick.push(firstRunner.state.index)
+      }
+      log.push(`${tick}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
+    }
+
     // ── 10. G2 만 닫힌 그림 — 원본은 그 그림도 그린다 (`DefenseViewState.closingListFrame`) ──
     // G3 · G4 · G1 이 열리고 G2(52502)에서 닫히면(쥔 채 다 선 판의 +0x120 세기는 목록 틱 뒤 주자부터 세어 G2 에서 51 이 되기 쉽다)
     // 다음 그림은 0x3f060 의 목록 틱(6 절 이동 + 야수 준비 틱 줄이기 a1312) · 카메라를 돌고 슬롯 2 는 529f0 으로 빠진 채 그려진다.

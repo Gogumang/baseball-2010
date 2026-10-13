@@ -593,6 +593,9 @@ function LivePlayback({
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     }
     stateRef.current = running
+    // 건너뛰기가 이 그림 안에서 여러 틱을 돌고 판 끝 전에 풀리면(카메라 3f17e) 다음 그림부터는 다시 한 그림에 한 틱이다 — 앞서 돈 틱만큼
+    // 시작 갱신을 당겨 갱신 계수가 진행기 틱을 따라잡을 때까지 멈춰 있지 않게 한다
+    if (running.tick > wanted) startedAtRef.current -= running.tick - wanted
     const finished = isDefensePlayFinished(running)
     // 닫힌 뒤(+0x1094 를 세는 갱신)에 온 키도 0x519cc 를 지난다 — 받으면 52b26 이 남은 셈을 이 그림 안에서 다 돈다
     if (!moved && finished && pressesRef.current.length > 0) {

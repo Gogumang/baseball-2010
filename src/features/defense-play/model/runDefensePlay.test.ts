@@ -18,6 +18,7 @@ import { throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import {
   cpuSpecialThrowOf,
   defenseAbilitiesOf,
+  defensePlayResultOf,
   isBattedBallInPlay,
   isBallBeyondFence,
   isDefensePlayFinished,
@@ -2058,5 +2059,40 @@ describe('희생 [sp+8] · 번트 타구 state[0x13] — 정산 a83e2 · a88e0 �
       runnersAdvanced: 결과.sacrifice,
     })
     expect(hasBit(bits, BURST_RESULT_BIT.번트진루)).toBe(false)
+  })
+})
+
+describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', () => {
+  const 홈런판 = (): DefensePlayInput => ({
+    outcome: { kind: '홈런' },
+    trajectory: battedBallTrajectory(BATTED_BALL_PATTERNS[24][0]),
+    bases: { first: true, second: false, third: false },
+    outs: 0,
+  })
+
+  it('건너뛰는 동안 공이 멈추고 타자주자가 홈(+0x7c == +0x8c == 4)에 닿는 틱에 +0xfe7 이 풀리고, 그 1점은 그 틱 메시지 0x13 이다', () => {
+    let state = startDefensePlay(홈런판())
+    let pressed = false
+    let 풀린틱 = -1
+    while (!isDefensePlayFinished(state)) {
+      const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+      if (key !== null) pressed = true
+      const before = state.fastForward
+      state = stepDefensePlay(state, key)
+      if ((before || key !== null) && !state.fastForward && 풀린틱 < 0) {
+        풀린틱 = state.tick - 1
+        expect(state.runInsThisTick).toContain(0)
+        expect(state.runners[0].state).toMatchObject({ targetBase: 4, startBase: 4, scored: true })
+      }
+    }
+    expect(풀린틱).toBeGreaterThan(0)
+    expect(state.log).toContain(`${풀린틱}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
+    // 점수는 안 누른 판과 같다 — 새로 올리지 않는다
+    expect(defensePlayResultOf(state).advance).toEqual(runDefensePlay(홈런판()).advance)
+  })
+
+  it('건너뛰지 않으면 아무것도 안 한다', () => {
+    const 결과 = runDefensePlay(홈런판())
+    expect(결과.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
   })
 })
