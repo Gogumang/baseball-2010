@@ -179,9 +179,8 @@ export interface MissionDefenseSituation {
  * 지금 타순 칸 s 에 선 레코드가 시작 때 칸 s 레코드의 자리를 갖고, 타순 밖 레코드는 0(어느 칸에도 안 맞는다)이 된다.
  * 대타는 명단(`lineup`)만 바꾸므로 명단에서 그대로 읽는다.
  *
- * ⚠️ **칸 0(투수)**: 원본은 선수를 찾지 않아 g = 2 고정 · 야수+0xec 가 비어 있다(펌블 표 b41e4 는 선수가 없으면 0). 진행기는 칸 0 도
- * 능력치 하나로 등급을 잡으므로 이 둘을 한 값으로 나타낼 수 없다 — 진행기 기본값(500)으로 둔다(다른 모드는 투수 칸 2 를 넣는다 —
- * `defenseAbilitiesOf` 주석. 둘 다 원본과 다르다, 진행기 쪽 숙제).
+ * **칸 0(투수)**: 원본은 선수를 찾지 않아 g = 2 고정 · 야수+0xec 가 비어 있다(펌블 표 b41e4 는 선수가 없으면 0). 진행기가 이 칸을
+ * 선수 없는 칸으로 다루므로(`fielderAbilityOf` — 입력을 읽지 않는다) 자리만 기본값으로 채운다. 모든 모드가 같다(`defenseAbilitiesOf`).
  * ⚠️ 찾는 레코드가 미션 타자 · 마타자 표지면(수비 팀에는 안 생긴다) 진행기 기본값이다.
  */
 export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[] {

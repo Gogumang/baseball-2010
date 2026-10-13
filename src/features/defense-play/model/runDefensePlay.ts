@@ -77,6 +77,7 @@ import {
   AI_STATE,
   createFielders,
   createRunner,
+  fielderAbilityOf,
   fielderArrivalTicks,
   initialPlayView,
   NONE,
@@ -392,18 +393,14 @@ export interface DefenseLineupPlayer {
 /**
  * 타순에 선 선수들을 **수비 칸 9개**(0 투수 … 8 중견)의 능력치 배열로 옮긴다.
  *
- * ⚠️ **원본 그대로**: 칸 0(투수)의 "수비 능력치" 도 같은 `0xb570c(팀, **2**, 선수, 90, 1)` 로 읽는데,
- * 투수 레코드의 칸 2 는 **변화**다 (J-4 의 칸 표). 원본이 레코드 종류를 가리지 않고 칸 2 를 읽으므로
- * 여기서도 투수의 변화 값을 그대로 넘긴다 — 고치지 않는다.
+ * 칸 0(투수)은 판 시작 0xb0fb4 가 **선수를 찾지 않는다**(b1032 — `fielderAbilityOf` 주석). 그래서 송구 속도 g = 2 ·
+ * 악송구 보정 8 · 펌블 0 · 레이저 굴림 없음으로 고정이고, 진행기는 이 칸의 값을 읽지 않는다 — 자리만 기본값으로 채운다.
+ * (예전 웹은 마운드 투수의 능력치 칸 2(투수 레코드에서는 변화)를 넣었다 — 원본에 없는 길이라 걷었다.)
  *
  * 자리 코드가 없거나 겹치는 칸은 원본 평균대(등급 3 = 500)로 둔다.
  */
-export function defenseAbilitiesOf(
-  lineup: readonly DefenseLineupPlayer[],
-  pitcherDefense: number = DEFAULT_ABILITY,
-): number[] {
+export function defenseAbilitiesOf(lineup: readonly DefenseLineupPlayer[]): number[] {
   const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_ABILITY)
-  abilities[0] = pitcherDefense
   const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
   for (const player of lineup) {
     const code = (player.position ?? 0) & 0xf
@@ -1527,7 +1524,7 @@ export function stepDefensePlay(
         thrower: fielders[fromSlot],
         target: receiverTarget,
         laser: true,
-        ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+        ability: fielderAbilityOf(abilities, fromSlot, DEFAULT_ABILITY),
         random: input.random,
         body: ballBody,
       })
@@ -1542,7 +1539,7 @@ export function stepDefensePlay(
         target: receiverTarget,
         special: special.special,
         bounce: special.bounce,
-        ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+        ability: fielderAbilityOf(abilities, fromSlot, DEFAULT_ABILITY),
         random: input.random,
         body: ballBody,
       })
@@ -1918,7 +1915,8 @@ export function stepDefensePlay(
         laserRolled = true
         const passed = rollLaserThrow(
           {
-            defenseAbility: abilities[chaserSlot] ?? DEFAULT_ABILITY,
+            // 66a94: 공 쫓는 야수+0xec 가 없으면(투수 칸 0) 굴림 없이 실패 — `rollLaserThrow`
+            defenseAbility: fielderAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY),
             skillIds: input.fielderSkillIds?.[chaserSlot] ?? [],
           },
           input.random,
@@ -2020,7 +2018,7 @@ export function stepDefensePlay(
       // 손으로 만든 시험 궤적(원본 칸 없음)은 마지막 점을 멈춘 점으로 본다.
       const ballIsMoving =
         trajectory.isStoppedAt === undefined ? tick < trajectory.length - 1 : !trajectory.isStoppedAt(tick)
-      if (rollFumble(abilities[chaserSlot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
+      if (rollFumble(fielderAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
         fumbled = true
         fumbleMarks = fumbleMarks.map((value, slot) => (slot === chaserSlot ? FUMBLE_MARK_TICKS : value))
         // b4280: 야수+0xb8 = 6(놓침 동작) · 메시지 0xbc2 · 사건(sp+0x24) = 1 — 쥐지 않는다. 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 로

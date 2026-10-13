@@ -1,5 +1,5 @@
 import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
-import { throwErrorBiasOf } from '@/entities/fielding/model/fieldingState'
+import { NO_PLAYER_THROW_ERROR_BIAS, throwErrorBiasOf } from '@/entities/fielding/model/fieldingState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -13,8 +13,12 @@ const RANDOM_LIMIT = 10_000
 /** 펌블 확률표 0xd87d4 = [200,180,160,140,120,100,80,50] (÷10000) — 등급 0~7 */
 export const FUMBLE_PERMYRIAD: readonly number[] = [200, 180, 160, 140, 120, 100, 80, 50]
 
-/** 만분율 펌블 확률. 수비 ≤125 면 2.0%, 925 초과면 0.5% */
-export function fumbleChanceOf(defenseAbility: number): number {
+/**
+ * 만분율 펌블 확률. 수비 ≤125 면 2.0%, 925 초과면 0.5%.
+ * `null` = 야수+0xec(선수)가 없는 칸(투수 칸 0, `fielderAbilityOf`) — b41e4 가 0 을 쓴다.
+ */
+export function fumbleChanceOf(defenseAbility: number | null): number {
+  if (defenseAbility === null) return 0
   return FUMBLE_PERMYRIAD[abilityGradeOf(defenseAbility)]
 }
 
@@ -32,17 +36,18 @@ export function fumbleChanceOf(defenseAbility: number): number {
  * ```
  * 예전 웹은 멈춘 공이면 굴리지 않아 그 뒤 난수 차례가 하나씩 밀렸다.
  */
-export function rollFumble(defenseAbility: number, ballIsMoving: boolean, random: RandomPort): boolean {
+export function rollFumble(defenseAbility: number | null, ballIsMoving: boolean, random: RandomPort): boolean {
   const roll = random.rand(0, RANDOM_LIMIT)
   return ballIsMoving && fumbleChanceOf(defenseAbility) > roll
 }
 
 /**
- * 악송구 기준값 = (10 − 등급) + 특수×100 + 100 (0xa1828). 특수 = 0xa1620 의 다섯째 인자(송구 계획 [1], CPU 홈 특수 송구)라
+ * 악송구 기준값 = (10 − 등급) + 특수×100 + 100 (0xa1828). `null`(선수 없는 투수 칸 0)이면 보정 +0xe4 = 8 (0xb0fb4 b10a2). 특수 = 0xa1620 의 다섯째 인자(송구 계획 [1], CPU 홈 특수 송구)라
  * 오히려 1%p 더 위험하다. 레이저 송구(플레이+0x1f4)는 0xa1620 이 아니라 야수 vtb0 = 0xa222c 로 던져 이 굴림 자체가 없다.
  */
-export function throwErrorChanceOf(defenseAbility: number, special = false): number {
-  return throwErrorBiasOf(abilityGradeOf(defenseAbility)) + (special ? 100 : 0) + 100
+export function throwErrorChanceOf(defenseAbility: number | null, special = false): number {
+  const bias = defenseAbility === null ? NO_PLAYER_THROW_ERROR_BIAS : throwErrorBiasOf(abilityGradeOf(defenseAbility))
+  return bias + (special ? 100 : 0) + 100
 }
 
 export interface ThrowErrorResult {
@@ -65,7 +70,7 @@ export const NO_THROW_ERROR: ThrowErrorResult = { errant: false, speedDelta: 0, 
  * 확률은 ≈1.03~1.10% 다.
  */
 export function rollThrowError(
-  defenseAbility: number,
+  defenseAbility: number | null,
   special: boolean,
   random: RandomPort,
 ): ThrowErrorResult {

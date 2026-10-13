@@ -2074,20 +2074,15 @@ export function substitutionDetailAbilities(
 /**
  * 한 팀의 수비 아홉 칸 능력치 — 타순에 선 선수의 **경기용** 수비(질병·보직·사기·팀 능력치·코치까지
  * 먹인 값, J-4)를 로스터의 수비 자리 코드로 칸에 꽂는다.
- * 칸 0(투수)은 지금 마운드에 선 투수의 능력치 칸 2 다 (⚠️ 원본 그대로 — `defenseAbilitiesOf` 주석).
+ * 칸 0(투수)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다 — 마운드 투수를 넣지 않는다.
  */
-function defenseAbilitiesFor(
-  progress: TeamGameProgress,
-  teamId: number,
-  pitcherIndex: number,
-): readonly number[] {
+function defenseAbilitiesFor(progress: TeamGameProgress, teamId: number): readonly number[] {
   const context = abilityContextOf(progress.options)
   return defenseAbilitiesOf(
     entryBattersOf(progress, teamId).map((player, slot) => ({
       position: player.position,
       defense: entryBatterGameAbilities(context, teamId, player, slot)[2],
     })),
-    pitcherAbilitiesAt(progress, teamId, pitcherIndex)[2],
   )
 }
 
@@ -2442,7 +2437,7 @@ function batterDefenseInputOf(
     // 공이 나는 동안 출발한 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
     stealingFrom: progress.stealingFrom,
     // 우리 공격이니 수비는 상대 팀이다
-    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
     // 난수를 넘겨야 펌블·악송구·필살수비·레이저 굴림이 돈다
     random,
@@ -3070,7 +3065,7 @@ function defensiveDefenseInputOf(
     // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
     stealingFrom: progress.stealingFrom,
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
-    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
     random,
     gameMode: progress.options.mode,
@@ -3299,7 +3294,7 @@ export function pickoff(
     outs: progress.game.outs,
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 (타구 진행기 `defensiveDefenseInputOf` 와 같은 근사:
     // 주자 모두가 지금 타자의 주루를 쓴다)
-    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
     random,
     // 공격이 CPU 라 자동 진루 제어기(0xaf918)가 돈다 (0xae690 첫 항)
@@ -3335,7 +3330,7 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     bases,
     outs: progress.game.outs,
     // 우리 공격이니 수비는 상대 팀이다
-    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
     random,
     // 우리가 공격이다 — 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
@@ -3553,14 +3548,14 @@ function arriveTeamPitch(
       ...(humanOffense
         ? {
             // 우리 공격이니 수비는 상대(CPU) — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690 의 둘째 항)
-            defenseAbilities: defenseAbilitiesFor(progress, options.opponentTeamId, progress.opponentPitcherIndex),
+            defenseAbilities: defenseAbilitiesFor(progress, options.opponentTeamId),
             defenseIsCpu: true,
             offenseIsCpu: false,
             runningMode: options.runningModeManual === true ? ('수동' as const) : ('자동' as const),
           }
         : {
             // 우리 수비 — 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓)
-            defenseAbilities: defenseAbilitiesFor(progress, options.ourTeamId, progress.ourPitcherIndex),
+            defenseAbilities: defenseAbilitiesFor(progress, options.ourTeamId),
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),

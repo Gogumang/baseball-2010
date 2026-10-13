@@ -12,6 +12,7 @@ import {
   throwErrorChanceOf,
 } from '@/entities/fielding/model/fieldingErrors'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createFielders, fielderAbilityOf, UNSEARCHED_FIELDER_SLOT } from '@/entities/fielding/model/fieldingState'
 
 const 고정 = (value: number): RandomPort => createConstantRandom(value)
 
@@ -101,5 +102,28 @@ describe('필살수비 발동 — 0x66b30 = 0x66be4, 표 0xd25b0', () => {
   it('A 가 실패했을 때만 B 를 굴려 슬라이딩 창을 연다', () => {
     expect(rollSpecialDefense(999, 차례([0.9, 0.0]))).toEqual({ jumpUnlocked: false, slideUnlocked: true })
     expect(rollSpecialDefense(999, 고정(0.9))).toEqual({ jumpUnlocked: false, slideUnlocked: false })
+  })
+})
+
+describe('투수 칸 0 — 판 시작 0xb0fb4 가 선수를 찾지 않는다 (b1032)', () => {
+  it('송구 속도는 g = 2 고정 (940 + 8 × 2) — 입력 능력치를 안 읽는다 (b106a)', () => {
+    for (const ability of [0, 500, 999]) {
+      const fielders = createFielders(Array.from({ length: 9 }, () => ability))
+      expect(fielders[UNSEARCHED_FIELDER_SLOT].throwSpeed).toBe(956)
+      expect(fielders[UNSEARCHED_FIELDER_SLOT].baseThrowSpeed).toBe(956)
+    }
+    // 다른 칸은 그대로 등급 + 1 이다
+    expect(createFielders(Array.from({ length: 9 }, () => 999))[1].throwSpeed).toBe(940 + 8 * 8)
+  })
+
+  it('선수 없는 칸(null)은 악송구 보정 8 (b10a2 r0 = 2 → 2 − 2 + 8) · 펌블 확률 0 (b41e4)', () => {
+    expect(fielderAbilityOf([999, 700], 0, 500)).toBeNull()
+    expect(fielderAbilityOf([999, 700], 1, 500)).toBe(700)
+    expect(fielderAbilityOf([999], 4, 500)).toBe(500)
+    expect(throwErrorChanceOf(null)).toBe(8 + 100)
+    expect(throwErrorChanceOf(null, true)).toBe(8 + 200)
+    expect(fumbleChanceOf(null)).toBe(0)
+    // 펌블 굴림은 먹는다 — 0 이어도 0 > 0 이 아니라 안 걸린다
+    expect(rollFumble(null, true, 고정(0))).toBe(false)
   })
 })

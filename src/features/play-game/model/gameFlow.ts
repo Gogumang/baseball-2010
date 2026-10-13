@@ -1084,18 +1084,14 @@ function finishPlayerOutcome(
  *
  * 나만의리그 타자편은 전역 모드 4 라 팀 능력치 보정(비트마스크 0x306 = 모드 1·2·8·9)이
  * 붙지 않는다 → 로스터에 적힌 밑값을 그대로 쓴다.
- * 칸 0(투수)은 오늘 상대 선발의 능력치 칸 2 다 (`defenseAbilitiesOf` 주석 — ⚠️ 원본 그대로).
+ * 칸 0(투수)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다 — 여기서 넣지 않는다.
  */
 function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
-  // 수비 칸 0 은 지금 마운드에 선 투수다 — 교체되면 바뀐다
-  const ace = moundAcePitcherOf(progress, false)
-  const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
   return defenseAbilitiesOf(
     teamBatters(progress.opponentTeamId).map((player) => ({
       position: player.position,
       defense: player.ability[2],
     })),
-    ace === undefined ? pitcher?.ability[2] : ace.breaking,
   )
 }
 
