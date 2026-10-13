@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 describe('무한 G 스위치', () => {
-  it('기본은 꺼져 있다 — 원본 규칙이 그대로 돈다', () => {
+  it('시험 환경에서는 기본이 꺼져 있다 — 원본 규칙이 그대로 돈다 (앱은 기본으로 켠다)', () => {
     expect(isInfiniteGamePointOn()).toBe(false)
   })
 
@@ -39,6 +39,14 @@ describe('무한 G 스위치', () => {
 
   it('다른 이름은 켜지지 않는다', () => {
     주소바꾸기('?무한')
+    expect(isInfiniteGamePointOn()).toBe(false)
+  })
+
+  it('`?원본G` 는 켜는 이름보다 앞서 끈다', () => {
+    주소바꾸기('?무한G&원본G')
+    expect(isInfiniteGamePointOn()).toBe(false)
+    window.localStorage.setItem('compus-baseball/dev', 'real-gp')
+    주소바꾸기('?무한G')
     expect(isInfiniteGamePointOn()).toBe(false)
   })
 })
