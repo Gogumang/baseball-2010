@@ -92,6 +92,8 @@ interface SeasonRouteProps {
     readonly levels: Readonly<Record<number, number>>
     readonly onOpenAce: (cell: number) => void
     readonly onLevelUp: (cell: number, cost: number) => void
+    /** 경기 전 0xd7(목록 k 2 = 격자 종류 7)에서 열 칸이 다 열렸으면 히든 팀 외인구단 12 (0x7b408) */
+    readonly onAllAcesOpen?: () => void
   }
   /**
    * 기록연감의 명예의 전당 — 선수영입(0xe2 → 0xdf) 후보 칸 1~4(투수 +0x880)·6~(타자 +0x940). 안 넘기면 빈 칸이다.
@@ -549,6 +551,7 @@ export function SeasonRoute({
         openedAceBatterIds={aceSelect?.openedAceBatterIds ?? DEFAULT_OPENED_ACE_BATTER_IDS}
         {...(aceSelect === undefined ? {} : {
           levels: aceSelect.levels, onOpenAce: aceSelect.onOpenAce, onLevelUp: aceSelect.onLevelUp,
+          ...(aceSelect.onAllAcesOpen === undefined ? {} : { onAllAcesOpen: aceSelect.onAllAcesOpen }),
         })}
         gamePoint={session.gamePoints}
         onSelect={actions.choosePreGameAce}

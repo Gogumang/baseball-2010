@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -73,6 +73,15 @@ export interface AceSelectScreenProps {
   readonly onSelect: (cell: number) => void
   readonly onCancel: () => void
   /**
+   * **마선수 10명이 모두 열렸으면 히든 팀 외인구단** — 격자 그리기 0x7a570 의 종류 7(공용 목록 k 2 = 일반모드 상태 21 ·
+   * 시즌 0xd7 경기 전, 0x64802 `[sp+0xe0] == 2 ? 7 : 8`)만 0x7b408 로 가서 전역기록 +0x30..+0x39 가 다 켜졌으면
+   * `0x62368(ui, 12, 0)` 을 부른다(0x7b424). 그 칸 그리기는 매 틱이고 0x62368 이 이미 열린 것을 거르므로 웹은 화면이 서 있는
+   * 동안 열 칸이 다 열려 있으면(열리는 순간 포함) 한 번 부른다. 스페셜(k 11)·코치채용(k 10)은 종류 8 이라 넘기지 않는다.
+   * ⚠️ 미확인: 그 갈래 앞의 그리기 조건 [격자+9] · [격자+6] · 깜빡임 [sp+0x58]((+0x18 & 7) ≤ 4) — 커서 칸이 그려지는
+   * 틀로 보이며, 이 때문에 원본은 화면이 선 뒤 몇 틱 안에 연다(웹은 바로)
+   */
+  readonly onAllAcesOpen?: () => void
+  /**
    * 화면 맨 밑에 먼저 깔 것 — 시즌 장면 0x105 는 상태별 그리기 앞에 늘 공통 앞그림 0xb810 을 부르고, 0xd7 마선수 고르기는 0xdd · 0xe0 · 0xe1 밖이라
    * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
    */
@@ -120,7 +129,7 @@ const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShap
  */
 export function AceSelectScreen({
   phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0,
-  onOpenAce, onLevelUp, onSelect, onCancel, underlay, overlay,
+  onOpenAce, onLevelUp, onSelect, onCancel, underlay, overlay, onAllAcesOpen,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -140,6 +149,15 @@ export function AceSelectScreen({
   useEffect(() => {
     setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
   }, [phase])
+
+  // 0x7b408~0x7b42e — for i in 0..9: 전역 +0x30 + i == 0 이면 그만, 다 켜졌으면 0x62368(ui, 12, 0)
+  const isEveryAceOpen = Array.from({ length: ACE_PER_ROLE }, (_unused, index) => index)
+    .every((index) => openedAcePitcherIds.includes(index) && openedAceBatterIds.includes(index))
+  const onAllAcesOpenRef = useRef(onAllAcesOpen)
+  onAllAcesOpenRef.current = onAllAcesOpen
+  useEffect(() => {
+    if (isEveryAceOpen) onAllAcesOpenRef.current?.()
+  }, [isEveryAceOpen])
 
   const isCellOpen = (cell: number) =>
     aceRoleOfCell(cell) === ACE_PHASE.마투수

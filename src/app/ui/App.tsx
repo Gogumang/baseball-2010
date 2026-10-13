@@ -111,6 +111,8 @@ const MISSION_SCREENS: readonly Screen['kind'][] = [
 const GENERAL_STAT_MODE = 1
 /** 0x1ca4c 1cb42 `movs r1, #0x11` — 나리 명전 등록 완료 창 뒤에 여는 히든 (전광판 칸 1 "고대의전광판") */
 const REGISTERED_HALL_OF_FAME_HIDDEN_ID = 17
+/** 0x7b426 `movs r1, #0xc` — 마선수 열 칸이 다 열리면 여는 히든 팀 외인구단 (0x62368 의 k) */
+const ALL_ACES_HIDDEN_TEAM_ID = 12
 /** 투수 미션 · 타자 미션 = 원본 모드 5 · 6 (0x29a54 → 표 0xcec00) */
 const MISSION_PITCHER_MODE = 5
 const MISSION_BATTER_MODE = 6
@@ -408,6 +410,11 @@ export function App() {
       aceLevels.levelUp(cell)
       collection.recordStat({ kind: 'G사용', usage: GAME_POINT_USAGE.ace, amount: cost })
     },
+    // 0x7b408 — 격자 종류 7(일반모드 21 · 시즌 0xd7 경기 전)에서 열 칸이 다 열렸으면 0x62368(ui, 12, 0) 히든 팀 외인구단.
+    // 웹 표에는 팀 번호 14 로 든다(`hiddenOpenStoredIdOf`)
+    onAllAcesOpen: () => {
+      collection.openHidden(ALL_ACES_HIDDEN_TEAM_ID)
+    },
   }
 
   /**
@@ -567,6 +574,7 @@ export function App() {
         // "예" → G를 빼고 플래그를 세운다 (0xa3e2 · 0xa3f6). 모자람 판정은 화면이 이미 했다.
         // `spend` 의 자르기 [0, 99999] 와 "모자라면 한 푼도 안 깎는다" 가 원본 0xa3dc~0xa3f4 와 같다.
         onOpenAce={aceSelect.onOpenAce}
+        onAllAcesOpen={aceSelect.onAllAcesOpen}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
         runningModeManual={gameSettings.settings.runningMode === '수동'}
         // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
