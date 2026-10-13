@@ -407,6 +407,12 @@ export interface DefenseViewState {
    * 진행기는 멈춘 그림(머리에서 +0x1993)에 싣고, 재생 화면은 판이 닫힌 뒤(마지막 그림 다음 갱신부터) 싣는다. 안 주면 움직인다.
    */
   readonly cameraFrozen?: boolean
+  /**
+   * **판이 슬롯 2 머리 G2(52502)에서만 닫힌 그림** — 공용 갱신 0x3f060 의 G1(3f0b8)은 열려 목록 틱(야수 · 주자 한 걸음)과 카메라 따라가기는
+   * 돌고, 슬롯 2 는 529f0(+0x1094 = 1)으로 빠진 그림이다(`playGate.passPlayGateBetweenTicks` 의 `listTickOpen`). 진행기의 마지막 스냅샷이며,
+   * 재생 화면은 이 그림을 판이 닫힌 첫 갱신으로 세고(+0x1094) 카메라를 이 그림까지 움직인 뒤 그 다음부터 세운다. 안 주면 거짓.
+   */
+  readonly closingListFrame?: boolean
   /** 플레이 +0x111 — 사건 코드 8(홈런). 안 주면 거짓 */
   readonly homeRunFlag?: boolean
   /** 플레이 +0x129 — 사건 코드 12(폴 홈런). 안 주면 거짓 */

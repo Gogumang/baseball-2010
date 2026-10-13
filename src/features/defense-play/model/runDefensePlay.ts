@@ -121,6 +121,7 @@ import {
   isFoulEnded,
   strikesAfterPlay,
   liveRunnerCountOf,
+  gateRunnerViewsOf,
   passPlayGateBetweenTicks,
   playEndResultCode,
   someRunnerStillActive,
@@ -2315,14 +2316,17 @@ export function stepDefensePlay(
     }
 
     // ── 5. 화면 스냅샷 ──
-    ticks.push(
+    /**
+     * 판 틱 `at` 의 그림. 5 절은 이 틱이고, 판이 G2 에서만 닫힌 그림(`closingListFrame` — 8 절 뒤)은 다음 틱 자리에서 한 번 더 찍는다.
+     */
+    const snapshotAt = (at: number, fieldersNow: readonly FielderState[], frozenCamera: boolean): DefensePlayView =>
       viewStateOf({
-        tick,
+        tick: at,
         ball: ballPointAt({
-          tick,
+          tick: at,
           trajectory,
           catchTick,
-          fielders,
+          fielders: fieldersNow,
           holderSlot: play.ballHolderSlot,
           held: play.held,
           throwBase,
@@ -2334,28 +2338,28 @@ export function stepDefensePlay(
         }),
         ballIsFlying:
           uncatchable
-            ? tick < trajectory.landingTick
-            : tick < catchTick || (throwArrivalTick >= 0 && tick < throwArrivalTick),
+            ? at < trajectory.landingTick
+            : at < catchTick || (throwArrivalTick >= 0 && at < throwArrivalTick),
         // 카메라 0x3f060 — 홈런(+0x111) · 폴 홈런(+0x129) 판에서 공.vt18(멈춤)이면 타자주자를 본다.
         // 멈춤은 관문 파울 갈래와 같은 읽기다 — 쥔 공은 손에 붙어 안 움직인다(유력)
         ballStopped:
           play.held ||
-          (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
+          (trajectory.isStoppedAt === undefined ? at >= trajectory.length - 1 : trajectory.isStoppedAt(at)),
         homeRunFlag,
         poleHomeRunFlag: play.suppressed,
         // 공 그리기 0x36dfc — 쥔 공(+0x12c)과 담장 뒤로 사라진 공은 공 · 그림자를 안 그린다
         ballHeld: play.held,
-        ballBeyondFence: isBallBeyondFence(tick, ballLandingTick, trajectory.fenceTick, homeRunFlag),
+        ballBeyondFence: isBallBeyondFence(at, ballLandingTick, trajectory.fenceTick, homeRunFlag),
         // 공+0x68 — 0 이면 0x36dfc 36e24 가 공 · 그림자를 건너뛴다(판 첫 그림 · 송구 · 다시 쏜 그림)
-        ballPlaybackTick: tick - ballLaunchTick,
+        ballPlaybackTick: at - ballLaunchTick,
         // 머리에서 경기 멈춤(+0x1993)이 서 있던 그림(레이저 발사 다음 그림) — 0x3f060 이 3f0a4 에서 돌아가 카메라가 안 움직인다
-        cameraFrozen: pausedAtHead,
-        fielders,
+        cameraFrozen: frozenCamera,
+        fielders: fieldersNow,
         runners: runners.map((runner) => runner.state),
-        catchKind: tick >= play.actionStartTick && tick <= catchTick ? play.catchKind : null,
+        catchKind: at >= play.actionStartTick && at <= catchTick ? play.catchKind : null,
         chaserSlot,
         throwingSlot:
-          throwArrivalTick >= 0 && tick >= throwReleaseTick && tick < throwReleaseTick + 3 ? throwFromSlot : NONE,
+          throwArrivalTick >= 0 && at >= throwReleaseTick && at < throwReleaseTick + 3 ? throwFromSlot : NONE,
         throwBase,
         previousActions,
         // ── 그림에만 쓰이는 것들 ──
@@ -2369,9 +2373,11 @@ export function stepDefensePlay(
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
-      }),
-    )
+      })
+    ticks.push(snapshotAt(tick, fielders, pausedAtHead))
 
+    // 관문 G3 · G4 · G1 은 다음 그림의 목록 틱(6 절 이동) 앞 주자를 본다 (`playGate.gateRunnerViewsOf`)
+    const runnersBeforeListTick = runners.map((runner) => runner.state)
     // 6~7 절은 다음 그림의 목록 틱(0x3f060)과 플레이 틱 꼬리다 — 이 틱에 멈췄으면 다음 그림도 멈춰 있어 없다
     nextFrame: {
     if (pausedThisTick) break nextFrame
@@ -2691,6 +2697,7 @@ export function stepDefensePlay(
     // (전문은 `entities/fielding/model/playGate.ts` — `passPlayGateBetweenTicks`). 부를 때마다 +0x120 이 오르므로 주자가 다 서고
     // (+0x94 까지) 누가 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17 틱) 닫힌다. 그동안에도 자동 진루 · CPU 송구가 돈다.
     // 3아웃(b0dbe) · 사건 코드 11(b0db4)이면 곧바로 닫힌다. 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
+    const gateRunners = gateRunnerViewsOf(runnersBeforeListTick, runners.map((runner) => runner.state))
     const gate = passPlayGateBetweenTicks(
       {
         foulFlag,
@@ -2711,26 +2718,52 @@ export function stepDefensePlay(
           : undefined,
         lastEventCode,
         outs,
-        // 0xaa05c — 7 절의 값과 같다(보류 풀기는 주자를 안 건드린다). 멈춘 틱은 7 절이 없어 여기서 잰다
-        someRunnerActive: someRunnerStillActive(
-          runners.map((runner) => runner.state),
-          isAtTarget,
-        ),
+        // 0xaa05c · 0xa990c — G3 · G4 · G1 은 6 절 이동 · 득점 앞 주자를 본다(G2 는 아래 `headInput`)
+        someRunnerActive: someRunnerStillActive(gateRunners.frame, isAtTarget),
         homeRunDerby: false,
         homeRunFlag,
         poleHomeRunFlag: play.suppressed,
-        liveRunnerCount: liveRunnerCountOf(runners.map((runner) => runner.state)),
+        liveRunnerCount: liveRunnerCountOf(gateRunners.frame),
         ballHeld: play.held,
         groundRuleFlag,
         endCounter,
       },
       fastForward,
       gamePaused,
+      // G2(슬롯 2 머리 52502) — 목록 틱(6 절 이동) 뒤 · 득점 0xaa0a8(G2 뒤) 앞
+      {
+        someRunnerActive: someRunnerStillActive(gateRunners.head, isAtTarget),
+        liveRunnerCount: liveRunnerCountOf(gateRunners.head),
+      },
     )
     endCounter = gate.endCounter
     counterBeforeHead = gate.counterBeforeHead
     drawGateOpen = gate.drawOpen
     if (!gate.open) play = { ...play, finished: true }
+
+    // ── 10. G2 만 닫힌 그림 — 원본은 그 그림도 그린다 (`DefenseViewState.closingListFrame`) ──
+    // G3 · G4 · G1 이 열리고 G2(52502)에서 닫히면(쥔 채 다 선 판의 +0x120 세기는 목록 틱 뒤 주자부터 세어 G2 에서 51 이 되기 쉽다)
+    // 다음 그림은 0x3f060 의 목록 틱(6 절 이동 + 야수 준비 틱 줄이기 a1312) · 카메라를 돌고 슬롯 2 는 529f0 으로 빠진 채 그려진다.
+    // 공+0x68 은 그 앞 0x3f378(G4)이 이미 올렸으므로 다음 틱 점이다. 건너뛰는 동안(+0xfe7)은 그리지 않는다.
+    // ⚠️ 그 그림의 연출(결과 판 · 줌 · 큰 OUT — 그리기 0x46c88)은 닫힌 뒤 그림처럼 앞 그림 칸을 그대로 둔다(진행기의 연출 단계는 판 틱에만 돈다)
+    if (!gate.open && gate.listTickOpen === true && !fastForward) {
+      const listTickFielders = fielders.map((fielder) =>
+        fielder.actionLockTicks > 0
+          ? { ...fielder, actionLockTicks: fielder.actionLockTicks - 1 }
+          : fielder.holdingBall && fielder.actionRemainingTicks > 0
+            ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+            : fielder,
+      )
+      const drawnView = ticks[ticks.length - 1]
+      ticks.push({
+        ...snapshotAt(tick + 1, listTickFielders, false),
+        zoom: drawnView?.zoom ?? null,
+        bigOut: drawnView?.bigOut ?? null,
+        judgeText: drawnView?.judgeText ?? null,
+        flash: drawnView?.flash ?? null,
+        closingListFrame: true,
+      })
+    }
   }
 
   // ── 한 틱치를 상태에 되돌려 넣는다 ──

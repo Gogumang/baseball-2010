@@ -56,8 +56,9 @@ describe('패턴 없이 온 홈런의 재생 — 원본 판(runDefensePlay) 그�
       const 점 = 궤적.pointAt(tick)
       expect({ x: play.ticks[tick].ball.x, z: play.ticks[tick].ball.z }).toEqual({ x: 점.x, z: 점.z })
     }
-    // 마지막 틱이 타자주자가 홈을 밟은 틱이다 — 그 틱 끝 관문이 닫는다(스냅샷은 틱 머리의 그림이라 한 걸음 앞이다)
-    expect(play.log.at(-1)).toBe(`${play.ticks.length - 1}틱 0번 주자 홈 — 보류 0 / 득점 1`)
+    // 타자주자는 마지막 앞 틱에 홈을 밟는다 — 그 이동(다음 그림의 목록 틱) 뒤 G2 는 득점 0xaa0a8(G2 뒤) 앞이라 0xa990c 가 아직 1 이고,
+    // 한 그림 더 돈 뒤 그 그림 그리기 G3 부터 닫힌다(스냅샷은 틱 머리의 그림이라 한 걸음 앞이다)
+    expect(play.log.at(-1)).toBe(`${play.ticks.length - 2}틱 0번 주자 홈 — 보류 0 / 득점 1`)
   })
 
   it('주자는 타자주자를 포함해 모두 홈까지 돈다', () => {

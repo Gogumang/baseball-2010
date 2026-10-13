@@ -463,9 +463,10 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       // 내림차순이라 1루 주자(칸 1, 판 내림) → 타자주자(칸 0, n = 2 · 간격 20 · 타이머 40) 차례로 메시지 0x13 이 와 판이 선다
       const 일루 = { ...홈런(), outcome: registerContact(홈런().outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
       const 일루판 = runDefensePlay(일루)
+      // 홈인 틱 뒤 한 그림 더 — 그 그림의 G2 는 득점 0xaa0a8(G2 뒤) 앞이라 아직 열리고, 그 그림 그리기 G3 이 닫는다
       expect(일루판.log.filter((line) => line.includes('주자 홈 —')).map((line) => line.replace(/ — .*/, ''))).toEqual([
-        `${일루판.ticks.length - 1}틱 1번 주자 홈`,
-        `${일루판.ticks.length - 1}틱 0번 주자 홈`,
+        `${일루판.ticks.length - 2}틱 1번 주자 홈`,
+        `${일루판.ticks.length - 2}틱 0번 주자 홈`,
       ])
       // 두 점이 g 번마다 오른 뒤 g 번 더 — 판 끝 뒤 약 61 번째 닫힌 갱신 (예전 웹은 타자주자가 먼저라 판이 곧바로 내려 11 번째)
       expect(Math.abs(갱신수(일루) - (일루판.ticks.length + 61))).toBeLessThanOrEqual(3)

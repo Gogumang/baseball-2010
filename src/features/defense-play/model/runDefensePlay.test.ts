@@ -1736,13 +1736,18 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       bases: EMPTY_BASES,
       outs: 0,
     })
-    // 쥔 틱 끝부터 그리기 0x46e3c(G3) · 다음 그림 0x3f0b8(G1) · 슬롯 2 머리 52502(G2) — 틱마다 3 씩.
-    // 52번째 호출(old 51)은 18 번째 틱 끝의 G3 이다 — 그 그림의 HOMERUN 글자 관문부터 닫히고, G1 · G2 도 닫혀 세기는 54 로 끝난다
-    expect(세기.at(-1)).toBe(54)
-    const 시작 = 세기.lastIndexOf(3)
-    expect(세기.slice(시작)).toEqual(Array.from({ length: 18 }, (_unused, index) => (index + 1) * 3))
+    // 그리기 0x46e3c(G3) · 다음 그림 0x3f0b8(G1) · 슬롯 2 머리 52502(G2) — 틱마다 3 씩. 타자주자가 1루에 닿는 이동(다음 그림의
+    // 목록 틱)은 G1 과 G2 사이라, 그 틱 끝 G3 · G1 은 아직 안 선 주자를 보고 0 으로 두고 G2 부터 센다(1).
+    // 52번째 호출(old 51)은 18 번째 틱 끝의 G2 다 — G3(old 49) · G1(old 50)은 열려 마지막 그림의 HOMERUN 글자 관문도 열려 있고,
+    // G1 이 연 다음 그림(목록 틱 · 카메라만 도는 그림)이 `closingListFrame` 으로 하나 더 찍힌다
+    expect(세기.at(-1)).toBe(52)
+    const 시작 = 세기.indexOf(1)
+    expect(세기.slice(시작)).toEqual(Array.from({ length: 18 }, (_unused, index) => 1 + index * 3))
     expect(state.tick).toBe(시작 + 18)
-    expect(state.drawGateOpen).toBe(false)
+    expect(state.drawGateOpen).toBe(true)
+    expect(state.ticks).toHaveLength(state.tick + 1)
+    expect(state.ticks.at(-1)?.closingListFrame).toBe(true)
+    expect(state.ticks.at(-1)?.cameraFrozen).toBe(false)
   })
 
   it('판 시작 · 안 쥔 틱은 0x3f378(G4)까지 네 번 불러도 +0x120 이 0 이다 — 쥐기 전 틱 끝의 세기는 0', () => {
@@ -1752,7 +1757,8 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       bases: EMPTY_BASES,
       outs: 0,
     })
-    const 시작 = 세기.lastIndexOf(3)
+    const 시작 = 세기.indexOf(1)
+    expect(시작).toBeGreaterThan(0)
     expect(세기.slice(0, 시작).every((value) => value === 0)).toBe(true)
   })
 

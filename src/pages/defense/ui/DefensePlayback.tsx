@@ -303,7 +303,8 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     const at = holder.tally.nextIndex
     const view = ticks[Math.min(at, lastIndex)]
     if (view === undefined) break
-    holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex)
+    // G2 만 닫힌 그림(`closingListFrame`)은 그려지지만 슬롯 2 는 529f0 — 닫힌 셈(+0x1094)의 첫 갱신이다
+    holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex || view.closingListFrame === true)
   }
   const isFinished = ticks.length === 0 || holder.tally.ended || skipped
 
@@ -388,7 +389,7 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     if (at > lastIndex && !stepper.finished) break
     const view = ticks[Math.min(at, lastIndex)]
     if (view === undefined) break
-    holder.tally = stepRecordedBoard(holder.tally, view, false, at > lastIndex)
+    holder.tally = stepRecordedBoard(holder.tally, view, false, at > lastIndex || view.closingListFrame === true)
   }
   const isFinished = stepper.finished && holder.tally.ended
 
@@ -465,8 +466,13 @@ function LivePlayback({
   /** +0x1094 — 관문이 닫힌 뒤 지난 갱신 수 (판 시작 0) */
   const closedCountRef = useRef(0)
   const [view, setView] = useState<DefenseViewState | null>(null)
-  /** 판이 닫힌 뒤 갱신(+0x1094 셈)에 들었다 — 0x3f060 의 G1(3f0b8)이 닫혀 카메라가 선다 */
+  /** 판이 닫힌 뒤 갱신(+0x1094 셈)에 들었고 0x3f060 의 G1(3f0b8)이 닫혔다 — 카메라가 선다 */
   const [closed, setClosed] = useState(false)
+  /**
+   * 진행기가 판 끝에 찍은 "G2 만 닫힌 그림"(`closingListFrame`) — 원본은 닫힌 첫 갱신(+0x1094 = 1)에 목록 틱 · 카메라를 한 번 더 돌려
+   * 이 그림을 그리고, 그 다음 갱신부터 G1 이 닫혀 카메라가 선다. 없으면 null
+   */
+  const closingFrameRef = useRef<DefenseViewState | null>(null)
   const [runBoard, setRunBoard] = useState<RunScoreBoardView | null>(null)
   /** 0x35108(0x17 끝)을 지났다 — 닫힌 뒤 11 번째 갱신, 홈런 점수판이 선 홈런 타구는 내려갈 때까지 더, 키 건너뛰기면 그 그림 */
   const [ended, setEnded] = useState(false)
@@ -512,6 +518,7 @@ function LivePlayback({
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
       particlesRef.current = createParticleScene()
       closedUpdateRef.current = null
+      closingFrameRef.current = null
       setEnded(false)
       setClosed(false)
       setView(null)
@@ -605,10 +612,13 @@ function LivePlayback({
     } else if (!moved && finished) {
       // 판이 닫힌 뒤 갱신 — 갱신은 529f0(+0x1094 셈, 판 칸 · 글자 없음), 그리기는 비거리 판 · 득점 점수판, 프레임 끝 파티클 틱.
       // 진행기가 닫은 갱신은 위에서 돌았다. 갱신을 건너뛴 만큼 따라잡는다(진행기 틱과 같은 상한)
-      setClosed(true)
       const closedFrames = Math.min(update - (closedUpdateRef.current ?? update - 1), MAX_CLOSED_CATCH_UP)
       for (let frame = 0; frame < closedFrames; frame += 1) {
         closedCountRef.current += 1
+        // 닫힌 첫 갱신이 G2 만 닫힌 그림이면 그 그림(목록 틱 · 카메라 한 걸음)을 그리고, 그 뒤 갱신부터 카메라가 선다
+        const closing = closingFrameRef.current
+        if (closing !== null && closedCountRef.current === 1) setView(closing)
+        else setClosed(true)
         if (closesDefenseScene(closedCountRef.current, homeRunHit, boardRef.current)) {
           endsNow = true
           break
@@ -619,7 +629,16 @@ function LivePlayback({
       }
     }
     closedUpdateRef.current = update
-    if (moved) setView(running.ticks[running.ticks.length - 1] ?? null)
+    if (moved) {
+      // 판 끝 틱이 "G2 만 닫힌 그림" 을 함께 찍었으면 그 그림은 다음(닫힌 첫) 갱신 몫이다
+      const last = running.ticks[running.ticks.length - 1] ?? null
+      if (last?.closingListFrame === true) {
+        closingFrameRef.current = last
+        setView(running.ticks[running.ticks.length - 2] ?? null)
+      } else {
+        setView(last)
+      }
+    }
     if (endsNow) {
       // 0x35108 — 타이머 [+0x10f8] = 0 · +0x1100 = 0 · 글자 끄기 · 파티클 치우기 (아래 끝 효과)
       boardRef.current = { ...boardRef.current, timer: 0, active: false }
@@ -667,8 +686,8 @@ function LivePlayback({
 
 /**
  * 판이 닫힌 뒤 그림 — 0x3f060 이 3f0b8 관문(G1)에서 닫혀 대상 · 따라가기(3f1c0)까지 안 가므로 카메라가 그 자리에 선다.
- * ⚠️ 원본은 G2 만 닫히고 G1 은 열린 그림이 하나 있을 수 있다(+0x120 세기가 그 사이에서 50 을 넘을 때) — 웹 진행기는 그 그림을
- *    만들지 않으므로(`playGate` 머리말의 틱 · 그림 맞추기 미해결) 마지막 그림 다음부터 세운다.
+ * G2 만 닫히고 G1 은 열린 그림(+0x120 세기가 G1 · G2 사이에서 51 이 될 때)은 진행기가 `closingListFrame` 으로 마지막에 찍어 둔다 —
+ * 그 그림까지는 카메라가 움직이고 그 다음 갱신부터 선다.
  */
 function frozenCamera(state: DefenseViewState): DefenseViewState {
   return state.cameraFrozen === true ? state : { ...state, cameraFrozen: true }

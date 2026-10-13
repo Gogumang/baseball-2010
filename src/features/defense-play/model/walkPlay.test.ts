@@ -56,8 +56,11 @@ describe('볼넷 · 사구 밀어내기 판 — 종류 2 (0xb288c · 0x46418 · 
     const result = runWalkPlay({ bases: EMPTY_BASES, outs: 0, pitchJudgement: 4, runAbility: 500 })
     expect(result.ticks[0].runners.map((runner) => runner.index)).toEqual([0])
     expect(result.ticks[0].runners[0]).toMatchObject({ base: 1, isAdvancing: true })
-    // 속도 335 · 홈 → 1루 7772 → 24 틱째에 닿는다 — 그 뒤 17 그림
-    expect(result.ticks).toHaveLength(41)
+    // 속도 335 · 홈 → 1루 7772 → 24 틱째에 닿는다 — 그 뒤 17 그림. 세기는 도착 뒤 G2 부터라 51 번째가 G2 에 떨어져
+    // G1 이 열린 그림(목록 틱 · 카메라만 도는 그림, `closingListFrame`)이 하나 더 붙는다
+    expect(result.ticks).toHaveLength(42)
+    expect(result.ticks.at(-1)?.closingListFrame).toBe(true)
+    expect(result.ticks.slice(0, -1).some((view) => view.closingListFrame === true)).toBe(false)
     expect(result.pitchJudgement).toBe(4)
     expect(isWalkPlayResult(result)).toBe(true)
     expect(acceptsWalkPlaySkipKey(result)).toBe(true)

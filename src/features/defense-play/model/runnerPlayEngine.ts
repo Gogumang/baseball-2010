@@ -34,7 +34,12 @@ import {
   type HeldRunState,
 } from '@/entities/fielding/model/heldRuns'
 import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
-import { liveRunnerCountOf, passPlayGateBetweenTicks, someRunnerStillActive } from '@/entities/fielding/model/playGate'
+import {
+  gateRunnerViewsOf,
+  liveRunnerCountOf,
+  passPlayGateBetweenTicks,
+  someRunnerStillActive,
+} from '@/entities/fielding/model/playGate'
 import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
@@ -618,30 +623,33 @@ function* runnerPlaySteps(
     if (!play.finished && cpuThrowEnabled) cpuThrowDecision(tick)
 
     // ── 5. 그림 ──
-    ticks.push(
+    /** 판 틱 `at` 의 그림 — 판이 G2 에서만 닫힌 그림(`closingListFrame`)은 다음 틱 자리로 한 번 더 찍는다 */
+    const snapshotAt = (at: number, fieldersNow: readonly FielderState[]): DefensePlayView =>
       viewStateOf({
-        tick,
+        tick: at,
         ball:
           chase !== null
-            ? chase.trajectory.pointAt(tick)
+            ? chase.trajectory.pointAt(at)
             : (input.restingBall ?? fielders[play.ballHolderSlot]?.position ?? basePosition(0)),
         ballIsFlying: chase !== null,
         // 공 그리기 0x36dfc(36e90) — 쥔 공(+0x12c)은 공 · 그림자를 안 그린다
         ballHeld: play.held,
         // 공+0x68 — 판 시작 · 송구 · 다시 쏘기가 0 으로 둔 그림은 0x36dfc 36e24 가 공 · 그림자를 건너뛴다
-        ballPlaybackTick: tick - (chase?.startTick ?? 0),
-        fielders,
+        ballPlaybackTick: at - (chase?.startTick ?? 0),
+        fielders: fieldersNow,
         runners: runnerStates(),
         catchKind: null,
         chaserSlot: chase?.slot ?? play.ballHolderSlot,
-        throwingSlot: flight !== null && tick < flight.releaseTick + 3 ? flight.from : NONE,
+        throwingSlot: flight !== null && at < flight.releaseTick + 3 ? flight.from : NONE,
         throwBase: flight?.base ?? NONE,
         previousActions,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
-      }),
-    )
+      })
+    ticks.push(snapshotAt(tick, fielders))
+    // 관문 G3 · G4 · G1 은 다음 그림의 목록 틱(아래 이동) 앞 주자를 본다 (`playGate.gateRunnerViewsOf`)
+    const runnersBeforeListTick = runnerStates()
 
     // ── 6. 움직이기 ──
     const chasing = chase
@@ -754,21 +762,41 @@ function* runnerPlaySteps(
     // ── 9. 판 진행 관문 0xb0d28 (`playGate.passPlayGateBetweenTicks`) — 이 틱 그리기 G3 · 0x3f378 G4 · 다음 틱 0x3f060 G1 · 슬롯 2 머리 G2 ──
     // 3아웃 · 처리 안 끝난 주자 · 아무도 안 쥠(종류 9 의 줍기 전 · 송구 중) → 이어 감, 공을 쥔 채 관문 51 번(+0x120 — 그림마다 3 번, 17 틱) → 닫음.
     // state[0xb] 는 이 판의 결과 코드(9 · 13)다. 낙구·담장 결과 코드(b44f6)는 이 판에 타구가 없어 안 선다.
-    const gate = passPlayGateBetweenTicks({
-      foulFlag: false,
-      lastEventCode: resultCode ?? 0,
-      outs,
-      someRunnerActive: stillActive,
-      homeRunDerby: false,
-      homeRunFlag: false,
-      poleHomeRunFlag: false,
-      liveRunnerCount: liveRunnerCountOf(runnerStates()),
-      ballHeld: play.held,
-      groundRuleFlag: false,
-      endCounter,
-    })
+    const gateRunners = gateRunnerViewsOf(runnersBeforeListTick, runnerStates())
+    const gate = passPlayGateBetweenTicks(
+      {
+        foulFlag: false,
+        lastEventCode: resultCode ?? 0,
+        outs,
+        someRunnerActive: someRunnerStillActive(gateRunners.frame, isAtTarget),
+        homeRunDerby: false,
+        homeRunFlag: false,
+        poleHomeRunFlag: false,
+        liveRunnerCount: liveRunnerCountOf(gateRunners.frame),
+        ballHeld: play.held,
+        groundRuleFlag: false,
+        endCounter,
+      },
+      false,
+      false,
+      // G2(슬롯 2 머리 52502) — 목록 틱(이동) 뒤 · 득점 0xaa0a8 앞
+      {
+        someRunnerActive: someRunnerStillActive(gateRunners.head, isAtTarget),
+        liveRunnerCount: liveRunnerCountOf(gateRunners.head),
+      },
+    )
     endCounter = gate.endCounter
     if (!gate.open) play = { ...play, finished: true }
+    // G2 만 닫힌 그림 — 다음 그림의 목록 틱(이동 · 야수 준비 틱 줄이기)과 카메라는 돌고 슬롯 2 는 빠진 채 그려진다
+    // (`DefenseViewState.closingListFrame`, 타구 진행기 10 절과 같다)
+    if (!gate.open && gate.listTickOpen === true) {
+      const listTickFielders = fielders.map((fielder) =>
+        fielder.holdingBall && fielder.actionRemainingTicks > 0
+          ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
+          : fielder,
+      )
+      ticks.push({ ...snapshotAt(tick + 1, listTickFielders), closingListFrame: true })
+    }
   }
 
   const voidedRuns = outs > 2 ? held.heldRuns : 0
