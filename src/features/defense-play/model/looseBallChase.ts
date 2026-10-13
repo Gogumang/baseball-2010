@@ -24,6 +24,8 @@ export interface LooseBallChase {
   readonly catchPoint: WorldPoint
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 (원본 공은 한 경기 내내 같은 객체) */
   readonly body?: BallBody
+  /** 이 공을 깐 판 틱 — 그 그림의 공+0x68 이 0 이다(b12da). 그림의 재생 틱 = 판 틱 − 이 값 (`DefenseBall.isPlaybackStart`) */
+  readonly startTick: number
 }
 
 /** 예보 칸 — 필살수비 창 · +0x127 은 타구 판(메시지 0x11 · 0x51408)만 세운다. 이 판들에선 늘 꺼져 있다 */
@@ -49,6 +51,7 @@ export function chaseLooseBall(
     catchTick,
     catchPoint: { x: at.x, y: 0, z: at.z },
     body: ball.flight.body,
+    startTick: atTick,
   }
 }
 
@@ -65,6 +68,8 @@ export function initialLooseBallChase(
     catchTick,
     catchPoint: { x: at.x, y: 0, z: at.z },
     body: isBallTrajectory(trajectory) ? trajectory.flight.body : undefined,
+    // 판 시작 vt18 b284a → vt24(1) 0xb12d0 이 공+0x68 = 0
+    startTick: 0,
   }
 }
 

@@ -133,6 +133,7 @@ import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedC
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
 import {
+  hideBallOfLastSnapshot,
   viewStateOf,
   type ActionMemory,
   type DefensePlayView,
@@ -859,6 +860,13 @@ export interface DefensePlayState {
    */
   ballLandingTick: number
   /**
+   * 지금 공을 깐 판 틱 — 공+0x68(재생 틱)이 0 인 그림. 판 시작 vt18(b27ec → vt24(1) 0xb12d0 의 b12da)이 0 으로 두므로 처음은 0,
+   * 송구 0xb2e38(b307c) · 다시 쏘기 0xb3148(b3294)이 그 틱으로 옮긴다(`takeLooseBall`). 그림의 공+0x68 = 판 틱 − 이 값 —
+   * 0x3f378(3f3c6)이 그리기 뒤에만 +1 하므로 깐 그림은 0 이고 0x36dfc 36e24 가 공을 안 그린다(`DefenseBall.isPlaybackStart`).
+   * 쥔 동안은 +1 이 멈추지만(3f3b2 +0x12c) 쥔 공은 어차피 안 그리고, 놓는 길은 모두 0 으로 다시 둔다.
+   */
+  ballLaunchTick: number
+  /**
    * 지금 쫓는 공이 **받을 야수에게 던진 송구공**(공+0xaac == 0 — 보통 · 흔들린 · 레이저 송구)인가. 받는 것도 포구 틱 갈래(1 절)다.
    */
   receivingThrow: boolean
@@ -1108,6 +1116,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     groundRuleFlag: false,
     landingChase,
     ballLandingTick: trajectory.landingTick,
+    ballLaunchTick: 0,
     receivingThrow: false,
   }
 }
@@ -1247,6 +1256,7 @@ export function stepDefensePlay(
   let groundRuleFlag = state.groundRuleFlag
   let landingChase = state.landingChase
   let ballLandingTick = state.ballLandingTick
+  let ballLaunchTick = state.ballLaunchTick
   let receivingThrow = state.receivingThrow
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 필살타법 표시 공 0xbc3 — 송구 받기는 사건 없이 b42c8 쥐기). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
   let ballEventThisTick = false
@@ -1625,6 +1635,8 @@ export function stepDefensePlay(
     deadlyJumpArmed = false
     trajectory = spliceTrajectory(trajectory, tick, next)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
+    // b12da — 공+0x68 = 0 : 이 그림은 공을 안 그린다(0x36dfc 36e24)
+    ballLaunchTick = tick
     const forecast = forecastCatch(next, fielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
       ...options,
       jumpUnlocked: state.specialDefense.jumpUnlocked,
@@ -2334,6 +2346,8 @@ export function stepDefensePlay(
         // 공 그리기 0x36dfc — 쥔 공(+0x12c)과 담장 뒤로 사라진 공은 공 · 그림자를 안 그린다
         ballHeld: play.held,
         ballBeyondFence: isBallBeyondFence(tick, ballLandingTick, trajectory.fenceTick, homeRunFlag),
+        // 공+0x68 — 0 이면 0x36dfc 36e24 가 공 · 그림자를 건너뛴다(판 첫 그림 · 송구 · 다시 쏜 그림)
+        ballPlaybackTick: tick - ballLaunchTick,
         // 머리에서 경기 멈춤(+0x1993)이 서 있던 그림(레이저 발사 다음 그림) — 0x3f060 이 3f0a4 에서 돌아가 카메라가 안 움직인다
         cameraFrozen: pausedAtHead,
         fielders,
@@ -2613,7 +2627,11 @@ export function stepDefensePlay(
     }
 
     // ── 6e. 틱 끝 b45a0 — 사건이 있었으면 플레이.vt70 = 0xb3148: 공을 그 야수에게서 튕겨 다시 쏜다 ──
-    if (ballEventThisTick) relaunchFromFielder()
+    if (ballEventThisTick) {
+      relaunchFromFielder()
+      // 다시 쏘기는 플레이 틱 꼬리(b45a0)라 이 그림 그리기보다 먼저다 — 웹은 스냅샷(5 절)을 앞서 찍었으므로 그 그림의 공을 지운다
+      if (ballLaunchTick === tick) hideBallOfLastSnapshot(ticks)
+    }
 
     // ── 7. 보류 득점 풀기 (0xaa34c) ──
     // aa364 의 "진행 중인 주자" 도 0xaa05c 다 — +0x94(요구 루) 항까지 본다
@@ -2779,6 +2797,7 @@ export function stepDefensePlay(
   state.groundRuleFlag = groundRuleFlag
   state.landingChase = landingChase
   state.ballLandingTick = ballLandingTick
+  state.ballLaunchTick = ballLaunchTick
   state.tick = tick + 1
   return state
 }

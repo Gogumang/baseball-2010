@@ -39,7 +39,12 @@ import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fi
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
-import { viewStateOf, type ActionMemory, type DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import {
+  hideBallOfLastSnapshot,
+  viewStateOf,
+  type ActionMemory,
+  type DefensePlayView,
+} from '@/features/defense-play/model/defensePlayView'
 import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import type { DefenseKeyPress, DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
@@ -623,6 +628,8 @@ function* runnerPlaySteps(
         ballIsFlying: chase !== null,
         // 공 그리기 0x36dfc(36e90) — 쥔 공(+0x12c)은 공 · 그림자를 안 그린다
         ballHeld: play.held,
+        // 공+0x68 — 판 시작 · 송구 · 다시 쏘기가 0 으로 둔 그림은 0x36dfc 36e24 가 공 · 그림자를 건너뛴다
+        ballPlaybackTick: tick - (chase?.startTick ?? 0),
         fielders,
         runners: runnerStates(),
         catchKind: null,
@@ -725,6 +732,8 @@ function* runnerPlaySteps(
       const bounced = bounceOffFielder(fumbledBall, tick, holder.position, input.random)
       if (bounced !== null) {
         takeLooseBall(chaseLooseBall(bounced.ball, tick, fielders, { initialChaserSlot: fumbledBall.slot }, maximumTicks))
+        // 다시 쏘기(b45a0)는 이 그림 그리기보다 먼저다 — 앞서 찍은 스냅샷의 공을 지운다(공+0x68 = 0, 36e24)
+        hideBallOfLastSnapshot(ticks)
         flight = null
         log.push(
           `${tick}틱 공 튕김 (0xb3148) — 속도 ${bounced.speed} · v0 ${bounced.verticalSpeed} · 각 ${bounced.angle} · ` +

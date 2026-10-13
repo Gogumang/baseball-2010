@@ -232,11 +232,21 @@ export interface DefenseBall extends WorldPoint {
    * 홈런(+0x111, 36e32)이다. 0x36dfc 가 공 · 그림자를 안 그린다(36e9e). 안 주면 거짓
    */
   readonly isBeyondFence?: boolean
+  /**
+   * 공+0x68(재생 틱) ≤ 0 — 공을 막 깐 그림이다. 0x36dfc 머리 36e24 `공+0x68 > 0` 이 거짓이면 3738c 로 곧장 빠져 공 · 그림자(37268) ·
+   * 두 번째 비거리 판(37388 0x36cd4)을 모두 안 그린다. 공+0x68 은 판 시작 vt18(b27ec — 종류 1 · 9 는 vt24(1) 0xb12d0 의 b12da,
+   * 2 · 3 · 4 · 5 는 0xa276d) · 송구 0xb2e38(b307c vt24(0)) · 다시 쏘기 0xb3148(b3294 vt24(1))이 0 으로 두고, 그 그림 그리기 **뒤**
+   * 0x3f378(3f3c6 — 안 쥐었고 G4 가 열렸을 때)만 0xa2594 로 +1 한다. 곧 공을 깐 그 그림만 0 이다. 안 주면 거짓
+   */
+  readonly isPlaybackStart?: boolean
 }
 
-/** 0x36dfc 가 공(과 그림자)을 그리는가 — 36e86~36ea4: 홈런 뒤 · 담장 뒤가 아니고 쥔 공(+0x12c)이 아닐 때 */
+/**
+ * 0x36dfc 가 공(과 그림자)을 그리는가 — 36e24 재생 틱 > 0 이고, 36e86~36ea4: 홈런 뒤 · 담장 뒤가 아니고 쥔 공(+0x12c)이 아닐 때.
+ * 두 번째 비거리 판(37388)은 첫 판(46cb6)과 같은 자리 · 같은 층(그리기 목록 앞)에 다시 칠할 뿐이라 따로 그리지 않는다.
+ */
 export function isBallDrawn(ball: DefenseBall): boolean {
-  return ball.isHeld !== true && ball.isBeyondFence !== true
+  return ball.isPlaybackStart !== true && ball.isHeld !== true && ball.isBeyondFence !== true
 }
 
 /** 야수 한 명 */

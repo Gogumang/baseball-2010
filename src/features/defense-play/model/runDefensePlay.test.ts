@@ -844,6 +844,25 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   })
 })
 
+describe('공+0x68(재생 틱) 0 인 그림은 공을 안 그린다 (0x36dfc 36e24)', () => {
+  it('판 첫 그림(vt18 → b12da)은 공+0x68 = 0 이라 안 그리고, 다음 그림부터 그린다', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    expect(결과.ticks[0].ball.isPlaybackStart).toBe(true)
+    expect(결과.ticks[1].ball.isPlaybackStart).toBe(false)
+  })
+
+  it('송구를 던진 그림(b307c → b12da)도 공+0x68 = 0 — 그 그림만 안 그리고 다음 그림은 1 번 점이다', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    const 던진틱 = 결과.log.map((줄) => /^(\d+)틱 \d루로 .*송구 — /.exec(줄)).find((m) => m !== null)
+    expect(던진틱).toBeDefined()
+    const 틱 = Number(던진틱![1])
+    expect(결과.ticks[틱].ball.isPlaybackStart).toBe(true)
+    expect(결과.ticks[틱 + 1].ball.isPlaybackStart).toBe(false)
+    const 그밖 = 결과.ticks.filter((view, at) => at !== 0 && at !== 틱 && view.ball.isPlaybackStart === true)
+    expect(그밖).toHaveLength(0)
+  })
+})
+
 describe('공 사라짐 판정 0x36dfc (36e2a~36e80)', () => {
   it('담장선이 있거나 홈런이면, 낙구 + 2 와 담장선 + 6 을 둘 다 넘은 틱부터다', () => {
     expect(isBallBeyondFence(40, 32, 29, false)).toBe(true)
