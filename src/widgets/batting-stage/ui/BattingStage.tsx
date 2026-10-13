@@ -35,6 +35,7 @@ import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/
 import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
+import { useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import { acceptsBattingKey, keyTickOf, swingReleaseTickOf } from '@/widgets/batting-stage/lib/swingWindow'
 import { RESULT_PHASE_TICKS, resultPhaseTicksOf } from '@/widgets/batting-stage/lib/stagePhaseTicks'
@@ -275,6 +276,7 @@ interface BattingStageProps {
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
 export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
+  const isCommonWindowOpen = useIsCommonWindowOpen()
   const refs = useStageRefs({
     ...props,
     canBunt,
@@ -288,6 +290,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     recentAtBatCodes,
     // 필살 남은 횟수 표시 0x38a30 이 그림마다 읽는다
     specialSwingRemaining,
+    // 공용 창(히든 오픈 알림 등)이 떠 있으면 경기 장면 갱신이 멈춘다 (0x52cc6)
+    isSceneFrozen: isCommonWindowOpen,
   })
   const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { CommonWindowOpenContext } from '@/shared/lib/commonWindow/commonWindow'
 import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -422,10 +423,12 @@ export function App() {
   /**
    * 히든 오픈 알림 공용 창 — 0x62368 이 0x74ef5(종류 1, OK)로 띄운다. 원본 창은 어느 장면 위에도 그려지므로 모든 화면 위에 얹는다.
    * 닫히면 대기 글이 있으면 그 글로 다시 선다(0x75440).
+   * 떠 있는 동안 장면은 틀마다 0x754f9 로 창을 보고 키를 건너뛴다 — 경기 장면(0x52c50 52cc6)은 갱신까지 멈춘다
+   * (`CommonWindowOpenContext` 머리말). 키는 상자가 잡는 단계에서 다 가져간다.
    */
   const withHiddenOpenNotice = (routes: ReactNode) => (
     <>
-      {routes}
+      <CommonWindowOpenContext.Provider value={hiddenOpenNotice.text !== null}>{routes}</CommonWindowOpenContext.Provider>
       {hiddenOpenNotice.text !== null && (
         <ScreenOverlay>
           <MessageBox
