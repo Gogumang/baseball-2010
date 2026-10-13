@@ -487,3 +487,34 @@ describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () 
     expect(calls.slice(at, at + 4)).toEqual([[0, 9], [0, 10], [0, 10], [0, 2]])
   })
 })
+
+describe('판 끝 누적 비거리 > 1999 → 히든 39 (0x52a00~0x52a16)', () => {
+  it('맞은 공의 판이 끝날 때 누적이 1999 를 넘었으면 그때마다 부른다 (이미 열렸는지는 받는 쪽)', () => {
+    const opened: number[] = []
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => opened.push(id) }))
+    OK(rendered)
+    const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
+    let expected = 0
+    for (let ball = 0; ball < 40 && rendered.result.current.result === null; ball += 1) {
+      act(() => rendered.result.current.onPitchResolved(존홈런))
+      act(() => {
+        vi.advanceTimersByTime(resultHoldMillisecondsOf(존홈런) + 500)
+      })
+      // 셈은 판 시작에 끝나 있으니 화면 칸(run)이 판 끝에 따라온 값이 그 공 뒤 누적이다
+      if (rendered.result.current.run.totalDistance > 1999) expected += 1
+      if (rendered.result.current.isAwaitingConfirm) OK(rendered)
+      expect(opened).toHaveLength(expected)
+    }
+    expect(opened.every((id) => id === 39)).toBe(true)
+    // 존 홈런으로 보너스 게임까지 가면 누적이 1999 를 넘는다 — 넘은 뒤의 판 끝마다 한 번씩
+    expect(opened.length).toBeGreaterThan(0)
+  })
+
+  it('맞지 않은 공(0x12)에서는 부르지 않는다', () => {
+    const opened: number[] = []
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => opened.push(id) }))
+    OK(rendered)
+    한구(rendered, 헛스윙)
+    expect(opened).toEqual([])
+  })
+})

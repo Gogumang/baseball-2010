@@ -156,7 +156,17 @@ export interface HomeRunDerbyOptions {
    * (`DERBY_HALL_OF_FAME_BATTER_SLOT`). 경기를 세울 때 팀+0x32 가 이 칸이다(3a550). 안 넘기면 0.
    */
   readonly modeBatterSlot?: number
+  /**
+   * **히든 39 열기** `0x62368(ui, 0x27 = 39, 0)` — 0x17 갱신이 관문이 닫힌 뒤 11 번째 갱신(529f0 `+0x1094 > 10`)에
+   * 0xae3e8 로 가기 **앞**(52a00~52a16)에서 누적 비거리 st+0x34(s16) > 1999 면 부른다. 이미 열렸는지는 받는 쪽이 본다.
+   * 그 검사는 모드를 안 가리지만 st+0x34 를 더하는 0xa600c 는 모드 7 갈래(0x52794 · 0x52828)만 불러 더비에서만 닿는다
+   */
+  readonly onOpenHidden?: (id: number) => void
 }
+
+/** 52a08 `cmp r2, 0x7cf; ble` — 누적 비거리가 1999 를 넘으면 */
+const DERBY_DISTANCE_HIDDEN_THRESHOLD = 1999
+const DERBY_DISTANCE_HIDDEN_ID = 39
 
 /**
  * **홈런더비 경기 시작 굴림** — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73)(`rollSceneLoadingTip`) · 상태 7 갱신 0x3e340 의 덱 1275 ·
@@ -303,6 +313,7 @@ export function useHomeRunDerby({
   random,
   myTeamId = DERBY_NO_BATTER_SAVE_TEAM_ID,
   modeBatterSlot = 0,
+  onOpenHidden,
 }: HomeRunDerbyOptions): HomeRunDerbySession {
   /** HUD 가 그리는 진행 — 셈(`runRef`)은 공이 맞은 순간 하고, 이 칸은 판 끝 · 0x12 대기 끝에 따라 맞춘다 */
   const [run, setRun] = useState<DerbyRun>(createDerbyRun)
@@ -356,6 +367,8 @@ export function useHomeRunDerby({
   bestRef.current = bestDistance
   const onFinishRef = useRef(onFinish)
   onFinishRef.current = onFinish
+  const onOpenHiddenRef = useRef(onOpenHidden)
+  onOpenHiddenRef.current = onOpenHidden
   const randomRef = useRef(random)
   randomRef.current = random
 
@@ -656,6 +669,11 @@ export function useHomeRunDerby({
       // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
       // 맞지 않은 공(0xae24c)은 이 갈래가 없다
       if (playRef.current?.batted.isHomeRun === true) audioRef.current.stop()
+      // 52a00~52a16 — 판(0x17) 끝, 0x35108 · 0xae3e8 앞에서 누적 비거리 st+0x34 > 1999 면 히든 39. 누적은 판 안 0xa600c 가
+      // 이미 더했다(웹은 판 시작에 셈해 둔 `runRef`). 맞지 않은 공(0x12)은 이 갈래를 안 지난다
+      if (playRef.current !== null && runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD) {
+        onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID)
+      }
       // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
       if (playRef.current !== null) setEffectsClearedAt(performance.now())
       playRef.current = null

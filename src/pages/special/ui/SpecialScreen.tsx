@@ -309,6 +309,17 @@ export type HallOfFameMode =
       readonly onRegister: (slot: number | null) => HallOfFameResult['kind']
       readonly onDone: () => void
       readonly onLater: () => void
+      /**
+       * **완료 창(꼬리표 0x30)을 닫았을 때의 히든 17** — 0x1ca4c 1cb02~1cb58 (직접 떴다):
+       * ```
+       * [창+0x248] == 0x30 && 답 == 0 → 답 = −1
+       *   0x9f6c1(전역기록, 1, 1)(전광판 히든 칸 1 = id 17 열렸나) 거짓 → 0x62368(ui, 0x11, 0) · [창+0x3ac] = 0x31
+       *   참 → 1cb7c [this+0x278] = 1 · 화면 전환 → 메인 메뉴
+       * 꼬리표 0x31 창을 닫으면 → 같은 1cb7c
+       * ```
+       * 열고 알림 창을 띄웠으면 참 — 그 창을 닫을 때 `then`(= `onDone`) 을 부른다. 거짓이면 목록이 곧바로 `onDone`.
+       */
+      readonly openRegisteredHidden?: (then: () => void) => boolean
     }
   /**
    * **미션 선수 고르기** — 메인 메뉴 하위 17 (진입 0x2613c · 갱신 0x29a54), 목록 종류 0 (`[목록+0x1fc] = 0`, 0x261c2).
@@ -374,6 +385,8 @@ type HallOfFamePopup =
   | { readonly kind: 'G부족' }
   | { readonly kind: '나중에' }
   | { readonly kind: '완료' }
+  /** 완료 창 뒤 히든 17 알림(꼬리표 0x31)이 공용 창에 떠 있는 동안 — 목록은 키를 안 받고 창이 닫히면 나간다 */
+  | { readonly kind: '히든알림' }
   | { readonly kind: '알림'; readonly text: string; readonly buttons: readonly string[] }
   /** 스페셜 말풍선 삭제 확인 StrMAINMENU[128] (skin+0x314 = 4) */
   | { readonly kind: '삭제확인'; readonly side: HallOfFameSide; readonly slot: number }
@@ -592,7 +605,10 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       return setPopup({ kind: '완료' })
     }
     if (popup.kind === '나중에') return index === 0 ? mode.onLater() : setPopup(null)
-    if (popup.kind === '완료') return mode.onDone()
+    if (popup.kind === '완료') {
+      if (mode.openRegisteredHidden?.(mode.onDone) === true) return setPopup({ kind: '히든알림' })
+      return mode.onDone()
+    }
     // G 부족 "예" 는 결과 7 → G 충전 페이지 139(🌐) — 웹은 목록으로 돌아온다
     return setPopup(null)
   }
@@ -780,7 +796,9 @@ function popupTextOf(popup: HallOfFamePopup): {
   readonly buttons: readonly string[]
   /** 처음 커서 — 0x749d5 를 부르는 자리만 준다 (안 주면 첫 칸) */
   readonly initialSelected?: number
-} {
+} | null {
+  // 히든 알림은 앱의 공용 창이 그린다
+  if (popup.kind === '히든알림') return null
   if (popup.kind === '확인') return { text: HALL_OF_FAME_TEXT.confirm, buttons: ['예', '아니오'] }
   if (popup.kind === 'G부족') return { text: HALL_OF_FAME_TEXT.shortage, buttons: ['예', '아니오'] }
   if (popup.kind === '나중에') return { text: HALL_OF_FAME_TEXT.later, buttons: ['예', '아니오'] }

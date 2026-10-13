@@ -59,6 +59,11 @@ interface CareerRoutesProps {
     /** 칸 0 나리 투수 — 투수편 저장이 있으면 (0x5eb8c 의 g+0x43 · 0x1fbd0) */
     readonly nariPitcher: HallOfFameNariPlayer | null
     readonly register: (career: PlayerCareer, slot: number | null) => HallOfFameResult['kind']
+    /**
+     * 완료 창(꼬리표 0x30)을 닫았을 때 0x1ca4c 가 여는 히든 17(전광판 "고대의전광판") — 열고 알림을 띄웠으면 참이고
+     * 그 창을 닫을 때 `then` 을 부른다 (`SpecialScreen` 등록 모드의 같은 이름 머리말)
+     */
+    readonly openRegisteredHidden?: (then: () => void) => boolean
     /** 전역 G(`mgr+0x64`) — 등록 목록(상태 145) 머리띠 0x54d95 가 그린다 */
     readonly gamePoint?: number
   }
@@ -418,6 +423,7 @@ export function CareerRoutes({
               return result
             },
             ...(hallOfFame.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint }),
+            ...(hallOfFame.openRegisteredHidden === undefined ? {} : { openRegisteredHidden: hallOfFame.openRegisteredHidden }),
           }}
           onContinue={actions.continueAfterEnding}
           onFinish={actions.finishEnding} />

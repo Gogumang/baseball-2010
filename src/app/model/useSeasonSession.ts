@@ -1167,6 +1167,11 @@ export function useSeasonSession(
    * 쪽에서 한 번만 설정 창이 저절로 뜬다. 넘기면 이 칸도 읽고 쓴다(시즌 저장 `matchSettingsSeen` 은 옛 저장 몫으로 계속 적는다).
    */
   matchSettingsSeenSlot?: { readonly read: () => boolean; readonly markSeen: () => void },
+  /**
+   * 정산 0x4ea0c 4f1e8~4f212 — 정규시즌 경기에서 사람 팀이 이기면 전역기록 +0xbf 를 올리고(0x9f6f0) 100 이면 히든 45.
+   * 기록연감 훅이 든다(`recordSeasonRegularWin`). 안 넘기면 세지 않는다
+   */
+  onRegularSeasonWin?: () => void,
 ): SeasonSession {
   /** 내 팀 명단 차례 — 영입한 명전 선수에게 기록을 싣는다 (7da5044 의 받는 쪽 `TeamEntryOrder.record`) */
   const recordSourceNow = useCallback((): SeasonEntryRecordSource | undefined => {
@@ -2163,6 +2168,9 @@ export function useSeasonSession(
         return { next: SEASON_SCENE_STATE.국가대항전, jingle: null }
       }
 
+      // 4f1a2~4f212 — 모드 2 이고 L+0x34 · L+0xac 가 0(이 갈래)이고 이겼으면([sp+0x50]) 0x9f6f0 → +0xbf > 99 면 히든 45.
+      // 평가 0x4f274 보다 앞이다
+      if (won) onRegularSeasonWin?.()
       const afterMyGame = won
         ? recordLeagueResult(current.league, record.teamId, opponent)
         : recordLeagueResult(current.league, opponent, record.teamId)
@@ -2234,7 +2242,7 @@ export function useSeasonSession(
       // 관중수입 창(0xe9)이 뜨면서 나는 평가 징글 36·37·38 (0xdec4/0xdede) — 창은 결과 화면 확인 뒤에 선다
       return { next: SEASON_SCENE_STATE.관중수입, jingle: seasonEvaluationJingleIdOf(evaluation.popularityChange) }
     },
-    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, ownRotationShift, random, recordStat],
+    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, onRegularSeasonWin, ownRotationShift, random, recordStat],
   )
 
   /**

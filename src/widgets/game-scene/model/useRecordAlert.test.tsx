@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import type { RecordAlertOptions } from '@/widgets/game-scene/model/useRecordAlert'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
@@ -90,5 +92,24 @@ describe('useRecordAlert — 칸 채우기 0x4e600 은 공 끝에만', () => {
     rerender({ ids: [1, 2], options: options('b', true) })
     tick(10)
     expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([true, false])
+  })
+})
+
+describe('useRecordAlert — 0xa77f0 끝 0x62234 (RecordAchievedContext)', () => {
+  it('새로 든 기록마다 차례대로 한 번 — 공 끝과 상관없이 들어온 그 그림에', () => {
+    const achieved: number[] = []
+    const wrapper = ({ children }: { readonly children: ReactNode }) => (
+      <RecordAchievedContext.Provider value={(id) => achieved.push(id)}>{children}</RecordAchievedContext.Provider>
+    )
+    const { rerender } = renderHook(({ ids, options }: Props) => useRecordAlert(ids, options), {
+      initialProps: { ids: [], options: { isDrawing: true, pitchEnd: { serial: 0 } } } as Props,
+      wrapper,
+    })
+    rerender({ ids: [15, 1], options: { isDrawing: true, pitchEnd: { serial: 0 } } })
+    expect(achieved).toEqual([15, 1])
+    rerender({ ids: [15, 1], options: { isDrawing: true, pitchEnd: { serial: 1 } } })
+    expect(achieved).toEqual([15, 1])
+    rerender({ ids: [15, 1, 31], options: { isDrawing: false, pitchEnd: { serial: 1 } } })
+    expect(achieved).toEqual([15, 1, 31])
   })
 })

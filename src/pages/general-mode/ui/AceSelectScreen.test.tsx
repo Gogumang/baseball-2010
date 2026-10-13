@@ -393,3 +393,28 @@ describe('머리띠·바닥띠 — 0x54d95(skin, 4 "마선수선택", 0x205) (0x
     expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
   })
 })
+
+describe('마선수 열 칸이 다 열리면 히든 팀 외인구단 (0x7b408 → 0x62368(ui, 12, 0))', () => {
+  it('다 열린 채로 서면 한 번 부른다', () => {
+    const onAllAcesOpen = vi.fn()
+    띄우기({ onAllAcesOpen })
+    expect(onAllAcesOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('한 칸이라도 닫혀 있으면 안 부르고, 마지막 칸이 열리는 순간 부른다', () => {
+    const onAllAcesOpen = vi.fn()
+    const { rerender } = 띄우기({ onAllAcesOpen, openedAceBatterIds: [0, 1, 2, 3] })
+    expect(onAllAcesOpen).not.toHaveBeenCalled()
+    rerender(
+      <AceSelectScreen
+        phase={ACE_PHASE.마투수}
+        openedAcePitcherIds={[0, 1, 2, 3, 4]}
+        openedAceBatterIds={[0, 1, 2, 3, 4]}
+        onSelect={vi.fn()}
+        onCancel={vi.fn()}
+        onAllAcesOpen={onAllAcesOpen}
+      />,
+    )
+    expect(onAllAcesOpen).toHaveBeenCalledTimes(1)
+  })
+})

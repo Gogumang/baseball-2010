@@ -53,6 +53,10 @@ import { SEASON_PHASE } from '@/entities/season-mode/model/seasonStateMachine'
 import { nariSeasonRecordsOf } from '@/app/model/seasonHallOfFameRecords'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { useEditedNames } from '@/entities/player-name/model/useEditedNames'
+import { aceCellOfUnlock, recordUnlockIdOf } from '@/entities/collection/model/recordUnlock'
+import { recordUnlockNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
+import { isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
+import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -110,6 +114,10 @@ const MISSION_SCREENS: readonly Screen['kind'][] = [
 
 /** 일반모드 = 원본 모드 1 (0x22c7d 의 획득 GP 칸 0) */
 const GENERAL_STAT_MODE = 1
+/** 0x1ca4c 1cb42 `movs r1, #0x11` — 나리 명전 등록 완료 창 뒤에 여는 히든 (전광판 칸 1 "고대의전광판") */
+const REGISTERED_HALL_OF_FAME_HIDDEN_ID = 17
+/** 0x7b426 `movs r1, #0xc` — 마선수 열 칸이 다 열리면 여는 히든 팀 외인구단 (0x62368 의 k) */
+const ALL_ACES_HIDDEN_TEAM_ID = 12
 /** 투수 미션 · 타자 미션 = 원본 모드 5 · 6 (0x29a54 → 표 0xcec00) */
 const MISSION_PITCHER_MODE = 5
 const MISSION_BATTER_MODE = 6
@@ -184,9 +192,12 @@ export function App() {
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
+  /** 시즌 정규시즌 승리 수 +0xbf (0x9f6f0) — 기록연감 훅이 선 뒤 꽂는다 (`recordStatRef` 와 같은 까닭) */
+  const recordSeasonRegularWinRef = useRef<() => void>(() => {})
+  const recordSeasonRegularWin = useCallback(() => recordSeasonRegularWinRef.current(), [])
   /** `0x62368(ui, k, 0)` — 기록연감 훅의 열기 + 알림. 미션 세션이 그보다 먼저 서므로 `recordStatRef` 처럼 꽂는다 */
-  const openHiddenRef = useRef<(id: number) => boolean>(() => false)
-  const openHidden = useCallback((id: number) => openHiddenRef.current(id), [])
+  const openHiddenRef = useRef<(id: number, then?: (() => void) | null) => boolean>(() => false)
+  const openHidden = useCallback((id: number, then: (() => void) | null = null) => openHiddenRef.current(id, then), [])
   /** 시즌 팀 경기가 영입한 명전 선수를 그 기록으로 세울 때 읽는 명전 칸 — 위 ref 와 같은 값 */
   const readHallOfFame = useCallback(() => hallOfFameForMissionRef.current, [])
   /**
@@ -206,6 +217,8 @@ export function App() {
     seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
     // 전역기록 +0x11e — 0xdd 진입 0x6548 과 일반 22 진입 0x3163c 가 같은 칸을 본다
     modeSave.matchSettingsSeenPort,
+    // 정산 0x4ea0c 의 정규시즌 승리 수 +0xbf → 100 이면 히든 45 (0x9f6f0 · 0x62368)
+    recordSeasonRegularWin,
   )
   // 142 경기 준비 0x1c46c 가 내 마타자·마투수를 열린 것 중에서 굴린다 (0x9f604 · 0x9f650, 825865d)
   const nariOpenedAces = useMemo(
@@ -365,7 +378,8 @@ export function App() {
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
     openHiddenRef.current = openCollectionHidden
-  }, [recordCollectionStat, openCollectionHidden])
+    recordSeasonRegularWinRef.current = collection.recordSeasonRegularWin
+  }, [recordCollectionStat, openCollectionHidden, collection.recordSeasonRegularWin])
   // 히든 오픈은 원본에서 전역 저장이라 선수에게도 알려 준다 (상점이 선수 기록으로 판정한다)
   const { syncOpenedHidden } = careerSession.actions
   const openedHiddenIds = collection.collection.openedHiddenIds
@@ -401,6 +415,11 @@ export function App() {
       aceLevels.levelUp(cell)
       collection.recordStat({ kind: 'G사용', usage: GAME_POINT_USAGE.ace, amount: cost })
     },
+    // 0x7b408 — 격자 종류 7(일반모드 21 · 시즌 0xd7 경기 전)에서 열 칸이 다 열렸으면 0x62368(ui, 12, 0) 히든 팀 외인구단.
+    // 웹 표에는 팀 번호 14 로 든다(`hiddenOpenStoredIdOf`)
+    onAllAcesOpen: () => {
+      collection.openHidden(ALL_ACES_HIDDEN_TEAM_ID)
+    },
   }
 
   /**
@@ -426,8 +445,33 @@ export function App() {
    * 떠 있는 동안 장면은 틀마다 0x754f9 로 창을 보고 키를 건너뛴다 — 경기 장면(0x52c50 52cc6)은 갱신까지 멈춘다
    * (`CommonWindowOpenContext` 머리말). 키는 상자가 잡는 단계에서 다 가져간다.
    */
+  /**
+   * **기록달성 누계 해금 `0x62234(ui, k)`** — 경기 중 기록 k 를 셀 때마다(0xa77f0 끝 a7922). 문턱은 통계 누계 `+4 + k`(지난
+   * 경기까지)를 본다(`recordUnlockIdOf`). 마선수(id 0~7)는 마선수 칸을, 그 밖은 전역 해금표를 켜고 이미 켜져 있으면(0x61f5c)
+   * 아무것도 안 한다. 켰으면 0x1f1b9 저장 뒤 공용 창 0x74ef5 에 StrCOMMON[140|138|139] 한 줄(쓰는 곳 줄 없음)
+   */
+  const aceOpenSaveRef = useRef(aceOpen.save)
+  aceOpenSaveRef.current = aceOpen.save
+  const { readStats: readCollectionStats, openHiddenQuietly } = collection
+  const { open: openAceCellFlag } = aceOpen
+  const { announceText: announceHiddenText } = hiddenOpenNotice
+  const unlockByRecord = useCallback((recordId: number) => {
+    const id = recordUnlockIdOf(readCollectionStats(), recordId)
+    if (id === null) return
+    const cell = aceCellOfUnlock(id)
+    if (cell !== null) {
+      if (isAceCellOpen(aceOpenSaveRef.current, cell)) return
+      aceOpenSaveRef.current = { cells: aceOpenSaveRef.current.cells.map((open, at) => (at === cell ? true : open)) }
+      openAceCellFlag(cell)
+    } else if (!openHiddenQuietly(id)) {
+      return
+    }
+    const text = recordUnlockNoticeTextOf(id)
+    if (text !== null) announceHiddenText(text)
+  }, [announceHiddenText, openAceCellFlag, openHiddenQuietly, readCollectionStats])
+
   const withHiddenOpenNotice = (routes: ReactNode) => (
-    <>
+    <RecordAchievedContext.Provider value={unlockByRecord}>
       <CommonWindowOpenContext.Provider value={hiddenOpenNotice.text !== null}>{routes}</CommonWindowOpenContext.Provider>
       {hiddenOpenNotice.text !== null && (
         <ScreenOverlay>
@@ -439,7 +483,7 @@ export function App() {
           />
         </ScreenOverlay>
       )}
-    </>
+    </RecordAchievedContext.Provider>
   )
 
   // 미션 모드는 메인 메뉴에서 들어가 선수 고르기(하위 17)부터 띄운다 — 육성·명예 선수가 다 없으면 원본대로
@@ -562,6 +606,7 @@ export function App() {
         // "예" → G를 빼고 플래그를 세운다 (0xa3e2 · 0xa3f6). 모자람 판정은 화면이 이미 했다.
         // `spend` 의 자르기 [0, 99999] 와 "모자라면 한 푼도 안 깎는다" 가 원본 0xa3dc~0xa3f4 와 같다.
         onOpenAce={aceSelect.onOpenAce}
+        onAllAcesOpen={aceSelect.onAllAcesOpen}
         gaugeSettingOn={gameSettings.settings.pitchControl === '게이지'}
         runningModeManual={gameSettings.settings.runningMode === '수동'}
         // 환경설정 "송구" (설정 +0xf4) — 팀 경기는 사람이 **수비하는 타석**에서만 먹는다 (0xae6c8)
@@ -586,6 +631,8 @@ export function App() {
           collection: collection.collection,
           nariBatter: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
           register: (target, slot) => collection.registerPitcher(target, wallet, slot),
+          // 145 완료 창(꼬리표 0x30) 닫힘 0x1ca4c — 히든 17 을 열면 알림(꼬리표 0x31)을 닫은 뒤 메인 메뉴로
+          openRegisteredHidden: (then: () => void) => openHidden(REGISTERED_HALL_OF_FAME_HIDDEN_ID, then),
           // 등록 목록(상태 145) 머리띠 0x54d95(skin, 9 "나만의리그 투수편", 5) 가 전역 G 를 그린다
           gamePoint: wallet.balance,
         }}
@@ -620,6 +667,7 @@ export function App() {
         onLogoVoice={() => sound.play(0)}
         hallOfFameDeletion={hallOfFameDeletion}
         recordStat={recordStat}
+        openHidden={openHidden}
         // 홈런더비 타자 게터 0x1fc20 — 타자편 대결 대기(g[0x11f])면 명예 타자 대신 나리 타자
         aceMatchHold={aceMatchHoldPort}
         onRenamePlayer={editedNames.rename}
@@ -701,6 +749,8 @@ export function App() {
         collection: collection.collection,
         nariPitcher: nariPitcherOf(pitcherSession.career),
         register: (target, slot) => collection.register(target, wallet, slot),
+        // 145 완료 창(꼬리표 0x30) 닫힘 0x1ca4c — 히든 17 을 열면 알림(꼬리표 0x31)을 닫은 뒤 메인 메뉴로
+        openRegisteredHidden: (then: () => void) => openHidden(REGISTERED_HALL_OF_FAME_HIDDEN_ID, then),
         // 등록 목록(상태 145) 머리띠 0x54d95(skin, 8 "나만의리그 타자편", 5) 가 전역 G 를 그린다
         gamePoint: wallet.balance,
       }}

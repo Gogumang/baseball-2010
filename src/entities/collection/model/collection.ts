@@ -110,6 +110,30 @@ export interface Collection {
   readonly openedHiddenIds: readonly number[]
   /** 통계 기록 `[mgr+0xc8]` 중 웹이 채우는 칸 — GP 아이템 구매 수·G 사용처·켠 스킬 비트 (`annalsStats.ts`) */
   readonly stats: AnnalsStats
+  /**
+   * 전역기록 **`+0xbf`(s8)** — 시즌모드 정규시즌 경기에서 사람 팀이 이긴 수, 100 에서 멈춘다(0x9f6f0). 정산 0x4ea0c 가
+   * 올린 바로 뒤 > 99 면 히든 45 를 연다(`countSeasonRegularWin`). 옛 저장에는 없어 0
+   */
+  readonly seasonRegularWinCount?: number
+}
+
+/** 0x9f6f0 의 상한 (`cmp r3,#0x64; ble`) */
+export const SEASON_REGULAR_WIN_CAP = 100
+/** 0x4f204 `cmp r3,#0x63; ble` — 올린 수가 99 를 넘으면 0x62368(ui, 0x2d = 45, 0) */
+const SEASON_REGULAR_WIN_HIDDEN_THRESHOLD = 99
+export const SEASON_REGULAR_WIN_HIDDEN_ID = 45
+
+/**
+ * **정산 0x4ea0c 의 4f1a2~4f212** (직접 떴다) — 모드 2 경기이고 L+0x34(포스트시즌) · L+0xac(국가대항전)가 둘 다 0 이고
+ * 사람 팀이 이겼으면([sp+0x50] = 0x4a350, 동점은 선공 승) `0x9f6f0(전역기록)`: `+0xbf = min(+0xbf + 1, 100)`. 이어서
+ * `+0xbf > 99` 면 히든 45 를 연다. 올린 기록과 열 id(없으면 null)를 돌려준다
+ */
+export function countSeasonRegularWin(collection: Collection): { readonly collection: Collection; readonly hiddenId: number | null } {
+  const count = Math.min((collection.seasonRegularWinCount ?? 0) + 1, SEASON_REGULAR_WIN_CAP)
+  return {
+    collection: { ...collection, seasonRegularWinCount: count },
+    hiddenId: count > SEASON_REGULAR_WIN_HIDDEN_THRESHOLD ? SEASON_REGULAR_WIN_HIDDEN_ID : null,
+  }
 }
 
 export const EMPTY_COLLECTION: Collection = {
@@ -482,5 +506,10 @@ export function normalizeCollection(raw: unknown): Collection {
     hallOfFamePitchers,
     openedHiddenIds,
     stats: normalizeAnnalsStats(candidate.stats),
+    ...(Number.isInteger(candidate.seasonRegularWinCount)
+      && (candidate.seasonRegularWinCount as number) >= 0
+      && (candidate.seasonRegularWinCount as number) <= SEASON_REGULAR_WIN_CAP
+      ? { seasonRegularWinCount: candidate.seasonRegularWinCount as number }
+      : {}),
   }
 }

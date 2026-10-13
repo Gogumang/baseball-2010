@@ -356,6 +356,48 @@ describe('명예의 전당 등록 목록 — 나리 상태 145 (0x62568 목록 �
     expect(onDone).toHaveBeenCalled()
   })
 
+  it('완료 창(꼬리표 0x30)을 닫으면 히든 17 — 새로 열었으면 알림 창을 닫을 때까지 나가지 않는다 (0x1ca4c)', () => {
+    const onRegister = vi.fn(() => '등록' as const)
+    const onDone = vi.fn()
+    let then: (() => void) | null = null
+    const openRegisteredHidden = vi.fn((next: () => void) => {
+      then = next
+      return true
+    })
+    render(
+      <HallOfFameScreen
+        collection={EMPTY_COLLECTION}
+        mode={{ kind: '등록', edition: '타자', nari: { 투수: null, 타자: 나리 }, onRegister, onDone, onLater: vi.fn(), openRegisteredHidden }}
+        onBack={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '9번 슬롯' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(openRegisteredHidden).toHaveBeenCalledTimes(1)
+    expect(onDone).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(then).toBe(onDone)
+  })
+
+  it('히든 17 이 이미 열려 있으면(0x9f6c1 참) 완료 창을 닫자마자 나간다', () => {
+    const onDone = vi.fn()
+    render(
+      <HallOfFameScreen
+        collection={EMPTY_COLLECTION}
+        mode={{
+          kind: '등록', edition: '타자', nari: { 투수: null, 타자: 나리 }, onRegister: () => '등록', onDone, onLater: vi.fn(),
+          openRegisteredHidden: () => false,
+        }}
+        onBack={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '9번 슬롯' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onDone).toHaveBeenCalled()
+  })
+
   it('G 가 모자라면 0xcc214 "구매 페이지로 이동하시겠습니까?" — 어느 답이든 목록으로 돌아온다', () => {
     const { onDone, 슬롯 } = 열기등록({ onRegister: () => 'G부족' })
     fireEvent.click(슬롯(5))

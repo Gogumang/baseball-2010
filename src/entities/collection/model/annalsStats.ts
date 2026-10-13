@@ -187,6 +187,20 @@ export function playTimeHiddenIdOf(stats: AnnalsStats, mode: number): number | n
   return Math.trunc(playTimeOf(stats, slot) / HOUR_MS) > 9 ? id : null
 }
 
+/** 0x4ecca `cmp r4, 0x1869e; ble` — 획득 GP 일곱 칸 합이 99998 을 넘으면 */
+const EARNED_GAME_POINT_HIDDEN_THRESHOLD = 99_998
+const EARNED_GAME_POINT_HIDDEN_ID = 33
+
+/**
+ * **정산 0x4ea0c 의 4eca0~4ecda** (직접 떴다) — 모드 5 · 6(미션)이 아니면 기록 달성 G 를 더하고 `0x22c7d` · `0x22e10` ·
+ * 저장 0x1f1e1 을 한 바로 뒤, 통계 `+0x8c` u32 일곱 칸(모드별 획득 GP)을 **모두 더해** 99998 을 넘으면
+ * `0x62368(ui, 0x21 = 33, 0)`. 보유 G(+0x64)가 아니라 **지금까지 얻은 GP 합**이다. 열 id 를, 아니면 null
+ */
+export function earnedGamePointHiddenIdOf(stats: AnnalsStats): number | null {
+  const total = stats.gamePointEarned.reduce((sum, amount) => sum + amount, 0)
+  return total > EARNED_GAME_POINT_HIDDEN_THRESHOLD ? EARNED_GAME_POINT_HIDDEN_ID : null
+}
+
 const isMode = (mode: number): mode is StatMode => mode === 2 || mode === 3 || mode === 4
 
 /**

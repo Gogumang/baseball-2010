@@ -45,6 +45,8 @@ export interface GeneralModeScreenProps {
   readonly gamePoint?: number
   /** 마선수 한 칸을 G로 열었다 (0xa3f6) — 받는 쪽이 G를 빼고 오픈 플래그를 세운다 */
   readonly onOpenAce?: (cell: number) => void
+  /** 상태 21 마선수 격자(종류 7)가 서 있는 동안 열 칸이 다 열렸으면 — 히든 팀 외인구단 12 (0x7b408, `AceSelectScreen`) */
+  readonly onAllAcesOpen?: () => void
   /** 구장 표 — 도시명 0xd1df8 · 수용 인원 0xd1e34 (웹판 데이터에 아직 없다) */
   readonly stadiums?: readonly StadiumEntry[]
   /**
@@ -183,7 +185,7 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
 function GeneralModePrepare(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, onLevelUpAce, gamePoint, onOpenAce, stadiums, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
+    aceLevels, onLevelUpAce, gamePoint, onOpenAce, onAllAcesOpen, stadiums, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
     gaugeSettingOn, runningModeManual, throwModeManual, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
   } = props
   /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
@@ -294,6 +296,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           {...(aceLevels === undefined ? {} : { levels: aceLevels })}
           {...(gamePoint === undefined ? {} : { gamePoint })}
           {...(onOpenAce === undefined ? {} : { onOpenAce })}
+          {...(onAllAcesOpen === undefined ? {} : { onAllAcesOpen })}
           {...(onLevelUpAce === undefined ? {} : { onLevelUp: onLevelUpAce })}
           onSelect={actions.selectAce}
           onCancel={back}

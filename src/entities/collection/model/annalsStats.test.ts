@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
   gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
-  addRecordCounts, recordCountOf, RECORD_COUNT_KINDS, addPlayTime, playTimeHiddenIdOf, totalPlayTimeOf,
+  addRecordCounts, recordCountOf, RECORD_COUNT_KINDS, addPlayTime, playTimeHiddenIdOf, totalPlayTimeOf, earnedGamePointHiddenIdOf,
 } from '@/entities/collection/model/annalsStats'
 
 /** 기록연감 통계 기록 `[mgr+0xc8]` — 0x22e35 · 0x22c29 · 0xb663c (디스어셈 확정) */
@@ -184,5 +184,13 @@ describe('플레이 시계 — 0x3f554 시작 · 0x4e8b0 지난 시간 뒤 다�
     startPlayClock(1000)
     expect(lapPlayClock(4500)).toBe(3500)
     expect(lapPlayClock(5000)).toBe(500)
+  })
+})
+
+describe('정산 0x4ea0c 획득 GP 합 → 히든 33 (4eca0~4ecda)', () => {
+  it('일곱 칸 합이 99998 을 넘을 때만 — 보유 G 가 아니라 얻은 GP 합', () => {
+    const at = (amounts: readonly number[]) => ({ ...EMPTY_ANNALS_STATS, gamePointEarned: amounts })
+    expect(earnedGamePointHiddenIdOf(at([99_998, 0, 0, 0, 0, 0, 0]))).toBeNull()
+    expect(earnedGamePointHiddenIdOf(at([50_000, 0, 49_999, 0, 0, 0, 0]))).toBe(33)
   })
 })

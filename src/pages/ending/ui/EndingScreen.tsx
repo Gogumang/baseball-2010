@@ -51,6 +51,11 @@ interface EndingScreenProps {
     readonly nari: { readonly 투수: HallOfFameNariPlayer | null; readonly 타자: HallOfFameNariPlayer | null }
     readonly onRegister: (slot: number | null) => HallOfFameResult['kind']
     /**
+     * 완료 창(꼬리표 0x30)을 닫았을 때 0x1ca4c 가 여는 히든 17(전광판 "고대의전광판") — 열고 알림을 띄웠으면 참이고
+     * 그 창을 닫을 때 `then` 을 부른다 (`SpecialScreen` 등록 모드의 같은 이름 머리말)
+     */
+    readonly openRegisteredHidden?: (then: () => void) => boolean
+    /**
      * 전역 G(`mgr+0x64`) — 상태 145 그리기 0x15d54 는 목록 0x63b15(…, 6, 1, [this+0x2c], −1) 뒤에 머리띠 객체
      * 0x7f4ec([this+0xe0]) = `0x54d95(skin, 제목, 바닥)` 을 부르고, 그 칸은 매 틱 0x16a34 → 0x16928 이 세운다:
      * 상태 0x76·0x6d·0x65·0x80 이 아니면 기본 갈래 0x169ea 로 `0x7f53c(hdr, [this+0xcc] == 4 ? 8 : 9, 5, 0)` —
@@ -157,6 +162,7 @@ export function EndingScreen(props: EndingScreenProps) {
           edition: hallOfFame.edition,
           nari: hallOfFame.nari,
           onRegister: hallOfFame.onRegister,
+          ...(hallOfFame.openRegisteredHidden === undefined ? {} : { openRegisteredHidden: hallOfFame.openRegisteredHidden }),
           // 등록 완료 창을 닫았다 — 모드 저장은 등록이 된 그 순간(`onRegister` 가 '등록' 을 돌려줄 때) 부르는 쪽이 이미 지웠다(0x62dbe)
           onDone: () => props.onFinish(true),
           onLater: onFinish,
