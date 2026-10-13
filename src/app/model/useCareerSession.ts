@@ -96,7 +96,7 @@ import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock, startPlayClock } from '@/entities/collection/model/playClock'
 import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
-import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
+import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { withGameSkillCounters } from '@/entities/story/model/skillCondition'
@@ -1930,6 +1930,10 @@ export function useCareerSession({
       setShopNotice(selection.notice)
       setShopGpDetail(selection.detail ?? null)
       setCareer(selection.career)
+      // 장비 구매 0x14a74 — 구매 완료 창 없이, 새로 연 컬렉터마다 0x62368 → 공용 창(구매 확인 창이 닫힌 뒤 대기 칸에서 선다)
+      if (selection.openedHiddenIds !== undefined && selection.openedHiddenIds.length > 0) {
+        announceHiddenOpen?.(selection.openedHiddenIds)
+      }
       // GP 칸 구매가 확정됐으면(G 를 뺐으면) 0x14ffe `0x22e35(모드 4, 칸)` → 0x1501e `0x22c29(1, 가격)`
       const [tab, first] = itemId.split(':')
       if (tab === 'GP' && selection.career !== career) {
@@ -2054,12 +2058,12 @@ export function useCareerSession({
       rewards
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: reward.value }))
-      // 보상 7 로 열린 히든 장비 알림 (StrCOMMON[139]+[143])
-      const openTexts = viewed.openedHiddenIds
-        .filter((id) => !career.openedHiddenIds.includes(id))
-        .map(hiddenOpenTextOf)
-        .filter((text): text is string => text !== null)
-      if (openTexts.length > 0) setManagementNotice(openTexts.join(' · '))
+      // 보상 종류 7 — 0x8c60e `0x62368(전역, |v|, 1)`: 셋째 인자 1 이라 이미 열렸어도 늘 공용 창(떠 있으면 대기 칸)
+      const hiddenIds = rewards
+        .filter((reward) => reward.kind === EVENT_REWARD_KIND.히든오픈)
+        .map((reward) => Math.abs(reward.value))
+        .filter((id) => hiddenOpenNoticeTextOf(id) !== null)
+      if (hiddenIds.length > 0) announceHiddenOpen?.(hiddenIds)
 
       if (screen.context === '장소') {
         // 빈 장소(440~444)는 **행동·외출 횟수를 쓰지 않고** 장소 화면으로 돌아간다 (0x1c014, G-4).

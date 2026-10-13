@@ -119,8 +119,7 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { formatOriginalMoney } from '@/features/shop/model/shopSelection'
-import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
-import { pitcherHiddenOpenTextOf } from '@/entities/pitcher-career/model/pitcherEquipment'
+import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
@@ -557,19 +556,14 @@ function cupGameOptionsOf(
 const HIDDEN_OPEN_REWARD_KIND = 7
 
 /**
- * 보상 종류 7 의 알림 글 — 0x8c60e 가 `0x62368(…, |v|, 1)` 을 부른다. 셋째 인자 1 이면 이미 열렸는지(0x61f5c)를
- * 보지 않고 **늘** 팝업(0x74ef5)을 띄운다: StrCOMMON[139] "히든 아이템 오픈!! [%s]" + 쓰는 곳 줄
- * (id ≤ 18 [141] 시즌 · ≤ 34 [142] 투수편 · ≤ 50 [143] 타자편, 0x62420~0x62480). 글은 상점 알림과 같은 함수로 만든다.
+ * 보상 종류 7 의 히든 k — 0x8c60e 가 `0x62368(…, |v|, 1)` 을 부른다. 셋째 인자 1 이면 이미 열렸는지(0x61f5c)를
+ * 보지 않고 **늘** 공용 창(0x74ef5)을 띄운다 — 글은 공용 알림 창의 원문 마크업(`hiddenOpenNoticeTextOf`).
  */
-function hiddenOpenNoticeOf(rewards: readonly EventReward[]): string {
+function hiddenOpenRewardIdsOf(rewards: readonly EventReward[]): number[] {
   return rewards
     .filter((reward) => reward.kind === HIDDEN_OPEN_REWARD_KIND)
-    .map((reward) => {
-      const id = Math.abs(reward.value)
-      return pitcherHiddenOpenTextOf(id) ?? hiddenOpenTextOf(id)
-    })
-    .filter((text): text is string => text !== null)
-    .join('!N')
+    .map((reward) => Math.abs(reward.value))
+    .filter((id) => hiddenOpenNoticeTextOf(id) !== null)
 }
 
 /** 496 "정말로 은퇴하려는 거냐?" — 502 "은퇴한다" 의 gotoEvent (선택지 380 / 503) */
@@ -1723,6 +1717,10 @@ export function usePitcherLeagueSession(
       setShopNotice(selection.notice)
       setShopGpDetail(selection.detail ?? null)
       if (selection.career === merged) return
+      // 장비 구매 0x14a74 — 구매 완료 창 없이, 새로 연 컬렉터마다 0x62368 → 공용 창(구매 확인 창이 닫힌 뒤 대기 칸에서 선다)
+      if (selection.openedHiddenIds !== undefined && selection.openedHiddenIds.length > 0) {
+        announceHiddenOpen?.(selection.openedHiddenIds)
+      }
       // G 를 안 쓴 칸(장비·서브·착용)은 저장의 G 칸을 건드리지 않는다 — `?무한G` 의 99999 가 저장에 새지 않게
       const spentGamePoint = selection.career.gamePoint !== merged.gamePoint
       commit(spentGamePoint ? selection.career : { ...selection.career, gamePoint: career.gamePoint })
@@ -1733,7 +1731,7 @@ export function usePitcherLeagueSession(
         recordStat({ kind: 'GP아이템구매', mode: PITCHER_LEAGUE_MODE, index, price: BATTER_GP_ITEMS[index].price })
       }
     },
-    [career, commit, random, recordStat, shown],
+    [announceHiddenOpen, career, commit, random, recordStat, shown],
   )
 
   /**
@@ -1897,8 +1895,9 @@ export function usePitcherLeagueSession(
       rewards
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
-      const hiddenNotice = hiddenOpenNoticeOf(rewards)
-      if (hiddenNotice !== '') setStoryNotice(hiddenNotice)
+      // 보상 종류 7 — 0x62368(…, |v|, 1) 이 공용 창에 띄운다(떠 있으면 대기 칸)
+      const hiddenIds = hiddenOpenRewardIdsOf(rewards)
+      if (hiddenIds.length > 0) announceHiddenOpen?.(hiddenIds)
       setStory(null)
       if (story.context === '연말') return continueYearEnd(viewed, [...story.viewed, ...viewedEventIds], endingEventId !== null)
       if (story.context === '연초') {
@@ -1935,7 +1934,7 @@ export function usePitcherLeagueSession(
       commit(viewed)
       setScene('관리')
     },
-    [career, commit, continueYearEnd, enterEnding, enterOutingMap, random, recordStat, story],
+    [announceHiddenOpen, career, commit, continueYearEnd, enterEnding, enterOutingMap, random, recordStat, story],
   )
 
   /**
