@@ -189,3 +189,32 @@ describe('견제 판 루별 주자 주루', () => {
     expect(느린.ticks).not.toEqual(같은.ticks)
   })
 })
+
+describe('견제 판 그림 칸 — 공 가진 야수 고리(0x43cb0) · 이름 판 · "!"', () => {
+  it('판 시작 투수 쥐기는 0x17 진입이 지워 고리가 없고, 1루수가 견제구를 쥔 틱부터 그 칸에 뜬다', () => {
+    const result = runPickoffPlay({
+      targetBase: 1,
+      bases: 일루,
+      outs: 0,
+      random: 세는난수(0.9),
+      fielderPlates: [{ name: '투수', pitcherRole: 0 }, null, { name: '일루수', positionCode: 3 }],
+      runnerAces: { first: 2 },
+    })
+    expect(result.ticks[0].holderMark).toBeNull()
+    const 쥔틱 = result.ticks.find((view) => view.holderMark != null)
+    expect(쥔틱?.holderMark).toEqual({ slot: 2, anim: 3 })
+    expect(쥔틱?.holderPlate).toEqual({ name: '일루수', positionCode: 3 })
+    expect(result.ticks[0].runners[0]?.isAce).toBe(true)
+  })
+
+  it('악송구를 던진 투수는 +0xc0 = 4 (a1908)', () => {
+    // 리드 굴림(0.9) 뒤 악송구 굴림 0 → 악송구
+    const values = [0.9, 0]
+    const random = createFractionRandom(() => values.shift() ?? 0.9)
+    const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
+    expect(result.errantThrow).toBe(true)
+    const 던진틱 = result.ticks.findIndex((view) => view.fielders.some((fielder) => fielder.slot === 0 && fielder.throwErrorTicks > 0))
+    expect(던진틱).toBeGreaterThanOrEqual(0)
+    expect(result.ticks[던진틱]?.fielders.find((fielder) => fielder.slot === 0)?.throwErrorTicks).toBe(4)
+  })
+})

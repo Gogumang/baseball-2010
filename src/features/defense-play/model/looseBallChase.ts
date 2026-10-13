@@ -24,6 +24,11 @@ export interface LooseBallChase {
   readonly catchPoint: WorldPoint
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 (원본 공은 한 경기 내내 같은 객체) */
   readonly body?: BallBody
+  /**
+   * 송구 예보(a = 0)가 두 번째 패스(b1878)로 넘어갔나 — 그 자리 b188a~b1892 가 그때의 공 가진 야수(+0x130 = 던진 야수)의
+   * +0xc0 = 4 를 적는다(그림 "!" 만 본다, `catchForecast.secondPassStarted`). 다른 예보는 늘 거짓
+   */
+  readonly secondPassStarted?: boolean
 }
 
 /** 예보 칸 — 필살수비 창 · +0x127 은 타구 판(메시지 0x11 · 0x51408)만 세운다. 이 판들에선 늘 꺼져 있다 */
@@ -49,6 +54,7 @@ export function chaseLooseBall(
     catchTick,
     catchPoint: { x: at.x, y: 0, z: at.z },
     body: ball.flight.body,
+    secondPassStarted: forecast.secondPassStarted,
   }
 }
 

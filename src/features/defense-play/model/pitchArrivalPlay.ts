@@ -1,4 +1,6 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -158,6 +160,10 @@ export interface PitchArrivalPlayInput {
   readonly offenseIsCpu?: boolean
   readonly runningMode?: ManualAutoMode
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /**
@@ -268,6 +274,8 @@ export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: Rando
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
+        fielderPlates: input.fielderPlates,
+        runnerAces: input.runnerAces,
         scene: input.scene,
       },
     }
@@ -295,6 +303,8 @@ export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: Rando
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAces: input.runnerAces,
     scene: input.scene,
   }
   if (kind === PASSED_BALL_PLAY_KIND) {

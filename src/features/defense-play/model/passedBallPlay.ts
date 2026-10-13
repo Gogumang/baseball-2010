@@ -1,4 +1,7 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { FUMBLE_MARK_TICKS } from '@/features/defense-play/model/playerEffects'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { battedBallTrajectory, BATTING_POINT } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
@@ -93,6 +96,10 @@ export interface PassedBallPlayInput {
   readonly offenseIsCpu?: boolean
   readonly runningMode?: ManualAutoMode
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
@@ -189,6 +196,11 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+    runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
+    // 0x3e062(0x3e08c~0x3e092) — 판정이 포수 +0xb8 = 6 을 적고 0x17 로 간다(첫 그림 앞 야수 틱이 5 로 줄인다)
+    fumbleMarks: Array.from({ length: abilities.length }, (_, slot) => (slot === CATCHER_SLOT ? FUMBLE_MARK_TICKS : 0)),
     scene: input.scene,
     controls: input.controls,
   }
