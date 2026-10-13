@@ -15,6 +15,7 @@ import {
   ballFrameOf,
   ballShadowOf,
   cameraTargetOf,
+  isBallDrawn,
   fielderActionFrameOf,
   fielderFrameOf,
   fielderSpriteOf,
@@ -232,5 +233,17 @@ describe('공 그림자 0x356f8 (← 0x36dfc 37268)', () => {
     expect(ballShadowOf({ x: 100, y: 200 }, -1)).toEqual([])
     expect(ballShadowOf({ x: 100, y: 0 }, 5)).toEqual([])
     expect(ballShadowOf({ x: 100, y: 1 }, 5)).not.toEqual([])
+  })
+})
+
+describe('0x36dfc 가 공을 그리는가 — 36e24 재생 틱 · 36e86~36ea4', () => {
+  const 공 = { x: 0, z: 0, height: 0, isFlying: true }
+  it('공+0x68 ≤ 0(막 깐 공)이면 안 그린다', () => {
+    expect(isBallDrawn({ ...공, isPlaybackStart: true })).toBe(false)
+    expect(isBallDrawn(공)).toBe(true)
+  })
+  it('쥔 공 · 담장 뒤 공도 안 그린다', () => {
+    expect(isBallDrawn({ ...공, isHeld: true })).toBe(false)
+    expect(isBallDrawn({ ...공, isBeyondFence: true })).toBe(false)
   })
 })

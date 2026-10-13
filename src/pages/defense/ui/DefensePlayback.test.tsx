@@ -415,7 +415,7 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
     return state.tick
   }
 
-  it('홈런(state[0x1d])이 선 뒤 키를 누르면 판 끝 · 닫힌 셈 · 0x35108 까지 그 그림 안에서 끝낸다 — 결과는 안 누른 판과 같다', () => {
+  it('홈런(state[0x1d])이 선 뒤 키를 누르면 한 그림 안에서 되풀이하다, 공이 멈춘 뒤 타자주자가 홈에 닿는 그림에 카메라 0x3f060 이 풀어(3f17e) 그 뒤는 보통으로 끝낸다 — 결과는 안 누른 판과 같다', () => {
     vi.useFakeTimers()
     try {
       const input = 홈런()
@@ -428,10 +428,17 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       expect(onDone).not.toHaveBeenCalled()
       fireEvent.keyDown(window, { key: '5' })
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      // 3f164 — +0xfe7 && 주자 0 +0x7c == +0x8c == 4 → +0xfe7 = 0 · 메시지 0x13 : 52b36 이 되풀이를 멈추고 그 그림을 그린다
+      expect(onDone).not.toHaveBeenCalled()
+      // 그 뒤 G3 이 닫히는 그림 하나 · 닫힌 셈 11 갱신
+      for (let i = 0; i < 60 && onDone.mock.calls.length === 0; i += 1) {
+        act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      }
       expect(onDone).toHaveBeenCalledTimes(1)
       const 건너뜀 = 결과(onDone)
       expect(건너뜀.advance).toEqual(그대로.advance)
       expect(건너뜀.log.some((line) => line.includes('키 건너뛰기'))).toBe(true)
+      expect(건너뜀.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(true)
     } finally {
       vi.useRealTimers()
     }
@@ -463,9 +470,10 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       // 내림차순이라 1루 주자(칸 1, 판 내림) → 타자주자(칸 0, n = 2 · 간격 20 · 타이머 40) 차례로 메시지 0x13 이 와 판이 선다
       const 일루 = { ...홈런(), outcome: registerContact(홈런().outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
       const 일루판 = runDefensePlay(일루)
+      // 홈인 틱 뒤 한 그림 더 — 그 그림의 G2 는 득점 0xaa0a8(G2 뒤) 앞이라 아직 열리고, 그 그림 그리기 G3 이 닫는다
       expect(일루판.log.filter((line) => line.includes('주자 홈 —')).map((line) => line.replace(/ — .*/, ''))).toEqual([
-        `${일루판.ticks.length - 1}틱 1번 주자 홈`,
-        `${일루판.ticks.length - 1}틱 0번 주자 홈`,
+        `${일루판.ticks.length - 2}틱 1번 주자 홈`,
+        `${일루판.ticks.length - 2}틱 0번 주자 홈`,
       ])
       // 두 점이 g 번마다 오른 뒤 g 번 더 — 판 끝 뒤 약 61 번째 닫힌 갱신 (예전 웹은 타자주자가 먼저라 판이 곧바로 내려 11 번째)
       expect(Math.abs(갱신수(일루) - (일루판.ticks.length + 61))).toBeLessThanOrEqual(3)

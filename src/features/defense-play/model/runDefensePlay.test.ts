@@ -19,6 +19,7 @@ import { throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import {
   cpuSpecialThrowOf,
   defenseAbilitiesOf,
+  defensePlayResultOf,
   isBattedBallInPlay,
   isBallBeyondFence,
   isDefensePlayFinished,
@@ -842,6 +843,25 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     // 홈런 칸(+0x111)은 담장선 틱의 사건 코드 처리(다음 그림)부터 선다
     expect(결과.ticks[궤적.fenceTick + 1].homeRunFlag).toBe(true)
     expect(결과.ticks[궤적.fenceTick - 1].homeRunFlag).toBe(false)
+  })
+})
+
+describe('공+0x68(재생 틱) 0 인 그림은 공을 안 그린다 (0x36dfc 36e24)', () => {
+  it('판 첫 그림(vt18 → b12da)은 공+0x68 = 0 이라 안 그리고, 다음 그림부터 그린다', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    expect(결과.ticks[0].ball.isPlaybackStart).toBe(true)
+    expect(결과.ticks[1].ball.isPlaybackStart).toBe(false)
+  })
+
+  it('송구를 던진 그림(b307c → b12da)도 공+0x68 = 0 — 그 그림만 안 그리고 다음 그림은 1 번 점이다', () => {
+    const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
+    const 던진틱 = 결과.log.map((줄) => /^(\d+)틱 \d루로 .*송구 — /.exec(줄)).find((m) => m !== null)
+    expect(던진틱).toBeDefined()
+    const 틱 = Number(던진틱![1])
+    expect(결과.ticks[틱].ball.isPlaybackStart).toBe(true)
+    expect(결과.ticks[틱 + 1].ball.isPlaybackStart).toBe(false)
+    const 그밖 = 결과.ticks.filter((view, at) => at !== 0 && at !== 틱 && view.ball.isPlaybackStart === true)
+    expect(그밖).toHaveLength(0)
   })
 })
 
@@ -1718,13 +1738,18 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       bases: EMPTY_BASES,
       outs: 0,
     })
-    // 쥔 틱 끝부터 그리기 0x46e3c(G3) · 다음 그림 0x3f0b8(G1) · 슬롯 2 머리 52502(G2) — 틱마다 3 씩.
-    // 52번째 호출(old 51)은 18 번째 틱 끝의 G3 이다 — 그 그림의 HOMERUN 글자 관문부터 닫히고, G1 · G2 도 닫혀 세기는 54 로 끝난다
-    expect(세기.at(-1)).toBe(54)
-    const 시작 = 세기.lastIndexOf(3)
-    expect(세기.slice(시작)).toEqual(Array.from({ length: 18 }, (_unused, index) => (index + 1) * 3))
+    // 그리기 0x46e3c(G3) · 다음 그림 0x3f0b8(G1) · 슬롯 2 머리 52502(G2) — 틱마다 3 씩. 타자주자가 1루에 닿는 이동(다음 그림의
+    // 목록 틱)은 G1 과 G2 사이라, 그 틱 끝 G3 · G1 은 아직 안 선 주자를 보고 0 으로 두고 G2 부터 센다(1).
+    // 52번째 호출(old 51)은 18 번째 틱 끝의 G2 다 — G3(old 49) · G1(old 50)은 열려 마지막 그림의 HOMERUN 글자 관문도 열려 있고,
+    // G1 이 연 다음 그림(목록 틱 · 카메라만 도는 그림)이 `closingListFrame` 으로 하나 더 찍힌다
+    expect(세기.at(-1)).toBe(52)
+    const 시작 = 세기.indexOf(1)
+    expect(세기.slice(시작)).toEqual(Array.from({ length: 18 }, (_unused, index) => 1 + index * 3))
     expect(state.tick).toBe(시작 + 18)
-    expect(state.drawGateOpen).toBe(false)
+    expect(state.drawGateOpen).toBe(true)
+    expect(state.ticks).toHaveLength(state.tick + 1)
+    expect(state.ticks.at(-1)?.closingListFrame).toBe(true)
+    expect(state.ticks.at(-1)?.cameraFrozen).toBe(false)
   })
 
   it('판 시작 · 안 쥔 틱은 0x3f378(G4)까지 네 번 불러도 +0x120 이 0 이다 — 쥐기 전 틱 끝의 세기는 0', () => {
@@ -1734,7 +1759,8 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       bases: EMPTY_BASES,
       outs: 0,
     })
-    const 시작 = 세기.lastIndexOf(3)
+    const 시작 = 세기.indexOf(1)
+    expect(시작).toBeGreaterThan(0)
     expect(세기.slice(0, 시작).every((value) => value === 0)).toBe(true)
   })
 
@@ -2159,5 +2185,40 @@ describe('레이저 잔상 칸 (장면 +0x1991 — 그림 0x37076)', () => {
     expect(잔상.at(-1)!).toBeGreaterThan(F + 2)
     const 송구뒤 = state.ticks.find((view) => view.tick === F + 3)!
     expect(송구뒤.laserTrailFrom).not.toEqual(state.ticks.find((view) => view.tick === F)!.laserTrailFrom)
+  })
+})
+
+describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', () => {
+  const 홈런판 = (): DefensePlayInput => ({
+    outcome: { kind: '홈런' },
+    trajectory: battedBallTrajectory(BATTED_BALL_PATTERNS[24][0]),
+    bases: { first: true, second: false, third: false },
+    outs: 0,
+  })
+
+  it('건너뛰는 동안 공이 멈추고 타자주자가 홈(+0x7c == +0x8c == 4)에 닿는 틱에 +0xfe7 이 풀리고, 그 1점은 그 틱 메시지 0x13 이다', () => {
+    let state = startDefensePlay(홈런판())
+    let pressed = false
+    let 풀린틱 = -1
+    while (!isDefensePlayFinished(state)) {
+      const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+      if (key !== null) pressed = true
+      const before = state.fastForward
+      state = stepDefensePlay(state, key)
+      if ((before || key !== null) && !state.fastForward && 풀린틱 < 0) {
+        풀린틱 = state.tick - 1
+        expect(state.runInsThisTick).toContain(0)
+        expect(state.runners[0].state).toMatchObject({ targetBase: 4, startBase: 4, scored: true })
+      }
+    }
+    expect(풀린틱).toBeGreaterThan(0)
+    expect(state.log).toContain(`${풀린틱}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
+    // 점수는 안 누른 판과 같다 — 새로 올리지 않는다
+    expect(defensePlayResultOf(state).advance).toEqual(runDefensePlay(홈런판()).advance)
+  })
+
+  it('건너뛰지 않으면 아무것도 안 한다', () => {
+    const 결과 = runDefensePlay(홈런판())
+    expect(결과.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
   })
 })

@@ -146,12 +146,10 @@ export function passPlayGate(input: PlayGateInput): PlayGateResult {
  * 0x46c88  그리기 — 0x4403c 등 연출 → G3
  * 0x3f378  G4
  * ```
- * ⚠️ 미해결(근사): 웹 진행기의 한 틱(`runDefensePlay`)은 이 차례를 그대로 따르지 않는다 — 자동 진루 · CPU 송구(4 · 4c 절)가 그림(5 절)
- *    앞이고, 목록 틱의 이동(6 절 — 머리글이 "원본의 다음 틱 야수 틱 자리" 로 둔다) · 득점 · 플레이 틱 꼬리(6b~6e 절)가 그림 뒤에 있다.
- *    그 읽기대로면 틱 끝 관문 넷이 모두 6 절 뒤 상태를 보는데, 원본에서 그 상태를 보는 것은 G2 뿐이다(G3 · G4 · G1 은 다음 그림의 목록 틱
- *    앞). 거꾸로 6 절을 "이 그림의 목록 틱" 으로 읽으면 G2 만 어긋난다. 어느 쪽인지는 웹 한 틱의 절들을 원본 그림에 다시 맞춰야 정해지고,
- *    한 칸만 옮기면 두 읽기가 섞여 지어내는 것이 된다 — 옮기지 않았다. 차이는 주자가 막 다 선 그림의 +0x120 세기 한 번(판 끝 틱이 한 그림
- *    앞뒤로 갈 수 있다)이다.
+ * **웹 한 틱과의 맞춤(확정, 2026-10-14)**: 웹 판 틱 N 의 1~4c 절 · 6b~6e 절은 그림 N 의 슬롯 2, 5 절 스냅샷은 그림 N 그리기, 6 절 이동은
+ *    그림 N+1 의 목록 틱, 6 절 득점은 그림 N+1 의 0xaa0a8 이다(근거는 `gateRunnerViewsOf`). 그래서 틱 끝 관문은 G3 · G4 · G1 이 6 절 이동
+ *    앞 주자, G2 가 이동 뒤 · 득점 앞 주자를 본다. G1 이 열리고 G2 만 닫히면 그 그림(목록 틱 · 카메라만 돈다)을 진행기가
+ *    `closingListFrame` 으로 한 장 더 찍는다. ⚠️ 6b~6e 를 6 절 이동 뒤에 두는 옛 근사는 그대로다.
  * **경기 멈춤(+0x1993)** — 세우는 곳은 레이저 발사 0x400bc(슬롯 2 머리 524e2) 하나다. 그 그림은 524e6 에서 G2 를 안 부르고, 그리기
  * 0x46c88 의 G3 는 돌며(앞에 +0x1993 갈래가 없다), 0x3f378 G4 는 3f392 에서 건너뛴다. 다음 그림은 G1(3f0a4) · G2 가 건너뛰고 G3 만 돈다 —
  * 그 그리기의 레이저 연출 0x4403c 단계 1 이 +0x1993 = 0 으로 내리므로 G4 부터 다시 돈다(`runDefensePlay` 0c · 7b 절).
@@ -164,6 +162,11 @@ export interface PlayGateFrameResult extends PlayGateResult {
    * 원본은 524e6 에서 G2 를 안 부르므로(0x400bc 는 G2 앞 524e2) 이 값으로 되돌린다. G2 를 안 불렀으면 `endCounter` 와 같다.
    */
   readonly counterBeforeHead: number
+  /**
+   * 공용 갱신 0x3f060 의 관문(G1, 3f0b8) — 다음 그림의 목록 틱(야수 · 주자 vt0xc)과 카메라(3f0ea 가 r6 = G1 을 본다)가 도는가.
+   * 경기 멈춤으로 G1 을 안 불렀으면 null. G2 만 닫히고 이것이 참인 그림이 원본에 있다(`closingListFrame`).
+   */
+  readonly listTickOpen: boolean | null
 }
 
 /**
@@ -177,23 +180,62 @@ export function passPlayGateBetweenTicks(
   input: PlayGateInput,
   fastForward = false,
   paused = false,
+  headInput: Partial<PlayGateInput> = {},
 ): PlayGateFrameResult {
   let counter = input.endCounter
-  const call = (): PlayGateResult => {
-    const result = passPlayGate({ ...input, endCounter: counter })
+  const call = (override: Partial<PlayGateInput> = {}): PlayGateResult => {
+    const result = passPlayGate({ ...input, ...override, endCounter: counter })
     counter = result.endCounter
     return result
   }
   let drawOpen: boolean | null = null
   if (!fastForward) {
     drawOpen = call().open // G3 그리기 0x46e3c
-    if (paused) return { open: true, endCounter: counter, drawOpen, counterBeforeHead: counter }
+    if (paused) return { open: true, endCounter: counter, drawOpen, counterBeforeHead: counter, listTickOpen: null }
     if (!input.ballHeld) call() // G4 0x3f3b2 — +0x12c == 0 일 때만
   }
-  call() // G1 공용 갱신 0x3f0b8 (건너뛰기 중엔 52b32 의 0x3f060)
+  const listTickOpen = call().open // G1 공용 갱신 0x3f0b8 (건너뛰기 중엔 52b32 의 0x3f060)
   const counterBeforeHead = counter
-  const head = call() // G2 슬롯 2 머리 52502
-  return { open: head.open, endCounter: counter, drawOpen, counterBeforeHead }
+  const head = call(headInput) // G2 슬롯 2 머리 52502 — 목록 틱 뒤 상태(`gateRunnerViewsOf`)
+  return { open: head.open, endCounter: counter, drawOpen, counterBeforeHead, listTickOpen }
+}
+
+/**
+ * **틱 끝 관문 넷이 보는 주자** — 웹 한 틱(`runDefensePlay` 등)의 절과 원본 그림의 맞춤 (2026-10-14 직접 뜸으로 확정).
+ *
+ * 공+0x68(재생 틱)은 그리기 뒤 0x3f378(3f3c6)만 +1 하므로 그림 N 의 플레이 틱 0xb401c(포구 b41d0 · 아웃 판정 b43da · 낙구 b4492 의
+ * `공+0x68 == aa0`)는 공+0x68 = N 을 본다. 웹 판 틱 N 의 포구(1 절) · 낙구(6d 절)도 판 틱 N 을 보므로 둘은 그림 N 의 슬롯 2 다. 그림 N 의
+ * 스냅샷(5 절)은 목록 틱이 옮긴 자리를 그리는데 그 자리는 앞 판 틱의 6 절이 옮긴 것이다 — 곧 웹 판 틱 N 의 **6 절 이동 = 그림 N+1 의 목록
+ * 틱**(0x3f060 의 vt8 0xbfe9c)이고, 6 절의 득점은 그림 N+1 의 0xaa0a8(슬롯 2, G2 뒤)이다.
+ * ```
+ * 웹 판 틱 N : 0'(야수 준비 틱 = 그림 N 목록 틱의 몫) · 1~4c(그림 N 슬롯 2) · 5 스냅샷(그림 N 그리기) · 6 이동(그림 N+1 목록 틱) ·
+ *             6 득점(그림 N+1 0xaa0a8) · 6b~6e(그림 N 플레이 틱 꼬리 — 웹이 6 절 뒤에 둔다) · 8 관문
+ * 원본       : G3(N) · G4(N) · G1(N+1) → 목록 틱(N+1) → G2(N+1) → 0xaa0a8(N+1) …
+ * ```
+ * 그래서 G3 · G4 · G1 은 **6 절 이동 앞** 자리(아웃 · 결과 코드는 6b~6e 뒤 그대로), G2 는 **6 절 이동 뒤 · 득점 앞** 자리를 본다:
+ * - `frame`(G3 · G4 · G1): 자리 · 목표 루 · 닿은 루 · 홈 득점은 6 절 앞, 아웃은 틱 끝. 요구 루(+0x94)는 6d 가 세운 값을 따르되 6 절 도착이
+ *   푼 것(0xa040c)은 아직 안 풀린 것으로 본다.
+ * - `head`(G2): 6 절 뒤 그대로, 홈 득점(+0x96 — 0xaa0a8 이 G2 뒤에 세운다)만 6 절 앞.
+ * ⚠️ 6b~6e(아웃 판정 · 결과 9 · 낙구)는 원본에서 그림 N 슬롯 2 라 6 절 이동 앞 자리를 보지만 웹은 이동 뒤에 돈다 — 옛 근사 그대로다.
+ */
+export function gateRunnerViewsOf(
+  before: readonly RunnerState[],
+  after: readonly RunnerState[],
+): { readonly frame: readonly RunnerState[]; readonly head: readonly RunnerState[] } {
+  const frame = after.map((now, index) => {
+    const then = before[index]
+    if (then === undefined) return now
+    return {
+      ...then,
+      isOut: now.isOut,
+      requiredBase: now.requiredBase === NONE && then.requiredBase !== NONE ? then.requiredBase : now.requiredBase,
+    }
+  })
+  const head = after.map((now, index) => {
+    const then = before[index]
+    return then === undefined ? now : { ...now, scored: then.scored }
+  })
+  return { frame, head }
 }
 
 /**

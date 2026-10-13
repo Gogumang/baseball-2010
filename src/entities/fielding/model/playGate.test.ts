@@ -4,6 +4,7 @@ import { basePosition, isSamePoint } from '@/entities/fielding/model/fieldGeomet
 import { createRunner, NONE, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import {
   eventCodeEffectOf,
+  gateRunnerViewsOf,
   isFoulEnded,
   liveRunnerCountOf,
   passPlayGate,
@@ -142,12 +143,14 @@ describe('판 진행 관문 0xb0d28', () => {
       endCounter: 3,
       drawOpen: true,
       counterBeforeHead: 2,
+      listTickOpen: true,
     })
     expect(passPlayGateBetweenTicks({ ...닫힘없음, groundRuleFlag: true, endCounter: 0 })).toEqual({
       open: true,
       endCounter: 4,
       drawOpen: true,
       counterBeforeHead: 3,
+      listTickOpen: true,
     })
     // 건너뛰기(+0xfe7) 동안은 52b32 의 0x3f060(G1) · 524f8 의 G2 둘뿐이고 그리기가 없다
     expect(passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: 0 }, true)).toEqual({
@@ -155,6 +158,7 @@ describe('판 진행 관문 0xb0d28', () => {
       endCounter: 2,
       drawOpen: null,
       counterBeforeHead: 1,
+      listTickOpen: true,
     })
     // 경기 멈춤 +0x1993(레이저 0x400bc) — 0x3f378 · 0x3f060 · 0x524c0 이 건너뛰어 그리기 G3 하나뿐, 판은 이어진다
     expect(passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, endCounter: 0 }, false, true)).toEqual({
@@ -162,7 +166,40 @@ describe('판 진행 관문 0xb0d28', () => {
       endCounter: 1,
       drawOpen: true,
       counterBeforeHead: 1,
+      listTickOpen: null,
     })
+  })
+
+  it('G2(52502)만 닫히고 G1(3f0b8)은 열린 그림 — 세기가 G1 · G2 사이에서 51 이 되면 listTickOpen 만 참이다', () => {
+    // 안 쥐고 +0x124 만 선 판: G3 48 · G4 49 · G1 50 은 열리고 G2 가 old 51 로 닫는다
+    expect(passPlayGateBetweenTicks({ ...닫힘없음, groundRuleFlag: true, endCounter: 48 })).toEqual({
+      open: false,
+      endCounter: 52,
+      drawOpen: true,
+      counterBeforeHead: 51,
+      listTickOpen: true,
+    })
+    // G2 만 목록 틱 뒤 주자를 본다 — 앞 셋이 뛰는 주자로 0 에 두면 G2 부터 센다
+    expect(
+      passPlayGateBetweenTicks({ ...닫힘없음, ballHeld: true, someRunnerActive: true, endCounter: 30 }, false, false, {
+        someRunnerActive: false,
+      }),
+    ).toMatchObject({ open: true, endCounter: 1, listTickOpen: true })
+  })
+
+  it('틱 끝 관문이 보는 주자 — G3 · G4 · G1 은 목록 틱 이동 앞(아웃은 틱 끝), G2 는 이동 뒤 · 득점(0xaa0a8) 앞', () => {
+    const 앞 = createRunner(1, 2, 300, { targetBase: 3, requiredBase: 3 })
+    const 뒤 = { ...앞, position: basePosition(3), startBase: 3, settled: true, requiredBase: NONE }
+    const 득점앞 = createRunner(2, 3, 300, { targetBase: 4 })
+    const 득점뒤 = { ...득점앞, position: basePosition(4), startBase: 4, settled: true, scored: true }
+    const 아웃 = { ...createRunner(0, 0, 300, { targetBase: 1 }) }
+    const { frame, head } = gateRunnerViewsOf([앞, 득점앞, 아웃], [뒤, 득점뒤, { ...아웃, isOut: true }])
+    expect(frame[0]).toMatchObject({ position: 앞.position, requiredBase: 3 })
+    expect(frame[1]).toMatchObject({ position: 득점앞.position, scored: false })
+    expect(frame[2].isOut).toBe(true)
+    expect(head[0]).toEqual(뒤)
+    expect(head[1]).toMatchObject({ position: basePosition(4), scored: false })
+    expect(liveRunnerCountOf(head)).toBe(2)
   })
 
   it('쥔 채 주자가 다 서면 틱 끝마다 세 번 — 17틱 열리고 18번째 틱 끝 G3(old 51)부터 닫는다', () => {

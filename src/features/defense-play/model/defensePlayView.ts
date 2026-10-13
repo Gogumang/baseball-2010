@@ -57,6 +57,11 @@ export interface ViewStateInput {
   readonly ballHeld?: boolean
   /** 공이 담장 뒤로 사라졌다(0x36dfc 36e2a~36e80 — `DefenseBall.isBeyondFence`). 안 주면 거짓 */
   readonly ballBeyondFence?: boolean
+  /**
+   * 공+0x68 — 이 그림에서 공이 재생 중인 틱(`DefenseBall.isPlaybackStart`). 판 틱에서 지금 공을 깐 판 틱을 뺀 값이다.
+   * 0 이하면 0x36dfc 가 36e24 에서 공 · 그림자 · 두 번째 비거리 판을 건너뛴다. 안 주면 1(그린다)
+   */
+  readonly ballPlaybackTick?: number
   /** 이 그림은 카메라가 안 움직인다(머리에서 경기 멈춤 +0x1993 — 0x3f0a4). 안 주면 움직인다 */
   readonly cameraFrozen?: boolean
   readonly fielders: readonly FielderState[]
@@ -171,6 +176,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       isStopped: input.ballStopped === true,
       isHeld: input.ballHeld === true,
       isBeyondFence: input.ballBeyondFence === true,
+      isPlaybackStart: (input.ballPlaybackTick ?? 1) <= 0,
     },
     fielders,
     runners,
@@ -338,4 +344,14 @@ function tickSince(memory: ActionMemory, key: string, action: number, tick: numb
     return 0
   }
   return tick - previous.since
+}
+
+/**
+ * 마지막 스냅샷의 공을 "막 깐 공"(공+0x68 = 0)으로 바꾼다 — 플레이 틱 꼬리 b45a0 의 다시 쏘기 0xb3148(b3294 → b12da)는 그 그림
+ * 그리기보다 먼저인데 진행기는 스냅샷을 앞서 찍으므로, 다시 쏜 틱의 그림에서 공 · 그림자를 지운다(0x36dfc 36e24).
+ */
+export function hideBallOfLastSnapshot(ticks: DefensePlayView[]): void {
+  const last = ticks[ticks.length - 1]
+  if (last === undefined) return
+  ticks[ticks.length - 1] = { ...last, ball: { ...last.ball, isPlaybackStart: true } }
 }
