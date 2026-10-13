@@ -463,8 +463,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             : latestRef.current.homeRunText === null
               ? null
               : homeRunTextFrameAt(latestRef.current.homeRunText, now, tickLength),
-        swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType),
+        swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType, latestRef.current.aceBatterOrder),
         bodyType,
+        ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
         batterSkinIndex: latestRef.current.batterSkinIndex,
         batterTeamIndex: latestRef.current.batterTeamIndex,
         batterEquipment: latestRef.current.batterEquipment,

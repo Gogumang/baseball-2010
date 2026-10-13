@@ -31,7 +31,6 @@ import {
 import type { GameAcePitcher, GameAceSetup, GameTeamAces } from '@/features/play-game/model/gameAces'
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import {
-  BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
   batterAt,
   teamBatters,
@@ -54,6 +53,7 @@ import {
   rosterLineupOf,
   rosterSlotAt,
   tryQuickCpuPinchHit,
+  withLineupRecordSlot,
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -1027,7 +1027,7 @@ export function startPitch(
   // **이번 공을 깎은 뒤**의 체력을 본다. 스태미나는 게이지 결과와 무관하다 — 인자가 (game, 구질) 뿐이다 (P1 3-1 확정)
   // 지금 상대 타자 레코드 — 0xa5e14 · 실투 0x33cbc 가 +0x14 의 압도 22 를, 0xab214 스킬 갈래가 +0x14 · 칸 0xb6394 를 읽는다
   // (붙박이 줄은 Xls 행 그대로, 마타자는 XlsACE_BAT 행 — 모드 갈래 없음)
-  const opponentBatter = quickBatterOfTeam(options, false, opponentRosterSlotOf(progress))
+  const opponentBatter = opponentQuickBatterOf(progress)
   const opponentIntimidates = opponentBatter.skillIds.includes(INTIMIDATE_SKILL_ID)
   const stamina = drainStamina({
     stamina: progress.stamina,
@@ -1147,9 +1147,9 @@ export function startPitch(
       // 같은 갈래가 던지는 내 투수 레코드 +0x14 도 `0xb62b4(투수, n)` 로 읽는다 — 장착 스킬(비트 + 16)
       pitcherSkillIds: options.pitcherSkillIds ?? [],
       skillSituation: {
-        // 투수 스킬 31(0xabcd8)의 `0xb6394(타자)` = +0xa & 0x1f — 경기 준비 0xb8768 → 0xb603c 가 마선수 아닌 줄을 레코드 첨자로
-        // 다시 매기고(붙박이 칸), 마타자는 제 순번 그대로
-        batterOrderIndex: opponentBatter.ace?.order ?? opponentRosterSlotOf(progress) % BATTERS_PER_TEAM,
+        // 투수 스킬 31(0xabcd8)의 `0xb6394(타자)` = +0xa & 0x1f — 경기 준비 0xb8768 → 0xb603c 가 마선수 아닌 줄을 명단 배열
+        // 첨자로 다시 매기고(`QuickLineup.recordSlots` — 마타자에 밀린 옛 9번은 12), 마타자는 제 순번 그대로
+        batterOrderIndex: opponentBatter.recordSlot ?? 0,
         inning: progress.game.inning,
         // 0xab966 — 수비(우리) 점수 > 공격(상대) 점수
         isLosing: progress.game.ourScore > progress.game.opponentScore,
@@ -2262,6 +2262,12 @@ function opponentRosterSlotOf(progress: PitcherGameProgress): number {
   return rosterSlotAt(progress.opponentLineup, progress.opponentOrderIndex)
 }
 
+/** 지금 상대 타자의 간이 타석 레코드 — 레코드 칸 0xb6394 는 명단이 든 첨자(`withLineupRecordSlot`), 마타자는 제 순번 */
+function opponentQuickBatterOf(progress: PitcherGameProgress): QuickAtBatBatter {
+  const batter = quickBatterOfTeam(progress.options, false, opponentRosterSlotOf(progress))
+  return withLineupRecordSlot(batter, progress.opponentLineup, progress.opponentOrderIndex)
+}
+
 /**
  * **상태 0xf 진입 `0x3d954`** — 내가 던지는 타석에서 공 하나를 고르기 전마다 돈다 (디스어셈 3d9e4~3da94).
  * ```
@@ -2677,7 +2683,7 @@ function playDefensiveAtBat(
   const mound = progress.ourMound
   const defense = ourQuickDefenseOf(progress)
   const order = progress.opponentOrderIndex
-  const batter = quickBatterOfTeam(options, false, opponentRosterSlotOf(progress))
+  const batter = opponentQuickBatterOf(progress)
   const pitched = perPitchDrainOf(defense, mound, batter)
   // 내가 마운드에 없는 수비 타석은 자동진행(0x21) 안의 간이 타석 — 상태 0xf 를 안 지나 돌발을 굴리지 않는다
   const appearance = playQuickPlateAppearance(
@@ -2779,7 +2785,7 @@ function playTeammateAtBat(
   const defense = opponentQuickDefenseOf(progress)
   const order = before.battingOrderIndex
   // 대타가 들어오면 그 타순 칸에 선 선수가 바뀐다 — 명단(`team+0xe`)에서 고른다
-  const batter = quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, order))
+  const batter = withLineupRecordSlot(quickBatterOfTeam(options, true, rosterSlotAt(progress.ourLineup, order)), progress.ourLineup, order)
   const pitched = perPitchDrainOf(defense, mound, batter)
   const appearance = playQuickPlateAppearance(
     {

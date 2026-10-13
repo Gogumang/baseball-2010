@@ -63,6 +63,8 @@ export interface PitchingStageSource {
   readonly batterForm: number
   /** 타자 손 0xb63c0 — 마타자는 표 0xd88b0. 없으면 폼의 낮은 비트 */
   readonly batterSide?: number
+  /** 마타자 순번 0xb63a0 (0~4) — 마타자 그림 `ace/batter_*`(0x78ab0) · 자세표(0xb905c). 없으면 일반 타자 */
+  readonly aceBatterOrder?: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
 }
@@ -523,6 +525,7 @@ export function PitchingScreen({
             pitcherHand={stage.pitcherHand}
             {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
             {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
+            {...(stage.aceBatterOrder === undefined ? {} : { aceBatterOrder: stage.aceBatterOrder })}
             // 미션은 구장 생성자 값 0 · 바닥 줄 기본 — 타자 미션 화면(`MissionPlayScreen`)과 같다
             stadium={0}
             fieldPalette={null}

@@ -12,7 +12,8 @@ import { staminaCapacityOf, staminaPercentOf } from '@/entities/pitcher-career/m
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { BATTERS } from '@/shared/config/original/roster'
 import { leagueBatterIdOf, leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
-import { teamMatchupCardsOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -78,5 +79,22 @@ describe('팀경기 상태 0xe 소개 판 값 (0x44944)', () => {
     expect(batter.battingAverage).toBe(325)
     expect(batter.homeRuns).toBe(2)
     expect(batter.runsBattedIn).toBe(9)
+  })
+})
+
+describe('사람 수비 장면의 마운드 그림 — 타석 교대 0x47cc8 (0x482fc · 48138~4816a)', () => {
+  it('붙박이 투수는 레코드 +0x19 · +0x1a 니블 − 1 로 장비 겹(0x79790)을 싣는다 — 외인구단(팀 14)은 제구 니블 3 → 모자 등급 2', () => {
+    const progress = startTeamGame({ ...기본옵션, ourTeamId: 14 }, createSeededRandom(1))
+    const stage = teamPitcherSideStageOf(progress)
+    expect(stage.acePitcher).toBeNull()
+    expect(stage.pitcherEquipment).toEqual({ head: 2, hand: -1, body: -1, leg: -1 })
+  })
+
+  it('마투수가 마운드에 서면 적재 0x793b0 이 ace/pitcher_* 를 싣고 장비 겹은 없다', () => {
+    const started = startTeamGame({ ...기본옵션, acePitcherId: 1 }, createSeededRandom(1))
+    const aceSlot = started.ourPitcherEntry.findIndex((pitcher) => pitcher.aceIndex >= 0)
+    const stage = teamPitcherSideStageOf({ ...started, ourPitcherIndex: aceSlot })
+    expect(stage.acePitcher?.framesUrl).toBe(ACE_PITCHERS[1]!.framesUrl)
+    expect(stage.pitcherEquipment).toBeUndefined()
   })
 })

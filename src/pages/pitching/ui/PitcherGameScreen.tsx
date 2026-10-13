@@ -937,13 +937,14 @@ const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(tea
 /**
  * 타석에 선 상대 타자의 그림 재료 — 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀(헬멧 · 몸통 벌).
  * 마타자는 XlsACE_BAT_DATA 레코드 +0xb(`aceBatterProfileOf`)의 폼 · 피부, 손은 표 0xd88b0.
- * ⚠️ 미이식: 폼 4~8 이면 몸통 적재 0x78ab0 이 마타자 그림 다섯(폼 − 4)을 싣는다 — 웹 타자 겹은 보통 타자 몸통뿐이다.
+ * 마타자는 순번 0xb63a0 을 타석 교대 0x47dd6 이 몸통 적재 0x78ab0 에 넘겨 `ace/batter_*` 한 장을 싣는다(`aceBatterOrder`).
  */
 function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
   readonly batterForm: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
   readonly batterSide?: number
+  readonly aceBatterOrder?: number
 } {
   const batter = opponentBatterOf(progress)
   const teamIndex = progress.options.opponentTeamId
@@ -954,6 +955,7 @@ function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
       batterSkinIndex: (profile >> 2) & 3,
       batterTeamIndex: teamIndex,
       batterSide: batterHandOf(profile, batter.aceIndex),
+      aceBatterOrder: batter.aceIndex,
     }
   }
   const profile = batter.profile ?? 0

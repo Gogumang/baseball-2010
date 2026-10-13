@@ -52,6 +52,7 @@ import {
   rosterLineupOf,
   rosterSlotAt,
   tryQuickCpuPinchHit,
+  withLineupRecordSlot,
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { runnerCountOf } from '@/entities/game/model/baseState'
@@ -1842,7 +1843,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
   const order = progress.game.battingOrderIndex
-  const batter = teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order))
+  const batter = withLineupRecordSlot(teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order)), progress.ourLineup, order)
   const pitched = perPitchDrainOf(opponentDefense, mound, batter)
   const appearance = playQuickPlateAppearance(
     {

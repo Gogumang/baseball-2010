@@ -9,13 +9,14 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 
 /** 지금 그릴 타자 자세 f — 틱은 게임 속도(한 틱 ms)로 센다. 자세표도 몸통 종류로 갈린다 */
-export function batterFrameNow(now: number, swingStartedAt: number, isBunting: boolean, bodyType: number): number {
+export function batterFrameNow(now: number, swingStartedAt: number, isBunting: boolean, bodyType: number, aceOrder = -1): number {
   const tickOf = (time: number) => Math.floor(time / millisecondsPerFrame())
   return batterFrameAt({
     tick: tickOf(now),
     swingTick: swingStartedAt < 0 ? null : tickOf(swingStartedAt),
     isBunting,
     bodyType,
+    aceOrder,
   })
 }
 

@@ -8,6 +8,7 @@ import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { QuickAtBatBatter } from '@/entities/game/model/quickAtBat'
 
 /**
  * 간이 엔진이 도는 경기(리그 CPU 경기 0xc2a48 · 나만의리그 타자편의 자동 타석)의 **한 팀 명단**.
@@ -27,6 +28,13 @@ export interface QuickLineup {
   readonly records: readonly BatterGameRecord[]
   /** `team+0x28c` 벤치 타자 수 */
   readonly benchBatters: number
+  /**
+   * 명단 칸마다 그 선수 레코드의 칸 `0xb6394` = `+0xa & 0x1f`. 경기 준비 0xb8768 이 `team[0xe + i] = i` 로 세우고 0xb603c 가
+   * 마선수 아닌 줄마다 `0xb6605(rec, i)` 로 **배열 첨자**를 적는다(마타자를 넣는 0xb8870 도 b889a 에서 0xb8768 을 부른다).
+   * 대타 0xaebe4 는 명단 칸(선수 첨자)만 맞바꾸고 레코드는 그대로라 칸이 선수를 따라간다. 투수 스킬 31(0xabcd8)이 본다.
+   * 마선수 칸은 값이 있어도 쓰지 않는다(레코드 +0xa = 0x40 + 순번 — 타자 쪽 `recordSlot`). 없으면(옛 저장) 타자 쪽 값
+   */
+  readonly recordSlots?: readonly number[]
 }
 
 /** 타순 칸 수 — `0xaf020` 이 `(team+0x32 + 1) mod 9` 로 돈다 */
@@ -39,7 +47,28 @@ export function rosterLineupOf(rosterSize: number): QuickLineup {
     rosterSlots,
     records: rosterSlots.map(() => EMPTY_BATTER_GAME_RECORD),
     benchBatters: Math.max(0, rosterSize - QUICK_LINEUP_SIZE),
+    recordSlots: renumberedRecordSlotsOf(rosterSize),
   }
+}
+
+/** 0xb8768 → 0xb603c 가 다시 매긴 레코드 칸 — 명단 칸 i 의 선수가 i (마선수 칸은 안 쓴다) */
+export function renumberedRecordSlotsOf(size: number): readonly number[] {
+  return Array.from({ length: size }, (_unused, index) => index)
+}
+
+/** 그 타순에 선 선수의 레코드 칸 `0xb6394` — 명단이 안 들고 있으면 undefined */
+export function recordSlotAt(lineup: QuickLineup, order: number): number | undefined {
+  return lineup.recordSlots?.[lineupSlotOf(order)]
+}
+
+/**
+ * 간이 타석 타자에 명단의 레코드 칸을 단다 — 마선수(`ace`)는 제 레코드 +0xa(0x40 + 순번)라 그대로 둔다.
+ * 명단이 칸을 안 들면(옛 저장) 타자 쪽 값 그대로
+ */
+export function withLineupRecordSlot(batter: QuickAtBatBatter, lineup: QuickLineup, order: number): QuickAtBatBatter {
+  if (batter.ace !== undefined) return batter
+  const recordSlot = recordSlotAt(lineup, order)
+  return recordSlot === undefined ? batter : { ...batter, recordSlot }
 }
 
 /** 타순 커서(이닝 안에서 9 를 넘어 셀 수 있다)가 가리키는 명단 칸 */
@@ -147,6 +176,14 @@ export function tryQuickCpuPinchHit(
   // 빠진 선수를 명단에서 지운다 — 재출장은 없다 (aed16 `0xb95b1`)
   rosterSlots.splice(entryIndex, 1)
   records.splice(entryIndex, 1)
+  // 레코드 칸은 선수 레코드에 붙어 있어 명단 칸과 같이 옮겨진다 (`recordSlots` 주석)
+  let recordSlots: number[] | undefined
+  if (lineup.recordSlots !== undefined) {
+    recordSlots = [...lineup.recordSlots]
+    recordSlots[slot] = lineup.recordSlots[entryIndex] ?? entryIndex
+    recordSlots[entryIndex] = lineup.recordSlots[slot] ?? slot
+    recordSlots.splice(entryIndex, 1)
+  }
 
   return {
     lineup: {
@@ -154,6 +191,7 @@ export function tryQuickCpuPinchHit(
       records,
       // 벤치 타자 수 −1, 0 밑으로는 안 간다 (aed9c~aedae)
       benchBatters: Math.max(0, lineup.benchBatters - 1),
+      ...(recordSlots === undefined ? {} : { recordSlots }),
     },
     outgoingRosterSlot,
     incomingRosterSlot,

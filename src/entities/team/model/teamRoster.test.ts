@@ -45,7 +45,10 @@ describe('teamRoster — 원본 Team 구조체의 12타자·8투수', () => {
       power: player.ability[1],
       run: player.ability[3],
       skillIds: skillIdsOfBits(player.skillBits, false),
+      // 레코드 칸 0xb6394 = XlsBATTER 행 +0xa (0x20 + 칸) & 0x1f
+      recordSlot: 0,
     })
+    expect(batterAt(0, 14).recordSlot).toBe(2)
 
     const pitcher = teamPitchers(0)[0]
     expect(startingPitcherOf(0)).toEqual({

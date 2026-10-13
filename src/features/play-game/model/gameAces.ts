@@ -27,6 +27,7 @@
  */
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
+import { renumberedRecordSlotsOf } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
@@ -104,7 +105,15 @@ export function gameAceBatterOf(
   const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
   const ability = aceRecordAbilityAtLevel(player, level)
   // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (`quickSwingBoostOf`)
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(player), ace: { order: index, level } }
+  // 레코드 칸 0xb6394 = +0xa & 0x1f — XlsACE_BAT_DATA 행 +0xa = 0x40 + 순번(zt1 을 풀어 확인), 0xb603c 는 마선수를 안 건드린다
+  return {
+    hit: ability.hit,
+    power: ability.power,
+    run: ability.run,
+    skillIds: aceSkillIdsOf(player),
+    recordSlot: index,
+    ace: { order: index, level },
+  }
 }
 
 /**
@@ -123,7 +132,8 @@ export function withAceBatterLineup(lineup: QuickLineup, aceIndex: number): Quic
   }
   rosterSlots[ACE_BATTER_ENTRY_SLOT] = ACE_BATTER_ROSTER_SLOT
   records[ACE_BATTER_ENTRY_SLOT] = EMPTY_BATTER_GAME_RECORD
-  return { rosterSlots, records, benchBatters: lineup.benchBatters + 1 }
+  // 0xb8870 이 넣은 뒤 b889a 에서 0xb8768 로 다시 매긴다 — 맨 끝으로 밀린 옛 9번은 그 첨자(12)
+  return { rosterSlots, records, benchBatters: lineup.benchBatters + 1, recordSlots: renumberedRecordSlotsOf(rosterSlots.length) }
 }
 
 /** 마투수를 넣은 투수 차례 — 8번 칸(로스터 여덟 뒤 = 벤치 맨 끝)에 하나 더 (0xb521c, 벤치 투수 수 team+0x33 +1) */
