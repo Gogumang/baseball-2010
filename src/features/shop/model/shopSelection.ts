@@ -1,6 +1,6 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
-  equipmentBlockReasonOf, equipmentItemOf, EQUIPMENT_PARTS, equipOwned, hiddenOpenTextOf, ownsEquipment, purchaseEquipment,
+  equipmentBlockReasonOf, equipmentItemOf, EQUIPMENT_PARTS, equipOwned, ownsEquipment, purchaseEquipment,
 } from '@/entities/career/model/equipment'
 import type { EquipmentBlockReason } from '@/entities/career/model/equipment'
 import { purchaseSubItem, SUB_ITEM_BLOCK_TEXT, SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItems'
@@ -36,6 +36,11 @@ export interface ShopSelection {
   readonly notice: string
   /** GP 칸 0~4·6 을 샀을 때만 — 창을 닫으면 상점 그대로(콜백 0x1d649 는 닫기만, 굴림 없음) */
   readonly detail?: GpDetailOf<PlayerCareer> | null
+  /**
+   * 장비 구매가 **새로 연** 히든 k (컬렉터 — 타자 36·40·44·48 / 투수 20·24·28·32). 부르는 쪽이 공용 알림 창에 띄운다
+   * (창 차례는 `selectEquipment` 머리말). 없으면 비었거나 빠진다
+   */
+  readonly openedHiddenIds?: readonly number[]
 }
 
 const EQUIPMENT_BLOCK_TEXT: Readonly<Record<Exclude<EquipmentBlockReason, '인기도부족'>, string>> = {
@@ -43,7 +48,8 @@ const EQUIPMENT_BLOCK_TEXT: Readonly<Record<Exclude<EquipmentBlockReason, '인�
   이미보유: '이미 가지고 있는 아이템입니다', // StrMODE[78]
   소지금부족: '소지금이 부족합니다', // StrMODE[77]
 }
-const purchasedText = (name: string) => `[${name}] 구매 완료` // StrMODE[92]
+/** StrMODE[92] — 서브아이템(kind 1)만 띄운다. ⚠️ 원문 마크업 `!C[!cFFFF00%s!cFFFFFF] 구매 완료` 은 아직 안 옮겼다(상자가 앞에 !C 를 붙인다) */
+const purchasedText = (name: string) => `[${name}] 구매 완료`
 
 /** 장비착용 화면 (0x17b66) — 가진 장비만 낄 수 있다 */
 function wearEquipment(career: PlayerCareer, part: number, level: number): ShopSelection {
@@ -54,7 +60,23 @@ function wearEquipment(career: PlayerCareer, part: number, level: number): ShopS
   return { career: equipOwned(career, part, level), notice: '' }
 }
 
-/** 상점 장착 탭 (0x13506) — 미오픈 → 보유 → 인기도 → 소지금 순으로 막는다 */
+/**
+ * 상점 장착 탭 (0x13506) — 미오픈 → 보유 → 인기도 → 소지금 순으로 막는다.
+ *
+ * **장비 구매 확정의 창 차례 — 0x14a74 kind 3 (0x14aaa~0x14c8a, 직접 떴다)**
+ * ```
+ * 앞가드  [창+9] ≠ 0 · [창+0x248] == 2(구매 확인) · (s8)[창+0x21c] == 0(예)     ; 창은 아직 서 있다(닫힘 애니 중)
+ * 14b2c   소지금 −가격×10 (0~9999) · 보유 · 곧바로 장착 니블 · 0x1fded · 0x22755 저장
+ * 14ba4   [창+0x21c] = −1                                                    ; 답만 비운다 — 창은 안 닫는다
+ * 14bac~  네 부위 0xa5021 참 → 0x62369(ui, 컬렉터 k, 0) → 0x74ef5(창, 글, 종류 1)
+ * 14c8a   끝 — StrMODE[92] "구매 완료" 창이 없다
+ * ```
+ * StrMODE[92] 를 0x702b5 로 꺼내는 곳은 이 함수의 **kind 1 서브아이템 갈래 하나**(0x14d28 → 0xbbef9(글, 1, 1, 1))와 시즌 0x7fa6 ·
+ * 메인 메뉴 0x30972 뿐이다(전수, `movs r1,#0x5c` + 0x702b5). 그래서 장비는 구매 완료 창이 **없다**.
+ * 0x62368 의 0x74ef4 는 구매 확인 창이 아직 떠 있어([창+9] ≠ 0 — 닫힘 애니 동안도) 글을 **대기 칸**(+0x2a4 = 1 · +0x2a8 글)에
+ * 넣고, 확인 창 닫힘이 끝나면 0x754f8 → 0x742a8(닫기) → 0x75440 이 그 글로 창을 다시 세운다. 곧 차례는
+ * **구매 확인 창 닫힘 → 히든 오픈 알림 창**(새로 연 컬렉터가 있을 때만)이다.
+ */
 function selectEquipment(career: PlayerCareer, part: number, level: number): ShopSelection {
   const item = equipmentItemOf(part, level)
   const blockReason = equipmentBlockReasonOf(career, part, level)
@@ -63,9 +85,9 @@ function selectEquipment(career: PlayerCareer, part: number, level: number): Sho
   }
   if (blockReason !== null) return { career, notice: EQUIPMENT_BLOCK_TEXT[blockReason] }
   const bought = purchaseEquipment(career, part, level)
+  // 0x62368 셋째 인자 0 — 이미 열린 k(0x61f5c)는 창을 안 띄운다
   const opened = bought.openedHiddenIds.filter((id) => !career.openedHiddenIds.includes(id))
-  const openTexts = opened.map(hiddenOpenTextOf).filter((text): text is string => text !== null)
-  return { career: bought, notice: [purchasedText(item.name), ...openTexts].join(' · ') }
+  return { career: bought, notice: '', openedHiddenIds: opened }
 }
 
 const TEN_THOUSAND = 10_000

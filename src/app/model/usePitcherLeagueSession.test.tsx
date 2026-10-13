@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { EMPTY_LEAGUE, startPostseason } from '@/entities/league/model/league'
@@ -1385,14 +1385,23 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
     expect(result.current.career?.seenEventIds).toContain(String(eventId))
   })
 
-  it('보상 종류 7(히든 오픈)은 0x62368 팝업 글을 띄운다 — 투수 id 19~34 는 [142] 투수편, 35~ 는 [143] 타자편', async () => {
-    const result = await 판짜기({ gamesPlayed: 0 })
+  it('보상 종류 7(히든 오픈)은 0x62368(…, |v|, 1) — 공용 알림 창에 k 를 넘긴다(글은 공용 창의 원문 마크업)', async () => {
+    const 알림 = vi.fn()
+    const { result } = renderHook(() => usePitcherLeagueSession(
+      메모리저장(), createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
+      undefined, true, 알림,
+    ))
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 0 }))
+    await 이벤트불러오기(result)
+    첫이벤트넘기기(result)
     act(() => result.current.actions.openOuting())
     act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
     act(() => result.current.actions.completeStory([{ kind: 7, value: 19 }, { kind: 7, value: 43 }], [result.current.story!.eventId]))
 
     expect(result.current.career?.openedHiddenIds).toEqual([19, 43])
-    expect(result.current.storyNotice).toMatch(/^히든 아이템 오픈!! \[.+\] 나만의리그 투수편에서 사용가능합니다!N히든 아이템 오픈!! \[.+\] 나만의리그 타자편에서 사용가능합니다$/)
+    expect(result.current.storyNotice).toBe('')
+    expect(알림).toHaveBeenCalledWith([19, 43])
   })
 
   it('[!] 칸은 112 에 들어설 때 한 번 찍는다(0x118e4) — 지도에 있는 동안 커리어가 바뀌어도 그대로, [들어가기] 도 그 칸(0x8ce58)', async () => {
@@ -1622,6 +1631,28 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
 })
 
 describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
+  it('컬렉터가 되는 일곱째 구매는 구매 완료 창 없이 공용 알림 창에 k 를 넘긴다 (0x14a74 → 0x62368(ui, 20, 0))', () => {
+    const 알림 = vi.fn()
+    const { result } = renderHook(() => usePitcherLeagueSession(
+      메모리저장(), createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
+      undefined, true, 알림,
+    ))
+    act(() => result.current.actions.create('투수', 신인))
+    act(() => result.current.actions.save({
+      ...result.current.career!, money: 200_000, popularity: 999, ownedEquipment: ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5'],
+    }))
+    act(() => result.current.actions.openShop('장착'))
+    act(() => result.current.actions.purchase(shopItemId('장착', 0, 6)))
+
+    expect(result.current.shopNotice).toBe('')
+    expect(알림).toHaveBeenCalledWith([20])
+    // 이미 전역에서 열린 k 면 0x62368 셋째 인자 0 이라 창이 없다
+    알림.mockClear()
+    act(() => result.current.actions.save({ ...result.current.career!, ownedEquipment: ['1-0', '1-1', '1-2', '1-3', '1-4', '1-5'] }))
+    act(() => result.current.actions.purchase(shopItemId('장착', 1, 6), [24]))
+    expect(알림).not.toHaveBeenCalled()
+  })
+
   it('장비를 사면 소지금·장착 니블이 저장에 들어가고, 투수 그림 등급(0x79790)이 그 니블을 받는다', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
@@ -1636,7 +1667,8 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
     act(() => result.current.actions.purchase(shopItemId('장착', 0, 9), [21]))
 
     const career = result.current.career!
-    expect(result.current.shopNotice).toBe('[사신의 두건] 구매 완료')
+    // 장비는 구매 완료 창이 없다 (0x14a74 kind 3)
+    expect(result.current.shopNotice).toBe('')
     expect(career.money).toBe(50_000)
     expect(career.equipmentLevels.control).toBe(10)
     expect(career.openedHiddenIds).toContain(21)

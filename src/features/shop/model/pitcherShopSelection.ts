@@ -1,7 +1,7 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
   equipOwnedPitcherEquipment, isPitcherEquipmentEquipped, ownsPitcherEquipment, pitcherEquipmentBlockReasonOf,
-  pitcherEquipmentItemOf, pitcherHiddenOpenTextOf, purchasePitcherEquipment,
+  pitcherEquipmentItemOf, purchasePitcherEquipment,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 import type { PitcherEquipmentBlockReason } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { formatOriginalMoney, opensGpDetailWindow } from '@/features/shop/model/shopSelection'
@@ -30,6 +30,8 @@ export interface PitcherShopSelection {
   readonly notice: string
   /** GP 칸 0~4·6 — 타자편과 같은 상세 결과 창 (0x14a74 모드 공용, `opensGpDetailWindow`) */
   readonly detail?: GpDetailOf<PitcherCareer> | null
+  /** 장비 구매가 새로 연 히든 k (컬렉터 20·24·28·32) — 공용 알림 창에 띄운다 (창 차례는 `shopSelection` 의 `selectEquipment` 머리말) */
+  readonly openedHiddenIds?: readonly number[]
 }
 
 const BLOCK_TEXT: Readonly<Record<Exclude<PitcherEquipmentBlockReason, '인기도부족'>, string>> = {
@@ -37,7 +39,8 @@ const BLOCK_TEXT: Readonly<Record<Exclude<PitcherEquipmentBlockReason, '인기�
   이미보유: '이미 가지고 있는 아이템입니다', // StrMODE[78]
   소지금부족: '소지금이 부족합니다', // StrMODE[77]
 }
-const purchasedText = (name: string) => `[${name}] 구매 완료` // StrMODE[92]
+/** StrMODE[92] — 서브아이템(kind 1)만 띄운다 (0x14d28). 장비(kind 3)는 구매 완료 창이 없다 (창 차례는 `shopSelection` 의 `selectEquipment` 머리말) */
+const purchasedText = (name: string) => `[${name}] 구매 완료`
 
 const parse = (itemId: string) => {
   const [tab, first, second] = itemId.split(':')
@@ -122,9 +125,7 @@ export function selectPitcherShopItem(career: PitcherCareer, itemId: string, ran
   const blockNotice = pitcherEquipmentBlockNoticeOf(career, part, level)
   if (blockNotice !== null) return { career, notice: blockNotice }
   const bought = purchasePitcherEquipment(career, part, level)
-  const openTexts = bought.openedHiddenIds
-    .filter((id) => !career.openedHiddenIds.includes(id))
-    .map(pitcherHiddenOpenTextOf)
-    .filter((text): text is string => text !== null)
-  return { career: bought, notice: [purchasedText(pitcherEquipmentItemOf(part, level).name), ...openTexts].join(' · ') }
+  // 0x14a74 kind 3 — 구매 완료 창 없이 새로 연 컬렉터 k 만 (0x62368 셋째 인자 0 이라 이미 열린 k 는 창이 없다)
+  const opened = bought.openedHiddenIds.filter((id) => !career.openedHiddenIds.includes(id))
+  return { career: bought, notice: '', openedHiddenIds: opened }
 }

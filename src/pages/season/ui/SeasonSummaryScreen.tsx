@@ -6,7 +6,7 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
   SEASON_AUTOBOT_BAT_HIDDEN_ID, koreanSeriesRewardOf, nextLeagueFirstAward,
 } from '@/entities/season-mode/model/seasonRewards'
-import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
+import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import type {
   LeagueFirstAward, SeasonReward, SeasonSummaryEntry,
 } from '@/entities/season-mode/model/seasonRewards'
@@ -175,7 +175,7 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
 
       {phase === '해금알림' && (
         <MessageBox
-          text={hiddenOpenTextOf(SEASON_AUTOBOT_BAT_HIDDEN_ID) ?? ''}
+          text={hiddenOpenNoticeTextOf(SEASON_AUTOBOT_BAT_HIDDEN_ID) ?? ''}
           buttons={['OK']}
           // 꼬리표 0 이 닫히면 0x87e8 — 리그 1위 G 검사를 한 번 (1·5·10 중 아직 안 받은 첫 칸 하나)
           onAnswer={checkLeagueFirst}
