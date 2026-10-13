@@ -1265,6 +1265,19 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
     expect(실시간Random.rand(0, 10_000)).toBe(미리Random.rand(0, 10_000))
   })
 
+  it('견제 판 이름 판(0x43cb0) 칸 0 은 마운드의 나 — 이름(`myName`) · 보직(레코드 +0xb & 3)', () => {
+    const progress = startPitcherGame({ ...기본옵션, myName: '나투수' }, 씨앗(1))
+    const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+    const 붙듦 = pickoff(일루, '3', 씨앗(5), true)
+    const pending = 붙듦.pendingRunnerPlay
+    expect(pending?.kind).toBe('pickoff')
+    if (pending?.kind !== 'pickoff') return
+    expect(pending.input.fielderPlates?.[0]).toEqual(
+      일루.onMound ? { name: '나투수', pitcherRole: 기본옵션.role } : null,
+    )
+    expect(pending.input.runnerAces?.first ?? null).toBeNull()
+  })
+
   it('주자가 없으면 CPU 도루 굴림이 없다 — 못 맞힌 공은 0.1% 굴림(0x35034) 하나만 더 쓴다', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
     const 끝 = startPitch(progress, 가운데직구, 씨앗(3))

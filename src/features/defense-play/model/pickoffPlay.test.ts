@@ -213,7 +213,7 @@ describe('견제 판 그림 칸 — 공 가진 야수 고리(0x43cb0) · 이름 
     const random = createFractionRandom(() => values.shift() ?? 0.9)
     const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
     expect(result.errantThrow).toBe(true)
-    const 던진틱 = result.ticks.findIndex((view) => view.fielders.some((fielder) => fielder.slot === 0 && fielder.throwErrorTicks > 0))
+    const 던진틱 = result.ticks.findIndex((view) => view.fielders.some((fielder) => fielder.slot === 0 && (fielder.throwErrorTicks ?? 0) > 0))
     expect(던진틱).toBeGreaterThanOrEqual(0)
     expect(result.ticks[던진틱]?.fielders.find((fielder) => fielder.slot === 0)?.throwErrorTicks).toBe(4)
   })
