@@ -90,3 +90,22 @@ describe('스페셜 에디트 화면', () => {
     expect(originalNameOf(teamBatters(0)[0])).not.toBe('Kim')
   })
 })
+
+describe('머리띠 미끄러짐 [skin+0x84] — 상태 29 는 처음 선 하위 0 에서만 (0x24804 · 0x2e1e0 의 0x63b14 첫 그림)', () => {
+  const coinTop = () => (screen.getByTestId('머리띠-G').querySelector('[data-badge-coin]') as HTMLElement).style.top
+
+  it('처음 하위 0 은 미끄러지고, 명단(하위 1)에서 돌아온 하위 0 은 다 내려온 자리다', async () => {
+    const { ScreenFrame } = await import('@/widgets/screen-frame/ui/ScreenFrame')
+    const settled = render(<ScreenFrame title="팀선택" gamePoint={0} onBack={null} slides={false} />)
+    const settledTop = coinTop()
+    settled.unmount()
+
+    render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={vi.fn()} />)
+    expect(coinTop()).not.toBe(settledTop)
+    key('Enter')
+    expect(coinTop()).toBe(settledTop)
+    key('Escape')
+    expect(screen.queryByTestId('엔트리-줄-0')).toBeNull()
+    expect(coinTop()).toBe(settledTop)
+  })
+})

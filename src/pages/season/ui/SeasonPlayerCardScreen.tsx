@@ -153,7 +153,7 @@ export function SeasonPlayerCardScreen({
         </>
       )}
 
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isDetailOpen ? onCloseDetail : onBack} footer={7} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isDetailOpen ? onCloseDetail : onBack} footer={7} slides={false} />
 
       {isDetailOpen && (
         <DetailWindow rows={detail.rows} messages={detail.messages} scrollOffset={scrollOffset} onClose={onCloseDetail} />

@@ -119,7 +119,7 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
           )
         })}
       </div>
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
     </RawScreen>
   )
 }

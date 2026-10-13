@@ -104,7 +104,7 @@ export function SeasonItemShopScreen({
           isKeyEnabled={!isPopup}
         />
       </div>
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
       {question !== null && (
         <MessageBox text={question.text} buttons={['예', '아니오']}
           onAnswer={(index) => (index === 0 ? buy(question.slot) : setQuestion(null))} />

@@ -196,7 +196,7 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScree
       <div style={{ position: 'absolute', left: 8, top: 260, width: 224 }}>
         <MarkupText raw={`!C${NAME_LIMIT_GUIDE}`} />
       </div>
-      <ScreenFrame title="시즌모드" gamePoint={0} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} />
+      <ScreenFrame title="시즌모드" gamePoint={0} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
       {isAsking && (
         <MessageBox text={DECIDE_QUESTION} buttons={['예', '아니오']}
           onAnswer={(answer) => {

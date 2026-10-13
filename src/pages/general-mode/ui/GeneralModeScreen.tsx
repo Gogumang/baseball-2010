@@ -245,9 +245,13 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
   }
 
   switch (flow.step) {
+    // 18 · 19 는 다른 하위 상태라 들어설 때마다 새로 선다: 들어옴 0x23e08 · 0x23e70 이 목록 [메뉴+0x74] 커서를
+    // vt+0x14(0, 0)(0x6c00c) 로 0 칸에 두고, 그림 0x2de3c · 0x2ddb0 의 공용 목록 0x63b14 가 상태 틱 0 인 첫 그림에서
+    // [skin+0x84] 를 세워 머리띠가 다시 미끄러진다 — key 로 둘을 갈라 같은 화면을 이어 쓰지 않는다
     case GENERAL_MODE_STEP.유저팀:
       return (
         <TeamSelectScreen
+          key="18"
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           onSelect={actions.selectUserTeam}
@@ -259,6 +263,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
     case GENERAL_MODE_STEP.AI팀:
       return (
         <TeamSelectScreen
+          key="19"
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           // ⚠️ 유저 팀과 같은 팀인지 보지 않는다 — 원본 그대로다 (R4 3a 상태 19)
@@ -315,6 +320,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             onCloseAceLocked={actions.closeEntryAceLocked}
             // 그림 0x2e070 도 22 진입이 떠 둔 구장 바탕(0x581dc(skin, [메뉴+0xb8], 0))을 먼저 깐다
             underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
+            // 23 진입 0x2648c 는 [skin+0x84] 를 안 세우고 그림 0x2e070 도 공용 목록 0x63b14 를 안 부른다
+            slides={false}
           />
         )
       }

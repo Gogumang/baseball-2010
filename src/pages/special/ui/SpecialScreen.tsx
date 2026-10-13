@@ -235,7 +235,7 @@ export function SpecialScreen({
 
       {gamePoint === undefined
         ? <SpecialBands onBack={onBack} />
-        : <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />}
+        : <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} slides={false} />}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
