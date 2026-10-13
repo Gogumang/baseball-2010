@@ -68,6 +68,9 @@ import type { EntryTab } from '@/entities/season-mode/model/entryEditor'
 import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
+/** 기록연감 해금표에서 히든 팀이 쓰는 마지막 번호 (팀 10~14) */
+const LAST_HIDDEN_TEAM_ID = 14
+
 interface SeasonRouteProps {
   readonly session: SeasonSession
   readonly random: RandomPort
@@ -500,7 +503,10 @@ export function SeasonRoute({
         mode={scene === SEASON_SCENE_STATE.구장관리 ? '구장관리' : '상점'}
         // 히든 칸 해금 플래그 `app[0xe0 + 종류×4 + (칸−4)]` (S3 7절) — 전역 저장 칸이라
         // 시즌 레코드가 아니라 세션이 들고 있다. 안 넘기면 히든이 영영 안 열린다
-        isHiddenOpen={(unlockId) => session.openedStadiumIds.includes(unlockId)}
+        // 나리 명전 등록(0x1ca4c)이 연 전광판 17 은 기록연감의 전역 해금표에 든다. 그 표는 히든 팀을 팀 번호 10~14 로 들어
+        // 관중석 13 · 14 와 번호가 겹치므로 거기서는 15 이상만 읽는다
+        isHiddenOpen={(unlockId) => session.openedStadiumIds.includes(unlockId)
+          || (unlockId > LAST_HIDDEN_TEAM_ID && (hallOfFame?.openedHiddenIds ?? []).includes(unlockId))}
         onUnlock={actions.openStadiumItems}
         onChange={actions.updateRecord}
         // 상점(0xdc 종류 4) 취소는 아이템 메뉴 0xd0 (0x957c 종류 4 갈래 0x9aa2 → 0x9bd4~0x9bec)

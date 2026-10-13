@@ -109,6 +109,8 @@ const MISSION_SCREENS: readonly Screen['kind'][] = [
 
 /** 일반모드 = 원본 모드 1 (0x22c7d 의 획득 GP 칸 0) */
 const GENERAL_STAT_MODE = 1
+/** 0x1ca4c 1cb42 `movs r1, #0x11` — 나리 명전 등록 완료 창 뒤에 여는 히든 (전광판 칸 1 "고대의전광판") */
+const REGISTERED_HALL_OF_FAME_HIDDEN_ID = 17
 /** 투수 미션 · 타자 미션 = 원본 모드 5 · 6 (0x29a54 → 표 0xcec00) */
 const MISSION_PITCHER_MODE = 5
 const MISSION_BATTER_MODE = 6
@@ -187,8 +189,8 @@ export function App() {
   const recordSeasonRegularWinRef = useRef<() => void>(() => {})
   const recordSeasonRegularWin = useCallback(() => recordSeasonRegularWinRef.current(), [])
   /** `0x62368(ui, k, 0)` — 기록연감 훅의 열기 + 알림. 미션 세션이 그보다 먼저 서므로 `recordStatRef` 처럼 꽂는다 */
-  const openHiddenRef = useRef<(id: number) => boolean>(() => false)
-  const openHidden = useCallback((id: number) => openHiddenRef.current(id), [])
+  const openHiddenRef = useRef<(id: number, then?: (() => void) | null) => boolean>(() => false)
+  const openHidden = useCallback((id: number, then: (() => void) | null = null) => openHiddenRef.current(id, then), [])
   /** 시즌 팀 경기가 영입한 명전 선수를 그 기록으로 세울 때 읽는 명전 칸 — 위 ref 와 같은 값 */
   const readHallOfFame = useCallback(() => hallOfFameForMissionRef.current, [])
   /**
@@ -589,6 +591,8 @@ export function App() {
           collection: collection.collection,
           nariBatter: nariBatterOf(careerSession.career ?? careerSession.savedCareer),
           register: (target, slot) => collection.registerPitcher(target, wallet, slot),
+          // 145 완료 창(꼬리표 0x30) 닫힘 0x1ca4c — 히든 17 을 열면 알림(꼬리표 0x31)을 닫은 뒤 메인 메뉴로
+          openRegisteredHidden: (then: () => void) => openHidden(REGISTERED_HALL_OF_FAME_HIDDEN_ID, then),
           // 등록 목록(상태 145) 머리띠 0x54d95(skin, 9 "나만의리그 투수편", 5) 가 전역 G 를 그린다
           gamePoint: wallet.balance,
         }}
@@ -705,6 +709,8 @@ export function App() {
         collection: collection.collection,
         nariPitcher: nariPitcherOf(pitcherSession.career),
         register: (target, slot) => collection.register(target, wallet, slot),
+        // 145 완료 창(꼬리표 0x30) 닫힘 0x1ca4c — 히든 17 을 열면 알림(꼬리표 0x31)을 닫은 뒤 메인 메뉴로
+        openRegisteredHidden: (then: () => void) => openHidden(REGISTERED_HALL_OF_FAME_HIDDEN_ID, then),
         // 등록 목록(상태 145) 머리띠 0x54d95(skin, 8 "나만의리그 타자편", 5) 가 전역 G 를 그린다
         gamePoint: wallet.balance,
       }}
