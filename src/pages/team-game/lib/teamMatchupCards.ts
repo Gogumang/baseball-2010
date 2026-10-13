@@ -185,6 +185,7 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
   readonly batterSide?: number
+  readonly aceBatterOrder?: number
   readonly pitcherForm: number
   readonly pitcherHand: number
 } {
@@ -201,6 +202,7 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
       batterSkinIndex: (profile >> 2) & 3,
       batterTeamIndex: teamId,
       batterSide: teamBatterHandOf(teamId, batter),
+      aceBatterOrder: batter.aceIndex,
       pitcherForm,
       pitcherHand,
     }

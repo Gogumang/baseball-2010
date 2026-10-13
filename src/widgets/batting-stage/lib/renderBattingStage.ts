@@ -38,7 +38,7 @@ import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedRea
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
-import { batterLayersOf, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { aceBatterLayersOf, batterLayersOf, isAceBatterOrder, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
@@ -93,6 +93,11 @@ export interface StageScene {
   readonly swingFrame: number
   /** 타자 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) */
   readonly bodyType: number
+  /**
+   * 마타자 순번 `0xb63a0(타자)` (0~4) — 있으면 몸통 적재 0x78ab0 이 `ace/batter_*` 를 싣고 그리기 0x78cfc 가 그 한 장만 그린다
+   * (`aceBatterLayersOf`). 없거나 음수면 일반 타자 겹
+   */
+  readonly aceBatterOrder?: number
   /**
    * 타자 그림의 대체 팔레트 재료 — 몸통 = **피부 × 15 + 팀** · 헬멧 = **팀** (0x78be8·0x78c14, C-1).
    * 원본은 그림 객체를 세울 때 선수 레코드 `rec[0xb]` 의 피부(bit2-3)와 팀 번호를 같이 넘긴다 (0x10810).
@@ -194,7 +199,7 @@ export function renderBattingStage(
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
-  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
+  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
   }
@@ -453,6 +458,7 @@ function drawBatter(
   skinIndex: number,
   teamIndex: number,
   equipment: BatterEquipment,
+  aceOrder?: number,
 ): void {
   const anchor = stageLayoutOf(side).batterAnchor
   // 좌우 이동(fe4)은 원본도 객체 x(+4)에 그대로 더하므로 거울 축을 그 자리로 옮겨 방향을 지킨다.
@@ -463,7 +469,8 @@ function drawBatter(
     context.translate(axisX * 2, 0)
     context.scale(-1, 1)
   }
-  for (const layer of batterLayersOf(swingFrame, bodyType, equipment)) {
+  const layers = isAceBatterOrder(aceOrder) ? aceBatterLayersOf(swingFrame, aceOrder) : batterLayersOf(swingFrame, bodyType, equipment)
+  for (const layer of layers) {
     const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, skinIndex, teamIndex))
     if (frame === null) continue
     context.drawImage(frame.image, axisX + frame.offsetX, anchor.y + frame.offsetY)

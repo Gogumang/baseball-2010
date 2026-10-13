@@ -38,6 +38,11 @@ interface PitcherSideStageProps {
    * 타자 손 0xb63c0 (화면 배치 +0x17e1) — 안 주면 폼의 낮은 비트. 마타자는 폼이 아니라 표 0xd88b0 이라 부르는 쪽이 준다
    */
   readonly batterSide?: number
+  /**
+   * 마타자 순번 `0xb63a0(타자)` (0~4) — 타석 교대 0x47dd6 이 몸통 적재 0x78ab0 에 넘겨 `ace/batter_*` 한 장을 싣고, 스윙 객체
+   * +0x24(0x35686)로 자세표 0xb905c 의 마타자 갈래를 고른다. 없으면 일반 타자
+   */
+  readonly aceBatterOrder?: number
   /** 마운드의 내 투수 — 폼(단계 표) · 손(좌투 뒤집기) · 장비 겹(0x79790) */
   readonly pitcherForm: number
   readonly pitcherHand: number
@@ -152,8 +157,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           swingTick: swingTick,
           isBunting: swingTick !== null && shownSwing !== null && shownSwing.buntKind !== 0 && nowTick >= swingTick && !isIdle,
           bodyType,
+          ...(current.aceBatterOrder === undefined ? {} : { aceOrder: current.aceBatterOrder }),
         }),
         bodyType,
+        ...(current.aceBatterOrder === undefined ? {} : { aceBatterOrder: current.aceBatterOrder }),
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,
         batterEquipment: NO_EQUIPMENT,

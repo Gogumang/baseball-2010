@@ -286,6 +286,8 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     canBunt,
     swingMode,
     batterForm,
+    // 마타자 순번 — 타석 교대 0x47dd6 이 몸통 적재 0x78ab0 에, 0x35686 이 스윙 객체 +0x24 에 넣는 0xb63a0
+    aceBatterOrder: aceBatterIndex,
     batterSkinIndex,
     batterEquipment: batterEquipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(batterEquipmentLevels),
     // 팀을 안 넘기면 HUD 의 내 팀 번호를 쓴다 (근사 — props 주석 참고)

@@ -620,7 +620,7 @@ export function PitcherAceMatchRoute(
  * 투수 미션 타석 장면 재료 — 마운드는 미션 투수(폼 · 손 0xb63c0 = 폼 & 1 · 장비 겹 — 0x108f8 이 선수 게터 0x1fbd0 의 기록 사본을
  * 0x10810 에 넘겨 니블로 0x79790), 타석은 지금 CPU 타자 0xae89c 의 명단 줄(폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 팀).
  * 마타자 칸은 미션 상대 마선수(`opponentAce` − 1)의 XlsACE_BAT_DATA +0xb · 손 표 0xd88b0.
- * ⚠️ 미이식: 마타자 폼 4~8 의 마타자 그림(0x78ab0) — 웹 타자 겹은 보통 몸통뿐이다.
+ * 마타자는 순번 0xb63a0 으로 몸통 적재 0x78ab0 이 `ace/batter_*` 를 싣는다(`aceBatterOrder`).
  */
 function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: PitcherRun): PitchingStageSource {
   const form = session.pitcher.repertoire.form
@@ -635,7 +635,7 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),
     batterForm: profile >> 4,
     batterSkinIndex: (profile >> 2) & 3,
-    ...(aceIndex >= 0 ? { batterSide: batterHandOf(profile, aceIndex) } : {}),
+    ...(aceIndex >= 0 ? { batterSide: batterHandOf(profile, aceIndex), aceBatterOrder: aceIndex } : {}),
     batterTeamIndex: run.cpu.batting?.teamId ?? 0,
   }
 }
