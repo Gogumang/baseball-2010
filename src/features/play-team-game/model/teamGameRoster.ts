@@ -162,9 +162,11 @@ export function quickBatterFor(
 ): QuickAtBatBatter {
   const ability = batterGameAbilities(context, teamId, battingOrderIndex)
   const roster = teamBatters(teamId)
-  const player = roster[((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM]
-  // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 비트를 읽는다(모드 검사 없음)
-  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: skillIdsOfBits(player?.skillBits ?? 0, false) }
+  const slot = ((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM
+  const player = roster[slot]
+  // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 비트를 읽는다(모드 검사 없음).
+  // 레코드 칸 0xb6394 = Xls 행 +0xa & 0x1f = 붙박이 칸 (`batterAt` 주석)
+  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: skillIdsOfBits(player?.skillBits ?? 0, false), recordSlot: slot }
 }
 
 /** 간이 타석 엔진이 보는 투수 */

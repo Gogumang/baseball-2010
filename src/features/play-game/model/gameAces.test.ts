@@ -9,6 +9,7 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import {
   ACE_BATTER_ROSTER_SLOT,
   ACE_PITCHER_SLOT,
+  gameAceBatterOf,
   withAceBatterLineup,
 } from '@/features/play-game/model/gameAces'
 import type { GameAceSetup } from '@/features/play-game/model/gameAces'
@@ -29,6 +30,9 @@ describe('마타자 넣기 0xb8870 → 0xb53f0 (명단 9번, 옛 9번은 맨 끝
     const lineup = withAceBatterLineup(rosterLineupOf(12), 0)
     expect(lineup.rosterSlots.slice(9)).toEqual([ACE_BATTER_ROSTER_SLOT, 10, 11, 9])
     expect(lineup.benchBatters).toBe(4)
+    // 0xb8870 b889a 가 0xb8768 로 다시 매긴다 — 맨 끝으로 밀린 옛 9번(로스터 9)의 레코드 칸은 12
+    expect(lineup.recordSlots?.[12]).toBe(12)
+    expect(gameAceBatterOf(2, undefined)?.recordSlot).toBe(2)
   })
 
   it('번호가 −1 이면 아무도 안 들어간다', () => {

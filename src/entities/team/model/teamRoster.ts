@@ -73,10 +73,17 @@ export function quickPitcherOf(player: RosterPlayer, equipment?: readonly number
   }
 }
 
-/** 타순 index 번째 타자 (12명을 돌려 쓴다) */
+/**
+ * 타순 index 번째 타자 (12명을 돌려 쓴다).
+ *
+ * 레코드 칸 `0xb6394(타자)` = `+0xa & 0x1f` — XlsBATTER_DATA 행 +0xa 는 `0x20 + 팀 안 칸`(0~11, zt1 을 풀어 확인)이고 경기 준비
+ * 0xb8768 → 0xb603c 도 마선수 아닌 줄을 배열 첨자로 다시 매기므로 붙박이 칸 그대로다. 명단이 다른 차례(마타자를 넣어 밀린 칸 ·
+ * 나리 명단)면 부르는 쪽이 `withLineupRecordSlot` 으로 그 첨자를 단다
+ */
 export function batterAt(teamId: number, battingOrderIndex: number): QuickAtBatBatter {
   const roster = teamBatters(teamId)
-  return quickBatterOf(roster[battingOrderIndex % roster.length])
+  const slot = battingOrderIndex % roster.length
+  return { ...quickBatterOf(roster[slot]), recordSlot: slot }
 }
 
 /**

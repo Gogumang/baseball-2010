@@ -1,7 +1,7 @@
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
 import { teamBatters } from '@/entities/team/model/teamRoster'
-import { QUICK_LINEUP_SIZE } from '@/entities/game/model/quickLineup'
+import { QUICK_LINEUP_SIZE, renumberedRecordSlotsOf } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
 
@@ -255,6 +255,8 @@ export function nariQuickLineupOf(record: NariTeamRecord): QuickLineup {
     rosterSlots,
     records: rosterSlots.map(() => EMPTY_BATTER_GAME_RECORD),
     benchBatters: Math.max(0, rosterSlots.length - QUICK_LINEUP_SIZE),
+    // 경기 장면 0x39fdc(3a2fa)가 0xb8768 → 0xb603c 로 다시 매긴다 — 붙박이 칸이 아니라 이 레코드 배열의 첨자
+    recordSlots: renumberedRecordSlotsOf(rosterSlots.length),
   }
 }
 

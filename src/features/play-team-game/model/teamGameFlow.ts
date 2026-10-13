@@ -1805,6 +1805,8 @@ function entryQuickBatterOf(
     run: ability[3],
     // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 +0x14 를 모드 검사 없이 읽는다 (마타자는 제 행)
     skillIds: entryBatterSkillIdsOf(entry),
+    // 레코드 칸 0xb6394 — 경기 시작 명단 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`, 사람 타석 투수 스킬 31 과 같은 값)
+    ...(entry?.recordSlot === undefined ? {} : { recordSlot: entry.recordSlot }),
     // 기록으로 선 표 밖 타자(영입한 명전 · 나리)는 레코드 +0xa 비트7(0xb6389) — 0xab214 의 내 선수 갈래가 레코드를 직접 읽는다
     ...(entry !== undefined && aceIndex < 0 && entry.rosterSlot === NO_ROSTER_SLOT ? { isOwnPlayer: true } : {}),
     // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (k = 레벨·5 + 순번, `quickSwingBoostOf`)

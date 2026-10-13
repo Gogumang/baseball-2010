@@ -26,6 +26,7 @@ import {
   recordLineupPlay,
   rosterSlotAt,
   tryQuickCpuPinchHit,
+  withLineupRecordSlot,
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -469,7 +470,8 @@ export function* simulateHalfInningTicks(
   /** 이 타순 커서에 지금 선 타자 — 명단이 있으면 명단에서, 없으면 예전처럼 `batterAt` 으로 */
   const batterOn = (cursor: number): QuickAtBatBatter =>
     offense !== undefined && lineup !== undefined
-      ? offense.batterOf(rosterSlotAt(lineup, cursor))
+      ? // 레코드 칸 0xb6394 는 명단이 든다 — 경기 준비가 다시 매긴 배열 첨자(`QuickLineup.recordSlots`)
+        withLineupRecordSlot(offense.batterOf(rosterSlotAt(lineup, cursor)), lineup, cursor)
       : batterAt(cursor)
   /**
    * **A(`+0x284`)** 이 투수의 이번 이닝 실점. 이닝 교대 0xa5b00 이 0 으로 되돌리므로
