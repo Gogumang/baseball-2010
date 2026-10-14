@@ -49,6 +49,7 @@ import {
   startTeamGame,
   startThrowPitch,
   stealableBases,
+  stepAutoRelay,
   startSteal,
   summaryOf,
   throwPitch,
@@ -56,6 +57,7 @@ import {
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { baserunnerAllowedOfFates } from '@/features/defense-play/model/runnerFates'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
 import {
   clearSeasonGameRecord,
@@ -667,6 +669,108 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
       expect(실시간Random.rand(0, 0x7fffffff)).toBe(미리Random.rand(0, 0x7fffffff))
     }
     expect(deferred).toBeGreaterThan(0)
+  })
+})
+
+describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 번 부른다 (판정 B 0xae3e8 ae576 → ae5a8)', () => {
+  const 헛스윙: PitchOutcomeDetail = {
+    resolution: { kind: '스트라이크', isSwinging: true },
+    hasSwung: true,
+    isBunt: false,
+    resultCode: null,
+  }
+  const 투스트라이크일루 = () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    return {
+      progress: {
+        ...progress,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+        atBat: { ...progress.atBat, strikes: 2 },
+      },
+      random,
+    }
+  }
+  const 상대투수삼진 = (progress: TeamGameProgress) =>
+    progress.pitcherLines
+      .filter((line) => line.teamId === progress.options.opponentTeamId)
+      .reduce((sum, line) => sum + line.strikeouts, 0)
+
+  it('우리 타자 삼진 + 도루 — 타석 칸 · 결과 링(a8ac8 · a8a04) · 리그 타수(a8852)가 안 오르고, 상대 투수 탈삼진(a8d14)은 오른다', () => {
+    const { progress } = 투스트라이크일루()
+    const slot = progress.game.battingOrderIndex
+    const 도루 = applyBatterPitch(startSteal(progress, 1), 헛스윙, createSeededRandom(1))
+    const 그냥 = applyBatterPitch(progress, 헛스윙, createSeededRandom(1))
+
+    expect(도루.lastArrivalPlay?.kind).toBe(5)
+    expect(그냥.lastArrivalPlay).toBeNull()
+    // 둘 다 삼진으로 한 아웃이 오르고 다음 타자다
+    expect(도루.game.outs).toBe(progress.game.outs + 1)
+    expect(그냥.game.outs).toBe(progress.game.outs + 1)
+    expect(도루.game.battingOrderIndex).toBe(그냥.game.battingOrderIndex)
+    // 보통 삼진은 타석 칸 · 리그 타수를 올린다
+    expect(그냥.ourEntryRecords[slot]?.plateAppearances).toBe((progress.ourEntryRecords[slot]?.plateAppearances ?? 0) + 1)
+    expect(그냥.leaguePlateAppearances.length).toBe(progress.leaguePlateAppearances.length + 1)
+    // 종류 5 정산은 둘 다 건너뛴다
+    expect(도루.ourEntryRecords[slot]).toEqual(progress.ourEntryRecords[slot])
+    expect(도루.leaguePlateAppearances).toEqual(progress.leaguePlateAppearances)
+    // 상대 투수 줄의 탈삼진은 둘 다 하나
+    expect(상대투수삼진(도루)).toBe(상대투수삼진(progress) + 1)
+    expect(상대투수삼진(그냥)).toBe(상대투수삼진(progress) + 1)
+    // 기록 8(도루) 은 그대로
+    expect(도루.recordIds).toEqual([...progress.recordIds, 8])
+  })
+
+  it('우리 수비 삼진 + CPU 도루 — 상대 타석 칸 · 리그 타수가 안 오르고, 출루 허용 state[0x88] 은 판의 주자 목록대로다', () => {
+    let found = 0
+    for (let seed = 1; seed <= 3000 && found < 3; seed += 1) {
+      const { progress } = 시작({}, seed)
+      const 일루 = {
+        ...progress,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+        atBat: { ...progress.atBat, strikes: 2 },
+      }
+      const pitch = { typeNumber: 첫구질(일루), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 }
+      const next = throwPitch(일루, pitch, createSeededRandom(seed * 7919))
+      const play = next.lastArrivalPlay
+      if (play?.kind !== 5 || next.game.outs !== 일루.game.outs + 1 || next.opponentOrderIndex === 일루.opponentOrderIndex) continue
+      found += 1
+      const slot = 일루.opponentOrderIndex
+      expect(next.opponentEntryRecords[slot]).toEqual(일루.opponentEntryRecords[slot])
+      expect(next.leaguePlateAppearances).toEqual(일루.leaguePlateAppearances)
+      expect(next.pitching.allowedBaserunner).toBe(baserunnerAllowedOfFates(play.result.runnerFates))
+      // R[3] — 삼진 아웃 하나(1루 도루는 늘 세이프)
+      expect(next.recordTally.moundOuts).toBe(일루.recordTally.moundOuts + 1)
+      expect(next.recordTally.moundStrikeouts).toBe(일루.recordTally.moundStrikeouts + 1)
+    }
+    expect(found).toBeGreaterThan(0)
+  })
+})
+
+describe('자동으로 넘긴 상대 간이 타석의 출루 허용 state[0x88] — 정산 주자 목록 마지막 원소 (0xc1054 · 0xc1170 · c1918)', () => {
+  it('타자가 나간 결과(안타 · 홈런 · 볼넷 · 사구)는 득점이 없을 때만, 아웃 · 삼진은 루에 주자가 있으면 선다', () => {
+    const 전부자동 = { ...FULL_PLAY_SETTINGS, kind: MATCH_SETTING_KIND.상세, value: 0 } as const
+    const seen = { 나감: 0, 득점나감: 0, 주자아웃: 0, 빈루아웃: 0 }
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const random = createSeededRandom(seed)
+      let current = startTeamGame({ ...기본옵션, settings: 전부자동, liveAutoRelay: true }, random)
+      for (let step = 0; step < 2000 && current.autoRelay != null; step += 1) {
+        const prev = current
+        current = stepAutoRelay(current, random)
+        const tick = current.autoRelay?.ticks[0] ?? null
+        const atBat = tick?.atBat ?? null
+        // 우리 수비(상대 공격)의 타석 틱 — 앞에서 아직 안 섰을 때만 이 타석의 값이 보인다
+        if (tick === null || atBat === null || atBat.ours || prev.pitching.allowedBaserunner) continue
+        const runs = tick.progress.game.opponentScore - prev.game.opponentScore
+        const reached = ['안타', '홈런', '볼넷', '사구'].includes(atBat.outcome.kind)
+        const runnersBefore = [tick.before.bases.first, tick.before.bases.second, tick.before.bases.third].some(Boolean)
+        const expected = reached ? runs === 0 : runnersBefore
+        if (reached) seen[runs === 0 ? '나감' : '득점나감'] += 1
+        else seen[runnersBefore ? '주자아웃' : '빈루아웃'] += 1
+        expect(tick.progress.pitching.allowedBaserunner, `seed ${seed} step ${step} ${atBat.outcome.kind}`).toBe(expected)
+      }
+    }
+    // 갈래가 다 나와야 시험이 뜻이 있다 — "주자 있는 아웃" 은 앞 타석이 득점과 함께 나간 뒤에만 아직 안 선 채 와서 드물다
+    expect([seen.나감, seen.득점나감, seen.빈루아웃].every((count) => count > 0), JSON.stringify(seen)).toBe(true)
   })
 })
 
