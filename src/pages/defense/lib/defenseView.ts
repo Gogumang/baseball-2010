@@ -488,6 +488,11 @@ export interface DefenseViewState {
    */
   readonly ballParticles?: BallParticleFacts | null
   /**
+   * 경기 +0xfd4 — **주자 판**(밀어내기 · 견제 · 도루 · 폭투 · 포일)이 열린 때 남아 있던 스윙 판정 결과 코드(`features/defense-play/model/sceneResultCode`).
+   * 득점 함성 · 점수판의 홈런성(0x357e0, 24~26)이 본다. null 이면 원본에서 정해지지 않은 값(헛스윙) · 없으면(undefined) 타구 판이다
+   */
+  readonly sceneResultCode?: number | null
+  /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.
    */

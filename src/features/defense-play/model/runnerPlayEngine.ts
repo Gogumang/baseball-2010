@@ -176,6 +176,11 @@ export interface RunnerPlayEngineInput {
   /** 타석 교대 0x483a0 이 실은 주자 마선수 그림 번호 (`runnerAces.loadedRunnerAceOf`) */
   readonly runnerAceSprite?: number | null
   /**
+   * 경기 +0xfd4 — 이 판이 열릴 때 남아 있던 스윙 판정 결과 코드(`sceneResultCode`). 튐 파티클(0x37022 ∉ {9,10,11}) ·
+   * 홈런성(0x357e0, 24~26)이 본다. 모르면(헛스윙의 정해지지 않은 값 · 안 줌) null — 두 조건 모두 거르지 않는다
+   */
+  readonly sceneResultCode?: number | null
+  /**
    * 판이 열릴 때의 야수 +0xb8(펌블 표시, 칸별). 폭투 · 포일 판정 0x3e062(0x3e08c~0x3e092)가 **포수 +0xb8 = 6** 을 적고
    * 0x17 로 간다 — 첫 그림 앞 야수 틱(a12da)이 하나 줄여 첫 그림은 5 다(`passedBallPlay`). 안 주면 0
    */
@@ -765,7 +770,7 @@ function* runnerPlaySteps(
         throwErrorTicks: throwErrorMarks,
         // 공 그리기 0x36dfc 의 튐 파티클 — 0x46c88 이 판 종류를 안 보고 늘 부른다(`ballParticleFactsOf`). 큰 타구 갈래는 판 종류 ∈ {1, 8} 이라 없다.
         // 공은 송구 · 다시 쏘기 · 폭투가 깐 궤적(세계 0xbfed0)을 판 틱으로 읽는다. 쥔 공 · 쫓는 공이 없는 그림은 안 쏜다.
-        // ⚠️ 미확인: +0xfd4(결과 코드)는 스윙 판정 51308 이 적는 칸이라 주자 판에서는 앞 스윙의 값이 남는다 — 진행기가 몰라 null(거르지 않음)
+        // +0xfd4(결과 코드)는 스윙 판정 51308 이 적고 0x11 진입이 공마다 지우는 칸이라 이 판이 열린 때의 값 그대로다(`sceneResultCode`)
         ballParticles:
           chase === null || play.held
             ? null
@@ -776,10 +781,11 @@ function* runnerPlaySteps(
                 onTrajectory: true,
                 bigHitWatch: false,
                 playKind: input.kind,
-                resultCode: null,
+                resultCode: input.sceneResultCode ?? null,
               }),
         runnerAceIndexes: input.runnerAceIndexes,
         runnerAceSprite: input.runnerAceSprite ?? null,
+        sceneResultCode: input.sceneResultCode ?? null,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,

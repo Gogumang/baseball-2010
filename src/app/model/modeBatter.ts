@@ -35,6 +35,17 @@ export interface ModeBatter {
    * 미션도 나리 타자편 저장을 올리니 그 선수의 번호다 — '0' 키(0x51dee)가 S+0x10 에 싣는 값.
    */
   readonly specialSwingNumber: number
+  /**
+   * 선수 레코드 +0xb 의 생김새 — 폼(윗니블 `2 × 타입 + 손`) · 피부(bit2-3). 타석 교대 0x47d98~0x47dd6 이 타자 그림 적재 0x78ab0 에
+   * 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 손 `0xb63c0`(= 폼 & 1)을 넘긴다. 모르면(선수 없음 · 옛 명전 기록) 없다
+   */
+  readonly look?: ModeBatterLook
+}
+
+/** 선수 레코드 +0xb — 폼 `2 × 타입 + 손` · 피부 0 황인 · 1 백인 · 2 흑인 */
+export interface ModeBatterLook {
+  readonly form: number
+  readonly skinIndex: number
 }
 
 export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
@@ -43,6 +54,8 @@ export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
     ability: equippedAbilityOf(career),
     skillIds: career.equippedSkillIds,
     specialSwingNumber: career.specialSwingNumber,
+    // 저장 선수의 +0xb — 폼 = 2 × 타입 + 손 (C 5절 0x16f9a) · 피부
+    look: { form: career.battingTypeIndex * 2 + career.battingSide, skinIndex: career.skinIndex },
   }
 }
 
@@ -58,7 +71,15 @@ export function modeBatterOfHallOfFame(famer: HallOfFamer): ModeBatter {
   const ability = famer.equipmentLevels === undefined
     ? (famer.equippedAbility ?? famer.ability)
     : equippedAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds: skillIds })
-  return { ability, skillIds, specialSwingNumber: famer.specialSwingNumber ?? 0 }
+  return {
+    ability,
+    skillIds,
+    specialSwingNumber: famer.specialSwingNumber ?? 0,
+    // 등록이 옮긴 +0xb — 옛 기록(생김새 칸을 남기기 전)은 모른다
+    ...(famer.look === undefined
+      ? {}
+      : { look: { form: famer.look.typeIndex * 2 + famer.look.handIndex, skinIndex: famer.look.skinIndex } }),
+  }
 }
 
 /**

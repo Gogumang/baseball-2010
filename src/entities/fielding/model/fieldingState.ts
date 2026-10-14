@@ -251,6 +251,25 @@ export function defenseTeamBonusOf(mode: number, teamConcentration: number): num
 }
 
 /**
+ * **주자 속도의 팀 등급** — 주자 만들기 0xa93ac 의 a9482~a94a4 (직접 재역어셈):
+ * ```
+ * a946c    v = 0xb570c(팀레코드, 3, 선수, 90) × cfg[+0x16](=7) / 100     ; 주루 능력치
+ * a9482    m = 전역 모드 0x1552d10
+ * a9488    m == 2 || m == 1 || m == 8 이면:  v += 0xbbe98(s16 팀레코드+0xa)   ; 팀 능력치 넷째 칸 '근성'의 등급 0~7
+ * a94a4    주자+0xa4 = v                ; 달리기 속도 vt64 0xa092c = cfg[+0x14](300) + 주자+0xa4
+ * ```
+ * 팀레코드(셋째 인자)는 **주자의 팀**이다 — 루 위 주자 0xa9a10(a9a3e `0xb8680(팀)`, 주자 = `0xae8b8(팀, 루)`) ·
+ * 타자주자 0x46418(4650e, 타자 = `0xae89c(팀)`) 모두 공격 팀을 넘긴다. 수비 보너스(b10d0, 1·2·8·9)와 달리 **모드 9 가 빠진다**.
+ */
+export const RUNNER_TEAM_GRADE_MODES: readonly number[] = [1, 2, 8]
+
+/** a9488 — 모드가 1·2·8 이면 `0xbbe98(공격 팀 근성)`, 아니면 0 */
+export function runnerTeamGradeOf(mode: number, teamGrit: number): number {
+  if (!RUNNER_TEAM_GRADE_MODES.includes(mode)) return 0
+  return abilityGradeOf(teamGrit)
+}
+
+/**
  * 플레이 시작 때의 야수 9명 (0xb0fb4 + 0xb0f88).
  * 능력치는 송구 속도·악송구·펌블·필살수비 확률에만 쓰이고 **이동 속도에는 전혀 안 들어간다** (P2 1c).
  * `teamBonus` 는 `defenseTeamBonusOf` — 아홉 칸(칸 0 포함) 모두의 송구 속도에 더한다(등급 · 악송구 보정은 그대로).

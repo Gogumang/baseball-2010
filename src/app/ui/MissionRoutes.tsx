@@ -231,6 +231,8 @@ export function MissionRoutes({
         ability={stageBatter.ability}
         batterSkillIds={stageBatter.skillIds}
         batterRecordSlot={stageBatter.recordSlot}
+        // 타자 그림 · 손 — 지금 타자 레코드 +0xb (미션 타자 = 나리 저장 · 명예 기록, 마스터 차례 = 그 줄)
+        {...(stageBatter.look === undefined ? {} : { batterLook: stageBatter.look })}
         batterName={stageBatter.name}
         pitcherAbility={{
           ...missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent),

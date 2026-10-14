@@ -20,7 +20,7 @@ import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { gameAbilitiesOf, pitcherGameAbilityPartsOf, TEAM_ABILITY_SLOT } from '@/features/play-team-game/model/gameAbilities'
-import { defenseTeamBonusOf } from '@/entities/fielding/model/fieldingState'
+import { defenseTeamBonusOf, runnerTeamGradeOf } from '@/entities/fielding/model/fieldingState'
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
 import type {
@@ -124,6 +124,15 @@ function teamAbilitiesOf(context: TeamGameAbilityContext, teamId: number): reado
  */
 export function defenseTeamBonusFor(context: TeamGameAbilityContext, teamId: number): number {
   return defenseTeamBonusOf(context.mode, teamAbilitiesOf(context, teamId)[TEAM_ABILITY_SLOT.집중] ?? 0)
+}
+
+/**
+ * **주자 속도의 팀 등급** — 주자 만들기 0xa93ac a9488: 모드 1·2·8 면 `0xbbe98(s16 공격 팀레코드+0xa)`.
+ * 팀레코드 +0xa 는 팀 능력치 넷째 칸 '근성'이다 — `defenseTeamBonusFor` 와 같은 레코드(시즌 트레이닝을 먹인 값 ·
+ * 없으면 XlsTEAM_DATA)를 읽는다. 모드 9(대전 이벤트)는 0 이다.
+ */
+export function runnerTeamGradeFor(context: TeamGameAbilityContext, teamId: number): number {
+  return runnerTeamGradeOf(context.mode, teamAbilitiesOf(context, teamId)[TEAM_ABILITY_SLOT.근성] ?? 0)
 }
 
 /** 타자 한 명의 경기용 능력치 네 칸 — 히트·파워·수비·주루 */

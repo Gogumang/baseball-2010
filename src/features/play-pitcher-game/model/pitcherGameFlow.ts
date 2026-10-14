@@ -87,6 +87,7 @@ import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-control
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import { contactOfOutcome, registerContact } from '@/entities/batting/model/battedContact'
+import { SCENE_RESULT_CODE_START, sceneResultCodeOfThrown } from '@/features/defense-play/model/sceneResultCode'
 import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
@@ -432,6 +433,11 @@ export interface PitcherGameProgress {
   /** 마지막 공에 CPU 타자가 휘둘렀으면 그 스윙 프레임 · 번트 종류 — 타석 장면의 타자 자세(0x4e0dc → 0x49e64) */
   readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
+  /**
+   * 경기 +0xfd4 — 스윙 판정 결과 코드 칸(`features/defense-play/model/sceneResultCode`). 0x11 진입(3deea)이 공마다 0 으로 지우고
+   * CPU 타자가 휘두른 공만 판정(5130e)이 덮는다. 주자 판의 튐 파티클 · 홈런성 조건이 본다 — 견제는 앞 공의 값. null = 원본 미정의(헛스윙)
+   */
+  readonly sceneResultCode: number | null
   /** 이닝별 실점 표 (`0xb6988`) — 감독 강판 3번 사유가 읽는다 */
   readonly inningRuns: readonly number[]
   readonly decision: DecisionState
@@ -888,6 +894,7 @@ export function startPitcherGame(
     atBatPrepared: false,
     lastPitch: null,
     lastResolution: null,
+    sceneResultCode: SCENE_RESULT_CODE_START,
     inningRuns: [],
     decision: EMPTY_DECISION_STATE,
     pitcherRecord: EMPTY_PITCHER_GAME_RECORD,
@@ -1198,6 +1205,8 @@ export function startPitch(
     lastPitch: pitch,
     lastCpuSwing: cpuSwingPoseOf(thrown),
     lastResolution: resolution,
+    // 경기 +0xfd4 — 0x11 진입이 지우고 CPU 타자가 휘두른 공이면 스윙 판정이 덮는다
+    sceneResultCode: sceneResultCodeOfThrown(resolution, foulContact),
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
@@ -1390,6 +1399,8 @@ function arrivePitcherPitch(
       throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
       buntKind: pitch.buntKind ?? 0,
       scene: progress.defenseScene,
+      // 경기 +0xfd4 — 이 공의 값 (`startPitch` 가 이미 적었다)
+      sceneResultCode: progress.sceneResultCode,
     },
     random,
   )
@@ -1721,6 +1732,8 @@ export function pickoff(
     defenseIsCpu: false,
     throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
     scene: progress.defenseScene,
+    // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
+    sceneResultCode: progress.sceneResultCode,
   }
   if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input } }
   return applyPickoffResult(progress, play.targetBase, runPickoffPlay(input), random, false)
