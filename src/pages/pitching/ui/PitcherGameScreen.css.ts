@@ -10,68 +10,23 @@ export const matchupFrame = style({
   height: 320,
   margin: '0 auto',
 })
-import { theme } from '@/app/styles/theme.css'
 
 export const frame = style({
   position: 'relative',
 })
 
-export const hud = style({
+/**
+ * 장면 위 팝업 판 — 경기 중 메뉴(0x741a0)는 원본도 장면 위에 뜬다. 판(240×320)을 덮고 메뉴 조각을 세로 가운데에 둔다.
+ * ⚠️ 메뉴 모양은 아직 웹 판(`InGameMenu`)이다 — 자리만 장면 위로 옮겼다.
+ */
+export const popupLayer = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: 5,
   display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '3px 4px',
-  background: theme.color.hudRow,
-  fontSize: '11px',
-  color: theme.color.ink,
+  flexDirection: 'column',
+  justifyContent: 'center',
+  gap: '10px',
+  padding: '0 10px',
+  overflowY: 'auto',
 })
-
-export const score = style({
-  marginLeft: 'auto',
-  color: theme.color.accent,
-})
-
-/** 볼·스트라이크·아웃 램프 */
-export const count = style({
-  display: 'flex',
-  gap: '6px',
-  padding: '3px 4px',
-  fontSize: '11px',
-  color: theme.color.inkDim,
-})
-
-export const lamp = style({
-  color: theme.color.inkFaint,
-  selectors: {
-    '&[data-on="true"]': { color: theme.color.accent },
-  },
-})
-
-/** 스태미나 막대 — 원본은 체력%를 4단계(0x3493c)로 보여 준다 */
-export const staminaTrack = style({
-  position: 'relative',
-  height: '8px',
-  margin: '4px 0',
-  border: `1px solid ${theme.color.line}`,
-  background: theme.color.surfaceDeep,
-})
-
-export const staminaFill = style({
-  height: '100%',
-  background: theme.color.accent,
-  selectors: {
-    '&[data-low="true"]': { background: '#ef4d42' },
-  },
-})
-
-export const bases = style({
-  display: 'flex',
-  gap: '4px',
-  fontSize: '11px',
-  color: theme.color.inkFaint,
-})
-
-export const baseOn = style({
-  color: theme.color.accent,
-})
-

@@ -888,6 +888,8 @@ export function TeamGameScreen({
     setSlot(null)
     setAim(null)
   }
+  /** 사람 수비 타석 장면의 투수 · 타자 그림 재료 — 구질 누름 칸도 그 배치(타자 손)를 따른다 */
+  const teamStage = teamPitcherSideStageOf(progress)
 
   return (
     <div className={styles.frame}>
@@ -1156,7 +1158,7 @@ export function TeamGameScreen({
                 playerSide: game.playerSide,
                 runnerRunAbilities: runnerRunAbilitiesOf(progress),
               }}
-              {...teamPitcherSideStageOf(progress)}
+              {...teamStage}
               stadium={sceneStadium?.stadium ?? 0}
               fieldPalette={fieldPalette}
               skyRow={stadiumSkyRow ?? 0}
@@ -1181,6 +1183,63 @@ export function TeamGameScreen({
               {isMatchupShown && matchupCards}
               {/* 교체 연출 0x16 "CHANGE" (0x4da30) */}
               {substitutionOverlay}
+              {/*
+                투구 입력 — 그림은 장면이 그린다. 부품은 키 · 틱과 그림 자리의 투명한 누름 칸만 내므로 장면 판(240×320) 안에 둔다
+              */}
+              {phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && (
+                  <PitchSlotPicker
+                    choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
+                    isPaused={isPopupOpen}
+                    stageSide={teamStage.batterSide ?? teamStage.batterForm & 1}
+                    overlay={{
+                      ref: inputOverlayRef,
+                      typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
+                      magicRemaining: progress.magicRemaining,
+                    }}
+                    onDecide={(chosen) => {
+                      const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
+                      if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
+                      setSlot(found)
+                      setPhase('코스')
+                    }}
+                  />
+              )}
+              {phase === '코스' && (
+                  <AimCursor
+                    side={options.stageSide ?? 1}
+                    isPaused={isPopupOpen}
+                    overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
+                    onConfirm={(confirmed) => {
+                      // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+                      // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
+                      setAim(confirmed)
+                      setPhase('게이지')
+                    }}
+                    // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
+                    onCancel={() => {
+                      setPhase('구질')
+                      setSlot(null)
+                      actions.returnToPitchSelection()
+                    }}
+                  />
+              )}
+              {phase === '게이지' && (
+                  <PitchGradeGauge
+                    isPaused={isPopupOpen}
+                    showsGauge={showsGauge}
+                    onRelease={(gaugeCell) => throwWith(gaugeCell)}
+                    {...(aim === null
+                      ? {}
+                      : {
+                          overlay: {
+                            ref: inputOverlayRef,
+                            aim,
+                            aimSide: options.stageSide ?? 1,
+                            gaugeSettingOn: options.gaugeSettingOn === true,
+                          },
+                        })}
+                  />
+              )}
             </PitcherSideStage>
             {phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && (
               <>
@@ -1188,44 +1247,12 @@ export function TeamGameScreen({
                 {(game.bases.first || game.bases.second || game.bases.third) && (
                   <Hint>견제 3·1·7 (1·2·3루)</Hint>
                 )}
-                <PitchSlotPicker
-                  choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
-                  isPaused={isPopupOpen}
-                  overlay={{
-                    ref: inputOverlayRef,
-                    typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
-                    magicRemaining: progress.magicRemaining,
-                  }}
-                  onDecide={(chosen) => {
-                    const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
-                    if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
-                    setSlot(found)
-                    setPhase('코스')
-                  }}
-                />
               </>
             )}
 
             {phase === '코스' && (
               <>
                 <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />
-                <AimCursor
-                  side={options.stageSide ?? 1}
-                  isPaused={isPopupOpen}
-                  overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
-                  onConfirm={(confirmed) => {
-                    // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
-                    // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
-                    setAim(confirmed)
-                    setPhase('게이지')
-                  }}
-                  // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
-                  onCancel={() => {
-                    setPhase('구질')
-                    setSlot(null)
-                    actions.returnToPitchSelection()
-                  }}
-                />
                 <Hint>방향키(숫자 1~9)로 조준점을 흘려 보내고 OK 로 확정 · CLR 은 구질로</Hint>
               </>
             )}
@@ -1233,21 +1260,6 @@ export function TeamGameScreen({
             {phase === '게이지' && (
               <>
                 {showsGauge && <Panel heading="3. 투구 결정" />}
-                <PitchGradeGauge
-                  isPaused={isPopupOpen}
-                  showsGauge={showsGauge}
-                  onRelease={(gaugeCell) => throwWith(gaugeCell)}
-                  {...(aim === null
-                    ? {}
-                    : {
-                        overlay: {
-                          ref: inputOverlayRef,
-                          aim,
-                          aimSide: options.stageSide ?? 1,
-                          gaugeSettingOn: options.gaugeSettingOn === true,
-                        },
-                      })}
-                />
               </>
             )}
           </div>
