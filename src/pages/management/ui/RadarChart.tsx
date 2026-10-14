@@ -22,7 +22,7 @@ const NUMBER_HEIGHT = 10
  * 0x5ad94 `ldr [색표 + k·4]` → 0 이 아니면 0x6aff8 에 [sp+0x18]=1·[sp+0x1c]=색 → 글자를 효과 0xb(단색)로 찍는다
  * (0x6b0fa~0x6b112 `movs r3,#0xb`, [sp]=색). 점·선·축 이름 상자는 색을 받지 않는다.
  */
-function TintedNumber({ glyphs, right, top, color }: {
+export function TintedNumber({ glyphs, right, top, color }: {
   readonly glyphs: readonly Glyph[]; readonly right: number; readonly top: number; readonly color: string
 }) {
   let x = right - glyphsWidthOf(glyphs)

@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest'
+import {
+  SEASON_CARD_FIGURE, SEASON_CARD_LOGO, initialSeasonCardFigure, seasonCardLookOf, stepSeasonCardFigure, steppedBoardPointsOf,
+} from '@/pages/season/lib/seasonPlayerCard'
+import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
+
+const run = (isBatter: boolean, form: number, lastTick: number) => {
+  const states: SeasonCardFigureState[] = []
+  let state = initialSeasonCardFigure(isBatter, form)
+  for (let tick = 0; tick <= lastTick; tick += 1) {
+    state = stepSeasonCardFigure(state, tick, isBatter)
+    states.push(state)
+  }
+  return states
+}
+
+describe('시즌 선수 카드 0x7ba44 · 그림 0xae98', () => {
+  it('계단형 판 0x7650c — 관리 화면 값(35, 190, 30)과 카드 값(0x67, 0x38, 0)', () => {
+    expect(steppedBoardPointsOf(35, 190, 30).map(({ x, y }) => `${x},${y}`).join(' '))
+      .toBe('0,54 141,54 160,35 240,35 240,206 160,206 141,225 0,225')
+    expect(steppedBoardPointsOf(0x67, 0x38, 0).map(({ x, y }) => `${x},${y}`).join(' '))
+      .toBe('0,122 111,122 130,103 240,103 240,140 130,140 111,159 0,159')
+  })
+
+  it('로고 (20, 72) 무게 12/16 · 타자 발 (57, 160) · 투수 이미지 (11, 18) 두 배', () => {
+    expect([SEASON_CARD_LOGO.x, SEASON_CARD_LOGO.y, SEASON_CARD_LOGO.opacity]).toEqual([20, 72, 0.75])
+    expect(SEASON_CARD_FIGURE.batter).toEqual({ x: 57, y: 160 })
+    expect(SEASON_CARD_FIGURE.pitcherImage).toEqual({ x: 11, y: 18, scale: 2 })
+  })
+
+  it('그림 값 — 폼 +0xb >> 4 · 피부 bit2-3 · 니블 네 칸', () => {
+    expect(seasonCardLookOf({ profile: 0x3c, equipment: [1, 2, 0, 3] }, 4))
+      .toEqual({ form: 3, skin: 3, team: 4, equipment: [1, 2, 0, 3] })
+  })
+
+  it('0x45e8 타자 — 틱 30 에 준비(2) → 스윙(3) → 대기(5)', () => {
+    const states = run(true, 0, 140)
+    expect(states[29]?.animation.state).toBe(5)
+    expect(states[30]?.animation.state).toBe(2)
+    const swing = states.findIndex((state) => state.animation.state === 3)
+    expect(swing).toBeGreaterThan(30)
+    const back = states.findIndex((state, tick) => tick > swing && state.animation.state === 5)
+    expect(back).toBeGreaterThan(swing)
+    // 틱 140 (0x8c 의 배수) 에 다시 건다
+    expect(states[140]?.animation.state).toBe(2)
+  })
+
+  it('0x45e8 투수 — 틱 30 에 투구(1), 단계 > 11 에서 다섯 번 머문 뒤 0', () => {
+    const states = run(false, 0, 139)
+    expect(states[29]?.animation.state).toBe(0)
+    expect(states[30]?.animation.state).toBe(1)
+    const rest = states.findIndex((state, tick) => tick > 30 && state.animation.state === 0)
+    expect(rest).toBeGreaterThan(30)
+    expect(states[rest]?.hold).toBe(0)
+  })
+})

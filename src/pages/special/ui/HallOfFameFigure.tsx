@@ -51,7 +51,7 @@ export function HallOfFameFigure({ drawing, ax, ay }: {
   return null
 }
 
-function PitcherFigure({ look, pose }: { readonly look: HallOfFameFigureLook; readonly pose: number }) {
+export function PitcherFigure({ look, pose }: { readonly look: HallOfFameFigureLook; readonly pose: number }) {
   const [control, velocity, breaking, stamina] = look.equipment
   const layers = pitcherLayersOf(pose, pitcherEquipmentOf({ control, velocity, breaking, stamina }))
   const { figureX, figureY } = HALL_OF_FAME_FIGURE.image
@@ -60,7 +60,7 @@ function PitcherFigure({ look, pose }: { readonly look: HallOfFameFigureLook; re
       ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(look.skin, look.team) : null)} testId="명전-투수몸" />
 }
 
-function FigureLayers({ layers, x, y, isMirrored, paletteOf, testId }: {
+export function FigureLayers({ layers, x, y, isMirrored, paletteOf, testId }: {
   readonly layers: readonly BatterLayer[]
   readonly x: number
   readonly y: number

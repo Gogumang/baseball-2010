@@ -398,14 +398,14 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     // 0x5980 — 이전 상태 0xcd 라 탭 1(투수), 보기 전용
     expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
     키('Enter')
-    expect(screen.getByTestId('선수상세-이름').textContent).toBe('봉은중')
+    expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('봉은중')
 
     키('0')
     const 창 = screen.getByRole('dialog', { name: '상세정보' })
     expect(창).toBeTruthy()
     키('Escape')
     expect(screen.queryByRole('dialog', { name: '상세정보' })).toBeNull()
-    expect(screen.getByTestId('선수상세-이름').textContent).toBe('봉은중')
+    expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('봉은중')
 
     키('Escape')
     expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
@@ -419,7 +419,7 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     키('*')
     키('ArrowDown')
     키('Enter')
-    expect(screen.getByTestId('선수상세-이름').textContent).toBe('이태형')
+    expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('이태형')
     키('Escape')
     expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('박택용')
     expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-current')).toBe('true')
@@ -446,8 +446,7 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
     expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
     키('Enter')
-    expect(screen.getByRole('group', { name: '장비' })).toBeTruthy()
-    expect(screen.getByTestId('장비-선수').textContent).toContain('봉은중')
+    expect(screen.getByRole('group', { name: '장비 봉은중' })).toBeTruthy()
 
     키('Enter') // 부위 0 → 칸 목록
     키('Enter') // 칸 0 — 투수 앞 44칸 4 × 10 = 40 ≤ 50
@@ -458,6 +457,8 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     const saved = store.load() as { state: { record: { money: number } } ; roster: { pitchers: { equipment?: number[] }[] } }
     expect(saved.state.record.money).toBe(10)
     expect(saved.roster.pitchers.some((player) => player.equipment?.[0] === 1)).toBe(true)
+    // 낀 칸은 mode_ui 44 막대 위 (0xce, 0xc7, 0xbd) 글
+    expect(screen.getByRole('button', { name: '나이스 모자' }).style.color).toBe('rgb(206, 199, 189)')
 
     키('Enter') // 같은 칸을 다시 — 지금 낀 것
     expect(알림글()).toContain('이미 가지고 있는')
