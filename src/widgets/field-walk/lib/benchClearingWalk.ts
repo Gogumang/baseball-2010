@@ -193,7 +193,7 @@ export function stepBenchClearingWalk(
  * 전수로 훑음 — 0x457cc 의 것은 다른 객체 [0x1400070]), 0xba9e0 · 0x6b4d4 가 이를 화면 버퍼 줄 번호에 더한다 — 화면 버퍼 위쪽 여백이라
  * 240×320 을 꽉 채우는 웹에서는 0 이다. 같은 꼴의 객체 생성자 0x2c20 · 0x2c90(vtable 0xcba14)도 +8+0x40 을 0 으로 둔다.
  * ⚠️ 미확인: 실기 단말이 넣는 값. 구멍 색 (255, 0, 255) 이 0x98975 에서 투명이라는 것은 쓰임새로 본 것이다.
- * (원 닫기 그리기 0xbd4b4 · 0xbd5bc 는 다른 갈래에서 `widgets/game-scene/lib/irisClose.ts` 로 옮겨지는 중이다.)
+ * (원 닫기 그리기 0xbd4b4 · 0xbd5bc 는 `widgets/game-scene/lib/irisClose.ts` 가 그린다.)
  */
 export const BENCH_CLEARING_IRIS_LAST_LEVEL = 32
 /** 0x401d4 가 나가는 틱 — 단계 32 를 그린 다음 갱신 */
