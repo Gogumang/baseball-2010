@@ -16,10 +16,10 @@ import {
   newlyOpenedHiddenTeamsOf,
   queuedPopupsOf,
 } from '@/entities/national-cup/model/nationalCupFlow'
-import { conditionTextOf } from '@/entities/career/model/titles'
 import type { NationalCupFinish, NationalCupMode } from '@/entities/national-cup/model/nationalCupFlow'
 import { NationalCupBracket } from '@/pages/national-cup/ui/NationalCupBracket'
 import { NationalCupStandings } from '@/pages/national-cup/ui/NationalCupStandings'
+import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
 
 export interface NationalCupScreenProps {
   readonly mode: NationalCupMode
@@ -67,16 +67,16 @@ export interface NationalCupScreenProps {
   readonly onOpenHiddenTeams?: (teams: readonly number[]) => void
   /**
    * 나리 134 첫 틀 `0x1b92c` 머리(1b92e~1b958)의 칭호 8 "국가 대표" — 비트 8 이 없을 때의 칭호 이름(`nationalCupStandingsTitleOf`).
-   * 주면 들어설 때 칭호 팝업(0x1274c, 종류 0x78)을 띄우고, 확인(0x1b1e4)에서 `onConfirmEntryTitle` 이 주고 곧바로 장착한다.
+   * 주면 들어설 때 칭호 팝업(0x1274c — 0x741a1 높이 0x78)을 띄우고, 확인(0x1b1e4)에서 `onConfirmEntryTitle` 이 주고 곧바로 장착한다.
    */
   readonly entryTitle?: string | null
   readonly onConfirmEntryTitle?: () => void
 }
 
-/** 134 에 들어설 때 걸리는 팝업 — 히든 팀 오픈(0x22) · 칭호(0x78) */
+/** 134 에 들어설 때 걸리는 팝업 — 히든 팀 오픈(0x22) · 칭호(0x1274c 창, 높이 0x78) */
 type EntryPopup =
   | { readonly kind: '히든팀'; readonly text: string }
-  | { readonly kind: '칭호'; readonly text: string }
+  | { readonly kind: '칭호'; readonly title: string }
 
 interface EntryState {
   /** 이번 진입이 처음 연 히든 팀 (팝업이 대기 칸에서 밀려도 열기는 다 일어난다) */
@@ -99,8 +99,8 @@ function entryStateOf(
   const hiddenPopups: EntryPopup[] = openedTeams.map((team) => ({ kind: '히든팀', text: hiddenTeamOpenText(TEAMS[team]?.name ?? '') }))
   const titlePopups: EntryPopup[] = entryTitle === null || entryTitle === undefined
     ? []
-    // 칭호 팝업 그림 0x1afe8 — 이름 StrNICKNAME[i] 와 조건 문구 [i+64] (관리 화면 칭호 팝업과 같은 근사 — 알림 상자)
-    : [{ kind: '칭호', text: `!C${entryTitle}!N${conditionTextOf(entryTitle) ?? ''}` }]
+    // 칭호 팝업 0x1274c — 그리기 0x1afe8 · 키 0x1b1e4 (`TitleWindow`)
+    : [{ kind: '칭호', title: entryTitle }]
   return { openedTeams, popups: queuedPopupsOf([...hiddenPopups, ...titlePopups]) }
 }
 
@@ -155,11 +155,8 @@ export function NationalCupScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry])
 
-  const closeEntryPopup = () => {
-    // 칭호 팝업 확인 0x1b1e4 — 비트 · 곧바로 장착(+0x1c4) · 저장
-    if (entryPopup?.kind === '칭호') onConfirmEntryTitle?.()
-    setEntryPopupIndex((index) => index + 1)
-  }
+  /** 띄운 팝업이 닫혔다 — 대기 칸의 다음 팝업(0x75440) */
+  const closeEntryPopup = () => setEntryPopupIndex((index) => index + 1)
   /** 동전 던지기(`0xb858c`)가 우승국을 바꿀 수 있어 확인 뒤 대회를 따로 들고 있는다 */
   const [resolved, setResolved] = useState<NationalCup>(cup)
 
@@ -200,8 +197,12 @@ export function NationalCupScreen({
             onBack={step === '순위' ? () => setStep('대진') : null} slides={false} />
         : <ScreenFrame title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'} gamePoint={gamePoint} onBack={null} footer={5} slides={false} />}
 
-      {entryPopup !== null && (
+      {entryPopup?.kind === '히든팀' && (
         <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />
+      )}
+      {entryPopup?.kind === '칭호' && (
+        // 칭호 팝업 확인 0x1b1e4 — 키를 받은 그 자리에서 비트 · 곧바로 장착(+0x1c4) · 저장, 다음 팝업은 닫힘 애니 뒤
+        <TitleWindow key={entryPopupIndex} title={entryPopup.title} onKey={onConfirmEntryTitle} onClose={closeEntryPopup} />
       )}
 
       {step === '결과' && (

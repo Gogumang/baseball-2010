@@ -10,10 +10,11 @@ interface GoalBarProps {
 }
 
 /**
- * 미션 목표 띠. 타자편·투수편 화면이 같이 쓴다.
+ * 미션 목표 띠 — 지금은 투수편 화면(pages/pitching)만 쓴다.
  *
- * 원본 0x36714 는 목표 글 +0xe 의 줄을 **하나씩** 보이며 넘길 뿐, 개수·진행 수·달성 표시는 그리지 않는다
- * (`goalTicker` 주석). 그래서 이름만 보이고 갱신 한 틱(`millisecondsPerFrame`)마다 띠를 한 칸 넘긴다.
+ * ⚠️ 근사: 원본 0x36714 는 웹 껍데기 띠가 아니라 타석 캔버스 오른쪽 위 trainning.pzx 판에 목표 글 한 줄과 노란 "지금/목표"
+ * (0x36358)를 그린다. 타자 미션은 원본대로 옮겼다(`pages/mission-play/ui/MissionHud` · `missionHudLayout`) — 투수편(모드 5:
+ * 공 그림 7 · "투구" 띠 · 표 0xcfdf4/0xcfe48)은 투수편 화면을 옮길 때 같이 바꾼다.
  */
 export function GoalBar({ goals }: GoalBarProps) {
   const [tick, setTick] = useState(0)

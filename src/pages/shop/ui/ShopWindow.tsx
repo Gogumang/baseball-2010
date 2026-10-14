@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { SpriteNumber } from '@/shared/ui'
+import { CommonPanel, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
@@ -116,9 +116,10 @@ export function ShopWindow({
 
   return (
     <>
-      {/* 박스 0 — 공용 판 0x55e61(skin, 24, 48, 192, 212, 정렬 0x11, 16) */}
-      <div className={windowStyles.window}
-        style={{ left: WINDOW_BOX.x, top: WINDOW_BOX.y, width: WINDOW_BOX.width, height: WINDOW_BOX.height }} />
+      {/* 박스 0 — 81e66 공용 판 0x55e61(skin, 24, 48, 192, 212, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
+          (81e3e~81e68 직접 뜸 — [창+0x1a4] ≠ 0 인 서브 · GP 갈래. 0 이면 81e20 → 0x81d0c 스킬 창 판). 제목 탭이 서서 위 띠는 안 본다 */}
+      <CommonPanel x={WINDOW_BOX.x} y={WINDOW_BOX.y} width={WINDOW_BOX.width} height={WINDOW_BOX.height}
+        topBand={0x10} titleTab testId="상점-판" />
 
       {/* 머리 — 창 종류별 (0x81ea2~0x82254) */}
       {kind === '서브' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}

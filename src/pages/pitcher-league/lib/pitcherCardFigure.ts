@@ -24,8 +24,8 @@ import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAb
  * 그림 생김새는 사본 니블을 따르므로 장비 창이 줄을 훑으면(0x81938 → vt+0x14) 그 장비를 끼운 채로 그린다.
  */
 
-/** 이미지를 찍는 자리 — (박스 0.x, 박스 0.y − 0x23) */
-export const PITCHER_CARD_IMAGE = { x: 11, y: 53 - 0x23 } as const
+/** 이미지를 찍는 자리 — (박스 0.x, 박스 0.y − 0x23) · 효과 0x10 · 2 = 정수 두 배 확대(0x15ed4~0x15ede, 시즌 카드 0xaf3e~0xaf48 과 같다) */
+export const PITCHER_CARD_IMAGE = { x: 11, y: 53 - 0x23, scale: 2 } as const
 
 const animationOf = (form: number, state: number): FigureAnimation => ({ state, step: 0, count: 0, form })
 

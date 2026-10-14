@@ -211,6 +211,7 @@ export function MissionRoutes({
 
   const selectScreen = (
     <MissionSelectScreen
+      gamePoint={gamePoint ?? 0}
       clearedKeys={session.clearedKeys}
       clearCounts={session.clearCounts}
       initialSide={session.player?.side ?? session.lastSide}

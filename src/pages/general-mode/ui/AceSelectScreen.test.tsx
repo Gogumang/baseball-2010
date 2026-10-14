@@ -7,6 +7,9 @@ import {
 } from '@/pages/general-mode/lib/generalModeSetup'
 import { AceSelectScreen, acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
 
+// 머리띠가 미끄러지는 다섯 그림 동안의 키 막음(`useFrameSlideKeyLock`)은 따로 시험한다 — 여기서는 다 내려온 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useFrameSlideKeyLock', () => ({ useFrameSlideKeyLock: () => ({ current: false }) }))
+
 /** 마선수 고르기 (하위 상태 21, 목록 k = 2) — 윗줄 마투수 5 · 아랫줄 마타자 5 */
 
 afterEach(cleanup)
@@ -205,7 +208,8 @@ describe('오픈 힌트 팝업', () => {
 
     // 칸 0 ← 0 · '8' → 5 · ↓ → 0(감기) · → 1 · '5' = OK → 칸 1 레벨업 창
     누르기(['ArrowLeft', '8', 'ArrowDown', 'ArrowRight', '5'])
-    expect(screen.getByRole('dialog', { name: '마선수 레벨업' }).textContent).toContain(acePlayerOfCell(1)?.name ?? '없음')
+    // 원본 창 0x5f394 는 이름을 안 그린다 — 연 칸은 창의 data-cell 로 본다
+    expect(screen.getByRole('dialog', { name: '마선수 레벨업' }).getAttribute('data-cell')).toBe('1')
   })
 })
 

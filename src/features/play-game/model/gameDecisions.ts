@@ -126,6 +126,7 @@ export interface PitcherOfRecordNames {
 /**
  * 결과 판 세 줄의 이름 (0x4fe9c: `0xb62c0(0xb8b60(팀[측], 번호))`).
  * `nameOf(우리 팀인가, 투수 칸)` 은 부르는 쪽 로스터에서 이름을 찾는다.
+ * 세이브 줄은 5032a~50336 이 측 ≠ 2 에 더해 **승리투수 번호(st+0x48) ≠ 세이브 번호(st+0x60)** 일 때만 그린다(측은 안 견준다).
  */
 export function pitcherOfRecordNamesOf(
   decisions: DecisionState,
@@ -134,5 +135,6 @@ export function pitcherOfRecordNamesOf(
 ): PitcherOfRecordNames {
   const name = (record: PitcherOfRecord) =>
     record.side === NO_SIDE ? null : (nameOf(record.side === playerSide, record.number) ?? null)
-  return { win: name(decisions.winner), loss: name(decisions.loser), save: name(decisions.save) }
+  const save = decisions.save.number === decisions.winner.number ? null : name(decisions.save)
+  return { win: name(decisions.winner), loss: name(decisions.loser), save }
 }

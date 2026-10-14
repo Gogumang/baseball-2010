@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { MessageBox } from '@/shared/ui'
+import { CommonPanel, MessageBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import {
@@ -86,9 +86,10 @@ export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowPro
 
   return (
     <div className={styles.overlay} role="dialog" aria-label="칭호" onClick={onClose}>
-      {/* 박스 0 — 공용 판 0x55e61 */}
-      <div className={styles.window}
-        style={{ left: windowBox.x, top: windowBox.y, width: windowBox.width, height: windowBox.height }} />
+      {/* 박스 0 — 19974 공용 판 0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
+          (1993a~19974 직접 뜸 — 박스 0 은 그림 자료 +0xfc = mode_ui 프레임 63). 제목 탭이 서서 위 띠는 안 본다 */}
+      <CommonPanel x={windowBox.x} y={windowBox.y} width={windowBox.width} height={windowBox.height}
+        topBand={0x10} titleTab testId="칭호-판" />
 
       {/* 박스 1 — img_text 279 "닉네임" 팔레트 3 · 정렬 0x21 · ox 28 */}
       {header !== undefined && (
@@ -152,7 +153,7 @@ export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowPro
             {index === cursor && isBlinkOn && (
               <svg className={local.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
                 data-testid="칭호-커서">
-                {/* 0xb9ed5 노랑 테두리 — 0x6a978 이 폭·높이에 1 을 더해 넘긴다(U-113, ⚠️ 플랫폼 테두리 크기 미확인) */}
+                {/* 0xb9ed5 노랑 테두리 — 0x6a978 이 폭·높이에 1 을 더해 플랫폼 0x14006d8 에 넘겨 (w + 1) × (h + 1) 칸을 덮는다(U-113 확정) */}
                 <rect x={TITLE_CURSOR_BOX.x + 0.5} y={TITLE_CURSOR_BOX.y + dy + 0.5}
                   width={TITLE_CURSOR_BOX.width} height={TITLE_CURSOR_BOX.height}
                   fill="none" stroke={TITLE_LIST_COLORS.cursor} strokeWidth={1} />

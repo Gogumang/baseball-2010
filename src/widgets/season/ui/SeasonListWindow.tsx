@@ -26,7 +26,26 @@ export interface SeasonListWindowProps {
   /** 되돌아가기 — 원본 취소 키(−16) 와 같은 곳으로 간다 */
   readonly onBack?: () => void
   readonly backLabel?: string
+  /**
+   * 그 화면의 원본 판 인자 — 안 주면 기본 판(24, 54, 192, 212). 주면 그 자리 · 위 띠 · 제목 탭으로 긋고, 판 위 제목 글은
+   * 밝은 띠 · 탭 위에서 보이게 짙은 남색으로 둔다(⚠️ 근사 — 원본 제목 그림은 아직 안 떴다).
+   */
+  readonly panel?: SeasonListPanel
 }
+
+export interface SeasonListPanel {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly topBand?: number
+  readonly titleTab?: boolean
+}
+
+/** 0xe8 십전대보탕 투수 고르기 — 0x5cfec → 0x5c984 의 5ca4e 판 (W/2, H/2 + 5, 210, 220, 정렬 0x22, 위 띠 0x12; 아래 띠는 늘 0) */
+export const ENTRY_LIST_PANEL: SeasonListPanel = { x: 120 - 105, y: 165 - 110, width: 210, height: 220, topBand: 0x12 }
+/** 0xe7 트레이드 확인 — 0xd4e8 의 d5b4 판 = mode_ui 프레임 70 박스 0 (24, 57, 192, 210), 정렬 0x11 · 위 띠 0x10 · 제목 탭 1 */
+export const TRADE_CONFIRM_PANEL: SeasonListPanel = { x: 24, y: 57, width: 192, height: 210, topBand: 0x10, titleTab: true }
 
 /**
  * 시즌 화면들이 함께 쓰는 **공용 판 목록 창**.
@@ -36,7 +55,7 @@ export interface SeasonListWindowProps {
  * 줄 높이 18px 은 순위표(0x7f070)의 줄 간격을 그대로 따랐다.
  */
 export function SeasonListWindow({
-  title, rows, cursor, onMoveCursor, onSelect, footer, onBack, backLabel = '되돌아가기',
+  title, rows, cursor, onMoveCursor, onSelect, footer, onBack, backLabel = '되돌아가기', panel,
 }: SeasonListWindowProps) {
   // 판에 들어가는 줄 수를 넘으면 커서를 따라 굴린다 (원본 목록 객체도 ▲▼ 로 굴린다 — 근사)
   const rowCount = VISIBLE_ROWS
@@ -55,11 +74,18 @@ export function SeasonListWindow({
             0, 0x22, 위 띠 0x12, 아래 띠 ([편집기+0x3e8] == 1 ? 0x12 : 0), 0, 0) (5ca2c~5ca4e)
           · 레벨업 창 0x5f394 (r5 = [sp+0x58] = 0 · r7 = 1, 5f3aa · 5f3c4) 의 0x55e60(…, 192, 212, 0, 0x22, 0, 0, 제목 탭 1,
             어둡게 1) 은 이 목록이 아니라 `widgets/ace-level-up` 의 창이다.
-          배치가 화면마다 달라 이 공용 근사 창에는 기본 판만 그린다 */}
-      <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
+          0xe7 · 0xe8 은 `panel` 로 그 판을 넘긴다(`TRADE_CONFIRM_PANEL` · `ENTRY_LIST_PANEL`). 그 밖은 기본 판 */}
+      {panel === undefined
+        ? <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
+        : <CommonPanel x={panel.x} y={panel.y} width={panel.width} height={panel.height} topBand={panel.topBand ?? 0}
+            titleTab={panel.titleTab === true} testId="시즌-목록-판" />}
       <div
         className={styles.title}
-        style={{ left: TITLE_BOX.x, top: TITLE_BOX.y, width: TITLE_BOX.width, height: TITLE_BOX.height }}
+        style={{
+          left: TITLE_BOX.x, top: TITLE_BOX.y, width: panel?.titleTab === true ? 80 : TITLE_BOX.width, height: TITLE_BOX.height,
+          ...(panel === undefined ? {} : { color: '#10246B' }),
+          ...(panel?.titleTab === true ? { textAlign: 'left' as const } : {}),
+        }}
       >
         {title}
       </div>

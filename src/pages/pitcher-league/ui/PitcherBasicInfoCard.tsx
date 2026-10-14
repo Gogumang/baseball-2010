@@ -19,7 +19,7 @@ interface PitcherBasicInfoCardProps {
 /**
  * **투수편 기본정보 카드 0x15e20** — 장비 창(상점 111 · 장비착용 121) 뒤에 선다. 정보 칸 0x7c451 은 상태 0x67 · 0x6f · 0x79 에서
  * 건너뛰므로(0x15ef0~0x15efc) 카드 판 0x7ba44(레이더) · 투수 그림뿐이다.
- * - 투수 그림: 54×75 이미지 [0x1552ae0] 를 (박스 0.x, 박스 0.y − 0x23) 에 (`lib/pitcherCardFigure`)
+ * - 투수 그림: 54×75 이미지 [0x1552ae0] 를 (박스 0.x, 박스 0.y − 0x23) 에 두 배로(0x98975 효과 0x10 · 2) (`lib/pitcherCardFigure`)
  * - 레이더 0x5a990 모드 3: 축 이름 37 제구 · 38 구속 · 39 변화 · 40 체력, 기본값 0xb6415(사본, k, 0) · 실효값 0xb570d(…, 사본, …)
  * 카드 판 모양(0x7ba44)은 타자 카드와 같은 박스 근사다 (`BasicInfoCard`).
  */
@@ -39,7 +39,10 @@ export function PitcherBasicInfoCard({ career, figureEquipment }: PitcherBasicIn
       <AbilityRadar base={PITCHER_ABILITY_ORDER.map((key) => career.ability[key])}
         shown={PITCHER_ABILITY_ORDER.map((key) => shown[key])} labelFrames={PITCHER_RADAR_LABEL_FRAMES} />
       <div className={specialStyles.hofFigureImage} data-testid="투수카드-그림"
-        style={{ left: PITCHER_CARD_IMAGE.x, top: PITCHER_CARD_IMAGE.y, width: image.width, height: image.height }}>
+        style={{
+          left: PITCHER_CARD_IMAGE.x, top: PITCHER_CARD_IMAGE.y, width: image.width, height: image.height,
+          transform: `scale(${PITCHER_CARD_IMAGE.scale})`, transformOrigin: '0 0', imageRendering: 'pixelated',
+        }}>
         <PitcherFigure look={look} pose={pitcherCardPoseAt(look.form, tick)} />
       </div>
     </div>

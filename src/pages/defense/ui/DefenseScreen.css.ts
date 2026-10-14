@@ -57,19 +57,6 @@ export const actor = style({
  * `+0x11` 은 프레임 +17 이고, 좌/우는 동작 3·4 가 다른 프레임 묶음으로 처리한다.
  */
 
-/**
- * 레이저 송구 반짝임 (경기+0x19ad) — 공 쥔 야수를 **빨강 RGB(255,0,0)** 으로 그린다
- * (0x43278 의 0x43406~0x4342c: 그리기 효과 **12** + 색 0x1400748, I-controls 1c 끝 · R2 2절).
- *
- * ⚠️ **근사**: 효과 번호 12 가 픽셀을 어떻게 섞는지는 원본에서 안 풀렸다(0xbb91d 의 종류·세기 식,
- * R2 3-2 "미해결"). 여기서는 그림 알파는 그대로 두고 **몸 색만 빨간 실루엣으로 덮는** CSS 필터로
- * 대신한다 — 색(255,0,0)과 "공 쥔 야수 한 명" 은 원본대로고, 섞는 방식만 우리 것이다.
- */
-export const laserShining = style({
-  filter:
-    'brightness(0) saturate(100%) invert(16%) sepia(99%) saturate(7404%) hue-rotate(1deg) brightness(105%) contrast(118%)',
-})
-
 /** 득점 점수판 0x41a64 한 벌 — 안쪽은 240×320 원본 절대 좌표 */
 export const runScoreBoard = style({
   position: 'absolute',

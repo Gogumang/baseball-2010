@@ -43,3 +43,23 @@ export function recordPickIconOffsetOf(imageWidth: number, imageHeight: number):
 export function recordPickLabelXOf(labelWidth: number): number {
   return ((RECORD_PICK_CELL_SIZE - labelWidth) / 2) | 0
 }
+
+/**
+ * **팝업 판** — 0x9008(시즌 0xdb 키) 908c 가 띄우는 `0x741a1([0x140005c], 0x80, 그림 0xf655, 키 0xf661, 장면)`
+ * (0x741a0~0x74228 직접 뜸): [창+0x20e] 목표 높이 = **0x80** · [+0x212] 그리는 높이 = **6** · [+0x210] 폭 = W · [창+8] 종류 = 8.
+ * 그리기 0x746cc 는 판 0x744c4 를 (0, (H − 그리는 높이) >> 1, W, 그리는 높이) 에 긋는다 — #335FCD 칠에 위·아래 다섯 줄
+ * (메시지 상자와 같은 판, `MessageBox`). 종류 8 이라 버튼이 없고 판 위에 장면 그림 0xf334 · 0x19448 을 부른다.
+ * 펼침 0x75556~0x75588: 틀마다 그리는 높이 × 2, 두 배가 목표보다 크면 목표로 맞추고 끝 — 6 → 12 → 24 → 48 → 96 → 128.
+ * 펼치는 동안은 판만 긋고(0x7479c `bne` 끝) 키도 안 본다(0x754f8).
+ */
+export const RECORD_PICK_POPUP_HEIGHT = 0x80
+export const RECORD_PICK_POPUP_START_HEIGHT = 6
+
+/** 펼침 한 틀 — 다 펼쳤으면 null */
+export function nextRecordPickPopupHeightOf(height: number): number | null {
+  const doubled = height * 2
+  return RECORD_PICK_POPUP_HEIGHT < doubled ? null : doubled
+}
+
+/** 판 윗변 — (H − 그리는 높이) >> 1 (0x74502~0x74520) */
+export const recordPickPopupTopOf = (height: number) => (320 - height) >> 1

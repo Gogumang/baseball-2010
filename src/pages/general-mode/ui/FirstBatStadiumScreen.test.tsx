@@ -5,6 +5,9 @@ import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/mod
 import { FIRST_BAT_PHASE, STADIUM_COUNT } from '@/pages/general-mode/lib/generalModeSetup'
 import { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 
+// 머리띠가 미끄러지는 다섯 그림 동안의 키 막음(`useFrameSlideKeyLock`)은 따로 시험한다 — 여기서는 다 내려온 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useFrameSlideKeyLock', () => ({ useFrameSlideKeyLock: () => ({ current: false }) }))
+
 /** 선공/구장 (하위 상태 20, 목록 k = 3) — 한 화면에서 두 단계를 돈다 */
 
 afterEach(cleanup)

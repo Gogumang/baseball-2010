@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
@@ -54,7 +54,11 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
   readonly slides?: boolean
 }
 
-/** 판 (15, 55, 210, 220) — P6 2f 의 0x5c984 공용 판 (유력) */
+/**
+ * 판 (15, 55, 210, 220) — 0x5cfec → 0x5c984 의 5ca4e 공용 판 0x55e60(편집기, W/2, H/2 + 5, 0xd2, 0xdc, 0, 0x22, 위 띠 0x12,
+ * 아래 띠 ((s8)[편집기+0x3e8] == 1 ? 0x12 : 0), 0, 0) (5ca2c~5ca4e 직접 뜸). [편집기+0x3e8] 은 초기화 0x5561c(556a0)가 0 으로만
+ * 쓰므로 아래 띠는 늘 0 이다. ⚠️ 판 안 줄·칸 그림은 아직 근사다.
+ */
 const PANEL = { x: 15, y: 55, width: 210, height: 220 } as const
 /** `0x55798(ed, 3, 10)` — 한 번에 보이는 줄 10 */
 const VISIBLE_ROWS = 10
@@ -123,9 +127,8 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
   return (
     <RawScreen>
       {underlay}
-      <div className={styles.panel}
-        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }} />
-      <div className={styles.tabLine} style={{ left: PANEL.x, top: PANEL.y + 4, width: PANEL.width }}>
+      <CommonPanel x={PANEL.x} y={PANEL.y} width={PANEL.width} height={PANEL.height} topBand={0x12} testId="엔트리-판" />
+      <div className={styles.teamLine} style={{ left: PANEL.x, top: PANEL.y + 4, width: PANEL.width }}>
         {teamName}
       </div>
       {/* 타자 탭의 하위 탭 `+0x330` — 0 타순 · 1 수비위치 (좌·우로 옮긴다) */}

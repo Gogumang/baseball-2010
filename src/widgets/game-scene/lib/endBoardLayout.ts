@@ -25,23 +25,54 @@ export const GAME_END_INPUT_LOCK_TICKS = 10
  * (R10 5절 0x4fe9c 확정). 왼쪽이 측 0(초 = 원정), 오른쪽이 측 1(말 = 홈).
  * 웹은 `gameState.ts:24` 대로 **플레이어 팀이 홈(말)** 이라 오른쪽이 우리 점수다.
  *
- * ⚠️ 숫자 글꼴은 원본이 `0x585ac(…, 프레임 0x46, 값, x, y, 6, …, 2)` 로 그리는데
- * game_ui 프레임 0x46(70) 은 32×15 파란 판이라 숫자꼴이 아니다 — 어느 스프라이트의 0x46 인지
- * 못 맞춰 웹은 HUD 와 같은 num.pzx 숫자(F-3-1 확정)를 쓴다. 마지막 인자 2 = 가로 가운데 정렬로 본다.
+ * 숫자는 50098 · 500e2 `0x585ad(skin, [[[장면+0x1014]+8]+8], 0x46, 값, x, y, 간격 6, 자리 0, 정렬 2, 0, 0)` —
+ * [장면+0x1014] 는 ui/num.pzx(F 4절 0x330f0) 라 **num 이미지 0x46~0x4f(큰 파란 숫자, 30×36 안팎)** 다.
+ * 수비 득점판 0x41a64(`pages/defense/lib/runScoreBoard`, 간격 8)와 같은 글꼴 · 같은 함수다.
+ * 0x585ac: 폭 = Σ그림 폭 + **셋째 글자부터** 간격, 정렬 2 → x −= 폭/2, 세로는 y 그대로(왼쪽 위), 글자마다 폭 + 간격씩 나아간다.
  */
 export const SCORE_SLOTS = {
   away: { x: SCREEN_WIDTH / 2 - 64, y: SCREEN_HEIGHT / 2 - 7 },
   home: { x: SCREEN_WIDTH / 2 + 67, y: SCREEN_HEIGHT / 2 - 7 },
 } as const
-/** num.pzx 숫자 한 줄 높이 */
-export const SCORE_GLYPH_HEIGHT = 10
+
+/** num 이미지 기준 0x46 · 간격 6 (0x5009a `movs r3, #6`) */
+export const SCORE_DIGIT_BASE = 0x46
+const SCORE_GAP = 6
+/** num 이미지 0x46~0x4f 의 폭 (public/sprites/num 070~079 그림 크기) */
+const SCORE_DIGIT_WIDTHS = [32, 22, 29, 29, 32, 30, 30, 31, 30, 30] as const
+
+export interface ScoreGlyph {
+  /** num 이미지 번호 */
+  readonly image: number
+  readonly x: number
+  readonly y: number
+}
+
+/** 0x585ad(…, 0x46, 값, x, y, 6, 0, 2) — 자리 0 이라 앞 0 을 채우지 않는다 */
+export function endScoreGlyphsOf(value: number, slot: { readonly x: number; readonly y: number }): ScoreGlyph[] {
+  const digits = String(Math.max(0, Math.trunc(value))).split('').map(Number)
+  const measured = digits.reduce(
+    (sum, digit, index) => sum + SCORE_DIGIT_WIDTHS[digit]! + (index > 1 ? SCORE_GAP : 0),
+    0,
+  )
+  let left = slot.x - (measured >> 1)
+  return digits.map((digit) => {
+    const placed = { image: SCORE_DIGIT_BASE + digit, x: left, y: slot.y }
+    left += SCORE_DIGIT_WIDTHS[digit]! + SCORE_GAP
+    return placed
+  })
+}
 
 /**
- * 승·패·세 투수 3줄 (0x4fe9c, R10 5절 확정).
- * 바탕은 game_ui 프레임 0x5d(93, 54×15 = 딱지 칸) · 0x5e(94, 55×15 = 이름 칸),
- * y = H/2 + 33 + i × (줄높이 + 1) = 193 · 209 · 225.
- *
- * ⚠️ 줄의 x 는 원본 코드에 안 적혀 있다 — 두 칸(54+55=109)을 화면 가로 가운데로 모았다 (근사).
+ * 승·패·세 투수 3줄 (0x4fe9c 50120~50246 직접 뜸). 바탕은 game_ui([장면+0x1018]) 프레임 0x5d(93, 54×15 = 딱지 칸) ·
+ * 0x5e(94, 55×15 = 이름 칸), 줄높이 h = 프레임 0x5d 높이 15 (0xba815 상자):
+ * ```
+ * 50162  0xba759(game_ui, 0x5d, 1, W/2 − w₅d − 2, H/2 + 0x21 + i·(h + 1))          ; 딱지 칸 (64, 193 + 16i)
+ * 5019c  0xba759(game_ui, 0x5e, 1, W/2,          H/2 + 0x21 + i·(h + 1))          ; 이름 칸 (120, …)
+ * 50238  0xba759(img_text, 표 0xd0470[i], 1, W/2 − w₅d + w₅d/2 − w딱지/2 − 2, H/2 + 0x21 + i·(h + 1) + 3)
+ * 502c4  이름 0xba269("!C!cffffff%s", W/2, 줄 위 + 2, 폭 w₅d(54), −1, 0)          ; 이름 칸 x 에서 폭 54 가운데
+ * ```
+ * 나눗셈은 0 쪽으로 버린다(asr + 부호 보정). 그림 원점은 셋 다 (0, 0) 이다(origins.json).
  */
 export const PITCHER_ROWS = {
   count: 3,
@@ -53,8 +84,10 @@ export const PITCHER_ROWS = {
   namePlate: { frame: 94, width: 55, height: 15 },
 } as const
 
-const ROWS_WIDTH = PITCHER_ROWS.labelPlate.width + PITCHER_ROWS.namePlate.width
-export const PITCHER_ROW_X = Math.floor((SCREEN_WIDTH - ROWS_WIDTH) / 2)
+/** 딱지 칸 x = W/2 − w₅d − 2 */
+export const PITCHER_ROW_X = SCREEN_WIDTH / 2 - PITCHER_ROWS.labelPlate.width - 2
+/** 이름 칸 x = W/2 */
+export const PITCHER_NAME_PLATE_X = SCREEN_WIDTH / 2
 
 /** 줄 딱지 = img_text 표 0xd0470 = [388, 389, 329] (S10 1·2절에서 렌더해 읽음 — 확정) */
 export const PITCHER_LABELS = [
@@ -67,21 +100,24 @@ export function pitcherRowTopOf(row: number) {
   return PITCHER_ROWS.firstY + PITCHER_ROWS.step * row
 }
 
-/** 딱지 그림을 딱지 칸 가운데에 놓는다 */
+/** 50238 — W/2 − w₅d + trunc(w₅d/2) − trunc(w딱지/2) − 2 · 줄 위 + 3 */
 export function pitcherLabelPositionOf(row: number) {
   const label = PITCHER_LABELS[row]
+  const plateWidth = PITCHER_ROWS.labelPlate.width
   return {
-    x: PITCHER_ROW_X + Math.floor((PITCHER_ROWS.labelPlate.width - label.width) / 2),
-    y: pitcherRowTopOf(row) + Math.floor((PITCHER_ROWS.rowHeight - label.height) / 2),
+    x: SCREEN_WIDTH / 2 - plateWidth + Math.trunc(plateWidth / 2) - Math.trunc(label.width / 2) - 2,
+    y: pitcherRowTopOf(row) + 3,
   }
 }
 
-/** 이름 칸 — 원본 글은 `"!C!cffffff%s"`(0xcf2e0) 가운데 맞춤 흰 글씨다 */
+/**
+ * 이름 글 상자 — 0xba269(글, W/2, 줄 위 + 2, 폭 w₅d = 54, 높이 −1, 0). 글은 `"!C!cffffff%s"`(0xcf2e0) 가운데 맞춤 흰 글씨,
+ * 높이 −1 이라 세로는 y 에서 위를 맞춘다. 폭은 이름 칸(55)이 아니라 딱지 칸 폭 54 를 그대로 쓴다(원본대로).
+ */
 export function pitcherNameBoxOf(row: number) {
   return {
-    x: PITCHER_ROW_X + PITCHER_ROWS.labelPlate.width,
-    y: pitcherRowTopOf(row),
-    width: PITCHER_ROWS.namePlate.width,
-    height: PITCHER_ROWS.rowHeight,
+    x: PITCHER_NAME_PLATE_X,
+    y: pitcherRowTopOf(row) + 2,
+    width: PITCHER_ROWS.labelPlate.width,
   }
 }

@@ -14,7 +14,8 @@ import {
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
-import { matchInfoEntryPhaseOf } from '@/pages/management/lib/matchInfoEntry'
+import { matchInfoValueCellDy } from '@/pages/management/lib/matchInfoEntry'
+import { useMatchInfoEntry } from '@/pages/management/ui/useMatchInfoEntry'
 import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
 
 const SLT_IMAGE = './sprites/slt_frame'
@@ -52,7 +53,7 @@ export interface SeasonMatchInfoScreenProps {
    * 0x63b15 넷째 인자 — `[장면+0x28] ≠ 0xe0`(이전 상태가 엔트리 편집 0xe0 이 아님, 0xb39a~0xb3a6). 참이면 머리띠가 미끄러져
    * 내려오는 다섯 그림 동안 본문을 비우고, 파랑 배너 둘이 네 그림 동안 들어온 뒤 본문이 선다(`pages/management/lib/matchInfoEntry`).
    * 0xe0 에서 돌아오면 거짓 — 머리띠도 안 미끄러진다. 안 주면 거짓.
-   * ⚠️ 미확인: 연출 동안 키 0x83cc 가 키를 받는지는 안 떴다 — 웹은 늘 받는다.
+   * 키 0x83cc 는 맨 앞에서 [[0x1552cfc]+0xe4] == 0 이면 아무것도 안 한다(0x83de) — 머리띠 · 배너 · 값 줄 펼침이 끝날 때까지 키를 안 받는다.
    */
   readonly isEntryAnimated?: boolean
 }
@@ -70,12 +71,14 @@ export function SeasonMatchInfoScreen({
   lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry, stage = null,
   isSettingsOpen = false, settingsWindow = null, isEntryAnimated = false,
 }: SeasonMatchInfoScreenProps) {
-  const phase = matchInfoEntryPhaseOf(useUpdateCounter(), isEntryAnimated)
+  const { phase, valueRows, areValueCellsHidden, isKeyReady } = useMatchInfoEntry(isEntryAnimated)
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 키 함수 맨 앞 — [[0x1552cfc]+0xe4](값 줄 펼침 끝) == 0 이면 아무것도 안 한다 (`isMatchInfoKeyReadyAt`)
+      if (!isKeyReady.current) return
       // 0x83cc: −5(OK)·'5'(0x35, 0x8442) → 0x847e 경기 시작
       if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()
@@ -155,7 +158,7 @@ export function SeasonMatchInfoScreen({
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
         style={{ left: MATCH_INFO_LAYOUT.arrow.rightX + (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
 
-      {/* 줄 다섯 — 가운데 딱지 + 좌우 값 */}
+      {/* 줄 다섯 — 가운데 딱지 (0x64d30 본문) */}
       {lines.map((line, index) => {
         const y = matchInfoRowY(index)
         return (
@@ -165,25 +168,38 @@ export function SeasonMatchInfoScreen({
             {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대다 — 글자는 팔레트 3(짙은 파랑)으로 구웠다 */}
             <FrameSprite folder={IMG_TEXT_FRAME} frame={line.labelFrame} origins={imgTextOrigins}
               x={MATCH_INFO_LAYOUT.labelBar.x} y={y + MATCH_INFO_LAYOUT.labelBar.textDy} />
-            {/* 값 칸 slt_frame 이미지 10 — 유저 (16, y + 3) · CPU 뒤집어 (138, y − 3) (0x5dcc0) */}
+          </span>
+        )
+      })}
+
+      {/*
+        값 칸 0x5dcc0 — 딱지 뒤에 칸 i = 0 … 9 (짝 유저 · 홀 CPU) 차례로. 유저 slt_frame 이미지 10 (16, y + 3) · CPU 뒤집어 (138, y − 3),
+        펼치는 동안은 아랫줄 칸이 첫 줄 자리에서 떨어져 내려온다(`matchInfoValueCellDy`). 재굴림 중에는 안 그린다.
+      */}
+      {!areValueCellsHidden && lines.map((line, index) => {
+        const y = matchInfoRowY(index)
+        const userY = y + MATCH_INFO_LAYOUT.valueCell.userDy + matchInfoValueCellDy(valueRows.unfold, 2 * index)
+        const cpuY = y + MATCH_INFO_LAYOUT.valueCell.cpuDy + matchInfoValueCellDy(valueRows.unfold, 2 * index + 1)
+        return (
+          <span key={line.label}>
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy }} />
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy, transform: 'scaleX(-1)' }} />
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY }} />
             <span className={styles.centeredText} data-testid={`시즌경기정보-${line.label}-유저`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.user}
             </span>
+            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY, transform: 'scaleX(-1)' }} />
             <span className={styles.centeredText} data-testid={`시즌경기정보-${line.label}-CPU`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.cpu}
             </span>
           </span>
         )
       })}
 
-      {/* 노랑 반원 두 쪽 — 값 줄이 다 펼쳐졌고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108). ⚠️ 값 줄 펼침 연출은 아직 옮기지 않아 늘 펼쳐진 것으로 본다 */}
-      {isBob && (
+      {/* 노랑 반원 두 쪽 — 값 줄 0x5dcc0 이 다 펼쳤다고 돌려줬고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108) */}
+      {valueRows.isReady && isBob && (
         <>
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
             style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />
