@@ -20,15 +20,20 @@ interface BasicInfoCardProps {
    */
   readonly showsInfoTable?: boolean
   /**
-   * 선수 그림에 끼울 장비 니블 — 장비 창이 줄을 훑으며 입혀 보는 값(0x81938 이 그림 +0x3e + 부위 에 레벨을 넣는다).
-   * 안 주면 선수가 지금 낀 그대로다. ⚠️ 레이더(0x7ba44)가 입혀 본 값을 따라가는지는 미확인이라 레이더는 지금 값으로 둔다.
+   * 장비 창이 줄을 훑으며 입혀 보는 니블 — 0x81938 은 창 [창+0x148] 의 기록 니블을 고쳐 쓰고 그림 +0x3e + 부위 에 레벨을 넣는다.
+   * 상점 111 · 장비착용 121 진입의 0x108f8 이 [창+0x148] 을 선수 기록 0x30 바이트의 **사본**([장면+0x114], 0x1400408 복사)으로
+   * 갈아 두므로 입혀 보기는 이 사본에만 남는다(`pages/shop/lib/equipmentWindowState`).
+   * 레이더도 같은 사본을 읽는다 — 0x7ba44 의 나리 갈래(0x7bfc8~0x7c090)가 축마다 기본값 0xb6415([창+0x148], k, 0)와
+   * 실효값 0xb570d(팀, k, [창+0x148], …, 0x5a)를 견준다 → 입혀 본 장비가 실효값(채운 도형 · 숫자 색)에 든다.
+   * 안 주면 선수가 지금 낀 그대로다.
    */
   readonly figureEquipment?: PlayerCareer['equipmentLevels']
 }
 
 /** 기본정보 카드 (0x15e20) — 선수 그림 · ABILITY 레이더 · 정보 칸. 카드 판 모양(0x7ba44)은 박스만 알아 근사한다 (추정) */
 export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }: BasicInfoCardProps) {
-  const shown = effectiveAbilityOf(career)
+  // ⚠️ 미확인: 0x7ba44 가 0xb570d 넷째 인자로 넘기는 값([gfx+0x174] − 0x66, 0x66 · 0x67 이면 0)의 뜻은 안 떴다 — 피로 인자(0x5a > 54)만 같다
+  const shown = effectiveAbilityOf(figureEquipment === undefined ? career : { ...career, equipmentLevels: figureEquipment })
   const values = [
     (TEAMS[career.teamId] ?? TEAMS[0]).name,
     career.name,

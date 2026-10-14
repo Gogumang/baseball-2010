@@ -51,6 +51,7 @@ export function HallOfFameFigure({ drawing, ax, ay }: {
   return null
 }
 
+/** 54×75 이미지 안의 단일 PZX 투수 그림 (27, 62) — 나리 투수편 카드 0x15e20 도 같은 이미지 [0x1552ae0] 를 쓴다 */
 export function PitcherFigure({ look, pose }: { readonly look: HallOfFameFigureLook; readonly pose: number }) {
   const [control, velocity, breaking, stamina] = look.equipment
   const layers = pitcherLayersOf(pose, pitcherEquipmentOf({ control, velocity, breaking, stamina }))

@@ -33,7 +33,7 @@ const 띄우기 = (overrides: Partial<Props> = {}) =>
 const 칸들 = () => screen.getAllByRole('button').filter((button) => button.style.width === '40px')
 
 describe('준비 흐름', () => {
-  it('유저 팀 → AI 팀 → 선공 → 구장 → 마투수 → 마타자 → 경기정보 로 이어진다', () => {
+  it('유저 팀 → AI 팀 → 선공 → 구장 → 마투수 → 마타자 → 경기정보 로 이어진다', async () => {
     띄우기()
 
     // 18 유저 팀
@@ -48,8 +48,9 @@ describe('준비 흐름', () => {
     fireEvent.click(칸들()[0])
     fireEvent.click(칸들()[5])
 
-    // 22 경기정보 — 선발 줄이 두 팀 모두 차 있다
-    expect(screen.getByTestId('경기정보-마투수-유저').textContent).toBe(ACE_PLAYERS[5].name)
+    // 22 경기정보 — 21 에서 들어오면 머리띠(다섯 그림) · 배너(네 그림) 연출 뒤에 본문이 선다(0x63b15 넷째 인자 · 이전 ≠ 23)
+    expect(screen.queryByTestId('경기정보-마투수-유저')).toBeNull()
+    expect((await screen.findByTestId('경기정보-마투수-유저', {}, { timeout: 3000 })).textContent).toBe(ACE_PLAYERS[5].name)
     expect(screen.getByTestId('경기정보-마타자-유저').textContent).toBe(ACE_PLAYERS[0].name)
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeTruthy()
   })

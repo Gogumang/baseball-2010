@@ -45,6 +45,8 @@ export function radarLabelBoxOf(axis: number): { x: number; y: number } {
 
 /** 축 이름 img_text (표 0xd1b14, 타자) */
 export const RADAR_LABEL_FRAMES = [41, 42, 43, 44]
+/** 투수 축 이름 — 0x5a990 모드 3 의 번호 0~3 → img_text 37 제구 · 38 구속 · 39 변화 · 40 체력 */
+export const PITCHER_RADAR_LABEL_FRAMES = [37, 38, 39, 40]
 export const RADAR_LABEL_BOX_IMAGE = './sprites/slt_frame/017.png'
 export const RADAR_BACKGROUND_IMAGE = './sprites/slt_frame/003.png'
 export const RADAR_COLORS = { axis: ORIGINAL_COLORS.radarAxis, fill: ORIGINAL_COLORS.highlightYellow, fillOpacity: 0xb4 / 255, edge: ORIGINAL_COLORS.text }

@@ -4,6 +4,9 @@ import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { pitcherShopEntriesOf } from '@/pages/shop/lib/pitcherShopEntries'
 import { pitcherEquipmentRowsOf } from '@/pages/shop/lib/equipmentRows'
 import { ShopScreenView } from '@/pages/shop/ui/ShopScreen'
+import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
+import { PitcherBasicInfoCard } from '@/pages/pitcher-league/ui/PitcherBasicInfoCard'
+import { PITCHER_EQUIPMENT_PARTS } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { pitcherGpDetailViewOf } from '@/pages/shop/lib/gpDetailView'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 
@@ -26,8 +29,8 @@ interface PitcherShopScreenProps {
  * 장비 창은 `0x7b970`(타자편) 이 거짓이라 mode_ui **프레임 31**(모자·공·글러브·신발 아이콘)을 쓰고,
  * 효과 줄의 능력치 이름은 img_text 340~343(제구·구속·변화·체력)이다.
  *
- * ⚠️ 미확인: 창 위의 기본정보 카드 0x15e20 투수 갈래 — 그림 객체 대신 54×75 이미지 [0x1552ae0] 를
- * (박스 0.x, 박스 0.y − 0x23) 에 0x98975 로 찍는다. 투수 카드(레이더 · 판)가 웹에 아직 없어 이 화면은 카드 없이 창만 그린다.
+ * 창 뒤에는 기본정보 카드 0x15e20 투수 갈래 — 54×75 이미지 [0x1552ae0] 를 (박스 0.x, 박스 0.y − 0x23) 에 0x98975 로 찍고
+ * 레이더는 모드 3 축(제구 · 구속 · 변화 · 체력)이다 (`pitcher-league/ui/PitcherBasicInfoCard`). 줄을 훑으면 사본 니블로 입혀 보인다.
  */
 export function PitcherShopScreen({
   tab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack,
@@ -36,9 +39,16 @@ export function PitcherShopScreen({
     <ShopScreenView
       kind={tab}
       entriesOf={() => (tab === '서브' || tab === 'GP' ? pitcherShopEntriesOf(career, tab) : [])}
+      // 0x7d34c(gfx, 0) 모드 3 갈래 — 창 종류 1 · 2 일 때만 그린다(0x167cc)
+      statusPanel={<PitcherStatusBoard career={career} />}
       equipment={tab === '장착' || tab === '착용' ? {
         edition: '투수',
         rowsOf: (part) => pitcherEquipmentRowsOf(career, part, tab === '착용'),
+        preview: (part, level) => (
+          <PitcherBasicInfoCard career={career} figureEquipment={level === null ? undefined : {
+            ...career.equipmentLevels, [PITCHER_EQUIPMENT_PARTS[part].ability]: level + 1,
+          }} />
+        ),
       } : undefined}
       questionOf={(itemId) => pitcherPurchaseQuestionOf(career, itemId)}
       money={career.money}

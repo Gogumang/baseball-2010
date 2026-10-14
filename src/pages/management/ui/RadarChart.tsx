@@ -41,10 +41,23 @@ export function TintedNumber({ glyphs, right, top, color }: {
   )
 }
 
-/** ABILITY 레이더 (0x5a990) — 999 기준, 축 이름 상자, 숫자 색 비교 */
+/** ABILITY 레이더 (0x5a990) — 타자 능력치 네 칸 (축 이름 41~44 히트 · 파워 · 수비 · 주루) */
 export function RadarChart({ base, shown }: { readonly base: BatterAbility; readonly shown: BatterAbility }) {
+  return <AbilityRadar base={KEYS.map((key) => base[key])} shown={KEYS.map((key) => shown[key])} labelFrames={RADAR_LABEL_FRAMES} />
+}
+
+/**
+ * 레이더 0x5a990 — 999 기준, 축 이름 상자, 숫자 색 비교. 축 이름은 첫 스택 인자(모드)가 고른다(0x5aa40~0x5aafc):
+ * 2(타자) → 이름 번호 4~7 · 3(투수) → 0~3, img_text 프레임 = 37 + 번호(37 제구 · 38 구속 · 39 변화 · 40 체력 · 41 히트 …).
+ * 나리 카드 0x7ba44 는 0x7b970(타자편)이면 2, 아니면 3 을 넘긴다(0x7c098~0x7c0aa).
+ */
+export function AbilityRadar({ base, shown, labelFrames }: {
+  readonly base: readonly number[]
+  readonly shown: readonly number[]
+  readonly labelFrames: readonly number[]
+}) {
   const origins = useFrameOrigins('./sprites/mode_ui/frames')
-  const points = KEYS.map((key, axis) => radarPointOf(axis, shown[key]))
+  const points = shown.map((value, axis) => radarPointOf(axis, value))
   return (
     <>
       <FrameSprite folder="./sprites/mode_ui/frames" frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
@@ -56,22 +69,22 @@ export function RadarChart({ base, shown }: { readonly base: BatterAbility; read
       <img className={styles.layer} alt="" src={RADAR_BACKGROUND_IMAGE}
         style={{ left: RADAR_CENTER.x, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2, transform: 'scaleX(-1)' }} />
       <svg className={styles.board} viewBox="0 0 240 320">
-        {KEYS.map((key, axis) => {
+        {points.map((point, axis) => {
           const end = radarAxisEndOf(axis)
-          return <line key={key} x1={end.x} y1={end.y} x2={points[axis].x} y2={points[axis].y} stroke={RADAR_COLORS.axis} />
+          return <line key={axis} x1={end.x} y1={end.y} x2={point.x} y2={point.y} stroke={RADAR_COLORS.axis} />
         })}
         <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')}
           fill={RADAR_COLORS.fill} fillOpacity={RADAR_COLORS.fillOpacity} stroke={RADAR_COLORS.edge} />
       </svg>
-      {KEYS.map((key, axis) => {
+      {shown.map((value, axis) => {
         const box = radarLabelBoxOf(axis)
-        const glyphs = numberGlyphsOf(shown[key])
-        const color = abilityColorOf(base[key], shown[key])
+        const glyphs = numberGlyphsOf(value)
+        const color = abilityColorOf(base[axis] ?? value, value)
         const right = box.x + 13 + Math.ceil(glyphsWidthOf(glyphs) / 2)
         return (
-          <div key={key}>
+          <div key={axis}>
             <img className={styles.layer} alt="" src={RADAR_LABEL_BOX_IMAGE} style={{ left: box.x, top: box.y }} />
-            <img className={styles.layer} alt="" src={`${IMG_TEXT}/${String(RADAR_LABEL_FRAMES[axis]).padStart(3, '0')}.png`}
+            <img className={styles.layer} alt="" src={`${IMG_TEXT}/${String(labelFrames[axis]).padStart(3, '0')}.png`}
               style={{ left: box.x + 3, top: box.y + 3 }} />
             {/* 숫자 (상자x+18, 상자y+17) — 가운데 기준은 추정 */}
             {color === null

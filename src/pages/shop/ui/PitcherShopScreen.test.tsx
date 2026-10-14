@@ -69,3 +69,18 @@ describe('투수 장비 상점 화면', () => {
     expect(screen.queryByText('모자')).toBeNull()
   })
 })
+
+describe('장비 창 뒤 기본정보 카드 0x15e20 투수 갈래', () => {
+  it('투수 그림 이미지는 (11, 18) · 레이더 축 이름은 37~40(제구 · 구속 · 변화 · 체력) · 커맨드 줄은 없다', () => {
+    const { container } = render(
+      <PitcherShopScreen tab="장착" career={createPitcherCareer('투수')} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />,
+    )
+    const image = screen.getByTestId('투수카드-그림')
+    expect([image.style.left, image.style.top]).toEqual(['11px', '18px'])
+    const labels = [...container.querySelectorAll('[data-testid="pitcher-basic-info-card"] img')]
+      .map((node) => (node as HTMLImageElement).getAttribute('src') ?? '')
+      .filter((src) => src.includes('img_text/frames/0'))
+    expect(labels.filter((src) => /\/0(37|38|39|40)\.png$/.test(src))).toHaveLength(4)
+    expect(screen.queryByTestId('command-bar')).toBeNull()
+  })
+})

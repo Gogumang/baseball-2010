@@ -39,3 +39,19 @@ describe('시즌 경기정보 0xdd', () => {
     expect(container.querySelector('button[aria-label="되돌아가기"]')).toBeTruthy()
   })
 })
+
+describe('0xdd 들어올 때 연출 (0xb398 의 0x63b15 넷째 인자 — 이전 ≠ 0xe0)', () => {
+  it('켜져 있으면 첫 그림은 본문이 없다 — 0xe0 에서 돌아온 것(꺼짐)이면 곧바로 본문', () => {
+    const lines = [{ label: '순위', labelFrame: 0, user: '1', cpu: '2' }]
+    const props = {
+      lines, myTeamId: 0, opponentTeamId: 1, playerSide: PLAYER_SIDE_LAST_BAT,
+      onStart: vi.fn(), onOpenSettings: vi.fn(), onCancel: vi.fn(),
+    }
+    const first = render(<SeasonMatchInfoScreen {...props} isEntryAnimated />)
+    expect(first.queryByTestId('시즌경기정보-순위-유저')).toBeNull()
+    first.unmount()
+
+    const second = render(<SeasonMatchInfoScreen {...props} isEntryAnimated={false} />)
+    expect(second.getByTestId('시즌경기정보-순위-유저').textContent).toBe('1')
+  })
+})

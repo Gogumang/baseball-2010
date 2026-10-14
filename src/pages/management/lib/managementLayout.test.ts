@@ -45,8 +45,8 @@ describe('하위 메뉴 · 등장 애니메이션 — 0x7e84c · 0x7ff8c (layout
     expect(slidePositionAt(170, 245, 3)).toBe(commandSlotYAt(245, 3))
   })
 
-  it('머리띠·바닥띠는 갱신마다 두 배로 30 까지 미끄러진다 (시작값 1 은 추정)', () => {
-    expect([0, 1, 2, 3, 4, 5, 6].map(frameSlideOf)).toEqual([1, 2, 4, 8, 16, 30, 30])
+  it('머리띠·바닥띠는 +0x86 = 1 에서 그릴 때마다 먼저 두 배로 한 뒤 그린다 — 첫 그림 2, 30 에서 멈춘다 (0x54e02)', () => {
+    expect([0, 1, 2, 3, 4, 5].map(frameSlideOf)).toEqual([2, 4, 8, 16, 30, 30])
   })
 })
 

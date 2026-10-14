@@ -14,6 +14,8 @@ import {
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
+import { matchInfoEntryPhaseOf } from '@/pages/management/lib/matchInfoEntry'
+import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const SLT_FRAME = './sprites/slt_frame/frames'
@@ -46,6 +48,13 @@ export interface SeasonMatchInfoScreenProps {
   readonly isSettingsOpen?: boolean
   /** 경기진행 설정 창 0x6042c — 그림 0xb398 이 공용 목록 다음 **머리띠 0x54d94 앞**에 그린다(화면 판 안에 그려야 해서 이 칸으로 받는다) */
   readonly settingsWindow?: ReactNode
+  /**
+   * 0x63b15 넷째 인자 — `[장면+0x28] ≠ 0xe0`(이전 상태가 엔트리 편집 0xe0 이 아님, 0xb39a~0xb3a6). 참이면 머리띠가 미끄러져
+   * 내려오는 다섯 그림 동안 본문을 비우고, 파랑 배너 둘이 네 그림 동안 들어온 뒤 본문이 선다(`pages/management/lib/matchInfoEntry`).
+   * 0xe0 에서 돌아오면 거짓 — 머리띠도 안 미끄러진다. 안 주면 거짓.
+   * ⚠️ 미확인: 연출 동안 키 0x83cc 가 키를 받는지는 안 떴다 — 웹은 늘 받는다.
+   */
+  readonly isEntryAnimated?: boolean
 }
 
 /**
@@ -59,8 +68,9 @@ export interface SeasonMatchInfoScreenProps {
  */
 export function SeasonMatchInfoScreen({
   lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry, stage = null,
-  isSettingsOpen = false, settingsWindow = null,
+  isSettingsOpen = false, settingsWindow = null, isEntryAnimated = false,
 }: SeasonMatchInfoScreenProps) {
+  const phase = matchInfoEntryPhaseOf(useUpdateCounter(), isEntryAnimated)
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
 
@@ -103,6 +113,9 @@ export function SeasonMatchInfoScreen({
   return (
     <RawScreen>
       <MatchInfoStadiumBackdrop stage={stage} />
+      {phase.kind === '배너' && <MatchInfoEntryBanners offset={phase.offset} testId="시즌경기정보-배너" />}
+      {phase.kind === '본문' && (
+        <>
       {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
       {[
         { anchor: anchorA, frame: 157 },
@@ -178,6 +191,8 @@ export function SeasonMatchInfoScreen({
             style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }} />
         </>
       )}
+        </>
+      )}
 
       {/* 원본에 없는 웹 전용 단추 셋 — 원본은 바닥띠 소프트키가 한다. 바닥띠 왼쪽에 나란히 세운다 */}
       <Button variant="corner" className={styles.softKey} style={{ left: 4 }} onClick={onStart}>
@@ -197,7 +212,8 @@ export function SeasonMatchInfoScreen({
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
 
       {/* 바닥 = [skin+0x2ba](설정 창) ? 4 : 0x44 (0xb3cc~0xb3da) — 0x44 = "0경기설정"(깜박임) + 되돌아가기 · 4 = 되돌아가기만 */}
-      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={isSettingsOpen ? 0x4 : 0x44} />
+      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={isSettingsOpen ? 0x4 : 0x44}
+        slides={isEntryAnimated} />
     </RawScreen>
   )
 }
