@@ -600,14 +600,16 @@ export function SeasonRoute({
           onOpenEntry={(isUserTeam) => {
             if (!session.isMatchSettingsOpen) actions.openEntryEdit(isUserTeam)
           }}
+          isSettingsOpen={session.isMatchSettingsOpen}
+          // 설정 창 0x6042c 는 화면 판 안, 머리띠 앞에 그린다 (0xb398)
+          settingsWindow={session.isMatchSettingsOpen && (
+            <MatchSettingsWindow
+              settings={session.matchSettings}
+              onConfirm={actions.applyMatchSettings}
+              onClose={actions.toggleMatchSettings}
+            />
+          )}
         />
-        {session.isMatchSettingsOpen && (
-          <MatchSettingsWindow
-            settings={session.matchSettings}
-            onConfirm={actions.applyMatchSettings}
-            onClose={actions.toggleMatchSettings}
-          />
-        )}
       </>
     )
   }

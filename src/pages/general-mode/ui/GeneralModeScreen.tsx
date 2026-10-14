@@ -11,7 +11,7 @@ import { AceSelectScreen } from '@/pages/general-mode/ui/AceSelectScreen'
 import { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 import type { StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
-import { MatchSettingsWindow } from '@/pages/general-mode/ui/MatchSettingsWindow'
+import { MatchSettingsWindow } from '@/pages/match-settings'
 import { hiddenTeamHintMessage } from '@/pages/general-mode/lib/hiddenTeam'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import { MessageBox } from '@/shared/ui'
@@ -339,22 +339,31 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             cpuMatchInfo={session.cpuMatchInfo}
             // 22 진입 0x314b0 → 0x5fd04 가 떠 둔 구장 바탕
             stage={session.matchInfoStage}
-            onStart={actions.start}
-            onOpenSettings={actions.openSettings}
-            onRespin={actions.respin}
-            onCancel={back}
+            // 설정 창이 열려 있으면 키가 모두 창으로 간다 (0x311a8 skin+0x2ba) — 시즌 0xdd 와 같은 창 0x6042c · 0x5ffcc 다
+            onStart={() => {
+              if (!session.isSettingsOpen) actions.start()
+            }}
+            onOpenSettings={() => {
+              if (!session.isSettingsOpen) actions.openSettings()
+            }}
+            onRespin={() => {
+              if (!session.isSettingsOpen) actions.respin()
+            }}
+            onCancel={() => {
+              if (!session.isSettingsOpen) back()
+            }}
             onOpenEntry={(isUserTeam) => {
               // 설정 창이 열려 있으면 키가 창으로 간다 (0x311a8 skin+0x2ba)
               if (!session.isSettingsOpen) actions.openEntry(isUserTeam)
             }}
+            settingsWindow={session.isSettingsOpen && (
+              <MatchSettingsWindow
+                settings={session.settings}
+                onConfirm={actions.applySettings}
+                onClose={actions.closeSettings}
+              />
+            )}
           />
-          {session.isSettingsOpen && (
-            <MatchSettingsWindow
-              settings={session.settings}
-              onConfirm={actions.applySettings}
-              onCancel={actions.closeSettings}
-            />
-          )}
         </>
       )
   }

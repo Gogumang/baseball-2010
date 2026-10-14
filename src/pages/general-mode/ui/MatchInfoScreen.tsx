@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -40,6 +41,11 @@ export interface MatchInfoScreenProps {
   readonly isQuickStart?: boolean
   /** 경기진행 설정 창이 떠 있는가 (skin+0x2ba) — 바닥이 되돌아가기(4)만 남는다 */
   readonly isSettingsOpen?: boolean
+  /**
+   * 경기진행 설정 창 0x6042c — 그림 0x2e0c4 가 목록(4/5) 다음 **머리띠 0x54d95 앞**(2e124 → 2e1be)에 그린다.
+   * 화면 판(240×320) 안에 그려야 해서 부르는 쪽이 창을 이 칸으로 넘긴다
+   */
+  readonly settingsWindow?: ReactNode
   /** `*` 재굴림이 도는 중인가 (skin+0xf4) — 그동안 키를 전부 버린다(0x312b6) */
   readonly isRespinning?: boolean
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
@@ -76,7 +82,7 @@ export interface MatchInfoScreenProps {
  *   - '4'/왼 → 유저 팀 · '6'/오른 → CPU 팀(보기 전용) **엔트리 편집**(상태 23, 편집기 0x55864)
  */
 export function MatchInfoScreen({
-  setup, isQuickStart = false, isSettingsOpen = false, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
+  setup, isQuickStart = false, isSettingsOpen = false, settingsWindow = null, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
   userStarterName = null, cpuMatchInfo = null, stage = null,
 }: MatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
@@ -205,6 +211,8 @@ export function MatchInfoScreen({
       <div className={styles.hintLine}>
         <Hint>Enter 경기 시작 · 0 경기설정{isQuickStart ? ' · * 재선택' : ''}</Hint>
       </div>
+
+      {settingsWindow}
 
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}

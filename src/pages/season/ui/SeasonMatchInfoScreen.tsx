@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -40,6 +41,10 @@ export interface SeasonMatchInfoScreenProps {
   readonly onOpenEntry?: (isUserTeam: boolean) => void
   /** 바탕 — 0xdd 진입 0x6548 의 무대를 0x5fd04 가 흐려 떠 둔 그림(공통 앞그림 0xb810 의 `0x581dc(스킨, 0, 0)`). 없으면 바탕 없음 */
   readonly stage?: MatchInfoStadiumState | null
+  /** [skin+0x2ba] — 경기진행 설정 창이 열렸나. 바닥띠가 4 / 0x44 로 갈린다 (0xb3cc~0xb3da) */
+  readonly isSettingsOpen?: boolean
+  /** 경기진행 설정 창 0x6042c — 그림 0xb398 이 공용 목록 다음 **머리띠 0x54d94 앞**에 그린다(화면 판 안에 그려야 해서 이 칸으로 받는다) */
+  readonly settingsWindow?: ReactNode
 }
 
 /**
@@ -53,6 +58,7 @@ export interface SeasonMatchInfoScreenProps {
  */
 export function SeasonMatchInfoScreen({
   lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry, stage = null,
+  isSettingsOpen = false, settingsWindow = null,
 }: SeasonMatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -162,7 +168,7 @@ export function SeasonMatchInfoScreen({
       <Button variant="corner" className={styles.softKey} style={{ left: 4 }} onClick={onStart}>
         경기 시작
       </Button>
-      {/* 바닥띠 비트 0x40 "0경기설정" — 18틱 주기로 깜빡인다(깜빡임은 아직 안 옮겼다) */}
+      {/* 바닥띠 비트 0x40 "0경기설정" 그림(그릴 때마다 [skin+0x410]++ 의 `% 18 ≤ 8` — 18틱 깜빡임)은 ScreenFrame 이 그린다 — 이 단추는 웹 덧붙임 */}
       <Button variant="corner" className={styles.softKey} style={{ left: 62 }} onClick={onOpenSettings}>
         0 경기설정
       </Button>
@@ -170,10 +176,13 @@ export function SeasonMatchInfoScreen({
         <Hint>Enter/5 경기 시작 · 0 경기설정 · ←/→ 엔트리</Hint>
       </div>
 
+      {settingsWindow}
+
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
-      {/* 바닥 = [skin+0x2ba](설정 창) ? 4 : 0x44 (0xb3cc~0xb3da) — 이 화면이 떠 있는 동안 설정 창은 닫혀 있어 0x44 = "0경기설정"(깜박임) + 되돌아가기 */}
-      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={0x44} />
+
+      {/* 바닥 = [skin+0x2ba](설정 창) ? 4 : 0x44 (0xb3cc~0xb3da) — 0x44 = "0경기설정"(깜박임) + 되돌아가기 · 4 = 되돌아가기만 */}
+      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={isSettingsOpen ? 0x4 : 0x44} />
     </RawScreen>
   )
 }

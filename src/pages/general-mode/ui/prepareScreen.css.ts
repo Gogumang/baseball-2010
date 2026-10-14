@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css'
-import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /** 준비 화면 세 장은 모두 원작 240×320 좌표를 그대로 쓴다 — 조각마다 절대 배치다 (0x63b15) */
 export const layer = style({
@@ -90,77 +90,4 @@ export const hintLine = style({
   width: '240px',
   zIndex: 2,
   pointerEvents: 'none',
-})
-
-/**
- * 경기진행 설정 창 (0x6042c).
- * ⚠️ 원본 배치 미해독 — 근사: 창 좌표가 R4 "남은 것" 에 있어 공용 판 크기(192 폭)만 빌려 썼다.
- */
-export const settingsWindow = style({
-  position: 'absolute',
-  left: 24,
-  top: 54,
-  width: 192,
-  height: 212,
-  boxSizing: 'border-box',
-  padding: 6,
-  background: ORIGINAL_COLORS.panelDeep,
-  border: `1px solid ${ORIGINAL_COLORS.boxEdgeInner}`,
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  lineHeight: '14px',
-  overflowY: 'auto',
-})
-
-export const settingsHeading = style({
-  margin: '0 0 4px',
-  fontSize: '11px',
-  color: ORIGINAL_COLORS.highlightYellow,
-})
-
-export const settingsRow = style({
-  display: 'flex',
-  gap: '2px',
-  alignItems: 'center',
-  margin: '2px 0',
-  // 상세 설정 줄은 칸이 아홉 개다 — 11px 글꼴에서는 한 줄에 다 못 서므로 접어 내린다
-  flexWrap: 'wrap',
-})
-
-export const settingsRowLabel = style({
-  width: '48px',
-  flexShrink: 0,
-})
-
-export const settingsOption = style({
-  boxSizing: 'border-box',
-  padding: '1px 3px',
-  border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
-  background: 'transparent',
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  // 이름이 줄어 "찬스/플레/이" 처럼 세 줄로 접히지 않게 못박는다 (9px 때는 48px 에 들어갔다)
-  flexShrink: 0,
-  whiteSpace: 'nowrap',
-  cursor: 'pointer',
-})
-
-export const settingsOptionSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
-  color: ORIGINAL_COLORS.highlightYellow,
-})
-
-export const settingsOptionOn = style({
-  background: ORIGINAL_COLORS.boardHighlight,
-})
-
-export const settingsDescription = style({
-  margin: '4px 0',
-  color: UI_COLORS.badgeInk,
-})
-
-export const settingsActions = style({
-  display: 'flex',
-  gap: '4px',
-  marginTop: '6px',
 })
