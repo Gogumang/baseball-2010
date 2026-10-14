@@ -13,7 +13,7 @@ import {
   MENU_BANNER, MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_PANEL_HEADING_COLOR,
   MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR, MENU_REEL_SHADOW_OFFSET,
   MENU_REEL_SLOTS, MENU_WHEEL_ITEM_FRAMES, MENU_WHEEL_TURN_TICKS,
-  isMenuWheelAngleDrawn, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
+  menuWheelSlotDrawOf, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
   menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelSlotRowOf,
   menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf, menuWheelOrderOf,
   menuWheelPointOf,
@@ -23,6 +23,7 @@ import { DescriptionPanel } from '@/pages/main-menu/ui/DescriptionPanel'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { MenuBand } from '@/pages/main-menu/ui/MenuBand'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
+import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 
@@ -260,15 +261,19 @@ export function MainMenuScreen({
     : Math.max(TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId), 0)
   const wheelOrder = menuWheelOrderOf(wheelCursor)
   const wheelDirection = isWheel ? turn.direction : null
-  const wheelLabels = wheelOrder.map((entryIndex, slot) => {
+  // 칸 고리 0x24dd2~0x251e4 는 자리 5 → 0 차례로 칸마다 밑판(main_ui 이미지 0 · 1 · 2)을 찍고 그 위에 칸 글자를 그린다
+  const wheelLabels = wheelOrder.map((entryIndex, slot) => ({ entryIndex, slot })).reverse().map(({ entryIndex, slot }) => {
     const angle = menuWheelAngleAt(slot, wheelDirection, turn.counter)
-    if (!isMenuWheelAngleDrawn(angle)) return null
+    const draw = menuWheelSlotDrawOf(angle)
+    if (draw === null) return null
+    const entry = TOP_ENTRIES[entryIndex]
+    const underlay = <MenuWheelUnderlayImage key={`${entry.id}-밑판`} underlay={draw.underlay} />
     const frame = MENU_WHEEL_ITEM_FRAMES[entryIndex]
     const size = sizeOf(textOrigins, frame)
-    if (size === null) return null
+    // 접힌 칸(경우 1~4)은 글자를 안 그린다 (24f98)
+    if (!draw.showsLabel || size === null) return underlay
     const topLeft = menuWheelLabelTopLeftOf(menuWheelPointOf(angle), size.width, size.height)
-    const entry = TOP_ENTRIES[entryIndex]
-    return (
+    return [underlay, (
       <button
         key={entry.id}
         type="button"
@@ -287,7 +292,7 @@ export function MainMenuScreen({
       >
         <img src={frameSrc(IMG_TEXT, frame)} alt="" />
       </button>
-    )
+    )]
   })
 
   // ── 아랫단 세로 릴 ──

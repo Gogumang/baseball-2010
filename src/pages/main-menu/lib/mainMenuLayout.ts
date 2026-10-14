@@ -39,8 +39,9 @@
  * 0x24b1c 에는 아예 없다. 그리고 멈추는 값은 **높이/2 = 160** 이다 — 폭/2 = 120 이 아니다.
  * 0x254e8 이 부르는 것이 폭(0x14008b8)이 아니라 **높이(0x14008c8)** 이기 때문이다.
  *
+ * 각도 구간별 main_ui 이미지 0·1·2 칸 밑판 · 접힘 연출(R6 2절)은 `menuWheelSlotDrawOf` 가 옮겼다(2026-10-14).
+ *
  * ## 아직 모르는 것
- * - 각도 구간별 main_ui 이미지 0·1·2 접힘 연출(R6 2절)은 안 옮겼다. **미구현**(지어낸 것 아님).
  * - main_ball 을 그리는 조건 `[+0xe6] ≥ 0` 의 뜻을 몰라 늘 그린다. **근사**.
  *   (진입 0x237b4 가 `[0xe6] = 0`, 0x23848 이 5·0x11 로 들어올 때만 `= 1` 을 넣는다. 0x24cde 가
  *    `[0xe6] ≤ 0` 이면 테두리 원·칸 글자를 통째로 건너뛰므로 뜻이 "바퀴를 편다" 쪽으로 보이는데,
@@ -208,6 +209,8 @@ export interface MenuWheelRestingLabel {
   readonly entryIndex: number
   readonly frame: number
   readonly point: MenuWheelPoint
+  /** 글자 밑판 (`menuWheelSlotDrawOf`) — 멈춘 표 각(45 · 90 · 180 · 270 · 315)은 늘 이미지 0 */
+  readonly underlay: MenuWheelUnderlay
 }
 
 /**
@@ -218,9 +221,60 @@ export interface MenuWheelRestingLabel {
 export function menuWheelRestingLabelsOf(cursor: number): readonly MenuWheelRestingLabel[] {
   return menuWheelOrderOf(cursor).flatMap((entryIndex, slot) => {
     const angle = menuWheelAngleAt(slot, null, 0)
-    if (!isMenuWheelAngleDrawn(angle)) return []
-    return [{ slot, entryIndex, frame: MENU_WHEEL_ITEM_FRAMES[entryIndex], point: menuWheelPointOf(angle) }]
+    const draw = menuWheelSlotDrawOf(angle)
+    if (draw === null || !draw.showsLabel) return []
+    return [{ slot, entryIndex, frame: MENU_WHEEL_ITEM_FRAMES[entryIndex], point: menuWheelPointOf(angle), underlay: draw.underlay }]
   })
+}
+
+/** main_ui 이미지 0 · 1 · 2 의 크기 — 칸 밑판 76×28 · 접히는 93×23 · 더 접힌 125×15 (public/sprites/main_ui, R6 2절) */
+export const MENU_WHEEL_UNDERLAY_SIZES = [
+  { width: 76, height: 28 },
+  { width: 93, height: 23 },
+  { width: 125, height: 15 },
+] as const
+
+/** 칸 밑판 하나 — main_ui 이미지 · 좌상단 · 상하 뒤집기(효과 0x11 · 인자 1) */
+export interface MenuWheelUnderlay {
+  readonly image: 0 | 1 | 2
+  readonly x: number
+  readonly y: number
+  readonly flipsVertically: boolean
+}
+
+/** 칸 하나를 그리는 법 — 밑판과 그 위 칸 글자(img_text 프레임)를 그리는가 */
+export interface MenuWheelSlotDraw {
+  readonly underlay: MenuWheelUnderlay
+  readonly showsLabel: boolean
+}
+
+/**
+ * **칸 밑판** — 바퀴 그리기 0x24b1c 의 칸 고리 24eca~24f94 (R6 2절, 2026-10-14 다시 뜸). 그리는 각(19~341, 24ef0)에서
+ * 이미지 0 크기로 기준점 가운데 (x0, y0) = (x − (w0 >> 1), y − (h0 >> 1)) 를 잡고 각으로 갈린다:
+ * ```
+ * 24efe  a > 332 → 이미지 2 를 (판 x, 판 y − 5)                        ; 판 = main_ui 이미지 3 (0x24d80 0xba815 · 24db0~24dc6)
+ * 24f1c  a > 323 → 이미지 1 을 (x0 + 10, y0)
+ * 24f32  a ≤ 27  → 이미지 2 를 (판 x, 판 y + 판 높이 − 5) 효과 0x11 · 인자 1(상하 뒤집기)
+ * 24f56  a ≤ 36  → 이미지 1 을 (x0 + 10, y0) 효과 0x11 · 인자 1
+ *        그 밖    → 이미지 0 을 (x0, y0)
+ * 24f98  이미지 0 일 때(경우 0)만 그 위에 칸 글자를 그린다
+ * ```
+ * 바퀴가 도는 동안 칸이 오른쪽 아래 설명 판(이미지 3) 쪽으로 납작하게 접혀 들어가는 연출이다. 그리지 않는 각이면 null.
+ */
+export function menuWheelSlotDrawOf(angle: number): MenuWheelSlotDraw | null {
+  if (!isMenuWheelAngleDrawn(angle)) return null
+  const a = wrapDegrees(angle)
+  const point = menuWheelPointOf(angle)
+  const base = MENU_WHEEL_UNDERLAY_SIZES[0]
+  const x0 = point.x - (base.width >> 1)
+  const y0 = point.y - (base.height >> 1)
+  const panel = MENU_DESCRIPTION_PANEL
+  const folded = (underlay: MenuWheelUnderlay): MenuWheelSlotDraw => ({ underlay, showsLabel: false })
+  if (a > 332) return folded({ image: 2, x: panel.x, y: panel.y - 5, flipsVertically: false })
+  if (a > 323) return folded({ image: 1, x: x0 + 10, y: y0, flipsVertically: false })
+  if (a <= 27) return folded({ image: 2, x: panel.x, y: panel.y + panel.height - 5, flipsVertically: true })
+  if (a <= 36) return folded({ image: 1, x: x0 + 10, y: y0, flipsVertically: true })
+  return { underlay: { image: 0, x: x0, y: y0, flipsVertically: false }, showsLabel: true }
 }
 
 /** 칸 그림의 좌상단 — 기준점 가운데 맞춤 (0x24fc4: x − w/2, y − h/2) */

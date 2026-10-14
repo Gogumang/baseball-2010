@@ -75,7 +75,12 @@ describe('반원 바퀴 칸 글자 (0x24f9e~ — 메인 메뉴 wheelLabels 와 �
     const { container } = 띄우기()
     await vi.waitFor(() => expect(container.querySelectorAll('[data-wheel-label]').length).toBe(5))
     const ids = [...container.querySelectorAll('[data-wheel-label]')].map((node) => node.getAttribute('data-wheel-label'))
-    expect(ids).toEqual(['도움말', '환경설정', '랭킹', '게임문의', '게임시작'])
+    // 칸 고리는 자리 5 → 0 차례로 그린다(0x24dd2~0x251e4)
+    expect(ids).toEqual(['게임시작', '게임문의', '랭킹', '환경설정', '도움말'])
+    // 칸마다 글자 앞에 main_ui 이미지 0 밑판(0x24f6c)
+    const underlays = [...container.querySelectorAll('[data-wheel-underlay]')]
+    expect(underlays.map((node) => node.getAttribute('data-wheel-underlay'))).toEqual(['0', '0', '0', '0', '0'])
+    expect(underlays[0]?.nextElementSibling?.getAttribute('data-wheel-label')).toBe('게임시작')
     vi.unstubAllGlobals()
   })
 })

@@ -411,3 +411,13 @@ describe('처음 메뉴 키 (0x29454) — CLR 은 안 보고, ←→·숫자도 
     expect(screen.getByText('게임모드 별 랭킹', { exact: false })).toBeTruthy()
   })
 })
+
+describe('반원 바퀴 칸 밑판 (0x24b1c 24eca~24f94)', () => {
+  it('멈춘 윗단은 고른 칸(0°)을 빼고 다섯 칸에 main_ui 이미지 0 밑판을 자리 5 → 0 차례로 찍는다', () => {
+    const { container } = 띄우기()
+    const underlays = [...container.querySelectorAll('[data-wheel-underlay]')]
+    expect(underlays.map((node) => node.getAttribute('src'))).toEqual(Array(5).fill('./sprites/main_ui/000.png'))
+    // 자리 5(315°) 가 먼저 — 기준점 (120 + 65 + 20, 320 − 66) 가운데
+    expect((underlays[0] as HTMLElement).style.left).toBe(`${120 + 65 + 20 - 38}px`)
+  })
+})
