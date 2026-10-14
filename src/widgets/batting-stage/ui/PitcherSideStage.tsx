@@ -20,6 +20,7 @@ import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { tiredEffectAnimationOf } from '@/widgets/batting-stage/lib/pitcherTiredEffect'
 
 interface PitcherSideStageProps {
   /** 이 화면에서 마지막으로 던진 공(진행기 `lastPitch`). 화면이 설 때 이미 있던 공은 다시 날리지 않는다 */
@@ -83,6 +84,11 @@ interface PitcherSideStageProps {
    * 0xf = 구질 목록이 실린 대기 · 0x10 = 조준 · 0x11 = 게이지 또는 공이 나는 동안. 안 넘기면 안 그린다
    */
   readonly skillPanel?: PitcherSideSkillPanelSource
+  /**
+   * 마운드 투수의 체력% (0xaebb1 — 레코드 +0x2c ÷ 100). 34 이하면 서 있는 투수 위에 지친 표시(player_effect 애니 9 · 10)를
+   * 얹는다 (`pitcherTiredEffect`). 안 주면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
   /** 장면 위에 얹는 UI (소개 판 · 교체 연출 · 조준 그림 따위) — 원본도 상태 그리기가 장면 다음에 그린다 */
   readonly children?: ReactNode
 }
@@ -121,6 +127,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     const stepSkillPanel = createSkillPanelDriver()
     let skillPanelStateFSerial = 0
     let wasSkillPanelStateF = false
+    /** 지친 표시 애니를 되감은 장면 틱 — 0xf 진입 0x3d954 가 player_effect 애니를 되감는다 */
+    let tiredEffectRewindTick = 0
 
     const frame = (now: number) => {
       const current = latestRef.current
@@ -163,7 +171,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
       const inputKind = isIdle && !current.isPaused ? (current.inputOverlayRef?.current?.kind ?? null) : null
       const isSkillPanelStateF = inputKind === '구질'
-      if (isSkillPanelStateF && !wasSkillPanelStateF) skillPanelStateFSerial += 1
+      if (isSkillPanelStateF && !wasSkillPanelStateF) {
+        skillPanelStateFSerial += 1
+        tiredEffectRewindTick = nowTick
+      }
       wasSkillPanelStateF = isSkillPanelStateF
       const skillPanel = current.skillPanel
       const skillPanelView: SkillPanelView | null =
@@ -229,6 +240,14 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitcherHand: current.pitcherHand,
         stagePhase: stage.phase,
         pitchInput,
+        // 0x38f42~ — 투구 동작 중(+0x14 ≠ 0)이 아닐 때 · 마투수 아님 · 모드 7 은 체력 100.
+        // ⚠️ 근사: 웹 '대기' 만 서 있는 투수로 본다 — 0x12 동안의 +0x14 는 안 봐서 안 그리고, 교체 연출 0x16 은 가르지 않는다
+        pitcherTiredEffect: (() => {
+          const percent = current.pitcherStaminaPercent
+          if (percent === undefined || percent === null || !isIdle || (current.acePitcher ?? null) !== null) return null
+          const animation = tiredEffectAnimationOf(percent)
+          return animation === null ? null : { animation, step: Math.max(0, nowTick - tiredEffectRewindTick) }
+        })(),
         timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,
         // 필살 남은 횟수 0x38a30 은 38a42 에서 0x33fe4(수비 조작 사람)면 바로 끝 — 사람이 던지는 장면엔 없다
         specialSwingRemaining: null,

@@ -40,6 +40,8 @@ import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stag
  *        0x6a9f1(x − 5, y6 − 5, 폭 + 10, 높이 + 2, 0x28000000) 반투명 검정 판 → 이름을 (x, y6 − 4) 에
  * 4d8fc  구질 == 22(마구): 0x15605d4(0, 0, W, H, 5) — 화면 덮개 단계 5
  * ```
+ * 덮개 [0x15605d4] = 0x9b234 는 검정 덮기로 화면을 **단계/16 남긴다**(CORRECTIONS 3절 — 색 덮기 [0x15605d0] = 0x9b3f4 의
+ * (단계 + 1)/16 과 다른 몸통) → 단계 5 는 화면 5/16 · 검정 11/16.
  * 판 · 덮개는 바로 그리고 애니 · 이름은 그리기 목록(0xbe8a5 · 0xbe8d5)에 넣어 0xbe6a1 이 투수 · 타자와 함께 그린다 —
  * 곧 판 · 덮개는 선수 **아래**, 애니 · 이름은 선수 **위**(목록 깊이 [0xcfa8c + 0x14] 는 앞쪽).
  *
@@ -49,10 +51,18 @@ import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stag
  * 4d360  모드 ≠ 7 이고 (사람 공격 아님 ∧ 설정 +0x2d(게이지) == 0) 이면 프레임 0x23(35) 을 그 점에 (CPU 투구 난이도 +0x2c 가 기본 2 일 때)
  * 4d3f6  0x3f500(게이지 켬 ∧ 구질 ≠ 22) ∧ 0x33fe4 → 게이지 (`pitchGaugeSprite` 의 규칙):
  *        t == 0: 커서 ≤ 8 이면 0 → 0x3a, 아니면 0x3b 위 min(0x3b + 커서, 0x43) ; 커서 > 8 → 0x3a
- *        t > 0: min(0x3b + 커서, 0x43)(효과 8) · 애니 1 이 안 끝났으면 min(0x3b + 누른 칸, 0x43) · 애니 1 · t == 5 면 game_effect 애니 0,
- *               애니 1 이 끝났으면 [+0x17c4] ≤ 3 동안 결과 원을 y − (15 − 3·틱) 위로
+ *        t > 0 (2026-10-14 다시 뜸, 0x4d52e~0x4d706):
+ *          4d56e  min(0x3b + 커서, 0x43) 을 0xbe8d5(…, 효과 1, 인자 8)    ; 멈춘 커서 — 반투명 8/16
+ *          4d586  애니 1([+0x1010] 애니 +4)의 끝 비트(애니 기록 +8 → 바이트 2 비트 2)가 꺼져 있으면
+ *          4d5c6    min(0x3b + 누른 칸 [+0x17c8], 0x43) 을 맨 그림으로
+ *          4d602  애니 1 을 0xbe8a5 로 그리고 0x93d91 로 한 칸 넘긴다(끝 비트가 서도 그린다 — 끝 칸)
+ *          4d614  t([+0x17c0]) == 5 면 game_effect(+0x102c) 애니 0 도 그리고 한 칸 넘긴다
+ *          4d6a8  애니 1 끝 비트가 서 있고 [+0x17c4] ≤ 3 이면 min(0x3b + 누른 칸, 0x43) 을 0xbe8d5(…, 효과 1, 인자 max(15 − 3·[+0x17c4], 0))
+ *                 로 그리고 [+0x17c4] + 1   ; 결과 원 — **자리는 그대로, 반투명 15 · 12 · 9 · 6 /16 으로 옅어진다**
  * ```
- * ⚠️ 근사: 효과 8 은 안 풀어 맨 그림으로 · 결과 원 틱은 애니 1(다섯 칸) 뒤부터 센다 · 그리기 목록 깊이 정렬 대신 선수 다음에 그린다.
+ * 효과 1 · 인자 L = 반투명 겹치기 L/16 (R6 3a, 0 이나 16 이상이면 안 그림). 예전에 결과 원을 y − (15 − 3·틱) 로 올려 그린 것은
+ * 그 인자를 y 로 잘못 읽은 것이다.
+ * ⚠️ 근사: 결과 원 틱은 애니 1(다섯 칸) 뒤부터 센다 · 그리기 목록 깊이 정렬 대신 선수 다음에 그린다.
  */
 
 /** 0xf — 구질 목록 */
@@ -216,14 +226,17 @@ function onceLength(entries: readonly StageAnimationEntry[]): number {
 
 /* ── 그리기 ── */
 
+/** 0x4d8fc 의 덮개 단계 — 검정 덮개 0x15605d4 가 화면을 단계/16 남긴다 */
+const MAGIC_COVER_STEP = 5
+
 /**
- * 선수 **아래** — 0x10 의 바로 그리는 것: 마구면 화면 덮개 단계 5, 이름 뒤 반투명 판.
- * ⚠️ 덮개 진하기(단계 / 16)는 0x15605d4 본문을 못 읽은 추정 — 웹 이야기 판 덮개와 같은 셈.
+ * 선수 **아래** — 0x10 의 바로 그리는 것: 마구면 화면 덮개 단계 5(화면 5/16 · 검정 11/16), 이름 뒤 반투명 판.
  */
 export function drawPitchInputUnderlay(context: CanvasRenderingContext2D, overlay: PitchInputOverlay | null, side: number): void {
   if (overlay === null || overlay.kind !== '조준') return
   if (overlay.typeNumber === MAGIC_TYPE_NUMBER) {
-    context.fillStyle = `rgba(0, 0, 0, ${5 / 16})`
+    // 0x15605d4 단계 5 — 화면을 5/16 남긴다 (머리말)
+    context.fillStyle = `rgba(0, 0, 0, ${1 - MAGIC_COVER_STEP / 16})`
     context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
     return
   }
@@ -257,14 +270,23 @@ export function drawPitchInputSprites(context: CanvasRenderingContext2D, overlay
   }
   if (!overlay.gaugeSettingOn) drawFrame(context, SLT_FRAMES, 0x23, point.x, point.y)
   if (!overlay.showsGauge) return
-  for (const draw of gaugeDrawsOf(overlay)) drawFrame(context, draw.folder, draw.frame, point.x, point.y + draw.dy)
+  for (const draw of gaugeDrawsOf(overlay)) {
+    context.save()
+    context.globalAlpha = draw.alpha
+    drawFrame(context, draw.folder, draw.frame, point.x, point.y)
+    context.restore()
+  }
 }
 
 export interface GaugeDraw {
   readonly folder: string
   readonly frame: number
-  readonly dy: number
+  /** 효과 1 · 인자 L 의 그림 몫 L/16 — 효과 없는 맨 그림은 1 */
+  readonly alpha: number
 }
+
+/** 멈춘 커서 — 0xbe8d5(…, 효과 1, 인자 8) */
+const STOPPED_CURSOR_ALPHA = 8 / 16
 
 const GAUGE_OUTLINE = 0x3a
 const GAUGE_BASE = 0x3b
@@ -279,30 +301,31 @@ const gaugeFrameOfCell = (cell: number) => Math.min(GAUGE_BASE + cell, GAUGE_LAS
 export function gaugeDrawsOf(overlay: Pick<PitchGaugeOverlay, 'cursor' | 'pressed' | 'decidedTicks'>): GaugeDraw[] {
   const { cursor, pressed } = overlay
   if (pressed < 1 || pressed > PERFECT_CELL) {
-    if (cursor <= 0 || cursor > 8) return [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, dy: 0 }]
+    if (cursor <= 0 || cursor > 8) return [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, alpha: 1 }]
     return [
-      { folder: SLT_FRAMES, frame: GAUGE_BASE, dy: 0 },
-      { folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0 },
+      { folder: SLT_FRAMES, frame: GAUGE_BASE, alpha: 1 },
+      { folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), alpha: 1 },
     ]
   }
-  const draws: GaugeDraw[] = [{ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0 }]
+  const draws: GaugeDraw[] = [{ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), alpha: STOPPED_CURSOR_ALPHA }]
   const entries = frameAnimations(SLT_FRAMES)?.[GAUGE_RESULT_ANIMATION] ?? []
   const length = entries.length === 0 ? 5 : onceLength(entries)
   const d = overlay.decidedTicks
   if (d < length) {
-    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), dy: 0 })
+    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), alpha: 1 })
     const entry = onceStepAt(entries, d)
-    if (entry !== null) draws.push({ folder: SLT_FRAMES, frame: entry.frame, dy: 0 })
+    if (entry !== null) draws.push({ folder: SLT_FRAMES, frame: entry.frame, alpha: 1 })
     if (pressed === PERFECT_CELL) {
       const effect = frameAnimations(GAME_EFFECT_FRAMES)?.[0]
       const effectEntry = effect === undefined ? null : onceStepAt(effect, d)
-      if (effectEntry !== null) draws.push({ folder: GAME_EFFECT_FRAMES, frame: effectEntry.frame, dy: 0 })
+      if (effectEntry !== null) draws.push({ folder: GAME_EFFECT_FRAMES, frame: effectEntry.frame, alpha: 1 })
     }
     return draws
   }
   const resultTick = d - length
   if (resultTick < GAUGE_RESULT_TICKS) {
-    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), dy: -Math.max(15 - 3 * resultTick, 0) })
+    // 4d6c4 — 인자 L = max(15 − 3·틱, 0) 을 효과 1 반투명으로 (자리는 그대로)
+    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), alpha: Math.max(15 - 3 * resultTick, 0) / 16 })
   }
   return draws
 }

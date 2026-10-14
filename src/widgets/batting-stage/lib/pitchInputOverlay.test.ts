@@ -47,11 +47,12 @@ describe('0x11 게이지 (0x4d412~)', () => {
     expect(gaugeDrawsOf({ cursor: 8, pressed: 0, decidedTicks: 0 }).map((draw) => draw.frame)).toEqual([0x3b, 0x43])
   })
 
-  it('정한 뒤 — 애니 1 이 끝나면 결과 원이 15 · 12 · 9 · 6 위로 떠오른다', () => {
+  it('정한 뒤 — 애니 1 이 끝나면 결과 원이 제자리에서 15 · 12 · 9 · 6 /16 으로 옅어진다', () => {
     const afterAnimation = gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 5 })
     expect(afterAnimation).toEqual([
-      { folder: './sprites/slt_pitch/frames', frame: 0x41, dy: 0 },
-      { folder: './sprites/slt_pitch/frames', frame: 0x41, dy: -15 },
+      // 멈춘 커서 반투명 8/16 · 결과 원은 자리 그대로 15/16 (4d6c4 효과 1 · 인자 15)
+      { folder: './sprites/slt_pitch/frames', frame: 0x41, alpha: 8 / 16 },
+      { folder: './sprites/slt_pitch/frames', frame: 0x41, alpha: 15 / 16 },
     ])
     expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 9 })).toHaveLength(1)
   })

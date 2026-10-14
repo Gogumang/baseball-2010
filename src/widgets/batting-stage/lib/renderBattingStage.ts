@@ -45,6 +45,8 @@ import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { drawPitcherTiredEffect } from '@/widgets/batting-stage/lib/pitcherTiredEffect'
+import type { PitcherTiredEffect } from '@/widgets/batting-stage/lib/pitcherTiredEffect'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
@@ -175,6 +177,8 @@ export interface StageScene {
    * 구질 목록이면 존 자리(0x4c53c)에 존 대신 그린다
    */
   readonly pitchInput?: PitchInputOverlay | null
+  /** 지친 투수 표시 — 0x38d1c 의 player_effect 애니 9 · 10 (`pitcherTiredEffect`). 안 주면 안 그린다 */
+  readonly pitcherTiredEffect?: PitcherTiredEffect | null
 }
 
 export function renderBattingStage(
@@ -208,6 +212,11 @@ export function renderBattingStage(
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
+  // 0x38d1c 꼬리 38f42~ — 서 있는 투수 위 지친 표시(같은 그리기 목록 · 같은 점)
+  if (scene.pitcherTiredEffect !== undefined && scene.pitcherTiredEffect !== null && scene.acePitcher === null) {
+    const anchor = stageLayoutOf(side).pitcherAnchor
+    drawPitcherTiredEffect(context, scene.pitcherTiredEffect, pitcherMirrorOf(anchor.x, scene.pitcherHand ?? 0), anchor.y)
+  }
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
