@@ -3,7 +3,7 @@
  *
  * ```
  * y0 = H/2 − 109 = 51
- * 창 = 공용 판 (24, 54, 192, 212)
+ * 창 = 공용 판 0x55e61(skin, W/2, H/2, 192, 212, 0, 0x22, 위 띠 0x10, 0, 0, 0) → (24, 54, 192, 212)  ; 1df84~1dfa4
  * 격자 = 0x79ed5([this+0x80], 5, 120, y0 + 28 = 79, 표, 칸 28, 5열, 3행) → 15칸
  * ```
  * 격자 만들기 인자의 `cy` 는 **중심이 아니라 첫 줄 위쪽 y** 다 (S9 확정 — P6 의 "중심" 표기는
@@ -41,7 +41,7 @@ export function cellPositionOf(index: number) {
 export const BOTTOM_FRAME = { frame: 1, x: 34, y: 175 } as const
 /** 탭 글씨 — slt_frame 이미지 51 "MISSION" (45×8) */
 export const TAB_LABEL = { image: 51, x: 101, y: 179 } as const
-/** 설명 상자 0xbb28d(120, 193, 173, 65, 2) — 가운데 기준이라 왼쪽 x = 120 − 173/2 */
+/** 설명 상자 0xbb28d(120, 193, 173, 65, 2) — 가운데 기준이라 왼쪽 x = 120 − (173 >> 1) = 34 (1dfd2~1dfe2) */
 export const DESCRIPTION_BOX = { centerX: 120, y: 193, width: 173, height: 65 } as const
 /** 설명 글 — 흰 글 (45, 197, 폭 150) */
 export const DESCRIPTION_TEXT = { x: 45, y: 197, width: 150 } as const

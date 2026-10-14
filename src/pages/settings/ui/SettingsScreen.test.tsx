@@ -17,6 +17,13 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 afterEach(cleanup)
 
+// 머리띠 미끄러짐 동안 페이지를 안 그리는 길([skin+0x84] → 0x5a772)은 `SettingsHeaderSlide.test.tsx` 가 따로 본다 —
+// 여기서는 머리띠가 이미 다 내려온 것으로 두고 페이지 내용만 본다
+vi.mock('@/widgets/screen-frame/lib/frameSlide', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/widgets/screen-frame/lib/frameSlide')>()),
+  isFrameSlideClearedAt: () => true,
+}))
+
 const 띄우기 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}) =>
   render(
     <SettingsScreen

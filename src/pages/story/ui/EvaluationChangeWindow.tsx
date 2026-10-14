@@ -1,5 +1,5 @@
 import { useEffect, useId } from 'react'
-import { FrameSprite } from '@/shared/ui'
+import { CommonPanel, FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
@@ -38,7 +38,8 @@ export interface EvaluationChangeWindowProps {
 /**
  * **경기 평가 변화 창** — 이벤트 system sub 2 (그리기 0x86c90, 배치는 `pages/story/lib/evaluationChangeWindow`).
  * 240×320 화면 좌표 그대로 이야기 덮개 위에 놓는다. 닫기는 원본 OK(−5) · '5' — 웹은 Enter · Space · '5' 와 누르기.
- * ⚠️ 공용 창 0x55e61 의 그림은 웹 공용 근사(`GameWindow.css` window)다 — 올해의 목표 창과 같다.
+ * 공용 창은 `0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)` (0x86cd0~0x86d02 직접 뜸) —
+ * 정렬 0x11 은 가로·세로 옮김 비트(0x2 · 0x4 · 0x20 · 0x40)가 없어 박스 0 왼쪽 위 그대로, 제목 탭이 서서 위 띠는 안 본다.
  * 창이 떠 있는 동안에도 0x8b5ac 가 틀마다 0x7fbc4 로 앞 say 상자를 그린다(`EvaluationEventPlayer` 가 남긴다) — 창 뒤 어둡게가 그 위를 덮는다.
  */
 export function EvaluationChangeWindow({ values, goals, year, game, onClose }: EvaluationChangeWindowProps) {
@@ -69,7 +70,7 @@ export function EvaluationChangeWindow({ values, goals, year, game, onClose }: E
             values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
         </filter>
       </svg>
-      <div className={windowStyles.window} style={{ left: area.x, top: area.y, width: area.width, height: area.height }} />
+      <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
       <FrameSprite folder={MODE_UI} frame={EVALUATION_CHANGE_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
       <MessageLineText year={year} game={game} box={layout.messageBox} />
       {layout.texts.map((piece, index) => (

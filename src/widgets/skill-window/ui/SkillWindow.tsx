@@ -357,7 +357,9 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
   return (
     <div className={windowStyles.overlay} role="dialog" aria-label="아이템/스킬" onClick={onClose}>
       <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
-        {/* 0x81d0c — 종류 0 의 판 */}
+        {/* 0x81d0c — 종류 0 의 판. 0x81dc0 은 [win+0x1a4] == 0 이면(81e1c~81e76) 공용 판 0x55e60 을 부르지 않고
+            0x81d0c(둥글기 1 판 0xba0bd 셋: 검정 · 흰 −1 · #335FCD −2)로 그린다 — 0x55e61(…, 0x11, 0x10, 0, 제목 탭 1, 0)은
+            종류 ≠ 0(상점 · 장비) 갈래(81e3e~81e68)만 쓴다 */}
         <RoundPlate x={WINDOW_BOX.x} y={WINDOW_BOX.y} width={WINDOW_BOX.width - 1} height={WINDOW_BOX.height - 1} color={WINDOW_COLORS.outer} />
         <RoundPlate x={WINDOW_BOX.x + 1} y={WINDOW_BOX.y + 1} width={WINDOW_BOX.width - 3} height={WINDOW_BOX.height - 3} color={WINDOW_COLORS.inner} />
         <rect x={WINDOW_BOX.x + 2} y={WINDOW_BOX.y + 2} width={WINDOW_BOX.width - 4} height={WINDOW_BOX.height - 4} fill={WINDOW_COLORS.fill} />

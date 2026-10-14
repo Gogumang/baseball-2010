@@ -26,9 +26,9 @@ const 띄우기 = (overrides: Partial<Parameters<typeof MissionSelectScreen>[0]>
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
 describe('미션 선택 격자', () => {
-  it('판은 가운데 192×212 다 (24, 54)', () => {
-    const { container } = 띄우기()
-    const panel = container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement
+  it('판은 가운데 192×212 다 (24, 54) — 공용 판 0x55e61(…, 위 띠 0x10)', () => {
+    띄우기()
+    const panel = screen.getByTestId('미션-고르기-판')
 
     expect(panel.style.left).toBe(`${PANEL.x}px`)
     expect(panel.style.top).toBe(`${PANEL.y}px`)

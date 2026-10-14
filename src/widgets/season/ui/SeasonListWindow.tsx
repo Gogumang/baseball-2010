@@ -47,7 +47,15 @@ export function SeasonListWindow({
 
   return (
     <div role="group" aria-label={title}>
-      {/* 공용 판 0x55e61 — ⚠️ 미확인: 띠 · 제목 탭 인자는 이 목록을 부르는 원본 자리를 못 맞춰 기본 판만 그린다 */}
+      {/* 공용 판 0x55e61 — ⚠️ 근사: 이 목록 창을 쓰는 화면들의 원본 그림은 0x55e60 을 부르지 않거나 다른 인자다.
+          · 0xe2 선수영입(0xa10c) · 0xe4 트레이드 팀 고르기(0xa14c): 공용 목록 0x63b15 + 0x7f4ed 뿐 — 0x63b14 는
+            0x55e60 을 부르지 않는다(0x55e60 의 BL · 리터럴 참조 전수에 없다)
+          · 0xe7 트레이드 확인(0xd4e8): 0x55e61(skin, 박스 x · y · w · h, 0, 0x11, 0x10, 0, 제목 탭 1, 0) (d570~d5b4)
+          · 0xe8 십전대보탕 투수 고르기(0xafd0): 엔트리 목록 창 0x5cfec → 0x5c984 의 0x55e60(…, W/2, H/2 + 5, 210, 220,
+            0, 0x22, 위 띠 0x12, 아래 띠 ([편집기+0x3e8] == 1 ? 0x12 : 0), 0, 0) (5ca2c~5ca4e)
+          · 레벨업 창 0x5f394 (r5 = [sp+0x58] = 0 · r7 = 1, 5f3aa · 5f3c4) 의 0x55e60(…, 192, 212, 0, 0x22, 0, 0, 제목 탭 1,
+            어둡게 1) 은 이 목록이 아니라 `widgets/ace-level-up` 의 창이다.
+          배치가 화면마다 달라 이 공용 근사 창에는 기본 판만 그린다 */}
       <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
       <div
         className={styles.title}

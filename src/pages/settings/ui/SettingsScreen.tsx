@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CommonPanel, FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, MessageBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { isFrameSlideClearedAt } from '@/widgets/screen-frame/lib/frameSlide'
 import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-controls/model/vibration'
@@ -112,18 +113,32 @@ export function SettingsScreen({
   const [cursor, setCursor] = useState(0)
   /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
   const [hasReturned, setHasReturned] = useState(false)
-  const tick = useUpdateCounter()
-  const isOutlineShown = isSelectedOutlineShown(tick)
+  const updates = useUpdateCounter()
+  const isOutlineShown = isSelectedOutlineShown(updates)
   /** 고른 줄 까딱임 — 표 0xd1784 · 0xd1754 (`settingsLayout` 의 `ROW_SHAKE_TABLES` 머리말) */
-  const rowShake = useCursorShake(tick)
+  const rowShake = useCursorShake(updates)
   const [notice, setNotice] = useState<string | null>(null)
   const [isDetailOpen, setDetailOpen] = useState(false)
   const [isModeResetOpen, setModeResetOpen] = useState(false)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
+  const titlePalette = useImgTextPalette3()
 
   /** 경기 장면 안 "설정"(skin+0x125 = 1) — 작은 판, 값 줄 셋만, OK 단추가 넷째 커서 칸 */
   const isInGame = mainMenu === undefined
+  /**
+   * **머리띠가 미끄러지는 동안은 페이지를 안 그린다** — 0x593c8 은 [skin+0x84] ≠ 0 이면 0x59428~0x5942e 에서
+   * `bl 0x5a772` 로 빠진다. 0x5a772 는 함수가 아니라 0x593c8 자신의 끝(0x5a772~0x5a780: [페이지+0x25] = 0 · sp 되돌림 · pop)이라
+   * **판·제목·줄·설명 띠를 하나도 안 그리고, 판 펼침 0x5a6fe 도 안 부르고** 돌아간다. 그래서 그 뒤 0x55e60 의
+   * 알파 · 위 띠 · 아래 띠 · 어둡게 자리에 넘기는 r7(= [skin+0x84])은 늘 0 이다 (깃발이 서 있으면 거기까지 못 온다).
+   * 깃발은 상태 8 진입 0x259fc(앞 상태가 0x20~0x22 가 아닐 때) · 0x20 진입 0x2421c · 0x21 진입 0x242a4 가 세우고
+   * 머리띠 0x54d95 가 다 내려온 그림에서 지운다(`isFrameSlideClearedAt`). 경기 중 메뉴(skin+0x125)는 머리띠가 없어 늘 그린다.
+   * 값은 이 페이지(또는 하위 페이지)가 머리띠와 함께 들어선 갱신 수 — null 이면 미끄러지지 않는다.
+   */
+  const [pageSlideStart, setPageSlideStart] = useState<number | null>(isInGame ? null : 0)
+  const isPageShown = pageSlideStart === null || isFrameSlideClearedAt(updates - pageSlideStart)
+  const isPageShownRef = useRef(isPageShown)
+  isPageShownRef.current = isPageShown
   const panel = isInGame ? IN_GAME_PANEL : PANEL
   /** 판·제목·줄·OK 가 y0 를 따라 내려가는 만큼 */
   const panelDy = panel.y - PANEL.y
@@ -156,6 +171,8 @@ export function SettingsScreen({
   useEffect(() => {
     if (!isFolding) return undefined
     const timer = window.setInterval(() => {
+      // 0x5a6fe 는 0x593c8 이 판을 그린 뒤에만 부른다 — 머리띠가 미끄러지는 동안은 펼침도 멈춘다
+      if (!isPageShownRef.current) return
       const next = nextPanelFold(foldRef.current, panel.height)
       // 접힘이 끝나면 갱신 끝 0x29688 이 상태 4 로 — 10 높이 판은 그려지지 않는다
       if (!next.isOpening && next.isDone) {
@@ -205,12 +222,14 @@ export function SettingsScreen({
     // (skin+0x90 · +0x94 · +0x98 · +0x99, 0x24262~0x24274 · 0x242ea~0x242fc) — 공용 페이지 0x593c8 이 그대로 편다
     if (index === 3) {
       setFold(openingFold())
+      setPageSlideStart(updates)
       return setDetailOpen(true)
     }
     // 칸 4 → 상태 0x21 (0x295d0 `0xbcb49(…, 0x21)`) — 조건 없이 들어간다
     if (index === 4) {
       if (onResetEditedNames === undefined) return undefined
       setFold(openingFold())
+      setPageSlideStart(updates)
       return setModeResetOpen(true)
     }
     setNotice(SETTINGS_TEXT.dataManagementBlocked)
@@ -254,7 +273,8 @@ export function SettingsScreen({
   if (isDetailOpen) {
     return (
       <DetailSettings settings={settings} onChange={onChange} mainMenu={mainMenu} panelHeight={Math.min(fold.height, PANEL.height)}
-        onBack={() => { setHasReturned(true); setDetailOpen(false) }} />
+        isPageShown={isPageShown}
+        onBack={() => { setHasReturned(true); setPageSlideStart(null); setDetailOpen(false) }} />
     )
   }
   // 모드 초기화도 딴 페이지다 (장면 상태 0x21 · 페이지 33, 갱신 0x2c6d8 · 그리기 0x2dc00)
@@ -267,7 +287,8 @@ export function SettingsScreen({
         {...(onResetSeason === undefined ? {} : { onResetSeason })}
         mainMenu={mainMenu}
         panelHeight={Math.min(fold.height, PANEL.height)}
-        onBack={() => { setHasReturned(true); setModeResetOpen(false) }}
+        isPageShown={isPageShown}
+        onBack={() => { setHasReturned(true); setPageSlideStart(null); setModeResetOpen(false) }}
       />
     )
   }
@@ -275,7 +296,7 @@ export function SettingsScreen({
   /**
    * 이번에 그리는 판 높이 — 판은 화면 가운데를 기준으로 위아래로 펴진다.
    * 판 = `0x55e60(skin, W/2, H/2, 192, h, 0, 정렬 0x22, 0, 0, 제목 탭 1, 0)` (0x594f4~0x59510) — 왼쪽 위 제목 탭 모양.
-   * ⚠️ 미확인: [skin+0x84] ≠ 0 이면 0x5a772 를 부른 뒤 그 값을 알파·띠·어둡게 인자로 그대로 넘긴다(0x59428~0x5950e) — 그 길은 안 옮겼다.
+   * 알파 · 띠 · 어둡게 자리의 r7 = [skin+0x84] 는 여기까지 오면 늘 0 이다(`isPageShown` 머리말).
    */
   const drawnHeight = Math.min(fold.height, panel.height)
   const isUnfolded = drawnHeight >= panel.height
@@ -283,10 +304,14 @@ export function SettingsScreen({
 
   return (
     <RawScreen>
+      {isPageShown && (<>
+      {titlePalette.definition}
       <CommonPanel x={panel.x} y={SCREEN.height / 2 - Math.trunc(drawnHeight / 2)} width={panel.width} height={drawnHeight}
         titleTab />
       <PanelClip x={panel.x} y={clip.y} width={panel.width} height={clip.height}>
-      <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy} />
+      {/* 제목 img_text 289 — 팔레트 3(#2949A5 · #10246B) 으로 그린다 (0x59572~0x595cc: 0x913e5(img_text, 3) 뒤 0xba759) */}
+      <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy}
+        style={titlePalette.style} />
 
       {names.map((name, index) => {
         const top = rowTopOf(index) + panelDy
@@ -415,6 +440,7 @@ export function SettingsScreen({
 
       {/* 설명 띠 0x55544 — StrMAINMENU[0x20 + 커서]. OK 칸이거나 경기 중이면 안 그린다 (0x59e64 앞 갈래) */}
       {!isInGame && !isOkSelected && <DescriptionBand text={SETTINGS_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />}
+      </>)}
 
       {/* 머리띠 되돌아가기 = CLR (0x295e2) */}
       <SettingsFrame mainMenu={mainMenu} onBack={leave} slides={!hasReturned} />
@@ -486,12 +512,14 @@ function toggleDetail(settings: GameSettings, row: number): GameSettings {
  * 배치는 그리기 0x59e82~0x5a2f4 를 직접 뜬 값이다 (`settingsLayout.ts` 의 `DETAIL_*` 주석) — 아래 OK 단추는 없다.
  * 웹판에 배선이 없는 값(송구·전광판)도 **원본에 줄이 있으므로 그대로 보여 주고 저장한다.**
  */
-function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
+function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown, onBack }: {
   readonly settings: GameSettings
   readonly onChange: (settings: GameSettings) => void
   readonly mainMenu: { readonly gamePoint: number } | undefined
   /** 이번에 그리는 판 높이 — 첫 화면이 들고 있는 펼침(`nextPanelFold`) */
   readonly panelHeight: number
+  /** 머리띠가 다 내려왔나 — 아니면 0x593c8 이 아무것도 안 그린다 (`SettingsScreen` 의 `isPageShown`) */
+  readonly isPageShown: boolean
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
@@ -501,6 +529,7 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
   const rowShake = useCursorShake(tick)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
+  const titlePalette = useImgTextPalette3()
   const values = detailValuesOf(settings)
 
   useEffect(() => {
@@ -532,10 +561,13 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
   const clip = panelClipOf(panelHeight, PANEL.height)
   return (
     <RawScreen>
+      {isPageShown && (<>
+      {titlePalette.definition}
       <UnfoldingPanel height={panelHeight} />
       <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
+      {/* 제목 img_text 290 — 팔레트 3 (0x59e82~0x59eae `0x913e5(img_text, 3)`) */}
       <FrameSprite folder={IMG_TEXT} frame={DETAIL_TITLE.frame} origins={titleFrames}
-        x={DETAIL_TITLE.x} y={DETAIL_TITLE.y} />
+        x={DETAIL_TITLE.x} y={DETAIL_TITLE.y} style={titlePalette.style} />
 
       {DETAIL_ROWS.map((row, index) => {
         const top = detailRowTopOf(index)
@@ -609,6 +641,7 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
       </PanelClip>
       {/* 설명 띠 0x5a310 — StrMAINMENU[0x26 + 커서], 조건 없이 */}
       <DescriptionBand text={DETAIL_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />
+      </>)}
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
     </RawScreen>
   )
@@ -662,7 +695,7 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  * ⚠️ 칸 1 시즌모드: `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
  */
 function ModeResetPage({
-  onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, panelHeight, onBack,
+  onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, panelHeight, isPageShown, onBack,
 }: {
   readonly onResetCareer: (edition: CareerResetEdition) => void
   readonly careerResetBlockOf?: (edition: CareerResetEdition) => string | null
@@ -671,6 +704,8 @@ function ModeResetPage({
   readonly mainMenu: { readonly gamePoint: number } | undefined
   /** 이번에 그리는 판 높이 — 첫 화면이 들고 있는 펼침(`nextPanelFold`) */
   readonly panelHeight: number
+  /** 머리띠가 다 내려왔나 — 아니면 0x593c8 이 아무것도 안 그린다 (`SettingsScreen` 의 `isPageShown`) */
+  readonly isPageShown: boolean
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
@@ -681,6 +716,7 @@ function ModeResetPage({
   const [popup, setPopup] = useState<ModeResetPopup | null>(null)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
+  const titlePalette = useImgTextPalette3()
 
   const openRow = (index: number) => {
     if (index === 0) return setPopup({ kind: '나리고르기' })
@@ -730,10 +766,13 @@ function ModeResetPage({
   const clip = panelClipOf(panelHeight, PANEL.height)
   return (
     <RawScreen>
+      {isPageShown && (<>
+      {titlePalette.definition}
       <UnfoldingPanel height={panelHeight} />
       <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
+      {/* 제목 img_text 291 — 팔레트 3 (0x5a316~0x5a340 `0x913e5(img_text, 3)`) */}
       <FrameSprite folder={IMG_TEXT} frame={MODE_RESET_TITLE.frame} origins={titleFrames}
-        x={MODE_RESET_TITLE.x} y={MODE_RESET_TITLE.y} />
+        x={MODE_RESET_TITLE.x} y={MODE_RESET_TITLE.y} style={titlePalette.style} />
 
       {MODE_RESET_NAMES.map((name, index) => {
         const top = modeResetRowTopOf(index)
@@ -765,6 +804,7 @@ function ModeResetPage({
         )
       })}
       </PanelClip>
+      </>)}
 
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
 

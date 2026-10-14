@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { FrameSprite } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
@@ -173,14 +173,13 @@ export function SettlementBoard({
         </>
       ) : (
         <>
-          <div className={styles.window} style={{
-            left: panel.window.x, top: panel.window.y, width: panel.window.width, height: panel.window.height,
-          }} />
+          {/* 4aafe 공용 판 0x55e61(skin, W/2, H/2, 176, h, 0, 0x22, 위 띠 0x10, 0, 0, 0) */}
+          <CommonPanel x={panel.window.x} y={panel.window.y} width={panel.window.width} height={panel.window.height}
+            topBand={0x10} testId="정산-판-창" />
           <img className={styles.sprite} alt="RESULT" src={imageSrc(GAME_UI, panel.title.image)}
             style={{ left: panel.title.x, top: panel.title.y }} />
-          <div className={styles.innerBox} style={{
-            left: panel.recordBox.x, top: panel.recordBox.y, width: panel.recordBox.width, height: panel.recordBox.height,
-          }} />
+          {/* 4ab6e 칸 0xbb28d(…, 정렬 2) */}
+          <InsetBox x={panel.recordBox.x} y={panel.recordBox.y} width={panel.recordBox.width} height={panel.recordBox.height} />
           {panel.hasRecords ? (
             <>
               {visibleRows.map((row, offset) => {
@@ -221,9 +220,8 @@ export function SettlementBoard({
             </span>
           )}
 
-          <div className={styles.innerBox} style={{
-            left: panel.pointBox.x, top: panel.pointBox.y, width: panel.pointBox.width, height: panel.pointBox.height,
-          }} />
+          {/* 4ad34 칸 0xbb28d(…, 정렬 2) */}
+          <InsetBox x={panel.pointBox.x} y={panel.pointBox.y} width={panel.pointBox.width} height={panel.pointBox.height} />
           {panel.pointRows.map((row, index) => {
             const value = index === 0 ? gamePoints : heldGamePoints
             return (
@@ -241,9 +239,9 @@ export function SettlementBoard({
 
           {panel.rewardBox !== null && panel.ticker !== null && (
             <>
-              <div className={styles.innerBox} style={{
-                left: panel.rewardBox.x, top: panel.rewardBox.y, width: panel.rewardBox.width, height: panel.rewardBox.height,
-              }} />
+              {/* 4aeb4 칸 0xbb28d(…, 정렬 2) */}
+              <InsetBox x={panel.rewardBox.x} y={panel.rewardBox.y} width={panel.rewardBox.width}
+                height={panel.rewardBox.height} />
               {versusWinBonus !== undefined && <RewardTicker text={versusRewardTextOf(versusWinBonus)} box={panel.ticker} />}
             </>
           )}

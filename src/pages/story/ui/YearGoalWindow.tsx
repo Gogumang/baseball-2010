@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { FrameSprite } from '@/shared/ui'
+import { CommonPanel, FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import { YEAR_GOAL_BOXES, YEAR_GOAL_MODE_UI_FRAME, yearGoalWindowLayoutOf } from '@/pages/story/lib/yearGoalWindow'
@@ -15,7 +15,8 @@ const pad = (frame: number) => String(frame).padStart(3, '0')
  * **올해의 목표 창** — 이벤트 system sub 1 (그리기 0x86fdc · 0x8656c, 배치는 `pages/story/lib/yearGoalWindow`).
  * 나리 두 편(묶음 0~2)과 시즌모드(모드 2 갈래, 묶음 3)가 같은 창을 쓴다.
  * 240×320 화면 좌표 그대로 이야기 덮개 위에 놓는다. 누르면(원본 OK · '5') 닫힌다 — 키는 재생기(`useEventPlayback`)가 받는다.
- * ⚠️ 공용 창 0x55e61 의 그림은 웹 공용 근사(`GameWindow.css` window)다 — 선 목록만 확인됐다.
+ * 공용 창은 `0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)` (0x8700e~0x8703a 직접 뜸) —
+ * 정렬 0x11 은 가로·세로 옮김 비트(0x2 · 0x4 · 0x20 · 0x40)가 없어 박스 0 왼쪽 위 그대로, 제목 탭이 서서 위 띠는 안 본다.
  * 창이 떠 있는 동안에도 대화창 0x8b5ac 가 틀마다 0x7fbc4 로 앞 say 상자를 그린다 — 창은 그 위다(`StoryScreen` 이 상자를 남긴다).
  */
 export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalWindowSource; readonly onClose: () => void }) {
@@ -34,7 +35,7 @@ export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalW
             values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
         </filter>
       </svg>
-      <div className={windowStyles.window} style={{ left: area.x, top: area.y, width: area.width, height: area.height }} />
+      <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
       <FrameSprite folder={MODE_UI} frame={YEAR_GOAL_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
       {layout.texts.map((piece, index) => (
         <img key={`t${index}`} className={windowStyles.layer} src={`${IMG_TEXT}/${pad(piece.frame)}.png`} alt=""
