@@ -1691,7 +1691,7 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
     expect(result.current.shopTab).toBe('서브')
     act(() => result.current.actions.purchase(shopItemId('서브', 0)))
 
-    expect(result.current.shopNotice).toBe('[표적판] 구매 완료')
+    expect(result.current.shopNotice).toBe('!C[!cFFFF00표적판!cFFFFFF] 구매 완료')
     expect(result.current.career?.money).toBe(5_000)
     expect((store.load() as { subItemIds: number[] }).subItemIds).toEqual([0])
 

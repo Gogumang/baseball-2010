@@ -1,3 +1,4 @@
+import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { autoSlideRunnerIndexes, SLIDING_SPEED_BONUS, type SlidingRunner } from '@/entities/defense-controls/model/sliding'
 import {
@@ -692,6 +693,21 @@ function* runnerPlaySteps(
         holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
         fumbleTicks: fumbleMarks,
         throwErrorTicks: throwErrorMarks,
+        // 공 그리기 0x36dfc 의 튐 파티클 — 0x46c88 이 판 종류를 안 보고 늘 부른다(`ballParticleFactsOf`). 큰 타구 갈래는 판 종류 ∈ {1, 8} 이라 없다.
+        // 공은 송구 · 다시 쏘기 · 폭투가 깐 궤적(세계 0xbfed0)을 판 틱으로 읽는다. 쥔 공 · 쫓는 공이 없는 그림은 안 쏜다.
+        // ⚠️ 미확인: +0xfd4(결과 코드)는 스윙 판정 51308 이 적는 칸이라 주자 판에서는 앞 스윙의 값이 남는다 — 진행기가 몰라 null(거르지 않음)
+        ballParticles:
+          chase === null || play.held
+            ? null
+            : ballParticleFactsOf({
+                ballTick: at - chase.startTick,
+                at,
+                trajectory: chase.trajectory,
+                onTrajectory: true,
+                bigHitWatch: false,
+                playKind: input.kind,
+                resultCode: null,
+              }),
         runnerAceIndexes: input.runnerAceIndexes,
         runnerAceSprite: input.runnerAceSprite ?? null,
         aceIndexes: input.aceIndexes,

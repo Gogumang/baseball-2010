@@ -4,7 +4,8 @@ import {
   pitcherEquipmentItemOf, purchasePitcherEquipment,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 import type { PitcherEquipmentBlockReason } from '@/entities/pitcher-career/model/pitcherEquipment'
-import { formatOriginalMoney, opensGpDetailWindow } from '@/features/shop/model/shopSelection'
+// StrMODE[92] — 서브아이템(kind 1)만 띄운다 (0x14d28). 장비(kind 3)는 구매 완료 창이 없다 (창 차례는 `shopSelection` 의 `selectEquipment` 머리말)
+import { formatOriginalMoney, opensGpDetailWindow, purchasedText } from '@/features/shop/model/shopSelection'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import { SUB_ITEM_BLOCK_TEXT, purchaseSubItem, subItemBlockReasonOf } from '@/entities/career/model/subItems'
 import {
@@ -39,8 +40,6 @@ const BLOCK_TEXT: Readonly<Record<Exclude<PitcherEquipmentBlockReason, '인기�
   이미보유: '이미 가지고 있는 아이템입니다', // StrMODE[78]
   소지금부족: '소지금이 부족합니다', // StrMODE[77]
 }
-/** StrMODE[92] — 서브아이템(kind 1)만 띄운다 (0x14d28). 장비(kind 3)는 구매 완료 창이 없다 (창 차례는 `shopSelection` 의 `selectEquipment` 머리말) */
-const purchasedText = (name: string) => `[${name}] 구매 완료`
 
 const parse = (itemId: string) => {
   const [tab, first, second] = itemId.split(':')

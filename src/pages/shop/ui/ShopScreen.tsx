@@ -31,6 +31,13 @@ const TABS: readonly ShopTab[] = ['장착', '서브', 'GP', '착용']
 const PART_NAMES = EQUIPMENT_PARTS.map((part) => part.name)
 
 /**
+ * 결과 알림 글 — 원문 마크업으로 온 글(StrMODE[92] 구매 완료 `!C[!cFFFF00…`)은 그대로, 마크업 없이 옮겨 둔 글은 가운데 맞춤(!C)을 붙인다
+ */
+function centeredNoticeOf(text: string): string {
+  return text.startsWith('!C') ? text : `!C${text}`
+}
+
+/**
  * 상점·아이템 창 (0x8453c → 0x81dc0). 관리 화면 [아이템] 의 네 갈래가 모두 여기로 온다:
  *   창 종류 1 서브아이템 · 2 GP아이템 · 3 장비 상점 / 장비착용 (R12 1a)
  *   — 종류 4 구장 아이템(0x83378, 프레임 32)은 시즌 구단관리 쪽이라 웹에 아직 데이터가 없다.
@@ -161,7 +168,7 @@ export function ShopScreenView({
         <DetailWindow rows={detail.rows} messages={detail.messages} onClose={() => onCloseDetail?.()} />
       )}
       {pending === null && blockNotice === null && !isDetailOpen && isNoticeOpen && (
-        <MessageBox text={`!C${noticeText}`} buttons={['확인']} onAnswer={() => setDismissedNotice(noticeText)} />
+        <MessageBox text={centeredNoticeOf(noticeText)} buttons={['확인']} onAnswer={() => setDismissedNotice(noticeText)} />
       )}
     </RawScreen>
   )

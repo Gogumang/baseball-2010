@@ -6,6 +6,7 @@ import type { EquipmentBlockReason } from '@/entities/career/model/equipment'
 import { purchaseSubItem, SUB_ITEM_BLOCK_TEXT, SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItems'
 import { BATTER_GP_ITEMS, EAGLE_EYE_ITEM_ID, EAGLE_EYE_NOTICE, gpItemBlockReasonOf, gpItemNoticeOf, purchaseGpItem } from '@/entities/career/model/gpItems'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /** 상점 탭 (0x14a74 의 화면+0x1a4 — 3 장착 · 1 서브 · 2 GP) · 선수정보 장비착용(0x17b66) */
 export type ShopTab = '장착' | '서브' | 'GP' | '착용'
@@ -48,8 +49,15 @@ const EQUIPMENT_BLOCK_TEXT: Readonly<Record<Exclude<EquipmentBlockReason, '인�
   이미보유: '이미 가지고 있는 아이템입니다', // StrMODE[78]
   소지금부족: '소지금이 부족합니다', // StrMODE[77]
 }
-/** StrMODE[92] — 서브아이템(kind 1)만 띄운다. ⚠️ 원문 마크업 `!C[!cFFFF00%s!cFFFFFF] 구매 완료` 은 아직 안 옮겼다(상자가 앞에 !C 를 붙인다) */
-const purchasedText = (name: string) => `[${name}] 구매 완료`
+/**
+ * StrMODE[92] 원문 마크업 `!C[!cFFFF00%s!cFFFFFF] 구매 완료` — 서브아이템(kind 1)만 띄운다. 0x14d28 이 `0x702b5(글표, 0x5c)` 로 꺼내
+ * 0x14d38 `0x845d5` 이름을 0x1400468(sprintf)로 넣고 0xbbef9(글, 1, 1, 1) → 0x74ef5(창, 글, 1, 0, 0) 로 **그대로** 띄운다(0xbbef8 은
+ * 앞에 아무것도 안 붙인다). 시즌 0x7fa6 도 같은 글이다(`seasonItemShop.applySeasonSubItem`). 메인 메뉴 0x30972(상태 36 0x308d8 —
+ * 🌐 서버 갈래, 웹에 없음)는 sprintf 없이 %s 째로 띄운다.
+ */
+export const purchasedText = (name: string) => (ORIGINAL_MODE_TEXT[PURCHASED_TEXT_ID] ?? '').replace('%s', name)
+/** StrMODE[92] */
+const PURCHASED_TEXT_ID = 92
 
 /** 장비착용 화면 (0x17b66) — 가진 장비만 낄 수 있다 */
 function wearEquipment(career: PlayerCareer, part: number, level: number): ShopSelection {

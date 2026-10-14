@@ -243,6 +243,9 @@ export function missionDefensePlayInputOf(
     ...(abilities === undefined
       ? {}
       : { defenseAbilities: abilities.defenseAbilities, runAbilities: abilities.runAbilities }),
+    // 그림 전용 — 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10). 난수와 무관하다
+    ...(abilities?.fielderPlates === undefined ? {} : { fielderPlates: abilities.fielderPlates }),
+    ...(abilities?.runnerAces === undefined ? {} : { runnerAces: abilities.runnerAces }),
     // 사람이 수비하는 투수편에서만 환경설정 송구가 먹는다 (0xae6c8 의 앞 항이 거짓)
     ...(isPitcherSide ? { throwMode: throwModeManual === false ? '자동' : '수동' } : {}),
   }

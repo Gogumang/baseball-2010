@@ -5,6 +5,8 @@ import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import {
   missionBatterSlotOf,
   missionDefenseAbilitiesOf,
+  missionFielderPlatesOf,
+  missionRunnerAcesOf,
   missionPlayAbilitiesOf,
   missionRunAbilitiesOnBaseOf,
   missionRunnerRunAbilitiesOf,
@@ -13,7 +15,8 @@ import {
 } from '@/entities/mission/model/missionRunners'
 import { masterGameAbilityOf, MISSION_ACE_ROSTER_SLOT } from '@/entities/mission/model/missionCpuTeam'
 import { battingRecordAt, MISSION_NARI_RECORD } from '@/entities/mission/model/missionGame'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { rosterSlotAt } from '@/entities/game/model/quickLineup'
 import type { BaseState } from '@/entities/game/model/baseState'
 
@@ -171,5 +174,50 @@ describe('미션 수비 판 아홉 칸 수비 — 0xb0fb4 (수비 팀 레코드�
     const abilities = missionPlayAbilitiesOf(run)
     expect(abilities.runAbilities).toEqual(missionRunAbilitiesOnBaseOf(run))
     expect(abilities.defenseAbilities).toEqual(missionDefenseAbilitiesOf(run))
+  })
+})
+
+describe('미션 수비 판 이름 판(0x43cb0) · 마선수 주자(0x79d10)', () => {
+  it('타자 미션 — 칸 1~8 은 CPU 팀 야수(이름 · 자리 니블), 칸 0 은 CPU 마운드 투수(이름 · 보직 profile & 3)', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자' && m.opponentAce === 0)!
+    const run = startMission(mission)
+    const plates = missionFielderPlatesOf(run)
+    const pitching = run.cpu.pitching!
+    const pitcher = teamPitchers(pitching.teamId)[pitching.roster[pitching.mound.pitcherSlot]!]!
+    expect(plates[0]).toEqual({ name: pitcher.name, pitcherRole: pitcher.profile & 3 })
+    teamBatters(run.game.cpuAutoBatting!.teamId).forEach((player) => {
+      const code = (player.position ?? 0) & 0xf
+      if (code - 1 >= 1 && code - 1 < 9 && plates[code - 1]?.name === player.name) {
+        expect(plates[code - 1]).toEqual({ name: player.name, positionCode: code })
+      }
+    })
+    expect(plates.slice(1).filter((plate) => plate !== null).length).toBeGreaterThan(0)
+    // 사람 칸 팀 공격에는 마선수가 없다
+    expect(missionRunnerAcesOf(run)).toEqual({ batter: null, first: null, second: null, third: null })
+  })
+
+  it('타자 마선수 미션 — 마운드 마투수는 이름만(보직 없음)', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자' && m.opponentAce > 0)!
+    const run = startMission(mission)
+    expect(missionFielderPlatesOf(run)[0]).toEqual({ name: ACE_PITCHERS[mission.opponentAce - 1]!.name, pitcherRole: undefined })
+  })
+
+  it('투수 미션 — 칸 0 은 미션 투수(aa81c~aa878 0번), 마타자 칸 주자 · 타자는 순번 − 1', () => {
+    const mission = MISSIONS.find((m) => m.side === '투수' && m.opponentAce > 0)!
+    const run = startPitcherMission(mission)
+    const plates = missionFielderPlatesOf({ ...run, missionPitcher: { name: '나투수', role: 2 } })
+    expect(plates[0]).toEqual({ name: '나투수', pitcherRole: 2 })
+    expect(missionFielderPlatesOf(run)[0]).toBeNull()
+    // 0xaae7c 가 지금 타순 레코드에 마타자를 끼웠다
+    expect(missionRunnerAcesOf(run).batter).toBe(mission.opponentAce - 1)
+  })
+
+  it('missionPlayAbilitiesOf 에 경기를 넘기면 그림 전용 두 칸을 싣는다', () => {
+    const mission = MISSIONS.find((m) => m.side === '타자')!
+    const run = startMission(mission)
+    expect(missionPlayAbilitiesOf(run).fielderPlates).toBeUndefined()
+    const withPlates = missionPlayAbilitiesOf(run, {}, run)
+    expect(withPlates.fielderPlates).toEqual(missionFielderPlatesOf(run))
+    expect(withPlates.runnerAces).toEqual(missionRunnerAcesOf(run))
   })
 })

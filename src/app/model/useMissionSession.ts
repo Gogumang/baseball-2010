@@ -766,14 +766,30 @@ export function useMissionSession({
       ...(aceBatterRun === undefined ? {} : { aceBatterRun }),
     }
   }
-  /** 수비 판에 먹이는 수비 아홉 칸 · 루별 주루 — 미션 타구 · 공 도착 · 견제 판이 같은 값을 쓴다 (`missionPlayAbilitiesOf`) */
-  const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities =>
-    missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission))
+  /** 투수 미션의 미션 투수 이름 판(0x43cb0 칸 0) — 판을 먹이는 콜백들이 늘 지금 값을 보게 ref 로 든다 */
+  const missionPitcherPlateRef = useRef<ModePitcher['plate']>(undefined)
+  missionPitcherPlateRef.current = pitcher.plate
+  /**
+   * 수비 판에 먹이는 수비 아홉 칸 · 루별 주루 — 미션 타구 · 공 도착 · 견제 판이 같은 값을 쓴다 (`missionPlayAbilitiesOf`).
+   * 그림 전용 이름 판(0x43cb0) · 마선수 주자(0x79d10)도 함께 싣는다 (`missionFielderPlatesOf` · `missionRunnerAcesOf`)
+   */
+  const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities => {
+    const missionPitcher = missionPitcherPlateRef.current
+    return missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission), {
+      ...run,
+      ...(missionPitcher === undefined ? {} : { missionPitcher }),
+    })
+  }
+  /** 공 도착 판에 얹는 그림 전용 두 칸 (능력치 칸은 부르는 쪽이 따로 넣는다) */
+  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces }: MissionPlayAbilities) => ({
+    ...(fielderPlates === undefined ? {} : { fielderPlates }),
+    ...(runnerAces === undefined ? {} : { runnerAces }),
+  })
   /** 견제 판 꼴 — 견제는 타자주자가 없어 루 1~3 만 */
   const pickoffAbilitiesOf = (run: MissionRun) => {
-    const { defenseAbilities, runAbilities } = playAbilitiesOf(run)
+    const { runAbilities, ...rest } = playAbilitiesOf(run)
     const { 0: _batter, ...onBase } = runAbilities
-    return { defenseAbilities, runAbilities: onBase }
+    return { ...rest, runAbilities: onBase }
   }
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
@@ -1355,6 +1371,8 @@ export function useMissionSession({
             runAbilities: pitcherRunAbilities,
             // 아홉 칸 수비 — 사람 칸 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)
             defenseAbilities: missionDefenseAbilitiesOf(pitcherRun),
+            // 그림 전용 — 공 가진 야수 이름 판(0x43cb0, 칸 0 = 미션 투수) · CPU 마타자 주자 그림(0x79d10)
+            ...pitchArrivalPlatesOf(playAbilitiesOf(pitcherRun)),
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: throwModeManual === false ? '자동' : '수동',
