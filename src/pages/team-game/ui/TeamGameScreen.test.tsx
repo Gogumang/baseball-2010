@@ -251,9 +251,9 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
-    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
-    for (const 칸 of ['계속', '자동진행', '조작방법', '설정', '나가기']) {
-      expect(screen.getByText(칸)).toBeTruthy()
+    expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
+    for (const 칸 of ['계속하기', '자동진행', '게임방법', '환경설정', '메인메뉴']) {
+      expect(screen.getByRole('option', { name: 칸 })).toBeTruthy()
     }
   })
 
@@ -261,22 +261,22 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     띄우기()
     fireEvent.keyDown(window, { key: '*' })
 
-    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+    expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
   })
 
   it('나가기를 고르면 StrGAME[0] 확인 문구가 뜬다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(screen.getByRole('option', { name: '메인메뉴' }))
 
     expect(screen.getByText(/메인메뉴로 나가시겠습니까/)).toBeTruthy()
-    expect(screen.getByText('예')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
   })
 
   it('G포인트를 안 넘기면 자동진행 칸이 잠긴다 (비용을 검사할 수 없다)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    const 자동진행 = screen.getByText('자동진행').closest('button')
+    const 자동진행 = screen.getByRole('option', { name: '자동진행' }).closest('button')
 
     expect(자동진행?.disabled).toBe(true)
   })
@@ -295,10 +295,10 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     )
     판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('자동진행'))
+    fireEvent.click(screen.getByRole('option', { name: '자동진행' }))
 
     expect(screen.getByText(/30 G포인트/)).toBeTruthy()
-    fireEvent.click(screen.getByText('예'))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(screen.getByText(/G포인트가 부족합니다/)).toBeTruthy()
     expect(onSpendGamePoint).not.toHaveBeenCalled()
@@ -321,8 +321,8 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     )
     판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('자동진행'))
-    fireEvent.click(screen.getByText('예'))
+    fireEvent.click(screen.getByRole('option', { name: '자동진행' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(onSpendGamePoint).toHaveBeenCalledWith(30)
     // 자동진행 중계(상태 0x21)가 선다 — 새 저장 속도 1 이면 4틱마다 0xc262c 한 번
@@ -352,7 +352,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     )
     판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('자동진행'))
+    fireEvent.click(screen.getByRole('option', { name: '자동진행' }))
 
     expect(screen.getByText(/100 G포인트/)).toBeTruthy()
   })
@@ -373,16 +373,16 @@ describe('투수 교체 (#)', () => {
     fireEvent.keyDown(window, { key: '*' })
 
     expect(screen.getByText('투수 교체')).toBeTruthy()
-    expect(screen.queryByText('경기 중 메뉴')).toBeNull()
+    expect(screen.queryByRole('listbox', { name: '경기 중 메뉴' })).toBeNull()
     const 메뉴 = screen.getByRole('button', { name: '메뉴' })
     expect((메뉴 as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(메뉴)
     expect(screen.getByText('투수 교체')).toBeTruthy()
-    expect(screen.queryByText('경기 중 메뉴')).toBeNull()
+    expect(screen.queryByRole('listbox', { name: '경기 중 메뉴' })).toBeNull()
     // 창을 닫으면(0x495fc 의 '#'·CLR) 다시 먹는다
     fireEvent.click(screen.getByRole('button', { name: '취소' }))
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+    expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
   })
 
   it('우리 공격 차례에는 교체 입구가 없다 — 원본은 그 자리에서 대타를 연다', () => {
@@ -461,8 +461,10 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
     expect(screen.queryByText('투수 교체')).toBeNull()
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+    expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
+    // 메뉴의 '5' 는 숫자키 꼴 2 — 다섯째 칸(메인메뉴)을 곧바로 골라 질문 창이 뜬다. 창이 키를 먹는 동안 장면 OK 는 없다(0x754f8)
     fireEvent.keyDown(window, { key: '5' })
+    fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))

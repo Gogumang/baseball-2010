@@ -80,36 +80,35 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 1 — 자동진행 자리에 다시
     띄우기()
 
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    expect(screen.getByRole('option', { name: /계속/ })).toBeTruthy()
+    expect(screen.getByRole('option', { name: '계속하기' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '닫기' }))
-    expect(screen.queryByRole('option', { name: /계속/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: '계속하기' })).toBeNull()
   })
 
   it('**다시하기** 칸이 있다 — 자동진행이 아니다 (홈런더비는 행 1)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
-    expect(screen.getByRole('option', { name: '다시하기' })).toBeTruthy()
-    expect(screen.queryByRole('option', { name: /자동진행/ })).toBeNull()
+    expect(screen.getByRole('option', { name: '재도전' })).toBeTruthy()
+    expect(screen.queryByRole('option', { name: '자동진행' })).toBeNull()
   })
 
   it('설정을 안 넘기면 그 칸이 잠긴다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
-    expect((screen.getByRole('option', { name: '설정' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('option', { name: '환경설정' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('다시하기를 고르면 StrGAME[7] 로 되묻고, 예를 눌러야 처음부터 다시 선다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByRole('option', { name: '다시하기' }))
+    fireEvent.click(screen.getByRole('option', { name: '재도전' }))
 
     expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
 
-    const 예 = screen.getAllByRole('option').find((option) => option.textContent?.endsWith('예'))
-    fireEvent.click(예!)
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
     // 처음부터 다시 — 첫 공으로 돌아온다 (HUD 공 번호 1/10)
     expect(screen.getAllByTestId('공번호')[0]?.getAttribute('src')).toBe('./sprites/num/001.png')
     // 새 경기 장면 — 로딩 판도 다시 선다(상태 7 진입 0x39f88)

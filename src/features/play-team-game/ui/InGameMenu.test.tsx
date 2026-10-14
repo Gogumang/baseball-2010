@@ -1,63 +1,128 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
+import { inGameMenuLayoutOf, inGameMenuSlideAt } from '@/features/play-team-game/model/inGameMenu'
 
 afterEach(cleanup)
 
-describe('경기 중 메뉴 — 다시하기 (표 0xcfcfc 행 1, 0x3c706)', () => {
-  it('미션·홈런더비 행에는 자동진행 대신 다시하기가 있다', () => {
-    render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={vi.fn()} />)
+const 칸 = (name: string) => screen.getByRole('option', { name })
+const 고른칸 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
+const 예 = () => screen.getByRole('button', { name: '예' })
+const 아니오 = () => screen.getByRole('button', { name: '아니오' })
 
-    expect(screen.getByText('다시하기')).toBeTruthy()
-    expect(screen.queryByText('자동진행')).toBeNull()
+describe('경기 중 메뉴 판 — 그리기 0x3cdd0 (하위 0~3)', () => {
+  it('판은 왼쪽 아래 — h = 칸수 × 14 + 21 · y = 320 − h − 18 · x = [+0x1954] − 0x45', () => {
+    const five = inGameMenuLayoutOf(5, 0x44)
+    expect(five.box).toEqual({ x: -1, y: 211, width: 70, height: 91 })
+    expect(five.title).toEqual({ x: 7, y: 216 })
+    expect(five.rows[0]).toEqual({
+      pill: { x: 2, y: 229, width: 65, height: 14 },
+      digit: { centerX: 8, y: 231, value: 1 },
+      label: { x: 16, y: 231 },
+    })
+    expect(five.rows[4]?.pill.y).toBe(229 + 56)
+    const four = inGameMenuLayoutOf(4, 0x44)
+    expect(four.box).toEqual({ x: -1, y: 225, width: 70, height: 77 })
   })
 
+  it("'*' 로 새로 열면 왼쪽에서 밀려 든다 — 그린 뒤 걸음 ×2 · 0x44 에서 멈춤 (0x3d0ca~0x3d0ee)", () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7].map(inGameMenuSlideAt)).toEqual([0, 2, 6, 14, 30, 62, 68, 68])
+  })
+
+  it('칸 이름은 img_text 표 0xcff9c 그림이다 — 고른 칸만 노란 칠', () => {
+    render(<InGameMenu mode={1} onContinue={vi.fn()} cursor={2} />)
+    expect(screen.getByTestId('경기-메뉴-칸-2').dataset.selected).toBe('true')
+    expect(screen.getByTestId('경기-메뉴-칸-0').dataset.selected).toBe('false')
+    expect(screen.getByTestId('경기-메뉴-판').dataset.slide).toBe('68')
+  })
+
+  it('대전 6회 제한이면 자동진행 칸 이름이 회색 단색이다 (3cf0a · 3cfa4)', () => {
+    render(<InGameMenu mode={8} onContinue={vi.fn()} onAutoProgress={vi.fn()} gamePoint={999} canAutoProgress={false} />)
+    expect(screen.getByTestId('경기-메뉴-칸-1').dataset.grey).toBe('true')
+  })
+
+  it('밀려 들기를 켜면 0 에서 시작해 틀마다 나아간다', () => {
+    vi.useFakeTimers()
+    try {
+      render(<InGameMenu mode={1} onContinue={vi.fn()} slidesIn />)
+      expect(screen.getByTestId('경기-메뉴-판').dataset.slide).toBe('0')
+      act(() => {
+        vi.advanceTimersByTime(10_000)
+      })
+      expect(screen.getByTestId('경기-메뉴-판').dataset.slide).toBe('68')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('경기 중 메뉴 — 칸 (표 0xcfcfc)', () => {
+  it('일반·시즌·대전 행 — 계속하기 · 자동진행 · 게임방법 · 환경설정 · 메인메뉴', () => {
+    render(<InGameMenu mode={1} onContinue={vi.fn()} />)
+    expect(screen.getAllByRole('option').map((option) => option.getAttribute('aria-label')))
+      .toEqual(['계속하기', '자동진행', '게임방법', '환경설정', '메인메뉴'])
+  })
+
+  it('미션·홈런더비 행에는 자동진행 대신 재도전이 있다', () => {
+    render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={vi.fn()} />)
+    expect(칸('재도전')).toBeTruthy()
+    expect(screen.queryByRole('option', { name: '자동진행' })).toBeNull()
+  })
+
+  it('나만의리그 행은 네 칸이다', () => {
+    render(<InGameMenu mode={3} onContinue={vi.fn()} />)
+    expect(screen.getAllByRole('option')).toHaveLength(4)
+  })
+})
+
+describe('경기 중 메뉴 — 다시하기 (표 0xcfcfc 행 1, 0x3c706)', () => {
   it('StrGAME[7] 문구로 한 번 묻고, 예를 고르면 다시 시작한다', () => {
     const onRestart = vi.fn()
     render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={onRestart} />)
 
-    fireEvent.click(screen.getByText('다시하기'))
+    fireEvent.click(칸('재도전'))
     expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
 
-    fireEvent.click(screen.getByText('예'))
+    fireEvent.click(예())
     expect(onRestart).toHaveBeenCalledTimes(1)
   })
 
-  it('아니오면 아무 일도 없다', () => {
+  it('아니오면 아무 일도 없고 메뉴로 돌아온다', () => {
     const onRestart = vi.fn()
     render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={onRestart} />)
 
-    fireEvent.click(screen.getByText('다시하기'))
-    fireEvent.click(screen.getByText('아니오'))
+    fireEvent.click(칸('재도전'))
+    fireEvent.click(아니오())
 
     expect(onRestart).not.toHaveBeenCalled()
-    expect(screen.getByText('경기 중 메뉴')).toBeTruthy()
+    expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
   })
 
   it('손잡이를 안 넘긴 칸은 잠긴다', () => {
     render(<InGameMenu mode={6} onContinue={vi.fn()} />)
 
-    expect(screen.getByText('다시하기').closest('button')?.disabled).toBe(true)
-    expect(screen.getByText('나가기').closest('button')?.disabled).toBe(true)
-    expect(screen.getByText('계속').closest('button')?.disabled).toBe(false)
+    expect((칸('재도전') as HTMLButtonElement).disabled).toBe(true)
+    expect((칸('메인메뉴') as HTMLButtonElement).disabled).toBe(true)
+    expect((칸('계속하기') as HTMLButtonElement).disabled).toBe(false)
   })
 })
 
-describe('경기 중 메뉴 커서 — 메뉴 객체(+0xf30)를 0 으로 되돌리는 곳은 \'*\' 로 여는 0x3c02c 뿐이다', () => {
-  const 고른칸 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
-
+describe("경기 중 메뉴 커서 — 메뉴 객체(+0xf30)를 0 으로 되돌리는 곳은 '*' 로 여는 0x3c02c 뿐이다", () => {
   it('넘겨받은 커서 칸에서 시작한다 — [조작방법]·[설정]에서 돌아올 때 (0x3ca36 · 0x3cb0e)', () => {
     render(<InGameMenu mode={3} cursor={2} onContinue={vi.fn()} />)
-    expect(고른칸()?.textContent).toContain('설정')
+    expect(고른칸()?.getAttribute('aria-label')).toBe('환경설정')
   })
 
-  it('커서가 옮겨지면 알려 준다', () => {
+  it('커서가 옮겨지면 알려 준다 — 세로 감기(꼴 0x20)', () => {
     const onCursorChange = vi.fn()
     render(<InGameMenu mode={3} onContinue={vi.fn()} onCursorChange={onCursorChange} />)
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     expect(onCursorChange).toHaveBeenLastCalledWith(1)
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(3)
   })
 
   it('질문 창에서 아니오로 돌아와도 커서가 남는다', () => {
@@ -65,34 +130,30 @@ describe('경기 중 메뉴 커서 — 메뉴 객체(+0xf30)를 0 으로 되돌�
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
-    fireEvent.click(screen.getByText('아니오'))
-    expect(고른칸()?.textContent).toContain('다시하기')
+    fireEvent.click(아니오())
+    expect(고른칸()?.getAttribute('aria-label')).toBe('재도전')
   })
 })
 
 describe('경기 중 메뉴 — 나가기 (동작 3 0x3c504 → 하위 1 0x3c77c → 상태 0x22)', () => {
-  const 고른칸 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
-
-  it('모드 1~4·8·9 는 StrGAME[0], 미션·홈런더비는 StrGAME[1] 로 묻고 처음 커서는 [예]다 (0x749d5 없음)', () => {
+  it('모드 1~4·8·9 는 StrGAME[0], 미션·홈런더비는 StrGAME[1] 로 묻는다 (0x74ef5 종류 2)', () => {
     render(<InGameMenu mode={3} onContinue={vi.fn()} onQuit={vi.fn()} />)
-    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(칸('메인메뉴'))
     expect(screen.getByText(/G포인트가 사라집니다/)).toBeTruthy()
-    expect(고른칸()?.textContent).toContain('예')
     cleanup()
 
     render(<InGameMenu mode={6} onContinue={vi.fn()} onQuit={vi.fn()} />)
-    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(칸('메인메뉴'))
     expect(screen.getByText(/진행 중인 게임을 그만하고/)).toBeTruthy()
-    expect(고른칸()?.textContent).toContain('예')
   })
 
-  it('[예] 면 나간다 · [아니오] 면 메뉴로 돌아온다', () => {
+  it('처음 커서는 [예]다 (0x749d5 없음) — [아니오] 면 메뉴로 돌아온다', () => {
     const onQuit = vi.fn()
     render(<InGameMenu mode={7} onContinue={vi.fn()} onQuit={onQuit} />)
-    fireEvent.click(screen.getByText('나가기'))
-    fireEvent.click(screen.getByText('아니오'))
+    fireEvent.click(칸('메인메뉴'))
+    fireEvent.click(아니오())
     expect(onQuit).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(칸('메인메뉴'))
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onQuit).toHaveBeenCalledTimes(1)
   })
@@ -101,13 +162,13 @@ describe('경기 중 메뉴 — 나가기 (동작 3 0x3c504 → 하위 1 0x3c77c
 describe('경기 중 메뉴 — 자동진행 알림 문구는 StrGAME 원문이다', () => {
   it('[2] 대전 6회 제한 · [5] G포인트 부족', () => {
     render(<InGameMenu mode={8} onContinue={vi.fn()} onAutoProgress={vi.fn()} gamePoint={999} canAutoProgress={false} />)
-    fireEvent.click(screen.getByText('자동진행'))
+    fireEvent.click(칸('자동진행'))
     expect(screen.getByText(/자동진행 가능합니다/)).toBeTruthy()
     cleanup()
 
     render(<InGameMenu mode={1} onContinue={vi.fn()} onAutoProgress={vi.fn()} autoProgressCost={100} gamePoint={0} />)
-    fireEvent.click(screen.getByText('자동진행'))
-    fireEvent.click(screen.getByText('예'))
+    fireEvent.click(칸('자동진행'))
+    fireEvent.click(예())
     expect(screen.getByText(/자동진행을 할 수 없습니다/)).toBeTruthy()
     expect(screen.getByText(/에서 충전할 수 있습니다/)).toBeTruthy()
   })
@@ -121,40 +182,40 @@ describe('경기 중 메뉴 — [조작방법] · [설정] 은 울리던 소리�
   }
   afterEach(() => setActiveSound(null))
 
-  it('[조작방법] 을 고르면 끊고 뷰어를 연다', () => {
+  it('[게임방법] 을 고르면 끊고 뷰어를 연다', () => {
     const port = 통로()
     const onOpenHelp = vi.fn()
     render(<InGameMenu mode={3} onContinue={vi.fn()} onOpenHelp={onOpenHelp} />)
 
-    fireEvent.click(screen.getByText('조작방법'))
+    fireEvent.click(칸('게임방법'))
 
     expect(port.stop).toHaveBeenCalledTimes(1)
     expect(onOpenHelp).toHaveBeenCalledTimes(1)
   })
 
-  it('[설정] 을 고르면 끊고 설정을 연다', () => {
+  it('[환경설정] 을 고르면 끊고 설정을 연다', () => {
     const port = 통로()
     const onOpenSettings = vi.fn()
     render(<InGameMenu mode={3} onContinue={vi.fn()} onOpenSettings={onOpenSettings} />)
 
-    fireEvent.click(screen.getByText('설정'))
+    fireEvent.click(칸('환경설정'))
 
     expect(port.stop).toHaveBeenCalledTimes(1)
     expect(onOpenSettings).toHaveBeenCalledTimes(1)
   })
 
-  it('[계속] 은 끊지 않는다', () => {
+  it('[계속하기] 는 끊지 않는다', () => {
     const port = 통로()
     render(<InGameMenu mode={3} onContinue={vi.fn()} />)
 
-    fireEvent.click(screen.getByText('계속'))
+    fireEvent.click(칸('계속하기'))
 
     expect(port.stop).not.toHaveBeenCalled()
   })
 })
 
 describe('경기 중 메뉴 숫자키 — 목록 0x6bfe1(1열, 4|5줄, 숫자키 꼴 2, 0x230) (0x3c08e · 0x6c100)', () => {
-  it('숫자 n 은 n 번째 칸을 바로 고르고 OK 다 — 1 = 계속', () => {
+  it('숫자 n 은 n 번째 칸을 바로 고르고 OK 다 — 1 = 계속하기', () => {
     const onContinue = vi.fn()
     render(<InGameMenu mode={6} onContinue={onContinue} />)
     fireEvent.keyDown(window, { key: '1' })
@@ -167,8 +228,7 @@ describe('경기 중 메뉴 숫자키 — 목록 0x6bfe1(1열, 4|5줄, 숫자키
     fireEvent.keyDown(window, { key: '9' })
     expect(onCursorChange).not.toHaveBeenCalledWith(8)
 
-    const restartIndex = screen.getAllByRole('option').findIndex((option) => option.textContent?.includes('다시하기'))
-    fireEvent.keyDown(window, { key: String(restartIndex + 1) })
+    fireEvent.keyDown(window, { key: '2' })
     expect(screen.getByText(/다시 플레이하시겠습니까/)).toBeTruthy()
   })
 })
@@ -181,10 +241,11 @@ describe('경기 중 메뉴 — 창 뒤 어둡게 (0x741a0 · 0x746cc, 경기 �
     expect(dim.style.background).toBe(`rgba(0, 0, 0, ${6 / 16})`)
   })
 
-  it('질문 창에서도 같은 한 겹이다', () => {
+  it('질문 창(0x74ef5)은 메뉴 덮개 대신 제 덮개 한 겹이다', () => {
     render(<InGameMenu mode={6} onContinue={vi.fn()} onRestart={vi.fn()} />)
 
-    fireEvent.click(screen.getByText('다시하기'))
-    expect(screen.getAllByTestId('경기-메뉴-어둡게')).toHaveLength(1)
+    fireEvent.click(칸('재도전'))
+    expect(screen.queryByTestId('경기-메뉴-어둡게')).toBeNull()
+    expect(screen.getByRole('dialog').style.background).toBe(`rgba(0, 0, 0, ${6 / 16})`)
   })
 })

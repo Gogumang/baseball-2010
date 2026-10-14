@@ -16,17 +16,11 @@ export const frame = style({
 })
 
 /**
- * 장면 위 팝업 판 — 경기 중 메뉴(0x741a0)는 원본도 장면 위에 뜬다. 판(240×320)을 덮고 메뉴 조각을 세로 가운데에 둔다.
- * ⚠️ 메뉴 모양은 아직 웹 판(`InGameMenu`)이다 — 자리만 장면 위로 옮겼다.
+ * 장면 위 팝업 판 — 경기 중 메뉴(일시정지 창 0x741a0)는 원본도 장면 위에 뜬다. 판(240×320)을 덮고, 메뉴는 원본 좌표대로
+ * 스스로 자리를 잡는다(`InGameMenu` — 그리기 0x3cdd0).
  */
 export const popupLayer = style({
   position: 'absolute',
   inset: 0,
   zIndex: 5,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  gap: '10px',
-  padding: '0 10px',
-  overflowY: 'auto',
 })

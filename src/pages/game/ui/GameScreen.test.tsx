@@ -50,16 +50,16 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
-    for (const 칸 of ['계속', '조작방법', '설정', '나가기']) {
-      expect(screen.getByText(칸)).toBeTruthy()
+    for (const 칸 of ['계속하기', '게임방법', '환경설정', '메인메뉴']) {
+      expect(screen.getByRole('option', { name: 칸 })).toBeTruthy()
     }
-    expect(screen.queryByText('자동진행')).toBeNull()
+    expect(screen.queryByRole('option', { name: '자동진행' })).toBeNull()
   })
 
   it('[조작방법]은 띠 없이 뷰어만 띄우고, CLR 로 닫으면 경기 중 메뉴로 돌아간다 (0x3ce54 · 0x3ca36)', () => {
     const { container } = 띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('조작방법'))
+    fireEvent.click(screen.getByRole('option', { name: '게임방법' }))
 
     expect(screen.getByText('<기본 조작>')).toBeTruthy()
     const 띠그림 = [...container.querySelectorAll('img')].filter((img) => img.getAttribute('src')?.includes('game_frame'))
@@ -72,27 +72,27 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
     // 여는 때는 장 고르기라 CLR 한 번에 닫힌다 → 메뉴가 다시 뜬다
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByText('<기본 조작>')).toBeNull()
-    expect(screen.getByText('조작방법')).toBeTruthy()
+    expect(screen.getByRole('option', { name: '게임방법' })).toBeTruthy()
   })
 
   it('[조작방법]은 경기 화면을 내리지 않고 그 위에 얹힌다 — 닫으면 메뉴 커서가 그대로다 (0x3ca36 · 0x52efe)', () => {
     띄우기()
     fireEvent.keyDown(window, { key: '*' })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
-    expect(screen.getByRole('option', { name: /조작방법/ }).getAttribute('aria-selected')).toBe('true')
-    fireEvent.click(screen.getByText('조작방법'))
+    expect(screen.getByRole('option', { name: '게임방법' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('option', { name: '게임방법' }))
 
     // 뷰어 뒤에 경기 장면(원본 240×320 판)이 그대로 있다
     expect(screen.getByText('<기본 조작>')).toBeTruthy()
     expect(document.querySelector('[data-original-screen] canvas')).not.toBeNull()
 
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.getByRole('option', { name: /조작방법/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('option', { name: '게임방법' }).getAttribute('aria-selected')).toBe('true')
 
     // '*' 로 닫았다 새로 열면(0x3c02c → 0x6c00c(메뉴, 0, 0)) 첫 칸이다
     fireEvent.keyDown(window, { key: '*' })
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.getByRole('option', { name: /계속/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('option', { name: '계속하기' }).getAttribute('aria-selected')).toBe('true')
   })
 
   it('[설정]에서 돌아와도 경기 중 메뉴로, 커서는 그대로다 (0x3cb0e)', () => {
@@ -100,21 +100,21 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
     fireEvent.keyDown(window, { key: '*' })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowDown' })
-    fireEvent.click(screen.getByText('설정'))
-    expect(screen.queryByText('경기 중 메뉴')).toBeNull()
+    fireEvent.click(screen.getByRole('option', { name: '환경설정' }))
+    expect(screen.queryByRole('listbox', { name: '경기 중 메뉴' })).toBeNull()
 
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.getByRole('option', { name: /설정/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('option', { name: '환경설정' }).getAttribute('aria-selected')).toBe('true')
   })
 
   it('나가기를 고르면 StrGAME[0] 확인 문구가 뜨고, 예가 경기를 끝낸다', () => {
     const onQuit = vi.fn()
     띄우기({ onQuit })
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('나가기'))
+    fireEvent.click(screen.getByRole('option', { name: '메인메뉴' }))
 
     expect(screen.getByText(/메인메뉴로 나가시겠습니까/)).toBeTruthy()
-    fireEvent.click(screen.getByText('예'))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onQuit).toHaveBeenCalledTimes(1)
   })
 
@@ -122,7 +122,7 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
-    expect(screen.getByText('설정').closest('button')?.disabled).toBe(true)
+    expect(screen.getByRole('option', { name: '환경설정' }).closest('button')?.disabled).toBe(true)
   })
 })
 
@@ -159,7 +159,7 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자', () => {
     expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.queryByText('조작방법')).toBeNull()
+    expect(screen.queryByRole('option', { name: '게임방법' })).toBeNull()
 
     fireEvent.keyDown(window, { key: '5' })
     expect(screen.getByRole('button', { name: '메뉴' })).toBeTruthy()

@@ -189,10 +189,10 @@ describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*
     메뉴화면({ onRestart: vi.fn() })
     expect(screen.queryByRole('button', { name: '포기' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
-    for (const 메뉴칸 of ['계속', '다시하기', '조작방법', '설정', '나가기']) {
-      expect(screen.getByText(메뉴칸)).toBeTruthy()
+    for (const 메뉴칸 of ['계속하기', '재도전', '게임방법', '환경설정', '메인메뉴']) {
+      expect(screen.getByRole('option', { name: 메뉴칸 })).toBeTruthy()
     }
-    expect(screen.queryByText('자동진행')).toBeNull()
+    expect(screen.queryByRole('option', { name: '자동진행' })).toBeNull()
     // 투구 단계(누름 칸)는 가려진다 — 단계 상태는 그대로다
     expect(구질단계()?.closest('[hidden]')).toBeTruthy()
     // '*' 로 닫는다
@@ -204,8 +204,8 @@ describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*
     const onGiveUp = vi.fn()
     메뉴화면({ onGiveUp })
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
-    fireEvent.click(screen.getByText('나가기'))
-    fireEvent.click(screen.getByText('예'))
+    fireEvent.click(screen.getByRole('option', { name: '메인메뉴' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onGiveUp).toHaveBeenCalled()
   })
 })
