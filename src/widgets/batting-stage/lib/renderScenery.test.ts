@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
+  RIGHT_HANDED_CROWD_SHIFT, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
   drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
@@ -211,5 +212,22 @@ describe('drawMatchInfoStadium — 경기정보 바탕의 날 그림', () => {
       { style: '#fff', rect: [0, 0, 240, 320] },
       { style: 'rgb(198, 212, 215)', rect: [0, 0, 240, 320] },
     ])
+  })
+})
+
+// 0x77974 · 0x77494 · 0x7725c — 구장 +0x60 == 0(우타)이면 펜스 · 바닥을 효과 0x11 로 뒤집는다 (화면 x → 238 − x)
+describe('우타 거울 — 구장 +0x60 (0x779a4 · 0x772ca)', () => {
+  it('펜스 박스로 놓는 그림은 잰 박스만큼 옮긴다 — 펜스 0 · 1 · 2 모두 141', () => {
+    expect(rightHandedBoxShiftOf({ offsetX: -204, width: 768 })).toBe(141)
+    expect(rightHandedBoxShiftOf({ offsetX: -163, width: 686 })).toBe(141)
+    expect(rightHandedBoxShiftOf({ offsetX: -187, width: 734 })).toBe(141)
+  })
+
+  it('관중 ppl 은 안 뒤집고 0x78 + 21 옮긴다', () => {
+    expect(RIGHT_HANDED_CROWD_SHIFT).toBe(141)
+  })
+
+  it('거울 축은 (239, 0) — 좌타 XL + p 와 우타 XR − 1 − p 의 합이 238', () => {
+    expect(RIGHT_HANDED_MIRROR_X).toBe(239)
   })
 })
