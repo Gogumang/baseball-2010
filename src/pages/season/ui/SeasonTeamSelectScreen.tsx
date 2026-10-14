@@ -99,8 +99,8 @@ const NAME_TEXT = { x: 62, y: 187 } as const
 const MODE_BOX = { x: 121, y: 185, width: 14, height: 14 } as const
 /** 0x1400748(0xff, 0xff, 0) — 테두리 · 이름 글 */
 const NAME_COLOR = 'rgb(255, 255, 0)'
-/** 0x1400748(0x2e, 0x94, 0x46) — 입력 방식 칸 */
-const MODE_BOX_COLOR = 'rgb(46, 148, 70)'
+/** 0x1400748(r0 0x2e, r1 0x46, r2 0x94) — 입력 방식 칸 (0xbb36 · 0xbb40 · 0xbb4e, 나리 0x66 0x16160~0x16176 과 같다) */
+const MODE_BOX_COLOR = 'rgb(46, 70, 148)'
 
 interface SeasonTeamNameScreenProps {
   readonly teamId: number
@@ -126,7 +126,7 @@ interface SeasonTeamNameScreenProps {
  * ba74  박스 1 (30,184,25,15) ∪ 박스 2 (60,184,81,15) = (30,184,111,15) → (−1, −1, +2, +2) = (29,183,113,17)
  *       0xba015(…, 1, (0xff, 0xff, 0))                   ; 노랑 테두리(둥글기 1)
  * baf8  박스 2 → 0x677d5(입력기, x + 2, y + 3, 글꼴, (0xff, 0xff, 0), 1, 0x11, 0)   ; 이름 글 (62, 187) 노랑
- * bb32  (x + w − 20, y + 1, 14, 14) = (121, 185, 14, 14) · 0xba0bd(…, 1, (0x2e, 0x94, 0x46))   ; 입력 방식 칸 초록 칠
+ * bb32  (x + w − 20, y + 1, 14, 14) = (121, 185, 14, 14) · 0xba0bd(…, 1, (0x2e, 0x46, 0x94))   ; 입력 방식 칸 남색 칠
  *       0x676f9(입력기, 123, 187, …)                     ; 입력 방식 글
  * bb92  mode_ui 프레임 24(빨간 ◀ 5×8)를 그 칸에 0xb9e05(…, 0x21, 0, 0, −폭) · (…, 0x24, 0x11, 0, 2 × 폭)   ; 좌우 화살표
  * bbda  0x55545([this+0xa8], StrMODE[3]) 안내 줄 · 0x7f4ed 머리띠
