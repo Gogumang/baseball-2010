@@ -1,4 +1,6 @@
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
+import { nariGameRecordOf } from '@/entities/career/model/nariCupTeams'
+import { nariRecordFieldersOf } from '@/entities/career/model/nariTeamRecord'
 import { useRef } from 'react'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
@@ -136,6 +138,11 @@ export function PitcherLeagueRoute({
         pitcherName={career.name}
         // 마운드 내 투수 그림의 장비 겹 (0x108f8 모드 ≠ 4 → 0x79368 · 0x10810 → 0x79790)
         pitcherEquipmentLevels={career.equipmentLevels}
+        // 두 팀 레코드 타자 배열 차례 — 교대 판 이름표 0x40008 · 운동장 마선수 그림 0x79b48 이 훑는다 (경기 장면 0x39fdc 의 0xb891c 모드 3)
+        fieldLineups={{
+          ours: nariRecordFieldersOf(nariGameRecordOf(career, gameOptions.ourTeamId), gameOptions.ourTeamId, null),
+          opponent: nariRecordFieldersOf(nariGameRecordOf(career, gameOptions.opponentTeamId), gameOptions.opponentTeamId, null),
+        }}
         // 정산 판(0x4a384) 보유 GP 줄 — 전역 G [app+0x64] (커리어 칸은 지갑과 다리로 이어진다). 판이 이 경기 G 를 더해 보인다
         gamePoint={career.gamePoint}
         random={random}

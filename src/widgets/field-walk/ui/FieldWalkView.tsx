@@ -7,9 +7,9 @@ import {
   DEFENSE_BACKGROUND_URL,
   DEFENSE_BACKGROUND_WIDTH,
   defenderPaletteIndexOf,
-  fielderSpriteOf,
 } from '@/pages/defense/lib/defenseView'
 import type { FieldWalker } from '@/widgets/field-walk/lib/fieldWalker'
+import { type WalkerAceSprite, walkerSpriteOf } from '@/widgets/field-walk/lib/walkerAces'
 import * as styles from '@/widgets/field-walk/ui/FieldWalkView.css'
 
 /** 한 줄 9명 — 0x43010(장면, 그림, 줄, 공격?) 한 번 */
@@ -19,10 +19,10 @@ export interface FieldWalkRow {
   /** 그림 팔레트 = 그 팀 번호 (`defender.mpl` 벌). 없으면 구운 색 */
   readonly teamIndex?: number | null
   /**
-   * 칸별 마선수 그림 번호(0~4) — 0x79b48 의 a(칸 0 이고 그 팀 지금 투수가 마선수 → 투수 마선수 그림) ·
-   * b(칸 선수 +0xec 가 마선수 → 타자 마선수 그림). 없으면 보통 그림
+   * 칸별 마선수 그림 — 0x79b48 의 a(칸 0 이고 그 줄 팀 지금 투수가 마선수 → 투수 마선수 그림) ·
+   * b(칸 선수 +0xec 가 마선수 → 그 팀 첫 마타자 그림). 없으면(null) 보통 그림 (`lib/walkerAces`)
    */
-  readonly aceIndexes?: readonly (number | null)[]
+  readonly aceSprites?: readonly (WalkerAceSprite | null)[]
 }
 
 interface FieldWalkViewProps {
@@ -61,12 +61,12 @@ export function FieldWalkView({ offset, grassPalette = null, rows, children }: F
       <img className={styles.backgroundMirrored}
         style={{ left: offset.x + DEFENSE_BACKGROUND_WIDTH - 1, top: offset.y, ...size }} src={backgroundUrl} alt="" />
       {actors.map(({ row, rowIndex, slot, walker }) => {
-        const ace = row.aceIndexes?.[slot] ?? null
-        const sprite = fielderSpriteOf({ slot, x: walker.x, z: walker.z, action: walker.action, actionTick: walker.actionTick, aceIndex: ace })
+        const ace = row.aceSprites?.[slot] ?? null
+        const sprite = walkerSpriteOf(walker, ace)
         return (
           <div key={`${rowIndex}-${slot}`} className={styles.actor}
             style={{ left: toScreenX(walker.x) + offset.x, top: toScreenY(walker.z) + offset.y }}
-            data-testid={`운동장-선수-${rowIndex}-${slot}`} data-frame={sprite.frame} data-x={walker.x} data-z={walker.z}>
+            data-testid={`운동장-선수-${rowIndex}-${slot}`} data-frame={sprite.frame} data-ace={ace === null ? undefined : `${ace.kind}-${ace.index}`} data-x={walker.x} data-z={walker.z}>
             <WalkerSprite folder={sprite.folder} frame={sprite.frame}
               paletteIndex={ace === null ? defenderPaletteIndexOf(row.teamIndex) : null} />
           </div>

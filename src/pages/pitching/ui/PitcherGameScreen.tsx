@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { ReactNode } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -45,7 +46,7 @@ import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { type PitcherFieldLineups, pitcherFieldAcesOf } from '@/pages/pitching/lib/pitcherFieldTeams'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
@@ -134,6 +135,11 @@ interface PitcherGameScreenProps {
    * 0x10810 이 부위마다 0x79790 으로 장비 겹을 싣는다. 안 주면 맨몸 투수다.
    */
   readonly pitcherEquipmentLevels?: PitcherAbility
+  /**
+   * 두 팀의 레코드 타자 배열 차례 — 경기 장면 0x39fdc 가 `0xb891c(…, 모드 3, 팀)` 로 세운 나리 팀 레코드(국가대항전이면 대회 칸).
+   * 공수 교대 판 이름표 0x40008 · +0xec(마선수 그림) · 벤치 클리어링이 이 차례로 훑는다. 안 주면 이름표는 투수만, 마선수 그림은 보통 그림
+   */
+  readonly fieldLineups?: PitcherFieldLineups
 }
 
 export function PitcherGameScreen({
@@ -147,6 +153,7 @@ export function PitcherGameScreen({
   matchupRecords,
   gamePoint,
   pitcherEquipmentLevels,
+  fieldLineups,
 }: PitcherGameScreenProps) {
   const session = usePitcherGame(options, random, settings?.isVibrationOn)
   const { progress, canPitch, summary, actions } = session
@@ -496,6 +503,8 @@ export function PitcherGameScreen({
           opponentTeamId: side1Team,
           gameMode: PITCHER_CAREER_MODE,
         }}
+        // 라이벌전 띠 0x3b80c — 적재 상태 8 의 0xb8f68(두 팀) (표 0xd8a90 의 짝)
+        isRivalry={isRivalryMatch(side0Team, side1Team)}
         onDone={() => setIntroDone(true)}
       />
     )
@@ -563,6 +572,21 @@ export function PitcherGameScreen({
           batterHand: pitcherMatchupCardsOf(progress, pitcherName).batterHand,
           bases: progress.game.bases,
           grassPalette,
+          // 마선수 그림 0x79b48 — 수비 줄은 내 팀(내가 맞혔다), 공격 줄은 상대 팀
+          defenseAces: pitcherFieldAcesOf(progress, options, fieldLineups, true),
+          offenseAces: (() => {
+            const offense = pitcherFieldAcesOf(progress, options, fieldLineups, false)
+            if (offense === null) return null
+            // 3a97e — 사구를 맞은 지금 타자가 마타자면 그 레코드(자리 니블은 레코드 줄의 값)를 타자 칸과 맞바꾼다.
+            // ⚠️ 근사: 3aa1a 의 마선수 주자 맞바꿈 — 웹 루상이 주자 +0x9c 를 안 든다
+            const batterAce = opponentBatterOf(progress).aceIndex
+            const aceRow = batterAce === undefined ? undefined : fieldLineups?.opponent.find((row) => row.ace === batterAce)
+            return {
+              ...offense,
+              batter: batterAce === undefined ? null : { position: aceRow?.position ?? 0, ace: batterAce },
+              aceRunnerBases: [false, false, false] as const,
+            }
+          })(),
         })}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={random}
@@ -576,6 +600,7 @@ export function PitcherGameScreen({
    * 모드 3 에서는 1회초 판만 선다 (진행기 `withHalfInningBoard` 머리말).
    */
   if (isHalfInningBoardOpen && board !== null) {
+    const isOurDefenseBoard = (board.half === '초' ? 0 : 1) !== options.playerSide
     return withRecordAlert(
       <HalfInningBoard
         key={board.serial}
@@ -587,21 +612,21 @@ export function PitcherGameScreen({
         scoreboardSides={scoreboardSides}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={pitcherHalfInningCardsOf(progress, pitcherName, board.half)}
-        // 운동장 전경 0x4fb8c — 투수편 판은 경기 첫 판(1회초)뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래)
+        // 운동장 전경 0x4fb8c — 투수편 판은 경기 첫 판(1회초 — 인트로 0xc 바로 뒤)뿐이라 장면이 수비 줄 · 카메라를 아직 안 옮겼다
+        // (`carry` 없음 = 0x3fac4 의 자리 합 0 갈래, `lib/fieldCarry`)
         field={halfInningFieldOf({
           rolls: board.fielderRolls,
           half: board.half,
-          isFirstBoard: board.serial === 1,
+          carry: null,
           playerSide: options.playerSide,
           ourTeamId: options.ourTeamId,
           opponentTeamId: options.opponentTeamId,
           grassPalette,
-          // 이름표 — 칸 0 은 내 투수, 1~8 은 내 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008).
-          // ⚠️ 근사: 원본은 경기 팀 레코드 차례를 훑는다 — 웹은 붙박이 표 차례
-          fielderNames: fielderNamesByPosition(
-            pitcherName ?? null,
-            teamBatters(options.ourTeamId).map((player) => ({ name: player.name, position: player.position ?? 0 })),
-          ),
+          // 이름표 — 칸 0 은 내 투수, 1~8 은 0x40008: 수비 팀(내 팀) 레코드 타자 배열 차례에서 자리 니블이 칸 + 1 인 첫 선수
+          fielderNames: fielderNamesByPosition(pitcherName ?? null, isOurDefenseBoard ? fieldLineups?.ours ?? null : fieldLineups?.opponent ?? null),
+          // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (0x3fac4 가 +0xec · 두 그림을 싣는다)
+          defenseAces: pitcherFieldAcesOf(progress, options, fieldLineups, isOurDefenseBoard),
+          offenseAces: pitcherFieldAcesOf(progress, options, fieldLineups, !isOurDefenseBoard),
         })}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />,

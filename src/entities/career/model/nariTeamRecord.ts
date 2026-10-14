@@ -4,6 +4,7 @@ import { teamBatters } from '@/entities/team/model/teamRoster'
 import { QUICK_LINEUP_SIZE, renumberedRecordSlotsOf } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
+import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
 
 /**
  * **나만의리그 팀 레코드** — 나리 저장 블록 `[저장+0xb8]`(투수편 모드 3) · `[저장+0xbc]`(타자편 모드 4) 의
@@ -196,6 +197,27 @@ export function seatNariMatchAces(
 /** 레코드 9번 칸 마타자 번호 — 없으면 `NO_RECORD_ACE` */
 export function recordAceBatterOf(record: NariTeamRecord): number {
   return record.batters[ACE_BATTER_INDEX]?.ace ?? NO_RECORD_ACE
+}
+
+/** 레코드 타자 한 줄을 경기 장면이 읽는 꼴로 — 이름(0xb62c0) · 자리 니블 · 마타자 번호 */
+export interface NariRecordFielder {
+  readonly name: string
+  readonly position: number
+  /** 마타자면 0~4, 아니면 null (레코드 +0xa & 0x40 — 0xb633c) */
+  readonly ace: number | null
+}
+
+/**
+ * 레코드 타자 배열을 차례 그대로 — `0xb8680(팀)` 이 내주는 `[T+0x18]` 을 `0xb8a34(팀, k)` 로 훑는 곳(공수 교대 판 이름표 0x40008 ·
+ * +0xec 0x3fac4 · 벤치 클리어링 0x3a5f0)이 이 차례로 본다. 내 선수 줄 이름은 `myName`, 마타자 줄은 마선수 표, 나머지는 그 팀 붙박이 표 행.
+ */
+export function nariRecordFieldersOf(record: NariTeamRecord, teamId: number, myName: string | null): readonly NariRecordFielder[] {
+  const table = teamBatters(teamId)
+  return record.batters.map((row) => {
+    if (row.ace !== undefined) return { name: ACE_BATTERS[row.ace]?.name ?? '', position: row.position, ace: row.ace }
+    if (row.slot === MY_RECORD_SLOT) return { name: myName ?? '', position: row.position, ace: null }
+    return { name: table[row.slot]?.name ?? '', position: row.position, ace: null }
+  })
 }
 
 /** 내 선수 줄의 첨자 — 없으면 −1 */
