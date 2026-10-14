@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
+import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -347,6 +348,11 @@ export function MissionPlayScreen({
             batterAbility={ability}
             batterSkillIds={batterSkillIds}
             batterRecordSlot={batterRecordSlot}
+            // 그 타순 칸의 오늘 타석 결과 링 — 공격(사람 칸) 팀 + 타순(팀+0x32)×0x18 + 0x34 (0x445cc 4477a~4478c · 0xab214 aba8e~abaac).
+            // 스윙 판정의 16 상승세 · 17 하락세와 스킬 판 비트 16 · 17 이 같은 링을 읽는다 (사람 타석 결과는 `afterHumanPlateAppearance` 가 넣는다)
+            recentAtBatCodes={
+              run.game.humanBatting.lineup.records[lineupSlotOf(run.game.humanBatting.order)]?.results ?? []
+            }
             // 타자 그림 · 손 — 레코드 +0xb (사람 칸에 마타자는 없어 손 = 폼 & 1, 0xb63c0)
             batterForm={batterLook?.form ?? 0}
             batterSkinIndex={batterLook?.skinIndex ?? 0}

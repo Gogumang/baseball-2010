@@ -920,6 +920,9 @@ export function TeamGameScreen({
               batterSkillIds={entryBatterSkillIdsOf(currentBatterEntry(progress))}
               // 투수 스킬 31 의 0xb6394 — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
               batterRecordSlot={currentBatterEntry(progress)?.recordSlot ?? 0}
+              // 그 타순 칸의 오늘 타석 결과 링 — 공격 팀 + 타순(팀+0x32)×0x18 + 0x34 (0x445cc 4477a~4478c · 0xab214 aba8e~abaac).
+              // 스윙 판정 0xab214 의 16 상승세 · 17 하락세와 스킬 판 비트 16 · 17 이 같은 링을 읽는다
+              recentAtBatCodes={progress.ourEntryRecords[game.battingOrderIndex]?.results ?? []}
               gameMode={options.mode}
               // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
               isScoreboardOn={settings?.isScoreboardOn}
