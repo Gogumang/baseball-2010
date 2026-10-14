@@ -10,12 +10,16 @@ import {
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { lineupSlotOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
+import { defenseFielderPlatesOf } from '@/features/defense-play/model/runDefensePlay'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { MISSION_ACE_ROSTER_SLOT, masterGameAbilityOf } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { MISSION_NARI_RECORD } from '@/entities/mission/model/missionGame'
 import type { MissionGame } from '@/entities/mission/model/missionGame'
 import type { OriginalMission } from '@/shared/config/original/missions'
+import type { RosterPlayer } from '@/shared/config/original/roster'
 
 /**
  * **미션 경기의 주자 신원** — 미션도 모드 5 · 6 짜리 보통 경기(장면 0x104)라 주자 목록(sim+0x80)이 선수 레코드를 든다
@@ -186,8 +190,21 @@ export interface MissionDefenseSituation {
  */
 export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[] {
   const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_RUN_ABILITY)
+  for (const { slot, player } of missionDefenseFieldersOf(run)) {
+    if (player !== undefined) abilities[slot] = masterGameAbilityOf(player, false, DEFENSE_SLOT)
+  }
+  return abilities
+}
+
+/**
+ * 판 시작 0xb0fb4 가 칸 1~8 에 앉히는 **야수 레코드** — 레코드 차례로 자리 니블 − 1 칸에 첫 레코드(겹치면 앞 레코드).
+ * 미션 타자 · 마타자 표지면 `player` 가 없다(수비 팀에는 안 생긴다). 자리 니블은 `missionDefenseAbilitiesOf` 머리말대로 대타가 맞바꾼 값.
+ */
+function missionDefenseFieldersOf(
+  run: MissionDefenseSituation,
+): { readonly slot: number; readonly positionCode: number; readonly player: RosterPlayer | undefined }[] {
   const defense = run.mission.side === '타자' ? run.game.cpuAutoBatting : run.game.humanBatting
-  if (defense === null) return abilities
+  if (defense === null) return []
   const roster = teamBatters(defense.teamId)
   const rowOf = (record: number) => defense.records[record] ?? record
   const positionOfRow = (row: number) => (roster[row]?.position ?? 0) & 0xf
@@ -197,30 +214,108 @@ export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[
     positions.set(rosterSlotAt(defense.lineup, order), positionOfRow(rowOf(order)))
   }
   const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
+  const fielders: { slot: number; positionCode: number; player: RosterPlayer | undefined }[] = []
   for (let record = 0; record < defense.records.length; record += 1) {
-    const slot = (positions.get(record) ?? 0) - 1
+    const positionCode = positions.get(record) ?? 0
+    const slot = positionCode - 1
     if (slot < 1 || slot >= FIELDER_COUNT || filled[slot]) continue
     filled[slot] = true
     const row = rowOf(record)
     const player = row === MISSION_NARI_RECORD || row === MISSION_ACE_ROSTER_SLOT ? undefined : roster[row]
-    if (player !== undefined) abilities[slot] = masterGameAbilityOf(player, false, DEFENSE_SLOT)
+    fielders.push({ slot, positionCode, player })
   }
-  return abilities
+  return fielders
 }
 
 /** 타순 아홉 칸 */
 const QUICK_LINEUP_SLOTS = 9
 
-/** 미션 수비 판에 먹이는 능력치 — 아홉 칸 수비와 루별 주루(0 = 타자주자) */
+/** 미션 수비 판에 먹이는 능력치 — 아홉 칸 수비와 루별 주루(0 = 타자주자), 그리고 그림 전용 이름 판 · 마선수 주자 */
 export interface MissionPlayAbilities {
   readonly defenseAbilities: readonly number[]
   readonly runAbilities: Partial<Record<0 | 1 | 2 | 3, number>>
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `missionFielderPlatesOf`). 안 주면 고리만 그린다 */
+  readonly fielderPlates?: ReturnType<typeof defenseFielderPlatesOf>
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (주자 그림 0x79d10 · 적재 0x483a0 — `missionRunnerAcesOf`) */
+  readonly runnerAces?: RunnerAces
 }
 
-/** 수비 판(타구 · 견제 · 공 도착 · 밀어내기)이 읽는 능력치 한 벌 — `missionDefenseAbilitiesOf` + `missionRunAbilitiesOnBaseOf` */
+/**
+ * 수비 판(타구 · 견제 · 공 도착 · 밀어내기)이 읽는 능력치 한 벌 — `missionDefenseAbilitiesOf` + `missionRunAbilitiesOnBaseOf`.
+ * `plates` 를 주면 그림 전용 이름 판(`missionFielderPlatesOf`) · 마선수 주자(`missionRunnerAcesOf`)도 싣는다 — 난수와 무관하다.
+ */
 export function missionPlayAbilitiesOf(
   run: MissionRunnerSituation & MissionDefenseSituation,
   special: MissionSpecialRunners = {},
+  plates?: MissionPlateSituation,
 ): MissionPlayAbilities {
-  return { defenseAbilities: missionDefenseAbilitiesOf(run), runAbilities: missionRunAbilitiesOnBaseOf(run, special) }
+  return {
+    defenseAbilities: missionDefenseAbilitiesOf(run),
+    runAbilities: missionRunAbilitiesOnBaseOf(run, special),
+    ...(plates === undefined
+      ? {}
+      : { fielderPlates: missionFielderPlatesOf(plates), runnerAces: missionRunnerAcesOf(plates) }),
+  }
+}
+
+/** 이름 판 · 마선수 주자를 고르는 데 쓰는 미션 경기 — 수비 팀 마운드(`cpu.pitching`) · 미션 투수 · 마선수 순번 */
+export type MissionPlateSituation = MissionRunnerSituation & MissionDefenseSituation & {
+  readonly mission: Pick<OriginalMission, 'side' | 'opponentAce'>
+  readonly cpu: Pick<MissionCpuTeam, 'batting' | 'pitching'>
+  /**
+   * 투수 미션(모드 5)의 미션 투수 — 이름 0xb62c0 · 보직 0xb6dec(레코드 +0xb & 3). 선수 게터 0x1fbd0 의 기록(나리 투수 · 명예 투수).
+   * 안 주면(대체 투수) 칸 0 판이 없다
+   */
+  readonly missionPitcher?: { readonly name: string; readonly role?: number }
+}
+
+/**
+ * **수비 아홉 칸의 이름 판 선수** (0x43cb0 — `defenseFielderPlatesOf`). 칸 1~8 은 판 시작 0xb0fb4 가 앉힌 야수 레코드(`missionDefenseFieldersOf`,
+ * 이름 0xb62c0 · 자리 +0x1c & 0xf 0x54590). 칸 0 은 0x43cb0 이 야수 +0xec 를 안 보고 `0xae83c(팀[st[0xa]])` = 수비 팀 팀[0] 투수(43e48~43e60)
+ * 를 다시 찾고 보직은 `0xb6dec`(43e6a) 다:
+ * - 타자 미션(모드 6) — CPU 팀 지금 마운드(`cpu.pitching.mound`). 마스터 줄이면 이름 + 보직(+0xb & 3 = `profile & 3`, 0xaa8a0 맞바꿈은
+ *   줄째라 보직이 따라간다), 마투수 칸이면 이름만(보직 없음 → 판 없음, 타자편 `gameFlow` · 팀 경기와 같다).
+ * - 투수 미션(모드 5) — 사람 칸 팀 0번 투수 = 미션 투수: aa826 `0xb8820` 이 0x1fbd0 기록을 투수 명부에 베끼고 aa81c~aa878 이
+ *   0xb6389 · 0xb6349(육성 · 명예) 줄을 찾아 0xb5e98 로 0번에 앉힌다. 미션은 투수가 안 바뀐다.
+ */
+export function missionFielderPlatesOf(run: MissionPlateSituation): ReturnType<typeof defenseFielderPlatesOf> {
+  const lineup = missionDefenseFieldersOf(run)
+    .filter((fielder) => fielder.player !== undefined)
+    .map((fielder) => ({ name: fielder.player?.name ?? '', position: fielder.positionCode }))
+  return defenseFielderPlatesOf(lineup, missionMoundPitcherOf(run))
+}
+
+function missionMoundPitcherOf(run: MissionPlateSituation): { readonly name: string; readonly role?: number } | undefined {
+  if (run.mission.side === '투수') return run.missionPitcher
+  const pitching = run.cpu.pitching
+  if (pitching === null) return undefined
+  const row = pitching.roster[pitching.mound.pitcherSlot] ?? pitching.mound.pitcherSlot
+  if (row === MISSION_ACE_ROSTER_SLOT) {
+    const ace = missionOpponentOf('투수', run.mission.opponentAce)
+    return ace === null ? undefined : { name: ace.name }
+  }
+  const pitcher = teamPitchers(pitching.teamId)[row]
+  return pitcher === undefined ? undefined : { name: pitcher.name, role: pitcher.profile & 3 }
+}
+
+/**
+ * **공격 팀 타자 · 루 위 주자의 마선수 번호** (`runnerAces` — 주자 그림 0x79d10 · 적재 0x483a0). 주자 +0x9c 는 0xa94ca 가 적는
+ * 0xb63a0 마선수 번호라 마선수 레코드만 선다 — 미션에서는 투수 미션 CPU 타선의 마타자 칸(0xaae7c 가 레코드 9 에 베낀 마선수,
+ * 번호 = 0xb63a1 = 순번 − 1)뿐이다. 타자 미션의 사람 칸 팀은 마스터 줄 · 미션 타자(육성 · 명예, 0x40 비트 아님)라 늘 null 이다.
+ */
+export function missionRunnerAcesOf(run: MissionPlateSituation): RunnerAces {
+  const offense = offenseOf(run)
+  const aceNumber = run.mission.opponentAce - 1
+  const aceOf = (slot: number | null): number | null => {
+    if (slot === null || offense === null || aceNumber < 0) return null
+    const record = rosterSlotAt(offense.lineup, slot)
+    return (offense.records[record] ?? record) === MISSION_ACE_ROSTER_SLOT ? aceNumber : null
+  }
+  const runners = missionRunnersOf(run)
+  return {
+    batter: aceOf(missionBatterSlotOf(run)),
+    first: aceOf(runnerOnBase(runners, 1)),
+    second: aceOf(runnerOnBase(runners, 2)),
+    third: aceOf(runnerOnBase(runners, 3)),
+  }
 }
