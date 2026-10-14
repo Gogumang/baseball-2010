@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MATCH_SETTING_KIND, INNING_VALUE } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import { MatchSettingsScreen } from '@/pages/match-settings/ui/MatchSettingsWindow'
-import { WINDOW } from '@/pages/match-settings/lib/matchSettingsLayout'
+import { DETAIL_WINDOW, SMALL_WINDOW } from '@/pages/match-settings/lib/matchSettingsLayout'
 
 /**
  * 경기진행 설정 창 (0x5fef4 갱신 · 0x5ffcc 키 · 0x6042c 그리기 — R4 4절 · J-3).
@@ -40,17 +40,33 @@ describe('단계 0 — 종류 고르기', () => {
     }
   })
 
-  it('종류 이름은 img_text 399~401 그림이다', () => {
+  it('종류 이름은 img_text 399~401 그림이다 (표 0xd1c70)', () => {
     띄우기()
 
-    const image = 줄('찬스 플레이').querySelector('img')
-    expect(image?.getAttribute('src')).toBe('./sprites/img_text/frames/399.png')
+    expect(줄('찬스 플레이').getAttribute('data-frame')).toBe('399')
+    expect(줄('상세 플레이').getAttribute('data-frame')).toBe('401')
   })
 
-  it('공용 판 (24, 54, 192, 212) 에 그린다 — ⚠️ 원본 배치 미해독, 근사', () => {
+  it('판은 0x55e60(W/2, H/2, 192, 160, 정렬 0x22) → (24, 80, 192, 160) — 상세만 192×212', () => {
     띄우기()
 
-    expect(WINDOW).toEqual({ x: 24, y: 54, width: 192, height: 212 })
+    const 판 = screen.getByTestId('경기설정-판')
+    expect(SMALL_WINDOW).toEqual({ x: 24, y: 80, width: 192, height: 160 })
+    expect(DETAIL_WINDOW).toEqual({ x: 24, y: 54, width: 192, height: 212 })
+    expect([판.style.left, 판.style.top, 판.style.height]).toEqual(['24px', '80px', '160px'])
+
+    fireEvent.click(줄('상세 플레이'))
+    const 상세판 = screen.getByTestId('경기설정-판')
+    expect([상세판.style.top, 상세판.style.height]).toEqual(['54px', '212px'])
+  })
+
+  it('설명 칸에는 지금 종류의 글(표 0xd1c7c)만 나온다', () => {
+    띄우기()
+
+    expect(screen.getByText(/미리 정해진 상황에 맞춰/)).toBeTruthy()
+    누르기('ArrowDown')
+    expect(screen.queryByText(/미리 정해진 상황에 맞춰/)).toBe(null)
+    expect(screen.getByText(/시작 이닝을 선택하여 경기/)).toBeTruthy()
   })
 
   it('CLR(Esc) 은 저장하지 않고 창을 닫는다', () => {
@@ -122,11 +138,16 @@ describe('단계 1 — 이닝', () => {
 })
 
 describe('단계 1 — 찬스', () => {
-  it('두 칸은 이름 그림이 없어 설명 문구로 나온다 — 공격 쪽과 수비 쪽이 다르다', () => {
+  it('두 칸은 popup 그림 19(공격) · 20(수비) 이고, 설명 칸에는 고른 값의 글(표 0xd1c88)만 나온다', () => {
     띄우기()
     fireEvent.click(줄('찬스 플레이'))
 
+    expect(줄('공격').getAttribute('data-frame')).toBe('19')
+    expect(줄('수비').getAttribute('data-frame')).toBe('20')
     expect(screen.getByText(/공격 중 2, 3루에 주자가 있을/)).toBeTruthy()
+    expect(screen.queryByText(/수비 중 3루에 주자가 있을 때/)).toBe(null)
+
+    누르기('ArrowRight')
     expect(screen.getByText(/수비 중 3루에 주자가 있을 때/)).toBeTruthy()
   })
 })
@@ -167,6 +188,16 @@ describe('단계 1 — 상세', () => {
 
     fireEvent.click(screen.getByLabelText('타자조작 3번'))
     expect(screen.getByLabelText('타자조작 3번').getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('켜진 칸은 프레임 49(타순·이닝) · 51(주자) 이고, 지금 줄의 설명은 StrMAINMENU[121 + 줄] 이다', () => {
+    상세로()
+
+    fireEvent.click(screen.getByLabelText('공격주자 2루'))
+
+    expect(screen.getByLabelText('공격주자 2루').getAttribute('data-frame')).toBe('51')
+    expect(screen.getByLabelText('타자조작 1번').getAttribute('data-frame')).toBe('48')
+    expect(screen.getByText(/공격 시 해당 베이스/)).toBeTruthy()
   })
 
   it('한 항목도 없이 확인하면 StrMAINMENU[126] 알림만 뜨고 저장되지 않는다', () => {

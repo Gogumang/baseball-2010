@@ -8,9 +8,12 @@
  * - **설명 8개**는 binary.mod 안의 낱개 문자열이다(StrMODE 도 StrMAINMENU 도 아니다).
  *   R4 4절이 적은 VA 를 그대로 달아 두었다. 마크업(`!C`·`!cffffff`·`!N`)까지 원본 그대로다.
  * - **상세 네 줄 설명·확인·경고**는 `data/StrMAINMENU.zt1` 의 [121]~[126] 이다.
- *   ⚠️ StrMAINMENU 는 아직 `shared/config/original` 에 생성물이 없다. 그래서
+ *   StrMAINMENU 는 아직 `shared/config/original` 에 생성물이 없다. 그래서
  *   `shared/config/original/mainMenu.ts` 와 같은 관례로 **번호를 달아 옮겨 적는다** —
  *   생성물이 생기면 `ORIGINAL_MAIN_MENU_TEXT[121]` 처럼 번호로 읽도록 바꿀 것.
+ *   원문은 원본 파일에서 직접 읽어 확정했다(2026-10-14): `base/work/jar/data/StrMAINMENU.zt1` = u32 크기 · u32 해제 크기 · zlib,
+ *   푼 것은 'GST\x01' · u16 개수 215 · u16 시작 위치 × 개수 · CP949 글(끝 0). [121] 은 **끝에 빈칸이 하나 붙어 있다**(원본 그대로).
+ *   그리기 0x6042c 는 [skin+0x2a4] 표에서 0x702b5(표, 121 + 줄)로 읽는다(61b1c~61b2a).
  * - **이름 그림**은 `ui/img_text.pzx` 합성 프레임이다(`public/sprites/img_text/frames`).
  */
 
@@ -31,15 +34,18 @@ export const KIND_DESCRIPTIONS = [
 ] as const
 
 /**
- * 찬스 값 설명 (표 0xd1c88) — 0xd2240 · 0xd2280.
+ * 찬스 값 설명 (표 0xd1c88) — 0xd2240 · 0xd2280. 고른 값의 글 하나만 설명 칸에 나온다.
  *
- * ⚠️ 찬스 값에는 **이름 그림이 없다** (R4 표에 그림 칸이 비어 있다).
- * 그래서 이 창은 찬스 두 칸을 설명 문구로 보여 준다.
+ * 찬스 두 칸은 이름 그림 표가 따로 없고, 그리기 0x6042c 가 그림을 곧바로 부른다(607b4~60a40):
+ * popup 프레임 19(방망이) · 20(글러브) 위에 img_text 352 "공격" · 338 "수비" (`CHANCE_LABELS`).
  */
 export const CHANCE_DESCRIPTIONS = [
   '!C!cffffff공격 중 2, 3루에 주자가 있을!N때 타자로 플레이 합니다', // 0xd2240 — 값 0
   '!C!cffffff수비 중 3루에 주자가 있을 때!N투수로 플레이 합니다', // 0xd2280 — 값 1
 ] as const
+
+/** 찬스 두 칸 이름 — img_text 352 "공격" · 338 "수비" 그림 글자 그대로 (읽기 보조·테스트용) */
+export const CHANCE_LABELS = ['공격', '수비'] as const
 
 /** 이닝 값 이름 그림 (표 0xd1c90) — 404 "자동진행 없음" · 405 "3이닝 자동진행" · 406 "6이닝 자동진행" */
 export const INNING_LABEL_FRAMES = [404, 405, 406] as const
@@ -62,7 +68,7 @@ export const DETAIL_CONFIRM_LABEL = '확인'
 
 /** 상세 네 줄 설명 — StrMAINMENU[121]~[124] */
 export const DETAIL_ROW_DESCRIPTIONS = [
-  '!cFFFFFF[!cFFFF00타자조작!cFFFFFF]: 지정한 타순 타자만 플레이합니다', // [121]
+  '!cFFFFFF[!cFFFF00타자조작!cFFFFFF]: 지정한 타순 타자만 플레이합니다 ', // [121] — 끝 빈칸까지 원문
   '!cFFFFFF[!cFFFF00공격주자!cFFFFFF]: 공격 시 해당 베이스 주자 있을 때 플레이합니다', // [122]
   '!cFFFFFF[!cFFFF00투수조작!cFFFFFF]: 지정한 이닝에 투수 수비를 플레이합니다', // [123]
   '!cFFFFFF[!cFFFF00수비주자!cFFFFFF]: 수비 시 해당 베이스 주자 있을 때 플레이합니다', // [124]

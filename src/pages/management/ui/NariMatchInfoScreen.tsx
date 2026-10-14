@@ -10,7 +10,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import {
-  MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, matchInfoRowY,
+  MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, matchInfoRowY,
 } from '@/pages/general-mode/lib/prepareLayout'
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
@@ -100,7 +100,9 @@ export function NariMatchInfoScreen({
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT
   const tagAnchor = isUserFirstBat ? anchorA : anchorB
-  const tagOffset = isUserFirstBat ? firstBatTag.user : firstBatTag.cpu
+  // 공용 목록 깜빡 [sp+0xd4] — 꼬리표 2px · 화살 1px · 노랑 반원 (0x63b4a)
+  const isBob = isPrepareBobOn(useUpdateCounter())
+  const tagPlace = firstBatTagPlacementOf(isUserFirstBat, tagAnchor, isBob)
 
   return (
     <RawScreen>
@@ -130,20 +132,21 @@ export function NariMatchInfoScreen({
       {/* 선공 꼬리표 */}
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, firstBatTag.image)}
         style={{
-          left: tagAnchor.x + tagOffset.dx,
-          top: tagAnchor.y + tagOffset.dy,
+          left: tagPlace.tag.x,
+          top: tagPlace.tag.y,
           transform: isUserFirstBat ? 'scaleX(-1)' : undefined,
         }} />
       <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins}
-        x={tagAnchor.x + tagOffset.textDx} y={tagAnchor.y + tagOffset.textDy} />
+        x={tagPlace.text.x} y={tagPlace.text.y} />
 
-      {/* 가운데 PLAY BALL 공 + 노랑 반원 두 쪽 */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
-        style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
-        style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }} />
+      {/* 가운데 PLAY BALL 공 — 노랑 반원 두 쪽은 값 줄 0x5dcc0 뒤에 깜빡일 때만 그린다 (0x65086) */}
       <FrameSprite folder={SLT_FRAME} frame={MATCH_INFO_LAYOUT.playBall.frame} origins={sltOrigins}
         x={120 - 23} y={MATCH_INFO_LAYOUT.playBall.y} />
+      {/* 좌우 화살 slt_frame 이미지 20 — d = 깜빡 [sp+0xd4] (0x64eba~0x64f08) */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
+        style={{ left: MATCH_INFO_LAYOUT.arrow.leftX - (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y }} />
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
+        style={{ left: MATCH_INFO_LAYOUT.arrow.rightX + (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
 
       {/* 줄 다섯 — 가운데 딱지 + 좌우 값 */}
       {lines.map((line, index) => {
@@ -154,22 +157,32 @@ export function NariMatchInfoScreen({
               style={{ left: MATCH_INFO_LAYOUT.labelBar.x, top: y }} />
             <FrameSprite folder={IMG_TEXT_FRAME} frame={line.labelFrame} origins={imgTextOrigins}
               x={MATCH_INFO_LAYOUT.labelBar.x} y={y + MATCH_INFO_LAYOUT.labelBar.textDy} />
+            {/* 값 칸 slt_frame 이미지 10 — 유저 (16, y + 3) · CPU 뒤집어 (138, y − 3) (0x5dcc0) */}
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y }} />
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy }} />
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y }} />
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy, transform: 'scaleX(-1)' }} />
             <span className={styles.centeredText} data-testid={`나리경기정보-${line.label}-유저`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + 2, width: MATCH_INFO_LAYOUT.valueCell.textWidth }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.user}
             </span>
             <span className={styles.centeredText} data-testid={`나리경기정보-${line.label}-CPU`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + 2, width: MATCH_INFO_LAYOUT.valueCell.textWidth }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.cpu}
             </span>
           </span>
         )
       })}
 
+      {/* 노랑 반원 두 쪽 — 값 줄이 다 펼쳐졌고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108). ⚠️ 값 줄 펼침 연출은 아직 옮기지 않아 늘 펼쳐진 것으로 본다 */}
+      {isBob && (
+        <>
+          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
+            style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />
+          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
+            style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }} />
+        </>
+      )}
         </>
       )}
 

@@ -1,13 +1,15 @@
 import { useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
-  MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, matchInfoRowY,
+  MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, matchInfoRowY,
 } from '@/pages/general-mode/lib/prepareLayout'
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
 import type { PlayerSide } from '@/entities/game/model/gameState'
@@ -40,6 +42,10 @@ export interface SeasonMatchInfoScreenProps {
   readonly onOpenEntry?: (isUserTeam: boolean) => void
   /** 바탕 — 0xdd 진입 0x6548 의 무대를 0x5fd04 가 흐려 떠 둔 그림(공통 앞그림 0xb810 의 `0x581dc(스킨, 0, 0)`). 없으면 바탕 없음 */
   readonly stage?: MatchInfoStadiumState | null
+  /** [skin+0x2ba] — 경기진행 설정 창이 열렸나. 바닥띠가 4 / 0x44 로 갈린다 (0xb3cc~0xb3da) */
+  readonly isSettingsOpen?: boolean
+  /** 경기진행 설정 창 0x6042c — 그림 0xb398 이 공용 목록 다음 **머리띠 0x54d94 앞**에 그린다(화면 판 안에 그려야 해서 이 칸으로 받는다) */
+  readonly settingsWindow?: ReactNode
 }
 
 /**
@@ -53,6 +59,7 @@ export interface SeasonMatchInfoScreenProps {
  */
 export function SeasonMatchInfoScreen({
   lines, myTeamId, opponentTeamId, playerSide, gamePoint = 0, onStart, onOpenSettings, onCancel, onOpenEntry, stage = null,
+  isSettingsOpen = false, settingsWindow = null,
 }: SeasonMatchInfoScreenProps) {
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -89,7 +96,9 @@ export function SeasonMatchInfoScreen({
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT
   const tagAnchor = isUserFirstBat ? anchorA : anchorB
-  const tagOffset = isUserFirstBat ? firstBatTag.user : firstBatTag.cpu
+  // 공용 목록 깜빡 [sp+0xd4] — 꼬리표 2px · 화살 1px · 노랑 반원 (0x63b4a)
+  const isBob = isPrepareBobOn(useUpdateCounter())
+  const tagPlace = firstBatTagPlacementOf(isUserFirstBat, tagAnchor, isBob)
 
   return (
     <RawScreen>
@@ -117,20 +126,21 @@ export function SeasonMatchInfoScreen({
       {/* 선공 꼬리표 */}
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, firstBatTag.image)}
         style={{
-          left: tagAnchor.x + tagOffset.dx,
-          top: tagAnchor.y + tagOffset.dy,
+          left: tagPlace.tag.x,
+          top: tagPlace.tag.y,
           transform: isUserFirstBat ? 'scaleX(-1)' : undefined,
         }} />
       <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins}
-        x={tagAnchor.x + tagOffset.textDx} y={tagAnchor.y + tagOffset.textDy} />
+        x={tagPlace.text.x} y={tagPlace.text.y} />
 
-      {/* 가운데 PLAY BALL 공 + 노랑 반원 두 쪽 */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
-        style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
-        style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }} />
+      {/* 가운데 PLAY BALL 공 — 노랑 반원 두 쪽은 값 줄 0x5dcc0 뒤에 깜빡일 때만 그린다 (0x65086) */}
       <FrameSprite folder={SLT_FRAME} frame={MATCH_INFO_LAYOUT.playBall.frame} origins={sltOrigins}
         x={120 - 23} y={MATCH_INFO_LAYOUT.playBall.y} />
+      {/* 좌우 화살 slt_frame 이미지 20 — d = 깜빡 [sp+0xd4] (0x64eba~0x64f08) */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
+        style={{ left: MATCH_INFO_LAYOUT.arrow.leftX - (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y }} />
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
+        style={{ left: MATCH_INFO_LAYOUT.arrow.rightX + (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
 
       {/* 줄 다섯 — 가운데 딱지 + 좌우 값 */}
       {lines.map((line, index) => {
@@ -142,27 +152,38 @@ export function SeasonMatchInfoScreen({
             {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대다 — 글자는 팔레트 3(짙은 파랑)으로 구웠다 */}
             <FrameSprite folder={IMG_TEXT_FRAME} frame={line.labelFrame} origins={imgTextOrigins}
               x={MATCH_INFO_LAYOUT.labelBar.x} y={y + MATCH_INFO_LAYOUT.labelBar.textDy} />
+            {/* 값 칸 slt_frame 이미지 10 — 유저 (16, y + 3) · CPU 뒤집어 (138, y − 3) (0x5dcc0) */}
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y }} />
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy }} />
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y }} />
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy, transform: 'scaleX(-1)' }} />
             <span className={styles.centeredText} data-testid={`시즌경기정보-${line.label}-유저`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + 2, width: MATCH_INFO_LAYOUT.valueCell.textWidth }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.user}
             </span>
             <span className={styles.centeredText} data-testid={`시즌경기정보-${line.label}-CPU`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + 2, width: MATCH_INFO_LAYOUT.valueCell.textWidth }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.cpu}
             </span>
           </span>
         )
       })}
 
+      {/* 노랑 반원 두 쪽 — 값 줄이 다 펼쳐졌고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108). ⚠️ 값 줄 펼침 연출은 아직 옮기지 않아 늘 펼쳐진 것으로 본다 */}
+      {isBob && (
+        <>
+          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
+            style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />
+          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
+            style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }} />
+        </>
+      )}
+
       {/* 원본에 없는 웹 전용 단추 셋 — 원본은 바닥띠 소프트키가 한다. 바닥띠 왼쪽에 나란히 세운다 */}
       <Button variant="corner" className={styles.softKey} style={{ left: 4 }} onClick={onStart}>
         경기 시작
       </Button>
-      {/* 바닥띠 비트 0x40 "0경기설정" — 18틱 주기로 깜빡인다(깜빡임은 아직 안 옮겼다) */}
+      {/* 바닥띠 비트 0x40 "0경기설정" 그림(그릴 때마다 [skin+0x410]++ 의 `% 18 ≤ 8` — 18틱 깜빡임)은 ScreenFrame 이 그린다 — 이 단추는 웹 덧붙임 */}
       <Button variant="corner" className={styles.softKey} style={{ left: 62 }} onClick={onOpenSettings}>
         0 경기설정
       </Button>
@@ -170,10 +191,13 @@ export function SeasonMatchInfoScreen({
         <Hint>Enter/5 경기 시작 · 0 경기설정 · ←/→ 엔트리</Hint>
       </div>
 
+      {settingsWindow}
+
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
-      {/* 바닥 = [skin+0x2ba](설정 창) ? 4 : 0x44 (0xb3cc~0xb3da) — 이 화면이 떠 있는 동안 설정 창은 닫혀 있어 0x44 = "0경기설정"(깜박임) + 되돌아가기 */}
-      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={0x44} />
+
+      {/* 바닥 = [skin+0x2ba](설정 창) ? 4 : 0x44 (0xb3cc~0xb3da) — 0x44 = "0경기설정"(깜박임) + 되돌아가기 · 4 = 되돌아가기만 */}
+      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel} footer={isSettingsOpen ? 0x4 : 0x44} />
     </RawScreen>
   )
 }

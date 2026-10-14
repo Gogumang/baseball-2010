@@ -36,9 +36,6 @@ export type { AceSelectScreenProps } from '@/pages/general-mode/ui/AceSelectScre
 export { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 export type { MatchInfoScreenProps } from '@/pages/general-mode/ui/MatchInfoScreen'
 
-export { MatchSettingsWindow } from '@/pages/general-mode/ui/MatchSettingsWindow'
-export type { MatchSettingsWindowProps } from '@/pages/general-mode/ui/MatchSettingsWindow'
-
 export { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 export type { GeneralModeSession, UseGeneralModeOptions } from '@/pages/general-mode/model/useGeneralMode'
 

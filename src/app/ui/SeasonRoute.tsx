@@ -546,6 +546,8 @@ export function SeasonRoute({
     return (
       <AceSelectScreen
         phase={session.preGameAces.phase}
+        // rec+0xe — 마타자 단계에서 회색으로 안 그릴 마투수 칸 (0x7b1d8)
+        chosenPitcherCell={session.preGameAces.pitcher}
         openedAcePitcherIds={aceSelect?.openedAcePitcherIds ?? DEFAULT_OPENED_ACE_PITCHER_IDS}
         openedAceBatterIds={aceSelect?.openedAceBatterIds ?? DEFAULT_OPENED_ACE_BATTER_IDS}
         {...(aceSelect === undefined ? {} : {
@@ -600,14 +602,16 @@ export function SeasonRoute({
           onOpenEntry={(isUserTeam) => {
             if (!session.isMatchSettingsOpen) actions.openEntryEdit(isUserTeam)
           }}
+          isSettingsOpen={session.isMatchSettingsOpen}
+          // 설정 창 0x6042c 는 화면 판 안, 머리띠 앞에 그린다 (0xb398)
+          settingsWindow={session.isMatchSettingsOpen && (
+            <MatchSettingsWindow
+              settings={session.matchSettings}
+              onConfirm={actions.applyMatchSettings}
+              onClose={actions.toggleMatchSettings}
+            />
+          )}
         />
-        {session.isMatchSettingsOpen && (
-          <MatchSettingsWindow
-            settings={session.matchSettings}
-            onConfirm={actions.applyMatchSettings}
-            onClose={actions.toggleMatchSettings}
-          />
-        )}
       </>
     )
   }

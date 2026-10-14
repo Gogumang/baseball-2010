@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css'
-import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /** 준비 화면 세 장은 모두 원작 240×320 좌표를 그대로 쓴다 — 조각마다 절대 배치다 (0x63b15) */
 export const layer = style({
@@ -32,12 +32,15 @@ export const fillPanel = style({
   pointerEvents: 'none',
 })
 
-/** 고를 수 있는 칸 — 격자 칸 그리기 0x7a571 이 미해독이라 테두리·바탕은 근사다 */
+/**
+ * 격자 칸을 누르는 자리 — 그림(남색 둥근 바탕 · slt_frame 이미지 0 · 얼굴 · 커서 이미지 1)은 화면이 원본 자리에 따로 그린다
+ * (격자 그리기 0x7a571 종류 7, `prepareLayout` 의 `ACE_LAYOUT.cellBack` 머리말). 이 단추는 테두리·바탕이 없다.
+ */
 export const cell = style({
   position: 'absolute',
   boxSizing: 'border-box',
   padding: 0,
-  border: '1px solid transparent',
+  border: 'none',
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
   font: 'inherit',
@@ -46,24 +49,24 @@ export const cell = style({
   imageRendering: 'pixelated',
 })
 
-export const cellSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
+/**
+ * 효과 0xa(회색) — 원본은 팔레트 픽셀 함수 0x97f01 의 회색 식이다(R6 · `widgets/batting-stage` 의 `grayRunPipPixel`).
+ * ⚠️ 근사: 그림이 `<img>` 라 CSS 회색 거르개로 대신한다.
+ */
+export const grayImage = style({
+  filter: 'grayscale(1)',
 })
 
-/** 선공/후공처럼 두 쪽 중 하나를 고르는 자리 — 원본은 팀 엠블럼 옆 꼬리표로 보인다 */
+/** 두 쪽 중 하나를 누르는 자리(선공 쪽 엠블럼 원 · 구장 화살) — 그림은 화면이 원본 자리에 따로 그린다 (웹판 단추) */
 export const sideButton = style({
   position: 'absolute',
   boxSizing: 'border-box',
   padding: 0,
-  border: '1px solid transparent',
+  border: 'none',
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
   fontSize: '11px',
   cursor: 'pointer',
-})
-
-export const sideButtonSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
 })
 
 /**
@@ -90,77 +93,4 @@ export const hintLine = style({
   width: '240px',
   zIndex: 2,
   pointerEvents: 'none',
-})
-
-/**
- * 경기진행 설정 창 (0x6042c).
- * ⚠️ 원본 배치 미해독 — 근사: 창 좌표가 R4 "남은 것" 에 있어 공용 판 크기(192 폭)만 빌려 썼다.
- */
-export const settingsWindow = style({
-  position: 'absolute',
-  left: 24,
-  top: 54,
-  width: 192,
-  height: 212,
-  boxSizing: 'border-box',
-  padding: 6,
-  background: ORIGINAL_COLORS.panelDeep,
-  border: `1px solid ${ORIGINAL_COLORS.boxEdgeInner}`,
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  lineHeight: '14px',
-  overflowY: 'auto',
-})
-
-export const settingsHeading = style({
-  margin: '0 0 4px',
-  fontSize: '11px',
-  color: ORIGINAL_COLORS.highlightYellow,
-})
-
-export const settingsRow = style({
-  display: 'flex',
-  gap: '2px',
-  alignItems: 'center',
-  margin: '2px 0',
-  // 상세 설정 줄은 칸이 아홉 개다 — 11px 글꼴에서는 한 줄에 다 못 서므로 접어 내린다
-  flexWrap: 'wrap',
-})
-
-export const settingsRowLabel = style({
-  width: '48px',
-  flexShrink: 0,
-})
-
-export const settingsOption = style({
-  boxSizing: 'border-box',
-  padding: '1px 3px',
-  border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
-  background: 'transparent',
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  // 이름이 줄어 "찬스/플레/이" 처럼 세 줄로 접히지 않게 못박는다 (9px 때는 48px 에 들어갔다)
-  flexShrink: 0,
-  whiteSpace: 'nowrap',
-  cursor: 'pointer',
-})
-
-export const settingsOptionSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
-  color: ORIGINAL_COLORS.highlightYellow,
-})
-
-export const settingsOptionOn = style({
-  background: ORIGINAL_COLORS.boardHighlight,
-})
-
-export const settingsDescription = style({
-  margin: '4px 0',
-  color: UI_COLORS.badgeInk,
-})
-
-export const settingsActions = style({
-  display: 'flex',
-  gap: '4px',
-  marginTop: '6px',
 })

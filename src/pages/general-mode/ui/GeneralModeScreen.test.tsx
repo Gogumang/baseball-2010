@@ -185,11 +185,11 @@ describe('경기진행 설정', () => {
     띄우기({ isQuickStart: true })
 
     fireEvent.click(screen.getByRole('button', { name: '0 경기설정' }))
-    const 창 = screen.getByRole('dialog', { name: '경기진행 설정' })
+    const 창 = screen.getByRole('group', { name: '경기진행 설정' })
 
     // 뒤쪽 경기정보 화면에도 같은 이름의 버튼이 있어 창 안에서만 찾는다
     fireEvent.click(within(창).getByRole('button', { name: '되돌아가기' }))
-    expect(screen.queryByRole('dialog', { name: '경기진행 설정' })).toBeNull()
+    expect(screen.queryByRole('group', { name: '경기진행 설정' })).toBeNull()
   })
 })
 
