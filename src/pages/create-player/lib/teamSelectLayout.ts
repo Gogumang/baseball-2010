@@ -242,6 +242,22 @@ export function abilityChartVerticesOf(
 }
 
 /**
+ * **자라는 애니의 꼭짓점** — 한 걸음 `0x760e8` 이 지금값(E+8)으로 다시 잡는 자리 (0x761f8~0x762aa, 직접 떴다):
+ * ```
+ * 길이 = (u8)(지금값 × 최대길이 / 999)          ; 0x761fc muls · 0xca7b5 · 0x76208 strb — 최대길이 = 반지름 × 축 최대치 / 999
+ * 지금값 ≠ 0 이면 길이 = max(3, 길이)          ; 0x7626e~0x76276
+ * ```
+ * 다 자라 지금값 = 목표값이 돼도 이 식을 지난 자리 그대로라 작은 값도 3 은 뻗는다.
+ */
+export function abilityGrowthVerticesOf(center: ChartPoint, current: readonly number[], maximumLength: number): readonly ChartPoint[] {
+  return ABILITY_AXIS_ANGLES.map((angle, axis) => {
+    const value = current[axis] ?? 0
+    const length = Math.trunc((value * maximumLength) / ABILITY_CHART_SCALE) & 0xff
+    return abilityVertexOf(center, value === 0 ? length : Math.max(3, length), angle)
+  })
+}
+
+/**
  * 바탕 테두리 — 그리기 `0x7633c` (확정).
  * 넘겨받은 반지름이 아니라 **고정 29**(`0x7639c movs r3,#0x1d`)로, 자기 각도표 `0xd36fc`
  * (= 역시 [225,315,45,135])를 따라 네 꼭짓점을 잡고 **선 네 줄**(0x763d6~0x7641e)을 긋는다.

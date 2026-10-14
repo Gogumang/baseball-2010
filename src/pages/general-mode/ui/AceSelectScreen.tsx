@@ -17,6 +17,7 @@ import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 
 const SLT_IMAGE = './sprites/slt_frame'
@@ -169,6 +170,8 @@ export function AceSelectScreen({
   const entry = useListPageEntry({ grid: { shape: ACE_GRID_OPEN, isAnimated: true } })
   const { keyLock } = entry
   const gridOpen = entry.grid
+  // 커서 튕김 — 시작 0x7a005(격자, 1, 1, 1) 의 셋째 인자 [격자+6] = 1 (`useGridCursorBounce`)
+  const bounce = useGridCursorBounce()
   // 격자 커서 깜빡임 [격자+0x18] — 시작 0x7a005 가 0 으로 두고(0x7a01e) 그릴 때마다 끝에서 +1(0x7b490) → 본문 몇째 그림인가와 같다.
   // 커서 칸 그리기 0x7b3a0 은 열림 애니가 끝났고([격자+9]) 깜빡임이 켜졌을 때만 돈다(0x7b3a2 · 0x7b3c6)
   const isGridCursorOn = gridOpen !== null && gridOpen.state.isDone && isAceGridCursorOn(gridOpen.blink)
@@ -252,7 +255,10 @@ export function AceSelectScreen({
       if (direction !== null) {
         event.preventDefault()
         if (!isLevelUpMode && !isCoachMode && (direction === 'up' || direction === 'down')) return
-        return setCursor((previous) => moveGridCursor(ACE_GRID_SHAPES[mode === '레벨업' ? '레벨업' : '고르기'], previous, direction))
+        const next = moveGridCursor(ACE_GRID_SHAPES[mode === '레벨업' ? '레벨업' : '고르기'], cursor, direction)
+        // 칸이 바뀐 키(커서 +0x25)면 고른 칸을 튕긴다 — 0x7a005(격자, 1, 1, 1) 의 [격자+6] = 1 (0x64836)
+        if (next !== cursor) bounce.start(direction)
+        return setCursor(next)
       }
       if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()
@@ -343,8 +349,9 @@ export function AceSelectScreen({
         커서는 깜빡일 때 slt_frame 이미지 1 을 (x − 2, y − 2) (prepareLayout `ACE_LAYOUT.cellBack` 머리말)
       */}
       {Array.from({ length: cellCount }, (_unused, cell) => {
-        const { x } = aceCellPositionOf(cell)
-        const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell)
+        const shake = cell === cursor ? bounce.offset : null
+        const x = aceCellPositionOf(cell).x + (shake?.dx ?? 0)
+        const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell) + (shake?.dy ?? 0)
         const back = ACE_LAYOUT.cellBack
         return (
           <span key={`back-${cell}`}>
@@ -359,8 +366,9 @@ export function AceSelectScreen({
         )
       })}
       {Array.from({ length: cellCount }, (_unused, cell) => {
-        const { x } = aceCellPositionOf(cell)
-        const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell)
+        const shake = cell === cursor ? bounce.offset : null
+        const x = aceCellPositionOf(cell).x + (shake?.dx ?? 0)
+        const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell) + (shake?.dy ?? 0)
         const player = acePlayerOfCell(cell)
         const open = isCellOpen(cell)
         // [skin+0x105](레벨업 화면)이면 흐리지 않는다 — ⚠️ 코치채용(종류 8)도 흐리지 않는 것으로 둔다(미확인)
@@ -390,7 +398,10 @@ export function AceSelectScreen({
       })}
       {isGridCursorOn && (
         <img className={styles.layer} alt="" data-testid="마선수-커서" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cursor.image)}
-          style={{ left: aceCellPositionOf(cursor).x + ACE_LAYOUT.cursor.dx, top: aceCellPositionOf(cursor).y + ACE_LAYOUT.cursor.dy }} />
+          style={{
+            left: aceCellPositionOf(cursor).x + ACE_LAYOUT.cursor.dx + bounce.offset.dx,
+            top: aceCellPositionOf(cursor).y + ACE_LAYOUT.cursor.dy + bounce.offset.dy,
+          }} />
       )}
 
       </>)}

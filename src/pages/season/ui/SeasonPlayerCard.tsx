@@ -11,7 +11,7 @@ import {
   abilityColorOf, radarAxisEndOf, radarLabelBoxOf, radarPointOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import { TintedNumber } from '@/pages/management/ui/RadarChart'
-import { useRadarGrowth } from '@/pages/management/model/useRadarGrowth'
+import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
 import { HALL_OF_FAME_FIGURE, figureHandOf } from '@/pages/special/lib/hallOfFameFigure'

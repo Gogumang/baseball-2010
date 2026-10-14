@@ -17,12 +17,14 @@ import {
   DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
   HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
   HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS,
-  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf,
+  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH, HALL_OF_FAME_CELL_ART, hallOfFameCellImagesOf,
+  hallOfFameCellImageTopLeftOf, isHallOfFameCellDimmed,
   hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
@@ -36,7 +38,10 @@ import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
+import { footerBottomOf, headerTopOf } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
+import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
+import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
@@ -277,8 +282,20 @@ function SpecialWheelLabels() {
   )
 }
 
-/** 머리띠·바닥띠 0x54d95(skin, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1) */
-function SpecialBands({ onBack }: { readonly onBack: () => void }) {
+/**
+ * 머리띠·바닥띠 0x54d95(skin, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1). G포인트를 받지 않은 화면(시험 · 머리띠를
+ * 안 넘긴 부르는 쪽)이 `ScreenFrame` 대신 쓴다.
+ *
+ * `slides` 면 0x54d95 가 그릴 때마다 +0x86 을 두 배로 해(0x54dfe~0x54e08) 머리띠는 위에서 · 바닥띠는 아래에서 미끄러져 들어온다
+ * — `ScreenFrame` 과 같은 `frameSlideOf` · `headerTopOf` · `footerBottomOf` 로 다 내려온 자리(머리 −8 · 바닥 320)에서 민다.
+ * 공용 목록 0x63b14 를 부르는 명예의 전당(스페셜 27 · 나리 145 0x15d54 = 0x63b15(…, 6, 1, [this+0x2c], −1))은 틱 0 에
+ * +0x84 = 1 · +0x86 = 1 을 세워(0x63ba0~0x63bb4) 미끄러지고, 스페셜 목록 6 은 세우지 않아(ScreenFrame `slides` 머리말) 안 미끄러진다.
+ */
+function SpecialBands({ onBack, slides = false }: { readonly onBack: () => void; readonly slides?: boolean }) {
+  const updates = useUpdateCounter(slides)
+  const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
+  const dyTop = headerTopOf(slide) - headerTopOf(FRAME_SLIDE_END)
+  const dyBottom = footerBottomOf(slide) - footerBottomOf(FRAME_SLIDE_END)
   return (
     <>
       <svg
@@ -289,25 +306,26 @@ function SpecialBands({ onBack }: { readonly onBack: () => void }) {
         height={SCREEN.height}
         shapeRendering="crispEdges"
       >
-        <rect x={0} y={HEADBAND.band.y} width={SCREEN.width} height={HEADBAND.band.height} fill={HEADBAND.band.color} />
-        <rect x={0} y={HEADBAND.line.y} width={SCREEN.width} height={HEADBAND.line.height} fill={HEADBAND.line.color} />
-        <rect x={0} y={FOOTER.band.y} width={SCREEN.width} height={FOOTER.band.height} fill={FOOTER.band.color} />
-        <rect x={0} y={FOOTER.line.y} width={SCREEN.width} height={1} fill={FOOTER.line.color} />
+        <rect x={0} y={HEADBAND.band.y + dyTop} width={SCREEN.width} height={HEADBAND.band.height} fill={HEADBAND.band.color} />
+        <rect x={0} y={HEADBAND.line.y + dyTop} width={SCREEN.width} height={HEADBAND.line.height} fill={HEADBAND.line.color} />
+        <rect x={0} y={FOOTER.band.y + dyBottom} width={SCREEN.width} height={FOOTER.band.height} fill={FOOTER.band.color} />
+        <rect x={0} y={FOOTER.line.y + dyBottom} width={SCREEN.width} height={1} fill={FOOTER.line.color} />
       </svg>
       {HEADBAND.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.tileImage)} style={{ left: x, top: HEADBAND.tileY }} />
+        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.tileImage)} style={{ left: x, top: HEADBAND.tileY + dyTop }} />
       ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)} style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY }} />
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.title.image)} style={{ left: HEADBAND.title.x, top: HEADBAND.title.y }} />
+      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)} style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY + dyTop }} />
+      <img className={styles.sprite} alt="" data-testid="스페셜-머리띠-제목" src={imageSrc(GAME_FRAME, HEADBAND.title.image)}
+        style={{ left: HEADBAND.title.x, top: HEADBAND.title.y + dyTop }} />
       {FOOTER.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.tileImage)} style={{ left: x, top: FOOTER.tileY }} />
+        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.tileImage)} style={{ left: x, top: FOOTER.tileY + dyBottom }} />
       ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.cornerImage)} style={{ left: FOOTER.cornerX, top: FOOTER.tileY }} />
+      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.cornerImage)} style={{ left: FOOTER.cornerX, top: FOOTER.tileY + dyBottom }} />
       <button
         type="button"
         className={styles.backButton}
         aria-label="되돌아가기"
-        style={{ left: FOOTER.backIcon.x, top: FOOTER.backIcon.y }}
+        style={{ left: FOOTER.backIcon.x, top: FOOTER.backIcon.y + dyBottom }}
         onClick={onBack}
       >
         <img src={imageSrc(GAME_FRAME, FOOTER.backIcon.image)} alt="" />
@@ -484,11 +502,14 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   // 0x63b14 k 6·7·8 — 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지
   // 키 함수(16 0x29ac8 · 17 0x29a54 · 27 0x2ac00 · 시즌 0xe2 0xe340 · 나리 145 0x1ca4c)가 [skin+0xe4] == 0 을 보고 아무것도 안 한다.
   // 부르는 곳(0x2df20 · 0x2dec8 · 0x2dcd8 · 0xa10c · 0x15d54)이 모두 넷째 인자 1 이라 [skin+0xe8] = 1 — 애니가 돈다.
-  // ⚠️ 나리 145 · 머리띠를 안 넘긴 스페셜 27 은 웹 머리띠(`SpecialBands`)가 안 미끄러지지만 본문 · 키는 원본대로 머리띠 다섯 그림 뒤다
+  // 머리띠도 같은 틱 0 에 +0x84 를 세우므로(0x63ba0) `frame` 을 안 받은 `SpecialBands` 도 미끄러진다 — 본문 · 키는 그 다섯 그림 뒤다.
+  // 나리 145(0x15d54)의 머리띠는 0x7f4ec([this+0xe0]) — 틀 0x16928 기본 갈래 0x169ea 가 0x7f53c(hdr, [this+0xcc] == 4 ? 8 : 9, 5, 0)
+  // 로 세운 제목 8 "나만의리그 타자편" / 9 "투수편" · 바닥 5 · G포인트다(부르는 쪽 EndingScreen 이 `frame` 으로 넘긴다).
   const gridOpenShape = hallOfFameGridOpenShapeOf(view.rows)
   const entry = useListPageEntry({ grid: { shape: gridOpenShape, isAnimated: true } })
   const { keyLock } = entry
   const gridOpen = entry.grid
+  const bounce = useGridCursorBounce()
   const teamLogo = current.kind === '찬칸' && (slot === NARI_PITCHER_SLOT || slot === NARI_BATTER_SLOT) && current.figure !== null
     ? current.figure.team : null
 
@@ -615,7 +636,10 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         : null
       if (direction !== null) {
         event.preventDefault()
-        return setSlot((previous) => view.firstSlot + moveGridCursor(menuGrid, previous - view.firstSlot, direction))
+        const next = view.firstSlot + moveGridCursor(menuGrid, slot - view.firstSlot, direction)
+        // 칸이 바뀐 키(커서 +0x25)면 고른 칸을 튕긴다 — 시작 0x7a005(격자, [skin+0xe8], 1, 0) 의 [격자+6] = 1 (0x651e4)
+        if (next !== slot) bounce.start(direction)
+        return setSlot(next)
       }
       if (event.key === '5') {
         event.preventDefault()
@@ -763,13 +787,17 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         )
       })}
 
-      <HallOfFameAbilityChart center={chartCenter} values={chartValues} />
+      <HallOfFameAbilityChart center={chartCenter} values={chartValues} slot={slot} />
 
-      {/* 5×3 격자 — 칸마다 둥근 네모 RGB(48,69,205) 를 (x−3, y−3, 칸+3) 에 (0x7a844) */}
+      {/* 5×3 격자 0x7a571 종류 6 — 칸 바탕 없이(시작 넷째 인자 [격자+8] = 0) 칸 틀 · 상태 그림 · (145) 다른 편 덮개 (0x7ac2e) */}
       {slots.map((entry, index) => {
         if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
         const box = hallOfFameCellOf(index - view.firstSlot)
-        const dy = gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot)
+        const shake = index === slot ? bounce.offset : null
+        const x = box.x + (shake?.dx ?? 0)
+        const y = box.y + gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot) + (shake?.dy ?? 0)
+        const typeIndex = entry.kind === '찬칸' && entry.figure !== null ? entry.figure.form >> 1 : null
+        const isDimmed = isHallOfFameCellDimmed(mode.kind === '등록' ? mode.edition : null, index)
         return (
           <button
             key={index}
@@ -780,21 +808,34 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
             data-slot={index}
             data-kind={entry.kind}
             data-state={entry.state}
-            style={{
-              left: box.x - HALL_OF_FAME_GRID.backingInset,
-              top: box.y + dy - HALL_OF_FAME_GRID.backingInset,
-              width: box.width + HALL_OF_FAME_GRID.backingInset,
-              height: box.height + HALL_OF_FAME_GRID.backingInset,
-              background: HALL_OF_FAME_GRID.backingColor,
-              borderRadius: HALL_OF_FAME_GRID.cornerRadius,
-              // 커서는 열림 애니가 끝난 뒤([격자+9])에만 0x7b3a0 이 그린다
-              ...(gridOpen.state.isDone ? {} : { outline: 'none' }),
-            }}
+            style={{ left: x, top: y, width: box.width, height: box.height }}
             onMouseEnter={() => setSlot(index)}
             onClick={() => { setSlot(index); pressSlot(index) }}
-          />
+          >
+            <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.frame.image)} style={{ left: 0, top: 0 }} />
+            {hallOfFameCellImagesOf(index, entry.state, typeIndex).map((image) => {
+              const at = hallOfFameCellImageTopLeftOf(image)
+              return <img key={image.image} className={styles.sprite} alt="" data-cell-image={image.image}
+                src={imageSrc(SLT_FRAME, image.image)} style={{ left: at.dx, top: at.dy }} />
+            })}
+            {isDimmed && (
+              // 0x6b7d5(gfx, x, y, 39, 38, 둥글기 1, 0x80000000) — (w + 1)×(h + 1) 에서 네 모서리 점이 빠진 꼴, 한 겹이라 clip-path 로 깎는다
+              <span className={styles.hofCellDim} data-part="덮개" style={{
+                width: HALL_OF_FAME_CELL_ART.frame.width + 1, height: HALL_OF_FAME_CELL_ART.frame.height + 1,
+                opacity: HALL_OF_FAME_CELL_ART.dimOpacity,
+              }} />
+            )}
+          </button>
         )
       })}
+      {/* 커서 0x7b3a0 → 0x7b432 — 열림 애니가 끝났고([격자+9]) 깜빡일 때([격자+0x18] % 8 ≤ 4) slt_frame 1 을 (x − 2, y − 2) */}
+      {gridOpen.state.isDone && gridOpen.blink % 8 <= 4 && slot >= view.firstSlot && (
+        <img className={styles.sprite} alt="" data-testid="명전-커서" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.cursor.image)}
+          style={{
+            left: hallOfFameCellOf(slot - view.firstSlot).x + HALL_OF_FAME_CELL_ART.cursor.dx + bounce.offset.dx,
+            top: hallOfFameCellOf(slot - view.firstSlot).y + HALL_OF_FAME_CELL_ART.cursor.dy + bounce.offset.dy,
+          }} />
+      )}
 
       </>)}
 
@@ -833,7 +874,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       )}
 
       {frame === undefined
-        ? <SpecialBands onBack={goBack} />
+        ? <SpecialBands onBack={goBack} slides />
         : <ScreenFrame title={frame.title} gamePoint={frame.gamePoint} onBack={goBack} />}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
@@ -865,7 +906,18 @@ function popupTextOf(popup: HallOfFamePopup): {
  * 빈 칸·잠긴 칸은 기록이 없어 네 값이 0 이라 바탕만 남는다 (0x5b1de~0x5b1f6).
  * ⚠️ 축 딱지 그림(종류 2 → 4~7 · 종류 3 → 0~3 번)과 빨간 최대 테두리(anim+0x1e0)는 팀 도형과 같은 까닭으로 안 그린다.
  */
-function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoint; readonly values: readonly number[] }) {
+/**
+ * 능력치 도형 0x5aefc 종류 3(투수 칸 ≤ 4) / 2(타자), 반지름 30 — 0x65690~0x65740. k 6~8 본문은 칸이 비어도(기록 0x5ea18 = 0 →
+ * 0x6535a → 0x654d4 → 0x65680) 이 도형을 부르고, 기록이 0 이면 0x5b2d2 가 네 값을 0 으로 채운다.
+ * 값 도형은 레이더 [skin+0xd4] 의 자라는 애니(`AbilityGrowthPolygon`) — 들어옴(27 0x25f8c · 16 0x25e6c · 17 0x2613c · 나리 145 0x1c8ec ·
+ * 시즌 0xe2)이 +0xad = 0 으로 두어 본문 첫 그림에 0 에서 자라고, 커서가 움직인 그림(커서 +0x25)에 0x63b14 가 +0x1e3 = 0 으로 두어
+ * 지난 목표값에서 새 칸 값으로 오르내린다(빈 칸이면 0 으로 줄어든다).
+ */
+function HallOfFameAbilityChart({ center, values, slot }: {
+  readonly center: ChartPoint
+  readonly values: readonly number[]
+  readonly slot: number
+}) {
   const radius = HALL_OF_FAME_CHART.radius
   const size = radius * 2
   const pointsOf = (points: readonly ChartPoint[]) => points.map((point) => `${point.x},${point.y}`).join(' ')
@@ -874,10 +926,7 @@ function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoin
       viewBox={`${center.x - radius} ${center.y - radius} ${size} ${size}`}
       style={{ left: center.x - radius, top: center.y - radius }}>
       <polygon points={pointsOf(abilityChartFrameOf(center))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
-      {values.length > 0 && (
-        <polygon data-part="values" points={pointsOf(hallOfFameChartVerticesOf(center, values))}
-          fill={ORIGINAL_COLORS.radarFill} fillOpacity={CHART_FILL_ALPHA} stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
-      )}
+      <AbilityGrowthPolygon center={center} targets={values} maximumLength={HALL_OF_FAME_CHART_MAXIMUM_LENGTH} restartKey={slot} />
     </svg>
   )
 }
@@ -889,9 +938,6 @@ function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoin
 const hallOfFameGridOpenShapeOf = (rows: number): GridOpenShape => ({
   rows, columns: HALL_OF_FAME_GRID.columns, rowHeight: HALL_OF_FAME_GRID.rowHeight, rowGap: HALL_OF_FAME_GRID.verticalGap, shift: 1,
 })
-
-/** 팀 도형과 같은 채움 불투명도 0xb4 (TeamSelectScreen) */
-const CHART_FILL_ALPHA = 0xb4 / 0xff
 
 /** 말풍선 둘째 칸 — 슬롯에서 삭제 */
 const HALL_OF_FAME_BUBBLE_DELETE = 1

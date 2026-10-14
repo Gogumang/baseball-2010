@@ -3,7 +3,7 @@ import {
   ABILITY_AXIS_ANGLES, ABILITY_AXIS_MAXIMUM, ABILITY_CHART, ABILITY_FRAME_RADIUS, ANCHOR_A,
   ANCHOR_B, GRID, NAME_BAR, OPEN_TEAM_COUNT, TAG, TEAM_COUNT, abilityAxisLengthOf,
   abilityAxisMaximumLengthOf, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf,
-  gridRowCountOf, isTeamOpen, teamNameFrameOf,
+  abilityGrowthVerticesOf, abilityVertexOf, gridRowCountOf, isTeamOpen, teamNameFrameOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 
 /** 팀 고르기 배치 (상태 0x65 → 목록 0x63b15 의 k=0, 본문 0x63dee — P6 2a 확정) */
@@ -120,5 +120,14 @@ describe('히든 팀 잠금', () => {
   it('10~14 는 해금 기록이 있어야 열린다', () => {
     expect(isTeamOpen(12, [])).toBe(false)
     expect(isTeamOpen(12, [12])).toBe(true)
+  })
+})
+
+describe('abilityGrowthVerticesOf — 0x760e8 꼭짓점 (길이 u8 · 값 ≠ 0 이면 최소 3)', () => {
+  it('값 10 × 30 / 999 = 0 이지만 3 은 뻗는다 · 값 0 은 가운데', () => {
+    const center = { x: 100, y: 100 }
+    const [a, b] = abilityGrowthVerticesOf(center, [10, 0, 0, 0], 30)
+    expect(a).toEqual(abilityVertexOf(center, 3, 225))
+    expect(b).toEqual(center)
   })
 })

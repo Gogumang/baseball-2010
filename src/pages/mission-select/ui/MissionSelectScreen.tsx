@@ -10,6 +10,7 @@ import {
   MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import { EventMissionWindow } from '@/pages/mission-select/ui/EventMissionWindow'
 import type { EventMissionAnswer } from '@/pages/mission-select/ui/EventMissionWindow'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
@@ -91,6 +92,7 @@ export function MissionSelectScreen({
    * 시험용 `slides = false` 는 다 내려온 · 다 연 자리에서 본다.
    */
   const gridOpen = useListPageEntry({ slides, grid: { shape: MISSION_GRID_OPEN, isAnimated: slides } }).grid
+  const bounce = useGridCursorBounce()
   const [side, setSide] = useState<OriginalMission['side']>(initialSide)
   const [cursor, setCursor] = useState(0)
   /** [this+0xa0] — 이벤트 미션 창의 고름(≠ 0 미션실행). 장면 진입 0x1d9a4 가 1 로 둔다 */
@@ -141,7 +143,10 @@ export function MissionSelectScreen({
         : null
       if (direction !== null) {
         event.preventDefault()
-        return setCursor((previous) => moveGridCursor(MISSION_GRID_SHAPE, previous, direction))
+        const next = moveGridCursor(MISSION_GRID_SHAPE, cursor, direction)
+        // 칸이 바뀐 키(커서 +0x25)면 고른 칸을 튕긴다 — 시작 0x7a005(격자, 1, 1, 0) 의 [격자+6] = 1 (0x1e1b0). 키 0x1daa4 가 방향을 적는다
+        if (next !== cursor) bounce.start(direction)
+        return setCursor(next)
       }
       if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
@@ -188,8 +193,9 @@ export function MissionSelectScreen({
 
       {Array.from({ length: cellCount }, (_unused, index) => {
         const mission = missions[index]
-        const { x } = cellPositionOf(index)
-        const y = cellPositionOf(index).y + (gridOpen === null ? 0 : gridOpenCellDy(MISSION_GRID_OPEN, gridOpen.state, index))
+        const shake = index === cursor ? bounce.offset : null
+        const x = cellPositionOf(index).x + (shake?.dx ?? 0)
+        const y = cellPositionOf(index).y + (gridOpen === null ? 0 : gridOpenCellDy(MISSION_GRID_OPEN, gridOpen.state, index)) + (shake?.dy ?? 0)
         if (mission === undefined) {
           return (
             <div key={index} className={styles.cell}
@@ -216,7 +222,7 @@ export function MissionSelectScreen({
 
       {cursor < cellCount && (gridOpen === null || gridOpen.state.isDone) && (
         <div className={styles.cursor}
-          style={{ left: cursorCell.x, top: cursorCell.y, width: GRID.cellWidth, height: GRID.cell }} />
+          style={{ left: cursorCell.x + bounce.offset.dx, top: cursorCell.y + bounce.offset.dy, width: GRID.cellWidth, height: GRID.cell }} />
       )}
 
       <FrameSprite folder={`${SLT_FRAME}/frames`} frame={BOTTOM_FRAME.frame} origins={frames}
