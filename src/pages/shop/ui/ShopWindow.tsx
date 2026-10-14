@@ -3,12 +3,11 @@ import { SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
-import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   CURSOR_BLINK_PERIOD, CURSOR_VISIBLE_UPDATES, DESCRIPTION_BOX, HEAD_LABEL_FRAME, INNER, LABEL_HEIGHT,
-  LEFT_TAB_BOX, MODE_UI_FRAME, MONEY_DIGIT_BASE_FRAME, NAME_BOX, RIGHT_TAB_BOX, SHOP_COLORS, SLOT_COLUMNS,
-  SLOT_COUNT, SLOT_ROWS, SLOT_SIZE, VALUE_BOX, WINDOW_BOX, centeredLeftOf, centeredTopOf, slotCellRectsOf, slotPositionOf,
+  LEFT_TAB_BOX, MODE_UI_FRAME, MONEY_BAR_OFFSET, MONEY_DIGIT_OFFSET, MONEY_LABEL_OFFSET, NAME_BOX, RIGHT_TAB_BOX, SHOP_COLORS, SLOT_COLUMNS,
+  SLOT_COUNT, SLOT_ROWS, SLOT_SIZE, VALUE_BOX, VALUE_DIGIT_RIGHT_INSET, WINDOW_BOX, centeredLeftOf, centeredTopOf, slotCellRectsOf, slotPositionOf, valueBarPositionOf,
 } from '@/pages/shop/lib/shopLayout'
 import type { ShopBox, ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
@@ -20,15 +19,6 @@ const MODE_UI = './sprites/mode_ui/frames'
 const ITEM_ICON = './sprites/item_icon'
 
 const spriteSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
-
-/** 만원 숫자를 글꼴 36(하늘색)으로 옮긴다 — 0x63331 이 소지금에 쓰는 글자꼴 */
-const DIGIT_BASE_FRAME = 20
-const withMoneyFont = (glyphs: readonly Glyph[]): Glyph[] =>
-  glyphs.map((glyph) =>
-    glyph.frame >= DIGIT_BASE_FRAME && glyph.frame < DIGIT_BASE_FRAME + 10
-      ? { ...glyph, frame: glyph.frame - DIGIT_BASE_FRAME + MONEY_DIGIT_BASE_FRAME }
-      : glyph,
-  )
 
 interface ShopWindowProps {
   readonly kind: ShopWindowKindName
@@ -106,21 +96,20 @@ export function ShopWindow({
     if (size === null) return null
     return tintedLabel(frame, centeredLeftOf(box, size.width), centeredTopOf(box, size.height), color)
   }
-  /** 값 막대 프레임 52 를 칸 왼쪽에 (0x11 / 0x14) */
-  const valueBar = (box: ShopBox) => {
+  /** 값 막대 프레임 52 — 정렬 0x11 · (ox, oy) 또는 0x14(오른쪽 위) */
+  const valueBar = (box: ShopBox, align: 0x11 | 0x14, ox = 0, oy = 0) => {
     const size = modeUiOrigins?.[String(MODE_UI_FRAME.valueBar).padStart(3, '0')] ?? null
     if (size === null) return null
+    const { x, y } = valueBarPositionOf(box, align, size.width, ox, oy)
     return (
-      <img className={styles.layer} alt=""
-        src={spriteSrc(MODE_UI, MODE_UI_FRAME.valueBar)}
-        style={{ left: box.x, top: centeredTopOf(box, size.height) }} />
+      <img className={styles.layer} alt="" src={spriteSrc(MODE_UI, MODE_UI_FRAME.valueBar)} style={{ left: x, top: y }} />
     )
   }
-  /** 칸 오른쪽 끝에 붙는 글 (정렬 0x21) */
-  const rightLabel = (frame: number, box: ShopBox, color: string) => {
+  /** 칸 왼쪽 · 세로 가운데에 붙는 글 (정렬 0x21) */
+  const leftLabel = (frame: number, box: ShopBox, color: string, ox = 0, oy = 0) => {
     const size = labelSizeOf(frame)
     if (size === null) return null
-    return tintedLabel(frame, box.x + INNER.labelBarLeftPadding, centeredTopOf(box, size.height), color)
+    return tintedLabel(frame, box.x + ox, centeredTopOf(box, size.height) + oy, color)
   }
 
   const descriptionLines = parseGameMarkup(selected?.description ?? '')
@@ -134,23 +123,19 @@ export function ShopWindow({
       {/* 머리 — 창 종류별 (0x81ea2~0x82254) */}
       {kind === '서브' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
       {kind === 'GP' && centeredLabel(HEAD_LABEL_FRAME.GP아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
-      {/* 서브는 오른쪽 탭에 소지금 (종류 1·5 — 막대 52 + img_text 302 + 글꼴 36 숫자) */}
-      {kind !== 'GP' && (
+      {/* 서브는 박스 2 에 소지금 (종류 1·5 — 막대 52 · img_text 302 · 주황 숫자, 모두 oy 4) */}
+      {kind === '서브' && (
         <>
-          {valueBar(RIGHT_TAB_BOX)}
-          {rightLabel(HEAD_LABEL_FRAME.소지금, RIGHT_TAB_BOX, SHOP_COLORS.text)}
-          <SpriteNumber glyphs={withMoneyFont(moneyGlyphsOf(money))}
-            right={RIGHT_TAB_BOX.x + RIGHT_TAB_BOX.width - INNER.valueRightPadding}
-            boxTop={RIGHT_TAB_BOX.y} boxHeight={RIGHT_TAB_BOX.height} />
+          {valueBar(RIGHT_TAB_BOX, 0x11, MONEY_BAR_OFFSET.x, MONEY_BAR_OFFSET.y)}
+          {leftLabel(HEAD_LABEL_FRAME.소지금, RIGHT_TAB_BOX, SHOP_COLORS.text, MONEY_LABEL_OFFSET.x, MONEY_LABEL_OFFSET.y)}
+          <SpriteNumber glyphs={moneyGlyphsOf(money)}
+            right={RIGHT_TAB_BOX.x + RIGHT_TAB_BOX.width + MONEY_DIGIT_OFFSET.x}
+            boxTop={RIGHT_TAB_BOX.y + MONEY_DIGIT_OFFSET.y} boxHeight={RIGHT_TAB_BOX.height} />
         </>
       )}
-      {/* GP 는 값 칸에 막대 52 + img_text 303 "가격" (종류 2) */}
-      {kind === 'GP' && (
-        <>
-          {valueBar(VALUE_BOX)}
-          {rightLabel(HEAD_LABEL_FRAME.가격, VALUE_BOX, SHOP_COLORS.text)}
-        </>
-      )}
+      {/* 값 칸 — 서브·GP 둘 다 막대 52(정렬 0x14) + img_text 303 "가격"(정렬 0x21) */}
+      {valueBar(VALUE_BOX, 0x14)}
+      {leftLabel(HEAD_LABEL_FRAME.가격, VALUE_BOX, SHOP_COLORS.text)}
 
       {/* 칸 바탕 0x7e764 — 10칸 모두 (0x82420, 깃발 0) */}
       <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
@@ -211,7 +196,7 @@ export function ShopWindow({
       {selected !== undefined && (
         <SpriteNumber
           glyphs={kind === 'GP' ? numberGlyphsOf(selected.price) : moneyGlyphsOf(selected.price)}
-          right={VALUE_BOX.x + VALUE_BOX.width - INNER.valueRightPadding}
+          right={VALUE_BOX.x + VALUE_BOX.width - VALUE_DIGIT_RIGHT_INSET}
           boxTop={VALUE_BOX.y} boxHeight={VALUE_BOX.height} />
       )}
 

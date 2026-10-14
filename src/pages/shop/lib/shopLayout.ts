@@ -115,27 +115,44 @@ export const SHOP_COLORS = {
 } as const
 
 /**
- * num.pzx 글자꼴.
- * 소지금 숫자는 0x63331 이 **글꼴 36** 으로 그린다 — num 36~45 를 열어 보니 하늘색(74,186,255)이고,
- * 기본 20~29 는 주황/노랑(255,178,24)이라 값 칸(노랑)은 기본 글꼴 그대로 쓴다.
+ * 머리 칸 자리 — 0x81dc0 의 종류 1·5(0x81fb6~0x82134) · 종류 2(0x8216c~0x82254) 를 직접 떴다:
+ * ```
+ * 종류 1·5  박스 1  img_text 105 효과 11(#335FCD) 정렬 0x22
+ *           박스 2  mode_ui 52 정렬 0x11 · (ox 30, oy 4) · img_text 302 팔레트 0 정렬 0x21 · (ox −4, oy 4)
+ *                   소지금 0x63331(박스 2, 선수 +2 × 100, num, 정렬 0x24, ox −2, oy 4)
+ *           박스 5  mode_ui 52 정렬 0x14 · img_text 303 팔레트 0 정렬 0x21          ; 0x8223a 로 GP 와 같은 꼬리
+ * 종류 2    박스 1  img_text 110 효과 11(#335FCD) 정렬 0x22
+ *           박스 5  mode_ui 52 정렬 0x14 · img_text 303 팔레트 0 정렬 0x21
+ * 값        0x63331(박스 5, 가격 × 1000, num, 정렬 0x24, ox −2, oy 0)                ; 0x8286e
+ * ```
+ * 숫자 글꼴은 num 그림 목록을 그대로 받는 0x63118 이 `[목록 + 0x50 + 자리 × 4]` = **그림 20 + 자리**(주황)로 고른다.
+ * 앞서 여기 적었던 "글꼴 36" 은 0x63331 의 여섯째 인자(oy 4)를 잘못 읽은 것이다 — num 30~39 가 하늘색 0~9 라 36 부터 세면
+ * 숫자가 여섯씩 밀려 찍혔다.
  */
-export const MONEY_DIGIT_BASE_FRAME = 36
+export const MONEY_BAR_OFFSET = { x: 30, y: 4 } as const
+export const MONEY_LABEL_OFFSET = { x: -4, y: 4 } as const
+export const MONEY_DIGIT_OFFSET = { x: -2, y: 4 } as const
+export const VALUE_DIGIT_RIGHT_INSET = 2
+
+/** 막대 52 를 놓는 왼쪽 위 — 정렬 0x11 이면 박스 왼쪽 위, 0x14 면 박스 오른쪽 위에 (ox, oy) 를 더한다 */
+export function valueBarPositionOf(
+  box: ShopBox, align: 0x11 | 0x14, barWidth: number, ox = 0, oy = 0,
+): { readonly x: number; readonly y: number } {
+  return { x: (align === 0x14 ? box.x + box.width - barWidth : box.x) + ox, y: box.y + oy }
+}
 
 /**
  * 박스 **안쪽** 좌표는 문서에 없어서 근사했다 (P6 3절이 박스 자리까지만 확정했다):
  *   이름 딱지 글 — 박스 3 가운데(0x22), 검정 그림자 (+1,+1) 뒤 흰 글 → 세로는 글 높이로 가운데 맞춤
  *   설명 — 박스 4 왼쪽 위(0x11) 에서 4px 안쪽, 줄 간격 13 (0xb9d35 의 줄 y 74/81 차가 7~8 이지만
  *          웹 글꼴이 더 커서 11px 글자에 맞는 13px 로 둔다)
- *   값 칸 숫자 — 박스 5 오른쪽에서 4px 안쪽 (순위표·소지금 칸과 같은 여백)
- *   격자 아이콘 — 33×33 칸 가운데
+ * *   격자 아이콘 — 33×33 칸 가운데
  */
 export const INNER = {
   nameTextLeft: 5,
   nameShadow: 1,
   descriptionPadding: 4,
   descriptionLineHeight: 13,
-  valueRightPadding: 4,
-  labelBarLeftPadding: 4,
 } as const
 
 /** 커서는 칸을 1px 둘러싸고 깜박인다 (필살타법 창 0x803d4 와 같은 방식) */

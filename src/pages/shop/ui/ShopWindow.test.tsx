@@ -6,7 +6,8 @@ import { createCareer, MAXIMUM_MORALE } from '@/entities/career/model/playerCare
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import { SUB_ITEMS } from '@/entities/career/model/subItems'
 import {
-  DESCRIPTION_BOX, NAME_BOX, SLOT_COUNT, SLOT_SIZE, SLOT_XS, SLOT_YS, VALUE_BOX, WINDOW_BOX, slotPositionOf,
+  DESCRIPTION_BOX, MONEY_BAR_OFFSET, NAME_BOX, RIGHT_TAB_BOX, SLOT_COUNT, SLOT_SIZE, SLOT_XS, SLOT_YS, VALUE_BOX, WINDOW_BOX,
+  slotPositionOf, valueBarPositionOf,
 } from '@/pages/shop/lib/shopLayout'
 
 /**
@@ -77,6 +78,11 @@ describe('아이템 창 격자 (mode_ui 프레임 34)', () => {
 })
 
 describe('아이템 창 박스 (mode_ui 프레임 33)', () => {
+  it('머리 칸 (0x81fb6~0x82254) — 서브 소지금 막대 (152, 54) · 값 칸 막대는 박스 5 오른쪽 위 (146, 163)', () => {
+    expect(valueBarPositionOf(RIGHT_TAB_BOX, 0x11, 61, MONEY_BAR_OFFSET.x, MONEY_BAR_OFFSET.y)).toEqual({ x: 152, y: 54 })
+    expect(valueBarPositionOf(VALUE_BOX, 0x14, 61)).toEqual({ x: 146, y: 163 })
+  })
+
   it('판은 (24,48) 192×212 다', () => {
     const { container } = render(
       <ShopScreen initialTab="GP" career={소지금많은선수} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />,
