@@ -35,7 +35,7 @@ export interface SeasonRecordPickPopupProps {
  */
 export function SeasonRecordPickPopup({ side, onToggle, onConfirm, onCancel }: SeasonRecordPickPopupProps) {
   return (
-    <RecordPickPopup ariaLabel="기록순위" testIdPrefix="기록순위" selected={side === '타자' ? 0 : 1}
+    <RecordPickPopup ariaLabel="기록순위" testIdPrefix="기록순위" selected={side === '타자' ? 0 : 1} closeKind="바로"
       cells={[
         { label: '타자기록', labelFrame: PICK_LABEL_FRAMES.타자 },
         { label: '투수기록', labelFrame: PICK_LABEL_FRAMES.투수 },

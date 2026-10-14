@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { MarkupText, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
@@ -231,11 +232,11 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
 }
 
 /**
- * 판 높이 — 0x741a1 이 팝업 +0x20e 에 넣는 0x6e = 110. ⚠️ 유력: 판이 세로 가운데 (320 − 110) / 2 = 105 에 선다고 보았다
- * (메시지 상자 0x74ef4 와 같은 가운데 맞춤). 글·칸 좌표는 그리기 콜백 0x32b7d 에서 떴다(확정).
+ * 판 높이 — 0x741a1 이 팝업 +0x20e 에 넣는 0x6e = 110. 판은 세로 가운데 (320 − 110) / 2 = 105 다 — 확정(2026-10-14):
+ * 그리기 0x744c4 가 x = (W − 폭) >> 1 · y = ((H − 그리는 높이) >> 1) + [창+0x244](0x741a0 이 0) 로 긋는다(0x744de~0x74520).
+ * 글·칸 좌표는 그리기 콜백 0x32b7d 에서 떴다(확정).
  */
 const POPUP_HEIGHT = 0x6e
-const POPUP_TOP = (320 - POPUP_HEIGHT) / 2
 /** 문구 `0xba269(글, W/2 − 100, 0x82, 0xc8, 흰색)` */
 const PROMPT = { x: 120 - 100, y: 0x82, width: 0xc8 } as const
 /** 입력 칸 폭 100 × 높이 15 를 (W/2 − 50, 0xaf) 에 RGB(30,45,160) 로 채운다 (0x6b7d5) */
@@ -267,19 +268,36 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
   nameRef.current = name
   const handlersRef = useRef({ onConfirm, onCancel })
   handlersRef.current = { onConfirm, onCancel }
+  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침을 건너뛴다
+  const bandRef = useRef<HTMLDivElement>(null)
+  const [hasNoLayout, setHasNoLayout] = useState(false)
+  useLayoutEffect(() => {
+    if ((bandRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
+  }, [])
+  /**
+   * 0x741a0 펼침 6 → 12 → 24 → 48 → 96 → 110 — 그동안 키 콜백 0x32b5d 도, 확인 · 취소를 보는 그리기 콜백 0x32b7d 도 안 불린다
+   * (0x75556 · 0x7479c). 확인 · 취소는 0x74361(창, 0 / −1) 이 [창+9] = 0 으로 그 자리에서 치운다(닫힘 애니 없음 — `popupWindow`).
+   */
+  const motion = usePopupWindowMotion({ targetHeight: POPUP_HEIGHT, skipsMotion: hasNoLayout })
+  const motionRef = useRef(motion)
+  motionRef.current = motion
 
   useEffect(() => {
     // 창이 떠 있는 동안 키는 창 것이다 — 뒤의 엔트리 화면(window 리스너)이 숫자·* 키를 가로채지 않게 잡는 단계에서 멈춘다
     const onKeyDown = (event: KeyboardEvent) => {
       event.stopImmediatePropagation()
+      if (!motionRef.current.acceptsKeys()) {
+        event.preventDefault()
+        return
+      }
       if (event.key === 'Enter') {
         event.preventDefault()
-        if (nameRef.current.length > 0) handlersRef.current.onConfirm(nameRef.current)
+        if (nameRef.current.length > 0) motionRef.current.close('바로', () => handlersRef.current.onConfirm(nameRef.current))
         return
       }
       if (event.key === 'Escape') {
         event.preventDefault()
-        if (nameRef.current.length === 0) return handlersRef.current.onCancel()
+        if (nameRef.current.length === 0) return void motionRef.current.close('바로', () => handlersRef.current.onCancel())
         setName((previous) => [...previous].slice(0, -1).join(''))
       }
     }
@@ -287,14 +305,19 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
+  if (motion.isClosed) return null
+  const isOpening = motion.openingHeight !== null
+  const bandHeight = motion.openingHeight ?? POPUP_HEIGHT
+
   return (
     <div className={styles.dim} role="dialog" aria-label="이름 입력">
-      <div className={styles.band} style={{ top: POPUP_TOP, height: POPUP_HEIGHT }} />
-      <div className={styles.prompt} style={{ left: PROMPT.x, top: PROMPT.y, width: PROMPT.width }}>
+      {/* 판 0x744c4 — y = (H − 그리는 높이) / 2 */}
+      <div className={styles.band} ref={bandRef} style={{ top: (320 - bandHeight) >> 1, height: bandHeight }} />
+      <div className={styles.prompt} style={{ left: PROMPT.x, top: PROMPT.y, width: PROMPT.width, visibility: isOpening ? 'hidden' : undefined }}>
         <MarkupText raw={NAME_PROMPT} />
       </div>
-      <input className={styles.field} aria-label="이름" value={name} autoFocus
-        style={{ left: FIELD.x, top: FIELD.y, width: FIELD.width, height: FIELD.height }}
+      <input className={styles.field} aria-label="이름" value={name} autoFocus readOnly={isOpening}
+        style={{ left: FIELD.x, top: FIELD.y, width: FIELD.width, height: FIELD.height, visibility: isOpening ? 'hidden' : undefined }}
         onChange={(event) => {
           // CP949 8 바이트까지 (입력기 최대 I+8 = min(8, 64), R11 1b — 한글 2 · 그 밖 1, 섞어 써도 된다)
           if (nameByteLengthOf(event.target.value) <= EDITED_NAME_BYTES) setName(event.target.value)

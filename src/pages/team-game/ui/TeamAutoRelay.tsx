@@ -248,6 +248,8 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
         <MessageBox
           text={AUTO_RELAY_STOP_QUESTION}
           dimOpacity={GAME_POPUP_DIM_OPACITY}
+          // 경기 장면 [창+0x24f] = 1 → 답한 갱신에 폭 0 — 줄임 없이 다음 갱신에 닫힌다
+          closesWithoutShrink
           buttons={['예', '아니오']}
           onAnswer={(index) => {
             setAsking(false)

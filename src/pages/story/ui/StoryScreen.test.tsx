@@ -782,14 +782,18 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
     expect(스킬창.querySelector('img')?.getAttribute('data-frame')).toBe('370')
     expect(스킬창.textContent).toContain('"행운"')
     expect(스킬창.textContent).toContain('스킬을 획득하였습니다.')
-    // 열림(6 → … → 100) 뒤 OK 로 닫는다 — 키를 받은 그 갱신에 다음 명령(0x8e054 · [mgr+8] = 1), 닫힘(240 → 120 → 60)과 겹친다
-    틀(6)
-    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    // 펼치는 동안(6 → 12 → 24 → 48 → 96 → 100)은 키를 안 받는다 (0x75556)
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByTestId('스킬-보상-창')).toBeTruthy()
-    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
-    틀(2)
+    틀(4)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByTestId('스킬-보상-창')).toBeTruthy()
+    틀(1)
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    // 다 펼친 뒤 OK — 0x8e054 가 0x742a9 로 그 자리에서 치운다(닫힘 애니 없음) · [mgr+8] = 1 로 그 갱신에 다음 명령
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.queryByTestId('스킬-보상-창')).toBeNull()
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
     대사넘기기()
     틀(1)
     expect(onComplete).toHaveBeenCalledWith(

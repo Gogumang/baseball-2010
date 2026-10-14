@@ -233,7 +233,8 @@ export function ShopScreenView({
         <MessageBox text={`!C${blockNotice}`} buttons={['확인']} onAnswer={() => setBlockNotice(null)} />
       )}
       {detail !== null && (
-        <DetailWindow rows={detail.rows} messages={detail.messages} onClose={() => onCloseDetail?.()} />
+        // 장비 구매 확정 0x14a74(0x15084) — 0x741a0(높이 0), 키 0x1d648 이 0x742a9 로 바로 치운다
+        <DetailWindow rows={detail.rows} messages={detail.messages} onClose={() => onCloseDetail?.()} opensAsCommonPopup />
       )}
       {pending === null && blockNotice === null && !isDetailOpen && isNoticeOpen && (
         <MessageBox text={centeredNoticeOf(noticeText)} buttons={['확인']} onAnswer={() => setDismissedNotice(noticeText)} />

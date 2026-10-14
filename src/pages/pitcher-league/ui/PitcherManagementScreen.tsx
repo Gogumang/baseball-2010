@@ -298,6 +298,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
         (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
         ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
+        ⚠️ 여닫기 미반영: 원본은 0x741a0(높이 0x78)이라 펼침(6 → 120) 동안 키를 안 받고, 키 0x19398 은 CLR(0x1942a) · 확인 모두
+           [창+0x215] = 1 — 폭 240 → 120 → 닫힘(`popupWindow` '줄임'). 판이 근사라 웹은 아직 곧바로 연다 · 닫는다.
       */}
       {menu.choice !== null && (
         <div className={styles.choiceLayer}>
@@ -362,7 +364,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
 
       {/* 상세 결과 창(0x872a1) — 타자편 창을 그대로 쓴다 (두 모드 공용, 이름표만 340~343). 화면 기준 원본 좌표 */}
       {menu.detail !== null && (
-        <DetailWindow rows={menu.detail.rows} messages={menu.detail.messages} onClose={menu.closeDetail} />
+        // 훈련 0x17f5c · 휴식 0x18e3c 결과 — 0x741a0(높이 0), 키 0x1b4c4 · 0x1b308 이 0x742a9 로 바로 치운다
+        <DetailWindow rows={menu.detail.rows} messages={menu.detail.messages} onClose={menu.closeDetail} opensAsCommonPopup />
       )}
 
       {menu.question !== null && (

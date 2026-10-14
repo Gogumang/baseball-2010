@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
+import type { PopupCloseKind } from '@/shared/lib/commonWindow/popupWindow'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -9,7 +10,7 @@ import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
   RECORD_PICK_CELL_SIZE, RECORD_PICK_CELLS, RECORD_PICK_DIM_LABEL_COLOR, RECORD_PICK_LABEL_GAP, RECORD_PICK_POPUP_HEIGHT,
-  RECORD_PICK_POPUP_START_HEIGHT, RECORD_PICK_TITLE_ID, nextRecordPickPopupHeightOf, recordPickIconOffsetOf, recordPickLabelXOf,
+  RECORD_PICK_TITLE_ID, recordPickIconOffsetOf, recordPickLabelXOf,
   recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 
@@ -46,6 +47,11 @@ export interface RecordPickPopupProps {
   readonly onConfirm: () => void
   /** 취소 */
   readonly onCancel: () => void
+  /**
+   * 키 콜백이 창을 닫는 길 (`popupWindow` 머리말) — 시즌 0xf5d4 는 0x742a9 를 바로 불러 `'바로'`,
+   * 나리 0x196ec 는 [창+0x215] = 1 이라 `'줄임'`(폭 240 → 120 → 닫힘). `onConfirm` · `onCancel` 은 창이 치워진 때 온다.
+   */
+  readonly closeKind: PopupCloseKind
 }
 
 /**
@@ -53,50 +59,53 @@ export interface RecordPickPopupProps {
  * 키는 잡는 단계에서 다 가져간다(뒤 메뉴가 같은 키를 받지 않게).
  * 판은 공용 창 [0x140005c] 의 띠 판 0x744c4(폭 240 · 높이 0x80, 펼침 6 → 128)이고, 뒤는 그리는 틀마다 검정 단계 5 로 덮는다 —
  * 나리 0xf684 · 시즌 0x3b14 장면이 [창+0x24f] = 0 · [창+0x24c] = 1 을 세운다(`popupDim`).
- * ⚠️ 미확인: 닫힐 때 [+0x215] 가로 줄임을 이 팝업 키 0xf5d4 · 0x196ec 가 타는지는 안 떠서 웹은 곧바로 닫는다.
+ * 닫힘은 키 콜백마다 다르다 (2026-10-14 직접 뜸, `closeKind`): 시즌 0xf5d4 는 CLR(0xf5e2) · 확인(0xf614) 모두 0x742a9 를 바로 불러
+ * 그 자리에서 치우고, 나리 0x196ec 는 CLR(0x196f4~0x196fc) · 확인(0x19758) 모두 [창+0x215] = 1 — 다음 갱신부터 판 폭 240 → 120 → 닫힘.
+ * 줄이는 동안에도 그리기 0x19448 은 돌아 제목 · 칸은 그대로 그려지고(판만 가운데로 준다, 0x744c4) 키는 안 받는다.
+ * ⚠️ 근사: 원본 나리 키는 확인한 그 갱신에 상태를 124 로 바꾸고(0xbcb49) 창은 124 위에서 줄어든다 — 웹은 다 닫힌 뒤 `onConfirm`.
  */
-export function RecordPickPopup({ ariaLabel, testIdPrefix, cells, selected, onToggle, onConfirm, onCancel }: RecordPickPopupProps) {
+export function RecordPickPopup({
+  ariaLabel, testIdPrefix, cells, selected, closeKind, onToggle, onConfirm, onCancel,
+}: RecordPickPopupProps) {
   const latest = useRef({ onToggle, onConfirm, onCancel })
   latest.current = { onToggle, onConfirm, onCancel }
-  /** 그리는 높이 [창+0x212] — 다 펼쳤으면 목표 0x80 */
-  const [height, setHeight] = useState(RECORD_PICK_POPUP_START_HEIGHT)
-  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침을 건너뛰고 다 펼친 판에서 시작한다
+  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 · 줄임을 건너뛴다
   const boxRef = useRef<HTMLDivElement>(null)
+  const [hasNoLayout, setHasNoLayout] = useState(false)
   useLayoutEffect(() => {
-    if ((boxRef.current?.offsetHeight ?? 0) <= 0) setHeight(RECORD_PICK_POPUP_HEIGHT)
+    if ((boxRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
   }, [])
-  const isOpening = height < RECORD_PICK_POPUP_HEIGHT
-  const isOpeningRef = useRef(isOpening)
-  isOpeningRef.current = isOpening
-  useEffect(() => {
-    if (!isOpening) return
-    const timer = window.setTimeout(
-      () => setHeight((current) => nextRecordPickPopupHeightOf(current) ?? RECORD_PICK_POPUP_HEIGHT),
-      millisecondsPerFrame(),
-    )
-    return () => window.clearTimeout(timer)
-  }, [isOpening, height])
+  const motion = usePopupWindowMotion({ targetHeight: RECORD_PICK_POPUP_HEIGHT, skipsMotion: hasNoLayout })
+  const closeKindRef = useRef(closeKind)
+  closeKindRef.current = closeKind
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
-      // 펼치는 동안은 창이 키를 잡기만 하고 보지 않는다 (0x754f8 → 0x75556 갈래)
-      if (isOpeningRef.current) {
+      const isToggle = ['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)
+      const isConfirm = event.key === 'Enter' || event.key === '5'
+      const isCancel = isCancelKey(event.key)
+      // 펼치는 동안 · 줄이는 동안은 창이 키를 잡기만 하고 키 콜백을 부르지 않는다 (0x754f8 → 0x75556 · 0x7558a 갈래)
+      if (!motion.acceptsKeys()) {
+        if (motion.isClosed) return
         event.preventDefault()
         event.stopPropagation()
         return
       }
-      if (isCancelKey(event.key)) current.onCancel()
-      else if (['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)) current.onToggle()
-      else if (event.key === 'Enter' || event.key === '5') current.onConfirm()
+      if (isCancel) motion.close(closeKindRef.current, current.onCancel)
+      else if (isToggle) current.onToggle()
+      else if (isConfirm) motion.close(closeKindRef.current, current.onConfirm)
       else return
       event.preventDefault()
       event.stopPropagation()
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [])
+  }, [motion])
 
   const labelOrigins = useFrameOrigins(IMG_TEXT)
+  if (motion.isClosed) return null
+  /** 판 0x744c4 — 펼치는 동안 높이 [창+0x212], 줄이는 동안 폭 [창+0x210] 을 가로 가운데로 */
+  const box = popupBoxStyleOf(motion, RECORD_PICK_POPUP_HEIGHT)
   const icon = recordPickIconOffsetOf(MODE_ICON_SIZE, MODE_ICON_SIZE)
   const labelTop = RECORD_PICK_CELL_SIZE + RECORD_PICK_LABEL_GAP
   return (
@@ -104,8 +113,8 @@ export function RecordPickPopup({ ariaLabel, testIdPrefix, cells, selected, onTo
       {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
       <div style={{ ...pixel, left: 0, top: 0, width: 240, height: 320, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
       <div className={boxStyles.box} data-testid={`${testIdPrefix}-판`} ref={boxRef}
-        style={{ top: recordPickPopupTopOf(height), transform: 'none', height, padding: 0 }} />
-      {!isOpening && (<>
+        style={{ ...box, top: recordPickPopupTopOf(box.height), transform: 'none', padding: 0 }} />
+      {motion.openingHeight === null && (<>
       {/* "!C보고 싶은 기록을!N선택해주세요" — 두 줄 가운데 */}
       <div className={styles.title} style={{ left: 120 - 0x54, top: 160 - 0x28, width: 0x54 * 2, whiteSpace: 'normal' }}>
         <MarkupText raw={ORIGINAL_MODE_TEXT[RECORD_PICK_TITLE_ID] ?? ''} />

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MissionSelectScreen } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { BATTER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { GRID, NO_MISSION_TEXT, PANEL, cellPositionOf } from '@/pages/mission-select/lib/missionSelectLayout'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 미션 선택 (0x1df08 — P6 2b).
@@ -178,6 +179,29 @@ describe('미션 선택 격자', () => {
       expect(screen.queryByRole('dialog', { name: '이벤트 미션' })).toBeNull()
       expect(screen.getByText('이벤트 미션을 다운로드하세요')).toBeTruthy()
       expect(onSelect).not.toHaveBeenCalled()
+    })
+
+    it('펼치는 동안(6 → … → 100)은 키를 안 받고, 키 0x1dcb0 의 닫힘은 [창+0x215] — 폭 240 → 120 → 닫힘', () => {
+      vi.useFakeTimers()
+      띄우기()
+      칸14로()
+      fireEvent.keyDown(window, { key: 'Enter' })
+      const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+      // 펼치는 동안 → 는 뒤집지 않는다 (0x75556)
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      틀(5)
+      expect(screen.getByRole('button', { name: '미션실행' }).dataset.selected).toBe('true')
+      fireEvent.keyDown(window, { key: 'Escape' })
+      const 판 = () => screen.getByRole('dialog', { name: '이벤트 미션' }).firstElementChild as HTMLElement
+      expect(판().style.width).toBe('240px')
+      틀(1)
+      expect(판().style.width).toBe('120px')
+      expect(판().style.left).toBe('60px')
+      // 줄이는 동안도 키를 안 받는다 (0x7558a)
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      expect(screen.getByRole('button', { name: '미션실행' }).dataset.selected).toBe('true')
+      틀(1)
+      expect(screen.queryByRole('dialog', { name: '이벤트 미션' })).toBeNull()
     })
 
     it('CLR 은 창만 닫고 목록에 남는다 — 고름은 다시 열어도 그대로다 ([this+0xa0])', () => {

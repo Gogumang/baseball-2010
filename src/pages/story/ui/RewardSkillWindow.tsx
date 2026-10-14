@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { MarkupText } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { EVENT_WINDOW_DIM_OPACITY, SCREEN_HEIGHT, SCREEN_WIDTH } from '@/pages/story/lib/eventDialogue'
 
@@ -17,8 +17,10 @@ const IMG_TEXT = './sprites/img_text/frames'
  * 키       0x8e054: OK −5 · '5' · CLR −16 → 0x742a9(창) 닫기 · [mgr+8] = 1 (다음 명령)
  * ```
  * 창 판(0x746cc)은 공용 알림과 같은 띠다 — 웹은 `MessageBox` 의 판 모양을 높이 100 으로 쓴다. 뒤 어둡게는 이벤트 장면의 6/16.
- * 열림은 공용 갱신(0x75556)이 높이를 ×2 로 키운다고 보고 6 에서 시작한다. 닫힘은 공용 알림과 같은 폭 ÷2(240 → 120 → 60).
- * 키를 받은 그 갱신에 [mgr+8] = 1 이라 다음 명령이 닫힘 애니와 겹쳐 돈다 — `onKey` 가 그 갱신, `onClose` 는 다 닫힌 뒤다.
+ * 열림은 공용 갱신 0x75556 이 높이를 6 에서 ×2 로 키우고(6 → 12 → 24 → 48 → 96 → 100), 그동안은 키 콜백을 안 부른다.
+ * **닫힘 애니가 없다** (2026-10-14 직접 뜸): 키 0x8e054 는 0x8e064~0x8e06a 에서 0x742a9 를 바로 부른다 — [창+0x215](폭 ÷2)를
+ * 켜지 않고 [창+9] = 0 으로 그 자리에서 치우며 대기 칸(0x75440)도 안 띄운다. 그 갱신에 [mgr+8] = 1 이라 다음 명령이 돈다 —
+ * `onKey` · `onClose` 둘 다 키를 받은 그 자리다(`popupWindow` 머리말).
  */
 export const REWARD_SKILL_WINDOW = {
   height: 100,
@@ -32,61 +34,25 @@ export const REWARD_SKILL_WINDOW = {
   textTop: SCREEN_HEIGHT / 2 - 5,
 } as const
 
-const OPEN_GROWTH = 2
-const CLOSE_START_WIDTH = SCREEN_WIDTH
-const CLOSE_SHRINK = 2
-const CLOSE_END_WIDTH = 99
-
-type Animation = { readonly kind: '열림'; readonly height: number } | { readonly kind: '닫힘'; readonly width: number } | null
-
 export function RewardSkillWindow({ text, gained, onKey, onClose }: {
   readonly text: string
   readonly gained: boolean
-  /** 키 0x8e054 를 받은 그 갱신 — 0x742a9(닫기 시작) · [mgr+8] = 1 (다음 명령) */
+  /** 키 0x8e054 를 받은 그 갱신 — 0x742a9(그 자리에서 치움) · [mgr+8] = 1 (다음 명령) */
   readonly onKey?: () => void
-  /** 닫힘 애니가 끝났다 — 창이 사라진다 */
+  /** 창이 치워졌다 — 키와 같은 자리(닫힘 애니 없음) */
   readonly onClose: () => void
 }) {
-  const [animation, setAnimation] = useState<Animation>({ kind: '열림', height: REWARD_SKILL_WINDOW.openStartHeight })
-  const animationRef = useRef(animation)
-  animationRef.current = animation
+  const motion = usePopupWindowMotion({ targetHeight: REWARD_SKILL_WINDOW.height })
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const onKeyRef = useRef(onKey)
   onKeyRef.current = onKey
-  const isClosedRef = useRef(false)
 
-  const close = () => {
-    if (animationRef.current?.kind === '닫힘' || isClosedRef.current) return
-    const closing: Animation = { kind: '닫힘', width: CLOSE_START_WIDTH }
-    animationRef.current = closing
-    setAnimation(closing)
+  // 0x8e054 → 0x742a9: [창+0x215] 를 켜지 않고 그 자리에서 치운다 — 펼치는 동안은 키 콜백이 불리지 않는다(0x75556)
+  const close = () => motion.close('바로', () => {
     onKeyRef.current?.()
-  }
-
-  const animationKind = animation?.kind ?? null
-  useEffect(() => {
-    if (animationKind === null) return undefined
-    const timer = window.setInterval(() => {
-      const previous = animationRef.current
-      if (previous === null || isClosedRef.current) return
-      // 틀마다 앞 틀 값에서 잇는다 — 그리기를 기다리지 않고 ref 도 함께 옮긴다
-      const step = (next: Animation) => {
-        animationRef.current = next
-        setAnimation(next)
-      }
-      if (previous.kind === '열림') {
-        const next = previous.height * OPEN_GROWTH
-        return step(next >= REWARD_SKILL_WINDOW.height ? null : { kind: '열림', height: next })
-      }
-      const next = Math.floor(previous.width / CLOSE_SHRINK)
-      step({ kind: '닫힘', width: next })
-      if (next > CLOSE_END_WIDTH) return
-      isClosedRef.current = true
-      onCloseRef.current()
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
-  }, [animationKind])
+    onCloseRef.current()
+  })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -100,24 +66,18 @@ export function RewardSkillWindow({ text, gained, onKey, onClose }: {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   })
 
+  if (motion.isClosed) return null
+
   const frame = gained ? REWARD_SKILL_WINDOW.gainedFrame : REWARD_SKILL_WINDOW.removedFrame
   const imageLeft = Math.trunc((SCREEN_WIDTH - (REWARD_SKILL_WINDOW.frameWidth[frame] ?? 0)) / 2)
   const boxTop = (SCREEN_HEIGHT - REWARD_SKILL_WINDOW.height) / 2
-  const shownHeight = animation?.kind === '열림' ? animation.height : REWARD_SKILL_WINDOW.height
-  const shownWidth = animation?.kind === '닫힘' ? animation.width : SCREEN_WIDTH
-  const isOpening = animation?.kind === '열림'
+  const isOpening = motion.openingHeight !== null
 
   return (
     <div className={boxStyles.dim} role="dialog" aria-label="스킬 보상" data-testid="스킬-보상-창"
       style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }} onClick={close}>
       <div className={boxStyles.box}
-        style={{
-          height: shownHeight,
-          padding: 0,
-          left: Math.floor((SCREEN_WIDTH - shownWidth) / 2),
-          width: shownWidth,
-          overflow: 'hidden',
-        }}>
+        style={{ ...popupBoxStyleOf(motion, REWARD_SKILL_WINDOW.height), padding: 0, overflow: 'hidden' }}>
         {/* 펼치는 동안에는 안을 안 그린다 (0x7479c) */}
         <div style={{ visibility: isOpening ? 'hidden' : undefined }}>
           <img src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`} alt="" data-frame={frame}

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { MarkupText } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import { TITLE_WINDOW, titleWindowLinesOf } from '@/widgets/title-window/lib/titleWindow'
@@ -8,7 +8,6 @@ import { TITLE_WINDOW, titleWindowLinesOf } from '@/widgets/title-window/lib/tit
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const OPEN_GROWTH = 2
 
 /**
  * **칭호 팝업** 0x1274c — 그리기 0x1afe8 · 키 0x1b1e4 (`TITLE_WINDOW` 주석).
@@ -28,37 +27,16 @@ export function TitleWindow({ title, onKey, onClose }: {
   /** 창이 치워졌다 — 키와 같은 자리(닫힘 애니 없음) */
   readonly onClose?: () => void
 }) {
-  const [openingHeight, setOpeningHeight] = useState<number | null>(TITLE_WINDOW.openStartHeight)
-  const openingRef = useRef(openingHeight)
-  openingRef.current = openingHeight
+  const motion = usePopupWindowMotion({ targetHeight: TITLE_WINDOW.height })
   const onKeyRef = useRef(onKey)
   onKeyRef.current = onKey
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
-  const [isClosed, setIsClosed] = useState(false)
-  const isClosedRef = useRef(false)
 
-  const close = () => {
-    if (openingRef.current !== null || isClosedRef.current) return
-    isClosedRef.current = true
-    setIsClosed(true)
+  const close = () => motion.close('바로', () => {
     onKeyRef.current?.()
     onCloseRef.current?.()
-  }
-
-  const isOpening = openingHeight !== null
-  useEffect(() => {
-    if (!isOpening) return undefined
-    const timer = window.setInterval(() => {
-      const previous = openingRef.current
-      if (previous === null) return
-      const grown = previous * OPEN_GROWTH
-      const next = grown >= TITLE_WINDOW.height ? null : grown
-      openingRef.current = next
-      setOpeningHeight(next)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
-  }, [isOpening])
+  })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -78,14 +56,15 @@ export function TitleWindow({ title, onKey, onClose }: {
   const textStyle = { position: 'absolute', left: TITLE_WINDOW.textLeft, marginLeft: 0, width: TITLE_WINDOW.textWidth } as const
 
   // 키를 받은 그 자리에서 치운다 — 부르는 쪽이 아직 내리지 않았어도 다시 그리지 않는다
-  if (isClosed) return null
+  if (motion.isClosed) return null
+  const isOpening = motion.openingHeight !== null
 
   return (
     <div className={boxStyles.dim} role="dialog" aria-label="칭호" data-testid="칭호-창"
       style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}>
       <div className={boxStyles.box}
         style={{
-          height: openingHeight ?? TITLE_WINDOW.height,
+          height: motion.openingHeight ?? TITLE_WINDOW.height,
           padding: 0,
           left: 0,
           width: SCREEN_WIDTH,

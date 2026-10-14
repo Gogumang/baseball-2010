@@ -1,6 +1,7 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { CommonPanel, FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import { MessageLineText } from '@/pages/management/ui/StatusValues'
@@ -41,6 +42,9 @@ export interface EvaluationChangeWindowProps {
  * 공용 창은 `0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)` (0x86cd0~0x86d02 직접 뜸) —
  * 정렬 0x11 은 가로·세로 옮김 비트(0x2 · 0x4 · 0x20 · 0x40)가 없어 박스 0 왼쪽 위 그대로, 제목 탭이 서서 위 띠는 안 본다.
  * 창이 떠 있는 동안에도 0x8b5ac 가 틀마다 0x7fbc4 로 앞 say 상자를 그린다(`EvaluationEventPlayer` 가 남긴다) — 창 뒤 어둡게가 그 위를 덮는다.
+ * 여닫기(2026-10-14 직접 뜸 — 0x8d386~0x8d3f0 · 0x754f8): 띄운 쪽이 [창+0x290] = 0 으로 끄고 키 콜백 없이 키 표에 −5 · '5' 를 넣는다.
+ * 그래서 띄운 그림은 펼침 표시([+0x214]) 때문에 글을 안 그리고(0x7479c), 다음 갱신의 첫 갈래(0x7550a~)가 펼침을 끈 뒤 그 갱신에 키 표를 본다.
+ * 키가 [+0x215] 를 세우면 그다음 갱신 첫 갈래가 줄임 없이 0x742a8 · 0x75440 — 창은 키 뒤 한 갱신 더 남는다(`popupWindow` 의 `expands: false`).
  */
 export function EvaluationChangeWindow({ values, goals, year, game, onClose }: EvaluationChangeWindowProps) {
   const modeUiOrigins = useFrameOrigins(MODE_UI)
@@ -49,20 +53,37 @@ export function EvaluationChangeWindow({ values, goals, year, game, onClose }: E
   const layout = evaluationChangeWindowLayoutOf(values, goals)
   const { window: area } = EVALUATION_CHANGE_BOXES
 
+  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 여닫기 틀을 건너뛴다
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const [hasNoLayout, setHasNoLayout] = useState(false)
+  useLayoutEffect(() => {
+    if ((overlayRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
+  }, [])
+  // 0x8d386: 0x741a1(높이 0, 그리기 0x8a361, 키 없음) 뒤 [창+0x290] = 0(0x8d39e~0x8d3a8) · 키 표 −5 · '5' → 0
+  const motion = usePopupWindowMotion({ targetHeight: 0, expands: false, skipsMotion: hasNoLayout })
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const close = () => motion.close('줄임', () => onCloseRef.current())
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Enter' && event.key !== ' ' && event.key !== '5') return
       event.preventDefault()
-      onClose()
+      close()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  })
+
+  if (motion.isClosed) return null
+  // 띄운 그림은 [창+0x214] 라 0x7479c 가 그리기 콜백을 안 부른다 — 뒤 어둡게만
+  const isOpening = motion.openingHeight !== null
 
   return (
     // 뒤 어둡게 — 이벤트 장면의 창은 떠 있는 그리기마다 검정 6/16 (0x746cc, `EVENT_WINDOW_DIM_OPACITY`)
-    <div className={windowStyles.overlay} data-testid="경기-평가-변화-창" role="dialog" aria-label="경기 평가 변화" onClick={onClose}
-      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
+    <div className={windowStyles.overlay} data-testid="경기-평가-변화-창" role="dialog" aria-label="경기 평가 변화" onClick={close}
+      ref={overlayRef} style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
+      <div style={{ visibility: isOpening ? 'hidden' : undefined }}>
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
         <filter id={navyFilterId} colorInterpolationFilters="sRGB">
           {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색 — 올해의 목표 창과 같은 1차식 */}
@@ -93,6 +114,7 @@ export function EvaluationChangeWindow({ values, goals, year, game, onClose }: E
         <img key={`n${index}`} className={windowStyles.layer} src={`${NUM}/${pad(piece.frame)}.png`} alt=""
           style={{ left: piece.x, top: piece.y }} />
       ))}
+      </div>
     </div>
   )
 }

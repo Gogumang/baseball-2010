@@ -74,7 +74,7 @@ export function NariRecordPickPopup({ onChoose, onCancel }: NariRecordPickPopupP
   /** [장면+0x166] — 팝업을 열 때 0 (130d4~130dc) */
   const [pick, setPick] = useState<RecordRoomPick>(RECORD_ROOM_PICK.개인기록)
   return (
-    <RecordPickPopup ariaLabel="기록실" testIdPrefix="기록실" selected={pick}
+    <RecordPickPopup ariaLabel="기록실" testIdPrefix="기록실" selected={pick} closeKind="줄임"
       cells={[
         { label: RECORD_ROOM_PICK_LABELS[0], labelFrame: RECORD_ROOM_PICK_LABEL_FRAMES[0] },
         { label: RECORD_ROOM_PICK_LABELS[1], labelFrame: RECORD_ROOM_PICK_LABEL_FRAMES[1] },
