@@ -26,6 +26,7 @@ import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface HomeRunDerbyScreenProps {
   /**
@@ -123,6 +124,8 @@ export function HomeRunDerbyScreen({
   })
   const tick = useUpdateCounter()
   const menu = useInGameMenuState()
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+  useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /**
@@ -359,6 +362,8 @@ export function HomeRunDerbyScreen({
               mode={DERBY_MODE}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onExit}

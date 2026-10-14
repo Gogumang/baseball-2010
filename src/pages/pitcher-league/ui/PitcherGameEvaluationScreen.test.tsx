@@ -21,11 +21,17 @@ const 다찍기 = () => act(() => {
   vi.advanceTimersByTime(200 * millisecondsPerFrame())
 })
 
+/** 116 이 선 틀 — 114(평가 이벤트)는 다음 틀에 들어선다(116 진입 끝 12bb6~12bbe 의 0xbcb49) */
+const 한틀 = () => act(() => {
+  vi.advanceTimersByTime(millisecondsPerFrame())
+})
+
 const 경기: PitcherLastGame = { decisionCode: 1, outs: 18, runs: 1, strikeouts: 5, managerCommentIndex: 2 }
 
 describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
   it('밑그림은 공 무늬 → 상태판 → 머리띠 — 근사 창(PixelScreen)이 아니다', () => {
     const { container } = render(<PitcherGameEvaluationScreen career={createPitcherCareer('테스터')} lastGame={경기} onConfirm={vi.fn()} />)
+    한틀()
     expect(screen.getByTestId('바탕-공무늬')).toBeTruthy()
     // 상태판 이름 칸
     expect(container.textContent).toContain('테스터')
@@ -34,6 +40,7 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
   it('0x8b5ac 덧그림 — 인기도 변화 막대가 틀마다 한 줄씩 오른다 (선발 d 12: 6 → 30 줄)', () => {
     render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 0, popularityChange: 6, reputationChange: 0 } }}
       lastGame={경기} onConfirm={vi.fn()} />)
+    한틀()
     const 막대 = screen.getByTestId('인기도-막대')
     expect(막대.getAttribute('data-rows')).toBe('0')
     act(() => {
@@ -46,6 +53,7 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
 
   it('감독 초상화 바닥은 관리 화면 쪽 135 — 0x7fbc4 가 프레임 10 박스 0 의 y + h − 2 를 0x7f998 에 (아래 여백 320 − 135)', () => {
     const { container } = render(<PitcherGameEvaluationScreen career={createPitcherCareer('테스터')} lastGame={경기} onConfirm={vi.fn()} />)
+    한틀()
     expect(container.querySelector('[style*="bottom: 185px"]')).not.toBeNull()
   })
 
@@ -53,6 +61,7 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
     const onConfirm = vi.fn()
     render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 3, popularityChange: 0, reputationChange: -2 } }}
       lastGame={경기} onConfirm={onConfirm} />)
+    한틀()
     다찍기()
     const 대사 = screen.getByRole('group', { name: '경기 평가' }).textContent ?? ''
     expect(대사).toContain('6.0이닝 5삼진 1실점')
@@ -88,6 +97,7 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
       lastEvaluation: { moraleChange: 3, popularityChange: 0, reputationChange: -2 },
     }
     render(<PitcherGameEvaluationScreen career={career} lastGame={경기} onConfirm={onConfirm} />)
+    한틀()
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
       다찍기()
       fireEvent.keyDown(window, { key: 'Enter' })

@@ -78,6 +78,7 @@ import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/Settlement
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { MAXIMUM_GAME_POINT, STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
@@ -231,6 +232,8 @@ export function PitcherGameScreen({
   /** 구질 · 조준 · 게이지 그림 재료 — 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
   const inputOverlayRef = usePitchInputOverlayRef()
   const menu = useInGameMenuState()
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+  useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 일시정지 팝업이 떠 있는가 — 경기 중 메뉴, 또는 그 하위 4 [조작방법] 뷰어 (둘 다 0x741a0 팝업이라 경기 키·갱신이 멈춘다) */
@@ -956,6 +959,8 @@ export function PitcherGameScreen({
               mode={PITCHER_CAREER_MODE}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onQuit}

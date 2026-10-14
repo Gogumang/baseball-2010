@@ -50,6 +50,7 @@ import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
@@ -166,6 +167,8 @@ export function GameScreen({
   onRecordAlertSceneChange,
 }: GameScreenProps) {
   const menu = useInGameMenuState()
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+  useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
@@ -466,6 +469,8 @@ export function GameScreen({
               mode={BATTER_CAREER_MODE}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onQuit}

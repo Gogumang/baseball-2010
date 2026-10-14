@@ -43,13 +43,18 @@ export interface RecordPickPopupProps {
   readonly selected: 0 | 1
   /** 좌·우(−3 · −4) · '4' · '6' */
   readonly onToggle: () => void
-  /** 확인(−5 · '5') */
+  /**
+   * 확인(−5 · '5'). `'바로'` 면 창이 치워진 그 자리, `'줄임'` 이면 키를 받은 **다음 갱신** — 나리 0x196ec 는 확인한 그 자리에서
+   * 0xbcb49(장면+0x18, 124) 를 걸어(0x19736~0x19750) 다음 틀 머리(0x1cdec 의 1ce00)에 124 가 들어서고, 창은 그 위에서 줄어든다
+   */
   readonly onConfirm: () => void
-  /** 취소 */
+  /** 취소 — 창이 치워진 때 (나리 CLR 0x196f4 는 [창+0x215] 만 쓰고 상태는 그대로다) */
   readonly onCancel: () => void
+  /** 확인 뒤 창이 다 치워졌다 (`'줄임'` 에서 아래 화면이 이미 갈린 뒤) */
+  readonly onClosed?: () => void
   /**
    * 키 콜백이 창을 닫는 길 (`popupWindow` 머리말) — 시즌 0xf5d4 는 0x742a9 를 바로 불러 `'바로'`,
-   * 나리 0x196ec 는 [창+0x215] = 1 이라 `'줄임'`(폭 240 → 120 → 닫힘). `onConfirm` · `onCancel` 은 창이 치워진 때 온다.
+   * 나리 0x196ec 는 [창+0x215] = 1 이라 `'줄임'`(폭 240 → 120 → 닫힘).
    */
   readonly closeKind: PopupCloseKind
 }
@@ -62,13 +67,13 @@ export interface RecordPickPopupProps {
  * 닫힘은 키 콜백마다 다르다 (2026-10-14 직접 뜸, `closeKind`): 시즌 0xf5d4 는 CLR(0xf5e2) · 확인(0xf614) 모두 0x742a9 를 바로 불러
  * 그 자리에서 치우고, 나리 0x196ec 는 CLR(0x196f4~0x196fc) · 확인(0x19758) 모두 [창+0x215] = 1 — 다음 갱신부터 판 폭 240 → 120 → 닫힘.
  * 줄이는 동안에도 그리기 0x19448 은 돌아 제목 · 칸은 그대로 그려지고(판만 가운데로 준다, 0x744c4) 키는 안 받는다.
- * ⚠️ 근사: 원본 나리 키는 확인한 그 갱신에 상태를 124 로 바꾸고(0xbcb49) 창은 124 위에서 줄어든다 — 웹은 다 닫힌 뒤 `onConfirm`.
+ * 나리 확인은 원본 차례대로 키를 받은 다음 갱신에 `onConfirm`(124 가 들어선다)이고 창은 그 위에서 줄어든 뒤 `onClosed`.
  */
 export function RecordPickPopup({
-  ariaLabel, testIdPrefix, cells, selected, closeKind, onToggle, onConfirm, onCancel,
+  ariaLabel, testIdPrefix, cells, selected, closeKind, onToggle, onConfirm, onCancel, onClosed,
 }: RecordPickPopupProps) {
-  const latest = useRef({ onToggle, onConfirm, onCancel })
-  latest.current = { onToggle, onConfirm, onCancel }
+  const latest = useRef({ onToggle, onConfirm, onCancel, onClosed })
+  latest.current = { onToggle, onConfirm, onCancel, onClosed }
   // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 · 줄임을 건너뛴다
   const boxRef = useRef<HTMLDivElement>(null)
   const [hasNoLayout, setHasNoLayout] = useState(false)
@@ -78,6 +83,11 @@ export function RecordPickPopup({
   const motion = usePopupWindowMotion({ targetHeight: RECORD_PICK_POPUP_HEIGHT, skipsMotion: hasNoLayout })
   const closeKindRef = useRef(closeKind)
   closeKindRef.current = closeKind
+  /** 확인 — `'바로'` 는 치운 자리에서, `'줄임'` 은 다음 갱신에 `onConfirm` · 다 닫히면 `onClosed` */
+  const confirm = () => {
+    if (closeKindRef.current === '바로') return motion.close('바로', () => latest.current.onConfirm())
+    return motion.close('줄임', () => latest.current.onClosed?.(), () => latest.current.onConfirm())
+  }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
@@ -93,7 +103,7 @@ export function RecordPickPopup({
       }
       if (isCancel) motion.close(closeKindRef.current, current.onCancel)
       else if (isToggle) current.onToggle()
-      else if (isConfirm) motion.close(closeKindRef.current, current.onConfirm)
+      else if (isConfirm) confirm()
       else return
       event.preventDefault()
       event.stopPropagation()
@@ -132,7 +142,11 @@ export function RecordPickPopup({
               left: geometry.x, top: geometry.y, width: RECORD_PICK_CELL_SIZE, height: labelTop + (labelSize?.height ?? 0),
               background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto', overflow: 'visible',
             }}
-            onClick={() => (isOn ? onConfirm() : onToggle())}>
+            onClick={() => {
+              if (!motion.acceptsKeys()) return
+              if (isOn) confirm()
+              else onToggle()
+            }}>
             <img alt="" data-testid={`${testIdPrefix}-칸-${index}`}
               src={isOn ? selectedModeIconOf(geometry.iconFrame) : modeIconOf(geometry.iconFrame)}
               style={{ ...pixel, left: icon.x, top: icon.y }} />

@@ -81,6 +81,7 @@ import {
   teamMatchupCardsOf,
   teamPitcherSideStageOf,
 } from '@/pages/team-game/lib/teamMatchupCards'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -238,6 +239,10 @@ export function TeamGameScreen({
   /** 0x10 에서 확정한 조준점 `+0x10b8` — 게이지(0x11) 뒤 놓을 때 쓴다 */
   const [aim, setAim] = useState<WorldPoint | null>(null)
   const menu = useInGameMenuState()
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+  useMarksGameScene()
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+  useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 구질 · 조준 · 게이지 그림 재료 — 사람 수비 타석 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
@@ -1233,6 +1238,8 @@ export function TeamGameScreen({
               mode={options.mode}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onQuit}

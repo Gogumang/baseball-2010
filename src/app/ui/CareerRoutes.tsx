@@ -221,6 +221,8 @@ function CareerScreens({
           onContinue={actions.confirmGameResult}
           // 116(0x11e0c) → 114 평가 대화 0x8b5ac: 공 무늬 · 상태판([이벤트+0xb] = 1 — 0x8a71e) · 머리띠
           underlay={<NariEventUnderlay career={career} isPreviousGame />}
+          // 116 이 선 첫 틀 — 그림 0x11e0c(머리띠 · 상태판 0x7d34c(gfx, 0)). 114 는 다음 틀
+          entryUnderlay={<NariEventUnderlay career={career} />}
           // 정산 0x4ea0c 를 막 지났을 때만 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           {...(screen.settlementInning === undefined
             ? {}

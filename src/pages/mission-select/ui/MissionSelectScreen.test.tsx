@@ -175,6 +175,8 @@ describe('미션 선택 격자', () => {
 
       fireEvent.keyDown(window, { key: 'Enter' })
       애니끝내기()
+      // 하위 3 은 창이 닫힌 다음 갱신의 키 함수 0x1daa4 가 본다(0x1dc00 → 0x74ef5)
+      애니끝내기()
 
       expect(screen.queryByRole('dialog', { name: '이벤트 미션' })).toBeNull()
       expect(screen.getByText('이벤트 미션을 다운로드하세요')).toBeTruthy()
@@ -204,6 +206,24 @@ describe('미션 선택 격자', () => {
       expect(screen.queryByRole('dialog', { name: '이벤트 미션' })).toBeNull()
     })
 
+    it('하위 상태는 키를 받은 갱신에 바뀌지만 키 함수 0x1daa4 는 창이 다 닫힌 다음 갱신에 본다 — 알림은 그때 뜬다 (0x1dd18 · 1eaac)', () => {
+      vi.useFakeTimers()
+      띄우기()
+      칸14로()
+      fireEvent.keyDown(window, { key: 'Enter' })
+      애니끝내기()
+      const 틀 = () => act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      fireEvent.keyDown(window, { key: 'Enter' })
+      틀()
+      expect(screen.getByRole('dialog', { name: '이벤트 미션' })).toBeTruthy()
+      틀()
+      // 닫힌 갱신 — 키 함수는 아직(0x754f9 가 1)
+      expect(screen.queryByRole('dialog', { name: '이벤트 미션' })).toBeNull()
+      expect(screen.queryByText('이벤트 미션을 다운로드하세요')).toBeNull()
+      틀()
+      expect(screen.getByText('이벤트 미션을 다운로드하세요')).toBeTruthy()
+    })
+
     it('CLR 은 창만 닫고 목록에 남는다 — 고름은 다시 열어도 그대로다 ([this+0xa0])', () => {
       vi.useFakeTimers()
       const onBack = vi.fn()
@@ -213,6 +233,7 @@ describe('미션 선택 격자', () => {
       애니끝내기()
       fireEvent.keyDown(window, { key: 'ArrowRight' })
       fireEvent.keyDown(window, { key: 'Escape' })
+      애니끝내기()
       애니끝내기()
 
       expect(screen.queryByRole('dialog', { name: '이벤트 미션' })).toBeNull()
