@@ -9,6 +9,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import * as styles from '@/pages/mission-play/ui/MissionPlayScreen.css'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -47,6 +48,12 @@ interface MissionPlayScreenProps {
   readonly batterSkillIds?: readonly number[]
   /** 타자 레코드 칸 0xb6394 (투수 스킬 31) — `missionStageBatterOf().recordSlot`. 안 넘기면 0 */
   readonly batterRecordSlot?: number
+  /**
+   * 지금 타자 레코드 +0xb 의 폼 · 피부 (`missionStageBatterOf().look`) — 타석 교대 0x47d98~0x47dd6 이 그림 적재 0x78ab0 에
+   * 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 손 0xb63c0 을 넘기고, 0x47d58~0x47d70 이 같은 손을 장면 +0x17e1(배치 side)에
+   * 쓴다(모드 갈림 없음 — 미션 6 도 같다). 손은 스윙 판정 0xab214 · CPU 투구도 본다. 안 넘기면 폼 0(타격형 · 우타) · 피부 0
+   */
+  readonly batterLook?: { readonly form: number; readonly skinIndex: number }
   readonly pitcherAbility: PitcherAbility
   /** 마투수 미션의 상대. 일반 투수면 null */
   readonly opponent: AcePlayer | null
@@ -155,6 +162,7 @@ export function MissionPlayScreen({
   batterName,
   batterSkillIds,
   batterRecordSlot,
+  batterLook,
   pitcherAbility,
   opponent,
   pitcherEquipmentNibbles,
@@ -334,6 +342,10 @@ export function MissionPlayScreen({
             batterAbility={ability}
             batterSkillIds={batterSkillIds}
             batterRecordSlot={batterRecordSlot}
+            // 타자 그림 · 손 — 레코드 +0xb (사람 칸에 마타자는 없어 손 = 폼 & 1, 0xb63c0)
+            batterForm={batterLook?.form ?? 0}
+            batterSkinIndex={batterLook?.skinIndex ?? 0}
+            batterHand={batterSideOfForm(batterLook?.form ?? 0)}
             // 판정 묶음 '미션' = 모드 6(타자 미션) — 공격(사람) +100 (0xab5c0)
             swingMode="미션"
             // 미션은 나리 타자편 저장의 선수(등록 타자 rec[0xa] 0xa0 — 비트7)가 친다. 내 선수 보너스는 모드 3·4 에서만
@@ -415,7 +427,7 @@ export function MissionPlayScreen({
 
           {/*
             0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 투수·타자 소개 판 0x44944 (모드 검사 없음). 사람이 치므로 타자 PLAYER · 투수 COM.
-            ⚠️ 웹 미션 상태에 없는 칸(이름·기록·좌우 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 우타(0) 배치.
+            ⚠️ 웹 미션 상태에 없는 칸(이름·기록 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 레코드 +0xb 의 0xb63c0.
           */}
           {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
           {isSubstituting && substitutionScene !== null && (
@@ -428,7 +440,7 @@ export function MissionPlayScreen({
 
           {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards
-              batterHand={0}
+              batterHand={batterSideOfForm(batterLook?.form ?? 0)}
               pitcher={{ isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) }}
               batter={{ isComputer: false, ...(batterName === undefined ? {} : { name: batterName }) }}
             />

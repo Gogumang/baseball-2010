@@ -58,9 +58,23 @@ describe('명예 타자 — 0x1fc20 의 +0xa6 ≥ 0 갈래 = 0x1f640 명전 기�
   })
 
   it('옛 저장은 남긴 장비 얹은 능력치(없으면 기본)로 — 스킬 없음, 필살 0', () => {
-    const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, ...옛기록 } = collection.hallOfFame[0]
+    const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, look: _l, ...옛기록 } = collection.hallOfFame[0]
     expect(modeBatterOfHallOfFame(옛기록)).toEqual({ ability: 옛기록.equippedAbility, skillIds: [], specialSwingNumber: 0 })
     const { equippedAbility: _a, ...더옛기록 } = 옛기록
     expect(modeBatterOfHallOfFame(더옛기록).ability).toEqual(나리.ability)
+  })
+
+  it('생김새 — 레코드 +0xb (타석 교대 0x47d98~0x47dd6 의 폼 · 피부 · 손): 명전 기록은 등록이 옮긴 +0xb, 옛 기록 · 선수 없음은 모른다', () => {
+    expect(modeBatterOf(null).look).toBeUndefined()
+    expect(modeBatterOf(나리).look).toEqual({ form: 나리.battingTypeIndex * 2 + 나리.battingSide, skinIndex: 나리.skinIndex })
+    const famer = collection.hallOfFame[0]
+    if (famer.look !== undefined) {
+      expect(modeBatterOfHallOfFame(famer).look).toEqual({
+        form: famer.look.typeIndex * 2 + famer.look.handIndex,
+        skinIndex: famer.look.skinIndex,
+      })
+    }
+    const { look: _l, ...옛기록 } = famer
+    expect(modeBatterOfHallOfFame(옛기록).look).toBeUndefined()
   })
 })

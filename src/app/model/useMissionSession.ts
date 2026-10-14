@@ -93,7 +93,7 @@ import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
   isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame,
 } from '@/app/model/modePitcher'
-import { hallOfFameModeBatterOf } from '@/app/model/modeBatter'
+import { hallOfFameModeBatterOf, type ModeBatterLook } from '@/app/model/modeBatter'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
@@ -2385,7 +2385,12 @@ export function missionHumanBatterOf(
  */
 export function missionStageBatterOf(
   run: MissionRun,
-  missionBatter: { readonly ability: BatterAbility; readonly skillIds: readonly number[]; readonly specialSwingNumber?: number },
+  missionBatter: {
+    readonly ability: BatterAbility
+    readonly skillIds: readonly number[]
+    readonly specialSwingNumber?: number
+    readonly look?: ModeBatterLook
+  },
 ): {
   readonly ability: BatterAbility
   readonly skillIds: readonly number[]
@@ -2393,6 +2398,11 @@ export function missionStageBatterOf(
   readonly name?: string
   /** 타자 레코드 칸 0xb6394 — 스윙 0xab214 의 투수 스킬 31 (`missionHumanRecordSlotOf`) */
   readonly recordSlot: number
+  /**
+   * 타석 교대 0x47d98~0x47dd6 이 지금 타자 `0xae89c(공격 팀)` 레코드 +0xb 에서 싣는 그림 · 손 재료 — 폼 `rec[0xb] >> 4` ·
+   * 피부 `(rec[0xb] >> 2) & 3` (손 0xb63c0 = 폼 & 1 — 사람 칸에 마타자는 없다). 모르면(옛 명전 기록) 없다
+   */
+  readonly look?: ModeBatterLook
 } {
   const batter = missionHumanBatterOf(run)
   // 투수 미션은 사람이 안 친다 — 0
@@ -2403,6 +2413,7 @@ export function missionStageBatterOf(
       skillIds: missionBatter.skillIds,
       specialSwingNumber: missionBatter.specialSwingNumber ?? 0,
       recordSlot,
+      ...(missionBatter.look === undefined ? {} : { look: missionBatter.look }),
     }
   }
   return {
@@ -2411,6 +2422,8 @@ export function missionStageBatterOf(
     specialSwingNumber: 0,
     name: batter.row.name,
     recordSlot,
+    // 마스터 줄 +0xb (`RosterPlayer.profile`)
+    look: { form: (batter.row.profile >> 4) & 0xf, skinIndex: (batter.row.profile >> 2) & 3 },
   }
 }
 

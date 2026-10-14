@@ -1583,6 +1583,14 @@ describe('타자 미션 타석 화면의 타자 — 미션 타자 차례가 아�
     expect(stage.name).toBe(row.name)
     expect(stage.specialSwingNumber).toBe(0)
     expect(stage.skillIds).not.toContain(22)
+    // 타석 교대 0x47d98~0x47dd6 — 그 줄 +0xb 의 폼 `>> 4` · 피부 `(>> 2) & 3`
+    expect(stage.look).toEqual({ form: (row.profile >> 4) & 0xf, skinIndex: (row.profile >> 2) & 3 })
+  })
+
+  it('미션 타자의 생김새(나리 저장 · 명전 기록 +0xb)를 그대로 싣는다', () => {
+    const 빠르게 = MISSIONS.find((m) => m.side === '타자' && m.id === 10)!
+    const look = { form: 3, skinIndex: 2 }
+    expect(missionStageBatterOf(startMission(빠르게), { ...미션타자, look }).look).toEqual(look)
   })
 })
 
