@@ -189,6 +189,7 @@ import {
   passesRecordTeamGate,
   pinchHitHomeRunRecordIdsOf,
   recordGamePointsOf,
+  strikeoutCallRecordIdsOf,
   strikeoutRecordIdsOf,
   threePitchInningRecordIdsOf,
 } from '@/entities/game/model/gameRecords'
@@ -1533,13 +1534,14 @@ function withOurDefenseRecords(
   const moundStrikeoutCombo = strikeout ? tally.moundStrikeoutCombo + 1 : runnerPlay ? tally.moundStrikeoutCombo : 0
   const outs = play.outsBefore + outsInPlay
   const recordIds = [
-    ...(strikeout
+    // 종류 5 정산은 0xa7998(18~23)을 안 부르고(a8d38), 16/17(삼진 콜)은 판 정산보다 먼저라 판을 먹일 때(`applyTeamArrival`)
+    // 24 앞에 이미 줬다
+    ...(strikeout && !runnerPlay
       ? strikeoutRecordIdsOf({
           pitches: play.atBatPitches,
           balls: play.balls,
-          // 종류 5 정산은 0xa7998(18~23)을 안 부른다(a8d38) — 콤보 · 한 투수 삼진 칸이 어느 값에도 안 걸리게 넘긴다
-          comboCount: runnerPlay ? NO_STRIKEOUT_STEP : moundStrikeoutCombo,
-          pitcherStrikeouts: runnerPlay ? NO_STRIKEOUT_STEP : moundStrikeouts,
+          comboCount: moundStrikeoutCombo,
+          pitcherStrikeouts: moundStrikeouts,
         })
       : []),
     ...laserThrowOutRecordOf({
@@ -1568,9 +1570,6 @@ function withOurDefenseRecords(
     false,
   )
 }
-
-/** `strikeoutRecordIdsOf` 의 콤보 · 한 투수 삼진 칸이 어느 단계에도 안 걸리는 값 — 0xa7998 을 안 부르는 정산 */
-const NO_STRIKEOUT_STEP = -1
 
 /**
  * **경기 끝 기록** — `0xa7de8`(0x4ea0c 가 부른다): 37~39 점수차 승 · 28~31 완투 계열. 둘 다 0xa77f0 의 방향 게이트는
@@ -3910,7 +3909,14 @@ function applyTeamArrival(progress: TeamGameProgress, play: PitchArrivalPlay, hu
   let next = settles
     ? settledApply.progress
     : withRunnerOnlyAdvance(base, play.result.advance, humanSide, play.result.runnerFates, false).progress
-  next = withGameRecords(next, play.recordIds, humanOffense)
+  // 삼진 + 도루 판(종류 5) — 삼진 콜 0xa7c4c(16 삼구 · 17 풀카운트)는 정산 0xa8024 보다 **먼저** 났다(정산이 그 콜이 넣은 사건 5 를
+  // 세어 [sp+0x20] 으로 쓴다, a8d00). 그래서 알림 차례는 16/17 → 24(a83de)다 — 타석 결과 쪽(`withOurDefenseRecords` 의
+  // `stealPlayOuts`)은 다시 안 준다. 16/17 은 수비 계열이라 사람 수비에서만 게이트를 지난다
+  const strikeoutCall =
+    play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
+      ? strikeoutCallRecordIdsOf({ pitches: progress.recordTally.atBatPitches, balls: progress.atBat.balls })
+      : []
+  next = withGameRecords(next, [...strikeoutCall, ...play.recordIds], humanOffense)
   next = withLeagueStolenBases(next, progress, play, humanOffense)
   // 삼진이 함께 선 도루 판은 정산이 삼진 길에서 한 번에 돈다 (`stealPlayWithStrikeoutOf`)
   if (play.kind === 5 && progress.atBat.outcome?.kind !== '삼진') {

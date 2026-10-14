@@ -744,6 +744,27 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
     }
     expect(found).toBeGreaterThan(0)
   })
+
+  it('기록 알림 차례 — 삼진 콜 0xa7c4c 의 16/17 이 정산 a83de 의 24 보다 먼저, 18~23 은 없다 (a8d38)', () => {
+    let found = 0
+    for (let seed = 1; seed <= 3000 && found < 2; seed += 1) {
+      const { progress } = 시작({}, seed)
+      const 풀카운트 = {
+        ...progress,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+        atBat: { ...progress.atBat, balls: 3, strikes: 2 },
+      }
+      const pitch = { typeNumber: 첫구질(풀카운트), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 }
+      const next = throwPitch(풀카운트, pitch, createSeededRandom(seed * 7919))
+      const play = next.lastArrivalPlay
+      if (play?.kind !== 5 || next.opponentOrderIndex === 풀카운트.opponentOrderIndex) continue
+      found += 1
+      const added = next.recordIds.slice(풀카운트.recordIds.length)
+      const expected = [17, ...(play.result.caughtFrom.length > 0 ? [24] : [])]
+      expect(added.filter((id) => id === 17 || id === 24 || (id >= 18 && id <= 23))).toEqual(expected)
+    }
+    expect(found).toBeGreaterThan(0)
+  }, 30_000)
 })
 
 describe('자동으로 넘긴 상대 간이 타석의 출루 허용 state[0x88] — 정산 주자 목록 마지막 원소 (0xc1054 · 0xc1170 · c1918)', () => {
