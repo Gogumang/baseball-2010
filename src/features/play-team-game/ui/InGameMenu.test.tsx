@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { inGameMenuLayoutOf, inGameMenuSlideAt } from '@/features/play-team-game/model/inGameMenu'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 
 afterEach(cleanup)
 
@@ -247,5 +249,97 @@ describe('경기 중 메뉴 — 창 뒤 어둡게 (0x741a0 · 0x746cc, 경기 �
     fireEvent.click(칸('재도전'))
     expect(screen.queryByTestId('경기-메뉴-어둡게')).toBeNull()
     expect(screen.getByRole('dialog').style.background).toBe(`rgba(0, 0, 0, ${6 / 16})`)
+  })
+})
+
+describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-14 직접 뜸)', () => {
+  function 높이를_잴_수_있게(height: number) {
+    const 원래 = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => height })
+    return () => {
+      if (원래 === undefined) Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight')
+      else Object.defineProperty(HTMLElement.prototype, 'offsetHeight', 원래)
+    }
+  }
+  const 틀 = (n = 1) => act(() => vi.advanceTimersByTime(millisecondsPerFrame() * n))
+  const 판 = () => screen.queryByTestId('경기-메뉴-판')
+
+  /** 여는 곳 흉내 — `useInGameMenuState` 를 그대로 쓴다 */
+  function 여는곳({ onQuit, onRestart }: { readonly onQuit?: () => void; readonly onRestart?: () => void }) {
+    const menu = useInGameMenuState()
+    return (
+      <>
+        <button type="button" onClick={menu.toggle}>별표</button>
+        <span data-testid="열림">{String(menu.isOpen)}</span>
+        {menu.isOpen && (
+          <InGameMenu mode={6} cursor={menu.cursor} onCursorChange={menu.setCursor} slidesIn={menu.slidesIn}
+            opening={menu.opening} bindCloser={menu.bindCloser} onContinue={menu.close}
+            {...(onQuit === undefined ? {} : { onQuit })} {...(onRestart === undefined ? {} : { onRestart })} />
+        )}
+      </>
+    )
+  }
+  const 열림 = () => screen.getByTestId('열림').textContent
+
+  let 되돌리기: () => void = () => {}
+  afterEach(() => {
+    되돌리기()
+    vi.useRealTimers()
+  })
+
+  it("'*' 로 연 창은 [+0x290] = 0 — 연 그림은 펼침이라 판이 없고, 다음 갱신부터 그린다 (0x49936 · 0x7550a)", () => {
+    vi.useFakeTimers()
+    되돌리기 = 높이를_잴_수_있게(320)
+    render(<여는곳 />)
+    fireEvent.click(screen.getByText('별표'))
+    expect(판()).toBeNull()
+    틀()
+    expect(판()).not.toBeNull()
+  })
+
+  it("'*' 로 연 창의 계속 · CLR 은 한 갱신 뒤에 닫힌다 — 그동안 메뉴가 그대로 남는다 (0x3c1a8 · 7550a~75552)", () => {
+    vi.useFakeTimers()
+    되돌리기 = 높이를_잴_수_있게(320)
+    render(<여는곳 />)
+    fireEvent.click(screen.getByText('별표'))
+    틀()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(열림()).toBe('true')
+    expect(판()).not.toBeNull()
+    // 닫히는 동안 키는 안 본다
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(고른칸()?.getAttribute('aria-label')).toBe('계속하기')
+    틀()
+    expect(열림()).toBe('false')
+  })
+
+  it('질문은 메뉴 창이 닫힌 갱신에 뜨고, [아니오] 뒤 다시 뜬 메뉴는 한 갱신 펼침 · 닫힘은 두 갱신 줄임이다 (0x7442d · 0x75440)', () => {
+    vi.useFakeTimers()
+    되돌리기 = 높이를_잴_수_있게(320)
+    render(<여는곳 onRestart={vi.fn()} />)
+    fireEvent.click(screen.getByText('별표'))
+    틀()
+    fireEvent.click(칸('재도전'))
+    // 질문은 대기 칸 — 메뉴가 한 갱신 더 남는다
+    expect(screen.queryByRole('button', { name: '아니오' })).toBeNull()
+    expect(판()).not.toBeNull()
+    틀()
+    expect(판()).toBeNull()
+    // 질문 창 펼침(10 → 20 → … → 목표) 뒤 [아니오]
+    틀(6)
+    fireEvent.click(아니오())
+    // 경기 장면 [창+0x24e] = 1 — 줄임 없이 다음 갱신에 닫힌다
+    틀()
+    expect(screen.queryByRole('button', { name: '아니오' })).toBeNull()
+    // 다시 뜬 메뉴([+0x290] = 1)는 한 갱신 펼침 동안 안 그린다
+    expect(판()).toBeNull()
+    틀()
+    expect(판()).not.toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    틀()
+    expect(열림()).toBe('true')
+    expect(판()).not.toBeNull()
+    틀()
+    expect(열림()).toBe('false')
   })
 })

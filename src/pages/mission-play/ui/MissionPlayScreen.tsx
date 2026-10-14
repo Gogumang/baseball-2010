@@ -482,6 +482,8 @@ export function MissionPlayScreen({
               mode={MISSION_BATTER_MODE}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onGiveUp}

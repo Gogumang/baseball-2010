@@ -962,6 +962,9 @@ export function TeamGameScreen({
             mode={options.mode}
             cursor={menu.cursor}
             onCursorChange={menu.setCursor}
+            slidesIn={menu.slidesIn}
+            opening={menu.opening}
+            bindCloser={menu.bindCloser}
             onContinue={menu.close}
             onQuit={onQuit}
             onOpenHelp={() => {

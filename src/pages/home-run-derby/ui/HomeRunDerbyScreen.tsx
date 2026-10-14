@@ -359,6 +359,8 @@ export function HomeRunDerbyScreen({
               mode={DERBY_MODE}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onExit}

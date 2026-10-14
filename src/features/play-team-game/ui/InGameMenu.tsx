@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -16,6 +16,8 @@ import {
   REPLAY_CONFIRM,
 } from '@/features/play-team-game/model/inGameMenu'
 import type { InGameMenuAction, InGameMenuLayout } from '@/features/play-team-game/model/inGameMenu'
+import type { InGameMenuCloser, InGameMenuOpening } from '@/features/play-team-game/model/useInGameMenuState'
+import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as styles from '@/features/play-team-game/ui/InGameMenu.css'
 
@@ -92,6 +94,10 @@ interface InGameMenuProps {
    * [조작방법]·[설정]에서 돌아오면 거짓(0x44 그대로). 기본 거짓.
    */
   readonly slidesIn?: boolean
+  /** 창이 어떻게 떴는가(`useInGameMenuState` 의 `opening`) — 펼침 · 닫힘 갱신 수가 갈린다. 기본 '별표' */
+  readonly opening?: InGameMenuOpening
+  /** 여는 곳의 닫기(CLR · '*' · 계속)를 창에 맡긴다 (`useInGameMenuState` 의 `bindCloser`) */
+  readonly bindCloser?: (closer: InGameMenuCloser | null) => void
 }
 
 /**
@@ -103,7 +109,8 @@ interface InGameMenuProps {
  * 여는 곳(경기 화면)이 240×320 판 위 층(inset 0)에 놓는다. 마우스 길은 칸 그림 자리의 투명 누름 칸이다.
  *
  * 키(0x3c158 하위 0 → 격자 0x6c031, 1열 · 꼴 0x230 · 숫자키 꼴 2): ↑↓ 세로 감기 · 숫자 d 는 칸 d − 1 로 옮기고 곧바로 OK ·
- * OK 고름. 소리는 없다(0x3c17e~0x3c1fc 에 소리 부름이 없다). CLR·'\*' 닫기는 여는 곳(`useInGameMenuState`)의 몫이다.
+ * OK 고름 · CLR · '\*' 닫기(0x3c1a8). 소리는 없다(0x3c17e~0x3c1fc 에 소리 부름이 없다).
+ * 닫힘은 공용 창의 [+0x215] 갈래다(`PauseWindow`) — 여는 곳은 `useInGameMenuState` 의 `close` 를 쓰고 `bindCloser` 로 창에 맡긴다.
  */
 export function InGameMenu({
   mode,
@@ -119,28 +126,43 @@ export function InGameMenu({
   cursor: initialCursor = 0,
   onCursorChange,
   slidesIn = false,
+  opening = '별표',
+  bindCloser,
 }: InGameMenuProps) {
   const [confirming, setConfirming] = useState<InGameMenuAction | null>(null)
   const actions = inGameMenuOf(mode)
   /** 질문 창에서 돌아와도 같은 메뉴 객체라 커서가 남는다 */
   const [cursor, setCursor] = useState(() => (initialCursor >= 0 && initialCursor < actions.length ? initialCursor : 0))
   const [notice, setNotice] = useState<string | null>(null)
-  /** 그린 횟수 — 밀려 들기 [장면+0x1954] 를 정한다. 돌아온 메뉴는 끝값부터 */
-  const [slideFrame, setSlideFrame] = useState(() => (slidesIn ? 0 : Number.POSITIVE_INFINITY))
-  const slide = Number.isFinite(slideFrame) ? inGameMenuSlideAt(slideFrame) : IN_GAME_MENU_SLIDE_END
+  /** 일시정지 창 한 벌 — 질문 [아니오] · 알림 [확인] 이 창을 새로 띄울 때(0x75440 → 0x741a0) 늘린다 */
+  const [pauseWindow, setPauseWindow] = useState<{ readonly serial: number; readonly opening: InGameMenuOpening; readonly slidesIn: boolean }>(
+    () => ({ serial: 0, opening, slidesIn }),
+  )
+  /**
+   * 일시정지 창이 아직 서 있는가 — 질문 [예](나가기 · 다시하기 · 자동진행) · [조작방법] · [설정] 으로 넘어간 뒤면 거짓이라 여는 곳의
+   * 닫기가 곧바로 닫는다. 질문 · 알림 창이 떠 있는 동안은 그 창이 키를 잡는다(`MessageBox`).
+   */
+  const handedOffRef = useRef(false)
+  const isMessageShownRef = useRef(false)
+  isMessageShownRef.current = confirming !== null || notice !== null
+  /** 서 있는 창의 닫기 — 창이 키를 안 받으면 거짓 */
+  const windowCloseRef = useRef<((onClosed: () => void) => boolean) | null>(null)
 
   useEffect(() => {
-    if (slide >= IN_GAME_MENU_SLIDE_END) return
-    const timer = window.setInterval(() => setSlideFrame((frame) => frame + 1), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
-  }, [slide])
+    if (bindCloser === undefined) return undefined
+    bindCloser((finish) => {
+      if (handedOffRef.current) return false
+      // 질문 · 알림 창이 떠 있거나 일시정지 창이 펼치는 · 줄이는 중이면 키를 안 본다 (0x754f8 → 0x75556 · 0x7558a 갈래)
+      if (isMessageShownRef.current) return true
+      windowCloseRef.current?.(finish)
+      return true
+    })
+    return () => bindCloser(null)
+  }, [bindCloser])
 
   const onCursorChangeRef = useRef(onCursorChange)
   onCursorChangeRef.current = onCursorChange
-  const cursorRef = useRef(cursor)
-  cursorRef.current = cursor
   const moveCursor = (next: number) => {
-    cursorRef.current = next
     setCursor(next)
     onCursorChangeRef.current?.(next)
   }
@@ -163,66 +185,50 @@ export function InGameMenu({
     }
   }
 
+  /** 질문 · 알림 창을 띄운다 — 0x74ef5 는 창이 떠 있어 대기 칸에 적히고, 일시정지 창이 [+0x215] 로 닫힌 갱신에 0x75440 이 띄운다 */
+  const askAfterClose = (show: () => void) => {
+    if (windowCloseRef.current?.(show) !== true) show()
+  }
+
   /** 점프표 0xcff84 */
   const choose = (action: InGameMenuAction) => {
     if (!isEnabled(action)) return
+    // [계속하기](0x3c1fe) — [창+0x215] = 1 · 하위 0. 여는 곳의 닫기가 창의 닫힘을 탄다
     if (action === '계속') return onContinue()
     // [조작방법](코드 1 0x3c212 → 하위 4) · [설정](코드 2 0x3c326 → 하위 5)은 뷰어를 세운 뒤 일시정지 팝업을 다시 띄우기
     // 직전(0x3c2f8 · 0x3c45c)에 울리던 소리를 끊는다(0x6e418)
+    // ⚠️ 미확인: 이 갈래도 [창+0x215] = 1(0x3c212~0x3c21e)이라 메뉴 창은 한 갱신(또는 두 갱신) 뒤 내려가는데, 그동안 그리기 콜백
+    // 0x3cdd0 이 하위 4 · 5 에서 무엇을 그리는지 안 읽었다 — 웹은 곧바로 뷰어 · 설정 판으로 넘어간다
     if (action === '조작방법') {
       activeSound().stop()
+      handedOffRef.current = true
       return onOpenHelp?.()
     }
     if (action === '설정') {
       activeSound().stop()
+      handedOffRef.current = true
       return onOpenSettings?.()
     }
-    // 대전모드는 6회를 넘기면 질문 없이 StrGAME[2] 알림만 뜬다 (0x3c60c — 0x74ef5 종류 1)
-    if (action === '자동진행' && !canAutoProgress) return setNotice(VERSUS_INNING_LIMIT_NOTICE)
-    setConfirming(action)
+    // 대전모드는 6회를 넘기면 질문 없이 StrGAME[2] 알림만 뜬다 (0x3c60c — 0x74ef5 종류 1 · 0x7442d · 하위 6 · [창+0x215])
+    if (action === '자동진행' && !canAutoProgress) return askAfterClose(() => setNotice(VERSUS_INNING_LIMIT_NOTICE))
+    // 나가기 0x3c504 · 자동진행 0x3c67e~ · 다시하기 0x3c706 — 0x74ef5 → 0x7442d(닫힘 콜백 0x3c159) · [창+0x215] = 1 · 하위 1|2|3
+    askAfterClose(() => setConfirming(action))
   }
-  const chooseRef = useRef(choose)
-  chooseRef.current = choose
-  const actionsRef = useRef(actions)
-  actionsRef.current = actions
 
-  const isMenuShown = confirming === null && notice === null
-  useEffect(() => {
-    if (!isMenuShown) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return
-      const current = actionsRef.current
-      const count = current.length
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault()
-        // 꼴 0x20 — 세로 감기
-        const step = event.key === 'ArrowDown' ? 1 : -1
-        return moveCursor((cursorRef.current + step + count) % count)
-      }
-      // 숫자키 꼴 2(0x6c100~0x6c14e) — 숫자 d 를 칸 d − 1('0' 은 9)로 옮기고 −5(OK)
-      if (/^[0-9]$/.test(event.key)) {
-        const index = event.key === '0' ? 9 : Number(event.key) - 1
-        if (index >= count) return
-        event.preventDefault()
-        moveCursor(index)
-        const action = current[index]
-        if (action !== undefined) chooseRef.current(action)
-        return
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        const action = current[cursorRef.current]
-        if (action !== undefined) chooseRef.current(action)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-    // moveCursor 는 ref 만 만진다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMenuShown])
+  /** 질문 [아니오] · 알림 [확인] — 닫힘 콜백(하위 1 0x3c7a6 · 하위 6 0x3cd5c)이 일시정지 창을 다시 띄운다(밀려 들기부터) */
+  const reopenPauseWindow = () => {
+    setPauseWindow((previous) => ({ serial: previous.serial + 1, opening: '질문뒤', slidesIn: true }))
+  }
 
   if (notice !== null) {
-    return <MessageBox text={notice} buttons={['확인']} dimOpacity={POPUP_DIM_OPACITY} onAnswer={() => setNotice(null)} />
+    return (
+      <MessageBox text={notice} buttons={['확인']} dimOpacity={POPUP_DIM_OPACITY} closesWithoutShrink
+        onAnswer={() => {
+          setNotice(null)
+          // G포인트 부족(하위 2 0x3c7d8 의 알림)도 대전 6회 알림(하위 6)도 닫히면 메뉴로 — ⚠️ 하위 2 알림의 닫힘 콜백은 안 읽었다
+          reopenPauseWindow()
+        }} />
+    )
   }
 
   if (confirming !== null) {
@@ -232,28 +238,157 @@ export function InGameMenu({
         : confirming === '다시하기'
           ? REPLAY_CONFIRM
           : autoProgressConfirmOf(autoProgressCost)
-    // ⚠️ 미확인: 질문 창이 떠 있는 동안 멈춘 장면 그림에 메뉴 판이 남는지(0x74ef4 가 장면을 한 번 다시 그리게 하는지)는 안 읽었다 —
-    // 창 하나만 어둡게 위에 띄운다
+    // 질문 창이 뜨는 갱신은 0x74ef4 가 [+0x250] = 1 이라 경기 장면을 한 번 다시 그리고(52efe) 그 위를 한 번 어둡게 덮는다 —
+    // 메뉴 판은 그때 지워진다. 경기 장면 [창+0x24e] = 1 이라 답하면 줄임 없이 다음 갱신에 닫힌다(`closesWithoutShrink`).
+    // ⚠️ 근사: '별표' 창 뒤의 질문은 0x754f8 첫 갈래가 0x75440 뒤 75556 펼침 갈래로 이어져 첫 그림이 이미 높이 20 이다 — 웹은 10 부터
     return (
       <MessageBox
         key={confirming}
         text={text}
         buttons={['예', '아니오']}
         dimOpacity={POPUP_DIM_OPACITY}
+        closesWithoutShrink
         onAnswer={(index) => {
           const asked = confirming
           setConfirming(null)
           // 아니오 · CLR(키 표 −16 → −1, 0x3c55a~0x3c570)은 일시정지 팝업을 다시 띄운다 — 메뉴 커서 그대로
-          if (index !== 0) return
+          if (index !== 0) return reopenPauseWindow()
+          handedOffRef.current = true
           if (asked === '나가기') return onQuit?.()
           if (asked === '다시하기') return onRestart?.()
           // 자동진행 — 확정(예) 하위 2 = 0x3c7d8 이 여기서 G포인트를 검사한다
-          if (gamePoint === undefined || gamePoint < autoProgressCost) return setNotice(NOT_ENOUGH_GAME_POINT)
+          if (gamePoint === undefined || gamePoint < autoProgressCost) {
+            handedOffRef.current = false
+            setNotice(NOT_ENOUGH_GAME_POINT)
+            return
+          }
           onAutoProgress?.(autoProgressCost)
         }}
       />
     )
   }
+
+  return (
+    <PauseWindow
+      key={pauseWindow.serial}
+      opening={pauseWindow.opening}
+      slidesIn={pauseWindow.slidesIn}
+      actions={actions}
+      cursor={cursor}
+      canAutoProgress={canAutoProgress}
+      isEnabled={isEnabled}
+      onMoveCursor={moveCursor}
+      onChoose={choose}
+      onRequestClose={() => onContinue()}
+      windowCloseRef={windowCloseRef}
+    />
+  )
+}
+
+/**
+ * **일시정지 창 한 벌** — 0x741a0(창, 목표 높이 0, 그리기 0x3cdd1, 키 0x3c159, 장면). 목표 높이 0 이라 판 0x744c4 는 안 긋고
+ * (0x7478a) 그리기 콜백 0x3cdd0 이 메뉴 판을 그린다. 펼치는 동안([+0x214])은 그리기 콜백을 안 부르고(0x7479c) 뒤 어둡게만 남는다.
+ * 닫힘은 키 콜백이 [창+0x215] = 1 을 쓰는 것뿐이고(0x3c1a8 CLR · '*' · 0x3c1fe 계속 · 질문 갈래들 — 0x742a9 는 안 부른다),
+ * 그동안 그리기 콜백은 돌아 메뉴가 그대로 남고 키는 안 본다(0x7558a). '별표' 창은 [+0x290] = 0 이라 다음 갱신에, 그 밖은 폭
+ * 240 → 120 → 닫힘 두 갱신 뒤에 내려간다(`InGameMenuOpening`).
+ */
+function PauseWindow({
+  opening, slidesIn, actions, cursor, canAutoProgress, isEnabled, onMoveCursor, onChoose, onRequestClose, windowCloseRef,
+}: {
+  readonly opening: InGameMenuOpening
+  readonly slidesIn: boolean
+  readonly actions: readonly InGameMenuAction[]
+  readonly cursor: number
+  readonly canAutoProgress: boolean
+  readonly isEnabled: (action: InGameMenuAction) => boolean
+  readonly onMoveCursor: (cursor: number) => void
+  readonly onChoose: (action: InGameMenuAction) => void
+  /** CLR · '*' (0x3c1a8) — 여는 곳의 닫기(계속과 같다) */
+  readonly onRequestClose: () => void
+  readonly windowCloseRef: { current: ((onClosed: () => void) => boolean) | null }
+}) {
+  // 레이아웃이 없는 환경(시험)에서는 `MessageBox` 처럼 펼침 · 닫힘을 건너뛴다
+  const dimRef = useRef<HTMLDivElement>(null)
+  const [hasNoLayout, setHasNoLayout] = useState(false)
+  useLayoutEffect(() => {
+    if ((dimRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
+  }, [])
+  const motion = usePopupWindowMotion({
+    targetHeight: 0,
+    expands: opening !== '별표',
+    opensAtOnce: opening === '복귀',
+    skipsMotion: hasNoLayout,
+  })
+  const motionRef = useRef(motion)
+  motionRef.current = motion
+  // 창이 키를 받을 때만 닫는다 — 펼침 · 줄임 중이면 그 키는 버려지지만(0x75556 · 0x7558a) 닫기 요청은 받은 셈이다
+  useLayoutEffect(() => {
+    windowCloseRef.current = (onClosed) => {
+      const current = motionRef.current
+      if (!current.acceptsKeys()) return true
+      return current.close('줄임', onClosed)
+    }
+    return () => {
+      windowCloseRef.current = null
+    }
+  }, [windowCloseRef])
+
+  /** 그린 횟수 — 밀려 들기 [장면+0x1954] 를 정한다. 그리기 콜백은 펼치는 동안 안 돈다(0x7479c) */
+  const isShown = motion.openingHeight === null
+  const [slideFrame, setSlideFrame] = useState(() => (slidesIn ? 0 : Number.POSITIVE_INFINITY))
+  const slide = Number.isFinite(slideFrame) ? inGameMenuSlideAt(slideFrame) : IN_GAME_MENU_SLIDE_END
+  useEffect(() => {
+    if (!isShown || slide >= IN_GAME_MENU_SLIDE_END) return
+    const timer = window.setInterval(() => setSlideFrame((frame) => frame + 1), millisecondsPerFrame())
+    return () => window.clearInterval(timer)
+  }, [isShown, slide])
+
+  const cursorRef = useRef(cursor)
+  cursorRef.current = cursor
+  const latest = useRef({ actions, onMoveCursor, onChoose, onRequestClose })
+  latest.current = { actions, onMoveCursor, onChoose, onRequestClose }
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      const { actions: current, onMoveCursor: move, onChoose: choose, onRequestClose: requestClose } = latest.current
+      // 펼치는 동안('별표' 창 말고) · 줄이는 동안은 키 콜백 0x3c158 을 안 부른다
+      if (!motionRef.current.acceptsKeys()) return
+      const count = current.length
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        // 꼴 0x20 — 세로 감기
+        const step = event.key === 'ArrowDown' ? 1 : -1
+        const next = (cursorRef.current + step + count) % count
+        cursorRef.current = next
+        return move(next)
+      }
+      // 숫자키 꼴 2(0x6c100~0x6c14e) — 숫자 d 를 칸 d − 1('0' 은 9)로 옮기고 −5(OK)
+      if (/^[0-9]$/.test(event.key)) {
+        const index = event.key === '0' ? 9 : Number(event.key) - 1
+        if (index >= count) return
+        event.preventDefault()
+        cursorRef.current = index
+        move(index)
+        const action = current[index]
+        if (action !== undefined) choose(action)
+        return
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        const action = current[cursorRef.current]
+        if (action !== undefined) choose(action)
+        return
+      }
+      // CLR(−16) — 0x3c1a8: [장면+0x1084] = 1 · 하위 0 · [창+0x215] = 1. 여는 곳이 같은 키를 받아도 창이 이미 줄이는 중이라
+      // 두 번 닫지 않는다. '*'(0x2a)도 같은 갈래지만 여는 곳의 `toggle` 이 받는다(여기서도 받으면 닫힌 뒤 다시 연다)
+      if (event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault()
+        requestClose()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const layout = inGameMenuLayoutOf(actions.length, slide)
   return (
@@ -263,27 +398,34 @@ export function InGameMenu({
         (0x74228) [창+0x24f] 를 [창+0x24e] 로 옮기므로 0x746cc 는 **한 번** — 연 그림에 검정 단계 5 = 6/16 — 덮는다.
         메뉴 동안 경기를 다시 안 그려 그 한 겹이 멈춘 그림 위에 남는다 (`popupDim`).
       */}
-      <div className={styles.dim} data-testid="경기-메뉴-어둡게" style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
-      <MenuPanel layout={layout} actions={actions} cursor={cursor} canAutoProgress={canAutoProgress} />
-      <div role="listbox" aria-label="경기 중 메뉴">
-        {actions.map((action, index) => {
-          const row = layout.rows[index]
-          if (row === undefined) return null
-          return (
-            <PressArea
-              key={action}
-              label={IN_GAME_MENU_LABELS[action]}
-              rect={{ x: row.pill.x, y: row.pill.y, width: row.pill.width + 1, height: row.pill.height + 1 }}
-              option={{ isSelected: index === cursor }}
-              isDisabled={!isEnabled(action)}
-              onPress={() => {
-                moveCursor(index)
-                choose(action)
-              }}
-            />
-          )
-        })}
-      </div>
+      <div ref={dimRef} className={styles.dim} data-testid="경기-메뉴-어둡게"
+        style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
+      {isShown && !motion.isClosed && (
+        <>
+          <MenuPanel layout={layout} actions={actions} cursor={cursor} canAutoProgress={canAutoProgress} />
+          <div role="listbox" aria-label="경기 중 메뉴">
+            {actions.map((action, index) => {
+              const row = layout.rows[index]
+              if (row === undefined) return null
+              return (
+                <PressArea
+                  key={action}
+                  label={IN_GAME_MENU_LABELS[action]}
+                  rect={{ x: row.pill.x, y: row.pill.y, width: row.pill.width + 1, height: row.pill.height + 1 }}
+                  option={{ isSelected: index === cursor }}
+                  isDisabled={!isEnabled(action)}
+                  onPress={() => {
+                    if (!motionRef.current.acceptsKeys()) return
+                    cursorRef.current = index
+                    onMoveCursor(index)
+                    onChoose(action)
+                  }}
+                />
+              )
+            })}
+          </div>
+        </>
+      )}
     </>
   )
 }

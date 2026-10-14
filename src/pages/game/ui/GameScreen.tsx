@@ -466,6 +466,8 @@ export function GameScreen({
               mode={BATTER_CAREER_MODE}
               cursor={menu.cursor}
               slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onQuit}
