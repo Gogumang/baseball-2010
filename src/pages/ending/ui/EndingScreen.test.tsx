@@ -1,22 +1,49 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
-  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, ENDING_IMAGE, SHORT_ENDING_TEXT_TOP, WALK_IN,
+  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, ENDING_IMAGE, ENDING_STAGE, SHORT_ENDING_TEXT_TOP, WALK_IN,
   creditsTopOf, creditsWalkersOf, endingImageOffsetOf, endingWalkInAnimationOf, endingWalkInPaletteOf,
   irisCircleOf, irisStartTickOf, risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * 나만의리그 엔딩 (상태 141 — 0x87c7c · 0x168fc → 0x882b4 / 0x88bb4).
  * 부상·방출은 띠 창 + 걸어 들어오는 선수, 은퇴 엔딩은 그림 + 원형 전환 + 올라오는 글, 그 뒤 제작진.
  */
 
-afterEach(cleanup)
+// 단계는 효과기 아홉 틀을 기다린다 — 틀을 손으로 넘긴다
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
-const 띄우기 = (overrides: Partial<Parameters<typeof EndingScreen>[0]> = {}) =>
+const 틀 = (count: number) => {
+  act(() => {
+    vi.advanceTimersByTime(count * millisecondsPerFrame())
+  })
+}
+
+/** 단계 1 의 키 → 단계 2 (종류 1 아홉 틀) → 단계 3 제작진 */
+const 제작진으로 = () => {
+  fireEvent.click(screen.getByRole('button', { name: '확인' }))
+  틀(ENDING_STAGE.effectorFrames + 1)
+}
+
+/** 띄우고 단계 1(진입 효과기가 끝난 틀)까지 넘긴다 */
+const 띄우기 = (overrides: Partial<Parameters<typeof EndingScreen>[0]> = {}) => {
+  const rendered = 띄우기만(overrides)
+  틀(ENDING_STAGE.firstStageAt + 1)
+  return rendered
+}
+
+const 띄우기만 = (overrides: Partial<Parameters<typeof EndingScreen>[0]> = {}) =>
   render(
     <EndingScreen
       playerName="홍길동"
@@ -148,7 +175,7 @@ describe('은퇴 엔딩 2~9 (0x886ca 갈래)', () => {
 describe('제작진 (0x88bb4)', () => {
   it('연애 엔딩 9 + c 를 제작진 앞에 붙이고 2틱에 1px 올라온다', () => {
     띄우기({ endingIndex: 9, seenEventIds: ['300'] })
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    제작진으로()
     expect(screen.getByText(/가장 소중한 한 사람과/)).toBeTruthy()
     expect(screen.getByText('-총괄/PM-')).toBeTruthy()
     expect(creditsTopOf(0)).toBe(320)
@@ -181,7 +208,7 @@ describe('엔딩 흐름', () => {
   it('은퇴 엔딩은 확인하면 제작진 [21] 이 아래에서 위로 흐른다', () => {
     띄우기()
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    제작진으로()
 
     expect(screen.getByText('-총괄/PM-')).toBeTruthy()
   })
@@ -199,7 +226,7 @@ describe('엔딩 흐름', () => {
       },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' })) // 엔딩 글 → 제작진
+    제작진으로() // 엔딩 글 → 제작진
     fireEvent.click(screen.getByRole('button', { name: '확인' })) // 제작진 → 보너스
 
     expect(screen.getByText(/3000 G포인트/)).toBeTruthy()
@@ -222,7 +249,7 @@ describe('엔딩 흐름', () => {
   it('보너스 팝업 0x2b 를 닫을 때 onBonusReceived · 이미 받았으면(S+0x7b) 보너스 없이 등록 팝업 0x2d (0x1220c 12276~12284)', () => {
     const onBonusReceived = vi.fn()
     띄우기({ onBonusReceived })
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    제작진으로()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect(onBonusReceived).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
@@ -231,7 +258,7 @@ describe('엔딩 흐름', () => {
 
     const again = vi.fn()
     띄우기({ isBonusReceived: true, onBonusReceived: again })
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    제작진으로()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect(screen.queryByText(/3000 G포인트/)).toBeNull()
     expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
@@ -242,7 +269,7 @@ describe('엔딩 흐름', () => {
     const onFinish = vi.fn()
     띄우기({ onFinish, bonusGamePoint: 0 })
 
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    제작진으로()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: '아니오' }))
 
@@ -281,7 +308,7 @@ describe('엔딩 흐름', () => {
 describe('명예의 전당 등록 목록(상태 145) 머리띠 — 0x15d54 → 0x7f4ec, 칸은 0x16928 기본 갈래가 세운다', () => {
   const 그림들 = (container: HTMLElement) => [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '')
   const 등록목록까지 = () => {
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    제작진으로()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
   }
@@ -338,5 +365,61 @@ describe('판정 없음(e = −1) — 141 의 키 0x1220c 가 아무 팝업도 �
     expect(screen.queryByLabelText('확인')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
     expect(onFinish).not.toHaveBeenCalled()
+  })
+})
+
+describe('단계 [장면+0xd4] — 효과기 아홉 틀을 기다린다 (0x12300 · 0x1bf54 · 0x12246)', () => {
+  const 덮개 = () => screen.queryByTestId('엔딩-효과기') as HTMLElement | null
+
+  it('단계 0 은 아무것도 안 그리고, 진입의 종류 1 이 끝난 다음 틀에 단계 1 이 검정에서 밝아진다', () => {
+    const { container } = 띄우기만()
+    expect(container.querySelector('[data-part="stage-0"]')).not.toBeNull()
+    expect(container.querySelector('img[data-part="ending-image"]')).toBeNull()
+    틀(ENDING_STAGE.firstStageAt + 1)
+    expect(container.querySelector('[data-part="stage-0"]')).toBeNull()
+    expect(container.querySelector('img[data-part="ending-image"]')).not.toBeNull()
+    // 종류 2 는 단계 0, 2, …, 16 — 덮개가 점점 옅어진다
+    const 처음 = Number(덮개()?.style.opacity)
+    틀(2)
+    expect(Number(덮개()?.style.opacity)).toBeLessThan(처음)
+    틀(ENDING_STAGE.effectorFrames)
+    expect(덮개()).toBeNull()
+  })
+
+  it('단계 0 의 키는 먹지 않는다 — 단계 1 의 키만 단계 2 로 어둡게 덮고, 그동안 엔딩은 그대로다', () => {
+    const { container } = 띄우기만()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    틀(ENDING_STAGE.firstStageAt + ENDING_STAGE.effectorFrames + 1)
+    expect(screen.queryByText('-총괄/PM-')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    틀(ENDING_STAGE.effectorFrames - 2)
+    expect(screen.queryByText('-총괄/PM-')).toBeNull()
+    expect(container.querySelector('img[data-part="ending-image"]')).not.toBeNull()
+    expect(Number(덮개()?.style.opacity)).toBeGreaterThan(0.5)
+    // 단계 2 의 키도 먹지 않는다
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    틀(3)
+    expect(screen.getByText('-총괄/PM-')).toBeTruthy()
+    expect(screen.queryByText(/3000 G포인트/)).toBeNull()
+  })
+
+  it('부상·방출은 단계를 안 보고 곧장 이어하기를 묻는다 (0x1220c 머리 e ≤ 1)', () => {
+    띄우기만({ endingIndex: 0, isContinuable: true })
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(screen.getByText(/이어하시겠습니까/)).toBeTruthy()
+  })
+})
+
+describe('띠 창 배경 시간대 [gfx+0x1c] (0x7b9ac ← 0x7b934 ← 0xb8fbd)', () => {
+  const 배경프레임 = (container: HTMLElement) =>
+    container.querySelector('img[data-frame][src*="mode_back"]')?.getAttribute('data-frame')
+
+  it('6~15시 낮 0 · 16~19시 저녁 1 · 그 밖 밤 2', () => {
+    expect(배경프레임(띄우기({ endingIndex: 0, isContinuable: true, hour: 9 }).container)).toBe('0')
+    cleanup()
+    expect(배경프레임(띄우기({ endingIndex: 0, isContinuable: true, hour: 17 }).container)).toBe('1')
+    cleanup()
+    expect(배경프레임(띄우기({ endingIndex: 0, isContinuable: true, hour: 22 }).container)).toBe('2')
   })
 })

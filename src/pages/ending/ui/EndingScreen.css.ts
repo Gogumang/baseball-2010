@@ -73,3 +73,15 @@ export const pressArea = style({
   cursor: 'pointer',
   selectors: { '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` } },
 })
+
+/** 화면 효과기 0xbd844 의 검정 덮기 — 불투명도 (16 − 단계)/16 (`blackStepCoverOpacityOf`). 창까지 덮지만 누름은 막지 않는다 */
+export const effectCover = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: '240px',
+  height: '320px',
+  background: '#000000',
+  pointerEvents: 'none',
+  zIndex: 50,
+})
