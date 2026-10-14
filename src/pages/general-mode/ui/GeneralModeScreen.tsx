@@ -217,6 +217,15 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
     ...(onGameSave === undefined ? {} : { onMatchBlockWrite: onGameSave }),
   })
   const { flow, actions } = session
+  /**
+   * 22 그림 0x2e0c4 의 0x63b15 넷째 인자 = `[메뉴+0x28] ≠ 0x17` — 이전 상태가 23(엔트리 편집)이 아니면 머리띠 미끄러짐 ·
+   * 본문 숨김 · 배너 연출을 켠다 (모드 1 · 8 · 9 두 갈래 모두, 0x2e0ee~0x2e11a · 0x2e16a~). `pages/management/lib/matchInfoEntry`.
+   */
+  const matchView = session.isPlaying || flow.step !== GENERAL_MODE_STEP.경기정보 ? null
+    : session.entryEdit !== null ? '23' : '22'
+  const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
+  if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
+  const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '23'
   /** 준비 단계 취소 — 18 · 빠른실행 22 의 CLR 은 게임시작 목록(하위 5)으로 (0x29d9a · 0x313c4) */
   const cancelPrepare = () => onExit(5)
   const back = () => {
@@ -333,6 +342,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           <MatchInfoScreen
             setup={flow.setup}
             isQuickStart={flow.isQuickStart}
+            isEntryAnimated={isMatchInfoEntryAnimated}
             isSettingsOpen={session.isSettingsOpen}
             isRespinning={session.isRespinning}
             userStarterName={session.userStarterName}

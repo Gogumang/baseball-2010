@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { linePixels, scanlineSpans } from '@/features/play-game/model/aceCutIn'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
@@ -14,9 +13,8 @@ import {
 } from '@/pages/general-mode/lib/prepareLayout'
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
-import {
-  MATCH_INFO_BANNER_COLORS, matchInfoBannersOf, matchInfoEntryPhaseOf,
-} from '@/pages/management/lib/matchInfoEntry'
+import { matchInfoEntryPhaseOf } from '@/pages/management/lib/matchInfoEntry'
+import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const SLT_FRAME = './sprites/slt_frame/frames'
@@ -105,7 +103,7 @@ export function NariMatchInfoScreen({
   return (
     <RawScreen>
       <MatchInfoStadiumBackdrop stage={stage} />
-      {phase.kind === '배너' && <EntryBanners offset={phase.offset} />}
+      {phase.kind === '배너' && <MatchInfoEntryBanners offset={phase.offset} testId="나리경기정보-배너" />}
       {phase.kind === '본문' && (
         <>
       {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
@@ -185,29 +183,5 @@ export function NariMatchInfoScreen({
       <ScreenFrame title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'} gamePoint={gamePoint} onBack={onCancel}
         slides={isEntryAnimated} />
     </RawScreen>
-  )
-}
-
-/** 들어올 때 배너 둘 — 0x54790 (스캔라인 채우기 0x75c70 · 테두리 0x75dc4 · 윗변 아래 선 셋 0x6a905) */
-function EntryBanners({ offset }: { readonly offset: number }) {
-  return (
-    <svg className={styles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
-      data-testid="나리경기정보-배너" data-offset={offset} style={{ left: 0, top: 0 }}>
-      {matchInfoBannersOf(offset).map((banner, index) => (
-        <g key={index}>
-          {scanlineSpans(banner.points).map((span) => (
-            <rect key={`f${span.y}-${span.x0}`} x={span.x0} y={span.y} width={span.x1 - span.x0 + 1} height={1}
-              fill={MATCH_INFO_BANNER_COLORS.fill} />
-          ))}
-          {banner.points.flatMap((point, corner) => linePixels(point, banner.points[(corner + 1) % banner.points.length]))
-            .map((pixel, pixelIndex) => (
-              <rect key={`b${pixelIndex}`} x={pixel.x} y={pixel.y} width={1} height={1} fill={MATCH_INFO_BANNER_COLORS.border} />
-            ))}
-          {banner.lines.flatMap((line, lineIndex) => linePixels(line.from, line.to).map((pixel, pixelIndex) => (
-            <rect key={`l${lineIndex}-${pixelIndex}`} x={pixel.x} y={pixel.y} width={1} height={1} fill={line.color} />
-          )))}
-        </g>
-      ))}
-    </svg>
   )
 }

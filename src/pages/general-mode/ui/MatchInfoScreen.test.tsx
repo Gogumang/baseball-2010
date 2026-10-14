@@ -167,3 +167,14 @@ describe('바닥 (0x2e0c4 모드 1 갈래)', () => {
     expect(screen.getByRole('button', { name: '되돌아가기' })).toBeTruthy()
   })
 })
+
+describe('22 들어올 때 연출 (0x2e0c4 의 0x63b15 넷째 인자 — 이전 ≠ 23)', () => {
+  it('켜져 있으면 첫 그림은 머리띠가 내려오는 중이라 본문이 없다 — 23 에서 돌아온 것(꺼짐)이면 곧바로 본문', () => {
+    const { unmount } = 띄우기({ isEntryAnimated: true })
+    expect(screen.queryByTestId('경기정보-순위-유저')).toBeNull()
+    unmount()
+
+    띄우기({ isEntryAnimated: false })
+    expect(screen.getByTestId('경기정보-순위-유저')).toBeTruthy()
+  })
+})

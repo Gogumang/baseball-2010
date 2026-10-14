@@ -587,6 +587,8 @@ export function SeasonRoute({
           gamePoint={session.gamePoints}
           // 0xdd 진입 0x6548 → 0x5fd04 가 떠 둔 구장 바탕 (공통 앞그림 0xb810 이 0xdd 면 0x581dc 로 찍는다)
           stage={session.matchInfoStage}
+          // 그림 0xb398 의 0x63b15 넷째 인자 = 이전 상태 ≠ 0xe0(엔트리 편집) — 들어올 때 머리띠 · 배너 연출
+          isEntryAnimated={previousScene !== SEASON_SCENE_STATE.엔트리편집}
           onStart={() => {
             // 설정 창이 열려 있으면 키가 모두 창으로 간다 (0x83f2 메뉴+0x2ba)
             if (!session.isMatchSettingsOpen) actions.startPendingGame()

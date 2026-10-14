@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
@@ -13,6 +14,8 @@ import { generalModeMatchInfoLines } from '@/pages/general-mode/lib/matchInfoLin
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
+import { matchInfoEntryPhaseOf } from '@/pages/management/lib/matchInfoEntry'
+import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const SLT_FRAME = './sprites/slt_frame/frames'
@@ -56,10 +59,18 @@ export interface MatchInfoScreenProps {
   /** 유저 팀 "선발" — 0x30f20 의 0↔k 뒤(엔트리 편집이 고쳤으면 그것)의 투수 0번 */
   readonly userStarterName?: string | null
   /** CPU 칸 — 0x30f20 이 세운 AI 팀의 선발·마선수 */
-  readonly cpuMatchInfo?: CpuMatchInfo | null  /**
+  readonly cpuMatchInfo?: CpuMatchInfo | null
+  /**
    * 바탕 — 22 진입 0x314b0 의 무대를 0x5fd04 가 흐려 떠 둔 그림(그리기 0x2e0c4 의 `0x581dc(스킨, 0, 0)`). 없으면 바탕 없음
    */
   readonly stage?: MatchInfoStadiumState | null
+  /**
+   * 0x63b15 넷째 인자 — `[메뉴+0x28] ≠ 0x17`(이전 상태가 23 엔트리 편집이 아님, 0x2e0fa). 참이면 머리띠가 미끄러져 내려오는
+   * 다섯 그림 동안 본문을 비우고, 파랑 배너 둘이 네 그림 동안 들어온 뒤 본문이 선다 (`pages/management/lib/matchInfoEntry`).
+   * 23 에서 돌아오면 거짓 — 머리띠도 안 미끄러지고 본문이 곧바로 선다. 안 주면 거짓.
+   * ⚠️ 미확인: 연출 동안 키 0x311a8 이 키를 받는지는 안 떴다 — 웹은 늘 받는다.
+   */
+  readonly isEntryAnimated?: boolean
 }
 
 /**
@@ -77,8 +88,9 @@ export interface MatchInfoScreenProps {
  */
 export function MatchInfoScreen({
   setup, isQuickStart = false, isSettingsOpen = false, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
-  userStarterName = null, cpuMatchInfo = null, stage = null,
+  userStarterName = null, cpuMatchInfo = null, stage = null, isEntryAnimated = false,
 }: MatchInfoScreenProps) {
+  const phase = matchInfoEntryPhaseOf(useUpdateCounter(), isEntryAnimated)
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const lines = generalModeMatchInfoLines(setup, userStarterName, cpuMatchInfo)
@@ -125,6 +137,9 @@ export function MatchInfoScreen({
   return (
     <RawScreen>
       <MatchInfoStadiumBackdrop stage={stage} />
+      {phase.kind === '배너' && <MatchInfoEntryBanners offset={phase.offset} testId="경기정보-배너" />}
+      {phase.kind === '본문' && (
+        <>
       {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
       {[
         { anchor: anchorA, frame: 157 },
@@ -189,6 +204,9 @@ export function MatchInfoScreen({
         )
       })}
 
+        </>
+      )}
+
       {/* 원본에 없는 웹 전용 단추 셋 — 원본은 바닥띠 소프트키가 한다. 바닥띠 왼쪽에 나란히 세운다 */}
       <Button variant="corner" className={styles.softKey} style={{ left: 4 }} onClick={onStart}>
         경기 시작
@@ -209,7 +227,7 @@ export function MatchInfoScreen({
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
       <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel}
-        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)} />
+        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)} slides={isEntryAnimated} />
     </RawScreen>
   )
 }
