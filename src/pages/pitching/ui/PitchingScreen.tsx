@@ -665,6 +665,7 @@ export function PitchingScreen({
             // 미션 투수편 = 모드 5 — 표 0xcfcfc 행 1(계속·다시하기·조작방법·설정·나가기)
             mode={MISSION_PITCHER_MODE}
             cursor={menu.cursor}
+            slidesIn={menu.slidesIn}
             onCursorChange={menu.setCursor}
             onContinue={menu.close}
             onQuit={onGiveUp}

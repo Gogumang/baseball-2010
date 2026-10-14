@@ -12,6 +12,11 @@ export interface InGameMenuState {
   readonly close: () => void
   /** [조작방법]·[설정]에서 돌아온다 — **커서를 그대로 두고** 다시 띄운다 */
   readonly reopen: () => void
+  /**
+   * 지금 열린 메뉴가 '\*' 로 **새로 연** 것인가 — 0x3c02c 만 [장면+0x1954] = 0 · [+0x1958] = 1 로 되돌려 판이 밀려 든다.
+   * `reopen`(0x3ca36 · 0x3cb0e)은 안 되돌린다. `InGameMenu` 의 `slidesIn` 에 넘긴다.
+   */
+  readonly slidesIn: boolean
 }
 
 /**
@@ -26,11 +31,15 @@ export interface InGameMenuState {
 export function useInGameMenuState(): InGameMenuState {
   const [isOpen, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
+  const [slidesIn, setSlidesIn] = useState(false)
   const isOpenRef = useRef(isOpen)
   isOpenRef.current = isOpen
 
   const close = useCallback(() => setOpen(false), [])
-  const reopen = useCallback(() => setOpen(true), [])
+  const reopen = useCallback(() => {
+    setSlidesIn(false)
+    setOpen(true)
+  }, [])
   const toggle = useCallback(() => {
     if (isOpenRef.current) {
       isOpenRef.current = false
@@ -41,8 +50,10 @@ export function useInGameMenuState(): InGameMenuState {
     // 0x3c02c → 0x6c00c(메뉴, 0, 0) — 새로 열면 첫 칸
     isOpenRef.current = true
     setCursor(0)
+    // 0x3c03c~0x3c04e — [장면+0x1954] = 0 · [장면+0x1958] = 1
+    setSlidesIn(true)
     setOpen(true)
   }, [])
 
-  return { isOpen, cursor, setCursor, toggle, close, reopen }
+  return { isOpen, cursor, setCursor, toggle, close, reopen, slidesIn }
 }

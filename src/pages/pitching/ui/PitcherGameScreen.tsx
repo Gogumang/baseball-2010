@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { ReactNode } from 'react'
-import { MessageBox, PixelScreen, RawScreen } from '@/shared/ui'
+import { MessageBox, RawScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -68,6 +68,7 @@ import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPan
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { SettlementPressArea } from '@/pages/team-game/ui/SettlementPressArea'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { nariSceneStadium, sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
@@ -724,17 +725,15 @@ export function PitcherGameScreen({
     // [+0x17f4] — 진입 0x4ea0c 4ebaa~4ec7c 가 기록 달성 횟수로 센 이번 경기 G (투수편 세션 `finishGame` 과 같은 식)
     const earned = recordGamePointsOf(summary.recordIds)
     return withRecordAlert(
-      <PixelScreen
-        title="경기 결과"
-        leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
-      >
+      <RawScreen>
         {/*
           정산 그리기 0x4a384 — 구름 0x78448 과 배경 고르기 0x40ff0(장면, +0x17e2)을 먼저 그린다 (선수·공·HUD 없음, 모드를 안 가린다).
           +0x17e2 는 갱신 0x4b100 이 사람 팀이 이긴 판만 틱마다 3 씩 150 까지 올려 구장이 가라앉는다 (`settlementBackdropOffsetAt`).
           모드 3 은 시즌 홈·대전이 아니라 0x78578 갈래다 — 팀경기와 같은 `BattingStage` 결과 배경을 쓴다(시즌 구장 없음).
           감독 평가·변화 글은 경기 장면 밖 나리 상태 116(진입 0x1278c)의 몫이다 — 부르는 쪽(투수편 세션)이 띄운다
         */}
-        <div className={styles.matchupFrame}>
+        {/* 결과 배경 — 타석 캔버스는 좌우 −10px 를 두므로 10px 밀어 원본 (0, 0) 에 맞춘다(`GameResultScreen.css` 의 backdrop) */}
+        <div className={styles.settlementBackdrop}>
           <BattingStage
             // 결과 배경은 선수·공을 안 그려 능력치를 읽지 않는다 — 꼴을 채우는 기본값
             batterAbility={STARTING_ABILITY}
@@ -764,23 +763,25 @@ export function PitcherGameScreen({
             }}
             onPitchResolved={() => {}}
           />
-          <SettlementBoard
-            mode={PITCHER_CAREER_MODE}
-            isWin={isHumanWin}
-            // 0xb69b0(st, 0/1) — 왼쪽이 측 0
-            side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
-            side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
-            scoreboardSides={scoreboardSides}
-            recordIds={summary.recordIds}
-            gamePoints={earned}
-            {...(gamePoint === undefined
-              ? {}
-              : { heldGamePoints: Math.min(MAXIMUM_GAME_POINT, Math.max(0, gamePoint + earned)) })}
-            onExit={() => onFinish(summary)}
-            effectLayers={settlementLayers}
-          />
         </div>
-      </PixelScreen>,
+        <SettlementBoard
+          mode={PITCHER_CAREER_MODE}
+          isWin={isHumanWin}
+          // 0xb69b0(st, 0/1) — 왼쪽이 측 0
+          side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
+          side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
+          scoreboardSides={scoreboardSides}
+          recordIds={summary.recordIds}
+          gamePoints={earned}
+          {...(gamePoint === undefined
+            ? {}
+            : { heldGamePoints: Math.min(MAXIMUM_GAME_POINT, Math.max(0, gamePoint + earned)) })}
+          onExit={() => onFinish(summary)}
+          effectLayers={settlementLayers}
+        />
+        {/* 원본에 없는 웹 [확인] 소프트키 대신 — 판 키 0x407f0 로 OK 를 보내는 투명 누름 칸 */}
+        <SettlementPressArea />
+      </RawScreen>,
     )
   }
 
@@ -954,6 +955,7 @@ export function PitcherGameScreen({
               // 나만의리그 투수편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
               mode={PITCHER_CAREER_MODE}
               cursor={menu.cursor}
+              slidesIn={menu.slidesIn}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onQuit}

@@ -16,15 +16,11 @@ export const canvasSlot = style({
 })
 
 /**
- * 경기 중 메뉴(일시정지 창 0x741a0 자리) — `InGameMenu` 는 본문 흐름에 놓이는 조각이라 판 위에 띄울 칸을 준다.
- * 어둡게 층(inset 0)이 이 칸을 덮는다.
+ * 경기 중 메뉴(일시정지 창 0x741a0 자리) — 판(240×320)을 덮는 층. 메뉴는 원본 좌표대로 스스로 자리를 잡는다
+ * (`InGameMenu` — 그리기 0x3cdd0). 어둡게 층(inset 0)이 이 칸을 덮는다.
  */
 export const menuLayer = style({
   position: 'absolute',
   inset: 0,
   zIndex: 6,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  padding: '0 10px',
 })
