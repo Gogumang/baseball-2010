@@ -28,6 +28,8 @@ const 기본옵션: PitcherGameOptions = {
 /** 17 풀카운트 삼진 (삼진 콜 0xa7c4c) · 24 도루 저지 (정산 0xa8024 a83de) */
 const FULL_COUNT_STRIKEOUT_RECORD = 17
 const CAUGHT_STEALING_RECORD = 24
+/** 26 병살 — 삼진 사건 5 + 도루 저지 아웃 사건 0xd 로 이 정산의 [sp+0x30] == 2 (a8e58, state[0x1a] 는 0) */
+const DOUBLE_PLAY_RECORD = 26
 
 /** 풀카운트 · 2루 주자에서 내 공 하나 — 화면이 도는 갈래라 도루 판(종류 5)을 붙든다 */
 function 붙든도루판(seed: number) {
@@ -43,7 +45,7 @@ function 붙든도루판(seed: number) {
 }
 
 describe('삼진 + 도루 판(종류 5)의 기록 알림 차례 — 삼진 콜 16/17 이 정산의 24 보다 먼저', () => {
-  it('풀카운트 삼진에 3루 도루 주자가 잡히면 17 → 24 차례로 쌓인다', () => {
+  it('풀카운트 삼진에 3루 도루 주자가 잡히면 17 → 24 → 26 차례로 쌓인다', () => {
     let checked = 0
     for (let seed = 1; seed <= 3000 && checked === 0; seed += 1) {
       const { 주자, 붙듦, random } = 붙든도루판(seed)
@@ -62,7 +64,7 @@ describe('삼진 + 도루 판(종류 5)의 기록 알림 차례 — 삼진 콜 1
       }
       const 끝 = resolveRunnerPlay(붙듦, caught, random)
       const added = 끝.recordIds.slice(주자.recordIds.length)
-      expect(added).toEqual([FULL_COUNT_STRIKEOUT_RECORD, CAUGHT_STEALING_RECORD])
+      expect(added).toEqual([FULL_COUNT_STRIKEOUT_RECORD, CAUGHT_STEALING_RECORD, DOUBLE_PLAY_RECORD])
     }
     expect(checked).toBeGreaterThan(0)
   })

@@ -14,6 +14,7 @@ import { limitOrNull, missionPlay } from '@/entities/mission/model/missionRun'
 import type { MissionRun, MissionStatus } from '@/entities/mission/model/missionRun'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates, chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import type { RunnerFate } from '@/features/defense-play/model/runnerFates'
 import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import { missionRunnersAfterPlay, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -197,6 +198,12 @@ export interface PitcherOutcomeOptions {
   readonly random?: RandomPort
   /** 화면(상태 0x17)이 이미 다 돌린 수비 플레이. 주면 여기서 또 굴리지 않는다 */
   readonly played?: DefensePlayResult
+  /**
+   * 이 삼진과 **한 정산**인 주자 판(도루 종류 5 · 삼진 그대로인 폭투·포일 종류 9)의 주자 운명 — 판정 B 가 그 판 끝에서 정산
+   * 0xa8024 를 한 번 부르므로(ae576 · ae596 → ae5a8) R+0x130(a8c5c~a8c86)은 그 판의 주자 목록 마지막 원소로 정해진다.
+   * 안 주면 판 없는 삼진의 목록(`runnerFatesWithoutPlay`)이다
+   */
+  readonly settledRunnerFates?: readonly RunnerFate[]
 }
 
 /** 타석이 끝났다. 목표를 채우면 성공, 한도·제한에 닿으면 실패다. */
@@ -217,7 +224,7 @@ export function applyPitcherOutcome(
     // R+0x144 = 볼넷만 (사구는 R+0x148 — `brokenConditionsOf` 머리글)
     walks: run.allowed.walks + (settled.kind === '볼넷' ? 1 : 0),
     // R+0x130 = 이번 플레이 하나의 값 (덮어쓴다) — 목록 마지막 원소의 +0x96 이 꺼져 있나
-    baserunner: baserunnerAllowedOfFates(defense.runnerFates) ? 1 : 0,
+    baserunner: baserunnerAllowedOfFates(options.settledRunnerFates ?? defense.runnerFates) ? 1 : 0,
   }
   const progress = recordPitcherOutcome(
     run.progress,

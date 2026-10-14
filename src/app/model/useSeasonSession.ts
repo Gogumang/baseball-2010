@@ -2472,6 +2472,8 @@ export function useSeasonSession(
         dayCounter: postseasonStarterSlotOf(series, myTeam),
         opponentDayCounter: postseasonStarterSlotOf(series, opponent),
         opponentPitcherOrder: postseasonPitcherOrderOf(series, opponent),
+        // SR+0xb4 — 정산 타자 게이트 0xa56dc 의 모드 2 갈래가 거짓이 된다 (`settlementBatterGateOf`)
+        isPostseason: true,
       }
       // 0xef 키: 내 팀이 X/Y 면 this+0x11c = 1 → 0xd7 (P4 4b) — 정규시즌과 같은 경기 전 흐름이다
       return enterPreGameSquad({ kind: '포스트시즌', options: postseasonOptions })

@@ -429,7 +429,11 @@ export function missionPitchingDefenseOf(
     // 투수 능력치 칸 3 = 체력 — 소모(0x66e44 용량)에만 쓴다. 사람 타석의 마투수 소모는 세션이 든다(`ace` 를 안 넘긴다)
     staminaAbilityAt: (slot) =>
       isAce(slot) && options.ace !== undefined ? options.ace.staminaAbility : masterAt(slot).ability[3],
-    // 벤치 줄의 +0x2c — 마스터 줄은 모두 10000 이고 미션 한 판 안에서는 벤치가 안 던진다
+    // 벤치 줄의 +0x2c — 확정(직접 떴다): 미션의 CPU 팀은 명부 0xb8680 의 모드 5·6 갈래(b86e2)라 g[0x11f] · g[0x176] 대기와
+    // g[0xf6] == 2(시즌) 가 함께 설 때만 시즌 팀 0x1f571 이고(그 조합은 SYS 8 이 시즌에서 대기를 안 세워 안 생긴다) 늘 마스터 팀
+    // 0x1f8c1 이다. 마스터 팀은 0x1ff98 이 XlsPITCHER_DATA 행(0x21 + 팀×0x180 + 칸×0x30)을 통째 베끼고, 그 +0x2c 는 15 팀 120 줄
+    // 모두 10000 이다(zt1 을 풀어 확인). 마스터 팀을 쓰는 모드는 5·6 뿐이고(0xd8a30 점프표 — 1 · 2 · 3 · 4 · 8 · 9 는 다른 표)
+    // 미션 끝 0x4ea0c(4ef18) · 다시하기 · 나가기가 0x20094 → 0x1ff98 로 다시 싣는다 → 미션 시작의 벤치는 늘 10000 이다
     staminaAt: () => FULL_STAMINA,
     lead,
     // 0x66e44 의 V = 0x1f9a8(앱, 모드, 팀) — 모드 5·6·7 은 0x1fa1e(늘 0)라 V 가 없어 사기 100

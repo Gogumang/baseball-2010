@@ -349,6 +349,16 @@ describe('R+0x130 — 주자 목록 마지막 원소의 +0x96 (0xa8c5c~0xa8c86)'
     expect(applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }).allowed.baserunner).toBe(0)
   })
 
+  it('삼진과 한 정산인 도루 · 폭투 판이면 그 판의 주자 목록대로다 — 잡힌 도루 주자가 마지막이면 0 (ae576 · ae596 → a8c5c)', () => {
+    expect(applyPitcherOutcome(withBases(FIRST), { kind: '삼진' }).allowed.baserunner).toBe(1)
+    expect(
+      applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }, { settledRunnerFates: [fate(1, false, true)] }).allowed.baserunner,
+    ).toBe(0)
+    expect(
+      applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }, { settledRunnerFates: [fate(1, false, false)] }).allowed.baserunner,
+    ).toBe(1)
+  })
+
   it('주자가 있으면 맨 앞 주자를 본다 — 삼진으로 남은 1루 주자는 1, 득점하면 0', () => {
     expect(applyPitcherOutcome(withBases(FIRST), { kind: '삼진' }).allowed.baserunner).toBe(1)
     const 득점 = playedWith(
