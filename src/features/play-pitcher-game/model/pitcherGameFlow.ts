@@ -458,6 +458,8 @@ export interface PitcherGameProgress {
    */
   readonly sceneConfirmPending?: boolean
   readonly lastPitch: Pitch | null
+  /** 마지막 공(`lastPitch`)이 실투였나 — 놓기 0x4dc78 4deae 의 투구 객체 +8 = 4 → 0x38d1c 38ee0 머리 위 "!" (`PitcherSideStage.isMistakePitch`) */
+  readonly lastPitchIsMistake?: boolean
   /** 마지막 공에 CPU 타자가 휘둘렀으면 그 스윙 프레임 · 번트 종류 — 타석 장면의 타자 자세(0x4e0dc → 0x49e64) */
   readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
@@ -1271,6 +1273,7 @@ export function startPitch(
     atBatPitches: progress.atBatPitches + 1,
     halfInningPitches: progress.halfInningPitches + 1,
     lastPitch: pitch,
+    lastPitchIsMistake: isMistake,
     lastCpuSwing: cpuSwingPoseOf(thrown),
     lastResolution: resolution,
     // 경기 +0xfd4 — 0x11 진입이 지우고 CPU 타자가 휘두른 공이면 스윙 판정이 덮는다

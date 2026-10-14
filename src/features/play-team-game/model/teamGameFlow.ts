@@ -810,6 +810,11 @@ export interface TeamGameProgress {
   readonly opponentSpecialSwingRemaining: readonly number[]
   readonly pitchCount: number
   readonly lastPitch: Pitch | null
+  /**
+   * 우리가 던진 마지막 공(`lastPitch`)이 실투였나 — 놓기 0x4dc78 의 4deae 가 실투 판정 0x33cbc 참이면 투구 객체 +8 = 4 를 적고,
+   * 투수 그리기 0x38d1c 38ee0 이 그림마다 1 줄이며 머리 위 "!" 를 그린다 (`PitcherSideStage.isMistakePitch`)
+   */
+  readonly lastPitchIsMistake?: boolean
   /** 우리가 던진 마지막 공에 CPU 타자가 휘둘렀으면 스윙 프레임 · 번트 종류 — 사람 수비 타석 장면의 타자 자세(0x4e0dc) */
   readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
@@ -3121,6 +3126,7 @@ function pitchOnce(
     },
     pitcherLines: chargeMoundLine(progress, true, { pitches: 1 }),
     lastPitch: pitch,
+    lastPitchIsMistake: isMistake,
     lastResolution: resolution,
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
