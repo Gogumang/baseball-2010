@@ -15,6 +15,7 @@ import {
   missionCpuBatterAbilityOf,
   missionCpuBatterOf,
   missionCpuMoundPitcherAbilityOf,
+  missionCpuMoundPitcherEquipmentOf,
   startMissionCpuTeam,
 } from '@/entities/mission/model/missionCpuTeam'
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
@@ -327,5 +328,21 @@ describe('투수 소모의 비겁자(비트 18) · 끈기(비트 10) — 0xa5e14
     const rows = Array.from({ length: 15 }, (_unused, teamId) => teamPitchers(teamId)).flat()
     expect(rows.filter((row) => ((row.skillBits >>> 10) & 1) === 1)).toHaveLength(12)
     expect(rows.filter((row) => ((row.skillBits >>> 18) & 1) === 1)).toHaveLength(0)
+  })
+})
+
+describe('타자 미션 마운드 투수의 장비 니블 — 타석 교대 0x47cc8 의 48138~4816a (모드 6 도 같다)', () => {
+  it('외인구단(팀 14)이 수비하는 타자 14 — 마운드 마스터 줄 +0x19 · +0x1a 니블(제구 3)', () => {
+    const mission = missionOf('타자', 14)
+    const team = startMissionCpuTeam(mission)
+    const slot = team.pitching!.roster[team.pitching!.mound.pitcherSlot]!
+    expect(missionCpuMoundPitcherEquipmentOf(team)).toEqual(teamPitchers(14)[slot]!.equipment)
+    expect(missionCpuMoundPitcherEquipmentOf(team)).toEqual([3, 0, 0, 0])
+  })
+
+  it('마투수가 마운드에 서면(타자 4 — 팀 14 · 마투수 2) 니블이 없다 — 그림은 ace/pitcher_*', () => {
+    const team = startMissionCpuTeam(missionOf('타자', 4))
+    expect(isMissionCpuMoundAce(team)).toBe(true)
+    expect(missionCpuMoundPitcherEquipmentOf(team)).toBeUndefined()
   })
 })

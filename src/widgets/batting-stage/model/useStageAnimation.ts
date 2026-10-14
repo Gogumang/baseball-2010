@@ -150,7 +150,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const bases = hud?.bases ?? { first: false, second: false, third: false }
       return {
         pitcher: pitcherAbility,
-        situation: pitchSituationOf(hud, latestRef.current.batterForm),
+        situation: pitchSituationOf(hud, latestRef.current.batterForm, latestRef.current.batterHand),
         difficulty: 'hard',
         magic: magicStateOf(pitcherAbility.repertoire),
         // 견제를 받아 줄 쪽이 있을 때만 켠다 — 주자 루는 HUD 루 그대로 (원본 0xa9878 자리)
@@ -318,6 +318,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         phaseRef.current = '대기'
         phaseStartedAtRef.current = now
         pitchRef.current = null
+        // 0xf 진입 0x3d954 → 0x35650 → 0xb9318 이 스윙 객체를 대기(상태 5)로 되돌린다 — 그때까지 스윙 끝 칸에 머문다 (`batterFrameAt`)
+        swingStartedAtRef.current = -1
       }
     }
 
@@ -377,8 +379,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const tickLength = millisecondsPerFrame()
       // 몸통 종류 t = 폼 >> 1 (0 balancer · 1 sluger, 0x78ab0) — 자세표도 이걸로 갈린다
       const bodyType = bodyTypeOf(latestRef.current.batterForm)
-      // 손 = 폼 & 1 (0 우타 · 1 좌타) — 그림 반전과 앵커·존 칸을 고른다 (R6 4절)
-      const side = batterSideOfForm(latestRef.current.batterForm)
+      // 손 0xb63c0 (0 우타 · 1 좌타) — 그림 반전과 앵커·존 칸을 고른다 (R6 4절). 타석 교대 0x47d58~0x47d70 이 장면 +0x17e1 ·
+      // 그림 +0x48 · +0x60 에 같은 0xb63c1(타자)를 쓴다 — 마타자는 표 0xd88b0, 그 밖은 폼 & 1
+      const side = latestRef.current.batterHand ?? batterSideOfForm(latestRef.current.batterForm)
       const isPitching = phaseRef.current === '투구중' && pitch !== null
       const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength) : -1
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
@@ -472,6 +475,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         side,
         hud: latestRef.current.hud,
         acePitcher: latestRef.current.acePitcher,
+        ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
         tick: nowTick,
         ...(runnerAnimationSteps === undefined ? {} : { runnerAnimationSteps }),
@@ -535,6 +539,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       pitchRef.current = null
       buntRef.current = null
       swingRef.current = null
+      swingStartedAtRef.current = -1
       pitchJudgedRef.current = false
       heldResultRef.current = null
       pendingHitRef.current = null

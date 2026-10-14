@@ -325,6 +325,17 @@ export function missionCpuMoundPitcherAbilityOf(team: MissionCpuTeam): PitcherAb
 }
 
 /**
+ * **타자 미션 마운드 투수의 장비 니블** — 마스터 줄(Xls 행 사본, 0x1ff98) +0x19 · +0x1a 네 칸. 타석 교대 0x47cc8 이 마운드 그림을
+ * 다시 실을 때 마투수(0xb633c)가 아니면 48138~4816a 가 이 니블 − 1 로 장비 겹 0x79790 을 부른다(모드 6 도 같다). 마투수 칸이거나
+ * CPU 수비 팀이 없으면 undefined
+ */
+export function missionCpuMoundPitcherEquipmentOf(team: MissionCpuTeam): readonly number[] | undefined {
+  const pitching = team.pitching
+  if (pitching === null) return undefined
+  return masterPitcherRowAt(pitching, pitching.mound.pitcherSlot)?.equipment
+}
+
+/**
  * **투수 미션의 지금 CPU 타자** `0xae89c(공격 팀)` — 타순 `team+0x32` 칸에 선 명단 줄. 마타자 칸이면 `isAce`(줄은 null),
  * 아니면 마스터 팀 타자 줄(Xls 행 사본, 0x1ff98 — 대타로 들어온 벤치 줄 포함). CPU 공격 팀이 없으면(타자 미션) null.
  */

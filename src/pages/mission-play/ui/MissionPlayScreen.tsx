@@ -50,6 +50,8 @@ interface MissionPlayScreenProps {
   readonly pitcherAbility: PitcherAbility
   /** 마투수 미션의 상대. 일반 투수면 null */
   readonly opponent: AcePlayer | null
+  /** 마운드 투수 레코드 +0x19 · +0x1a 장비 니블 — 마투수면 안 넘긴다 (`BattingStage.pitcherEquipmentNibbles`) */
+  readonly pitcherEquipmentNibbles?: readonly number[] | undefined
   readonly atBat: AtBatState
   readonly isPaused: boolean
   readonly bannerText: string
@@ -155,6 +157,7 @@ export function MissionPlayScreen({
   batterRecordSlot,
   pitcherAbility,
   opponent,
+  pitcherEquipmentNibbles,
   atBat,
   isPaused,
   bannerText,
@@ -347,6 +350,8 @@ export function MissionPlayScreen({
             // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
             isVibrationOn={settings?.isVibrationOn}
             pitcherAbility={pitcherAbility}
+            // 마운드 투수 장비 겹 — 타석 교대 0x47cc8 의 48138~4816a (모드 6 도 같다)
+            pitcherEquipmentNibbles={opponent === null ? pitcherEquipmentNibbles : undefined}
             isEagleEyeEnabled={false}
             // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0 · 팀 st[0x28 + 칸])을 HUD 에 보인다
             hud={{

@@ -30,6 +30,7 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import {
   hiddenStealBasesOf,
   mySpecialSwingRemainingOf,
+  opponentPitcherEquipmentOf,
   runnerRunAbilitiesOf,
   stealableBasesOf,
 } from '@/features/play-game/model/gameFlow'
@@ -331,6 +332,8 @@ export function GameScreen({
             // 그 배열을 다시 매기므로 내 칸 = 대표팀 안 내 첨자 = `nariCupBattingOrderOf` − 1 = playerOrderIndex
             batterRecordSlot={progress.game.playerOrderIndex}
             pitcherAbility={pitcherAbility}
+            // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
+            pitcherEquipmentNibbles={opponentPitcherEquipmentOf(progress)}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
             aceLevels={aceLevels}
             hud={{

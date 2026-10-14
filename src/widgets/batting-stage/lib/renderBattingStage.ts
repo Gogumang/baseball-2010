@@ -125,7 +125,8 @@ export interface StageScene {
    *
    * *(정정 2026-10-14)* 경기 장면 마운드 그림(장면 +0xf1c)은 타석 교대 0x47cc8 이 따로 다시 싣는다 — 마운드 투수가 마투수가 아니면
    * 48138~4816a 가 **그 투수 레코드**의 니블 − 1 로 0x79790 을 부른다(모드를 안 가린다). 그래서 팀 경기 사람 수비 장면도 명단 투수
-   * 니블로 채운다(`teamPitcherSideStageOf`). ⚠️ 미이식: 사람 타석(`BattingStage`)의 CPU 투수 장비 겹은 아직 안 넘긴다.
+   * 니블로 채운다(`teamPitcherSideStageOf`). 사람 타석(`BattingStage`)도 상대 마운드 투수 레코드의 니블을 넘긴다
+   * (`BattingStage.pitcherEquipmentNibbles` — 팀 경기 · 나리 타자편 · 미션 · 홈런더비).
    */
   readonly pitcherEquipment?: PitcherEquipment
   /**

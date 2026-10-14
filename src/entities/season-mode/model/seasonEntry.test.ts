@@ -142,6 +142,21 @@ describe('영입 선수 기록에 밑값 · +0x14 · 니블이 있으면 경기 
     ])
   })
 
+  it('기록 사본의 니블 · +0xb 도 경기로 넘긴다 — 타석 그림 장비 겹(0x78fd8 · 0x79790)과 폼 · 손이 본다', () => {
+    const order = seasonEntryOrderOf({
+      pitchers: [
+        { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: 투수기록 },
+        { id: 0xb4, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: 투수기록, equipment: [0, 7, 0, 3] },
+      ],
+      batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: { ...타자기록, profile: 0x34 } }],
+    })
+    const [옮긴니블, 시즌니블] = order.pitchers
+    expect(typeof 옮긴니블 === 'object' && 'equipment' in 옮긴니블 ? 옮긴니블.equipment : null).toEqual([2, 0, 0, 0])
+    // 시즌 장비 창이 바꾼 명단 니블이 이긴다 (0x7d90 이 팀 레코드 +0x19 · +0x1a 를 쓴다)
+    expect(typeof 시즌니블 === 'object' && 'equipment' in 시즌니블 ? 시즌니블.equipment : null).toEqual([0, 7, 0, 3])
+    expect(order.batters[0]?.record).toMatchObject({ equipment: [2, 0, 0, 0], profile: 0x34 })
+  })
+
   it('밑값이 없는 옛 사본은 영입 때 남긴 0xb6414 값 그대로', () => {
     const order = seasonEntryOrderOf({
       pitchers: [],

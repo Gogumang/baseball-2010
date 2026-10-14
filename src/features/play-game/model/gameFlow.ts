@@ -1175,6 +1175,18 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
 }
 
 /**
+ * **내 타석 마운드의 상대 투수 장비 니블** — 레코드 +0x19 · +0x1a 네 칸. 타석 교대 0x47cc8 이 마운드 그림(장면 +0xf1c)을 다시 실을 때
+ * 0xae83c(수비 팀)가 마투수(0xb633c)가 아니면 48138~4816a 가 이 니블 − 1 로 장비 겹 0x79790 을 부른다(모드 4 도 같다).
+ * 레코드는 `opponentPitcherAbilityOf` 와 같은 붙박이 표 칸(Xls 행 — 리그 열 팀은 0, 외인구단 팀 14 만 제구 니블 3)이다.
+ * 마선수 대결 투수(`aceOpponent`)나 142 가 8번 칸에 넣은 마투수가 서 있으면 undefined (그림은 0x793b0 의 ace/pitcher_*)
+ */
+export function opponentPitcherEquipmentOf(progress: GameProgress): readonly number[] | undefined {
+  if (progress.aceOpponent !== null) return undefined
+  if (moundAcePitcherOf(progress, false) !== undefined) return undefined
+  return teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]?.equipment
+}
+
+/**
  * **지금 상대 마운드 투수의 소개 판 재료** (상태 0xe 의 0x44944 — 투수 `0xae83c(수비 팀)`).
  * - 이름 · 보직 `+0xb & 3`(로스터 칸 표) · 손 0xb63c0(폼 & 1 · 마투수 표 `pitcherHandOf`) — 레코드는 붙박이 표 칸 또는 142 가
  *   8번 칸에 넣은 마투수다. 마선수 대결 투수(`aceOpponent`)는 이름만 안다.

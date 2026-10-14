@@ -12,6 +12,7 @@ import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
+import { missionCpuMoundPitcherEquipmentOf } from '@/entities/mission/model/missionCpuTeam'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
@@ -238,6 +239,8 @@ export function MissionRoutes({
             session.opponentStaminaPercentAfterPitch(missionRun, pitchTypeNumber),
         }}
         opponent={missionMoundOpponent(missionRun)}
+        // 마운드 마스터 줄 +0x19 · +0x1a 니블 — 마투수 칸이면 없다 (0x47cc8 48138~4816a)
+        pitcherEquipmentNibbles={missionCpuMoundPitcherEquipmentOf(missionRun.cpu)}
         atBat={runner.atBat}
         isPaused={runner.isPaused}
         bannerText={runner.bannerText}

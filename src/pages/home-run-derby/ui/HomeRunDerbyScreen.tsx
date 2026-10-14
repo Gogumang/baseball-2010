@@ -287,6 +287,8 @@ export function HomeRunDerbyScreen({
             // 0xb6394(P) = k 로 선다. 그 뒤 마스터 줄도 배열 첨자 = 타순 칸이라 늘 지금 타순 팀+0x32 와 같다
             batterRecordSlot={session.batter.order}
             pitcherAbility={pitcher.ability}
+            // 단계 0 마스터 줄 2 의 장비 니블 → 장비 겹 (0x47cc8 48138~4816a). 마투수 단계는 없다
+            pitcherEquipmentNibbles={pitcher.equipment}
             aceLevels={aceLevels}
             swingMode="홈런더비"
             // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드 7 도 막지 않는다(모드 갈림 없음). 내 선수가 쳐서 마선수가 아니다
