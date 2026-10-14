@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { PixelScreen } from '@/shared/ui'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -116,6 +117,8 @@ interface MissionPlayScreenProps {
   readonly stealingFrom?: readonly number[]
   /** 루상 주자 애니 시계 — 미션 장면 수명(`BattingStage.runnerAnimationClock`) */
   readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
+  /** 경기 스킬 표시 판의 장면 칸(함성 비트 칸 · 애니 7 · 8) — 미션 장면 수명. 안 주면 타석 화면이 사는 동안만 */
+  readonly skillPanelScene?: MutableRefObject<SkillPanelScene>
   /**
    * 경기 중 메뉴 **"다시하기"** (표 0xcfcfc 행 1 · StrGAME[7], `0x3c706`).
    * 미션·홈런더비 행만 자동진행 자리에 이 칸이 온다. 안 넘기면 칸이 잠긴다.
@@ -186,6 +189,7 @@ export function MissionPlayScreen({
   runnerRunAbilities,
   stealingFrom,
   runnerAnimationClock,
+  skillPanelScene,
   onRestart,
   settings,
   onSettingsChange,
@@ -357,6 +361,12 @@ export function MissionPlayScreen({
             onSpecialSwingUsed={onSpecialSwingUsed}
             sceneBuntKind={sceneBuntKind}
             {...(runnerAnimationClock === undefined ? {} : { runnerAnimationClock })}
+            // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 사람이 앉은 측이 공격 측(st[9])
+            skillPanel={{
+              entryKey: sceneConfirmWait ?? null,
+              attackSide: humanSideOf(run.mission),
+              ...(skillPanelScene === undefined ? {} : { scene: skillPanelScene }),
+            }}
             gameMode={MISSION_BATTER_MODE}
             // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
             isScoreboardOn={settings?.isScoreboardOn}

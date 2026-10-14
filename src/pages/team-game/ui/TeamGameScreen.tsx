@@ -90,6 +90,7 @@ import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import { createSkillPanelScene, restoreCheerBit } from '@/widgets/batting-stage/lib/skillPanel'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
@@ -299,6 +300,8 @@ export function TeamGameScreen({
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, options)
   /** 장면 +0xf24 의 루상 주자 애니 0~2 — 장면이 사는 동안 0x35b94 가 부를 때마다 돈다 (`RunnerAnimationClock`) */
   const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), options)
+  /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c(0x3301c 가 두 측 0x3ff) · 애니 7 · 8 — 경기 장면 수명 (`skillPanel`) */
+  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), options)
   /** 수비 화면이 실시간으로 도는 판(타구 · 사람 수비의 주자 판)이 있는가 — 원본 상태 0x17 */
   const isDefenseInPlay = session.pendingDefensePlay !== null || progress.pendingRunnerPlay != null
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
@@ -861,6 +864,15 @@ export function TeamGameScreen({
             benchIndexes={session.benchBatters}
             abilitiesOf={(index) => substitutionDetailAbilities(progress, '대타', index)}
             onSelect={(benchIndex) => {
+              // 0x16 진입 0x3d458 의 0x668cc(스킨, 공격 팀, 0) — 들어오는 타자의 레코드 칸 비트를 다시 세운다(함성 29 를 다시 낼 수 있다)
+              const incoming = progress.ourEntry[benchIndex]
+              if (incoming?.recordSlot !== undefined) {
+                skillPanelSceneRef.current.cheerBits = restoreCheerBit(
+                  skillPanelSceneRef.current.cheerBits,
+                  game.playerSide,
+                  incoming.recordSlot,
+                )
+              }
               actions.pinchHit(benchIndex)
               setChangeWindow(null)
             }}
@@ -883,6 +895,8 @@ export function TeamGameScreen({
               // 장면 +0xfdc — CPU 타석(0x34436)과 사람 키가 같은 칸을 쓴다. 진행기가 공마다 든 값을 넘긴다
               sceneBuntKind={progress.sceneBuntKind ?? 0}
               runnerAnimationClock={runnerAnimationClockRef}
+              // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 사람 팀이 공격 측(st[9])
+              skillPanel={{ entryKey: progress.sceneConfirm ?? null, attackSide: game.playerSide, scene: skillPanelSceneRef }}
               // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
               canBunt
               // 팀 경기(모드 1·2·8·9)는 판정 묶음 '일반' — "내 선수" 보너스(모드 3·4)도 타자 미션 +100(모드 6)도 없다 (0xab214)
