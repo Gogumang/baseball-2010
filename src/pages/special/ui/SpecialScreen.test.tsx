@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
-  ROW, SPECIAL_ITEMS, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
+  ROW, SPECIAL_ITEMS, descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 
 /**
@@ -678,5 +679,31 @@ describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c
     const 이미지 = screen.getByTestId('명전-투수그림')
     expect([이미지.style.left, 이미지.style.top, 이미지.style.width, 이미지.style.height]).toEqual(['8px', '13px', '54px', '75px'])
     expect(screen.queryByTestId('명전-팀로고')).toBeNull()
+  })
+})
+
+describe('설명 판 까딱임 (0x252c6 · 0x25716 — 표 0xce8bc · 0xce88c)', () => {
+  it('↓ 로 옮긴 줄의 설명 판이 +2 · −2 뒤 제자리로 — 판 안 그림도 같이 옮긴다', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = 띄우기()
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 3)
+      })
+      const 판 = () => container.querySelector('img[src$="main_ui/003.png"]') as HTMLElement
+      const 제자리 = descriptionPanelTopOf(1)
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+      expect(판().style.top).toBe(`${제자리 + 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(판().style.top).toBe(`${제자리 - 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(판().style.top).toBe(`${제자리}px`)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
