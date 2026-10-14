@@ -116,12 +116,13 @@ describe('조건 20 — 기록 · 카운터로 얻는 스킬 (0xad474 ~ 0xad7cc 
     expect(meetsSkillAcquireCondition({ ...전설, mvpSeasonBits: 0b111111 }, 값(7), undefined)).toBe(false)
   })
 
-  it('10 해결사 · 16 상승세 — 경기 카운터 S+0x1f0[6] > 5 · [1]+[2]+[3] > 9, 11 번트왕은 카운터를 세지 않아 불발', () => {
+  it('10 해결사 · 16 상승세 · 11 번트왕 — 경기 카운터 S+0x1f0[6] > 5 · [1]+[2]+[3] > 9 · [5] > 49 (0xad4e0)', () => {
     expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 0, 6] }), 값(10), undefined)).toBe(true)
     expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 0, 5] }), 값(10), undefined)).toBe(false)
     expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 4, 3, 3] }), 값(16), undefined)).toBe(true)
     expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 3, 3, 3] }), 값(16), undefined)).toBe(false)
-    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 99, 0] }), 값(11), undefined)).toBe(false)
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 50, 0] }), 값(11), undefined)).toBe(true)
+    expect(meetsSkillAcquireCondition(선수({ gameSkillCounters: [0, 0, 0, 0, 0, 49, 0] }), 값(11), undefined)).toBe(false)
   })
 
   it('12 찬스 · 13 좌완UP · 14 우완UP · 15 제압 — 통산(지난 해 + 이번 해) 2루타 · 타점 · 안타 · 3루타와 손', () => {
@@ -147,6 +148,12 @@ describe('조건 20 — 기록 · 카운터로 얻는 스킬 (0xad474 ~ 0xad7cc 
       reputationCounts: { ...EMPTY_REPUTATION_COUNTS, walkOffs: 1, homeRunStreaksOfTwo: 1, homeRunStreaksOfThree: 1 },
     })
     expect(섞임.gameSkillCounters).toEqual([0, 1, 1, 1, 1, 0, 1])
+    // [5] += G+0xf8 번트 수 (0xa6a86~0xa6a92)
+    const 번트 = withGameSkillCounters(섞임, {
+      stats: EMPTY_SEASON_STATS,
+      reputationCounts: { ...EMPTY_REPUTATION_COUNTS, bunts: 3 },
+    })
+    expect(번트.gameSkillCounters).toEqual([0, 1, 1, 1, 1, 3, 1])
   })
 })
 

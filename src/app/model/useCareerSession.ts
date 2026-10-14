@@ -7,7 +7,7 @@ import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { arrivePitch, cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -977,6 +977,16 @@ export function useCareerSession({
         })
         progressRef.current = thrown
         setProgress(thrown)
+      }
+      // 번트 판정을 받은 공(자세가 틱 N − 1 까지 섬) — 0x4e1f8 → 스윙 시작 0xa5fac → 코드 11 → G+0xf8 번트 수 +1.
+      // 게이트 0xa56dc(R, 지금 타자, 1) 은 국가대항전 · 포스트시즌이면 거짓 (`recordMyBuntAttempt`)
+      const beforeBunt = progressRef.current
+      if (beforeBunt !== null && detail.hasSwung && (buntKind ?? 0) !== 0) {
+        const bunted = recordMyBuntAttempt(beforeBunt, {
+          isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+        })
+        progressRef.current = bunted
+        setProgress(bunted)
       }
       // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58) ·
       // 연속 파울(0xa7dbc) · 파울 콜 25(51c5c)는 판이 파울로 닫힐 때(`finishDefensePlay`)다 — 여기서는 타구음만 낸다.
