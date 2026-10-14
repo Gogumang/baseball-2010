@@ -118,8 +118,10 @@ export interface EffectTimeline {
  * 창 없는 system(0x8d91c) · 하위 ≠ 0 예아니오(0x8d954)는 그 자리에서 [mgr+8] = 1 을 세우므로 다음 명령은 **다음 틀**에 돈다.
  * 4~7 은 효과가 끝날 때까지 다음 명령을 막는다(`isBlockingEffectId`) — 프레임 `start + 끝 세움 + 1` 이 '끝' 그리기,
  * 그다음 틀에 다음 명령이 돈다. 그동안 앞 say 상자 · 초상화는 그대로다(`isStepHeld`).
- * ⚠️ 보상(명령 7)은 원본에서 보상 알림 창(0x8beb8 글 → 0xbbef8 → 0x74ef4 종류 1 · 첫 종류 4 는 0x741a0)을 띄우고 확인까지 기다린다
- * (0x8daa0). 웹은 그 창을 아직 안 옮겨 한 틀로 둔다.
+ * 보상(명령 7)은 원본에서 보상 알림 창(0x8beb8 글 → 0xbbef8 → 0x74ef4 종류 1 · 첫 종류 4 는 0x741a0)을 띄우고 확인까지 기다린다
+ * (0x8daa0). 웹도 창을 띄우는 보상에서 걸음을 끊어(`useEventPlayback` 의 `stopAtWindow`) 그 명령이 **멈출 명령**이 된다 — 지나온 명령에
+ * 들지 않으므로 여기서 셀 일이 없다(창은 `StoryScreen` 의 보상 창, 닫는 키가 다음 걸음을 연다).
+ * ⚠️ 지나온 명령에 남는 보상은 웹이 창 글을 못 짓는 것(첫 종류 7 등)뿐이다 — 원본은 그것도 창을 띄워 기다리지만 웹은 한 틀로 센다.
  */
 /** 지나온 명령 가운데 소리(명령 6)가 도는 틀 — `effectTimelineOf` 와 같은 셈(명령 하나에 한 틀, 막는 효과는 끝까지) */
 export function soundTimelineOf(commands: readonly EventCommand[]): readonly { readonly id: number; readonly start: number }[] {
