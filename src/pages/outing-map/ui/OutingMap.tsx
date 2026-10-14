@@ -11,9 +11,10 @@ import {
 import type { MapBox, OutingPlace } from '@/shared/config/outingPlaces'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { Button, FrameSprite } from '@/shared/ui'
+import { Button, FrameSprite, SolidStamp } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
 import { placeLabelTopLeftOf } from '@/pages/outing-map/lib/placeLabelPosition'
 import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
@@ -35,6 +36,9 @@ const cursorAnchorOf = (box: MapBox) => ({ x: box.x + Math.trunc(box.width / 2),
 
 /** 효과 1·인자 7 — 그림 무게가 7/16 이다 (R6 3a) */
 const UNSELECTED_OPACITY = 7 / 16
+/** 고른 건물 테두리 0x7ec44~0x7ecb0 — 찍는 차례 (x−1, y) · (x, y−1) · (x+1, y) · (x, y+1) 과 색 RGB(255,255,255) */
+const SELECTED_OUTLINE_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
+const SELECTED_OUTLINE_COLOR = '#FFFFFF'
 /** 시간대 2(밤) — 0xb8fbd 의 20~5시 */
 const NIGHT_TIME_SLOT = 2
 
@@ -92,9 +96,19 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
         </>
       )}
 
-      {/* 0x7ec04~0x7ecf8 — 고른 건물 · 이름은 덮개 뒤에 그려 밝게 남는다. 그다음 선택 화살표(0x7ecfc) · [!](0x7ed6c) */}
+      {/*
+        0x7ec04~0x7ecf8 — 고른 건물 · 이름은 덮개 뒤에 그려 밝게 남는다. 건물은 프레임 sel+1 을 효과 0xb(단색) · RGB(255,255,255) 로
+        (x−1, y) (x, y−1) (x+1, y) (x, y+1) 네 번 찍어 흰 1px 테두리를 두르고(0x7ec44~0x7ecb0) 그 위에 보통으로 그린다(0x7ecc0).
+        그다음 선택 화살표(0x7ecfc) · [!](0x7ed6c)
+      */}
       {OUTING_PLACES.filter((place) => place.id === selectedPlaceId).map((place) => (
-        <PlaceArt key={place.id} place={place} origins={origins} labelOrigins={labelOrigins} isSelected onOpen={onOpen} />
+        <Fragment key={place.id}>
+          {SELECTED_OUTLINE_WAYS.map(([dx, dy]) => (
+            <SolidStamp key={`${dx},${dy}`} folder={MAP_FRAMES} frame={place.frame} origins={origins}
+              x={dx} y={styles.MAP_TOP + dy} color={SELECTED_OUTLINE_COLOR} />
+          ))}
+          <PlaceArt place={place} origins={origins} labelOrigins={labelOrigins} isSelected onOpen={onOpen} />
+        </Fragment>
       ))}
       {OUTING_PLACES.map((place) => (
         place.id === selectedPlaceId ? animated(CURSOR_ANIMATION, cursorAnchorOf(place.cursorBox), `${place.id}-cursor`) : null
