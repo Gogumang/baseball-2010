@@ -168,6 +168,17 @@ describe('한 플레이 진행기 — 타자주자도 원본 수비 규칙으로
     expect(태그땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
   })
 
+  it('쥐기 판정(0xb2758)이 낸 태그 아웃은 같은 플레이 틱의 두 번째 판정(b42f2 · b43de)이 state[0x87] 을 지워 콜 20 이다', () => {
+    // 2루 주자 땅볼 — 1루수(2)가 공을 잡는 13틱의 쥐기 판정이 1루로 뛰던 타자주자를 태그(결과 3)한다. 쥐기가 +0xe0 을 세우므로
+    // 같은 플레이 틱 0xb401c 가 b42ce 뒤 vt90 을 한 번 더 부르고(머리 b36dc 에서 state[0x87] = 0), 그 판정은 아무도 안 죽여 0 이다 —
+    // 결과 코드 13 을 b4540 이 읽을 때 칸은 0 (예전 웹은 쥐기 판정의 태그를 그대로 들고 가 62 였다)
+    const 결과 = play(땅볼아웃, { first: false, second: true, third: false }, 0, [50, 409, 355, 0])
+
+    expect(결과.log).toContain('13틱 2번 야수가 잡았다 (종류 0)')
+    expect(결과.log).toContain('13틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
+    expect(결과.tagOut).toBe(false)
+  })
+
   it('얕게 뜬 공을 잡히면 주자는 원래 루에 그대로 있다 (0xa9620 리터치)', () => {
     const 결과 = play(직선타아웃, 만루, 0, 얕은뜬공)
 
@@ -250,14 +261,17 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
   })
 
   it('2아웃 땅볼 — 타자주자가 죽은 틱에 홈을 밟은 주자는 보류(0xaa1c0)되고 3아웃이라 영영 안 풀린다(0xaa388)', () => {
-    // 원본 코드 3 — 투수가 잡아 CPU 송구로 1루에 던지고, 16틱에 타자주자가 1루 포스(0xb36d0 결과 2)로 죽는 그 틱에
-    // 3루 주자가 홈을 밟는다. (예전 손-패턴 [70, 1000, 202] 의 판은 "결과 코드가 정한 1루 도착 틱" 다리에 기대고 있었다)
-    const 결과 = play(땅볼아웃, 주자3루, 2, [99, 898, 290, 1])
+    // 투수가 잡아 CPU 송구로 1루에 던지고, 17틱 그림의 플레이 틱에서 타자주자가 1루 포스(0xb36d0 결과 2)로 죽는다. 3루 주자는
+    // 그 그림의 목록 틱(16틱 6 절 이동)에 홈에 닿아, 플레이 틱 뒤의 득점 0xaa0a8(525fc)이 3아웃을 보고 보류한다.
+    // (씨앗을 다시 골랐다 — 예전 [99, 898, 290, 1] 은 득점을 아웃 판정 앞에 세던 옛 차례에 기댔다. 그 판은 이제 3아웃이 홈인
+    //  그림보다 먼저라 G1 이 닫혀 주자가 홈에 못 닿는다 — 원본 차례 그대로)
+    const 결과 = play(땅볼아웃, 주자3루, 2, [63, 704, 224, 1])
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.advance.runsScored).toBe(0)
     expect(결과.voidedRuns).toBe(1)
-    expect(결과.log).toContain('16틱 1번 주자 홈 — 보류 1 / 득점 0')
+    expect(결과.log).toContain('17틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.log).toContain('17틱 1번 주자 홈 — 보류 1 / 득점 0')
   })
 
   it('2아웃 땅볼 — 타자주자가 살아 뛰던 때 바로 올린 득점(0xaa1b0)은 뒤에 타자주자가 죽어 3아웃이 돼도 남는다', () => {
@@ -269,7 +283,20 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
     expect(결과.runnerFates[0].retired).toBe(true)
     expect(결과.advance.runsScored).toBe(1)
     expect(결과.voidedRuns).toBe(0)
-    expect(결과.log).toContain('16틱 1번 주자 홈 — 보류 0 / 득점 1')
+    // 주자는 16틱 6 절 이동(그림 17 의 목록 틱)에 닿고 그림 17 의 슬롯 2 득점 0xaa0a8 이 센다
+    expect(결과.log).toContain('17틱 1번 주자 홈 — 보류 0 / 득점 1')
+  })
+
+  it('3아웃이 난 그림 뒤의 목록 틱에서야 홈에 닿을 주자는 득점도 보류도 없다 — 관문이 닫혀 0xaa0a8 이 안 돈다', () => {
+    // 16틱 그림의 플레이 틱에서 타자주자가 1루 포스로 3아웃 → 그 그림 그리기 G3 부터 닫혀(b0dbe) 다음 그림의 목록 틱 · 슬롯 2 가
+    // 없다. 3루 주자는 그 목록 틱에 홈에 닿을 참이었다 — 예전 웹은 득점을 아웃 판정 앞(6 절 이동 뒤)에 세어 보류 1 로 적었다
+    const 결과 = play(땅볼아웃, 주자3루, 2, [99, 898, 290, 1])
+
+    expect(결과.log).toContain('16틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.advance.outsAdded).toBe(1)
+    expect(결과.advance.runsScored).toBe(0)
+    expect(결과.voidedRuns).toBe(0)
+    expect(결과.log.some((line) => line.includes('주자 홈'))).toBe(false)
   })
 
   it('2아웃이라도 안타로 타자주자가 살면 점수는 그대로 난다', () => {
@@ -678,8 +705,9 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     const 잡음 = 필살.log.findIndex((line) => line.includes('잡았다'))
     expect(맞음).toBeGreaterThanOrEqual(0)
     expect(잡음).toBeGreaterThan(맞음)
-    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 유격수가 줍는다
-    expect(필살.log[잡음]).toBe('23틱 5번 야수가 잡았다 (종류 0)')
+    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 2루수가 줍는다.
+    // 다시 쏘기(b45a0)는 그림 6 의 슬롯 2 라 예보가 그 그림의 야수 자리(6 절 이동 앞)로 고른다 — 예전 웹은 이동 뒤 자리로 골라 유격수였다
+    expect(필살.log[잡음]).toBe('23틱 3번 야수가 잡았다 (종류 0)')
   })
 
   it('튕기는 동안에도 3루 주자는 홈을 밟는다', () => {
@@ -780,13 +808,14 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   it('사람이 귀루 키를 누르면 되돌아 뛰다가 협살 태그로 죽는다', () => {
     // 협살은 수비가 CPU 일 때만 걸리므로 공격은 늘 사람이다. 되돌아 뛰는 것은 귀루 키('3' = 1루 주자,
     // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그(0xb36d0 결과 3)다 — 협살 중이라 협살 아웃으로 센다.
-    // 16틱 귀루: 달려가는 루가 1루로 바뀐 주자를 공 쥔 1루수가 마주 쫓아 28틱에 태그한다
+    // 16틱 귀루: 달려가는 루가 1루로 바뀐 주자를 공 쥔 1루수가 마주 쫓아 29틱에 태그한다
+    // (아웃 판정 · 낙구 요구 루가 이동 앞(같은 그림 슬롯 2)이 되어 예전 28틱보다 한 틱 뒤다)
     const 결과 = 협살상황(true)
 
     expect(결과.log).toContain('16틱 귀루 — 주자 1')
     expect(결과.rundowns).toBe(1)
     expect(결과.rundownOuts).toBe(1)
-    expect(결과.log).toContain('28틱 협살 태그 — 1번 주자 아웃')
+    expect(결과.log).toContain('29틱 협살 태그 — 1번 주자 아웃')
     // 타자주자 1루 포스(15틱) + 협살 태그
     expect(결과.advance.outsAdded).toBe(2)
   })
@@ -1339,7 +1368,9 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     const 태그 = 결과.log.find((line) => line.includes('태그 아웃'))
     expect(태그).toBeDefined()
     const 아웃틱 = 태그!.split('틱')[0]
-    expect(아웃틱).toBe('13')
+    // 3루 주자는 13틱 6 절 이동(그림 14 의 목록 틱)에 포수 옆으로 들어오고, 그림 14 의 플레이 틱 b43da 가 태그한다
+    // (예전 웹은 아웃 판정을 이동 뒤 같은 판 틱에 두어 13틱으로 적었다)
+    expect(아웃틱).toBe('14')
     expect(결과.log.some((line) => line.startsWith(`${아웃틱}틱 1루로 송구`) && line.includes('CPU 결정'))).toBe(true)
     expect(결과.throwBase).toBe(1)
     expect(결과.advance.outsAdded).toBe(2)
@@ -1659,7 +1690,8 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
     // 무사 1루 — 원본 코드 15 [95, 980, 750]: 30틱 귀루 키에 1번 주자가 2↔3루 협살(2루수 3 · 3루수 4)에 걸리고, 34틱 진루 ·
-    // 37틱 귀루 키에 짝 송구가 3→4(35틱) · 4→3(43틱) 으로 오간다. 49틱에 받은 2루수가 2루로 가 닿는 50틱에 1번 주자가 이미 2루에 서 있다.
+    // 37틱 귀루 키에 짝 송구가 3→4(35틱) · 4→3(43틱) 으로 오간다. 49틱에 받은 2루수가 2루로 가 닿고(50틱 6 절 이동 = 그림 51 의 목록 틱), 그림 51 의 플레이 틱 b4412 가 그 +0x3b 와 이미 2루에
+    // 선 1번 주자를 본다.
     // (예전 장면 [94, 1359, 221] 씨앗 257 은 투수 펌블로 튄 공에 기댄 협살이었다 — 투수 칸은 선수가 없어(0xb0fb4 b1032) 펌블하지 않는다)
     const keys: Record<number, string> = { 30: '3', 34: '2', 37: '3' }
     const 결과 = runDefensePlay({
@@ -1673,7 +1705,7 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
     })
 
     expect(결과.log).toContain('43틱 협살 송구 4→3 — 49틱 도착')
-    expect(결과.log).toContain('50틱 결과 코드 9 — 3번 야수가 2루에 닿았지만 1번 주자가 서 있다')
+    expect(결과.log).toContain('51틱 결과 코드 9 — 3번 야수가 2루에 닿았지만 1번 주자가 서 있다')
   })
 
   it('3아웃이면 그 틱 끝에서 판이 닫힌다 — 판 진행 관문 0xb0d28 의 state[6] > 2 (b0dbe)', () => {
@@ -2232,6 +2264,50 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
   it('건너뛰지 않으면 아무것도 안 한다', () => {
     const 결과 = runDefensePlay(홈런판())
     expect(결과.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
+  })
+
+  it('같은 목록 틱에 앞 주자도 홈에 닿으면 타자주자의 0x13(카메라 3f17e)이 먼저고, 앞 주자는 다음 그림의 득점 0xaa0a8 이 센다', () => {
+    // 원본 차례: 건너뛰는 동안 52b26 의 0x3f060 = 목록 틱(주자 이동) → 카메라 3f164 가 곧바로 타자주자 메시지 0x13 → 52b36 에서 멈추고 그린다.
+    // 같은 목록 틱에 닿은 앞 주자의 +0x3b 는 그 뒤 슬롯 2 의 0xaa0a8(525fc)이 본다 — 웹은 다음 판 틱 6f 절이다
+    const 풀린틱 = (() => {
+      let state = startDefensePlay(홈런판())
+      let pressed = false
+      while (!isDefensePlayFinished(state)) {
+        const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+        if (key !== null) pressed = true
+        const before = state.fastForward || key !== null
+        state = stepDefensePlay(state, key)
+        if (before && !state.fastForward) return state.tick - 1
+      }
+      return -1
+    })()
+    expect(풀린틱).toBeGreaterThan(0)
+
+    let state = startDefensePlay(홈런판())
+    let pressed = false
+    while (state.tick < 풀린틱) {
+      const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+      if (key !== null) pressed = true
+      state = stepDefensePlay(state, key)
+    }
+    // 1루 주자를 타자주자와 같은 자리 · 같은 걸음으로 홈 앞에 다시 세운다(이미 들어온 1점은 그대로 둔다)
+    const 타자 = state.runners[0]
+    const 앞주자 = state.runners[1]
+    앞주자.state = { ...타자.state, index: 앞주자.state.index, isBatterRunner: false, scored: false, isOut: false }
+    앞주자.counted = false
+    앞주자.arrivedThisListTick = false
+    const 앞점수 = state.held.scoreboardRuns
+
+    state = stepDefensePlay(state, null)
+    expect(state.fastForward).toBe(false)
+    expect(state.runInsThisTick).toEqual([0])
+    expect(앞주자.state.scored).toBe(false)
+    expect(state.held.scoreboardRuns).toBe(앞점수 + 1)
+
+    state = stepDefensePlay(state, null)
+    expect(state.runInsThisTick).toEqual([앞주자.state.index])
+    expect(앞주자.state.scored).toBe(true)
+    expect(state.held.scoreboardRuns).toBe(앞점수 + 2)
   })
 })
 

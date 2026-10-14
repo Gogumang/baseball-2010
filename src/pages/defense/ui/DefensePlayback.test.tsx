@@ -367,12 +367,12 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
   it('재생 갈래 — 타자주자가 홈을 밟으면 판이 서고 공격 쪽 점수가 1점씩 올라간다 (마지막 틱 = 플레이 끝이면 내린다)', async () => {
     const { homeRunPlaybackOf } = await import('@/features/defense-play/model/homeRunPlayback')
     const 홈런 = homeRunPlaybackOf({ outcome: { kind: '홈런', bases: 4 } as AtBatOutcome, bases: 주자3루 })!
-    // 판의 마지막 그림은 틱 머리라 타자주자가 홈을 한 걸음 앞둔 그림이다 — 그 틱 끝(홈인 뒤) 자리로 옮긴 그림을 만들고,
-    // 원본 0x17 이 홈인 뒤에도 이어지는 경우를 흉내 내 62 틱 더 붙인다 — 첫 장이 홈인 틱, 마지막 장이 플레이 끝
-    const 머리 = 홈런.ticks[홈런.ticks.length - 1]!
+    // 판의 마지막 그림은 타자주자가 홈에 닿은 목록 틱 뒤 그림이다(득점 0xaa0a8 은 그 그림의 슬롯 2) — 원본 0x17 이 홈인 뒤에도
+    // 이어지는 경우를 흉내 내 그 그림을 61 장 더 붙인다 — 판의 마지막 장이 홈인 틱, 붙인 마지막 장이 플레이 끝
+    const last = 홈런.ticks[홈런.ticks.length - 1]!
     const 홈 = basePosition(0)
-    const last = { ...머리, runners: 머리.runners.map((runner) => ({ ...runner, x: 홈.x, z: 홈.z })) }
-    const ticks = [...홈런.ticks, ...Array.from({ length: 62 }, () => last)]
+    expect(last.runners.find((runner) => runner.index === 0)).toMatchObject({ x: 홈.x, z: 홈.z })
+    const ticks = [...홈런.ticks, ...Array.from({ length: 61 }, () => last)]
     vi.useFakeTimers()
     try {
       const onDone = vi.fn()
@@ -390,8 +390,9 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
       expect(shown[0]).toBe('0')
       expect(shown).toContain('1')
       expect(shown[shown.length - 1]).toBe('2')
-      // 21 + 20 + 20 번 — 홈인 틱부터 세고 끝 틱(플레이 끝)은 그리지 않는다
-      expect(shown).toHaveLength(61)
+      // 20 + 21 + 19 번 — 두 주자가 같은 그림(판의 마지막 그림)에 홈인해 한 그림에 둘을 받는다(예전 시험은 타자주자만 한 그림
+      // 늦게 옮겨 붙여 21 + 20 + 20 이었다). 끝 틱(플레이 끝)은 그리지 않는다
+      expect(shown).toHaveLength(60)
     } finally {
       vi.useRealTimers()
     }
@@ -470,10 +471,11 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       // 내림차순이라 1루 주자(칸 1, 판 내림) → 타자주자(칸 0, n = 2 · 간격 20 · 타이머 40) 차례로 메시지 0x13 이 와 판이 선다
       const 일루 = { ...홈런(), outcome: registerContact(홈런().outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
       const 일루판 = runDefensePlay(일루)
-      // 홈인 틱 뒤 한 그림 더 — 그 그림의 G2 는 득점 0xaa0a8(G2 뒤) 앞이라 아직 열리고, 그 그림 그리기 G3 이 닫는다
+      // 둘이 홈에 닿은 목록 틱 다음 그림 — 그 그림의 G2 는 득점 0xaa0a8(G2 뒤) 앞이라 아직 열리고, 그 그림 슬롯 2 의 득점(마지막 판 틱)
+      // 뒤 그리기 G3 이 닫는다
       expect(일루판.log.filter((line) => line.includes('주자 홈 —')).map((line) => line.replace(/ — .*/, ''))).toEqual([
-        `${일루판.ticks.length - 2}틱 1번 주자 홈`,
-        `${일루판.ticks.length - 2}틱 0번 주자 홈`,
+        `${일루판.ticks.length - 1}틱 1번 주자 홈`,
+        `${일루판.ticks.length - 1}틱 0번 주자 홈`,
       ])
       // 두 점이 g 번마다 오른 뒤 g 번 더 — 판 끝 뒤 약 61 번째 닫힌 갱신 (예전 웹은 타자주자가 먼저라 판이 곧바로 내려 11 번째)
       expect(Math.abs(갱신수(일루) - (일루판.ticks.length + 61))).toBeLessThanOrEqual(3)
