@@ -45,3 +45,30 @@ export function showsPitcherFatigue(input: {
 export function pitcherFatigueFrameAt(entries: readonly StageAnimationEntry[], drawCall: number): { frame: number; dx: number; dy: number } | null {
   return loopingAnimationStepAt(entries, Math.max(0, drawCall))
 }
+
+/**
+ * **실투 "!"** — 투수 그리기 0x38d1c 의 38ee0~38f3e (2026-10-14 직접 떴다). 체력 그림과 같은 함수, 모드 7 거름(38ed6) 뒤 · 체력 거름(38f42) 앞:
+ * ```
+ * 38ee0  c = 투구 객체 [+0xf98] 바이트 +8
+ * 38eec  c ≠ 0 이면 +8 = c − 1 하고 player_effect(+0x1030) 애니 13 을 (투수 x, 투수 y − 0x34) 에 효과 0 · 깊이 [0xcfa8c+8] 로,
+ *        그린 뒤 0x93d91([애니표 +0x34]) 로 한 칸
+ * ```
+ * +8 을 쓰는 곳은 놓기 0x4dc78 둘뿐이다(Q1 노트 · `strb #8` 전수): 4de9c 에서 0 으로 지우고, 실투 판정 0x33cbc 가 참이면 4deae 에서 4.
+ * 곧 **실투 공이 손을 떠난 틱부터 네 번** 머리 위에 "!" 가 뜬다. 상태 0x16 · 던지는 동작 · 마투수 거름(38f42~38f62)은 이 뒤라 안 받는다
+ * — 마투수도 실투면 뜬다. 효과 0 이라 좌투도 안 뒤집고 x 는 좌투 + 1 (0x38db8) 자리 그대로다.
+ * 애니 13 은 프레임 50 네 칸(지연 0, dy 0 · +2 · −1 · −2)이고 0xf 진입 0x3d954 가 player_effect 애니를 모두 되감으며 돌림 비트
+ * 0x1a610(비트 4 · 9 · 10 · 13 · 15 · 16 — 즉치 마스크)으로 13 을 돌림으로 켠다. k 번째 그림은 k 칸 나아간 칸이다(체력 그림과 같은 셈).
+ * 홈런 갈래의 "!"(39136 — 0x357e0 · 투수 단계 13 · +0x199a)는 웹이 투수 단계 13 을 몰라 옮기지 않았다(⚠️ 미이식).
+ * ⚠️ 근사: +8 은 그림마다 1 줄지만 웹은 놓은 틱(0x11 틱 10)부터 장면 틱으로 센다.
+ */
+export const MISTAKE_MARK_ANIMATION = 13
+/** 4deae — 실투면 +8 = 4 */
+export const MISTAKE_MARK_DRAWS = 4
+/** 38f22 `subs r2, #0x34` — 투수 y 위 52 */
+export const MISTAKE_MARK_OFFSET_Y = -0x34
+
+/** 놓은 틱부터 k 번째(1 부터) 그림이면 "!" 를 그리는가 (38ed6 모드 7 거름 · 38eec +8 ≠ 0) */
+export function showsPitcherMistakeMark(gameMode: number | undefined, drawCall: number | null): boolean {
+  if (gameMode === HOME_RUN_DERBY_MODE || drawCall === null) return false
+  return drawCall >= 1 && drawCall <= MISTAKE_MARK_DRAWS
+}

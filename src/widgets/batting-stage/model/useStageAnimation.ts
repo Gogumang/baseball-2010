@@ -153,6 +153,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let cpuPitchCycle: { startedAt: number; typeRolls: number; typeNumber: number; target: WorldPoint | null } | null = null
     /** 0x11 에 들어서 놓기(틱 10)를 기다리는 공 — 0xf 의 마지막 구질과 0x10 의 목표점 */
     let releasePending: { typeNumber: number; target: WorldPoint } | null = null
+    /** 실투로 놓은 공 — 놓기 0x4dc78 이 투구 객체 +8 = 4 (4deae), 투수 그리기 0x38d1c 가 그림마다 1 줄이며 "!" 를 그린다 */
+    let mistakeMarkPitch: object | null = null
     /** 그 틱에 원본이 읽는 재료 — 볼카운트 · 주자 · 마구 · 투수 (`selectPitch` 와 같은 인자) */
     const cpuPitchArgsNow = (): CpuPitchArgs => {
       const { pitcherAbility, hud, onPickoff } = latestRef.current
@@ -243,6 +245,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           latestRef.current.random,
         )
         releasePending = null
+        // 4de9c +8 = 0 · 4deae 실투면 +8 = 4 — 공마다 다시 적는다
+        mistakeMarkPitch = choice.isMistakePitch ? choice.pitch : null
         pitchRef.current = choice.pitch
         pitchTypeNumberRef.current = choice.pitchTypeNumber
       }
@@ -537,6 +541,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         side,
         hud: latestRef.current.hud,
         pitcherStaminaPercent: latestRef.current.pitcherStaminaPercent ?? null,
+        // 실투 "!" — 놓은 0x11 틱 10 의 그림이 첫 그림(1)이다 (`pitcherFatigue` 의 실투 "!")
+        pitcherMistakeMarkDraw:
+          isPitching && pitch !== null && pitch === mistakeMarkPitch
+            ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) - CPU_RELEASE_TICK_IN_0X11 + 1
+            : null,
         ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
