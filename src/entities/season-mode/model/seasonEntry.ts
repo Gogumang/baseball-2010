@@ -355,6 +355,20 @@ export interface SeasonEntryTablePitcher {
   readonly equipment?: readonly number[]
 }
 
+/**
+ * 기록으로 선 선수의 지금 레코드 니블 — 시즌 장비 창(0xdc → 0x7d90)이 쓴 시즌 명단 값, 없으면 영입 0xc554 가 옮긴 기록 사본의 니블.
+ * 둘 다 없으면(니블 칸이 생기기 전의 옛 사본) 싣지 않는다 — 맨몸으로 그린다.
+ * ⚠️ 이사 못 함: 1514e8c 앞에 영입한 나리 사본은 영입 순간의 니블을 남기지 않았고 지금 나리 저장은 그 뒤에 바뀌었을 수 있어
+ *    되찾을 길이 없다(지어내지 않는다). 니블 없는 옛 명전 기록도 같다
+ */
+function recordNibblesOf(
+  player: SeasonPlayer,
+  record: Pick<SeasonEntryBatterRecord, 'equipment'>,
+): { readonly equipment?: readonly number[] } {
+  const equipment = player.equipment ?? record.equipment
+  return equipment === undefined ? {} : { equipment }
+}
+
 export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEntryRecordSource): SeasonEntryOrder {
   const isTablePlayer = (player: SeasonPlayer) => player.id < HALL_OF_FAME_FIRST_ID
   return {
@@ -383,6 +397,9 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
               recordId: player.id,
               // 장착 비트(+0x14) — 간이 타석 0xab214 의 스킬 판정이 본다(옛 사본은 없다)
               ...(record.skillBits === undefined ? {} : { skillBits: record.skillBits }),
+              // 니블 +0x19 · +0x1a(타석 그림 장비 겹 0x78fd8) · +0xb(폼 · 피부 · 손) — 영입 0xc554 가 통째로 옮긴 0x30 바이트의 칸
+              ...recordNibblesOf(player, record),
+              ...(record.profile === undefined ? {} : { profile: record.profile }),
             },
           }
     }),
@@ -398,12 +415,14 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
       const carried = player.record
       const record = carried !== undefined && 'repertoire' in carried ? carried : recordOf?.pitcher(player)
       if (record === undefined) return NOT_IN_ROSTER
-      // 0xb6414 를 지금 니블로 다시 셈한다(`seasonRecordAbilityOf`). 장착 비트(+0x14)도 실어 경기의 스킬 판정이 본다
+      // 0xb6414 를 지금 니블로 다시 셈한다(`seasonRecordAbilityOf`). 장착 비트(+0x14)도 실어 경기의 스킬 판정이 본다.
+      // 니블(+0x19 · +0x1a)은 마운드 그림 장비 겹(타석 교대 0x47cc8 48138~4816a → 0x79790)이 고른다
       const { baseAbility: _base, equipment: _equipment, ...rest } = record
       return {
         ...rest,
         ability: seasonRecordAbilityOf(record, player.equipment, true),
         recordId: player.id,
+        ...recordNibblesOf(player, record),
       }
     }),
   }

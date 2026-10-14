@@ -8,6 +8,8 @@ import {
   rosterEntryPitchersOf,
   withAceBatter,
   withAcePitcher,
+  withBatterRecordNibbles,
+  withPitcherRecordNibbles,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type { TeamEntryOrder } from '@/features/play-team-game/model/teamGameRoster'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
@@ -80,5 +82,35 @@ describe('마선수 경기 능력치 aceLeveledAbility — 0xb6415(rec, k, 1): �
     const leveled = aceLeveledAbility(raw, '투수', 3, {})
     expect(leveled[0]).toBe(Math.trunc((raw[0] * 60) / 100) + Math.trunc(Math.trunc((raw[0] * 60) / 100) / 10))
     expect(leveled[1]).toBe(Math.trunc((raw[1] * 60) / 100))
+  })
+})
+
+describe('기록으로 선 영입 선수의 니블 · +0xb — 영입 0xc554 가 통째로 옮긴 0x30 바이트', () => {
+  const 투수기록 = {
+    name: '나리투',
+    ability: [500, 500, 500, 500] as const,
+    repertoire: { name: '나리투', form: 1, pitchMask: 1, magicId: 0 },
+    recordId: 0xfe,
+    equipment: [4, 0, 0, 2],
+  }
+  const 타자기록 = { name: '나리타', ability: [500, 500, 500, 500] as const, recordId: 0xfe, equipment: [0, 3, 0, 0], profile: 0x34 }
+  const order: TeamEntryOrder = {
+    batters: [{ rosterSlot: -1, position: 3, record: 타자기록 }, ...Array.from({ length: 8 }, (_, slot) => ({ rosterSlot: slot, position: slot + 1 }))],
+    pitchers: [투수기록, 1, 2, 3, 4],
+  }
+
+  it('명단 칸이 니블(마운드 장비 겹 0x79790 · 타자 0x78fd8)과 +0xb 를 든다', () => {
+    expect(entryPitchersOfOrder(0, order)[0]?.equipment).toEqual([4, 0, 0, 2])
+    expect(entryBattersOfOrder(0, order)[0]).toMatchObject({ equipment: [0, 3, 0, 0], profile: 0x34, recordId: 0xfe })
+  })
+
+  it('옛 경기 블록(칸 없음)은 같은 원본 id 의 지금 기록에서 빠진 칸만 채운다 — 표 줄 · 있는 값은 그대로', () => {
+    const { equipment: _p, ...옛투수 } = entryPitchersOfOrder(0, order)[0]!
+    const { equipment: _b, profile: _f, ...옛타자 } = entryBattersOfOrder(0, order)[0]!
+    const 표투수 = entryPitchersOfOrder(0, order)[1]!
+    expect(withPitcherRecordNibbles([옛투수, 표투수], order)).toEqual([{ ...옛투수, equipment: [4, 0, 0, 2] }, 표투수])
+    expect(withBatterRecordNibbles([옛타자], order)).toEqual([{ ...옛타자, equipment: [0, 3, 0, 0], profile: 0x34 }])
+    const 있는값 = { ...옛투수, equipment: [1, 1, 1, 1] }
+    expect(withPitcherRecordNibbles([있는값], order)).toEqual([있는값])
   })
 })
