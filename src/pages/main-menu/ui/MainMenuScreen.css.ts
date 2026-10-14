@@ -71,18 +71,6 @@ export const description = style({
   pointerEvents: 'none',
 })
 
-export const confirmKeys = style({
-  position: 'absolute',
-  left: 0,
-  right: 0,
-  bottom: '4px',
-  display: 'flex',
-  gap: '14px',
-  justifyContent: 'center',
-  color: theme.color.accent,
-  fontSize: '11px',
-})
-
 export const backButton = style({
   position: 'absolute',
   left: '6px',
