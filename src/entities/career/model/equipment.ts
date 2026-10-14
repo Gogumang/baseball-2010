@@ -77,9 +77,12 @@ export const ownsEquipment = (career: PlayerCareer, part: number, level: number)
 const COLLECTOR_LEVEL = 8
 
 /**
- * 히든 레벨이 열렸는가. 레벨 0~6 을 모두 가지면 컬렉터 칸(레벨 8)이 열린다 (0xa5020).
- * 원본 오픈 비트는 전역 저장(game_o.sav)에 있고 이벤트 304~307(보상 7)·미션 올 클리어 등으로도 열리지만
- * 웹판은 아직 컬렉터 조건만 본다 (누락 탐색 7차 표 참고).
+ * 히든 장비 오픈 경로 — 모두 전역 해금표(`app+0xc0`)에 0x62368 로 켠다. 열렸는지는 `isHiddenOpen` 이 그 표만 본다.
+ * - 컬렉터(레벨 8): 레벨 0~6 을 모두 가지면 — 구매 확정 0x14a74 가 네 부위 0xa5020 을 본다(`purchaseEquipment`)
+ * - 이벤트 보상 종류 7(0x8c60e `0x62368(전역, |v|, 1)`): r_event 304~307 의 값 43 · 35 · 19 · 29 (R7 4절) —
+ *   `eventReward` 가 커리어에 켜고 앱이 기록연감 해금표로 올린다(`useCareerSession` 의 `announceHiddenOpen`)
+ * - 미션 편별 올클리어 0xa5184(정산 4ef86): 타자 37 · 투수 21 — `useMissionSession` 이 기록연감에 켜고 `syncOpenedHidden` 이 선수에게 옮긴다
+ * - 오토봇 배트 41(0x15984 · 0x6900 — 세 모드 정규시즌 1위) 등 나머지 id 는 아래 주석과 `entities/collection`
  */
 /**
  * 타자 장비 오픈 id (헬멧 35~38 · 배트 39~42 · 밴드 43~46 · 슈즈 47~50, 0x61f5c).
