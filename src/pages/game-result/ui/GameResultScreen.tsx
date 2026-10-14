@@ -164,32 +164,35 @@ export function GameResultScreen({
     const title = newTitles[0]
     return (
       <RawScreen>
-        {isTitlePopupOpen && title !== undefined ? (
-          <>
-            {underlay}
-            {/*
-              116 진입 1299e~129c8 — 칭호 39 가 없고 이 경기 홈런 > 3 이면 +0x270 = 39 로 칭호 팝업 0x1274c(종류 0x78)를 건다.
-              그리기 0x1afe8 · 키 0x1b1e4 는 관리 화면 칭호 팝업과 같은 창(`TitleWindow`) — 키가 주고 그 자리에서 치운다.
-              ⚠️ 근사: 팝업이 떠 있는 동안 밑의 평가 이벤트가 어디까지 도는지는 미해결이라 팝업을 닫은 뒤 이벤트를 튼다
-            */}
+        <EvaluationEventPlayer
+          underlay={underlay}
+          // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
+          dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
+          dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
+          changeValues={changeValues}
+          goals={yearGoalWindowValuesOf(career)}
+          year={career.season}
+          // 0x7d120(…, 1) — 막 치른 경기 번호
+          game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
+          streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
+          streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
+          gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
+          onDone={onContinue}
+        />
+        {isTitlePopupOpen && title !== undefined && (
+          /*
+            116 진입 1299e~129c8 — 칭호 39 가 없고 이 경기 홈런 > 3 이면 +0x270 = 39 로 칭호 팝업 0x1274c(종류 0x78)를 건다.
+            그리기 0x1afe8 · 키 0x1b1e4 는 관리 화면 칭호 팝업과 같은 창(`TitleWindow`) — 키가 주고 그 자리에서 치운다.
+            **밑의 평가 이벤트는 팝업과 함께 돈다** (2026-10-14 직접 뜸): 116 진입은 팝업을 건 뒤 끝(12bb6~12bbe)에서
+            0xbcb49(114) 를 걸고, 나리 틀 0x1cdec 는 창이 떠 있어도(0x1d070 0x754f9 참) 상태 키 표 0xcc7e0 만 건너뛰고
+            상태 바꿈(0x1ce00) · 진입 · 갱신(0x1d1b2 → 114 0x1c014 — 이벤트 실행기 0x8cf65)· 그리기는 돌린다.
+            그래서 다음 틀에 114 가 들어와 명령 1 say 상자가 팝업 밑에서 오르고, 키(114 키 0x13b88 → 0x8b805)는 창이 먹어
+            대사는 팝업이 치워진 뒤의 키부터 넘어간다(치우는 그 틀의 키도 0x754f9 가 1 이라 이벤트에 안 간다).
+            ⚠️ 웹은 팝업과 같은 그림에서 이벤트를 세운다 — 원본은 114 진입이 한 틀 늦다.
+          */
+          <div style={{ position: 'absolute', inset: 0, zIndex: 50 }}>
             <TitleWindow title={title} onKey={onConfirmTitle} onClose={() => setIsTitlePopupOpen(false)} />
-          </>
-        ) : (
-          <EvaluationEventPlayer
-            underlay={underlay}
-            // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
-            dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
-            dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
-            changeValues={changeValues}
-            goals={yearGoalWindowValuesOf(career)}
-            year={career.season}
-            // 0x7d120(…, 1) — 막 치른 경기 번호
-            game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
-            streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
-            streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
-            gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
-            onDone={onContinue}
-          />
+          </div>
         )}
       </RawScreen>
     )

@@ -202,24 +202,33 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     expect(container.querySelector('canvas')).toBeNull()
   })
 
-  it('116 이 건 칭호 39 는 칭호 팝업 0x1274c(0x1afe8 창) — 펼치는 동안 키를 안 받고, 키가 주고 그 자리에서 치운 뒤 평가 이벤트', () => {
+  it('116 이 건 칭호 39 는 칭호 팝업 0x1274c(0x1afe8 창) — 밑에서 평가 이벤트가 같이 돌고, 키는 팝업이 먹는다', () => {
     vi.useFakeTimers()
     const onConfirmTitle = vi.fn()
     render(
       <GameResultScreen summary={요약()} gamePointReward={0} newTitles={['다이너마이트 배트']} evaluation={평가}
         career={createCareer('선수')} onContinue={vi.fn()} onConfirmTitle={onConfirmTitle} />,
     )
-    expect(screen.queryByTestId('대사-상자')).toBeNull()
     expect(screen.getByTestId('칭호-창').querySelector('[data-part="이름"]')?.textContent).toBe('"다이너마이트 배트"')
-    // 펼침(높이 6 → 120) 동안은 키 콜백을 안 부른다 (0x754f8 75556~75588)
+    // 나리 틀 0x1cdec 는 창이 떠 있어도 상태 바꿈 · 갱신을 돌린다 — 114 의 명령 1 say 상자가 팝업 밑에 선다
+    expect(screen.getByTestId('대사-상자')).toBeTruthy()
+    const 대사 = () => screen.getByTestId('대사-상자').getAttribute('data-text')
+    const 처음대사 = 대사()
+    // 펼침(높이 6 → 120) 동안은 키 콜백을 안 부른다 (0x754f8 75556~75588) — 대사도 안 넘어간다(0x754f9 참 → 키 표 건너뜀)
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(onConfirmTitle).not.toHaveBeenCalled()
     프레임(200)
-    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(대사()).toBe(처음대사)
+    expect(screen.queryByRole('dialog', { name: '경기 평가 변화' })).toBeNull()
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(onConfirmTitle).toHaveBeenCalledTimes(1)
-    // 닫힘 애니 없음 — 0x1b1e4 가 0x742a8 로 바로 치운다
+    // 닫힘 애니 없음 — 0x1b1e4 가 0x742a8 로 바로 치운다. 그 키는 이벤트에 안 간다
     expect(screen.queryByTestId('칭호-창')).toBeNull()
-    프레임(200)
+    expect(screen.queryByRole('dialog', { name: '경기 평가 변화' })).toBeNull()
     expect(screen.getByTestId('대사-상자')).toBeTruthy()
+    // 팝업이 치워진 뒤의 키부터 이벤트가 받는다 — 명령 2 system sub 2(변화 창)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('dialog', { name: '경기 평가 변화' })).toBeTruthy()
   })
 })
