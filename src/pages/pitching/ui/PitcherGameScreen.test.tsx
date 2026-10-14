@@ -258,7 +258,8 @@ describe('투수편 경기 화면', () => {
       vi.useRealTimers()
     }
 
-    expect(screen.getByText('경기 결과')).toBeTruthy()
+    // 웹 제목줄 없이 원본 240×320 한 장이다
+    expect(screen.queryByText('경기 결과')).toBeNull()
     // 정산 그리기 0x4a384 — 모드 3 도 팀경기와 같은 판(점수판 틀 · 점수 · 기본 화면)이다
     expect(screen.getByTestId('정산-판')).toBeTruthy()
     expect(screen.getByTestId('정산-점수-0')).toBeTruthy()

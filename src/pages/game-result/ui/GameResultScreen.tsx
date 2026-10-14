@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
@@ -23,6 +23,7 @@ import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { SettlementPressArea } from '@/pages/team-game/ui/SettlementPressArea'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -270,10 +271,8 @@ export function GameResultScreen({
         {...(settlement === undefined ? {} : { effectLayers: settlementLayers })}
       />
 
-      {/* 원본에 없는 웹 전용 단추 — 원본은 '0' 이 아닌 키(소프트키 포함)가 정산을 나간다 */}
-      <Button variant="corner" className={styles.continueButton} onClick={leaveSettlement}>
-        확인
-      </Button>
+      {/* 원본에 없는 웹 [확인] 단추 대신 — 판 키 0x407f0 로 OK 를 보내는 투명 누름 칸('0' 이 아닌 키가 정산을 나간다) */}
+      <SettlementPressArea />
     </RawScreen>
   )
 }
