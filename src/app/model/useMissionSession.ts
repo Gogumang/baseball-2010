@@ -59,7 +59,8 @@ import {
   sceneResultCodeAfterPitch,
   sceneResultCodeOfThrown,
 } from '@/features/defense-play/model/sceneResultCode'
-import { chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import { baserunnerAllowedOfFates, chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import { arrivalPlaySettles } from '@/features/defense-play/model/settlementEvents'
 import {
   missionDefenseAbilitiesOf,
   missionPlayAbilitiesOf,
@@ -1532,7 +1533,13 @@ export function useMissionSession({
         play !== null && arrivalApplicationOf(play) === 'batterRuns'
           ? // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)가 이 삼진 타석의 진루다 (0x3e0d0 state[0x1a])
             withPitcherNotOut(nextRun, outcome, play)
-          : applyPitcherOutcome(nextRun, outcome, { random })
+          : applyPitcherOutcome(nextRun, outcome, {
+              random,
+              // 삼진과 한 정산인 도루 · 폭투·포일 판 — R+0x130 은 그 판의 주자 목록대로다 (a8c5c)
+              ...(play !== null && outcome.kind === '삼진' && arrivalApplicationOf(play) === 'runnerOnly'
+                ? { settledRunnerFates: play.result.runnerFates }
+                : {}),
+            })
       resetAtBatWithConfirm()
     } else {
       nextRun = checkPitchExhausted(nextRun)
@@ -2509,10 +2516,14 @@ function missionBatterSkillIdsOf(run: MissionRun, missionBatterSkillIds: readonl
  * - 판정 0xaaa6c 는 판 끝(0xae5c4, 모드 5·6)에서 돈다 — 정산을 건너뛴 폭투·포일 판(ae5a2 → ae5b6)도 판정은 돈다.
  *   웹 판정(`pitcherRun.judgeStatus`)은 미션 엔티티 안에 있어 여기서는 `judgedAfterRunnerPlay` 가 같은 순서로 본다.
  * - 주자 판에서 잡은 아웃(견제사·도루사·진루 중 아웃)은 '아웃' 목표에도 든다 — `outCallsOf` 머리글.
- * ⚠️ 미해결: R+0x130(출루 허용)을 정산이 주자 판에서도 덮어쓰는지는 안 읽었다 — 손대지 않는다.
+ * - R+0x130(출루 허용): 정산 a8c80 `0xa57f8(R, 0x17, r5)` 은 판 종류를 안 거른다(직접 떴다 — a8c2e~a8c86 사이에 state[0x26] 읽기
+ *   없음) → 정산하는 주자 판(견제 · 도루 · 삼진 선 폭투)도 그 판 주자 목록 마지막 원소로 **덮어쓴다**. 정산을 건너뛰는 판은 그대로.
+ * - 견제 정산은 같은 투구 틈 앞 판의 사건까지 세지만 미션이 보는 칸(R+0x128 · R+0x130 · R+0x13c)은 사건 목록을 안 쓴다 —
+ *   R+0x128 · R+0x130 은 주자 목록, R+0x13c 는 아웃 콜이다.
  */
 function withPitcherMissionRunnerPlay(run: PitcherRun, play: PitchArrivalPlay): PitcherRun {
-  return withPitcherMissionRunnerResult(run, play.result, play.kind === 5 || play.strikeout === 'strikeoutStands')
+  const halfOrGameEnded = run.outs + play.result.advance.outsAdded >= MISSION_OUTS_PER_INNING
+  return withPitcherMissionRunnerResult(run, play.result, arrivalPlaySettles(play, { halfOrGameEnded }))
 }
 
 /**
@@ -2538,7 +2549,12 @@ function withPitcherMissionRunnerResult(run: PitcherRun, result: DefensePlayResu
       }),
       outs: isInningOver ? 0 : outs,
       totalOuts: run.totalOuts + advance.outsAdded,
-      allowed: { ...run.allowed, runs: run.allowed.runs + charged },
+      allowed: {
+        ...run.allowed,
+        runs: run.allowed.runs + charged,
+        // R+0x130 — 정산하는 판이면 그 판 주자 목록 마지막 원소로 덮어쓴다 (a8c5c~a8c86)
+        ...(settles ? { baserunner: baserunnerAllowedOfFates(result.runnerFates) ? 1 : 0 } : {}),
+      },
       // 판의 득점도 점수판 득점 0xa5c34 — CPU 측. 3아웃이면 0x18 · 자동진행을 기다린다
       game: withHalfEnd(withMissionScore(run.game, cpuSideOf(run.mission), advance.runsScored), isInningOver),
     },
@@ -2619,6 +2635,14 @@ function judgedAfterRunnerPlay(run: PitcherRun, outs: number): PitcherRun {
     const broken = run.progress.brokenConditions.includes('무실점')
       ? run.progress.brokenConditions
       : [...run.progress.brokenConditions, '무실점']
+    return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
+  }
+  // 출루 허용 한도(+0xa3 ↔ R+0x130) — 정산하는 주자 판이 R+0x130 을 덮어쓴 값으로 같은 실패 한도 비교(0xaa940)를 지난다
+  const baserunnerLimit = run.mission.failLimits.baserunners
+  if (baserunnerLimit > 0 && run.allowed.baserunner >= baserunnerLimit) {
+    const broken = run.progress.brokenConditions.includes('무출루')
+      ? run.progress.brokenConditions
+      : [...run.progress.brokenConditions, '무출루']
     return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
   }
   // 나머지는 판 끝 판정 그대로 — 경기 끝(0xb68fc) · 노히트노런 · 퍼펙트게임 · 목표 칸 · 남은 기회 (`judgePitcherRun`)
