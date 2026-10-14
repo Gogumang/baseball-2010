@@ -91,13 +91,20 @@ export function recordLineupPlay(
   order: number,
   outcome: AtBatOutcome,
   /** 간이 엔진 타석인가 — 링의 아웃 코드가 늘 5 다(`quickAtBatResultCodeOf`). 안 넘기면 사람 판 기준 */
-  options: { readonly quickEngine?: boolean } = {},
+  options: {
+    readonly quickEngine?: boolean
+    /**
+     * 정산 [sp+0x24] > 0 — 홈런 수 `+0x13` 을 올리는 a8728 의 조건. 안 넘기면 홈런이면 참. 타자 게이트 sp+0x34 가 거짓인 판의
+     * 장내 홈런(a84d6)은 거짓이라 안타 `+0x12` 와 링 코드 4 만 남는다
+     */
+    readonly homeRunCounted?: boolean
+  } = {},
 ): QuickLineup {
   const slot = lineupSlotOf(order)
   const records = [...lineup.records]
   records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: isHit(outcome),
-    isHomeRun: outcome.kind === '홈런',
+    isHomeRun: outcome.kind === '홈런' && options.homeRunCounted !== false,
     // 같은 정산이 오늘 타석 결과 링에도 넣는다 (0xa908c)
     resultCode: options.quickEngine === true ? quickAtBatResultCodeOf(outcome) : atBatResultCodeOf(outcome),
   })

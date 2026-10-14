@@ -67,6 +67,13 @@ export interface AtBatRecordInput {
   readonly walksInGame: number
   /** 이 타석으로 사이클링 히트가 완성되었는가 */
   readonly completesCycle: boolean
+  /**
+   * 정산 0xa8024 의 홈런 수 [sp+0x24] > 0 — 홈런 갈래(a85be~a86b4 · 기록 1~4)와 0xa7b00(12~14)에 드는가. 안 넘기면 홈런이면 참.
+   * 담장을 넘긴 사건 8 은 게이트 없이 세지만 장내 홈런 state[0x25] 는 a84d6 이 타자 게이트 sp+0x34 가 참일 때만 더한다 —
+   * 거짓이면(포스트시즌 · 국가대항전) 루타 4 안타로만 적혀 이 기록들을 건너뛴다. 연타석(9~11) · 사이클(15)은 결과 링(코드 4)을
+   * 보므로 그대로다.
+   */
+  readonly homeRunCounted?: boolean
 }
 
 const TIERED_FROM = { consecutiveHits: 3, homeRuns: 2, walks: 2 }
@@ -78,11 +85,12 @@ export function atBatRecordIdsOf(input: AtBatRecordInput): number[] {
   const ids: number[] = []
   const { outcome } = input
   if (outcome.kind === '안타' && outcome.bases === 3) ids.push(RECORD.triple)
-  if (outcome.kind === '홈런') ids.push(RECORD.soloHomeRun + Math.min(Math.max(input.runsScored, 1), 4) - 1)
+  const countedHomeRun = outcome.kind === '홈런' && input.homeRunCounted !== false
+  if (countedHomeRun) ids.push(RECORD.soloHomeRun + Math.min(Math.max(input.runsScored, 1), 4) - 1)
   const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
   const hitTier = isHit ? tierOf(input.consecutiveHits, TIERED_FROM.consecutiveHits, 3) : null
   if (hitTier !== null) ids.push(RECORD.consecutiveHits + hitTier)
-  const homeRunTier = outcome.kind === '홈런' ? tierOf(input.homeRunsInGame, TIERED_FROM.homeRuns, 3) : null
+  const homeRunTier = countedHomeRun ? tierOf(input.homeRunsInGame, TIERED_FROM.homeRuns, 3) : null
   if (homeRunTier !== null) ids.push(RECORD.multipleHomeRuns + homeRunTier)
   if (input.completesCycle) ids.push(RECORD.cycle)
   const walkTier = outcome.kind === '볼넷' ? tierOf(input.walksInGame, TIERED_FROM.walks, 2) : null

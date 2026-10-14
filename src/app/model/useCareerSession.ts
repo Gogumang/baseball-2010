@@ -849,8 +849,9 @@ export function useCareerSession({
       //    a8362 도루 +0x2c · a8498 안타 +0x22 · a8538 2루타 +0x24 · a8578 3루타 +0x26 · a85c4 홈런 +0x28 · a8866 타수 +0x20 ·
       //    a895c 타점 +0x2a 는 `applyGameResult` 의 `withoutRecordLine` 이 뺀다. 남은 a84d6 은 장내 홈런 state[0x25] 를 홈런 수
       //    [sp+0x24] 에 더하는 자리라, 포스트시즌 장내 홈런은 a8210 이 루타 4 안타로 적되 홈런 갈래(a85be~a86b4 · e[0x13] a8728)를
-      //    건너뛴다.
-      //    ⚠️ 미확인(웹 미반영): 그 장내 홈런 갈래는 경기 흐름(gameFlow) 쪽 일이라 여기서 옮기지 않았다.
+      //    건너뛴다 — 경기 흐름이 판을 먹일 때 옮겼다(`resolveDefensePlay` 의 `isRecorded` → `finishPlayerOutcome`).
+      //    a8024 를 다 보아도 타자 레코드 +0x20~+0x2c 를 게이트 없이 쓰는 곳은 없다 — 게이트 없는 레코드 쓰기는 수비 투수의
+      //    +0x2a 사사구(a8b58 · a8bd2)뿐이라 타자편 내 기록에는 없다.
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
       // 연속 기록 칸을 잇는다. 116 의 0x8a6fc 는 그 칸을 읽어 알림 줄과 **보상 명령**(평판 · 슬럼프 스킬)을 내장 이벤트에
       // 쌓을 뿐이라, 보상은 114 가 이벤트를 틀 때(웹은 [확인] `confirmGameResult`) 먹는다 (`streakEventOf`)
@@ -1348,6 +1349,8 @@ export function useCareerSession({
       // 파울 각 공 판을 낙구 전에 잡았다(파울 뜬공 아웃) — 이 타석에서 앞서 난 연속 파울 기록(32·33)을 정산과 함께 넘긴다
       const resolved = resolveDefensePlay(current, played, random, {
         foulRecordIds: isFoulPlay && played.foulEnded !== true ? pitchTallyRef.current.foulRecordIds : undefined,
+        // 정산 0xa8024 의 타자 게이트 [sp+0x34] — 국가대항전 · 포스트시즌이면 거짓 (장내 홈런 a84d6 · 번트 안타 a8506)
+        isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
       })
       progressRef.current = resolved
       setProgress(resolved)

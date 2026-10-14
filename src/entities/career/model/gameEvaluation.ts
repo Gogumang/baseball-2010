@@ -116,14 +116,17 @@ const STRIKEOUT_REPUTATION = -2
 
 /**
  * 평판 가산 칸 (0xa57f8 의 사건 코드 → G+오프셋, P7 B1·B2 확정).
- * 웹이 아직 만들지 않은 사건(번트 안타)은 늘 0 이다.
  */
 export interface ReputationCounts {
   /** G+0xc8 — 만루 홈런 (+2) */
   readonly grandSlams: number
   /** G+0xc4 — 끝내기 안타·홈런 (+3) */
   readonly walkOffs: number
-  /** G+0xf4 — 번트 안타 (+1). ⚠️ 미확인(웹 미반영): 정산 a8506(안타 갈래 · state[0x13]) 의 코드 10 을 아직 안 세어 늘 0 이다 */
+  /**
+   * G+0xf4 — 번트 안타 (+1). 정산 0xa8024 의 a8506 하나가 올린다 — 안타 갈래([sp+0x14] — 장내 홈런 · 홈런 포함)에서 번트
+   * 타구(state[0x13] ≠ 0)면 0xa57f8(코드 10). 코드 ≤ 0x13 이라 지금 타자 0xa56dc(R, 타자, 1) 게이트 안이다(포스트시즌 ·
+   * 국가대항전 거짓). 희생번트(아웃)는 안 센다. 웹은 경기 흐름 `finishPlayerOutcome` 이 판 결과 `buntBall` 로 센다
+   */
   readonly buntHits: number
   /** G+0xfc — 볼넷 (2개 이상이면 +1) */
   readonly walks: number
