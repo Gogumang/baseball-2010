@@ -82,7 +82,7 @@ describe('상점 선택 — 0x14a74', () => {
   })
 
   it('서브 아이템과 GP 아이템도 산다', () => {
-    expect(selectShopItem(선수({ money: 20000 }), shopItemId('서브', 0), 난수).notice).toBe('[표적판] 구매 완료')
+    expect(selectShopItem(선수({ money: 20000 }), shopItemId('서브', 0), 난수).notice).toBe('!C[!cFFFF00표적판!cFFFFFF] 구매 완료')
     const gp = selectShopItem(선수({ gamePoint: 300, morale: 10 }), shopItemId('GP', 6), 난수)
     // 칸 6 은 알림 대신 상세 결과 창 (0x15030) — 알림 글은 비고 창 재료가 나온다
     expect([gp.notice, gp.career.morale, gp.career.gamePoint]).toEqual(['', 50, 0])

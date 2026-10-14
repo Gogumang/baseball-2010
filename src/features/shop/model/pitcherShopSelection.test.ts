@@ -82,7 +82,7 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
     expect(pitcherPurchaseQuestionOf(투수(), shopItemId('서브', 1)))
       .toBe('!C!cFFFF00소지금 2억!cFFFFFF이 소모됩니다!N구매하겠습니까?')
     const { career, notice } = selectPitcherShopItem(투수(), shopItemId('서브', 1), 무작위)
-    expect(notice).toBe('[1톤 바벨] 구매 완료')
+    expect(notice).toBe('!C[!cFFFF001톤 바벨!cFFFFFF] 구매 완료')
     expect(career.money).toBe(30_000)
     expect(career.subItemIds).toEqual([1])
   })
