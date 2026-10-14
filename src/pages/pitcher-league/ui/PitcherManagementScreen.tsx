@@ -245,12 +245,23 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     <PitchChoicePopup selected={menu.choiceIndex} onMove={menu.moveChoice}
       onChoose={menu.chooseOption} onClosed={() => menu.chooseOption(-1)} />
   )
-  return <>{managementBodyOf()}{choicePopup}</>
+  /** 기록실 팝업이 124 위에서 다 줄어들었다 — 다시 [기록실] 을 열 때 내린다 */
+  const [isRecordPopupGone, setRecordPopupGone] = useState(false)
+  const closeRecordRoom = () => {
+    setRecordPick(null)
+    setRecordPopupGone(false)
+    menu.closeWindow()
+  }
+  /** 106 칸 4 [기록실] 팝업 0x80 — 확인한 다음 틀에 124 가 서고 창은 그 위에서 줄어든다(0x196ec → 0xbcb49). 갈래 밖 한 자리 */
+  const recordPopup = menu.subWindow === '기록실' && !isRecordPopupGone && (
+    <NariRecordPickPopup onChoose={setRecordPick} onCancel={closeRecordRoom} onClosed={() => setRecordPopupGone(true)} />
+  )
+  return <>{managementBodyOf()}{choicePopup}{recordPopup}</>
 
   function managementBodyOf() {
   if (menu.subWindow === '기록실' && recordPick !== null) {
     return <NariRecordView edition="투수" career={career} pick={recordPick} gamePoint={career.gamePoint}
-      onBack={() => { setRecordPick(null); menu.closeWindow() }} />
+      onBack={closeRecordRoom} />
   }
 
   if (menu.subWindow === '구질훈련') {
@@ -320,8 +331,6 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
         footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false} />
 
-      {/* 106 칸 4 [기록실] — 팝업 0x80(0x19448) → 124(0x116d4 · 0x1463c · 0x16778), 취소는 106 */}
-      {isRecordRoom && <NariRecordPickPopup onChoose={setRecordPick} onCancel={menu.closeWindow} />}
 
       {/*
         칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1). 기본정보(119) 위에 겹쳐 뜨고

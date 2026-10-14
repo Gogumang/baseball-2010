@@ -67,8 +67,10 @@ export interface PopupWindowMotion {
   /**
    * 키 콜백이 창을 닫는다. `onClosed` 는 창이 치워진 때 — `'바로'` 면 그 자리, `'줄임'` 이면 폭이 99 이하가 된 갱신이다.
    * 키를 안 받는 때면 아무것도 안 하고 false.
+   * `onNextUpdate` 는 키를 받은 **다음 갱신**(첫 줄임 갱신 — 닫히는 갱신이면 `onClosed` 앞)에 부른다: 키 콜백이 그 자리에서
+   * 0xbcb49 로 상태를 걸면 장면 틀 머리의 상태 바꿈(나리 0x1cdec 의 1ce00)이 다음 틀에 새 상태로 들어가고, 창은 그 위에서 줄어든다.
    */
-  readonly close: (kind: PopupCloseKind, onClosed?: () => void) => boolean
+  readonly close: (kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => boolean
 }
 
 /**
@@ -99,6 +101,7 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
   const closingRef = useRef(closingWidth)
   const isClosedRef = useRef(false)
   const onClosedRef = useRef<(() => void) | undefined>(undefined)
+  const onNextUpdateRef = useRef<(() => void) | undefined>(undefined)
   const skipsMotionRef = useRef(skipsMotion)
   skipsMotionRef.current = skipsMotion
   const expandsRef = useRef(expands)
@@ -132,6 +135,9 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
         return setOpeningHeight(next)
       }
       if (closingRef.current === null) return
+      const onNextUpdate = onNextUpdateRef.current
+      onNextUpdateRef.current = undefined
+      onNextUpdate?.()
       const next = nextPopupClosingWidth(closingRef.current)
       if (next === null) return finish()
       closingRef.current = next
@@ -145,13 +151,15 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
     [],
   )
 
-  const close = useCallback((kind: PopupCloseKind, onClosed?: () => void) => {
+  const close = useCallback((kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => {
     if (!acceptsKeys()) return false
     onClosedRef.current = onClosed
     if (kind === '바로' || skipsMotionRef.current) {
+      onNextUpdate?.()
       finish()
       return true
     }
+    onNextUpdateRef.current = onNextUpdate
     // [+0x290] == 0 이면 다음 갱신의 첫 갈래가 줄임 없이 닫는다 — 폭 0 은 다음 갱신에 닫히는 값이다
     const width = expandsRef.current ? POPUP_CLOSE_START_WIDTH : 0
     openingRef.current = null
