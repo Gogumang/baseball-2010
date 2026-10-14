@@ -14,7 +14,7 @@ import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { FIGURE_BOX, FIGURE_FOOT, INFO_BOARD, RIGHT_PANEL } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
 import {
-  ACTION_ROW, ARROW, BACKDROP, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
+  ACTION_ROW, ARROW, BACKDROP, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
   INFO_FRAME, ROOKIE_BATTING_ORDER, ROW_HINTS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
 } from '@/pages/create-player/lib/createPlayerLayout'
 import type { CreatePlayerRowId, InfoCellId } from '@/pages/create-player/lib/createPlayerLayout'
@@ -277,7 +277,7 @@ function LayerSprite({
   )
 }
 
-/** 값 칸 양옆 화살표 — 그림은 근사(ARROW 주석) */
+/** 값 칸 화살표 — mode_ui 프레임 24 (ARROW 주석) */
 function ArrowButton({
   rowId, step, onPress,
 }: {
@@ -287,10 +287,10 @@ function ArrowButton({
 }) {
   const box = INFO_CELLS.find((cell) => cell.id === rowId)?.value
   if (box === undefined) return null
-  const left = step < 0 ? box.x - ARROW.gap - ARROW.width : box.x + box.width + ARROW.gap
+  const at = arrowTopLeftOf(box, step)
   return (
     <button type="button" className={styles.arrowButton} aria-label={`${rowId} ${step < 0 ? '이전' : '다음'}`}
-      style={{ left, top: box.y + Math.floor((box.height - ARROW.height) / 2), width: ARROW.width, height: ARROW.height }}
+      style={{ left: at.x, top: at.y, width: ARROW.width, height: ARROW.height }}
       onClick={() => onPress(rowId, step)}>
       <img alt="" src={ARROW.image} style={{ transform: step < 0 ? undefined : 'scaleX(-1)' }} />
     </button>
