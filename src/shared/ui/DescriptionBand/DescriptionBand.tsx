@@ -15,8 +15,16 @@ const rgba = (alpha: number) => `rgba(${r}, ${g}, ${b}, ${alpha / 255})`
  * 그라데이션 한 장으로 그린다. 글이 비면(0x555d4 의 null 갈래) 띠만 그린다.
  * ⚠️ 유력: 띠가 화면에 처음 나타난 그림에서도 펴며 시작한다 (진입 때 [skin+0x8a] 값은 안 읽었다).
  */
-export function DescriptionBand({ text, seed }: { readonly text: string; readonly seed: number }) {
-  const [ticks, setTicks] = useState(0)
+export function DescriptionBand({ text, seed, initialTicks = 0 }: {
+  readonly text: string
+  readonly seed: number
+  /**
+   * 처음 그릴 때 이미 지난 펼침 갱신 수 — 띠 객체는 장면 것([장면+0xd8] 따위)이라 다른 하위 화면이 편 띠를 이어받는 자리가 쓴다
+   * (투수 등록 0x67 → 0x66: 0x10b18 이 같은 띠를 다시 펴고, 0x66 진입 0x17360 은 이전 상태 0x67 이면 띠를 안 건드린다).
+   */
+  readonly initialTicks?: number
+}) {
+  const [ticks, setTicks] = useState(initialTicks)
   const [lastSeed, setLastSeed] = useState(seed)
   if (lastSeed !== seed) {
     setLastSeed(seed)

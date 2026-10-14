@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FrameSprite, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp, TextField } from '@/shared/ui'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -140,6 +140,19 @@ export function PitcherRegisterScreen({
   const [pitchCell, setPitchCell] = useState(0)
   /** 0x67 상태 틱 [this+0x2c] — 들어올 때 0 */
   const [pitchTick, setPitchTick] = useState(0)
+  /**
+   * 설명 띠 [장면+0xd8] 는 0x66 · 0x67 이 같이 쓴다 — 0x67 진입 0x10b18 이 [띠+0x88] = 1 · [+0x8a] = 1 로 다시 펴고(10b1a~10b30),
+   * 0x67 은 틱 ≤ 0x31 동안 그 띠를 그린다. CLR 로 0x66 에 돌아오면 진입 0x17360 이 이전 상태 0x67 을 보고 곧장 끝나(1736a → 1764e)
+   * 띠를 다시 펴지 않는다 — 0x67 이 편 만큼(보통 다 편 160) 이어서 0x66 글을 쓴다. 0x66 띠가 처음 그릴 때의 펼침 갱신 수다.
+   */
+  const [registerBandTicks, setRegisterBandTicks] = useState(0)
+  const pitchTickRef = useRef(pitchTick)
+  pitchTickRef.current = pitchTick
+  /** 0x67 → 0x66 (CLR) — 0x67 이 그린 띠 갱신 수를 0x66 띠가 이어받는다 */
+  const leavePitchPhase = () => {
+    setRegisterBandTicks(pitchTickRef.current + 1)
+    setPhase('등록')
+  }
   // ⚠️ 0x66 의 상태 틱 첫 그림 값은 안 읽었다 — 화면이 선 뒤의 갱신 수로 깜빡인다
   const tick = useUpdateCounter()
   const isBlinkOn = (phase === '변화구' ? pitchTick : tick) % 10 !== 0
@@ -220,7 +233,7 @@ export function PitcherRegisterScreen({
         const key = breakingPitchKeyOf(event.key)
         if (key === null) return
         event.preventDefault()
-        if (key === 'clr') return setPhase('등록')
+        if (key === 'clr') return leavePitchPhase()
         if (key === 'ok') return pressPitchCellOk(pitchCell)
         return setPitchCell(breakingPitchCursorAfter(pitchCell, key))
       }
@@ -251,9 +264,14 @@ export function PitcherRegisterScreen({
     <RawScreen>
       {/* 장면 틀 0x16928 — 0x66 · 0x67 은 "그 밖" 갈래: 공 무늬 바탕 0x5fd61 */}
       <SkinBackdrop kind="공무늬" />
-      {/* 0x7f4ed 머리띠 — 0x15f34 는 맨 앞, 0x162bc 는 칸 뒤에 그린다(겹치지 않는다). 되돌아가기 = CLR */}
+      {/*
+        0x7f4ed 머리띠 — 0x15f34 는 맨 앞, 0x162bc 는 칸 뒤에 그린다(겹치지 않는다). 되돌아가기 = CLR.
+        안 미끄러진다(확정): [skin+0x84] = 1 을 쓰는 0x63b14 를 나리 장면에서 부르는 그림은 0x15d54 · 0x15d98 · 0x15de4 셋뿐이고
+        (0x63b15 xref 전수) 0x15f34 · 0x162bc · 0x15e20 은 안 부른다. 진입 0x17360 · 0x10b18 도 +0x84 를 안 쓴다. 앞 101(0x15de4)이
+        세운 +0x84 는 머리띠가 다 내려와 0x54e16 이 지운 뒤에야 101 키 0x14114 가 받으므로([skin+0xe4], R9 12-2) 0x66 에 남지 않는다
+      */}
       <ScreenFrame title="나만의리그투수편" gamePoint={gamePoint} slides={false}
-        onBack={() => (phase === '등록' ? pressRowKey('clr', false) : setPhase('등록'))} />
+        onBack={() => (phase === '등록' ? pressRowKey('clr', false) : leavePitchPhase())} />
 
       {/* 카드 0x15e20 — 카드 판 · 레이더(0xb570d 넷째 인자 0) · 투수 그림 */}
       <PitcherBasicInfoCard career={cardCareer} appliesCondition={false} />
@@ -324,8 +342,9 @@ export function PitcherRegisterScreen({
               option={{ isSelected: row === selectedRow }}
               onPress={() => (row === selectedRow ? pressRowKey('ok', false) : selectRow(row))} />
           ))}
-          {/* ⚠️ 0x67 에서 돌아오면 원본은 띠를 다시 펴지 않는다(0x17360 이 [띠+0x88] · [+0x8a] 를 안 세운다) — 웹은 띠가 다시 선다 */}
-          <DescriptionBand text={ORIGINAL_MODE_TEXT[REGISTER_ROW_HINTS[selectedRow] ?? 3] ?? ''} seed={selectedRow} />
+          {/* 0x67 에서 돌아오면 원본은 띠를 다시 펴지 않는다(0x17360 이 [띠+0x88] · [+0x8a] 를 안 세운다) — 0x67 이 편 만큼 이어받는다 */}
+          <DescriptionBand text={ORIGINAL_MODE_TEXT[REGISTER_ROW_HINTS[selectedRow] ?? 3] ?? ''} seed={selectedRow}
+            initialTicks={registerBandTicks} />
         </div>
       )}
 
