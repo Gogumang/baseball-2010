@@ -699,6 +699,16 @@ describe('결산 한국시리즈 보상 순위 0xb7aa0(L, 팀, 0) — 0x85ec (se
     expect([3, 5, 1, 7, 0].map(순위)).toEqual([0, 1, 2, 3, 10])
   })
 
+  it('한국시리즈 아랫 시드가 2위여도 준PO 승자는 플레이오프 칸(L+0x3b)이라 2 — 시리즈에 남긴 준PO 승자 · 옛 저장은 로테이션 칸으로', () => {
+    // 준PO 5 > 7 → PO 1(2위) > 5 → 한국시리즈 3 > 1
+    const 시리즈 = { ...끝난시리즈, teams: [3, 1] as const }
+    const 순위 = (series: typeof 시리즈 & { semiPlayoffWinner?: number; rotations?: Record<number, number> }) =>
+      [3, 1, 5, 7, 0].map((teamId) => seasonPostseasonRankOf({ teamId, inPostseason: false }, 리그, series))
+    expect(순위({ ...시리즈, semiPlayoffWinner: 5 })).toEqual([0, 1, 2, 3, 10])
+    // 옛 저장(칸 없음) — 준PO 3칸씩 · PO 2칸 더 돈 5 가 승자
+    expect(순위({ ...시리즈, rotations: { 5: 5, 7: 3, 1: 2, 3: 3 } })).toEqual([0, 1, 2, 3, 10])
+  })
+
   it('포스트시즌 밖이면 정규시즌 정렬표 자리(0부터)다 (b7afc~b7b22)', () => {
     expect(seasonPostseasonRankOf({ teamId: 0, inPostseason: false }, 리그, null)).toBe(0)
     expect(seasonPostseasonRankOf({ teamId: 4, inPostseason: false }, 리그, null)).toBe(4)

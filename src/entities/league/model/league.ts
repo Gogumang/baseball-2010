@@ -196,6 +196,13 @@ export interface PostseasonSeries {
    * `[0..7]` 로 본다.
    */
   readonly baseOrders?: Readonly<Record<number, readonly number[]>>
+  /**
+   * **준플레이오프 승자** — 원본 대진 칸 `L+0x3b`(플레이오프 아랫 시드). 0xb7724 가 준PO 를 이긴 팀을 그 칸에 넣고
+   * 다음 라운드가 끝나도 지우지 않는다(대진 칸은 0xb80a8 이 시즌 포스트시즌을 열 때만 깐다). 결산 순위 0xb7aa0 의 칸 1
+   * (플레이오프) 갈래가 이 칸을 본다 — 한국시리즈 아랫 시드가 2위면 웹 `teams` 로는 알 수 없어 따로 남긴다.
+   * 준PO 가 끝나기 전이면 없다. 옛 저장은 `withSemiPlayoffWinner` 가 이사한다.
+   */
+  readonly semiPlayoffWinner?: number
 }
 
 /**
@@ -323,6 +330,41 @@ export function advancePostseason(series: PostseasonSeries, winner: number): Pos
   if (series.round === '한국시리즈') return { ...series, wins, rotations, round: '종료', champion: winner }
   const next = series.round === '준플레이오프' ? '플레이오프' : '한국시리즈'
   const topSeed = series.qualifiers[next === '플레이오프' ? 1 : 0]
-  return { ...series, round: next, teams: [topSeed, winner], wins: [0, 0], winsNeeded: WINS_NEEDED[next], rotations }
+  return {
+    ...series,
+    round: next,
+    teams: [topSeed, winner],
+    wins: [0, 0],
+    winsNeeded: WINS_NEEDED[next],
+    rotations,
+    // 0xb7724 — 준PO 승자는 플레이오프 칸 1(L+0x3b)에 들어가 포스트시즌 끝까지 남는다
+    ...(series.round === '준플레이오프' ? { semiPlayoffWinner: winner } : {}),
+  }
+}
+
+/**
+ * **옛 저장 이사** — `semiPlayoffWinner` 가 생기기 전 저장의 시리즈에 준PO 승자를 채운다.
+ *
+ * - 플레이오프 중이면 아랫 시드 `teams[1]` 이 곧 준PO 승자다.
+ * - 한국시리즈 · 종료면 아랫 시드가 2위가 아닐 때 그 팀(플레이오프 승자)이 준PO 승자다.
+ * - 아랫 시드가 2위면 3·4위 중 **로테이션 칸(`rotations`)이 많은 팀**이다 — 두 팀이 준PO 에서 같은 n − 1 칸을 돌았고,
+ *   승자만 플레이오프(3선승이라 3경기 이상)에서 2 칸 이상을 더 돌았다(`advancePostseason`).
+ * - 로테이션 칸도 없는 더 옛 저장은 알 길이 없어 비워 둔다 — 지어내지 않는다.
+ */
+export function withSemiPlayoffWinner(series: PostseasonSeries): PostseasonSeries {
+  if (series.semiPlayoffWinner !== undefined || series.round === '준플레이오프') return series
+  const inferred = inferredSemiPlayoffWinnerOf(series)
+  return inferred === null ? series : { ...series, semiPlayoffWinner: inferred }
+}
+
+function inferredSemiPlayoffWinnerOf(series: PostseasonSeries): number | null {
+  if (series.round === '플레이오프') return series.teams[1]
+  const [, second, third, fourth] = series.qualifiers
+  if (series.teams[1] !== second) return series.teams[1]
+  if (third === undefined || fourth === undefined || series.rotations === undefined) return null
+  const thirdTurns = series.rotations[third] ?? 0
+  const fourthTurns = series.rotations[fourth] ?? 0
+  if (thirdTurns === fourthTurns) return null
+  return thirdTurns > fourthTurns ? third : fourth
 }
 
