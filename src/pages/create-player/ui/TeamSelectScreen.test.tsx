@@ -5,6 +5,9 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { TEAMS } from '@/shared/config/original/teams'
 import { GRID, MY_LEAGUE_TEAM_GRID_SHAPE, TEAM_COUNT, cellPositionOf } from '@/pages/create-player/lib/teamSelectLayout'
 
+// 머리띠가 미끄러지는 다섯 그림 동안의 키 막음(`useFrameSlideKeyLock`)은 따로 시험한다 — 여기서는 다 내려온 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useFrameSlideKeyLock', () => ({ useFrameSlideKeyLock: () => ({ current: false }) }))
+
 /** 팀 고르기 (상태 0x65) — 15팀 격자에서 하나를 고른다 */
 
 afterEach(cleanup)

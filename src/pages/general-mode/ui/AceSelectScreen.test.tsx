@@ -7,6 +7,9 @@ import {
 } from '@/pages/general-mode/lib/generalModeSetup'
 import { AceSelectScreen, acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
 
+// 머리띠가 미끄러지는 다섯 그림 동안의 키 막음(`useFrameSlideKeyLock`)은 따로 시험한다 — 여기서는 다 내려온 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useFrameSlideKeyLock', () => ({ useFrameSlideKeyLock: () => ({ current: false }) }))
+
 /** 마선수 고르기 (하위 상태 21, 목록 k = 2) — 윗줄 마투수 5 · 아랫줄 마타자 5 */
 
 afterEach(cleanup)

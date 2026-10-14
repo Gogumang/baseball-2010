@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -75,8 +76,11 @@ export function FirstBatStadiumScreen({
   const isStadiumPhase = phase === FIRST_BAT_PHASE.구장
   const stadium = stadiums?.[stadiumId]
 
+  // 머리띠가 미끄러지는 동안 키 함수가 [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useFrameSlideKeyLock`)
+  const keyLock = useFrameSlideKeyLock()
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (keyLock.current) return
       const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
       if (event.key === 'Escape') {
         event.preventDefault()

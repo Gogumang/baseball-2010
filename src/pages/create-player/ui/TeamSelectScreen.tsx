@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
 import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -99,8 +100,11 @@ export function TeamSelectScreen({
   const team = TEAMS[cursor] ?? TEAMS[0]
   const isOpen = isTeamOpen(cursor, openedHiddenIds)
 
+  // 머리띠가 미끄러지는 동안 키 함수가 [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useFrameSlideKeyLock`)
+  const keyLock = useFrameSlideKeyLock()
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (keyLock.current) return
       // 장면 키(나만의리그 0x14114 · 시즌 0xca 0x8da4 · 트레이드 0xe4 0x8250 · 일반모드 18 0x29b38 · 19 0x29c98)는
       // 모두 키 [this+0x40] 을 걸러 내지 않고 격자 vt+0x18(0x6c299 → 0x6c521 → 0x6c031)에 그대로 넘긴다 —
       // 숫자키 꼴 1 이라 '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK(−5) 로 돌아온다 (표 0xd2e7c).
