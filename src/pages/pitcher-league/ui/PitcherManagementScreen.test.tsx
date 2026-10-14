@@ -234,8 +234,8 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
 
     누르기('구질')
 
-    // PitchTrainingScreen 이 그대로 열린다 — 새로 만들지 않는다
-    expect(screen.getByText('구질 훈련')).toBeTruthy()
+    // 관리 화면 위에 창 0x803d4 가 선다
+    expect(screen.getByTestId('구질훈련-창')).toBeTruthy()
   })
 })
 
@@ -297,7 +297,7 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     누르기('구질')
 
     expect(screen.getByText('구질 / 마구')).toBeTruthy()
-    expect(screen.queryByText('구질 훈련')).toBeNull()
+    expect(screen.queryByTestId('구질훈련-창')).toBeNull()
   })
 
   it('123 창 탭 1 — 마구 칸을 고르면 StrMODE[70] 을 묻고 레코드 +0x18 에 번호를 넣는다 (0x17cec)', () => {
@@ -562,7 +562,7 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('ArrowRight')
     키('Enter')
 
-    expect(screen.getByText('구질 훈련')).toBeTruthy()
+    expect(screen.getByTestId('구질훈련-창')).toBeTruthy()
   })
 
   it('좌우는 칸 수로 감긴다 — 왼쪽 한 번이면 마지막 칸(구질)이다', () => {
@@ -572,7 +572,7 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('ArrowLeft')
     키('Enter')
 
-    expect(screen.getByText('구질 훈련')).toBeTruthy()
+    expect(screen.getByTestId('구질훈련-창')).toBeTruthy()
   })
 
   it('취소(−16)는 팝업만 닫고 트레이닝 목록으로 돌려보낸다', () => {
@@ -582,7 +582,7 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('Escape')
 
     expect(screen.queryByText('원하는 항목을 선택해주세요')).toBeNull()
-    expect(screen.queryByText('구질 훈련')).toBeNull()
+    expect(screen.queryByTestId('구질훈련-창')).toBeNull()
     // 107 목록이 그대로 있다 (칸 4 는 마구 레벨을 옆에 적는다)
     expect(칸이름들()).toContain('마구')
   })

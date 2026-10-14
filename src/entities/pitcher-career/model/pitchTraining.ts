@@ -83,6 +83,27 @@ export function hasPitchType(career: PitcherCareer, typeNumber: number): boolean
   return typeNumber > 0 && ((career.pitchMask >>> (typeNumber - 1)) & 1) === 1
 }
 
+/** 등록이 무조건 주는 FASTBALL (구질 번호 1) — 마스크에 없어도 0xb6d5e 가 칸 0 에 넣는다 (J 3-1) */
+export const FASTBALL_TYPE_NUMBER = 1
+
+/** 구질 목록 칸 표 `0xd8920` — 구질 t 의 칸 (FASTBALL 0 · 표 0xcc390 의 행 r 은 칸 r + 1) */
+const LIST_SLOT_OF_TYPE: readonly number[] = [6, 0, 1, 1, 2, 2, 3, 3, 4, 4, 1, 1, 2, 2, 3, 3, 4, 4, 1, 2, 3, 4]
+const LAST_ORDINARY_TYPE = 21
+
+/**
+ * 지금 경기 구질 목록에 든 구질인가 — `0xa436c(S, t)`: 내 레코드로 목록 0xb6d2d(레코드, 칸, 6)를 세워 칸 1~5 에 t 가 있는지 본다.
+ * 목록은 마스크 비트를 구질 번호 차례로 훑어 칸 0xd8920[t] 에 덮어쓰므로 **한 칸(행)에는 번호가 큰 구질 하나만** 남는다.
+ * 구질 훈련 창(108 탭 2)의 키 가드 ①(0x17962) · 칸 그림(0x80e76 · 0x80f8c · 0x81130 · 0x81272)도 같은 함수다.
+ */
+export function isInPitchList(career: PitcherCareer, typeNumber: number): boolean {
+  if (typeNumber <= FASTBALL_TYPE_NUMBER || typeNumber > LAST_ORDINARY_TYPE || !hasPitchType(career, typeNumber)) return false
+  const slot = LIST_SLOT_OF_TYPE[typeNumber]
+  for (let later = typeNumber + 1; later <= LAST_ORDINARY_TYPE; later += 1) {
+    if (LIST_SLOT_OF_TYPE[later] === slot && hasPitchType(career, later)) return false
+  }
+  return true
+}
+
 /**
  * 선행 판정 `0xa42d8`:
  *   - 열0·1 : 같은 칸 단계 ≤ 0
@@ -104,7 +125,7 @@ export function isHiddenPitchRowOpen(career: PitcherCareer, row: number): boolea
 
 /**
  * 창이 칸 하나를 골랐을 때의 결과 — 원본 가드 순서 그대로다 (0x17912~0x17a4c).
- *   ① 이미 가진 구질(`0xa436c`) → **아무 말 없이 무시**
+ *   ① 지금 경기 구질 목록에 든 구질(`0xa436c` — `isInPitchList`, 0x17962) → **아무 말 없이 무시**
  *   ② 단계 > 열/2 → 무시
  *   ③ 열4 인데 계열 미오픈 → StrMODE[67]
  *   ④ 선행 거짓 → StrMODE[68]
@@ -131,7 +152,7 @@ export const PITCH_TRAINING_TEXT = {
 export function pitchTrainingGateOf(career: PitcherCareer, row: number, column: number): PitchTrainingGate {
   const typeNumber = pitchTypeNumberOf(row, column)
   if (typeNumber === 0) return { kind: '무시' }
-  if (hasPitchType(career, typeNumber)) return { kind: '무시' }
+  if (isInPitchList(career, typeNumber)) return { kind: '무시' }
   if (pitchTrainingStageOf(career, row, column) > Math.trunc(column / 2)) return { kind: '무시' }
   if (column === HIDDEN_PITCH_COLUMN && !isHiddenPitchRowOpen(career, row)) {
     return { kind: '막힘', textIndex: PITCH_TRAINING_TEXT.hiddenLocked }
