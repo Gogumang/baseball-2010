@@ -51,8 +51,14 @@ import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
-import { missionFielderPlatesOf } from '@/entities/mission/model/missionRunners'
-import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { missionFielderPlatesOf, missionRunnerAcesOf, missionWalkTeamOf } from '@/entities/mission/model/missionRunners'
+import {
+  type BenchClearingOffenseAces,
+  aceRunnerBasesOf,
+  benchClearingFieldOf,
+} from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
+import type { WalkerLineSeats, WalkerSeat } from '@/widgets/field-walk/lib/walkerAces'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -172,10 +178,33 @@ export function MissionRoutes({
   const isFreePassReady = useFreePassPlayStart(
     session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
   )
+  /**
+   * 미션 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 미션 시작 첫 0x18 판 0x3fac4 · 사람 반 이닝의 수비 판 시작 0xb0fb4 ·
+   * 투수 미션 벤치 클리어링 0x3a5f0. 자동진행 0x21 이 돌아온 0x18 은 판 없이 지나가 0x3fac4 를 안 부른다(Q2)
+   */
+  const benchRun = session.pendingBenchClearing?.run ?? null
+  const walkerSeats = useWalkerLineSeats({
+    sceneKey: playScreenRef.current,
+    playKey: session.pendingDefensePlay ?? session.pickoffReplay,
+    playDefenseRecords: playingRun === null ? null : missionWalkTeamOf(playingRun, true)?.records ?? null,
+    board:
+      session.halfInningBoard === null || playingRun === null
+        ? null
+        : {
+            key: session.halfInningBoard.serial,
+            defense: missionWalkTeamOf(playingRun, true)?.records ?? [],
+            offense: missionWalkTeamOf(playingRun, false)?.records ?? [],
+          },
+    benchClearing:
+      session.pendingBenchClearing === null || benchRun === null
+        ? null
+        : { key: session.pendingBenchClearing, offense: missionBenchOffenseOf(benchRun) },
+  })
   const overlay = missionOverlayOf(
     session, defenseSceneRef, playingRun, runner.bannerText, isFreePassReady,
     missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
     missionPitcherNameOf(session, hallOfFame, nari.투수),
+    walkerSeats,
   )
   if (overlay !== null) return overlay
 
@@ -389,6 +418,8 @@ function missionOverlayOf(
   missionBatterName?: string | null,
   /** 미션 투수 이름 (`missionPitcherNameOf`) — 투수 미션 첫 0x18 판의 PITCHER */
   missionPitcherName?: string | null,
+  /** 장면 두 줄의 +0xec — 판 앞 값 · 벤치 클리어링 때 수비 줄 (`useWalkerLineSeats`) */
+  walkerSeats?: { readonly boardBefore: WalkerLineSeats; readonly benchDefense: readonly WalkerSeat[] },
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(0x667f8 로딩 판 · 0x54120 진행 칸 끝 0x24 · 0x53dbc 팁 rand(0, 73)) 뒤 상태 7 · 9 · 8 의
@@ -438,6 +469,10 @@ function missionOverlayOf(
           opponentTeamId: sideTeams[1],
           batterHand: missionCpuBatterHandOf(benchRun),
           bases: benchRun.bases,
+          // 마선수 그림 0x79b48 — 수비 줄은 사람 칸 팀(미션 투수), 공격 줄은 CPU 타선(마타자 칸 포함)
+          defenseAces: missionWalkTeamOf(benchRun, true),
+          defenseSeats: walkerSeats?.benchDefense ?? null,
+          offenseAces: missionBenchOffenseOf(benchRun),
         })}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={session.random}
@@ -494,11 +529,14 @@ function missionOverlayOf(
           opponentTeamId: boardSides[1].team,
           // 이름표 — 칸 0 은 수비 팀 지금 투수, 1~8 은 0x40008: 수비 팀 레코드 차례에서 자리 니블이 칸 + 1 인 첫 레코드 — 판 시작 0xb0fb4 와
           // 같은 훑기라 수비 판 이름 판의 야수(`missionFielderPlatesOf`, 대타 니블 맞바꿈까지)를 그대로 쓴다.
-          // ⚠️ 미확인: 미션 팀의 마선수 그림(0x79b48 a · b)은 아직 안 넘긴다 — 보통 그림
           fielderNames: [
             boardCards.pitcherName,
             ...missionFielderPlatesOf(playingRun).slice(1).map((plate) => plate?.name ?? null),
           ],
+          // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (`missionWalkTeamOf`). 판 앞 +0xec 는 장면을 세운 직후라 0
+          defenseAces: missionWalkTeamOf(playingRun, true),
+          offenseAces: missionWalkTeamOf(playingRun, false),
+          seats: walkerSeats?.boardBefore ?? null,
         })}
         onConfirm={actions.confirmHalfInningBoard}
       />
@@ -703,5 +741,22 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     batterTeamIndex: run.cpu.batting?.teamId ?? 0,
     // 경기 스킬 표시 판 — 지금 CPU 타자 · 미션 투수(장착 비트 + 16) · 공격 측(CPU 칸)
     skillPanel: missionPitchingSkillPanelOf(run, session.pitcher.skillIds),
+  }
+}
+
+/**
+ * 투수 미션 벤치 클리어링 공격 줄(CPU 타선) 재료 — 3a97e: 사구를 맞은 지금 타자가 마타자면 그 레코드 니블(마타자는 0 — `missionWalkTeamOf`)로
+ * 맞바꾼다(니블 0 이면 원본은 O[−1] = [장면+0x1754], `benchOffenseSeatsOf`). 3aa1a: 루 위 마선수 주자(+0x9c)는 수비 판 재료 `missionRunnerAcesOf`
+ */
+function missionBenchOffenseOf(run: MissionRun | PitcherRun): BenchClearingOffenseAces | null {
+  const team = missionWalkTeamOf(run, false)
+  if (team === null) return null
+  const aces = missionRunnerAcesOf(run)
+  const batterAce = aces.batter ?? null
+  const batterRecord = batterAce === null ? undefined : team.records.find((record) => record.ace === batterAce)
+  return {
+    ...team,
+    batter: batterAce === null ? null : { position: batterRecord?.position ?? 0, ace: batterAce },
+    aceRunnerBases: aceRunnerBasesOf(aces, run.bases),
   }
 }

@@ -14,7 +14,8 @@ import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
-import { gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
+import { gameBenchOffenseOf, gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
+import type { WalkerLineSeats, WalkerSeat } from '@/widgets/field-walk/lib/walkerAces'
 import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
@@ -53,6 +54,8 @@ const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(tea
 interface GameScreenProps {
   readonly career: PlayerCareer
   readonly progress: GameProgress
+  /** 경기 장면 두 줄의 +0xec — 교대 판 앞 값 · 벤치 클리어링 때 수비 줄 (`useWalkerLineSeats`, 수비 재생을 건너 남아야 해 GameRoute 가 든다) */
+  readonly walkerSeats?: { readonly boardBefore: WalkerLineSeats; readonly benchDefense: readonly WalkerSeat[] }
   readonly atBat: AtBatState
   readonly pitcherAbility: PitcherAbility
   /**
@@ -137,6 +140,7 @@ type MenuOverlay = '조작방법' | '설정'
 export function GameScreen({
   career,
   progress,
+  walkerSeats,
   atBat,
   pitcherAbility,
   aceLevels,
@@ -252,13 +256,10 @@ export function GameScreen({
           grassPalette: sceneFieldPaletteOf(sceneStadium),
           // 마선수 그림 0x79b48 — 공격 줄은 내 팀(사구를 맞은 타자는 나 — 마선수가 아니다), 수비 줄은 상대 팀
           defenseAces: fieldTeams.opponent.aces,
-          offenseAces: {
-            ...fieldTeams.ours.aces,
-            // 사구를 맞은 지금 타자는 내 선수 — 마선수가 아니라 3a97e 의 맞바꿈이 없다
-            batter: null,
-            // ⚠️ 근사: 루 위 동료가 마선수 주자(+0x9c)인지는 웹 루상이 안 든다 — 마타자는 대타로만 서서 루에 있을 수 있다
-            aceRunnerBases: [false, false, false],
-          },
+          // 수비 줄 +0xec — 이 장면에서 마지막으로 적힌 값(1회초 판 · 내 타석의 수비 판 시작)
+          defenseSeats: walkerSeats?.benchDefense ?? null,
+          // 사구를 맞은 지금 타자는 내 선수 — 마선수가 아니라 3a97e 의 맞바꿈이 없다. 루 위 마선수 주자는 3aa1a
+          offenseAces: gameBenchOffenseOf(fieldTeams.ours, progress),
         })}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={random}
@@ -301,6 +302,7 @@ export function GameScreen({
           // 마선수 그림 0x79b48 — 수비 줄은 수비 팀, 공격 줄은 공격 팀 (0x3fac4 가 +0xec · 두 그림을 싣는다)
           defenseAces: boardDefense.aces,
           offenseAces: boardOffense.aces,
+          seats: walkerSeats?.boardBefore ?? null,
         })}
         onConfirm={() => setBoardClosed(true)}
       />

@@ -318,3 +318,50 @@ export function missionRunnerAcesOf(run: MissionPlateSituation): RunnerAces {
     third: aceOf(runnerOnBase(runners, 3)),
   }
 }
+
+/** 운동장 전경 · 벤치 클리어링의 한 줄 팀 재료 — 지금 투수 마투수 번호(0x79b48 a)와 레코드 타자 배열 차례(자리 니블 · 마타자 번호) */
+export interface MissionWalkTeam {
+  readonly pitcherAce: number | null
+  readonly records: readonly { readonly position: number; readonly ace: number | null }[]
+}
+
+/**
+ * **미션 경기 한 줄 팀의 레코드 차례** (`0xb8a34(팀, k)` — 0x3fac4 · 0xb0fb4 · 0x3a5f0 이 훑는 그 배열). 공격 팀은 `offenseOf`(투수 미션 =
+ * CPU 타선, 타자 미션 = 사람 칸), 수비 팀은 `missionDefenseFieldersOf` 와 같은 고름(타자 미션 = CPU `cpuAutoBatting`, 투수 미션 = 사람 칸).
+ * 레코드 k 의 자리 니블:
+ * - 타순 칸 s 에 선 레코드 = 레코드 s 줄의 니블 — 대타 0xaebe4 가 시작 칸 니블을 들어온 레코드에 넘긴다(`missionDefenseFieldersOf` 머리말).
+ *   마타자는 0xb53f0 의 0x40 갈래가 XlsACE_BAT 행 0x30 바이트를 통째 베껴 +0x1c 가 0(다섯 행 모두 행 바이트 28 = 0)이고, 0xaae7c 의
+ *   `0xb8cb8(팀, team+0x32, 9)` 는 레코드째 맞바꾸므로 마타자가 선 칸의 니블은 **0** 이다.
+ * - 타순 밖 레코드 = 그 줄 제 니블(붙박이 벤치는 0, 마타자에게 밀려 9번으로 간 붙박이는 제 니블 그대로).
+ * 마타자 번호 = 미션 마선수 순번 − 1 (`missionRunnerAcesOf` 와 같다). 지금 투수 마투수 = CPU 팀 마운드가 마투수 칸일 때(타자 미션).
+ * ⚠️ 미확인: 미션 타자 레코드(`MISSION_NARI_RECORD`)의 니블은 0xb53f0 0x80 갈래가 "옛 [k] 선수 것"을 남기는데 웹은 마스터 줄 표를
+ * 안 거쳐 0 으로 둔다 — 마선수가 아니라 그림은 같고 이름표(수비 줄)에는 안 선다.
+ */
+export function missionWalkTeamOf(run: MissionPlateSituation, isDefense: boolean): MissionWalkTeam | null {
+  const team = isDefense
+    ? run.mission.side === '타자'
+      ? run.game.cpuAutoBatting
+      : run.game.humanBatting
+    : offenseOf(run)
+  if (team === null) return null
+  const isCpuTeam = run.mission.side === '타자' ? isDefense : !isDefense
+  const aceNumber = run.mission.opponentAce - 1
+  const roster = teamBatters(team.teamId)
+  const rowOf = (record: number) => team.records[record] ?? record
+  const nibbleOfRow = (row: number) =>
+    row === MISSION_ACE_ROSTER_SLOT || row === MISSION_NARI_RECORD ? 0 : (roster[row]?.position ?? 0) & 0xf
+  const inLineup = new Map<number, number>()
+  for (let order = 0; order < QUICK_LINEUP_SLOTS; order += 1) inLineup.set(rosterSlotAt(team.lineup, order), order)
+  const recordCount = Math.max(team.records.length, ...[...inLineup.keys()].map((record) => record + 1))
+  const records = Array.from({ length: recordCount }, (_unused, record) => {
+    const row = rowOf(record)
+    const order = inLineup.get(record)
+    return {
+      position: order === undefined ? nibbleOfRow(row) : nibbleOfRow(rowOf(order)),
+      ace: isCpuTeam && row === MISSION_ACE_ROSTER_SLOT && aceNumber >= 0 ? aceNumber : null,
+    }
+  })
+  const pitching = isCpuTeam ? run.cpu.pitching : null
+  const moundRow = pitching === null ? null : pitching.roster[pitching.mound.pitcherSlot] ?? pitching.mound.pitcherSlot
+  return { pitcherAce: moundRow === MISSION_ACE_ROSTER_SLOT && aceNumber >= 0 ? aceNumber : null, records }
+}

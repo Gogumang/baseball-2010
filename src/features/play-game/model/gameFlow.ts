@@ -1457,7 +1457,7 @@ function ourOrderAceOf(progress: GameProgress, orderSlot: number): number | null
 }
 
 /** 이 타석 타자 · 루 위 주자의 마선수 번호 (`runnerAces`) */
-function ourRunnerAcesOf(progress: GameProgress) {
+export function ourRunnerAcesOf(progress: GameProgress) {
   const runners = runnersOfGame(progress.game)
   const onBase = (base: 1 | 2 | 3) => {
     const runner = runnerOnBase(runners, base)

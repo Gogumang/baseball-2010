@@ -29,6 +29,7 @@ import {
   specialSwingRemainingAt,
   substitutionDetailAbilities,
   isOurOffense,
+  runnerAcesFor,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
@@ -40,7 +41,12 @@ import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
-import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import {
+  type BenchClearingOffenseAces,
+  aceRunnerBasesOf,
+  benchClearingFieldOf,
+} from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import {
   type FieldCarry,
   NEW_FIELD_CARRY,
@@ -85,7 +91,7 @@ import type {
   TeamEntryBatter,
   TeamEntryPitcher,
 } from '@/features/play-team-game/model/teamGameRoster'
-import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type {
   TeamGameOptions,
   TeamGameProgress,
@@ -310,6 +316,25 @@ export function TeamGameScreen({
   const carryLivePlay = (result: DefensePlayResult | undefined) => {
     if (result !== undefined) fieldCarryRef.current = fieldCarryAfterPlay(result.ticks, fieldCarryRef.current)
   }
+  /**
+   * 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 교대 판 0x3fac4 · 수비 판 시작 0xb0fb4 · 벤치 클리어링 0x3a5f0 이 차례로 적는다.
+   * 수비 판은 실시간 갈래(`pendingDefensePlay` · `pendingRunnerPlay`)든 재생 갈래(`lastDefensePlay`)든 판 하나마다 그 판 앞 그림의 수비 팀으로 훑는다
+   */
+  const benchOffense = progress.pendingBenchClearing === null ? null : benchClearingOffenseOf(progress)
+  const walkerSeats = useWalkerLineSeats({
+    sceneKey: options,
+    playKey: session.pendingDefensePlay ?? progress.pendingRunnerPlay ?? play,
+    playDefenseRecords: teamWalkAcesOf(progress, !isOurOffense(progress)).records,
+    board:
+      board === null
+        ? null
+        : {
+            key: board.serial,
+            defense: teamWalkAcesOf(progress, !isOurOffense(progress)).records,
+            offense: teamWalkAcesOf(progress, isOurOffense(progress)).records,
+          },
+    benchClearing: progress.pendingBenchClearing === null ? null : { key: progress.pendingBenchClearing, offense: benchOffense },
+  })
   /** `#` 교체 화면(경기 상태 0xb)이 떠 있는가 — 수비 중이면 투수 교체, 공격 중이면 대타 */
   const [changeWindow, setChangeWindow] = useState<'투수' | '대타' | null>(null)
   const isChangingPitcher = changeWindow === '투수'
@@ -775,12 +800,9 @@ export function TeamGameScreen({
           grassPalette: fieldPalette,
           // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (명단 차례로 본다 — 아래 `teamWalkAcesOf`)
           defenseAces: teamWalkAcesOf(progress, !isOurOffense(progress)),
-          offenseAces: {
-            ...teamWalkAcesOf(progress, isOurOffense(progress)),
-            batter: benchClearingBatterOf(progress),
-            // ⚠️ 근사: 3aa1a 의 마선수 주자(+0x9c) 맞바꿈 — 웹 루상이 주자 +0x9c 를 안 든다
-            aceRunnerBases: [false, false, false],
-          },
+          // 수비 줄 +0xec — 이 장면에서 마지막으로 적힌 값 (교대 판 · 수비 판 시작)
+          defenseSeats: walkerSeats.benchDefense,
+          offenseAces: benchOffense,
         })}
         walkStateRef={benchWalkRef}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
@@ -817,17 +839,18 @@ export function TeamGameScreen({
           // 앞 장면(0x17 · 앞 판 · 0x1e · 0x21)이 남긴 수비 줄 자리 · 카메라 — 자리 합 0 인 칸이 있으면 0x3fac4 가 경기 첫 판으로 본다
           carry: fieldCarryRef.current,
           walkStateRef: boardWalkRef,
-          // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각
+          // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (못 찾은 칸은 판 앞 +0xec 가 남는다)
           defenseAces: teamWalkAcesOf(progress, !isOurOffense(progress)),
           offenseAces: teamWalkAcesOf(progress, isOurOffense(progress)),
+          seats: walkerSeats.boardBefore,
           playerSide: options.playerSide,
           ourTeamId: options.ourTeamId,
           opponentTeamId: options.opponentTeamId,
           grassPalette: fieldPalette,
-          // 이름표 — 칸 0 은 수비 팀 지금 투수, 1~8 은 수비 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008)
+          // 이름표 — 칸 0 은 수비 팀 지금 투수, 1~8 은 수비 팀 레코드 차례에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008)
           fielderNames: fielderNamesByPosition(
             teamHalfInningCardsOf(progress, board.half).pitcherName,
-            isOurOffense(progress) ? progress.opponentEntry : progress.ourEntry,
+            teamRecordBattersOf(progress, !isOurOffense(progress)),
           ),
         })}
         onConfirm={() => {
@@ -1447,17 +1470,51 @@ function slotTypeNumbersOf(slots: readonly PitchSlot[]): number[] {
 }
 
 /**
- * 팀 경기 한 팀의 운동장 마선수 재료 — 지금 투수(투수 명단 칸 `ourPitcherIndex` · `opponentPitcherIndex`)의 마투수 번호와
- * 명단(`ourEntry` · `opponentEntry`)의 자리 · 마타자 번호. ⚠️ 근사: 원본은 레코드 타자 배열 차례를 훑는다 — 웹 명단은 선수째 옮기는
- * 타순 차례라 대타 뒤에는 차례가 다를 수 있다(대타 0xaebe4 가 자리 니블도 맞바꾸므로 칸마다 찾는 선수는 같다).
+ * 팀 경기 한 팀의 **레코드 타자 배열 차례** — 원본은 `0xb8a34(팀, k)` 로 레코드 배열 `[T+0x18]` 을 차례대로 훑고(0x3fac4 · 0x40008 ·
+ * 0x3a5f0 · 0xb0fb4), 대타 0xaebe4 는 명단 team+0xe 와 두 레코드의 자리 니블만 맞바꿔 레코드 배열의 차례는 경기 내내 그대로다.
+ * 웹 명단(`ourEntry` · `opponentEntry`)은 선수째 옮기는 타순 차례이고 니블도 선수와 함께 맞바꾸므로(`substituteBatter`), 선수마다
+ * 경기를 세울 때의 레코드 첨자로 되돌려 늘어놓는다 — 마선수 아닌 줄은 `recordSlot`(0xb603c 가 다시 매긴 첨자), 마타자는 0xb53f0 이
+ * 넣은 9번. 대타로 빠져 명단에서 지워진 선수는 니블이 들어온 벤치 선수 것(붙박이 벤치 니블 0)이라 어느 칸에도 안 맞아 빼도 같지만,
+ * 마타자는 그 팀 첫 마타자 그림(0xb8a50)을 정하므로 명단에 없으면 니블 0 으로 9번에 되살린다.
  */
+function teamRecordBattersOf(
+  progress: TeamGameProgress,
+  ours: boolean,
+): readonly { readonly name: string; readonly position: number; readonly ace: number | null }[] {
+  const entry = ours ? progress.ourEntry : progress.opponentEntry
+  const rows = entry.map((batter, index) => ({
+    index: batter.aceIndex >= 0 ? ACE_RECORD_INDEX : batter.recordSlot ?? index,
+    name: batter.name,
+    position: batter.position,
+    ace: batter.aceIndex >= 0 ? batter.aceIndex : null,
+  }))
+  const teamAce = ours ? progress.options.aceBatterId ?? -1 : progress.opponentAceBatterIndex
+  if (teamAce >= 0 && !rows.some((row) => row.ace !== null)) {
+    rows.push({ index: ACE_RECORD_INDEX, name: ACE_BATTERS[teamAce]?.name ?? '', position: 0, ace: teamAce })
+  }
+  return [...rows].sort((a, b) => a.index - b.index).map(({ name, position, ace }) => ({ name, position, ace }))
+}
+
+/** 마타자가 0xb53f0 으로 들어가는 레코드 칸 (첫 벤치) */
+const ACE_RECORD_INDEX = 9
+
+/** 팀 경기 한 팀의 운동장 마선수 재료 — 지금 투수(투수 명단 칸)의 마투수 번호와 레코드 타자 배열 차례(`teamRecordBattersOf`) */
 function teamWalkAcesOf(progress: TeamGameProgress, ours: boolean): WalkTeamAces {
   const pitchers = ours ? progress.ourPitcherEntry : progress.opponentPitcherEntry
   const pitcher = pitchers[ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex]
-  const entry = ours ? progress.ourEntry : progress.opponentEntry
   return {
     pitcherAce: pitcher !== undefined && pitcher.aceIndex >= 0 ? pitcher.aceIndex : null,
-    records: entry.map((batter) => ({ position: batter.position, ace: batter.aceIndex >= 0 ? batter.aceIndex : null })),
+    records: teamRecordBattersOf(progress, ours),
+  }
+}
+
+/** 벤치 클리어링 공격 줄 재료 — 공격 팀 레코드 · 사구를 맞은 타자(3a97e) · 루 위 마선수 주자(3aa1a, 수비 판 재료 `runnerAcesFor` 의 +0x9c) */
+function benchClearingOffenseOf(progress: TeamGameProgress): BenchClearingOffenseAces {
+  const ours = isOurOffense(progress)
+  return {
+    ...teamWalkAcesOf(progress, ours),
+    batter: benchClearingBatterOf(progress),
+    aceRunnerBases: aceRunnerBasesOf(runnerAcesFor(progress, ours), progress.game.bases),
   }
 }
 

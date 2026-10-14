@@ -1646,7 +1646,7 @@ function ourMoundPlateOf(progress: PitcherGameProgress): { readonly name: string
 /**
  * 상대 타자 · 루 위 주자의 **마선수 번호** (`runnerAces` — 주자 그림 0x79d10 · 적재 0x483a0). 명단 칸이 마타자 칸이면 142 가 넣은 마타자.
  */
-function opponentRunnerAcesOf(progress: PitcherGameProgress): RunnerAces {
+export function opponentRunnerAcesOf(progress: PitcherGameProgress): RunnerAces {
   const ace = teamAcesOf(progress.options, false).batter
   const aceOf = (slot: number | null) =>
     slot !== null && ace >= 0 && rosterSlotAt(progress.opponentLineup, slot) === ACE_BATTER_ROSTER_SLOT ? ace : null
