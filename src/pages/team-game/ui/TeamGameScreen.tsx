@@ -19,6 +19,7 @@ import {
   currentBatterEntry,
   entryBatterSkillIdsOf,
   currentPitcherAbility,
+  currentPitcherEquipment,
   currentPitcherAceIndex,
   opponentMagicStateOf,
   pitchSlotsFor,
@@ -920,6 +921,8 @@ export function TeamGameScreen({
                 hiddenRunnerBases: progress.stealingFrom,
               }}
               isEagleEyeEnabled={false}
+              // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
+              pitcherEquipmentNibbles={currentPitcherEquipment(progress)}
               // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
               acePitcher={
                 opposingAcePitcher === null

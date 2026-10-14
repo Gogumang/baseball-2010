@@ -27,7 +27,7 @@ import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
 import { gameHalfInningCardsOf } from '@/pages/game/lib/gameHalfInningCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import { mySpecialSwingRemainingOf, runnerRunAbilitiesOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
+import { mySpecialSwingRemainingOf, opponentPitcherEquipmentOf, runnerRunAbilitiesOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { RUTHLESS_SKILL_ID } from '@/entities/batting/model/specialSwing'
@@ -326,6 +326,8 @@ export function GameScreen({
             // 그 배열을 다시 매기므로 내 칸 = 대표팀 안 내 첨자 = `nariCupBattingOrderOf` − 1 = playerOrderIndex
             batterRecordSlot={progress.game.playerOrderIndex}
             pitcherAbility={pitcherAbility}
+            // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
+            pitcherEquipmentNibbles={opponentPitcherEquipmentOf(progress)}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
             aceLevels={aceLevels}
             hud={{

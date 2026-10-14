@@ -4,7 +4,7 @@ import type { TeamEntryBatter, TeamEntryPitcher } from '@/features/play-team-gam
 import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
 import { countsAsAtBat, isHit } from '@/entities/at-bat/model/atBatOutcome'
@@ -225,8 +225,3 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamId, ...mound }
 }
 
-/** 니블 네 칸(제구 · 구속 · 변화 · 체력 = 부위 0~3, `rec[0x19 + k/2]`) → 투수 장비 겹 */
-function pitcherEquipmentOfNibbles(nibbles: readonly number[]): PitcherEquipment {
-  const [control = 0, velocity = 0, breaking = 0, stamina = 0] = nibbles
-  return pitcherEquipmentOf({ control, velocity, breaking, stamina })
-}

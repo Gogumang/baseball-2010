@@ -9,7 +9,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
-import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
@@ -83,6 +83,8 @@ export interface StageLatest {
    */
   readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
   readonly acePitcher: AcePitcherFrames | null
+  /** 마운드 투수 장비 겹 (`BattingStage` 의 `pitcherEquipmentNibbles` 주석) — 없으면 맨몸 */
+  readonly pitcherEquipment?: PitcherEquipment
   readonly canBunt: boolean
   /** 타자 폼 (원본 rec[0xb] 윗니블 = 2 × 타입 + 손). 몸통·자세표를 `폼 >> 1` 로 고른다 */
   readonly batterForm: number

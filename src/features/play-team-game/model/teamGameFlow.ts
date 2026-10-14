@@ -2035,6 +2035,18 @@ export function currentPitcherAceIndex(progress: TeamGameProgress): number {
   )
 }
 
+/**
+ * **사람 타석 마운드의 상대 투수 장비 니블** — 레코드 +0x19 · +0x1a 네 칸(`TeamEntryPitcher.equipment`). 타석 교대 0x47cc8 이
+ * 마운드 그림(장면 +0xf1c)을 다시 실을 때 0xae83c(수비 팀)가 마투수(0xb633c)가 아니면 48138~4816a 가 이 니블 − 1 로 장비 겹
+ * 0x79790 을 부른다(모드를 안 가린다). 표 줄은 Xls 행(외인구단 팀 14 는 제구 니블 3) · 시즌 CPU 명단 니블(0x665e8) ·
+ * 기록으로 선 영입 투수는 기록 사본의 니블이다. 마투수면 undefined(그림은 0x793b0 의 ace/pitcher_*)
+ */
+export function currentPitcherEquipment(progress: TeamGameProgress): readonly number[] | undefined {
+  const entry = pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
+  if (entry === undefined || entry.aceIndex >= 0) return undefined
+  return entry.equipment
+}
+
 /** 우리 선발 투수의 경기용 능력치 (제구·구속·변화·체력) */
 export function ourPitcherStats(progress: TeamGameProgress): PitcherStats {
   const ability = pitcherAbilitiesAt(progress, progress.options.ourTeamId, progress.ourPitcherIndex)

@@ -4,6 +4,7 @@ import {
   applyPlayerOutcome,
   cpuPickoff,
   opponentPitcherAbilityOf,
+  opponentPitcherEquipmentOf,
   resolveDefensePlay,
   startGame,
   mySpecialSwingRemainingOf,
@@ -24,6 +25,7 @@ import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/mod
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -1575,5 +1577,21 @@ describe('루에 선 주자의 신원 — 원본 주자 목록대로 (0xa93ac ·
     expect(ourRunnerRunsOnBaseOf(mineOnFirst)[1]).toBe(777)
     // 타석 화면 0x35b94 상태 0xe 주루 칸도 같은 값 — 빈 루는 안 채운다
     expect(runnerRunAbilitiesOf(mineOnFirst)).toEqual({ first: 777 })
+  })
+})
+
+describe('내 타석 마운드의 상대 투수 장비 니블 — 타석 교대 0x47cc8 의 48138~4816a (모드 4 도 같다)', () => {
+  it('외인구단(팀 14) 투수는 Xls 행 니블(제구 3), 리그 열 팀은 0', () => {
+    const 외인구단 = { ...startGame(createSeededRandom(1), 0, 9, 14), aceOpponent: null }
+    expect(opponentPitcherEquipmentOf(외인구단)).toEqual(
+      teamPitchers(14)[외인구단.opponentMound.pitcherSlot]!.equipment,
+    )
+    expect(opponentPitcherEquipmentOf(외인구단)).toEqual([3, 0, 0, 0])
+    expect(opponentPitcherEquipmentOf({ ...startGame(createSeededRandom(1), 0, 9, 3), aceOpponent: null })).toEqual([0, 0, 0, 0])
+  })
+
+  it('마선수 대결 투수가 서면 니블이 없다 — 그림은 ace/pitcher_*', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 14)
+    expect(opponentPitcherEquipmentOf({ ...progress, aceOpponent: ACE_PITCHERS[0]! })).toBeUndefined()
   })
 })

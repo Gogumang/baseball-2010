@@ -404,6 +404,17 @@ export function pitcherEquipmentOf(nibbles: {
   }
 }
 
+/**
+ * 레코드 니블 네 칸(제구 · 구속 · 변화 · 체력 = 부위 0~3, `rec[0x19 + k/2]`, k 짝수 = 윗니블) → 투수 장비 겹.
+ * 타석 교대 0x47cc8 의 48138~4816a 가 마운드 투수(0xae83c(수비 팀))가 마투수가 아니면 이 니블 − 1 로 0x79790 을 부른다(모드 무관).
+ * 없으면(undefined) 맨몸이다.
+ */
+export function pitcherEquipmentOfNibbles(nibbles: readonly number[] | undefined): PitcherEquipment {
+  if (nibbles === undefined) return NO_PITCHER_EQUIPMENT
+  const [control = 0, velocity = 0, breaking = 0, stamina = 0] = nibbles
+  return pitcherEquipmentOf({ control, velocity, breaking, stamina })
+}
+
 const PITCHER_HEAD_FOLDER = (grade: number) => `${SPRITES}/item_pit_head_${grade}/frames`
 const PITCHER_BODY_FOLDER = (grade: number) => `${SPRITES}/item_pit_body_${grade}/frames`
 /** 기본 `_0`(등급 0~6) · 히든 `_7`(7~10) 두 장뿐이고 나머지는 `.mpl` 줄로 갈린다 */

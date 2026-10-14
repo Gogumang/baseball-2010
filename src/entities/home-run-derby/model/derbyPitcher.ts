@@ -41,7 +41,11 @@ const ENGINE_DIVISOR = 10
  * 0xaebb0 이 모드 7 이면 100 이라 안 깎는다. 폼 · 보유 구질 · 마구 번호는 같은 줄의 +0xb · +0x1c · +0x18
  * (`ROSTER_PITCHER_REPERTOIRES`, 전역 번호 팀 × 8 + 줄). 구질은 따로 1 로 고정된다(`pitchType`).
  */
-function ordinaryDerbyPitcherOf(opponentTeamId: number): { readonly name: string | null; readonly ability: PitcherAbility } {
+function ordinaryDerbyPitcherOf(opponentTeamId: number): {
+  readonly name: string | null
+  readonly ability: PitcherAbility
+  readonly equipment?: readonly number[]
+} {
   const row = teamPitchers(opponentTeamId)[DERBY_ORDINARY_PITCHER_ROW]
   if (row === undefined) return { name: null, ability: LEGACY_ORDINARY_DERBY_PITCHER }
   const control = masterGameAbilityOf(row, true, 0)
@@ -50,6 +54,8 @@ function ordinaryDerbyPitcherOf(opponentTeamId: number): { readonly name: string
   const repertoire = ROSTER_PITCHER_REPERTOIRES[opponentTeamId * PITCHERS_PER_TEAM + DERBY_ORDINARY_PITCHER_ROW]
   return {
     name: row.name,
+    // 마운드 그림 장비 겹 — 마스터 줄 +0x19 · +0x1a (`DerbyPitcher.equipment`)
+    equipment: row.equipment,
     ability: {
       control: Math.round(control / ENGINE_DIVISOR),
       velocity: Math.round(velocity / ENGINE_DIVISOR),
@@ -90,6 +96,12 @@ export interface DerbyPitcher {
   readonly ability: PitcherAbility
   /** 원본이 이 단계에서 던지는 구질 번호 — 0 단계 1, 그 위는 22(마구) */
   readonly pitchType: number
+  /**
+   * 단계 0 투수 레코드(마스터 줄 2)의 장비 니블 +0x19 · +0x1a — 타석 교대 0x47cc8 이 마운드 그림을 다시 실을 때 마투수가 아니면
+   * 48138~4816a 가 이 니블 − 1 로 장비 겹 0x79790 을 부른다(모드 7 도 같다). v = rand(0, 9) 라 리그 열 팀뿐이어서 늘 0 이다.
+   * 마투수 단계 · 상대 팀을 모를 때는 없다
+   */
+  readonly equipment?: readonly number[]
 }
 
 /**
@@ -122,7 +134,14 @@ export function derbyPitcherOf(
       opponentTeamId === undefined
         ? { name: null, ability: LEGACY_ORDINARY_DERBY_PITCHER }
         : ordinaryDerbyPitcherOf(opponentTeamId)
-    return { stage, ace: null, name: ordinary.name, ability: ordinary.ability, pitchType }
+    return {
+      stage,
+      ace: null,
+      name: ordinary.name,
+      ability: ordinary.ability,
+      pitchType,
+      ...(ordinary.equipment === undefined ? {} : { equipment: ordinary.equipment }),
+    }
   }
   // 홈런더비(모드 7)는 0xaebb0 이 늘 100 — 피로(0xb58e6, 55 이상 그대로)도 지친 제구 등급도 없다
   return {
