@@ -1,5 +1,5 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
-import { Button, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
@@ -20,7 +20,9 @@ import {
 } from '@/widgets/field-walk/lib/benchClearingWalk'
 import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { irisHoleSpansOf } from '@/widgets/game-scene/lib/irisClose'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 
 interface BenchClearingSceneProps {
   /** 운동장 18명 — 안 주면 바탕을 안 그린다(검정) */
@@ -50,10 +52,11 @@ interface BenchClearingSceneProps {
  * - 그리기 0x43228: 투수판에 맞춘 수비 운동장 위에 수비 9명(제자리 → 틱 10 에 마운드 둘레로) · 공격 9명(더그아웃 → 1루 · 3루 쪽 둘레,
  *   타자는 마운드로, 틱 60 에 더그아웃으로)을 그리기 목록 차례로. 글 · 효과음 없음.
  * - 틱 100: 화면 전환 종류 7(원 닫기, `benchClearingIrisOf`) — 단계 32 를 그린 다음 갱신(틱 133)에서 소리 멈춤(0x6e418) 뒤 나간다.
+ *   그림은 0xbd5bc 그대로 — 화면 전체 검정에 지름 240/단계 원 구멍을 뚫는다(`lib/irisClose`, `IrisCloseCanvas`).
  * - OK(−5)·'5'(0x40628): 소리 멈춤 · 입자 지움 · 같은 출구 — 건너뛰기. 웹은 Enter·Space 도 받는다.
  *
  * 0x6e418 은 울리는 소리를 가리지 않고 끊는다(`SoundPort.stop`) — 44 가 아직 울리면 그것을 끊는다.
- * 확인 단추는 웹 전용이다(원본은 OK 키).
+ * 화면을 누르는 투명 칸(`OkTapArea`)은 웹 전용이다(원본은 OK 키).
  */
 export function BenchClearingScene({ field, random, onDone, walkStateRef }: BenchClearingSceneProps) {
   const reachedRef = useRef(false)
@@ -118,20 +121,32 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
           ]}
         />
       )}
-      {iris !== null && (
-        <div
-          className={styles.cover}
-          data-testid="벤치-원닫기"
-          data-size={iris.size}
-          style={{
-            background: `radial-gradient(circle ${iris.size / 2}px at ${iris.x + iris.size / 2}px ${iris.y + iris.size / 2}px, transparent 100%, #000 100%)`,
-          }}
-        />
-      )}
-      <Button variant="corner" className={styles.okButton} onClick={finish}>
-        확인
-      </Button>
+      {iris !== null && <IrisCloseCanvas x={iris.x} y={iris.y} size={iris.size} />}
+      <OkTapArea onTap={finish} />
     </RawScreen>
+  )
+}
+
+const SCREEN_WIDTH = 240
+const SCREEN_HEIGHT = 320
+
+/**
+ * **원 닫기 한 그림** — 0xbd5bc: 화면 크기(W × H) 그림을 검정으로 칠하고(0x14006e8(0, 0, W, H)) (255, 0, 255) 채운 원
+ * 0x1400708(x, y, w, h, 0, 360) 으로 구멍을 뚫어 (0, 0) 에 찍는다. 구멍 칸은 `irisHoleSpansOf`(⚠️ 단말 함수라 화소 규칙은 미확인).
+ */
+function IrisCloseCanvas({ x, y, size }: { readonly x: number; readonly y: number; readonly size: number }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  useEffect(() => {
+    const context = canvasRef.current?.getContext('2d') ?? null
+    if (context === null) return
+    context.globalCompositeOperation = 'source-over'
+    context.fillStyle = '#000000'
+    context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+    for (const span of irisHoleSpansOf(x, y, size)) context.clearRect(span.from, span.y, span.to - span.from + 1, 1)
+  }, [x, y, size])
+  return (
+    <canvas ref={canvasRef} className={styles.cover} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
+      data-testid="벤치-원닫기" data-size={size} style={{ imageRendering: 'pixelated' }} />
   )
 }
 

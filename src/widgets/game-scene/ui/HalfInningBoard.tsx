@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { Button, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
-import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { HALF_INNING_SCOREBOARD_FROM_TICK, SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -43,7 +43,7 @@ interface HalfInningBoardProps {
  *
  * - 운동장 전경 0x4fb8c 는 틱과 상관없이 늘 바탕이다(0x4fef8, 틱 ≤ 69 는 이것만) — 새 수비가 더그아웃에서 제자리로 걷고 앞 수비가
  *   더그아웃으로 들어가며, 틱 100 뒤에는 카메라가 야수를 하나씩 비추며 이름표를 단다 (`widgets/field-walk/ui/HalfInningField`).
- * - 확인 단추는 웹 전용이다(원본은 OK 키). 예전 웹의 "N회초" 글자는 원본에 없어 뺐다.
+ * - 화면을 누르는 투명 칸(`OkTapArea`)은 웹 전용이다(원본은 OK 키). 예전 웹의 "N회초" 글자는 원본에 없어 뺐다.
  */
 export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, field, onConfirm }: HalfInningBoardProps) {
   const tick = useSceneTick(onTick)
@@ -78,9 +78,7 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
       )}
       {cards !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && <HalfInningCards data={cards} />}
       </div>
-      <Button variant="corner" className={styles.okButton} onClick={confirm}>
-        확인
-      </Button>
+      <OkTapArea onTap={confirm} />
     </RawScreen>
   )
 }

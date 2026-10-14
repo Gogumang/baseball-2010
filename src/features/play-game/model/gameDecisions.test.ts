@@ -55,4 +55,11 @@ describe('승·패·세 칸 — 득점 0xa5c34 를 한 점씩', () => {
 
     expect(names).toEqual({ win: '우리3', loss: '상대5', save: null })
   })
+
+  it('세이브 줄은 승리투수 번호와 같으면 비운다 (5032a~50336, 측은 안 견준다)', () => {
+    const base = { ...EMPTY_DECISION_STATE, winner: { side: 1, number: 3 }, loser: { side: 0, number: 5 } }
+    const nameOf = (ours: boolean, number: number) => `${ours ? '우리' : '상대'}${number}`
+    expect(pitcherOfRecordNamesOf({ ...base, save: { side: 1, number: 4 } }, 1, nameOf).save).toBe('우리4')
+    expect(pitcherOfRecordNamesOf({ ...base, save: { side: 0, number: 3 } }, 1, nameOf).save).toBeNull()
+  })
 })

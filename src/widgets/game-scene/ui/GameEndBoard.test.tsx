@@ -117,3 +117,23 @@ describe('공수 교대 판의 운동장 전경 0x4fb8c', () => {
     expect(tag.textContent).toBe('좌익')
   })
 })
+
+describe('OK 를 대신하는 투명 눌림 칸 (웹 전용)', () => {
+  it('경기 끝 판은 10틱 동안 눌러도 안 넘어가고 그 뒤 누르면 넘어간다', () => {
+    vi.useFakeTimers()
+    const onConfirm = vi.fn()
+    render(<GameEndBoard side0Score={0} side1Score={1} names={[null, null, null]} onConfirm={onConfirm} />)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onConfirm).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('교대 판은 누르면 곧 넘어간다', () => {
+    const onConfirm = vi.fn()
+    render(<HalfInningBoard inning={1} half="초" onConfirm={onConfirm} />)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+})

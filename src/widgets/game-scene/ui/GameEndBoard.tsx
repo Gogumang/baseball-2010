@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { Button, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { GAME_END_INPUT_LOCK_TICKS } from '@/widgets/game-scene/lib/endBoardLayout'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
-import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -104,10 +104,8 @@ export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, l
           tick={tick}
         />
       )}
-      {/* 원본에 없는 웹 전용 단추 — 원본은 OK 키가 한다. 10틱 동안은 원본처럼 먹지 않는다 */}
-      <Button variant="corner" className={styles.okButton} disabled={isLocked} onClick={confirm}>
-        확인
-      </Button>
+      {/* OK 키를 대신하는 투명 눌림 칸(웹 전용) — 10틱 동안은 원본처럼 먹지 않는다 */}
+      <OkTapArea disabled={isLocked} onTap={confirm} />
     </RawScreen>
   )
 }
