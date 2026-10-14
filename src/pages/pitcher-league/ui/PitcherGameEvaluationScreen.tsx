@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { NO_LAST_EVALUATION, pitcherLastGameLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -53,7 +55,24 @@ export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: Pit
   } as const
   // 0x7d120(…, 1) — 막 치른 경기 번호
   const changeGame = messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)
+  /**
+   * 116 진입 0x1278c 는 끝(12bb6~12bbe)에서 0xbcb49(114) 를 걸 뿐이다 — 116 이 선 틀은 116 그림 0x11e0c(머리띠 0x7f4ed ·
+   * 상태판 0x7d34c(gfx, 0))만 그리고, 114(평가 이벤트)는 다음 틀 머리(0x1cdec 의 1ce00)에 들어선다
+   */
+  const [isEvaluationEntered, setEvaluationEntered] = useState(false)
+  useEffect(() => {
+    if (isEvaluationEntered) return undefined
+    const timer = window.setTimeout(() => setEvaluationEntered(true), millisecondsPerFrame())
+    return () => window.clearTimeout(timer)
+  }, [isEvaluationEntered])
 
+  if (!isEvaluationEntered) {
+    return (
+      <RawScreen>
+        <PitcherEventUnderlay career={career} />
+      </RawScreen>
+    )
+  }
   return (
     <RawScreen>
       <EvaluationEventPlayer

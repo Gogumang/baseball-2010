@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
@@ -88,6 +89,11 @@ interface GameResultScreenProps {
    */
   readonly underlay?: ReactNode
   /**
+   * 116 이 선 첫 틀의 그림 — 116 그리기 0x11e0c 는 머리띠 0x7f4ed · 상태판 0x7d34c(gfx, **0**) 뿐이다(앞그림 0x16a34 의 공 무늬 위).
+   * 114(평가 이벤트)는 116 진입 끝 12bb6~12bbe 의 0xbcb49(114) 로 **다음 틀**에 들어선다. 안 주면 `underlay` 를 쓴다.
+   */
+  readonly entryUnderlay?: ReactNode
+  /**
    * **경기 장면 끝(0x18 → 0x19)을 지나 왔을 때** — 경기 끝 판 0x4fe9c 와 정산 그림 0x4a384 의 재료.
    * `inning` 은 경기 끝 이닝(타석 HUD 와 같은 1 부터 — 전역 경기 상태 +0x6b 의 칸), `playerSide` 는 사람 팀의 측
    * (점수 · 점수판 틀 두 측이 측 0 = 선공부터), `random` 은 경기 난수.
@@ -132,10 +138,21 @@ export function GameResultScreen({
   career,
   onContinue,
   underlay,
+  entryUnderlay,
   settlement,
 }: GameResultScreenProps) {
   const [phase, setPhase] = useState<Phase>(() =>
     settlement !== undefined ? '끝판' : evaluation !== undefined ? '평가' : '정산')
+  /**
+   * 116 → 114 가 들어섰는가 — 116 진입 0x1278c 는 칭호 팝업 0x1274c 를 건 뒤 끝(12bb6~12bbe)에서 0xbcb49(114) 를 걸 뿐이라,
+   * 그 틀은 116 그림(0x11e0c)과 팝업만 그리고 114 진입 0x11d00 · 갱신 0x1c014(이벤트 실행기)는 다음 틀 머리(1ce00)에서 돈다.
+   */
+  const [isEvaluationEntered, setEvaluationEntered] = useState(false)
+  useEffect(() => {
+    if (phase !== '평가' || isEvaluationEntered) return undefined
+    const timer = window.setTimeout(() => setEvaluationEntered(true), millisecondsPerFrame())
+    return () => window.clearTimeout(timer)
+  }, [phase, isEvaluationEntered])
   const [isTitlePopupOpen, setIsTitlePopupOpen] = useState(newTitles.length > 0)
   // 결과 배경의 하늘 줄은 경기를 세울 때 고른 구장 +0x10(`settlement.skyRow`, 0x783b0 모드 4 — 굴림 없음)이다. 원본은 경기 내내 같은
   // 구장객체라 정산 그림도 그 줄이다. 배경 난수는 줄을 안 받았을 때(옛 호출)만 쓰여 경기 난수에 새지 않게 따로 든다
@@ -166,7 +183,9 @@ export function GameResultScreen({
     const title = newTitles[0]
     return (
       <RawScreen>
-        <EvaluationEventPlayer
+        {/* 116 이 선 틀 — 116 그림 0x11e0c 만(평가 이벤트 114 는 다음 틀부터) */}
+        {!isEvaluationEntered && (entryUnderlay ?? underlay)}
+        {isEvaluationEntered && <EvaluationEventPlayer
           underlay={underlay}
           // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
           dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
@@ -180,7 +199,7 @@ export function GameResultScreen({
           streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
           gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
           onDone={onContinue}
-        />
+        />}
         {isTitlePopupOpen && title !== undefined && (
           /*
             116 진입 1299e~129c8 — 칭호 39 가 없고 이 경기 홈런 > 3 이면 +0x270 = 39 로 칭호 팝업 0x1274c(종류 0x78)를 건다.
@@ -190,7 +209,7 @@ export function GameResultScreen({
             상태 바꿈(0x1ce00) · 진입 · 갱신(0x1d1b2 → 114 0x1c014 — 이벤트 실행기 0x8cf65)· 그리기는 돌린다.
             그래서 다음 틀에 114 가 들어와 명령 1 say 상자가 팝업 밑에서 오르고, 키(114 키 0x13b88 → 0x8b805)는 창이 먹어
             대사는 팝업이 치워진 뒤의 키부터 넘어간다(치우는 그 틀의 키도 0x754f9 가 1 이라 이벤트에 안 간다).
-            ⚠️ 웹은 팝업과 같은 그림에서 이벤트를 세운다 — 원본은 114 진입이 한 틀 늦다.
+            팝업이 선 첫 틀은 116 그림뿐이고 이벤트는 다음 틀에 선다(`isEvaluationEntered`).
           */
           <div style={{ position: 'absolute', inset: 0, zIndex: 50 }}>
             <TitleWindow title={title} onKey={onConfirmTitle} onClose={() => setIsTitlePopupOpen(false)} />

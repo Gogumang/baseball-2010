@@ -151,6 +151,8 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect(screen.getByTestId('밑그림')).toBeTruthy()
     expect(onContinue).not.toHaveBeenCalled()
+    // 116 이 선 틀 — 114 는 다음 틀
+    프레임(1)
     프레임(200)
     const 줄 = [...screen.getByTestId('대사-상자').querySelectorAll('[data-part="글줄"]')].map((line) => line.textContent)
     expect(줄[0]).toBe('4타수 2안타 3타점 1홈런')
@@ -210,6 +212,9 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
         career={createCareer('선수')} onContinue={vi.fn()} onConfirmTitle={onConfirmTitle} />,
     )
     expect(screen.getByTestId('칭호-창').querySelector('[data-part="이름"]')?.textContent).toBe('"다이너마이트 배트"')
+    // 116 이 선 틀은 116 그림과 팝업뿐 — 114 진입은 116 진입 끝(12bb6~12bbe)의 0xbcb49 로 다음 틀이다
+    expect(screen.queryByTestId('대사-상자')).toBeNull()
+    프레임(1)
     // 나리 틀 0x1cdec 는 창이 떠 있어도 상태 바꿈 · 갱신을 돌린다 — 114 의 명령 1 say 상자가 팝업 밑에 선다
     expect(screen.getByTestId('대사-상자')).toBeTruthy()
     const 대사 = () => screen.getByTestId('대사-상자').getAttribute('data-text')
