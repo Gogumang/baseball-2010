@@ -431,10 +431,9 @@ export function SeasonRoute({
       return (
         <SeasonEquipmentScreen
           record={state.record}
-          playerName={view.name}
-          isBatter={!isPitcher}
+          teamMorale={state.teamMorale}
+          view={{ ...view, equipment }}
           equipment={equipment}
-          abilities={seasonCardAbilitiesOf(view, { record: state.record, teamMorale: state.teamMorale })}
           isHiddenOpen={(id) => opened.includes(id)}
           gamePoint={session.gamePoints}
           onPurchase={(bought) => {
