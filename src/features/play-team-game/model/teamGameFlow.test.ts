@@ -1754,6 +1754,39 @@ describe('견제 — 메시지 0x10 → 0x50f28 → 플레이 종류 4 (사람 �
     expect(cpuPickoff(수비판, 1, createSeededRandom(1))).toBe(수비판)
   })
 
+  const 아웃합 = (progress: TeamGameProgress) => progress.pitcherLines.reduce((sum, line) => sum + line.outs, 0)
+
+  it('견제 판 정산(종류 4)은 같은 투구 틈 앞 판의 사건까지 센다 — R[3] · 투수 줄 +0x20 · state[0x8a] · 26 (0xa8024 · 사건 목록은 0xa5e14 만 비운다)', () => {
+    const { progress } = 시작()
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    const 그냥 = pickoff(판, '3', createSeededRandom(3))
+    const play = 그냥.lastDefensePlay
+    if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
+    expect(play.advance.outsAdded).toBe(0)
+    // 같은 틈에 앞 판이 아웃 2 · 득점 1 을 남겼다
+    const 남은 = pickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 1 } }, '3', createSeededRandom(3))
+    expect(남은.recordTally.moundOuts).toBe(그냥.recordTally.moundOuts + 2)
+    expect(아웃합(남은)).toBe(아웃합(그냥) + 2)
+    expect(남은.pitching.runsAllowed).toBe(그냥.pitching.runsAllowed + 1)
+    // [sp+0x30] == 2 → 병살 26 (a8e58) — 사람 수비라 게이트를 지난다
+    expect(남은.recordIds).toContain(26)
+    expect(그냥.recordIds).not.toContain(26)
+    // 같은 타석이 이어지니 몫이 남고, 다음 공(0xa5e14)이 비운다
+    expect(남은.pendingSettlementEvents).toEqual({ outs: 2, runs: 1 })
+    const 던진뒤 = throwPitch(남은, { typeNumber: 첫구질(남은), gaugeCell: 0 }, createSeededRandom(9))
+    expect(던진뒤.pendingSettlementEvents).not.toEqual({ outs: 2, runs: 1 })
+  })
+
+  it('CPU 견제 정산 — 사람 공격이면 수비 칸(R[3] · 26 · state[0x8a])은 안 서고 상대 투수 줄 아웃만 앞 몫까지 센다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    const 그냥 = cpuPickoff(판, 1, createSeededRandom(11))
+    const 남은 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 1, createSeededRandom(11))
+    expect(아웃합(남은)).toBe(아웃합(그냥) + 2)
+    expect(남은.recordTally.moundOuts).toBe(그냥.recordTally.moundOuts)
+    expect(남은.recordIds).toEqual(그냥.recordIds)
+  })
+
   it('견제를 끼워도 기존 경로의 난수 차례는 그대로다 — 견제 판의 굴림만큼만 밀린다', () => {
     const { progress } = 시작()
     const 판 = 주자(progress, { first: true, second: false, third: false })
