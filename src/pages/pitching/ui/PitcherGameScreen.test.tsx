@@ -108,7 +108,7 @@ const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) =
     />,
   )
   fireEvent.keyDown(window, { key: '5' })
-  if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByText(/^\d+회[초말]$/) !== null) {
+  if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByTestId(/^교대-판-/) !== null) {
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
   }
   OK통과()
@@ -204,7 +204,7 @@ describe('투수편 경기 화면', () => {
     vi.useFakeTimers()
     render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} />)
     fireEvent.keyDown(window, { key: '5' })
-    if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByText(/^\d+회[초말]$/) !== null) {
+    if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByTestId(/^교대-판-/) !== null) {
       fireEvent.click(screen.getByRole('button', { name: '확인' }))
     }
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
@@ -299,11 +299,11 @@ describe('투수편 경기 화면', () => {
 describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
   it('인트로가 먼저 서고, 후공·선발이면 그 뒤 1회초 판이 OK 를 기다린다 — 그 동안 메뉴 키가 안 먹는다', () => {
     render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={vi.fn()} />)
-    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.getByTestId('인트로-띠')).toBeTruthy()
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
 
     fireEvent.keyDown(window, { key: '5' })
-    expect(screen.getByText('1회초')).toBeTruthy()
+    expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.queryByText('조작방법')).toBeNull()
@@ -328,7 +328,7 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
     fireEvent.keyDown(window, { key: '5' })
     // 1회초 우리 공격 — 타석마다 한 틱(교체 틱 포함) · 마지막 칸 다음 틱에 0x18
     expect(중계넘기기()).toBeGreaterThan(3)
-    expect(screen.queryByText('1회초')).toBeNull()
+    expect(screen.queryByTestId('교대-판-1회초')).toBeNull()
     OK통과()
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
   })

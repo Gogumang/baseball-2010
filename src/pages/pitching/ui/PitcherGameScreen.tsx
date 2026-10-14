@@ -37,12 +37,15 @@ import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { TEAMS } from '@/shared/config/original/teams'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
@@ -480,9 +483,19 @@ export function PitcherGameScreen({
     const side1Team = options.playerSide === 0 ? options.opponentTeamId : options.ourTeamId
     return (
       <GameIntro
-        awayName={TEAMS[side0Team]?.name ?? ''}
-        homeName={TEAMS[side1Team]?.name ?? ''}
+        // 모드 3 은 홈(측 1) 팀 이름 + "스타디움" (0x418b6 의 0xb6bdc(st, 1))
+        stadiumNameFrame={introStadiumNameFrameOf(PITCHER_CAREER_MODE, null, side1Team)}
         scoreboardSides={scoreboardSides}
+        // 배경 고르기 0x40ff0 → 모드 3 은 0x78578 — 경기 장면의 타석 구장(0x39fdc 모드 3) 그대로
+        backdrop={{
+          skyRow: stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0,
+          skyColumn: 0,
+          stadium: sceneStadium.stadium,
+          fieldPalette: grassPalette,
+          ourTeamId: side0Team,
+          opponentTeamId: side1Team,
+          gameMode: PITCHER_CAREER_MODE,
+        }}
         onDone={() => setIntroDone(true)}
       />
     )
@@ -538,7 +551,24 @@ export function PitcherGameScreen({
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진행기가 이미 썼다
   if (progress.pendingBenchClearing !== null) {
-    return withRecordAlert(<BenchClearingScene onDone={actions.finishBenchClearing} />)
+    return withRecordAlert(
+      <BenchClearingScene
+        // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명. 타자 손은 사구를 맞은 상대 타자(타석 소개 판과 같은 값)
+        field={benchClearingFieldOf({
+          entryRolls: progress.pendingBenchClearing.entryRolls,
+          half: progress.game.half,
+          playerSide: options.playerSide,
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          batterHand: pitcherMatchupCardsOf(progress, pitcherName).batterHand,
+          bases: progress.game.bases,
+          grassPalette,
+        })}
+        // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
+        random={random}
+        onDone={actions.finishBenchClearing}
+      />,
+    )
   }
 
   /**
@@ -557,6 +587,22 @@ export function PitcherGameScreen({
         scoreboardSides={scoreboardSides}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={pitcherHalfInningCardsOf(progress, pitcherName, board.half)}
+        // 운동장 전경 0x4fb8c — 투수편 판은 경기 첫 판(1회초)뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래)
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: board.serial === 1,
+          playerSide: options.playerSide,
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          grassPalette,
+          // 이름표 — 칸 0 은 내 투수, 1~8 은 내 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008).
+          // ⚠️ 근사: 원본은 경기 팀 레코드 차례를 훑는다 — 웹은 붙박이 표 차례
+          fielderNames: fielderNamesByPosition(
+            pitcherName ?? null,
+            teamBatters(options.ourTeamId).map((player) => ({ name: player.name, position: player.position ?? 0 })),
+          ),
+        })}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />,
     )

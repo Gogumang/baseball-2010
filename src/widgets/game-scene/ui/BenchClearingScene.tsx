@@ -1,57 +1,82 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button, RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   BENCH_CLEARING_SOUND,
   BENCH_CLEARING_TARGET_TICK,
-  BENCH_CLEARING_TRANSITION_MS,
-  BENCH_CLEARING_TRANSITION_TICK,
+  rollBenchClearingTargets,
 } from '@/features/play-game/model/benchClearingScene'
+import { screenOffsetOf } from '@/pages/defense/lib/defenseCamera'
+import {
+  BENCH_CLEARING_EXIT_TICK,
+  type BenchClearingField,
+  type BenchClearingWalkInput,
+  type BenchClearingWalkState,
+  benchClearingCamera,
+  benchClearingIrisOf,
+  startBenchClearingWalk,
+  stepBenchClearingWalk,
+} from '@/widgets/field-walk/lib/benchClearingWalk'
+import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 
 interface BenchClearingSceneProps {
+  /** 운동장 18명 — 안 주면 바탕을 안 그린다(검정) */
+  readonly field?: BenchClearingField
   /**
-   * 연출이 끝났다 — 출구 0xae24c. `reachedTargetTick` = 틱 10 의 갱신(수비 목표 굴림 8 번)이 돌았는가.
-   * 진행기 `resolveBenchClearing` 이 그 굴림을 대신 낸다.
+   * 경기 난수 — 주면 틱 10 의 갱신(0x401d4)에서 이 화면이 수비 8명 목표 굴림 8 번을 낸다(그 값으로 수비가 마운드로 몰린다).
+   * 안 주면 굴리지 않고 `onDone` 으로 알린다 — 부르는 쪽이 끝에서 굴린다(차례는 같다, 그림의 목표만 없다).
+   */
+  readonly random?: RandomPort
+  /**
+   * 연출이 끝났다 — 출구 0xae24c. `reachedTargetTick` = 틱 10 의 갱신이 돌았는데 **굴림 8 번을 아직 안 냈다**
+   * (`random` 을 안 넘긴 경우) — 진행기 `resolveBenchClearing` 이 그 굴림을 대신 낸다. `random` 을 넘기면 늘 거짓이다.
    */
   readonly onDone: (reachedTargetTick: boolean) => void
 }
 
 /**
- * **벤치 클리어링 연출** — 경기 장면 상태 0x1e (`features/play-game/model/benchClearingScene` 머리말).
+ * **벤치 클리어링 연출** — 경기 장면 상태 0x1e (`features/play-game/model/benchClearingScene` 머리말,
+ * 운동장은 `widgets/field-walk/lib/benchClearingWalk`).
  *
- * - 진입: 소리 44 (0x3aba4, loop 0). 진입 굴림 45 번은 진행기가 이미 썼다.
- * - 틱 10: 수비 8명 목표 굴림 — 화면은 "돌았다" 만 기억해 끝날 때 알린다(굴림은 진행기가).
- * - 틱 100: 화면 전환 0xbdae8(…, 7, 0, 5, 1500) → 전환이 끝나면 소리 멈춤(0x6e418) 뒤 나간다.
+ * - 진입: 소리 44 (0x3aba4, loop 0). 진입 굴림 45 번은 진행기가 이미 썼다(값은 `field.entryRolls`).
+ * - 그리기 0x43228: 투수판에 맞춘 수비 운동장 위에 수비 9명(제자리 → 틱 10 에 마운드 둘레로) · 공격 9명(더그아웃 → 1루 · 3루 쪽 둘레,
+ *   타자는 마운드로, 틱 60 에 더그아웃으로)을 그리기 목록 차례로. 글 · 효과음 없음.
+ * - 틱 100: 화면 전환 종류 7(원 닫기, `benchClearingIrisOf`) — 단계 32 를 그린 다음 갱신(틱 133)에서 소리 멈춤(0x6e418) 뒤 나간다.
  * - OK(−5)·'5'(0x40628): 소리 멈춤 · 입자 지움 · 같은 출구 — 건너뛰기. 웹은 Enter·Space 도 받는다.
  *
- * ⚠️ 미해결 — 그림(0x43228): 수비 배경 0x411e0 위에 수비 9명(+0x111c)·공격 9명(+0x1758, 마선수면 +0x177c 그림)이
- *    더그아웃 표 0xcfaf8 에서 투수판 0xcfa8c 로 몰려나오는 모습은, 세계 좌표 → 화면 투영과 선수 동작 그림을
- *    이 화면에 옮기지 않아 그리지 않는다. 웹은 글자(웹 전용)만 둔다.
- * ⚠️ 전환 길이 1500 은 0xbdae8 의 마지막 인자다 — 단위(ms)는 유력. 원본은 전환 객체가 끝났다고 할 때 나간다.
  * 0x6e418 은 울리는 소리를 가리지 않고 끊는다(`SoundPort.stop`) — 44 가 아직 울리면 그것을 끊는다.
+ * 확인 단추는 웹 전용이다(원본은 OK 키).
  */
-export function BenchClearingScene({ onDone }: BenchClearingSceneProps) {
+export function BenchClearingScene({ field, random, onDone }: BenchClearingSceneProps) {
   const reachedRef = useRef(false)
+  const targetRollsRef = useRef<readonly number[] | null>(null)
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
-  const [isTransitioning, setTransitioning] = useState(false)
+  const randomRef = useRef(random)
+  randomRef.current = random
   const audio = activeSound()
 
   const finish = () => {
     if (doneRef.current) return
     doneRef.current = true
-    // 0x40500(틱 100 전환 끝) · 0x4063a(키 건너뛰기) — 0x6e418
+    // 0x40500(전환 끝) · 0x4063a(키 건너뛰기) — 0x6e418
     audio.stop()
-    onDoneRef.current(reachedRef.current)
+    onDoneRef.current(reachedRef.current && targetRollsRef.current === null)
   }
 
-  useSceneTick((tick) => {
-    if (tick === BENCH_CLEARING_TARGET_TICK) reachedRef.current = true
-    if (tick === BENCH_CLEARING_TRANSITION_TICK) setTransitioning(true)
-  }, !isTransitioning)
+  const tick = useSceneTick((next) => {
+    if (doneRef.current) return
+    if (next === BENCH_CLEARING_TARGET_TICK) {
+      reachedRef.current = true
+      // 0x401d4 틱 10 — 수비 8명 목표 굴림 8 번
+      if (randomRef.current !== undefined) targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
+    }
+    if (next >= BENCH_CLEARING_EXIT_TICK) finish()
+  })
 
   // 진입 꼬리 0x3aba4 — 0x6e498(음, 0x2c, 0)
   useEffect(() => {
@@ -59,13 +84,6 @@ export function BenchClearingScene({ onDone }: BenchClearingSceneProps) {
     // 진입 한 번 — 다시 내지 않는다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!isTransitioning) return
-    const handle = window.setTimeout(finish, BENCH_CLEARING_TRANSITION_MS)
-    return () => window.clearTimeout(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTransitioning])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -78,14 +96,55 @@ export function BenchClearingScene({ onDone }: BenchClearingSceneProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const walk = useBenchClearingWalk(field, tick, targetRollsRef.current)
+  const iris = benchClearingIrisOf(tick)
   return (
     <RawScreen>
-      <div className={styles.webCaption} style={isTransitioning ? { opacity: 0.4 } : undefined}>
-        벤치 클리어링
-      </div>
+      {field !== undefined && walk !== null && (
+        <FieldWalkView
+          offset={screenOffsetOf(benchClearingCamera())}
+          grassPalette={field.grassPalette ?? null}
+          rows={[
+            // 43240 0x43010(장면, [+0xf20], +0x111c, 0) — 수비 줄
+            { walkers: walk.fielders, teamIndex: field.defenseTeam ?? null },
+            // 43252 0x43010(장면, [+0x177c], +0x1758, 1) — 공격 줄
+            { walkers: walk.offense, teamIndex: field.offenseTeam ?? null },
+          ]}
+        />
+      )}
+      {iris !== null && (
+        <div
+          className={styles.cover}
+          data-testid="벤치-원닫기"
+          data-size={iris.size}
+          style={{
+            background: `radial-gradient(circle ${iris.size / 2}px at ${iris.x + iris.size / 2}px ${iris.y + iris.size / 2}px, transparent 100%, #000 100%)`,
+          }}
+        />
+      )}
       <Button variant="corner" className={styles.okButton} onClick={finish}>
         확인
       </Button>
     </RawScreen>
   )
+}
+
+/** 틱마다 한 걸음씩 — 진입부터 다시 굴리지 않게 지난 상태를 들고 있는다 */
+function useBenchClearingWalk(
+  field: BenchClearingWalkInput | undefined,
+  tick: number,
+  targetRolls: readonly number[] | null,
+): BenchClearingWalkState | null {
+  const memory = useRef<{ readonly field: BenchClearingWalkInput; readonly tick: number; readonly state: BenchClearingWalkState } | null>(null)
+  if (field === undefined) return null
+  let current = memory.current
+  const isSame = current !== null && current.field.entryRolls === field.entryRolls
+    && current.field.offenseSide === field.offenseSide && current.field.isLeftBatter === field.isLeftBatter
+  if (current === null || !isSame || current.tick > tick) {
+    current = { field, tick: -1, state: startBenchClearingWalk(field) }
+  }
+  let { state } = current
+  for (let t = current.tick + 1; t <= tick; t += 1) state = stepBenchClearingWalk(state, t, field, targetRolls)
+  memory.current = { field, tick: Math.max(tick, current.tick), state }
+  return state
 }

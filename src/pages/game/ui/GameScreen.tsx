@@ -12,6 +12,9 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { teamBatters } from '@/entities/team/model/teamRoster'
+import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
@@ -238,7 +241,24 @@ export function GameScreen({
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
   if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
-    return <BenchClearingScene onDone={onBenchClearingDone} />
+    return (
+      <BenchClearingScene
+        // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명 (사구를 맞은 타자는 나다)
+        field={benchClearingFieldOf({
+          entryRolls: progress.pendingBenchClearing.entryRolls,
+          half: progress.game.half,
+          playerSide: progress.game.playerSide,
+          ourTeamId: career.teamId,
+          opponentTeamId: progress.opponentTeamId,
+          batterHand: career.battingSide,
+          bases: progress.game.bases,
+          grassPalette: sceneFieldPaletteOf(sceneStadium),
+        })}
+        // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
+        random={random}
+        onDone={onBenchClearingDone}
+      />
+    )
   }
 
   /**
@@ -257,6 +277,22 @@ export function GameScreen({
         scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, career.teamId, progress.opponentTeamId)}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={gameHalfInningCardsOf(progress, career, board.half)}
+        // 운동장 전경 0x4fb8c — 타자편 판은 경기 첫 판(1회초)뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래)
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: board.serial === 1,
+          playerSide: progress.game.playerSide,
+          ourTeamId: career.teamId,
+          opponentTeamId: progress.opponentTeamId,
+          grassPalette: sceneFieldPaletteOf(sceneStadium),
+          // 이름표 — 칸 0 은 상대 마운드, 1~8 은 상대 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008).
+          // ⚠️ 근사: 원본은 경기 팀 레코드 차례(대타 · 마타자 반영)를 훑는다 — 웹은 붙박이 표 차례
+          fielderNames: fielderNamesByPosition(
+            gameHalfInningCardsOf(progress, career, board.half).pitcherName,
+            teamBatters(progress.opponentTeamId).map((player) => ({ name: player.name, position: player.position ?? 0 })),
+          ),
+        })}
         onConfirm={() => setBoardClosed(true)}
       />
     )

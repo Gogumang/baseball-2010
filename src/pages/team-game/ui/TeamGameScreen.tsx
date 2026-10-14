@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
@@ -27,6 +26,7 @@ import {
   runnerRunAbilitiesOf,
   specialSwingRemainingAt,
   substitutionDetailAbilities,
+  isOurOffense,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
@@ -36,6 +36,9 @@ import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/us
 import { RecordAlertPanel, RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
@@ -555,9 +558,20 @@ export function TeamGameScreen({
     const side1Team = options.playerSide === 0 ? options.opponentTeamId : options.ourTeamId
     return (
       <GameIntro
-        awayName={TEAMS[side0Team]?.name ?? ''}
-        homeName={TEAMS[side1Team]?.name ?? ''}
+        // 모드 1 은 구장 번호 st+0x30, 그 밖은 홈(측 1) 팀 이름 + "스타디움" (0x418b6)
+        stadiumNameFrame={introStadiumNameFrameOf(options.mode, options.stadiumId, side1Team)}
         scoreboardSides={scoreboardSides}
+        // 배경 고르기 0x40ff0 — 타석 · 정산 배경과 같은 구장(시즌 홈경기 · 대전이면 시즌 구장)
+        backdrop={{
+          skyRow: stadiumSkyRow ?? 0,
+          skyColumn: 0,
+          stadium: sceneStadium?.stadium ?? 0,
+          fieldPalette,
+          ...(seasonStadium === undefined ? {} : { seasonStadium }),
+          ourTeamId: side0Team,
+          opponentTeamId: side1Team,
+          gameMode: options.mode,
+        }}
         onDone={() => setIntroDone(true)}
       />
     )
@@ -699,7 +713,24 @@ export function TeamGameScreen({
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다 (진입 굴림 45 번은 진행기가 이미 썼다)
   if (progress.pendingBenchClearing !== null) {
-    return <BenchClearingScene onDone={actions.finishBenchClearing} />
+    return (
+      <BenchClearingScene
+        // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명. 타자 손은 사구를 맞은 지금 타자(타석 소개 판과 같은 값)
+        field={benchClearingFieldOf({
+          entryRolls: progress.pendingBenchClearing.entryRolls,
+          half: progress.game.half,
+          playerSide: options.playerSide,
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          batterHand: matchup.batterHand,
+          bases: progress.game.bases,
+          grassPalette: fieldPalette,
+        })}
+        // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
+        random={random}
+        onDone={actions.finishBenchClearing}
+      />
+    )
   }
 
   /**
@@ -718,6 +749,21 @@ export function TeamGameScreen({
         scoreboardSides={scoreboardSides}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={teamHalfInningCardsOf(progress, board.half)}
+        // 운동장 전경 0x4fb8c — 새 수비가 더그아웃에서 제자리로 걷고 앞 수비가 들어간다 (판 틱 0 의 굴림 36 개)
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: board.serial === 1,
+          playerSide: options.playerSide,
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          grassPalette: fieldPalette,
+          // 이름표 — 칸 0 은 수비 팀 지금 투수, 1~8 은 수비 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008)
+          fielderNames: fielderNamesByPosition(
+            teamHalfInningCardsOf(progress, board.half).pitcherName,
+            isOurOffense(progress) ? progress.opponentEntry : progress.ourEntry,
+          ),
+        })}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )

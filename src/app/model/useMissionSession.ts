@@ -79,6 +79,7 @@ import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
@@ -100,6 +101,7 @@ import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { hallOfFamePitcherAt } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
@@ -644,6 +646,8 @@ export function useMissionSession({
       readonly outcome: AtBatOutcome
       /** 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤 0x17 로 재생한다 */
       readonly walkReplay?: DefensePlayResult | null
+      /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+      readonly entryRolls?: readonly BenchClearingEntryRoll[]
     } | null
   >(null)
   /**
@@ -664,9 +668,13 @@ export function useMissionSession({
    * OK(메시지 1 인자 0x18) → 0xae3a0 → 0xd → 0xe. 판이 서 있는 동안 0xe 대기는 없다. 3아웃 뒤 0x18 은 늘 0x21 이라(Q2 2e-2) 이 판은
    * 미션 한 판에 이 하나뿐이다. `serial` 은 판마다 새로.
    */
-  const [halfInningBoard, setHalfInningBoard] = useState<
-    { readonly serial: number; readonly inning: number; readonly half: '초' | '말' } | null
-  >(null)
+  const [halfInningBoard, setHalfInningBoard] = useState<{
+    readonly serial: number
+    readonly inning: number
+    readonly half: '초' | '말'
+    /** 판 틱 0 의 0x3fac4 굴림 36 개 — 운동장 전경 0x4fb8c (`rollHalfInningFielders`) */
+    readonly fielderRolls: readonly HalfInningFielderRoll[]
+  } | null>(null)
   const halfInningBoardSerialRef = useRef(0)
   /**
    * **경기 장면 로딩 판** — 상태 7 진입 0x39f88 이 로딩 판(0x667f8 — loadingbar.pzx · StrTIP)을 세우고 0x53dbc 가 팁 칸
@@ -1514,11 +1522,12 @@ export function useMissionSession({
       )
       if (entersBenchClearing) {
         // 진입 0x3a5f0 — 공격 9명 자리·목표 굴림 45 번이 곧바로 나간다. 사구는 연출이 끝날 때까지 붙든다
-        rollBenchClearingEntry(random)
+        const entryRolls = rollBenchClearingEntry(random)
         setPitcherStaminaStored(staminaAfterBenchClearing(pitcherStamina, benchClearingEffectOf(true).defenseStaminaLoss))
         setPendingBenchClearing({
           run: nextRun,
           outcome,
+          entryRolls,
           walkReplay: play !== null && arrivalApplicationOf(play) === 'freePass' ? play.result : null,
         })
         setPitcherRun(nextRun)
@@ -1815,9 +1824,10 @@ export function useMissionSession({
       enterNewAtBatConfirm()
       return
     }
-    rollHalfInningFielders(random)
+    const fielderRolls = rollHalfInningFielders(random)
     halfInningBoardSerialRef.current += 1
     setHalfInningBoard({
+      fielderRolls,
       serial: halfInningBoardSerialRef.current,
       inning: run.game.inning + 1,
       half: run.game.offenseSide === 0 ? '초' : '말',

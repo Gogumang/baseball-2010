@@ -98,3 +98,22 @@ describe('공수 교대 판의 두 팀 판 0x42364 · 0x420dc', () => {
     expect(screen.getByTestId('교대판-타자이름-1').textContent).toBe('일번')
   })
 })
+
+describe('공수 교대 판의 운동장 전경 0x4fb8c', () => {
+  const rolls = Array.from({ length: 9 }, () => ({ offenseSpeed: 300, scatterX: 50, scatterZ: 150, fielderSpeed: 300 }))
+
+  it('판이 선 틱부터 바탕으로 18명을 그리고, 틱 100 뒤 카메라가 비춘 야수에 이름표를 단다', () => {
+    vi.useFakeTimers()
+    const names = ['투수', '포수', '일루', '이루', '삼루', '유격', '우익', '좌익', '중견']
+    render(<HalfInningBoard inning={1} half="초" onConfirm={() => {}}
+      field={{ input: { rolls, offenseSide: 0, previousFielders: null }, defenseTeam: 3, offenseTeam: 5, fielderNames: names }} />)
+    expect(screen.getByTestId('운동장-전경')).toBeTruthy()
+    expect(screen.getAllByTestId(/^운동장-선수-/)).toHaveLength(18)
+    expect(screen.queryByTestId('운동장-이름표')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 101))
+    // 틱 101 — 카메라가 이미 멈춰 있으면 표 0xd044c 칸 1 = 좌익(7)
+    const tag = screen.getByTestId('운동장-이름표')
+    expect(tag.dataset.slot).toBe('7')
+    expect(tag.textContent).toBe('좌익')
+  })
+})

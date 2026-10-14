@@ -163,7 +163,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
 
     // 미션 장면은 상태 8 끝에서 곧장 첫 0x18 판 — 첫 반 이닝(CPU 공격 · 사람 수비)이 사람 몫이라 판이 OK 를 기다린다
     expect(받은것).toHaveLength(0)
-    expect(view.getByText(/회(초|말)$/)).toBeTruthy()
+    expect(view.getByTestId(/^교대-판-/)).toBeTruthy()
     act(() => view.getByText('확인').click())
 
     const shown = 받은것.at(-1)
@@ -198,7 +198,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(받은팁).toEqual([LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(1))]])
     // 로딩 판을 다 그리면 첫 0x18 판
     expect(세션!.loadingTip).toBeNull()
-    expect(view.getByText(/회(초|말)$/)).toBeTruthy()
+    expect(view.getByTestId(/^교대-판-/)).toBeTruthy()
     act(() => 세션!.actions.beginPitcherAceMatch(mission))
     expect(받은팁).toHaveLength(2)
   })

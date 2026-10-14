@@ -1147,7 +1147,9 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
 
     // 들어가기 굴림 1 + 진입 0x3a5f0 의 45 — 밀어내기 주루·다음 타석은 아직 안 돌았다
     expect(굴림).toBe(46)
-    expect(들어감.pendingBenchClearing).toEqual({ outcome: { kind: '사구' } })
+    expect(들어감.pendingBenchClearing).toEqual({ outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
+    // 진입 굴림 45 번은 그리기 0x43228 이 쓰도록 칸 9 개로 싣는다
+    expect(들어감.pendingBenchClearing?.entryRolls).toHaveLength(9)
     expect(들어감.game).toEqual(시작.game)
     expect(들어감.opponentMound.pitches - 시작.opponentMound.pitches).toBe(10)
     expect(들어감.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
@@ -1349,16 +1351,20 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자일 때만', () => {
 
   it('선공·1번 타자면 판이 서고, 후공이거나 1번이 아니면 안 선다', () => {
     const 선공1번 = startGame(createSeededRandom(3), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
-    expect(선공1번.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초' })
+    expect(선공1번.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초', fielderRolls: expect.any(Array) })
     expect(isPlayerTurn(선공1번.game)).toBe(true)
 
     expect(startGame(createSeededRandom(3), 0, 1).halfInningBoard).toBeNull()
     expect(startGame(createSeededRandom(3), 0, 2, undefined, PLAYER_SIDE_FIRST_BAT).halfInningBoard).toBeNull()
   })
 
-  it('판의 걸음 굴림 36 개(0x3fac4)가 첫 타석 준비보다 앞에 끼어든다 — 값은 버려진다', () => {
-    const 세우기 = (n: number, value: number) => startGame(앞값(n, value), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
-    // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
+  it('판의 걸음 굴림 36 개(0x3fac4)가 첫 타석 준비보다 앞에 끼어든다 — 값은 운동장 그림에만 쓰인다', () => {
+    const 세우기 = (n: number, value: number) => {
+      const progress = startGame(앞값(n, value), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+      // 판 칸의 굴림 값(운동장 전경 0x4fb8c 의 재료)만 빼고 본다
+      return { ...progress, halfInningBoard: { ...progress.halfInningBoard!, fielderRolls: undefined } }
+    }
+    // 판이 첫 36 개를 그림에만 쓰므로 그 값이 무엇이든 경기는 같다
     expect(세우기(36, 0.001)).toEqual(세우기(36, 0.999))
     // 경기를 세우는 동안 쓴 굴림 = 장면 덱 섞기 + 효과 객체 1202 + 시뮬 초기화 rand(0, 2) + 판 36 + 첫 타석 준비(1회초 첫 타석이라 CPU 투수 교체·돌발 후보가 없어 0)
     let 수 = 0

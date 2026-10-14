@@ -49,6 +49,8 @@ import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -419,7 +421,25 @@ function missionOverlayOf(
 
   // 투수 미션 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 투수편 `PitcherGameScreen` 과 같은 위젯이다
   if (session.pendingBenchClearing !== null) {
-    return <BenchClearingScene onDone={actions.finishBenchClearing} />
+    const benchRun = session.pendingBenchClearing.run
+    const sideTeams = missionWithSideTeamsOf(benchRun.mission, benchRun.game.humanBatting.teamId).sideTeams
+    return (
+      <BenchClearingScene
+        // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명. 타자는 사구를 맞은 지금 CPU 타자(투구 장면과 같은 손)
+        field={benchClearingFieldOf({
+          entryRolls: session.pendingBenchClearing.entryRolls,
+          half: benchRun.game.offenseSide === 0 ? '초' : '말',
+          playerSide: 0,
+          ourTeamId: sideTeams[0],
+          opponentTeamId: sideTeams[1],
+          batterHand: missionCpuBatterHandOf(benchRun),
+          bases: benchRun.bases,
+        })}
+        // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
+        random={session.random}
+        onDone={actions.finishBenchClearing}
+      />
+    )
   }
 
   // CPU 견제 한 판 — 세션이 이미 다 돌려 먹였다. 화면은 재생만 한다 (나만의리그 `GameRoute` 의 lastDefensePlay 와 같은 꼴)
@@ -444,6 +464,11 @@ function missionOverlayOf(
   const board = session.halfInningBoard
   if (board !== null && playingRun !== null && playingRun.status === '진행중') {
     const sideMission = missionWithSideTeamsOf(playingRun.mission, playingRun.game.humanBatting.teamId)
+    const boardSides = missionScoreboardSidesOf(sideMission)
+    const boardCards = missionFirstBoardCardsOf(playingRun, {
+      missionBatter: missionBatterName ?? null,
+      missionPitcher: missionPitcherName ?? null,
+    })
     return (
       <HalfInningBoard
         key={board.serial}
@@ -452,10 +477,18 @@ function missionOverlayOf(
         onTick={(tick) => {
           if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
         }}
-        scoreboardSides={missionScoreboardSidesOf(sideMission)}
-        cards={missionFirstBoardCardsOf(playingRun, {
-          missionBatter: missionBatterName ?? null,
-          missionPitcher: missionPitcherName ?? null,
+        scoreboardSides={boardSides}
+        cards={boardCards}
+        // 운동장 전경 0x4fb8c — 미션 판은 장면의 첫 판뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래). 팀은 두 측 그대로
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: true,
+          playerSide: 0,
+          ourTeamId: boardSides[0].team,
+          opponentTeamId: boardSides[1].team,
+          // ⚠️ 미확인: 미션 팀은 칸별 선수 위치를 웹이 안 들어 투수 이름표만 단다
+          fielderNames: fielderNamesByPosition(boardCards.pitcherName, null),
         })}
         onConfirm={actions.confirmHalfInningBoard}
       />
@@ -627,6 +660,14 @@ export function PitcherAceMatchRoute(
       random={session.random}
     />
   )
+}
+
+/** 지금 CPU 타자의 손 0xb63c0 — 마타자 칸은 손 표 0xd88b0, 아니면 명단 줄 `+0xb` 폼 & 1 (`pitchingStageOf` 와 같은 길) */
+function missionCpuBatterHandOf(run: PitcherRun): number {
+  const batter = missionCpuBatterOf(run.cpu)
+  const aceIndex = batter?.isAce === true ? run.mission.opponentAce - 1 : -1
+  const profile = aceIndex >= 0 ? aceBatterProfileOf(aceIndex) : (batter?.row?.profile ?? 0)
+  return batterHandOf(profile, aceIndex)
 }
 
 /**

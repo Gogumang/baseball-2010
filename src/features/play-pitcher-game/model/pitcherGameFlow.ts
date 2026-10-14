@@ -190,7 +190,9 @@ import type {
   PitcherGameEvaluation,
 } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
@@ -566,12 +568,20 @@ export interface PitcherGameProgress {
     readonly outcome: AtBatOutcome
     /** 이 사구 공이 연 밀어내기 판(종류 2, `arrivePitcherPitch`) — 연출 뒤 0x17 로 재생한다 */
     readonly arrivalPlay?: PitchArrivalPlay | null
+    /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+    readonly entryRolls?: readonly BenchClearingEntryRoll[]
   } | null
   /**
    * 마지막으로 **OK 를 기다리며 선** 공수 교대 판(상태 0x18 교대 가지) — 화면은 `serial` 이 바뀌면 판을 띄운다.
    * 모드 3 에서는 1회초 판(인트로 0xc 끝 → 0x18)만 설 수 있다 — `withHalfInningBoard` 머리말.
    */
-  readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
+  readonly halfInningBoard: {
+    readonly serial: number
+    readonly inning: number
+    readonly half: GameState['half']
+    /** 판 틱 0 의 0x3fac4 굴림 36 개 — 운동장 전경 0x4fb8c 가 18명을 걷게 한다 (`rollHalfInningFielders`) */
+    readonly fielderRolls?: readonly HalfInningFielderRoll[]
+  } | null
   /** 마지막으로 사람이 던진 타석의 반 이닝 — 반 이닝이 바뀐 뒤 첫 사람 타석인지 가린다 */
   readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
   /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
@@ -1299,8 +1309,11 @@ function afterMyPitchArrival(
   const settled = withPitcherBenchClearing(arrived, outcome, random)
   if (settled !== arrived) {
     // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
-    rollBenchClearingEntry(random)
-    return { ...settled, pendingBenchClearing: play === null ? { outcome } : { outcome, arrivalPlay: play } }
+    const entryRolls = rollBenchClearingEntry(random)
+    return {
+      ...settled,
+      pendingBenchClearing: play === null ? { outcome, entryRolls } : { outcome, arrivalPlay: play, entryRolls },
+    }
   }
   return finishNonPlayOutcome(settled, outcome, random, play)
 }
@@ -2798,10 +2811,11 @@ function withHalfInningBoard(progress: PitcherGameProgress, random: RandomPort):
   const { game } = progress
   const last = progress.lastHumanHalf
   if (last !== null && last.inning === game.inning && last.half === game.half) return progress
-  rollHalfInningFielders(random)
+  const fielderRolls = rollHalfInningFielders(random)
   return {
     ...progress,
     halfInningBoard: {
+      fielderRolls,
       serial: (progress.halfInningBoard?.serial ?? 0) + 1,
       inning: game.inning,
       half: game.half,

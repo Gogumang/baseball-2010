@@ -1725,7 +1725,10 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
       serial: 1,
       inning: run.game.inning + 1,
       half: run.game.offenseSide === 0 ? '초' : '말',
+      // 운동장 전경 0x4fb8c 가 쓰는 굴림 값 — 칸 9 개
+      fielderRolls: expect.any(Array),
     })
+    expect(rendered.result.current.halfInningBoard?.fielderRolls).toHaveLength(9)
     expect(rendered.result.current.sceneConfirm).toBeNull()
 
     act(() => rendered.result.current.actions.confirmHalfInningBoard())

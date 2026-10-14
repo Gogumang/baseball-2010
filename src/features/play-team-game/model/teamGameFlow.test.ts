@@ -1878,7 +1878,7 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
     const 안들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
 
     // 들어가면 연출(상태 0x1e)에서 사구를 붙든다 — 밀어내기는 연출이 끝난 뒤 (`teamBenchClearing.test`)
-    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' } })
+    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
     expect(들어감.game).toEqual(progress.game)
     expect(들어감.opponentPitcherCounters.pitches - 안들어감.opponentPitcherCounters.pitches).toBe(10)
     expect(들어감.gameRecord).toEqual(안들어감.gameRecord)
@@ -1962,7 +1962,7 @@ describe('승·패·세 칸 — 결과 판(0x4fe9c)이 읽는 state+0x44/0x50/0x
 describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모두 사람일 때만 선다)', () => {
   it('시즌(모드 2) 첫 타석이 사람이면 1회초 판이 선다 — 인트로 0xc 끝이 0x18 로 보낸다', () => {
     const { progress } = 시작()
-    expect(progress.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초' })
+    expect(progress.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초', fielderRolls: expect.any(Array) })
   })
 
   it('일반(모드 1)·이닝/전체 설정이면 인트로가 곧장 0xd 로 가 1회초 판이 없다 (0x39e3c)', () => {
@@ -1979,7 +1979,7 @@ describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모�
         : applyBatterOutcome(current, { kind: '아웃', detail: '뜬공아웃' }, random)
     }
     // 1회초 판 · 1회말 판 · 2회초 판
-    expect(current.halfInningBoard).toEqual({ serial: 3, inning: 2, half: '초' })
+    expect(current.halfInningBoard).toEqual({ serial: 3, inning: 2, half: '초', fielderRolls: expect.any(Array) })
   })
 })
 

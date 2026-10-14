@@ -396,13 +396,13 @@ describe('경기 시작 인트로 (상태 0xc)', () => {
     render(
       <TeamGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} onQuit={vi.fn()} />,
     )
-    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.getByTestId('인트로-띠')).toBeTruthy()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 53))
-    expect(screen.queryByText(/VS/)).toBeTruthy()
+    expect(screen.queryByTestId('인트로-띠')).toBeTruthy()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
-    expect(screen.queryByText(/VS/)).toBeNull()
+    expect(screen.queryByTestId('인트로-띠')).toBeNull()
     // 1회초 판(0x18) — 판은 OK 를 기다린다
-    expect(screen.getByText('1회초')).toBeTruthy()
+    expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     vi.useRealTimers()
   })
 
@@ -415,7 +415,7 @@ describe('경기 시작 인트로 (상태 0xc)', () => {
         onQuit={vi.fn()}
       />,
     )
-    expect(screen.queryByText(/VS/)).toBeNull()
+    expect(screen.queryByTestId('인트로-띠')).toBeNull()
   })
 })
 

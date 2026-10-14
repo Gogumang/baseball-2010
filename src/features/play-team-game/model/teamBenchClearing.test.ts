@@ -45,7 +45,7 @@ describe('팀 경기 벤치 클리어링 연출 (상태 0x1e) — 우리 타자�
     const 들어감 = startBatterOutcome(progress, { kind: '사구' }, random)
 
     expect(counter.count).toBe(46)
-    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' } })
+    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
     expect(들어감.game).toEqual(progress.game)
     expect(isHumanTurn(들어감)).toBe(false)
   })
