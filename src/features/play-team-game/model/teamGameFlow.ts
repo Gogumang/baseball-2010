@@ -62,6 +62,11 @@ import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import { contactOfOutcome, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
+import {
+  SCENE_RESULT_CODE_START,
+  sceneResultCodeAfterPitch,
+  sceneResultCodeOfThrown,
+} from '@/features/defense-play/model/sceneResultCode'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import {
@@ -771,6 +776,11 @@ export interface TeamGameProgress {
   readonly lastCpuSwing?: CpuSwingPose | null
   readonly lastResolution: PitchResolution | null
   /**
+   * 경기 +0xfd4 — 스윙 판정 결과 코드 칸(`features/defense-play/model/sceneResultCode`). 0x11 진입(3deea)이 공마다 0 으로 지우고
+   * 휘두른 공만 판정(5130e)이 덮는다. 주자 판의 튐 파티클 · 홈런성 조건이 본다 — 견제는 앞 공의 값을 본다. null = 원본 미정의(헛스윙)
+   */
+  readonly sceneResultCode: number | null
+  /**
    * **재생만 하면 되는** 장면 — 매 틱 스냅샷이 들어 있어 화면은 이것만 받아 그리면 된다.
    * 홈런 비행처럼 사람이 조작할 것이 없는 장면이 여기 들어온다. 사람이 주루·송구를 잡는
    * 인플레이 타구는 `pendingDefensePlay` 쪽으로 가고, 다 본 뒤에는 **여기 남기지 않는다**
@@ -965,6 +975,8 @@ export function resumeTeamGame(
     sceneConfirmPending: false,
     lastPitch: null,
     lastResolution: null,
+    // 이어하기는 경기 장면을 새로 만든다 — 할당기의 0 채움(`SCENE_RESULT_CODE_START`)
+    sceneResultCode: SCENE_RESULT_CODE_START,
     lastDefensePlay: null,
     lastArrivalPlay: null,
     pendingDefensePlay: null,
@@ -1211,6 +1223,7 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
     pitchCount: 0,
     lastPitch: null,
     lastResolution: null,
+    sceneResultCode: SCENE_RESULT_CODE_START,
     lastDefensePlay: null,
     stealingFrom: [],
     lastArrivalPlay: null,
@@ -2217,7 +2230,12 @@ function batterPitch(
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
   // 장면 +0xfdc — 사람 타석은 번트 · 스윙 키(0x51dce · 0x51e2c · 0x51e84)가 쓴다. 타석 화면이 이 칸을 받아 키 없는 공은 앞 값 그대로 낸다
-  progress = { ...progress, sceneBuntKind: options.buntKind ?? 0 }
+  // 경기 +0xfd4 — 0x11 진입이 지우고 휘두른 공이면 스윙 판정이 덮는다(`sceneResultCodeAfterPitch`)
+  progress = {
+    ...progress,
+    sceneBuntKind: options.buntKind ?? 0,
+    sceneResultCode: sceneResultCodeAfterPitch(detail.resolution, detail.resultCode),
+  }
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다. 연속 파울 기록(0xa7dbc)은 판의 결과 코드 7 메시지(51c5c)에서라 판이 파울로 닫힐 때 센다.
   // 필살 스윙의 성공 굴림(0x517e6)은 타석 판정이 쏜 공(`detail.foulContact`)에 재료만 실어 판 시작(필살수비 · 폴 굴림 뒤)이 굴린다
   if (detail.resolution.kind === '파울' && detail.pattern !== undefined && detail.resultCode !== null) {
@@ -2888,6 +2906,8 @@ function pitchOnce(
     ...(stealingFrom.length === 0 ? {} : { stealDisplayFrom: stealingFrom }),
     sceneBuntKind: thrown.buntKind ?? 0,
     lastCpuSwing: cpuSwingPoseOf(thrown),
+    // 경기 +0xfd4 — 0x11 진입이 지우고 CPU 타자가 휘두른 공이면 스윙 판정이 덮는다
+    sceneResultCode: sceneResultCodeOfThrown(resolution, foulContact),
   }
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다
@@ -3384,6 +3404,8 @@ export function pickoff(
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
     defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.ourTeamId),
     runnerTeamGrade: offenseRunnerTeamGradeOf(progress, false),
+    // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
+    sceneResultCode: progress.sceneResultCode,
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
@@ -3424,6 +3446,8 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
     defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.opponentTeamId),
     runnerTeamGrade: offenseRunnerTeamGradeOf(progress, true),
+    // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
+    sceneResultCode: progress.sceneResultCode,
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
@@ -3666,6 +3690,8 @@ function arriveTeamPitch(
       // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공은 0 — 0x11 진입의 memset)
       buntKind: pitch.buntKind ?? 0,
       scene: progress.defenseScene,
+      // 경기 +0xfd4 — 이 공의 값 (부르는 쪽이 이미 적었다)
+      sceneResultCode: progress.sceneResultCode,
     },
     random,
   )

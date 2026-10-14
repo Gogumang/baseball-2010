@@ -364,7 +364,9 @@ function stepRecordedBoard(
  * (그 밖은 견제 · 도루 · 폭투 판), 그 판은 난수 없이 돌려 펌블 굴림 자체가 없다. 화면 스냅샷(`DefenseViewState`)에는
  * 펌블 동작(0xd)도 `fumbled` 칸도 실려 오지 않으므로 여기서는 알 길도 없다.
  * 두 갈래는 `input` 이 있으면 실시간, 없으면 재생으로 **서로 배타**라 겹쳐 울릴 일도 없다.
- * ⚠️ 0x357e0(결과 코드 24~26)은 재생 틱에 없어 "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
+ * 0x357e0(결과 코드 [경기+0xfd4] 24~26) — 주자 판(견제 · 도루 · 폭투 · 밀어내기)의 틱은 판이 열린 때의 값(`sceneResultCode`)을 싣고
+ * 와 그것으로 본다(견제는 앞 공의 값이 남아 홈런 뒤 첫 공 앞 견제면 참이다). ⚠️ 그 값이 없는 재생(패턴 없이 온 홈런 재생)은
+ * "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
  */
 function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePassPlay, children }: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
@@ -375,9 +377,13 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
   if (tallyRef.current === null || tallyRef.current.ticks !== ticks) {
     tallyRef.current = { ticks, tally: EMPTY_RECORDED_TALLY }
   }
-  // 타자주자(칸 0)가 달리는 재생 = 홈런 비행 — 웹 재생 갈래의 다른 판(견제·도루·폭투)은 타자주자를 안 싣는다.
-  // 밀어내기 판(종류 2)은 타자주자를 싣지만 홈런이 아니다(0x357e0 은 결과 코드 24~26)
-  const isHomeRun = !freePassPlay && ticks[0]?.runners.some((runner) => runner.index === 0) === true
+  // 주자 판은 판이 열린 때의 [경기+0xfd4] 를 싣고 온다(`sceneResultCode` — null 은 정해지지 않은 값이라 거짓으로 본다).
+  // 싣지 않은 재생은 타자주자(칸 0)가 달리는 재생 = 홈런 비행. 밀어내기 판(종류 2)은 타자주자를 싣지만 홈런이 아니다
+  const sceneResultCode = ticks[0]?.sceneResultCode
+  const isHomeRun =
+    sceneResultCode !== undefined
+      ? isHomeRunHitCode(sceneResultCode)
+      : !freePassPlay && ticks[0]?.runners.some((runner) => runner.index === 0) === true
   /** 0x519cc 키 건너뛰기를 받았다 — 그 그림 안에서 0x35108 까지 끝난다 */
   const [skipped, setSkipped] = useState(false)
   useEffect(() => {
@@ -502,10 +508,11 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     if (at > lastIndex && !stepper.finished) break
     const view = ticks[Math.min(at, lastIndex)]
     if (view === undefined) break
-    holder.tally = stepRecordedBoard(holder.tally, view, false, at > lastIndex || view.closingListFrame === true)
-    // 주자 판(도루 · 폭투 · 견제)은 타구가 없어 점수판과 같이 0x357e0 을 거짓으로 본다 — 홈인마다 60
-    // ⚠️ 미확인: 원본 [경기+0xfd4] 가 투구마다 지워지는지는 안 읽었다(점수판 갈래와 같은 가정)
-    playRunInCheers(holder.tally, false)
+    // 주자 판(도루 · 폭투 · 견제)의 0x357e0 은 판이 열린 때 남은 [경기+0xfd4](`sceneResultCode`)를 본다 — 0x11 진입(3deea)이
+    // 공마다 0 으로 지우고 스윙 판정(5130e)만 덮어, 도루 · 폭투는 이 공의 값(안 휘둘렀으면 0), 견제는 앞 공의 값이다
+    const homeRunHit = isHomeRunHitCode(view.sceneResultCode)
+    holder.tally = stepRecordedBoard(holder.tally, view, homeRunHit, at > lastIndex || view.closingListFrame === true)
+    playRunInCheers(holder.tally, homeRunHit)
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 튐 파티클 · 프레임 끝 파티클 틱(경기 난수 — 그 틱 진행기 굴림 뒤).
     // 0x35108 로 끝난 갱신은 안 그린다. ⚠️ 판 틱을 미리 몇 틱 앞서 돌린 갱신(따라잡기)은 굴림 차례가 그 틱들 뒤로 몰린다(근사)
     if (!holder.tally.ended && random !== undefined) drawBallParticles(particles.run, view, cameraOffsetRef.current, random)

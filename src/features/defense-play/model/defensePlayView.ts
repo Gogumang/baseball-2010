@@ -108,6 +108,8 @@ export interface ViewStateInput {
   readonly laserTrailFrom?: WorldPoint | null
   /** 공 그리기 0x36dfc 파티클의 진행기 쪽 조건 (`BallParticleFacts`). 안 주면 안 쏜다 */
   readonly ballParticles?: BallParticleFacts | null
+  /** 경기 +0xfd4 — 주자 판이 열린 때의 스윙 판정 결과 코드(`sceneResultCode`). 안 주면 싣지 않는다(타구 판) */
+  readonly sceneResultCode?: number | null
 }
 
 /**
@@ -199,6 +201,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     holderMark: input.holderMark ?? null,
     holderPlate: input.holderMark == null ? null : (input.holderPlate ?? null),
     ballParticles: input.ballParticles ?? null,
+    ...(input.sceneResultCode === undefined ? {} : { sceneResultCode: input.sceneResultCode }),
   }
 }
 

@@ -178,6 +178,11 @@ export interface PickoffPlayInput {
    * 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`). 견제는 투구(0x10 · 0x11)를 안 지나 +0x1997 · 판정 애니를
    * 되감지 않는 것으로 본다(유력 — 견제 키 0xf → 0x17 길을 다 뜨지 않았다)
    */
+  /**
+   * 경기 +0xfd4 — 이 판이 열릴 때 남아 있던 스윙 판정 결과 코드(`sceneResultCode`). 튐 파티클(0x37022 ∉ {9,10,11}) ·
+   * 홈런성(0x357e0, 24~26)이 본다. 모르면(헛스윙의 정해지지 않은 값 · 안 줌) null — 두 조건 모두 거르지 않는다
+   */
+  readonly sceneResultCode?: number | null
   readonly scene?: DefenseScene
   /**
    * 사람 조작 — 이 판 동안 틱마다 눌린 키. 상태 0x17 키 0x53420 은 판 종류를 안 가린다 — 사람이 수비면 0x533c8 이
@@ -687,7 +692,7 @@ function* pickoffPlaySteps(
         throwErrorTicks: throwErrorMarks,
         // 공 그리기 0x36dfc 의 튐 파티클 — 0x46c88 이 판 종류를 안 보고 늘 부른다(`ballParticleFactsOf`). 큰 타구 갈래는 판 종류 ∈ {1, 8} 이라 없다.
         // 공은 송구 · 다시 쏘기 · 폭투가 깐 궤적(세계 0xbfed0)을 판 틱으로 읽는다. 쥔 공 · 쫓는 공이 없는 그림은 안 쏜다.
-        // ⚠️ 미확인: +0xfd4(결과 코드)는 스윙 판정 51308 이 적는 칸이라 주자 판에서는 앞 스윙의 값이 남는다 — 진행기가 몰라 null(거르지 않음)
+        // +0xfd4(결과 코드) — 견제는 0x11 을 안 지나 **앞 공**의 스윙 판정 값이 남는다(`sceneResultCode`)
         ballParticles:
           chase === null || play.held
             ? null
@@ -698,10 +703,11 @@ function* pickoffPlaySteps(
                 onTrajectory: true,
                 bigHitWatch: false,
                 playKind: PICKOFF_PLAY_KIND,
-                resultCode: null,
+                resultCode: input.sceneResultCode ?? null,
               }),
         runnerAceIndexes,
         runnerAceSprite,
+        sceneResultCode: input.sceneResultCode ?? null,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,

@@ -1002,7 +1002,13 @@ export function useCareerSession({
           : arrivePitch(
               beforeArrival,
               // 못 맞힌 번트의 번트 종류(장면 +0xfdc)도 싣는다 — 도루 판 리드 0x3d7b8
-              { resolution: detail.resolution, outcomeAfter: nextAtBat.outcome, buntKind: buntKind ?? 0 },
+              // 맞은 공의 결과 코드는 경기 +0xfd4 로 남는다(다음 견제 판이 본다)
+              {
+                resolution: detail.resolution,
+                outcomeAfter: nextAtBat.outcome,
+                buntKind: buntKind ?? 0,
+                resultCode: detail.resultCode,
+              },
               random,
             )
       if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {

@@ -1247,6 +1247,22 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     if (진행중.pendingDefensePlay !== null) expect(cpuPickoff(진행중, 1, createSeededRandom(1))).toBe(진행중)
   })
 
+  it('경기 +0xfd4 — 공마다 0x11 이 지우고 휘두른 공만 덮는다. 견제 판은 앞 공의 값을 싣는다', () => {
+    const progress = startGame(createSeededRandom(20100905))
+    expect(progress.sceneResultCode).toBe(0)
+    const 판 = 주자(progress, { first: true, second: false, third: false })
+    // 맞은 공(타구 결과 코드 25) — arrivePitch 가 판 없이 넘겨도 칸은 적는다
+    const 맞음 = arrivePitch(판, { resolution: { kind: '파울' }, outcomeAfter: null, resultCode: 25 }, createSeededRandom(3))
+    expect(맞음.progress.sceneResultCode).toBe(25)
+    const 견제 = cpuPickoff(맞음.progress, 1, createSeededRandom(7))
+    const play = 견제.lastDefensePlay
+    if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
+    expect(play.ticks[0]?.sceneResultCode).toBe(25)
+    // 다음 공이 볼이면 0 으로 돌아간다 — 바뀌지 않으면 같은 객체
+    const 볼 = arrivePitch(맞음.progress, { resolution: { kind: '볼' }, outcomeAfter: null, resultCode: null }, createSeededRandom(3))
+    expect(볼.progress.sceneResultCode).toBe(0)
+  })
+
   it('견제는 공이 아니다 — 투구 수·스태미나·타순이 그대로고 재생할 견제 판만 생긴다', () => {
     const progress = startGame(createSeededRandom(20100905))
     const 판 = 주자(progress, { first: true, second: false, third: true })

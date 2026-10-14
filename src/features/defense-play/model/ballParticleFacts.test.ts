@@ -63,3 +63,22 @@ describe('주자 판 스냅샷의 파티클 조건', () => {
     expect(result.ticks.some((view) => view.ballParticles != null)).toBe(true)
   })
 })
+
+describe('주자 판이 보는 경기 +0xfd4 (`sceneResultCode`)', () => {
+  it('견제 판 — 앞 공의 결과 코드 9~11 이면 튐을 안 쏘고, 모든 틱에 그 값을 싣는다', () => {
+    const 견제 = (sceneResultCode: number | null) =>
+      runPickoffPlay({ targetBase: 1, bases: { ...EMPTY_BASES, first: true }, outs: 0, sceneResultCode })
+    const 파울뒤 = 견제(10)
+    expect(파울뒤.ticks.every((view) => view.sceneResultCode === 10)).toBe(true)
+    expect(파울뒤.ticks.every((view) => (view.ballParticles?.bounceNextHeight ?? null) === null)).toBe(true)
+    expect(견제(25).ticks[0]?.sceneResultCode).toBe(25)
+    // 안 휘두른 앞 공(0) · 정해지지 않은 값(null)은 거르지 않는다 — 같은 판
+    expect(견제(0).ticks.map((view) => view.ballParticles)).toEqual(견제(null).ticks.map((view) => view.ballParticles))
+  })
+
+  it('폭투 · 포일 판 — 넘긴 값을 그대로 싣는다', () => {
+    const shot = { angle: 95, strength: 220, verticalSpeed: -100 }
+    const result = runPassedBallPlay({ shot, bases: EMPTY_BASES, outs: 0, sceneResultCode: 0 })
+    expect(result.ticks.every((view) => view.sceneResultCode === 0)).toBe(true)
+  })
+})

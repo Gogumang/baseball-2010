@@ -152,6 +152,11 @@ export interface StealPlayInput {
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
+  /**
+   * 경기 +0xfd4 — 이 판이 열릴 때 남아 있던 스윙 판정 결과 코드(`sceneResultCode`). 튐 파티클(0x37022 ∉ {9,10,11}) ·
+   * 홈런성(0x357e0, 24~26)이 본다. 모르면(헛스윙의 정해지지 않은 값 · 안 줌) null — 두 조건 모두 거르지 않는다
+   */
+  readonly sceneResultCode?: number | null
   readonly scene?: DefenseScene
   /** 사람 조작 — 틱마다 눌린 키 (`RunnerPlayEngineInput.controls`) */
   readonly controls?: DefensePlayControls
@@ -245,6 +250,7 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
     runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
     runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
     scene: input.scene,
+    sceneResultCode: input.sceneResultCode,
     controls: input.controls,
   }
 }

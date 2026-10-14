@@ -113,6 +113,11 @@ import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { EMPTY_BATTER_GAME_RECORD, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { contactOfOutcome, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
+import {
+  SCENE_RESULT_CODE_START,
+  sceneResultCodeAfterPitch,
+  sceneResultCodeOfThrown,
+} from '@/features/defense-play/model/sceneResultCode'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import {
   cancelBurst,
@@ -310,6 +315,12 @@ export interface GameProgress {
    * `pendingDefensePlay` 쪽으로 가고, 다 본 뒤에는 **여기 남기지 않는다** — 남기면 한 번 더 튼다.
    */
   readonly lastDefensePlay: DefensePlayResult | null
+  /**
+   * 경기 +0xfd4 — 스윙 판정 결과 코드 칸(`features/defense-play/model/sceneResultCode`). 내 타석의 공마다 0x11 진입(3deea)이 0 으로
+   * 지우고 휘두른 공만 판정(5130e)이 덮는다. 간이 엔진 타석(0x21)은 손대지 않아 앞 타석 마지막 공의 값이 남는다.
+   * 주자 판의 튐 파티클 · 홈런성 조건이 본다 — CPU 견제는 앞 공의 값. null = 원본 미정의(헛스윙)
+   */
+  readonly sceneResultCode: number | null
   /**
    * **자동진행 중계(상태 0x21)의 틱들** — 내 타석 사이에 돈 간이 엔진 0xc262c 한 번마다 한 칸(교체로 공 없이 돌아간 틱 · 타석 하나).
    * 모드 4 는 동료 타석 · 상대 반 이닝이 늘 0x21 이고(0xc1ed6) 키 · 속도 · 배경음 · 연출 대기가 없어 굴린 결과를 화면이 나중에 틀어도
@@ -558,6 +569,7 @@ export function startGame(
     log: [],
     nextLogId: 1,
     lastDefensePlay: null,
+    sceneResultCode: SCENE_RESULT_CODE_START,
     pendingDefensePlay: null,
     burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
     lastBurstResolution: null,
@@ -814,6 +826,8 @@ export function startPlayerFoulPlay(
   return {
     // 파울 각 공 판도 타구 판(종류 1)이다 — 시작 리드 0x3d7b8 이 출발 표시를 지운다
     ...withoutStealDisplay(progress),
+    // 경기 +0xfd4 — 맞은 공이라 스윙 판정이 방향까지 붙인 코드를 적었다
+    sceneResultCode: contact.resultCode,
     pendingDefensePlay: withPredictedOutcome({
       // 필살타법 성공 굴림(0x517e6)은 쏜 공의 재료(`contact.specialSwing`)로 판 시작이 필살수비 · 폴 굴림 뒤에 한다
       ...defensePlayInputOf(progress, outcome, contact.pattern, random, { buntKind: options.buntKind }),
@@ -2368,6 +2382,8 @@ export function arrivePitch(
     readonly outcomeAfter: AtBatOutcome | null
     /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
     readonly buntKind?: number
+    /** 맞은 공(타구)의 방향까지 붙인 결과 코드 (`PitchOutcomeDetail.resultCode`) — 경기 +0xfd4. 안 주면 쏜 공(`contactOfOutcome`)에서 */
+    readonly resultCode?: number | null
   },
   random: RandomPort,
 ): PitchArrivalStep {
@@ -2375,6 +2391,12 @@ export function arrivePitch(
   if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null) {
     return { progress, play: null, interrupted: false }
   }
+  // 경기 +0xfd4 — 이 공의 0x11 진입이 지우고 휘두른 공이면 스윙 판정이 덮는다. 바뀔 때만 새 객체(부르는 쪽이 같은 객체로 판 없음을 본다)
+  const sceneResultCode =
+    pitch.resultCode !== undefined
+      ? sceneResultCodeAfterPitch(pitch.resolution, pitch.resultCode)
+      : sceneResultCodeOfThrown(pitch.resolution)
+  if (sceneResultCode !== progress.sceneResultCode) progress = { ...progress, sceneResultCode }
   if (!arrivesUnhit(pitch.resolution)) {
     const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
     // 판 없이 온 파울(옛 길) — 판정 A 0xae24c 의 파울 → 같은 타석 다음 공 0xf 진입 0x3d954
@@ -2404,6 +2426,7 @@ export function arrivePitch(
       // (키 없는 공은 0 — 0x11 진입 0x3de10 이 공마다 memset 한다, `BattingStage.sceneBuntKind`)
       buntKind: pitch.buntKind ?? 0,
       scene: progress.defenseScene,
+      sceneResultCode: progress.sceneResultCode,
     },
     random,
   )
@@ -2564,6 +2587,8 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     // 수비는 CPU 다 — 슬롯 2 의 0xae6c8 첫 항(경기[0x31 + 수비측] == 1)이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
     defenseIsCpu: true,
     scene: progress.defenseScene,
+    // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값(앞 타석 마지막 공일 수도 있다)이 남는다
+    sceneResultCode: progress.sceneResultCode,
   })
 
   // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·홈런 가지도 안 선다 (pinchHitAi 게이트)

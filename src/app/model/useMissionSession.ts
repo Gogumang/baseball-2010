@@ -54,6 +54,11 @@ import {
   startHumanSteal,
   type PitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
+import {
+  SCENE_RESULT_CODE_START,
+  sceneResultCodeAfterPitch,
+  sceneResultCodeOfThrown,
+} from '@/features/defense-play/model/sceneResultCode'
 import { chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import {
   missionDefenseAbilitiesOf,
@@ -600,6 +605,11 @@ export function useMissionSession({
    */
   const [stealingFrom, setStealingFrom] = useState<readonly StealBase[]>([])
   const stealingFromRef = useRef(stealingFrom)
+  /**
+   * 경기 +0xfd4 — 스윙 판정 결과 코드 칸(`features/defense-play/model/sceneResultCode`). 공마다 0x11 진입(3deea)이 0 으로 지우고
+   * 휘두른 공만 판정(5130e)이 덮는다. 주자 판의 튐 파티클 · 홈런성 조건이 본다 — 견제는 앞 공의 값. 경기 장면을 새로 열면 0
+   */
+  const sceneResultCodeRef = useRef<number | null>(SCENE_RESULT_CODE_START)
   const takeStealingFrom = () => {
     const taken = stealingFromRef.current
     stealingFromRef.current = []
@@ -938,6 +948,8 @@ export function useMissionSession({
       buntKind = 0,
     ) => {
       const pitchingRun = missionRunRef.current
+      // 경기 +0xfd4 — 이 공의 0x11 진입이 지우고 휘두른 공이면 스윙 판정이 덮는다
+      sceneResultCodeRef.current = sceneResultCodeAfterPitch(detail.resolution, detail.resultCode)
       // 견제는 공이 아니라 구질이 오지 않는다 (`PitchOutcomeDetail.pitchTypeNumber`)
       const pitchTypeNumber = detail.pitchTypeNumber
       if (pitchingRun !== null && pitchTypeNumber !== undefined) {
@@ -1011,6 +1023,8 @@ export function useMissionSession({
                 offenseIsCpu: false,
                 // 장면 +0xfdc — 못 맞힌 번트의 번트 종류. 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
                 buntKind,
+                // 경기 +0xfd4 — 이 공의 값
+                sceneResultCode: sceneResultCodeRef.current,
               },
               random,
             )
@@ -1343,6 +1357,8 @@ export function useMissionSession({
     )
     const resolution = thrown.resolution
     const foulContact = thrown.foulContact
+    // 경기 +0xfd4 — 이 공의 0x11 진입이 지우고 CPU 타자가 휘두른 공이면 스윙 판정이 덮는다
+    sceneResultCodeRef.current = sceneResultCodeOfThrown(resolution, foulContact)
     // 0x4e136 — 필살 스윙이 나간 틱에 남은 −1 (헛스윙도). 마타자가 아니면 null 이라 칸을 안 건드린다
     const cpuAfterSwing =
       thrown.specialSwingRemaining === null
@@ -1379,6 +1395,8 @@ export function useMissionSession({
             throwMode: throwModeManual === false ? '자동' : '수동',
             // 장면 +0xfdc — CPU 타자의 이 공 번트 종류(⚠️ 번트 헛스윙은 `simulateBatter` 가 아직 안 낸다)
             buntKind: thrown.buntKind ?? 0,
+            // 경기 +0xfd4 — 이 공의 값
+            sceneResultCode: sceneResultCodeRef.current,
           },
           random,
         )
@@ -1767,6 +1785,7 @@ export function useMissionSession({
     setPickoffReplay(null)
     setPendingBenchClearing(null)
     stealingFromRef.current = []
+    sceneResultCodeRef.current = SCENE_RESULT_CODE_START
     setStealingFrom([])
     setPitcherStealDisplay(null)
     // 경기 장면 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번.
@@ -1895,6 +1914,7 @@ export function useMissionSession({
       setPickoffReplay(null)
       setPendingBenchClearing(null)
       stealingFromRef.current = []
+      sceneResultCodeRef.current = SCENE_RESULT_CODE_START
       setStealingFrom([])
       setPitcherStealDisplay(null)
       dropAutoRelay()
@@ -2013,6 +2033,8 @@ export function useMissionSession({
         defenseIsCpu: true,
         // 수비 아홉 칸(CPU 팀 레코드, 0xb0fb4) · 루별 주루(사람 칸 팀 주자 신원)
         ...pickoffAbilitiesOf(current),
+        // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
+        sceneResultCode: sceneResultCodeRef.current,
       })
       const interrupted = current.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
       setMissionRun((previous) => (previous === null ? previous : settleBatterRun(applyPickoff(previous, result.advance, result.runnerFates))))
@@ -2070,6 +2092,8 @@ export function useMissionSession({
         throwMode: throwModeManual === false ? '자동' : '수동',
         // 수비 아홉 칸(사람 칸 팀 레코드, 0xb0fb4) · 루별 주루(CPU 타선 주자 신원)
         ...pickoffAbilitiesOf(pitcherRun),
+        // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
+        sceneResultCode: sceneResultCodeRef.current,
       })
       const interrupted = pitcherRun.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
       playSoundIds(audio, [pickoffCallSoundIdOf(result)])
