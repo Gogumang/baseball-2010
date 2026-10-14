@@ -2023,6 +2023,12 @@ function applyDefensivePlay(
   )
   const slot = progress.opponentOrderIndex
   const previousLog = progress.opponentBatterLogs[slot] ?? { hits: 0, homeRuns: 0 }
+  // 정산 홈런 수 [sp+0x24] > 0 — 장내 홈런 state[0x25] 는 a84d6 이 타자 게이트 [sp+0x34] = 0xa56dc(ctx, 지금 타자, 0)
+  // (모드 3 갈래 0xa571c: 포스트시즌 · 국가대항전 아님 && 마선수 아님)가 참일 때만 더한다. 거짓이면 루타 4 안타로만 적혀
+  // 홈런 갈래(B0)와 a8728 의 타순 칸 홈런 +0x13 을 건너뛴다. 담장 사건 8 은 게이트 없이 센다
+  const batterGate =
+    countsMyPitcherRecord(progress) && rosterSlotAt(progress.opponentLineup, slot) !== ACE_BATTER_ROSTER_SLOT
+  const homeRunCounted = outcome.kind === '홈런' && !(defensePlay?.groundHomeRun === true && !batterGate)
   const hit = isHit(outcome)
   const walk = outcome.kind === '볼넷'
   // 출루 허용 state[0x88]·투수 +0x2a·삼자범퇴 칸 ctx+0x184 는 볼넷·사구를 함께 본다
@@ -2178,12 +2184,12 @@ function applyDefensivePlay(
     // 종류 5 정산은 a8a04 · a8ac8 이 결과 링 · 타석 +0x14 를 건너뛴다
     opponentLineup: stealPlaySettlement
       ? progress.opponentLineup
-      : recordLineupPlay(progress.opponentLineup, slot, outcome, { quickEngine: quickAdvance !== undefined }),
+      : recordLineupPlay(progress.opponentLineup, slot, outcome, { quickEngine: quickAdvance !== undefined, homeRunCounted }),
     opponentBatterLogs: {
       ...progress.opponentBatterLogs,
       [slot]: {
         hits: previousLog.hits + (hit ? 1 : 0),
-        homeRuns: previousLog.homeRuns + (outcome.kind === '홈런' ? 1 : 0),
+        homeRuns: previousLog.homeRuns + (homeRunCounted ? 1 : 0),
       },
     },
     atBat: createAtBat(),
@@ -2197,7 +2203,7 @@ function applyDefensivePlay(
   // 0x8f414 는 사람 장면의 타석 끝(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)에서만 돈다 — 내가 던진 타석만.
   // 내가 마운드에 없는 타석은 간이 엔진(0x21)이라 판정이 없다 (`triggerBurstAtPrep` 머리말)
   const resolved = mine
-    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded, defensePlay)
+    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded, defensePlay, homeRunCounted)
     : next
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
   const closed: PitcherGameProgress = halfChanged
@@ -2307,6 +2313,8 @@ function resolveBurstFor(
   outsAdded: number,
   inningEnded: boolean,
   defensePlay: DefensePlayResult | null,
+  /** 정산 홈런 수 [sp+0x24] > 0 — B0 을 켜는 홈런 갈래에 드는가 (`applyDefensivePlay`) */
+  homeRunCounted: boolean,
 ): PitcherGameProgress {
   if (progress.burst === null) return progress
   const resolution = resolveBurst(
@@ -2323,6 +2331,7 @@ function resolveBurstFor(
       // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
       isBunt: defensePlay?.buntBall === true,
       runnersAdvanced: defensePlay?.sacrifice === true,
+      homeRunCounted,
       // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
       humanTeamWalkOff:
         progress.game.isFinished && progress.game.ourScore > progress.game.opponentScore,
