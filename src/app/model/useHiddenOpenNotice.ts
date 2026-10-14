@@ -17,7 +17,12 @@ export function useHiddenOpenNotice() {
   const [window, setWindow] = useState<HiddenOpenWindow>(EMPTY_HIDDEN_OPEN_WINDOW)
   /** 닫기가 이어 할 일을 렌더를 기다리지 않고 읽는다 */
   const windowRef = useRef(window)
-  /** 창을 새로 띄운 횟수 — 대기 글로 다시 띄울 때 상자를 새로 세운다(0x75440 → 0x741a0, 펼침부터) */
+  /**
+   * 창을 새로 띄운 횟수 — 대기 글로 다시 띄울 때 상자를 새로 세운다(펼침부터). 0x75440 은 대기 칸에 그리기 · 키([+0x3b4] · [+0x3b8])가
+   * 있으면 0x741a0, 없으면 글 [+0x2a8] 로 0x74ef4 를 부른다(0x7545a~0x754a6) — 글 알림은 0x74ef4 다.
+   * ⚠️ 장면이 [창+0x24f] = 1(경기 0x3301c · 메인 메뉴 0x234d4)이면 닫힘이 줄임 없이 한 갱신이다(`MessageBox` 의 `closesWithoutShrink`).
+   *    앱이 장면을 몰라 늘 줄임(240 → 120 → 닫힘)으로 닫는다.
+   */
   const [serial, setSerial] = useState(0)
   const update = useCallback((next: (current: HiddenOpenWindow) => HiddenOpenWindow) => {
     windowRef.current = next(windowRef.current)

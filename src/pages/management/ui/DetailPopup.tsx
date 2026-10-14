@@ -1,6 +1,8 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { CommonPanel, FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
@@ -43,6 +45,8 @@ export function DetailPopup({ result, onClose }: DetailPopupProps) {
       rows={detailRowsOf(result.before, result.after, result.changes)}
       messages={result.messages}
       onClose={onClose}
+      // 훈련 0x17f5c(0x18d5e) · 휴식 0x18e3c(0x18fd2) 결과 — 0x741a0(높이 0)
+      opensAsCommonPopup
     />
   )
 }
@@ -68,6 +72,14 @@ interface DetailWindowProps {
    * 안 주면 안 덮는다(지금까지와 같다).
    */
   readonly dimOpacity?: number
+  /**
+   * 공용 창 [0x140005c] 의 0x741a0(높이 0)으로 띄운 결과 창 — 나리 훈련 0x17f5c(키 0x1b4c4) · 휴식 0x18e3c(키 0x1b308) ·
+   * 장비 구매 확정 0x14a74(키 0x1d648) · 시즌 팀 트레이닝 결과 0xc074(키 0xf2c8). 2026-10-14 직접 뜸:
+   * 띄운 그림은 펼침([창+0x214])이라 글을 안 그리고(0x7479c — 뒤 어둡게만), 다음 갱신 0x75556 이 높이 6 → 목표 0 으로 펼침을 끝내며
+   * 그 갱신의 키는 안 본다. 네 키 콜백 모두 OK(−5) · '5' · CLR(−16) 에 0x742a9 를 바로 불러 그 자리에서 치운다(닫힘 애니 없음).
+   * 참이면 이 창이 닫는 키(OK · '5' · CLR)를 잡는 단계에서 가져가고, 펼치는 갱신에는 모든 키를 막는다.
+   */
+  readonly opensAsCommonPopup?: boolean
 }
 
 /**
@@ -77,7 +89,38 @@ interface DetailWindowProps {
  */
 export function DetailWindow({
   rows, messages, onClose, scrollOffset = 0, tableYOffset = DETAIL_Y_OFFSET, hidesEmptyMessages = false, dimOpacity,
+  opensAsCommonPopup = false,
 }: DetailWindowProps) {
+  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 틀을 건너뛴다
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const [hasNoLayout, setHasNoLayout] = useState(false)
+  useLayoutEffect(() => {
+    if ((overlayRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
+  }, [])
+  const motion = usePopupWindowMotion({ targetHeight: 0, skipsMotion: !opensAsCommonPopup || hasNoLayout })
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  const close = () => {
+    if (!opensAsCommonPopup) return onClose()
+    motion.close('바로', () => onCloseRef.current())
+  }
+  useEffect(() => {
+    if (!opensAsCommonPopup) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      // 펼치는 갱신에는 키 콜백을 안 부른다 — 뒤 화면 리스너(시즌 결과의 글 넘김 따위)까지 막는다
+      if (!motion.acceptsKeys()) {
+        if (!motion.isClosed) event.stopImmediatePropagation()
+        return
+      }
+      // 닫는 키는 창이 가져간다 — 그 밖의 키(시즌 결과 0xf2c8 의 위 · 아래)는 부른 쪽 리스너가 본다
+      if (!['Enter', ' ', '5', 'Escape', 'Backspace'].includes(event.key)) return
+      event.stopImmediatePropagation()
+      event.preventDefault()
+      close()
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  })
   const messageBox = detailMessageBoxOf(tableYOffset)
   const showsMessages = !hidesEmptyMessages || messages.length > 0
   const origins = useFrameOrigins(MODE_UI)
@@ -90,9 +133,12 @@ export function DetailWindow({
     return <SpriteNumber glyphs={glyphs} right={center + Math.ceil(glyphsWidthOf(glyphs) / 2)} boxTop={top} boxHeight={ROW_HEIGHT} />
   }
 
+  if (motion.isClosed) return null
   return (
-    <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={onClose}
+    <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={close} ref={overlayRef}
       style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
+      {/* 띄운 그림은 펼침이라 그리기 콜백을 안 부른다(0x7479c) — 뒤 어둡게만 */}
+      <div style={{ visibility: motion.openingHeight !== null ? 'hidden' : undefined }}>
       <CommonPanel x={DETAIL_WINDOW.x} y={DETAIL_WINDOW.y} width={DETAIL_WINDOW.width} height={DETAIL_WINDOW.height} titleTab />
       <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
         style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />
@@ -149,6 +195,7 @@ export function DetailWindow({
         ))}
       </svg>
       </>)}
+      </div>
     </div>
   )
 }

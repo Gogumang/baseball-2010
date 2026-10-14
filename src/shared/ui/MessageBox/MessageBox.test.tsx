@@ -203,6 +203,24 @@ describe('메시지 상자 애니메이션', () => {
     }
   })
 
+  it('장면이 [창+0x24f] = 1 이면(closesWithoutShrink) 답한 갱신에 폭 0 — 줄임 없이 다음 갱신에 답한다 (0x75656~0x7566c)', () => {
+    const 되돌리기 = 높이를_잴_수_있게(79)
+    vi.useFakeTimers()
+    const onAnswer = vi.fn()
+    try {
+      render(<MessageBox text="질문" buttons={['예', '아니오']} closesWithoutShrink onAnswer={onAnswer} />)
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 3))
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(상자().style.width).toBe('0px')
+      expect(onAnswer).not.toHaveBeenCalled()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(onAnswer).toHaveBeenCalledWith(0)
+    } finally {
+      vi.useRealTimers()
+      되돌리기()
+    }
+  })
+
   it('닫힘은 폭을 매 틱 ÷2 하고 99 이하가 되면 그때 답을 넘긴다 (240→120→60)', () => {
     const 되돌리기 = 높이를_잴_수_있게(79)
     vi.useFakeTimers()

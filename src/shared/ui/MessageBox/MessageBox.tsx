@@ -50,6 +50,13 @@ interface MessageBoxProps {
    * 검정 (5 + 1)/16, 장면이 세운 [창+0x24f] → [창+0x24e] 가 0 일 때). 안 주면 지금까지의 공용 근사다.
    */
   readonly dimOpacity?: number
+  /**
+   * 장면이 [창+0x24f] = 1 을 세운 자리(경기 장면 0x3301c · 메인 메뉴 0x234d4)면 참 — 창을 띄울 때 [창+0x24e] 로 옮겨지고(0x7503c),
+   * 키를 받은 갱신의 격자 · 키 표 갈래가 [+0x215] 와 함께 **폭 [+0x210] = 0** 을 적는다(0x75656~0x7566c · 0x756a4~0x756b4).
+   * 그래서 다음 갱신 0x75596 이 0 ÷ 2 ≤ 99 로 곧장 닫는다 — 240 → 120 줄임이 없고 답은 한 갱신 뒤다.
+   * ⚠️ 그 한 갱신 동안 폭 0 판 위 글 · 버튼을 그리는지는 미확인 — 웹은 판과 함께 안 보이게 둔다.
+   */
+  readonly closesWithoutShrink?: boolean
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
   /**
@@ -70,7 +77,7 @@ interface MessageBoxProps {
 
 /**
  * **열림** (0x75006 · 0x75556~0x75588): 그리는 높이 [+0x212] = **10** 에서 시작해 매 갱신 **×2**,
- * 두 배가 목표 높이 이상이면 목표로 맞추고 플래그를 끈다 (한 줄 상자 79 면 10→20→40→79).
+ * 목표 높이 < 두 배면 목표로 맞추고 플래그를 끈다 (한 줄 상자 79 면 10→20→40→79). 두 배가 목표와 같으면 한 갱신 더 펼침이다.
  * 상자는 늘 `(화면높이 − 현재높이)/2` 에 그려져 **세로 가운데에서 위아래로 펼쳐지고**,
  * 펼치는 동안에는 글·버튼을 그리지 않는다 (0x7479c).
  */
@@ -81,8 +88,8 @@ const OPEN_GROWTH = 2
  * **닫힘** (0x7558a~0x755d8): [+0x215] 가 켜지면 매 갱신 폭 [+0x210] 을 **÷2**,
  * **99 이하**가 되면 닫고 콜백을 부른다 (240→120→60 두 갱신).
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 줄어드는 폭을 화면 어느 쪽에 붙이는지가 원본 노트에 없다.
- *    가로 가운데로 모았다.
+ * 줄어드는 판은 **가로 가운데**다 — 확정(2026-10-14): 그리기 0x744c4 가 x = (W − 폭) >> 1 · y = ((H − 높이) >> 1) + [창+0x244] 로 긋는다
+ * (0x744de~0x74520). 장면이 [창+0x24f] = 1 이면 줄임 없이 다음 갱신에 닫힌다(`closesWithoutShrink`).
  * ⚠️ 레이아웃이 없는 환경(측정 높이 0 — 테스트 등)에서는 두 애니메이션을 모두 건너뛰고
  *    **답을 그 자리에서 넘긴다**. props 계약(`onAnswer` 를 바로 부르는 것)을 지키기 위함이다.
  */
@@ -152,7 +159,8 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 }
 
 export function MessageBox({
-  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, onAnswer, onAnswerKey,
+  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, closesWithoutShrink = false,
+  onAnswer, onAnswerKey,
 }: MessageBoxProps) {
   /** 격자 열 수 — 안 주면 버튼이 한 줄이다 */
   const columns = Math.max(1, grid?.columns ?? buttons.length)
@@ -168,6 +176,8 @@ export function MessageBox({
   const onAnswerKeyRef = useRef(onAnswerKey)
   onAnswerKeyRef.current = onAnswerKey
   const isAnsweredRef = useRef(false)
+  const closesWithoutShrinkRef = useRef(closesWithoutShrink)
+  closesWithoutShrinkRef.current = closesWithoutShrink
   const isFinishedRef = useRef(false)
 
   const boxRef = useRef<HTMLDivElement>(null)
@@ -205,7 +215,7 @@ export function MessageBox({
     onAnswerKeyRef.current?.(index)
     // 원본은 닫힘 애니메이션이 끝난 뒤에 콜백을 부른다 (0x755d8). 레이아웃이 없으면 곧바로.
     if (fullHeightRef.current <= 0) return onAnswerRef.current(index)
-    setAnimation({ kind: '닫힘', width: CLOSE_START_WIDTH, answer: index })
+    setAnimation({ kind: '닫힘', width: closesWithoutShrinkRef.current ? 0 : CLOSE_START_WIDTH, answer: index })
   }, [])
 
   // 갱신 한 번 = 게임 루프 한 틱 (원본도 "매 갱신" 이다)
@@ -224,8 +234,8 @@ export function MessageBox({
       }
       if (previous.kind === '열림') {
         const next = previous.height * OPEN_GROWTH
-        // 두 배가 목표 이상이면 목표 높이로 맞추고 애니메이션을 끝낸다
-        return advance(next >= fullHeightRef.current ? null : { kind: '열림', height: next })
+        // 목표 < 두 배면 목표 높이로 맞추고 애니메이션을 끝낸다 — 같으면 한 갱신 더 펼침이다(0x7557c `blt`)
+        return advance(next > fullHeightRef.current ? null : { kind: '열림', height: next })
       }
       const next = Math.floor(previous.width / CLOSE_SHRINK)
       advance({ kind: '닫힘', width: next, answer: previous.answer })

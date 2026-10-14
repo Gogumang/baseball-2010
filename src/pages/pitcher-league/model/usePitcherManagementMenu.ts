@@ -568,12 +568,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     if (choice === null) return
     const count = choice.labels.length
     const onKey = (event: KeyboardEvent) => {
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+      // 0x19398: ← → · '4' · '6' 은 +0x166 뒤집기, OK(−5) · '5' 는 고르기, CLR(−16)은 [창+0x215] 닫기
+      const step = event.key === 'ArrowRight' || event.key === '6' ? 1 : event.key === 'ArrowLeft' || event.key === '4' ? -1 : 0
       if (step !== 0) {
         event.preventDefault()
         return setChoiceIndex((previous) => (previous + step + count) % count)
       }
-      if (event.key === 'Enter' || event.key === ' ') {
+      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
         return chooseOption(choiceIndexRef.current)
       }

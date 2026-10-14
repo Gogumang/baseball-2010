@@ -171,6 +171,8 @@ function SeasonTrainingResultPopup({ result, onClose, firstLine, onFirstLineChan
       hidesEmptyMessages
       // 0x741a0 창 — 시즌 장면 생성자 0x3b14(0x3b1c~0x3b2e)가 [창+0x24f] = 0 · [+0x24c] = 1 이라 그리기마다 검정 단계 5 로 덮는다
       dimOpacity={POPUP_DIM_OPACITY}
+      // 0xc074 의 0x741a0(높이 0) — 첫 그림은 펼침이라 글이 없고 그 갱신의 키는 안 본다. 닫는 키(0xf2c8 → 0x742a9)는 창이 가져간다
+      opensAsCommonPopup
     />
   )
 }

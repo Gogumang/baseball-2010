@@ -81,4 +81,22 @@ describe('usePopupWindowMotion', () => {
     expect(onClosed).toHaveBeenCalledTimes(1)
     expect(result.current.isClosed).toBe(true)
   })
+
+  it('[창+0x290] = 0(expands: false) — 첫 그림만 글을 안 그리고 키는 바로 받으며, 닫힘은 다음 갱신', () => {
+    const onClosed = vi.fn()
+    const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 0, expands: false }))
+    expect(result.current.openingHeight).toBe(6)
+    expect(result.current.acceptsKeys()).toBe(true)
+    act(() => { result.current.close('줄임', onClosed) })
+    expect(onClosed).not.toHaveBeenCalled()
+    틀(1)
+    expect(onClosed).toHaveBeenCalledTimes(1)
+  })
+
+  it('목표 0 인 창은 한 갱신만 펼침 — 그동안 키를 안 받는다', () => {
+    const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 0 }))
+    expect(result.current.acceptsKeys()).toBe(false)
+    틀(1)
+    expect(result.current.acceptsKeys()).toBe(true)
+  })
 })

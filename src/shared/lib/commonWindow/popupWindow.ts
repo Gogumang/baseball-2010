@@ -24,6 +24,9 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
  *   - **줄임**(`'줄임'`) — 키 콜백이 [창+0x215] = 1 을 쓴다. 다음 갱신부터 폭 240 → 120 → 60(닫힘 · 0x75440).
  *     나리 기록실 0x196ec · 투수 구질 0x19398 · 이벤트 미션 0x1dcb0 · 경기 중 메뉴 0x3c158.
  *     줄이는 동안에도 그리기 콜백은 돈다(0x7479c 는 [+0x214] 만 본다) — 판만 가운데로 줄고((W − 폭)/2, 0x744c4) 글은 안 잘린다.
+ *     목표 높이 0 인 창(판 없음 — 0x744c4 는 [+0x20e] == 0 이면 안 그린다)은 줄임이 안 보이고 글만 두 갱신 더 남는다.
+ *   - 띄운 쪽이 [창+0x290] = 0 으로 두면(이벤트 system sub 2 — 0x8d39e~0x8d3a8) 0x754f8 첫 갈래가 다음 갱신에 [+0x214] 를 끄고
+ *     키도 그 갱신에 받으며, [+0x215] 가 서면 다음 갱신에 줄임 없이 닫는다(`expands: false`).
  */
 
 /** 0x741a0 의 [창+0x212] — 처음 그리는 높이 */
@@ -70,10 +73,15 @@ export interface PopupWindowMotion {
  * 0x741a0 창 하나의 펼침 · 닫힘. 갱신 한 번 = 원본 틀 하나(`millisecondsPerFrame`).
  * `skipsMotion` 이 참이면(레이아웃이 없는 시험 환경 따위) 다 펼친 채로 시작하고 `'줄임'` 도 바로 닫는다 — `MessageBox` 와 같은 약속.
  */
-export function usePopupWindowMotion({ targetHeight, skipsMotion = false }: {
+export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expands = true }: {
   /** [창+0x20e] — 0x741a0 의 둘째 인자 */
   readonly targetHeight: number
   readonly skipsMotion?: boolean
+  /**
+   * [창+0x290] — 0x741a0 은 1 이다. 0 이면(띄운 쪽이 끈 자리) 0x754f8 첫 갈래(0x7550a~0x75552)가 펼침을 다음 갱신에 끄고 그 갱신에
+   * 키를 받으며, 닫힘([+0x215])은 다음 갱신에 줄임 없이 치운다. 첫 그림은 여전히 [+0x214] 라 글을 안 그린다.
+   */
+  readonly expands?: boolean
 }): PopupWindowMotion {
   const [openingHeight, setOpeningHeight] = useState<number | null>(skipsMotion ? null : POPUP_OPEN_START_HEIGHT)
   const [closingWidth, setClosingWidth] = useState<number | null>(null)
@@ -85,6 +93,8 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false }: {
   const onClosedRef = useRef<(() => void) | undefined>(undefined)
   const skipsMotionRef = useRef(skipsMotion)
   skipsMotionRef.current = skipsMotion
+  const expandsRef = useRef(expands)
+  expandsRef.current = expands
 
   const finish = useCallback(() => {
     isClosedRef.current = true
@@ -109,7 +119,7 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false }: {
     const timer = window.setInterval(() => {
       if (isClosedRef.current) return
       if (openingRef.current !== null) {
-        const next = nextPopupOpeningHeight(openingRef.current, targetHeight)
+        const next = expandsRef.current ? nextPopupOpeningHeight(openingRef.current, targetHeight) : null
         openingRef.current = next
         return setOpeningHeight(next)
       }
@@ -123,7 +133,7 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false }: {
   }, [isMoving, targetHeight, finish])
 
   const acceptsKeys = useCallback(
-    () => openingRef.current === null && closingRef.current === null && !isClosedRef.current,
+    () => (openingRef.current === null || !expandsRef.current) && closingRef.current === null && !isClosedRef.current,
     [],
   )
 
@@ -134,8 +144,12 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false }: {
       finish()
       return true
     }
-    closingRef.current = POPUP_CLOSE_START_WIDTH
-    setClosingWidth(POPUP_CLOSE_START_WIDTH)
+    // [+0x290] == 0 이면 다음 갱신의 첫 갈래가 줄임 없이 닫는다 — 폭 0 은 다음 갱신에 닫히는 값이다
+    const width = expandsRef.current ? POPUP_CLOSE_START_WIDTH : 0
+    openingRef.current = null
+    setOpeningHeight(null)
+    closingRef.current = width
+    setClosingWidth(width)
     return true
   }, [acceptsKeys, finish])
 
