@@ -455,6 +455,11 @@ export interface TeamGameOptions {
    * `> 1 ? 2 : 8` 로 놓고 그 줄로 바닥을 다시 싣는다(`seasonNationalCupSceneStadium` — 상수라 굴림 없음). 대회가 아니면 생략
    */
   readonly nationalCupStage?: number
+  /**
+   * **시즌 포스트시즌 경기인가** (SR+0xb4). 정산 0xa8024 의 타자 게이트 [sp+0x34] = 0xa56dc(ctx, 지금 타자, 0) 의 모드 2 갈래
+   * 0xa56fa 가 SR+0x12c(국가대항전) · SR+0xb4(포스트시즌)면 거짓이다 (`settlementBatterGateOf`). 안 넘기면 정규 경기
+   */
+  readonly isPostseason?: boolean
 }
 
 export interface TeamGameLogEntry {
@@ -1434,9 +1439,14 @@ function withOurAtBatRecords(
   outcome: AtBatOutcome,
   runsBattedIn: number,
   isPinchHitAtBat: boolean,
+  /** 정산 [sp+0x24] > 0 — 홈런 갈래에 드는가 (`homeRunCountedOf`). 안 넘기면 홈런이면 참 */
+  homeRunCounted = outcome.kind === '홈런',
 ): TeamGameProgress {
-  const recorded = recordBatterAtBat(progress.ourBatterLogs[slot] ?? EMPTY_BATTER_GAME_LOG, outcome, runsBattedIn)
-  const isHomeRun = outcome.kind === '홈런'
+  const recorded = recordBatterAtBat(progress.ourBatterLogs[slot] ?? EMPTY_BATTER_GAME_LOG, outcome, runsBattedIn, {
+    homeRunCounted,
+  })
+  // 홈런 갈래를 건너뛴 장내 홈런은 안타 갈래 a86b4 가 ctx+0x162 를 0 으로 둔다 · a8764 대타 홈런도 홈런 갈래 안이다
+  const isHomeRun = homeRunCounted
   const backToBack = backToBackRecordOf({
     streak: progress.recordTally.homeRunStreak,
     humanOffense: true,
@@ -1645,10 +1655,45 @@ function hasCycle(hitBases: readonly number[]): boolean {
  * a8a46:  k=6  삼진 (수비가 CPU 인 쪽 — 내 타자가 당한 삼진)
  * ```
  */
+/**
+ * **정산 타자 게이트 [sp+0x34]** = `0xa56dc(ctx, 지금 타자, 0)`(a8070, 직접 떴다):
+ * ```
+ * a56ea  모드 − 2 > 4 → 거짓                      ; 팀 경기 모드 1 · 7 · 8 은 늘 거짓
+ * a56fa  모드 2: SR(0x1f55d)+0x12c(국가대항전) || SR+0xb4(포스트시즌) → 거짓
+ * a5744  0xb633d(타자) (마선수) → 거짓, 아니면 참
+ * ```
+ * 장내 홈런 state[0x25] 는 a84d6 이 이 게이트가 참일 때만 홈런 수 [sp+0x24] 에 더한다 (`homeRunCountedOf`).
+ */
+function settlementBatterGateOf(progress: TeamGameProgress, ourOffense: boolean): boolean {
+  const { options } = progress
+  if (options.mode !== TEAM_GAME_MODE.시즌) return false
+  if (options.isPostseason === true || options.nationalCupStage !== undefined) return false
+  const entry = ourOffense ? progress.ourEntry : progress.opponentEntry
+  const order = ourOffense ? progress.game.battingOrderIndex : progress.opponentOrderIndex
+  const slot = ((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
+  return (entry[slot]?.aceIndex ?? NO_ACE_BATTER) < 0
+}
+
+/**
+ * **정산 홈런 수 [sp+0x24] > 0 인가** — 담장을 넘긴 사건 8 은 게이트 없이 센다(a80a8). 장내 홈런은 타자 게이트가 거짓이면
+ * 루타 4 안타로만 적혀 홈런 갈래 a85be~a86b4(기록 1~4 · 백투백 0xa794c · 시즌 코드 · B0)와 a8728 의 타순 칸 홈런 +0x13 ·
+ * 0xa7b00(12~14) · a8764 대타 홈런(5)을 건너뛰고, a86b4 가 ctx+0x162 를 0 으로 둔다. 결과 링은 루타 4(a8704) 그대로다.
+ */
+function homeRunCountedOf(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  defensePlay: DefensePlayResult | null,
+  ourOffense: boolean,
+): boolean {
+  return outcome.kind === '홈런' && !(defensePlay?.groundHomeRun === true && !settlementBatterGateOf(progress, ourOffense))
+}
+
 function offenseRecordOf(
   outcome: AtBatOutcome,
   runsBattedIn: number,
   hitBasesBefore: readonly number[],
+  /** 정산 [sp+0x24] > 0 — 홈런 갈래의 시즌 코드 (`homeRunCountedOf`). 안 넘기면 홈런이면 참 */
+  homeRunCounted = outcome.kind === '홈런',
 ): { readonly codes: readonly number[]; readonly hitBases: readonly number[] } {
   const codes: number[] = []
   let hitBases = hitBasesBefore
@@ -1660,7 +1705,7 @@ function offenseRecordOf(
     if (bases === 2) codes.push(SEASON_RECORD_CODE.이루타)
     if (bases === 3) codes.push(SEASON_RECORD_CODE.삼루타)
     // 홈런 네 칸은 **타점**이 가른다 — 원본도 득점이 1~4 가 아니면 아무 칸도 안 올린다
-    if (outcome.kind === '홈런' && runsBattedIn >= 1 && runsBattedIn <= 4) {
+    if (homeRunCounted && runsBattedIn >= 1 && runsBattedIn <= 4) {
       codes.push(SEASON_RECORD_CODE.솔로홈런 + runsBattedIn - 1)
     }
     if (!cycleBefore && hasCycle(hitBases)) codes.push(SEASON_RECORD_CODE.사이클)
@@ -1721,12 +1766,14 @@ function withPlateAppearance(
   outcome: AtBatOutcome | null,
   /** 간이 엔진 타석인가 — 링의 아웃 코드가 늘 5 다 (`quickAtBatResultCodeOf`) */
   quickEngine = false,
+  /** 정산 [sp+0x24] > 0 — a8728 의 홈런 +0x13 (`homeRunCountedOf`). 안 넘기면 홈런이면 참 */
+  homeRunCounted = outcome !== null && outcome.kind === '홈런',
 ): readonly BatterGameRecord[] {
   const next = [...records]
   const resultCodeOf = quickEngine ? quickAtBatResultCodeOf : atBatResultCodeOf
   next[slot] = recordPlateAppearance(next[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: outcome !== null && isHit(outcome),
-    isHomeRun: outcome !== null && outcome.kind === '홈런',
+    isHomeRun: homeRunCounted,
     // 같은 정산이 오늘 타석 결과 링에도 넣는다 (0xa908c) — 견제 판은 게이트에 막힌다
     ...(outcome === null ? { playKind: PICKOFF_PLAY_KIND } : { resultCode: resultCodeOf(outcome) }),
   })
@@ -2645,13 +2692,17 @@ function finishBatterOutcome(
   const inningEnded = before.outs + outsAdded >= OUTS_PER_INNING
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
   const runnerPlay = stealPlay !== undefined
+  // 정산 홈런 수 [sp+0x24] > 0 — 장내 홈런은 타자 게이트 [sp+0x34](a84d6)가 참일 때만 (`homeRunCountedOf`)
+  const homeRunCounted = homeRunCountedOf(progress, outcome, defensePlay, true)
   // 시즌 평판 16칸 — 우리 공격이라 **수비측(상대)이 CPU** 인 코드(≥ 6)만 선다. 종류 5 정산은 삼진 코드 6(a8a46)을 안 지난다
   const offense = runnerPlay
     ? { codes: [], hitBases: progress.ourHitBases[slot] ?? [] }
-    : offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [])
+    : offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [], homeRunCounted)
   // 기록달성 (0xa8024 → 0xa77f0) — 사람 공격이라 공격 계열이 게이트를 지난다. 5 대타 홈런은 ctx+0x160 을 본다.
   // 종류 5 정산은 타석 결과 목록(0xa908d)도 백투백 카운터 지우기(a8ab2)도 안 지난다
-  const recorded = runnerPlay ? progress : withOurAtBatRecords(progress, slot, outcome, runsBattedIn, isPinchHitAtBat(progress))
+  const recorded = runnerPlay
+    ? progress
+    : withOurAtBatRecords(progress, slot, outcome, runsBattedIn, isPinchHitAtBat(progress), homeRunCounted)
 
   const next: TeamGameProgress = {
     ...recorded,
@@ -2680,7 +2731,7 @@ function finishBatterOutcome(
       game.inning !== before.inning || game.half !== before.half,
     ),
     ourHits: progress.ourHits + (isHit(outcome) ? 1 : 0),
-    ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, runnerPlay ? null : outcome),
+    ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, runnerPlay ? null : outcome, false, homeRunCounted),
     leaguePlateAppearances: runnerPlay
       ? progress.leaguePlateAppearances
       : withLeaguePlateAppearance(
@@ -2706,6 +2757,7 @@ function finishBatterOutcome(
     // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
     isBunt: defensePlay?.buntBall === true,
     runnersAdvanced: defensePlay?.sacrifice === true,
+    homeRunCounted,
   })
 
   return advance(
@@ -3371,6 +3423,8 @@ function finishDefensiveAtBat(
   const walk = isFreePass(outcome)
   const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
   const stealPlayOuts = stealPlay?.result.advance.outsAdded
+  // 정산 홈런 수 [sp+0x24] > 0 — 상대 타자의 장내 홈런도 타자 게이트 [sp+0x34](a84d6)를 본다 (`homeRunCountedOf`)
+  const homeRunCounted = homeRunCountedOf(progress, outcome, defensePlay, false)
   // 이 정산의 주자 목록을 낸 판 — 종류 5 · 종류 9 판이 함께 선 삼진이면 그 판(a8c5c 는 판의 목록을 본다)
   const runnerListPlay = stealPlay?.result ?? wildPitchPlay?.result
 
@@ -3425,6 +3479,7 @@ function finishDefensiveAtBat(
       slot,
       stealPlay === undefined ? outcome : null,
       quick !== undefined,
+      stealPlay === undefined && homeRunCounted,
     ),
     // 리그 타수 +0x20 (a8866~a8894)도 종류 4·5 를 건너뛴다(a8852) — 삼진이 리그 줄에 쌓는 칸은 타수뿐이다
     leaguePlateAppearances:
@@ -3474,6 +3529,7 @@ function finishDefensiveAtBat(
         // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
         isBunt: defensePlay?.buntBall === true,
         runnersAdvanced: defensePlay?.sacrifice === true,
+        homeRunCounted,
       })
     : recorded
 
@@ -4322,6 +4378,8 @@ function resolveBurstFor(
     isBunt?: boolean
     /** B6 — 희생 [sp+8] (`DefensePlayResult.sacrifice`) */
     runnersAdvanced?: boolean
+    /** B0 — 정산 홈런 수 [sp+0x24] > 0 (`homeRunCountedOf`) */
+    homeRunCounted?: boolean
   },
 ): TeamGameProgress {
   if (progress.burst === null) return progress
