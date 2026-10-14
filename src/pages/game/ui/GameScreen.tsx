@@ -465,6 +465,7 @@ export function GameScreen({
               // 나만의리그 타자편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
               mode={BATTER_CAREER_MODE}
               cursor={menu.cursor}
+              slidesIn={menu.slidesIn}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onQuit}

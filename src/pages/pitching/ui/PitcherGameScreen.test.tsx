@@ -258,7 +258,8 @@ describe('투수편 경기 화면', () => {
       vi.useRealTimers()
     }
 
-    expect(screen.getByText('경기 결과')).toBeTruthy()
+    // 웹 제목줄 없이 원본 240×320 한 장이다
+    expect(screen.queryByText('경기 결과')).toBeNull()
     // 정산 그리기 0x4a384 — 모드 3 도 팀경기와 같은 판(점수판 틀 · 점수 · 기본 화면)이다
     expect(screen.getByTestId('정산-판')).toBeTruthy()
     expect(screen.getByTestId('정산-점수-0')).toBeTruthy()
@@ -316,7 +317,7 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
     expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.queryByText('조작방법')).toBeNull()
+    expect(screen.queryByRole('option', { name: '게임방법' })).toBeNull()
 
     vi.useFakeTimers()
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -349,11 +350,11 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
 
-    for (const 칸 of ['계속', '조작방법', '설정', '나가기']) {
-      expect(screen.getByText(칸)).toBeTruthy()
+    for (const 칸 of ['계속하기', '게임방법', '환경설정', '메인메뉴']) {
+      expect(screen.getByRole('option', { name: 칸 })).toBeTruthy()
     }
-    expect(screen.queryByText('자동진행')).toBeNull()
-    expect(screen.queryByText('다시하기')).toBeNull()
+    expect(screen.queryByRole('option', { name: '자동진행' })).toBeNull()
+    expect(screen.queryByRole('option', { name: '재도전' })).toBeNull()
   })
 
   it('메뉴가 떠 있는 동안에는 투구 단계가 가려진다', () => {

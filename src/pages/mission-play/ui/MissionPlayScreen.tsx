@@ -481,6 +481,7 @@ export function MissionPlayScreen({
               // 미션 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
               mode={MISSION_BATTER_MODE}
               cursor={menu.cursor}
+              slidesIn={menu.slidesIn}
               onCursorChange={menu.setCursor}
               onContinue={menu.close}
               onQuit={onGiveUp}

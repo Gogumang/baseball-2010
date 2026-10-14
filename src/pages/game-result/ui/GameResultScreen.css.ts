@@ -12,10 +12,3 @@ export const backdrop = style({
   height: 320,
   pointerEvents: 'none',
 })
-
-/** 원본에 없는 웹 전용 [확인] — 원본은 '0' 이 아닌 키가 정산을 나간다 (0x407f0) */
-export const continueButton = style({
-  position: 'absolute',
-  right: '4px',
-  bottom: '4px',
-})
