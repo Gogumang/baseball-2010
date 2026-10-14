@@ -47,6 +47,7 @@ import { yearGoalWindowValuesOf } from '@/entities/career/model/seasonFlow'
 import { careerLeagueRecordsOf, judgeSeasonAwards } from '@/entities/awards/model/seasonAwards'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { StoryContext } from '@/app/model/useStorySchedule'
+import { SceneHourContext, useSceneEntryHour } from '@/shared/lib/phoneClock/phoneClock'
 
 interface CareerRoutesProps {
   readonly screen: Screen
@@ -79,8 +80,27 @@ interface CareerRoutesProps {
 
 export type AceMatchStarter = (command: MatchCommand, carried: StoryCarry, context: StoryContext) => void
 
-/** 육성 모드 화면 분기. */
-export function CareerRoutes({
+/**
+ * 경기 장면 0x104 쪽 화면 — 나리 장면 0x106 이 내려가 있다. 여기서 다른 화면으로 오면 장면이 새로 서서 상태 100 진입 0x1c154 를 지난다.
+ * ⚠️ 근사: '경기결과' 는 정산 그림(경기 장면 0x19)과 평가 116(나리 장면)을 한 화면으로 보이므로 경기 장면 쪽으로 친다 —
+ * 원본은 116 앞 상태 100 에서 시각을 잡으니 몇 초 이르다.
+ */
+const NARI_OUTSIDE_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결과', '대회경기결과', '마선수대결'])
+
+/**
+ * 육성 모드 화면 분기 — 나리 장면의 시간대 시각(상태 100 진입 0x1c154 끝 `0x7b934(gfx, 0xb8fbd())`)을 장면에 들어설 때 잡아
+ * 안쪽 화면들(경기장 띠 · 엔딩 띠 · 훈련 창 · 외출 지도 밤)에 내려 준다(`SceneHourContext`).
+ */
+export function CareerRoutes(props: CareerRoutesProps) {
+  const hour = useSceneEntryHour(!NARI_OUTSIDE_SCREENS.has(props.screen.kind))
+  return (
+    <SceneHourContext.Provider value={hour}>
+      <CareerScreens {...props} />
+    </SceneHourContext.Provider>
+  )
+}
+
+function CareerScreens({
   screen,
   setScreen,
   session,
@@ -290,7 +310,7 @@ export function CareerRoutes({
       // (0x7e84c(0x69) 의 관리 6칸 — '관리' 갈래, 138 을 거친 타순 이벤트는 빼고), 그 밖은 칸 수 0 이라 안 그린다
       if (eventEnd.isEnding) {
         if (screen.context === '외출진입' || screen.context === '장소') {
-          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
+          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
         }
         return (
           <NariEventUnderlay career={career}>
@@ -302,7 +322,7 @@ export function CareerRoutes({
         <>
           {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
           {isOverOutingMap && (
-            <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
+            <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
           )}
           {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
           <ScreenOverlay>

@@ -52,6 +52,7 @@ import { nariPitcherOf } from '@/app/model/useCollection'
 import type { PitcherAceMatch, PitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
+import { SceneHourContext, useSceneEntryHour } from '@/shared/lib/phoneClock/phoneClock'
 
 interface PitcherLeagueRouteProps {
   readonly session: PitcherLeagueSession
@@ -82,6 +83,21 @@ interface PitcherLeagueRouteProps {
 }
 
 /**
+ * 투수편 라우트 — 나리 장면 0x106 의 시간대 시각(상태 100 진입 0x1c154 끝 `0x7b934(gfx, 0xb8fbd())`)을 장면에 들어설 때 잡아
+ * 안쪽 화면에 내려 준다(`SceneHourContext`). 경기(0x104) · 마선수 대결 경기 동안은 나리 장면이 내려가 있다.
+ */
+export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
+  const { scene, gameOptions } = props.session
+  const isInNariScene = !(scene === '경기' && gameOptions !== null) && scene !== '마선수대결'
+  const hour = useSceneEntryHour(isInNariScene)
+  return (
+    <SceneHourContext.Provider value={hour}>
+      <PitcherLeagueScreens {...props} />
+    </SceneHourContext.Provider>
+  )
+}
+
+/**
  * 나만의리그 **투수편** 라우팅 (원본 게임 모드 3, 장면 0x106).
  *
  * 등록(0x65 → 0x66) → 관리(상태 105 허브) → 경기 → 정산 한 바퀴를 돌다가,
@@ -94,7 +110,7 @@ interface PitcherLeagueRouteProps {
  * 주인공 초상화는 피부 팔레트만 따른다: 장타형 +8(0x63a70)은 `모드 == 4` 일 때만이라 투수는 늘 +0 이다.
  * 상점은 [아이템] → 110 → **111 상점**(장비·서브·GP) · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다.
  */
-export function PitcherLeagueRoute({
+function PitcherLeagueScreens({
   session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch, hallOfFame,
 }: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
@@ -266,7 +282,7 @@ export function PitcherLeagueRoute({
       // 커맨드 줄(앞 상태 105 = '관리' 갈래만 관리 6칸, 그 밖 칸 수 0) · 머리띠 제목 9
       if (eventEnd.isEnding) {
         if (story.context === '지도' || story.context === '장소') {
-          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />
+          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
         }
         return (
           <>
@@ -280,7 +296,7 @@ export function PitcherLeagueRoute({
       return (
         <>
           {isOverStatusBoard && <PitcherEventUnderlay career={career} />}
-          {isOverMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} hour={new Date().getHours()} />}
+          {isOverMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />}
           <ScreenOverlay>
           <StoryScreen
             // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만

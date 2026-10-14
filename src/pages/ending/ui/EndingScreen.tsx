@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -11,7 +11,10 @@ import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { romanceEndingIndexOf, romanceEventsSeenOf } from '@/entities/career/model/seasonFlow'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
-import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { takeLeftFrames } from '@/shared/lib/leftFrame/leftFrame'
+import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
+import type { ModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import {
   BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, ENDING_STAGE, INJURY_ENDING, IRIS_COVER,
   LAST_WALK_IN_ENDING, RISING_TEXT, SCREEN, SHORT_ENDING_TEXT_TOP, WALK_IN, creditsTopOf, creditsWalkersOf,
@@ -21,7 +24,6 @@ import type { CreditsWalker, EndingWalkInLook } from '@/pages/ending/lib/endingL
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
 
 const ENDING_FRAMES = './sprites/ending/frames'
-const MODE_BACK_FRAMES = './sprites/mode_back/frames'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
@@ -79,7 +81,7 @@ interface EndingScreenProps {
    * 안 주면 **타격형 황인 타자**로 본다 — 애니 바탕 0 · 팔레트 2 로, 원본이 그 비트에서 뽑는 값과 같다.
    */
   readonly walkInLook?: EndingWalkInLook
-  /** 띠 창 배경의 시간대를 고를 휴대폰 시각 (`BAND_BACKGROUND` 머리말). 안 주면 지금 시각 */
+  /** 띠 창 배경의 시간대를 고를 한국 시각 (`BAND_BACKGROUND` 머리말). 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`) */
   readonly hour?: number
 }
 
@@ -125,7 +127,7 @@ interface Question {
  *
  * 단계(`ENDING_STAGE` 머리말 — 화면 효과기 0xbdae8 의 아홉 틀을 기다린다): 0 은 아무것도 안 그리고, 1 은 검정에서 밝아지며 엔딩,
  * 키가 단계 2 로 엔딩을 어둡게 덮은 뒤 3 이 제작진을 밝힌다(틀 수 n 을 0 으로). 부상·방출의 키는 단계를 안 보고 곧장 이어하기를 묻는다.
- * ⚠️ 근사: 단계 0 은 원본이 앞 화면이 남은 화면 버퍼를 어둡게 덮는데, 웹은 검정 판만 둔다.
+ * 단계 0 은 앞 화면이 남은 화면 버퍼를 효과기 종류 1 이 어둡게 덮는다 — 웹은 내려간 앞 화면 판을 복제해 깐다(`LeftFrame`).
  */
 export function EndingScreen(props: EndingScreenProps) {
   const { playerName, endingIndex, bonusGamePoint, isContinuable, hallOfFame, onContinue } = props
@@ -141,7 +143,9 @@ export function EndingScreen(props: EndingScreenProps) {
   /** 단계 2 → 3 (0x1bf9a: n = 0) — 제작진의 틀 수가 여기서 시작한다 */
   const creditsAt = leavingAt === null ? null : leavingAt + ENDING_STAGE.effectorFrames
   const stage = tick < ENDING_STAGE.firstStageAt ? 0 : creditsAt === null ? 1 : tick < creditsAt ? 2 : 3
-  const bandFrame = backgroundFrameOf(props.hour ?? new Date().getHours())
+  const sceneHour = useSceneHour()
+  /** 띠 안 배경 — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (`BAND_BACKGROUND` 머리말) */
+  const band = useModeBackSprite(props.hour ?? sceneHour)
   // 단계 3 의 첫 틀에 제작진으로 (0x1bf9c) — 그 뒤 키가 보너스 · 등록을 묻는다
   useEffect(() => {
     if (stage === 3 && phase === '엔딩') setPhase('제작진')
@@ -209,8 +213,13 @@ export function EndingScreen(props: EndingScreenProps) {
   // 제작진은 은퇴 엔딩(연애 엔딩이 붙는 e 2~9)에만 있고, 그 뒤 보너스·등록 팝업도 제작진 위에 뜬다 (단계 > 2 의 키)
   const isCredits = romanceEndingIndex !== null && phase !== '엔딩'
 
-  /** 이 틀의 효과기 덮개 — 단계 1 은 종류 2(밝아짐), 단계 2 는 종류 1(어두워짐), 단계 3 은 n = 0 부터 다시 종류 2 */
-  const effect = stage === 1
+  /**
+   * 이 틀의 효과기 덮개 — 단계 0 은 진입 0x12300 이 건 종류 1(어두워짐)이 남은 앞 화면 위에, 단계 1 은 종류 2(밝아짐),
+   * 단계 2 는 종류 1(어두워짐), 단계 3 은 n = 0 부터 다시 종류 2
+   */
+  const effect = stage === 0
+    ? screenEffectFrameAt('검정에서밝아짐', '검정', tick)
+    : stage === 1
     ? screenEffectFrameAt('검게어두워짐', '검정', tick - ENDING_STAGE.firstStageAt)
     : stage === 2 && leavingAt !== null
       ? screenEffectFrameAt('검정에서밝아짐', '검정', tick - leavingAt)
@@ -221,13 +230,13 @@ export function EndingScreen(props: EndingScreenProps) {
   return (
     <RawScreen>
       {stage === 0
-        // 단계 0 — 그리기 0x882c4 가 아무것도 안 그린다
-        ? <div className={styles.blackScreen} data-part="stage-0" />
+        // 단계 0 — 그리기 0x882c4 가 아무것도 안 그려 화면 버퍼에 앞 화면의 마지막 틀이 남는다 (`LeftFrame`)
+        ? <LeftFrame />
         : isCredits && creditsAt !== null
           ? <EndingCredits romanceEndingIndex={romanceEndingIndex} romanceEvents={romanceEventsSeenOf(seenEventIds)} look={walkInLook}
-            tick={Math.max(0, tick - creditsAt)} bandFrame={bandFrame} />
+            tick={Math.max(0, tick - creditsAt)} band={band} />
           : endingIndex <= LAST_WALK_IN_ENDING
-            ? <ShortEnding endingIndex={endingIndex} look={walkInLook} tick={tick} bandFrame={bandFrame} />
+            ? <ShortEnding endingIndex={endingIndex} look={walkInLook} tick={tick} band={band} />
             : <RetirementEnding endingIndex={endingIndex} playerName={playerName} tick={tick} />}
 
       {onPress !== undefined && (
@@ -286,8 +295,32 @@ function NoJudgementEnding() {
   )
 }
 
+/**
+ * **단계 0 의 화면 버퍼** — 그리기 0x882c4 가 단계 0 이면 곧장 돌아가(882c8) 버퍼에는 141 에 들어오기 전 화면의 마지막 틀이 남는다.
+ * 같은 커밋에 내려간 앞 화면 판(`takeLeftFrames`)을 한 번 복제해 깐다. 앞 화면 판이 없으면(판 없는 화면에서 왔다) 검정이다.
+ * ⚠️ 미확인: 이어하기로 들어온 141(메인 메뉴 → 장면 0x106 → 상태 100 → 1 자원 적재 → 141)은 버퍼에 무엇이 남는지 대조하지 않았다 —
+ * 웹은 메인 메뉴 판을 깐다.
+ */
+function LeftFrame() {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const isTakenRef = useRef(false)
+  useLayoutEffect(() => {
+    const host = hostRef.current
+    // 시험용 엄격 모드의 두 번째 진입은 건너뛴다 — 처음 선 그 커밋에서만 앞 화면을 받는다
+    if (host === null || isTakenRef.current) return
+    isTakenRef.current = true
+    for (const frame of takeLeftFrames()) {
+      const copy = frame.cloneNode(true) as HTMLElement
+      copy.removeAttribute('data-original-screen')
+      Object.assign(copy.style, { position: 'absolute', left: '0', top: '0' })
+      host.appendChild(copy)
+    }
+  }, [])
+  return <div ref={hostRef} className={styles.blackScreen} data-part="stage-0" />
+}
+
 /** 띠 창 (0x883b6~0x88556 · 제작진 0x88bcc~0x88d64) — 가운데 박스 검정 + 박스 **바깥** 위·아래 11px 띠 + 선 */
-function BandWindow({ bandFrame, children }: { readonly bandFrame: number; readonly children?: ReactNode }) {
+function BandWindow({ band, children }: { readonly band: ModeBackSprite; readonly children?: ReactNode }) {
   const { x, y, width, height, edgeHeight } = BAND_WINDOW
   const bottom = y + height
   return (
@@ -319,7 +352,7 @@ function BandWindow({ bandFrame, children }: { readonly bandFrame: number; reado
           height: BAND_BACKGROUND.height,
         }}
       >
-        <img className={styles.sprite} alt="" src={imageSrc(MODE_BACK_FRAMES, bandFrame)} data-frame={bandFrame} style={{ left: 0, top: 0 }} />
+        <img className={styles.sprite} alt="" src={band.src} data-frame={band.slot} style={{ left: 0, top: 0 }} />
       </div>
       {children}
     </>
@@ -327,15 +360,15 @@ function BandWindow({ bandFrame, children }: { readonly bandFrame: number; reado
 }
 
 /** 부상·방출 엔딩 (0x883b6 갈래) — 띠 창 + 걸어 들어오는 선수(+ 부상 아이콘) + StrENDING[e] */
-function ShortEnding({ endingIndex, look, tick, bandFrame }: {
+function ShortEnding({ endingIndex, look, tick, band }: {
   readonly endingIndex: number
   readonly look: EndingWalkInLook
   /** 141 에 들어와 돈 틀 수 n */
   readonly tick: number
-  readonly bandFrame: number
+  readonly band: ModeBackSprite
 }) {
   return (
-    <BandWindow bandFrame={bandFrame}>
+    <BandWindow band={band}>
       <WalkIn tick={tick} look={look} hasInjuryIcon={endingIndex === INJURY_ENDING} />
       <div
         className={styles.endingText}
@@ -499,19 +532,19 @@ function CreditsWalkerSprite({ walker, tick, playerPalette }: {
  * `(0, H − n/2, W)` 로 올라온다. 띠 아래 20px 밑으로만 보인다 (0xbaf6d 잘라내기).
  * 인물은 나중 번호부터 그려 선수가 맨 앞이다.
  */
-function EndingCredits({ romanceEndingIndex, romanceEvents, look, tick, bandFrame }: {
+function EndingCredits({ romanceEndingIndex, romanceEvents, look, tick, band }: {
   readonly romanceEndingIndex: number
   readonly romanceEvents: readonly number[]
   readonly look: EndingWalkInLook
   /** 단계 3 에 들어와 돈 틀 수 — 0x1bf9a 가 n 을 0 으로 되돌린다 */
   readonly tick: number
-  readonly bandFrame: number
+  readonly band: ModeBackSprite
 }) {
   const walkers = creditsWalkersOf(look, romanceEvents)
   const credits = `!C${ORIGINAL_ENDINGS[romanceEndingIndex] ?? ''}${'!N'.repeat(CREDITS.gapLines)}${ORIGINAL_ENDINGS[CREDITS.index] ?? ''}`
   const palette = endingWalkInPaletteOf(look)
   return (
-    <BandWindow bandFrame={bandFrame}>
+    <BandWindow band={band}>
       <div data-part="credits-walkers">
         {[...walkers].reverse().map((walker, index) => (
           <CreditsWalkerSprite key={walkers.length - 1 - index} walker={walker} tick={tick} playerPalette={palette} />

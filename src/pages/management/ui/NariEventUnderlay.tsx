@@ -32,7 +32,7 @@ export function NariEventUnderlay({ career, isPreviousGame = false, children }: 
   return (
     <>
       <SkinBackdrop kind="공무늬" />
-      <ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} isPreviousGame={isPreviousGame} />
+      <ManagementBoard career={career} titleName={currentTitleOf(career)} isPreviousGame={isPreviousGame} />
       {children}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={null} footer={5} slides={false} />
     </>

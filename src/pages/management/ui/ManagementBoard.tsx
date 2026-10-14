@@ -4,14 +4,15 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
   BOARD_COLOR, BOARD_POLYGON, MORALE_GAUGE_BACKGROUND, MORALE_LABEL_FRAME, NAME_BAND, STADIUM_BAND,
-  STATUS_BOXES, backgroundFrameOf, moraleGaugeColumnsOf, moraleGaugeFrameOf, nameBandSplitOf,
+  STATUS_BOXES, moraleGaugeColumnsOf, moraleGaugeFrameOf, nameBandSplitOf,
 } from '@/pages/management/lib/managementLayout'
 import { StatusValues } from '@/pages/management/ui/StatusValues'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 
 const MODE_UI = './sprites/mode_ui/frames'
-const MODE_BACK = './sprites/mode_back/frames'
 const IMG_TEXT = './sprites/img_text/frames'
 const STATUS_FRAME = 11
 const SCREEN_WIDTH = 240
@@ -19,7 +20,8 @@ const SCREEN_WIDTH = 240
 const BAND_SLOPE = 19
 
 interface StatusBoardBaseProps {
-  readonly hour: number
+  /** 시간대를 고를 한국 시각 — 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`) */
+  readonly hour?: number
   /** 이름 띠가 꺾이는 x (`nameBandSplitOf`) */
   readonly nameBandSplit: number
   /** 사기 막대 값 — 나만의리그 0xa3a25(S) · 시즌 팀 레코드 +2 (0x7d768~0x7d798) */
@@ -44,7 +46,8 @@ interface StatusBoardBaseProps {
  */
 export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent, moraleOffsetY = 0 }: StatusBoardBaseProps) {
   const uiOrigins = useFrameOrigins(MODE_UI)
-  const backOrigins = useFrameOrigins(MODE_BACK)
+  const sceneHour = useSceneHour()
+  const stadiumBand = useModeBackSprite(hour ?? sceneHour)
   const gauge = { ...STATUS_BOXES.moraleGauge, y: STATUS_BOXES.moraleGauge.y + moraleOffsetY }
   const moraleLabelY = STATUS_BOXES.moraleLabel.y + moraleOffsetY
   const columns = moraleGaugeColumnsOf(morale)
@@ -74,7 +77,8 @@ export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent, mora
       </svg>
 
       <div className={styles.layer} style={{ left: STADIUM_BAND.imageLeft, top: STADIUM_BAND.imageTop, width: SCREEN_WIDTH - 1, height: STADIUM_BAND.imageHeight, overflow: 'hidden' }}>
-        <FrameSprite folder={MODE_BACK} frame={backgroundFrameOf(hour)} origins={backOrigins} x={0} y={0} />
+        {/* 프레임 · 팔레트 = 시간대 [win+0x1c] (0x7b934 — mode_back.mpl 줄 t − 1). 세 프레임 원점은 모두 (0, 0) */}
+        <img className={styles.layer} style={{ left: 0, top: 0 }} src={stadiumBand.src} data-frame={stadiumBand.slot} alt="" />
       </div>
 
       {nameContent}
@@ -94,7 +98,7 @@ export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent, mora
 interface ManagementBoardProps {
   readonly career: PlayerCareer
   readonly titleName: string
-  readonly hour: number
+  readonly hour?: number
   /** 0x7d34c 둘째 인자 [이벤트+0xb] — 메시지줄 경기 번호 −1 (`StatusValues`) */
   readonly isPreviousGame?: boolean
 }

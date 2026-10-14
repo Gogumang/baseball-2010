@@ -26,6 +26,7 @@ export {
   MODE_ICON,
 } from '@/shared/ui/PixelNumber/PixelNumber'
 export { FrameSprite } from '@/shared/ui/FrameSprite/FrameSprite'
+export { SolidStamp } from '@/shared/ui/SolidStamp/SolidStamp'
 export { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 export { SpriteNumber } from '@/shared/ui/SpriteNumber/SpriteNumber'
 export { MessageBox } from '@/shared/ui/MessageBox/MessageBox'

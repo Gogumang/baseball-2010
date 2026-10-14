@@ -5,7 +5,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import { isFrameSlideClearedAt } from '@/widgets/screen-frame/lib/frameSlide'
+import { isFrameSlideClearedAt, isFrameSlidingAt } from '@/widgets/screen-frame/lib/frameSlide'
 import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { VIBRATION_TOGGLE_MILLISECONDS, vibrate } from '@/entities/defense-controls/model/vibration'
@@ -117,6 +117,8 @@ export function SettingsScreen({
   const isOutlineShown = isSelectedOutlineShown(updates)
   /** 고른 줄 까딱임 — 표 0xd1784 · 0xd1754 (`settingsLayout` 의 `ROW_SHAKE_TABLES` 머리말) */
   const rowShake = useCursorShake(updates)
+  /** 머리띠가 미끄러지는 그리기 — 메인 메뉴 환경설정만 머리띠가 있고, 하위 페이지에서 돌아온 화면은 미끄러지지 않는다 */
+  const isHeaderSliding = mainMenu !== undefined && !hasReturned && isFrameSlidingAt(updates)
   const [notice, setNotice] = useState<string | null>(null)
   const [isDetailOpen, setDetailOpen] = useState(false)
   const [isModeResetOpen, setModeResetOpen] = useState(false)
@@ -241,8 +243,9 @@ export function SettingsScreen({
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
-        // 1열 격자라 세로 키는 늘 커서를 옮긴다(끝에서 감는다) → 격자 +0x25 가 서고 그 방향으로 까딱인다
-        rowShake.start(vertical > 0 ? 'down' : 'up')
+        // 1열 격자라 세로 키는 늘 커서를 옮긴다(끝에서 감는다) → 격자 +0x25 가 서고 그 방향으로 까딱인다.
+        // 머리띠가 미끄러지는 그리기는 0x5942e 가 페이지를 안 그리고 +0x25 만 지워(0x5a772) 까딱이지 않는다 (`ROW_SHAKE_TABLES`)
+        if (!isHeaderSliding) rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + cursorCount) % cursorCount)
       }
       const horizontal = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
@@ -537,7 +540,8 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
-        rowShake.start(vertical > 0 ? 'down' : 'up')
+        // 0x20 진입 0x2421c 가 머리띠를 다시 미끄러뜨린다 — 그동안은 페이지를 안 그리고 +0x25 만 지운다(0x5a772)
+        if (!isFrameSlidingAt(tick)) rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + DETAIL_ROW_COUNT) % DETAIL_ROW_COUNT)
       }
       // 갱신 0x288ac 가 OK(−5) · 좌우(−3 · −4) · '4'(0x34) · '6'(0x36) 을 모두 같은 갈래 0x28920(칸 값 ^= 1)으로 보낸다 — 확정.
@@ -745,7 +749,8 @@ function ModeResetPage({
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
-        rowShake.start(vertical > 0 ? 'down' : 'up')
+        // 0x21 진입 0x242a4 도 머리띠를 미끄러뜨린다 — 그동안은 +0x25 만 지워 까딱이지 않는다(0x5a772)
+        if (!isFrameSlidingAt(tick)) rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + MODE_RESET_ROW_COUNT) % MODE_RESET_ROW_COUNT)
       }
       if (event.key === 'Enter' || event.key === ' ') {

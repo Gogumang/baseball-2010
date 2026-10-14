@@ -70,7 +70,7 @@ export interface SeasonEventEndFrameProps {
  * 이벤트로 가는 길은 웹에 없어 그 표는 안 다룬다.
  */
 export function SeasonEventEndFrame({ record, teamMorale, gamePoint, kind, cursor }: SeasonEventEndFrameProps) {
-  if (kind === '지도') return <OutingMapUnderlay eventPlaceIds={NO_PLACES} hour={new Date().getHours()} />
+  if (kind === '지도') return <OutingMapUnderlay eventPlaceIds={NO_PLACES} />
   const disabledIds = new Set(disabledManagementIndexesOf(record).map((index) => MANAGEMENT_MENU[index]))
   return (
     <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoint} onBack={null} showsCenterStage={false}

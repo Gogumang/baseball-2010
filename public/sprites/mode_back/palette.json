@@ -1,6 +1,6 @@
 {
  "mpl": "ui/mode_back.mpl",
- "select": "미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다",
+ "select": "시간대 t: 0 → 기본색(mpl 안 씀) · 1 → 줄 0 · 2 → 줄 1 (0x7b934)",
  "baked": null,
  "colors": [
   "#ff00ff",

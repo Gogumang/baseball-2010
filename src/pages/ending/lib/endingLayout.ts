@@ -55,9 +55,9 @@ export const BAND_WINDOW_BOTTOM = BAND_WINDOW.y + BAND_WINDOW.height
  * 나리 장면에서는 상태 100 진입 0x1c154 끝(0x1c418~0x1c424)이 `0x7b934(gfx, 0xb8fbd())` 로 부른다 — 관리 화면 경기장 띠와 같은 값.
  * 0xb8fbd 는 휴대폰 시계(0x6f391 — 밀리초 → 시, (시 + 9) mod 24 = 한국 시각) 6~15 → 0 낮 · 16~19 → 1 저녁 · 그 밖 → 2 밤
  * (`backgroundFrameOf`). 엔딩 적재 0x87c7c 는 [gfx+0x1c] 를 건드리지 않는다.
- * ⚠️ 근사: 원본은 **마지막으로 상태 100 에 들어온 때**의 시각이고, 웹은 엔딩 화면을 그리는 지금 시각(기기 지역 시각)이다.
- * ⚠️ 미적용: 0x7b934 는 같은 값으로 mode_back.mpl 의 벌 t − 1 을 입힌다(0x7b94e → 0xb9c35, 저녁 · 밤 색). 웹은 mode_back 의
- * 팔레트 번호 지도(`frames/index`)가 없어 프레임만 고른다 — 관리 화면 경기장 띠와 같은 상태다.
+ * 시각은 **마지막으로 상태 100 에 들어온 때**의 한국 시각이다 — 라우트가 장면에 들어설 때 잡아 내려 준다(`useSceneHour`).
+ * 0x7b934 는 같은 값으로 mode_back.mpl 의 줄 t − 1 을 입힌다(0x7b94e → 0xb9c35, 저녁 · 밤 색, t = 0 은 기본색) —
+ * `useModeBackSprite` 가 번호 지도(`mode_back/frames/index`, `tools/apply_mpl.py`)로 칠한다.
  */
 export const BAND_BACKGROUND = { left: 1, top: BAND_WINDOW.y + 1, height: BAND_WINDOW.height - 2 } as const
 

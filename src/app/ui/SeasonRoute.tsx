@@ -66,6 +66,7 @@ import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import type { EntryTab } from '@/entities/season-mode/model/entryEditor'
 import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { SceneHourContext, useSceneEntryHour } from '@/shared/lib/phoneClock/phoneClock'
 
 /** 기록연감 해금표에서 히든 팀이 쓰는 마지막 번호 (팀 10~14) */
 const LAST_HIDDEN_TEAM_ID = 14
@@ -172,6 +173,20 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
 }
 
 /**
+ * 시즌모드 라우트 — 시즌 장면 0x105 의 시간대 시각(진입 0xcb 0x4b50 끝 4c7a~4c8a `0x7b934([장면+0xc0], 0xb8fbd())`)을 장면에
+ * 들어설 때 잡아 안쪽 화면에 내려 준다(`SceneHourContext`). 경기(0xe1 → 경기 장면 0x104) 동안은 시즌 장면이 내려가 있다.
+ */
+export function SeasonRoute(props: SeasonRouteProps) {
+  const { scene, gameOptions } = props.session
+  const hour = useSceneEntryHour(!(scene === SEASON_SCENE_STATE.경기직전 && gameOptions !== null))
+  return (
+    <SceneHourContext.Provider value={hour}>
+      <SeasonScreens {...props} />
+    </SceneHourContext.Provider>
+  )
+}
+
+/**
  * 시즌 모드 라우팅 (원본 장면 0x105).
  *
  * 어느 화면 다음에 무엇이 오는지는 `entities/season-mode` 의 상태 기계가 정하고,
@@ -180,7 +195,7 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
  * **아직 화면이 없는 장면**(연초 목표 0xd4 등)은
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
-export function SeasonRoute({
+function SeasonScreens({
   session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords, onHallOfFameEquipment,
 }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
@@ -808,7 +823,7 @@ export function SeasonRoute({
     const resultText = session.outingResultText
     return (
       <RawScreen>
-        <SeasonOutingMap selected={place} hour={new Date().getHours()} />
+        <SeasonOutingMap selected={place} />
         <SeasonOutingPopup place={place} onFinished={() => actions.runOuting(place)} />
         {resultText !== null && (
           <MessageBox text={resultText} buttons={['확인']} onAnswer={actions.closeOutingResult} />

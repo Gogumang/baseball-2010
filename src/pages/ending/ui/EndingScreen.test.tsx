@@ -9,6 +9,7 @@ import {
   irisCircleOf, irisStartTickOf, risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { RawScreen } from '@/shared/ui'
 
 /**
  * 나만의리그 엔딩 (상태 141 — 0x87c7c · 0x168fc → 0x882b4 / 0x88bb4).
@@ -384,6 +385,31 @@ describe('단계 [장면+0xd4] — 효과기 아홉 틀을 기다린다 (0x12300
     expect(Number(덮개()?.style.opacity)).toBeLessThan(처음)
     틀(ENDING_STAGE.effectorFrames)
     expect(덮개()).toBeNull()
+  })
+
+  it('단계 0 은 남은 앞 화면 위에 진입의 종류 1 이 점점 어둡게 덮는다 (0x882c4 가 안 그린다)', () => {
+    const 엔딩 = (
+      <EndingScreen playerName="홍길동" endingIndex={9} bonusGamePoint={3000} isContinuable={false}
+        hallOfFame={{ collection: EMPTY_COLLECTION, edition: '타자', nari: { 투수: null, 타자: null }, onRegister: vi.fn(() => '등록' as const) }}
+        onContinue={vi.fn(() => true)} onFinish={vi.fn()} />
+    )
+    const { container, rerender } = render(<RawScreen><div data-testid="앞-화면">관리 화면</div></RawScreen>)
+    rerender(엔딩)
+    const 단계0 = container.querySelector('[data-part="stage-0"]') as HTMLElement
+    expect(단계0.textContent).toContain('관리 화면')
+    // 종류 1 은 16, 14, …, 0 — 첫 틀은 안 칠하고 점점 짙어진다
+    expect(덮개()).toBeNull()
+    틀(2)
+    const 앞 = Number(덮개()?.style.opacity)
+    expect(앞).toBeGreaterThan(0)
+    틀(4)
+    expect(Number(덮개()?.style.opacity)).toBeGreaterThan(앞)
+    expect(container.querySelector('[data-part="stage-0"]')?.textContent).toContain('관리 화면')
+  })
+
+  it('앞 화면 판이 같은 커밋에 내려가지 않았으면 단계 0 은 검정 판만 둔다', () => {
+    const { container } = 띄우기만()
+    expect(container.querySelector('[data-part="stage-0"]')?.childElementCount).toBe(0)
   })
 
   it('단계 0 의 키는 먹지 않는다 — 단계 1 의 키만 단계 2 로 어둡게 덮고, 그동안 엔딩은 그대로다', () => {
