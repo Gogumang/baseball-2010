@@ -1029,6 +1029,8 @@ export function useCareerSession({
                 resultCode: detail.resultCode,
               },
               random,
+              // 정산 0xa59c0 의 타자 게이트 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓
+              { isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null },
             )
       if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
         progressRef.current = arrival.progress
@@ -1436,7 +1438,9 @@ export function useCareerSession({
     cpuPickoff: (base: PickoffBase) => {
       const current = progressRef.current
       if (current === null) return
-      const next = cpuPickoff(current, base, random)
+      const next = cpuPickoff(current, base, random, {
+        isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+      })
       if (next === current) return
       progressRef.current = next
       setProgress(next)

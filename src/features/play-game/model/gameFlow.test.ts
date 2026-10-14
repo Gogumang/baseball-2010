@@ -1295,6 +1295,31 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     expect(isPlayerTurn(after.game)).toBe(true)
   })
 
+  it('견제 판 정산(종류 4)은 같은 투구 틈 앞 판의 사건까지 센다 — 상대 투수 +0x20 · 모드 4 의 0xa59c0 (인기도 · 병살 · 득점권 아웃)', () => {
+    const progress = startGame(createSeededRandom(20100905))
+    const 판 = 주자(progress, { first: false, second: true, third: false })
+    const 그냥 = cpuPickoff(판, 2, createSeededRandom(7))
+    const play = 그냥.lastDefensePlay
+    if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
+    // 이 씨앗의 견제는 세이프 — 판의 사건은 없고 주자는 2루에 남는다
+    expect(play.advance).toMatchObject({ outsAdded: 0, runsScored: 0, bases: { second: true } })
+    const 아웃합 = (p: GameProgress) => p.pitcherLines.reduce((sum, line) => sum + line.outs, 0)
+    // 같은 틈에 앞 판이 아웃 2 를 남겼다 — [sp+0x30] == 2
+    const 남은 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 2, createSeededRandom(7))
+    expect(아웃합(남은)).toBe(아웃합(그냥) + 2)
+    // 아웃 > 1 → −1 · 병살 G+0x118 · 아웃 > 0 이고 판 뒤 2루에 산 주자 → 득점권 아웃 G+0x11c
+    expect(남은.popularityPoints).toBe(그냥.popularityPoints - 1)
+    expect(남은.doublePlays).toBe(그냥.doublePlays + 1)
+    expect(남은.scoringPositionOuts).toBe(그냥.scoringPositionOuts + 1)
+    expect(남은.pendingSettlementEvents).toEqual({ outs: 2, runs: 0 })
+    // 0xa56dc(ctx, 타자, 1) 가 거짓(포스트시즌 · 국가대항전)이면 0xa59c0 은 아무것도 안 센다
+    const 포스트 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 2, createSeededRandom(7), {
+      isRecorded: false,
+    })
+    expect(포스트.doublePlays).toBe(그냥.doublePlays)
+    expect(포스트.popularityPoints).toBe(그냥.popularityPoints)
+  })
+
   it('견제를 끼워도 뒤 굴림 차례는 견제 판이 쓴 만큼만 밀린다', () => {
     const progress = startGame(createSeededRandom(20100905))
     const 판 = 주자(progress, { first: true, second: false, third: false })
