@@ -26,6 +26,7 @@ import {
   runnerRunAbilitiesOf,
   specialSwingRemainingAt,
   substitutionDetailAbilities,
+  isOurOffense,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
@@ -36,6 +37,7 @@ import { RecordAlertPanel, RecordAlertScreenOverlay } from '@/widgets/game-scene
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
@@ -719,6 +721,21 @@ export function TeamGameScreen({
         scoreboardSides={scoreboardSides}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={teamHalfInningCardsOf(progress, board.half)}
+        // 운동장 전경 0x4fb8c — 새 수비가 더그아웃에서 제자리로 걷고 앞 수비가 들어간다 (판 틱 0 의 굴림 36 개)
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: board.serial === 1,
+          playerSide: options.playerSide,
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          grassPalette: fieldPalette,
+          // 이름표 — 칸 0 은 수비 팀 지금 투수, 1~8 은 수비 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008)
+          fielderNames: fielderNamesByPosition(
+            teamHalfInningCardsOf(progress, board.half).pitcherName,
+            isOurOffense(progress) ? progress.opponentEntry : progress.ourEntry,
+          ),
+        })}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />
     )

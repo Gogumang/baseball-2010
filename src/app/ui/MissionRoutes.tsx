@@ -48,6 +48,7 @@ import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -438,6 +439,11 @@ function missionOverlayOf(
   const board = session.halfInningBoard
   if (board !== null && playingRun !== null && playingRun.status === '진행중') {
     const sideMission = missionWithSideTeamsOf(playingRun.mission, playingRun.game.humanBatting.teamId)
+    const boardSides = missionScoreboardSidesOf(sideMission)
+    const boardCards = missionFirstBoardCardsOf(playingRun, {
+      missionBatter: missionBatterName ?? null,
+      missionPitcher: missionPitcherName ?? null,
+    })
     return (
       <HalfInningBoard
         key={board.serial}
@@ -446,10 +452,18 @@ function missionOverlayOf(
         onTick={(tick) => {
           if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
         }}
-        scoreboardSides={missionScoreboardSidesOf(sideMission)}
-        cards={missionFirstBoardCardsOf(playingRun, {
-          missionBatter: missionBatterName ?? null,
-          missionPitcher: missionPitcherName ?? null,
+        scoreboardSides={boardSides}
+        cards={boardCards}
+        // 운동장 전경 0x4fb8c — 미션 판은 장면의 첫 판뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래). 팀은 두 측 그대로
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: true,
+          playerSide: 0,
+          ourTeamId: boardSides[0].team,
+          opponentTeamId: boardSides[1].team,
+          // ⚠️ 미확인: 미션 팀은 칸별 선수 위치를 웹이 안 들어 투수 이름표만 단다
+          fielderNames: fielderNamesByPosition(boardCards.pitcherName, null),
         })}
         onConfirm={actions.confirmHalfInningBoard}
       />

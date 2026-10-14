@@ -954,7 +954,7 @@ describe('포스트시즌 게이트 0xa56dc (모드 3 갈래 0xa571c — S+0xb4 
 describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () => {
   it('후공·선발이면 1회초 판이 서고, 경기 내내 다른 판은 안 선다', () => {
     const 시작 = startPitcherGame(기본옵션, 씨앗(20100901))
-    expect(시작.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초' })
+    expect(시작.halfInningBoard).toEqual({ serial: 1, inning: 1, half: '초', fielderRolls: expect.any(Array) })
 
     const 끝 = 끝까지던지기(시작, 4)
     expect(끝.halfInningBoard?.serial).toBe(1)
@@ -994,10 +994,11 @@ describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () =
     const OK까지 = (random: RandomPort) => {
       const 대기 = startPitcherGame(기본옵션, random)
       const 확인 = confirmScene(대기, random)
-      // 대기 객체는 걸음마다 새로 만드니 비교에서 뺀다
-      return { ...확인, sceneConfirm: null }
+      // 대기 객체는 걸음마다 새로 만드니 비교에서 뺀다 · 판 칸의 굴림 값(운동장 전경 0x4fb8c 의 재료)도 뺀다
+      const board = 확인.halfInningBoard === null ? null : { ...확인.halfInningBoard, fielderRolls: undefined }
+      return { ...확인, sceneConfirm: null, halfInningBoard: board }
     }
-    // 판이 첫 36 개를 먹고 버리므로 그 값이 무엇이든 경기는 같다
+    // 판이 첫 36 개를 그림에만 쓰므로 그 값이 무엇이든 경기는 같다
     expect(OK까지(앞값(36, 0.001))).toEqual(OK까지(앞값(36, 0.999)))
     // 하나라도 타석 준비 쪽으로 새면 갈린다 — 이 비교가 실제로 무언가를 재는지 확인
     expect(OK까지(앞값(37, 0.001))).not.toEqual(OK까지(앞값(37, 0.999)))

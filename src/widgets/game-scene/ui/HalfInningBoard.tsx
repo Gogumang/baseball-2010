@@ -7,9 +7,11 @@ import { HALF_INNING_SCOREBOARD_FROM_TICK, SCOREBOARD_AT } from '@/widgets/score
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { HalfInningCards } from '@/widgets/game-scene/ui/HalfInningCards'
 import type { HalfInningCardsData } from '@/widgets/game-scene/ui/HalfInningCards'
+import { HalfInningField } from '@/widgets/field-walk/ui/HalfInningField'
+import type { HalfInningFieldProps } from '@/widgets/field-walk/ui/HalfInningField'
 
 interface HalfInningBoardProps {
-  /** 판이 서는 반 이닝 — 웹 전용 글자 (원본 판 그림은 미해결) */
+  /** 판이 서는 반 이닝 — 그림에는 안 쓴다(시험 · 부르는 쪽이 판을 가려 보는 표시) */
   readonly inning: number
   readonly half: '초' | '말'
   /** 틱마다 (1 부터) — 부르는 쪽이 틱 2 에 징글 13 을 낸다 (0x4f7ac) */
@@ -18,6 +20,11 @@ interface HalfInningBoardProps {
   readonly scoreboardSides?: readonly [ScoreboardSide, ScoreboardSide]
   /** 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER") 의 값 — 안 주면 판을 안 그린다 */
   readonly cards?: HalfInningCardsData
+  /**
+   * 운동장 전경 0x4fb8c 의 재료 — 판 틱 0 의 굴림 36 개 · 공격 측 · 앞 자리 · 팀 · 이름 (`widgets/field-walk`). 틱은 판이 넣는다.
+   * 안 주면 바탕을 안 그린다(검정).
+   */
+  readonly field?: Omit<HalfInningFieldProps, 'tick'>
   /** OK — 메시지 1(인자 0x18) → 0xae3a0 → 경기 중이라 다음 반 이닝 첫 타석(0xd) */
   readonly onConfirm: () => void
 }
@@ -34,11 +41,11 @@ interface HalfInningBoardProps {
  *   (`widgets/scoreboard-frame`), 이어 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER") 를 (14, 158) · (150, 158) 에
  *   — 초면 왼쪽이 DUE UP, 말이면 왼쪽이 PITCHER (`lib/halfInningCardsLayout`, 0x4ff16~0x5001a).
  *
- * ⚠️ 미해결 — 그림: 운동장 전경 0x4fb8c(야수 18명이 제자리로 걷는 모습 — 0x43010 두 번 · 0xbe6a1 · 0x40008 …)는
- *    틱과 상관없이 늘 바탕으로 그리고(0x4fef8, 틱 ≤ 69 는 이것만) 그 위에 판이 얹히지만, 3D 운동장·야수 걸음
- *    (0x3fac4 굴림 값)을 웹이 들고 있지 않아 그리지 않는다. 웹은 반 이닝 글자와 확인 단추를 둔다(웹 전용).
+ * - 운동장 전경 0x4fb8c 는 틱과 상관없이 늘 바탕이다(0x4fef8, 틱 ≤ 69 는 이것만) — 새 수비가 더그아웃에서 제자리로 걷고 앞 수비가
+ *   더그아웃으로 들어가며, 틱 100 뒤에는 카메라가 야수를 하나씩 비추며 이름표를 단다 (`widgets/field-walk/ui/HalfInningField`).
+ * - 확인 단추는 웹 전용이다(원본은 OK 키). 예전 웹의 "N회초" 글자는 원본에 없어 뺐다.
  */
-export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, onConfirm }: HalfInningBoardProps) {
+export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, field, onConfirm }: HalfInningBoardProps) {
   const tick = useSceneTick(onTick)
   const confirmRef = useRef(onConfirm)
   confirmRef.current = onConfirm
@@ -63,12 +70,13 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
 
   return (
     <RawScreen>
+      <div data-testid={`교대-판-${inning}회${half}`} data-tick={tick}>
+      {/* 0x4fef8 0x4fb8c — 늘 바탕 */}
+      {field !== undefined && <HalfInningField {...field} tick={tick} />}
       {scoreboardSides !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && (
         <ScoreboardFrame {...SCOREBOARD_AT.halfInning} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
       )}
       {cards !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && <HalfInningCards data={cards} />}
-      <div className={styles.webCaption}>
-        {inning}회{half}
       </div>
       <Button variant="corner" className={styles.okButton} onClick={confirm}>
         확인

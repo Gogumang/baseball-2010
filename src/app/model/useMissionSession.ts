@@ -95,6 +95,7 @@ import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { hallOfFamePitcherAt } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
@@ -654,9 +655,13 @@ export function useMissionSession({
    * OK(메시지 1 인자 0x18) → 0xae3a0 → 0xd → 0xe. 판이 서 있는 동안 0xe 대기는 없다. 3아웃 뒤 0x18 은 늘 0x21 이라(Q2 2e-2) 이 판은
    * 미션 한 판에 이 하나뿐이다. `serial` 은 판마다 새로.
    */
-  const [halfInningBoard, setHalfInningBoard] = useState<
-    { readonly serial: number; readonly inning: number; readonly half: '초' | '말' } | null
-  >(null)
+  const [halfInningBoard, setHalfInningBoard] = useState<{
+    readonly serial: number
+    readonly inning: number
+    readonly half: '초' | '말'
+    /** 판 틱 0 의 0x3fac4 굴림 36 개 — 운동장 전경 0x4fb8c (`rollHalfInningFielders`) */
+    readonly fielderRolls: readonly HalfInningFielderRoll[]
+  } | null>(null)
   const halfInningBoardSerialRef = useRef(0)
   /**
    * **경기 장면 로딩 판** — 상태 7 진입 0x39f88 이 로딩 판(0x667f8 — loadingbar.pzx · StrTIP)을 세우고 0x53dbc 가 팁 칸
@@ -1795,9 +1800,10 @@ export function useMissionSession({
       enterNewAtBatConfirm()
       return
     }
-    rollHalfInningFielders(random)
+    const fielderRolls = rollHalfInningFielders(random)
     halfInningBoardSerialRef.current += 1
     setHalfInningBoard({
+      fielderRolls,
       serial: halfInningBoardSerialRef.current,
       inning: run.game.inning + 1,
       half: run.game.offenseSide === 0 ? '초' : '말',

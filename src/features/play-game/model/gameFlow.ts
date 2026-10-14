@@ -138,6 +138,7 @@ import {
 } from '@/features/play-game/model/gameDecisions'
 import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
@@ -372,7 +373,13 @@ export interface GameProgress {
    * **1회초 판**(상태 0x18 교대 가지가 OK 를 기다림) — 섰으면 그 판, 아니면 null. 화면은 첫 타석 앞에 띄운다.
    * 모드 4 에서 판이 설 수 있는 것은 이 하나뿐이다 (`withFirstInningBoard` 머리말).
    */
-  readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
+  readonly halfInningBoard: {
+    readonly serial: number
+    readonly inning: number
+    readonly half: GameState['half']
+    /** 판 틱 0 의 0x3fac4 굴림 36 개 — 운동장 전경 0x4fb8c 가 18명을 걷게 한다 (`rollHalfInningFielders`) */
+    readonly fielderRolls?: readonly HalfInningFielderRoll[]
+  } | null
   /**
    * **내 타순 칸의 필살타법 남은 횟수** — 팀 객체 `s8 team[+0x29 + 타순]` (H2 1-1·1-2).
    *
@@ -594,10 +601,10 @@ export function startGame(
  */
 function withFirstInningBoard(progress: GameProgress, random: RandomPort): GameProgress {
   if (!isPlayerTurn(progress.game)) return progress
-  rollHalfInningFielders(random)
+  const fielderRolls = rollHalfInningFielders(random)
   return {
     ...progress,
-    halfInningBoard: { serial: 1, inning: progress.game.inning, half: progress.game.half },
+    halfInningBoard: { serial: 1, inning: progress.game.inning, half: progress.game.half, fielderRolls },
   }
 }
 

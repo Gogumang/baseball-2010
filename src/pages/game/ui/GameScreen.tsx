@@ -11,6 +11,8 @@ import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
@@ -253,6 +255,22 @@ export function GameScreen({
         scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, career.teamId, progress.opponentTeamId)}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={gameHalfInningCardsOf(progress, career, board.half)}
+        // 운동장 전경 0x4fb8c — 타자편 판은 경기 첫 판(1회초)뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래)
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: board.serial === 1,
+          playerSide: progress.game.playerSide,
+          ourTeamId: career.teamId,
+          opponentTeamId: progress.opponentTeamId,
+          grassPalette: sceneFieldPaletteOf(sceneStadium),
+          // 이름표 — 칸 0 은 상대 마운드, 1~8 은 상대 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008).
+          // ⚠️ 근사: 원본은 경기 팀 레코드 차례(대타 · 마타자 반영)를 훑는다 — 웹은 붙박이 표 차례
+          fielderNames: fielderNamesByPosition(
+            gameHalfInningCardsOf(progress, career, board.half).pitcherName,
+            teamBatters(progress.opponentTeamId).map((player) => ({ name: player.name, position: player.position ?? 0 })),
+          ),
+        })}
         onConfirm={() => setBoardClosed(true)}
       />
     )

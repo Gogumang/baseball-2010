@@ -130,6 +130,7 @@ import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
 import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import { chargePitcherLine, outsAddedBetween } from '@/entities/game/model/gamePitcherLines'
@@ -542,7 +543,13 @@ export interface TeamGameProgress {
    * 마지막으로 **OK 를 기다리며 선** 공수 교대 판(상태 0x18 교대 가지) — 화면은 `serial` 이 바뀌면 판을 띄운다.
    * 판은 앞 장면이 사람 장면이고 다음 장면도 사람 장면일 때만 선다 (`features/play-game/model/halfInningBoard`).
    */
-  readonly halfInningBoard: { readonly serial: number; readonly inning: number; readonly half: GameState['half'] } | null
+  readonly halfInningBoard: {
+    readonly serial: number
+    readonly inning: number
+    readonly half: GameState['half']
+    /** 판 틱 0 의 0x3fac4 굴림 36 개 — 운동장 전경 0x4fb8c 가 18명을 걷게 한다 (`rollHalfInningFielders`) */
+    readonly fielderRolls?: readonly HalfInningFielderRoll[]
+  } | null
   /** 마지막으로 사람이 잡은 타석의 반 이닝 — 반 이닝이 바뀐 뒤 첫 사람 타석인지 가린다 */
   readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
   /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
@@ -5013,10 +5020,11 @@ function withHalfInningBoard(progress: TeamGameProgress, random: RandomPort): Te
   const last = progress.lastHumanHalf
   if (last !== null && last.inning === game.inning && last.half === game.half) return progress
   if (last === null && introSkipsFirstBoard(progress.options.mode, settingsOf(progress))) return progress
-  rollHalfInningFielders(random)
+  const fielderRolls = rollHalfInningFielders(random)
   return {
     ...progress,
     halfInningBoard: {
+      fielderRolls,
       serial: (progress.halfInningBoard?.serial ?? 0) + 1,
       inning: game.inning,
       half: game.half,

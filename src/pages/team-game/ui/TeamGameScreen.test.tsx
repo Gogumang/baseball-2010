@@ -402,7 +402,7 @@ describe('경기 시작 인트로 (상태 0xc)', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(screen.queryByTestId('인트로-띠')).toBeNull()
     // 1회초 판(0x18) — 판은 OK 를 기다린다
-    expect(screen.getByText('1회초')).toBeTruthy()
+    expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     vi.useRealTimers()
   })
 

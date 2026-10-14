@@ -156,7 +156,7 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자', () => {
 
   it('판이 먼저 서서 OK 를 기다리고, 그 동안 메뉴 키가 안 먹는다 — OK 뒤 타석', () => {
     띄우기({ progress: 선공1번() })
-    expect(screen.getByText('1회초')).toBeTruthy()
+    expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.queryByText('조작방법')).toBeNull()

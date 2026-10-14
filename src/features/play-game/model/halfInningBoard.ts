@@ -25,6 +25,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 3fc8c: 수비수 걸음 속도         i ≤ 5 ? rand(160, 240) : rand(300, 400)
  * ```
  * 합 **36** 굴림. 같은 판의 다른 함수(0x3ac90·0x4f928·0x4f7ac·0x4fe9c)는 굴리지 않는다(호출 그래프 6단 확인).
+ * 값은 운동장 전경(0x4fb8c)의 자리 · 걸음으로만 쓰인다(`widgets/field-walk/lib/halfInningWalk`).
  *
  * ## 화면 (그리기 0x4fe9c)
  * 틱 ≤ 69 는 0x4fb8c 운동장 전경(야수 0x43010 두 번 — 위 걸음), 틱 ≥ 70 은 점수판 틀 0x41440(경기, 0, 0, 0, 0, 0) 과
@@ -33,7 +34,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * - 점수판 틀 0x41440 은 확정·적용 — `widgets/scoreboard-frame`(0x4ff12, 경기 끝 판이면 y 3), 판은 `widgets/game-scene/ui/HalfInningBoard`.
  * - 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER") 도 확정·적용 — 판폭 212(game_ui 프레임 19 상자 4)라 (14, 158) · (150, 158),
  *   `widgets/game-scene/lib/halfInningCardsLayout`.
- * - ⚠️ 미해결 — 운동장 전경 0x4fb8c (틱과 상관없이 늘 바탕, 틱 ≤ 69 는 이것만).
+ * - 운동장 전경 0x4fb8c (틱과 상관없이 늘 바탕, 틱 ≤ 69 는 이것만)도 확정·적용 — 굴림 값을 판 칸에 실어(`HalfInningFielderRoll`)
+ *   `widgets/field-walk` 가 18명 걸음 · 카메라 · 이름표를 그린다.
  */
 
 /** 0x3fac4 루프 — i = 8..0 */
@@ -41,15 +43,33 @@ const FIELDER_COUNT = 9
 /** `cmp i, #5 ; bgt` — 타순 뒤쪽(i ≤ 5)은 느린 걸음 */
 const SLOW_STEP_LAST_INDEX = 5
 
-/** 공수 교대 판 틱 0 의 야수 걸음 굴림 36 개 (0x3fac4) — 값은 그림에만 쓰여 버린다 */
-export function rollHalfInningFielders(random: RandomPort): void {
+/** 0x3fac4 가 칸 i 하나에 굴린 넷 — 운동장 전경 0x4fb8c 가 이것으로 18명을 걷게 한다 (`widgets/field-walk`) */
+export interface HalfInningFielderRoll {
+  /** 3fbfa — 공격 쪽(앞 반 이닝 수비) 선수 걸음 0xbec7c */
+  readonly offenseSpeed: number
+  /** 3fc2c — rand(0, 200): 수비수 시작 x = 더그아웃.x − (r + 100)·(8 − i) */
+  readonly scatterX: number
+  /** 3fc46 — rand(100, 300): 수비수 시작 z = 더그아웃.z − (r + 100)·(8 − i) */
+  readonly scatterZ: number
+  /** 3fc8c — 수비수 걸음 0xbec7c */
+  readonly fielderSpeed: number
+}
+
+/**
+ * 공수 교대 판 틱 0 의 야수 걸음 굴림 36 개 (0x3fac4). 값은 그림(운동장 전경)에만 쓰인다 — 판을 세우는 진행기가 판 칸에 실어
+ * 화면으로 넘긴다. 칸 i(0 투수 … 8 중견)의 값이 `[i]` 에 든다(굴림 차례는 i = 8 → 0).
+ */
+export function rollHalfInningFielders(random: RandomPort): readonly HalfInningFielderRoll[] {
+  const rolls: HalfInningFielderRoll[] = []
   for (let index = FIELDER_COUNT - 1; index >= 0; index -= 1) {
     const slow = index <= SLOW_STEP_LAST_INDEX
-    random.rand(slow ? 160 : 300, slow ? 240 : 400)
-    random.rand(0, 200)
-    random.rand(100, 300)
-    random.rand(slow ? 160 : 300, slow ? 240 : 400)
+    const offenseSpeed = random.rand(slow ? 160 : 300, slow ? 240 : 400)
+    const scatterX = random.rand(0, 200)
+    const scatterZ = random.rand(100, 300)
+    const fielderSpeed = random.rand(slow ? 160 : 300, slow ? 240 : 400)
+    rolls[index] = { offenseSpeed, scatterX, scatterZ, fielderSpeed }
   }
+  return rolls
 }
 
 /** 판이 OK 를 기다리는 동안 내는 징글 13 의 틱 — 0x4f7ac `틱 == 2` */

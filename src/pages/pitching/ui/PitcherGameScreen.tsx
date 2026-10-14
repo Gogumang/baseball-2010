@@ -43,6 +43,8 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
+import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
@@ -567,6 +569,22 @@ export function PitcherGameScreen({
         scoreboardSides={scoreboardSides}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={pitcherHalfInningCardsOf(progress, pitcherName, board.half)}
+        // 운동장 전경 0x4fb8c — 투수편 판은 경기 첫 판(1회초)뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래)
+        field={halfInningFieldOf({
+          rolls: board.fielderRolls,
+          half: board.half,
+          isFirstBoard: board.serial === 1,
+          playerSide: options.playerSide,
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          grassPalette,
+          // 이름표 — 칸 0 은 내 투수, 1~8 은 내 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008).
+          // ⚠️ 근사: 원본은 경기 팀 레코드 차례를 훑는다 — 웹은 붙박이 표 차례
+          fielderNames: fielderNamesByPosition(
+            pitcherName ?? null,
+            teamBatters(options.ourTeamId).map((player) => ({ name: player.name, position: player.position ?? 0 })),
+          ),
+        })}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />,
     )
