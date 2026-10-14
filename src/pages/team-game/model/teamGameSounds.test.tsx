@@ -213,7 +213,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
 
     fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
 
-    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.getByTestId('투수 교체 창')).toBeTruthy()
     expect(녹음.played).toContain(PITCHER_CHANGE_SOUND)
     unmount()
     vi.useRealTimers()

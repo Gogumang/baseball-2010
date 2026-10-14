@@ -840,6 +840,8 @@ export function PitcherGameScreen({
         inputOverlayRef={inputOverlayRef}
         // 0x38f68 — 마운드 투수 체력% 로 지친 표시(player_effect 애니 9 · 10). 강판 뒤 마운드는 다른 투수라 싣지 않는다
         pitcherStaminaPercent={progress.onMound ? staminaPercentOf(progress.stamina) : null}
+        // 실투 "!" 0x38d1c 38ee0 — 놓기 0x4dc78 4deae (강판 뒤 마운드 공은 이 화면이 그리지 않는다)
+        isMistakePitch={progress.lastPitchIsMistake === true}
         // "#TIME" 0x4c92e — 0x38984 는 모드 3 을 안 막는다('#' 가 강판 물음을 연다). n = 수비팀(우리)[+0x33] 벤치 투수 수
         timeKeyCount={ourBenchPitcherCountOf(progress)}
         // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 공격 측(st[9]) = 상대(CPU) 측

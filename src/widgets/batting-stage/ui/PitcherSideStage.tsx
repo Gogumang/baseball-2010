@@ -40,6 +40,11 @@ interface PitcherSideStageProps {
    */
   readonly pitcherStaminaPercent?: number | null
   /**
+   * `pitch` 가 실투였나 — 놓기 0x4dc78 의 4deae 가 투구 객체 +8 = 4 를 적어 투수 그리기 0x38d1c 38ee0 이 놓은 그림부터 네 번
+   * 머리 위 "!"(player_effect 애니 13)를 그린다 (`pitcherFatigue` 의 실투 "!"). 안 넘기면 안 그린다
+   */
+  readonly isMistakePitch?: boolean
+  /**
    * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
    * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
    */
@@ -121,6 +126,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let releaseTick: number | null = null
     /** 지금 공의 CPU 스윙 — 화면이 설 때 있던 공은 다시 날리지 않으므로 그 스윙도 없다 */
     let shownSwing: CpuSwingPose | null = null
+    /** 지금 공이 실투인가 — 화면이 설 때 있던 공은 다시 날리지 않으므로 "!" 도 없다 */
+    let shownMistake = false
     let pausedSinceTick = 0
     let wasPaused = false
     /** 팝업 동안 멈춘 시간 — 장면 틱에서 뺀다 */
@@ -146,6 +153,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         shownPitch = current.pitch
         releaseTick = current.pitch === null ? null : nowTick
         shownSwing = current.cpuSwing ?? null
+        shownMistake = current.pitch !== null && current.isMistakePitch === true
       }
       if (current.isPaused && !wasPaused) pausedSinceTick = nowTick
       wasPaused = current.isPaused
@@ -237,6 +245,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         side,
         hud: current.hud,
         pitcherStaminaPercent: current.pitcherStaminaPercent ?? null,
+        // 실투 "!" — 놓은 틱(0x11 틱 10)의 그림이 첫 그림(1)이다. ⚠️ 근사: 그림마다가 아니라 장면 틱으로 센다(타자편과 같다)
+        pitcherMistakeMarkDraw:
+          shownMistake && releaseTick !== null && stage.phase.kind === '투구중' ? nowTick - releaseTick + 1 : null,
         ...(current.runnerAces === undefined ? {} : { runnerAces: current.runnerAces }),
         acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,

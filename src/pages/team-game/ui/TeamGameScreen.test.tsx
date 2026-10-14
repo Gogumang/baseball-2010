@@ -33,6 +33,24 @@ const OK통과 = () => {
   }
 }
 
+
+/** 투구 단계 · 타석 — 웹 글자 대신 누름 칸 판(testid) · 타석 캔버스가 보이는지로 가른다. 그림은 장면이 그린다 */
+const 보임 = (testId: string) => {
+  const element = screen.queryByTestId(testId)
+  return element !== null && element.closest('[hidden]') === null
+}
+const 구질보임 = () => 보임('구질 누름 칸')
+const 조준보임 = () => 보임('조준 영역')
+const 게이지보임 = () => 보임('게이지 누름 칸')
+/** 사람 타석 장면 — BattingStage 캔버스(사람 수비 장면 `PitcherSideStage` 는 소프트키 판 아래 따로 선다) */
+const 타석보임 = () => document.querySelector('canvas[class*="BattingStage_stage"]') !== null
+/** 교체 창 줄 — 커서 줄이 아니면 한 번 눌러 커서를 옮기고, 커서 줄을 누르면 OK (0x495fc) */
+const 벤치고르기 = (name: string) => {
+  const 고르기 = screen.queryByRole('button', { name: `${name} 고르기` })
+  if (고르기 !== null) fireEvent.click(고르기)
+  fireEvent.click(screen.getByRole('button', { name: `${name} 교체` }))
+}
+
 afterEach(() => {
   setAutoRelayRecordPort(null)
   cleanup()
@@ -83,28 +101,27 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
   it('후공이면 1회초가 우리 수비라 구질 고르기가 뜬다 (상태 0xf)', () => {
     띄우기()
 
-    expect(screen.getByText('1회초')).toBeTruthy()
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('구질을 고르면 0xf 의 틱 8 에 코스 고르기로 넘어간다 (상태 0x10, 0x39c1c)', () => {
     띄우기()
     fireEvent.click(구질칸('FASTBALL'))
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 7))
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
 
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준보임()).toBe(true)
   })
 
   it('코스 고르기에서 CLR 이면 구질 고르기로 돌아간다 (상태 0x10 → 0xf, 0x50ee6)', () => {
     띄우기()
     구질고르기('FASTBALL')
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준보임()).toBe(true)
     fireEvent.keyDown(window, { key: 'Escape' })
 
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
-    expect(screen.queryByText(/2\. 코스 선택/)).toBeNull()
+    expect(구질보임()).toBe(true)
+    expect(조준보임()).toBe(false)
   })
 
   it('게이지 설정이 꺼져 있어도 0x11 을 지나 틱 10 에 던진다 (원본 기본값 — 0x50ed0 · 0x4e060)', () => {
@@ -115,17 +132,17 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     조준확정()
 
     // 게이지 그림·안내는 없고 아직 안 던졌다
-    expect(screen.queryByText('3. 투구 결정')).toBeNull()
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(게이지보임()).toBe(false)
+    expect(구질보임()).toBe(false)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     // 놓았다 — 남은 0x11 비행과 0x12 대기 동안은 원본도 다음 공 입력을 안 받는다
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 80))
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('경기 중 메뉴를 열어도 투구 단계는 숨긴 채 멈춘다 — 닫으면 게이지 틱이 이어진다 (팝업 동안 장면 정지 0x52cc6)', () => {
@@ -136,17 +153,17 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
 
     fireEvent.keyDown(window, { key: '*' })
     // 내리지 않고 숨긴다
-    expect(screen.getByText('3. 투구 결정').closest('[hidden]')).not.toBeNull()
+    expect(screen.getByTestId('게이지 누름 칸').closest('[hidden]')).not.toBeNull()
     // 메뉴 동안은 틱이 안 흘러 공이 안 나간다
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 30))
     fireEvent.keyDown(window, { key: '*' })
 
     // 0x11 그대로 — 처음부터가 아니라 남은 다섯 틱 뒤에 놓는다
-    expect(screen.getByText('3. 투구 결정').closest('[hidden]')).toBeNull()
+    expect(screen.getByTestId('게이지 누름 칸').closest('[hidden]')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 4))
-    expect(screen.getByText('3. 투구 결정')).toBeTruthy()
+    expect(게이지보임()).toBe(true)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
-    expect(screen.queryByText('3. 투구 결정')).toBeNull()
+    expect(게이지보임()).toBe(false)
   })
 
   it('게이지를 켜면 투구 결정 단계가 뜬다 (상태 0x11)', () => {
@@ -154,7 +171,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     구질고르기('FASTBALL')
     조준확정()
 
-    expect(screen.getByText('3. 투구 결정')).toBeTruthy()
+    expect(게이지보임()).toBe(true)
   })
 })
 
@@ -174,20 +191,20 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
     for (let pitch = 0; pitch < 200; pitch += 1) {
       // 새 타자면 0xe 에서 OK 부터
       OK통과()
-      if (screen.queryByText('1. 구질 선택') === null) break
+      if (!구질보임()) break
       구질고르기('FASTBALL')
       조준확정후놓기()
       // 남은 0x11 비행 · 0x12 대기 동안은 다음 공을 안 받는다 — 수비 화면이 뜨면 거기서 멈춘다
       for (let 틱 = 0; 틱 < 80; 틱 += 1) {
         if (container.querySelector(`img[src="${DEFENSE_BACKGROUND_URL}"]`) !== null) break
-        if (screen.queryByText('1. 구질 선택') !== null) break
+        if (구질보임()) break
         act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
       }
     }
 
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     // 타석으로 넘어간 것이 아니다 — 수비 화면이다
-    expect(screen.queryByText('타석')).toBeNull()
+    expect(타석보임()).toBe(false)
     expect(container.querySelector(`img[src="${DEFENSE_BACKGROUND_URL}"]`)).not.toBeNull()
   })
 })
@@ -216,12 +233,12 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
     )
     판닫기()
 
-    expect(screen.getByText('타석')).toBeTruthy()
+    expect(타석보임()).toBe(true)
     // 0xe 소개 판의 타자 칸이 타순 1번과 **명단에 선 타자 이름**을 적는다 (대타가 붙은 뒤로는 이름이 바뀐다)
     소개판까지()
     expect(타자칸()).toEqual({ name: '박택용', order: ['31'] })
     // 같은 화면에 투구 단계가 함께 뜨지 않는다 — 공수는 번갈아 돈다
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
   })
 
   it("'#' 가 공격 중에는 **대타** 화면을 연다 (0x49598 의 공격 가지)", () => {
@@ -229,17 +246,17 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
     fireEvent.keyDown(window, { key: '#' })
 
     // 제목 글자는 img_text 149 "타자" + 299 "교체" (S10 4절 — 규칙은 대타지만 화면 글자는 "타자 교체")
-    expect(screen.getByText('타자 교체')).toBeTruthy()
+    expect(screen.getByTestId('타자 교체 창')).toBeTruthy()
     // 수비 쪽 제목은 안 뜬다
-    expect(screen.queryByText('투수 교체')).toBeNull()
+    expect(screen.queryByTestId('투수 교체 창')).toBeNull()
   })
 
   it('고른 마타자가 대타로 타석에 선다 (원본에서 마타자가 타석에 서는 유일한 길)', () => {
     띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT, aceBatterId: 0 })
     fireEvent.keyDown(window, { key: '#' })
-    fireEvent.click(screen.getByText('메디카 (마타자)'))
+    벤치고르기('메디카')
 
-    expect(screen.queryByText('타자 교체')).toBeNull()
+    expect(screen.queryByTestId('타자 교체 창')).toBeNull()
     // 대타가 서면 0xe 로 돌아와 소개 판이 다시 선다 — 같은 타순 1번에 메디카
     소개판까지()
     expect(타자칸()).toEqual({ name: '메디카', order: ['31'] })
@@ -363,8 +380,8 @@ describe('투수 교체 (#)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
 
-    expect(screen.getByText('투수 교체')).toBeTruthy()
-    expect(screen.getByText(/지금 투수 —/)).toBeTruthy()
+    expect(screen.getByTestId('투수 교체 창')).toBeTruthy()
+    expect(screen.getByTestId('교체 줄 지금 선수')).toBeTruthy()
   })
 
   it("교체 창(상태 0xb)에서는 '*'·메뉴 소프트키가 안 먹는다 — 창이 그대로고 메뉴도 안 열린다 (0x498d4 '*' 는 0xd~0x15 만)", () => {
@@ -372,17 +389,40 @@ describe('투수 교체 (#)', () => {
     fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
     fireEvent.keyDown(window, { key: '*' })
 
-    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.getByTestId('투수 교체 창')).toBeTruthy()
     expect(screen.queryByRole('listbox', { name: '경기 중 메뉴' })).toBeNull()
     const 메뉴 = screen.getByRole('button', { name: '메뉴' })
     expect((메뉴 as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(메뉴)
-    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.getByTestId('투수 교체 창')).toBeTruthy()
     expect(screen.queryByRole('listbox', { name: '경기 중 메뉴' })).toBeNull()
     // 창을 닫으면(0x495fc 의 '#'·CLR) 다시 먹는다
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '# 취소' }))
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
+  })
+
+  it("'0' 이 선수 정보 창(0x5b798)을 열고 닫는다 — 커서는 ↑↓ 로 감기고, 커서 줄을 누르면 교체다 (0x495fc)", () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
+    expect(screen.queryByTestId('선수 정보 창')).toBeNull()
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByTestId('선수 정보 창')).toBeTruthy()
+    // 창이 다 열린 뒤(여섯째 그림)에야 능력치 도형이 선다
+    expect(screen.queryByTestId('선수 정보 도형')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8))
+    expect(screen.getByTestId('선수 정보 도형')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '0 INFO' }))
+    expect(screen.queryByTestId('선수 정보 창')).toBeNull()
+
+    // 위로 한 칸이면 맨 끝 줄로 감긴다 — 그 줄을 누르면 교체가 확정되어 창이 닫힌다
+    const 줄들 = screen.getAllByRole('button', { name: / (교체|고르기)$/ })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    const 커서줄 = screen.getAllByRole('button', { name: / 교체$/ })
+    expect(커서줄).toHaveLength(1)
+    expect(줄들.length).toBeGreaterThan(0)
+    fireEvent.click(커서줄[0])
+    expect(screen.queryByTestId('투수 교체 창')).toBeNull()
   })
 
   it('우리 공격 차례에는 교체 입구가 없다 — 원본은 그 자리에서 대타를 연다', () => {
@@ -437,39 +477,39 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
 
   it('수비 차례: OK 전에는 구질 고르기가 없고, 들어선 뒤 세 갱신 안의 OK 는 안 먹는다 (0x49a26)', () => {
     판까지()
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     fireEvent.keyDown(window, { key: '5' })
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     // 시간 제한·자동 진행이 없다 (0x39bd4)
     act(() => vi.advanceTimersByTime(60_000))
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     fireEvent.keyDown(window, { key: '5' })
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it("0xe 에서 '#' 교체 창이 열리고(0x4994a) 닫으면 다시 0xe — '*' 메뉴도 열리고 메뉴가 떠 있으면 OK 를 안 받는다", () => {
     판까지()
     // 0xd(두 그림)는 '#' 가 여는 상태 범위(0xe·0xf) 밖이다
     fireEvent.keyDown(window, { key: '#' })
-    expect(screen.queryByText('투수 교체')).toBeNull()
+    expect(screen.queryByTestId('투수 교체 창')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '#' })
-    expect(screen.getByText('투수 교체')).toBeTruthy()
+    expect(screen.getByTestId('투수 교체 창')).toBeTruthy()
     // 창이 떠 있으면 OK 를 안 받는다 — '#' 로 닫으면(0x495fc 취소) 곧장 0xe 에 다시 선다
     fireEvent.keyDown(window, { key: '#' })
-    expect(screen.queryByText('투수 교체')).toBeNull()
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(screen.queryByTestId('투수 교체 창')).toBeNull()
+    expect(구질보임()).toBe(false)
     fireEvent.keyDown(window, { key: '*' })
     expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
     // 메뉴의 '5' 는 숫자키 꼴 2 — 다섯째 칸(메인메뉴)을 곧바로 골라 질문 창이 뜬다. 창이 키를 먹는 동안 장면 OK 는 없다(0x754f8)
     fireEvent.keyDown(window, { key: '5' })
     fireEvent.keyDown(window, { key: 'Escape' })
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('0xd 두 그림 뒤 0xe 에 들어서면 투수·타자 소개 판(0x44944)이 서고, OK 뒤에는 걷힌다 (0x4d9ec)', () => {
@@ -484,7 +524,7 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
 
   it('공격 차례도 같다 — 타석 장면은 서지만 OK 전에는 공이 안 나간다', () => {
     판까지({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    expect(screen.getByText('타석')).toBeTruthy()
+    expect(타석보임()).toBe(true)
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     OK통과()
     expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
