@@ -59,6 +59,12 @@ interface MessageBoxProps {
    * 안 주면 지금 장면의 값(`CommonWindowSceneContext` — 앱이 화면 · 경기 장면으로 정한다)이다.
    */
   readonly closesWithoutShrink?: boolean
+  /**
+   * 첫 그림이 이미 한 번 펼친 높이(10 × 2 = 20)다 — 앞 창이 [창+0x290] = 0 이라 0x754f8 첫 갈래(7550a~75552)가 앞 창을 줄임 없이
+   * 닫고 0x75440 으로 이 상자를 띄운 갱신이, 그대로 75556 펼침 갈래로 이어져 높이를 한 번 두 배로 한다(경기 중 메뉴를 '*' 로 연 창 뒤의
+   * 질문 · 알림). 앞 창이 줄임(0x7558a)으로 닫힌 자리는 0x75440 뒤 곧장 돌아가(755d8) 10 부터다. 안 주면 10 부터.
+   */
+  readonly opensOneStepIn?: boolean
   /** 누른 버튼 번호 */
   readonly onAnswer: (index: number) => void
   /**
@@ -162,7 +168,7 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 
 export function MessageBox({
   text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, closesWithoutShrink: closesWithoutShrinkProp,
-  onAnswer, onAnswerKey,
+  opensOneStepIn = false, onAnswer, onAnswerKey,
 }: MessageBoxProps) {
   // 창을 띄울 때 [창+0x24f] 를 [창+0x24e] 로 옮긴다(0x7503c) — 띄운 자리가 정하지 않았으면 지금 장면의 값
   const sceneClosesWithoutShrink = useSceneClosesWithoutShrink()
@@ -190,11 +196,15 @@ export function MessageBox({
   const fullHeightRef = useRef(0)
   const [animation, setAnimation] = useState<BoxAnimation>(null)
 
-  // 열림: 첫 그리기 전에 높이를 재고 10 에서 시작한다 (0x75006)
+  // 열림: 첫 그리기 전에 높이를 재고 10 에서 시작한다 (0x75006). `opensOneStepIn` 이면 띄운 갱신이 한 번 두 배로 한 뒤라
+  // 첫 그림이 20 — 목표 < 20 이면 그 갱신에 다 펼친다(0x7557c)
   useLayoutEffect(() => {
     const full = boxRef.current?.offsetHeight ?? 0
     fullHeightRef.current = full
-    if (full > OPEN_START_HEIGHT) setAnimation({ kind: '열림', height: OPEN_START_HEIGHT })
+    const start = opensOneStepIn ? OPEN_START_HEIGHT * OPEN_GROWTH : OPEN_START_HEIGHT
+    if (full > OPEN_START_HEIGHT && start <= full) setAnimation({ kind: '열림', height: start })
+    // 처음 한 번만 — 펼침 시작은 띄운 그 갱신이 정한다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 같은 자리에서 글만 바뀌면 **새 상자**다 (보상 안내가 잇달아 뜨는 화면들). 답 잠금을 푼다 —

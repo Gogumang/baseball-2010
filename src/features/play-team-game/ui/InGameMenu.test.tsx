@@ -265,14 +265,17 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   const 판 = () => screen.queryByTestId('경기-메뉴-판')
 
   /** 여는 곳 흉내 — `useInGameMenuState` 를 그대로 쓴다 */
-  function 여는곳({ onQuit, onRestart }: { readonly onQuit?: () => void; readonly onRestart?: () => void }) {
+  function 여는곳({ onQuit, onRestart, mode = 6, gamePoint }: {
+    readonly onQuit?: () => void; readonly onRestart?: () => void; readonly mode?: number; readonly gamePoint?: number
+  }) {
     const menu = useInGameMenuState()
     return (
       <>
         <button type="button" onClick={menu.toggle}>별표</button>
         <span data-testid="열림">{String(menu.isOpen)}</span>
         {menu.isOpen && (
-          <InGameMenu mode={6} cursor={menu.cursor} onCursorChange={menu.setCursor} slidesIn={menu.slidesIn}
+          <InGameMenu mode={mode} cursor={menu.cursor} onAutoProgress={vi.fn()} autoProgressCost={30}
+            {...(gamePoint === undefined ? {} : { gamePoint })} onCursorChange={menu.setCursor} slidesIn={menu.slidesIn}
             opening={menu.opening} bindCloser={menu.bindCloser} onContinue={menu.close}
             {...(onQuit === undefined ? {} : { onQuit })} {...(onRestart === undefined ? {} : { onRestart })} />
         )}
@@ -340,6 +343,63 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
     expect(열림()).toBe('true')
     expect(판()).not.toBeNull()
     틀()
+    expect(열림()).toBe('false')
+  })
+
+  const 상자 = () => document.querySelector('[role="dialog"] > div') as HTMLElement
+
+  it("'*' 로 연 창 뒤의 질문은 첫 그림이 이미 높이 20 이다 — 7550a~75552 → 0x75440 → 75556 펼침이 같은 갱신", () => {
+    vi.useFakeTimers()
+    되돌리기 = 높이를_잴_수_있게(320)
+    render(<여는곳 onRestart={vi.fn()} />)
+    fireEvent.click(screen.getByText('별표'))
+    틀()
+    fireEvent.click(칸('재도전'))
+    틀()
+    expect(상자().style.height).toBe('20px')
+    틀()
+    expect(상자().style.height).toBe('40px')
+  })
+
+  it('다시 띄운 창([+0x290] = 1) 뒤의 질문은 줄임 끝 0x75440 뒤 곧장 돌아가(755d8) 10 부터다', () => {
+    vi.useFakeTimers()
+    되돌리기 = 높이를_잴_수_있게(320)
+    render(<여는곳 onRestart={vi.fn()} />)
+    fireEvent.click(screen.getByText('별표'))
+    틀()
+    fireEvent.click(칸('재도전'))
+    틀()
+    틀(9)
+    fireEvent.click(아니오())
+    틀()
+    틀(2)
+    expect(판()).not.toBeNull()
+    fireEvent.click(칸('재도전'))
+    // 줄임 두 갱신(240 → 120 → 닫힘) 뒤 질문
+    틀()
+    틀()
+    expect(상자().style.height).toBe('10px')
+  })
+
+  it('자동진행 [예] 뒤 G포인트 부족 알림(하위 2 0x3c7d8)은 닫힘 콜백이 없다 — 닫히면 메뉴 없이 경기로 돌아간다', () => {
+    vi.useFakeTimers()
+    되돌리기 = 높이를_잴_수_있게(320)
+    render(<여는곳 mode={1} gamePoint={0} />)
+    fireEvent.click(screen.getByText('별표'))
+    틀()
+    fireEvent.click(칸('자동진행'))
+    틀()
+    틀(9)
+    fireEvent.click(예())
+    틀()
+    // 질문이 닫힌 갱신에 알림이 대기 칸에서 뜬다 — 앞 창이 줄임(폭 0)으로 닫혀 10 부터
+    expect(screen.getByText(/자동진행을 할 수 없습니다/)).toBeTruthy()
+    expect(상자().style.height).toBe('10px')
+    틀(9)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    틀()
+    expect(screen.queryByText(/자동진행을 할 수 없습니다/)).toBeNull()
+    expect(판()).toBeNull()
     expect(열림()).toBe('false')
   })
 })

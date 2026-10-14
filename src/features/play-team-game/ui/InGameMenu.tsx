@@ -133,7 +133,11 @@ export function InGameMenu({
   const actions = inGameMenuOf(mode)
   /** 질문 창에서 돌아와도 같은 메뉴 객체라 커서가 남는다 */
   const [cursor, setCursor] = useState(() => (initialCursor >= 0 && initialCursor < actions.length ? initialCursor : 0))
-  const [notice, setNotice] = useState<string | null>(null)
+  /**
+   * 알림 — `after` 는 닫힌 뒤의 길: '메뉴' 는 대전 6회 알림(하위 6 · 닫힘 콜백 0x3c159 → 0x3cd5c 가 메뉴를 다시 띄운다),
+   * '경기' 는 자동진행 [예] 뒤 G포인트 부족(하위 2 0x3c7d8 — 닫힘 콜백 없이 하위 0 으로 두고 끝, 아래 `NOT_ENOUGH_GAME_POINT`)
+   */
+  const [notice, setNotice] = useState<{ readonly text: string; readonly after: '메뉴' | '경기' } | null>(null)
   /** 일시정지 창 한 벌 — 질문 [아니오] · 알림 [확인] 이 창을 새로 띄울 때(0x75440 → 0x741a0) 늘린다 */
   const [pauseWindow, setPauseWindow] = useState<{ readonly serial: number; readonly opening: InGameMenuOpening; readonly slidesIn: boolean }>(
     () => ({ serial: 0, opening, slidesIn }),
@@ -197,8 +201,10 @@ export function InGameMenu({
     if (action === '계속') return onContinue()
     // [조작방법](코드 1 0x3c212 → 하위 4) · [설정](코드 2 0x3c326 → 하위 5)은 뷰어를 세운 뒤 일시정지 팝업을 다시 띄우기
     // 직전(0x3c2f8 · 0x3c45c)에 울리던 소리를 끊는다(0x6e418)
-    // ⚠️ 미확인: 이 갈래도 [창+0x215] = 1(0x3c212~0x3c21e)이라 메뉴 창은 한 갱신(또는 두 갱신) 뒤 내려가는데, 그동안 그리기 콜백
-    // 0x3cdd0 이 하위 4 · 5 에서 무엇을 그리는지 안 읽었다 — 웹은 곧바로 뷰어 · 설정 판으로 넘어간다
+    // 이 갈래는 [창+0x215] = 1 · 하위 4|5 와 함께 **[창+0x290] = 0** 을 쓴다(0x3c310~0x3c31a · 0x3c474~0x3c47e) — 어떻게 연 창이든
+    // 다음 갱신 첫 갈래가 줄임 없이 닫고 대기 칸(같은 0x741a0)을 띄운다. 그동안 그리기 콜백 0x3cdd0 은 하위 4 면 뷰어 0x639a5(skin)
+    // 하나(0x3ce54), 하위 5 면 설정 판 0x593c9(skin, [장면+0xf94], 8) 하나(0x3ce60)만 그리고 메뉴 판(0x3ce76~)은 건너뛴다 —
+    // 키를 받은 그림부터 뷰어 · 설정 판이다. 웹이 곧바로 넘어가는 것과 같다
     if (action === '조작방법') {
       activeSound().stop()
       handedOffRef.current = true
@@ -210,7 +216,9 @@ export function InGameMenu({
       return onOpenSettings?.()
     }
     // 대전모드는 6회를 넘기면 질문 없이 StrGAME[2] 알림만 뜬다 (0x3c60c — 0x74ef5 종류 1 · 0x7442d · 하위 6 · [창+0x215])
-    if (action === '자동진행' && !canAutoProgress) return askAfterClose(() => setNotice(VERSUS_INNING_LIMIT_NOTICE))
+    if (action === '자동진행' && !canAutoProgress) {
+      return askAfterClose(() => setNotice({ text: VERSUS_INNING_LIMIT_NOTICE, after: '메뉴' }))
+    }
     // 나가기 0x3c504 · 자동진행 0x3c67e~ · 다시하기 0x3c706 — 0x74ef5 → 0x7442d(닫힘 콜백 0x3c159) · [창+0x215] = 1 · 하위 1|2|3
     askAfterClose(() => setConfirming(action))
   }
@@ -220,13 +228,26 @@ export function InGameMenu({
     setPauseWindow((previous) => ({ serial: previous.serial + 1, opening: '질문뒤', slidesIn: true }))
   }
 
+  /**
+   * '\*' 로 연 창([+0x290] = 0) 뒤의 질문 · 알림은 앞 창을 닫은 갱신이 0x754f8 첫 갈래 → 0x75440 → 75556 펼침으로 이어져 첫 그림이
+   * 이미 높이 20 이다. 다시 띄운 창([+0x290] = 1)은 줄임(0x7558a) 끝의 0x75440 뒤 곧장 돌아가(755d8) 10 부터다.
+   */
+  const opensOneStepIn = pauseWindow.opening === '별표'
+
   if (notice !== null) {
     return (
-      <MessageBox text={notice} buttons={['확인']} dimOpacity={POPUP_DIM_OPACITY} closesWithoutShrink
+      <MessageBox text={notice.text} buttons={['확인']} dimOpacity={POPUP_DIM_OPACITY} closesWithoutShrink
+        opensOneStepIn={notice.after === '메뉴' && opensOneStepIn}
         onAnswer={() => {
+          const after = notice.after
           setNotice(null)
-          // G포인트 부족(하위 2 0x3c7d8 의 알림)도 대전 6회 알림(하위 6)도 닫히면 메뉴로 — ⚠️ 하위 2 알림의 닫힘 콜백은 안 읽었다
-          reopenPauseWindow()
+          // 대전 6회 알림(하위 6) — 닫힘 콜백 0x3c159 → 0x3cd5c 가 일시정지 창을 다시 띄운다
+          if (after === '메뉴') return reopenPauseWindow()
+          // G포인트 부족(하위 2 0x3c7d8 → 0x3c812~0x3c838): 0x74ef5(…, StrGAME[5], 종류 0x81) 뒤 하위 0 으로 두고 끝난다 — 0x7442d 가
+          // 없어 이 알림의 닫힘 콜백은 없다(질문 창의 [+0x228] 은 0x742a8 이 0x74330 에서 지우고, 대기 칸 [+0x3c0] 은 0x75440 이
+          // 옮긴 뒤 0x754e6 에서 지운다). 알림이 닫히면 창이 하나도 없어 경기가 이어진다 — 메뉴를 다시 띄우지 않는다
+          handedOffRef.current = true
+          onContinue()
         }} />
     )
   }
@@ -240,7 +261,7 @@ export function InGameMenu({
           : autoProgressConfirmOf(autoProgressCost)
     // 질문 창이 뜨는 갱신은 0x74ef4 가 [+0x250] = 1 이라 경기 장면을 한 번 다시 그리고(52efe) 그 위를 한 번 어둡게 덮는다 —
     // 메뉴 판은 그때 지워진다. 경기 장면 [창+0x24e] = 1 이라 답하면 줄임 없이 다음 갱신에 닫힌다(`closesWithoutShrink`).
-    // ⚠️ 근사: '별표' 창 뒤의 질문은 0x754f8 첫 갈래가 0x75440 뒤 75556 펼침 갈래로 이어져 첫 그림이 이미 높이 20 이다 — 웹은 10 부터
+    // '별표' 창 뒤의 질문은 첫 그림이 이미 높이 20 이다(`opensOneStepIn`)
     return (
       <MessageBox
         key={confirming}
@@ -248,6 +269,7 @@ export function InGameMenu({
         buttons={['예', '아니오']}
         dimOpacity={POPUP_DIM_OPACITY}
         closesWithoutShrink
+        opensOneStepIn={opensOneStepIn}
         onAnswer={(index) => {
           const asked = confirming
           setConfirming(null)
@@ -259,7 +281,7 @@ export function InGameMenu({
           // 자동진행 — 확정(예) 하위 2 = 0x3c7d8 이 여기서 G포인트를 검사한다
           if (gamePoint === undefined || gamePoint < autoProgressCost) {
             handedOffRef.current = false
-            setNotice(NOT_ENOUGH_GAME_POINT)
+            setNotice({ text: NOT_ENOUGH_GAME_POINT, after: '경기' })
             return
           }
           onAutoProgress?.(autoProgressCost)

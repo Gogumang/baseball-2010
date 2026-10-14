@@ -128,6 +128,22 @@ describe('기본 변화구 고르기 (0x67)', () => {
     }
   })
 
+  it('0x67 에서 CLR 로 돌아오면 0x66 띠를 다시 펴지 않는다 — 0x10b18 이 편 같은 띠 [장면+0xd8] 를 이어받아 곧장 160 (0x17360 1736a → 1764e)', () => {
+    vi.useFakeTimers()
+    try {
+      화면()
+      이름넣기('테스트')
+      const 띠폭 = () => document.querySelector('[data-description-band]')?.getAttribute('data-description-band')
+      변화구로()
+      act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 10) })
+      키('Escape')
+      expect(screen.queryByTestId('변화구-고르기')).toBeNull()
+      expect(띠폭()).toBe('160')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('하나 이하로 OK 를 누르면 StrMODE[13] 알림, 두 개면 확인 상자다', () => {
     화면()
     이름넣기('테스트')

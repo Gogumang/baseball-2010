@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -547,7 +547,7 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
 
     키('Enter')
     // 탭 1 → 108 창을 거친다 (진입 0x17730 — 커서는 배운 수 L = 0 칸)
-    expect(screen.getByText('마구 훈련')).toBeTruthy()
+    expect(screen.getByTestId('마구훈련-창')).toBeTruthy()
     expect(screen.queryByText(/가 소모됩니다/)).toBeNull()
 
     키('Enter')
@@ -760,7 +760,7 @@ describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 
     누르기('트레이닝')
     누르기('마구')
     누르기('마구')
-    expect(screen.getByText('마구 훈련')).toBeTruthy()
+    expect(screen.getByTestId('마구훈련-창')).toBeTruthy()
   }
   const 커서칸 = () => screen.getAllByRole('button').filter((button) => button.getAttribute('aria-pressed') === 'true')
     .map((button) => button.textContent)
@@ -768,14 +768,14 @@ describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 
   it('처음 커서는 min(배운 수 L, 3) 칸이다 (177c8~17806)', () => {
     화면({ career: 투수({ magicLevel: 2, popularity: 2000, gamePoint: 5000 }) })
     마구창까지()
-    const 칸들 = screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
-    expect(칸들.findIndex((button) => button.getAttribute('aria-pressed') === 'true')).toBe(2)
+    const 칸들 = within(screen.getByTestId('마구훈련-창')).getAllByRole('option')
+    expect(칸들.findIndex((button) => button.getAttribute('aria-selected') === 'true')).toBe(2)
   })
 
   it('배운 칸은 StrMODE[63] · 앞 칸이 남았으면 [64] · 인기도가 모자라면 [62] (그 칸 값)', () => {
     화면({ career: 투수({ magicLevel: 1, popularity: 600, gamePoint: 5000 }) })
     마구창까지()
-    const 칸들 = () => screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
+    const 칸들 = () => within(screen.getByTestId('마구훈련-창')).getAllByRole('option')
 
     fireEvent.click(칸들()[0])
     expect(screen.getByText(/이미 훈련 완료된 스킬입니다/)).toBeTruthy()
@@ -791,15 +791,17 @@ describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 
     const onSave = vi.fn()
     화면({ career: 투수({ magicLevel: 1, popularity: 2000, gamePoint: 100 }), onSave })
     마구창까지()
-    const 칸들 = () => screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))
+    const 칸들 = () => within(screen.getByTestId('마구훈련-창')).getAllByRole('option')
     // 커서를 칸 3 으로 옮겨 둔다 — 139 에서 돌아오면 108 진입이 다시 L 칸에 둔다
-    fireEvent.pointerEnter(칸들()[3])
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(칸들()[3].getAttribute('aria-selected')).toBe('true')
     fireEvent.click(칸들()[1])
     expect(screen.getByText(/G포인트가 부족합니다/)).toBeTruthy()
     fireEvent.click(칸('예'))
 
-    expect(screen.getByText('마구 훈련')).toBeTruthy()
-    expect(칸들().findIndex((button) => button.getAttribute('aria-pressed') === 'true')).toBe(1)
+    expect(screen.getByTestId('마구훈련-창')).toBeTruthy()
+    expect(칸들().findIndex((button) => button.getAttribute('aria-selected') === 'true')).toBe(1)
     expect(onSave).not.toHaveBeenCalled()
   })
 
@@ -807,7 +809,7 @@ describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 
     화면()
     마구창까지()
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.queryByText('마구 훈련')).toBeNull()
+    expect(screen.queryByTestId('마구훈련-창')).toBeNull()
     expect(칸이름들()).toContain('마구')
     expect(커서칸()).toEqual([])
   })

@@ -268,7 +268,9 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const isRecordRoom = menu.subWindow === '기록실'
   // 108 탭 2 그림 0x19e44 = 관리 화면 0x19da4 위에 창 0x803d4 — 아래 줄은 107 하위 메뉴 그대로다
   const isPitchTraining = menu.subWindow === '구질훈련'
-  const isMenuShown = menu.subWindow === null || isRecordRoom || isPitchTraining
+  // 108 탭 1 도 같은 그림 0x19e44 — 관리 화면 위에 창 0x803d4
+  const isMagicTraining = menu.subWindow === '마구훈련'
+  const isMenuShown = menu.subWindow === null || isRecordRoom || isPitchTraining || isMagicTraining
   return (
     <RawScreen>
       {/*
@@ -280,7 +282,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={!isRecordRoom && !isPitchTraining && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
             morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
@@ -300,15 +302,16 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
               onSelectPitch={menu.selectPitchCell}
             />
           )}
-          {menu.subWindow === '마구훈련' && (
-            <PitcherMagicTrainingPanel career={career} cursor={menu.magicTrainingCursor}
-              onMoveCursor={menu.moveMagicTrainingCursor} onConfirm={menu.confirmMagicTrainingCell} />
-          )}
         </div>
       )}
 
       {/* 108 탭 2 구질 훈련 창 0x803d4 — 키는 창이 받는다(0x17828 → 0x80268), 취소는 107 */}
       {isPitchTraining && <PitchTrainingScreen career={career} onTrain={menu.trainPitch} onClose={menu.closeWindow} />}
+      {/* 108 탭 1 마구 창 0x803d4 — 키는 `usePitcherManagementMenu`(0x17828 → 0x80268), 취소는 107 */}
+      {isMagicTraining && (
+        <PitcherMagicTrainingPanel career={career} cursor={menu.magicTrainingCursor}
+          onMoveCursor={menu.moveMagicTrainingCursor} onConfirm={menu.confirmMagicTrainingCell} />
+      )}
 
 
       {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
