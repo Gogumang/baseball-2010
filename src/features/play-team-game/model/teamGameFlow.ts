@@ -792,6 +792,17 @@ export interface TeamGameProgress {
    */
   readonly stealingFrom: readonly StealBase[]
   /**
+   * **도루 출발 표시** st[0x15 + i] — 이번 공에 출발한 주자(사람 키 · CPU 0x520de)의 루. 그 루의 주자는 루에 안 그린다.
+   * 원본은 판정 입력과 한 칸(st[0x14 + i])이지만 판정 때 지우지 않는다 (직접 재역어셈):
+   * - 0xf 진입 `0x3d954` 3d966~3d976 — `for i in 0..3: st[0x14 + i] = 0 ; st[0xa4 + i] = 0` (`enterPitchSelection`)
+   * - 판 시작 리드 `0x3d7b8` 3d8c6~3d8d2 — 판 종류 **1(타구)** 일 때만 도루 주자의 칸을 지운다. 도루(5) · 폭투(9) · 밀어내기(2)
+   *   판은 안 지운다.
+   * 그래서 공 도착 판정 → 결과 띠 → 도루 판 재생 → (새 타석이면 0xd · 0xe 를 지나) 0xf 까지 출발 루는 비어 보인다.
+   * 웹은 판정 입력(`stealingFrom`)은 판정 때 거두고(다음 공 전에 0xf 가 지우므로 같다) 표시만 이 칸에 남긴다 — 미션과 같은 꼴.
+   * 없으면(옛 상태) 비어 있다.
+   */
+  readonly stealDisplayFrom?: readonly StealBase[]
+  /**
    * **마지막으로 열린 공 도착 판** (0x3dfac — 종류 9 폭투·포일 · 종류 5 도루). 판정 콜(17 · 62/20)을 고르는 데만 쓴다 —
    * 걸음 앞뒤가 다른 객체면 이번 걸음에 새로 열린 판이다. 재생은 `lastDefensePlay` 가 맡는다.
    */
@@ -2347,7 +2358,8 @@ export function startBatterOutcome(
       ? batterDefenseInputOf(stealing, outcome, pattern, random, options)
       : { ...batterDefenseInputOf(stealing, outcome, fixturePatternFor(outcome), random, options), outcomeIsGiven: true },
   )
-  return { ...progress, pendingDefensePlay: { side: '공격', input, outcome: input.outcome } }
+  // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
+  return { ...withoutStealDisplay(progress), pendingDefensePlay: { side: '공격', input, outcome: input.outcome } }
 }
 
 /**
@@ -2808,6 +2820,8 @@ function pitchOnce(
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
+    // CPU 도루 0x520de → 0xa9bd4 — 출발한 주자가 있으면 표시 칸도 같은 칸이다 (없으면 앞 0xf 진입이 이미 지웠다)
+    ...(stealingFrom.length === 0 ? {} : { stealDisplayFrom: stealingFrom }),
     sceneBuntKind: thrown.buntKind ?? 0,
     lastCpuSwing: cpuSwingPoseOf(thrown),
   }
@@ -2987,7 +3001,8 @@ function startDefensiveAtBat(
           outcomeIsGiven: true,
         },
   )
-  return { ...progress, pendingDefensePlay: { side: '수비', input, outcome: input.outcome } }
+  // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
+  return { ...withoutStealDisplay(progress), pendingDefensePlay: { side: '수비', input, outcome: input.outcome } }
 }
 
 /** 파울 각 공 판의 임시 결과 칸 — 판이 파울로 닫히면 쓰지 않고, 잡히면 판 끝 정산(뜬공 아웃)이 갈아 끼운다 */
@@ -3004,7 +3019,8 @@ function startDefensiveFoulPlay(
   buntKind: number,
 ): TeamGameProgress {
   const stealing = progress
-  const cleared = withoutSteal(progress)
+  // 파울 각 공 판도 타구 판(종류 1)이다 — 시작 리드 0x3d7b8 이 출발 표시를 지운다
+  const cleared = withoutStealDisplay(progress)
   const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
   const input = withPredictedOutcome({
     ...defensiveDefenseInputOf(stealing, outcome, contact.pattern, random, false),
@@ -3024,7 +3040,8 @@ function startBatterFoulPlay(
   options: BatterOutcomeOptions,
 ): TeamGameProgress {
   const stealing = progress
-  const cleared = withoutSteal(progress)
+  // 파울 각 공 판도 타구 판(종류 1)이다 — 시작 리드 0x3d7b8 이 출발 표시를 지운다
+  const cleared = withoutStealDisplay(progress)
   const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
   const input = withPredictedOutcome({
     ...batterDefenseInputOf(stealing, outcome, contact.pattern, random, options),
@@ -3657,8 +3674,15 @@ function describeArrivalPlay(play: PitchArrivalPlay, humanOffense: boolean): str
   return `${who}도루${tail}`
 }
 
+/** 판정 입력(st[0x14 + i])만 거둔다 — 표시(`stealDisplayFrom`)는 0xf 진입 · 타구 판 시작까지 남는다 */
 function withoutSteal(progress: TeamGameProgress): TeamGameProgress {
   return progress.stealingFrom.length === 0 ? progress : { ...progress, stealingFrom: [] }
+}
+
+/** 판정 입력과 표시를 함께 지운다 — 0xf 진입 3d966~3d976 · 타구 판(종류 1) 시작 리드 0x3d7b8 3d8c6~3d8d2 */
+function withoutStealDisplay(progress: TeamGameProgress): TeamGameProgress {
+  const cleared = withoutSteal(progress)
+  return (cleared.stealDisplayFrom ?? []).length === 0 ? cleared : { ...cleared, stealDisplayFrom: [] }
 }
 
 /**
@@ -3871,8 +3895,10 @@ export function burstGameRecordOf(
  * 0xac428 의 인자는 간이 엔진(0xc1ba4 의 0xc1ce2)과 같다 — 팀 경기 모드(1·2·8·9)에서 `[sp+4]`(모드 3)·`[sp+0xc]`
  * (최소 벤치)가 둘 다 0 이다 — 그래서 `judgeAutoPitcherChange` 를 그대로 쓴다.
  */
-function enterPitchSelection(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
-  if (progress.game.isFinished || !isHumanTurn(progress)) return progress
+function enterPitchSelection(entering: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  if (entering.game.isFinished || !isHumanTurn(entering)) return entering
+  // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 돌발 · 교체 묻기(3d9e4~)보다 앞이다
+  const progress = withoutStealDisplay(entering)
   // 3d9fc · 3da44 — 돌발 진행 중(0x8eb94 = obj+0xc ≠ −1)이면 두 판정 모두 건너뛴다
   if (progress.burst !== null && progress.burst.current !== null) return progress
   const changed = isOurOffense(progress)
@@ -4682,7 +4708,8 @@ export function startSteal(progress: TeamGameProgress, base: StealBase): TeamGam
   if (!isBatterTurn(progress)) return progress
   const stealingFrom = startHumanSteal(progress.game.bases, progress.stealingFrom, base)
   if (stealingFrom === progress.stealingFrom) return progress
-  return { ...progress, stealingFrom }
+  // 0xa9bd4 가 st[0x14 + 루] 를 세운다 — 판정 입력과 표시가 한 칸이다
+  return { ...progress, stealingFrom, stealDisplayFrom: stealingFrom }
 }
 
 /**

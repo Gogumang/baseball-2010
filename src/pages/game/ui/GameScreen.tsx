@@ -19,7 +19,7 @@ import type { RecordAlertFrame } from '@/widgets/game-scene/lib/recordAlert'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
-import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import { confirmedCountOf, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
@@ -27,7 +27,12 @@ import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
 import { gameHalfInningCardsOf } from '@/pages/game/lib/gameHalfInningCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import { mySpecialSwingRemainingOf, runnerRunAbilitiesOf, stealableBasesOf } from '@/features/play-game/model/gameFlow'
+import {
+  hiddenStealBasesOf,
+  mySpecialSwingRemainingOf,
+  runnerRunAbilitiesOf,
+  stealableBasesOf,
+} from '@/features/play-game/model/gameFlow'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { RUTHLESS_SKILL_ID } from '@/entities/batting/model/specialSwing'
@@ -343,8 +348,9 @@ export function GameScreen({
               playerSide: progress.game.playerSide,
               // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자 주력, 내가면 내 능력치
               runnerRunAbilities: runnerRunAbilitiesOf(progress),
-              // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입이 지운다)
-              hiddenRunnerBases: progress.stealingFrom,
+              // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입 · 타구 판 시작이 지운다).
+              // 새 타석의 0xf 진입은 0xe 의 첫 OK 뒤라 받은 OK 수를 넘긴다
+              hiddenRunnerBases: hiddenStealBasesOf(progress, confirmedCountOf(progress.sceneConfirm)),
             }}
             isEagleEyeEnabled={isEagleEyeEnabled}
             acePitcher={
