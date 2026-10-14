@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -31,6 +32,9 @@ const IMG_TEXT = './sprites/img_text/frames'
 const POPUP = './sprites/popup/frames'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
+
+/** 고르지 않은 줄 — 까딱임 없음 */
+const NO_SHIFT = { dx: 0, dy: 0 } as const
 
 interface SettingsScreenProps {
   readonly settings: GameSettings
@@ -113,7 +117,10 @@ export function SettingsScreen({
   const [cursor, setCursor] = useState(0)
   /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
   const [hasReturned, setHasReturned] = useState(false)
-  const isOutlineShown = isSelectedOutlineShown(useUpdateCounter())
+  const tick = useUpdateCounter()
+  const isOutlineShown = isSelectedOutlineShown(tick)
+  /** 고른 줄 까딱임 — 표 0xd1784 · 0xd1754 (`settingsLayout` 의 `ROW_SHAKE_TABLES` 머리말) */
+  const rowShake = useCursorShake(tick)
   const [notice, setNotice] = useState<string | null>(null)
   const [isDetailOpen, setDetailOpen] = useState(false)
   const [isModeResetOpen, setModeResetOpen] = useState(false)
@@ -220,6 +227,8 @@ export function SettingsScreen({
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
+        // 1열 격자라 세로 키는 늘 커서를 옮긴다(끝에서 감는다) → 격자 +0x25 가 서고 그 방향으로 까딱인다
+        rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + cursorCount) % cursorCount)
       }
       const horizontal = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
@@ -295,22 +304,24 @@ export function SettingsScreen({
         const barFrame = isValueRow ? (index === 2 ? VALUE_ROW.vibrationBarFrame : VALUE_ROW.barFrame) : MENU_ROW.barFrame
         const icon = index === 0 && settings.soundLevel === 0 ? SOUND_OFF_ICON
           : index === 2 && settings.isVibrationOn ? VIBRATION_ON_ICON : ROW_ICONS[index]
+        // 까딱임은 줄 루프(0x59644~0x598f2)의 그림에만 — 아이콘 · 값 그림(0x59902~)과 진동 값 테두리는 제자리다
+        const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
         return (
           <div key={name}>
             <img className={styles.sprite} alt=""
               src={imageSrc(SLT_FRAME, isSelected ? bullet.selectedBulletImage : bullet.bulletImage)}
-              style={{ left: bullet.bullet.x, top: top + bullet.bullet.dy }} />
+              style={{ left: bullet.bullet.x + dx, top: top + bullet.bullet.dy + dy }} />
             <FrameSprite folder={`${SLT_FRAME}/frames`} frame={barFrame}
-              origins={frames} x={bar.x} y={top + bar.dy} />
+              origins={frames} x={bar.x + dx} y={top + bar.dy + dy} />
 
             {isValueRow && icon !== undefined ? (
               <>
-                <div className={styles.valueName} style={{ left: VALUE_ROW.name.x, top: top + VALUE_ROW.name.dy }}>
+                <div className={styles.valueName} style={{ left: VALUE_ROW.name.x + dx, top: top + VALUE_ROW.name.dy + dy }}>
                   {name}
                 </div>
                 <img className={styles.sprite} alt=""
                   src={imageSrc(SLT_FRAME, VALUE_ROW.iconBackImage)}
-                  style={{ left: VALUE_ROW.iconBack.x, top: top + VALUE_ROW.iconBack.dy }} />
+                  style={{ left: VALUE_ROW.iconBack.x + dx, top: top + VALUE_ROW.iconBack.dy + dy }} />
                 <img className={styles.sprite} alt="" data-testid={`설정아이콘-${index}`}
                   src={imageSrc(SLT_FRAME, icon.image)}
                   style={{
@@ -321,10 +332,10 @@ export function SettingsScreen({
                   <>
                     <img className={styles.sprite} alt=""
                       src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
-                      style={{ left: VALUE_ROW.leftArrow.x, top: top + VALUE_ROW.leftArrow.dy }} />
+                      style={{ left: VALUE_ROW.leftArrow.x + dx, top: top + VALUE_ROW.leftArrow.dy + dy }} />
                     <img className={styles.sprite} alt=""
                       src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
-                      style={{ left: VALUE_ROW.rightArrow.x, top: top + VALUE_ROW.rightArrow.dy, transform: 'scaleX(-1)' }} />
+                      style={{ left: VALUE_ROW.rightArrow.x + dx, top: top + VALUE_ROW.rightArrow.dy + dy, transform: 'scaleX(-1)' }} />
                   </>
                 )}
                 {/* 소리 막대 — 아래 맞춤, 기준은 막대 높이 18 (밑변 Y + 53). 0 이면 "OFF" */}
@@ -367,7 +378,7 @@ export function SettingsScreen({
             ) : (
               <div className={styles.menuName}
                 style={{
-                  left: MENU_ROW.name.x, top: top + MENU_ROW.name.dy, width: MENU_ROW.name.width,
+                  left: MENU_ROW.name.x + dx, top: top + MENU_ROW.name.dy + dy, width: MENU_ROW.name.width,
                   color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
                 }}>
                 {name}
@@ -376,7 +387,7 @@ export function SettingsScreen({
 
             {isBlinkOn && (
               <div className={styles.selectedOutline}
-                style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
+                style={{ left: bar.x + dx, top: top + bar.dy + dy, width: bar.width, height: bar.height }} />
             )}
 
             <button type="button" className={styles.row} aria-label={name}
@@ -488,7 +499,10 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
-  const isOutlineShown = isSelectedOutlineShown(useUpdateCounter())
+  const tick = useUpdateCounter()
+  const isOutlineShown = isSelectedOutlineShown(tick)
+  /** 고른 줄 까딱임 — 같은 표 0xd1784 · 0xd1754 (0x59f04~0x59f4a) */
+  const rowShake = useCursorShake(tick)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
   const values = detailValuesOf(settings)
@@ -498,6 +512,7 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
+        rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + DETAIL_ROW_COUNT) % DETAIL_ROW_COUNT)
       }
       // 갱신 0x288ac 가 OK(−5) · 좌우(−3 · −4) · '4'(0x34) · '6'(0x36) 을 모두 같은 갈래 0x28920(칸 값 ^= 1)으로 보낸다 — 확정.
@@ -533,28 +548,30 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
         // 화살·흰 테두리는 깜빡일 때만([sp+0x9c]) — 펴는 동안은 0x59548 이 끈다
         const isBlinkOn = isSelected && isOutlineShown && isUnfolded
         const valueOutline = detailValueOutlineOf(values[index])
+        // 까딱임은 줄 루프(0x59f4a~0x5a224) 그림 모두 — 줄 뒤 값 칸 노랑 테두리(0x5a226~)는 제자리다
+        const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
         return (
           <div key={row.name}>
             <img className={styles.sprite} alt=""
               src={imageSrc(SLT_FRAME, isSelected ? DETAIL_ROW.selectedBulletImage : DETAIL_ROW.bulletImage)}
-              style={{ left: DETAIL_ROW.bullet.x, top: top + DETAIL_ROW.bullet.dy }} />
-            <div className={styles.valueName} style={{ left: DETAIL_ROW.name.x, top: top + DETAIL_ROW.name.dy }}>
+              style={{ left: DETAIL_ROW.bullet.x + dx, top: top + DETAIL_ROW.bullet.dy + dy }} />
+            <div className={styles.valueName} style={{ left: DETAIL_ROW.name.x + dx, top: top + DETAIL_ROW.name.dy + dy }}>
               {row.name}
             </div>
             <img className={styles.sprite} alt=""
               src={imageSrc(SLT_FRAME, DETAIL_ROW.iconBackImage)}
-              style={{ left: DETAIL_ROW.iconBack.x, top: top + DETAIL_ROW.iconBack.dy }} />
+              style={{ left: DETAIL_ROW.iconBack.x + dx, top: top + DETAIL_ROW.iconBack.dy + dy }} />
             <img className={styles.sprite} alt=""
               src={imageSrc(SLT_FRAME, row.icon.image)}
-              style={{ left: DETAIL_ROW.iconBack.x + icon.dx, top: top + DETAIL_ROW.iconBack.dy + icon.dy }} />
+              style={{ left: DETAIL_ROW.iconBack.x + icon.dx + dx, top: top + DETAIL_ROW.iconBack.dy + icon.dy + dy }} />
             <FrameSprite folder={`${SLT_FRAME}/frames`} frame={DETAIL_ROW.barFrame}
-              origins={frames} x={DETAIL_ROW.bar.x} y={top + DETAIL_ROW.bar.dy} />
+              origins={frames} x={DETAIL_ROW.bar.x + dx} y={top + DETAIL_ROW.bar.dy + dy} />
 
             {row.labels.map((label, choice) => (
               <div key={label} className={styles.vibrationLabel}
                 style={{
-                  left: DETAIL_CHOICES[choice].x,
-                  top: top + DETAIL_CHOICES[choice].dy,
+                  left: DETAIL_CHOICES[choice].x + dx,
+                  top: top + DETAIL_CHOICES[choice].dy + dy,
                   width: DETAIL_CHOICES[choice].width,
                   color: values[index] === choice ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
                 }}>
@@ -566,13 +583,13 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, onBack }: {
               <>
                 <img className={styles.sprite} alt=""
                   src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
-                  style={{ left: DETAIL_ROW.leftArrow.x, top: top + DETAIL_ROW.leftArrow.dy }} />
+                  style={{ left: DETAIL_ROW.leftArrow.x + dx, top: top + DETAIL_ROW.leftArrow.dy + dy }} />
                 <img className={styles.sprite} alt=""
                   src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
-                  style={{ left: DETAIL_ROW.rightArrow.x, top: top + DETAIL_ROW.rightArrow.dy, transform: 'scaleX(-1)' }} />
+                  style={{ left: DETAIL_ROW.rightArrow.x + dx, top: top + DETAIL_ROW.rightArrow.dy + dy, transform: 'scaleX(-1)' }} />
                 <div className={styles.selectedOutline}
                   style={{
-                    left: DETAIL_ROW.outline.x, top: top + DETAIL_ROW.outline.dy,
+                    left: DETAIL_ROW.outline.x + dx, top: top + DETAIL_ROW.outline.dy + dy,
                     width: DETAIL_ROW.outline.width, height: DETAIL_ROW.outline.height,
                   }} />
               </>
@@ -661,7 +678,10 @@ function ModeResetPage({
   readonly onBack: () => void
 }) {
   const [cursor, setCursor] = useState(0)
-  const isOutlineShown = isSelectedOutlineShown(useUpdateCounter())
+  const tick = useUpdateCounter()
+  const isOutlineShown = isSelectedOutlineShown(tick)
+  /** 고른 줄 까딱임 — 같은 표 0xd1784 · 0xd1754 (0x5a386~0x5a3cc) */
+  const rowShake = useCursorShake(tick)
   const [popup, setPopup] = useState<ModeResetPopup | null>(null)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
@@ -693,6 +713,7 @@ function ModeResetPage({
       const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
+        rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + MODE_RESET_ROW_COUNT) % MODE_RESET_ROW_COUNT)
       }
       if (event.key === 'Enter' || event.key === ' ') {
@@ -721,23 +742,24 @@ function ModeResetPage({
       {MODE_RESET_NAMES.map((name, index) => {
         const top = modeResetRowTopOf(index)
         const isSelected = index === cursor
+        const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
         return (
           <div key={name}>
             <img className={styles.sprite} alt=""
               src={imageSrc(SLT_FRAME, isSelected ? MODE_RESET_ROW.selectedBulletImage : MODE_RESET_ROW.bulletImage)}
-              style={{ left: bullet.x, top: top + bullet.dy }} />
+              style={{ left: bullet.x + dx, top: top + bullet.dy + dy }} />
             <FrameSprite folder={`${SLT_FRAME}/frames`} frame={MODE_RESET_ROW.barFrame}
-              origins={frames} x={bar.x} y={top + bar.dy} />
+              origins={frames} x={bar.x + dx} y={top + bar.dy + dy} />
             <div className={styles.menuName}
               style={{
-                left: nameBox.x, top: top + nameBox.dy, width: nameBox.width,
+                left: nameBox.x + dx, top: top + nameBox.dy + dy, width: nameBox.width,
                 color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
               }}>
               {name}
             </div>
             {isSelected && isOutlineShown && isUnfolded && (
               <div className={styles.selectedOutline}
-                style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }} />
+                style={{ left: bar.x + dx, top: top + bar.dy + dy, width: bar.width, height: bar.height }} />
             )}
             <button type="button" className={styles.row} aria-label={name}
               style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}

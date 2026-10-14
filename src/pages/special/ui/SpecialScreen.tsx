@@ -28,6 +28,8 @@ import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayIm
 import { menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf } from '@/pages/main-menu/lib/mainMenuLayout'
 import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -105,6 +107,8 @@ export function SpecialScreen({
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
+  /** 설명 판 까딱임 — 표 0xce8bc · 0xce88c (`DESCRIPTION_PANEL` 머리말) */
+  const panelShake = useCursorShake(useUpdateCounter())
 
   const openItem = (index: number) => {
     const item = SPECIAL_ITEMS[index]
@@ -121,6 +125,8 @@ export function SpecialScreen({
       const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (step !== 0) {
         event.preventDefault()
+        // 갱신 0x28b9c: ↑ · ↓ 가 [메뉴+0xf4] = 1 을 세우고 0x5550d 로 방향을 적는다 → 그리기 머리 0x252c6 가 까딱임을 건다
+        panelShake.start(step > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + step + ITEM_COUNT) % ITEM_COUNT)
       }
       if (event.key === 'Enter' || event.key === ' ') {
@@ -165,6 +171,7 @@ export function SpecialScreen({
   }
 
   const selected = SPECIAL_ITEMS[cursor]
+  const { dx: shakeDx, dy: shakeDy } = panelShake.offset
 
   return (
     <RawScreen>
@@ -190,22 +197,22 @@ export function SpecialScreen({
         className={styles.sprite}
         alt=""
         src={imageSrc(MAIN_UI, DESCRIPTION_PANEL.image)}
-        style={{ left: DESCRIPTION_PANEL.x, top: descriptionPanelTopOf(cursor) }}
+        style={{ left: DESCRIPTION_PANEL.x + shakeDx, top: descriptionPanelTopOf(cursor) + shakeDy }}
       />
       <img
         className={`${styles.sprite} ${selected.availability === '됨' ? '' : styles.dimmed}`}
         alt=""
         src={imageSrc(MAIN_UI_FRAMES, selected.labelFrame)}
         style={{
-          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding,
-          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.padding,
+          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding + shakeDx,
+          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.padding + shakeDy,
         }}
       />
       <div
         className={styles.description}
         style={{
-          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding,
-          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.textDy,
+          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding + shakeDx,
+          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.textDy + shakeDy,
           color: DESCRIPTION_PANEL.textColor,
         }}
       >
@@ -422,8 +429,10 @@ type HallOfFamePopup =
  * 위쪽 A(58,110) 자리에 고른 칸의 선수, B(178,96) 자리에 능력치 도형, 아래쪽에 **5×3 격자 15칸**
  * (`NARI_PITCHER_SLOT` 머리말의 배치). 스페셜에서는 칸을 고르면 **말풍선**(친구에게 선물 / 슬롯에서 삭제)이 뜬다.
  *
- * ⚠️ **웹에 값이 없어 못 그린 것**
- *  - 찬 칸의 **캐릭터 그림**([skin+0x290])과 **팀 로고**(캐릭터+0x30) — 원 두 개만 깔고 이름 막대를 얹는다.
+ * 찬 칸의 **캐릭터 그림**([skin+0x290])과 **팀 로고**(캐릭터+0x30, 나리 칸 0·5)는 `HallOfFameFigure` · `TeamLogo` 가 A 자리에
+ * 그린다 — 원 두 개는 빈 칸 · 잠긴 칸에만 깐다(0x6535a~).
+ *
+ * ⚠️ **웹에서 못 하는 것**
  *  - "친구에게 선물" 은 통신이 필요해 안내만 띄운다. "슬롯에서 삭제" 는 `deletion`(HallOfFameDeletion) 대로 돈다.
  *    슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */

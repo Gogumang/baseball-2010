@@ -1,3 +1,4 @@
+import { CURSOR_SHAKE_DIRECTION_CODES } from '@/shared/lib/cursorShake/cursorShake'
 /**
  * 기록연감 키 처리 (메인 메뉴 상태 30 갱신 0x2b7a0 — 직접 떴다).
  *
@@ -54,7 +55,7 @@ export const ANNALS_GRID_SHAPES: readonly AnnalsGridShape[] = [
 export type AnnalsDirection = 'left' | 'right' | 'up' | 'down'
 
 /** [skin+0x8c] 방향 번호 (0x5550d) */
-export const DIRECTION_CODES: Record<AnnalsDirection, number> = { left: 0, right: 1, up: 2, down: 3 }
+export const DIRECTION_CODES: Record<AnnalsDirection, number> = CURSOR_SHAKE_DIRECTION_CODES
 
 /**
  * 격자 커서 한 칸 옮기기 (0x6c445 → 0x6be71 → 0x6bead). 칸 번호 = 줄 × 열 + 칸.
@@ -169,12 +170,7 @@ export const isListCursorBlinkOn = (drawsSinceBuilt: number) => drawsSinceBuilt 
  * `x += 표 0xce8bc[2·방향 + t]`, `y += 표 0xce88c[3·방향 + t]` 로 그리고 t 를 올린다 — t > 1 이면 [this+0xfc] = −1.
  * 곧 두 틱: ← (−2, 0)→(+2, 0) · → (+2, 0)→(−2, 0) · ↑ (0, −2)→(0, +2) · ↓ (0, +2)→(0, −2).
  */
-const SHAKE_X = [-2, 2, 2, -2, 0, 0, 0, 0] as const
-const SHAKE_Y = [0, 0, 0, 0, 0, 0, -2, 2, 0, 2, -2, 0] as const
-export function cursorShakeOf(directionCode: number, tick: number): { readonly dx: number; readonly dy: number } {
-  if (tick < 0 || tick > 1) return { dx: 0, dy: 0 }
-  return { dx: SHAKE_X[2 * directionCode + tick] ?? 0, dy: SHAKE_Y[3 * directionCode + tick] ?? 0 }
-}
+export { cursorShakeOf } from '@/shared/lib/cursorShake/cursorShake'
 
 /**
  * **판 열고 닫기** — 들어올 때 0x2407c: 높이 [skin+0x90] = 32 · 속도 [skin+0x94] = 1 · 끝남 [skin+0x98] = 0 ·

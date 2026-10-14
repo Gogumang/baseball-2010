@@ -681,3 +681,33 @@ describe('설명 띠 0x55544 — y 275 · 1 → 4 → 16 → 64 → 160 으로 �
     expect(container.querySelector('[data-description-band]')).toBeNull()
   })
 })
+
+/**
+ * 고른 줄 까딱임 (0x59462 · 0x59600~0x59644 — 표 0xd1784 · 0xd1754): 커서가 옮겨 간 그리기부터 두 그리기 동안
+ * 그 줄 그림을 ↓ (0,+2)(0,−2) · ↑ (0,−2)(0,+2) 옮긴다. 값 그림(0x59902~)은 제자리다.
+ */
+describe('고른 줄 까딱임 (표 0xd1784 · 0xd1754)', () => {
+  it('↓ 로 옮겨 간 줄의 글머리가 +2 · −2 뒤 제자리로 돌아온다', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = 띄우기()
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 6)
+      })
+      const 글머리 = () => container.querySelector(`img[src$="/${String(VALUE_ROW.selectedBulletImage).padStart(3, '0')}.png"]`) as HTMLElement
+      const 제자리 = rowTopOf(1) + VALUE_ROW.bullet.dy
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+      expect(글머리().style.top).toBe(`${제자리 + 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(글머리().style.top).toBe(`${제자리 - 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(글머리().style.top).toBe(`${제자리}px`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
