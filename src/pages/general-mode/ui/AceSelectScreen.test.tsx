@@ -205,7 +205,8 @@ describe('오픈 힌트 팝업', () => {
 
     // 칸 0 ← 0 · '8' → 5 · ↓ → 0(감기) · → 1 · '5' = OK → 칸 1 레벨업 창
     누르기(['ArrowLeft', '8', 'ArrowDown', 'ArrowRight', '5'])
-    expect(screen.getByRole('dialog', { name: '마선수 레벨업' }).textContent).toContain(acePlayerOfCell(1)?.name ?? '없음')
+    // 원본 창 0x5f394 는 이름을 안 그린다 — 연 칸은 창의 data-cell 로 본다
+    expect(screen.getByRole('dialog', { name: '마선수 레벨업' }).getAttribute('data-cell')).toBe('1')
   })
 })
 

@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react'
-import { MarkupText, MessageBox } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, MessageBox, useImgTextPalette3 } from '@/shared/ui'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { ACE_OPEN_TABLE } from '@/shared/config/original/aceOpen'
 import {
   ACE_LEVEL_UP_TEXT,
   aceLevelUpOutcomeOf,
   aceLevelUpRowsOf,
 } from '@/entities/mission/model/aceLevel'
+import {
+  ACE_BATTER_ROW_LABEL_FRAMES, ACE_LEVEL_UP_ARROW_IMAGE, ACE_LEVEL_UP_BAR_FRAME, ACE_LEVEL_UP_BUTTONS, ACE_LEVEL_UP_BUTTON_SIZE,
+  ACE_LEVEL_UP_COST_BOX, ACE_LEVEL_UP_COST_TEXT, ACE_LEVEL_UP_HEAD, ACE_LEVEL_UP_PANEL, ACE_LEVEL_UP_TIMES_FRAME, ACE_LEVEL_UP_TITLE,
+  ACE_PITCHER_ROW_LABEL_FRAMES, aceLevelUpNumberOf, aceLevelUpRowOf,
+} from '@/widgets/ace-level-up/lib/aceLevelUpLayout'
+import type { AceLevelUpGlyph } from '@/widgets/ace-level-up/lib/aceLevelUpLayout'
 import * as styles from '@/widgets/ace-level-up/ui/AceLevelUpWindow.css'
 
-/** 원작 화면 크기 — 창은 (W/2, H/2) 가운데 192×212 (0x5f3d8~0x5f424 `0x55e60(…, 0xc0, 0xd4, …)`) */
-const SCREEN = { width: 240, height: 320 } as const
-const WINDOW = { width: 192, height: 212 } as const
+const IMG_TEXT = './sprites/img_text/frames'
+const SLT_FRAME = './sprites/slt_frame/frames'
+const SLT_IMAGE = './sprites/slt_frame'
+const POPUP = './sprites/popup/frames'
+const NUM = './sprites/num'
+const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /** 마투수/마타자 구분 — 창 그리기 0x5f4be `cmp idx,#4; bgt` (칸 0~4 마투수) */
 const LAST_PITCHER_CELL = 4
@@ -42,10 +53,10 @@ export interface AceLevelUpWindowProps {
  * +0x314 = 1 이다. 팝업 "아니오" 는 팝업만 닫는다 (0x5fcaa). "예" 는 원본에서 G 충전 페이지(상태 24)로
  * 나간다(0x2af56 → 0x2b25a) — ⚠️ 웹판엔 통신 충전 화면이 없어 "아니오" 와 같이 팝업만 닫는다 (근사).
  *
- * 창 안 (0x5f394): 제목 img_text 375 "레벨업", 다섯 줄 = 능력치 네 칸의 지금 값·다음 레벨 값(배율 사본
- * 0xd1734) + 필살타법/마구 횟수(0xd1739/0xd173e), 비용 줄 StrCOMMON[49], 예/아니오 버튼.
- * ⚠️ 미해결(화면): 줄 y·막대 그림 0x585ac·버튼 그림 0xbb28d(…, 0xae, 0x41, 2) 의 세부 배치는
- *    S9 2-5 도 "유력" 까지라 여기서는 글자 판으로만 그린다. 성공 연출 0xbbc85 도 없다.
+ * 창 안 (0x5f394 — 배치는 `aceLevelUpLayout` 머리말): 공용 판(제목 탭 · 어둡게) · 제목 img_text 375 "레벨업" 팔레트 3 ·
+ * 머리 줄 "LV" 지금 → 다음 · 다섯 줄 = 능력치 네 칸의 지금 값 → 다음 레벨 값(배율 사본 0xd1734) + 필살타법/마구 횟수
+ * (0xd1739/0xd173e) · 안쪽 칸에 비용 줄 StrCOMMON[49] · popup.pzx 예/아니오 그림.
+ * ⚠️ 미확인: 성공 연출 0xbbc85 는 옮기지 않았다.
  */
 export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }: AceLevelUpWindowProps) {
   /** `skin+0x31e` — 1 = "예" 가 기본 (0x5faf4 가 1 로 되돌린다) */
@@ -88,56 +99,88 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
+  const textOrigins = useFrameOrigins(IMG_TEXT)
+  const sltOrigins = useFrameOrigins(SLT_FRAME)
+  const popupOrigins = useFrameOrigins(POPUP)
+  const palette3 = useImgTextPalette3()
+  const widthOf = (frame: number) => textOrigins?.[pad(frame)]?.width ?? 0
+  const labelFrames = role === '투수' ? ACE_PITCHER_ROW_LABEL_FRAMES : ACE_BATTER_ROW_LABEL_FRAMES
+  const numberImages = (glyphs: readonly AceLevelUpGlyph[], key: string) => glyphs.map((glyph, index) => (
+    <img key={`${key}-${index}`} className={styles.layer} alt="" src={`${NUM}/${pad(glyph.image)}.png`}
+      style={{ left: glyph.x, top: glyph.y }} />
+  ))
+  const textLine = (frame: number, left: number, top: number, key?: string) => (
+    <img key={key} className={styles.layer} alt="" src={`${IMG_TEXT}/${pad(frame)}.png`} style={{ left, top }} />
+  )
+  const head = ACE_LEVEL_UP_HEAD
+  const costLines = parseGameMarkup(ACE_LEVEL_UP_TEXT.confirm.replace('%d', String(outcome.cost)))
+
   return (
     <>
-      <div
-        className={styles.window}
-        role="dialog"
-        aria-label="마선수 레벨업"
-        style={{
-          left: (SCREEN.width - WINDOW.width) / 2,
-          top: (SCREEN.height - WINDOW.height) / 2,
-          width: WINDOW.width,
-          height: WINDOW.height,
-        }}
-      >
-        <div className={styles.title}>레벨업</div>
-        <div className={styles.name}>
-          {entry?.name ?? ''} <span className={styles.level}>LV.{level + 1}</span>
-        </div>
-        <div className={styles.rows}>
-          {rows.map((row) => (
-            <div key={row.label} style={{ display: 'contents' }} data-testid="레벨업-줄">
-              <span>{row.label}</span>
-              <span className={styles.value}>{row.current}</span>
-              <span className={styles.arrow}>→</span>
-              <span className={styles.nextValue}>{row.next}</span>
+      <div role="dialog" aria-label="마선수 레벨업" data-cell={cell}>
+        {palette3.definition}
+        {/* 5f424 공용 판 0x55e60(skin, W/2, H/2, 0xc0, 0xd4, 0, 0x22, 0, 0, 제목 탭 1, 어둡게 1) */}
+        <CommonPanel x={ACE_LEVEL_UP_PANEL.x} y={ACE_LEVEL_UP_PANEL.y} width={ACE_LEVEL_UP_PANEL.width}
+          height={ACE_LEVEL_UP_PANEL.height} titleTab dim testId="레벨업-판" />
+        <img className={styles.layer} alt="레벨업" src={`${IMG_TEXT}/${pad(ACE_LEVEL_UP_TITLE.frame)}.png`}
+          style={{ left: ACE_LEVEL_UP_TITLE.centerX - (widthOf(ACE_LEVEL_UP_TITLE.frame) >> 1), top: ACE_LEVEL_UP_TITLE.y, ...palette3.style }} />
+
+        {/* 머리 줄 — LV 지금 → 다음 */}
+        <FrameSprite folder={SLT_FRAME} frame={ACE_LEVEL_UP_BAR_FRAME} origins={sltOrigins} x={head.bar.x} y={head.bar.y} />
+        <img className={styles.layer} alt="" src={`${SLT_IMAGE}/${pad(ACE_LEVEL_UP_ARROW_IMAGE)}.png`}
+          style={{ left: head.arrow.x, top: head.arrow.y }} />
+        {textLine(head.labelFrame, head.labelRight - widthOf(head.labelFrame), head.labelY)}
+        <span data-testid="레벨업-레벨" aria-label={`LV ${level + 1} → ${level + 2}`}>
+          {numberImages(aceLevelUpNumberOf(level + 1, head.currentCenterX, head.numberY, 2), 'lv-now')}
+          {numberImages(aceLevelUpNumberOf(level + 2, head.nextCenterX, head.numberY, 2), 'lv-next')}
+        </span>
+
+        {rows.map((row, index) => {
+          const place = aceLevelUpRowOf(index)
+          const labelFrame = labelFrames[index] ?? 0
+          return (
+            <div key={row.label} data-testid="레벨업-줄" aria-label={`${row.label} ${row.current} → ${row.next}`}>
+              <FrameSprite folder={SLT_FRAME} frame={ACE_LEVEL_UP_BAR_FRAME} origins={sltOrigins} x={place.currentBar.x} y={place.currentBar.y} />
+              <img className={styles.layer} alt="" src={`${SLT_IMAGE}/${pad(ACE_LEVEL_UP_ARROW_IMAGE)}.png`}
+                style={{ left: place.arrow.x, top: place.arrow.y }} />
+              <FrameSprite folder={SLT_FRAME} frame={ACE_LEVEL_UP_BAR_FRAME} origins={sltOrigins} x={place.nextBar.x} y={place.nextBar.y} />
+              {textLine(labelFrame, place.labelRight - widthOf(labelFrame), place.labelY)}
+              {place.times.map((spot, spotIndex) => textLine(ACE_LEVEL_UP_TIMES_FRAME, spot.x, spot.y, `times-${spotIndex}`))}
+              {numberImages(aceLevelUpNumberOf(row.current, place.currentRight, place.numberY, 4), 'now')}
+              {numberImages(aceLevelUpNumberOf(row.next, place.nextRight, place.numberY, 4), 'next')}
+            </div>
+          )
+        })}
+
+        {/* 5f878 안쪽 칸 · 5f8de 비용 줄 0xba269(…, (38, 196), 폭 164) */}
+        <InsetBox x={ACE_LEVEL_UP_COST_BOX.x} y={ACE_LEVEL_UP_COST_BOX.y} width={ACE_LEVEL_UP_COST_BOX.width}
+          height={ACE_LEVEL_UP_COST_BOX.height} testId="레벨업-비용-칸" />
+        <div className={styles.cost} data-testid="레벨업-비용"
+          style={{ left: ACE_LEVEL_UP_COST_TEXT.x, top: ACE_LEVEL_UP_COST_TEXT.y, width: ACE_LEVEL_UP_COST_TEXT.width }}>
+          {costLines.map((line, lineIndex) => (
+            <div key={lineIndex} style={{ textAlign: line.isCentered ? 'center' : 'left' }}>
+              {line.segments.map((segment, segmentIndex) => (
+                <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+              ))}
             </div>
           ))}
         </div>
-        <div className={styles.cost}>
-          <MarkupText raw={ACE_LEVEL_UP_TEXT.confirm.replace('%d', String(outcome.cost))} />
-        </div>
-        <div className={styles.buttons}>
-          <button
-            type="button"
-            className={`${styles.button} ${isYes ? styles.buttonSelected : ''}`}
-            aria-pressed={isYes}
-            onMouseEnter={() => setIsYes(true)}
-            onClick={() => (isYes ? confirm() : setIsYes(true))}
-          >
-            예
-          </button>
-          <button
-            type="button"
-            className={`${styles.button} ${isYes ? '' : styles.buttonSelected}`}
-            aria-pressed={!isYes}
-            onMouseEnter={() => setIsYes(false)}
-            onClick={onClose}
-          >
-            아니오
-          </button>
-        </div>
+
+        {/* 5f948 · 5f97c popup 1 "예" · 2 "아니오" — 고른 칸은 6 · 7 을 덧긋는다 (5f9f6) */}
+        {ACE_LEVEL_UP_BUTTONS.map((button, index) => {
+          const isSelected = (index === 0) === isYes
+          return (
+            <span key={button.label}>
+              <FrameSprite folder={POPUP} frame={button.frame} origins={popupOrigins} x={button.x} y={button.y} />
+              {isSelected && (
+                <FrameSprite folder={POPUP} frame={button.selectedFrame} origins={popupOrigins} x={button.x} y={button.y} />
+              )}
+              <button type="button" className={styles.hitArea} aria-label={button.label} aria-pressed={isSelected}
+                style={{ left: button.x, top: button.y, width: ACE_LEVEL_UP_BUTTON_SIZE.width, height: ACE_LEVEL_UP_BUTTON_SIZE.height }}
+                onClick={() => (index === 0 ? (isYes ? confirm() : setIsYes(true)) : onClose())} />
+            </span>
+          )
+        })}
       </div>
       {isShortageOpen && (
         <MessageBox
