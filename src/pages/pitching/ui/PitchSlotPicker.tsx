@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isPitchSelectionDue, pitchSlotOfKey } from '@/features/play-pitcher-game/model/pitchAim'
 import { slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
-import { TapLayer, TapZone } from '@/pages/pitching/ui/TapZone'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -66,7 +67,6 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
       : ({ kind: '구질', typeNumbers: overlay.typeNumbers, magicRemaining: overlay.magicRemaining, tick } satisfies PitchInputOverlay),
   )
   /** 고른 칸 (`+0xfc8` 이 서 있는 자리) */
-  const [chosen, setChosen] = useState<number | null>(null)
   const chosenRef = useRef<number | null>(null)
   const isDoneRef = useRef(false)
   const propsRef = useRef({ choices, onDecide, isPaused })
@@ -91,7 +91,6 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
     // 빈 칸 · 막힌 마구 칸 — `+0xfc8` 이 그대로다
     if (choice === undefined || choice.isBlocked === true) return
     chosenRef.current = slot
-    setChosen(slot)
   }
   const pressRef = useRef(press)
   pressRef.current = press
@@ -110,21 +109,20 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
   }, [])
 
   return (
-    <TapLayer testId="구질 누름 칸">
+    <PressLayer testId="구질 누름 칸">
       {choices.map((choice) => {
         const rect = slotTapRectOf(choice.slot, stageSide)
         if (rect === null) return null
         return (
-          <TapZone
+          <PressArea
             key={choice.slot}
             rect={rect}
             label={`${SLOT_KEY_LABELS[choice.slot] ?? ''} ${choice.name}`}
-            isPressed={choice.slot === chosen}
             isDisabled={choice.isBlocked === true}
             onPress={() => press(choice.slot)}
           />
         )
       })}
-    </TapLayer>
+    </PressLayer>
   )
 }

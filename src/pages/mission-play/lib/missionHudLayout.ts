@@ -3,7 +3,7 @@ import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import type { GoalTickerFrame } from '@/entities/mission/model/goalTicker'
 
 /**
- * **타자 미션 HUD — 원본 `0x36714`** (2026-10-14 직접 뜸, 0x36714~0x36c90 · 줄 그리기 0x36358 · 숫자 0x3608c · 시계 0x361e4).
+ * **미션 HUD — 원본 `0x36714`** (타자 미션 모드 6 · 투수 미션 모드 5) (2026-10-14 직접 뜸, 0x36714~0x36c90 · 줄 그리기 0x36358 · 숫자 0x3608c · 시계 0x361e4).
  *
  * 부르는 곳은 0x36cb8 하나 — 타석 점수판 `0x373d0` 의 **맨 끝**(0x378f0)에서 모드 5 · 6 일 때만 부른다. 곧 미션 화면의 목표는
  * 웹 껍데기의 띠가 아니라 **타석 캔버스 오른쪽 위 판**에 점수판과 같은 차례로 그린다(점수판 위 · 소개 판 0x44944 아래).
@@ -72,6 +72,14 @@ export const MISSION_HUD_BASE: readonly HudSprite[] = [
   // 369c0 모드 6: 이미지 8 방망이 (x0 + 7, 8)
   { src: `${TRAINNING_FOLDER}/008.png`, left: PANEL_X + 7, top: 8 },
 ]
+
+/** 미션 모드 — 5 투수 미션 · 6 타자 미션 ([장면+0x1104]) */
+export type MissionHudMode = 5 | 6
+
+/** 369b2 머리 아이콘 — 모드 6 이미지 8 방망이 (x0 + 7, 8) · 모드 5 이미지 7 공 (x0 + 7, 7) */
+export function missionHudIconOf(mode: MissionHudMode): HudSprite {
+  return mode === 6 ? MISSION_HUD_BASE[2] : { src: `${TRAINNING_FOLDER}/007.png`, left: PANEL_X + 7, top: 7 }
+}
 
 // ── 숫자 0x3608c · 0x585ad ──
 
@@ -163,6 +171,34 @@ const COUNT_KEY_OF: Readonly<Record<(typeof GOAL_KEYWORDS)[number], string | nul
   사이클링히트: null,
 }
 
+/**
+ * **모드 5 의 줄 맞대기** — 0x36466~0x36522: 이름표 0xcfdf4(9 개)를 0x14003b8(strcmp)로 맞대 칸 번호 i 를 고르고 점프표 0xcfe48[i] 로
+ * (목표 = 행 목표 칸 0xa54b5 의 니블, 지금 = 투수 칸 P = R+0x124 의 값)을 고른다. 맞는 이름이 없으면 i 는 0 그대로다(36492~364ae).
+ * ```
+ * 0 탈삼진     목표 행+0xa0 윗 4비트 · 지금 P+0x10        1 삼진콤보   아랫 4비트 · P+0x28
+ * 2 MAX게이지  행+0xa1 윗 4비트 · P+0x34                  3 무실점 · 4 노히트노런 · 5 퍼펙트게임 → (0, 1)
+ * 6 실점       행+0xa1 아랫 4비트 · P+4                    7 아웃       행+0xa4 바이트 · P+0x18
+ * 8 피안타     36524 로 곧장 — 첫 값 (0, 0) 그대로
+ * ```
+ * 웹 진행 칸(`MissionProgress.counts`)은 같은 이름으로 탈삼진 · 삼진콤보 · MAX게이지 · 아웃을 든다. 실점은 허용 실점(`allowed.runs`).
+ */
+const PITCHER_GOAL_KEYWORDS = ['탈삼진', '삼진콤보', 'MAX게이지', '무실점', '노히트노런', '퍼펙트게임', '실점', '아웃', '피안타'] as const
+
+export function pitcherGoalCountOf(
+  mission: OriginalMission,
+  progress: MissionProgress,
+  line: string,
+  allowedRuns: number,
+): GoalCount {
+  const keyword = PITCHER_GOAL_KEYWORDS.find((word) => word === line) ?? PITCHER_GOAL_KEYWORDS[0]
+  if (keyword === '무실점' || keyword === '노히트노런' || keyword === '퍼펙트게임') return { current: 0, target: 1 }
+  if (keyword === '피안타') return { current: 0, target: 0 }
+  const target = mission.goalCounts[keyword] ?? 0
+  const current = keyword === '실점' ? allowedRuns : (progress.counts[keyword] ?? 0)
+  // 0x3667a — 지금 > 목표면 지금 = 목표
+  return { current: Math.min(current, target), target }
+}
+
 export interface GoalCount {
   readonly current: number
   readonly target: number
@@ -243,6 +279,10 @@ export interface MissionLimitState {
   readonly swingLimit: number
   /** 쓴 스윙 — R+0xf0 (웹 = 한도 − 남은 스윙) */
   readonly swingsUsed: number
+  /**
+   * 모드 5 투수 미션 — 행[9] 아랫 4비트(투구 한도) · 던진 공 P+0x1c. 주면 스윙 띠 대신 "투구" 띠(img_text 0x107)를 그린다
+   */
+  readonly pitches?: { readonly limit: number; readonly thrown: number }
 }
 
 /** 0x369f6 · 0x36b04 — 타석 띠 · 스윙 띠 */
@@ -268,12 +308,17 @@ export function limitStripsOf(state: MissionLimitState): LimitStrip[] {
     previousTop = top
     previousHeight = STRIP_HEIGHT
   }
-  if (state.swingLimit > 0) {
+  // 36b04 — 모드 6 스윙 한도(img_text 0x108) · 모드 5 투구 한도(0x107)
+  const second =
+    state.pitches === undefined
+      ? { limit: state.swingLimit, used: state.swingsUsed, label: 264 }
+      : { limit: state.pitches.limit, used: state.pitches.thrown, label: 263 }
+  if (second.limit > 0) {
     const base = previousTop + previousHeight
     strips.push({
       strip: { src: `${TRAINNING_FRAMES}/013.png`, left: PANEL_X, top: base + 2, opacity: STRIP_OPACITY },
-      label: { src: `${IMG_TEXT_FRAMES}/264.png`, left: PANEL_X + 6, top: base + 6 },
-      glyphs: slashCounterGlyphsOf(state.swingsUsed, state.swingLimit, PANEL_X + 0x31, base + 6, COUNTER_BASE.white),
+      label: { src: `${IMG_TEXT_FRAMES}/${second.label}.png`, left: PANEL_X + 6, top: base + 6 },
+      glyphs: slashCounterGlyphsOf(second.used, second.limit, PANEL_X + 0x31, base + 6, COUNTER_BASE.white),
     })
   }
   return strips

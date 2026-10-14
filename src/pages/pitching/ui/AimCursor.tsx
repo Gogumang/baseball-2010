@@ -8,8 +8,10 @@ import {
   aimTickOf,
 } from '@/features/play-pitcher-game/model/pitchAim'
 import type { AimDirection, AimKeyAction } from '@/features/play-pitcher-game/model/pitchAim'
-import { AIM_KEYPAD_KEYS, aimTapRectsOf, CLEAR_KEY_RECT } from '@/pages/pitching/lib/pitchInputTapZones'
-import { TapLayer, TapZone } from '@/pages/pitching/ui/TapZone'
+import { AIM_KEYPAD_KEYS, aimTapRectsOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
@@ -119,18 +121,18 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   const rects = aimTapRectsOf(side)
 
   return (
-    <TapLayer testId="조준 영역">
+    <PressLayer testId="조준 영역">
       {/* 조준점 값 — 그림은 장면이 그린다. 시험 · 읽기 보조용 */}
       <span hidden data-testid="조준점" data-x={aim.x} data-y={aim.y} data-z={aim.z} />
       {AIM_KEYPAD_KEYS.map((key, index) => (
-        <TapZone
+        <PressArea
           key={key}
           rect={rects[index]}
           label={key === '5' ? '조준 확정' : `조준 ${KEYPAD_LABELS[key] ?? key}`}
           onPress={() => pressKey(key)}
         />
       ))}
-      {onCancel !== undefined && <TapZone rect={CLEAR_KEY_RECT} label="CLR 구질로" onPress={() => pressKey('Escape')} />}
-    </TapLayer>
+      {onCancel !== undefined && <PressArea rect={CLEAR_PRESS_RECT} label="CLR 구질로" onPress={() => pressKey('Escape')} />}
+    </PressLayer>
   )
 }

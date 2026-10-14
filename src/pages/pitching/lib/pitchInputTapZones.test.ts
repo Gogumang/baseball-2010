@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { aimTapRectsOf, gaugeTapRectOf, MENU_KEY_RECT, slotTapRectOf, TIME_KEY_RECT } from '@/pages/pitching/lib/pitchInputTapZones'
+import { aimTapRectsOf, gaugeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 
 describe('투구 입력 누름 칸', () => {
   it('소프트키 칸은 "*MENU" (0, 307) · "#TIME" (198, 307) 글자 자리 41×12 다', () => {
-    expect(MENU_KEY_RECT).toEqual({ x: 0, y: 307, width: 41, height: 12 })
-    expect(TIME_KEY_RECT).toEqual({ x: 198, y: 307, width: 41, height: 12 })
+    expect(MENU_PRESS_RECT).toEqual({ x: 0, y: 307, width: 41, height: 12 })
+    expect(TIME_PRESS_RECT).toEqual({ x: 198, y: 307, width: 41, height: 12 })
   })
 
   it('구질 칸은 투수 앵커에서 잰다 — 좌타 (83, 188) · 우타 (156, 188)', () => {

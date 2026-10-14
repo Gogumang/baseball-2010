@@ -1,4 +1,4 @@
-import { MENU_LABEL_POSITION } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { MENU_LABEL_POSITION, TIME_LABEL_POSITION } from '@/widgets/batting-stage/lib/softKeyLabels'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { PressRect } from '@/shared/ui'
 
@@ -12,6 +12,18 @@ import type { PressRect } from '@/shared/ui'
  * (타석 공용 그리기 0x4c4bc 의 4c926, `softKeyLabels`).
  */
 export const MENU_PRESS_RECT: PressRect = { ...MENU_LABEL_POSITION, width: 41, height: 12 }
+
+/**
+ * '#' — 소프트키 글자 "#TIME"(game_ui 프레임 91, 41 × 12)이 서는 (W − w − 1, H − h − 1) = (198, 307) 자리 (0x4c9f8).
+ * 그 글자는 0x38984 가 참이고 상태 0xe · 0xf 이며 벤치 수 > 0 일 때만 선다(`softKeyLabels`) — 누름 칸도 '#' 를 받는 동안만 둔다.
+ */
+export const TIME_PRESS_RECT: PressRect = { ...TIME_LABEL_POSITION, width: 41, height: 12 }
+
+/**
+ * CLR — 원본 화면에는 CLR 글자가 없다(하드웨어 키). ⚠️ 웹 자리: 조준(0x10) · 게이지(0x11)는 "#TIME" 을 안 그리는 상태라(0x4c92e)
+ * 오른쪽 소프트키 글자 자리를 빌린다.
+ */
+export const CLEAR_PRESS_RECT: PressRect = TIME_PRESS_RECT
 
 /**
  * 도루 '3' · '2' · '1' — 원본은 도루 키에 그림을 두지 않는다. 그 주자가 선 루를 점수판 0x373d0 의 루 그림

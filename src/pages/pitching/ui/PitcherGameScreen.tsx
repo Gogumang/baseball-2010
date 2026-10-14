@@ -32,9 +32,9 @@ import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
 import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
-import { TapLayer, TapZone } from '@/pages/pitching/ui/TapZone'
-import { MENU_KEY_RECT, TIME_KEY_RECT } from '@/pages/pitching/lib/pitchInputTapZones'
-import type { TapRect } from '@/pages/pitching/lib/pitchInputTapZones'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
+import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -827,14 +827,13 @@ export function PitcherGameScreen({
 
         {/* 0xe — OK 하나를 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
         {isAwaitingConfirm && !isPopupOpen && !asksGiveUp && (
-          <TapLayer testId="확인 누름 칸">
-            <TapZone
-              rect={WHOLE_STAGE}
+          <PressLayer testId="확인 누름 칸">
+            <PressArea
               label="확인"
               isDisabled={!sceneConfirm.acceptsConfirm}
               onPress={sceneConfirm.confirm}
             />
-          </TapLayer>
+          </PressLayer>
         )}
 
         {/* 0xf 구질 — 그림은 장면(0x4c4bc 4c528~)이 그리고 여기는 키 · 틱 · 누름 칸만 */}
@@ -908,10 +907,10 @@ export function PitcherGameScreen({
           메뉴로(소프트키1 도 '*' 로 읽는다, 498e8), '#' 는 0xe · 0xf 에서 강판 물음(0x4994a → StrGAME[104])
         */}
         {acceptsMenuKey && (
-          <TapLayer testId="소프트키 누름 칸" isOnTop>
-            <TapZone rect={MENU_KEY_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
-            {acceptsGiveUpKey && <TapZone rect={TIME_KEY_RECT} label="# 강판" onPress={() => setAsksGiveUp(true)} />}
-          </TapLayer>
+          <PressLayer testId="소프트키 누름 칸" isOnTop>
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
+            {acceptsGiveUpKey && <PressArea rect={TIME_PRESS_RECT} label="# 강판" onPress={() => setAsksGiveUp(true)} />}
+          </PressLayer>
         )}
 
         {isMenuOpen && (
@@ -996,8 +995,6 @@ export function PitcherGameScreen({
 const GIVE_UP_CONFIRM_TEXT = '!C그만 던지시겠습니까?'
 
 /** 장면 판 전체 — 0xe 의 OK 누름 칸 */
-const WHOLE_STAGE: TapRect = { x: 0, y: 0, width: 240, height: 320 }
-
 /** 작은 팀 로고 (team_logo_ini) — 팀 경기 HUD 와 같은 그림 */
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 

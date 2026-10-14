@@ -8,7 +8,8 @@ import {
   KEY_OK,
 } from '@/features/play-pitcher-game/model/pitchAim'
 import { gaugeTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
-import { TapLayer, TapZone } from '@/pages/pitching/ui/TapZone'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -136,12 +137,12 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
 
   const isDecided = isDecidedCell(pressed)
   return (
-    <TapLayer testId="게이지 누름 칸">
-      <TapZone
-        rect={overlay === undefined ? { x: 0, y: 0, width: 240, height: 320 } : gaugeTapRectOf(overlay.aim, overlay.aimSide)}
+    <PressLayer testId="게이지 누름 칸">
+      <PressArea
+        {...(overlay === undefined ? {} : { rect: gaugeTapRectOf(overlay.aim, overlay.aimSide) })}
         label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}
         onPress={press}
       />
-    </TapLayer>
+    </PressLayer>
   )
 }

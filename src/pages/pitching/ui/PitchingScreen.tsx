@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { RawScreen } from '@/shared/ui'
-import { goalsOf } from '@/entities/mission/model/missionGoal'
-import { MissionGoalPanel } from '@/pages/pitching/ui/MissionGoalPanel'
-import { TapLayer, TapZone } from '@/pages/pitching/ui/TapZone'
-import { MENU_KEY_RECT } from '@/pages/pitching/lib/pitchInputTapZones'
+import { MissionHud } from '@/pages/mission-play/ui/MissionHud'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
+import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import type { PitchTypeInfo } from '@/shared/config/original/pitchTypes'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
@@ -340,7 +340,6 @@ export function PitchingScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, onPickoffKey])
 
-  const goals = goalsOf(run.mission, run.progress)
   const teamIds = missionTeamIdsOf(run)
 
   if (run.status !== '진행중') {
@@ -552,22 +551,24 @@ export function PitchingScreen({
         })()}
 
       {stage !== undefined && (
-        <MissionGoalPanel
+        // 점수판 0x373d0 꼬리 0x378f0 → 0x36cb8(모드 5) → 0x36714 — 장면 오른쪽 위 미션 판 (타자 미션과 같은 그리기, 모드 5 갈래)
+        <MissionHud
           mode={MISSION_PITCHER_MODE}
-          goalLines={goals.map((goal) => goal.name)}
-          plateAppearance={
-            run.remainingPlateAppearances === null
-              ? null
-              : {
-                  limit: run.mission.plateAppearanceLimit,
-                  used: run.mission.plateAppearanceLimit - run.remainingPlateAppearances,
-                }
-          }
-          pitches={
-            run.remainingPitches === null
-              ? null
-              : { limit: run.mission.pitchLimit, thrown: run.mission.pitchLimit - Math.max(0, run.remainingPitches) }
-          }
+          mission={run.mission}
+          progress={run.progress}
+          limits={{
+            plateAppearanceLimit: run.mission.plateAppearanceLimit,
+            plateAppearancesUsed: run.mission.plateAppearanceLimit - (run.remainingPlateAppearances ?? run.mission.plateAppearanceLimit),
+            swingLimit: 0,
+            swingsUsed: 0,
+            // 행[9] 아랫 4비트 · P+0x1c
+            pitches: {
+              limit: run.mission.pitchLimit,
+              thrown: run.mission.pitchLimit - Math.max(0, run.remainingPitches ?? run.mission.pitchLimit),
+            },
+          }}
+          remainingSeconds={run.remainingSeconds}
+          allowedRuns={run.allowed.runs}
           isFrozen={isPopupOpen}
           isDimmed={isPitchMenuShown}
         />
@@ -575,14 +576,13 @@ export function PitchingScreen({
 
       {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
       {isAwaitingConfirm && !isMenuOpen && (
-        <TapLayer testId="확인 누름 칸">
-          <TapZone
-            rect={{ x: 0, y: 0, width: 240, height: 320 }}
+        <PressLayer testId="확인 누름 칸">
+          <PressArea
             label="확인"
             isDisabled={!sceneConfirm.acceptsConfirm}
             onPress={sceneConfirm.confirm}
           />
-        </TapLayer>
+        </PressLayer>
       )}
 
       {/* 0xf 구질 — 그림은 장면(0x4c4bc 4c528~)이 그리고 여기는 키 · 틱 · 누름 칸만 */}
@@ -651,9 +651,9 @@ export function PitchingScreen({
         "#TIME" 은 없다 — '#' 교체 검사 0x38984 가 미션(모드 5 · 6)을 막는다
       */}
       {overlay !== '조작방법' && (
-        <TapLayer testId="소프트키 누름 칸" isOnTop>
-          <TapZone rect={MENU_KEY_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
-        </TapLayer>
+        <PressLayer testId="소프트키 누름 칸" isOnTop>
+          <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
+        </PressLayer>
       )}
 
       {isMenuOpen && (

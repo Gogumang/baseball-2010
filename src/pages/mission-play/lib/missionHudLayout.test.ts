@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BATTER_MISSIONS, createProgress } from '@/entities/mission/model/missionGoal'
 import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
+import { missionHudIconOf, pitcherGoalCountOf } from '@/pages/mission-play/lib/missionHudLayout'
 import {
   COUNTER_BASE, COUNTER_CLIP, MISSION_HUD_BASE, TEXT_CLIP,
   goalCountOf, goalLineDrawsOf, limitStripsOf, slashCounterGlyphsOf, timerGlyphsOf,
@@ -91,5 +92,27 @@ describe('타자 미션 HUD 0x36714', () => {
       { left: 59, top: 63, size: 2, color: '#80e6ff' },
       { left: 59, top: 69, size: 2, color: '#80e6ff' },
     ])
+  })
+})
+
+describe('모드 5 투수 미션 갈래 (0x369b2 · 0x36b04 · 0x36466)', () => {
+  it('머리 아이콘은 이미지 7 공을 (x0 + 7, 7) 에', () => {
+    expect(missionHudIconOf(5)).toEqual({ src: './sprites/trainning/007.png', left: 158, top: 7 })
+  })
+
+  it('투구 한도 띠는 img_text 0x107 "투구" · 던진 공 / 한도 — 타석 띠가 없으면 판 바로 아래(59)', () => {
+    const strips = limitStripsOf({ plateAppearanceLimit: 0, plateAppearancesUsed: 0, swingLimit: 0, swingsUsed: 0, pitches: { limit: 9, thrown: 3 } })
+    expect(strips).toHaveLength(1)
+    expect(strips[0]!.strip.top).toBe(59)
+    expect(strips[0]!.label.src).toBe('./sprites/img_text/frames/263.png')
+  })
+
+  it('줄 맞대기 0xcfdf4 — 탈삼진은 지금/목표, 무실점 · 노히트노런 · 퍼펙트게임은 0/1, 피안타는 0/0, 지금은 목표에서 자른다', () => {
+    const mission = { goalCounts: { 탈삼진: 3, 실점: 2 } } as unknown as Parameters<typeof pitcherGoalCountOf>[0]
+    const progress = { counts: { 탈삼진: 5 }, plateAppearances: 0, brokenConditions: [] }
+    expect(pitcherGoalCountOf(mission, progress, '탈삼진', 0)).toEqual({ current: 3, target: 3 })
+    expect(pitcherGoalCountOf(mission, progress, '무실점', 0)).toEqual({ current: 0, target: 1 })
+    expect(pitcherGoalCountOf(mission, progress, '피안타', 0)).toEqual({ current: 0, target: 0 })
+    expect(pitcherGoalCountOf(mission, progress, '실점', 1)).toEqual({ current: 1, target: 2 })
   })
 })
