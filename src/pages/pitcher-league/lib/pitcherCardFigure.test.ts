@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { PITCHER_CARD_IMAGE, pitcherCardLookOf, pitcherCardPoseAt } from '@/pages/pitcher-league/lib/pitcherCardFigure'
 
 describe('투수편 카드 그림 (0x15e20 · 틀 0x142b4)', () => {
-  it('이미지는 (박스 0.x, 박스 0.y − 0x23) = (11, 18) 에 찍는다', () => {
-    expect(PITCHER_CARD_IMAGE).toEqual({ x: 11, y: 18 })
+  it('이미지는 (박스 0.x, 박스 0.y − 0x23) = (11, 18) 에 두 배로 찍는다 (0x98975 효과 0x10 · 2)', () => {
+    expect(PITCHER_CARD_IMAGE).toEqual({ x: 11, y: 18, scale: 2 })
   })
 
   it('틱 30 전에는 서 있고(애니 0), 30 에 던지기를 시작한다 — 140 의 배수마다 같은 동작을 다시 한다', () => {
