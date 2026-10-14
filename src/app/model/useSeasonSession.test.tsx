@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import {
-  SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, useSeasonSession,
+  SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
+  useSeasonSession,
 } from '@/app/model/useSeasonSession'
 import {
   EMPTY_LEAGUE, pitcherOrdersAfterPostseason, postseasonGameOf, postseasonRotationTurnsOf, postseasonStarterSlotOf,
@@ -28,6 +29,8 @@ import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
 import { BURST_GOAL } from '@/entities/burst-mission/model/burstMissionJudge'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
+import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
 /** 시즌 모드 한 판을 잇는 훅 (원본 장면 0x105) — 저장·장면 전환만 본다 */
@@ -643,6 +646,116 @@ describe('시즌 목표 ③④ 의 재료 (seasonGoalInputOf)', () => {
     시작(result, 0)
     const { state, league, roster, playerStats, series } = result.current
     expect(seasonGoalWindowNumbersFor({ state: state!, league, roster, playerStats, series }).current[0]).toBe(0)
+  })
+})
+
+describe('시즌 목표 ④ 팀 방어율 — 사람 경기의 투수 줄 (0xa3764 · 0xb6ce8 ← 0xa8024 · 0xa7de8)', () => {
+  /** 어느 타석도 사람이 잡지 않는 설정 — 비트가 하나도 안 켜진 "상세" */
+  const 전부자동: MatchProgressSettings = {
+    kind: MATCH_SETTING_KIND.상세,
+    value: 0,
+    battingOrderBits: 0,
+    pitchingInningBits: 0,
+    offenseRunnerBits: 0,
+    defenseRunnerBits: 0,
+  }
+
+  it('팀 경기 요약의 내 팀 투수 줄이 쌓여 ④ 가 그 줄의 방어율 평균이 된다 — 늘 0(달성)이 아니다', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    const options = result.current.gameOptions!
+    const progress = startTeamGame({ ...options, settings: 전부자동 }, createSeededRandom(7))
+    const summary = summaryOf(progress)
+    expect(summary.opponentScore).toBeGreaterThan(0)
+    act(() => result.current.actions.finishGame(summary))
+
+    // 0xb6ce8: 아웃 > 0 이면 실점 × 2700 / 아웃(9999 상한), 아웃 0 이면 실점이 있으면 9999 · 없으면 0
+    const 투수수 = result.current.roster.pitchers.length
+    const 방어율 = (slot: number) => {
+      const lines = summary.leaguePitchers!.lines.filter((line) => line.teamId === 0 && line.pitcherSlot === slot)
+      const outs = lines.reduce((total, line) => total + line.outs, 0)
+      const runs = lines.reduce((total, line) => total + line.runsAllowed, 0)
+      if (outs > 0) return Math.min(Math.trunc((runs * 2700) / outs), 9999)
+      return runs > 0 ? 9999 : 0
+    }
+    const 기대 = Math.trunc(Array.from({ length: 투수수 }, (_unused, slot) => 방어율(slot)).reduce((a, b) => a + b, 0) / 투수수)
+    const { state, league, roster, playerStats, series } = result.current
+    const 입력 = seasonGoalInputOf({ state: state!, league, roster, playerStats, series })
+    expect(기대).toBeGreaterThan(0)
+    expect(입력.teamEarnedRunAverage).toBe(기대)
+  })
+})
+
+describe('결산 한국시리즈 보상 순위 0xb7aa0(L, 팀, 0) — 0x85ec (seasonPostseasonRankOf)', () => {
+  // 정규 1~4위 = 3 · 1 · 5 · 7. 준PO 5 > 7 → PO 5 > 1 → 한국시리즈 3 > 5
+  const 끝난시리즈 = {
+    round: '종료', qualifiers: [3, 1, 5, 7], teams: [3, 5], wins: [0, 0], winsNeeded: 4, champion: 3,
+  } as const
+  const 리그 = { ...EMPTY_LEAGUE, wins: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0], losses: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+
+  it('끝난 대진(L+0x36)이면 우승 0 · 한국시리즈 1 · 플레이오프 2 · 준플레이오프 3 · 못 든 팀 10', () => {
+    const 순위 = (teamId: number) => seasonPostseasonRankOf({ teamId, inPostseason: false }, 리그, 끝난시리즈)
+    expect([3, 5, 1, 7, 0].map(순위)).toEqual([0, 1, 2, 3, 10])
+  })
+
+  it('포스트시즌 밖이면 정규시즌 정렬표 자리(0부터)다 (b7afc~b7b22)', () => {
+    expect(seasonPostseasonRankOf({ teamId: 0, inPostseason: false }, 리그, null)).toBe(0)
+    expect(seasonPostseasonRankOf({ teamId: 4, inPostseason: false }, 리그, null)).toBe(4)
+  })
+})
+
+describe('전역기록 칸 — 구장 히든 +0xe0 · 이벤트 100 수령 +0xbe 는 새로 고쳐도 · 새 시즌에도 남는다', () => {
+  it('열린 구장 히든 아이템이 저장되어 다시 띄우면 이어지고, 시즌을 지우고 새로 해도 남는다 (0x9f6cc → 0x1f1b9)', () => {
+    const store = 메모리저장()
+    const first = 띄우기(store)
+    시작(first.result, 0)
+    act(() => first.result.current.actions.openStadiumItems([13, 16, 13]))
+    expect(first.result.current.openedStadiumIds).toEqual([13, 16])
+
+    const second = 띄우기(store)
+    expect(second.result.current.openedStadiumIds).toEqual([13, 16])
+    act(() => second.result.current.actions.resetSeason())
+    const third = 띄우기(store)
+    expect(third.result.current.state).toBeNull()
+    expect(third.result.current.openedStadiumIds).toEqual([13, 16])
+    시작(third.result, 2)
+    expect(third.result.current.openedStadiumIds).toEqual([13, 16])
+    expect((store.load() as { openedStadiumIds?: number[] }).openedStadiumIds).toEqual([13, 16])
+  })
+
+  it('이벤트 100 의 G 를 받으면 +0xbe 가 저장된다 (0x8c714)', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    expect((store.load() as { event100Awarded?: boolean }).event100Awarded).toBe(false)
+    act(() => result.current.actions.giveSeasonEventReward([{ kind: 10, value: 1000 }], 100))
+    expect((store.load() as { event100Awarded?: boolean }).event100Awarded).toBe(true)
+    // 다른 이벤트의 G 는 이 칸을 안 세운다
+    const other = 메모리저장()
+    const { result: 다른 } = 띄우기(other)
+    시작(다른, 0)
+    act(() => 다른.current.actions.giveSeasonEventReward([{ kind: 10, value: 1000 }], 1))
+    expect((other.load() as { event100Awarded?: boolean }).event100Awarded).toBe(false)
+  })
+
+  it('옛 저장 이사 — 칸이 없으면 레코드의 구장 히든 보유·컬렉터와 본 이벤트 100 에서 세운다', () => {
+    const store = 메모리저장()
+    const first = 띄우기(store)
+    시작(first.result, 0)
+    const record = first.result.current.state!.record
+    // 관중석 기본 0~3 전부 + 관중석 히든 5번(14) · 전광판 히든 6번(18) 보유, 이벤트 100 을 봤다
+    const owned = record.stadiumOwned.map((flag, index) => flag || index <= 3 || index === 5 || index === 7 + 6)
+    act(() => first.result.current.actions.updateRecord({
+      ...record, stadiumOwned: owned, seenEvents: [...record.seenEvents, 100],
+    }))
+    const { openedStadiumIds: _ids, event100Awarded: _awarded, ...legacy } = store.load() as Record<string, unknown>
+    store.save(legacy)
+
+    const second = 띄우기(store)
+    expect(second.result.current.openedStadiumIds).toEqual([13, 14, 18])
+    act(() => second.result.current.actions.updateRecord(second.result.current.state!.record))
+    expect(store.load()).toMatchObject({ openedStadiumIds: [13, 14, 18], event100Awarded: true })
   })
 })
 

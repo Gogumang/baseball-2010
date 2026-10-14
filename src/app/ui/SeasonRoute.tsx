@@ -37,14 +37,13 @@ import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { SEASON_YEAR_GOAL_LABEL_SET } from '@/pages/story/lib/yearGoalWindow'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { judgeSeasonEnding } from '@/entities/season-mode/model/seasonRewards'
-import type { PostseasonSeries } from '@/entities/league/model/league'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { seasonRewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import {
-  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf,
+  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
 } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
@@ -936,7 +935,7 @@ export function SeasonRoute({
         yearIndex={state.record.yearIndex}
         gamePoint={session.gamePoints}
         random={random}
-        // ⚠️ 웹판 임시 — 원본은 여기서 사람이 대표팀을 조작해 경기를 친다 (시즌 221)
+        // 대회 경기 — 세션이 대표팀 경기 옵션을 세워 팀 경기 화면으로 간다(사람이 조작한다, 시즌 221)
         onStartGame={(matchup) => actions.playCupGame(matchup.myTeam, matchup.opponent)}
         onFinish={(finish) => actions.finishCup(finish)}
         // 0xf3 갱신 0xe684 — 틀마다 0x65de5(전역, 0) 대한민국 · 우승국(SR+0x144)이 10 이면 결승 상대도 연다. 처음 열리면
@@ -968,9 +967,8 @@ export function SeasonRoute({
       <SeasonSummaryScreen
         record={state.record}
         series={series}
-        // 0xb7aa0(리그, 팀, 0) — 0 우승 · 1 준우승(한국시리즈에서 진 팀) · 그 밖은 보상 없음.
-        // 웹 entities/league 에 이 함수가 없어 시리즈 결과에서 바로 읽는다
-        postseasonRank={postseasonRankOf(series, state.record.teamId)}
+        // 0x85ec 의 0xb7aa0(리그, 팀, 0) — 0 우승 · 1 준우승(한국시리즈에서 진 팀) · 그 밖은 보상 없음
+        postseasonRank={seasonPostseasonRankOf(state.record, league, series)}
         leagueFirstAwardedBits={session.leagueFirstAwardedBits}
         entry={session.summaryEntry}
         onLeagueFirstAward={actions.awardLeagueFirst}
@@ -985,7 +983,7 @@ export function SeasonRoute({
     return (
       <SeasonEndingScreen
         // 엔딩 번호는 레코드에서 다시 판정한다 (0xa3084). 여기 올 때 레코드가 그대로라 값이 같다.
-        // ⚠️ 원본은 판정값 e 를 `저장+0xa0+e` 에 남기지만 그 전역 저장 칸이 웹에 없다 — **근사다**.
+        // 판정값 e 의 `전역기록+0xa0+e = 1`(0x6e0c 6e22~6e38)은 앱이 이 레코드로 기록연감 엔딩 칸에 켜 저장한다(App → useCollection).
         // 손댄 세이브 등으로 10년차가 아닌 채 phase 6 이면 0(비 인기 구단)으로 둔다
         endingIndex={judgeSeasonEnding(state.record) ?? 0}
         // SR+0x7b — 판정 0 은 진입 0x6be8 이, 그 밖은 보너스 팝업 0x2b 닫힘(0x8bd8)이 세운다. 서 있으면 키 0x6b3c 가 팝업 없이 넘긴다
@@ -1089,16 +1087,3 @@ export function SeasonRoute({
   )
 }
 
-/**
- * 내 팀의 포스트시즌 순위 — 원본 `0xb7aa0(리그, 팀, 0)` 자리다.
- * **0 우승 · 1 준우승(한국시리즈에서 진 팀)** 이고, 그 밖에는 보상이 붙지 않는다.
- * `entities/league` 에 같은 함수가 없어 시리즈 결과에서 읽는다.
- */
-function postseasonRankOf(series: PostseasonSeries | null, teamId: number): number {
-  if (series === null || series.round !== '종료') return NO_POSTSEASON_REWARD
-  if (series.champion === teamId) return 0
-  return series.teams.includes(teamId) ? 1 : NO_POSTSEASON_REWARD
-}
-
-/** 우승도 준우승도 아닐 때 넘기는 값 — 결산 화면이 보상을 붙이지 않는다 */
-const NO_POSTSEASON_REWARD = 2

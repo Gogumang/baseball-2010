@@ -52,6 +52,9 @@ import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
+import {
+  STADIUM_HIDDEN_FIRST_SLOT, STADIUM_HIDDEN_UNLOCK_IDS, STADIUM_KINDS, ownsStadiumItem, stadiumCollectorUnlocks,
+} from '@/entities/season-mode/model/stadiumItems'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
 import { applyCpuEquipment, rollCpuEquipment } from '@/entities/season-mode/model/cpuEquipment'
 import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
@@ -164,10 +167,8 @@ const ENDING_BONUS_UNIT = 1000
  * 화면(`pages/season`)은 상태를 하나도 안 들고 있고, 어느 화면 다음에 무엇이 오는지는
  * `entities/season-mode` 의 상태 기계가 전부 안다. 이 훅은 그 둘을 잇고 **저장**만 맡는다.
  *
- * ⚠️ **웹판 임시**: 원본 시즌모드는 사람이 팀을 조작해 경기를 치른다. 웹에는 아직 팀 경기
- *    화면이 없어 `playNextGame` 이 리그 시뮬레이터(0xc11f0 과 같은 간이 엔진)로 **자동 진행**한다.
- *    승패·수입·평가는 원본 식을 그대로 쓰지만 **경기 자체를 사람이 못 친다** — 화면이 생기면
- *    이 함수만 갈아 끼우면 된다.
+ * 경기는 사람이 팀 경기 화면(`features/play-team-game`)에서 친다 — 경기정보 0xdd OK 가 `gameOptions` 를 세우고, 경기가 끝나면
+ * 화면이 요약(`summaryOf`)을 `finishGame` 에 넘긴다. `playNextGame` 은 경기 전 화면(0xd7·0xdd)을 건너뛰고 곧장 경기 옵션을 세우는 **디버그·시험용** 지름길이다 (원본에 없는 길).
  */
 
 export interface SeasonSession {
@@ -221,15 +222,14 @@ export interface SeasonSession {
   readonly isNextGameFromMenu: boolean
   /**
    * 열린 구장 히든 아이템 id (관중석 13·14·15 · 전광판 16·17·18).
-   * 원본 자리는 **전역 저장** `app[0xe0 + 종류×4 + (칸−4)]` 다 (S3 7절) — 시즌 레코드가 아니라
-   * 앱 저장에 있어 시즌을 새로 시작해도 남는다. 웹에는 그 전역 저장 객체가 없어 세션 상태에 둔다.
-   * ⚠️ 그래서 웹에서는 새로 고치면 사라진다 — G(+0x64)는 지갑으로, 리그 1위 G 비트(+0x145)는 `rewardStore` 로
-   * 옮겨 이 한계를 벗어났다.
+   * 원본 자리는 **전역기록** `0x1f1d9 + 0xe0 + 종류×4 + (칸−4)` 다 (S3 7절 · K 5절) — 시즌 레코드가 아니라
+   * 전역 저장(0x1f1b9)에 있어 시즌을 새로 시작해도 남는다. 웹은 시즌 저장에 실어 넘겨받는다(`SeasonSave.openedStadiumIds`).
    */
   readonly openedStadiumIds: readonly number[]
   /**
-   * 시즌모드가 연 **전역 해금표 `app+0xc0`** 칸 — 지금은 결산 0x6900 의 0x29 "오토봇 배트" 하나다. 앱이 기록연감
-   * 해금 목록에 합친다. 자리는 위 칸과 같은 세션 상태다(근사).
+   * 시즌모드가 이번 세션에 연 **전역 해금표 `app+0xc0`** 칸 — 결산 0x6900 의 0x29 "오토봇 배트"와 국가대항전 히든 팀(0x65de4).
+   * 앱이 곧바로 기록연감 해금 목록(`useCollection` — 저장된다)에 합치므로 새로 고친 뒤에는 그 목록이 주인이다
+   * (결산 0x29 검사 · 국가대항전 화면이 둘을 합쳐 본다).
    */
   readonly openedHiddenIds: readonly number[]
   /**
@@ -578,6 +578,68 @@ interface SeasonSave {
    * (웹 명단 첨자 돌림 수 — `withOwnRecordRotation`). 진행 꼴이 바뀌어 못 읽으면 저장 없음으로 본다.
    */
   readonly gameSave?: SeasonGameSaveBlock | null
+  /**
+   * **전역기록(0x1f1d9, `game_o.sav`) `+0xe0 + 종류×4 + (칸−4)`** — 열린 구장 히든 아이템 id(관중석 13·14·15 · 전광판 16·17·18).
+   * 쓰기는 `0x62368` → `0x9f6cc(전역, 종류, k, 1)` → 전역 저장 `0x1f1b9`(K 5절 · S3 7절). 시즌 파일 칸이 아니라 모드 초기화
+   * `0x224ec(2)` 도 안 지운다 — 웹은 위 경기진행 설정과 같이 시즌 저장에 실어 두고 새 시즌·시즌 초기화가 넘겨받는다
+   * (`SeasonGlobalSlots`). 기록연감 해금표는 히든 팀을 10~14 로 들어 13·14 가 겹치므로 그 표에 섞지 않는다.
+   */
+  readonly openedStadiumIds?: readonly number[]
+  /**
+   * **전역기록 `+0xbe`** — 이벤트 100 의 1000 G 를 받았다 (보상 0x8c460 이 시즌 id 100 에서 G 를 줄 때 1 — `0x8c714`, 판정 0xacfbc
+   * ad056~ad07a 는 서 있으면 100 을 본 것으로만 치고 불발). 위 칸과 같이 시즌 저장에 실어 넘겨받는다.
+   */
+  readonly event100Awarded?: boolean
+}
+
+/**
+ * 전역기록 칸 중 시즌모드만 쓰는 둘 — 구장 히든 `+0xe0` 과 이벤트 100 수령 `+0xbe`. 세션이 따로 들고 있고 시즌 저장을 쓸 때마다
+ * 함께 적는다(`commit` · `resetSeason`). 시즌 파일과 생사를 같이 하지 않으므로 새 시즌·시즌 초기화에도 남는다.
+ */
+interface SeasonGlobalSlots {
+  readonly openedStadiumIds: readonly number[]
+  readonly event100Awarded: boolean
+}
+
+/** 구장 히든 id 13~18 (`STADIUM_HIDDEN_UNLOCK_IDS`) */
+const STADIUM_HIDDEN_IDS: readonly number[] = STADIUM_HIDDEN_UNLOCK_IDS.flat()
+
+/** 이벤트 100 — 날짜 창 now 21 의 1000 G 이벤트 (P4 1b) */
+const SEASON_EVENT_100_ID = 100
+
+/**
+ * 저장에서 전역 칸 둘을 읽는다. 칸이 없는 **옛 저장 이사**(웹 전용 규칙 — 예전에는 세션 상태에만 있어 저장되지 않았다):
+ * - 구장 히든: 지금 시즌 레코드가 가진 히든 칸(4~6)은 열려 있어야 살 수 있었고(구매 가드 0x9a84 미오픈), 기본 네 칸을 다 가졌으면
+ *   그 구매 뒤 0x81d0 이 컬렉터 13 · 16 을 열었다 — 그 둘을 연 것으로 본다. 다른 길(명전 · 🌐 이벤트)로 연 칸은 모른다.
+ * - 이벤트 100: 본 비트(SR+8~)에 100 이 서 있으면 받은 것으로 본다 — 100 은 보상으로 +0xbe 를 세우거나, 이미 서 있어 불발로
+ *   본 것으로만 쳐지거나 둘 중 하나라서다.
+ */
+function seasonGlobalSlotsOf(raw: unknown, legacy: SeasonSave | null): SeasonGlobalSlots {
+  const value = raw !== null && typeof raw === 'object' ? (raw as Partial<SeasonSave>) : {}
+  const record = legacy?.state.record
+  const openedStadiumIds = Array.isArray(value.openedStadiumIds)
+    ? value.openedStadiumIds.filter((id, index, ids) => STADIUM_HIDDEN_IDS.includes(id) && ids.indexOf(id) === index)
+    : record === undefined ? [] : legacyOpenedStadiumIdsOf(record)
+  const event100Awarded = typeof value.event100Awarded === 'boolean'
+    ? value.event100Awarded
+    : record?.seenEvents.includes(SEASON_EVENT_100_ID) ?? false
+  return { openedStadiumIds, event100Awarded }
+}
+
+/** 이벤트 100 보상 — 전역기록 +0xbe = 1 (0x8c714). 이미 서 있으면 같은 객체 */
+function withEvent100Awarded(slots: SeasonGlobalSlots): SeasonGlobalSlots {
+  return slots.event100Awarded ? slots : { ...slots, event100Awarded: true }
+}
+
+/** 옛 저장 이사 — 레코드가 가진 구장 히든 칸 + 컬렉터 해금 (위 `seasonGlobalSlotsOf`) */
+function legacyOpenedStadiumIdsOf(record: SeasonRecord): readonly number[] {
+  const opened = new Set<number>(stadiumCollectorUnlocks(record))
+  STADIUM_KINDS.forEach((kind, kindIndex) => {
+    STADIUM_HIDDEN_UNLOCK_IDS[kindIndex]?.forEach((id, offset) => {
+      if (ownsStadiumItem(record, kind, STADIUM_HIDDEN_FIRST_SLOT + offset)) opened.add(id)
+    })
+  })
+  return STADIUM_HIDDEN_IDS.filter((id) => opened.has(id))
 }
 
 /**
@@ -1230,8 +1292,13 @@ export function useSeasonSession(
   const [pendingGame, setPendingGame] = useState<PendingSeasonGame | null>(null)
   const [isMatchSettingsOpen, setIsMatchSettingsOpen] = useState(false)
   const [matchInfoStage, setMatchInfoStage] = useState<MatchInfoStadiumState | null>(null)
-  /** 전역 저장 app+0xe0 — 열린 구장 히든 아이템 id (S3 7절). 웹은 세션 상태에 둔다(근사) */
-  const [openedStadiumIds, setOpenedStadiumIds] = useState<readonly number[]>([])
+  /**
+   * 전역기록 칸 둘 — 구장 히든 app+0xe0(S3 7절) · 이벤트 100 수령 +0xbe(0x8c714). 시즌 저장에 실어 두고 시즌을 쓸 때마다 같이
+   * 적는다(`SeasonGlobalSlots`) — 새로 고쳐도 · 새 시즌에도 남는다
+   */
+  const [globals, setGlobals] = useState<SeasonGlobalSlots>(() => seasonGlobalSlotsOf(store.load(), loaded.current))
+  const globalsRef = useRef(globals)
+  const { openedStadiumIds, event100Awarded } = globals
   /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 세션 상태, 앱이 기록연감 해금 목록에 합친다 */
   const [openedHiddenIds, setOpenedHiddenIds] = useState<readonly number[]>([])
   /** 지금 결산 진입(0x6900) — 0x29 가 새로 열려 진입의 리그 1위 G 검사를 건너뛰었는가 (0x69ce → 0x6ac8) */
@@ -1269,11 +1336,6 @@ export function useSeasonSession(
     setMenuCursors((cursors) => ({ ...cursors, [menu]: index }))
   }, [])
   const playbackSerial = useRef(0)
-  /**
-   * 전역 저장 +0xbe — 이벤트 100 의 1000 G 를 받았는가 (0x8c714). 모드를 가리지 않는 전역 칸이라 시즌을 새로
-   * 해도 남는다. ⚠️ 웹엔 그 전역 저장 객체가 없어 세션 상태에 둔다(새로 고치면 사라진다) — 근사.
-   */
-  const [event100Awarded, setEvent100Awarded] = useState(false)
   /**
    * 이벤트 관리자 읽기 객체의 커서(+0x28 · +0x2c) — 관리자는 장면 0x105 를 만들 때(0x3b14) 새로 생긴다.
    * 웹은 훅이 서는 때와 경기를 마치고 돌아오는 때(`finishGame`)를 그 자리로 본다.
@@ -1336,7 +1398,18 @@ export function useSeasonSession(
     (next: SeasonSave) => {
       latestSave.current = next
       setSave(next)
-      store.save(next)
+      store.save({ ...next, ...globalsRef.current })
+    },
+    [store],
+  )
+  /** 전역기록 칸(`SeasonGlobalSlots`)을 고치고 곧바로 저장한다 — 원본도 쓰는 그 자리에서 전역 저장 0x1f1b9 를 부른다 */
+  const updateGlobals = useCallback(
+    (change: (current: SeasonGlobalSlots) => SeasonGlobalSlots) => {
+      const next = change(globalsRef.current)
+      if (next === globalsRef.current) return
+      globalsRef.current = next
+      setGlobals(next)
+      store.save({ ...(latestSave.current ?? carriedGlobals.current), ...next })
     },
     [store],
   )
@@ -1539,7 +1612,7 @@ export function useSeasonSession(
     carriedGlobals.current = carry
     latestSave.current = null
     setSave(null)
-    store.save(carry)
+    store.save({ ...carry, ...globalsRef.current })
     setGameOptions(null)
     setResumeGame(null)
     setPendingGame(null)
@@ -1635,13 +1708,6 @@ export function useSeasonSession(
     [commit, save, spendGamePoint],
   )
 
-  /**
-   * 다음 경기 — ⚠️ **웹판 임시 자동 진행**. 파일 머리 주석 참고.
-   *
-   * 원본 순서를 지킨다: 내 경기를 치르고(0xc2dac 과 같은 간이 엔진) 전적에 넣은 뒤,
-   * 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 칸·명단 엇갈림 포함, `cpuGameSidesOf`), 평가(0xa719c)를
-   * 얹고 phase 를 "경기끝" 으로 두어 관중수입(0xe9)으로 넘어간다.
-   */
   /**
    * 커리어·팀 상태에서 팀 경기 옵션을 만든다 (세 종류가 같은 화면을 쓴다).
    *
@@ -2603,9 +2669,10 @@ export function useSeasonSession(
    * 새 해는 머리에서 먼저 **10년차 엔딩 판정 `0xa3084`** 를 본다 (P4 1c).
    * 예전에는 이 머리 분기가 통째로 빠져 있어 **10년차 엔딩에 영영 닿지 못했다**.
    *
-   * ⚠️ 안 옮긴 것 — `저장+0xa0+e = 1`(본 엔딩 종류 표시)는 **전역 저장** 칸이라 웹에 자리가 없다.
-   * 이벤트 500("시즌모드 10년은 모두 종료") 재생(0xd3)도 시즌 이벤트 흐름이 아직 없어 건너뛰고
-   * 곧장 0xf5 로 간다 — **근사다**.
+   * 엔딩 갈래(6e1e~6e7a, 직접 떴다): `전역기록(0x1f1d9)+0xa0+e = 1` · 0x1f1b9 → phase 6 · 0x1fded · 0x22755 →
+   * 0x8bdc9(이벤트 500 "시즌모드 10년은 모두 종료") · [다음 0xf5] · 0xd3. 웹은 500 을 `startEvent` 로 틀어 끝나면 0xf5 로 가고,
+   * 본 엔딩 표시(+0xa0+e)는 앱이 phase 6 레코드의 판정값을 기록연감 엔딩 칸에 켜 저장한다(`App` → `useCollection`
+   * `mergeSeasonEndingIntoCollection`).
    */
   const finishSeason = useCallback((reward?: SeasonReward | null) => {
     if (save === null) return
@@ -2662,7 +2729,7 @@ export function useSeasonSession(
         // 0x8c6e4 `0x22c7d(v, 모드)` — 획득 GP 통계
         recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
       }
-      if (applied.event100Awarded) setEvent100Awarded(true)
+      if (applied.event100Awarded) updateGlobals(withEvent100Awarded)
       // 선택지가 번호로 부른 마지막 이벤트 다음부터 이어 훑는다 (0xae170)
       const lastCalled = viewedEventIds[viewedEventIds.length - 1]
       if (lastCalled !== undefined && lastCalled !== playback.eventId) {
@@ -2688,7 +2755,7 @@ export function useSeasonSession(
       setEventPlayback(null)
       setScene(playback.returnScene)
     },
-    [commit, eventPlayback, gainGamePoint, random, recordSourceNow, recordStat, save, startEvent],
+    [commit, eventPlayback, gainGamePoint, random, recordSourceNow, recordStat, save, startEvent, updateGlobals],
   )
 
   /**
@@ -2723,9 +2790,9 @@ export function useSeasonSession(
         gainGamePoint(applied.gamePoint)
         recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
       }
-      if (applied.event100Awarded) setEvent100Awarded(true)
+      if (applied.event100Awarded) updateGlobals(withEvent100Awarded)
     },
-    [commit, gainGamePoint, random, recordStat],
+    [commit, gainGamePoint, random, recordStat, updateGlobals],
   )
 
   const confirmSeasonEventChoice = useCallback(
@@ -2751,15 +2818,15 @@ export function useSeasonSession(
 
   /**
    * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
-   * 원본 자리가 전역 저장이라 시즌 세이브가 아니라 세션 칸에 쌓는다 (위 `openedStadiumIds` 주석).
+   * 원본 자리가 전역기록이라 시즌 레코드가 아니라 전역 칸(`SeasonGlobalSlots`)에 쌓고 곧바로 저장한다 (0x62368 → 0x1f1b9).
    * 해금 알림 창(`0x62368` → StrCOMMON[139] + [141])은 상점 화면이 완료 팝업을 닫을 때 띄운다(`StadiumShopScreen`).
    */
   const openStadiumItems = useCallback((unlockIds: readonly number[]) => {
-    setOpenedStadiumIds((opened) => {
-      const added = unlockIds.filter((id) => !opened.includes(id))
-      return added.length === 0 ? opened : [...opened, ...added]
+    updateGlobals((slots) => {
+      const added = unlockIds.filter((id, index) => !slots.openedStadiumIds.includes(id) && unlockIds.indexOf(id) === index)
+      return added.length === 0 ? slots : { ...slots, openedStadiumIds: [...slots.openedStadiumIds, ...added] }
     })
-  }, [])
+  }, [updateGlobals])
 
   /** 0xe684 → 0x65de4 — 전역 해금표(웹 `openedHiddenIds`, 팀은 10~14 그대로)에 쓴다. 앱이 전역 기록으로 모은다 */
   const openCupHiddenTeams = useCallback((teams: readonly number[]) => {
@@ -3200,9 +3267,11 @@ export interface SeasonGoalSource {
  * ③④ 의 선수 줄은 리그 선수 기록표(`playerStats`)에서 **경기가 쌓을 때와 같은 열쇠**로 찾는다 —
  * 타자는 저장 명단 차례를 `entryBattersOfOrder` 로 붙박이 표 칸에 맞춘 `팀 × 12 + 칸`, 투수는 `팀 × 8 + 칸`.
  *
+ * 사람 경기의 투수 줄도 쌓인다 — 팀 경기 요약 `leaguePitchers`(양 팀 표 칸 줄 + 경기 끝 판정)를 정규시즌 정산이
+ * `recordSeasonHumanGamePitchers` 로 넣는다(원본 0xa8024 · 0xa7de8, 0xa56dc 모드 2 갈래라 정규시즌만). 그래서 ④ 는 내 팀 투수가
+ * 실점하면 0 보다 커진다.
+ *
  * ⚠️ 한계 (지어내지 않고 남긴다):
- * - 웹 팀 경기 요약(`TeamGameSummary`)이 **사람 경기의 투수 등판 줄**을 싣지 않아 내 팀 투수 줄은 늘 0 이다 —
- *   원본은 사람 경기도 0xa8024·0xa7de8 로 쌓는다. 그래서 지금은 ④ 가 0(달성)으로 나온다.
  * - 트레이드로 옮겨 온 선수는 옛 팀 표 자리(`tableTeamId` · id), 영입한 명전·나리 선수(id ≥ 0xb4 · 0xfe)는 원본 id 의
  *   표 밖 줄(`recordBatters`·`recordPitchers` — 0xa56dc 모드 2 갈래가 마선수만 거른다)로 쌓였다 — 같은 열쇠로 읽는다.
  *   기록을 못 찾은 표 밖 선수(`recordOf` 를 안 넘긴 길)는 경기가 남은 표 칸으로 세우고(`tableSlotsOfOrder`) 그 칸으로
@@ -3257,6 +3326,30 @@ export function seasonGoalWindowNumbersFor(source: SeasonGoalSource): SeasonGoal
     seasonGoalInputOf(source),
     seasonGoalWindowRankOf(regularRank, record.games, record.inPostseason),
   )
+}
+
+/**
+ * 결산 0xef 의 한국시리즈 보상이 보는 **포스트시즌 순위** — 갱신 0x85ec(8622~8636)가 부르는 `0xb7aa0(L, SR[1], 0)`
+ * (b7aa0~b7b2a 직접 떴다 — 목표 ① 과 같은 함수 · 같은 셋째 인자):
+ * ```
+ * (L+0x34 포스트시즌 ≠ 0 || L+0x36 끝남 ≠ 0) && 셋째 == 0:
+ *     L+0x37(우승팀) == 팀 → 0
+ *     i = 0..2: L[0x38+2i+1] == 팀 || L[0x38+2i] == 팀 → i + 1     ; 0 한국시리즈 · 1 플레이오프 · 2 준플레이오프 칸
+ *     → 10
+ * 그 밖: 0xb79d8 정렬표에서 팀의 자리(0부터), 없으면 −1
+ * ```
+ * 0x85ec 는 0 이면 우승 [197], 1 이면 준우승 [198], 그 밖은 보상 없이 0x87b4 다. 결과 키 0x9dc8 이 SR+0xb6(= L+0x36) ≠ 0
+ * 일 때만 이 사슬을 열므로 늘 대진 갈래다 — 우승팀 0, 한국시리즈에서 진 팀(칸 0 의 둘 중 남은 하나) 1,
+ * 플레이오프에서 진 팀 2, 준플레이오프에서 진 팀 3, 못 든 팀 10.
+ */
+export function seasonPostseasonRankOf(
+  record: Pick<SeasonRecord, 'teamId' | 'inPostseason'>,
+  league: League,
+  series: PostseasonSeries | null,
+): number {
+  const regularRank = rankingOf(league).indexOf(record.teamId)
+  const isBracket = record.inPostseason || series?.round === '종료'
+  return goalRankOf(record.teamId, regularRank, isBracket ? goalBracketOf(series) : null)
 }
 
 /**
