@@ -19,7 +19,8 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { gameAbilitiesOf, pitcherGameAbilityPartsOf } from '@/features/play-team-game/model/gameAbilities'
+import { gameAbilitiesOf, pitcherGameAbilityPartsOf, TEAM_ABILITY_SLOT } from '@/features/play-team-game/model/gameAbilities'
+import { defenseTeamBonusOf } from '@/entities/fielding/model/fieldingState'
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
 import type {
@@ -114,6 +115,15 @@ function teamAbilitiesOf(context: TeamGameAbilityContext, teamId: number): reado
   const given = context.teamAbilities?.[teamId]
   if (given !== undefined) return given
   return TEAMS[teamId]?.values.slice(TEAM_ABILITY_OFFSET) ?? []
+}
+
+/**
+ * **수비 판의 팀 보너스** — 판 시작 0xb0fb4 b10d0: 모드 1·2·8·9 면 `0xbbe98(s16 수비 팀레코드+8)`.
+ * 팀레코드 +8 은 팀 능력치 셋째 칸 '집중'이다 — 경기용 능력치 0xb570c 의 팀 보정(0xb592c)이 읽는 같은 레코드라
+ * `teamAbilitiesOf`(시즌 트레이닝을 먹인 값 · 없으면 XlsTEAM_DATA) 그대로 쓴다.
+ */
+export function defenseTeamBonusFor(context: TeamGameAbilityContext, teamId: number): number {
+  return defenseTeamBonusOf(context.mode, teamAbilitiesOf(context, teamId)[TEAM_ABILITY_SLOT.집중] ?? 0)
 }
 
 /** 타자 한 명의 경기용 능력치 네 칸 — 히트·파워·수비·주루 */

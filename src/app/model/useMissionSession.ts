@@ -1303,7 +1303,8 @@ export function useMissionSession({
       random,
     )
     // 0xa9bd4 가 세운 st[0x14 + 루] 는 화면 표시 칸이기도 하다 — 0x35b94 가 그 루 주자를 안 그린다(`pitcherStealDisplay`).
-    // ⚠️ 근사(때): 원본은 0x11 의 10번째 틱에 출발한다 — 웹은 공을 던지는 걸음에 세워 공이 날기 시작할 때부터 비어 보인다
+    // 때: 원본은 0x11 의 틱 10(0x537dc `[+0x18] == 10` → 0x583)에 출발한다 — 공을 놓는 틱(0x4e060 `[+0x2c] > 9`)과 같은 그림이라
+    // 공을 던지는 이 걸음(게이지가 틱 10 에 부른다)이 곧 그 틱이다
     setPitcherStealDisplay(stealingFrom.length === 0 ? null : { bases: stealingFrom, selectionEntered: false })
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
     const thrown = pitchAgainstBatterDetailed(

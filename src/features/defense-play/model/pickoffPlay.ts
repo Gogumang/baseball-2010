@@ -140,6 +140,11 @@ export interface PickoffPlayInput {
   readonly outs: number
   /** 수비 9명 능력치 (칸 순서). 칸 0(투수)은 원본 그대로 레코드 칸 2 를 읽는다(`defenseAbilitiesOf`) */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자들의 주루 능력치 */
   readonly runAbility?: number
   /** 루별 주자 주루 (1~3). 없는 루는 `runAbility` — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 들고 있다 */
@@ -242,7 +247,7 @@ function* pickoffPlaySteps(
 
   // ── 1. 시작 0xb28be ──
   const start = startPickoff(targetBase)
-  let fielders: readonly FielderState[] = createFielders(abilities).map((fielder) => {
+  let fielders: readonly FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
     if (fielder.slot === PITCHER_SLOT) {
       return { ...fielder, holdingBall: true, aiState: start.pitcherAiState }
     }

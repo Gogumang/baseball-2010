@@ -512,6 +512,18 @@ export interface PitcherGameProgress {
    */
   readonly stealingFrom: readonly StealBase[]
   /**
+   * **CPU 도루 출발 표시** st[0x15 + i] — CPU 가 이번 공에 출발시킨 주자의 루(0x520de → 0xa9bd4). 투구 화면 HUD(0x35b94)는
+   * 그 루의 주자를 안 그린다. 판정 입력(`stealingFrom`)과 원본은 한 칸이지만 지우는 때가 판정이 아니다 (직접 재역어셈):
+   * - 0xf 진입 `0x3d954` 3d966~3d976 — `for i in 0..3: st[0x14 + i] = 0 ; st[0xa4 + i] = 0` (`enterPitchSelection`)
+   * - 판 시작 리드 `0x3d7b8` 3d8c6~3d8d2 — 판 종류 **1(타구 · 파울 각 공)** 일 때만. 도루(5) · 폭투(9) · 밀어내기(2) 판은 안 지운다.
+   * 세우는 때는 상태 0x11 의 틱 10(CPU 조작 0x537dc `[+0x18] == 10` → 0x583) — 공을 놓는 틱(0x4e060 `[+0x2c] > 9`)과 같은 그림이라
+   * 웹은 공을 던지는 걸음(`startPitch`)에 세운다.
+   * 같은 타석 다음 공의 0xf 진입은 진행기가 공을 먹인 걸음에 바로 돌리므로(`afterMyPitchArrival`) 그 진입은 `selectionEntered` 로만
+   * 적는다 — 화면은 공이 날거나 0x12 인 동안(원본 0x11 · 0x12) 계속 숨긴다(투수 미션 `pitcherStealDisplay` 와 같은 꼴).
+   * 새 타석이면 0xf 진입이 0xe 의 OK(`confirmScene`) 뒤라 그때까지 숨긴다. 없으면(옛 상태) 비어 있다.
+   */
+  readonly stealDisplay?: PitcherStealDisplay | null
+  /**
    * **마지막으로 열린 공 도착 판** (0x3dfac — 종류 9 폭투·포일 · 종류 5 도루). 판정 콜을 고르는 데만 쓴다 —
    * 걸음 앞뒤가 다른 객체면 이번 걸음에 새로 열린 판이다. 재생은 `lastDefensePlay` 가 맡는다.
    */
@@ -1189,13 +1201,16 @@ export function startPitch(
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     atBat: foulContact === undefined ? applyPitchResolution(progress.atBat, resolution) : progress.atBat,
     stealingFrom,
+    // 0xa9bd4 가 세운 st[0x14 + 루] 는 화면 표시 칸이기도 하다 — 출발이 없으면 앞 0xf 진입이 이미 지웠다
+    stealDisplay: stealingFrom.length === 0 ? null : { bases: stealingFrom, selectionEntered: false },
   }
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다.
   // 타석은 아직 안 끝났다 — 판이 파울로 닫히면 `resolveDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로 간다
   if (foulContact !== undefined) {
     return {
-      ...withoutSteal(afterPitch),
+      // 파울 각 공 판도 타구 판(종류 1)이다 — 시작 리드 0x3d7b8 이 출발 표시를 지운다(3d8c6~3d8d2)
+      ...withoutStealDisplay(afterPitch),
       pendingDefensePlay: withPredictedOutcome({
         ...defensePlayInputOf(afterPitch, registerContact(FOUL_PLAY_OUTCOME, foulContact), random),
         // 판 끝 결과 코드 11(2스트라이크 번트 파울) · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
@@ -1240,7 +1255,8 @@ function afterMyPitchArrival(
     // `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다.
     // 출발 칸은 타구 판 입력(리드 0x3d7b8)이 읽고 나면 비운다
     return {
-      ...withoutSteal(arrived),
+      // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
+      ...withoutStealDisplay(arrived),
       // 진행기 입력의 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
       pendingDefensePlay: withPredictedOutcome({
         ...defensePlayInputOf(arrived, outcome, random),
@@ -1272,6 +1288,13 @@ function afterMyPitchArrival(
 /**
  * 실시간 주자 판과 판이 끝난 뒤 이어 갈 재료 — 공 도착 판은 `startPitch` 의 나머지를, 견제 판은 `applyPickoffResult` 를 잇는다.
  */
+/** 투구 화면의 CPU 도루 출발 표시 (`PitcherGameProgress.stealDisplay`) */
+export interface PitcherStealDisplay {
+  readonly bases: readonly StealBase[]
+  /** 0xf 진입 3d966~3d976 이 이미 지웠다 — 화면은 공이 날거나 0x12 인 동안만 숨긴다 */
+  readonly selectionEntered: boolean
+}
+
 export type PitcherPendingRunnerPlay = LiveRunnerPlay & { readonly resume?: { readonly buntKind: number } }
 
 /**
@@ -1439,8 +1462,32 @@ function describeArrivalPlay(play: PitchArrivalPlay): string {
   return `상대 도루${tail}`
 }
 
+/** 판정 입력(st[0x14 + i])만 거둔다 — 표시(`stealDisplay`)는 0xf 진입 · 타구 판 시작까지 남는다 */
 function withoutSteal(progress: PitcherGameProgress): PitcherGameProgress {
   return progress.stealingFrom.length === 0 ? progress : { ...progress, stealingFrom: [] }
+}
+
+/** 판정 입력과 표시를 함께 지운다 — 타구 판(종류 1) 시작 리드 0x3d7b8 3d8c6~3d8d2 */
+function withoutStealDisplay(progress: PitcherGameProgress): PitcherGameProgress {
+  const cleared = withoutSteal(progress)
+  return (cleared.stealDisplay ?? null) === null ? cleared : { ...cleared, stealDisplay: null }
+}
+
+/** 0xf 진입 3d966~3d976 — 표시 칸이 지워졌다고 적는다(화면은 공이 날거나 0x12 인 동안 계속 숨긴다) */
+function withStealDisplayCleared(progress: PitcherGameProgress): PitcherGameProgress {
+  const display = progress.stealDisplay ?? null
+  if (display === null || display.selectionEntered) return progress
+  return { ...progress, stealDisplay: { ...display, selectionEntered: true } }
+}
+
+/**
+ * **투구 화면이 루에 안 그릴 주자의 루** — `stealDisplay` 를 화면의 "공이 날거나 0x12 인 동안"(원본 0x11 · 0x12)과 묶는다.
+ * 0xf 진입이 이미 지웠어도 그 진입은 원본에서 0x12 뒤라 그동안은 숨긴다.
+ */
+export function hiddenStealBasesOf(progress: PitcherGameProgress, isPitchSceneBusy: boolean): readonly StealBase[] {
+  const display = progress.stealDisplay ?? null
+  if (display === null) return []
+  return !display.selectionEntered || isPitchSceneBusy ? display.bases : []
 }
 
 /**
@@ -2331,8 +2378,10 @@ function opponentQuickBatterOf(progress: PitcherGameProgress): QuickAtBatBatter 
  * (판정 B 0xae3e8 의 ae592, `pickoff`)이다 — 그래서 공마다 카운트를 실은 채로 다시 묻는다
  * (카운트가 있으면 확률이 `>> (볼 + 스트라이크 + 1)` 로 준다, `judgeCpuPinchHit`).
  */
-function enterPitchSelection(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
-  if (!isPitchTurn(progress) || !progress.atBatPrepared) return progress
+function enterPitchSelection(entering: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  if (!isPitchTurn(entering) || !entering.atBatPrepared) return entering
+  // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 돌발 · 대타 묻기(3d9e4~)보다 앞이다
+  const progress = withStealDisplayCleared(entering)
   if (progress.burst !== null && progress.burst.current !== null) return progress
   const pinched = applyOpponentCpuPinchHit(progress, random, true)
   if (pinched === progress) return progress

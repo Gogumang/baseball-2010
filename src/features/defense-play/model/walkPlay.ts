@@ -72,6 +72,11 @@ export interface WalkPlayInput {
   readonly stealingFrom?: readonly StealBase[]
   /** 수비 9명 능력치 (칸 순서) — 야수 송구 속도에만 쓰인다 */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 루별 주자 주루 (0 = 타자주자). 없으면 `runAbility` */
   readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -171,7 +176,7 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
   const result = runRunnerPlay({
     kind: WALK_PLAY_KIND,
     // vt20(0) — 야수는 시작 자리, 아무도 손에 안 쥠(+0xe0 = 0)
-    fielders: createFielders(abilities),
+    fielders: createFielders(abilities, input.defenseTeamBonus ?? 0),
     play,
     runners,
     abilities,
