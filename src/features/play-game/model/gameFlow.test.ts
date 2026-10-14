@@ -13,6 +13,7 @@ import {
   startPlayerOutcome,
   startSteal,
   arrivePitch,
+  hiddenStealBasesOf,
   summaryOf,
   resolveBenchClearing,
   throwOpponentPitch,
@@ -314,10 +315,11 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
    * 3아웃이면 영영 안 풀린다(0xaa388). 타자주자가 살아 뛰던 때 바로 올린 득점은 남는다(원본 그대로).
    */
   it('2아웃 땅볼에 보류된 3루 주자 득점은 타자주자가 셋째 아웃이 되면 무효가 된다 (0xaa1c0 · 0xaa388)', () => {
-    // 원본 코드 4 — 3루 주자가 먼저 홈을 밟아 보류되고(공이 땅에 닿았고 타자주자가 살아 뛴다), 타자주자는 CPU 송구에
-    // 1루 포스(0xb36d0 결과 2)로 셋째 아웃이다. (예전 손-패턴 [80, 800, 150] 은 결과를 먼저 정하던 다리 없이 돌리면
-    // 투수가 뜬 채로 잡는 공이다)
-    const 땅볼: BattedBallPattern = [107, 787, 280, 1]
+    // 원본 코드 5 — 2루수가 주워 1루로 던진다. 3루 주자가 홈을 밟아 보류되고(공이 땅에 닿았고 타자주자가 살아 뛴다), 타자주자는
+    // CPU 송구에 1루 포스(0xb36d0 결과 2)로 셋째 아웃이다. (예전 손-패턴 [80, 800, 150] 은 결과를 먼저 정하던 다리 없이 돌리면
+    // 투수가 뜬 채로 잡는 공이다. 그다음 [107, 787, 280, 1](코드 4)은 투수가 1루로 던지는 공이라, 투수 칸 송구 속도가 선수 없는
+    // 칸의 g = 2(0xb0fb4 b106a)로 느려지며 타자주자가 살아 득점이 남는다)
+    const 땅볼: BattedBallPattern = [70, 1095, 100, 1]
     const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
     const 이사 = 내타석({ first: false, second: false, third: true }, 2)
     const play = applyPlayerOutcome(이사, 땅볼아웃, createSeededRandom(3), { pattern: 땅볼 }).lastDefensePlay!
@@ -823,6 +825,42 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       expect(뒤.lastDefensePlay).toBe(play.result)
       expect(뒤.log[0]?.text).toContain('도루 성공')
     }
+  })
+
+  it('도루 출발 표시 st[0x15 + i] 는 판정 때가 아니라 0xf 진입(3d966~3d976)에서 지운다 — 같은 타석 다음 공이면 그 걸음에 지워진다', () => {
+    const random = createSeededRandom(1)
+    const 시작 = startGame(random)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    expect(hiddenStealBasesOf(출발, 0)).toEqual([1])
+    // 볼 — 판정(0x3dfac) 뒤 같은 타석 다음 공 0xf 진입이 지운다
+    const { progress: 뒤 } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    expect(뒤.stealingFrom).toEqual([])
+    expect(hiddenStealBasesOf(뒤, 0)).toEqual([])
+  })
+
+  it('타석이 끝난 공의 출발 표시는 새 타석 0xe 의 첫 OK(→ 0xf 진입)까지 남는다 — 판정 입력만 판정 때 거둔다', () => {
+    const random = createSeededRandom(4)
+    const 시작 = startGame(random)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    // 볼넷 + 도루 — 밀어내기 판(종류 2)은 표시를 안 지운다(0x3d7b8 은 종류 1 만)
+    const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, random)
+    expect(뒤.stealingFrom).toEqual([])
+    expect(hiddenStealBasesOf(뒤, 0)).toEqual([1])
+    const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, random, { arrivalPlay: play })
+    // 다음 내 타석의 0xe 를 기다리는 동안은 1루(새로 선 주자)도 안 그린다 — 원본 그대로
+    expect(isPlayerTurn(끝.game)).toBe(true)
+    expect(끝.sceneConfirm).not.toBeNull()
+    expect(hiddenStealBasesOf(끝, 0)).toEqual([1])
+    expect(hiddenStealBasesOf(끝, 1)).toEqual([])
+  })
+
+  it('타구 판(종류 1) 시작 리드 0x3d7b8 은 도루 주자의 출발 표시를 지운다 (3d8c6~3d8d2)', () => {
+    const random = createSeededRandom(4)
+    const 시작 = startGame(random)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    const 진행중 = startPlayerOutcome(출발, { kind: '아웃', detail: '땅볼아웃' }, random)
+    expect(진행중.pendingDefensePlay?.stealingFrom).toEqual([1])
+    expect(hiddenStealBasesOf(진행중, 0)).toEqual([])
   })
 
   it('도루 없이 못 맞힌 공이면 rollPassedBall 한 번만 굴리고 판이 없다 · 맞힌 공은 굴리지 않는다', () => {

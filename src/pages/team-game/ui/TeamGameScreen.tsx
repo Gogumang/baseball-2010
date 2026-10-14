@@ -916,8 +916,8 @@ export function TeamGameScreen({
                 playerSide: game.playerSide,
                 // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자의 경기용 주력
                 runnerRunAbilities: runnerRunAbilitiesOf(progress),
-                // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입이 지운다)
-                hiddenRunnerBases: progress.stealingFrom,
+                // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입 · 타구 판 시작이 지운다)
+                hiddenRunnerBases: progress.stealDisplayFrom ?? [],
               }}
               isEagleEyeEnabled={false}
               // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다

@@ -22,6 +22,7 @@ import {
 import {
   AI_STATE,
   createFielders,
+  fielderAbilityOf,
   fielderArrivalTicks,
   createRunner,
   initialPlayView,
@@ -425,7 +426,7 @@ function* pickoffPlaySteps(
       target: fielders[plan.toSlot]?.target ?? basePosition(base),
       special: isSpecial,
       bounce: isSpecial && special.bounce,
-      ability: abilities[holderSlot] ?? DEFAULT_ABILITY,
+      ability: fielderAbilityOf(abilities, holderSlot, DEFAULT_ABILITY),
       random: input.random,
       body: ballBody,
     })
@@ -550,7 +551,7 @@ function* pickoffPlaySteps(
         current.trajectory.isStoppedAt === undefined
           ? tick < current.trajectory.length - 1
           : !current.trajectory.isStoppedAt(tick)
-      if (input.random !== undefined && rollFumble(abilities[current.slot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
+      if (input.random !== undefined && rollFumble(fielderAbilityOf(abilities, current.slot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
         fumbled = true
         ballEventThisTick = true
         // b4280 — 야수 +0xb8 = 6

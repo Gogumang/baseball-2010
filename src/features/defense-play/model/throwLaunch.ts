@@ -65,8 +65,8 @@ export interface ThrowLaunchInput {
   readonly special?: boolean
   /** 원바운드 — 특수 && 거리 > 20400 (a16be, `cpuSpecialThrowOf`) */
   readonly bounce?: boolean
-  /** 던지는 야수 수비 능력 — 악송구 기준 +0xe4 */
-  readonly ability: number
+  /** 던지는 야수 수비 능력 — 악송구 기준 +0xe4. `null` = 선수 없는 칸(투수 칸 0 — 보정 8, `fielderAbilityOf`) */
+  readonly ability: number | null
   /** 없으면 굴리지 않는다(이 진행기들의 규약) */
   readonly random?: RandomPort
   /** 이어 받을 공 객체 칸 */

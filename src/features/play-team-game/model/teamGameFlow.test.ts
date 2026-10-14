@@ -594,6 +594,28 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     }
   })
 
+  it('출발 표시 st[0x15 + i] 는 판정 때가 아니라 0xf 진입(3d966~3d976)에서 지운다 — 같은 타석 다음 공이면 그 걸음에 지워진다', () => {
+    const { progress } = 일루주자()
+    const started = startSteal(progress, 1)
+    expect(started.stealDisplayFrom).toEqual([1])
+    const next = applyBatterPitch(started, 볼, createSeededRandom(1))
+    expect(next.stealingFrom).toEqual([])
+    expect(next.stealDisplayFrom ?? []).toEqual([])
+  })
+
+  it('볼넷 + 도루(밀어내기 판 — 종류 2)는 표시를 안 지운다 — 다음 0xf 진입까지 남는다 (0x3d7b8 은 종류 1 만)', () => {
+    const { progress } = 일루주자()
+    const 쓰리볼 = { ...startSteal(progress, 1), atBat: { ...progress.atBat, balls: 3 } }
+    const next = applyBatterPitch(쓰리볼, 볼, createSeededRandom(1))
+    expect(next.stealingFrom).toEqual([])
+    expect(next.game.bases).toEqual({ first: true, second: true, third: false })
+    // 다음 타자의 0xe OK 대기 동안은 1루(새로 선 타자주자)도 안 그린다 — 원본 그대로(0xe 그리기도 같은 칸을 본다)
+    expect(next.sceneConfirmPending).toBe(true)
+    expect(next.stealDisplayFrom).toEqual([1])
+    // OK → 0xf 진입이 지운다
+    expect(confirmScene(next, createSeededRandom(1)).stealDisplayFrom ?? []).toEqual([])
+  })
+
   it('출발하지 않은 공은 판이 없다 (0.1% 폭투·포일 굴림만 한 번)', () => {
     const { progress } = 일루주자()
     const next = applyBatterPitch(progress, 볼, createSeededRandom(1))

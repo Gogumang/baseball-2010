@@ -98,9 +98,19 @@ export function laserThrowChanceOf(input: LaserThrowInput): number {
   return base * CHANCE_SCALE
 }
 
-/** 0x66a8c — rand(0,1000) < 기준 */
-export function rollLaserThrow(input: LaserThrowInput, random: RandomPort): boolean {
-  return random.rand(0, CHANCE_LIMIT) < laserThrowChanceOf(input)
+/**
+ * 0x66a8c(경기 장면, 공 쫓는 야수 0xb0c90) — rand(0,1000) < 기준.
+ * ```
+ * 66a94  r5 = 야수+0xec(선수) ; 66aa6 0 이면 → 66b0e 0 을 돌린다      ; **굴림 없이** 실패
+ * ```
+ * 야수+0xec 는 판 시작 0xb0fb4 가 선수를 찾은 칸에만 쓴다 — 투수 칸 0 은 비어 있어(`fielderAbilityOf` 가 `null`) 난수를 안 먹는다.
+ */
+export function rollLaserThrow(
+  input: Omit<LaserThrowInput, 'defenseAbility'> & { readonly defenseAbility: number | null },
+  random: RandomPort,
+): boolean {
+  if (input.defenseAbility === null) return false
+  return random.rand(0, CHANCE_LIMIT) < laserThrowChanceOf({ ...input, defenseAbility: input.defenseAbility })
 }
 
 /**

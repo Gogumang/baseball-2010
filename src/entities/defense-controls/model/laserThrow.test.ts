@@ -110,6 +110,22 @@ describe('레이저 송구 확률 — 표 0xd2590 [3,4,5,6,7,8,9,10]', () => {
     expect(rollLaserThrow(입력, 차례로([29]))).toBe(true)
     expect(rollLaserThrow(입력, 차례로([30]))).toBe(false)
   })
+
+  it('쫓는 야수+0xec(선수)가 없으면(투수 칸 0) 난수 없이 실패한다 — 0x66a8c 66aa6', () => {
+    let 굴림 = 0
+    const 세는: RandomPort = {
+      rand: () => {
+        굴림 += 1
+        return 0
+      },
+      rand9d: () => {
+        굴림 += 1
+        return 0
+      },
+    }
+    expect(rollLaserThrow({ defenseAbility: null, skillIds: [21] }, 세는)).toBe(false)
+    expect(굴림).toBe(0)
+  })
 })
 
 describe('"반짝이는 순간" 창 — 0xb2648 (포구 −10 ~ +8틱)', () => {

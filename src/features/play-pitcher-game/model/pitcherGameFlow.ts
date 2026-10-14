@@ -1355,7 +1355,7 @@ function arrivePitcherPitch(
       stealingFrom: progress.stealingFrom,
       bases: before.bases,
       outs: before.outs,
-      // 수비 아홉 칸은 우리 팀, 칸 0 은 나 — 타구 진행기(`defensePlayInputOf`)와 같은 원본 버그(칸 0 은 변화)까지 그대로
+      // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032, `myDefenseAbilitiesOf`)
       defenseAbilities: myDefenseAbilitiesOf(progress),
       // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
       fielderPlates: myFielderPlatesOf(progress),
@@ -1443,7 +1443,6 @@ function withoutSteal(progress: PitcherGameProgress): PitcherGameProgress {
   return progress.stealingFrom.length === 0 ? progress : { ...progress, stealingFrom: [] }
 }
 
-/** 수비 아홉 칸 — 우리 팀, 칸 0 은 나(⚠️ 원본 그대로 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**) */
 /**
  * 수비 아홉 칸의 **이름 판 선수** (0x43cb0 — `defenseFielderPlatesOf`) — 칸 고르기는 `myDefenseAbilitiesOf` 와 같다.
  * 칸 0 은 지금 마운드 투수 = 나(이름 `myName` · 보직 `role` = 레코드 +0xb & 3).
@@ -1473,13 +1472,16 @@ function opponentRunnerAcesOf(progress: PitcherGameProgress): RunnerAces {
   }
 }
 
+/**
+ * 수비 아홉 칸 — 우리 팀. 칸 0(투수 = 나)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다
+ * (송구 g = 2 · 악송구 보정 8 · 펌블 0 — `fielderAbilityOf`). 견제 · 공 도착 판도 같은 값을 쓴다.
+ */
 function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] {
   return defenseAbilitiesOf(
     teamBatters(progress.options.ourTeamId).map((player) => ({
       position: player.position,
       defense: player.ability[2],
     })),
-    progress.options.stats.breaking,
   )
 }
 
@@ -1645,14 +1647,8 @@ export function pickoff(
     targetBase: play.targetBase,
     bases,
     outs: progress.game.outs,
-    // 수비 아홉 칸은 우리 팀, 칸 0 은 나 — 타구 진행기와 같은 원본 버그(칸 0 은 변화)까지 그대로
-    defenseAbilities: defenseAbilitiesOf(
-      teamBatters(progress.options.ourTeamId).map((player) => ({
-        position: player.position,
-        defense: player.ability[2],
-      })),
-      progress.options.stats.breaking,
-    ),
+    // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032)
+    defenseAbilities: myDefenseAbilitiesOf(progress),
     fielderPlates: myFielderPlatesOf(progress),
     runnerAces: opponentRunnerAcesOf(progress),
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
@@ -1801,16 +1797,8 @@ function defensePlayInputOf(
     outs: progress.game.outs,
     // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
     stealingFrom: progress.stealingFrom,
-    // 내가 던진 타석이니 수비 아홉 칸은 **우리 팀**이고, 칸 0(투수)은 나다.
-    // ⚠️ 원본 그대로: 칸 0 도 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**가 들어간다
-    // (0xb570c(팀, 2, 선수, 90, 1) — `defenseAbilitiesOf` 주석).
-    defenseAbilities: defenseAbilitiesOf(
-      teamBatters(progress.options.ourTeamId).map((player) => ({
-        position: player.position,
-        defense: player.ability[2],
-      })),
-      progress.options.stats.breaking,
-    ),
+    // 내가 던진 타석이니 수비 아홉 칸은 **우리 팀**이다. 칸 0(투수 = 나)은 판 시작 0xb0fb4 가 선수를 찾지 않는다(b1032)
+    defenseAbilities: myDefenseAbilitiesOf(progress),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
     fielderPlates: myFielderPlatesOf(progress),
     runnerAces: opponentRunnerAcesOf(progress),

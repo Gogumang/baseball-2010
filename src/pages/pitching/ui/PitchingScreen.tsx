@@ -185,6 +185,12 @@ interface PitchingScreenProps {
   readonly onPopupFrozenChange?: (isFrozen: boolean) => void
   /** 타석 장면 재료 — 있으면 구질 · 조준 · 게이지 위에 캔버스 장면을 깐다(소개 판 · "CHANGE" 는 그 위). 없으면 예전 패널만 */
   readonly stage?: PitchingStageSource
+  /**
+   * st[0x15 + i] — 이번 공에 CPU 가 도루를 출발시킨 주자의 루(세션 `pitcherStealDisplay`, 0x520de → 0xa9bd4). 그 주자는 루에 안
+   * 그린다(0x35b94 의 주자 그리기가 같은 칸을 본다 — 타자 미션 화면과 같다). 0xf 진입 · 타구 판 시작이 지운다.
+   * 세션은 같은 타석 다음 공의 0xf 진입을 공을 먹인 걸음에 바로 적으므로(`selectionEntered`), 공이 날거나 0x12 인 동안은 계속 숨긴다
+   */
+  readonly stealDisplay?: { readonly bases: readonly number[]; readonly selectionEntered: boolean } | null
 }
 
 export function PitchingScreen({
@@ -216,6 +222,7 @@ export function PitchingScreen({
   settings,
   onSettingsChange,
   stage,
+  stealDisplay = null,
 }: PitchingScreenProps) {
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
@@ -517,6 +524,9 @@ export function PitchingScreen({
               ourTeamId: teamIds.human,
               opponentTeamId: teamIds.cpu,
               playerSide: humanSideOf(run.mission),
+              // st[0x15 + i] — CPU 가 이번 공에 도루를 출발시킨 주자는 0xf 진입 전까지(공이 날거나 0x12 인 동안 포함) 루에 안 그린다
+              hiddenRunnerBases:
+                stealDisplay !== null && (!stealDisplay.selectionEntered || isPitchSceneBusy) ? stealDisplay.bases : [],
             }}
             batterForm={stage.batterForm}
             batterSkinIndex={stage.batterSkinIndex}
