@@ -248,14 +248,17 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
   })
 
   it('2아웃 땅볼 — 타자주자가 죽은 틱에 홈을 밟은 주자는 보류(0xaa1c0)되고 3아웃이라 영영 안 풀린다(0xaa388)', () => {
-    // 원본 코드 3 — 투수가 잡아 CPU 송구로 1루에 던지고, 16틱에 타자주자가 1루 포스(0xb36d0 결과 2)로 죽는 그 틱에
-    // 3루 주자가 홈을 밟는다. (예전 손-패턴 [70, 1000, 202] 의 판은 "결과 코드가 정한 1루 도착 틱" 다리에 기대고 있었다)
-    const 결과 = play(땅볼아웃, 주자3루, 2, [99, 898, 290, 1])
+    // 투수가 잡아 CPU 송구로 1루에 던지고, 17틱 그림의 플레이 틱에서 타자주자가 1루 포스(0xb36d0 결과 2)로 죽는다. 3루 주자는
+    // 그 그림의 목록 틱(16틱 6 절 이동)에 홈에 닿아, 플레이 틱 뒤의 득점 0xaa0a8(525fc)이 3아웃을 보고 보류한다.
+    // (씨앗을 다시 골랐다 — 예전 [99, 898, 290, 1] 은 득점을 아웃 판정 앞에 세던 옛 차례에 기댔다. 그 판은 이제 3아웃이 홈인
+    //  그림보다 먼저라 G1 이 닫혀 주자가 홈에 못 닿는다 — 원본 차례 그대로)
+    const 결과 = play(땅볼아웃, 주자3루, 2, [63, 704, 224, 1])
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.advance.runsScored).toBe(0)
     expect(결과.voidedRuns).toBe(1)
-    expect(결과.log).toContain('16틱 1번 주자 홈 — 보류 1 / 득점 0')
+    expect(결과.log).toContain('17틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.log).toContain('17틱 1번 주자 홈 — 보류 1 / 득점 0')
   })
 
   it('2아웃 땅볼 — 타자주자가 살아 뛰던 때 바로 올린 득점(0xaa1b0)은 뒤에 타자주자가 죽어 3아웃이 돼도 남는다', () => {
@@ -267,7 +270,20 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
     expect(결과.runnerFates[0].retired).toBe(true)
     expect(결과.advance.runsScored).toBe(1)
     expect(결과.voidedRuns).toBe(0)
-    expect(결과.log).toContain('16틱 1번 주자 홈 — 보류 0 / 득점 1')
+    // 주자는 16틱 6 절 이동(그림 17 의 목록 틱)에 닿고 그림 17 의 슬롯 2 득점 0xaa0a8 이 센다
+    expect(결과.log).toContain('17틱 1번 주자 홈 — 보류 0 / 득점 1')
+  })
+
+  it('3아웃이 난 그림 뒤의 목록 틱에서야 홈에 닿을 주자는 득점도 보류도 없다 — 관문이 닫혀 0xaa0a8 이 안 돈다', () => {
+    // 16틱 그림의 플레이 틱에서 타자주자가 1루 포스로 3아웃 → 그 그림 그리기 G3 부터 닫혀(b0dbe) 다음 그림의 목록 틱 · 슬롯 2 가
+    // 없다. 3루 주자는 그 목록 틱에 홈에 닿을 참이었다 — 예전 웹은 득점을 아웃 판정 앞(6 절 이동 뒤)에 세어 보류 1 로 적었다
+    const 결과 = play(땅볼아웃, 주자3루, 2, [99, 898, 290, 1])
+
+    expect(결과.log).toContain('16틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.advance.outsAdded).toBe(1)
+    expect(결과.advance.runsScored).toBe(0)
+    expect(결과.voidedRuns).toBe(0)
+    expect(결과.log.some((line) => line.includes('주자 홈'))).toBe(false)
   })
 
   it('2아웃이라도 안타로 타자주자가 살면 점수는 그대로 난다', () => {
@@ -661,8 +677,9 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     const 잡음 = 필살.log.findIndex((line) => line.includes('잡았다'))
     expect(맞음).toBeGreaterThanOrEqual(0)
     expect(잡음).toBeGreaterThan(맞음)
-    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 유격수가 줍는다
-    expect(필살.log[잡음]).toBe('23틱 5번 야수가 잡았다 (종류 0)')
+    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 2루수가 줍는다.
+    // 다시 쏘기(b45a0)는 그림 6 의 슬롯 2 라 예보가 그 그림의 야수 자리(6 절 이동 앞)로 고른다 — 예전 웹은 이동 뒤 자리로 골라 유격수였다
+    expect(필살.log[잡음]).toBe('23틱 3번 야수가 잡았다 (종류 0)')
   })
 
   it('튕기는 동안에도 3루 주자는 홈을 밟는다', () => {
@@ -737,7 +754,9 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
 
   it('송구가 닿으면 공은 받은 야수의 손으로 옮겨 간다 — 받은 짝이 다시 던질 수 있다 (0xb2734)', () => {
     // 같은 판에서 16틱에 귀루 키('3')를 누르면 주자의 달려가는 루가 1루로 바뀌어 유격수(2루 커버)가 짝(1루수 2)에게 던지고,
-    // 받은 1루수가 공을 쥐어 다시 유격수에게 던진다
+    // 20틱에 한 번 더 귀루하면 받은 1루수가 공을 쥐어 다시 유격수에게 던진다.
+    // (키를 다시 골랐다 — 펌블 사건(5틱)의 포스 요구 루가 이제 같은 그림의 목록 틱에 걸려(6d 절이 6 절 이동 앞) 주자가 한 틱 일찍
+    //  2루로 붙들린다. 16틱 키 하나로는 24틱에 공을 받은 1루수 쪽에서 협살이 풀린다)
     const 결과 = runDefensePlay({
       outcome: 단타,
       trajectory: battedBallTrajectory([87, 1388, 222, 0]),
@@ -745,13 +764,13 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
       outs: 0,
       defenseIsCpu: true,
       random: createSeededRandom(26),
-      controls: { side: '공격', keyAt: (tick) => (tick === 16 ? { key: '3' } : null) },
+      controls: { side: '공격', keyAt: (tick) => (tick === 16 || tick === 20 ? { key: '3' } : null) },
     })
 
     expect(결과.rundowns).toBe(1)
     expect(결과.log).toContain('15틱 협살 시작 — 1번 주자 2↔1루 (야수 5·2)')
     expect(결과.log).toContain('16틱 협살 송구 5→2 — 24틱 도착')
-    expect(결과.log).toContain('24틱 협살 송구 2→5 — 30틱 도착')
+    expect(결과.log).toContain('24틱 협살 송구 2→5 — 29틱 도착')
   })
 
   it('**주자가 안 되돌면 태그가 안 난다** — 원본에도 주자 쪽 협살 AI 가 없다', () => {
@@ -1333,7 +1352,9 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     const 태그 = 결과.log.find((line) => line.includes('태그 아웃'))
     expect(태그).toBeDefined()
     const 아웃틱 = 태그!.split('틱')[0]
-    expect(아웃틱).toBe('13')
+    // 3루 주자는 13틱 6 절 이동(그림 14 의 목록 틱)에 포수 옆으로 들어오고, 그림 14 의 플레이 틱 b43da 가 태그한다
+    // (예전 웹은 아웃 판정을 이동 뒤 같은 판 틱에 두어 13틱으로 적었다)
+    expect(아웃틱).toBe('14')
     expect(결과.log.some((line) => line.startsWith(`${아웃틱}틱 1루로 송구`) && line.includes('CPU 결정'))).toBe(true)
     expect(결과.throwBase).toBe(1)
     expect(결과.advance.outsAdded).toBe(2)
@@ -1649,8 +1670,10 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
-    // 무사 1루 — 원본 코드 15 [94, 1359, 221] 씨앗 257: 2루 커버(3)가 쥔 공으로 1번 주자 1↔2루 협살이 서고, 19틱 귀루 키에
-    // 2루수가 짝 1루수(2)에게 던진다. 받은 1루수가 1루로 가 닿는 31틱에 타자주자(0번)가 이미 1루에 서 있다.
+    // 무사 1루 — 원본 코드 15 [94, 1359, 221] 씨앗 257: 2루 커버(3)가 쥔 공으로 1번 주자 1↔2루 협살이 서고, 17틱 귀루 키에
+    // 2루수가 짝 1루수(2)에게 던진다. 받은 1루수가 1루로 가 닿는 그림 29 에 타자주자(0번)가 이미 1루에 서 있다 — 1루수는 28틱 6 절
+    // 이동(그림 29 의 목록 틱)에 닿고, 그 +0x3b 를 그림 29 의 플레이 틱 b4412 가 본다.
+    // (키를 다시 골랐다 — 펌블 사건의 포스 요구 루가 같은 그림 목록 틱에 걸려 주자가 한 틱 일찍 붙들리므로 19틱 키로는 협살 태그가 난다)
     // (예전 장면 [134, 944, 944] 씨앗 12 는 2루 커버가 아직 공을 안 쥔 송구 비행 중에 협살을 세우던 웹 근사에 기대 있었다)
     const 결과 = runDefensePlay({
       outcome: 단타,
@@ -1660,10 +1683,10 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       runAbility: 500,
       random: createSeededRandom(257),
       defenseIsCpu: true,
-      controls: { side: '공격', keyAt: (tick) => (tick === 19 ? { key: '3' } : null) },
+      controls: { side: '공격', keyAt: (tick) => (tick === 17 ? { key: '3' } : null) },
     })
 
-    expect(결과.log).toContain('31틱 결과 코드 9 — 2번 야수가 1루에 닿았지만 0번 주자가 서 있다')
+    expect(결과.log).toContain('29틱 결과 코드 9 — 2번 야수가 1루에 닿았지만 0번 주자가 서 있다')
   })
 
   it('3아웃이면 그 틱 끝에서 판이 닫힌다 — 판 진행 관문 0xb0d28 의 state[6] > 2 (b0dbe)', () => {
@@ -2220,5 +2243,49 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
   it('건너뛰지 않으면 아무것도 안 한다', () => {
     const 결과 = runDefensePlay(홈런판())
     expect(결과.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
+  })
+
+  it('같은 목록 틱에 앞 주자도 홈에 닿으면 타자주자의 0x13(카메라 3f17e)이 먼저고, 앞 주자는 다음 그림의 득점 0xaa0a8 이 센다', () => {
+    // 원본 차례: 건너뛰는 동안 52b26 의 0x3f060 = 목록 틱(주자 이동) → 카메라 3f164 가 곧바로 타자주자 메시지 0x13 → 52b36 에서 멈추고 그린다.
+    // 같은 목록 틱에 닿은 앞 주자의 +0x3b 는 그 뒤 슬롯 2 의 0xaa0a8(525fc)이 본다 — 웹은 다음 판 틱 6f 절이다
+    const 풀린틱 = (() => {
+      let state = startDefensePlay(홈런판())
+      let pressed = false
+      while (!isDefensePlayFinished(state)) {
+        const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+        if (key !== null) pressed = true
+        const before = state.fastForward || key !== null
+        state = stepDefensePlay(state, key)
+        if (before && !state.fastForward) return state.tick - 1
+      }
+      return -1
+    })()
+    expect(풀린틱).toBeGreaterThan(0)
+
+    let state = startDefensePlay(홈런판())
+    let pressed = false
+    while (state.tick < 풀린틱) {
+      const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+      if (key !== null) pressed = true
+      state = stepDefensePlay(state, key)
+    }
+    // 1루 주자를 타자주자와 같은 자리 · 같은 걸음으로 홈 앞에 다시 세운다(이미 들어온 1점은 그대로 둔다)
+    const 타자 = state.runners[0]
+    const 앞주자 = state.runners[1]
+    앞주자.state = { ...타자.state, index: 앞주자.state.index, isBatterRunner: false, scored: false, isOut: false }
+    앞주자.counted = false
+    앞주자.arrivedThisListTick = false
+    const 앞점수 = state.held.scoreboardRuns
+
+    state = stepDefensePlay(state, null)
+    expect(state.fastForward).toBe(false)
+    expect(state.runInsThisTick).toEqual([0])
+    expect(앞주자.state.scored).toBe(false)
+    expect(state.held.scoreboardRuns).toBe(앞점수 + 1)
+
+    state = stepDefensePlay(state, null)
+    expect(state.runInsThisTick).toEqual([앞주자.state.index])
+    expect(앞주자.state.scored).toBe(true)
+    expect(state.held.scoreboardRuns).toBe(앞점수 + 2)
   })
 })
