@@ -54,6 +54,8 @@ import {
   summaryOf,
   throwPitch,
   resolveRunnerPlay,
+  humanDefenseSkillPanelOf,
+  entryBatterSkillIdsOf,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -1180,6 +1182,17 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
     expect(canOpenPitcherChange(수비)).toBe(true)
   })
 
+  it('사람 수비 타석의 경기 스킬 표시 판 재료 — 상대 지금 타자 칸 · 그 타순 칸 결과 링 · 우리 마운드 투수 (0x445cc · 0x3d160)', () => {
+    const 수비 = 시작({ playerSide: PLAYER_SIDE_LAST_BAT }).progress
+    const 링 = [1, 2, 7]
+    const records = [...수비.opponentEntryRecords]
+    records[수비.opponentOrderIndex] = { ...records[수비.opponentOrderIndex]!, results: 링 }
+    const 판 = humanDefenseSkillPanelOf({ ...수비, opponentEntryRecords: records })
+    expect(판.batterRecordSlot).toBe(수비.opponentEntry[수비.opponentOrderIndex]?.recordSlot)
+    expect(판.recentAtBatCodes).toEqual(링)
+    expect(판.batterSkillIds).toEqual(entryBatterSkillIdsOf(수비.opponentEntry[수비.opponentOrderIndex]))
+  })
+
   it('대타가 옛 타자의 수비 자리를 받고, 빠진 선수는 명단에서 지워진다 (재출장 없음)', () => {
     const { progress } = 공격시작({ aceBatterId: 0 })
     const 옛타자 = progress.ourEntry[0]!
@@ -1193,6 +1206,8 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
     expect(뒤.ourEntry.some((player) => player.name === 옛타자.name)).toBe(false)
     expect(뒤.ourBenchBatters).toBe(3)
     expect(currentBatterEntry(뒤)?.aceIndex).toBe(0)
+    // 0x16 진입 3d562 0x668cc(스킨, 공격 팀, 0) — 확정 0xaebe4 앞이라 **나가는** 타자의 레코드 칸을 공격 측(사람)에
+    expect(뒤.substitutionScene?.cheerRestore).toEqual({ attackSide: progress.game.playerSide, recordSlot: 옛타자.recordSlot })
   })
 
   it('대타 타자의 능력치가 타석 화면에 그대로 간다', () => {

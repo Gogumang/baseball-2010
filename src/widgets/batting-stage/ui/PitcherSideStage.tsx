@@ -14,7 +14,10 @@ import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
-import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
+import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
+import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
+import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
+import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
@@ -74,6 +77,12 @@ interface PitcherSideStageProps {
    * 상태 0xe(쉬는 대기) · 0xf(구질 목록이 실린 동안)에만 그린다
    */
   readonly timeKeyCount?: number | null
+  /**
+   * **경기 스킬 표시 판** (장면 +0x19b0, 0xd 진입 48fa4 · 0xf 진입 3dd78 · 그리기 0x4b5b4) — CPU 타자 · 사람 투수가 장착한 스킬 중
+   * 지금 걸리는 이름을 20 그림 동안 보이고, 그 CPU 타자가 전국구 · 먹튀면 함성 29 를 낸다. 공용 HUD 0x4c4bc 꼬리라 누가 던지든 같다.
+   * 0xf = 구질 목록이 실린 대기 · 0x10 = 조준 · 0x11 = 게이지 또는 공이 나는 동안. 안 넘기면 안 그린다
+   */
+  readonly skillPanel?: PitcherSideSkillPanelSource
   /** 장면 위에 얹는 UI (소개 판 · 교체 연출 · 조준 그림 따위) — 원본도 상태 그리기가 장면 다음에 그린다 */
   readonly children?: ReactNode
 }
@@ -108,6 +117,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let frozenTotal = 0
     let frozenSince: number | null = null
     let handle = 0
+    /** 경기 스킬 표시 판 — 0xf 에 들 때마다 하나씩 올리는 표지(구질 목록이 새로 실리면 새 0xf 진입) */
+    const stepSkillPanel = createSkillPanelDriver()
+    let skillPanelStateFSerial = 0
+    let wasSkillPanelStateF = false
 
     const frame = (now: number) => {
       const current = latestRef.current
@@ -146,6 +159,45 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 0x4c92e — "#TIME" 은 상태 0xe · 0xf 만
       const isTimeState = isIdle && (current.isPaused || pitchInput?.kind === '구질')
       const isResult = stage.phase.kind === '결과'
+      const side = current.batterSide ?? batterSideOfForm(current.batterForm)
+      // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
+      const inputKind = isIdle && !current.isPaused ? (current.inputOverlayRef?.current?.kind ?? null) : null
+      const isSkillPanelStateF = inputKind === '구질'
+      if (isSkillPanelStateF && !wasSkillPanelStateF) skillPanelStateFSerial += 1
+      wasSkillPanelStateF = isSkillPanelStateF
+      const skillPanel = current.skillPanel
+      const skillPanelView: SkillPanelView | null =
+        skillPanel === undefined
+          ? null
+          : stepSkillPanel({
+              source: { ...skillPanel, isDefenseCpu: skillPanel.isDefenseCpu ?? false },
+              isStateF: isSkillPanelStateF,
+              stateFMark: skillPanelStateFSerial,
+              isDrawnState: isSkillPanelStateF || inputKind === '조준' || inputKind === '게이지' || stage.phase.kind === '투구중',
+              nowTick,
+              batterSkillBits: skillBitsOfIds(skillPanel.batterSkillIds, false),
+              pitcherSkillBits: skillBitsOfIds(skillPanel.pitcherSkillIds, true),
+              strikes: current.hud?.strikes ?? 0,
+              batterRecordSlot: skillPanel.batterRecordSlot,
+              batterHand: side,
+              // 0xd 진입 상황 — 사람이 던지는 타석이라 공격 측(CPU)이 hud 의 상대 점수다. 주자 0xa9888 은 1~3 루(타자는 0x17 진입에
+              // 목록에 든다 — 0x46418 4650e)
+              situation: () => {
+                const bases = current.hud?.bases ?? { first: false, second: false, third: false }
+                return {
+                  gameMode: current.gameMode,
+                  inning: current.hud?.inning ?? 1,
+                  attackScore: current.hud?.opponentScore ?? 0,
+                  defenseScore: current.hud?.ourScore ?? 0,
+                  runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
+                  hasSecondBaseRunner: bases.second,
+                  pitcherHand: current.pitcherHand,
+                  batterHand: side,
+                  batterRecordSlot: skillPanel.batterRecordSlot,
+                  recentAtBatCodes: skillPanel.recentAtBatCodes,
+                }
+              },
+            })
       renderBattingStage(context, {
         pitch: stage.phase.kind === '대기' ? null : pitch,
         frame: stage.ballFrame,
@@ -169,7 +221,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,
         batterEquipment: NO_EQUIPMENT,
-        side: current.batterSide ?? batterSideOfForm(current.batterForm),
+        side,
         hud: current.hud,
         acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
@@ -180,6 +232,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,
         // 필살 남은 횟수 0x38a30 은 38a42 에서 0x33fe4(수비 조작 사람)면 바로 끝 — 사람이 던지는 장면엔 없다
         specialSwingRemaining: null,
+        // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판
+        skillPanel: skillPanelView,
         scenery: {
           skyRow: current.skyRow,
           stadium: current.stadium,

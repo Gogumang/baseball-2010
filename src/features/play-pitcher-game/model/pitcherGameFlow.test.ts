@@ -22,6 +22,7 @@ import {
   giveUpPitching,
   hiddenStealBasesOf,
   isPitchTurn,
+  pitcherSceneSkillPanelOf,
   pickoff,
   pitchSlotsFor,
   pitchersOfRecordOf,
@@ -1088,6 +1089,12 @@ describe('내가 던지는 타석의 CPU 대타 0xac228 — 0xf 진입 0x3d954 (
     // 사람 장면 대타라 "Time!"·등판음 신호가 선다 (안 바뀐 공은 그대로)
     expect(안바뀜.scenePinchHit).toBeNull()
     expect(바뀜.scenePinchHit).toEqual({ serial: 1, by: 'CPU', incomingIsAce: false })
+    // 0x16 진입 3d562 0x668cc(스킨, 공격 팀, 0) — 확정 앞이라 나가는 타자의 레코드 칸을 공격 측(CPU)에 다시 세운다
+    expect(바뀜.substitutionScene?.cheerRestore).toEqual({
+      attackSide: 경기.game.playerSide === 0 ? 1 : 0,
+      recordSlot: pitcherSceneSkillPanelOf(경기).batterRecordSlot,
+    })
+    expect(pitcherSceneSkillPanelOf(바뀜).batterRecordSlot).not.toBe(pitcherSceneSkillPanelOf(경기).batterRecordSlot)
     expect(isPitchTurn(바뀜)).toBe(true)
     // 대타 굴림 둘(rand(0,1000)·rand(0,벤치)) 뒤 0x16 → 0xd → 0xe(강판 판정)에 다시 서서 OK 를 기다린다
     expect(대타각본.calls()).toBeGreaterThanOrEqual(평소.calls() + 1)

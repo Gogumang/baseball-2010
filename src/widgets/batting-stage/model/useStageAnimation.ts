@@ -42,10 +42,8 @@ import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derby
 import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
-import {
-  SKILL_CHEER_SOUND_ID, batterSkillPanelBitsOf, createSkillPanelScene, enterAtBatSkillPanel,
-  enterPitchSkillPanel, pitcherSkillPanelBitsOf, skillBitsOfIds, skillCheerOf, stepSkillPanel,
-} from '@/widgets/batting-stage/lib/skillPanel'
+import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
+import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 
@@ -57,9 +55,6 @@ const INTIMIDATE_SKILL_ID = 22
 const CPU_AIM_TICK_IN_0X10 = 6
 /** 0x11 의 공 놓기 틱 — 0x4e078 은 상태 틱 > 9 인 첫 틱(10)에 0x4dc78 을 부른다 */
 const CPU_RELEASE_TICK_IN_0X11 = 10
-
-/** 따라잡기로 한 번에 돌리는 판 그림 수 — 탭이 쉬다 돌아와도 판이 한꺼번에 사라지지 않게 */
-const SKILL_PANEL_CATCH_UP_LIMIT = 4
 
 /** 수비 투수 레코드 +0x14 — 번호를 직접 든 능력치(마투수)면 번호 − 16, 아니면 비트 그대로 (`resolvePitch.pitcherSkillIdsOf` 와 같은 고름) */
 function pitcherSkillBitsOf(pitcher: PitcherAbility): number {
@@ -360,15 +355,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let pausedSince: number | null = null
 
     /**
-     * **경기 스킬 표시 판** (`lib/skillPanel`) — 장면 +0x19b0 ~ +0x19c0. 0xd 진입 열쇠(`skillPanel.entryKey`)가 바뀐 뒤 첫 0xf 진입에서
-     * 0x445cc · 0x3d160 으로 두 비트를 정하고(웹은 0xd · 0xe 를 따로 안 세어 0xf 진입 직전에 한다 — 그 사이 상황은 안 바뀐다),
-     * 0xf 진입마다 2 스트라이크 갈래 3dd4e 를 본다. 그리기 0x4b5b4 는 0xf · 0x10 · 0x11 의 그림마다 한 번 — 원본 틱으로 센다.
+     * **경기 스킬 표시 판** (`model/skillPanelDriver`) — 사람이 치는 타석의 0xf 는 쉬지 않는 '대기', 0xf 진입은 그 단계에 든 시각
+     * (`phaseStartedAtRef`)이 바뀔 때, 0x10 · 0x11 은 '투구중'이다.
      */
-    /** 지금 0xf 에 든 시각(`phaseStartedAtRef`) — 바뀌면 새 0xf 진입이다. 0xf 가 아니면 null */
-    let skillPanelStateFMark: number | null = null
-    let skillPanelTick = -1
-    let skillPanelView: SkillPanelView | null = null
-    const localSkillPanelScene = createSkillPanelScene()
+    const stepSkillPanel = createSkillPanelDriver()
     const skillPanelSituationNow = (): SkillPanelSituation => {
       const latest = latestRef.current
       const hud = latest.hud
@@ -393,61 +383,20 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const latest = latestRef.current
       const source = latest.skillPanel
       if (source === undefined) return null
-      const scene = source.scene?.current ?? localSkillPanelScene
-      if (source.entryKey !== null && source.entryKey !== undefined && source.entryKey !== scene.entryKey) {
-        scene.entryKey = source.entryKey
-        scene.isAtBatPending = true
-      }
       const isStateF = phaseRef.current === '대기' && !latest.isPaused
-      if (!isStateF) skillPanelStateFMark = null
-      else if (skillPanelStateFMark !== phaseStartedAtRef.current) {
-        skillPanelStateFMark = phaseStartedAtRef.current
-        const pitcherBits = pitcherSkillBitsOf(latest.pitcherAbility)
-        if (scene.isAtBatPending) {
-          // 0xd 진입 0x48d50 — 48f9a 0x445cc · 48f9e 0x3d160 · 48fa4
-          scene.isAtBatPending = false
-          const situation = skillPanelSituationNow()
-          scene.panel = enterAtBatSkillPanel(
-            scene.panel,
-            batterSkillPanelBitsOf(skillBitsOfIds(latest.batterSkillIds, false), situation),
-            pitcherSkillPanelBitsOf(pitcherBits, situation),
-          )
-        }
-        // 0xf 진입 0x3d954 3dd4e — st[4] == 2 && 수비 투수 비트 11
-        scene.panel = enterPitchSkillPanel(scene.panel, latest.hud?.strikes ?? 0, pitcherBits)
-      }
-      const isDrawnState = isStateF || phaseRef.current === '투구중'
-      if (!isDrawnState) {
-        skillPanelTick = -1
-        return null
-      }
-      const steps = skillPanelTick < 0 ? 1 : Math.min(SKILL_PANEL_CATCH_UP_LIMIT, nowTick - skillPanelTick)
-      skillPanelTick = nowTick
-      const drawSource = {
+      return stepSkillPanel({
+        source,
+        isStateF,
+        stateFMark: phaseStartedAtRef.current,
+        isDrawnState: isStateF || phaseRef.current === '투구중',
+        nowTick,
+        batterSkillBits: skillBitsOfIds(latest.batterSkillIds, false),
+        pitcherSkillBits: pitcherSkillBitsOf(latest.pitcherAbility),
+        strikes: latest.hud?.strikes ?? 0,
+        batterRecordSlot: latest.batterRecordSlot,
         batterHand: latest.batterHand ?? batterSideOfForm(latest.batterForm),
-        isDefenseCpu: source.isDefenseCpu ?? true,
-      }
-      for (let step = 0; step < steps; step += 1) {
-        const { view, next } = stepSkillPanel(scene.panel, drawSource, scene.arrowDraws)
-        if (view !== null) {
-          // 4c26a~4c3a2 — 판을 세운 뒤 첫 그림에서 한 번
-          if (scene.panel.cheerPending) {
-            const cheered = skillCheerOf(scene.cheerBits, {
-              attackSide: source.attackSide,
-              batterRecordSlot: latest.batterRecordSlot,
-              batterSkillBits: skillBitsOfIds(latest.batterSkillIds, false),
-            })
-            if (cheered !== null) {
-              scene.cheerBits = cheered
-              activeSound().play(SKILL_CHEER_SOUND_ID)
-            }
-          }
-          scene.arrowDraws += 1
-        }
-        scene.panel = next
-        skillPanelView = view
-      }
-      return skillPanelView
+        situation: skillPanelSituationNow,
+      })
     }
 
     /** 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 쉬기 시작한 뒤 틱(⚠️ 근사: 웹 쉬기는 0xd 두 그림부터라 0xe 진입보다 두 그림 이르다) */

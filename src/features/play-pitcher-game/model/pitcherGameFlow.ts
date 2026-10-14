@@ -2483,6 +2483,25 @@ function opponentQuickBatterOf(progress: PitcherGameProgress): QuickAtBatBatter 
 }
 
 /**
+ * **내가 던지는 타석의 경기 스킬 표시 판 재료** (`PitcherSideStage.skillPanel`) — CPU 스윙 0xab214 가 읽는 것과 같은 두 레코드:
+ * 상대 지금 타자(+0x14 · 0xb6394 · 그 타순 칸 결과 링 팀 + 타순×0x18 + 0x34)와 내 투수(+0x14, 장착 비트 + 16).
+ */
+export function pitcherSceneSkillPanelOf(progress: PitcherGameProgress): {
+  readonly batterSkillIds: readonly number[]
+  readonly batterRecordSlot: number
+  readonly pitcherSkillIds: readonly number[]
+  readonly recentAtBatCodes: readonly number[]
+} {
+  const batter = opponentQuickBatterOf(progress)
+  return {
+    batterSkillIds: batter.skillIds,
+    batterRecordSlot: batter.recordSlot ?? 0,
+    pitcherSkillIds: progress.options.pitcherSkillIds ?? [],
+    recentAtBatCodes: progress.opponentLineup.records[lineupSlotOf(progress.opponentOrderIndex)]?.results ?? [],
+  }
+}
+
+/**
  * **상태 0xf 진입 `0x3d954`** — 내가 던지는 타석에서 공 하나를 고르기 전마다 돈다 (디스어셈 3d9e4~3da94).
  * ```
  * 3d9e4  수비 팀이 CPU 인가 (state[0x31 + state[0xa]] == 1) — 모드 3 의 내 팀은 사람 팀(0x3a20a)이라 거짓
@@ -2551,6 +2570,8 @@ function applyOpponentCpuPinchHit(
     random,
   )
   if (pinch === null) return progress
+  // 0x16 진입 3d562 0x668cc(스킨, 공격 팀, 0) — 확정 0xaebe4(3d56c) 앞이라 나가는 타자의 레코드 칸이다 (`cheerRestore`)
+  const outgoingRecordSlot = opponentQuickBatterOf(progress).recordSlot
   const opponentBatterLogs = { ...progress.opponentBatterLogs }
   delete opponentBatterLogs[slot]
   return appendLog(
@@ -2581,6 +2602,10 @@ function applyOpponentCpuPinchHit(
             ...(rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT
               ? { aceSlot: aceCutInSlotOf('타자', teamAcesOf(progress.options, false).batter) }
               : {}),
+            // 공격 측(st[9]) = 상대(CPU) 측
+            ...(outgoingRecordSlot === undefined
+              ? {}
+              : { cheerRestore: { attackSide: progress.game.playerSide === 0 ? 1 : 0, recordSlot: outgoingRecordSlot } }),
           }
         : progress.substitutionScene,
     },

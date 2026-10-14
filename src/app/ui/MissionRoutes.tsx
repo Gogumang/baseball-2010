@@ -6,6 +6,7 @@ import {
   missionBatterSpecialSwingRemainingOf,
   missionMoundOpponent,
   missionMoundPitcherAbility,
+  missionPitchingSkillPanelOf,
   missionStageBatterOf,
 } from '@/app/model/useMissionSession'
 import type { useMissionSession } from '@/app/model/useMissionSession'
@@ -339,6 +340,7 @@ export function MissionRoutes({
         onPickoffKey={actions.pickoff}
         // st[0x15 + i] — CPU 가 이번 공에 도루를 출발시킨 주자는 루에 안 그린다
         stealDisplay={session.pitcherStealDisplay}
+        skillPanelScene={skillPanelSceneRef}
         // 상태 0xe — 새 타석마다 사람 OK 를 기다린다
         sceneConfirm={session.sceneConfirm}
         onSceneConfirm={session.confirmScene}
@@ -650,5 +652,7 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     batterSkinIndex: (profile >> 2) & 3,
     ...(aceIndex >= 0 ? { batterSide: batterHandOf(profile, aceIndex), aceBatterOrder: aceIndex } : {}),
     batterTeamIndex: run.cpu.batting?.teamId ?? 0,
+    // 경기 스킬 표시 판 — 지금 CPU 타자 · 미션 투수(장착 비트 + 16) · 공격 측(CPU 칸)
+    skillPanel: missionPitchingSkillPanelOf(run, session.pitcher.skillIds),
   }
 }

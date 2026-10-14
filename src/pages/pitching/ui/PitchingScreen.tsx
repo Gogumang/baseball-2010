@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { MutableRefObject } from 'react'
 import { Hint, Panel, PixelScreen } from '@/shared/ui'
 import { goalsOf } from '@/entities/mission/model/missionGoal'
 import { GoalBar } from '@/entities/mission/ui/GoalBar'
@@ -41,6 +42,8 @@ import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
+import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
@@ -67,6 +70,17 @@ export interface PitchingStageSource {
   readonly aceBatterOrder?: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
+  /**
+   * 경기 스킬 표시 판 재료 — 지금 CPU 타자 · 미션 투수 레코드 · 공격 측 st[9] (`missionPitchingSkillPanelOf`). 0xd 진입 열쇠는 이 화면의
+   * 0xe 대기(`sceneConfirm`), 장면 칸은 `skillPanelScene`. 없으면 판을 안 그린다
+   */
+  readonly skillPanel?: {
+    readonly attackSide: number
+    readonly batterSkillIds: readonly number[]
+    readonly batterRecordSlot: number
+    readonly pitcherSkillIds: readonly number[]
+    readonly recentAtBatCodes: readonly number[]
+  }
 }
 
 /**
@@ -191,6 +205,8 @@ interface PitchingScreenProps {
    * 세션은 같은 타석 다음 공의 0xf 진입을 공을 먹인 걸음에 바로 적으므로(`selectionEntered`), 공이 날거나 0x12 인 동안은 계속 숨긴다
    */
   readonly stealDisplay?: { readonly bases: readonly number[]; readonly selectionEntered: boolean } | null
+  /** 경기 스킬 표시 판의 장면 칸(함성 비트 칸 skin+0x44c · 애니 7 · 8) — 미션 장면 수명. 안 주면 이 화면이 사는 동안만 */
+  readonly skillPanelScene?: MutableRefObject<SkillPanelScene>
 }
 
 export function PitchingScreen({
@@ -223,7 +239,10 @@ export function PitchingScreen({
   onSettingsChange,
   stage,
   stealDisplay = null,
+  skillPanelScene,
 }: PitchingScreenProps) {
+  // 교체 연출 0x16 진입 0x3d458 의 CPU 대타 가지 0x668cc (`SubstitutionScene.cheerRestore`)
+  useSkillCheerRestore(substitutionScene, skillPanelScene)
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
    * `min(레코드 +3 아래 4비트, 0x63)` = 시작 이닝 인덱스를 쓴다(`start.inning` − 1). 재도전 · 다시하기도 같은 준비를 다시 돈다.
@@ -548,6 +567,16 @@ export function PitchingScreen({
             inputOverlayRef={inputOverlayRef}
             // "#TIME" 없음 — '#' 교체 검사 0x38984 가 미션(모드 5 · 6)을 막는다(38984~38a20)
             timeKeyCount={null}
+            // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체
+            {...(stage.skillPanel === undefined
+              ? {}
+              : {
+                  skillPanel: {
+                    ...stage.skillPanel,
+                    entryKey: sceneConfirmWait ?? null,
+                    ...(skillPanelScene === undefined ? {} : { scene: skillPanelScene }),
+                  },
+                })}
           >
             {matchupCards}
             {substitutionOverlay}

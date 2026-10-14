@@ -101,6 +101,12 @@ export interface SubstitutionScene {
    * 없으면 0 — 대기를 세우는 걸음이 곧 연출을 세우는 걸음이다.
    */
   readonly confirmsBefore?: number
+  /**
+   * **대타 가지의 함성 비트 다시 세우기** — 0x16 진입 0x3d458 의 3d562 `0x668cc(스킨, 공격 팀, 0)`. 대타 확정 0xaebe4(3d56c)보다
+   * **앞**이라 0xae89c(공격 팀)이 아직 **나가는 타자**다 — 그 레코드 칸 0xb6394 비트를 스킨 +0x44c + 공격 측(st[9]) · 2 에 다시 세운다
+   * (`skillPanel.restoreCheerBit`). 투수 교체 가지(3d5fe, 인자 1)는 수비 측 비트 0x200 이라 함성 검사(낮은 바이트)가 안 읽는다 — 없다
+   */
+  readonly cheerRestore?: { readonly attackSide: number; readonly recordSlot: number }
 }
 
 /** 0x38b64 의 고르기 — 마선수 26 · 2루나 3루 주자 15 · 그 밖 14 (투수 가지 · 타자 가지 같은 번호) */
