@@ -1,3 +1,4 @@
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { DefenseKeyPress, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import { runRunnerPlay, startRunnerPlay } from '@/features/defense-play/model/runnerPlayEngine'
@@ -38,6 +39,11 @@ export interface LiveRunnerStepper {
 
 /** 사람 수비 조작을 달아 진행기를 세운다 — 키는 `step` 으로 받으므로 `keyAt` 은 안 쓴다 */
 const HUMAN_DEFENSE = { side: '수비' as const, keyAt: () => null }
+
+/** 그 판이 굴리는 경기 난수 — 재생 화면의 그림 쪽 굴림(공 그리기 파티클 · 프레임 끝 파티클 틱)도 같은 난수에 이어서 든다 */
+export function liveRunnerPlayRandomOf(play: LiveRunnerPlay): RandomPort | undefined {
+  return play.kind === 'arrival' ? play.opened.engineInput.random : play.input.random
+}
 
 export function startLiveRunnerPlay(play: LiveRunnerPlay): LiveRunnerStepper {
   if (play.kind === 'arrival') return startRunnerPlay({ ...play.opened.engineInput, controls: HUMAN_DEFENSE })
