@@ -86,6 +86,10 @@ describe('판정 글자 — game_judge 애니 (0x39504)', () => {
   it('종류 → 애니 번호', () => {
     expect(['스트라이크', '헛스윙', '볼', '파울', '아웃', '볼넷', '삼진', '몸에 맞는 공'].map(judgeAnimationOf)).toEqual([0, 0, 3, 4, 1, 6, 9, 7])
     expect(judgeAnimationOf('홈런!')).toBeNull()
+    // 홈런(판정 v = 8 · 12)은 0x393b4 의 표 0xcfe90 이 0x394d6 으로 건너뛴다 — 글자 대신 HOMERUN 연출이다
+    expect(
+      describeResolution({ resolution: { kind: '타구', outcome: { kind: '홈런' } }, hasSwung: true, isBunt: false, resultCode: 24 }),
+    ).toBe('')
     // 사구 판정 문구가 애니 7 로 이어진다 (판정 v4)
     expect(
       judgeAnimationOf(

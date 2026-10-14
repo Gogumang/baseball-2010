@@ -40,8 +40,6 @@ import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stag
  *        0x6a9f1(x − 5, y6 − 5, 폭 + 10, 높이 + 2, 0x28000000) 반투명 검정 판 → 이름을 (x, y6 − 4) 에
  * 4d8fc  구질 == 22(마구): 0x15605d4(0, 0, W, H, 5) — 화면 덮개 단계 5
  * ```
- * 덮개 [0x15605d4] = 0x9b234 는 검정 덮기로 화면을 **단계/16 남긴다**(CORRECTIONS 3절 — 색 덮기 [0x15605d0] = 0x9b3f4 의
- * (단계 + 1)/16 과 다른 몸통) → 단계 5 는 화면 5/16 · 검정 11/16.
  * 판 · 덮개는 바로 그리고 애니 · 이름은 그리기 목록(0xbe8a5 · 0xbe8d5)에 넣어 0xbe6a1 이 투수 · 타자와 함께 그린다 —
  * 곧 판 · 덮개는 선수 **아래**, 애니 · 이름은 선수 **위**(목록 깊이 [0xcfa8c + 0x14] 는 앞쪽).
  *
@@ -51,18 +49,11 @@ import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stag
  * 4d360  모드 ≠ 7 이고 (사람 공격 아님 ∧ 설정 +0x2d(게이지) == 0) 이면 프레임 0x23(35) 을 그 점에 (CPU 투구 난이도 +0x2c 가 기본 2 일 때)
  * 4d3f6  0x3f500(게이지 켬 ∧ 구질 ≠ 22) ∧ 0x33fe4 → 게이지 (`pitchGaugeSprite` 의 규칙):
  *        t == 0: 커서 ≤ 8 이면 0 → 0x3a, 아니면 0x3b 위 min(0x3b + 커서, 0x43) ; 커서 > 8 → 0x3a
- *        t > 0 (2026-10-14 다시 뜸, 0x4d52e~0x4d706):
- *          4d56e  min(0x3b + 커서, 0x43) 을 0xbe8d5(…, 효과 1, 인자 8)    ; 멈춘 커서 — 반투명 8/16
- *          4d586  애니 1([+0x1010] 애니 +4)의 끝 비트(애니 기록 +8 → 바이트 2 비트 2)가 꺼져 있으면
- *          4d5c6    min(0x3b + 누른 칸 [+0x17c8], 0x43) 을 맨 그림으로
- *          4d602  애니 1 을 0xbe8a5 로 그리고 0x93d91 로 한 칸 넘긴다(끝 비트가 서도 그린다 — 끝 칸)
- *          4d614  t([+0x17c0]) == 5 면 game_effect(+0x102c) 애니 0 도 그리고 한 칸 넘긴다
- *          4d6a8  애니 1 끝 비트가 서 있고 [+0x17c4] ≤ 3 이면 min(0x3b + 누른 칸, 0x43) 을 0xbe8d5(…, 효과 1, 인자 max(15 − 3·[+0x17c4], 0))
- *                 로 그리고 [+0x17c4] + 1   ; 결과 원 — **자리는 그대로, 반투명 15 · 12 · 9 · 6 /16 으로 옅어진다**
+ *        t > 0: min(0x3b + 커서, 0x43)(효과 1 · 인자 8) · 애니 1 이 안 끝났으면 min(0x3b + 누른 칸, 0x43) · 애니 1 · t == 5 면 game_effect 애니 0,
+ *               애니 1 이 끝났으면 [+0x17c4] ≤ 3 동안 결과 원을 효과 1 · 인자 15 − 3·틱 으로(흐려짐)
  * ```
- * 효과 1 · 인자 L = 반투명 겹치기 L/16 (R6 3a, 0 이나 16 이상이면 안 그림). 예전에 결과 원을 y − (15 − 3·틱) 로 올려 그린 것은
- * 그 인자를 y 로 잘못 읽은 것이다.
- * ⚠️ 근사: 결과 원 틱은 애니 1(다섯 칸) 뒤부터 센다 · 그리기 목록 깊이 정렬 대신 선수 다음에 그린다.
+ * 게이지의 t > 0 덧그림(효과 1 · 인자 8 멈춘 커서 · 애니 1 · t == 5 game_effect 애니 0 · 흐려지는 결과 원)은 `gaugeDrawsOf`.
+ * ⚠️ 근사: 그리기 목록 깊이 정렬 대신 선수 다음에 그린다.
  */
 
 /** 0xf — 구질 목록 */
@@ -96,6 +87,10 @@ export interface PitchGaugeOverlay {
   readonly showsGauge: boolean
   /** 환경설정 게이지(+0x2d) — 꺼져 있으면 목표점에 프레임 35 */
   readonly gaugeSettingOn: boolean
+  /**
+   * 목표 표시 프레임 0x23 을 넣는가 — 부르는 쪽이 `showsGaugeTargetFrameOf`(0x4d360) 로 낸 값. 안 주면 예전처럼 게이지 설정이 꺼졌을 때
+   */
+  readonly showsTargetFrame?: boolean
   /** 커서 +0x17bc */
   readonly cursor: number
   /** 누른 칸 +0x17c8 (0 = 아직) */
@@ -226,17 +221,15 @@ function onceLength(entries: readonly StageAnimationEntry[]): number {
 
 /* ── 그리기 ── */
 
-/** 0x4d8fc 의 덮개 단계 — 검정 덮개 0x15605d4 가 화면을 단계/16 남긴다 */
-const MAGIC_COVER_STEP = 5
-
 /**
- * 선수 **아래** — 0x10 의 바로 그리는 것: 마구면 화면 덮개 단계 5(화면 5/16 · 검정 11/16), 이름 뒤 반투명 판.
+ * 선수 **아래** — 0x10 의 바로 그리는 것: 마구면 화면 덮개 단계 5, 이름 뒤 반투명 판.
+ * 덮개 [0x15605d4] = 0x9b234 는 검정 덮기로 화면을 **단계/16 남긴다**(CORRECTIONS 3절 — 색 덮기 [0x15605d0] = 0x9b3f4 의
+ * (단계 + 1)/16 과 다른 몸통) → 단계 5 는 화면 5/16 · 검정 11/16.
  */
 export function drawPitchInputUnderlay(context: CanvasRenderingContext2D, overlay: PitchInputOverlay | null, side: number): void {
   if (overlay === null || overlay.kind !== '조준') return
   if (overlay.typeNumber === MAGIC_TYPE_NUMBER) {
-    // 0x15605d4 단계 5 — 화면을 5/16 남긴다 (머리말)
-    context.fillStyle = `rgba(0, 0, 0, ${1 - MAGIC_COVER_STEP / 16})`
+    context.fillStyle = `rgba(0, 0, 0, ${1 - 5 / 16})`
     context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
     return
   }
@@ -268,66 +261,138 @@ export function drawPitchInputSprites(context: CanvasRenderingContext2D, overlay
     if (label !== null) drawFrame(context, SLT_FRAMES, overlay.typeNumber - 1, label.x, label.y6 - 4)
     return
   }
-  if (!overlay.gaugeSettingOn) drawFrame(context, SLT_FRAMES, 0x23, point.x, point.y)
+  if (overlay.showsTargetFrame ?? !overlay.gaugeSettingOn) drawFrame(context, SLT_FRAMES, 0x23, point.x, point.y)
   if (!overlay.showsGauge) return
   for (const draw of gaugeDrawsOf(overlay)) {
-    context.save()
-    context.globalAlpha = draw.alpha
-    drawFrame(context, draw.folder, draw.frame, point.x, point.y)
-    context.restore()
+    if (draw.alpha === undefined) {
+      drawFrame(context, draw.folder, draw.frame, point.x, point.y + draw.dy)
+      continue
+    }
+    const alpha = context.globalAlpha
+    context.globalAlpha = alpha * draw.alpha
+    drawFrame(context, draw.folder, draw.frame, point.x, point.y + draw.dy)
+    context.globalAlpha = alpha
   }
 }
 
 export interface GaugeDraw {
   readonly folder: string
   readonly frame: number
-  /** 효과 1 · 인자 L 의 그림 몫 L/16 — 효과 없는 맨 그림은 1 */
-  readonly alpha: number
+  readonly dy: number
+  /** 효과 1 · 인자 L — 반투명 겹치기, 그림 무게 L/16 (R6 3a). 없으면 보통 그리기 */
+  readonly alpha?: number
 }
-
-/** 멈춘 커서 — 0xbe8d5(…, 효과 1, 인자 8) */
-const STOPPED_CURSOR_ALPHA = 8 / 16
 
 const GAUGE_OUTLINE = 0x3a
 const GAUGE_BASE = 0x3b
 const GAUGE_LAST = 0x43
+/** 0x4d4c0 — t == 0 이고 커서 ≤ 8 이면 게이지 위에 목표 표시 프레임 0x23 도 넣는다 */
+export const GAUGE_TARGET_FRAME = 0x23
 const GAUGE_RESULT_ANIMATION = 1
 const GAUGE_RESULT_TICKS = 4
-const PERFECT_CELL = 9
+const PERFECT_GRADE_CELL = 9
+/** 0x4d54c — t 가 선 뒤 멈춘 커서 칸은 효과 1 · 인자 8 (반반) */
+const STOPPED_CURSOR_LEVEL = 8
+/** 0x4d6c4 — 결과 원 인자 L = max(15 − 3·[+0x17c4], 0) */
+const RESULT_RING_LEVEL = 15
+const RESULT_RING_LEVEL_STEP = 3
+const EFFECT_LEVELS = 16
+/** 애니 1 표가 아직 안 왔을 때의 길이 — slt_pitch 애니 1 은 다섯 칸 · 지연 0 */
+const DEFAULT_RESULT_ANIMATION_LENGTH = 5
 
 const gaugeFrameOfCell = (cell: number) => Math.min(GAUGE_BASE + cell, GAUGE_LAST)
 
-/** 게이지 그림 목록 (0x4d412~0x4d708) */
-export function gaugeDrawsOf(overlay: Pick<PitchGaugeOverlay, 'cursor' | 'pressed' | 'decidedTicks'>): GaugeDraw[] {
-  const { cursor, pressed } = overlay
-  if (pressed < 1 || pressed > PERFECT_CELL) {
-    if (cursor <= 0 || cursor > 8) return [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, alpha: 1 }]
-    return [
-      { folder: SLT_FRAMES, frame: GAUGE_BASE, alpha: 1 },
-      { folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), alpha: 1 },
-    ]
+export interface GaugeAnimationTables {
+  /** slt_pitch 애니 1 (누른 칸 고리) */
+  readonly result: readonly StageAnimationEntry[]
+  /** game_effect 애니 0 (t == 5 덧그림) */
+  readonly perfect: readonly StageAnimationEntry[]
+}
+
+/** 되감긴(칸 0 · 틱 0) 애니를 k 번 나아간 뒤의 칸 — 마지막 칸을 넘겨 끝났으면 null (0x93d90, 그리기는 목록을 비울 때 0xbe6a1) */
+function frameAfterAdvances(entries: readonly StageAnimationEntry[], advances: number): number | null {
+  let remaining = advances
+  for (const entry of entries) {
+    const length = Math.max(1, entry.delay)
+    if (remaining < length) return entry.frame
+    remaining -= length
   }
-  const draws: GaugeDraw[] = [{ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), alpha: STOPPED_CURSOR_ALPHA }]
-  const entries = frameAnimations(SLT_FRAMES)?.[GAUGE_RESULT_ANIMATION] ?? []
-  const length = entries.length === 0 ? 5 : onceLength(entries)
-  const d = overlay.decidedTicks
-  if (d < length) {
-    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), alpha: 1 })
-    const entry = onceStepAt(entries, d)
-    if (entry !== null) draws.push({ folder: SLT_FRAMES, frame: entry.frame, alpha: 1 })
-    if (pressed === PERFECT_CELL) {
-      const effect = frameAnimations(GAME_EFFECT_FRAMES)?.[0]
-      const effectEntry = effect === undefined ? null : onceStepAt(effect, d)
-      if (effectEntry !== null) draws.push({ folder: GAME_EFFECT_FRAMES, frame: effectEntry.frame, alpha: 1 })
-    }
+  return null
+}
+
+/**
+ * 게이지 그림 목록 (0x4d412~0x4d708, 2026-10-14 다시 떴다). t = `+0x17c0` = max(누른 칸 − 4, 1) (누름 0x50e2a).
+ * ```
+ * t == 0:  커서 > 8 → 0x3a | 커서 == 0 → 0x3a · 0x23 | 그 밖 → 0x3b · (커서 > 0 이면 min(0x3b + 커서, 0x43)) · 0x23 ; 커서 +1 (4d708)
+ * t > 0 (그림 k 번째, 1 부터):
+ *   4d52e  min(0x3b + 커서, 0x43) 를 효과 1 · 인자 8(반투명 반반)
+ *   4d586  애니 1(되감기 0x39894) 끝 비트가 아직 없으면 min(0x3b + 누른 칸, 0x43) 보통
+ *   4d5ca  애니 1 을 그리기 목록에 넣고 0x93d91 — 목록은 비울 때 그려 **k 칸 나아간 뒤**의 칸이 나온다(끝 칸 72 는 빈 그림)
+ *   4d612  t == 5 면 game_effect 애니 0 도 같은 식으로(0x39894 가 되감음)
+ *   4d69e  애니 1 끝 비트가 섰고 [+0x17c4] ≤ 3 이면 min(0x3b + 누른 칸, 0x43) 를 효과 1 · 인자 max(15 − 3·[+0x17c4], 0) → +1
+ * ```
+ * 결과 원은 위로 떠오르는 것이 아니라 **제자리에서 흐려진다**(인자 15 · 12 · 9 · 6 — 그림 무게 L/16). 예전 웹은 인자를 y 로 읽었다.
+ * 웹 `decidedTicks` 는 칸을 정한 뒤 흐른 그림 수라 부름 차례 k = decidedTicks + 1 로 본다(⚠️ 근사: 게이지 틱과 장면 그림의 맞물림).
+ */
+export function gaugeDrawsOf(
+  overlay: Pick<PitchGaugeOverlay, 'cursor' | 'pressed' | 'decidedTicks'>,
+  tables: GaugeAnimationTables = {
+    result: frameAnimations(SLT_FRAMES)?.[GAUGE_RESULT_ANIMATION] ?? [],
+    perfect: frameAnimations(GAME_EFFECT_FRAMES)?.[0] ?? [],
+  },
+): GaugeDraw[] {
+  const { cursor, pressed } = overlay
+  if (pressed < 1 || pressed > PERFECT_GRADE_CELL) {
+    if (cursor > 8) return [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, dy: 0 }]
+    const draws: GaugeDraw[] =
+      cursor === 0
+        ? [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, dy: 0 }]
+        : [{ folder: SLT_FRAMES, frame: GAUGE_BASE, dy: 0 }]
+    if (cursor > 0) draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0 })
+    draws.push({ folder: SLT_FRAMES, frame: GAUGE_TARGET_FRAME, dy: 0 })
     return draws
   }
-  const resultTick = d - length
-  if (resultTick < GAUGE_RESULT_TICKS) {
-    // 4d6c4 — 인자 L = max(15 − 3·틱, 0) 을 효과 1 반투명으로 (자리는 그대로)
-    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), alpha: Math.max(15 - 3 * resultTick, 0) / 16 })
+  const call = Math.max(0, overlay.decidedTicks) + 1
+  const draws: GaugeDraw[] = [{ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0, alpha: STOPPED_CURSOR_LEVEL / EFFECT_LEVELS }]
+  const resultLength = tables.result.length === 0 ? DEFAULT_RESULT_ANIMATION_LENGTH : onceLength(tables.result)
+  // 4d586 의 검사는 이번 그림의 진행(4d60a) 앞이라 k − 1 번 나아간 상태를 본다
+  if (call - 1 < resultLength) draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), dy: 0 })
+  const ring = frameAfterAdvances(tables.result, call)
+  if (ring !== null) draws.push({ folder: SLT_FRAMES, frame: ring, dy: 0 })
+  if (pressed === PERFECT_GRADE_CELL) {
+    const perfect = frameAfterAdvances(tables.perfect, call)
+    if (perfect !== null) draws.push({ folder: GAME_EFFECT_FRAMES, frame: perfect, dy: 0 })
+  }
+  const resultTick = call - resultLength
+  if (resultTick >= 0 && resultTick < GAUGE_RESULT_TICKS) {
+    const level = Math.max(RESULT_RING_LEVEL - RESULT_RING_LEVEL_STEP * resultTick, 0)
+    draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(pressed), dy: 0, alpha: level / EFFECT_LEVELS })
   }
   return draws
+}
+
+/**
+ * **목표 표시 프레임 0x23 을 0x11 그림이 넣는가** — 0x4d360~0x4d3f4 (2026-10-14 직접 떴다).
+ * ```
+ * 4d362  모드 [+0x1104] == 7 → 안 넣음
+ * 4d366  모드 5 · 6 이 아니고 난이도(설정 +0x2c) == 0 → 넣음
+ * 4d380  모드 4, 또는 모드 2 이고 0x33fb8(공격 측 팀 +0x10 == 0) → 이글아이 남은 경기(레코드 [+0xf08]+0x54) > 0 이면 넣음
+ * 4d3a8  0x33fb8 거짓이고 게이지 설정(+0x2d) == 0 → 넣음
+ * ```
+ * 레코드 +0x54 는 이글아이 남은 경기다(G 노트 · P4 — 상점 아이템 "투구 목표점 보기"). 곧 이글아이는 원 그림이 아니라 이 프레임이다.
+ * 웹 난이도는 늘 2(hard)라 둘째 줄은 안 탄다. 부르는 쪽이 아직 이 값을 다 싣지 않아 그림 쪽 판정만 둔다.
+ */
+export function showsGaugeTargetFrameOf(input: {
+  readonly mode: number
+  readonly difficulty: number
+  readonly isAttackSideHuman: boolean
+  readonly eagleEyeGames: number
+  readonly gaugeSettingOn: boolean
+}): boolean {
+  if (input.mode === 7) return false
+  if (input.mode !== 5 && input.mode !== 6 && input.difficulty === 0) return true
+  if ((input.mode === 4 || (input.mode === 2 && input.isAttackSideHuman)) && input.eagleEyeGames > 0) return true
+  return !input.isAttackSideHuman && !input.gaugeSettingOn
 }
 
 /**

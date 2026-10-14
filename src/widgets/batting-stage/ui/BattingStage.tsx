@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { MutableRefObject } from 'react'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
@@ -22,7 +23,8 @@ import {
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import { pitchVibrationMillisecondsOf } from '@/widgets/batting-stage/lib/pitchVibration'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
-import { batterSideOfForm, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
+import { specialSwingStageEffectOf } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -57,6 +59,15 @@ interface BattingStageProps {
   readonly isEagleEyeEnabled: boolean
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: StageHud | null
+  /**
+   * 마운드 투수 체력 % — 34 이하면 투수 자리에 체력 그림(player_effect 애니 9 · 10, 0x38d1c)을 그린다. 안 넘기면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
+   * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /** 등판한 마선수의 합성 프레임. 없으면 평범한 투수다. */
   readonly acePitcher: AcePitcherFrames | null
   /**
@@ -393,24 +404,6 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       pitchTypeNumber === null ? resolved : { ...resolved, detail: { ...resolved.detail, pitchTypeNumber } }
     // 필살 성공(0x34c74 → 0x517e6)은 판정이 방향·패턴 뒤에 굴려 실어 준다 — 헛스윙이면 굴리지 않는다
     const isUncatchable = resolved.isUncatchable
-    // 필살 연출 파티클은 **성공 여부와 무관**하게 `S+0x10` 이 켜져 있으면 나간다 (0x49aec).
-    // ⚠️ 원본은 상태 0x13 그리기에서 한 번(경기+0x196b) 쏜다. 웹도 이제 상태 0x13('타격' 단계)을 두지만
-    //    파티클은 여전히 스윙이 판정되는 이 시점(헛스윙 포함)에 쏜다 — 0x13 은 맞은 공만 거치므로 헛스윙에서도
-    //    나가는지는 미확인이다. **때는 근사**고 고르는 번호만 원본 그대로다.
-    if (swing?.isSpecial === true) {
-      // 한 줄이 파티클을 두 개까지 쏜다 — 원본 0x49dbc·0x49de0 의 차례 그대로다
-      const specials = specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)
-      const anchor = stageLayoutOf(latest.batterHand ?? batterSideOfForm(latest.batterForm)).batterAnchor
-      for (const special of specials) {
-        emitParticles(
-          particlesRef.current,
-          particleConfigOf(special.id),
-          anchor.x + shiftRef.current,
-          anchor.y + special.offsetY,
-          special.img,
-        )
-      }
-    }
     if (scene !== undefined) scene.deck = result.deck
     else deckRef.current = result.deck
     const resultText = describeResolution(result.detail)
@@ -426,7 +419,17 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 맞은 틱의 공 자리로 본다 (근사)
       const pattern = lastDrawnPattern(result.deck, result.detail.resultCode)
       const contact = swing === null ? null : ballPixelAt(pitch, swing.frame)
-      if (pattern !== null && contact !== null) {
+      // 필살 스윙(S+0x10)이 0x49aec 의 그림 갈래를 타면 그 함수가 [sp+0x60] = 1 을 세워 보통 불꽃(49faa~4a0ce)을 건너뛰고,
+      // 같은 타격점에 필살 파티클을 쏜다(49dbc · 49de0) — 0x49aec 는 0x13 · 맞은 공에서만 불리므로 헛스윙엔 아무것도 없다
+      const specialEffect =
+        swing?.isSpecial === true
+          ? specialSwingStageEffectOf(specialSwingNumber, latest.batterForm, aceBatterIndex, latest.batterHand ?? batterSideOfForm(latest.batterForm))
+          : null
+      if (specialEffect !== null && contact !== null) {
+        for (const special of specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)) {
+          emitParticles(particlesRef.current, particleConfigOf(special.id), contact.x, contact.y + special.offsetY, special.img)
+        }
+      } else if (specialEffect === null && pattern !== null && contact !== null) {
         const particleId = hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))
         if (particleId !== null) {
           emitParticles(particlesRef.current, particleConfigOf(particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
@@ -443,6 +446,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
         watchesBigHit,
         resultText,
         buntKind: sceneBuntKindOfThisPitch(),
+        specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
       }
       phaseRef.current = '타격'
       phaseStartedAtRef.current = now

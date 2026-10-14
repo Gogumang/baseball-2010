@@ -72,6 +72,8 @@ export interface PitchingStageSource {
   readonly aceBatterOrder?: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
+  /** 마운드 미션 투수의 체력% (0xaebb1 — +0x2c ÷ 100). 지친 표시 0x38d1c(player_effect 애니 9 · 10)를 고른다. 안 주면 안 그린다 */
+  readonly pitcherStaminaPercent?: number
   /**
    * 경기 스킬 표시 판 재료 — 지금 CPU 타자 · 미션 투수 레코드 · 공격 측 st[9] (`missionPitchingSkillPanelOf`). 0xd 진입 열쇠는 이 화면의
    * 0xe 대기(`sceneConfirm`), 장면 칸은 `skillPanelScene`. 없으면 판을 안 그린다
@@ -520,6 +522,7 @@ export function PitchingScreen({
               pitcherForm={stage.pitcherForm}
               pitcherHand={stage.pitcherHand}
               {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
+            {...(stage.pitcherStaminaPercent === undefined ? {} : { pitcherStaminaPercent: stage.pitcherStaminaPercent })}
               {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
               {...(stage.aceBatterOrder === undefined ? {} : { aceBatterOrder: stage.aceBatterOrder })}
               // 미션은 구장 생성자 값 0 · 바닥 줄 기본 — 타자 미션 화면(`MissionPlayScreen`)과 같다
@@ -641,7 +644,7 @@ export function PitchingScreen({
             onRelease={throwPitch}
             {...(stage === undefined || aim === null
               ? {}
-              : { overlay: { ref: inputOverlayRef, aim, aimSide, gaugeSettingOn: usesGauge } })}
+              : { overlay: { ref: inputOverlayRef, aim, aimSide, gaugeSettingOn: usesGauge, gameMode: MISSION_PITCHER_MODE } })}
           />
         </div>
       )}

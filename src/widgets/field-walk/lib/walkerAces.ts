@@ -43,17 +43,76 @@ const isAceIndex = (index: number | null | undefined): index is number =>
 
 /**
  * 칸 i 의 +0xec — 레코드 차례로 자리 니블이 i + 1 인 첫 레코드 (0x3fac4 · 0x40008 · 0xb0fb4 가 같은 훑기).
- * ⚠️ 미확인 근사: 맞는 레코드가 없으면 원본은 +0xec 를 안 덮어 앞 장면 값이 남는다 — 웹은 비운다.
+ * 맞는 레코드가 없으면 **안 덮는다**(직접 뜸 2026-10-14): 0x3fac4 3fe28~3fe4e 는 맞을 때만 3fe4c `str` 로 적고 못 찾으면 3fee0 으로
+ * 건너뛰며, 판 시작 0xb0fb4 도 맞을 때만 b1184~b1188 에서 적는다(못 찾으면 b1062 로 빠져 +0xec 를 안 건드린다). 그래서 앞 장면이
+ * 그 칸에 남긴 레코드(`previous[i]`)가 그대로 남는다. `previous` 를 안 주면 경기 장면을 세운 뒤 아무도 안 적은 칸 — 야수 객체는
+ * `new`(0x1238 → 0x2ac4: malloc 뒤 0x1400428 memset 0)로 만들고 생성자 0xa0e08 · 0xa0db8 은 +0xec 를 안 적어 0(없음)이다.
  */
-export function walkerRecordsOf<T extends { readonly position: number }>(records: readonly T[]): readonly (T | null)[] {
+export function walkerRecordsOf<T extends { readonly position: number }, P = T>(
+  records: readonly T[],
+  previous?: readonly (P | null)[] | null,
+): readonly (T | P | null)[] {
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) =>
-    records.find((record) => (record.position & 0xf) === slot + 1) ?? null)
+    records.find((record) => (record.position & 0xf) === slot + 1) ?? previous?.[slot] ?? null)
+}
+
+/** 걷는 사람 하나의 +0xec 레코드 — 그림이 보는 것은 마타자 번호뿐이다(0xb633c). 없으면 null */
+export type WalkerSeat = { readonly ace: number | null } | null
+
+/**
+ * **경기 장면의 두 줄 +0xec** — 장면 +0x111c(수비 줄, 0x3e340 이 경기 세우기에 한 번 만든다)와 +0x1758(공격 줄, 0x3e340 이 만들고
+ * 벤치 클리어링 진입 0x3a5f0 이 3a722~3a73c 에서 9명을 **새로** 만들어 바꾼다)의 칸별 레코드. 적는 곳 전수(`adds #0xec ; str` 꼴, 직접 뜸):
+ * ```
+ * 0x3fac4 3fe4c · 3ff16  교대 판 — 수비 줄 · 공격 줄 칸 0..8 (못 찾으면 안 덮음)
+ * 0xb0fb4 b1188          수비 판 시작(상태 0x17) — 수비 줄 칸 1..8 만 (칸 0 은 찾지 않는다, 못 찾으면 안 덮음)
+ * 0x3a5f0 3a8ce · 3a9ce · 3aab2   벤치 클리어링 — 새 공격 줄 칸 0..8 과 그 맞바꿈
+ * ```
+ * (그 밖의 `+0xec` 쓰기 0x547bc · 0x54a24 · 0x5dcdc · 0x67a64 · 0x69434 · 0x7f7ec 는 다른 객체다.)
+ */
+export interface WalkerLineSeats {
+  readonly defense: readonly WalkerSeat[]
+  readonly offense: readonly WalkerSeat[]
+}
+
+/** 경기 장면을 세운 직후 — 두 줄 모두 0 */
+export const NEW_WALKER_LINE_SEATS: WalkerLineSeats = {
+  defense: Array.from({ length: FIELDER_COUNT }, () => null),
+  offense: Array.from({ length: FIELDER_COUNT }, () => null),
+}
+
+const seatOf = (record: { readonly ace: number | null } | null): WalkerSeat => (record === null ? null : { ace: record.ace })
+
+/** 교대 판 0x3fac4 가 두 줄을 다시 훑은 뒤 — 수비 줄은 수비 팀, 공격 줄은 공격 팀 레코드 차례 (못 찾은 칸은 앞 값) */
+export function seatsAfterHalfInningBoard(
+  previous: WalkerLineSeats,
+  defenseRecords: readonly { readonly position: number; readonly ace: number | null }[],
+  offenseRecords: readonly { readonly position: number; readonly ace: number | null }[],
+): WalkerLineSeats {
+  return {
+    defense: walkerRecordsOf(defenseRecords, previous.defense).map(seatOf),
+    offense: walkerRecordsOf(offenseRecords, previous.offense).map(seatOf),
+  }
+}
+
+/**
+ * 수비 판 시작 0xb0fb4 뒤 — 수비 줄 칸 1..8 만 그 판의 수비 팀 레코드로 다시 훑는다(b1032: 칸 0 은 찾기를 건너뛴다). 공격 줄은 그대로.
+ * (원본 그대로: 못 찾은 칸은 b1062 로 빠지며 r5 에 **마지막으로 훑은 레코드**가 남아 그 레코드로 수비 능력치 g 를 셈한다 — +0xec 는 안 적는다.)
+ */
+export function seatsAfterDefensePlay(
+  previous: WalkerLineSeats,
+  defenseRecords: readonly { readonly position: number; readonly ace: number | null }[],
+): WalkerLineSeats {
+  const scanned = walkerRecordsOf(defenseRecords, previous.defense).map(seatOf)
+  return { defense: scanned.map((seat, slot) => (slot === 0 ? previous.defense[0] ?? null : seat)), offense: previous.offense }
 }
 
 /** 교대 판 한 줄의 칸별 마선수 그림 (a · b 갈래) — 없으면 null(보통 그림) */
-export function walkAceSpritesOf(team: WalkTeamAces | null | undefined): readonly (WalkerAceSprite | null)[] {
+export function walkAceSpritesOf(
+  team: WalkTeamAces | null | undefined,
+  previous?: readonly WalkerSeat[] | null,
+): readonly (WalkerAceSprite | null)[] {
   if (team == null) return Array.from({ length: FIELDER_COUNT }, () => null)
-  return walkAceSpritesOfRecords(team.pitcherAce, walkerRecordsOf(team.records), team.records)
+  return walkAceSpritesOfRecords(team.pitcherAce, walkerRecordsOf(team.records, previous), team.records)
 }
 
 /**

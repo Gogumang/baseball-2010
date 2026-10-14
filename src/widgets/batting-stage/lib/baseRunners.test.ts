@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aceRunnerFramesOf,
   baseRunnerDrawsOf,
   createRunnerAnimationClock,
   grayRunPipPixel,
@@ -117,5 +118,14 @@ describe('효과 0xc 한 픽셀 0x98351 — ((c & 0xf7de) >> 1) + ((인자 & 0xf
 
   it('인자 색과 반반 섞는다 — 인자 흰색(0xffff)이면 검정이 반 밝기', () => {
     expect(halfShadeRunnerPixel(0, 0, 0, 0xffff)).toEqual({ r: 123, g: 125, b: 123 })
+  })
+})
+
+describe('루상 마선수 주자 그림 (0x35c62 · 0x79e3d · 0x79da9)', () => {
+  it('마선수 주자면 실린 마선수(+0x1c) 그림, 아니면 null(defender)', () => {
+    expect(aceRunnerFramesOf(true, 4)).toBe('./sprites/defender_tiger/frames')
+    expect(aceRunnerFramesOf(true, 0)).toBe('./sprites/defender_medica/frames')
+    expect(aceRunnerFramesOf(false, 4)).toBeNull()
+    expect(aceRunnerFramesOf(true, null)).toBeNull()
   })
 })

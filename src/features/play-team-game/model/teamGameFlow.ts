@@ -2327,7 +2327,7 @@ function fielderPlatesFor(progress: TeamGameProgress, teamId: number, pitcherInd
  * 공격 팀 타자 · 루 위 주자의 **마선수 번호** (`runnerAces` — 주자 그림 0x79d10 · 적재 0x483a0). 명단 칸의 마타자(`aceIndex` 0~4)만.
  * `ours` 면 우리 공격(타순 = 경기 타순), 아니면 상대 공격(상대 타순).
  */
-function runnerAcesFor(progress: TeamGameProgress, ours: boolean): RunnerAces {
+export function runnerAcesFor(progress: TeamGameProgress, ours: boolean): RunnerAces {
   const entry = ours ? progress.ourEntry : progress.opponentEntry
   const order = ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex
   const runners = runnersOfGame(progress.game, order)

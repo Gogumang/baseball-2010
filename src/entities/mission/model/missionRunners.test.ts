@@ -12,6 +12,7 @@ import {
   missionRunnerRunAbilitiesOf,
   missionRunnerRunAt,
   missionRunnersOf,
+  missionWalkTeamOf,
 } from '@/entities/mission/model/missionRunners'
 import { masterGameAbilityOf, MISSION_ACE_ROSTER_SLOT } from '@/entities/mission/model/missionCpuTeam'
 import { battingRecordAt, MISSION_NARI_RECORD } from '@/entities/mission/model/missionGame'
@@ -210,6 +211,22 @@ describe('미션 수비 판 이름 판(0x43cb0) · 마선수 주자(0x79d10)', (
     expect(missionFielderPlatesOf(run)[0]).toBeNull()
     // 0xaae7c 가 지금 타순 레코드에 마타자를 끼웠다
     expect(missionRunnerAcesOf(run).batter).toBe(mission.opponentAce - 1)
+  })
+
+  it('운동장 줄 팀 — 투수 미션 CPU 타선의 마타자 레코드는 니블 0(XlsACE_BAT +0x1c = 0) · 타자 미션 CPU 수비 마운드 마투수', () => {
+    const pitcherMission = MISSIONS.find((m) => m.side === '투수' && m.opponentAce > 0)!
+    const run = startPitcherMission(pitcherMission)
+    const offense = missionWalkTeamOf(run, false)!
+    const ace = offense.records.find((record) => record.ace !== null)!
+    expect(ace).toEqual({ position: 0, ace: pitcherMission.opponentAce - 1 })
+    // 붙박이 아홉 니블은 칸마다 하나씩 그대로 남는다(마타자에게 밀린 붙박이는 9번으로 가도 제 니블)
+    const nibbles = offense.records.map((record) => record.position).filter((position) => position > 0)
+    expect(new Set(nibbles).size).toBe(9)
+    expect(missionWalkTeamOf(run, true)!.pitcherAce).toBeNull()
+    const batterMission = MISSIONS.find((m) => m.side === '타자' && m.opponentAce > 0)!
+    const batterRun = startMission(batterMission)
+    expect(missionWalkTeamOf(batterRun, true)!.pitcherAce).toBe(batterMission.opponentAce - 1)
+    expect(missionWalkTeamOf(batterRun, false)!.records.every((record) => record.ace === null)).toBe(true)
   })
 
   it('missionPlayAbilitiesOf 에 경기를 넘기면 그림 전용 두 칸을 싣는다', () => {

@@ -8,6 +8,7 @@ import {
   KEY_OK,
 } from '@/features/play-pitcher-game/model/pitchAim'
 import { gaugeTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { showsGaugeTargetFrameOf } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
@@ -37,6 +38,11 @@ interface PitchGradeGaugeProps {
     readonly aim: WorldPoint
     readonly aimSide: number
     readonly gaugeSettingOn: boolean
+    /**
+     * 경기 모드 [+0x1104] — 목표 표시 프레임 0x23 판정 0x4d360(`showsGaugeTargetFrameOf`)이 본다. 이 부품은 사람이 던질 때만 서므로
+     * 공격 측은 늘 CPU 다(이글아이 줄 4d380 은 사람 공격 갈래라 안 탄다). 안 주면 예전처럼 게이지 설정만 본다
+     */
+    readonly gameMode?: number
   }
 }
 
@@ -80,6 +86,18 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
           aimSide: overlay.aimSide,
           showsGauge,
           gaugeSettingOn: overlay.gaugeSettingOn,
+          ...(overlay.gameMode === undefined
+            ? {}
+            : {
+                showsTargetFrame: showsGaugeTargetFrameOf({
+                  mode: overlay.gameMode,
+                  // ⚠️ 웹 난이도(설정 +0x2c)는 늘 2 — 4d366 의 난이도 0 갈래는 안 탄다
+                  difficulty: 2,
+                  isAttackSideHuman: false,
+                  eagleEyeGames: 0,
+                  gaugeSettingOn: overlay.gaugeSettingOn,
+                }),
+              }),
           cursor,
           pressed,
           decidedTicks: resultTick,

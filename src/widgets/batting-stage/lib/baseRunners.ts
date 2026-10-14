@@ -28,7 +28,10 @@ import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabe
  * 하나만 부르고 반복으로 켠 애니는 0x93d90 이 멈추지 않는다 → 루 i 의 애니는 **그 루에 (숨김 없이) 주자가 선 채 0x35b94 가 불린
  * 그림 수**만큼 한 칸씩 나아가고 장면이 끝날 때까지 되감기지 않는다(주자가 바뀌어도, 타석 · 이닝을 건너도 이어진다). 첫 부름은 진행(0x93d90:
  * 안 도는 애니는 그대로)이 아무것도 안 하고 켜기(0x93cfd: 칸 틱 [1] = 0, 칸 [0] 은 그대로)만 해 첫 칸 0 을 그린다.
- * 마선수 주자의 +0x1c 묶음(ace/defender_*)은 웹에 없어 defender 그림으로 그린다(⚠️ 미이식).
+ * 마선수 주자(p+0x9c ≠ −1)는 0x79e3d · 그리기 0x79da9 가 묶음 +0x1c 의 같은 애니 i 를 **팔레트 없이** 그린다 — +0x1c 는 타석 교대
+ * 0x483a0 이 실은 한 장뿐이라(타자 마선수 우선, 아니면 가장 앞선 마선수 주자 — `loadedRunnerAceOf`) 다른 마선수 주자도 그 그림이다
+ * (원본 그대로). `aceRunnerFramesOf`.
+ * ⚠️ 근사: +0x1c 묶음의 애니 객체는 defender 묶음과 따로라 진행 수가 다를 수 있다 — 같은 루 시계를 쓴다.
  */
 
 /** game_ui 이미지 22 — 1·3루 쪽 작은 창(34×35) */
@@ -229,3 +232,21 @@ export function grayRunPipPixel(red: number, green: number, blue: number): { r: 
   return { r: (five << 3) | (five >> 2), g: (six << 2) | (six >> 4), b: (five << 3) | (five >> 2) }
 }
 
+/** ace/defender_* — 표 0xd3f0c[번호](0x79cbc, 20바이트 간격): medica · kao · roze · death · tiger */
+const ACE_RUNNER_FRAMES: readonly string[] = [
+  './sprites/defender_medica/frames',
+  './sprites/defender_kao/frames',
+  './sprites/defender_roze/frames',
+  './sprites/defender_death/frames',
+  './sprites/defender_tiger/frames',
+]
+
+/**
+ * 루 주자 그림 폴더 · 팔레트 — 마선수 주자면 실린 마선수 그림(+0x1c, 팔레트 없음), 아니면 defender(+0xc, 팀 팔레트).
+ * `loadedAce` 는 타석 교대 0x483a0 이 실은 번호(`loadedRunnerAceOf`), `isAceRunner` 는 그 루 주자의 +0x9c ≠ −1.
+ * 실린 그림이 없으면(웹 재료가 비면) 예전처럼 defender 로 그린다.
+ */
+export function aceRunnerFramesOf(isAceRunner: boolean, loadedAce: number | null): string | null {
+  if (!isAceRunner || loadedAce === null) return null
+  return ACE_RUNNER_FRAMES[loadedAce] ?? null
+}
