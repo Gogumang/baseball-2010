@@ -345,13 +345,3 @@ function tickSince(memory: ActionMemory, key: string, action: number, tick: numb
   }
   return tick - previous.since
 }
-
-/**
- * 마지막 스냅샷의 공을 "막 깐 공"(공+0x68 = 0)으로 바꾼다 — 플레이 틱 꼬리 b45a0 의 다시 쏘기 0xb3148(b3294 → b12da)는 그 그림
- * 그리기보다 먼저인데 진행기는 스냅샷을 앞서 찍으므로, 다시 쏜 틱의 그림에서 공 · 그림자를 지운다(0x36dfc 36e24).
- */
-export function hideBallOfLastSnapshot(ticks: DefensePlayView[]): void {
-  const last = ticks[ticks.length - 1]
-  if (last === undefined) return
-  ticks[ticks.length - 1] = { ...last, ball: { ...last.ball, isPlaybackStart: true } }
-}

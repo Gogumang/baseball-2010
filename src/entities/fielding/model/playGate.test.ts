@@ -187,18 +187,17 @@ describe('판 진행 관문 0xb0d28', () => {
     ).toMatchObject({ open: true, endCounter: 1, listTickOpen: true })
   })
 
-  it('틱 끝 관문이 보는 주자 — G3 · G4 · G1 은 목록 틱 이동 앞(아웃은 틱 끝), G2 는 이동 뒤 · 득점(0xaa0a8) 앞', () => {
+  it('틱 끝 관문이 보는 주자 — G3 · G4 · G1 은 목록 틱 이동 앞, G2 는 이동 뒤(득점 0xaa0a8 은 다음 판 틱 슬롯 2 라 아직)', () => {
+    // 아웃 판정 · 낙구 요구 루는 슬롯 2(이동 앞)에서 이미 적혀 있고, 이동은 요구 루 풀기(0xa040c)까지만 한다 — 득점은 안 센다
     const 앞 = createRunner(1, 2, 300, { targetBase: 3, requiredBase: 3 })
     const 뒤 = { ...앞, position: basePosition(3), startBase: 3, settled: true, requiredBase: NONE }
     const 득점앞 = createRunner(2, 3, 300, { targetBase: 4 })
-    const 득점뒤 = { ...득점앞, position: basePosition(4), startBase: 4, settled: true, scored: true }
-    const 아웃 = { ...createRunner(0, 0, 300, { targetBase: 1 }) }
-    const { frame, head } = gateRunnerViewsOf([앞, 득점앞, 아웃], [뒤, 득점뒤, { ...아웃, isOut: true }])
-    expect(frame[0]).toMatchObject({ position: 앞.position, requiredBase: 3 })
-    expect(frame[1]).toMatchObject({ position: 득점앞.position, scored: false })
-    expect(frame[2].isOut).toBe(true)
-    expect(head[0]).toEqual(뒤)
-    expect(head[1]).toMatchObject({ position: basePosition(4), scored: false })
+    const 득점뒤 = { ...득점앞, position: basePosition(4), startBase: 4, settled: true }
+    const 아웃 = { ...createRunner(0, 0, 300, { targetBase: 1 }), isOut: true }
+    const { frame, head } = gateRunnerViewsOf([앞, 득점앞, 아웃], [뒤, 득점뒤, 아웃])
+    expect(frame).toEqual([앞, 득점앞, 아웃])
+    expect(head).toEqual([뒤, 득점뒤, 아웃])
+    expect(someRunnerStillActive(frame, (runner) => runner.settled)).toBe(true)
     expect(liveRunnerCountOf(head)).toBe(2)
   })
 

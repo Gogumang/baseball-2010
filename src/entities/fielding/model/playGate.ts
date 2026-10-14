@@ -141,15 +141,18 @@ export function passPlayGate(input: PlayGateInput): PlayGateResult {
  * ```
  * 0x3f060  G1 → 열렸고 0x17 이면 장면 +0x1e4 목록 vt8 0xbfe9c — 원소 0 부터 오름차순으로 vt0xc(야수 0xa1284 · 주자 0xa01cc 이동 · 도착)
  * 0x524c0  524c4 +0x1992 == −1 이면 0x523bc · 0x4e858 · 0x400bc → 524e6 +0x1993 이면 끝 → G2 →
- *          52540 주자 관리 vt14 0xaa008 · 525e8 플레이 vt48 · 525fc 주자 관리 vt18 0xaa0a8(득점 · 보류 풀기, 내림차순) ·
- *          52612 플레이 vt4c(포구 · 송구 · 0xb401c 공 물리 · 아웃 판정 b43da …) · 0x52660 자동 진루 · 0x52670 자동 슬라이딩 · 526ae CPU 송구
+ *          52540 주자 관리 vt14 0xaa008 · 525e8 플레이 vt48 = 0xb401c(포구 갈래 · 협살 · 아웃 판정 b43da · 결과 9 b43ec · 낙구 b444e ·
+ *          메시지 0xbba b4562 · 튕김 b45a0) · 525fc 주자 관리 vt18 0xaa0a8(득점 · 보류 풀기, 내림차순) · 52612 플레이 vt4c = 0xb45dc
+ *          (중계 · 사람 목표 · 야수 AI 고리) · 0x52660 자동 진루 · 0x52670 자동 슬라이딩 · 526ae CPU 송구
+ *          (플레이 vtable 0xd8618: +0x48 = 0xb401d · +0x4c = 0xb45dd / 주자 관리 vtable 0xd8308: +0x14 = 0xaa009 · +0x18 = 0xaa0a9)
  * 0x46c88  그리기 — 0x4403c 등 연출 → G3
  * 0x3f378  G4
  * ```
- * **웹 한 틱과의 맞춤(확정, 2026-10-14)**: 웹 판 틱 N 의 1~4c 절 · 6b~6e 절은 그림 N 의 슬롯 2, 5 절 스냅샷은 그림 N 그리기, 6 절 이동은
- *    그림 N+1 의 목록 틱, 6 절 득점은 그림 N+1 의 0xaa0a8 이다(근거는 `gateRunnerViewsOf`). 그래서 틱 끝 관문은 G3 · G4 · G1 이 6 절 이동
- *    앞 주자, G2 가 이동 뒤 · 득점 앞 주자를 본다. G1 이 열리고 G2 만 닫히면 그 그림(목록 틱 · 카메라만 돈다)을 진행기가
- *    `closingListFrame` 으로 한 장 더 찍는다. ⚠️ 6b~6e 를 6 절 이동 뒤에 두는 옛 근사는 그대로다.
+ * **웹 한 틱과의 맞춤(확정, 2026-10-14)**: 웹 판 틱 N 의 0~4c 절(포구 → 아웃 판정 · 결과 9 · 낙구 · 메시지 · 튕김 → 득점 0xaa0a8 ·
+ *    보류 풀기 → vt4c → 자동 진루 · CPU 송구)은 그림 N 의 슬롯 2, 5 절 스냅샷 · 연출은 그림 N 그리기, 6 절 이동은 그림 N+1 의 목록 틱이다
+ *    (근거는 `gateRunnerViewsOf`). 그래서 틱 끝 관문은 G3 · G4 · G1 이 6 절 이동 앞 주자, G2 가 이동 뒤 주자(득점은 다음 판 틱 슬롯 2 라
+ *    아직 안 셌다)를 본다. G1 이 열리고 G2 만 닫히면 그 그림(목록 틱 · 카메라 · 그리기만 돈다)을 진행기가 `closingListFrame` 으로
+ *    한 장 더 찍는다. 득점은 목록 틱에서 막 닿은 주자(+0x3b)만 세므로 G2 가 닫힌 그림의 홈인은 세지 않는다.
  * **경기 멈춤(+0x1993)** — 세우는 곳은 레이저 발사 0x400bc(슬롯 2 머리 524e2) 하나다. 그 그림은 524e6 에서 G2 를 안 부르고, 그리기
  * 0x46c88 의 G3 는 돌며(앞에 +0x1993 갈래가 없다), 0x3f378 G4 는 3f392 에서 건너뛴다. 다음 그림은 G1(3f0a4) · G2 가 건너뛰고 G3 만 돈다 —
  * 그 그리기의 레이저 연출 0x4403c 단계 1 이 +0x1993 = 0 으로 내리므로 G4 부터 다시 돈다(`runDefensePlay` 0c · 7b 절).
@@ -204,38 +207,23 @@ export function passPlayGateBetweenTicks(
  * **틱 끝 관문 넷이 보는 주자** — 웹 한 틱(`runDefensePlay` 등)의 절과 원본 그림의 맞춤 (2026-10-14 직접 뜸으로 확정).
  *
  * 공+0x68(재생 틱)은 그리기 뒤 0x3f378(3f3c6)만 +1 하므로 그림 N 의 플레이 틱 0xb401c(포구 b41d0 · 아웃 판정 b43da · 낙구 b4492 의
- * `공+0x68 == aa0`)는 공+0x68 = N 을 본다. 웹 판 틱 N 의 포구(1 절) · 낙구(6d 절)도 판 틱 N 을 보므로 둘은 그림 N 의 슬롯 2 다. 그림 N 의
+ * `공+0x68 == aa0`)는 공+0x68 = N 을 본다. 웹 판 틱 N 의 포구(1 절) · 판정 · 낙구도 판 틱 N 을 보므로 그림 N 의 슬롯 2 다. 그림 N 의
  * 스냅샷(5 절)은 목록 틱이 옮긴 자리를 그리는데 그 자리는 앞 판 틱의 6 절이 옮긴 것이다 — 곧 웹 판 틱 N 의 **6 절 이동 = 그림 N+1 의 목록
- * 틱**(0x3f060 의 vt8 0xbfe9c)이고, 6 절의 득점은 그림 N+1 의 0xaa0a8(슬롯 2, G2 뒤)이다.
+ * 틱**(0x3f060 의 vt8 0xbfe9c)이고, 그 이동에서 홈에 닿은 주자의 득점은 판 틱 N+1 의 슬롯 2(0xaa0a8, G2 뒤)가 센다.
  * ```
- * 웹 판 틱 N : 0'(야수 준비 틱 = 그림 N 목록 틱의 몫) · 1~4c(그림 N 슬롯 2) · 5 스냅샷(그림 N 그리기) · 6 이동(그림 N+1 목록 틱) ·
- *             6 득점(그림 N+1 0xaa0a8) · 6b~6e(그림 N 플레이 틱 꼬리 — 웹이 6 절 뒤에 둔다) · 8 관문
+ * 웹 판 틱 N : 0'(야수 준비 틱 = 그림 N 목록 틱의 몫) · 1~4c(그림 N 슬롯 2 — 판정 · 득점 포함) · 5 스냅샷 · 연출(그림 N 그리기) ·
+ *             6 이동(그림 N+1 목록 틱) · 8 관문
  * 원본       : G3(N) · G4(N) · G1(N+1) → 목록 틱(N+1) → G2(N+1) → 0xaa0a8(N+1) …
  * ```
- * 그래서 G3 · G4 · G1 은 **6 절 이동 앞** 자리(아웃 · 결과 코드는 6b~6e 뒤 그대로), G2 는 **6 절 이동 뒤 · 득점 앞** 자리를 본다:
- * - `frame`(G3 · G4 · G1): 자리 · 목표 루 · 닿은 루 · 홈 득점은 6 절 앞, 아웃은 틱 끝. 요구 루(+0x94)는 6d 가 세운 값을 따르되 6 절 도착이
- *   푼 것(0xa040c)은 아직 안 풀린 것으로 본다.
- * - `head`(G2): 6 절 뒤 그대로, 홈 득점(+0x96 — 0xaa0a8 이 G2 뒤에 세운다)만 6 절 앞.
- * ⚠️ 6b~6e(아웃 판정 · 결과 9 · 낙구)는 원본에서 그림 N 슬롯 2 라 6 절 이동 앞 자리를 보지만 웹은 이동 뒤에 돈다 — 옛 근사 그대로다.
+ * 그래서 G3 · G4 · G1 은 **6 절 이동 앞**(`frame` = `before`), G2 는 **6 절 이동 뒤**(`head` = `after`) 자리를 본다. 예전에는 아웃 판정 ·
+ * 결과 9 · 낙구(6b~6e)와 득점을 6 절 이동 뒤에 두어 아웃 · 요구 루 · 득점 칸을 이 함수가 앞뒤에서 섞어 골랐다 — 진행기들이 원본
+ * 차례로 바뀌어 그 섞기를 걷었다.
  */
 export function gateRunnerViewsOf(
   before: readonly RunnerState[],
   after: readonly RunnerState[],
 ): { readonly frame: readonly RunnerState[]; readonly head: readonly RunnerState[] } {
-  const frame = after.map((now, index) => {
-    const then = before[index]
-    if (then === undefined) return now
-    return {
-      ...then,
-      isOut: now.isOut,
-      requiredBase: now.requiredBase === NONE && then.requiredBase !== NONE ? then.requiredBase : now.requiredBase,
-    }
-  })
-  const head = after.map((now, index) => {
-    const then = before[index]
-    return then === undefined ? now : { ...now, scored: then.scored }
-  })
-  return { frame, head }
+  return { frame: before, head: after }
 }
 
 /**
