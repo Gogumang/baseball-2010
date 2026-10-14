@@ -12,6 +12,9 @@ import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { batterMatchInfoOf, cupMatchInfoOf } from '@/pages/management/lib/nariMatchPrepare'
 import { ShopScreen } from '@/pages/shop/ui/ShopScreen'
+import { SeasonOutingPopup } from '@/pages/season/ui/SeasonOutingPopup'
+import { nariOutingPresentationOf } from '@/pages/season/lib/seasonOutingPopup'
+import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
@@ -241,6 +244,12 @@ export function CareerRoutes({
           // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 알림으로)
           resultText={session.outingResult?.effectText ?? null}
           onCloseResult={actions.closeOutingResult}
+          presentation={session.outingPresentation === null ? null : (
+            <SeasonOutingPopup place={session.outingPresentation.place}
+              presentation={nariOutingPresentationOf(session.outingPresentation.place, { isSlugger: career.battingTypeIndex === 1 })}
+              char0Palette={portraitPaletteIndex(career.skinIndex)}
+              onFinished={actions.finishOutingPresentation} />
+          )}
         />
       )
 

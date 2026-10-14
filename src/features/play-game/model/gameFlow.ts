@@ -697,6 +697,17 @@ export interface PlayerOutcomeOptions {
  * `batterIntimidates` = 타석에 선 내 선수가 타자 스킬 22 압도를 **장착**했는가.
  * 상대 투수 스킬 18 비겁자 · 10 끈기는 그 레코드 +0x14 (`quickDefenseOf` 의 `skillBitsAt` → `drainPitcherForPitch`).
  */
+/**
+ * **번트 판정을 받은 내 공** — 0x4e060 의 4e15c~4e1fa: 번트 자세(S+8)가 공 틱 N − 1 까지 섰으면 스윙 시작 0xa5fac 를 부르고, 그 안
+ * a5fcc 가 state[0x13](번트 종류) ≠ 0 이라 0xa57f8(코드 11) → G+0xf8 +1 (`ReputationCounts.bunts`). 맞혔든 헛맞았든 센다.
+ * 나리 타자편의 사람 타석은 내 타석뿐이라 0xa56dc(R, 타자, 1) 게이트(국가대항전 · 포스트시즌이면 거짓)만 본다. 굴림 없음.
+ */
+export function recordMyBuntAttempt(progress: GameProgress, options: { readonly isRecorded: boolean }): GameProgress {
+  if (progress.game.isFinished || !options.isRecorded) return progress
+  const counts = progress.reputationCounts
+  return { ...progress, reputationCounts: { ...counts, bunts: (counts.bunts ?? 0) + 1 } }
+}
+
 export function throwOpponentPitch(
   progress: GameProgress,
   pitchTypeNumber: number,
@@ -1405,6 +1416,7 @@ function addReputationCounts(
     grandSlams: counts.grandSlams + (outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS ? 1 : 0),
     walkOffs: counts.walkOffs + (isWalkOff && isHit ? 1 : 0),
     buntHits: counts.buntHits,
+    ...(counts.bunts === undefined ? {} : { bunts: counts.bunts }),
     // G+0xfc 는 볼넷만이다 — 사구 갈래(0xa8b90)는 코드 13 으로 G+0x100 을 올리고, 평판식은 0xfc 만 읽는다
     walks: counts.walks + (outcome.kind === '볼넷' ? 1 : 0),
     goAheadRuns:

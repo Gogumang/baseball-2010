@@ -159,7 +159,7 @@ import { lapPlayClock } from '@/entities/collection/model/playClock'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
-import type { OutingResult } from '@/entities/career/model/outing'
+import type { OutingPresentation, OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
@@ -262,6 +262,8 @@ export interface PitcherLeagueSession {
   readonly outingNotice: string
   /** 126 효과 팝업(0x15234) 과 이어질 입원 회복 글(0x1575c) — 효과 팝업이 떠 있지 않으면 null */
   readonly outingResult: OutingResult | null
+  /** 126 연출(0x85074) 중인 외출 — 장소 p 와 고른 기능. 효과 팝업이 닫힐 때까지 남는다(판의 띠 · 검정). 아니면 null */
+  readonly outingPresentation: OutingPresentation | null
   /** 126 에서 105 로 돌아온 뒤 관리 화면 위에 남는 입원 회복 팝업 글 (0x1575c `0xbbef8(글, 1, 1, 1)`). 없으면 '' */
   readonly outingRecoveryNotice: string
   /** 지금 재생하는 이벤트 (장면 '이벤트'). 아니면 null */
@@ -343,6 +345,8 @@ export interface PitcherLeagueSession {
     readonly openOuting: () => void
     /** 113 장소 기능 — 가드 0x16cf0 → 효과 0x15234 (→ 입원 회복 0x1575c). 모드 3·4 공용 (`outing.ts`) */
     readonly runOutingFunction: (functionId: string) => void
+    /** 126 연출 끝(0x84e58) — 효과 0x15234 를 굴려 효과 팝업을 띄운다 */
+    readonly finishOutingPresentation: () => void
     /** 113 칸 0 [들어가기] — 배정된 장소 이벤트(0x8ce58), 없으면 빈 장소 440+장소를 114 로 튼다 */
     readonly enterOutingPlace: (place: OutingPlace) => void
     /** 126 효과 팝업 [확인] → (입원이면 회복 글) → 105 (틀 0x1575c) */
@@ -1761,11 +1765,12 @@ export function usePitcherLeagueSession(
    * 126 흐름은 원본 그대로다 (두 편 같은 코드): 진입 0x11da8 → 연출 0x85074 (60 갱신, 확인 키 0x105c8 로 건너뜀)
    * → 연출 끝(0x84e58)에 효과 0x15234 가 굴리고 **효과 팝업**(StrMODE[22]·[23]·[25]·[24] 줄 + 서브 아이템 [195])을
    * 지도 위에 띄운다 → 팝업이 닫히면 틀 0x1575c 가 입원이면 회복을 굴려 **회복 글 팝업**을 띄우고 **105** 로 간다.
-   * 그 사이 다른 굴림이 없어 웹은 고를 때 한 번에 굴린다 (차례 같음).
-   * ⚠️ 미해결: 연출 그림(0x84ea0 — event_ani 애니 [1,0,2,4,3][장소] · event_char_1 +30 · event_char_0 +0x5d)은 아직 옮기지 않았다.
+   * 연출 그림은 0x85074 의 시즌이 아닌 갈래 — event_ani 애니 [1,0,2,4,3][장소] · event_char_1 +0x1e · event_char_0 +0x5d(투수편은
+   * 0x7b970 이 거짓이라 장타형 +0x63 갈래가 없다) · 팔레트 피부 − 1 (`nariOutingPresentationOf`).
    */
   const [outingNotice, setOutingNotice] = useState('')
   const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
+  const [outingPresentation, setOutingPresentation] = useState<OutingPresentation | null>(null)
   const [outingRecoveryNotice, setOutingRecoveryNotice] = useState('')
   /**
    * 112 진입(0x118e4) 횟수 — 늘 때마다 [!] 칸을 다시 찍는다(`outingSlots`). 105 → 112(`openOuting`) · 지도 자동 이벤트에서
@@ -1781,6 +1786,7 @@ export function usePitcherLeagueSession(
   const openOuting = useCallback(() => {
     setOutingNotice('')
     setOutingResult(null)
+    setOutingPresentation(null)
     enterOutingMap()
     setScene('외출')
   }, [enterOutingMap])
@@ -1793,16 +1799,27 @@ export function usePitcherLeagueSession(
       if (outingFunction === undefined) return
       const reason = outingBlockReasonOf(career, outingFunction)
       if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
-      const outcome = performOuting(career, outingFunction, random)
-      commit(outcome.career)
+      // 113 → 126 진입 0x11da8 → 연출 0x85074. 효과는 연출이 끝난 틀에 굴린다 (`finishOutingPresentation`)
+      const place = OUTING_PLACES.find((candidate) => candidate.functions.includes(outingFunction))
       setOutingNotice('')
-      setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
+      setOutingPresentation({ functionId, place: (place?.frame ?? 1) - 1 })
     },
-    [career, commit, random],
+    [career],
   )
+  const finishOutingPresentation = useCallback(() => {
+    if (career === null || outingPresentation === null || outingResult !== null) return
+    const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
+      (candidate) => candidate.id === outingPresentation.functionId,
+    )
+    if (outingFunction === undefined) return
+    const outcome = performOuting(career, outingFunction, random)
+    commit(outcome.career)
+    setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
+  }, [career, commit, outingPresentation, outingResult, random])
   const closeOutingResult = useCallback(() => {
     if (outingResult === null) return
     setOutingResult(null)
+    setOutingPresentation(null)
     setOutingRecoveryNotice(outingResult.recoveryText)
     setScene('관리')
   }, [outingResult])
@@ -1831,7 +1848,8 @@ export function usePitcherLeagueSession(
   const wasIdleAtMapRef = useRef(false)
   useEffect(() => {
     const isIdle =
-      career !== null && scene === '외출' && story === null && outingResult === null && fileEvents !== null
+      career !== null && scene === '외출' && story === null && outingResult === null && outingPresentation === null
+      && fileEvents !== null
     if (!isIdle) {
       wasIdleAtMapRef.current = false
       return
@@ -1841,7 +1859,7 @@ export function usePitcherLeagueSession(
     if (!isArrival) return
     const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, random)
     if (event !== null) openStory({ eventId: event.id, context: '지도', viewed: [] })
-  }, [career, fileEvents, openStory, outingResult, random, scanAuto, scene, story])
+  }, [career, fileEvents, openStory, outingPresentation, outingResult, random, scanAuto, scene, story])
 
   /**
    * 113 칸 0 [들어가기] (키 0x16c64): `0x8ce59` 가 배정된 이벤트를 부르고, 없으면 이벤트 440+장소
@@ -2142,6 +2160,7 @@ export function usePitcherLeagueSession(
     shopGpDetail,
     outingNotice,
     outingResult,
+    outingPresentation,
     outingRecoveryNotice,
     story,
     storyEvents,
@@ -2341,6 +2360,7 @@ export function usePitcherLeagueSession(
       closeShopGpDetail,
       openOuting,
       runOutingFunction,
+      finishOutingPresentation,
       enterOutingPlace,
       closeOutingResult,
       dismissOutingRecoveryNotice,

@@ -123,7 +123,7 @@ export interface ReputationCounts {
   readonly grandSlams: number
   /** G+0xc4 — 끝내기 안타·홈런 (+3) */
   readonly walkOffs: number
-  /** G+0xf4 — 번트 안타 (+1). 웹에는 번트가 없어 늘 0 이다 */
+  /** G+0xf4 — 번트 안타 (+1). ⚠️ 미확인(웹 미반영): 정산 a8506(안타 갈래 · state[0x13]) 의 코드 10 을 아직 안 세어 늘 0 이다 */
   readonly buntHits: number
   /** G+0xfc — 볼넷 (2개 이상이면 +1) */
   readonly walks: number
@@ -140,6 +140,12 @@ export interface ReputationCounts {
   readonly homeRunStreaksOfTwo?: number
   /** G+0xe0 — 이어진 홈런이 3 에 닿은 횟수 */
   readonly homeRunStreaksOfThree?: number
+  /**
+   * G+0xf8 — 번트 수. 스윙 시작 0xa5fac 이 state[0x13](번트 종류) ≠ 0 이면 0xa57f8(코드 11) → +0xf8 (표 0xd8218[11] = 0xa58e0).
+   * 사람 장면에서 0xa5fac 를 번트로 부르는 길은 0x4e1f8 하나 — 번트 자세(S+8)가 공 틱 N − 1 까지 서서 판정을 받은 공이다
+   * (4e15c r7). 코드 ≤ 0x13 이라 지금 타자 0xa56dc(R, 타자, 1) 게이트 안이다. 평판식은 안 읽는다 — 경기 카운터 [5] 재료. 없으면 0
+   */
+  readonly bunts?: number
 }
 
 export const EMPTY_REPUTATION_COUNTS: ReputationCounts = {

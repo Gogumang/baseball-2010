@@ -48,6 +48,29 @@ export const SEASON_OUTING_PRESENTATIONS: readonly SeasonOutingPresentation[] = 
   eventPresentationOf(3),
 ]
 
+/**
+ * **나만의리그 126 연출** — 같은 0x85074 의 시즌이 아닌 갈래 (진입 0x11da8 · 그리기 0x16874 = 지도 0x7ea64(gfx, [+0xac], 0) →
+ * 0x84ea0, 직접 떴다):
+ * ```
+ * 850bc  장소 0 → 시즌(0x7b998)이 아니면 k = 1 (그 밖 장소는 시즌과 같다: 1 → 0 · 2 → 2 · 3 → 4 · 4 → 3)
+ * 85132  [gfx+0x1c0] = event_char_1 애니 k + 0x1e, 팔레트 −1
+ * 8515e  타자편(0x7b970)이고 내 타자 0x1fc21 의 +0xb >> 5 == 1(장타형)이면 event_char_0 애니 k + 0x63, 아니면 k + 0x5d
+ * 85186  시즌이 아니면 팔레트 = (레코드 0x1fc75(저장, 모드) +0xb 비트 2~3 = 피부) − 1 → [gfx+0x1c4] (0xd2424 = event_char_0.mpl)
+ * ```
+ * 게이지 · 판 · 확인 키 건너뛰기는 시즌과 같은 함수들(0x84634 · 0x848d0 · 0x84e58 · 0x84ea0)이다.
+ */
+export function nariOutingPresentationOf(place: number, options: { readonly isSlugger: boolean }): SeasonOutingPresentation {
+  const k = NARI_OUTING_ANIMATIONS[place] ?? NARI_OUTING_ANIMATIONS[0]
+  return {
+    folder: EVENT_ANI,
+    animation: k,
+    overlays: { char1: k + 0x1e, char0: k + (options.isSlugger ? 0x63 : 0x5d) },
+  }
+}
+
+/** 장소 p → event_ani 애니 k (점프표 0xd4a90, 시즌이 아닌 갈래) */
+const NARI_OUTING_ANIMATIONS: readonly number[] = [1, 0, 2, 4, 3]
+
 /** 가운데 정렬판의 창 R (mode_ui 프레임 10 박스 0) 과 세로 보정 d */
 export const OUTING_PANEL = { x: 0, y: 65, width: 240, height: 72, d: 59 } as const
 /** 띠 높이 */

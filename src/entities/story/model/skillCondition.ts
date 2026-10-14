@@ -14,8 +14,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * ```
  * 표는 19칸(스킬 2~20)이고, 표에 없는 스킬은 그냥 통과다.
  *
- * ⚠️ **11 번트왕만 아직 옮기지 못했다** — S+0x1f0[5](G+0xf8 번트 수: 스윙 시작 0xa5fac 의 코드 11, state[0x13] 번트일 때)를
- * 웹 경기가 세지 않는다. 지어내지 않고 **불발**로 둔다(이벤트 413 이 뜨지 않는다).
+ * 11 번트왕은 S+0x1f0[5] > 49 (0xad4e0) — [5] 는 G+0xf8 번트 수(스윙 시작 0xa5fac 의 코드 11, state[0x13] 번트일 때)를
+ * 정규시즌 경기마다 더한 값이다(`withGameSkillCounters`).
  * 해제 기록(`removedMinusSkillIds`)은 연초 115 의 0xa4ee8 이 +0x1d0 을 지워 "그 해" 것만 남는다 — 두 편 모두 105 진입이
  * 115 를 열 때 비운다(useCareerSession · usePitcherLeagueSession).
  */
@@ -85,7 +85,7 @@ function isCycleGame(stats: SeasonStats): boolean {
  * else:                                  [2] += G+0xe0 (3연타석 홈런) ; [3] += G+0xdc (2연타석 홈런)
  * [4] += u8 G+0xc4 (끝내기 안타 · 홈런)  ; [5] += G+0xf8 (번트 수) ; [6] += G+0xc8 (만루 홈런)
  * ```
- * 칸은 u16(strh)이라 65536 에서 돈다. [5] 번트 수는 웹 경기가 세지 않아 더하지 않는다(⚠️ 미해결 — 11 번트왕).
+ * 칸은 u16(strh)이라 65536 에서 돈다. [5] 번트 수는 경기 진행기가 번트 판정을 받은 내 공마다 센다(`recordMyBuntAttempt`).
  * 같은 값을 +0x1e0 벌에도 더하지만 그 벌을 읽는 곳이 없어 웹은 +0x1f0 벌만 든다.
  */
 export function withGameSkillCounters(career: PlayerCareer, summary: Pick<GameSummary, 'stats' | 'reputationCounts'>): PlayerCareer {
@@ -102,6 +102,8 @@ export function withGameSkillCounters(career: PlayerCareer, summary: Pick<GameSu
     add(3, counts.homeRunStreaksOfTwo ?? 0)
   }
   add(4, counts.walkOffs & 0xff)
+  // 0xa6a86~0xa6a92: [5] += G+0xf8 (ldr r6 = G+0xf8 — 0xa6a16)
+  add(5, counts.bunts ?? 0)
   add(6, counts.grandSlams)
   return { ...career, gameSkillCounters: counters }
 }
@@ -162,6 +164,8 @@ const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: Rand
   7: (career) => toInt8(career.regularSeasonFirstCount) >= 8 && mvpSeasonCountOf(career.mvpSeasonBits) > 6,
   // 10 해결사 — u16 +0x1f0[6](만루 홈런 수) > 5 (0xad494 모드 4)
   10: (career) => gameCounterOf(career, 6) > 5,
+  // 11 번트왕 — u16 +0x1f0[5](번트 수) > 49 (0xad4e0 모드 4)
+  11: (career) => gameCounterOf(career, 5) > 49,
   // 12 찬스 — 통산 +0x24(2루타) ≥ 80 이고 +0x2a(타점) ≥ 200 (0xad514 모드 4)
   12: (career) => {
     const total = batterCareerTotalOf(career)

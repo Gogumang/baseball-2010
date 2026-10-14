@@ -13,9 +13,9 @@ import { seasonEarnedRunAverageOf } from '@/entities/pitcher-career/model/pitche
  * 다른 것은 성적 칸뿐이다: 타율·안타·홈런 자리에 투수 레코드의
  * 아웃 +0x20 · 실점 +0x22 · 세이브 +0x24 · 탈삼진 +0x26 · 승 +0x2e · 패 +0x2f 가 들어간다 (P1 6절).
  *
- * ⚠️ 원본 시즌 끝 사슬은 136(올해의 목표 평가) → 130(타이틀) → 131(MVP) → 132(연말) 인데,
- * 투수편은 목표 표(0xd7e9a)와 리그 투수 성적표가 웹에 없어 136·130·131 을 건너뛴다 —
- * 자세한 까닭은 `entities/pitcher-career/model/pitcherSeasonFlow.ts` 머리글에 적었다.
+ * [다음](`onYearEnd` = 세션의 `beginYearEnd`)은 원본 시즌 끝 사슬 136(올해의 목표 392 → 393~396, 투수 표 0xd7e9a) →
+ * 130(타이틀 370 → 371~374) → 131(MVP 375 → 376/377) → (128 포스트시즌) → 132(연말) 를 그대로 돈다 —
+ * 걸음은 `entities/pitcher-career/model/pitcherYearEnd.ts` 의 `nextPitcherYearEndStep` 이 고른다.
  */
 export function PitcherSeasonEndScreen({
   career,

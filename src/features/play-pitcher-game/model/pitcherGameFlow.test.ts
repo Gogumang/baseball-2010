@@ -936,6 +936,9 @@ describe('포스트시즌 게이트 0xa56dc (모드 3 갈래 0xa571c — S+0xb4 
       expect(끝.pitcherRecord.battersFaced).toBe(0)
       expect(끝.runsAllowedByMe).toBe(0)
       expect(요약.seasonDelta).toMatchObject({ outs: 0, strikeouts: 0, runsAllowed: 0 })
+      // 경기 끝 0xa7de8 — 승 +0x2e · 패 +0x2f · 세이브 +0x24 와 R+0x124 도 같은 게이트 (a7e2a · a7e46 · a7e70 · a7e8c · a7ec6 · a7ede)
+      expect(요약.seasonDelta).toMatchObject({ wins: 0, losses: 0, saves: 0 })
+      expect(요약.decisionCode).toBe(0)
     }
     expect(확인).toBe(true)
   })

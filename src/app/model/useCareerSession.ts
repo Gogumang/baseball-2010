@@ -7,7 +7,7 @@ import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { arrivePitch, cpuPickoff, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -76,7 +76,7 @@ import {
   restBlockReasonOf,
   runRest,
 } from '@/entities/career/model/outing'
-import type { OutingResult } from '@/entities/career/model/outing'
+import type { OutingPresentation, OutingResult } from '@/entities/career/model/outing'
 import {
   EVENT_TRIGGER,
   finishEvent,
@@ -436,6 +436,11 @@ export function useCareerSession({
   const [outingNotice, setOutingNotice] = useState('')
   /** 상태 126 결과 팝업 두 장 — 효과 글(0x15234)과 입원 회복 글(0x1575c). 효과 팝업이 떠 있지 않으면 null */
   const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
+  /**
+   * 상태 126 연출 (진입 0x11da8 → 0x85074 · 그리기 0x16874) — 고른 기능과 장소 p([gfx+0x184] = 지도 프레임 − 1).
+   * 연출이 끝난 틀(0x84e58)에 효과 0x15234 를 굴려 `outingResult` 를 띄우고, 효과 팝업이 닫힐 때까지 판(띠 · 검정)이 남는다.
+   */
+  const [outingPresentation, setOutingPresentation] = useState<OutingPresentation | null>(null)
   const [managementNotice, setManagementNotice] = useState('')
   /** 상세정보 결과 창 (0x8a0a4) — 닫을 때 훈련은 부상, 휴식은 회복을 굴린다 */
   const [managementDetail, setManagementDetail] = useState<ManagementDetail | null>(null)
@@ -840,9 +845,12 @@ export function useCareerSession({
       }
       // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4). 116 쪽(0x12bc2~0x12c3c)이라 포스트시즌에도 돈다 — 그때
       // +0x4a 는 앞 평가 경기 값이다(위).
-      //    ⚠️ 미해결: 포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(현재 타자) 가 거짓이라 내 타자 기록 칸 쓰기 아홉 곳
-      //    (0xa8362·0xa8498·0xa84d6·0xa8538·0xa8578·0xa85c4·0xa8866·0xa895c …)이 막힌다 — 어느 칸이 웹 `applyGameResult`
-      //    의 어느 줄인지 아직 다 짝짓지 못해 기록은 그대로 센다.
+      //    포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(지금 타자, 0)(a8070)가 거짓이라 그 게이트 여덟 곳이 막힌다 —
+      //    a8362 도루 +0x2c · a8498 안타 +0x22 · a8538 2루타 +0x24 · a8578 3루타 +0x26 · a85c4 홈런 +0x28 · a8866 타수 +0x20 ·
+      //    a895c 타점 +0x2a 는 `applyGameResult` 의 `withoutRecordLine` 이 뺀다. 남은 a84d6 은 장내 홈런 state[0x25] 를 홈런 수
+      //    [sp+0x24] 에 더하는 자리라, 포스트시즌 장내 홈런은 a8210 이 루타 4 안타로 적되 홈런 갈래(a85be~a86b4 · e[0x13] a8728)를
+      //    건너뛴다.
+      //    ⚠️ 미확인(웹 미반영): 그 장내 홈런 갈래는 경기 흐름(gameFlow) 쪽 일이라 여기서 옮기지 않았다.
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
       // 연속 기록 칸을 잇는다. 116 의 0x8a6fc 는 그 칸을 읽어 알림 줄과 **보상 명령**(평판 · 슬럼프 스킬)을 내장 이벤트에
       // 쌓을 뿐이라, 보상은 114 가 이벤트를 틀 때(웹은 [확인] `confirmGameResult`) 먹는다 (`streakEventOf`)
@@ -969,6 +977,16 @@ export function useCareerSession({
         })
         progressRef.current = thrown
         setProgress(thrown)
+      }
+      // 번트 판정을 받은 공(자세가 틱 N − 1 까지 섬) — 0x4e1f8 → 스윙 시작 0xa5fac → 코드 11 → G+0xf8 번트 수 +1.
+      // 게이트 0xa56dc(R, 지금 타자, 1) 은 국가대항전 · 포스트시즌이면 거짓 (`recordMyBuntAttempt`)
+      const beforeBunt = progressRef.current
+      if (beforeBunt !== null && detail.hasSwung && (buntKind ?? 0) !== 0) {
+        const bunted = recordMyBuntAttempt(beforeBunt, {
+          isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+        })
+        progressRef.current = bunted
+        setProgress(bunted)
       }
       // 파울 각 공 — 원본은 맞은 공이면 각과 무관하게 판(상태 0x17)을 돈다(메시지 0x11 → 0x13 → 0x17). 스트라이크(0xb6b58) ·
       // 연속 파울(0xa7dbc) · 파울 콜 25(51c5c)는 판이 파울로 닫힐 때(`finishDefensePlay`)다 — 여기서는 타구음만 낸다.
@@ -1623,6 +1641,7 @@ export function useCareerSession({
       if (command === '외출') {
         setOutingNotice('')
         setOutingResult(null)
+        setOutingPresentation(null)
         // 112 진입 0x118e4 → 0x8cdc0 이 커서를 0 으로 되감은 **뒤에** 자동 발동 0x1cf9c 가 훑는다 — 웹은 그 훑기를 화면을
         // 바꾸기 전에 하므로 되감기를 먼저 한다
         story.rewindCursor()
@@ -1909,11 +1928,21 @@ export function useCareerSession({
       const reason = outingBlockReasonOf(career, outingFunction)
       if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
 
-      // 113 → 126: 원본은 연출(0x85074) 뒤 효과(0x15234)를 굴려 효과 팝업을 지도 위에 띄우고, 그 팝업이 닫히면
-      // 입원 회복(0x1575c)을 굴린다. 그 사이 다른 굴림이 없어 여기서 한 번에 굴려도 차례가 같다.
-      // ⚠️ 미해결: 126 연출 그림(0x84ea0 — event_ani · event_char_1 · event_char_0 세 겹)은 아직 옮기지 않았다.
-      const outcome = performOuting(career, outingFunction, random)
+      // 113 → 126: 연출(0x85074 — event_ani · event_char_1 · event_char_0 세 겹, `outingPresentation`)이 끝난 틀에 효과(0x15234)를
+      // 굴려 효과 팝업을 지도 위에 띄우고(`finishOutingPresentation`), 그 팝업이 닫히면 입원 회복(0x1575c)을 굴린다
+      const place = OUTING_PLACES.find((candidate) => candidate.functions.includes(outingFunction))
       setOutingNotice('')
+      setOutingPresentation({ functionId, place: (place?.frame ?? 1) - 1 })
+    },
+
+    /** 126 연출 끝(0x84e58 이 참인 틀) — 효과 0x15234 를 굴려 효과 팝업을 띄운다. 연출 동안 굴림은 없다 */
+    finishOutingPresentation: () => {
+      if (career === null || outingPresentation === null || outingResult !== null) return
+      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
+        (candidate) => candidate.id === outingPresentation.functionId,
+      )
+      if (outingFunction === undefined) return
+      const outcome = performOuting(career, outingFunction, random)
       setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
       setCareer(outcome.career)
     },
@@ -1925,6 +1954,7 @@ export function useCareerSession({
     closeOutingResult: () => {
       if (outingResult === null) return
       setOutingResult(null)
+      setOutingPresentation(null)
       if (outingResult.recoveryText !== '') setManagementNotice(outingResult.recoveryText)
       setScreen({ kind: '관리' })
     },
@@ -2293,6 +2323,7 @@ export function useCareerSession({
     shopGpDetail,
     outingNotice,
     outingResult,
+    outingPresentation,
     managementNotice,
     managementDetail,
     pendingTitle,

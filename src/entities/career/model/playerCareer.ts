@@ -294,7 +294,8 @@ export interface PlayerCareer {
   readonly endingBonusReceived?: boolean
   /**
    * 질병 이벤트 쿨다운 (선수 +0x7c). 질병에 걸리거나 나으면 20 이 되고, 0 보다 크면 이벤트 490 이 막힌다.
-   * 줄어드는 단위는 미확인이라 경기마다 1 씩 줄인다 (추정).
+   * **경기마다 1** 씩 준다 — 경기 끝 정산 0x4ea0c 의 4f3a2~4f3b2: 모드 2·3·4 면 s8 +0x7c > 0 이면 −1 (포스트시즌 · 대회 경기도
+   * 지난다 — `applyGameResult` · `settleNariCupGame`).
    */
   readonly illnessCooldown: number
   /** 배팅 타입 첫 선택 (선수 +0xb 상위 비트) */
