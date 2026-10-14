@@ -4,6 +4,7 @@ import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { pitcherShopEntriesOf } from '@/pages/shop/lib/pitcherShopEntries'
 import { pitcherEquipmentRowsOf } from '@/pages/shop/lib/equipmentRows'
 import { ShopScreenView } from '@/pages/shop/ui/ShopScreen'
+import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { pitcherGpDetailViewOf } from '@/pages/shop/lib/gpDetailView'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 
@@ -36,6 +37,8 @@ export function PitcherShopScreen({
     <ShopScreenView
       kind={tab}
       entriesOf={() => (tab === '서브' || tab === 'GP' ? pitcherShopEntriesOf(career, tab) : [])}
+      // 0x7d34c(gfx, 0) 모드 3 갈래 — 창 종류 1 · 2 일 때만 그린다(0x167cc)
+      statusPanel={<PitcherStatusBoard career={career} />}
       equipment={tab === '장착' || tab === '착용' ? {
         edition: '투수',
         rowsOf: (part) => pitcherEquipmentRowsOf(career, part, tab === '착용'),
