@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { CommonPanel } from '@/shared/ui'
 import {
   FOOTER_BOX, SEASON_WINDOW, TITLE_BOX, VISIBLE_ROWS, rowBoxOf,
 } from '@/widgets/season/lib/seasonWindowLayout'
@@ -46,13 +47,8 @@ export function SeasonListWindow({
 
   return (
     <div role="group" aria-label={title}>
-      <div
-        className={styles.window}
-        style={{
-          left: SEASON_WINDOW.x, top: SEASON_WINDOW.y,
-          width: SEASON_WINDOW.width, height: SEASON_WINDOW.height,
-        }}
-      />
+      {/* 공용 판 0x55e61 — ⚠️ 미확인: 띠 · 제목 탭 인자는 이 목록을 부르는 원본 자리를 못 맞춰 기본 판만 그린다 */}
+      <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
       <div
         className={styles.title}
         style={{ left: TITLE_BOX.x, top: TITLE_BOX.y, width: TITLE_BOX.width, height: TITLE_BOX.height }}

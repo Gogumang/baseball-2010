@@ -18,7 +18,10 @@ export const layer = style({
   pointerEvents: 'none',
 })
 
-/** 공용 창 0x55e60 — 둥근 판 #335FCD, 검정 테두리, 안쪽 흰 선 (모양은 추정, 선 목록만 확인됐다) */
+/**
+ * ⚠️ 근사 — 공용 창 0x55e60 의 CSS 흉내다. 원본 선 목록은 `shared/lib/commonPanel` 에서 확정했고
+ * `shared/ui` 의 `CommonPanel` 이 그대로 그린다. 새 화면은 그것을 쓰고, 이 클래스는 아직 옮기지 않은 화면만 남아 쓴다.
+ */
 export const window = style({
   position: 'absolute',
   boxSizing: 'border-box',

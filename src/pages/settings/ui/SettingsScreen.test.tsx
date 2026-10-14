@@ -21,7 +21,6 @@ const 띄우기 = (overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {}
   render(
     <SettingsScreen
       settings={DEFAULT_SETTINGS}
-      hasSavedCareer
       onChange={vi.fn()}
       onResetCareer={vi.fn()}
       onResetEditedNames={vi.fn()}
@@ -64,7 +63,7 @@ describe('환경설정 창 배치', () => {
       vi.advanceTimersByTime(millisecondsPerFrame() * 4)
     })
     vi.useRealTimers()
-    const panel = container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement
+    const panel = container.querySelector('[data-testid="공용판"]') as HTMLElement
 
     expect(panel.style.left).toBe(`${PANEL.x}px`)
     expect(panel.style.top).toBe(`${PANEL.y}px`)
@@ -132,7 +131,7 @@ describe('환경설정 값 바꾸기', () => {
 
       vibrateSpy.mockClear()
       rerender(
-        <SettingsScreen settings={{ ...DEFAULT_SETTINGS, isVibrationOn: true }} hasSavedCareer
+        <SettingsScreen settings={{ ...DEFAULT_SETTINGS, isVibrationOn: true }}
           onChange={vi.fn()} onResetCareer={vi.fn()} onBack={vi.fn()} />,
       )
       fireEvent.click(줄('진동'))
@@ -222,7 +221,7 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
   }
 
   it('나리 저장이 없어도 들어간다 — 칸 4 는 조건 없이 0xbcb49(…, 0x21)', () => {
-    모드초기화열기({ hasSavedCareer: false })
+    모드초기화열기()
 
     for (const name of ['나만의리그 초기화', '시즌모드 초기화', '에디트 초기화']) expect(줄(name)).toBeTruthy()
   })
@@ -300,7 +299,7 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
   })
 
   it('나만의리그: 저장 유무와 상관없이 고르기 창 0xcf848 — 타자편(고른 13)·투수편(보통 12), 처음 커서 타자편', () => {
-    모드초기화열기({ hasSavedCareer: false })
+    모드초기화열기()
 
     fireEvent.click(줄('나만의리그 초기화'))
     expect(screen.getByRole('dialog').textContent).toContain('초기화할 데이터를 선택하세요')
@@ -476,7 +475,7 @@ describe('환경설정 머리띠와 흰 테두리 깜빡임', () => {
  */
 describe('환경설정 첫 화면 — OK 칸과 판 펼침·접힘', () => {
   const 판높이 = (container: HTMLElement) =>
-    (container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement).style.height
+    (container.querySelector('[data-testid="공용판"]') as HTMLElement).style.height
   const 한틱 = () => act(() => {
     vi.advanceTimersByTime(millisecondsPerFrame())
   })

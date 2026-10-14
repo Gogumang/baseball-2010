@@ -245,7 +245,6 @@ export function EntryRoutes({
     return (
       <SettingsScreen
         settings={gameSettings.settings}
-        hasSavedCareer={session.savedCareer !== null}
         // 값은 메모리만 고치고 첫 화면을 나갈 때(0x295e2) 한 번 0x1f1b9 로 쓴다
         onChange={gameSettings.changeSettings}
         onSave={gameSettings.saveSettings}

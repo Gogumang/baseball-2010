@@ -41,7 +41,7 @@ const 띄우기 = (overrides: Partial<Parameters<typeof RecordAnnals>[0]> = {}) 
 describe('기록연감 뼈대', () => {
   it('판은 가운데 192×212 다', () => {
     const { container } = 띄우기()
-    const panel = container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement
+    const panel = container.querySelector('[data-testid="공용판"]') as HTMLElement
 
     expect(panel.style.left).toBe(`${PANEL.x}px`)
     expect(panel.style.top).toBe(`${PANEL.y}px`)
@@ -121,7 +121,7 @@ describe('기록연감 뼈대', () => {
     vi.useFakeTimers()
     const { container } = render(<RecordAnnals collection={EMPTY_COLLECTION} onBack={vi.fn()} />)
     시계맞추기()
-    const panel = () => container.querySelector(`div[style*="${PANEL.width}px"]`) as HTMLElement
+    const panel = () => container.querySelector('[data-testid="공용판"]') as HTMLElement
     expect(panel().style.height).toBe('32px')
     expect(panel().style.top).toBe('144px')
 

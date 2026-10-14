@@ -1,16 +1,6 @@
 import { style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
-/** 공용 창 0x55e60 */
-export const panel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '6px',
-  background: ORIGINAL_COLORS.boardFill,
-  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
-})
-
 export const sprite = style({
   position: 'absolute',
   imageRendering: 'pixelated',
@@ -99,15 +89,6 @@ export const progressValue = style({
   textAlign: 'center',
   fontSize: '11px',
   lineHeight: '11px',
-  pointerEvents: 'none',
-})
-
-export const descriptionBox = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '2px',
-  background: '#213473',
   pointerEvents: 'none',
 })
 

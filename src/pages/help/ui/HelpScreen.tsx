@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { RawScreen, ScreenOverlay } from '@/shared/ui'
+import { CommonPanel, InsetBox, RawScreen, ScreenOverlay, SpriteNumber } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import {
-  BODY_PANEL,
+  HELP_PAGER_GLYPH_HEIGHT,
   HELP_PANEL_CLOSE_HEIGHTS,
   HELP_PANEL_FULL_HEIGHT,
   HELP_PANEL_OPEN_HEIGHTS,
   HELP_VIEWER,
   SCREEN,
+  helpPagerOf,
 } from '@/pages/help/lib/helpLayout'
 import {
   HELP_RATING_TABLE,
@@ -28,6 +29,7 @@ import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 
 const SLT_FRAME = './sprites/slt_frame'
 const SLT_FRAMES = './sprites/slt_frame/frames'
+const NUM = './sprites/num'
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
@@ -91,7 +93,8 @@ const viewerKeyOf = (key: string): HelpViewerKey | null => {
  * 쪽 보기는 반대다(0x59090 · 0x59196). 판은 열 때 4프레임에 걸쳐 커지고, 메인 메뉴에서는 CLR 로 닫을 때 4프레임에 걸쳐 줄어든다
  * (`HELP_PANEL_*_HEIGHTS`). 경기 중은 `[뷰어+0x125]` 라 CLR 이 곧장 닫는다.
  *
- * ⚠️ 근사한 곳: 판 0x55e60 · 본문 상자 0xbb28d 의 색과 테두리, 쪽 번호 숫자 그림(num.pzx 0x585ac)은 웹 글자로 둔다.
+ * 판 0x55e60 은 원본 선 목록 그대로(`CommonPanel`) — 잠기지 않은 뷰어([+0x45c] = 0)는 위 띠 16(0x58eb6), 잠긴 뷰어(상태 10)는
+ * 제목 탭(0x58e1a)이다. 본문 상자 0xbb28d 는 `InsetBox`, 쪽 번호는 num.pzx 숫자 그림 0x585ac(`helpPagerOf`)다.
  * 글은 원본 줄 나누기(한글 9·영문 5·자간 1)로 나눈 뒤 웹 글꼴로 그린다. 쪽 넘기기·장 넘기기·닫기 단추는 웹판 편의다.
  * 쪽 보기 → 장 고르기(CLR)가 쓰는 `+0x80 = 0` 의 뜻은 안 읽었다.
  */
@@ -169,6 +172,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   const clipHeight = isAnimating ? Math.max(panelHeight - 10, 0) : panelHeight + 10
   const showsTitleHighlight = !viewer.isChoosingChapter || isBlinkOn
   const showsPageArrows = viewer.isChoosingChapter || isBlinkOn
+  const pager = helpPagerOf(page, pageCount)
   const knobTop = helpScrollKnobTopOf(lines.length, viewer.scrollTop)
   const { knobLength } = helpScrollMetricsOf(lines.length)
   const visibleLines = lines.slice(viewer.scrollTop, viewer.scrollTop + HELP_TEXT_BOX.visibleLines)
@@ -180,9 +184,14 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
 
   const body = (
     <>
-      <div
-        className={styles.panel}
-        style={{ left: x0, top: panelTop, width: panelWidth, height: panelHeight }}
+      {/* 판 0x55e60(skin, W/2, H/2, 192, +0x90, 0, 0x22, …) — [+0x45c] 면 (띠 0, 0, 제목 탭 1) 아니면 (띠 0x10, 0, 0) (0x58dea~0x58ec6) */}
+      <CommonPanel
+        x={x0}
+        y={panelTop}
+        width={panelWidth}
+        height={panelHeight}
+        topBand={isChapterLocked ? 0 : 0x10}
+        titleTab={isChapterLocked}
       />
 
       <div className={styles.clip} style={{ left: 0, top: clipTop, width: SCREEN.width, height: clipHeight }}>
@@ -229,8 +238,14 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
             </>
           )}
 
-          <div className={styles.pagerText} style={{ left: BODY_PANEL.pager.numberX, top: BODY_PANEL.pager.y }}>
-            {page + 1}/{pageCount}
+          {/* 쪽 번호 — num.pzx 숫자 0x585ac 두 자리 + 사이 "/" 이미지 0x65 (0x59102~0x59192) */}
+          <div role="img" aria-label={`${page + 1}/${pageCount}`}>
+            <SpriteNumber glyphs={pager.page.glyphs} right={pager.page.right} boxTop={pager.y}
+              boxHeight={HELP_PAGER_GLYPH_HEIGHT} folder={NUM} />
+            <img className={styles.sprite} alt="" src={imageSrc(NUM, pager.slash.image)}
+              style={{ left: pager.slash.x, top: pager.slash.y }} />
+            <SpriteNumber glyphs={pager.count.glyphs} right={pager.count.right} boxTop={pager.y}
+              boxHeight={HELP_PAGER_GLYPH_HEIGHT} folder={NUM} />
           </div>
 
           {/* 쪽 화살 slt_frame 이미지 20 — 장 고르기면 늘, 쪽 보기면 깜빡인다 (0x59196~0x59204). 웹판은 누를 수도 있다 */}
@@ -253,14 +268,12 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
             <img src={imageSrc(SLT_FRAME, HELP_VIEWER.pageArrow.image)} alt="" style={{ opacity: showsPageArrows ? 1 : 0 }} />
           </button>
 
-          <div
-            className={styles.innerBox}
-            style={{
-              left: HELP_VIEWER.innerBox.x,
-              top: HELP_VIEWER.innerBox.y,
-              width: HELP_VIEWER.innerBox.width,
-              height: HELP_VIEWER.innerBox.height,
-            }}
+          {/* 본문 상자 0xbb28d(x0 + 5, y0 + 0x24, 0xac, 0xab, 정렬 1) (0x59208~0x5921a) */}
+          <InsetBox
+            x={HELP_VIEWER.innerBox.x}
+            y={HELP_VIEWER.innerBox.y}
+            width={HELP_VIEWER.innerBox.width}
+            height={HELP_VIEWER.innerBox.height}
           />
 
           {/* 스크롤 막대 0x58c10 — 바탕 · 위아래 화살(slt_frame 이미지 78) · 흰 손잡이 */}

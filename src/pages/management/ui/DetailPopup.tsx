@@ -1,4 +1,4 @@
-import { FrameSprite, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -71,7 +71,8 @@ interface DetailWindowProps {
 }
 
 /**
- * 상세정보 창 — 표와 메시지 줄. 누르면 닫힌다. 창 모양(0x55e60)은 선 목록만 확인돼 CSS 로 근사한다 (추정)
+ * 상세정보 창 — 표와 메시지 줄. 누르면 닫힌다. 창 = 0x871f8 의 공용 판 `0x55e60(skin, x, y, w, h, 0, 정렬 0x11, 0x10, 0, 제목 탭 1, 0)`
+ * (0x8720c~0x87232) — 제목 탭이 서 있어 위 띠 0x10 은 안 쓰인다. 모양은 `CommonPanel` 이 원본 선 목록대로 그린다.
  * 두 모드 공용 창(0x872d4)이라 줄(이름표 포함)만 받는다 — 투수편은 이름표 340~343 으로 세운 줄을 넘긴다.
  */
 export function DetailWindow({
@@ -92,7 +93,7 @@ export function DetailWindow({
   return (
     <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={onClose}
       style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
-      <div className={styles.window} style={{ left: DETAIL_WINDOW.x, top: DETAIL_WINDOW.y, width: DETAIL_WINDOW.width, height: DETAIL_WINDOW.height }} />
+      <CommonPanel x={DETAIL_WINDOW.x} y={DETAIL_WINDOW.y} width={DETAIL_WINDOW.width} height={DETAIL_WINDOW.height} titleTab />
       <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
         style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />
       <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={tableYOffset} />
