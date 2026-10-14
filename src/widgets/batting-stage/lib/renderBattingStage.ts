@@ -48,7 +48,6 @@ import { drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { UI_COLORS } from '@/shared/config/design'
-import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -600,30 +599,17 @@ function drawFastballFlame(
 
 /**
  * 판정 글자 — game_judge 애니를 존 표 0xcfb7c[+0x17e1] 에서 잡은 원점(우타 (122,224) · 좌타 (117,224))에 재생한다
- * (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다
+ * (0x39504 → 0x393b4). 애니가 없는 판정은 그리지 않는다 — 0x393b4 의 표 0xcfe90 은 v = 6 · 8 · 12 를 0x394d6 으로 건너뛰고
+ * 원본 타석 화면에는 웹 글꼴 같은 큰 결과 글자가 없다 (F 노트 587~589). 홈런은 HOMERUN 연출(`isHomeRun`)이 대신 나간다.
  */
 function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number, side: number): void {
   const { x: centerX, y: centerY } = stageLayoutOf(side).judgeCenter
   const animation = judgeAnimationOf(text)
-  if (animation !== null) {
-    const entries = frameAnimations(JUDGE_FRAMES)?.[animation]
-    const frameIndex = entries === undefined ? null : judgeFrameAt(entries, resultTick)
-    const frame = frameIndex === null ? null : placedFrame(JUDGE_FRAMES, frameIndex)
-    if (frame !== null) context.drawImage(frame.image, centerX + frame.offsetX, centerY + frame.offsetY)
-    return
-  }
-
-  // 원본 글꼴 웹폰트를 정수 2배(22px)로 쓴다 — 11 의 정수배여야 도트가 안 뭉갠다.
-  // 캔버스 `ctx.font` 는 CSS 변수를 못 읽어 `PIXEL_FONT_FAMILY` 상수를 직접 끼운다.
-  // 굵게(bold)는 빼 둔다 — 비트맵 글꼴에 굵은 자형이 없어 브라우저가 억지로 번지게 그린다.
-  context.font = `22px '${PIXEL_FONT_FAMILY}', 'Galmuri11', sans-serif`
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-  context.lineWidth = 4
-  context.strokeStyle = UI_COLORS.resultOutline
-  context.strokeText(text, centerX, centerY)
-  context.fillStyle = UI_COLORS.resultText
-  context.fillText(text, centerX, centerY)
+  if (animation === null) return
+  const entries = frameAnimations(JUDGE_FRAMES)?.[animation]
+  const frameIndex = entries === undefined ? null : judgeFrameAt(entries, resultTick)
+  const frame = frameIndex === null ? null : placedFrame(JUDGE_FRAMES, frameIndex)
+  if (frame !== null) context.drawImage(frame.image, centerX + frame.offsetX, centerY + frame.offsetY)
 }
 
 /**

@@ -205,8 +205,11 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         tick: nowTick,
         resultTick: isResult ? stage.phase.tick : 0,
         resultText: isResult && resolution !== null ? describePitchResolution(resolution) : '',
-        isHomeRun: false,
-        homeRunTick: 0,
+        // CPU 홈런도 판정 v = 8 · 12 → 0x51cd8 이 +0x1960 을 켜 HOMERUN 글자(0x40b18)가 나간다 — 판정 글자는 없다 (타자편 `BattingStage` 와 같은 길).
+        // ⚠️ 맞은 공은 0x12 를 안 지나(`passesHeldResult`) 이 장면에서는 '결과' 가 서지 않는다 — 원본도 0x13 → 0x17(수비 판)이라
+        //    글자는 수비 판 그리기 0x46c88 이 띄운다(`pages/defense` 의 `DefenseHomeRunText`). 여기서는 같은 판정이 '결과' 로 들어올 때만 탄다
+        isHomeRun: isResult && resolution !== null && resolution.kind === '타구' && resolution.outcome.kind === '홈런',
+        homeRunTick: isResult ? stage.phase.tick : 0,
         isEagleEyeEnabled: false,
         shift: 0,
         swingFrame: batterFrameAt({
