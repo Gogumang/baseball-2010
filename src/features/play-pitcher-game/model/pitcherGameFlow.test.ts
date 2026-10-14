@@ -728,6 +728,20 @@ describe('견제 — 구질 고르기(0xf)에서 3·1·7 (0x53548 → 0x50f28 �
     // 다시 던질 수 있다 — 상태 0xf 로 돌아온다
     expect(isPitchTurn(after)).toBe(true)
   })
+  it('견제 판 정산(종류 4)은 같은 투구 틈 앞 판의 사건까지 센다 — 시즌 아웃 +0x20 · R[3] · state[0x8a] · 26 (0xa8024)', () => {
+    const progress = 주자있는판({ first: true, second: false, third: false })
+    const 그냥 = pickoff(progress, '3', 씨앗(1))
+    expect(그냥.lastDefensePlay?.advance.outsAdded).toBe(0)
+    const 남은 = pickoff({ ...progress, pendingSettlementEvents: { outs: 2, runs: 1 } }, '3', 씨앗(1))
+    expect(summaryOf(남은).seasonDelta.outs).toBe(summaryOf(그냥).seasonDelta.outs + 2)
+    expect(남은.teamRunsAllowed).toBe(그냥.teamRunsAllowed + 1)
+    // [sp+0x30] == 2 → 병살 26 (a8e58)
+    expect(남은.recordIds).toContain(26)
+    expect(그냥.recordIds).not.toContain(26)
+    // 아웃 콜 칸 R+0x13c 는 콜마다라 그대로다
+    expect(남은.record.outsRecorded).toBe(그냥.record.outsRecorded)
+    expect(남은.pendingSettlementEvents).toEqual({ outs: 2, runs: 1 })
+  })
 })
 
 /**

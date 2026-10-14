@@ -63,6 +63,7 @@ import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
   laserThrowOutRecordOf,
+  multiOutPlayRecordIdsOf,
   passesRecordTeamGate,
   strikeoutCallRecordIdsOf,
   strikeoutRecordIdsOf,
@@ -86,6 +87,13 @@ import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback
 import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
 import { chargedRunsOfFates, runnerFatesWithoutPlay, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import {
+  arrivalPlaySettles,
+  pendingSettlementEventsAfter,
+  settlementEventsOfPlay,
+  withSettlementEvents,
+} from '@/features/defense-play/model/settlementEvents'
+import type { PendingSettlementEvents } from '@/features/defense-play/model/settlementEvents'
 import { pickoffPlayForKey, PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
@@ -474,6 +482,18 @@ export interface PitcherGameProgress {
   readonly teamWalksAllowed: number
   readonly teamHitsAllowed: number
   readonly teamRunsAllowed: number
+  /**
+   * **정산 사건 목록(ctx+0x30)에 남은 앞 판의 몫** — 같은 투구 틈에 앞서 돈 도루 · 폭투·포일 · 견제 판의 아웃 · 득점.
+   * 견제 판(종류 4) 정산이 함께 센다(`features/defense-play/model/settlementEvents`). 공이 손을 떠날 때(0xa5e14) 비운다.
+   */
+  readonly pendingSettlementEvents?: PendingSettlementEvents
+  /**
+   * **정산이 센 아웃 − 아웃 콜이 센 아웃** — 우리 지금 투수 R[3](a8f8c, 완투 판정) · 투수 레코드 +0x20(a8cb0, 시즌 아웃)은 정산이
+   * 사건 목록의 아웃([sp+0x30])으로 세고, R+0x13c(`record.outsRecorded`)는 아웃 콜 0xa7c4c · 0xa7d0c 가 하나마다 센다.
+   * 둘이 갈리는 곳: 정산을 건너뛰는 폭투·포일 판(ae596 → ae5a2, −아웃) · 같은 투구 틈 앞 판을 다시 세는 견제 정산(+앞 몫).
+   * 없으면 0
+   */
+  readonly settledOutsExtra?: number
   /** 이 이닝에 아직 아무도 안 내보냈는가 — R+0x184(삼자범퇴 표시) 자리 */
   readonly perfectInningFlag: boolean
   /** 상대 타순 칸별 이번 경기 안타·홈런 — 돌발 b6/b7 조건이 읽는 기록 +0x12·+0x13 */
@@ -1210,6 +1230,8 @@ export function startPitch(
     // 같은 0xa5e14 의 a5e72 가 state[0xd](교체 직후)도 내린다 — 두 팀 공용 한 칸이다
     ...withMoundsPitched(progress),
     pitchCount: progress.pitchCount + 1,
+    // 같은 0xa5e14 가 정산 사건 목록을 비운다 (a5e80 ctx+0x2c = 0)
+    pendingSettlementEvents: undefined,
     // ctx+0x161 · ctx+0x16c — 투구 처리 0xa5e14 가 공 하나마다 둘 다 올린다
     atBatPitches: progress.atBatPitches + 1,
     halfInningPitches: progress.halfInningPitches + 1,
@@ -1463,9 +1485,27 @@ function applyPitcherArrival(progress: PitcherGameProgress, play: PitchArrivalPl
   // 낫아웃 · 볼넷 · 사구는 타석 결과 쪽(`startPitch`)이 먹인다 — 밀어내기 판(종류 2)은 재생 칸에만
   if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 
-  const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
-  let next = withMyRunnerPlay(opened, play.result, settles, play.shownLive === true).progress
+  // 판정 B 가 정산을 부르는가 — 도루는 늘, 폭투·포일은 삼진이 섰거나 반 이닝 · 경기가 끝난 판만 (`arrivalPlaySettles`)
+  const settledApply = withMyRunnerPlay(opened, play.result, true, play.shownLive === true).progress
+  const ended =
+    settledApply.game.isFinished || settledApply.game.inning !== before.inning || settledApply.game.half !== before.half
+  const settles = arrivalPlaySettles(play, { halfOrGameEnded: ended })
+  let next = settles ? settledApply : withMyRunnerPlay(opened, play.result, false, play.shownLive === true).progress
   next = withStealPlayLeagueSteals(next, progress, play)
+  // 삼진 없는 도루 판(종류 5)의 정산 — 거르지 않는 칸 (`withMyRunnerPlaySettlement`). 삼진과 한 정산이면 타석 결과 쪽이 센다
+  if (play.kind === 5 && progress.atBat.outcome?.kind !== '삼진') {
+    next = withMyRunnerPlaySettlement(next, play.result, settlementEventsOfPlay(play.result))
+  }
+  // 같은 타석이 이어지면 이 판의 사건이 목록에 남아 다음 견제 정산이 함께 센다 — 다음 공의 0xa5e14 가 비운다
+  const continues =
+    progress.atBat.outcome === null &&
+    !next.game.isFinished &&
+    next.game.inning === before.inning &&
+    next.game.half === before.half
+  next = {
+    ...next,
+    pendingSettlementEvents: pendingSettlementEventsAfter(undefined, settlementEventsOfPlay(play.result), continues),
+  }
   // 삼진 + 도루 판(종류 5) — 삼진 콜 0xa7c4c(16 삼구 · 17 풀카운트)는 정산 0xa8024 보다 **먼저** 났다: 정산이 그 콜이 넣은
   // 사건 5 를 세어([sp+0x20]) 레코드 +0x26 을 올리므로(a8d00) 콜이 판 정산 앞이다. 그래서 알림 차례는 16/17 → 24(a83de)다.
   // 타석 결과 쪽(`applyDefensivePlay` 의 `stealPlaySettlement`)은 이 둘을 다시 안 준다
@@ -1620,6 +1660,14 @@ function finishNonPlayOutcome(
     (arrival !== null && arrivalApplicationOf(arrival) === 'freePass' ? arrival.result : null)
   // 삼진 + 도루 판(종류 5) — 판정 B 가 정산 0xa8024 를 종류 5 로 한 번 부른다(`stealPlaySettlement`)
   const stealPlaySettlement = arrival !== null && arrival.kind === 5 && outcome.kind === '삼진'
+  // 삼진과 한 정산인 주자 판 — 도루(종류 5) · 삼진 그대로인 폭투·포일(종류 9, ae596 → ae5a6). 그 판의 아웃 사건 · 필살송구 표시도
+  // 이 정산이 센다
+  const settledRunnerPlay =
+    arrival !== null &&
+    outcome.kind === '삼진' &&
+    (arrival.kind === 5 || (arrival.kind === 9 && arrival.strikeout === 'strikeoutStands'))
+      ? arrival.result
+      : undefined
   return advance(
     applyDefensivePlay(
       progress,
@@ -1631,6 +1679,7 @@ function finishNonPlayOutcome(
       undefined,
       undefined,
       stealPlaySettlement,
+      settledRunnerPlay,
     ),
     random,
   )
@@ -1744,8 +1793,9 @@ export function resolveDefensePlay(
  *
  * - 사람 경기의 CPU 도루(0x520de)는 공이 나는 동안(상태 0x11)에만 걸리고 견제는 상태 0xf 에서만 들어와 겹치지
  *   않는다(Q1 3b). 견제사·진루는 판 시작 리드(0x3d7b8, 3370bf0)로 루를 떠난 주자에게서 난다.
- * - 진루·아웃·실점은 `withMyRunnerPlay`(도루·폭투 판과 같은 먹이기)로 먹인다. 0xa8024 의 나머지 기록 칸
- *   (투수 아웃 수·돌발 판정 등)이 견제 판에서 어떻게 도는지는 **미해결**이라 손대지 않는다.
+ * - 진루·아웃·실점은 `withMyRunnerPlay`(도루·폭투 판과 같은 먹이기)로 먹인다. 0xa8024(종류 4)의 거르지 않는 칸
+ *   (36 · 시즌 아웃 +0x20 · R[3] · state[0x8a] · 26/27)은 `withMyRunnerPlaySettlement` — 같은 투구 틈 앞 판의 사건까지 센다.
+ *   돌발 판정 0x8f414 는 결과비트 0 이라 판정이 없다.
  */
 export function pickoff(
   progress: PitcherGameProgress,
@@ -1800,12 +1850,16 @@ function applyPickoffResult(
       ? recordBatterFaced(progress.pitcherRecord, PICKOFF_PLAY_KIND)
       : progress.pitcherRecord,
   }
-  // 견제도 정산 0xa8024 를 지난다(I 4a-3) — 들어온 주자는 주자 운명으로 센다
+  // 견제도 정산 0xa8024 를 지난다(I 4a-3, ae576 → ae5a8) — 들어온 주자는 주자 운명으로 센다
   const applied = withMyRunnerPlay(faced, result, true, shownLive)
   const { changed } = applied
   const advanceResult = result.advance
   const before = progress.game
-  let next = applied.progress
+  // 종류 4 정산의 거르지 않는 칸 — 사건 목록은 0x11 을 안 지나 같은 투구 틈 앞 판의 몫이 함께 든다
+  const events = withSettlementEvents(progress.pendingSettlementEvents, settlementEventsOfPlay(result))
+  let next = withMyRunnerPlaySettlement(applied.progress, result, events)
+  const ended = next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
+  next = { ...next, pendingSettlementEvents: ended ? undefined : events }
   const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
   next = appendLog(
     next,
@@ -1834,8 +1888,43 @@ function applyPickoffResult(
  * - 판에서 잡은 아웃은 아웃 콜 0xa7d0c 가 하나마다 센다(정산과 무관) — R+0x13c · 셋째 아웃이면 25 삼구 삼자범퇴 · R+0x154.
  *   정산 0xa8024 의 종류 4·5 갈래는 타석 칸(R+0x138 · R+0x134 · 타석 +0x14 …)을 건너뛰어 여기서 더 셀 것이 없다
  *   (삼진 + 도루 판의 삼진 타석은 `applyDefensivePlay` 의 `stealPlaySettlement`).
- * ⚠️ 미확인: 주자 판 끝의 돌발 판정(0x8f414 — 0x17 끝 0x528b0)은 손대지 않았다.
+ * 주자 판 끝의 돌발 판정(0x8f414 — 0x17 끝 52a8e)은 판정이 없다: 결과비트 ctx+0x188 은 타석 초기화 0xa5bcc(a5be0)만 지우고
+ * 0xa599c 는 종류 4·5 면 안 켜 이어지는 타석 안에서 늘 0 이다(8f41e 에서 돌아간다). 정산하는 폭투·포일 판(삼진 · 3아웃)은
+ * 타석 · 반 이닝을 끝내는 판이라 타석 결과 쪽이 판정한다.
+ * `settles` 가 거짓인 판은 state[0x8a](`teamRunsAllowed`) · R[3]/+0x20(`settledOutsExtra`)도 안 센다.
  */
+/**
+ * **타석 결과 없는 주자 판(견제 종류 4 · 삼진 없는 도루 종류 5)의 정산 0xa8024 — 거르지 않는 칸** (직접 떴다).
+ * 진루 · 실점 R+0x128 · 아웃 콜 칸은 `withMyRunnerPlay` 가 먼저 먹였다.
+ * ```
+ * a80f8  [sp+0x30] > 0 && state[0x8b](필살송구 표시 — 0xf 진입 0xb67d0 이 지워 이 판 것) → k 36
+ * a8cb0  투수 레코드 +0x20 += [sp+0x30]  · a8f8c  R[3] += [sp+0x30]          ; `settledOutsExtra` 로 앞 몫을 더한다
+ * a8dd0  state[0x8a] += [sp+0x28]
+ * a8e58  [sp+0x30] == 2 → k 26 / == 3 → k 27                                    ; state[0x1a] 는 0xf 진입이 지워 거짓
+ * ```
+ * `events` 는 사건 목록을 훑은 값 — 견제 판은 같은 투구 틈 앞 판(도루 · 폭투 · 앞 견제)의 몫까지 든다(원본 그대로 다시 센다).
+ * 투수편은 사람이 늘 수비라 36 · 26 · 27 이 게이트 0xa77f0 을 지난다. 시즌 코드(0xa755c)는 모드 2 전용이라 없다.
+ * 돌발 판정 0x8f414 는 결과비트가 0(0xa599c 는 종류 4·5 면 안 켠다 · 지우는 곳 0xa5bcc 하나)이라 판정이 없다.
+ */
+function withMyRunnerPlaySettlement(
+  next: PitcherGameProgress,
+  result: DefensePlayResult,
+  events: PendingSettlementEvents,
+): PitcherGameProgress {
+  const earlierOuts = events.outs - result.advance.outsAdded
+  const earlierRuns = events.runs - result.advance.runsScored
+  const recordIds = [
+    ...laserThrowOutRecordOf({ laserThrowFlag: result.laserOutFlag, outsInPlay: events.outs }).recordIds,
+    ...multiOutPlayRecordIdsOf({ outsInPlay: events.outs, strikeoutWhileRunning: false }),
+  ]
+  return {
+    ...next,
+    ...(earlierOuts === 0 ? {} : { settledOutsExtra: (next.settledOutsExtra ?? 0) + earlierOuts }),
+    ...(earlierRuns === 0 ? {} : { teamRunsAllowed: next.teamRunsAllowed + earlierRuns }),
+    ...(recordIds.length > 0 && recordsAllowed(next) ? { recordIds: [...next.recordIds, ...recordIds] } : {}),
+  }
+}
+
 function withMyRunnerPlay(
   progress: PitcherGameProgress,
   result: DefensePlayResult,
@@ -1891,7 +1980,12 @@ function withMyRunnerPlay(
       outsRecorded: progress.record.outsRecorded + (counted ? applied.outsAdded : 0),
       perfectInnings: progress.record.perfectInnings + (inningEnded && progress.perfectInningFlag ? 1 : 0),
     },
-    teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
+    // state[0x8a] — 정산 a8dd0 이 이 판 득점을 더한다. 정산을 건너뛰는 판은 안 센다
+    teamRunsAllowed: progress.teamRunsAllowed + (settles ? applied.runsScored : 0),
+    // R[3] · +0x20 은 정산이 센다 — 정산을 건너뛰는 판의 아웃은 아웃 콜(R+0x13c)에만 든다
+    ...(settles || applied.outsAdded === 0
+      ? {}
+      : { settledOutsExtra: (progress.settledOutsExtra ?? 0) - applied.outsAdded }),
     ...(threePitchInning.length > 0 && recordsAllowed(progress)
       ? { recordIds: [...progress.recordIds, ...threePitchInning] }
       : {}),
@@ -2013,6 +2107,11 @@ function applyDefensivePlay(
    * ```
    */
   stealPlaySettlement = false,
+  /**
+   * 이 삼진과 한 정산인 주자 판(도루 종류 5 · 삼진 그대로인 폭투·포일 종류 9)의 결과 — 판의 진루는 `applyPitcherArrival` 가 먼저
+   * 먹였다. 정산 [sp+0x30] 에 그 판의 아웃 사건이 들고(a8e58 26/27), 필살송구 표시 state[0x8b] 도 그 판의 것이다(a80f8)
+   */
+  settledRunnerPlay?: DefensePlayResult,
 ): PitcherGameProgress {
   const before = progress.game
   const advanceResult =
@@ -2147,11 +2246,15 @@ function applyDefensivePlay(
         ]
   // 36 필살송구 아웃 — 정산 0xa8024(a80f8~a8116)은 모드를 안 가리고, 게이트 0xa77f0 은 수비 팀이 사람이면 36 을 들인다.
   // 표시 state[0x8b] 는 수비 화면 결과 판 0x46844 가 레이저 연출 뒤 코드 13 결과 판에서 세운다(`DefensePlayResult.laserOutFlag`)
-  if (defensePlay !== null) {
-    newRecordIds.push(
-      ...laserThrowOutRecordOf({ laserThrowFlag: defensePlay.laserOutFlag, outsInPlay: applied.outsAdded }).recordIds,
-    )
+  // 이 정산의 아웃 [sp+0x30] — 삼진 사건 5 와 함께 선 주자 판의 아웃 사건 0xd 까지
+  const settledOuts = applied.outsAdded + (settledRunnerPlay?.advance.outsAdded ?? 0)
+  const laserPlay = defensePlay ?? settledRunnerPlay
+  if (laserPlay !== undefined) {
+    newRecordIds.push(...laserThrowOutRecordOf({ laserThrowFlag: laserPlay.laserOutFlag, outsInPlay: settledOuts }).recordIds)
   }
+  // 26 병살 · 27 삼중살 — a8e58 은 판 종류를 안 거른다. 게이트 0xa77f0 은 수비 팀이 사람이면 들인다
+  // ⚠️ 미확인: 낫아웃(state[0x1a]) 판은 [sp+0x30] 에 삼진 사건이 하나 더 들고 2아웃이면 26 을 막는다 — 그 판은 늘 거짓으로 본다
+  newRecordIds.push(...multiOutPlayRecordIdsOf({ outsInPlay: settledOuts, strikeoutWhileRunning: false }))
   // 25 삼구 삼자범퇴 (0xa7d0c) — 반 이닝을 공 셋으로 3아웃
   if (inningEnded) {
     newRecordIds.push(
@@ -2213,7 +2316,9 @@ function applyDefensivePlay(
 
   // 0x8f414 는 사람 장면의 타석 끝(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)에서만 돈다 — 내가 던진 타석만.
   // 내가 마운드에 없는 타석은 간이 엔진(0x21)이라 판정이 없다 (`triggerBurstAtPrep` 머리말)
-  const resolved = mine
+  // 삼진 + 도루 판은 판정 A(0xae24c)가 state[0xb] 3·4 라 정산 없이 0x17 로 보내고, 0x17 끝 정산은 종류 5 라 결과비트를 안 켠다
+  // (0xa599c a59a8) — 0x12 끝(4e7ca) · 0x17 끝(52a8e)의 0x8f414 가 비트 0 으로 돌아 판정이 없고 돌발은 남는다(8f41e)
+  const resolved = mine && !stealPlaySettlement
     ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded, defensePlay, homeRunCounted)
     : next
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
@@ -3666,7 +3771,8 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     decisionCode,
     earnedRunAverage: earnedRunAverageOf(progress.runsAllowedByMe, record.outsRecorded),
     seasonDelta: {
-      outs: record.outsRecorded,
+      // 레코드 +0x20 — 정산 a8cb0 이 사건 목록의 아웃으로 센다 (`settledOutsExtra`)
+      outs: record.outsRecorded + (progress.settledOutsExtra ?? 0),
       runsAllowed: progress.runsAllowedByMe,
       // 레코드 +0x26 — R+0x134 에 삼진 + 도루 판(종류 5)의 삼진을 더한 값 (`stealPlayStrikeouts`)
       strikeouts: record.strikeouts + (progress.stealPlayStrikeouts ?? 0),
@@ -3742,7 +3848,8 @@ function gameEndRecordIdsFor(progress: PitcherGameProgress): readonly number[] {
       pitchCourseConfirmed: progress.pitchCount > 0,
       // state[0x6b]+1 = 치른 이닝 전부 (연장이면 그만큼 늘어난다)
       inningsPlayed: progress.endedInningIndex + 1,
-      outsRecorded: progress.record.outsRecorded,
+      // R[3] — 정산 a8f8c 가 사건 목록의 아웃으로 센다 (`settledOutsExtra`)
+      outsRecorded: progress.record.outsRecorded + (progress.settledOutsExtra ?? 0),
       hitsAllowed: progress.teamHitsAllowed,
       walksAllowed: progress.teamWalksAllowed,
       runsAllowed: progress.teamRunsAllowed,
