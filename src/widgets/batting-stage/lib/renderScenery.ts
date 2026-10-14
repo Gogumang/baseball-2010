@@ -267,7 +267,8 @@ function drawClouds(context: CanvasRenderingContext2D, tick: number, paletteRow:
  * XL = −131 · XR = 370 이라 **화면 x → 238 − x 거울**이다(바닥도 폭 585 라 같은 거울). 그래서 펜스 · 관중석 · 전광판 그림 · 바닥은
  * 캔버스를 (239, 0) 에서 뒤집어 그리고, 박스로 놓는 팀 아이콘 · 전광판 글자는 뒤집지 않은 채 잰 박스만큼 옮긴다
  * (`rightHandedBoxShiftOf` — 지금 펜스 셋은 모두 141), 관중 ppl 은 0x78 + 21 = 141 옮긴다.
- * 그래서 우타 때는 관중석의 "GAMEVIL®" 글자도 거울로 나온다 — 원본 그대로다(예전 웹은 이 글자를 근거로 거울을 꺼 두었다).
+ * 예전 웹은 통째로 뒤집어 관중 ppl 그림의 "GAMEVIL®" 글자가 거울로 나와 거울을 꺼 두었다 — 원본은 ppl 을 안 뒤집고 옮기기만
+ * 하므로 우타에서도 그 글자는 똑바로 읽힌다(헤드리스 확인).
  * 흔들기 칸(구장 +0x64 → 0xbb255 · 0x771e4)은 웹이 안 그리므로 0 으로 본다.
  */
 export const RIGHT_HANDED_MIRROR_X = 239
