@@ -4,8 +4,11 @@
  * 창 객체는 관리 장면의 0x7b7b8(크기 0x398)이고, 그림은 [this+0x138] = `ui/mode_ui.pzx` 다.
  * 갈림은 `[this+0x1a4]`(창 종류):
  *   1 서브아이템 상점 · 2 GP아이템 상점 · 3 장비 상점 · 4 구장 아이템  (R12 1a 표)
- *   — P6 3절은 "==3 이면 구장 아이템" 이라 적었지만 R12 4절이 **4 가 구장 아이템**이라고 정정했다.
- * 종류 1·2·3 은 0x81dc0(프레임 33 박스 6개 + 34 격자 10칸), 종류 4 만 0x83378(프레임 32)로 간다.
+ * 0x8453c 는 **종류 3 이면 0x83378, 아니면 0x81dc0** 이다(0x84546 `cmp r3,#3`, 직접 떴다).
+ *   — 종류 1·2 는 0x81dc0(프레임 33 박스 6개 + 34 격자 10칸, 이 파일),
+ *     종류 3 장비는 0x83378(프레임 30 타자 · 31 투수, `equipmentWindowLayout`),
+ *     종류 4 구장 아이템은 0xb158 이 0x83378 을 직접 부른다(프레임 32).
+ *   P6 3절의 "==3 이면 구장 아이템" 은 0x8453c 의 갈림을 0x83378 안의 구장 갈래(종류 4)와 섞은 것이다.
  *
  * 스프라이트 확인 (public/sprites/mode_ui/frames):
  *   프레임 33·34 는 **PNG 가 없다** — 그림 없이 박스만 있는 배치 프레임이라 그렇다
@@ -25,7 +28,7 @@ export interface ShopBox {
   readonly height: number
 }
 
-/** 창 종류 [this+0x1a4] (R12 1a) */
+/** 창 종류 [this+0x1a4] (R12 1a) — 장비(3)는 0x83378 장비 창으로 간다 */
 export const SHOP_WINDOW_KIND = { 서브: 1, GP: 2, 장착: 3, 착용: 3, 구장: 4 } as const
 export type ShopWindowKindName = keyof typeof SHOP_WINDOW_KIND
 
@@ -112,27 +115,45 @@ export const SHOP_COLORS = {
 } as const
 
 /**
- * num.pzx 글자꼴.
- * 소지금 숫자는 0x63331 이 **글꼴 36** 으로 그린다 — num 36~45 를 열어 보니 하늘색(74,186,255)이고,
- * 기본 20~29 는 주황/노랑(255,178,24)이라 값 칸(노랑)은 기본 글꼴 그대로 쓴다.
+ * 머리 칸 자리 — 0x81dc0 의 종류 1·5(0x81fb6~0x82134) · 종류 2(0x8216c~0x82254) 를 직접 떴다:
+ * ```
+ * 종류 1·5  박스 1  img_text 105 효과 11(#335FCD) 정렬 0x22
+ *           박스 2  mode_ui 52 정렬 0x11 · (ox 30, oy 4) · img_text 302 팔레트 0 정렬 0x21 · (ox −4, oy 4)
+ *                   소지금 0x63331(박스 2, 선수 +2 × 100, num, 정렬 0x24, ox −2, oy 4)
+ *           박스 5  mode_ui 52 정렬 0x14 · img_text 303 팔레트 0 정렬 0x21          ; 0x8223a 로 GP 와 같은 꼬리
+ * 종류 2    박스 1  img_text 110 효과 11(#335FCD) 정렬 0x22
+ *           박스 5  mode_ui 52 정렬 0x14 · img_text 303 팔레트 0 정렬 0x21
+ * 값        0x63331(박스 5, 가격 × 1000, num, 정렬 0x24, ox −2, oy 0)                ; 0x8286e
+ * ```
+ * 숫자 글꼴은 num 그림 목록을 그대로 받는 0x63118 이 `[목록 + 0x50 + 자리 × 4]` = **그림 20 + 자리**(주황)로 고른다.
+ * P6 3절의 "0x63331(skin, 박스 2, …, 글꼴 36, 4)" 의 36 은 글꼴이 아니라 **정렬 0x24** 이고 4 는 oy 다
+ * (postseasonBracketLayout 이 같은 오독을 짚었다). 앞서 웹은 이것을 글꼴로 읽어 num 36 부터 셌는데, num 30~39 가 하늘색 0~9 라
+ * 숫자가 여섯씩 밀려 찍혔다.
  */
-export const MONEY_DIGIT_BASE_FRAME = 36
+export const MONEY_BAR_OFFSET = { x: 30, y: 4 } as const
+export const MONEY_LABEL_OFFSET = { x: -4, y: 4 } as const
+export const MONEY_DIGIT_OFFSET = { x: -2, y: 4 } as const
+export const VALUE_DIGIT_RIGHT_INSET = 2
+
+/** 막대 52 를 놓는 왼쪽 위 — 정렬 0x11 이면 박스 왼쪽 위, 0x14 면 박스 오른쪽 위에 (ox, oy) 를 더한다 */
+export function valueBarPositionOf(
+  box: ShopBox, align: 0x11 | 0x14, barWidth: number, ox = 0, oy = 0,
+): { readonly x: number; readonly y: number } {
+  return { x: (align === 0x14 ? box.x + box.width - barWidth : box.x) + ox, y: box.y + oy }
+}
 
 /**
  * 박스 **안쪽** 좌표는 문서에 없어서 근사했다 (P6 3절이 박스 자리까지만 확정했다):
  *   이름 딱지 글 — 박스 3 가운데(0x22), 검정 그림자 (+1,+1) 뒤 흰 글 → 세로는 글 높이로 가운데 맞춤
  *   설명 — 박스 4 왼쪽 위(0x11) 에서 4px 안쪽, 줄 간격 13 (0xb9d35 의 줄 y 74/81 차가 7~8 이지만
  *          웹 글꼴이 더 커서 11px 글자에 맞는 13px 로 둔다)
- *   값 칸 숫자 — 박스 5 오른쪽에서 4px 안쪽 (순위표·소지금 칸과 같은 여백)
- *   격자 아이콘 — 33×33 칸 가운데
+ * *   격자 아이콘 — 33×33 칸 가운데
  */
 export const INNER = {
   nameTextLeft: 5,
   nameShadow: 1,
   descriptionPadding: 4,
   descriptionLineHeight: 13,
-  valueRightPadding: 4,
-  labelBarLeftPadding: 4,
 } as const
 
 /** 커서는 칸을 1px 둘러싸고 깜박인다 (필살타법 창 0x803d4 와 같은 방식) */
@@ -140,18 +161,53 @@ export const CURSOR_BLINK_PERIOD = 10
 export const CURSOR_VISIBLE_UPDATES = 9
 
 /**
- * 아이템 아이콘은 `item_icon.pzx` 를 목록 순서대로 쓴다 — 서브 k → k, GP k → 10+k.
- * (원본 아이콘 표 0x7e764 는 미해독이지만 그림이 이름과 하나씩 맞는 것을 확인했다.)
- * 장비(종류 3)는 맞는 아이콘 표를 못 찾았다 — item_icon 은 27장뿐이라 44칸을 덮지 못한다.
- * 그래서 장비 칸은 아이콘 없이 레벨 숫자만 그린다 (근사).
+ * 아이템 아이콘은 `item_icon.pzx` 를 목록 순서대로 쓴다 — 서브 k → k, GP k → 10+k (투수 GP 는 표 0xd4676).
+ * 장비(창 종류 3)는 이 격자를 쓰지 않는다 — 0x8453c 가 종류 3 을 장비 창 0x83378(목록 줄)로 보낸다(`equipmentWindowLayout`).
+ * (앞서 여기 "원본 아이콘 표 0x7e764" 라 적었으나 0x7e764 는 아이콘 표가 아니라 아래 **칸 바탕** 함수다.)
  */
 export const GP_ICON_OFFSET = 10
 export const SUB_ICON_COUNT = 10
 
-export function itemIconFrameOf(kind: ShopWindowKindName, index: number): number | null {
+export function itemIconFrameOf(kind: '서브' | 'GP', index: number): number | null {
   if (kind === '서브') return index < SUB_ICON_COUNT ? index : null
-  if (kind === 'GP') return GP_ICON_OFFSET + index
-  return null
+  return GP_ICON_OFFSET + index
+}
+
+/** 칸 바탕 0x7e764 의 색 — 셋째 인자(깃발)가 0 이면 파랑, 아니면 빨강·주황 (0x7e776~0x7e7bc). 0x81dc0 은 늘 0 으로 부른다 */
+export const SLOT_CELL_COLORS = {
+  normal: { edge: '#041D52', fill: '#2033AA', shine: '#3045CD' },
+  flagged: { edge: '#932F31', fill: '#FF6C3F', shine: '#FFBD3C' },
+} as const
+
+export interface SlotCellRect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
+}
+
+/**
+ * 칸 바탕 0x7e764(창, 칸 xy, 칸 wh, 깃발, 0) — 격자 칸마다(0x82420, 칸 10개 모두) 아이콘보다 먼저 그린다. 직접 떴다:
+ * ```
+ * 7e7d2  0xba0bd(칸, 둥글기 1, 테 색)            ; 둥근 칠은 (w+1)×(h+1) 을 덮고 네 모서리 한 칸을 비운다
+ * 7e800  0xb9f75((x+1, y+1), (w−1, h−1), 채우기 색)
+ * 7e834  0xb9f75((x+2, y+2), (w−3, trunc((h−1)/2) − 2), 빛 색)   ; 위 절반 밝은 띠
+ * ```
+ */
+export function slotCellRectsOf(cell: { readonly x: number; readonly y: number }, isFlagged = false): readonly SlotCellRect[] {
+  const colors = isFlagged ? SLOT_CELL_COLORS.flagged : SLOT_CELL_COLORS.normal
+  const { x, y } = cell
+  const size = SLOT_SIZE
+  return [
+    // 둥근 칠 — 모서리를 뺀 테두리 네 변 (안쪽은 아래 채우기가 덮는다)
+    { x: x + 1, y, width: size - 1, height: 1, color: colors.edge },
+    { x: x + 1, y: y + size, width: size - 1, height: 1, color: colors.edge },
+    { x, y: y + 1, width: 1, height: size - 1, color: colors.edge },
+    { x: x + size, y: y + 1, width: 1, height: size - 1, color: colors.edge },
+    { x: x + 1, y: y + 1, width: size - 1, height: size - 1, color: colors.fill },
+    { x: x + 2, y: y + 2, width: size - 3, height: Math.trunc((size - 1) / 2) - 2, color: colors.shine },
+  ]
 }
 
 /** 박스 가운데에 폭 w 짜리 그림을 놓을 왼쪽 x (정렬 0x22 의 가로) */

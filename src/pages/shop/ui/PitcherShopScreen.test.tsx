@@ -23,6 +23,9 @@ describe('투수 장비 상점 화면', () => {
     )
 
     expect(screen.getAllByText('나이스 모자').length).toBeGreaterThan(0)
+    // 장비 창(0x83378)은 처음에 부위 탭 초점이다 — 확인 키가 먼저 목록으로 들어가고(0x81c34), 다시 확인이 구매다
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.queryByRole('dialog', { name: '알림' })).not.toBeNull()
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -44,7 +47,7 @@ describe('투수 장비 상점 화면', () => {
 
     // 창은 커서 칸(0 장어구이) 이름만 그린다 — 칸 9 는 표에서 본다
     expect(screen.getAllByText('장어구이').length).toBeGreaterThan(0)
-    const entries = pitcherShopEntriesOf(createPitcherCareer('투수'), 'GP', 0)
+    const entries = pitcherShopEntriesOf(createPitcherCareer('투수'), 'GP')
     expect(entries[9]).toMatchObject({ name: '십전대보탕', iconFrame: 20 })
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(screen.getByText('G포인트가 부족합니다')).toBeTruthy()

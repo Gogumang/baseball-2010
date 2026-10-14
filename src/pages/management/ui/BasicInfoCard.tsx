@@ -12,8 +12,22 @@ import { RadarChart } from '@/pages/management/ui/RadarChart'
 import { InfoTable } from '@/pages/management/ui/InfoTable'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
+interface BasicInfoCardProps {
+  readonly career: PlayerCareer
+  /**
+   * 정보 칸(0x7c451)을 그리는가. 0x15e20 은 상태가 0x67 · 0x6f(상점 111) · 0x79(장비착용 121) 이면
+   * 정보 칸을 건너뛴다(0x15ef0~0x15efc) — 그 자리에 장비 창 0x83378 이 선다.
+   */
+  readonly showsInfoTable?: boolean
+  /**
+   * 선수 그림에 끼울 장비 니블 — 장비 창이 줄을 훑으며 입혀 보는 값(0x81938 이 그림 +0x3e + 부위 에 레벨을 넣는다).
+   * 안 주면 선수가 지금 낀 그대로다. ⚠️ 레이더(0x7ba44)가 입혀 본 값을 따라가는지는 미확인이라 레이더는 지금 값으로 둔다.
+   */
+  readonly figureEquipment?: PlayerCareer['equipmentLevels']
+}
+
 /** 기본정보 카드 (0x15e20) — 선수 그림 · ABILITY 레이더 · 정보 칸. 카드 판 모양(0x7ba44)은 박스만 알아 근사한다 (추정) */
-export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
+export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }: BasicInfoCardProps) {
   const shown = effectiveAbilityOf(career)
   const values = [
     (TEAMS[career.teamId] ?? TEAMS[0]).name,
@@ -40,12 +54,16 @@ export function BasicInfoCard({ career }: { readonly career: PlayerCareer }) {
         웹 `career.equipmentLevels` 가 그 니블을 그대로 들고 있다.
         그림자는 끈다 — 같은 0x10810 의 0x1085c 가 `fig+0x48 = 0` 으로 둔다 (0x78dc6 이 슬롯 0 을 가른다).
       */}
-      {batterLayersOf(0, career.battingTypeIndex, batterEquipmentOf(career.equipmentLevels), false).map((layer, index) => (
+      {batterLayersOf(0, career.battingTypeIndex, batterEquipmentOf(figureEquipment ?? career.equipmentLevels), false).map((layer, index) => (
         <LayerSprite key={index} layer={layer} skinIndex={career.skinIndex} teamIndex={career.teamId} />
       ))}
       <RadarChart base={career.ability} shown={shown} />
-      <div className={styles.cardPanel} style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
-      <InfoTable values={values} battingOrder={career.battingOrder} />
+      {showsInfoTable && (
+        <>
+          <div className={styles.cardPanel} style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
+          <InfoTable values={values} battingOrder={career.battingOrder} />
+        </>
+      )}
     </div>
   )
 }

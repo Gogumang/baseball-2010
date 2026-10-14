@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EQUIPMENT_PARTS } from '@/entities/career/model/equipment'
@@ -10,6 +11,13 @@ import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
 import type { ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { ShopWindow } from '@/pages/shop/ui/ShopWindow'
+import { EquipmentWindow } from '@/pages/shop/ui/EquipmentWindow'
+import { batterEquipmentRowsOf } from '@/pages/shop/lib/equipmentRows'
+import type { EquipmentRow } from '@/pages/shop/lib/equipmentRows'
+import type { EquipmentEdition } from '@/pages/shop/lib/equipmentWindowLayout'
+import { INITIAL_EQUIPMENT_WINDOW, previewLevelOf } from '@/pages/shop/lib/equipmentWindowState'
+import type { EquipmentWindowState } from '@/pages/shop/lib/equipmentWindowState'
+import { BasicInfoCard } from '@/pages/management/ui/BasicInfoCard'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import type { DetailView } from '@/pages/management/lib/detailPopup'
 import { batterGpDetailViewOf } from '@/pages/shop/lib/gpDetailView'
@@ -28,7 +36,6 @@ interface ShopScreenProps {
 }
 
 const TABS: readonly ShopTab[] = ['장착', '서브', 'GP', '착용']
-const PART_NAMES = EQUIPMENT_PARTS.map((part) => part.name)
 
 /**
  * 결과 알림 글 — 원문 마크업으로 온 글(StrMODE[92] 구매 완료 `!C[!cFFFF00…`)은 그대로, 마크업 없이 옮겨 둔 글은 가운데 맞춤(!C)을 붙인다
@@ -38,24 +45,37 @@ function centeredNoticeOf(text: string): string {
 }
 
 /**
- * 상점·아이템 창 (0x8453c → 0x81dc0). 관리 화면 [아이템] 의 네 갈래가 모두 여기로 온다:
- *   창 종류 1 서브아이템 · 2 GP아이템 · 3 장비 상점 / 장비착용 (R12 1a)
- *   — 종류 4 구장 아이템(0x83378, 프레임 32)은 시즌 구단관리 쪽이라 웹에 아직 데이터가 없다.
- *     배치 좌표만 `shopLayout.STADIUM_BOXES` 에 넣어 뒀다.
+ * 상점·아이템 창 (0x8453c). 관리 화면 [아이템] 의 네 갈래가 모두 여기로 온다 (R12 1a):
+ *   창 종류 1 서브아이템 · 2 GP아이템 → 0x81dc0 (mode_ui 프레임 33 박스 6개 + 프레임 34 격자 10칸, `ShopWindow`)
+ *   창 종류 3 장비 상점(111) · 장비착용(121) → **0x83378** (mode_ui 프레임 30 — `EquipmentWindow`)
+ *   — 0x8453c 는 `[창+0x1a4] == 3` 이면 0x83378, 아니면 0x81dc0 이다(0x84546). 종류 4 구장 아이템도 0x83378 이고
+ *     시즌 구단관리(0xb158)가 직접 부른다 — 웹에 아직 데이터가 없어 좌표만 `shopLayout.STADIUM_BOXES` 에 있다.
  *
- * 창은 **mode_ui 프레임 33 박스 6개 + 프레임 34 격자 10칸** 으로 그린다 (P6 3절).
- * 앞서 웹은 글자 탭 + MenuList 였다.
+ * 그리기 0x167cc: 종류 3 이면 창 → 기본정보 카드 0x15e20(선수 그림 · 레이더, 정보 칸은 건너뜀) → 머리띠,
+ * 그 밖이면 상태판 0x7d34c → 커맨드 줄 0x7e418 → 창 → 머리띠.
+ * ⚠️ 서브·GP 의 상태판 · 커맨드 줄은 아직 안 그린다.
  */
 export function ShopScreen({
   initialTab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack,
 }: ShopScreenProps) {
   const tab = TABS.find((candidate) => candidate === initialTab) ?? '장착'
+  const isEquipment = tab === '장착' || tab === '착용'
   return (
     <ShopScreenView
       kind={windowKindNameOf(tab)}
-      entriesOf={(part) => shopEntriesOf({ tab, career, part })}
+      entriesOf={() => (tab === '서브' || tab === 'GP' ? shopEntriesOf({ tab, career }) : [])}
+      equipment={isEquipment ? {
+        edition: '타자',
+        rowsOf: (part) => batterEquipmentRowsOf(career, part, tab === '착용'),
+        // 0x15e20 의 타자 갈래 — 그림 객체를 (박스 가운데, 박스 아래 − 10) 에 그린다. 줄을 훑으면 그 장비를 끼워 보인다(0x81938)
+        preview: (part, level) => (
+          <BasicInfoCard career={career} showsInfoTable={false}
+            figureEquipment={level === null ? undefined : {
+              ...career.equipmentLevels, [EQUIPMENT_PARTS[part].ability]: level + 1,
+            }} />
+        ),
+      } : undefined}
       questionOf={(itemId) => purchaseQuestionOf(career, itemId)}
-      partNames={tab === '장착' || tab === '착용' ? PART_NAMES : undefined}
       money={career.money}
       gamePoint={career.gamePoint}
       title="나만의리그타자편"
@@ -68,14 +88,23 @@ export function ShopScreen({
   )
 }
 
+/** 장비 창(창 종류 3) 재료 — 타자편·투수편이 표만 갈아 넣는다 */
+export interface EquipmentWindowSpec {
+  readonly edition: EquipmentEdition
+  /** 부위 → 목록 줄 (0x8146c) */
+  readonly rowsOf: (part: number) => readonly EquipmentRow[]
+  /** 창 위의 기본정보 카드 0x15e20 — 입혀 볼 레벨(줄 초점의 커서 줄, 없으면 null) */
+  readonly preview?: (part: number, level: number | null) => ReactNode
+}
+
 export interface ShopScreenViewProps {
   readonly kind: ShopWindowKindName
-  /** 부위(장비 상점) → 격자 칸. 서브·GP 는 부위를 안 쓴다 */
-  readonly entriesOf: (part: number) => readonly ShopEntry[]
+  /** 서브·GP 격자 칸 (장비 창이면 안 쓴다) */
+  readonly entriesOf: () => readonly ShopEntry[]
+  /** 창 종류 3 — 있으면 0x81dc0 격자 대신 장비 창 0x83378 을 그린다 */
+  readonly equipment?: EquipmentWindowSpec
   /** 살 수 있는 칸의 확인 문구(StrMODE[79]·[81]·[82]) — null 이면 묻지 않고 곧바로 `onPurchase` */
   readonly questionOf: (itemId: string) => string | null
-  /** 장비 상점·장비착용의 부위 탭 이름 — 없으면 탭을 안 그린다 */
-  readonly partNames?: readonly string[]
   /** 소지금 (만원) */
   readonly money: number
   readonly gamePoint: number
@@ -96,16 +125,17 @@ export interface ShopScreenViewProps {
  * 원본도 키 처리 0x13460 · 구매 확정 0x14a74 · 창 0x81dc0 이 한 벌이고 모드로 표만 갈린다 (R12 1a).
  */
 export function ShopScreenView({
-  kind, entriesOf, questionOf, partNames, money, gamePoint, title, noticeText, detail = null, onCloseDetail, onPurchase, onBack,
+  kind, entriesOf, equipment, questionOf, money, gamePoint, title, noticeText, detail = null, onCloseDetail, onPurchase, onBack,
 }: ShopScreenViewProps) {
-  const [part, setPart] = useState(0)
   const [cursor, setCursor] = useState(0)
+  const [equipmentState, setEquipmentState] = useState<EquipmentWindowState>(INITIAL_EQUIPMENT_WINDOW)
   const [pending, setPending] = useState<{ readonly itemId: string; readonly question: string } | null>(null)
   /** 가드에 걸린 칸의 안내 — 원본 0x13460 은 여기서 1버튼 팝업만 띄우고 사지 않는다 */
   const [blockNotice, setBlockNotice] = useState<string | null>(null)
   const [dismissedNotice, setDismissedNotice] = useState('')
 
-  const entries = entriesOf(part)
+  const entries = entriesOf()
+  const equipmentRows = equipment?.rowsOf(equipmentState.part) ?? []
   const isNoticeOpen = noticeText !== '' && noticeText !== dismissedNotice
   const isDetailOpen = detail !== null
 
@@ -121,38 +151,58 @@ export function ShopScreenView({
     return () => window.removeEventListener('keydown', onKey)
   }, [isDetailOpen, onCloseDetail])
 
+  const askOrPurchase = (itemId: string) => {
+    // 살 수 있는 칸은 StrMODE[79]·[81]·[82] 로 한 번 묻는다
+    const question = questionOf(itemId)
+    if (question === null) onPurchase(itemId)
+    else setPending({ itemId, question })
+  }
+
   const select = (index: number) => {
     const entry = entries[index]
     if (entry === undefined) return
     // 서브·GP 는 막힘 문구가 entities 쪽에 그대로 있어 창이 바로 띄운다.
-    // 장비는 문구가 features/shop 안에만 있어서 예전처럼 부모가 만들게 둔다 (규칙을 두 번 적지 않으려고).
     if (entry.blockNotice !== null) {
       setBlockNotice(entry.blockNotice)
       return
     }
-    // 살 수 있는 칸은 StrMODE[79]·[82] 로 한 번 묻는다
-    const question = questionOf(entry.id)
-    if (question === null) onPurchase(entry.id)
-    else setPending({ itemId: entry.id, question })
+    askOrPurchase(entry.id)
   }
 
-  const changePart = (next: number) => {
-    setPart(next)
-    setCursor(0)
-  }
+  const isKeyEnabled = pending === null && blockNotice === null && !isNoticeOpen && !isDetailOpen
 
   return (
     <RawScreen>
-      <ShopWindow
-        kind={kind}
-        entries={entries}
-        cursor={cursor}
-        onMoveCursor={setCursor}
-        onSelect={select}
-        money={money}
-        isKeyEnabled={pending === null && blockNotice === null && !isNoticeOpen && !isDetailOpen}
-        partTabs={partNames === undefined ? undefined : { names: partNames, current: part, onChange: changePart }}
-      />
+      {equipment === undefined ? (
+        <ShopWindow
+          kind={kind}
+          entries={entries}
+          cursor={cursor}
+          onMoveCursor={setCursor}
+          onSelect={select}
+          money={money}
+          isKeyEnabled={isKeyEnabled}
+        />
+      ) : (
+        <>
+          <EquipmentWindow
+            edition={equipment.edition}
+            rows={equipmentRows}
+            state={equipmentState}
+            onStateChange={setEquipmentState}
+            // 장비는 막힘 문구가 features/shop 안에 있어 부모(`onPurchase`)가 만든다 — 규칙을 두 번 적지 않으려고
+            onSelect={(row) => askOrPurchase(row.id)}
+            onExit={onBack}
+            money={money}
+            isShop={kind === '장착'}
+            isKeyEnabled={isKeyEnabled}
+          />
+          {equipment.preview?.(
+            equipmentState.part,
+            previewLevelOf(equipmentState, equipmentRows.map((row) => row.level)),
+          )}
+        </>
+      )}
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
       {pending !== null && (
         <MessageBox text={pending.question} buttons={['예', '아니오']}

@@ -30,7 +30,8 @@ import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 export interface PitcherEquipmentPart {
   readonly index: number
   /**
-   * 부위 탭 이름 — ⚠️ **웹판 이름**. 원본 장비 창은 목록 행이 부위라 탭 글자가 따로 없다(R12 1b-가).
+   * 부위 이름 — ⚠️ **웹판 이름**(화면에는 안 그린다). 원본 장비 창 0x83378 의 부위 탭은 글자가 아니라
+   * mode_ui 프레임 31 의 아이콘 넷이다(`pages/shop/lib/equipmentWindowLayout`).
    * 그 부위 장비 이름(StrITEM 44~87: ~모자 · ~글러브 · ~아대 · ~신발)에서 땄다.
    */
   readonly name: string
