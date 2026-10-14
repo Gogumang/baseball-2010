@@ -18,6 +18,7 @@ import type {
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
+import { runInCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import {
   EMPTY_HOME_RUN_SCORE_BOARD, closesDefenseScene, drawRunScoreBoardScene, isHomeRunHitCode, runScoreBoardHiddenScoresOf,
@@ -219,11 +220,24 @@ interface RecordedBoardTally {
   /** 마지막 그리기에서 판이 섰나 · 공격 쪽에서 뺄 점수 */
   readonly visible: boolean
   readonly hidden: number
+  /** 이 갱신에 보낸 메시지 0x13 의 주자 칸들 — 0x51fb8 머리의 함성(`runInCheerSoundIdOf`)을 고른다 */
+  readonly runIns: readonly number[]
 }
 
 const EMPTY_RECORDED_TALLY: RecordedBoardTally = {
   nextIndex: 0, leftHome: new Set(), scored: new Set(), runs: 0, board: EMPTY_HOME_RUN_SCORE_BOARD, closedCount: 0,
-  ended: false, visible: false, hidden: 0,
+  ended: false, visible: false, hidden: 0, runIns: [],
+}
+
+/**
+ * 재생 갱신 하나가 보낸 메시지 0x13 들의 함성 — 0x51fb8 머리 51fb8~51fdc (홈런성이 아니면 60, 홈런성이면 주자 칸 0 일 때만 30).
+ * 갱신을 한 번씩만 지나는 셈(ref) 안에서 부르므로 한 번씩만 난다
+ */
+function playRunInCheers(tally: RecordedBoardTally, homeRunHit: boolean): void {
+  for (const slot of tally.runIns) {
+    const cheer = runInCheerSoundIdOf(slot, homeRunHit)
+    if (cheer !== null) activeSound().play(cheer)
+  }
 }
 
 /**
@@ -237,11 +251,12 @@ function stepRecordedBoard(
   const leftHome = new Set(tally.leftHome)
   const scored = new Set(tally.scored)
   let { runs, board, closedCount } = tally
+  const runIns: number[] = []
   if (isClosed) {
     closedCount += 1
     // 52a1c — 홈런 판이 서 있는 동안은 안 닫는다
     if (closesDefenseScene(closedCount, isHomeRun, board)) {
-      return { ...tally, nextIndex: tally.nextIndex + 1, closedCount, ended: true, visible: false, hidden: 0 }
+      return { ...tally, nextIndex: tally.nextIndex + 1, closedCount, ended: true, visible: false, hidden: 0, runIns }
     }
   } else {
     for (const runner of view.runners) {
@@ -253,13 +268,14 @@ function stepRecordedBoard(
       if (!leftHome.has(runner.index)) continue
       scored.add(runner.index)
       runs += 1
+      runIns.push(runner.index)
       board = runScoreBoardRunIn(board, runner.index, isHomeRun, false)
     }
   }
   const drawn = drawRunScoreBoardScene(board, isHomeRun)
   return {
     nextIndex: tally.nextIndex + 1, leftHome, scored, runs, board: drawn.next, closedCount, ended: false,
-    visible: drawn.visible, hidden: drawn.hidden,
+    visible: drawn.visible, hidden: drawn.hidden, runIns,
   }
 }
 
@@ -305,6 +321,7 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     if (view === undefined) break
     // G2 만 닫힌 그림(`closingListFrame`)은 그려지지만 슬롯 2 는 529f0 — 닫힌 셈(+0x1094)의 첫 갱신이다
     holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex || view.closingListFrame === true)
+    playRunInCheers(holder.tally, isHomeRun)
   }
   const isFinished = ticks.length === 0 || holder.tally.ended || skipped
 
@@ -390,6 +407,9 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     const view = ticks[Math.min(at, lastIndex)]
     if (view === undefined) break
     holder.tally = stepRecordedBoard(holder.tally, view, false, at > lastIndex || view.closingListFrame === true)
+    // 주자 판(도루 · 폭투 · 견제)은 타구가 없어 점수판과 같이 0x357e0 을 거짓으로 본다 — 홈인마다 60
+    // ⚠️ 미확인: 원본 [경기+0xfd4] 가 투구마다 지워지는지는 안 읽었다(점수판 갈래와 같은 가정)
+    playRunInCheers(holder.tally, false)
   }
   const isFinished = stepper.finished && holder.tally.ended
 
@@ -565,8 +585,13 @@ function LivePlayback({
         effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
         boardRef.current = { ...boardRef.current, active: false }
       }
-      // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래
+      // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래.
+      // 그 머리 51fb8~51fdc 가 먼저 함성을 예약한다 — 홈런성이 아니면 60, 홈런성이면 주자 칸 0 일 때만 30(+0xfe7 은 안 본다).
+      // 예약 0x6e498 은 울리던 소리를 끊는 한 칸이라 통로 하나 `play` 와 같다(`soundPort` 머리 주석).
+      // ⚠️ 미확인: 같은 그림의 슬라이딩 10(0x5268c) · 펌블 29(그리기 0x4381a)와의 앞뒤 — 웹은 득점 함성을 먼저 낸다
       for (const slot of running.runInsThisTick) {
+        const cheer = runInCheerSoundIdOf(slot, homeRunHit)
+        if (cheer !== null) activeSound().play(cheer)
         boardRef.current = runScoreBoardRunIn(boardRef.current, slot, homeRunHit, running.fastForward)
       }
       if (running.fastForward) {

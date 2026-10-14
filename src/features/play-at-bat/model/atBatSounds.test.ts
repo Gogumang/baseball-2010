@@ -3,6 +3,7 @@ import {
   contactSoundIdOf,
   deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
+  runInCheerSoundIdOf,
   pitchCallSoundIdOf,
   PITCH_RELEASE_SOUND,
   unjudgedWhiffSoundIdOf,
@@ -195,5 +196,19 @@ describe('깊은 타구 함성 60 (0x52b62~0x52ba4)', () => {
 describe('투구 순간 소리', () => {
   it('보통 투구는 12 다 (마구 28 은 웹이 가를 수 없어 안 쓴다)', () => {
     expect(PITCH_RELEASE_SOUND).toBe(12)
+  })
+})
+
+describe('득점 메시지 0x13 의 함성 — 0x51fb8 머리 51fb8~51fdc', () => {
+  it('홈런성(0x357e0)이 아니면 주자 칸과 상관없이 60 — 보류 해제 0x64 도', () => {
+    expect(runInCheerSoundIdOf(0, false)).toBe(60)
+    expect(runInCheerSoundIdOf(2, false)).toBe(60)
+    expect(runInCheerSoundIdOf(0x64, false)).toBe(60)
+  })
+
+  it('홈런성이면 타자주자(칸 0)만 30, 앞선 주자는 소리 없음', () => {
+    expect(runInCheerSoundIdOf(0, true)).toBe(30)
+    expect(runInCheerSoundIdOf(1, true)).toBeNull()
+    expect(runInCheerSoundIdOf(3, true)).toBeNull()
   })
 })

@@ -394,3 +394,28 @@ export function deepHitCheerSoundIdOf(input: DeepHitCheerInput): number | null {
   }
   return input.carryDistance > DEEP_HIT_DISTANCE ? DEEP_HIT_CHEER_SOUND : null
 }
+
+/** 관중 함성 — 홈런성 타구에서 타자주자(주자 칸 0)가 홈을 밟을 때 (0x51fd2~0x51fdc) */
+export const BATTER_RUN_IN_CHEER_SOUND = 30
+
+/**
+ * **주자 한 명 홈인(메시지 0x13) 때의 함성** — 경기 장면 메시지 처리 0x509a0 의 0x13 갈래(0x50a76 → **0x51fb8**) 머리:
+ * ```
+ * 00051fb8: bl 0x357e0            ; [경기+0xfd4](타구 결과 코드) − 0x18 ≤ 2 — 홈런성(24~26)인가
+ * 00051fc2: bne 0x51fcc           ; 홈런성이면 ↓
+ * 00051fc4: movs r1,#0x3c         ; 아니면 60 → 51fd8 로 예약
+ * 00051fcc: ldr r3,[sp,#0xec]     ; p1 = 주자 칸
+ * 00051fce: cmp r3,#0 ; bne 51fe0 ; 0 이 아니면 소리 없음
+ * 00051fd4: movs r1,#0x1e         ; 30
+ * 00051fda: 0x6e499(소리, 번호, 0) ; 예약 (울리던 소리를 끊는 한 칸)
+ * ```
+ * 곧 **홈런성이 아니면 60, 홈런성이고 p1 == 0 이면 30, 홈런성이고 p1 ≠ 0 이면 소리 없음.** 키 건너뛰기(+0xfe7)는 안 본다.
+ * p1 은 메시지를 보낸 쪽이 싣는 주자 칸이다 — 바로 득점 0xaa1b0 은 주자 목록 칸 i(0 = 타자주자), 보류 해제 0xaa39e 는 0x64,
+ * 카메라 0x3f060 의 3f17e 는 0 (`runDefensePlay` 의 `runInsThisTick`). 그래서 홈런에서는 타자주자가 들어올 때만 30 이 난다.
+ * (앞서 `L-sound-effects.md` · `sounds.ts` 가 적던 "홈런성이면 60 · 아니면 p1 == 0 일 때 30" 은 bne 방향을 거꾸로 읽은 것이다.)
+ * `homeRunHit` 은 0x357e0 과 같은 판정(`pages/defense/lib/runScoreBoard.isHomeRunHitCode`)을 넘긴다.
+ */
+export function runInCheerSoundIdOf(slot: number, homeRunHit: boolean): number | null {
+  if (!homeRunHit) return DEEP_HIT_CHEER_SOUND
+  return slot === 0 ? BATTER_RUN_IN_CHEER_SOUND : null
+}
