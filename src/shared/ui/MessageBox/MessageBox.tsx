@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 
 interface MessageBoxProps {
@@ -55,6 +56,7 @@ interface MessageBoxProps {
    * 키를 받은 갱신의 격자 · 키 표 갈래가 [+0x215] 와 함께 **폭 [+0x210] = 0** 을 적는다(0x75656~0x7566c · 0x756a4~0x756b4).
    * 그래서 다음 갱신 0x75596 이 0 ÷ 2 ≤ 99 로 곧장 닫는다 — 240 → 120 줄임이 없고 답은 한 갱신 뒤다.
    * ⚠️ 그 한 갱신 동안 폭 0 판 위 글 · 버튼을 그리는지는 미확인 — 웹은 판과 함께 안 보이게 둔다.
+   * 안 주면 지금 장면의 값(`CommonWindowSceneContext` — 앱이 화면 · 경기 장면으로 정한다)이다.
    */
   readonly closesWithoutShrink?: boolean
   /** 누른 버튼 번호 */
@@ -159,9 +161,12 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 }
 
 export function MessageBox({
-  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, closesWithoutShrink = false,
+  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, closesWithoutShrink: closesWithoutShrinkProp,
   onAnswer, onAnswerKey,
 }: MessageBoxProps) {
+  // 창을 띄울 때 [창+0x24f] 를 [창+0x24e] 로 옮긴다(0x7503c) — 띄운 자리가 정하지 않았으면 지금 장면의 값
+  const sceneClosesWithoutShrink = useSceneClosesWithoutShrink()
+  const closesWithoutShrink = closesWithoutShrinkProp ?? sceneClosesWithoutShrink
   /** 격자 열 수 — 안 주면 버튼이 한 줄이다 */
   const columns = Math.max(1, grid?.columns ?? buttons.length)
   const firstSelected = Math.min(Math.max(0, initialSelected), Math.max(0, buttons.length - 1))

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useLayoutEffect } from 'react'
 
 /**
  * **공용 창 [0x140005c] 이 떠 있는가** — 히든 오픈 알림(0x62368 → 0x74ef5)처럼 앱이 모든 화면 위에 얹는 창.
@@ -29,4 +29,42 @@ export const CommonWindowPushContext = createContext<(text: string) => void>(() 
 
 export function useCommonWindowPush(): (text: string) => void {
   return useContext(CommonWindowPushContext)
+}
+
+/**
+ * **지금 장면이 [창+0x24f] = 1 을 세웠는가** — 장면 생성자만 이 칸을 쓴다(리터럴 0x24f 를 읽는 곳 전수, 2026-10-14 직접 뜸):
+ * ```
+ * 1 을 쓰는 곳  메인 메뉴 0x234d4(234dc~234e2) · 경기 0x3301c(33062~)
+ * 0 을 쓰는 곳  시즌 0x3b14(3b1c~) · 나리 0xf684(f688~) · 미션 목록 0x1d784(1d788~)
+ * 읽는 곳       0x74228(0x741a0) · 0x7503c(0x74ef4) — 창을 띄울 때 [창+0x24e] 로 옮긴다 · 0x32dd8 · 0x74458 · 0x52efe(경기 그리기)
+ * ```
+ * [+0x24e] 가 선 창은 키를 받은 갱신의 격자 · 키 표 갈래가 [+0x215] 와 함께 폭 0 을 적어(75656~7566c · 756a4~756b4)
+ * 다음 갱신에 줄임 없이 닫힌다 — `MessageBox` 의 `closesWithoutShrink` 기본값이 이것이다.
+ * 앱이 지금 화면으로 값을 정하고, 경기 장면(0x104)을 그리는 화면은 `useMarksGameScene` 으로 서 있는 동안 1 로 둔다.
+ */
+export const CommonWindowSceneContext = createContext(false)
+
+export function useSceneClosesWithoutShrink(): boolean {
+  return useContext(CommonWindowSceneContext)
+}
+
+/** 경기 장면이 섰다(true) · 내려갔다(false) — 앱이 센다. 앱이 없는 자리(시험)에서는 아무것도 안 한다 */
+export const GameSceneMarkContext = createContext<(isUp: boolean) => void>(() => undefined)
+
+/**
+ * 경기 장면 0x104(생성자 0x3301c 가 [창+0x24f] = 1)를 그리는 화면이 부른다 — 서 있는 동안 앱의 공용 창(히든 오픈 알림 따위)과
+ * 그 아래 `MessageBox` 가 줄임 없이 닫힌다.
+ */
+export function useMarksGameScene(): void {
+  const mark = useContext(GameSceneMarkContext)
+  useLayoutEffect(() => {
+    mark(true)
+    return () => mark(false)
+  }, [mark])
+}
+
+/** `useMarksGameScene` 을 갈래 안에서 쓰는 자리(경기 끝 판 0x18 · 정산 0x19 를 한 화면이 같이 그리는 결과 화면 따위) */
+export function GameSceneMark(): null {
+  useMarksGameScene()
+  return null
 }

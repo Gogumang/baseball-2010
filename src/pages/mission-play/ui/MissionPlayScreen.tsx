@@ -35,6 +35,7 @@ import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState
 import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -230,6 +231,10 @@ export function MissionPlayScreen({
   const cpuScore = run.game.scores[cpuSideOf(run.mission)]
 
   const menu = useInGameMenuState()
+
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+
+  useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   // 일시정지 팝업 0x741a0(메뉴 · 그 하위 조작방법 · 설정)이 떠 있으면 0x12 상태 틱이 멈춘다 (0x52cc6) — 든 쪽에 알린다

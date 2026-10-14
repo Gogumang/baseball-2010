@@ -29,6 +29,7 @@ import { STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { GameSceneMark } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 나리 타자편 — 게임 모드 4 (정산 그리기 0x4a384 는 팀경기와 같은 갈래 0x4a948) */
 const BATTER_CAREER_MODE = 4
@@ -202,6 +203,9 @@ export function GameResultScreen({
   if (phase === '끝판') {
     // 경기 끝 판(상태 0x18 경기 끝 가지 0x4fe9c) — 10틱 뒤 OK → 정산 0x19 진입 0x4ea0c
     return (
+      <>
+      {/* 경기 끝 판 0x18 · 정산 0x19 는 아직 경기 장면 0x104 — 공용 창이 줄임 없이 닫힌다([창+0x24f] = 1) */}
+      <GameSceneMark />
       <GameEndBoard
         side0Score={side0Score}
         side1Score={side1Score}
@@ -218,11 +222,13 @@ export function GameResultScreen({
         }
         onConfirm={() => setPhase('정산')}
       />
+      </>
     )
   }
 
   return (
     <RawScreen>
+      <GameSceneMark />
       {/*
         정산 그리기 0x4a384 머리 — 구름 0x78448 · 배경 0x40ff0(장면, +0x17e2). 이긴 판만 갱신 0x4b100 이 +0x17e2 를 틱마다 3 씩
         150 까지 올려 구장이 가라앉는다. 정산 효과 0x4ea0c(밤 승리 불꽃 · 패배 비)와 그림마다 효과 · 파티클 틱은 경기 난수로 돈다

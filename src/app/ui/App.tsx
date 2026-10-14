@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CommonWindowOpenContext, CommonWindowPushContext } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  CommonWindowOpenContext, CommonWindowPushContext, CommonWindowSceneContext, GameSceneMarkContext,
+} from '@/shared/lib/commonWindow/commonWindow'
+import { sceneClosesWithoutShrinkOf } from '@/app/model/commonWindowScene'
 import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -189,6 +192,9 @@ export function App() {
   const recordStatRef = useRef<(event: AnnalsStatEvent) => void>(() => {})
   /** 히든 오픈 알림 공용 창 [0x140005c] (0x62368 → 0x74ef5) — 어느 화면 위에도 뜬다 */
   const hiddenOpenNotice = useHiddenOpenNotice()
+  /** 서 있는 경기 장면(0x104) 화면 수 — `useMarksGameScene` 이 센다 */
+  const [gameSceneCount, setGameSceneCount] = useState(0)
+  const markGameScene = useCallback((isUp: boolean) => setGameSceneCount((count) => count + (isUp ? 1 : -1)), [])
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
@@ -470,17 +476,27 @@ export function App() {
     if (text !== null) announceHiddenText(text)
   }, [announceHiddenText, openAceCellFlag, openHiddenQuietly, readCollectionStats])
 
+  /**
+   * 지금 장면의 [창+0x24f] — 메인 메뉴 0x234d4 · 경기 0x3301c 는 1. 화면으로 정하고, 경기 장면(0x104)을 그리는 화면이 서 있으면
+   * 그 동안 1 이다(`useMarksGameScene`). 이 아래 `MessageBox` 와 히든 오픈 알림 창이 줄임 없이 닫힌다(0x7503c → [창+0x24e]).
+   */
+  const sceneClosesWithoutShrink = gameSceneCount > 0 || sceneClosesWithoutShrinkOf(screen.kind, mission.player !== null)
   const withHiddenOpenNotice = (routes: ReactNode) => (
     <RecordAchievedContext.Provider value={unlockByRecord}>
-      <CommonWindowOpenContext.Provider value={hiddenOpenNotice.text !== null}>
-        <CommonWindowPushContext.Provider value={hiddenOpenNotice.push}>{routes}</CommonWindowPushContext.Provider>
-      </CommonWindowOpenContext.Provider>
+      <GameSceneMarkContext.Provider value={markGameScene}>
+        <CommonWindowSceneContext.Provider value={sceneClosesWithoutShrink}>
+          <CommonWindowOpenContext.Provider value={hiddenOpenNotice.text !== null}>
+            <CommonWindowPushContext.Provider value={hiddenOpenNotice.push}>{routes}</CommonWindowPushContext.Provider>
+          </CommonWindowOpenContext.Provider>
+        </CommonWindowSceneContext.Provider>
+      </GameSceneMarkContext.Provider>
       {hiddenOpenNotice.text !== null && (
         <ScreenOverlay>
           <MessageBox
             key={hiddenOpenNotice.serial}
             text={hiddenOpenNotice.text}
             buttons={['확인']}
+            closesWithoutShrink={sceneClosesWithoutShrink}
             onAnswer={hiddenOpenNotice.close}
           />
         </ScreenOverlay>
