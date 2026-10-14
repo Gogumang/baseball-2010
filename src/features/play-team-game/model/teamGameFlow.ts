@@ -144,6 +144,7 @@ import { FULL_PLAY_SETTINGS, isHumanControlled } from '@/features/play-team-game
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   aceLeveledAbility,
+  defenseTeamBonusFor,
   entryBatterGameAbilities,
   entryPitcherGameAbilities,
   entryPitcherGameAbilityParts,
@@ -2492,6 +2493,7 @@ function batterDefenseInputOf(
     stealingFrom: progress.stealingFrom,
     // 우리 공격이니 수비는 상대 팀이다
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
+    defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.opponentTeamId),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 상대 수비 · 우리 주자
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
     runnerAces: runnerAcesFor(progress, true),
@@ -3128,6 +3130,7 @@ function defensiveDefenseInputOf(
     stealingFrom: progress.stealingFrom,
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
+    defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.ourTeamId),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 우리 수비 · 상대 주자
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
     runnerAces: runnerAcesFor(progress, false),
@@ -3360,6 +3363,7 @@ export function pickoff(
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 (타구 진행기 `defensiveDefenseInputOf` 와 같은 근사:
     // 주자 모두가 지금 타자의 주루를 쓴다)
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
+    defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.ourTeamId),
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
@@ -3398,6 +3402,7 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     outs: progress.game.outs,
     // 우리 공격이니 수비는 상대 팀이다
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
+    defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.opponentTeamId),
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
@@ -3620,6 +3625,7 @@ function arriveTeamPitch(
         ? {
             // 우리 공격이니 수비는 상대(CPU) — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690 의 둘째 항)
             defenseAbilities: defenseAbilitiesFor(progress, options.opponentTeamId),
+            defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), options.opponentTeamId),
             fielderPlates: fielderPlatesFor(progress, options.opponentTeamId, progress.opponentPitcherIndex),
             defenseIsCpu: true,
             offenseIsCpu: false,
@@ -3628,6 +3634,7 @@ function arriveTeamPitch(
         : {
             // 우리 수비 — 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓)
             defenseAbilities: defenseAbilitiesFor(progress, options.ourTeamId),
+            defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), options.ourTeamId),
             fielderPlates: fielderPlatesFor(progress, options.ourTeamId, progress.ourPitcherIndex),
             defenseIsCpu: false,
             offenseIsCpu: true,

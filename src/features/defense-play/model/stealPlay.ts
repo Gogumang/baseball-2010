@@ -122,6 +122,11 @@ export interface StealPlayInput {
   readonly outs: number
   /** 수비 9명 능력치 (칸 순서) */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자 주루 능력치 — 루별로 줄 수 있다. 없으면 `runAbility` */
   readonly runAbilities?: Partial<Record<1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -177,7 +182,7 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
   const covers = [...PICKOFF_COVER_OF_BASE]
 
   // ── b297a: 야수 1~4 를 제 루로 · 커버 = 루 + 1 ──
-  const fielders: FielderState[] = createFielders(abilities).map((fielder) => {
+  const fielders: FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
     const base = covers.indexOf(fielder.slot)
     if (base < 0) return fielder
     return {

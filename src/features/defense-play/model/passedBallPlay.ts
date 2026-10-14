@@ -84,6 +84,11 @@ export interface PassedBallPlayInput {
   /** `passedBallStrikeoutOf` 가 `'batterRuns'` 면 참 — 타자주자를 맨 앞에 만든다 (state[0x1a]) */
   readonly batterRuns?: boolean
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자 주루 능력치 — 루별(0 = 낫아웃 타자주자) */
   readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -150,7 +155,7 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
   })
 
   // ── 0xb284a: 예보(vt24, 추적야수 = 포수라 t ≤ 4 동안 포수를 건너뜀) → 고르기(vt34) ──
-  const startFielders = createFielders(abilities)
+  const startFielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
   const forecast = forecastCatch(trajectory, startFielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
     initialChaserSlot: CATCHER_SLOT,
   })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PITCHER_ENTRY_ACE_SLOT,
   aceLeveledAbility,
+  defenseTeamBonusFor,
   entryBattersOfOrder,
   entryPitchersOfOrder,
   rosterEntryBattersOf,
@@ -13,6 +14,7 @@ import type { TeamEntryOrder } from '@/features/play-team-game/model/teamGameRos
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { createFielders, defenseTeamBonusOf } from '@/entities/fielding/model/fieldingState'
 
 describe('투수 명단의 레코드 +0x14 스킬 비트 — 공 하나 소모 0xa5e14 의 비겁자(18) · 끈기(10)', () => {
   it('붙박이 줄은 Xls 행 비트 그대로, 마투수 · 마타자는 XlsACE 행 비트 그대로 (0xb521c · 0xb53f0 이 통째 베낀다)', () => {
@@ -80,5 +82,31 @@ describe('마선수 경기 능력치 aceLeveledAbility — 0xb6415(rec, k, 1): �
     const leveled = aceLeveledAbility(raw, '투수', 3, {})
     expect(leveled[0]).toBe(Math.trunc((raw[0] * 60) / 100) + Math.trunc(Math.trunc((raw[0] * 60) / 100) / 10))
     expect(leveled[1]).toBe(Math.trunc((raw[1] * 60) / 100))
+  })
+})
+
+describe('수비 팀 보너스 — 판 시작 0xb0fb4 b10d0~b10f2', () => {
+  it('모드 1·2·8·9 만 0xbbe98(팀레코드+8 = 집중) 등급, 나머지 모드는 0', () => {
+    // 서울 드래곤즈(0) 집중 430 → 등급 3 · 인천 돌핀즈(2) 집중 320 → 등급 2
+    for (const mode of [1, 2, 8, 9]) {
+      expect(defenseTeamBonusFor({ mode, seasonTeamId: -1 }, 0)).toBe(3)
+      expect(defenseTeamBonusFor({ mode, seasonTeamId: -1 }, 2)).toBe(2)
+    }
+    for (const mode of [3, 4, 5, 6, 7]) expect(defenseTeamBonusFor({ mode, seasonTeamId: -1 }, 0)).toBe(0)
+    // 시즌 트레이닝을 먹인 팀 능력치를 넘기면 그 값을 본다
+    expect(defenseTeamBonusFor({ mode: 2, seasonTeamId: 0, teamAbilities: [[0, 0, 926, 0]] }, 0)).toBe(7)
+    expect(defenseTeamBonusOf(2, 125)).toBe(0)
+  })
+
+  it('940 + 8g 를 다 센 뒤 송구 속도에만 더한다 — 칸 0(투수)도 g = 2 고정값 위에 받고, 등급은 그대로', () => {
+    const plain = createFielders([500, 500, 500, 500, 500, 500, 500, 500, 500])
+    const bonused = createFielders([500, 500, 500, 500, 500, 500, 500, 500, 500], 3)
+    expect(plain[0]!.baseThrowSpeed).toBe(956)
+    expect(bonused[0]!.baseThrowSpeed).toBe(959)
+    expect(bonused[0]!.throwSpeed).toBe(959)
+    expect(bonused[0]!.defenseGrade).toBe(plain[0]!.defenseGrade)
+    // 수비 500 → 등급 3 → g = 4 → 940 + 32
+    expect(plain[4]!.baseThrowSpeed).toBe(972)
+    expect(bonused[4]!.baseThrowSpeed).toBe(975)
   })
 })

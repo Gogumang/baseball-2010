@@ -209,6 +209,11 @@ export interface DefensePlayInput {
   readonly outs: number
   /** 수비 9명의 수비 능력치 (칸 순서). 기본 500 */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자들의 주루 능력치. 기본 500 */
   readonly runAbility?: number
   /**
@@ -1002,7 +1007,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     runnerSpeedOf(input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY)
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
 
-  let fielders = createFielders(abilities)
+  let fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
   // 결과를 넘겨받은 호출(옛 길 · 시험)이 미리 굴려 둔 필살타법 성공. 쏜 공(`contactOfOutcome`)의 필살 스윙은 아래 0x517e6 자리에서 굴린다
   let uncatchable = input.isUncatchable === true
 

@@ -231,8 +231,29 @@ export function fielderAbilityOf(
 }
 
 /**
+ * **수비 팀 보너스** — 판 시작 0xb0fb4 의 b10d0~b10f2 (직접 재역어셈):
+ * ```
+ * b0fd0    팀레코드 = 0xb8680(팀[st[0xa]])      ; [sp+0x24] — 수비 팀의 레코드(명부). 0xb570c 에도 같은 값을 넘긴다
+ * b0ff4    [sp+0x14] = 전역 모드 0x1552d10 ∈ {1, 2, 8, 9}
+ * b10d0    [sp+0x14] 면:  b = 0xbbe98(s16 팀레코드+8)          ; 팀 능력치 셋째 칸 '집중'의 등급 0~7
+ * b10e6      사거리 +0x8c 값 += b      ; (+0x8c 는 읽는 곳이 없다 — P2 1c, 웹에 칸이 없다)
+ * b10f2      송구 속도 v += b          ; 940 + 8·g 를 다 센 **뒤** — 0xa0fc4(야수, v) 가 +0xd4 · +0xdc = v, +0xd8 = v·130/100
+ * ```
+ * 악송구 보정 +0xe4(b10c4)는 이 갈래 **앞**에 이미 sp+8 에 적혀 보너스를 안 받는다. 칸 0(투수)도 고리 안이라 같이 받는다 —
+ * g = 2 고정(b106a)으로 센 940 + 16 에 b 를 더한다. 팀레코드 +4·+6·+8·+0xa = 투구·타격·집중·근성(구단정보 0x7bf9c 표 0xd48b8).
+ */
+export const DEFENSE_TEAM_BONUS_MODES: readonly number[] = [1, 2, 8, 9]
+
+/** b10d0 — 모드가 1·2·8·9 면 `0xbbe98(팀 집중)`, 아니면 0 */
+export function defenseTeamBonusOf(mode: number, teamConcentration: number): number {
+  if (!DEFENSE_TEAM_BONUS_MODES.includes(mode)) return 0
+  return abilityGradeOf(teamConcentration)
+}
+
+/**
  * 플레이 시작 때의 야수 9명 (0xb0fb4 + 0xb0f88).
  * 능력치는 송구 속도·악송구·펌블·필살수비 확률에만 쓰이고 **이동 속도에는 전혀 안 들어간다** (P2 1c).
+ * `teamBonus` 는 `defenseTeamBonusOf` — 아홉 칸(칸 0 포함) 모두의 송구 속도에 더한다(등급 · 악송구 보정은 그대로).
  */
 export function createFielders(defenseAbilities: readonly number[], teamBonus = 0): readonly FielderState[] {
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
