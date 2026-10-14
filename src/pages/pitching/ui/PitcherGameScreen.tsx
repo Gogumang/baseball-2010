@@ -644,7 +644,6 @@ export function PitcherGameScreen({
     return (
       <SettingsScreen
         settings={settings}
-        hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
         onBack={() => {

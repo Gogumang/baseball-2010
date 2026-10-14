@@ -24,16 +24,30 @@ const 띄우기 = (overrides: Partial<Parameters<typeof HelpScreen>[0]> = {}) =>
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
 describe('도움말 본문 (상태 7)', () => {
+  it('쪽 번호는 num.pzx 숫자 그림 — 쪽은 오른쪽 끝을 W/2 + 0x34 에, 쪽수는 W/2 + 0x42 에서, 사이 "/" 이미지 0x65 (0x59102~0x59192)', () => {
+    띄우기()
+
+    const 쪽번호 = screen.getByRole('img', { name: '1/5' })
+    const 그림 = [...쪽번호.querySelectorAll('img')].map((img) => [img.getAttribute('src'), img.style.left, img.style.top])
+    // "1"(4px) 은 정렬 4 라 172 − 4 = 168 · "/" 는 174 · "5"(8px) 는 186 — y 는 y0 + 0x16 = 76
+    expect(그림).toEqual([
+      ['./sprites/num/001.png', '168px', '76px'],
+      ['./sprites/num/101.png', '174px', '76px'],
+      ['./sprites/num/005.png', '186px', '76px'],
+    ])
+  })
+
   it('가운데 192 판에 장 0 [기본 조작] 첫 쪽부터 보여 준다 (0x63689(뷰어, 0)) — 판은 높이 0x20 에서 열리기 시작한다', () => {
     const { container } = 띄우기()
 
-    const 판 = container.querySelector(`div[style*="width: ${BODY_PANEL.width}px"]`) as HTMLElement
+    const 판 = container.querySelector('[data-testid="공용판"]') as HTMLElement
+    expect(판.style.width).toBe(`${BODY_PANEL.width}px`)
     expect(판.style.left).toBe(`${BODY_PANEL.x}px`)
     // 첫 그리기는 +0x90 = 0x20 — 가운데 H/2 에서 위아래로 16
     expect(판.style.height).toBe(`${HELP_PANEL_OPEN_HEIGHTS[0]}px`)
     expect(판.style.top).toBe(`${160 - 16}px`)
     expect(screen.getByText('<기본 조작>')).toBeTruthy()
-    expect(screen.getByText('1/5')).toBeTruthy()
+    expect(screen.getByRole('img', { name: '1/5' })).toBeTruthy()
   })
 
   it('판 높이 연출 — 열 때 32 → 36 → 52 → 116 → 212, 닫을 때 212 → 208 → 192 → 128 (0x59300~0x593a8)', () => {
@@ -60,7 +74,7 @@ describe('도움말 본문 (상태 7)', () => {
     fireEvent.keyDown(window, { key: 'Enter' })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
 
-    expect(screen.getByText('2/5')).toBeTruthy()
+    expect(screen.getByRole('img', { name: '2/5' })).toBeTruthy()
     expect(screen.getByText('<타격 조작>')).toBeTruthy()
   })
 
@@ -108,7 +122,7 @@ describe('도움말 본문 (상태 7)', () => {
     expect(screen.getByText('<게임문의>')).toBeTruthy()
     // 둘째 쪽은 빈 StrHOWTO[33] — 표 0xd0b18 그대로 한 쪽이고 등급표(0x54330)를 그린다
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(screen.getByText('2/4')).toBeTruthy()
+    expect(screen.getByRole('img', { name: '2/4' })).toBeTruthy()
     expect(screen.getByTestId('등급표')).toBeTruthy()
     expect(screen.getByText('MO-090814-004')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'ArrowRight' })

@@ -281,7 +281,6 @@ export function MissionPlayScreen({
     return (
       <SettingsScreen
         settings={settings}
-        hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
         onBack={() => {

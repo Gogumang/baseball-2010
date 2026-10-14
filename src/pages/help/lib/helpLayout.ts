@@ -73,19 +73,68 @@ export const rowLeftOf = (item: RankingMenuItem) => ROW.rightEdge - item.labelWi
 /**
  * 도움말 본문 판 (상태 7 · 경기 중 [조작방법] — 뷰어 그리기 `0x58fd4`).
  * 판 0x55e60 은 가운데 (W/2, H/2) · 폭 192 · 다 열린 높이 0xd4 = 212 라 왼쪽 위가 (24, 54) 다 (확정).
- * 쪽 번호 자리는 `HELP_VIEWER` 표 참고 — 숫자 그림(num.pzx 0x585ac)은 웹 글자로 둔다(근사).
+ * 쪽 번호 자리는 `HELP_VIEWER` 표와 `helpPagerOf` 참고.
  */
 export const BODY_PANEL = {
   x: SCREEN.width / 2 - 96,
   y: SCREEN.height / 2 - 106,
   width: 192,
   height: 212,
-  /** 쪽 번호 — 쪽 (W/2 + 0x34, y0 + 0x16) · 쪽수 (W/2 + 0x42, …). 웹은 "쪽/쪽수" 한 덩이로 쪽 자리에 쓴다 */
-  pager: {
-    numberX: SCREEN.width / 2 + 0x34,
-    y: 54 + 0x16,
-  },
 } as const
+
+/** 쪽 번호 자리 — 쪽 (W/2 + 0x34) · 쪽수 (W/2 + 0x42) · "/" (W/2 + 0x36), y = y0 + 0x16 */
+const HELP_VIEWER_PAGER = {
+  pageX: SCREEN.width / 2 + 0x34,
+  countX: SCREEN.width / 2 + 0x42,
+  slashX: SCREEN.width / 2 + 0x36,
+  y: 54 + 0x16,
+} as const
+
+/** num.pzx 이미지 0~9 — 8×10, "1" 만 4×10 (그림 크기) */
+const HELP_PAGER_DIGIT_WIDTH = 8
+const HELP_PAGER_ONE_WIDTH = 4
+/** 사이 "/" — num 이미지 0x65 (10×10) */
+export const HELP_PAGER_SLASH_IMAGE = 0x65
+export const HELP_PAGER_GLYPH_HEIGHT = 10
+
+export interface HelpPagerNumber {
+  readonly glyphs: readonly { readonly frame: number; readonly width: number }[]
+  /** `SpriteNumber` 에 넘길 오른쪽 끝 — 그 컴포넌트는 글자마다 폭 + 1 을 세므로 원본 폭 셈에 맞춰 옮긴 값 */
+  readonly right: number
+}
+
+/**
+ * **쪽 번호** — 뷰어 그리기 0x58d10 의 0x59102~0x59192 (직접 떴다). 그림 묶음은 [skin+0xb8] = ui/num.pzx 다.
+ * ```
+ * 5912a  0x585ac(skin, num, 기준 0, 쪽 + 1,                 W/2 + 0x34, y0 + 0x16, 간격 1, 자리 0, 정렬 4)   ; 오른쪽 끝을 x 에
+ * 59166  0x585ac(skin, num, 기준 0, 쪽수 = 표 0xd0b18[장],   W/2 + 0x42, y0 + 0x16, 간격 1, 자리 0, 정렬 1)   ; 왼쪽 끝을 x 에
+ * 59192  0xba759(num, 0x65, 종류 0 이미지, W/2 + 0x36, y0 + 0x16, …)                                 ; 사이 "/"
+ * ```
+ * 0x585ac 의 폭 셈은 **셋째 글자부터만** 간격을 더하고(0x58620) 글자마다는 폭 + 간격씩 나아간다
+ * (`widgets/matchup-cards` 의 `paddedNumberGlyphsOf` 와 같은 함수). 정렬 4 는 x 에서 그 폭을 뺀다 — 그래서 두 자리면
+ * 마지막 글자 오른쪽 끝이 x + 1 이다. 정렬 1 은 x 에서 시작한다.
+ */
+export function helpPagerOf(page: number, pageCount: number) {
+  const glyphsOf = (value: number) => [...String(Math.max(0, Math.trunc(value)))].map((digit) => ({
+    frame: Number(digit),
+    width: digit === '1' ? HELP_PAGER_ONE_WIDTH : HELP_PAGER_DIGIT_WIDTH,
+  }))
+  const gap = 1
+  /** SpriteNumber 의 폭 = Σ(폭 + 1) 이므로, 원본 폭(첫 두 글자는 간격 없음)과 맞추려면 오른쪽 끝을 min(자리수, 2) 만큼 민다 */
+  const rightOf = (left: number, glyphs: readonly { width: number }[]) =>
+    left + glyphs.reduce((sum, glyph) => sum + glyph.width + gap, 0)
+  const pageGlyphs = glyphsOf(page + 1)
+  const measured = pageGlyphs.reduce((sum, glyph, index) => sum + glyph.width + (index > 1 ? gap : 0), 0)
+  const pageLeft = HELP_VIEWER_PAGER.pageX - measured
+  const countGlyphs = glyphsOf(pageCount)
+  return {
+    page: { glyphs: pageGlyphs, right: rightOf(pageLeft, pageGlyphs) } satisfies HelpPagerNumber,
+    count: { glyphs: countGlyphs, right: rightOf(HELP_VIEWER_PAGER.countX, countGlyphs) } satisfies HelpPagerNumber,
+    slash: { image: HELP_PAGER_SLASH_IMAGE, x: HELP_VIEWER_PAGER.slashX, y: HELP_VIEWER_PAGER.y },
+    y: HELP_VIEWER_PAGER.y,
+  }
+}
+
 
 /**
  * 뷰어 그리기 `0x58fd4`(→ 0x639a5 · 0x58d10) 의 배치 — x0 = W/2 − 0x60 = 24, y0 = H/2 − 0x6a = 54 (확정).
@@ -99,7 +148,7 @@ export const BODY_PANEL = {
  * | 잠김(장 6) 제목 img_text 프레임 26 | (x0 + 0x21 − w/2, H/2 − 0x65) |
  * | 쪽 화살 slt_frame **이미지 20** | (W/2 + 0x23, y0 + 0x17) · 좌우 뒤집어 (W/2 + 0x50, …) — 장 고르기면 늘, 쪽 보기면 깜빡임 |
  * | 쪽 번호 0x585ac(num) | 쪽 (W/2 + 0x34, y0 + 0x16) · 쪽수 (W/2 + 0x42, …) · 사이 num 이미지 0x65 (W/2 + 0x36, …) |
- * | 본문 상자 0xbb28d | (x0 + 5, y0 + 0x24, 0xac, 0xab) |
+ * | 본문 상자 0xbb28d | (x0 + 5, y0 + 0x24, 0xac, 0xab, 정렬 1) — `InsetBox` |
  * | 스크롤 막대 0x58c10 | (x0 + 0xb3, y0 + 0x28) — `HELP_SCROLL_BAR` |
  * | 글 0x58750 | `HELP_TEXT_BOX` |
  *

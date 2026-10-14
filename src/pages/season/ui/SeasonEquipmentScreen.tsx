@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, MessageBox, RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { EQUIPMENT_PARTS } from '@/entities/career/model/equipment'
@@ -117,7 +117,8 @@ export function SeasonEquipmentScreen({
       {/* 공통 앞그림 0xb810 — 0xdc 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="장비">
-        <div className={styles.window} style={{ left: CARD.x, top: CARD.y, width: CARD.width, height: CARD.height }} />
+        {/* 공용 판 0x55e60 — ⚠️ 미확인: 이 화면이 부르는 0x55e60 의 띠 · 제목 탭 인자는 안 떴다 — 기본 판만 그린다 */}
+        <CommonPanel x={CARD.x} y={CARD.y} width={CARD.width} height={CARD.height} />
         <div className={styles.title} data-testid="장비-선수" style={{ left: CARD.x, top: CARD.y + 6, width: CARD.width }}>{playerName}</div>
         {cardAbilities.map((ability, slot) => (
           <div key={slot} className={styles.row}
@@ -127,7 +128,7 @@ export function SeasonEquipmentScreen({
           </div>
         ))}
 
-        <div className={styles.window} style={{ left: PARTS.x, top: PARTS.y, width: PARTS.width, height: PARTS.rowHeight * 4 * 2 + 6 }} />
+        <CommonPanel x={PARTS.x} y={PARTS.y} width={PARTS.width} height={PARTS.rowHeight * 4 * 2 + 6} />
         {partNames.map((name, slot) => (
           <button key={name} type="button" aria-label={`부위 ${name}`} aria-current={slot === part}
             className={`${styles.row}${slot === part ? ` ${styles.rowSelected}` : ''}`}
@@ -142,7 +143,7 @@ export function SeasonEquipmentScreen({
           </button>
         ))}
 
-        <div className={styles.window} style={{ left: ITEMS.x, top: ITEMS.y, width: ITEMS.width, height: ITEMS.rowHeight * SEASON_EQUIPMENT_LEVEL_COUNT + 6 }} />
+        <CommonPanel x={ITEMS.x} y={ITEMS.y} width={ITEMS.width} height={ITEMS.rowHeight * SEASON_EQUIPMENT_LEVEL_COUNT + 6} />
         {Array.from({ length: SEASON_EQUIPMENT_LEVEL_COUNT }, (_unused, slot) => {
           const isCurrent = isItemFocus && slot === level
           const isEquipped = (equipment[part] ?? 0) - 1 === slot

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -34,11 +34,6 @@ const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStar
 
 interface SettingsScreenProps {
   readonly settings: GameSettings
-  /**
-   * ⚠️ 이제 안 읽는다 — 원본 모드 초기화 나리 칸(0x2c746)은 저장 유무를 안 보고 늘 고르기 창을 띄운다. 경기 중 "설정" 들이
-   * 아직 넘기므로 칸만 남긴다.
-   */
-  readonly hasSavedCareer: boolean
   readonly onChange: (settings: GameSettings) => void
   /**
    * 파일 저장 0x1f1b9 — 메인 메뉴 첫 화면을 OK 칸·CLR 로 나갈 때(0x295e2) 접기 전에 한 번 부른다. 상세 설정·모드 초기화
@@ -268,19 +263,19 @@ export function SettingsScreen({
     )
   }
 
-  /** 이번에 그리는 판 높이 — 판은 화면 가운데를 기준으로 위아래로 펴진다 (0x55e60 정렬 0x22) */
+  /**
+   * 이번에 그리는 판 높이 — 판은 화면 가운데를 기준으로 위아래로 펴진다.
+   * 판 = `0x55e60(skin, W/2, H/2, 192, h, 0, 정렬 0x22, 0, 0, 제목 탭 1, 0)` (0x594f4~0x59510) — 왼쪽 위 제목 탭 모양.
+   * ⚠️ 미확인: [skin+0x84] ≠ 0 이면 0x5a772 를 부른 뒤 그 값을 알파·띠·어둡게 인자로 그대로 넘긴다(0x59428~0x5950e) — 그 길은 안 옮겼다.
+   */
   const drawnHeight = Math.min(fold.height, panel.height)
   const isUnfolded = drawnHeight >= panel.height
   const clip = panelClipOf(drawnHeight, panel.height)
 
   return (
     <RawScreen>
-      <div
-        className={styles.panel}
-        style={{
-          left: panel.x, top: SCREEN.height / 2 - Math.trunc(drawnHeight / 2), width: panel.width, height: drawnHeight,
-        }}
-      />
+      <CommonPanel x={panel.x} y={SCREEN.height / 2 - Math.trunc(drawnHeight / 2)} width={panel.width} height={drawnHeight}
+        titleTab />
       <PanelClip x={panel.x} y={clip.y} width={panel.width} height={clip.height}>
       <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy} />
 
@@ -418,12 +413,13 @@ export function SettingsScreen({
   )
 }
 
-/** 판 (24, H/2 − h/2, 192, h) — 화면 가운데를 기준으로 위아래로 펴진다 (0x55e60 정렬 0x22). 하위 페이지 0x20 · 0x21 용 */
+/**
+ * 판 (24, H/2 − h/2, 192, h) — 화면 가운데를 기준으로 위아래로 펴진다. 하위 페이지 0x20 · 0x21 용.
+ * 공용 페이지 0x593c8 의 공통 앞부분이 모든 종류(8 · 0x20 · 0x21 · 0x22)에 같은 판을 그린다 —
+ * `0x55e60(skin, W/2, H/2, 192, h, 0, 정렬 0x22, 0, 0, 제목 탭 1, 0)` (0x594f4~0x59510).
+ */
 function UnfoldingPanel({ height }: { readonly height: number }) {
-  return (
-    <div className={styles.panel}
-      style={{ left: PANEL.x, top: SCREEN.height / 2 - Math.trunc(height / 2), width: PANEL.width, height }} />
-  )
+  return <CommonPanel x={PANEL.x} y={SCREEN.height / 2 - Math.trunc(height / 2)} width={PANEL.width} height={height} titleTab />
 }
 
 /**

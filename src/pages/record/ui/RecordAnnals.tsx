@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { FrameSprite, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -215,9 +215,9 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
 
   return (
     <RawScreen>
-      {/* 판 (24, 160 − h/2, 192, h) — 들어올 때 32 에서 그림마다 커진다 (0x55e60 · 0x2fb94) */}
-      <div className={styles.panel}
-        style={{ left: PANEL.x, top: panelTopOf(panelHeight), width: PANEL.width, height: panelHeight }} />
+      {/* 판 (24, 160 − h/2, 192, h) — 들어올 때 32 에서 그림마다 커진다 (0x2fb94).
+          0x55e60(skin, W/2, H/2, 192, h, 0, 정렬 0x22, 위 띠 0x10, 0, 0, 0) (0x2e40a~0x2e42a) */}
+      <CommonPanel x={PANEL.x} y={panelTopOf(panelHeight)} width={PANEL.width} height={panelHeight} topBand={0x10} />
       {/* 판 안 그림 — 높이 ≤ 211 동안은 (24, 160 − h/2 + 5, 192, h − 10) 로 잘린다 (0x2e42e~0x2e452) */}
       <div className={styles.content}
         style={panelHeight >= PANEL_FULL_HEIGHT ? undefined : {
@@ -293,13 +293,13 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
           />
           <FrameSprite folder={SLT_FRAMES} frame={SKILL_DESCRIPTION.tabFrame} origins={frames}
             x={SKILL_DESCRIPTION.tabX} y={SKILL_DESCRIPTION.tabY} />
-          <div className={styles.descriptionBox}
-            style={{
-              left: SKILL_DESCRIPTION.box.centerX - SKILL_DESCRIPTION.box.width / 2,
-              top: SKILL_DESCRIPTION.box.y,
-              width: SKILL_DESCRIPTION.box.width,
-              height: SKILL_DESCRIPTION.box.height,
-            }} />
+          {/* 설명 상자 0xbb28d(W/2, …, 0xad, 0x3c, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 (0x2f35e~0x2f36e) */}
+          <InsetBox
+            x={SKILL_DESCRIPTION.box.centerX - (SKILL_DESCRIPTION.box.width >> 1)}
+            y={SKILL_DESCRIPTION.box.y}
+            width={SKILL_DESCRIPTION.box.width}
+            height={SKILL_DESCRIPTION.box.height}
+          />
           <div className={styles.descriptionText}
             style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y, width: SKILL_DESCRIPTION.text.width }}>
             {collection.skills.includes(cursor)

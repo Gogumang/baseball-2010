@@ -863,7 +863,6 @@ export function TeamGameScreen({
       <SettingsScreen
         settings={settings}
         // 경기 중 "설정" 은 작은 판(skin+0x125)이라 모드 초기화 줄이 아예 없다 — mainMenu 를 안 넘기면 그렇게 그린다
-        hasSavedCareer={false}
         onChange={onSettingsChange}
         onResetCareer={() => {}}
         onBack={() => {

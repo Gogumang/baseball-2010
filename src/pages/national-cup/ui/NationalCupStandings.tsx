@@ -1,4 +1,4 @@
-import { SpriteNumber } from '@/shared/ui'
+import { CommonPanel, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { glyphsWidthOf, PERCENT_FRAME } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
@@ -64,8 +64,9 @@ export function NationalCupStandings({ cup, onConfirm, isConfirmable = true }: N
 
   return (
     <div role="group" aria-label="국가대항전 순위">
-      <div className={styles.window}
-        style={{ left: STANDINGS_WINDOW.x, top: STANDINGS_WINDOW.y, width: STANDINGS_WINDOW.width, height: STANDINGS_WINDOW.height }} />
+      {/* 순위표 0x7f070 의 판 0x55e60(skin, x, y, w, h, 0, 정렬 0x11, 위 띠 0x10, 0, 0, 0) (0x7f0b6~0x7f0e4) */}
+      <CommonPanel x={STANDINGS_WINDOW.x} y={STANDINGS_WINDOW.y} width={STANDINGS_WINDOW.width}
+        height={STANDINGS_WINDOW.height} topBand={0x10} />
 
       <svg className={styles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
         {HEADER_CELLS.slice(0, HEADER_DIVIDER_COUNT).map((cell) => (

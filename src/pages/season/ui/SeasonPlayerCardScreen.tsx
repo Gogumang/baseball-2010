@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { RawScreen } from '@/shared/ui'
+import { CommonPanel, RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -115,7 +115,8 @@ export function SeasonPlayerCardScreen({
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xd9 · 0xda 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
-      <div className={styles.window} style={{ left: CARD.x, top: CARD.y, width: CARD.width, height: CARD.height }} />
+      {/* 공용 판 0x55e60 — ⚠️ 미확인: 이 화면이 부르는 0x55e60 의 띠 · 제목 탭 인자는 안 떴다 — 기본 판만 그린다 */}
+      <CommonPanel x={CARD.x} y={CARD.y} width={CARD.width} height={CARD.height} />
       <div className={styles.title} style={{ left: CARD.x, top: CARD.y + 12, width: RIGHT_PANEL.x - CARD.x }}>
         {TEAMS[teamId]?.name ?? ''}
       </div>

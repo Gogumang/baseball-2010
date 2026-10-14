@@ -34,16 +34,6 @@ export const backButton = style({
   selectors: { '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` } },
 })
 
-/** 본문 창 = 공용 판 0x55e61 (기록연감·환경설정과 같은 가운데 192 판) */
-export const panel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '6px',
-  background: ORIGINAL_COLORS.boardFill,
-  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
-})
-
 /** 본문 한 줄 — 원본 줄 나누기(`wrapHelpText`)로 이미 나눈 줄이라 웹 글꼴로 다시 접지 않는다 */
 export const textLine = style({
   position: 'absolute',
@@ -52,16 +42,6 @@ export const textLine = style({
   lineHeight: '14px',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
-  pointerEvents: 'none',
-})
-
-/** 본문 상자 0xbb28d — 색은 미션 고르기 설명 상자와 같은 근사 */
-export const innerBox = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '2px',
-  background: '#213473',
   pointerEvents: 'none',
 })
 
@@ -103,15 +83,6 @@ export const ratingText = style({
   fontSize: '11px',
   lineHeight: '11px',
   whiteSpace: 'nowrap',
-})
-
-/** 쪽 번호 */
-export const pagerText = style({
-  position: 'absolute',
-  color: ORIGINAL_COLORS.text,
-  fontSize: '11px',
-  lineHeight: '13px',
-  pointerEvents: 'none',
 })
 
 /** 경기 중 [조작방법] — 멈춘 경기 장면을 검정으로 한 번 덮는다 (불투명도는 부르는 쪽이 색 덮기 단계로 준다) */
