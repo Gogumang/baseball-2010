@@ -13,7 +13,9 @@ import { isFrameSlidingAt } from '@/widgets/screen-frame/lib/frameSlide'
  * 나리 101 0x14114 · 142 0x13c30 · 145 0x1ca4c.
  * 키(갱신)는 그리기보다 먼저라 그림 n 을 보고 누른 키는 그림 n 앞의 깃발을 본다 — `isFrameSlidingAt(n)` 이면 버린다.
  * 격자를 그리는 k(0·1·9 · 2·10·11 · 6~8)는 격자 열림 애니 0x79fa8 이 끝날 때까지도 0 이라 `useListPageEntry` 를 쓴다.
- * 이 훅은 격자가 없는 선공/구장(k 3)만 쓴다 — ⚠️ 미확인: k 3 이 [skin+0xe4] 에 담는 r5(0x647ae)가 무엇인지 안 읽었다.
+ * 이 훅은 격자가 없는 선공/구장(k 3)만 쓴다. k 3 이 [skin+0xe4] 에 담는 r5 는 **늘 1** 이다 — 본문 끝 구장 이름 그림 앞
+ * 0x6476c `movs r5, #1` 뒤 0x647ae `strb r5, [skin+0xe4]` 까지 r5 를 고치는 곳이 없다(사이의 0xba759 는 0xca9fc 다리로 불려
+ * r5 를 지킨다). 그래서 k 3 은 본문을 처음 그린 그림부터 키를 받는다 — 머리띠가 미끄러지는 동안만 막는 것이 원본과 같다.
  */
 export function useFrameSlideKeyLock(slides = true): { readonly current: boolean } {
   const updates = useUpdateCounter()

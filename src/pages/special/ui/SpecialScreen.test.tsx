@@ -714,3 +714,27 @@ describe('설명 판 까딱임 (0x252c6 · 0x25716 — 표 0xce8bc · 0xce88c)',
     }
   })
 })
+
+describe('G포인트를 안 받은 머리띠 SpecialBands (0x54d95)', () => {
+  const 제목 = () => screen.getByTestId('스페셜-머리띠-제목')
+
+  it('명예의 전당(0x63b14 틱 0 에 +0x84 · +0x86 = 1)은 2 · 4 · 8 · 16 · 30 으로 미끄러져 들어온다', () => {
+    vi.useFakeTimers()
+    try {
+      render(<HallOfFameScreen collection={EMPTY_COLLECTION} mode={{ kind: '보기' }} onBack={vi.fn()} />)
+      // 첫 그림 +0x86 = 2 → 머리 기준 2 − 38, 다 내려온 −8 보다 28 위
+      expect(제목().style.top).toBe(`${7 - 28}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 6)
+      })
+      expect(제목().style.top).toBe('7px')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('스페셜 목록 6 은 +0x84 를 세우지 않아 처음부터 다 내려온 자리다', () => {
+    띄우기()
+    expect(제목().style.top).toBe('7px')
+  })
+})

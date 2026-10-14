@@ -23,6 +23,7 @@ import {
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
@@ -36,6 +37,7 @@ import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
+import { footerBottomOf, headerTopOf } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
@@ -277,8 +279,20 @@ function SpecialWheelLabels() {
   )
 }
 
-/** 머리띠·바닥띠 0x54d95(skin, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1) */
-function SpecialBands({ onBack }: { readonly onBack: () => void }) {
+/**
+ * 머리띠·바닥띠 0x54d95(skin, 0, 5) — 제목 "2010프로야구" + 바닥 되돌아가기 (P6 1-1). G포인트를 받지 않은 화면(시험 · 머리띠를
+ * 안 넘긴 부르는 쪽)이 `ScreenFrame` 대신 쓴다.
+ *
+ * `slides` 면 0x54d95 가 그릴 때마다 +0x86 을 두 배로 해(0x54dfe~0x54e08) 머리띠는 위에서 · 바닥띠는 아래에서 미끄러져 들어온다
+ * — `ScreenFrame` 과 같은 `frameSlideOf` · `headerTopOf` · `footerBottomOf` 로 다 내려온 자리(머리 −8 · 바닥 320)에서 민다.
+ * 공용 목록 0x63b14 를 부르는 명예의 전당(스페셜 27 · 나리 145 0x15d54 = 0x63b15(…, 6, 1, [this+0x2c], −1))은 틱 0 에
+ * +0x84 = 1 · +0x86 = 1 을 세워(0x63ba0~0x63bb4) 미끄러지고, 스페셜 목록 6 은 세우지 않아(ScreenFrame `slides` 머리말) 안 미끄러진다.
+ */
+function SpecialBands({ onBack, slides = false }: { readonly onBack: () => void; readonly slides?: boolean }) {
+  const updates = useUpdateCounter(slides)
+  const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
+  const dyTop = headerTopOf(slide) - headerTopOf(FRAME_SLIDE_END)
+  const dyBottom = footerBottomOf(slide) - footerBottomOf(FRAME_SLIDE_END)
   return (
     <>
       <svg
@@ -289,25 +303,26 @@ function SpecialBands({ onBack }: { readonly onBack: () => void }) {
         height={SCREEN.height}
         shapeRendering="crispEdges"
       >
-        <rect x={0} y={HEADBAND.band.y} width={SCREEN.width} height={HEADBAND.band.height} fill={HEADBAND.band.color} />
-        <rect x={0} y={HEADBAND.line.y} width={SCREEN.width} height={HEADBAND.line.height} fill={HEADBAND.line.color} />
-        <rect x={0} y={FOOTER.band.y} width={SCREEN.width} height={FOOTER.band.height} fill={FOOTER.band.color} />
-        <rect x={0} y={FOOTER.line.y} width={SCREEN.width} height={1} fill={FOOTER.line.color} />
+        <rect x={0} y={HEADBAND.band.y + dyTop} width={SCREEN.width} height={HEADBAND.band.height} fill={HEADBAND.band.color} />
+        <rect x={0} y={HEADBAND.line.y + dyTop} width={SCREEN.width} height={HEADBAND.line.height} fill={HEADBAND.line.color} />
+        <rect x={0} y={FOOTER.band.y + dyBottom} width={SCREEN.width} height={FOOTER.band.height} fill={FOOTER.band.color} />
+        <rect x={0} y={FOOTER.line.y + dyBottom} width={SCREEN.width} height={1} fill={FOOTER.line.color} />
       </svg>
       {HEADBAND.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.tileImage)} style={{ left: x, top: HEADBAND.tileY }} />
+        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.tileImage)} style={{ left: x, top: HEADBAND.tileY + dyTop }} />
       ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)} style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY }} />
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.title.image)} style={{ left: HEADBAND.title.x, top: HEADBAND.title.y }} />
+      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)} style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY + dyTop }} />
+      <img className={styles.sprite} alt="" data-testid="스페셜-머리띠-제목" src={imageSrc(GAME_FRAME, HEADBAND.title.image)}
+        style={{ left: HEADBAND.title.x, top: HEADBAND.title.y + dyTop }} />
       {FOOTER.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.tileImage)} style={{ left: x, top: FOOTER.tileY }} />
+        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.tileImage)} style={{ left: x, top: FOOTER.tileY + dyBottom }} />
       ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.cornerImage)} style={{ left: FOOTER.cornerX, top: FOOTER.tileY }} />
+      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.cornerImage)} style={{ left: FOOTER.cornerX, top: FOOTER.tileY + dyBottom }} />
       <button
         type="button"
         className={styles.backButton}
         aria-label="되돌아가기"
-        style={{ left: FOOTER.backIcon.x, top: FOOTER.backIcon.y }}
+        style={{ left: FOOTER.backIcon.x, top: FOOTER.backIcon.y + dyBottom }}
         onClick={onBack}
       >
         <img src={imageSrc(GAME_FRAME, FOOTER.backIcon.image)} alt="" />
@@ -484,7 +499,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   // 0x63b14 k 6·7·8 — 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지
   // 키 함수(16 0x29ac8 · 17 0x29a54 · 27 0x2ac00 · 시즌 0xe2 0xe340 · 나리 145 0x1ca4c)가 [skin+0xe4] == 0 을 보고 아무것도 안 한다.
   // 부르는 곳(0x2df20 · 0x2dec8 · 0x2dcd8 · 0xa10c · 0x15d54)이 모두 넷째 인자 1 이라 [skin+0xe8] = 1 — 애니가 돈다.
-  // ⚠️ 나리 145 · 머리띠를 안 넘긴 스페셜 27 은 웹 머리띠(`SpecialBands`)가 안 미끄러지지만 본문 · 키는 원본대로 머리띠 다섯 그림 뒤다
+  // 머리띠도 같은 틱 0 에 +0x84 를 세우므로(0x63ba0) `frame` 을 안 받은 `SpecialBands` 도 미끄러진다 — 본문 · 키는 그 다섯 그림 뒤다.
+  // 나리 145(0x15d54)의 머리띠는 0x7f4ec([this+0xe0]) — 틀 0x16928 기본 갈래 0x169ea 가 0x7f53c(hdr, [this+0xcc] == 4 ? 8 : 9, 5, 0)
+  // 로 세운 제목 8 "나만의리그 타자편" / 9 "투수편" · 바닥 5 · G포인트다(부르는 쪽 EndingScreen 이 `frame` 으로 넘긴다).
   const gridOpenShape = hallOfFameGridOpenShapeOf(view.rows)
   const entry = useListPageEntry({ grid: { shape: gridOpenShape, isAnimated: true } })
   const { keyLock } = entry
@@ -833,7 +850,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       )}
 
       {frame === undefined
-        ? <SpecialBands onBack={goBack} />
+        ? <SpecialBands onBack={goBack} slides />
         : <ScreenFrame title={frame.title} gamePoint={frame.gamePoint} onBack={goBack} />}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
