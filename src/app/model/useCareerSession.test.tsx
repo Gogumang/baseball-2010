@@ -1078,6 +1078,7 @@ describe('외출 지도 [!] 칸 — 112 진입 0x118e4 → 0x8cdc0 이 한 번 �
     const 찍은것 = rendered.result.current.session.eventPlaceIds
 
     act(() => rendered.result.current.session.actions.runOutingFunction('외식'))
+    act(() => rendered.result.current.session.actions.finishOutingPresentation())
     expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
     expect(rendered.result.current.session.eventPlaceIds).toBe(찍은것)
 
@@ -1090,6 +1091,7 @@ describe('외출 지도 [!] 칸 — 112 진입 0x118e4 → 0x8cdc0 이 한 번 �
     const rendered = 띄우기({ ...createCareer('외출'), morale: 50, money: 1000 })
     act(() => rendered.result.current.setScreen({ kind: '외출' }))
     act(() => rendered.result.current.session.actions.runOutingFunction('외식'))
+    act(() => rendered.result.current.session.actions.finishOutingPresentation())
     expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
 
     act(() => rendered.result.current.session.actions.enterPlace(OUTING_PLACES[0]))
@@ -1103,6 +1105,11 @@ describe('외출 126 — 효과 팝업 → 105 (0x15234 · 0x1575c)', () => {
     act(() => rendered.result.current.setScreen({ kind: '외출' }))
 
     act(() => rendered.result.current.session.actions.runOutingFunction('입원'))
+    // 126 진입 0x11da8 → 연출 0x85074 — 효과는 연출이 끝난 틀(0x84e58)에 굴린다. 병원은 지도 프레임 3 → 장소 p = 2
+    expect(rendered.result.current.session.outingPresentation).toEqual({ functionId: '입원', place: 2 })
+    expect(rendered.result.current.session.outingResult).toBeNull()
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(false)
+    act(() => rendered.result.current.session.actions.finishOutingPresentation())
     expect(rendered.result.current.session.outingResult?.effectText).toMatch(/^!C소지금 200!cFF0000하락/)
     expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
     expect(rendered.result.current.screen).toEqual({ kind: '외출' })
@@ -1110,6 +1117,7 @@ describe('외출 126 — 효과 팝업 → 105 (0x15234 · 0x1575c)', () => {
     act(() => rendered.result.current.session.actions.closeOutingResult())
     expect(rendered.result.current.session.outingResult).toBeNull()
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.session.outingPresentation).toBeNull()
     expect(rendered.result.current.session.managementNotice).toBe('!C부상에서 회복 되었습니다.')
   })
 })

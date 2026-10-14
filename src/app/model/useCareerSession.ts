@@ -76,7 +76,7 @@ import {
   restBlockReasonOf,
   runRest,
 } from '@/entities/career/model/outing'
-import type { OutingResult } from '@/entities/career/model/outing'
+import type { OutingPresentation, OutingResult } from '@/entities/career/model/outing'
 import {
   EVENT_TRIGGER,
   finishEvent,
@@ -436,6 +436,11 @@ export function useCareerSession({
   const [outingNotice, setOutingNotice] = useState('')
   /** 상태 126 결과 팝업 두 장 — 효과 글(0x15234)과 입원 회복 글(0x1575c). 효과 팝업이 떠 있지 않으면 null */
   const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
+  /**
+   * 상태 126 연출 (진입 0x11da8 → 0x85074 · 그리기 0x16874) — 고른 기능과 장소 p([gfx+0x184] = 지도 프레임 − 1).
+   * 연출이 끝난 틀(0x84e58)에 효과 0x15234 를 굴려 `outingResult` 를 띄우고, 효과 팝업이 닫힐 때까지 판(띠 · 검정)이 남는다.
+   */
+  const [outingPresentation, setOutingPresentation] = useState<OutingPresentation | null>(null)
   const [managementNotice, setManagementNotice] = useState('')
   /** 상세정보 결과 창 (0x8a0a4) — 닫을 때 훈련은 부상, 휴식은 회복을 굴린다 */
   const [managementDetail, setManagementDetail] = useState<ManagementDetail | null>(null)
@@ -1620,6 +1625,7 @@ export function useCareerSession({
       if (command === '외출') {
         setOutingNotice('')
         setOutingResult(null)
+        setOutingPresentation(null)
         // 112 진입 0x118e4 → 0x8cdc0 이 커서를 0 으로 되감은 **뒤에** 자동 발동 0x1cf9c 가 훑는다 — 웹은 그 훑기를 화면을
         // 바꾸기 전에 하므로 되감기를 먼저 한다
         story.rewindCursor()
@@ -1906,11 +1912,21 @@ export function useCareerSession({
       const reason = outingBlockReasonOf(career, outingFunction)
       if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
 
-      // 113 → 126: 원본은 연출(0x85074) 뒤 효과(0x15234)를 굴려 효과 팝업을 지도 위에 띄우고, 그 팝업이 닫히면
-      // 입원 회복(0x1575c)을 굴린다. 그 사이 다른 굴림이 없어 여기서 한 번에 굴려도 차례가 같다.
-      // ⚠️ 미해결: 126 연출 그림(0x84ea0 — event_ani · event_char_1 · event_char_0 세 겹)은 아직 옮기지 않았다.
-      const outcome = performOuting(career, outingFunction, random)
+      // 113 → 126: 연출(0x85074 — event_ani · event_char_1 · event_char_0 세 겹, `outingPresentation`)이 끝난 틀에 효과(0x15234)를
+      // 굴려 효과 팝업을 지도 위에 띄우고(`finishOutingPresentation`), 그 팝업이 닫히면 입원 회복(0x1575c)을 굴린다
+      const place = OUTING_PLACES.find((candidate) => candidate.functions.includes(outingFunction))
       setOutingNotice('')
+      setOutingPresentation({ functionId, place: (place?.frame ?? 1) - 1 })
+    },
+
+    /** 126 연출 끝(0x84e58 이 참인 틀) — 효과 0x15234 를 굴려 효과 팝업을 띄운다. 연출 동안 굴림은 없다 */
+    finishOutingPresentation: () => {
+      if (career === null || outingPresentation === null || outingResult !== null) return
+      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
+        (candidate) => candidate.id === outingPresentation.functionId,
+      )
+      if (outingFunction === undefined) return
+      const outcome = performOuting(career, outingFunction, random)
       setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
       setCareer(outcome.career)
     },
@@ -1922,6 +1938,7 @@ export function useCareerSession({
     closeOutingResult: () => {
       if (outingResult === null) return
       setOutingResult(null)
+      setOutingPresentation(null)
       if (outingResult.recoveryText !== '') setManagementNotice(outingResult.recoveryText)
       setScreen({ kind: '관리' })
     },
@@ -2290,6 +2307,7 @@ export function useCareerSession({
     shopGpDetail,
     outingNotice,
     outingResult,
+    outingPresentation,
     managementNotice,
     managementDetail,
     pendingTitle,

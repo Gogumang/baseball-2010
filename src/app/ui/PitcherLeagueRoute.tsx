@@ -22,6 +22,9 @@ import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGa
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
+import { SeasonOutingPopup } from '@/pages/season/ui/SeasonOutingPopup'
+import { nariOutingPresentationOf } from '@/pages/season/lib/seasonOutingPopup'
+import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
@@ -223,6 +226,12 @@ export function PitcherLeagueRoute({
       // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
       resultText={session.outingResult?.effectText ?? null}
       onCloseResult={actions.closeOutingResult}
+      presentation={session.outingPresentation === null ? null : (
+        <SeasonOutingPopup place={session.outingPresentation.place}
+          presentation={nariOutingPresentationOf(session.outingPresentation.place, { isSlugger: false })}
+          char0Palette={portraitPaletteIndex(career.skinIndex)}
+          onFinished={actions.finishOutingPresentation} />
+      )}
     />
   )
 

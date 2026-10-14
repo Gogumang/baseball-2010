@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { OutingMap } from '@/pages/outing-map/ui/OutingMap'
@@ -18,6 +19,11 @@ interface OutingMapScreenProps {
    */
   readonly resultText?: string | null
   readonly onCloseResult?: () => void
+  /**
+   * 상태 126 연출 판 (그리기 0x16874 = 지도 0x7ea64(gfx, 고른 장소, 0) → 가운데 정렬판 0x84ea0) — 지도 위, 효과 팝업 아래에 깐다.
+   * 연출 중에는 지도가 키를 받지 않는다(126 키 0x105c8 은 건너뛰기뿐).
+   */
+  readonly presentation?: ReactNode
 }
 
 /**
@@ -26,7 +32,7 @@ interface OutingMapScreenProps {
  * [들어가기]/[기능] 두 칸만 띄운다 (0x7ee1a, F-2 2-7) — 전체 화면 목록이 아니다.
  */
 export function OutingMapScreen({
-  noticeText, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult,
+  noticeText, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult, presentation = null,
 }: OutingMapScreenProps) {
   const [openPlace, setOpenPlace] = useState<OutingPlace | null>(null)
   const [selectedPlaceId, setSelectedPlaceId] = useState(OUTING_PLACES[0].id)
@@ -53,6 +59,7 @@ export function OutingMapScreen({
           onClose={() => setOpenPlace(null)}
         />
       )}
+      {presentation}
       {resultText !== null && (
         <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />
       )}

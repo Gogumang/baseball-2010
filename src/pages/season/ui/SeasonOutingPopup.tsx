@@ -9,6 +9,8 @@ import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
 import {
   EVENT_CHAR_0, EVENT_CHAR_1, OUTING_PANEL, OUTING_PANEL_BAND, SEASON_OUTING_PRESENTATIONS, isSeasonOutingSkipKey,
 } from '@/pages/season/lib/seasonOutingPopup'
+import type { SeasonOutingPresentation } from '@/pages/season/lib/seasonOutingPopup'
+import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 
 const WINDOW_FOLDER = './sprites/mode_back/frames'
@@ -28,6 +30,10 @@ const BAND_LIGHT = '#4A7DFF'
 export interface SeasonOutingPopupProps {
   /** 장소 p ([gfx+0x184]) */
   readonly place: number
+  /** 시즌이 아닌 갈래(나만의리그 126 — `nariOutingPresentationOf`)의 연출. 없으면 시즌 표 */
+  readonly presentation?: SeasonOutingPresentation
+  /** event_char_0 팔레트 번호 (0x85186 — 나리는 피부 − 1, `portraitPaletteIndex`). null 이면 구운 그림 그대로(시즌 −1) */
+  readonly char0Palette?: number | null
   /** 게이지 끝 — 0x84e58 이 참이 되는 틀에 0xc81c 로 간다 */
   readonly onFinished: () => void
 }
@@ -37,8 +43,8 @@ export interface SeasonOutingPopupProps {
  * 지도는 부르는 쪽이 먼저 깐다(0xa06c). 애니가 끝나면(놓인 뒤) 판의 띠·검정만 남는다 — 결과 팝업은 그 위.
  * 확인 키(0x4944)는 게이지를 끝으로 건너뛴다. 취소는 없다.
  */
-export function SeasonOutingPopup({ place, onFinished }: SeasonOutingPopupProps) {
-  const presentation = SEASON_OUTING_PRESENTATIONS[place] ?? SEASON_OUTING_PRESENTATIONS[0]
+export function SeasonOutingPopup({ place, presentation: given, char0Palette = null, onFinished }: SeasonOutingPopupProps) {
+  const presentation = given ?? SEASON_OUTING_PRESENTATIONS[place] ?? SEASON_OUTING_PRESENTATIONS[0]
   const origins = useFrameOrigins(presentation.folder)
   const animations = useAnimations(presentation.folder)
   const char1Origins = useFrameOrigins(EVENT_CHAR_1)
@@ -114,7 +120,8 @@ export function SeasonOutingPopup({ place, onFinished }: SeasonOutingPopupProps)
             {overlays !== null && (
               <>
                 <AnimationSprite folder={EVENT_CHAR_1} origins={char1Origins} entries={char1Animations?.[overlays.char1]} update={update} />
-                <AnimationSprite folder={EVENT_CHAR_0} origins={char0Origins} entries={char0Animations?.[overlays.char0]} update={update} />
+                <AnimationSprite folder={EVENT_CHAR_0} origins={char0Origins} entries={char0Animations?.[overlays.char0]} update={update}
+                  palette={char0Palette} />
               </>
             )}
           </div>
@@ -139,19 +146,32 @@ function Band({ top, lines }: { readonly top: number; readonly lines: readonly (
   )
 }
 
-function AnimationSprite({ folder, origins, entries, update }: {
+function AnimationSprite({ folder, origins, entries, update, palette = null }: {
   readonly folder: string
   readonly origins: FrameOrigins | null
   readonly entries: readonly AnimationEntry[] | undefined
   readonly update: number
+  readonly palette?: number | null
 }) {
   const step = entries === undefined ? null : animationStepAt(entries, update)
   if (step === null) return null
   const key = String(step.frame).padStart(3, '0')
   const origin = origins?.[key]
   if (origin === undefined) return null
-  return (
-    <img className={styles.sprite} style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
-      src={`${folder}/${key}.png`} alt="" />
-  )
+  const left = ANCHOR.x + origin.x + step.dx
+  const top = ANCHOR.y + origin.y + step.dy
+  if (palette !== null) {
+    // 프레임마다 따로 마운트한다 — `useRecoloredSprite` 가 앞 프레임 주소를 한 번 내보내지 않게 (CenterStage 와 같다)
+    return <RecoloredFrame key={key} url={`${folder}/${key}.png`} palette={palette} left={left} top={top} />
+  }
+  return <img className={styles.sprite} style={{ left, top }} src={`${folder}/${key}.png`} alt="" />
+}
+
+function RecoloredFrame({ url, palette, left, top }: {
+  readonly url: string
+  readonly palette: number
+  readonly left: number
+  readonly top: number
+}) {
+  return <img className={styles.sprite} style={{ left, top }} src={useRecoloredSprite(url, palette)} alt="" />
 }

@@ -1745,6 +1745,7 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
     expect(result.current.scene).toBe('외출')
 
     act(() => result.current.actions.runOutingFunction('외식'))
+    act(() => result.current.actions.finishOutingPresentation())
 
     const saved = store.load() as { morale: number; money: number; hasActedThisCycle: boolean; outingsThisSeason: number }
     // 외식 사기 bfa55(25,31) + 외식회원증 4 → 79 이상 85 이하 · 소지금 −100(만원)
@@ -1772,6 +1773,7 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
     )
     act(() => result.current.actions.openOuting())
     act(() => result.current.actions.runOutingFunction('입원'))
+    act(() => result.current.actions.finishOutingPresentation())
     act(() => result.current.actions.closeOutingResult())
 
     expect(result.current.scene).toBe('관리')

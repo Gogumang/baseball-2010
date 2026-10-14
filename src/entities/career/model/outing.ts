@@ -108,6 +108,11 @@ export interface OutingResult {
   readonly effectText: string
   readonly recoveryText: string
 }
+/** 상태 126 연출 중인 외출 — 고른 기능 id 와 장소 p([gfx+0x184], 지도 프레임 − 1) */
+export interface OutingPresentation {
+  readonly functionId: string
+  readonly place: number
+}
 export interface OutingOutcome<T extends OutingCareer> extends OutingResult {
   readonly career: T
 }
