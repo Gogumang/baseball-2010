@@ -94,20 +94,41 @@ function gameBatterLineOf(progress: TeamGameProgress, teamId: number, entry: Tea
   }, EMPTY_LEAGUE_BATTER_LINE)
 }
 
-/** 타자 레코드 +0xb(폼 니블) — 붙박이 표 행에서. 표 밖 선수(영입한 명전·나리)는 웹 명단에 칸이 없어 모른다 */
+/**
+ * 타자 레코드 +0xb(폼 니블) — 붙박이 표 행, 표 밖 선수(영입한 명전·나리)는 기록 사본의 +0xb(`TeamEntryBatter.profile`).
+ * ⚠️ 칸이 생기기 전의 옛 기록 사본은 모른다(null)
+ */
 function batterProfileOf(teamId: number, entry: TeamEntryBatter): number | null {
-  if (entry.rosterSlot === NO_ROSTER_SLOT) return null
+  if (entry.rosterSlot === NO_ROSTER_SLOT) return entry.profile ?? null
   return BATTERS[leagueBatterIdOf(entry.tableTeamId ?? teamId, entry.rosterSlot)]?.profile ?? null
 }
 
 /**
- * 타자 손 `0xb63c0`(1 좌타 · 0 우타) — 마타자는 마선수 표, 그 밖은 레코드 +0xb 폼 니블. ⚠️ 표 밖 선수(영입한 명전 · 나리)는
- * 웹 명단에 폼 칸이 없어 우타(0)로 둔다.
+ * 타자 손 `0xb63c0`(1 좌타 · 0 우타) — 마타자는 마선수 표, 그 밖은 레코드 +0xb 폼 니블. ⚠️ +0xb 를 모르는 옛 기록 사본은
+ * 우타(0)로 둔다.
  */
 export function teamBatterHandOf(teamId: number, entry: TeamEntryBatter): number {
   if (entry.aceIndex >= 0) return batterHandOf(0, entry.aceIndex)
   const profile = batterProfileOf(teamId, entry)
   return profile === null ? 0 : batterHandOf(profile)
+}
+
+/**
+ * **사람 타석 타자 그림 · 판정 재료** — 지금 타자 `0xae89c(공격 팀 = 우리)` 레코드에서 (`BattingStage` 의 batterForm · batterSkinIndex ·
+ * batterHand). 타석 교대 0x47d98~0x47dd6 이 타자 그림 적재 0x78ab0 에 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` ·
+ * 손 0xb63c0 을 넘기고, 0x47d58~0x47d70 이 같은 손을 장면 +0x17e1(배치 side)에 쓴다. 마타자는 XlsACE_BAT +0xb
+ * (`aceBatterProfileOf`)와 손 표 0xd88b0 — 폼의 낮은 비트가 아니다. ⚠️ +0xb 를 모르는 옛 기록 사본은 0(타격형 · 우타 · 피부 0)
+ */
+export function teamBattingStageBatterOf(progress: TeamGameProgress): {
+  readonly batterForm: number
+  readonly batterSkinIndex: number
+  readonly batterHand: number
+} {
+  const teamId = progress.options.ourTeamId
+  const batter = currentBatterEntry(progress)
+  if (batter === undefined) return { batterForm: 0, batterSkinIndex: 0, batterHand: 0 }
+  const profile = batter.aceIndex >= 0 ? aceBatterProfileOf(batter.aceIndex) : (batterProfileOf(teamId, batter) ?? 0)
+  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterHand: teamBatterHandOf(teamId, batter) }
 }
 
 /**

@@ -75,6 +75,8 @@ export function situationOf(
   batterForm = 0,
   pitch?: Pick<Pitch, 'pitcherForm' | 'pitcherMagicNumber'>,
   batterRecordSlot = 0,
+  /** 타자 손 0xb63c0 — 마타자는 표 0xd88b0 이라 폼과 다를 수 있다. 없으면 폼 & 1 */
+  batterHand?: number,
 ): SwingSituation {
   const bases = hud?.bases ?? { first: false, second: false, third: false }
   return {
@@ -83,7 +85,7 @@ export function situationOf(
     runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
     hasSecondBaseRunner: bases.second,
     pitcherSide: pitch === undefined ? 0 : pitcherHandOfPitch(pitch),
-    batterSide: batterSideOfForm(batterForm),
+    batterSide: batterHand ?? batterSideOfForm(batterForm),
     balls: hud?.balls ?? 0,
     strikes: hud?.strikes ?? 0,
     batterOrderIndex: batterRecordSlot,
@@ -92,15 +94,16 @@ export function situationOf(
 }
 
 /** CPU 투구 AI 에 넘길 볼카운트·주자 상황. side 는 타자 손이라 투구 원점·판정 기준점이 따라 갈린다 */
-export function pitchSituationOf(hud: HudState | null, batterForm = 0): PitchSituation {
+export function pitchSituationOf(hud: HudState | null, batterForm = 0, batterHand?: number): PitchSituation {
   const bases = hud?.bases ?? { first: false, second: false, third: false }
+  const side = batterHand ?? batterSideOfForm(batterForm)
   return {
     strikes: hud?.strikes ?? 0,
     balls: hud?.balls ?? 0,
     outs: hud?.outs ?? 0,
     runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
     hasSecondBaseRunner: bases.second,
-    batterSide: batterSideOfForm(batterForm),
-    side: batterSideOfForm(batterForm),
+    batterSide: side,
+    side,
   }
 }

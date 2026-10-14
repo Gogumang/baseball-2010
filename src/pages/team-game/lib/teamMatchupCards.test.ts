@@ -13,10 +13,10 @@ import { staminaCapacityOf, staminaPercentOf } from '@/entities/pitcher-career/m
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { BATTERS } from '@/shared/config/original/roster'
 import { leagueBatterIdOf, leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
-import { teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { teamBattingStageBatterOf, teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
-import { withAcePitcher } from '@/features/play-team-game/model/teamGameRoster'
+import { NO_ROSTER_SLOT, withAceBatter, withAcePitcher } from '@/features/play-team-game/model/teamGameRoster'
 
 const 기본옵션: TeamGameOptions = {
   mode: 2,
@@ -132,5 +132,32 @@ describe('사람 타석 마운드의 상대 투수 장비 겹 — 타석 교대 
     const aceSlot = opponentPitcherEntry.findIndex((pitcher) => pitcher.aceIndex >= 0)
     expect(aceSlot).toBeGreaterThanOrEqual(0)
     expect(currentPitcherEquipment({ ...started, opponentPitcherEntry, opponentPitcherIndex: aceSlot })).toBeUndefined()
+  })
+})
+
+describe('사람 타석 타자 폼 · 피부 · 손 — 타석 교대 0x47d58~0x47dd6 (팀 경기도 넘긴다)', () => {
+  it('붙박이 표 타자는 Xls 행 +0xb — 폼 >> 4 · 피부 (>> 2) & 3 · 손 = 폼 & 1', () => {
+    const started = startTeamGame(기본옵션, createSeededRandom(1))
+    const at = (battingOrderIndex: number) =>
+      teamBattingStageBatterOf({ ...started, game: { ...started.game, battingOrderIndex } })
+    const 칸 = started.ourEntry.findIndex((batter) => batter.rosterSlot === 3)
+    // 팀 0 의 칸 3 = +0xb 0x34 → 폼 3(장타형 · 좌타) · 피부 1
+    expect(at(칸)).toEqual({ batterForm: 3, batterSkinIndex: 1, batterHand: 1 })
+  })
+
+  it('마타자는 XlsACE_BAT +0xb 의 폼과 손 표 0xd88b0 — 메디카는 폼 4(낮은 비트 0)인데 좌타(1)', () => {
+    const started = startTeamGame(기본옵션, createSeededRandom(1))
+    const ourEntry = withAceBatter(started.ourEntry, 0)
+    const aceSlot = ourEntry.findIndex((batter) => batter.aceIndex === 0)
+    const stage = teamBattingStageBatterOf({ ...started, ourEntry, game: { ...started.game, battingOrderIndex: aceSlot } })
+    expect(stage).toEqual({ batterForm: 4, batterSkinIndex: 0, batterHand: 1 })
+  })
+
+  it('기록으로 선 영입 타자는 기록 사본의 +0xb', () => {
+    const started = startTeamGame(기본옵션, createSeededRandom(1))
+    const ourEntry = started.ourEntry.map((batter, index) =>
+      index === 0 ? { ...batter, rosterSlot: NO_ROSTER_SLOT, recordId: 0xfe, profile: 0x34 } : batter)
+    const stage = teamBattingStageBatterOf({ ...started, ourEntry, game: { ...started.game, battingOrderIndex: 0 } })
+    expect(stage).toEqual({ batterForm: 3, batterSkinIndex: 1, batterHand: 1 })
   })
 })
