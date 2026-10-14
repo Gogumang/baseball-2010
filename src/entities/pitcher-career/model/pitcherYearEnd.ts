@@ -163,7 +163,7 @@ export function enterPitcherYearEndEvent(career: PitcherCareer, eventId: number)
 
 /**
  * 이벤트를 진입에서 트는 시즌 끝 상태 — 136 이 392, 130 이 370, 131 이 375, 132(0x10c54)가 501/504/502/380.
- * 380 은 502 의 선택지(gotoEvent)·'연말' 화면에서도 열리지만 그때도 상태는 132 다. 384~391 · 461~464 는 상태를 바꾸지 않는다
+ * 380 은 502 의 선택지(gotoEvent)로도 열리지만 그때도 상태는 132 다. 384~391 · 461~464 는 상태를 바꾸지 않는다
  * (133 0x1a090 · 134 0x19f30 은 S+0x50 을 안 쓴다 — 타자편 794c8d9).
  */
 const SEASON_END_STATE_OF_EVENT: Readonly<Partial<Record<number, SeasonEndState>>> = {
@@ -187,8 +187,6 @@ export type PitcherResumePoint =
   | { readonly kind: '경기결과' }
   /** 128 대진 — S+0x50 == 0xf, 또는 경기 뒤(2) 116 이 g ≠ 0 이라 128 로 */
   | { readonly kind: '포스트시즌' }
-  /** 경기 뒤(2) 116 이 포스트시즌 중 g == 0 이라 136 으로 — 웹은 시즌 끝 화면(136 자리) */
-  | { readonly kind: '시즌종료' }
   /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 */
   | { readonly kind: '관리' }
   /**
@@ -244,7 +242,8 @@ export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint 
     return leagueDayCounterOf(career) % 2 === 0 ? { kind: '관리' } : { kind: '다음경기순위' }
   }
   if (career.seasonEndState === 128) return { kind: '포스트시즌' }
-  return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
+  // 116 끝(12b74~12b94): g == 0 → [114 → 136] — 136 진입 0x10bb0 이 392 를 튼다(사이에 시즌 요약 화면 없음)
+  return leagueDayCounterOf(career) === 0 ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID } : { kind: '포스트시즌' }
 }
 
 /** 13년차의 연차idx — 0x1c2c2 `cmp r5, #0xc` */

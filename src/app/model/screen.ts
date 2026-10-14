@@ -121,8 +121,6 @@ export type Screen =
       readonly context: StoryContext
       readonly carried: StoryCarry
     }
-  | { readonly kind: '성적' }
-  | { readonly kind: '시즌종료' }
   /**
    * 나만의리그 포스트시즌 대진 (원본 상태 128). 대진은 `career.postseason` 이 들고, 화면은 그 위에 뜬
    * 알림 팝업(0xb 정규시즌 우승 · 7 우승 팀 발표 · 8 한국시리즈 우승)만 들고 다닌다.

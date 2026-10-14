@@ -45,7 +45,6 @@ export const SCREEN_BGM = {
   다음경기순위: 4,
   아이템: 4,
   외출: 4,
-  성적: 4,
   엔딩: 46,
 } as const satisfies Partial<Record<Screen['kind'], number>>
 
@@ -195,7 +194,7 @@ export function screenBgmOf(screen: Screen, enteredFrom: Screen['kind'] | null =
  * 114, 134, 1, 112} 면 `0x6ea6d(소리, 4, −1, 1)`(1aef4~1af02) — 관리 화면 배경음 4. 111 상점·112 외출은 105 에서 들어가
  * 배경음을 안 건드려 그 4 가 이어진다(타자편 `SCREEN_BGM` 의 아이템·외출 4 와 같다).
  * 141 엔딩은 타자편과 같은 진입 0x12300(모드 갈림 없음) — `endingBgmOf`(e ≤ 1 이면 52, 그 밖 46).
- * 시즌 끝 사슬(136 · 130 · 131 · 132 · 133 — 웹 '시즌종료' · '연말')과 국가대항전(134 · 135)은 배경음을 안 건드린다(null).
+ * 시즌 끝 사슬(136 · 130 · 131 · 132 · 133 — 웹은 이벤트 화면)과 국가대항전(134 · 135)은 배경음을 안 건드린다(null).
  * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
  */
 export function pitcherLeagueBgmOf(
@@ -227,7 +226,7 @@ export function pitcherLeagueBgmOf(
   // 131 0x19774 · 132 0x10c54 · 133 0x1a090 · 134 0x19f30 · 135 없음 · 136 0x10bb0, 처리 스위치(0x1d1b2) 134 0x1b92c 말고는 없음,
   // 키 표 0xcc7e0 134 0x19fdc · 135 0x10680, 그리기 표 0xcc884 130 0x19f18 · 131 0x19f24 · 132 · 136 0x11e0c · 134 0x19fc8 ·
   // 135 0x168dc — 이들과 그 아래 세 단계 호출에 0x6ea6c · 0x6e498 · 0x6e418 · 0x6e438 · 0x6eaf0 이 없다
-  if (scene === '시즌종료' || scene === '연말' || scene === '국가대항전') return null
+  if (scene === '국가대항전') return null
   return SCREEN_BGM.투수편
 }
 

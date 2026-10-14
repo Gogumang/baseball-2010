@@ -20,8 +20,6 @@ import { ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
-import { RecordScreen } from '@/pages/record/ui/RecordScreen'
-import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
@@ -357,9 +355,6 @@ function CareerScreens({
       )
     }
 
-    case '성적':
-      return <RecordScreen career={career} onBack={backToManagement} />
-
     case '다음경기순위':
       return (
         <NextGameStandingsScreen league={career.league} edition="타자편" gamePoint={career.gamePoint}
@@ -397,9 +392,6 @@ function CareerScreens({
         </NariScreenPush>
       )
     }
-
-    case '시즌종료':
-      return <SeasonEndScreen career={career} onStartNextSeason={actions.beginYearEnd} />
 
     case '포스트시즌':
       return (

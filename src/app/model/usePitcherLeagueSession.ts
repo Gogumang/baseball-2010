@@ -105,7 +105,6 @@ import {
   midSeasonEventId,
   midSeasonTitlesOf,
   NO_ENDING_JUDGEMENT,
-  RETIREMENT_CHOICE_EVENT_ID,
   savedCareerOf,
   salaryOfferOf,
   SALARY_EVENT_ID,
@@ -191,12 +190,12 @@ const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
 
 /**
  * 화면 유니온 — 원본 장면 0x106 의 상태 번호를 괄호에 적는다.
- *   등록(101~104) · 관리(105) · 경기(144) · 시즌종료(136 자리) · 연말(132 — 502 갈림길 화면) · 엔딩(141) ·
+ *   등록(101~104) · 관리(105) · 경기(144) · 엔딩(141) ·
  *   상점(111 장비 상점 / 121 장비착용 — 어느 쪽인지는 `shopTab`) · 외출(112 지도 · 113 장소) ·
  *   이벤트(114 이벤트 재생 — 무엇을 틀었는지는 `story`) · 포스트시즌(128 대진 — 팝업은 `postseasonPopup`)
  */
 export type PitcherScene =
-  | '등록' | '관리' | '경기' | '시즌종료' | '연말' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결' | '포스트시즌'
+  | '등록' | '관리' | '경기' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결' | '포스트시즌'
   /** 다음경기 앞 순위표 (상태 109) — 타자편과 같은 진입 0x10d8c · 키 0x105f0 · 그림 0x168a4 */
   | '다음경기순위'
   /** 경기 준비(매치업, 상태 142) — 타자편과 같은 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 */
@@ -315,12 +314,8 @@ export interface PitcherLeagueSession {
     readonly finishGame: (summary: PitcherGameSummary) => void
     /** 116 경기 뒤 평가 [확인] → 114 → 105/109/128/136 (116 의 끝 0x12b74) */
     readonly confirmGameResult: () => void
-    /** 시즌 끝 화면 [다음] → 연말 사슬 136 → 130 → 131 → 132 (→ 133) 을 이벤트 392 부터 튼다 */
+    /** **웹 전용 디버그(시험용)** — 연말 사슬 136 → 130 → 131 → 132 (→ 133) 을 이벤트 392 부터 곧장 튼다. 화면은 부르지 않는다 */
     readonly beginYearEnd: () => void
-    /** 연말 502 "연봉 협상한다" → 이벤트 380 (연봉협상) */
-    readonly continueCareer: () => void
-    /** 연말 502 "은퇴한다" → 이벤트 496 (→ 503 → 엔딩 화면 141) */
-    readonly retire: () => void
     /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기. 모자라면 false */
     readonly continueAfterEnding: () => boolean
     /** 엔딩 141 의 보너스 팝업 0x2b 를 닫았다 — 보너스 · S+0x7b = 1 · 저장 (1bbf4~1bc70) */
@@ -570,9 +565,6 @@ function hiddenOpenRewardIdsOf(rewards: readonly EventReward[]): number[] {
     .filter((id) => hiddenOpenNoticeTextOf(id) !== null)
 }
 
-/** 496 "정말로 은퇴하려는 거냐?" — 502 "은퇴한다" 의 gotoEvent (선택지 380 / 503) */
-const RETIREMENT_CONFIRM_EVENT_ID = 496
-
 /**
  * **match 로 나가는 장소 이벤트의 끝 처리** — 이벤트 관리자 0x8cf64 의 match(SYS 8, 0x8d734~0x8d904)는 미션 장면 전환
  * (0xbdae9)을 걸고 0x8a380 으로 관리자를 비운 뒤 **1(끝남)** 을 돌려준다(보통 이벤트 끝 0x8d506 → 0x8d8ee 와 같은 꼬리).
@@ -609,23 +601,26 @@ function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
 }
 
 function pitcherSceneOfResume(career: PitcherCareer | null, resumePoint: PitcherResumePoint): PitcherScene {
-  return career === null
-    ? '등록'
-    : resumePoint.kind === '이벤트'
-      ? '이벤트'
-      : resumePoint.kind === '포스트시즌'
-        ? '포스트시즌'
-        : resumePoint.kind === '시즌종료'
-          ? '시즌종료'
-          // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
-          : resumePoint.kind === '다음경기순위'
-            ? '다음경기순위'
-            : resumePoint.kind === '경기결과'
-              ? '경기결과'
-              // 0x1c154 그 밖 갈래 S+0x12c → 134 — 저장의 대회로 대진판부터
-              : resumePoint.kind === '국가대항전' ? '국가대항전'
-                // 1c24e S+0x50 == 6 → 141 — 보너스를 받은 저장(S+0x7b)이라 키 0x1220c 가 등록 팝업 0x2d 로 간다
-                : resumePoint.kind === '엔딩' ? '엔딩' : '관리'
+  if (career === null) return '등록'
+  switch (resumePoint.kind) {
+    case '이벤트':
+      return '이벤트'
+    case '포스트시즌':
+      return '포스트시즌'
+    // 109 — 이전 상태가 1(자원 적재)이라 `nextGameFromManagement` 는 거짓 그대로다
+    case '다음경기순위':
+      return '다음경기순위'
+    case '경기결과':
+      return '경기결과'
+    // 0x1c154 그 밖 갈래 S+0x12c → 134 — 저장의 대회로 대진판부터
+    case '국가대항전':
+      return '국가대항전'
+    // 1c24e S+0x50 == 6 → 141 — 보너스를 받은 저장(S+0x7b)이라 키 0x1220c 가 등록 팝업 0x2d 로 간다
+    case '엔딩':
+      return '엔딩'
+    default:
+      return '관리'
+  }
 }
 
 function pitcherStoryOfResume(resumePoint: PitcherResumePoint): PitcherStory | null {
@@ -866,6 +861,20 @@ export function usePitcherLeagueSession(
     const started = resumed.current?.career
     if (started === null || started === undefined) return
     store.save(started)
+  }, [resumePoint, store])
+
+  /**
+   * 이어하기가 시즌 끝 사슬의 상태(136 · 130 · 131 · 132)로 들어갔으면 그 진입처럼 저장한다 — 한 번만. 136 진입 0x10bb0 은
+   * S+0x50 = 0xb 뒤 `0x1fded · 0x22755(…, 1)` 로 곧바로 저장한다(10bb8~10bce). 경기 뒤(S+0x50 == 2)에 끊긴 옛 저장이 116 끝처럼
+   * g == 0 으로 136 에 들어온 때(`pitcherResumePointOf`)만 저장 칸이 실제로 바뀐다 — 나머지는 같은 값을 다시 쓴다.
+   */
+  const resumedYearEndRef = useRef(false)
+  useEffect(() => {
+    if (resumedYearEndRef.current || resumePoint.kind !== '이벤트') return
+    resumedYearEndRef.current = true
+    const entered = resumed.current?.career
+    if (entered === null || entered === undefined || isSaveErasedRef.current) return
+    store.save(savedCareerOf(entered))
   }, [resumePoint, store])
 
   const commitWith = useCallback(
@@ -1385,77 +1394,6 @@ export function usePitcherLeagueSession(
     [aceLevels, career, commit, finishCupGame, gameOptions, random, recordStat, setUpPitcherScene],
   )
 
-  /**
-   * 116 [확인] → 114 — 0x8a6fc 가 쌓은 평가 내장 이벤트를 틀고, 114 진입 0x11d00 이 S+0x50 = 2 → 3(웹 null), 116 의 끝
-   * (0x12b74~0x12bb2)이 고른 뒤 상태로 간다.
-   */
-  const confirmGameResult = useCallback(
-    () => {
-      if (career === null) return
-      // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 연속 기록 보상 명령(평판 · 집중/새가슴/더티볼)을 먹는다 —
-      // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리)
-      const rewarded = career.seasonEndState === 116
-        ? applyPitcherEventRewards(career, pitcherStreakEventOfCareer(career).rewards)
-        : career
-      const counted: PitcherCareer = { ...rewarded, seasonEndState: null }
-
-      /*
-       * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
-       * 아니면 [114 → 128]** (R9 116절, 모드 갈림 없음). 관리 주기·부상 엔딩·중간평가를 타지 않는다.
-       * 내 시리즈가 끝난 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라 136 부터 사슬을
-       * **다시 돈다** — 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 다시 튼다(0x8bdc8 → 0xae170). 원본 그대로다.
-       * 45번째 경기는 경기 전 대진이 없어 아래 시즌종료로 간다(그때도 L+0x32 = 0 → 136 이다).
-       */
-      if (counted.postseason !== null) {
-        if (leagueDayCounterOf(counted) === 0) {
-          // 114 진입 0x11d00 이 2 → 0xb(포스트시즌 g == 0) — 136 진입이 다시 쓴다 (웹 null)
-          commit(counted)
-          return setScene('시즌종료')
-        }
-        // 128 진입 0x120a4 — S+0x50 = 0xf · 저장
-        commit({ ...counted, seasonEndState: 128 })
-        setPostseasonPopup(regularSeasonPopupOnEnter(counted))
-        return setScene('포스트시즌')
-      }
-      // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
-      // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
-      if (isPitcherSeasonFinished(counted)) {
-        commit(counted)
-        return setScene('시즌종료')
-      }
-      /*
-       * **2경기 주기** — 상태 116 의 끝(0x12b74~0x12bb2)이 `S+0xb2`(경기 수)의 **비트0** 을 본다:
-       * ```
-       *   12b98: ldrb r3,[r2]        ; r2 = S+0xb2 = 경기 수 g
-       *   12b9a: movs r1,#0
-       *   12b9c: lsls r5,r3,#0x1f    ; 비트0 을 부호 자리로
-       *   12b9e: bmi  0x12ba2        ; 홀수면 건너뜀
-       *   12ba0: movs r1,#1          ; 짝수
-       *   12ba8: cmp  r1,#0 ; beq 0x12bb0
-       *   12bac: movs r1,#0x69       ; 105 관리 화면
-       *   12bb0: movs r1,#0x6d       ; 109 순위표
-       * ```
-       * 이 함수에는 **모드 갈림이 없다** — 장면 0x106 은 모드 3(투수편)·4(타자편)가 함께 쓰므로
-       * 투수편도 타자편과 **똑같이 2경기 주기**다 (재진입 분기 0x1c38e~0x1c3b8 도 같은 판정).
-       * 홀수 경기 뒤는 109 순위표로 간다 — 타자편(`useCareerSession.confirmGameResult`)과 같다
-       * (원본 109 → 142 → 144 → 경기 장면. 웹은 142·144 없이 109 확인이 곧바로 경기).
-       *
-       * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
-       *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
-       */
-      if (!isPitcherManagementCycleOpen(counted)) {
-        // 116 → [114 → 109] 순위표 (이전 상태가 105 가 아니라 취소가 안 먹는다). 109 진입 0x10d8c 가 S+0x50 = 4 · 저장
-        commit({ ...counted, seasonEndState: 109 })
-        setNextGameFromManagement(false)
-        return setScene('다음경기순위')
-      }
-      // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7). 그 검사는 105 에
-      // 들어올 때마다 도는 진입 곁가지라 관리 화면 도착 고리(아래 '관리 화면(105)의 이벤트')가 한다
-      commit(counted)
-      setScene('관리')
-    },
-    [career, commit],
-  )
 
   /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
   const startNewSeason = useCallback(
@@ -1554,23 +1492,84 @@ export function usePitcherLeagueSession(
     [commit, enterEnding, openYearEndEvent, startNewSeason],
   )
 
-  /** 시즌 끝 화면 [다음] → 136 의 이벤트 392 "올해의 목표" 부터 연말 사슬을 튼다 */
+  /**
+   * **웹 전용 디버그(시험용 진입점)** — 지금 커리어로 136 의 392 "올해의 목표" 부터 연말 사슬을 곧장 튼다. 화면은 이 길을
+   * 부르지 않는다: 원본 길은 116 끝(`confirmGameResult`)이 [114 → 136] 으로 곧장 간다.
+   */
   const beginYearEnd = useCallback(() => {
     if (career === null) return
     continueYearEnd(career, [])
   }, [career, continueYearEnd])
 
-  /** 502 "연봉 협상한다 (다음연차 진행)" → 380 (502 의 선택지 gotoEvent) */
-  const continueCareer = useCallback(() => {
-    if (career === null) return
-    openYearEndEvent(career, SALARY_EVENT_ID, [RETIREMENT_CHOICE_EVENT_ID])
-  }, [career, openYearEndEvent])
+  /**
+   * 116 [확인] → 114 — 0x8a6fc 가 쌓은 평가 내장 이벤트를 틀고, 114 진입 0x11d00 이 S+0x50 = 2 → 3(웹 null), 116 의 끝
+   * (0x12b74~0x12bb2)이 고른 뒤 상태로 간다.
+   */
+  const confirmGameResult = useCallback(
+    () => {
+      if (career === null) return
+      // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 연속 기록 보상 명령(평판 · 집중/새가슴/더티볼)을 먹는다 —
+      // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리)
+      const rewarded = career.seasonEndState === 116
+        ? applyPitcherEventRewards(career, pitcherStreakEventOfCareer(career).rewards)
+        : career
+      const counted: PitcherCareer = { ...rewarded, seasonEndState: null }
 
-  /** 502 "은퇴한다" → 496 "정말로 은퇴하려는 거냐?" (→ 503 → 엔딩 141 / → 380) */
-  const retire = useCallback(() => {
-    if (career === null) return
-    openYearEndEvent(career, RETIREMENT_CONFIRM_EVENT_ID, [RETIREMENT_CHOICE_EVENT_ID])
-  }, [career, openYearEndEvent])
+      /*
+       * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
+       * 아니면 [114 → 128]** (R9 116절, 모드 갈림 없음). 관리 주기·부상 엔딩·중간평가를 타지 않는다.
+       * 내 시리즈가 끝난 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라 136 부터 사슬을
+       * **다시 돈다** — 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 다시 튼다(0x8bdc8 → 0xae170). 원본 그대로다.
+       * 45번째 경기는 경기 전 대진이 없어 아래 갈래로 간다(그때도 L+0x32 = 0 → 136 이다).
+       */
+      if (counted.postseason !== null) {
+        if (leagueDayCounterOf(counted) === 0) {
+          // 114 진입 0x11d00 이 2 → 0xb(포스트시즌 g == 0) — 136 진입이 다시 쓴다. 116 끝은 [114 → 136] 을 곧장 예약한다
+          // (0xbcb49(0x88) · 0xbcb49(0x72), 12b8c~12bbe) — 사이에 시즌 요약 화면이 없다(웹 전용 '시즌종료' 화면은 r71 에서 걷음)
+          return continueYearEnd(counted, [])
+        }
+        // 128 진입 0x120a4 — S+0x50 = 0xf · 저장
+        commit({ ...counted, seasonEndState: 128 })
+        setPostseasonPopup(regularSeasonPopupOnEnter(counted))
+        return setScene('포스트시즌')
+      }
+      // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
+      // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
+      // 45번째 경기는 하루 끝 0xb818c 가 대진 0xb80a8 을 열며 L+0x32 = 0 이라 위와 같은 [114 → 136] 이다.
+      if (isPitcherSeasonFinished(counted)) return continueYearEnd(counted, [])
+      /*
+       * **2경기 주기** — 상태 116 의 끝(0x12b74~0x12bb2)이 `S+0xb2`(경기 수)의 **비트0** 을 본다:
+       * ```
+       *   12b98: ldrb r3,[r2]        ; r2 = S+0xb2 = 경기 수 g
+       *   12b9a: movs r1,#0
+       *   12b9c: lsls r5,r3,#0x1f    ; 비트0 을 부호 자리로
+       *   12b9e: bmi  0x12ba2        ; 홀수면 건너뜀
+       *   12ba0: movs r1,#1          ; 짝수
+       *   12ba8: cmp  r1,#0 ; beq 0x12bb0
+       *   12bac: movs r1,#0x69       ; 105 관리 화면
+       *   12bb0: movs r1,#0x6d       ; 109 순위표
+       * ```
+       * 이 함수에는 **모드 갈림이 없다** — 장면 0x106 은 모드 3(투수편)·4(타자편)가 함께 쓰므로
+       * 투수편도 타자편과 **똑같이 2경기 주기**다 (재진입 분기 0x1c38e~0x1c3b8 도 같은 판정).
+       * 홀수 경기 뒤는 109 순위표로 간다 — 타자편(`useCareerSession.confirmGameResult`)과 같다
+       * (원본 109 → 142 → 144 → 경기 장면. 웹은 142·144 없이 109 확인이 곧바로 경기).
+       *
+       * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
+       *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
+       */
+      if (!isPitcherManagementCycleOpen(counted)) {
+        // 116 → [114 → 109] 순위표 (이전 상태가 105 가 아니라 취소가 안 먹는다). 109 진입 0x10d8c 가 S+0x50 = 4 · 저장
+        commit({ ...counted, seasonEndState: 109 })
+        setNextGameFromManagement(false)
+        return setScene('다음경기순위')
+      }
+      // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7). 그 검사는 105 에
+      // 들어올 때마다 도는 진입 곁가지라 관리 화면 도착 고리(아래 '관리 화면(105)의 이벤트')가 한다
+      commit(counted)
+      setScene('관리')
+    },
+    [career, commit, continueYearEnd],
+  )
 
   /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기 */
   const continueAfterEnding = useCallback(() => {
@@ -2347,8 +2346,6 @@ export function usePitcherLeagueSession(
         })
       },
       beginYearEnd,
-      continueCareer,
-      retire,
       continueAfterEnding,
       receiveEndingBonus,
       finishEnding,
