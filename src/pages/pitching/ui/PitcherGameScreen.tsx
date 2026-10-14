@@ -981,13 +981,6 @@ export function PitcherGameScreen({
           </div>
         )}
 
-        <ul className={styles.log}>
-          {progress.log.slice(0, 6).map((entry) => (
-            <li key={entry.id} className={styles.logLine} data-mine={entry.isMine}>
-              {entry.text}
-            </li>
-          ))}
-        </ul>
       </PixelScreen>
 
       {visibleBurstLines !== null && (

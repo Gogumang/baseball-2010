@@ -1255,13 +1255,6 @@ export function TeamGameScreen({
           <Hint>자동 진행 중…</Hint>
         )}
 
-        <ul className={styles.log}>
-          {progress.log.slice(0, 6).map((entry) => (
-            <li key={entry.id} className={styles.logLine} data-mine={entry.isMine}>
-              {entry.text}
-            </li>
-          ))}
-        </ul>
       </PixelScreen>
 
       {/*

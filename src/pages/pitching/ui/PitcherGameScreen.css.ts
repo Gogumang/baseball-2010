@@ -75,17 +75,3 @@ export const baseOn = style({
   color: theme.color.accent,
 })
 
-export const log = style({
-  margin: '6px 0 0',
-  padding: 0,
-  listStyle: 'none',
-  fontSize: '11px',
-  color: theme.color.inkDim,
-})
-
-export const logLine = style({
-  padding: '1px 0',
-  selectors: {
-    '&[data-mine="true"]': { color: theme.color.ink },
-  },
-})
