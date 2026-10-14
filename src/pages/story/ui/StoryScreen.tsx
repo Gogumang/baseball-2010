@@ -24,6 +24,7 @@ import {
   INITIAL_EVENT_BACKDROP, clearsDialogueBeforeMatch, drawEventBackdrop, portraitBaseYOf,
 } from '@/pages/story/lib/eventBackdrop'
 import type { EventBackdropState } from '@/pages/story/lib/eventBackdrop'
+import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
 
 /** 화자 번호 1 은 플레이어 이름으로 바꾼다. */
 const PLAYER_SPEAKER = 1
@@ -176,6 +177,7 @@ export function StoryScreen({
   // 명령 6 소리 — 지나온 명령이 도는 틀에 (0x8d470)
   useEventSounds(step)
   const effect = screenEffect.frame
+  useWholeScreenOffset(effect?.offset ?? null)
   // 막는 효과를 기다리는 동안은 멈출 명령이 아직 돌지 않았다 — 앞 say 상자 · 초상화가 그대로다
   const command = isReleased ? step.command : null
 
@@ -261,11 +263,8 @@ export function StoryScreen({
   }
 
   return (
-    <div className={styles.overlay}
-      // 흔들기(종류 9)는 원본이 화면 전체 그리기 원점을 옮긴다(0xba888) — 웹은 이 이야기 판만 옮긴다 (근사)
-      style={effect === null || (effect.offset.x === 0 && effect.offset.y === 0)
-        ? undefined
-        : { transform: `translate(${effect.offset.x}px, ${effect.offset.y}px)` }}>
+    // 흔들기(종류 9)는 그린 화면 버퍼를 통째로 옮긴다(0xba888) — 밑그림 · 이야기 판 · 창 모두 (`useWholeScreenOffset`)
+    <div className={styles.overlay}>
       {backdropDraw.fill !== null && (
         // 0x6a734 — 밑그림 위 · 상자와 초상화 아래에 화면 전체를 칠한다 ([mgr+0x2c8])
         <div className={styles.backdropFill} data-testid="event-backdrop-fill"

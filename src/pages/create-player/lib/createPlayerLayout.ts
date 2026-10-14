@@ -161,10 +161,22 @@ export function isCursorVisibleAt(tick: number): boolean {
 export const INFO_FRAME = { batter: 2, pitcher: 1 } as const
 
 /**
- * 고른 줄 양옆 화살표. 원본은 mode_ui 프레임 목록 +0x60 의 그림을 쓰는데(0x160a8) 프레임 번호가
- * C-6 에도 "세부 유력" 으로만 남아 있다 → 기록연감 쪽 화살표(`slt_frame` 그림 20, 5×8)로 근사했다.
+ * 고른 줄 화살표 (0x160a8~0x160e0, 직접 떴다). 그림은 [장면+0xec] = `ui/mode_ui.pzx`(나리 진입 0x13f08 · 0x11910 이 싣는다)의
+ * 프레임 목록 +0x60 = **프레임 24**(5×8 왼쪽 화살, 원점 (0,0)). 고른 줄이 0(이름)이 아니면 값 칸 상자 R(박스 4, 커서 사각형의 안쪽)에
+ * ```
+ * 0xb9e05(프레임 24, R, 정렬 0x21, 효과 0)                 ; 왼쪽 화살 — 정렬 비트 0x1 은 0xb9d74 가 안 봐 x = R.x
+ * 0xb9e05(프레임 24, R, 정렬 0x24, 효과 0x11, x 이동 = 폭)  ; 뒤집은 오른쪽 화살 — x = R.x + R.w − 폭 + 폭 = R.x + R.w
+ * ```
+ * 세로 0x20 은 `(d >> 1) + d % 2`, d = R.h − 8 (15 → 4). 뒤집기 0x11 은 왼쪽 끝을 그대로 두고 그린다(환경설정 화살과 같은 쓰임).
+ * 곧 왼쪽 화살은 값 칸 **안** 왼쪽 끝에, 오른쪽 화살은 값 칸 바로 **바깥** 오른쪽에 선다(원본 그대로).
  */
-export const ARROW = { image: './sprites/slt_frame/020.png', width: 5, height: 8, gap: 3 } as const
+export const ARROW = { image: './sprites/mode_ui/frames/024.png', width: 5, height: 8 } as const
+
+/** 화살 자리 — `step` < 0 왼쪽 · > 0 오른쪽 */
+export function arrowTopLeftOf(box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }, step: number) {
+  const d = box.height - ARROW.height
+  return { x: step < 0 ? box.x : box.x + box.width, y: box.y + (d >> 1) + (d % 2) }
+}
 
 /** 선수 미리보기 자세 — 대기 애니 첫 칸 (batterLayersOf 의 프레임 0) */
 export const FIGURE_POSE_FRAME = 0

@@ -45,3 +45,14 @@ export const noticeLine = style({
   fontSize: '11px',
   lineHeight: 14 / 11,
 })
+
+/** 밤 덮개 — 화면 전체 [0x15605d4] 단계 9 (0x7eba2). 누름은 아래 건물로 지나간다 */
+export const nightCover = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: '240px',
+  height: '320px',
+  background: '#000000',
+  pointerEvents: 'none',
+})
