@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { RawScreen } from '@/shared/ui'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
-import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { RankingBoard } from '@/pages/nari-record-room/ui/RankingBoard'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  SEASON_RANKING_SIZE, moveRankingPage, rankingCategoriesOf, seasonRankingValueTextOf,
-} from '@/entities/season-mode/model/seasonRecordRanking'
+import { moveRankingPage, rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRanking'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   OPEN_YEAR_RECORD_VIEW, RECORD_ROOM_PICK, RECORD_ROOM_PICK_LABEL_FRAMES, RECORD_ROOM_PICK_LABELS,
@@ -27,12 +24,6 @@ import type {
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
-/** 내 팀 줄 글색 (0xff, 0xd4, 0x29) — 0x57c70 */
-const MY_TEAM_COLOR = '#ffd429'
-/** 팀 이름 img_text = 0x41 + 팀 (0x57e76) */
-const TEAM_NAME_FRAME_BASE = 0x41
-/** 순위표 머리 글 img_text — 136 "순위" · 27 "이름" · 235 "팀명" (0x57a76 · 0x57ab2 · 0x57aec) */
-const RANK_HEADER_FRAMES = [136, 27, 235] as const
 
 export type NariRecordViewProps = {
   /** [장면+0x164] — 팝업 0x80 에서 고른 칸 */
@@ -286,13 +277,9 @@ interface NariRankingScreenProps {
   readonly onBack: () => void
 }
 
-/** ⚠️ 근사 배치 — 시즌 0xdb(`SeasonRecordRankScreen`)와 같은 0x5796c 판. 시작 x · 칸 사이 3 · 줄 사이 4 만 확정 */
-const RANK_TABLE = { x: 20, headerY: 60, firstRowY: 84, rowStep: 18, columns: [24, 76, 64, 36] } as const
-
 /**
  * 124 둘째 갈래 — 0x5796c(나리 판 목록) · 키 0x5787d(좌·우로 쪽 [편집기+0x444], 끝에서 멈춘다 · 쪽이 바뀌면 다시 뽑는다).
- * 그림은 시즌 기록순위 0xdb 와 같은 함수다: 머리 줄 순위 · 이름 · 팀명 · 쪽의 종류 글(옮길 수 있으면 좌우 화살),
- * 줄 i 는 순위 i + 1 · 이름 · 팀 img_text 0x41 + 팀 · 값, 그 줄 팀이 내 팀([편집기+0x448] = S[1])이면 노란 글.
+ * 그림은 시즌 기록순위 0xdb 와 같은 함수다 — `RankingBoard`(배치 `lib/rankingBoard.ts` 머리말). 내 팀 = [편집기+0x448] = S[1].
  */
 function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRankingScreenProps) {
   const side = nariRankingSideOf(edition)
@@ -315,43 +302,12 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
   const categories = rankingCategoriesOf(side)
   const category = categories[page] ?? categories[0]
   const entries = nariRankingEntriesOf(edition, career, page)
-  const columnX = RANK_TABLE.columns.map((_width, index) => RANK_TABLE.x + RANK_TABLE.columns.slice(0, index).reduce((sum, width) => sum + width + 3, 0))
-  const headerFrames = [...RANK_HEADER_FRAMES, category.labelFrame]
-
   return (
     <RawScreen>
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`순위기록 ${side} ${category.label}`}>
-        <div className={windowStyles.window} style={{ left: 14, top: 52, width: 212, height: 216 }} />
-        {headerFrames.map((frame, index) => (
-          <img key={frame} className={windowStyles.layer} alt="" src={frameSrc(frame)}
-            style={{ left: columnX[index] + RANK_TABLE.columns[index] / 2, top: RANK_TABLE.headerY, transform: 'translateX(-50%)' }} />
-        ))}
-        {page > 0 && <span className={styles.title} style={{ left: columnX[3] - 6, top: RANK_TABLE.headerY - 2, width: 6 }}>◀</span>}
-        {page < categories.length - 1 && (
-          <span className={styles.title} style={{ left: columnX[3] + RANK_TABLE.columns[3], top: RANK_TABLE.headerY - 2, width: 6 }}>▶</span>
-        )}
-        {Array.from({ length: SEASON_RANKING_SIZE }, (_unused, row) => {
-          const entry = entries[row]
-          const rowTop = RANK_TABLE.firstRowY + row * RANK_TABLE.rowStep
-          const color = entry !== undefined && entry.record.teamId === career.teamId ? MY_TEAM_COLOR : ORIGINAL_COLORS.text
-          return (
-            <div key={row} data-testid={`순위기록-줄-${row}`} style={{ color }}>
-              {entry !== undefined && (
-                <>
-                  <span className={styles.title} style={{ left: columnX[0], top: rowTop, width: RANK_TABLE.columns[0], color }}>{row + 1}</span>
-                  <span className={styles.title} style={{ left: columnX[1], top: rowTop, width: RANK_TABLE.columns[1], color }}>{entry.record.name}</span>
-                  <img className={windowStyles.layer} alt="" src={frameSrc(TEAM_NAME_FRAME_BASE + entry.record.teamId)}
-                    style={{ left: columnX[2] + RANK_TABLE.columns[2] / 2, top: rowTop + 2, transform: 'translateX(-50%)' }} />
-                  <span className={styles.title} data-testid={`순위기록-값-${row}`}
-                    style={{ left: columnX[3], top: rowTop, width: RANK_TABLE.columns[3], color }}>
-                    {seasonRankingValueTextOf(category.kind, entry.value)}
-                  </span>
-                </>
-              )}
-            </div>
-          )
-        })}
+        <RankingBoard kind={category.kind} kindLabelFrame={category.labelFrame} entries={entries} myTeamId={career.teamId}
+          hasPreviousPage={page > 0} hasNextPage={page < categories.length - 1} testIdPrefix="순위기록" />
       </div>
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
     </RawScreen>
