@@ -325,7 +325,8 @@ export function MessageBox({
             return (
               <button key={label} type="button" className={styles.button} aria-label={label}
                 style={cellSize === null ? undefined : { width: cellSize.width, height: cellSize.height }}
-                onMouseEnter={() => setSelected(index)} onFocus={() => setSelected(index)}
+                // 마우스 올리기로는 고르지 않는다 — 원본은 키패드뿐이고, 창이 뜰 때 멈춘 포인터 아래 단추가 선택을 빼앗았다(나만의리그 [14])
+                onFocus={() => setSelected(index)}
                 onClick={() => answer(index)}>
                 {frame === undefined ? (isSelected ? `▶ ${shown}` : shown) : (
                   <img
