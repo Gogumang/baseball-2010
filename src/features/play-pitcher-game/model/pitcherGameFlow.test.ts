@@ -18,6 +18,7 @@ import {
   ourPitcherOrderOf,
   earnedRunAverageOf,
   giveUpPitching,
+  hiddenStealBasesOf,
   isPitchTurn,
   pickoff,
   pitchSlotsFor,
@@ -1276,6 +1277,65 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
       일루.onMound ? { name: '나투수', pitcherRole: 기본옵션.role } : null,
     )
     expect(pending.input.runnerAces?.first ?? null).toBeNull()
+  })
+
+  it('CPU 도루 출발 표시 st[0x15 + i] — 도루 판(종류 5)은 안 지우고, 같은 타석 다음 공의 0xf 진입은 `selectionEntered` 로만 적는다', () => {
+    let checked = 0
+    let sameAtBat = 0
+    let newAtBat = 0
+    for (let seed = 601; seed <= 2000; seed += 1) {
+      const progress = startPitcherGame(기본옵션, 씨앗(1))
+      // 짝수 씨앗은 풀카운트 — 볼넷 · 삼진 + 도루로 타석이 끝나는 공도 본다
+      const fullCount = seed % 2 === 0 ? { atBat: { ...progress.atBat, balls: 3, strikes: 2 } } : {}
+      const 일루 = {
+        ...progress,
+        ...fullCount,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+      }
+      const 끝 = startPitch(일루, 가운데직구, 씨앗(seed))
+      if (끝.lastArrivalPlay?.kind !== 5) continue
+      checked += 1
+      const display = 끝.stealDisplay ?? null
+      expect(display?.bases).toEqual([1])
+      // 판정 입력은 판정 때 거둔다 — 표시만 남는다
+      expect(끝.stealingFrom).toEqual([])
+      if (끝.game.half !== 일루.game.half) continue
+      if (끝.sceneConfirmPending === true && 끝.opponentOrderIndex !== 일루.opponentOrderIndex) {
+        // 새 타석(삼진 · 볼넷 + 도루) — 0xf 진입은 0xe 의 OK 뒤라 그때까지 숨긴다(새로 선 주자라도 그 루면 안 그린다 — 원본 그대로)
+        newAtBat += 1
+        expect(display?.selectionEntered).toBe(false)
+        expect(hiddenStealBasesOf(끝, false)).toEqual([1])
+        const 확인 = confirmScene(끝, 씨앗(1))
+        if (확인.sceneConfirmPending !== true) expect(hiddenStealBasesOf(확인, false)).toEqual([])
+      } else if (끝.opponentOrderIndex === 일루.opponentOrderIndex) {
+        // 같은 타석 다음 공 — 0xf 진입이 이 걸음에 돌았다(그 진입의 CPU 대타로 0xe 에 다시 서도 이미 지운 뒤다).
+        // 화면은 공이 날거나 0x12 인 동안만 숨긴다
+        sameAtBat += 1
+        expect(display?.selectionEntered).toBe(true)
+        expect(hiddenStealBasesOf(끝, true)).toEqual([1])
+        expect(hiddenStealBasesOf(끝, false)).toEqual([])
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+    expect(sameAtBat).toBeGreaterThan(0)
+    expect(newAtBat).toBeGreaterThan(0)
+  })
+
+  it('출발이 없는 공은 표시가 없다 · 타구 판(종류 1) 시작 0x3d7b8 은 출발 표시를 지운다', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 끝 = startPitch(progress, 가운데직구, 씨앗(3))
+    expect(끝.stealDisplay ?? null).toBeNull()
+    expect(hiddenStealBasesOf(끝, true)).toEqual([])
+    let batted = 0
+    for (let seed = 601; seed <= 1000 && batted < 3; seed += 1) {
+      const 시작 = startPitcherGame(기본옵션, 씨앗(1))
+      const 일루 = { ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }
+      const 친공 = startPitch(일루, 가운데직구, 씨앗(seed))
+      if (친공.pendingDefensePlay === null) continue
+      batted += 1
+      expect(친공.stealDisplay ?? null).toBeNull()
+    }
+    expect(batted).toBeGreaterThan(0)
   })
 
   it('주자가 없으면 CPU 도루 굴림이 없다 — 못 맞힌 공은 0.1% 굴림(0x35034) 하나만 더 쓴다', () => {
