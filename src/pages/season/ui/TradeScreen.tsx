@@ -12,7 +12,7 @@ import { TRADE_REQUEST_TAB } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import { myTradeEntriesOf, opponentTradeEntriesOf } from '@/widgets/season/lib/tradeList'
 import type { TradePlayerEntry } from '@/widgets/season/lib/tradeList'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
+import { ENTRY_LIST_PANEL, SeasonListWindow, TRADE_CONFIRM_PANEL } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
@@ -151,7 +151,7 @@ export interface TradeScreenProps {
  * (내 팀 칸은 그림 0xa14c → 칸 그리기 0x7a570 이 로고 위를 검정 덮기 단계 7 로 어둡게 한다 — `TeamSelectScreen.coveredTeamId`).
  *
  * ⚠️ **원본 배치 미해독 — 근사**: 0xe5·0xe6 의 엔트리 목록 창(0x5cfec)과 0xe7 의 진행 화면
- * (0xd4e8) 좌표를 확인하지 못해 다른 시즌 화면과 같은 공용 판 목록으로 그린다.
+ * (0xd4e8) 안 칸 배치(mode_ui 프레임 70 박스 1~10)를 아직 옮기지 못해 공용 판 목록으로 그린다. 판만 원본 인자다.
  * 머리띠 제목도 트레이드 그림이 따로 없어 **시즌모드** 제목을 쓴다.
  * 요청 중 위·아래를 바꿔 넣는 키 −3 은 보기 전용 편집기의 왼쪽 갈래(0x559f8)라 끝 코드만 적고 아무도 안 읽는다 —
  * 곧 커서가 안 움직일 뿐이다(`lockedCursor` 주석).
@@ -443,6 +443,9 @@ export function TradeScreen({
       )}
 
       <SeasonListWindow
+        // 판 — 0xe5(그림 0xb0f4) · 0xe6(0xb0b4) 은 엔트리 목록 창 0x5cfec → 0x5c984 판, 0xe7 은 그림 0xd4e8 의 d5b4 공용 판
+        // (mode_ui 프레임 70 박스 0, 정렬 0x11, 위 띠 0x10, 제목 탭 1). 그리기 점프표 0xcc024 의 f042 · f04a · f0b2 로 확인
+        panel={step.kind === '확인' ? TRADE_CONFIRM_PANEL : ENTRY_LIST_PANEL}
         title={title}
         rows={step.kind === '확인' ? boostRows : rowsOf(listEntries)}
         cursor={shownCursor}

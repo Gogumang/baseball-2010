@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { MessageBox } from '@/shared/ui'
+import { CommonPanel, MessageBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import {
@@ -86,9 +86,10 @@ export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowPro
 
   return (
     <div className={styles.overlay} role="dialog" aria-label="칭호" onClick={onClose}>
-      {/* 박스 0 — 공용 판 0x55e61 */}
-      <div className={styles.window}
-        style={{ left: windowBox.x, top: windowBox.y, width: windowBox.width, height: windowBox.height }} />
+      {/* 박스 0 — 19974 공용 판 0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
+          (1993a~19974 직접 뜸 — 박스 0 은 그림 자료 +0xfc = mode_ui 프레임 63). 제목 탭이 서서 위 띠는 안 본다 */}
+      <CommonPanel x={windowBox.x} y={windowBox.y} width={windowBox.width} height={windowBox.height}
+        topBand={0x10} titleTab testId="칭호-판" />
 
       {/* 박스 1 — img_text 279 "닉네임" 팔레트 3 · 정렬 0x21 · ox 28 */}
       {header !== undefined && (

@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { FrameSprite } from '@/shared/ui'
+import { FrameSprite, RoundBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { RECORD_ALERT_ROW_FRAME, RECORD_ALERT_TITLE_FRAME } from '@/widgets/game-scene/lib/recordAlert'
 import type { RecordAlertFrame } from '@/widgets/game-scene/lib/recordAlert'
@@ -16,7 +16,8 @@ const TEXT_COLOR = '#FFFFFF'
 /**
  * **경기 중 기록 달성 알림 0x4e35c** — 오른쪽 위에서 밀려 드는 판(머리 "기록달성" · G 누계)과 칸 다섯.
  * 값과 자리는 `lib/recordAlert`, 상태는 `model/useRecordAlert`. 부르는 화면의 240×320 판 위에 겹친다.
- * ⚠️ 근사: 칸 0x5eec5(…, 4, 1, 1, 0x41, 2, 0xc8, 0x335fcd, …) 의 그림은 안 읽어 홈런더비 칸과 같은 CSS 로 둔다.
+ * 칸은 둥근 칸 0x5eec5(skin, x, 5, 100, h, 둥글기 4, 정렬 1, 반사 1, 반사 길이 0x41, 걸음 2, 0xc8(안 읽음), 칠 #335FCD, 테두리 0, 0)
+ * — `RoundBox` 가 원본 선 목록대로 긋는다 (4e47a 직접 뜸, 0x5eec4 는 `roundBoxPaintsOf`).
  */
 export function RecordAlertPanel({ frame }: { readonly frame: RecordAlertFrame }) {
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
@@ -33,7 +34,8 @@ export function RecordAlertPanel({ frame }: { readonly frame: RecordAlertFrame }
             values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
         </filter>
       </svg>
-      <div className={styles.box} style={{ left: panel.x, top: panel.y, width: panel.width, height: panel.height }} />
+      <RoundBox x={panel.x} y={panel.y} width={panel.width} height={panel.height} round={4} shine shineLength={0x41} shineStep={2}
+        fill="#335FCD" edge="#000000" testId="기록달성-칸" />
       <FrameSprite folder={IMG_TEXT_FRAMES} frame={RECORD_ALERT_TITLE_FRAME} origins={textOrigins}
         x={panel.title.x} y={panel.title.y} style={{ filter: `url(#${navyFilterId})` }} />
       {frame.rows.map((row) => (
