@@ -1379,6 +1379,17 @@ export function opponentPitcherEquipmentOf(progress: GameProgress): readonly num
 }
 
 /**
+ * **내 타석 마운드 투수의 체력%** — 투수 그리기 0x38d1c 의 38f68 이 `0xaebb1(수비 팀)` = trunc(지금 마운드 +0x2c / 100) 로 읽어
+ * 34 이하면 지친 눈(player_effect 애니 9 · 10)을 그린다(`BattingStage.pitcherStaminaPercent`).
+ * 38f56 이 투수가 마선수(0xb633d)면 건너뛰므로 마선수 대결 투수(`aceOpponent`)나 142 가 8번 칸에 넣은 마투수가 서 있으면 null.
+ */
+export function opponentMoundStaminaPercentOf(progress: GameProgress): number | null {
+  if (progress.aceOpponent !== null) return null
+  if (moundAcePitcherOf(progress, false) !== undefined) return null
+  return staminaPercentOf(progress.opponentMound.stamina)
+}
+
+/**
  * **지금 상대 마운드 투수의 소개 판 재료** (상태 0xe 의 0x44944 — 투수 `0xae83c(수비 팀)`).
  * - 이름 · 보직 `+0xb & 3`(로스터 칸 표) · 손 0xb63c0(폼 & 1 · 마투수 표 `pitcherHandOf`) — 레코드는 붙박이 표 칸 또는 142 가
  *   8번 칸에 넣은 마투수다. 마선수 대결 투수(`aceOpponent`)는 이름만 안다.

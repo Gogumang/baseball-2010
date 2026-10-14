@@ -302,6 +302,10 @@ export function MissionRoutes({
         // 상태 0xe 주루 칸 — 루에 선 주자의 신원대로 (`missionRunnerRunAbilitiesOf`)
         runnerRunAbilities={session.missionRunnerRunAbilities}
         stealingFrom={session.stealingFrom}
+        // 루상 마선수 주자 그림(0x35b94 · +0x1c) — 수비 판과 같은 `missionRunnerAcesOf`
+        {...(session.missionRunnerAces === undefined ? {} : { runnerAces: session.missionRunnerAces })}
+        // 투수 그리기 0x38d1c 의 지친 눈 — 마운드 체력% 0xaebb1 (마투수면 타석 화면이 거른다)
+        pitcherStaminaPercent={session.opponentStaminaPercent}
         runnerAnimationClock={runnerAnimationClockRef}
         skillPanelScene={skillPanelSceneRef}
         onSteal={actions.steal}

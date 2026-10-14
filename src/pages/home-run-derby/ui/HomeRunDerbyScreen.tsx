@@ -278,7 +278,9 @@ export function HomeRunDerbyScreen({
             // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
             isVibrationOn={settings?.isVibrationOn}
             isEagleEyeEnabled={false}
-            // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다)
+            // 홈런더비는 일반 점수판을 안 그린다 (0x4c4bc 가 0x373d0 대신 0x45a54 로 간다).
+            // 루상 주자(runnerAces)는 주자가 없어, 투수 체력 · 실투 "!"(pitcherStaminaPercent)는 투수 그리기 0x38d1c 가 모드 7 이면
+            // 38ed6 에서 건너뛰어 넘기지 않는다
             hud={null}
             acePitcher={
               ace === null

@@ -65,6 +65,7 @@ import {
   missionDefenseAbilitiesOf,
   missionPlayAbilitiesOf,
   missionRunAbilitiesOnBaseOf,
+  missionRunnerAcesOf,
   missionRunnerRunAbilitiesOf,
   missionRunnersAfterPlay,
 } from '@/entities/mission/model/missionRunners'
@@ -2289,6 +2290,11 @@ export function useMissionSession({
      */
     missionRunnerRunAbilities:
       missionRun === null ? {} : missionRunnerRunAbilitiesOf(missionRun, specialRunnersRef.current(missionRun.mission)),
+    /**
+     * 타자 미션 타석 화면의 타자 · 루 주자 마선수 번호 — 루상 주자 0x35b94 가 주자 +0x9c ≠ −1 이면 타석 교대 0x483a0 이 +0x1c 에 실은
+     * ace/defender 그림으로 그린다. 수비 판(`playAbilitiesOf` 의 `runnerAces`)과 같은 값이다 (`missionRunnerAcesOf`)
+     */
+    missionRunnerAces: missionRun === null ? undefined : missionRunnerAcesOf(missionRun),
     /** 상태 0xe 의 OK 대기 — 화면이 `useSceneConfirm` 에 넘긴다 (새 타석이면 메시지 0xbc1 의 타석 등장음을 실었다) */
     sceneConfirm: announcedSceneConfirm,
     /** 경기 장면 로딩 판의 팁 글(StrTIP[1 + rand(0, 73)]) — 서 있으면 라우트가 로딩 판을 그리고 끝나면 `actions.finishLoading` */
