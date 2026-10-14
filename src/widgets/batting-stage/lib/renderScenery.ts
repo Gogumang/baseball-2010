@@ -29,8 +29,8 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
  *   (또는 `hidden_fence_*`)와 `fence_board.pzx`(또는 `hidden_board_*`)를 고르고, 팀 아이콘·전광판
  *   상자를 **전광판 그림**에서 읽는다. 관중 `ppl` 은 셋째 인자가 늘 0 이라 안 그린다.
  *
- * 구장 객체 +0x60 은 **현재 타자의 손**을 받아, 우타(0)면 두 그리기 모두 효과 0x11 로
- * **펜스·관중·전광판을 통째로 뒤집는다** (R6 4절). 하늘·구름과 바닥(0x7725c)은 뒤집지 않는다.
+ * 구장 객체 +0x60 은 **현재 타자의 손**을 받아, 우타(0)면 펜스 · 관중석 · 전광판 그림과 바닥(0x7725c)을 효과 0x11 로
+ * 뒤집는다 — 팀 아이콘 · 관중 ppl · 전광판 글자는 안 뒤집고 옮기기만 한다 (`RIGHT_HANDED_MIRROR_X` 주석). 하늘·구름은 그대로다.
  */
 /**
  * 시즌 구장 그리기에 들어가는 세 값 — 구장 객체 `+0x88`(관중석 칸) · `+0x89`(관중 단계) ·
@@ -212,7 +212,7 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   }
   const offsetY = state.offsetY ?? 0
   drawFence(context, state, offsetY)
-  drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY)
+  drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY, (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타)
   if (offsetY === 0) drawSkyLight(context, state, colorIndex)
 }
 
@@ -252,47 +252,74 @@ function drawClouds(context: CanvasRenderingContext2D, tick: number, paletteRow:
   }
 }
 
+/**
+ * **우타(구장 +0x60 == 0) 거울** — 0x77974 · 0x77494 · 0x7725c 를 직접 떴다 (2026-10-14).
+ * ```
+ * 779a4  +0x60 ≠ 0(좌타): x = 구장+4 − 1 … − 10 에 효과 0 · 박스 계산 0x948cd 도 효과 0      ; 77a1a~77a40
+ *        +0x60 == 0(우타): x = 구장+4 + 10 + 480 에 효과 0x11(좌우)로 펜스를 그리고 박스도 효과 0x11 로 잰다 ; 77a42~77ab4
+ * 77ad0  팀 아이콘 0 · 1 = 펜스 박스 i 의 (x, y) + (잰 박스 x − 프레임 +0xe) — 아이콘 자체는 안 뒤집는다(0xb9d35, 정렬 0x22)
+ * 77bea  관중 ppl(+0x74) 파트: 좌타 x = 기준 + dx · 우타 x = 기준 + dx + 0x78 — **효과는 같다(안 뒤집는다)**
+ * 77d06  전광판 글자 상자 = 펜스 박스 2 + 1 + (잰 박스 x − 프레임 +0xe) — 글자도 안 뒤집는다
+ * 77540  시즌 구장 0x77494: 관중석 · 관중 덧그림 · 전광판 그림 셋 다 우타면 x + 490 · 효과 0x11, 아이콘 · 글자는 전광판 그림 박스로 잰다
+ * 772ca  바닥 0x7725c: 좌타 x = 구장+4 − 1 − 0x48 효과 0 · 우타 x = 구장+4 − 0x21 효과 0x11 (그림 단계 뒤집기 — 제 상자 안)
+ * ```
+ * 효과 0x11 · b 0 은 파트를 x' = X − (dx + 폭) 에 거울로 놓는다(R6 3b) — 펜스 점 p 는 좌타 XL + p, 우타 XR − 1 − p 이고
+ * XL = −131 · XR = 370 이라 **화면 x → 238 − x 거울**이다(바닥도 폭 585 라 같은 거울). 그래서 펜스 · 관중석 · 전광판 그림 · 바닥은
+ * 캔버스를 (239, 0) 에서 뒤집어 그리고, 박스로 놓는 팀 아이콘 · 전광판 글자는 뒤집지 않은 채 잰 박스만큼 옮긴다
+ * (`rightHandedBoxShiftOf` — 지금 펜스 셋은 모두 141), 관중 ppl 은 0x78 + 21 = 141 옮긴다.
+ * 예전 웹은 통째로 뒤집어 관중 ppl 그림의 "GAMEVIL®" 글자가 거울로 나와 거울을 꺼 두었다 — 원본은 ppl 을 안 뒤집고 옮기기만
+ * 하므로 우타에서도 그 글자는 똑바로 읽힌다(헤드리스 확인).
+ * 흔들기 칸(구장 +0x64 → 0xbb255 · 0x771e4)은 웹이 안 그리므로 0 으로 본다.
+ */
+export const RIGHT_HANDED_MIRROR_X = 239
+/** 우타 펜스 그리기 x = 구장+4 + 10 + 480 (0x77a72 · 0x77a84) */
+const RIGHT_HANDED_FENCE_X = CAMERA.x + 10 + 480
+/** 우타 관중 ppl 파트는 좌타 자리 + 0x78 + 21 (77bf0 · 77c0e — 기준이 −1 − 10 대신 + 10 이고 + 0x78) */
+export const RIGHT_HANDED_CROWD_SHIFT = 10 + 0x78 - (-1 - 10)
+
+/**
+ * 우타 때 박스로 놓는 그림(팀 아이콘 · 전광판 글자)을 좌타 자리에서 옮기는 값 — (XR − 2·원점x − 폭) − XL.
+ * 0x948cd 가 효과 0x11 로 잰 박스 x = XR − (원점x + 폭) 에서 프레임 +0xe(원점x) 를 한 번 더 뺀다.
+ */
+export function rightHandedBoxShiftOf(frame: { readonly offsetX: number; readonly width: number }): number {
+  return RIGHT_HANDED_FENCE_X - 2 * frame.offsetX - frame.width - FENCE_ANCHOR.x
+}
+
 function drawFence(context: CanvasRenderingContext2D, state: SceneryState, offsetY: number): void {
-  /**
-   * ⚠️ **꺼 뒀다.** 우타일 때 펜스 묶음을 통째로 뒤집었더니 관중석 그림(`ppl`)에 박혀 있는
-   *    **"GAMEVIL®" 광고 글자가 거울상**으로 나왔다. 원본 그림 파일에서는 그 글자가
-   *    똑바로 읽히므로(직접 펼쳐서 확인), 퍼블리셔 로고를 뒤집어 내보냈을 리가 없다.
-   *
-   *    앵커 표(0xcfb18·0xcfb2c·0xcfb7c)의 두 칸이 폭 480 기준 거울이라
-   *    (480−276=204≈203 · 480−184=296≈295 · 480−226−33=221) 원본이 무대를 통째로
-   *    뒤집는 것처럼 보이지만, **어느 쪽이 native 인지**가 아직 안 밝혀졌다.
-   *    밝혀질 때까지는 배경을 뒤집지 않는다 — 타자 그림 반전과 앵커 표는 그대로 산다.
-   */
-  const isMirrored = false && (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타
+  const isMirrored = (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타
   context.save()
   // 0x77974 의 기준 y = 구장+8 + 밀기 + 3 — 펜스·팀 아이콘·관중·전광판이 모두 이 기준에서 그려진다
   context.translate(0, offsetY)
-  if (isMirrored) {
-    context.translate(STAGE_WIDTH, 0)
-    context.scale(-1, 1)
-  }
-  drawFenceParts(context, state)
+  drawFenceParts(context, state, isMirrored)
   context.restore()
 }
 
-function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState): void {
+/** 박스 기준을 옮길 값 — 좌타 0, 우타면 그 그림으로 잰 값(그림이 아직 없으면 null: 놓을 자리를 못 잰다) */
+function boxShiftOf(frame: PlacedFrame | null, isMirrored: boolean): number | null {
+  if (!isMirrored) return 0
+  return frame === null ? null : rightHandedBoxShiftOf({ offsetX: frame.offsetX, width: frame.image.width })
+}
+
+function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState, isMirrored: boolean): void {
   if (state.seasonStadium !== undefined) {
-    drawSeasonFenceParts(context, state, state.seasonStadium)
+    drawSeasonFenceParts(context, state, state.seasonStadium, isMirrored)
     return
   }
 
   const fence = placedFrame(FENCE_FRAMES, state.stadium)
-  drawAtFenceAnchor(context, fence)
+  drawAtFenceAnchor(context, fence, isMirrored)
+  const shift = boxShiftOf(fence, isMirrored)
 
   const boxes = FENCE_BOXES[state.stadium] ?? []
-  drawTeamIcons(context, state, boxes)
+  if (shift !== null) drawTeamIcons(context, state, boxes, shift)
 
+  // 관중 ppl — 우타도 안 뒤집고 옆으로만 옮긴다 (77bea~77c16)
   const crowd = placedFrame(CROWD_FRAMES, state.stadium)
-  drawAtFenceAnchor(context, crowd)
+  drawAtFenceAnchor(context, crowd, false, isMirrored ? RIGHT_HANDED_CROWD_SHIFT : 0)
 
   // 전광판 (board_ani) — 환경설정 +0x3a OFF 면 그리지 않는다 (R2-game-effects.md 6절)
   if (state.isScoreboardOn === false) return
-  drawScoreboardText(context, boxes[SCOREBOARD_BOX], state.tick)
+  if (shift !== null) drawScoreboardText(context, boxes[SCOREBOARD_BOX], state.tick, shift)
 }
 
 /**
@@ -309,23 +336,37 @@ function drawSeasonFenceParts(
   context: CanvasRenderingContext2D,
   state: SceneryState,
   season: SeasonStadium,
+  isMirrored: boolean,
 ): void {
   const fence = seasonFenceFramesOf(season.stand, season.crowd)
-  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.standFrame))
-  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.crowdFrame))
+  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.standFrame), isMirrored)
+  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.crowdFrame), isMirrored)
 
   const board = seasonBoardFrameOf(season.board)
-  drawAtFenceAnchor(context, placedFrame(board.folder, board.frame))
+  const boardFrame = placedFrame(board.folder, board.frame)
+  drawAtFenceAnchor(context, boardFrame, isMirrored)
+  // 아이콘 · 글자 상자는 전광판 그림을 효과 0x11 로 잰 박스(sp+0x58)로 옮긴다 (0x7764c · 0x7778a)
+  const shift = boxShiftOf(boardFrame, isMirrored)
+  if (shift === null) return
 
-  drawTeamIcons(context, state, seasonTeamIconBoxesOf(season.board))
+  drawTeamIcons(context, state, seasonTeamIconBoxesOf(season.board), shift)
 
   if (state.isScoreboardOn === false) return
-  drawScoreboardText(context, seasonScoreboardBoxOf(season.board) ?? undefined, state.tick)
+  drawScoreboardText(context, seasonScoreboardBoxOf(season.board) ?? undefined, state.tick, shift)
 }
 
-function drawAtFenceAnchor(context: CanvasRenderingContext2D, frame: PlacedFrame | null): void {
+/** 펜스 기준에 그림 하나 — 우타 거울(`RIGHT_HANDED_MIRROR_X`)이면 캔버스를 뒤집어 같은 자리에 그린다. `shiftX` 는 안 뒤집는 옮김 */
+function drawAtFenceAnchor(context: CanvasRenderingContext2D, frame: PlacedFrame | null, isMirrored = false, shiftX = 0): void {
   if (frame === null) return
+  if (!isMirrored) {
+    context.drawImage(frame.image, FENCE_ANCHOR.x + shiftX + frame.offsetX, FENCE_ANCHOR.y + frame.offsetY)
+    return
+  }
+  context.save()
+  context.translate(RIGHT_HANDED_MIRROR_X, 0)
+  context.scale(-1, 1)
   context.drawImage(frame.image, FENCE_ANCHOR.x + frame.offsetX, FENCE_ANCHOR.y + frame.offsetY)
+  context.restore()
 }
 
 /** 박스 0·1 = 구장+0x84 / +0x80 팀 아이콘 — 어느 쪽이 우리 팀인지는 추정 */
@@ -333,6 +374,7 @@ function drawTeamIcons(
   context: CanvasRenderingContext2D,
   state: SceneryState,
   boxes: readonly (readonly number[])[],
+  shiftX = 0,
 ): void {
   // 0x77974 77ad6~77af0 · 77b4a~77b64 — 14 → 10, 10 이상 → 11 을 고른 뒤 **전역 모드 5 · 6(미션)이면 늘 11** 로 덮는다
   const isMissionMode = state.gameMode === 5 || state.gameMode === 6
@@ -343,7 +385,7 @@ function drawTeamIcons(
     const box = boxes[boxIndex]
     const image = sprite(TEAM_ICON(icons[index] ?? MISSION_TEAM_ICON))
     if (box === undefined || image === null) return
-    context.drawImage(image, FENCE_ANCHOR.x + box[0], FENCE_ANCHOR.y + box[1])
+    context.drawImage(image, FENCE_ANCHOR.x + shiftX + box[0], FENCE_ANCHOR.y + box[1])
   })
 }
 
@@ -352,10 +394,11 @@ function drawScoreboardText(
   context: CanvasRenderingContext2D,
   box: readonly number[] | undefined,
   tick: number,
+  shiftX = 0,
 ): void {
   const board = placedFrame(SCOREBOARD_FRAMES, 0)
   if (box === undefined || board === null) return
-  const left = FENCE_ANCHOR.x + box[0]
+  const left = FENCE_ANCHOR.x + shiftX + box[0]
   const top = FENCE_ANCHOR.y + box[1]
   context.save()
   context.beginPath()
@@ -407,9 +450,18 @@ function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, co
  * `grassPalette` 가 있으면 그 `.mpl` 줄로 칠한 그림을 쓴다 (잔디 = 팔레트, `0x786c8`).
  * 칠하는 동안에는 구운 그림이 나가므로 첫 몇 프레임은 기본색이 보인다.
  */
-function drawField(context: CanvasRenderingContext2D, grassPalette: number | null, offsetY: number): void {
+function drawField(context: CanvasRenderingContext2D, grassPalette: number | null, offsetY: number, isMirrored = false): void {
   const field = fieldBackground(grassPalette)
   if (field === null) return
+  if (isMirrored) {
+    // 0x772ca — 우타는 x = 구장+4 − 0x21 에 효과 0x11(제 상자 안 뒤집기). 폭 585 라 좌타 자리(−193)의 238 − x 거울과 같다
+    context.save()
+    context.translate(RIGHT_HANDED_MIRROR_X, 0)
+    context.scale(-1, 1)
+    context.drawImage(field, -STAGE_LAYOUT.fieldSourceX, STAGE_LAYOUT.fieldTopY + offsetY)
+    context.restore()
+    return
+  }
   context.drawImage(
     field,
     STAGE_LAYOUT.fieldSourceX, 0, STAGE_WIDTH, field.height,
@@ -569,7 +621,8 @@ export function drawMatchInfoStadium(context: CanvasRenderingContext2D, state: M
   context.translate(0, dy)
   if (!isFlatSky && isCloudVisible(colorIndex)) drawClouds(context, 0, cloudPaletteRowOf(colorIndex))
   // 일반 구장 0x77974 — 펜스 프레임 · 팀 아이콘 · 관중 · 전광판(틱 0)
-  drawFenceParts(context, scenery)
+  // ⚠️ 미확인: 이 무대의 +0x60(타자 손)을 누가 쓰는지 안 봤다 — 예전처럼 좌타(안 뒤집음)로 둔다
+  drawFenceParts(context, scenery, false)
   context.restore()
   // 바닥 0x7725c — 무대+0xc 줄
   drawField(context, state.fieldPalette, dy)

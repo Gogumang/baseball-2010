@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
@@ -16,6 +17,7 @@ import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
+import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -70,6 +72,11 @@ export interface PendingHit {
   readonly resultText: string
   /** 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트) — 인플레이로 넘길 때 함께 알린다 */
   readonly buntKind: number
+  /**
+   * 필살 스윙 연출 그림(0x49aec) — 상태 0x13 동안 타격점에 그림 애니 · 미라지 타자를 그린다 (`specialSwingEffect`).
+   * 필살 갈래를 안 타는 스윙이면 null
+   */
+  readonly specialEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null
 }
 
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */
@@ -78,6 +85,15 @@ export interface StageLatest {
   readonly pitcherAbility: PitcherAbility
   readonly isEagleEyeEnabled: boolean
   readonly hud: StageHud | null
+  /**
+   * 마운드 투수 체력 % — 34 이하면 투수 자리에 체력 그림(player_effect 애니 9 · 10, 0x38d1c)을 그린다. 안 넘기면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
+   * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /**
    * 루상 주자 애니 시계 — 경기 장면 수명의 칸(`useSceneScopedRef`)을 넘기면 타석 화면이 다시 서도 이어진다 (`RunnerAnimationClock`).
    * 안 넘기면 이 화면이 사는 동안만 센다

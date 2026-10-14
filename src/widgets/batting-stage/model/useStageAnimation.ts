@@ -400,6 +400,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     }
 
     /** 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 쉬기 시작한 뒤 틱(⚠️ 근사: 웹 쉬기는 0xd 두 그림부터라 0xe 진입보다 두 그림 이르다) */
+    const specialSwingEffectNow = (now: number, tickLength: number) => {
+      const effect = pendingHitRef.current?.specialEffect ?? null
+      if (phaseRef.current !== '타격' || effect === null) return null
+      return { ...effect, drawCall: pitchTickAt(now, phaseStartedAtRef.current, tickLength) + 1 }
+    }
+
     const stagePhaseNow = (now: number, tickLength: number) => {
       const isPaused = latestRef.current.isPaused
       const pausedWaiting = phaseRef.current === '대기' && isPaused
@@ -521,6 +527,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
               ? null
               : homeRunTextFrameAt(latestRef.current.homeRunText, now, tickLength),
         swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType, latestRef.current.aceBatterOrder),
+        // 필살 스윙 연출 그림 0x49aec — 상태 0x13('타격') 동안 그림마다 한 번 불린다 (k = 단계 틱 + 1, `specialSwingEffect`)
+        specialSwingEffect: specialSwingEffectNow(now, tickLength),
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
         batterSkinIndex: latestRef.current.batterSkinIndex,
@@ -528,6 +536,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         batterEquipment: latestRef.current.batterEquipment,
         side,
         hud: latestRef.current.hud,
+        pitcherStaminaPercent: latestRef.current.pitcherStaminaPercent ?? null,
+        ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,

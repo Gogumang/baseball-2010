@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -34,6 +35,15 @@ interface PitcherSideStageProps {
   /** 0x12 대기 틱 (0x4e6d4 — `resultWaitTicksOf`) */
   readonly resultTicks: number
   readonly hud: HudState | null
+  /**
+   * 마운드 투수 체력 % — 34 이하면 투수 자리에 체력 그림(player_effect 애니 9 · 10, 0x38d1c)을 그린다. 안 넘기면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
+   * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /** 타석에 선 (CPU) 타자의 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 팀 */
   readonly batterForm: number
   readonly batterSkinIndex: number
@@ -205,8 +215,11 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         tick: nowTick,
         resultTick: isResult ? stage.phase.tick : 0,
         resultText: isResult && resolution !== null ? describePitchResolution(resolution) : '',
-        isHomeRun: false,
-        homeRunTick: 0,
+        // CPU 홈런도 판정 v = 8 · 12 → 0x51cd8 이 +0x1960 을 켜 HOMERUN 글자(0x40b18)가 나간다 — 판정 글자는 없다 (타자편 `BattingStage` 와 같은 길).
+        // ⚠️ 맞은 공은 0x12 를 안 지나(`passesHeldResult`) 이 장면에서는 '결과' 가 서지 않는다 — 원본도 0x13 → 0x17(수비 판)이라
+        //    글자는 수비 판 그리기 0x46c88 이 띄운다(`pages/defense` 의 `DefenseHomeRunText`). 여기서는 같은 판정이 '결과' 로 들어올 때만 탄다
+        isHomeRun: isResult && resolution !== null && resolution.kind === '타구' && resolution.outcome.kind === '홈런',
+        homeRunTick: isResult ? stage.phase.tick : 0,
         isEagleEyeEnabled: false,
         shift: 0,
         swingFrame: batterFrameAt({
@@ -223,6 +236,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         batterEquipment: NO_EQUIPMENT,
         side,
         hud: current.hud,
+        pitcherStaminaPercent: current.pitcherStaminaPercent ?? null,
+        ...(current.runnerAces === undefined ? {} : { runnerAces: current.runnerAces }),
         acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,

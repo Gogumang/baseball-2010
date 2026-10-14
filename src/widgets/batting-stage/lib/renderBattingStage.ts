@@ -23,6 +23,7 @@ import {
   BASE_WINDOW_IMAGE,
   RUNNER_FRAMES,
   RUN_PIP_IMAGE,
+  aceRunnerFramesOf,
   baseRunnerDrawsOf,
   grayRunPipPixel,
   halfShadeRunnerPixel,
@@ -33,6 +34,8 @@ import {
   type BaseKey,
 } from '@/widgets/batting-stage/lib/baseRunners'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { loadedRunnerAceOf } from '@/features/defense-play/model/runnerAces'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
 import { drawSkillPanel } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
@@ -44,11 +47,13 @@ import { aceBatterLayersOf, batterLayersOf, isAceBatterOrder, layerPaletteIndexO
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
-import { drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { GAUGE_TARGET_FRAME, drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
+import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
+import { PLAYER_EFFECT_FRAMES, pitcherFatigueAnimationOf, pitcherFatigueFrameAt, showsPitcherFatigue } from '@/widgets/batting-stage/lib/pitcherFatigue'
+import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { UI_COLORS } from '@/shared/config/design'
-import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -117,6 +122,11 @@ export interface StageScene {
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: HudState | null
   /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 마선수 주자는 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9).
+   * 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
+  /**
    * 마운드에 선 투수의 **장착 장비 등급** (0x79790 적재 · 0x79524 여섯 칸).
    * 안 넘기면 맨몸 투수라 지금까지와 똑같이 바탕 f · f+22 두 겹만 그린다.
    *
@@ -142,6 +152,11 @@ export interface StageScene {
    * (0x38dac~0x38db8 → 0x38e6c 그림 객체 +4). 없으면 0.
    */
   readonly pitcherHand?: number
+  /**
+   * 마운드 투수 체력 % (0xaebb1(수비 팀)) — 34 이하면 투수 그리기 0x38d1c 가 player_effect 애니 9 · 10 을 투수 자리에 그린다
+   * (`pitcherFatigue`). 안 넘기면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
   readonly acePitcher: {
     readonly framesUrl: string
     readonly frameCount: number
@@ -170,6 +185,11 @@ export interface StageScene {
   readonly specialSwingRemaining?: number | null
   /** 경기 스킬 표시 판(0x4b5b4) 이 그림의 모습 — 상태 0xf ~ 0x11 이고 수명이 남았을 때만 (`skillPanel`) */
   readonly skillPanel?: SkillPanelView | null
+  /**
+   * 필살 스윙 연출 그림 (0x49aec) — 타격점 (x, y) 에 그림 애니 0 의 `drawCall` 번째 부름 칸, 미라지면 반대쪽 타석의 타자 그림.
+   * 상태 0x13 동안만 부르는 쪽이 채운다 (`specialSwingEffect`). 없거나 null 이면 안 그린다
+   */
+  readonly specialSwingEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number; readonly drawCall: number }) | null
   /**
    * 사람 투구 UI (구질 목록 0xf · 조준 0x10 · 게이지 0x11) — 상태 그리기가 장면 위에 그리는 것 (`pitchInputOverlay`).
    * 구질 목록이면 존 자리(0x4c53c)에 존 대신 그린다
@@ -205,10 +225,20 @@ export function renderBattingStage(
   drawPitchInputUnderlay(context, pitchInput, side)
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
-    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
+    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
+  // 0x38d1c 의 체력 그림 — 같은 깊이(24500)로 투수 다음에 들어간다
+  drawPitcherFatigue(context, scene, side)
+  const special = scene.specialSwingEffect ?? null
+  // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
+  if (special !== null && special.isBehindBatter) drawSpecialSwingPicture(context, special)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder)
+  // 미라지(49c9c~49d40) — 같은 타자 그림을 반대쪽 타석 앵커(0xcfb34 / 0xcfb2c)에 반대 손 자세로, 좌우 이동(+0xfe4) 없이 한 장 더
+  if (special !== null && special.showsMirage) {
+    drawBatter(context, scene.swingFrame, 0, scene.bodyType, side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
+  }
+  if (special !== null && !special.isBehindBatter) drawSpecialSwingPicture(context, special)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
   }
@@ -289,8 +319,10 @@ function drawBaseRunners(
   tick: number,
   showsRunPips: boolean,
   runnerAnimationSteps?: readonly (number | null)[],
+  runnerAces?: RunnerAces,
 ): void {
   const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
+  const loadedAce = runnerAces === undefined ? null : loadedRunnerAceOf(runnerAces, hud.bases)
   // st[0x15 + i] — 도루를 출발한 주자의 루는 창도 주자도 안 그린다 (35c4a 가 그 루의 몸통을 통째로 건너뛴다)
   const hidden = hud.hiddenRunnerBases ?? []
   const shownBases = {
@@ -314,18 +346,22 @@ function drawBaseRunners(
       context.restore()
       continue
     }
-    const entries = frameAnimations(RUNNER_FRAMES)?.[draw.animation]
+    const base = RUNNER_BASE_OF_ANIMATION[draw.animation]
+    const aceOfBase = base === undefined ? undefined : runnerAces?.[base]
+    const aceFolder = aceRunnerFramesOf(aceOfBase !== undefined && aceOfBase !== null && aceOfBase >= 0, loadedAce)
+    const folder = aceFolder ?? RUNNER_FRAMES
+    const entries = frameAnimations(folder)?.[draw.animation]
     const clockStep = runnerAnimationSteps === undefined ? tick : runnerAnimationSteps[draw.animation]
     const step = entries === undefined || clockStep === null || clockStep === undefined ? null : loopingAnimationStepAt(entries, clockStep)
     if (step === null) continue
-    const placed = placedFrame(RUNNER_FRAMES, step.frame, paletteIndex)
+    // 0x79da9 — 마선수 그림(+0x1c)은 팔레트 없이, defender(+0xc)는 공격 팀 팔레트(+0x10)로
+    const placed = placedFrame(folder, step.frame, aceFolder === null ? paletteIndex : null)
     if (placed === null) continue
     const x = draw.x + step.dx + placed.offsetX
     const y = draw.y + step.dy + placed.offsetY
     if (draw.isSilhouette) drawHalfShaded(context, placed.image, x, y)
     else context.drawImage(placed.image, x, y)
     // 35f4e~3604c — 같은 애니 칸의 상자(0x93e7d)를 상자 점에서 잡아 주루 칸을 잇따라 넣는다
-    const base = RUNNER_BASE_OF_ANIMATION[draw.animation]
     const runAbility = base === undefined ? undefined : hud.runnerRunAbilities?.[base]
     if (!showsRunPips || base === undefined || runAbility === undefined) continue
     const anchor = runnerBoxAnchorOf(base, side)
@@ -390,6 +426,31 @@ function drawHalfShaded(context: CanvasRenderingContext2D, image: HTMLImageEleme
   context.drawImage(canvas, x, y)
 }
 
+function drawPitcherFatigue(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {
+  const stamina = scene.pitcherStaminaPercent
+  if (stamina === null || stamina === undefined) return
+  const shows = showsPitcherFatigue({
+    gameMode: scene.scenery.gameMode,
+    isAcePitcher: scene.acePitcher !== null,
+    isThrowing: scene.pitcherTick !== null,
+  })
+  const animation = pitcherFatigueAnimationOf(stamina)
+  if (!shows || animation === null) return
+  const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[animation]
+  const step = entries === undefined ? null : pitcherFatigueFrameAt(entries, (scene.stagePhase?.tick ?? scene.tick) + 1)
+  const placed = step === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, step.frame)
+  if (step === null || placed === null) return
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  const { axisX, isMirrored } = pitcherMirrorOf(anchor.x, scene.pitcherHand ?? 0)
+  context.save()
+  if (isMirrored) {
+    context.translate(axisX * 2, 0)
+    context.scale(-1, 1)
+  }
+  context.drawImage(placed.image, axisX + step.dx + placed.offsetX, anchor.y + step.dy + placed.offsetY)
+  context.restore()
+}
+
 /** 좌투(손 1) — 그림을 뒤집고 x 를 1 옮긴다 (0x79524 효과 0x11 · 0x38db8) */
 const LEFT_HANDED_PITCHER = 1
 
@@ -449,6 +510,28 @@ function drawPitcher(
   if (image === null) return
 
   context.drawImage(image, MOUND_CENTER_X - image.width / 2, MOUND_BOTTOM_Y - image.height)
+}
+
+/**
+ * 필살 그림 애니 0 의 지금 칸 (0xbe8a5 종류 2 → 0x93c45). 효과 0x11 · b 0 은 점 x 를 축으로 거울(R6 3b — x' = X − (dx + 폭))
+ */
+function drawSpecialSwingPicture(
+  context: CanvasRenderingContext2D,
+  special: NonNullable<StageScene['specialSwingEffect']>,
+): void {
+  const entries = frameAnimations(special.folder)?.[0]
+  const frameIndex = entries === undefined ? null : specialSwingEffectFrameAt(entries, special.drawCall)
+  const frame = frameIndex === null ? null : placedFrame(special.folder, frameIndex)
+  if (frame === null) return
+  const x = Math.round(special.x)
+  const y = Math.round(special.y) + special.offsetY
+  context.save()
+  if (special.isMirrored) {
+    context.translate(x * 2, 0)
+    context.scale(-1, 1)
+  }
+  context.drawImage(frame.image, x + frame.offsetX, y + frame.offsetY)
+  context.restore()
 }
 
 /**
@@ -527,18 +610,15 @@ function drawStrikeZone(context: CanvasRenderingContext2D, side: number): void {
   context.drawImage(frame.image, anchor.x + frame.offsetX, anchor.y + frame.offsetY)
 }
 
+/**
+ * 이글아이 — 원본은 0x11 그리기 0x4d2ac 가 목표점에 ui/slt_pitch 프레임 0x23 을 넣는다(모드 4 · 레코드 +0x54 > 0, 0x4d380 ·
+ * `pitchInputOverlay.showsGaugeTargetFrameOf`). 예전 웹이 그리던 원 · 십자는 원본에 없다.
+ * ⚠️ 근사: 목표점은 투영 0xb94b5 를 다시 풀지 않고 공 도착점(`platePixelOf`)을 쓴다.
+ */
 function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: number; y: number }): void {
-  context.strokeStyle = UI_COLORS.eagleEye
-  context.lineWidth = 1.5
-  context.beginPath()
-  context.arc(center.x, center.y, 8, 0, Math.PI * 2)
-  context.stroke()
-  context.beginPath()
-  context.moveTo(center.x - 11, center.y)
-  context.lineTo(center.x + 11, center.y)
-  context.moveTo(center.x, center.y - 11)
-  context.lineTo(center.x, center.y + 11)
-  context.stroke()
+  const frame = placedFrame(ZONE_FRAME_FOLDER, GAUGE_TARGET_FRAME)
+  if (frame === null) return
+  context.drawImage(frame.image, Math.round(center.x) + frame.offsetX, Math.round(center.y) + frame.offsetY)
 }
 
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */
@@ -600,30 +680,17 @@ function drawFastballFlame(
 
 /**
  * 판정 글자 — game_judge 애니를 존 표 0xcfb7c[+0x17e1] 에서 잡은 원점(우타 (122,224) · 좌타 (117,224))에 재생한다
- * (0x39504 → 0x393b4). 해당 애니가 없는 문구는 글자로 쓴다
+ * (0x39504 → 0x393b4). 애니가 없는 판정은 그리지 않는다 — 0x393b4 의 표 0xcfe90 은 v = 6 · 8 · 12 를 0x394d6 으로 건너뛰고
+ * 원본 타석 화면에는 웹 글꼴 같은 큰 결과 글자가 없다 (F 노트 587~589). 홈런은 HOMERUN 연출(`isHomeRun`)이 대신 나간다.
  */
 function drawResultText(context: CanvasRenderingContext2D, text: string, resultTick: number, side: number): void {
   const { x: centerX, y: centerY } = stageLayoutOf(side).judgeCenter
   const animation = judgeAnimationOf(text)
-  if (animation !== null) {
-    const entries = frameAnimations(JUDGE_FRAMES)?.[animation]
-    const frameIndex = entries === undefined ? null : judgeFrameAt(entries, resultTick)
-    const frame = frameIndex === null ? null : placedFrame(JUDGE_FRAMES, frameIndex)
-    if (frame !== null) context.drawImage(frame.image, centerX + frame.offsetX, centerY + frame.offsetY)
-    return
-  }
-
-  // 원본 글꼴 웹폰트를 정수 2배(22px)로 쓴다 — 11 의 정수배여야 도트가 안 뭉갠다.
-  // 캔버스 `ctx.font` 는 CSS 변수를 못 읽어 `PIXEL_FONT_FAMILY` 상수를 직접 끼운다.
-  // 굵게(bold)는 빼 둔다 — 비트맵 글꼴에 굵은 자형이 없어 브라우저가 억지로 번지게 그린다.
-  context.font = `22px '${PIXEL_FONT_FAMILY}', 'Galmuri11', sans-serif`
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-  context.lineWidth = 4
-  context.strokeStyle = UI_COLORS.resultOutline
-  context.strokeText(text, centerX, centerY)
-  context.fillStyle = UI_COLORS.resultText
-  context.fillText(text, centerX, centerY)
+  if (animation === null) return
+  const entries = frameAnimations(JUDGE_FRAMES)?.[animation]
+  const frameIndex = entries === undefined ? null : judgeFrameAt(entries, resultTick)
+  const frame = frameIndex === null ? null : placedFrame(JUDGE_FRAMES, frameIndex)
+  if (frame !== null) context.drawImage(frame.image, centerX + frame.offsetX, centerY + frame.offsetY)
 }
 
 /**

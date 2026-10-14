@@ -41,15 +41,16 @@ export function describePitchResolution(resolution: PitchOutcomeDetail['resoluti
     case '타구': {
       // 2스트라이크 번트 파울(판정 11)도 파울 각 공 판을 돌아 판 끝 결과 코드 11 로 닫힌다 — 맞는 순간에는 글자가 없다
       // 맞은 공의 안타·아웃은 수비 판(상태 0x17)이 끝나야 정해진다 — 타석에 실린 결과는 임시 값이라(`battedContact`)
-      // 맞는 순간에는 글자를 띄우지 않는다. 담장을 먼저 넘는 궤적만 HOMERUN 연출(아래 `isHomeRunResolution`)로 간다
-      if (resolution.outcome.kind === '홈런') return '홈런!'
+      // 맞는 순간에는 글자를 띄우지 않는다. 홈런도 판정 글자가 없다 — 그리기 0x393b4 의 표 0xcfe90 은 판정 v = 8 · 12(홈런)를
+      // 0x394d6 으로 건너뛴다(안 그림). 홈런은 HOMERUN 연출(+0x1960 · 0x40b18, 아래 `isHomeRunResolution`)이 대신 나간다
       return ''
     }
   }
 }
 
 /**
- * 홈런인가 — 판정 스위치 v = 8·12 (R2 3-2 의 켜는 곳).
+ * 홈런인가 — 판정 스위치 v = 8·12 (R2 3-2 의 켜는 곳). 0x51c82 의 0x51cd8~0x51d0a 가 +0x1960 = 1 · 칸 5+i 를 쓰는 갈래는
+ * 누가 치든(사람 타석 · 사람이 던지는 타석) 같다 — 모드 · 조작 측을 안 본다.
  * 화면에 띄우는 문구는 사람이 읽는 글자라 바뀔 수 있으니 문구 대신 결과로 가린다.
  */
 export function isHomeRunResolution(detail: PitchOutcomeDetail): boolean {
