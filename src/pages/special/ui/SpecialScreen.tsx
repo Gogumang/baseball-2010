@@ -16,13 +16,14 @@ import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import {
   DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
   HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
-  HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS, WHEEL,
+  HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS,
   descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf,
   hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -36,7 +37,6 @@ import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 
 const MAIN_UI = './sprites/main_ui'
 const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
-const MAIN_BALL_FRAMES = './sprites/main_ball/frames'
 const GAME_FRAME = './sprites/game_frame'
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 /** ui/team_logo.pzx — 메뉴 진입 0x24924 가 [this+0xa8] 에 올려 0x663c5 로 목록에 넘긴다 */
@@ -88,7 +88,7 @@ interface SpecialScreenProps {
  * 마선수선택(상태 28)은 앱이 `renderAceSelect` 로, 에디트(상태 29)는 `renderEdit` 로 꽂는다.
  *
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
- * 바퀴는 호와 공만(칸 여섯은 메인 메뉴 몫), 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
+ * 바퀴는 메인 메뉴의 `MenuWheel`(도는 공 + 호)만 깔고 그 위 칸 글자 여섯(0x24f9e~ — 메인 메뉴 `wheelLabels`)은 아직 안 얹었다, 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
  */
 export function SpecialScreen({
   collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange, onBack,
@@ -159,25 +159,8 @@ export function SpecialScreen({
 
   return (
     <RawScreen>
-      {/* 반원 바퀴 0x24b1c — 테두리 원 3겹 (120, 320) 반지름 93·95·97 */}
-      <svg
-        className={styles.sprite}
-        style={{ left: 0, top: 0 }}
-        viewBox={`0 0 ${SCREEN.width} ${SCREEN.height}`}
-        width={SCREEN.width}
-        height={SCREEN.height}
-        shapeRendering="crispEdges"
-      >
-        {WHEEL.radii.map((radius, index) => (
-          <circle key={radius} cx={WHEEL.centerX} cy={WHEEL.centerY} r={radius} fill="none" stroke={WHEEL.colors[index]} />
-        ))}
-      </svg>
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(MAIN_BALL_FRAMES, WHEEL.ball.frame)}
-        style={{ left: WHEEL.centerX + WHEEL.ball.dx, top: WHEEL.centerY + WHEEL.ball.dy }}
-      />
+      {/* 반원 바퀴 0x24b1c 의 바닥 — 가운데에서 도는 main_ball 애니 0 + 테두리 원 3겹 (120, 320) 반지름 93·95·97. 메인 메뉴와 같은 그림 */}
+      <MenuWheel />
 
       {/* 여덟 칸 — 고른 줄은 설명 판이 그리므로 목록에서는 빼고 그린다 (원본도 판이 그 자리를 덮는다) */}
       {SPECIAL_ITEMS.map((item, index) => (

@@ -137,22 +137,10 @@ export const DESCRIPTION_PANEL = {
 
 export const descriptionPanelTopOf = (index: number) => rowTopOf(index) + DESCRIPTION_PANEL.dy
 
-/**
- * 반원 바퀴 (0x24b1c — F-5 확정): 중심 (120, 320), 테두리 원 3겹 반지름 93·95·97,
- * 가운데에서 `main_ball` 애니 0 이 돈다.
- *
- * ⚠️ 바퀴의 여섯 칸(게임시작·스페셜…)은 **메인 메뉴 화면 몫**이고 웹 메인 메뉴는 아직 바퀴가 아니라
- * (F-5, MainMenuScreen 은 글자 목록) 여기서는 뒤에 깔리는 호와 공만 그린다 — **배치 근사**.
+/*
+ * 반원 바퀴 (0x24b1c — F-5 확정)는 메인 메뉴의 `MenuWheel`(pages/main-menu/ui/MenuWheel.tsx)을 그대로 깐다 —
+ * 중심 (120, 320), 테두리 원 3겹 반지름 93·95·97, 가운데에서 `main_ball` 애니 0 이 돈다.
  */
-export const WHEEL = {
-  centerX: SCREEN.width / 2,
-  centerY: SCREEN.height,
-  radii: [93, 95, 97],
-  /** RGB(37,55,120) · RGB(138,185,235) · RGB(36,55,120) (0x24cfe·0x24d16·0x24d2e) */
-  colors: ['#253778', '#8AB9EB', '#243778'],
-  /** main_ball 프레임 0 (141×141, origins.json 원점 (−70,−70) = 가운데 맞춤). 도는 애니는 안 넣었다 */
-  ball: { frame: 0, dx: -70, dy: -70 },
-} as const
 
 /**
  * 머리띠·바닥띠 `0x54d95(skin, 0, 5)` — 다 내려온 상태 (P6 1-1 확정).
