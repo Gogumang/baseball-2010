@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, threePitchInningRecordIdsOf, pinchHitHomeRunRecordIdsOf, backToBackRecordOf, stealPlayRecordIdsOf, multiOutPlayRecordIdsOf, foulRecordOf, laserThrowOutRecordOf, passesRecordTeamGate } from '@/entities/game/model/gameRecords'
+import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, strikeoutCallRecordIdsOf, strikeoutTallyRecordIdsOf, threePitchInningRecordIdsOf, pinchHitHomeRunRecordIdsOf, backToBackRecordOf, stealPlayRecordIdsOf, multiOutPlayRecordIdsOf, foulRecordOf, laserThrowOutRecordOf, passesRecordTeamGate } from '@/entities/game/model/gameRecords'
 import type { CompleteGameInput, StrikeoutRecordInput, StealPlayRunner } from '@/entities/game/model/gameRecords'
 
 const 타석 = (overrides = {}) => ({
@@ -245,5 +245,14 @@ describe('지급 게이트 0xa77f0 의 팀 방향 (R8 1절)', () => {
     const 없음 = { offenseIsHuman: false, defenseIsHuman: false }
     expect([28, 29, 30, 31, 37, 38, 39].every((id) => passesRecordTeamGate(id, 없음))).toBe(true)
     expect([0, 16, 36].some((id) => passesRecordTeamGate(id, 없음))).toBe(false)
+  })
+})
+
+describe('삼진 기록 나눔 — 삼진 콜 0xa7c4c(16·17) · 정산 0xa7998(18~23)', () => {
+  it('콜은 16·17 만, 정산 몫은 18~23 만 — 합치면 strikeoutRecordIdsOf 와 같다', () => {
+    const input = { pitches: 3, balls: 3, comboCount: 3, pitcherStrikeouts: 10 }
+    expect(strikeoutCallRecordIdsOf(input)).toEqual([16, 17])
+    expect(strikeoutTallyRecordIdsOf(input)).toEqual([18, 21])
+    expect(strikeoutRecordIdsOf(input)).toEqual([16, 17, 18, 21])
   })
 })

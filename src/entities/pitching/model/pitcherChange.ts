@@ -202,7 +202,8 @@ export function rollsCloser(input: CloserRollInput, random: RandomPort): boolean
  * **로스터 투수 칸별 보직** — `XlsPITCHER_DATA` 레코드 `+0xb & 3` (0xb6dec → 0xb6704 가 읽는 칸).
  * 레코드 0x30 바이트가 표 한 줄 그대로이고, 15팀 × 8줄 120줄이 **모두 팀 안 차례 [0,0,0,0,1,1,1,2]** 다
  * (`base/extracted/XlsPITCHER_DATA.json` 의 줄마다 바이트 11 을 풀어 확인 — 선발 넷 · 중간 셋 · 마무리 하나).
- * 웹 로스터 JSON 에는 이 칸이 없어(생성기 몫) 여기 표로 둔다. 생성기가 `+0xb` 를 싣게 되면 그 값으로 바꾼다.
+ * 웹 로스터도 이 바이트를 `RosterPlayer.profile`(+0xb)로 싣는다 — 120줄 모두 `profile & 3` 이 이 표와 같다(시험이 지킨다).
+ * 칸 번호만으로 부르는 쪽(마투수 8번 · 내 투수 칸은 표 밖)이 많아 칸 표로 둔다.
  *
  * 선발 교체 0xb5e98(0↔k, k ≤ 3)·4인 로테이션은 선발끼리만 맞바꾸므로 칸의 보직이 그대로다.
  */
@@ -219,7 +220,7 @@ export interface ReplacementCandidate {
   readonly index: number
   /** 스태미나 0~10000 (`+0x2c`). 모르면 `FULL_STAMINA` */
   readonly stamina?: number
-  /** 보직. **웹 로스터에는 이 값이 없다** — 넣어 주면 원본 순서를 그대로 쓴다 */
+  /** 보직 `+0xb & 3` (0xb6dec) — 로스터 줄은 `rosterPitcherRoleOf`(= `RosterPlayer.profile & 3`). 넣어 주면 원본 순서를 그대로 쓴다 */
   readonly role?: PitcherRole
   /** 마선수인가 — 0xb633c = 레코드 `+0xa` **비트6**. 0xabfcc 는 늘 거르고, 0xb8a8d 는 이것을 찾는다 */
   readonly isSpecialPitcher?: boolean
@@ -267,10 +268,10 @@ const MIDDLE_RELIEVER: PitcherRole = PITCHER_ROLE.unknown
  * ```
  * **마선수는 어느 보직 목록에도 안 든다** — 마선수를 올리는 길은 0xac428 의 "벤치 마지막"(0xac360) 뿐이다.
  *
- * ⚠️ **웹 로스터(`shared/config/original/roster.ts`)에는 보직(`+0xb` 하위 2비트)이 없다.**
- * 후보에 `role` 이 하나도 안 실려 오면 위 순서를 세울 수 없어, 원본의 가장 흔한 갈래인
+ * 보직은 레코드 `+0xb` 하위 2비트다 — 웹 로스터 `RosterPlayer.profile & 3` = `rosterPitcherRoleOf(칸)` 이고, 진행기들
+ * (`simulateHalfInning` 의 `roleAt`)이 후보마다 싣는다.
+ * ⚠️ 후보에 `role` 이 하나도 안 실려 오면(보직을 안 넘기는 옛 길 · 시험) 위 순서를 세울 수 없어, 원본의 가장 흔한 갈래인
  * **"중간계투 = 스태미나가 가장 많은 후보"** 만 남긴다 (같으면 벤치 번호가 작은 쪽). **근사다.**
- * 보직을 채우려면 `XlsPITCHER_DATA` 의 레코드 `+0xb` 를 로스터 JSON 에 넣어야 한다.
  * 마무리 갈래의 "능력 합" 0xb5b50 은 후보의 `abilitySum` 이다 — 마무리 후보 중 하나라도 이 값이 없으면
  * 예전처럼 스태미나 순으로 본다(**근사**, 부르는 쪽이 아직 안 넘기는 길).
  */

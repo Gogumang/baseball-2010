@@ -364,7 +364,9 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
  * (모드 3 `gameAbilityOf`), 투수 미션은 모드 5 `gameAbilityOf` 값을 넘긴다.
  * 미션 마타자는 부르는 쪽(`useMissionSession` 의 `missionOpponentAbility`)이 레벨 배율(0xb6414 의
  * 0xd88aa[`mgr[0x13a+칸]`])을 먼저 곱해 넘긴다 — 레벨은 전역 저장(`useAceLevels`)이고 스페셜 마선수
- * 레벨업(0x5fb24)이 올린다. ⚠️ 로스터 스킬 보정(0xb6414 플래그 1)은 아직 못 붙인다 (부르는 쪽 주석).
+ * 레벨업(0x5fb24)이 올린다. 밑값은 레코드의 `0xb6414(rec, k, 1)`(장비 니블 · 장착 스킬 5 −100 · 7 +50,
+ * `entities/team/model/recordAbility.recordAbilityOf`)이어야 한다 — 0xb570c 첫머리 b5728 이 플래그 1 로 부른다.
+ * 투수편 `opponentBatterAbility` · 팀 경기 명단은 그 값을 넘긴다. ⚠️ 미션 쪽 부르는 곳은 따로 확인하지 않았다.
  */
 export function pitchAgainstBatter(
   pitch: Pitch,

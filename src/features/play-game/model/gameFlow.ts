@@ -64,6 +64,7 @@ import { chargeHalfInningLines, chargePitcherLine, outsAddedBetween } from '@/en
 import type { GamePitcherLine } from '@/entities/game/model/gamePitcherLines'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
+import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -955,6 +956,8 @@ function defensePlayInputOf(
     // 마선수 주자 그림(0x79d10 · 적재 0x483a0) — 우리 타자 · 루 위 주자 중 142 가 넣은 마타자 칸
     runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
+    // 루별 주자 주루 — 주자마다 제 레코드로 0xb570c(팀, 3, 주자, …, 90) (판 시작 0xb0fb4 가 주자 +0xa4 에 적는 값). 0 = 타자주자(나)
+    runAbilities: runAbilitiesOnBaseOf(progress),
     // 이 공이 나는 동안 출발한 도루 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 15·14 + rand(0,9) 틱 몰아 돌린다
     stealingFrom: progress.stealingFrom,
     // 난수를 넘겨야 펌블(0xb41d0)·악송구(0xa1828)·필살수비(0x66b30/0x66be4) 굴림이 돈다
@@ -1251,11 +1254,9 @@ export function opponentMoundOf(progress: GameProgress): {
 }
 
 /**
- * 주자들의 주루 능력치.
- *
- * ⚠️ **근사**: 원본은 주자마다 제 레코드로 `0xb570c(팀, 3, 선수, 90)` 을 불러 속도를 따로 잡지만
- * (I-controls 3a), 이 진행기는 주자 전원에 한 값만 받는다. 지금 타석에 선 칸의 주루를 넘긴다 —
- * 누상 주자가 누구인지 `GameState` 가 들고 있지 않은 것도 `stealBase` 와 같은 한계다.
+ * **지금 타자(타자주자)** 의 주루 능력치 — 원본은 주자마다 제 레코드로 `0xb570c(팀, 3, 선수, 90)` 을 불러 속도를 잡는다
+ * (I-controls 3a). 루 위 주자는 신원(`GameState.runners`)대로 `ourRunnerRunsOnBaseOf` 가 따로 내고, 진행기 입력은
+ * 둘을 합친 `runAbilitiesOnBaseOf` 를 받는다. 이 값은 루별 값이 없는 칸의 기본값(`runAbility`)으로도 쓰인다.
  */
 function runnerRunAbilityOf(progress: GameProgress): number {
   return ourRunnerRunOf(progress, lineupSlotOf(progress.game.battingOrderIndex))
@@ -2079,7 +2080,8 @@ function finalStaminasOf(table: readonly number[], mound: HalfInningMound): read
  * 판정 0xac428 이 마운드 보직을, 새 투수 고르기 0xabfcc 가 벤치 보직을 본다. 안 넘기면 모두 선발로 보여
  * 9회 이후 마무리 상황마다 매 타자 투수가 바뀐다(58066a1 뒤의 회귀).
  *
- * ⚠️ 팀 사기(`0x66e44` 의 `V[+2]`)는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다**.
+ * 팀 사기(`0x66e44` 의 `V[+2]`)는 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 4)를 찾아 읽는다 — 팀 레코드 사기
+ * (`teamRecordMoraleOf`, 표값)다. 투구 소모(0xa5e14)의 용량과 상대 마운드 체력 막대(`opponentMoundOf`)가 같은 값을 본다.
  */
 function quickDefenseOf(
   teamId: number,
@@ -2103,6 +2105,7 @@ function quickDefenseOf(
     staminaAbilityAt: (slot) =>
       isAce(slot) && ace !== undefined ? ace.staminaAbility : roster[slot % roster.length].ability[3],
     lead,
+    morale: teamRecordMoraleOf(teamId),
     bothTeamsAreCpu: false,
     roleAt: rosterPitcherRoleOf,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 4 는 0xb574a 가지가 내 육성
@@ -2580,6 +2583,8 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     fielderPlates: opponentFielderPlatesOf(progress),
     runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
+    // 루별 주자 주루 — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4(제 레코드 0xb570c(팀, 3, 주자, …, 90))를 든다
+    runAbilities: ourRunnerRunsOnBaseOf(progress),
     random,
     // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
     offenseIsCpu: false,

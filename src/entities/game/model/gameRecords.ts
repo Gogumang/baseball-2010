@@ -202,9 +202,23 @@ export interface StrikeoutRecordInput {
  * 우리 투수가 잡은 삼진에만 준다 (0xa77f0 게이트가 수비 팀이 사람 팀인지 본다).
  */
 export function strikeoutRecordIdsOf(input: StrikeoutRecordInput): number[] {
+  return [...strikeoutCallRecordIdsOf(input), ...strikeoutTallyRecordIdsOf(input)]
+}
+
+/** 삼진 콜 `0xa7c4c` 의 16 삼구 · 17 풀카운트 — 공 도착 판정 0x3dfac 의 삼진 갈래가 부른다(판 종류와 무관) */
+export function strikeoutCallRecordIdsOf(input: Pick<StrikeoutRecordInput, 'pitches' | 'balls'>): number[] {
   const ids: number[] = []
   if (input.pitches === THREE_PITCH_COUNT) ids.push(STRIKEOUT.threePitch)
   if (input.balls === FULL_COUNT_BALLS) ids.push(STRIKEOUT.fullCount)
+  return ids
+}
+
+/**
+ * 정산 `0xa8024` 의 a8d5a `0xa7998` — 18~20 삼진 콤보 · 21~23 한 투수 10/15/20 삼진. a8d38 이 판 종류 state[0x26] 4·5(견제 ·
+ * 도루)면 R+0x134(코드 0x18)와 함께 건너뛴다 — 삼진 + 도루 판(종류 5)으로 끝난 삼진은 이 기록을 안 받는다.
+ */
+export function strikeoutTallyRecordIdsOf(input: Pick<StrikeoutRecordInput, 'comboCount' | 'pitcherStrikeouts'>): number[] {
+  const ids: number[] = []
   const comboStep = COMBO_STEPS.indexOf(input.comboCount)
   if (comboStep >= 0) ids.push(STRIKEOUT.combo + comboStep)
   const totalStep = PITCHER_TOTAL_STEPS.indexOf(input.pitcherStrikeouts)

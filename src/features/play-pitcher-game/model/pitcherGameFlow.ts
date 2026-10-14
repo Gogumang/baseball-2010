@@ -29,7 +29,9 @@ import {
   withAceBatterLineup,
 } from '@/features/play-game/model/gameAces'
 import type { GameAcePitcher, GameAceSetup, GameTeamAces } from '@/features/play-game/model/gameAces'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel } from '@/entities/mission/model/aceLevel'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
+import type { RosterPlayer } from '@/shared/config/original/roster'
 import {
   PITCHERS_PER_TEAM,
   batterAt,
@@ -62,6 +64,7 @@ import {
   gameEndRecordIdsOf,
   laserThrowOutRecordOf,
   passesRecordTeamGate,
+  strikeoutCallRecordIdsOf,
   strikeoutRecordIdsOf,
   threePitchInningRecordIdsOf,
 } from '@/entities/game/model/gameRecords'
@@ -107,6 +110,7 @@ import type { LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPla
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -359,7 +363,7 @@ export interface PitcherGameOptions {
   /**
    * 나리 연차 idx — 저장 레코드 `+0xb3` (0 = 1년차). 0xab214 의 내 투수 보너스 `aP = D[0x1dc] − D[0x1de] × idx`
    * (ab41c) 가 본다. 모드 3 의 레코드는 `0x1f8d4(저장, 3)` = `[저장+0xb8]+0x11c` 다.
-   * ⚠️ 안 넘기면 0(1년차, 보너스 최대) — 옵션을 짜는 쪽(`pitcherGameOptions`)이 아직 안 넘긴다.
+   * 옵션을 짜는 쪽(`pitcherGameOptions`)이 `career.season − 1` 을 넘긴다. 안 넘기면 0(1년차, 보너스 최대) — 시험 · 옛 길.
    */
   readonly careerYearIndex?: number
   /**
@@ -608,8 +612,10 @@ export interface PitcherGameProgress {
    * 투구마다 `0xa5e14` 가 깎는다 (c26ca). 칸 번호는 `ourPitcherOrderOf`·`opponentPitcherOrderOf` 의 로스터 칸이다.
    *
    * 우리 쪽은 내 투수가 마운드에 있으면 `MY_PITCHER_SLOT` 이다 — 그동안 내 스태미나·투구 수는 `stamina`·`pitchCount` 가 든다
-   * (사람 장면은 이 칸을 안 본다). ⚠️ 투수 스태미나는 경기마다 가득에서 시작한다(원본은 시즌 레코드 +0x2c — 타자편 `gameFlow`
-   * 와 같은 근사).
+   * (사람 장면은 이 칸을 안 본다). 마운드에 오르는 투수의 스태미나는 제 레코드 `+0x2c` 다 — 두 팀 표(`ourPitcherStaminas` ·
+   * `opponentPitcherStaminas`, 리그 표 `leaguePitcherStaminas` 에서 이어 온 값)에서 꺼낸다. 경기가 깎은 값은 경기 끝 표로
+   * 리그 표에 남고(0xaeb08), 하루 끝 4f304 가 열 팀 `0xb617c`(+20%)를 먹인다(`entities/pitcher-career/model/leaguePitcherRecords`).
+   * 내 투수는 `options.stamina`(레코드 +0x2c, 하루 끝 0xb60e0 회복 — `applyPitcherGameResult`)로 오른다.
    */
   readonly ourMound: HalfInningMound
   readonly opponentMound: HalfInningMound
@@ -638,6 +644,12 @@ export interface PitcherGameProgress {
    * 포스트시즌 · 국가대항전 거르기는 커리어에 먹이는 쪽이 한다. 옛 진행은 없다
    */
   readonly leaguePlateAppearances?: readonly LeaguePlateAppearance[]
+  /**
+   * **삼진 + 도루 판(종류 5)으로 끝난 내 삼진 수** — 정산 0xa8024 가 종류 5 로 한 번 돌아 a8d38 이 R+0x134(탈삼진, 코드 0x18)를
+   * 건너뛰지만, 투수 레코드 **+0x26(시즌 탈삼진)** 은 a8d06~a8d34 가 판 종류를 안 보고 [sp+0x20](이번 플레이의 삼진 사건 5 수)만큼
+   * 올린다(게이트 sp+0x38 = 0xa56dc(R, 수비 지금 투수, 0)). 그래서 시즌 탈삼진은 `record.strikeouts` 에 이 수를 더한다. 옛 진행은 없다
+   */
+  readonly stealPlayStrikeouts?: number
   /** 우리·상대 지금 투수의 **이번 이닝 실점 A**(`+0x284`) — 반 이닝 교대 `0xa5b00`·교체 `0xaec64` 가 0 으로 */
   readonly ourInningRunsAllowed: number
   readonly opponentInningRunsAllowed: number
@@ -764,45 +776,43 @@ function withOutgoingStamina(table: readonly number[], outgoing: HalfInningMound
 /**
  * 상대 타순 칸의 타자 능력치 (히트·파워·수비·주루 — 레코드 순서 그대로).
  *
- * **히트는 경기용 값**이다 — CPU 타자 결정 0x34334 가 `0xb570d(ctx, 0, 타자, 1, 90, 1)` 로 읽는다
- * (Q1 1b, ce462ce). 모드 3 에서 0xb570c 는:
+ * 네 칸 모두 밑값은 레코드의 **`0xb6414(rec, k, 1)`** 이다 (`recordAbilityOf` — 장비 니블 → 장착 스킬 5 무력감 −100 ·
+ * 7 전설 +50 · 타자 스킬 20 수비 −100, b6494~b6512). 경기용 능력치 0xb570c/0xb570d 가 첫머리 b5728 에서 플래그 1 로 부르고,
+ * 모드 3 에서는:
  * ```
- * b5728  v = 0xb6415(타자, 0, 1)          ; 마선수 배율 → 장비 → 스킬
+ * b5728  v = 0xb6415(타자, k, 1)          ; 마선수 배율 → 장비 → 스킬
  * b574a  모드 3·4: 0xb6389(타자) 거짓(내 육성 선수가 아니다) → b58e6
  * b58e6  체력 인자 90 → 감소 없음
  * b593a  팀 능력치 — 모드 마스크 0x306 = {1,2,8,9} 라 모드 3 은 없다
  *        코치 — 모드 2 만 · 0..999 로 자른다
  * ```
- * 그래서 `gameAbilityOf(모드 3, 내 팀 아님)` = 날 값을 0..999 로 자른 값이다.
- * ⚠️ 0xb6414 의 스킬 보정(5 −100 · 7 +50)은 웹 로스터에 스킬 비트(+0x14)가 없어 못 붙인다 — 미해결.
- *    상대 로스터는 마선수도 장비도 없어 그 둘은 원래 0 이다.
- * 파워·수비·주루는 이 길이 아니라(0xab214·수비·주루가 저마다 부른다) 여기서 손대지 않는다.
+ * 그래서 `gameAbilityOf(모드 3, 내 팀 아님)` = 0xb6414 플래그 1 값을 0..999 로 자른 값이다.
+ * - 히트: CPU 타자 결정 0x34334 가 `0xb570d(ctx, 0, 타자, 1, 90, 1)` 로 읽는다 (Q1 1b, ce462ce).
+ * - 파워: 스윙 결과 0xab214 가 `0xb570d(팀, 1, 타자, 1, 0x5a, 1)` 로 읽는다 (ab4fe).
+ * - 주루: 주자 속도 `0xb570c(팀, 3, 주자, …, 90)` (I-controls 3a).
+ * - 수비: 이 타자가 수비에 서는 일은 사람 장면에 없다 — 같은 레코드 칸을 그대로 둔다.
+ * 붙박이 줄의 스킬 비트 · 장비 니블은 Xls 행 그대로다(`RosterPlayer.skillBits` · `equipment`) — 간이 타석
+ * (`teamRoster.quickBatterOf`)과 같은 밑값이다. 142 가 넣은 마타자는 레벨 배율(b6438) 뒤 같은 단계(`aceRecordAbilityAtLevel`).
  */
 function opponentBatterAbility(options: PitcherGameOptions, rosterSlot: number) {
   // 142 가 상대 명단 9번에 넣은 마타자가 CPU 대타로 서면 그 레코드 — 0xb6415 첫 단계가 레벨 배율을 먹인다
   const ace = rosterSlot === ACE_BATTER_ROSTER_SLOT ? aceBatterAbilityOf(options) : undefined
-  if (ace !== undefined) {
-    return {
-      hit: gameAbilityOf({ mode: PITCHER_EDITION_MODE, base: ace.hit, isPitcher: false, slot: BATTER_SLOT.히트, isMyTeam: false }),
-      power: ace.power,
-      defense: ace.defense,
-      run: ace.run,
-    }
-  }
   const roster = teamBatters(options.opponentTeamId)
-  const player = roster[rosterSlot % roster.length]
+  const record = ace ?? recordBatterAbilityOf(roster[rosterSlot % roster.length])
+  const gameAbility = (base: number, slot: number) =>
+    gameAbilityOf({ mode: PITCHER_EDITION_MODE, base, isPitcher: false, slot, isMyTeam: false })
   return {
-    hit: gameAbilityOf({
-      mode: PITCHER_EDITION_MODE,
-      base: player.ability[0],
-      isPitcher: false,
-      slot: BATTER_SLOT.히트,
-      isMyTeam: false,
-    }),
-    power: player.ability[1],
-    defense: player.ability[2],
-    run: player.ability[3],
+    hit: gameAbility(record.hit, BATTER_SLOT.히트),
+    power: gameAbility(record.power, BATTER_SLOT.파워),
+    defense: gameAbility(record.defense, BATTER_SLOT.수비),
+    run: gameAbility(record.run, BATTER_SLOT.주루),
   }
+}
+
+/** 붙박이 줄 레코드의 `0xb6414(rec, k, 1)` 네 칸 (히트·파워·수비·주루) */
+function recordBatterAbilityOf(player: RosterPlayer) {
+  const [hit, power, defense, run] = recordAbilityOf(player, false)
+  return { hit, power, defense, run }
 }
 
 /**
@@ -849,12 +859,12 @@ export function myMoundStaminaOf(progress: PitcherGameProgress): {
   }
 }
 
-/** 상대 마타자의 레벨 배율 먹은 네 칸 (히트·파워·수비·주루) */
+/** 상대 마타자 레코드의 `0xb6414(rec, k, 1)` 네 칸 — 레벨 배율(b6438) 뒤 장비 · 스킬 단계 (히트·파워·수비·주루) */
 function aceBatterAbilityOf(options: PitcherGameOptions) {
   const index = teamAcesOf(options, false).batter
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
-  return aceAbilityAtLevel(player.ability, aceLevelOf(options.aces?.levels, aceLevelSlotOf('타자', index + 1)))
+  return aceRecordAbilityAtLevel(player, aceLevelOf(options.aces?.levels, aceLevelSlotOf('타자', index + 1)))
 }
 
 /** 간이 타석의 타자 — 명단 칸이 마타자 칸이면 142 가 넣은 마타자 */
@@ -1352,8 +1362,9 @@ interface PitcherPitchArrival {
  *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다.
  *
  * - 루별 주루: 루에 선 주자의 신원(`GameState.runners`, 원본 주자 목록)대로 그 상대 타순 칸 선수(`runAbilitiesOnBaseOf`).
- * ⚠️ 미해결: 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — R+0x138(타자 수)이
- *   안 오르는 갈래다(0xa8d98). 웹은 주자 판 뒤 보통 삼진 길(`applyDefensivePlay`)로 타자 수를 센다.
+ * - 삼진 + 도루(종류 5)면 원본 판정 B 는 정산 0xa8024 를 **종류 5 로 한 번** 부른다 — 주자 판을 먹인 뒤 삼진 타석을
+ *   `applyDefensivePlay(…, stealPlaySettlement)` 로 먹여 R+0x138(타자 수, a8d98) · R+0x134(탈삼진, a8d38) · 18~23 ·
+ *   상대 타자 타석 칸(a8ac8) · 리그 타수(a8856)를 건너뛴다. 아웃 R+0x13c · 16/17 은 삼진 콜 0xa7c4c 몫이라 그대로 센다.
  * - 번트 종류(장면 +0xfdc): `simulateBatter` 가 낸 이 공의 값(`thrown.buntKind`)을 주자 판에 싣는다 — 도루 판 리드 0x3d7b8 이
  *   도루 안 한 주자에게 +3 틱을 더한다.
  *   번트 헛스윙은 그 공의 종류를, 안 휘두른 공은 0 을 낸다 — 0x11 진입 0x3de10(3deb8 0x340dc)이 공마다 +0xfd8 · +0xfdc · +0xfe0 을
@@ -1574,6 +1585,16 @@ function runAbilitiesOnBaseOf(progress: PitcherGameProgress): Partial<Record<0 |
   return runs
 }
 
+/** 루별 주루 표에서 루 위 주자 칸(1~3)만 — 견제 판 입력(`PickoffPlayInput.runAbilities`) */
+function runnerRunsOnBaseOf(runs: Partial<Record<0 | 1 | 2 | 3, number>>): Partial<Record<1 | 2 | 3, number>> {
+  const onBase: Partial<Record<1 | 2 | 3, number>> = {}
+  for (const base of [1, 2, 3] as const) {
+    const run = runs[base]
+    if (run !== undefined) onBase[base] = run
+  }
+  return onBase
+}
+
 /** 인플레이가 아닌 타석 끝(삼진·볼넷·사구·홈런) — 0xae24c 의 보통 길 뒤 0x17(밀어내기)·정산 0xa8024 */
 function finishNonPlayOutcome(
   progress: PitcherGameProgress,
@@ -1586,8 +1607,20 @@ function finishNonPlayOutcome(
   const playback =
     homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs }) ??
     (arrival !== null && arrivalApplicationOf(arrival) === 'freePass' ? arrival.result : null)
+  // 삼진 + 도루 판(종류 5) — 판정 B 가 정산 0xa8024 를 종류 5 로 한 번 부른다(`stealPlaySettlement`)
+  const stealPlaySettlement = arrival !== null && arrival.kind === 5 && outcome.kind === '삼진'
   return advance(
-    applyDefensivePlay(progress, outcome, true, progress.atBat.balls, null, playback),
+    applyDefensivePlay(
+      progress,
+      outcome,
+      true,
+      progress.atBat.balls,
+      null,
+      playback,
+      undefined,
+      undefined,
+      stealPlaySettlement,
+    ),
     random,
   )
 }
@@ -1726,6 +1759,8 @@ export function pickoff(
     fielderPlates: myFielderPlatesOf(progress),
     runnerAces: opponentRunnerAcesOf(progress),
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
+    // 루별 주자 주루 — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 든다 (타자는 견제 판에 안 뛴다)
+    runAbilities: runnerRunsOnBaseOf(runAbilitiesOnBaseOf(progress)),
     random,
     offenseIsCpu: true,
     // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
@@ -1785,7 +1820,10 @@ function applyPickoffResult(
  *   폭투·포일(9)은 `state[0xc] == 5`(삼진) 일 때만 0xd 로 가며 부른다 — 아니면 ae5a2 → ae5b6 으로 **건너뛴다**.
  * - 반 이닝이 넘어갔으면 이닝 칸·삼자범퇴 표시·반 이닝 투구 수·볼카운트·타석 준비를 내린다 — 다음 타석은 `advance` 가 세운다.
  *
- * ⚠️ 미해결: 정산 0xa8024 의 나머지 기록 칸(투수 아웃 수 R+0x13c·돌발 판정 등)이 주자 판에서 어떻게 도는지는 손대지 않았다.
+ * - 판에서 잡은 아웃은 아웃 콜 0xa7d0c 가 하나마다 센다(정산과 무관) — R+0x13c · 셋째 아웃이면 25 삼구 삼자범퇴 · R+0x154.
+ *   정산 0xa8024 의 종류 4·5 갈래는 타석 칸(R+0x138 · R+0x134 · 타석 +0x14 …)을 건너뛰어 여기서 더 셀 것이 없다
+ *   (삼진 + 도루 판의 삼진 타석은 `applyDefensivePlay` 의 `stealPlaySettlement`).
+ * ⚠️ 미확인: 주자 판 끝의 돌발 판정(0x8f414 — 0x17 끝 0x528b0)은 손대지 않았다.
  */
 function withMyRunnerPlay(
   progress: PitcherGameProgress,
@@ -1823,6 +1861,13 @@ function withMyRunnerPlay(
     settles && countsMyPitcherRecord(progress)
       ? chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
       : 0
+  // 판에서 잡은 아웃(견제사 · 도루사 · 주루 아웃)은 콜 62/20 → 결과 13 → 아웃 콜 0xa7d0c 가 하나마다 센다 — 정산과 무관하다:
+  //   a7d52  R+0x13c += 1 (코드 0x1a — 0xa57f8 게이트: 수비 지금 투수가 R 의 선수, `countsMyPitcherRecord`)
+  //   a7d78  ctx+0x16c(반 이닝 투구 수) == 3 && 아웃 == 3 → 25 삼구 삼자범퇴 (수비가 사람일 때 — 투수편은 늘)
+  //   a7d8e  아웃 == 3 && R+0x184(삼자범퇴 표시) → R+0x154 (코드 0x20 — 게이트 밖)
+  const counted = countsMyPitcherRecord(progress)
+  const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
+  const threePitchInning = inningEnded ? threePitchInningRecordIdsOf(progress.halfInningPitches, OUTS_PER_INNING) : []
   next = {
     ...next,
     game: applied.game,
@@ -1832,8 +1877,13 @@ function withMyRunnerPlay(
     record: {
       ...progress.record,
       runsAllowedField: progress.record.runsAllowedField + charged,
+      outsRecorded: progress.record.outsRecorded + (counted ? applied.outsAdded : 0),
+      perfectInnings: progress.record.perfectInnings + (inningEnded && progress.perfectInningFlag ? 1 : 0),
     },
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
+    ...(threePitchInning.length > 0 && recordsAllowed(progress)
+      ? { recordIds: [...progress.recordIds, ...threePitchInning] }
+      : {}),
   }
   if (halfChanged) {
     next = {
@@ -1880,6 +1930,8 @@ function defensePlayInputOf(
     runnerAces: opponentRunnerAcesOf(progress),
     // 주자는 상대 타자다 — 지금 타순 칸의 주루
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
+    // 루별 주자 주루 — 주자마다 제 레코드 0xb570c(팀, 3, 주자, …, 90). 0 = 타자주자(지금 타자)
+    runAbilities: runAbilitiesOnBaseOf(progress),
     random,
     // 나만의리그 투수편 = 전역 모드 3
     gameMode: PITCHER_EDITION_MODE,
@@ -1935,6 +1987,21 @@ function applyDefensivePlay(
   quickAdvance?: AdvanceResult,
   /** 간이 엔진 타석이 민 주자 신원(상대 타순 칸) — `quickAdvance` 와 함께 */
   quickRunners?: BaseRunners,
+  /**
+   * **삼진 + 도루 판(종류 5)** 의 정산 — 판정 B 0xae3e8 이 state[0xc] == 5 && 종류 5 면 0xd 로 가며 0xa8024 를 종류 5 로 한 번
+   * 부른다(ae586 · ae5a8). 삼진 콜 0xa7c4c(R+0x13c +1 · 16/17 · 0xb8cec R[0]·R[1])는 공 도착 0x3dfac 가 이미 했고, 정산 안에서
+   * state[0x26] ∈ {4, 5} 가 막는 칸은 건너뛴다:
+   * ```
+   * a8856  상대 타자 리그 기록(+0x20 타수 …)          — 건너뜀
+   * a8a04  아웃 코드 · 결과 링                      — 건너뜀
+   * a8ac8  코드 7 · 타순 칸 타석 +0x14              — 건너뜀
+   * a8d38  R+0x134 탈삼진(코드 0x18, R+0x14c 콤보) · 0xa7998(18~23) — 건너뜀
+   * a8d98  R+0x138 타자 수(코드 0x19)                — 건너뜀
+   * a8fb6  0xb8cec R[1] 끊기 · 결과비트 0x200       — 건너뜀
+   * a8cb0  투수 레코드 +0x20(아웃) · a8d00 +0x26(삼진) — 판 종류를 안 본다 (`stealPlayStrikeouts`)
+   * ```
+   */
+  stealPlaySettlement = false,
 ): PitcherGameProgress {
   const before = progress.game
   const advanceResult =
@@ -2020,12 +2087,16 @@ function applyDefensivePlay(
       : {
         ...progress.record,
         hitsAllowed: progress.record.hitsAllowed + (hit ? 1 : 0),
-        strikeouts: progress.record.strikeouts + (outcome.kind === '삼진' ? 1 : 0),
+        // R+0x134 — 정산 a8d4e (코드 0x18). 종류 5 정산은 a8d38 이 건너뛴다
+        strikeouts: progress.record.strikeouts + (outcome.kind === '삼진' && !stealPlaySettlement ? 1 : 0),
+        // R+0x13c — 삼진 콜 0xa7c4c · 아웃 콜 0xa7d0c 가 올린다(정산과 무관)
         outsRecorded: progress.record.outsRecorded + applied.outsAdded,
         // R+0x144 은 볼넷만이다 — 코드 0x1c 는 state[5] > 3 일 때뿐(0xa8e04), 사구는 아래 R+0x148(0x1d)
         walksAllowed: progress.record.walksAllowed + (walk ? 1 : 0),
-        // 연속 탈삼진 — 삼진이 아닌 타석이 끼면 끊긴다 (R+0x14c, 0xa619e)
-        strikeoutCombo: outcome.kind === '삼진' ? progress.record.strikeoutCombo + 1 : 0,
+        // 연속 탈삼진 — 삼진이 아닌 타석이 끼면 끊긴다 (R+0x14c, 0xa619e). 종류 5 정산은 코드 0x18 을 안 지나 그대로다
+        strikeoutCombo: stealPlaySettlement
+          ? progress.record.strikeoutCombo
+          : outcome.kind === '삼진' ? progress.record.strikeoutCombo + 1 : 0,
         // R+0x154 — 삼자범퇴 이닝 (S5 정정 4: "무안타" 가 아니라 아무도 안 내보낸 이닝이다)
         perfectInnings: progress.record.perfectInnings + (inningEnded && perfectInningFlag ? 1 : 0),
       }
@@ -2043,16 +2114,19 @@ function applyDefensivePlay(
 
   // 삼진 계열 16·17(0xa7c4c) 과 18~23(0xa7998). 게이트는 "수비 팀이 사람 팀인가" 만 보므로
   // 동료 투수가 잡은 삼진도 우리 팀 기록으로 들어온다 (R8 1절).
-  const newRecordIds: number[] = strikeout
-    ? [
-        ...strikeoutRecordIdsOf({
-          pitches: progress.atBatPitches,
-          balls,
-          comboCount: moundStrikeoutCombo,
-          pitcherStrikeouts: moundStrikeouts,
-        }),
-      ]
-    : []
+  // 종류 5 정산은 a8d38 이 0xa7998(18~23)을 건너뛰어 16·17(삼진 콜)만 남는다
+  const newRecordIds: number[] = !strikeout
+    ? []
+    : stealPlaySettlement
+      ? strikeoutCallRecordIdsOf({ pitches: progress.atBatPitches, balls })
+      : [
+          ...strikeoutRecordIdsOf({
+            pitches: progress.atBatPitches,
+            balls,
+            comboCount: moundStrikeoutCombo,
+            pitcherStrikeouts: moundStrikeouts,
+          }),
+        ]
   // 36 필살송구 아웃 — 정산 0xa8024(a80f8~a8116)은 모드를 안 가리고, 게이트 0xa77f0 은 수비 팀이 사람이면 36 을 들인다.
   // 표시 state[0x8b] 는 수비 화면 결과 판 0x46844 가 레이저 연출 뒤 코드 13 결과 판에서 세운다(`DefensePlayResult.laserOutFlag`)
   if (defensePlay !== null) {
@@ -2082,7 +2156,15 @@ function applyDefensivePlay(
       : progress.recordIds,
     inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
     record,
-    pitcherRecord: mine && counts ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch) : progress.pitcherRecord,
+    // 종류 5 정산은 a8d98 이 R+0x138(타자 수)을 건너뛴다 — 사구는 종류 5 와 겹치지 않는다(밀어내기 종류 2 로 덮인다)
+    pitcherRecord:
+      mine && counts && !stealPlaySettlement
+        ? pitcherRecordAfterPlay(progress.pitcherRecord, hitByPitch)
+        : progress.pitcherRecord,
+    // 시즌 탈삼진 +0x26 — 판 종류를 안 보는 a8d00 몫 (`stealPlayStrikeouts`)
+    ...(stealPlaySettlement && strikeout && mine && counts
+      ? { stealPlayStrikeouts: (progress.stealPlayStrikeouts ?? 0) + 1 }
+      : {}),
     runsAllowedByMe: progress.runsAllowedByMe + chargedCounted,
     inheritedRunners,
     // 레코드 +0x2a — 게이트 없이 마운드의 내 투수에게 (a8b58 · a8bd2)
@@ -2092,7 +2174,10 @@ function applyDefensivePlay(
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     perfectInningFlag,
     // 정산 0xa8024 — 타순 칸 기록(타석 +0x14 · 안타 +0x12 · 홈런 +0x13)이 CPU 대타 0xac228 의 재료다
-    opponentLineup: recordLineupPlay(progress.opponentLineup, slot, outcome, { quickEngine: quickAdvance !== undefined }),
+    // 종류 5 정산은 a8a04 · a8ac8 이 결과 링 · 타석 +0x14 를 건너뛴다
+    opponentLineup: stealPlaySettlement
+      ? progress.opponentLineup
+      : recordLineupPlay(progress.opponentLineup, slot, outcome, { quickEngine: quickAdvance !== undefined }),
     opponentBatterLogs: {
       ...progress.opponentBatterLogs,
       [slot]: {
@@ -2104,7 +2189,8 @@ function applyDefensivePlay(
     atBatPrepared: false,
     endedInningIndex: applied.game.inning - 1,
     // 정산 0xa8024 — 0xa56dc(ctx, 지금 타자, 0) 이면 상대 타자 레코드 +0x20~+0x2a (마타자 칸은 거짓)
-    ...withLeaguePlateAppearance(progress, false, slot, outcome, applied.runsScored),
+    // 종류 5 정산은 a8856 이 상대 타자 리그 기록(+0x20 타수 …)을 건너뛴다
+    ...(stealPlaySettlement ? {} : withLeaguePlateAppearance(progress, false, slot, outcome, applied.runsScored)),
   }
 
   // 0x8f414 는 사람 장면의 타석 끝(0x12 갱신 0x4e6d4 · 0x17 끝 0x528b0)에서만 돈다 — 내가 던진 타석만.
@@ -3155,7 +3241,8 @@ function applyTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomP
  *
  * `bothTeamsAreCpu` 는 거짓 — 모드 3 경기 준비 `0x3a20a` 가 내 팀을 사람 팀으로 적는다. 다만 마무리 굴림 `0xac360` 은
  * 벤치에 마선수가 있을 때만(0xb8a8d) 돌아 이 화면 로스터에서는 돌지 않는다.
- * ⚠️ 상대 팀 사기는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다** (타자편 `gameFlow.quickDefenseOf` 와 같다).
+ * 사기는 용량 `0x66e44` 의 `V[+2]` — 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 3 → 0x1f940)를 찾으므로 상대 투수는
+ * 상대 팀 레코드 사기다(`teamRecordMoraleOf`, 표값). 간이 엔진 소모(0xa5e14)와 체력 막대가 같은 값을 본다.
  */
 function quickDefenseOf(
   progress: PitcherGameProgress,
@@ -3199,7 +3286,7 @@ function quickDefenseOf(
     lead: isOurs
       ? progress.game.ourScore - progress.game.opponentScore
       : progress.game.opponentScore - progress.game.ourScore,
-    morale: isOurs ? options.teamMorale : 100,
+    morale: isOurs ? options.teamMorale : teamRecordMoraleOf(options.opponentTeamId),
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다
@@ -3552,7 +3639,8 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     seasonDelta: {
       outs: record.outsRecorded,
       runsAllowed: progress.runsAllowedByMe,
-      strikeouts: record.strikeouts,
+      // 레코드 +0x26 — R+0x134 에 삼진 + 도루 판(종류 5)의 삼진을 더한 값 (`stealPlayStrikeouts`)
+      strikeouts: record.strikeouts + (progress.stealPlayStrikeouts ?? 0),
       pitches: progress.pitchCount,
       wins: decisionCode === 1 ? 1 : 0,
       losses: decisionCode === 2 ? 1 : 0,
