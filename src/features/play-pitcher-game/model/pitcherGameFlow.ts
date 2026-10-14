@@ -361,7 +361,7 @@ export interface PitcherGameOptions {
   /**
    * 나리 연차 idx — 저장 레코드 `+0xb3` (0 = 1년차). 0xab214 의 내 투수 보너스 `aP = D[0x1dc] − D[0x1de] × idx`
    * (ab41c) 가 본다. 모드 3 의 레코드는 `0x1f8d4(저장, 3)` = `[저장+0xb8]+0x11c` 다.
-   * ⚠️ 안 넘기면 0(1년차, 보너스 최대) — 옵션을 짜는 쪽(`pitcherGameOptions`)이 아직 안 넘긴다.
+   * 옵션을 짜는 쪽(`pitcherGameOptions`)이 `career.season − 1` 을 넘긴다. 안 넘기면 0(1년차, 보너스 최대) — 시험 · 옛 길.
    */
   readonly careerYearIndex?: number
   /**
@@ -605,8 +605,10 @@ export interface PitcherGameProgress {
    * 투구마다 `0xa5e14` 가 깎는다 (c26ca). 칸 번호는 `ourPitcherOrderOf`·`opponentPitcherOrderOf` 의 로스터 칸이다.
    *
    * 우리 쪽은 내 투수가 마운드에 있으면 `MY_PITCHER_SLOT` 이다 — 그동안 내 스태미나·투구 수는 `stamina`·`pitchCount` 가 든다
-   * (사람 장면은 이 칸을 안 본다). ⚠️ 투수 스태미나는 경기마다 가득에서 시작한다(원본은 시즌 레코드 +0x2c — 타자편 `gameFlow`
-   * 와 같은 근사).
+   * (사람 장면은 이 칸을 안 본다). 마운드에 오르는 투수의 스태미나는 제 레코드 `+0x2c` 다 — 두 팀 표(`ourPitcherStaminas` ·
+   * `opponentPitcherStaminas`, 리그 표 `leaguePitcherStaminas` 에서 이어 온 값)에서 꺼낸다. 경기가 깎은 값은 경기 끝 표로
+   * 리그 표에 남고(0xaeb08), 하루 끝 4f304 가 열 팀 `0xb617c`(+20%)를 먹인다(`entities/pitcher-career/model/leaguePitcherRecords`).
+   * 내 투수는 `options.stamina`(레코드 +0x2c, 하루 끝 0xb60e0 회복 — `applyPitcherGameResult`)로 오른다.
    */
   readonly ourMound: HalfInningMound
   readonly opponentMound: HalfInningMound

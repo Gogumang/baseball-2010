@@ -120,11 +120,11 @@ function advanceForWalk(bases: BaseState): AdvanceResult {
  * 1·2루 주자의 태그업 진루도 있다.
  *
  * 그 수비 시뮬레이션은 `features/defense-play/runDefensePlay` 로 옮겨졌고, **사람이 잡은 타석은
- * 셋 다 그 길로 간다**: 타자편(`play-game`)·팀 경기(`play-team-game`)·투수편(`play-pitcher-game`).
+ * 넷 다 그 길로 간다**: 타자편(`play-game`)·팀 경기(`play-team-game`)·투수편(`play-pitcher-game`)·
+ * 미션(`entities/mission/model/missionRun.missionPlay` — 인플레이 타구는 진행기 결과의 advance 를 쓴다).
  * 자동으로 넘기는 타석은 원본도 간이 엔진이므로 `quickEngine` 갈래를 쓴다.
  *
- * ⚠️ 그래서 아래 "3루 주자면 1점" 근사에 남은 길은 **미션 모드**(`entities/mission`) 뿐이다.
- * 미션도 사람이 치는 타석이라 원본대로면 수비 시뮬레이션이 돌아야 한다 — 아직 안 이었다.
+ * ⚠️ 아래 "3루 주자면 1점" 근사는 판 결과 없이 아웃을 먹이는 길(시험 · 판을 안 도는 옛 호출)에만 남는다.
  */
 function advanceForOut(
   bases: BaseState,

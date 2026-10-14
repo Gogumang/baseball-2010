@@ -12,6 +12,7 @@ import {
   rosterPitcherRoleOf,
 } from '@/entities/pitching/model/pitcherChange'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
+import { PITCHERS } from '@/shared/config/original/roster'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -200,6 +201,12 @@ describe('새 투수 고르기 0xabfcc', () => {
     const 후보 = [{ index: 8, isOwnPlayer: true }, { index: 3, stamina: 100 }]
     expect(chooseReplacementPitcher(후보, { inningIndex: 3, currentStamina: 0 })).toBe(8)
     expect(chooseReplacementPitcher(후보, { inningIndex: 3, currentStamina: 0, excludeOwnPlayers: true })).toBe(3)
+  })
+
+  it('로스터 칸 표는 로스터 120줄의 레코드 +0xb & 3 (`profile`)과 같다', () => {
+    PITCHERS.forEach((player, index) => {
+      expect(player.profile & 3).toBe(ROSTER_PITCHER_ROLES[index % ROSTER_PITCHER_ROLES.length])
+    })
   })
 
   it('로스터 칸 표 [0,0,0,0,1,1,1,2] — 평소는 중간(4~6) 스태미나 최고, 중간이 없으면 마무리, 그다음 선발 끝', () => {
