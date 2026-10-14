@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { commonPanelPaintsOf, insetBoxPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
-import type { CommonPanelOptions, PanelPaint } from '@/shared/lib/commonPanel/commonPanel'
+import { commonPanelPaintsOf, insetBoxPaintsOf, roundBoxPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
+import type { CommonPanelOptions, PanelPaint, RoundBoxOptions } from '@/shared/lib/commonPanel/commonPanel'
 import * as styles from '@/shared/ui/CommonPanel/CommonPanel.css'
 
 interface PaintedRectsProps {
@@ -65,4 +65,24 @@ interface InsetBoxProps {
 export function InsetBox({ x, y, width, height, testId }: InsetBoxProps) {
   const paints = useMemo(() => insetBoxPaintsOf(width, height), [width, height])
   return <PaintedRects x={x} y={y} width={width} height={height} paints={paints} testId={testId} />
+}
+
+interface RoundBoxProps extends RoundBoxOptions {
+  /** 칸 왼쪽 위 — 원본 정렬 비트로 옮긴 뒤 값 */
+  readonly x: number
+  readonly y: number
+  readonly testId?: string
+}
+
+/**
+ * **둥근 칸 `0x5eec4`** — 둥근 칠 · 둥근 테두리, 반사 인자가 서면 왼쪽 위 머리 반사 줄 (`roundBoxPaintsOf`).
+ * 둥근 칠은 (w + 1) × (h + 1) 을 덮는다.
+ */
+export function RoundBox({ x, y, width, height, testId, ...options }: RoundBoxProps) {
+  const { round, shine, shineLength, shineStep, shortShine, fill, edge } = options
+  const paints = useMemo(
+    () => roundBoxPaintsOf({ width, height, round, shine, shineLength, shineStep, shortShine, fill, edge }),
+    [width, height, round, shine, shineLength, shineStep, shortShine, fill, edge],
+  )
+  return <PaintedRects x={x} y={y} width={width + 1} height={height + 1} paints={paints} testId={testId} />
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
+import { Button, CommonPanel, FrameSprite, InsetBox, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
@@ -135,8 +135,9 @@ export function MissionSelectScreen({
 
   return (
     <RawScreen>
-      <div className={styles.panel}
-        style={{ left: PANEL.x, top: PANEL.y, width: PANEL.width, height: PANEL.height }} />
+      {/* 1df9a 공용 판 0x55e61(skin, W/2, H/2, 192, 212, 0, 0x22, 위 띠 0x10, 0, 0, 0) — 알파·아래 띠·제목 탭·어둡게 자리의
+          r7 = [skin+0x84] 는 0 이 아니면 0x1e730(이 함수의 끝 — 아무것도 안 그리고 돌아간다)로 빠지므로 여기서는 늘 0 이다 */}
+      <CommonPanel x={PANEL.x} y={PANEL.y} width={PANEL.width} height={PANEL.height} topBand={0x10} testId="미션-고르기-판" />
 
       <div className={styles.title}
         style={{ left: TITLE.x, top: TITLE.y, width: TITLE.width, color: TITLE.color }}>
@@ -180,13 +181,9 @@ export function MissionSelectScreen({
       <img className={styles.sprite} alt="MISSION"
         src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />
 
-      <div className={styles.descriptionBox}
-        style={{
-          left: DESCRIPTION_BOX.centerX - DESCRIPTION_BOX.width / 2,
-          top: DESCRIPTION_BOX.y,
-          width: DESCRIPTION_BOX.width,
-          height: DESCRIPTION_BOX.height,
-        }} />
+      {/* 1dfe0 칸 0xbb28d(W/2, H/2 + 0x21, 173, 65, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 */}
+      <InsetBox x={DESCRIPTION_BOX.centerX - (DESCRIPTION_BOX.width >> 1)} y={DESCRIPTION_BOX.y}
+        width={DESCRIPTION_BOX.width} height={DESCRIPTION_BOX.height} testId="미션-설명-칸" />
       <div className={styles.descriptionText}
         style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
         {selected === undefined

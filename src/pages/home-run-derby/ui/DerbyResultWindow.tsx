@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FrameSprite, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, FrameSprite, RoundBox, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
@@ -17,6 +17,8 @@ const IMG_TEXT_FRAMES = './sprites/img_text/frames'
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const POPUP_FRAMES = './sprites/popup/frames'
 const RESULT_TITLE_IMAGE = `./sprites/game_ui/${String(RESULT_TITLE.image).padStart(3, '0')}.png`
+/** 둥근 칸 0x5eec5 의 공통 인자 — 둥글기 4 · 반사 길이 0x56 · 걸음 2 · 칠 #395DCE · 테두리 0(검정) (45d84~45daa · 460ec · 46238) */
+const ROUND_BOX = { round: 4, shineLength: 0x56, shineStep: 2, fill: '#395DCE', edge: '#000000' } as const
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface DerbyResultWindowProps {
@@ -36,8 +38,10 @@ interface DerbyResultWindowProps {
  * 칸 B(획득 GP / 보유 GP), 칸 C(StrMAINMENU[53] "재도전하시겠습니까?" + 예·아니오)를 놓는다.
  * 좌표는 전부 `derbyResultLayout` 에 원본 값으로 적혀 있다.
  *
- * 창 몸통(0x55e60)·안쪽 칸(0x5eec4)의 **그림 모양**은 선 목록만 확인돼 CSS 로 근사한다 (추정) —
- * 다른 화면(`pages/settings` · `pages/record`)이 쓰는 것과 같은 근사다.
+ * 창 몸통은 공용 판 0x55e60(skin, W/2, H/2, 176, 213, 0, 0x22, 위 띠 0x10, 0, 0, 0)(45d06~45d24) 이고,
+ * 안쪽 칸 셋은 0xbb28c 가 아니라 **둥근 칸 0x5eec4**(둥글기 4 · 칠 #395DCE · 테두리 검정)다 — 칸 A 만 반사 줄을 긋는다
+ * (45d84~45dae `0x5eec5(skin, W/2, H/2 − 0x55, 162, 84, 4, 2, 1, 0x56, 2, 0, 0x395dce, 0, 0)`, 칸 B · C 는 반사 0).
+ * 둘 다 원본 선 목록대로 `shared/ui` 의 `CommonPanel` · `RoundBox` 가 그린다.
  *
  * 신기록 표시는 없다 — 0x45c18 은 신기록 칸 st+0x3c 를 읽지 않는다. 신기록은 진입 0x4f574 의 효과음 0x1f 로만 알린다.
  *
@@ -48,6 +52,7 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
   const [answer, setAnswer] = useState(RETRY_DEFAULT_ANSWER)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   const popupOrigins = useFrameOrigins(POPUP_FRAMES)
+  const titlePalette = useImgTextPalette3()
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -72,17 +77,19 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
 
   return (
     <div className={styles.layer}>
-      <div
-        className={styles.window}
-        style={{ left: RESULT_WINDOW.x, top: RESULT_WINDOW.y, width: RESULT_WINDOW.width, height: RESULT_WINDOW.height }}
-      />
+      {/* 45d24 공용 판 0x55e60(skin, W/2, H/2, 176, 213, 0, 0x22, 위 띠 0x10, 0, 0, 0) */}
+      <CommonPanel x={RESULT_WINDOW.x} y={RESULT_WINDOW.y} width={RESULT_WINDOW.width} height={RESULT_WINDOW.height}
+        topBand={0x10} testId="더비-결과-창" />
 
       {/* game_ui 이미지 30 = "RESULT" (56×7) */}
       <img className={styles.sprite} style={{ left: RESULT_TITLE.x, top: RESULT_TITLE.y }} src={RESULT_TITLE_IMAGE} alt="RESULT" />
 
       {/* 칸 A — 162×84 */}
-      <div className={styles.innerBox} style={{ left: STAT_BOX.x, top: STAT_BOX.y, width: STAT_BOX.width, height: STAT_BOX.height }} />
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={STAT_BOX_TITLE.frame} origins={textOrigins} x={STAT_BOX_TITLE.x} y={STAT_BOX_TITLE.y} />
+      <RoundBox x={STAT_BOX.x} y={STAT_BOX.y} width={STAT_BOX.width} height={STAT_BOX.height} {...ROUND_BOX} shine testId="더비-칸-A" />
+      {/* 칸 제목 "홈런더비" 는 img_text 팔레트 3 — 45db2 0x913e5(img_text, 3) → 253 → 45de8 0x913e5(img_text, 0) 뒤 줄 이름들 */}
+      {titlePalette.definition}
+      <FrameSprite folder={IMG_TEXT_FRAMES} frame={STAT_BOX_TITLE.frame} origins={textOrigins} x={STAT_BOX_TITLE.x} y={STAT_BOX_TITLE.y}
+        style={titlePalette.style} />
 
       {STAT_ROWS.map((row, index) => (
         <div key={row.name}>
@@ -105,7 +112,7 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
       ))}
 
       {/* 칸 B — 획득 GP / 보유 GP */}
-      <div className={styles.innerBox} style={{ left: POINT_BOX.x, top: POINT_BOX.y, width: POINT_BOX.width, height: POINT_BOX.height }} />
+      <RoundBox x={POINT_BOX.x} y={POINT_BOX.y} width={POINT_BOX.width} height={POINT_BOX.height} {...ROUND_BOX} />
       {POINT_ROWS.map((row, index) => (
         <div key={row.name}>
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins} x={POINT_LABEL_X} y={row.labelY} />
@@ -117,7 +124,7 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
       ))}
 
       {/* 칸 C — 재도전 묻기 */}
-      <div className={styles.innerBox} style={{ left: RETRY_BOX.x, top: RETRY_BOX.y, width: RETRY_BOX.width, height: RETRY_BOX.height }} />
+      <RoundBox x={RETRY_BOX.x} y={RETRY_BOX.y} width={RETRY_BOX.width} height={RETRY_BOX.height} {...ROUND_BOX} />
       <div className={styles.question} style={{ left: RETRY_TEXT.x, top: RETRY_TEXT.y, width: RETRY_TEXT.width }}>
         {RETRY_QUESTION}
       </div>

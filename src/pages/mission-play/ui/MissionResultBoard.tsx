@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FrameSprite } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
@@ -118,16 +118,14 @@ export function MissionResultBoard({
       {/* 4a576 마선수 대결(g[0x11f] · g[0x176])은 여기서 끝 */}
       {!isAce && (
         <>
-          <div className={styles.window} style={{
-            left: MISSION_RESULT_WINDOW.x, top: MISSION_RESULT_WINDOW.y,
-            width: MISSION_RESULT_WINDOW.width, height: MISSION_RESULT_WINDOW.height,
-          }} />
+          {/* 4a5f4 공용 판 0x55e61(skin, W/2, H/2, 176, 152, 0, 0x22, 위 띠 0x10, 0, 0, 0) */}
+          <CommonPanel x={MISSION_RESULT_WINDOW.x} y={MISSION_RESULT_WINDOW.y}
+            width={MISSION_RESULT_WINDOW.width} height={MISSION_RESULT_WINDOW.height} topBand={0x10} testId="미션-결과-창" />
           <img className={styles.sprite} alt="RESULT" src={imageSrc(GAME_UI, MISSION_RESULT_TITLE.image)}
             style={{ left: MISSION_RESULT_TITLE.x, top: MISSION_RESULT_TITLE.y }} />
 
-          <div className={styles.innerBox} style={{
-            left: MISSION_POINT_BOX.x, top: MISSION_POINT_BOX.y, width: MISSION_POINT_BOX.width, height: MISSION_POINT_BOX.height,
-          }} />
+          {/* 4a67e 칸 0xbb28d(W/2, H/2 − 0x33, 162, 0x3d, 정렬 2) */}
+          <InsetBox x={MISSION_POINT_BOX.x} y={MISSION_POINT_BOX.y} width={MISSION_POINT_BOX.width} height={MISSION_POINT_BOX.height} />
           {MISSION_POINT_ROWS.map((row, index) => {
             const value = index === 0 ? earnedGamePoint : heldGamePoint
             return (
@@ -145,9 +143,8 @@ export function MissionResultBoard({
             )
           })}
 
-          <div className={styles.innerBox} style={{
-            left: MISSION_RETRY_BOX.x, top: MISSION_RETRY_BOX.y, width: MISSION_RETRY_BOX.width, height: MISSION_RETRY_BOX.height,
-          }} />
+          {/* 4a69c 칸 0xbb28d(W/2, H/2 + 0x10, 162, 0x31, 정렬 2) */}
+          <InsetBox x={MISSION_RETRY_BOX.x} y={MISSION_RETRY_BOX.y} width={MISSION_RETRY_BOX.width} height={MISSION_RETRY_BOX.height} />
           {question !== undefined && (
             <span className={styles.text} data-testid="미션-재도전-글" style={{
               left: MISSION_RETRY_TEXT.x, top: MISSION_RETRY_TEXT.y, width: MISSION_RETRY_TEXT.width,

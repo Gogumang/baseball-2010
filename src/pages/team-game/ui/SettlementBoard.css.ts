@@ -31,25 +31,6 @@ export const sprite = style({
   pointerEvents: 'none',
 })
 
-/** 공용 창 0x55e60 — 모양은 선 목록만 확인돼 CSS 로 근사한다 (홈런더비 결과 창과 같은 근사) */
-export const window = style({
-  position: 'absolute',
-  background: ORIGINAL_COLORS.boardFill,
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.boxEdgeWhite}`,
-  borderRadius: '4px',
-  pointerEvents: 'none',
-})
-
-/** 칸 0xbb28c(…, 2) — 홈런더비 결과 창의 안쪽 칸과 같은 근사 */
-export const innerBox = style({
-  position: 'absolute',
-  background: '#395DCE',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '3px',
-  pointerEvents: 'none',
-})
-
 /** 0xba269 흰 글 */
 export const text = style({
   position: 'absolute',

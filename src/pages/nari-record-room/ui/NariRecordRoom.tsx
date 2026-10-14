@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { RawScreen } from '@/shared/ui'
+import type { CSSProperties } from 'react'
+import { CommonPanel, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -132,12 +133,14 @@ const YEAR_KEYS: Readonly<Record<string, YearRecordKey>> = {
   Enter: '기타', 5: '기타', 1: '기타', 3: '기타', 7: '기타', 9: '기타', '#': '기타',
 }
 
-/** 머리 글 img_text — 0x5650c 가 (x, 56, 폭, 15) 가운데에 (img_text 크기는 origins.json) */
-function YearLabel({ frame, x, width, alt }: { readonly frame: number; readonly x: number; readonly width: number; readonly alt: string }) {
+/** 머리 글 img_text — 0x5650c 가 (x, 56, 폭, 15) 가운데에 (img_text 크기는 origins.json). 팔레트 3 (0x565ac~0x565b8 `0x913e5(img_text, 3)`) */
+function YearLabel({ frame, x, width, alt, palette }: {
+  readonly frame: number; readonly x: number; readonly width: number; readonly alt: string; readonly palette: CSSProperties
+}) {
   const origins = useFrameOrigins(IMG_TEXT)
   const size = origins?.[String(frame).padStart(3, '0')]
   const offset = size === undefined ? { x: 0, y: 3 } : yearLabelOffsetOf(width, size.width, size.height)
-  return <img alt={alt} src={frameSrc(frame)} style={{ ...pixel, left: x + offset.x, top: YEAR_TABLE_LAYOUT.labelY + offset.y }} />
+  return <img alt={alt} src={frameSrc(frame)} style={{ ...pixel, ...palette, left: x + offset.x, top: YEAR_TABLE_LAYOUT.labelY + offset.y }} />
 }
 
 /**
@@ -210,19 +213,24 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
     .filter(({ index }) => index >= view.firstColumn - 1 && index <= view.firstColumn + VISIBLE_YEAR_COLUMNS)
   const cursorRow = view.cursor - view.top
   const isInset = yearCursorIsInsetOf(view)
+  const palette3 = useImgTextPalette3()
 
   return (
     <RawScreen>
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`개인기록 ${edition}`}>
-        <div className={windowStyles.window} style={{ left: layout.panel.x, top: layout.panel.y, width: layout.panel.width, height: layout.panel.height }} />
+        {palette3.definition}
+        {/* 5ca4e 공용 판 0x55e60(편집기, W/2, H/2 + 5, 210, 220, 0, 0x22, 위 띠 0x12, 아래 띠, 0, 0) — 아래 띠는
+            (s8)[편집기+0x3e8] == 1 이면 0x12, 아니면 0 (5ca00~5ca10). ⚠️ 미확인: +0x3e8 을 세우는 곳을 못 찾아 0 으로 둔다 */}
+        <CommonPanel x={layout.panel.x} y={layout.panel.y} width={layout.panel.width} height={layout.panel.height}
+          topBand={0x12} testId="개인기록-판" />
         {rows.length > 1 && (
           <>
             <img alt="위" src={imageOf(SLT_FRAME, UP_ARROW_IMAGE)} style={{ ...pixel, left: layout.arrowX, top: layout.upArrowY - blink }} />
             <img alt="아래" src={imageOf(SLT_FRAME, DOWN_ARROW_IMAGE)} style={{ ...pixel, left: layout.arrowX, top: layout.downArrowY + blink }} />
           </>
         )}
-        <YearLabel frame={YEAR_NUMBER_HEADER_FRAME} x={layout.numberX} width={layout.numberWidth} alt="연차" />
+        <YearLabel frame={YEAR_NUMBER_HEADER_FRAME} x={layout.numberX} width={layout.numberWidth} alt="연차" palette={palette3.style} />
         {visibleRows.map((_row, offsetRow) => (
           <div key={view.top + offsetRow} aria-label={String(view.top + offsetRow + 1)}>
             <img alt="" src={imageOf(GAME_UI_FRAMES, NUMBER_CELL_FRAME)} style={{ ...pixel, left: layout.numberX, top: rowY(offsetRow) }} />
@@ -245,7 +253,7 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
             const left = layout.statX - layout.clip.x + (index - view.firstColumn) * layout.columnStep + offset
             return (
               <div key={column.bit} data-testid={`개인기록-열-${column.label}`} style={{ ...pixel, left, top: -layout.clip.y }}>
-                <YearLabel frame={column.labelFrame} x={0} width={layout.statWidth} alt={column.label} />
+                <YearLabel frame={column.labelFrame} x={0} width={layout.statWidth} alt={column.label} palette={palette3.style} />
                 {visibleRows.map((row, offsetRow) => {
                   const number = row.numberOf(column.bit)
                   const drawing = number === null ? null : yearCellDrawingOf(number)
@@ -288,6 +296,8 @@ interface NariRankingScreenProps {
 
 /** ⚠️ 근사 배치 — 시즌 0xdb(`SeasonRecordRankScreen`)와 같은 0x5796c 판. 시작 x · 칸 사이 3 · 줄 사이 4 만 확정 */
 const RANK_TABLE = { x: 20, headerY: 60, firstRowY: 84, rowStep: 18, columns: [24, 76, 64, 36] } as const
+/** 57a32~57a52 — 0x55e60(…, W/2, H/2 + 5, 0xd2, 0xdc, 정렬 0x22) → 왼쪽 위 (120 − 105, 165 − 110) */
+const RANK_PANEL = { x: 15, y: 55, width: 0xd2, height: 0xdc } as const
 
 /**
  * 124 둘째 갈래 — 0x5796c(나리 판 목록) · 키 0x5787d(좌·우로 쪽 [편집기+0x444], 끝에서 멈춘다 · 쪽이 바뀌면 다시 뽑는다).
@@ -317,15 +327,20 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
   const entries = nariRankingEntriesOf(edition, career, page)
   const columnX = RANK_TABLE.columns.map((_width, index) => RANK_TABLE.x + RANK_TABLE.columns.slice(0, index).reduce((sum, width) => sum + width + 3, 0))
   const headerFrames = [...RANK_HEADER_FRAMES, category.labelFrame]
+  const palette3 = useImgTextPalette3()
 
   return (
     <RawScreen>
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`순위기록 ${side} ${category.label}`}>
-        <div className={windowStyles.window} style={{ left: 14, top: 52, width: 212, height: 216 }} />
+        {palette3.definition}
+        {/* 57a52 공용 판 0x55e60(편집기, W/2, H/2 + 5, 210, 220, 0, 0x22, 위 띠 0x12, 0, 0, 0) → (15, 55, 210, 220) */}
+        <CommonPanel x={RANK_PANEL.x} y={RANK_PANEL.y} width={RANK_PANEL.width} height={RANK_PANEL.height} topBand={0x12}
+          testId="순위기록-판" />
+        {/* 머리 글은 img_text 팔레트 3 (57a5c · 57a9c · 57ad6 · 57b9a `0x913e5(img_text, 3)` 뒤 0x5650c) */}
         {headerFrames.map((frame, index) => (
           <img key={frame} className={windowStyles.layer} alt="" src={frameSrc(frame)}
-            style={{ left: columnX[index] + RANK_TABLE.columns[index] / 2, top: RANK_TABLE.headerY, transform: 'translateX(-50%)' }} />
+            style={{ ...palette3.style, left: columnX[index] + RANK_TABLE.columns[index] / 2, top: RANK_TABLE.headerY, transform: 'translateX(-50%)' }} />
         ))}
         {page > 0 && <span className={styles.title} style={{ left: columnX[3] - 6, top: RANK_TABLE.headerY - 2, width: 6 }}>◀</span>}
         {page < categories.length - 1 && (
