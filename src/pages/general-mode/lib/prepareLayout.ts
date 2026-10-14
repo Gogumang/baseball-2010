@@ -13,6 +13,8 @@
  * **프레임**은 `sprites/<이름>/frames/NNN.png` 다. 노트가 "이미지 9" 라 하면 앞쪽,
  * "프레임 0" 이라 하면 뒤쪽이다.
  */
+import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
+
 export const SCREEN = { width: 240, height: 320 } as const
 
 /**
@@ -156,7 +158,7 @@ export const ACE_LAYOUT = {
  *
  * 가로만 가운데를 맞추고 **세로는 `top` 을 그대로** 쓴다 — 줄 사이는 줄높이 40 + 세로틈 18 = 58.
  * 5열 화면이라 열별 보정 `0xd40b8 = [3,3,3,13,13]` 도 받는다 (종류 7·8 이 대상이다).
- * 열림 애니(위에서 한 줄씩 떨어짐)와 커서 튕김(2px 2틱)이 끝난 자리다 — ⚠️ 두 연출은 아직 옮기지 않았다.
+ * 열림 애니(위에서 한 줄씩 떨어짐 — `ACE_GRID_OPEN`)와 커서 튕김(2px 2틱)이 끝난 자리다 — ⚠️ 튕김은 아직 옮기지 않았다.
  */
 export function aceCellPositionOf(index: number) {
   const { columns, cell, centerX, top, hGap, vGap } = ACE_LAYOUT.grid
@@ -167,7 +169,18 @@ export function aceCellPositionOf(index: number) {
   }
 }
 
-/** 격자 커서 깜빡임 — 그릴 때마다 [격자+0x18] 을 1 올리고 `% 8 ≤ 4` (0x7a632~0x7a64a). ⚠️ 시작 값 미확인 */
+/**
+ * 격자 열림 애니의 꼴 (`shared/lib/gridOpen`) — 줄높이 40 · 세로틈 0x12 · 가속 시프트 1(0x6481e `str r6,[sp,#0x18]`).
+ * 시작 `0x7a005(격자, 1, 1, 1)`(0x64832~0x6483c) — 넷째 인자와 상관없이 늘 돈다.
+ */
+export const ACE_GRID_OPEN: GridOpenShape = {
+  rows: ACE_LAYOUT.grid.rows, columns: ACE_LAYOUT.grid.columns, rowHeight: ACE_LAYOUT.grid.cell, rowGap: ACE_LAYOUT.grid.vGap, shift: 1,
+}
+
+/**
+ * 격자 커서 깜빡임 — 그릴 때마다 [격자+0x18] 을 1 올리고 `% 8 ≤ 4` (0x7a632~0x7a64a).
+ * 시작 0x7a005 가 [격자+0x18] = 0 으로 둔다(0x7a01e) — 격자를 지은 그림이 0 이다.
+ */
 export const isAceGridCursorOn = (drawCount: number): boolean => ((drawCount % 8) + 8) % 8 <= 4
 
 /**

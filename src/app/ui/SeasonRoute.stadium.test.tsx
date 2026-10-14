@@ -13,6 +13,12 @@ import { LEAGUE_SIDE_HOME, leagueSideOf } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * **시즌 홈경기 타석에 장착한 전광판·관중석이 실제로 간다** — 배선만 못박는다.
  *

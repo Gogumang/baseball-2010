@@ -28,3 +28,13 @@ export const isFrameSlideClearedAt = (updates: number): boolean => updates > 0 &
 export function isFrameSlidingAt(updates: number): boolean {
   return updates <= 0 || frameSlideOf(updates - 1) < FRAME_SLIDE_END
 }
+
+/**
+ * 공용 목록 0x63b14 · 미션 고르기 0x1df08 처럼 [skin+0x84] 가 서 있으면 본문 없이 끝나는 그림의 **본문 첫 그림** —
+ * 깃발이 그 그림 앞에 이미 내려가 있는 첫 그림이다(`isFrameSlidingAt` 이 처음 거짓인 그림).
+ */
+export const FRAME_SLIDE_BODY_FIRST_DRAW = (() => {
+  let draw = 0
+  while (isFrameSlidingAt(draw)) draw += 1
+  return draw
+})()

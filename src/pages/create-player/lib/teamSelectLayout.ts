@@ -13,6 +13,7 @@
  */
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
+import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
@@ -114,16 +115,32 @@ export const MY_LEAGUE_TEAM_GRID_SHAPE: AnnalsGridShape = TEAM_GRID_SHAPE
  * 위쪽 = cy                                        ; 그대로 쓴다
  * y[i] -= 0xd40b8[i mod 열]                        ; 5열 화면의 열별 보정
  * ```
- * ⚠️ 칸 **너비 배열**과 가로·세로 틈은 문서에 값이 없어 40·0 으로 둔다 (**근사**).
+ * ⚠️ 칸 **너비 배열**과 가로틈은 문서에 값이 없어 40·0 으로 둔다 (**근사**).
+ * 세로틈은 팀 고르기 본문 0x63dee 가 정한다(직접 떴다): `[sp+0xac] = 0`(0x63df6), k 9(에디트)만 `[sp+0xb0] = 10 · [sp+0xac] = 8`
+ * (0x64032~0x6403c) — 0x79ed5 의 열째 인자(세로틈, 0x64082 `str r0,[sp,#0x14]`)다. 그래서 에디트 10칸은 줄 사이가 48 이다.
  */
-export function cellPositionOf(index: number, _count = TEAM_COUNT) {
+export function cellPositionOf(index: number, count = TEAM_COUNT) {
   const left = GRID.centerX - (GRID.columns * GRID.cell) / 2
   const column = index % GRID.columns
   return {
     x: left + GRID.cell * column,
-    y: GRID.top + GRID.cell * Math.floor(index / GRID.columns) - COLUMN_Y_OFFSETS[column],
+    y: GRID.top + (GRID.cell + teamGridRowGapOf(count)) * Math.floor(index / GRID.columns) - COLUMN_Y_OFFSETS[column],
   }
 }
+
+/** 에디트(k 9) 팀 수 — 0x64036 `movs r1,#0xa` */
+const EDIT_GRID_TEAM_COUNT = 10
+
+/** 세로틈 — 팀 15칸(k 0·1)은 0, 에디트 10칸(k 9)은 8 (0x63df6 · 0x6403c) */
+export const teamGridRowGapOf = (count: number) => (count === EDIT_GRID_TEAM_COUNT ? 8 : 0)
+
+/**
+ * 격자 열림 애니의 꼴 (`shared/lib/gridOpen`) — `0x79ed5([skin+0xe0], 9, 120, H/2 + 22, 표, 40, 5열, 개수/5, 0, 세로틈, 1)`
+ * (0x64060~0x64090): 줄높이 40 · 가속 시프트 1. 시작 `0x7a005(격자, [skin+0xe8], 1, 1)`(0x64094~0x640a2) — 애니는 넷째 인자를 따른다.
+ */
+export const teamGridOpenShapeOf = (count = TEAM_COUNT): GridOpenShape => ({
+  rows: gridRowCountOf(count), columns: GRID.columns, rowHeight: GRID.cell, rowGap: teamGridRowGapOf(count), shift: 1,
+})
 
 /** 팀이 열려 있는가 — 0~9 는 늘 열려 있고, 10~14 히든은 해금 기록이 있어야 한다 */
 export function isTeamOpen(teamId: number, openedHiddenIds: readonly number[]): boolean {

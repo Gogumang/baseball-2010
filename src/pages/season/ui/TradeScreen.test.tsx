@@ -12,6 +12,12 @@ import { TEAMS } from '@/shared/config/original/teams'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * 트레이드 네 칸 (0xe4 팀 고르기 → 0xe5 영입 선수 → 0xe6 보상 선수 → 0xe7 확인·진행).
  * 성공률·비용은 J 4-4 확정이고, 나리·명예 선수 거절(StrMODE[165]/[166])도 함께 본다.

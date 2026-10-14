@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
+import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
+import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -9,7 +10,7 @@ import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
-  TEAM_COUNT, TEAM_GRID_SHAPE, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen,
+  TEAM_COUNT, TEAM_GRID_SHAPE, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen, teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
@@ -40,6 +41,9 @@ const CELL_CURSOR_SIZE = 42
  * 원본 그리기 합성식 0xbb91d 에 "크기 a/10" 배율이 있어 5/10 ≈ 38×38 로 보는 것이 자연스럽다.
  */
 const CELL_LOGO_SIZE = 38
+
+/** 팀 15칸 격자의 열림 애니 꼴 (k 0·1 — `teamGridOpenShapeOf`) */
+const TEAM_GRID_OPEN = teamGridOpenShapeOf(TEAM_COUNT)
 
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
@@ -100,8 +104,11 @@ export function TeamSelectScreen({
   const team = TEAMS[cursor] ?? TEAMS[0]
   const isOpen = isTeamOpen(cursor, openedHiddenIds)
 
-  // 머리띠가 미끄러지는 동안 키 함수가 [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useFrameSlideKeyLock`)
-  const keyLock = useFrameSlideKeyLock()
+  // 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지 키 함수가
+  // [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useListPageEntry`). 격자 시작 애니 = [skin+0xe8] — 이 화면들은 모두 넷째 인자 1 이다
+  const entry = useListPageEntry({ grid: { shape: TEAM_GRID_OPEN, isAnimated: true } })
+  const { keyLock } = entry
+  const gridOpen = entry.grid
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (keyLock.current) return
@@ -135,6 +142,7 @@ export function TeamSelectScreen({
 
   return (
     <RawScreen>
+      {gridOpen !== null && (<>
       {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
       {[
         { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
@@ -180,7 +188,8 @@ export function TeamSelectScreen({
 
       {/* 15팀 격자 */}
       {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
-        const { x, y } = cellPositionOf(index)
+        const { x } = cellPositionOf(index)
+        const y = cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index)
         const open = isTeamOpen(index, openedHiddenIds)
         return (
           <button
@@ -219,13 +228,15 @@ export function TeamSelectScreen({
                 opacity: blackStepCoverOpacityOf(TEAM_COVER_STEP),
               }} />
             )}
-            {index === cursor && (
+            {/* 커서는 열림 애니가 끝난 뒤([격자+9])에만 0x7b3a0 이 그린다 */}
+            {index === cursor && gridOpen.state.isDone && (
               <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
                 style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }} />
             )}
           </button>
         )
       })}
+      </>)}
 
       {/* 머리띠(제목)·바닥띠 — 원본 상태 101 그리기 0x15de4 도 이 둘을 얹는다 (P6 1-1 · R9 206 · F 489) */}
       {/* 바닥띠의 "되돌아가기" 가 원본의 되돌아가기 소프트키다 (P6 1-1) — 따로 둔 버튼은 없앴다:

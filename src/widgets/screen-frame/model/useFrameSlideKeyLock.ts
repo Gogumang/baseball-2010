@@ -12,8 +12,8 @@ import { isFrameSlidingAt } from '@/widgets/screen-frame/lib/frameSlide'
  * 27 0x2ac00 · 28 0x2af20 · 29 0x2b2e0, 시즌 0xca 0x8da4 · 0xd7 0xa248 · 0xdd 0x83cc · 0xe2 0xe340 · 0xe4 0x8250,
  * 나리 101 0x14114 · 142 0x13c30 · 145 0x1ca4c.
  * 키(갱신)는 그리기보다 먼저라 그림 n 을 보고 누른 키는 그림 n 앞의 깃발을 본다 — `isFrameSlidingAt(n)` 이면 버린다.
- * ⚠️ 미이식: 머리띠가 다 내려온 뒤에도 격자 열림 애니 0x79fa8(위에서 한 줄씩 가속하며 떨어짐, S9 3-3)가 끝날 때까지 [skin+0xe4] 는 0 이다 —
- * 웹은 격자 열림 애니가 없어 머리띠까지만 막는다.
+ * 격자를 그리는 k(0·1·9 · 2·10·11 · 6~8)는 격자 열림 애니 0x79fa8 이 끝날 때까지도 0 이라 `useListPageEntry` 를 쓴다.
+ * 이 훅은 격자가 없는 선공/구장(k 3)만 쓴다 — ⚠️ 미확인: k 3 이 [skin+0xe4] 에 담는 r5(0x647ae)가 무엇인지 안 읽었다.
  */
 export function useFrameSlideKeyLock(slides = true): { readonly current: boolean } {
   const updates = useUpdateCounter()

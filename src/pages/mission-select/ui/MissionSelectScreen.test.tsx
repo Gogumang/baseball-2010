@@ -48,7 +48,7 @@ describe('미션 선택 격자', () => {
     const first = 칸(BATTER_MISSIONS[0].name)
     const second = 칸(BATTER_MISSIONS[1].name)
 
-    expect(first.style.width).toBe(`${GRID.cell}px`)
+    expect(first.style.width).toBe(`${GRID.cellWidth}px`)
     expect(first.style.left).toBe(`${cellPositionOf(0).x}px`)
     expect(second.style.left).toBe(`${cellPositionOf(1).x}px`)
     expect(second.style.top).toBe(first.style.top)

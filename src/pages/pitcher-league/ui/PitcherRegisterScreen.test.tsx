@@ -7,6 +7,12 @@ import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitch
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * 투수 등록 (0x66) — 고르는 줄은 타자편과 같은 다섯이고 뜻만 다르다.
  * 확인(0x67)도 화면을 비우지 않고 상자만 얹는다.
