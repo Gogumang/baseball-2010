@@ -299,7 +299,7 @@ describe('투수편 경기 화면', () => {
 describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
   it('인트로가 먼저 서고, 후공·선발이면 그 뒤 1회초 판이 OK 를 기다린다 — 그 동안 메뉴 키가 안 먹는다', () => {
     render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={vi.fn()} />)
-    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.getByTestId('인트로-띠')).toBeTruthy()
     expect(screen.queryByText('1. 구질 선택')).toBeNull()
 
     fireEvent.keyDown(window, { key: '5' })

@@ -48,20 +48,9 @@ export const webCaption = style({
   pointerEvents: 'none',
 })
 
-/**
- * 인트로 띠 — 높이 30 (0x6a9f0(g, 0, y, W, 30, …)). ⚠️ y 는 미해결이라 화면 가운데에 둔다(웹 전용 배치).
- */
+/** 인트로 띠 0x6a9f0(g, 0, 0xbaa8c() + 40, W, 30, …) — 자리 · 크기 · 색은 화면이 준다 (`lib/introLayout`) */
 export const introBand = style({
   position: 'absolute',
-  left: 0,
-  right: 0,
-  top: '145px',
-  height: '30px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: ORIGINAL_COLORS.text,
-  fontSize: '13px',
   pointerEvents: 'none',
 })
 

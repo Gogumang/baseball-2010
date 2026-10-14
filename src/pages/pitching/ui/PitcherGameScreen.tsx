@@ -37,12 +37,12 @@ import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { TEAMS } from '@/shared/config/original/teams'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
@@ -480,9 +480,19 @@ export function PitcherGameScreen({
     const side1Team = options.playerSide === 0 ? options.opponentTeamId : options.ourTeamId
     return (
       <GameIntro
-        awayName={TEAMS[side0Team]?.name ?? ''}
-        homeName={TEAMS[side1Team]?.name ?? ''}
+        // 모드 3 은 홈(측 1) 팀 이름 + "스타디움" (0x418b6 의 0xb6bdc(st, 1))
+        stadiumNameFrame={introStadiumNameFrameOf(PITCHER_CAREER_MODE, null, side1Team)}
         scoreboardSides={scoreboardSides}
+        // 배경 고르기 0x40ff0 → 모드 3 은 0x78578 — 경기 장면의 타석 구장(0x39fdc 모드 3) 그대로
+        backdrop={{
+          skyRow: stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0,
+          skyColumn: 0,
+          stadium: sceneStadium.stadium,
+          fieldPalette: grassPalette,
+          ourTeamId: side0Team,
+          opponentTeamId: side1Team,
+          gameMode: PITCHER_CAREER_MODE,
+        }}
         onDone={() => setIntroDone(true)}
       />
     )

@@ -125,7 +125,7 @@ describe('경기 시작', () => {
     fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
 
     // 팀 경기 장면은 경기 시작 인트로(상태 0xc, 모드 1)부터 선다
-    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.getByTestId('인트로-띠')).toBeTruthy()
   })
 
   it('경기정보 OK 가 첫 저장(0x3136e)을 넘긴다 — 1회초 아웃 0 의 일반모드 진행', () => {
@@ -167,7 +167,7 @@ describe('이어하기 (0x213c0(앱, 1, 0) → 장면 0x104)', () => {
     const onGameSave = vi.fn()
     띄우기({ resumeGame: save, onGameStart, onGameSave })
 
-    expect(screen.getByText(/VS/)).toBeTruthy()
+    expect(screen.getByTestId('인트로-띠')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '경기 시작' })).toBeNull()
     expect(onGameStart).not.toHaveBeenCalled()
     expect(onGameSave).toHaveBeenCalled()

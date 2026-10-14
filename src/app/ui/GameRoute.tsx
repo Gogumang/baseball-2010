@@ -23,8 +23,9 @@ import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
-import { TEAMS } from '@/shared/config/original/teams'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
+
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
 import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
@@ -36,6 +37,9 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
 import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { gameAutoRelayStepsOf } from '@/pages/game/lib/gameAutoRelay'
+
+/** 나리 타자편 — 전역 모드 [0x1552d10] = 4 */
+const BATTER_CAREER_MODE = 4
 
 interface GameRouteProps {
   readonly session: ReturnType<typeof useCareerSession>
@@ -190,10 +194,24 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     const side1Team = progress.game.playerSide === 0 ? progress.opponentTeamId : progress.ourTeamId
     return (
       <GameIntro
-        awayName={TEAMS[side0Team]?.name ?? ''}
-        homeName={TEAMS[side1Team]?.name ?? ''}
+        // 모드 4 는 홈(측 1) 팀 이름 + "스타디움" (0x418b6 의 0xb6bdc(st, 1))
+        stadiumNameFrame={introStadiumNameFrameOf(BATTER_CAREER_MODE, null, side1Team)}
         // 점수판 틀 0x41440 (0x419f4) 의 두 측 — 내 팀 PLAYER · 상대 COM (타석 교대 판과 같은 두 측)
         scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId)}
+        // 배경 고르기 0x40ff0 → 모드 4 는 0x78578 — 경기 장면의 타석 구장(0x39fdc 모드 4) 그대로
+        {...(session.sceneStadium == null
+          ? {}
+          : {
+              backdrop: {
+                skyRow: session.stadiumSkyRow,
+                skyColumn: 0,
+                stadium: session.sceneStadium.stadium,
+                fieldPalette: sceneFieldPaletteOf(session.sceneStadium),
+                ourTeamId: side0Team,
+                opponentTeamId: side1Team,
+                gameMode: BATTER_CAREER_MODE,
+              },
+            })}
         onDone={() => setIntroDone(true)}
       />
     )

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
@@ -36,6 +35,7 @@ import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/us
 import { RecordAlertPanel, RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
@@ -545,9 +545,20 @@ export function TeamGameScreen({
     const side1Team = options.playerSide === 0 ? options.opponentTeamId : options.ourTeamId
     return (
       <GameIntro
-        awayName={TEAMS[side0Team]?.name ?? ''}
-        homeName={TEAMS[side1Team]?.name ?? ''}
+        // 모드 1 은 구장 번호 st+0x30, 그 밖은 홈(측 1) 팀 이름 + "스타디움" (0x418b6)
+        stadiumNameFrame={introStadiumNameFrameOf(options.mode, options.stadiumId, side1Team)}
         scoreboardSides={scoreboardSides}
+        // 배경 고르기 0x40ff0 — 타석 · 정산 배경과 같은 구장(시즌 홈경기 · 대전이면 시즌 구장)
+        backdrop={{
+          skyRow: stadiumSkyRow ?? 0,
+          skyColumn: 0,
+          stadium: sceneStadium?.stadium ?? 0,
+          fieldPalette,
+          ...(seasonStadium === undefined ? {} : { seasonStadium }),
+          ourTeamId: side0Team,
+          opponentTeamId: side1Team,
+          gameMode: options.mode,
+        }}
         onDone={() => setIntroDone(true)}
       />
     )
