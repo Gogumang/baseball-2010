@@ -4,6 +4,7 @@ import {
   EVENT_MARKER_ANIMATION,
   MAP_FRAME,
   MAP_FRAMES,
+  NIGHT_WINDOW_FRAME,
   OUTING_PLACES,
   PLACE_LABEL_FRAMES,
 } from '@/shared/config/outingPlaces'
@@ -15,6 +16,9 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { Button, FrameSprite } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
 import { placeLabelTopLeftOf } from '@/pages/outing-map/lib/placeLabelPosition'
+import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
+import { NIGHT_DIM_STEP } from '@/pages/management/lib/outingMapUnderlay'
+import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 
 /**
  * [!] 표시 기준점 (0x7ed6c, F-2 2-6 확정) — `mapX + bx + (bw >> 1)`, `mapY + by`.
@@ -30,6 +34,8 @@ const cursorAnchorOf = (box: MapBox) => ({ x: box.x + Math.trunc(box.width / 2),
 
 /** 효과 1·인자 7 — 그림 무게가 7/16 이다 (R6 3a) */
 const UNSELECTED_OPACITY = 7 / 16
+/** 시간대 2(밤) — 0xb8fbd 의 20~5시 */
+const NIGHT_TIME_SLOT = 2
 
 interface OutingMapProps {
   readonly selectedPlaceId: string
@@ -39,14 +45,21 @@ interface OutingMapProps {
   readonly onBack: () => void
   /** 지도 위에 얹을 것 — 장소 기능 말풍선 (F-2 2-7) */
   readonly children?: ReactNode
+  /**
+   * 시간대 [gfx+0x1c] 를 고를 휴대폰 시각 — 나리 상태 100 진입 0x1c154 끝(0x1c418~0x1c424)이 `0x7b934(gfx, 0xb8fbd())` 로 세운다
+   * (0xb8fbd: 휴대폰 시계 0x6f391 의 한국 시각, 6~15 → 0 · 16~19 → 1 · 그 밖 → 2). 안 주면 지금 시각.
+   * ⚠️ 근사: 원본은 마지막으로 상태 100 에 들어온 때의 시각이다 — 웹은 그리는 지금 시각(기기 지역 시각).
+   */
+  readonly hour?: number
 }
 
 /** 원작 외출 지도 — event_map 프레임 그대로 (건물·이름·[!]·선택 화살표) */
-export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, onBack, children }: OutingMapProps) {
+export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, onBack, children, hour }: OutingMapProps) {
   const origins = useFrameOrigins(MAP_FRAMES)
   const labelOrigins = useFrameOrigins(PLACE_LABEL_FRAMES)
   const animations = useAnimations(MAP_FRAMES)
   const update = useUpdateCounter()
+  const isNight = backgroundFrameOf(hour ?? new Date().getHours()) === NIGHT_TIME_SLOT
 
   const animated = (animation: number, anchor: { x: number; y: number }, key: string) => {
     const step = animationStepAt(animations?.[animation] ?? [], update)
@@ -60,37 +73,34 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
   return (
     <RawScreen>
       <FrameSprite folder={MAP_FRAMES} frame={MAP_FRAME} origins={origins} x={0} y={styles.MAP_TOP} />
-      {/*
-        프레임 6 은 길 점선이 아니라 **창문 불빛**이고, 원본은 **밤(시간대 2 = 20~5시)에만** 그린다.
-        그것도 화면 전체를 단계 9 로 어둡게 한 뒤에 얹는다 (0x7eba2, F-2 2-3 확정).
-        웹에는 아직 시간대가 없어 늘 낮이므로 그리지 않는다 — 앞서는 항상 그리고 있었다.
-      */}
 
-      {OUTING_PLACES.map((place) => {
-        const frameOrigin = origins?.[String(place.frame).padStart(3, '0')]
-        const label = labelOrigins?.[String(place.labelFrame).padStart(3, '0')]
-        return (
-          <div key={place.id}>
-            {frameOrigin !== undefined && (
-              <button type="button" className={styles.placeButton} aria-label={place.name}
-                style={{ left: frameOrigin.x, top: frameOrigin.y + styles.MAP_TOP, width: frameOrigin.width, height: frameOrigin.height }}
-                onClick={() => onOpen(place)}>
-                {/* 고르지 않은 건물은 효과 1·인자 7 = 7/16 반투명 겹치기다 (0x7eb0a · R6 3a 확정) */}
-                <img className={styles.sprite}
-                  style={{ left: 0, top: 0, opacity: place.id === selectedPlaceId ? 1 : UNSELECTED_OPACITY }}
-                  src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
-              </button>
-            )}
-            {/* 이름은 박스에 mapY 를 안 더한다 (F-2 2-4 확정) — 앞서 웹은 MAP_TOP 을 더하고 있었다 */}
-            {label !== undefined && (
-              <FrameSprite folder={PLACE_LABEL_FRAMES} frame={place.labelFrame} origins={labelOrigins}
-                {...placeLabelTopLeftOf(place.nameBox, label.width, label.height)} />
-            )}
-            {eventPlaceIds.has(place.id) && animated(EVENT_MARKER_ANIMATION, markerAnchorOf(place.markerBox), `${place.id}-event`)}
-            {place.id === selectedPlaceId && animated(CURSOR_ANIMATION, cursorAnchorOf(place.cursorBox), `${place.id}-cursor`)}
-          </div>
-        )
-      })}
+      {/* 0x7eb0a~0x7eba0 — 고르지 않은 건물(효과 1·인자 7 = 7/16 반투명 겹치기, R6 3a 확정)과 그 이름. 고른 건물은 밤 덮개 뒤에 그린다 */}
+      {OUTING_PLACES.filter((place) => place.id !== selectedPlaceId).map((place) => (
+        <PlaceArt key={place.id} place={place} origins={origins} labelOrigins={labelOrigins} isSelected={false} onOpen={onOpen} />
+      ))}
+
+      {/*
+        0x7eba2~0x7ec00 밤: 시간대 [gfx+0x1c] == 2 이면 화면 전체를 [0x15605d4] 단계 9 로 덮고(검정 몫 7/16)
+        프레임 6(창문 불빛)을 지도 원점에 얹는다 (F-2 2-3 확정). 그 밖 시간대에는 둘 다 없다.
+      */}
+      {isNight && (
+        <>
+          <div className={styles.nightCover} data-testid="외출지도-밤덮개"
+            style={{ opacity: blackStepCoverOpacityOf(NIGHT_DIM_STEP) }} />
+          <FrameSprite folder={MAP_FRAMES} frame={NIGHT_WINDOW_FRAME} origins={origins} x={0} y={styles.MAP_TOP} />
+        </>
+      )}
+
+      {/* 0x7ec04~0x7ecf8 — 고른 건물 · 이름은 덮개 뒤에 그려 밝게 남는다. 그다음 선택 화살표(0x7ecfc) · [!](0x7ed6c) */}
+      {OUTING_PLACES.filter((place) => place.id === selectedPlaceId).map((place) => (
+        <PlaceArt key={place.id} place={place} origins={origins} labelOrigins={labelOrigins} isSelected onOpen={onOpen} />
+      ))}
+      {OUTING_PLACES.map((place) => (
+        place.id === selectedPlaceId ? animated(CURSOR_ANIMATION, cursorAnchorOf(place.cursorBox), `${place.id}-cursor`) : null
+      ))}
+      {OUTING_PLACES.map((place) => (
+        eventPlaceIds.has(place.id) ? animated(EVENT_MARKER_ANIMATION, markerAnchorOf(place.markerBox), `${place.id}-event`) : null
+      ))}
 
       <Button variant="corner" className={styles.cornerButton} onClick={onBack}>
         ‹ 관리
@@ -100,5 +110,34 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
       </div>
       {children}
     </RawScreen>
+  )
+}
+
+/** 건물 한 채와 그 이름 — 고르지 않은 건물은 7/16 반투명. 이름은 박스에 mapY 를 안 더한다 (F-2 2-4 확정) */
+function PlaceArt({ place, origins, labelOrigins, isSelected, onOpen }: {
+  readonly place: OutingPlace
+  readonly origins: ReturnType<typeof useFrameOrigins>
+  readonly labelOrigins: ReturnType<typeof useFrameOrigins>
+  readonly isSelected: boolean
+  readonly onOpen: (place: OutingPlace) => void
+}) {
+  const frameOrigin = origins?.[String(place.frame).padStart(3, '0')]
+  const label = labelOrigins?.[String(place.labelFrame).padStart(3, '0')]
+  return (
+    <>
+      {frameOrigin !== undefined && (
+        <button type="button" className={styles.placeButton} aria-label={place.name}
+          style={{ left: frameOrigin.x, top: frameOrigin.y + styles.MAP_TOP, width: frameOrigin.width, height: frameOrigin.height }}
+          onClick={() => onOpen(place)}>
+          <img className={styles.sprite}
+            style={{ left: 0, top: 0, opacity: isSelected ? 1 : UNSELECTED_OPACITY }}
+            src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
+        </button>
+      )}
+      {label !== undefined && (
+        <FrameSprite folder={PLACE_LABEL_FRAMES} frame={place.labelFrame} origins={labelOrigins}
+          {...placeLabelTopLeftOf(place.nameBox, label.width, label.height)} />
+      )}
+    </>
   )
 }

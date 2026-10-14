@@ -202,7 +202,7 @@ export const MAP_FRAMES = `${MAP}/frames`
 export const MAP_FRAME = 0
 /**
  * 프레임 6 은 길 점선이 아니라 **창문 불빛**이고, 밤(시간대 2 = 20~5시)에만 그린다 (0x7eba2, F-2 2-3).
- * 웹에는 아직 시간대가 없어 쓰지 않는다.
+ * 시간대는 휴대폰 시각(0xb8fbd)으로 고른다 — `OutingMap` · `OutingMapUnderlay` 가 그린다.
  */
 export const NIGHT_WINDOW_FRAME = 6
 /** 애니메이션 0 = 선택 화살표(프레임 7·8), 1 = [?] 표시(프레임 9·10), 2 = [!] 표시(프레임 11·12) */
