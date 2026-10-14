@@ -1466,8 +1466,18 @@ function applyPitcherArrival(progress: PitcherGameProgress, play: PitchArrivalPl
   const settles = play.kind === 5 || play.strikeout === 'strikeoutStands'
   let next = withMyRunnerPlay(opened, play.result, settles, play.shownLive === true).progress
   next = withStealPlayLeagueSteals(next, progress, play)
+  // 삼진 + 도루 판(종류 5) — 삼진 콜 0xa7c4c(16 삼구 · 17 풀카운트)는 정산 0xa8024 보다 **먼저** 났다: 정산이 그 콜이 넣은
+  // 사건 5 를 세어([sp+0x20]) 레코드 +0x26 을 올리므로(a8d00) 콜이 판 정산 앞이다. 그래서 알림 차례는 16/17 → 24(a83de)다.
+  // 타석 결과 쪽(`applyDefensivePlay` 의 `stealPlaySettlement`)은 이 둘을 다시 안 준다
+  const strikeoutCall =
+    play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
+      ? strikeoutCallRecordIdsOf({ pitches: progress.atBatPitches, balls: progress.atBat.balls })
+      : []
   // 0xa77f0 — 24(도루 저지)는 수비 계열이라 사람 수비에서 지난다. 8(도루)은 공격 계열이라 버려진다
-  const recordIds = play.recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true }))
+  const recordIds = [
+    ...strikeoutCall,
+    ...play.recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true })),
+  ]
   if (recordIds.length > 0 && recordsAllowed(next)) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
   next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play)}`, true)
   const interrupted =
@@ -2121,11 +2131,12 @@ function applyDefensivePlay(
 
   // 삼진 계열 16·17(0xa7c4c) 과 18~23(0xa7998). 게이트는 "수비 팀이 사람 팀인가" 만 보므로
   // 동료 투수가 잡은 삼진도 우리 팀 기록으로 들어온다 (R8 1절).
-  // 종류 5 정산은 a8d38 이 0xa7998(18~23)을 건너뛰어 16·17(삼진 콜)만 남는다
+  // 종류 5 정산은 a8d38 이 0xa7998(18~23)을 건너뛰어 16·17(삼진 콜)만 남는다 — 그 둘은 판 정산보다 먼저라 판을 먹일 때
+  // (`applyPitcherArrival`) 24 앞에 이미 줬다
   const newRecordIds: number[] = !strikeout
     ? []
     : stealPlaySettlement
-      ? strikeoutCallRecordIdsOf({ pitches: progress.atBatPitches, balls })
+      ? []
       : [
           ...strikeoutRecordIdsOf({
             pitches: progress.atBatPitches,
