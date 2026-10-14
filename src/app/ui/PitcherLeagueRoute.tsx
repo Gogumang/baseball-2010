@@ -105,6 +105,14 @@ export function PitcherLeagueRoute({
    * 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 규칙: 행동함이고 이전이 109 · 110 이 아니면 첫 칸. 상점(111 · 121)에서
    * 돌아오면 105 가 아니라 하위 메뉴(110 · 106)로 선다(`nariReturnSubMenuOf`) — 이 규칙을 안 친다.
    */
+  /**
+   * 142 경기 준비 그림 0x15d98 의 0x63b15 넷째 인자 = `[장면+0x28] ≠ 0x8f` — 이전 상태가 143(엔트리 보기)이 아니면
+   * 머리띠 미끄러짐 · 배너 연출을 켠다 (`pages/management/lib/matchInfoEntry`).
+   */
+  const matchView = scene === '경기준비' ? (session.entryView === null ? '142' : '143') : null
+  const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
+  if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
+  const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '143'
   const mainCursor = useRef(createNariMainMenuCursor()).current
   const entryTrail = useRef<string | null>(null)
   const entryKey = career === null ? null
@@ -209,7 +217,8 @@ export function PitcherLeagueRoute({
       <NariScreenPush view={pushView}>
         <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
           playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint} stage={session.matchInfoStage}
-          onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView} />
+          onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView}
+            isEntryAnimated={isMatchInfoEntryAnimated} />
       </NariScreenPush>
     )
   }
