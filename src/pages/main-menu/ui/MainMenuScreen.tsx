@@ -266,7 +266,9 @@ export function MainMenuScreen({
         className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
         style={{ left: topLeft.x, top: topLeft.y }}
         disabled={!isWheel}
-        onMouseEnter={() => isWheel && dispatch({ type: '모드선택', id: entry.id })}
+        // ⚠️ 마우스를 올리기만 해서 커서를 옮기지 않는다(onMouseEnter 없음) — 원본은 키패드뿐이다. 바퀴·릴이 돌면 멈춘 포인터 아래로
+        // 다른 칸이 들어와 브라우저가 mouseenter 를 쏘므로, 포인터를 메뉴 위에 둔 채 키로 고르면 커서가 엉뚱한 칸으로 튀었다
+        // (게임시작 → ↓↓ 나만의리그 → OK 가 일반모드 창 · 홈런더비 · 스페셜로 갔다). 누르면 그 칸을 고르고 바로 시작한다
         onClick={() => {
           dispatch({ type: '모드선택', id: entry.id })
           dispatch({ type: '시작' })
@@ -311,7 +313,7 @@ export function MainMenuScreen({
           aria-label={entry.id}
           className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
           style={{ left: topLeft.x, top: topLeft.y }}
-          onMouseEnter={() => dispatch({ type: '모드선택', id: entry.id })}
+          // 마우스 올리기로는 고르지 않는다 — 바퀴 칸과 같은 까닭(멈춘 포인터 아래로 릴이 돌아 들어온 칸이 커서를 빼앗는다)
           onClick={() => {
             dispatch({ type: '모드선택', id: entry.id })
             dispatch({ type: '시작' })
