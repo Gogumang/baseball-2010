@@ -2,18 +2,9 @@ import { style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /**
- * 엔트리 목록 창 0x5cfec → 0x5c984 의 근사 모양. 판 자리(15, 55, 210, 220)만 P6 2f 에서 왔고(유력)
+ * 엔트리 목록 창 0x5cfec → 0x5c984. 판은 공용 판 `CommonPanel`(5ca4e 원본 인자)이고,
  * 줄·칸 그림은 미해독이라 시즌 창들과 같은 방식(둥근 판 + 흰 글)으로 그린다.
  */
-
-export const panel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '6px',
-  background: ORIGINAL_COLORS.boardFill,
-  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
-})
 
 const text = {
   position: 'absolute',
@@ -25,6 +16,12 @@ const text = {
 } as const
 
 export const tabLine = style({ ...text, textAlign: 'center', pointerEvents: 'none' })
+
+/**
+ * 위 띠(0x12 — #FFFFFF · #E2E2E2) 위 팀 이름 줄. ⚠️ 근사: 원본 띠 안 그림은 아직 안 떴다 — 밝은 띠 위에서 읽히도록
+ * img_text 팔레트 3 의 짙은 남색(#10246B)으로 둔다.
+ */
+export const teamLine = style({ ...text, textAlign: 'center', pointerEvents: 'none', color: '#10246B' })
 
 export const tabActive = style({ color: ORIGINAL_COLORS.highlightYellow })
 

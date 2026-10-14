@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { SEASON_SHOP_TEXT, seasonShopTextOf } from '@/entities/season-mode/model/seasonItemShop'
-import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
+import { ENTRY_LIST_PANEL, SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
@@ -34,6 +34,7 @@ export interface SeasonStaminaPickScreenProps {
  *         취소(−16) → 0xdc
  * 0x6f8c  결과 0x1d → 0xdc (0x5f3c 가 이전 상태 0xe8 을 보고 GP 커서를 칸 3 으로)
  * ```
+ * 판은 0x5cfec → 0x5c984 의 원본 판(`ENTRY_LIST_PANEL`).
  * ⚠️ 근사: 목록 창(0x5cfec + 0x54d94)의 열·배치는 안 풀었다 — 공용 목록 창에 이름과 스태미나 %를 적는다.
  */
 export function SeasonStaminaPickScreen({ pitchers, onPick, onBack }: SeasonStaminaPickScreenProps) {
@@ -55,7 +56,7 @@ export function SeasonStaminaPickScreen({ pitchers, onPick, onBack }: SeasonStam
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xe8 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
-      <SeasonListWindow title="투수" rows={rows} cursor={cursor} onMoveCursor={moveTo} onSelect={select} onBack={onBack} />
+      <SeasonListWindow panel={ENTRY_LIST_PANEL} title="투수" rows={rows} cursor={cursor} onMoveCursor={moveTo} onSelect={select} onBack={onBack} />
       {notice !== null && (
         <MessageBox text={notice.text} buttons={['OK']} onAnswer={() => {
           setNotice(null)
