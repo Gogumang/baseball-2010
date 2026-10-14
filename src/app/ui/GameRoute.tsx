@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -215,6 +216,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
                 gameMode: BATTER_CAREER_MODE,
               },
             })}
+        // 라이벌전 띠 0x3b80c — 적재 상태 8 의 0xb8f68(두 팀) (표 0xd8a90 의 짝)
+        isRivalry={isRivalryMatch(side0Team, side1Team)}
         onDone={() => setIntroDone(true)}
       />
     )

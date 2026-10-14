@@ -34,4 +34,17 @@ describe('경기 시작 인트로 그리기 (0x417ac)', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 2))
     expect(screen.getByTestId('구장-배경').dataset.offsetY).toBe('260')
   })
+
+  it('라이벌전이면 그림 1 부터 맨 위에 라이벌전 띠 0x3b80c 를 단계 min(n, 9) 로 그린다 — 아니면 없다', () => {
+    vi.useFakeTimers()
+    const { rerender } = render(<GameIntro stadiumNameFrame={0x41} isRivalry onDone={() => {}} />)
+    // 그림 0 은 +0x194c = 0 이라 아무것도 안 그린다
+    expect(screen.queryByTestId('라이벌전-띠')).toBeNull()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 3))
+    expect(screen.getByTestId('라이벌전-띠').dataset.step).toBe('3')
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 20))
+    expect(screen.getByTestId('라이벌전-띠').dataset.step).toBe('9')
+    rerender(<GameIntro stadiumNameFrame={0x41} onDone={() => {}} />)
+    expect(screen.queryByTestId('라이벌전-띠')).toBeNull()
+  })
 })

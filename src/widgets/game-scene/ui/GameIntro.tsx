@@ -26,6 +26,8 @@ import {
 } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { SceneryBackdrop } from '@/widgets/batting-stage/ui/SceneryBackdrop'
+import { rivalryStepAt } from '@/widgets/game-scene/lib/rivalryBand'
+import { RivalryBandCanvas } from '@/widgets/game-scene/ui/RivalryBandCanvas'
 import type { SceneryBackdropStage } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
@@ -44,6 +46,11 @@ interface GameIntroProps {
    * 내려 그린다. 안 주면 배경을 안 그린다(검정).
    */
   readonly backdrop?: SceneryBackdropStage
+  /**
+   * 라이벌전(+0x194a) — 적재 상태 8 이 `0xb8f68(두 팀)` 으로 정한다(`isRivalryMatch`). 참이면 흐려지기 전까지 맨 위에
+   * 라이벌전 띠 0x3b80c 를 그린다. 안 주면 거짓
+   */
+  readonly isRivalry?: boolean
   /** 54틱이 다 지났거나 OK·'5' 로 건너뛰었다 → 0x18(1회초 판) 또는 0xd */
   readonly onDone: () => void
 }
@@ -59,10 +66,11 @@ interface GameIntroProps {
  * 효과 1 · 인자 [+0x17e6](그림 몫 L/16)으로 함께 흐려진다. 이름 칸 칠은 상태 0xc 라 알파 [+0x17e4].
  * 띠는 효과 인자를 안 받고 알파만 내려간다(예전 웹은 띠 전체를 한 번 더 흐렸다 — 원본에 없다).
  *
- * ⚠️ 미확인: 라이벌전 9프레임 띠(0x3b80c — 두 팀이 표 0xd8a90 의 짝이고 [+0x17e6] > 14 일 때)는 단계별 좌표를 안 읽어 그리지 않는다.
- * ⚠️ 미확인: 띠 칠 0x6a9f0 의 알파 섞기는 점수판 이름 칸(0x6b7d4)과 같은 "윗바이트/255" 로 본다.
+ * 맨 위 겹: 라이벌전이고 `[+0x17e6] > 14`(흐려지기 전)면 라이벌전 띠 0x3b80c (41a00, `lib/rivalryBand`) — 그림 n 이 단계 min(n, 9).
+ * 띠 칠 0x6a9f0(직접 뜸 6a9f0~6aa18): 색 윗바이트 알파가 0 · 0xff 가 아니면 플랫폼 그리기 속성 0x1400698(gc, 4, 알파)를 걸고 칠한다 —
+ * 알파는 max(1, +0x17e4 − 0x55) = 1~170 이라 늘 섞는다. ⚠️ 미확인: 섞기 식은 단말 몫이라 바이너리에 없다 — 웹은 "윗바이트/255" 로 섞는다.
  */
-export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, onDone }: GameIntroProps) {
+export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRivalry = false, onDone }: GameIntroProps) {
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
@@ -122,6 +130,8 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, onDone 
         <ScoreboardFrame {...SCOREBOARD_AT.intro} side0={scoreboardSides[0]} side1={scoreboardSides[1]}
           effectLevel={effectLevel} introAlpha={fade.alpha} />
       )}
+      {/* 41a00 — +0x194a && [+0x17e6] > 14 → 0x3b80c (그림 0 은 단계 0 이라 안 그린다) */}
+      {isRivalry && fade.level > 14 && rivalryStepAt(tick) > 0 && <RivalryBandCanvas step={rivalryStepAt(tick)} />}
     </RawScreen>
   )
 }
