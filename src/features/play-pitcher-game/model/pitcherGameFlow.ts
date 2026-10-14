@@ -508,6 +508,12 @@ export interface PitcherGameProgress {
    * 없으면 0
    */
   readonly settledOutsExtra?: number
+  /**
+   * **투수 레코드 +0x20(시즌 아웃)만 더 세는 몫** — 낫아웃(state[0x1a]) 정산은 [sp+0x30] 에 삼진 사건 5 가 하나 더 들어
+   * a8cb0 이 +0x20 에 그대로 더하고, 보정 −1 은 R+0x13c(a8cfc)와 R[3](a8fa8)에만 건다 — 낫아웃 하나마다 시즌 아웃이 1 많다
+   * (원본 그대로). 없으면 0
+   */
+  readonly seasonOutsExtra?: number
   /** 이 이닝에 아직 아무도 안 내보냈는가 — R+0x184(삼자범퇴 표시) 자리 */
   readonly perfectInningFlag: boolean
   /** 상대 타순 칸별 이번 경기 안타·홈런 — 돌발 b6/b7 조건이 읽는 기록 +0x12·+0x13 */
@@ -1532,15 +1538,22 @@ function applyPitcherArrival(progress: PitcherGameProgress, play: PitchArrivalPl
     pendingSettlementEvents: pendingSettlementEventsAfter(undefined, settlementEventsOfPlay(play.result), continues),
   }
   // 삼진 + 도루 판(종류 5) — 삼진 콜 0xa7c4c(16 삼구 · 17 풀카운트)는 정산 0xa8024 보다 **먼저** 났다: 정산이 그 콜이 넣은
-  // 사건 5 를 세어([sp+0x20]) 레코드 +0x26 을 올리므로(a8d00) 콜이 판 정산 앞이다. 그래서 알림 차례는 16/17 → 24(a83de)다.
+  // 사건 5 를 세어([sp+0x20]) 레코드 +0x26 을 올리므로(a8d00) 콜이 판 정산 앞이다. 그래서 알림 차례는 16/17 → 36 → 24(a83de)다.
   // 타석 결과 쪽(`applyDefensivePlay` 의 `stealPlaySettlement`)은 이 둘을 다시 안 준다
-  const strikeoutCall =
-    play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
-      ? strikeoutCallRecordIdsOf({ pitches: progress.atBatPitches, balls: progress.atBat.balls })
-      : []
+  const strikeoutSteal = play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
+  const strikeoutCall = strikeoutSteal
+    ? strikeoutCallRecordIdsOf({ pitches: progress.atBatPitches, balls: progress.atBat.balls })
+    : []
+  // 그 한 정산 안에서는 36(a80f8 — [sp+0x30] > 0 && state[0x8b])이 도루 루프의 24(a83de)보다 먼저다. [sp+0x30] 에는 삼진 사건 5 가
+  // 들어 늘 0 보다 크다 — 타석 결과 쪽(`applyDefensivePlay` 의 `stealPlaySettlement`)은 36 을 다시 안 준다
+  const laserThrow = strikeoutSteal
+    ? laserThrowOutRecordOf({ laserThrowFlag: play.result.laserOutFlag, outsInPlay: play.result.advance.outsAdded + 1 })
+        .recordIds
+    : []
   // 0xa77f0 — 24(도루 저지)는 수비 계열이라 사람 수비에서 지난다. 8(도루)은 공격 계열이라 버려진다
   const recordIds = [
     ...strikeoutCall,
+    ...laserThrow,
     ...play.recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: false, defenseIsHuman: true })),
   ]
   if (recordIds.length > 0 && recordsAllowed(next)) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
@@ -2173,6 +2186,9 @@ function applyDefensivePlay(
   const freePass = isFreePass(outcome)
   const hitByPitch = outcome.kind === '사구'
   const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
+  // **낫아웃(state[0x1a])** — 공 도착 0x3dfac 의 종류 9 갈래 0x3e09e~0x3e0e0 이 삼진 콜 0xa7c4c(사건 5 · R+0x13c +1 · R[0]·R[1])를
+  // 부르고 state[0x1a] = 1 을 세운 뒤 타자주자를 끼운 판(0x46418)을 돈다. 판 운명을 진루로 먹이는 삼진은 이 갈래뿐이다
+  const droppedThirdStrike = outcome.kind === '삼진' && defensePlay !== null
 
   let decision = progress.decision
   for (let run = 1; run <= applied.runsScored; run += 1) {
@@ -2254,7 +2270,10 @@ function applyDefensivePlay(
   // 삼진 아닌 결과로 끝난 타석마다 콤보가 끊긴다 (R8 5-5).
   const strikeout = outcome.kind === '삼진'
   const moundStrikeouts = progress.moundStrikeouts + (strikeout ? 1 : 0)
-  const moundStrikeoutCombo = strikeout ? progress.moundStrikeoutCombo + 1 : 0
+  // 삼진 콜 0xa7c4c 가 올린 R[1] — 18~23 판정 0xa7998(a8d5a)은 이 값을 본다
+  const strikeoutComboAtCall = strikeout ? progress.moundStrikeoutCombo + 1 : 0
+  // 정산 끝 a8fb2~a8ff8 이 `!([sp+0x20] > 0 && !state[0x1a])` 면 R[1] = 0 — 낫아웃 삼진도 판정 뒤 콤보를 끊는다(종류 4·5 는 건너뜀)
+  const moundStrikeoutCombo = droppedThirdStrike ? 0 : strikeoutComboAtCall
 
   // 삼진 계열 16·17(0xa7c4c) 과 18~23(0xa7998). 게이트는 "수비 팀이 사람 팀인가" 만 보므로
   // 동료 투수가 잡은 삼진도 우리 팀 기록으로 들어온다 (R8 1절).
@@ -2268,21 +2287,26 @@ function applyDefensivePlay(
           ...strikeoutRecordIdsOf({
             pitches: progress.atBatPitches,
             balls,
-            comboCount: moundStrikeoutCombo,
+            comboCount: strikeoutComboAtCall,
             pitcherStrikeouts: moundStrikeouts,
           }),
         ]
   // 36 필살송구 아웃 — 정산 0xa8024(a80f8~a8116)은 모드를 안 가리고, 게이트 0xa77f0 은 수비 팀이 사람이면 36 을 들인다.
   // 표시 state[0x8b] 는 수비 화면 결과 판 0x46844 가 레이저 연출 뒤 코드 13 결과 판에서 세운다(`DefensePlayResult.laserOutFlag`)
   // 이 정산의 아웃 [sp+0x30] — 삼진 사건 5 와 함께 선 주자 판의 아웃 사건 0xd 까지
-  const settledOuts = applied.outsAdded + (settledRunnerPlay?.advance.outsAdded ?? 0)
+  // 낫아웃 판은 삼진 콜이 넣은 사건 5 가 판의 아웃 사건 앞에 하나 더 든다(판의 아웃은 아웃 콜 0xa7d0c 의 0xd)
+  const settledOuts =
+    applied.outsAdded + (settledRunnerPlay?.advance.outsAdded ?? 0) + (droppedThirdStrike ? 1 : 0)
   const laserPlay = defensePlay ?? settledRunnerPlay
-  if (laserPlay !== undefined) {
+  // 삼진 + 도루 판의 36 은 판을 먹일 때(`applyPitcherArrival`) 24 앞에 이미 줬다 — a80f8 이 a83de(24)보다 먼저다
+  if (laserPlay !== undefined && !stealPlaySettlement) {
     newRecordIds.push(...laserThrowOutRecordOf({ laserThrowFlag: laserPlay.laserOutFlag, outsInPlay: settledOuts }).recordIds)
   }
-  // 26 병살 · 27 삼중살 — a8e58 은 판 종류를 안 거른다. 게이트 0xa77f0 은 수비 팀이 사람이면 들인다
-  // ⚠️ 미확인: 낫아웃(state[0x1a]) 판은 [sp+0x30] 에 삼진 사건이 하나 더 들고 2아웃이면 26 을 막는다 — 그 판은 늘 거짓으로 본다
-  newRecordIds.push(...multiOutPlayRecordIdsOf({ outsInPlay: settledOuts, strikeoutWhileRunning: false }))
+  // 26 병살 · 27 삼중살 — a8e58 은 판 종류를 안 거른다. 게이트 0xa77f0 은 수비 팀이 사람이면 들인다.
+  // 낫아웃은 [sp+0x30] == 2 여도 0xb6c3c(state[0x1a])가 26 을 막는다(a8e5e) — 27 은 막지 않는다
+  newRecordIds.push(
+    ...multiOutPlayRecordIdsOf({ outsInPlay: settledOuts, strikeoutWhileRunning: droppedThirdStrike }),
+  )
   // 25 삼구 삼자범퇴 (0xa7d0c) — 반 이닝을 공 셋으로 3아웃
   if (inningEnded) {
     newRecordIds.push(
@@ -2315,6 +2339,8 @@ function applyDefensivePlay(
       ? { stealPlayStrikeouts: (progress.stealPlayStrikeouts ?? 0) + 1 }
       : {}),
     runsAllowedByMe: progress.runsAllowedByMe + chargedCounted,
+    // 낫아웃 — a8cb0 +0x20 += [sp+0x30](삼진 사건 포함), 보정 −1 은 R+0x13c · R[3] 에만 (`seasonOutsExtra`)
+    ...(droppedThirdStrike && mine && counts ? { seasonOutsExtra: (progress.seasonOutsExtra ?? 0) + 1 } : {}),
     inheritedRunners,
     // 레코드 +0x2a — 게이트 없이 마운드의 내 투수에게 (a8b58 · a8bd2)
     freePassesByMe: progress.freePassesByMe + (mine && freePass ? 1 : 0),
@@ -2352,7 +2378,18 @@ function applyDefensivePlay(
   // 삼진 + 도루 판은 판정 A(0xae24c)가 state[0xb] 3·4 라 정산 없이 0x17 로 보내고, 0x17 끝 정산은 종류 5 라 결과비트를 안 켠다
   // (0xa599c a59a8) — 0x12 끝(4e7ca) · 0x17 끝(52a8e)의 0x8f414 가 비트 0 으로 돌아 판정이 없고 돌발은 남는다(8f41e)
   const resolved = mine && !stealPlaySettlement
-    ? resolveBurstFor(next, outcome, applied.runsScored, before.outs, applied.outsAdded, inningEnded, defensePlay, homeRunCounted)
+    ? resolveBurstFor(
+      next,
+      outcome,
+      applied.runsScored,
+      before.outs,
+      // 결과비트 B8 · B10 · B5 가 보는 [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 든다
+      settledOuts,
+      inningEnded,
+      defensePlay,
+      homeRunCounted,
+      droppedThirdStrike,
+    )
     : next
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
   const closed: PitcherGameProgress = halfChanged
@@ -2464,6 +2501,8 @@ function resolveBurstFor(
   defensePlay: DefensePlayResult | null,
   /** 정산 홈런 수 [sp+0x24] > 0 — B0 을 켜는 홈런 갈래에 드는가 (`applyDefensivePlay`) */
   homeRunCounted: boolean,
+  /** state[0x1a] 낫아웃 — B9 를 안 켠다 (a8fc6) */
+  strikeoutWhileRunning = false,
 ): PitcherGameProgress {
   if (progress.burst === null) return progress
   const resolution = resolveBurst(
@@ -2481,6 +2520,7 @@ function resolveBurstFor(
       isBunt: defensePlay?.buntBall === true,
       runnersAdvanced: defensePlay?.sacrifice === true,
       homeRunCounted,
+      strikeoutWhileRunning,
       // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
       humanTeamWalkOff:
         progress.game.isFinished && progress.game.ourScore > progress.game.opponentScore,
@@ -3806,7 +3846,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     earnedRunAverage: earnedRunAverageOf(progress.runsAllowedByMe, record.outsRecorded),
     seasonDelta: {
       // 레코드 +0x20 — 정산 a8cb0 이 사건 목록의 아웃으로 센다 (`settledOutsExtra`)
-      outs: record.outsRecorded + (progress.settledOutsExtra ?? 0),
+      outs: record.outsRecorded + (progress.settledOutsExtra ?? 0) + (progress.seasonOutsExtra ?? 0),
       runsAllowed: progress.runsAllowedByMe,
       // 레코드 +0x26 — R+0x134 에 삼진 + 도루 판(종류 5)의 삼진을 더한 값 (`stealPlayStrikeouts`)
       strikeouts: record.strikeouts + (progress.stealPlayStrikeouts ?? 0),

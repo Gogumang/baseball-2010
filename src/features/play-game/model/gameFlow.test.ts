@@ -1681,3 +1681,64 @@ describe('내 타석 마운드의 상대 투수 장비 니블 — 타석 교대 
     expect(opponentPitcherEquipmentOf({ ...progress, aceOpponent: ACE_PITCHERS[0]! })).toBeUndefined()
   })
 })
+
+describe('내 삼진 + 도루 판 · 낫아웃 판의 정산 0xa8024 — [sp+0x30] 은 삼진 사건 5 와 판의 아웃 사건을 함께 센다', () => {
+  function 내타석(bases: BaseState, outs: number): GameProgress {
+    const progress = startGame(createSeededRandom(20100901))
+    return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+  const 판 = (kind: 5 | 9, outsAdded: number, bases: BaseState, fates: { fromBase: number; scored: boolean; retired: boolean }[]) =>
+    ({
+      kind,
+      strikeout: kind === 9 ? 'batterRuns' : 'none',
+      recordIds: [],
+      result: { advance: { bases, runsScored: 0, outsAdded }, runnerFates: fates },
+    }) as unknown as Parameters<typeof startPlayerOutcome>[3] extends infer O
+      ? O extends { arrivalPlay?: infer P }
+        ? NonNullable<P>
+        : never
+      : never
+  const 아웃합 = (p: GameProgress) => p.pitcherLines.reduce((sum, line) => sum + line.outs, 0)
+  const 삼진합 = (p: GameProgress) => p.pitcherLines.reduce((sum, line) => sum + line.strikeouts, 0)
+
+  it('삼진 + 도루 저지는 정산이 하나(종류 5) — 내 타수 · 삼진 · 결과 링이 안 오르고 0xa59c0 은 아웃 2(−1 · 병살 G+0x118)', () => {
+    // 판(도루 저지)은 `arrivePitch` 가 먼저 먹였다 — 1루 주자가 2루에서 잡혀 루가 비고 아웃 하나
+    const 판뒤 = { ...내타석(EMPTY_BASES, 1) }
+    const 도루저지 = 판(5, 1, EMPTY_BASES, [{ fromBase: 1, scored: false, retired: true }])
+    const 끝 = startPlayerOutcome(판뒤, { kind: '삼진' }, createSeededRandom(3), { arrivalPlay: 도루저지 })
+    const 보통 = startPlayerOutcome(판뒤, { kind: '삼진' }, createSeededRandom(3))
+
+    expect(끝.pendingDefensePlay).toBeNull()
+    expect(보통.myStats.atBats).toBe(판뒤.myStats.atBats + 1)
+    expect(보통.myStats.strikeouts).toBe(판뒤.myStats.strikeouts + 1)
+    // a8852 · a8a04 · a8ac8 건너뜀
+    expect(끝.myStats).toEqual(판뒤.myStats)
+    expect(끝.recentAtBatCodes).toEqual(판뒤.recentAtBatCodes)
+    // 0xa59c0 — 아웃 [sp+0x30] = 삼진 1 + 도루 저지 1
+    expect(끝.doublePlays).toBe(판뒤.doublePlays + 1)
+    expect(보통.doublePlays).toBe(판뒤.doublePlays)
+    expect(끝.popularityPoints).toBe(판뒤.popularityPoints - 1)
+    // 상대 투수 +0x26 탈삼진 · +0x20 의 삼진 몫은 보통 삼진과 같다 (뒤 자동진행도 같은 판이라 같다)
+    expect(삼진합(끝)).toBe(삼진합(보통))
+    expect(아웃합(끝)).toBe(아웃합(보통))
+  })
+
+  it('포스트시즌 · 국가대항전(0xa56dc 거짓)이면 0xa59c0 을 안 센다', () => {
+    const 판뒤 = 내타석(EMPTY_BASES, 1)
+    const 도루저지 = 판(5, 1, EMPTY_BASES, [{ fromBase: 1, scored: false, retired: true }])
+    const 끝 = startPlayerOutcome(판뒤, { kind: '삼진' }, createSeededRandom(3), { arrivalPlay: 도루저지, isRecorded: false })
+    expect(끝.doublePlays).toBe(판뒤.doublePlays)
+    expect(끝.popularityPoints).toBe(판뒤.popularityPoints)
+  })
+
+  it('낫아웃에 타자주자가 1루에서 잡히면 [sp+0x30] 2 — 0xa59c0 병살 · 상대 투수 +0x20 은 하나 더(보정 없음)', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 낫아웃 = 판(9, 1, EMPTY_BASES, [{ fromBase: 0, scored: false, retired: true }])
+    const 끝 = startPlayerOutcome(시작, { kind: '삼진' }, createSeededRandom(3), { arrivalPlay: 낫아웃 })
+    const 보통 = startPlayerOutcome(시작, { kind: '삼진' }, createSeededRandom(3))
+    expect(끝.doublePlays).toBe(시작.doublePlays + 1)
+    expect(보통.doublePlays).toBe(시작.doublePlays)
+    // 둘 다 1아웃 · 빈 루라 뒤 자동진행이 같다 — 차이는 a8cb0 의 삼진 사건 하나다
+    expect(아웃합(끝)).toBe(아웃합(보통) + 1)
+  })
+})
