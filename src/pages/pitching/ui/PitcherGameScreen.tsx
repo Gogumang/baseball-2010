@@ -73,7 +73,7 @@ import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
-import { opponentBatterOf, ourBenchPitcherCountOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { opponentBatterOf, ourBenchPitcherCountOf, pitcherSceneSkillPanelOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -81,6 +81,8 @@ import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/ma
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import { pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
+import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -163,6 +165,10 @@ export function PitcherGameScreen({
   const settlementLayers = useSettlementEffectLayers()
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, options)
+  /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c(0x3301c 가 두 측 0x3ff) · 애니 7 · 8 — 경기 장면 수명 (`skillPanel`) */
+  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), options)
+  // 교체 연출 0x16 진입 0x3d458 의 CPU 대타 가지 0x668cc (`SubstitutionScene.cheerRestore`)
+  useSkillCheerRestore(progress.substitutionScene, skillPanelSceneRef)
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   const isBenchClearing = progress.pendingBenchClearing !== null
@@ -868,6 +874,13 @@ export function PitcherGameScreen({
           inputOverlayRef={inputOverlayRef}
           // "#TIME" 0x4c92e — 0x38984 는 모드 3 을 안 막는다('#' 가 강판 물음을 연다). n = 수비팀(우리)[+0x33] 벤치 투수 수
           timeKeyCount={ourBenchPitcherCountOf(progress)}
+          // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 공격 측(st[9]) = 상대(CPU) 측
+          skillPanel={{
+            entryKey: progress.sceneConfirm ?? null,
+            attackSide: progress.game.playerSide === 0 ? 1 : 0,
+            scene: skillPanelSceneRef,
+            ...pitcherSceneSkillPanelOf(progress),
+          }}
         >
           {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />

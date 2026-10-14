@@ -191,7 +191,7 @@ describe('함성 29 — 0x4c39a', () => {
     expect(skillCheerOf(장면.cheerBits, { attackSide: 0, batterRecordSlot: 9, batterSkillBits: 비트(1) })).toBeNull()
   })
 
-  it('대타 0x668cc 가 들어온 타자 칸 비트를 다시 세운다', () => {
+  it('대타 0x668cc 가 (확정 앞이라 나가는) 타자 칸 비트를 다시 세운다', () => {
     expect(restoreCheerBit([0x3f7, 0x3ff], 0, 3)).toEqual([0x3ff, 0x3ff])
     expect(restoreCheerBit([0x3ff, 0x3ff], 1, 11)).toEqual([0x3ff, 0xbff])
   })

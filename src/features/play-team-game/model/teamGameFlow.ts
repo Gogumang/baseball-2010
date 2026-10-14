@@ -1936,6 +1936,26 @@ export function entryPitcherSkillIdsOf(entry: TeamEntryPitcher | undefined): rea
   return ace !== undefined ? aceSkillIdsOf(ace) : skillIdsOfBits(entry.skillBits ?? 0, true)
 }
 
+/**
+ * **사람 수비 타석의 경기 스킬 표시 판 재료** (`PitcherSideStage.skillPanel`) — CPU 스윙 0xab214 가 읽는 것과 같은 두 레코드:
+ * 상대 지금 타자(+0x14 · 0xb6394 · 그 타순 칸 결과 링)와 우리 마운드 투수(+0x14).
+ */
+export function humanDefenseSkillPanelOf(progress: TeamGameProgress): {
+  readonly batterSkillIds: readonly number[]
+  readonly batterRecordSlot: number
+  readonly pitcherSkillIds: readonly number[]
+  readonly recentAtBatCodes: readonly number[]
+} {
+  const { options } = progress
+  const batter = entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]
+  return {
+    batterSkillIds: entryBatterSkillIdsOf(batter),
+    batterRecordSlot: batter?.recordSlot ?? 0,
+    pitcherSkillIds: entryPitcherSkillIdsOf(pitcherEntryAt(progress, options.ourTeamId, progress.ourPitcherIndex)),
+    recentAtBatCodes: progress.opponentEntryRecords[progress.opponentOrderIndex]?.results ?? [],
+  }
+}
+
 /** 간이 타석 엔진이 보는 타자 — 히트·파워·주루만 쓴다 */
 function entryQuickBatterOf(
   progress: TeamGameProgress,
@@ -4224,6 +4244,21 @@ function substitutionSceneAfter(
   }
 }
 
+/** 0x3d458 3d562 `0x668cc(스킨, 공격 팀, 0)` 재료 — 나가는 타자의 레코드 칸 (`SubstitutionScene.cheerRestore`) */
+function withCheerRestore(
+  scene: SubstitutionScene,
+  attackSide: number,
+  outgoing: TeamEntryBatter | undefined,
+): SubstitutionScene {
+  if (outgoing?.recordSlot === undefined) return scene
+  return { ...scene, cheerRestore: { attackSide, recordSlot: outgoing.recordSlot } }
+}
+
+/** st[9] 의 다른 측 */
+function opposingSideOf(side: number): number {
+  return side === 0 ? 1 : 0
+}
+
 function enterConfirmWait(progress: TeamGameProgress): TeamGameProgress {
   return { ...progress, sceneConfirm: enterSceneConfirm(), sceneConfirmPending: true, atBatPrepared: true }
 }
@@ -4870,8 +4905,13 @@ export function pinchHit(
         by: '사람',
         incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
       },
-      // 0x496f0 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xe 타자 등판음
-      substitutionScene: substitutionSceneAfter(progress, '타자', swapped.incoming.aceIndex),
+      // 0x496f0 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xe 타자 등판음.
+      // 3d562 0x668cc 는 확정 앞이라 나가는 타자의 레코드 칸 비트를 공격 측(사람)에 다시 세운다
+      substitutionScene: withCheerRestore(
+        substitutionSceneAfter(progress, '타자', swapped.incoming.aceIndex),
+        progress.game.playerSide,
+        progress.ourEntry[progress.game.battingOrderIndex],
+      ),
     },
     `${progress.game.inning}회${progress.game.half} 대타 — ${swapped.outgoing.name} → ${swapped.incoming.name}`,
     true,
@@ -5035,7 +5075,12 @@ function applyCpuPinchHit(
               by: 'CPU' as const,
               incomingIsAce: swapped.incoming.aceIndex !== NO_ACE_BATTER,
             },
-            substitutionScene: substitutionSceneAfter(progress, '타자', swapped.incoming.aceIndex),
+            // 3d562 0x668cc — 확정 앞이라 나가는 타자(`batter`)의 레코드 칸 비트를 공격 측에 다시 세운다
+            substitutionScene: withCheerRestore(
+              substitutionSceneAfter(progress, '타자', swapped.incoming.aceIndex),
+              battingIsOurs ? progress.game.playerSide : opposingSideOf(progress.game.playerSide),
+              batter,
+            ),
           }
         : {}),
     },

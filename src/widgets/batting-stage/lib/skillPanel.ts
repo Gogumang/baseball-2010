@@ -47,8 +47,13 @@ import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
  *                        / 아니면 0xb62b4(투수, 1)(값 버림)
  * [+0x19b0] = 0
  * ```
- * 비트 칸은 경기 장면 초기화 0x3301c 가 두 측 모두 0x3ff 로 채우고, 대타 0x3d458 의 0x668cc(스킨, 팀, 0)이 들어온 타자 칸 비트를
- * 다시 세운다(`restoreCheerBit`).
+ * 비트 칸은 경기 장면 초기화 0x3301c 가 두 측 모두 0x3ff 로 채우고, 교체 연출 0x16 진입 0x3d458 의 대타 가지 3d562
+ * 0x668cc(스킨, 공격 팀, 0)이 다시 세운다(`restoreCheerBit`) — 대타 확정 0xaebe4(3d56c)보다 앞이라 0xae89c(공격 팀)은 아직
+ * **나가는 타자**다(사람 대타 · 사람 수비 타석의 CPU 대타 모두, `SubstitutionScene.cheerRestore`).
+ *
+ * 사람이 치는 타석(`BattingStage`)과 사람이 던지는 타석(`PitcherSideStage`)이 같은 판을 그린다 — 0xd 진입 0x48d50 ·
+ * 0x445cc · 0x3d160 · 그리기 0x4c4bc → 0x4b5b4 · 함성 4c26a 어디에도 조작(0x33fe4) · 모드 갈래가 없다(모드 7 만 비트 0).
+ * 사람이 던지면 타자 판은 CPU 타자의 것, 투수 아이콘 칸은 사람 수비 y − 0x4e 다.
  */
 
 /** 수명 +0x19b4 = 20 (48fc8 · 3dd8a) — 0xf ~ 0x11 그림마다 1 씩 줄어 20 그림을 그린다 */
@@ -107,7 +112,10 @@ export interface SkillPanelSituation {
   /** 0xb69b0 — 공격 측 · 수비 측 점수 */
   readonly attackScore: number
   readonly defenseScore: number
-  /** 0xa9888 — 루 위 주자 수 (1~3루) */
+  /**
+   * 0xa9888 — 주자관리(장면 +0x20c) 루 0~3 의 산 주자 수. 0xd 진입 때 루 0(타자)은 비어 있다 — 타자주자는 0x17 진입 0x46418 의
+   * 4650e 0xa93ac 가 처음 넣고, 파울은 0x35108 의 0xa975c 가 개수를 되돌리며, 3아웃은 0x18 진입 0x3ac90 이 목록을 비운다 → 1~3루 주자 수
+   */
   readonly runnerCount: number
   /** 0xa97a0(필드, 2) */
   readonly hasSecondBaseRunner: boolean
@@ -152,7 +160,7 @@ export function batterSkillPanelBitsOf(skillBits: number, situation: SkillPanelS
  * 1 · 2 · 5 · 7 · 8 · 9 · 10 · 18 · 19 · 20 · 22 는 조건 없음 · 12 좌타UP = 타자 왼손 · 13 우타UP = 타자 오른손 · 14 투지 = 6회 이후 수비가 짐 ·
  * 15 집중 = 타자 칸 0xb6394 가 2~4 · 16 안정감 = 주자 > 1 · 17 새가슴 = 2루 주자 · 21 열혈 = 주자 > 0. 0·3·4·6·11·23 은 안 본다
  * (11 은 0xf 진입의 2 스트라이크 갈래 — `TWO_STRIKE_PITCHER_BITS`).
- * ⚠️ 미확인: 0xd 진입 때 주자 수 0xa9888 이 타자 칸(루 0)을 세는지 — 1~3루 주자로 본다.
+ * 주자 수 0xa9888 은 0xd 진입 때 1~3루 주자만 센다(`SkillPanelSituation.runnerCount`).
  */
 export function pitcherSkillPanelBitsOf(skillBits: number, situation: SkillPanelSituation): number {
   if (situation.gameMode === HOME_RUN_DERBY_MODE) return 0
@@ -431,7 +439,10 @@ export function skillCheerOf(cheerBits: readonly [number, number], input: SkillC
   return next
 }
 
-/** 0x668cc(스킨, 팀, 0) — 대타로 들어온 타자의 칸 비트를 다시 세운다(이미 서 있으면 그대로) */
+/**
+ * 0x668cc(스킨, 팀, 0) 668fe~6694a — 측 = st[9] ≠ 0 ? 1 : 0, 칸 = 0xb6394(0xae89c(팀)) 의 비트가 꺼져 있으면 세운다(strh — 칸 16 이상은
+ * 안 남는다). 0x16 진입 대타 가지에서는 확정 앞이라 **나가는 타자**의 칸이다
+ */
 export function restoreCheerBit(cheerBits: readonly [number, number], attackSide: number, batterRecordSlot: number): [number, number] {
   const side = attackSide !== 0 ? 1 : 0
   const next: [number, number] = [cheerBits[0], cheerBits[1]]
@@ -461,7 +472,12 @@ function drawFrameAt(context: CanvasRenderingContext2D, index: number, x: number
   if (frame !== null) context.drawImage(frame.image, x + frame.offsetX, y + frame.offsetY)
 }
 
-/** ⚠️ 미확인: 0xba411 은 그때 글꼴 색을 쓰는데 0x4b5b4 가 색을 정하지 않는다 — 흰색으로 둔다. 글꼴은 기기 글꼴이라 11px 로 갈음 */
+/**
+ * 글 색 — 0xba411 은 그때 글꼴 색 [[0x1400070]+0x3c]+0x54 를 쓰고 0x4b5b4 는 색을 정하지 않는다. 0xf ~ 0x11 은 늘 0xe 를 지나는데
+ * 0xe 의 소개 판 0x44944 가 44b5c~44b72 에서 0x9c735(글꼴, RGB(255, 255, 255))로 흰색을 세우고, 그 뒤 0xf ~ 0x11 의 그리기
+ * (0x52c50 의 상태 그리기 · 0x4c4bc 의 돌발 띠 0x8e858 · 기록 알림 0x4e304 · 팝업 글 0x74664)가 세우는 색도 모두 −1(0xffff 흰색,
+ * 0xba269 의 [sp])이다 → 흰색(BL · 함수 포인터 리터럴로 닿는 길 전수 — vtable 간접 부름은 안 따라갔다). 글꼴은 기기 글꼴이라 11px 로 갈음
+ */
 const ROW_TEXT_COLOR = '#ffffff'
 const ROW_FONT = `11px '${PIXEL_FONT_FAMILY}', 'Galmuri11', sans-serif`
 

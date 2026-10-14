@@ -902,6 +902,15 @@ export function useMissionSession({
       ...(substitution.incomingIsAce && run.mission.opponentAce > 0
         ? { aceSlot: aceCutInSlotOf(substitution.kind === '대타' ? '타자' : '투수', run.mission.opponentAce - 1) }
         : {}),
+      // 0x16 진입 3d562 0x668cc(스킨, 공격 팀, 0) — 확정 0xaebe4 앞이라 나가는 CPU 타자의 레코드 칸을 공격 측(st[9])에
+      ...(substitution.kind === '대타'
+        ? {
+            cheerRestore: {
+              attackSide: run.game.offenseSide,
+              recordSlot: missionCpuBatterRecordSlotOf(run, missionCpuBatterOf(cpu)),
+            },
+          }
+        : {}),
     }))
     // 0x16 → 0xd → 0xe — 새 대기(화면은 연출이 끝난 뒤부터 0xd 두 그림을 센다)
     setSceneConfirm(enterSceneConfirm())
@@ -2478,6 +2487,30 @@ function missionCpuBatterSkillIdsOf(
     return ace === null ? [] : aceSkillIdsOf(ace)
   }
   return skillIdsOfBits(cpuBatter.row?.skillBits ?? 0, false)
+}
+
+/**
+ * **투수 미션 타석 장면의 경기 스킬 표시 판 재료** (`PitcherSideStage.skillPanel`) — CPU 스윙 0xab214 가 읽는 것과 같은 두 레코드:
+ * 지금 CPU 타자(+0x14 · 0xb6394 · 그 타순 칸 결과 링)와 미션 투수(+0x14, 장착 비트 + 16). 공격 측 st[9] 는 CPU 칸이다.
+ */
+export function missionPitchingSkillPanelOf(
+  run: MissionRun,
+  pitcherSkillIds: readonly number[],
+): {
+  readonly attackSide: number
+  readonly batterSkillIds: readonly number[]
+  readonly batterRecordSlot: number
+  readonly pitcherSkillIds: readonly number[]
+  readonly recentAtBatCodes: readonly number[]
+} {
+  const cpuBatter = missionCpuBatterOf(run.cpu)
+  return {
+    attackSide: run.game.offenseSide,
+    batterSkillIds: missionCpuBatterSkillIdsOf(run, cpuBatter),
+    batterRecordSlot: missionCpuBatterRecordSlotOf(run, cpuBatter),
+    pitcherSkillIds,
+    recentAtBatCodes: missionCpuSwingSituationOf(run, cpuBatter).recentAtBatCodes,
+  }
 }
 
 /** 투수 미션 지금 CPU 타자의 레코드 칸 0xb6394 — 마타자면 마선수 순번, 아니면 마스터 줄 팀 안 칸 */

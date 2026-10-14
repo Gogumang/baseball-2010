@@ -24,6 +24,7 @@ import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
+import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
 import { menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf } from '@/pages/main-menu/lib/mainMenuLayout'
 import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -95,8 +96,8 @@ interface SpecialScreenProps {
  * — 나머지 다섯 칸이 45·90·180·270·315° 에 선다(`menuWheelRestingLabelsOf`).
  *
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
- * 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다. 칸 글자 밑판(main_ui 이미지 0, 0x24eca~0x24f94 — 각 37~323 에서 글자
- * 앞에 기준점 가운데로 찍는다)은 메인 메뉴 `wheelLabels` 도 아직 안 그려 같이 비워 둔다.
+ * 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다. 칸 글자 밑에는 main_ui 이미지 0 밑판(0x24eca~0x24f94 — 각 37~323 에서
+ * 기준점 가운데)을 먼저 찍는다 — 멈춘 표 각은 늘 이 경우라 접힌 이미지 1 · 2 는 안 나온다(`menuWheelSlotDrawOf`).
  */
 export function SpecialScreen({
   collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange, onBack,
@@ -238,18 +239,20 @@ export function SpecialScreen({
 const SPECIAL_WHEEL_CURSOR = TOP_ENTRIES.findIndex((entry) => entry.id === '스페셜')
 
 /**
- * 반원 바퀴 0x24b1c 의 칸 글자 — img_text 프레임을 기준점 가운데(0x24fc4: x − w/2, y − h/2)에. 하위 6 은 키가 바퀴를 안 돌려
- * 누를 수 없는 그림이다(메인 메뉴 아랫단의 `disabled` 칸과 같다).
+ * 반원 바퀴 0x24b1c 의 칸 — 자리 5 → 0 차례로 main_ui 이미지 0 밑판을 찍고 그 위에 img_text 프레임 글자를 기준점 가운데
+ * (0x24fc4: x − w/2, y − h/2)에. 하위 6 은 키가 바퀴를 안 돌려 누를 수 없는 그림이다(메인 메뉴 아랫단의 `disabled` 칸과 같다).
  */
 function SpecialWheelLabels() {
   const origins = useFrameOrigins(IMG_TEXT_FRAMES)
   return (
     <>
-      {menuWheelRestingLabelsOf(SPECIAL_WHEEL_CURSOR).map((label) => {
+      {[...menuWheelRestingLabelsOf(SPECIAL_WHEEL_CURSOR)].reverse().map((label) => {
+        const underlay = <MenuWheelUnderlayImage key={`${label.entryIndex}-밑판`} underlay={label.underlay} />
         const size = origins?.[String(label.frame).padStart(3, '0')]
-        if (size === undefined) return null
+        if (size === undefined) return underlay
         const topLeft = menuWheelLabelTopLeftOf(label.point, size.width, size.height)
-        return (
+        return [
+          underlay,
           <img
             key={label.entryIndex}
             className={styles.sprite}
@@ -257,8 +260,8 @@ function SpecialWheelLabels() {
             data-wheel-label={TOP_ENTRIES[label.entryIndex]?.id}
             src={imageSrc(IMG_TEXT_FRAMES, label.frame)}
             style={{ left: topLeft.x, top: topLeft.y }}
-          />
-        )
+          />,
+        ]
       })}
     </>
   )

@@ -10,7 +10,7 @@ import {
   isMenuWheelAngleDrawn, menuBandAlphaAt, menuBandLinesOf, menuBandStateAt, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
   menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelOrderOf,
   menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf,
-  menuWheelOrderOf, menuWheelPointOf, menuWheelRestingLabelsOf, menuWheelStepOf, rotateMenuReel,
+  menuWheelOrderOf, menuWheelPointOf, menuWheelRestingLabelsOf, menuWheelSlotDrawOf, menuWheelStepOf, rotateMenuReel,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 
 describe('반원 바퀴 — 원본 값 (0x24b1c, 확정)', () => {
@@ -304,5 +304,51 @@ describe('멈춘 바퀴의 칸 글자 (0x24b1c — 스페셜 하위 6 이 쓴다
     expect(labels.map((label) => label.entryIndex)).toEqual([2, 3, 4, 5, 0])
     expect(labels.map((label) => label.frame)).toEqual([2, 3, 4, 26, 0])
     expect(labels.map((label) => label.point)).toEqual([45, 90, 180, 270, 315].map(menuWheelPointOf))
+  })
+})
+
+describe('칸 밑판 — 0x24b1c 24eca~24f98 (main_ui 이미지 0 · 1 · 2)', () => {
+  it('37~323° 는 이미지 0(76×28)을 기준점 가운데에 찍고 그 위에 글자를 그린다', () => {
+    const point = menuWheelPointOf(270)
+    expect(menuWheelSlotDrawOf(270)).toEqual({
+      underlay: { image: 0, x: point.x - 38, y: point.y - 14, flipsVertically: false },
+      showsLabel: true,
+    })
+    expect(menuWheelSlotDrawOf(37)?.showsLabel).toBe(true)
+    expect(menuWheelSlotDrawOf(323)?.showsLabel).toBe(true)
+  })
+
+  it('324~332° 는 이미지 1 을 (x0 + 10, y0) · 333~341° 는 이미지 2 를 설명 판 윗변 (96, 284) — 글자 없음', () => {
+    const point = menuWheelPointOf(324)
+    expect(menuWheelSlotDrawOf(324)).toEqual({
+      underlay: { image: 1, x: point.x - 38 + 10, y: point.y - 14, flipsVertically: false },
+      showsLabel: false,
+    })
+    expect(menuWheelSlotDrawOf(333)).toEqual({
+      underlay: { image: 2, x: 96, y: 284, flipsVertically: false },
+      showsLabel: false,
+    })
+  })
+
+  it('19~27° 는 이미지 2 를 판 아랫변 (96, 347) · 28~36° 는 이미지 1 을 상하 뒤집어(효과 0x11 · 1) — 글자 없음', () => {
+    expect(menuWheelSlotDrawOf(27)).toEqual({
+      underlay: { image: 2, x: 96, y: 289 + 63 - 5, flipsVertically: true },
+      showsLabel: false,
+    })
+    const point = menuWheelPointOf(36)
+    expect(menuWheelSlotDrawOf(36)).toEqual({
+      underlay: { image: 1, x: point.x - 38 + 10, y: point.y - 14, flipsVertically: true },
+      showsLabel: false,
+    })
+  })
+
+  it('0° 근처(342~18°)는 아무것도 안 그린다 (24ef0)', () => {
+    expect(menuWheelSlotDrawOf(0)).toBeNull()
+    expect(menuWheelSlotDrawOf(342)).toBeNull()
+    expect(menuWheelSlotDrawOf(18)).toBeNull()
+  })
+
+  it('멈춘 바퀴의 칸은 늘 이미지 0 밑판이다', () => {
+    expect(menuWheelRestingLabelsOf(1).every((label) => label.underlay.image === 0)).toBe(true)
   })
 })

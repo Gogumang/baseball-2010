@@ -177,6 +177,22 @@ export interface SkillPanelSource {
   readonly isDefenseCpu?: boolean
 }
 
+/**
+ * 사람이 던지는 타석의 판 재료 (`PitcherSideStage.skillPanel`) — 지금 CPU 타자 레코드 · 마운드의 사람 투수 레코드.
+ * 0xd 진입 0x445cc · 0x3d160 · 함성 29 는 사람이 치는 타석과 같은 함수다(모드 · 조작 갈래 없음 — 445cc · 3d160 · 4c26a).
+ * `attackSide` 는 CPU 공격 측(st[9]), `isDefenseCpu` 는 없으면 거짓(투수 아이콘 칸 앵커 y − 0x4e, 4c098)
+ */
+export interface PitcherSideSkillPanelSource extends SkillPanelSource {
+  /** 지금 CPU 타자 레코드 +0x14 의 장착 스킬 번호 (`0xb62b4(타자, n)`) */
+  readonly batterSkillIds: readonly number[]
+  /** 0xb6394(타자) = rec[0xa] & 0x1f — 투수 스킬 15 · 함성 비트 칸 */
+  readonly batterRecordSlot: number
+  /** 마운드 사람 투수 레코드 +0x14 의 장착 스킬 번호(비트 + 16) */
+  readonly pitcherSkillIds: readonly number[]
+  /** 그 타순 칸의 오늘 타석 결과 링(팀 + 타순×0x18 + 0x34, 0x53100) — 타자 스킬 16 · 17 */
+  readonly recentAtBatCodes: readonly number[]
+}
+
 /** 경기 정산 0x4ea0c 의 효과를 고르는 재료 */
 export interface SettlementEffectSource {
   /** 0x4a350 — 사람 팀이 이겼나 */

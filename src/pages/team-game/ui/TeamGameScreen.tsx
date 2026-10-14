@@ -17,6 +17,7 @@ import {
   currentBatterAbility,
   currentBatterEntry,
   entryBatterSkillIdsOf,
+  humanDefenseSkillPanelOf,
   currentPitcherAbility,
   currentPitcherEquipment,
   currentPitcherAceIndex,
@@ -100,7 +101,8 @@ import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
-import { createSkillPanelScene, restoreCheerBit } from '@/widgets/batting-stage/lib/skillPanel'
+import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
+import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
@@ -312,6 +314,8 @@ export function TeamGameScreen({
   const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), options)
   /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c(0x3301c 가 두 측 0x3ff) · 애니 7 · 8 — 경기 장면 수명 (`skillPanel`) */
   const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), options)
+  // 교체 연출 0x16 진입 0x3d458 의 대타 가지 0x668cc — 사람 대타 · 사람 수비 타석의 CPU 대타 모두 (`cheerRestore`)
+  useSkillCheerRestore(progress.substitutionScene, skillPanelSceneRef)
   /** 수비 화면이 실시간으로 도는 판(타구 · 사람 수비의 주자 판)이 있는가 — 원본 상태 0x17 */
   const isDefenseInPlay = session.pendingDefensePlay !== null || progress.pendingRunnerPlay != null
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
@@ -919,15 +923,7 @@ export function TeamGameScreen({
             abilitiesOf={(index) => substitutionDetailAbilities(progress, '대타', index)}
             seasonStatsOf={(entry) => teamBatterSeasonStatsOf(progress, matchupRecords, progress.options.ourTeamId, entry)}
             onSelect={(benchIndex) => {
-              // 0x16 진입 0x3d458 의 0x668cc(스킨, 공격 팀, 0) — 들어오는 타자의 레코드 칸 비트를 다시 세운다(함성 29 를 다시 낼 수 있다)
-              const incoming = progress.ourEntry[benchIndex]
-              if (incoming?.recordSlot !== undefined) {
-                skillPanelSceneRef.current.cheerBits = restoreCheerBit(
-                  skillPanelSceneRef.current.cheerBits,
-                  game.playerSide,
-                  incoming.recordSlot,
-                )
-              }
+              // 0x16 진입 0x3d458 의 0x668cc(스킨, 공격 팀, 0)는 진행기가 연출(`substitutionScene.cheerRestore`)에 싣는다
               actions.pinchHit(benchIndex)
               setChangeWindow(null)
             }}
@@ -966,6 +962,9 @@ export function TeamGameScreen({
               batterSkillIds={entryBatterSkillIdsOf(currentBatterEntry(progress))}
               // 투수 스킬 31 의 0xb6394 — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
               batterRecordSlot={currentBatterEntry(progress)?.recordSlot ?? 0}
+              // 그 타순 칸의 오늘 타석 결과 링 — 공격 팀 + 타순(팀+0x32)×0x18 + 0x34 (0x445cc 4477a~4478c · 0xab214 aba8e~abaac).
+              // 스윙 판정 0xab214 의 16 상승세 · 17 하락세와 스킬 판 비트 16 · 17 이 같은 링을 읽는다
+              recentAtBatCodes={progress.ourEntryRecords[game.battingOrderIndex]?.results ?? []}
               gameMode={options.mode}
               // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
               isScoreboardOn={settings?.isScoreboardOn}
@@ -1103,6 +1102,14 @@ export function TeamGameScreen({
               inputOverlayRef={inputOverlayRef}
               // "#TIME" 0x4c940 — 사람 수비라 n = 우리 팀[+0x33] 벤치 투수 수. 팀 경기는 0x38984 가 통과한다
               timeKeyCount={session.benchPitchers.length}
+              // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 사람 타석과 같은 장면 칸 · 0xd 진입마다 새 0xe 대기 객체 ·
+              // 공격 측(st[9]) = 상대(CPU) 측
+              skillPanel={{
+                entryKey: progress.sceneConfirm ?? null,
+                attackSide: game.playerSide === 0 ? 1 : 0,
+                scene: skillPanelSceneRef,
+                ...humanDefenseSkillPanelOf(progress),
+              }}
             >
               {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 */}
               {isMatchupShown && matchupCards}
