@@ -81,6 +81,11 @@ interface DefenseScreenProps {
    * 위, 야수 · 주자 · 공 아래이고 줌 펀치(46e24 0xbb84c)가 함께 늘린다.
    */
   readonly underActors?: ReactNode
+  /**
+   * 이 그림의 **카메라 오프셋**(+0xfec, +0xff0 — 0x41230)을 적어 둘 칸. 공 그리기 0x36dfc 의 파티클(`lib/ballParticles`)은
+   * 화면 좌표로 쏘는데 파티클 장면은 재생 쪽(`DefensePlayback`)이 들고 있어서, 그쪽이 이 값을 읽는다. 그릴 때마다 덮어쓴다.
+   */
+  readonly cameraOffsetRef?: { current: { readonly x: number; readonly y: number } | null }
   /** 화면 위에 얹을 것 — 조작 버튼·점수판 같은 것 */
   readonly children?: ReactNode
 }
@@ -161,6 +166,7 @@ export function DefenseScreen({
   isRunning = true,
   grassPalette = null,
   underActors,
+  cameraOffsetRef,
   children,
 }: DefenseScreenProps) {
   const update = useUpdateCounter(isRunning)
@@ -185,6 +191,7 @@ export function DefenseScreen({
   }
   const camera = cameraRef.current.state
   const offset = screenOffsetOf(camera)
+  if (cameraOffsetRef !== undefined) cameraOffsetRef.current = offset
 
   const screenOf = (point: { readonly x: number; readonly z: number }) => ({
     x: toScreenX(point.x) + offset.x,

@@ -8,7 +8,6 @@ import {
   equipmentItemOf,
   equipOwned,
   hiddenOpenIdOf,
-  hiddenOpenTextOf,
   isHiddenOpen,
   openHidden,
   purchaseEquipment,
@@ -71,11 +70,6 @@ describe('장착 아이템 — 0x13460 · 0x14a74', () => {
     expect(bought.openedHiddenIds).toContain(36)
     expect(openHidden(선수(), 36).openedHiddenIds).toEqual([36])
     expect(openHidden(선수({ openedHiddenIds: [36] }), 36).openedHiddenIds).toEqual([36])
-  })
-
-  it('오픈 알림은 StrCOMMON[139] + [143] — 타자 장비 id 만 이름을 안다', () => {
-    expect(hiddenOpenTextOf(36)).toBe('히든 아이템 오픈!! [검투사 투구] 나만의리그 타자편에서 사용가능합니다')
-    expect(hiddenOpenTextOf(3)).toBeNull()
   })
 
   it('히든 힌트는 부위당 레벨 7·8·9·10 순서다', () => {

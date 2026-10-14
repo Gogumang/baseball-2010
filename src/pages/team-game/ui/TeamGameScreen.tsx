@@ -19,6 +19,7 @@ import {
   currentBatterEntry,
   entryBatterSkillIdsOf,
   currentPitcherAbility,
+  currentPitcherEquipment,
   currentPitcherAceIndex,
   opponentMagicStateOf,
   pitchSlotsFor,
@@ -49,7 +50,7 @@ import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/Settlement
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
-import { teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { teamBattingStageBatterOf, teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -871,6 +872,9 @@ export function TeamGameScreen({
             <div className={styles.matchupFrame}>
             <BattingStage
               batterAbility={currentBatterAbility(progress)}
+              // 타자 폼 rec[0xb] >> 4 · 피부 · 손 0xb63c0 (타석 교대 0x47d58~0x47dd6) — 몸통 · 자세표 · 배치 side 와 스윙 판정 0xab214 ·
+              // CPU 투구의 타자 손. 마타자 손은 표 0xd88b0
+              {...teamBattingStageBatterOf(progress)}
               // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
               aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
               // 타석 그림 0x10866 → 0x78fd8 — 선수 레코드 +0x19·+0x1a 장비 니블(부위 0~3 = 히트·파워·수비·주루 칸)로 장비 겹을
@@ -916,10 +920,12 @@ export function TeamGameScreen({
                 playerSide: game.playerSide,
                 // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자의 경기용 주력
                 runnerRunAbilities: runnerRunAbilitiesOf(progress),
-                // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입이 지운다)
-                hiddenRunnerBases: progress.stealingFrom,
+                // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입 · 타구 판 시작이 지운다)
+                hiddenRunnerBases: progress.stealDisplayFrom ?? [],
               }}
               isEagleEyeEnabled={false}
+              // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
+              pitcherEquipmentNibbles={currentPitcherEquipment(progress)}
               // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
               acePitcher={
                 opposingAcePitcher === null

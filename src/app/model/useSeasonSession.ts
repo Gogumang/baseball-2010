@@ -132,7 +132,7 @@ import {
 import type { LeagueBatterLine, LeaguePitcherLine } from '@/entities/league/model/leaguePlayerStats'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
-import { NO_ROSTER_SLOT, entryBattersOfOrder } from '@/features/play-team-game/model/teamGameRoster'
+import { NO_ROSTER_SLOT, entryBattersOfOrder, withBatterRecordNibbles, withPitcherRecordNibbles } from '@/features/play-team-game/model/teamGameRoster'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import {
   FULL_PITCHER_STAMINA, SEASON_SHOP_TEXT, SEASON_STAMINA_ITEM, applySeasonGpItem, applySeasonSubItem, seasonGpItemPriceOf,
@@ -2842,7 +2842,14 @@ export function useSeasonSession(
       return false
     }
     const options: TeamGameOptions = { ...saved.options, ...(aceLevels === undefined ? {} : { aceLevels }) }
-    const restored: TeamGameProgress = { ...saved, options }
+    // 옛 블록 이사 — 기록으로 선 영입 선수의 니블 · +0xb 가 없으면 같은 레코드(지금 시즌 명단의 기록 사본)에서 채운다
+    const order = entryOrderOf(current.roster)
+    const restored: TeamGameProgress = {
+      ...saved,
+      options,
+      ourEntry: withBatterRecordNibbles(saved.ourEntry, order),
+      ourPitcherEntry: withPitcherRecordNibbles(saved.ourPitcherEntry, order),
+    }
     // 장면 0x104 셋업 0x39fdc 모드 2 갈래 — 정규시즌이면 관중·수입 0xa34b8 이 **다시** 돈다(원본 버그: 이어할 때마다
     // 수입이 소지금에 겹친다). 곧이어 +0x4e = 1 · 파일 쓰기(0x3a426 · 0x22755)
     const withIncome = withSceneSetupIncome(current, saved.options.opponentTeamId)
@@ -2856,7 +2863,7 @@ export function useSeasonSession(
     setResumeGame(restored)
     setScene(SEASON_SCENE_STATE.경기직전)
     return true
-  }, [aceLevels, commit])
+  }, [aceLevels, commit, entryOrderOf])
 
   /** 경기 중 "나가기" — 장면만 내린다(+0x4e · 블록은 그대로). 다음 진입이 `resumeSavedGame` 으로 다시 세운다 */
   const leaveGame = useCallback(() => {

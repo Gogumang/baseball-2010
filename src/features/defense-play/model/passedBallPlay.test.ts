@@ -103,3 +103,16 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
     expect(isPassedBallPlayResult(null)).toBe(false)
   })
 })
+
+describe('폭투·포일 판 그림 칸 — 포수 +0xb8 = 6(0x3e062) · 고리', () => {
+  it('판정이 적은 포수 +0xb8 = 6 은 첫 그림 앞 야수 틱이 줄여 5 부터 보이고, 틱마다 하나씩 준다', () => {
+    const result = runPassedBallPlay({ shot: 가운데, bases: { ...EMPTY_BASES, first: true }, outs: 0 })
+    const 포수 = (tick: number) => result.ticks[tick]?.fielders.find((fielder) => fielder.slot === 1)
+    expect(포수(0)?.fumbleTicks).toBe(5)
+    expect(포수(1)?.fumbleTicks).toBe(4)
+    expect(포수(5)?.fumbleTicks).toBe(0)
+    expect(result.ticks[0].holderMark).toBeNull()
+    const 쥔틱 = result.ticks.find((view) => view.holderMark != null)
+    expect(쥔틱?.holderMark?.anim).toBe(3)
+  })
+})

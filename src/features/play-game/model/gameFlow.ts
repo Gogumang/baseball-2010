@@ -52,6 +52,7 @@ import {
   rosterLineupOf,
   rosterSlotAt,
   tryQuickCpuPinchHit,
+  withLineupRecordSlot,
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { runnerCountOf } from '@/entities/game/model/baseState'
@@ -390,6 +391,22 @@ export interface GameProgress {
    * (`arrivePitch`) 도루 판(종류 5)을 열거나 그냥 지워진다. 인플레이 타구면 타구 판의 리드(0x3d7b8)가 이 칸을 본다.
    */
   readonly stealingFrom: readonly StealBase[]
+  /**
+   * **도루 출발 표시** st[0x15 + i] — 이번 공에 출발한 주자의 루. 그 루의 주자는 루에 안 그린다(`hiddenStealBasesOf`).
+   * 원본은 판정 입력과 한 칸(st[0x14 + i])이지만 지우는 때가 판정이 아니다 (직접 재역어셈):
+   * - 0xf 진입 `0x3d954` 3d966~3d976 — `for i in 0..3: st[0x14 + i] = 0 ; st[0xa4 + i] = 0` (`enterPitchSelection`)
+   * - 판 시작 리드 `0x3d7b8` 3d8c6~3d8d2 — 판 종류 **1(타구)** 일 때만 도루 주자의 칸을 지운다. 도루(5) · 폭투(9) · 밀어내기(2)
+   *   판은 안 지운다.
+   * 그래서 공 도착 판정 → 결과 띠 → 도루 판 재생 → (새 타석이면 0xd · 0xe 를 지나) 0xf 까지 출발 루는 비어 보인다.
+   * 웹은 판정 입력(`stealingFrom`)은 판정 때 거두고(다음 공 전에 0xf 가 지우므로 같다) 표시만 이 칸에 남긴다 — 미션과 같은 꼴.
+   * 없으면(옛 상태) 비어 있다.
+   */
+  readonly stealDisplayFrom?: readonly StealBase[]
+  /**
+   * **표시가 이 0xe 대기의 첫 OK 까지만 남는다** — 새 타석은 0xf 진입이 0xe 의 OK(메시지 1 → 0x50c18) 뒤라, 진행기가 미리 돌리는
+   * `enterPitchSelection`(`prepareMyAtBat`)은 표시를 바로 못 지우고 이 대기에 묶어 둔다. 화면이 OK 수를 넘겨 읽는다.
+   */
+  readonly stealDisplayUntilConfirm?: SceneConfirmWait | null
   /**
    * **내 선수의 주력** `0xb570d(ctx, 3, 나, 1, 0x5a, 1)` — 모드 4 는 팀 정액 · 코치를 안 타 피로 없는 실효값(`effectiveAbilityOf`)이다.
    * 루에 선 주자가 나면(간이 타석 도루 판정 c19a0 · 주자 판 주루) 이 값을 쓴다. 없으면(옛 시험) 내 타순 칸 로스터 줄 값.
@@ -744,7 +761,8 @@ export function startPlayerOutcome(
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
   if (isBattedBallKind(outcome) && pattern !== undefined) {
     return {
-      ...withoutSteal(progress),
+      // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
+      ...withoutStealDisplay(progress),
       pendingDefensePlay: withPredictedOutcome(defensePlayInputOf(progress, outcome, pattern, random, options)),
     }
   }
@@ -762,7 +780,7 @@ export function startPlayerOutcome(
   // ⚠️ 패턴 없이 들어온 안타·아웃(시험·옛 호출) — 원본에 없는 길이다. 결과에 맞는 패턴을 원본 표에서 골라 판을 돌린다
   //    (`fixturePatternFor`). 실제 타석(`resolvePitch`)은 늘 패턴을 싣는다
   return {
-    ...withoutSteal(progress),
+    ...withoutStealDisplay(progress),
     pendingDefensePlay: {
       ...defensePlayInputOf(progress, outcome, fixturePatternFor(outcome), random, options),
       outcomeIsGiven: true,
@@ -794,7 +812,8 @@ export function startPlayerFoulPlay(
   if (progress.game.isFinished) return progress
   const outcome = registerContact(FOUL_PLAY_OUTCOME, contact)
   return {
-    ...withoutSteal(progress),
+    // 파울 각 공 판도 타구 판(종류 1)이다 — 시작 리드 0x3d7b8 이 출발 표시를 지운다
+    ...withoutStealDisplay(progress),
     pendingDefensePlay: withPredictedOutcome({
       // 필살타법 성공 굴림(0x517e6)은 쏜 공의 재료(`contact.specialSwing`)로 판 시작이 필살수비 · 폴 굴림 뒤에 한다
       ...defensePlayInputOf(progress, outcome, contact.pattern, random, { buntKind: options.buntKind }),
@@ -1084,18 +1103,14 @@ function finishPlayerOutcome(
  *
  * 나만의리그 타자편은 전역 모드 4 라 팀 능력치 보정(비트마스크 0x306 = 모드 1·2·8·9)이
  * 붙지 않는다 → 로스터에 적힌 밑값을 그대로 쓴다.
- * 칸 0(투수)은 오늘 상대 선발의 능력치 칸 2 다 (`defenseAbilitiesOf` 주석 — ⚠️ 원본 그대로).
+ * 칸 0(투수)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다 — 여기서 넣지 않는다.
  */
 function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
-  // 수비 칸 0 은 지금 마운드에 선 투수다 — 교체되면 바뀐다
-  const ace = moundAcePitcherOf(progress, false)
-  const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
   return defenseAbilitiesOf(
     teamBatters(progress.opponentTeamId).map((player) => ({
       position: player.position,
       defense: player.ability[2],
     })),
-    ace === undefined ? pitcher?.ability[2] : ace.breaking,
   )
 }
 
@@ -1157,6 +1172,18 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
     // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (붙박이 줄 = Xls 행 그대로)
     skillBits: pitcher.skillBits,
   }
+}
+
+/**
+ * **내 타석 마운드의 상대 투수 장비 니블** — 레코드 +0x19 · +0x1a 네 칸. 타석 교대 0x47cc8 이 마운드 그림(장면 +0xf1c)을 다시 실을 때
+ * 0xae83c(수비 팀)가 마투수(0xb633c)가 아니면 48138~4816a 가 이 니블 − 1 로 장비 겹 0x79790 을 부른다(모드 4 도 같다).
+ * 레코드는 `opponentPitcherAbilityOf` 와 같은 붙박이 표 칸(Xls 행 — 리그 열 팀은 0, 외인구단 팀 14 만 제구 니블 3)이다.
+ * 마선수 대결 투수(`aceOpponent`)나 142 가 8번 칸에 넣은 마투수가 서 있으면 undefined (그림은 0x793b0 의 ace/pitcher_*)
+ */
+export function opponentPitcherEquipmentOf(progress: GameProgress): readonly number[] | undefined {
+  if (progress.aceOpponent !== null) return undefined
+  if (moundAcePitcherOf(progress, false) !== undefined) return undefined
+  return teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]?.equipment
 }
 
 /**
@@ -1619,6 +1646,18 @@ function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgres
  * 둘째 대기다(`chainSceneConfirm`). 타석 중간(다음 공 · 판 끝 · 견제 끝)에서는 앞 대기가 이미 OK 를 받았으니 새 대기다.
  */
 function enterPitchSelection(progress: GameProgress, random: RandomPort, afterConfirm = false): GameProgress {
+  // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e)보다 앞이다.
+  // 새 타석(`afterConfirm`)은 이 진입이 0xe 의 첫 OK 뒤라 표시를 그 대기에 묶어 둔다(`hiddenStealBasesOf`) — 교체로 대기가
+  // 이어지면(같은 걸음의 둘째 0xe) 이어진 대기 객체에 묶는다. 첫 OK 가 곧 첫 0xf 진입이라 둘째 0xe 에서는 이미 지워져 있다
+  if (!afterConfirm || (progress.stealDisplayFrom ?? []).length === 0) {
+    return selectPitchAfterClear(withoutStealDisplay(progress), random, afterConfirm)
+  }
+  const entered = selectPitchAfterClear(withoutSteal(progress), random, afterConfirm)
+  return { ...entered, stealDisplayUntilConfirm: entered.sceneConfirm ?? null }
+}
+
+/** `enterPitchSelection` 의 3d9e4 부터 — CPU 투수 교체 묻기 */
+function selectPitchAfterClear(progress: GameProgress, random: RandomPort, afterConfirm: boolean): GameProgress {
   let current = progress
   let pendingWait = afterConfirm ? progress.sceneConfirm : null
   for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
@@ -1842,7 +1881,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   const opponentDefense = opponentQuickDefenseOf(progress)
   const mound = progress.opponentMound
   const order = progress.game.battingOrderIndex
-  const batter = teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order))
+  const batter = withLineupRecordSlot(teamBatterAt(progress, true, rosterSlotAt(progress.ourLineup, order)), progress.ourLineup, order)
   const pitched = perPitchDrainOf(opponentDefense, mound, batter)
   const appearance = playQuickPlateAppearance(
     {
@@ -2283,7 +2322,8 @@ export function startSteal(progress: GameProgress, base: StealBase): GameProgres
   if (game.isFinished || !isPlayerTurn(game) || progress.pendingDefensePlay !== null) return progress
   const stealingFrom = startHumanSteal(game.bases, progress.stealingFrom, base)
   if (stealingFrom === progress.stealingFrom) return progress
-  return { ...progress, stealingFrom }
+  // 0xa9bd4 가 st[0x14 + 루] 를 세운다 — 판정 입력과 표시가 한 칸이다
+  return { ...progress, stealingFrom, stealDisplayFrom: stealingFrom, stealDisplayUntilConfirm: null }
 }
 
 /** 지금 출발시킬 수 있는 루 — 화면의 도루 키 안내용 (`canStartSteal`) */
@@ -2352,6 +2392,9 @@ export function arrivePitch(
       outs: before.outs,
       // 우리 공격이니 수비는 상대 팀 — 타구 진행기와 같은 아홉 칸
       defenseAbilities: opponentDefenseAbilitiesOf(progress),
+      // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 타구 판과 같은 칸
+      fielderPlates: opponentFielderPlatesOf(progress),
+      runnerAces: ourRunnerAcesOf(progress),
       runAbilities: runAbilitiesOnBaseOf(progress),
       defenseIsCpu: true,
       // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
@@ -2399,8 +2442,28 @@ function describeArrivalPlay(play: PitchArrivalPlay): string {
   return `도루${tail}`
 }
 
+/** 판정 입력(st[0x14 + i])만 거둔다 — 표시(`stealDisplayFrom`)는 0xf 진입 · 타구 판 시작까지 남는다 */
 function withoutSteal(progress: GameProgress): GameProgress {
   return progress.stealingFrom.length === 0 ? progress : { ...progress, stealingFrom: [] }
+}
+
+/** 판정 입력과 표시를 함께 지운다 — 0xf 진입 3d966~3d976 · 타구 판(종류 1) 시작 리드 0x3d7b8 3d8c6~3d8d2 */
+function withoutStealDisplay(progress: GameProgress): GameProgress {
+  const cleared = withoutSteal(progress)
+  if ((cleared.stealDisplayFrom ?? []).length === 0 && (cleared.stealDisplayUntilConfirm ?? null) === null) return cleared
+  return { ...cleared, stealDisplayFrom: [], stealDisplayUntilConfirm: null }
+}
+
+/**
+ * **루에 안 그릴 주자의 루** — 도루 출발 표시 st[0x15 + i] (`stealDisplayFrom`).
+ * `confirmedCount` 는 지금 0xe 대기(`sceneConfirm`)가 받은 OK 수다(`confirmedCountOf`) — 새 타석의 0xf 진입은 첫 OK 뒤라
+ * 표시가 그 대기에 묶여 있으면(`stealDisplayUntilConfirm`) OK 를 받기 전까지만 숨긴다.
+ */
+export function hiddenStealBasesOf(progress: GameProgress, confirmedCount: number): readonly StealBase[] {
+  const shown = progress.stealDisplayFrom ?? []
+  const until = progress.stealDisplayUntilConfirm ?? null
+  if (until === null) return shown
+  return progress.sceneConfirm === until && confirmedCount === 0 ? shown : []
 }
 
 /**
@@ -2491,6 +2554,8 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     outs: before.outs,
     // 우리 공격이니 수비는 상대 팀이다 — 타구 진행기와 같은 아홉 칸·같은 주루 근사
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
+    fielderPlates: opponentFielderPlatesOf(progress),
+    runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
     random,
     // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)

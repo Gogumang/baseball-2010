@@ -10,7 +10,7 @@ import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
 import { createPatternDeck, lastDrawnPattern, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
-import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { canSkipHitPause, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import {
   BIG_HIT_PARTICLE,
@@ -59,6 +59,12 @@ interface BattingStageProps {
   readonly hud: StageHud | null
   /** 등판한 마선수의 합성 프레임. 없으면 평범한 투수다. */
   readonly acePitcher: AcePitcherFrames | null
+  /**
+   * 마운드 투수(수비 팀 지금 투수 `0xae83c`) 레코드의 **장비 니블 네 칸** `+0x19 · +0x1a`(제구 · 구속 · 변화 · 체력 = 모자 · 글러브 ·
+   * 아대 · 신발). 타석 교대 0x47cc8 이 마운드 그림(장면 +0xf1c)을 다시 싣고, 마투수(0xb633c)가 아니면 48138~4816a 가 이 니블 − 1 로
+   * 장비 겹 0x79790 을 부른다 — 모드를 안 가린다. 마투수(`acePitcher`)면 넘기지 않는다. 없으면 맨몸
+   */
+  readonly pitcherEquipmentNibbles?: readonly number[] | undefined
   /** 번트를 쓸 수 있는지 */
   readonly canBunt?: boolean
   /** 판정 모드 — 나만의리그(모드 3·4)는 "내 선수"(비트7) 보너스, '미션'(모드 6)은 사람 공격 +100 (0xab214) */
@@ -69,6 +75,12 @@ interface BattingStageProps {
    * 안 넘기면 0 = 타격형·우타라 예전과 같은 밸런스형 몸통이다.
    */
   readonly batterForm?: number
+  /**
+   * **타자 손** `0xb63c0`(0 우타 · 1 좌타) — 마타자(0xb63a0 이 0~4)면 표 0xd88b0 [1, 0, 0, 0, 1](b63ea), 그 밖은 폼 & 1.
+   * 타석 교대 0x47d58~0x47d70 이 장면 +0x17e1(배치 side) · 그림 +0x48 · +0x60 에 쓰고, 스윙 판정 0xab214 · CPU 투구가 같은 손을 본다.
+   * 안 넘기면 폼 & 1 (마타자가 아니면 같다)
+   */
+  readonly batterHand?: number | undefined
   /**
    * **피부** (선수 레코드 `rec[0xb]` bit2-3 — 0 황인 · 1 백인 · 2 흑인) 와 **소속 팀 번호**.
    * 원본은 타자 그림 객체를 세울 때 이 둘을 같이 넘겨 몸통 팔레트 `피부 × 15 + 팀`,
@@ -281,15 +293,20 @@ interface BattingStageProps {
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
-export function BattingStage({ canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
+export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
   const isCommonWindowOpen = useIsCommonWindowOpen()
   const refs = useStageRefs({
     ...props,
     canBunt,
     swingMode,
     batterForm,
+    ...(batterHand === undefined ? {} : { batterHand }),
+    // 마타자 순번 — 타석 교대 0x47dd6 이 몸통 적재 0x78ab0 에, 0x35686 이 스윙 객체 +0x24 에 넣는 0xb63a0
+    aceBatterOrder: aceBatterIndex,
     batterSkinIndex,
     batterEquipment: batterEquipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(batterEquipmentLevels),
+    // 마운드 장비 겹 (48138~4816a → 0x79790) — 마투수 그림이면 0x482fc 의 0x793b0 이 따로 싣는다
+    pitcherEquipment: pitcherEquipmentOfNibbles(pitcherEquipmentNibbles),
     // 팀을 안 넘기면 HUD 의 내 팀 번호를 쓴다 (근사 — props 주석 참고)
     batterTeamIndex: batterTeamIndex ?? props.hud?.ourTeamId ?? 0,
     batterSkillIds,
@@ -333,7 +350,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
       batterSkillIds: latest.batterSkillIds,
       // 0xab214 는 투수 레코드로 손 0xb63c0 을 바로 읽는다(스킬 13 좌완UP · 14 우완UP) — 던진 공이 그 투수의 폼·+0x18 을 든다.
       // 다섯째 인자는 타자 레코드 칸 0xb6394(투수 스킬 31) — 부르는 쪽이 그 모드의 레코드 칸을 넘긴다(`batterRecordSlot`)
-      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch, latest.batterRecordSlot),
+      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch, latest.batterRecordSlot, latest.batterHand),
       // 내 선수 보너스·계수는 비트7(육성·명전)만 본다 — 마선수(비트6) 등판은 해당하지 않는다 (0xb6389).
       // 마구 번호(+0x18) 1~4 를 가진 투수는 비트7 이다 (일반 레코드 +0x18 은 모두 0 — H2 4-2)
       isBatterOwnPlayer,
@@ -378,7 +395,7 @@ export function BattingStage({ canBunt = false, swingMode = '일반', batterForm
     if (swing?.isSpecial === true) {
       // 한 줄이 파티클을 두 개까지 쏜다 — 원본 0x49dbc·0x49de0 의 차례 그대로다
       const specials = specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)
-      const anchor = stageLayoutOf(batterSideOfForm(latest.batterForm)).batterAnchor
+      const anchor = stageLayoutOf(latest.batterHand ?? batterSideOfForm(latest.batterForm)).batterAnchor
       for (const special of specials) {
         emitParticles(
           particlesRef.current,

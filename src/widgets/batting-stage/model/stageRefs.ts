@@ -9,7 +9,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
-import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
@@ -83,9 +83,15 @@ export interface StageLatest {
    */
   readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
   readonly acePitcher: AcePitcherFrames | null
+  /** 마운드 투수 장비 겹 (`BattingStage` 의 `pitcherEquipmentNibbles` 주석) — 없으면 맨몸 */
+  readonly pitcherEquipment?: PitcherEquipment
   readonly canBunt: boolean
   /** 타자 폼 (원본 rec[0xb] 윗니블 = 2 × 타입 + 손). 몸통·자세표를 `폼 >> 1` 로 고른다 */
   readonly batterForm: number
+  /** 타자 손 0xb63c0 (0 우타 · 1 좌타) — `BattingStage` 의 같은 이름 props 주석. 없으면 폼 & 1 */
+  readonly batterHand?: number
+  /** 마타자 순번 0xb63a0 (0~4) — 마타자 그림 `ace/batter_*`(0x78ab0) · 자세표(0xb905c 의 u ≤ 4 갈래). 음수면 일반 타자 */
+  readonly aceBatterOrder?: number
   /** 타자 그림 팔레트 재료 — 몸통 피부×15+팀 · 헬멧 팀 (0x78be8·0x78c14) */
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number

@@ -102,3 +102,24 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     expect(isStealPlayResult(pickoff)).toBe(false)
   })
 })
+
+describe('도루 판 그림 칸 — 공 가진 야수 고리(0x43cb0) · 이름 판 · 마선수 주자 (그림만)', () => {
+  it('판 시작 포수 쥐기는 0x17 진입이 지워 고리가 없고, 2루수가 송구를 쥔 틱부터 그 칸에 뜬다', () => {
+    const result = runStealPlay({
+      bases: 일루,
+      stealingFrom: [1],
+      outs: 0,
+      runAbility: 500,
+      manualThrowBase: 2,
+      offenseIsCpu: true,
+      fielderPlates: [null, { name: '포수', positionCode: 2 }, null, { name: '이루수', positionCode: 4 }],
+      runnerAces: { first: 3 },
+    })
+    expect(result.ticks[0].holderMark).toBeNull()
+    const 쥔틱 = result.ticks.find((view) => view.holderMark != null)
+    expect(쥔틱?.holderMark).toEqual({ slot: 3, anim: 1 })
+    expect(쥔틱?.holderPlate).toEqual({ name: '이루수', positionCode: 4 })
+    expect(result.ticks[0].runners[0]?.isAce).toBe(true)
+    expect(result.ticks[0].runnerAceSprite).toBe(3)
+  })
+})

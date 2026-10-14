@@ -72,10 +72,11 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
 
   it('악송구면 수평·수직 속도 · 방향 크기 · 부호 넷을 더 굴리고(0xa1868~0xa1924), 예보 vt24(0)가 고른 야수가 줍는다', () => {
     // 늘 0 인 난수 — 줍는 족족 움직이는 공을 펌블해 0xb3148 로 튕기고(튕김 rand(−20, 20) · 다시 줍는 펌블 굴림),
-    // 그사이 자동 진루가 주자를 홈까지 보낸다. 루 위에서 쥔 적이 없어 결과 코드는 안 선다
+    // 그사이 자동 진루가 주자를 홈까지 보낸다. 루 위에서 쥔 적이 없어 결과 코드는 안 선다.
+    // (굴림 수는 투수 칸이 선수 없는 칸 — 송구 g = 2 · 악송구 보정 8 · 펌블 0(0xb0fb4 b1032) — 이 되며 34 → 36)
     const random = 세는난수(0)
     const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
-    expect(random.count()).toBe(34)
+    expect(random.count()).toBe(36)
     expect(result.errantThrow).toBe(true)
     expect(result.fumbled).toBe(true)
     expect(result.resultCode).toBeNull()
@@ -189,5 +190,34 @@ describe('견제 판 루별 주자 주루', () => {
       runAbilities: { 1: 0 },
     })
     expect(느린.ticks).not.toEqual(같은.ticks)
+  })
+})
+
+describe('견제 판 그림 칸 — 공 가진 야수 고리(0x43cb0) · 이름 판 · "!"', () => {
+  it('판 시작 투수 쥐기는 0x17 진입이 지워 고리가 없고, 1루수가 견제구를 쥔 틱부터 그 칸에 뜬다', () => {
+    const result = runPickoffPlay({
+      targetBase: 1,
+      bases: 일루,
+      outs: 0,
+      random: 세는난수(0.9),
+      fielderPlates: [{ name: '투수', pitcherRole: 0 }, null, { name: '일루수', positionCode: 3 }],
+      runnerAces: { first: 2 },
+    })
+    expect(result.ticks[0].holderMark).toBeNull()
+    const 쥔틱 = result.ticks.find((view) => view.holderMark != null)
+    expect(쥔틱?.holderMark).toEqual({ slot: 2, anim: 3 })
+    expect(쥔틱?.holderPlate).toEqual({ name: '일루수', positionCode: 3 })
+    expect(result.ticks[0].runners[0]?.isAce).toBe(true)
+  })
+
+  it('악송구를 던진 투수는 +0xc0 = 4 (a1908)', () => {
+    // 리드 굴림(0.9) 뒤 악송구 굴림 0 → 악송구
+    const values = [0.9, 0]
+    const random = createFractionRandom(() => values.shift() ?? 0.9)
+    const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
+    expect(result.errantThrow).toBe(true)
+    const 던진틱 = result.ticks.findIndex((view) => view.fielders.some((fielder) => fielder.slot === 0 && (fielder.throwErrorTicks ?? 0) > 0))
+    expect(던진틱).toBeGreaterThanOrEqual(0)
+    expect(result.ticks[던진틱]?.fielders.find((fielder) => fielder.slot === 0)?.throwErrorTicks).toBe(4)
   })
 })

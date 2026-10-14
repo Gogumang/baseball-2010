@@ -19,7 +19,8 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { gameAbilitiesOf, pitcherGameAbilityPartsOf } from '@/features/play-team-game/model/gameAbilities'
+import { gameAbilitiesOf, pitcherGameAbilityPartsOf, TEAM_ABILITY_SLOT } from '@/features/play-team-game/model/gameAbilities'
+import { defenseTeamBonusOf } from '@/entities/fielding/model/fieldingState'
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
 import type {
@@ -116,6 +117,15 @@ function teamAbilitiesOf(context: TeamGameAbilityContext, teamId: number): reado
   return TEAMS[teamId]?.values.slice(TEAM_ABILITY_OFFSET) ?? []
 }
 
+/**
+ * **수비 판의 팀 보너스** — 판 시작 0xb0fb4 b10d0: 모드 1·2·8·9 면 `0xbbe98(s16 수비 팀레코드+8)`.
+ * 팀레코드 +8 은 팀 능력치 셋째 칸 '집중'이다 — 경기용 능력치 0xb570c 의 팀 보정(0xb592c)이 읽는 같은 레코드라
+ * `teamAbilitiesOf`(시즌 트레이닝을 먹인 값 · 없으면 XlsTEAM_DATA) 그대로 쓴다.
+ */
+export function defenseTeamBonusFor(context: TeamGameAbilityContext, teamId: number): number {
+  return defenseTeamBonusOf(context.mode, teamAbilitiesOf(context, teamId)[TEAM_ABILITY_SLOT.집중] ?? 0)
+}
+
 /** 타자 한 명의 경기용 능력치 네 칸 — 히트·파워·수비·주루 */
 export function batterGameAbilities(
   context: TeamGameAbilityContext,
@@ -162,9 +172,11 @@ export function quickBatterFor(
 ): QuickAtBatBatter {
   const ability = batterGameAbilities(context, teamId, battingOrderIndex)
   const roster = teamBatters(teamId)
-  const player = roster[((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM]
-  // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 비트를 읽는다(모드 검사 없음)
-  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: skillIdsOfBits(player?.skillBits ?? 0, false) }
+  const slot = ((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM
+  const player = roster[slot]
+  // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 비트를 읽는다(모드 검사 없음).
+  // 레코드 칸 0xb6394 = Xls 행 +0xa & 0x1f = 붙박이 칸 (`batterAt` 주석)
+  return { hit: ability[0], power: ability[1], run: ability[3], skillIds: skillIdsOfBits(player?.skillBits ?? 0, false), recordSlot: slot }
 }
 
 /** 간이 타석 엔진이 보는 투수 */
@@ -267,10 +279,15 @@ export interface TeamEntryBatter {
    */
   readonly ability: readonly [number, number, number, number]
   /**
-   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 (0 없음 · n = 레벨 + 1) — 붙박이 표 선수만 든다(마선수·기록으로 선 영입 선수는 없다).
-   * 타석 그림 0x10866 → 0x78fd8 이 이 니블로 장비 겹을 고른다
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 (0 없음 · n = 레벨 + 1) — 붙박이 표 선수 · 기록으로 선 영입 선수(기록 사본의 니블)가 든다
+   * (마선수는 없다). 타석 그림 0x10866 → 0x78fd8 이 이 니블로 장비 겹을 고른다
    */
   readonly equipment?: readonly number[]
+  /**
+   * 레코드 +0xb 한 바이트 — 기록으로 선 영입 선수만 든다(기록 사본 `TeamEntryBatterRecord.profile`). 붙박이 표 선수는 Xls 행
+   * (`RosterPlayer.profile`)에서 읽는다. 폼 = `>> 4`(0xb6e24) · 피부 = `(>> 2) & 3` · 손 0xb63c0 = 폼 & 1
+   */
+  readonly profile?: number
   /** 수비 위치 코드 = 레코드 `+0x1c & 0xf`. **0 은 자리 없는 후보(벤치)** 다 */
   readonly position: number
   /** 마타자면 `ACE_BATTERS` 칸 0~4, 아니면 −1 */
@@ -463,6 +480,13 @@ export interface TeamEntryPitcher {
    * 통째 베낀 XlsACE_PIT 행 그대로(`withAcePitcher` — 붕붕머신 16 · 발렌타인 16 · 22, 18 · 10 은 다섯 줄 모두 0). 없으면 0.
    */
   readonly skillBits?: number
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸(제구 · 구속 · 변화 · 체력 = 모자 · 글러브 · 아대 · 신발) — 타석 교대 0x47cc8 이 마운드 투수가
+   * 마투수(0xb633c)가 아니면 48138~4816a 에서 이 니블 − 1 로 투수 그림 0x79790 장비 겹을 싣는다. 표 줄은 Xls 행(또는 시즌 명단 니블),
+   * 마투수는 안 쓴다. 기록으로 선 영입 투수는 영입 0xc554 가 통째로 옮긴 기록 사본의 니블(`TeamEntryPitcherRecord.equipment`).
+   * 없으면 맨몸(옛 기록 사본 — 니블 칸이 생기기 전에 영입한 나리 사본 · 니블 없는 옛 명전 기록)
+   */
+  readonly equipment?: readonly number[]
 }
 
 /**
@@ -493,6 +517,7 @@ export function rosterEntryPitchersOf(teamId: number): readonly TeamEntryPitcher
   return teamPitchers(teamId).map((player, slot) => ({
     name: player.name,
     ability: rowAbilityOf(player, true),
+    equipment: player.equipment,
     repertoire: rosterRepertoireOf(teamId, slot),
     aceIndex: NO_ACE_BATTER,
     orderIndex: slot,
@@ -573,6 +598,13 @@ export interface TeamEntryBatterRecord {
   readonly recordId?: number
   /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryBatter.skillBits`). 시즌 명단은 기록 사본에 있으면 싣는다(옛 사본은 없어 0) */
   readonly skillBits?: number
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 — 영입 0xc554 가 옮긴 0x30 바이트의 니블(시즌 장비 창이 바꾸면 그 값). 타석 그림 장비 겹
+   * (타자 0x78fd8 · 투수 0x79790)이 이 니블 − 1 로 고른다. 옛 사본엔 없다
+   */
+  readonly equipment?: readonly number[]
+  /** 레코드 +0xb 한 바이트 (`seasonRecordProfileOf`) — 폼 · 피부 · 손. 옛 사본엔 없다 */
+  readonly profile?: number
 }
 
 /** 붙박이 표 밖 투수의 기록 — `TeamEntryBatterRecord` 주석과 같다 */
@@ -588,6 +620,8 @@ export interface TeamEntryPitcherRecord {
   readonly recordId?: number
   /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryPitcher.skillBits`). 시즌 명단은 기록 사본에 있으면 싣는다(옛 사본은 없어 0) */
   readonly skillBits?: number
+  /** 레코드 +0x19 · +0x1a 장비 니블 네 칸 — `TeamEntryBatterRecord.equipment` 와 같다. 마운드 장비 겹 0x79790 이 고른다 */
+  readonly equipment?: readonly number[]
 }
 
 /**
@@ -626,7 +660,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
   return order.batters.map((batter, index) => {
     const position = batter.position & 0xf
     if (batter.record !== undefined) {
-      const { recordId, skillBits } = batter.record
+      const { recordId, skillBits, equipment, profile } = batter.record
       return {
         name: batter.record.name,
         ability: batter.record.ability,
@@ -635,6 +669,8 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
         rosterSlot: NO_ROSTER_SLOT,
         ...(recordId === undefined ? {} : { recordId }),
         ...(skillBits === undefined ? {} : { skillBits }),
+        ...equipmentOf(equipment),
+        ...(profile === undefined ? {} : { profile }),
       }
     }
     if (isForeignTable(batter.tableTeamId, teamId)) {
@@ -668,6 +704,47 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
   })
 }
 
+/**
+ * **옛 경기 저장 이사** — 기록 사본에 니블 · +0xb 를 싣기 전에 저장한 경기 블록의 명단은 기록으로 선 영입 선수에게 그 칸이 없다.
+ * 원본은 팀 레코드(영입 0xc554 가 옮긴 0x30 바이트) 하나를 경기와 시즌이 함께 쓰므로, 지금 시즌 명단으로 만든 명단 차례(`order`)의
+ * 같은 원본 id(`recordId`) 기록에서 빠진 칸만 채운다 — 있는 값은 그대로다. 표 줄 · 마선수는 손대지 않는다.
+ */
+export function withBatterRecordNibbles(
+  entry: readonly TeamEntryBatter[],
+  order: TeamEntryOrder,
+): readonly TeamEntryBatter[] {
+  return entry.map((batter) => {
+    if (batter.recordId === undefined || (batter.equipment !== undefined && batter.profile !== undefined)) return batter
+    const record = order.batters.find((candidate) => candidate.record?.recordId === batter.recordId)?.record
+    if (record === undefined) return batter
+    return {
+      ...batter,
+      ...(batter.equipment !== undefined || record.equipment === undefined ? {} : { equipment: record.equipment }),
+      ...(batter.profile !== undefined || record.profile === undefined ? {} : { profile: record.profile }),
+    }
+  })
+}
+
+/** `withBatterRecordNibbles` 의 투수 쪽 — 기록으로 선 영입 투수의 니블(마운드 장비 겹 0x79790)만 채운다 */
+export function withPitcherRecordNibbles(
+  entry: readonly TeamEntryPitcher[],
+  order: TeamEntryOrder,
+): readonly TeamEntryPitcher[] {
+  return entry.map((pitcher) => {
+    if (pitcher.recordId === undefined || pitcher.equipment !== undefined) return pitcher
+    const record = order.pitchers.find(
+      (candidate): candidate is TeamEntryPitcherRecord =>
+        typeof candidate !== 'number' && 'recordId' in candidate && candidate.recordId === pitcher.recordId,
+    )
+    return record?.equipment === undefined ? pitcher : { ...pitcher, equipment: record.equipment }
+  })
+}
+
+/** 장비 니블 칸 — 있을 때만 싣는다 */
+function equipmentOf(equipment: readonly number[] | undefined): { readonly equipment?: readonly number[] } {
+  return equipment === undefined ? {} : { equipment }
+}
+
 /** 고친 차례로 세운 투수 명단 — 0번이 저장 레코드의 0번이다 (선발 칸은 부르는 쪽이 정한다) */
 export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryPitcher[] {
   const table = teamPitchers(teamId)
@@ -689,6 +766,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
       return {
         name: player?.name ?? '',
         ability: rowAbilityOf(player, true, pitcher.equipment),
+        ...equipmentOf(pitcher.equipment ?? player?.equipment),
         repertoire: rosterRepertoireOf(tableTeamId, pitcher.tableSlot),
         aceIndex: NO_ACE_BATTER,
         orderIndex,
@@ -708,6 +786,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
         ...(pitcher.role === undefined ? {} : { role: pitcher.role }),
         ...(pitcher.recordId === undefined ? {} : { recordId: pitcher.recordId }),
         ...(pitcher.skillBits === undefined ? {} : { skillBits: pitcher.skillBits }),
+        ...equipmentOf(pitcher.equipment),
       }
     }
     const slot = slots[orderIndex] ?? 0
@@ -715,6 +794,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
     return {
       name: player?.name ?? '',
       ability: rowAbilityOf(player, true),
+      ...equipmentOf(player?.equipment),
       repertoire: rosterRepertoireOf(teamId, slot),
       aceIndex: NO_ACE_BATTER,
       orderIndex,

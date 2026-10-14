@@ -77,6 +77,7 @@ import {
   AI_STATE,
   createFielders,
   createRunner,
+  fielderAbilityOf,
   fielderArrivalTicks,
   initialPlayView,
   NONE,
@@ -138,7 +139,9 @@ import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defe
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
+import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
 import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
+import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import {
   holderMarkOf,
   viewStateOf,
@@ -205,6 +208,11 @@ export interface DefensePlayInput {
   readonly outs: number
   /** 수비 9명의 수비 능력치 (칸 순서). 기본 500 */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자들의 주루 능력치. 기본 500 */
   readonly runAbility?: number
   /**
@@ -376,6 +384,21 @@ export interface DefensePlayInput {
    * 안 주면 모두 보통 주자 그림이다.
    */
   readonly runnerAces?: RunnerAces
+  /**
+   * 경기 +0x199a — 큰 타구 감상 플래그(0x392ac, 상태 0x13 이 세운다). 수비 화면 공 그리기 0x36dfc 가 서 있는 동안
+   * 판 종류 1 · 8 이면 그림마다 큰 타구 파티클을 쏜다. 안 주면 이 판의 타구(결과 코드 · 궤적 폴 틱 · 거리 눈금)로 0x392ac 를 다시 본다
+   * — 0x13 과 같은 공이라 같은 값이다.
+   */
+  readonly bigHitWatch?: boolean
+}
+
+/** 0x392ac — 판 입력의 타구로 큰 타구 감상 플래그를 본다 (`bigHitWatch` 를 안 준 판) */
+function bigHitWatchOf(input: Pick<DefensePlayInput, 'outcome' | 'trajectory'>): boolean {
+  return isBigHitWatch({
+    resultCode: contactOfOutcome(input.outcome)?.resultCode ?? null,
+    poleTick: input.trajectory.poleTick,
+    carryScale: input.trajectory.carryScale ?? 0,
+  })
 }
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
@@ -393,18 +416,14 @@ export interface DefenseLineupPlayer {
 /**
  * 타순에 선 선수들을 **수비 칸 9개**(0 투수 … 8 중견)의 능력치 배열로 옮긴다.
  *
- * ⚠️ **원본 그대로**: 칸 0(투수)의 "수비 능력치" 도 같은 `0xb570c(팀, **2**, 선수, 90, 1)` 로 읽는데,
- * 투수 레코드의 칸 2 는 **변화**다 (J-4 의 칸 표). 원본이 레코드 종류를 가리지 않고 칸 2 를 읽으므로
- * 여기서도 투수의 변화 값을 그대로 넘긴다 — 고치지 않는다.
+ * 칸 0(투수)은 판 시작 0xb0fb4 가 **선수를 찾지 않는다**(b1032 — `fielderAbilityOf` 주석). 그래서 송구 속도 g = 2 ·
+ * 악송구 보정 8 · 펌블 0 · 레이저 굴림 없음으로 고정이고, 진행기는 이 칸의 값을 읽지 않는다 — 자리만 기본값으로 채운다.
+ * (예전 웹은 마운드 투수의 능력치 칸 2(투수 레코드에서는 변화)를 넣었다 — 원본에 없는 길이라 걷었다.)
  *
  * 자리 코드가 없거나 겹치는 칸은 원본 평균대(등급 3 = 500)로 둔다.
  */
-export function defenseAbilitiesOf(
-  lineup: readonly DefenseLineupPlayer[],
-  pitcherDefense: number = DEFAULT_ABILITY,
-): number[] {
+export function defenseAbilitiesOf(lineup: readonly DefenseLineupPlayer[]): number[] {
   const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_ABILITY)
-  abilities[0] = pitcherDefense
   const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
   for (const player of lineup) {
     const code = (player.position ?? 0) & 0xf
@@ -966,7 +985,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     runnerSpeedOf(input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY)
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
 
-  let fielders = createFielders(abilities)
+  let fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
   // 결과를 넘겨받은 호출(옛 길 · 시험)이 미리 굴려 둔 필살타법 성공. 쏜 공(`contactOfOutcome`)의 필살 스윙은 아래 0x517e6 자리에서 굴린다
   let uncatchable = input.isUncatchable === true
 
@@ -1593,7 +1612,7 @@ export function stepDefensePlay(
         thrower: fielders[fromSlot],
         target: receiverTarget,
         laser: true,
-        ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+        ability: fielderAbilityOf(abilities, fromSlot, DEFAULT_ABILITY),
         random: input.random,
         body: ballBody,
       })
@@ -1608,7 +1627,7 @@ export function stepDefensePlay(
         target: receiverTarget,
         special: special.special,
         bounce: special.bounce,
-        ability: abilities[fromSlot] ?? DEFAULT_ABILITY,
+        ability: fielderAbilityOf(abilities, fromSlot, DEFAULT_ABILITY),
         random: input.random,
         body: ballBody,
       })
@@ -1985,7 +2004,8 @@ export function stepDefensePlay(
         laserRolled = true
         const passed = rollLaserThrow(
           {
-            defenseAbility: abilities[chaserSlot] ?? DEFAULT_ABILITY,
+            // 66a94: 공 쫓는 야수+0xec 가 없으면(투수 칸 0) 굴림 없이 실패 — `rollLaserThrow`
+            defenseAbility: fielderAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY),
             skillIds: input.fielderSkillIds?.[chaserSlot] ?? [],
           },
           input.random,
@@ -2087,7 +2107,7 @@ export function stepDefensePlay(
       // 손으로 만든 시험 궤적(원본 칸 없음)은 마지막 점을 멈춘 점으로 본다.
       const ballIsMoving =
         trajectory.isStoppedAt === undefined ? tick < trajectory.length - 1 : !trajectory.isStoppedAt(tick)
-      if (rollFumble(abilities[chaserSlot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
+      if (rollFumble(fielderAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
         fumbled = true
         fumbleMarks = fumbleMarks.map((value, slot) => (slot === chaserSlot ? FUMBLE_MARK_TICKS : value))
         // b4280: 야수+0xb8 = 6(놓침 동작) · 메시지 0xbc2 · 사건(sp+0x24) = 1 — 쥐지 않는다. 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 로
@@ -2728,6 +2748,19 @@ export function stepDefensePlay(
         throwErrorTicks: throwErrorMarks,
         // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
         laserTrailFrom: laserTrailOn ? ballSegmentStart : null,
+        // 공 그리기 0x36dfc 의 큰 타구 · 튐 파티클 — 진행기 쪽 조건 (`ballParticleFactsOf`).
+        // 튐은 공을 **궤적에서 읽어 그리는 틱**(`ballPointAt` 의 앞 두 갈래 — 잡히기 전 · 못 잡는 공 · 끼워 넣은 송구 · 튕긴 공)에만 본다.
+        // ⚠️ `ballPointAt` 이 근사(낮은 포물선)로 그리는 송구 틱은 손을 떠나는 틱에 높이 투영이 0 → 0 아님이 되어 거짓 튐이 생기므로
+        // 안 본다(그 틱의 원본 튐은 미확인)
+        ballParticles: ballParticleFactsOf({
+          ballTick: tick,
+          at: tick,
+          trajectory,
+          onTrajectory: uncatchable || tick < catchTick,
+          bigHitWatch: input.bigHitWatch ?? bigHitWatchOf(input),
+          playKind: play.kind,
+          resultCode: contactOfOutcome(input.outcome)?.resultCode ?? null,
+        }),
         runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
         runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,

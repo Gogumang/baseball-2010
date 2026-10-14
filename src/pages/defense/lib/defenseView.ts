@@ -405,6 +405,26 @@ export interface HolderPlate {
   readonly positionCode?: number
 }
 
+/**
+ * 공 그리기 0x36dfc 의 파티클 두 갈래 중 **진행기 쪽 조건** (직접 뜬 것 — 화면 쪽 조건 · 좌표는 `lib/ballParticles`):
+ * ```
+ * 36e24  공+0x68(공 틱) > 0 이 아니면 끝                    ; 그 앞 36e0a · 36e12 는 공 그림판이 있나
+ * 36e86  쥔 공 · 담장 뒤로 사라진 공이면 그림 없음(→ 3736c)
+ * 36f76  경기+0x199a && state[0x26](판 종류) ∈ {1, 8} → 0xbbc85(…, 4, 10)            ; 큰 타구
+ * 36fe0  … 높이 투영 == 0 이면: 공+0x6c − 1 > 공+0x68 && !0x357e0 && +0xfd4 ∉ {9,10,11}
+ *          && 0xa25fd(공 틱 + 1 점)의 높이 투영 ≠ 0 → 공+0xab4 = 1 · 0xbbc85(…, 0, 8)   ; 튐
+ * ```
+ */
+export interface BallParticleFacts {
+  /** 큰 타구 갈래 0x36f76~0x36f92 — 경기+0x199a(0x392ac) && 판 종류 ∈ {1, 8} */
+  readonly bigHit: boolean
+  /**
+   * 튐 갈래의 화면 밖 조건(궤적 안 끝남 · 0x357e0 거짓 · 결과 코드 ∉ {9,10,11})이 다 맞으면 **다음 점(공 틱 + 1)의 높이**(월드 y),
+   * 아니면 null. 높이 투영(0xb94b5 의 둘째 값)은 화면 쪽이 한다.
+   */
+  readonly bounceNextHeight: number | null
+}
+
 /** 화면 한 틱치 스냅샷 */
 export interface DefenseViewState {
   readonly ball: DefenseBall
@@ -462,6 +482,11 @@ export interface DefenseViewState {
    * 화면이 그 점에서 공까지 공 그림을 반투명으로 늘어놓는다(`laserTrailMarksOf`). 없으면 null
    */
   readonly laserTrailFrom?: { readonly x: number; readonly z: number; readonly height: number } | null
+  /**
+   * 공 그리기 0x36dfc 가 **파티클을 쏠지** 보는 것 중 화면(카메라) 밖의 조건 — 진행기가 정한다(`lib/ballParticles`).
+   * 없으면 아무것도 안 쏜다(재생 · 주자 판).
+   */
+  readonly ballParticles?: BallParticleFacts | null
   /**
    * 카메라가 따로 볼 곳. 원본은 상태 0x18(경기 끝 직전)에 투수판 (20000, 24500) 의
    * (x, z − 2000) 을 1%/틱 으로 본다 (R3 1-3). 없으면 아래 규칙대로 공/타자주자를 본다.

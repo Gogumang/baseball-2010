@@ -17,6 +17,7 @@ import {
   FIELDER_ACTION,
   HOLDER_MARK_ANIM,
   RUNNER_ACTION,
+  type BallParticleFacts,
   type DefenseFielder,
   type HolderMark,
   type HolderPlate,
@@ -34,7 +35,7 @@ import {
  * 어느 틱에 어느 칸을 쓰는지는 원본 동작 큐를 안 읽었으므로 **움직이는 방향에서 뽑아 쓴다(근사)**.
  */
 
-export type { HolderMark, HolderPlate }
+export type { BallParticleFacts, HolderMark, HolderPlate }
 
 /** 진행기가 내주는 한 틱 — 화면이 쓰는 스냅샷에 틱 번호만 붙였다 */
 export interface DefensePlayView extends DefenseViewState {
@@ -105,6 +106,8 @@ export interface ViewStateInput {
   readonly runnerAceSprite?: number | null
   /** 레이저 잔상(장면 +0x1991)이 서 있으면 지금 공 궤적의 t = 0 점(월드 x · y 높이 · z) */
   readonly laserTrailFrom?: WorldPoint | null
+  /** 공 그리기 0x36dfc 파티클의 진행기 쪽 조건 (`BallParticleFacts`). 안 주면 안 쏜다 */
+  readonly ballParticles?: BallParticleFacts | null
 }
 
 /**
@@ -195,6 +198,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
         : { x: input.laserTrailFrom.x, z: input.laserTrailFrom.z, height: input.laserTrailFrom.y },
     holderMark: input.holderMark ?? null,
     holderPlate: input.holderMark == null ? null : (input.holderPlate ?? null),
+    ballParticles: input.ballParticles ?? null,
   }
 }
 

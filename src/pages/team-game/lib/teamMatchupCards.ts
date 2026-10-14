@@ -3,6 +3,10 @@ import { currentBatterEntry, isOurOffense, moundStaminaOf } from '@/features/pla
 import type { TeamEntryBatter, TeamEntryPitcher } from '@/features/play-team-game/model/teamGameRoster'
 import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
+import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
 import { countsAsAtBat, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import {
   EMPTY_LEAGUE_BATTER_LINE,
@@ -90,20 +94,41 @@ function gameBatterLineOf(progress: TeamGameProgress, teamId: number, entry: Tea
   }, EMPTY_LEAGUE_BATTER_LINE)
 }
 
-/** 타자 레코드 +0xb(폼 니블) — 붙박이 표 행에서. 표 밖 선수(영입한 명전·나리)는 웹 명단에 칸이 없어 모른다 */
+/**
+ * 타자 레코드 +0xb(폼 니블) — 붙박이 표 행, 표 밖 선수(영입한 명전·나리)는 기록 사본의 +0xb(`TeamEntryBatter.profile`).
+ * ⚠️ 칸이 생기기 전의 옛 기록 사본은 모른다(null)
+ */
 function batterProfileOf(teamId: number, entry: TeamEntryBatter): number | null {
-  if (entry.rosterSlot === NO_ROSTER_SLOT) return null
+  if (entry.rosterSlot === NO_ROSTER_SLOT) return entry.profile ?? null
   return BATTERS[leagueBatterIdOf(entry.tableTeamId ?? teamId, entry.rosterSlot)]?.profile ?? null
 }
 
 /**
- * 타자 손 `0xb63c0`(1 좌타 · 0 우타) — 마타자는 마선수 표, 그 밖은 레코드 +0xb 폼 니블. ⚠️ 표 밖 선수(영입한 명전 · 나리)는
- * 웹 명단에 폼 칸이 없어 우타(0)로 둔다.
+ * 타자 손 `0xb63c0`(1 좌타 · 0 우타) — 마타자는 마선수 표, 그 밖은 레코드 +0xb 폼 니블. ⚠️ +0xb 를 모르는 옛 기록 사본은
+ * 우타(0)로 둔다.
  */
 export function teamBatterHandOf(teamId: number, entry: TeamEntryBatter): number {
   if (entry.aceIndex >= 0) return batterHandOf(0, entry.aceIndex)
   const profile = batterProfileOf(teamId, entry)
   return profile === null ? 0 : batterHandOf(profile)
+}
+
+/**
+ * **사람 타석 타자 그림 · 판정 재료** — 지금 타자 `0xae89c(공격 팀 = 우리)` 레코드에서 (`BattingStage` 의 batterForm · batterSkinIndex ·
+ * batterHand). 타석 교대 0x47d98~0x47dd6 이 타자 그림 적재 0x78ab0 에 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` ·
+ * 손 0xb63c0 을 넘기고, 0x47d58~0x47d70 이 같은 손을 장면 +0x17e1(배치 side)에 쓴다. 마타자는 XlsACE_BAT +0xb
+ * (`aceBatterProfileOf`)와 손 표 0xd88b0 — 폼의 낮은 비트가 아니다. ⚠️ +0xb 를 모르는 옛 기록 사본은 0(타격형 · 우타 · 피부 0)
+ */
+export function teamBattingStageBatterOf(progress: TeamGameProgress): {
+  readonly batterForm: number
+  readonly batterSkinIndex: number
+  readonly batterHand: number
+} {
+  const teamId = progress.options.ourTeamId
+  const batter = currentBatterEntry(progress)
+  if (batter === undefined) return { batterForm: 0, batterSkinIndex: 0, batterHand: 0 }
+  const profile = batter.aceIndex >= 0 ? aceBatterProfileOf(batter.aceIndex) : (batterProfileOf(teamId, batter) ?? 0)
+  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterHand: teamBatterHandOf(teamId, batter) }
 }
 
 /**
@@ -178,22 +203,34 @@ export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMat
  * **사람이 던지는 타석 장면의 그림 재료** (`PitcherSideStage`) — 타자 `0xae89c(공격 팀 = 상대)` · 투수 `0xae83c(수비 팀 = 우리)`.
  * 타자: 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀. 마타자는 XlsACE_BAT_DATA +0xb
  * (`aceBatterProfileOf`) · 손 표 0xd88b0. 표 밖 선수(영입한 명전·나리)는 웹 명단에 폼 칸이 없어 0.
- * 투수: 폼 · 손 0xb63c0. ⚠️ 우리 마투수의 마선수 그림 · 장비 겹(0x79790)은 웹 명단에 칸이 없어 평범한 맨몸 투수로 그린다.
+ * 투수: 폼 · 손 0xb63c0. 타석 교대 0x47cc8 이 마운드 그림(장면 +0xf1c)을 다시 싣는다 — 마투수(0xb633c)면 0x482fc 의 적재 0x793b0 이
+ * 순번 0xb63a0 으로 `ace/pitcher_*` 를(`acePitcher`), 아니면 48138~4816a 가 레코드 +0x19 · +0x1a 니블 − 1 로 장비 겹 0x79790 을
+ * (`pitcherEquipment`) 싣는다. 투수편 · 투수 미션(0x108f8 → 0x10810 → 0x79790)과 같은 겹이다.
  */
 export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   readonly batterForm: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
   readonly batterSide?: number
+  readonly aceBatterOrder?: number
   readonly pitcherForm: number
   readonly pitcherHand: number
+  readonly pitcherEquipment?: PitcherEquipment
+  readonly acePitcher: AcePitcherFrames | null
 } {
   const teamId = progress.options.opponentTeamId
   const batter = progress.opponentEntry[progress.opponentOrderIndex]
   const pitcher = progress.ourPitcherEntry[progress.ourPitcherIndex]
   const pitcherForm = pitcher?.repertoire.form ?? 0
   const pitcherHand = pitcher === undefined ? 0 : pitcherHandOf(pitcherForm, pitcher.aceIndex >= 0)
-  if (batter === undefined) return { batterForm: 0, batterSkinIndex: 0, batterTeamIndex: teamId, pitcherForm, pitcherHand }
+  const ace = pitcher === undefined ? undefined : ACE_PITCHERS[pitcher.aceIndex]
+  const mound = {
+    pitcherForm,
+    pitcherHand,
+    acePitcher: ace === undefined ? null : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl },
+    ...(ace !== undefined || pitcher?.equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOfNibbles(pitcher.equipment) }),
+  }
+  if (batter === undefined) return { batterForm: 0, batterSkinIndex: 0, batterTeamIndex: teamId, ...mound }
   if (batter.aceIndex >= 0) {
     const profile = aceBatterProfileOf(batter.aceIndex)
     return {
@@ -201,10 +238,11 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
       batterSkinIndex: (profile >> 2) & 3,
       batterTeamIndex: teamId,
       batterSide: teamBatterHandOf(teamId, batter),
-      pitcherForm,
-      pitcherHand,
+      aceBatterOrder: batter.aceIndex,
+      ...mound,
     }
   }
   const profile = batterProfileOf(teamId, batter) ?? 0
-  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamId, pitcherForm, pitcherHand }
+  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamId, ...mound }
 }
+

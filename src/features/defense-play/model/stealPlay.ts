@@ -1,4 +1,6 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { basePosition, runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import {
@@ -120,6 +122,11 @@ export interface StealPlayInput {
   readonly outs: number
   /** 수비 9명 능력치 (칸 순서) */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자 주루 능력치 — 루별로 줄 수 있다. 없으면 `runAbility` */
   readonly runAbilities?: Partial<Record<1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -138,6 +145,10 @@ export interface StealPlayInput {
   /** 주루 설정 +0xbd (기본 자동) */
   readonly runningMode?: ManualAutoMode
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
@@ -171,7 +182,7 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
   const covers = [...PICKOFF_COVER_OF_BASE]
 
   // ── b297a: 야수 1~4 를 제 루로 · 커버 = 루 + 1 ──
-  const fielders: FielderState[] = createFielders(abilities).map((fielder) => {
+  const fielders: FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
     const base = covers.indexOf(fielder.slot)
     if (base < 0) return fielder
     return {
@@ -230,6 +241,9 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+    runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
     scene: input.scene,
     controls: input.controls,
   }

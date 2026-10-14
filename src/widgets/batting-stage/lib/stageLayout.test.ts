@@ -93,6 +93,11 @@ describe('타자 좌우 — side 0 우타 · 1 좌타 (0xb63c0)', () => {
     expect(pitchSituationOf(null, 1).side).toBe(BATTER_SIDE.좌타)
   })
 
+  it('손 0xb63c0 을 따로 받으면 그 값 — 마타자는 표 0xd88b0 이라 폼 & 1 과 다르다 (메디카 폼 4 · 좌타)', () => {
+    expect(situationOf(null, [], 4, undefined, 0, BATTER_SIDE.좌타).batterSide).toBe(BATTER_SIDE.좌타)
+    expect(pitchSituationOf(null, 4, BATTER_SIDE.좌타)).toMatchObject({ side: BATTER_SIDE.좌타, batterSide: BATTER_SIDE.좌타 })
+  })
+
   it('투수 좌우는 공에 실린 투수 손(0xb63c0) — 공이 없으면 우투 0 (타자 스킬 13·14, 0xab9f0·0xaba1e)', () => {
     expect(situationOf(null, [], 0).pitcherSide).toBe(0)
     expect(situationOf(null, [], 0, { pitcherForm: 1, pitcherMagicNumber: 0 }).pitcherSide).toBe(1)

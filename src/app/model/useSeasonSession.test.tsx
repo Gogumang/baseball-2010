@@ -2163,7 +2163,7 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
     act(() => result.current.actions.startPendingGame())
 
     const order = result.current.gameOptions?.ourEntryOrder
-    expect(order?.batters[0]).toEqual({ rosterSlot: -1, position: roster.batters[0]!.fieldPosition & 0xf, record: { name: '전설', ability: [500, 600, 300, 200], recordId: 0xc8 } })
+    expect(order?.batters[0]).toEqual({ rosterSlot: -1, position: roster.batters[0]!.fieldPosition & 0xf, record: { name: '전설', ability: [500, 600, 300, 200], recordId: 0xc8, profile: 0 } })
     const pitcher = order?.pitchers.find((entry) => typeof entry !== 'number')
     expect(pitcher).toEqual({
       name: '철완',

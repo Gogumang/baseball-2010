@@ -101,6 +101,8 @@ export function pitcherGameOptionsOf(
     playerSide: settings.playerSide ?? leagueGamePlayerSideOf(career),
     role: career.role,
     positionCode: career.positionCode,
+    // 수비 화면 이름 판(0x43cb0) 칸 0 — 내 투수 레코드 이름
+    myName: career.name,
     // g = 시즌+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽는다 (모드 3·4 공용). 정규시즌은 치른 경기 수,
     // 포스트시즌은 **시리즈 안 경기 수**다: 대진 0xb80a8 이 0(b811c), 시리즈 끝 0xb7724 가 −1(b777a), 하루 끝 +1(b819a).
     // 커리어 `gamesPlayed` 는 내 경기만 세므로 포스트시즌 g 가 아니다 (`leagueDayCounterOf`, 타자편 5b78dc1 과 같다)

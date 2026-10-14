@@ -1,3 +1,4 @@
+import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   gateRunnerViewsOf,
@@ -5,6 +6,8 @@ import {
   passPlayGateBetweenTicks,
   someRunnerStillActive,
 } from '@/entities/fielding/model/playGate'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { PICKOFF_PLAY_KIND, type PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { autoAdvanceDecisions } from '@/entities/fielding/model/autoAdvance'
 import { rollFumble } from '@/entities/fielding/model/fieldingErrors'
@@ -20,6 +23,7 @@ import {
 import {
   AI_STATE,
   createFielders,
+  fielderAbilityOf,
   fielderArrivalTicks,
   createRunner,
   initialPlayView,
@@ -37,10 +41,16 @@ import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import {
+  holderMarkOf,
   viewStateOf,
   type ActionMemory,
   type DefensePlayView,
 } from '@/features/defense-play/model/defensePlayView'
+import {
+  FUMBLE_MARK_TICKS,
+  THROW_ERROR_MARK_TICKS,
+  tickMarkCounter,
+} from '@/features/defense-play/model/playerEffects'
 import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import {
@@ -129,6 +139,11 @@ export interface PickoffPlayInput {
   readonly outs: number
   /** 수비 9명 능력치 (칸 순서). 칸 0(투수)은 원본 그대로 레코드 칸 2 를 읽는다(`defenseAbilitiesOf`) */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자들의 주루 능력치 */
   readonly runAbility?: number
   /** 루별 주자 주루 (1~3). 없는 루는 `runAbility` — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 들고 있다 */
@@ -147,6 +162,10 @@ export interface PickoffPlayInput {
   /** 송구 설정 +0xf4 (원본 기본 수동) — `0xae6c8` 뒤 항 */
   readonly throwMode?: ManualAutoMode
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /**
@@ -229,7 +248,7 @@ function* pickoffPlaySteps(
 
   // ── 1. 시작 0xb28be ──
   const start = startPickoff(targetBase)
-  let fielders: readonly FielderState[] = createFielders(abilities).map((fielder) => {
+  let fielders: readonly FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
     if (fielder.slot === PITCHER_SLOT) {
       return { ...fielder, holdingBall: true, aiState: start.pitcherAiState }
     }
@@ -292,6 +311,18 @@ function* pickoffPlaySteps(
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
+  /**
+   * **그림 전용** 경기+0x19ac — 쥐기 0xb2710 의 메시지 0x15 가 세우고 0x17 진입 0x467de 가 내린다. 판 시작에 투수가 쥔 공
+   * (0xb28be)은 0x46418 안에서 0x467de 보다 앞이라 지워진다 — 견제 송구를 받은(주운) 야수가 쥘 때 선다
+   */
+  let grabbed = false
+  /** **그림 전용** 야수 +0xb8(펌블 표시) · +0xc0(송구 실수 표시) — `runDefensePlay` 와 같은 칸 */
+  let fumbleMarks: number[] = Array.from({ length: fielders.length }, () => 0)
+  let throwErrorMarks: number[] = Array.from({ length: fielders.length }, () => 0)
+  const markSlot = (marks: number[], slot: number, value: number) =>
+    marks.map((current, index) => (index === slot ? value : current))
+  const runnerAceIndexes = runnerAceIndexesOf(input.runnerAces, input.bases)
+  const runnerAceSprite = loadedRunnerAceOf(input.runnerAces, input.bases)
   // `0xae6c8`([장면+0x214], 설정+0xf4) — 수비가 CPU 거나 송구 설정이 자동이면 슬롯 2 의 0xafa60 이 매 틱 돈다
   const cpuThrowEnabled = input.defenseIsCpu === true || (input.throwMode ?? '수동') !== '수동'
 
@@ -405,13 +436,17 @@ function* pickoffPlaySteps(
       target: fielders[plan.toSlot]?.target ?? basePosition(base),
       special: isSpecial,
       bounce: isSpecial && special.bounce,
-      ability: abilities[holderSlot] ?? DEFAULT_ABILITY,
+      ability: fielderAbilityOf(abilities, holderSlot, DEFAULT_ABILITY),
       random: input.random,
       body: ballBody,
     })
     if (thrown.errant) errantThrow = true
+    // a1908(악송구) · a17fc(원바운드) — 던진 야수 +0xc0 = 4 (그림 0x438c4 의 "!")
+    if (thrown.errant || thrown.bounce) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     // b307c vt24(0) · vt34 — 받을(주울) 야수 · 포구 틱
     takeLooseBall(chaseLooseBall(thrown.ball, tick, fielders, forecastOptionsOf(thrown, holderSlot, coverSlot), MAXIMUM_TICKS))
+    // b188a — 송구 예보가 두 번째 패스로 가면 그때의 +0x130(던진 야수 — b307c 앞)의 +0xc0 = 4
+    if (chase?.secondPassStarted === true) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     flight = { from: holderSlot, base, releaseTick: tick }
     // b2f80 · b3070 손을 떠난다 · b2df8~b2e14 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로)
     fielders = fielders.map((fielder) => {
@@ -478,6 +513,9 @@ function* pickoffPlaySteps(
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
+    // a12da · a12e6 — 동작 잠금(+0xb4)이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 만 본다)
+    fumbleMarks = fumbleMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
+    throwErrorMarks = throwErrorMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
     fielders = fielders.map((fielder) =>
       fielder.holdingBall && fielder.actionRemainingTicks > 0
         ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
@@ -505,9 +543,11 @@ function* pickoffPlaySteps(
         current.trajectory.isStoppedAt === undefined
           ? tick < current.trajectory.length - 1
           : !current.trajectory.isStoppedAt(tick)
-      if (input.random !== undefined && rollFumble(abilities[current.slot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
+      if (input.random !== undefined && rollFumble(fielderAbilityOf(abilities, current.slot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
         fumbled = true
         ballEventThisTick = true
+        // b4280 — 야수 +0xb8 = 6
+        fumbleMarks = markSlot(fumbleMarks, current.slot, FUMBLE_MARK_TICKS)
         log.push(`${tick}틱 ${current.slot}번 야수 펌블 (0xbc2)`)
       } else {
         chase = null
@@ -534,6 +574,8 @@ function* pickoffPlaySteps(
             ? undefined
             : runners.find((runner) => !runner.state.isOut && wrapBase(runner.state.startBase) === footBase)
         play = { ...play, ballHolderSlot: receiver, catchFielderSlot: receiver, held: true, wantsThrow: true }
+        // 쥐기 0xb2710 의 메시지 0x15 → 경기+0x19ac = 1
+        grabbed = true
         log.push(`${tick}틱 ${receiver}번 야수가 공을 쥐었다`)
         runOutJudgement(tick)
         // b4292 — 발밑 루에 산 주자가 서 있는 포구는 결과 코드 9 (판 결과 칸은 첫 번째만 적지만 메시지는 포구마다 간다)
@@ -682,6 +724,33 @@ function* pickoffPlaySteps(
         throwingSlot: at < 3 ? PITCHER_SLOT : NONE,
         throwBase: flight?.base ?? targetBase,
         previousActions,
+        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac · +0x130 · 공격 주체. 이 판은 레이저(+0x19ad)를 안 옮겼다
+        holderMark: holderMarkOf({
+          grabbed,
+          holderSlot: play.ballHolderSlot,
+          offenseIsCpu: input.offenseIsCpu === true,
+          isShining: false,
+        }),
+        holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
+        fumbleTicks: fumbleMarks,
+        throwErrorTicks: throwErrorMarks,
+        // 공 그리기 0x36dfc 의 튐 파티클 — 0x46c88 이 판 종류를 안 보고 늘 부른다(`ballParticleFactsOf`). 큰 타구 갈래는 판 종류 ∈ {1, 8} 이라 없다.
+        // 공은 송구 · 다시 쏘기 · 폭투가 깐 궤적(세계 0xbfed0)을 판 틱으로 읽는다. 쥔 공 · 쫓는 공이 없는 그림은 안 쏜다.
+        // ⚠️ 미확인: +0xfd4(결과 코드)는 스윙 판정 51308 이 적는 칸이라 주자 판에서는 앞 스윙의 값이 남는다 — 진행기가 몰라 null(거르지 않음)
+        ballParticles:
+          chase === null || play.held
+            ? null
+            : ballParticleFactsOf({
+                ballTick: at - chase.startTick,
+                at,
+                trajectory: chase.trajectory,
+                onTrajectory: true,
+                bigHitWatch: false,
+                playKind: PICKOFF_PLAY_KIND,
+                resultCode: null,
+              }),
+        runnerAceIndexes,
+        runnerAceSprite,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,

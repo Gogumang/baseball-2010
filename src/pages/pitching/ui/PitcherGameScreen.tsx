@@ -9,7 +9,7 @@ import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import type { PitchSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
-import { pitchSlotsFor, pitchersOfRecordOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { hiddenStealBasesOf, pitchSlotsFor, pitchersOfRecordOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
   PitcherGameOptions,
   PitcherGameSummary,
@@ -271,6 +271,15 @@ export function PitcherGameScreen({
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
   /** 공이 날거나 0x12 인 동안 — 원본 상태 0x11 · 0x12 */
   const isPitchSceneBusy = pitchWaitTicks > 0
+  /**
+   * st[0x15 + i] — CPU 가 이번 공에 도루를 출발시킨 주자는 루에 안 그린다(`hiddenStealBasesOf`, 0x520de → 0xa9bd4).
+   * 진행기가 같은 걸음에 다음 공의 0xf 진입까지 돌려도 원본 0xf 진입은 0x12 뒤라 공이 날거나 0x12 인 동안은 숨긴다 —
+   * 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정(`lastResolution`)이 들어온 그림도 그동안으로 친다
+   */
+  const hiddenRunnerBases = hiddenStealBasesOf(
+    progress,
+    isPitchSceneBusy || lastResolutionRef.current !== lastResolution,
+  )
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
@@ -790,6 +799,8 @@ export function PitcherGameScreen({
             ourTeamId: options.ourTeamId,
             opponentTeamId: options.opponentTeamId,
             playerSide: progress.game.playerSide,
+            // st[0x15 + i] — CPU 도루 출발 주자는 0xf 진입 전까지(공이 날거나 0x12 인 동안 포함) 루에 안 그린다
+            hiddenRunnerBases,
           }}
           {...stageBatterOf(progress)}
           pitcherForm={options.repertoire.form}
@@ -937,13 +948,14 @@ const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(tea
 /**
  * 타석에 선 상대 타자의 그림 재료 — 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀(헬멧 · 몸통 벌).
  * 마타자는 XlsACE_BAT_DATA 레코드 +0xb(`aceBatterProfileOf`)의 폼 · 피부, 손은 표 0xd88b0.
- * ⚠️ 미이식: 폼 4~8 이면 몸통 적재 0x78ab0 이 마타자 그림 다섯(폼 − 4)을 싣는다 — 웹 타자 겹은 보통 타자 몸통뿐이다.
+ * 마타자는 순번 0xb63a0 을 타석 교대 0x47dd6 이 몸통 적재 0x78ab0 에 넘겨 `ace/batter_*` 한 장을 싣는다(`aceBatterOrder`).
  */
 function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
   readonly batterForm: number
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
   readonly batterSide?: number
+  readonly aceBatterOrder?: number
 } {
   const batter = opponentBatterOf(progress)
   const teamIndex = progress.options.opponentTeamId
@@ -954,6 +966,7 @@ function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
       batterSkinIndex: (profile >> 2) & 3,
       batterTeamIndex: teamIndex,
       batterSide: batterHandOf(profile, batter.aceIndex),
+      aceBatterOrder: batter.aceIndex,
     }
   }
   const profile = batter.profile ?? 0

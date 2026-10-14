@@ -6,8 +6,7 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
-import { hiddenOpenTextOf } from '@/entities/career/model/equipment'
-import { pitcherHiddenOpenTextOf } from '@/entities/pitcher-career/model/pitcherEquipment'
+import { hiddenOpenNoticeTextOf as hiddenOpenWindowTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -229,19 +228,18 @@ export function rewardNoticeOf(items: readonly EventReward[], eventId: number, c
 
 /**
  * **첫 종류 7 의 창 글** — 0x8c460 이 항목마다 종류 7 이면 0x62368(전역, |값|, 1)을 부른다. 셋째 인자 1 이라 이미 열렸는지
- * (0x61f5c)를 안 보고 **늘** 공용 창을 띄운다(R13 11절). 글은 StrCOMMON[139] "히든 아이템 오픈!! [이름]" + 쓰는 곳 줄
- * (id 13~18 [141] 시즌 · 19~34 [142] 투수편 · 35~50 [143] 타자편, 0x62420~0x62480) — 모드와 상관없이 id 로 갈린다
- * (투수편 장소 이벤트 304 · 305 의 타자 id 도 타자편 글). 글은 상점 알림과 같은 웹 글(`pitcherHiddenOpenTextOf` ·
- * `hiddenOpenTextOf`)을 쓴다.
+ * (0x61f5c)를 안 보고 **늘** 공용 창을 띄운다(R13 11절). 글은 0x62368 원문 마크업 그대로 — k ≥ 13 이면 StrCOMMON[139]
+ * "!C히든 아이템 오픈!!!N[이름]" + "!N!N"(0xd1720 두 번) + 쓰는 곳 줄(13~18 [141] 시즌 · 19~34 [142] 투수편 · 35~50 [143] 타자편,
+ * 0x62420~0x62480), k ≤ 12 는 [140] 마선수 · [138] 히든 팀 한 줄 — 모드와 상관없이 k 로 갈린다(투수편 장소 이벤트 304 · 305 의
+ * 타자 k 도 타자편 글). 공용 알림 창과 같은 글 함수(`hiddenOpenNoticeTextOf`)를 쓴다.
  * 한 명령에 종류 7 이 여럿이면 0x62368 이 같은 창을 차례로 다시 세워 **마지막 것**이 남는다(유력 — 데이터의 종류 7 명령
- * 304 · 305 · 306 · 307 은 모두 한 항목이라 겉으로 갈리지 않는다). 웹이 글을 못 짓는 id 면 null.
+ * 304 · 305 · 306 · 307 은 모두 한 항목이라 겉으로 갈리지 않는다). 웹이 글을 못 짓는 k(51 이상)면 null.
  */
 function hiddenOpenNoticeTextOf(items: readonly EventReward[]): string | null {
   const opened = items.filter((item) => item.kind === HIDDEN_OPEN_KIND)
   const last = opened[opened.length - 1]
   if (last === undefined) return null
-  const id = Math.abs(last.value)
-  return pitcherHiddenOpenTextOf(id) ?? hiddenOpenTextOf(id)
+  return hiddenOpenWindowTextOf(Math.abs(last.value))
 }
 
 /** 알림 글이 읽는 선수 칸 — 나리 타자편 `PlayerCareer` · 투수편 `PitcherCareer` 가 같은 이름으로 든다 */

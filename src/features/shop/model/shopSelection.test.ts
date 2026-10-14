@@ -29,10 +29,10 @@ describe('구매 확인 — StrMODE[79]', () => {
 })
 
 describe('상점 선택 — 0x14a74', () => {
-  it('장착 아이템을 사면 "[이름] 구매 완료" (StrMODE[92])', () => {
+  it('장착 아이템을 사면 곧바로 장착 — 구매 완료 창(StrMODE[92])은 없다 (0x14a74 kind 3 0x14aaa~0x14c8a)', () => {
     const result = selectShopItem(선수({ money: 6000 }), shopItemId('장착', 0, 0), 난수)
 
-    expect(result.notice).toBe('[나이스 헬멧] 구매 완료')
+    expect(result.notice).toBe('')
     expect(result.career.equipmentLevels.hit).toBe(1)
   })
 
@@ -64,15 +64,25 @@ describe('상점 선택 — 0x14a74', () => {
     expect(selectShopItem(선수({ money: 99999 }), shopItemId('장착', 0, 8), 난수).notice).toBe('아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다')
   })
 
-  it('컬렉터가 되면 히든 오픈 알림이 붙는다', () => {
+  it('장비 구매는 구매 완료 창이 없고(0x14a74 kind 3) 새로 연 컬렉터 k 만 낸다 — 공용 창이 확인 창 뒤에 띄운다', () => {
     const 여섯개 = ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5']
     const result = selectShopItem(선수({ money: 999999, popularity: 999, ownedEquipment: 여섯개 }), shopItemId('장착', 0, 6), 난수)
 
-    expect(result.notice).toBe('[하이퍼 헬멧] 구매 완료 · 히든 아이템 오픈!! [검투사 투구] 나만의리그 타자편에서 사용가능합니다')
+    expect(result.notice).toBe('')
+    expect(result.openedHiddenIds).toEqual([36])
+    // 컬렉터가 아니면 창이 하나도 없다
+    const 하나 = selectShopItem(선수({ money: 999999, popularity: 999 }), shopItemId('장착', 0, 0), 난수)
+    expect(하나.notice).toBe('')
+    expect(하나.openedHiddenIds).toEqual([])
+    // 이미 열린 k(0x61f5c)면 0x62368 셋째 인자 0 이라 창이 없다
+    const 열림 = selectShopItem(
+      선수({ money: 999999, popularity: 999, ownedEquipment: 여섯개, openedHiddenIds: [36] }), shopItemId('장착', 0, 6), 난수,
+    )
+    expect(열림.openedHiddenIds).toEqual([])
   })
 
   it('서브 아이템과 GP 아이템도 산다', () => {
-    expect(selectShopItem(선수({ money: 20000 }), shopItemId('서브', 0), 난수).notice).toBe('[표적판] 구매 완료')
+    expect(selectShopItem(선수({ money: 20000 }), shopItemId('서브', 0), 난수).notice).toBe('!C[!cFFFF00표적판!cFFFFFF] 구매 완료')
     const gp = selectShopItem(선수({ gamePoint: 300, morale: 10 }), shopItemId('GP', 6), 난수)
     // 칸 6 은 알림 대신 상세 결과 창 (0x15030) — 알림 글은 비고 창 재료가 나온다
     expect([gp.notice, gp.career.morale, gp.career.gamePoint]).toEqual(['', 50, 0])

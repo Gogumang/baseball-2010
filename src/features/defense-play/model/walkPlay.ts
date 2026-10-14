@@ -1,4 +1,6 @@
 import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import {
   createFielders,
@@ -70,12 +72,21 @@ export interface WalkPlayInput {
   readonly stealingFrom?: readonly StealBase[]
   /** 수비 9명 능력치 (칸 순서) — 야수 송구 속도에만 쓰인다 */
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 루별 주자 주루 (0 = 타자주자). 없으면 `runAbility` */
   readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
   readonly runAbility?: number
   /** 주자 속도에 더하는 팀 등급 (전역 모드 1·2·8 에서만) */
   readonly runnerTeamGrade?: number
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
@@ -165,7 +176,7 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
   const result = runRunnerPlay({
     kind: WALK_PLAY_KIND,
     // vt20(0) — 야수는 시작 자리, 아무도 손에 안 쥠(+0xe0 = 0)
-    fielders: createFielders(abilities),
+    fielders: createFielders(abilities, input.defenseTeamBonus ?? 0),
     play,
     runners,
     abilities,
@@ -175,6 +186,9 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+    runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
     scene: input.scene,
   })
   return { ...result, pitchJudgement: input.pitchJudgement }

@@ -3,8 +3,10 @@ import {
   QUICK_LINEUP_SIZE,
   recordLineupPlay,
   rosterLineupOf,
+  recordSlotAt,
   rosterSlotAt,
   tryQuickCpuPinchHit,
+  withLineupRecordSlot,
 } from '@/entities/game/model/quickLineup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -52,6 +54,8 @@ describe('간이 엔진 명단과 CPU 대타 (0xac228 → 0xaf06c → 0xaebe4 �
     // 들어온 선수의 기록(비어 있다)이 그 칸으로 온다 — 기록은 선수를 따라간다 (aed02~aed16)
     expect(pinch?.lineup.records[0].plateAppearances).toBe(0)
     expect(pinch?.lineup.benchBatters).toBe(2)
+    // 레코드 칸 0xb6394 는 선수 레코드에 붙어 있다 — 0xaebe4 는 명단 칸만 맞바꾼다
+    expect(pinch?.lineup.recordSlots).toEqual([10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11])
   })
 
   it('굴림이 문턱 이상이면 안 바꾼다 — 굴림은 하나만 쓴다', () => {
@@ -103,5 +107,22 @@ describe('오늘 타석 결과 링 — 간이 엔진 타석의 아웃은 늘 5 (
       lineup = recordLineupPlay(lineup, 3, outcome, { quickEngine: true })
     }
     expect(lineup.records[3]?.results).toEqual([2, 7, 8, 4])
+  })
+})
+
+describe('레코드 칸 0xb6394 — 경기 준비 0xb8768 → 0xb603c 의 배열 첨자', () => {
+  it('명단 칸 i 의 선수는 i, 마선수는 타자 쪽 순번 그대로', () => {
+    const lineup = { ...rosterLineupOf(12), recordSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }
+    expect(recordSlotAt(lineup, 9 + 3)).toBe(3)
+    const batter = { hit: 1, power: 1, run: 1, skillIds: [], recordSlot: 9 }
+    expect(withLineupRecordSlot(batter, lineup, 4).recordSlot).toBe(4)
+    const ace = { ...batter, recordSlot: 2, ace: { order: 2, level: 0 } }
+    expect(withLineupRecordSlot(ace, lineup, 4).recordSlot).toBe(2)
+  })
+
+  it('명단이 칸을 안 들면(옛 저장) 타자 쪽 값 그대로', () => {
+    const { recordSlots: _unused, ...old } = rosterLineupOf(12)
+    const batter = { hit: 1, power: 1, run: 1, skillIds: [], recordSlot: 7 }
+    expect(withLineupRecordSlot(batter, old, 4).recordSlot).toBe(7)
   })
 })

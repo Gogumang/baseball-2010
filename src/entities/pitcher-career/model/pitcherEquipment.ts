@@ -98,19 +98,6 @@ export function pitcherHiddenOpenIdOf(part: number, level: number): number {
   return PITCHER_HIDDEN_ID_START + part * HIDDEN_LEVELS_PER_PART + level - FIRST_HIDDEN_LEVEL
 }
 
-const PITCHER_HIDDEN_ID_END = PITCHER_HIDDEN_ID_START + PITCHER_EQUIPMENT_PARTS.length * HIDDEN_LEVELS_PER_PART
-
-/** StrCOMMON[139] "히든 아이템 오픈!! [%s]" + StrCOMMON[142] — 투수 id 가 아니면 null */
-export function pitcherHiddenOpenTextOf(id: number): string | null {
-  if (id < PITCHER_HIDDEN_ID_START || id >= PITCHER_HIDDEN_ID_END) return null
-  const offset = id - PITCHER_HIDDEN_ID_START
-  const item = pitcherEquipmentItemOf(
-    Math.floor(offset / HIDDEN_LEVELS_PER_PART),
-    FIRST_HIDDEN_LEVEL + (offset % HIDDEN_LEVELS_PER_PART),
-  )
-  return `히든 아이템 오픈!! [${item.name}] 나만의리그 투수편에서 사용가능합니다`
-}
-
 /** 보유 표시 — 타자편과 같은 "부위-레벨" 문자열 (`rec[0x188 + 부위·11 + 레벨]`) */
 const keyOf = (part: number, level: number) => `${part}-${level}`
 

@@ -16,7 +16,7 @@ import type {
   HalfInningMound,
   HalfInningResult,
 } from '@/entities/game/model/simulateHalfInning'
-import { rosterLineupOf } from '@/entities/game/model/quickLineup'
+import { renumberedRecordSlotsOf, rosterLineupOf } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
@@ -440,7 +440,8 @@ function aceBatterOf(index: number, levels: Readonly<Record<number, number>> | u
   const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))
   const ability = aceRecordAbilityAtLevel(ace, level)
   // 0xb633c 비트6 — 간이 타석 보정 구조체에 히트·파워가 붙는다 (`quickSwingBoostOf`)
-  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(ace), ace: { order: index, level } }
+  // 레코드 칸 0xb6394 = XlsACE_BAT 행 +0xa (0x40 + 순번) & 0x1f = 순번
+  return { hit: ability.hit, power: ability.power, run: ability.run, skillIds: aceSkillIdsOf(ace), recordSlot: index, ace: { order: index, level } }
 }
 
 /**
@@ -457,7 +458,8 @@ function withAceBatterLineup(lineup: QuickLineup): QuickLineup {
   }
   rosterSlots[ACE_BATTER_ENTRY_SLOT] = ACE_BATTER_ROSTER_SLOT
   records[ACE_BATTER_ENTRY_SLOT] = EMPTY_BATTER_GAME_RECORD
-  return { rosterSlots, records, benchBatters: lineup.benchBatters + 1 }
+  // 0xb8870 이 넣은 뒤 b889a 에서 0xb8768 로 다시 매긴다 — 맨 끝으로 밀린 옛 9번은 그 첨자(12)
+  return { rosterSlots, records, benchBatters: lineup.benchBatters + 1, recordSlots: renumberedRecordSlotsOf(rosterSlots.length) }
 }
 
 /** CPU 끼리 경기 준비 `0xc239c` 의 굴림 다섯 (c2464~c24ea) */

@@ -41,17 +41,18 @@ describe('투수 장비 상점', () => {
       .toBe('아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다')
   })
 
-  it('사면 구매 완료(StrMODE[92]) 알림과 함께 장착된다', () => {
+  it('사면 곧바로 장착된다 — 구매 완료 창(StrMODE[92])은 없다 (0x14a74 kind 3)', () => {
     const { career, notice } = selectPitcherShopItem(투수(), shopItemId('장착', 2, 0), 무작위)
-    expect(notice).toBe('[나이스 아대] 구매 완료')
+    expect(notice).toBe('')
     expect(career.equipmentLevels.breaking).toBe(1)
     expect(career.money).toBe(46_000)
   })
 
-  it('일곱째를 사면 컬렉터 히든 오픈 알림이 붙는다', () => {
+  it('일곱째를 사면 구매 완료 창 없이 컬렉터 k 32 를 낸다 (0x14a74 kind 3 — 공용 창은 부르는 쪽)', () => {
     const 여섯 = 투수({ money: 999_000, ownedEquipment: ['3-0', '3-1', '3-2', '3-3', '3-4', '3-5'] })
-    expect(selectPitcherShopItem(여섯, shopItemId('장착', 3, 6), 무작위).notice)
-      .toBe('[하이퍼 신발] 구매 완료 · 히든 아이템 오픈!! [선장의 신발] 나만의리그 투수편에서 사용가능합니다')
+    const result = selectPitcherShopItem(여섯, shopItemId('장착', 3, 6), 무작위)
+    expect(result.notice).toBe('')
+    expect(result.openedHiddenIds).toEqual([32])
   })
 })
 
@@ -81,7 +82,7 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
     expect(pitcherPurchaseQuestionOf(투수(), shopItemId('서브', 1)))
       .toBe('!C!cFFFF00소지금 2억!cFFFFFF이 소모됩니다!N구매하겠습니까?')
     const { career, notice } = selectPitcherShopItem(투수(), shopItemId('서브', 1), 무작위)
-    expect(notice).toBe('[1톤 바벨] 구매 완료')
+    expect(notice).toBe('!C[!cFFFF001톤 바벨!cFFFFFF] 구매 완료')
     expect(career.money).toBe(30_000)
     expect(career.subItemIds).toEqual([1])
   })

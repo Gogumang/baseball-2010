@@ -1,4 +1,7 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { FUMBLE_MARK_TICKS } from '@/features/defense-play/model/playerEffects'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { battedBallTrajectory, BATTING_POINT } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
@@ -81,6 +84,11 @@ export interface PassedBallPlayInput {
   /** `passedBallStrikeoutOf` 가 `'batterRuns'` 면 참 — 타자주자를 맨 앞에 만든다 (state[0x1a]) */
   readonly batterRuns?: boolean
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 주자 주루 능력치 — 루별(0 = 낫아웃 타자주자) */
   readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -93,6 +101,10 @@ export interface PassedBallPlayInput {
   readonly offenseIsCpu?: boolean
   readonly runningMode?: ManualAutoMode
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
@@ -143,7 +155,7 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
   })
 
   // ── 0xb284a: 예보(vt24, 추적야수 = 포수라 t ≤ 4 동안 포수를 건너뜀) → 고르기(vt34) ──
-  const startFielders = createFielders(abilities)
+  const startFielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
   const forecast = forecastCatch(trajectory, startFielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
     initialChaserSlot: CATCHER_SLOT,
   })
@@ -189,6 +201,11 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+    runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
+    // 0x3e062(0x3e08c~0x3e092) — 판정이 포수 +0xb8 = 6 을 적고 0x17 로 간다(첫 그림 앞 야수 틱이 5 로 줄인다)
+    fumbleMarks: Array.from({ length: abilities.length }, (_, slot) => (slot === CATCHER_SLOT ? FUMBLE_MARK_TICKS : 0)),
     scene: input.scene,
     controls: input.controls,
   }

@@ -18,6 +18,7 @@ import type {
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
+import { runInCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import {
   EMPTY_HOME_RUN_SCORE_BOARD, closesDefenseScene, drawRunScoreBoardScene, isHomeRunHitCode, runScoreBoardHiddenScoresOf,
@@ -28,6 +29,8 @@ import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { RunScoreBoard } from '@/pages/defense/ui/RunScoreBoard'
 import { createParticleScene, type ParticleScene } from '@/entities/particle/model/particleScene'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import {
@@ -44,7 +47,11 @@ import {
   type DefenseSceneMemory,
 } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { DefenseDistanceBoard, DefenseHomeRunText, DefenseParticles } from '@/pages/defense/ui/DefenseEffectsLayer'
+import { ballParticleShotsOf, type BallParticleShot } from '@/pages/defense/lib/ballParticles'
+import { cameraBoundsOf, centerOn, screenOffsetOf } from '@/pages/defense/lib/defenseCamera'
+import * as screenStyles from '@/pages/defense/ui/DefenseScreen.css'
 import {
+  liveRunnerPlayRandomOf,
   startLiveRunnerPlay,
   type LiveRunnerPlay,
   type LiveRunnerStepper,
@@ -190,6 +197,77 @@ export function DefensePlayback({
   )
 }
 
+/**
+ * 이 그림의 공 그리기 0x36dfc 가 쏠 파티클 (`lib/ballParticles`) — 화면 좌표는 카메라 오프셋을 더한 것이다.
+ * 원본 카메라는 그 그림의 0x3f060(목록 틱, 플레이 틱 앞)이 옮긴 자리다. 웹 화면은 갱신마다 앞 그림의 대상으로 카메라를 옮긴 뒤
+ * 그리므로 **이 갱신에 화면이 적은 오프셋**이 같은 자리다. 첫 그림(아직 안 그림)은 화면 진입의 가운데 맞춤(공 (x, z))과 같다.
+ * ⚠️ 한 갱신에 여러 틱을 따라잡으면 그 틱들은 같은 오프셋으로 쏜다(근사).
+ */
+function ballShotsAt(
+  drawn: DefenseViewState | undefined,
+  cameraOffset: { readonly x: number; readonly y: number } | null,
+): readonly BallParticleShot[] {
+  if (drawn === undefined) return []
+  const offset =
+    cameraOffset ??
+    screenOffsetOf(
+      centerOn(
+        cameraBoundsOf(screenStyles.SCREEN_WIDTH, screenStyles.SCREEN_HEIGHT),
+        drawn.cameraTarget ?? { x: drawn.ball.x, z: drawn.ball.z },
+      ),
+    )
+  return ballParticleShotsOf(drawn, offset)
+}
+
+/**
+ * **주자 판 · 재생 갈래의 공 그리기 파티클** — 0x17 진입 0x46418 이 파티클 관리자를 비우고(4673e 0x6dee4), 그림마다 0x46c88 이 공 그리기
+ * 0x36dfc(판 종류를 안 본다 — `features/defense-play/model/ballParticleFacts`)로 튐 파티클을 쏘고 프레임 끝 0x6de84 가 굴린다.
+ * 판이 닫힌 뒤 그림(+0x1094 셈)도 마지막 그림의 공을 그대로 그린다. 0x35108(끝) · 키 건너뛰기 0x519cc 가 치운다.
+ * 주자 판에는 홈런 연출(글자 · 효과)이 없어 연출 칸은 빈 장면에서 시작한다.
+ */
+interface BallParticleRun {
+  readonly scene: ParticleScene
+  effects: DefenseEffects
+  version: number
+  cleared: boolean
+}
+
+function startBallParticleRun(): BallParticleRun {
+  return { scene: createParticleScene(), effects: defenseEffectsOf(DEFENSE_SCENE_START), version: 0, cleared: false }
+}
+
+/** 그림 하나 — 공 그리기의 파티클을 쏘고 프레임 끝 파티클 틱을 돌린다 */
+function drawBallParticles(
+  run: BallParticleRun,
+  drawn: DefenseViewState | undefined,
+  cameraOffset: { readonly x: number; readonly y: number } | null,
+  random: RandomPort,
+): void {
+  if (run.cleared) return
+  const frame = stepDefenseEffects(
+    run.effects,
+    null,
+    { particles: run.scene, random, configOf: particleConfigOf },
+    ballShotsAt(drawn, cameraOffset),
+  )
+  run.effects = frame.effects
+  run.version += 1
+}
+
+/** 0x35108 · 0x519cc — 파티클을 치운다 */
+function clearBallParticles(run: BallParticleRun): void {
+  if (run.cleared) return
+  run.effects = endDefenseEffects(run.effects, run.scene)
+  run.cleared = true
+  run.version += 1
+}
+
+/**
+ * 미리 돌린 재생 갈래의 파티클 굴림 — ⚠️ 근사: 원본은 경기 난수로 판 틱 굴림 사이사이에 굴리지만, 이 갈래의 판은 이미 다 돌았고
+ * 경기 흐름도 그 뒤 굴림을 먼저 써 버렸다. 경기 난수를 건드리지 않게 그림 전용 난수로 굴린다
+ */
+const RECORDED_PARTICLE_SEED = 0x36dfc
+
 interface RecordedPlaybackProps {
   readonly ticks: readonly DefenseViewState[]
   readonly onDone: (result?: DefensePlayResult) => void
@@ -219,11 +297,24 @@ interface RecordedBoardTally {
   /** 마지막 그리기에서 판이 섰나 · 공격 쪽에서 뺄 점수 */
   readonly visible: boolean
   readonly hidden: number
+  /** 이 갱신에 보낸 메시지 0x13 의 주자 칸들 — 0x51fb8 머리의 함성(`runInCheerSoundIdOf`)을 고른다 */
+  readonly runIns: readonly number[]
 }
 
 const EMPTY_RECORDED_TALLY: RecordedBoardTally = {
   nextIndex: 0, leftHome: new Set(), scored: new Set(), runs: 0, board: EMPTY_HOME_RUN_SCORE_BOARD, closedCount: 0,
-  ended: false, visible: false, hidden: 0,
+  ended: false, visible: false, hidden: 0, runIns: [],
+}
+
+/**
+ * 재생 갱신 하나가 보낸 메시지 0x13 들의 함성 — 0x51fb8 머리 51fb8~51fdc (홈런성이 아니면 60, 홈런성이면 주자 칸 0 일 때만 30).
+ * 갱신을 한 번씩만 지나는 셈(ref) 안에서 부르므로 한 번씩만 난다
+ */
+function playRunInCheers(tally: RecordedBoardTally, homeRunHit: boolean): void {
+  for (const slot of tally.runIns) {
+    const cheer = runInCheerSoundIdOf(slot, homeRunHit)
+    if (cheer !== null) activeSound().play(cheer)
+  }
 }
 
 /**
@@ -237,11 +328,12 @@ function stepRecordedBoard(
   const leftHome = new Set(tally.leftHome)
   const scored = new Set(tally.scored)
   let { runs, board, closedCount } = tally
+  const runIns: number[] = []
   if (isClosed) {
     closedCount += 1
     // 52a1c — 홈런 판이 서 있는 동안은 안 닫는다
     if (closesDefenseScene(closedCount, isHomeRun, board)) {
-      return { ...tally, nextIndex: tally.nextIndex + 1, closedCount, ended: true, visible: false, hidden: 0 }
+      return { ...tally, nextIndex: tally.nextIndex + 1, closedCount, ended: true, visible: false, hidden: 0, runIns }
     }
   } else {
     for (const runner of view.runners) {
@@ -253,13 +345,14 @@ function stepRecordedBoard(
       if (!leftHome.has(runner.index)) continue
       scored.add(runner.index)
       runs += 1
+      runIns.push(runner.index)
       board = runScoreBoardRunIn(board, runner.index, isHomeRun, false)
     }
   }
   const drawn = drawRunScoreBoardScene(board, isHomeRun)
   return {
     nextIndex: tally.nextIndex + 1, leftHome, scored, runs, board: drawn.next, closedCount, ended: false,
-    visible: drawn.visible, hidden: drawn.hidden,
+    visible: drawn.visible, hidden: drawn.hidden, runIns,
   }
 }
 
@@ -298,6 +391,14 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [freePassPlay, ticks])
+  const particlesRef = useRef<{ readonly ticks: readonly DefenseViewState[]; readonly run: BallParticleRun; readonly random: RandomPort } | null>(
+    null,
+  )
+  if (particlesRef.current === null || particlesRef.current.ticks !== ticks) {
+    particlesRef.current = { ticks, run: startBallParticleRun(), random: createSeededRandom(RECORDED_PARTICLE_SEED) }
+  }
+  const particles = particlesRef.current
+  const cameraOffsetRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
   const holder = tallyRef.current
   while (ticks.length > 0 && !holder.tally.ended && holder.tally.nextIndex <= update) {
     const at = holder.tally.nextIndex
@@ -305,8 +406,12 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     if (view === undefined) break
     // G2 만 닫힌 그림(`closingListFrame`)은 그려지지만 슬롯 2 는 529f0 — 닫힌 셈(+0x1094)의 첫 갱신이다
     holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex || view.closingListFrame === true)
+    playRunInCheers(holder.tally, isHomeRun)
+    // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 파티클 · 프레임 끝 파티클 틱. 0x35108 로 끝난 갱신은 안 그린다
+    if (!holder.tally.ended) drawBallParticles(particles.run, view, cameraOffsetRef.current, particles.random)
   }
   const isFinished = ticks.length === 0 || holder.tally.ended || skipped
+  if (isFinished) clearBallParticles(particles.run)
 
   useEffect(() => {
     if (isFinished) onDone()
@@ -326,8 +431,9 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     board = runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, holder.tally.hidden)
   }
   return (
-    <DefenseScreen state={state} grassPalette={grassPalette}>
+    <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef}>
       {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
+      <DefenseParticles scene={particles.run.scene} version={particles.run.version} />
       {children}
     </DefenseScreen>
   )
@@ -356,9 +462,14 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
   }
   const pressesRef = useRef<DefenseKeyPress[]>([])
   const tallyRef = useRef<{ readonly play: LiveRunnerPlay; tally: RecordedBoardTally } | null>(null)
+  const particlesRef = useRef<{ readonly play: LiveRunnerPlay; readonly run: BallParticleRun } | null>(null)
+  const cameraOffsetRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
   if (tallyRef.current === null || tallyRef.current.play !== play) {
     tallyRef.current = { play, tally: EMPTY_RECORDED_TALLY }
     pressesRef.current = []
+  }
+  if (particlesRef.current === null || particlesRef.current.play !== play) {
+    particlesRef.current = { play, run: startBallParticleRun() }
   }
 
   useEffect(() => {
@@ -383,6 +494,8 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
   const lastIndex = Math.max(0, ticks.length - 1)
   // 판 동안은 그려진 틱까지, 닫힌 뒤로는 닫힌 갱신(+0x1094)을 센다
   const holder = tallyRef.current
+  const particles = particlesRef.current
+  const random = liveRunnerPlayRandomOf(play)
   const seen = update - startedAt
   while (ticks.length > 0 && !holder.tally.ended && holder.tally.nextIndex <= seen) {
     const at = holder.tally.nextIndex
@@ -390,8 +503,15 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     const view = ticks[Math.min(at, lastIndex)]
     if (view === undefined) break
     holder.tally = stepRecordedBoard(holder.tally, view, false, at > lastIndex || view.closingListFrame === true)
+    // 주자 판(도루 · 폭투 · 견제)은 타구가 없어 점수판과 같이 0x357e0 을 거짓으로 본다 — 홈인마다 60
+    // ⚠️ 미확인: 원본 [경기+0xfd4] 가 투구마다 지워지는지는 안 읽었다(점수판 갈래와 같은 가정)
+    playRunInCheers(holder.tally, false)
+    // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 튐 파티클 · 프레임 끝 파티클 틱(경기 난수 — 그 틱 진행기 굴림 뒤).
+    // 0x35108 로 끝난 갱신은 안 그린다. ⚠️ 판 틱을 미리 몇 틱 앞서 돌린 갱신(따라잡기)은 굴림 차례가 그 틱들 뒤로 몰린다(근사)
+    if (!holder.tally.ended && random !== undefined) drawBallParticles(particles.run, view, cameraOffsetRef.current, random)
   }
   const isFinished = stepper.finished && holder.tally.ended
+  if (isFinished) clearBallParticles(particles.run)
 
   useEffect(() => {
     if (isFinished) onDone(stepper.result())
@@ -411,8 +531,9 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     board = runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, holder.tally.hidden)
   }
   return (
-    <DefenseScreen state={state} grassPalette={grassPalette}>
+    <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef}>
       {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
+      <DefenseParticles scene={particles.run.scene} version={particles.run.version} />
       {children}
     </DefenseScreen>
   )
@@ -486,6 +607,8 @@ function LivePlayback({
   const particlesRef = useRef<ParticleScene>(createParticleScene())
   /** 마지막으로 돈 갱신 — 판이 닫힌 뒤 건너뛴 갱신을 따라잡는다 */
   const closedUpdateRef = useRef<number | null>(null)
+  /** 화면(`DefenseScreen`)이 마지막으로 그린 카메라 오프셋 (+0xfec, +0xff0) — 공 그리기 파티클의 화면 좌표 */
+  const cameraOffsetRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
   const [effectsView, setEffectsView] = useState<{
     readonly text: HomeRunTextFrame | null
     readonly distanceBoard: number | null
@@ -519,6 +642,7 @@ function LivePlayback({
       particlesRef.current = createParticleScene()
       closedUpdateRef.current = null
       closingFrameRef.current = null
+      cameraOffsetRef.current = null
       setEnded(false)
       setClosed(false)
       setView(null)
@@ -541,6 +665,10 @@ function LivePlayback({
       ]
       return { scores: runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, drawn.hidden) }
     }
+
+    /** 이 그림의 공 그리기 0x36dfc 가 쏠 파티클 (`ballShotsAt`) */
+    const ballShotsOf = (drawn: DefenseViewState | undefined): readonly BallParticleShot[] =>
+      ballShotsAt(drawn, cameraOffsetRef.current)
 
     // 한 갱신 = 한 틱. 프레임을 건너뛴 만큼은 따라잡는다
     const wanted = Math.floor((update - startedAtRef.current) / UPDATES_PER_TICK) + 1
@@ -565,8 +693,13 @@ function LivePlayback({
         effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
         boardRef.current = { ...boardRef.current, active: false }
       }
-      // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래
+      // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래.
+      // 그 머리 51fb8~51fdc 가 먼저 함성을 예약한다 — 홈런성이 아니면 60, 홈런성이면 주자 칸 0 일 때만 30(+0xfe7 은 안 본다).
+      // 예약 0x6e498 은 울리던 소리를 끊는 한 칸이라 통로 하나 `play` 와 같다(`soundPort` 머리 주석).
+      // ⚠️ 미확인: 같은 그림의 슬라이딩 10(0x5268c) · 펌블 29(그리기 0x4381a)와의 앞뒤 — 웹은 득점 함성을 먼저 낸다
       for (const slot of running.runInsThisTick) {
+        const cheer = runInCheerSoundIdOf(slot, homeRunHit)
+        if (cheer !== null) activeSound().play(cheer)
         boardRef.current = runScoreBoardRunIn(boardRef.current, slot, homeRunHit, running.fastForward)
       }
       if (running.fastForward) {
@@ -575,7 +708,7 @@ function LivePlayback({
         skippedNow = true
       } else {
         // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
-        effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts)
+        effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts, ballShotsOf(running.ticks[running.ticks.length - 1]))
         effectsRef.current = effectsFrame.effects
         // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
         board = drawBoard(running.held.scoreboardRuns)
@@ -626,7 +759,8 @@ function LivePlayback({
           endsNow = true
           break
         }
-        effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts)
+        // 닫힌 뒤 그림도 공을 그린다 — 마지막 그림의 공 · 조건 그대로(카메라는 서 있다)
+        effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts, ballShotsOf(running.ticks[running.ticks.length - 1]))
         effectsRef.current = effectsFrame.effects
         board = drawBoard(running.held.scoreboardRuns)
       }
@@ -673,6 +807,7 @@ function LivePlayback({
     <DefenseScreen
       state={closed ? frozenCamera(view) : view}
       grassPalette={grassPalette}
+      cameraOffsetRef={cameraOffsetRef}
       underActors={
         effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined
       }

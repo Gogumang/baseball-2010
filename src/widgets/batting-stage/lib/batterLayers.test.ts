@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { aceBatterLayersOf, batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
@@ -8,14 +8,15 @@ describe('타자 자세 프레임 f — 0xb905c', () => {
     expect([0, 3, 4, 8, 12, 15, 16].map((tick) => batterFrameAt({ tick, swingTick: null, isBunting: false, bodyType: 0 }))).toEqual([0, 0, 1, 2, 3, 3, 0])
   })
 
-  it('스윙은 6~12 를 매 틱 한 칸씩, 끝나면 대기로 돌아간다', () => {
+  it('스윙은 6~12 를 매 틱 한 칸씩, 끝나면 마지막 칸 12 에 머문다 (0xb9168 은 k = 칸 수 − 1 에 서고 0xb928c 의 되돌림은 안 선다)', () => {
     const 스윙 = (tick: number) => batterFrameAt({ tick, swingTick: 100, isBunting: false, bodyType: 0 })
-    expect([100, 101, 106, 107].map(스윙)).toEqual([6, 7, 12, 2])
+    expect([100, 101, 106, 107, 140].map(스윙)).toEqual([6, 7, 12, 12, 12])
   })
 
   it('sluger 는 대기 [0..4], 스윙 7~11 이다', () => {
     expect(batterFrameAt({ tick: 16, swingTick: null, isBunting: false, bodyType: 1 })).toBe(4)
     expect(batterFrameAt({ tick: 104, swingTick: 100, isBunting: false, bodyType: 1 })).toBe(11)
+    expect(batterFrameAt({ tick: 130, swingTick: 100, isBunting: false, bodyType: 1 })).toBe(11)
   })
 
   it('번트 자세는 balancer 13 · sluger 12', () => {
@@ -199,5 +200,42 @@ describe('투수 장비 레이어 — 0x79790 적재 · 0x79524 여섯 칸', () 
     expect(pitcherEquipmentOf({ control: 3, velocity: 1, breaking: 0, stamina: 11 })).toEqual({
       head: 2, hand: 0, body: -1, leg: 10,
     })
+  })
+})
+
+describe('마타자 그림 — 적재 0x78ab0 (표 0xd3adc) · 자세 0xb905c 의 u ≤ 4 갈래', () => {
+  const 프레임 = (aceOrder: number, tick: number, swingTick: number | null = null, isBunting = false) =>
+    batterFrameAt({ tick, swingTick, isBunting, bodyType: 1, aceOrder })
+
+  it('순번 0~4 = medica · kao · roze · death · tiger 한 장, 프레임 f 그대로 (0x78cfc 78d26~78d90)', () => {
+    expect(파일(aceBatterLayersOf(3, 0))).toEqual(['batter_medica:3'])
+    expect(aceBatterLayersOf(3, 0).map((layer) => layer.folder)).toEqual(['./sprites/batter_medica/frames'])
+    expect(aceBatterLayersOf(7, 4)).toEqual([{ folder: './sprites/batter_tiger/frames', frame: 7 }])
+    expect(aceBatterLayersOf(0, 5)).toEqual([])
+  })
+
+  it('대기 — 메디카는 [0,1,2,1,3], 나머지는 [0,1,2,3] 을 칸마다 4틱 (0xd8b0d · 0xd8ad3)', () => {
+    expect([0, 4, 8, 12, 16, 20].map((tick) => 프레임(0, tick))).toEqual([0, 1, 2, 1, 3, 0])
+    expect([0, 4, 8, 12, 16].map((tick) => 프레임(2, tick))).toEqual([0, 1, 2, 3, 0])
+  })
+
+  it('스윙 — 6 + 0xd8b32[9u + k], 칸 수 0xd8ac5 = [8,9,7,7,7]', () => {
+    expect(Array.from({ length: 8 }, (_, k) => 프레임(0, 100 + k, 100))).toEqual([6, 7, 8, 9, 10, 11, 11, 11])
+    expect(Array.from({ length: 9 }, (_, k) => 프레임(1, 100 + k, 100))).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14])
+    expect(Array.from({ length: 7 }, (_, k) => 프레임(3, 100 + k, 100))).toEqual([6, 7, 8, 9, 10, 11, 11])
+  })
+
+  it('스윙 끝 — 마지막 칸에 머문다 (0xb9168 상태 3 은 돌지 않고, 0xb928c 의 k == 칸 수 되돌림은 안 선다 · 0xf 의 0xb9318 까지)', () => {
+    expect([108, 120, 400].map((tick) => 프레임(1, tick, 100))).toEqual([14, 14, 14])
+    expect([107, 150].map((tick) => 프레임(0, tick, 100))).toEqual([11, 11])
+    expect(프레임(4, 130, 100)).toBe(12)
+  })
+
+  it('번트 — 마타자 갈래가 없어 v = 폼 4~8 이 `cmp v,#3 ; bgt` 로 0 (원본 그대로)', () => {
+    expect(프레임(4, 5, null, true)).toBe(0)
+  })
+
+  it('순번이 없거나 음수면 일반 타자 자세표', () => {
+    expect(batterFrameAt({ tick: 0, swingTick: null, isBunting: true, bodyType: 1, aceOrder: -1 })).toBe(12)
   })
 })

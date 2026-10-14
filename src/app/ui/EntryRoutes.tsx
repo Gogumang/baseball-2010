@@ -193,7 +193,7 @@ export function EntryRoutes({
   }
 
   if (screen.kind === '타이틀') {
-    return <TitleScreen onStart={() => setScreen({ kind: '메인메뉴' })} />
+    return <TitleScreen onStart={() => setScreen({ kind: '메인메뉴', isFromTitle: true })} />
   }
 
   if (screen.kind === '도움말') {
@@ -383,6 +383,8 @@ export function EntryRoutes({
       // 장면 0x103 생성자 0x234d4 의 [0x140006c] — 관리 메뉴 취소(5)면 게임시작 목록으로 바로 연다
       {...(screen.kind === '메인메뉴' && screen.openTier !== undefined ? { openTier: screen.openTier } : {})}
       {...(screen.kind === '메인메뉴' && screen.isBandGrown === true ? { isBandGrown: true } : {})}
+      // 머리띠 미끄러짐 [skin+0x84] — 타이틀 갱신 0x245f8 에서 왔을 때만
+      {...(screen.kind === '메인메뉴' && screen.isFromTitle === true ? { headerSlides: true } : {})}
       {...(gameStartCursor === undefined ? {} : { gameStartCursor })}
       topMenuCursor={topMenuCursor}
       hasSavedGame={session.savedCareer !== null}

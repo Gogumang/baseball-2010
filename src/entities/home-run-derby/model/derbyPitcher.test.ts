@@ -76,3 +76,17 @@ describe('홈런더비 상대 투수 (S13 5절 확정)', () => {
     expect(derbyPitcherOf(2, undefined, 3).name).toBe('붕붕머신')
   })
 })
+
+describe('홈런더비 마운드 장비 니블 — 타석 교대 0x47cc8 의 48138~4816a', () => {
+  it('단계 0 은 상대 팀 마스터 줄 2 의 니블 — v = rand(0, 9) 라 리그 열 팀이고 늘 0', () => {
+    for (let team = 0; team <= 9; team += 1) {
+      expect(derbyPitcherOf(0, undefined, team).equipment).toEqual(teamPitchers(team)[DERBY_ORDINARY_PITCHER_ROW]!.equipment)
+      expect(derbyPitcherOf(0, undefined, team).equipment).toEqual([0, 0, 0, 0])
+    }
+  })
+
+  it('마투수 단계 · 상대 팀을 모를 때는 니블이 없다', () => {
+    expect(derbyPitcherOf(1).equipment).toBeUndefined()
+    expect(derbyPitcherOf(0).equipment).toBeUndefined()
+  })
+})

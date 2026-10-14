@@ -605,6 +605,17 @@ export function useMissionSession({
     stealingFromRef.current = []
     return taken
   }
+  /**
+   * **투수 미션: CPU 가 이번 공에 출발시킨 주자의 루** — 같은 칸 st[0x14 + 루](0x520de → 0xa9bd4)의 화면 표시.
+   * 지우는 곳은 타자 미션과 같다(0xf 진입 3d966~3d976 · 타구 판 시작 0x3d7b8). 다만 투수 미션은 같은 타석 다음 공의 0xf 진입
+   * (`askPitchSelection`)을 결과 0x12 를 기다리지 않고 공을 먹인 걸음에 바로 묻는다 — 그래서 0xf 진입은 `selectionEntered`
+   * 로만 적고, 화면이 아직 공이 날거나 0x12 인 동안(`PitchingScreen` 의 `isPitchSceneBusy`)은 계속 숨긴다.
+   * 새 타석이면 0xf 진입이 0xe 의 OK 뒤라 그때까지 숨긴다. 판정 입력은 이 칸이 아니라 공마다의 지역 값이다.
+   */
+  const [pitcherStealDisplay, setPitcherStealDisplay] = useState<{
+    readonly bases: readonly StealBase[]
+    readonly selectionEntered: boolean
+  } | null>(null)
   /** 표시 칸 st[0x15 + i] 를 지운다 — 0xf 진입 0x3d954 · 타구 판 시작 0x3d7b8(종류 1) */
   const clearStealDisplay = () => {
     stealingFromRef.current = []
@@ -755,14 +766,30 @@ export function useMissionSession({
       ...(aceBatterRun === undefined ? {} : { aceBatterRun }),
     }
   }
-  /** 수비 판에 먹이는 수비 아홉 칸 · 루별 주루 — 미션 타구 · 공 도착 · 견제 판이 같은 값을 쓴다 (`missionPlayAbilitiesOf`) */
-  const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities =>
-    missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission))
+  /** 투수 미션의 미션 투수 이름 판(0x43cb0 칸 0) — 판을 먹이는 콜백들이 늘 지금 값을 보게 ref 로 든다 */
+  const missionPitcherPlateRef = useRef<ModePitcher['plate']>(undefined)
+  missionPitcherPlateRef.current = pitcher.plate
+  /**
+   * 수비 판에 먹이는 수비 아홉 칸 · 루별 주루 — 미션 타구 · 공 도착 · 견제 판이 같은 값을 쓴다 (`missionPlayAbilitiesOf`).
+   * 그림 전용 이름 판(0x43cb0) · 마선수 주자(0x79d10)도 함께 싣는다 (`missionFielderPlatesOf` · `missionRunnerAcesOf`)
+   */
+  const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities => {
+    const missionPitcher = missionPitcherPlateRef.current
+    return missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission), {
+      ...run,
+      ...(missionPitcher === undefined ? {} : { missionPitcher }),
+    })
+  }
+  /** 공 도착 판에 얹는 그림 전용 두 칸 (능력치 칸은 부르는 쪽이 따로 넣는다) */
+  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces }: MissionPlayAbilities) => ({
+    ...(fielderPlates === undefined ? {} : { fielderPlates }),
+    ...(runnerAces === undefined ? {} : { runnerAces }),
+  })
   /** 견제 판 꼴 — 견제는 타자주자가 없어 루 1~3 만 */
   const pickoffAbilitiesOf = (run: MissionRun) => {
-    const { defenseAbilities, runAbilities } = playAbilitiesOf(run)
+    const { runAbilities, ...rest } = playAbilitiesOf(run)
     const { 0: _batter, ...onBase } = runAbilities
-    return { defenseAbilities, runAbilities: onBase }
+    return { ...rest, runAbilities: onBase }
   }
   /** 결과를 확인하고 돌아갈 때 마지막으로 한 편의 목록을 연다 */
   const [lastSide, setLastSide] = useState<OriginalMission['side']>('타자')
@@ -806,6 +833,9 @@ export function useMissionSession({
   const askPitchSelection = (kind: 'new' | 'same') => {
     // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e · 3da70)보다 앞이다
     clearStealDisplay()
+    setPitcherStealDisplay((previous) =>
+      previous === null || previous.selectionEntered ? previous : { ...previous, selectionEntered: true },
+    )
     const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
     const run = isPitcherSide ? pitcherRun : missionRun
     if (run === null || run.status !== '진행중') return
@@ -1272,6 +1302,10 @@ export function useMissionSession({
       { bases: pitcherRun.bases, offenseIsCpu: true, runAbilityOf: (base) => pitcherRunAbilities[base] ?? 0 },
       random,
     )
+    // 0xa9bd4 가 세운 st[0x14 + 루] 는 화면 표시 칸이기도 하다 — 0x35b94 가 그 루 주자를 안 그린다(`pitcherStealDisplay`).
+    // 때: 원본은 0x11 의 틱 10(0x537dc `[+0x18] == 10` → 0x583)에 출발한다 — 공을 놓는 틱(0x4e060 `[+0x2c] > 9`)과 같은 그림이라
+    // 공을 던지는 이 걸음(게이지가 틱 10 에 부른다)이 곧 그 틱이다
+    setPitcherStealDisplay(stealingFrom.length === 0 ? null : { bases: stealingFrom, selectionEntered: false })
     // 원본 0x34334 가 보는 상황 — state 의 볼카운트·아웃과 주자 유무(0xa9599)
     const thrown = pitchAgainstBatterDetailed(
       pitch,
@@ -1338,6 +1372,8 @@ export function useMissionSession({
             runAbilities: pitcherRunAbilities,
             // 아홉 칸 수비 — 사람 칸 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)
             defenseAbilities: missionDefenseAbilitiesOf(pitcherRun),
+            // 그림 전용 — 공 가진 야수 이름 판(0x43cb0, 칸 0 = 미션 투수) · CPU 마타자 주자 그림(0x79d10)
+            ...pitchArrivalPlatesOf(playAbilitiesOf(pitcherRun)),
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: throwModeManual === false ? '자동' : '수동',
@@ -1389,6 +1425,8 @@ export function useMissionSession({
     // 판이 파울로 닫히면 `finishDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로, 잡히면 판 끝 정산(뜬공 아웃)이다
     if (foulContact !== undefined) {
       const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, foulContact)
+      // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
+      setPitcherStealDisplay(null)
       setPendingDefensePlay({
         side: '투수',
         input: {
@@ -1417,6 +1455,8 @@ export function useMissionSession({
     }
 
     if (runsDefense && outcome !== null) {
+      // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
+      setPitcherStealDisplay(null)
       // 수비 화면(0x17)이 돈다 — 실점·피안타·이닝 목표는 다 돌고 난 뒤에 센다
       setPendingDefensePlay({
         side: '투수',
@@ -1728,6 +1768,7 @@ export function useMissionSession({
     setPendingBenchClearing(null)
     stealingFromRef.current = []
     setStealingFrom([])
+    setPitcherStealDisplay(null)
     // 경기 장면 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번.
     // 미션(모드 5·6)도 보통 경기 장면이라 모드 점프 뒤 이 꼬리를 탄다 — 1회초 판·첫 타석 준비보다 앞.
     // 그 앞 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 이 이 장면의 패턴 덱을 섞는다(사람 · CPU 타자가 같이 쓴다).
@@ -1855,6 +1896,7 @@ export function useMissionSession({
       setPendingBenchClearing(null)
       stealingFromRef.current = []
       setStealingFrom([])
+      setPitcherStealDisplay(null)
       dropAutoRelay()
       // 마선수 대결도 미션 장면(모드 6)으로 나간다 — 상태 7 진입 0x39f88 의 로딩 팁 rand(0, 73) · 장면 덱(0x3e340 → 0xb08e8) ·
       // 0x3fa0e 의 rand(0, 2) 한 번 (`resetForNewMatch` 와 같다)
@@ -2185,6 +2227,11 @@ export function useMissionSession({
     batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
     /** 타자 미션: 이번 공에 출발한 주자의 루 (st[0x14 + 루]) — 타석 화면이 그 주자를 루에 안 그린다 */
     stealingFrom,
+    /**
+     * 투수 미션: CPU 가 이번 공에 출발시킨 주자의 루 (st[0x14 + 루]) — 투구 화면이 그 주자를 루에 안 그린다.
+     * `selectionEntered` 면 0xf 진입이 이미 지웠다 — 화면은 공이 날거나 0x12 인 동안만 숨긴다 (위 상태 주석)
+     */
+    pitcherStealDisplay,
     /**
      * 타자 미션 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74 `0xb570d(ctx, 3, 주자, 1, 90, 1)`).
      * 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로다 (`missionRunnerRunAbilitiesOf`)

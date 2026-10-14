@@ -4,6 +4,7 @@ import {
   applyPlayerOutcome,
   cpuPickoff,
   opponentPitcherAbilityOf,
+  opponentPitcherEquipmentOf,
   resolveDefensePlay,
   startGame,
   mySpecialSwingRemainingOf,
@@ -13,6 +14,7 @@ import {
   startPlayerOutcome,
   startSteal,
   arrivePitch,
+  hiddenStealBasesOf,
   summaryOf,
   resolveBenchClearing,
   throwOpponentPitch,
@@ -24,6 +26,7 @@ import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/mod
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -316,9 +319,9 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
   it('2아웃 땅볼에 보류된 3루 주자 득점은 타자주자가 셋째 아웃이 되면 무효가 된다 (0xaa1c0 · 0xaa388)', () => {
     // 원본 코드 4 — 투수가 잡아 CPU 송구로 1루에 던지고, 18틱 그림의 플레이 틱에서 타자주자가 1루 포스(0xb36d0 결과 2)로 셋째
     // 아웃이 된다. 3루 주자는 그 그림의 목록 틱에 홈에 닿아, 플레이 틱 뒤의 득점 0xaa0a8 이 3아웃을 보고 보류한다(0xaa1c0) —
-    // 3아웃이라 안 풀린다(0xaa388). (씨앗을 다시 골랐다 — 예전 [107, 787, 280, 1] 은 득점을 아웃 판정 앞에 세던 옛 차례에 기댔고,
-    // 원본 차례에서는 3아웃이 홈인 목록 틱보다 먼저라 관문이 닫혀 득점도 보류도 없다. 그 앞 손-패턴 [80, 800, 150] 은 투수가
-    // 뜬 채로 잡는 공이다)
+    // 3아웃이라 안 풀린다(0xaa388). (씨앗을 다시 골랐다 — [70, 1095, 100, 1] 은 득점을 아웃 판정 앞에 세던 옛 차례에 기댔고, 원본
+    // 차례에서는 3아웃이 홈인 목록 틱보다 먼저라 관문이 닫혀 득점도 보류도 없다. 그 앞 [107, 787, 280, 1] 은 투수 칸 송구 속도
+    // g = 2(0xb0fb4 b106a)로 타자주자가 살고, 손-패턴 [80, 800, 150] 은 투수가 뜬 채로 잡는 공이다)
     const 땅볼: BattedBallPattern = [110, 711, 41, 1]
     const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
     const 이사 = 내타석({ first: false, second: false, third: true }, 2)
@@ -825,6 +828,42 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       expect(뒤.lastDefensePlay).toBe(play.result)
       expect(뒤.log[0]?.text).toContain('도루 성공')
     }
+  })
+
+  it('도루 출발 표시 st[0x15 + i] 는 판정 때가 아니라 0xf 진입(3d966~3d976)에서 지운다 — 같은 타석 다음 공이면 그 걸음에 지워진다', () => {
+    const random = createSeededRandom(1)
+    const 시작 = startGame(random)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    expect(hiddenStealBasesOf(출발, 0)).toEqual([1])
+    // 볼 — 판정(0x3dfac) 뒤 같은 타석 다음 공 0xf 진입이 지운다
+    const { progress: 뒤 } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    expect(뒤.stealingFrom).toEqual([])
+    expect(hiddenStealBasesOf(뒤, 0)).toEqual([])
+  })
+
+  it('타석이 끝난 공의 출발 표시는 새 타석 0xe 의 첫 OK(→ 0xf 진입)까지 남는다 — 판정 입력만 판정 때 거둔다', () => {
+    const random = createSeededRandom(4)
+    const 시작 = startGame(random)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    // 볼넷 + 도루 — 밀어내기 판(종류 2)은 표시를 안 지운다(0x3d7b8 은 종류 1 만)
+    const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, random)
+    expect(뒤.stealingFrom).toEqual([])
+    expect(hiddenStealBasesOf(뒤, 0)).toEqual([1])
+    const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, random, { arrivalPlay: play })
+    // 다음 내 타석의 0xe 를 기다리는 동안은 1루(새로 선 주자)도 안 그린다 — 원본 그대로
+    expect(isPlayerTurn(끝.game)).toBe(true)
+    expect(끝.sceneConfirm).not.toBeNull()
+    expect(hiddenStealBasesOf(끝, 0)).toEqual([1])
+    expect(hiddenStealBasesOf(끝, 1)).toEqual([])
+  })
+
+  it('타구 판(종류 1) 시작 리드 0x3d7b8 은 도루 주자의 출발 표시를 지운다 (3d8c6~3d8d2)', () => {
+    const random = createSeededRandom(4)
+    const 시작 = startGame(random)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    const 진행중 = startPlayerOutcome(출발, { kind: '아웃', detail: '땅볼아웃' }, random)
+    expect(진행중.pendingDefensePlay?.stealingFrom).toEqual([1])
+    expect(hiddenStealBasesOf(진행중, 0)).toEqual([])
   })
 
   it('도루 없이 못 맞힌 공이면 rollPassedBall 한 번만 굴리고 판이 없다 · 맞힌 공은 굴리지 않는다', () => {
@@ -1577,5 +1616,21 @@ describe('루에 선 주자의 신원 — 원본 주자 목록대로 (0xa93ac ·
     expect(ourRunnerRunsOnBaseOf(mineOnFirst)[1]).toBe(777)
     // 타석 화면 0x35b94 상태 0xe 주루 칸도 같은 값 — 빈 루는 안 채운다
     expect(runnerRunAbilitiesOf(mineOnFirst)).toEqual({ first: 777 })
+  })
+})
+
+describe('내 타석 마운드의 상대 투수 장비 니블 — 타석 교대 0x47cc8 의 48138~4816a (모드 4 도 같다)', () => {
+  it('외인구단(팀 14) 투수는 Xls 행 니블(제구 3), 리그 열 팀은 0', () => {
+    const 외인구단 = { ...startGame(createSeededRandom(1), 0, 9, 14), aceOpponent: null }
+    expect(opponentPitcherEquipmentOf(외인구단)).toEqual(
+      teamPitchers(14)[외인구단.opponentMound.pitcherSlot]!.equipment,
+    )
+    expect(opponentPitcherEquipmentOf(외인구단)).toEqual([3, 0, 0, 0])
+    expect(opponentPitcherEquipmentOf({ ...startGame(createSeededRandom(1), 0, 9, 3), aceOpponent: null })).toEqual([0, 0, 0, 0])
+  })
+
+  it('마선수 대결 투수가 서면 니블이 없다 — 그림은 ace/pitcher_*', () => {
+    const progress = startGame(createSeededRandom(1), 0, 9, 14)
+    expect(opponentPitcherEquipmentOf({ ...progress, aceOpponent: ACE_PITCHERS[0]! })).toBeUndefined()
   })
 })

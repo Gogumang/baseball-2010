@@ -14,6 +14,7 @@ import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
+import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
@@ -38,10 +39,19 @@ interface PitcherSideStageProps {
    * 타자 손 0xb63c0 (화면 배치 +0x17e1) — 안 주면 폼의 낮은 비트. 마타자는 폼이 아니라 표 0xd88b0 이라 부르는 쪽이 준다
    */
   readonly batterSide?: number
+  /**
+   * 마타자 순번 `0xb63a0(타자)` (0~4) — 타석 교대 0x47dd6 이 몸통 적재 0x78ab0 에 넘겨 `ace/batter_*` 한 장을 싣고, 스윙 객체
+   * +0x24(0x35686)로 자세표 0xb905c 의 마타자 갈래를 고른다. 없으면 일반 타자
+   */
+  readonly aceBatterOrder?: number
   /** 마운드의 내 투수 — 폼(단계 표) · 손(좌투 뒤집기) · 장비 겹(0x79790) */
   readonly pitcherForm: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
+  /**
+   * 마운드의 마투수 그림 — 타석 교대 0x482fc 의 적재 0x793b0 이 순번 0xb63a0 으로 `ace/pitcher_*` 를 싣는다. 없으면 평범한 투수
+   */
+  readonly acePitcher?: AcePitcherFrames | null
   /** 구장 +0x70 · 바닥 줄 +0xc · 하늘 줄 +0x10 */
   readonly stadium: number
   readonly fieldPalette: number | null
@@ -152,14 +162,16 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           swingTick: swingTick,
           isBunting: swingTick !== null && shownSwing !== null && shownSwing.buntKind !== 0 && nowTick >= swingTick && !isIdle,
           bodyType,
+          ...(current.aceBatterOrder === undefined ? {} : { aceOrder: current.aceBatterOrder }),
         }),
         bodyType,
+        ...(current.aceBatterOrder === undefined ? {} : { aceBatterOrder: current.aceBatterOrder }),
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,
         batterEquipment: NO_EQUIPMENT,
         side: current.batterSide ?? batterSideOfForm(current.batterForm),
         hud: current.hud,
-        acePitcher: null,
+        acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,
         pitcherHand: current.pitcherHand,

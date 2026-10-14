@@ -123,30 +123,10 @@ export function isHiddenOpen(career: PlayerCareer, part: number, level: number):
   return career.openedHiddenIds.includes(hiddenOpenIdOf(part, level))
 }
 
-const BATTER_HIDDEN_ID_END = BATTER_HIDDEN_ID_START + EQUIPMENT_PARTS.length * HIDDEN_LEVELS_PER_PART
-
-/**
- * 히든 오픈 알림 — StrCOMMON[139] "히든 아이템 오픈!! [%s]" 뒤에 **쓰는 곳을 알리는 뒷줄**이 붙는다.
- * 뒷줄은 id 로 갈린다 (R12 5절 확정): **13~18 시즌모드**(StrCOMMON[141]) ·
- * **19~34 나만의리그 투수편**(142) · **35~50 나만의리그 타자편**(143).
- * 앞서 웹은 타자 id 만 다루고 뒷줄도 타자 문구로 고정돼 있었다.
+/*
+ * 히든 오픈 알림 글은 공용 알림 창 `entities/collection/model/hiddenOpenNotice` 의 `hiddenOpenNoticeTextOf`(0x62368 원문 마크업 —
+ * StrCOMMON[139] + "!N!N" + 범위별 뒷줄)를 쓴다. 앞서 여기 있던 `hiddenOpenTextOf` 는 원문이 아닌 한 줄 글이었다.
  */
-const SEASON_HIDDEN_ID_RANGE = { first: 13, last: 18 }
-const PITCHER_HIDDEN_ID_RANGE = { first: 19, last: 34 }
-
-export function hiddenOpenTextOf(id: number): string | null {
-  if (id >= SEASON_HIDDEN_ID_RANGE.first && id <= SEASON_HIDDEN_ID_RANGE.last) {
-    // 구장 아이템(관중석·전광판) — 이름은 시즌 구단관리 쪽이라 아직 없다
-    return '히든 아이템 오픈!! 시즌모드에서 사용가능합니다'
-  }
-  if (id >= PITCHER_HIDDEN_ID_RANGE.first && id <= PITCHER_HIDDEN_ID_RANGE.last) {
-    return '히든 아이템 오픈!! 나만의리그 투수편에서 사용가능합니다'
-  }
-  if (id < BATTER_HIDDEN_ID_START || id >= BATTER_HIDDEN_ID_END) return null
-  const offset = id - BATTER_HIDDEN_ID_START
-  const item = equipmentItemOf(Math.floor(offset / HIDDEN_LEVELS_PER_PART), FIRST_HIDDEN_LEVEL + (offset % HIDDEN_LEVELS_PER_PART))
-  return `히든 아이템 오픈!! [${item.name}] 나만의리그 타자편에서 사용가능합니다`
-}
 
 /** 오픈 id 를 기록한다 (0x62368). 원본은 전역 저장이라 앱이 기록연감으로도 옮긴다 */
 export function openHidden(career: PlayerCareer, id: number): PlayerCareer {

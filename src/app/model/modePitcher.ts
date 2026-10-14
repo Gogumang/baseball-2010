@@ -91,6 +91,11 @@ export interface ModePitcher {
    * `0xb62b4(투수, n)` 로 읽는다 (`equippedPitcherSkillIdsOf`)
    */
   readonly skillIds: readonly number[]
+  /**
+   * 수비 화면 공 가진 야수 이름 판(0x43cb0)의 칸 0 — 그 기록의 이름 0xb62c0 · 보직 0xb6dec(+0xb & 3). 미션 투수는 사람 칸 팀
+   * 0번 투수다(aa81c~aa878, `missionFielderPlatesOf`). 대체 투수는 없다(판 없음)
+   */
+  readonly plate?: { readonly name: string; readonly role?: number }
 }
 
 /** 체력 100% — `stats` 는 피로 없는 값이다 */
@@ -136,8 +141,10 @@ function modePitcherFromRecord(
   repertoire: { readonly pitchMask: number; readonly form: number; readonly magicNumber: number },
   record: { readonly equippedSkillIds: readonly number[]; readonly equipmentLevels?: PitcherAbility },
   stamina: number,
+  plate: ModePitcher['plate'],
 ): ModePitcher {
   return {
+    ...(plate === undefined ? {} : { plate }),
     ...(record.equipmentLevels === undefined ? {} : { equipmentLevels: record.equipmentLevels }),
     stats: fatiguedStatsOf(equippedAbility, MISSION_STAMINA),
     ability: equippedAbility,
@@ -162,6 +169,7 @@ export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
     career,
     // 저장된 나리 투수의 +0x2c (`PitcherCareer.stamina`)
     career.stamina,
+    { name: career.name, role: career.role },
   )
 }
 
@@ -190,6 +198,8 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
     // ⚠️ 미해결: 명전 기록 +0x2c 는 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값인데 웹 명전 기록(`HallOfFamePitcher`)이
     //    그 칸을 안 남긴다 — 남길 때까지 10000 으로 둔다
     MISSION_STAMINA,
+    // ⚠️ 보직을 안 남긴 옛 명전 기록은 보직이 없다(판 없음) — 원본 기록에는 늘 있는 칸이다
+    famer.role === undefined ? { name: famer.name } : { name: famer.name, role: famer.role },
   )
 }
 

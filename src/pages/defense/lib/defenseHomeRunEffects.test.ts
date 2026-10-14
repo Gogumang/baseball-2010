@@ -110,6 +110,24 @@ describe('수비 판 홈런 연출 — 원본 프레임 차례', () => {
     expect(frame.effects.fireworks).not.toBeNull()
   })
 
+  it('공 그리기 0x36dfc 의 파티클은 그 그림 안에서 쏘고 프레임 끝 틱(0x6de84)이 한 번 굴린다 — 튐은 공+0xab4 를 세운다', () => {
+    const particles = createParticleScene()
+    const 쏜것: number[] = []
+    const frame = stepDefenseEffects(
+      defenseEffectsOf(DEFENSE_SCENE_START),
+      그리는틱,
+      { particles, random: 세는난수(), configOf: (id) => (쏜것.push(id), 설정) },
+      [
+        { id: 4, img: 10, x: 10, y: 20, bounce: false },
+        { id: 0, img: 8, x: 10, y: 30, bounce: true },
+      ],
+    )
+    expect(쏜것).toEqual([4, 0])
+    expect(particles.emitters).toHaveLength(2)
+    expect(frame.effects.ballBounced).toBe(true)
+    expect(defenseEffectsOf(sceneMemoryOf(frame.effects)).ballBounced).toBe(false)
+  })
+
   it('글자가 꺼져 있으면(홈런 갈래 전) 그리기 틱이어도 글자 · 판이 없다 (0x40b22 · 0x36cea)', () => {
     const particles = createParticleScene()
     const frame = stepDefenseEffects(defenseEffectsOf(DEFENSE_SCENE_START), 그리는틱, { particles, configOf: () => 설정 })

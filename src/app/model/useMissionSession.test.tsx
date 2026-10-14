@@ -673,6 +673,43 @@ function seededAfterStart(seed: number): RandomPort {
   return random
 }
 
+describe('투수 미션 CPU 도루 출발 표시 — st[0x15 + i] (0x520de → 0xa9bd4), 화면이 그 루 주자를 안 그린다', () => {
+  it('CPU 가 공이 나는 동안 출발시킨 주자의 루가 표시 칸에 서고, 같은 타석 다음 공의 0xf 진입은 `selectionEntered` 로만 적는다', () => {
+    // 미션 12 "최강의 챔피언" — 1사 1·3루. 1루 주자 출발은 rand(0, 1000) ≤ 5(표 0xd047c 첫 줄 · 주력 칸 0)라 드물다 —
+    // 씨앗을 넘겨 가며 CPU 도루가 나는 공을 찾는다
+    let found = false
+    for (let seed = 1; seed < 3000 && !found; seed += 1) {
+      const rendered = setUpPitcherMission(12, seed)
+      for (let pitch = 0; pitch < 40 && !found; pitch += 1) {
+        const session = rendered.result.current.session
+        if (session.pitcherRun?.status !== '진행중') break
+        if (session.pendingDefensePlay !== null) {
+          act(() => session.actions.finishDefensePlay())
+          continue
+        }
+        if (session.pendingBenchClearing !== null) {
+          act(() => session.actions.finishBenchClearing(false))
+          continue
+        }
+        act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+        const after = rendered.result.current.session
+        const display = after.pitcherStealDisplay
+        if (display === null) continue
+        found = true
+        // 못 맞힌 공이다 — 타구 판(종류 1)이면 판 시작 0x3d7b8 이 지웠다
+        expect(after.pendingDefensePlay).toBeNull()
+        expect(display.bases.length).toBeGreaterThan(0)
+        // 같은 타석이면 0xf 진입이 그 걸음에 돌아 적혔고(화면은 공이 날거나 0x12 인 동안 숨긴다), 새 타석(볼카운트 0-0)이면
+        // 0xf 진입이 0xe 의 OK 뒤라 아직 안 적혔다
+        const { balls, strikes } = rendered.result.current.runner.atBat
+        expect(display.selectionEntered).toBe(balls + strikes > 0)
+      }
+      rendered.unmount()
+    }
+    expect(found).toBe(true)
+  })
+})
+
 describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 모드 5 를 안 막는다', () => {
   // 미션 12 "최강의 챔피언" — 1사 1·3루, 2볼
   it("'3' 은 1루 견제 판을 사람 수비·송구 설정으로 돌려 먹이고 재생할 판을 남긴다 — 투구 수·볼카운트는 그대로", () => {

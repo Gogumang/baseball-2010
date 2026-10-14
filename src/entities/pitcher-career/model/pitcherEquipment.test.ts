@@ -3,7 +3,7 @@ import { createPitcherCareer, equippedPitcherAbilityOf } from '@/entities/pitche
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
   PITCHER_EQUIPMENT_PARTS, equipOwnedPitcherEquipment, isPitcherHiddenOpen, pitcherEquipmentBlockReasonOf,
-  pitcherEquipmentItemOf, pitcherHiddenOpenIdOf, pitcherHiddenOpenTextOf, purchasePitcherEquipment,
+  pitcherEquipmentItemOf, pitcherHiddenOpenIdOf, purchasePitcherEquipment,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 
 /** 투수편(모드 3) 장비 — 0x13460 kind 3 · 0x14a74 · 0x832e8 · 0xb6414 (pitcherEquipment.ts 머리글) */
@@ -40,8 +40,6 @@ describe('투수 장비 표', () => {
 
   it('히든 id 는 19~34 — 컬렉터(레벨 8)가 20·24·28·32 (0x14bda…)', () => {
     expect([0, 1, 2, 3].map((part) => pitcherHiddenOpenIdOf(part, 8))).toEqual([20, 24, 28, 32])
-    expect(pitcherHiddenOpenTextOf(20)).toBe('히든 아이템 오픈!! [해적 선장모] 나만의리그 투수편에서 사용가능합니다')
-    expect(pitcherHiddenOpenTextOf(36)).toBeNull()
   })
 })
 

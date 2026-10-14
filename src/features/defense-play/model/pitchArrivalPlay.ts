@@ -1,4 +1,6 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -149,6 +151,11 @@ export interface PitchArrivalPlayInput {
   /** 이 투구 전의 아웃 수 (state[6]) — 판 종류 고르기(0x3e0ee)가 읽는다. 판은 삼진이 서면 + 1 로 연다(`playOutsOf`) */
   readonly outs: number
   readonly defenseAbilities?: readonly number[]
+  /**
+   * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
+   * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
+   */
+  readonly defenseTeamBonus?: number
   /** 루별 주자 주루 (0 = 낫아웃 타자주자) */
   readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -158,6 +165,10 @@ export interface PitchArrivalPlayInput {
   readonly offenseIsCpu?: boolean
   readonly runningMode?: ManualAutoMode
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /**
@@ -262,12 +273,15 @@ export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: Rando
         pitchJudgement: input.pitchJudgement,
         stealingFrom: input.stealingFrom,
         defenseAbilities: input.defenseAbilities,
+        defenseTeamBonus: input.defenseTeamBonus,
         runAbilities: input.runAbilities,
         runAbility: input.runAbility,
         runnerTeamGrade: input.runnerTeamGrade,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
+        fielderPlates: input.fielderPlates,
+        runnerAces: input.runnerAces,
         scene: input.scene,
       },
     }
@@ -285,6 +299,7 @@ export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: Rando
     bases: input.bases,
     outs: playOutsOf(input.outs, input.pitchJudgement, strikeout),
     defenseAbilities: input.defenseAbilities,
+    defenseTeamBonus: input.defenseTeamBonus,
     runAbility: input.runAbility,
     runnerTeamGrade: input.runnerTeamGrade,
     random,
@@ -295,6 +310,8 @@ export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: Rando
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAces: input.runnerAces,
     scene: input.scene,
   }
   if (kind === PASSED_BALL_PLAY_KIND) {

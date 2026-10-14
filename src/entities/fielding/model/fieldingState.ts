@@ -72,7 +72,7 @@ export interface FielderState {
   readonly arrivalSlackTicks: number
   /** 동작 잠금 카운트 (+0xb4). 0 보다 크면 다른 동작을 못 받는다 */
   readonly actionLockTicks: number
-  /** 경기용 수비 능력치 등급 0~7 (0xbbe98) */
+  /** 경기용 수비 능력치 등급 0~7 (0xbbe98). 칸 0(투수)은 선수가 없어 g = 2 에 맞춘 1 이다(`UNSEARCHED_FIELDER_SLOT`) */
   readonly defenseGrade: number
   /**
    * **지난 송구의 속도 +0xdc** — 송구 틱 0xa1adc(야수 vtbc)가 읽는 v 다.
@@ -194,12 +194,72 @@ export function throwErrorBiasOf(defenseGrade: number): number {
 }
 
 /**
+ * **판 시작 0xb0fb4 가 선수를 찾지 않는 칸 — 투수(칸 0).** 직접 재역어셈:
+ * ```
+ * b1018  칸 i = 0..8:
+ * b1032    cmp r4,#0 ; beq b1062          ; i == 0 → 선수 찾기(b103e 고리)를 건너뛴다 — r5(선수) = 0
+ * b106a    r0 = 2 ; 선수 있으면 r0 = 0xbbe98(0xb570d(ctx, 2, 선수, 90, 1)) + 1     ; g
+ * b108c    사거리 +0x8c = g × cfg+0x28 · 송구 속도 v = cfg+0x1a(940) + cfg+0x2a(8) × g  → 0xa0fc4(야수, v)
+ * b10a2    r0 = 2 ; 선수 있으면 r0 = 0xbbe98(...)                                    ; **+1 이 없다**
+ * b10c4    악송구 보정 +0xe4 = cfg+0x2c(2) − r0 + 8
+ * b1184    선수를 찾은 칸만 야수+0xec = 선수                                         ; 칸 0 은 안 쓴다
+ * ```
+ * 그래서 칸 0 은 **어느 모드든** 송구 속도 g = 2(= 940 + 16), 악송구 보정 8, 펌블 확률 0(펌블 b41e4 는 +0xec 가 없으면 0)이다.
+ * 능력치 하나로는 이 셋을 나타낼 수 없다(g = 2 는 등급 1, 보정 8 은 등급 2 의 값) — 진행기는 이 칸의 입력 능력치를 **읽지 않는다**.
+ * ⚠️ 미확인: 야수+0xec 는 이 함수가 칸 0 에 쓰지 않을 뿐 비우지도 않는다. 야수 객체를 만든 뒤 칸 0 의 +0xec 를 쓰는 곳은
+ *    찾지 못해 "늘 비어 있다" 로 옮긴다.
+ */
+export const UNSEARCHED_FIELDER_SLOT = 0
+
+/** 선수 없는 칸의 g (b106a `movs r0,#2`) — 송구 속도 940 + 8 × 2 */
+const NO_PLAYER_THROW_G = 2
+
+/** 선수 없는 칸의 악송구 보정 — b10a2 r0 = 2 → cfg+0x2c(2) − 2 + 8 */
+export const NO_PLAYER_THROW_ERROR_BIAS = 8
+
+/**
+ * 야수 칸의 **선수 수비 능력치** — 칸 0(투수)은 선수가 없어 `null` 이다(`UNSEARCHED_FIELDER_SLOT`).
+ * 펌블(`rollFumble`) · 악송구(`rollThrowError`) 가 `null` 을 "선수 없음"(확률 0 · 보정 8)으로 읽는다.
+ */
+export function fielderAbilityOf(
+  defenseAbilities: readonly number[],
+  slot: number,
+  fallback: number,
+): number | null {
+  if (slot === UNSEARCHED_FIELDER_SLOT) return null
+  return defenseAbilities[slot] ?? fallback
+}
+
+/**
+ * **수비 팀 보너스** — 판 시작 0xb0fb4 의 b10d0~b10f2 (직접 재역어셈):
+ * ```
+ * b0fd0    팀레코드 = 0xb8680(팀[st[0xa]])      ; [sp+0x24] — 수비 팀의 레코드(명부). 0xb570c 에도 같은 값을 넘긴다
+ * b0ff4    [sp+0x14] = 전역 모드 0x1552d10 ∈ {1, 2, 8, 9}
+ * b10d0    [sp+0x14] 면:  b = 0xbbe98(s16 팀레코드+8)          ; 팀 능력치 셋째 칸 '집중'의 등급 0~7
+ * b10e6      사거리 +0x8c 값 += b      ; (+0x8c 는 읽는 곳이 없다 — P2 1c, 웹에 칸이 없다)
+ * b10f2      송구 속도 v += b          ; 940 + 8·g 를 다 센 **뒤** — 0xa0fc4(야수, v) 가 +0xd4 · +0xdc = v, +0xd8 = v·130/100
+ * ```
+ * 악송구 보정 +0xe4(b10c4)는 이 갈래 **앞**에 이미 sp+8 에 적혀 보너스를 안 받는다. 칸 0(투수)도 고리 안이라 같이 받는다 —
+ * g = 2 고정(b106a)으로 센 940 + 16 에 b 를 더한다. 팀레코드 +4·+6·+8·+0xa = 투구·타격·집중·근성(구단정보 0x7bf9c 표 0xd48b8).
+ */
+export const DEFENSE_TEAM_BONUS_MODES: readonly number[] = [1, 2, 8, 9]
+
+/** b10d0 — 모드가 1·2·8·9 면 `0xbbe98(팀 집중)`, 아니면 0 */
+export function defenseTeamBonusOf(mode: number, teamConcentration: number): number {
+  if (!DEFENSE_TEAM_BONUS_MODES.includes(mode)) return 0
+  return abilityGradeOf(teamConcentration)
+}
+
+/**
  * 플레이 시작 때의 야수 9명 (0xb0fb4 + 0xb0f88).
  * 능력치는 송구 속도·악송구·펌블·필살수비 확률에만 쓰이고 **이동 속도에는 전혀 안 들어간다** (P2 1c).
+ * `teamBonus` 는 `defenseTeamBonusOf` — 아홉 칸(칸 0 포함) 모두의 송구 속도에 더한다(등급 · 악송구 보정은 그대로).
  */
 export function createFielders(defenseAbilities: readonly number[], teamBonus = 0): readonly FielderState[] {
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
-    const grade = abilityGradeOf(defenseAbilities[slot] ?? 0)
+    // 칸 0(투수)은 b1032 가 선수를 찾지 않아 g = 2 고정 — 등급으로는 g − 1 = 1 (입력 능력치를 안 읽는다)
+    const grade =
+      slot === UNSEARCHED_FIELDER_SLOT ? NO_PLAYER_THROW_G - 1 : abilityGradeOf(defenseAbilities[slot] ?? 0)
     const start = FIELDER_START_POSITIONS[slot]
     // 0xa0fc4(야수, v): +0xdc = +0xd4 = v · +0xd8 = v × 130 / 100
     const throwSpeed = throwSpeedOf(grade, teamBonus)
