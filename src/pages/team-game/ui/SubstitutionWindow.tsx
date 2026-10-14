@@ -9,8 +9,8 @@ import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { yearCellDrawingOf, yearLabelOffsetOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
-import { radarGrowthAt, radarGrowthStart } from '@/pages/management/lib/radarGrowth'
-import type { RadarGrowthState } from '@/pages/management/lib/radarGrowth'
+import { radarGrowthAt, radarGrowthStart } from '@/shared/lib/radarGrowth/radarGrowth'
+import type { RadarGrowthState } from '@/shared/lib/radarGrowth/radarGrowth'
 import { abilityChartFrameOf, abilityChartVerticesOf } from '@/pages/create-player/lib/teamSelectLayout'
 import {
   BATTER_DETAIL_ROWS,
