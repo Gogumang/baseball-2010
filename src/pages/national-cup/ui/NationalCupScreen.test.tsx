@@ -238,10 +238,9 @@ describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호
       // CLR 은 안 받는다 (0x1b1e4 는 OK · '5' 만)
       fireEvent.keyDown(window, { key: 'Escape' })
       expect(onConfirmEntryTitle).not.toHaveBeenCalled()
-      // OK — 키를 받은 그 자리에서 준다, 창은 닫힘 애니 뒤 사라진다
+      // OK — 키를 받은 그 자리에서 주고 창도 그 자리에서 치운다(0x1b1e4 → 0x742a8, 닫힘 애니 없음)
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(onConfirmEntryTitle).toHaveBeenCalledTimes(1)
-      act(() => { vi.advanceTimersByTime(1000) })
       expect(screen.queryByTestId('칭호-창')).toBeNull()
 
       // 팝업이 다 닫혔다 — 이제 대진판 확인

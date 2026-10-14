@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, MessageBox, RawScreen } from '@/shared/ui'
+import { Button, RawScreen } from '@/shared/ui'
+import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
 import { nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
 import type { NariRecordLine, PlayerCareer } from '@/entities/career/model/playerCareer'
-import { conditionTextOf } from '@/entities/career/model/titles'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
 import { evaluationGaugeDivisorOf } from '@/pages/story/lib/evaluationGauge'
@@ -60,9 +60,11 @@ interface GameResultScreenProps {
   /** [+0x17f4] 이번 경기에 번 G — 정산 진입 0x4ea0c 4ebaa~4ec7c 가 기록 달성 횟수로 센 값 */
   readonly gamePointReward: number
   /**
-   * 116 진입 0x1278c 가 직접 주는 칭호(39 다이너마이트 배트 — 1299e~129c8) — 칭호 팝업 0x1274c(종류 0x78)로 띄운다.
+   * 116 진입 0x1278c 가 직접 거는 칭호(39 다이너마이트 배트 — 1299e~129c8) — 칭호 팝업 0x1274c(종류 0x78, `TitleWindow`)로 띄운다.
    */
   readonly newTitles: readonly string[]
+  /** 칭호 팝업 키 0x1b1e4 — 비트 · 곧바로 장착 · 저장. 116 진입은 팝업만 걸고 주는 것은 이 키다 */
+  readonly onConfirmTitle?: () => void
   /**
    * 116 경기 뒤 평가 — 감독 글 · 변화 글 · 연속 기록. 국가대항전 경기는 116 을 안 지나(0x4ea0c 4f03a 가 S+0x50 = 2 를
    * 대회가 아닐 때만 쓴다) 없다 — 그때는 정산 판 [OK] 가 곧장 다음(134 대진판)이다.
@@ -121,6 +123,7 @@ export function GameResultScreen({
   pitcherNames,
   gamePointReward,
   newTitles,
+  onConfirmTitle,
   evaluation,
   streakNotices = [],
   recordLine,
@@ -165,15 +168,11 @@ export function GameResultScreen({
           <>
             {underlay}
             {/*
-              116 진입 1299e~129c8 — 칭호 39 를 막 받았으면 칭호 팝업 0x1274c(종류 0x78)를 띄운다. 그림 0x1afe8 은 이름
-              StrNICKNAME[i] 와 조건 문구 [i+64] 다. ⚠️ 근사: 팝업 틀 배치는 관리 화면 칭호 팝업과 같은 알림 상자 —
-              팝업이 떠 있는 동안 밑의 평가 이벤트가 어디까지 도는지는 미해결이라 팝업을 닫은 뒤 이벤트를 튼다
+              116 진입 1299e~129c8 — 칭호 39 가 없고 이 경기 홈런 > 3 이면 +0x270 = 39 로 칭호 팝업 0x1274c(종류 0x78)를 건다.
+              그리기 0x1afe8 · 키 0x1b1e4 는 관리 화면 칭호 팝업과 같은 창(`TitleWindow`) — 키가 주고 그 자리에서 치운다.
+              ⚠️ 근사: 팝업이 떠 있는 동안 밑의 평가 이벤트가 어디까지 도는지는 미해결이라 팝업을 닫은 뒤 이벤트를 튼다
             */}
-            <MessageBox
-              text={`!C${title}!N${conditionTextOf(title) ?? ''}`}
-              buttons={['확인']}
-              onAnswer={() => setIsTitlePopupOpen(false)}
-            />
+            <TitleWindow title={title} onKey={onConfirmTitle} onClose={() => setIsTitlePopupOpen(false)} />
           </>
         ) : (
           <EvaluationEventPlayer

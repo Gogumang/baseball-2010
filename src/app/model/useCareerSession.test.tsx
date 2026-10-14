@@ -1763,7 +1763,7 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     expect(셋.result.current.session.career?.seasonPopularityGain).toBe(14)
   })
 
-  it('116 은 이 경기 홈런 > 3 이면 칭호 39 를 직접 준다(1299e) — 다시 띄워도 비트가 섰으면 안 준다', () => {
+  it('116 은 이 경기 홈런 > 3 이면 칭호 39 팝업을 건다(1299e) — 주는 것은 키 0x1b1e4, 키 전에 끄면 다시 뜨고 비트가 섰으면 안 뜬다', () => {
     const 홈런넷 = {
       ...평가중(),
       lastGame: { ...지난경기, summary: { ...지난경기.summary, stats: { ...지난경기.summary.stats, homeRuns: 4 } } },
@@ -1771,7 +1771,15 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     const rendered = 띄우기(홈런넷)
     const screen = rendered.result.current.screen
     expect(screen.kind === '경기결과' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
+    // 116 진입은 팝업만 건다 — 비트는 아직 없다
+    expect(rendered.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[39])
+    const 키전 = 띄우기(rendered.result.current.session.career!)
+    const beforeKey = 키전.result.current.screen
+    expect(beforeKey.kind === '경기결과' ? beforeKey.newTitles : null).toEqual([TITLE_NAMES[39]])
+    // 키 0x1b1e4 — 비트 · 곧바로 장착
+    act(() => rendered.result.current.session.actions.confirmGameResultTitle())
     expect(rendered.result.current.session.career?.titleIds).toContain(TITLE_NAMES[39])
+    expect(rendered.result.current.session.career?.equippedTitle).toBe(39)
     const 다시 = 띄우기(rendered.result.current.session.career!)
     const again = 다시.result.current.screen
     expect(again.kind === '경기결과' ? again.newTitles : null).toEqual([])

@@ -202,15 +202,23 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     expect(container.querySelector('canvas')).toBeNull()
   })
 
-  it('116 이 준 칭호 39 는 칭호 팝업 0x1274c 로 — 닫으면 평가 이벤트', () => {
+  it('116 이 건 칭호 39 는 칭호 팝업 0x1274c(0x1afe8 창) — 펼치는 동안 키를 안 받고, 키가 주고 그 자리에서 치운 뒤 평가 이벤트', () => {
     vi.useFakeTimers()
+    const onConfirmTitle = vi.fn()
     render(
       <GameResultScreen summary={요약()} gamePointReward={0} newTitles={['다이너마이트 배트']} evaluation={평가}
-        career={createCareer('선수')} onContinue={vi.fn()} />,
+        career={createCareer('선수')} onContinue={vi.fn()} onConfirmTitle={onConfirmTitle} />,
     )
     expect(screen.queryByTestId('대사-상자')).toBeNull()
-    expect(screen.getByText(/다이너마이트 배트/)).toBeTruthy()
+    expect(screen.getByTestId('칭호-창').querySelector('[data-part="이름"]')?.textContent).toBe('"다이너마이트 배트"')
+    // 펼침(높이 6 → 120) 동안은 키 콜백을 안 부른다 (0x754f8 75556~75588)
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onConfirmTitle).not.toHaveBeenCalled()
+    프레임(200)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onConfirmTitle).toHaveBeenCalledTimes(1)
+    // 닫힘 애니 없음 — 0x1b1e4 가 0x742a8 로 바로 치운다
+    expect(screen.queryByTestId('칭호-창')).toBeNull()
     프레임(200)
     expect(screen.getByTestId('대사-상자')).toBeTruthy()
   })
