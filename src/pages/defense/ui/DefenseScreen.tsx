@@ -1,8 +1,9 @@
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { shinedSpriteUrl } from '@/pages/defense/lib/laserShine'
 import {
   CAMERA_FOLLOW_PERCENT,
   type CameraState,
@@ -101,13 +102,16 @@ function ActorSprite({
   folder,
   frame,
   paletteIndex = null,
+  isLaserShining = false,
 }: {
   readonly folder: string
   readonly frame: number
   readonly paletteIndex?: number | null
+  /** 그리기 효과 0xc · 빨강 (`lib/laserShine`) — 그림 픽셀과 색을 반반 섞는다 */
+  readonly isLaserShining?: boolean
 }) {
   const origins = useFrameOrigins(folder)
-  if (paletteIndex === null) {
+  if (paletteIndex === null && !isLaserShining) {
     return <FrameSprite folder={folder} frame={frame} origins={origins} x={0} y={0} />
   }
   const key = String(frame).padStart(3, '0')
@@ -119,6 +123,7 @@ function ActorSprite({
       key={key}
       url={`${folder}/${key}.png`}
       paletteIndex={paletteIndex}
+      isLaserShining={isLaserShining}
       left={origin.x}
       top={origin.y}
     />
@@ -133,21 +138,40 @@ function ActorSprite({
  * (초상화 `EventPortraits.tsx` 의 `PaintedFrame` 에서 실제로 걸렸던 함정이다).
  * 새로 마운트하면 처음 상태가 이번 프레임의 구운 주소라 엉뚱한 칸이 비칠 일이 없다.
  * ⚠️ 캔버스가 없거나(테스트의 jsdom) 아직 다 안 칠했으면 구운 그림을 그대로 쓴다 — 색만 한 박자 늦는다.
+ * 반짝임(효과 0xc)은 팀 색을 칠한 **뒤** 그림에 입힌다 — 원본도 팔레트 색 칸(0x98394 의 `ldrh [팔레트]`)을 섞는다.
  */
 function PaintedSprite({
   url,
   paletteIndex,
+  isLaserShining = false,
   left,
   top,
 }: {
   readonly url: string
   readonly paletteIndex: number | null
+  readonly isLaserShining?: boolean
   readonly left: number
   readonly top: number
 }) {
-  return (
-    <img className={styles.paintedSprite} style={{ left, top }} src={useRecoloredSprite(url, paletteIndex)} alt="" />
-  )
+  const painted = useRecoloredSprite(url, paletteIndex)
+  const shown = useShinedSprite(painted, isLaserShining)
+  return <img className={styles.paintedSprite} style={{ left, top }} src={shown} alt="" />
+}
+
+/** 효과 0xc 를 입힌 주소 — 꺼져 있거나 아직 다 안 칠했으면 받은 주소 그대로 */
+function useShinedSprite(url: string, isOn: boolean): string {
+  const [shined, setShined] = useState<{ readonly from: string; readonly to: string } | null>(null)
+  useEffect(() => {
+    if (!isOn) return
+    let isActive = true
+    shinedSpriteUrl(url).then((to) => {
+      if (isActive) setShined({ from: url, to })
+    })
+    return () => {
+      isActive = false
+    }
+  }, [url, isOn])
+  return isOn && shined !== null && shined.from === url ? shined.to : url
 }
 
 /**
@@ -426,7 +450,7 @@ function Fielder({
 }: {
   readonly fielder: DefenseFielder
   readonly point: { readonly x: number; readonly y: number }
-  /** 레이저 송구 반짝임(경기+0x19ad) — 이 야수 몸을 빨강(255,0,0)으로 그린다 */
+  /** 레이저 송구 반짝임(경기+0x19ad) — 이 야수를 효과 0xc · 빨강(255,0,0)으로 그린다(그림과 색 반반, `lib/laserShine`) */
   readonly isLaserShining?: boolean
 }) {
   // 그림판마다 프레임 기준이 다르다 — 보통·타자 마선수는 +17, 투수 마선수는 날값 (S12 8절)
@@ -435,14 +459,14 @@ function Fielder({
   const paletteIndex = fielder.aceIndex == null ? defenderPaletteIndexOf(fielder.teamIndex) : null
   return (
     <div
-      className={isLaserShining ? `${styles.actor} ${styles.laserShining}` : styles.actor}
+      className={styles.actor}
       style={{ left: point.x, top: point.y }}
       data-testid={`defense-fielder-${fielder.slot}`}
       data-frame={frame}
       // 반짝이는 순간은 그림이 아니라 색만 바뀌므로 테스트가 볼 표시를 따로 남긴다
       data-laser-shining={isLaserShining ? 'true' : undefined}
     >
-      <ActorSprite folder={folder} frame={frame} paletteIndex={paletteIndex} />
+      <ActorSprite folder={folder} frame={frame} paletteIndex={paletteIndex} isLaserShining={isLaserShining} />
     </div>
   )
 }

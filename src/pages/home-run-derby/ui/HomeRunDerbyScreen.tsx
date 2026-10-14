@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { PixelScreen } from '@/shared/ui'
+import { PressArea } from '@/shared/ui'
+import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
+import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
@@ -21,7 +23,6 @@ import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { derbyMasterBatterOf } from '@/entities/home-run-derby/model/derbyLineup'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
-import * as styles from '@/pages/home-run-derby/ui/HomeRunDerbyScreen.css'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
@@ -244,53 +245,9 @@ export function HomeRunDerbyScreen({
 
   return (
     <>
-      <PixelScreen
-        title="홈런더비"
-        // 공 번호는 HUD 의 공 아이콘(0x45a54)만 그린다 — 웹 전용 배지를 두지 않는다
-        // 결과 창(상태 0x1a)은 키 0x40a08 이 예·아니오만 받는다 — 경기 중 메뉴를 안 띄운다
-        rightKey={
-          isResultShown
-            ? undefined
-            : {
-                label: isMenuOpen ? '닫기' : '메뉴',
-                onPress: menu.toggle,
-              }
-        }
-      >
-        {isMenuOpen && !isResultShown && (
-          <InGameMenu
-            // 홈런더비 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
-            mode={DERBY_MODE}
-            cursor={menu.cursor}
-            onCursorChange={menu.setCursor}
-            onContinue={menu.close}
-            onQuit={onExit}
-            onRestart={() => {
-              menu.close()
-              // 다시하기도 결과 창 [예]와 같이 경기 장면 0x104 를 새로 세운다(0x3c9d8 → 0x27) — 타석 캔버스도 새로 띄운다
-              setStageSerial((serial) => serial + 1)
-              session.restart()
-            }}
-            onOpenHelp={() => {
-              menu.close()
-              setOverlay('조작방법')
-            }}
-            onOpenSettings={
-              settings === undefined || onSettingsChange === undefined
-                ? undefined
-                : () => {
-                    menu.close()
-                    setOverlay('설정')
-                  }
-            }
-          />
-        )}
-        {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
-        <div
-          className={styles.stageArea}
-          // 판이 도는 동안 화면을 누르면 키로 본다(터치용 웹판 편의 — 0xe 의 OK 와 같은 자리)
-          onClick={acceptsConfirm ? confirm : isPlayRunning ? skipHomeRun : undefined}
-        >
+      <RawScreen>
+        {/* 타석 캔버스 — RawScreen 판 (0, 0) 에 맞춘다(`stageScreen.css`) */}
+        <div className={stageScreen.canvasSlot}>
           <BattingStage
             // 하늘 줄 — 세션이 장면 시작 · 결과 진입 0x4f574 에 굴린 구장 +0x10
             skyRow={session.skyRow}
@@ -339,50 +296,91 @@ export function HomeRunDerbyScreen({
             random={random}
             onPitchResolved={(detail) => session.onPitchResolved(detail)}
           />
-
-          {session.result !== null ? (
-            <DerbyResultWindow
-              result={session.result}
-              heldGamePoint={gamePoint}
-              onRetry={() => {
-                setStageSerial((serial) => serial + 1)
-                session.retryFromResult()
-              }}
-              onExit={onExit}
-            />
-          ) : (
-            <>
-              <DerbyHud
-                isPlayShown={isPlayShown}
-                run={run}
-                bestDistance={bestDistance}
-                isEventZoneShown={session.isEventZoneShown}
-                tick={tick}
-                shownCombo={session.shownCombo}
-                distanceBoardValue={
-                  session.distanceBoard === null
-                    ? null
-                    : derbyDisplayDistanceAt(
-                        session.distanceBoard.batted,
-                        Math.floor((performance.now() - session.distanceBoard.startedAt) / millisecondsPerFrame()),
-                        session.distanceBoard.previous,
-                      )
-                }
-                // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
-                batterSide={batterSideOfForm(stageBatter.form ?? 0)}
-              />
-              {/* 0xe 그리기 0x4d9ec 는 타석 화면(0x4c4bc — HUD 0x45a54 포함) 다음에 0x44944 를 그린다 → HUD 위 */}
-              {session.isAwaitingConfirm && (
-                <DerbyMatchupCards
-                  batterHand={batterSideOfForm(stageBatter.form ?? 0)}
-                  pitcherName={pitcher.name ?? undefined}
-                  batter={stageMatchupBatter}
-                />
-              )}
-            </>
-          )}
         </div>
-      </PixelScreen>
+
+        {session.result !== null ? (
+          <DerbyResultWindow
+            result={session.result}
+            heldGamePoint={gamePoint}
+            onRetry={() => {
+              setStageSerial((serial) => serial + 1)
+              session.retryFromResult()
+            }}
+            onExit={onExit}
+          />
+        ) : (
+          <>
+            <DerbyHud
+              isPlayShown={isPlayShown}
+              run={run}
+              bestDistance={bestDistance}
+              isEventZoneShown={session.isEventZoneShown}
+              tick={tick}
+              shownCombo={session.shownCombo}
+              distanceBoardValue={
+                session.distanceBoard === null
+                  ? null
+                  : derbyDisplayDistanceAt(
+                      session.distanceBoard.batted,
+                      Math.floor((performance.now() - session.distanceBoard.startedAt) / millisecondsPerFrame()),
+                      session.distanceBoard.previous,
+                    )
+              }
+              // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
+              batterSide={batterSideOfForm(stageBatter.form ?? 0)}
+            />
+            {/* 0xe 그리기 0x4d9ec 는 타석 화면(0x4c4bc — HUD 0x45a54 포함) 다음에 0x44944 를 그린다 → HUD 위 */}
+            {session.isAwaitingConfirm && (
+              <DerbyMatchupCards
+                batterHand={batterSideOfForm(stageBatter.form ?? 0)}
+                pitcherName={pitcher.name ?? undefined}
+                batter={stageMatchupBatter}
+              />
+            )}
+          </>
+        )}
+
+        {/*
+          웹 제목줄("홈런더비")은 걷었다 — 원본 240×320 장면 한 장뿐이고 공 번호는 HUD 0x45a54 가 그린다.
+          마우스 · 터치 길 — 투명한 누름 칸: 0xe 의 OK · 판(0x17) 건너뛰기(화면 전체) · '*' 메뉴("*MENU" 자리).
+          결과 창(상태 0x1a)은 키 0x40a08 이 예 · 아니오만 받는다 — 경기 중 메뉴 칸을 안 둔다.
+        */}
+        {!isMenuOpen && (acceptsConfirm || isPlayRunning) && (
+          <PressArea label={acceptsConfirm ? '확인' : '건너뛰기'} onPress={acceptsConfirm ? confirm : skipHomeRun} />
+        )}
+        {!isResultShown && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.toggle} />}
+
+        {isMenuOpen && !isResultShown && (
+          <div className={stageScreen.menuLayer}>
+            <InGameMenu
+              // 홈런더비 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
+              mode={DERBY_MODE}
+              cursor={menu.cursor}
+              onCursorChange={menu.setCursor}
+              onContinue={menu.close}
+              onQuit={onExit}
+              onRestart={() => {
+                menu.close()
+                // 다시하기도 결과 창 [예]와 같이 경기 장면 0x104 를 새로 세운다(0x3c9d8 → 0x27) — 타석 캔버스도 새로 띄운다
+                setStageSerial((serial) => serial + 1)
+                session.restart()
+              }}
+              onOpenHelp={() => {
+                menu.close()
+                setOverlay('조작방법')
+              }}
+              onOpenSettings={
+                settings === undefined || onSettingsChange === undefined
+                  ? undefined
+                  : () => {
+                      menu.close()
+                      setOverlay('설정')
+                    }
+              }
+            />
+          </div>
+        )}
+      </RawScreen>
       {overlay === '조작방법' && (
         <HelpScreen
           onBack={() => {

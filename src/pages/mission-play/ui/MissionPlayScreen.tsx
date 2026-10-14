@@ -3,13 +3,15 @@ import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
-import { PixelScreen } from '@/shared/ui'
+import { PressArea, RawScreen } from '@/shared/ui'
+import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/stagePressAreas'
+import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
+import { MissionHud } from '@/pages/mission-play/ui/MissionHud'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
-import * as styles from '@/pages/mission-play/ui/MissionPlayScreen.css'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -17,8 +19,6 @@ import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { goalsOf } from '@/entities/mission/model/missionGoal'
-import { GoalBar } from '@/entities/mission/ui/GoalBar'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
@@ -224,7 +224,6 @@ export function MissionPlayScreen({
   useEffect(() => {
     onPopupFrozenChange?.(isPopupFrozen)
   }, [isPopupFrozen, onPopupFrozenChange])
-  const goals = goalsOf(run.mission, run.progress)
   const isOver = run.status !== '진행중'
   /** [미션+0xbc] — 결과 판 · 정산 효과의 "이겼나" (0x4ea0c 4ef2a · 0x4a384 4a3ea) */
   const isSuccess = run.status === '성공'
@@ -232,7 +231,7 @@ export function MissionPlayScreen({
   const settlementLayers = useSettlementEffectLayers()
   /**
    * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0, 모드 갈림 없음). 결과 연출·메뉴·조작방법·설정이 덮으면
-   * 받지 않는다. ⚠️ 미이식: 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 안내 판 0x44944.
+   * 받지 않는다. 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 소개 판 0x44944 는 아래 `SceneMatchupCards` 가 그린다.
    */
   const isSubstituting = !isOver && substitutionScene !== null
   // 교체 연출 0x16 동안은 0xd · 0xe 가 아니다 — 연출이 끝난 뒤부터 0xd 두 그림을 센다
@@ -269,13 +268,6 @@ export function MissionPlayScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMenuOpen, onSteal, overlay, stealableBases])
 
-  const badgeParts: string[] = []
-  if (run.remainingSeconds !== null) badgeParts.push(`${Math.ceil(run.remainingSeconds)}초`)
-  if (run.remainingPlateAppearances !== null) {
-    badgeParts.push(`${Math.max(0, run.remainingPlateAppearances)}타석`)
-  }
-  if (run.remainingSwings !== null) badgeParts.push(`${Math.max(0, run.remainingSwings)}스윙`)
-
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
@@ -294,54 +286,9 @@ export function MissionPlayScreen({
 
   return (
     <>
-      <PixelScreen
-        title={run.mission.name}
-        badge={badgeParts.join(' · ') || undefined}
-        leftKey={
-          isOver
-            ? // 결과 판(0x19)은 제 키(0x407f0)를 받는다
-              undefined
-            : isAwaitingConfirm && !isMenuOpen
-              ? // 0xe — OK 하나만 받는다 (0x532b0)
-                { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
-            : canSteal
-              ? { label: `도루 ${stealableBases[0]}루`, onPress: () => stealIfFlying(stealableBases[0]) }
-              : undefined
-        }
-        rightKey={
-          isOver
-            ? undefined
-            : { label: isMenuOpen ? '닫기' : '메뉴', onPress: menu.toggle }
-        }
-      >
-        <GoalBar goals={goals} />
-
-        {isMenuOpen && (
-          <InGameMenu
-            // 미션 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
-            mode={MISSION_BATTER_MODE}
-            cursor={menu.cursor}
-            onCursorChange={menu.setCursor}
-            onContinue={menu.close}
-            onQuit={onGiveUp}
-            onRestart={onRestart}
-            onOpenHelp={() => {
-              menu.close()
-              setOverlay('조작방법')
-            }}
-            onOpenSettings={
-              settings === undefined || onSettingsChange === undefined
-                ? undefined
-                : () => {
-                    menu.close()
-                    setOverlay('설정')
-                  }
-            }
-          />
-        )}
-
-        {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
-        <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
+      <RawScreen>
+        {/* 타석 캔버스 — RawScreen 판 (0, 0) 에 맞춘다(`stageScreen.css`) */}
+        <div className={stageScreen.canvasSlot}>
           <BattingStage
             skyRow={skyRow}
             batterAbility={ability}
@@ -440,46 +387,105 @@ export function MissionPlayScreen({
             onPickoff={onPickoff}
             flightProbeRef={flightProbeRef}
           />
-
-          {/*
-            0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 투수·타자 소개 판 0x44944 (모드 검사 없음). 사람이 치므로 타자 PLAYER · 투수 COM.
-            ⚠️ 웹 미션 상태에 없는 칸(이름·기록 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 레코드 +0xb 의 0xb63c0.
-          */}
-          {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
-          {isSubstituting && substitutionScene !== null && (
-            <SubstitutionSceneOverlay
-              key={substitutionScene.serial}
-              aceSlot={substitutionScene.aceSlot ?? null}
-              onDone={() => onSubstitutionSceneDone?.()}
-            />
-          )}
-
-          {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
-            <SceneMatchupCards
-              batterHand={batterSideOfForm(batterLook?.form ?? 0)}
-              pitcher={{ isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) }}
-              batter={{ isComputer: false, ...(batterName === undefined ? {} : { name: batterName }) }}
-            />
-          )}
-
-          {/* 원본 타석 화면에는 글자 안내가 없다 — 웹 전용 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다 */}
-
-          {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
-          {isOver && (
-            <MissionResultBoard
-              isSuccess={isSuccess}
-              effectLayers={settlementLayers}
-              earnedGamePoint={resultBoard?.earnedGamePoint ?? 0}
-              {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
-              {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}
-              onExit={(exit) => {
-                if (resultBoard?.aceMatch === undefined && exit === '다시' && onRetry !== undefined) onRetry()
-                else onFinish()
-              }}
-            />
-          )}
         </div>
-      </PixelScreen>
+
+        {/*
+          미션 HUD 0x36714 — 점수판 0x373d0 끝(0x378f0 → 0x36cb8, 모드 5 · 6)에서 그린다: 오른쪽 위 판에 목표 글 한 줄 · 노란
+          "지금/목표" · 타석 · 스윙 한도 띠, 시간 제한이면 왼쪽 시계. 결과(0x19) 그림 0x4a384 는 점수판을 안 그려 HUD 도 없다.
+          웹 제목줄(미션 이름) · 배지(남은 초 · 타석 · 스윙)와 껍데기 목표 띠(GoalBar)는 걷었다 — 그 값은 이 판이 그린다.
+        */}
+        {!isOver && (
+          <MissionHud
+            mission={run.mission}
+            progress={run.progress}
+            limits={{
+              plateAppearanceLimit: run.mission.plateAppearanceLimit,
+              plateAppearancesUsed: run.mission.plateAppearanceLimit - (run.remainingPlateAppearances ?? run.mission.plateAppearanceLimit),
+              swingLimit: run.mission.swingLimit,
+              swingsUsed: run.mission.swingLimit - (run.remainingSwings ?? run.mission.swingLimit),
+            }}
+            remainingSeconds={run.remainingSeconds}
+          />
+        )}
+
+        {/*
+          0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 투수·타자 소개 판 0x44944 (모드 검사 없음). 사람이 치므로 타자 PLAYER · 투수 COM.
+          ⚠️ 웹 미션 상태에 없는 칸(이름·기록 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 레코드 +0xb 의 0xb63c0.
+        */}
+        {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
+        {isSubstituting && substitutionScene !== null && (
+          <SubstitutionSceneOverlay
+            key={substitutionScene.serial}
+            aceSlot={substitutionScene.aceSlot ?? null}
+            onDone={() => onSubstitutionSceneDone?.()}
+          />
+        )}
+
+        {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+          <SceneMatchupCards
+            batterHand={batterSideOfForm(batterLook?.form ?? 0)}
+            pitcher={{ isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) }}
+            batter={{ isComputer: false, ...(batterName === undefined ? {} : { name: batterName }) }}
+          />
+        )}
+
+        {/* 원본 타석 화면에는 글자 안내가 없다 — 웹 전용 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다 */}
+
+        {/* 경기 상태 0x19 — 미션 결과 판 0x4a384(모드 5·6) · 키 0x407f0 */}
+        {isOver && (
+          <MissionResultBoard
+            isSuccess={isSuccess}
+            effectLayers={settlementLayers}
+            earnedGamePoint={resultBoard?.earnedGamePoint ?? 0}
+            {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
+            {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}
+            onExit={(exit) => {
+              if (resultBoard?.aceMatch === undefined && exit === '다시' && onRetry !== undefined) onRetry()
+              else onFinish()
+            }}
+          />
+        )}
+
+        {/*
+          마우스 · 터치 길 — 투명한 누름 칸: 0xe 의 OK(화면 전체) · '*' 메뉴("*MENU" 자리) · 도루(점수판 루 그림 자리).
+          결과 판(0x19)은 제 키(0x407f0)를 받아 여기 칸을 안 둔다.
+        */}
+        {isAwaitingConfirm && !isMenuOpen && (
+          // 0xe — OK 하나만 받는다 (0x532b0)
+          <PressArea label="확인" onPress={sceneConfirm.confirm} isDisabled={!sceneConfirm.acceptsConfirm} />
+        )}
+        {!isAwaitingConfirm && !isMenuOpen && canSteal &&
+          stealableBases.map((base) => (
+            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
+          ))}
+        {!isOver && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.toggle} />}
+
+        {isMenuOpen && (
+          <div className={stageScreen.menuLayer}>
+            <InGameMenu
+              // 미션 행은 자동진행 자리에 **다시하기**가 온다 (표 0xcfcfc 행 1)
+              mode={MISSION_BATTER_MODE}
+              cursor={menu.cursor}
+              onCursorChange={menu.setCursor}
+              onContinue={menu.close}
+              onQuit={onGiveUp}
+              onRestart={onRestart}
+              onOpenHelp={() => {
+                menu.close()
+                setOverlay('조작방법')
+              }}
+              onOpenSettings={
+                settings === undefined || onSettingsChange === undefined
+                  ? undefined
+                  : () => {
+                      menu.close()
+                      setOverlay('설정')
+                    }
+              }
+            />
+          </div>
+        )}
+      </RawScreen>
       {overlay === '조작방법' && (
         <HelpScreen
           onBack={() => {

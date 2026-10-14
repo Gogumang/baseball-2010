@@ -82,9 +82,9 @@ describe('나만의리그 타자편 경기 중 메뉴 (표 0xcfcfc 행 2)', () =
     expect(screen.getByRole('option', { name: /조작방법/ }).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(screen.getByText('조작방법'))
 
-    // 뷰어 뒤에 경기 장면(머리 제목)이 그대로 있다
+    // 뷰어 뒤에 경기 장면(원본 240×320 판)이 그대로 있다
     expect(screen.getByText('<기본 조작>')).toBeTruthy()
-    expect(screen.getByText(/번타자/)).toBeTruthy()
+    expect(document.querySelector('[data-original-screen] canvas')).not.toBeNull()
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.getByRole('option', { name: /조작방법/ }).getAttribute('aria-selected')).toBe('true')
