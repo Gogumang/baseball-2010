@@ -318,6 +318,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         phaseRef.current = '대기'
         phaseStartedAtRef.current = now
         pitchRef.current = null
+        // 0xf 진입 0x3d954 → 0x35650 → 0xb9318 이 스윙 객체를 대기(상태 5)로 되돌린다 — 그때까지 스윙 끝 칸에 머문다 (`batterFrameAt`)
+        swingStartedAtRef.current = -1
       }
     }
 
@@ -535,6 +537,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       pitchRef.current = null
       buntRef.current = null
       swingRef.current = null
+      swingStartedAtRef.current = -1
       pitchJudgedRef.current = false
       heldResultRef.current = null
       pendingHitRef.current = null

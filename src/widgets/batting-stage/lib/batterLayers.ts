@@ -230,20 +230,33 @@ function aceBatterFrameAt(tick: number, swingTick: number | null, isBunting: boo
   if (swingTick !== null) {
     const steps = ACE_SWING_STEPS[aceOrder]
     const elapsed = tick - swingTick
-    // ⚠️ 근사(일반 타자와 같다): 원본은 스윙 마지막 칸에 머문다 — 웹은 스윙이 끝나면 대기 칸으로 돌아간다
-    if (elapsed >= 0 && elapsed < steps.length) return ACE_SWING_START + steps[elapsed]
+    // 스윙 끝 칸에 머문다 (`batterFrameAt` 주석 — 0xb9168 · 0xb928c)
+    if (elapsed >= 0) return ACE_SWING_START + steps[Math.min(elapsed, steps.length - 1)]
   }
   const idle = ACE_IDLE_FRAMES[aceOrder]
   return idle[Math.floor(Math.max(0, tick) / IDLE_TICKS_PER_FRAME) % idle.length]
 }
 
+/**
+ * **스윙은 마지막 칸에 머문다** (갱신 0xb9168 · 틱 함수 0xb928c, 2026-10-14 직접 뜸):
+ * ```
+ * b9168  상태 3(스윙): 지연 r5 = 0 · 칸 수 r1 = 마타자 0xd8ac5[u] = [8,9,7,7,7] · 일반 v ≤ 1 → 7 · v 2·3 → 5 · 돌기 r6 = 0
+ * b921e  카운터 +0x20 ++ ; 옛 카운터 ≥ r5 이면 — k ≥ r1 − 1 이면 r6 == 0 이라 **아무것도 안 한다**(k 가 r1 − 1 에 선다),
+ *        아니면 k++ · 카운터 0                                         ; 돌기(r6 = 1)는 상태 5(대기)뿐
+ * b928c  b9168 뒤 +0xd(스윙 중) · 상태 3 이면 — 마타자 k == 0xd8ac5[u](칸 수) · 일반 k == 7 | 5 일 때만 0xb915c(S, 0)
+ *        → k 는 칸 수 − 1 에서 멈추므로 **이 갈래는 안 선다**(원본 그대로)
+ * 3d954  0xf 진입 → 0x35650 → 스윙 객체 vtable +0xc = 0xb9318 → 0xb915c(S, 5) — 다음 공의 0xf 에서야 대기로 돌아온다
+ *        (타석 교대 0x48d50 48ee4 도 0x35650)
+ * ```
+ * 그래서 스윙이 끝나면 0x12 · 0x13 · 인플레이 동안 마지막 칸 그대로고, 부르는 쪽이 0xf(웹 '대기')에 들 때 `swingTick` 을 지운다.
+ */
 export function batterFrameAt({ tick, swingTick, isBunting, bodyType, aceOrder }: BatterPoseInput): number {
   if (isAceBatterOrder(aceOrder)) return aceBatterFrameAt(tick, swingTick, isBunting, aceOrder)
   const pose = POSES[bodyType] ?? POSES[0]
   if (isBunting) return pose.bunt
   if (swingTick !== null) {
     const elapsed = tick - swingTick
-    if (elapsed >= 0 && elapsed < pose.swingLength) return pose.swingStart + elapsed
+    if (elapsed >= 0) return pose.swingStart + Math.min(elapsed, pose.swingLength - 1)
   }
   const cell = Math.floor(Math.max(0, tick) / IDLE_TICKS_PER_FRAME) % pose.idle.length
   return pose.idle[cell]
