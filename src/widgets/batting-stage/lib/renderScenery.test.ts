@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
-  RIGHT_HANDED_CROWD_SHIFT, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
+  MATCH_INFO_STADIUM_MIRRORED, RIGHT_HANDED_CROWD_SHIFT, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
   drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
@@ -203,6 +203,10 @@ describe('drawMatchInfoStadium — 경기정보 바탕의 날 그림', () => {
     expect(fills[0]).toEqual({ style: '#fff', rect: [0, 0, 240, 320] })
     expect(fills[1]?.rect).toEqual([0, 0, 240, 12])
     expect(translates).toEqual([[0, 2]])
+  })
+
+  it('무대는 생성자 0x76ac8 이 +0x60 = 0 으로 두어 우타 거울 길이다', () => {
+    expect(MATCH_INFO_STADIUM_MIRRORED).toBe(true)
   })
 
   it('구장 8 — 흰색 뒤 하늘 단색 한 칸', () => {

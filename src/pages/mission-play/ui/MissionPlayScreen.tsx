@@ -23,6 +23,7 @@ import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
@@ -116,6 +117,16 @@ interface MissionPlayScreenProps {
   readonly runnerRunAbilities?: Partial<Record<'first' | 'second' | 'third', number>>
   /** st[0x15 + i] — 이번 공에 도루를 출발한 주자의 루(세션 `stealingFrom`). 그 주자는 루에 안 그린다 */
   readonly stealingFrom?: readonly number[]
+  /**
+   * 타자 · 루 주자의 마선수 번호(주자 +0x9c, 세션 `missionRunnerAces`) — 루상 주자 0x35b94 가 마선수 주자를 타석 교대 0x483a0 이
+   * +0x1c 에 실은 ace/defender 그림으로 그린다. 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
+  /**
+   * 마운드 투수 체력% (`0xaebb1(수비 팀)`, 세션 `opponentStaminaPercent`) — 투수 그리기 0x38d1c 가 34 이하면 지친 눈을 그린다.
+   * 모드 6 도 그린다(38ed6 은 모드 7 만 거른다). 마투수는 타석 화면이 거른다(38f56). 안 넘기면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
   /** 루상 주자 애니 시계 — 미션 장면 수명(`BattingStage.runnerAnimationClock`) */
   readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
   /** 경기 스킬 표시 판의 장면 칸(함성 비트 칸 · 애니 7 · 8) — 미션 장면 수명. 안 주면 타석 화면이 사는 동안만 */
@@ -189,6 +200,8 @@ export function MissionPlayScreen({
   stealableBases = [],
   runnerRunAbilities,
   stealingFrom,
+  runnerAces,
+  pitcherStaminaPercent,
   runnerAnimationClock,
   skillPanelScene,
   onRestart,
@@ -327,6 +340,8 @@ export function MissionPlayScreen({
             pitcherAbility={pitcherAbility}
             // 마운드 투수 장비 겹 — 타석 교대 0x47cc8 의 48138~4816a (모드 6 도 같다)
             pitcherEquipmentNibbles={opponent === null ? pitcherEquipmentNibbles : undefined}
+            {...(runnerAces === undefined ? {} : { runnerAces })}
+            pitcherStaminaPercent={pitcherStaminaPercent ?? null}
             isEagleEyeEnabled={false}
             // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0 · 팀 st[0x28 + 칸])을 HUD 에 보인다
             hud={{

@@ -36,7 +36,9 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import {
   hiddenStealBasesOf,
   mySpecialSwingRemainingOf,
+  opponentMoundStaminaPercentOf,
   opponentPitcherEquipmentOf,
+  ourRunnerAcesOf,
   runnerRunAbilitiesOf,
   stealableBasesOf,
 } from '@/features/play-game/model/gameFlow'
@@ -386,6 +388,10 @@ export function GameScreen({
               // 새 타석의 0xf 진입은 0xe 의 첫 OK 뒤라 받은 OK 수를 넘긴다
               hiddenRunnerBases: hiddenStealBasesOf(progress, confirmedCountOf(progress.sceneConfirm)),
             }}
+            // 루상 주자 0x35b94 — 주자 +0x9c ≠ −1(마선수)이면 타석 교대 0x483a0 이 +0x1c 에 실은 ace/defender 그림 (수비 판과 같은 값)
+            runnerAces={ourRunnerAcesOf(progress)}
+            // 투수 그리기 0x38d1c — 상대 마운드 체력% ≤ 34 면 지친 눈(모드 4 도 그린다 — 38ed6 은 모드 7 만 거른다). 마투수면 null
+            pitcherStaminaPercent={opponentMoundStaminaPercentOf(progress)}
             isEagleEyeEnabled={isEagleEyeEnabled}
             acePitcher={
               ace === null

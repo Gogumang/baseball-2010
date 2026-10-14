@@ -294,6 +294,26 @@ function drawFence(context: CanvasRenderingContext2D, state: SceneryState, offse
   context.restore()
 }
 
+/*
+ * **둘째 관중 묶음 [구장+0x78]** — 0x77974 의 77c24~77cda (2026-10-14 직접 떴다). 첫 묶음 +0x74(`stadium/ppl.pzx`)와 똑같이 그린다:
+ * ```
+ * 77c24  설정 +0x3a(전광판) == 0 이면 건너뜀 · 77c38 [구장+0x78] == 0 이면 건너뜀
+ * 77c40  프레임 (s8)구장+0x70 의 파트마다: x = 기준(sp+0x40) + dx (+0x60 == 0 이면 + 0x78) · y = 기준(sp+0x44) + dy · 효과 0 · 그림 vt+0x14
+ * ```
+ * 그런데 +0x78 은 jar 안의 그림이 아니다. 적재 0x76ba4 의 76ddc~76e98:
+ * ```
+ * 76ddc  옛 +0x78 이 있으면 풀고 0
+ * 76df8  설정 +0x3a == 0 이면 안 싣는다
+ * 76e04  0x69fd1(…, "ppl.pzx" 0xd3904) — 단말 저장소에 그 파일이 있는가 (경로에 "stadium/" 가 없다)
+ * 76e10  오늘 = 0xbaaf9 의 연 · 월 · 일 → 연×10000 + 월×100 + 일 + 19000100
+ *        만료 = 저장 +0x149 · +0x14a · +0x14b → 연×10000 + 월×100 + 일 + 20000000
+ * 76e76  만료 ≥ 오늘이면 0xb9719("ppl.pzx", 0, …) 로 실어 +0x78 · 아니면 76e9e 0x6a101 로 파일을 지운다
+ * ```
+ * 그 파일과 만료일은 네트워크 받기 0x7262c 가 쓴다(72b9c 0x69fe1 쓰기 · 72c50~ 저장 +0x149~+0x14b — `d_level.dat` 과 같은 받기).
+ * 곧 **내려받은 광고 관중 그림**이라 원본 jar(`base/work/jar` 에는 `stadium/ppl.pzx` 만 있다)만으로는 안 그려진다. 웹은 받기가 없어
+ * 그리지 않는다 — 원본의 "받은 적 없는 단말" 과 같다. 시즌 구장 0x77494 는 관중 ppl 을 아예 안 그린다(셋째 인자 0).
+ */
+
 /** 박스 기준을 옮길 값 — 좌타 0, 우타면 그 그림으로 잰 값(그림이 아직 없으면 null: 놓을 자리를 못 잰다) */
 function boxShiftOf(frame: PlacedFrame | null, isMirrored: boolean): number | null {
   if (!isMirrored) return 0
@@ -316,6 +336,7 @@ function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState, 
   // 관중 ppl — 우타도 안 뒤집고 옆으로만 옮긴다 (77bea~77c16)
   const crowd = placedFrame(CROWD_FRAMES, state.stadium)
   drawAtFenceAnchor(context, crowd, false, isMirrored ? RIGHT_HANDED_CROWD_SHIFT : 0)
+  // 둘째 관중 묶음 [구장+0x78] (77c24~77cda) — 내려받는 광고 그림이라 웹은 안 그린다 (위 "둘째 관중 묶음" 주석)
 
   // 전광판 (board_ani) — 환경설정 +0x3a OFF 면 그리지 않는다 (R2-game-effects.md 6절)
   if (state.isScoreboardOn === false) return
@@ -485,7 +506,9 @@ function drawField(context: CanvasRenderingContext2D, grassPalette: number | nul
  * - 하늘 칸 구장+0x18 은 0x783b0 이 `[0x1552d0c]+0x6b`(마지막 경기 상태의 이닝)를 읽는다 — 웹은 그 값을 안 들어 부르는 쪽이 넘긴다.
  * - 구름 자리(구장 안 구름 칸)와 전광판 글자 자리(+0x8c)는 마지막으로 흐른 값 그대로인데 웹은 처음 값(틱 0)으로 둔다.
  * - 전광판 칸 3 의 팀 아이콘(구장+0x80 · +0x84)은 이 장면에서 누가 채우는지 못 찾아 안 그린다.
- * - 바닥 0x7725c 의 x 는 구장+0x60(타자 손)에 따라 1 줄어드는데 그 값도 못 찾았다 — 경기 배경과 같이 무시한다.
+ * - ⚠️ 미이식: 이 구장([this+0x10c])도 0x3b14 의 4032 가 생성자 0x76b24 로 만들어 +0x60 = 0(76ae2)이다 — 경기정보 무대
+ *   (`MATCH_INFO_STADIUM_MIRRORED`)처럼 시즌 구장 0x77494 · 바닥 0x7725c 가 우타 거울 길로 그려질 것이다. 이 장면에서 +0x60 을 다시
+ *   쓰는 곳은 없다(쓰는 곳 전수 — 경기정보 무대 주석). 미리보기 카메라(−165)에서 바닥 자르기와 거울을 맞추는 일이 남아 안 뒤집는다.
  */
 export const STADIUM_PREVIEW_CAMERA = { x: -165, y: -80 } as const
 
@@ -563,6 +586,17 @@ export function drawStadiumPreview(context: CanvasRenderingContext2D, state: Sta
  */
 export const MATCH_INFO_STADIUM_CAMERA = { x: -120, y: -68 } as const
 
+/**
+ * **경기정보 무대는 우타 거울로 그린다** (2026-10-14 직접 떴다). 무대는 세 진입이 모두 생성자 0x76b24(0x314b0 315c6 · 0x6548 67dc ·
+ * 0x1c46c 1c7ae)로 새로 만들고, 0x76b24 → 0x76ac8 이 76ade~76ae2 에서 **+0x60 = 0** 으로 둔다. 그 뒤 진입이 채우는 칸은 +0x70 · +0x80 ·
+ * +0x84 · +0xc 이고 0x5fd04 의 0x76b6c · 0x76ba4 · 0x783b0 · 0x76fc4 도 +0x60 을 안 쓴다 — `adds rN, #0x60 ; strb [rN]` 을 .text
+ * 전체에서 훑으면 +0x60 을 쓰는 곳은 0x76ae2(생성자) 와 경기 장면 구장(장면 +0xf10)을 적는 다섯 곳(0x3adbc · 0x3b108 · 0x47d62 ·
+ * 0x48890 · 0x516b8 — 모두 `[장면+0xf10]` 에 0xb63c1 타자 손)뿐이다(str/strh 로 +0x5c~+0x60 을 덮는 곳도 구장 클래스 안에 없다).
+ * 0x77974 의 [sp+0x48] = 무대+0x60(779a0) 이 0 이므로 펜스 · 바닥은 효과 0x11 로 뒤집히고 팀 아이콘 · 전광판 글자 · 관중 ppl 은
+ * 경기 우타와 같이 옮겨진다.
+ */
+export const MATCH_INFO_STADIUM_MIRRORED = true
+
 export interface MatchInfoStadiumState {
   /** 무대 +0x70 — 펜스 프레임 · 하늘 단색(8) */
   readonly stadium: number
@@ -620,12 +654,12 @@ export function drawMatchInfoStadium(context: CanvasRenderingContext2D, state: M
   context.save()
   context.translate(0, dy)
   if (!isFlatSky && isCloudVisible(colorIndex)) drawClouds(context, 0, cloudPaletteRowOf(colorIndex))
-  // 일반 구장 0x77974 — 펜스 프레임 · 팀 아이콘 · 관중 · 전광판(틱 0)
-  // ⚠️ 미확인: 이 무대의 +0x60(타자 손)을 누가 쓰는지 안 봤다 — 예전처럼 좌타(안 뒤집음)로 둔다
-  drawFenceParts(context, scenery, false)
+  // 일반 구장 0x77974 — 펜스 프레임 · 팀 아이콘 · 관중 · 전광판(틱 0). 무대 +0x60 == 0 이라 **우타 거울** 길이다
+  // (`MATCH_INFO_STADIUM_MIRRORED` — 펜스 뒤집기 · 아이콘 · 글자 옮김 · 관중 ppl 141 옮김)
+  drawFenceParts(context, scenery, MATCH_INFO_STADIUM_MIRRORED)
   context.restore()
-  // 바닥 0x7725c — 무대+0xc 줄
-  drawField(context, state.fieldPalette, dy)
+  // 바닥 0x7725c — 무대+0xc 줄, +0x60 == 0 이라 772ca 우타 갈래(효과 0x11)
+  drawField(context, state.fieldPalette, dy, MATCH_INFO_STADIUM_MIRRORED)
   // 하늘 조명 0x78490(무대, 0, 1)
   drawSkyLight(context, scenery, colorIndex)
 }

@@ -51,7 +51,15 @@ import { GAUGE_TARGET_FRAME, drawPitchInputSprites, drawPitchInputUnderlay, draw
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
-import { PLAYER_EFFECT_FRAMES, pitcherFatigueAnimationOf, pitcherFatigueFrameAt, showsPitcherFatigue } from '@/widgets/batting-stage/lib/pitcherFatigue'
+import {
+  MISTAKE_MARK_ANIMATION,
+  MISTAKE_MARK_OFFSET_Y,
+  PLAYER_EFFECT_FRAMES,
+  pitcherFatigueAnimationOf,
+  pitcherFatigueFrameAt,
+  showsPitcherFatigue,
+  showsPitcherMistakeMark,
+} from '@/widgets/batting-stage/lib/pitcherFatigue'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { UI_COLORS } from '@/shared/config/design'
 
@@ -157,6 +165,11 @@ export interface StageScene {
    * (`pitcherFatigue`). 안 넘기면 안 그린다
    */
   readonly pitcherStaminaPercent?: number | null
+  /**
+   * 실투 공을 놓은 틱부터 센 그림 수(1 부터) — 1~4 면 투수 그리기 0x38d1c 가 머리 위에 player_effect 애니 13 "!" 를 그린다
+   * (투구 객체 +8, 놓기 0x4dc78 의 4deae · `pitcherFatigue` 의 실투 "!"). 안 넘기거나 null 이면 안 그린다
+   */
+  readonly pitcherMistakeMarkDraw?: number | null
   readonly acePitcher: {
     readonly framesUrl: string
     readonly frameCount: number
@@ -228,7 +241,8 @@ export function renderBattingStage(
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
-  // 0x38d1c 의 체력 그림 — 같은 깊이(24500)로 투수 다음에 들어간다
+  // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
+  drawPitcherMistakeMark(context, scene, side)
   drawPitcherFatigue(context, scene, side)
   const special = scene.specialSwingEffect ?? null
   // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
@@ -424,6 +438,19 @@ function drawHalfShaded(context: CanvasRenderingContext2D, image: HTMLImageEleme
   }
   layer.putImageData(pixels, 0, 0)
   context.drawImage(canvas, x, y)
+}
+
+function drawPitcherMistakeMark(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {
+  const drawCall = scene.pitcherMistakeMarkDraw ?? null
+  if (!showsPitcherMistakeMark(scene.scenery.gameMode, drawCall) || drawCall === null) return
+  const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[MISTAKE_MARK_ANIMATION]
+  const step = entries === undefined ? null : pitcherFatigueFrameAt(entries, drawCall)
+  const placed = step === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, step.frame)
+  if (step === null || placed === null) return
+  // 38f24 x = 투수 x(좌투면 + 1) · 38f22 y = 투수 y − 0x34 · 효과 0 — 좌투도 안 뒤집는다
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  const { axisX } = pitcherMirrorOf(anchor.x, scene.pitcherHand ?? 0)
+  context.drawImage(placed.image, axisX + step.dx + placed.offsetX, anchor.y + MISTAKE_MARK_OFFSET_Y + step.dy + placed.offsetY)
 }
 
 function drawPitcherFatigue(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {
