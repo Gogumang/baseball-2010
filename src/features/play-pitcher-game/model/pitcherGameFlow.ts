@@ -29,7 +29,9 @@ import {
   withAceBatterLineup,
 } from '@/features/play-game/model/gameAces'
 import type { GameAcePitcher, GameAceSetup, GameTeamAces } from '@/features/play-game/model/gameAces'
-import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel } from '@/entities/mission/model/aceLevel'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
+import type { RosterPlayer } from '@/shared/config/original/roster'
 import {
   PITCHERS_PER_TEAM,
   batterAt,
@@ -106,6 +108,7 @@ import type { LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPla
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -758,45 +761,43 @@ function withOutgoingStamina(table: readonly number[], outgoing: HalfInningMound
 /**
  * 상대 타순 칸의 타자 능력치 (히트·파워·수비·주루 — 레코드 순서 그대로).
  *
- * **히트는 경기용 값**이다 — CPU 타자 결정 0x34334 가 `0xb570d(ctx, 0, 타자, 1, 90, 1)` 로 읽는다
- * (Q1 1b, ce462ce). 모드 3 에서 0xb570c 는:
+ * 네 칸 모두 밑값은 레코드의 **`0xb6414(rec, k, 1)`** 이다 (`recordAbilityOf` — 장비 니블 → 장착 스킬 5 무력감 −100 ·
+ * 7 전설 +50 · 타자 스킬 20 수비 −100, b6494~b6512). 경기용 능력치 0xb570c/0xb570d 가 첫머리 b5728 에서 플래그 1 로 부르고,
+ * 모드 3 에서는:
  * ```
- * b5728  v = 0xb6415(타자, 0, 1)          ; 마선수 배율 → 장비 → 스킬
+ * b5728  v = 0xb6415(타자, k, 1)          ; 마선수 배율 → 장비 → 스킬
  * b574a  모드 3·4: 0xb6389(타자) 거짓(내 육성 선수가 아니다) → b58e6
  * b58e6  체력 인자 90 → 감소 없음
  * b593a  팀 능력치 — 모드 마스크 0x306 = {1,2,8,9} 라 모드 3 은 없다
  *        코치 — 모드 2 만 · 0..999 로 자른다
  * ```
- * 그래서 `gameAbilityOf(모드 3, 내 팀 아님)` = 날 값을 0..999 로 자른 값이다.
- * ⚠️ 0xb6414 의 스킬 보정(5 −100 · 7 +50)은 웹 로스터에 스킬 비트(+0x14)가 없어 못 붙인다 — 미해결.
- *    상대 로스터는 마선수도 장비도 없어 그 둘은 원래 0 이다.
- * 파워·수비·주루는 이 길이 아니라(0xab214·수비·주루가 저마다 부른다) 여기서 손대지 않는다.
+ * 그래서 `gameAbilityOf(모드 3, 내 팀 아님)` = 0xb6414 플래그 1 값을 0..999 로 자른 값이다.
+ * - 히트: CPU 타자 결정 0x34334 가 `0xb570d(ctx, 0, 타자, 1, 90, 1)` 로 읽는다 (Q1 1b, ce462ce).
+ * - 파워: 스윙 결과 0xab214 가 `0xb570d(팀, 1, 타자, 1, 0x5a, 1)` 로 읽는다 (ab4fe).
+ * - 주루: 주자 속도 `0xb570c(팀, 3, 주자, …, 90)` (I-controls 3a).
+ * - 수비: 이 타자가 수비에 서는 일은 사람 장면에 없다 — 같은 레코드 칸을 그대로 둔다.
+ * 붙박이 줄의 스킬 비트 · 장비 니블은 Xls 행 그대로다(`RosterPlayer.skillBits` · `equipment`) — 간이 타석
+ * (`teamRoster.quickBatterOf`)과 같은 밑값이다. 142 가 넣은 마타자는 레벨 배율(b6438) 뒤 같은 단계(`aceRecordAbilityAtLevel`).
  */
 function opponentBatterAbility(options: PitcherGameOptions, rosterSlot: number) {
   // 142 가 상대 명단 9번에 넣은 마타자가 CPU 대타로 서면 그 레코드 — 0xb6415 첫 단계가 레벨 배율을 먹인다
   const ace = rosterSlot === ACE_BATTER_ROSTER_SLOT ? aceBatterAbilityOf(options) : undefined
-  if (ace !== undefined) {
-    return {
-      hit: gameAbilityOf({ mode: PITCHER_EDITION_MODE, base: ace.hit, isPitcher: false, slot: BATTER_SLOT.히트, isMyTeam: false }),
-      power: ace.power,
-      defense: ace.defense,
-      run: ace.run,
-    }
-  }
   const roster = teamBatters(options.opponentTeamId)
-  const player = roster[rosterSlot % roster.length]
+  const record = ace ?? recordBatterAbilityOf(roster[rosterSlot % roster.length])
+  const gameAbility = (base: number, slot: number) =>
+    gameAbilityOf({ mode: PITCHER_EDITION_MODE, base, isPitcher: false, slot, isMyTeam: false })
   return {
-    hit: gameAbilityOf({
-      mode: PITCHER_EDITION_MODE,
-      base: player.ability[0],
-      isPitcher: false,
-      slot: BATTER_SLOT.히트,
-      isMyTeam: false,
-    }),
-    power: player.ability[1],
-    defense: player.ability[2],
-    run: player.ability[3],
+    hit: gameAbility(record.hit, BATTER_SLOT.히트),
+    power: gameAbility(record.power, BATTER_SLOT.파워),
+    defense: gameAbility(record.defense, BATTER_SLOT.수비),
+    run: gameAbility(record.run, BATTER_SLOT.주루),
   }
+}
+
+/** 붙박이 줄 레코드의 `0xb6414(rec, k, 1)` 네 칸 (히트·파워·수비·주루) */
+function recordBatterAbilityOf(player: RosterPlayer) {
+  const [hit, power, defense, run] = recordAbilityOf(player, false)
+  return { hit, power, defense, run }
 }
 
 /**
@@ -843,12 +844,12 @@ export function myMoundStaminaOf(progress: PitcherGameProgress): {
   }
 }
 
-/** 상대 마타자의 레벨 배율 먹은 네 칸 (히트·파워·수비·주루) */
+/** 상대 마타자 레코드의 `0xb6414(rec, k, 1)` 네 칸 — 레벨 배율(b6438) 뒤 장비 · 스킬 단계 (히트·파워·수비·주루) */
 function aceBatterAbilityOf(options: PitcherGameOptions) {
   const index = teamAcesOf(options, false).batter
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
-  return aceAbilityAtLevel(player.ability, aceLevelOf(options.aces?.levels, aceLevelSlotOf('타자', index + 1)))
+  return aceRecordAbilityAtLevel(player, aceLevelOf(options.aces?.levels, aceLevelSlotOf('타자', index + 1)))
 }
 
 /** 간이 타석의 타자 — 명단 칸이 마타자 칸이면 142 가 넣은 마타자 */
@@ -1563,6 +1564,16 @@ function runAbilitiesOnBaseOf(progress: PitcherGameProgress): Partial<Record<0 |
   return runs
 }
 
+/** 루별 주루 표에서 루 위 주자 칸(1~3)만 — 견제 판 입력(`PickoffPlayInput.runAbilities`) */
+function runnerRunsOnBaseOf(runs: Partial<Record<0 | 1 | 2 | 3, number>>): Partial<Record<1 | 2 | 3, number>> {
+  const onBase: Partial<Record<1 | 2 | 3, number>> = {}
+  for (const base of [1, 2, 3] as const) {
+    const run = runs[base]
+    if (run !== undefined) onBase[base] = run
+  }
+  return onBase
+}
+
 /** 인플레이가 아닌 타석 끝(삼진·볼넷·사구·홈런) — 0xae24c 의 보통 길 뒤 0x17(밀어내기)·정산 0xa8024 */
 function finishNonPlayOutcome(
   progress: PitcherGameProgress,
@@ -1715,6 +1726,8 @@ export function pickoff(
     fielderPlates: myFielderPlatesOf(progress),
     runnerAces: opponentRunnerAcesOf(progress),
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
+    // 루별 주자 주루 — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 든다 (타자는 견제 판에 안 뛴다)
+    runAbilities: runnerRunsOnBaseOf(runAbilitiesOnBaseOf(progress)),
     random,
     offenseIsCpu: true,
     // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
@@ -1867,6 +1880,8 @@ function defensePlayInputOf(
     runnerAces: opponentRunnerAcesOf(progress),
     // 주자는 상대 타자다 — 지금 타순 칸의 주루
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
+    // 루별 주자 주루 — 주자마다 제 레코드 0xb570c(팀, 3, 주자, …, 90). 0 = 타자주자(지금 타자)
+    runAbilities: runAbilitiesOnBaseOf(progress),
     random,
     // 나만의리그 투수편 = 전역 모드 3
     gameMode: PITCHER_EDITION_MODE,
@@ -3142,7 +3157,8 @@ function applyTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomP
  *
  * `bothTeamsAreCpu` 는 거짓 — 모드 3 경기 준비 `0x3a20a` 가 내 팀을 사람 팀으로 적는다. 다만 마무리 굴림 `0xac360` 은
  * 벤치에 마선수가 있을 때만(0xb8a8d) 돌아 이 화면 로스터에서는 돌지 않는다.
- * ⚠️ 상대 팀 사기는 이 화면이 들고 있지 않아 100 으로 본다 — **근사다** (타자편 `gameFlow.quickDefenseOf` 와 같다).
+ * 사기는 용량 `0x66e44` 의 `V[+2]` — 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 3 → 0x1f940)를 찾으므로 상대 투수는
+ * 상대 팀 레코드 사기다(`teamRecordMoraleOf`, 표값). 간이 엔진 소모(0xa5e14)와 체력 막대가 같은 값을 본다.
  */
 function quickDefenseOf(
   progress: PitcherGameProgress,
@@ -3186,7 +3202,7 @@ function quickDefenseOf(
     lead: isOurs
       ? progress.game.ourScore - progress.game.opponentScore
       : progress.game.opponentScore - progress.game.ourScore,
-    morale: isOurs ? options.teamMorale : 100,
+    morale: isOurs ? options.teamMorale : teamRecordMoraleOf(options.opponentTeamId),
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다

@@ -1,4 +1,4 @@
-import { TEAMS } from '@/shared/config/original/teams'
+import { DEFAULT_TEAM_MORALE, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
@@ -63,12 +63,11 @@ const COOL_SKILL = 22
 /** 행운 스킬 6 — 경기 뒤 사기 +1 (pitcherGameEvaluation 의 `hasLuckSkill`) */
 const LUCK_SKILL = 6
 
-/** 팀 사기 기본값 — 팀 레코드 s16 +2 (XlsTEAM_DATA 둘째 u16). 전 팀이 100 으로 시작한다 */
-const TEAM_MORALE_VALUE_INDEX = 1
-export const DEFAULT_TEAM_MORALE = 100
+/** 팀 사기 기본값 — 팀 레코드 s16 +2 (XlsTEAM_DATA 둘째 u16). 전 팀이 100 으로 시작한다 (`entities/team/model/teamMorale`) */
+export { DEFAULT_TEAM_MORALE }
 
 export function teamMoraleOf(teamId: number): number {
-  return TEAMS[teamId]?.values[TEAM_MORALE_VALUE_INDEX] ?? DEFAULT_TEAM_MORALE
+  return teamRecordMoraleOf(teamId)
 }
 
 export interface PitcherGameSettings {
