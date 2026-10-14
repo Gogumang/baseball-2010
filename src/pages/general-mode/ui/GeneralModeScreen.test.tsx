@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
@@ -197,9 +198,20 @@ describe('경기진행 설정', () => {
 describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
   const 줄이름 = (index: number) =>
     screen.getByTestId(`엔트리-줄-${index}`).querySelectorAll('span')[1]?.textContent ?? ''
+  // 빠른실행 22 는 들어올 때 연출이 있어 머리띠 5 · 배너 4 · 값 줄 펼침 8 그림 뒤(그림 16)부터 키를 받는다 (0x311b2)
+  const 연출_뒤_띄우기 = (overrides: Partial<Props>) => {
+    vi.useFakeTimers()
+    띄우기(overrides)
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 17)
+    })
+  }
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it("'4' 로 유저 팀 투수 엔트리를 열고, 0번과 2번을 바꾸면 경기정보 선발이 바뀐다 — '6' 으로 돌아온다", () => {
-    띄우기({ isQuickStart: true })
+    연출_뒤_띄우기({ isQuickStart: true })
     fireEvent.keyDown(window, { key: '4' })
     const 둘째 = 줄이름(2)
     for (const key of ['5', 'ArrowDown', 'ArrowDown', '5']) fireEvent.keyDown(window, { key })
@@ -211,7 +223,7 @@ describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
   })
 
   it("'6' 으로 연 CPU 팀 엔트리는 보기 전용이다 — OK 해도 순서가 그대로다", () => {
-    띄우기({ isQuickStart: true })
+    연출_뒤_띄우기({ isQuickStart: true })
     fireEvent.keyDown(window, { key: '6' })
     const 첫째 = 줄이름(0)
     for (const key of ['5', 'ArrowDown', '5']) fireEvent.keyDown(window, { key })
