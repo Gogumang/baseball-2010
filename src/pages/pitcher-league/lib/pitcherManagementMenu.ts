@@ -70,9 +70,9 @@ export const PITCHER_ITEM_SLOTS: readonly PitcherMenuEntry[] = [
 export const PITCH_WINDOW_CHOICES: readonly [string, string] = ['마구', '구질']
 
 /**
- * ⚠️ **추정**: 팝업 0x78 은 좌우로 `+0x166` 을 토글해 탭 `+0x166 ? 2 : 1` 을 고른다(R9). 탭 1·2 중
- * 어느 쪽이 마구이고 어느 쪽이 구질인지는 문서에 없다 — `pitcherManagement.ts` 가 "그 창에 마구와
- * 구질 훈련이 함께 있다" 고만 적어 **탭 1 = 마구 · 탭 2 = 구질** 로 둔다.
+ * 팝업 0x78 은 좌우로 `+0x166` 을 토글해 탭 `+0x166 ? 2 : 1` 을 고른다 — 키 0x19398 이 [[장면+0xe0]+0x188] 에 적는다(193ca~19422).
+ * **탭 1 = 마구 · 탭 2 = 구질** 은 확정(2026-10-14): 그리기 0x190f8 이 +0x166 == 0 일 때 고르는 왼쪽 칸 글이 img_text 308 "마구",
+ * 오른쪽이 309 "변화구"다(`PitchChoicePopup`).
  */
 export const PITCH_WINDOW_TABS = { 마구: 1, 구질: 2 } as const
 
