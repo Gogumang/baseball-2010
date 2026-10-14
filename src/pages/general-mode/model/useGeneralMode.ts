@@ -98,7 +98,8 @@ export interface GeneralModeSession {
   readonly cpuMatchInfo: CpuMatchInfo | null
   /**
    * 22 진입 `0x314b0` 이 새로 만든 무대(메뉴+0xb8)의 구장 +0x70 — `0x78664(무대, st+0x30)` (`rollStadiumNumber`).
-   * 경기정보 구장 미리보기 `0x5fd04` 가 그리는 구장이다(웹은 아직 미리보기를 안 그린다). 상태 22 에 들어온 적이 없으면 null
+   * 경기정보 구장 미리보기 `0x5fd04` 가 그리는 구장이다 — 웹은 `matchInfoStage` 로 떠 둔 바탕을 `MatchInfoStadiumBackdrop` 이 그린다.
+   * 상태 22 에 들어온 적이 없으면 null
    */
   readonly matchInfoStadium: number | null
   /**

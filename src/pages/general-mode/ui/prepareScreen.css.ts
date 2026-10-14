@@ -32,12 +32,15 @@ export const fillPanel = style({
   pointerEvents: 'none',
 })
 
-/** 고를 수 있는 칸 — 격자 칸 그리기 0x7a571 이 미해독이라 테두리·바탕은 근사다 */
+/**
+ * 격자 칸을 누르는 자리 — 그림(남색 둥근 바탕 · slt_frame 이미지 0 · 얼굴 · 커서 이미지 1)은 화면이 원본 자리에 따로 그린다
+ * (격자 그리기 0x7a571 종류 7, `prepareLayout` 의 `ACE_LAYOUT.cellBack` 머리말). 이 단추는 테두리·바탕이 없다.
+ */
 export const cell = style({
   position: 'absolute',
   boxSizing: 'border-box',
   padding: 0,
-  border: '1px solid transparent',
+  border: 'none',
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
   font: 'inherit',
@@ -46,24 +49,24 @@ export const cell = style({
   imageRendering: 'pixelated',
 })
 
-export const cellSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
+/**
+ * 효과 0xa(회색) — 원본은 팔레트 픽셀 함수 0x97f01 의 회색 식이다(R6 · `widgets/batting-stage` 의 `grayRunPipPixel`).
+ * ⚠️ 근사: 그림이 `<img>` 라 CSS 회색 거르개로 대신한다.
+ */
+export const grayImage = style({
+  filter: 'grayscale(1)',
 })
 
-/** 선공/후공처럼 두 쪽 중 하나를 고르는 자리 — 원본은 팀 엠블럼 옆 꼬리표로 보인다 */
+/** 두 쪽 중 하나를 누르는 자리(선공 쪽 엠블럼 원 · 구장 화살) — 그림은 화면이 원본 자리에 따로 그린다 (웹판 단추) */
 export const sideButton = style({
   position: 'absolute',
   boxSizing: 'border-box',
   padding: 0,
-  border: '1px solid transparent',
+  border: 'none',
   background: 'transparent',
   color: ORIGINAL_COLORS.text,
   fontSize: '11px',
   cursor: 'pointer',
-})
-
-export const sideButtonSelected = style({
-  borderColor: ORIGINAL_COLORS.highlightYellow,
 })
 
 /**

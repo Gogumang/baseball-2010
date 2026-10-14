@@ -546,6 +546,8 @@ export function SeasonRoute({
     return (
       <AceSelectScreen
         phase={session.preGameAces.phase}
+        // rec+0xe — 마타자 단계에서 회색으로 안 그릴 마투수 칸 (0x7b1d8)
+        chosenPitcherCell={session.preGameAces.pitcher}
         openedAcePitcherIds={aceSelect?.openedAcePitcherIds ?? DEFAULT_OPENED_ACE_PITCHER_IDS}
         openedAceBatterIds={aceSelect?.openedAceBatterIds ?? DEFAULT_OPENED_ACE_BATTER_IDS}
         {...(aceSelect === undefined ? {} : {

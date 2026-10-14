@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
 import { ACE_LEVEL_UP_TEXT, aceLevelOf, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
 import { AceLevelUpWindow } from '@/widgets/ace-level-up/ui/AceLevelUpWindow'
-import { ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf } from '@/pages/general-mode/lib/prepareLayout'
+import {
+  ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf, isAceCellDimmed, isAceGridCursorOn,
+} from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
@@ -16,6 +19,8 @@ import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 
 const SLT_IMAGE = './sprites/slt_frame'
+/** [skin+0xac] — 격자 칸 그림 (0~9 마선수 얼굴 · 10 "?") */
+const ACE_ICON = './sprites/ace_icon'
 const IMG_TEXT_FRAME = './sprites/img_text/frames'
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
@@ -70,6 +75,11 @@ export interface AceSelectScreenProps {
    * 안 넘기면 팝업이 힌트만 보여 주고 닫힌다 (예전 그대로).
    */
   readonly onOpenAce?: (cell: number) => void
+  /**
+   * 이미 고른 마투수 칸(rec+0xe) — 마타자 단계에서 **이 칸만 빼고** 마투수 칸을 회색(효과 0xa)으로 그린다(0x7b1d8~0x7b1ea).
+   * 안 넘기면 마타자 단계의 마투수 칸을 모두 회색으로 그린다.
+   */
+  readonly chosenPitcherCell?: number | null
   readonly onSelect: (cell: number) => void
   readonly onCancel: () => void
   /**
@@ -128,7 +138,7 @@ const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShap
  *   - 열린 마선수 자리의 애니메이션 `[skin+0x138]` — 여기서는 정지 그림을 쓴다.
  */
 export function AceSelectScreen({
-  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0,
+  phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0, chosenPitcherCell = null,
   onOpenAce, onLevelUp, onSelect, onCancel, underlay, overlay, onAllAcesOpen,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -253,6 +263,8 @@ export function AceSelectScreen({
 
   const { anchorA, anchorB } = ACE_LAYOUT
   const cursorPlayer = acePlayerOfCell(cursor)
+  // 격자 커서 깜빡임 [격자+0x18] (그릴 때마다 +1) — ⚠️ 시작 값 미확인, 웹은 화면을 띄운 뒤 갱신 수 + 1
+  const isGridCursorOn = isAceGridCursorOn(useUpdateCounter() + 1)
   const isCursorOpen = isCellOpen(cursor)
   const cursorLevel = aceLevelOf(levels, cursor)
 
@@ -314,11 +326,32 @@ export function AceSelectScreen({
         </span>
       ))}
 
-      {/* 10칸 격자 */}
+      {/*
+        10칸 격자 0x7a571 종류 7 — 칸마다 남색 둥근 바탕(x − 3, y − 3, 43×43) · slt_frame 이미지 0 · 얼굴(x + 3, y + 2) 또는 "?"(x + 10, y + 5),
+        커서는 깜빡일 때 slt_frame 이미지 1 을 (x − 2, y − 2) (prepareLayout `ACE_LAYOUT.cellBack` 머리말)
+      */}
+      {Array.from({ length: cellCount }, (_unused, cell) => {
+        const { x, y } = aceCellPositionOf(cell)
+        const back = ACE_LAYOUT.cellBack
+        return (
+          <span key={`back-${cell}`}>
+            {/* 0x6b7d5(…, 43, 43, 둥글기 1) — (w + 1)×(h + 1) 에서 네 모서리 점이 빠진 꼴 */}
+            <span className={styles.fillPanel} style={{
+              left: x + back.dx + 1, top: y + back.dy, width: back.size - 1, height: back.size + 1, background: back.color,
+            }} />
+            <span className={styles.fillPanel} style={{
+              left: x + back.dx, top: y + back.dy + 1, width: back.size + 1, height: back.size - 1, background: back.color,
+            }} />
+          </span>
+        )
+      })}
       {Array.from({ length: cellCount }, (_unused, cell) => {
         const { x, y } = aceCellPositionOf(cell)
         const player = acePlayerOfCell(cell)
         const open = isCellOpen(cell)
+        // [skin+0x105](레벨업 화면)이면 흐리지 않는다 — ⚠️ 코치채용(종류 8)도 흐리지 않는 것으로 둔다(미확인)
+        const isDimmed = !isLevelUpMode && !isCoachMode
+          && isAceCellDimmed(cell, phase === ACE_PHASE.마투수, chosenPitcherCell)
         return (
           <button
             key={cell}
@@ -326,18 +359,25 @@ export function AceSelectScreen({
             aria-label={open && player !== undefined ? player.name : LOCK_LABEL}
             aria-pressed={cell === cursor}
             disabled={!isCoachMode && !isCellSelectable(cell)}
-            className={`${styles.cell} ${cell === cursor ? styles.cellSelected : ''}`}
+            className={styles.cell}
+            data-dimmed={isDimmed}
             style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
             onClick={() => (isLevelUpMode ? requestLevelUp(cell) : isCoachMode ? pressCell(cell) : onSelect(cell))}
             onMouseEnter={() => setCursor(cell)}
           >
+            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cellImage)} style={{ left: 0, top: 0 }} />
             {open && player !== undefined
-              ? <img className={styles.layer} alt="" src={player.iconUrl} style={{ left: 3, top: 3 }} />
-              : <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.lock.iconImage)}
-                  style={{ left: 12, top: 12 }} />}
+              ? <img className={`${styles.layer}${isDimmed ? ` ${styles.grayImage}` : ''}`} alt="" src={player.iconUrl}
+                  style={{ left: ACE_LAYOUT.icon.dx, top: ACE_LAYOUT.icon.dy }} />
+              : <img className={styles.layer} alt="" src={imageSrc(ACE_ICON, ACE_LAYOUT.lockedIcon.image)}
+                  style={{ left: ACE_LAYOUT.lockedIcon.dx, top: ACE_LAYOUT.lockedIcon.dy }} />}
           </button>
         )
       })}
+      {isGridCursorOn && (
+        <img className={styles.layer} alt="" data-testid="마선수-커서" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cursor.image)}
+          style={{ left: aceCellPositionOf(cursor).x + ACE_LAYOUT.cursor.dx, top: aceCellPositionOf(cursor).y + ACE_LAYOUT.cursor.dy }} />
+      )}
 
       {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 머리띠를 가리던 것을 제자리로 옮겼다 */}
       <div className={styles.hintLine}>

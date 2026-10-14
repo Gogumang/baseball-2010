@@ -296,6 +296,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
       return (
         <AceSelectScreen
           phase={flow.acePhase}
+          // rec+0xe — 마타자 단계에서 회색으로 안 그릴 마투수 칸 (0x7b1d8)
+          chosenPitcherCell={flow.setup.acePitcherId}
           {...(openedAcePitcherIds === undefined ? {} : { openedAcePitcherIds })}
           {...(openedAceBatterIds === undefined ? {} : { openedAceBatterIds })}
           {...(aceLevels === undefined ? {} : { levels: aceLevels })}

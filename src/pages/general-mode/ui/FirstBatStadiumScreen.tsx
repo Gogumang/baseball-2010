@@ -1,12 +1,15 @@
 import { useEffect } from 'react'
 import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
-import { FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF } from '@/pages/general-mode/lib/prepareLayout'
-import { FIRST_BAT_PHASE, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
+import {
+  FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, stadiumArrowsOf,
+} from '@/pages/general-mode/lib/prepareLayout'
+import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 
@@ -114,7 +117,11 @@ export function FirstBatStadiumScreen({
   const { anchorA, anchorB, firstBatTag } = FIRST_BAT_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT
   const tagAnchor = isUserFirstBat ? anchorA : anchorB
-  const tagOffset = isUserFirstBat ? firstBatTag.user : firstBatTag.cpu
+  // 공용 목록 깜빡 [sp+0xd4] — 꼬리표 2px · 고른 쪽 원 · 구장 막대 칠 · 화살 (0x63b4a)
+  const isBob = isPrepareBobOn(useUpdateCounter())
+  const tagPlace = firstBatTagPlacementOf(isUserFirstBat, tagAnchor, isBob)
+  const arrows = stadiumArrowsOf(isStadiumPhase, isBob, stadiumId, STADIUM_COUNT)
+  const nameWidth = imgTextOrigins?.[String(FIRST_BAT_LAYOUT.stadiumNameFrame + stadiumId).padStart(3, '0')]?.width ?? 0
 
   return (
     <RawScreen>
@@ -132,6 +139,17 @@ export function FirstBatStadiumScreen({
         </span>
       ))}
 
+      {/* 단계 0 · 깜빡일 때 커서 쪽 엠블럼 뒤 반투명 노랑 원 0x6b7b9(기준 − 41, 82×82, 0x80FFFF00) — 엠블럼보다 먼저 (0x6413c) */}
+      {!isStadiumPhase && isBob && (
+        <span className={styles.lockedCircle} data-testid="선공-커서-원" style={{
+          left: tagAnchor.x - FIRST_BAT_LAYOUT.sideCircle.radius,
+          top: tagAnchor.y - FIRST_BAT_LAYOUT.sideCircle.radius,
+          width: FIRST_BAT_LAYOUT.sideCircle.radius * 2,
+          height: FIRST_BAT_LAYOUT.sideCircle.radius * 2,
+          background: FIRST_BAT_LAYOUT.sideCircle.color,
+        }} />
+      )}
+
       {/* 두 팀 엠블럼 0x5a7b9 — A 유저 · B CPU */}
       <img className={styles.layer} alt={TEAMS[userTeamId]?.name ?? ''} src={TEAMS[userTeamId]?.logoUrl}
         style={{ left: anchorA.x - TEAM_LOGO_HALF.width, top: anchorA.y - TEAM_LOGO_HALF.height }} />
@@ -145,12 +163,12 @@ export function FirstBatStadiumScreen({
       {/* 선공 꼬리표 — 선공을 잡은 쪽에만 붙는다 */}
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, firstBatTag.image)}
         style={{
-          left: tagAnchor.x + tagOffset.dx,
-          top: tagAnchor.y + tagOffset.dy,
+          left: tagPlace.tag.x,
+          top: tagPlace.tag.y,
           transform: isUserFirstBat ? 'scaleX(-1)' : undefined,
         }} />
       <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins}
-        x={tagAnchor.x + tagOffset.textDx} y={tagAnchor.y + tagOffset.textDy} />
+        x={tagPlace.text.x} y={tagPlace.text.y} />
 
       {/* 단계 0 — 선공/후공 고르기. 원본은 좌·우 키로 꼬리표를 옮기고 OK 로 확정한다 */}
       {!isStadiumPhase && (
@@ -163,12 +181,12 @@ export function FirstBatStadiumScreen({
               key={label}
               type="button"
               aria-pressed={playerSide === side}
-              className={`${styles.sideButton} ${playerSide === side ? styles.sideButtonSelected : ''}`}
-              style={{ left: anchor.x - 30, top: anchor.y + 26, width: 60, height: 14 }}
+              aria-label={label}
+              // 원본은 좌·우 키로 커서를 옮기고 OK 로 정한다 — 마우스는 엠블럼 원 자리(82×82)를 누른다 (웹판)
+              className={styles.sideButton}
+              style={{ left: anchor.x - 41, top: anchor.y - 41, width: 82, height: 82 }}
               onClick={() => onChooseFirstBat(side)}
-            >
-              {label}
-            </button>
+            />
           ))}
           {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 있던 것을 제자리로 옮겼다 */}
           <div className={styles.hintLine}>
@@ -185,27 +203,35 @@ export function FirstBatStadiumScreen({
           background: 'rgba(29, 68, 168, 0.85)',
         }} />
 
+      {/* 단계 1 · 깜빡일 때 구장 막대 자리 반투명 노랑 둥근 칠 0x6b7d5(26, 197, 188, 16, 둥글기 1) (0x6432e) */}
+      {isStadiumPhase && isBob && (
+        <span className={styles.fillPanel} data-testid="구장-커서-칠" style={{
+          left: FIRST_BAT_LAYOUT.stadiumHighlight.x, top: FIRST_BAT_LAYOUT.stadiumHighlight.y,
+          width: FIRST_BAT_LAYOUT.stadiumHighlight.width + 1, height: FIRST_BAT_LAYOUT.stadiumHighlight.height + 1,
+          background: FIRST_BAT_LAYOUT.stadiumHighlight.color, borderRadius: 1,
+        }} />
+      )}
+
       {/* 구장 줄 — 막대 + 이름 그림 + 좌우 화살 */}
       <FrameSprite folder={GAME_UI_FRAME} frame={FIRST_BAT_LAYOUT.stadiumBar.frame} origins={gameUiOrigins}
         x={FIRST_BAT_LAYOUT.stadiumBar.x} y={FIRST_BAT_LAYOUT.stadiumBar.y} />
       <FrameSprite folder={IMG_TEXT_FRAME} frame={FIRST_BAT_LAYOUT.stadiumNameFrame + stadiumId}
         origins={imgTextOrigins}
-        x={FIRST_BAT_LAYOUT.stadiumBar.x + FIRST_BAT_LAYOUT.stadiumBar.width / 2 - 45}
+        x={FIRST_BAT_LAYOUT.stadiumNameCenterX - (nameWidth >> 1)}
         y={FIRST_BAT_LAYOUT.stadiumNameY} />
+      {/* 좌우 화살 — 단계와 상관없이 늘 그린다 (0x644ac~0x64576). 누르는 칸은 구장 단계에서만 (웹판) */}
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
+        style={{ left: arrows.leftX, top: FIRST_BAT_LAYOUT.arrow.y }} />
+      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
+        style={{ left: arrows.rightX, top: FIRST_BAT_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
       {isStadiumPhase && (
         <>
           <button type="button" aria-label="이전 구장" className={styles.sideButton}
-            style={{ left: FIRST_BAT_LAYOUT.arrow.leftX, top: FIRST_BAT_LAYOUT.arrow.y, width: 7, height: 10 }}
-            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))}>
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
-              style={{ left: 0, top: 0 }} />
-          </button>
+            style={{ left: FIRST_BAT_LAYOUT.arrow.leftX - 2, top: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }}
+            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))} />
           <button type="button" aria-label="다음 구장" className={styles.sideButton}
-            style={{ left: FIRST_BAT_LAYOUT.arrow.rightX, top: FIRST_BAT_LAYOUT.arrow.y, width: 7, height: 10 }}
-            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))}>
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
-              style={{ left: 0, top: 0, transform: 'scaleX(-1)' }} />
-          </button>
+            style={{ left: FIRST_BAT_LAYOUT.arrow.rightX - 2, top: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }}
+            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))} />
         </>
       )}
 
