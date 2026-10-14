@@ -132,6 +132,35 @@ export function teamBattingStageBatterOf(progress: TeamGameProgress): {
 }
 
 /**
+ * 투수 레코드의 시즌 줄 값 — 방어율 `0xb6ce8`(×100) · 탈삼진 `+0x26`. 시즌 레코드 = 리그 기록표 줄 + (게이트가 열렸으면) 이 경기 줄.
+ * 소개 판(0x44944)과 교체 창 목록 줄(0x37904 · 0x37e5c)이 같은 레코드 칸을 읽는다. 기록표를 안 줬거나 마투수면 null.
+ */
+export function teamPitcherSeasonStatsOf(
+  progress: TeamGameProgress,
+  records: TeamMatchupRecords | undefined,
+  teamId: number,
+  entry: TeamEntryPitcher,
+): { readonly earnedRunAverage: number; readonly strikeouts: number } | null {
+  const base = records === undefined ? null : basePitcherLineOf(records, teamId, entry)
+  if (base === null) return null
+  const line = records?.countsThisGame === true ? sumPitcherLines(base, gamePitcherLineOf(progress, teamId, entry)) : base
+  return pitcherCardStatsOf(line)
+}
+
+/** 타자 레코드의 시즌 줄 값 — 타율 `0xb8e3c`(×1000) · 홈런 `+0x28` · 타점 `+0x2a` (`teamPitcherSeasonStatsOf` 와 같은 출처) */
+export function teamBatterSeasonStatsOf(
+  progress: TeamGameProgress,
+  records: TeamMatchupRecords | undefined,
+  teamId: number,
+  entry: TeamEntryBatter,
+): { readonly battingAverage: number; readonly homeRuns: number; readonly runsBattedIn: number } | null {
+  const base = records === undefined ? null : baseBatterLineOf(records, teamId, entry)
+  if (base === null) return null
+  const line = records?.countsThisGame === true ? sumBatterLines(base, gameBatterLineOf(progress, teamId, entry)) : base
+  return batterCardStatsOf(line)
+}
+
+/**
  * **팀경기 상태 0xe 의 소개 판 값** (0x44944) — 투수 `0xae83c(수비 팀)` · 타자 `0xae89c(공격 팀)` 레코드에서.
  * - 팀 글자 `0xb6c20(st, 측)`: 우리가 치면 타자 PLAYER · 투수 COM, 던지면 반대.
  * - 투수: 이름 · 보직 `+0xb & 3` · 손 0xb63c0(폼 & 1, 마투수 표) · 체력 막대(용량 0x66e44 · % 0xaebb0) ·
@@ -155,22 +184,8 @@ export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMat
 
   const batterHand = batterEntry === undefined ? 0 : teamBatterHandOf(battingTeam, batterEntry)
 
-  const pitcherBase = records === undefined || pitcherEntry === undefined
-    ? null
-    : basePitcherLineOf(records, fieldingTeam, pitcherEntry)
-  const pitcherLine = pitcherBase === null || pitcherEntry === undefined
-    ? null
-    : records?.countsThisGame === true
-      ? sumPitcherLines(pitcherBase, gamePitcherLineOf(progress, fieldingTeam, pitcherEntry))
-      : pitcherBase
-  const batterBase = records === undefined || batterEntry === undefined
-    ? null
-    : baseBatterLineOf(records, battingTeam, batterEntry)
-  const batterLine = batterBase === null || batterEntry === undefined
-    ? null
-    : records?.countsThisGame === true
-      ? sumBatterLines(batterBase, gameBatterLineOf(progress, battingTeam, batterEntry))
-      : batterBase
+  const pitcherStats = pitcherEntry === undefined ? null : teamPitcherSeasonStatsOf(progress, records, fieldingTeam, pitcherEntry)
+  const batterStats = batterEntry === undefined ? null : teamBatterSeasonStatsOf(progress, records, battingTeam, batterEntry)
 
   const slot = ourBatting ? progress.game.battingOrderIndex : progress.opponentOrderIndex
   const entryRecords = ourBatting ? progress.ourEntryRecords : progress.opponentEntryRecords
@@ -187,14 +202,14 @@ export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMat
             throwsLeft: pitcherHandOf(pitcherEntry.repertoire.form, pitcherEntry.aceIndex >= 0) === 1,
             stamina: staminaGaugeOf(moundStaminaOf(progress, !ourBatting)),
           }),
-      ...(pitcherLine === null ? {} : pitcherCardStatsOf(pitcherLine)),
+      ...(pitcherStats ?? {}),
     },
     batter: {
       isComputer: !ourBatting,
       battingOrder: slot % 9,
       recentResults: entryRecords[slot]?.results ?? [],
       ...(batterEntry === undefined ? {} : { name: batterEntry.name, position: batterEntry.position }),
-      ...(batterLine === null ? {} : batterCardStatsOf(batterLine)),
+      ...(batterStats ?? {}),
     },
   }
 }

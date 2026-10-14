@@ -50,7 +50,14 @@ import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/Settlement
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
-import { teamBattingStageBatterOf, teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
+import {
+  teamBatterSeasonStatsOf,
+  teamBattingStageBatterOf,
+  teamMatchupCardsOf,
+  teamPitcherSeasonStatsOf,
+  teamPitcherSideStageOf,
+} from '@/pages/team-game/lib/teamMatchupCards'
+import { fieldPositionLabelOf } from '@/entities/season-mode/model/entryEditor'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -849,6 +856,7 @@ export function TeamGameScreen({
             currentIndex={progress.ourPitcherIndex}
             benchIndexes={session.benchPitchers}
             abilitiesOf={(index) => substitutionDetailAbilities(progress, '투수', index)}
+            seasonStatsOf={(entry) => teamPitcherSeasonStatsOf(progress, matchupRecords, progress.options.ourTeamId, entry)}
             onSelect={(benchIndex) => {
               actions.changePitcher(benchIndex)
               setChangeWindow(null)
@@ -860,6 +868,7 @@ export function TeamGameScreen({
             currentSlot={game.battingOrderIndex}
             benchIndexes={session.benchBatters}
             abilitiesOf={(index) => substitutionDetailAbilities(progress, '대타', index)}
+            seasonStatsOf={(entry) => teamBatterSeasonStatsOf(progress, matchupRecords, progress.options.ourTeamId, entry)}
             onSelect={(benchIndex) => {
               actions.pinchHit(benchIndex)
               setChangeWindow(null)
@@ -1160,7 +1169,22 @@ interface PitcherChangeWindowProps {
   readonly benchIndexes: readonly number[]
   /** 그 명단 칸의 상세 창 능력치 네 칸 — `0xb6414(rec, 칸, 1)` (`substitutionDetailAbilities`) */
   readonly abilitiesOf: (index: number) => readonly [number, number, number, number] | null
+  /** 그 투수 레코드의 시즌 줄 — 방어율 0xb6ce8 · 탈삼진 +0x26 (`teamPitcherSeasonStatsOf`). 기록표가 없으면 null */
+  readonly seasonStatsOf: (entry: TeamEntryPitcher) => { readonly earnedRunAverage: number; readonly strikeouts: number } | null
   readonly onSelect: (benchIndex: number) => void
+}
+
+/** 투수 보직 `+0xb & 3` 글자 — 원본은 아이콘(0x38240)이라 웹은 글자로 적는다. 표 줄은 [0,0,0,0,1,1,1,2] (`ROSTER_PITCHER_ROLES`) */
+const PITCHER_ROLE_LABELS: readonly string[] = ['선발', '중간', '마무리']
+
+/** 방어율 ×100 → "3.45" */
+function earnedRunAverageText(value: number): string {
+  return (value / 100).toFixed(2)
+}
+
+/** 타율 ×1000 → ".345" (1000 이면 "1.000") */
+function battingAverageText(value: number): string {
+  return value >= 1000 ? '1.000' : `.${String(value).padStart(3, '0')}`
 }
 
 /**
@@ -1170,24 +1194,30 @@ interface PitcherChangeWindowProps {
  * **벤치 목록 6줄**을 놓고, 칸마다 딱지 **이름 · 보직 · 방어 · 삼진**(딱지 표 0xcfe7e = img_text 27·28·171·181 —
  * 두 글자 그림, S10 5절)을 적는다. 값은 방어율·탈삼진이다. OK 가 확정(상태 0x16 연출), '#'·CLR 이 취소(→ 0xe)다.
  *
- * ⚠️ **근사**: 웹 로스터에는 보직(`+0xb`)도 시즌 기록(방어율 0xb6ce8·탈삼진)도 없다 —
- * 대신 원본이 '0' 상세 창에만 적는 능력치(`0xb6414(rec, 칸, 1)` — 마선수 레벨 배율 포함,
- * `substitutionDetailAbilities`)를 목록 줄에 붙여 적는다. 창 배치도 웹 껍데기 그대로다.
+ * 보직은 명단 투수의 `role`(레코드 `+0xb & 3`), 방어율 · 탈삼진은 소개 판과 같은 시즌 레코드 줄(`teamPitcherSeasonStatsOf`)이다.
+ * '0' 상세 창 능력치(`0xb6414(rec, 칸, 1)` — 마선수 레벨 배율 포함, `substitutionDetailAbilities`)는 상세 창이 웹에 없어
+ * 줄 끝에 덧붙인다.
+ * ⚠️ 미확인: 기록표가 없는 모드(일반 1 · 대전 8·9 — Xls 행의 줄)와 마투수(표 칸 없음)는 방어율 · 탈삼진을 비운다(소개 판과 같다).
+ * 보직 · 수비 칸은 원본 아이콘 대신 글자다. 창 배치도 웹 껍데기 그대로다.
  */
 function PitcherChangeWindow({
   entry,
   currentIndex,
   benchIndexes,
   abilitiesOf,
+  seasonStatsOf,
   onSelect,
 }: PitcherChangeWindowProps) {
   const describe = (index: number) => {
     const player = entry[index]
     const ability = abilitiesOf(index)
     if (player === undefined || ability === null) return { label: `${index + 1}번`, detail: undefined }
+    const stats = seasonStatsOf(player)
+    const role = player.role === undefined ? '-' : (PITCHER_ROLE_LABELS[player.role] ?? '-')
+    const record = stats === null ? '방어 - · 삼진 -' : `방어 ${earnedRunAverageText(stats.earnedRunAverage)} · 삼진 ${stats.strikeouts}`
     return {
       label: player.aceIndex >= 0 ? `${player.name} (마투수)` : player.name,
-      detail: `제구 ${ability[0]} · 구속 ${ability[1]} · 체력 ${ability[3]}`,
+      detail: `${role} · ${record} (제구 ${ability[0]} · 구속 ${ability[1]} · 체력 ${ability[3]})`,
     }
   }
   const current = describe(currentIndex)
@@ -1218,6 +1248,8 @@ interface PinchHitWindowProps {
   readonly benchIndexes: readonly number[]
   /** 그 명단 칸의 상세 창 능력치 네 칸 — `0xb6414(rec, 칸, 1)` (`substitutionDetailAbilities`) */
   readonly abilitiesOf: (index: number) => readonly [number, number, number, number] | null
+  /** 그 타자 레코드의 시즌 줄 — 타율 0xb8e3c · 홈런 +0x28 (`teamBatterSeasonStatsOf`). 기록표가 없으면 null */
+  readonly seasonStatsOf: (entry: TeamEntryBatter) => { readonly battingAverage: number; readonly homeRuns: number } | null
   readonly onSelect: (benchIndex: number) => void
 }
 
@@ -1228,19 +1260,21 @@ interface PinchHitWindowProps {
  * (0xcfe7e = img_text 27·28·172·61, S10 5절)을 적는다. 보직 칸은 수비 위치, 타율은 0xb8e3c(안타 +0x22 ×1000 /
  * 타수 +0x20, 1000 상한), 홈런은 레코드 +0x28 이다.
  *
- * ⚠️ **근사**: 웹 명단(`TeamEntryBatter`)에는 시즌 기록(타수·안타·홈런)이 없다 — 대신 원본이 '0' 상세 창에만 적는
- * 능력치(`0xb6414(rec, 칸, 1)`, `substitutionDetailAbilities`) 히트·파워·주루를 목록 줄에 붙여 적는다.
- * 창 배치도 웹 껍데기 그대로다.
+ * 보직 칸(수비 위치 `+0x1c & 0xf`)은 명단의 `position`, 타율 · 홈런은 소개 판과 같은 시즌 레코드 줄(`teamBatterSeasonStatsOf`)이다.
+ * '0' 상세 창 능력치(`0xb6414(rec, 칸, 1)`, `substitutionDetailAbilities`) 히트·파워·주루는 줄 끝에 덧붙인다.
+ * ⚠️ 미확인: 기록표가 없는 모드(일반 · 대전)와 마타자는 타율 · 홈런을 비운다. 창 배치도 웹 껍데기 그대로다.
  * 고른 선수는 **옛 타자의 수비 자리를 받고, 빠진 선수는 벤치에서 지워진다**(재출장 없음, 0xaebe4).
  */
-function PinchHitWindow({ entry, currentSlot, benchIndexes, abilitiesOf, onSelect }: PinchHitWindowProps) {
+function PinchHitWindow({ entry, currentSlot, benchIndexes, abilitiesOf, seasonStatsOf, onSelect }: PinchHitWindowProps) {
   const describe = (index: number) => {
     const player = entry[index]
     const ability = abilitiesOf(index)
     if (player === undefined || ability === null) return { label: `${index + 1}번`, detail: undefined }
+    const stats = seasonStatsOf(player)
+    const record = stats === null ? '타율 - · 홈런 -' : `타율 ${battingAverageText(stats.battingAverage)} · 홈런 ${stats.homeRuns}`
     return {
       label: player.aceIndex >= 0 ? `${player.name} (마타자)` : player.name,
-      detail: `히트 ${ability[0]} · 파워 ${ability[1]} · 주루 ${ability[3]}`,
+      detail: `${fieldPositionLabelOf(player.position)} · ${record} (히트 ${ability[0]} · 파워 ${ability[1]} · 주루 ${ability[3]})`,
     }
   }
   const current = describe(currentSlot)
