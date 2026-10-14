@@ -126,18 +126,20 @@ describe('견제를 받은 야수의 CPU 송구 결정 — 슬롯 2 의 0xafa60 
       defenseIsCpu: true,
     })
 
-    // 6틱에 1루수가 받아 +0xc8 = 3 → 9틱에 준비. 8틱 견제사 뒤 주자가 없고 1루수가 공을 쥐어 +0x120 이 8틱 끝부터 한 그림에
-    // 세 번(그리기 G3 · 0x3f060 G1 · 52502 G2) 올라 52번째 호출(25틱 끝의 G3)에서 닫힌다 — 수비 CPU · 사람 모두 같다
-    // (점수식이 던질 루를 못 찾는다)
+    // 6틱에 1루수가 받아 +0xc8 = 3 → 9틱에 준비. 9틱 견제사(돌아오던 주자가 8틱 이동 = 그림 9 의 목록 틱에서 다가와 그림 9 의
+    // 플레이 틱 b43da 가 태그한다) 뒤 주자가 없고 1루수가 공을 쥐어 +0x120 이 9틱 끝부터 한 그림에 세 번(그리기 G3 · 0x3f060 G1 ·
+    // 52502 G2) 올라 52번째 호출(26틱 끝의 G3)에서 닫힌다 — 수비 CPU · 사람 모두 같다 (점수식이 던질 루를 못 찾는다).
+    // (예전 웹은 판정을 이동 뒤 같은 판 틱에 두어 8틱 견제사 · 26 그림이었다)
     expect(사람.throwArrivalTick).toBe(6)
-    expect(사람.ticks).toHaveLength(26)
-    expect(CPU.ticks).toHaveLength(26)
+    expect(사람.log).toContain('9틱 1번 주자 견제사 (0xb36d0 결과 3)')
+    expect(사람.ticks).toHaveLength(27)
+    expect(CPU.ticks).toHaveLength(27)
     expect(CPU.advance).toEqual(사람.advance)
     // 송구 설정이 자동이면 사람 수비도 같다
     expect(
       runPickoffPlay({ targetBase: 1, bases: { first: true, second: false, third: false }, outs: 0, throwMode: '자동' })
         .ticks,
-    ).toHaveLength(26)
+    ).toHaveLength(27)
   })
 
   it('표본 — CPU 갈래가 돌아도 견제 판의 결과·굴림은 그대로다 (점수식이 던질 루를 못 찾는다)', () => {
