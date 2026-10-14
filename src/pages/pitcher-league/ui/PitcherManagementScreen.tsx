@@ -234,27 +234,18 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     setAwaitingEntry(false)
   })
 
-  // 구질 훈련(상태 108 의 구질 탭)은 이미 있는 창을 그대로 쓴다 — 새로 만들지 않는다
   // 124 그림 0x16778 — 목록 판과 머리띠만(관리 화면은 없다). 취소 → 106
   if (menu.subWindow === '기록실' && recordPick !== null) {
     return <NariRecordView edition="투수" career={career} pick={recordPick} gamePoint={career.gamePoint}
       onBack={() => { setRecordPick(null); menu.closeWindow() }} />
   }
 
-  if (menu.subWindow === '구질훈련') {
-    return (
-      <PitchTrainingScreen
-        career={career}
-        onTrain={menu.trainPitch}
-        onClose={menu.closeWindow}
-      />
-    )
-  }
-
   const isBasicInfo = menu.subWindow === '기본정보'
   // 106 칸 4 [기록실] 의 팝업 0x80 은 106 화면 위에 뜬다 — 124 로 가면 `NariRecordView` 가 화면을 덮는다
   const isRecordRoom = menu.subWindow === '기록실'
-  const isMenuShown = menu.subWindow === null || isRecordRoom
+  // 108 탭 2 그림 0x19e44 = 관리 화면 0x19da4 위에 창 0x803d4 — 아래 줄은 107 하위 메뉴 그대로다
+  const isPitchTraining = menu.subWindow === '구질훈련'
+  const isMenuShown = menu.subWindow === null || isRecordRoom || isPitchTraining
   return (
     <RawScreen>
       {/*
@@ -266,7 +257,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={!isRecordRoom && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!isRecordRoom && !isPitchTraining && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
             morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
@@ -292,6 +283,9 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           )}
         </div>
       )}
+
+      {/* 108 탭 2 구질 훈련 창 0x803d4 — 키는 창이 받는다(0x17828 → 0x80268), 취소는 107 */}
+      {isPitchTraining && <PitchTrainingScreen career={career} onTrain={menu.trainPitch} onClose={menu.closeWindow} />}
 
       {/*
         팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
