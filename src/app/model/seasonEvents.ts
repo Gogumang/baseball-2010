@@ -89,8 +89,6 @@ export type ResumePoint =
   | { readonly kind: '이벤트'; readonly eventId: number }
   /** S+0xb4(포스트시즌 중) ≠ 0 이고 S+0x50 이 위 값이 아님 → 128 대진 */
   | { readonly kind: '포스트시즌' }
-  /** S+0x50 == 2(경기 뒤) → 116 → g == 0 이면 [114 → 136] — 45번째 경기 뒤 · 내 시리즈가 끝난 경기 뒤 */
-  | { readonly kind: '시즌종료' }
   /** 그 밖 갈래의 S+0xb2 짝수 · S+0x50 ∈ {1,3} → 105 관리 화면 */
   | { readonly kind: '관리' }
   /**
@@ -183,8 +181,8 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
     return leagueDayCounterOf(career) % 2 === 0 ? { kind: '관리' } : { kind: '다음경기순위' }
   }
   if (career.seasonEndState === 128) return { kind: '포스트시즌' }
-  // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝처럼 g == 0 이면 136(시즌 끝 화면), 아니면 128
-  return leagueDayCounterOf(career) === 0 ? { kind: '시즌종료' } : { kind: '포스트시즌' }
+  // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝(12b74~12b94)처럼 g == 0 이면 [114 → 136](392 를 트는 136 진입으로 곧장), 아니면 128
+  return leagueDayCounterOf(career) === 0 ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID } : { kind: '포스트시즌' }
 }
 
 /** 0x1c154 의 S+0x50 == 0xa 갈래(1c2a2~1c344) — 연차idx(S+0xb3)는 끝난 해의 것(`season − 1`)이다 */

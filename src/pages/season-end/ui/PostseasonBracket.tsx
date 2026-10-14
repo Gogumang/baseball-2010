@@ -13,8 +13,6 @@ import * as styles from '@/pages/season-end/ui/PostseasonBracket.css'
 
 interface PostseasonBracketProps {
   readonly series: PostseasonSeries | null
-  /** 오른쪽 위 단추 — 원본에 없는 웹 전용 길 (시즌 성적 요약으로) */
-  readonly onShowStats?: () => void
   readonly onNext?: () => void
   readonly nextLabel?: string
   /**
@@ -37,7 +35,7 @@ interface PostseasonBracketProps {
  *    머리띠·바닥 그리기 0x7f4ec 다 — `frame` 칸으로 받는다.)
  *  - 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이라 여기서는 안 띄운다 (4a-3).
  */
-export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {
+export function PostseasonBracket({ series, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {
   const origins = useFrameOrigins(BACKDROP.folder)
   const view = bracketViewOf(series)
   const wonLegs = new Set(view.wonLegs)
@@ -100,11 +98,6 @@ export function PostseasonBracket({ series, onShowStats, onNext, nextLabel = '�
       {onNext !== undefined && (
         <Button variant="corner" className={styles.nextButton} onClick={onNext}>
           {nextLabel}
-        </Button>
-      )}
-      {onShowStats !== undefined && (
-        <Button variant="corner" className={styles.statsButton} onClick={onShowStats}>
-          시즌 성적 ›
         </Button>
       )}
     </RawScreen>

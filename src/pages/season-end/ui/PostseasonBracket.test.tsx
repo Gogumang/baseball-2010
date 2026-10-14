@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import { PostseasonBracket } from '@/pages/season-end/ui/PostseasonBracket'
-import { SeasonEndScreen } from '@/pages/season-end/ui/SeasonEndScreen'
 import {
   LINE_SEGMENTS, RANK_TAGS, RANK_UNIT, TEAM_CELLS, cellIndexOfRank, rankDigitRightOf,
   rankUnitPositionOf,
 } from '@/pages/season-end/lib/bracketLayout'
 import { advancePostseason, startPostseason } from '@/entities/league/model/league'
 import { TEAMS } from '@/shared/config/original/teams'
-import { createCareer } from '@/entities/career/model/playerCareer'
 
 /**
  * 포스트시즌 대진표 (0x853ac — P6 4a-1).
@@ -162,33 +160,5 @@ describe('이긴 길 빨강 (0x855b4~0x857ec)', () => {
     expect(색(container, 'champion')).toBe('rgb(255, 0, 0)')
     expect(색(container, 'rank1')).toBe('rgb(8, 4, 74)')
     expect(색(container, 'rank2')).toBe('rgb(8, 4, 74)')
-  })
-})
-
-describe('시즌 끝 화면에 붙었다', () => {
-  const 선수 = { ...createCareer('홍길동'), postseason: startPostseason(순위) }
-
-  it('포스트시즌이 있으면 대진표를 먼저 보여 준다', () => {
-    const { container } = render(<SeasonEndScreen career={선수} onStartNextSeason={vi.fn()} />)
-
-    expect(container.querySelectorAll('div[data-leg]').length).toBeGreaterThan(0)
-  })
-
-  it('오른쪽 위 단추로 시즌 성적 요약으로 넘어가고 다시 돌아온다', () => {
-    const { container } = render(<SeasonEndScreen career={선수} onStartNextSeason={vi.fn()} />)
-
-    fireEvent.click(screen.getByRole('button', { name: '시즌 성적 ›' }))
-    expect(container.querySelectorAll('div[data-leg]').length).toBe(0)
-
-    fireEvent.click(screen.getByRole('button', { name: '대진표' }))
-    expect(container.querySelectorAll('div[data-leg]').length).toBeGreaterThan(0)
-  })
-
-  it('포스트시즌 기록이 없으면 예전 성적 요약 그대로다', () => {
-    const { container } = render(
-      <SeasonEndScreen career={{ ...createCareer('홍길동'), postseason: null }} onStartNextSeason={vi.fn()} />,
-    )
-
-    expect(container.querySelectorAll('div[data-leg]').length).toBe(0)
   })
 })

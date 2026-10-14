@@ -87,10 +87,10 @@ describe('이어하기 분기 0x1c154 — S+0x50(seasonEndState)', () => {
     expect(resumePointOf(선수({ seasonEndState: 132, season: 8, popularity: 1600 }))).toEqual({ kind: '이벤트', eventId: 502 })
   })
 
-  it('포스트시즌 중 0xf 는 128, 대진만 열리고 사슬 전이면 시즌종료(116 → 136), 그 밖은 관리', () => {
+  it('포스트시즌 중 0xf 는 128, 대진만 열리고 사슬 전이면 116 → 136(392), 그 밖은 관리', () => {
     const 대진 = startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     expect(resumePointOf(선수({ seasonEndState: 128, postseason: 대진 }))).toEqual({ kind: '포스트시즌' })
-    expect(resumePointOf(선수({ postseason: 대진 }))).toEqual({ kind: '시즌종료' })
+    expect(resumePointOf(선수({ postseason: 대진 }))).toEqual({ kind: '이벤트', eventId: 392 })
     expect(resumePointOf(선수())).toEqual({ kind: '관리' })
   })
 

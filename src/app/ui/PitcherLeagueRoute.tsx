@@ -18,8 +18,6 @@ import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoSt
 import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { PitcherSeasonEndScreen } from '@/pages/pitcher-league/ui/PitcherSeasonEndScreen'
-import { PitcherYearEndScreen } from '@/pages/pitcher-league/ui/PitcherYearEndScreen'
 import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
@@ -102,7 +100,7 @@ export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
  * 나만의리그 **투수편** 라우팅 (원본 게임 모드 3, 장면 0x106).
  *
  * 등록(0x65 → 0x66) → 관리(상태 105 허브) → 경기 → 정산 한 바퀴를 돌다가,
- * 45경기를 다 치르면 **시즌종료(136 자리) → 130·131 → 포스트시즌 대진(128) → 연말(132) → 엔딩(141)** 로 빠진다.
+ * 45경기를 다 치르면 116 끝이 곧장 **136(392) → 130·131 → 포스트시즌 대진(128) → 연말(132) → 엔딩(141)** 이벤트 사슬로 빠진다.
  * 관리 화면 안의 선수정보·트레이닝·구질 훈련·휴식은 `PitcherManagementScreen` 이 스스로 돈다.
  *
  * [외출] → **112 외출 지도** 는 타자편 화면(`OutingMapScreen`)을 그대로 쓴다 — 원본 모드 3·4 가 같은 상태·
@@ -378,20 +376,6 @@ function PitcherLeagueScreens({
         // 134 첫 틀 0x1b92c 머리 — 비트 8 이 없으면 칭호 8 "국가 대표" 팝업 0x78, 확인 0x1b1e4 가 주고 장착
         entryTitle={nationalCupStandingsTitleOf(career.titleIds)}
         onConfirmEntryTitle={actions.confirmCupTitle}
-      />
-    )
-  }
-
-  if (scene === '시즌종료') {
-    return <PitcherSeasonEndScreen career={career} onYearEnd={actions.beginYearEnd} />
-  }
-
-  if (scene === '연말') {
-    return (
-      <PitcherYearEndScreen
-        career={career}
-        onContinueCareer={actions.continueCareer}
-        onRetire={actions.retire}
       />
     )
   }

@@ -465,9 +465,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(펼치기(0)).not.toContain(0x29)
   })
 
-  it('이어하기 — 45번째 경기 뒤(사슬 전)는 시즌 끝 화면, 정규시즌은 관리 화면', () => {
+  it('이어하기 — 45번째 경기 뒤(사슬 전)는 116 끝처럼 136(392)부터, 정규시즌은 관리 화면', () => {
     const 대진 = startPostseason([3, 0, 1, 2, 4, 5, 6, 7])
-    expect(이어하기({ gamesPlayed: 45, postseason: 대진 }).current.scene).toBe('시즌종료')
+    const 사슬 = 이어하기({ gamesPlayed: 45, postseason: 대진 })
+    expect(사슬.current.scene).toBe('이벤트')
+    expect(사슬.current.story).toEqual({ eventId: 392, context: '연말', viewed: [] })
+    expect(사슬.current.career?.seasonEndState).toBe(136)
     expect(이어하기({ gamesPlayed: 12 }).current.scene).toBe('관리')
   })
 
@@ -485,13 +488,15 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.career?.seasonEndState).toBe(128)
   })
 
-  it('45경기째를 치르면 정규시즌이 닫히고 시즌종료 화면으로 간다 (0xb818c)', () => {
+  it('45경기째를 치르면 정규시즌이 닫히고 116 끝이 곧장 136(392)으로 간다 (0xb818c · 12b8c~12bbe)', () => {
     const result = 판짜기({ gamesPlayed: 44 })
 
     경기치르기(result)
 
     expect(result.current.career?.gamesPlayed).toBe(45)
-    expect(result.current.scene).toBe('시즌종료')
+    expect(result.current.scene).toBe('이벤트')
+    expect(result.current.story).toEqual({ eventId: 392, context: '연말', viewed: [] })
+    expect(result.current.career?.seasonEndState).toBe(136)
     // 정규시즌이 닫히면 포스트시즌 대진이 선다
     expect(result.current.career?.postseason).not.toBeNull()
   })
@@ -516,16 +521,14 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
         경기들.push(result.current.gameOptions!.isPostseason)
         act(() => result.current.actions.finishGame(경기요약))
         act(() => result.current.actions.confirmGameResult())
-        // 116 끝: 시리즈가 이어지면 128, 내 시리즈가 끝났으면(g == 0) 136 시즌 끝 사슬을 다시 돈다
-        expect(['포스트시즌', '시즌종료']).toContain(result.current.scene)
-        continue
-      }
-      if (result.current.scene === '시즌종료') {
-        다시돈사슬 += 1
-        act(() => result.current.actions.beginYearEnd())
-        expect(result.current.story?.eventId).toBe(392)
-        expect([376, 377]).toContain(연말끝까지(result).at(-1))
-        expect(result.current.scene).toBe('포스트시즌')
+        // 116 끝: 시리즈가 이어지면 128, 내 시리즈가 끝났으면(g == 0) 곧장 136(392) 시즌 끝 사슬을 다시 돈다
+        expect(['포스트시즌', '이벤트']).toContain(result.current.scene)
+        if (String(result.current.scene) === '이벤트') {
+          다시돈사슬 += 1
+          expect(result.current.story?.eventId).toBe(392)
+          expect([376, 377]).toContain(연말끝까지(result).at(-1))
+          expect(result.current.scene).toBe('포스트시즌')
+        }
         continue
       }
       if (result.current.scene === '경기준비') {
@@ -895,15 +898,6 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
 
     expect(result.current.scene).toBe('관리')
     expect(result.current.career?.season).toBe(11)
-  })
-
-  it('502 갈림길 화면(연말)의 버튼도 같은 이벤트로 — 연봉협상 380 · 은퇴 496', () => {
-    const result = 판짜기({ season: 10, gamesPlayed: 45, popularity: 1600 })
-    act(() => result.current.actions.continueCareer())
-    expect(result.current.story).toEqual({ eventId: 380, context: '연말', viewed: [502] })
-
-    act(() => result.current.actions.retire())
-    expect(result.current.story).toEqual({ eventId: 496, context: '연말', viewed: [502] })
   })
 
   it('마지막 해(13년차)는 연말이 반드시 엔딩이다 (은퇴식 504)', () => {

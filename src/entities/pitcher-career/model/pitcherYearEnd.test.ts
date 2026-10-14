@@ -176,11 +176,11 @@ describe('이어하기 0x1c154 (모드 3·4 공용) — pitcherResumePointOf', (
     expect(pitcherResumePointOf(투수({ season: 2, seasonEndState: 132 }))).toEqual({ kind: '이벤트', eventId: 380 })
   })
 
-  it('128(0xf)이면 대진으로, 경기 뒤(116)면 g 로 — 0 이면 시즌 끝(136 자리), 아니면 128', () => {
+  it('128(0xf)이면 대진으로, 경기 뒤(116)면 g 로 — 0 이면 136(392), 아니면 128', () => {
     const 대진 = startPostseason([0, 1, 2, 3, 4, 5, 6, 7])
     expect(pitcherResumePointOf(투수({ postseason: 대진, seasonEndState: 128 }))).toEqual({ kind: '포스트시즌' })
     // 45번째 경기 뒤 — 대진이 막 열려 g = 0
-    expect(pitcherResumePointOf(투수({ gamesPlayed: 45, postseason: 대진 }))).toEqual({ kind: '시즌종료' })
+    expect(pitcherResumePointOf(투수({ gamesPlayed: 45, postseason: 대진 }))).toEqual({ kind: '이벤트', eventId: 392 })
     // 포스트시즌 경기 뒤 시리즈가 이어지면 g ≠ 0
     expect(pitcherResumePointOf(투수({ gamesPlayed: 46, postseason: { ...대진, wins: [1, 0] } }))).toEqual({
       kind: '포스트시즌',

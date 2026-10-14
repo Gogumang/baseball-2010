@@ -1405,8 +1405,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     )
     // 이어하기는 128 — 경기 결과 화면에서 [확인] 했다 치고 116 의 끝을 밟는다
     act(() => rendered.result.current.session.actions.confirmGameResult())
-    expect(rendered.result.current.screen).toEqual({ kind: '시즌종료' })
-    act(() => rendered.result.current.session.actions.beginYearEnd())
+    // 116 끝(12b8c~12bbe) [114 → 136] — 시즌 요약 화면 없이 136 진입이 392 를 튼다
     expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 392, context: '시즌' })
     expect(rendered.result.current.session.career?.seasonEndState).toBe(136)
     이벤트보기(rendered, [396])
@@ -1419,11 +1418,11 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(rendered.result.current.session.career?.postseason).toEqual(끝난준PO)
   })
 
-  it('경기 뒤(116, S+0x50 = 2)에 끊긴 이어하기도 116 의 끝처럼 — g == 0 이면 시즌 끝, 아니면 128', () => {
+  it('경기 뒤(116, S+0x50 = 2)에 끊긴 이어하기도 116 의 끝처럼 — g == 0 이면 136(392), 아니면 128', () => {
     const 끝난준PO = advancePostseason({ ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [2, 1] }, 2)
-    expect(띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 49, postseason: 끝난준PO })).result.current.screen).toEqual({
-      kind: '시즌종료',
-    })
+    const 사슬 = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 49, postseason: 끝난준PO })).result.current
+    expect(사슬.screen).toEqual({ kind: '이벤트', eventId: 392, context: '시즌' })
+    expect(사슬.session.career?.seasonEndState).toBe(136)
     const 진행중 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [1, 1] as [number, number] }
     expect(
       띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 47, postseason: 진행중, regularSeasonRewardTaken: true })).result.current

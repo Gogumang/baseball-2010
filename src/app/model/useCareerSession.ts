@@ -349,9 +349,9 @@ const NO_STAT = () => {}
 
 /**
  * 여기서 '관리' 로 돌아오는 것은 105 진입이 아니다 — 111 상점 취소는 110 · 121 장비착용 취소는 106 하위 메뉴로 선다
- * (`nariReturnSubMenuOf`). '성적' 은 106 칸을 근사한 웹 임시 화면이다.
+ * (`nariReturnSubMenuOf`).
  */
-const NOT_MANAGEMENT_ENTRY_FROM: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>(['아이템', '성적'])
+const NOT_MANAGEMENT_ENTRY_FROM: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>(['아이템'])
 
 /** 처음부터 열린 마선수 — 저장 +0x30 · +0x35 (`normalizeAceOpenSave` 가 늘 켠다) */
 const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
@@ -1140,8 +1140,8 @@ export function useCareerSession({
    * 순위표 취소(109) · 하위 메뉴 취소(106 · 107 · 110)에서 돌아올 때도 `0xbcb49(0x69)` 로 105 에 다시 들어와 굴린다.
    * 훑기를 건너뛰는 것은 진입이 114 · 115 를 예약한 때(0x1cfdc — 연초 115 · 부상 엔딩 500)와 새 선수 · 대결 대기뿐이다(아래).
    *
-   * 웹은 화면이 '관리' 로 바뀐 것을 진입으로 본다. 단 상점(111 취소 → 110 · 121 취소 → 106, `nariReturnSubMenuOf`)과 웹 임시
-   * 화면 '성적'(106 칸)은 하위 메뉴로 돌아오는 길이라 105 진입이 아니다. 화면이 '관리' 인 채 105 에 다시 들어오는 길(하위 메뉴
+   * 웹은 화면이 '관리' 로 바뀐 것을 진입으로 본다. 단 상점(111 취소 → 110 · 121 취소 → 106, `nariReturnSubMenuOf`)은
+   * 하위 메뉴로 돌아오는 길이라 105 진입이 아니다. 화면이 '관리' 인 채 105 에 다시 들어오는 길(하위 메뉴
    * 취소 · 훈련 · 휴식 결과 창 닫기 · 필살타법 알림 닫기)은 `reenterManagement` 가 센다.
    */
   const [managementReentryCount, setManagementReentryCount] = useState(0)
@@ -1248,6 +1248,17 @@ export function useCareerSession({
     const next = startNextSeason(finished)
     setCareer(next)
     setScreen({ kind: '관리' })
+  }
+
+  /**
+   * 시즌 끝 사슬 136 으로 — 116 끝(12b74~12bbe)이 S+0xb4 ≠ 0 이고 S+0xb2(g) == 0 이면 `0xbcb49(0x88)` · `0xbcb49(0x72)` 로
+   * [114 → 136] 을 곧장 예약한다(45번째 경기 뒤 · 내 시리즈가 끝난 경기 뒤). 사이에 시즌 요약 화면은 없다 — 예전 웹 전용
+   * '시즌종료' 화면(r71 에서 걷음)은 원본에 없었다. 136 진입 0x10bb0 = S+0x50 = 0xb · 0x1fded · 저장 0x22755 ·
+   * 0x8bdc9(392 올해의 목표) · [114 → 130] (10bb0~10bf6). 그 해 성적은 원본에서 124 기록실 · 128 대진표 · 116 평가 창이 보인다.
+   */
+  const enterYearEndChain = (current: PlayerCareer) => {
+    setCareer(enterSeasonEvent(current, GOAL_INTRO_EVENT_ID))
+    setScreen({ kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID, context: '시즌' })
   }
 
   /**
@@ -1580,7 +1591,6 @@ export function useCareerSession({
       }
       if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
       setCareer(savedCareer)
-      if (point.kind === '시즌종료') return setScreen({ kind: '시즌종료' })
       // 109 — 100 → 1(자원 적재) → 109 라 이전 상태가 1: 취소가 안 먹고 바닥 1, 배경음 4 (0x10d8c · 0x105f0)
       if (point.kind === '다음경기순위') return setScreen({ kind: '다음경기순위', fromManagement: false })
       setScreen({ kind: '관리' })
@@ -1668,16 +1678,16 @@ export function useCareerSession({
     },
 
     /**
-     * [선수정보] 하위 메뉴 중 관리 화면이 직접 띄우지 않는 칸. 장비착용은 장착 상점으로, 나머지는 성적 화면으로
-     * 보낸다 (임시). 아이템/스킬은 이제 관리 화면의 스킬 창(`equipSkill`)이 맡는다 — 아이템 쪽은 아직 없다.
+     * [선수정보] 하위 메뉴 106 중 관리 화면이 직접 띄우지 않는 칸 — 키 0x13010 점프표 0xcc69c 칸 1 [장비착용] → 121
+     * (장착 상점 '착용' 탭). 나머지 칸 0 기본정보 119 · 2 아이템/스킬 122 · 3 필살타법 123 · 4 기록실(팝업 0x80 → 124)은
+     * 관리 화면이 스스로 띄운다(`useManagementMenu`). 예전 웹 임시 '성적' 화면(R9 500행)은 원본 106 의 다섯 칸에 없는
+     * 화면이라 걷었다 — 그 화면이 보이던 시즌·통산 성적은 124 기록실, 능력치는 119/120, 칭호는 129 가 보인다.
      */
     openPlayerInfo: (itemId: string) => {
-      if (itemId === '장비착용') {
-        setShopNotice('')
-        setShopGpDetail(null)
-        return setScreen({ kind: '아이템', tab: '착용' })
-      }
-      setScreen({ kind: '성적' })
+      if (itemId !== '장비착용') return
+      setShopNotice('')
+      setShopGpDetail(null)
+      setScreen({ kind: '아이템', tab: '착용' })
     },
 
     /**
@@ -1740,11 +1750,12 @@ export function useCareerSession({
       //     레코드를 번호로 찾아 틀 뿐 본 표시를 보지 않는다 — 392 → 130(370) → 131(375) 가 보상째 다시 나오고 128 로 온다.
       //     원본 동작 그대로 옮긴다 (미션·대결 같은 반복 가드가 없는 자리다).
       //   - 그 밖 포스트시즌 경기: 128.
+      //   116 끝은 0xbcb49(0x88 = 136) · 0xbcb49(0x72 = 114) 를 바로 예약한다(12b8c~12bbe) — 사이에 시즌 요약 화면이 없다.
       if (career.postseason !== null) {
-        if (leagueDayCounterOf(career) === 0) return setScreen({ kind: '시즌종료' })
+        if (leagueDayCounterOf(career) === 0) return enterYearEndChain(career)
         return enterPostseason(career)
       }
-      if (isSeasonFinished(career)) return setScreen({ kind: '시즌종료' })
+      if (isSeasonFinished(career)) return enterYearEndChain(career)
       // 22경기 뒤 중간평가 (0x11910 → 0x11e84)
       if (career.gamesPlayed === MID_SEASON_GAME) {
         const achieved = achievedGoalCount(career, '중간')
@@ -2212,12 +2223,13 @@ export function useCareerSession({
       finishPostseason(applyKoreanSeriesReward(career))
     },
 
-    /** 시즌 성적 화면 뒤 — 올해의 목표 결과(392)부터 연말 이벤트를 잇는다 */
+    /**
+     * **웹 전용 디버그(시험용 진입점)** — 지금 커리어로 136 연말 사슬을 곧장 튼다. 화면은 이 길을 부르지 않는다:
+     * 원본 길은 116 끝(`confirmGameResult`)이 [114 → 136] 으로 곧장 간다(`enterYearEndChain`).
+     */
     beginYearEnd: () => {
       if (career === null) return
-      // 136 진입 0x10bb0 — S+0x50 = 0xb · 저장 뒤 392
-      setCareer(enterSeasonEvent(career, GOAL_INTRO_EVENT_ID))
-      setScreen({ kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID, context: '시즌' })
+      enterYearEndChain(career)
     },
 
     /**

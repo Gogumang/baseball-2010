@@ -50,9 +50,3 @@ export const nextButton = style({
   left: '4px',
   top: '4px',
 })
-
-export const statsButton = style({
-  position: 'absolute',
-  right: '4px',
-  top: '4px',
-})
