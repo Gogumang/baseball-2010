@@ -8,6 +8,8 @@ import {
   abilityColorOf, radarAxisEndOf, radarLabelBoxOf, radarPointOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { useRadarGrowth } from '@/pages/management/model/useRadarGrowth'
+import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 
 const KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
 const IMG_TEXT = './sprites/img_text/frames'
@@ -57,7 +59,9 @@ export function AbilityRadar({ base, shown, labelFrames }: {
   readonly labelFrames: readonly number[]
 }) {
   const origins = useFrameOrigins('./sprites/mode_ui/frames')
-  const points = shown.map((value, axis) => radarPointOf(axis, value))
+  // 자라는 애니 — 꼭짓점 · 숫자는 지금값(E+8), 숫자 색은 카드가 견준 최종값 그대로(0x5ad94)
+  const current = useRadarGrowth(shown)
+  const points = current.map((value, axis) => radarPointOf(axis, value))
   return (
     <>
       <FrameSprite folder="./sprites/mode_ui/frames" frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
@@ -68,17 +72,20 @@ export function AbilityRadar({ base, shown, labelFrames }: {
         style={{ left: RADAR_CENTER.x - BACKGROUND_HALF.width, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2 }} />
       <img className={styles.layer} alt="" src={RADAR_BACKGROUND_IMAGE}
         style={{ left: RADAR_CENTER.x, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2, transform: 'scaleX(-1)' }} />
+      {/* 0x764c8: 바탕 0x7633c(고정 29 마름모 #6B92F4) → 도형 0x75e30(채움 · 흰 테두리) → 축 이름 줄 0x5abe2~(기준점 → 지금 꼭짓점) */}
       <svg className={styles.board} viewBox="0 0 240 320">
+        <polygon points={abilityChartFrameOf(RADAR_CENTER).map((point) => `${point.x},${point.y}`).join(' ')}
+          fill="none" stroke={RADAR_COLORS.axis} />
+        <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+          fill={RADAR_COLORS.fill} fillOpacity={RADAR_COLORS.fillOpacity} stroke={RADAR_COLORS.edge} />
         {points.map((point, axis) => {
           const end = radarAxisEndOf(axis)
           return <line key={axis} x1={end.x} y1={end.y} x2={point.x} y2={point.y} stroke={RADAR_COLORS.axis} />
         })}
-        <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-          fill={RADAR_COLORS.fill} fillOpacity={RADAR_COLORS.fillOpacity} stroke={RADAR_COLORS.edge} />
       </svg>
       {shown.map((value, axis) => {
         const box = radarLabelBoxOf(axis)
-        const glyphs = numberGlyphsOf(value)
+        const glyphs = numberGlyphsOf(current[axis] ?? value)
         const color = abilityColorOf(base[axis] ?? value, value)
         const right = box.x + 13 + Math.ceil(glyphsWidthOf(glyphs) / 2)
         return (

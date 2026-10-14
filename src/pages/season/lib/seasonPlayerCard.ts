@@ -31,7 +31,8 @@ import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/season
  * ⚠️ 미확인: 딱지 [gfx+0x168] 은 상태 0xca(팀 고르기) · 0xe4(트레이드) 그리기(0xea50 · 0xeaa8 → 0x4774 · 0x50a8)만
  * `[this+0xd4]` 로 채운다 — 그 화면을 거치지 않은 판(이어 하기)에서 값이 무엇인지 못 가려 딱지는 그리지 않는다
  * (구단정보 0xd5 화면과 같은 처리).
- * ⚠️ 미확인: 레이더 0x5a990 의 도형 자라는 애니([skin+0xd4] +0xac · +0x1e3)는 관리 화면 레이더처럼 옮기지 않았다.
+ * 레이더 0x5a990 의 도형 자라는 애니([skin+0xd4] +0xad · +0x1e3 — 0xd9 들어옴 0x5446 · 0xdc 0x5f98 가 0 에서 다시 건다)는
+ * `management/model/useRadarGrowth` 가 그린다.
  */
 
 /**

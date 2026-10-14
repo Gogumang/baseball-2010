@@ -10,13 +10,18 @@ describe('기본정보 레이더 차트 — 0x5a990', () => {
   })
 
   it('꼭짓점 거리는 floor(값×30/999) — 500 이면 15', () => {
-    // 15 × cos45° ≈ 10.6 → 11 (축마다 반올림)
-    expect(radarPointOf(1, 500)).toEqual({ x: 189, y: 93 })
+    // 15 × 46340 >> 16 = 10 · −15 × 46340 >> 16 = −11 (산술 시프트 0x76250)
+    expect(radarPointOf(1, 500)).toEqual({ x: 188, y: 93 })
   })
 
-  it('축 이름 상자 위치는 layout-re 계산값과 같다', () => {
+  it('값이 0 이 아니면 길이는 최소 3 이다 (0x7626e) — 50 은 1 이 아니라 3', () => {
+    expect(radarPointOf(1, 50)).toEqual({ x: 178 + 2, y: 104 - 3 })
+    expect(radarPointOf(1, 0)).toEqual(RADAR_CENTER)
+  })
+
+  it('축 이름 상자 — 기준점은 (R + 18)·표 >> 16 (0x5ac00~0x5ac1e), 양수 쪽이 1 작다', () => {
     expect([0, 1, 2, 3].map(radarLabelBoxOf)).toEqual([
-      { x: 120, y: 43 }, { x: 211, y: 43 }, { x: 211, y: 137 }, { x: 120, y: 137 },
+      { x: 120, y: 43 }, { x: 210, y: 43 }, { x: 210, y: 136 }, { x: 120, y: 136 },
     ])
   })
 

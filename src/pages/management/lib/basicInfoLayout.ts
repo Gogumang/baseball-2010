@@ -14,11 +14,19 @@ const AXIS_DEGREES = [225, 315, 45, 135]
 const LABEL_BOX = { width: 26, height: 29 }
 const SIXTEEN_BITS = 65536
 
-/** ×65536 표 곱을 반올림한다 — layout-re 계산값(120,43)(211,43)… 과 맞는 쪽 (추정) */
-const scaled = (unit: number, distance: number) => Math.round((unit * distance) / SIXTEEN_BITS)
+/**
+ * ×65536 표 곱을 `asrs #0x10` 으로 내린다 — 꼭짓점 0x76250 · 0x76286, 축 이름 기준점 0x5ac08 · 0x5ac1c (직접 떴다).
+ * 산술 시프트라 음수는 더 작은 쪽으로 간다: 45° 쪽 48 은 +33 · −34.
+ */
+const scaled = (unit: number, distance: number) => Math.floor((unit * distance) / SIXTEEN_BITS)
 
+/**
+ * 꼭짓점 — 길이 = (u8)(값 × 최대길이 / 999)(0x761f8~0x76208, 최대길이 = 반지름 × 999 / 999), 값이 0 이 아니면
+ * **최소 3**(0x7626e~0x76276 · 0x76292~0x7629a)이다. 값은 자라는 애니의 지금값(E+8)이다 (`radarGrowth`).
+ */
 export function radarPointOf(axis: number, value: number): { x: number; y: number } {
-  const distance = Math.floor((Math.max(0, value) * RADAR_RADIUS) / MAXIMUM_ABILITY)
+  const length = Math.floor((Math.max(0, value) * RADAR_RADIUS) / MAXIMUM_ABILITY) & 0xff
+  const distance = value === 0 ? length : Math.max(3, length)
   const degree = AXIS_DEGREES[axis]
   return {
     x: RADAR_CENTER.x + scaled(cosineSixteen(degree), distance),
