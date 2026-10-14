@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
-import { PixelScreen } from '@/shared/ui'
-import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
+import { PressArea, RawScreen } from '@/shared/ui'
+import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/stagePressAreas'
+import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
@@ -46,7 +47,6 @@ import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import * as styles from '@/pages/game/ui/GameScreen.css'
 
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
@@ -166,11 +166,6 @@ export function GameScreen({
   const ace = progress.aceOpponent
   /** 운동장 전경 · 벤치 클리어링의 두 팀 — 레코드 타자 배열 차례 · 지금 투수 마선수 (`gameFieldTeamsOf`) */
   const fieldTeams = gameFieldTeamsOf(career, progress)
-  /**
-   * 경기 중 모은 G포인트 누계. 원본도 기록을 달성할 때마다 더해 화면에 보여 준다 (0xa77f0 이 evt+0x180 에 누적).
-   * 원본이 이 숫자를 어디에 그리는지는 아직 못 찾아, 웹 껍데기의 제목 옆 칸에 둔다 (추정).
-   */
-  const earnedGamePoint = recordGamePointsOf(progress.recordIds)
 
   /** 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
   const stealableBases = onSteal === undefined ? [] : stealableBasesOf(progress)
@@ -330,31 +325,9 @@ export function GameScreen({
 
   return (
     <>
-      <PixelScreen
-        title={`${career.name} · ${career.battingOrder}번타자`}
-        badge={
-          isEagleEyeEnabled
-            ? `G ${earnedGamePoint} · 이글아이 ${career.eagleEyeGamesRemaining}`
-            : `G ${earnedGamePoint}`
-        }
-        leftKey={
-          sceneConfirm.isAwaiting && !isMenuOpen
-            ? // 0xe — OK 하나만 받는다 (0x532b0)
-              { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
-            : stealableBases.length > 0 && !isMenuOpen
-            ? {
-                label: `도루 ${stealableBases[0]}루`,
-                onPress: () => stealIfFlying(stealableBases[0]),
-              }
-            : undefined
-        }
-        rightKey={{
-          label: isMenuOpen ? '닫기' : '메뉴',
-          onPress: menu.toggle,
-        }}
-      >
-        {/* 0xe 에서 화면을 누르면 OK 로 본다 (터치용 웹판 편의 — 캔버스 탭이 스윙인 것과 같은 자리) */}
-        <div className={styles.stageArea} onClick={sceneConfirm.acceptsConfirm ? sceneConfirm.confirm : undefined}>
+      <RawScreen>
+        {/* 타석 캔버스 — RawScreen 판 (0, 0) 에 맞춘다(`stageScreen.css`) */}
+        <div className={stageScreen.canvasSlot}>
           {/*
             원본 타석 화면에는 글자 안내가 없다 — 마선수 등판은 컷인 0x473f0 · 판정은 game_judge 애니뿐이라
             웹 전용 "등판!" 띠 · 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다
@@ -450,42 +423,59 @@ export function GameScreen({
             flightProbeRef={flightProbeRef}
             onPickoff={onPickoff}
           />
-          {/*
-            0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 타석 장면 위에 투수·타자 소개 판 0x44944. 팀 글자는 0xb6c20: 내 팀 PLAYER · 상대 COM.
-            값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).
-          */}
-          {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
-          {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
-          {substitution.isShown && (
-            <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
-          )}
-          {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
-          {recordAlert !== undefined && <RecordAlertPanel frame={recordAlert} />}
         </div>
+        {/*
+          0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 타석 장면 위에 투수·타자 소개 판 0x44944. 팀 글자는 0xb6c20: 내 팀 PLAYER · 상대 COM.
+          값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).
+        */}
+        {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
+        {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
+        {substitution.isShown && (
+          <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
+        )}
+        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
+        {recordAlert !== undefined && <RecordAlertPanel frame={recordAlert} />}
+
+        {/*
+          웹 제목줄 · 배지(G 누계 · 이글아이)는 걷었다 — 원본 240×320 장면 한 장뿐이다. G 누계는 기록 달성 알림 0x4e35c 가
+          판 머리에 그리고(위 `RecordAlertPanel`), 이글아이 남은 경기는 경기 화면에 안 그린다(상태판 0x7d34c 의 아이콘뿐, P4).
+          마우스 · 터치 길은 투명한 누름 칸으로 남긴다 — 0xe 의 OK(화면 전체) · '*' 메뉴("*MENU" 자리) · 도루(점수판 루 그림 자리)
+        */}
+        {sceneConfirm.isAwaiting && !isMenuOpen && (
+          // 0xe — OK 하나만 받는다 (0x532b0)
+          <PressArea label="확인" onPress={sceneConfirm.confirm} isDisabled={!sceneConfirm.acceptsConfirm} />
+        )}
+        {!sceneConfirm.isAwaiting && !isMenuOpen &&
+          stealableBases.map((base) => (
+            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
+          ))}
+        <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.toggle} />
 
         {isMenuOpen ? (
-          <InGameMenu
-            // 나만의리그 타자편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
-            mode={BATTER_CAREER_MODE}
-            cursor={menu.cursor}
-            onCursorChange={menu.setCursor}
-            onContinue={menu.close}
-            onQuit={onQuit}
-            onOpenHelp={() => {
-              menu.close()
-              setOverlay('조작방법')
-            }}
-            onOpenSettings={
-              settings === undefined || onSettingsChange === undefined
-                ? undefined
-                : () => {
-                    menu.close()
-                    setOverlay('설정')
-                  }
-            }
-          />
+          <div className={stageScreen.menuLayer}>
+            <InGameMenu
+              // 나만의리그 타자편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
+              mode={BATTER_CAREER_MODE}
+              cursor={menu.cursor}
+              onCursorChange={menu.setCursor}
+              onContinue={menu.close}
+              onQuit={onQuit}
+              onOpenHelp={() => {
+                menu.close()
+                setOverlay('조작방법')
+              }}
+              onOpenSettings={
+                settings === undefined || onSettingsChange === undefined
+                  ? undefined
+                  : () => {
+                      menu.close()
+                      setOverlay('설정')
+                    }
+              }
+            />
+          </div>
         ) : null}
-      </PixelScreen>
+      </RawScreen>
       {overlay === '조작방법' && (
         <HelpScreen
           onBack={() => {

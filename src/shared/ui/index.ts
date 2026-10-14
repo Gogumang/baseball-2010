@@ -28,6 +28,8 @@ export {
 export { FrameSprite } from '@/shared/ui/FrameSprite/FrameSprite'
 export { SolidStamp } from '@/shared/ui/SolidStamp/SolidStamp'
 export { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
+export { PressArea } from '@/shared/ui/PressArea/PressArea'
+export type { PressRect } from '@/shared/ui/PressArea/PressArea'
 export { SpriteNumber } from '@/shared/ui/SpriteNumber/SpriteNumber'
 export { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 export { ScreenOverlay } from '@/shared/ui/ScreenOverlay/ScreenOverlay'

@@ -183,3 +183,68 @@ describe('미션 HUD 는 경기 칸 run.game 을 그린다 — 점수판 0xb69b0
     })
   })
 })
+
+describe('웹 테두리 걷기 — 원본 240×320 판 한 장 · 목표는 HUD 0x36714 가 그린다', () => {
+  const 띄우기 = (name: string, extra: Partial<Parameters<typeof MissionPlayScreen>[0]> = {}) => {
+    const mission = MISSIONS.find((candidate) => candidate.side === '타자' && candidate.name === name)!
+    return render(
+      <MissionPlayScreen
+        run={startMission(mission)}
+        ability={ROOKIE_BATTER_ABILITY}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        opponent={null}
+        atBat={createAtBat()}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onGiveUp={vi.fn()}
+        onFinish={vi.fn()}
+        onSteal={vi.fn()}
+        {...extra}
+      />,
+    )
+  }
+
+  it('제목줄(미션 이름) · 배지(남은 타석 · 스윙) 대신 HUD 판에 목표 글 · 노란 "지금/목표" · 타석 · 스윙 띠를 그린다', () => {
+    const view = 띄우기('빠르게 제압하라')
+    expect(view.queryByText('빠르게 제압하라')).toBeNull()
+    expect(view.queryByText(/스윙$/)).toBeNull()
+    expect(view.container.querySelector('[data-original-screen]')).not.toBeNull()
+    expect(view.getByTestId('미션-판').getAttribute('src')).toBe('./sprites/trainning/frames/012.png')
+    expect(view.getAllByTestId('미션-목표-글').map((node) => node.textContent)).toEqual(['안타'])
+    expect(view.getAllByTestId('미션-목표-수').map((node) => node.getAttribute('data-src'))).toEqual([
+      './sprites/num/080.png', './sprites/num/100.png', './sprites/num/083.png',
+    ])
+    // 스윙 한도 3 만 있다 — 띠 하나, "0/3"
+    expect(view.getAllByTestId('미션-한도-띠')).toHaveLength(1)
+    expect(view.queryByTestId('미션-시계')).toBeNull()
+  })
+
+  it('시간 제한 미션은 왼쪽에 시계 띠를 그린다', () => {
+    const view = 띄우기('폭주!! 사이클링 히트')
+    expect(view.getByTestId('미션-시계')).toBeTruthy()
+  })
+
+  it('메뉴는 "*MENU" 자리(0, 307, 41 × 12)의 투명한 누름 칸으로 연다', () => {
+    const view = 띄우기('명품 타자의 첫 걸음')
+    const press = view.getByRole('button', { name: '메뉴' })
+    expect(press.textContent).toBe('')
+    expect([press.style.left, press.style.top, press.style.width, press.style.height]).toEqual(['0px', '307px', '41px', '12px'])
+    act(() => press.click())
+    expect(view.getByRole('option', { name: /계속/ })).toBeTruthy()
+  })
+
+  it('도루는 점수판 루 그림 자리의 투명한 누름 칸 — 공이 날 때만 출발한다', () => {
+    const onSteal = vi.fn()
+    const view = 띄우기('기동력은 나의 힘', { onSteal, stealableBases: [1] })
+    const press = view.getByRole('button', { name: '도루 1루' })
+    expect([press.style.left, press.style.top]).toEqual(['68px', '14px'])
+    act(() => press.click())
+    expect(onSteal).not.toHaveBeenCalled()
+    const probe = stageProps.last?.flightProbeRef as { current: (() => boolean) | null }
+    probe.current = () => true
+    act(() => press.click())
+    expect(onSteal).toHaveBeenCalledWith(1)
+  })
+})

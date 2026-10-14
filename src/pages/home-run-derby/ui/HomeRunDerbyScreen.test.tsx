@@ -50,9 +50,10 @@ describe('홈런더비 화면', () => {
     expect(받은팁).toEqual([LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(1))]])
   })
 
-  it('제목이 뜨고, 공 번호는 HUD 공 아이콘(0x45a54)만 그린다 — 웹 전용 배지 · 안내 줄이 없다', () => {
+  it('웹 제목줄 없이 원본 240×320 판 한 장이고, 공 번호는 HUD(0x45a54)만 그린다 — 웹 전용 배지 · 안내 줄이 없다', () => {
     띄우기()
-    expect(screen.getByText('홈런더비')).toBeTruthy()
+    expect(screen.queryByText('홈런더비')).toBeNull()
+    expect(document.querySelector('[data-original-screen] canvas')).not.toBeNull()
     expect(screen.queryByText('1 / 10구')).toBeNull()
     expect(screen.queryByText(/10구 안에 멀리 쳐라/)).toBeNull()
   })

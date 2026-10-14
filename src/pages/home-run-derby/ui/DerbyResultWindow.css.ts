@@ -38,8 +38,3 @@ export const answerButton = style({
   cursor: 'pointer',
   overflow: 'visible',
 })
-
-/**
- * 신기록 알림 — 원본은 그림 대신 **효과음 0x1f**(아니면 0x20)로만 알린다(0x4f644~).
- * 웹은 소리가 없어 글로 대신한다 (원본에 없는 웹판 표시).
- */
