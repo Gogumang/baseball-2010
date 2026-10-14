@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
 import type { ReactNode } from 'react'
 import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -220,8 +221,11 @@ export function AceSelectScreen({
     onOpenAce(cell)
   }
 
+  // 머리띠가 미끄러지는 동안 키 함수가 [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useFrameSlideKeyLock`)
+  const keyLock = useFrameSlideKeyLock()
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (keyLock.current) return
       // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
       if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
       if (overlay !== undefined && overlay !== null && overlay !== false) return

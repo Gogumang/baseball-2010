@@ -15,7 +15,8 @@ import { generalModeMatchInfoLines } from '@/pages/general-mode/lib/matchInfoLin
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
-import { matchInfoEntryPhaseOf } from '@/pages/management/lib/matchInfoEntry'
+import { matchInfoValueCellDy } from '@/pages/management/lib/matchInfoEntry'
+import { useMatchInfoEntry } from '@/pages/management/ui/useMatchInfoEntry'
 import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
 
 const SLT_IMAGE = './sprites/slt_frame'
@@ -74,7 +75,7 @@ export interface MatchInfoScreenProps {
    * 0x63b15 넷째 인자 — `[메뉴+0x28] ≠ 0x17`(이전 상태가 23 엔트리 편집이 아님, 0x2e0fa). 참이면 머리띠가 미끄러져 내려오는
    * 다섯 그림 동안 본문을 비우고, 파랑 배너 둘이 네 그림 동안 들어온 뒤 본문이 선다 (`pages/management/lib/matchInfoEntry`).
    * 23 에서 돌아오면 거짓 — 머리띠도 안 미끄러지고 본문이 곧바로 선다. 안 주면 거짓.
-   * ⚠️ 미확인: 연출 동안 키 0x311a8 이 키를 받는지는 안 떴다 — 웹은 늘 받는다.
+   * 갱신 0x311a8 은 맨 앞에서 [[0x1552cfc]+0xe4] == 0 이면 아무것도 안 한다(0x311b2) — 머리띠 · 배너 · 값 줄 펼침이 끝날 때까지 키를 안 받는다.
    */
   readonly isEntryAnimated?: boolean
 }
@@ -96,13 +97,15 @@ export function MatchInfoScreen({
   setup, isQuickStart = false, isSettingsOpen = false, settingsWindow = null, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
   userStarterName = null, cpuMatchInfo = null, stage = null, isEntryAnimated = false,
 }: MatchInfoScreenProps) {
-  const phase = matchInfoEntryPhaseOf(useUpdateCounter(), isEntryAnimated)
+  const { phase, valueRows, areValueCellsHidden, isKeyReady } = useMatchInfoEntry(isEntryAnimated, isRespinning)
   const sltOrigins = useFrameOrigins(SLT_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const lines = generalModeMatchInfoLines(setup, userStarterName, cpuMatchInfo)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 키 함수 맨 앞 — [[0x1552cfc]+0xe4](값 줄 펼침 끝) == 0 이면 아무것도 안 한다 (`isMatchInfoKeyReadyAt`)
+      if (!isKeyReady.current) return
       // 0x311a8: 빠른실행이고 [메뉴+0x154] ≤ 0x13(재굴림이 도는 중)이면 312ba 에서 끝 — 키를 안 본다
       if (isRespinning) return
       if (event.key === 'Enter') {
@@ -187,7 +190,7 @@ export function MatchInfoScreen({
       <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
         style={{ left: MATCH_INFO_LAYOUT.arrow.rightX + (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
 
-      {/* 줄 다섯 — 가운데 딱지 + 좌우 값 */}
+      {/* 줄 다섯 — 가운데 딱지 (0x64d30 본문) */}
       {lines.map((line, index) => {
         const y = matchInfoRowY(index)
         return (
@@ -197,25 +200,38 @@ export function MatchInfoScreen({
             {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대다 — 글자는 팔레트 3(짙은 파랑)으로 구웠다 */}
             <FrameSprite folder={IMG_TEXT_FRAME} frame={line.labelFrame} origins={imgTextOrigins}
               x={MATCH_INFO_LAYOUT.labelBar.x} y={y + MATCH_INFO_LAYOUT.labelBar.textDy} />
-            {/* 값 칸 slt_frame 이미지 10 — 유저 (16, y + 3) · CPU 뒤집어 (138, y − 3) (0x5dcc0) */}
+          </span>
+        )
+      })}
+
+      {/*
+        값 칸 0x5dcc0 — 딱지 뒤에 칸 i = 0 … 9 (짝 유저 · 홀 CPU) 차례로. 유저 slt_frame 이미지 10 (16, y + 3) · CPU 뒤집어 (138, y − 3),
+        펼치는 동안은 아랫줄 칸이 첫 줄 자리에서 떨어져 내려온다(`matchInfoValueCellDy`). 재굴림 중에는 안 그린다.
+      */}
+      {!areValueCellsHidden && lines.map((line, index) => {
+        const y = matchInfoRowY(index)
+        const userY = y + MATCH_INFO_LAYOUT.valueCell.userDy + matchInfoValueCellDy(valueRows.unfold, 2 * index)
+        const cpuY = y + MATCH_INFO_LAYOUT.valueCell.cpuDy + matchInfoValueCellDy(valueRows.unfold, 2 * index + 1)
+        return (
+          <span key={line.label}>
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy }} />
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy, transform: 'scaleX(-1)' }} />
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY }} />
             <span className={styles.centeredText} data-testid={`경기정보-${line.label}-유저`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: y + MATCH_INFO_LAYOUT.valueCell.userDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.user}
             </span>
+            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY, transform: 'scaleX(-1)' }} />
             <span className={styles.centeredText} data-testid={`경기정보-${line.label}-CPU`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: y + MATCH_INFO_LAYOUT.valueCell.cpuDy + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
+              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
               {line.cpu}
             </span>
           </span>
         )
       })}
 
-      {/* 노랑 반원 두 쪽 — 값 줄이 다 펼쳐졌고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108). ⚠️ 값 줄 펼침 연출은 아직 옮기지 않아 늘 펼쳐진 것으로 본다 */}
-      {isBob && (
+      {/* 노랑 반원 두 쪽 — 값 줄 0x5dcc0 이 다 펼쳤다고 돌려줬고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108) */}
+      {valueRows.isReady && isBob && (
         <>
           <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
             style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />

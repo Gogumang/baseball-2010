@@ -153,7 +153,7 @@ export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowPro
             {index === cursor && isBlinkOn && (
               <svg className={local.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
                 data-testid="칭호-커서">
-                {/* 0xb9ed5 노랑 테두리 — 0x6a978 이 폭·높이에 1 을 더해 넘긴다(U-113, ⚠️ 플랫폼 테두리 크기 미확인) */}
+                {/* 0xb9ed5 노랑 테두리 — 0x6a978 이 폭·높이에 1 을 더해 플랫폼 0x14006d8 에 넘겨 (w + 1) × (h + 1) 칸을 덮는다(U-113 확정) */}
                 <rect x={TITLE_CURSOR_BOX.x + 0.5} y={TITLE_CURSOR_BOX.y + dy + 0.5}
                   width={TITLE_CURSOR_BOX.width} height={TITLE_CURSOR_BOX.height}
                   fill="none" stroke={TITLE_LIST_COLORS.cursor} strokeWidth={1} />

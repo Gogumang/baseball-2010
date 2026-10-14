@@ -20,7 +20,7 @@ import * as styles from '@/pages/special/ui/SpecialScreen.css'
  * - 타자: 겹침 타자 그림 vt+0x10 = 0x78cfd 를 (A.x, A.y + 0x2d) 에 바로. 그림자 끔(0x652d6 `그림+0x48 = 0`).
  *   잔상(batter_ghost)은 공용 생성자 0x767ec 가 +0x2c 에 늘 싣고 0x78eca 가 자세 8·9 에 끼우므로 그대로 둔다.
  *   우타(손 0)면 그림 x 를 축으로 뒤집는다(0x78d0c 효과 0x11 — 축은 타석 그림과 같은 근사).
- * - 투수: 54×75 이미지 [0x1552ae0] 를 (A.x − (손 ? 0x32 : 0x3b), A.y − 0x61) 에 — 그 안 (27, 62) 에 단일 PZX 투수 그림
+ * - 투수: 54×75 이미지 [0x1552ae0] 를 (A.x − (손 ? 0x32 : 0x3b), A.y − 0x61) 에 **두 배로**(0x98975 효과 0x10 · 2) — 그 안 (27, 62) 에 단일 PZX 투수 그림
  *   0x79525(바탕 pitcher.pzx 팔레트 피부 × 15 + 팀 0x794c2 · 장비 여섯 칸 `pitcherLayersOf`). 좌완(손 ≠ 0)이면 뒤집는다(0x79544).
  *   이미지 밖은 잘린다(54×75 만 떠 둔다). 마젠타 투명 키라 빈 곳은 비친다.
  */
@@ -43,6 +43,7 @@ export function HallOfFameFigure({ drawing, ax, ay }: {
         style={{
           left: ax + pitcherImageDxOf(drawing.hand), top: ay + HALL_OF_FAME_FIGURE.imageDy,
           width: image.width, height: image.height,
+          transform: `scale(${HALL_OF_FAME_FIGURE.imageScale})`, transformOrigin: '0 0', imageRendering: 'pixelated',
         }}>
         {drawing.image !== null && <PitcherFigure look={drawing.image.look} pose={drawing.image.pose} />}
       </div>

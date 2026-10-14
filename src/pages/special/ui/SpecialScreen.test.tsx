@@ -673,11 +673,12 @@ describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c
     expect(screen.getByTestId('명전-팀로고').getAttribute('src')).toBe('./sprites/team_logo/004.png')
   })
 
-  it('명전 투수 칸 1 — 54×75 이미지를 (A.x − 0x32, A.y − 0x61) 에 (좌완), 팀 로고는 없다', () => {
+  it('명전 투수 칸 1 — 54×75 이미지를 (A.x − 0x32, A.y − 0x61) 에 두 배로(0x98975 효과 0x10 · 2, 좌완), 팀 로고는 없다', () => {
     열기()
     fireEvent.mouseEnter(screen.getByRole('button', { name: '2번 슬롯' }))
     const 이미지 = screen.getByTestId('명전-투수그림')
     expect([이미지.style.left, 이미지.style.top, 이미지.style.width, 이미지.style.height]).toEqual(['8px', '13px', '54px', '75px'])
+    expect([이미지.style.transform, 이미지.style.transformOrigin]).toEqual(['scale(2)', '0 0'])
     expect(screen.queryByTestId('명전-팀로고')).toBeNull()
   })
 })
