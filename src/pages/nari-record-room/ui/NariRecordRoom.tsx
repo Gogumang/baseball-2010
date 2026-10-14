@@ -211,7 +211,9 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
       <div role="group" aria-label={`개인기록 ${edition}`}>
         {palette3.definition}
         {/* 5ca4e 공용 판 0x55e60(편집기, W/2, H/2 + 5, 210, 220, 0, 0x22, 위 띠 0x12, 아래 띠, 0, 0) — 아래 띠는
-            (s8)[편집기+0x3e8] == 1 이면 0x12, 아니면 0 (5ca00~5ca10). ⚠️ 미확인: +0x3e8 을 세우는 곳을 못 찾아 0 으로 둔다 */}
+            (s8)[편집기+0x3e8] == 1 이면 0x12, 아니면 0 (5ca00~5ca10). [편집기+0x3e8] 에 쓰는 곳은 편집기 초기화 0x5561c 의
+            556a0 `strb 0` 하나뿐이다(binary.mod 전체에서 +0x3e8 쓰기를 상수 추적으로 찾았다 — 읽는 곳도 5ca04 하나). 124 진입
+            0x116d4 → 0x5761c → 0x5561c 가 늘 먼저 돌므로 아래 띠는 **늘 0** 이다 — 원본에서도 그려지지 않는 죽은 갈래 */}
         <CommonPanel x={layout.panel.x} y={layout.panel.y} width={layout.panel.width} height={layout.panel.height}
           topBand={0x12} testId="개인기록-판" />
         {rows.length > 1 && (

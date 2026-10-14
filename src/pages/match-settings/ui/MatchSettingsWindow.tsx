@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -204,8 +204,9 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
   return (
     <div role="group" aria-label="경기진행 설정" data-stage={state.stage} data-kind={kind}>
       <PaletteFilters id={filterId} />
-      <div className={styles.window} data-testid="경기설정-판"
-        style={{ left: board.x, top: board.y, width: board.width, height: board.height }} />
+      {/* 공용 판 0x55e60(skin, W/2, H/2, 0xc0, h, 0, 정렬 0x22, 0, 0, 제목 탭 1, 어둡게 1) — 네 부르는 자리
+          6051e · 607fa · 60b30(h 0xa0) · 60e94(h 0xd4) 를 직접 떴다(알파 · 띠 자리는 [sp+0x88] = r7 = 0, 604c8) */}
+      <CommonPanel x={board.x} y={board.y} width={board.width} height={board.height} titleTab dim testId="경기설정-판" />
       {title}
       {body}
       <Description layout={isDetail ? DETAIL_DESCRIPTION : SMALL_DESCRIPTION} raw={descriptionOf(state)} />

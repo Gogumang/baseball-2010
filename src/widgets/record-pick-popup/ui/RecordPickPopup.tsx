@@ -1,12 +1,16 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
+import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
-  RECORD_PICK_CELL_SIZE, RECORD_PICK_CELLS, RECORD_PICK_DIM_LABEL_COLOR, RECORD_PICK_LABEL_GAP, RECORD_PICK_TITLE_ID,
-  recordPickIconOffsetOf, recordPickLabelXOf,
+  RECORD_PICK_CELL_SIZE, RECORD_PICK_CELLS, RECORD_PICK_DIM_LABEL_COLOR, RECORD_PICK_LABEL_GAP, RECORD_PICK_POPUP_HEIGHT,
+  RECORD_PICK_POPUP_START_HEIGHT, RECORD_PICK_TITLE_ID, nextRecordPickPopupHeightOf, recordPickIconOffsetOf, recordPickLabelXOf,
+  recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 
 const IMG_TEXT = './sprites/img_text/frames'
@@ -47,13 +51,40 @@ export interface RecordPickPopupProps {
 /**
  * **두 칸 고르기 팝업 0x80** — 시즌 기록순위 0xf334 · 나리 기록실 0x19448 공용 그림(`recordPickPopup` 머리말).
  * 키는 잡는 단계에서 다 가져간다(뒤 메뉴가 같은 키를 받지 않게).
+ * 판은 공용 창 [0x140005c] 의 띠 판 0x744c4(폭 240 · 높이 0x80, 펼침 6 → 128)이고, 뒤는 그리는 틀마다 검정 단계 5 로 덮는다 —
+ * 나리 0xf684 · 시즌 0x3b14 장면이 [창+0x24f] = 0 · [창+0x24c] = 1 을 세운다(`popupDim`).
+ * ⚠️ 미확인: 닫힐 때 [+0x215] 가로 줄임을 이 팝업 키 0xf5d4 · 0x196ec 가 타는지는 안 떠서 웹은 곧바로 닫는다.
  */
 export function RecordPickPopup({ ariaLabel, testIdPrefix, cells, selected, onToggle, onConfirm, onCancel }: RecordPickPopupProps) {
   const latest = useRef({ onToggle, onConfirm, onCancel })
   latest.current = { onToggle, onConfirm, onCancel }
+  /** 그리는 높이 [창+0x212] — 다 펼쳤으면 목표 0x80 */
+  const [height, setHeight] = useState(RECORD_PICK_POPUP_START_HEIGHT)
+  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침을 건너뛰고 다 펼친 판에서 시작한다
+  const boxRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if ((boxRef.current?.offsetHeight ?? 0) <= 0) setHeight(RECORD_PICK_POPUP_HEIGHT)
+  }, [])
+  const isOpening = height < RECORD_PICK_POPUP_HEIGHT
+  const isOpeningRef = useRef(isOpening)
+  isOpeningRef.current = isOpening
+  useEffect(() => {
+    if (!isOpening) return
+    const timer = window.setTimeout(
+      () => setHeight((current) => nextRecordPickPopupHeightOf(current) ?? RECORD_PICK_POPUP_HEIGHT),
+      millisecondsPerFrame(),
+    )
+    return () => window.clearTimeout(timer)
+  }, [isOpening, height])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
+      // 펼치는 동안은 창이 키를 잡기만 하고 보지 않는다 (0x754f8 → 0x75556 갈래)
+      if (isOpeningRef.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
       if (isCancelKey(event.key)) current.onCancel()
       else if (['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)) current.onToggle()
       else if (event.key === 'Enter' || event.key === '5') current.onConfirm()
@@ -70,7 +101,11 @@ export function RecordPickPopup({ ariaLabel, testIdPrefix, cells, selected, onTo
   const labelTop = RECORD_PICK_CELL_SIZE + RECORD_PICK_LABEL_GAP
   return (
     <div role="dialog" aria-label={ariaLabel}>
-      <div className={windowStyles.window} style={{ left: 120 - 0x54 - 6, top: 160 - 0x28 - 8, width: 0x54 * 2 + 12, height: 100 }} />
+      {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
+      <div style={{ ...pixel, left: 0, top: 0, width: 240, height: 320, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
+      <div className={boxStyles.box} data-testid={`${testIdPrefix}-판`} ref={boxRef}
+        style={{ top: recordPickPopupTopOf(height), transform: 'none', height, padding: 0 }} />
+      {!isOpening && (<>
       {/* "!C보고 싶은 기록을!N선택해주세요" — 두 줄 가운데 */}
       <div className={styles.title} style={{ left: 120 - 0x54, top: 160 - 0x28, width: 0x54 * 2, whiteSpace: 'normal' }}>
         <MarkupText raw={ORIGINAL_MODE_TEXT[RECORD_PICK_TITLE_ID] ?? ''} />
@@ -105,6 +140,7 @@ export function RecordPickPopup({ ariaLabel, testIdPrefix, cells, selected, onTo
           </button>
         )
       })}
+      </>)}
     </div>
   )
 }

@@ -12,6 +12,10 @@ import {
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { EventMissionWindow } from '@/pages/mission-select/ui/EventMissionWindow'
 import type { EventMissionAnswer } from '@/pages/mission-select/ui/EventMissionWindow'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { isFrameSlideClearedAt } from '@/widgets/screen-frame/lib/frameSlide'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -36,6 +40,10 @@ interface MissionSelectScreenProps {
   readonly canSwitchSide?: boolean
   readonly onSelect: (mission: OriginalMission) => void
   readonly onBack: () => void
+  /** 머리띠 G포인트 — 안 주면 0 */
+  readonly gamePoint?: number
+  /** 머리띠가 미끄러져 들어오는가(상태 1 진입 0x1d9a4 가 [skin+0x84] = 1). 기본 true — 시험은 false 로 다 내려온 자리에서 본다 */
+  readonly slides?: boolean
 }
 
 /**
@@ -43,8 +51,8 @@ interface MissionSelectScreenProps {
  *
  * 원본은 글자 목록이 아니라 **가운데 192×212 판 + 5×3 미션 격자(28px)** 다.
  * 아래에 slt_frame 프레임 1 틀과 "MISSION" 탭, 설명 상자, 보상 "%dG" · 성공 "%d회" 칸이 붙는다.
- * 편(타자/투수)은 화면 안 탭이 아니라 **머리띠 제목 12/13** 으로 갈린다 — 웹에는 머리띠가 없어
- * 모서리 버튼으로 둔다.
+ * 편(타자/투수)은 화면 안 탭이 아니라 **머리띠 제목 12/13** 으로 갈린다(`ScreenFrame` 미션모드타자편 · 투수편).
+ * 편 바꾸기 모서리 버튼은 웹 추가다(원본은 고른 선수가 편을 정한다).
  *
  * 격자 칸 안쪽 그림은 아직 못 읽어(0x7a571 내부) 번호와 잠김·클리어 상태만 그린다.
  *
@@ -62,7 +70,19 @@ export function MissionSelectScreen({
   canSwitchSide = true,
   onSelect,
   onBack,
+  gamePoint = 0,
+  slides = true,
 }: MissionSelectScreenProps) {
+  /**
+   * 장면 그리기 0x1e9e8 (직접 떴다): 공무늬 0x5fd61(skin, 0, 0, W, H) → [skin+0x84] == 0 일 때만 상태 그리기 0x1e99c(…, 3) →
+   * 머리띠 0x54d95(skin, [장면+0x88] == 6 ? 12 : 13, 바닥 5, 0) → 0x72391 → 창 0x746cd.
+   * 제목 12/13 은 점프표 0xd19b0 의 5502a · 55058 — game_frame 18 "미션모드" + 부제 타자편/투수편.
+   * 상태 1 진입 0x1d9a4(1d9be)가 [skin+0x84] = 1 을 세워 머리띠가 미끄러져 들어오고, 그동안은 판 · 격자 · 설명을 하나도 안 그린다
+   * (0x1df08 머리 1df22~1df2a 도 같은 깃발로 끝 0x1e730 에 빠진다). 깃발은 머리띠가 다 내려온 그림에서 지워진다(`isFrameSlideClearedAt`).
+   * ⚠️ 미확인: 미끄러지는 동안의 키 처리 0x1daa4 가 깃발을 보는지는 안 떴다 — 웹은 키를 그대로 받는다.
+   */
+  const updates = useUpdateCounter()
+  const isBodyShown = !slides || isFrameSlideClearedAt(updates)
   const [side, setSide] = useState<OriginalMission['side']>(initialSide)
   const [cursor, setCursor] = useState(0)
   /** [this+0xa0] — 이벤트 미션 창의 고름(≠ 0 미션실행). 장면 진입 0x1d9a4 가 1 로 둔다 */
@@ -133,8 +153,22 @@ export function MissionSelectScreen({
   const reward = selected === undefined ? 0 : missionRewardOf(selected.stage, clears)
   const cursorCell = cellPositionOf(cursor)
 
+  const frame = (
+    <ScreenFrame title={side === '타자' ? '미션모드타자편' : '미션모드투수편'} gamePoint={gamePoint} footer={5} onBack={onBack}
+      slides={slides} />
+  )
+  if (!isBodyShown) {
+    return (
+      <RawScreen>
+        <SkinBackdrop kind="공무늬" />
+        {frame}
+      </RawScreen>
+    )
+  }
+
   return (
     <RawScreen>
+      <SkinBackdrop kind="공무늬" />
       {/* 1df9a 공용 판 0x55e61(skin, W/2, H/2, 192, 212, 0, 0x22, 위 띠 0x10, 0, 0, 0) — 알파·아래 띠·제목 탭·어둡게 자리의
           r7 = [skin+0x84] 는 0 이 아니면 0x1e730(이 함수의 끝 — 아무것도 안 그리고 돌아간다)로 빠지므로 여기서는 늘 0 이다 */}
       <CommonPanel x={PANEL.x} y={PANEL.y} width={PANEL.width} height={PANEL.height} topBand={0x10} testId="미션-고르기-판" />
@@ -212,9 +246,7 @@ export function MissionSelectScreen({
           {side === '타자' ? '투수편' : '타자편'}
         </Button>
       )}
-      <Button variant="corner" className={styles.backButton} onClick={onBack}>
-        ‹ 돌아가기
-      </Button>
+      {frame}
 
       {eventWindow === '창' && (
         <EventMissionWindow isRunSelected={isEventRunSelected}

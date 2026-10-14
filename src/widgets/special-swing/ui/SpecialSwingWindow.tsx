@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { MessageBox, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, MessageBox, SpriteNumber } from '@/shared/ui'
 import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -157,8 +157,10 @@ export function SpecialSwingWindow({
 
   return (
     <div className={styles.overlay} role="dialog" aria-label="필살타법" onClick={onClose}>
-      <div className={styles.window}
-        style={{ left: SPECIAL_SWING_WINDOW.x, top: SPECIAL_SWING_WINDOW.y, width: SPECIAL_SWING_WINDOW.width, height: SPECIAL_SWING_WINDOW.height }} />
+      {/* 8046c 공용 판 0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0) — 박스 0 은
+          0xcaa04(…, [sp+0x70] = 그림 자료 +0x68 = mode_ui 프레임 26, 0, 0) (80420~8046c 직접 뜸). 제목 탭이 서서 위 띠는 안 본다 */}
+      <CommonPanel x={SPECIAL_SWING_WINDOW.x} y={SPECIAL_SWING_WINDOW.y} width={SPECIAL_SWING_WINDOW.width}
+        height={SPECIAL_SWING_WINDOW.height} topBand={0x10} titleTab testId="필살타법-판" />
       <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${TITLE_FRAME}.png`}
         style={{ left: TITLE_BOX.x + Math.trunc((TITLE_BOX.width - widthOf(TITLE_FRAME)) / 2), top: TITLE_BOX.y + Math.trunc((TITLE_BOX.height - LABEL_HEIGHT + 1) / 2) }} />
       <img className={styles.layer} alt="" src={`${MODE_UI}/${String(FRAME_IMAGE.frame).padStart(3, '0')}.png`}

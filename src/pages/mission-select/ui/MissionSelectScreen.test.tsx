@@ -19,11 +19,20 @@ const 띄우기 = (overrides: Partial<Parameters<typeof MissionSelectScreen>[0]>
       initialSide="타자"
       onSelect={vi.fn()}
       onBack={vi.fn()}
+      slides={false}
       {...overrides}
     />,
   )
 
 const 칸 = (name: string) => screen.getByRole('button', { name })
+
+describe('머리띠 0x54d95 (장면 그리기 0x1e9e8)', () => {
+  it('제목은 미션모드 + 편 부제 — 머리띠가 미끄러지는 첫 그림은 판을 안 그린다([skin+0x84] ≠ 0 → 상태 그리기 건너뜀)', () => {
+    띄우기({ slides: true })
+    expect(screen.queryByTestId('미션-고르기-판')).toBeNull()
+    expect(screen.getByTestId('머리띠-G')).toBeTruthy()
+  })
+})
 
 describe('미션 선택 격자', () => {
   it('판은 가운데 192×212 다 (24, 54) — 공용 판 0x55e61(…, 위 띠 0x10)', () => {
