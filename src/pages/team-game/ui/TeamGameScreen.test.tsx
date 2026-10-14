@@ -40,8 +40,10 @@ afterEach(() => {
 })
 
 /** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 조준(0x10)으로 넘어간다 (0x39c1c) */
+/** 구질 칸 누름 칸 — 그림은 장면이 그리고 칸은 투명한 누름 칸이다. 읽기 이름은 "키 구질" (0x534d8) */
+const 구질칸 = (name: string) => screen.getByRole('button', { name: new RegExp(` ${name}$`) })
 const 구질고르기 = (name: string) => {
-  fireEvent.click(screen.getByText(name))
+  fireEvent.click(구질칸(name))
   act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8))
 }
 
@@ -87,7 +89,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
 
   it('구질을 고르면 0xf 의 틱 8 에 코스 고르기로 넘어간다 (상태 0x10, 0x39c1c)', () => {
     띄우기()
-    fireEvent.click(screen.getByText('FASTBALL'))
+    fireEvent.click(구질칸('FASTBALL'))
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 7))
     expect(screen.getByText('1. 구질 선택')).toBeTruthy()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))

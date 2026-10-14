@@ -17,6 +17,12 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+/** 투구 단계 — 웹 글자 대신 누름 칸 판(testid)으로 가른다. 그림은 장면이 그린다 */
+const 구질단계 = () => screen.queryByTestId('구질 누름 칸')
+const 조준단계 = () => screen.queryByTestId('조준 영역')
+/** 구질 칸 누름 칸 — 읽기 이름은 "키 구질" (0x534d8) */
+const 칸 = (key: string, name: string) => screen.getByRole('button', { name: `${key} ${name}` }) as HTMLButtonElement
+
 /** 경기 장면 틱 n 개를 흘린다 */
 const 틱 = (n: number) => act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * n))
 
@@ -56,34 +62,33 @@ describe('미션 준비 0xaa57c — 전역 경기 상태 +0x6b', () => {
 describe('투수 미션 투구 화면의 마구 칸 (0x50db8)', () => {
   it('남은 횟수가 0 이면 마구 칸을 골라도 구질 단계에 그대로 머문다 — 키가 버려진다', () => {
     띄우기(0)
-    expect(screen.getByText(/못 던짐/)).toBeTruthy()
-    fireEvent.click(screen.getByText(마구칸.name))
+    expect(칸('2', 마구칸.name).disabled).toBe(true)
+    fireEvent.click(칸('2', 마구칸.name))
     틱(8)
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
-    expect(screen.queryByText(/2\. 코스 선택/)).toBeNull()
+    expect(구질단계()).toBeTruthy()
+    expect(조준단계()).toBeNull()
   })
 
   it('남은 횟수가 있으면 마구 칸이 코스 고르기로 넘어간다', () => {
     띄우기(2)
-    expect(screen.queryByText(/못 던짐/)).toBeNull()
-    expect(screen.getByText('마구 · 남은 2회')).toBeTruthy()
-    fireEvent.click(screen.getByText(마구칸.name))
+    expect(칸('2', 마구칸.name).disabled).toBe(false)
+    fireEvent.click(칸('2', 마구칸.name))
     틱(8)
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준단계()).toBeTruthy()
   })
 
   it('남은 0 이어도 다른 구질은 그대로 고를 수 있다', () => {
     띄우기(0)
-    fireEvent.click(screen.getByText(직구.name))
+    fireEvent.click(칸('OK', 직구.name))
     틱(8)
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준단계()).toBeTruthy()
   })
 
   it('남은 횟수를 안 넘기면(예전 부르는 쪽) 막지 않는다', () => {
     띄우기(undefined)
-    fireEvent.click(screen.getByText(마구칸.name))
+    fireEvent.click(칸('2', 마구칸.name))
     틱(8)
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준단계()).toBeTruthy()
   })
 })
 
@@ -122,16 +127,16 @@ describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x5
 
   it('코스 고르기(상태 0x10)로 넘어가면 받지 않는다', () => {
     const onPickoffKey = 견제띄우기()
-    fireEvent.click(screen.getByText(직구.name))
+    fireEvent.click(칸('OK', 직구.name))
     틱(8)
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준단계()).toBeTruthy()
     fireEvent.keyDown(window, { key: '3' })
     expect(onPickoffKey).not.toHaveBeenCalled()
   })
 })
 
 describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x532b0)', () => {
-  it('대기가 있으면 구질 고르기 대신 확인 소프트키가 서고, 세 갱신 뒤 OK 로 구질 고르기가 뜬다', () => {
+  it('대기가 있으면 구질 고르기 대신 확인 누름 칸이 서고, 세 갱신 뒤 OK 로 구질 고르기가 뜬다', () => {
     vi.useFakeTimers()
     try {
       render(
@@ -147,16 +152,16 @@ describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린�
           sceneConfirm={enterSceneConfirm()}
         />,
       )
-      expect(screen.queryByText('1. 구질 선택')).toBeNull()
+      expect(구질단계()).toBeNull()
       // 0xd 두 그림 뒤 0xe — 투수·타자 소개 판(0x44944)이 선다
       expect(screen.queryByTestId('소개판')).toBeNull()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
       expect(screen.getByTestId('소개판')).toBeTruthy()
       fireEvent.keyDown(window, { key: 'Enter' })
-      expect(screen.queryByText('1. 구질 선택')).toBeNull()
+      expect(구질단계()).toBeNull()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
       fireEvent.click(screen.getByRole('button', { name: '확인' }))
-      expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+      expect(구질단계()).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
@@ -184,14 +189,15 @@ describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*
     메뉴화면({ onRestart: vi.fn() })
     expect(screen.queryByRole('button', { name: '포기' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
-    for (const 칸 of ['계속', '다시하기', '조작방법', '설정', '나가기']) {
-      expect(screen.getByText(칸)).toBeTruthy()
+    for (const 메뉴칸 of ['계속', '다시하기', '조작방법', '설정', '나가기']) {
+      expect(screen.getByText(메뉴칸)).toBeTruthy()
     }
     expect(screen.queryByText('자동진행')).toBeNull()
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    // 투구 단계(누름 칸)는 가려진다 — 단계 상태는 그대로다
+    expect(구질단계()?.closest('[hidden]')).toBeTruthy()
     // '*' 로 닫는다
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질단계()?.closest('[hidden]')).toBeNull()
   })
 
   it('메뉴 소프트키로도 열리고, [나가기]를 확인하면 나가기 손잡이를 부른다', () => {
@@ -262,6 +268,6 @@ describe('투수 미션 조준 (상태 0x10) — 세션의 틱 0x39c5c 를 매 �
 
     expect(onThrow).not.toHaveBeenCalled()
     expect(onReturnToPitchSelection).toHaveBeenCalledTimes(1)
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질단계()).toBeTruthy()
   })
 })

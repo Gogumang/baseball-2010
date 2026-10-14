@@ -6,9 +6,9 @@ import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   COUNTER_BASE, COUNTER_CLIP, GOAL_TEXT_WIDTH, MISSION_HUD_BASE, TEXT_CLIP, TIMER_ICON, TIMER_STRIP,
-  goalCountOf, goalLineDrawsOf, limitStripsOf, slashCounterGlyphsOf, timerGlyphsOf,
+  goalCountOf, goalLineDrawsOf, limitStripsOf, missionHudIconOf, pitcherGoalCountOf, slashCounterGlyphsOf, timerGlyphsOf,
 } from '@/pages/mission-play/lib/missionHudLayout'
-import type { ClipRect, HudGlyph, HudSprite, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
+import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
 
 interface MissionHudProps {
@@ -17,6 +17,17 @@ interface MissionHudProps {
   readonly limits: MissionLimitState
   /** 남은 초 [0x1552af0] — 시간 제한이 없으면 null. 0 이면 시계를 안 그린다 (0x36c42) */
   readonly remainingSeconds: number | null
+  /** 미션 모드 — 6 타자(기본) · 5 투수. 머리 아이콘 · 줄 맞대기 표 · 두째 띠가 갈린다 */
+  readonly mode?: MissionHudMode
+  /** 모드 5 의 '실점' 줄 지금 값 — 허용 실점 (P+4) */
+  readonly allowedRuns?: number
+  /** 일시정지 팝업 동안 — 장면 그리기가 멈춰 줄 넘김도 멈춘다 */
+  readonly isFrozen?: boolean
+  /**
+   * 0xf 구질 목록이 실린 동안 — 빛 지도(4c5a6 · 0x9ce71)가 그 앞까지 그린 화면(점수판 꼬리인 이 판 포함)을 RGB 각 × 15/32 로
+   * 어둡게 한다. 판은 투수 둘레 원(지름 60) 밖이라 늘 15/32 다
+   */
+  readonly isDimmed?: boolean
 }
 
 function Sprite({ sprite }: { readonly sprite: HudSprite }) {
@@ -67,16 +78,25 @@ function Clip({ rect, children }: { readonly rect: ClipRect | null; readonly chi
  * 시간 제한이면 왼쪽에 시계. 목표 글은 줄이 둘 이상이면 21 그림 머물고 17 그림 동안 왼쪽으로 넘긴다(`goalTicker`).
  * 좌표 · 그림 · 색은 모두 원본 값이다(`missionHudLayout`).
  */
-export function MissionHud({ mission, progress, limits, remainingSeconds }: MissionHudProps) {
+export function MissionHud({
+  mission,
+  progress,
+  limits,
+  remainingSeconds,
+  mode = 6,
+  allowedRuns = 0,
+  isFrozen = false,
+  isDimmed = false,
+}: MissionHudProps) {
   const lines = mission.goals
   const lineCount = lines.length
   // 줄 넘김 칸은 0x36714 가 그릴 때마다 스스로 올린다 — 그림 한 장 = 갱신 한 틱
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    if (lineCount <= 1) return
+    if (lineCount <= 1 || isFrozen) return
     const timer = window.setInterval(() => setTick((value) => value + 1), millisecondsPerFrame())
     return () => window.clearInterval(timer)
-  }, [lineCount])
+  }, [lineCount, isFrozen])
 
   const frame = goalTickerFrameAt(tick, lineCount)
   const isSliding = frame.nextIndex !== null
@@ -84,7 +104,11 @@ export function MissionHud({ mission, progress, limits, remainingSeconds }: Miss
   const timer = remainingSeconds === null || remainingSeconds <= 0 ? null : timerGlyphsOf(Math.ceil(remainingSeconds))
 
   return (
-    <div className={styles.hud} data-testid="미션-HUD">
+    <div
+      className={styles.hud}
+      data-testid="미션-HUD"
+      {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}
+    >
       {MISSION_HUD_BASE.slice(0, 2).map((sprite, index) => (
         <Sprite key={index} sprite={sprite} />
       ))}
@@ -103,7 +127,10 @@ export function MissionHud({ mission, progress, limits, remainingSeconds }: Miss
       </Clip>
       <Clip rect={isSliding ? COUNTER_CLIP : null}>
         {draws.map((draw) => {
-          const count = goalCountOf(mission, progress, lines[draw.index])
+          const count =
+            mode === 5
+              ? pitcherGoalCountOf(mission, progress, lines[draw.index], allowedRuns)
+              : goalCountOf(mission, progress, lines[draw.index])
           return (
             <Glyphs
               key={`수-${draw.index}`}
@@ -113,8 +140,8 @@ export function MissionHud({ mission, progress, limits, remainingSeconds }: Miss
           )
         })}
       </Clip>
-      {/* 방망이 (모드 6 — 이미지 8) */}
-      <Sprite sprite={MISSION_HUD_BASE[2]} />
+      {/* 머리 아이콘 — 모드 6 방망이(이미지 8) · 모드 5 공(이미지 7) */}
+      <Sprite sprite={missionHudIconOf(mode)} />
       {limitStripsOf(limits).map((strip, index) => (
         <div key={index} data-testid="미션-한도-띠">
           <Sprite sprite={strip.strip} />

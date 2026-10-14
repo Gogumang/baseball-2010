@@ -158,7 +158,12 @@ export function abilityAfterFatigue(value: number, staminaPercent: number): numb
   return value - Math.trunc((value * reduction) / 100)
 }
 
-/** 투구 화면이 쓰는 표시용 체력 단계 0~3 = min(trunc(체력%/25), 3) (0x3493c, 유력) */
+/**
+ * 체력 단계 0~3 = min(trunc(체력%/25), 3) — 0x3493c 의 식(확정).
+ * ⚠️ 0x3493c 는 .text 전체에 부르는 곳이 없다(BL · 리터럴 풀 0곳, 2026-10-14) — 원본 화면은 이 단계를 그리지 않는다.
+ * 경기 장면의 체력 표시는 투수 위 지친 표시(0x38f68 — 체력% ≤ 34 에 player_effect 애니 9 · ≤ 19 에 애니 10)다
+ * (`widgets/batting-stage/lib/pitcherTiredEffect`).
+ */
 export function staminaGaugeStepOf(staminaPercent: number): number {
   return Math.min(Math.trunc(staminaPercent / 25), 3)
 }

@@ -32,9 +32,20 @@ const OK통과 = () => {
 /** 경기 장면 틱 n 개를 흘린다 */
 const 틱 = (n: number) => act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * n))
 
+/** 투구 단계 — 웹 글자 대신 누름 칸 판(testid)이 보이는지로 가른다. 그림은 장면이 그린다 */
+const 보임 = (testId: string) => {
+  const element = screen.queryByTestId(testId)
+  return element !== null && element.closest('[hidden]') === null
+}
+const 구질보임 = () => 보임('구질 누름 칸')
+const 조준보임 = () => 보임('조준 영역')
+const 게이지보임 = () => 보임('게이지 누름 칸')
+/** 구질 칸 누름 칸 — 읽기 이름은 "키 구질" (0x534d8) */
+const 구질칸 = (name: string) => screen.getByRole('button', { name: new RegExp(` ${name}$`) })
+
 /** 구질 칸을 누르고(0x50da8) 0xf 의 틱 8 을 지나 조준(0x10)으로 넘어간다 (0x39c1c) */
 const 구질고르기 = (name: string) => {
-  fireEvent.click(screen.getByText(name))
+  fireEvent.click(구질칸(name))
   틱(8)
 }
 
@@ -119,25 +130,24 @@ describe('투수편 경기 화면', () => {
   it('등판일이면 1단계 구질 고르기가 뜬다 (상태 0xf)', () => {
     띄우기()
 
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
-    expect(screen.getByText('FASTBALL')).toBeTruthy()
+    expect(구질보임()).toBe(true)
+    expect(구질칸('FASTBALL')).toBeTruthy()
   })
 
-  it('마구 칸이 남은 횟수와 함께 뜬다 (칸 5 = 0 키)', () => {
+  it('마구 칸이 0 키 자리에 선다 (칸 5)', () => {
     띄우기()
 
-    expect(screen.getByText('파이어 볼')).toBeTruthy()
-    expect(screen.getByText(/마구 · 남은 4회/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '0 파이어 볼' })).toBeTruthy()
   })
 
   it('구질을 고르면 0xf 의 틱 8 에 2단계 코스 고르기로 넘어간다 (0x50da8 → 0x39c1c → 상태 0x10)', () => {
     띄우기()
-    fireEvent.click(screen.getByText('FASTBALL'))
+    fireEvent.click(구질칸('FASTBALL'))
     틱(7)
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
     틱(1)
 
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준보임()).toBe(true)
   })
 
   it('구질은 칸마다 정해진 키로 고른다 — OK 는 칸 0 (0x534d8)', () => {
@@ -145,7 +155,7 @@ describe('투수편 경기 화면', () => {
     fireEvent.keyDown(window, { key: 'Enter' })
     틱(8)
 
-    expect(screen.getByText(/2\. 코스 선택 — FASTBALL/)).toBeTruthy()
+    expect(조준보임()).toBe(true)
   })
 
   it('조준에서 CLR 은 구질 고르기로 돌아간다 (0x50ee0 → 0xf)', () => {
@@ -153,7 +163,7 @@ describe('투수편 경기 화면', () => {
     구질고르기('FASTBALL')
     fireEvent.keyDown(window, { key: 'Escape' })
 
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('환경설정 게이지가 꺼져 있어도 0x11 을 지나 틱 10 에 던진다 (원본 기본값 — 0x50ed0 · 0x4e060)', () => {
@@ -164,20 +174,20 @@ describe('투수편 경기 화면', () => {
     // 놓기 0x4dc78 의 표시 구속 굴림(0x34968 → 0x66dc0 rand)이 흩어짐 앞에 끼어 첫 공이 인플레이가 되어 3 → 2(1 부터 센 첫 씨앗)로 옮겼다
     띄우기({}, 2)
     구질고르기('FASTBALL')
-    expect(screen.getByText(/2\. 코스 선택/)).toBeTruthy()
+    expect(조준보임()).toBe(true)
     조준확정()
     // 게이지 그림·안내는 없고 틱 10 까지는 아직 안 던졌다
-    expect(screen.queryByText('3. 투구 결정')).toBeNull()
+    expect(게이지보임()).toBe(false)
     expect(screen.queryByLabelText(/투구 게이지/)).toBeNull()
     틱(9)
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     틱(1)
     // 놓았다 — 남은 0x11 비행과 0x12 대기 동안은 원본도 다음 공 입력을 안 받는다
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     틱(80)
 
     // 다시 1단계로 돌아왔다 — 한 개를 던졌다는 뜻이다
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('게이지를 켜면 3단계 투구 결정이 뜬다 (상태 0x11)', () => {
@@ -185,19 +195,19 @@ describe('투수편 경기 화면', () => {
     구질고르기('FASTBALL')
     조준확정()
 
-    expect(screen.getByText('3. 투구 결정')).toBeTruthy()
+    expect(게이지보임()).toBe(true)
     expect(screen.getByLabelText(/투구 게이지/)).toBeTruthy()
     // 누르지 않아도 0x11 의 틱 10 에 놓는다 (0x4e060)
     틱(10)
-    expect(screen.queryByText('3. 투구 결정')).toBeNull()
+    expect(게이지보임()).toBe(false)
   })
 
   it('`#` 를 누르면 StrGAME[104] "그만 던지시겠습니까?" 가 뜬다 — 모드 3 은 교체 화면이 없다', () => {
     띄우기()
-    fireEvent.click(screen.getByText('# 강판'))
+    fireEvent.click(screen.getByRole('button', { name: '# 강판' }))
 
     expect(screen.getByText('그만 던지시겠습니까?')).toBeTruthy()
-    expect(screen.getByText('예')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
   })
 
   it("0xe(OK 대기)에서도 '#' 키가 강판 물음을 연다(0x4994a) — 0xd 두 그림 동안은 안 열리고, '아니오' 면 다시 OK 를 기다린다", () => {
@@ -213,10 +223,10 @@ describe('투수편 경기 화면', () => {
     act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '#' })
     expect(screen.getByText('그만 던지시겠습니까?')).toBeTruthy()
-    fireEvent.click(screen.getByText('아니오'))
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+    expect(구질보임()).toBe(false)
     OK통과()
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('감독 강판이 나면 대사 창이 뜨고 던질 수 없다 (상태 0x23)', () => {
@@ -224,7 +234,7 @@ describe('투수편 경기 화면', () => {
 
     // 글만 있는 창이고 화자 머리글은 "[감독님] : " 다
     expect(screen.getByText(/\[감독님\]/)).toBeTruthy()
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
   })
 
   it('감독 대사 창은 확인 키 하나뿐이라 강판을 무를 수 없다', () => {
@@ -300,7 +310,7 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
   it('인트로가 먼저 서고, 후공·선발이면 그 뒤 1회초 판이 OK 를 기다린다 — 그 동안 메뉴 키가 안 먹는다', () => {
     render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={vi.fn()} />)
     expect(screen.getByTestId('인트로-띠')).toBeTruthy()
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
 
     fireEvent.keyDown(window, { key: '5' })
     expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
@@ -311,9 +321,9 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
     vi.useFakeTimers()
     fireEvent.keyDown(window, { key: 'Enter' })
     // 판 OK → 0xd → 0xe — 이번엔 사람 OK 를 기다린다
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     OK통과()
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 
   it('선공이면 첫 장면이 우리 공격(자동)이라 판 없이 — 그 중계(0x21)를 본 뒤 곧장 던진다', () => {
@@ -330,7 +340,7 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
     expect(중계넘기기()).toBeGreaterThan(3)
     expect(screen.queryByTestId('교대-판-1회초')).toBeNull()
     OK통과()
-    expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+    expect(구질보임()).toBe(true)
   })
 })
 
@@ -350,7 +360,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
     띄우기()
     fireEvent.keyDown(window, { key: '*' })
 
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
   })
 })
 
@@ -372,7 +382,7 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
     for (let pitch = 0; pitch < 최대; pitch += 1) {
       // 새 타자면 0xe 에서 OK 부터
       OK통과()
-      if (screen.queryByText('1. 구질 선택') === null) return
+      if (!구질보임()) return
       한개던지기()
     }
   }
@@ -382,7 +392,7 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
     수비화면까지던지기()
 
     // 원본이 0x17 을 도는 동안 0xf(구질 고르기)로 안 돌아가는 그 자리다
-    expect(screen.queryByText('1. 구질 선택')).toBeNull()
+    expect(구질보임()).toBe(false)
     expect(screen.getAllByTestId('defense-background-left').length).toBeGreaterThan(0)
   })
 
@@ -404,15 +414,15 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
     try {
       띄우기({}, 3)
       수비화면까지던지기()
-      expect(screen.queryByText('1. 구질 선택')).toBeNull()
+      expect(구질보임()).toBe(false)
 
-      for (let 갱신 = 0; 갱신 < 400 && screen.queryByText('1. 구질 선택') === null; 갱신 += 1) {
+      for (let 갱신 = 0; 갱신 < 400 && !구질보임(); 갱신 += 1) {
         act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
         // 다음 타자면 0xe 의 OK
         if (screen.queryByRole('button', { name: '확인' }) !== null) fireEvent.keyDown(window, { key: 'Enter' })
       }
 
-      expect(screen.getByText('1. 구질 선택')).toBeTruthy()
+      expect(구질보임()).toBe(true)
     } finally {
       vi.useRealTimers()
     }

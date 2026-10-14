@@ -87,6 +87,10 @@ export interface PitchGaugeOverlay {
   readonly showsGauge: boolean
   /** 환경설정 게이지(+0x2d) — 꺼져 있으면 목표점에 프레임 35 */
   readonly gaugeSettingOn: boolean
+  /**
+   * 목표 표시 프레임 0x23 을 넣는가 — 부르는 쪽이 `showsGaugeTargetFrameOf`(0x4d360) 로 낸 값. 안 주면 예전처럼 게이지 설정이 꺼졌을 때
+   */
+  readonly showsTargetFrame?: boolean
   /** 커서 +0x17bc */
   readonly cursor: number
   /** 누른 칸 +0x17c8 (0 = 아직) */
@@ -219,12 +223,13 @@ function onceLength(entries: readonly StageAnimationEntry[]): number {
 
 /**
  * 선수 **아래** — 0x10 의 바로 그리는 것: 마구면 화면 덮개 단계 5, 이름 뒤 반투명 판.
- * ⚠️ 덮개 진하기(단계 / 16)는 0x15605d4 본문을 못 읽은 추정 — 웹 이야기 판 덮개와 같은 셈.
+ * 덮개 [0x15605d4] = 0x9b234 는 검정 덮기로 화면을 **단계/16 남긴다**(CORRECTIONS 3절 — 색 덮기 [0x15605d0] = 0x9b3f4 의
+ * (단계 + 1)/16 과 다른 몸통) → 단계 5 는 화면 5/16 · 검정 11/16.
  */
 export function drawPitchInputUnderlay(context: CanvasRenderingContext2D, overlay: PitchInputOverlay | null, side: number): void {
   if (overlay === null || overlay.kind !== '조준') return
   if (overlay.typeNumber === MAGIC_TYPE_NUMBER) {
-    context.fillStyle = `rgba(0, 0, 0, ${5 / 16})`
+    context.fillStyle = `rgba(0, 0, 0, ${1 - 5 / 16})`
     context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
     return
   }
@@ -256,7 +261,7 @@ export function drawPitchInputSprites(context: CanvasRenderingContext2D, overlay
     if (label !== null) drawFrame(context, SLT_FRAMES, overlay.typeNumber - 1, label.x, label.y6 - 4)
     return
   }
-  if (!overlay.gaugeSettingOn) drawFrame(context, SLT_FRAMES, 0x23, point.x, point.y)
+  if (overlay.showsTargetFrame ?? !overlay.gaugeSettingOn) drawFrame(context, SLT_FRAMES, 0x23, point.x, point.y)
   if (!overlay.showsGauge) return
   for (const draw of gaugeDrawsOf(overlay)) {
     if (draw.alpha === undefined) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { ReactNode } from 'react'
-import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
+import { MessageBox, PixelScreen, RawScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -33,6 +33,9 @@ import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
 import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { ManagerHookWindow } from '@/pages/pitching/ui/ManagerHookWindow'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
+import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -781,178 +784,97 @@ export function PitcherGameScreen({
     )
   }
 
+  /** 장면 배치 — 타자 손(0xb63c0). 구질 목록 누름 칸이 투수 앵커 0xcfb18[이 값] 둘레에 선다 (`PitcherSideStage` 와 같은 값) */
+  const stageBatter = stageBatterOf(progress)
+  const stageSide = stageBatter.batterSide ?? (stageBatter.batterForm & 1)
+  /** '*' 소프트키 — 공용 키 0x498d4 가 받는 동안(경기 장면 · 조작방법 뷰어가 아닐 때) */
+  const acceptsMenuKey = !isSceneShowing && overlay !== '조작방법' && !asksGiveUp
+
   return (
     <div className={styles.frame}>
-      <PixelScreen
-        title={`${progress.game.inning}회${progress.game.half}`}
-        badge={`${staminaPercentOf(progress.stamina)}%`}
-        leftKey={
-          isAwaitingConfirm && !isPopupOpen
-            ? // 0xe — OK 를 받는다 (0x532b0). 강판 물음은 '#' 키로 연다 (위 `acceptsGiveUpKey`)
-              { label: '확인', onPress: sceneConfirm.confirm, isDisabled: !sceneConfirm.acceptsConfirm }
-            : canPitch && !isPopupOpen && !isPitchSceneBusy
-              ? { label: '# 강판', onPress: () => setAsksGiveUp(true) }
-              : undefined
-        }
-        rightKey={{
-          label: isMenuOpen ? '닫기' : '메뉴',
-          onPress: menu.toggle,
+      {/*
+        원본은 240×320 경기 장면 한 장이다 — 웹 제목줄 · 배지 · 소프트키 막대 · 아웃/루/점수 글자 · B/S 램프 · 체력 막대는 없다.
+        HUD 는 장면의 0x4c4bc(0x373d0), 체력은 투수 위 지친 표시(0x38f68)가 그린다. 마우스 길은 장면 그림 자리의 투명한 누름 칸이다
+      */}
+      <RawScreen>
+      <PitcherSideStage
+        pitch={progress.lastPitch}
+        resolution={progress.lastResolution}
+        resultTicks={heldResultTicks}
+        cpuSwing={progress.lastCpuSwing ?? null}
+        hud={{
+          inning: progress.game.inning,
+          half: progress.game.half,
+          ourScore: progress.game.ourScore,
+          opponentScore: progress.game.opponentScore,
+          balls: progress.atBat.balls,
+          strikes: progress.atBat.strikes,
+          outs: progress.game.outs,
+          bases: progress.game.bases,
+          ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
+          opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
+          ourTeamId: options.ourTeamId,
+          opponentTeamId: options.opponentTeamId,
+          playerSide: progress.game.playerSide,
+          // st[0x15 + i] — CPU 도루 출발 주자는 0xf 진입 전까지(공이 날거나 0x12 인 동안 포함) 루에 안 그린다
+          hiddenRunnerBases,
+        }}
+        {...stageBatterOf(progress)}
+        pitcherForm={options.repertoire.form}
+        // 내 투수 손 0xb63c0 = 폼 & 1 (마투수 아님)
+        pitcherHand={pitcherHandOf(options.repertoire.form, false)}
+        // 내 투수가 마운드에 있을 때만 — 강판 뒤 마운드는 다른 투수다
+        {...(pitcherEquipmentLevels === undefined || !progress.onMound
+          ? {}
+          : { pitcherEquipment: pitcherEquipmentOf(pitcherEquipmentLevels) })}
+        // 타석 구장 +0x70 · 바닥 줄 +0xc — 셋업 0x39fdc 모드 3 갈래 (정산 배경과 같은 구장)
+        stadium={sceneStadium.stadium}
+        fieldPalette={grassPalette}
+        // 하늘 줄 = 구장 +0x10 — 0x783b0 모드 3: 리그 날짜 g mod 6
+        skyRow={stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0}
+        gameMode={PITCHER_CAREER_MODE}
+        {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
+        isPaused={isAwaitingConfirm}
+        isFrozen={isPitchInputPaused}
+        inputOverlayRef={inputOverlayRef}
+        // 0x38f68 — 마운드 투수 체력% 로 지친 표시(player_effect 애니 9 · 10). 강판 뒤 마운드는 다른 투수라 싣지 않는다
+        pitcherStaminaPercent={progress.onMound ? staminaPercentOf(progress.stamina) : null}
+        // "#TIME" 0x4c92e — 0x38984 는 모드 3 을 안 막는다('#' 가 강판 물음을 연다). n = 수비팀(우리)[+0x33] 벤치 투수 수
+        timeKeyCount={ourBenchPitcherCountOf(progress)}
+        // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 공격 측(st[9]) = 상대(CPU) 측
+        skillPanel={{
+          entryKey: progress.sceneConfirm ?? null,
+          attackSide: progress.game.playerSide === 0 ? 1 : 0,
+          scene: skillPanelSceneRef,
+          ...pitcherSceneSkillPanelOf(progress),
         }}
       >
-        <div className={styles.hud}>
-          <span>
-            아웃 {progress.game.outs} · 투구 {progress.pitchCount}
-          </span>
-          <span className={styles.bases}>
-            <span className={progress.game.bases.first ? styles.baseOn : undefined}>1</span>
-            <span className={progress.game.bases.second ? styles.baseOn : undefined}>2</span>
-            <span className={progress.game.bases.third ? styles.baseOn : undefined}>3</span>
-          </span>
-          <span className={styles.score}>
-            {progress.game.ourScore} : {progress.game.opponentScore}
-          </span>
-        </div>
-
-        <div className={styles.count}>
-          <span>
-            B{' '}
-            {[0, 1, 2].map((index) => (
-              <span key={index} className={styles.lamp} data-on={progress.atBat.balls > index}>
-                ●
-              </span>
-            ))}
-          </span>
-          <span>
-            S{' '}
-            {[0, 1].map((index) => (
-              <span key={index} className={styles.lamp} data-on={progress.atBat.strikes > index}>
-                ●
-              </span>
-            ))}
-          </span>
-          <span>상대 {progress.opponentOrderIndex + 1}번</span>
-        </div>
-
-        <div className={styles.staminaTrack}>
-          <div
-            className={styles.staminaFill}
-            style={{ width: `${staminaPercentOf(progress.stamina)}%` }}
-            data-low={staminaPercentOf(progress.stamina) <= 20}
-          />
-        </div>
-
-        {isMenuOpen && (
-          <InGameMenu
-            // 나만의리그 투수편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
-            mode={PITCHER_CAREER_MODE}
-            cursor={menu.cursor}
-            onCursorChange={menu.setCursor}
-            onContinue={menu.close}
-            onQuit={onQuit}
-            onOpenHelp={() => {
-              menu.close()
-              setOverlay('조작방법')
-            }}
-            onOpenSettings={
-              settings === undefined || onSettingsChange === undefined
-                ? undefined
-                : () => {
-                    menu.close()
-                    setOverlay('설정')
-                  }
-            }
-          />
+        {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+          <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
         )}
+        {substitution.isShown && (
+          <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
+        )}
+      </PitcherSideStage>
 
-        {!isPopupOpen && asksGiveUp && (
-          <>
-            {/* StrGAME[104] "그만 던지시겠습니까?" — 모드 3 은 교체 화면 대신 이 물음만 뜬다 */}
-            <Panel heading="그만 던지시겠습니까?" />
-            <MenuList
-              items={[
-                { id: '예', label: '예' },
-                { id: '아니오', label: '아니오' },
-              ]}
-              onSelect={(id) => {
-                setAsksGiveUp(false)
-                if (id === '예') actions.giveUp()
-              }}
+        {/* 0xe — OK 하나를 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
+        {isAwaitingConfirm && !isPopupOpen && !asksGiveUp && (
+          <PressLayer testId="확인 누름 칸">
+            <PressArea
+              label="확인"
+              isDisabled={!sceneConfirm.acceptsConfirm}
+              onPress={sceneConfirm.confirm}
             />
-          </>
+          </PressLayer>
         )}
 
-        {/*
-          타석 장면 — 원본은 누가 던지든 같은 프레임 0x52c50 이 같은 상태 그리기(0xd 0x4db2c · 0xe 0x4d9ec · 0xf 0x4d9b0 ·
-          0x10 0x4d780 · 0x11 0x4d2ac · 0x12 0x4ce9c)로 구장 · 투수 0x38d1c · 타자 0x49e64 · 주자 0x35b94 · HUD 0x4c4bc 를 그린다
-          (`widgets/batting-stage/lib/pitcherSideStage`). 그 위에 상태별 판이 얹힌다:
-          0xe — 0xd 두 그림 뒤 0x4d9ec 가 투수·타자 소개 판 0x44944 (모드 검사 없음 — 내가 던지므로 투수 PLAYER · 타자 COM).
-          0x16 — 교체 연출 "CHANGE" (0x4da30).
-        */}
-        <PitcherSideStage
-          pitch={progress.lastPitch}
-          resolution={progress.lastResolution}
-          resultTicks={heldResultTicks}
-          cpuSwing={progress.lastCpuSwing ?? null}
-          hud={{
-            inning: progress.game.inning,
-            half: progress.game.half,
-            ourScore: progress.game.ourScore,
-            opponentScore: progress.game.opponentScore,
-            balls: progress.atBat.balls,
-            strikes: progress.atBat.strikes,
-            outs: progress.game.outs,
-            bases: progress.game.bases,
-            ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
-            opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
-            ourTeamId: options.ourTeamId,
-            opponentTeamId: options.opponentTeamId,
-            playerSide: progress.game.playerSide,
-            // st[0x15 + i] — CPU 도루 출발 주자는 0xf 진입 전까지(공이 날거나 0x12 인 동안 포함) 루에 안 그린다
-            hiddenRunnerBases,
-          }}
-          {...stageBatterOf(progress)}
-          pitcherForm={options.repertoire.form}
-          // 내 투수 손 0xb63c0 = 폼 & 1 (마투수 아님)
-          pitcherHand={pitcherHandOf(options.repertoire.form, false)}
-          // 내 투수가 마운드에 있을 때만 — 강판 뒤 마운드는 다른 투수다
-          {...(pitcherEquipmentLevels === undefined || !progress.onMound
-            ? {}
-            : { pitcherEquipment: pitcherEquipmentOf(pitcherEquipmentLevels) })}
-          // 타석 구장 +0x70 · 바닥 줄 +0xc — 셋업 0x39fdc 모드 3 갈래 (정산 배경과 같은 구장)
-          stadium={sceneStadium.stadium}
-          fieldPalette={grassPalette}
-          // 하늘 줄 = 구장 +0x10 — 0x783b0 모드 3: 리그 날짜 g mod 6
-          skyRow={stadiumSkyRowOf({ mode: PITCHER_CAREER_MODE, dayCounter: options.dayCounter }) ?? 0}
-          gameMode={PITCHER_CAREER_MODE}
-          {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
-          isPaused={isAwaitingConfirm}
-          isFrozen={isPitchInputPaused}
-          inputOverlayRef={inputOverlayRef}
-          // "#TIME" 0x4c92e — 0x38984 는 모드 3 을 안 막는다('#' 가 강판 물음을 연다). n = 수비팀(우리)[+0x33] 벤치 투수 수
-          timeKeyCount={ourBenchPitcherCountOf(progress)}
-          // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 공격 측(st[9]) = 상대(CPU) 측
-          skillPanel={{
-            entryKey: progress.sceneConfirm ?? null,
-            attackSide: progress.game.playerSide === 0 ? 1 : 0,
-            scene: skillPanelSceneRef,
-            ...pitcherSceneSkillPanelOf(progress),
-          }}
-        >
-          {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
-            <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
-          )}
-          {substitution.isShown && (
-            <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
-          )}
-        </PitcherSideStage>
-        {!isPitchInputPaused && canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질' && (
-          <Panel heading="1. 구질 선택" />
-        )}
+        {/* 0xf 구질 — 그림은 장면(0x4c4bc 4c528~)이 그리고 여기는 키 · 틱 · 누름 칸만 */}
         {canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질' && (
           <div hidden={isPitchInputPaused}>
             <PitchSlotPicker
               choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
               isPaused={isPitchInputPaused}
+              stageSide={stageSide}
               overlay={{
                 ref: inputOverlayRef,
                 typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
@@ -968,7 +890,7 @@ export function PitcherGameScreen({
           </div>
         )}
 
-        {!isPitchInputPaused && canPitch && phase === '코스' && <Panel heading={<>2. 코스 선택 — {slot?.name}</>} />}
+        {/* 0x10 조준 — 그림은 장면 0x4d780 */}
         {canPitch && phase === '코스' && (
           <div hidden={isPitchInputPaused}>
             <AimCursor
@@ -988,11 +910,10 @@ export function PitcherGameScreen({
                 actions.returnToPitchSelection()
               }}
             />
-            <Hint>방향키(숫자 1~9)로 조준점을 흘려 보내고 OK 로 확정 · CLR 은 구질로</Hint>
           </div>
         )}
 
-        {!isPitchInputPaused && canPitch && phase === '게이지' && showsGauge && <Panel heading="3. 투구 결정" />}
+        {/* 0x11 게이지 — 그림은 장면 0x4d2ac */}
         {canPitch && phase === '게이지' && (
           <div hidden={isPitchInputPaused}>
             <PitchGradeGauge
@@ -1007,34 +928,87 @@ export function PitcherGameScreen({
                       aim,
                       aimSide: progress.options.stageSide ?? 1,
                       gaugeSettingOn: options.gaugeSettingOn === true,
+                      gameMode: PITCHER_CAREER_MODE,
                     },
                   })}
             />
           </div>
         )}
 
-      </PixelScreen>
+        {/*
+          소프트키 — 장면이 그리는 "*MENU" · "#TIME" 글자 자리(0x4c8e0 · `softKeyLabels`)의 누름 칸. '*' 는 0x498d4 가 경기 중
+          메뉴로(소프트키1 도 '*' 로 읽는다, 498e8), '#' 는 0xe · 0xf 에서 강판 물음(0x4994a → StrGAME[104])
+        */}
+        {acceptsMenuKey && (
+          <PressLayer testId="소프트키 누름 칸" isOnTop>
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
+            {acceptsGiveUpKey && <PressArea rect={TIME_PRESS_RECT} label="# 강판" onPress={() => setAsksGiveUp(true)} />}
+          </PressLayer>
+        )}
 
-      {visibleBurstLines !== null && (
-        <BurstMissionWindow
-          lines={visibleBurstLines}
-          judgement={resolution?.judgement ?? null}
-          onClose={
-            resolution !== null ? actions.closeBurst : () => setShownProposal(proposal)
-          }
-        />
-      )}
+        {isMenuOpen && (
+          <div className={styles.popupLayer}>
+            <InGameMenu
+              // 나만의리그 투수편은 표 0xcfcfc 의 행 2 — 자동진행·다시하기가 없는 네 칸이다
+              mode={PITCHER_CAREER_MODE}
+              cursor={menu.cursor}
+              onCursorChange={menu.setCursor}
+              onContinue={menu.close}
+              onQuit={onQuit}
+              onOpenHelp={() => {
+                menu.close()
+                setOverlay('조작방법')
+              }}
+              onOpenSettings={
+                settings === undefined || onSettingsChange === undefined
+                  ? undefined
+                  : () => {
+                      menu.close()
+                      setOverlay('설정')
+                    }
+              }
+            />
+          </div>
+        )}
 
-      {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다 */}
-      {progress.managerHookText !== null && !substitution.isShown && (
-        <ManagerHookWindow
-          userEventIndex={progress.managerHookText}
-          onConfirm={actions.confirmManagerHook}
-        />
-      )}
+        {/*
+          "그만 던지시겠습니까?" — 공용 키 0x498d4 의 '#' 가지 0x4994a: 모드 3([+0x1104] == 3)이면 0x49968 에서
+          `0xbbef8(0x702b5(StrGAME, 104), 종류 2(예/아니오), 팝업 id 0x1b, 1)` 로 시스템 예/아니오 팝업을 띄운다.
+          답은 프레임 0x52c50 의 52c62~52c90 이 읽는다 — 팝업 id 0x1b 이고 답 칸 [창+0x21c] == 0(예)이면 0xc1b48(스스로 강판).
+          아니오는 아무 일 없이 닫힌다. 처음 커서는 첫 칸 "예"(0x749d5 없음)
+        */}
+        {!isPopupOpen && asksGiveUp && (
+          <MessageBox
+            text={GIVE_UP_CONFIRM_TEXT}
+            buttons={['예', '아니오']}
+            onAnswer={(index) => {
+              setAsksGiveUp(false)
+              if (index === 0) actions.giveUp()
+            }}
+          />
+        )}
 
-      {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음 */}
-      <RecordAlertScreenOverlay frame={recordAlert} />
+        {visibleBurstLines !== null && (
+          <BurstMissionWindow
+            lines={visibleBurstLines}
+            judgement={resolution?.judgement ?? null}
+            onClose={
+              resolution !== null ? actions.closeBurst : () => setShownProposal(proposal)
+            }
+          />
+        )}
+
+        {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다 */}
+        {progress.managerHookText !== null && !substitution.isShown && (
+          <ManagerHookWindow
+            userEventIndex={progress.managerHookText}
+            onConfirm={actions.confirmManagerHook}
+          />
+        )}
+
+        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음 */}
+        <RecordAlertScreenOverlay frame={recordAlert} />
+      </RawScreen>
 
       {overlay === '조작방법' && (
         <HelpScreen
@@ -1050,6 +1024,10 @@ export function PitcherGameScreen({
   )
 }
 
+/** StrGAME[104] (`base/extracted/StrGAME.json` 원문 그대로) — '#' 가지 0x49968 이 0x702b5(StrGAME, 0x68) 로 꺼낸다 */
+const GIVE_UP_CONFIRM_TEXT = '!C그만 던지시겠습니까?'
+
+/** 장면 판 전체 — 0xe 의 OK 누름 칸 */
 /** 작은 팀 로고 (team_logo_ini) — 팀 경기 HUD 와 같은 그림 */
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 

@@ -45,6 +45,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
+import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PitchingStageSource } from '@/pages/pitching/ui/PitchingScreen'
 import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
@@ -735,6 +736,8 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     pitcherForm: form,
     pitcherHand: pitcherHandOf(form, false),
     ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),
+    // 0x38d1c 의 지친 표시 — 미션 투수 +0x2c 도 공마다 깎인다(0xa5e14). 모드 5 는 0xaebb0 의 모드 7 갈래가 아니라 실제 체력%
+    pitcherStaminaPercent: staminaPercentOf(session.pitcherStamina),
     batterForm: profile >> 4,
     batterSkinIndex: (profile >> 2) & 3,
     ...(aceIndex >= 0 ? { batterSide: batterHandOf(profile, aceIndex), aceBatterOrder: aceIndex } : {}),

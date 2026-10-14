@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
-  AIM_CLAMP,
   AIM_STILL,
   aimKeyActionOf,
   aimStartOf,
   aimTickOf,
 } from '@/features/play-pitcher-game/model/pitchAim'
 import type { AimDirection, AimKeyAction } from '@/features/play-pitcher-game/model/pitchAim'
-import { ZONE_HALF_WORLD } from '@/features/play-pitcher-game/model/pitcherPitch'
-import * as styles from '@/pages/pitching/ui/AimCursor.css'
+import { AIM_KEYPAD_KEYS, aimTapRectsOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 
@@ -29,28 +29,14 @@ interface AimCursorProps {
   readonly onCancel?: () => void
   /** 일시정지 팝업(0x741a0)이 떠 있으면 틱도 키도 멈춘다 */
   readonly isPaused?: boolean
-  /**
-   * 장면 위 조준 그림(0x4d780 — 조준점의 애니 0 · 구질 이름)의 재료를 실을 칸. 넘기면 아래 작은 조준판은 숨긴다
-   * (조준점 값은 그대로 들고 있다)
-   */
+  /** 장면 위 조준 그림(0x4d780 — 조준점의 애니 0 · 구질 이름)의 재료를 실을 칸 */
   readonly overlay?: { readonly ref: PitchInputOverlayRef; readonly typeNumber: number }
 }
 
-/** 화면 칸 — 자르기 범위(x ±600 · y ±400)를 이 배율로 줄여 그린다 */
-const WORLD_PER_PIXEL = 8
-
-/** 화면 키패드 — 휴대폰 숫자판 그대로 ('5' = OK) */
-const KEYPAD: readonly { readonly key: string; readonly label: string }[] = [
-  { key: '1', label: '↖' },
-  { key: '2', label: '↑' },
-  { key: '3', label: '↗' },
-  { key: '4', label: '←' },
-  { key: '5', label: 'OK' },
-  { key: '6', label: '→' },
-  { key: '7', label: '↙' },
-  { key: '8', label: '↓' },
-  { key: '9', label: '↘' },
-]
+/** 누름 칸 읽기 이름 — 휴대폰 숫자판 그대로 ('5' = OK) */
+const KEYPAD_LABELS: Readonly<Record<string, string>> = {
+  '1': '↖', '2': '↑', '3': '↗', '4': '←', '5': 'OK', '6': '→', '7': '↙', '8': '↓', '9': '↘',
+}
 
 /**
  * **조준 (경기 상태 0x10)** — 원본은 칸을 고르지 않고 **계속 흐르는 조준점**을 움직인다.
@@ -63,7 +49,8 @@ const KEYPAD: readonly { readonly key: string; readonly label: string }[] = [
  *   ⚠️ 근사: 한 틱 안에서 메시지 8 과 0x39c5c 의 앞뒤는 안 봤다 — 웹은 지운 방향으로 한 번 더 돈 뒤 넘긴다.
  *
  * 원본 조준 그림은 장면 위다 — `overlay` 를 넘기면 장면(`widgets/batting-stage/lib/pitchInputOverlay`)이 조준점의 투영(0xbe3d8,
- * `projectToScreen`) 자리에 slt_pitch 애니 0 을, 존 위에 구질 이름을 그린다. 여기 작은 판은 그때 숨기고 키패드만 남긴다.
+ * `projectToScreen`) 자리에 slt_pitch 애니 0 을, 존 위에 구질 이름을 그린다. 이 부품은 키 · 틱과, 마우스 길로 조준 영역(자르기
+ * 상자의 투영)을 3 × 3 으로 나눈 **투명한 누름 칸**(숫자 1~9, 가운데 = OK)과 CLR 칸만 낸다 (`pitchInputTapZones`).
  */
 export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false, overlay }: AimCursorProps) {
   const [aim, setAim] = useState<WorldPoint>(() => aimStartOf(side))
@@ -127,67 +114,25 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
-  const boxWidth = (AIM_CLAMP.x * 2) / WORLD_PER_PIXEL
-  const boxHeight = (AIM_CLAMP.y * 2) / WORLD_PER_PIXEL
-  const toLeft = (x: number) => (x - (center.x - AIM_CLAMP.x)) / WORLD_PER_PIXEL
-  // 세계 y 는 위로 클수록 — 화면은 아래로 커진다
-  const toTop = (y: number) => (center.y + AIM_CLAMP.y - y) / WORLD_PER_PIXEL
+  const pressKey = (key: string) => {
+    const action = aimKeyActionOf(key)
+    if (action !== null) apply(action)
+  }
+  const rects = aimTapRectsOf(side)
 
   return (
-    <div className={styles.frame}>
-      <div
-        className={styles.field}
-        style={{ width: `${boxWidth}px`, height: `${boxHeight}px` }}
-        data-testid="조준판"
-        hidden={overlay !== undefined}
-      >
-        <span
-          className={styles.zone}
-          style={{
-            left: `${toLeft(center.x - ZONE_HALF_WORLD.x)}px`,
-            top: `${toTop(center.y + ZONE_HALF_WORLD.y)}px`,
-            width: `${(ZONE_HALF_WORLD.x * 2) / WORLD_PER_PIXEL}px`,
-            height: `${(ZONE_HALF_WORLD.y * 2) / WORLD_PER_PIXEL}px`,
-          }}
+    <PressLayer testId="조준 영역">
+      {/* 조준점 값 — 그림은 장면이 그린다. 시험 · 읽기 보조용 */}
+      <span hidden data-testid="조준점" data-x={aim.x} data-y={aim.y} data-z={aim.z} />
+      {AIM_KEYPAD_KEYS.map((key, index) => (
+        <PressArea
+          key={key}
+          rect={rects[index]}
+          label={key === '5' ? '조준 확정' : `조준 ${KEYPAD_LABELS[key] ?? key}`}
+          onPress={() => pressKey(key)}
         />
-        <span
-          className={styles.dot}
-          style={{ left: `${toLeft(aim.x)}px`, top: `${toTop(aim.y)}px` }}
-          data-testid="조준점"
-          data-x={aim.x}
-          data-y={aim.y}
-          data-z={aim.z}
-        />
-      </div>
-      <div className={styles.keypad}>
-        {KEYPAD.map((button) => (
-          <button
-            type="button"
-            key={button.key}
-            className={styles.key}
-            aria-label={button.key === '5' ? '조준 확정' : `조준 ${button.label}`}
-            onClick={() => {
-              const action = aimKeyActionOf(button.key)
-              if (action !== null) apply(action)
-            }}
-          >
-            {button.label}
-          </button>
-        ))}
-      </div>
-      {onCancel !== undefined && (
-        <button
-          type="button"
-          className={styles.clear}
-          onClick={() => {
-            const action = aimKeyActionOf('Escape')
-            if (action !== null) apply(action)
-          }}
-        >
-          CLR 구질로
-        </button>
-      )}
-    </div>
+      ))}
+      {onCancel !== undefined && <PressArea rect={CLEAR_PRESS_RECT} label="CLR 구질로" onPress={() => pressKey('Escape')} />}
+    </PressLayer>
   )
 }

@@ -7,16 +7,10 @@ import {
   originalKeyCodeOf,
   KEY_OK,
 } from '@/features/play-pitcher-game/model/pitchAim'
-import {
-  GAUGE_OUTER_FRAME,
-  GAUGE_RESULT_TICKS,
-  gaugeFrameForCell,
-  gaugeResultFrameForCell,
-  gaugeResultOffsetY,
-  isGaugeOutlineCell,
-} from '@/pages/pitching/lib/pitchGaugeSprite'
-import type { GaugeFrame } from '@/pages/pitching/lib/pitchGaugeSprite'
-import * as styles from '@/pages/pitching/ui/PitchGradeGauge.css'
+import { gaugeTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { showsGaugeTargetFrameOf } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -37,13 +31,18 @@ interface PitchGradeGaugeProps {
   readonly showsGauge?: boolean
   /**
    * 장면 위 게이지(0x4d2ac — 목표점의 slt_pitch 원)의 재료를 실을 칸 — 확정한 조준점 · 투영 칸 · 환경설정 게이지(+0x2d).
-   * 넘기면 이 단추는 원을 그리지 않고 누름만 받는다
+   * 누름 칸도 그 목표점 둘레에 선다. 안 넘기면(장면 없음) 누름 칸이 판 전체다
    */
   readonly overlay?: {
     readonly ref: PitchInputOverlayRef
     readonly aim: WorldPoint
     readonly aimSide: number
     readonly gaugeSettingOn: boolean
+    /**
+     * 경기 모드 [+0x1104] — 목표 표시 프레임 0x23 판정 0x4d360(`showsGaugeTargetFrameOf`)이 본다. 이 부품은 사람이 던질 때만 서므로
+     * 공격 측은 늘 CPU 다(이글아이 줄 4d380 은 사람 공격 갈래라 안 탄다). 안 주면 예전처럼 게이지 설정만 본다
+     */
+    readonly gameMode?: number
   }
 }
 
@@ -59,8 +58,11 @@ const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
  *
  * ⚠️ **원본 그대로**: 칸 8 과 9 는 프레임을 `min(…, 0x43)` 으로 자르는 바람에 **화면에서 구별되지 않고**,
  * 칸 9 는 원이 사라진 바로 그 한 틱이다. 원본에 결과 글자가 없어 안내 문구도 붙이지 않는다.
- * ⚠️ 미이식: t 가 선 뒤 0x4d53c~0x4d69e 가 덧그리는 것(그림 플래그 8 의 멈춘 커서 · 레코드 비트에 걸린 칸 그림 · t == 5 의 덧그림)은
- * 멈춘 커서 원 하나로만 옮겼다.
+ *
+ * 그림은 모두 장면이 그린다(`widgets/batting-stage/lib/pitchInputOverlay` 의 `gaugeDrawsOf`) — t 가 선 뒤 0x4d52e~0x4d706 의
+ * 멈춘 커서(효과 1 · 인자 8 = 반투명 8/16) · 애니 1 의 끝 비트가 서기 전 누른 칸 원 · 애니 1 · t == 5 의 game_effect 애니 0 ·
+ * 끝 비트 뒤 결과 원(효과 1 · 인자 15 − 3·[+0x17c4] 로 옅어짐)까지. 이 부품은 그 재료(커서 `+0x17bc` · 누른 칸 `+0x17c8` ·
+ * 정한 뒤 그림 수)를 싣고, 마우스 길로 목표점 둘레의 **투명한 누름 칸**(OK)만 낸다.
  */
 export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true, overlay }: PitchGradeGaugeProps) {
   /** 0x11 상태 틱 `[+0x2c]` */
@@ -84,6 +86,18 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
           aimSide: overlay.aimSide,
           showsGauge,
           gaugeSettingOn: overlay.gaugeSettingOn,
+          ...(overlay.gameMode === undefined
+            ? {}
+            : {
+                showsTargetFrame: showsGaugeTargetFrameOf({
+                  mode: overlay.gameMode,
+                  // ⚠️ 웹 난이도(설정 +0x2c)는 늘 2 — 4d366 의 난이도 0 갈래는 안 탄다
+                  difficulty: 2,
+                  isAttackSideHuman: false,
+                  eagleEyeGames: 0,
+                  gaugeSettingOn: overlay.gaugeSettingOn,
+                }),
+              }),
           cursor,
           pressed,
           decidedTicks: resultTick,
@@ -140,39 +154,13 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   if (!showsGauge) return null
 
   const isDecided = isDecidedCell(pressed)
-  // 원은 장면이 그린다 — 단추는 누름만
-  if (overlay !== undefined) {
-    return (
-      <button type="button" className={styles.gauge} onClick={press} aria-label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}>
-        OK
-      </button>
-    )
-  }
-  const circle = (frame: GaugeFrame, offsetY = 0) =>
-    frame.color === null ? (
-      <span
-        className={`${styles.circle} ${styles.outline}`}
-        style={{ width: `${frame.size}px`, height: `${frame.size}px` }}
-      />
-    ) : (
-      <span
-        className={styles.circle}
-        style={{
-          width: `${frame.size}px`,
-          height: `${frame.size}px`,
-          background: frame.color,
-          transform: `translate(-50%, calc(-50% + ${offsetY}px))`,
-        }}
-      />
-    )
-
   return (
-    <button type="button" className={styles.gauge} onClick={press} aria-label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}>
-      {!isDecided && !isGaugeOutlineCell(cursor) && circle(GAUGE_OUTER_FRAME)}
-      {!isDecided && circle(gaugeFrameForCell(cursor))}
-      {/* t 가 선 뒤(0x4d52e~) — 멈춘 커서 칸 min(0x3b + 칸, 0x43) */}
-      {isDecided && circle(gaugeResultFrameForCell(pressed))}
-      {isDecided && resultTick < GAUGE_RESULT_TICKS && circle(gaugeResultFrameForCell(pressed), gaugeResultOffsetY(resultTick))}
-    </button>
+    <PressLayer testId="게이지 누름 칸">
+      <PressArea
+        {...(overlay === undefined ? {} : { rect: gaugeTapRectOf(overlay.aim, overlay.aimSide) })}
+        label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}
+        onPress={press}
+      />
+    </PressLayer>
   )
 }

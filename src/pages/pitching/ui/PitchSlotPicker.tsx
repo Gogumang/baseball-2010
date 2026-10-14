@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isPitchSelectionDue, pitchSlotOfKey } from '@/features/play-pitcher-game/model/pitchAim'
-import * as styles from '@/pages/pitching/ui/PitchSlotPicker.css'
+import { slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { PressArea } from '@/shared/ui'
+import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -27,9 +29,14 @@ interface PitchSlotPickerProps {
    * 장면(`PitcherSideStage`)이 그림마다 읽는다. 안 넘기면 싣지 않는다
    */
   readonly overlay?: { readonly ref: PitchInputOverlayRef; readonly typeNumbers: readonly number[]; readonly magicRemaining: number }
+  /**
+   * 장면 배치 — 타자 손(0 우타 · 1 좌타, 0xb63c0). 구질 목록은 투수 앵커 0xcfb18[이 값] 둘레에 그려지므로 누름 칸도 그 자리다.
+   * 기본 1(좌타)
+   */
+  readonly stageSide?: number
 }
 
-/** 칸 → 키 (0x534d8) */
+/** 칸 → 키 (0x534d8) — 누름 칸 읽기 이름 */
 const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
 
 /**
@@ -39,12 +46,17 @@ const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
  * - 0x50da8 은 칸의 구질을 `+0xfc8` 에 적기만 한다 — 남은 마구가 0 이면 마구 칸 키를 버린다(0x50db8).
  * - 넘김은 0xf 의 틱 `0x39c1c` 몫이다: 상태 틱이 7 을 넘고 구질이 정해졌을 때만 0x10 — 그 전에 누른 키는
  *   칸만 바꿔 적는다(마지막 키가 이긴다). 0xf 진입 0x3d954 가 `+0xfc8` 을 0 으로 지우므로 들어설 때마다 처음부터다.
- * - ⚠️ 미이식: 빈 칸(구질 0)의 키는 0x50de8 에서 투수 그림 객체(+0xf98)에 0x9dff8(…, 2)를 건다 — 웹 투구 화면엔 그
- *   그림이 없어 아무 일도 안 한다.
+ * - ⚠️ 미이식: 빈 칸(구질 0)의 키는 0x50de8 에서 투수 그림 객체(+0xf98)에 0x9dff8(…, 2)를 건다 — 상태 +0x14 = 2 · 단계 · 틱 0
+ *   (0x9dff8~0x9e000)이라 그 투수가 대기 동작(표 0xd73e4 · 프레임 0,19,0,19 — 0x9df8c 가 단계 3 을 넘으면 상태 0)을 **한 바퀴**
+ *   한다. 장면(`PitcherSideStage`)이 투수를 그리지만 지금 웹 대기 그림은 그 한 바퀴를 늘 되풀이해 그린다
+ *   (`stageScenery.pitcherIdleFrameAt` — 상태 0 의 선 자세와 갈리지 않는다). 장면이 투수 상태 0 · 2 를 가르면 이 키에서 이을 수 있다.
  *
  * 견제 '3' · '1' · '7'(0x53548)은 같은 상태의 다른 키라 부르는 쪽이 따로 받는다.
+ *
+ * 그림(구질 목록 0x4c4bc 4c528~)은 장면이 그린다 — 이 부품은 키 · 틱과, 마우스 길로 그 그림 칸 자리의 **투명한 누름 칸**만 낸다
+ * (`pitchInputTapZones`). 누름 칸은 가장 가까운 장면 판(240×320, `position: relative`)에 붙는다.
  */
-export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay }: PitchSlotPickerProps) {
+export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, stageSide = 1 }: PitchSlotPickerProps) {
   /** 0xf 상태 틱 `[+0x2c]` */
   const tickRef = useRef(0)
   const [tick, setTick] = useState(0)
@@ -55,7 +67,6 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay }
       : ({ kind: '구질', typeNumbers: overlay.typeNumbers, magicRemaining: overlay.magicRemaining, tick } satisfies PitchInputOverlay),
   )
   /** 고른 칸 (`+0xfc8` 이 서 있는 자리) */
-  const [chosen, setChosen] = useState<number | null>(null)
   const chosenRef = useRef<number | null>(null)
   const isDoneRef = useRef(false)
   const propsRef = useRef({ choices, onDecide, isPaused })
@@ -80,7 +91,6 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay }
     // 빈 칸 · 막힌 마구 칸 — `+0xfc8` 이 그대로다
     if (choice === undefined || choice.isBlocked === true) return
     chosenRef.current = slot
-    setChosen(slot)
   }
   const pressRef = useRef(press)
   pressRef.current = press
@@ -99,24 +109,20 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay }
   }, [])
 
   return (
-    <ul className={styles.list}>
-      {choices.map((choice) => (
-        <li key={choice.slot}>
-          <button
-            type="button"
-            className={styles.item}
-            aria-pressed={choice.slot === chosen}
-            disabled={choice.isBlocked === true}
-            onClick={() => press(choice.slot)}
-          >
-            <span className={styles.key}>{SLOT_KEY_LABELS[choice.slot] ?? ''}</span>
-            <span className={styles.label}>
-              {choice.name}
-              {choice.detail !== undefined && <span className={styles.detail}>{choice.detail}</span>}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <PressLayer testId="구질 누름 칸">
+      {choices.map((choice) => {
+        const rect = slotTapRectOf(choice.slot, stageSide)
+        if (rect === null) return null
+        return (
+          <PressArea
+            key={choice.slot}
+            rect={rect}
+            label={`${SLOT_KEY_LABELS[choice.slot] ?? ''} ${choice.name}`}
+            isDisabled={choice.isBlocked === true}
+            onPress={() => press(choice.slot)}
+          />
+        )
+      })}
+    </PressLayer>
   )
 }
