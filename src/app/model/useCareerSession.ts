@@ -861,11 +861,11 @@ export function useCareerSession({
       // 경기 뒤 평가 116 진입 0x1278c 가 S+0x50 = 2 · 저장 — 이어하기가 116 을 다시 띄운다(`continueSaved`). S 의 +0x4a ·
       // +0x1d8 처럼 지난 경기 재료를 저장에 남긴다(`lastGame`).
       // 0x1a1c0 칭호는 여기서 주지 않는다(관리 화면 갱신 0x1aec4 `pendingTitle`) — 116 은 칭호 39 하나만 직접 띄운다
-      // (1299e: 이 경기 홈런 > 3 · 비트 없음 → 0x1274c 팝업). 웹은 팝업 대신 결과 화면 칭호 칸으로 보이고 그 자리에서 준다
+      // (1299e: 이 경기 홈런 > 3 · 비트 없음 → +0x270 = 39 · 0x1274c 팝업). 진입은 팝업만 걸고 주는 것은 키 0x1b1e4 다
+      // (`confirmGameResultTitle`) — 116 진입 저장(S+0x50 = 2)에는 비트가 없어 키 전에 끄면 이어하기가 팝업을 다시 띄운다.
       // 칭호 39 는 S+0x1d8[3] 을 본다 — 포스트시즌 경기 뒤에는 앞 평가 경기의 홈런 수다
       const dynamite = gameResultTitleOf(advanced.titleIds, recordLine.homeRuns)
-      const titled = dynamite === null ? advanced : awardTitles(advanced, [dynamite])
-      setCareer({ ...titled, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation, recordLine) })
+      setCareer({ ...advanced, seasonEndState: 116, lastGame: nariLastGameOf(summary, evaluation, recordLine) })
       // 경기 끝 0x4ea0c: 기록 달성 G 합을 저장 G 에 더한 뒤 0x4ec82 `0x22c7d(액수, 모드 4)` 로 획득 GP 통계에 적는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointRewardOf(summary) })
       // 이어서 0x4ec8a `0x22e10` 이 이번 경기 기록 배열 40칸을 연감 달성 횟수 [+4+n] 에 더한다 (e48e922)
@@ -1551,10 +1551,9 @@ export function useCareerSession({
       if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {
         // 116 진입 0x1278c 다시 — 카운터를 한 번 더 쓰고(겹쳐 쌓임) 평가 창을 다시 띄운다
         const counted = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
-        // 1299e 도 다시 — 비트가 이미 섰으면 안 준다
+        // 1299e 도 다시 — 비트가 이미 섰으면 팝업을 안 건다. 주는 것은 키 0x1b1e4 (`confirmGameResultTitle`)
         const dynamite = gameResultTitleOf(counted.titleIds, (lastGame.recordLine ?? lastGame.summary.stats).homeRuns)
-        const replayed = dynamite === null ? counted : awardTitles(counted, [dynamite])
-        setCareer(replayed)
+        setCareer(counted)
         playSoundIds(audio, [evaluationJingleIdOf(lastGame.evaluation.popularityChange)])
         return setScreen({
           kind: '경기결과',
@@ -1563,7 +1562,7 @@ export function useCareerSession({
           gamePointReward: 0,
           newTitles: dynamite === null ? [] : [dynamite],
           evaluation: lastGame.evaluation,
-          streakNotices: streakEventOf(replayed).notices,
+          streakNotices: streakEventOf(counted).notices,
         })
       }
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
@@ -1715,6 +1714,14 @@ export function useCareerSession({
       setCareer(result.career)
       // 0x148d8 `0x22c29(모드 4 → 1, 비용)` — 타자편 소모 GP
       recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: career.gamePoint - result.career.gamePoint })
+    },
+
+    /** 116 의 칭호 39 팝업 키 0x1b1e4 — 비트 · 곧바로 장착(+0x1c4) · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
+    confirmGameResultTitle: () => {
+      if (career === null || screen.kind !== '경기결과') return
+      const title = screen.newTitles[0]
+      if (title === undefined || career.titleIds.includes(title)) return
+      setCareer(awardTitles(career, [title]))
     },
 
     confirmGameResult: () => {

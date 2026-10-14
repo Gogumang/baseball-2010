@@ -36,7 +36,8 @@ import { pitcherYearGoalWindowValuesOf } from '@/entities/pitcher-career/model/p
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
-import { conditionTextOf, nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
+import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
+import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
 import {
   isContinuablePitcherEnding,
   judgePitcherSeasonAwards,
@@ -472,13 +473,10 @@ function PitcherLeagueScreens({
       {session.storyNotice !== '' && session.outingRecoveryNotice === '' && (
         <MessageBox text={session.storyNotice} buttons={['확인']} onAnswer={actions.dismissStoryNotice} />
       )}
-      {/* 칭호 팝업 0x1274c — 이름 [i+16] · 조건 [i+80] (투수편 i > 31, 0x1afe8). ⚠️ 팝업 틀 배치는 옮기지 않아 알림 상자다 */}
+      {/* 칭호 팝업 0x1274c — 그리기 0x1afe8(투수편 i > 31 이면 이름 [i+16] · 조건 [i+80]) · 키 0x1b1e4 (`TitleWindow`).
+          키가 창을 그 자리에서 치우고 다음 갱신 0x1aec4 가 다음 칭호를 새 창으로 띄운다 — `key` 가 칭호마다 새 창을 세운다 */}
       {session.pendingTitle !== null && (
-        <MessageBox
-          text={`!C${session.pendingTitle}!N${conditionTextOf(session.pendingTitle) ?? ''}`}
-          buttons={['확인']}
-          onAnswer={actions.confirmTitle}
-        />
+        <TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} />
       )}
     </>
   )

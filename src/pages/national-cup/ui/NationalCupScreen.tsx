@@ -201,7 +201,7 @@ export function NationalCupScreen({
         <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />
       )}
       {entryPopup?.kind === '칭호' && (
-        // 칭호 팝업 확인 0x1b1e4 — 키를 받은 그 자리에서 비트 · 곧바로 장착(+0x1c4) · 저장, 다음 팝업은 닫힘 애니 뒤
+        // 칭호 팝업 확인 0x1b1e4 — 키를 받은 그 자리에서 비트 · 곧바로 장착(+0x1c4) · 저장 · 창을 바로 치운다(0x742a8, 닫힘 애니 없음)
         <TitleWindow key={entryPopupIndex} title={entryPopup.title} onKey={onConfirmEntryTitle} onClose={closeEntryPopup} />
       )}
 

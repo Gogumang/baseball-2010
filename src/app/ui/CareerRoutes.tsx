@@ -16,7 +16,7 @@ import { SeasonOutingPopup } from '@/pages/season/ui/SeasonOutingPopup'
 import { nariOutingPresentationOf } from '@/pages/season/lib/seasonOutingPopup'
 import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
-import { MessageBox, ScreenOverlay } from '@/shared/ui'
+import { ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
@@ -37,7 +37,8 @@ import { nariBatterOf } from '@/app/model/useCollection'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { endingBonusOf, isContinuableEnding } from '@/entities/career/model/seasonFlow'
 import { TEAMS } from '@/shared/config/original/teams'
-import { conditionTextOf, nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
+import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
+import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { nariLastGameRecordLineOf } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -178,17 +179,12 @@ function CareerScreens({
   )
 
   /**
-   * 칭호 팝업 0x1274c (종류 0x78) — 관리 화면 위에 하나씩. 그림 0x1afe8 은 이름 StrNICKNAME[i] 와 조건 문구 [i+64] 를 그린다.
-   * ⚠️ 그 팝업 틀의 배치(0x1afe8 의 좌표·그림)는 옮기지 않아 알림 상자로 보인다 — 근사. 다른 알림·상세 창이 닫힌 뒤에 띄운다.
+   * 칭호 팝업 0x1274c (종류 0x78, 그리기 0x1afe8 · 키 0x1b1e4 — `TitleWindow`) — 관리 화면 위에 하나씩. 다른 알림·상세 창이 닫힌 뒤에 띄운다.
+   * 키가 비트·장착·저장(`confirmTitle`)과 함께 창을 그 자리에서 치우고([창+9] = 0, 닫힘 애니 없음), 다음 갱신 0x1aec4 가
+   * +0x274 == 1 이라 다시 판정해 다음 칭호를 새 창(높이 6 에서 펼침)으로 띄운다 — `key` 가 칭호마다 새 창을 세운다.
    */
   const titlePopup = session.pendingTitle !== null && session.managementNotice === '' && session.managementDetail === null
-    ? (
-      <MessageBox
-        text={`!C${session.pendingTitle}!N${conditionTextOf(session.pendingTitle) ?? ''}`}
-        buttons={['확인']}
-        onAnswer={actions.confirmTitle}
-      />
-    )
+    ? <TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} />
     : null
   const managementWithTitle = (
     <>
@@ -218,6 +214,7 @@ function CareerScreens({
           summary={screen.summary}
           gamePointReward={screen.gamePointReward}
           newTitles={screen.newTitles}
+          onConfirmTitle={actions.confirmGameResultTitle}
           evaluation={screen.evaluation}
           streakNotices={screen.streakNotices}
           // 116 의 S+0x1d8 — 정산이 남긴 줄(포스트시즌 경기 뒤에는 앞 평가 경기 줄)
