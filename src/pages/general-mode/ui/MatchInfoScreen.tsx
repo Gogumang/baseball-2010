@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -36,6 +37,18 @@ const generalMatchInfoFooterOf = (isQuickStart: boolean, isRespinning: boolean, 
   if (isSettingsOpen) footer = (footer & ~0x20) ^ 0x40
   return footer
 }
+
+/** 누름 칸이 보내는 키 — 키 처리(`useEffect` 안 window 듣개)가 그대로 받는다 */
+const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+
+/** 가운데 PLAY BALL 공(slt_frame 0, 46×46)의 자리 = OK */
+const PLAY_BALL_PRESS_RECT = { x: 240 / 2 - 23, y: MATCH_INFO_LAYOUT.playBall.y - 33, width: 46, height: 46 } as const
+
+/** 엠블럼(76×76)의 자리 */
+const logoPressRectOf = (anchor: { readonly x: number; readonly y: number }) => ({
+  x: anchor.x - TEAM_LOGO_HALF.width, y: anchor.y - TEAM_LOGO_HALF.height,
+  width: TEAM_LOGO_HALF.width * 2, height: TEAM_LOGO_HALF.height * 2,
+})
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 
@@ -242,29 +255,33 @@ export function MatchInfoScreen({
         </>
       )}
 
-      {/* 원본에 없는 웹 전용 단추 셋 — 원본은 바닥띠 소프트키가 한다. 바닥띠 왼쪽에 나란히 세운다 */}
-      <Button variant="corner" className={styles.softKey} style={{ left: 4 }} onClick={onStart}>
-        경기 시작
-      </Button>
-      {/* 바닥띠 비트 0x40 "0경기설정" 그림(18틱 깜빡임)은 ScreenFrame 이 그린다 — 이 단추는 웹 덧붙임 */}
-      <Button variant="corner" className={styles.softKey} style={{ left: 62 }} onClick={onOpenSettings}>
-        0 경기설정
-      </Button>
-      {isQuickStart && (
-        <Button variant="corner" className={styles.softKey} style={{ left: 126 }} onClick={onRespin}>
-          * 재선택
-        </Button>
+      {/*
+        원본에 없던 웹 단추 셋([경기 시작] · [0 경기설정] · [* 재선택])과 키 안내 글을 걷고 **투명 누름 칸**으로 —
+        누르면 그 키를 보낸다(펼침 · 재굴림 중 막기도 키 처리 그대로). 가운데 PLAY BALL 공 = OK, 두 엠블럼 = ←/→ 엔트리,
+        바닥띠 "0경기설정" · "#재선택" 표시 = 그 키. 설정 창이 떠 있으면 키가 모두 창으로 가므로 칸을 안 세운다
+      */}
+      {!isSettingsOpen && (
+        <>
+          <PressArea label="경기 시작" rect={PLAY_BALL_PRESS_RECT} onPress={() => pressKey('Enter')} />
+          {onOpenEntry !== undefined && (
+            <>
+              <PressArea label="PLAYER 엔트리" rect={logoPressRectOf(anchorA)} onPress={() => pressKey('ArrowLeft')} />
+              <PressArea label="COM 엔트리" rect={logoPressRectOf(anchorB)} onPress={() => pressKey('ArrowRight')} />
+            </>
+          )}
+        </>
       )}
-      <div className={styles.hintLine}>
-        <Hint>Enter 경기 시작 · 0 경기설정{isQuickStart ? ' · * 재선택' : ''}</Hint>
-      </div>
 
       {settingsWindow}
 
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
       <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel}
-        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)} slides={isEntryAnimated} />
+        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)} slides={isEntryAnimated}
+        footerPresses={{
+          [FOOTER_BITS.gameSettings]: { label: '0 경기설정', onPress: () => pressKey('0') },
+          [FOOTER_BITS.reselect]: { label: '* 재선택', onPress: () => pressKey('*') },
+        }} />
     </RawScreen>
   )
 }
