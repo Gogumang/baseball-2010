@@ -546,3 +546,54 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
     }
   })
 })
+
+describe('득점 메시지 0x13 의 함성 — 0x51fb8 머리 (홈런성이 아니면 60 · 홈런성이면 타자주자만 30)', () => {
+  const 소리받기 = (울린것: number[]) => setActiveSound({
+    play: (id) => void 울린것.push(id),
+    playBgm: () => {},
+    stopBgm: () => {},
+    resumeBgm: () => {},
+    stop: () => {},
+    currentBgm: () => null,
+    setVolume: () => {},
+    getVolume: () => 100,
+  })
+
+  it('실시간 갈래 — 단타에 3루 주자가 들어오는 틱에 60 을 낸다(30 은 없다)', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    소리받기(울린것)
+    try {
+      const onDone = vi.fn()
+      render(<DefensePlayback input={타구(단타, 주자3루)} onDone={onDone} />)
+      for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(결과(onDone).advance.runsScored).toBeGreaterThan(0)
+      expect(울린것).toContain(60)
+      expect(울린것).not.toContain(30)
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+
+  it('재생 갈래 홈런 — 3루 주자 홈인은 소리 없고 타자주자(칸 0) 홈인에 30 한 번', async () => {
+    const { homeRunPlaybackOf } = await import('@/features/defense-play/model/homeRunPlayback')
+    const 홈런 = homeRunPlaybackOf({ outcome: { kind: '홈런', bases: 4 } as AtBatOutcome, bases: 주자3루 })!
+    const 머리 = 홈런.ticks[홈런.ticks.length - 1]!
+    const 홈 = basePosition(0)
+    const last = { ...머리, runners: 머리.runners.map((runner) => ({ ...runner, x: 홈.x, z: 홈.z })) }
+    const ticks = [...홈런.ticks, ...Array.from({ length: 62 }, () => last)]
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    소리받기(울린것)
+    try {
+      const onDone = vi.fn()
+      render(<DefensePlayback ticks={ticks} onDone={onDone} />)
+      for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(울린것.filter((id) => id === 30 || id === 60)).toEqual([30])
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+})

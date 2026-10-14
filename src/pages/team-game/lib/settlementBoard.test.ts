@@ -78,6 +78,21 @@ describe('대전 승리 팝업 글 — 0x4b100 4b20a~4b2d4', () => {
     expect(versusWinPopupTextOf({ kind: 0, value: 1500n }, () => null)).toBe('!C추가 1500GP 획득')
   })
 
+  it('숫자 0xbc73d → 0xbc6c0 은 아래 32비트만 부호 있는 10진으로 — 쉼표 · 0 채움 없음, 위 32비트는 안 본다', async () => {
+    const { versusWinPopupTextOf } = await import('@/pages/team-game/lib/settlementBoard')
+    expect(versusWinPopupTextOf({ kind: 0, value: 1234567n }, () => null)).toBe('!C추가 1234567GP 획득')
+    expect(versusWinPopupTextOf({ kind: 0, value: 0n }, () => null)).toBe('!C추가 0GP 획득')
+    expect(versusWinPopupTextOf({ kind: 0, value: (7n << 32n) | 25n }, () => null)).toBe('!C추가 25GP 획득')
+    expect(versusWinPopupTextOf({ kind: 0, value: 0xffffffffn }, () => null)).toBe('!C추가 -1GP 획득')
+  })
+
+  it('종류 1 의 이름은 0x61e8c — i ≤ 12 는 StrCOMMON(마선수 · 히든 팀), 그 위는 StrITEM', async () => {
+    const { versusWinPopupTextOf } = await import('@/pages/team-game/lib/settlementBoard')
+    const { hiddenNameOf } = await import('@/entities/collection/model/hiddenOpenNotice')
+    expect(versusWinPopupTextOf({ kind: 1, value: (1n << 0n) | (1n << 7n) | (1n << 12n) }, hiddenNameOf))
+      .toBe('!C!cffff00레오니오픈!N!C!cffff00킹타이거오픈!N!C!cffff00외인구단오픈!N')
+  })
+
   it('종류 1 은 켜진 비트 0..50 마다 "!C!cffff00" + 이름 + "오픈!N", 비면 창 없음 · 그 밖 종류도 없음', async () => {
     const { versusWinPopupTextOf } = await import('@/pages/team-game/lib/settlementBoard')
     const nameOf = (id: number) => `이름${id}`

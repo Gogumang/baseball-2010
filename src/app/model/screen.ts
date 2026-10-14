@@ -26,6 +26,12 @@ export type Screen =
        * 바탕 띠 `[0xe4]` 는 이미 다 자랐다. `openTier` 5 와 함께만 쓴다
        */
       readonly isBandGrown?: true
+      /**
+       * 타이틀(하위 3)에서 키를 눌러 처음 메뉴(하위 4)로 왔다 — 타이틀 갱신 0x245f8 만 `[skin+0x84] = 1 · [+0x86] = 1` 뒤
+       * 0xbcb49(this+0x18, 4) 라 머리띠가 미끄러져 내려온다. 그 밖 길(다른 장면이 메뉴를 새로 세움 · 같은 장면의 하위 6~38 에서
+       * 돌아옴)은 하위 4 들어옴 0x24a40 · 5 들어옴 0x25b88 이 +0x84 를 안 세워 다 내려온 자리에 선다
+       */
+      readonly isFromTitle?: true
     }
   /** 도움말 뷰어 — 처음 메뉴 [도움말](하위 7) · `isInquiry` 면 [게임문의](하위 10, 진입 0x2668c: 장 6 쪽 보기 · 장 잠금) */
   | { readonly kind: '도움말'; readonly isInquiry?: true }

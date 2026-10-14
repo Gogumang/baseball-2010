@@ -112,6 +112,16 @@ interface MainMenuScreenProps {
    * 띠 `[0xe4]` 는 내려올 때 이미 다 자랐으므로 펼쳐진 채로 선다
    */
   readonly isBandGrown?: boolean
+  /**
+   * 머리띠가 미끄러져 내려오는가 (`ScreenFrame` 의 `slides`, [skin+0x84]). 메뉴 장면에서 +0x84 = 1 을 쓰는 들어옴은
+   * 표 0xcf06c 의 3 · 8(조건) · 15 · 16 · 17 · 25~29 · 32 · 33 · 34(조건) · 37 과 타이틀 갱신 0x245f8 인데, 두 단(하위 4 · 5)을
+   * 그리는 것은 0x245f8 → 하위 4 뿐이다 — 하위 4 들어옴 0x24a40 · 5 들어옴 0x25b88 · 생성자 0x234d4 는 +0x84 를 안 쓴다.
+   * 그래서 타이틀에서 왔을 때만 참이다. 하위 3 들어옴 0x258fc 가 세운 것은 타이틀 그림 0x2cbac 가 머리띠를 안 그려 0x245f8 까지 남는다.
+   * 다른 하위 상태(15 · 16 · 17 …)가 세운 미끄러짐은 그 화면에서 다 내려온 뒤 돌아오므로 메뉴에서는 안 미끄러진다.
+   * ⚠️ 미확인: 그 화면이 미끄러짐을 다 끝내기 전(+0x86 이 30 에 닿기 전, 그림 대여섯 장)에 돌아오면 원본은 남은 미끄러짐을
+   * 메뉴에서 잇는다 — 웹은 화면마다 새로 세므로 이 경우를 옮기지 않았다. 안 넘기면 거짓
+   */
+  readonly headerSlides?: boolean
 }
 
 /** 판정을 부르는 상태 틱 (0x29520 `cmp r3,#0xa`) */
@@ -168,6 +178,7 @@ export function MainMenuScreen({
   gameStartCursor,
   topMenuCursor,
   isBandGrown = false,
+  headerSlides = false,
 }: MainMenuScreenProps) {
   // 아랫단 바탕 띠 — 처음 메뉴 OK 로 내려올 때마다(0x294b8) · 장면이 하위 5 로 바로 설 때(생성자 0x2381c) 1 부터 자란다.
   // 자라는 동안은 릴 줄을 안 그리고(0x254d8) 하위 5·9 갱신이 키를 버린다([0xe2] ≠ 0 — 0x28cc2 · 0x28ae0)
@@ -389,11 +400,12 @@ export function MainMenuScreen({
 
       {/* 머리띠·바닥띠는 두 단 다 마지막에 그린다 — 윗단 바닥 1(뒤로 표시 없음) · 아랫단 바닥 5(뒤로 표시).
           미끄러짐은 [skin+0x84] 가 서 있을 때만 [skin+0x86] 을 두 배씩 키운다(0x54df0~0x54e1e) — 그 둘을 세우는 곳은
-          다른 하위 상태의 들어옴(3 0x258fc · 0x23f5c · 0x24804 …)뿐이고 하위 4 들어옴 0x24a40 · 5 들어옴 0x25b88 은 안 건드린다.
-          곧 두 단을 오가도 머리띠는 다시 내려오지 않는다 — 같은 ScreenFrame 을 그대로 두어 미끄러짐을 이어 간다 */}
+          다른 하위 상태의 들어옴(3 0x258fc · 0x23f5c · 0x24804 …)과 타이틀 갱신 0x245f8 뿐이고 하위 4 들어옴 0x24a40 · 5 들어옴 0x25b88 은
+          안 건드린다. 곧 타이틀에서 왔을 때만 미끄러지고(`headerSlides`), 두 단을 오가도 다시 내려오지 않는다 —
+          같은 ScreenFrame 을 그대로 두어 미끄러짐을 이어 간다 */}
       {gamePoint !== undefined && (
         <ScreenFrame title="2010프로야구" gamePoint={gamePoint}
-          onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} />
+          onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} slides={headerSlides} />
       )}
 
       {state.lockedNotice !== null && (

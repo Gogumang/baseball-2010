@@ -15,7 +15,7 @@ import {
 } from '@/pages/team-game/lib/settlementBoard'
 import type { VersusWinReward } from '@/pages/team-game/lib/settlementBoard'
 import { useCommonWindowPush, useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
-import { hiddenItemNameOf } from '@/entities/collection/model/hiddenOpenNotice'
+import { hiddenNameOf } from '@/entities/collection/model/hiddenOpenNotice'
 import * as styles from '@/pages/team-game/ui/SettlementBoard.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
@@ -90,7 +90,7 @@ export function SettlementBoard({
   // (4b17a~4b2d4). 틱은 들어선 그림이 0 이고, 공용 창이 떠 있는 동안 경기 장면 0x52c50 은 상태 바꿈(틱 +1)을 건너뛴다(52cc6)
   useSceneTick((tick) => {
     if (tick !== VERSUS_WIN_POPUP_TICK || !isPanelOpen || !isVersusMode(mode) || !isWin || versusReward === undefined) return
-    const text = versusWinPopupTextOf(versusReward, hiddenItemNameOf)
+    const text = versusWinPopupTextOf(versusReward, hiddenNameOf)
     if (text !== null) pushCommonWindow(text)
   }, !useIsCommonWindowOpen())
   const rows = settlementRecordRowsOf(recordIds)
