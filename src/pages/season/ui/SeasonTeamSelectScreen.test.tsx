@@ -5,8 +5,11 @@ import { SeasonTeamSelectScreen, hiddenTeamHintOf } from '@/pages/season/ui/Seas
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
 
-// 머리띠가 미끄러지는 다섯 그림 동안의 키 막음(`useFrameSlideKeyLock`)은 따로 시험한다 — 여기서는 다 내려온 뒤로 본다
-vi.mock('@/widgets/screen-frame/model/useFrameSlideKeyLock', () => ({ useFrameSlideKeyLock: () => ({ current: false }) }))
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
 
 /** 시즌 팀 고르기 0xca — 키 0x8da4 (8e06 칸 ≤ 9 → 0xc8 · 8e18~8ec2 히든 힌트 · 8ec8 취소) */
 

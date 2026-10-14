@@ -10,6 +10,12 @@ import {
   ROW, SPECIAL_ITEMS, descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * 스페셜 목록 (메인 메뉴 상태 6, 하위 목록 0x2524c — P6 2d).
  * 여덟 칸(main_ui 프레임 15~21·28)을 오른쪽 세로 목록으로 20px 간격에 세운다.

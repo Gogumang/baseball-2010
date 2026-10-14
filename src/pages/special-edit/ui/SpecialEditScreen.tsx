@@ -8,6 +8,7 @@ import { pointEntryCursor } from '@/entities/season-mode/model/entryEditor'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf,
+  teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
   EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
@@ -17,6 +18,8 @@ import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
+import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -116,6 +119,9 @@ interface EditTeamSelectProps {
   readonly slides: boolean
 }
 
+/** 에디트 10칸 격자의 열림 애니 꼴 — 2줄 · 세로틈 8 (k 9, 0x64032~0x6403c) */
+const EDIT_GRID_OPEN = teamGridOpenShapeOf(EDIT_TEAM_COUNT)
+
 /** 격자 키 — 방향키와 숫자 2·4·6·8 (격자 키 처리 0x6c299 의 표 0xd2e7c) */
 const ARROW_DIRECTIONS: Readonly<Record<string, AnnalsDirection>> = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
@@ -128,9 +134,15 @@ const ARROW_DIRECTIONS: Readonly<Record<string, AnnalsDirection>> = {
  */
 function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, slides }: EditTeamSelectProps) {
   const team = TEAMS[cursor] ?? TEAMS[0]
+  // 갱신 0x2b2e0 은 하위 0([skin+0xe6] == 0, 0x2b30e~0x2b318)에서 맨 앞에 [[0x1552cfc]+0xe4] == 0 이면 아무것도 안 한다(0x2b31a~0x2b326)
+  // — 머리띠가 미끄러지는 동안(본문 없음)과 격자 열림 애니(0x79fa8) 동안이다. 애니는 [skin+0xe8] = 넷째 인자 1 이라 미끄러질 때 돈다
+  const entry = useListPageEntry({ slides, grid: { shape: EDIT_GRID_OPEN, isAnimated: slides } })
+  const { keyLock } = entry
+  const gridOpen = entry.grid
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (keyLock.current) return
       const direction = ARROW_DIRECTIONS[event.key]
       if (direction !== undefined) {
         event.preventDefault()
@@ -147,7 +159,7 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onMove, onChoose, onBack])
+  }, [onMove, onChoose, onBack, keyLock])
 
   const chartCenter = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
   const radius = ABILITY_CHART.radius
@@ -156,6 +168,7 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
 
   return (
     <RawScreen>
+      {gridOpen !== null && (<>
       {[
         { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
         { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
@@ -189,7 +202,8 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
       </svg>
 
       {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
-        const { x, y } = cellPositionOf(index, EDIT_TEAM_COUNT)
+        const { x } = cellPositionOf(index, EDIT_TEAM_COUNT)
+        const y = cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index)
         return (
           <button key={entry.id} type="button" aria-label={entry.name} aria-pressed={index === cursor}
             className={styles.cell} style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
@@ -201,13 +215,14 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
                 left: (GRID.cell - CELL_LOGO_SIZE) / 2, top: (GRID.cell - CELL_LOGO_SIZE) / 2,
                 width: CELL_LOGO_SIZE, height: CELL_LOGO_SIZE,
               }} />
-            {index === cursor && (
+            {index === cursor && gridOpen.state.isDone && (
               <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
                 style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }} />
             )}
           </button>
         )
       })}
+      </>)}
 
       {/* 머리띠 0x54d95(skin, 1 "팀선택", 5 되돌아가기) — 0x2e224 */}
       <ScreenFrame title="팀선택" gamePoint={gamePoint} onBack={onBack} footer={5} slides={slides} />

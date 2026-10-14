@@ -11,6 +11,12 @@ import {
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * 나만의리그 엔딩 (상태 141 — 0x87c7c · 0x168fc → 0x882b4 / 0x88bb4).
  * 부상·방출은 띠 창 + 걸어 들어오는 선수, 은퇴 엔딩은 그림 + 원형 전환 + 올라오는 글, 그 뒤 제작진.

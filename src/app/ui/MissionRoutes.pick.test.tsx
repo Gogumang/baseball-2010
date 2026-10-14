@@ -11,6 +11,12 @@ import type { Screen } from '@/app/model/screen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 afterEach(cleanup)
 
 describe('미션 모드 진입 — 하위 17 선수 고르기를 먼저 띄운다 (0x2613c · 0x29a54)', () => {

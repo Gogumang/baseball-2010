@@ -20,7 +20,7 @@ export interface SeasonScreenFadeProps {
  * **화면 효과기 0xbdae8([0x140007c], 종류, 0, 5, 1500)** — 시즌 장면의 전환 덮개(직접 떴다). 효과 몸통은 `entities/story` 의
  * `screenEffectFrameAt`(그리기 0xbd844 — 틀마다 단계 ±2, 9 틀, 끝 다음 틀에 비움)이고, 셋째 · 넷째 인자(5, 1500)는 종류 7 · 8 만 쓴다
  * — 곧 1500ms 가 아니라 **아홉 틀**이다.
- * 효과기가 도는 동안(+4 ≠ 0 · +0x10 == 0)은 시즌 장면의 키 받기 0x4b18 · 0x4b34 가 키를 안 적는다 — 웹은 그동안 키를 삼킨다.
+ * 효과기가 도는 동안(+4 ≠ 0 · +0x10 ≠ 0 — 0x4b18 도 나리 0x10758 과 같은 문이다)은 시즌 장면의 키 받기 0x4b18 · 0x4b34 가 키를 안 적는다 — 웹은 그동안 키를 삼킨다.
  */
 export function SeasonScreenFade({ kind, onEnd }: SeasonScreenFadeProps) {
   const frame = useUpdateCounter()

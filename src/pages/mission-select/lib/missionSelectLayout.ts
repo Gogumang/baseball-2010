@@ -9,6 +9,8 @@
  * 격자 만들기 인자의 `cy` 는 **중심이 아니라 첫 줄 위쪽 y** 다 (S9 확정 — P6 의 "중심" 표기는
  * 그때 인자 이름을 잘못 읽은 것). 왼쪽 x 는 `cx − (Σ칸너비 + (열−1)·가로틈)/2` 로 가운데를 맞춘다.
  */
+import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
+
 const SCREEN_WIDTH = 240
 
 export const PANEL = { x: 24, y: 54, width: 192, height: 212 } as const
@@ -16,24 +18,38 @@ export const PANEL = { x: 24, y: 54, width: 192, height: 212 } as const
 /** 미션 이름 — 판 윗부분 밝은 제목 띠 위, 글색 #335FCD */
 export const TITLE = { x: 24, y: 51 + 7, width: 192, color: '#335FCD' } as const
 
+/**
+ * `0x79ed5([this+0x80], 5, 120, [sp+0x38] + 0x1c, 표 0xcd68c, 0x1c, 5, 3, 3, 2, 2)` (0x1e166~0x1e1a8, 직접 떴다):
+ * 칸 너비 표 0xcd68c = [30, 30, 30, 30, 30] · 줄높이 28 · 가로틈 3 · 세로틈 2 · 가속 시프트 2.
+ * 시작 `0x7a005(격자, 1, 1, 0)`(0x1e1ac~0x1e1b6) — 열림 애니가 늘 돈다. 격자는 [this+0xa1] 이 서 있을 때만 다시 짓고(0x1e15c~0x1e1e4)
+ * 그 깃발은 상태 1 진입 0x1d9a4 만 세운다(0x1da08) → 상태 1 에 들어와 본문을 처음 그릴 때 한 번 돈다.
+ */
 export const GRID = {
   columns: 5,
   rows: 3,
+  /** 줄높이 (칸 높이) */
   cell: 28,
-  /** 가로·세로 틈은 원본 인자에 안 나와 0 으로 둔다 */
-  gap: 0,
+  /** 칸 너비 — 표 0xcd68c */
+  cellWidth: 30,
+  hGap: 3,
+  vGap: 2,
   centerX: SCREEN_WIDTH / 2,
   top: 51 + 28,
 } as const
 
-export const GRID_LEFT = GRID.centerX - (GRID.columns * GRID.cell + (GRID.columns - 1) * GRID.gap) / 2
+/** 격자 열림 애니의 꼴 (`shared/lib/gridOpen`) */
+export const MISSION_GRID_OPEN: GridOpenShape = {
+  rows: GRID.rows, columns: GRID.columns, rowHeight: GRID.cell, rowGap: GRID.vGap, shift: 2,
+}
+
+export const GRID_LEFT = GRID.centerX - Math.trunc((GRID.columns * GRID.cellWidth + (GRID.columns - 1) * GRID.hGap) / 2)
 
 export function cellPositionOf(index: number) {
   const column = index % GRID.columns
   const row = Math.floor(index / GRID.columns)
   return {
-    x: GRID_LEFT + column * (GRID.cell + GRID.gap),
-    y: GRID.top + row * (GRID.cell + GRID.gap),
+    x: GRID_LEFT + column * (GRID.cellWidth + GRID.hGap),
+    y: GRID.top + row * (GRID.cell + GRID.vGap),
   }
 }
 

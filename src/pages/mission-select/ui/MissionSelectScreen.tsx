@@ -7,7 +7,7 @@ import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, GRID, MISSION_GRID_SHAPE,
-  NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
+  MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { EventMissionWindow } from '@/pages/mission-select/ui/EventMissionWindow'
@@ -15,6 +15,8 @@ import type { EventMissionAnswer } from '@/pages/mission-select/ui/EventMissionW
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { isFrameSlideClearedAt } from '@/widgets/screen-frame/lib/frameSlide'
+import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
+import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
 
@@ -83,6 +85,12 @@ export function MissionSelectScreen({
    */
   const updates = useUpdateCounter()
   const isBodyShown = !slides || isFrameSlideClearedAt(updates)
+  /**
+   * 격자 열림 애니 (`MISSION_GRID_OPEN`) — 본문 첫 그림에 격자를 짓고 늘 돈다. 0x1df08 은 0x7a571 이 돌려준 값을 버리고(0x1e1fc)
+   * 키 0x1daa4 도 그 값을 안 본다 → 애니 동안에도 키는 그대로다. 커서는 끝난 뒤([격자+9])에만 그린다(0x7b3a2).
+   * 시험용 `slides = false` 는 다 내려온 · 다 연 자리에서 본다.
+   */
+  const gridOpen = useListPageEntry({ slides, grid: { shape: MISSION_GRID_OPEN, isAnimated: slides } }).grid
   const [side, setSide] = useState<OriginalMission['side']>(initialSide)
   const [cursor, setCursor] = useState(0)
   /** [this+0xa0] — 이벤트 미션 창의 고름(≠ 0 미션실행). 장면 진입 0x1d9a4 가 1 로 둔다 */
@@ -180,11 +188,12 @@ export function MissionSelectScreen({
 
       {Array.from({ length: cellCount }, (_unused, index) => {
         const mission = missions[index]
-        const { x, y } = cellPositionOf(index)
+        const { x } = cellPositionOf(index)
+        const y = cellPositionOf(index).y + (gridOpen === null ? 0 : gridOpenCellDy(MISSION_GRID_OPEN, gridOpen.state, index))
         if (mission === undefined) {
           return (
             <div key={index} className={styles.cell}
-              style={{ left: x, top: y, width: GRID.cell, height: GRID.cell, background: '#1D2A55', color: '#4A5C8F' }}
+              style={{ left: x, top: y, width: GRID.cellWidth, height: GRID.cell, background: '#1D2A55', color: '#4A5C8F' }}
               onMouseEnter={() => setCursor(index)}
               onClick={() => { setCursor(index); openEventWindowOrSelect(index) }} />
           )
@@ -194,7 +203,7 @@ export function MissionSelectScreen({
         return (
           <button key={index} type="button" className={styles.cell} aria-label={mission.name}
             style={{
-              left: x, top: y, width: GRID.cell, height: GRID.cell,
+              left: x, top: y, width: GRID.cellWidth, height: GRID.cell,
               background: isLocked ? '#1D2A55' : isCleared ? '#2E4694' : '#213473',
               color: isLocked ? '#4A5C8F' : '#FFFFFF',
             }}
@@ -205,9 +214,9 @@ export function MissionSelectScreen({
         )
       })}
 
-      {cursor < cellCount && (
+      {cursor < cellCount && (gridOpen === null || gridOpen.state.isDone) && (
         <div className={styles.cursor}
-          style={{ left: cursorCell.x, top: cursorCell.y, width: GRID.cell, height: GRID.cell }} />
+          style={{ left: cursorCell.x, top: cursorCell.y, width: GRID.cellWidth, height: GRID.cell }} />
       )}
 
       <FrameSprite folder={`${SLT_FRAME}/frames`} frame={BOTTOM_FRAME.frame} origins={frames}

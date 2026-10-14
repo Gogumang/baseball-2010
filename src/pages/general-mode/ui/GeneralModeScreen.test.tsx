@@ -9,6 +9,12 @@ import { GeneralModeScreen } from '@/pages/general-mode/ui/GeneralModeScreen'
 import { generalGameOfSave } from '@/pages/general-mode/lib/generalModeResume'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * 일반모드 한 판 (하위 상태 18 → 19 → 20 → 21 → 22 → 경기 장면 0x104).
  * 팀 고르기 두 장은 나만의리그가 쓰던 `TeamSelectScreen` 을 그대로 빌려 쓴다.

@@ -18,8 +18,13 @@ interface NariScreenPushProps {
 /**
  * **142 ↔ 143 화면 밀기** (효과기 종류 8, `pages/management/lib/nariScreenPush` 머리말).
  * 원본은 효과를 걸 때 지금 화면을 떠 두고(0xbda00) 갱신마다 새 화면을 옮긴 위에 떠 둔 화면을 그린다. 웹은 화면이 바뀔 때
- * 앞 화면의 DOM 을 복제해 두었다가 같은 자리에 겹친다 — 복제본은 키를 받지 않으므로(옛 화면의 키 처리는 이미 떠났다)
- * 그동안 키는 새 상태의 것만 먹는다.
+ * 앞 화면의 DOM 을 복제해 두었다가 같은 자리에 겹친다.
+ *
+ * **밀기 동안은 키를 아무도 못 받는다** (직접 떴다): 나리 장면 vtable 0xcc2fc 의 키 누름 0x10758 · 키 뗌 0x10774 가
+ * `[eff+4] == 0 || [eff+0x10] == 0` 일 때만 장면+0x38 · +0x3c 에 키를 적는다(0x1075c~0x1076a, eff = [0x140007c]) — 효과기가 도는 동안
+ * (+4 = 8 · +0x10 = 1/2) 들어온 키는 버려지고 쌓이지도 않는다(매 틀 0xbca04 가 +0x38 을 지운다, 0xbcb04). 그래서 앞 화면도 새 화면
+ * (142 키 0x13c30 · 143 0x1457c)도 못 받고, 효과기를 비운 뒤(0xbd852)부터 받는다. 웹은 밀기가 서 있는 동안 키를 삼키고 누름도 막는다.
+ * ⚠️ 원본은 효과를 건 틀의 꼬리(+0x10 = 0 → 1) 앞에 들어온 키는 적힌다 — 웹은 거는 순간부터 막는다(한 틀 차이).
  */
 export function NariScreenPush({ view, children }: NariScreenPushProps) {
   const liveRef = useRef<HTMLDivElement>(null)
@@ -31,6 +36,24 @@ export function NariScreenPush({ view, children }: NariScreenPushProps) {
   const [push, setPush] = useState<{ direction: ScreenPushDirection; frame: ScreenPushFrame } | null>(null)
 
   useEffect(() => () => cancelAnimationFrame(handleRef.current), [])
+
+  // 0x10758 · 0x10774 — 효과기가 도는 동안 키 누름 · 뗌을 버린다. 자식 화면의 키 처리기(useEffect)보다 먼저 걸리도록
+  // 처음 붙을 때 레이아웃 효과에서 window 잡는 단계에 한 번 건다
+  const isPushingRef = useRef(false)
+  isPushingRef.current = push !== null
+  useLayoutEffect(() => {
+    const swallow = (event: KeyboardEvent) => {
+      if (!isPushingRef.current) return
+      event.stopImmediatePropagation()
+      event.preventDefault()
+    }
+    window.addEventListener('keydown', swallow, true)
+    window.addEventListener('keyup', swallow, true)
+    return () => {
+      window.removeEventListener('keydown', swallow, true)
+      window.removeEventListener('keyup', swallow, true)
+    }
+  }, [])
 
   useLayoutEffect(() => {
     const previous = viewRef.current
@@ -66,7 +89,8 @@ export function NariScreenPush({ view, children }: NariScreenPushProps) {
 
   return (
     <div className={styles.frame}>
-      <div ref={liveRef} style={push === null ? undefined : { transform: translate(push.frame.newX, push.frame.newY) }}>
+      <div ref={liveRef}
+        style={push === null ? undefined : { transform: translate(push.frame.newX, push.frame.newY), pointerEvents: 'none' }}>
         {children}
       </div>
       <div

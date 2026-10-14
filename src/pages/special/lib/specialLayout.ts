@@ -205,7 +205,7 @@ export const HALL_OF_FAME_GRID = {
   /** ⚠️ 근사 — 줄높이(40)와 같은 값으로 둔다 */
   cellWidth: 40,
   rowHeight: 40,
-  /** ⚠️ 근사 — 인자에 값이 없어 0 으로 둔다 */
+  /** 가로 · 세로틈 0 — 0x79ed5 아홉째 · 열째 인자가 둘 다 r5 = 0 이다(0x651c6 · 0x651d4 · 0x651d6, 직접 떴다) */
   horizontalGap: 0,
   verticalGap: 0,
   /** 종류 6 의 열별 y 보정 표 0xd40b8 (확정) */

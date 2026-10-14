@@ -7,6 +7,12 @@ import { coachNameOf } from '@/entities/season-mode/model/seasonCoach'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 
+// 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
+vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()
+  return { ...actual, useListPageEntry: actual.settledListPageEntry }
+})
+
 /**
  * 코치채용 (선수단 화면 0xd7 을 `this+0x11c = 2` 로 띄운 것, 채용 0xa248) — J 4-3 확정.
  * 가드 순서와 "바꾸면 계약금을 새로 낸다" 를 못박는다.

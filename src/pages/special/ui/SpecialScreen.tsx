@@ -23,6 +23,9 @@ import {
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
+import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
+import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
 import { menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf } from '@/pages/main-menu/lib/mainMenuLayout'
@@ -478,6 +481,14 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
     // 홈런더비 하위 16 은 그리기 0x32dd8 이 0x669c1 을 부르지 않는다(0x11 · 0x1b 만)
     capturesImage: !(mode.kind === '선수고르기' && mode.purpose === '홈런더비'),
   })
+  // 0x63b14 k 6·7·8 — 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지
+  // 키 함수(16 0x29ac8 · 17 0x29a54 · 27 0x2ac00 · 시즌 0xe2 0xe340 · 나리 145 0x1ca4c)가 [skin+0xe4] == 0 을 보고 아무것도 안 한다.
+  // 부르는 곳(0x2df20 · 0x2dec8 · 0x2dcd8 · 0xa10c · 0x15d54)이 모두 넷째 인자 1 이라 [skin+0xe8] = 1 — 애니가 돈다.
+  // ⚠️ 나리 145 · 머리띠를 안 넘긴 스페셜 27 은 웹 머리띠(`SpecialBands`)가 안 미끄러지지만 본문 · 키는 원본대로 머리띠 다섯 그림 뒤다
+  const gridOpenShape = hallOfFameGridOpenShapeOf(view.rows)
+  const entry = useListPageEntry({ grid: { shape: gridOpenShape, isAnimated: true } })
+  const { keyLock } = entry
+  const gridOpen = entry.grid
   const teamLogo = current.kind === '찬칸' && (slot === NARI_PITCHER_SLOT || slot === NARI_BATTER_SLOT) && current.figure !== null
     ? current.figure.team : null
 
@@ -578,6 +589,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
     if (notice !== null || popup !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       event.stopImmediatePropagation()
+      if (keyLock.current) return
       if (isBubbleOpen) {
         if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
           event.preventDefault()
@@ -655,6 +667,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   return (
     <RawScreen>
       <SkinBackdrop kind={backdrop ?? (mode.kind === '등록' ? '공무늬' : '메뉴바탕')} />
+      {gridOpen !== null && (<>
       {/*
         A 자리 — 빈 칸·잠긴 칸(0x5ea18 이 0, 0x6535a~)만 원 두 개 (A−38 지름 77 · A−31 지름 63) 를 깐다.
         찬 칸(0x6522e~)은 원 없이 나리 칸(0·5)이면 team_logo 프레임 [그림+0x30](= 팀) 을 A 가운데(0x65554~0x65598),
@@ -756,6 +769,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       {slots.map((entry, index) => {
         if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
         const box = hallOfFameCellOf(index - view.firstSlot)
+        const dy = gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot)
         return (
           <button
             key={index}
@@ -768,17 +782,21 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
             data-state={entry.state}
             style={{
               left: box.x - HALL_OF_FAME_GRID.backingInset,
-              top: box.y - HALL_OF_FAME_GRID.backingInset,
+              top: box.y + dy - HALL_OF_FAME_GRID.backingInset,
               width: box.width + HALL_OF_FAME_GRID.backingInset,
               height: box.height + HALL_OF_FAME_GRID.backingInset,
               background: HALL_OF_FAME_GRID.backingColor,
               borderRadius: HALL_OF_FAME_GRID.cornerRadius,
+              // 커서는 열림 애니가 끝난 뒤([격자+9])에만 0x7b3a0 이 그린다
+              ...(gridOpen.state.isDone ? {} : { outline: 'none' }),
             }}
             onMouseEnter={() => setSlot(index)}
             onClick={() => { setSlot(index); pressSlot(index) }}
           />
         )
       })}
+
+      </>)}
 
       {/* 말풍선 (0x65866) — 판 76×36 #2E4694 + 흰 테, 칸 두 개 70×14 #213473 */}
       {isBubbleOpen && (
@@ -863,6 +881,14 @@ function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoin
     </svg>
   )
 }
+
+/**
+ * 격자 열림 애니의 꼴 — `0x79ed5(격자, 종류, 120, H/2 + dy, 표, 40, 5열, 줄, 0, 0, 1)`(0x651ae~0x651d8: 가로 · 세로틈 r5 = 0,
+ * 가속 시프트 1) · 시작 `0x7a005(격자, [skin+0xe8], 1, 0)`(0x651dc~0x651ea).
+ */
+const hallOfFameGridOpenShapeOf = (rows: number): GridOpenShape => ({
+  rows, columns: HALL_OF_FAME_GRID.columns, rowHeight: HALL_OF_FAME_GRID.rowHeight, rowGap: HALL_OF_FAME_GRID.verticalGap, shift: 1,
+})
 
 /** 팀 도형과 같은 채움 불투명도 0xb4 (TeamSelectScreen) */
 const CHART_FILL_ALPHA = 0xb4 / 0xff

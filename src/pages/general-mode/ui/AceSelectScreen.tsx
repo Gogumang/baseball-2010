@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
+import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
+import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
 import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
@@ -11,7 +11,7 @@ import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/li
 import { ACE_LEVEL_UP_TEXT, aceLevelOf, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
 import { AceLevelUpWindow } from '@/widgets/ace-level-up/ui/AceLevelUpWindow'
 import {
-  ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf, isAceCellDimmed, isAceGridCursorOn,
+  ACE_GRID_OPEN, ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf, isAceCellDimmed, isAceGridCursorOn,
 } from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
@@ -164,11 +164,22 @@ export function AceSelectScreen({
   // 0x7b408~0x7b42e — for i in 0..9: 전역 +0x30 + i == 0 이면 그만, 다 켜졌으면 0x62368(ui, 12, 0)
   const isEveryAceOpen = Array.from({ length: ACE_PER_ROLE }, (_unused, index) => index)
     .every((index) => openedAcePitcherIds.includes(index) && openedAceBatterIds.includes(index))
+  // 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지 키 함수가
+  // [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useListPageEntry`). 마선수 격자는 시작 0x7a005(격자, 1, 1, 1)이라 애니가 늘 돈다(0x64834)
+  const entry = useListPageEntry({ grid: { shape: ACE_GRID_OPEN, isAnimated: true } })
+  const { keyLock } = entry
+  const gridOpen = entry.grid
+  // 격자 커서 깜빡임 [격자+0x18] — 시작 0x7a005 가 0 으로 두고(0x7a01e) 그릴 때마다 끝에서 +1(0x7b490) → 본문 몇째 그림인가와 같다.
+  // 커서 칸 그리기 0x7b3a0 은 열림 애니가 끝났고([격자+9]) 깜빡임이 켜졌을 때만 돈다(0x7b3a2 · 0x7b3c6)
+  const isGridCursorOn = gridOpen !== null && gridOpen.state.isDone && isAceGridCursorOn(gridOpen.blink)
+
   const onAllAcesOpenRef = useRef(onAllAcesOpen)
   onAllAcesOpenRef.current = onAllAcesOpen
+  // 0x7b408 은 커서 칸 그리기(종류 7) 안이라 커서가 그려지는 그림에서만 돈다
+  const isEveryAceOpenSeen = isEveryAceOpen && isGridCursorOn
   useEffect(() => {
-    if (isEveryAceOpen) onAllAcesOpenRef.current?.()
-  }, [isEveryAceOpen])
+    if (isEveryAceOpenSeen) onAllAcesOpenRef.current?.()
+  }, [isEveryAceOpenSeen])
 
   const isCellOpen = (cell: number) =>
     aceRoleOfCell(cell) === ACE_PHASE.마투수
@@ -221,8 +232,6 @@ export function AceSelectScreen({
     onOpenAce(cell)
   }
 
-  // 머리띠가 미끄러지는 동안 키 함수가 [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useFrameSlideKeyLock`)
-  const keyLock = useFrameSlideKeyLock()
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (keyLock.current) return
@@ -267,14 +276,13 @@ export function AceSelectScreen({
 
   const { anchorA, anchorB } = ACE_LAYOUT
   const cursorPlayer = acePlayerOfCell(cursor)
-  // 격자 커서 깜빡임 [격자+0x18] (그릴 때마다 +1) — ⚠️ 시작 값 미확인, 웹은 화면을 띄운 뒤 갱신 수 + 1
-  const isGridCursorOn = isAceGridCursorOn(useUpdateCounter() + 1)
   const isCursorOpen = isCellOpen(cursor)
   const cursorLevel = aceLevelOf(levels, cursor)
 
   return (
     <RawScreen>
       {underlay}
+      {gridOpen !== null && (<>
       {/*
         ⚠️ **A 딱지는 그리지 않는다 — 원본도 마선수 고르기(k 2·11)에서는 안 그린다.**
         공용 목록 0x63b15 는 A 딱지 플래그 `[sp+0xb4]` 를 기본 1 로 두는데(0x63cea `movs r2,#1`
@@ -335,7 +343,8 @@ export function AceSelectScreen({
         커서는 깜빡일 때 slt_frame 이미지 1 을 (x − 2, y − 2) (prepareLayout `ACE_LAYOUT.cellBack` 머리말)
       */}
       {Array.from({ length: cellCount }, (_unused, cell) => {
-        const { x, y } = aceCellPositionOf(cell)
+        const { x } = aceCellPositionOf(cell)
+        const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell)
         const back = ACE_LAYOUT.cellBack
         return (
           <span key={`back-${cell}`}>
@@ -350,7 +359,8 @@ export function AceSelectScreen({
         )
       })}
       {Array.from({ length: cellCount }, (_unused, cell) => {
-        const { x, y } = aceCellPositionOf(cell)
+        const { x } = aceCellPositionOf(cell)
+        const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell)
         const player = acePlayerOfCell(cell)
         const open = isCellOpen(cell)
         // [skin+0x105](레벨업 화면)이면 흐리지 않는다 — ⚠️ 코치채용(종류 8)도 흐리지 않는 것으로 둔다(미확인)
@@ -382,6 +392,8 @@ export function AceSelectScreen({
         <img className={styles.layer} alt="" data-testid="마선수-커서" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cursor.image)}
           style={{ left: aceCellPositionOf(cursor).x + ACE_LAYOUT.cursor.dx, top: aceCellPositionOf(cursor).y + ACE_LAYOUT.cursor.dy }} />
       )}
+
+      </>)}
 
       {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 머리띠를 가리던 것을 제자리로 옮겼다 */}
       <div className={styles.hintLine}>
