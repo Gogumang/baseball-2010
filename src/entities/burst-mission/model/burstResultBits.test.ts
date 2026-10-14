@@ -24,7 +24,7 @@ describe('결과비트 값 (타석 결과 +0x188)', () => {
 })
 
 describe('타석 결과 → 결과비트', () => {
-  it('진루 수에 따라 홈런·2루타·3루타·단타 비트가 하나만 켜진다 (0xa87b6)', () => {
+  it('진루 수에 따라 2루타·3루타·단타 비트가 갈린다 (0xa87b6)', () => {
     const 기본 = { runsBattedIn: 0, outsBefore: 0, outsAdded: 0 }
 
     expect(hasBit(burstResultBitsOf({ ...기본, outcome: 홈런 }), B.홈런)).toBe(true)
@@ -32,6 +32,19 @@ describe('타석 결과 → 결과비트', () => {
     expect(hasBit(burstResultBitsOf({ ...기본, outcome: 삼루타 }), B['3루타'])).toBe(true)
     expect(hasBit(burstResultBitsOf({ ...기본, outcome: 단타 }), B.단타)).toBe(true)
     expect(hasBit(burstResultBitsOf({ ...기본, outcome: 이루타 }), B.단타)).toBe(false)
+  })
+
+  it('홈런은 루타 4 라 a87b2 의 "그 밖" 으로 B3 도 켠다 — 홈런 갈래(a86ae)의 B0 과 함께', () => {
+    const 기본 = { runsBattedIn: 0, outsBefore: 0, outsAdded: 0 }
+
+    expect(burstResultBitsOf({ ...기본, outcome: 홈런 }) & (B.홈런 | B.단타)).toBe(B.홈런 | B.단타)
+  })
+
+  it('타자 게이트가 거짓인 장내 홈런(a84d6 — 홈런 갈래를 건너뜀)은 B0 없이 B3 만 켠다', () => {
+    const bits = burstResultBitsOf({ outcome: 홈런, runsBattedIn: 1, outsBefore: 0, outsAdded: 0, homeRunCounted: false })
+
+    expect(hasBit(bits, B.홈런)).toBe(false)
+    expect(hasBit(bits, B.단타)).toBe(true)
   })
 
   it('점수가 들어오면 B4(타점)가 켜진다 (0xa89c4)', () => {

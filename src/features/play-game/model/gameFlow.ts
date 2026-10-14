@@ -859,7 +859,15 @@ export function resolveDefensePlay(
   progress: GameProgress,
   result: DefensePlayResult,
   random: RandomPort,
-  options: { readonly foulRecordIds?: readonly number[] } = {},
+  options: {
+    readonly foulRecordIds?: readonly number[]
+    /**
+     * 정산 0xa8024 의 타자 게이트 [sp+0x34] = 0xa56dc(R, 지금 타자, 0)(a8070) — 나리 타자편은 국가대항전 · 포스트시즌이면 거짓
+     * (`recordMyBuntAttempt` 와 같은 답 — 사건 코드 ≤ 0x13 의 게이트 0xa56dc(R, 타자, 1)도 같은 모드 갈래다). 안 넘기면 참.
+     * 거짓이면 장내 홈런은 홈런 갈래를 건너뛰고(`finishPlayerOutcome`) 번트 안타 G+0xf4 도 안 센다
+     */
+    readonly isRecorded?: boolean
+  } = {},
 ): GameProgress {
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
@@ -878,6 +886,7 @@ export function resolveDefensePlay(
     random,
     result,
     null,
+    { isRecorded: options.isRecorded },
   )
 }
 
@@ -1004,6 +1013,8 @@ function finishPlayerOutcome(
    * **실시간으로 이미 다 보여 준 플레이는 null** — 넣으면 같은 장면을 한 번 더 튼다.
    */
   playback: DefensePlayResult | null,
+  /** 타자 게이트 [sp+0x34] (`resolveDefensePlay` 의 `isRecorded`). 안 넘기면 참 */
+  options: { readonly isRecorded?: boolean } = {},
 ): GameProgress {
   // 수비 진행기를 돈 판이면 살아남은 주자로 신원을 앉힌다
   const nextGame = applyAtBatOutcome(
@@ -1026,19 +1037,28 @@ function finishPlayerOutcome(
     hadSecondBaseRunner: progress.game.bases.second,
   })
 
+  // 타자 게이트 [sp+0x34] — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay`)
+  const isRecorded = options.isRecorded !== false
+  // 홈런 수 [sp+0x24] > 0 — 담장을 넘긴 사건 8 은 게이트 없이 센다(a80a8). 장내 홈런 state[0x25] 는 a84d6 이 [sp+0x34] 가
+  // 참일 때만 더해, 거짓이면 루타 4 안타로만 적히고 홈런 갈래 a85be~a86b4(레코드 홈런 · 기록 1~4 · 백투백 0xa794c · B0)와
+  // a8728 의 타순 칸 홈런 +0x13 · 0xa7b00(12~14)을 건너뛴다. 결과 링은 루타 4(a8704) 그대로라 사이클 · 뒤 타석의 한 타자
+  // 홈런 셈(링 코드 4)에는 든다 — 이 경기 기록(`myStats`)의 홈런도 그대로 센다(포스트시즌 레코드 줄은 `withoutRecordLine` 이 뺀다)
+  const homeRunCounted = outcome.kind === '홈런' && !(defensePlay?.groundHomeRun === true && !isRecorded)
   // 기록 판정은 동료 타석과 같은 함수를 쓴다 — 원본은 기록을 팀 단위로 센다 (0xa77f0)
   const recorded = recordBatterAtBat(
     { stats: progress.myStats, consecutiveHits: progress.consecutiveHits },
     outcome,
     runsBattedIn,
+    { homeRunCounted },
   )
   const myStats = recorded.log.stats
   const consecutiveHits = recorded.log.consecutiveHits
-  // 백투백 6·7 — 정산 0xa8024 의 홈런 갈래(@a8606)가 0xa794c 를 부른다. 공격 팀이 사람 팀(우리)이다
+  // 백투백 6·7 — 정산 0xa8024 의 홈런 갈래(@a8606)가 0xa794c 를 부른다. 공격 팀이 사람 팀(우리)이다.
+  // 홈런 갈래를 건너뛴 장내 홈런은 안타 갈래 a86b4 가 ctx+0x162 를 0 으로 둔다
   const backToBack = backToBackRecordOf({
     streak: progress.homeRunStreak,
     humanOffense: true,
-    isHomeRun: outcome.kind === '홈런',
+    isHomeRun: homeRunCounted,
   })
   const recordIds = [...recorded.recordIds, ...backToBack.recordIds]
 
@@ -1063,6 +1083,7 @@ function finishPlayerOutcome(
             // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8). ⚠️ B7(a88fc 고리)은 아직 안 싣는다
             isBunt: defensePlay?.buntBall === true,
             runnersAdvanced: defensePlay?.sacrifice === true,
+            homeRunCounted,
           }),
         )
 
@@ -1085,7 +1106,7 @@ function finishPlayerOutcome(
         progress.opponentInningRunsAllowed + runsBattedIn,
       ),
       // 내 타석도 같은 정산 0xa8024 가 타순 칸 기록(안타·홈런·타석)을 세운다
-      ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome),
+      ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome, { homeRunCounted }),
       // 같은 정산이 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진을 쌓는다 (0xa8cca · 0xa8ee4 · 0xa8d1c)
       pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
         outs: outsAddedBetween(progress.game, nextGame),
@@ -1112,6 +1133,9 @@ function finishPlayerOutcome(
         isWalkOff,
         ourScoreBefore: progress.game.ourScore,
         opponentScore: progress.game.opponentScore,
+        // a8506 — 안타 갈래([sp+0x14])이고 번트 타구(state[0x13] — 판 입력의 번트 종류)면 코드 10 → G+0xf4.
+        // 0xa57f8 의 게이트 0xa56dc(R, 타자, 1)가 거짓(포스트시즌 · 국가대항전)이면 안 센다
+        isBuntHit: isRecorded && defensePlay?.buntBall === true && (outcome.kind === '안타' || outcome.kind === '홈런'),
       }),
     },
     `${progress.game.inning}회${progress.game.half} 나 — ${describeOutcome(outcome)}${
@@ -1388,7 +1412,7 @@ function moundAcePitcherOf(progress: GameProgress, isOurs: boolean): GameAcePitc
  * 타석 하나로 r 점이 들어오면 내 점수가 `before+1 … before+r` 로 차례로 오르므로, 그 구간에
  * 상대 점수가 걸리는지만 보면 같은 결과가 된다.
  *
- * 번트 안타(G+0xf4)는 웹에 번트가 없어 늘 0 이다.
+ * 번트 안타(G+0xf4)는 정산 a8506 — 안타 갈래 안에서 번트 타구(state[0x13])일 때 코드 10 (`isBuntHit`).
  */
 function addReputationCounts(
   counts: ReputationCounts,
@@ -1398,6 +1422,8 @@ function addReputationCounts(
     isWalkOff: boolean
     ourScoreBefore: number
     opponentScore: number
+    /** 번트 안타 — 코드 10(a8506)을 부르는 판 (`finishPlayerOutcome`). 안 넘기면 거짓 */
+    isBuntHit?: boolean
   },
 ): ReputationCounts {
   const { outcome, runsBattedIn, isWalkOff, ourScoreBefore, opponentScore } = play
@@ -1415,7 +1441,7 @@ function addReputationCounts(
     homeRunStreaksOfThree: (counts.homeRunStreaksOfThree ?? 0) + (reached === 3 ? 1 : 0),
     grandSlams: counts.grandSlams + (outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS ? 1 : 0),
     walkOffs: counts.walkOffs + (isWalkOff && isHit ? 1 : 0),
-    buntHits: counts.buntHits,
+    buntHits: counts.buntHits + (play.isBuntHit === true ? 1 : 0),
     ...(counts.bunts === undefined ? {} : { bunts: counts.bunts }),
     // G+0xfc 는 볼넷만이다 — 사구 갈래(0xa8b90)는 코드 13 으로 G+0x100 을 올리고, 평판식은 0xfc 만 읽는다
     walks: counts.walks + (outcome.kind === '볼넷' ? 1 : 0),
