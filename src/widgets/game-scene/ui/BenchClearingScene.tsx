@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { type MutableRefObject, useEffect, useRef } from 'react'
 import { Button, RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -35,6 +35,11 @@ interface BenchClearingSceneProps {
    * (`random` 을 안 넘긴 경우) — 진행기 `resolveBenchClearing` 이 그 굴림을 대신 낸다. `random` 을 넘기면 늘 거짓이다.
    */
   readonly onDone: (reachedTargetTick: boolean) => void
+  /**
+   * 그린 틱의 18명 상태를 적어 두는 칸 — 연출이 끝나면 부르는 쪽이 수비 줄 자리를 다음 장면(교대 판)으로 넘긴다(`lib/fieldCarry`).
+   * `onDone` 앞에 마지막 그림의 상태가 들어 있다
+   */
+  readonly walkStateRef?: MutableRefObject<BenchClearingWalkState | null>
 }
 
 /**
@@ -50,7 +55,7 @@ interface BenchClearingSceneProps {
  * 0x6e418 은 울리는 소리를 가리지 않고 끊는다(`SoundPort.stop`) — 44 가 아직 울리면 그것을 끊는다.
  * 확인 단추는 웹 전용이다(원본은 OK 키).
  */
-export function BenchClearingScene({ field, random, onDone }: BenchClearingSceneProps) {
+export function BenchClearingScene({ field, random, onDone, walkStateRef }: BenchClearingSceneProps) {
   const reachedRef = useRef(false)
   const targetRollsRef = useRef<readonly number[] | null>(null)
   const doneRef = useRef(false)
@@ -97,6 +102,7 @@ export function BenchClearingScene({ field, random, onDone }: BenchClearingScene
   }, [])
 
   const walk = useBenchClearingWalk(field, tick, targetRollsRef.current)
+  if (walkStateRef !== undefined && walk !== null) walkStateRef.current = walk
   const iris = benchClearingIrisOf(tick)
   return (
     <RawScreen>
@@ -106,9 +112,9 @@ export function BenchClearingScene({ field, random, onDone }: BenchClearingScene
           grassPalette={field.grassPalette ?? null}
           rows={[
             // 43240 0x43010(장면, [+0xf20], +0x111c, 0) — 수비 줄
-            { walkers: walk.fielders, teamIndex: field.defenseTeam ?? null },
+            { walkers: walk.fielders, teamIndex: field.defenseTeam ?? null, ...(field.defenseAces === undefined ? {} : { aceSprites: field.defenseAces }) },
             // 43252 0x43010(장면, [+0x177c], +0x1758, 1) — 공격 줄
-            { walkers: walk.offense, teamIndex: field.offenseTeam ?? null },
+            { walkers: walk.offense, teamIndex: field.offenseTeam ?? null, ...(field.offenseAces === undefined ? {} : { aceSprites: field.offenseAces }) },
           ]}
         />
       )}

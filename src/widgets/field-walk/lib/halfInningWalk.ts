@@ -95,18 +95,20 @@ export interface HalfInningWalkInput {
   /** st[9] — 이번 반 이닝 공격 측 (0 초 · 1 말) */
   readonly offenseSide: 0 | 1
   /**
-   * 판이 서기 전 수비 줄의 자리. null 이면 아직 한 번도 안 선 것 — 생성자 그대로 (0, 0, 0)이다(경기 첫 판).
-   * ⚠️ 미확인 근사: 원본은 앞 판(0x17)이 끝난 자리 그대로인데 웹은 그 자리를 들고 있지 않다 — 부르는 쪽은 수비 시작 자리를 넘긴다.
+   * 판이 서기 전 수비 줄(+0x111c)의 자리 — 앞 장면이 남긴 그대로(`lib/fieldCarry`: 0x17 이 끝난 자리 · 앞 판이 닫힌 틱 · 벤치 클리어링).
+   * null 이면 아직 한 번도 안 선 것 — 생성자 그대로 (0, 0, 0)이다(경기 첫 판). 높이 y 는 합 검사에만 든다.
    */
-  readonly previousFielders: readonly { readonly x: number; readonly z: number }[] | null
+  readonly previousFielders: readonly { readonly x: number; readonly y?: number; readonly z: number }[] | null
   /**
-   * 판이 서기 전 카메라 왼쪽 위. 경기 첫 판(야수 자리 0)은 0x3fac4 가 더그아웃으로 곧바로 옮기므로 안 본다.
-   * ⚠️ 미확인 근사: 원본은 앞 판(0x17)의 카메라 그대로다 — 안 주면 이 판의 목표(투수판)에서 시작한다.
+   * 판이 서기 전 카메라 왼쪽 위 — 앞 장면이 남긴 그대로(`lib/fieldCarry`). 자리 합이 0 인 칸이 있으면 0x3fac4 가 더그아웃으로 곧바로
+   * 옮기므로 안 본다. 안 주면(부르는 쪽이 카메라를 안 들고 있을 때) 이 판의 목표(투수판)에서 시작한다.
    */
   readonly previousCamera?: CameraState | null
 }
 
-const isZeroPoint = (point: { readonly x: number; readonly z: number }) => point.x + point.z === 0
+/** 3fb7c~3fba4 — O(= F 의 지금 자리) 의 x + y + z == 0 */
+const isZeroPoint = (point: { readonly x: number; readonly y?: number; readonly z: number }) =>
+  point.x + (point.y ?? 0) + point.z === 0
 
 /** 0x3fac4 — 판 틱 0 의 세우기 (그 틱의 0x4f7ac 앞) */
 export function startHalfInningWalk(input: HalfInningWalkInput): HalfInningWalkState {
@@ -119,8 +121,8 @@ export function startHalfInningWalk(input: HalfInningWalkInput): HalfInningWalkS
   let camera: CameraState | null = input.previousCamera ?? null
   for (let index = FIELDER_COUNT - 1; index >= 0; index -= 1) {
     const roll = input.rolls[index] ?? { offenseSpeed: 0, scatterX: 0, scatterZ: 0, fielderSpeed: 0 }
-    const previous = input.previousFielders?.[index] ?? { x: 0, z: 0 }
-    let walker = placeWalker(standWalker(NEW_FIELD_WALKER), previous)
+    const previous = input.previousFielders?.[index] ?? { x: 0, y: 0, z: 0 }
+    let walker = placeWalker(standWalker(NEW_FIELD_WALKER), { x: previous.x, z: previous.z })
     if (!isZeroPoint(previous)) {
       walker = aimWalker(walker, offenseDugout)
     } else {
@@ -134,7 +136,7 @@ export function startHalfInningWalk(input: HalfInningWalkInput): HalfInningWalkS
       z: defenseDugout.z - (roll.scatterZ + 100) * back,
     }
     const home = FIELDER_START_POSITIONS[index]
-    const fielder = aimWalker(placeWalker(standWalker({ ...NEW_FIELD_WALKER, ...previous }), start), home)
+    const fielder = aimWalker(placeWalker(standWalker({ ...NEW_FIELD_WALKER, x: previous.x, z: previous.z }), start), home)
     fielders[index] = setWalkerSpeed(fielder, roll.fielderSpeed)
   }
   const cameraTarget = centerOn(BOUNDS, { x: plate.x, z: plate.z - CAMERA_Z_LIFT })

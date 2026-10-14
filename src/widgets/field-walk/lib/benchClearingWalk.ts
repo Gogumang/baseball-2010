@@ -14,6 +14,7 @@ import {
   stepWalker,
 } from '@/widgets/field-walk/lib/fieldWalker'
 import { DUGOUT_POSITIONS } from '@/widgets/field-walk/lib/halfInningWalk'
+import type { WalkerAceSprite } from '@/widgets/field-walk/lib/walkerAces'
 
 /**
  * **벤치 클리어링(상태 0x1e)의 운동장** — 진입 0x3a5f0 이 18명을 세우고, 갱신 0x405b0 이 걷게 하고 0x401d4 가 틱마다 목표 · 동작을 준다.
@@ -77,6 +78,9 @@ export interface BenchClearingField extends BenchClearingWalkInput {
   readonly offenseTeam?: number | null
   /** 수비 바탕 잔디 팔레트 줄 */
   readonly grassPalette?: number | null
+  /** 수비 줄 · 공격 줄 칸별 마선수 그림 (0x79b48 a · b — `benchClearingFieldOf`). 안 주면 보통 그림 */
+  readonly defenseAces?: readonly (WalkerAceSprite | null)[]
+  readonly offenseAces?: readonly (WalkerAceSprite | null)[]
 }
 
 export interface BenchClearingWalkState {

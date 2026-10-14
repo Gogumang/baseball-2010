@@ -50,7 +50,8 @@ import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
-import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
+import { missionFielderPlatesOf } from '@/entities/mission/model/missionRunners'
 import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 
 /*
@@ -481,16 +482,22 @@ function missionOverlayOf(
         }}
         scoreboardSides={boardSides}
         cards={boardCards}
-        // 운동장 전경 0x4fb8c — 미션 판은 장면의 첫 판뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래). 팀은 두 측 그대로
+        // 운동장 전경 0x4fb8c — 미션 판은 장면의 첫 판뿐이라(상태 8 끝 48bf0 이 곧장 보낸다) 장면이 수비 줄 · 카메라를 아직 안 옮겼다
+        // (`carry` 없음 = 0x3fac4 의 자리 합 0 갈래). 팀은 두 측 그대로
         field={halfInningFieldOf({
           rolls: board.fielderRolls,
           half: board.half,
-          isFirstBoard: true,
+          carry: null,
           playerSide: 0,
           ourTeamId: boardSides[0].team,
           opponentTeamId: boardSides[1].team,
-          // ⚠️ 미확인: 미션 팀은 칸별 선수 위치를 웹이 안 들어 투수 이름표만 단다
-          fielderNames: fielderNamesByPosition(boardCards.pitcherName, null),
+          // 이름표 — 칸 0 은 수비 팀 지금 투수, 1~8 은 0x40008: 수비 팀 레코드 차례에서 자리 니블이 칸 + 1 인 첫 레코드 — 판 시작 0xb0fb4 와
+          // 같은 훑기라 수비 판 이름 판의 야수(`missionFielderPlatesOf`, 대타 니블 맞바꿈까지)를 그대로 쓴다.
+          // ⚠️ 미확인: 미션 팀의 마선수 그림(0x79b48 a · b)은 아직 안 넘긴다 — 보통 그림
+          fielderNames: [
+            boardCards.pitcherName,
+            ...missionFielderPlatesOf(playingRun).slice(1).map((plate) => plate?.name ?? null),
+          ],
         })}
         onConfirm={actions.confirmHalfInningBoard}
       />

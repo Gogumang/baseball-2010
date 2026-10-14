@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { type MutableRefObject, useRef } from 'react'
 import { screenOffsetOf, toScreenX, toScreenY } from '@/pages/defense/lib/defenseCamera'
 import {
   type HalfInningWalkInput,
@@ -8,6 +8,7 @@ import {
   stepHalfInningWalk,
 } from '@/widgets/field-walk/lib/halfInningWalk'
 import { nameTagBoxOf, nameTagPiecesOf } from '@/widgets/field-walk/lib/nameTag'
+import type { WalkerAceSprite } from '@/widgets/field-walk/lib/walkerAces'
 import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import * as styles from '@/widgets/field-walk/ui/FieldWalkView.css'
 
@@ -26,6 +27,15 @@ export interface HalfInningFieldProps {
    * (원본도 선수가 없으면 안 그린다). 안 주면 이름표가 없다.
    */
   readonly fielderNames?: readonly (string | null)[]
+  /** 수비 줄 칸별 마선수 그림 (0x79b48 a · b — `lib/walkerAces`). 안 주면 보통 그림 */
+  readonly defenseAces?: readonly (WalkerAceSprite | null)[]
+  /** 공격 줄 칸별 마선수 그림 */
+  readonly offenseAces?: readonly (WalkerAceSprite | null)[]
+  /**
+   * 그린 틱의 걸음 상태를 적어 두는 칸 — 판이 OK 로 닫힐 때 부르는 쪽이 이 자리 · 카메라를 다음 장면으로 넘긴다(`lib/fieldCarry`).
+   * 원본은 같은 야수 · 카메라 객체가 경기 내내 산다.
+   */
+  readonly walkStateRef?: MutableRefObject<HalfInningWalkState | null>
 }
 
 /**
@@ -33,18 +43,22 @@ export interface HalfInningFieldProps {
  * 수비 줄(새 수비)이 더그아웃에서 제자리로 걷고, 공격 줄(앞 반 이닝 수비)이 더그아웃으로 들어가며, 틱 100 뒤 카메라가 야수를 하나씩
  * 비추며 그 선수 이름표를 단다. 모드 0 · 자동진행(+0x1784) · 경기 끝이면 원본도 안 그린다 — 부르는 쪽이 판을 세울 때만 쓴다.
  */
-export function HalfInningField({ input, tick, defenseTeam = null, offenseTeam = null, grassPalette = null, fielderNames }: HalfInningFieldProps) {
+export function HalfInningField({
+  input, tick, defenseTeam = null, offenseTeam = null, grassPalette = null, fielderNames, defenseAces, offenseAces, walkStateRef,
+}: HalfInningFieldProps) {
   const memory = useRef<{ readonly input: HalfInningWalkInput; readonly tick: number; readonly state: HalfInningWalkState } | null>(null)
   let current = memory.current
   // 판 재료가 같으면(굴림 · 측 · 앞 자리) 이어서 굴린다 — 부르는 쪽이 그림마다 새 꼴을 만들어도 처음부터 다시 돌지 않는다
   const isSameInput = current !== null && current.input.rolls === input.rolls
     && current.input.offenseSide === input.offenseSide && current.input.previousFielders === input.previousFielders
+    && current.input.previousCamera === input.previousCamera
   if (current === null || !isSameInput || current.tick > tick) {
     current = { input, tick: -1, state: startHalfInningWalk(input) }
   }
   let { state } = current
   for (let t = current.tick + 1; t <= tick; t += 1) state = stepHalfInningWalk(state, t)
   memory.current = { input, tick: Math.max(tick, current.tick), state }
+  if (walkStateRef !== undefined) walkStateRef.current = state
 
   const offset = screenOffsetOf(state.camera)
   const tagSlot = halfInningNameTagSlotOf(state, tick)
@@ -60,9 +74,9 @@ export function HalfInningField({ input, tick, defenseTeam = null, offenseTeam =
       grassPalette={grassPalette}
       rows={[
         // 4fbd2 0x43010(장면, [+0x177c], +0x111c, 0) — 수비 줄
-        { walkers: state.fielders, teamIndex: defenseTeam },
+        { walkers: state.fielders, teamIndex: defenseTeam, ...(defenseAces === undefined ? {} : { aceSprites: defenseAces }) },
         // 4fbea 0x43010(장면, [+0xf20], +0x1758, 1) — 공격 줄
-        { walkers: state.offense, teamIndex: offenseTeam },
+        { walkers: state.offense, teamIndex: offenseTeam, ...(offenseAces === undefined ? {} : { aceSprites: offenseAces }) },
       ]}
     >
       {tagBox !== null && (

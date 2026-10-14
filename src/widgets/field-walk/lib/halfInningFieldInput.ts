@@ -1,6 +1,8 @@
-import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
+import type { MutableRefObject } from 'react'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
-import type { HalfInningWalkInput } from '@/widgets/field-walk/lib/halfInningWalk'
+import type { FieldCarry } from '@/widgets/field-walk/lib/fieldCarry'
+import type { HalfInningWalkInput, HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
+import { type WalkTeamAces, walkAceSpritesOf } from '@/widgets/field-walk/lib/walkerAces'
 
 /** 수비 칸 수 */
 const FIELDER_COUNT = 9
@@ -11,10 +13,10 @@ export interface HalfInningFieldSource {
   /** 판이 서는 반 이닝 — 초면 측 0 공격 */
   readonly half: '초' | '말'
   /**
-   * 이 경기 장면에서 수비 줄이 한 번도 안 섰나 — 0x3fac4 의 "자리 합 0" 갈래(카메라를 더그아웃에 곧바로, 앞 수비는 안 걷는다).
-   * 경기 첫 판이 그렇다(판도 플레이 0x17 도 없었다). ⚠️ 근사: 부르는 쪽은 "이 장면의 첫 판" 으로 가른다.
+   * 판이 서기 전 수비 줄 자리 · 카메라 — 앞 장면이 남긴 그대로(`lib/fieldCarry`). null · 안 줌이면 경기 장면을 세운 뒤 아무도 안 옮긴
+   * 것(자리 (0, 0, 0)) — 0x3fac4 의 "자리 합 0" 갈래(카메라를 더그아웃에 곧바로, 앞 수비는 안 걷는다)다.
    */
-  readonly isFirstBoard: boolean
+  readonly carry?: FieldCarry | null
   /** 사람 측(st[0x31 + 측] == 0) · 두 팀 번호 — 그림 팔레트 */
   readonly playerSide: number
   readonly ourTeamId: number
@@ -22,6 +24,11 @@ export interface HalfInningFieldSource {
   readonly grassPalette?: number | null
   /** 수비 칸별 이름표 이름 (칸 0 = 지금 투수) — `fielderNamesByPosition` */
   readonly fielderNames?: readonly (string | null)[]
+  /** 수비 팀 · 공격 팀의 마선수 재료 (0x79b48 a · b — `lib/walkerAces`). 안 주면 보통 그림 */
+  readonly defenseAces?: WalkTeamAces | null
+  readonly offenseAces?: WalkTeamAces | null
+  /** 그린 틱의 걸음 상태를 적어 둘 칸 — 판이 닫힐 때 `fieldCarryAfterHalfInning` 으로 넘긴다 */
+  readonly walkStateRef?: MutableRefObject<HalfInningWalkState | null>
 }
 
 /** 판 하나의 운동장 전경 재료 — `HalfInningBoard.field` */
@@ -29,11 +36,12 @@ export function halfInningFieldOf(source: HalfInningFieldSource) {
   if (source.rolls === undefined) return undefined
   const offenseSide: 0 | 1 = source.half === '초' ? 0 : 1
   const teamOf = (side: number) => (side === source.playerSide ? source.ourTeamId : source.opponentTeamId)
+  const carry = source.carry ?? null
   const input: HalfInningWalkInput = {
     rolls: source.rolls,
     offenseSide,
-    // ⚠️ 미확인 근사: 경기 첫 판이 아니면 원본은 앞 판(0x17)이 끝난 자리 그대로다 — 웹은 수비 시작 자리 표 0xcfa8c 로 둔다
-    previousFielders: source.isFirstBoard ? null : FIELDER_START_POSITIONS,
+    previousFielders: carry === null ? null : carry.fielders,
+    ...(carry === null || carry.camera === null ? {} : { previousCamera: carry.camera }),
   }
   return {
     input,
@@ -41,12 +49,16 @@ export function halfInningFieldOf(source: HalfInningFieldSource) {
     offenseTeam: teamOf(offenseSide),
     grassPalette: source.grassPalette ?? null,
     ...(source.fielderNames === undefined ? {} : { fielderNames: source.fielderNames }),
+    ...(source.defenseAces == null ? {} : { defenseAces: walkAceSpritesOf(source.defenseAces) }),
+    ...(source.offenseAces == null ? {} : { offenseAces: walkAceSpritesOf(source.offenseAces) }),
+    ...(source.walkStateRef === undefined ? {} : { walkStateRef: source.walkStateRef }),
   }
 }
 
 /**
- * 이름표 이름 — 칸 0 은 지금 투수 이름(0xae83c), 칸 1~8 은 수비 팀에서 위치 코드(레코드 +0x1c & 0xf)가 칸 + 1 인 첫 선수(0x40008).
- * 명단을 모르면 그 칸은 null.
+ * 이름표 이름 — 칸 0 은 지금 투수 이름(0xae83c), 칸 1~8 은 0x40008(장면, 칸): 수비 팀 `0xb8680(팀)` 의 **레코드 타자 배열**
+ * (`[T+0x18]`, 수 `[T+0x10]`)을 `0xb8a34(팀, k)` 로 차례대로 훑어 자리 니블(+0x1c & 0xf)이 칸 + 1 인 첫 레코드(40032~400a4, 직접 뜸).
+ * `lineup` 은 그 레코드 차례 그대로 넘긴다(대타 0xaebe4 가 맞바꾼 니블까지 — 각 모드의 수비 판 이름 판과 같은 훑기). 명단을 모르면 그 칸은 null.
  */
 export function fielderNamesByPosition(
   pitcherName: string | null,
@@ -54,6 +66,6 @@ export function fielderNamesByPosition(
 ): readonly (string | null)[] {
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
     if (slot === 0) return pitcherName
-    return lineup?.find((player) => player.position === slot + 1)?.name ?? null
+    return lineup?.find((player) => (player.position & 0xf) === slot + 1)?.name ?? null
   })
 }

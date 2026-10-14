@@ -1,10 +1,12 @@
 import {
   insertMyBatter,
   myBatterIndexOf,
+  nariTeamRecordOf,
+  nariTeamsOf,
   tableNariTeamRecord,
 } from '@/entities/career/model/nariTeamRecord'
-import type { NariTeamRecord } from '@/entities/career/model/nariTeamRecord'
-import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
+import type { NariTeamRecord, NariTeamRecordFields } from '@/entities/career/model/nariTeamRecord'
+import { LEAGUE_TEAM_COUNT, UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import { advanceRotation } from '@/entities/pitcher-career/model/pitcherRotation'
 
 /**
@@ -79,4 +81,18 @@ export function nariCupRecordOf(teams: NariCupTeams, teamId: number): NariTeamRe
 export function nariCupBattingOrderOf(teams: NariCupTeams): number | null {
   const index = myBatterIndexOf(teams.korea)
   return index < 0 ? null : index + 1
+}
+
+/**
+ * 경기 장면이 팀을 세우는 레코드 — `0xb8680` 모드 3 · 4 → `0x1f989` → 모드 4 `0x1f8f8` · 모드 3 `0x1f940`: 국가대항전(S+0x12c)이면 팀 10 은
+ * +0xbc4, 그 밖 팀은 +0xbe0 (대회 칸), 아니면 열 팀 레코드. 커리어가 대회 칸을 아직 안 들었으면(첫 경기 전) 마스터 복사로 본다.
+ */
+export function nariGameRecordOf(
+  career: NariTeamRecordFields & { readonly battingOrder?: number; readonly nariCupTeams?: NariCupTeams },
+  teamId: number,
+): NariTeamRecord {
+  if (teamId >= LEAGUE_TEAM_COUNT) {
+    return career.nariCupTeams === undefined ? masterCupRecordOf(teamId) : nariCupRecordOf(career.nariCupTeams, teamId)
+  }
+  return nariTeamRecordOf(nariTeamsOf(career), teamId)
 }

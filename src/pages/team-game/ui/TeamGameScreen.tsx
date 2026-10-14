@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import { Hint, MenuList, Panel, PixelScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
@@ -40,6 +41,17 @@ import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import {
+  type FieldCarry,
+  NEW_FIELD_CARRY,
+  fieldCarryAfterBenchClearing,
+  fieldCarryAfterHalfInning,
+  fieldCarryAfterPlay,
+  fieldCarryAfterRelay,
+} from '@/widgets/field-walk/lib/fieldCarry'
+import type { HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
+import type { BenchClearingWalkState } from '@/widgets/field-walk/lib/benchClearingWalk'
+import type { WalkTeamAces } from '@/widgets/field-walk/lib/walkerAces'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
@@ -274,6 +286,30 @@ export function TeamGameScreen({
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
   const finishPlayback = useCallback(() => setShownPlay(play), [play])
+  /**
+   * 장면 +0x111c 수비 줄 자리 · 카메라 +0x1e8 — 경기 내내 같은 객체라 교대 판 0x3fac4 가 앞 장면이 남긴 그대로 읽는다(`lib/fieldCarry`).
+   * 수비 화면 0x17 이 끝난 판 · 교대 판이 닫힌 틱 · 벤치 클리어링 · 자동진행 중계(카메라만)가 차례로 덮는다.
+   */
+  const fieldCarryRef = useRef<FieldCarry>(NEW_FIELD_CARRY)
+  const boardWalkRef = useRef<HalfInningWalkState | null>(null)
+  const benchWalkRef = useRef<BenchClearingWalkState | null>(null)
+  const carriedPlayRef = useRef<DefensePlayResult | null>(null)
+  const carriedRelayRef = useRef<number | null>(null)
+  // 재생 갈래 · 키 없이 돈 판(`lastDefensePlay`)은 판이 정해진 자리에서 이어 받는다 — 판마다 한 번
+  if (play !== null && play !== carriedPlayRef.current) {
+    carriedPlayRef.current = play
+    fieldCarryRef.current = fieldCarryAfterPlay(play.ticks, fieldCarryRef.current)
+  }
+  // 자동진행 중계 0x21 진입 3ac04 — 카메라만 투수판으로
+  const relaySerial = progress.autoRelay?.serial ?? null
+  if (relaySerial !== null && relaySerial !== carriedRelayRef.current) {
+    carriedRelayRef.current = relaySerial
+    fieldCarryRef.current = fieldCarryAfterRelay(fieldCarryRef.current)
+  }
+  /** 실시간으로 돈 판 — 결과를 먹이기 앞에 자리 · 카메라를 받는다 */
+  const carryLivePlay = (result: DefensePlayResult | undefined) => {
+    if (result !== undefined) fieldCarryRef.current = fieldCarryAfterPlay(result.ticks, fieldCarryRef.current)
+  }
   /** `#` 교체 화면(경기 상태 0xb)이 떠 있는가 — 수비 중이면 투수 교체, 공격 중이면 대타 */
   const [changeWindow, setChangeWindow] = useState<'투수' | '대타' | null>(null)
   const isChangingPitcher = changeWindow === '투수'
@@ -576,6 +612,8 @@ export function TeamGameScreen({
           opponentTeamId: side1Team,
           gameMode: options.mode,
         }}
+        // 라이벌전 띠 0x3b80c — 적재 상태 8 의 0xb8f68(두 팀) (표 0xd8a90 의 짝)
+        isRivalry={isRivalryMatch(side0Team, side1Team)}
         onDone={() => setIntroDone(true)}
       />
     )
@@ -681,7 +719,10 @@ export function TeamGameScreen({
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
-        onDone={actions.finishDefensePlay}
+        onDone={(result) => {
+          carryLivePlay(result)
+          actions.finishDefensePlay(result)
+        }}
       />
     )
   }
@@ -696,7 +737,10 @@ export function TeamGameScreen({
         runnerPlay={runnerPlay}
         grassPalette={fieldPalette}
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
-        onDone={actions.finishRunnerPlay}
+        onDone={(result) => {
+          carryLivePlay(result)
+          actions.finishRunnerPlay(result)
+        }}
       />
     )
   }
@@ -729,10 +773,23 @@ export function TeamGameScreen({
           batterHand: matchup.batterHand,
           bases: progress.game.bases,
           grassPalette: fieldPalette,
+          // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (명단 차례로 본다 — 아래 `teamWalkAcesOf`)
+          defenseAces: teamWalkAcesOf(progress, !isOurOffense(progress)),
+          offenseAces: {
+            ...teamWalkAcesOf(progress, isOurOffense(progress)),
+            batter: benchClearingBatterOf(progress),
+            // ⚠️ 근사: 3aa1a 의 마선수 주자(+0x9c) 맞바꿈 — 웹 루상이 주자 +0x9c 를 안 든다
+            aceRunnerBases: [false, false, false],
+          },
         })}
+        walkStateRef={benchWalkRef}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={random}
-        onDone={actions.finishBenchClearing}
+        onDone={(reachedTargetTick) => {
+          if (benchWalkRef.current !== null) fieldCarryRef.current = fieldCarryAfterBenchClearing(benchWalkRef.current)
+          benchWalkRef.current = null
+          actions.finishBenchClearing(reachedTargetTick)
+        }}
       />
     )
   }
@@ -757,7 +814,12 @@ export function TeamGameScreen({
         field={halfInningFieldOf({
           rolls: board.fielderRolls,
           half: board.half,
-          isFirstBoard: board.serial === 1,
+          // 앞 장면(0x17 · 앞 판 · 0x1e · 0x21)이 남긴 수비 줄 자리 · 카메라 — 자리 합 0 인 칸이 있으면 0x3fac4 가 경기 첫 판으로 본다
+          carry: fieldCarryRef.current,
+          walkStateRef: boardWalkRef,
+          // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각
+          defenseAces: teamWalkAcesOf(progress, !isOurOffense(progress)),
+          offenseAces: teamWalkAcesOf(progress, isOurOffense(progress)),
           playerSide: options.playerSide,
           ourTeamId: options.ourTeamId,
           opponentTeamId: options.opponentTeamId,
@@ -768,7 +830,12 @@ export function TeamGameScreen({
             isOurOffense(progress) ? progress.opponentEntry : progress.ourEntry,
           ),
         })}
-        onConfirm={() => setClosedBoardSerial(board.serial)}
+        onConfirm={() => {
+          // 판이 닫힌 틱의 자리 · 카메라 — 0x4f7ac 는 0x18 동안만 걸음 · 카메라를 굴린다
+          if (boardWalkRef.current !== null) fieldCarryRef.current = fieldCarryAfterHalfInning(boardWalkRef.current)
+          boardWalkRef.current = null
+          setClosedBoardSerial(board.serial)
+        }}
       />
     )
   }
@@ -1385,4 +1452,27 @@ function slotTypeNumbersOf(slots: readonly PitchSlot[]): number[] {
   const numbers = [0, 0, 0, 0, 0, 0]
   for (const slot of slots) if (slot.slot >= 0 && slot.slot < numbers.length) numbers[slot.slot] = slot.typeNumber
   return numbers
+}
+
+/**
+ * 팀 경기 한 팀의 운동장 마선수 재료 — 지금 투수(투수 명단 칸 `ourPitcherIndex` · `opponentPitcherIndex`)의 마투수 번호와
+ * 명단(`ourEntry` · `opponentEntry`)의 자리 · 마타자 번호. ⚠️ 근사: 원본은 레코드 타자 배열 차례를 훑는다 — 웹 명단은 선수째 옮기는
+ * 타순 차례라 대타 뒤에는 차례가 다를 수 있다(대타 0xaebe4 가 자리 니블도 맞바꾸므로 칸마다 찾는 선수는 같다).
+ */
+function teamWalkAcesOf(progress: TeamGameProgress, ours: boolean): WalkTeamAces {
+  const pitchers = ours ? progress.ourPitcherEntry : progress.opponentPitcherEntry
+  const pitcher = pitchers[ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex]
+  const entry = ours ? progress.ourEntry : progress.opponentEntry
+  return {
+    pitcherAce: pitcher !== undefined && pitcher.aceIndex >= 0 ? pitcher.aceIndex : null,
+    records: entry.map((batter) => ({ position: batter.position, ace: batter.aceIndex >= 0 ? batter.aceIndex : null })),
+  }
+}
+
+/** 벤치 클리어링 3a97e — 사구를 맞은 지금 타자가 마타자면 그 자리 니블 · 번호 */
+function benchClearingBatterOf(progress: TeamGameProgress): { readonly position: number; readonly ace: number | null } | null {
+  const ours = isOurOffense(progress)
+  const entry = ours ? progress.ourEntry : progress.opponentEntry
+  const batter = entry[ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex]
+  return batter === undefined || batter.aceIndex < 0 ? null : { position: batter.position, ace: batter.aceIndex }
 }

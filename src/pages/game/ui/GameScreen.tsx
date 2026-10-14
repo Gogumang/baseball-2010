@@ -13,7 +13,7 @@ import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
-import { teamBatters } from '@/entities/team/model/teamRoster'
+import { gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
 import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
@@ -164,6 +164,8 @@ export function GameScreen({
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
   const ace = progress.aceOpponent
+  /** 운동장 전경 · 벤치 클리어링의 두 팀 — 레코드 타자 배열 차례 · 지금 투수 마선수 (`gameFieldTeamsOf`) */
+  const fieldTeams = gameFieldTeamsOf(career, progress)
   /**
    * 경기 중 모은 G포인트 누계. 원본도 기록을 달성할 때마다 더해 화면에 보여 준다 (0xa77f0 이 evt+0x180 에 누적).
    * 원본이 이 숫자를 어디에 그리는지는 아직 못 찾아, 웹 껍데기의 제목 옆 칸에 둔다 (추정).
@@ -253,6 +255,15 @@ export function GameScreen({
           batterHand: career.battingSide,
           bases: progress.game.bases,
           grassPalette: sceneFieldPaletteOf(sceneStadium),
+          // 마선수 그림 0x79b48 — 공격 줄은 내 팀(사구를 맞은 타자는 나 — 마선수가 아니다), 수비 줄은 상대 팀
+          defenseAces: fieldTeams.opponent.aces,
+          offenseAces: {
+            ...fieldTeams.ours.aces,
+            // 사구를 맞은 지금 타자는 내 선수 — 마선수가 아니라 3a97e 의 맞바꿈이 없다
+            batter: null,
+            // ⚠️ 근사: 루 위 동료가 마선수 주자(+0x9c)인지는 웹 루상이 안 든다 — 마타자는 대타로만 서서 루에 있을 수 있다
+            aceRunnerBases: [false, false, false],
+          },
         })}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={random}
@@ -266,6 +277,9 @@ export function GameScreen({
    * 징글 13 은 판의 틱 2 (0x4f7ac). OK → 0xae3a0 → 0xd → 첫 타석.
    */
   if (isHalfInningBoardOpen && board !== null) {
+    const isOurOffense = (board.half === '초' ? 0 : 1) === progress.game.playerSide
+    const boardDefense = isOurOffense ? fieldTeams.opponent : fieldTeams.ours
+    const boardOffense = isOurOffense ? fieldTeams.ours : fieldTeams.opponent
     return (
       <HalfInningBoard
         inning={board.inning}
@@ -277,21 +291,21 @@ export function GameScreen({
         scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, career.teamId, progress.opponentTeamId)}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={gameHalfInningCardsOf(progress, career, board.half)}
-        // 운동장 전경 0x4fb8c — 타자편 판은 경기 첫 판(1회초)뿐이라 수비 줄이 아직 안 섰다(0x3fac4 의 자리 0 갈래)
+        // 운동장 전경 0x4fb8c — 타자편 판은 경기 첫 판(1회초 — 인트로 0xc 바로 뒤)뿐이라 장면이 수비 줄 · 카메라를 아직 안 옮겼다
+        // (`carry` 없음 = 0x3fac4 의 자리 합 0 갈래, `lib/fieldCarry`)
         field={halfInningFieldOf({
           rolls: board.fielderRolls,
           half: board.half,
-          isFirstBoard: board.serial === 1,
+          carry: null,
           playerSide: progress.game.playerSide,
           ourTeamId: career.teamId,
           opponentTeamId: progress.opponentTeamId,
           grassPalette: sceneFieldPaletteOf(sceneStadium),
-          // 이름표 — 칸 0 은 상대 마운드, 1~8 은 상대 팀 명단에서 위치 코드가 칸 + 1 인 첫 선수 (0x40008).
-          // ⚠️ 근사: 원본은 경기 팀 레코드 차례(대타 · 마타자 반영)를 훑는다 — 웹은 붙박이 표 차례
-          fielderNames: fielderNamesByPosition(
-            gameHalfInningCardsOf(progress, career, board.half).pitcherName,
-            teamBatters(progress.opponentTeamId).map((player) => ({ name: player.name, position: player.position ?? 0 })),
-          ),
+          // 이름표 — 칸 0 은 상대 마운드, 1~8 은 0x40008: 상대 팀 레코드 타자 배열 차례(나리 팀 레코드 · 대회 칸)에서 자리 니블이 칸 + 1 인 첫 선수
+          fielderNames: fielderNamesByPosition(gameHalfInningCardsOf(progress, career, board.half).pitcherName, boardDefense.lineup),
+          // 마선수 그림 0x79b48 — 수비 줄은 수비 팀, 공격 줄은 공격 팀 (0x3fac4 가 +0xec · 두 그림을 싣는다)
+          defenseAces: boardDefense.aces,
+          offenseAces: boardOffense.aces,
         })}
         onConfirm={() => setBoardClosed(true)}
       />
