@@ -13,6 +13,7 @@ import type { PitchSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { hiddenStealBasesOf, pitchSlotsFor, pitchersOfRecordOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
   PitcherGameOptions,
+  PitcherGameProgress,
   PitcherGameSummary,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -45,7 +46,13 @@ import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
-import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import {
+  type BenchClearingOffenseAces,
+  aceRunnerBasesOf,
+  benchClearingFieldOf,
+} from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
+import { nariFieldersAfterPinchHits } from '@/entities/career/model/nariTeamRecord'
 import { type PitcherFieldLineups, pitcherFieldAcesOf } from '@/pages/pitching/lib/pitcherFieldTeams'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { pitcherHalfInningCardsOf } from '@/pages/pitching/lib/pitcherHalfInningCards'
@@ -74,7 +81,12 @@ import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
-import { opponentBatterOf, ourBenchPitcherCountOf, pitcherSceneSkillPanelOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import {
+  opponentBatterOf,
+  opponentRunnerAcesOf,
+  ourBenchPitcherCountOf,
+  pitcherSceneSkillPanelOf,
+} from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
@@ -155,7 +167,7 @@ export function PitcherGameScreen({
   matchupRecords,
   gamePoint,
   pitcherEquipmentLevels,
-  fieldLineups,
+  fieldLineups: recordFieldLineups,
 }: PitcherGameScreenProps) {
   const session = usePitcherGame(options, random, settings?.isVibrationOn)
   const { progress, canPitch, summary, actions } = session
@@ -178,6 +190,35 @@ export function PitcherGameScreen({
   useSkillCheerRestore(progress.substitutionScene, skillPanelSceneRef)
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
+  /** 두 팀 레코드 차례 — 대타 0xaebe4 가 맞바꾼 자리 니블은 지금 명단으로 따라간다 (`nariFieldersAfterPinchHits`) */
+  const fieldLineups: PitcherFieldLineups | undefined =
+    recordFieldLineups === undefined
+      ? undefined
+      : {
+          ours: nariFieldersAfterPinchHits(recordFieldLineups.ours, progress.ourLineup),
+          opponent: nariFieldersAfterPinchHits(recordFieldLineups.opponent, progress.opponentLineup),
+        }
+  const benchOffense = progress.pendingBenchClearing === null ? null : pitcherBenchOffenseOf(progress, options, fieldLineups)
+  const boardOurDefense = board !== null && (board.half === '초' ? 0 : 1) !== options.playerSide
+  const ourFieldRecords = pitcherFieldAcesOf(progress, options, fieldLineups, true)?.records ?? null
+  /**
+   * 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 1회초 판 0x3fac4 · 수비 판 시작 0xb0fb4(투수편의 수비 판은 늘 내 팀 수비) ·
+   * 벤치 클리어링 0x3a5f0
+   */
+  const walkerSeats = useWalkerLineSeats({
+    sceneKey: options,
+    playKey: progress.pendingDefensePlay ?? progress.pendingRunnerPlay ?? progress.lastDefensePlay,
+    playDefenseRecords: ourFieldRecords,
+    board:
+      board === null || fieldLineups === undefined
+        ? null
+        : {
+            key: board.serial,
+            defense: boardOurDefense ? fieldLineups.ours : fieldLineups.opponent,
+            offense: boardOurDefense ? fieldLineups.opponent : fieldLineups.ours,
+          },
+    benchClearing: progress.pendingBenchClearing === null ? null : { key: progress.pendingBenchClearing, offense: benchOffense },
+  })
   const isBenchClearing = progress.pendingBenchClearing !== null
   /** 공용 키 0x498d4 의 상태 범위(0xd~0x15) 밖 — 인트로 0xc · 판 0x18 · 벤치 클리어링 0x1e */
   const isSceneShowing = !isIntroDone || isHalfInningBoardOpen || isBenchClearing || summary !== null
@@ -580,19 +621,9 @@ export function PitcherGameScreen({
           grassPalette,
           // 마선수 그림 0x79b48 — 수비 줄은 내 팀(내가 맞혔다), 공격 줄은 상대 팀
           defenseAces: pitcherFieldAcesOf(progress, options, fieldLineups, true),
-          offenseAces: (() => {
-            const offense = pitcherFieldAcesOf(progress, options, fieldLineups, false)
-            if (offense === null) return null
-            // 3a97e — 사구를 맞은 지금 타자가 마타자면 그 레코드(자리 니블은 레코드 줄의 값)를 타자 칸과 맞바꾼다.
-            // ⚠️ 근사: 3aa1a 의 마선수 주자 맞바꿈 — 웹 루상이 주자 +0x9c 를 안 든다
-            const batterAce = opponentBatterOf(progress).aceIndex
-            const aceRow = batterAce === undefined ? undefined : fieldLineups?.opponent.find((row) => row.ace === batterAce)
-            return {
-              ...offense,
-              batter: batterAce === undefined ? null : { position: aceRow?.position ?? 0, ace: batterAce },
-              aceRunnerBases: [false, false, false] as const,
-            }
-          })(),
+          // 수비 줄 +0xec — 이 장면에서 마지막으로 적힌 값(1회초 판 · 내 수비 판 시작)
+          defenseSeats: walkerSeats.benchDefense,
+          offenseAces: benchOffense,
         })}
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={random}
@@ -633,6 +664,7 @@ export function PitcherGameScreen({
           // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (0x3fac4 가 +0xec · 두 그림을 싣는다)
           defenseAces: pitcherFieldAcesOf(progress, options, fieldLineups, isOurDefenseBoard),
           offenseAces: pitcherFieldAcesOf(progress, options, fieldLineups, !isOurDefenseBoard),
+          seats: walkerSeats.boardBefore,
         })}
         onConfirm={() => setClosedBoardSerial(board.serial)}
       />,
@@ -1068,4 +1100,24 @@ function slotChoices(magicRemaining: number, slots: readonly PitchSlot[]): Pitch
         : {}),
       isBlocked: !canSelectSlot(slot, magicRemaining),
     }))
+}
+
+/**
+ * 투수편 벤치 클리어링 공격 줄(상대 팀) 재료 — 3a97e: 사구를 맞은 지금 타자가 마타자면 그 레코드(자리 니블은 대타 뒤 레코드 줄의 값)를
+ * 타자 칸과 맞바꾼다. 3aa1a: 루 위 마선수 주자(+0x9c)는 수비 판 재료 `opponentRunnerAcesOf` 그대로
+ */
+function pitcherBenchOffenseOf(
+  progress: PitcherGameProgress,
+  options: PitcherGameOptions,
+  fieldLineups: PitcherFieldLineups | undefined,
+): BenchClearingOffenseAces | null {
+  const offense = pitcherFieldAcesOf(progress, options, fieldLineups, false)
+  if (offense === null) return null
+  const batterAce = opponentBatterOf(progress).aceIndex
+  const aceRow = batterAce === undefined ? undefined : fieldLineups?.opponent.find((row) => row.ace === batterAce)
+  return {
+    ...offense,
+    batter: batterAce === undefined ? null : { position: aceRow?.position ?? 0, ace: batterAce },
+    aceRunnerBases: aceRunnerBasesOf(opponentRunnerAcesOf(progress), progress.game.bases),
+  }
 }

@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import type { FieldCarry } from '@/widgets/field-walk/lib/fieldCarry'
 import type { HalfInningWalkInput, HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
-import { type WalkTeamAces, walkAceSpritesOf } from '@/widgets/field-walk/lib/walkerAces'
+import { type WalkTeamAces, type WalkerLineSeats, walkAceSpritesOf } from '@/widgets/field-walk/lib/walkerAces'
 
 /** 수비 칸 수 */
 const FIELDER_COUNT = 9
@@ -27,6 +27,11 @@ export interface HalfInningFieldSource {
   /** 수비 팀 · 공격 팀의 마선수 재료 (0x79b48 a · b — `lib/walkerAces`). 안 주면 보통 그림 */
   readonly defenseAces?: WalkTeamAces | null
   readonly offenseAces?: WalkTeamAces | null
+  /**
+   * 판이 서기 전 두 줄의 +0xec — 0x3fac4 는 자리 니블이 맞는 레코드가 없는 칸을 안 덮어 앞 값이 남는다(`walkerRecordsOf`).
+   * 안 주면 경기 장면을 세운 뒤 아무도 안 적은 줄(모두 0)이다. 판 뒤 값은 `seatsAfterHalfInningBoard`
+   */
+  readonly seats?: WalkerLineSeats | null
   /** 그린 틱의 걸음 상태를 적어 둘 칸 — 판이 닫힐 때 `fieldCarryAfterHalfInning` 으로 넘긴다 */
   readonly walkStateRef?: MutableRefObject<HalfInningWalkState | null>
 }
@@ -49,8 +54,8 @@ export function halfInningFieldOf(source: HalfInningFieldSource) {
     offenseTeam: teamOf(offenseSide),
     grassPalette: source.grassPalette ?? null,
     ...(source.fielderNames === undefined ? {} : { fielderNames: source.fielderNames }),
-    ...(source.defenseAces == null ? {} : { defenseAces: walkAceSpritesOf(source.defenseAces) }),
-    ...(source.offenseAces == null ? {} : { offenseAces: walkAceSpritesOf(source.offenseAces) }),
+    ...(source.defenseAces == null ? {} : { defenseAces: walkAceSpritesOf(source.defenseAces, source.seats?.defense) }),
+    ...(source.offenseAces == null ? {} : { offenseAces: walkAceSpritesOf(source.offenseAces, source.seats?.offense) }),
     ...(source.walkStateRef === undefined ? {} : { walkStateRef: source.walkStateRef }),
   }
 }

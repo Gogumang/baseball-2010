@@ -1,3 +1,5 @@
+import { gameBenchOffenseOf, gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
+import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
@@ -149,6 +151,30 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   )
   const isDefenseShown =
     progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady)
+  /**
+   * 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 교대 판 0x3fac4(1회초 판) · 수비 판 시작 0xb0fb4 · 벤치 클리어링 0x3a5f0.
+   * 타자편의 수비 판은 늘 내 타석이라 수비 팀은 상대다. GameScreen 은 수비 재생 동안 내려가므로 여기서 든다
+   */
+  const fieldTeams = gameFieldTeamsOf(career, progress)
+  const boardNow = progress.halfInningBoard ?? null
+  const boardOursOffense = boardNow !== null && (boardNow.half === '초' ? 0 : 1) === progress.game.playerSide
+  const walkerSeats = useWalkerLineSeats({
+    sceneKey: sceneSerialRef.current,
+    playKey: progress.pendingDefensePlay ?? play,
+    playDefenseRecords: fieldTeams.opponent.aces.records,
+    board:
+      boardNow === null
+        ? null
+        : {
+            key: boardNow.serial,
+            defense: (boardOursOffense ? fieldTeams.opponent : fieldTeams.ours).aces.records,
+            offense: (boardOursOffense ? fieldTeams.ours : fieldTeams.opponent).aces.records,
+          },
+    benchClearing:
+      progress.pendingBenchClearing === null
+        ? null
+        : { key: progress.pendingBenchClearing, offense: gameBenchOffenseOf(fieldTeams.ours, progress) },
+  })
   const [alertScene, setAlertScene] = useState<RecordAlertScene>({ isFrozen: false, key: 'play' })
   alertSceneFrozenRef.current = alertScene.isFrozen
   const reportAlertScene = useCallback((scene: RecordAlertScene) => {
@@ -279,6 +305,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       <GameScreen
         career={career}
         progress={progress}
+        walkerSeats={walkerSeats}
         atBat={runner.atBat}
         // 지금 마운드의 상대 투수 — CPU 교체(0xac428)가 바꾸면 바뀐 투수가 던진다 (0xae83c).
         // 마선수 대결의 마투수는 0xb6414 첫 단계 `v · 0xd88aa[mgr[0x13a + 순번]] / 100` 을 먹는다.
