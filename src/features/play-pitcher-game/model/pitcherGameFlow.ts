@@ -11,7 +11,14 @@ import {
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import { runnersOfGame } from '@/entities/game/model/gameState'
-import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import { EMPTY_BASE_RUNNERS, runnerOnBase } from '@/entities/game/model/baseRunners'
+import {
+  chargedRunsByPitcher,
+  freezeRunnerPitchers,
+  scoredFromBasesOf,
+  settleRunnerPitchers,
+} from '@/entities/game/model/runnerPitchers'
+import type { RunnerPitcherTags } from '@/entities/game/model/runnerPitchers'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -58,7 +65,6 @@ import {
   withLineupRecordSlot,
 } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
-import type { BaseState } from '@/entities/game/model/baseState'
 import {
   completeGameRecordIdsOf,
   gameEndRecordIdsOf,
@@ -89,7 +95,7 @@ import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-pla
 import {
   baserunnerAllowedOfFates,
   baserunnerAllowedOfPlay,
-  chargedRunsOfFates,
+  chargedFromBasesOfFates,
   runnerFatesWithoutPlay,
   survivorsFromBaseOfFates,
 } from '@/features/defense-play/model/runnerFates'
@@ -471,15 +477,16 @@ export interface PitcherGameProgress {
   /**
    * 내 투수에게 매겨진 실점 — 레코드 +0x22(방어율)이고 평가 칸 R+0x128 과 같은 값이다.
    * 둘 다 정산 0xa8024 의 같은 주자 루프(0xa8ea4~0xa8f60)가 **득점 주자를 내보낸 투수**(주자+0x30)에게
-   * 매긴다 — 마운드에 있는 동안의 득점 + 강판 때 남겨 둔 주자(`inheritedRunners`)의 득점.
+   * 매긴다 — 마운드에 있는 동안의 득점 + 강판 때 남겨 둔 주자(`runnerPitchers` 가 `MY_PITCHER_SLOT`)의 득점.
    */
   readonly runsAllowedByMe: number
   /**
-   * 강판 때 루에 남겨 두고 내려온 **내 주자** 수 (주자+0x30 = 내 투수). 마운드에 있는 동안은 늘 0 이다.
-   * 원본은 주자마다 내보낸 투수를 적어 두므로(0xa93ac 넷째 인자 → 주자+0x30) 강판 뒤 간이 엔진
-   * 타석(0xc1054 등도 정산 0xa8024 를 부른다)에서 이 주자가 들어와도 내 실점이다.
+   * **지금 공격 중인 쪽 루의 주자마다 그 주자를 내보낸 투수**(주자+0x30) — 우리 수비면 우리 투수 칸(나는 `MY_PITCHER_SLOT`),
+   * 우리 공격이면 상대 투수 칸. 원본은 주자마다 내보낸 투수를 적어 두므로(0xa93ac 넷째 인자 → 주자+0x30) 강판 뒤 간이 엔진
+   * 타석(0xc1054 등도 정산 0xa8024 를 부른다)에서 내가 남긴 주자가 들어와도 내 실점이다(`entities/game/model/runnerPitchers`).
+   * 반 이닝이 넘어가면 빈 루라 비고, 없으면 지금 투수로 본다
    */
-  readonly inheritedRunners: number
+  readonly runnerPitchers?: RunnerPitcherTags
   /**
    * 내가 마운드에서 내준 볼넷 · 사구 — 레코드 **+0x2a(사사구)**. 정산 0xa8024 의 공통 꼬리가
    * `state[5] > 3`(볼넷, a8b0c) · `state[0x12]`(사구, a8b8a) 이면 수비 팀 지금 투수 0xae83d 의 +0x2a 를 +1 하고
@@ -676,7 +683,7 @@ export interface PitcherGameProgress {
   readonly opponentPitcherStaminas: readonly number[]
   /**
    * 이 경기를 던진 **CPU 투수** 줄 (`entities/game/model/gamePitcherLines`) — 내 투수(육성 선수)는 빼고 동료·상대 투수만.
-   * 간이 타석마다 아웃·실점·삼진을 그 순간 마운드 투수에게 쌓고, 투구 수는 교체·경기 끝에 그 마운드의 `pitches` 를 얹는다.
+   * 간이 타석마다 아웃·삼진은 그 순간 마운드 투수에게, 실점은 들어온 주자의 책임 투수(주자+0x30)에게 쌓고, 투구 수는 교체·경기 끝에 그 마운드의 `pitches` 를 얹는다.
    */
   readonly pitcherLines: readonly GamePitcherLine[]
   /**
@@ -960,7 +967,6 @@ export function startPitcherGame(
     record: EMPTY_PITCHER_EVALUATION_RECORD,
     pitchCount: 0,
     runsAllowedByMe: 0,
-    inheritedRunners: 0,
     freePassesByMe: 0,
     teamBaserunnerAllowed: false,
     teamHitsAllowed: 0,
@@ -1996,12 +2002,20 @@ function withMyRunnerPlay(
     decision = applyRunScoredFor(progress, decision, run, true)
   }
   const halfChanged = applied.game.half !== before.half || applied.game.inning !== before.inning
-  // 포스트시즌이면 0xa56dc 가 거짓이라 R+0x128 · +0x22 를 안 센다 (`countsMyPitcherRecord`).
-  // 내가 마운드에 있을 때만이라 들어온 주자는 모두 내가 내보낸 주자다 (R+0x128 · +0x22)
-  const charged =
-    settles && countsMyPitcherRecord(progress)
-      ? chargedRunsOfFates(result.runnerFates, before.outs + advanceResult.outsAdded)
-      : 0
+  // 들어온 주자마다 그 주자를 내보낸 투수(주자+0x30)에게 — 정산을 지나는 판만(a8ea4). 포스트시즌이면 0xa56dc 가 거짓이라
+  // R+0x128 · +0x22 를 안 센다 (`countsMyPitcherRecord`). 루별 책임 투수 장부는 정산과 무관하게 판 뒤로 옮긴다
+  const runnersAtPitch = runnersOfGame(before, progress.opponentOrderIndex)
+  const runnerSettlement = settleRunnerPitchers({
+    tags: progress.runnerPitchers,
+    before: runnersAtPitch,
+    after: halfChanged ? EMPTY_BASE_RUNNERS : runnersOfGame(applied.game, applied.opponentOrderIndex),
+    batter: null,
+    pitcher: progress.ourMound.pitcherSlot,
+    scoredFromBases: settles ? chargedFromBasesOfFates(result.runnerFates, before.outs + advanceResult.outsAdded) : [],
+  })
+  const charged = countsMyPitcherRecord(progress)
+    ? runnerSettlement.charged.filter((pitcher) => pitcher === MY_PITCHER_SLOT).length
+    : 0
   // 판에서 잡은 아웃(견제사 · 도루사 · 주루 아웃)은 콜 62/20 → 결과 13 → 아웃 콜 0xa7d0c 가 하나마다 센다 — 정산과 무관하다:
   //   a7d52  R+0x13c += 1 (코드 0x1a — 0xa57f8 게이트: 수비 지금 투수가 R 의 선수, `countsMyPitcherRecord`)
   //   a7d78  ctx+0x16c(반 이닝 투구 수) == 3 && 아웃 == 3 → 25 삼구 삼자범퇴 (수비가 사람일 때 — 투수편은 늘)
@@ -2015,6 +2029,13 @@ function withMyRunnerPlay(
     decision,
     inningRuns: addInningRuns(progress.inningRuns, before.inning, applied.runsScored),
     runsAllowedByMe: progress.runsAllowedByMe + charged,
+    runnerPitchers: runnerSettlement.tags,
+    // 동료가 내보낸 주자의 실점은 그 동료 줄에 (내 줄은 커리어가 센다)
+    pitcherLines: chargedRunsByPitcher(runnerSettlement.charged).reduce(
+      (lines, [pitcherSlot, runsAllowed]) =>
+        chargeCpuPitcherLine(lines, progress.options.ourTeamId, pitcherSlot, { runsAllowed }),
+      progress.pitcherLines,
+    ),
     record: {
       ...progress.record,
       runsAllowedField: progress.record.runsAllowedField + charged,
@@ -2214,29 +2235,36 @@ function applyDefensivePlay(
    * **내가 내보낸 주자가 들어올 때마다 1** 이다. 일반 선수인 동료 투수는 비트7 이 없어
    * R+0x128 에 안 든다(+0x22 에는 든다 — 웹은 동료 투수 레코드를 따로 두지 않는다).
    *
-   * - 마운드에 있는 동안(`mine`)의 주자는 모두 내 주자다 — 선발은 경기 시작부터, 구원은 8회 0아웃(빈 루)에 올라오므로
-   *   남의 주자를 물려받는 일이 없다 (`shouldEnterNow`).
-   * - 강판 뒤에는 남겨 둔 내 주자(`inheritedRunners`)만 내 실점이다. 주자는 서로 앞지를 수 없어 내 주자가 늘 앞쪽에
-   *   있으므로 **득점은 내 주자부터** 센다.
+   * 들어온 주자마다 **그 주자를 내보낸 투수**(주자+0x30, `runnerPitchers`)에게 매긴다 — 강판 때 루에 남겨 둔 내 주자가 강판 뒤
+   * 간이 엔진 타석에 들어와도 내 실점이고, 동료가 남긴 주자가 들어오면 그 동료 줄(+0x22) 몫이다.
    *
-   * 내가 던진 타석은 주자 운명(`runnerFates`, 90c7864)으로 센다 — 인플레이 타구는 진행기 결과, 삼진·볼넷·사구·홈런은
-   *   `runnerFatesWithoutPlay`. 그래서 3아웃 갈래(0xa8ec0: 목록 0번 주자가 살았으면 보류됐다 날아간 득점까지 세고,
-   *   죽었으면 하나도 안 센다)도 원본대로다. `outsAfterPlay` 는 3아웃 정리 전의 아웃 수.
-   *
-   * ⚠️ 미해결(근사): ① 강판 뒤 간이 엔진 타석은 주자 운명이 없어 점수판 득점(`runsScored`)을 쓰고, 내 주자가
-   *   이 플레이에서 아웃되고 뒤 주자가 들어온 경우(드묾)는 뒤 주자 득점을 내 것으로 세며, 남은 내 주자 수는
-   *   `min(남은 수, 루의 주자 수)` 로 줄인다. 간이 엔진의 3아웃 갈래도 점수판 득점으로 대신한다.
+   * 실점을 매길 주자는 내가 던진 타석이면 주자 운명(`runnerFates`, 90c7864)으로 센다 — 인플레이 타구는 진행기 결과,
+   *   삼진·볼넷·사구·홈런은 `runnerFatesWithoutPlay`. 그래서 3아웃 갈래(0xa8ec0: 목록 0번 주자가 살았으면 보류됐다 날아간
+   *   득점까지 세고, 죽었으면 하나도 안 센다)도 원본대로다. `outsAfterPlay` 는 3아웃 정리 전의 아웃 수.
+   *   간이 엔진 타석은 주자가 죽지 않아(0xc0fb4) 루에서 빠진 앞선 주자부터 점수판 득점만큼이다(`scoredFromBasesOf`).
    *
    * 포스트시즌이면 0xa56dc 가 거짓이라 R+0x128 · +0x22 와 0xa57f8 의 R 칸(코드 0x14~0x1f)을 하나도 안 센다
-   * (`countsMyPitcherRecord`). 남겨 둔 주자 수(`inheritedRunners`)의 장부는 그대로 줄인다 — 세는 일만 막힌다.
+   * (`countsMyPitcherRecord`). 루별 책임 투수 장부는 그대로 옮긴다 — 세는 일만 막힌다.
    */
-  const chargedToMe = mine
-    ? chargedRunsOfMyPlay(before.bases, outcome, defensePlay, before.outs + applied.outsAdded, applied.runsScored)
-    : Math.min(applied.runsScored, progress.inheritedRunners)
-  const inheritedRunners =
-    mine || inningEnded
-      ? 0
-      : Math.min(progress.inheritedRunners - chargedToMe, runnerCountOf(applied.game.bases))
+  const runnersAtPitch = runnersOfGame(before, progress.opponentOrderIndex)
+  const halfChangedByPlay = applied.game.half !== before.half || applied.game.inning !== before.inning
+  const runnersAfterPlay = halfChangedByPlay ? EMPTY_BASE_RUNNERS : runnersOfGame(applied.game, applied.opponentOrderIndex)
+  const runnerSettlement = settleRunnerPitchers({
+    tags: progress.runnerPitchers,
+    before: runnersAtPitch,
+    after: runnersAfterPlay,
+    batter: lineupSlotOf(progress.opponentOrderIndex),
+    // 새로 나간 타자주자의 책임 투수 = 지금 우리 마운드 (내가 서 있으면 `MY_PITCHER_SLOT`)
+    pitcher: progress.ourMound.pitcherSlot,
+    scoredFromBases:
+      defensePlay !== null || (mine && outcome.kind !== '안타' && outcome.kind !== '아웃')
+        ? chargedFromBasesOfFates(
+            defensePlay?.runnerFates ?? runnerFatesWithoutPlay(before.bases, outcome),
+            before.outs + applied.outsAdded,
+          )
+        : scoredFromBasesOf(runnersAtPitch, runnersAfterPlay, applied.runsScored),
+  })
+  const chargedToMe = runnerSettlement.charged.filter((pitcher: number) => pitcher === MY_PITCHER_SLOT).length
 
   const counts = countsMyPitcherRecord(progress)
   const playedRecord: PitcherEvaluationRecord = !mine
@@ -2339,9 +2367,15 @@ function applyDefensivePlay(
       ? { stealPlayStrikeouts: (progress.stealPlayStrikeouts ?? 0) + 1 }
       : {}),
     runsAllowedByMe: progress.runsAllowedByMe + chargedCounted,
+    runnerPitchers: runnerSettlement.tags,
+    // 동료 투수가 내보낸 주자의 실점은 그 동료 줄(+0x22)에 — 내 줄(`MY_PITCHER_SLOT`)은 커리어가 센다
+    pitcherLines: chargedRunsByPitcher(runnerSettlement.charged).reduce(
+      (lines, [pitcherSlot, runsAllowed]) =>
+        chargeCpuPitcherLine(lines, progress.options.ourTeamId, pitcherSlot, { runsAllowed }),
+      progress.pitcherLines,
+    ),
     // 낫아웃 — a8cb0 +0x20 += [sp+0x30](삼진 사건 포함), 보정 −1 은 R+0x13c · R[3] 에만 (`seasonOutsExtra`)
     ...(droppedThirdStrike && mine && counts ? { seasonOutsExtra: (progress.seasonOutsExtra ?? 0) + 1 } : {}),
-    inheritedRunners,
     // 레코드 +0x2a — 게이트 없이 마운드의 내 투수에게 (a8b58 · a8bd2)
     freePassesByMe: progress.freePassesByMe + (mine && freePass ? 1 : 0),
     teamHitsAllowed: progress.teamHitsAllowed + (hit ? 1 : 0),
@@ -2410,23 +2444,6 @@ function applyDefensivePlay(
     }`,
     mine,
   )
-}
-
-/**
- * 내가 던진 타석 하나가 R+0x128 · +0x22 에 더하는 수 (`chargedRunsOfFates`, 0xa8ea4~0xa8f6e).
- * 인플레이 타구는 진행기가 낸 운명, 그 밖(삼진·볼넷·사구·홈런)은 진행기 없이 정해지는 운명을 쓴다.
- * 진행기 결과가 없는 인플레이 타구(일어나지 않지만)는 점수판 득점으로 대신한다.
- */
-function chargedRunsOfMyPlay(
-  basesBefore: BaseState,
-  outcome: AtBatOutcome,
-  defensePlay: DefensePlayResult | null,
-  outsAfterPlay: number,
-  runsScored: number,
-): number {
-  if (defensePlay !== null) return chargedRunsOfFates(defensePlay.runnerFates, outsAfterPlay)
-  if (outcome.kind === '안타' || outcome.kind === '아웃') return runsScored
-  return chargedRunsOfFates(runnerFatesWithoutPlay(basesBefore, outcome), outsAfterPlay)
 }
 
 /**
@@ -2782,7 +2799,11 @@ export function giveUpPitching(
         onMound: false,
         simpleEngineRunning: true,
         // 루에 남겨 둔 주자는 주자+0x30 이 나라서 들어오면 내 실점이다 (0xa8ee4)
-        inheritedRunners: runnerCountOf(progress.game.bases),
+        runnerPitchers: freezeRunnerPitchers(
+          progress.runnerPitchers,
+          runnersOfGame(progress.game, progress.opponentOrderIndex),
+          MY_PITCHER_SLOT,
+        ),
         // 새 투수의 기록이 되므로 0 부터. (어차피 강판 뒤에는 기록 게이트가 닫힌다)
         moundStrikeouts: 0,
         moundStrikeoutCombo: 0,
@@ -2816,7 +2837,11 @@ export function closeManagerHookWindow(
         onMound: false,
         simpleEngineRunning: true,
         // 루에 남겨 둔 주자는 주자+0x30 이 나라서 들어오면 내 실점이다 (0xa8ee4)
-        inheritedRunners: runnerCountOf(progress.game.bases),
+        runnerPitchers: freezeRunnerPitchers(
+          progress.runnerPitchers,
+          runnersOfGame(progress.game, progress.opponentOrderIndex),
+          MY_PITCHER_SLOT,
+        ),
         moundStrikeouts: 0,
         moundStrikeoutCombo: 0,
         atBatPrepared: false,
@@ -3038,6 +3063,12 @@ function enterAsRelief(progress: PitcherGameProgress): PitcherGameProgress {
         justChanged: false,
       },
       ourPitcherStaminas: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
+      // 루에 남은 주자(있다면)는 내려가는 동료가 책임 투수다 (주자+0x30)
+      runnerPitchers: freezeRunnerPitchers(
+        progress.runnerPitchers,
+        runnersOfGame(progress.game, progress.opponentOrderIndex),
+        progress.ourMound.pitcherSlot,
+      ),
       pitcherLines: chargeCpuPitcherLine(progress.pitcherLines, progress.options.ourTeamId, progress.ourMound.pitcherSlot, {
         pitches: progress.ourMound.pitches,
       }),
@@ -3130,10 +3161,10 @@ function playDefensiveAtBat(
   const halfChanged = played.game.half !== before.half || played.game.inning !== before.inning
   const result: PitcherGameProgress = {
     ...played,
-    // 정산 0xa8024 — 우리 마운드 CPU 투수 레코드에 아웃·실점·탈삼진 (내 투수는 커리어가 따로 센다)
+    // 정산 0xa8024 — 우리 마운드 CPU 투수 레코드에 아웃·탈삼진 (내 투수는 커리어가 따로 센다). 실점은 `applyDefensivePlay` 가
+    // 들어온 주자의 책임 투수(주자+0x30)에게 이미 매겼다
     pitcherLines: chargeCpuPitcherLine(played.pitcherLines, options.ourTeamId, mound.pitcherSlot, {
       outs: outsAddedBetween(before, played.game),
-      runsAllowed: runs,
       strikeouts: play.outcome.kind === '삼진' ? 1 : 0,
     }),
     ourMound: {
@@ -3218,6 +3249,17 @@ function playTeammateAtBat(
   }
   const slot = before.battingOrderIndex
   const halfChanged = game.half !== before.half || game.inning !== before.inning
+  // 실점은 들어온 주자의 책임 투수(주자+0x30)에게 — 간이 엔진 주자는 죽지 않아 루에서 빠진 앞선 주자가 들어온 주자다
+  const runnersAtPitch = runnersOfGame(before, order)
+  const runnersAfter = halfChanged ? EMPTY_BASE_RUNNERS : appearance.runners
+  const runnerSettlement = settleRunnerPitchers({
+    tags: progress.runnerPitchers,
+    before: runnersAtPitch,
+    after: runnersAfter,
+    batter: lineupSlotOf(order),
+    pitcher: mound.pitcherSlot,
+    scoredFromBases: scoredFromBasesOf(runnersAtPitch, runnersAfter, runs),
+  })
   // 모드 3 은 내 팀 전체가 사람 팀이라 **공격 게이트도 열린다** (0x3a20a) —
   // 간이 엔진이 돌린 동료 타석도 같은 0xa8024 를 지나 타격 기록(0~15·34·35)이 된다 (R8 1절·8절).
   const recorded = recordBatterAtBat(
@@ -3234,12 +3276,16 @@ function playTeammateAtBat(
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       // 정산 0xa8024 — 타순 칸 기록(타석·안타·홈런)이 다음 CPU 대타 판정의 재료다
       ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, { quickEngine: true }),
-      // 같은 정산이 상대 마운드 투수 레코드에 아웃·실점·탈삼진을 쌓는다
-      pitcherLines: chargeCpuPitcherLine(progress.pitcherLines, options.opponentTeamId, mound.pitcherSlot, {
-        outs: outsAddedBetween(before, game),
-        runsAllowed: runs,
-        strikeouts: outcome.kind === '삼진' ? 1 : 0,
-      }),
+      // 같은 정산이 상대 마운드 투수 레코드에 아웃·탈삼진을, 실점은 들어온 주자의 책임 투수에게 쌓는다 (a8cb0 · a8d00 · a8ee4)
+      pitcherLines: chargedRunsByPitcher(runnerSettlement.charged).reduce(
+        (lines, [pitcherSlot, runsAllowed]) =>
+          chargeCpuPitcherLine(lines, options.opponentTeamId, pitcherSlot, { runsAllowed }),
+        chargeCpuPitcherLine(progress.pitcherLines, options.opponentTeamId, mound.pitcherSlot, {
+          outs: outsAddedBetween(before, game),
+          strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        }),
+      ),
+      runnerPitchers: runnerSettlement.tags,
       recordIds: recordsAllowed(progress)
         ? [...progress.recordIds, ...recorded.recordIds]
         : progress.recordIds,
@@ -3638,10 +3684,17 @@ function withPitcherChanged(
     outgoing.pitcherSlot,
     { pitches: outgoing.pitches },
   )
+  // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
+  const runnerPitchers = freezeRunnerPitchers(
+    progress.runnerPitchers,
+    isOurs ? runnersOfGame(game, progress.opponentOrderIndex) : runnersOfGame(game),
+    outgoing.pitcherSlot,
+  )
   return isOurs
     ? {
         ...progress,
         decision,
+        runnerPitchers,
         ourMound: mound,
         ourInningRunsAllowed: 0,
         ourPitcherStaminas: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
@@ -3650,6 +3703,7 @@ function withPitcherChanged(
     : {
         ...progress,
         decision,
+        runnerPitchers,
         opponentMound: mound,
         opponentInningRunsAllowed: 0,
         opponentPitcherStaminas: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),

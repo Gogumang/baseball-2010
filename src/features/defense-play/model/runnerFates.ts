@@ -116,6 +116,15 @@ export function chargedRunsOfFates(fates: readonly RunnerFate[], outsAfterPlay: 
 }
 
 /**
+ * 정산 주자 루프가 실점을 매기는 주자의 **투구 때 루**(0 = 타자주자) — `chargedRunsOfFates` 와 같은 거르기(3아웃이고 목록 0번이
+ * 끝났으면 하나도 없다). 그 주자의 책임 투수(주자+0x30)에게 +0x22 · 경기 기록 [2] 를 매긴다(`entities/game/model/runnerPitchers`)
+ */
+export function chargedFromBasesOfFates(fates: readonly RunnerFate[], outsAfterPlay: number): readonly number[] {
+  if (chargedRunsOfFates(fates, outsAfterPlay) === 0) return []
+  return fates.filter((fate) => fate.scored).map((fate) => fate.fromBase)
+}
+
+/**
  * **R+0x130(출루 허용)** — 정산 `0xa8c5c~0xa8c86`: 목록을 돌며 `r5 = (주자+0x96 == 0)` 을 루프 안에서
  * **새로** 매기므로 **마지막 원소 하나만** 본다. 목록이 비면 r5 = 0 그대로다(0xa8c2e).
  */

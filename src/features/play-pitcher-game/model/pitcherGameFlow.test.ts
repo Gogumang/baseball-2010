@@ -922,7 +922,11 @@ describe('R+0x128 · 레코드 +0x22 — 득점 주자를 내보낸 투수에게
       // 남겨 둔 주자는 셋이라 내 실점은 셋을 넘지 않는다 — 팀 실점과 달리 강판 뒤 새 주자 득점은 빠진다
       expect(끝.runsAllowedByMe).toBeLessThanOrEqual(3)
       expect(끝.record.runsAllowedField).toBe(끝.runsAllowedByMe)
-      expect(끝.inheritedRunners).toBe(0)
+      // 내가 남긴 주자의 실점은 동료 투수 줄(+0x22)에 다시 안 든다 — 우리 팀 실점은 내 몫 + 동료 줄 몫이다
+      const 동료실점 = 끝.pitcherLines
+        .filter((line) => line.teamId === 끝.options.ourTeamId)
+        .reduce((sum, line) => sum + line.runsAllowed, 0)
+      expect(동료실점 + 끝.runsAllowedByMe).toBe(끝.game.opponentScore)
     }
 
     expect(찾음).toBe(true)

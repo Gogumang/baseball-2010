@@ -1,6 +1,8 @@
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
+import { chargedRunsByPitcher, scoredFromBasesOf, settleRunnerPitchers } from '@/entities/game/model/runnerPitchers'
+import type { RunnerPitcherTags } from '@/entities/game/model/runnerPitchers'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher, QuickAtBatSituation } from '@/entities/game/model/quickAtBat'
@@ -450,6 +452,8 @@ export function* simulateHalfInningTicks(
   let bases = EMPTY_BASES
   /** 루에 선 주자의 타순 커서 — 원본 주자 목록(sim+0x80, `baseRunners.ts`). 반 이닝은 빈 루에서 시작한다 */
   let runners = EMPTY_BASE_RUNNERS
+  /** 루별 책임 투수(주자+0x30) — 반 이닝은 빈 목록에서 시작한다(0xa9250) */
+  let runnerPitchers: RunnerPitcherTags | undefined = undefined
   let outs = 0
   let runs = 0
   let hits = 0
@@ -647,6 +651,7 @@ export function* simulateHalfInningTicks(
     }
     // 볼넷 진루 · 도루 · 땅볼 진루는 `playQuickPlateAppearance` 가 먹였다
     const advanced = appearance.advance
+    const runnersAtPitch = runners
     bases = advanced.bases
     runners = appearance.runners
     outs += advanced.outsAdded
@@ -676,12 +681,26 @@ export function* simulateHalfInningTicks(
     })
 
     if (defense !== undefined && mound !== undefined) {
+      // 실점은 들어온 주자마다 그 주자를 내보낸 투수(주자+0x30)에게 — 승계 주자는 앞 투수 몫이다 (0xa8ea4~0xa8f36).
+      // 간이 엔진 주자는 죽지 않아(0xc0fb4 는 전원을 민다) 루에서 빠진 앞선 주자가 들어온 주자다
+      const settled = settleRunnerPitchers({
+        tags: runnerPitchers,
+        before: runnersAtPitch,
+        after: runners,
+        batter: order,
+        pitcher: mound.pitcherSlot,
+        scoredFromBases: scoredFromBasesOf(runnersAtPitch, runners, scored),
+      })
+      runnerPitchers = settled.tags
       addLine(mound.pitcherSlot, {
         outs: advanced.outsAdded,
-        runsAllowed: scored,
+        runsAllowed: 0,
         strikeouts: outcome.kind === '삼진' ? 1 : 0,
         pitches: play.pitches,
       })
+      for (const [slot, runsCharged] of chargedRunsByPitcher(settled.charged)) {
+        addLine(slot, { outs: 0, runsAllowed: runsCharged, strikeouts: 0, pitches: 0 })
+      }
       inningRunsAllowed = Math.min(MAXIMUM_COUNTER, inningRunsAllowed + scored)
       mound = {
         ...mound,

@@ -20,7 +20,7 @@ import {
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { runnersOfGame } from '@/entities/game/model/gameState'
-import { runnerOnBase, runnersBehindCursor } from '@/entities/game/model/baseRunners'
+import { EMPTY_BASE_RUNNERS, runnerOnBase, runnersBehindCursor } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import {
@@ -127,7 +127,19 @@ import {
   tryTriggerBurst,
 } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
-import { batterRunnerSafeOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import {
+  batterRunnerSafeOfFates,
+  chargedFromBasesOfFates,
+  runnerFatesWithoutPlay,
+  survivorsFromBaseOfFates,
+} from '@/features/defense-play/model/runnerFates'
+import {
+  chargedRunsByPitcher,
+  freezeRunnerPitchers,
+  scoredFromBasesOf,
+  settleRunnerPitchers,
+} from '@/entities/game/model/runnerPitchers'
+import type { RunnerPitcherTags } from '@/entities/game/model/runnerPitchers'
 import {
   arrivalPlaySettles,
   pendingSettlementEventsAfter,
@@ -217,7 +229,7 @@ export interface GameProgress {
   readonly opponentPitcherStaminas: readonly number[]
   /**
    * 이 경기를 던진 투수 줄 (`entities/game/model/gamePitcherLines`) — 우리 팀은 반 이닝 엔진 줄 그대로, 상대 팀은
-   * 내 타석·동료 타석·주자 판마다 아웃·실점·삼진을 그 순간 마운드 투수에게 쌓는다. 투구 수는 교체·경기 끝에
+   * 내 타석·동료 타석·주자 판마다 아웃·삼진은 그 순간 마운드 투수에게, 실점은 들어온 주자의 책임 투수(주자+0x30)에게 쌓는다. 투구 수는 교체·경기 끝에
    * 그 마운드의 `pitches` 를 얹는다. 경기 끝 `summaryOf` 가 리그 기록 재료로 낸다.
    */
   readonly pitcherLines: readonly GamePitcherLine[]
@@ -281,6 +293,11 @@ export interface GameProgress {
    * 견제 판(종류 4) 정산이 함께 센다(`features/defense-play/model/settlementEvents`). 공이 손을 떠날 때(0xa5e14) 비운다.
    */
   readonly pendingSettlementEvents?: PendingSettlementEvents
+  /**
+   * **우리 공격 루의 주자마다 그 주자를 내보낸 상대 투수**(주자+0x30, 붙박이 표 칸) — 정산 주자 루프(0xa8ea4~0xa8f36)가 들어온
+   * 주자의 실점(레코드 +0x22)을 지금 마운드가 아니라 이 투수에게 매긴다(`entities/game/model/runnerPitchers`). 없으면 지금 투수
+   */
+  readonly runnerPitchers?: RunnerPitcherTags
   /** 평판 가산 칸 누계 (0xa57f8) */
   readonly reputationCounts: ReputationCounts
   /** 사용자 최근 두 타석의 기록 코드 — 스킬 16·17 조건 (0x53100) */
@@ -1153,12 +1170,18 @@ function finishPlayerOutcome(
       ),
       // 내 타석도 같은 정산 0xa8024 가 타순 칸 기록(안타·홈런·타석)을 세운다
       ourLineup: recordLineupPlay(progress.ourLineup, progress.game.battingOrderIndex, outcome, { homeRunCounted }),
-      // 같은 정산이 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진을 쌓는다 (0xa8cca · 0xa8ee4 · 0xa8d1c)
-      pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
-        outs: outsAddedBetween(progress.game, nextGame) + (droppedThirdStrike ? 1 : 0),
-        runsAllowed: runsBattedIn,
-        strikeouts: outcome.kind === '삼진' ? 1 : 0,
-      }),
+      // 같은 정산이 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·탈삼진을 쌓고(0xa8cca · 0xa8d1c), 실점은 들어온 주자의
+      // 책임 투수에게 매긴다(0xa8ee4 — 주자 운명대로, 3아웃 갈래 포함)
+      ...chargeOpponentRunsOf(
+        progress,
+        chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
+          outs: outsAddedBetween(progress.game, nextGame) + (droppedThirdStrike ? 1 : 0),
+          strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        }),
+        nextGame,
+        lineupSlotOf(progress.game.battingOrderIndex),
+        scoredFromBasesOfMyPlay(progress.game, nextGame, outcome, defensePlay, runsBattedIn),
+      ),
       lastDefensePlay: playback,
       burst: resolution === null ? progress.burst : resolution.session,
       // 아직 안 보여 준 판정을 지우지 않는다 — 지우는 것은 창을 닫을 때뿐이다.
@@ -1244,11 +1267,18 @@ function finishStrikeoutStealSettlement(
       game: nextGame,
       decisions: decisionsAfterPlay(progress.decisions, progress.game, nextGame, moundsOf(progress)),
       opponentMound: { ...progress.opponentMound, justChanged: false },
-      // a8cb0 +0x20 · a8d00 +0x26 은 판 종류를 안 거른다 — 판의 아웃은 `arrivePitch` 가 이미 매겼고 여기는 삼진 사건 몫이다
-      pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
-        outs: outsAddedBetween(progress.game, nextGame),
-        strikeouts: 1,
-      }),
+      // a8cb0 +0x20 · a8d00 +0x26 은 판 종류를 안 거른다 — 판의 아웃은 `arrivePitch` 가 이미 매겼고 여기는 삼진 사건 몫이다.
+      // 삼진은 주자를 안 움직여 실점이 없다 — 반 이닝이 넘어가면 책임 투수 장부도 빈 루로
+      ...chargeOpponentRunsOf(
+        progress,
+        chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
+          outs: outsAddedBetween(progress.game, nextGame),
+          strikeouts: 1,
+        }),
+        nextGame,
+        null,
+        [],
+      ),
       lastDefensePlay: arrival.result,
       popularityPoints: progress.popularityPoints + points,
       doublePlays: progress.doublePlays + penalties.doublePlays,
@@ -1765,7 +1795,15 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
   const bases: BaseState = { first: placed[0] === true, second: placed[1] === true, third: placed[2] === true }
   // c237a 0xa9a9c → 0xa9a10(주자관리, 공격 팀 sim+0x74, 수비 팀 sim+0x78, 루표) — 찬 루를 3 → 1 루로 세며 k 번째 루에
   // 공격 팀 지금 타자 칸(team+0x32 = 내 칸)에서 거꾸로 k 번째 타순 칸을 세운다 (`runnersBehindCursor`). 굴림 없음
-  return { ...progress, game: { ...game, outs, bases, runners: runnersBehindCursor(bases, game.battingOrderIndex) } }
+  const seated = runnersBehindCursor(bases, game.battingOrderIndex)
+  // 0xa9a10 a9a44 — 새로 세운 주자의 책임 투수(주자+0x30)는 지금 마운드 투수 0xae83d(수비 팀)다
+  const pitcher = progress.opponentMound.pitcherSlot
+  const pitchers = {
+    first: seated.first === null ? null : pitcher,
+    second: seated.second === null ? null : pitcher,
+    third: seated.third === null ? null : pitcher,
+  }
+  return { ...progress, game: { ...game, outs, bases, runners: seated }, runnerPitchers: { runners: seated, pitchers } }
 }
 
 /**
@@ -2121,11 +2159,17 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
       ourLineup: recordLineupPlay(progress.ourLineup, slot, outcome, { quickEngine: true }),
-      pitcherLines: chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, mound.pitcherSlot, {
-        outs: outsAddedBetween(progress.game, game),
-        runsAllowed: runsBattedIn,
-        strikeouts: outcome.kind === '삼진' ? 1 : 0,
-      }),
+      // 실점은 들어온 주자의 책임 투수에게 (0xa8ee4) — 간이 엔진 주자는 죽지 않아 빠진 앞선 주자가 들어온 주자다
+      ...chargeOpponentRunsOf(
+        progress,
+        chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, mound.pitcherSlot, {
+          outs: outsAddedBetween(progress.game, game),
+          strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        }),
+        game,
+        lineupSlotOf(order),
+        scoredFromBasesOf(runnersOfGame(progress.game), appearance.runners, runsBattedIn),
+      ),
       opponentMound: {
         ...mound,
         // 공마다 이미 깎았다 (위 `beforePitch`, 0xc262c 의 c26c8)
@@ -2346,6 +2390,8 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
     {
       ...progress,
       opponentMound: after,
+      // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
+      runnerPitchers: freezeRunnerPitchers(progress.runnerPitchers, runnersOfGame(progress.game), before.pitcherSlot),
       // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다
       opponentPitcherStaminas: withStaminaAt(progress.opponentPitcherStaminas, before.pitcherSlot, before.stamina),
       // 그 투수의 투구 수(+0x27c)를 줄에 얹는다 — 교체 0xaec64 가 0 으로 돌린다
@@ -2702,13 +2748,19 @@ function withRunnerOnlyPlay(
     ...next,
     game,
     decisions: decisionsAfterPlay(next.decisions, before, game, moundsOf(next)),
-    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃·실점을 지금 상대 마운드 투수에게
-    pitcherLines: settles
-      ? chargePitcherLine(next.pitcherLines, next.opponentTeamId, next.opponentMound.pitcherSlot, {
-          outs: outsAddedBetween(before, game),
-          runsAllowed: runs,
-        })
-      : next.pitcherLines,
+    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃은 지금 상대 마운드 투수(a8cb0), 실점은 들어온 주자의 책임 투수(a8ee4)
+    ...chargeOpponentRunsOf(
+      next,
+      settles
+        ? chargePitcherLine(next.pitcherLines, next.opponentTeamId, next.opponentMound.pitcherSlot, {
+            outs: outsAddedBetween(before, game),
+          })
+        : next.pitcherLines,
+      game,
+      null,
+      chargedFromBasesOfFates(result.runnerFates, before.outs + advance.outsAdded),
+      settles,
+    ),
     opponentMound: {
       ...next.opponentMound,
       runsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentMound.runsAllowed + runs),
@@ -2716,6 +2768,59 @@ function withRunnerOnlyPlay(
     opponentInningRunsAllowed: Math.min(MAXIMUM_PITCHER_COUNTER, next.opponentInningRunsAllowed + runs),
   }
   return next
+}
+
+/**
+ * **우리 공격 플레이 하나의 실점을 책임 투수(주자+0x30)에게** — 정산 주자 루프 0xa8ea4~0xa8f36 이 들어온 주자마다 그 주자를
+ * 내보낸 상대 투수의 레코드 +0x22 를 올린다(승계 주자면 앞 투수). 루별 책임 투수 칸(`runnerPitchers`)도 플레이 뒤로 옮긴다 —
+ * 새로 나간 타자주자는 지금 마운드 투수(0x46418 → 0xa93ac 넷째 인자 0xae83d).
+ * `scoredFromBases` 는 실점을 매길 주자의 투구 때 루(0 = 타자주자). `settles` 가 거짓이면(정산을 안 지나는 판) 칸만 옮긴다.
+ */
+function chargeOpponentRunsOf(
+  progress: GameProgress,
+  lines: readonly GamePitcherLine[],
+  after: GameState,
+  batter: number | null,
+  scoredFromBases: readonly number[],
+  settles = true,
+): Pick<GameProgress, 'pitcherLines' | 'runnerPitchers'> {
+  const before = progress.game
+  const sameHalf = after.inning === before.inning && after.half === before.half
+  const settled = settleRunnerPitchers({
+    tags: progress.runnerPitchers,
+    before: runnersOfGame(before),
+    after: sameHalf ? runnersOfGame(after) : EMPTY_BASE_RUNNERS,
+    batter,
+    pitcher: progress.opponentMound.pitcherSlot,
+    scoredFromBases: settles ? scoredFromBases : [],
+  })
+  let pitcherLines = lines
+  for (const [pitcherSlot, runsAllowed] of chargedRunsByPitcher(settled.charged)) {
+    pitcherLines = chargePitcherLine(pitcherLines, progress.opponentTeamId, pitcherSlot, { runsAllowed })
+  }
+  return { pitcherLines, runnerPitchers: settled.tags }
+}
+
+/**
+ * 내 타석이 실점을 매길 주자의 투구 때 루 — 진행기를 돈 판은 그 운명, 삼진 · 볼넷 · 사구 · 홈런은 정산이 보는 목록
+ * (`runnerFatesWithoutPlay`), 둘 다 아닌 길(패턴 없이 온 시험 · 옛 호출)은 앞선 주자부터 점수판 득점만큼
+ */
+function scoredFromBasesOfMyPlay(
+  before: GameState,
+  after: GameState,
+  outcome: AtBatOutcome,
+  defensePlay: DefensePlayResult | null,
+  runs: number,
+): readonly number[] {
+  if (defensePlay !== null) {
+    return chargedFromBasesOfFates(defensePlay.runnerFates, before.outs + defensePlay.advance.outsAdded)
+  }
+  if (outcome.kind === '안타' || outcome.kind === '아웃') {
+    const sameHalf = after.inning === before.inning && after.half === before.half
+    return scoredFromBasesOf(runnersOfGame(before), sameHalf ? runnersOfGame(after) : EMPTY_BASE_RUNNERS, runs)
+  }
+  const fates = runnerFatesWithoutPlay(before.bases, outcome)
+  return chargedFromBasesOfFates(fates, before.outs + (outcome.kind === '삼진' ? 1 : 0))
 }
 
 /**

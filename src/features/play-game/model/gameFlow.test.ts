@@ -1742,3 +1742,35 @@ describe('내 삼진 + 도루 판 · 낫아웃 판의 정산 0xa8024 — [sp+0x3
     expect(아웃합(끝)).toBe(아웃합(보통) + 1)
   })
 })
+
+describe('승계 주자 실점 — 상대 투수 줄 +0x22 는 들어온 주자를 내보낸 투수(주자+0x30)에게 (0xa8ee4)', () => {
+  it('앞 투수가 내보낸 주자가 내 홈런에 들어오면 그 투수 줄, 내 득점은 지금 투수 줄', () => {
+    const progress = startGame(createSeededRandom(20100901))
+    const 지금투수 = progress.opponentMound.pitcherSlot
+    const 앞투수 = 99
+    const 일삼루 = {
+      ...progress,
+      game: {
+        ...progress.game,
+        half: '말' as const,
+        bases: { first: true, second: false, third: true },
+        runners: { first: 5, second: null, third: 4 },
+      },
+      runnerPitchers: {
+        runners: { first: 5, second: null, third: 4 },
+        pitchers: { first: 앞투수, second: null, third: 앞투수 },
+      },
+    }
+    const 끝 = startPlayerOutcome(일삼루, { kind: '홈런' }, createSeededRandom(3))
+    const 실점 = (slot: number) =>
+      끝.pitcherLines
+        .filter((line) => line.teamId === 끝.opponentTeamId && line.pitcherSlot === slot)
+        .reduce((sum, line) => sum + line.runsAllowed, 0)
+    const 처음실점 = (slot: number) =>
+      일삼루.pitcherLines
+        .filter((line) => line.teamId === 일삼루.opponentTeamId && line.pitcherSlot === slot)
+        .reduce((sum, line) => sum + line.runsAllowed, 0)
+    expect(실점(앞투수)).toBe(2)
+    expect(실점(지금투수) - 처음실점(지금투수)).toBeGreaterThanOrEqual(1)
+  })
+})

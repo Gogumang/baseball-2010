@@ -7,8 +7,8 @@ import type { GameEndDecision } from '@/entities/game/model/winLossSave'
  * (`leaguePitcherAppearancesOf` → `recordLeaguePitcherAppearances`)에 쌓는다.
  *
  * - 아웃: 0xa8cca~0xa8ce4 가 이번 플레이의 결과 코드 5(삼진)·0xd(아웃) 수를 더한다 — 웹은 그 플레이로 늘어난 아웃 수.
- * - 실점: 원본 0xa8ee4 는 홈을 밟은 주자에 적힌 **그 주자를 내보낸 투수**(주자+0x30)에게 매긴다. 웹 주자는 신원을 들고
- *   있지 않아 그 순간 마운드 투수에게 매긴다 — 반 이닝 엔진(`HalfInningPitcherLine`)과 같은 **근사다**.
+ * - 실점: 원본 0xa8ee4 는 홈을 밟은 주자에 적힌 **그 주자를 내보낸 투수**(주자+0x30)에게 매긴다 — 진행기마다 루별 책임 투수
+ *   칸(`entities/game/model/runnerPitchers`)을 들고 그 투수 줄에 매긴다(반 이닝 엔진 `HalfInningPitcherLine` 도 같다).
  * - 투구 수: 그 투수 마운드의 `pitches`(+0x27c) — 교체·경기 끝에 얹는다.
  */
 export interface GamePitcherLine {
