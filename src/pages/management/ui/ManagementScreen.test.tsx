@@ -122,7 +122,7 @@ describe('관리 화면 알림 상자', () => {
 
     clickCommand('트레이닝')
     clickCommand('필살타법')
-    fireEvent.click(screen.getByRole('button', { name: '파워 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '파워 스윙' }))
 
     expect(screen.queryByRole('dialog', { name: '알림' })?.textContent).toContain('인기도')
   })
@@ -135,7 +135,7 @@ describe('관리 화면 알림 상자', () => {
     clickCommand('트레이닝')
     clickCommand('필살타법')
     const 창 = screen.getByRole('dialog', { name: '필살타법' })
-    fireEvent.click(screen.getByRole('button', { name: '파워 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '파워 스윙' }))
     expect(document.body.textContent).toContain('G포인트가 부족합니다')
     // 키로 [예] (처음 커서) — 상자 단추를 누르면 클릭이 창 바깥 덮개(닫기)까지 올라간다
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -166,7 +166,7 @@ describe('관리 화면 알림 상자', () => {
 
     clickCommand('선수정보')
     clickCommand('필살타법')
-    fireEvent.click(screen.getByRole('button', { name: '플레임 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '플레임 스윙' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(onSelectSpecialSwing).toHaveBeenCalledWith(2)

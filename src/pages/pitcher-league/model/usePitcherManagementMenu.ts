@@ -14,7 +14,6 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import {
   MAGIC_MAXIMUM_LEVEL,
   MAGIC_REQUIRED_POPULARITY,
-  MAGIC_TRAINING_CELL_COUNT,
   PITCHER_TRAINING_MENUS,
   magicTrainingCellBlockOf,
   magicTrainingCellCostOf,
@@ -61,6 +60,7 @@ import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pi
 import type { DetailRow } from '@/pages/management/lib/detailPopup'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { moveSpecialTrainingCursor, specialTrainingKeyOf } from '@/widgets/special-swing/lib/specialTrainingWindow'
 
 /**
  * 투수편 관리 화면의 상태 기계 — 원본 장면 0x106 의 상태 **105(허브) · 106(선수정보) · 107(트레이닝)**
@@ -484,25 +484,17 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다)
       if (question !== null || choice !== null || notice !== '') return
       /*
-       * 108 마구 창 — 확인(−5 / '5')은 0x17828 의 칸 가드, 그 밖 키는 창 객체 0x80269 가 격자 커서를 옮긴다.
-       * 칸 넷이 한 줄이라 ←→ 로 돌고 끝에서 감긴다(타자 필살타법 창 `SpecialSwingWindow` 와 같은 창 키). 취소는 `back`.
+       * 108 마구 창 — 확인(−5 / '5')은 0x17828 의 칸 가드, 그 밖 키는 창 객체 0x80269 가 탭 격자(4, 1, 0x330)를 옮긴다.
+       * 칸 넷이 한 줄이라 ←→ 로 돌고 끝에서 감기며, ↑ 는 왼쪽 · ↓ 는 오른쪽 칸이 된다(타자 필살타법 창과 같은 창 키). 취소는 `back`.
        */
       if (subWindow === '마구훈련') {
-        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-        if (step !== 0) {
-          event.preventDefault()
-          return setMagicTrainingCursor((current) => (current + step + MAGIC_TRAINING_CELL_COUNT) % MAGIC_TRAINING_CELL_COUNT)
-        }
-        if (event.key === 'Enter' || event.key === '5') {
-          event.preventDefault()
-          return confirmMagicTrainingCell(magicTrainingCursor)
-        }
+        const key = specialTrainingKeyOf(event.key)
+        if (key === null) return undefined
+        event.preventDefault()
+        if (key === 'ok') return confirmMagicTrainingCell(magicTrainingCursor)
         // 취소(−16) → 107 (17a76 `0xbcb49(this+0x18, 0x6b)`)
-        if (event.key === 'Escape' || event.key === 'Backspace') {
-          event.preventDefault()
-          return back()
-        }
-        return undefined
+        if (key === 'clr') return back()
+        return setMagicTrainingCursor((current) => moveSpecialTrainingCursor(current, key))
       }
       // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8')
       if (abilityDetailOffset !== null) {

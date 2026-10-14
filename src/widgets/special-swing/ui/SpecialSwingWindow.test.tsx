@@ -16,7 +16,7 @@ afterEach(cleanup)
 const 한줄로 = (text: string) => stripGameMarkup(text).replace(/\s+/g, '')
 const 문구 = (index: number) => 한줄로(ORIGINAL_MODE_TEXT[index])
 const 알림글 = () => 한줄로(screen.getByRole('dialog', { name: '알림' }).textContent ?? '')
-const 칸누르기 = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
+const 칸누르기 = (name: string) => fireEvent.click(screen.getByRole('option', { name }))
 
 describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
   it('배우지 않은 칸은 StrMODE[71] "트레이닝 완료 후 사용할 수 있습니다" 다', () => {
@@ -149,5 +149,50 @@ describe('배우기 — 상태 0x6c · 0x17828', () => {
 
     expect(onTrain).toHaveBeenCalledTimes(1)
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('그림 · 키 — 0x803d4 탭 0 · 창 키 0x80268', () => {
+  const 고른칸 = () => screen.getAllByRole('option').findIndex((option) => option.getAttribute('aria-selected') === 'true')
+
+  it('123(0x7b) 진입 0x17690 은 커서를 칸 0 에 둔다 — G 동전 · 비용 · 횟수 없이 아래 글은 "장착"(295)', () => {
+    const { container } = render(<SpecialSwingWindow level={3} sessions={0} battingTypeIndex={0} onClose={vi.fn()} />)
+
+    expect(고른칸()).toBe(0)
+    expect(container.querySelector('img[src$="gpoint/011.png"]')).toBeNull()
+    expect(screen.queryByTestId('필살타법-비용-횟수')).toBeNull()
+    expect(screen.getByTestId('필살타법-글').getAttribute('data-label')).toBe('295')
+  })
+
+  it('↑ 는 왼쪽 칸, ↓ 는 오른쪽 칸 — 숫자 4 · 6 도 같다 (탭 격자 0x330 감기)', () => {
+    render(<SpecialSwingWindow level={3} sessions={0} battingTypeIndex={0} onClose={vi.fn()} />)
+
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(고른칸()).toBe(3)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: '6' })
+    expect(고른칸()).toBe(1)
+    fireEvent.keyDown(window, { key: '4' })
+    expect(고른칸()).toBe(0)
+  })
+
+  it('장타형이 메테오(저장 4)를 쓰면 넷째 칸 아이콘은 주황이지만 "사용중" 글은 안 뜬다', () => {
+    render(<SpecialSwingWindow mode="훈련" level={4} sessions={0} battingTypeIndex={1} selectedNumber={4}
+      popularity={9999} gamePoint={9999} onClose={vi.fn()} />)
+
+    expect(screen.getByTestId('필살칸-3').getAttribute('data-in-use')).toBe('true')
+    expect(screen.queryByTestId('필살타법-글')).toBeNull()
+  })
+
+  it('훈련 창 — 비용 · 횟수 · 이름 · 설명 · 잠김은 배운 수 L ≤ i 인 칸', () => {
+    render(<SpecialSwingWindow mode="훈련" level={1} sessions={2} battingTypeIndex={0}
+      popularity={9999} gamePoint={9999} onClose={vi.fn()} />)
+
+    const figures = screen.getByTestId('필살타법-비용-횟수')
+    expect(figures.getAttribute('data-cost')).toBe('700')
+    expect(figures.getAttribute('data-progress')).toBe('2/5')
+    expect(screen.getByTestId('필살타법-이름').textContent).toBe('플레임 스윙')
+    expect(screen.getByTestId('필살타법-설명').textContent).toBe('조건: 인기도500 / 파워 스윙사용 횟수:3')
+    expect([0, 1, 2, 3].map((slot) => screen.getByTestId(`필살칸-${slot}`).getAttribute('data-locked'))).toEqual(['false', 'true', 'true', 'true'])
   })
 })

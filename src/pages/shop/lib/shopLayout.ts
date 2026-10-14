@@ -156,7 +156,7 @@ export const INNER = {
   descriptionLineHeight: 13,
 } as const
 
-/** 커서는 칸을 1px 둘러싸고 깜박인다 (필살타법 창 0x803d4 와 같은 방식) */
+/** 커서는 칸을 1px 둘러싸고 깜박인다 */
 export const CURSOR_BLINK_PERIOD = 10
 export const CURSOR_VISIBLE_UPDATES = 9
 
