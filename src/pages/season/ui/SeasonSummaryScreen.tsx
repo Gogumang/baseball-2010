@@ -43,10 +43,8 @@ export interface SeasonSummaryScreenProps {
   readonly series: PostseasonSeries | null
   /**
    * **내 팀의 포스트시즌 순위** `0xb7aa0(리그, 팀, 0)` — 0 우승 · 1 준우승 · 그 밖은 보상 없음.
-   *
-   * ⚠️ 웹 `entities/league` 에는 아직 이 함수가 없다(순위표 `rankingOf` 는 정규시즌 승패로만 센다).
-   * 그래서 값을 지어내지 않고 **부르는 쪽에서 받는다** — 한국시리즈 우승팀이면 0,
-   * 한국시리즈에서 진 팀이면 1 을 넘기면 된다.
+   * 부르는 쪽이 `seasonPostseasonRankOf`(앱 세션)로 센다 — 결과 키 0x9dc8 은 L+0x36(끝남)일 때만 이 사슬을 열어 늘 대진 칸
+   * 갈래다: 우승 0 · 한국시리즈 1 · 플레이오프 2 · 준플레이오프 3 · 못 든 팀 10.
    */
   readonly postseasonRank: number
   /** 저장(전역) **+0x145** — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 시작해도 유지된다) */
