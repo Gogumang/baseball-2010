@@ -86,6 +86,10 @@ export interface StageLatest {
   readonly isEagleEyeEnabled: boolean
   readonly hud: StageHud | null
   /**
+   * 마운드 투수 체력 % — 34 이하면 투수 자리에 체력 그림(player_effect 애니 9 · 10, 0x38d1c)을 그린다. 안 넘기면 안 그린다
+   */
+  readonly pitcherStaminaPercent?: number | null
+  /**
    * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
    * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
    */
