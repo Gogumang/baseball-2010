@@ -40,10 +40,20 @@ describe('선수 카드 0xd9', () => {
     expect(props.onBack).toHaveBeenCalled()
   })
 
-  it('이름과 네 칸 — 실효값이 기본값보다 낮으면 빨강 (사기 20 → −100)', () => {
+  it('레이더 네 칸 — 실효값이 기본값보다 낮으면 빨강 (사기 20 → −100) · 타자는 축 이름 41~44', () => {
     띄우기(false, 20)
-    expect(screen.getByTestId('선수상세-이름').textContent).toBe('박택용')
-    expect(screen.getByTestId('선수상세-능력-0').textContent).toBe('히트470')
+    const hit = screen.getByTestId('시즌카드-능력-0')
+    expect(hit.dataset.value).toBe('470')
+    expect(hit.dataset.color).toBe('#FF0000')
+    expect(hit.dataset.label).toBe('41')
+  })
+
+  it('카드 0x7ba44 — 계단형 판 · 반투명 로고(12/16) · 타자 그림 (이름 글은 정보 칸에만)', () => {
+    띄우기(false)
+    expect(screen.getByTestId('시즌카드-판')).toBeTruthy()
+    expect(screen.getByTestId('시즌카드-로고').style.opacity).toBe('0.75')
+    expect(screen.getByTestId('시즌카드-타자그림')).toBeTruthy()
+    expect(screen.queryByTestId('선수상세-이름')).toBeNull()
   })
 
   it('정보 칸 0x7c450 — 타자는 여덟 줄(끝이 노란 타순)', () => {
