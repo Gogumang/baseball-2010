@@ -47,6 +47,8 @@ import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
+import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
+import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { UI_COLORS } from '@/shared/config/design'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
@@ -170,6 +172,11 @@ export interface StageScene {
   /** 경기 스킬 표시 판(0x4b5b4) 이 그림의 모습 — 상태 0xf ~ 0x11 이고 수명이 남았을 때만 (`skillPanel`) */
   readonly skillPanel?: SkillPanelView | null
   /**
+   * 필살 스윙 연출 그림 (0x49aec) — 타격점 (x, y) 에 그림 애니 0 의 `drawCall` 번째 부름 칸, 미라지면 반대쪽 타석의 타자 그림.
+   * 상태 0x13 동안만 부르는 쪽이 채운다 (`specialSwingEffect`). 없거나 null 이면 안 그린다
+   */
+  readonly specialSwingEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number; readonly drawCall: number }) | null
+  /**
    * 사람 투구 UI (구질 목록 0xf · 조준 0x10 · 게이지 0x11) — 상태 그리기가 장면 위에 그리는 것 (`pitchInputOverlay`).
    * 구질 목록이면 존 자리(0x4c53c)에 존 대신 그린다
    */
@@ -207,7 +214,15 @@ export function renderBattingStage(
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
+  const special = scene.specialSwingEffect ?? null
+  // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
+  if (special !== null && special.isBehindBatter) drawSpecialSwingPicture(context, special)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder)
+  // 미라지(49c9c~49d40) — 같은 타자 그림을 반대쪽 타석 앵커(0xcfb34 / 0xcfb2c)에 반대 손 자세로, 좌우 이동(+0xfe4) 없이 한 장 더
+  if (special !== null && special.showsMirage) {
+    drawBatter(context, scene.swingFrame, 0, scene.bodyType, side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
+  }
+  if (special !== null && !special.isBehindBatter) drawSpecialSwingPicture(context, special)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, platePixelOf(scene.pitch))
   }
@@ -448,6 +463,28 @@ function drawPitcher(
   if (image === null) return
 
   context.drawImage(image, MOUND_CENTER_X - image.width / 2, MOUND_BOTTOM_Y - image.height)
+}
+
+/**
+ * 필살 그림 애니 0 의 지금 칸 (0xbe8a5 종류 2 → 0x93c45). 효과 0x11 · b 0 은 점 x 를 축으로 거울(R6 3b — x' = X − (dx + 폭))
+ */
+function drawSpecialSwingPicture(
+  context: CanvasRenderingContext2D,
+  special: NonNullable<StageScene['specialSwingEffect']>,
+): void {
+  const entries = frameAnimations(special.folder)?.[0]
+  const frameIndex = entries === undefined ? null : specialSwingEffectFrameAt(entries, special.drawCall)
+  const frame = frameIndex === null ? null : placedFrame(special.folder, frameIndex)
+  if (frame === null) return
+  const x = Math.round(special.x)
+  const y = Math.round(special.y) + special.offsetY
+  context.save()
+  if (special.isMirrored) {
+    context.translate(x * 2, 0)
+    context.scale(-1, 1)
+  }
+  context.drawImage(frame.image, x + frame.offsetX, y + frame.offsetY)
+  context.restore()
 }
 
 /**

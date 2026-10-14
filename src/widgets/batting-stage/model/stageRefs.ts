@@ -16,6 +16,7 @@ import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
+import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -70,6 +71,11 @@ export interface PendingHit {
   readonly resultText: string
   /** 이 공의 번트 종류 장면 +0xfdc (0 스윙 · 1~3 번트) — 인플레이로 넘길 때 함께 알린다 */
   readonly buntKind: number
+  /**
+   * 필살 스윙 연출 그림(0x49aec) — 상태 0x13 동안 타격점에 그림 애니 · 미라지 타자를 그린다 (`specialSwingEffect`).
+   * 필살 갈래를 안 타는 스윙이면 null
+   */
+  readonly specialEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null
 }
 
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */
