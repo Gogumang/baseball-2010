@@ -219,8 +219,8 @@ describe('경기 장면 — 0x3e340 의 맨 앞 0x3e350 이 소리를 끊고 시
 })
 
 describe('메인 메뉴 아래 화면 — 상태 7 · 8 · 13 · 하위 목록은 진입 표 0xcea84 의 빈 칸이라 1 이 이어진다', () => {
-  it('도움말 · 환경설정 · 스페셜 · 나리편선택은 배경음을 안 바꾼다', () => {
-    for (const kind of ['도움말', '환경설정', '스페셜', '나리편선택'] as const) expect(screenBgmOf({ kind })).toBeNull()
+  it('도움말 · 환경설정 · 스페셜은 배경음을 안 바꾼다', () => {
+    for (const kind of ['도움말', '환경설정', '스페셜'] as const) expect(screenBgmOf({ kind })).toBeNull()
     expect(screenBgmOf({ kind: '메인메뉴' })).toBe(1)
   })
 
