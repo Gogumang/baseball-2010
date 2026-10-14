@@ -1,5 +1,5 @@
 import {
-  DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN, WHEEL,
+  DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN,
   descriptionPanelTopOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 
@@ -21,7 +21,7 @@ import {
  * (앞서 "다섯 칸뿐이라 이 화면에 없다" 고 적어 둔 주석은 틀렸다).
  */
 
-export { DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN, WHEEL, descriptionPanelTopOf, rowTopOf }
+export { DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN, descriptionPanelTopOf, rowTopOf }
 
 /**
  * ⚠️ 아래 다섯 칸은 **도움말이 아니라 랭킹 하위 메뉴(상태 9)** 의 것이다 (표 `0xceb37` =

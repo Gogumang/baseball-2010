@@ -103,7 +103,7 @@ const MODE_SAVE_KEY = 'compus-baseball/mode-save'
 const NARI_BATTER_MODE = 4
 const NARI_PITCHER_MODE = 3
 
-const ENTRY_SCREENS: readonly Screen['kind'][] = ['이용안내', '로고', '타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '나리편선택', '팀선택', '선수등록', '홈런더비', '일반모드']
+const ENTRY_SCREENS: readonly Screen['kind'][] = ['이용안내', '로고', '타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '팀선택', '선수등록', '홈런더비', '일반모드']
 
 const MISSION_SCREENS: readonly Screen['kind'][] = [
   '마선수대결',

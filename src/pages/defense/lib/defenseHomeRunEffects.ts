@@ -210,7 +210,7 @@ export function stepDefenseEffects(
 
 /**
  * 키 건너뛰기 0x519cc(51a0a~51a32) — +0x1960 = 0(글자 끄기) · 0x8fc70(홈런 효과 칸 버리기) · 파티클 +0x57 = 0 · 0x6dee4(파티클 치우기).
- * 글자 칸(+0x1961~)과 +0x36 은 안 건드린다. ⚠️ 0x6e418(소리 멈춤)은 소리 포트에 멈춤이 없어 안 옮겼다.
+ * 글자 칸(+0x1961~)과 +0x36 은 안 건드린다. 같은 처리의 소리 끊기 0x6e418(0x519fe)은 부르는 쪽(`DefensePlayback`)이 소리 포트 `stop` 으로 한다.
  */
 export function fastForwardDefenseEffects(effects: DefenseEffects, particles: ParticleScene): DefenseEffects {
   clearParticles(particles)

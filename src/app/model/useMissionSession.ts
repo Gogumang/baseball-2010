@@ -1393,7 +1393,8 @@ export function useMissionSession({
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: throwModeManual === false ? '자동' : '수동',
-            // 장면 +0xfdc — CPU 타자의 이 공 번트 종류(⚠️ 번트 헛스윙은 `simulateBatter` 가 아직 안 낸다)
+            // 장면 +0xfdc — CPU 타자의 이 공 번트 종류. 휘두른 공은 0x3445a 가 쓴 값(번트 헛스윙도 남는다), 안 휘두른 공은
+            // 0x11 진입 0x340dc 의 memset(+0xfd8, 0, 12)이 지운 0 (`pitchAgainstBatterDetailed` 의 `buntKind`) — 도루 리드 0x3d7b8 의 +3 틱이 본다
             buntKind: thrown.buntKind ?? 0,
             // 경기 +0xfd4 — 이 공의 값
             sceneResultCode: sceneResultCodeRef.current,
@@ -2326,7 +2327,7 @@ const STEAL_RECORD_ID = 8
  * 도루 목표 칸은 확정이다 (직접 재역어셈): 판정 0xaaa6c 모드 6 갈래가 `0xaa928(R+0x10c, 행+0xa4 아래)`(aab56)로 재고,
  *    R+0x10c(사건 코드 0x10, 핸들러 0xa5900 `+= 1`)를 올리는 곳은 정산 0xa8024 의 a8388 하나 — 도루 주자 루프(a830c~a83d6)
  *    에서 루를 옮긴 주자마다 기록 8(a83c6)과 **같은 반복**에서 부른다. 그래서 기록 8 의 수와 같다. 판정은 판 끝(0xae5c4)에서 돈다.
- * ⚠️ 악송구·폭투로 들어온 득점은 타점이 아니라 목표·화면 점수에 안 든다 — 견제와 같은 근사(`applyPickoff` 주석).
+ * 악송구·폭투로 들어온 득점은 점수판(화면 점수 · 경기 끝)에는 들고 타점 목표에는 안 든다 — 원본 정산 a8946 그대로(`applyPickoff` 주석).
  */
 function withMissionRunnerPlay(run: MissionRun, play: PitchArrivalPlay): MissionRun {
   if (run.status !== '진행중') return run

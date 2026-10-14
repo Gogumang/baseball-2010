@@ -268,7 +268,7 @@ export interface HomeRunDerbySession {
   /**
    * 판(0x17)이 도는 동안 받은 키 — 0x17 키 처리 0x53420 이 키마다 보내는 메시지 0x587 → 0x519cc (`skipDerbyBattedBall` 머리말).
    * 홈런 틱 다음부터 판 끝 전까지만 효과가 있다: 공 틱을 끝으로 넘겨 다음 틱에 관문을 닫고(판 끝 = 키 틱 + 1 + 10),
-   * HOMERUN 글자를 끈다. ⚠️ 같은 처리의 소리 멈춤 0x6e418 은 소리 포트에 멈춤이 없어 안 옮겼다(shared — 구역 밖).
+   * HOMERUN 글자를 끄고, 울리던 소리를 끊는다(0x519fe 의 0x6e418 — 소리 포트 `stop`).
    */
   readonly skipHomeRun: () => void
   /**
@@ -471,7 +471,10 @@ export function useHomeRunDerby({
     // 0xd 첫 그림 — 0x48d50 의 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음(모드 갈림 없음). 더비의 0xd 는 첫 공 앞 ·
     // 단계가 오를 때 · 보너스를 열 때뿐이라 교체 연출 0x16 을 안 거친다. 타자는 모드 타자(나리 · 명전 기록 — 마선수 비트 0x40 없음)라
     // 26 이 아니고, 주자를 두는 판이 없어 14 다.
-    // ⚠️ 볼넷 · 사구 뒤 원본은 주자를 세우는지(2·3루면 15) 안 떴다 — 웹 더비에는 주자 칸이 없다
+    // 볼넷 · 사구 뒤에도 주자가 안 선다 (2026-10-14 직접 떴다): 판정 v3 · v4(0x3e1ae · 0x3e1b4)는 플레이 종류만 2 로 두고
+    // (0xb0cb8(플레이, 2)), 주자를 루에 세우는 것은 0x12 끝 0xae24c 의 일반 갈래 ae344~ae35c(st[0xb] 3 · 4 → 상태 0x17)다.
+    // 모드 7 은 ae270 `cmp 7` 에서 ae274~ae336(기회 셈 → 0xd 또는 0x1a)으로 갈라 0x17 을 안 지난다 → 0xa97a1(2·3루)이 늘 거짓이라
+    // 15 가 아니라 늘 14 다. 웹 더비에 주자 칸이 없는 것도 원본 그대로다
     playSoundIds(audioRef.current, [DERBY_AT_BAT_ENTRY_SOUND])
     prepareTimerRef.current = window.setTimeout(() => {
       prepareTimerRef.current = null

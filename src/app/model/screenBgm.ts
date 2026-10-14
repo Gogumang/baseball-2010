@@ -30,7 +30,7 @@ import type { PitcherScene, PitcherStoryContext } from '@/app/model/usePitcherLe
  */
 export const SCREEN_BGM = {
   메인메뉴: 1,
-  // 도움말 · 스페셜 · 나리편선택은 없다 — 모두 장면 0x103 안의 상태(7 · 13 · 하위 목록)라 진입이 상태 표
+  // 도움말 · 스페셜은 없다 — 모두 장면 0x103 안의 상태(7 · 13)라 진입이 상태 표
   // 0xcea84 의 아무것도 안 하는 칸이다. 메뉴의 1 이 이어진다. 환경설정(8)은 진입 0x259fc 가 소리를 끊는다(`stopsSoundOnEnter`) —
   // 그래서 돌아올 때 0x24a40 이 1 을 처음부터 다시 튼다(`useScreenBgm`)
   팀선택: 3,
