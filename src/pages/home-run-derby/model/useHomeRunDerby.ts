@@ -3,6 +3,7 @@ import { startPlayClock } from '@/entities/collection/model/playClock'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { derbyNoContactWaitFramesOf, derbyPitchCallOf } from '@/pages/home-run-derby/lib/derbyPitchCall'
 import {
   DERBY_HOME_RUN_SOUND,
@@ -232,6 +233,10 @@ export interface HomeRunDerbySession {
    * 끝나면 `finishBenchClearing` 을 부른다(출구 0xae24c).
    */
   readonly isBenchClearing: boolean
+  /** 벤치 클리어링 진입 굴림 45 번 (`rollBenchClearingEntry`) — 운동장 그림 재료. 안 섰으면 null */
+  readonly benchClearingEntryRolls: readonly BenchClearingEntryRoll[] | null
+  /** 상대(수비, 측 1) 팀 — 장면 셋업 0x39fdc 모드 7 의 rand(0, 9). 아직 안 뽑았으면 undefined */
+  readonly opponentTeamId: number | undefined
   /** 벤치 클리어링 연출이 끝났다 — `reachedTargetTick` = 틱 10 의 수비 목표 굴림 8 번(0x401d4)이 돌았는가 */
   readonly finishBenchClearing: (reachedTargetTick: boolean) => void
   /** 결과를 보여 주는 동안·상태 0xe 에서 OK 를 기다리는 동안은 새 공을 안 던진다 */
@@ -326,6 +331,8 @@ export function useHomeRunDerby({
   const ballsRef = useRef(0)
   /** 벤치 클리어링(상태 0x1e) 중인가 */
   const [isBenchClearing, setIsBenchClearing] = useState(false)
+  /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 */
+  const [benchClearingEntryRolls, setBenchClearingEntryRolls] = useState<readonly BenchClearingEntryRoll[] | null>(null)
   const isBenchClearingRef = useRef(false)
   const myTeamIdRef = useRef(myTeamId)
   myTeamIdRef.current = myTeamId
@@ -692,7 +699,7 @@ export function useHomeRunDerby({
         ) {
           // 진입 0x3a5f0 — 공격 9명 굴림 45 번 (`rollBenchClearingEntry`). 꼬리 0x3ab4a~ 의 수비 CPU 투구 수 +10 · 평판 0xa755c 는
           // 더비에 보이는 곳이 없다(체력% 0xaebb0 은 모드 7 이면 늘 100 · 기록은 a780a 가 막는다)
-          rollBenchClearingEntry(scene)
+          setBenchClearingEntryRolls(rollBenchClearingEntry(scene))
           isBenchClearingRef.current = true
           setIsBenchClearing(true)
           return
@@ -825,6 +832,8 @@ export function useHomeRunDerby({
     batter: derbyLineupBatterOf(lineup),
     modeBatterPosition: derbyModeBatterPositionOf(lineup),
     isBenchClearing,
+    benchClearingEntryRolls,
+    opponentTeamId,
     finishBenchClearing,
     isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,
     isAwaitingConfirm,

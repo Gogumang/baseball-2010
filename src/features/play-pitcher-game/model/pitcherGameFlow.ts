@@ -186,6 +186,7 @@ import type {
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
@@ -556,6 +557,8 @@ export interface PitcherGameProgress {
     readonly outcome: AtBatOutcome
     /** 이 사구 공이 연 밀어내기 판(종류 2, `arrivePitcherPitch`) — 연출 뒤 0x17 로 재생한다 */
     readonly arrivalPlay?: PitchArrivalPlay | null
+    /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+    readonly entryRolls?: readonly BenchClearingEntryRoll[]
   } | null
   /**
    * 마지막으로 **OK 를 기다리며 선** 공수 교대 판(상태 0x18 교대 가지) — 화면은 `serial` 이 바뀌면 판을 띄운다.
@@ -1286,8 +1289,11 @@ function afterMyPitchArrival(
   const settled = withPitcherBenchClearing(arrived, outcome, random)
   if (settled !== arrived) {
     // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
-    rollBenchClearingEntry(random)
-    return { ...settled, pendingBenchClearing: play === null ? { outcome } : { outcome, arrivalPlay: play } }
+    const entryRolls = rollBenchClearingEntry(random)
+    return {
+      ...settled,
+      pendingBenchClearing: play === null ? { outcome, entryRolls } : { outcome, arrivalPlay: play, entryRolls },
+    }
   }
   return finishNonPlayOutcome(settled, outcome, random, play)
 }

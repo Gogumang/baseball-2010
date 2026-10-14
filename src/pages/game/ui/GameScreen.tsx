@@ -13,6 +13,7 @@ import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { teamBatters } from '@/entities/team/model/teamRoster'
+import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
@@ -236,7 +237,24 @@ export function GameScreen({
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
   if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
-    return <BenchClearingScene onDone={onBenchClearingDone} />
+    return (
+      <BenchClearingScene
+        // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명 (사구를 맞은 타자는 나다)
+        field={benchClearingFieldOf({
+          entryRolls: progress.pendingBenchClearing.entryRolls,
+          half: progress.game.half,
+          playerSide: progress.game.playerSide,
+          ourTeamId: career.teamId,
+          opponentTeamId: progress.opponentTeamId,
+          batterHand: career.battingSide,
+          bases: progress.game.bases,
+          grassPalette: sceneFieldPaletteOf(sceneStadium),
+        })}
+        // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
+        random={random}
+        onDone={onBenchClearingDone}
+      />
+    )
   }
 
   /**

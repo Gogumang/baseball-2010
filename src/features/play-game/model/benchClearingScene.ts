@@ -52,11 +52,11 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * | 틱 | 하는 일 |
  * |---|---|
  * | 10 | **수비 8명** 목표 = 투수판 둘레 — rand 8 번 (아래) |
- * | 30 | 수비 선수 동작 번호 (vt 0x44: 1·1·1·4·4·3·2·2·0) |
+ * | 30 | 수비 선수 동작 번호 vt 0x44 — [8] 1 · [7] 1 · [6] 1 · [5] 4 · [4] 4 · [3] 3 · [2] 2 · [1] 2 → 0 · [0] 0 |
  * | 60 | 공격 8명(+0x1774..+0x1758) 목표 = 더그아웃 점, 마지막 한 명(+0x1778) 동작 3/4(st[9]) · +0xb8 = 10 |
  * | 70 · 80 | +0x1778 동작 3/4 (st[9] 에 따라) |
  * | 100 | 화면 전환 0xbdae8([0x140007c], 7, 0, 5, 1500) — 종류 7 은 굴리지 않는다(종류 8 만 0x9d468) |
- * | > 100 · 전환 끝 | 소리 멈춤 0x6e418, 다음 = 0xae24c(보통 길) |
+ * | > 100 · 전환 끝 | 소리 멈춤 0x6e418, 다음 = 0xae24c(보통 길) — 종류 7 은 단계 0 → 32 를 한 그림에 하나씩 그려 **틱 133** 에 끝난다 |
  * 틱 10 의 굴림 (401fa~4039a): rand(1000, 2000) · rand(2000, 3000) · rand(1000, 1500) · rand(2500, 3000) ·
  * rand(1000, 1500) · rand(2500, 3000) · rand(0, 2000) · rand(0, 2000) = **8 번**.
  *
@@ -69,35 +69,58 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 /** 공격 쪽 선수 수 — 진입 루프 i = 8..0 */
 const OFFENSE_PLAYERS = 9
 
-/** 진입 0x3a5f0 의 굴림 45 번 — 값은 그림(선수 자리·목표)에만 쓰여 버린다 */
-export function rollBenchClearingEntry(random: RandomPort): void {
-  for (let index = OFFENSE_PLAYERS - 1; index >= 0; index -= 1) {
-    random.rand(0, 200)
-    random.rand(100, 300)
-    random.rand(200, 400)
-    // 측 0 · 측 1 갈래가 목표 표 칸만 다르고 굴림 범위·차례는 같다
-    random.rand(-1000, 1000)
-    random.rand(-1000, 8000)
-  }
+/** 진입 0x3a5f0 이 공격 쪽 칸 i 하나에 굴린 다섯 — 그림 0x43228 이 이것으로 공격 9명을 세운다 (`widgets/field-walk`) */
+export interface BenchClearingEntryRoll {
+  /** 3a780 rand(0, 200): x = 더그아웃.x − (r + 100)·(8 − i) */
+  readonly scatterX: number
+  /** 3a79c rand(100, 300): z = 더그아웃.z − (r + 100)·(8 − i) */
+  readonly scatterZ: number
+  /** 3a7be rand(200, 400): 걸음 0xbec7c — 곧이어 0xa21bc 가 220 으로 덮는다(원본 그대로) */
+  readonly speed: number
+  /** rand(−1000, 1000): 목표 x = 표 칸.x + r */
+  readonly targetX: number
+  /** rand(−1000, 8000): 목표 z = 표 칸.z + r */
+  readonly targetZ: number
 }
 
-/** 틱 10 에 수비 8명 목표를 다시 줄 때의 굴림 8 번 (0x401d4) */
-export function rollBenchClearingTargets(random: RandomPort): void {
-  random.rand(1000, 2000)
-  random.rand(2000, 3000)
-  random.rand(1000, 1500)
-  random.rand(2500, 3000)
-  random.rand(1000, 1500)
-  random.rand(2500, 3000)
-  random.rand(0, 2000)
-  random.rand(0, 2000)
+/** 진입 0x3a5f0 의 굴림 45 번 — 값은 그림(선수 자리·목표)에만 쓰인다. 칸 i 의 값이 `[i]` 에 든다(굴림 차례는 i = 8 → 0) */
+export function rollBenchClearingEntry(random: RandomPort): readonly BenchClearingEntryRoll[] {
+  const rolls: BenchClearingEntryRoll[] = []
+  for (let index = OFFENSE_PLAYERS - 1; index >= 0; index -= 1) {
+    const scatterX = random.rand(0, 200)
+    const scatterZ = random.rand(100, 300)
+    const speed = random.rand(200, 400)
+    // 측 0 · 측 1 갈래가 목표 표 칸만 다르고 굴림 범위·차례는 같다
+    const targetX = random.rand(-1000, 1000)
+    const targetZ = random.rand(-1000, 8000)
+    rolls[index] = { scatterX, scatterZ, speed, targetX, targetZ }
+  }
+  return rolls
+}
+
+/**
+ * 틱 10 에 수비 8명 목표를 다시 줄 때의 굴림 8 번 (0x401d4) — 굴린 차례 그대로 돌려준다
+ * (칸 8 x · 칸 6 x · 칸 5 x · 칸 3 z · 칸 2 z · 칸 1 x · 칸 0 x · 칸 0 z — `benchClearingWalk` 가 쓴다)
+ */
+export function rollBenchClearingTargets(random: RandomPort): readonly number[] {
+  return [
+    random.rand(1000, 2000),
+    random.rand(2000, 3000),
+    random.rand(1000, 1500),
+    random.rand(2500, 3000),
+    random.rand(1000, 1500),
+    random.rand(2500, 3000),
+    random.rand(0, 2000),
+    random.rand(0, 2000),
+  ]
 }
 
 /** 수비 목표 굴림이 나가는 틱 */
 export const BENCH_CLEARING_TARGET_TICK = 10
-/** 화면 전환이 걸리는 틱 — 그 뒤 전환이 끝나면 나간다 */
+/**
+ * 화면 전환이 걸리는 틱 — 그 뒤 전환이 끝나면 나간다. 전환(종류 7 원 닫기)의 길이 · 그림은 `widgets/field-walk/lib/benchClearingWalk`
+ * (`BENCH_CLEARING_EXIT_TICK`). 예전 웹은 0xbdae8 의 마지막 인자 1500 을 ms 로 읽었으나 종류 7 은 그 인자를 안 쓴다(bdb14).
+ */
 export const BENCH_CLEARING_TRANSITION_TICK = 100
-/** 0xbdae8 의 마지막 인자 — 전환 길이 1500 (ms 로 보인다, 유력) */
-export const BENCH_CLEARING_TRANSITION_MS = 1500
 /** 진입 꼬리 0x3aba4 — `0x6e498(음, 0x2c, 0)` (loop 0) */
 export const BENCH_CLEARING_SOUND = 44

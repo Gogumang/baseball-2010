@@ -1774,7 +1774,7 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
     const 안들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
 
     // 들어가면 연출(상태 0x1e)에서 사구를 붙든다 — 밀어내기는 연출이 끝난 뒤 (`teamBenchClearing.test`)
-    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' } })
+    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
     expect(들어감.game).toEqual(progress.game)
     expect(들어감.opponentPitcherCounters.pitches - 안들어감.opponentPitcherCounters.pitches).toBe(10)
     expect(들어감.gameRecord).toEqual(안들어감.gameRecord)

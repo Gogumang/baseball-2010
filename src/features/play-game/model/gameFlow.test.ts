@@ -1147,7 +1147,9 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
 
     // 들어가기 굴림 1 + 진입 0x3a5f0 의 45 — 밀어내기 주루·다음 타석은 아직 안 돌았다
     expect(굴림).toBe(46)
-    expect(들어감.pendingBenchClearing).toEqual({ outcome: { kind: '사구' } })
+    expect(들어감.pendingBenchClearing).toEqual({ outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
+    // 진입 굴림 45 번은 그리기 0x43228 이 쓰도록 칸 9 개로 싣는다
+    expect(들어감.pendingBenchClearing?.entryRolls).toHaveLength(9)
     expect(들어감.game).toEqual(시작.game)
     expect(들어감.opponentMound.pitches - 시작.opponentMound.pitches).toBe(10)
     expect(들어감.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)

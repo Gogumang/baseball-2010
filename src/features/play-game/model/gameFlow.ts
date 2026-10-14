@@ -124,6 +124,7 @@ import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBit
 import { batterRunnerSafeOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
@@ -368,7 +369,12 @@ export interface GameProgress {
    * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
    * `arrivalPlay` 는 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤에 재생한다.
    */
-  readonly pendingBenchClearing: { readonly outcome: AtBatOutcome; readonly arrivalPlay?: PitchArrivalPlay | null } | null
+  readonly pendingBenchClearing: {
+    readonly outcome: AtBatOutcome
+    readonly arrivalPlay?: PitchArrivalPlay | null
+    /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+    readonly entryRolls?: readonly BenchClearingEntryRoll[]
+  } | null
   /**
    * **1회초 판**(상태 0x18 교대 가지가 OK 를 기다림) — 섰으면 그 판, 아니면 null. 화면은 첫 타석 앞에 띄운다.
    * 모드 4 에서 판이 설 수 있는 것은 이 하나뿐이다 (`withFirstInningBoard` 머리말).
@@ -760,9 +766,12 @@ export function startPlayerOutcome(
   const cleared = withBenchClearing(progress, outcome, random)
   if (cleared !== progress) {
     // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
-    rollBenchClearingEntry(random)
+    const entryRolls = rollBenchClearingEntry(random)
     const arrivalPlay = options.arrivalPlay ?? null
-    return { ...cleared, pendingBenchClearing: arrivalPlay === null ? { outcome } : { outcome, arrivalPlay } }
+    return {
+      ...cleared,
+      pendingBenchClearing: arrivalPlay === null ? { outcome, entryRolls } : { outcome, arrivalPlay, entryRolls },
+    }
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern

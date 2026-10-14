@@ -74,6 +74,7 @@ import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
@@ -635,6 +636,8 @@ export function useMissionSession({
       readonly outcome: AtBatOutcome
       /** 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤 0x17 로 재생한다 */
       readonly walkReplay?: DefensePlayResult | null
+      /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+      readonly entryRolls?: readonly BenchClearingEntryRoll[]
     } | null
   >(null)
   /**
@@ -1500,11 +1503,12 @@ export function useMissionSession({
       )
       if (entersBenchClearing) {
         // 진입 0x3a5f0 — 공격 9명 자리·목표 굴림 45 번이 곧바로 나간다. 사구는 연출이 끝날 때까지 붙든다
-        rollBenchClearingEntry(random)
+        const entryRolls = rollBenchClearingEntry(random)
         setPitcherStaminaStored(staminaAfterBenchClearing(pitcherStamina, benchClearingEffectOf(true).defenseStaminaLoss))
         setPendingBenchClearing({
           run: nextRun,
           outcome,
+          entryRolls,
           walkReplay: play !== null && arrivalApplicationOf(play) === 'freePass' ? play.result : null,
         })
         setPitcherRun(nextRun)

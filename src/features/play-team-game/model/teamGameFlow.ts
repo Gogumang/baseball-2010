@@ -129,6 +129,7 @@ import type { PitchSlot, PitcherStats } from '@/features/play-pitcher-game/model
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
@@ -564,6 +565,8 @@ export interface TeamGameProgress {
     readonly outcome: AtBatOutcome
     /** 이 사구 공이 연 밀어내기 판(종류 2, `arriveTeamPitch`) — 연출(0x1e) 뒤 0x17 로 재생한다 */
     readonly arrivalPlay?: PitchArrivalPlay | null
+    /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+    readonly entryRolls?: readonly BenchClearingEntryRoll[]
   } | null
   /** 지금 타석의 볼 카운트 (사람이 잡은 타석에서만 찬다) */
   readonly atBat: AtBatState
@@ -2390,11 +2393,12 @@ export function startBatterOutcome(
   const cleared = withBatterBenchClearing(progress, outcome, random)
   if (cleared !== progress) {
     // 들어갔다 — 진입 0x3a5f0 의 굴림 45 번 뒤 연출에서 붙든다
-    rollBenchClearingEntry(random)
+    const entryRolls = rollBenchClearingEntry(random)
     const arrivalPlay = options.arrivalPlay ?? null
     return {
       ...cleared,
-      pendingBenchClearing: arrivalPlay === null ? { side: '공격', outcome } : { side: '공격', outcome, arrivalPlay },
+      pendingBenchClearing:
+        arrivalPlay === null ? { side: '공격', outcome, entryRolls } : { side: '공격', outcome, arrivalPlay, entryRolls },
     }
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
@@ -2938,11 +2942,13 @@ function afterOurPitchArrival(
   const cleared = withPitcherBenchClearing(arrived, outcome, random)
   if (cleared !== arrived) {
     // 들어갔다 — 진입 0x3a5f0 의 굴림 45 번 뒤 연출에서 붙든다. 끼어들 사람이 없는 갈래는 끝까지 본 것으로
-    rollBenchClearingEntry(random)
+    const entryRolls = rollBenchClearingEntry(random)
     const held: TeamGameProgress = {
       ...cleared,
       pendingBenchClearing:
-        arrival.play === null ? { side: '수비', outcome } : { side: '수비', outcome, arrivalPlay: arrival.play },
+        arrival.play === null
+          ? { side: '수비', outcome, entryRolls }
+          : { side: '수비', outcome, arrivalPlay: arrival.play, entryRolls },
     }
     return defer ? held : resolveBenchClearing(held, { reachedTargetTick: true }, random)
   }
