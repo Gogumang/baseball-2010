@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -213,26 +213,43 @@ describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호
     )
   const 대진판확인 = () => screen.queryByRole('button', { name: '확인' })
 
-  it('첫 진입: 히든 팀 오픈 [대한민국] 이 먼저, 닫으면 칭호 "국가 대표" — 팝업이 다 닫혀야 대진판 확인이 먹는다', () => {
-    const onOpenHiddenTeams = vi.fn()
-    const onConfirmEntryTitle = vi.fn()
-    나리(createNationalCup(), { entryTitle: '국가 대표', onOpenHiddenTeams, onConfirmEntryTitle })
+  it('첫 진입: 히든 팀 오픈 [대한민국] 이 먼저, 닫으면 칭호 팝업 0x1afe8 — 팝업이 다 닫혀야 대진판 확인이 먹는다', () => {
+    vi.useFakeTimers()
+    try {
+      const onOpenHiddenTeams = vi.fn()
+      const onConfirmEntryTitle = vi.fn()
+      나리(createNationalCup(), { entryTitle: '국가 대표', onOpenHiddenTeams, onConfirmEntryTitle })
 
-    // 진입 그 자리에서 전역 해금 (0x65de4 65e0c~65e14)
-    expect(onOpenHiddenTeams).toHaveBeenCalledWith([10])
-    expect(글()).toContain('히든 팀 오픈!!')
-    expect(글()).toContain('[대한민국]')
-    expect(screen.getAllByRole('button', { name: '확인' })).toHaveLength(1)
-    확인()
+      // 진입 그 자리에서 전역 해금 (0x65de4 65e0c~65e14)
+      expect(onOpenHiddenTeams).toHaveBeenCalledWith([10])
+      expect(글()).toContain('히든 팀 오픈!!')
+      expect(글()).toContain('[대한민국]')
+      expect(screen.getAllByRole('button', { name: '확인' })).toHaveLength(1)
+      확인()
 
-    expect(글()).toContain('국가 대표')
-    expect(onConfirmEntryTitle).not.toHaveBeenCalled()
-    확인()
-    expect(onConfirmEntryTitle).toHaveBeenCalledTimes(1)
+      // 칭호 창 — img_text 합성 프레임 369 · 조건 StrNICKNAME[8 + 64] · 노란 "이름"
+      const 창 = screen.getByTestId('칭호-창')
+      expect(창.querySelector('img')?.getAttribute('src')).toBe('./sprites/img_text/frames/369.png')
+      act(() => { vi.advanceTimersByTime(1000) })
+      expect(창.querySelector('[data-part="조건"]')?.textContent).toBe('국가대표 첫 선발')
+      expect(창.querySelector('[data-part="이름"]')?.textContent).toBe('"국가 대표"')
+      expect(onConfirmEntryTitle).not.toHaveBeenCalled()
 
-    // 팝업이 다 닫혔다 — 이제 대진판 확인
-    확인()
-    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+      // CLR 은 안 받는다 (0x1b1e4 는 OK · '5' 만)
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(onConfirmEntryTitle).not.toHaveBeenCalled()
+      // OK — 키를 받은 그 자리에서 준다, 창은 닫힘 애니 뒤 사라진다
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(onConfirmEntryTitle).toHaveBeenCalledTimes(1)
+      act(() => { vi.advanceTimersByTime(1000) })
+      expect(screen.queryByTestId('칭호-창')).toBeNull()
+
+      // 팝업이 다 닫혔다 — 이제 대진판 확인
+      확인()
+      expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('이미 열린 대한민국은 다시 안 연다 — 칭호도 가졌으면 팝업 없이 대진판', () => {
@@ -260,7 +277,7 @@ describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호
     const onOpenHiddenTeams = vi.fn()
     나리(createNationalCup(), { entryTitle: '국가 대표', initialStep: '순위', onOpenHiddenTeams })
     expect(onOpenHiddenTeams).not.toHaveBeenCalled()
-    expect(글()).not.toContain('국가 대표')
+    expect(screen.queryByTestId('칭호-창')).toBeNull()
   })
 })
 
