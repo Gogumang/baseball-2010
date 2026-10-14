@@ -1,7 +1,12 @@
 import { useMemo } from 'react'
 import { commonPanelPaintsOf, insetBoxPaintsOf, roundBoxPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
 import type { CommonPanelOptions, PanelPaint, RoundBoxOptions } from '@/shared/lib/commonPanel/commonPanel'
+import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as styles from '@/shared/ui/CommonPanel/CommonPanel.css'
+
+/** 원작 화면 크기 — 어둡게는 0x14008b8 · 0x14008c8 (W, H) 전체를 덮는다 */
+const SCREEN_WIDTH = 240
+const SCREEN_HEIGHT = 320
 
 interface PaintedRectsProps {
   readonly x: number
@@ -37,19 +42,39 @@ interface CommonPanelProps extends CommonPanelOptions {
   /** 판 왼쪽 위 — 원본 정렬 비트로 옮긴 뒤 값 (`alignedTopLeftOf`) */
   readonly x: number
   readonly y: number
+  /**
+   * 열째 인자 [sp+0x90](u8) — ≠ 0 이면 판을 긋기 **전에** 화면 전체를 검정으로 덮는다 (0x55e70~0x55ebe, 직접 떴다):
+   * ```
+   * 55e7e  (u8)[sp+0x90] == 0 이면 건너뛴다
+   * 55e88  W = 0x14008b8 · H = 0x14008c8 · 색 = 0x1400748(0, 0, 0)
+   * 55ea8  [0x15605d0] 가 비어 있지 않으면 [0x15605d0](0, 0, W, H, 색, 단계 5)   ; 색 덮기 0x9b3f4 — 색 몫 (5 + 1)/16
+   * ```
+   * 그리는 틀마다 한 번이다 — 장면이 틀마다 다시 그려지면 겹치지 않는다(`POPUP_DIM_OPACITY` 와 같은 단계).
+   */
+  readonly dim?: boolean
   readonly testId?: string
 }
 
 /**
  * **공용 판 `0x55e60`** — 원본 선·칠 목록(`commonPanelPaintsOf`) 그대로 그린다.
- * 띠 · 제목 탭은 부르는 자리의 인자(위 띠 [sp+0x84] · 아래 띠 [sp+0x88] · 제목 탭 [sp+0x8c])를 그대로 넘긴다.
+ * 띠 · 제목 탭 · 어둡게는 부르는 자리의 인자(위 띠 [sp+0x84] · 아래 띠 [sp+0x88] · 제목 탭 [sp+0x8c] · 어둡게 [sp+0x90])를 그대로 넘긴다.
  */
-export function CommonPanel({ x, y, width, height, topBand = 0, bottomBand = 0, titleTab = false, testId }: CommonPanelProps) {
+export function CommonPanel({
+  x, y, width, height, topBand = 0, bottomBand = 0, titleTab = false, dim = false, testId,
+}: CommonPanelProps) {
   const paints = useMemo(
     () => commonPanelPaintsOf({ width, height, topBand, bottomBand, titleTab }),
     [width, height, topBand, bottomBand, titleTab],
   )
-  return <PaintedRects x={x} y={y} width={width} height={height} paints={paints} testId={testId ?? '공용판'} />
+  const panel = <PaintedRects x={x} y={y} width={width} height={height} paints={paints} testId={testId ?? '공용판'} />
+  if (!dim) return panel
+  return (
+    <>
+      <div className={styles.paint} data-testid={`${testId ?? '공용판'}-어둡게`} aria-hidden
+        style={{ left: 0, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
+      {panel}
+    </>
+  )
 }
 
 interface InsetBoxProps {

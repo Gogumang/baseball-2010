@@ -13,10 +13,10 @@ import {
 afterEach(cleanup)
 
 describe('칭호 목록 창 0x198fc', () => {
-  it('판은 프레임 63 박스 0 (24,56) 192×196 이다', () => {
+  it('판은 프레임 63 박스 0 (24,56) 192×196 공용 판 0x55e60 이다 (19974 — 제목 탭 1)', () => {
     const career = { ...createCareer('타자'), titleIds: [TITLE_NAMES[0], TITLE_NAMES[3]], equippedTitle: 3 }
-    const { container } = render(<TitleListWindow career={career} onEquip={vi.fn()} onClose={vi.fn()} />)
-    const panel = container.querySelector('div[style*="width: 192px"]') as HTMLElement
+    render(<TitleListWindow career={career} onEquip={vi.fn()} onClose={vi.fn()} />)
+    const panel = screen.getByTestId('칭호-판')
     expect(panel.style.left).toBe('24px')
     expect(panel.style.top).toBe('56px')
     expect(panel.style.height).toBe('196px')

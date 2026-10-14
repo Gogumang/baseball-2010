@@ -114,7 +114,7 @@ export interface CommonPanelOptions {
  *          칠 #FFFFFF (x+2, yb+1, w−4, b/2) · 칠 #E2E2E2 (x+2, yb+b/2, w−4, b/2)
  * ```
  * 나눗셈은 모두 0 쪽으로 버린다(asr + 부호 보정). 어둡게([sp+0x90] ≠ 0)는 판 앞에 화면 전체를 [0x15605d0] 검정 단계 5 로
- * 덮는 것이라(0x55ea8~0x55ebe) 이 목록에 넣지 않는다 — 부르는 화면 몫이다.
+ * 덮는 것이라(0x55ea8~0x55ebe) 판 칠 목록에는 넣지 않고 `CommonPanel` 의 `dim` 이 판 뒤에 화면 전체 덮개로 깐다.
  */
 export function commonPanelPaintsOf({
   width: w, height: h, topBand = 0, bottomBand = 0, titleTab = false,

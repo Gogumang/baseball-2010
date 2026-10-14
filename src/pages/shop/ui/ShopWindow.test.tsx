@@ -83,11 +83,11 @@ describe('아이템 창 박스 (mode_ui 프레임 33)', () => {
     expect(valueBarPositionOf(VALUE_BOX, 0x14, 61)).toEqual({ x: 146, y: 163 })
   })
 
-  it('판은 (24,48) 192×212 다', () => {
-    const { container } = render(
+  it('판은 (24,48) 192×212 공용 판 0x55e60 이다 (81e66 — 제목 탭 1)', () => {
+    render(
       <ShopScreen initialTab="GP" career={소지금많은선수} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />,
     )
-    const panel = container.querySelector(`div[style*="width: ${WINDOW_BOX.width}px"]`) as HTMLElement
+    const panel = screen.getByTestId('상점-판')
 
     expect(panel.style.left).toBe(`${WINDOW_BOX.x}px`)
     expect(panel.style.top).toBe(`${WINDOW_BOX.y}px`)
