@@ -44,7 +44,7 @@ import { aceBatterLayersOf, batterLayersOf, isAceBatterOrder, layerPaletteIndexO
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
-import { drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { GAUGE_TARGET_FRAME, drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
@@ -563,18 +563,15 @@ function drawStrikeZone(context: CanvasRenderingContext2D, side: number): void {
   context.drawImage(frame.image, anchor.x + frame.offsetX, anchor.y + frame.offsetY)
 }
 
+/**
+ * 이글아이 — 원본은 0x11 그리기 0x4d2ac 가 목표점에 ui/slt_pitch 프레임 0x23 을 넣는다(모드 4 · 레코드 +0x54 > 0, 0x4d380 ·
+ * `pitchInputOverlay.showsGaugeTargetFrameOf`). 예전 웹이 그리던 원 · 십자는 원본에 없다.
+ * ⚠️ 근사: 목표점은 투영 0xb94b5 를 다시 풀지 않고 공 도착점(`platePixelOf`)을 쓴다.
+ */
 function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: number; y: number }): void {
-  context.strokeStyle = UI_COLORS.eagleEye
-  context.lineWidth = 1.5
-  context.beginPath()
-  context.arc(center.x, center.y, 8, 0, Math.PI * 2)
-  context.stroke()
-  context.beginPath()
-  context.moveTo(center.x - 11, center.y)
-  context.lineTo(center.x + 11, center.y)
-  context.moveTo(center.x, center.y - 11)
-  context.lineTo(center.x, center.y + 11)
-  context.stroke()
+  const frame = placedFrame(ZONE_FRAME_FOLDER, GAUGE_TARGET_FRAME)
+  if (frame === null) return
+  context.drawImage(frame.image, Math.round(center.x) + frame.offsetX, Math.round(center.y) + frame.offsetY)
 }
 
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */
