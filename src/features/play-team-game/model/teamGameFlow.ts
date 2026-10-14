@@ -13,7 +13,15 @@ import {
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { runnersOfGame } from '@/entities/game/model/gameState'
-import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import { EMPTY_BASE_RUNNERS, runnerOnBase } from '@/entities/game/model/baseRunners'
+import {
+  chargedRunsByPitcher,
+  freezeRunnerPitchers,
+  scoredFromBasesOf,
+  settleRunnerPitchers,
+} from '@/entities/game/model/runnerPitchers'
+import type { RunnerPitcherTags } from '@/entities/game/model/runnerPitchers'
+import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import type { AdvanceResult } from '@/entities/game/model/baseState'
@@ -56,7 +64,13 @@ import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runne
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
-import { baserunnerAllowedOfFates, runnerFatesWithoutPlay, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import {
+  baserunnerAllowedOfFates,
+  baserunnerAllowedOfPlay,
+  chargedFromBasesOfFates,
+  runnerFatesWithoutPlay,
+  survivorsFromBaseOfFates,
+} from '@/features/defense-play/model/runnerFates'
 import {
   arrivalPlaySettles,
   pendingSettlementEventsAfter,
@@ -482,7 +496,7 @@ export interface TeamPitchingLine {
    * `state+0x88` 출루 허용 — 정산 `0xa8024` 의 `0xa8c5c~0xa8ca6` 이 **주자 목록의 마지막 원소** `+0x96 == 0` 이고
    * 수비 팀이 사람이면 1 로 세운다(지우는 곳 없음). `movs r5,#0` 가 루프 안이라 마지막 원소 하나만 본다 —
    * 야수선택(타자주자 살고 앞 주자 아웃)은 안 깨고, 에러로 산 타자주자는 깬다 (CORRECTIONS 2-1, S5 U-13 1 확정).
-   * 웹은 주자 운명 목록(`runnerFates`, 90c7864)을 `baserunnerAllowedOfFates` 로 읽는다 (`allowedBaserunnerOfPlay`).
+   * 웹은 주자 운명 목록(`runnerFates`, 90c7864)을 `baserunnerAllowedOfFates` 로 읽는다 (`baserunnerAllowedOfPlay`).
    */
   readonly allowedBaserunner: boolean
 }
@@ -624,7 +638,7 @@ export interface TeamGameProgress {
   readonly opponentPitcherCounters: MoundPitcherCounters
   /**
    * 이 경기를 던진 양 팀 투수 줄 (`entities/game/model/gamePitcherLines`, 붙박이 표 칸 — 마투수는 뺀다) — 사람·간이 타석·
-   * 주자 판의 정산 0xa8024 마다 아웃·실점·삼진을 그 순간 마운드 투수에게, 투구 0xa5e14 마다 투구 수를 쌓는다.
+   * 주자 판의 정산 0xa8024 마다 아웃·삼진은 그 순간 마운드 투수에게, 실점은 들어온 주자의 책임 투수(주자+0x30)에게, 투구 0xa5e14 마다 투구 수를 쌓는다.
    */
   readonly pitcherLines: readonly GamePitcherLine[]
   /**
@@ -851,6 +865,12 @@ export interface TeamGameProgress {
    * 없으면 0 이다.
    */
   readonly pendingSettlementEvents?: PendingSettlementEvents
+  /**
+   * **지금 공격 중인 쪽 루의 주자마다 그 주자를 내보낸 수비 팀 투수**(주자+0x30) — 수비 팀 투수 명단 차례. 정산 주자 루프
+   * (0xa8ea4~0xa8f36)가 들어온 주자의 실점을 지금 마운드가 아니라 이 투수에게 매긴다(`entities/game/model/runnerPitchers`).
+   * 반 이닝이 넘어가면 빈 루라 비고, 없으면 지금 투수로 본다
+   */
+  readonly runnerPitchers?: RunnerPitcherTags
   /**
    * **지금 화면이 실시간으로 돌리고 있는 타구.** 차 있으면 이 경기는 "수비 진행 중" 이고,
    * 타석 결과(안타/아웃 코드)만 정해졌을 뿐 **진루·아웃·득점은 아직 하나도 안 먹였다**.
@@ -1501,7 +1521,7 @@ function withHalfInningPitches(tally: TeamRecordTally, game: GameState, pitches:
  * - 18~20 삼진 콤보 · 21~23 한 투수 10/15/20삼진 — `0xa7998`, 우리 **현재** 투수의 R[1]·R[0].
  *   삼진 아닌 결과로 끝난 타석이면 R[1] = 0 (0xa8fb2~). 플레이 종류 4·5(견제·주자만)는 이 길로 안 온다.
  * - 25 삼구 삼자범퇴 — 아웃 처리 `0xa7d0c`: 반 이닝 투구 수(`ctx+0x16c`) == 3 이고 3아웃.
- * - 26·27 병살·삼중살 — 한 플레이 아웃 2·3 (`0xa8e58`). 주자 달리는 중 삼진(state[0x1a])은 웹에 없어 늘 거짓.
+ * - 26·27 병살·삼중살 — 한 플레이 아웃 2·3 (`0xa8e58`). 낫아웃(state[0x1a])이면 2 의 26 을 막는다 (`droppedThirdStrike`).
  *
  * **삼진 + 도루 판(종류 5)** 은 판정 B 0xae3e8 이 정산을 **종류 5 로 한 번**만 부른다(ae5a8) — `stealPlayOuts` 가 그 판의 아웃이다.
  * 0xa8024 의 종류 4·5 거르기(직접 떴다): a8d38 `0xa57f8(0x18)` · 0xa7998(18~23) 를 건너뛰고 · a8fb6 R[1](연속 삼진) 0 지우기도
@@ -1541,18 +1561,28 @@ function withOurDefenseRecords(
      * 사건만 더해진다(아웃 콜 0xa7d0c 가 그 판의 아웃마다 0xd 를 넣는다).
      */
     readonly wildPitchPlayOuts?: number
+    /**
+     * **낫아웃(state[0x1a])** — 0x3e09e 갈래가 삼진 콜 0xa7c4c(사건 5)를 부르고 state[0x1a] = 1 을 세운 뒤 타자주자 판을 돈다.
+     * `outsAdded` 는 그 판의 아웃(아웃 콜 0xa7d0c 의 0xd)이다. 정산은 [sp+0x30] = 1 + 판의 아웃으로 세고, a8e5e 가 26 을 막고,
+     * a8fa8 이 R[3] 을 −1 하고, a8fb6 이 R[1] 을 지운다
+     */
+    readonly droppedThirdStrike?: boolean
   },
 ): TeamGameProgress {
   const tally = progress.recordTally
   const strikeout = play.outcome.kind === '삼진'
   const runnerPlay = play.stealPlayOuts !== undefined
   const wildPitchOuts = play.wildPitchPlayOuts ?? 0
-  // 이 정산의 아웃 [sp+0x30] — 삼진 이벤트 5 와 판의 아웃 이벤트 0xd 를 함께 센다
-  const outsInPlay = play.outsAdded + (play.stealPlayOuts ?? 0) + wildPitchOuts
+  const droppedThirdStrike = play.droppedThirdStrike === true
+  // 이 정산의 아웃 [sp+0x30] — 삼진 이벤트 5 와 판의 아웃 이벤트 0xd 를 함께 센다 (낫아웃은 삼진 콜의 5 가 하나 더)
+  const outsInPlay = play.outsAdded + (play.stealPlayOuts ?? 0) + wildPitchOuts + (droppedThirdStrike ? 1 : 0)
   const moundStrikeouts = tally.moundStrikeouts + (strikeout ? 1 : 0)
-  // 0xa7c4c 가 R[1] 을 올리고, 지우기(a8fb6~a8ff8)는 종류 4·5 를 건너뛴다
-  const moundStrikeoutCombo = strikeout ? tally.moundStrikeoutCombo + 1 : runnerPlay ? tally.moundStrikeoutCombo : 0
-  const outs = play.outsBefore + outsInPlay
+  // 0xa7c4c 가 R[1] 을 올리고(18~23 판정 0xa7998 은 이 값을 본다), 지우기(a8fb6~a8ff8)는 종류 4·5 를 건너뛰고
+  // `[sp+0x20] > 0 && !state[0x1a]` 가 아니면 지운다 — 낫아웃 삼진은 판정 뒤 콤보를 끊는다
+  const comboAtCall = strikeout ? tally.moundStrikeoutCombo + 1 : runnerPlay ? tally.moundStrikeoutCombo : 0
+  const moundStrikeoutCombo = droppedThirdStrike ? 0 : comboAtCall
+  // 셋째 아웃은 아웃 콜(0xa7d0c)이 센 판의 아웃까지다 — 낫아웃의 삼진 사건은 state[6] 을 안 올린다
+  const outs = play.outsBefore + outsInPlay - (droppedThirdStrike ? 1 : 0)
   const recordIds = [
     // 종류 5 정산은 0xa7998(18~23)을 안 부르고(a8d38), 16/17(삼진 콜)은 판 정산보다 먼저라 판을 먹일 때(`applyTeamArrival`)
     // 24 앞에 이미 줬다
@@ -1560,18 +1590,24 @@ function withOurDefenseRecords(
       ? strikeoutRecordIdsOf({
           pitches: play.atBatPitches,
           balls: play.balls,
-          comboCount: moundStrikeoutCombo,
+          comboCount: comboAtCall,
           pitcherStrikeouts: moundStrikeouts,
         })
       : []),
-    ...laserThrowOutRecordOf({
-      // state[0x8b] — 결과 판 0x46844 가 레이저 연출 뒤 코드 13(그 판의 아웃 판정) 결과 판에서 세운 표시
-      laserThrowFlag: play.laserOutFlag,
-      outsInPlay,
-    }).recordIds,
-    ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: false }),
-    // 25 는 아웃 콜 0xa7d0c 몫이라 삼진(0xa7c4c)이 낸 아웃에는 없다 — 삼진 + 도루 판의 셋째 아웃은 늘 판의 도루 저지 콜이다
-    ...(strikeout && !runnerPlay && wildPitchOuts === 0 ? [] : threePitchInningRecordIdsOf(play.halfInningPitches, outs)),
+    // 삼진 + 도루 판의 36 은 판을 먹일 때(`applyTeamArrival`) 24 앞에 이미 줬다
+    ...(runnerPlay
+      ? []
+      : laserThrowOutRecordOf({
+          // state[0x8b] — 결과 판 0x46844 가 레이저 연출 뒤 코드 13(그 판의 아웃 판정) 결과 판에서 세운 표시
+          laserThrowFlag: play.laserOutFlag,
+          outsInPlay,
+        }).recordIds),
+    ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: droppedThirdStrike }),
+    // 25 는 아웃 콜 0xa7d0c 몫이라 삼진(0xa7c4c)이 낸 아웃에는 없다 — 삼진 + 도루 판의 셋째 아웃은 늘 판의 도루 저지 콜이다.
+    // 낫아웃은 판의 아웃(타자주자 · 주자)이 아웃 콜이다
+    ...(strikeout && !runnerPlay && wildPitchOuts === 0 && !(droppedThirdStrike && play.outsAdded > 0)
+      ? []
+      : threePitchInningRecordIdsOf(play.halfInningPitches, outs)),
   ]
   return withGameRecords(
     {
@@ -1582,8 +1618,8 @@ function withOurDefenseRecords(
         homeRunStreak: runnerPlay ? tally.homeRunStreak : 0,
         moundStrikeouts,
         moundStrikeoutCombo,
-        // a8f8c R[3] += [sp+0x30]
-        moundOuts: tally.moundOuts + outsInPlay,
+        // a8f8c R[3] += [sp+0x30] · a8fa8 낫아웃이면 −1
+        moundOuts: tally.moundOuts + outsInPlay - (droppedThirdStrike ? 1 : 0),
       },
     },
     recordIds,
@@ -1618,7 +1654,8 @@ function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number[] {
       inningsPlayed: game.inning,
       outsRecorded: progress.recordTally.moundOuts,
       hitsAllowed: progress.pitching.hitsAllowed,
-      walksAllowed: progress.pitching.walksAllowed,
+      // state[0x88] — 볼넷 수가 아니라 정산이 세운 출루 허용 표시다 (`allowedBaserunner`)
+      baserunnerAllowed: progress.pitching.allowedBaserunner,
       runsAllowed: progress.pitching.runsAllowed,
     }),
   ]
@@ -1742,13 +1779,16 @@ function defenseRecordCodesOf(
   outsAdded: number,
   /** 종류 4·5 정산 — 삼진 코드(a8a40)는 범타·삼진 갈래 안이라 안 선다. 병살 · 삼중살(a8e58)은 거르지 않는다 */
   runnerPlay = false,
+  /** state[0x1a] 낫아웃 — a8e5e 가 [sp+0x30] == 2 의 병살 갈래(26 · 코드 5)를 막는다. 삼중살은 막지 않는다 */
+  strikeoutWhileRunning = false,
 ): readonly number[] {
   const codes: number[] = []
   // outcome null = 삼진 없는 도루 판의 정산 — 아웃 칸만 본다
   if (outcome !== null && outcome.kind === '삼진' && !runnerPlay) codes.push(SEASON_RECORD_CODE.탈삼진)
   if (outcome !== null && isHit(outcome)) codes.push(SEASON_RECORD_CODE.피안타)
-  if (outsAdded === 2) codes.push(SEASON_RECORD_CODE.병살)
-  else if (outsAdded === 3) codes.push(SEASON_RECORD_CODE.삼중살)
+  if (outsAdded === 2) {
+    if (!strikeoutWhileRunning) codes.push(SEASON_RECORD_CODE.병살)
+  } else if (outsAdded === 3) codes.push(SEASON_RECORD_CODE.삼중살)
   return codes
 }
 
@@ -2723,6 +2763,9 @@ function finishBatterOutcome(
   const inningEnded = before.outs + outsAdded >= OUTS_PER_INNING
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
   const runnerPlay = stealPlay !== undefined
+  // 낫아웃(state[0x1a]) — 0x3e09e 갈래의 삼진 콜 0xa7c4c 가 사건 5 를 넣고 판(타자주자 포함)을 돈다. 정산 [sp+0x30] 에 그 사건이
+  // 판의 아웃 사건 앞에 하나 더 든다 — 상대 투수 +0x20(a8cb0)은 보정 없이 더한다
+  const droppedThirdStrike = outcome.kind === '삼진' && defensePlay !== null && !runnerPlay
   // 정산 홈런 수 [sp+0x24] > 0 — 장내 홈런은 타자 게이트 [sp+0x34](a84d6)가 참일 때만 (`homeRunCountedOf`)
   const homeRunCounted = homeRunCountedOf(progress, outcome, defensePlay, true)
   // 시즌 평판 16칸 — 우리 공격이라 **수비측(상대)이 CPU** 인 코드(≥ 6)만 선다. 종류 5 정산은 삼진 코드 6(a8a46)을 안 지난다
@@ -2741,11 +2784,27 @@ function finishBatterOutcome(
     // 득점 처리 0xa5c34 — 한 점씩 승·패·세 칸을 고친다
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
     // 정산 0xa8024 — 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진
-    pitcherLines: chargeMoundLine(progress, false, {
-      outs: outsAddedBetween(before, game),
-      runsAllowed: runsBattedIn,
-      strikeouts: outcome.kind === '삼진' ? 1 : 0,
-    }),
+    // 실점은 들어온 주자의 책임 투수(주자+0x30)에게 (a8ee4)
+    ...chargeRunsToResponsible(
+      progress,
+      chargeMoundLine(progress, false, {
+        outs: outsAddedBetween(before, game) + (droppedThirdStrike ? 1 : 0),
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+      }),
+      game,
+      false,
+      lineupSlotOf(before.battingOrderIndex),
+      scoredFromBasesOfAtBat(
+        before,
+        runnersOfGame(before),
+        game.inning === before.inning && game.half === before.half ? runnersOfGame(game) : EMPTY_BASE_RUNNERS,
+        outcome,
+        defensePlay,
+        false,
+        outsAdded,
+        runsBattedIn,
+      ),
+    ),
     gameRecord: withSeasonRecord(progress, '공격', offense.codes),
     ourHitBases: withHitBases(progress.ourHitBases, slot, offense.hitBases),
     lastDefensePlay: playback,
@@ -2781,7 +2840,9 @@ function finishBatterOutcome(
     outcome,
     runsBattedIn,
     outsBefore: before.outs,
-    outsAdded,
+    // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
+    outsAdded: outsAdded + (droppedThirdStrike ? 1 : 0),
+    strikeoutWhileRunning: droppedThirdStrike,
     inningEnded,
     humanTeamWalkOff: isWalkOff,
     batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
@@ -3361,51 +3422,6 @@ function defensiveDefenseInputOf(
 }
 
 /**
- * 이 정산(`0xa8024`)이 `state[0x88]`(출루 허용)을 세우는가 — `0xa8c5c~0xa8ca6`:
- * ```
- * a8c2e  r5 = 0 ; r4 = 0
- * a8c5c  for i < 0xa9598(목록 크기):  r3 = 주자[i]+0x96 ; r5 = 0 ; if r3 == 0: r5 = 1   ; ★ 루프 안에서 지운다
- * a8c86  0xa57f8(R, 0x17, r5)                                                          ; R+0x130 = r5 (읽는 곳 없음)
- * a8ca6  if r5 && 수비 팀이 사람: state[0x88] = 1
- * ```
- * 목록은 `[타자주자?, 1루?, 2루?, 3루?]` 라 마지막 원소 하나만 본다 (`baserunnerAllowedOfFates`).
- * - 수비 화면을 돈 판(인플레이 · 낫아웃 판)은 진행기의 `runnerFates`.
- * - 사람 장면의 삼진·볼넷·사구·홈런은 수비 화면 없이 정산으로 가므로 `runnerFatesWithoutPlay`.
- *
- * - **간이 엔진 타석**(자동으로 넘긴 상대 타석, `quick`)은 정산을 부르는 네 자리의 주자 목록 그대로다 (직접 떴다).
- *   목록(sim+0x80)은 루에 선 주자들이고, 판마다 `0xc1120` 이 루의 주자 +0x96 을 0 으로 지운다. 타자는 `0xa93ac` 가
- *   `0xa9374` 로 목록을 한 칸씩 뒤로 민 뒤 **0번 칸**에 넣는다 → 마지막 원소 = 가장 앞선 주자(주자가 없으면 타자).
- *   ```
- *   c1054 홈런      : 타자를 넣고 목록 전원 +0x95 · +0x96 = 1 (c10b8 · c10c4) → 0xa8024            → 안 선다
- *   c1170 안타 n루  : 타자를 넣고 c0fb4(n) — 전원 n루 진루, 4루를 넘은 주자만 +0x96 = 1 → 0xa8024
- *   c1918 볼넷·사구 : 타자를 넣고 c0fb4(1) — 전원 한 루 → 0xa8024
- *   c15b4·c170c·c1748·c18de·c18ec 아웃·삼진 : 타자를 **안 넣고** 0xa8024 (땅볼 진루 c0fb4(1)은 앞선 주자가 2루 이하일 때만이라 득점이 없다)
- *   ```
- *   전원이 같은 수만큼 가니 "가장 앞선 주자가 들어왔다" ⇔ 이 타석 득점 > 0 이다. 그래서 타자가 나간 결과(안타 · 홈런 · 볼넷 ·
- *   사구)는 **득점이 없을 때만**, 아웃 · 삼진은 **루에 주자가 있으면** 선다(원본 그대로 — 주자 있는 삼진도 "출루 허용" 이다).
- *   타석 중 도루(c1982~)는 실패도 득점도 없어(3루 주자는 안 뛴다, c1a12) 주자 수를 안 바꾼다.
- */
-function allowedBaserunnerOfPlay(
-  bases: GameState['bases'],
-  outcome: AtBatOutcome,
-  mine: boolean,
-  defensePlay: DefensePlayResult | null,
-  /** 간이 엔진 타석이 먹인 진루 (`playQuickPlateAppearance` 의 `advance`) — 득점이 곧 가장 앞선 주자의 +0x96 이다 */
-  quickAdvance?: AdvanceResult,
-): boolean {
-  if (defensePlay !== null) return baserunnerAllowedOfFates(defensePlay.runnerFates)
-  if (mine && outcome.kind !== '안타' && outcome.kind !== '아웃') {
-    return baserunnerAllowedOfFates(runnerFatesWithoutPlay(bases, outcome))
-  }
-  if (quickAdvance !== undefined) {
-    if (isHit(outcome) || isFreePass(outcome)) return quickAdvance.runsScored === 0
-    return runnerCountOf(bases) > 0
-  }
-  // ⚠️ 미확인: 판도 간이 엔진도 아닌 타석(지금은 부르는 곳이 없다) — 예전 근사(안타·볼넷·사구면 선다)
-  return isHit(outcome) || isFreePass(outcome)
-}
-
-/**
  * 상대 타석 하나를 경기 상태에 먹인다 — 예전 `applyDefensiveAtBat` 의 몸통이다.
  * `playback` 이 null 이면 재생할 것이 없다는 뜻이라 `lastDefensePlay` 는 그대로 둔다
  * (실시간으로 이미 다 보여 준 플레이가 여기로 온다 — 넣으면 같은 장면을 한 번 더 튼다).
@@ -3460,17 +3476,38 @@ function finishDefensiveAtBat(
   const homeRunCounted = homeRunCountedOf(progress, outcome, defensePlay, false)
   // 이 정산의 주자 목록을 낸 판 — 종류 5 · 종류 9 판이 함께 선 삼진이면 그 판(a8c5c 는 판의 목록을 본다)
   const runnerListPlay = stealPlay?.result ?? wildPitchPlay?.result
+  // 낫아웃(state[0x1a]) — 판 운명을 진루로 먹이는 삼진은 0x3e09e 갈래뿐이다. 삼진 콜이 넣은 사건 5 가 [sp+0x30] 에 하나 더 든다
+  const droppedThirdStrike = outcome.kind === '삼진' && defensePlay !== null
 
   const next: TeamGameProgress = {
     ...progress,
     game: applied.game,
     decisions: decisionsAfterPlay(progress.decisions, before, applied.game, moundsOf(progress)),
     // 정산 0xa8024 — 우리 마운드 투수 레코드에 아웃·실점·탈삼진 (a8cb0 +0x20 · a8d14 +0x26 은 종류를 안 거른다)
-    pitcherLines: chargeMoundLine(progress, true, {
-      outs: applied.outsAdded,
-      runsAllowed: applied.runsScored,
-      strikeouts: outcome.kind === '삼진' ? 1 : 0,
-    }),
+    // 실점은 들어온 주자의 책임 투수(주자+0x30)에게 (a8ee4) — 승계 주자면 앞 투수 몫이다
+    ...chargeRunsToResponsible(
+      progress,
+      chargeMoundLine(progress, true, {
+        // 낫아웃은 a8cb0 이 삼진 사건까지 더하고 보정(−1)은 R+0x13c · R[3] 에만 건다 — +0x20 이 하나 많다(원본 그대로)
+        outs: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
+        strikeouts: outcome.kind === '삼진' ? 1 : 0,
+      }),
+      applied.game,
+      true,
+      lineupSlotOf(progress.opponentOrderIndex),
+      scoredFromBasesOfAtBat(
+        before,
+        runnersOfGame(before, progress.opponentOrderIndex),
+        applied.game.inning === before.inning && applied.game.half === before.half
+          ? runnersOfGame(applied.game, applied.opponentOrderIndex)
+          : EMPTY_BASE_RUNNERS,
+        outcome,
+        defensePlay,
+        quick !== undefined,
+        applied.outsAdded,
+        applied.runsScored,
+      ),
+    ),
     opponentOrderIndex: applied.opponentOrderIndex,
     lastDefensePlay: playback ?? progress.lastDefensePlay,
     defenseScene: defensePlay?.scene ?? progress.defenseScene,
@@ -3494,7 +3531,7 @@ function finishDefensiveAtBat(
         progress.pitching.allowedBaserunner ||
         (runnerListPlay !== undefined
           ? baserunnerAllowedOfFates(runnerListPlay.runnerFates)
-          : allowedBaserunnerOfPlay(before.bases, outcome, mine, defensePlay, quick?.advance)),
+          : baserunnerAllowedOfPlay(before.bases, outcome, mine, defensePlay, quick?.advance)),
     },
     // 시즌 평판 16칸 — 우리 수비라 **공격측(상대)이 CPU** 인 코드(≤ 5)만 선다
     gameRecord: withSeasonRecord(
@@ -3502,8 +3539,12 @@ function finishDefensiveAtBat(
       '수비',
       defenseRecordCodesOf(
         outcome,
-        applied.outsAdded + (stealPlayOuts ?? 0) + (wildPitchPlay?.result.advance.outsAdded ?? 0),
+        applied.outsAdded +
+          (stealPlayOuts ?? 0) +
+          (wildPitchPlay?.result.advance.outsAdded ?? 0) +
+          (droppedThirdStrike ? 1 : 0),
         stealPlay !== undefined,
+        droppedThirdStrike,
       ),
     ),
     // 종류 5 정산은 타석 칸(+0x14 · a8ac8)도 결과 링(a8a04)도 안 올린다 — 견제 판과 같은 게이트
@@ -3541,6 +3582,7 @@ function finishDefensiveAtBat(
     laserOutFlag: (defensePlay ?? runnerListPlay)?.laserOutFlag ?? false,
     ...(stealPlayOuts === undefined ? {} : { stealPlayOuts }),
     ...(wildPitchPlay === undefined ? {} : { wildPitchPlayOuts: wildPitchPlay.result.advance.outsAdded }),
+    ...(droppedThirdStrike ? { droppedThirdStrike } : {}),
   })
 
   // 돌발 판정 0x8f414(돌발, 0xa7749 = ctx+0x188) — 삼진 + 도루 판은 판정 A(0xae24c)가 state[0xb] 3·4 라 정산 없이 0x17 로 보내
@@ -3553,7 +3595,9 @@ function finishDefensiveAtBat(
         outcome,
         runsBattedIn: applied.runsScored,
         outsBefore: before.outs,
-        outsAdded: applied.outsAdded,
+        // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
+        outsAdded: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
+        strikeoutWhileRunning: droppedThirdStrike,
         inningEnded,
         // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
         humanTeamWalkOff:
@@ -3750,13 +3794,26 @@ function withRunnerOnlyAdvance(
     ...progress,
     game,
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
-    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃·실점을 지금 수비 마운드 투수에게
-    pitcherLines: settles
-      ? chargeMoundLine(progress, humanDefends, {
-          outs: advanceResult.outsAdded,
-          runsAllowed: runs,
-        })
-      : progress.pitcherLines,
+    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃은 지금 수비 마운드 투수(a8cb0), 실점은 들어온 주자의 책임 투수(a8ee4)
+    ...chargeRunsToResponsible(
+      progress,
+      settles ? chargeMoundLine(progress, humanDefends, { outs: advanceResult.outsAdded }) : progress.pitcherLines,
+      game,
+      humanDefends,
+      null,
+      runnerFates === undefined
+        ? scoredFromBasesOf(
+            humanDefends ? runnersOfGame(before, progress.opponentOrderIndex) : runnersOfGame(before),
+            halfChanged
+              ? EMPTY_BASE_RUNNERS
+              : humanDefends
+                ? runnersOfGame(game, progress.opponentOrderIndex)
+                : runnersOfGame(game),
+            runs,
+          )
+        : chargedFromBasesOfFates(runnerFates, before.outs + advanceResult.outsAdded),
+      settles,
+    ),
     // 득점 처리 0xa5c34 는 1점마다 수비 팀 A·B 를 올린다 (P7 E1)
     ...(humanDefends
       ? {
@@ -3999,17 +4056,29 @@ function applyTeamArrival(progress: TeamGameProgress, play: PitchArrivalPlay, hu
     ? settledApply.progress
     : withRunnerOnlyAdvance(base, play.result.advance, humanSide, play.result.runnerFates, false).progress
   // 삼진 + 도루 판(종류 5) — 삼진 콜 0xa7c4c(16 삼구 · 17 풀카운트)는 정산 0xa8024 보다 **먼저** 났다(정산이 그 콜이 넣은 사건 5 를
-  // 세어 [sp+0x20] 으로 쓴다, a8d00). 그래서 알림 차례는 16/17 → 24(a83de)다 — 타석 결과 쪽(`withOurDefenseRecords` 의
+  // 세어 [sp+0x20] 으로 쓴다, a8d00). 그래서 알림 차례는 16/17 → 36 → 24(a83de)다 — 타석 결과 쪽(`withOurDefenseRecords` 의
   // `stealPlayOuts`)은 다시 안 준다. 16/17 은 수비 계열이라 사람 수비에서만 게이트를 지난다
-  const strikeoutCall =
-    play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
-      ? strikeoutCallRecordIdsOf({ pitches: progress.recordTally.atBatPitches, balls: progress.atBat.balls })
-      : []
-  next = withGameRecords(next, [...strikeoutCall, ...play.recordIds], humanOffense)
+  const strikeoutSteal = play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
+  const strikeoutCall = strikeoutSteal
+    ? strikeoutCallRecordIdsOf({ pitches: progress.recordTally.atBatPitches, balls: progress.atBat.balls })
+    : []
+  // 그 한 정산 안에서는 머리의 36(a80f8 — [sp+0x30] > 0 && state[0x8b])이 도루 루프의 24(a83de)보다 먼저다. [sp+0x30] 에는 삼진
+  // 사건 5 가 들어 늘 0 보다 크다 — 타석 결과 쪽(`withOurDefenseRecords` 의 `stealPlayOuts`)은 36 을 다시 안 준다
+  const laserThrow = strikeoutSteal
+    ? laserThrowOutRecordOf({ laserThrowFlag: play.result.laserOutFlag, outsInPlay: play.result.advance.outsAdded + 1 })
+        .recordIds
+    : []
+  next = withGameRecords(next, [...strikeoutCall, ...laserThrow, ...play.recordIds], humanOffense)
   next = withLeagueStolenBases(next, progress, play, humanOffense)
   // 삼진이 함께 선 도루 판은 정산이 삼진 길에서 한 번에 돈다 (`stealPlayWithStrikeoutOf`)
   if (play.kind === 5 && progress.atBat.outcome?.kind !== '삼진') {
     next = withRunnerPlaySettlement(next, progress, play.result, humanOffense, settlementEventsOfPlay(play.result))
+  }
+  // 삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기가 없는 정산이라 거르지 않는 칸(36 · 26/27 · R[3] ·
+  // state[0x88]) 위에 타석 칸 · 결과 링 · 리그 타수 · 콤보 지우기 · 결과비트까지 오른다
+  if (play.kind === 9 && settles && progress.atBat.outcome === null) {
+    next = withRunnerPlaySettlement(next, progress, play.result, humanOffense, settlementEventsOfPlay(play.result))
+    next = withTeamWildPitchSettlement(next, progress, play.result, humanOffense)
   }
   // 같은 타석이 이어지면 이 판의 사건이 목록에 남아 다음 견제 정산이 함께 센다 — 다음 공의 0xa5e14 가 비운다
   next = {
@@ -4124,6 +4193,71 @@ function withRunnerPlaySettlement(
     false,
   )
 }
+
+/**
+ * **삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9)의 타석 쪽 칸** — 정산 0xa8024 는 종류 9 를 안 거른다(직접 떴다):
+ * ```
+ * a882e/a8852  아웃 > 0 이고 득점이 없으면 지금 타자 타수 +0x20([sp+0x34]) · 타순 칸 +0x11        ; 득점 · 아웃이 함께면 건너뜀
+ * a89f4        아웃 > 0 → 결과 링 ← 5 · ctx+0x162 = 0
+ * a8ac8        타순 칸 타석 +0x14 (아웃이 없는 끝내기 판도)
+ * a8fb2        삼진 없음 → 수비 팀 지금 투수 R[1](연속 삼진) = 0
+ * 0xa599c      결과비트 → 0x17 끝(52a8e)의 0x8f414 가 그 비트로 돌발을 판정한다
+ * ```
+ * 거르지 않는 칸(36 · 26/27 · R[3] · state[0x88])은 부르는 쪽이 `withRunnerPlaySettlement` 로 먼저 셌다.
+ */
+function withTeamWildPitchSettlement(
+  next: TeamGameProgress,
+  before: TeamGameProgress,
+  result: DefensePlayResult,
+  humanOffense: boolean,
+): TeamGameProgress {
+  const outs = result.advance.outsAdded
+  const runs = result.advance.runsScored
+  const slot = humanOffense ? before.game.battingOrderIndex : before.opponentOrderIndex
+  const recordsBefore = humanOffense ? next.ourEntryRecords : next.opponentEntryRecords
+  const records = [...recordsBefore]
+  records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: false,
+    isHomeRun: false,
+    ...(outs > 0 ? { resultCode: WILD_PITCH_OUT_RESULT_CODE } : {}),
+  })
+  const tally = next.recordTally
+  const settled: TeamGameProgress = {
+    ...next,
+    ...(humanOffense ? { ourEntryRecords: records } : { opponentEntryRecords: records }),
+    leaguePlateAppearances:
+      outs > 0 && runs === 0
+        ? withLeaguePlateAppearance(
+            next.leaguePlateAppearances,
+            humanOffense ? next.options.ourTeamId : next.options.opponentTeamId,
+            humanOffense ? next.ourEntry : next.opponentEntry,
+            slot,
+            RUNNER_PLAY_OUTCOME_PLACEHOLDER,
+            0,
+          )
+        : next.leaguePlateAppearances,
+    recordTally: {
+      ...tally,
+      homeRunStreak: outs > 0 ? 0 : tally.homeRunStreak,
+      // R[1] 은 수비 팀 지금 투수 칸 — 우리가 지키는 쪽만 든다
+      moundStrikeoutCombo: humanOffense ? tally.moundStrikeoutCombo : 0,
+    },
+  }
+  return resolveBurstFor(settled, {
+    // 안타 · 볼넷 갈래가 아니다 — B4(타점)는 a8946 갈래(희생플라이 · 볼넷 · 사구) 안이라 안 선다
+    outcome: RUNNER_PLAY_OUTCOME_PLACEHOLDER,
+    runsBattedIn: 0,
+    outsBefore: before.game.outs,
+    outsAdded: outs,
+    inningEnded: before.game.outs + outs >= OUTS_PER_INNING,
+    humanTeamWalkOff: next.game.isFinished && next.game.ourScore > next.game.opponentScore,
+    // B5 의 r5 — 목록 0번(가장 뒤 주자)이 들어왔는가
+    batterRunnerSafe: batterRunnerSafeOfFates(result.runnerFates),
+  })
+}
+
+/** 종류 9 판 정산의 결과 링 코드 5(그 밖의 아웃, a8a9e) — 판에 공 잡은 뜬공이 없다 */
+const WILD_PITCH_OUT_RESULT_CODE = 5
 
 function describeArrivalPlay(play: PitchArrivalPlay, humanOffense: boolean): string {
   const runs = play.result.advance.runsScored
@@ -4428,6 +4562,8 @@ function resolveBurstFor(
     runnersAdvanced?: boolean
     /** B0 — 정산 홈런 수 [sp+0x24] > 0 (`homeRunCountedOf`) */
     homeRunCounted?: boolean
+    /** B9 — 낫아웃(state[0x1a])이면 삼진이어도 안 켠다 (a8fc6) */
+    strikeoutWhileRunning?: boolean
   },
 ): TeamGameProgress {
   if (progress.burst === null) return progress
@@ -4686,7 +4822,13 @@ function applyPitcherChange(
     our: ours ? nextIndex : progress.ourPitcherIndex,
     opponent: ours ? progress.opponentPitcherIndex : nextIndex,
   })
-  const base = { ...progress, pitcherJustChanged: true, decisions }
+  // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
+  const runnerPitchers = freezeRunnerPitchers(
+    progress.runnerPitchers,
+    ours ? runnersOfGame(progress.game, progress.opponentOrderIndex) : runnersOfGame(progress.game),
+    ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex,
+  )
+  const base = { ...progress, pitcherJustChanged: true, decisions, runnerPitchers }
   if (ours) {
     return {
       ...base,
@@ -5555,12 +5697,23 @@ function playAutoOffenseAtBat(
       cpuPinchHitUsed: false,
       // 공마다 이미 깎았다 (위 `beforePitch`)
       opponentStamina: drain.stamina(),
-      pitcherLines: chargeMoundLine(progress, false, {
-        outs: outsAddedBetween(before, game),
-        runsAllowed: runsBattedIn,
-        strikeouts: outcome.kind === '삼진' ? 1 : 0,
-        pitches: play.pitches,
-      }),
+      // 실점은 들어온 주자의 책임 투수(주자+0x30)에게 — 간이 엔진 주자는 죽지 않아 루에서 빠진 앞선 주자가 들어온 주자다
+      ...chargeRunsToResponsible(
+        progress,
+        chargeMoundLine(progress, false, {
+          outs: outsAddedBetween(before, game),
+          strikeouts: outcome.kind === '삼진' ? 1 : 0,
+          pitches: play.pitches,
+        }),
+        game,
+        false,
+        lineupSlotOf(slot),
+        scoredFromBasesOf(
+          runnersOfGame(before),
+          game.inning === before.inning && game.half === before.half ? appearance.runners : EMPTY_BASE_RUNNERS,
+          runsBattedIn,
+        ),
+      ),
       opponentPitcherCounters: addRunsToCounters(
         progress.opponentPitcherCounters,
         runsBattedIn,
@@ -5750,17 +5903,89 @@ function chargeMoundLine(
   ours: boolean,
   delta: Parameters<typeof chargePitcherLine>[3],
 ): readonly GamePitcherLine[] {
+  return chargeEntryLine(
+    progress,
+    progress.pitcherLines,
+    ours,
+    ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex,
+    delta,
+  )
+}
+
+/** 투수 명단 `index` 번 투수의 줄에 더한다 (`chargeMoundLine` 의 몸통 — 책임 투수 실점이 지금 마운드가 아닐 때도 쓴다) */
+function chargeEntryLine(
+  progress: TeamGameProgress,
+  lines: readonly GamePitcherLine[],
+  ours: boolean,
+  index: number,
+  delta: Parameters<typeof chargePitcherLine>[3],
+): readonly GamePitcherLine[] {
   const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
-  const entry = pitcherEntryAt(progress, teamId, ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex)
-  if (entry === undefined || entry.aceIndex >= 0) return progress.pitcherLines
+  const entry = pitcherEntryAt(progress, teamId, index)
+  if (entry === undefined || entry.aceIndex >= 0) return lines
   // 기록을 실어 선 표 밖 투수(영입한 명전·나리)는 원본 id 로 줄을 가른다 (칸 −1)
   if (entry.tableSlot === undefined) {
     return entry.recordId === undefined
-      ? progress.pitcherLines
-      : chargePitcherLine(progress.pitcherLines, teamId, NO_ROSTER_SLOT, delta, entry.recordId)
+      ? lines
+      : chargePitcherLine(lines, teamId, NO_ROSTER_SLOT, delta, entry.recordId)
   }
   // 줄은 그 투수의 붙박이 표 자리로 — 트레이드로 옮겨 온 투수는 옛 팀이다 (`TeamEntryPitcher.tableTeamId`)
-  return chargePitcherLine(progress.pitcherLines, entry.tableTeamId ?? teamId, entry.tableSlot, delta)
+  return chargePitcherLine(lines, entry.tableTeamId ?? teamId, entry.tableSlot, delta)
+}
+
+/**
+ * 타석 하나가 실점을 매길 주자의 투구 때 루 — 진행기를 돈 판은 그 운명, 사람 장면의 삼진 · 볼넷 · 사구 · 홈런은 정산이 보는
+ * 목록(`runnerFatesWithoutPlay`), 간이 엔진 타석(주자가 죽지 않는다)과 그 밖은 앞선 주자부터 점수판 득점만큼
+ */
+function scoredFromBasesOfAtBat(
+  before: GameState,
+  runnersBefore: BaseRunners,
+  runnersAfter: BaseRunners,
+  outcome: AtBatOutcome,
+  defensePlay: DefensePlayResult | null,
+  quickEngine: boolean,
+  outsAdded: number,
+  runs: number,
+): readonly number[] {
+  if (defensePlay !== null) return chargedFromBasesOfFates(defensePlay.runnerFates, before.outs + outsAdded)
+  if (quickEngine || outcome.kind === '안타' || outcome.kind === '아웃') {
+    return scoredFromBasesOf(runnersBefore, runnersAfter, runs)
+  }
+  return chargedFromBasesOfFates(runnerFatesWithoutPlay(before.bases, outcome), before.outs + outsAdded)
+}
+
+/**
+ * **플레이 하나의 실점을 책임 투수(주자+0x30)에게** — 정산 주자 루프 0xa8ea4~0xa8f36 이 들어온 주자마다 그 주자를 내보낸
+ * 수비 팀 투수의 레코드 +0x22 를 올린다(승계 주자면 앞 투수, `entities/game/model/runnerPitchers`). 루별 책임 투수 칸도 플레이
+ * 뒤로 옮긴다 — 새로 나간 타자주자는 지금 마운드(0xa93ac 넷째 인자 0xae83d). `settles` 가 거짓이면(정산을 안 지나는 판) 칸만 옮긴다.
+ */
+function chargeRunsToResponsible(
+  progress: TeamGameProgress,
+  lines: readonly GamePitcherLine[],
+  after: GameState,
+  /** 수비가 우리 팀인가 (상대 공격) */
+  oursDefending: boolean,
+  batter: number | null,
+  scoredFromBases: readonly number[],
+  settles = true,
+): Pick<TeamGameProgress, 'pitcherLines' | 'runnerPitchers'> {
+  const before = progress.game
+  const sameHalf = after.inning === before.inning && after.half === before.half
+  const runnersOf = (game: GameState, order: number) =>
+    oursDefending ? runnersOfGame(game, order) : runnersOfGame(game)
+  const settled = settleRunnerPitchers({
+    tags: progress.runnerPitchers,
+    before: runnersOf(before, progress.opponentOrderIndex),
+    after: sameHalf ? runnersOf(after, progress.opponentOrderIndex) : EMPTY_BASE_RUNNERS,
+    batter,
+    pitcher: oursDefending ? progress.ourPitcherIndex : progress.opponentPitcherIndex,
+    scoredFromBases: settles ? scoredFromBases : [],
+  })
+  let pitcherLines = lines
+  for (const [index, runsAllowed] of chargedRunsByPitcher(settled.charged)) {
+    pitcherLines = chargeEntryLine(progress, pitcherLines, oursDefending, index, { runsAllowed })
+  }
+  return { pitcherLines, runnerPitchers: settled.tags }
 }
 
 /** 판정 칸(측 · 명단 칸)을 붙박이 표 칸으로 — 표 칸이 없는 투수(마투수)는 표 밖 칸(8)으로 둬 기록표가 건너뛴다 */

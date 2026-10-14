@@ -1,5 +1,8 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import type { BaseState } from '@/entities/game/model/baseState'
+import { isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
+import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
+import { runnerCountOf } from '@/entities/game/model/baseState'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { RunnerState } from '@/entities/fielding/model/fieldingState'
 
 /**
@@ -113,6 +116,15 @@ export function chargedRunsOfFates(fates: readonly RunnerFate[], outsAfterPlay: 
 }
 
 /**
+ * 정산 주자 루프가 실점을 매기는 주자의 **투구 때 루**(0 = 타자주자) — `chargedRunsOfFates` 와 같은 거르기(3아웃이고 목록 0번이
+ * 끝났으면 하나도 없다). 그 주자의 책임 투수(주자+0x30)에게 +0x22 · 경기 기록 [2] 를 매긴다(`entities/game/model/runnerPitchers`)
+ */
+export function chargedFromBasesOfFates(fates: readonly RunnerFate[], outsAfterPlay: number): readonly number[] {
+  if (chargedRunsOfFates(fates, outsAfterPlay) === 0) return []
+  return fates.filter((fate) => fate.scored).map((fate) => fate.fromBase)
+}
+
+/**
  * **R+0x130(출루 허용)** — 정산 `0xa8c5c~0xa8c86`: 목록을 돌며 `r5 = (주자+0x96 == 0)` 을 루프 안에서
  * **새로** 매기므로 **마지막 원소 하나만** 본다. 목록이 비면 r5 = 0 그대로다(0xa8c2e).
  */
@@ -143,4 +155,49 @@ export function batterRunnerSafeOfFates(fates: readonly RunnerFate[]): boolean {
  */
 export function survivorsFromBaseOfFates(fates: readonly RunnerFate[]): readonly number[] {
   return fates.filter((fate) => !fate.retired && !fate.scored).map((fate) => fate.fromBase)
+}
+
+/**
+ * 이 정산(`0xa8024`)이 `state[0x88]`(출루 허용)을 세우는가 — `0xa8c5c~0xa8ca6`:
+ * ```
+ * a8c2e  r5 = 0 ; r4 = 0
+ * a8c5c  for i < 0xa9598(목록 크기):  r3 = 주자[i]+0x96 ; r5 = 0 ; if r3 == 0: r5 = 1   ; ★ 루프 안에서 지운다
+ * a8c86  0xa57f8(R, 0x17, r5)                                                          ; R+0x130 = r5 (읽는 곳 없음)
+ * a8ca6  if r5 && 수비 팀이 사람: state[0x88] = 1
+ * ```
+ * 목록은 `[타자주자?, 1루?, 2루?, 3루?]` 라 마지막 원소 하나만 본다 (`baserunnerAllowedOfFates`).
+ * - 수비 화면을 돈 판(인플레이 · 낫아웃 판)은 진행기의 `runnerFates`.
+ * - 사람 장면의 삼진·볼넷·사구·홈런은 수비 화면 없이 정산으로 가므로 `runnerFatesWithoutPlay`.
+ *
+ * - **간이 엔진 타석**(자동으로 넘긴 상대 타석, `quick`)은 정산을 부르는 네 자리의 주자 목록 그대로다 (직접 떴다).
+ *   목록(sim+0x80)은 루에 선 주자들이고, 판마다 `0xc1120` 이 루의 주자 +0x96 을 0 으로 지운다. 타자는 `0xa93ac` 가
+ *   `0xa9374` 로 목록을 한 칸씩 뒤로 민 뒤 **0번 칸**에 넣는다 → 마지막 원소 = 가장 앞선 주자(주자가 없으면 타자).
+ *   ```
+ *   c1054 홈런      : 타자를 넣고 목록 전원 +0x95 · +0x96 = 1 (c10b8 · c10c4) → 0xa8024            → 안 선다
+ *   c1170 안타 n루  : 타자를 넣고 c0fb4(n) — 전원 n루 진루, 4루를 넘은 주자만 +0x96 = 1 → 0xa8024
+ *   c1918 볼넷·사구 : 타자를 넣고 c0fb4(1) — 전원 한 루 → 0xa8024
+ *   c15b4·c170c·c1748·c18de·c18ec 아웃·삼진 : 타자를 **안 넣고** 0xa8024 (땅볼 진루 c0fb4(1)은 앞선 주자가 2루 이하일 때만이라 득점이 없다)
+ *   ```
+ *   전원이 같은 수만큼 가니 "가장 앞선 주자가 들어왔다" ⇔ 이 타석 득점 > 0 이다. 그래서 타자가 나간 결과(안타 · 홈런 · 볼넷 ·
+ *   사구)는 **득점이 없을 때만**, 아웃 · 삼진은 **루에 주자가 있으면** 선다(원본 그대로 — 주자 있는 삼진도 "출루 허용" 이다).
+ *   타석 중 도루(c1982~)는 실패도 득점도 없어(3루 주자는 안 뛴다, c1a12) 주자 수를 안 바꾼다.
+ */
+export function baserunnerAllowedOfPlay(
+  bases: BaseState,
+  outcome: AtBatOutcome,
+  mine: boolean,
+  defensePlay: Pick<DefensePlayResult, 'runnerFates'> | null,
+  /** 간이 엔진 타석이 먹인 진루 (`playQuickPlateAppearance` 의 `advance`) — 득점이 곧 가장 앞선 주자의 +0x96 이다 */
+  quickAdvance?: AdvanceResult,
+): boolean {
+  if (defensePlay !== null) return baserunnerAllowedOfFates(defensePlay.runnerFates)
+  if (mine && outcome.kind !== '안타' && outcome.kind !== '아웃') {
+    return baserunnerAllowedOfFates(runnerFatesWithoutPlay(bases, outcome))
+  }
+  if (quickAdvance !== undefined) {
+    if (isHit(outcome) || isFreePass(outcome)) return quickAdvance.runsScored === 0
+    return runnerCountOf(bases) > 0
+  }
+  // ⚠️ 미확인: 판도 간이 엔진도 아닌 타석(지금은 부르는 곳이 없다) — 예전 근사(안타·볼넷·사구면 선다)
+  return isHit(outcome) || isFreePass(outcome)
 }

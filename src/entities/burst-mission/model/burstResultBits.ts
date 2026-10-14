@@ -72,6 +72,11 @@ export interface BurstResultBitsInput {
    * 타자 게이트 sp+0x34 가 거짓인 판의 장내 홈런(a84d6)은 거짓이다 — 루타 4 안타라 B3 만 켜진다
    */
   readonly homeRunCounted?: boolean
+  /**
+   * state[0x1a] — 낫아웃 판(삼진 콜 0xa7c4c 뒤 타자주자가 뛰는 종류 9 판, 0x3e09e~0x3e0e0). B9 는 a8fc6~a8fdc 가
+   * `[sp+0x20] > 0 && !0xb6c3c(state)` 일 때만 켠다 — 낫아웃은 삼진이어도 B9 가 없다. 안 넘기면 거짓
+   */
+  readonly strikeoutWhileRunning?: boolean
 }
 
 const MAXIMUM_OUTS_PER_INNING = 3
@@ -80,8 +85,7 @@ const MAXIMUM_OUTS_PER_INNING = 3
  * 타석 결과 → 결과비트.
  *
  * **근사한 곳** (원본은 수비 플레이 상태를 직접 보고, 웹에는 아직 없는 값들이다):
- *   - B9 는 원본이 `state[0x1a] == 0`(주자 플레이로 이어지지 않은 삼진)까지 본다. 웹에는
- *     낫아웃·주자 플레이가 없으므로 삼진이면 늘 켠다.
+ *   - (없음 — B9 의 `state[0x1a] == 0`(낫아웃 아님)은 `strikeoutWhileRunning` 으로 받는다)
  *
  * B3 는 원본이 "루타가 2·3 이 아닌 나머지"(a87b2) 라 단타와 루타 4 홈런에 켠다 (근사 아님).
  */
@@ -122,7 +126,7 @@ export function burstResultBitsOf(input: BurstResultBitsInput): number {
 
   if (input.outsAdded >= 1) bits |= BURST_RESULT_BIT.아웃
   if (input.outsAdded >= 2) bits |= BURST_RESULT_BIT.병살
-  if (outcome.kind === '삼진') bits |= BURST_RESULT_BIT.삼진
+  if (outcome.kind === '삼진' && input.strikeoutWhileRunning !== true) bits |= BURST_RESULT_BIT.삼진
   // B11 은 볼넷 갈래 0xa8b7a 와 사구 갈래 0xa8bf4 두 곳이 켠다
   if (isWalkOrHitByPitch) bits |= BURST_RESULT_BIT.볼넷
 

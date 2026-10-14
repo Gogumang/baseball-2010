@@ -747,7 +747,7 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
     expect(found).toBeGreaterThan(0)
   })
 
-  it('기록 알림 차례 — 삼진 콜 0xa7c4c 의 16/17 이 정산 a83de 의 24 보다 먼저, 18~23 은 없다 (a8d38)', () => {
+  it('기록 알림 차례 — 삼진 콜 0xa7c4c 의 16/17 → 정산 머리 a80f8 의 36 → a83de 의 24, 18~23 은 없다 (a8d38)', () => {
     let found = 0
     for (let seed = 1; seed <= 3000 && found < 2; seed += 1) {
       const { progress } = 시작({}, seed)
@@ -762,8 +762,13 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
       if (play?.kind !== 5 || next.opponentOrderIndex === 풀카운트.opponentOrderIndex) continue
       found += 1
       const added = next.recordIds.slice(풀카운트.recordIds.length)
-      const expected = [17, ...(play.result.caughtFrom.length > 0 ? [24] : [])]
-      expect(added.filter((id) => id === 17 || id === 24 || (id >= 18 && id <= 23))).toEqual(expected)
+      // 36 은 같은 정산의 머리 a80f8 이라 도루 루프의 24 앞이다 ([sp+0x30] 에 삼진 사건이 들어 늘 0 보다 크다)
+      const expected = [
+        17,
+        ...(play.result.laserOutFlag ? [36] : []),
+        ...(play.result.caughtFrom.length > 0 ? [24] : []),
+      ]
+      expect(added.filter((id) => id === 17 || id === 24 || id === 36 || (id >= 18 && id <= 23))).toEqual(expected)
     }
     expect(found).toBeGreaterThan(0)
   }, 30_000)

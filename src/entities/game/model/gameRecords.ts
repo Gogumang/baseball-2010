@@ -124,8 +124,11 @@ export interface CompleteGameInput {
   /** 우리 투수가 잡은 아웃 수 */
   readonly outsRecorded: number
   readonly hitsAllowed: number
-  /** 출루 허용(state[0x88]) 쪽 — 볼넷과 사구를 함께 센다 */
-  readonly walksAllowed: number
+  /**
+   * 출루 허용 state[0x88] — 정산 a8c5c~a8ca6 이 그 정산의 주자 목록 마지막 원소가 안 끝났으면(+0x96 == 0) 세우는 표시
+   * (`baserunnerAllowedOfPlay`). 볼넷 · 사구 · 안타는 물론 에러 출루 · 산 주자가 남는 견제 판도 세운다
+   */
+  readonly baserunnerAllowed: boolean
   readonly runsAllowed: number
 }
 
@@ -151,7 +154,7 @@ const NO_COMPLETE_GAME_MODE = 4
  * 정산 0xa8024 는 사구에도 투수 볼넷 칸 +0x2a 를 올리고 타석 결과 9 로 적는다(R8 5-4).
  * **출루 칸 state[0x88] 에 사구도 들어간다** (확정): 0xa8c5c~0xa8cae 가 정산 뒤 주자 목록의 **마지막 주자**가
  * 살아 있으면(+0x96 == 0) 수비 팀이 사람일 때 state[0x88] = 1 로 세운다(R15 11-1 · S5 정정). 사구 플레이는
- * 아웃이 없어 모든 주자가 살아 있으므로 늘 선다 — 그래서 `walksAllowed` 는 **볼넷 + 사구**다.
+ * 아웃이 없어 모든 주자가 살아 있으므로 늘 선다 — 그래서 `baserunnerAllowed` 는 볼넷 · 사구에도 선다.
  * (덧붙여 0xa8e1c~0xa8e36: 사구면 투수 기록 코드 0x1d(R+0x148) ++, 이닝 퍼펙트 칸 ctx+0x184 = 0 — 볼넷 0x1c 와 같은 자리.)
  * 지금 웹에서 사람이 수비하는 화면(투수편·팀 경기 수비)은 CPU 타자가 사구를 맞는 길이 아직 없다.
  */
@@ -162,7 +165,7 @@ export function completeGameRecordIdsOf(input: CompleteGameInput): number[] {
   if (input.outsRecorded !== input.inningsPlayed * OUTS_PER_INNING) return []
   if (
     input.hitsAllowed === 0 &&
-    input.walksAllowed === 0 &&
+    !input.baserunnerAllowed &&
     input.runsAllowed === 0 &&
     input.outsRecorded < PERFECT_GAME_OUT_LIMIT
   ) {

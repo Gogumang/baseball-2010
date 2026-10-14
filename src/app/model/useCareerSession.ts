@@ -1070,6 +1070,8 @@ export function useCareerSession({
         arrivalPlay: arrival?.play ?? null,
         // 이 공의 번트 종류(장면 +0xfdc) — 타구 판 시작 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다
         buntKind: buntKind ?? 0,
+        // 삼진 + 도루 판의 한 정산이 0xa59c0 에 보는 타자 게이트 0xa56dc(ctx, 지금 타자, 1)
+        isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
       })
       progressRef.current = advanced
       setProgress(advanced)

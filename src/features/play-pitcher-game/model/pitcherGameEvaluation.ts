@@ -71,8 +71,9 @@ export interface PitcherEvaluationContext {
   readonly won: boolean
   /** 치른 이닝 `state+0x6b` (0-기준) — 완투 판정 `아웃 == 3·이닝 + 3` 에 쓴다 */
   readonly endedInningIndex: number
-  /** state+0x88 우리 투수가 내준 볼넷 · +0x89 피안타 · +0x8a 실점 (완투 계열 판정용) */
-  readonly teamWalksAllowed: number
+  /** state+0x88 출루 허용(정산이 읽는 주자 목록 마지막 원소가 살았던 적이 있는가) — 완투 계열 판정용 */
+  readonly teamBaserunnerAllowed: boolean
+  /** state+0x89 피안타 · +0x8a 실점 (완투 계열 판정용) */
   readonly teamHitsAllowed: number
   readonly teamRunsAllowed: number
   /** 구원이 등판조차 못 했는가 — 원본 `state[0x6a] == state[0x6b]` (P1 5-3·5-5) */
@@ -294,7 +295,7 @@ function starterReputationParts(
 
   if (isCompleteGame(record, context.endedInningIndex)) {
     if (
-      context.teamWalksAllowed === 0 &&
+      !context.teamBaserunnerAllowed &&
       context.teamHitsAllowed === 0 &&
       context.teamRunsAllowed === 0 &&
       record.outsRecorded <= REGULATION_OUTS
