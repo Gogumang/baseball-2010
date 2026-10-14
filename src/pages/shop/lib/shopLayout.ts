@@ -4,8 +4,11 @@
  * 창 객체는 관리 장면의 0x7b7b8(크기 0x398)이고, 그림은 [this+0x138] = `ui/mode_ui.pzx` 다.
  * 갈림은 `[this+0x1a4]`(창 종류):
  *   1 서브아이템 상점 · 2 GP아이템 상점 · 3 장비 상점 · 4 구장 아이템  (R12 1a 표)
- *   — P6 3절은 "==3 이면 구장 아이템" 이라 적었지만 R12 4절이 **4 가 구장 아이템**이라고 정정했다.
- * 종류 1·2·3 은 0x81dc0(프레임 33 박스 6개 + 34 격자 10칸), 종류 4 만 0x83378(프레임 32)로 간다.
+ * 0x8453c 는 **종류 3 이면 0x83378, 아니면 0x81dc0** 이다(0x84546 `cmp r3,#3`, 직접 떴다).
+ *   — 종류 1·2 는 0x81dc0(프레임 33 박스 6개 + 34 격자 10칸, 이 파일),
+ *     종류 3 장비는 0x83378(프레임 30 타자 · 31 투수, `equipmentWindowLayout`),
+ *     종류 4 구장 아이템은 0xb158 이 0x83378 을 직접 부른다(프레임 32).
+ *   P6 3절의 "==3 이면 구장 아이템" 은 0x8453c 의 갈림을 0x83378 안의 구장 갈래(종류 4)와 섞은 것이다.
  *
  * 스프라이트 확인 (public/sprites/mode_ui/frames):
  *   프레임 33·34 는 **PNG 가 없다** — 그림 없이 박스만 있는 배치 프레임이라 그렇다
@@ -25,7 +28,7 @@ export interface ShopBox {
   readonly height: number
 }
 
-/** 창 종류 [this+0x1a4] (R12 1a) */
+/** 창 종류 [this+0x1a4] (R12 1a) — 장비(3)는 0x83378 장비 창으로 간다 */
 export const SHOP_WINDOW_KIND = { 서브: 1, GP: 2, 장착: 3, 착용: 3, 구장: 4 } as const
 export type ShopWindowKindName = keyof typeof SHOP_WINDOW_KIND
 
@@ -140,18 +143,53 @@ export const CURSOR_BLINK_PERIOD = 10
 export const CURSOR_VISIBLE_UPDATES = 9
 
 /**
- * 아이템 아이콘은 `item_icon.pzx` 를 목록 순서대로 쓴다 — 서브 k → k, GP k → 10+k.
- * (원본 아이콘 표 0x7e764 는 미해독이지만 그림이 이름과 하나씩 맞는 것을 확인했다.)
- * 장비(종류 3)는 맞는 아이콘 표를 못 찾았다 — item_icon 은 27장뿐이라 44칸을 덮지 못한다.
- * 그래서 장비 칸은 아이콘 없이 레벨 숫자만 그린다 (근사).
+ * 아이템 아이콘은 `item_icon.pzx` 를 목록 순서대로 쓴다 — 서브 k → k, GP k → 10+k (투수 GP 는 표 0xd4676).
+ * 장비(창 종류 3)는 이 격자를 쓰지 않는다 — 0x8453c 가 종류 3 을 장비 창 0x83378(목록 줄)로 보낸다(`equipmentWindowLayout`).
+ * (앞서 여기 "원본 아이콘 표 0x7e764" 라 적었으나 0x7e764 는 아이콘 표가 아니라 아래 **칸 바탕** 함수다.)
  */
 export const GP_ICON_OFFSET = 10
 export const SUB_ICON_COUNT = 10
 
-export function itemIconFrameOf(kind: ShopWindowKindName, index: number): number | null {
+export function itemIconFrameOf(kind: '서브' | 'GP', index: number): number | null {
   if (kind === '서브') return index < SUB_ICON_COUNT ? index : null
-  if (kind === 'GP') return GP_ICON_OFFSET + index
-  return null
+  return GP_ICON_OFFSET + index
+}
+
+/** 칸 바탕 0x7e764 의 색 — 셋째 인자(깃발)가 0 이면 파랑, 아니면 빨강·주황 (0x7e776~0x7e7bc). 0x81dc0 은 늘 0 으로 부른다 */
+export const SLOT_CELL_COLORS = {
+  normal: { edge: '#041D52', fill: '#2033AA', shine: '#3045CD' },
+  flagged: { edge: '#932F31', fill: '#FF6C3F', shine: '#FFBD3C' },
+} as const
+
+export interface SlotCellRect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
+}
+
+/**
+ * 칸 바탕 0x7e764(창, 칸 xy, 칸 wh, 깃발, 0) — 격자 칸마다(0x82420, 칸 10개 모두) 아이콘보다 먼저 그린다. 직접 떴다:
+ * ```
+ * 7e7d2  0xba0bd(칸, 둥글기 1, 테 색)            ; 둥근 칠은 (w+1)×(h+1) 을 덮고 네 모서리 한 칸을 비운다
+ * 7e800  0xb9f75((x+1, y+1), (w−1, h−1), 채우기 색)
+ * 7e834  0xb9f75((x+2, y+2), (w−3, trunc((h−1)/2) − 2), 빛 색)   ; 위 절반 밝은 띠
+ * ```
+ */
+export function slotCellRectsOf(cell: { readonly x: number; readonly y: number }, isFlagged = false): readonly SlotCellRect[] {
+  const colors = isFlagged ? SLOT_CELL_COLORS.flagged : SLOT_CELL_COLORS.normal
+  const { x, y } = cell
+  const size = SLOT_SIZE
+  return [
+    // 둥근 칠 — 모서리를 뺀 테두리 네 변 (안쪽은 아래 채우기가 덮는다)
+    { x: x + 1, y, width: size - 1, height: 1, color: colors.edge },
+    { x: x + 1, y: y + size, width: size - 1, height: 1, color: colors.edge },
+    { x, y: y + 1, width: 1, height: size - 1, color: colors.edge },
+    { x: x + size, y: y + 1, width: 1, height: size - 1, color: colors.edge },
+    { x: x + 1, y: y + 1, width: size - 1, height: size - 1, color: colors.fill },
+    { x: x + 2, y: y + 2, width: size - 3, height: Math.trunc((size - 1) / 2) - 2, color: colors.shine },
+  ]
 }
 
 /** 박스 가운데에 폭 w 짜리 그림을 놓을 왼쪽 x (정렬 0x22 의 가로) */

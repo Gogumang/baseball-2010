@@ -63,12 +63,16 @@ describe('아이템 창 격자 (mode_ui 프레임 34)', () => {
     expect(칸(SUB_ITEMS[9].name).style.top).toBe(`${SLOT_YS[1]}px`)
   })
 
-  it('장비 상점은 레벨이 11 칸이라 격자를 한 행 굴려서 담는다 (근사)', () => {
-    띄우기('장착')
+  it('칸마다 칸 바탕 0x7e764 를 깐다 — 테 #041D52 · 채우기 #2033AA · 위 절반 #3045CD (10칸 모두)', () => {
+    띄우기('GP')
 
-    // 처음에는 레벨 1~10 이 보이고 11 번째 칸은 아직 격자 밖이다
-    expect(screen.getAllByText('1').length).toBeGreaterThan(0)
-    expect(screen.queryByText('11')).toBeNull()
+    const cells = screen.getByTestId('shop-slot-cells').querySelectorAll('rect')
+    expect(cells.length).toBe(SLOT_COUNT * 6)
+    const fill = [...cells].find((rect) => rect.getAttribute('fill') === '#2033AA')
+    expect(fill?.getAttribute('x')).toBe(String(SLOT_XS[0] + 1))
+    expect(fill?.getAttribute('width')).toBe(String(SLOT_SIZE - 1))
+    const shine = [...cells].find((rect) => rect.getAttribute('fill') === '#3045CD')
+    expect(shine?.getAttribute('height')).toBe('14')
   })
 })
 

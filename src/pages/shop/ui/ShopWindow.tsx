@@ -8,7 +8,7 @@ import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   CURSOR_BLINK_PERIOD, CURSOR_VISIBLE_UPDATES, DESCRIPTION_BOX, HEAD_LABEL_FRAME, INNER, LABEL_HEIGHT,
   LEFT_TAB_BOX, MODE_UI_FRAME, MONEY_DIGIT_BASE_FRAME, NAME_BOX, RIGHT_TAB_BOX, SHOP_COLORS, SLOT_COLUMNS,
-  SLOT_ROWS, SLOT_SIZE, VALUE_BOX, WINDOW_BOX, centeredLeftOf, centeredTopOf, slotPositionOf,
+  SLOT_COUNT, SLOT_ROWS, SLOT_SIZE, VALUE_BOX, WINDOW_BOX, centeredLeftOf, centeredTopOf, slotCellRectsOf, slotPositionOf,
 } from '@/pages/shop/lib/shopLayout'
 import type { ShopBox, ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
@@ -30,12 +30,6 @@ const withMoneyFont = (glyphs: readonly Glyph[]): Glyph[] =>
       : glyph,
   )
 
-export interface ShopPartTabs {
-  readonly names: readonly string[]
-  readonly current: number
-  readonly onChange: (part: number) => void
-}
-
 interface ShopWindowProps {
   readonly kind: ShopWindowKindName
   readonly entries: readonly ShopEntry[]
@@ -46,8 +40,6 @@ interface ShopWindowProps {
   readonly money: number
   /** 팝업이 떠 있으면 창은 키를 안 받는다 */
   readonly isKeyEnabled: boolean
-  /** 장비 상점의 부위 탭 (웹이 더한 것 — 원본은 목록의 행이 부위다) */
-  readonly partTabs?: ShopPartTabs
 }
 
 /**
@@ -56,11 +48,12 @@ interface ShopWindowProps {
  *   박스 0 창(24,48,192,212) · 1 왼쪽 탭 · 2 오른쪽 탭 · 3 이름 딱지 · 4 설명 · 5 값 칸
  *   격자 = 33×33 칸 10개 (x 34·69·104·139·174, y 77·115)
  *
- * 창 종류(R12 1a)에 따라 머리만 바뀐다 — 1 서브아이템 · 2 GP아이템 · 3 장비.
- * 아이템이 10 칸을 넘으면(장비 11 레벨) 격자를 한 행씩 굴린다 (근사 — shopLayout 주석 참고).
+ * 창 종류(R12 1a)에 따라 머리만 바뀐다 — 1 서브아이템 · 2 GP아이템. 장비(종류 3)는 이 창이 아니라
+ * 장비 창 0x83378(`EquipmentWindow`)이다.
+ * 칸마다 칸 바탕 0x7e764 를 먼저 깔고(10칸 모두 — 빈 칸도) 그 위에 아이콘을 얹는다.
  */
 export function ShopWindow({
-  kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled, partTabs,
+  kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled,
 }: ShopWindowProps) {
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const modeUiOrigins = useFrameOrigins(MODE_UI)
@@ -141,22 +134,7 @@ export function ShopWindow({
       {/* 머리 — 창 종류별 (0x81ea2~0x82254) */}
       {kind === '서브' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
       {kind === 'GP' && centeredLabel(HEAD_LABEL_FRAME.GP아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
-      {/* 장비 창의 머리 글은 원본에서 못 찾았다 — 부위 이름을 왼쪽 탭에 글자로 둔다 (근사) */}
-      {partTabs !== undefined && partTabs.names.map((name, index) => (
-        <button key={name} type="button"
-          className={`${styles.partTab}${index === partTabs.current ? ` ${styles.partTabOn}` : ''}`}
-          aria-pressed={index === partTabs.current}
-          style={{
-            left: LEFT_TAB_BOX.x + Math.trunc((LEFT_TAB_BOX.width / partTabs.names.length) * index),
-            top: LEFT_TAB_BOX.y + 2,
-            width: Math.trunc(LEFT_TAB_BOX.width / partTabs.names.length),
-          }}
-          onClick={() => partTabs.onChange(index)}>
-          {name}
-        </button>
-      ))}
-
-      {/* 서브·장비는 오른쪽 탭에 소지금 (종류 1·5 — 막대 52 + img_text 302 + 글꼴 36 숫자) */}
+      {/* 서브는 오른쪽 탭에 소지금 (종류 1·5 — 막대 52 + img_text 302 + 글꼴 36 숫자) */}
       {kind !== 'GP' && (
         <>
           {valueBar(RIGHT_TAB_BOX)}
@@ -173,6 +151,14 @@ export function ShopWindow({
           {rightLabel(HEAD_LABEL_FRAME.가격, VALUE_BOX, SHOP_COLORS.text)}
         </>
       )}
+
+      {/* 칸 바탕 0x7e764 — 10칸 모두 (0x82420, 깃발 0) */}
+      <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
+        data-testid="shop-slot-cells">
+        {Array.from({ length: SLOT_COUNT }, (_unused, slot) => slotCellRectsOf(slotPositionOf(slot)).map((rect, part) => (
+          <rect key={`${slot}-${part}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
+        )))}
+      </svg>
 
       {/* 격자 커서 — 칸을 1px 둘러싼다 */}
       <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
@@ -193,11 +179,10 @@ export function ShopWindow({
             style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}
             onMouseEnter={() => onMoveCursor(index)}
             onClick={() => (cursor === index ? onSelect(index) : onMoveCursor(index))}>
-            {entry.iconFrame === null
-              // 장비 칸은 맞는 아이콘 표를 못 찾아 레벨 숫자만 그린다 (근사)
-              ? <span>{index + 1}</span>
-              : <img className={entry.isOwned ? styles.ownedIcon : undefined} alt=""
-                  src={spriteSrc(ITEM_ICON, entry.iconFrame)} />}
+            {entry.iconFrame !== null && (
+              <img className={entry.isOwned ? styles.ownedIcon : undefined} alt=""
+                src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
+            )}
           </button>
         )
       })}
@@ -222,7 +207,7 @@ export function ShopWindow({
         {selected?.name ?? ''}
       </div>
 
-      {/* 박스 5 값 칸 — 서브·장비는 만원(억 표기), GP 는 그냥 숫자. 글색 노랑 */}
+      {/* 박스 5 값 칸 — 서브는 만원(억 표기), GP 는 그냥 숫자. 글색 노랑 */}
       {selected !== undefined && (
         <SpriteNumber
           glyphs={kind === 'GP' ? numberGlyphsOf(selected.price) : moneyGlyphsOf(selected.price)}

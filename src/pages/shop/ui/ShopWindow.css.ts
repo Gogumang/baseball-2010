@@ -78,18 +78,3 @@ export const descriptionLine = style({
   margin: 0,
   whiteSpace: 'pre-wrap',
 })
-
-/** 부위 탭 — 장비 상점에만 있다 (웹이 더한 것) */
-export const partTab = style({
-  position: 'absolute',
-  padding: 0,
-  border: 'none',
-  background: 'transparent',
-  color: SHOP_COLORS.text,
-  fontSize: '11px',
-  cursor: 'pointer',
-})
-
-export const partTabOn = style({
-  color: ORIGINAL_COLORS.highlightYellow,
-})
