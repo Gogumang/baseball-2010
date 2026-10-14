@@ -145,6 +145,7 @@ import type { MatchProgressSettings } from '@/features/play-team-game/model/matc
 import {
   aceLeveledAbility,
   defenseTeamBonusFor,
+  runnerTeamGradeFor,
   entryBatterGameAbilities,
   entryPitcherGameAbilities,
   entryPitcherGameAbilityParts,
@@ -2506,6 +2507,8 @@ function batterDefenseInputOf(
     // 우리 공격이니 수비는 상대 팀이다
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
     defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.opponentTeamId),
+    // 주자 속도의 팀 등급(0xa93ac a9488) — 우리 팀 근성
+    runnerTeamGrade: offenseRunnerTeamGradeOf(progress, true),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 상대 수비 · 우리 주자
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
     runnerAces: runnerAcesFor(progress, true),
@@ -2774,6 +2777,8 @@ function pitchOnce(
       bases: progress.game.bases,
       offenseIsCpu: true,
       runAbilityOf: (base) => runAbilitiesOnBaseOf(progress, '수비')[base] ?? 0,
+      // 루 위 주자 +0xa4 에 든 공격(상대) 팀 근성 등급 (0xa93ac a9488) — 300~383 이라 표 칸(÷250)은 그대로 1 이다
+      runnerTeamGrade: offenseRunnerTeamGradeOf(progress, false),
     },
     random,
   )
@@ -3143,6 +3148,8 @@ function defensiveDefenseInputOf(
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
     defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.ourTeamId),
+    // 주자 속도의 팀 등급(0xa93ac a9488) — 상대 팀 근성
+    runnerTeamGrade: offenseRunnerTeamGradeOf(progress, false),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 우리 수비 · 상대 주자
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
     runnerAces: runnerAcesFor(progress, false),
@@ -3376,6 +3383,7 @@ export function pickoff(
     // 주자 모두가 지금 타자의 주루를 쓴다)
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
     defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.ourTeamId),
+    runnerTeamGrade: offenseRunnerTeamGradeOf(progress, false),
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
@@ -3415,6 +3423,7 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     // 우리 공격이니 수비는 상대 팀이다
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
     defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.opponentTeamId),
+    runnerTeamGrade: offenseRunnerTeamGradeOf(progress, true),
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
@@ -3595,7 +3604,7 @@ interface TeamPitchArrival {
  *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다. ⚠️ 사람 공격 쪽 판의 주루 키(0x5331c)는 아직 안 받는다(미리 돌린다).
  *
  * - 루별 주루: 루에 선 주자의 신원(`GameState.runners`, 원본 주자 목록)대로 그 팀 타순 칸 선수(`runAbilitiesOnBaseOf`).
- * ⚠️ 미해결: 주자 속도의 팀 등급(전역 모드 1·2·8, R3 4절)은 팀 경기의 다른 판(타구·견제)처럼 안 싣는다(0).
+ * - 주자 속도의 팀 등급: 0xa93ac a9488 — 모드 1·2·8 에서 공격 팀 근성 등급(`offenseRunnerTeamGradeOf`). 타구·견제 판도 같다.
  * ⚠️ 미해결: 종류 5 판 정산 0xa8024 의 기록 칸(투수 아웃 수·평판·리그 기록)은 견제 판처럼 손대지 않았다.
  *
  * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
@@ -3631,6 +3640,8 @@ function arriveTeamPitch(
       bases: before.bases,
       outs: before.outs,
       runAbilities: runAbilitiesOnBaseOf(progress, humanSide),
+      // 주자 속도의 팀 등급(0xa93ac a9488) — 공격 팀 근성
+      runnerTeamGrade: offenseRunnerTeamGradeOf(progress, humanOffense),
       // 마선수 주자 그림(0x79d10) — 공격 팀 타자 · 루 위 주자
       runnerAces: runnerAcesFor(progress, humanOffense),
       ...(humanOffense
@@ -3764,6 +3775,16 @@ function withoutStealDisplay(progress: TeamGameProgress): TeamGameProgress {
  * 루별 주자 주루 (경기용 칸 3) — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 —
  * 공격 팀 타순 칸)대로다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(타순을 거꾸로 센다)로 본다.
  */
+/**
+ * **주자 속도의 팀 등급** — 주자 만들기 0xa93ac a9488: 전역 모드 1·2·8 이면 `0xbbe98(s16 팀레코드+0xa)`.
+ * 팀레코드는 주자의 팀(공격 팀)이다 — 루 위 주자 0xa9a10(a9a3e) · 타자주자 0x46418(4650e) 모두 공격 팀 `0xb8680(팀)`.
+ * 모드 9(대전 이벤트)는 0 이다(수비 보너스 b10d0 과 다르다).
+ */
+function offenseRunnerTeamGradeOf(progress: TeamGameProgress, ourOffense: boolean): number {
+  const { options } = progress
+  return runnerTeamGradeFor(abilityContextOf(options), ourOffense ? options.ourTeamId : options.opponentTeamId)
+}
+
 function runAbilitiesOnBaseOf(
   progress: TeamGameProgress,
   humanSide: ControlSide,

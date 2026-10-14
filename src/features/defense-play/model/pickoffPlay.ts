@@ -145,6 +145,11 @@ export interface PickoffPlayInput {
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
    */
   readonly defenseTeamBonus?: number
+  /**
+   * **주자 속도의 팀 등급** (주자 만들기 0xa93ac a9488 — `runnerTeamGradeOf`): 모드 1·2·8 에서 공격 팀 '근성' 등급.
+   * 모든 주자(타자주자 포함) 속도에 더한다. 안 주면 0(그 밖의 모드와 같다)
+   */
+  readonly runnerTeamGrade?: number
   /** 주자들의 주루 능력치 */
   readonly runAbility?: number
   /** 루별 주자 주루 (1~3). 없는 루는 `runAbility` — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 들고 있다 */
@@ -239,7 +244,8 @@ function* pickoffPlaySteps(
   ticks: DefensePlayView[],
 ): Generator<number, PickoffPlayResult, DefenseKeyPress | null> {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
-  const speedOf = (base: 1 | 2 | 3) => runnerSpeedOf(input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY)
+  const speedOf = (base: 1 | 2 | 3) =>
+    runnerSpeedOf(input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY, input.runnerTeamGrade ?? 0)
   const autoBaserunningEnabled = input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const targetBase = input.targetBase
   const log: string[] = []

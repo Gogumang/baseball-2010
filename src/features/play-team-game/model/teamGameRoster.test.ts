@@ -3,6 +3,7 @@ import {
   PITCHER_ENTRY_ACE_SLOT,
   aceLeveledAbility,
   defenseTeamBonusFor,
+  runnerTeamGradeFor,
   entryBattersOfOrder,
   entryPitchersOfOrder,
   rosterEntryBattersOf,
@@ -16,7 +17,8 @@ import type { TeamEntryOrder } from '@/features/play-team-game/model/teamGameRos
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { createFielders, defenseTeamBonusOf } from '@/entities/fielding/model/fieldingState'
+import { createFielders, defenseTeamBonusOf, runnerTeamGradeOf } from '@/entities/fielding/model/fieldingState'
+import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 
 describe('투수 명단의 레코드 +0x14 스킬 비트 — 공 하나 소모 0xa5e14 의 비겁자(18) · 끈기(10)', () => {
   it('붙박이 줄은 Xls 행 비트 그대로, 마투수 · 마타자는 XlsACE 행 비트 그대로 (0xb521c · 0xb53f0 이 통째 베낀다)', () => {
@@ -140,5 +142,24 @@ describe('수비 팀 보너스 — 판 시작 0xb0fb4 b10d0~b10f2', () => {
     // 수비 500 → 등급 3 → g = 4 → 940 + 32
     expect(plain[4]!.baseThrowSpeed).toBe(972)
     expect(bonused[4]!.baseThrowSpeed).toBe(975)
+  })
+})
+
+describe('주자 속도의 팀 등급 — 주자 만들기 0xa93ac a9488', () => {
+  it('모드 1·2·8 만 0xbbe98(공격 팀레코드+0xa = 근성) 등급, 모드 9 를 포함한 나머지는 0', () => {
+    // 서울 드래곤즈(0) 근성 365 → 등급 2 · 서울 게임빌즈(8) 근성 555 → 등급 4
+    for (const mode of [1, 2, 8]) {
+      expect(runnerTeamGradeFor({ mode, seasonTeamId: -1 }, 0)).toBe(2)
+      expect(runnerTeamGradeFor({ mode, seasonTeamId: -1 }, 8)).toBe(4)
+    }
+    // 수비 보너스(b10d0, 1·2·8·9)와 달리 모드 9 는 a9488 의 비교(2 · 1 · 8)에 없다
+    for (const mode of [0, 3, 4, 5, 6, 7, 9]) expect(runnerTeamGradeFor({ mode, seasonTeamId: -1 }, 8)).toBe(0)
+    // 시즌 트레이닝을 먹인 팀 능력치를 넘기면 그 값을 본다
+    expect(runnerTeamGradeFor({ mode: 2, seasonTeamId: 0, teamAbilities: [[0, 0, 0, 926]] }, 0)).toBe(7)
+    expect(runnerTeamGradeOf(9, 926)).toBe(0)
+  })
+
+  it('주자+0xa4 = ⌊주루×7/100⌋ + 등급 — 달리기 속도 300 + 그 값', () => {
+    expect(runnerSpeedOf(500, runnerTeamGradeOf(8, 555))).toBe(300 + 35 + 4)
   })
 })

@@ -214,6 +214,11 @@ export interface DefensePlayInput {
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
    */
   readonly defenseTeamBonus?: number
+  /**
+   * **주자 속도의 팀 등급** (주자 만들기 0xa93ac a9488 — `runnerTeamGradeOf`): 모드 1·2·8 에서 공격 팀 '근성' 등급.
+   * 모든 주자(타자주자 포함) 속도에 더한다. 안 주면 0(그 밖의 모드와 같다)
+   */
+  readonly runnerTeamGrade?: number
   /** 주자들의 주루 능력치. 기본 500 */
   readonly runAbility?: number
   /**
@@ -972,7 +977,10 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const abilities =
     input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const speedOf = (fromBase: number) =>
-    runnerSpeedOf(input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY)
+    runnerSpeedOf(
+      input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY,
+      input.runnerTeamGrade ?? 0,
+    )
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
 
   let fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
