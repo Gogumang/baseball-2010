@@ -22,7 +22,8 @@ import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-ca
  * - 투수 = 상대 마운드(`opponentMoundOf`): 이름 · 보직 · 손 · 체력 막대 · 시즌 줄 = 리그 기록표 줄(`career.leaguePlayerStats`)
  *   + 이 경기 줄(`pitcherLines`, 같은 게이트). 마투수는 표에 칸이 없어 시즌 줄을 비운다.
  * - 팀 글자 0xb6c20: 내 팀 PLAYER · 상대 COM.
- * ⚠️ 근사: 웹 `career.stats` 는 포스트시즌 경기도 더한다(applyGameResult) — 원본 레코드는 게이트가 막아 정규시즌 줄만 든다.
+ * `career.stats` 도 포스트시즌 경기의 레코드 줄(+0x20~+0x2c)은 안 더한다(`applyGameResult` 의 `withoutRecordLine`) — 원본 레코드처럼
+ * 정규시즌 줄만 든다.
  */
 export function gameMatchupCardsOf(progress: GameProgress, career: PlayerCareer): {
   readonly batterHand: number

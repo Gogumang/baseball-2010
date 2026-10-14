@@ -840,9 +840,12 @@ export function useCareerSession({
       }
       // 스킬 조건용 경기 뒤 카운터 — 사기까지 반영된 뒤에 센다 (A-4). 116 쪽(0x12bc2~0x12c3c)이라 포스트시즌에도 돈다 — 그때
       // +0x4a 는 앞 평가 경기 값이다(위).
-      //    ⚠️ 미해결: 포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(현재 타자) 가 거짓이라 내 타자 기록 칸 쓰기 아홉 곳
-      //    (0xa8362·0xa8498·0xa84d6·0xa8538·0xa8578·0xa85c4·0xa8866·0xa895c …)이 막힌다 — 어느 칸이 웹 `applyGameResult`
-      //    의 어느 줄인지 아직 다 짝짓지 못해 기록은 그대로 센다.
+      //    포스트시즌엔 정산 0xa8024 의 [sp+0x34] = 0xa56dc(지금 타자, 0)(a8070)가 거짓이라 그 게이트 여덟 곳이 막힌다 —
+      //    a8362 도루 +0x2c · a8498 안타 +0x22 · a8538 2루타 +0x24 · a8578 3루타 +0x26 · a85c4 홈런 +0x28 · a8866 타수 +0x20 ·
+      //    a895c 타점 +0x2a 는 `applyGameResult` 의 `withoutRecordLine` 이 뺀다. 남은 a84d6 은 장내 홈런 state[0x25] 를 홈런 수
+      //    [sp+0x24] 에 더하는 자리라, 포스트시즌 장내 홈런은 a8210 이 루타 4 안타로 적되 홈런 갈래(a85be~a86b4 · e[0x13] a8728)를
+      //    건너뛴다.
+      //    ⚠️ 미확인(웹 미반영): 그 장내 홈런 갈래는 경기 흐름(gameFlow) 쪽 일이라 여기서 옮기지 않았다.
       const counted = countGameForSkills(evaluated, evaluation.popularityChange)
       // 연속 기록 칸을 잇는다. 116 의 0x8a6fc 는 그 칸을 읽어 알림 줄과 **보상 명령**(평판 · 슬럼프 스킬)을 내장 이벤트에
       // 쌓을 뿐이라, 보상은 114 가 이벤트를 틀 때(웹은 [확인] `confirmGameResult`) 먹는다 (`streakEventOf`)

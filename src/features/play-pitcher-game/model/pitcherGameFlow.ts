@@ -157,6 +157,7 @@ import {
 } from '@/features/play-pitcher-game/model/pitcherGameState'
 import {
   EMPTY_DECISION_STATE,
+  PITCHER_DECISION_CODE,
   REGULATION_LAST_INNING_INDEX,
   applyPitcherChange,
   applyRunScored,
@@ -3499,10 +3500,18 @@ export function earnedRunAverageOf(runsAllowed: number, outsRecorded: number): n
 export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
   const { options } = progress
   const decision = gameEndDecisionOf(progress.decision)
-  const decisionCode = decisionCodeForMine(decision, {
-    side: progress.game.playerSide,
-    number: MY_PITCHER_NUMBER,
-  })
+  /*
+   * 경기 끝 0xa7de8 이 승 +0x2e(a7e2a) · 패 +0x2f(a7e70) · 세이브 +0x24(a7ec6)를 `0xa56dc(R, 그 투수, 0)` 이 참일 때만 올리고,
+   * 내 투수 칸 R+0x124(1 승 · 2 패 · 3 세이브)는 이어서 `0xa56dc(R, 그 투수, 1)`(a7e46 · a7e8c · a7ede)이 참일 때만 쓴다.
+   * 모드 3 갈래 0xa571c 는 포스트시즌 · 국가대항전이면 플래그와 상관없이 거짓 → 그 경기는 승패 · 세이브도 R+0x124 도 안 남는다.
+   * (투구 수 +0x28 은 0xa5e14 a5e30 이 게이트 없이 올린다)
+   */
+  const decisionCode = countsMyPitcherRecord(progress)
+    ? decisionCodeForMine(decision, {
+      side: progress.game.playerSide,
+      number: MY_PITCHER_NUMBER,
+    })
+    : PITCHER_DECISION_CODE.none
   const record: PitcherEvaluationRecord = {
     ...progress.record,
     hitByPitch: progress.pitcherRecord.hitByPitch,
