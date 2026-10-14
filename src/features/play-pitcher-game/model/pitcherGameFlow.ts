@@ -1466,6 +1466,9 @@ function arrivePitcherPitch(
       defenseAbilities: myDefenseAbilitiesOf(progress),
       // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
       fielderPlates: myFielderPlatesOf(progress),
+      // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+      defenseTeamIndex: progress.options.ourTeamId,
+      offenseTeamIndex: progress.options.opponentTeamId,
       runnerAces: opponentRunnerAcesOf(progress),
       runAbilities: runAbilitiesOnBaseOf(progress),
       defenseIsCpu: false,
@@ -1872,6 +1875,9 @@ export function pickoff(
     // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032)
     defenseAbilities: myDefenseAbilitiesOf(progress),
     fielderPlates: myFielderPlatesOf(progress),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.options.ourTeamId,
+    offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: opponentRunnerAcesOf(progress),
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
     // 루별 주자 주루 — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 든다 (타자는 견제 판에 안 뛴다)
@@ -2165,6 +2171,9 @@ function defensePlayInputOf(
     defenseAbilities: myDefenseAbilitiesOf(progress),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
     fielderPlates: myFielderPlatesOf(progress),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.options.ourTeamId,
+    offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: opponentRunnerAcesOf(progress),
     // 주자는 상대 타자다 — 지금 타순 칸의 주루
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
