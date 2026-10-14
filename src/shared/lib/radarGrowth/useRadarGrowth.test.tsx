@@ -5,10 +5,16 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { radarObject } from '@/shared/lib/radarGrowth/radarGrowth'
 
-function Probe({ targets, cursor, fromZero }: { readonly targets: readonly number[]; readonly cursor?: number; readonly fromZero?: boolean }) {
+function Probe({ targets, cursor, fromZero, restartFromZero }: {
+  readonly targets: readonly number[]
+  readonly cursor?: number
+  readonly fromZero?: boolean
+  readonly restartFromZero?: boolean
+}) {
   const current = useRadarGrowth(targets, {
     ...(cursor === undefined ? {} : { restartKey: cursor }),
     ...(fromZero === undefined ? {} : { fromZero }),
+    ...(restartFromZero === undefined ? {} : { restartFromZero }),
   })
   return <output data-testid="current">{current.join(',')}</output>
 }
@@ -51,5 +57,16 @@ describe('useRadarGrowth — 목록 0x63b14 의 커서 이동 다시 만들기 (
     radarObject.hasPrevious = true
     render(<Probe targets={[300, 300, 300, 300]} fromZero={false} />)
     expect(current()).toBe('300,300,300,300')
+  })
+})
+
+describe('useRadarGrowth — 나리 102 등록 키 0x16f28 (타입 · 포지션 줄 좌우 → +0xad = 0 · +0x1e3 = 0)', () => {
+  it('다시 건 그림에서 0 부터 48 씩 자란다 — 값이 안 바뀌어도', () => {
+    vi.useFakeTimers()
+    const { rerender } = render(<Probe targets={[300, 300, 300, 300]} cursor={0} restartFromZero />)
+    advance(10)
+    expect(current()).toBe('300,300,300,300')
+    rerender(<Probe targets={[300, 300, 300, 300]} cursor={1} restartFromZero />)
+    expect(current()).toBe('48,48,48,48')
   })
 })

@@ -55,6 +55,8 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
   const [selectedRow, setSelectedRow] = useState(0)
   const [isConfirming, setIsConfirming] = useState(false)
   const [tick, setTick] = useState(1)
+  /** 타입 · 포지션 줄의 좌우를 누른 횟수 — 레이더를 0 에서 다시 거는 때 (아래 `RadarChart`) */
+  const [radarRearms, setRadarRearms] = useState(0)
   const labelOrigins = useFrameOrigins(IMG_TEXT)
   const uiOrigins = useFrameOrigins(MODE_UI)
 
@@ -74,6 +76,9 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
   /** 값 바꾸기 — 원본 목록의 좌우 키 ([0x7c] 타입 · [0x78] 포지션 · [0x80] 손 · [0x84] 피부) */
   const changeValue = (id: CreatePlayerRowId, step: number) => {
     setProfile((previous) => choiceStepped(previous, id, step))
+    // 0x16f28: 타입 줄([0x7c], 0x16f60~0x16fe0) · 포지션 줄([0x78], 0x17046~0x170cc)은 목록 키를 넘긴 뒤 값이 바뀌었든 아니든
+    // 레이더 [skin+0xd4] 에 +0xac = 1 · +0xad = 0 · +0x1e3 = 0 · +0x1e0 = 0 을 쓴다 — 손 · 피부 줄은 안 쓴다
+    if (id === '타입' || id === '포지션') setRadarRearms((count) => count + 1)
   }
 
   // 빈 이름으로는 확인할 수 없다 (R11 1b — 원본 입력기도 strlen 0 이면 OK 를 안 받는다). 공백도 글자다 (strlen 만)
@@ -163,8 +168,8 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
         ))}
       </div>
 
-      {/* 시작 능력치 (0x16e2c) — 타입·포지션을 바꾸면 그때마다 다시 계산된다 */}
-      <RadarChart base={ability} shown={ability} />
+      {/* 시작 능력치 (0x16e2c) — 타입·포지션을 바꾸면 그때마다 다시 계산되고, 레이더는 0 에서 다시 자란다 (0x16f28) */}
+      <RadarChart base={ability} shown={ability} growth={{ restartKey: radarRearms, restartFromZero: true }} />
 
       <div className={styles.infoBoard}
         style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height }} />

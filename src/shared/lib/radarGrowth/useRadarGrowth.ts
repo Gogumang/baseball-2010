@@ -23,6 +23,11 @@ export interface RadarGrowthOptions {
    * 같은 상태 안에서 하위 화면만 바뀌어 들어옴을 다시 안 거치는 곳(에디트 하위 1 · 2 → 0)이 그렇다. 기본 참.
    */
   readonly fromZero?: boolean
+  /**
+   * `restartKey` 가 바뀐 그림에서 지난 목표값이 아니라 0 에서 다시 자라나 — 다시 거는 쪽이 +0x1e3 과 함께 +0xad = 0 도 쓰는 곳
+   * (나리 102 등록 키 0x16f28 의 타입 · 포지션 줄 좌우 — 0x16fb2~0x16fe0 · 0x1709e~0x170cc). prev 표는 그대로 둔다. 기본 거짓.
+   */
+  readonly restartFromZero?: boolean
 }
 
 /**
@@ -30,7 +35,7 @@ export interface RadarGrowthOptions {
  * 화면에 붙을 때 0 에서 자라고(들어옴 · +0xad = 0 · +0x1e3 = 0), `restartKey` 가 바뀌면 바뀐 그림에서
  * 지난 목표값부터 새 값으로 다시 오르내린다.
  */
-export function useRadarGrowth(targets: readonly number[], { restartKey, fromZero = true }: RadarGrowthOptions = {}): readonly number[] {
+export function useRadarGrowth(targets: readonly number[], { restartKey, fromZero = true, restartFromZero = false }: RadarGrowthOptions = {}): readonly number[] {
   const draws = useUpdateCounter()
   const key = restartKey === undefined ? targets.join(',') : String(restartKey)
   const [segment, setSegment] = useState<Segment>(() => ({
@@ -40,7 +45,7 @@ export function useRadarGrowth(targets: readonly number[], { restartKey, fromZer
   if (segment.restartKey !== key) {
     // 다시 만들기 앞 그림까지 굴린 값에서 지난 목표값 · 깃발을 넘겨받는다
     const reached = radarGrowthAt(segment.start, segment.targets, Math.max(0, draws - segment.startDraw - 1))
-    active = { restartKey: key, targets, startDraw: draws, start: radarGrowthStart(reached.previous, reached.hasPrevious, targets.length, false) }
+    active = { restartKey: key, targets, startDraw: draws, start: radarGrowthStart(reached.previous, reached.hasPrevious, targets.length, restartFromZero) }
     setSegment(active)
   }
   const state = radarGrowthAt(active.start, targets, Math.max(0, draws - active.startDraw))
