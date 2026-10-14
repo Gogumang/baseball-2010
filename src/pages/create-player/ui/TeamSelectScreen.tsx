@@ -16,6 +16,8 @@ import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
+import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
+import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
 
 /** 이미지 폴더 (128장) — 노트가 "slt_frame 이미지 N" 이라 부르는 막대들이 여기 있다.
  *  프레임 폴더(`slt_frame/frames`, 62장)와 **번호 체계가 다르다** — 116·117 은 프레임 쪽에 없다 */
@@ -110,6 +112,8 @@ export function TeamSelectScreen({
   const entry = useListPageEntry({ grid: { shape: TEAM_GRID_OPEN, isAnimated: true } })
   const { keyLock } = entry
   const gridOpen = entry.grid
+  // 격자 시작 0x7a005(격자, [skin+0xe8], 1, 1) — 셋째 인자 [격자+6] = 1 이라 커서 튕김이 있다 (0x6409c)
+  const bounce = useGridCursorBounce()
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (keyLock.current) return
@@ -122,7 +126,10 @@ export function TeamSelectScreen({
         : event.key === 'ArrowUp' || event.key === '2' ? 'up' : null
       if (direction !== null) {
         event.preventDefault()
-        return setCursor((previous) => moveGridCursor(gridShape, previous, direction))
+        const next = moveGridCursor(gridShape, cursor, direction)
+        // 칸이 바뀐 키(커서 +0x25)면 0x7a571 이 고른 칸을 그 방향으로 튕긴다 (`useGridCursorBounce`)
+        if (next !== cursor) bounce.start(direction)
+        return setCursor(next)
       }
       const isOk = event.key === 'Enter' || event.key === '5'
       if (isOk && isTeamOpen(cursor, openedHiddenIds)) {
@@ -139,7 +146,7 @@ export function TeamSelectScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cursor, openedHiddenIds, gridShape, onSelect, onSelectLocked, onCancel])
+  }, [cursor, openedHiddenIds, gridShape, onSelect, onSelectLocked, onCancel, bounce.start])
 
   return (
     <RawScreen>
@@ -187,10 +194,20 @@ export function TeamSelectScreen({
       {/* B — 능력치 도형. 잠긴 팀은 원본도 idx −1 을 넘겨 네 값을 0 으로 채운다 */}
       <TeamAbilityChart values={isOpen ? team.values.slice(2) : []} cursor={cursor} />
 
-      {/* 15팀 격자 */}
+      {/* 15팀 격자 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 넷째 인자 [격자+8] = 1 이라 칸 바탕(남색 둥근 네모)을 모든 칸에 먼저 깐다 */}
       {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
-        const { x } = cellPositionOf(index)
-        const y = cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index)
+        const shake = index === cursor ? bounce.offset : null
+        return (
+          <GridCellBack key={`back-${entry.id}`} className={styles.layer}
+            x={cellPositionOf(index).x + (shake?.dx ?? 0)}
+            y={cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)}
+            width={GRID.cell} height={GRID.cell} />
+        )
+      })}
+      {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
+        const shake = index === cursor ? bounce.offset : null
+        const x = cellPositionOf(index).x + (shake?.dx ?? 0)
+        const y = cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)
         const open = isTeamOpen(index, openedHiddenIds)
         return (
           <button

@@ -11,7 +11,7 @@ import {
   teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
-  EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
+  EDIT_GRID_SHAPE, EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
   editEntryListsOf, editTargetOf, moveEditGrid, pointEditGrid, pressEditEntryKey,
 } from '@/pages/special-edit/lib/specialEditFlow'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
@@ -19,6 +19,9 @@ import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
+import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
+import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
+import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 
@@ -140,6 +143,8 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
   const entry = useListPageEntry({ slides, grid: { shape: EDIT_GRID_OPEN, isAnimated: slides } })
   const { keyLock } = entry
   const gridOpen = entry.grid
+  // 격자 시작 0x7a005(격자, [skin+0xe8], 1, 1) — [격자+6] = 1 이라 칸이 바뀐 키에 커서 튕김 (0x6409c)
+  const bounce = useGridCursorBounce()
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -147,6 +152,7 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
       const direction = ARROW_DIRECTIONS[event.key]
       if (direction !== undefined) {
         event.preventDefault()
+        if (moveGridCursor(EDIT_GRID_SHAPE, cursor, direction) !== cursor) bounce.start(direction)
         return onMove(direction)
       }
       if (event.key === 'Enter' || event.key === '5') {
@@ -160,7 +166,7 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onMove, onChoose, onBack, keyLock])
+  }, [onMove, onChoose, onBack, keyLock, cursor, bounce.start])
 
   const chartCenter = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
   const radius = ABILITY_CHART.radius
@@ -204,9 +210,20 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
           restartKey={cursor} fromZero={slides} />
       </svg>
 
+      {/* 칸 바탕 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 [격자+8] = 1 (0x7a7da~0x7a89c) */}
       {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
-        const { x } = cellPositionOf(index, EDIT_TEAM_COUNT)
-        const y = cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index)
+        const shake = index === cursor ? bounce.offset : null
+        return (
+          <GridCellBack key={`back-${entry.id}`} className={styles.layer}
+            x={cellPositionOf(index, EDIT_TEAM_COUNT).x + (shake?.dx ?? 0)}
+            y={cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)}
+            width={GRID.cell} height={GRID.cell} />
+        )
+      })}
+      {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
+        const shake = index === cursor ? bounce.offset : null
+        const x = cellPositionOf(index, EDIT_TEAM_COUNT).x + (shake?.dx ?? 0)
+        const y = cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)
         return (
           <button key={entry.id} type="button" aria-label={entry.name} aria-pressed={index === cursor}
             className={styles.cell} style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}

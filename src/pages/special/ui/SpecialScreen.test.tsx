@@ -7,7 +7,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
-  ROW, SPECIAL_ITEMS, descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
+  ROW, SPECIAL_ITEMS, descriptionPanelTopOf, hallOfFameCellImagesOf, isHallOfFameCellDimmed, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
@@ -227,14 +227,18 @@ describe('명예의 전당 격자 5×3', () => {
     expect(hallOfFameCellOf(10).y).toBe(179 + 80 - 3)
   })
 
-  it('칸 바탕은 (x−3, y−3, 칸+3) 둥근 네모다 (0x7a844)', () => {
+  it('칸 바탕이 없다 — 시작 0x7a005 넷째 인자 [격자+8] = 0. 칸은 (x, y) 에 slt_frame 0 틀 + 상태 그림 (0x7ac2e)', () => {
     열기()
     const cell = hallOfFameCellOf(0)
     const 칸0 = screen.getByRole('button', { name: '1번 슬롯' })
 
-    expect(칸0.style.left).toBe(`${cell.x - 3}px`)
-    expect(칸0.style.top).toBe(`${cell.y - 3}px`)
-    expect(칸0.style.width).toBe(`${cell.width + 3}px`)
+    expect(칸0.style.left).toBe(`${cell.x}px`)
+    expect(칸0.style.top).toBe(`${cell.y}px`)
+    expect(칸0.style.background).toBe('')
+    expect(칸0.querySelector('img')?.getAttribute('src')).toBe('./sprites/slt_frame/000.png')
+    // 보기 모드의 나리 칸 0 은 상태 0 → 이미지 115 (×) 를 칸 가운데 (19 − 9, 19 − 9)
+    const 그림 = 칸0.querySelector('img[data-cell-image="115"]') as HTMLElement
+    expect([그림.style.left, 그림.style.top]).toEqual(['10px', '10px'])
   })
 
   it('칸 배치 0x5eb8c — 0·5·10 은 빈 자물쇠(상태 0), 투수 1~2·타자 6~9 가 열리고 나머지는 LOCK', () => {
@@ -574,9 +578,9 @@ describe('홈런더비 선수 고르기 — 하위 16 (0x25e6c 목록 종류 1 �
     expect(screen.queryByRole('button', { name: '5번 슬롯' })).toBeNull()
     const first = screen.getByRole('button', { name: '6번 슬롯' })
     expect(first.getAttribute('aria-current')).toBe('true')
-    expect(first.style.left).toBe(`${hallOfFameCellOf(0).x - HALL_OF_FAME_GRID.backingInset}px`)
+    expect(first.style.left).toBe(`${hallOfFameCellOf(0).x}px`)
     expect(screen.getByRole('button', { name: '15번 슬롯' }).style.top)
-      .toBe(`${hallOfFameCellOf(9).y - HALL_OF_FAME_GRID.backingInset}px`)
+      .toBe(`${hallOfFameCellOf(9).y}px`)
   })
 
   it('나리 타자 → 코드 2 · 명예 타자 → 코드 4 (+0xa6 = 명전 번호)', () => {
@@ -736,5 +740,53 @@ describe('G포인트를 안 받은 머리띠 SpecialBands (0x54d95)', () => {
   it('스페셜 목록 6 은 +0x84 를 세우지 않아 처음부터 다 내려온 자리다', () => {
     띄우기()
     expect(제목().style.top).toBe('7px')
+  })
+})
+
+describe('명전 칸 그림 0x7ac2e · 커서 튕김 0x7a7f6', () => {
+  it('상태별 그림 — 찬 칸 글러브/방망이 + 타입 딱지 · 빈 칸 어두운 그림 · 잠김 자물쇠', () => {
+    expect(hallOfFameCellImagesOf(1, 3, 1).map((image) => image.image)).toEqual([23, 27])
+    expect(hallOfFameCellImagesOf(6, 3, 1).map((image) => image.image)).toEqual([24, 30])
+    expect(hallOfFameCellImagesOf(6, 3, null).map((image) => image.image)).toEqual([24])
+    expect(hallOfFameCellImagesOf(2, 4, null).map((image) => image.image)).toEqual([21])
+    expect(hallOfFameCellImagesOf(7, 2, null).map((image) => image.image)).toEqual([22])
+    expect(hallOfFameCellImagesOf(12, 5, null).map((image) => image.image)).toEqual([31])
+  })
+
+  it('145 등록은 다른 편 칸을 반투명 검정으로 덮는다 (0x7aeaa)', () => {
+    expect(isHallOfFameCellDimmed('투수', 4)).toBe(false)
+    expect(isHallOfFameCellDimmed('투수', 5)).toBe(true)
+    expect(isHallOfFameCellDimmed('타자', 4)).toBe(true)
+    expect(isHallOfFameCellDimmed(null, 4)).toBe(false)
+  })
+
+  it('칸이 바뀐 → 키에 고른 칸이 +2 · −2 뒤 제자리 (0xd4080)', () => {
+    vi.useFakeTimers()
+    try {
+      render(<HallOfFameScreen collection={EMPTY_COLLECTION} mode={{ kind: '보기' }} onBack={vi.fn()} />)
+      const 왼 = (name: string) => screen.getByRole('button', { name }).style.left
+      const 제자리 = 왼('3번 슬롯')
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 3)
+      })
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      const 옮긴 = screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true') as HTMLElement
+      const name = 옮긴.getAttribute('aria-label') as string
+      const 원래 = Number.parseInt(제자리, 10)
+      expect(name).not.toBe('2번 슬롯')
+      const 기준 = hallOfFameCellOf(Number.parseInt(name, 10) - 1).x
+      expect(원래).toBeGreaterThan(0)
+      expect(왼(name)).toBe(`${기준 + 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(왼(name)).toBe(`${기준 - 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(왼(name)).toBe(`${기준}px`)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

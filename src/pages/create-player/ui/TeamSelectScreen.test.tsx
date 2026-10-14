@@ -128,8 +128,9 @@ describe('팀 고르기', () => {
 
     const 테두리들 = container.querySelectorAll('img[src$="slt_frame/001.png"]')
     expect(테두리들).toHaveLength(1)
-    // 커서가 1번 칸으로 옮겨 갔다 — 42px 그림이라 40px 칸에서 1px 씩 비어져 나온다
-    expect((테두리들[0].parentElement as HTMLElement).style.left).toBe(`${cellPositionOf(1).x}px`)
+    // 커서가 1번 칸으로 옮겨 갔다 — 42px 그림이라 40px 칸에서 1px 씩 비어져 나온다.
+    // 옮긴 그림은 커서 튕김(0xd4080 → 쪽 +2)이 칸째 민다
+    expect((테두리들[0].parentElement as HTMLElement).style.left).toBe(`${cellPositionOf(1).x + 2}px`)
   })
 
   it('머리띠 제목은 prop 으로 갈아 끼운다', () => {

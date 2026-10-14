@@ -17,7 +17,8 @@ import {
   DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
   HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
   HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS,
-  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH,
+  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH, HALL_OF_FAME_CELL_ART, hallOfFameCellImagesOf,
+  hallOfFameCellImageTopLeftOf, isHallOfFameCellDimmed,
   hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
@@ -40,6 +41,7 @@ import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLay
 import { footerBottomOf, headerTopOf } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
 import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
+import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
@@ -507,6 +509,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   const entry = useListPageEntry({ grid: { shape: gridOpenShape, isAnimated: true } })
   const { keyLock } = entry
   const gridOpen = entry.grid
+  const bounce = useGridCursorBounce()
   const teamLogo = current.kind === '찬칸' && (slot === NARI_PITCHER_SLOT || slot === NARI_BATTER_SLOT) && current.figure !== null
     ? current.figure.team : null
 
@@ -633,7 +636,10 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         : null
       if (direction !== null) {
         event.preventDefault()
-        return setSlot((previous) => view.firstSlot + moveGridCursor(menuGrid, previous - view.firstSlot, direction))
+        const next = view.firstSlot + moveGridCursor(menuGrid, slot - view.firstSlot, direction)
+        // 칸이 바뀐 키(커서 +0x25)면 고른 칸을 튕긴다 — 시작 0x7a005(격자, [skin+0xe8], 1, 0) 의 [격자+6] = 1 (0x651e4)
+        if (next !== slot) bounce.start(direction)
+        return setSlot(next)
       }
       if (event.key === '5') {
         event.preventDefault()
@@ -783,11 +789,15 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
 
       <HallOfFameAbilityChart center={chartCenter} values={chartValues} slot={slot} />
 
-      {/* 5×3 격자 — 칸마다 둥근 네모 RGB(48,69,205) 를 (x−3, y−3, 칸+3) 에 (0x7a844) */}
+      {/* 5×3 격자 0x7a571 종류 6 — 칸 바탕 없이(시작 넷째 인자 [격자+8] = 0) 칸 틀 · 상태 그림 · (145) 다른 편 덮개 (0x7ac2e) */}
       {slots.map((entry, index) => {
         if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
         const box = hallOfFameCellOf(index - view.firstSlot)
-        const dy = gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot)
+        const shake = index === slot ? bounce.offset : null
+        const x = box.x + (shake?.dx ?? 0)
+        const y = box.y + gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot) + (shake?.dy ?? 0)
+        const typeIndex = entry.kind === '찬칸' && entry.figure !== null ? entry.figure.form >> 1 : null
+        const isDimmed = isHallOfFameCellDimmed(mode.kind === '등록' ? mode.edition : null, index)
         return (
           <button
             key={index}
@@ -798,21 +808,34 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
             data-slot={index}
             data-kind={entry.kind}
             data-state={entry.state}
-            style={{
-              left: box.x - HALL_OF_FAME_GRID.backingInset,
-              top: box.y + dy - HALL_OF_FAME_GRID.backingInset,
-              width: box.width + HALL_OF_FAME_GRID.backingInset,
-              height: box.height + HALL_OF_FAME_GRID.backingInset,
-              background: HALL_OF_FAME_GRID.backingColor,
-              borderRadius: HALL_OF_FAME_GRID.cornerRadius,
-              // 커서는 열림 애니가 끝난 뒤([격자+9])에만 0x7b3a0 이 그린다
-              ...(gridOpen.state.isDone ? {} : { outline: 'none' }),
-            }}
+            style={{ left: x, top: y, width: box.width, height: box.height }}
             onMouseEnter={() => setSlot(index)}
             onClick={() => { setSlot(index); pressSlot(index) }}
-          />
+          >
+            <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.frame.image)} style={{ left: 0, top: 0 }} />
+            {hallOfFameCellImagesOf(index, entry.state, typeIndex).map((image) => {
+              const at = hallOfFameCellImageTopLeftOf(image)
+              return <img key={image.image} className={styles.sprite} alt="" data-cell-image={image.image}
+                src={imageSrc(SLT_FRAME, image.image)} style={{ left: at.dx, top: at.dy }} />
+            })}
+            {isDimmed && (
+              // 0x6b7d5(gfx, x, y, 39, 38, 둥글기 1, 0x80000000) — (w + 1)×(h + 1) 에서 네 모서리 점이 빠진 꼴, 한 겹이라 clip-path 로 깎는다
+              <span className={styles.hofCellDim} data-part="덮개" style={{
+                width: HALL_OF_FAME_CELL_ART.frame.width + 1, height: HALL_OF_FAME_CELL_ART.frame.height + 1,
+                opacity: HALL_OF_FAME_CELL_ART.dimOpacity,
+              }} />
+            )}
+          </button>
         )
       })}
+      {/* 커서 0x7b3a0 → 0x7b432 — 열림 애니가 끝났고([격자+9]) 깜빡일 때([격자+0x18] % 8 ≤ 4) slt_frame 1 을 (x − 2, y − 2) */}
+      {gridOpen.state.isDone && gridOpen.blink % 8 <= 4 && slot >= view.firstSlot && (
+        <img className={styles.sprite} alt="" data-testid="명전-커서" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.cursor.image)}
+          style={{
+            left: hallOfFameCellOf(slot - view.firstSlot).x + HALL_OF_FAME_CELL_ART.cursor.dx + bounce.offset.dx,
+            top: hallOfFameCellOf(slot - view.firstSlot).y + HALL_OF_FAME_CELL_ART.cursor.dy + bounce.offset.dy,
+          }} />
+      )}
 
       </>)}
 

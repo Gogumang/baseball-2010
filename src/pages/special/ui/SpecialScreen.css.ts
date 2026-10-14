@@ -82,10 +82,21 @@ export const hofCell = style({
   border: 'none',
   font: 'inherit',
   cursor: 'pointer',
+  background: 'transparent',
+  overflow: 'visible',
   selectors: {
-    '&[aria-current="true"]': { outline: '1px solid #FFFF00' },
     '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` },
   },
+})
+
+/** 145 등록에서 다른 편 칸 덮개 — 0x6b7d5 둥글기 1 (네 모서리 점 빠짐) */
+export const hofCellDim = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  background: '#000000',
+  pointerEvents: 'none',
+  clipPath: 'polygon(1px 0, calc(100% - 1px) 0, 100% 1px, 100% calc(100% - 1px), calc(100% - 1px) 100%, 1px 100%, 0 calc(100% - 1px), 0 1px)',
 })
 
 /** 말풍선 판 76×36 (0x65866) */
