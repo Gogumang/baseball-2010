@@ -8,6 +8,8 @@ import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/bat
 import { TrainingFigure } from '@/widgets/training-scene/ui/TrainingFigure'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 
 /** 연출 기준점 = 창 사각형 ((x + w) / 2, y + h) = (120, 137) (0x84954) */
 const ANCHOR = { x: 120, y: 137 }
@@ -15,12 +17,6 @@ const WINDOW_FOLDER = './sprites/mode_back/frames'
 /** 창 배경은 mode_back 을 (1, 52) 에 그린다 — 잘라내기 틀이 (1, 66) 이라 틀 안에서는 y −14 */
 const WINDOW_OFFSET_Y = 52 - 66
 
-/** 0xb8fbd: 시계로 창 배경을 고른다. 6~15시 0, 16~19시 1, 그 밖 2. */
-function windowFrameOf(hour: number): string {
-  if (hour >= 6 && hour <= 15) return '000'
-  if (hour >= 16 && hour <= 19) return '001'
-  return '002'
-}
 
 interface TrainingSceneProps {
   /** null 이면 연출 없이 창만 보인다 */
@@ -52,6 +48,8 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, bat
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const windowOrigins = useFrameOrigins(WINDOW_FOLDER)
+  /** 창 배경 0x7b9ac — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (장면에 들어설 때 0x7b934 가 세운 값) */
+  const windowSprite = useModeBackSprite(useSceneHour())
   const [update, setUpdate] = useState(-1)
 
   const onFinishedRef = useRef(onFinished)
@@ -82,7 +80,7 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, bat
   const frameKey = step === null ? '' : String(step.frame).padStart(3, '0')
   const origin = step === null ? undefined : origins?.[frameKey]
   const figure = presentation?.figure ?? null
-  const windowKey = windowFrameOf(new Date().getHours())
+  const windowKey = windowSprite.key
   const windowOrigin = windowOrigins?.[windowKey]
 
   return (
@@ -92,7 +90,7 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, bat
           <img
             className={styles.sprite}
             style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-            src={`${WINDOW_FOLDER}/${windowKey}.png`}
+            src={windowSprite.src}
             alt=""
           />
         )}

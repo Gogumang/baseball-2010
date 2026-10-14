@@ -9,11 +9,12 @@ import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import { pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
-import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
 import {
   SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_PRESENTATIONS, SEASON_TRAINING_SKIN, isSeasonTrainingSkipKey,
 } from '@/pages/season/lib/seasonTrainingPopup'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 
 /** 연출 기준점 = 창 사각형 ((x + w) / 2, y + h + d) = (120, 137), d = 0 (0x84954) */
 const ANCHOR = { x: 120, y: 137 }
@@ -41,6 +42,8 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const windowOrigins = useFrameOrigins(WINDOW_FOLDER)
+  /** 창 배경 0x7b9ac — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (장면에 들어설 때 0x7b934 가 세운 값) */
+  const windowSprite = useModeBackSprite(useSceneHour())
   const [update, setUpdate] = useState(0)
   const skipRef = useRef<() => void>(() => undefined)
   const onFinishedRef = useRef(onFinished)
@@ -85,7 +88,7 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
   const step = entries === undefined ? null : animationStepAt(entries, update)
   const frameKey = step === null ? '' : String(step.frame).padStart(3, '0')
   const origin = step === null ? undefined : origins?.[frameKey]
-  const windowKey = String(backgroundFrameOf(new Date().getHours())).padStart(3, '0')
+  const windowKey = windowSprite.key
   const windowOrigin = windowOrigins?.[windowKey]
   const { figure } = presentation
 
@@ -95,7 +98,7 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
       <div className={styles.windowClip}>
         {windowOrigin !== undefined && (
           <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-            src={`${WINDOW_FOLDER}/${windowKey}.png`} alt="" />
+            src={windowSprite.src} alt="" />
         )}
       </div>
       <div className={styles.animationClip}>

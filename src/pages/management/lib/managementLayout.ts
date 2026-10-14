@@ -1,5 +1,6 @@
 import { GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { timeSlotOfHour } from '@/shared/lib/phoneClock/phoneClock'
 
 /**
  * 관리 화면 원본 배치 (binary.mod 0x7d34c 상태판 · 0x7e418 커맨드 줄 — layout-re 명세, 바이트 확인).
@@ -246,9 +247,7 @@ export function messageLineLayoutOf(game: number, box: Box = STATUS_BOXES.messag
   return { gameLabelLeft, totalRight, slashLeft, slashTop, gameRight, yearLabelLeft, yearRight: right + dx, labelTop }
 }
 
-/** 경기장 띠 프레임 — 휴대폰 시각 기준 (this+0x1c) */
+/** 경기장 띠 프레임 = 시간대 [this+0x1c] — 한국 시각으로 0xb8fbd 를 친다 (`timeSlotOfHour`) */
 export function backgroundFrameOf(hour: number): number {
-  if (hour >= 6 && hour <= 15) return 0
-  if (hour >= 16 && hour <= 19) return 1
-  return 2
+  return timeSlotOfHour(hour)
 }

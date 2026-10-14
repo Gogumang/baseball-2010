@@ -5,13 +5,14 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt } from '@/widgets/training-scene/lib/animationPlayback'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
-import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
 import {
   EVENT_CHAR_0, EVENT_CHAR_1, OUTING_PANEL, OUTING_PANEL_BAND, SEASON_OUTING_PRESENTATIONS, isSeasonOutingSkipKey,
 } from '@/pages/season/lib/seasonOutingPopup'
 import type { SeasonOutingPresentation } from '@/pages/season/lib/seasonOutingPopup'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 
 const WINDOW_FOLDER = './sprites/mode_back/frames'
 const { x: RX, y: RY, width: RW, height: RH, d: D } = OUTING_PANEL
@@ -52,6 +53,8 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
   const char0Origins = useFrameOrigins(EVENT_CHAR_0)
   const char0Animations = useAnimations(EVENT_CHAR_0)
   const windowOrigins = useFrameOrigins(WINDOW_FOLDER)
+  /** 창 배경 0x7b9ac — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (장면에 들어설 때 0x7b934 가 세운 값) */
+  const windowSprite = useModeBackSprite(useSceneHour())
   const [update, setUpdate] = useState(0)
   const [isDone, setDone] = useState(false)
   const skipRef = useRef<() => void>(() => undefined)
@@ -95,7 +98,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
     }
   }, [])
 
-  const windowKey = String(backgroundFrameOf(new Date().getHours())).padStart(3, '0')
+  const windowKey = windowSprite.key
   const windowOrigin = windowOrigins?.[windowKey]
   const { overlays } = presentation
   const panelTop = RY + D
@@ -112,7 +115,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
           <div style={{ position: 'absolute', overflow: 'hidden', ...WINDOW_CLIP }}>
             {windowOrigin !== undefined && (
               <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-                src={`${WINDOW_FOLDER}/${windowKey}.png`} alt="" />
+                src={windowSprite.src} alt="" />
             )}
           </div>
           <div style={{ position: 'absolute', left: 0, top: 0, width: 240, height: ANIMATION_CLIP_HEIGHT, overflow: 'hidden' }}>

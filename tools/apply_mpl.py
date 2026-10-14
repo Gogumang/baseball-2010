@@ -131,12 +131,24 @@ OUTFIT_RULES: dict[str, str] = {
     # 칸 3(특급천연잔디)은 줄 −1 = PZX 기본색(#4a8231, 가장 밝은 녹색).
     # ⚠️ 타석(0x352e8)과 달리 **대전 모드 8·9 갈래가 없다** — 수비 바탕은 시즌 홈경기에서만 바뀐다.
     'stadium/defense': '잔디 칸 v: 줄 2 − v (0 → 2 · 1 → 1 · 2 → 0 · 3 → 기본색) (0x7885c)',
+    # ── 시간대 바탕 (0x7b934 · 0x7b8ec 디스어셈으로 확정) ──
+    #
+    # 경기장 띠 · 엔딩 띠 · 훈련/외출 창 배경(0x7b9ac)이 그리는 mode_back 그림 [gfx+0x18] 의 팔레트다.
+    #   0x7b934(gfx, t): t ≠ [gfx+0x1c] 이면 [gfx+0x1c] = t ; 줄 = t == 0 ? −1 : t − 1 ;
+    #                    0xb9c35("ui/mode_back.mpl", 그림, 줄)   ; 줄 −1 = PZX 기본 팔레트
+    #   0x7b8ec(적재)    도 같은 식으로 [gfx+0x1c] 의 줄을 입혀 올린다 (0xb9719)
+    #   t 는 0xb8fbd(휴대폰 시계 0x6f391 의 한국 시각): 6~15 → 0 · 16~19 → 1 · 그 밖 → 2.
+    #   부르는 곳은 나리 상태 100 진입 0x1c154(1c418~1c424) · 시즌 장면 진입 0xcb 0x4b50(4c7a~4c8a) 둘뿐이다.
+    'ui/mode_back': '시간대 t: 0 → 기본색(mpl 안 씀) · 1 → 줄 0 · 2 → 줄 1 (0x7b934)',
 }
 
 # 벌을 고르는 규칙을 아직 못 찾은 것들. 팔레트는 내보내되 굽지도 지도를 붙이지도 않는다.
 UNKNOWN_RULE = '미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다'
 KNOWN_BULK_RULES: dict[str, str] = {
     'ui/img_text': '로드 때 0번 고정, 그릴 때 0x913e4 가 고른다 (여기서 프레임에 구워 둔다)',
+    # 구장 하늘 · 빛 효과 — 팔레트를 고르는 것은 `widgets/batting-stage/lib/renderScenery.ts` 다 (palette.json 의 select 글만 지킨다)
+    'stadium/attack_sky_cloud': '줄 = 하늘 색 번호 v − 1 (v ≤ 8 일 때만 싣는다, v = 0 이면 −1 = 구운 벌). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절)',
+    'effect/sky_effect_light': '줄 = v ≤ 1 ? −1(구운 벌) : v − 2 (v ≤ 7 일 때만 싣는다). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절), 그리기 0x78490',
     'ui/mode_icon': '1벌뿐 — 관리 화면 "선택된 커맨드 아이콘" 주황. '
                     'tools/generate_management_sprites.py 가 이미 이 벌로 사본을 만든다',
 }

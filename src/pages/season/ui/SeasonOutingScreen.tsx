@@ -82,7 +82,7 @@ export function SeasonOutingScreen({ state, cursor, onCursorChange, onRun, onBac
 
   return (
     <RawScreen>
-      <SeasonOutingMap selected={cursor} hour={new Date().getHours()} />
+      <SeasonOutingMap selected={cursor} />
       <div role="group" aria-label="외출">
         {OUTING_PLACES.map((place, index) => {
           // 건물 프레임 자리(원점 = 지도 좌표, 지도 원점 (0, 11)) — 원점을 못 읽었으면 화살표 박스로

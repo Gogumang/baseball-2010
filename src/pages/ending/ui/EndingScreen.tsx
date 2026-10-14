@@ -11,7 +11,9 @@ import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { romanceEndingIndexOf, romanceEventsSeenOf } from '@/entities/career/model/seasonFlow'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
-import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
+import type { ModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import {
   BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, ENDING_STAGE, INJURY_ENDING, IRIS_COVER,
   LAST_WALK_IN_ENDING, RISING_TEXT, SCREEN, SHORT_ENDING_TEXT_TOP, WALK_IN, creditsTopOf, creditsWalkersOf,
@@ -21,7 +23,6 @@ import type { CreditsWalker, EndingWalkInLook } from '@/pages/ending/lib/endingL
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
 
 const ENDING_FRAMES = './sprites/ending/frames'
-const MODE_BACK_FRAMES = './sprites/mode_back/frames'
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
@@ -79,7 +80,7 @@ interface EndingScreenProps {
    * 안 주면 **타격형 황인 타자**로 본다 — 애니 바탕 0 · 팔레트 2 로, 원본이 그 비트에서 뽑는 값과 같다.
    */
   readonly walkInLook?: EndingWalkInLook
-  /** 띠 창 배경의 시간대를 고를 휴대폰 시각 (`BAND_BACKGROUND` 머리말). 안 주면 지금 시각 */
+  /** 띠 창 배경의 시간대를 고를 한국 시각 (`BAND_BACKGROUND` 머리말). 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`) */
   readonly hour?: number
 }
 
@@ -141,7 +142,9 @@ export function EndingScreen(props: EndingScreenProps) {
   /** 단계 2 → 3 (0x1bf9a: n = 0) — 제작진의 틀 수가 여기서 시작한다 */
   const creditsAt = leavingAt === null ? null : leavingAt + ENDING_STAGE.effectorFrames
   const stage = tick < ENDING_STAGE.firstStageAt ? 0 : creditsAt === null ? 1 : tick < creditsAt ? 2 : 3
-  const bandFrame = backgroundFrameOf(props.hour ?? new Date().getHours())
+  const sceneHour = useSceneHour()
+  /** 띠 안 배경 — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (`BAND_BACKGROUND` 머리말) */
+  const band = useModeBackSprite(props.hour ?? sceneHour)
   // 단계 3 의 첫 틀에 제작진으로 (0x1bf9c) — 그 뒤 키가 보너스 · 등록을 묻는다
   useEffect(() => {
     if (stage === 3 && phase === '엔딩') setPhase('제작진')
@@ -225,9 +228,9 @@ export function EndingScreen(props: EndingScreenProps) {
         ? <div className={styles.blackScreen} data-part="stage-0" />
         : isCredits && creditsAt !== null
           ? <EndingCredits romanceEndingIndex={romanceEndingIndex} romanceEvents={romanceEventsSeenOf(seenEventIds)} look={walkInLook}
-            tick={Math.max(0, tick - creditsAt)} bandFrame={bandFrame} />
+            tick={Math.max(0, tick - creditsAt)} band={band} />
           : endingIndex <= LAST_WALK_IN_ENDING
-            ? <ShortEnding endingIndex={endingIndex} look={walkInLook} tick={tick} bandFrame={bandFrame} />
+            ? <ShortEnding endingIndex={endingIndex} look={walkInLook} tick={tick} band={band} />
             : <RetirementEnding endingIndex={endingIndex} playerName={playerName} tick={tick} />}
 
       {onPress !== undefined && (
@@ -287,7 +290,7 @@ function NoJudgementEnding() {
 }
 
 /** 띠 창 (0x883b6~0x88556 · 제작진 0x88bcc~0x88d64) — 가운데 박스 검정 + 박스 **바깥** 위·아래 11px 띠 + 선 */
-function BandWindow({ bandFrame, children }: { readonly bandFrame: number; readonly children?: ReactNode }) {
+function BandWindow({ band, children }: { readonly band: ModeBackSprite; readonly children?: ReactNode }) {
   const { x, y, width, height, edgeHeight } = BAND_WINDOW
   const bottom = y + height
   return (
@@ -319,7 +322,7 @@ function BandWindow({ bandFrame, children }: { readonly bandFrame: number; reado
           height: BAND_BACKGROUND.height,
         }}
       >
-        <img className={styles.sprite} alt="" src={imageSrc(MODE_BACK_FRAMES, bandFrame)} data-frame={bandFrame} style={{ left: 0, top: 0 }} />
+        <img className={styles.sprite} alt="" src={band.src} data-frame={band.slot} style={{ left: 0, top: 0 }} />
       </div>
       {children}
     </>
@@ -327,15 +330,15 @@ function BandWindow({ bandFrame, children }: { readonly bandFrame: number; reado
 }
 
 /** 부상·방출 엔딩 (0x883b6 갈래) — 띠 창 + 걸어 들어오는 선수(+ 부상 아이콘) + StrENDING[e] */
-function ShortEnding({ endingIndex, look, tick, bandFrame }: {
+function ShortEnding({ endingIndex, look, tick, band }: {
   readonly endingIndex: number
   readonly look: EndingWalkInLook
   /** 141 에 들어와 돈 틀 수 n */
   readonly tick: number
-  readonly bandFrame: number
+  readonly band: ModeBackSprite
 }) {
   return (
-    <BandWindow bandFrame={bandFrame}>
+    <BandWindow band={band}>
       <WalkIn tick={tick} look={look} hasInjuryIcon={endingIndex === INJURY_ENDING} />
       <div
         className={styles.endingText}
@@ -499,19 +502,19 @@ function CreditsWalkerSprite({ walker, tick, playerPalette }: {
  * `(0, H − n/2, W)` 로 올라온다. 띠 아래 20px 밑으로만 보인다 (0xbaf6d 잘라내기).
  * 인물은 나중 번호부터 그려 선수가 맨 앞이다.
  */
-function EndingCredits({ romanceEndingIndex, romanceEvents, look, tick, bandFrame }: {
+function EndingCredits({ romanceEndingIndex, romanceEvents, look, tick, band }: {
   readonly romanceEndingIndex: number
   readonly romanceEvents: readonly number[]
   readonly look: EndingWalkInLook
   /** 단계 3 에 들어와 돈 틀 수 — 0x1bf9a 가 n 을 0 으로 되돌린다 */
   readonly tick: number
-  readonly bandFrame: number
+  readonly band: ModeBackSprite
 }) {
   const walkers = creditsWalkersOf(look, romanceEvents)
   const credits = `!C${ORIGINAL_ENDINGS[romanceEndingIndex] ?? ''}${'!N'.repeat(CREDITS.gapLines)}${ORIGINAL_ENDINGS[CREDITS.index] ?? ''}`
   const palette = endingWalkInPaletteOf(look)
   return (
-    <BandWindow bandFrame={bandFrame}>
+    <BandWindow band={band}>
       <div data-part="credits-walkers">
         {[...walkers].reverse().map((walker, index) => (
           <CreditsWalkerSprite key={walkers.length - 1 - index} walker={walker} tick={tick} playerPalette={palette} />

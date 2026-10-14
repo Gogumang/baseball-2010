@@ -39,7 +39,7 @@ export interface SeasonStatusPanelProps {
  * 화면 원점에 그리고 그 위에 다른 것(커맨드 줄·가운데 판·창)이 덮인다 — 부르는 쪽은 맨 먼저 둔다.
  */
 export function SeasonStatusPanel({
-  record, teamMorale, hour = new Date().getHours(), isPreviousGame = false,
+  record, teamMorale, hour, isPreviousGame = false,
 }: SeasonStatusPanelProps) {
   const layout = seasonStatusPanelLayoutOf(record, isPreviousGame)
   const { popularity, money, reputation, salary } = STATUS_BOXES

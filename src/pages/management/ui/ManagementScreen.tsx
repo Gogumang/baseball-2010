@@ -119,7 +119,7 @@ export function ManagementScreen(props: ManagementScreenProps) {
     <RawScreen>
       <SkinBackdrop kind="공무늬" />
       {!menu.isShowingBasicInfo && (
-        <ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} />
+        <ManagementBoard career={career} titleName={currentTitleOf(career)} />
       )}
       {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc)와 훈련 연출(125)에는 없다 */}
       {!menu.isShowingBasicInfo && menu.playingMenuId === null && (

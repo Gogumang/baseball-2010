@@ -19,6 +19,7 @@ import { placeLabelTopLeftOf } from '@/pages/outing-map/lib/placeLabelPosition'
 import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
 import { NIGHT_DIM_STEP } from '@/pages/management/lib/outingMapUnderlay'
 import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 
 /**
  * [!] 표시 기준점 (0x7ed6c, F-2 2-6 확정) — `mapX + bx + (bw >> 1)`, `mapY + by`.
@@ -47,8 +48,7 @@ interface OutingMapProps {
   readonly children?: ReactNode
   /**
    * 시간대 [gfx+0x1c] 를 고를 휴대폰 시각 — 나리 상태 100 진입 0x1c154 끝(0x1c418~0x1c424)이 `0x7b934(gfx, 0xb8fbd())` 로 세운다
-   * (0xb8fbd: 휴대폰 시계 0x6f391 의 한국 시각, 6~15 → 0 · 16~19 → 1 · 그 밖 → 2). 안 주면 지금 시각.
-   * ⚠️ 근사: 원본은 마지막으로 상태 100 에 들어온 때의 시각이다 — 웹은 그리는 지금 시각(기기 지역 시각).
+   * (0xb8fbd: 휴대폰 시계 0x6f391 의 한국 시각, 6~15 → 0 · 16~19 → 1 · 그 밖 → 2). 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`).
    */
   readonly hour?: number
 }
@@ -59,7 +59,8 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
   const labelOrigins = useFrameOrigins(PLACE_LABEL_FRAMES)
   const animations = useAnimations(MAP_FRAMES)
   const update = useUpdateCounter()
-  const isNight = backgroundFrameOf(hour ?? new Date().getHours()) === NIGHT_TIME_SLOT
+  const sceneHour = useSceneHour()
+  const isNight = backgroundFrameOf(hour ?? sceneHour) === NIGHT_TIME_SLOT
 
   const animated = (animation: number, anchor: { x: number; y: number }, key: string) => {
     const step = animationStepAt(animations?.[animation] ?? [], update)

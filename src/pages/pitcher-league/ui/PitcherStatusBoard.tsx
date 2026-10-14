@@ -87,7 +87,7 @@ interface PitcherStatusBoardProps {
  * 사기 박스 y −3 과 스태미나 막대(`staminaBarLayoutOf`) 둘뿐이다 — 이름 띠(꺾임 75 · 이름 · 칭호), 값 칸 넷(인기도 · 소지금 ·
  * 평판 · 연봉), 메시지줄, 아이콘 다섯은 같다.
  */
-export function PitcherStatusBoard({ career, hour = new Date().getHours(), isPreviousGame = false }: PitcherStatusBoardProps) {
+export function PitcherStatusBoard({ career, hour, isPreviousGame = false }: PitcherStatusBoardProps) {
   const band = NAME_BAND
   const bar = staminaBarLayoutOf(career)
   return (

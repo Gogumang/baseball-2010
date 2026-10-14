@@ -8,6 +8,7 @@ import {
   CURSOR_ANIMATION, MAP_FRAME, MAP_FRAMES, NIGHT_WINDOW_FRAME, OUTING_PLACES, PLACE_LABEL_FRAMES,
 } from '@/shared/config/outingPlaces'
 import { outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 
 /** 효과 1 · 인자 7 — 고르지 않은 건물은 7/16 (R6 3a) */
 const UNSELECTED_OPACITY = 7 / 16
@@ -18,8 +19,8 @@ const EIGHT_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1
 export interface SeasonOutingMapProps {
   /** 고른 칸 p (this+0xf8) */
   readonly selected: number
-  /** 시간대 [gfx+0x1c] 를 고를 시각 */
-  readonly hour: number
+  /** 시간대 [gfx+0x1c] 를 고를 한국 시각 — 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`) */
+  readonly hour?: number
 }
 
 /**
@@ -31,7 +32,8 @@ export function SeasonOutingMap({ selected, hour }: SeasonOutingMapProps) {
   const labelOrigins = useFrameOrigins(PLACE_LABEL_FRAMES)
   const animations = useAnimations(MAP_FRAMES)
   const update = useUpdateCounter()
-  const layout = outingMapUnderlayLayoutOf(hour)
+  const sceneHour = useSceneHour()
+  const layout = outingMapUnderlayLayoutOf(hour ?? sceneHour)
   const selectedPlace = OUTING_PLACES[selected]
   const selectedLabel = layout.labels[selected]
   const cursorStep = animationStepAt(animations?.[CURSOR_ANIMATION] ?? [], update)

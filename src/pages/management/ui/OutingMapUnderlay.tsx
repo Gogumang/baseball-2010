@@ -6,12 +6,13 @@ import {
   EVENT_MARKER_ANIMATION, MAP_FRAME, MAP_FRAMES, NIGHT_WINDOW_FRAME, OUTING_PLACES,
 } from '@/shared/config/outingPlaces'
 import { outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
+import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 
 export interface OutingMapUnderlayProps {
   /** [!] 칸 [gfx+0x9c] — 지도 진입 0x118e4 → 0x8cdc0 이 채운 장소들 */
   readonly eventPlaceIds: ReadonlySet<string>
-  /** 시간대 [gfx+0x1c](0x7b934 ← 0xb8fbd) 를 고를 시각 */
-  readonly hour: number
+  /** 시간대 [gfx+0x1c](0x7b934 ← 0xb8fbd) 를 고를 한국 시각 — 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`) */
+  readonly hour?: number
 }
 
 /**
@@ -38,7 +39,8 @@ export function OutingMapUnderlay({ eventPlaceIds, hour }: OutingMapUnderlayProp
   const origins = useFrameOrigins(MAP_FRAMES)
   const animations = useAnimations(MAP_FRAMES)
   const update = useUpdateCounter()
-  const layout = outingMapUnderlayLayoutOf(hour)
+  const sceneHour = useSceneHour()
+  const layout = outingMapUnderlayLayoutOf(hour ?? sceneHour)
   const markerStep = animationStepAt(animations?.[EVENT_MARKER_ANIMATION] ?? [], update)
   return (
     <div data-testid="외출지도-밑그림" style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}>
