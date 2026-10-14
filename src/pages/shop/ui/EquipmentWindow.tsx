@@ -176,7 +176,7 @@ function SelectedDetails({ row, edition, part, cursorBox, isBlinkOn, textOrigins
   const lines = parseGameMarkup(row.description)
   return (
     <>
-      {/* 0xb9ed5 노랑 사각 테두리 — 0x6a978 이 폭·높이에 1 을 더해 넘긴다(U-113, ⚠️ 플랫폼 테두리 크기 미확인) */}
+      {/* 0xb9ed5 노랑 사각 테두리 — 0x6a978 이 폭·높이에 1 을 더해 플랫폼 0x14006d8 에 넘겨 (w + 1) × (h + 1) 칸을 덮는다(U-113 확정 — 플랫폼은 받은 폭 · 높이를 칸 수로 본다) */}
       {isBlinkOn && (
         <svg className={styles.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
           data-testid="장비-줄테두리">

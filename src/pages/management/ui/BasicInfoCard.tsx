@@ -32,7 +32,10 @@ interface BasicInfoCardProps {
 
 /** 기본정보 카드 (0x15e20) — 선수 그림 · ABILITY 레이더 · 정보 칸. 카드 판 모양(0x7ba44)은 박스만 알아 근사한다 (추정) */
 export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }: BasicInfoCardProps) {
-  // ⚠️ 미확인: 0x7ba44 가 0xb570d 넷째 인자로 넘기는 값([gfx+0x174] − 0x66, 0x66 · 0x67 이면 0)의 뜻은 안 떴다 — 피로 인자(0x5a > 54)만 같다
+  // 0x7ba44 나리 갈래가 0xb570d 넷째 인자로 넘기는 값(0x7c02a~0x7c054): [gfx+0x174] − 0x66 ≤ 1(부호 없이) 이면 0, 아니면 1.
+  // [gfx+0x174] 는 상태 진입마다 0x7e84c(gfx, 상태) 가 적는 지금 상태(0x7e854)라 0 은 등록 102(0x66) · 확인 103(0x67) 뿐이다.
+  // 0 이면 0xb570c 가 질병 · 부상 · 사기 감소(0xb5734 → 0xb58e6)를 건너뛴다. 이 카드(105 · 111 · 121)는 늘 1 → effectiveAbilityOf.
+  // 피로 인자 0x5a 는 54 를 넘어 값을 안 바꾼다.
   const shown = effectiveAbilityOf(figureEquipment === undefined ? career : { ...career, equipmentLevels: figureEquipment })
   const values = [
     (TEAMS[career.teamId] ?? TEAMS[0]).name,
