@@ -4054,6 +4054,12 @@ function applyTeamArrival(progress: TeamGameProgress, play: PitchArrivalPlay, hu
   if (play.kind === 5 && progress.atBat.outcome?.kind !== '삼진') {
     next = withRunnerPlaySettlement(next, progress, play.result, humanOffense, settlementEventsOfPlay(play.result))
   }
+  // 삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기가 없는 정산이라 거르지 않는 칸(36 · 26/27 · R[3] ·
+  // state[0x88]) 위에 타석 칸 · 결과 링 · 리그 타수 · 콤보 지우기 · 결과비트까지 오른다
+  if (play.kind === 9 && settles && progress.atBat.outcome === null) {
+    next = withRunnerPlaySettlement(next, progress, play.result, humanOffense, settlementEventsOfPlay(play.result))
+    next = withTeamWildPitchSettlement(next, progress, play.result, humanOffense)
+  }
   // 같은 타석이 이어지면 이 판의 사건이 목록에 남아 다음 견제 정산이 함께 센다 — 다음 공의 0xa5e14 가 비운다
   next = {
     ...next,
@@ -4167,6 +4173,71 @@ function withRunnerPlaySettlement(
     false,
   )
 }
+
+/**
+ * **삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9)의 타석 쪽 칸** — 정산 0xa8024 는 종류 9 를 안 거른다(직접 떴다):
+ * ```
+ * a882e/a8852  아웃 > 0 이고 득점이 없으면 지금 타자 타수 +0x20([sp+0x34]) · 타순 칸 +0x11        ; 득점 · 아웃이 함께면 건너뜀
+ * a89f4        아웃 > 0 → 결과 링 ← 5 · ctx+0x162 = 0
+ * a8ac8        타순 칸 타석 +0x14 (아웃이 없는 끝내기 판도)
+ * a8fb2        삼진 없음 → 수비 팀 지금 투수 R[1](연속 삼진) = 0
+ * 0xa599c      결과비트 → 0x17 끝(52a8e)의 0x8f414 가 그 비트로 돌발을 판정한다
+ * ```
+ * 거르지 않는 칸(36 · 26/27 · R[3] · state[0x88])은 부르는 쪽이 `withRunnerPlaySettlement` 로 먼저 셌다.
+ */
+function withTeamWildPitchSettlement(
+  next: TeamGameProgress,
+  before: TeamGameProgress,
+  result: DefensePlayResult,
+  humanOffense: boolean,
+): TeamGameProgress {
+  const outs = result.advance.outsAdded
+  const runs = result.advance.runsScored
+  const slot = humanOffense ? before.game.battingOrderIndex : before.opponentOrderIndex
+  const recordsBefore = humanOffense ? next.ourEntryRecords : next.opponentEntryRecords
+  const records = [...recordsBefore]
+  records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: false,
+    isHomeRun: false,
+    ...(outs > 0 ? { resultCode: WILD_PITCH_OUT_RESULT_CODE } : {}),
+  })
+  const tally = next.recordTally
+  const settled: TeamGameProgress = {
+    ...next,
+    ...(humanOffense ? { ourEntryRecords: records } : { opponentEntryRecords: records }),
+    leaguePlateAppearances:
+      outs > 0 && runs === 0
+        ? withLeaguePlateAppearance(
+            next.leaguePlateAppearances,
+            humanOffense ? next.options.ourTeamId : next.options.opponentTeamId,
+            humanOffense ? next.ourEntry : next.opponentEntry,
+            slot,
+            RUNNER_PLAY_OUTCOME_PLACEHOLDER,
+            0,
+          )
+        : next.leaguePlateAppearances,
+    recordTally: {
+      ...tally,
+      homeRunStreak: outs > 0 ? 0 : tally.homeRunStreak,
+      // R[1] 은 수비 팀 지금 투수 칸 — 우리가 지키는 쪽만 든다
+      moundStrikeoutCombo: humanOffense ? tally.moundStrikeoutCombo : 0,
+    },
+  }
+  return resolveBurstFor(settled, {
+    // 안타 · 볼넷 갈래가 아니다 — B4(타점)는 a8946 갈래(희생플라이 · 볼넷 · 사구) 안이라 안 선다
+    outcome: RUNNER_PLAY_OUTCOME_PLACEHOLDER,
+    runsBattedIn: 0,
+    outsBefore: before.game.outs,
+    outsAdded: outs,
+    inningEnded: before.game.outs + outs >= OUTS_PER_INNING,
+    humanTeamWalkOff: next.game.isFinished && next.game.ourScore > next.game.opponentScore,
+    // B5 의 r5 — 목록 0번(가장 뒤 주자)이 들어왔는가
+    batterRunnerSafe: batterRunnerSafeOfFates(result.runnerFates),
+  })
+}
+
+/** 종류 9 판 정산의 결과 링 코드 5(그 밖의 아웃, a8a9e) — 판에 공 잡은 뜬공이 없다 */
+const WILD_PITCH_OUT_RESULT_CODE = 5
 
 function describeArrivalPlay(play: PitchArrivalPlay, humanOffense: boolean): string {
   const runs = play.result.advance.runsScored

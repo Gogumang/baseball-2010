@@ -106,3 +106,40 @@ describe('낫아웃(state[0x1a]) 정산 — 삼진 사건 5 가 [sp+0x30] 에 �
     expect(끝.moundStrikeouts).toBe(주자.moundStrikeouts + 1)
   })
 })
+
+describe('삼진 없이 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기 없는 정산이 상대 타석 칸 · 타자 수까지 올린다', () => {
+  it('9회말 동점 3루에서 공이 빠져 상대 끝내기 — 상대 타순 칸 타석 +0x14 · R+0x138 타자 수 · R[1] · R+0x14c 지우기', () => {
+    let checked = 0
+    for (let seed = 1; seed <= 300 && checked === 0; seed += 1) {
+      for (let n = 0; n < 3 && checked === 0; n += 1) {
+        const progress = startPitcherGame({ ...기본옵션, playerSide: 0 }, createSeededRandom(1))
+        const 끝내기판 = {
+          ...progress,
+          moundStrikeoutCombo: 2,
+          record: { ...progress.record, strikeoutCombo: 2 },
+          game: {
+            ...progress.game,
+            inning: 9,
+            half: '말' as const,
+            outs: 2,
+            ourScore: 3,
+            opponentScore: 3,
+            bases: { first: false, second: false, third: true },
+            runners: { first: null, second: null, third: 4 },
+          },
+        }
+        const 끝 = startPitch(끝내기판, { typeNumber: 1, gaugeCell: 0 }, 폭투난수(seed, n))
+        if (끝.lastArrivalPlay?.kind !== 9 || !끝.game.isFinished || 끝.atBat.outcome !== null) continue
+        checked += 1
+        const slot = 끝내기판.opponentOrderIndex % 9
+        expect(끝.opponentLineup.records[slot]?.plateAppearances ?? 0).toBe(
+          (끝내기판.opponentLineup.records[slot]?.plateAppearances ?? 0) + 1,
+        )
+        expect(끝.pitcherRecord.battersFaced).toBe(끝내기판.pitcherRecord.battersFaced + 1)
+        expect(끝.moundStrikeoutCombo).toBe(0)
+        expect(끝.record.strikeoutCombo).toBe(0)
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+})

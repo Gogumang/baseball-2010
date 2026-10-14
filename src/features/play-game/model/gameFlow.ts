@@ -2654,6 +2654,10 @@ export function arrivePitch(
   if (play.kind === 5 && pitch.outcomeAfter === null) {
     next = withRunnerPlaySettlement(next, progress, play.result, settlementEventsOfPlay(play.result), options.isRecorded !== false)
   }
+  // 삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기가 없는 정산이라 타석 칸 · 결과 링까지 오른다
+  if (play.kind === 9 && ended && pitch.outcomeAfter === null) {
+    next = withWildPitchSettlement(next, progress, play.result, options.isRecorded !== false)
+  }
   // 같은 타석이 이어지면 이 판의 사건이 목록에 남아 다음 견제 정산이 함께 센다 — 다음 공의 0xa5e14 가 비운다
   next = {
     ...next,
@@ -2870,6 +2874,81 @@ function withRunnerPlaySettlement(
     scoringPositionOuts: next.scoringPositionOuts + penalties.scoringPositionOuts,
   }
 }
+
+/**
+ * **삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9)의 정산 0xa8024** — 판정 B 가 아웃 > 2(ae554) · 경기 끝(ae402)이면
+ * 종류를 안 가리고 정산한다. 종류 9 는 state[0x26] ∈ {4, 5} 거르기에 안 걸려 **내 타석 칸들이 보통 정산처럼 오른다**(직접 떴다):
+ * ```
+ * a882e  득점 > 0 && 아웃 > 0 && 안타 아님 → a88d4 (타수 갈래를 건너뜀 — 희생과 같은 갈래)
+ * a8840  안타 수 [sp+0x2c] || 아웃 [sp+0x30] → a8852 종류 9 → 타수 +0x20([sp+0x34]) · 코드 8(G+0xec 타수) · 타순 칸 +0x11
+ * a89f4  아웃 > 0 && 안타 아님 && 종류 ∉ {4, 5} → 삼진 0 이라 a8a72: 결과 링 ← 6(state[0x1f] 뜬공) / 5 · ctx+0x162 = 0 · 코드 5(G+0xe4 = 0)
+ * a8ac8  종류 ∉ {4, 5} → 코드 7(G+0xe8 타석) · 타순 칸 타석 +0x14            ; 아웃이 없는 끝내기 판도 든다
+ * a8c02  모드 4 → 0xa59c0(ctx, 아웃, 0, −1, 득점, 0)                        ; 끝내기 && 득점 → +4
+ * 0xa599c 결과비트(종류 9 는 거르지 않는다) → 0x17 끝(52a8e)의 0x8f414 가 그 비트로 돌발을 판정한다
+ * ```
+ * 판에 공 잡은 뜬공이 없어 결과 링은 5 다. 득점권 아웃은 판이 끝난 루(3아웃 정리 전)의 2루 주자를 본다.
+ * 그 타석은 끊겨 다음 이닝에 같은 타순이 다시 선다(`arrivePitch` 의 `interrupted`) — 원본 그대로 타석이 두 번 센다.
+ */
+function withWildPitchSettlement(
+  next: GameProgress,
+  before: GameProgress,
+  result: DefensePlayResult,
+  /** 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓 (0xa59c0 게이트) */
+  isRecorded: boolean,
+): GameProgress {
+  const events = settlementEventsOfPlay(result)
+  const outs = events.outs
+  const atBat = outs > 0 && events.runs === 0
+  const slot = before.game.battingOrderIndex
+  const records = [...next.ourLineup.records]
+  const index = lineupSlotOf(slot)
+  records[index] = recordPlateAppearance(records[index] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: false,
+    isHomeRun: false,
+    ...(outs > 0 ? { resultCode: OUT_RESULT_CODE } : {}),
+  })
+  const settled: GameProgress = {
+    ...withRunnerPlaySettlement(next, before, result, events, isRecorded),
+    myStats: {
+      ...next.myStats,
+      plateAppearances: next.myStats.plateAppearances + 1,
+      atBats: next.myStats.atBats + (atBat ? 1 : 0),
+    },
+    ourLineup: { ...next.ourLineup, records },
+    ...(outs > 0
+      ? {
+          recentAtBatCodes: [...next.recentAtBatCodes, OUT_RESULT_CODE].slice(-RECENT_AT_BAT_COUNT),
+          consecutiveHits: 0,
+          homeRunStreak: 0,
+          reputationCounts: { ...next.reputationCounts, homeRunStreak: 0 },
+        }
+      : {}),
+  }
+  if (settled.burst === null) return settled
+  const isWalkOff = next.game.isFinished && next.game.ourScore > next.game.opponentScore
+  const resolution = resolveBurst(
+    settled.burst,
+    burstResultBitsOf({
+      // 안타 · 볼넷 갈래가 아니다 — B4(타점)는 a8946 갈래(희생플라이 · 볼넷 · 사구) 안이라 안 선다
+      outcome: RUNNER_PLAY_OUTCOME_PLACEHOLDER,
+      runsBattedIn: 0,
+      outsBefore: before.game.outs,
+      outsAdded: outs,
+      inningEnded: before.game.outs + outs >= OUTS_PER_INNING,
+      humanTeamWalkOff: isWalkOff,
+      // B5 의 r5 — 목록 0번(가장 뒤 주자)이 들어왔는가
+      batterRunnerSafe: batterRunnerSafeOfFates(result.runnerFates),
+    }),
+  )
+  return {
+    ...settled,
+    burst: resolution.session,
+    lastBurstResolution: resolution.judgement !== null ? resolution : settled.lastBurstResolution,
+  }
+}
+
+/** 결과 링 코드 5 — 그 밖의 아웃(땅볼 · 포스 · 태그, a8a9e) */
+const OUT_RESULT_CODE = 5
 
 /**
  * **CPU 투수의 견제** — 내 타석에서 상대(CPU) 투수 AI 가 목표점 대신 견제를 골랐다.

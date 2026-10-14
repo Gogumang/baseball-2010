@@ -1774,3 +1774,49 @@ describe('승계 주자 실점 — 상대 투수 줄 +0x22 는 들어온 주자�
     expect(실점(지금투수) - 처음실점(지금투수)).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe('삼진 없이 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기 없는 정산이 내 타석 칸까지 올린다', () => {
+  /** 0.1% 폭투·포일 굴림 `T > rand(0, 10000)`(0x35058)을 `n` 번째 rand(0, 10000) 에서 세운다 — 굴림 수는 그대로 */
+  function 폭투난수(seed: number, n: number): RandomPort {
+    const base = createSeededRandom(seed)
+    let count = 0
+    return {
+      ...base,
+      rand: (lo: number, hi: number) => {
+        const value = base.rand(lo, hi)
+        if (lo === 0 && hi === 10_000 && count++ === n) return 0
+        return value
+      },
+    }
+  }
+
+  it('9회말 동점 3루에서 볼이 빠져 끝내기 — 타석 +0x14(코드 7)는 오르고 아웃이 없어 타수 · 결과 링은 그대로, 0xa59c0 끝내기 +4', () => {
+    const progress = startGame(createSeededRandom(20100901))
+    const 끝내기판 = {
+      ...progress,
+      game: {
+        ...progress.game,
+        inning: 9,
+        half: '말' as const,
+        outs: 2,
+        ourScore: 3,
+        opponentScore: 3,
+        bases: { first: false, second: false, third: true },
+        runners: { first: null, second: null, third: 4 },
+      },
+    }
+    const step = arrivePitch(끝내기판, { resolution: { kind: '볼' } as never, outcomeAfter: null }, 폭투난수(1, 0))
+    expect(step.play?.kind).toBe(9)
+    expect(step.interrupted).toBe(true)
+    const 끝 = step.progress
+    expect(끝.game.isFinished).toBe(true)
+    expect(끝.myStats.plateAppearances).toBe(끝내기판.myStats.plateAppearances + 1)
+    expect(끝.myStats.atBats).toBe(끝내기판.myStats.atBats)
+    expect(끝.recentAtBatCodes).toEqual(끝내기판.recentAtBatCodes)
+    const slot = 끝내기판.game.battingOrderIndex % 9
+    expect(끝.ourLineup.records[slot]?.plateAppearances ?? 0).toBe(
+      (끝내기판.ourLineup.records[slot]?.plateAppearances ?? 0) + 1,
+    )
+    expect(끝.popularityPoints).toBe(끝내기판.popularityPoints + 4)
+  })
+})
