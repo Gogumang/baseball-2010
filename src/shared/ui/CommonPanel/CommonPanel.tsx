@@ -18,7 +18,7 @@ interface PaintedRectsProps {
 }
 
 /** 칠 목록을 원작 화소 그대로 칠한다 (SVG 네모 — 뒤 칸이 앞 칸을 덮는다, 가장자리 흐림 없음) */
-function PaintedRects({ x, y, width, height, paints, testId }: PaintedRectsProps) {
+export function PaintedRects({ x, y, width, height, paints, testId }: PaintedRectsProps) {
   if (width <= 0 || height <= 0) return null
   return (
     <svg

@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
-import { MarkupText, MessageBox, Panel, PixelScreen, StatGrid, TextField } from '@/shared/ui'
-import type { StatEntry } from '@/shared/ui'
-import { TEAMS } from '@/shared/config/original/teams'
+import { useEffect, useMemo, useState } from 'react'
+import { FrameSprite, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp, TextField } from '@/shared/ui'
+import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { roundEdgePaintsOf, roundFillPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
+import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
-import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
   PITCHER_HAND_LABELS,
@@ -17,50 +20,59 @@ import {
   canRegisterPitcher,
   pitcherRoleChoiceOf,
   pitcherRoleOfChoice,
-  rookiePitcherAbilityOf,
   toggleBreakingPitchSlot,
 } from '@/entities/pitcher-career/model/pitcherRegistration'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
-import { DEFAULT_TEAM_ID } from '@/entities/pitcher-career/model/pitcherCareer'
+import { DEFAULT_TEAM_ID, createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { nameWithoutLastChar, registerKeyOf, registerKeyOutcomeOf } from '@/pages/create-player/lib/registerKeys'
+import type { RegisterKey } from '@/pages/create-player/lib/registerKeys'
+import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import {
   BREAKING_PITCH_OK_CELL,
   breakingPitchCursorAfter,
   breakingPitchCursorAfterToggle,
   breakingPitchKeyOf,
 } from '@/pages/pitcher-league/lib/breakingPitchCursor'
-import * as styles from '@/pages/pitcher-league/ui/PitcherRegisterScreen.css'
+import {
+  ARROW_FRAME, ARROW_SIZE, BREAKING_CHOSEN_PLATE, BREAKING_HINT, BREAKING_NAME_OUTLINE, BREAKING_OK, BREAKING_PITCH_FRAME,
+  BREAKING_ROW_NUMBERS, BREAKING_ROW_NUMBER_BASE, INPUT_MODE_ARROWS, INPUT_MODE_BOX, INPUT_MODE_COLOR, NAME_TEXT_AT,
+  REGISTER_INFO_BOARD, REGISTER_INFO_FRAME, REGISTER_LABELS, REGISTER_ROW_HINTS, REGISTER_TEXT_BOXES, REGISTER_YELLOW,
+  TEAM_NAME_BOX, breakingPitchBoxOf, breakingRowNumberBoxOf, cursorBoxOf, registerValueBoxOf, teamNameFrameOf,
+  valueArrowsOf,
+} from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
+import type { RegisterBox } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
+import { PitcherBasicInfoCard } from '@/pages/pitcher-league/ui/PitcherBasicInfoCard'
+import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
 
 /**
- * 투수 선수 등록 (나만의리그 상태 **0x66** — 갱신 0x16f28 · 그리기 0x15f34, C-4 확정 ·
- * 등록 구질 J 3-1 확정). 확인(0x67)은 화면을 갈아 끼우지 않고 StrMODE[2] 상자만 얹는다.
+ * 투수 선수 등록 (나만의리그 상태 **0x66** — 갱신 0x16f28 · 그리기 0x15f34) 과 **기본 변화구 2개 고르기 0x67**
+ * (진입 0x10b18 · 키 0x12410 · 그리기 0x162bc). 원본 화면 한 장(`RawScreen`)이다 — 배치는 `lib/pitcherRegisterLayout` 머리글(직접 떴다).
  *
- * 고르는 줄은 타자편과 **같은 다섯**이고 뜻만 다르다 — 이름 · 타입(3가지) · **보직**(선발/구원) ·
- * 손(우완/좌완) · 피부. 투수만 한 단계가 더 있다: **기본 변화구 2개 고르기 = 상태 103(0x67)**.
- *
- * 0x66 마지막 줄에서 OK 를 누르면 타자편은 StrMODE[2] 확인 상자를, 투수편은 `0xbcb49(0x67)` 로
- * 변화구 고르기로 간다(0x172a2 → 0x17308). 0x67 (진입 0x10b18 · 키 0x12410 · 그리기 0x162bc):
+ * 고르는 줄은 타자편과 **같은 다섯**이고 뜻만 다르다 — 이름 · 타입(3가지) · **보직**(선발/구원) · 손(우완/좌완) · 피부.
+ * 0x66 마지막 줄에서 OK 를 누르면 타자편은 StrMODE[2] 확인 상자를, 투수편은 `0xbcb49(0x67)` 로 간다(0x172a2 → 0x17308).
  * - 처음엔 아무것도 안 골라져 있다(+0x13c..+0x143 = 0). 칸 규칙은 `toggleBreakingPitchSlot`(0x123ac).
  * - OK 칸(8)에서 고른 수가 1 이하면 StrMODE[13] 알림, 2 면 StrMODE[2] 확인 → 예면 104(등록 확정).
  * - CLR 은 0x66 으로 — 0x66 진입 0x17360 은 변화구 바이트를 건드리지 않아 **고른 값이 남는다**.
  * - 칸 커서 [this+0x88] 은 들어올 때마다 칸 0 이고, 옮기기는 `breakingPitchCursor`(0x12410 · 꼴 0x330)다.
- * - 0x67 동안 그리기 0x15ef0 은 정보 칸(0x7c450)을 그리지 않는다.
  *
- * ⚠️ **근사**: 원본은 관리 화면 기본정보 카드(0x15e20)를 그대로 그리고 커서만 얹는다(C-6).
- * 웹에는 **투수 카드**(mode_ui 프레임 1) 배치가 아직 없어 — 타자 카드 좌표(`basicInfoLayout`)는
- * 타순·필살 칸을 가진 타자 전용이다 — 여기서는 공용 판으로 줄만 세운다. 고를 값과 순서는 원본 그대로다.
+ * 카드(0x15e20)는 r55 의 투수 기본정보 카드를 쓴다 — 레이더 실효값은 0xb570d 넷째 인자 0(상태 0x66 · 0x67)이라
+ * 질병 · 부상 · 사기 감소를 건너뛴다. 새 선수 레코드에는 아직 스킬이 없다(신인 스킬은 104 의 0x11230 이 준다).
+ *
+ * 마우스 길(원본에는 없다): 값 칸 · 화살 · 구질 칸 · OK 칸 자리에 투명 누름 칸, 되돌아가기(CLR)는 머리띠 바닥 표시.
+ * 고른 줄의 값 칸을 한 번 더 누르면 OK 키다.
  */
 
 interface PitcherRegisterScreenProps {
   /** 앞 화면(팀 고르기 0x65)에서 고른 팀 0~14 */
   readonly teamId?: number
+  /** 머리띠 G — 팀 고르기 화면과 같은 값 */
+  readonly gamePoint?: number
   readonly onCreate: (name: string, profile: PitcherRookieProfile) => void
   readonly onCancel: () => void
 }
-
-type RowId = '이름' | '타입' | '보직' | '손' | '피부'
-const ROW_ORDER: readonly RowId[] = ['이름', '타입', '보직', '손', '피부']
 
 /** 0x66 등록 줄 · 0x67 변화구 고르기 */
 type Phase = '등록' | '변화구'
@@ -68,40 +80,85 @@ type Phase = '등록' | '변화구'
 /** 0x67 의 상자 — StrMODE[13] 알림(1 이하) · StrMODE[2] 확인(2개) */
 type PitchPopup = '부족' | '확인'
 
-const PITCH_HINT = ORIGINAL_MODE_TEXT[12] ?? ''
-/**
- * StrMODE[12] 안내는 0x67 그리기 0x162bc 가 상태 틱 [this+0x2c] ≤ 0x31 일 때만 그린다(0x16690~0x166b0 → 0x55545).
- * 상태 틱은 0xbc9c8 이 상태가 같으면 +1, 바뀌면 0 — 0x66 에서 0x67 로 들어올 때마다 0 부터 센다. 곧 들어온 뒤 50 틀 동안만 보인다.
- */
+/** StrMODE[12] 안내는 상태 틱 [this+0x2c] ≤ 0x31 일 때만 (0x16690~0x166b0) — 들어올 때마다 0 부터 센다 */
 const PITCH_HINT_LAST_TICK = 0x31
 const PITCH_SHORTAGE_TEXT = ORIGINAL_MODE_TEXT[13] ?? ''
 const CONFIRM_TEXT = ORIGINAL_MODE_TEXT[2] ?? ''
+const NAME_ROW = 0
+
+const MODE_UI = './sprites/mode_ui/frames'
+const IMG_TEXT = './sprites/img_text/frames'
+const SLT_PITCH = './sprites/slt_pitch/frames'
+const pad3 = (frame: number) => String(frame).padStart(3, '0')
+/** num 50+숫자 — 8×10 */
+const ROW_DIGIT = { width: 8, height: 10 } as const
+
+/** 0xb9d74 프레임 맞춤 — 0x2 가로 가운데(내림) · 0x4 오른쪽 · 0x20 세로 가운데(올림), 그 뒤 ox */
+function frameAt(origins: FrameOrigins | null, frame: number, box: RegisterBox, align: number, ox = 0): { x: number; y: number } | null {
+  const origin = origins?.[pad3(frame)]
+  if (origin === undefined) return null
+  let x = box.x + ox
+  let y = box.y
+  if ((align & 0x2) !== 0) x += (box.width - origin.width) >> 1
+  if ((align & 0x4) !== 0) x += box.width - origin.width
+  if ((align & 0x20) !== 0) {
+    const d = box.height - origin.height
+    y += Math.trunc(d / 2) + (d % 2)
+  }
+  return { x, y }
+}
+
+/** 둥근 테두리 0xba015 — (w + 1) × (h + 1) */
+function RoundEdge({ box, color, testId }: { readonly box: RegisterBox; readonly color: string; readonly testId?: string }) {
+  const paints = useMemo(() => roundEdgePaintsOf(box.width, box.height, color), [box.width, box.height, color])
+  return <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} testId={testId} />
+}
+/** 둥근 칠 0xba0bd — (w + 1) × (h + 1) */
+function RoundFill({ box, color }: { readonly box: RegisterBox; readonly color: string }) {
+  const paints = useMemo(() => roundFillPaintsOf(box.width, box.height, color), [box.width, box.height, color])
+  return <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} />
+}
+
+/** 판 0x7c110(박스, 0) — `boardRectsOf` 는 화면 좌표 칠 목록이다 */
+function InfoBoard() {
+  const paints = useMemo(() => boardRectsOf(REGISTER_INFO_BOARD, false), [])
+  return <PaintedRects x={0} y={0} width={240} height={320} paints={paints} testId="등록-정보판" />
+}
 
 export function PitcherRegisterScreen({
   teamId = DEFAULT_TEAM_ID,
+  gamePoint = 0,
   onCreate,
   onCancel,
 }: PitcherRegisterScreenProps) {
   const [name, setName] = useState('')
   const [profile, setProfile] = useState<PitcherRookieProfile>({ ...DEFAULT_PITCHER_ROOKIE_PROFILE, teamId })
-  const [selectedRow, setSelectedRow] = useState<RowId>('이름')
+  const [selectedRow, setSelectedRow] = useState(NAME_ROW)
   const [phase, setPhase] = useState<Phase>('등록')
   const [popup, setPopup] = useState<PitchPopup | null>(null)
   /** 0x67 격자 [this+0x88] 칸 — 0~7 구질 · 8 OK. 0x10b18 이 들어올 때마다 0 에 둔다 */
   const [pitchCell, setPitchCell] = useState(0)
   /** 0x67 상태 틱 [this+0x2c] — 들어올 때 0 */
   const [pitchTick, setPitchTick] = useState(0)
+  // ⚠️ 0x66 의 상태 틱 첫 그림 값은 안 읽었다 — 화면이 선 뒤의 갱신 수로 깜빡인다
+  const tick = useUpdateCounter()
+  const isBlinkOn = (phase === '변화구' ? pitchTick : tick) % 10 !== 0
+  const uiOrigins = useFrameOrigins(MODE_UI)
+  const textOrigins = useFrameOrigins(IMG_TEXT)
+  const pitchOrigins = useFrameOrigins(SLT_PITCH)
 
   useEffect(() => {
     if (phase !== '변화구') return undefined
     setPitchTick(0)
-    const timer = window.setInterval(() => {
-      setPitchTick((previous) => (previous > PITCH_HINT_LAST_TICK ? previous : previous + 1))
-    }, millisecondsPerFrame())
+    const timer = window.setInterval(() => setPitchTick((previous) => previous + 1), millisecondsPerFrame())
     return () => window.clearInterval(timer)
   }, [phase])
 
-  const ability = rookiePitcherAbilityOf(profile.role, profile.typeIndex)
+  /** 카드가 읽는 새 선수 레코드 — 등록 진입 0x17360 이 만든 것이라 스킬 · 장비가 없다 */
+  const cardCareer = useMemo(
+    () => ({ ...createPitcherCareer(name, { ...profile, teamId }), skillIds: [], equippedSkillIds: [] }),
+    [name, profile, teamId],
+  )
 
   /** 0x67 OK 칸(8) — 0x12410: 고른 수 ≤ 1 이면 StrMODE[13], 아니면 StrMODE[2] */
   const pressPitchOk = () => setPopup(canRegisterPitcher(profile) ? '확인' : '부족')
@@ -122,34 +179,38 @@ export function PitcherRegisterScreen({
   /** 0x67 OK — 칸 8 이면 상자, 아니면 그 칸 켜고/끄기 (0x12426) */
   const pressPitchCellOk = (cell: number) => (cell === BREAKING_PITCH_OK_CELL ? pressPitchOk() : togglePitchCell(cell))
 
-  const valueOf = (id: RowId): string => {
-    if (id === '이름') return name
-    if (id === '타입') return PITCHER_TYPE_LABELS[profile.typeIndex] ?? ''
-    if (id === '보직') return PITCHER_ROLE_LABELS[pitcherRoleChoiceOf(profile.role)] ?? ''
-    if (id === '손') return PITCHER_HAND_LABELS[profile.handIndex] ?? ''
-    return PITCHER_SKIN_LABELS[profile.skinIndex] ?? ''
-  }
-
   /** 값 바꾸기 — 원본 목록의 좌우 키 ([0x7c] 타입 · [0x78] 보직 · [0x80] 손 · [0x84] 피부) */
-  const changeValue = (id: RowId, step: number) => {
+  const changeValue = (row: number, step: number) => {
     setProfile((previous) => {
-      if (id === '타입') {
-        return { ...previous, typeIndex: wrap(previous.typeIndex + step, PITCHER_TYPE_COUNT) }
-      }
-      if (id === '보직') {
-        return { ...previous, role: pitcherRoleOfChoice(wrap(pitcherRoleChoiceOf(previous.role) + step, 2)) }
-      }
-      if (id === '손') return { ...previous, handIndex: wrap(previous.handIndex + step, 2) }
-      if (id === '피부') {
-        return { ...previous, skinIndex: wrap(previous.skinIndex + step, PITCHER_SKIN_LABELS.length) }
-      }
+      if (row === 1) return { ...previous, typeIndex: wrap(previous.typeIndex + step, PITCHER_TYPE_COUNT) }
+      if (row === 2) return { ...previous, role: pitcherRoleOfChoice(wrap(pitcherRoleChoiceOf(previous.role) + step, 2)) }
+      if (row === 3) return { ...previous, handIndex: wrap(previous.handIndex + step, 2) }
+      if (row === 4) return { ...previous, skinIndex: wrap(previous.skinIndex + step, PITCHER_SKIN_LABELS.length) }
       return previous
     })
   }
 
+  const selectRow = (row: number) => {
+    const nameInput = document.querySelector<HTMLInputElement>('input[aria-label="이름"]')
+    if (row === NAME_ROW) nameInput?.focus()
+    else nameInput?.blur()
+    setSelectedRow(row)
+  }
+
+  /** 줄 고르기 키 0x16f28 (`registerKeyOutcomeOf`, 마지막 줄 OK 만 0x67 로) — 입력칸 안의 Backspace 가 브라우저 몫이면 false */
+  const pressRowKey = (key: RegisterKey, isNativeDelete: boolean): boolean => {
+    const outcome = registerKeyOutcomeOf(selectedRow, key, name.length)
+    if (outcome.kind === 'deleteChar' && isNativeDelete) return false
+    if (outcome.kind === 'cancel') onCancel()
+    else if (outcome.kind === 'deleteChar') setName(nameWithoutLastChar(name))
+    else if (outcome.kind === 'finish') enterPitchPhase()
+    else if (outcome.kind === 'move') selectRow(outcome.row)
+    return true
+  }
+
   /**
-   * 키 — 0x66 줄 고르기는 타자편과 같은 갱신 0x16f28 이다(`registerKeyOutcomeOf`, 마지막 줄 OK 만 0x67 로).
-   * 0x67 은 키 0x12410 — OK 는 지금 칸(`pressPitchCellOk`) · 방향은 `breakingPitchCursorAfter` · CLR = 0x66.
+   * 키 — 0x66 줄 고르기는 타자편과 같은 갱신 0x16f28 이다. 0x67 은 키 0x12410 — OK 는 지금 칸 · 방향은
+   * `breakingPitchCursorAfter` · CLR = 0x66.
    */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -163,24 +224,12 @@ export function PitcherRegisterScreen({
         if (key === 'ok') return pressPitchCellOk(pitchCell)
         return setPitchCell(breakingPitchCursorAfter(pitchCell, key))
       }
-      const row = ROW_ORDER.indexOf(selectedRow)
-      const key = registerKeyOf(event.key, selectedRow === '이름')
+      const key = registerKeyOf(event.key, selectedRow === NAME_ROW)
       if (key !== null) {
-        const outcome = registerKeyOutcomeOf(row, key, name.length)
-        if (outcome.kind === 'deleteChar' && isTyping && event.key === 'Backspace') return
-        event.preventDefault()
-        if (outcome.kind === 'cancel') return onCancel()
-        if (outcome.kind === 'deleteChar') return setName(nameWithoutLastChar(name))
-        if (outcome.kind === 'finish') return enterPitchPhase()
-        if (outcome.kind === 'move') {
-          const nameInput = document.querySelector<HTMLInputElement>('input[aria-label="이름"]')
-          if (outcome.row === 0) nameInput?.focus()
-          else nameInput?.blur()
-          setSelectedRow(ROW_ORDER[outcome.row] ?? '이름')
-        }
+        if (pressRowKey(key, isTyping && event.key === 'Backspace')) event.preventDefault()
         return
       }
-      if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTyping && selectedRow !== '이름') {
+      if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTyping && selectedRow !== NAME_ROW) {
         event.preventDefault()
         changeValue(selectedRow, event.key === 'ArrowRight' ? 1 : -1)
       }
@@ -189,76 +238,141 @@ export function PitcherRegisterScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
-  const abilityEntries: readonly StatEntry[] = PITCHER_ABILITY_ORDER.map((key, slot) => ({
-    label: PITCHER_ABILITY_NAMES[slot],
-    value: ability[key],
-  }))
+  const valueTexts: Readonly<Record<keyof typeof REGISTER_TEXT_BOXES, string>> = {
+    타입: PITCHER_TYPE_LABELS[profile.typeIndex] ?? '',
+    보직: PITCHER_ROLE_LABELS[pitcherRoleChoiceOf(profile.role)] ?? '',
+    손: PITCHER_HAND_LABELS[profile.handIndex] ?? '',
+    피부: PITCHER_SKIN_LABELS[profile.skinIndex] ?? '',
+  }
+  const rowArrows = valueArrowsOf(selectedRow)
+  const teamNameAt = frameAt(textOrigins, teamNameFrameOf(teamId), TEAM_NAME_BOX, 0x22)
 
   return (
-    <PixelScreen
-      title="선수 등록"
-      badge={(TEAMS[teamId] ?? TEAMS[0]).name}
-      leftKey={{ label: '취소', onPress: phase === '등록' ? onCancel : () => setPhase('등록') }}
-      rightKey={phase === '등록'
-        ? { label: '등록', onPress: enterPitchPhase, isDisabled: name.length === 0 }
-        : { label: 'OK', onPress: pressPitchOk }}
-    >
-      {phase === '등록' && <Panel heading="기본 정보">
-        {ROW_ORDER.map((id) => (
-          <div key={id}
-            className={`${styles.row} ${id === selectedRow ? styles.rowSelected : ''}`}
-            onFocus={() => setSelectedRow(id)}>
-            <span className={styles.label}>{id}</span>
-            {id === '이름' ? (
-              <TextField className={styles.nameField} value={name} aria-label="이름"
-                onFocus={() => setSelectedRow('이름')}
-                onChange={(event) => {
-                  // CP949 8바이트까지 — 타자편과 같은 입력기다 (R11 1b)
-                  if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
-                }} />
-            ) : (
-              <>
-                <button type="button" className={styles.arrow} aria-label={`${id} 이전`}
-                  onClick={() => { setSelectedRow(id); changeValue(id, -1) }}>◀</button>
-                <span className={styles.value}>{valueOf(id)}</span>
-                <button type="button" className={styles.arrow} aria-label={`${id} 다음`}
-                  onClick={() => { setSelectedRow(id); changeValue(id, 1) }}>▶</button>
-              </>
-            )}
-          </div>
-        ))}
-      </Panel>}
+    <RawScreen>
+      {/* 장면 틀 0x16928 — 0x66 · 0x67 은 "그 밖" 갈래: 공 무늬 바탕 0x5fd61 */}
+      <SkinBackdrop kind="공무늬" />
+      {/* 0x7f4ed 머리띠 — 0x15f34 는 맨 앞, 0x162bc 는 칸 뒤에 그린다(겹치지 않는다). 되돌아가기 = CLR */}
+      <ScreenFrame title="나만의리그투수편" gamePoint={gamePoint} slides={false}
+        onBack={() => (phase === '등록' ? pressRowKey('clr', false) : setPhase('등록'))} />
 
-      {/* 시작 능력치 (0x16e2c) — 타입·보직을 바꾸면 그때마다 다시 계산된다 */}
-      <Panel heading="시작 능력치">
-        <StatGrid entries={abilityEntries} />
-      </Panel>
+      {/* 카드 0x15e20 — 카드 판 · 레이더(0xb570d 넷째 인자 0) · 투수 그림 */}
+      <PitcherBasicInfoCard career={cardCareer} appliesCondition={false} />
+      <InfoBoard />
 
-      {/* 기본 변화구 2개 (0x67) — 표 0xcc520 [2,3,5,4,7,6,8,9] 순서 그대로다 (J 3-1) */}
-      {phase === '변화구' && <Panel heading="기본 변화구">
-        <div className={styles.pitchGrid}>
-          {ROOKIE_BREAKING_PITCH_TYPES.map((typeNumber, slot) => {
-            const chosen = profile.breakingPitchSlots.includes(slot)
+      {phase === '등록' && (
+        <div data-testid="등록-정보칸">
+          {/* 정보 칸 0x7c450 (모드 3 · [gfx+0x28] = 1) */}
+          <FrameSprite folder={MODE_UI} frame={REGISTER_INFO_FRAME} origins={uiOrigins} x={0} y={0} />
+          {REGISTER_LABELS.map((label) => {
+            const at = frameAt(textOrigins, label.frame, label.box, label.align | 0x20, label.ox)
+            return at === null ? null : <FrameSprite key={label.frame} folder={IMG_TEXT} frame={label.frame} origins={textOrigins} x={at.x} y={at.y} />
+          })}
+          {teamNameAt !== null && (
+            <FrameSprite folder={IMG_TEXT} frame={teamNameFrameOf(teamId)} origins={textOrigins} x={teamNameAt.x} y={teamNameAt.y} />
+          )}
+          {(Object.keys(REGISTER_TEXT_BOXES) as (keyof typeof REGISTER_TEXT_BOXES)[]).map((id) => {
+            const box = REGISTER_TEXT_BOXES[id]
             return (
-              <button key={typeNumber} type="button"
-                className={`${styles.pitchCell} ${chosen ? styles.pitchCellChosen : ''} ${slot === pitchCell ? styles.pitchCellCursor : ''}`}
-                aria-pressed={chosen}
-                aria-current={slot === pitchCell}
-                onClick={() => togglePitchCell(slot)}>
-                {pitchTypeNameOf(typeNumber)}
-              </button>
+              <div key={id} className={managementStyles.infoValue}
+                style={{ left: box.x, top: box.y, width: box.width, height: box.height, color: ORIGINAL_COLORS.text }}>
+                {valueTexts[id]}
+              </div>
             )
           })}
-          <button type="button" aria-label="OK 칸"
-            className={`${styles.pitchCell} ${styles.pitchOkCell} ${pitchCell === BREAKING_PITCH_OK_CELL ? styles.pitchCellCursor : ''}`}
-            aria-current={pitchCell === BREAKING_PITCH_OK_CELL}
-            onClick={() => { setPitchCell(BREAKING_PITCH_OK_CELL); pressPitchOk() }}>
-            OK
-          </button>
+
+          {/* 커서 0xba015 — 틱 % 10 ≠ 0 일 때만 */}
+          {isBlinkOn && <RoundEdge box={cursorBoxOf(registerValueBoxOf(selectedRow))} color={REGISTER_YELLOW} testId="선수등록-커서" />}
+          {selectedRow !== NAME_ROW && (
+            <>
+              <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={uiOrigins} x={rowArrows.left.x} y={rowArrows.left.y} />
+              <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={uiOrigins} x={rowArrows.right.x} y={rowArrows.right.y}
+                style={{ transform: 'scaleX(-1)' }} />
+              <PressArea label={`${selectedRow}줄 이전`} rect={{ ...rowArrows.left, ...ARROW_SIZE }}
+                onPress={() => changeValue(selectedRow, -1)} />
+              <PressArea label={`${selectedRow}줄 다음`} rect={{ ...rowArrows.right, ...ARROW_SIZE }}
+                onPress={() => changeValue(selectedRow, 1)} />
+            </>
+          )}
+
+          {/* 이름 글 0x677d5 — 노랑. 원본 입력기는 웹 글 칸으로 대신하고 CP949 8바이트로 자른다 */}
+          <form onSubmit={(event) => event.preventDefault()}>
+            {/* 0x67 에서 CLR 로 돌아오면 0x17360 이 이전 상태 0x67 을 보고 곧장 끝난다(1736a → 1764e) — 줄 커서 · 값이 그대로라 초점을 뺏지 않는다 */}
+            <TextField value={name} autoFocus={selectedRow === NAME_ROW} aria-label="이름"
+              style={{
+                position: 'absolute', left: NAME_TEXT_AT.x, top: NAME_TEXT_AT.y - 2, width: INPUT_MODE_BOX.x - NAME_TEXT_AT.x - 1,
+                height: 13, padding: 0, border: 0, background: 'transparent', color: REGISTER_YELLOW, font: 'inherit',
+                fontSize: '11px', lineHeight: '13px', outline: 'none',
+              }}
+              onFocus={() => setSelectedRow(NAME_ROW)}
+              onChange={(event) => {
+                // CP949 8바이트까지 — 타자편과 같은 입력기다 (R11 1b)
+                if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
+              }} />
+          </form>
+          {selectedRow === NAME_ROW && (
+            <>
+              {/* 입력 방식 칸 0xba0bd · 화살. ⚠️ 입력 방식 글 0x676f9 는 웹 글 칸에 입력 방식이 없어 옮기지 않았다 */}
+              <RoundFill box={INPUT_MODE_BOX} color={INPUT_MODE_COLOR} />
+              <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={uiOrigins} x={INPUT_MODE_ARROWS.left.x} y={INPUT_MODE_ARROWS.left.y} />
+              <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={uiOrigins} x={INPUT_MODE_ARROWS.right.x}
+                y={INPUT_MODE_ARROWS.right.y} style={{ transform: 'scaleX(-1)' }} />
+            </>
+          )}
+          {/* 값 칸 누름 — 고르기 · 고른 줄이면 OK(↓ · 마지막 줄이면 0x67) */}
+          {[1, 2, 3, 4].map((row) => (
+            <PressArea key={row} label={`${row}줄 값`} rect={registerValueBoxOf(row)}
+              option={{ isSelected: row === selectedRow }}
+              onPress={() => (row === selectedRow ? pressRowKey('ok', false) : selectRow(row))} />
+          ))}
+          {/* ⚠️ 0x67 에서 돌아오면 원본은 띠를 다시 펴지 않는다(0x17360 이 [띠+0x88] · [+0x8a] 를 안 세운다) — 웹은 띠가 다시 선다 */}
+          <DescriptionBand text={ORIGINAL_MODE_TEXT[REGISTER_ROW_HINTS[selectedRow] ?? 3] ?? ''} seed={selectedRow} />
         </div>
-        {/* StrMODE[12] — 0x67 그리기 0x162bc 의 안내, 상태 틱 ≤ 0x31 동안만 */}
-        {pitchTick <= PITCH_HINT_LAST_TICK && <MarkupText raw={PITCH_HINT} />}
-      </Panel>}
+      )}
+
+      {phase === '변화구' && (
+        <div data-testid="변화구-고르기">
+          <FrameSprite folder={MODE_UI} frame={BREAKING_PITCH_FRAME} origins={uiOrigins} x={0} y={0} />
+          {BREAKING_ROW_NUMBERS.map((number, row) => {
+            const box = breakingRowNumberBoxOf(row)
+            // 0xba51c 정렬 0x22 · oy 1 — x += (w − 8) >> 1 · y += 올림((h − 10)/2) + 1
+            const d = box.height - ROW_DIGIT.height
+            return (
+              <img key={number} alt="" className={managementStyles.layer}
+                src={`./sprites/num/${pad3(BREAKING_ROW_NUMBER_BASE + number)}.png`}
+                style={{ left: box.x + ((box.width - ROW_DIGIT.width) >> 1), top: box.y + Math.trunc(d / 2) + (d % 2) + 1 }} />
+            )
+          })}
+          {ROOKIE_BREAKING_PITCH_TYPES.map((typeNumber, cell) => {
+            const box = breakingPitchBoxOf(cell)
+            const frame = typeNumber - 1
+            const at = frameAt(pitchOrigins, frame, box, 0x22)
+            const isChosen = profile.breakingPitchSlots.includes(cell)
+            return (
+              <div key={typeNumber} data-testid={`변화구칸-${cell}`} data-chosen={isChosen}>
+                {at !== null && !isChosen && <FrameSprite folder={SLT_PITCH} frame={frame} origins={pitchOrigins} x={at.x} y={at.y} />}
+                {isChosen && <FrameSprite folder={MODE_UI} frame={BREAKING_CHOSEN_PLATE} origins={uiOrigins} x={box.x} y={box.y} />}
+                {isChosen && at !== null && (
+                  <>
+                    {BREAKING_NAME_OUTLINE.map(([dx, dy]) => (
+                      <SolidStamp key={`${dx},${dy}`} folder={SLT_PITCH} frame={frame} origins={pitchOrigins} x={at.x + dx} y={at.y + dy} color="#000000" />
+                    ))}
+                    <SolidStamp folder={SLT_PITCH} frame={frame} origins={pitchOrigins} x={at.x} y={at.y} color={REGISTER_YELLOW} />
+                  </>
+                )}
+                {cell === pitchCell && isBlinkOn && <RoundEdge box={cursorBoxOf(box)} color={REGISTER_YELLOW} />}
+                <PressArea label={pitchTypeNameOf(typeNumber)} rect={box} option={{ isSelected: cell === pitchCell }}
+                  onPress={() => togglePitchCell(cell)} />
+              </div>
+            )
+          })}
+          <FrameSprite folder={MODE_UI} frame={pitchCell === BREAKING_PITCH_OK_CELL ? BREAKING_OK.orange : BREAKING_OK.blue}
+            origins={uiOrigins} x={BREAKING_OK.x} y={BREAKING_OK.y} />
+          <PressArea label="OK" rect={BREAKING_OK} option={{ isSelected: pitchCell === BREAKING_PITCH_OK_CELL }}
+            onPress={() => { setPitchCell(BREAKING_PITCH_OK_CELL); pressPitchOk() }} />
+          {/* StrMODE[12] — 상태 틱 ≤ 0x31 동안만 */}
+          {pitchTick <= PITCH_HINT_LAST_TICK && <DescriptionBand text={ORIGINAL_MODE_TEXT[BREAKING_HINT] ?? ''} seed={BREAKING_HINT} />}
+        </div>
+      )}
 
       {/* 상자는 지금 화면 위에 얹힌다 */}
       {popup === '부족' && (
@@ -271,7 +385,7 @@ export function PitcherRegisterScreen({
           onAnswer={(index) => (index === 0 ? onCreate(name, profile) : setPopup(null))}
         />
       )}
-    </PixelScreen>
+    </RawScreen>
   )
 }
 

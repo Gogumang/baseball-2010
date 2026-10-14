@@ -82,6 +82,15 @@ function roundEdge(x: number, y: number, w: number, h: number, color: string): P
 const roundFill = (x: number, y: number, w: number, h: number, color: string): PanelPaint[] =>
   [...fill(x + 1, y + 1, w - 1, h - 1, color), ...roundEdge(x, y, w, h, color)]
 
+/**
+ * 둥근 테두리 0x6aa64(x, y, w, h, 둥글기 ≤ 3, 색) 의 칠 목록 — 왼쪽 위 = (0, 0), (w + 1) × (h + 1) 을 덮는다.
+ * 0xba015(상자, 둥글기, 색) 가 이것을 부른다(0xba05e).
+ */
+export const roundEdgePaintsOf = (w: number, h: number, color: string): PanelPaint[] => roundEdge(0, 0, w, h, color)
+
+/** 둥근 칠 0x6b7d4(둥글기 ≤ 3) 의 칠 목록 — 0xba0bd(상자, 둥글기, 색) 가 이것을 부른다(0xba106). (w + 1) × (h + 1) */
+export const roundFillPaintsOf = (w: number, h: number, color: string): PanelPaint[] => roundFill(0, 0, w, h, color)
+
 export interface CommonPanelOptions {
   readonly width: number
   readonly height: number

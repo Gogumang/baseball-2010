@@ -15,9 +15,8 @@
  *   - 107 트레이닝 칸 0~3 은 **제구·구속·변화·체력**이고, 칸 4 는 같은 팝업 0x78 → **108** 이다
  *     (R7 4절 · `pitcherManagement.ts` 모듈 주석).
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 원본 커맨드 줄은 32×32 아이콘 계단형(표 0xd4740 · 하위 0xd4758)이지만
- * 투수편 화면들(`PitcherRegisterScreen`·`PitchTrainingScreen`)은 모두 공용 판(`PixelScreen`) 위에
- * 줄만 세우는 웹판 껍데기라 여기서도 같은 관례를 따른다. 좌표는 쓰지 않는다.
+ * 이 표는 메뉴 뜻(칸 id · 글)만 담는다 — 좌표는 쓰지 않는다. 커맨드 줄 그림은 `pitcherCommandBar`(0x7e418),
+ * 등록(0x66 · 0x67)은 `pitcherRegisterLayout`, 구질 훈련 창(108 탭 2)은 `pitchTrainingWindow` 가 원본 배치를 맡는다.
  */
 
 /** 105 커맨드 여섯 칸 — 점프표 0xcc540 차례 그대로 */
