@@ -299,9 +299,12 @@ function* runnerPlaySteps(
   })
 
   /** 0xb36d0 한 번 — 원본처럼 모든 주자를 본다(타자주자 제외 없음) */
+  /** 바로 앞 0xb36d0 한 번의 결과 — 같은 플레이 틱의 두 번째 판정이 state[0x87] 을 다시 적는다(타구 진행기 `grabOutThisTick`) */
+  let lastJudgedKind: number = OUT_KIND.NONE
   const runOutJudgement = (tick: number): void => {
     if (play.finished) return
     const judged = judgeOut(contextAt(tick))
+    lastJudgedKind = judged.kind
     if (judged.kind === OUT_KIND.NONE) return
     const victim = runners[judged.runnerIndex]
     if (victim === undefined || victim.state.isOut) return
@@ -548,7 +551,12 @@ function* runnerPlaySteps(
     }
     // ── 2. 아웃 판정 0xb36d0 — 플레이 틱 b43cc~b43ea (포구 갈래 뒤 · 같은 그림의 슬롯 2 — 6 절 이동 앞) ──
     // 그림 N 의 플레이 틱이라 주자 · 야수 자리는 그림 N 의 목록 틱(앞 판 틱의 6 절 이동)이 옮긴 그대로다(타구 진행기 6b 절과 같다)
+    // 쥐기 판정(0xb2758)이 이 틱에 아웃을 냈으면 같은 플레이 틱의 두 번째 판정(b42f2 · b43de)이 머리 b36dc 에서 state[0x87] 을
+    // 지우고 태그(3)일 때만 다시 세운다 — 결과 코드 13 은 b4540 에서 그 값을 읽는다(타구 진행기 6b 절)
+    const grabbedOut = outJudgedThisTick
+    lastJudgedKind = OUT_KIND.NONE
     runOutJudgement(tick)
+    if (grabbedOut) tagOut = lastJudgedKind === OUT_KIND.TAG
 
     // 낙구 0xb4492~0xb453c — 아웃 판정 b43da · 결과 9 b43ec 뒤(b444e~) — +0x112(쥐었거나 땅에 닿음)가 아직이면 state[0x1e] = 1 · 포스 요구 루 0xa95e8.
     // 사건(펌블)만 있는 틱도 b44f8 이 포스를 세운다

@@ -306,9 +306,12 @@ function* pickoffPlaySteps(
   })
 
   /** 0xb36d0 한 번 — 타구 진행기의 `runOutJudgement` 와 같은 자리, 다만 타자주자 제외가 없다 */
+  /** 바로 앞 0xb36d0 한 번의 결과 — 같은 플레이 틱의 두 번째 판정이 state[0x87] 을 다시 적는다(타구 진행기 `grabOutThisTick`) */
+  let lastJudgedKind: number = OUT_KIND.NONE
   const runOutJudgement = (tick: number): void => {
     if (play.finished) return
     const judged = judgeOut(contextAt(tick))
+    lastJudgedKind = judged.kind
     if (judged.kind === OUT_KIND.NONE) return
     const victim = runners[judged.runnerIndex]
     if (victim === undefined || victim.state.isOut) return
@@ -543,7 +546,12 @@ function* pickoffPlaySteps(
     }
 
     // ── 아웃 판정 0xb36d0 — 플레이 틱 b43cc~b43ea (포구 갈래 뒤 · 같은 그림의 슬롯 2 — 이동 앞, 타구 진행기 6b 절) ──
+    // 쥐기 판정(0xb2758)이 이 틱에 아웃을 냈으면 같은 플레이 틱의 두 번째 판정(b42f2 · b43de)이 머리 b36dc 에서 state[0x87] 을
+    // 지우고 태그(3)일 때만 다시 세운다 — 결과 코드 13 은 b4540 에서 그 값을 읽는다(타구 진행기 6b 절)
+    const grabbedOut = outJudgedThisTick
+    lastJudgedKind = OUT_KIND.NONE
     runOutJudgement(tick)
+    if (grabbedOut) tagOut = lastJudgedKind === OUT_KIND.TAG
 
     // ── 결과 메시지 0xbba(b4562) → 51a56 결과 판 칸 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다. 0x51d40 송구보다 먼저 ──
     if (outJudgedThisTick) tickMessageCode = 13

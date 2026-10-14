@@ -1440,14 +1440,13 @@ export function stepDefensePlay(
    *    - 결과 2 는 공 쥔 야수의 발밑 루(`0xa0ae4`, 좌표 **비트까지** 같음)가 주자의 루와 같아야 서는데,
    *      포구 틱의 야수는 목표점 = 포구점에 서 있다. 포구점이 루 좌표와 비트까지 같을 때만 닿는 갈래라
    *      실제로는 거의 안 선다.
-   *    여기에 **새로 드러난 어긋남 하나**: 포구 틱에는 vt90 이 두 번 돈다 — 쥐기 안(0xb2758) 한 번,
-   *    그 뒤 `b42f2` 또는 `b43de` 한 번(쥐기가 야수+0xe0 = 1 을 세우니 둘 중 하나는 반드시 돈다).
-   *    두 번째도 머리(b36dc)에서 `state[0x87] = 0` 으로 지우므로, **쥐기 판정이 태그 아웃(3)을 내고
-   *    두 번째가 0 이면 결과 코드 13 을 읽는 b4540 시점의 칸은 0** 이다(콜 20). 이 진행기는 쥐기 판정의
-   *    태그를 그대로 들고 가 62 를 낸다. 고치려면 "그 틱의 **마지막** 판정" 을 원본 차례대로 맞춰야 하는데,
-   *    포구 틱 뒤의 판정(웹은 이동 뒤 6b)이 원본에서 이동 갱신 앞인지 뒤인지가 `0xb401c`(해독 금지 구역)와
-   *    장면 갱신 고리에 있어 확정하지 못했다. 아웃·세이프와 난수는 안 바뀌고 콜 소리만 걸린 자리라
-   *    **에뮬레이터로 확인하기 전에는 그대로 둔다.**
+   *    포구 틱에는 vt90 이 두 번 돈다 — 쥐기 안(0xb2758) 한 번, 그 뒤 같은 플레이 틱 0xb401c 의 `b42f2` 또는
+   *    `b43de` 한 번(쥐기가 야수+0xe0 = 1 을 세우니 둘 중 하나는 반드시 돈다 — b42c8 → b42ce → b42e0 / b43cc, 직접 뜸).
+   *    두 번째도 머리(b36dc)에서 `state[0x87] = 0` 으로 지우므로, **쥐기 판정이 아웃을 내고 두 번째가 태그(3)가 아니면
+   *    결과 코드 13 을 읽는 b4540 시점의 칸은 0** 이다(콜 20). 두 번째 판정은 웹 6b 절이고 같은 그림의 슬롯 2(이동 앞)라
+   *    그 차례대로 옮겼다 — 쥐기에서 아웃이 난 틱은 6b 판정 결과로 `tagOut` 을 다시 적는다(`grabOutThisTick`).
+   *    ⚠️ 미확인: 원본은 협살 중(+0x1f0 ≠ −1)이면 b4316 갈래로 두 번째 판정 없이 b43ec 로 간다 — 쥐기에서 아웃이 난 틱에
+   *    협살이 서 있는 판은 아직 따로 안 가른다.
    */
   const runOutJudgement = (): void => {
     if (play.finished) return
@@ -1486,6 +1485,8 @@ export function stepDefensePlay(
 
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba (6c 절) */
   let outJudgedThisTick = false
+  /** 이번 틱 쥐기 0xb2710 안의 판정(0xb2758)이 아웃을 냈나 — 같은 플레이 틱의 두 번째 판정(6b 절)이 state[0x87] 을 다시 적는다 */
+  let grabOutThisTick = false
   /** 바로 앞 `runOutJudgement` 한 번의 결과 종류 — 쥐기의 뜬공 아웃(결과 1)을 가른다 */
   let judgedKindThisCall: number = OUT_KIND.NONE
 
@@ -2132,6 +2133,7 @@ export function stepDefensePlay(
       log.push(`${tick}틱 ${chaserSlot}번 야수가 잡았다 (종류 ${play.catchKind})`)
       judgedKindThisCall = OUT_KIND.NONE
       runOutJudgement()
+      grabOutThisTick = outJudgedThisTick
       const caughtFly = judgedKindThisCall === OUT_KIND.FLY
       play = { ...play, everHeld: true }
 
@@ -2304,7 +2306,11 @@ export function stepDefensePlay(
     // 자리는 그림 N 의 목록 틱(앞 판 틱의 6 절 이동)이 옮긴 그대로다 — 웹도 이 판 틱의 6 절 이동 **앞**에서 본다.
     // (예전 웹은 6b~6e 를 6 절 이동 뒤에 두어 판정이 한 목록 틱 늦은 자리를 봤다 — 옛 근사를 걷었다)
     // ⚠️ 미확인: 원본은 협살 중(+0x1f0 ≠ −1, b4316)이거나 b42e0 갈래(0xa99d8 · 야수+0x3b)를 탄 틱에는 b43da 를 건너뛴다 — 웹은 늘 돈다
+    judgedKindThisCall = OUT_KIND.NONE
     runOutJudgement()
+    // b36dc — 이 판정도 머리에서 state[0x87] = 0 으로 지우고 태그(3)일 때만 1 을 적는다. 쥐기 판정이 낸 아웃의 결과 코드 13 은
+    // b4540 에서 이 값을 읽는다 (위 `runOutJudgement` 주석)
+    if (grabOutThisTick) tagOut = judgedKindThisCall === OUT_KIND.TAG
 
     // ── 6c. 결과 코드 9·13 — 틱 끝의 CPU 송구 결정, **사람 수비·수동 송구에서도 돈다** (직접 뜬 것) ──
     // ```
