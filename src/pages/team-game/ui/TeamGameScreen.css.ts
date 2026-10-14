@@ -1,77 +1,10 @@
 import { style } from '@vanilla-extract/css'
-import { theme } from '@/app/styles/theme.css'
 
 export const frame = style({
   position: 'relative',
 })
 
-/** 이닝·아웃·주자·점수 한 줄 */
-export const hud = style({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  padding: '3px 4px',
-  background: theme.color.hudRow,
-  fontSize: '11px',
-  color: theme.color.ink,
-})
-
-export const score = style({
-  marginLeft: 'auto',
-  color: theme.color.accent,
-})
-
-export const bases = style({
-  display: 'flex',
-  gap: '4px',
-  fontSize: '11px',
-  color: theme.color.inkFaint,
-})
-
-export const baseOn = style({
-  color: theme.color.accent,
-})
-
-export const count = style({
-  display: 'flex',
-  gap: '6px',
-  padding: '3px 4px',
-  fontSize: '11px',
-  color: theme.color.inkDim,
-})
-
-export const lamp = style({
-  color: theme.color.inkFaint,
-  selectors: {
-    '&[data-on="true"]': { color: theme.color.accent },
-  },
-})
-
-export const staminaTrack = style({
-  position: 'relative',
-  height: '8px',
-  margin: '4px 0',
-  border: `1px solid ${theme.color.line}`,
-  background: theme.color.surfaceDeep,
-})
-
-export const staminaFill = style({
-  height: '100%',
-  background: theme.color.accent,
-  selectors: {
-    '&[data-low="true"]': { background: '#ef4d42' },
-  },
-})
-
+/** 정산 판(경기 결과) 자리 — 정산 배경 캔버스 위에 `SettlementBoard` 가 겹친다 */
 export const stageArea = style({
   position: 'relative',
 })
-
-/** 타석 캔버스(240×320) 자리 — 상태 0xe 의 소개 판(`MatchupCards`, 원본 좌표)이 이 위에 겹친다 */
-export const matchupFrame = style({
-  position: 'relative',
-  width: 240,
-  minHeight: 320,
-  margin: '0 auto',
-})
-

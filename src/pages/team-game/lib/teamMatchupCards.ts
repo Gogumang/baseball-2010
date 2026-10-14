@@ -98,7 +98,7 @@ function gameBatterLineOf(progress: TeamGameProgress, teamId: number, entry: Tea
  * 타자 레코드 +0xb(폼 니블) — 붙박이 표 행, 표 밖 선수(영입한 명전·나리)는 기록 사본의 +0xb(`TeamEntryBatter.profile`).
  * ⚠️ 칸이 생기기 전의 옛 기록 사본은 모른다(null)
  */
-function batterProfileOf(teamId: number, entry: TeamEntryBatter): number | null {
+export function batterProfileOf(teamId: number, entry: TeamEntryBatter): number | null {
   if (entry.rosterSlot === NO_ROSTER_SLOT) return entry.profile ?? null
   return BATTERS[leagueBatterIdOf(entry.tableTeamId ?? teamId, entry.rosterSlot)]?.profile ?? null
 }

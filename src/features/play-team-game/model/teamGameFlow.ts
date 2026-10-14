@@ -2297,6 +2297,25 @@ export function substitutionDetailAbilities(
 }
 
 /**
+ * **교체 창 이름 칸의 체력 줄 재료** — `0x571d8(skin, 0xb8680(팀), rec, 칸, 투수)`(37a7a · 381c6, 직접 떴다):
+ * ```
+ * M = 0x66e44(팀 레코드, rec, 0)             ; 첫 투수 보너스 없이 — 사기 보정 체력 + 250
+ * S = 모드 ∈ {1,2,3,4,8,9}(0x31e) ? trunc(rec+0x2c / 100) : 100
+ * ```
+ * 우리 팀 투수 명단 칸 `index` 의 체력 칸(`0xb6414(rec, 3, 1)` — 상세 창과 같은 값)과 그 칸의 +0x2c 다 —
+ * 지금 마운드 칸은 `stamina`, 그 밖은 `ourPitcherStaminas`(없으면 가득).
+ */
+export function substitutionStaminaOf(progress: TeamGameProgress, index: number): { readonly capacity: number; readonly percent: number } | null {
+  const ability = substitutionDetailAbilities(progress, '투수', index)
+  if (ability === null) return null
+  const stamina = index === progress.ourPitcherIndex ? progress.stamina : (progress.ourPitcherStaminas[index] ?? FULL_STAMINA)
+  return {
+    capacity: staminaCapacityOf(ability[3], ourTeamMoraleOf(progress.options), false),
+    percent: staminaPercentOf(stamina),
+  }
+}
+
+/**
  * 한 팀의 수비 아홉 칸 능력치 — 타순에 선 선수의 **경기용** 수비(질병·보직·사기·팀 능력치·코치까지
  * 먹인 값, J-4)를 로스터의 수비 자리 코드로 칸에 꽂는다.
  * 칸 0(투수)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다 — 마운드 투수를 넣지 않는다.
