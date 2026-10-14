@@ -25,7 +25,7 @@ const 선발: PitcherEvaluationContext = {
   role: PITCHER_ROLE.starter,
   won: true,
   endedInningIndex: 8,
-  teamWalksAllowed: 0,
+  teamBaserunnerAllowed: false,
   teamHitsAllowed: 0,
   teamRunsAllowed: 0,
   neverEntered: false,

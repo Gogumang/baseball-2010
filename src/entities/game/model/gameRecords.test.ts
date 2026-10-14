@@ -46,7 +46,7 @@ describe('완투 계열 기록 — 0xa7de8 (승리·모드·코스확정·아웃
     inningsPlayed: 9,
     outsRecorded: 27,
     hitsAllowed: 5,
-    walksAllowed: 2,
+    baserunnerAllowed: true,
     runsAllowed: 3,
     ...overrides,
   })
@@ -85,11 +85,11 @@ describe('완투 계열 기록 — 0xa7de8 (승리·모드·코스확정·아웃
   })
 
   it('출루·피안타·실점이 모두 0 이면 퍼펙트게임(31)', () => {
-    expect(completeGameRecordIdsOf(완투({ hitsAllowed: 0, walksAllowed: 0, runsAllowed: 0 }))).toEqual([31])
+    expect(completeGameRecordIdsOf(완투({ hitsAllowed: 0, baserunnerAllowed: false, runsAllowed: 0 }))).toEqual([31])
   })
 
   it('연장에 가면 퍼펙트게임이 아니다 — 아웃 28 부터는 노히트노런으로 내려간다', () => {
-    const 연장 = 완투({ inningsPlayed: 10, outsRecorded: 30, hitsAllowed: 0, walksAllowed: 0, runsAllowed: 0 })
+    const 연장 = 완투({ inningsPlayed: 10, outsRecorded: 30, hitsAllowed: 0, baserunnerAllowed: false, runsAllowed: 0 })
 
     expect(completeGameRecordIdsOf(연장)).toEqual([30])
   })

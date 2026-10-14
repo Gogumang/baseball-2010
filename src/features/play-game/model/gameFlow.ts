@@ -2805,7 +2805,8 @@ export function summaryOf(progress: GameProgress): GameSummary {
         inningsPlayed: progress.game.inning,
         outsRecorded: progress.pitching.outsRecorded,
         hitsAllowed: progress.pitching.hitsAllowed,
-        walksAllowed: progress.pitching.walksAllowed,
+        // 모드 4 라 위에서 걸러져 읽히지 않는다 — ⚠️ 근사: 간이 엔진 볼넷 수로 state[0x88] 을 대신한다
+        baserunnerAllowed: progress.pitching.walksAllowed > 0,
         runsAllowed: progress.game.opponentScore,
       }),
     ],

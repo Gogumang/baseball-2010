@@ -86,7 +86,13 @@ import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
-import { chargedRunsOfFates, runnerFatesWithoutPlay, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
+import {
+  baserunnerAllowedOfFates,
+  baserunnerAllowedOfPlay,
+  chargedRunsOfFates,
+  runnerFatesWithoutPlay,
+  survivorsFromBaseOfFates,
+} from '@/features/defense-play/model/runnerFates'
 import {
   arrivalPlaySettles,
   pendingSettlementEventsAfter,
@@ -480,8 +486,14 @@ export interface PitcherGameProgress {
    * 0..9999 로 자른다(a8b58~a8b74 · a8bd2~a8bee). 앞머리 게이트 [sp+0x38](0xa56dc)을 **안 본다** — 포스트시즌에도 센다(원본 그대로).
    */
   readonly freePassesByMe: number
-  /** state+0x88 볼넷 · +0x89 피안타 · +0x8a 실점 — 우리 팀 투수 **전체**가 내준 것 */
-  readonly teamWalksAllowed: number
+  /**
+   * state+0x88 출루 허용 — 정산 0xa8024 의 a8c5c~a8ca6 이 **그 정산이 읽는 주자 목록의 마지막 원소** `+0x96 == 0` 이고 수비 팀이
+   * 사람이면 1 로 세운다(지우는 곳 없음, `baserunnerAllowedOfPlay`). 판 종류를 안 거르므로 정산하는 주자 판(견제 4 · 도루 5 ·
+   * 삼진이나 3아웃 · 경기 끝으로 정산되는 폭투·포일 9)도 그 판의 주자 운명으로 본다. 야수선택은 안 깨고 에러로 산 타자주자는 깬다.
+   * 팀 경기 `TeamPitchingLine.allowedBaserunner` 와 같은 칸이다.
+   */
+  readonly teamBaserunnerAllowed: boolean
+  /** state+0x89 피안타 · +0x8a 실점 — 우리 팀 투수 **전체**가 내준 것 */
   readonly teamHitsAllowed: number
   readonly teamRunsAllowed: number
   /**
@@ -944,7 +956,7 @@ export function startPitcherGame(
     runsAllowedByMe: 0,
     inheritedRunners: 0,
     freePassesByMe: 0,
-    teamWalksAllowed: 0,
+    teamBaserunnerAllowed: false,
     teamHitsAllowed: 0,
     teamRunsAllowed: 0,
     perfectInningFlag: true,
@@ -1958,6 +1970,9 @@ function withMyRunnerPlay(
     ...progress,
     lastDefensePlay: shownLive ? progress.lastDefensePlay : result,
     defenseScene: result.scene,
+    // state[0x88] — 정산 a8c5c 는 판 종류를 안 거른다: 정산하는 판이면 그 판 주자 목록의 마지막 원소가 안 끝났을 때 선다
+    // (아무도 안 움직인 견제 판도 산 주자가 남아 선다 — 원본 그대로)
+    teamBaserunnerAllowed: progress.teamBaserunnerAllowed || (settles && baserunnerAllowedOfFates(result.runnerFates)),
   }
   if (!changed) return { progress: next, changed }
   const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult, {
@@ -2304,7 +2319,12 @@ function applyDefensivePlay(
     // 레코드 +0x2a — 게이트 없이 마운드의 내 투수에게 (a8b58 · a8bd2)
     freePassesByMe: progress.freePassesByMe + (mine && freePass ? 1 : 0),
     teamHitsAllowed: progress.teamHitsAllowed + (hit ? 1 : 0),
-    teamWalksAllowed: progress.teamWalksAllowed + (freePass ? 1 : 0),
+    // state[0x88] — 이 정산의 주자 목록 마지막 원소가 안 끝났으면 (a8c5c). 삼진과 한 정산인 주자 판은 그 판의 목록이다
+    teamBaserunnerAllowed:
+      progress.teamBaserunnerAllowed ||
+      (settledRunnerPlay !== undefined
+        ? baserunnerAllowedOfFates(settledRunnerPlay.runnerFates)
+        : baserunnerAllowedOfPlay(before.bases, outcome, mine, defensePlay, quickAdvance)),
     teamRunsAllowed: progress.teamRunsAllowed + applied.runsScored,
     perfectInningFlag,
     // 정산 0xa8024 — 타순 칸 기록(타석 +0x14 · 안타 +0x12 · 홈런 +0x13)이 CPU 대타 0xac228 의 재료다
@@ -3761,7 +3781,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     role: options.role,
     won: progress.game.ourScore > progress.game.opponentScore,
     endedInningIndex: progress.endedInningIndex,
-    teamWalksAllowed: progress.teamWalksAllowed,
+    teamBaserunnerAllowed: progress.teamBaserunnerAllowed,
     teamHitsAllowed: progress.teamHitsAllowed,
     teamRunsAllowed: progress.teamRunsAllowed,
     // ⚠️ **원본 빈틈 그대로** — 원본은 `state[0x6a] == state[0x6b]` 한 줄뿐이라 **7회 콜드게임만**
@@ -3865,7 +3885,7 @@ function gameEndRecordIdsFor(progress: PitcherGameProgress): readonly number[] {
       // R[3] — 정산 a8f8c 가 사건 목록의 아웃으로 센다 (`settledOutsExtra`)
       outsRecorded: progress.record.outsRecorded + (progress.settledOutsExtra ?? 0),
       hitsAllowed: progress.teamHitsAllowed,
-      walksAllowed: progress.teamWalksAllowed,
+      baserunnerAllowed: progress.teamBaserunnerAllowed,
       runsAllowed: progress.teamRunsAllowed,
     }),
   ]

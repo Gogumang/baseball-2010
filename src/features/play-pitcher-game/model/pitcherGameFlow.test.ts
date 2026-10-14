@@ -528,7 +528,7 @@ describe('기록달성 (0xa77f0)', () => {
         inningsPlayed: 9,
         outsRecorded: 27,
         hitsAllowed: 0,
-        walksAllowed: 0,
+        baserunnerAllowed: false,
         runsAllowed: 0,
       }),
     ).toEqual([31])
@@ -742,6 +742,15 @@ describe('견제 — 구질 고르기(0xf)에서 3·1·7 (0x53548 → 0x50f28 �
     expect(남은.record.outsRecorded).toBe(그냥.record.outsRecorded)
     expect(남은.pendingSettlementEvents).toEqual({ outs: 2, runs: 1 })
   })
+
+  it('살아 돌아온 견제 판도 출루 허용 state[0x88] 을 세운다 — a8c5c 는 판 종류를 안 거르고 그 판 목록 마지막 주자를 본다', () => {
+    const progress = 주자있는판({ first: true, second: false, third: false })
+    expect(progress.teamBaserunnerAllowed).toBe(false)
+    const 그냥 = pickoff(progress, '3', 씨앗(1))
+    expect(그냥.lastDefensePlay?.advance.outsAdded).toBe(0)
+    expect(그냥.game.bases.first).toBe(true)
+    expect(그냥.teamBaserunnerAllowed).toBe(true)
+  })
 })
 
 /**
@@ -816,7 +825,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     expect(끝.pitcherRecord.hitByPitch).toBe(1)
     expect(끝.pitcherRecord.battersFaced).toBe(1)
     expect(끝.record.walksAllowed).toBe(0)
-    expect(끝.teamWalksAllowed).toBe(1)
+    expect(끝.teamBaserunnerAllowed).toBe(true)
     expect(끝.perfectInningFlag).toBe(false)
     expect(summaryOf(끝).record.hitByPitch).toBe(1)
     // 레코드 +0x2a 사사구는 볼넷 · 사구를 함께 센다 (a8bd2)
@@ -867,7 +876,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     expect(끝.game.bases.first).toBe(true)
   })
 
-  it('퍼펙트(기록 31)가 사구로 깨진다 — 출루 허용 칸이 볼넷+사구를 센다', () => {
+  it('퍼펙트(기록 31)가 사구로 깨진다 — 출루 허용 칸 state[0x88] 이 사구에도 선다', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
     const 끝 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
     expect(
@@ -878,7 +887,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
         inningsPlayed: 9,
         outsRecorded: 27,
         hitsAllowed: 0,
-        walksAllowed: 끝.teamWalksAllowed,
+        baserunnerAllowed: 끝.teamBaserunnerAllowed,
         runsAllowed: 0,
       }),
     ).not.toContain(31)
