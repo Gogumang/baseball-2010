@@ -38,6 +38,8 @@ export function recordBatterAtBat(
   log: BatterGameLog,
   outcome: AtBatOutcome,
   runsBattedIn: number,
+  /** 정산 [sp+0x24] > 0 — 홈런 갈래에 드는가 (`AtBatRecordInput.homeRunCounted`). 안 넘기면 홈런이면 참 */
+  options: { readonly homeRunCounted?: boolean } = {},
 ): BatterAtBatRecord {
   const stats = recordAtBat(log.stats, outcome, runsBattedIn)
   const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
@@ -49,6 +51,7 @@ export function recordBatterAtBat(
     homeRunsInGame: stats.homeRuns,
     walksInGame: stats.walks,
     completesCycle: !isCycleOf(log.stats) && isCycleOf(stats),
+    homeRunCounted: options.homeRunCounted,
   })
 
   return { log: { stats, consecutiveHits }, recordIds }

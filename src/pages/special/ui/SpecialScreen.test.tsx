@@ -66,6 +66,20 @@ describe('스페셜 목록 배치', () => {
   })
 })
 
+describe('반원 바퀴 칸 글자 (0x24f9e~ — 메인 메뉴 wheelLabels 와 같은 꼴)', () => {
+  it('[스페셜] 을 고른 배열 그대로 — [스페셜] 은 0° 라 안 그리고 나머지 다섯 칸 글자가 선다', async () => {
+    const origins = Object.fromEntries(
+      [0, 2, 3, 4, 26].map((frame) => [String(frame).padStart(3, '0'), { x: 0, y: 0, width: 40, height: 10 }]),
+    )
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => origins })))
+    const { container } = 띄우기()
+    await vi.waitFor(() => expect(container.querySelectorAll('[data-wheel-label]').length).toBe(5))
+    const ids = [...container.querySelectorAll('[data-wheel-label]')].map((node) => node.getAttribute('data-wheel-label'))
+    expect(ids).toEqual(['도움말', '환경설정', '랭킹', '게임문의', '게임시작'])
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('스페셜 칸 고르기', () => {
   it('통신 기능 칸은 안내만 띄운다 — 충전·선물·친구추천·선물받기', () => {
     띄우기()

@@ -10,6 +10,7 @@ import {
   rankingOf,
   recordLeagueResult,
   startPostseason,
+  withSemiPlayoffWinner,
   pitcherOrdersAfterPostseason as 포스트시즌뒤차례,
   postseasonPitcherOrderOf as 포스트시즌차례,
   startPostseason as 포스트시즌시작,
@@ -182,5 +183,37 @@ describe('포스트시즌 선발도 리그 레코드 차례에서 이어 돈다 
     expect(차례[2]?.[0]).toBe(2)
     expect(차례[3]?.[0]).toBe(2)
     expect(차례[0]?.[0]).toBe(0)
+  })
+})
+
+describe('준PO 승자 칸 L+0x3b (0xb7724) — semiPlayoffWinner', () => {
+  const 순위 = [4, 1, 6, 0, 2, 3, 5, 7, 8, 9]
+
+  it('준PO 가 끝나면 승자를 남기고 한국시리즈 · 종료까지 지우지 않는다', () => {
+    let series = startPostseason(순위)
+    expect(series.semiPlayoffWinner).toBeUndefined()
+    for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 0)
+    expect(series.semiPlayoffWinner).toBe(0)
+    // PO 2위(1)가 이겨 한국시리즈 아랫 시드가 2위 — teams 만으로는 준PO 승자를 모른다
+    for (let game = 0; game < 3; game += 1) series = advancePostseason(series, 1)
+    expect(series).toMatchObject({ round: '한국시리즈', teams: [4, 1], semiPlayoffWinner: 0 })
+    for (let game = 0; game < 4; game += 1) series = advancePostseason(series, 4)
+    expect(series).toMatchObject({ round: '종료', semiPlayoffWinner: 0 })
+  })
+
+  it('옛 저장 이사 — 플레이오프면 아랫 시드, 한국시리즈 아랫 시드가 2위가 아니면 그 팀', () => {
+    const base = { qualifiers: 순위.slice(0, 4), wins: [0, 0] as const, winsNeeded: 3, champion: null }
+    expect(withSemiPlayoffWinner({ ...base, round: '플레이오프', teams: [1, 6] }).semiPlayoffWinner).toBe(6)
+    expect(withSemiPlayoffWinner({ ...base, round: '한국시리즈', teams: [4, 0] }).semiPlayoffWinner).toBe(0)
+    expect(withSemiPlayoffWinner({ ...base, round: '준플레이오프', teams: [6, 0] }).semiPlayoffWinner).toBeUndefined()
+  })
+
+  it('옛 저장 이사 — 아랫 시드가 2위면 로테이션 칸이 많은 3·4위 팀, 칸이 없으면 비워 둔다', () => {
+    const base = { qualifiers: 순위.slice(0, 4), wins: [0, 0] as const, winsNeeded: 4, champion: null, teams: [4, 1] as const }
+    // 준PO 6 vs 0 (0 승, 4경기 → 3칸씩) · PO 1 vs 0 (1 승, 3경기 → 2칸씩)
+    const rotations = { 6: 3, 0: 5, 1: 2 }
+    expect(withSemiPlayoffWinner({ ...base, round: '한국시리즈', rotations }).semiPlayoffWinner).toBe(0)
+    expect(withSemiPlayoffWinner({ ...base, round: '종료', champion: 4, rotations }).semiPlayoffWinner).toBe(0)
+    expect(withSemiPlayoffWinner({ ...base, round: '한국시리즈' }).semiPlayoffWinner).toBeUndefined()
   })
 })

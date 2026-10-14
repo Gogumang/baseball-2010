@@ -24,6 +24,9 @@ import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
+import { menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf } from '@/pages/main-menu/lib/mainMenuLayout'
+import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -87,8 +90,13 @@ interface SpecialScreenProps {
  * 여덟 칸을 다 그린다. 나머지(통신 기능 = 충전·선물·친구추천·선물받기)는 흐리게 그리고 누르면 안내를 띄운다.
  * 마선수선택(상태 28)은 앱이 `renderAceSelect` 로, 에디트(상태 29)는 `renderEdit` 로 꽂는다.
  *
+ * 바퀴는 메인 메뉴의 `MenuWheel`(도는 공 + 호)에 칸 글자(0x24f9e~0x24fe2 — 메인 메뉴 `wheelLabels` 와 같은 꼴)를 얹는다.
+ * 하위 6 에서는 바퀴가 돌지 않고 배열 `[0x1552d4c]` 는 윗단에서 [스페셜] 을 고른 그대로라 [스페셜] 이 0°(안 그림)에 있다
+ * — 나머지 다섯 칸이 45·90·180·270·315° 에 선다(`menuWheelRestingLabelsOf`).
+ *
  * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
- * 바퀴는 메인 메뉴의 `MenuWheel`(도는 공 + 호)만 깔고 그 위 칸 글자 여섯(0x24f9e~ — 메인 메뉴 `wheelLabels`)은 아직 안 얹었다, 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다.
+ * 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다. 칸 글자 밑판(main_ui 이미지 0, 0x24eca~0x24f94 — 각 37~323 에서 글자
+ * 앞에 기준점 가운데로 찍는다)은 메인 메뉴 `wheelLabels` 도 아직 안 그려 같이 비워 둔다.
  */
 export function SpecialScreen({
   collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange, onBack,
@@ -161,6 +169,7 @@ export function SpecialScreen({
     <RawScreen>
       {/* 반원 바퀴 0x24b1c 의 바닥 — 가운데에서 도는 main_ball 애니 0 + 테두리 원 3겹 (120, 320) 반지름 93·95·97. 메인 메뉴와 같은 그림 */}
       <MenuWheel />
+      <SpecialWheelLabels />
 
       {/* 여덟 칸 — 고른 줄은 설명 판이 그리므로 목록에서는 빼고 그린다 (원본도 판이 그 자리를 덮는다) */}
       {SPECIAL_ITEMS.map((item, index) => (
@@ -222,6 +231,36 @@ export function SpecialScreen({
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
+  )
+}
+
+/** [스페셜] 칸 — 윗단 배열 `[0x1552d4c]` 를 이 칸이 0번(0°)에 오도록 돈 커서 */
+const SPECIAL_WHEEL_CURSOR = TOP_ENTRIES.findIndex((entry) => entry.id === '스페셜')
+
+/**
+ * 반원 바퀴 0x24b1c 의 칸 글자 — img_text 프레임을 기준점 가운데(0x24fc4: x − w/2, y − h/2)에. 하위 6 은 키가 바퀴를 안 돌려
+ * 누를 수 없는 그림이다(메인 메뉴 아랫단의 `disabled` 칸과 같다).
+ */
+function SpecialWheelLabels() {
+  const origins = useFrameOrigins(IMG_TEXT_FRAMES)
+  return (
+    <>
+      {menuWheelRestingLabelsOf(SPECIAL_WHEEL_CURSOR).map((label) => {
+        const size = origins?.[String(label.frame).padStart(3, '0')]
+        if (size === undefined) return null
+        const topLeft = menuWheelLabelTopLeftOf(label.point, size.width, size.height)
+        return (
+          <img
+            key={label.entryIndex}
+            className={styles.sprite}
+            alt=""
+            data-wheel-label={TOP_ENTRIES[label.entryIndex]?.id}
+            src={imageSrc(IMG_TEXT_FRAMES, label.frame)}
+            style={{ left: topLeft.x, top: topLeft.y }}
+          />
+        )
+      })}
+    </>
   )
 }
 

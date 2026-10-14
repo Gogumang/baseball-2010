@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { PixelScreen } from '@/shared/ui'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -96,6 +97,8 @@ interface GameScreenProps {
   readonly sceneBuntKind?: number
   /** 루상 주자 애니 시계 — 경기 장면 수명(`BattingStage.runnerAnimationClock`). 안 주면 타석 화면이 사는 동안만 센다 */
   readonly runnerAnimationClock?: MutableRefObject<RunnerAnimationClock>
+  /** 경기 스킬 표시 판의 장면 칸(함성 29 비트 칸 skin+0x44c · 애니 7 · 8) — 경기 장면 수명. 안 주면 타석 화면이 사는 동안만 */
+  readonly skillPanelScene?: MutableRefObject<SkillPanelScene>
   /**
    * 이 경기 구장의 하늘 줄 +0x10 (0x783b0 모드 4 — 나리 저장 +0xb2 mod 6). 경기를 세울 때 정한 값을 경기 내내 넘긴다 —
    * 수비 재생으로 화면이 내려갔다 다시 서도 같은 줄이다. 안 주면 타석 화면이 그림을 세울 때 굴린다(예전 근사)
@@ -147,6 +150,7 @@ export function GameScreen({
   onSpecialSwingUsed,
   sceneBuntKind,
   runnerAnimationClock,
+  skillPanelScene,
   skyRow,
   sceneStadium = null,
   recordAlert,
@@ -383,6 +387,12 @@ export function GameScreen({
             onSpecialSwingUsed={onSpecialSwingUsed}
             sceneBuntKind={sceneBuntKind}
             {...(runnerAnimationClock === undefined ? {} : { runnerAnimationClock })}
+            // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 사람 팀이 공격 측(st[9])
+            skillPanel={{
+              entryKey: progress.sceneConfirm ?? null,
+              attackSide: progress.game.playerSide,
+              ...(skillPanelScene === undefined ? {} : { scene: skillPanelScene }),
+            }}
             // 0xab214 의 내 선수 보너스 — 모드 4 에서 rec = 0x1f8d4(저장, 4) = [저장+0xbc]+0x11c 의 rec[0xa] 비트7(육성)이
             // 서고(0xb6389, ab3d6), 연차 idx 는 같은 레코드 +0xb3 (ab3f2) — 커리어 연차는 1부터라 1 을 뺀다
             isBatterOwnPlayer

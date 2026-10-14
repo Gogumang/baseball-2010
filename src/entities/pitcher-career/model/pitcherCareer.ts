@@ -141,7 +141,13 @@ export const HIDDEN_PITCH_ROW_COUNT = 4
 
 /** 투수 시즌 성적 — 레코드 칸 그대로다 */
 export interface PitcherSeasonStats {
-  /** 등판 경기 수 (표시용. 원본 칸은 못 찾았다 — 웹에서만 센다) */
+  /**
+   * 등판 경기 수 — ⚠️ **원본에 없는 웹 전용 칸**(표시용). 투수 레코드 0x30 바이트의 시즌 칸 +0x20~+0x2f 는 시즌 시작 0xb6cc4 가
+   * 지우는 아홉 칸(+0x20 아웃 · +0x22 실점 · +0x24 세이브 · +0x26 탈삼진 · +0x28 투구 수 · +0x2a 사사구 · +0x2c 스태미나 10000 ·
+   * +0x2e 승 · +0x2f 패)으로 다 찼고, 연도 기록도 그 칸을 옮긴 것이며, 기록실 124 의 투수 열 표 0xd1a28 도 방어 · 이닝 · 실점 ·
+   * 승 · 패 · 세이브 · 삼진 · 투구수 · 사사구 아홉뿐이다. 원본 칸이 없으니 포스트시즌 게이트도 원본으로 정할 수 없어
+   * 등판한 경기마다(포스트시즌 포함) 센다 — 웹 투수편 시즌 끝 화면의 '등판' 줄만 읽는다
+   */
   readonly games: number
   /** +0x20 아웃 */
   readonly outs: number
@@ -817,7 +823,7 @@ export interface PitcherGameOutcome {
   }
   /** 경기 뒤 스태미나 (레코드 +0x2c) */
   readonly stamina: number
-  /** 이 경기에 실제로 등판했는가 — 등판 경기 수만 센다 */
+  /** 이 경기에 실제로 등판했는가 — 웹 전용 등판 경기 수(`PitcherSeasonStats.games`)만 센다 */
   readonly entered: boolean
   /** 경기 끝 G포인트 (기록 달성 합) */
   readonly gamePointReward: number

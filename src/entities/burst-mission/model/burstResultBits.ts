@@ -11,7 +11,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
  * | B0 | 0x001 | 0xa86ae | 홈런 |
  * | B1 | 0x002 | 0xa87b6 (진루 수 == 2) | 2루타 |
  * | B2 | 0x004 | 0xa87b6 (진루 수 == 3) | 3루타 |
- * | B3 | 0x008 | 0xa87b6 (그 밖) | 단타 |
+ * | B3 | 0x008 | 0xa87b6 (그 밖 — 루타 4 홈런도) | 단타 |
  * | B4 | 0x010 | 0xa89c4 (득점 > 0) | 타점 |
  * | B5 | 0x020 | 0xa882a | 타자 출루이고 **이닝이 안 끝남** |
  * | B6 | 0x040 | 0xa88f8 | 번트로 주자 진루·득점 (희생번트·스퀴즈 성공) |
@@ -67,6 +67,11 @@ export interface BurstResultBitsInput {
   readonly inningEnded?: boolean
   /** 이 플레이로 **사람 팀 승리**로 경기가 끝났는가 (0xa89f0) */
   readonly humanTeamWalkOff?: boolean
+  /**
+   * 정산 홈런 수 [sp+0x24] > 0 — B0 을 켜는 홈런 갈래(a85be → a86ae)에 드는가. 안 넘기면 홈런이면 참.
+   * 타자 게이트 sp+0x34 가 거짓인 판의 장내 홈런(a84d6)은 거짓이다 — 루타 4 안타라 B3 만 켜진다
+   */
+  readonly homeRunCounted?: boolean
 }
 
 const MAXIMUM_OUTS_PER_INNING = 3
@@ -77,14 +82,17 @@ const MAXIMUM_OUTS_PER_INNING = 3
  * **근사한 곳** (원본은 수비 플레이 상태를 직접 보고, 웹에는 아직 없는 값들이다):
  *   - B9 는 원본이 `state[0x1a] == 0`(주자 플레이로 이어지지 않은 삼진)까지 본다. 웹에는
  *     낫아웃·주자 플레이가 없으므로 삼진이면 늘 켠다.
- *   - B3 는 원본이 "진루 수가 2·3 이 아닌 나머지" 라 1루타 말고도 떨어질 수 있는데,
- *     웹 타석 결과에는 1·2·3루타밖에 없어 단타로만 켠다.
+ *
+ * B3 는 원본이 "루타가 2·3 이 아닌 나머지"(a87b2) 라 단타와 루타 4 홈런에 켠다 (근사 아님).
  */
 export function burstResultBitsOf(input: BurstResultBitsInput): number {
   const { outcome } = input
   let bits = 0
 
-  if (outcome.kind === '홈런') bits |= BURST_RESULT_BIT.홈런
+  if (outcome.kind === '홈런' && input.homeRunCounted !== false) bits |= BURST_RESULT_BIT.홈런
+  // a8790~a87b6 — 안타 갈래 끝이 루타 [sp+0x10] 로 고른다: 3 → B2 · 2 → B1 · **그 밖 → B3**. 홈런은 루타 4 라
+  // (a819e · a8210) 홈런 갈래(B0) 뒤 같은 자리에서 B3 도 켠다
+  if (outcome.kind === '홈런') bits |= BURST_RESULT_BIT.단타
   if (outcome.kind === '안타') {
     if (outcome.bases === 2) bits |= BURST_RESULT_BIT['2루타']
     else if (outcome.bases === 3) bits |= BURST_RESULT_BIT['3루타']
