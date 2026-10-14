@@ -56,7 +56,10 @@ export function isFieldCarryFresh(carry: FieldCarry): boolean {
  * 상태 0x17 이 끝난 자리 — 마지막 그림의 9명 자리와 카메라. 카메라는 수비 화면(`DefenseScreen`)과 같은 규칙으로 다시 굴린다:
  * 진입(466f4)은 첫 그림의 대상(공 (x, z))에 곧바로, 그 뒤 그림마다 0x3f060 이 그 그림의 대상(`cameraTargetOf`)으로 20% 따라가고,
  * 판이 닫힌 그림(`cameraFrozen`)은 선다.
- * ⚠️ 근사: 원본 0x3f060 은 갱신마다 한 번이다 — 웹 틱 하나를 갱신 하나로 본다(수비 화면도 같은 가정으로 그린다).
+ * 원본 0x3f060 은 갱신마다 한 번이고, 상태 0x17 의 한 그림은 G1 0x3f060(목록 틱 · 카메라 한 걸음) → 슬롯 2 머리 52502 관문 → 플레이 틱
+ * 한 번 → G3 그리기 차례다(`entities/fielding/model/playGate` 머리글 — 관문은 한 그림에 서너 번 불려도 플레이 틱은 하나) — 그래서 진행기
+ * 그림 하나가 원본 갱신 하나다(`DefensePlayback` 의 `UPDATES_PER_TICK` = 1 과 같은 셈). 슬롯 2 만 닫힌 마지막 그림(`closingListFrame`)은
+ * G1 이 열려 카메라가 한 걸음 더 가고, 그 뒤 닫힌 갱신(+0x1094)은 3f0b8 관문이 닫혀 카메라가 선다 — 재생 화면(`DefenseScreen`)과 같다.
  */
 export function fieldCarryAfterPlay(ticks: readonly DefenseViewState[], previous: FieldCarry): FieldCarry {
   const first = ticks[0]
