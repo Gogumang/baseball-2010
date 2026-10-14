@@ -1,11 +1,10 @@
-import { SpriteNumber } from '@/shared/ui'
-import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import {
   PITCHER_LABELS,
+  PITCHER_NAME_PLATE_X,
   PITCHER_ROWS,
   PITCHER_ROW_X,
-  SCORE_GLYPH_HEIGHT,
   SCORE_SLOTS,
+  endScoreGlyphsOf,
   pitcherLabelPositionOf,
   pitcherNameBoxOf,
   pitcherRowTopOf,
@@ -14,6 +13,7 @@ import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const NUM_IMAGES = './sprites/num'
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface EndBoardRowsProps {
@@ -30,23 +30,21 @@ interface EndBoardRowsProps {
  * 240×320 원본 좌표에 절대 배치하므로 `RawScreen` 안에 둔다.
  */
 export function EndBoardRows({ side0Score, side1Score, names }: EndBoardRowsProps) {
-  const leftGlyphs = numberGlyphsOf(side0Score)
-  const rightGlyphs = numberGlyphsOf(side1Score)
+  const scores = [
+    { slot: SCORE_SLOTS.away, value: side0Score },
+    { slot: SCORE_SLOTS.home, value: side1Score },
+  ] as const
   return (
     <>
-      {/* 점수 — 0x585ac 의 마지막 인자 2 = 가로 가운데 정렬로 본다 */}
-      <SpriteNumber
-        glyphs={leftGlyphs}
-        right={SCORE_SLOTS.away.x + Math.round(glyphsWidthOf(leftGlyphs) / 2)}
-        boxTop={SCORE_SLOTS.away.y}
-        boxHeight={SCORE_GLYPH_HEIGHT}
-      />
-      <SpriteNumber
-        glyphs={rightGlyphs}
-        right={SCORE_SLOTS.home.x + Math.round(glyphsWidthOf(rightGlyphs) / 2)}
-        boxTop={SCORE_SLOTS.home.y}
-        boxHeight={SCORE_GLYPH_HEIGHT}
-      />
+      {/* 점수 — 0x585ad(…, num 이미지 0x46, 값, x, y, 간격 6, 자리 0, 정렬 2) */}
+      {scores.map(({ slot, value }, side) => (
+        <span key={side} data-testid={`경기끝-점수-${side}`} data-value={value}>
+          {endScoreGlyphsOf(value, slot).map((glyph, index) => (
+            <img key={index} className={styles.sprite} alt="" src={frameSrc(NUM_IMAGES, glyph.image)}
+              style={{ left: glyph.x, top: glyph.y }} />
+          ))}
+        </span>
+      ))}
 
       {/* 승리투수·패전투수·세이브 세 줄 (표 0xd0470 = img_text 388·389·329) */}
       {PITCHER_LABELS.map((label, row) => {
@@ -62,7 +60,7 @@ export function EndBoardRows({ side0Score, side1Score, names }: EndBoardRowsProp
             />
             <img
               className={styles.sprite}
-              style={{ left: nameBox.x, top: nameBox.y }}
+              style={{ left: PITCHER_NAME_PLATE_X, top: pitcherRowTopOf(row) }}
               src={frameSrc(GAME_UI_FRAMES, PITCHER_ROWS.namePlate.frame)}
               alt=""
             />
@@ -74,7 +72,7 @@ export function EndBoardRows({ side0Score, side1Score, names }: EndBoardRowsProp
             />
             <div
               className={styles.pitcherName}
-              style={{ left: nameBox.x, top: nameBox.y, width: nameBox.width, height: nameBox.height }}
+              style={{ left: nameBox.x, top: nameBox.y, width: nameBox.width }}
             >
               {names[row] ?? ''}
             </div>
