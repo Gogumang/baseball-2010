@@ -265,6 +265,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           key="18"
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
+          {...(gamePoint === undefined ? {} : { gamePoint })}
           onSelect={actions.selectUserTeam}
           onSelectLocked={showHiddenHint}
           onCancel={cancelPrepare}
@@ -278,6 +279,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
           // ⚠️ 유저 팀과 같은 팀인지 보지 않는다 — 원본 그대로다 (R4 3a 상태 19)
+          {...(gamePoint === undefined ? {} : { gamePoint })}
           onSelect={actions.selectAiTeam}
           onSelectLocked={showHiddenHint}
           onCancel={back}
@@ -294,6 +296,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           playerSide={flow.firstBatCursor}
           stadiumId={flow.setup.stadiumId}
           {...(stadiums === undefined ? {} : { stadiums })}
+          {...(gamePoint === undefined ? {} : { gamePoint })}
           onMoveFirstBat={actions.moveFirstBat}
           onChooseFirstBat={actions.selectFirstBat}
           onMoveStadium={actions.moveStadium}
@@ -351,6 +354,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             cpuMatchInfo={session.cpuMatchInfo}
             // 22 진입 0x314b0 → 0x5fd04 가 떠 둔 구장 바탕
             stage={session.matchInfoStage}
+            // 머리띠 G포인트 — 전역 G(+0x64). 안 넘기면 0 으로 찍혔다
+            {...(gamePoint === undefined ? {} : { gamePoint })}
             // 설정 창이 열려 있으면 키가 모두 창으로 간다 (0x311a8 skin+0x2ba) — 시즌 0xdd 와 같은 창 0x6042c · 0x5ffcc 다
             onStart={() => {
               if (!session.isSettingsOpen) actions.start()
