@@ -374,8 +374,8 @@ export function flashOffsetOf(flash: DefenseFlash): { readonly x: number; readon
 export const LASER_SHINE_COLOR = { r: 255, g: 0, b: 0 } as const
 /**
  * 그 야수를 그릴 때 쓰는 그리기 효과 번호 — `0x79b48` 에 넘기는 **12** (I-controls 1c 끝 0x43406~0x4342c).
- * 효과 번호가 픽셀을 어떻게 섞는지(`0xbb91d` 의 종류·세기 식)는 **R2 3-2 에서 미해결**이라,
- * 웹판은 "몸 전체를 빨간 실루엣으로 덮는다" 로 **근사**한다.
+ * 0xbb91d 의 종류가 아니라 프레임 그리기 효과 번호다(0x79b48 → 0xbe8d5 → 0xbe810). 효과 0xc 의 픽셀 함수
+ * 0x98351 · 0x9af71 은 그림 픽셀과 인자 색을 565 채널마다 반반 섞는다 — 식과 그리기는 `lib/laserShine`.
  */
 export const LASER_SHINE_EFFECT_KIND = 12
 
