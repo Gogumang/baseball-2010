@@ -9,16 +9,6 @@ import { DESCRIPTION_BOX_COLORS, DESCRIPTION_LINE_HEIGHT } from '@/pages/match-s
  * ⚠️ 판(공용 판 0x55e60)의 모양만 근사다 — 공용 판 컴포넌트로 옮기는 중이라 그대로 둔다.
  */
 
-/** 공용 판 0x55e60 — 자리는 단계마다 `SMALL_WINDOW` · `DETAIL_WINDOW` */
-export const window = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '6px',
-  background: ORIGINAL_COLORS.boardFill,
-  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
-})
-
 /** 그림 한 장 — 원작 좌표에 그대로 놓는다 */
 export const layer = style({
   position: 'absolute',
