@@ -1446,15 +1446,31 @@ function withoutSteal(progress: PitcherGameProgress): PitcherGameProgress {
 /** 수비 아홉 칸 — 우리 팀, 칸 0 은 나(⚠️ 원본 그대로 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**) */
 /**
  * 수비 아홉 칸의 **이름 판 선수** (0x43cb0 — `defenseFielderPlatesOf`) — 칸 고르기는 `myDefenseAbilitiesOf` 와 같다.
- * 칸 0 은 지금 마운드 투수 = 나(이름 `myName` · 보직 `role` = 레코드 +0xb & 3).
- * ⚠️ 내가 내려간 뒤(`onMound` 거짓)의 수비 판은 웹이 안 띄워 칸 0 판을 안 채운다.
+ *
+ * 칸 0 은 **수비 팀의 지금 마운드 투수**다 — 0x43cb0 은 공 가진 야수 +0x88 이 0(투수)이면 야수 +0xec 를 안 보고
+ * `0xae83c(팀[st[0xa]])` = `0xb89dc(팀, 팀[0])`(43e48~43e60) 로 레코드를 다시 찾고 보직은 `0xb6dec`(43e6a, 레코드 +0xb & 3) 다.
+ * - 내가 마운드에 서 있으면(또는 강판 교체 0xc1b48 이 벤치가 비어 못 바꿔 팀[0] 이 내 줄 그대로면) 나 — 이름 `myName` · 보직 `role`.
+ * - 강판 뒤 팀[0] 은 교체 0xac428 이 고른 **교체 투수 레코드**다(`ourMound.pitcherSlot`) — 로스터 투수면 이름 + 보직(+0xb & 3),
+ *   마투수 칸이면 이름만(보직 없음 → 판 없음, 타자편 `opponentFielderPlatesOf` 와 같다).
+ * ⚠️ 모드 3 은 강판 뒤 늘 간이 엔진(0x21 — 0xc1eac 가 0xc1d38 거짓으로 자동)이라 수비 화면이 안 서서 실제로는 그려지지 않는다.
  */
-function myFielderPlatesOf(progress: PitcherGameProgress) {
-  const myName = progress.options.myName
-  return defenseFielderPlatesOf(
-    teamBatters(progress.options.ourTeamId),
-    progress.onMound && myName !== undefined ? { name: myName, role: progress.options.role } : undefined,
-  )
+export function myFielderPlatesOf(progress: PitcherGameProgress) {
+  return defenseFielderPlatesOf(teamBatters(progress.options.ourTeamId), ourMoundPlateOf(progress))
+}
+
+/** 수비 판 칸 0 — 우리 마운드의 지금 투수 (`0xae83c` → 이름 0xb62c0 · 보직 0xb6dec) */
+function ourMoundPlateOf(progress: PitcherGameProgress): { readonly name: string; readonly role?: number } | undefined {
+  const slot = progress.ourMound.pitcherSlot
+  if (progress.onMound || slot === MY_PITCHER_SLOT) {
+    const myName = progress.options.myName
+    return myName === undefined ? undefined : { name: myName, role: progress.options.role }
+  }
+  if (slot === acePitcherSlotOf(true)) {
+    const ace = teamAcePitcherOf(progress.options, true)
+    return ace === undefined ? undefined : { name: ace.player.name }
+  }
+  const pitcher = teamPitchers(progress.options.ourTeamId)[slot]
+  return pitcher === undefined ? undefined : { name: pitcher.name, role: pitcher.profile & 3 }
 }
 
 /**

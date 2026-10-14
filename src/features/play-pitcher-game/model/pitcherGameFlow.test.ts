@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
@@ -14,6 +15,7 @@ import {
   closeManagerHookWindow,
   confirmScene,
   MY_PITCHER_SLOT,
+  myFielderPlatesOf,
   ourBenchPitcherCountOf,
   ourPitcherOrderOf,
   earnedRunAverageOf,
@@ -1276,6 +1278,16 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
       일루.onMound ? { name: '나투수', pitcherRole: 기본옵션.role } : null,
     )
     expect(pending.input.runnerAces?.first ?? null).toBeNull()
+  })
+
+  it('이름 판 칸 0 은 우리 마운드의 지금 투수(0xae83c) — 강판 뒤면 교체 투수 레코드(이름 · 보직 +0xb & 3)', () => {
+    const progress = startPitcherGame({ ...기본옵션, myName: '나투수' }, 씨앗(1))
+    const 교체 = teamPitchers(기본옵션.ourTeamId)[2]
+    const 내려감 = { ...progress, onMound: false, ourMound: { ...progress.ourMound, pitcherSlot: 2 } }
+    expect(myFielderPlatesOf(내려감)[0]).toEqual({ name: 교체.name, pitcherRole: 교체.profile & 3 })
+    // 벤치가 비어 못 바꿨으면 팀[0] 이 내 줄 그대로다
+    const 남음 = { ...내려감, ourMound: { ...내려감.ourMound, pitcherSlot: MY_PITCHER_SLOT } }
+    expect(myFielderPlatesOf(남음)[0]).toEqual({ name: '나투수', pitcherRole: 기본옵션.role })
   })
 
   it('주자가 없으면 CPU 도루 굴림이 없다 — 못 맞힌 공은 0.1% 굴림(0x35034) 하나만 더 쓴다', () => {
