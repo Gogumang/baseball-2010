@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { radarGrowthAt, radarGrowthStart } from '@/pages/management/lib/radarGrowth'
+import { radarGrowthAt, radarGrowthStart } from '@/shared/lib/radarGrowth/radarGrowth'
 
 describe('레이더 자라는 애니 0x760e8', () => {
   it('들어오면 0 에서 그림마다 48 씩 — 첫 그림도 굴린 뒤라 48 이다', () => {

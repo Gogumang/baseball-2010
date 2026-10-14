@@ -7,7 +7,7 @@ import { EDITED_NAME_BYTES } from '@/entities/player-name/model/editedNames'
 import { pointEntryCursor } from '@/entities/season-mode/model/entryEditor'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf,
+  ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityAxisMaximumLengthOf, abilityChartFrameOf, cellPositionOf,
   teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
@@ -18,6 +18,7 @@ import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 
@@ -196,9 +197,11 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
         style={{ left: chartCenter.x - radius, top: chartCenter.y - radius }}>
         <polygon points={pointsOf(abilityChartFrameOf(chartCenter))}
           fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
-        <polygon points={pointsOf(abilityChartVerticesOf(chartCenter, team.values.slice(2), radius))}
-          fill={ORIGINAL_COLORS.radarFill} fillOpacity={0xb4 / 0xff}
-          stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
+        {/* 값 도형은 레이더 [skin+0xd4] 의 자라는 애니 — 들어옴 0x24804 가 +0xad = 0 으로 두어 0 에서, 커서가 움직인 그림(커서 +0x25)엔
+            0x63b14 가 +0x1e3 = 0 으로 두어 지난 값에서 (`AbilityGrowthPolygon`). 하위 1 · 2 에서 돌아오면 들어옴도 틱 0 도 안 거쳐
+            다 자란 그대로다 */}
+        <AbilityGrowthPolygon center={chartCenter} targets={team.values.slice(2)} maximumLength={abilityAxisMaximumLengthOf(radius)}
+          restartKey={cursor} fromZero={slides} />
       </svg>
 
       {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {

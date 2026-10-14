@@ -17,7 +17,7 @@ import {
   DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
   HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
   HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS,
-  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf,
+  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH,
   hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, rowLeftOf, rowTopOf,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
@@ -39,6 +39,7 @@ import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { footerBottomOf, headerTopOf } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
+import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
@@ -780,7 +781,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         )
       })}
 
-      <HallOfFameAbilityChart center={chartCenter} values={chartValues} />
+      <HallOfFameAbilityChart center={chartCenter} values={chartValues} slot={slot} />
 
       {/* 5×3 격자 — 칸마다 둥근 네모 RGB(48,69,205) 를 (x−3, y−3, 칸+3) 에 (0x7a844) */}
       {slots.map((entry, index) => {
@@ -882,7 +883,18 @@ function popupTextOf(popup: HallOfFamePopup): {
  * 빈 칸·잠긴 칸은 기록이 없어 네 값이 0 이라 바탕만 남는다 (0x5b1de~0x5b1f6).
  * ⚠️ 축 딱지 그림(종류 2 → 4~7 · 종류 3 → 0~3 번)과 빨간 최대 테두리(anim+0x1e0)는 팀 도형과 같은 까닭으로 안 그린다.
  */
-function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoint; readonly values: readonly number[] }) {
+/**
+ * 능력치 도형 0x5aefc 종류 3(투수 칸 ≤ 4) / 2(타자), 반지름 30 — 0x65690~0x65740. k 6~8 본문은 칸이 비어도(기록 0x5ea18 = 0 →
+ * 0x6535a → 0x654d4 → 0x65680) 이 도형을 부르고, 기록이 0 이면 0x5b2d2 가 네 값을 0 으로 채운다.
+ * 값 도형은 레이더 [skin+0xd4] 의 자라는 애니(`AbilityGrowthPolygon`) — 들어옴(27 0x25f8c · 16 0x25e6c · 17 0x2613c · 나리 145 0x1c8ec ·
+ * 시즌 0xe2)이 +0xad = 0 으로 두어 본문 첫 그림에 0 에서 자라고, 커서가 움직인 그림(커서 +0x25)에 0x63b14 가 +0x1e3 = 0 으로 두어
+ * 지난 목표값에서 새 칸 값으로 오르내린다(빈 칸이면 0 으로 줄어든다).
+ */
+function HallOfFameAbilityChart({ center, values, slot }: {
+  readonly center: ChartPoint
+  readonly values: readonly number[]
+  readonly slot: number
+}) {
   const radius = HALL_OF_FAME_CHART.radius
   const size = radius * 2
   const pointsOf = (points: readonly ChartPoint[]) => points.map((point) => `${point.x},${point.y}`).join(' ')
@@ -891,10 +903,7 @@ function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoin
       viewBox={`${center.x - radius} ${center.y - radius} ${size} ${size}`}
       style={{ left: center.x - radius, top: center.y - radius }}>
       <polygon points={pointsOf(abilityChartFrameOf(center))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
-      {values.length > 0 && (
-        <polygon data-part="values" points={pointsOf(hallOfFameChartVerticesOf(center, values))}
-          fill={ORIGINAL_COLORS.radarFill} fillOpacity={CHART_FILL_ALPHA} stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
-      )}
+      <AbilityGrowthPolygon center={center} targets={values} maximumLength={HALL_OF_FAME_CHART_MAXIMUM_LENGTH} restartKey={slot} />
     </svg>
   )
 }
@@ -906,9 +915,6 @@ function HallOfFameAbilityChart({ center, values }: { readonly center: ChartPoin
 const hallOfFameGridOpenShapeOf = (rows: number): GridOpenShape => ({
   rows, columns: HALL_OF_FAME_GRID.columns, rowHeight: HALL_OF_FAME_GRID.rowHeight, rowGap: HALL_OF_FAME_GRID.verticalGap, shift: 1,
 })
-
-/** 팀 도형과 같은 채움 불투명도 0xb4 (TeamSelectScreen) */
-const CHART_FILL_ALPHA = 0xb4 / 0xff
 
 /** 말풍선 둘째 칸 — 슬롯에서 삭제 */
 const HALL_OF_FAME_BUBBLE_DELETE = 1

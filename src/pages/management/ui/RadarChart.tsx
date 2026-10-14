@@ -8,7 +8,7 @@ import {
   abilityColorOf, radarAxisEndOf, radarLabelBoxOf, radarPointOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
-import { useRadarGrowth } from '@/pages/management/model/useRadarGrowth'
+import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 
 const KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']

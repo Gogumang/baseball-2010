@@ -5,7 +5,8 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import { abilityChartFrameOf, abilityChartVerticesOf } from '@/pages/create-player/lib/teamSelectLayout'
+import { abilityAxisMaximumLengthOf, abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
+import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
 import { ABILITY_TITLE, INFO_BOARD, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP, RADAR_CENTER, RADAR_RADIUS } from '@/pages/management/lib/basicInfoLayout'
 import { TEAM_INFO_LEFT_ROWS, TEAM_NAME_FRAME_BASE } from '@/pages/season/lib/seasonTeamInfo'
 import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
@@ -92,8 +93,9 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
           style={{ left: ABILITY_TITLE.centerX, top: ABILITY_TITLE.y, transform: 'translateX(-50%)' }} />
         <svg className={styles.board} viewBox="0 0 240 320" shapeRendering="crispEdges">
           <polygon points={points(abilityChartFrameOf(RADAR_CENTER))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} />
-          <polygon points={points(abilityChartVerticesOf(RADAR_CENTER, teamAbilities, RADAR_RADIUS))}
-            fill={ORIGINAL_COLORS.radarFill} fillOpacity={0xb4 / 0xff} stroke={ORIGINAL_COLORS.radarEdge} />
+          {/* 카드 0x7ba44 의 팀 갈래 0x7bf9c → 0x5aefd(…, 종류 0, 팀 레코드, 반지름 30) — 레이더 [skin+0xd4] 의 자라는 애니.
+              들어옴 0x5324 가 +0xad = 0 으로 두어(0x534c~0x5356) 0 에서 자란다 */}
+          <AbilityGrowthPolygon center={RADAR_CENTER} targets={teamAbilities} maximumLength={abilityAxisMaximumLengthOf(RADAR_RADIUS)} />
         </svg>
 
         <div className={styles.layer}

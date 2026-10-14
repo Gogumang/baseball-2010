@@ -10,11 +10,12 @@ import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
-  TEAM_COUNT, TEAM_GRID_SHAPE, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf, isTeamOpen, teamGridOpenShapeOf,
+  TEAM_COUNT, TEAM_GRID_SHAPE, abilityAxisMaximumLengthOf, abilityChartFrameOf, cellPositionOf, isTeamOpen, teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
+import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
 
 /** 이미지 폴더 (128장) — 노트가 "slt_frame 이미지 N" 이라 부르는 막대들이 여기 있다.
  *  프레임 폴더(`slt_frame/frames`, 62장)와 **번호 체계가 다르다** — 116·117 은 프레임 쪽에 없다 */
@@ -184,7 +185,7 @@ export function TeamSelectScreen({
       </span>
 
       {/* B — 능력치 도형. 잠긴 팀은 원본도 idx −1 을 넘겨 네 값을 0 으로 채운다 */}
-      <TeamAbilityChart values={isOpen ? team.values.slice(2) : []} />
+      <TeamAbilityChart values={isOpen ? team.values.slice(2) : []} cursor={cursor} />
 
       {/* 15팀 격자 */}
       {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
@@ -248,13 +249,6 @@ export function TeamSelectScreen({
 }
 
 /**
- * 값 도형 채움 알파 — `anim+0x80 = 0xb4ffff00`(0x5b386) 의 위 바이트 0xb4.
- * 아래 세 바이트 ffff00 이 `radarFill`(#FFFF00) 과 같고 `anim+0x7c = makeColor(255,255,255)`(0x5b380)
- * 가 `radarEdge`(#FFFFFF) 다. ⚠️ 값 도형을 이 두 색으로 칠하는 것은 **유력** — 채우는 호출은 못 짚었다.
- */
-const CHART_FILL_ALPHA = 0xb4 / 0xff
-
-/**
  * 팀 능력치 도형 — `0x5aefd` 종류 0, 반지름 30. S9 5절이 "미해결" 로 남긴 **값 → 꼭짓점 길이**를
  * 이번에 디스어셈으로 풀었다 (`0x75ebc` 만들기 · `0x7633c` 그리기).
  *
@@ -269,15 +263,18 @@ const CHART_FILL_ALPHA = 0xb4 / 0xff
  * 웹도 안 그린다(원본 그대로).
  * ⚠️ 꼭짓점 그림(프레임 8·9·10·11)과 축 딱지(반지름 +18, 0x5b412 루프)는 웹에 그림 근거가 없다.
  * 원본은 **숫자를 쓰지 않고 도형만** 그린다 — 여기도 숫자를 넣지 않는다.
+ *
+ * 값 도형은 레이더 [skin+0xd4] 의 자라는 애니로 그린다(`AbilityGrowthPolygon`): 들어옴(나리 101 0x10790 · 메인 메뉴 18 0x23e08 ·
+ * 19 0x23e70 · 시즌 0xca · 0xe4 …)이 +0xac = 1 · +0xad = 0 으로 두어 본문 첫 그림에 0 에서 자라고, 커서가 움직인 그림
+ * (격자 키 0x6c030 이 칸이 바뀌면 커서 +0x25 = 1 — 0x6c17c~0x6c192)에 0x63b14 가 [anim+0x1e3] = 0 으로 두어(0x63c36~0x63c56)
+ * 지난 목표값에서 새 팀 값으로 오르내린다.
  */
-function TeamAbilityChart({ values }: { readonly values: readonly number[] }) {
+function TeamAbilityChart({ values, cursor }: { readonly values: readonly number[]; readonly cursor: number }) {
   const center = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
   const radius = ABILITY_CHART.radius
   const size = radius * 2
   const pointsOf = (points: readonly { readonly x: number; readonly y: number }[]) =>
     points.map((point) => `${point.x},${point.y}`).join(' ')
-  // 잠긴 팀은 원본도 idx −1 로 네 값을 0 으로 채운다 (0x5b008) — 바탕 테두리만 남는다
-  const hasValues = values.length > 0
 
   return (
     <svg className={styles.layer} width={size} height={size} shapeRendering="crispEdges"
@@ -285,11 +282,8 @@ function TeamAbilityChart({ values }: { readonly values: readonly number[] }) {
       style={{ left: center.x - radius, top: center.y - radius }}>
       <polygon points={pointsOf(abilityChartFrameOf(center))}
         fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
-      {hasValues && (
-        <polygon points={pointsOf(abilityChartVerticesOf(center, values, radius))}
-          fill={ORIGINAL_COLORS.radarFill} fillOpacity={CHART_FILL_ALPHA}
-          stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
-      )}
+      {/* 잠긴 팀은 원본도 idx −1 로 네 값을 0 으로 채운다 (0x5b008) — 지난 값에서 0 으로 줄어든 뒤 바탕 테두리만 남는다 */}
+      <AbilityGrowthPolygon center={center} targets={values} maximumLength={abilityAxisMaximumLengthOf(radius)} restartKey={cursor} />
     </svg>
   )
 }

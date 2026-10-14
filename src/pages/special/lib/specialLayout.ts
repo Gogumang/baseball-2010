@@ -307,9 +307,12 @@ export const HALL_OF_FAME_CHART = { dy: 8, radius: 30, axisMaximum: 800 } as con
 
 const ORIGINAL_AXIS_SCALE = 999
 
+/** 최대길이 = 반지름 30 × 축 최대치 800 / 999 = 24 (0x75f30) */
+export const HALL_OF_FAME_CHART_MAXIMUM_LENGTH = Math.trunc((HALL_OF_FAME_CHART.radius * HALL_OF_FAME_CHART.axisMaximum) / ORIGINAL_AXIS_SCALE)
+
 /** 네 값의 꼭짓점 — 축 각도·꼭짓점 식은 팀 도형(`teamSelectLayout`)과 같고 축 최대치만 800 이다 */
 export function hallOfFameChartVerticesOf(center: ChartPoint, values: readonly number[]): readonly ChartPoint[] {
-  const maximum = Math.trunc((HALL_OF_FAME_CHART.radius * HALL_OF_FAME_CHART.axisMaximum) / ORIGINAL_AXIS_SCALE)
+  const maximum = HALL_OF_FAME_CHART_MAXIMUM_LENGTH
   return ABILITY_AXIS_ANGLES.map((angle, axis) =>
     abilityVertexOf(center, Math.trunc((maximum * (values[axis] ?? 0)) / ORIGINAL_AXIS_SCALE), angle))
 }
