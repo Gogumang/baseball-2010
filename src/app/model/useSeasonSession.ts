@@ -27,7 +27,7 @@ import { NO_TRADE_REQUEST, rollTradeRequest } from '@/entities/season-mode/model
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import {
   EMPTY_LEAGUE, LEAGUE_SIDE_HOME, UNSHUFFLED_PITCHER_ORDER, leagueSideOf, nextSeasonLeague, pitcherOrderOf,
-  pitcherOrdersAfterPostseason, rankingOf, rotateLeaguePitchers, startPostseason,
+  pitcherOrdersAfterPostseason, rankingOf, rotateLeaguePitchers, startPostseason, withSemiPlayoffWinner,
 } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
@@ -1105,6 +1105,8 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
     roster: staminaKnown ? roster : withFullRosterStamina(roster),
     playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     cpuPitcherStaminas: saved.cpuPitcherStaminas ?? fullCpuPitcherStaminas(state.record.teamId),
+    // 준PO 승자 칸(L+0x3b)이 생기기 전 시리즈 이사 — `withSemiPlayoffWinner`
+    ...(saved.series === undefined || saved.series === null ? {} : { series: withSemiPlayoffWinner(saved.series) }),
   }
 }
 
@@ -3360,10 +3362,9 @@ function goalBracketOf(series: PostseasonSeries | null): GoalPostseasonBracket {
   if (series === null) return { champion: null, pairs: [] }
   const [first, second, third, fourth] = series.qualifiers
   const inKoreanSeries = series.round === '한국시리즈' || series.round === '종료'
-  const playoffLower = series.round === '플레이오프'
-    ? series.teams[1]
-    // 한국시리즈 아랫 시드(플레이오프 승자)가 2위가 아니면 그 팀이 곧 준PO 승자다. 2위면 모른다 — 위 주석
-    : inKoreanSeries && series.teams[1] !== second ? series.teams[1] : null
+  // 플레이오프 칸 1(L+0x3b) = 준PO 승자 — 준PO 가 끝나면 0xb7724 가 넣고 포스트시즌 끝까지 남는다(`semiPlayoffWinner`).
+  // 옛 저장은 불러올 때 `withSemiPlayoffWinner` 가 채운다 — 그래도 모르면(로테이션 칸도 없는 저장) 빈 칸이다
+  const playoffLower = series.round === '준플레이오프' ? null : withSemiPlayoffWinner(series).semiPlayoffWinner ?? null
   return {
     champion: series.champion,
     pairs: [

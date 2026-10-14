@@ -202,6 +202,27 @@ export function menuWheelOrderOf(cursor: number): number[] {
   return order
 }
 
+/** 멈춘 바퀴의 칸 글자 하나 — 각도 표 자리 · 칸 번호 · img_text 프레임 · 기준점 */
+export interface MenuWheelRestingLabel {
+  readonly slot: number
+  readonly entryIndex: number
+  readonly frame: number
+  readonly point: MenuWheelPoint
+}
+
+/**
+ * **멈춘 바퀴(0x24b1c)의 칸 글자** — 커서 `cursor` 로 돈 배열(`menuWheelOrderOf`)을 표 각도에 놓고, 그리는 각(19~341)만 남긴다.
+ * 고른 칸은 0° 라 빠진다. 메인 메뉴 아랫단(하위 5 · 9)과 스페셜(하위 6)처럼 바퀴가 돌지 않는 하위 상태가 쓴다 — 그때 배열은
+ * 윗단에서 마지막으로 돈 그대로다(0x24780 은 하위 4 의 키 0x294e6 만 부른다).
+ */
+export function menuWheelRestingLabelsOf(cursor: number): readonly MenuWheelRestingLabel[] {
+  return menuWheelOrderOf(cursor).flatMap((entryIndex, slot) => {
+    const angle = menuWheelAngleAt(slot, null, 0)
+    if (!isMenuWheelAngleDrawn(angle)) return []
+    return [{ slot, entryIndex, frame: MENU_WHEEL_ITEM_FRAMES[entryIndex], point: menuWheelPointOf(angle) }]
+  })
+}
+
 /** 칸 그림의 좌상단 — 기준점 가운데 맞춤 (0x24fc4: x − w/2, y − h/2) */
 export function menuWheelLabelTopLeftOf(
   point: MenuWheelPoint,

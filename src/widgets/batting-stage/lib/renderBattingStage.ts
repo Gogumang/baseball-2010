@@ -34,6 +34,8 @@ import {
 } from '@/widgets/batting-stage/lib/baseRunners'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
+import { drawSkillPanel } from '@/widgets/batting-stage/lib/skillPanel'
+import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedReadout'
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
@@ -166,6 +168,8 @@ export interface StageScene {
   readonly timeKeyCount?: number | null
   /** 필살 남은 횟수 0xaea30(공격 팀) — 0x38a30 이 타자 옆에 "0:SP×n" 을 그린다 (`specialSwingBadge`). 없거나 null 이면 안 그린다 */
   readonly specialSwingRemaining?: number | null
+  /** 경기 스킬 표시 판(0x4b5b4) 이 그림의 모습 — 상태 0xf ~ 0x11 이고 수명이 남았을 때만 (`skillPanel`) */
+  readonly skillPanel?: SkillPanelView | null
   /**
    * 사람 투구 UI (구질 목록 0xf · 조준 0x10 · 게이지 0x11) — 상태 그리기가 장면 위에 그리는 것 (`pitchInputOverlay`).
    * 구질 목록이면 존 자리(0x4c53c)에 존 대신 그린다
@@ -238,6 +242,8 @@ export function renderBattingStage(
   if (scene.stagePhase !== undefined) drawPitchSpeedReadout(context, scene.stagePhase, scene.pitch?.displaySpeedKmh)
   // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
   if (scene.stagePhase !== undefined) drawSpecialSwingBadge(context, scene.stagePhase, scene.specialSwingRemaining ?? null, side)
+  // 0x4c4bc 꼬리 0x4cad4 — 경기 스킬 표시 판 0x4b5b4 (`skillPanel`)
+  if (scene.skillPanel !== undefined && scene.skillPanel !== null) drawSkillPanel(context, scene.skillPanel)
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)

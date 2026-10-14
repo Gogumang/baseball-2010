@@ -10,7 +10,7 @@ import {
   isMenuWheelAngleDrawn, menuBandAlphaAt, menuBandLinesOf, menuBandStateAt, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
   menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelOrderOf,
   menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf,
-  menuWheelOrderOf, menuWheelPointOf, menuWheelStepOf, rotateMenuReel,
+  menuWheelOrderOf, menuWheelPointOf, menuWheelRestingLabelsOf, menuWheelStepOf, rotateMenuReel,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 
 describe('반원 바퀴 — 원본 값 (0x24b1c, 확정)', () => {
@@ -295,5 +295,14 @@ describe('아랫단 바탕 띠 — 0x253e8~0x2548e · 0x254d4~0x25516 (확정)',
   it('[메뉴+0xe4] 가 0 이면 축 한 줄뿐이라 아무것도 안 보인다', () => {
     const lines = menuBandLinesOf(0)
     expect(lines.every((line) => line.y === SCREEN_HEIGHT)).toBe(true)
+  })
+})
+
+describe('멈춘 바퀴의 칸 글자 (0x24b1c — 스페셜 하위 6 이 쓴다)', () => {
+  it('[스페셜](칸 1)이 0° 라 빠지고 나머지 다섯이 45·90·180·270·315° 에 img_text 프레임 2·3·4·26·0 으로 선다', () => {
+    const labels = menuWheelRestingLabelsOf(1)
+    expect(labels.map((label) => label.entryIndex)).toEqual([2, 3, 4, 5, 0])
+    expect(labels.map((label) => label.frame)).toEqual([2, 3, 4, 26, 0])
+    expect(labels.map((label) => label.point)).toEqual([45, 90, 180, 270, 315].map(menuWheelPointOf))
   })
 })

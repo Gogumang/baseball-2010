@@ -27,6 +27,7 @@ import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import type { ModeBatter } from '@/app/model/modeBatter'
 import { isModeMagicPitchType, modePitchMenuOf, modePitchSlotNumbersOf } from '@/app/model/modePitcher'
@@ -149,6 +150,8 @@ export function MissionRoutes({
   const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
   /** 장면 +0xf24 의 루상 주자 애니 0~2 — 미션 장면이 사는 동안 0x35b94 가 부를 때마다 돈다 (`RunnerAnimationClock`) */
   const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), playScreenRef.current)
+  /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c(0x3301c 가 0x3ff) · 애니 7 · 8 — 미션 장면이 사는 동안 (`skillPanel`) */
+  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), playScreenRef.current)
 
   const playingRun =
     screen.kind === '투수미션' ? session.pitcherRun
@@ -266,6 +269,7 @@ export function MissionRoutes({
         runnerRunAbilities={session.missionRunnerRunAbilities}
         stealingFrom={session.stealingFrom}
         runnerAnimationClock={runnerAnimationClockRef}
+        skillPanelScene={skillPanelSceneRef}
         onSteal={actions.steal}
         // 경기 중 "나가기" — 0x40140 이 0xa5368(…, 0) 뒤 곧장 메인 메뉴(결과 화면 없음). 마선수 대결도 플래그를 안 보고 같은
         // 길이다 — 진 결과 이벤트는 다음 타자편 105 진입이 띄운다 (파일 머리 "마선수 대결의 경기 중 나가기" 주석)

@@ -15,6 +15,7 @@ import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -157,6 +158,23 @@ export interface StageLatest {
   readonly timeKeyCount?: number
   /** 지금 타자의 남은 필살 횟수 0xaea30 — `BattingStage` 의 같은 이름 props 주석 참고. 없으면 표시(0x38a30)를 안 그린다 */
   readonly specialSwingRemaining?: number
+  /** 경기 스킬 표시 판(0x4b5b4) 재료 — `BattingStage` 의 같은 이름 props 주석 참고. 없으면 판을 안 그린다 */
+  readonly skillPanel?: SkillPanelSource
+}
+
+/** 경기 스킬 표시 판 재료 (`widgets/batting-stage/lib/skillPanel`) */
+export interface SkillPanelSource {
+  /**
+   * **0xd 진입마다 새 값** — 그 타석의 0xe 대기 객체(`SceneConfirmWait`)를 넘긴다. 바뀐 뒤 첫 0xf 진입에서 0xd 진입 0x48d50 처럼
+   * 두 비트를 다시 정한다(0xd · 0xe 동안은 판이 안 그려지고 상황도 안 바뀐다). null 은 무시한다
+   */
+  readonly entryKey: unknown
+  /** st[9] — 공격 측(사람 타석이라 사람 팀 측). 함성 29 의 비트 칸을 고른다 */
+  readonly attackSide: number
+  /** 경기 장면 수명의 칸(`useSceneScopedRef`) — 비트 칸 skin+0x44c · 애니 7 · 8. 없으면 이 타석 화면이 사는 동안만 */
+  readonly scene?: MutableRefObject<SkillPanelScene>
+  /** 0xb6c20(st, st[0xa]) — 수비 측이 CPU 인가. 없으면 참(사람 타석) */
+  readonly isDefenseCpu?: boolean
 }
 
 /** 경기 정산 0x4ea0c 의 효과를 고르는 재료 */

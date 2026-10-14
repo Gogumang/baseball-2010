@@ -33,7 +33,7 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBat
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
-import type { AcePitcherFrames, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
+import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
@@ -290,6 +290,11 @@ interface BattingStageProps {
    * 오른쪽 아래에 game_ui 프레임 91 "#TIME" 을 그린다 (`softKeyLabels`). 안 넘기면 안 그린다.
    */
   readonly timeKeyCount?: number
+  /**
+   * **경기 스킬 표시 판** (장면 +0x19b0, 0xd 진입 48fa4 · 0xf 진입 3dd78 · 그리기 0x4b5b4) — 타자 · 투수가 장착한 스킬 중 지금 걸리는
+   * 이름을 20 그림 동안 화면 가장자리에 보이고, 전국구 · 먹튀 타자면 함성 29(0x4c39a)를 낸다(`lib/skillPanel`). 안 넘기면 안 그린다
+   */
+  readonly skillPanel?: SkillPanelSource
 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
