@@ -191,7 +191,8 @@ export function MissionPlayScreen({
   /**
    * 전역 경기 상태 +0x6b (`liveGameState`) — 미션 준비 0xaa57c 가 0xb6814 로 0 을 둔 뒤(0xaa5fc) 곧바로 0xaa698 이
    * `min(레코드 +3 아래 4비트, 0x63)` = 시작 이닝 인덱스를 쓴다(`start.inning` − 1). 재도전 · 다시하기도 같은 준비를 다시 돈다.
-   * ⚠️ 미해결: 미션 경기 안의 이닝 넘김(0xb6b6c)은 웹 미션 진행에 이닝 칸이 없어 따라가지 않는다.
+   * 미션 경기 안의 이닝 넘김(0xb6b6c)은 판의 이닝 칸 `run.game.inning` 이 따라간다(`flipMissionHalf` · 자동진행 중계 틱의 st[0x6b]) —
+   * 이 효과가 바뀔 때마다 전역 칸에 다시 싣는다.
    */
   const missionInningIndex = run.game.inning
   useEffect(() => {
@@ -398,7 +399,7 @@ export function MissionPlayScreen({
               : {
                   settlement: {
                     isWin: isSuccess,
-                    // 경기 상태 두 측 점수 — 위 HUD 와 같은 근사(웹 미션은 득점 칸을 따로 안 든다). 차이의 절댓값만 쓴다
+                    // 경기 상태 두 측 점수 0xb69b0 — 위 HUD 와 같은 점수판(`run.game.scores`, 견제 · 도루 · 폭투 판 득점도 든다). 차이의 절댓값만 쓴다
                     side0Score: run.game.scores[0],
                     side1Score: run.game.scores[1],
                     // 하늘 칸 — 경기 이닝 st[0x6b]

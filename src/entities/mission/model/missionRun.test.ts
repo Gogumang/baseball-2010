@@ -257,6 +257,14 @@ describe('applyPickoff — CPU 견제 한 판 (메시지 0x10 → 종류 4 → 0
     expect(next.bases).toEqual({ first: false, second: false, third: false })
     expect(next.game.halfEnded).toBe(true)
   })
+
+  it('악송구 · 폭투로 들어온 득점은 점수판(0xa5c34)에 들고 타점(R+0x104)에는 안 든다 — 정산 a8946 은 state[0x11] · 볼넷 · 사구 판만 타점을 적는다', () => {
+    const run = { ...startMission(번트의달인), bases: { first: false, second: false, third: true } }
+    const next = applyPickoff(run, { bases: { first: false, second: false, third: false }, runsScored: 1, outsAdded: 0 })
+
+    expect(next.game.scores[0] + next.game.scores[1]).toBe(run.game.scores[0] + run.game.scores[1] + 1)
+    expect(next.progress).toBe(run.progress)
+  })
 })
 
 describe('타점은 3아웃으로 끝난 판의 득점도 든다 (0xae3e8 ae554 → 정산 0xa8024 a8994 += 이벤트 0xf 수)', () => {
