@@ -46,10 +46,17 @@ import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import {
   hideBallOfLastSnapshot,
+  holderMarkOf,
   viewStateOf,
   type ActionMemory,
   type DefensePlayView,
+  type HolderPlate,
 } from '@/features/defense-play/model/defensePlayView'
+import {
+  FUMBLE_MARK_TICKS,
+  THROW_ERROR_MARK_TICKS,
+  tickMarkCounter,
+} from '@/features/defense-play/model/playerEffects'
 import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import type { DefenseKeyPress, DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
@@ -160,6 +167,17 @@ export interface RunnerPlayEngineInput {
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) — 이 판들(밀어내기 · 도루 · 폭투)은 투구 뒤라 +0x1997 · 애니가 되감겨 있다 */
   readonly scene?: DefenseScene
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`). 안 주면 고리만 그린다 */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 주자 칸(`RunnerState.index`) → 마선수 번호 (`runnerAces.runnerAceIndexesOf`). 안 주면 아무도 마선수가 아니다 */
+  readonly runnerAceIndexes?: readonly (number | null)[]
+  /** 타석 교대 0x483a0 이 실은 주자 마선수 그림 번호 (`runnerAces.loadedRunnerAceOf`) */
+  readonly runnerAceSprite?: number | null
+  /**
+   * 판이 열릴 때의 야수 +0xb8(펌블 표시, 칸별). 폭투 · 포일 판정 0x3e062(0x3e08c~0x3e092)가 **포수 +0xb8 = 6** 을 적고
+   * 0x17 로 간다 — 첫 그림 앞 야수 틱(a12da)이 하나 줄여 첫 그림은 5 다(`passedBallPlay`). 안 주면 0
+   */
+  readonly fumbleMarks?: readonly number[]
 }
 
 export interface RunnerPlayEngineResult extends DefensePlayResult {
@@ -280,6 +298,16 @@ function* runnerPlaySteps(
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
+  /**
+   * **그림 전용** 경기+0x19ac — 쥐기 0xb2710 의 메시지 0x15(0x51872)가 세우고 0x17 진입 0x467de 가 내린다. 도루 판의 포수 ·
+   * 판 시작 쥐기(b29d4 의 0xb2710)는 0x17 진입 0x46418 안에서 0x467de 보다 앞이라 지워진다 — 판 동안 새로 쥘 때 선다
+   */
+  let grabbed = false
+  /** **그림 전용** 야수 +0xb8(펌블 표시) · +0xc0(송구 실수 표시) — `runDefensePlay` 와 같은 칸 */
+  let fumbleMarks: number[] = Array.from({ length: fielders.length }, (_, slot) => input.fumbleMarks?.[slot] ?? 0)
+  let throwErrorMarks: number[] = Array.from({ length: fielders.length }, () => 0)
+  const markSlot = (marks: number[], slot: number, value: number) =>
+    marks.map((current, index) => (index === slot ? value : current))
 
   const runnerStates = () => runners.map((runner) => runner.state)
   /** 공 쥔 야수 vtC4 = 0xa20ec — +0xc8(준비 틱)이 다 줄었나. 쥐기 0xb2710(P, f, 1)이 넣고 야수 틱 0xa1284 가 줄인다 */
@@ -326,8 +354,9 @@ function* runnerPlaySteps(
           ? { ...fielder, holdingBall: false }
           : fielder,
     )
-    // 0xb2710: +0x128 = 1 · +0x130 = f · +0x12c = 1 · +0x112 = 1 · state[0x1e] = 1
+    // 0xb2710: +0x128 = 1 · +0x130 = f · +0x12c = 1 · +0x112 = 1 · state[0x1e] = 1 · 메시지 0x15 → 경기+0x19ac = 1
     play = { ...play, ballHolderSlot: slot, held: true, everHeld: true, wantsThrow: true }
+    grabbed = true
     ballOnGround = true
     runOutJudgement(tick)
   }
@@ -407,8 +436,12 @@ function* runnerPlaySteps(
       body: ballBody,
     })
     if (thrown.errant) errantThrow = true
+    // a1908(악송구) · a17fc(원바운드) — 던진 야수 +0xc0 = 4 (그림 0x438c4 의 "!")
+    if (thrown.errant || thrown.bounce) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     // b307c vt24(0) · vt34 — 받을(주울) 야수 · 포구 틱. 예보는 던진 야수가 손을 떠나기 전 칸으로 본다(b2f80 뒤지만 위치 · 목표는 같다)
     takeLooseBall(chaseLooseBall(thrown.ball, tick, fielders, forecastOptionsOf(thrown, holderSlot, coverSlot), maximumTicks))
+    // b188a — 송구 예보가 두 번째 패스로 가면 그때의 +0x130(던진 야수 — b307c 앞)의 +0xc0 = 4
+    if (chase?.secondPassStarted === true) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     flight = { from: holderSlot, base, releaseTick: tick }
     if (firstThrowBase === NONE) {
       firstThrowBase = base
@@ -488,6 +521,9 @@ function* runnerPlaySteps(
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 0. 야수 틱 0xa1284 — 공용 갱신 0x3f060 이 슬롯 2(0x524c0)보다 먼저 돈다. 쥔 동안 +0xc8 −= 1 (타구 진행기 0' 절) ──
+    // a12da · a12e6 — 동작 잠금(+0xb4)이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 만 본다)
+    fumbleMarks = fumbleMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
+    throwErrorMarks = throwErrorMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
     fielders = fielders.map((fielder) =>
       fielder.holdingBall && fielder.actionRemainingTicks > 0
         ? { ...fielder, actionRemainingTicks: fielder.actionRemainingTicks - 1 }
@@ -520,6 +556,8 @@ function* runnerPlaySteps(
       if (input.random !== undefined && rollFumble(abilities[current.slot] ?? DEFAULT_ABILITY, ballIsMoving, input.random)) {
         fumbled = true
         ballEventThisTick = true
+        // b4280 — 야수 +0xb8 = 6
+        fumbleMarks = markSlot(fumbleMarks, current.slot, FUMBLE_MARK_TICKS)
         log.push(`${tick}틱 ${current.slot}번 야수 펌블 (0xbc2)`)
       } else {
         chase = null
@@ -643,6 +681,18 @@ function* runnerPlaySteps(
         throwingSlot: flight !== null && at < flight.releaseTick + 3 ? flight.from : NONE,
         throwBase: flight?.base ?? NONE,
         previousActions,
+        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac · +0x130 · 공격 주체. 이 판은 레이저(+0x19ad)를 안 옮겼다 — 0x17 진입이 지운 채다
+        holderMark: holderMarkOf({
+          grabbed,
+          holderSlot: play.ballHolderSlot,
+          offenseIsCpu: input.offenseIsCpu === true,
+          isShining: false,
+        }),
+        holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
+        fumbleTicks: fumbleMarks,
+        throwErrorTicks: throwErrorMarks,
+        runnerAceIndexes: input.runnerAceIndexes,
+        runnerAceSprite: input.runnerAceSprite ?? null,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,

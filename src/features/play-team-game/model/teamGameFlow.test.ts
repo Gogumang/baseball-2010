@@ -932,6 +932,19 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(진행중.pendingDefensePlay!.input.defenseIsCpu).toBe(true)
   })
 
+  it('수비 화면 이름 판(0x43cb0) — 우리 공격이면 상대 수비 아홉 칸, 칸 0 은 지금 마운드 투수 · 마선수 주자 칸도 싣는다', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 진행중 = startBatterOutcome(progress, 땅볼, random)
+    const plates = 진행중.pendingDefensePlay!.input.fielderPlates!
+    expect(plates).toHaveLength(9)
+    expect(plates[0]?.name).toBe(progress.opponentPitcherEntry[progress.opponentPitcherIndex]?.name)
+    // 칸 1~8 은 그 칸 야수 — 수비 코드 = 칸 + 1
+    plates.slice(1).forEach((plate, index) => {
+      if (plate != null) expect(plate.positionCode).toBe(index + 2)
+    })
+    expect(진행중.pendingDefensePlay!.input.runnerAces).toEqual({ batter: null, first: null, second: null, third: null })
+  })
+
   it('사람이 던진 타석은 사람이 **수비**(송구 0x533c8)를 잡는다 — 같은 표의 반대 갈래', () => {
     const 번호 = 붙들리는투구번호(20100901)
     expect(번호).not.toBeNull()
@@ -942,6 +955,10 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(진행중.pendingDefensePlay!.side).toBe('수비')
     // 이 타석의 수비는 사람이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
     expect(진행중.pendingDefensePlay!.input.defenseIsCpu).toBe(false)
+    // 이름 판 칸 0 은 우리 마운드 투수
+    expect(진행중.pendingDefensePlay!.input.fielderPlates?.[0]?.name).toBe(
+      progress.ourPitcherEntry[progress.ourPitcherIndex]?.name,
+    )
     // 붙들려 있는 동안은 던질 차례가 아니다
     expect(isPitchTurn(진행중)).toBe(false)
     // 경기 상태는 한 톨도 안 바뀐다 (투구 수·스태미나만 이미 깎여 있다)

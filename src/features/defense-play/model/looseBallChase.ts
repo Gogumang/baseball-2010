@@ -26,6 +26,11 @@ export interface LooseBallChase {
   readonly body?: BallBody
   /** 이 공을 깐 판 틱 — 그 그림의 공+0x68 이 0 이다(b12da). 그림의 재생 틱 = 판 틱 − 이 값 (`DefenseBall.isPlaybackStart`) */
   readonly startTick: number
+  /**
+   * 송구 예보(a = 0)가 두 번째 패스(b1878)로 넘어갔나 — 그 자리 b188a~b1892 가 그때의 공 가진 야수(+0x130 = 던진 야수)의
+   * +0xc0 = 4 를 적는다(그림 "!" 만 본다, `catchForecast.secondPassStarted`). 다른 예보는 늘 거짓
+   */
+  readonly secondPassStarted?: boolean
 }
 
 /** 예보 칸 — 필살수비 창 · +0x127 은 타구 판(메시지 0x11 · 0x51408)만 세운다. 이 판들에선 늘 꺼져 있다 */
@@ -52,6 +57,7 @@ export function chaseLooseBall(
     catchPoint: { x: at.x, y: 0, z: at.z },
     body: ball.flight.body,
     startTick: atTick,
+    secondPassStarted: forecast.secondPassStarted,
   }
 }
 

@@ -2353,6 +2353,9 @@ export function arrivePitch(
       outs: before.outs,
       // 우리 공격이니 수비는 상대 팀 — 타구 진행기와 같은 아홉 칸
       defenseAbilities: opponentDefenseAbilitiesOf(progress),
+      // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 타구 판과 같은 칸
+      fielderPlates: opponentFielderPlatesOf(progress),
+      runnerAces: ourRunnerAcesOf(progress),
       runAbilities: runAbilitiesOnBaseOf(progress),
       defenseIsCpu: true,
       // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
@@ -2492,6 +2495,8 @@ export function cpuPickoff(progress: GameProgress, base: PickoffBase, random: Ra
     outs: before.outs,
     // 우리 공격이니 수비는 상대 팀이다 — 타구 진행기와 같은 아홉 칸·같은 주루 근사
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
+    fielderPlates: opponentFielderPlatesOf(progress),
+    runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
     random,
     // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)

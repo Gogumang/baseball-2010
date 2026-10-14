@@ -70,12 +70,14 @@ import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import {
   defenseAbilitiesOf,
+  defenseFielderPlatesOf,
   isBattedBallInPlay,
   recordedOutcomeOf,
   runDefensePlay,
   withPredictedOutcome,
 } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { isPickoffPlayResult, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
@@ -382,6 +384,10 @@ export interface PitcherGameOptions {
    * 마타자는 명단 9번(첫 벤치, 옛 9번은 맨 끝) (`features/play-game/model/gameAces`). 안 넘기면 아무도 안 싣는다.
    */
   readonly aces?: GameAceSetup
+  /**
+   * 내 투수 이름 (레코드 0xb62c0) — 수비 화면 공 가진 야수 이름 판(0x43cb0)의 칸 0(마운드 투수). 안 넘기면 그 칸 판이 없다
+   */
+  readonly myName?: string
 }
 
 export interface PitcherGameLogEntry {
@@ -1351,6 +1357,9 @@ function arrivePitcherPitch(
       outs: before.outs,
       // 수비 아홉 칸은 우리 팀, 칸 0 은 나 — 타구 진행기(`defensePlayInputOf`)와 같은 원본 버그(칸 0 은 변화)까지 그대로
       defenseAbilities: myDefenseAbilitiesOf(progress),
+      // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
+      fielderPlates: myFielderPlatesOf(progress),
+      runnerAces: opponentRunnerAcesOf(progress),
       runAbilities: runAbilitiesOnBaseOf(progress),
       defenseIsCpu: false,
       // 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓) — 원본 기본값은 수동
@@ -1435,6 +1444,35 @@ function withoutSteal(progress: PitcherGameProgress): PitcherGameProgress {
 }
 
 /** 수비 아홉 칸 — 우리 팀, 칸 0 은 나(⚠️ 원본 그대로 능력치 칸 2 를 읽어 투수 레코드에서는 **변화**) */
+/**
+ * 수비 아홉 칸의 **이름 판 선수** (0x43cb0 — `defenseFielderPlatesOf`) — 칸 고르기는 `myDefenseAbilitiesOf` 와 같다.
+ * 칸 0 은 지금 마운드 투수 = 나(이름 `myName` · 보직 `role` = 레코드 +0xb & 3).
+ * ⚠️ 내가 내려간 뒤(`onMound` 거짓)의 수비 판은 웹이 안 띄워 칸 0 판을 안 채운다.
+ */
+function myFielderPlatesOf(progress: PitcherGameProgress) {
+  const myName = progress.options.myName
+  return defenseFielderPlatesOf(
+    teamBatters(progress.options.ourTeamId),
+    progress.onMound && myName !== undefined ? { name: myName, role: progress.options.role } : undefined,
+  )
+}
+
+/**
+ * 상대 타자 · 루 위 주자의 **마선수 번호** (`runnerAces` — 주자 그림 0x79d10 · 적재 0x483a0). 명단 칸이 마타자 칸이면 142 가 넣은 마타자.
+ */
+function opponentRunnerAcesOf(progress: PitcherGameProgress): RunnerAces {
+  const ace = teamAcesOf(progress.options, false).batter
+  const aceOf = (slot: number | null) =>
+    slot !== null && ace >= 0 && rosterSlotAt(progress.opponentLineup, slot) === ACE_BATTER_ROSTER_SLOT ? ace : null
+  const runners = runnersOfGame(progress.game, progress.opponentOrderIndex)
+  return {
+    batter: aceOf(progress.opponentOrderIndex),
+    first: aceOf(runnerOnBase(runners, 1)),
+    second: aceOf(runnerOnBase(runners, 2)),
+    third: aceOf(runnerOnBase(runners, 3)),
+  }
+}
+
 function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] {
   return defenseAbilitiesOf(
     teamBatters(progress.options.ourTeamId).map((player) => ({
@@ -1615,6 +1653,8 @@ export function pickoff(
       })),
       progress.options.stats.breaking,
     ),
+    fielderPlates: myFielderPlatesOf(progress),
+    runnerAces: opponentRunnerAcesOf(progress),
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
     random,
     offenseIsCpu: true,
@@ -1771,6 +1811,9 @@ function defensePlayInputOf(
       })),
       progress.options.stats.breaking,
     ),
+    // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
+    fielderPlates: myFielderPlatesOf(progress),
+    runnerAces: opponentRunnerAcesOf(progress),
     // 주자는 상대 타자다 — 지금 타순 칸의 주루
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
     random,

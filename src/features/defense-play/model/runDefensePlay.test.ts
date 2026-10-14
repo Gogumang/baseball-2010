@@ -2222,3 +2222,42 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     expect(결과.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
   })
 })
+
+describe('공 그리기 0x36dfc 파티클 — 진행기 쪽 조건 (큰 타구 0x36f76 · 튐 0x36fe0)', () => {
+  const 입력 = (extra: Partial<DefensePlayInput> = {}): DefensePlayInput => ({
+    outcome: 땅볼아웃,
+    trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+    bases: EMPTY_BASES,
+    outs: 0,
+    defenseIsCpu: true,
+    ...extra,
+  })
+
+  it('공 틱 0 은 조건이 없다 (36e24 `공+0x68 > 0`)', () => {
+    const 결과 = runDefensePlay(입력({ bigHitWatch: true }))
+    expect(결과.ticks[0]?.tick).toBe(0)
+    expect(결과.ticks[0]?.ballParticles).toBeNull()
+  })
+
+  it('+0x199a 가 서 있고 판 종류 1 이면 큰 타구 — 안 서 있으면 아니다', () => {
+    expect(runDefensePlay(입력({ bigHitWatch: true })).ticks[1]?.ballParticles?.bigHit).toBe(true)
+    expect(runDefensePlay(입력({ bigHitWatch: false })).ticks[1]?.ballParticles?.bigHit).toBe(false)
+  })
+
+  it('+0x199a 를 안 주면 판 타구로 0x392ac 를 다시 본다 — 땅볼(결과 코드 홈런성 아님)은 꺼져 있다', () => {
+    expect(runDefensePlay(입력()).ticks[1]?.ballParticles?.bigHit).toBe(false)
+  })
+
+  it('공이 궤적 위에 있는 동안만 다음 점 높이를 싣고, 그 값은 궤적의 공 틱 + 1 점이다', () => {
+    const input = 입력()
+    const 결과 = runDefensePlay(input)
+    // 투수가 6 틱에 쥔다(위 고리 시험) — 그 앞은 궤적 위
+    for (let tick = 1; tick < 6; tick += 1) {
+      expect(결과.ticks[tick]?.ballParticles?.bounceNextHeight).toBe(input.trajectory.pointAt(tick + 1).y)
+    }
+    // 쥔 공은 궤적 위가 아니다(그림도 손에 붙인다 — `ballPointAt`)
+    const 쥔때 = 결과.ticks.filter((view) => view.ball.isHeld === true)
+    expect(쥔때.length).toBeGreaterThan(0)
+    for (const view of 쥔때) expect(view.ballParticles?.bounceNextHeight ?? null).toBeNull()
+  })
+})

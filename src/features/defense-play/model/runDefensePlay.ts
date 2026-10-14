@@ -138,6 +138,7 @@ import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defe
 import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
+import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
 import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
 import {
   holderMarkOf,
@@ -145,6 +146,7 @@ import {
   viewStateOf,
   type ActionMemory,
   type DefensePlayView,
+  type BallParticleFacts,
   type HolderPlate,
 } from '@/features/defense-play/model/defensePlayView'
 
@@ -377,6 +379,53 @@ export interface DefensePlayInput {
    * 안 주면 모두 보통 주자 그림이다.
    */
   readonly runnerAces?: RunnerAces
+  /**
+   * 경기 +0x199a — 큰 타구 감상 플래그(0x392ac, 상태 0x13 이 세운다). 수비 화면 공 그리기 0x36dfc 가 서 있는 동안
+   * 판 종류 1 · 8 이면 그림마다 큰 타구 파티클을 쏜다. 안 주면 이 판의 타구(결과 코드 · 궤적 폴 틱 · 거리 눈금)로 0x392ac 를 다시 본다
+   * — 0x13 과 같은 공이라 같은 값이다.
+   */
+  readonly bigHitWatch?: boolean
+}
+
+/** 0x392ac — 판 입력의 타구로 큰 타구 감상 플래그를 본다 (`bigHitWatch` 를 안 준 판) */
+function bigHitWatchOf(input: Pick<DefensePlayInput, 'outcome' | 'trajectory'>): boolean {
+  return isBigHitWatch({
+    resultCode: contactOfOutcome(input.outcome)?.resultCode ?? null,
+    poleTick: input.trajectory.poleTick,
+    carryScale: input.trajectory.carryScale ?? 0,
+  })
+}
+
+/** 0x357e0 — 결과 코드 24~26(홈런성) */
+const HOME_RUN_HIT_CODES: readonly number[] = [24, 25, 26]
+/** 0x37028~0x37038 — 튐 파티클을 안 쏘는 결과 코드 */
+const NO_BOUNCE_PARTICLE_CODES: readonly number[] = [9, 10, 11]
+/** 0x36f84~0x36f92 — 큰 타구 파티클을 쏘는 판 종류(state[0x26]): 1 타구 판 · 8 더비 판 */
+const BIG_HIT_PARTICLE_PLAY_KINDS: readonly number[] = [1, 8]
+
+/**
+ * 공 그리기 0x36dfc 의 파티클 조건 중 진행기 몫 (`defenseView.BallParticleFacts` 머리말 — 화면 쪽은 `lib/ballParticles`).
+ * - 36e24 `공+0x68 > 0` — 공 틱을 판 틱으로 본다(이 진행기는 공 점을 `trajectory.pointAt(틱)` 으로 읽는다).
+ * - 튐 갈래는 공을 **궤적(`trajectory`)에서 읽어 그리는 틱**(`ballPointAt` 의 앞 두 갈래 — 잡히기 전 · 못 잡는 공 · 끼워 넣은
+ *   송구 · 튕긴 공)에만 본다. ⚠️ `ballPointAt` 이 근사(낮은 포물선)로 그리는 송구 틱은 손을 떠나는 틱에 높이 투영이 0 → 0 아님이 되어
+ *   거짓 튐이 생기므로 null 로 둔다(그 틱의 원본 튐은 미확인).
+ */
+function ballParticleFactsOf(input: {
+  readonly tick: number
+  readonly trajectory: BattedBallTrajectory
+  readonly onTrajectory: boolean
+  readonly bigHitWatch: boolean
+  readonly playKind: number
+  readonly resultCode: number | null
+}): BallParticleFacts | null {
+  if (input.tick <= 0) return null
+  const bigHit = input.bigHitWatch && BIG_HIT_PARTICLE_PLAY_KINDS.includes(input.playKind)
+  const bounces =
+    input.onTrajectory &&
+    input.tick < input.trajectory.length - 1 &&
+    !HOME_RUN_HIT_CODES.includes(input.resultCode ?? -1) &&
+    !NO_BOUNCE_PARTICLE_CODES.includes(input.resultCode ?? -1)
+  return { bigHit, bounceNextHeight: bounces ? input.trajectory.pointAt(input.tick + 1).y : null }
 }
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
@@ -2467,6 +2516,15 @@ export function stepDefensePlay(
         throwErrorTicks: throwErrorMarks,
         // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
         laserTrailFrom: laserTrailOn ? ballSegmentStart : null,
+        // 공 그리기 0x36dfc 의 큰 타구 · 튐 파티클 — 진행기 쪽 조건 (`ballParticleFactsOf`)
+        ballParticles: ballParticleFactsOf({
+          tick,
+          trajectory,
+          onTrajectory: uncatchable || tick < catchTick,
+          bigHitWatch: input.bigHitWatch ?? bigHitWatchOf(input),
+          playKind: play.kind,
+          resultCode: contactOfOutcome(input.outcome)?.resultCode ?? null,
+        }),
         runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
         runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,

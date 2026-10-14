@@ -1,4 +1,6 @@
 import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import {
   createFielders,
@@ -76,6 +78,10 @@ export interface WalkPlayInput {
   /** 주자 속도에 더하는 팀 등급 (전역 모드 1·2·8 에서만) */
   readonly runnerTeamGrade?: number
   readonly aceIndexes?: readonly (number | null | undefined)[]
+  /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
+  readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
+  readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
@@ -175,6 +181,9 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
+    fielderPlates: input.fielderPlates,
+    runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),
+    runnerAceSprite: loadedRunnerAceOf(input.runnerAces, input.bases),
     scene: input.scene,
   })
   return { ...result, pitchJudgement: input.pitchJudgement }

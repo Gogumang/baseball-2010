@@ -29,6 +29,7 @@ import { applyOpponentAtBat, applyOpponentRunnerPlay } from '@/features/play-pit
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import {
   defenseAbilitiesOf,
+  defenseFielderPlatesOf,
   isBattedBallInPlay,
   recordedOutcomeOf,
   runDefensePlay,
@@ -36,6 +37,7 @@ import {
 } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
@@ -2093,6 +2095,44 @@ function defenseAbilitiesFor(
   )
 }
 
+/**
+ * 수비 아홉 칸의 **이름 판 선수** (0x43cb0 — `defenseFielderPlatesOf`) — 칸 고르기는 `defenseAbilitiesFor` 와 같다.
+ * 칸 0 은 지금 마운드 투수(보직 = 레코드 +0xb & 3). 마투수 · 보직 없는 투수는 보직을 안 넘긴다(→ 판 없음, 타자편 `gameFlow` 와 같다).
+ */
+function fielderPlatesFor(progress: TeamGameProgress, teamId: number, pitcherIndex: number) {
+  const pitchers = teamId === progress.options.ourTeamId ? progress.ourPitcherEntry : progress.opponentPitcherEntry
+  const pitcher = pitchers[pitcherIndex]
+  return defenseFielderPlatesOf(
+    entryBattersOf(progress, teamId),
+    pitcher === undefined
+      ? undefined
+      : pitcher.aceIndex >= 0 || pitcher.role === undefined
+        ? { name: pitcher.name }
+        : { name: pitcher.name, role: pitcher.role },
+  )
+}
+
+/**
+ * 공격 팀 타자 · 루 위 주자의 **마선수 번호** (`runnerAces` — 주자 그림 0x79d10 · 적재 0x483a0). 명단 칸의 마타자(`aceIndex` 0~4)만.
+ * `ours` 면 우리 공격(타순 = 경기 타순), 아니면 상대 공격(상대 타순).
+ */
+function runnerAcesFor(progress: TeamGameProgress, ours: boolean): RunnerAces {
+  const entry = ours ? progress.ourEntry : progress.opponentEntry
+  const order = ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex
+  const runners = runnersOfGame(progress.game, order)
+  const aceOf = (slot: number | null) => {
+    if (slot === null) return null
+    const ace = entry[slot]?.aceIndex ?? NO_ACE_BATTER
+    return ace >= 0 ? ace : null
+  }
+  return {
+    batter: aceOf(((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE),
+    first: aceOf(runnerOnBase(runners, 1)),
+    second: aceOf(runnerOnBase(runners, 2)),
+    third: aceOf(runnerOnBase(runners, 3)),
+  }
+}
+
 /** 타순 한 칸의 경기용 주루 능력치 (칸 3) — 진행기의 주자 속도가 된다 */
 function runAbilityFor(progress: TeamGameProgress, teamId: number, battingOrderIndex: number): number {
   return entryAbilitiesAt(progress, teamId, battingOrderIndex)[3]
@@ -2445,6 +2485,9 @@ function batterDefenseInputOf(
     stealingFrom: progress.stealingFrom,
     // 우리 공격이니 수비는 상대 팀이다
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 상대 수비 · 우리 주자
+    fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
     // 난수를 넘겨야 펌블·악송구·필살수비·레이저 굴림이 돈다
     random,
@@ -3073,6 +3116,9 @@ function defensiveDefenseInputOf(
     stealingFrom: progress.stealingFrom,
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 타자
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 우리 수비 · 상대 주자
+    fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
     random,
     gameMode: progress.options.mode,
@@ -3302,6 +3348,8 @@ export function pickoff(
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 (타구 진행기 `defensiveDefenseInputOf` 와 같은 근사:
     // 주자 모두가 지금 타자의 주루를 쓴다)
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
     random,
     // 공격이 CPU 라 자동 진루 제어기(0xaf918)가 돈다 (0xae690 첫 항)
@@ -3338,6 +3386,8 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     outs: progress.game.outs,
     // 우리 공격이니 수비는 상대 팀이다
     defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
     random,
     // 우리가 공격이다 — 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
@@ -3552,10 +3602,13 @@ function arriveTeamPitch(
       bases: before.bases,
       outs: before.outs,
       runAbilities: runAbilitiesOnBaseOf(progress, humanSide),
+      // 마선수 주자 그림(0x79d10) — 공격 팀 타자 · 루 위 주자
+      runnerAces: runnerAcesFor(progress, humanOffense),
       ...(humanOffense
         ? {
             // 우리 공격이니 수비는 상대(CPU) — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690 의 둘째 항)
             defenseAbilities: defenseAbilitiesFor(progress, options.opponentTeamId, progress.opponentPitcherIndex),
+            fielderPlates: fielderPlatesFor(progress, options.opponentTeamId, progress.opponentPitcherIndex),
             defenseIsCpu: true,
             offenseIsCpu: false,
             runningMode: options.runningModeManual === true ? ('수동' as const) : ('자동' as const),
@@ -3563,6 +3616,7 @@ function arriveTeamPitch(
         : {
             // 우리 수비 — 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓)
             defenseAbilities: defenseAbilitiesFor(progress, options.ourTeamId, progress.ourPitcherIndex),
+            fielderPlates: fielderPlatesFor(progress, options.ourTeamId, progress.ourPitcherIndex),
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),
