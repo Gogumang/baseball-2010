@@ -23,6 +23,7 @@ import {
   BASE_WINDOW_IMAGE,
   RUNNER_FRAMES,
   RUN_PIP_IMAGE,
+  aceRunnerFramesOf,
   baseRunnerDrawsOf,
   grayRunPipPixel,
   halfShadeRunnerPixel,
@@ -33,6 +34,8 @@ import {
   type BaseKey,
 } from '@/widgets/batting-stage/lib/baseRunners'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { loadedRunnerAceOf } from '@/features/defense-play/model/runnerAces'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { drawSpecialSwingBadge } from '@/widgets/batting-stage/lib/specialSwingBadge'
 import { drawSkillPanel } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
@@ -117,6 +120,11 @@ export interface StageScene {
   /** 마운드에 그릴 마선수. 없으면 평범한 투수라 그리지 않는다. */
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: HudState | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 마선수 주자는 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9).
+   * 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /**
    * 마운드에 선 투수의 **장착 장비 등급** (0x79790 적재 · 0x79524 여섯 칸).
    * 안 넘기면 맨몸 투수라 지금까지와 똑같이 바탕 f · f+22 두 겹만 그린다.
@@ -211,7 +219,7 @@ export function renderBattingStage(
   drawPitchInputUnderlay(context, pitchInput, side)
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
-    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps)
+    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
   }
   drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   const special = scene.specialSwingEffect ?? null
@@ -303,8 +311,10 @@ function drawBaseRunners(
   tick: number,
   showsRunPips: boolean,
   runnerAnimationSteps?: readonly (number | null)[],
+  runnerAces?: RunnerAces,
 ): void {
   const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
+  const loadedAce = runnerAces === undefined ? null : loadedRunnerAceOf(runnerAces, hud.bases)
   // st[0x15 + i] — 도루를 출발한 주자의 루는 창도 주자도 안 그린다 (35c4a 가 그 루의 몸통을 통째로 건너뛴다)
   const hidden = hud.hiddenRunnerBases ?? []
   const shownBases = {
@@ -328,18 +338,22 @@ function drawBaseRunners(
       context.restore()
       continue
     }
-    const entries = frameAnimations(RUNNER_FRAMES)?.[draw.animation]
+    const base = RUNNER_BASE_OF_ANIMATION[draw.animation]
+    const aceOfBase = base === undefined ? undefined : runnerAces?.[base]
+    const aceFolder = aceRunnerFramesOf(aceOfBase !== undefined && aceOfBase !== null && aceOfBase >= 0, loadedAce)
+    const folder = aceFolder ?? RUNNER_FRAMES
+    const entries = frameAnimations(folder)?.[draw.animation]
     const clockStep = runnerAnimationSteps === undefined ? tick : runnerAnimationSteps[draw.animation]
     const step = entries === undefined || clockStep === null || clockStep === undefined ? null : loopingAnimationStepAt(entries, clockStep)
     if (step === null) continue
-    const placed = placedFrame(RUNNER_FRAMES, step.frame, paletteIndex)
+    // 0x79da9 — 마선수 그림(+0x1c)은 팔레트 없이, defender(+0xc)는 공격 팀 팔레트(+0x10)로
+    const placed = placedFrame(folder, step.frame, aceFolder === null ? paletteIndex : null)
     if (placed === null) continue
     const x = draw.x + step.dx + placed.offsetX
     const y = draw.y + step.dy + placed.offsetY
     if (draw.isSilhouette) drawHalfShaded(context, placed.image, x, y)
     else context.drawImage(placed.image, x, y)
     // 35f4e~3604c — 같은 애니 칸의 상자(0x93e7d)를 상자 점에서 잡아 주루 칸을 잇따라 넣는다
-    const base = RUNNER_BASE_OF_ANIMATION[draw.animation]
     const runAbility = base === undefined ? undefined : hud.runnerRunAbilities?.[base]
     if (!showsRunPips || base === undefined || runAbility === undefined) continue
     const anchor = runnerBoxAnchorOf(base, side)

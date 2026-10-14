@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { SwingMode } from '@/entities/batting/model/swingResult'
@@ -84,6 +85,11 @@ export interface StageLatest {
   readonly pitcherAbility: PitcherAbility
   readonly isEagleEyeEnabled: boolean
   readonly hud: StageHud | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
+   * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /**
    * 루상 주자 애니 시계 — 경기 장면 수명의 칸(`useSceneScopedRef`)을 넘기면 타석 화면이 다시 서도 이어진다 (`RunnerAnimationClock`).
    * 안 넘기면 이 화면이 사는 동안만 센다

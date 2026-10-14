@@ -536,6 +536,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         batterEquipment: latestRef.current.batterEquipment,
         side,
         hud: latestRef.current.hud,
+        ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
         pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,

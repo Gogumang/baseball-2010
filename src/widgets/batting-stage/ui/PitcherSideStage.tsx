@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -34,6 +35,11 @@ interface PitcherSideStageProps {
   /** 0x12 대기 틱 (0x4e6d4 — `resultWaitTicksOf`) */
   readonly resultTicks: number
   readonly hud: HudState | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
+   * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /** 타석에 선 (CPU) 타자의 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 팀 */
   readonly batterForm: number
   readonly batterSkinIndex: number
@@ -226,6 +232,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         batterEquipment: NO_EQUIPMENT,
         side,
         hud: current.hud,
+        ...(current.runnerAces === undefined ? {} : { runnerAces: current.runnerAces }),
         acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,

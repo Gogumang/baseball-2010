@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { MutableRefObject } from 'react'
+import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
@@ -58,6 +59,11 @@ interface BattingStageProps {
   readonly isEagleEyeEnabled: boolean
   /** 화면에 겹쳐 그릴 경기 상황 */
   readonly hud: StageHud | null
+  /**
+   * 타자 · 루 주자의 마선수 번호(0~4, 주자 +0x9c) — 루상 마선수 주자를 실린 ace/defender 그림으로 그린다(0x35c62 · 0x79da9,
+   * `renderBattingStage` 의 같은 이름). 안 넘기면 모두 defender 그림이다
+   */
+  readonly runnerAces?: RunnerAces
   /** 등판한 마선수의 합성 프레임. 없으면 평범한 투수다. */
   readonly acePitcher: AcePitcherFrames | null
   /**
