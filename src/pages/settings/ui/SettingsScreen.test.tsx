@@ -690,8 +690,9 @@ describe('고른 줄 까딱임 (표 0xd1784 · 0xd1754)', () => {
     vi.useFakeTimers()
     try {
       const { container } = 띄우기()
+      // 머리띠가 다 미끄러진 뒤(+0x84 가 내려간 그리기 6)부터 까딱인다 — 반 틀은 rAF 걸음(16ms)이 틀 경계에 걸리지 않게
       act(() => {
-        vi.advanceTimersByTime(millisecondsPerFrame() * 6)
+        vi.advanceTimersByTime(millisecondsPerFrame() * 6.5)
       })
       const 글머리 = () => container.querySelector(`img[src$="/${String(VALUE_ROW.selectedBulletImage).padStart(3, '0')}.png"]`) as HTMLElement
       const 제자리 = rowTopOf(1) + VALUE_ROW.bullet.dy
@@ -701,6 +702,22 @@ describe('고른 줄 까딱임 (표 0xd1784 · 0xd1754)', () => {
         vi.advanceTimersByTime(millisecondsPerFrame())
       })
       expect(글머리().style.top).toBe(`${제자리 - 2}px`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(글머리().style.top).toBe(`${제자리}px`)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('머리띠가 미끄러지는 그리기에 누른 ↓ 는 커서만 옮기고 까딱이지 않는다 — 0x5942e 가 페이지를 안 그리고 +0x25 만 지운다 (U-123)', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = 띄우기()
+      const 글머리 = () => container.querySelector(`img[src$="/${String(VALUE_ROW.selectedBulletImage).padStart(3, '0')}.png"]`) as HTMLElement
+      const 제자리 = rowTopOf(1) + VALUE_ROW.bullet.dy
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+      expect(글머리().style.top).toBe(`${제자리}px`)
       act(() => {
         vi.advanceTimersByTime(millisecondsPerFrame())
       })
