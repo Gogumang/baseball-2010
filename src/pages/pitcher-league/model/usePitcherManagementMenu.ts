@@ -505,6 +505,11 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       }
       // 119 키 0x1056c — '0'(0x30) → 120 (진입 0x1b624: 글을 새로 만들고 스크롤 0)
       if (event.key === '0' && subWindow === '기본정보' && !isTitleWindowOpen) return setAbilityDetailOffset(0)
+      // 119 키 0x1056c — 취소(−16) → 106 · 129 키 0x11f9a — 취소 → 119 (`back`). 119 에는 커맨드 줄이 없어 여기서 받는다
+      if ((event.key === 'Escape' || event.key === 'Backspace') && subWindow === '기본정보') {
+        event.preventDefault()
+        return back()
+      }
       if (event.key !== '*') return
       if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
       if (subWindow === '기본정보') setIsTitleWindowOpen(true)

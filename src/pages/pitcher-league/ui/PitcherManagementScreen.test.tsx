@@ -440,6 +440,22 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     // 관리 메뉴는 걷힌다 — 119 그림은 0x19da4 를 안 거친다
     expect(칸이름들()).toEqual([])
   })
+
+  it('119 취소(−16)는 106 으로 · 129 취소는 119 로 (0x1056c · 0x11f9a)', () => {
+    화면()
+    누르기('선수정보')
+    누르기('기본정보')
+
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByRole('dialog', { name: '칭호' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '칭호' })).toBeNull()
+    expect(screen.getByTestId('기본정보-카드')).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('기본정보-카드')).toBeNull()
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
+  })
 })
 
 describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
