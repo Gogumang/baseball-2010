@@ -20,3 +20,22 @@ export function useImgTextPalette3(): { readonly definition: ReactElement; reado
   )
   return { definition, style: { filter: `url(#${id})` } }
 }
+
+/**
+ * **img_text 팔레트 4** — `0x913e4(애니, 4)` (#7B797B · #525152). 흰 글자 그림(R=G=B)을 두 색으로 잇는 1차식
+ * (`features/play-team-game/ui/InGameMenu` 의 "MENU" 머리와 같은 행렬).
+ */
+const PALETTE4_MATRIX = '2.5625 0 0 0 -2.08015  0 2.5 0 0 -2.02549  0 0 2.5625 0 -2.08015  0 0 0 1 0'
+
+/** 팔레트 4 필터 — `<svg>` 정의와 그림에 줄 `style` 을 함께 돌려준다 */
+export function useImgTextPalette4(): { readonly definition: ReactElement; readonly style: CSSProperties } {
+  const id = `img-text-palette4-${useId().replace(/:/g, '')}`
+  const definition = (
+    <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
+      <filter id={id} colorInterpolationFilters="sRGB">
+        <feColorMatrix type="matrix" values={PALETTE4_MATRIX} />
+      </filter>
+    </svg>
+  )
+  return { definition, style: { filter: `url(#${id})` } }
+}

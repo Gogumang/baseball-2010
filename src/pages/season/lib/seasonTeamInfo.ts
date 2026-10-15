@@ -45,8 +45,6 @@ export const TEAM_TYPE_FRAMES = [263, 347, 204, 205] as const
 export const SEAT_SUFFIX_FRAME = 345
 /** 정보 칸 앞 네 줄이 왼쪽 열 — 줄 4 부터 오른쪽 열 (0x7c592) */
 export const TEAM_INFO_LEFT_ROWS = 4
-/** 팀 이름 img_text = 0x41 + 팀 (0x7bc96) */
-export const TEAM_NAME_FRAME_BASE = 0x41
 
 /** 코치 이름 StrCOMMON[c + 15] 이 없을 때 (0xd4bb0) */
 const NO_COACH_TEXT = '----'

@@ -232,6 +232,15 @@ function SeasonScreens({
   useEffect(() => {
     if (scene === SEASON_SCENE_STATE.경기직전) setOutingCursor(0)
   }, [scene])
+  /**
+   * 카드 딱지 [창+0x168] — 같은 창 칸이라 수명이 장면 0x105 와 같다. 팀 고르기 0xca 진입 0x50a8 · 트레이드 0xe4 진입 0x4774 만
+   * 슬롯 그림([장면+0xd4] = ui/slt_frame)을 넣는다 (`pages/season/lib/seasonPlayerCard.ts` 머리말). 경기로 장면이 지워지면 다시 0.
+   */
+  const [hasCardBadge, setHasCardBadge] = useState(false)
+  useEffect(() => {
+    if (scene === SEASON_SCENE_STATE.팀고르기 || scene === SEASON_SCENE_STATE.트레이드) setHasCardBadge(true)
+    else if (scene === SEASON_SCENE_STATE.경기직전) setHasCardBadge(false)
+  }, [scene])
   /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
   const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**
@@ -719,6 +728,7 @@ function SeasonScreens({
           detail={seasonPlayerDetailViewOf(view, context)}
           isDetailOpen={scene === SEASON_SCENE_STATE.능력치상세}
           gamePoint={session.gamePoints}
+          hasCardBadge={hasCardBadge}
           onOpenDetail={() => actions.goto(SEASON_SCENE_STATE.능력치상세)}
           onCloseDetail={() => actions.goto(SEASON_SCENE_STATE.선수상세)}
           onBack={() => {
@@ -873,6 +883,7 @@ function SeasonScreens({
         // 순위 0xb7aa1(SR+0x80, 내 팀, 0) — 목표 ① 과 같은 함수·같은 인자
         rows={seasonTeamInfoRowsOf({ record: state.record, teamAbilities, rank: goalInput.rank })}
         gamePoint={session.gamePoints}
+        hasCardBadge={hasCardBadge}
         onBack={() => actions.goto(SEASON_SCENE_STATE.시즌정보)}
       />
     )

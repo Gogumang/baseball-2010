@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import type { ReactNode } from 'react'
-import { FrameSprite, SpriteNumber } from '@/shared/ui'
+import type { CSSProperties, ReactNode } from 'react'
+import { FrameSprite, SpriteNumber, useImgTextPalette4 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -19,15 +19,17 @@ import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import { FigureLayers, PitcherFigure } from '@/pages/special/ui/HallOfFameFigure'
 import * as specialStyles from '@/pages/special/ui/SpecialScreen.css'
 import {
-  SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, SEASON_CARD_RADAR_LABELS,
+  SEASON_CARD_BADGE, SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, SEASON_CARD_RADAR_LABELS,
   initialSeasonCardFigure, stepSeasonCardFigure, steppedBoardPointsOf,
 } from '@/pages/season/lib/seasonPlayerCard'
 import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
 import type { SeasonCardAbility } from '@/pages/season/lib/seasonPlayerDetail'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { alignedPositionOf } from '@/pages/shop/lib/equipmentWindowLayout'
 
 const MODE_UI = './sprites/mode_ui/frames'
 const IMG_TEXT = './sprites/img_text/frames'
+const SLT_FRAME = './sprites/slt_frame'
 const BACKGROUND_HALF = { width: 31, height: 62 }
 /** num 20번대 숫자 높이 (관리 화면 레이더와 같다) */
 const NUMBER_HEIGHT = 10
@@ -44,12 +46,19 @@ export interface SeasonPlayerCardProps {
    * 애니는 멈춘다. 다시 돌면 상태 틱이 0 부터라 애니도 새로 만든다(들어옴 0x5404).
    */
   readonly isAnimating: boolean
+  /**
+   * 딱지 [gfx+0x168] 이 서 있는가 — 이 장면에서 팀 고르기 0xca · 트레이드 0xe4 를 거쳤으면 참(`seasonPlayerCard.ts` 머리말).
+   * 장비 창 0xdc 는 서 있어도 그리지 않는다(0x7bbe2 `cmp #0xdc`).
+   */
+  readonly hasCardBadge?: boolean
   /** 카드와 그림 사이에 그리는 것 — 0xd9 는 정보 칸 0x7c450 (0xae98 이 카드 · 정보 칸 · 그림 차례로 그린다) */
   readonly children?: ReactNode
 }
 
 /** 카드 0x7ba44 시즌 · 선수 갈래 + 선수 그림 (`lib/seasonPlayerCard.ts` 머리말) */
-export function SeasonPlayerCard({ teamId, isPitcher, look, abilities, isAnimating, children }: SeasonPlayerCardProps) {
+export function SeasonPlayerCard({
+  teamId, isPitcher, look, abilities, isAnimating, hasCardBadge = false, children,
+}: SeasonPlayerCardProps) {
   const pose = useSeasonCardFigurePose(!isPitcher, look.form, isAnimating)
   const team = TEAMS[teamId]
   return (
@@ -62,6 +71,7 @@ export function SeasonPlayerCard({ teamId, isPitcher, look, abilities, isAnimati
             opacity: SEASON_CARD_LOGO.opacity,
           }} />
       )}
+      {team !== undefined && hasCardBadge && <SeasonCardBadge teamId={teamId} />}
       <SeasonCardRadar abilities={abilities} labelFrames={SEASON_CARD_RADAR_LABELS[isPitcher ? '투수' : '타자']} />
       {children}
       <SeasonCardFigure isPitcher={isPitcher} look={look} pose={pose} />
@@ -87,8 +97,41 @@ function useSeasonCardFigurePose(isBatter: boolean, form: number, isAnimating: b
   return current.state.pose
 }
 
+/**
+ * 로고 아래 · 위 딱지 [gfx+0x168] — 0x7bbda~0x7bdca (`SEASON_CARD_BADGE`). 로고가 있을 때만(0x7bbca 가 로고 갈래 안) 부른다.
+ * 판 A slt_frame 9 + 팀 이름 img_text 0x41+팀(팔레트 0) · 판 B slt_frame 116 + img_text 157(팔레트 4).
+ */
+export function SeasonCardBadge({ teamId }: { readonly teamId: number }) {
+  const origins = useFrameOrigins(IMG_TEXT)
+  const palette4 = useImgTextPalette4()
+  const { name, title, align } = SEASON_CARD_BADGE
+  const text = (frame: number, part: typeof name | typeof title, testId: string, style?: CSSProperties) => {
+    const origin = origins?.[String(frame).padStart(3, '0')]
+    if (origin === undefined) return null
+    const { x, y } = alignedPositionOf(part.board, origin.width, origin.height, align, part.ox, part.oy)
+    return (
+      <img className={managementStyles.layer} alt="" data-testid={testId} data-frame={frame} data-palette={part.palette}
+        src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`} style={{ left: x + origin.x, top: y + origin.y, ...style }} />
+    )
+  }
+  const board = (part: typeof name | typeof title, testId: string) => (
+    <img className={managementStyles.layer} alt="" data-testid={testId} data-image={part.board.image}
+      src={`${SLT_FRAME}/${String(part.board.image).padStart(3, '0')}.png`}
+      style={{ left: part.board.x, top: part.board.y, width: part.board.width, height: part.board.height }} />
+  )
+  return (
+    <div data-testid="시즌카드-딱지">
+      {palette4.definition}
+      {board(name, '시즌카드-딱지-이름판')}
+      {text(name.frameBase + teamId, name, '시즌카드-딱지-팀이름')}
+      {board(title, '시즌카드-딱지-머리판')}
+      {text(title.frame, title, '시즌카드-딱지-머리글', palette4.style)}
+    </div>
+  )
+}
+
 /** 계단형 판 0x76724 — 채움 · 테두리, 위 세 변 y+1 밝은 선 · 아래 세 변 y+1 어두운 선 (관리 화면 판과 같은 그리기) */
-function SteppedBoard() {
+export function SteppedBoard() {
   const points = steppedBoardPointsOf(SEASON_CARD_BOARD.top, SEASON_CARD_BOARD.height, SEASON_CARD_BOARD.offset)
   const line = (list: readonly { x: number; y: number }[]) => list.map((point) => `${point.x},${point.y + 1.5}`).join(' ')
   return (

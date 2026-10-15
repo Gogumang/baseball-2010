@@ -32,6 +32,8 @@ export interface SeasonPlayerCardScreenProps {
   /** 0xd9 취소(−16) → 선수 고르기 0xdf */
   readonly onBack: () => void
   readonly gamePoint?: number
+  /** 카드 딱지 [gfx+0x168] — 이 장면에서 0xca · 0xe4 를 거쳤는가 (`SeasonPlayerCard`) */
+  readonly hasCardBadge?: boolean
 }
 
 const IMG_TEXT = './sprites/img_text/frames'
@@ -58,7 +60,7 @@ const IMG_TEXT = './sprites/img_text/frames'
  * 창 0x8a0a4 는 나리 120 과 같은 창이라 `DetailWindow` 를 그대로 쓴다.
  */
 export function SeasonPlayerCardScreen({
-  teamId, view, abilities, info, detail, isDetailOpen, onOpenDetail, onCloseDetail, onBack, gamePoint = 0,
+  teamId, view, abilities, info, detail, isDetailOpen, onOpenDetail, onCloseDetail, onBack, gamePoint = 0, hasCardBadge = false,
 }: SeasonPlayerCardScreenProps) {
   const [scrollOffset, setScrollOffset] = useState(0)
   // 0x52f4 가 들어올 때마다 글을 새로 만들고 창+0x380 = 0 — 창을 다시 열면 맨 위부터
@@ -100,7 +102,7 @@ export function SeasonPlayerCardScreen({
       {/* 공통 앞그림 0xb810 — 0xd9 · 0xda 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
       <SeasonPlayerCard teamId={teamId} isPitcher={view.isPitcher} look={seasonCardLookOf(view, teamId)} abilities={abilities}
-        isAnimating={!isDetailOpen}>
+        isAnimating={!isDetailOpen} hasCardBadge={hasCardBadge}>
         {info !== undefined && (
           <>
             <div className={infoStyles.layer}
