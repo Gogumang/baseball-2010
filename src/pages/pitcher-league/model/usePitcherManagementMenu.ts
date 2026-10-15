@@ -135,8 +135,6 @@ export interface PitcherManagementMenu {
   readonly subWindow: PitcherMenuWindow
   /** 구질/마구 창의 탭 (1 마구 · 2 구질 — 팝업 0x78 의 `+0x166 ? 2 : 1`) */
   readonly pitchWindowTab: number
-  /** 창 안에서 탭을 바꾼다 (원본은 좌우 키로 `+0x166` 을 토글한다) */
-  readonly changePitchTab: (tab: number) => void
   /** 123 창 탭 1 — 마구 칸 i(0~3) 고르기 */
   readonly selectMagicCell: (cellIndex: number) => void
   /** 123 창 탭 2 — 구질 칸(행, 열) 고르기 */
@@ -507,6 +505,11 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       }
       // 119 키 0x1056c — '0'(0x30) → 120 (진입 0x1b624: 글을 새로 만들고 스크롤 0)
       if (event.key === '0' && subWindow === '기본정보' && !isTitleWindowOpen) return setAbilityDetailOffset(0)
+      // 119 키 0x1056c — 취소(−16) → 106 · 129 키 0x11f9a — 취소 → 119 (`back`). 119 에는 커맨드 줄이 없어 여기서 받는다
+      if ((event.key === 'Escape' || event.key === 'Backspace') && subWindow === '기본정보') {
+        event.preventDefault()
+        return back()
+      }
       if (event.key !== '*') return
       if (isTitleWindowOpen) return setIsTitleWindowOpen(false)
       if (subWindow === '기본정보') setIsTitleWindowOpen(true)
@@ -636,7 +639,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     kind,
     subWindow,
     pitchWindowTab,
-    changePitchTab: setPitchWindowTab,
     selectMagicCell,
     selectPitchCell: choosePitchCell,
     isTitleWindowOpen,

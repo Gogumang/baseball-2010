@@ -23,7 +23,6 @@ import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScre
 import { PitchChoicePopup } from '@/pages/pitcher-league/ui/PitchChoicePopup'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
-import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { CenterStage } from '@/pages/management/ui/CenterStage'
 import { nariStageCharactersOf } from '@/pages/management/lib/centerStage'
@@ -51,7 +50,7 @@ import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCu
  * 제목 `[장면+0xcc] == 4 ? 8 : 9` · 바닥 5 다 — 투수편([장면+0xcc] = 3)은 **제목 9**(`나만의리그투수편`, 그림 9 + 11)·바닥 5.
  * 기본정보(119) 그림 0x166cc 는 판을 안 거치고 직접 0x54d95(같은 제목, **바닥 0x87**: "#닉네임"·"0상세정보"·되돌아가기,
  * 0x166f2)를 부르고, 칭호 목록(129) 0x198fc 도 0x166cc 를 먼저 그린다. 표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로.
- * ⚠️ 본문(상태판·하위 창)은 여전히 **원본 배치 미해독 — 근사**: 머리띠와 바닥띠 사이 판에 줄로 세운다.
+ * 하위 창: 119 기본정보는 카드 0x15e20(`PitcherBasicInfoPanel`), 123 구질은 창 0x803d4 상태 0x7b(`PitcherRepertoirePanel`).
  */
 
 export interface PitcherManagementScreenProps {
@@ -274,7 +273,9 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const isPitchTraining = menu.subWindow === '구질훈련'
   // 108 탭 1 도 같은 그림 0x19e44 — 관리 화면 위에 창 0x803d4
   const isMagicTraining = menu.subWindow === '마구훈련'
-  const isMenuShown = menu.subWindow === null || isRecordRoom || isPitchTraining || isMagicTraining
+  // 123 그림 0x19e24 = 관리 화면 0x19da4 위에 창 0x803d4(상태 0x7b) — 아래 줄은 106 하위 메뉴 그대로다
+  const isRepertoire = menu.subWindow === '구질목록'
+  const isMenuShown = menu.subWindow === null || isRecordRoom || isPitchTraining || isMagicTraining || isRepertoire
   return (
     <RawScreen>
       {/*
@@ -286,27 +287,33 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
             morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
           })} />
         </>
       )}
-      {/* 하위 창(119 · 123 · 124)은 본문 근사 — 머리띠·바닥띠 사이 판 */}
-      {!isMenuShown && (
-        <div className={styles.frameBody}>
-          {isBasicInfo && <PitcherBasicInfoPanel career={career} />}
-          {menu.subWindow === '구질목록' && (
-            <PitcherRepertoirePanel
-              career={career}
-              tab={menu.pitchWindowTab}
-              onChangeTab={menu.changePitchTab}
-              onSelectMagic={menu.selectMagicCell}
-              onSelectPitch={menu.selectPitchCell}
-            />
-          )}
-        </div>
+      {/*
+        119 그림 0x166cc — 장면 틀 0x16928 의 공 무늬(0x5fd61, 상태 0x8e~0x90 밖은 다 깐다) 위에 기본정보 카드 0x15e20
+        (카드 판 · 레이더 · 투수 그림 · 정보 칸 0x7c451) → 머리띠 0x54d95(제목 9 · 바닥 0x87)
+      */}
+      {isBasicInfo && (
+        <>
+          <SkinBackdrop kind="공무늬" />
+          <PitcherBasicInfoPanel career={career} />
+        </>
+      )}
+      {/* 123 창 0x803d4(상태 0x7b) — 키 0x17cec 는 창이 받는다, 취소는 106 */}
+      {isRepertoire && (
+        <PitcherRepertoirePanel
+          career={career}
+          tab={menu.pitchWindowTab}
+          isKeyEnabled={menu.notice === '' && menu.question === null && menu.choice === null}
+          onSelectMagic={menu.selectMagicCell}
+          onSelectPitch={menu.selectPitchCell}
+          onClose={menu.closeWindow}
+        />
       )}
 
       {/* 108 탭 2 구질 훈련 창 0x803d4 — 키는 창이 받는다(0x17828 → 0x80268), 취소는 107 */}

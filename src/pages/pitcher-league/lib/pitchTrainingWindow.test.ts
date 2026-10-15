@@ -44,6 +44,16 @@ describe('0x803d4 탭 2 — unicorn 으로 돌린 그리기 호출과 같은 값
     expect(statusLabelOf(career, 0, 4, true)).toBe(0x125)
     expect(statusLabelOf(career, 0, 4, false)).toBe(0x125)
   })
+
+  it('123(0x7b) 은 처음 글이 0x127 "장착"(80cea) · 배운 칸도 0x127(81174) · 목록에 든 구질만 0x128', () => {
+    const career = 투수({ pitchTrainingStages: [1, 0, 0, 0, 0, 0, 0, 0], pitchMask: 0b10 })
+    expect(statusLabelOf(career, 0, 0, false, '장착')).toBe(0x127)
+    expect(statusLabelOf(career, 0, 0, true, '장착')).toBe(0x128)
+    expect(statusLabelOf(career, 0, 2, true, '장착')).toBe(0x127)
+    expect(statusLabelOf(career, 1, 0, true, '장착')).toBe(0x127)
+    // 108 은 배운 칸이 −1(안 그림)
+    expect(statusLabelOf(투수({ pitchTrainingStages: [1, 0, 0, 0, 0, 0, 0, 0], pitchMask: 0 }), 0, 0, true)).toBeNull()
+  })
 })
 
 describe('키 0x17828 · 0x80268', () => {

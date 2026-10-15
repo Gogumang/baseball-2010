@@ -64,7 +64,7 @@ import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
-import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { RecordAlertScreenOverlay, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { passesRecordTeamGate, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
@@ -1015,8 +1015,8 @@ export function PitcherGameScreen({
           />
         )}
 
-        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음 */}
-        <RecordAlertScreenOverlay frame={recordAlert} />
+        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음. 판 안이라 기둥 없이 */}
+        <RecordAlertStageOverlay frame={recordAlert} />
       </RawScreen>
 
       {overlay === '조작방법' && (
