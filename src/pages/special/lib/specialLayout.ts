@@ -87,59 +87,30 @@ export const SPECIAL_ITEMS: readonly SpecialItem[] = [
 export const ITEM_COUNT = SPECIAL_ITEMS.length
 
 /**
- * 줄 자리 (0x253d4~0x256d0).
- *
- * 원본 식 (S9 7-1 확정):
+ * **목록 = 메인 메뉴 아랫단과 같은 세로 릴 0x2524c(this, 6, 틱)** — 그리기 0x2860c 는 0x2863c(게임시작 5)와 목록 종류만 다르다
+ * (0x2860c: `0x24b1c(this)` → `0x2524c(this, 6, [this+0x2c])` → `0x54d95(skin, 0, 5)`, 직접 떴다).
+ * 그래서 줄 y · 바탕 띠 · 설명 판 · 회색 제목 · 설명 띠는 `pages/main-menu/lib/mainMenuLayout` 의 `MENU_REEL_*` ·
+ * `MENU_BAND_*` · `MENU_DESCRIPTION_PANEL` 을 그대로 쓴다 (S9 7절):
  * ```
- * off_i = −80 + 20·(i − 1) = 20i − 100      // 줄 간격 20px
- * y_i   = [메뉴+0xdc](= 화면높이 320) + off_i + 스크롤[0x1552d68] − 6
- * 가운데 x = W − 39 − w/2                    // 즉 오른쪽 끝이 x = 201 에 맞는다
+ * 줄 글자 = img_text 0xcea24 [7, 11, 189, 14, 17, 19, 21, 315] — 슬롯 표 0xceaf2[1] = [−1, 6, 7, 8, 1, 2, 3, 4, 5]
+ * 슬롯 1·2·3 y = 320 + 20i − 100 − 7 (+ 스크롤) · 4 는 안 그림(판이 대신) · 5·6·7 은 320 + 20i − 60 (화면 밖)
+ * 설명 판 main_ui 이미지 3 (96, 289) · 판 안 큰 글자 main_ui 프레임(칸) · 회색 제목 img_text 0xcea6c[1] = 1 "스페셜"
+ * 설명 띠 0x55545(StrMAINMENU[0x10 + 커서]) — 바탕 띠가 자라는 동안은 줄 · 띠를 안 그린다(0x254d8)
  * ```
- * 가로(오른쪽 끝 201)는 원본 그대로다.
- *
- * ⚠️ **세로는 배치 근사다.** 원본은 커서를 한자리에 두고 아홉 칸짜리 창 표(−1 이면 그 줄은 건너뜀)로
- * 목록을 굴려 한 번에 몇 줄만 보여 주고, 스크롤 값이 애니메이션과 섞여 있어 줄 y 를 그대로 옮길 수 없다.
- * 웹판은 여덟 칸을 **한 번에 다 보여 주는 게 목적**이라 27px 짜리 글자 그림이 겹치지 않게
- * 줄 간격을 30 으로 벌리고(원본 20), 첫 줄을 머리띠 아래 52 에 두었다 — 줄 7 = 262, 글자 밑이 289 라
- * 바닥띠(300) 위에 들어온다.
+ * 판 안 큰 글자의 main_ui 프레임은 표 0xceb2f (`SPECIAL_ITEMS[].labelFrame`).
  */
-export const ROW = {
-  /** 원본 줄 간격 (S9 7-1) — 여덟 줄을 한 번에 세우려고 웹판은 step 을 쓴다 */
-  originalStep: 20,
-  step: 30,
-  firstY: 52,
-  rightEdge: SCREEN.width - 39,
-} as const
+export const SPECIAL_REEL_STATE = 6
 
-export const rowTopOf = (index: number) => ROW.firstY + ROW.step * index
-
-/** 항목 그림 왼쪽 끝 — 가운데 x = W − 39 − w/2 이므로 오른쪽 끝이 201 에 붙는다 */
-export const rowLeftOf = (item: SpecialItem) => ROW.rightEdge - item.labelWidth
-
-/**
- * 고른 줄 옆 설명 판 = main_ui **이미지 3**(149×63 흰 둥근 판) 을 (W − 149 + 5, 줄 y − 31) 에.
- * 그 안에 항목 그림 + 설명 글을 (+8, +8) 로 (P6 2d).
+/*
+ * 설명 판 까딱임 — 판 그리기 0x25716~0x25752 가 판 자리에 더한다.
  *
- * **까딱임** (0x2524c 직접 뜸): 갱신 0x28b9c 가 ↑ · ↓ 에 [메뉴+0xf4] = 1 을 세우고 0x5550d 로 방향([skin+0x8c])을 적는다.
- * 그리기 머리 0x252c6~0x252e8 이 [+0xf4] 면 t [메뉴+0xf8] = 0 · 방향 [메뉴+0xfc] = [skin+0x8c], 판 그리기 0x25716~0x25752 가
+ * 갱신 0x28b9c 가 ↑ · ↓ 에 [메뉴+0xf4] = 1 을 세우고 0x5550d 로 방향([skin+0x8c])을 적는다(0x28c56~0x28c8a).
+ * 그리기 머리 0x252c6~0x252e8 이 [+0xf4] 면 t [메뉴+0xf8] = 0 · 방향 [메뉴+0xfc] = [skin+0x8c], 판 그리기가
  * [+0xfc] ≠ −1 이면 판 자리에 `0xce8bc[2·방향 + t]` · `0xce88c[3·방향 + t]` 를 더하고 t 를 올린다(t > 1 이면 −1).
- * 판 안 항목 그림 · 설명 글도 옮긴 자리 (+8, +8) 에 그려 함께 까딱인다 — 표 값은 기록연감과 같다(`shared/lib/cursorShake`):
- * ↑ (0,−2)(0,+2) · ↓ (0,+2)(0,−2), 두 그리기. 숫자 키 2 · 8 은 방향을 안 적어 지난 방향으로 까딱인다 — 웹은 화살표 키만 받는다.
- * 설명 글의 y 는 원본이 "(+8, +8)" 한 줄만 적어 두어, 항목 그림(높이 27) 아래로 내려 적는다 — **근사**.
+ * 판 안 큰 글자 · 회색 제목도 판 자리에서 재므로 함께 까딱인다 — 표 값은 기록연감과 같다(`shared/lib/cursorShake`):
+ * ↑ (0,−2)(0,+2) · ↓ (0,+2)(0,−2), 두 그리기.
+ * 키는 [메뉴+0xe1] ≠ 0 이고 바탕 띠가 다 자랐을 때([메뉴+0xe2] == 0)만 받는다(0x28ba0~0x28bb4).
  */
-export const DESCRIPTION_PANEL = {
-  image: 3,
-  width: 149,
-  height: 63,
-  x: SCREEN.width - 149 + 5,
-  dy: -31,
-  padding: 8,
-  /** 설명 글 RGB(128,128,128) (0x55545 인자) */
-  textColor: '#808080',
-  textDy: 38,
-} as const
-
-export const descriptionPanelTopOf = (index: number) => rowTopOf(index) + DESCRIPTION_PANEL.dy
 
 /*
  * 반원 바퀴 (0x24b1c — F-5 확정)는 메인 메뉴의 `MenuWheel`(pages/main-menu/ui/MenuWheel.tsx)을 그대로 깐다 —

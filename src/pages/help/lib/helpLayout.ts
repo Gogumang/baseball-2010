@@ -1,7 +1,4 @@
-import {
-  DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN,
-  descriptionPanelTopOf, rowTopOf,
-} from '@/pages/special/lib/specialLayout'
+import { FOOTER, HEADBAND, SCREEN } from '@/pages/special/lib/specialLayout'
 
 /**
  * 도움말 배치 — **큰 정정** (S12 2절).
@@ -21,7 +18,7 @@ import {
  * (앞서 "다섯 칸뿐이라 이 화면에 없다" 고 적어 둔 주석은 틀렸다).
  */
 
-export { DESCRIPTION_PANEL, FOOTER, HEADBAND, ROW, SCREEN, descriptionPanelTopOf, rowTopOf }
+export { FOOTER, HEADBAND, SCREEN }
 
 /**
  * ⚠️ 아래 다섯 칸은 **도움말이 아니라 랭킹 하위 메뉴(상태 9)** 의 것이다 (표 `0xceb37` =
@@ -68,7 +65,7 @@ export const RANKING_MENU_ITEMS: readonly RankingMenuItem[] = [
 export const RANKING_TITLE_FRAMES = [9, 12, 15, 18, 20] as const
 
 /** 항목 그림 왼쪽 끝 — 가운데 x = W − 39 − w/2 이므로 오른쪽 끝이 201 에 붙는다 (0x253d4) */
-export const rowLeftOf = (item: RankingMenuItem) => ROW.rightEdge - item.labelWidth
+export const rowLeftOf = (item: RankingMenuItem) => SCREEN.width - 39 - item.labelWidth
 
 /**
  * 도움말 본문 판 (상태 7 · 경기 중 [조작방법] — 뷰어 그리기 `0x58fd4`).

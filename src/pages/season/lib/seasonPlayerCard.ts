@@ -14,7 +14,7 @@ import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/season
  *   [gfx+0x138](mode_ui) 가 있으면 0x76725([gfx+0x134])         ; 계단형 판 — 들어옴 0x5404 가 0x76705(판, 0x67, 0x38, 0)
  *   로고 [gfx+0x140](들어옴 0x5404 가 team_logo 0x6fd9d(0xcc14c, 내 팀, 1)) 가 있으면
  *     (W/2 − w/2 − 0x3e, H/2 − h/2 − 0x32) 에 0xba1d5(…, 1, 0xc, 0) — 상태 0xd9 · 0xdc 는 효과 1 · 인자 12(반투명 12/16)
- *     [gfx+0x168] 이 있고 상태 ≠ 0xdc 면 로고 아래 · 위 딱지(slt_frame 이미지 9 · 116 + img_text 0x41+팀 · 157) — 아래 ⚠️
+ *     [gfx+0x168] 이 있고 상태 ≠ 0xdc 면 로고 아래 · 위 딱지(slt_frame 이미지 9 · 116 + img_text 0x41+팀 · 157) — `SEASON_CARD_BADGE`
  *   mode_ui 프레임 8 을 (W/2 + 0x3a − w/2, H/2 − 0x6b) · img_text 159 "ABILITY" 를 (… , H/2 − 0x42 − 0x25)
  *   시즌(0x7b998) · (상태 0xd9 또는 창 종류 [gfx+0x1a4] == 3) 이면 (0x7bede~0x7bf9a)
  *     k = 0..3  기본 0xb6415(기록, k, 0) · 실효 0xb570d(팀레코드, k, 기록, 1, 0x5b, 0) — 견줘 빨강·초록(`seasonCardAbilitiesOf`)
@@ -29,9 +29,11 @@ import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/season
  * 부위 0~3 니블(+0x19 윗 · 아랫, +0x1a 윗 · 아랫) n ≥ 1 이면 vt+0x14(그림, 부위, n − 1) · 그림+0x48 = 0(그림자 끔).
  * 애니는 타자 [this+0x128]: +0x24 = −1 · +0x28 = 폼 · 0xb915d(애니, 5) / 투수 [this+0x124]: +0x24 = −1 · +0xc = 폼 · 0x9dff9(애니, 0).
  *
- * ⚠️ 미확인: 딱지 [gfx+0x168] 은 상태 0xca(팀 고르기) · 0xe4(트레이드) 그리기(0xea50 · 0xeaa8 → 0x4774 · 0x50a8)만
- * `[this+0xd4]` 로 채운다 — 그 화면을 거치지 않은 판(이어 하기)에서 값이 무엇인지 못 가려 딱지는 그리지 않는다
- * (구단정보 0xd5 화면과 같은 처리).
+ * 딱지 [gfx+0x168] (직접 떴다): 창 객체는 장면 0x105 와 수명이 같고(new 가 0 으로 채운다) 이 칸을 적는 곳은
+ * 팀 고르기 0xca 진입 0x50a8(0x50c0~0x50d0) · 트레이드 0xe4 진입 0x4774(0x47a6~0x47bc) 둘뿐 — 둘 다 [장면+0xd4] 를 넣는다.
+ * [장면+0xd4] 는 장면 셋업 0x3b14 가 0(0x3ee2~0x3ef2), 상태 1 자원 적재 0x75fc 가 비었으면 ui/slt_frame(0x7736~0x775c)이라
+ * **이 장면에서 0xca · 0xe4 를 한 번이라도 거쳤으면** 딱지가 서고, 경기로 장면이 지워졌다 새로 서면 다시 0 이다(`hasCardBadge`).
+ * 레이아웃은 `SEASON_CARD_BADGE`.
  * 레이더 0x5a990 의 도형 자라는 애니([skin+0xd4] +0xad · +0x1e3 — 0xd9 들어옴 0x5446 · 0xdc 0x5f98 가 0 에서 다시 건다)는
  * `shared/lib/radarGrowth/useRadarGrowth` 가 그린다.
  */
@@ -84,6 +86,48 @@ export const SEASON_CARD_LOGO = {
   width: 77,
   height: 76,
   opacity: translucentOpacityOf(12),
+} as const
+
+/**
+ * 로고 아래 · 위 딱지 — 0x7bbda~0x7bdca (직접 떴다). 판 그림은 [gfx+0x168](ui/slt_frame) 이미지, 글은 img_text 를 그 판에
+ * 0xb9e05(정렬 0x22 가운데, ox, oy) 로 놓는다. 로고 크기는 team_logo 77×76.
+ * ```
+ * 판 A  slt_frame 9  (82×15)  (W/2 − (w >> 1) − 0x3e, H/2 + (로고h >> 1) − 0x30)        ; 0x7bbe8~0x7bc80 · 0xba1d5(…, 0, 0)
+ *       0x913e5(img_text, 0) · img_text 0x41 + 팀([gfx+0x24]) 를 판 A 에 0xb9e05(0x22, 0, 0, ox 1, oy −1)   ; 0x7bc84~0x7bcc2
+ * 판 B  slt_frame 116 (57×15) (W/2 − (w >> 1) − 0x3e, H/2 − (로고h >> 1) − h − 0x32)     ; 0x7bcc6~0x7bd8a
+ *       0x913e5(img_text, 4) · img_text 157 을 판 B 에 0xb9e05(0x22, 0, 0, ox 0, oy −1)                   ; 0x7bd8e~0x7bdca
+ * ```
+ */
+const BADGE_IMAGE_SIZE = { 9: { width: 82, height: 15 }, 116: { width: 57, height: 15 } } as const
+const badgeBoardX = (width: number) => SCREEN.width / 2 - (width >> 1) - 0x3e
+export const SEASON_CARD_BADGE = {
+  name: {
+    board: {
+      image: 9,
+      x: badgeBoardX(BADGE_IMAGE_SIZE[9].width),
+      y: SCREEN.height / 2 + (76 >> 1) - 0x30,
+      ...BADGE_IMAGE_SIZE[9],
+    },
+    /** img_text 0x41 + 팀 · 팔레트 0 */
+    frameBase: 0x41,
+    palette: 0,
+    ox: 1,
+    oy: -1,
+  },
+  title: {
+    board: {
+      image: 116,
+      x: badgeBoardX(BADGE_IMAGE_SIZE[116].width),
+      y: SCREEN.height / 2 - (76 >> 1) - BADGE_IMAGE_SIZE[116].height - 0x32,
+      ...BADGE_IMAGE_SIZE[116],
+    },
+    frame: 157,
+    palette: 4,
+    ox: 0,
+    oy: -1,
+  },
+  /** 가운데 정렬 0x22 */
+  align: 0x22,
 } as const
 
 /** 선수 그림 박스 — mode_ui 프레임 0 박스 0 */

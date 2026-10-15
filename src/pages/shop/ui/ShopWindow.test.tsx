@@ -179,3 +179,16 @@ describe('마우스 길 — 원본은 키패드뿐', () => {
     expect(onPurchase).not.toHaveBeenCalled()
   })
 })
+
+describe('격자 커서 감김 (0x81618 목록 꼴 0x30)', () => {
+  it('오른쪽 끝에서 → 는 같은 줄 첫 칸으로, ↓ 는 같은 열 다른 줄로 간다', () => {
+    띄우기('GP')
+    for (let step = 0; step < 4; step += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(칸(BATTER_GP_ITEMS[4]!.name).getAttribute('aria-current')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(칸(BATTER_GP_ITEMS[0]!.name).getAttribute('aria-current')).toBe('true')
+    fireEvent.keyDown(window, { key: '8' })
+    expect(칸(BATTER_GP_ITEMS[5]!.name).getAttribute('aria-current')).toBe('true')
+  })
+})
+

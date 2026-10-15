@@ -1,24 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { MarkupText, RawScreen } from '@/shared/ui'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import { SEASON_SUB_ITEM_COUNT, seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
-import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
+import { seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
 import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { SeasonCommandBar } from '@/pages/season/ui/SeasonCommonFrame'
 import { seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import {
-  DESCRIPTION_BOX, HEAD_LABEL_FRAME, LEFT_TAB_BOX, NAME_BOX, RIGHT_TAB_BOX, SLOT_COLUMNS, SLOT_SIZE, VALUE_BOX, WINDOW_BOX,
-  slotPositionOf,
-} from '@/pages/shop/lib/shopLayout'
-import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
-import * as styles from '@/pages/shop/ui/ShopWindow.css'
+import { ShopWindow } from '@/pages/shop/ui/ShopWindow'
+import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const ITEM_ICON = './sprites/item_icon'
-const pad = (frame: number) => String(frame).padStart(3, '0')
+/** 100만 원 → 만원 (소지금 = SR+2 × 100 만원) */
+const MILLION_TO_TEN_THOUSAND = 100
 
 export interface SeasonOwnedItemsScreenProps {
   readonly record: SeasonRecord
@@ -41,34 +34,33 @@ export interface SeasonOwnedItemsScreenProps {
  * 커서 칸이 비었으면 이름·값·설명도 그리지 않는다(0x82646~0x82656). 종류 1 의 보유 표시 0xc3858 은 없다.
  * 사고팔기는 없다 — 키 0x5f10 은 0x13460(나리 상점)·0x957c(시즌 상점) 어느 쪽도 부르지 않는다.
  *
- * 커맨드 줄 0x7e418 은 칸 수 0(0x7e84c 기본 갈래)이라 부모 칸 시즌정보만 그린다. ⚠️ 근사: 0x7e765 는 안 그린다. 격자 커서 이동은 나리 상점 창(`ShopWindow`)과 같게
- * 끝에서 감긴다(원본 목록 0xca7b5 의 감김은 안 풀었다).
+ * 창은 서브 · GP 상점과 같은 0x81dc0 이라 `ShopWindow`(종류 '보유')로 그린다 — 칸 바탕 0x7e764 를 10칸 모두에 깔고
+ * (0x82420, 가졌든 아니든), 격자 커서는 목록 vt+0x1c(5, 2, 1, 꼴 0x30)대로 줄 · 열 안에서 감긴다(`movedSlotOf`).
+ * 커맨드 줄 0x7e418 은 칸 수 0(0x7e84c 기본 갈래)이라 부모 칸 시즌정보만 그린다.
  */
 export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBack }: SeasonOwnedItemsScreenProps) {
-  const items = seasonSubItemsOf(record)
   const [cursor, setCursor] = useState(0)
   const latest = useRef({ onBack })
   latest.current = { onBack }
 
+  // 0x5f10 — 취소(−16) → 0xcd. 그 밖 키는 창 0x819ac(격자 커서) — `ShopWindow` 가 받는다
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        latest.current.onBack()
-        return
-      }
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1
-        : event.key === 'ArrowDown' ? SLOT_COLUMNS : event.key === 'ArrowUp' ? -SLOT_COLUMNS : 0
-      if (step === 0) return
+      if (event.key !== 'Escape' && event.key !== 'Backspace') return
       event.preventDefault()
-      setCursor((previous) => (previous + step + SEASON_SUB_ITEM_COUNT) % SEASON_SUB_ITEM_COUNT)
+      latest.current.onBack()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const selected = items[cursor]
-  const shown = selected !== undefined && selected.isOwned ? selected : null
+  // 칸 k 는 SR[0x58 + k] 가 서 있을 때만 아이콘 · 이름 · 값 · 설명 (0x82542 · 0x82646)
+  const entries: readonly (ShopEntry | null)[] = seasonSubItemsOf(record).map((item) => (item.isOwned
+    ? {
+      id: `시즌보유:${item.slot}`, name: item.name, description: item.description, price: item.price,
+      iconFrame: item.iconFrame, isOwned: false, blockNotice: null,
+    }
+    : null))
 
   return (
     <RawScreen>
@@ -78,49 +70,16 @@ export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBa
       {/* 커맨드 줄 0x7e418 — 이 상태는 0x7e84c 가 칸 수를 0 으로 비워 하위 메뉴 객체의 부모 칸(시즌정보)만 (6, 245) 에 남는다 */}
       <SeasonCommandBar slots={[]} cursor={0} parent={seasonParentSlotOf('시즌정보')} />
       <div role="group" aria-label="보유 아이템">
-        <div className={windowStyles.window}
-          style={{ left: WINDOW_BOX.x, top: WINDOW_BOX.y, width: WINDOW_BOX.width, height: WINDOW_BOX.height }} />
-        <img className={styles.layer} alt="서브아이템" src={`${IMG_TEXT}/${pad(HEAD_LABEL_FRAME.서브아이템)}.png`}
-          style={{ left: LEFT_TAB_BOX.x + LEFT_TAB_BOX.width / 2, top: LEFT_TAB_BOX.y + 2, transform: 'translateX(-50%)' }} />
-        <div className={styles.text} data-testid="보유아이템-소지금"
-          style={{ left: RIGHT_TAB_BOX.x, top: RIGHT_TAB_BOX.y + 1, width: RIGHT_TAB_BOX.width - 4, textAlign: 'right', color: ORIGINAL_COLORS.text }}>
-          {seasonMoneyTextOf(record.money)}
-        </div>
-
-        {items.map((item, index) => {
-          const { x, y } = slotPositionOf(index)
-          return (
-            <button key={item.slot} type="button" aria-label={item.isOwned ? item.name : `빈 칸 ${index}`}
-              aria-current={index === cursor} className={styles.slotButton}
-              style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}
-              onClick={() => setCursor(index)}>
-              {item.isOwned && <img alt="" src={`${ITEM_ICON}/${pad(item.iconFrame)}.png`} />}
-            </button>
-          )
-        })}
-        <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
-          <rect x={slotPositionOf(cursor).x - 0.5} y={slotPositionOf(cursor).y - 0.5} width={SLOT_SIZE + 1} height={SLOT_SIZE + 1}
-            fill="none" stroke={ORIGINAL_COLORS.text} strokeWidth={1} />
-        </svg>
-
-        <div className={styles.nameTag}
-          style={{ left: NAME_BOX.x, top: NAME_BOX.y, width: NAME_BOX.width, height: NAME_BOX.height }} />
-        {shown !== null && (
-          <>
-            <div className={styles.text} data-testid="보유아이템-이름"
-              style={{ left: NAME_BOX.x, top: NAME_BOX.y + 1, width: NAME_BOX.width, textAlign: 'center', color: ORIGINAL_COLORS.text }}>
-              {shown.name}
-            </div>
-            <div className={styles.text} data-testid="보유아이템-값"
-              style={{ left: VALUE_BOX.x, top: VALUE_BOX.y + 1, width: VALUE_BOX.width - 4, textAlign: 'right', color: ORIGINAL_COLORS.highlightYellow }}>
-              {seasonMoneyTextOf(shown.price / 100)}
-            </div>
-            <div className={styles.description} data-testid="보유아이템-설명"
-              style={{ left: DESCRIPTION_BOX.x + 4, top: DESCRIPTION_BOX.y + 4, width: DESCRIPTION_BOX.width - 8, height: DESCRIPTION_BOX.height - 8 }}>
-              <MarkupText raw={shown.description} />
-            </div>
-          </>
-        )}
+        <ShopWindow
+          kind="보유"
+          entries={entries}
+          cursor={cursor}
+          onMoveCursor={setCursor}
+          // 사고팔기는 없다 — 0x5f10 은 확인을 창에 넘길 뿐이다
+          onSelect={() => undefined}
+          money={record.money * MILLION_TO_TEN_THOUSAND}
+          isKeyEnabled
+        />
       </div>
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
     </RawScreen>

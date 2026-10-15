@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEASON_CARD_FIGURE, SEASON_CARD_LOGO, initialSeasonCardFigure, seasonCardLookOf, stepSeasonCardFigure, steppedBoardPointsOf,
+  SEASON_CARD_BADGE, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, initialSeasonCardFigure, seasonCardLookOf, stepSeasonCardFigure, steppedBoardPointsOf,
 } from '@/pages/season/lib/seasonPlayerCard'
 import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
 
@@ -52,5 +52,16 @@ describe('시즌 선수 카드 0x7ba44 · 그림 0xae98', () => {
     const rest = states.findIndex((state, tick) => tick > 30 && state.animation.state === 0)
     expect(rest).toBeGreaterThan(30)
     expect(states[rest]?.hold).toBe(0)
+  })
+
+  it('딱지 [gfx+0x168] — 판 A slt_frame 9 는 로고 아래 (17, 150), 판 B slt_frame 116 은 로고 위 (30, 57) (0x7bbe8~0x7bd8a)', () => {
+    expect(SEASON_CARD_BADGE.name.board).toMatchObject({ image: 9, x: 17, y: 150, width: 82, height: 15 })
+    expect(SEASON_CARD_BADGE.title.board).toMatchObject({ image: 116, x: 30, y: 57, width: 57, height: 15 })
+    // 로고 (W/2 − 38 − 0x3e, H/2 − 38 − 0x32) = (20, 72) 77×76 의 바로 위 · 아래 (판 B 아래 끝 72 · 판 A 위 끝 150)
+    expect(SEASON_CARD_BADGE.title.board.y + SEASON_CARD_BADGE.title.board.height).toBe(SEASON_CARD_LOGO.y)
+    expect(SEASON_CARD_BADGE.name.board.y).toBe(SEASON_CARD_LOGO.y + SEASON_CARD_LOGO.height + 2)
+    expect([SEASON_CARD_BADGE.name.ox, SEASON_CARD_BADGE.name.oy, SEASON_CARD_BADGE.name.palette]).toEqual([1, -1, 0])
+    expect([SEASON_CARD_BADGE.title.frame, SEASON_CARD_BADGE.title.ox, SEASON_CARD_BADGE.title.oy, SEASON_CARD_BADGE.title.palette])
+      .toEqual([157, 0, -1, 4])
   })
 })

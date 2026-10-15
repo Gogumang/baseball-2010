@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { STORE_EXPIRED_USER_EVENT } from '@/entities/season-mode/model/seasonAttendance'
 import {
@@ -31,12 +30,12 @@ export interface GameIncomeScreenProps {
  * 0xe9(0xdea0)는 그림도 키도 없이 이벤트를 쌓고 곧장 0xd3 으로 넘긴다 — 웹은 그 0xd3 재생을 이 화면이 맡는다.
  * 재생은 나리 116 과 같은 `EvaluationEventPlayer`(명령 1 say → 명령 2 변화 창)이고, 밑그림은 0x8b5ac 의 공 무늬 · 상태판
  * ([이벤트+0xb] = 1 — 막 치른 경기) · 머리띠다(`SeasonEventUnderlay`). 시즌은 연속 기록이 없고(명령 3 없음) 감독 글도 없다
- * (글 번호 50000 — 대사 = 기록 줄). 구내매점이 이 경기로 끝났으면 마지막 명령 system sub 5 가 StrUSER_EVT[113] 창을 연다.
+ * (글 번호 50000 — 대사 = 기록 줄). 구내매점이 이 경기로 끝났으면 마지막 명령 system sub 5 가 StrUSER_EVT[113] 창을 연다 —
+ * 창이 떠 있는 동안에도 0x8b5ac 가 틀마다 0x7fbc4 로 마지막 say 상자를 밑에 그린다(`EvaluationEventPlayer` 의 `finalNotice`).
  *
  * ⚠️ 0xd3 이 끝난 한 틀(0xa09c 의 공통 틀 — 앞 상태 0xe9 라 칸 없음)은 그리지 않는다.
  */
 export function GameIncomeScreen({ record, teamMorale, gamePoint, line, storeExpired, goals, onDone }: GameIncomeScreenProps) {
-  const [isExpiryOpen, setExpiryOpen] = useState(false)
   // 0x86531(gfx, S+7, 사기, S+0x4a, 인기도, S+0x64, 평판) — 0xdea0 이 넘기는 차례 (e07c~e0d0)
   const changeValues = {
     changes: [record.lastMoraleChange, record.lastPopularityChange, record.lastReputationGrade],
@@ -44,16 +43,6 @@ export function GameIncomeScreen({ record, teamMorale, gamePoint, line, storeExp
   } as const
 
   const underlay = <SeasonEventUnderlay record={record} teamMorale={teamMorale} gamePoint={gamePoint} isPreviousGame />
-
-  // ⚠️ 근사: 원본은 [113] 창 밑에 마지막 say 상자(0x7fbc4)가 남는다 — 재생기가 변화 창을 닫은 단계를 밖에 안 내줘 밑그림만 남긴다
-  if (isExpiryOpen) {
-    return (
-      <RawScreen>
-        {underlay}
-        <MessageBox text={ORIGINAL_USER_EVENTS[STORE_EXPIRED_USER_EVENT] ?? ''} buttons={['확인']} onAnswer={onDone} />
-      </RawScreen>
-    )
-  }
 
   return (
     <RawScreen>
@@ -68,7 +57,9 @@ export function GameIncomeScreen({ record, teamMorale, gamePoint, line, storeExp
         streak=""
         streakExpression={0}
         gauge={{ popularityChange: record.lastPopularityChange, divisor: SEASON_EVALUATION_GAUGE_DIVISOR }}
-        onDone={() => (storeExpired ? setExpiryOpen(true) : onDone())}
+        // [113] 창은 재생기 안에서 띄운다 — 0x8b5ac 가 그 밑에 마지막 say 상자(0x7fbc4)를 계속 그린다
+        finalNotice={storeExpired ? ORIGINAL_USER_EVENTS[STORE_EXPIRED_USER_EVENT] ?? '' : null}
+        onDone={onDone}
       />
     </RawScreen>
   )

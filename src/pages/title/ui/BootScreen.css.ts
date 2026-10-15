@@ -16,10 +16,13 @@ export const layer = style({
   pointerEvents: 'none',
 })
 
-/** 글 상자 — x 20 · 폭 W − 40 = 200 (0xba269 의 둘째·넷째 인자), 글색 검정 (0x1400748(0,0,0)) */
-export const textBox = style({
+/** 0x6ef4c 가 접은 한 줄 — 줄 높이 = 글꼴 높이 + 줄간 = 14 (0x6ef8a~0x6efa4, 줄 높이 인자 −1). 글꼴은 웹 글자(근사) */
+export const textLine = style({
   position: 'absolute',
-  left: 20,
   width: 200,
+  height: 14,
   color: '#000000',
+  fontSize: '11px',
+  lineHeight: '14px',
+  whiteSpace: 'pre',
 })

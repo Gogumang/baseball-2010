@@ -7,10 +7,11 @@ import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNum
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   CURSOR_BLINK_PERIOD, CURSOR_VISIBLE_UPDATES, DESCRIPTION_BOX, HEAD_LABEL_FRAME, INNER, LABEL_HEIGHT,
-  LEFT_TAB_BOX, MODE_UI_FRAME, MONEY_BAR_OFFSET, MONEY_DIGIT_OFFSET, MONEY_LABEL_OFFSET, NAME_BOX, RIGHT_TAB_BOX, SHOP_COLORS, SLOT_COLUMNS,
-  SLOT_COUNT, SLOT_ROWS, SLOT_SIZE, VALUE_BOX, VALUE_DIGIT_RIGHT_INSET, WINDOW_BOX, centeredLeftOf, centeredTopOf, slotCellRectsOf, slotPositionOf, valueBarPositionOf,
+  LEFT_TAB_BOX, MODE_UI_FRAME, MONEY_BAR_OFFSET, MONEY_DIGIT_OFFSET, MONEY_LABEL_OFFSET, NAME_BOX, RIGHT_TAB_BOX, SHOP_COLORS,
+  SLOT_COUNT, SLOT_SIZE, VALUE_BOX, VALUE_DIGIT_RIGHT_INSET, WINDOW_BOX, centeredLeftOf, centeredTopOf, movedSlotOf, slotCellRectsOf,
+  slotGridKeyOf, slotPositionOf, valueBarPositionOf,
 } from '@/pages/shop/lib/shopLayout'
-import type { ShopBox, ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
+import type { ItemGridWindowKind, ShopBox } from '@/pages/shop/lib/shopLayout'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/pages/shop/ui/ShopWindow.css'
@@ -22,8 +23,9 @@ const ITEM_ICON = './sprites/item_icon'
 const spriteSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface ShopWindowProps {
-  readonly kind: ShopWindowKindName
-  readonly entries: readonly ShopEntry[]
+  readonly kind: ItemGridWindowKind
+  /** 칸 k 의 내용 — 없거나 null 이면 빈 칸(바탕만, 커서는 선다 · 이름 · 값 · 설명 없음) */
+  readonly entries: readonly (ShopEntry | null)[]
   readonly cursor: number
   readonly onMoveCursor: (index: number) => void
   readonly onSelect: (index: number) => void
@@ -39,9 +41,11 @@ interface ShopWindowProps {
  *   박스 0 창(24,48,192,212) · 1 왼쪽 탭 · 2 오른쪽 탭 · 3 이름 딱지 · 4 설명 · 5 값 칸
  *   격자 = 33×33 칸 10개 (x 34·69·104·139·174, y 77·115)
  *
- * 창 종류(R12 1a)에 따라 머리만 바뀐다 — 1 서브아이템 · 2 GP아이템. 장비(종류 3)는 이 창이 아니라
- * 장비 창 0x83378(`EquipmentWindow`)이다.
+ * 창 종류(R12 1a)에 따라 머리만 바뀐다 — 1 서브아이템 · 2 GP아이템 · 5 보유 아이템(머리는 1 과 같다). 장비(종류 3)는 이 창이
+ * 아니라 장비 창 0x83378(`EquipmentWindow`)이다.
  * 칸마다 칸 바탕 0x7e764 를 먼저 깔고(10칸 모두 — 빈 칸도) 그 위에 아이콘을 얹는다.
+ * 격자는 늘 5 열 × 2 줄 10칸이고 커서는 줄 · 열 안에서 감긴다(`movedSlotOf` — 목록 vt+0x1c(5, 2, 1, 0x30)).
+ * 커서 칸이 비었으면 이름 · 값 · 설명을 그리지 않는다(종류 2 칸 > 6 은 0x826a6 · 0x827c6 · 0x828b4, 종류 5 안 가진 칸은 0x82646).
  */
 export function ShopWindow({
   kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled,
@@ -51,25 +55,15 @@ export function ShopWindow({
   const update = useUpdateCounter()
   const isCursorVisible = update % CURSOR_BLINK_PERIOD < CURSOR_VISIBLE_UPDATES
 
-  const selected = entries[cursor]
-  const rowCount = Math.ceil(entries.length / SLOT_COLUMNS)
-  const cursorRow = Math.trunc(cursor / SLOT_COLUMNS)
-  const topRow = rowCount <= SLOT_ROWS
-    ? 0
-    : Math.min(Math.max(0, cursorRow - SLOT_ROWS + 1), rowCount - SLOT_ROWS)
-  const firstVisible = topRow * SLOT_COLUMNS
-  const visible = entries.slice(firstVisible, firstVisible + SLOT_COLUMNS * SLOT_ROWS)
+  const selected = entries[cursor] ?? undefined
 
   useEffect(() => {
     if (!isKeyEnabled) return undefined
     const onKey = (event: KeyboardEvent) => {
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      const row = event.key === 'ArrowDown' ? SLOT_COLUMNS : event.key === 'ArrowUp' ? -SLOT_COLUMNS : 0
-      if (step !== 0 || row !== 0) {
-        onMoveCursor((cursor + step + row + entries.length) % entries.length)
-        return
-      }
-      if (event.key === 'Enter') onSelect(cursor)
+      const key = slotGridKeyOf(event.key)
+      if (key === null) return
+      if (key === '확인') onSelect(cursor)
+      else onMoveCursor(movedSlotOf(cursor, key))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -124,10 +118,10 @@ export function ShopWindow({
         topBand={0x10} titleTab testId="상점-판" />
 
       {/* 머리 — 창 종류별 (0x81ea2~0x82254) */}
-      {kind === '서브' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
+      {kind !== 'GP' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
       {kind === 'GP' && centeredLabel(HEAD_LABEL_FRAME.GP아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
-      {/* 서브는 박스 2 에 소지금 (종류 1·5 — 막대 52 · img_text 302 · 주황 숫자, 모두 oy 4) */}
-      {kind === '서브' && (
+      {/* 서브 · 보유는 박스 2 에 소지금 (종류 1·5 — 막대 52 · img_text 302 · 주황 숫자, 모두 oy 4) */}
+      {kind !== 'GP' && (
         <>
           {valueBar(RIGHT_TAB_BOX, 0x11, MONEY_BAR_OFFSET.x, MONEY_BAR_OFFSET.y)}
           {leftLabel(HEAD_LABEL_FRAME.소지금, RIGHT_TAB_BOX, SHOP_COLORS.text, MONEY_LABEL_OFFSET.x, MONEY_LABEL_OFFSET.y)}
@@ -150,24 +144,25 @@ export function ShopWindow({
 
       {/* 격자 커서 — 칸을 1px 둘러싼다 */}
       <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
-        {isCursorVisible && cursor >= firstVisible && cursor < firstVisible + visible.length && (
+        {isCursorVisible && cursor >= 0 && cursor < SLOT_COUNT && (
           <rect
-            x={slotPositionOf(cursor - firstVisible).x - 0.5}
-            y={slotPositionOf(cursor - firstVisible).y - 0.5}
+            x={slotPositionOf(cursor).x - 0.5}
+            y={slotPositionOf(cursor).y - 0.5}
             width={SLOT_SIZE + 1} height={SLOT_SIZE + 1}
             fill="none" stroke={SHOP_COLORS.text} strokeWidth={1} />
         )}
       </svg>
 
-      {visible.map((entry, offset) => {
-        const index = firstVisible + offset
-        const { x, y } = slotPositionOf(offset)
+      {Array.from({ length: SLOT_COUNT }, (_unused, index) => {
+        const entry = entries[index] ?? null
+        const { x, y } = slotPositionOf(index)
         return (
-          <button key={entry.id} type="button" aria-label={entry.name} aria-current={cursor === index} className={styles.slotButton}
+          <button key={entry?.id ?? `빈칸:${index}`} type="button" aria-label={entry?.name ?? `빈 칸 ${index}`}
+            aria-current={cursor === index} className={styles.slotButton}
             style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}
             onClick={() => (cursor === index ? onSelect(index) : onMoveCursor(index))}>
-            {entry.iconFrame !== null && (
-              <img className={entry.isOwned ? styles.ownedIcon : undefined} alt=""
+            {entry !== null && entry.iconFrame !== null && (
+              <img className={kind === '서브' && entry.isOwned ? styles.ownedIcon : undefined} alt=""
                 src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
             )}
           </button>
@@ -185,7 +180,7 @@ export function ShopWindow({
         }}>
         {selected?.name ?? ''}
       </div>
-      <div className={styles.nameText}
+      <div className={styles.nameText} data-testid="shop-name"
         style={{
           left: NAME_BOX.x + INNER.nameTextLeft,
           top: centeredTopOf(NAME_BOX, LABEL_HEIGHT),

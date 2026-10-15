@@ -363,9 +363,9 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     띄우기({ trainingSubItems: [false, true, false, false] })
     fireEvent.click(screen.getByRole('button', { name: '아이템' }))
     expect(screen.getByRole('group', { name: '보유 아이템' })).toBeTruthy()
-    expect(screen.queryByTestId('보유아이템-이름')).toBeNull() // 커서 칸 0 은 비었다
+    expect(screen.getByTestId('shop-name').textContent).toBe('') // 커서 칸 0 은 비었다
     키('ArrowRight')
-    expect(screen.getByTestId('보유아이템-이름').textContent).toBe('피칭머신')
+    expect(screen.getByTestId('shop-name').textContent).toBe('피칭머신')
     expect(screen.getByRole('button', { name: '빈 칸 0' })).toBeTruthy()
     키('Escape')
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()

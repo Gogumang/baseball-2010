@@ -31,6 +31,11 @@ export interface ShopBox {
 /** 창 종류 [this+0x1a4] (R12 1a) — 장비(3)는 0x83378 장비 창으로 간다 */
 export const SHOP_WINDOW_KIND = { 서브: 1, GP: 2, 장착: 3, 착용: 3, 구장: 4 } as const
 export type ShopWindowKindName = keyof typeof SHOP_WINDOW_KIND
+/**
+ * 격자 창 0x81dc0 을 쓰는 종류 — 1 서브아이템 · 2 GP · **5 보유 아이템**(시즌 0xd6 들어옴 0x5ee4).
+ * 종류 5 는 머리 · 설명이 종류 1 과 같고, 칸은 가진 것만 아이콘을 그리며 보유 표시 0xc3858 은 없다(0x8259c `cmp #1`).
+ */
+export type ItemGridWindowKind = '서브' | 'GP' | '보유'
 
 /**
  * mode_ui 프레임 33 박스 0~5 — 아이템·스킬 창 0x81dc0 (P6 3절 표).
@@ -53,6 +58,40 @@ export const SLOT_COUNT = SLOT_COLUMNS * SLOT_ROWS
 
 export function slotPositionOf(index: number): { readonly x: number; readonly y: number } {
   return { x: SLOT_XS[index % SLOT_COLUMNS], y: SLOT_YS[Math.trunc(index / SLOT_COLUMNS)] }
+}
+
+export type SlotGridKey = '왼' | '오른' | '위' | '아래' | '확인'
+
+/** 웹 키 → 격자 키 — 숫자키 꼴 1(0x6c031 · 표 0xd2e7c): '2' ↑ · '4' ← · '6' → · '8' ↓ · '5' 확인 */
+export function slotGridKeyOf(key: string): SlotGridKey | null {
+  if (key === 'ArrowLeft' || key === '4') return '왼'
+  if (key === 'ArrowRight' || key === '6') return '오른'
+  if (key === 'ArrowUp' || key === '2') return '위'
+  if (key === 'ArrowDown' || key === '8') return '아래'
+  if (key === 'Enter' || key === '5') return '확인'
+  return null
+}
+
+/**
+ * 격자 커서 한 걸음 — 창 0x81618 이 종류 1 · 2 · 5 에 목록 [창+0x19c] 을 vt+0x1c(5 열, 2 줄, 숫자키 꼴 1, 꼴 0x30)
+ * (0x81718~0x8174a)로 짓고, 키 0x819ac 는 그 목록 vt+0x18(키)만 부른다(0x819be 비트 0x26 → 0x81cc8). 직접 떴다:
+ * ```
+ * 0x6bead  꼴 0x10(가로 감기) 이고 가장자리를 넘으면 열 = (열 + dx + 열 수) mod 열 수   ; 0xca911 — 같은 줄에서 감긴다
+ *          꼴 0x100 이 없으니 줄은 그대로 (0x6bee8)
+ *          꼴 0x20(세로 감기) 이면 줄 = (줄 + dy + 줄 수) mod 줄 수                     ; 0x6bf54 — 같은 열에서 감긴다
+ * 고른 칸 = 줄 × 열 수 + 열 (0x81a00 · 0x823cc)
+ * ```
+ * 칸 10 개 모두에 커서가 선다 — 빈 칸(시즌 GP 칸 7~9 · 0xd6 의 안 가진 칸)도 막지 않는다.
+ */
+export function movedSlotOf(cursor: number, key: Exclude<SlotGridKey, '확인'>): number {
+  const column = cursor % SLOT_COLUMNS
+  const row = Math.trunc(cursor / SLOT_COLUMNS)
+  if (key === '왼' || key === '오른') {
+    const nextColumn = (column + (key === '오른' ? 1 : -1) + SLOT_COLUMNS) % SLOT_COLUMNS
+    return row * SLOT_COLUMNS + nextColumn
+  }
+  const nextRow = (row + (key === '아래' ? 1 : -1) + SLOT_ROWS) % SLOT_ROWS
+  return nextRow * SLOT_COLUMNS + column
 }
 
 /**

@@ -88,6 +88,8 @@ describe('경기 뒤 0xe9 평가 이벤트', () => {
     expect(onDone).not.toHaveBeenCalled()
     const 알림 = screen.getByRole('dialog', { name: '알림' })
     expect(알림.textContent).toContain('기간이 끝났습니다')
+    // 창 밑에 마지막 say 상자가 남는다 — 0x8b5ac 가 틀마다 0x7fbc4 (기록 줄 그대로)
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain('득점: 5 / 실점: 3')
 
     fireEvent.click(within(알림).getByRole('button', { name: '확인' }))
     expect(onDone).toHaveBeenCalled()

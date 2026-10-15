@@ -12,12 +12,12 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import {
-  DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
+  FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
   HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
-  HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, ROW, SCREEN, SLT_FRAME, SPECIAL_ITEMS,
-  descriptionPanelTopOf, hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH, HALL_OF_FAME_CELL_ART, hallOfFameCellImagesOf,
+  HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, SCREEN, SLT_FRAME, SPECIAL_ITEMS, SPECIAL_REEL_STATE,
+  hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH, HALL_OF_FAME_CELL_ART, hallOfFameCellImagesOf,
   hallOfFameCellImageTopLeftOf, isHallOfFameCellDimmed,
-  hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, rowLeftOf, rowTopOf,
+  hallOfFameEntryOfSlot, hallOfFameKeyCodeOf,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
@@ -30,7 +30,19 @@ import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
-import { menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf } from '@/pages/main-menu/lib/mainMenuLayout'
+import {
+  MENU_BANNER, MENU_DESCRIPTION_PANEL, MENU_PANEL_HEADING_COLOR, MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS,
+  MENU_REEL_SHADOW_COLOR, MENU_REEL_SHADOW_OFFSET, MENU_REEL_SLOTS,
+  menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf, menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf,
+  menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf,
+} from '@/pages/main-menu/lib/mainMenuLayout'
+import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
+import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
+import { MenuBand } from '@/pages/main-menu/ui/MenuBand'
+import * as menuStyles from '@/pages/main-menu/ui/MainMenuScreen.css'
+import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -86,6 +98,11 @@ interface SpecialScreenProps {
   /** 기록연감 비밀 번호 상태 — 메뉴 객체에 사는 값이라 들고 있는 쪽(메인 메뉴)이 넘긴다 (`RecordAnnals` 참고) */
   readonly annalsSecretCode?: SecretCodeState
   readonly onAnnalsSecretCodeChange?: (next: SecretCodeState) => void
+  /**
+   * 바탕 띠 `[메뉴+0xe4]` 가 이미 다 자랐는가 — 같은 장면에서 띠가 자란 뒤 다시 서는 경우(되돌리는 코드가 없다).
+   * 안 넘기면 처음 메뉴 OK(0x294b8 — 칸이 무엇이든 [0xe2] · [0xe4] = 1)로 막 내려온 것이라 1 부터 자란다
+   */
+  readonly isBandGrown?: boolean
   readonly onBack: () => void
 }
 
@@ -105,18 +122,30 @@ interface SpecialScreenProps {
  * 하위 6 에서는 바퀴가 돌지 않고 배열 `[0x1552d4c]` 는 윗단에서 [스페셜] 을 고른 그대로라 [스페셜] 이 0°(안 그림)에 있다
  * — 나머지 다섯 칸이 45·90·180·270·315° 에 선다(`menuWheelRestingLabelsOf`).
  *
- * ⚠️ 근사한 곳: 줄 y(원본은 굴러가는 목록이라 여덟 줄을 한 번에 세우려고 간격을 벌렸다 — `ROW` 주석),
- * 배경은 원본이 무엇을 까는지 아직 못 읽어 검정 그대로다. 칸 글자 밑에는 main_ui 이미지 0 밑판(0x24eca~0x24f94 — 각 37~323 에서
- * 기준점 가운데)을 먼저 찍는다 — 멈춘 표 각은 늘 이 경우라 접힌 이미지 1 · 2 는 안 나온다(`menuWheelSlotDrawOf`).
+ * 목록은 메인 메뉴 아랫단과 **같은 세로 릴 0x2524c(this, 6, 틱)** 이다(`specialLayout` 의 `SPECIAL_REEL_STATE` 머리말, 직접 떴다):
+ * 그리기 0x2860c 가 0x24b1c(바퀴) → 0x2524c → 머리띠 차례로, 게임시작 목록 0x2863c 와 목록 종류만 다르다. 그래서 바탕은 메인 메뉴
+ * 아랫단과 같다 — 배너 · 바퀴 · 바퀴 칸 글자 · **바탕 띠**(처음 메뉴 OK 0x294b8 이 칸이 무엇이든 [0xe2] · [0xe4] = 1 을 넣어
+ * 1 → 4 → 16 → 64 → 160 으로 자란다, 자라는 동안은 줄 · 설명 띠를 안 그리고 키도 버린다 0x28ba0~0x28bb4).
+ * 줄은 슬롯 1·2·3 (y 213 · 233 · 253) 에 커서 −3 · −2 · −1 칸, 고른 칸은 슬롯 4 라 안 그리고 설명 판(96, 289)이 대신 보인다.
+ * 슬롯 5·6·7 은 화면 밖이다(원본 그대로). ↑ · ↓ 는 릴을 돌린다(스크롤 ±1 · ±4 · ±16 뒤 회전).
+ * ⚠️ 배너 mode_back/000 은 메인 메뉴 화면이 깔던 것을 그대로 따른다 — 0x24b1c 안에서 그 그림을 그리는 곳은 이번에 못 찾았다(미확인).
  */
 export function SpecialScreen({
-  collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange, onBack,
+  collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange,
+  isBandGrown = false, onBack,
 }: SpecialScreenProps) {
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
-  /** 설명 판 까딱임 — 표 0xce8bc · 0xce88c (`DESCRIPTION_PANEL` 머리말) */
+  /** 설명 판 까딱임 — 표 0xce8bc · 0xce88c (`specialLayout` 의 까딱임 주석) */
   const panelShake = useCursorShake(useUpdateCounter())
+  /** 바탕 띠 [메뉴+0xe4] — 처음 메뉴 OK(0x294b8)가 1 로 두고 이 화면에서 자란다. 하위 화면을 다녀와도 되돌리지 않는다 */
+  const band = useMenuBand(true, isBandGrown)
+  /** 릴 돌기 — 스크롤 석 장 뒤 회전 (0x25386) */
+  const turn = useMenuTurn(cursor, ITEM_COUNT, MENU_REEL_SCROLL_STEPS.length)
+  /** 도는 동안은 돌기 전 배열을 그린다 */
+  const shownCursor = turn.direction === null ? cursor : turn.fromCursor
+  const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
 
   const openItem = (index: number) => {
     const item = SPECIAL_ITEMS[index]
@@ -130,6 +159,8 @@ export function SpecialScreen({
   useEffect(() => {
     if (view !== '목록' || notice !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
+      // 0x28ba0~0x28bb4 — 바탕 띠가 자라는 동안([메뉴+0xe2] ≠ 0)은 키를 통째로 버린다
+      if (band.isGrowing) return
       const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
       if (step !== 0) {
         event.preventDefault()
@@ -180,65 +211,75 @@ export function SpecialScreen({
 
   const selected = SPECIAL_ITEMS[cursor]
   const { dx: shakeDx, dy: shakeDy } = panelShake.offset
+  const panel = { x: MENU_DESCRIPTION_PANEL.x + shakeDx, y: MENU_DESCRIPTION_PANEL.y + shakeDy }
+  /** 판 안 큰 글자 자리 — 프레임 크기는 PNG 머리에서 읽어 둔 `labelWidth` · `labelHeight` (0x25794~0x257c4 가운데 + (2, 5)) */
+  const panelLabelAt = menuPanelLabelTopLeftOf(selected.labelWidth, selected.labelHeight)
+  const headingFrame = menuPanelHeadingFrameOf(SPECIAL_REEL_STATE)
+  const headingSize = headingFrame === null ? null : textOrigins?.[String(headingFrame).padStart(3, '0')] ?? null
+  /** 단색으로 찍는 글자 (원본 효과 0xb) — 그림을 마스크로 쓰고 색을 칠한다 */
+  const tinted = (src: string, left: number, top: number, width: number, height: number, color: string) => (
+    <div className={menuStyles.tintedLabel}
+      style={{ left, top, width, height, background: solidColorCss(color), maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
+  )
+
+  // ── 세로 릴 0x2524c(…, 6) — 슬롯 1·2·3 · 5·6·7 (4 는 판이 대신) ──
+  /** ↑(−1) 면 +, ↓(−2) 면 − 로 민다 (0x2534c) */
+  const scroll = turn.direction === null ? 0 : (turn.direction === -1 ? 1 : -1) * (MENU_REEL_SCROLL_STEPS[turn.counter] ?? 0)
+  const reelLabels = band.isGrowing ? [] : MENU_REEL_SLOTS.map((slot) => {
+    const entryIndex = menuReelEntryAtSlotOf(REEL_FRAMES, REEL_SLOT_ROW, shownCursor, slot)
+    if (entryIndex === null) return null
+    const frame = REEL_FRAME_LIST[entryIndex]
+    const item = SPECIAL_ITEMS[entryIndex]
+    const size = textOrigins?.[String(frame).padStart(3, '0')] ?? null
+    if (size === null || item === undefined) return null
+    const topLeft = menuReelTextTopLeftOf(slot, size.width, scroll)
+    if (topLeft === null) return null
+    const src = imageSrc(IMG_TEXT_FRAMES, frame)
+    return (
+      <div key={item.id} data-reel-slot={slot}>
+        {/* 그림자를 #212B70 으로 (+1,+1) 에 먼저 찍고 진짜 글자를 원색으로 덮는다 (0x255c8) */}
+        {tinted(src, topLeft.x + MENU_REEL_SHADOW_OFFSET.x, topLeft.y + MENU_REEL_SHADOW_OFFSET.y, size.width, size.height,
+          MENU_REEL_SHADOW_COLOR)}
+        <button type="button" aria-label={item.id} className={menuStyles.menuRow} data-frame={frame}
+          style={{ left: topLeft.x, top: topLeft.y }}
+          // ⚠️ 웹 조작 — 누르면 고르기만 한다(원본은 키패드뿐). 여는 것은 설명 판 누름(OK)이다
+          onClick={() => (band.isGrowing ? undefined : setCursor(entryIndex))}>
+          <img src={src} alt="" />
+        </button>
+      </div>
+    )
+  })
 
   return (
     <RawScreen>
+      <img className={styles.sprite} style={{ left: MENU_BANNER.x, top: MENU_BANNER.y }} src="./sprites/mode_back/000.png" alt="" />
       {/* 반원 바퀴 0x24b1c 의 바닥 — 가운데에서 도는 main_ball 애니 0 + 테두리 원 3겹 (120, 320) 반지름 93·95·97. 메인 메뉴와 같은 그림 */}
       <MenuWheel />
       <SpecialWheelLabels />
+      {/* 바탕 띠 — 바퀴 위, 릴 글자 아래 (0x253e8~0x2548e) */}
+      <MenuBand spread={band.spread} />
+      {reelLabels}
 
-      {/* 여덟 칸 — 고른 줄은 설명 판이 그리므로 목록에서는 빼고 그린다 (원본도 판이 그 자리를 덮는다) */}
-      {SPECIAL_ITEMS.map((item, index) => (
-        index === cursor ? null : (
-          <EffectImage
-            key={item.id}
-            className={`${styles.sprite} ${item.availability === '됨' ? '' : styles.dimmed}`}
-            effect={item.availability === '됨' ? null : DRAW_EFFECT.GRAY}
-            src={imageSrc(MAIN_UI_FRAMES, item.labelFrame)}
-            style={{ left: rowLeftOf(item), top: rowTopOf(index) }}
-          />
-        )
-      ))}
-
-      {/* 고른 줄 설명 판 = main_ui 이미지 3 (149×63) 을 (96, 줄 y − 31), 안에 항목 그림 + 설명 글 */}
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(MAIN_UI, DESCRIPTION_PANEL.image)}
-        style={{ left: DESCRIPTION_PANEL.x + shakeDx, top: descriptionPanelTopOf(cursor) + shakeDy }}
-      />
+      {/* 설명 판 = main_ui 이미지 3 (149×63) 을 (96, 289) — 아래 절반은 화면 밖(원본 그대로). 판 안 큰 글자 = main_ui 프레임(0x25774) */}
+      <img className={styles.sprite} alt="" data-testid="스페셜-설명판" src={imageSrc(MAIN_UI, MENU_DESCRIPTION_PANEL.frame)}
+        style={{ left: panel.x, top: panel.y }} />
       <EffectImage
         className={`${styles.sprite} ${selected.availability === '됨' ? '' : styles.dimmed}`}
         effect={selected.availability === '됨' ? null : DRAW_EFFECT.GRAY}
         src={imageSrc(MAIN_UI_FRAMES, selected.labelFrame)}
-        style={{
-          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding + shakeDx,
-          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.padding + shakeDy,
-        }}
-      />
-      <div
-        className={styles.description}
-        style={{
-          left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding + shakeDx,
-          top: descriptionPanelTopOf(cursor) + DESCRIPTION_PANEL.textDy + shakeDy,
-          color: DESCRIPTION_PANEL.textColor,
-        }}
-      >
-        {selected.description.split('!N').map((line) => <div key={line}>{line}</div>)}
-      </div>
-
-      {/* 눌림을 받는 투명 칸 — 그림 위에 얹어 설명 판에 가린 줄도 누를 수 있게 한다 */}
-      {SPECIAL_ITEMS.map((item, index) => (
-        <button
-          key={item.id}
-          type="button"
-          className={styles.row}
-          aria-label={item.id}
-          aria-current={index === cursor}
-          style={{ left: rowLeftOf(item), top: rowTopOf(index), width: item.labelWidth, height: ROW.step }}
-          onClick={() => openItem(index)}
-        />
-      ))}
+        style={{ left: panelLabelAt.x + shakeDx, top: panelLabelAt.y + shakeDy }} />
+      {/* 판 왼쪽 위 회색 제목 img_text 1 "스페셜" (0x257cc~0x257ee) */}
+      {headingFrame !== null && headingSize !== null && tinted(
+        imageSrc(IMG_TEXT_FRAMES, headingFrame), menuPanelHeadingTopLeftOf().x + shakeDx, menuPanelHeadingTopLeftOf().y + shakeDy,
+        headingSize.width, headingSize.height, MENU_PANEL_HEADING_COLOR,
+      )}
+      {/* 설명 띠 0x55545(StrMAINMENU[0x10 + 커서]) — 0x2524c 맨 끝. 띠가 자라는 동안은 안 그린다 */}
+      {!band.isGrowing && <DescriptionBand text={selected.description} seed={cursor} />}
+      {/* 설명 판 = 고른 칸 — 투명 누름 칸으로 OK (바닥띠 되돌아가기 x 206~ 는 비워 둔다) */}
+      {notice === null && (
+        <PressArea label={`${selected.id} 열기`} onPress={() => (band.isGrowing ? undefined : openItem(cursor))}
+          rect={{ x: MENU_DESCRIPTION_PANEL.x, y: MENU_DESCRIPTION_PANEL.y, width: 200 - MENU_DESCRIPTION_PANEL.x, height: 320 - MENU_DESCRIPTION_PANEL.y }} />
+      )}
 
       {gamePoint === undefined
         ? <SpecialBands onBack={onBack} />
@@ -248,6 +289,11 @@ export function SpecialScreen({
     </RawScreen>
   )
 }
+
+/** 상태 6 릴 표 — 글자 0xcea24 · 슬롯 0xceaf2[1] */
+const REEL_FRAMES = MENU_REEL_ITEM_FRAMES[SPECIAL_REEL_STATE] ?? []
+const REEL_FRAME_LIST = menuReelFrameListOf(REEL_FRAMES)
+const REEL_SLOT_ROW = menuReelSlotRowOf(SPECIAL_REEL_STATE)
 
 /** [스페셜] 칸 — 윗단 배열 `[0x1552d4c]` 를 이 칸이 0번(0°)에 오도록 돈 커서 */
 const SPECIAL_WHEEL_CURSOR = TOP_ENTRIES.findIndex((entry) => entry.id === '스페셜')
