@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { OutingMap } from '@/pages/outing-map/ui/OutingMap'
 import { PlaceBubble } from '@/pages/outing-map/ui/PlaceBubble'
 import { MessageBox } from '@/shared/ui'
+import { moveOutingMapCursor, outingMapDirectionOf } from '@/shared/lib/outingMap/outingMapCursor'
 
 interface OutingMapScreenProps {
   readonly noticeText: string
@@ -36,6 +37,40 @@ export function OutingMapScreen({
 }: OutingMapScreenProps) {
   const [openPlace, setOpenPlace] = useState<OutingPlace | null>(null)
   const [selectedPlaceId, setSelectedPlaceId] = useState(OUTING_PLACES[0].id)
+
+  /**
+   * 키 0x13ba4 (직접 떴다):
+   * ```
+   * −5 · '5'(0x35) → [gfx+0x184] = 칸 · 113 (장소 말풍선)
+   * −16 (CLR)      → 105
+   * 그 밖          → [this+0xac] = 0x7f3e4(gfx, [this+0xac], 키)   ; 방향 이동 표 0xd491c
+   * ```
+   * 말풍선(113) · 효과 팝업 · 126 연출이 떠 있으면 그쪽이 키를 받는다. 앞서 웹은 이 키를 안 받아 지도가 마우스로만 움직였다 (r82)
+   */
+  const isMapKeyOn = openPlace === null && resultText === null && presentation === null
+  const latest = useRef({ selectedPlaceId, onBack })
+  latest.current = { selectedPlaceId, onBack }
+  useEffect(() => {
+    if (!isMapKeyOn) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      const current = latest.current
+      const cursor = Math.max(OUTING_PLACES.findIndex((place) => place.id === current.selectedPlaceId), 0)
+      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
+        event.preventDefault()
+        return setOpenPlace(OUTING_PLACES[cursor])
+      }
+      if (event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault()
+        return current.onBack()
+      }
+      const direction = outingMapDirectionOf(event.key)
+      if (direction === null) return
+      event.preventDefault()
+      setSelectedPlaceId(OUTING_PLACES[moveOutingMapCursor(cursor, direction)]?.id ?? current.selectedPlaceId)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMapKeyOn])
 
   return (
     <OutingMap
