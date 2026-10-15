@@ -1,3 +1,4 @@
+import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { nariGameRecordOf } from '@/entities/career/model/nariCupTeams'
 import { nariRecordFieldersOf } from '@/entities/career/model/nariTeamRecord'
@@ -150,6 +151,7 @@ function PitcherLeagueScreens({
 
   if (career === null || scene === '등록') {
     return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create}
+      {...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint })}
       // 101 팀 고르기 취소 0x14114 1424c~14264: [0x140006c] = 5 — 게임시작 목록으로 바로 연다([0x1552d14] = 1 은 전역 모드를 일반으로)
       onCancel={() => onExit(5)} />
   }
@@ -281,21 +283,24 @@ function PitcherLeagueScreens({
       // 커맨드 줄(앞 상태 105 = '관리' 갈래만 관리 6칸, 그 밖 칸 수 0) · 머리띠 제목 9
       if (eventEnd.isEnding) {
         if (story.context === '지도' || story.context === '장소') {
-          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
+          return <RawScreen><OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} /></RawScreen>
         }
         return (
-          <>
+          <RawScreen>
             <SkinBackdrop kind="공무늬" />
             <PitcherStatusBoard career={career} />
             {story.context === '관리' && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
             <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={null} footer={5} slides={false} />
-          </>
+          </RawScreen>
         )
       }
+      // 밑그림은 240×320 판(RawScreen) 안에, 대사창 덮개(ScreenOverlay)는 그 형제로 — 밑그림을 안 감싸면 창 왼쪽 위(−120, −240)에 어긋나 그려졌다
       return (
         <>
-          {isOverStatusBoard && <PitcherEventUnderlay career={career} />}
-          {isOverMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />}
+          <RawScreen>
+            {isOverStatusBoard && <PitcherEventUnderlay career={career} />}
+            {isOverMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />}
+          </RawScreen>
           <ScreenOverlay>
           <StoryScreen
             // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만

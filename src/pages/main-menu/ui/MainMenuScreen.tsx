@@ -5,6 +5,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, MainMenuOpenTier, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
@@ -235,9 +236,9 @@ export function MainMenuScreen({
   const reelState = state.tier
   /**
    * 판 안 글칸은 처음 메뉴(하위 4) 0x24ff0 만 쓴다 — 하위 5·9 는 판(0x256fc)에 글을 안 쓰고 설명 띠 0x55544 로 쓴다.
-   * 잠긴 칸 안내(`lockedNotice`)는 원본 팝업 자리의 웹판 근사라 두 단 다 판 안에 그대로 둔다.
+   * 잠긴 칸 안내(`lockedNotice`)는 판이 아니라 확인 상자(0x74ef5)로 뜬다 — 아래 `MessageBox`.
    */
-  const panelText = state.lockedNotice ?? (isWheel ? selected?.description ?? '' : '')
+  const panelText = isWheel ? selected?.description ?? '' : ''
   /**
    * 하위 목록 설명 띠 — 0x2524c 끝 0x257f2~0x25860: 바탕 띠가 자라는 중(`[this+0xe2]`)이 아니고 상태가 4 가 아니면
    * `0x55545([this+0x120], StrMAINMENU[기준 + 커서])` — 기준은 하위 5 → 6 · 9 → 0x18 (6 → 0x10, 나머지는 글 없음).
@@ -416,11 +417,22 @@ export function MainMenuScreen({
           onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} slides={headerSlides} />
       )}
 
+      {/*
+        설명 판 = 지금 고른 칸(판 안 큰 글자) — 투명 누름 칸으로 OK. 고른 칸 글자는 바퀴·릴 어디서도 화면 안에 안 그려져
+        (바퀴 아래 자리 · 릴 자리 4 는 판이 대신 보인다) 마우스로 고른 칸을 시작할 길이 없었다. 바닥띠 되돌아가기(x 206~)는 비워 둔다
+      */}
+      {state.lockedNotice === null && state.generalModeWindow === null && !state.isPickingNariEdition && (
+        <PressArea label="고른 칸 시작" onPress={() => dispatch({ type: '시작' })}
+          rect={{ x: MENU_DESCRIPTION_PANEL.x, y: MENU_DESCRIPTION_PANEL.y, width: 200 - MENU_DESCRIPTION_PANEL.x, height: 320 - MENU_DESCRIPTION_PANEL.y }} />
+      )}
+
+      {/* 잠긴 칸 안내 — 원본 확인 팝업 0x74ef5 종류 1(OK 하나). 바닥 판 글칸에 웹 단추를 얹던 근사를 걷고 공용 상자로 띄운다 */}
       {state.lockedNotice !== null && (
-        <div className={styles.confirmKeys}>
-          {/* 원본 확인 팝업(0x74ef5 종류 1)은 아무 키나 받아 닫는다 */}
-          <button type="button" onClick={() => dispatch({ type: '시작' })}>확인</button>
-        </div>
+        <MessageBox
+          text={state.lockedNotice}
+          buttons={['OK']}
+          onAnswer={() => dispatch({ type: '시작' })}
+        />
       )}
 
       {/* 나만의리그 편 고르기 창 [14] — 하위 13 */}

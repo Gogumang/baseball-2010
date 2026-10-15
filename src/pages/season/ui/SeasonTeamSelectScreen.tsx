@@ -38,6 +38,8 @@ export interface SeasonTeamSelectScreenProps {
   readonly openedHiddenIds?: readonly number[]
   /** 0xc8 에서 이름을 넣고 [2] 에 "예" — 원본은 0xcc 새 시즌 초기화(0x5758)로 간다 */
   readonly onChoose: (teamId: number, name: string) => void
+  /** 머리띠 G포인트 — 전역 G(+0x64). 안 넘기면 0 으로 찍힌다 */
+  readonly gamePoint?: number
   /**
    * 취소(−16) — 0x8ec8: [0x140006c] = 5 · 0xbc290(앱, 0x103) 으로 메인 메뉴 장면에 나간다 (관리 메뉴 취소와 같다).
    * 그 뒤 [0x1552d14] = 1 은 **전역 게임 모드를 일반(1)으로** 되돌리는 것이다 — 메인 메뉴 생성자 0x237fa 가 [0x1552d10] 으로
@@ -62,7 +64,7 @@ export interface SeasonTeamSelectScreenProps {
  * `50d2~50e0 [this+0x98]->vt+0x14(0, 0)` — vt+0x14 = `0x6c00c`(범위 안이면 +0xc = x · +0x10 = y) — 로 커서를 (0, 0) 에 놓는다.
  * 웹은 격자 화면이 새로 서며 0 이라 같다.
  */
-export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit }: SeasonTeamSelectScreenProps) {
+export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit, gamePoint }: SeasonTeamSelectScreenProps) {
   const [hint, setHint] = useState<string | null>(null)
   /** 0xc8 에 들어선 팀 — null 이면 0xca */
   const [namingTeamId, setNamingTeamId] = useState<number | null>(null)
@@ -81,6 +83,7 @@ export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit 
 
   return (
     <TeamSelectScreen title="시즌모드" openedHiddenIds={openedHiddenIds}
+      {...(gamePoint === undefined ? {} : { gamePoint })}
       onSelect={pick} onSelectLocked={pick} onCancel={onExit}
       overlay={hint !== null && <MessageBox text={hint} buttons={['확인']} onAnswer={() => setHint(null)} />} />
   )

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -35,6 +35,17 @@ const 띄우기 = (overrides: Partial<Props> = {}) =>
       {...overrides}
     />,
   )
+
+/**
+ * 경기정보 누름 칸은 키를 보낸다 — 들어올 때 연출(머리띠 5 · 배너 4 · 값 줄 펼침 8 그림)이 끝나야 키를 받는다(0x311b2).
+ * 연출을 흘린 뒤 누른다. 부른 쪽 afterEach 가 진짜 시계로 되돌린다.
+ */
+const 연출_흘리고_누르기 = (name: string) => {
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * 17)
+  })
+  fireEvent.click(screen.getByRole('button', { name }))
+}
 
 /** 격자 칸 하나 = 40px 정사각 */
 const 칸들 = () => screen.getAllByRole('button').filter((button) => button.style.width === '40px')
@@ -127,10 +138,17 @@ describe('빠른실행', () => {
 })
 
 describe('경기 시작', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('경기정보에서 OK 하면 팀 경기 화면으로 넘어간다', () => {
     띄우기({ isQuickStart: true })
 
-    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    연출_흘리고_누르기('경기 시작')
 
     // 팀 경기 장면은 경기 시작 인트로(상태 0xc, 모드 1)부터 선다
     expect(screen.getByTestId('인트로-띠')).toBeTruthy()
@@ -144,7 +162,7 @@ describe('경기 시작', () => {
     expect(onGameSave).toHaveBeenCalledTimes(1)
     onGameSave.mockClear()
 
-    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    연출_흘리고_누르기('경기 시작')
 
     expect(onGameStart).toHaveBeenCalledTimes(1)
     expect(onGameSave).not.toHaveBeenCalled()
@@ -162,10 +180,12 @@ describe('이어하기 (0x213c0(앱, 1, 0) → 장면 0x104)', () => {
   /** 경기정보 OK 가 넘긴 첫 저장 하나를 얻는다 */
   const 첫저장 = (): TeamGameProgress => {
     const onGameStart = vi.fn()
+    vi.useFakeTimers()
     띄우기({ isQuickStart: true, onGameStart })
-    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    연출_흘리고_누르기('경기 시작')
     const save = onGameStart.mock.calls[0]?.[0] as TeamGameProgress
     cleanup()
+    vi.useRealTimers()
     return JSON.parse(JSON.stringify(save)) as TeamGameProgress
   }
 
@@ -190,9 +210,11 @@ describe('이어하기 (0x213c0(앱, 1, 0) → 장면 0x104)', () => {
 
 describe('경기진행 설정', () => {
   it("경기정보의 '0' 으로 창을 열고 CLR 로 닫는다", () => {
+    vi.useFakeTimers()
     띄우기({ isQuickStart: true })
 
-    fireEvent.click(screen.getByRole('button', { name: '0 경기설정' }))
+    연출_흘리고_누르기('0 경기설정')
+    vi.useRealTimers()
     const 창 = screen.getByRole('group', { name: '경기진행 설정' })
 
     // 뒤쪽 경기정보 화면에도 같은 이름의 버튼이 있어 창 안에서만 찾는다

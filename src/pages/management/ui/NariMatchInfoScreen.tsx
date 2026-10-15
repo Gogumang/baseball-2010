@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -9,7 +9,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import {
-  MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, matchInfoRowY,
+  MATCH_INFO_LAYOUT, MATCH_INFO_PLAY_BALL_PRESS_RECT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, matchInfoLogoPressRectOf, isPrepareBobOn, matchInfoRowY,
 } from '@/pages/general-mode/lib/prepareLayout'
 import type { MatchInfoLine } from '@/pages/general-mode/lib/matchInfoLines'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
@@ -18,6 +18,9 @@ import { useMatchInfoEntry } from '@/pages/management/ui/useMatchInfoEntry'
 import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
 
 const SLT_IMAGE = './sprites/slt_frame'
+/** 누름 칸이 보내는 키 — 키 처리(window 듣개)가 그대로 받는다 */
+const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+
 const SLT_FRAME = './sprites/slt_frame/frames'
 const IMG_TEXT_FRAME = './sprites/img_text/frames'
 
@@ -200,13 +203,17 @@ export function NariMatchInfoScreen({
         </>
       )}
 
-      {/* 원본에 없는 웹 전용 단추 — 원본은 OK 키다. 바닥띠 왼쪽에 세운다 */}
-      <Button variant="corner" className={styles.softKey} style={{ left: 4 }} onClick={onStart}>
-        경기 시작
-      </Button>
-      <div className={styles.hintLine}>
-        <Hint>{onEntry === undefined ? 'Enter 경기 시작 · Esc 되돌아가기' : 'Enter 경기 시작 · ←/→ 엔트리 · Esc 되돌아가기'}</Hint>
-      </div>
+      {/*
+        원본에 없던 웹 [경기 시작] 단추와 키 안내 글을 걷고 투명 누름 칸으로 — 누르면 그 키를 보낸다(들어올 때 연출 중 키 막음도 그대로).
+        가운데 PLAY BALL 공 = OK, 두 엠블럼 = ←/→ 143 엔트리 보기
+      */}
+      <PressArea label="경기 시작" rect={MATCH_INFO_PLAY_BALL_PRESS_RECT} onPress={() => pressKey('Enter')} />
+      {onEntry !== undefined && (
+        <>
+          <PressArea label="PLAYER 엔트리" rect={matchInfoLogoPressRectOf(anchorA)} onPress={() => pressKey('ArrowLeft')} />
+          <PressArea label="COM 엔트리" rect={matchInfoLogoPressRectOf(anchorB)} onPress={() => pressKey('ArrowRight')} />
+        </>
+      )}
 
       {/* 머리띠 0x7f4ed — 틀 0x16928 의 142 갈래: 제목 8/9 · 바닥 5(되돌아가기) */}
       <ScreenFrame title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'} gamePoint={gamePoint} onBack={onCancel}

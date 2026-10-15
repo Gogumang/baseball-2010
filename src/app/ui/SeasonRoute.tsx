@@ -301,7 +301,7 @@ function SeasonScreens({
   // 취소는 관리 메뉴 취소와 같이 [0x140006c] = 5 로 메인 메뉴에 나간다 (0x8ec8)
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
     return (
-      <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []}
+      <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []} gamePoint={session.gamePoints}
         onChoose={actions.chooseTeam} onExit={() => onExit(5)} />
     )
   }
