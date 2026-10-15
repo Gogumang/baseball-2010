@@ -34,6 +34,12 @@ export interface RosterPlayer {
    * 시즌 팀 레코드는 이 행을 그대로 복사해 시작한다 — 리그 열 팀은 모두 0, 외인구단(팀 14)만 차 있다.
    */
   readonly equipment: readonly [number, number, number, number]
+  /**
+   * 레코드 +0x20~+0x2b 의 s16 여섯 칸 — 행 바이트 32~43 의 **시즌 줄**. 마스터 팀(0x1ff98)은 행을 통째 베껴 이 줄이 그대로 남는다.
+   * 타자 [타수, 안타, 2루타, 3루타, 홈런, 타점] · 투수 [잡은 아웃, 실점, 세이브, 탈삼진, 투구 수, +0x2a].
+   * 소개 판 0x44944 가 방어율 · 탈삼진 · 타율 · 홈런 · 타점으로 읽는다(R10 10-3).
+   */
+  readonly recordLine: readonly number[]
 }
 
 // JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다

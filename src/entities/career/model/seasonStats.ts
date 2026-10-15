@@ -32,6 +32,15 @@ export const EMPTY_SEASON_STATS: SeasonStats = {
   strikeouts: 0,
 }
 
+/**
+ * **타자 레코드 +0x20~+0x2b 여섯 칸** — 웹 시즌 줄(`career.stats`)을 원본 레코드 칸 차례로: 타수 · 안타 · 2루타 · 3루타 · 홈런 · 타점.
+ * 미션(모드 6)은 선수 게터 0x1fc20 의 기록을 0xb87cc 가 0x30 바이트 통째 명부에 넣어 이 칸이 그대로 따라오고, 명전 등록 0x1f680 도
+ * 통째 베낀다 — 소개 판 0x44944 가 읽는다.
+ */
+export function batterRecordLineOf(stats: SeasonStats): readonly number[] {
+  return [stats.atBats, stats.hits, stats.doubles, stats.triples, stats.homeRuns, stats.runsBattedIn]
+}
+
 export function recordAtBat(
   stats: SeasonStats,
   outcome: AtBatOutcome,

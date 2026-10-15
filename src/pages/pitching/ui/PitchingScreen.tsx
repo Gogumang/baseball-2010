@@ -16,6 +16,7 @@ import type { AimDirection } from '@/features/play-pitcher-game/model/pitchAim'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
@@ -205,6 +206,15 @@ interface PitchingScreenProps {
   /** 타석 장면 재료 — 있으면 구질 · 조준 · 게이지 위에 캔버스 장면을 깐다(소개 판 · "CHANGE" 는 그 위). 없으면 예전 패널만 */
   readonly stage?: PitchingStageSource
   /**
+   * 상태 0xe 소개 판 0x44944 의 값 — 부르는 쪽(미션 라우트)이 지금 투수 · 타자 레코드로 만든다
+   * (`pages/mission-play/lib/missionMatchupCards`). 안 넘기면 팀 글자만 그린다
+   */
+  readonly matchupCards?: {
+    readonly batterHand: number
+    readonly pitcher: MatchupPitcherCard
+    readonly batter: MatchupBatterCard
+  }
+  /**
    * st[0x15 + i] — 이번 공에 CPU 가 도루를 출발시킨 주자의 루(세션 `pitcherStealDisplay`, 0x520de → 0xa9bd4). 그 주자는 루에 안
    * 그린다(0x35b94 의 주자 그리기가 같은 칸을 본다 — 타자 미션 화면과 같다). 0xf 진입 · 타구 판 시작이 지운다.
    * 세션은 같은 타석 다음 공의 0xf 진입을 공을 먹인 걸음에 바로 적으므로(`selectionEntered`), 공이 날거나 0x12 인 동안은 계속 숨긴다
@@ -216,6 +226,7 @@ interface PitchingScreenProps {
 
 export function PitchingScreen({
   run,
+  matchupCards: matchupCardValues,
   repertoire,
   repertoireSlots,
   usesGauge,
@@ -482,7 +493,9 @@ export function PitchingScreen({
             />
           )
           const matchupCards = !isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
-            <SceneMatchupCards batterHand={0} pitcher={{ isComputer: false }} batter={{ isComputer: true }} />
+            <SceneMatchupCards
+              {...(matchupCardValues ?? { batterHand: 0, pitcher: { isComputer: false }, batter: { isComputer: true } })}
+            />
           )
           if (stage === undefined) {
             return (

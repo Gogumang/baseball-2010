@@ -161,6 +161,8 @@ function PitcherLeagueScreens({
       <PitcherGameScreen
         options={gameOptions}
         pitcherName={career.name}
+        // 소개 판 0x44944 의 시즌 줄 — 내 투수 레코드 +0x20~(커리어 시즌 줄, 이 경기 앞) · 상대 타자는 리그 기록표
+        matchupRecords={{ mySeason: career.stats, stats: career.leaguePlayerStats }}
         // 마운드 내 투수 그림의 장비 겹 (0x108f8 모드 ≠ 4 → 0x79368 · 0x10810 → 0x79790)
         pitcherEquipmentLevels={career.equipmentLevels}
         // 두 팀 레코드 타자 배열 차례 — 교대 판 이름표 0x40008 · 운동장 마선수 그림 0x79b48 이 훑는다 (경기 장면 0x39fdc 의 0xb891c 모드 3)

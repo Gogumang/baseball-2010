@@ -3,6 +3,7 @@ import {
   equippedPitcherSkillIdsOf,
   isPitcherSkillEquipped,
   pitcherFormOfCareer,
+  pitcherRecordLineOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
@@ -96,6 +97,11 @@ export interface ModePitcher {
    * 0번 투수다(aa81c~aa878, `missionFielderPlatesOf`). 대체 투수는 없다(판 없음)
    */
   readonly plate?: { readonly name: string; readonly role?: number }
+  /**
+   * 기록 +0x20~+0x2b 시즌 줄 s16 여섯 칸 — 0xb8820 이 이 기록을 0x30 바이트 통째 명부에 넣어 소개 판 0x44944 가 그대로 읽는다(+ 기록
+   * 게이트 0xa5764 가 여는 이 경기 줄). 나리 = 저장 투수의 시즌 줄(`career.stats`), 명예 = 등록 때 베낀 줄. 모르면 없다
+   */
+  readonly recordLine?: readonly number[]
 }
 
 /** 체력 100% — `stats` 는 피로 없는 값이다 */
@@ -142,9 +148,11 @@ function modePitcherFromRecord(
   record: { readonly equippedSkillIds: readonly number[]; readonly equipmentLevels?: PitcherAbility },
   stamina: number,
   plate: ModePitcher['plate'],
+  recordLine?: readonly number[],
 ): ModePitcher {
   return {
     ...(plate === undefined ? {} : { plate }),
+    ...(recordLine === undefined ? {} : { recordLine }),
     ...(record.equipmentLevels === undefined ? {} : { equipmentLevels: record.equipmentLevels }),
     stats: fatiguedStatsOf(equippedAbility, MISSION_STAMINA),
     ability: equippedAbility,
@@ -170,6 +178,7 @@ export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
     // 저장된 나리 투수의 +0x2c (`PitcherCareer.stamina`)
     career.stamina,
     { name: career.name, role: career.role },
+    pitcherRecordLineOf(career.stats),
   )
 }
 
@@ -200,6 +209,7 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
     MISSION_STAMINA,
     // ⚠️ 보직을 안 남긴 옛 명전 기록은 보직이 없다(판 없음) — 원본 기록에는 늘 있는 칸이다
     famer.role === undefined ? { name: famer.name } : { name: famer.name, role: famer.role },
+    famer.recordLine,
   )
 }
 

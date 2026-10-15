@@ -58,7 +58,8 @@ describe('명예 타자 — 0x1fc20 의 +0xa6 ≥ 0 갈래 = 0x1f640 명전 기�
   })
 
   it('옛 저장은 남긴 장비 얹은 능력치(없으면 기본)로 — 스킬 없음, 필살 0', () => {
-    const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, look: _l, ...옛기록 } = collection.hallOfFame[0]
+    const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, look: _l, recordLine: _r, ...옛기록 } =
+      collection.hallOfFame[0]
     expect(modeBatterOfHallOfFame(옛기록)).toEqual({ ability: 옛기록.equippedAbility, skillIds: [], specialSwingNumber: 0 })
     const { equippedAbility: _a, ...더옛기록 } = 옛기록
     expect(modeBatterOfHallOfFame(더옛기록).ability).toEqual(나리.ability)

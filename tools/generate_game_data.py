@@ -156,6 +156,23 @@ def equipment_nibbles_of(row_hex: str) -> list[int]:
     return [first >> 4, first & 0xF, second >> 4, second & 0xF]
 
 
+# 레코드 +0x20~+0x2b — 시즌 줄 s16 여섯 칸. 0x1ff98 은 Xls 행 0x30 바이트를 통째 베껴 마스터 팀을 싣고(1ffe0~2004e memcpy),
+# 마선수 레코드도 0x20094 6번 갈래가 XlsACE_* 행을 그대로 붓는다 — 그래서 이 칸에 표의 줄이 그대로 남는다.
+# 타자: 타수 · 안타 · 2루타 · 3루타 · 홈런 · 타점 / 투수: 잡은 아웃 · 실점 · 세이브 · 탈삼진 · 투구 수 · (+0x2a).
+# 소개 판 0x44944 가 이 칸을 읽는다(R10 10-3). 기록 게이트 0xa56dc 가 거짓인 모드(1 · 7 · 8 · 9)와 미션의 마스터 줄은 경기 중에 안 오른다.
+RECORD_LINE_OFFSET = 0x20
+RECORD_LINE_COUNT = 6
+
+
+def record_line_of(row_hex: str) -> list[int]:
+    """선수 레코드 +0x20~+0x2b 의 s16 여섯 칸 (시즌 줄)."""
+    row = bytes.fromhex(row_hex)
+    return [
+        int.from_bytes(row[RECORD_LINE_OFFSET + i * 2:RECORD_LINE_OFFSET + 2 + i * 2], 'little', signed=True)
+        for i in range(RECORD_LINE_COUNT)
+    ]
+
+
 def quote(text: str) -> str:
     return "'" + text.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
@@ -208,6 +225,13 @@ def generate_ace_players() -> None:
         '  readonly burst: string',
         '  /** 레코드 +0x14 u32 — 장착 스킬 비트 (0xb62b4 가 읽는 칸) */',
         '  readonly skillBits: number',
+        '  /** 레코드 +0xb — 윗니블 폼 · 아랫 2비트 보직(0xb6704, 다섯 투수 모두 2 구원) */',
+        '  readonly profile: number',
+        '  /**',
+        '   * 레코드 +0x20~+0x2b s16 여섯 칸 — 시즌 줄. 0x20094 6번 갈래가 XlsACE_* 행을 그대로 붓고 마선수 줄은 기록 게이트',
+        '   * 0xa56dc 가 늘 거르므로(모드 2 · 3 · 4 0xb633d, 5 · 6 은 나리 · 명예만) 표의 값이 그대로 남는다. 소개 판 0x44944 가 읽는다.',
+        '   */',
+        '  readonly recordLine: readonly number[]',
         '}',
         '',
         '/** 원본 XlsACE_BAT_DATA / XlsACE_PIT_DATA. 능력치는 원본 0~999 눈금 그대로. */',
@@ -242,7 +266,8 @@ def generate_ace_players() -> None:
                 f"framesUrl: {quote('./sprites/' + folder + '/frames')}, "
                 f"frameCount: {frame_counts.get(folder, 0)}, "
                 f"stillUrl: {quote(largest_image(folder))}, burst: {quote(burst)}, "
-                f"skillBits: 0x{skill_bits_of(row):x} }},"
+                f"skillBits: 0x{skill_bits_of(row):x}, profile: 0x{profile_of(row):02x}, "
+                f"recordLine: [{', '.join(str(value) for value in record_line_of(row))}] }},"
             )
     lines.append(']')
     write('acePlayers.ts', '\n'.join(lines) + '\n')
@@ -405,6 +430,7 @@ def generate_roster() -> None:
                 'id': index, 'name': name, 'ability': abilities_of(row), 'grade': grade_of(row),
                 'profile': profile_of(row), 'skillBits': skill_bits_of(row),
                 'equipment': equipment_nibbles_of(row),
+                'recordLine': record_line_of(row),
             }
             # 수비 위치는 타자 표에만 있다. 투수 표의 같은 칸(+0x1c)은 다른 뜻이라 넣지 않는다.
             if label == 'batters':
@@ -446,6 +472,12 @@ def generate_roster() -> None:
         '   * 시즌 팀 레코드는 이 행을 그대로 복사해 시작한다 — 리그 열 팀은 모두 0, 외인구단(팀 14)만 차 있다.\n'
         '   */\n'
         '  readonly equipment: readonly [number, number, number, number]\n'
+        '  /**\n'
+        '   * 레코드 +0x20~+0x2b 의 s16 여섯 칸 — 행 바이트 32~43 의 **시즌 줄**. 마스터 팀(0x1ff98)은 행을 통째 베껴 이 줄이 그대로 남는다.\n'
+        '   * 타자 [타수, 안타, 2루타, 3루타, 홈런, 타점] · 투수 [잡은 아웃, 실점, 세이브, 탈삼진, 투구 수, +0x2a].\n'
+        '   * 소개 판 0x44944 가 방어율 · 탈삼진 · 타율 · 홈런 · 타점으로 읽는다(R10 10-3).\n'
+        '   */\n'
+        '  readonly recordLine: readonly number[]\n'
         '}\n'
         '\n'
         '// JSON 은 네 칸 튜플을 나타내지 못해 한 번 더 단언한다\n'

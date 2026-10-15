@@ -1,5 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import { isFreePass } from '@/entities/at-bat/model/atBatOutcome'
+import { countsAsAtBat, isFreePass } from '@/entities/at-bat/model/atBatOutcome'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { MISSIONS } from '@/shared/config/original/missions'
 
@@ -18,6 +18,11 @@ export interface MissionProgress {
   /** 목표 이름 → 지금까지 달성한 수 */
   readonly counts: Readonly<Record<string, number>>
   readonly plateAppearances: number
+  /**
+   * 미션 타자의 이 경기 **타수** — 정산 0xa8024 가 기록 게이트 0xa56dc(모드 5 · 6 갈래 0xa5764: 나리 · 명예 선수만 참)가 열린 타석에
+   * 레코드 +0x20 을 올리는 칸(a887e, `countsAsAtBat`). 목표 칸이 아니라 소개 판 0x44944 의 타율 분모다. 안 센 판(옛 판)은 없다
+   */
+  readonly atBats?: number
   /** 이미 깨진 조건 목표 (무실점·무안타) */
   readonly brokenConditions: readonly string[]
 }
@@ -303,7 +308,12 @@ export function recordOutcome(
   for (const name of goalNamesFor(outcome, runsBattedIn, isBunt, groundHomeRun)) {
     counts[name] = (counts[name] ?? 0) + (name === '타점' ? runsBattedIn : 1)
   }
-  return { ...progress, counts, plateAppearances: progress.plateAppearances + 1 }
+  return {
+    ...progress,
+    counts,
+    plateAppearances: progress.plateAppearances + 1,
+    atBats: (progress.atBats ?? 0) + (countsAsAtBat(outcome) ? 1 : 0),
+  }
 }
 
 /**
