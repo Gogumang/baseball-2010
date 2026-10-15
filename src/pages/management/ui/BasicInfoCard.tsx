@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+import { FrameSprite, PaintedRects } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -6,11 +8,17 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { batterEquipmentOf, batterLayersOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import {
-  BATTING_TYPE_NAMES, FIGURE_BOX, FIGURE_FOOT, INFO_BOARD, POSITION_NAMES, RIGHT_PANEL, SIDE_NAMES, SKIN_NAMES,
+  BATTING_TYPE_NAMES, FIGURE_FOOT, INFO_BOARD, POSITION_NAMES, SIDE_NAMES, SKIN_NAMES, basicInfoSpecialNameOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
+import { CardPlate } from '@/pages/management/ui/CardPlate'
+import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import { InfoTable } from '@/pages/management/ui/InfoTable'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+
+const MODE_UI = './sprites/mode_ui/frames'
+/** 정보 칸 값 칸 그림 — 타자편 mode_ui 2 (투수편은 1) */
+const INFO_FRAME = 2
 
 interface BasicInfoCardProps {
   readonly career: PlayerCareer
@@ -30,7 +38,10 @@ interface BasicInfoCardProps {
   readonly figureEquipment?: PlayerCareer['equipmentLevels']
 }
 
-/** 기본정보 카드 (0x15e20) — 선수 그림 · ABILITY 레이더 · 정보 칸. 카드 판 모양(0x7ba44)은 박스만 알아 근사한다 (추정) */
+/**
+ * 기본정보 카드 (0x15e20) — 카드 0x7ba44(계단형 판 · 반투명 로고 · ABILITY 레이더, `CardPlate`) → 선수 그림(프레임 박스 0x94a65 안)
+ * → 정보 칸 0x7c451. 0x15e20 은 이 셋 말고는 판을 그리지 않는다(예전 웹의 그림 칸 · 오른쪽 판 두 상자는 근사였다).
+ */
 export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }: BasicInfoCardProps) {
   // 0x7ba44 나리 갈래가 0xb570d 넷째 인자로 넘기는 값(0x7c02a~0x7c054): [gfx+0x174] − 0x66 ≤ 1(부호 없이) 이면 0, 아니면 1.
   // [gfx+0x174] 는 상태 진입마다 0x7e84c(gfx, 상태) 가 적는 지금 상태(0x7e854)라 0 은 등록 102(0x66) · 확인 103(0x67) 뿐이다.
@@ -41,16 +52,19 @@ export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }
     (TEAMS[career.teamId] ?? TEAMS[0]).name,
     career.name,
     BATTING_TYPE_NAMES[career.battingTypeIndex] ?? '',
-    // 필살 = 선수 +0x18 필살 번호의 이름. 웹은 필살타법 번호가 없어 레벨이 있으면 "필살타법" 으로 둔다 (추정)
-    career.specialSwingLevel > 0 ? '필살타법' : '',
+    // 필살 = 선수 +0x18 고른 번호의 이름 (0x7cb5c~0x7cbc0) — 0 이면 빈 줄
+    basicInfoSpecialNameOf(career.specialSwingNumber, career.battingTypeIndex),
     POSITION_NAMES[career.positionIndex] ?? '',
     SIDE_NAMES[career.battingSide] ?? '',
     SKIN_NAMES[career.skinIndex] ?? '',
   ]
+  const infoBoard = useMemo(() => boardRectsOf(INFO_BOARD, false), [])
+  const uiOrigins = useFrameOrigins(MODE_UI)
   return (
     <div data-testid="basic-info-card">
-      <div className={styles.cardPanel} style={{ left: FIGURE_BOX.x, top: FIGURE_BOX.y, width: FIGURE_BOX.width, height: FIGURE_BOX.height }} />
-      <div className={styles.cardPanel} style={{ left: RIGHT_PANEL.x, top: RIGHT_PANEL.y, width: RIGHT_PANEL.width, height: RIGHT_PANEL.height }} />
+      {/* 카드 0x7ba44 — 계단형 판 · 로고 · ABILITY 레이더 (그림보다 먼저) */}
+      <CardPlate teamId={career.teamId} />
+      <RadarChart base={career.ability} shown={shown} />
       {/*
         장착 장비를 입혀서 그린다 — 원본 관리 화면은 그림 객체를 세울 때(0x10810) 선수 레코드의
         장비 니블을 그대로 그림 슬롯에 넣는다:
@@ -65,10 +79,11 @@ export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }
       {batterLayersOf(0, career.battingTypeIndex, batterEquipmentOf(figureEquipment ?? career.equipmentLevels), false).map((layer, index) => (
         <LayerSprite key={index} layer={layer} skinIndex={career.skinIndex} teamIndex={career.teamId} />
       ))}
-      <RadarChart base={career.ability} shown={shown} />
       {showsInfoTable && (
         <>
-          <div className={styles.cardPanel} style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
+          {/* 정보 칸 0x7c450 — 프레임 = 0x7b970(타자편) ? 2 : 1 (0x7c490~0x7c4b0) · 판 0x7c110(gfx, 박스 0, 0) · 0xba19d(프레임, 0, 0) */}
+          <PaintedRects x={0} y={0} width={240} height={320} paints={infoBoard} testId="정보칸-판" />
+          <FrameSprite folder={MODE_UI} frame={INFO_FRAME} origins={uiOrigins} x={0} y={0} />
           <InfoTable values={values} battingOrder={career.battingOrder} />
         </>
       )}

@@ -48,21 +48,10 @@ export const trainingPopup = style({
   zIndex: 1,
 })
 
-
-/** 기본정보 카드 판 — 원본 0x7ba44 그리기는 박스만 확인 (추정) */
-export const cardPanel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
-  background: ORIGINAL_COLORS.panelDeep,
-  pointerEvents: 'none',
-})
-
 export const infoValue = style([
   layer,
   { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' },
 ])
-
 
 /**
  * 레이더 숫자를 단색으로 찍는다 — 원본 0x5ad94 가 색이 있으면 0x6aff8 에 효과 0xb(단색)를 넘긴다.

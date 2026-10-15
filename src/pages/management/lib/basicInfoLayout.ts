@@ -1,5 +1,6 @@
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { BATTER_BURSTS } from '@/shared/config/original/bursts'
 
 /**
  * 선수정보 → 기본정보 (0x15e20: 카드 0x7ba44 → 선수 그림 → 정보 칸 0x7c450, 레이더 0x5a990 — layout-re 3차).
@@ -82,8 +83,21 @@ export const BATTING_TYPE_NAMES = ['타격형', '장타형']
 export const POSITION_NAMES = ['내야', '외야']
 export const SIDE_NAMES = ['우타', '좌타']
 export const SKIN_NAMES = ['황인', '백인', '흑인']
-/** 선수 그림 칸 (11,53,93,117) · 오른쪽 판 (122,48,107,84) · 발 기준 (57,160) */
-export const FIGURE_BOX = { x: 11, y: 53, width: 93, height: 117 }
-export const RIGHT_PANEL = { x: 122, y: 48, width: 107, height: 84 }
+
+/**
+ * 정보 칸 필살 줄 — 나리 타자편 갈래 (0x7cb5c~0x7cbc0, 직접 떴다):
+ * ```
+ * n = ldrb [기록+0x18] ; n ≤ 0 이면 줄을 안 쓴다(0x7cb84 `ble`)
+ * i = 0x18 + n + (0x7b984(gfx) 투수편 ? 6 : 0) + (n == 4 ? [기록+0xb] >> 5 : 0)
+ * 0xba411(칸, StrCOMMON[i], 정렬 0x22)
+ * ```
+ * 타자편은 StrCOMMON[25~28] 파워 · 플레임 · 토네이도 · 미라지 스윙, 장타형(타입 1)의 4 는 [29] 메테오 스윙이다.
+ * 기록 +0x18 은 1~4 만 들어간다(고르기 0x17c64 · 훈련 완료 0x1816c 둘 다 `칸 + 1`).
+ */
+export function basicInfoSpecialNameOf(number: number, battingTypeIndex: number): string {
+  if (number <= 0) return ''
+  return BATTER_BURSTS[number - 1 + (number === 4 ? battingTypeIndex : 0)] ?? ''
+}
+/** 선수 그림 발 기준 (57,160) — 프레임 박스 0 (11,53,93,117) 의 (x + (w >> 1), y + h − 10) */
 export const FIGURE_FOOT = { x: 57, y: 160 }
 export const ABILITY_TITLE = { plate: { x: 154, y: 53 }, frame: 159, centerX: 178, y: 57 }

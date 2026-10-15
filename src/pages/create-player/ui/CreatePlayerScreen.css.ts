@@ -22,22 +22,6 @@ export const backdrop = style({
   pointerEvents: 'none',
 })
 
-/** 기본정보 카드 판 — 그림칸(11,53,93,117)·오른쪽 판(122,48,107,84). 원본 0x7ba44 그리기는 박스만 확인 (추정) */
-export const cardPanel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
-  background: ORIGINAL_COLORS.panelDeep,
-  pointerEvents: 'none',
-})
-
-/** 정보 판 (21,176,196,83) #335FCD */
-export const infoBoard = style({
-  position: 'absolute',
-  background: ORIGINAL_COLORS.boardFill,
-  pointerEvents: 'none',
-})
-
 /** 선수 미리보기 묶음 — 좌타면 발 기준을 축으로 좌우를 뒤집는다 */
 export const figure = style({
   position: 'absolute',

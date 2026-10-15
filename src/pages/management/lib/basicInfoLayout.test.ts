@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { RADAR_CENTER, radarLabelBoxOf, radarPointOf, abilityColorOf } from '@/pages/management/lib/basicInfoLayout'
+import {
+  RADAR_CENTER, radarLabelBoxOf, radarPointOf, abilityColorOf, basicInfoSpecialNameOf,
+} from '@/pages/management/lib/basicInfoLayout'
 
 describe('기본정보 레이더 차트 — 0x5a990', () => {
   it('중심 (178,104), 반지름 30, 값 999 면 축 끝이다', () => {
@@ -27,5 +29,20 @@ describe('기본정보 레이더 차트 — 0x5a990', () => {
 
   it('기본값보다 표시값이 크면 초록, 작으면 빨강 (0x7c008)', () => {
     expect([abilityColorOf(500, 550), abilityColorOf(500, 400), abilityColorOf(500, 500)]).toEqual(['#00FF40', '#FF0000', null])
+  })
+})
+
+describe('정보 칸 필살 줄 — 0x7cb5c~0x7cbc0 (StrCOMMON[0x18 + n + (n == 4 ? 타입 : 0)])', () => {
+  it('번호 0 은 빈 줄이다 (0x7cb84 ble)', () => {
+    expect(basicInfoSpecialNameOf(0, 0)).toBe('')
+  })
+
+  it('1~3 은 타입과 상관없이 StrCOMMON[25~27]', () => {
+    expect([1, 2, 3].map((n) => basicInfoSpecialNameOf(n, 1))).toEqual(['파워 스윙', '플레임 스윙', '토네이도스윙'])
+  })
+
+  it('4 는 타격형이면 [28] 미라지 스윙 · 장타형이면 [29] 메테오 스윙', () => {
+    expect(basicInfoSpecialNameOf(4, 0)).toBe('미라지 스윙')
+    expect(basicInfoSpecialNameOf(4, 1)).toBe('메테오 스윙')
   })
 })

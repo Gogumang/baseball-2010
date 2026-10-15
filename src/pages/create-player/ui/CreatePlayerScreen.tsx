@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { FrameSprite, MessageBox, PressArea, RawScreen, TextField } from '@/shared/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { FrameSprite, MessageBox, PaintedRects, PressArea, RawScreen, TextField } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
@@ -12,8 +12,10 @@ import { batterLayerPaletteIndex, batterLayersOf, NO_EQUIPMENT } from '@/widgets
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 // 원본은 등록 화면을 관리 화면 기본정보 카드(0x15e20)로 그린다 — 카드 좌표·레이더를 그대로 가져다 쓴다
-import { FIGURE_BOX, FIGURE_FOOT, INFO_BOARD, RIGHT_PANEL } from '@/pages/management/lib/basicInfoLayout'
+import { FIGURE_FOOT, INFO_BOARD } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
+import { CardPlate } from '@/pages/management/ui/CardPlate'
+import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import {
   ARROW, BACKDROP, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
   INFO_FRAME, ROOKIE_BATTING_ORDER, ROW_HINTS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
@@ -67,6 +69,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
   const [radarRearms, setRadarRearms] = useState(0)
   const labelOrigins = useFrameOrigins(IMG_TEXT)
   const uiOrigins = useFrameOrigins(MODE_UI)
+  const infoBoard = useMemo(() => boardRectsOf(INFO_BOARD, false), [])
 
   const ability = rookieAbilityOf(profile.battingTypeIndex, profile.positionIndex)
   const selectedId = ROW_ORDER[selectedRow]
@@ -141,11 +144,10 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
       <div className={styles.backdrop}
         style={{ left: BACKDROP.x, top: BACKDROP.y, width: BACKDROP.width, height: BACKDROP.height }} />
 
-      {/* 기본정보 카드 0x15e20 — 그림칸 · 오른쪽 판 · 선수 그림 · ABILITY 레이더 · 정보 칸 */}
-      <div className={styles.cardPanel}
-        style={{ left: FIGURE_BOX.x, top: FIGURE_BOX.y, width: FIGURE_BOX.width, height: FIGURE_BOX.height }} />
-      <div className={styles.cardPanel}
-        style={{ left: RIGHT_PANEL.x, top: RIGHT_PANEL.y, width: RIGHT_PANEL.width, height: RIGHT_PANEL.height }} />
+      {/* 기본정보 카드 0x15e20 — 카드 0x7ba44(계단형 판 · 팀 로고 · ABILITY 레이더) · 선수 그림 · 정보 칸 */}
+      <CardPlate teamId={teamId} />
+      {/* 시작 능력치 (0x16e2c) — 타입·포지션을 바꾸면 그때마다 다시 계산되고, 레이더는 0 에서 다시 자란다 (0x16f28) */}
+      <RadarChart base={ability} shown={ability} growth={{ restartKey: radarRearms, restartFromZero: true }} />
 
       {/*
         줄 1(타입)·3(손)을 바꾸면 원본은 그림을 다시 적재한다 (0x10810 → 0x78ab0):
@@ -171,11 +173,8 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
         ))}
       </div>
 
-      {/* 시작 능력치 (0x16e2c) — 타입·포지션을 바꾸면 그때마다 다시 계산되고, 레이더는 0 에서 다시 자란다 (0x16f28) */}
-      <RadarChart base={ability} shown={ability} growth={{ restartKey: radarRearms, restartFromZero: true }} />
-
-      <div className={styles.infoBoard}
-        style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height }} />
+      {/* 정보 칸 0x7c450 판 0x7c110(gfx, 박스 0, 0) */}
+      <PaintedRects x={0} y={0} width={240} height={320} paints={infoBoard} testId="정보칸-판" />
       {/* 값 칸 그림 = mode_ui 프레임 2 (타자). 프레임 원점이 (60,184) 이라 (0,0) 으로 넘긴다 */}
       <FrameSprite folder={MODE_UI} frame={INFO_FRAME.batter} origins={uiOrigins} x={0} y={0} />
 
