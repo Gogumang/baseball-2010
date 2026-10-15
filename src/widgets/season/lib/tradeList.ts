@@ -2,7 +2,8 @@ import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/mode
 import { tradePenaltyOf, tradeRefusalOf } from '@/entities/season-mode/model/playerTrade'
 import type { TradeRefusal } from '@/entities/season-mode/model/playerTrade'
 import { TRADE_REQUEST_TAB, playerGradeOf } from '@/entities/season-mode/model/tradeRequest'
-import { playerFaceOf } from '@/entities/season-mode/model/seasonEntry'
+import { playerFaceOf, seasonEntryCellsOf } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
 
 /**
  * 트레이드 화면(0xe5 영입 선수 · 0xe6 보상 선수)이 보여 줄 명단.
@@ -30,7 +31,12 @@ export interface TradePlayerEntry {
   readonly penalty: number
   /** 나리·명예 선수면 트레이드 거절 (StrMODE[165]/[166]) */
   readonly refusal: TradeRefusal | null
+  /** 레코드 +0xb & 3 — 확인 판 딱지(0xd4e8) · 목록 창 보직 딱지 (모르면 undefined) */
+  readonly profileLow?: number
 }
+
+/** +0xb & 3 만 보면 되는 칸 재료 — 줄 · 체력은 안 쓴다 */
+const PROFILE_ONLY: SeasonEntryCellSource = { staminaMode: 2, teamMorale: 100 }
 
 /** 한 팀 레코드의 탭 명단 — 내 팀(0xe6)·상대 팀(0xe5) 모두 같은 규칙이다 */
 export function tradeEntriesOf(
@@ -47,7 +53,13 @@ export function tradeEntriesOf(
     grade: playerGradeOf(teamId, tab, player),
     penalty: tradePenaltyOf(player, teamId, tab),
     refusal: tradeRefusalOf(player),
+    ...profileLowOf(teamId, player, isPitcher),
   }))
+}
+
+function profileLowOf(teamId: number, player: SeasonPlayer, isPitcher: boolean): { readonly profileLow?: number } {
+  const { profileLow } = seasonEntryCellsOf(teamId, player, isPitcher, 0, [], PROFILE_ONLY)
+  return profileLow === undefined ? {} : { profileLow }
 }
 
 /** 상대 팀 명단 (0xe5) — 시즌 저장의 그 팀 레코드 */

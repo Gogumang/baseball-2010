@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { TradeScreen, tradeQuestionTextOf } from '@/pages/season/ui/TradeScreen'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
@@ -81,9 +81,16 @@ const 띄우기 = (
 const 틀보내기 = () => act(() => {
   vi.advanceTimersByTime(millisecondsPerFrame() * 120)
 })
+/** 누름 칸 — 보통 단추, 엔트리 목록 창 줄은 목록 칸(option) */
+const 칸 = (이름: string | RegExp) => screen.queryByRole('button', { name: 이름 }) ?? screen.getByRole('option', { name: 이름 })
 const 누르기 = (이름: string | RegExp) => {
-  fireEvent.click(screen.getByRole('button', { name: 이름 }))
+  fireEvent.click(칸(이름))
   틀보내기()
+}
+/** 0xe5 · 0xe6 진입 알림 [163] · [164] (요청이면 [204] · [205]) 을 닫는다 — 0x5cd0 · 0x5b28 이 늘 띄운다 */
+const 알림닫기 = () => {
+  const 창 = screen.queryByRole('dialog', { name: '알림' })
+  if (창 !== null) fireEvent.click(within(창).getByRole('button', { name: '확인' }))
 }
 /** 단계 2·3 의 결과 글 [174]/[175] — 판 위에 그린다(팝업이 아니다) */
 const 결과글 = () => screen.getByRole('status', { name: '트레이드 진행' }).textContent ?? ''
@@ -92,11 +99,19 @@ const 결과닫기 = () => fireEvent.keyDown(window, { key: 'Enter' })
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 /** 0xe4 → 0xe5 : 상대 팀을 고른다 — 0x4774 가 탭을 0(투수)으로 지워 투수 목록으로 열린다 */
-const 상대팀고르기 = () => 누르기(TEAMS[OPPONENT].name)
-/** 0xe4 → 0xe5 → '*' : 타자 목록으로 뒤집는다 */
+const 상대팀고르기 = () => {
+  누르기(TEAMS[OPPONENT].name)
+  알림닫기()
+}
+/** 0xe4 → 0xe5 → '*' : 타자 목록으로 뒤집는다 — 바닥띠 "*타자" 표시 자리 */
 const 타자로 = () => {
   상대팀고르기()
-  누르기('타자')
+  누르기('* 타자')
+}
+/** 0xe5 에서 영입할 선수를 고르고 0xe6 진입 알림 [164] 를 닫는다 */
+const 영입고르기 = (이름: string) => {
+  누르기(이름)
+  알림닫기()
 }
 
 describe('0xe4 팀 고르기', () => {
@@ -128,21 +143,24 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
   it('고른 팀의 **투수** 명단이 먼저 나온다 — 0xe4 진입이 탭(this+0x154)을 0 으로 지운다 (StrMODE[163])', () => {
     띄우기(상태())
 
-    상대팀고르기()
+    누르기(TEAMS[OPPONENT].name)
+    // 0x5cd0 — 들어올 때 늘 [163] 알림
+    expect(알림글()).toContain('영입할 선수를 선택합니다')
+    알림닫기()
 
-    expect(document.body.textContent).toContain('영입할 선수를 선택합니다')
-    expect(screen.getByRole('button', { name: teamPitchers(OPPONENT)[0].name })).toBeDefined()
-    expect(screen.getByRole('button', { name: '투수' }).getAttribute('aria-current')).toBe('true')
+    expect(칸(teamPitchers(OPPONENT)[0].name)).toBeDefined()
+    // 투수 탭 바닥 0xf — "*타자" 표시 · 제목 7 "투수엔트리"
+    expect(screen.getByRole('button', { name: '* 타자' })).toBeDefined()
+    expect(screen.getByTestId('엔트리-열-등판순서-8000000')).toBeDefined()
   })
 
-  it('탭 단추 첫째가 투수(탭 0) · 둘째가 타자(탭 1)다 — 타자를 누르면 타자 명단', () => {
+  it('바닥띠 "*타자" 표시를 누르면 타자 명단 — 바닥이 0x17("*투수")로 바뀐다', () => {
     띄우기(상태())
     상대팀고르기()
 
-    const 단추들 = screen.getByRole('group', { name: '트레이드 탭' }).querySelectorAll('button')
-    expect([...단추들].map((단추) => 단추.textContent)).toEqual(['투수', '타자'])
-    누르기('타자')
-    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[0].name })).toBeDefined()
+    누르기('* 타자')
+    expect(칸(teamBatters(OPPONENT)[0].name)).toBeDefined()
+    expect(screen.getByRole('button', { name: '* 투수' })).toBeDefined()
   })
 
   it("'*' 키도 목록 탭을 뒤집는다 (편집기 559b2)", () => {
@@ -150,15 +168,15 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
     상대팀고르기()
 
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[0].name })).toBeDefined()
+    expect(칸(teamBatters(OPPONENT)[0].name)).toBeDefined()
   })
 
   it('⚠️ 0xe6 에서 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로다 (원본 그대로 — 0x727c 는 this+0x154 를 본다)', () => {
     // 소지금은 넉넉히 — 내 선수가 낮아 d < 0 이면 진행 가드 [77] 이 먼저 걸린다
     const { onTrade } = 띄우기(상태({ money: 9999 }), { random: 고정난수(1) })
     상대팀고르기() // 투수 탭
-    누르기(teamPitchers(OPPONENT)[1].name)
-    누르기('타자') // 0xe6 목록만 타자로
+    영입고르기(teamPitchers(OPPONENT)[1].name)
+    fireEvent.keyDown(window, { key: '*' }) // 0xe6 목록만 타자로 (바닥 7 이라 표시는 없다)
     누르기(teamBatters(MY_TEAM)[2].name) // 보이는 것은 타자 2번이지만 투수 탭 2번 칸이 된다
     누르기(/기본 진행/)
     누르기('예')
@@ -172,8 +190,10 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
     타자로()
     누르기(teamBatters(OPPONENT)[0].name)
 
-    expect(document.body.textContent).toContain('보상할 우리')
-    expect(screen.getByRole('button', { name: teamBatters(MY_TEAM)[0].name })).toBeDefined()
+    // 0x5b28 — [164] 알림
+    expect(알림글()).toContain('보상할 우리')
+    알림닫기()
+    expect(칸(teamBatters(MY_TEAM)[0].name)).toBeDefined()
   })
 
   it('영입해 온 나리 선수는 보상으로 못 낸다 (StrMODE[165])', () => {
@@ -186,7 +206,7 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
     띄우기(상태(), { roster: 나리가낀명단 })
 
     타자로()
-    누르기(teamBatters(OPPONENT)[0].name)
+    영입고르기(teamBatters(OPPONENT)[0].name)
     // 기록 사본이 없는 표 밖 선수는 `타자 N번` 으로 적힌다
     누르기('타자 1번')
 
@@ -200,7 +220,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   const 확인까지 = (나머지: Partial<Parameters<typeof TradeScreen>[0]> = {}, 상대칸 = 같은값칸, 내칸 = 같은값칸) => {
     const handles = 띄우기(상태(), 나머지)
     타자로()
-    누르기(teamBatters(OPPONENT)[상대칸].name)
+    영입고르기(teamBatters(OPPONENT)[상대칸].name)
     누르기(teamBatters(MY_TEAM)[내칸].name)
     return handles
   }
@@ -213,8 +233,8 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   it('+0x1b 차이가 성공률을 깎는다 — d = 110 이면 40 − 44 − 20 → 바닥 3%', () => {
     확인까지({}, 0, 0)
 
-    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('3%')
-    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('53%')
+    expect(screen.getByRole('button', { name: /기본 진행/ }).getAttribute('aria-label')).toContain('3%')
+    expect(screen.getByRole('button', { name: /\+50%/ }).getAttribute('aria-label')).toContain('53%')
   })
 
   it('성공하면 소지금에 d 가 더해진다 (0xd180 — 좋은 선수를 내주면 들어온다)', () => {
@@ -243,9 +263,9 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
   it('비용 세 칸과 그 성공률이 나온다 — 두 타자 다 마스터 칸 6 이라 벌점 0, 기본은 40% 다 (0xb6561)', () => {
     확인까지()
 
-    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain('40%')
-    expect(screen.getByRole('button', { name: /\+50%/ }).textContent).toContain('90%')
-    expect(screen.getByRole('button', { name: /\+20%/ }).textContent).toContain('60%')
+    expect(screen.getByRole('button', { name: /기본 진행/ }).getAttribute('aria-label')).toContain('40%')
+    expect(screen.getByRole('button', { name: /\+50%/ }).getAttribute('aria-label')).toContain('90%')
+    expect(screen.getByRole('button', { name: /\+20%/ }).getAttribute('aria-label')).toContain('60%')
   })
 
   it('타자 탭 마스터 칸 3 은 벌점 10 · 0 은 6 이다 — 3번끼리면 d 를 빼고 40 − 20 (표 값으로 견준다)', () => {
@@ -253,7 +273,7 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
     const d = (teamBatters(MY_TEAM)[3].grade - teamBatters(OPPONENT)[3].grade) * 10
     const 깎임 = Math.trunc((Math.abs(d < 0 ? d * 2 : d) * 100) / 250)
 
-    expect(screen.getByRole('button', { name: /기본 진행/ }).textContent).toContain(`${Math.max(40 - 깎임 - 20, 3)}%`)
+    expect(screen.getByRole('button', { name: /기본 진행/ }).getAttribute('aria-label')).toContain(`${Math.max(40 - 깎임 - 20, 3)}%`)
   })
 
   it('성공하면 맞바꿀 두 칸(탭·내 칸·상대 칸·상대 팀)을 넘기고 커맨드가 닫힌다', () => {
@@ -375,8 +395,8 @@ describe('0xe7 진행 연출 (0xcecc · 0xc66c 단계 1~3)', () => {
     const random: RandomPort = { rand: (lo, hi) => (굴림.push([lo, hi]), lo), rand9d: () => 0 }
     띄우기(상태(), { random })
     상대팀고르기()
-    fireEvent.click(screen.getByRole('button', { name: teamPitchers(OPPONENT)[0].name }))
-    fireEvent.click(screen.getByRole('button', { name: teamPitchers(MY_TEAM)[0].name }))
+    영입고르기(teamPitchers(OPPONENT)[0].name)
+    fireEvent.click(칸(teamPitchers(MY_TEAM)[0].name))
     fireEvent.click(screen.getByRole('button', { name: /기본 진행/ }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
@@ -402,8 +422,8 @@ describe('0xe7 진행 연출 (0xcecc · 0xc66c 단계 1~3)', () => {
   it('진행 중 확인 키는 게이지를 채워 다음 틀에 끝낸다 (0xc76e → this+0x164 = 너비)', () => {
     const { onTrade } = 띄우기(상태(), { random: 고정난수(1) })
     상대팀고르기()
-    fireEvent.click(screen.getByRole('button', { name: teamPitchers(OPPONENT)[0].name }))
-    fireEvent.click(screen.getByRole('button', { name: teamPitchers(MY_TEAM)[0].name }))
+    영입고르기(teamPitchers(OPPONENT)[0].name)
+    fireEvent.click(칸(teamPitchers(MY_TEAM)[0].name))
     fireEvent.click(screen.getByRole('button', { name: /기본 진행/ }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
@@ -466,7 +486,7 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
 
     expect(알림글()).toContain('상대 팀에서 제시한')
     누르기('확인')
-    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[2].name })).toBeDefined()
+    expect(칸(teamBatters(OPPONENT)[2].name)).toBeDefined()
   })
 
   it('다른 줄을 눌러도 요청 칸으로 진행하고 [205] → 확인 단계, 성공이 강제된다 (뽑기 100 이어도)', () => {
@@ -495,13 +515,13 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
   it('위·아래를 눌러도 커서가 요청 칸에서 안 움직인다 (−3 → 보기 전용 편집기 0x559f8 은 끝 코드만 적는다)', () => {
     띄우기(상태(), { request: 요청 })
     누르기('확인')
-    const 커서줄 = () => screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true')
+    const 커서줄 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
 
-    expect(커서줄()?.textContent).toContain(teamBatters(OPPONENT)[2].name)
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamBatters(OPPONENT)[2].name)
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowUp' })
     fireEvent.keyDown(window, { key: 'ArrowUp' })
-    expect(커서줄()?.textContent).toContain(teamBatters(OPPONENT)[2].name)
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamBatters(OPPONENT)[2].name)
   })
 
   it("요청 중에는 '*' 가 편집기에 안 가 탭이 묶인다 (0x7104 `키 == 0x2a` 거르기)", () => {
@@ -509,8 +529,10 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
     누르기('확인')
 
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.getByRole('button', { name: teamBatters(OPPONENT)[2].name })).toBeDefined()
-    expect(screen.queryByRole('group', { name: '트레이드 탭' })).toBeNull()
+    expect(칸(teamBatters(OPPONENT)[2].name)).toBeDefined()
+    // 요청이면 0xe5 바닥이 7 — "*투수" · "*타자" 표시가 없다 (0xb116~0xb124)
+    expect(screen.queryByRole('button', { name: '* 투수' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '* 타자' })).toBeNull()
   })
 
   it('영입 단계에서 취소하면 [216] — 예면 요청을 버린다', () => {
@@ -529,7 +551,7 @@ describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 
     띄우기(상태(), { request: { ...요청, tab: 0 } })
     누르기('확인')
 
-    expect(screen.getByRole('button', { name: teamPitchers(OPPONENT)[2].name })).toBeDefined()
+    expect(칸(teamPitchers(OPPONENT)[2].name)).toBeDefined()
   })
 })
 
@@ -544,8 +566,8 @@ describe('상대 팀 레코드 (시즌 저장의 CPU 명단)', () => {
     띄우기(상태(), { opponentRosterOf: () => 상대 })
     타자로()
 
-    expect(screen.getByRole('button', { name: teamBatters(MY_TEAM)[1].name })).toBeDefined()
-    expect(screen.queryByRole('button', { name: teamBatters(OPPONENT)[4].name })).toBeNull()
+    expect(칸(teamBatters(MY_TEAM)[1].name)).toBeDefined()
+    expect(screen.queryByRole('option', { name: teamBatters(OPPONENT)[4].name })).toBeNull()
   })
 
   it('데려온 선수는 내 목록에서 옛 팀 표 이름으로 나온다 — 내 팀 표의 같은 칸 이름이 아니다', () => {
@@ -554,9 +576,9 @@ describe('상대 팀 레코드 (시즌 저장의 CPU 명단)', () => {
     })
     띄우기(상태(), { roster: 내명단 })
     타자로()
-    누르기(teamBatters(OPPONENT)[0].name)
+    영입고르기(teamBatters(OPPONENT)[0].name)
 
-    expect(screen.getAllByRole('button', { name: teamBatters(OPPONENT)[7].name }).length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: teamBatters(MY_TEAM)[2].name })).toBeNull()
+    expect(screen.getAllByRole('option', { name: teamBatters(OPPONENT)[7].name }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('option', { name: teamBatters(MY_TEAM)[2].name })).toBeNull()
   })
 })

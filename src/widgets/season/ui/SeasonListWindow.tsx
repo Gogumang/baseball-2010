@@ -27,8 +27,8 @@ export interface SeasonListWindowProps {
   readonly onBack?: () => void
   readonly backLabel?: string
   /**
-   * 그 화면의 원본 판 인자 — 안 주면 기본 판(24, 54, 192, 212). 주면 그 자리 · 위 띠 · 제목 탭으로 긋고, 판 위 제목 글은
-   * 밝은 띠 · 탭 위에서 보이게 짙은 남색으로 둔다(⚠️ 근사 — 원본 제목 그림은 아직 안 떴다).
+   * 판 인자 — 안 주면 기본 판(24, 54, 192, 212). 주면 그 자리 · 위 띠 · 제목 탭으로 긋고, 판 위 제목 글은 밝은 띠 · 탭 위에서
+   * 보이게 짙은 남색으로 둔다(⚠️ 근사 — 이 목록 창을 쓰는 원본 화면은 이제 없다. 아래 판 주석)
    */
   readonly panel?: SeasonListPanel
 }
@@ -41,11 +41,6 @@ export interface SeasonListPanel {
   readonly topBand?: number
   readonly titleTab?: boolean
 }
-
-/** 0xe8 십전대보탕 투수 고르기 — 0x5cfec → 0x5c984 의 5ca4e 판 (W/2, H/2 + 5, 210, 220, 정렬 0x22, 위 띠 0x12; 아래 띠는 늘 0) */
-export const ENTRY_LIST_PANEL: SeasonListPanel = { x: 120 - 105, y: 165 - 110, width: 210, height: 220, topBand: 0x12 }
-/** 0xe7 트레이드 확인 — 0xd4e8 의 d5b4 판 = mode_ui 프레임 70 박스 0 (24, 57, 192, 210), 정렬 0x11 · 위 띠 0x10 · 제목 탭 1 */
-export const TRADE_CONFIRM_PANEL: SeasonListPanel = { x: 24, y: 57, width: 192, height: 210, topBand: 0x10, titleTab: true }
 
 /**
  * 시즌 화면들이 함께 쓰는 **공용 판 목록 창**.
@@ -66,15 +61,13 @@ export function SeasonListWindow({
 
   return (
     <div role="group" aria-label={title}>
-      {/* 공용 판 0x55e61 — ⚠️ 근사: 이 목록 창을 쓰는 화면들의 원본 그림은 0x55e60 을 부르지 않거나 다른 인자다.
-          · 0xe2 선수영입(0xa10c) · 0xe4 트레이드 팀 고르기(0xa14c): 공용 목록 0x63b15 + 0x7f4ed 뿐 — 0x63b14 는
-            0x55e60 을 부르지 않는다(0x55e60 의 BL · 리터럴 참조 전수에 없다)
-          · 0xe7 트레이드 확인(0xd4e8): 0x55e61(skin, 박스 x · y · w · h, 0, 0x11, 0x10, 0, 제목 탭 1, 0) (d570~d5b4)
-          · 0xe8 십전대보탕 투수 고르기(0xafd0): 엔트리 목록 창 0x5cfec → 0x5c984 의 0x55e60(…, W/2, H/2 + 5, 210, 220,
-            0, 0x22, 위 띠 0x12, 아래 띠 ([편집기+0x3e8] == 1 ? 0x12 : 0), 0, 0) (5ca2c~5ca4e)
-          · 레벨업 창 0x5f394 (r5 = [sp+0x58] = 0 · r7 = 1, 5f3aa · 5f3c4) 의 0x55e60(…, 192, 212, 0, 0x22, 0, 0, 제목 탭 1,
-            어둡게 1) 은 이 목록이 아니라 `widgets/ace-level-up` 의 창이다.
-          0xe7 · 0xe8 은 `panel` 로 그 판을 넘긴다(`TRADE_CONFIRM_PANEL` · `ENTRY_LIST_PANEL`). 그 밖은 기본 판 */}
+      {/* 공용 판 0x55e61 — ⚠️ 근사: 이 목록 창은 이제 선수영입 0xe2 의 `renderCandidates` 없는 길(시험)만 쓴다.
+          원본 화면마다의 그림은 각자 옮겼다(r89):
+          · 0xe2 선수영입(0xa10c): 공용 목록 0x63b15 k 6 + 0x7f4ed — 앱은 명예의 전당 목록(`HallOfFameScreen`)을 꽂는다
+          · 0xe4 트레이드 팀 고르기(0xa14c): 공용 목록 0x63b15 + 0x7f4ed — `TeamSelectScreen`
+          · 0xe5 · 0xe6 트레이드 선수(0xb0f4 · 0xb0b4) · 0xe8 십전대보탕 투수 고르기(0xafd0): 엔트리 목록 창 0x5cfec — `EntryListWindow`
+          · 0xe7 트레이드 확인(0xd4e8): mode_ui 프레임 70 · 71 판 — `TradeConfirmWindow`
+          · 레벨업 창 0x5f394 의 0x55e60(…, 192, 212, 0, 0x22, 0, 0, 제목 탭 1, 어둡게 1) 은 `widgets/ace-level-up` 의 창이다 */}
       {panel === undefined
         ? <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
         : <CommonPanel x={panel.x} y={panel.y} width={panel.width} height={panel.height} topBand={panel.topBand ?? 0}

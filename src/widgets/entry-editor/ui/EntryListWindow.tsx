@@ -144,7 +144,7 @@ function EntryListPresses({ geometry, rows, top, cursor, onPressRow, onPressArro
       {onPressRow !== undefined && rows.map((row, offset) => {
         const index = top + offset
         return (
-          <PressArea key={index} label={index === cursor ? `${row.name} 고르기` : row.name} testId={`엔트리-줄-${index}`}
+          <PressArea key={index} label={row.name} testId={`엔트리-줄-${index}`}
             option={{ isSelected: index === cursor }}
             rect={{ x: rowLeft, y: entryRowYOf(index, top), width: rowWidth, height: L.cellHeight }}
             onPress={() => onPressRow(index)} />

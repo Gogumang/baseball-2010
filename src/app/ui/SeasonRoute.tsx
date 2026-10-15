@@ -558,6 +558,8 @@ function SeasonScreens({
         onBack={backToTeamMenu}
         // 0xe4 히든 칸 힌트 — 해금(전역 +0x70)이면 [0] 줄이 빠진다 (0x82f0)
         openedHiddenIds={hallOfFame?.openedHiddenIds ?? []}
+        // 0xe5 · 0xe6 엔트리 목록 창 칸 재료 — 그 팀 레코드의 시즌 줄 · 체력
+        entryCellSourceOf={session.entryCellSourceOf}
       />
     )
   }
