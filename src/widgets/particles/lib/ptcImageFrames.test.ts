@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PTC_IMAGE_FRAMES, PTC_PART_IMAGE, ptcPartOf } from '@/widgets/particles/lib/ptcImageFrames'
-import { drawAlphaOf, DRAW_STRENGTH_MAX } from '@/widgets/particles/lib/renderParticles'
+import { particleEffectOf, DRAW_STRENGTH_MAX } from '@/widgets/particles/lib/renderParticles'
+import { DRAW_EFFECT, isEffectDrawn } from '@/shared/lib/pixelEffect/pixelEffect'
 
 describe('ptcimg 프레임 표', () => {
   it('프레임 17개를 든다', () => {
@@ -39,17 +40,18 @@ describe('파트 고르기 — 파트[ life % 파트수 ]', () => {
   })
 })
 
-describe('A → 알파 (유력)', () => {
-  it('mode 2 는 A 를 0~256 비율로 쓴다', () => {
-    expect(drawAlphaOf(2, DRAW_STRENGTH_MAX)).toBe(1)
-    expect(drawAlphaOf(2, 128)).toBe(0.5)
+describe('입자 그리기 효과 — vtbl+0x14(그림, x, y, mode, A >> 8, 0) (0x6dc4c → 0xc9f08)', () => {
+  it('mode 2 는 효과 2 더하기 · 인자 A >> 8', () => {
+    expect(particleEffectOf(2, 128)).toEqual({ effect: DRAW_EFFECT.ADDITIVE, argument: 128 })
   })
 
-  it('mode 0 은 A 를 보지 않는다 (파일 001)', () => {
-    expect(drawAlphaOf(0, 0)).toBe(1)
+  it('mode 0 은 효과 0 그냥 복사 (파일 001)', () => {
+    expect(particleEffectOf(0, 0)).toEqual({ effect: DRAW_EFFECT.COPY, argument: 0 })
   })
 
-  it('A 가 범위를 벗어나도 0~1 안에 든다', () => {
-    expect([drawAlphaOf(2, -10), drawAlphaOf(2, 9999)]).toEqual([0, 1])
+  it('A 가 1.0 이면 b = 256 이라 효과 2 가 안 그린다 (0x973d8 — 원본 그대로)', () => {
+    const { effect, argument } = particleEffectOf(2, DRAW_STRENGTH_MAX)
+    expect(isEffectDrawn(effect, argument)).toBe(false)
+    expect(isEffectDrawn(effect, 255)).toBe(true)
   })
 })
