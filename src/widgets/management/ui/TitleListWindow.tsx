@@ -146,7 +146,6 @@ export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowPro
                 left: nameBox.x, top: nameBox.y + dy, width: nameBox.width, height: nameBox.height,
                 color: isEquipped ? TITLE_LIST_COLORS.equippedText : TITLE_LIST_COLORS.text,
               }}
-              onMouseEnter={() => setCursor(index)}
               onClick={(event) => { event.stopPropagation(); setCursor(index); confirm(index) }}>
               {title}
             </button>

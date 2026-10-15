@@ -415,7 +415,6 @@ export function SettingsScreen({
 
             <button type="button" className={styles.row} aria-label={name}
               style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
-              onMouseEnter={() => setCursor(index)}
               onClick={() => { setCursor(index); openRow(index) }} />
           </div>
         )
@@ -433,7 +432,6 @@ export function SettingsScreen({
 
       <button type="button" className={styles.row} aria-label="확인"
         style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: okButtonTopOf(panel.height), width: OK_BUTTON.width, height: OK_BUTTON.height }}
-        onMouseEnter={() => setCursor(okCell)}
         onClick={() => { setCursor(okCell); leave() }}>
         <img className={styles.sprite} alt=""
           src={imageSrc(POPUP, isOkSelected ? OK_SELECTED_FRAME : OK_BUTTON.frame)}
@@ -636,7 +634,6 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
                 left: DETAIL_ROW.outline.x, top: top + DETAIL_ROW.outline.dy,
                 width: DETAIL_ROW.outline.width, height: DETAIL_ROW.outline.height,
               }}
-              onMouseEnter={() => setCursor(index)}
               onClick={() => { setCursor(index); onChange(toggleDetail(settings, index)) }} />
           </div>
         )
@@ -803,7 +800,6 @@ function ModeResetPage({
             )}
             <button type="button" className={styles.row} aria-label={name}
               style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
-              onMouseEnter={() => setCursor(index)}
               onClick={() => { setCursor(index); openRow(index) }} />
           </div>
         )

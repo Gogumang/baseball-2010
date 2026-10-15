@@ -102,7 +102,6 @@ export function SeasonListWindow({
             aria-current={isSelected}
             disabled={row.isDisabled === true}
             style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
-            onMouseEnter={() => onMoveCursor(index)}
             onClick={() => {
               onMoveCursor(index)
               onSelect(index)

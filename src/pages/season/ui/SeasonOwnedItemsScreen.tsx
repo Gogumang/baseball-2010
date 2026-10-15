@@ -93,7 +93,7 @@ export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBa
             <button key={item.slot} type="button" aria-label={item.isOwned ? item.name : `빈 칸 ${index}`}
               aria-current={index === cursor} className={styles.slotButton}
               style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}
-              onMouseEnter={() => setCursor(index)} onClick={() => setCursor(index)}>
+              onClick={() => setCursor(index)}>
               {item.isOwned && <img alt="" src={`${ITEM_ICON}/${pad(item.iconFrame)}.png`} />}
             </button>
           )

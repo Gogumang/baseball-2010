@@ -161,9 +161,8 @@ export function ShopWindow({
         const index = firstVisible + offset
         const { x, y } = slotPositionOf(offset)
         return (
-          <button key={entry.id} type="button" aria-label={entry.name} className={styles.slotButton}
+          <button key={entry.id} type="button" aria-label={entry.name} aria-current={cursor === index} className={styles.slotButton}
             style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}
-            onMouseEnter={() => onMoveCursor(index)}
             onClick={() => (cursor === index ? onSelect(index) : onMoveCursor(index))}>
             {entry.iconFrame !== null && (
               <img className={entry.isOwned ? styles.ownedIcon : undefined} alt=""

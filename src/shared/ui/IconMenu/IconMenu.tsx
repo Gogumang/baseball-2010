@@ -86,7 +86,6 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
             aria-selected={index === selectedIndex}
             aria-label={item.label}
             disabled={item.isDisabled === true}
-            onPointerEnter={() => setSelectedIndex(index)}
             onClick={() => {
               setSelectedIndex(index)
               onSelect(item.id)

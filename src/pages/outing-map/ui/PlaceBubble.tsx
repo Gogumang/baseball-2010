@@ -108,7 +108,6 @@ export function PlaceBubble({ place, onEnter, onRun, onClose }: PlaceBubbleProps
               // 고른 칸은 칸을 1px 씩 둘러싼 노랑 사각 테두리다 (0x6a979)
               outline: isSelected ? `1px solid ${SELECTED_COLOR}` : undefined,
             }}
-            onMouseEnter={() => setSelected(index)}
             onFocus={() => setSelected(index)}
             onClick={() => answer(index)}
           >

@@ -222,7 +222,6 @@ export function TeamSelectScreen({
               setCursor(index)
               onSelectLocked?.(index)
             }}
-            onMouseEnter={() => setCursor(index)}
           >
             {/* 칸 바탕(slt_frame 0) 먼저 깔고 그 위에 로고·물음표를 얹는다 */}
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)}

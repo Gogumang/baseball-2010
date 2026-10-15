@@ -28,10 +28,10 @@ const 띄우기 = (tab: string, career = 소지금많은선수, onPurchase = vi.
 }
 
 const 칸 = (name: string) => screen.getByRole('button', { name })
-/** 원작은 커서를 옮긴 뒤 확인 키를 누른다 — 웹에서도 칸을 한 번 짚고 눌러야 고른 것이 된다 */
+/** 원작은 커서를 옮긴 뒤 확인 키를 누른다 — 웹에서도 칸을 한 번 눌러 커서를 옮기고(이미 커서 칸이면 건너뜀) 다시 눌러야 고른 것이 된다 */
 const 칸고르기 = (name: string) => {
   const button = 칸(name)
-  fireEvent.mouseEnter(button)
+  if (button.getAttribute('aria-current') !== 'true') fireEvent.click(button)
   fireEvent.click(button)
 }
 const 알림 = () => screen.queryByRole('dialog', { name: '알림' })
@@ -162,6 +162,20 @@ describe('가드에 걸린 칸 (0x13460)', () => {
     칸고르기(SUB_ITEMS[0].name)
 
     expect(within(알림() as HTMLElement).getByText(/이미 가지고 있는/)).toBeTruthy()
+    expect(onPurchase).not.toHaveBeenCalled()
+  })
+})
+
+describe('마우스 길 — 원본은 키패드뿐', () => {
+  it('칸에 포인터를 올려 두기만 해서는 커서가 안 옮겨진다 — 첫 누름은 커서만 옮기고 고르지 않는다', () => {
+    const onPurchase = 띄우기('GP')
+    const 둘째 = 칸(BATTER_GP_ITEMS[1].name)
+    fireEvent.mouseEnter(둘째)
+    fireEvent.mouseOver(둘째)
+    expect(둘째.getAttribute('aria-current')).toBe('false')
+    expect(칸(BATTER_GP_ITEMS[0].name).getAttribute('aria-current')).toBe('true')
+    fireEvent.click(둘째)
+    expect(둘째.getAttribute('aria-current')).toBe('true')
     expect(onPurchase).not.toHaveBeenCalled()
   })
 })

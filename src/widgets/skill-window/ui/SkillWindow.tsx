@@ -415,7 +415,6 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
               <button key={`b${cell}`} type="button" className={styles.hitArea}
                 aria-label={name} aria-pressed={isSkillEquipped(career, skillId)}
                 style={{ left: area.x, top: area.y, width: area.width, height: area.height }}
-                onMouseEnter={() => { if (focus === '격자') setSkillCursor({ column: cell % SKILL_COLUMNS, row: topRow + Math.trunc(cell / SKILL_COLUMNS) }) }}
                 onClick={(event) => {
                   event.stopPropagation()
                   setFocus('격자')
