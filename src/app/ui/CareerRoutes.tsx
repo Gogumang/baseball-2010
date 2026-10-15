@@ -183,7 +183,8 @@ function CareerScreens({
    * +0x274 == 1 이라 다시 판정해 다음 칭호를 새 창(높이 6 에서 펼침)으로 띄운다 — `key` 가 칭호마다 새 창을 세운다.
    */
   const titlePopup = session.pendingTitle !== null && session.managementNotice === '' && session.managementDetail === null
-    ? <TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} />
+    // 관리 화면(RawScreen)의 형제라 240×320 기둥(ScreenOverlay)에 가둔다 — 안 가두면 창 판(left 0 · 폭 240)이 창 전체 왼쪽에 붙어 그려졌다
+    ? <ScreenOverlay><TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} /></ScreenOverlay>
     : null
   const managementWithTitle = (
     <>

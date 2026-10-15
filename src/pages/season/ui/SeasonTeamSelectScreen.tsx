@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MarkupText, MessageBox, RawScreen, TextField } from '@/shared/ui'
+import { MarkupText, MessageBox, PressArea, RawScreen, TextField } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
@@ -138,6 +138,9 @@ interface SeasonTeamNameScreenProps {
  * 0xcc 초기화 전이라 줄 값의 출처를 못 정했다 — 웹은 팀 이름만 적는다. 입력 방식 글 · 화살표 기준점(0x21 / 0x24) · 안내 줄 0x55545 의
  * 자리도 못 풀었다(웹 글 칸은 입력 방식이 없다).
  */
+/** ⚠️ 웹 자리: OK — 바닥띠 왼쪽 표시 자리 (x 2, 47×12, 다 내려온 바닥띠 B = 320 의 B − 18) */
+const NAME_OK_PRESS_RECT = { x: 2, y: 320 - 18, width: 47, height: 12 } as const
+
 function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScreenProps) {
   const [name, setName] = useState('')
   const [isAsking, setAsking] = useState(false)
@@ -200,6 +203,14 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScree
         <MarkupText raw={`!C${NAME_LIMIT_GUIDE}`} />
       </div>
       <ScreenFrame title="시즌모드" gamePoint={0} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
+      {/*
+        ⚠️ 웹 자리: OK — 원본 이름 입력 그림 0xba28 에는 OK 그림 자리가 없다(키 0xbc44 의 확인만). 마우스 · 터치로 끝낼 길이 없어
+        바닥띠 왼쪽 표시 자리(선수 등록 0x66 의 OK 와 같은 자리)를 투명 누름 칸으로 빌려 OK 키를 보낸다
+      */}
+      {!isAsking && (
+        <PressArea label="OK" rect={NAME_OK_PRESS_RECT}
+          onPress={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))} />
+      )}
       {isAsking && (
         <MessageBox text={DECIDE_QUESTION} buttons={['예', '아니오']}
           onAnswer={(answer) => {
