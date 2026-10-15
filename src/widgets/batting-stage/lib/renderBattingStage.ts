@@ -64,6 +64,9 @@ import {
   pitcherFatigueAnimationOf,
   pitcherFatigueFrameAt,
   pitcherHomeRunMarksOf,
+  pitchWindDrawCallOf,
+  PITCH_WIND_ANIMATION,
+  PITCH_WIND_OFFSET_X,
   HOME_RUN_PITCHER_ANIMATION,
   showsPitcherFatigue,
   showsPitcherMistakeMark,
@@ -267,6 +270,8 @@ export function renderBattingStage(
     { pitchTick: scene.pitcherTick, idleTick: scene.pitcherIdleTick ?? null },
     scene.acePitcher?.order ?? null,
   )
+  // 0x38dc6 바람 줄(애니 11) — 투수와 같은 깊이 24500 이지만 먼저 넣어 투수 밑에 그려진다
+  drawPitchWind(context, scene, side, pitcherAnimation)
   drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
   // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
   drawPitcherMistakeMark(context, scene, side)
@@ -484,6 +489,23 @@ export function pitcherMirrorOf(anchorX: number, hand: number): { readonly axisX
   return { axisX: anchorX + (isMirrored ? 1 : 0), isMirrored }
 }
 
+/** 0x79524 의 마투수 순번 +0x3d — 2 는 ace/pitcher_bbmachine.pzx (적재 0x793b0 의 점프표 0xd3d64 · 이름 0xd3da8) */
+const BBMACHINE_ACE_ORDER = 2
+
+/**
+ * 마투수 그림을 뒤집는가 — 그리기 0x79524 의 79568 갈래(그리기 목록이 있을 때):
+ * ```
+ * 79570  +0x3d == 2(bbmachine) 이면 효과 = 마지막 스택 인자 [sp+0x84] ≠ 0 ? 0 : 0x11       ; 손 +0x3c 는 안 본다
+ * 795b4  그 밖 마투수는 효과 [sp+0x28] = +0x3c(손) ≠ 0 ? 0x11 : 0
+ * ```
+ * 경기 장면 0x38d1c 는 투수가 bbmachine(0xb63a1 == 2, 38e82)일 때만 그 인자를 `[장면+0x17e1](배치 = 타자 손) == 0 ? 1 : 0`
+ * (38e9c~38eac)으로 넘긴다 — 곧 **bbmachine 은 투수 손과 상관없이 좌타(배치 1) 앞에서만 뒤집힌다**. x 의 좌투 + 1(0x38db8)은 그대로다.
+ */
+export function acePitcherMirrorsOf(aceOrder: number, isLeftHanded: boolean, side: number): boolean {
+  if (aceOrder === BBMACHINE_ACE_ORDER) return side !== 0
+  return isLeftHanded
+}
+
 /**
  * 투수 그림 객체의 그리기 0x79524. 마투수(+0x3d ≥ 0)는 79568 에서 갈려 실린 ace/pitcher_*.pzx 의 프레임 하나만 효과 0x11(좌투)로
  * 그리고, 평범한 투수는 바탕 · 장비 · 덧그림 여섯 칸을 쌓는다. 프레임은 0x9e0b8 이 상태 · 단계로 고른다 (`pitcherPoseOf`).
@@ -532,11 +554,36 @@ function drawPitcher(
   const frame = placedFrame(ace.framesUrl, index)
   if (frame === null) return
   context.save()
-  if (isMirrored) {
+  if (acePitcherMirrorsOf(ace.order, isMirrored, side)) {
     context.translate(axisX * 2, 0)
     context.scale(-1, 1)
   }
   context.drawImage(frame.image, axisX + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
+  context.restore()
+}
+
+/** 투구 바람 줄(0x38dc6~0x38e5e)을 `pitchWindDrawCallOf` 로 보고 player_effect 애니 11 을 투수 점 옆 8 에 그린다 */
+function drawPitchWind(context: CanvasRenderingContext2D, scene: StageScene, side: number, animation: PitcherAnimation): void {
+  const drawCall = pitchWindDrawCallOf({
+    state: animation.state,
+    step: animation.step,
+    pitcherTick: scene.pitcherTick,
+    aceOrder: scene.acePitcher?.order ?? null,
+  })
+  if (drawCall === null) return
+  const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[PITCH_WIND_ANIMATION]
+  const frameIndex = entries === undefined ? null : judgeFrameAt(entries, drawCall)
+  const placed = frameIndex === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, frameIndex)
+  if (placed === null) return
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  // 38df0 — 좌투면 x − 8 · 효과 0x11: 투수 점(좌투 + 1)을 축으로 한 거울 안에서 x + 8
+  const { axisX, isMirrored } = pitcherMirrorOf(anchor.x, scene.pitcherHand ?? 0)
+  context.save()
+  if (isMirrored) {
+    context.translate(axisX * 2, 0)
+    context.scale(-1, 1)
+  }
+  context.drawImage(placed.image, axisX + PITCH_WIND_OFFSET_X + placed.offsetX, anchor.y + placed.offsetY)
   context.restore()
 }
 

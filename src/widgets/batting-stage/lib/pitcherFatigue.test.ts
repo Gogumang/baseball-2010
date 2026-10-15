@@ -4,10 +4,12 @@ import {
   pitcherFatigueAnimationOf,
   pitcherFatigueFrameAt,
   pitcherHomeRunMarksOf,
+  pitchWindDrawCallOf,
   isHomeRunLikeResultCode,
   showsPitcherFatigue,
   showsPitcherMistakeMark,
 } from '@/widgets/batting-stage/lib/pitcherFatigue'
+import { judgeFrameAt, pitchStepAt } from '@/widgets/batting-stage/lib/stageScenery'
 
 describe('마운드 투수 체력 그림 (0x38f42~0x39086)', () => {
   it('체력 ≤ 19 애니 10 · 20~34 애니 9 · 35 이상 없음', () => {
@@ -69,5 +71,35 @@ describe('투수 그리기의 홈런 갈래 (0x3908a~0x39192)', () => {
     // 평범한 투수의 단계 13 은 투수 틱 19 — 0x13 이 틱 25 에 들었으면 틱 25 가 첫 그림
     expect(pitcherHomeRunMarksOf({ ...base, pitcherTickAtHit: 25, pitcherTick: 25 })?.drawCall).toBe(1)
     expect(pitcherHomeRunMarksOf({ ...base, pitcherTickAtHit: 10, pitcherTick: 19 })?.drawCall).toBe(1)
+  })
+})
+
+describe('투구 바람 줄 (0x38dc6~0x38e5e)', () => {
+  // player_effect 애니 11 — animations.json 그대로
+  const WIND = [
+    { frame: 37, delay: 1 },
+    { frame: 38, delay: 2 },
+    { frame: 39, delay: 1 },
+    { frame: 40, delay: 1 },
+    { frame: 41, delay: 1 },
+  ]
+  const at = (pitcherTick: number, aceOrder: number | null = null) =>
+    pitchWindDrawCallOf({ state: 1, step: pitchStepAt(pitcherTick, aceOrder), pitcherTick, aceOrder })
+
+  it('평범한 투수 단계 7~11(투수 틱 12~17) 에서만 여섯 번 그린다', () => {
+    const calls = Array.from({ length: 24 }, (_unused, tick) => at(tick))
+    expect(calls.slice(0, 12).every((call) => call === null)).toBe(true)
+    expect(calls.slice(12, 18)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(calls.slice(18).every((call) => call === null)).toBe(true)
+  })
+
+  it('k 번째 그림은 k 칸 나아간 칸 — 38 · 38 · 39 · 40 · 41 · 41 (첫 칸 37 은 안 보인다)', () => {
+    expect([1, 2, 3, 4, 5, 6].map((call) => judgeFrameAt(WIND, call))).toEqual([38, 38, 39, 40, 41, 41])
+  })
+
+  it('상태 1 이 아니거나 마투수면 안 그린다 (38dc6 · 38dd4)', () => {
+    expect(pitchWindDrawCallOf({ state: 0, step: 8, pitcherTick: 13, aceOrder: null })).toBeNull()
+    expect(pitchWindDrawCallOf({ state: 2, step: 8, pitcherTick: 13, aceOrder: null })).toBeNull()
+    expect(at(13, 0)).toBeNull()
   })
 })

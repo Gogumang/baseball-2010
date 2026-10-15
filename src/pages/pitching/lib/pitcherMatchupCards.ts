@@ -1,4 +1,5 @@
-import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import type { PitcherGameOptions, PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import { myMoundStaminaOf, opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
@@ -102,4 +103,20 @@ export function pitcherMatchupCardsOf(
       ...(batterLine === null ? {} : batterCardStatsOf(batterLine)),
     },
   }
+}
+
+/**
+ * **경기 시작 인트로 배경의 타자 손 (투수편 모드 3)** — 인트로 진입 0x3b084 는 모드를 안 가린다(상태 0xc 진입 0x52d80 하나):
+ * 3b0d2 공격 측 `st[9]` 팀 → 3b0f2 `0xae89d`(그 팀[+0xe + 팀[+0x32]] 선수) → 3b0fe `0xb63c1`(손) → 3b108 경기 구장 +0x60.
+ * - st[9]: 경기 상태 초기화 0xb6814(b6836)가 0 · st[0xa] = 1 로 두고, 바꾸는 곳은 3아웃 0xb6b6c(b6baa)와 미션 0xb6bc0(0xaa57c)뿐 —
+ *   인트로는 첫 타석 앞이라 **측 0(선공)**.
+ * - 팀[+0x32]: 팀 객체는 상태 7 장면 초기화 0x3e340(3e70c · 3e728)이 new 0x1239(→ 0x2ac4 가 0 으로 채운다) · 생성자 0xae801 로
+ *   새로 만든다. 그 뒤 인트로 앞에 +0x32 를 쓰는 곳(0x3a55a 는 0x39fdc 모드 7 갈래, 0xaa888 · 0xaa89e 는 미션, 0xaebe4 는 0xd 진입)이
+ *   모드 3 길에는 없다 → **0(1번 타자)**.
+ * 웹 투수편 명단은 로스터 차례 그대로이고 마타자는 9번 칸에 앉으므로(`withAceBatterLineup`) 1번은 늘 로스터 0번이다.
+ */
+export function pitcherIntroBatterHandOf(options: Pick<PitcherGameOptions, 'playerSide' | 'ourTeamId' | 'opponentTeamId'>): number {
+  const teamId = options.playerSide === 0 ? options.ourTeamId : options.opponentTeamId
+  const profile = teamBatters(teamId)[0]?.profile
+  return profile === undefined ? 0 : batterHandOf(profile)
 }

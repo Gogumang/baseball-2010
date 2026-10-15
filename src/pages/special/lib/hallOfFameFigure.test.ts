@@ -4,6 +4,9 @@ import {
   drawListFigure, drawListFigureTimes, pitcherImageDxOf, pitcherPoseOf,
 } from '@/pages/special/lib/hallOfFameFigure'
 import type { FigureAnimation, FigureFrame, HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
+import {
+  pitchStepAt, pitcherAnimationAt, pitcherFrameAt, pitcherPoseOf as stagePitcherPoseOf,
+} from '@/widgets/batting-stage/lib/stageScenery'
 
 const 투수: HallOfFameFigureLook = { form: 1, skin: 2, team: 14, equipment: [0, 0, 0, 0] }
 const 우완: HallOfFameFigureLook = { form: 2, skin: 0, team: 14, equipment: [0, 0, 0, 0] }
@@ -114,5 +117,29 @@ describe('목록 0x5e8bc · 0x63b14 찬 칸 갈래', () => {
   it('홈런더비(0x669c1 안 부름)는 이미지를 뜨지 않는다', () => {
     const frame = drawListFigureTimes(INITIAL_FIGURE_LIST_MEMORY, INITIAL_FIGURE_ENTRY, { ...투수칸(1), capturesImage: false }, 3)
     expect(frame.drawing).toEqual({ kind: '투수', image: null, hand: 1 })
+  })
+})
+
+describe('투수 애니 표는 경기 장면(stageScenery)과 한 곳 — vtable 0xd73d0', () => {
+  it('상태 1 — 그림 n 번째의 단계 · 자세가 경기 장면 pitchStepAt · pitcherFrameAt 와 같다 (폼 0~5)', () => {
+    for (let form = 0; form <= 5; form += 1) {
+      // 목록은 상태를 건 뒤 갱신 0x9e004 를 먼저 하고 그리므로 n 번째 그림 = 틱 n
+      let animation: FigureAnimation = { state: 1, step: 0, count: 0, form }
+      for (let tick = 1; tick <= 30; tick += 1) {
+        animation = advancePitcherAnimation(animation)
+        expect(animation.step).toBe(pitchStepAt(tick))
+        expect(pitcherPoseOf(animation)).toBe(pitcherFrameAt(form, tick))
+      }
+    }
+  })
+
+  it('상태 2 — 대기 한 바퀴 뒤 상태 0, 그동안의 자세는 경기 장면 대기 자세와 같다', () => {
+    let animation: FigureAnimation = { state: 2, step: 0, count: 0, form: 0 }
+    for (let tick = 1; tick <= 20; tick += 1) {
+      animation = advancePitcherAnimation(animation)
+      const stage = pitcherAnimationAt({ pitchTick: null, idleTick: tick })
+      expect(animation.state).toBe(stage.state)
+      expect(pitcherPoseOf(animation)).toBe(stagePitcherPoseOf(stage, 0))
+    }
   })
 })

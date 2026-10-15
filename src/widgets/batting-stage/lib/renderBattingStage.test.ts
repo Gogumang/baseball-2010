@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { offenseTeamIdOf, pitcherMirrorOf, showsStrikeZone, strikeZoneAnchorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { acePitcherMirrorsOf, offenseTeamIdOf, pitcherMirrorOf, showsStrikeZone, strikeZoneAnchorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { pitcherFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 
@@ -47,5 +47,18 @@ describe('루상 주자 팔레트 — 공격 팀', () => {
     expect(offenseTeamIdOf(hud)).toBe(7)
     expect(offenseTeamIdOf({ ...hud, playerSide: 0 })).toBe(3)
     expect(offenseTeamIdOf({ ...hud, half: '말' })).toBe(3)
+  })
+})
+
+describe('마투수 그림 뒤집기 — 0x79524 의 +0x3d == 2 갈래 (79570)', () => {
+  it('bbmachine(순번 2)은 손을 안 보고 좌타 배치(1)에서만 뒤집는다 (38e82~38eac)', () => {
+    expect([acePitcherMirrorsOf(2, false, 0), acePitcherMirrorsOf(2, true, 0)]).toEqual([false, false])
+    expect([acePitcherMirrorsOf(2, false, 1), acePitcherMirrorsOf(2, true, 1)]).toEqual([true, true])
+  })
+
+  it('그 밖 마투수는 손(+0x3c)대로 — 좌투면 효과 0x11', () => {
+    for (const order of [0, 1, 3, 4]) {
+      expect([acePitcherMirrorsOf(order, true, 0), acePitcherMirrorsOf(order, false, 1)]).toEqual([true, false])
+    }
   })
 })

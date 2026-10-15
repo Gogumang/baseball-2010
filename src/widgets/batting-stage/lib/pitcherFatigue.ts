@@ -133,3 +133,45 @@ export function pitcherHomeRunMarksOf(input: {
   if (drawCall < 1) return null
   return { drawCall, showsPitcherAnimation: input.aceOrder === null, showsBang: input.isBigHit }
 }
+
+/**
+ * **투구 바람 줄** — 투수 그리기 0x38d1c 의 0x38dc6~0x38e5e (2026-10-15 직접 떴다). 투수 점 (x, y) 를 정한 바로 뒤,
+ * 투수 그림을 그리기 목록에 넣는 0x38ed2 **앞**이고 모드 7 거름(38ed6)보다도 앞이다:
+ * ```
+ * 38dc6  투수 그림 객체 [+0xf98] 상태 +0x14 ≠ 1 이면 건너뜀
+ * 38dd4  투수가 마선수(0xb633d) 면 건너뜀
+ * 38de2  단계 +0x1c 가 7~11 (`cmp #6 / ble` · `cmp #0xb / bgt`) 이 아니면 건너뜀
+ * 38df0  좌투(0xb63c1) 면 x − 8, 아니면 x + 8                       ; x 는 좌투 + 1 (0x38db8) 을 먹은 투수 점
+ * 38e06  player_effect(+0x1030) 애니 11 을 (그 x, 투수 y) 에 효과 (좌투 ? 0x11 : 0) · 깊이 [0xcfa8c+8] = 24500 으로 그리기 목록에,
+ *        그린 뒤 0x93d91([애니표 +0x2c]) 로 한 칸
+ * ```
+ * 투수 그림(0x79524 → 0xbe8d5, 깊이 [0xd3cf8+8] = 24500)과 깊이가 같고, 목록 넣기 0xbe810 은 `새 깊이 < 칸 깊이` 인 첫 칸 앞에 넣어
+ * 같은 깊이면 **먼저 넣은 것이 먼저(아래)** 그려진다 — 바람 줄은 투수 **밑**이다.
+ * 애니 11(37 · 38 · 39 · 40 · 41, 지연 1 · 2 · 1 · 1 · 1)은 돌림이 아니라(0x1a610 에 비트 11 없음) 마지막 칸에 멈추고 0xf 진입
+ * 0x3d954 가 되감는다. 평범한 투수의 단계 7~11 은 유지 0 · 0 · 0 · 0 · 1(0xd73e9) 이라 여섯 그림이다.
+ * k 번째 그림은 k 칸 나아간 칸이다(실투 "!" · 체력 그림 · 홈런 갈래와 같은 셈) — 그래서 첫 칸 37 은 보이지 않는다(원본 그대로).
+ * 좌투 x − 8 · 효과 0x11 은 투수 점을 축으로 한 거울이라 웹은 거울 안에서 x + 8 로 그린다.
+ */
+export const PITCH_WIND_ANIMATION = 11
+/** 38dfc · 38e04 — 투수 점에서 던지는 팔 쪽으로 8 */
+export const PITCH_WIND_OFFSET_X = 8
+/** 38de8 · 38dec — 바람 줄을 그리는 단계 */
+const PITCH_WIND_FIRST_STEP = 7
+const PITCH_WIND_LAST_STEP = 0xb
+
+/** 바람 줄을 이 그림에서 그리면 그 그림 수(1 부터), 아니면 null */
+export function pitchWindDrawCallOf(input: {
+  /** 투수 그림 객체 상태 +0x14 */
+  readonly state: number
+  /** 단계 +0x1c */
+  readonly step: number
+  /** 상태 1 에 든 뒤 투수 틱 */
+  readonly pitcherTick: number | null
+  /** 마투수 순번 (없으면 null) */
+  readonly aceOrder: number | null
+}): number | null {
+  if (input.state !== 1 || input.aceOrder !== null || input.pitcherTick === null) return null
+  if (input.step < PITCH_WIND_FIRST_STEP || input.step > PITCH_WIND_LAST_STEP) return null
+  const drawCall = input.pitcherTick - pitchStepStartTickOf(PITCH_WIND_FIRST_STEP, null) + 1
+  return drawCall >= 1 ? drawCall : null
+}
