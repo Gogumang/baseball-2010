@@ -60,7 +60,7 @@ import {
 } from '@/entities/career/model/postseasonFlow'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
-import { nariMoraleOf, withNariGameMorale } from '@/entities/career/model/nariMorale'
+import { nariMoraleOf, nariTeamRecordMoraleOf, withNariGameMorale, withNariTeamRecordMorales } from '@/entities/career/model/nariMorale'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
@@ -634,6 +634,8 @@ export function useCareerSession({
        * (`GameProgress.teamMorale`, `nariMoraleOf`). 국가대항전이면 원본 버그로 상대국 칸 +2 값이다
        */
       teamMorale?: number,
+      /** 상대 리그 팀 레코드 +2 의 앞 값 — 상대가 후공이면 그 첫 공만 본다 (`GameProgress.opponentStaleMorale`). 대회는 안 넘긴다 */
+      opponentStaleMorale?: number,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
@@ -648,7 +650,7 @@ export function useCareerSession({
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
         ourRecordLineup, myRunAbility,
-        teamMorale,
+        teamMorale, opponentStaleMorale,
       )
       progressRef.current = started
       setProgress(started)
@@ -721,6 +723,8 @@ export function useCareerSession({
       current === null || current === undefined ? undefined : effectiveAbilityOf(withNariGameMorale(current)).run,
       // 두 팀 레코드 +2 = 0xa3a24 — 대회가 아니라 커리어 사기
       current === null || current === undefined ? undefined : nariMoraleOf(current),
+      // 상대 리그 팀 레코드 +2 에 남은 값 — 그 팀이 지난번 치른 경기 때의 나리 사기 (`nariTeamRecordMoraleOf`, r101)
+      current === null || current === undefined || opponent === undefined ? undefined : nariTeamRecordMoraleOf(current, opponent),
     )
   }, [aceLevels, startMatch])
 
@@ -844,8 +848,12 @@ export function useCareerSession({
       const resulted = applyGameResult(currentCareer, summary)
       // CPU 경기 0xc2a48(4f296)는 평가 0xa719c(4f274)가 사기를 바꾼 **뒤**다 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 그 사기를 쓴다
       const moraleAtCpuGames = nariMoraleOf(applyGameEvaluation(resulted, thisEvaluation, isEvaluated))
-      const settled = applySeasonEnd(
-        applyLeagueDay(resulted, summary.ourTeamId, random, aceLevels, moraleAtCpuGames),
+      // 사람 경기 상대의 리그 레코드 +2 는 경기 마지막 0xb570c 때의 나리 사기로 남는다 (`teamRecordMorales`, r101)
+      // ⚠️ 마지막 공 뒤에 돌발 보상 사기가 바뀌면 원본 그 칸은 바뀌기 전 값이다 — 웹은 경기 끝 값을 쓴다(미확인 차이)
+      const settled = withNariTeamRecordMorales(
+        applySeasonEnd(applyLeagueDay(resulted, summary.ourTeamId, random, aceLevels, moraleAtCpuGames)),
+        [finished.opponentTeamId],
+        finished.teamMorale ?? nariMoraleOf(currentCareer),
       )
       // 평가 0xa719c 안 0xa690c 가 경기 뒤 누적 카운터 S+0x1f0 을 더한다 — 정규시즌(평가하는 경기)만 (`withGameSkillCounters`)
       const evaluated = applyGameEvaluation(

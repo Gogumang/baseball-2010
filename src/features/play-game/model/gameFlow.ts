@@ -12,6 +12,7 @@ import {
   endSituationOf,
   isGameOverAt,
   PLAYER_BATTING_ORDER_INDEX,
+  PLAYER_SIDE_FIRST_BAT,
   PLAYER_SIDE_LAST_BAT,
   isPlayerTurn,
   ourHalfOf,
@@ -26,6 +27,7 @@ import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/
 import {
   changePitcherIfNeeded,
   drainPitcherForPitch,
+  drainMoraleOf,
   drainQuickPitcher,
   facingPitcherOf,
   simulateHalfInningTicks,
@@ -475,10 +477,15 @@ export interface GameProgress {
    *   c1320 은 두 팀 [r7+0x78] · [r7+0x74] 를 다, 0xc15a4 · 0xc1818)이 공마다 두 팀으로 부른다 → **상대 팀 칸도 나리 사기다**
    * 그래서 경기 중 사기가 바뀌면(돌발 보상 0x8e34c 종류 1) 다음 공부터 두 팀 용량이 바뀐 값을 본다(`withGameTeamMorale`).
    * 국가대항전이면 0xa3a24 가 상대국 칸 +2 를 읽는 원본 버그라 그 값이다. 없으면(옛 시험) 팀마다 표값(`teamRecordMoraleOf`)
-   * ⚠️ 미확인: 한 팀을 0xb570c 가 아직 한 번도 안 건드린 경기 첫 공의 용량은 그 칸의 앞 값(지난 경기 끝의 나리 사기 · 등록 표값)일 수
-   * 있다 — 첫 0xa5e14 와 첫 0xb570c 의 차례는 안 뜸
+   * 단 1회초 수비 팀(후공)의 첫 공은 0xb570c 보다 소모가 먼저라 그 칸의 **앞 값**이다(`opponentStaleMorale`, r101).
    */
   readonly teamMorale?: number
+  /**
+   * **상대 팀 레코드 +2 의 앞 값** — 상대가 후공(1회초 수비)일 때만 든다. 첫 공의 소모 0xa5e14(사람 장면 0x3de10 3dec6 · 간이 엔진
+   * c26cc)가 0xb570c(0x4dc78 의 0x4dbac · 0x34968 / 0xc11f0 c1446 · 0xc1818 c1852)보다 먼저 돌아 그 공의 용량은 지난번에 그 레코드를
+   * 덮은 나리 사기(`PlayerCareer.teamRecordMorales`)다. 내 팀 칸은 셋업 0x39fdc 3a332 가 먼저 덮어 없다 (`HalfInningDefense.staleMorale`)
+   */
+  readonly opponentStaleMorale?: number
 }
 
 /** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
@@ -572,6 +579,8 @@ export function startGame(
   myRunAbility?: number,
   /** 두 팀 레코드 사기 = 지금 나리 사기 0xa3a24 (`GameProgress.teamMorale`). 안 넘기면 팀마다 표값 */
   teamMorale?: number,
+  /** 상대 팀 레코드 +2 의 앞 값 (`GameProgress.opponentStaleMorale`) — 상대가 후공일 때만 쓴다. 안 넘기면 없다 */
+  opponentStaleMorale?: number,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
   const opponentAces = aces?.opponent ?? NO_GAME_ACES
@@ -640,6 +649,8 @@ export function startGame(
     stealingFrom: [],
     ...(myRunAbility === undefined ? {} : { myRunAbility }),
     ...(teamMorale === undefined ? {} : { teamMorale }),
+    // 1회초 수비 = 후공. 내가 선공이면 상대가 먼저 던진다 — 그 첫 공만 앞 값을 본다
+    ...(opponentStaleMorale === undefined || playerSide !== PLAYER_SIDE_FIRST_BAT ? {} : { opponentStaleMorale }),
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
@@ -1436,7 +1447,8 @@ export function opponentMoundOf(progress: GameProgress): {
   const defense = opponentQuickDefenseOf(progress)
   const stamina = {
     staminaAbility: defense.staminaAbilityAt(mound.pitcherSlot),
-    teamMorale: defense.morale ?? 100,
+    // 상태 0xe 의 체력 막대 0x44ea0 도 그 레코드 +2 를 읽는다 — 첫 공 앞이면 앞 값 (`drainMoraleOf`)
+    teamMorale: drainMoraleOf(defense, mound),
     isFirstPitcher: mound.usedSlots.length === 0,
     stamina: mound.stamina,
   }
@@ -2282,10 +2294,13 @@ function perPitchDrainOf(
   batter: Pick<QuickAtBatBatter, 'skillIds'>,
 ): { readonly beforePitch: () => QuickAtBatPitcher; readonly stamina: () => number } {
   let stamina = mound.stamina
+  // 투구 수는 타석이 끝나야 더해지므로 이 타석에서 이미 던진 공을 얹는다 (`drainMoraleOf` 의 첫 공 판정)
+  let thrown = 0
   const batterIntimidates = batter.skillIds.includes(QUICK_INTIMIDATE_SKILL_ID)
   return {
     beforePitch: () => {
-      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1, batterIntimidates)
+      stamina = drainQuickPitcher(defense, { ...mound, stamina, pitches: mound.pitches + thrown }, 1, batterIntimidates)
+      thrown += 1
       // 0xc11f0 · 0xc1818 은 체력%로 부른 제구 · 구속(피로 0xb58e6)을 세 자리에서 본다 — 반 이닝 엔진과 같은 값
       return facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(stamina))
     },
@@ -2339,6 +2354,8 @@ function quickDefenseOf(
   ace?: GameAcePitcher,
   /** 그 팀 레코드 +2 — 나리 사기(`GameProgress.teamMorale`). 안 넘기면 표값 */
   morale: number = teamRecordMoraleOf(teamId),
+  /** 그 레코드 +2 의 앞 값 — 첫 투수 첫 공만 (`HalfInningDefense.staleMorale`) */
+  staleMorale?: number,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
   const isAce = (slot: number) => ace !== undefined && slot === ACE_PITCHER_SLOT
@@ -2352,6 +2369,7 @@ function quickDefenseOf(
       isAce(slot) && ace !== undefined ? ace.staminaAbility : roster[slot % roster.length].ability[3],
     lead,
     morale,
+    ...(staleMorale === undefined ? {} : { staleMorale }),
     bothTeamsAreCpu: false,
     roleAt: rosterPitcherRoleOf,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 4 는 0xb574a 가지가 내 육성
@@ -2383,6 +2401,7 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     teamAcePitcherOf(progress, false),
     // 0xb570c b5768 이 상대 팀 레코드 +2 에도 나리 사기를 쓴다 (`GameProgress.teamMorale`)
     progress.teamMorale,
+    progress.opponentStaleMorale,
   )
 }
 

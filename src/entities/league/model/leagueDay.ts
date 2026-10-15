@@ -320,6 +320,12 @@ export interface LeagueAbilityContext {
    * 사기다 — 같은 날 사람 경기의 돌발 보상 종류 1 이 그 칸에 쌓은 값을 넘긴다(`useSeasonSession` 정산, 이름은 나리 때 붙은 그대로).
    */
   readonly nariMorale?: number
+  /**
+   * 나리 리그 팀 레코드 +2 의 **앞 값**(팀 번호 → 값, `nariTeamRecordMoraleOf`) — 간이 엔진 0xc262c 는 공마다 c26cc 소모 0xa5e14 가
+   * c26f6 0xc11f0(c1446) · c26fe 0xc1818(c1852)의 0xb570c(b5768 쓰기)보다 먼저라, **1회초 수비 팀(home 명단)의 첫 공**만 그 팀 레코드에
+   * 지난번 남은 값으로 용량을 센다(`HalfInningDefense.staleMorale`). 안 넘기면 늘 `nariMorale`
+   */
+  readonly staleRecordMorales?: Readonly<Record<number, number>>
 }
 
 /** 팀 능력치를 먹이는 모드 비트 0x306 = {1, 2, 8, 9} (0xb593a) */
@@ -516,6 +522,11 @@ export function cpuGameAcesOf(
   return sideOfX === LEAGUE_SIDE_HOME
     ? { away: rolls.teamB, home: rolls.teamA }
     : { away: rolls.teamA, home: rolls.teamB }
+}
+
+/** 1회초 수비 팀(home)의 레코드 +2 앞 값 — 첫 투수 첫 공만 본다 (`LeagueAbilityContext.staleRecordMorales`) */
+function withStaleMorale(defense: HalfInningDefense, staleMorale: number | undefined): HalfInningDefense {
+  return staleMorale === undefined ? defense : { ...defense, staleMorale }
 }
 
 /**
@@ -849,7 +860,10 @@ export function simulateLeagueGame(
         endsGame: ({ runs, outs }) =>
           isGameOverAt({ inning, half: '초', outs, awayScore: awayRuns + runs, homeScore: homeRuns }),
       },
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
+      withStaleMorale(
+        defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
+        extras?.abilityContext?.staleRecordMorales?.[matchup.home],
+      ),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, top, {

@@ -1,8 +1,9 @@
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
-import { DEFAULT_TEAM_MORALE, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
+import { DEFAULT_TEAM_MORALE, teamRecordMoraleAfterBurst, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { BALANCE } from '@/shared/config/original/balance'
+import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 
 /**
  * **나리 사기 읽기 · 쓰기** `0xa3a24` · `0xa3a44` — 사기는 선수 레코드가 아니라 **팀 레코드 +2** 에 있다 (직접 떴다).
@@ -70,8 +71,38 @@ export function withNariGameMorale<T extends NariMoraleCareer>(career: T): T {
  * 경기 끝에 같은 날 CPU 경기(대회 0xc2dac)가 볼 사기를 진행기 밖에서 셀 때 쓴다
  */
 export function nariMoraleAfterBurst(start: number, deltas: readonly BurstRewardDelta[]): number {
-  return deltas.reduce(
-    (morale, delta) => (delta.name === '사기' ? Math.min(MAXIMUM_MORALE, Math.max(0, morale + delta.amount)) : morale),
-    start,
-  )
+  return teamRecordMoraleAfterBurst(start, deltas)
+}
+
+/** 리그 팀 레코드 +2 의 앞 값을 든 커리어 — 타자편 `PlayerCareer` · 투수편 `PitcherCareer` */
+export interface NariTeamRecordMoraleCareer {
+  readonly teamRecordMorales?: Readonly<Record<number, number>>
+}
+
+/**
+ * 그 리그 팀 레코드 +2 에 지금 남은 값 — 그 팀이 마지막으로 치른 경기 때의 나리 사기(없으면 표값). 1회초 수비 팀(후공)의 첫 공 용량만
+ * 이 값을 본다: 공 하나의 소모 0xa5e14 가 0xb570c(b5768 쓰기)보다 먼저 돈다(간이 엔진 c26cc → c26f6/c26fe, 사람 장면 3dec6 → 0x4dc78)
+ */
+export function nariTeamRecordMoraleOf(career: NariTeamRecordMoraleCareer, teamId: number): number {
+  return career.teamRecordMorales?.[teamId] ?? teamRecordMoraleOf(teamId)
+}
+
+/** 이 팀들이 경기를 치러 0xb570c 가 레코드 +2 를 `morale` 로 덮었다 */
+export function withNariTeamRecordMorales<T extends NariTeamRecordMoraleCareer>(
+  career: T,
+  teamIds: readonly number[],
+  morale: number,
+): T {
+  if (teamIds.length === 0) return career
+  const next = { ...(career.teamRecordMorales ?? {}) }
+  for (const teamId of teamIds) next[teamId] = morale
+  return { ...career, teamRecordMorales: next }
+}
+
+/** 나리 리그 열 팀 번호 0~9 */
+export const NARI_LEAGUE_TEAM_IDS: readonly number[] = Array.from({ length: LEAGUE_TEAM_COUNT }, (_unused, teamId) => teamId)
+
+/** 열 팀 레코드 +2 의 앞 값 전부 — CPU 끼리 경기(`LeagueAbilityContext.staleRecordMorales`)에 넘긴다 */
+export function nariLeagueRecordMoralesOf(career: NariTeamRecordMoraleCareer): Readonly<Record<number, number>> {
+  return Object.fromEntries(NARI_LEAGUE_TEAM_IDS.map((teamId) => [teamId, nariTeamRecordMoraleOf(career, teamId)]))
 }

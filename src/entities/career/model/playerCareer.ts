@@ -16,7 +16,7 @@ import {
 } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
-import { nariMoraleOf } from '@/entities/career/model/nariMorale'
+import { NARI_LEAGUE_TEAM_IDS, nariLeagueRecordMoralesOf, nariMoraleOf, withNariTeamRecordMorales } from '@/entities/career/model/nariMorale'
 import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
@@ -385,6 +385,13 @@ export interface PlayerCareer {
    * 대회를 시작할 때(0xb7bf0 · 133) 세우고 142·하루 끝이 고친다. 대회 밖에서는 읽지 않는다. 옛 저장에는 없다.
    */
   readonly nariCupTeams?: NariCupTeams
+  /**
+   * **리그 팀 레코드 +2 의 앞 값**(팀 번호 → 값) — 나리 저장의 리그 열 팀 레코드 사기 칸. 0xb570c 모드 3·4 갈래(b5762~b5768)가 그 팀을
+   * 부를 때마다 그때 나리 사기로 덮이므로 **그 팀이 마지막으로 치른 경기 때의 나리 사기**가 남는다(사람 경기 상대 = 경기 끝 값, CPU 경기
+   * 0xc2a48 · 0xc2760 두 팀 = 평가 뒤 그날 값). 1회초 수비 팀의 첫 공 용량만 이 값을 본다(`HalfInningDefense.staleMorale`, r101).
+   * 내 팀 칸은 나리 사기 그 자체라 들지 않는다. 없는 팀은 표값(100). 옛 저장에는 없다
+   */
+  readonly teamRecordMorales?: Readonly<Record<number, number>>
   /**
    * **국가대항전 진행 중** — 원본 `S+0x12c`(= 리그 `L+0xac`) 플래그와 같은 리그 구조체의 대회 칸 `L+0xa8`~`L+0xc4` · 날짜 `L+0x32`.
    * 리그 구조체 L = S+0x80 은 나리 저장 블록 안이라 저장 0x22755 가 대회째 파일에 쓴다: 133 진입 0x1a090(대회 초기화 0xb7bf1 뒤
@@ -977,11 +984,13 @@ export function applyLeagueDay(
     aceLevels,
     true,
     // 간이 타석의 능력 0xb570d(…, 1, 0x5a, 1) — 모드 4 는 팀 능력치 정액 0xb592c(모드 비트 0x306 = 1·2·8·9)도 코치(모드 2)도
-    // 안 탄다. 밑값 그대로다. 같은 0xb570c 의 b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다(용량 0x66e44)
-    { mode: BATTER_EDITION_MODE, nariMorale },
+    // 안 탄다. 밑값 그대로다. 같은 0xb570c 의 b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다(용량 0x66e44) — 1회초 수비 팀 첫 공만 앞 값
+    { mode: BATTER_EDITION_MODE, nariMorale, staleRecordMorales: nariLeagueRecordMoralesOf(career) },
   )
+  // 그날 CPU 경기를 치른 여덟 팀(내 팀 · 사람 경기 상대 말고 모두)의 레코드 +2 는 이 사기로 덮였다
+  const cpuTeams = NARI_LEAGUE_TEAM_IDS.filter((teamId) => teamId !== myTeamId && teamId !== opponentOf(day, myTeamId))
   return {
-    ...career,
+    ...withNariTeamRecordMorales(career, cpuTeams, nariMorale),
     league: played.league,
     leaguePlayerStats: played.playerStats,
     // 하루 끝 4f2e8 — 열 팀 0xb617c (+20%)
@@ -1029,10 +1038,16 @@ export function applyPostseasonCpuGames(
     random,
     career.leaguePitcherStaminas ?? {},
     aceLevels,
-    // 0xc2760 → 0xc239c 간이 엔진의 0xb570c b5768 — 두 팀 레코드 +2 = 나리 사기 (`LeagueAbilityContext.nariMorale`)
-    { mode: BATTER_EDITION_MODE, nariMorale: nariMoraleOf(career) },
+    // 0xc2760 → 0xc239c 간이 엔진의 0xb570c b5768 — 두 팀 레코드 +2 = 나리 사기 (`LeagueAbilityContext.nariMorale`).
+    // 1회초 수비 팀 첫 공만 그 레코드의 앞 값 (`staleRecordMorales`, r101)
+    { mode: BATTER_EDITION_MODE, nariMorale: nariMoraleOf(career), staleRecordMorales: nariLeagueRecordMoralesOf(career) },
   )
-  return { ...career, postseason: result.series, leaguePitcherStaminas: result.pitcherStaminas }
+  return {
+    ...career,
+    postseason: result.series,
+    leaguePitcherStaminas: result.pitcherStaminas,
+    ...(result.staleRecordMorales === undefined ? {} : { teamRecordMorales: result.staleRecordMorales }),
+  }
 }
 
 /**
