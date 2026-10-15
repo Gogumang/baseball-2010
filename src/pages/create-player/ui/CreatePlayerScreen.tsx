@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FrameSprite, MessageBox, PressArea, RawScreen, TextField } from '@/shared/ui'
+import { FrameSprite, InputMethodText, MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
@@ -188,8 +188,12 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
               style={{ left: cell.label.x + cell.label.width - labelWidthOf(cell.labelFrame), top: cell.value.y + 3 }} />
             {cell.id === '이름' ? (
               <form onSubmit={(event) => event.preventDefault()}>
-                <TextField className={styles.nameInput} value={name} autoFocus aria-label="이름"
-                  style={{ left: cell.value.x, top: cell.value.y, width: cell.value.width, height: cell.value.height }}
+                {/* 이름 글 0x677d5(입력기, 값 칸 x + 2, y + 3, 앱 글꼴, RGB(255,255,0), 줄 == 0, 정렬 0x11, 0) — 0x16128~0x16152.
+                    노랑 · 왼쪽 맞춤 · 이름 줄일 때 '|' 커서. 예전 웹은 흰 글 가운데 맞춤이었다 */}
+                <InputMethodText value={name} autoFocus aria-label="이름"
+                  x={cell.value.x + 2} y={cell.value.y + 3} color={CURSOR_COLOR}
+                  isCursorOn={selectedId === '이름'}
+                  inputRect={cell.value}
                   onFocus={() => setSelectedRow(ROW_ORDER.indexOf('이름'))}
                   onChange={(event) => {
                     // CP949 8바이트까지 (R11 1b — 한글 2바이트 · 그 밖 1바이트, 섞어 써도 된다)

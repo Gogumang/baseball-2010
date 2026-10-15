@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FrameSprite, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp, TextField } from '@/shared/ui'
+import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp } from '@/shared/ui'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -283,12 +283,10 @@ export function PitcherRegisterScreen({
           {/* 이름 글 0x677d5 — 노랑. 원본 입력기는 웹 글 칸으로 대신하고 CP949 8바이트로 자른다 */}
           <form onSubmit={(event) => event.preventDefault()}>
             {/* 0x67 에서 CLR 로 돌아오면 0x17360 이 이전 상태 0x67 을 보고 곧장 끝난다(1736a → 1764e) — 줄 커서 · 값이 그대로라 초점을 뺏지 않는다 */}
-            <TextField value={name} autoFocus={selectedRow === NAME_ROW} aria-label="이름"
-              style={{
-                position: 'absolute', left: NAME_TEXT_AT.x, top: NAME_TEXT_AT.y - 2, width: INPUT_MODE_BOX.x - NAME_TEXT_AT.x - 1,
-                height: 13, padding: 0, border: 0, background: 'transparent', color: REGISTER_YELLOW, font: 'inherit',
-                fontSize: '11px', lineHeight: '13px', outline: 'none',
-              }}
+            {/* 0x677d5(입력기, 62, 204, 앱 글꼴, RGB(255,255,0), 줄 == 0, 정렬 0x11, 0) — 0x16128~0x16152. 줄 0 이면 '|' 커서 */}
+            <InputMethodText value={name} autoFocus={selectedRow === NAME_ROW} aria-label="이름"
+              x={NAME_TEXT_AT.x} y={NAME_TEXT_AT.y} color={REGISTER_YELLOW} isCursorOn={selectedRow === NAME_ROW}
+              inputRect={{ x: NAME_TEXT_AT.x, y: NAME_TEXT_AT.y - 2, width: INPUT_MODE_BOX.x - NAME_TEXT_AT.x - 1, height: 13 }}
               onFocus={() => setSelectedRow(NAME_ROW)}
               onChange={(event) => {
                 // CP949 8바이트까지 — 타자편과 같은 입력기다 (R11 1b)

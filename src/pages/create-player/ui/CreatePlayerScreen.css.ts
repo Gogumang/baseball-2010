@@ -51,28 +51,6 @@ export const infoValue = style([
   { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' },
 ])
 
-/**
- * 이름 칸. 원본은 폰 입력기(모드 A/a/1/가 · 멀티탭)를 쓰지만 웹은 일반 input 으로 대신한다
- * (R11 2-3: 지킬 규칙은 CP949 8바이트와 "빈 이름은 확인 불가" 둘뿐이다).
- */
-export const nameInput = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  padding: 0,
-  border: 'none',
-  background: 'transparent',
-  color: ORIGINAL_COLORS.text,
-  font: 'inherit',
-  fontSize: '11px',
-  lineHeight: '15px',
-  textAlign: 'center',
-  outline: 'none',
-  selectors: {
-    '&:focus': { background: ORIGINAL_COLORS.panelDeep },
-    '&::placeholder': { color: ORIGINAL_COLORS.boardHighlight },
-  },
-})
-
 /** 노란 깜빡이 커서 (0x16038) — 값 칸을 사방 1px 키운 테두리 */
 export const cursor = style({
   position: 'absolute',

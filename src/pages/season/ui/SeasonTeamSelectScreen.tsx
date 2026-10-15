@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MarkupText, MessageBox, PressArea, RawScreen, TextField } from '@/shared/ui'
+import { InputMethodText, MarkupText, MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
@@ -191,12 +191,10 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint }: SeasonTe
         background: MODE_BOX_COLOR, borderRadius: 1,
       }} />
       <form onSubmit={(event) => event.preventDefault()}>
-        <TextField value={name} autoFocus aria-label="이름"
-          // 0x677d5 — 박스 2 의 (x + 2, y + 3) 에 노랑 글. 입력 방식 칸 앞까지
-          style={{
-            position: 'absolute', left: NAME_TEXT.x, top: NAME_TEXT.y, width: MODE_BOX.x - NAME_TEXT.x, height: 12,
-            padding: 0, border: 0, background: 'transparent', color: NAME_COLOR,
-          }}
+        {/* 0x677d5(입력기, 박스 2 의 x + 2, y + 3, 앱 글꼴, 노랑, 커서 켬 1, 정렬 0x11, 0) — 0xbafc~0xbb2a. 누름 칸은 입력 방식 칸 앞까지 */}
+        <InputMethodText value={name} autoFocus aria-label="이름"
+          x={NAME_TEXT.x} y={NAME_TEXT.y} color={NAME_COLOR} isCursorOn
+          inputRect={{ x: NAME_TEXT.x, y: NAME_TEXT.y, width: MODE_BOX.x - NAME_TEXT.x, height: 12 }}
           onChange={(event) => {
             if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
           }} />
