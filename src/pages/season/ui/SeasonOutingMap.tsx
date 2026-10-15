@@ -7,9 +7,10 @@ import {
 } from '@/shared/config/outingPlaces'
 import { outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
-/** 효과 1 · 인자 7 — 고르지 않은 건물은 7/16 (R6 3a) */
-const UNSELECTED_OPACITY = 7 / 16
+/** 효과 1 · 인자 7 — 고르지 않은 건물은 7/16 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
+const UNSELECTED_OPACITY = translucentOpacityOf(7)
 /** 0x7ec04 · 0x7e300 의 단색 찍기 자리 — 건물은 네 방향, 글자 테두리는 여덟 방향(표 0xd48c8 · 0xd48e8) */
 const FOUR_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
 const EIGHT_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1], [-1, -1], [1, -1], [1, 1], [-1, 1]]
