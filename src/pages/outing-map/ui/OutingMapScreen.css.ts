@@ -24,14 +24,6 @@ export const placeButton = style({
   },
 })
 
-export const cornerButton = style({
-  position: 'absolute',
-  left: '4px',
-  top: '4px',
-  zIndex: 2,
-  padding: '2px 7px',
-})
-
 /** 지도 아래 남는 줄에 안내·결과 문구를 쓴다 (원본 메시지줄 위치는 미확인) */
 export const noticeLine = style({
   position: 'absolute',

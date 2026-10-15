@@ -113,6 +113,3 @@ export const hint = style([
   },
 ])
 
-export const actionButton = style({
-  position: 'absolute',
-})

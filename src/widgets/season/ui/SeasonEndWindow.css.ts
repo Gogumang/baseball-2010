@@ -50,29 +50,6 @@ export const rankUnit = style({
   pointerEvents: 'none',
 })
 
-/**
- * 화면 위에 한 줄 얹는 설명 글 (**원본 배치 미해독 — 근사**).
- * 원본은 상태판·커맨드 줄이 맡는 자리라 웹에서는 판 바깥 빈 자리에 둔다.
- */
-export const caption = style({
-  position: 'absolute',
-  zIndex: 5,
-  color: ORIGINAL_COLORS.text,
-  fontSize: `${TEXT.smallSize}px`,
-  lineHeight: `${TEXT.smallLineHeight}px`,
-  textAlign: 'center',
-  whiteSpace: 'pre-line',
-  pointerEvents: 'none',
-})
-
-/** 원본에 없는 웹 전용 단추 — 원본은 소프트키(확인 −5)가 한다 */
-export const cornerButton = style({
-  position: 'absolute',
-  zIndex: 6,
-  left: '4px',
-  top: '4px',
-})
-
 /** 띠·아이리스처럼 면만 있는 것은 240×320 SVG 한 장에 그린다 */
 export const overlay = style({
   position: 'absolute',

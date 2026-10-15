@@ -1,4 +1,4 @@
-import { Hint, Panel, StatGrid } from '@/shared/ui'
+import { Panel, StatGrid } from '@/shared/ui'
 import type { StatEntry } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -67,12 +67,10 @@ export function PitcherBasicInfoPanel({ career }: PitcherBasicInfoPanelProps) {
 
       <Panel heading="능력치 (지금 / 한계)">
         <StatGrid entries={abilityEntries} />
-        <Hint>한계는 타입이 아니라 보직으로 갈린다 — 표 0xd80be × 10 (선발 800 네 칸 / 구원 850·850·850·600)</Hint>
       </Panel>
 
       <Panel heading="실효 능력치">
         <StatGrid entries={effectiveEntries} />
-        <Hint>장비 → 장착 스킬 → 질병 → 부상 → 사기 차례로 매긴 값이다 (0xb570c)</Hint>
       </Panel>
     </>
   )
