@@ -354,7 +354,14 @@ def build_font(glyphs: GlyphSet) -> FontBuilder:
     builder.setupGlyphOrder(glyphs.order)
     builder.setupCharacterMap(glyphs.cmap)
     builder.setupGlyf({name: build_glyph(glyphs.rects[name]) for name in glyphs.order})
-    builder.setupHorizontalMetrics({name: (glyphs.advance[name], 0) for name in glyphs.order})
+    # 왼쪽 여백(lsb)은 반드시 글리프의 xMin 이어야 한다. TrueType 은 원점을 `xMin − lsb` 에 두므로(phantom point),
+    # 예전처럼 lsb 를 0 으로 박으면 'i'·'l'·'1' 처럼 칸 왼쪽이 빈 글자가 빈 만큼 **왼쪽으로 당겨져** 그려졌다
+    # ("Kim" 이 "Ki m" 처럼 보인 까닭). 원본 0x9c068 은 조각을 칸 왼쪽 끝(x)에 그대로 찍는다 — 칸 안 여백도 그림의 일부다.
+    glyf = builder.font['glyf']
+    builder.setupHorizontalMetrics({
+        name: (glyphs.advance[name], getattr(glyf[name], 'xMin', 0) if glyf[name].numberOfContours else 0)
+        for name in glyphs.order
+    })
     builder.setupHorizontalHeader(ascent=ASCENT, descent=-DESCENT, lineGap=0)
     builder.setupNameTable({
         'familyName': FAMILY_NAME,
