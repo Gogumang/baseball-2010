@@ -18,10 +18,11 @@ export function trainingOutcomeLinesOf(outcome: TrainingOutcome): string[] {
     for (const [key, value] of entries) lines.push(`${ABILITY_NAMES[key]} +${value} 상승하였습니다`)
     if (outcome.typeBonus > 0) lines.push(`타입 보너스 +${outcome.typeBonus}`) // StrMODE[194]
   } else if (progress.isLevelUp) {
-    lines.push(`${outcome.menuId} 훈련 완료!`) // StrMODE[87]
+    // 기술 이름 StrCOMMON[0x18 + n] + StrMODE[87] (0x18124~0x1813e)
+    lines.push(`${progress.name} 훈련 완료!`)
     lines.push('[선수정보]에서 사용 여부 변경 가능')
   } else {
-    lines.push(`[${outcome.menuId}] ${progress.sessions}/${progress.required}회 훈련`) // StrMODE[86]
+    lines.push(`[${progress.name}] ${progress.sessions}/${progress.required}회 훈련`) // StrMODE[86] (0x18170)
   }
   lines.push(`사기 -${outcome.moraleLoss}`)
   return lines

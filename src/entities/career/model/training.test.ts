@@ -127,7 +127,9 @@ describe('필살타법 훈련 — 0xa3bac 종류 4', () => {
 
     expect(outcome.career.gamePoint).toBe(100)
     expect(outcome.moraleLoss).toBe(9)
-    expect(outcome.specialSwing).toEqual({ sessions: 1, required: 4, isLevelUp: false })
+    expect(outcome.specialSwing).toEqual({ sessions: 1, required: 4, isLevelUp: false, name: '파워 스윙' })
+    // 훈련 완료가 아니면 고른 번호는 그대로 (0x18170 갈래)
+    expect(outcome.career.specialSwingNumber).toBe(0)
   })
 
   it('필요 횟수(4/5/6/7)를 채우면 레벨이 오르고 누적이 0 으로 돌아간다', () => {
@@ -135,8 +137,18 @@ describe('필살타법 훈련 — 0xa3bac 종류 4', () => {
 
     expect(outcome.career.gamePoint).toBe(5000 - 700)
     expect(outcome.moraleLoss).toBe(12)
-    expect(outcome.specialSwing).toEqual({ sessions: 5, required: 5, isLevelUp: true })
+    expect(outcome.specialSwing).toEqual({ sessions: 5, required: 5, isLevelUp: true, name: '플레임 스윙' })
     expect([outcome.career.specialSwingLevel, outcome.career.specialSwingSessions]).toEqual([2, 0])
+    // 0x1816c — 훈련 완료면 선수 +0x18 = 표 0xcc378[커서 1] = 2
+    expect(outcome.career.specialSwingNumber).toBe(2)
+  })
+
+  it('넷째 칸 이름은 4 + 타입 — 장타형이면 메테오 스윙, 고른 번호는 4 그대로 (0x180e8 · 0x1816c)', () => {
+    const outcome = runTraining(
+      선수({ gamePoint: 5000, battingTypeIndex: 1, specialSwingLevel: 3, specialSwingSessions: 6, skillIds: [] }), 필살(), 최대,
+    )
+    expect(outcome.specialSwing).toMatchObject({ isLevelUp: true, name: '메테오 스윙' })
+    expect(outcome.career.specialSwingNumber).toBe(4)
   })
 
   it('병아리(0)는 사기 감소 −1, 몹쓸몸(3)은 +2', () => {

@@ -39,6 +39,8 @@ interface 화면옵션 {
   readonly onExit?: () => void
   readonly onOuting?: () => void
   readonly onOpenShop?: (tab: PitcherShopTab) => void
+  readonly onReenter?: () => void
+  readonly onResultWindowChange?: (isOpen: boolean) => void
 }
 
 const 화면 = (options: 화면옵션 = {}) =>
@@ -586,6 +588,8 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
           onNextGame={options.onNextGame ?? (() => {})}
           onOuting={options.onOuting}
           onExit={options.onExit ?? (() => {})}
+          onReenter={options.onReenter}
+          onResultWindowChange={options.onResultWindowChange}
         />
       </StrictMode>,
     )
@@ -659,11 +663,32 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('Enter')
 
     expect(onSave).toHaveBeenCalled()
-    expect(screen.getByText(/마구 훈련 1\/4회/)).toBeTruthy()
+    // 0x17f5c 칸 4 — 마구 이름 StrCOMMON[0x1e + 1] 로 StrMODE[86] "[이름] %d/%d회 훈련"
+    expect(screen.getByText(/\[파이어 볼\] 1\/4회 훈련/)).toBeTruthy()
 
     // 결과 알림을 닫으면 105 허브로 돌아온다
     키('Enter')
     expect(칸이름들()).toEqual(['선수정보', '트레이닝', '휴식', '외출', '아이템', '다음경기'])
+  })
+
+  it('마구 훈련 결과(125)는 알림이 닫힐 때 105 에 다시 들어온다 — 그동안은 결과 창이 떠 있다고 알린다', () => {
+    const onReenter = vi.fn()
+    const onResultWindowChange = vi.fn()
+    엄격화면({ onReenter, onResultWindowChange })
+
+    키로마구칸까지()
+    키('Enter')
+    키('Enter')
+    키('Enter')
+
+    // 125 — 알림이 떠 있는 동안은 105 진입이 아니다
+    expect(onReenter).not.toHaveBeenCalled()
+    expect(onResultWindowChange).toHaveBeenLastCalledWith(true)
+
+    // 알림 닫기 → 125 틀 0x18dd8 → 105
+    키('Enter')
+    expect(onReenter).toHaveBeenCalledTimes(1)
+    expect(onResultWindowChange).toHaveBeenLastCalledWith(false)
   })
 
   it('[기록실] 팝업(0x80)도 같은 키로 돈다 — 오른쪽 칸이 나리 판 성적이다', () => {

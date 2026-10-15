@@ -139,6 +139,18 @@ describe('마구 훈련 (필살 창 0x17828 의 투수 탭)', () => {
     expect(career.magicLevel).toBe(1)
     expect(career.magicSessions).toBe(0)
     expect(career.gamePoint).toBe(5000 - 500 * 4)
+    // 0x1816c — 훈련 완료면 선수 +0x18 = 표 0xcc378[커서 0] = 1 (파이어 볼을 곧바로 고른다)
+    expect(career.selectedMagicNumber).toBe(1)
+  })
+
+  it('결과 글 이름은 StrCOMMON[0x1e + n] — 넷째는 4 + 타입 (0x180e6~0x1810e)', () => {
+    const first = runPitcherTraining(투수({ popularity: 200, gamePoint: 5000 }), 메뉴('마구'), 최소)
+    expect(first.magic).toEqual({ sessions: 1, required: 4, isLevelUp: false, name: '파이어 볼' })
+    expect(first.career.selectedMagicNumber).toBe(0)
+    const fourth = runPitcherTraining(
+      투수({ popularity: 5000, gamePoint: 5000, typeIndex: 2, magicLevel: 3 }), 메뉴('마구'), 최소,
+    )
+    expect(fourth.magic?.name).toBe('미라지 볼')
   })
 
   it('최고 레벨이면 창이 모든 칸을 막는다 (StrMODE[63])', () => {

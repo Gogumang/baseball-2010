@@ -26,7 +26,7 @@ describe('훈련 알림 문구', () => {
     const 최대글자수 = 24
     const 모든줄 = [
       ...trainingOutcomeLinesOf(결과()),
-      ...trainingOutcomeLinesOf(결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true } })),
+      ...trainingOutcomeLinesOf(결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true, name: '토네이도스윙' } })),
     ]
 
     for (const line of 모든줄) {
@@ -34,11 +34,11 @@ describe('훈련 알림 문구', () => {
     }
   })
 
-  it('필살타법은 StrMODE[86] 횟수 또는 [87] 훈련 완료', () => {
-    const 진행 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 2, required: 4, isLevelUp: false } })
-    const 완료 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true } })
-    expect(trainingOutcomeLinesOf(진행)).toEqual(['[필살타법] 2/4회 훈련', '사기 -6'])
-    expect(trainingOutcomeLinesOf(완료)).toEqual(['필살타법 훈련 완료!', '[선수정보]에서 사용 여부 변경 가능', '사기 -6'])
+  it('필살타법은 기술 이름(StrCOMMON[0x18 + n])으로 StrMODE[86] 횟수 또는 [87] 훈련 완료', () => {
+    const 진행 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 2, required: 4, isLevelUp: false, name: '파워 스윙' } })
+    const 완료 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true, name: '파워 스윙' } })
+    expect(trainingOutcomeLinesOf(진행)).toEqual(['[파워 스윙] 2/4회 훈련', '사기 -6'])
+    expect(trainingOutcomeLinesOf(완료)).toEqual(['파워 스윙 훈련 완료!', '[선수정보]에서 사용 여부 변경 가능', '사기 -6'])
   })
 
   it('거절 문구는 원문 (StrMODE[193]·[192])', () => {
