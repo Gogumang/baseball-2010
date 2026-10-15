@@ -628,6 +628,11 @@ export function useCareerSession({
        * 간이 타석 도루 판정(c19a0) · 주자 판 주루에 쓰인다 (`GameProgress.myRunAbility`)
        */
       myRunAbility?: number,
+      /**
+       * 내 팀 레코드 +2 — 나리 사기 읽기 · 쓰기 `0xa3a24` · `0xa3a44` 와 같은 칸(`0x1f988(저장, R[1])` + 2)이라 **커리어 사기**다.
+       * 국가대항전은 대표팀 칸(+0xbc4, 대회 시작 복사본)이라 안 넘긴다(표값)
+       */
+      ourTeamMorale?: number,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
@@ -642,6 +647,7 @@ export function useCareerSession({
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
         ourRecordLineup, myRunAbility,
+        ourTeamMorale,
       )
       progressRef.current = started
       setProgress(started)
@@ -712,6 +718,8 @@ export function useCareerSession({
       mine === undefined ? undefined : nariQuickLineupOf(mine),
       undefined,
       current === null || current === undefined ? undefined : effectiveAbilityOf(current).run,
+      // 0x1f9a8(저장, 4, 내 팀) + 2 = 0xa3a24 의 칸 — 커리어 사기
+      current === null || current === undefined ? undefined : current.morale,
     )
   }, [aceLevels, startMatch])
 

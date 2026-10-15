@@ -466,6 +466,12 @@ export interface GameProgress {
    * 루에 선 주자가 나면(간이 타석 도루 판정 c19a0 · 주자 판 주루) 이 값을 쓴다. 없으면(옛 시험) 내 타순 칸 로스터 줄 값.
    */
   readonly myRunAbility?: number
+  /**
+   * **내 팀 레코드 사기**(+2) — 우리 투수의 스태미나 용량 `0x66e44` 의 `V[+2]`. 모드 4 의 `0x1f9a8` → `0x1f8f8`(`[저장+0xbc]`)
+   * 내 팀 칸이고, 나리 사기 읽기 · 쓰기 `0xa3a24` · `0xa3a44` 가 같은 칸(`0x1f988(저장, R[1])` + 2)을 쓰므로 **커리어 사기**다.
+   * 국가대항전의 대표팀 칸(+0xbc4)은 대회 시작 복사본이라 안 넘긴다(표값). 없으면 표값(`teamRecordMoraleOf`)
+   */
+  readonly ourTeamMorale?: number
 }
 
 /** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
@@ -557,6 +563,8 @@ export function startGame(
   ourRecordLineup?: QuickLineup,
   /** 내 선수의 주력 (`GameProgress.myRunAbility`) — 첫 내 차례 앞 동료 타석의 도루 판정부터 본다 */
   myRunAbility?: number,
+  /** 내 팀 레코드 사기 = 커리어 사기 (`GameProgress.ourTeamMorale`). 안 넘기면 표값 */
+  ourTeamMorale?: number,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
   const opponentAces = aces?.opponent ?? NO_GAME_ACES
@@ -624,6 +632,7 @@ export function startGame(
     specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
     stealingFrom: [],
     ...(myRunAbility === undefined ? {} : { myRunAbility }),
+    ...(ourTeamMorale === undefined ? {} : { ourTeamMorale }),
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
@@ -1083,9 +1092,8 @@ function finishPlayerOutcome(
     defensePlay === null ? undefined : { survivorsFromBase: survivorsFromBaseOfFates(defensePlay.runnerFates) },
   )
   const runsBattedIn = nextGame.ourScore - progress.game.ourScore
-  const outsInPlay =
-    defensePlay?.advance.outsAdded ??
-    advanceRunners(progress.game.bases, outcome, progress.game.outs).outsAdded
+  const plainAdvance = defensePlay === null ? advanceRunners(progress.game.bases, outcome, progress.game.outs) : null
+  const outsInPlay = defensePlay?.advance.outsAdded ?? plainAdvance?.outsAdded ?? 0
   // 낫아웃(state[0x1a]) — 0x3e09e 갈래의 삼진 콜 0xa7c4c 가 사건 5 를 넣고 타자주자 판을 돈다(판 운명을 진루로 먹이는 삼진은
   // 이 갈래뿐이다). 정산 [sp+0x30] 에 그 사건이 판의 아웃 사건 앞에 하나 더 든다 — 0xa59c0 의 아웃(−1 · 병살 G+0x118 ·
   // 득점권 아웃) · 결과비트 B8/B10 · 상대 투수 +0x20(a8cb0, 보정 없음)이 그 값을 본다
@@ -1098,7 +1106,9 @@ function finishPlayerOutcome(
     outsInPlay: settledOuts,
     runsBattedIn,
     isWalkOff,
-    hadSecondBaseRunner: progress.game.bases.second,
+    // 0xa59c0 a5ace~a5ad8: 0xa97a1(주자 목록 ctx+0x14, 2) — **판이 끝난 뒤** 2루에 선 산 주자(+0x96 == 0 · +0x8c == 2).
+    // 반 이닝이 바뀌기 전, 판 끝 정산 0xa8024(a8c2a) 시점의 루다
+    hadSecondBaseRunner: (defensePlay?.advance.bases ?? plainAdvance?.bases ?? progress.game.bases).second,
   })
 
   // 타자 게이트 [sp+0x34] — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay`)
@@ -1972,6 +1982,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
       progress.ourPitcherOrder,
       progress.ourPitcherStaminas,
       teamAcePitcherOf(progress, true),
+      progress.ourTeamMorale,
     ),
     // 상대 타자는 명단에서 고르고, 타석마다 CPU 대타(0xac228)를 먼저 본다
     {
@@ -2304,8 +2315,10 @@ function finalStaminasOf(table: readonly number[], mound: HalfInningMound): read
  * 판정 0xac428 이 마운드 보직을, 새 투수 고르기 0xabfcc 가 벤치 보직을 본다. 안 넘기면 모두 선발로 보여
  * 9회 이후 마무리 상황마다 매 타자 투수가 바뀐다(58066a1 뒤의 회귀).
  *
- * 팀 사기(`0x66e44` 의 `V[+2]`)는 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 4)를 찾아 읽는다 — 팀 레코드 사기
- * (`teamRecordMoraleOf`, 표값)다. 투구 소모(0xa5e14)의 용량과 상대 마운드 체력 막대(`opponentMoundOf`)가 같은 값을 본다.
+ * 팀 사기(`0x66e44` 의 `V[+2]`)는 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 4 → 0x1f8f8 `[저장+0xbc]+4+0x1c·팀`)를 찾아 읽는다.
+ * 그 칸 +2 에 쓰는 곳은 나리 사기 쓰기 `0xa3a44`(`0x1f988(저장, R[1])` — 내 팀 칸) 하나라 **내 팀은 커리어 사기**, 상대 팀은
+ * 등록 `0x204e0` 이 마스터(0x1f8c0)에서 깊은 복사(0x1fe5c)한 표값(`teamRecordMoraleOf`)이다. 투구 소모(0xa5e14)의 용량과
+ * 상대 마운드 체력 막대(`opponentMoundOf`)가 같은 값을 본다.
  */
 function quickDefenseOf(
   teamId: number,
@@ -2317,6 +2330,8 @@ function quickDefenseOf(
   staminas?: readonly number[],
   /** 142 가 명부 8번 칸에 넣은 마투수 (`order` 에 8 이 들어 있다) */
   ace?: GameAcePitcher,
+  /** 그 팀 레코드 +2 — 내 팀이면 커리어 사기(`GameProgress.ourTeamMorale`). 안 넘기면 표값 */
+  morale: number = teamRecordMoraleOf(teamId),
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
   const isAce = (slot: number) => ace !== undefined && slot === ACE_PITCHER_SLOT
@@ -2329,7 +2344,7 @@ function quickDefenseOf(
     staminaAbilityAt: (slot) =>
       isAce(slot) && ace !== undefined ? ace.staminaAbility : roster[slot % roster.length].ability[3],
     lead,
-    morale: teamRecordMoraleOf(teamId),
+    morale,
     bothTeamsAreCpu: false,
     roleAt: rosterPitcherRoleOf,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 4 는 0xb574a 가지가 내 육성

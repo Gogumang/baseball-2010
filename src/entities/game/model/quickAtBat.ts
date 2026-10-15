@@ -218,7 +218,8 @@ export function quickPitchOf(
     spreadY = trunc((spreadY * 3) / divisor)
   }
 
-  // 부호를 각각 다시 뽑는다. 원본 호출은 디컴파일에서 인자가 날아가 rand(0,2) 로 본다 (추정)
+  // 부호를 각각 다시 뽑는다 — c144c · c1464 의 0xbfaa0 = `rand(0, 2)`(bfaa2 movs r0,#0 · movs r1,#2 · bl 0xbfa54, 확정).
+  // 0 이 아니면 그대로, 0 이면 뒤집는다. 차례는 x(sp+0x58 → sp+0x44) 먼저, y(sp+0x54 → sp+0x40) 다음이고 구위 등급 0xb74bc(c1492) 앞이다
   if (random.rand(0, 2) === 0) spreadX = -spreadX
   if (random.rand(0, 2) === 0) spreadY = -spreadY
 
@@ -238,8 +239,10 @@ export type PitchJudgement = '스트라이크' | '볼' | '포볼' | '삼진'
  *     간이 엔진 쪽 0xc0ee8(→ 0xb68bc) 이 부른다
  * 간이 엔진 루프(0xc262c)는 0x3dfac 를 지나지 않으므로 이 칸이 늘 0 이다 → 판정은 1·2·3·5 만 나온다.
  * 사람 타석의 사구는 `features/play-at-bat/model/resolvePitch.isHitByPitch` 가 맡는다.
- * +0x10(존 밖인데도 스트라이크로 치는 칸)은 0 으로 본다 (추정 — 사람 타석 0x35a20 도 이 칸이 서 있으면
- * 사구를 안 내므로 "스윙했나" 쪽 칸으로 보인다. 쓰는 곳은 안 찾았다).
+ * state[0x10](존 밖인데도 스트라이크로 치는 칸 — 9d58e `r1 == 0 && state[0x10] == 0` 일 때만 볼 쪽)은 **늘 0 이다 (확정, 2026-10 r87)**:
+ * 이 칸에 0 이 아닌 값을 쓰는 곳은 사람 장면 공 도착 판정 0x3dfac 의 `state[0x10] = 스윙 객체 +0xe`(0x3dfbe, "휘둘렀나") 하나이고,
+ * 간이 구역(0xc0d00~0xc2c00)에는 `strb …,#0x10` 이 없다. 0xc262c 는 타석 호출마다 머리에서 0xc0ee8 → 0xb68bc → 0xb67d0 을 불러
+ * `state[0x10] = 0`(b67f0)으로 지운다.
  */
 export function judgePitchOf(
   pitcher: QuickAtBatPitcher,
@@ -370,7 +373,9 @@ function verdictOf(
       : { kind: '끝', outcome: { kind: '아웃', detail: '땅볼아웃' } }
   }
   if (swing.code === FOUL_CODE) return { kind: '파울' }
-  // 원본은 뜬공·직선타를 구분하지 않는다 — 코드 0 하나뿐이라 뜬공으로 적는다 (추정)
+  // 원본은 뜬공·직선타를 구분하지 않는다 (확정, 2026-10 r87): 점프표 0xd9000[0] = c161c 가 아웃 기록 0xa7d0c(사건 0xd — 종류 칸 없음) ·
+  // 아웃 +1 · 0xa8025 · 다음 타자를 부르고 c1640 에서 곧장 c17dc 로 가 중계 글 sim+0xc4 도 안 고친다. 웹은 이 한 가지 아웃을
+  // '뜬공아웃' 이라는 표지로 들고 간다(중계 글 `missionAutoRelay` · 결과 링 `atBatResultRing` 이 이 표지로 코드 0 을 알아본다)
   if (swing.code === OUT_CODE) return { kind: '끝', outcome: { kind: '아웃', detail: '뜬공아웃' } }
   if (swing.code === HIT_CODES.homeRun) return { kind: '끝', outcome: { kind: '홈런' } }
 

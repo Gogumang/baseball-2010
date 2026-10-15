@@ -12,7 +12,6 @@ import { NariStatusValues } from '@/pages/management/ui/StatusValues'
 import { HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID } from '@/pages/management/ui/StatusIconRow'
 import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
-import { teamMoraleOf } from '@/pages/pitcher-league/model/pitcherGameOptions'
 
 /**
  * 상태 아이콘 줄의 조건 — 투수편(모드 3)도 0x7d34c 의 같은 줄을 탄다. 모드 갈림은 시즌(모드 2, 0x7b998) 하나뿐이라
@@ -44,7 +43,7 @@ const GAUGE_FILL = '#18216B'
  * 칸 = 프레임 11 박스 1 (194,41,41,15) → (x, y + h − 2, w + 1, 7) = (194, 54, 42, 7) · #18216B 로 채움
  * img_text 396 0xb9e05(정렬 0x21 · ox −(그림 폭 + 3))       ; 칸 왼쪽 밖
  * 안칸 (x + 1, y + 1, w − 2, h − 2) = (195, 55, 40, 5)
- * s = 선수 +0x2c · M = 0x66e44(팀 레코드, 선수, 보직 0xb6705 == 0) · W = trunc(trunc(s × M / 10000) × 40 / M)
+ * s = 선수 +0x2c · M = 0x66e44(팀 레코드 0x1f988(저장, R[1]), 선수, 보직 0xb6705 == 0) · W = trunc(trunc(s × M / 10000) × 40 / M)
  * 0x6a9f1 (x, y, W, 4) RGB(255,9,7) · (x, y+1, W, 2) RGB(255,128,1) 두 번 · (x, y+4, W, 1) RGB(188,0,1)
  * ```
  */
@@ -53,7 +52,8 @@ export function staminaBarLayoutOf(career: PitcherCareer) {
   const outer = { x: box.x, y: box.y + box.height - 2, width: box.width + 1, height: 7 }
   const inner = { x: outer.x + 1, y: outer.y + 1, width: outer.width - 2, height: outer.height - 2 }
   const capacity = staminaCapacityOf(
-    equippedPitcherAbilityOf(career).stamina, teamMoraleOf(career.teamId), career.role === PITCHER_ROLE.starter,
+    // 7d904 `0x1f988(저장, R[1])` + 2 — 나리 사기 0xa3a24 와 같은 칸이라 커리어 사기
+    equippedPitcherAbilityOf(career).stamina, career.morale, career.role === PITCHER_ROLE.starter,
   )
   const filled = capacity <= 0
     ? 0

@@ -1820,3 +1820,41 @@ describe('삼진 없이 경기 끝으로 정산되는 폭투·포일 판(종류 
     expect(끝.popularityPoints).toBe(끝내기판.popularityPoints + 4)
   })
 })
+
+describe('평가 타석 0xa59c0 의 득점권 아웃 G+0x11c — 2루 주자는 판이 끝난 뒤 기준이다 (a5ace 0xa97a1(목록, 2))', () => {
+  const 판 = (bases: BaseState): GameProgress => {
+    const progress = startGame(createSeededRandom(20100905))
+    return { ...progress, game: { ...progress.game, bases } }
+  }
+
+  it('2루 주자가 땅볼에 3루로 가고 타자가 죽으면 안 센다 — 플레이 전엔 2루에 있었다', () => {
+    const before = 판({ first: false, second: true, third: false })
+    const after = applyPlayerOutcome(before, { kind: '아웃', detail: '땅볼아웃' }, createSeededRandom(1))
+    expect(after.lastDefensePlay?.advance).toMatchObject({ outsAdded: 1, bases: { second: false, third: true } })
+    expect(after.scoringPositionOuts).toBe(before.scoringPositionOuts)
+  })
+
+  it('2루 주자가 그대로 선 뜬공 아웃은 센다', () => {
+    const before = 판({ first: false, second: true, third: false })
+    const after = applyPlayerOutcome(before, { kind: '아웃', detail: '뜬공아웃' }, createSeededRandom(1))
+    expect(after.lastDefensePlay?.advance).toMatchObject({ outsAdded: 1, bases: { second: true } })
+    expect(after.scoringPositionOuts).toBe(before.scoringPositionOuts + 1)
+  })
+})
+
+describe('나리 타자편 내 팀 사기 — 내 팀 레코드 +2 는 커리어 사기 칸이다 (0x1f9a8(저장, 4, 내 팀) · 0xa3a24 · 0xa3a44)', () => {
+  it('넘긴 사기가 우리 투수의 스태미나 용량(0x66e44 의 V[+2])에 들어간다 — 같은 씨앗이라도 1회초 소모가 달라진다', () => {
+    const start = (morale?: number) =>
+      startGame(
+        createSeededRandom(20100905), 0, undefined, undefined, undefined, 0, false, undefined, undefined, undefined, undefined,
+        morale,
+      )
+    const 표값 = start()
+    expect(표값.ourTeamMorale).toBeUndefined()
+    expect(start(100).ourMound).toEqual(표값.ourMound)
+    const 낮음 = start(5)
+    expect(낮음.ourTeamMorale).toBe(5)
+    expect(낮음.ourMound.pitches).toBeGreaterThan(0)
+    expect(낮음.ourMound.stamina).not.toBe(표값.ourMound.stamina)
+  })
+})

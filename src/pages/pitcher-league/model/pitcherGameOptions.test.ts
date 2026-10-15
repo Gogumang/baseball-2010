@@ -140,9 +140,13 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(pitcherGameOptionsOf({ ...보유만, equippedSkillIds: [23] }).magicCount).toBe(7)
   })
 
-  it('팀 사기는 팀 레코드 s16 +2 — 전 팀 100 이다', () => {
+  it('팀 사기는 팀 레코드 s16 +2 — 표는 전 팀 100, 나리 내 팀 칸은 커리어 사기와 같은 칸이다 (0xa3a24 · 0xa3a44)', () => {
     expect(teamMoraleOf(0)).toBe(100)
-    expect(pitcherGameOptionsOf(투수()).teamMorale).toBe(100)
+    expect(pitcherGameOptionsOf(투수()).teamMorale).toBe(투수().morale)
+    // 사기 쓰기 0xa3a44 가 0x1f988(저장, R[1]) + 2 에 적은 값을 경기의 스태미나 용량 0x66e44 가 0x1f9a8(저장, 3, 내 팀) + 2 로 읽는다
+    expect(pitcherGameOptionsOf({ ...투수(), morale: 37 }).teamMorale).toBe(37)
+    // 부르는 쪽이 넘기면(국가대항전 대표팀 칸 = 표값) 그 값이다
+    expect(pitcherGameOptionsOf({ ...투수(), morale: 37 }, { teamMorale: 100 }).teamMorale).toBe(100)
   })
 
   it('조립한 옵션으로 경기가 바로 시작된다', () => {

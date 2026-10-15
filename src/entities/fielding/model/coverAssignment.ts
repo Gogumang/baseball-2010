@@ -56,8 +56,11 @@ import {
  *        아니면 루 r−1 의 주자가 있으면 1 · 아니면 루 r−2 의 주자가 있고 그 +0x7c == r−1 이면 1 · 그 밖 0
  * ```
  * ⚠️ 미해결 (지어내지 않고 둔 것):
- * - P+0x168 을 쓰는 곳을 못 찾았다 — 타자주자 갈래(b1bde)는 안 선다고 본다. 타자주자는 +0x8c == 0 이라 루 1 은
- *   "루 r−1 의 주자" 로 어차피 선다
+ * - P+0x168 을 쓰는 곳이 바이너리에 없다(2026-10 r87 다시 훑음, ⚠️ 미확인은 new 0x1239 의 0 채움 하나) — 읽는 곳은 b1b8a 하나다.
+ *   상수 훑기(movs/lsls/adds · 리터럴 풀 · `adds rX, #i` + `[rX, #o]` · Thumb-2 `#0x168]`)로 플레이 쪽(0xa0000~0xb8000)
+ *   에서 +0x168 에 쓰는 자리를 찾지 못했고, 플레이 객체(new(0x1fc) 0x3e756, 생성자 0xb0b68)도 이 칸을 안 적는다.
+ *   그래서 갈래는 그대로 옮기되(`batterRunnerNeedsCover`) 칸 값은 생성 때 값 0 으로 둔다 → 안 선다.
+ *   타자주자는 +0x8c == 0 이라 루 1 은 "루 r−1 의 주자" 로 어차피 선다
  * - state[7] · +0x110 · 판 끝(+0x111 · +0x129 && 공 틱 > 담장 틱, b1ca2) 관문은 판이 도는 동안 막지 않는다고 본다
  * - vtcc(0xa2138 = +0xb0 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0)는 이 진행기에 없는 동작 잠금이라 늘 참으로 본다
  * - +0x94 는 웹의 `requiredBase ≠ −1` 로 읽는다(0xa95e8 · 0xa9620 이 둘을 함께 세우고 지운다)
@@ -102,6 +105,22 @@ function runnerOnBase(runners: readonly RunnerState[], base: number): RunnerStat
   return runners.find((runner) => !runner.isOut && runner.startBase === base)
 }
 
+/**
+ * 플레이 `+0x168` — 0xb1b88 의 타자주자 갈래(b1bde)만 읽는 칸. 쓰는 곳이 바이너리에 없어(머리말) 생성 때 값 그대로다.
+ * ⚠️ 미확인: new 0x1239 가 0 으로 채우는지 — 0 으로 둔다.
+ */
+export const PLAY_FIELD_0X168 = 0
+
+/**
+ * b1bde~b1c08 (직접 뜬 것): 주자 목록 0 번(0xa9564(…, 0))이 있고 아웃 아니고(+0x96 == 0)
+ * `(P+0x168 − 12) ≤ 2 || (P+0x168 − 6) ≤ 2`(부호 없는 비교 `bls`) 면 1.
+ */
+export function batterRunnerNeedsCover(runners: readonly RunnerState[], playField168: number = PLAY_FIELD_0X168): boolean {
+  const first = runners[0]
+  if (first === undefined || first.isOut) return false
+  return (playField168 - 12) >>> 0 <= 2 || (playField168 - 6) >>> 0 <= 2
+}
+
 /** 0xb1b88(P, b) — 그 루에 커버가 필요한가 (머리말 참고) */
 export function needsCover(context: DefenseContext, base: number): boolean {
   const { fielders, runners } = context
@@ -109,6 +128,7 @@ export function needsCover(context: DefenseContext, base: number): boolean {
   if (runners.some((runner) => runner.requiredBase !== NONE && runner.requiredBase === base && !runner.isOut)) {
     return true
   }
+  if (batterRunnerNeedsCover(runners)) return true
   const r = base === 0 ? 4 : base
   const on = runnerOnBase(runners, r)
   if (on !== undefined) return true
