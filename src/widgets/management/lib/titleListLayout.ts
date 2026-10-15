@@ -107,3 +107,18 @@ export const centeredTopOf = (box: TitleListBox, height: number) => {
   const extra = box.height - height
   return box.y + Math.trunc(extra / 2) + (extra % 2)
 }
+
+/**
+ * **윗줄 옮기기 — 한 줄씩 (쪽 단위가 아니다)**. 목록 [장면+0xa4] 는 0x3c 바이트 스크롤 격자(생성자 0x6c219, vtable 0xd2ea0)이고
+ * 키 vt+0x18 = 0x6c299 가 바탕 키 0x6c521 로 커서를 옮긴 뒤 vt+0x20 = 0x6c2bd 로 보이는 칸을 맞춘다(직접 떴다):
+ * ```
+ * 6c2e2  r = 커서 줄 +0x10 · t = 윗줄 +0x30 · v = 보이는 줄 수 +0x38
+ *        r < t 이거나 r ≥ t + v 일 때만: d = r − t ; d > 0 이면 t = r − v + 1 · 아니면 t = r
+ * ```
+ * 곧 커서가 보이는 칸을 벗어날 때 **그 줄이 막 보일 만큼만** 굴린다 — 아래로 넘으면 커서가 맨 아랫줄, 위로 넘으면 맨 윗줄.
+ * 감아서 0 으로 가면 t = 0, 맨 끝으로 가면 t = 끝 − v + 1 이다. 그리기 0x198fc 는 t + 줄(0x19a50~0x19a5c)을 9 줄 그린다.
+ */
+export function titleListTopAfter(top: number, cursor: number, visible: number): number {
+  if (cursor >= top && cursor < top + visible) return top
+  return cursor - top > 0 ? cursor - visible + 1 : cursor
+}

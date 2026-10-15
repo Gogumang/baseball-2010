@@ -8,7 +8,8 @@ import {
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
   TITLE_CURSOR_BOX, TITLE_HEADER_FRAME, TITLE_HEADER_OX, TITLE_LIST_BOXES, TITLE_LIST_COLORS, TITLE_LIST_FRAME,
-  TITLE_NUMBER_HEIGHT, TITLE_ROW_STEP, centeredTopOf, titleNumberLeftOf, titleNumberWidthOf, titleScrollBarRectsOf,
+  TITLE_NUMBER_HEIGHT, TITLE_ROW_STEP, centeredTopOf, titleListTopAfter, titleNumberLeftOf, titleNumberWidthOf,
+  titleScrollBarRectsOf,
 } from '@/widgets/management/lib/titleListLayout'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as local from '@/widgets/management/ui/TitleListWindow.css'
@@ -18,6 +19,13 @@ interface TitleListWindowProps {
   /** 확인 키로 칭호를 바꿨다 — 세션이 `equipTitle` 로 선수 +0x1c4 를 쓰고 저장한다 */
   readonly onEquip: (title: string) => void
   readonly onClose: () => void
+  /**
+   * 목록 객체의 윗줄 +0x30 — 장면 생성자(0x6c1e8)만 0 으로 두고 129 진입 0x104cc 는 커서만 (0, 0) 으로 돌린다.
+   * 그래서 다시 열면 **지난번 윗줄이 그대로** 남는다(키를 누르기 전까지 커서 0 이 안 보일 수 있다 — 원본 그대로).
+   * 부르는 쪽이 들고 있다가 넘긴다. 안 주면 0
+   */
+  readonly initialTop?: number
+  readonly onTopChange?: (top: number) => void
 }
 
 const MODE_UI = './sprites/mode_ui/frames'
@@ -37,21 +45,24 @@ const PALETTE_THREE_MATRIX = '1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 
  *                '*'(−16/0x2a) 면 하위 상태 0x77 = **119**(기본정보) 로 돌아간다.
  *
  * 그림은 0x198fc 그대로다 — mode_ui 프레임 63 박스 · 줄 막대 64/65 · 머리 img_text 279(팔레트 3) (`titleListLayout.ts`).
- * ⚠️ 미확인: 목록 객체가 윗줄을 옮기는 규칙(쪽 단위인지 한 줄씩인지)은 안 떠서 웹은 9줄 쪽 단위로 넘긴다.
+ * 진입 0x104cc: 목록 vt+0x1c(1열, 개수 줄, 숫자키 꼴 1, 꼴 0x230) → 바탕 0x6bfe0 이 vt+0x14(0, 0) — **커서는 늘 첫 줄**(장착한 칭호가
+ * 아니다) · +0x34 = 1 · +0x38 = min(개수, 9). 윗줄은 한 줄씩 굴린다(`titleListTopAfter`).
  */
-export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowProps) {
+export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTopChange }: TitleListWindowProps) {
   const titles = titleListOf(career.titleIds)
   const equipped = currentTitleOf(career)
-  const [cursor, setCursor] = useState(() => Math.max(titles.indexOf(equipped), 0))
+  const [cursor, setCursor] = useState(0)
+  const [top, setTop] = useState(initialTop)
   const [notice, setNotice] = useState<string | null>(null)
   const modeUiOrigins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const isBlinkOn = useUpdateCounter() % BLINK_PERIOD !== 0
   const headerFilterId = `title-palette3-${useId().replace(/:/g, '')}`
 
-  /** 커서가 있는 쪽의 첫 줄 — 원본 목록 객체가 쪽 단위로 굴린다 (`sel = list[쪽·쪽당 + 커서]`) */
-  const pageTop = Math.floor(cursor / TITLE_ROWS_PER_PAGE) * TITLE_ROWS_PER_PAGE
+  /** 보이는 줄 — 그리기 0x198fc 는 윗줄 +0x30 부터 9 줄 */
+  const pageTop = top
   const page = titles.slice(pageTop, pageTop + TITLE_ROWS_PER_PAGE)
+  const visibleRows = Math.min(titles.length, TITLE_ROWS_PER_PAGE)
 
   /** 확인 키 — 이미 장착한 것이면 원본도 **아무 일도 하지 않는다** (0x11fd6 의 `!=` 검사) */
   const confirm = (index: number) => {
@@ -69,7 +80,14 @@ export function TitleListWindow({ career, onEquip, onClose }: TitleListWindowPro
       if (step !== 0) {
         event.preventDefault()
         if (titles.length === 0) return
-        return setCursor((current) => (current + step + titles.length) % titles.length)
+        const next = (cursor + step + titles.length) % titles.length
+        const nextTop = titleListTopAfter(top, next, visibleRows)
+        setCursor(next)
+        if (nextTop !== top) {
+          setTop(nextTop)
+          onTopChange?.(nextTop)
+        }
+        return
       }
       if (event.key === 'Enter') {
         event.preventDefault()

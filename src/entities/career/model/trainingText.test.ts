@@ -46,3 +46,9 @@ describe('훈련 알림 문구', () => {
     expect(trainingBlockTextOf('능력치최대', '수비')).toBe('[수비] 능력치가 최대입니다')
   })
 })
+
+describe('훈련 막힘 글 — 훈련완료', () => {
+  it('StrMODE[63] "이미 훈련 완료된 스킬입니다" 다 (필살타법 창 0x17828 의 [63])', () => {
+    expect(trainingBlockTextOf('훈련완료', '필살타법')).toBe('이미 훈련 완료된 스킬입니다')
+  })
+})

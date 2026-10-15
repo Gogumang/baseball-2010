@@ -354,6 +354,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           career={titleViewOf(career)}
           onEquip={menu.equipTitle}
           onClose={menu.closeTitleWindow}
+          initialTop={mainCursor.titleListTop ?? 0}
+          onTopChange={(top) => { mainCursor.titleListTop = top }}
         />
       )}
       {/* 스킬 창 — 하위 상태 122. 타자편 위젯을 그대로 쓴다 (키 0x13140 · 대화 0x147b0 에 모드 갈림이 없다) */}

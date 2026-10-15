@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -103,6 +103,9 @@ const BASIC_INFO_FOOTER = 0x87
 export function ManagementScreen(props: ManagementScreenProps) {
   const { career, noticeText } = props
   const menu = useManagementMenu(props)
+  /** 칭호 목록 윗줄을 장면 동안 들고 있는 곳 — 루트가 준 커서 객체, 없으면 이 화면 몫 */
+  const ownTitleHolder = useRef<{ titleListTop?: number }>({}).current
+  const titleHolder = props.mainCursor ?? ownTitleHolder
   /** 108 필살타법 창에 들어선 횟수 — 139 G 충전에서 돌아오면 108 진입 0x17730 이 다시 돈다(창을 새로 마운트) */
   const [swingTrainingEntry, setSwingTrainingEntry] = useState(0)
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
@@ -195,7 +198,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
         }} />
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
       {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (
-        <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay} />
+        <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay}
+          initialTop={titleHolder.titleListTop ?? 0} onTopChange={(top) => { titleHolder.titleListTop = top }} />
       )}
       {menu.overlay === '필살타법' && (
         <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} battingTypeIndex={career.battingTypeIndex}
