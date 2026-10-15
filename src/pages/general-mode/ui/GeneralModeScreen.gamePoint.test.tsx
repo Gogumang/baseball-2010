@@ -11,7 +11,13 @@ import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameF
  * 부르는 쪽(App)이 `onSettlementEnter` 에서 지갑에 더하면 다시 그려진 판이 더한 값을 보인다.
  */
 vi.mock('@/pages/team-game/ui/TeamGameScreen', () => ({
-  TeamGameScreen: (props: { gamePoint?: number }) => <div data-testid="팀경기" data-game-point={props.gamePoint ?? ''} />,
+  TeamGameScreen: (props: { gamePoint?: number; onSpendGamePoint?: (cost: number) => void }) => (
+    <div data-testid="팀경기" data-game-point={props.gamePoint ?? ''}>
+      {props.onSpendGamePoint !== undefined && (
+        <button type="button" onClick={() => props.onSpendGamePoint?.(30)}>자동진행</button>
+      )}
+    </div>
+  ),
 }))
 
 const { GeneralModeScreen } = await import('@/pages/general-mode/ui/GeneralModeScreen')
@@ -46,5 +52,18 @@ describe('일반모드 → 팀 경기 화면의 보유 G', () => {
     const resumeGame = { options: { mode: 1 } } as unknown as TeamGameProgress
     render(<GeneralModeScreen {...base} resumeGame={resumeGame} gamePoint={77} />)
     expect(screen.getByTestId('팀경기').dataset.gamePoint).toBe('77')
+  })
+
+  it('자동진행 G 소비(0x3c83a~0x3c84e) — 받은 손잡이를 팀 경기 화면에 그대로 넘긴다, 없으면 넘기지 않아 칸이 잠긴다', () => {
+    const resumeGame = { options: { mode: 1 } } as unknown as TeamGameProgress
+    const onSpendGamePoint = vi.fn()
+    const { unmount } = render(
+      <GeneralModeScreen {...base} resumeGame={resumeGame} gamePoint={77} onSpendGamePoint={onSpendGamePoint} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '자동진행' }))
+    expect(onSpendGamePoint).toHaveBeenCalledWith(30)
+    unmount()
+    render(<GeneralModeScreen {...base} resumeGame={resumeGame} gamePoint={77} />)
+    expect(screen.queryByRole('button', { name: '자동진행' })).toBeNull()
   })
 })

@@ -43,6 +43,13 @@ export interface GeneralModeScreenProps {
    * 정산 진입 0x4ea0c 가 번 G 를 먼저 더하고(4ec5a) 판을 그리므로, 받는 쪽이 `onSettlementEnter` 에서 더한 값이 그대로 보인다.
    */
   readonly gamePoint?: number
+  /**
+   * 경기 중 메뉴 **자동진행** [예] — 받는 쪽이 전역 G(+0x64)에서 값을 뺀다. 원본 0x3c7ee~0x3c84e: 비용은 모드 8·9 만 100,
+   * 그 밖(모드 1 포함) 30 이고, 보유 G < 비용이면 StrGAME[5] 알림으로 끝(화면이 먼저 막는다), 아니면 G += −비용 을
+   * [0, 99999] 로 자른다. 이어 0x3c850~0x3c8d6 이 **모드 2 만 k3(시즌), 8·9 만 k4(대전)** 로 소모 통계 `0x22c29` 에 적고
+   * 모드 1 은 아무 칸에도 적지 않는다 — 그래서 받는 쪽은 G 만 뺀다. 없으면 자동진행 칸이 잠긴다
+   */
+  readonly onSpendGamePoint?: (cost: number) => void
   /** 마선수 한 칸을 G로 열었다 (0xa3f6) — 받는 쪽이 G를 빼고 오픈 플래그를 세운다 */
   readonly onOpenAce?: (cell: number) => void
   /** 상태 21 마선수 격자(종류 7)가 서 있는 동안 열 칸이 다 열렸으면 — 히든 팀 외인구단 12 (0x7b408, `AceSelectScreen`) */
@@ -153,7 +160,7 @@ function withLiveGameInning(props: GeneralModeScreenProps): GeneralModeScreenPro
 function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame: TeamGameProgress }) {
   const {
     random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual, gamePoint, initialSettings,
-    onFinish, onExit, onGameSave, onSettlementEnter,
+    onSpendGamePoint, onFinish, onExit, onGameSave, onSettlementEnter,
   } = props
   const [resumeFrom] = useState<TeamGameProgress>(() => ({
     ...resumeGame,
@@ -174,8 +181,9 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
       onFinish={onFinish}
       // 경기 중 나가기 0x40140 — 메인 메뉴 처음 단
       onQuit={() => onExit()}
-      // 정산 판의 보유 GP — 자동진행은 `onSpendGamePoint` 가 없어 여전히 잠긴다
+      // 정산 판의 보유 GP · 자동진행 비용 판정(0x3c802) — 자동진행 [예] 는 G 만 뺀다(모드 1 은 소모 통계 없음, 0x3c850)
       {...(gamePoint === undefined ? {} : { gamePoint })}
+      {...(onSpendGamePoint === undefined ? {} : { onSpendGamePoint })}
       {...(onGameSave === undefined ? {} : { onHalfInningSave: onGameSave })}
       {...(onSettlementEnter === undefined ? {} : { onSettlementEnter })}
     />
@@ -186,7 +194,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
     aceLevels, onLevelUpAce, gamePoint, onOpenAce, onAllAcesOpen, stadiums, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
-    gaugeSettingOn, runningModeManual, throwModeManual, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
+    gaugeSettingOn, runningModeManual, throwModeManual, onSpendGamePoint, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
   } = props
   /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
   const isFirstSaveRef = useRef(true)
@@ -240,8 +248,9 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         onFinish={onFinish}
         // 경기 중 나가기 0x40140 — 메인 메뉴 처음 단
         onQuit={() => onExit()}
-        // 정산 판의 보유 GP — 자동진행은 `onSpendGamePoint` 가 없어 여전히 잠긴다
+        // 정산 판의 보유 GP · 자동진행 비용 판정(0x3c802) — 자동진행 [예] 는 G 만 뺀다(모드 1 은 소모 통계 없음, 0x3c850)
         {...(gamePoint === undefined ? {} : { gamePoint })}
+        {...(onSpendGamePoint === undefined ? {} : { onSpendGamePoint })}
         onHalfInningSave={(save) => {
           if (isFirstSaveRef.current) {
             isFirstSaveRef.current = false
