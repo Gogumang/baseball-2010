@@ -36,7 +36,7 @@ import {
   startPitcherMission,
   withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
-import { battingRecordAt, cpuSideOf, humanSideOf, missionHumanRecordSlotOf, withMissionScore } from '@/entities/mission/model/missionGame'
+import { battingRecordAt, cpuSideOf, humanSideOf, missionHumanRecordSlotOf, missionTeamIdsOf, withMissionScore } from '@/entities/mission/model/missionGame'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import { skillIdsOfBits, teamBatters } from '@/entities/team/model/teamRoster'
@@ -795,15 +795,24 @@ export function useMissionSession({
    */
   const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities => {
     const missionPitcher = missionPitcherPlateRef.current
-    return missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission), {
-      ...run,
-      ...(missionPitcher === undefined ? {} : { missionPitcher }),
-    })
+    // 야수 · 주자 팔레트 — 경기[0x28 + 칸] 두 팀 중 수비측(타자 미션 CPU · 투수 미션 사람 칸) (C-1)
+    const teamIds = missionTeamIdsOf(run)
+    const humanDefends = run.mission.side === '투수'
+    return {
+      ...missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission), {
+        ...run,
+        ...(missionPitcher === undefined ? {} : { missionPitcher }),
+      }),
+      defenseTeamIndex: humanDefends ? teamIds.human : teamIds.cpu,
+      offenseTeamIndex: humanDefends ? teamIds.cpu : teamIds.human,
+    }
   }
   /** 공 도착 판에 얹는 그림 전용 두 칸 (능력치 칸은 부르는 쪽이 따로 넣는다) */
-  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces }: MissionPlayAbilities) => ({
+  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces, defenseTeamIndex, offenseTeamIndex }: MissionPlayAbilities) => ({
     ...(fielderPlates === undefined ? {} : { fielderPlates }),
     ...(runnerAces === undefined ? {} : { runnerAces }),
+    ...(defenseTeamIndex === undefined ? {} : { defenseTeamIndex }),
+    ...(offenseTeamIndex === undefined ? {} : { offenseTeamIndex }),
   })
   /** 견제 판 꼴 — 견제는 타자주자가 없어 루 1~3 만 */
   const pickoffAbilitiesOf = (run: MissionRun) => {
