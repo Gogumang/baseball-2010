@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
-import { PixelScreen, PressArea, RawScreen } from '@/shared/ui'
+import { PressArea, RawScreen } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import { MENU_PRESS_RECT, TIME_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/stagePressAreas'
@@ -69,6 +69,7 @@ import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
+import { SettlementPressArea } from '@/pages/team-game/ui/SettlementPressArea'
 import { TeamAutoRelay } from '@/pages/team-game/ui/TeamAutoRelay'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -669,16 +670,15 @@ export function TeamGameScreen({
     const isHumanWin = summary.result === '승'
     const ourSide = progress.game.playerSide
     return (
-      <PixelScreen
-        title="경기 결과"
-        leftKey={{ label: '확인', onPress: () => onFinish(summary) }}
-      >
+      // 정산(상태 0x19)도 원본 240×320 한 장이다 — 예전 웹 껍데기(PixelScreen 제목 띠 "경기 결과" · 소프트키 [확인])에 담으면 판이
+      // 화면 위로 붙고 아래가 껍데기 바탕으로 비었다(r77 패배 결과 g14). 나리 정산(`GameResultScreen`)과 같은 RawScreen · 배경 칸이다
+      <RawScreen>
         {/*
           정산 그리기 0x4a384 — 구름 0x78448 과 배경 고르기 0x40ff0(장면, +0x17e2)을 먼저 그린다 (선수·공·HUD 없음).
           +0x17e2 는 이긴 판만 틱마다 3 씩 150 까지 올라 구장이 가라앉는다 (`settlementBackdropOffsetAt`).
           그 위에 정산 판(0x4a404 진 판 덮개 · 0x4a448 띠·승패 그림 · 0x4a948 점수·기본 화면/기록 판)을 겹친다 (`SettlementBoard`).
         */}
-        <div className={styles.stageArea}>
+        <div className={styles.settlementBackdrop}>
           <BattingStage
             batterAbility={currentBatterAbility(progress)}
             pitcherAbility={currentPitcherAbility(progress)}
@@ -708,22 +708,24 @@ export function TeamGameScreen({
             }}
             onPitchResolved={() => {}}
           />
-          <SettlementBoard
-            mode={options.mode}
-            isWin={isHumanWin}
-            // 0xb69b0(st, 0/1) — 왼쪽이 측 0
-            side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
-            side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
-            scoreboardSides={scoreboardSides}
-            recordIds={summary.recordIds ?? []}
-            gamePoints={summary.gamePoints ?? 0}
-            // [app+0x64] — 정산 진입(0x4ea0c)이 번 G 를 더한 뒤의 값. 부르는 쪽이 `onSettlementEnter` 에서 더한다
-            {...(gamePoint === undefined ? {} : { heldGamePoints: gamePoint })}
-            onExit={() => onFinish(summary)}
-            effectLayers={settlementLayers}
-          />
         </div>
-      </PixelScreen>
+        <SettlementBoard
+          mode={options.mode}
+          isWin={isHumanWin}
+          // 0xb69b0(st, 0/1) — 왼쪽이 측 0
+          side0Score={ourSide === 0 ? summary.ourScore : summary.opponentScore}
+          side1Score={ourSide === 1 ? summary.ourScore : summary.opponentScore}
+          scoreboardSides={scoreboardSides}
+          recordIds={summary.recordIds ?? []}
+          gamePoints={summary.gamePoints ?? 0}
+          // [app+0x64] — 정산 진입(0x4ea0c)이 번 G 를 더한 뒤의 값. 부르는 쪽이 `onSettlementEnter` 에서 더한다
+          {...(gamePoint === undefined ? {} : { heldGamePoints: gamePoint })}
+          onExit={() => onFinish(summary)}
+          effectLayers={settlementLayers}
+        />
+        {/* 원본에 없는 웹 [확인] 소프트키 대신 — 판 키 0x407f0 로 OK 를 보내는 투명 누름 칸 */}
+        <SettlementPressArea />
+      </RawScreen>
     )
   }
 
