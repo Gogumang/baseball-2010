@@ -14,6 +14,11 @@ import type {
   EntryBatterLine, EntryBatterRow, EntryLists, EntryPitcherLine, EntryPitcherRow,
 } from '@/entities/season-mode/model/entryEditor'
 import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import type { PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
+import { PITCHERS } from '@/shared/config/original/roster'
+import type { RosterPlayer } from '@/shared/config/original/roster'
+import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoires'
 
 /**
  * **시즌 0xe0 엔트리 편집이 보는 명단** — 갱신 `0x63dc` · 키 `0x7044` · 그림 `0xb074` (직접 떴다).
@@ -64,6 +69,56 @@ export interface SeasonEntryCells {
   readonly pitcherLine?: EntryPitcherLine
   /** 체력 줄 — 용량 0x66e44(팀, rec, 0) · 퍼센트 (0x571d8) */
   readonly stamina?: { readonly capacity: number; readonly percent: number }
+  /** '0' 상세 창 0x5b798 이 읽는 레코드 칸 (`seasonDetailSourceOf`) */
+  readonly detailSource?: PlayerDetailSource
+}
+
+const detailRepertoireOf = (repertoire: Pick<PitcherRepertoire, 'form' | 'magicId' | 'pitchMask'> | undefined) =>
+  repertoire === undefined ? undefined : { form: repertoire.form, magicNumber: repertoire.magicId, pitchMask: repertoire.pitchMask }
+
+/**
+ * 명단 선수 레코드의 상세 창 칸 — 0xe0 그림 0xb074 → 0x5cfec(0x5c984) 끝 0x5cfc8 이 커서 줄 레코드를 0x5b798 에 넘긴다.
+ * 붙박이 표 선수는 Xls 행(+0xb · +0x14 · +0x1b · 레퍼토리 `ROSTER_PITCHER_REPERTOIRES`, 같은 차례), 영입 사본은 옮긴 기록 칸.
+ * 레코드 +0x18(필살)은 붙박이 표가 0 이고 타자 사본은 `specialNumber` 다.
+ * ⚠️ 미확인: 영입 사본의 +0x1b(연봉)는 웹 사본에 없어 비운다(0). 명전 칸에서만 이름을 찾는 표 밖 선수(사본 없음)는 칸을 모른다.
+ */
+export function seasonDetailSourceOf(
+  teamId: number,
+  player: SeasonPlayer,
+  isPitcher: boolean,
+  ability: readonly number[],
+): PlayerDetailSource | undefined {
+  const team = tableTeamOf(player, teamId)
+  const table = player.id < HALL_OF_FAME_FIRST_ID ? (isPitcher ? teamPitchers(team) : teamBatters(team))[player.id] : undefined
+  if (table !== undefined) return tableDetailSourceOf(table, isPitcher, ability)
+  const record = player.record
+  if (record === undefined) return undefined
+  if ('repertoire' in record) {
+    return {
+      isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0, grade: null,
+      repertoire: detailRepertoireOf(record.repertoire),
+    }
+  }
+  return {
+    isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0, grade: null,
+    specialNumber: record.specialNumber ?? 0,
+  }
+}
+
+/** 붙박이 표 행(Xls 0x30 바이트) 레코드의 상세 창 칸 — +0xb · +0x14 · +0x1b · 레퍼토리(`PITCHERS` 와 같은 차례) · +0x18 = 0 */
+export function tableDetailSourceOf(table: RosterPlayer, isPitcher: boolean, ability: readonly number[]): PlayerDetailSource {
+  return {
+    isPitcher, abilities: ability, aceIndex: -1, profile: table.profile, skillBits: table.skillBits, grade: table.grade,
+    ...(isPitcher ? { repertoire: detailRepertoireOf(ROSTER_PITCHER_REPERTOIRES[PITCHERS.indexOf(table)]) } : { specialNumber: 0 }),
+  }
+}
+
+/** 마선수 줄 — XlsACE 행을 통째 베낀 레코드 (+0xb · +0x14 · 마투수 레퍼토리 `ACE_PITCHER_REPERTOIRES`) */
+export function aceDetailSourceOf(ace: AcePlayer, aceIndex: number, ability: readonly number[], isPitcher: boolean): PlayerDetailSource {
+  return {
+    isPitcher, abilities: ability, aceIndex, profile: ace.profile, skillBits: ace.skillBits, grade: null,
+    ...(isPitcher ? { repertoire: detailRepertoireOf(ACE_PITCHER_REPERTOIRES[aceIndex]) } : {}),
+  }
 }
 
 /** 편집기 목록 한 줄 (타자) */
@@ -109,7 +164,8 @@ export const GENERAL_ENTRY_CELL_SOURCE: SeasonEntryCellSource = {
   staminaOf: () => FULL_RECORD_STAMINA,
 }
 
-const staminaPercentOf = (mode: number, stamina: number) =>
+/** 체력 줄 퍼센트 0x572a4 — [ed+0x334] ∈ {1, 2, 3, 4, 8, 9} 면 trunc(+0x2c / 100), 그 밖 100 */
+export const staminaPercentOf = (mode: number, stamina: number) =>
   mode >= 0 && mode <= 9 && ((0x31e >> mode) & 1) === 1 ? Math.trunc(stamina / 100) : 100
 
 /** 명단 선수 한 줄의 칸 재료 */
@@ -126,15 +182,18 @@ export function seasonEntryCellsOf(
   const record = player.record
   const profile = table?.profile ?? record?.profile ?? (record !== undefined && 'role' in record ? record.role : undefined)
   const profileLow = profile === undefined ? undefined : profile & 3
+  const detailSource = seasonDetailSourceOf(teamId, player, isPitcher, ability)
+  const detail = detailSource === undefined ? {} : { detailSource }
   if (!isPitcher) {
     const batterLine = source.batterLineOf?.(player) ?? (table === undefined ? undefined : entryBatterLineOfRecord(table.recordLine))
-    return { ...(profileLow === undefined ? {} : { profileLow }), ...(batterLine === undefined ? {} : { batterLine }) }
+    return { ...(profileLow === undefined ? {} : { profileLow }), ...(batterLine === undefined ? {} : { batterLine }), ...detail }
   }
   const pitcherLine = source.pitcherLineOf?.(player) ?? (table === undefined ? undefined : entryPitcherLineOfRecord(table.recordLine))
   const stamina = source.staminaOf?.(player, index) ?? player.stamina
   return {
     ...(profileLow === undefined ? {} : { profileLow }),
     ...(pitcherLine === undefined ? {} : { pitcherLine }),
+    ...detail,
     stamina: {
       capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false),
       percent: staminaPercentOf(source.staminaMode, stamina),
@@ -143,10 +202,12 @@ export function seasonEntryCellsOf(
 }
 
 /** 마선수 줄 — XlsACE 행을 통째 베낀 레코드(0xb521c · 0xb53f0): +0xb 는 표의 `profile`, 줄은 표의 `recordLine` */
-function aceCellsOf(ace: AcePlayer, ability: readonly number[], isPitcher: boolean, source: SeasonEntryCellSource): SeasonEntryCells {
-  if (!isPitcher) return { profileLow: ace.profile & 3, batterLine: entryBatterLineOfRecord(ace.recordLine) }
+function aceCellsOf(ace: AcePlayer, aceIndex: number, ability: readonly number[], isPitcher: boolean, source: SeasonEntryCellSource): SeasonEntryCells {
+  const detailSource = aceDetailSourceOf(ace, aceIndex, ability, isPitcher)
+  if (!isPitcher) return { profileLow: ace.profile & 3, batterLine: entryBatterLineOfRecord(ace.recordLine), detailSource }
   return {
     profileLow: ace.profile & 3,
+    detailSource,
     pitcherLine: entryPitcherLineOfRecord(ace.recordLine),
     // ⚠️ 미확인: 마투수 레코드 +0x2c 는 웹이 따로 들지 않아 가득으로 둔다
     stamina: { capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false), percent: staminaPercentOf(source.staminaMode, FULL_RECORD_STAMINA) },
@@ -297,7 +358,7 @@ export function seasonEntryListsOf(input: SeasonEntryInput): SeasonEntryLists {
     pitchers = seatAce(pitchers, ACE_PITCHER_SLOT, {
       name: acePitcher.name,
       ability,
-      ...aceCellsOf(acePitcher, ability, true, cells),
+      ...aceCellsOf(acePitcher, input.acePitcherId, ability, true, cells),
       isAce: true,
       rosterIndex: NOT_IN_ROSTER,
     })
@@ -308,7 +369,7 @@ export function seasonEntryListsOf(input: SeasonEntryInput): SeasonEntryLists {
     batters = seatAce(batters, ACE_BATTER_SLOT, {
       name: aceBatter.name,
       ability,
-      ...aceCellsOf(aceBatter, ability, false, cells),
+      ...aceCellsOf(aceBatter, input.aceBatterId, ability, false, cells),
       isAce: true,
       position: 0,
       rosterIndex: NOT_IN_ROSTER,

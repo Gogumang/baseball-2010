@@ -1,18 +1,14 @@
-import { abilityRadarAxesOf } from '@/pages/create-player/lib/abilityRadarPanel'
-import type { AbilityRadarAxis } from '@/pages/create-player/lib/abilityRadarPanel'
-import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
-import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
-import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { leagueBatterIdOf, leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
-import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import { playerDetailOf as playerDetailOfRecord } from '@/widgets/player-detail-window/lib/playerDetailWindow'
+import type { PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { substitutionDetailAbilities, substitutionStaminaOf } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamEntryBatter, TeamEntryPitcher } from '@/features/play-team-game/model/teamGameRoster'
 import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { aceBatterProfileOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { batterPositionBadgeOf, pitcherRoleBadgeOf } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
-import { batterProfileOf, teamBatterHandOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { batterProfileOf } from '@/pages/team-game/lib/teamMatchupCards'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import { teamBatterSeasonStatsOf, teamPitcherSeasonStatsOf } from '@/pages/team-game/lib/teamMatchupCards'
 
@@ -31,8 +27,10 @@ import { teamBatterSeasonStatsOf, teamPitcherSeasonStatsOf } from '@/pages/team-
  *   game_ui 이미지 12(41×12)를 (W/2 − 20, H − 13) · img_text 프레임 167 "0 INFO" 를 (W/2 − 15, H − 10)
  * ```
  * 칸 배치(0x37904 · 0x37e5c): 칸 x = 29 + 6 = 35 에서 칸마다 폭 + 3 — 이름 54(game_ui 28) · 나머지 36(game_ui 35).
- * 머리 0x5650c 는 game_ui 24 · 34 의 크기로 (x, y − 2, w, 15) 안 가운데에 img_text 표 0xcfe7e
- * (투수 27 이름 · 28 보직 · 171 방어 · 181 삼진 / 타자 27 · 28 · 172 타율 · 61 홈런)를 팔레트 0 으로 그린다. 값 줄은 머리 + 15 + 3.
+ * 머리 0x5650c 는 game_ui 24 · 34 의 크기로 0xb9d74(글, x, y − 2, w, 15, 0x22, …, dy [sp+0x14] = 2) — 곧 (x, y, w, 15) 안 가운데에
+ * img_text 표 0xcfe7e (투수 27 이름 · 28 보직 · 171 방어 · 181 삼진 / 타자 27 · 28 · 172 타율 · 61 홈런)를 팔레트 0 으로 그린다.
+ * 0x37904(장면, 29, 74) 는 머리 y = 74 + 3 = 77 을 넘긴다(0x3795a · 0x37994). 값 줄은 머리 + 15 + 3 = 95.
+ * (r99: 예전 75 는 0xb9d74 의 y − 2 를 받고 dy 2 를 빠뜨렸다 — 나리 기록실 124 r89 고침과 같은 것)
  * 벤치 줄은 154 에서 18 씩.
  */
 export const SUBSTITUTION_WINDOW = {
@@ -40,7 +38,7 @@ export const SUBSTITUTION_WINDOW = {
   title: { firstX: 41, secondX: 65, y: 60, pitcherFrame: 150, batterFrame: 149, changeFrame: 299 },
   arrows: { x: 114, upImage: 50, downImage: 51, upY: [43, 45], downY: [269, 267] },
   logo: { centerX: 120, centerY: 195, scale: 1.5, opacity: 7 / 32 },
-  current: { headerY: 75, cellY: 95 },
+  current: { headerY: 77, cellY: 95 },
   bench: { firstY: 154, step: 18, visibleRows: 6 },
   columnX: [35, 92, 131, 170],
   columnWidth: [54, 36, 36, 36],
@@ -70,15 +68,7 @@ export function cursorBoxOf(rowY: number, tick: number): { x: number; y: number;
     : { x: box.x, y: rowY, width: box.width, height: box.height, color: '#FF0000', opacity: 1 }
 }
 
-/** 둥근 테두리 0x6aa64(둥글기 ≤ 3) — 선 넷 (`commonPanel` 의 roundEdge 와 같은 식) */
-export function roundEdgeRectsOf(x: number, y: number, w: number, h: number): { x: number; y: number; width: number; height: number }[] {
-  return [
-    { x: x + 1, y, width: w - 1, height: 1 },
-    { x: x + 1, y: y + h, width: w - 1, height: 1 },
-    { x, y: y + 1, width: 1, height: h - 1 },
-    { x: x + w, y: y + 1, width: 1, height: h - 1 },
-  ]
-}
+export { roundEdgeRectsOf } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 
 /** "CHANGE" 애니 0 — 지연 4 의 세 칸 돌림 (0x93cfd(애니, 1) · 그릴 때마다 0x93d91 한 칸) */
 export const changeFrameAt = (draw: number) =>
@@ -208,148 +198,27 @@ export function movedListCursor(cursor: number, top: number, count: number, dy: 
   return { cursor: next, top: next - top > 0 ? next - visible + 1 : next }
 }
 
-/* ── 상세 창 0x5b798 ('0' INFO) ─────────────────────────────────────────────────────────── */
+/* ── 상세 창 0x5b798 ('0' INFO) — 엔트리 목록 창과 같이 쓴다 (`widgets/player-detail-window`) ─────────────── */
 
-/**
- * '0' 키 0x49712 — 창 [skin+0x424] 를 켜며 (x, y, w, h) = (W/2 + 0x52, H/2 − 0x65, 7, 203), 걸음 [+0x426] = 1, [+0x425] = 0.
- * 그릴 때마다(0x5c8aa, 창을 다 그린 **뒤**) 걸음 ×= 2 · x −= 걸음 · w += 걸음, w > 105 면 끝: w = 106 · x = W/2 + 0x52 − 0x60 = 106 ·
- * [+0x425] = 1. 흐르는 글 · 능력치 도형은 끝난 뒤에만 그린다.
- */
-export interface DetailWindowFrame {
-  readonly x: number
-  readonly width: number
-  readonly isOpen: boolean
-}
-
-export const DETAIL_WINDOW = { startX: 202, startWidth: 7, finalX: 106, finalWidth: 106, y: 59, height: 203 } as const
-
-/** 연 뒤 `draw` 번째(0 부터) 그림의 창 */
-export function detailWindowFrameAt(draw: number): DetailWindowFrame {
-  let x: number = DETAIL_WINDOW.startX
-  let width: number = DETAIL_WINDOW.startWidth
-  let step = 1
-  for (let index = 0; index < draw; index += 1) {
-    step *= 2
-    x -= step
-    width += step
-    if (width > 105) return { x: DETAIL_WINDOW.finalX, width: DETAIL_WINDOW.finalWidth, isOpen: true }
-  }
-  return { x, width, isOpen: false }
-}
-
-/**
- * 창 틀 0x5476c → 0x5461c(skin, x, y, w, h) — 둥근 칠(x, y, w, h, 1, #081C4A) · 둥근 테두리(x+1, y+1, w−2, h−2, #335FCD) ·
- * 점 넷(x+2 · x+w−2, y+2 · y+h−2, #335FCD) · 둥근 칠(x+2, y+2, w−4, h−4, #FFFFFF) · 둥근 칠(x+4, y+4, w−8, h−8, #335FCD).
- * 안쪽은 0xbae25(x + 5, y + 5, w − 10, h − 10) 로 자른다.
- */
-export const DETAIL_COLORS = { outer: '#081C4A', edge: '#335FCD', white: '#FFFFFF' } as const
-
-/** 줄 — 칸 x = 창 x + 9 (game_ui 23, 25×15) · 값 칸 창 x + 39 (game_ui 28, 54×15). y 는 에뮬레이션으로 받은 값 그대로 */
-export interface DetailRow {
-  readonly labelFrame: number
-  readonly cellY: number
-  readonly labelY: number
-  readonly textY: number
-}
-
-export const DETAIL_LABEL_DX = 9
-export const DETAIL_VALUE_DX = 39
-export const DETAIL_LABEL_CELL = 23
-export const DETAIL_VALUE_CELL = 28
-
-/** 투수(종류 3): 29 타입 · 30 손 · 34 구질(흐르는 글) · 33 스킬 · 32 마구 · 86 연봉 */
-export const PITCHER_DETAIL_ROWS: readonly DetailRow[] = [
-  { labelFrame: 29, cellY: 68, labelY: 67, textY: 68 },
-  { labelFrame: 30, cellY: 86, labelY: 85, textY: 86 },
-  { labelFrame: 34, cellY: 184, labelY: 183, textY: 184 },
-  { labelFrame: 33, cellY: 202, labelY: 201, textY: 202 },
-  { labelFrame: 32, cellY: 219, labelY: 219, textY: 220 },
-  { labelFrame: 86, cellY: 238, labelY: 237, textY: 238 },
-]
-
-/** 타자(종류 2): 29 타입 · 30 손 · 33 스킬 · 35 필살 · 86 연봉 */
-export const BATTER_DETAIL_ROWS: readonly DetailRow[] = [
-  { labelFrame: 29, cellY: 68, labelY: 67, textY: 68 },
-  { labelFrame: 30, cellY: 86, labelY: 85, textY: 86 },
-  { labelFrame: 33, cellY: 202, labelY: 201, textY: 202 },
-  { labelFrame: 35, cellY: 220, labelY: 219, textY: 220 },
-  { labelFrame: 86, cellY: 238, labelY: 237, textY: 238 },
-]
-
-/** 능력치 도형 0x5aefc(…, 가운데 x = 창 x + w/2, y = 창 y + h/2 − 16(투수) · − 6(타자), 종류, rec, 0, 반지름 22) */
-export const DETAIL_RADAR = { centerX: 159, pitcherCenterY: 144, batterCenterY: 154, radius: 22 } as const
-
-/**
- * 도형 축 칸 (0x5aefc 0x5b412 루프, 반지름 22) — 축 끝(선 0x6a905 #6B92F4 → 지금 꼭짓점) · 이름 상자 slt_frame 17(26×29) ·
- * 이름 img_text 상자 + 3 · 숫자 0x6aff8(상자 x + 0x12, 상자 y + 0x11, 앵커 4). 가운데 기준 상대값.
- * 상자 자리는 ABILITY 판과 같은 식 `abilityRadarAxesOf`(0x5b48c~0x5b532)로 돌린다 — 반지름 22 라 d = |30 − 22| = 8 을
- * x 는 안쪽으로(왼쪽 축 +8 · 오른쪽 축 −8), y 는 각도 ≤ 180(아래 축) 이면 +8 · 그 밖(위 축) −8 옮긴다:
- * 상자 = (−45, −38) · (19, −38) · (19, 9) · (−45, 9). (예전 손 값 (∓19, ∓38) 은 왼쪽 x 와 아래 y 가 틀렸다)
- */
-export const DETAIL_RADAR_AXES: readonly AbilityRadarAxis[] = abilityRadarAxesOf({ x: 0, y: 0 }, DETAIL_RADAR.radius)
-
-/** 축 이름 img_text — 0xd1b14: 투수 37 제구 · 38 구속 · 39 변화 · 40 체력 / 타자 41 히트 · 42 파워 · 43 수비 · 44 주루 */
-export const DETAIL_RADAR_LABELS = { pitcher: [37, 38, 39, 40], batter: [41, 42, 43, 44] } as const
-
-/** 연봉 0x55cf4 — v ≤ 9999 "%d" · 그 밖 "%d억"(나머지 0) · "%d억%03d" */
-export function salaryTextOf(value: number): string {
-  if (value <= 9999) return String(value)
-  const eok = Math.trunc(value / 10000)
-  const rest = value % 10000
-  return rest === 0 ? `${eok}억` : `${eok}억${String(rest).padStart(3, '0')}`
-}
-
-/** 손 글 — 표 0xd2084 · 0xd208c(우타 · 좌타) / 0xd2094 · 0xd209c(우완 · 좌완) */
-const HAND_TEXT = { batter: ['우타', '좌타'], pitcher: ['우완', '좌완'] } as const
-/** 타입 글 표 0x1400124 — 타자 +0xb >> 5 (타격형 · 장타형) · 투수 (폼 >> 1) + 2 (오버핸드 · 사이드암 · 언더스로) */
-const BATTER_TYPE_TEXT = ['타격형', '장타형'] as const
-const PITCHER_TYPE_TEXT = ['오버핸드', '사이드암', '언더스로'] as const
-/** 마선수 타입 — StrCOMMON[0x69 + 순번](타자) · [0x6e + 순번](투수) */
-const ACE_BATTER_TYPE_TEXT = ['백의천사', '무에타이', '새침부끄', '헤비메탈', '프로레슬링'] as const
-const ACE_PITCHER_TYPE_TEXT = ['싸이킥커', '사자왕류', 'MK-II', '뱀파이어', '용인족'] as const
-/** 마구 StrCOMMON[0x1e + n](1~3) · n = 4 면 [0x22 + 폼 >> 1] */
-const MAGIC_TEXT = ['파이어 볼', '웨이브 볼', '썬더 볼'] as const
-const FORM_MAGIC_TEXT = ['샤이닝 볼', '캐넌 볼', '미라지 볼'] as const
-/** 필살 StrCOMMON[0x18 + n] · 장타형이고 n = 4 면 [0x1d] 메테오 스윙 */
-const SPECIAL_SWING_TEXT = ['파워 스윙', '플레임 스윙', '토네이도스윙', '미라지 스윙'] as const
-const METEOR_SWING_TEXT = '메테오 스윙'
-/** 없음 글 0xcc274 · 이어 붙이기 0xcc298 */
-export const DETAIL_NONE_TEXT = '-'
-const JOIN_TEXT = ' / '
-
-export interface DetailRowValue {
-  /** 흐르는 글(0x5a8c8 — 창이 다 열린 뒤에만)인가, 가운데 글(0xba411)인가 */
-  readonly kind: 'text' | 'ticker'
-  readonly text: string
-}
-
-export interface PlayerDetail {
-  readonly kind: '투수' | '타자'
-  readonly values: readonly DetailRowValue[]
-  /** 도형 값 `0xb6414(rec, k, 1)` */
-  readonly abilities: readonly number[]
-}
-
-/** 스킬 이름 — 투수 갈래(5c49c)는 k > 7 이면 StrCOMMON[0x47 + k], 타자 갈래는 늘 [0x37 + k] (직접 돌려 확인) */
-function skillNamesOf(bits: number, isPitcher: boolean): string[] {
-  const names: string[] = []
-  for (let k = 0; k <= 0x17; k += 1) {
-    if (((bits >>> k) & 1) === 0) continue
-    const id = isPitcher && k > 7 ? k + 16 : k
-    names.push(ORIGINAL_SKILLS[id]?.name ?? '')
-  }
-  return names
-}
-
-const textValue = (text: string): DetailRowValue => ({ kind: 'text', text })
-const tickerOrNone = (names: readonly string[]): DetailRowValue =>
-  names.length === 0 ? textValue(DETAIL_NONE_TEXT) : { kind: 'ticker', text: names.join(JOIN_TEXT) }
-
-/** 연봉 = 레코드 +0x1b × 10 × 100 (모드 3 · 4 의 내 선수 갈래는 팀 경기에 없다) */
-function salaryOf(grade: number | null): DetailRowValue {
-  // ⚠️ 미확인: 표 밖 선수(영입 기록 · 마선수)의 +0x1b 는 웹 명단에 없어 0 으로 둔다
-  return textValue(salaryTextOf((grade ?? 0) * 1000))
-}
+export {
+  BATTER_DETAIL_ROWS,
+  DETAIL_COLORS,
+  DETAIL_LABEL_CELL,
+  DETAIL_LABEL_DX,
+  DETAIL_NONE_TEXT,
+  DETAIL_RADAR,
+  DETAIL_RADAR_AXES,
+  DETAIL_RADAR_LABELS,
+  DETAIL_VALUE_CELL,
+  DETAIL_VALUE_DX,
+  DETAIL_WINDOW,
+  PITCHER_DETAIL_ROWS,
+  SUBSTITUTION_DETAIL_ORIGIN,
+  detailWindowFrameAt,
+  salaryTextOf,
+  specialSwingTextOf,
+} from '@/widgets/player-detail-window/lib/playerDetailWindow'
+export type { DetailRow, DetailRowValue, DetailWindowFrame, PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 
 function pitcherGradeOf(teamId: number, entry: TeamEntryPitcher): number | null {
   if (entry.aceIndex >= 0 || entry.tableSlot === undefined) return null
@@ -369,52 +238,28 @@ export function playerDetailOf(progress: TeamGameProgress, kind: '투수' | '대
   if (kind === '투수') {
     const entry = progress.ourPitcherEntry[index]
     if (entry === undefined) return null
-    const isAce = entry.aceIndex >= 0
-    const { form, magicId: magicNumber, pitchMask } = entry.repertoire
-    const pitches: string[] = []
-    // 5c2b0 — k = 1..22, 레코드 +0x1c & 표 0xd17a8[k](= 1 << (k − 1)) 이면 이름 표 0x14000c8[k]
-    for (let k = 1; k <= 0x16; k += 1) if ((pitchMask & (1 << (k - 1))) !== 0) pitches.push(PITCH_TYPES[k - 1]?.name ?? '')
-    const magic = magicNumber <= 0
-      ? textValue(DETAIL_NONE_TEXT)
-      : isAce
-        ? { kind: 'ticker' as const, text: ACE_PLAYERS[5 + entry.aceIndex]?.burst ?? '' }
-        : { kind: 'ticker' as const, text: magicNumber === 4 ? (FORM_MAGIC_TEXT[form >> 1] ?? '') : (MAGIC_TEXT[magicNumber - 1] ?? '') }
-    return {
-      kind: '투수',
+    const { form, magicId, pitchMask } = entry.repertoire
+    return playerDetailOfRecord({
+      isPitcher: true,
       abilities,
-      values: [
-        textValue(isAce ? (ACE_PITCHER_TYPE_TEXT[entry.aceIndex] ?? '') : (PITCHER_TYPE_TEXT[form >> 1] ?? '')),
-        textValue(HAND_TEXT.pitcher[pitcherHandOf(form, isAce)] ?? ''),
-        { kind: 'ticker', text: pitches.join(JOIN_TEXT) },
-        tickerOrNone(skillNamesOf(entry.skillBits ?? 0, true)),
-        magic,
-        salaryOf(pitcherGradeOf(teamId, entry)),
-      ],
-    }
+      aceIndex: entry.aceIndex,
+      profile: 0,
+      skillBits: entry.skillBits ?? 0,
+      repertoire: { form, magicNumber: magicId, pitchMask },
+      // ⚠️ 미확인: 표 밖 선수(영입 기록 · 마선수)의 +0x1b 는 웹 명단에 없어 0 으로 둔다
+      grade: pitcherGradeOf(teamId, entry),
+    })
   }
   const entry = progress.ourEntry[index]
   if (entry === undefined) return null
-  const isAce = entry.aceIndex >= 0
-  const profile = entryProfileOf(progress, entry)
   // 레코드 +0x18 — 마타자는 순번 + 5, 붙박이 표 · 일반 레코드는 0 이다 (`teamGameFlow` 의 필살 남은 칸 주석, H2 4-2)
-  const special = isAce
-    ? { kind: 'ticker' as const, text: ACE_PLAYERS[entry.aceIndex]?.burst ?? '' }
-    : textValue(DETAIL_NONE_TEXT)
-  return {
-    kind: '타자',
+  return playerDetailOfRecord({
+    isPitcher: false,
     abilities,
-    values: [
-      textValue(isAce ? (ACE_BATTER_TYPE_TEXT[entry.aceIndex] ?? '') : (BATTER_TYPE_TEXT[profile >> 5] ?? '')),
-      textValue(HAND_TEXT.batter[teamBatterHandOf(teamId, entry)] ?? ''),
-      tickerOrNone(skillNamesOf(entry.skillBits ?? 0, false)),
-      special,
-      salaryOf(batterGradeOf(teamId, entry)),
-    ],
-  }
-}
-
-/** 필살 이름 — 일반 레코드 +0x18 이 있을 때의 갈래(5bd90~5be0e). 팀 경기 명단에는 아직 쓰는 곳이 없다 */
-export function specialSwingTextOf(number: number, battingType: number): string {
-  if (battingType === 1 && number === 4) return METEOR_SWING_TEXT
-  return SPECIAL_SWING_TEXT[number - 1] ?? ''
+    aceIndex: entry.aceIndex,
+    profile: entryProfileOf(progress, entry),
+    skillBits: entry.skillBits ?? 0,
+    specialNumber: 0,
+    grade: batterGradeOf(teamId, entry),
+  })
 }

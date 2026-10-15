@@ -91,4 +91,25 @@ describe('엔트리 편집 화면', () => {
     fireEvent.keyDown(window, { key: '#' })
     expect(onKey).not.toHaveBeenCalled()
   })
+
+  it("'0' 상세 창은 원본 선수 정보 창 0x5b798 — 엔트리 '0' 0x55920 자리 (212, 64) 에서 열리고 레코드 칸을 글로 적는다", () => {
+    const lists = {
+      ...목록,
+      pitchers: [{
+        ...목록.pitchers[0]!,
+        detailSource: {
+          isPitcher: true, abilities: [600, 500, 400, 300], aceIndex: -1, profile: 0, skillBits: 0, grade: 5,
+          repertoire: { form: 2, magicNumber: 0, pitchMask: 1 },
+        },
+      }, 목록.pitchers[1]!],
+    }
+    띄우기({ lists })
+    expect(screen.queryByTestId('선수 정보 창')).toBeNull()
+    cleanup()
+    띄우기({ lists, editor: { ...openEntryEditor(true), isDetailOpen: true } })
+    expect(screen.getByTestId('선수 정보 창')).toBeTruthy()
+    expect(screen.getByTestId('선수 정보 줄 0').getAttribute('aria-label')).toBe('사이드암')
+    expect(screen.getByTestId('선수 정보 줄 1').getAttribute('aria-label')).toBe('우완')
+    expect(screen.getByTestId('선수 정보 줄 5').getAttribute('aria-label')).toBe('5000')
+  })
 })

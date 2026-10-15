@@ -104,6 +104,28 @@ export interface EntryPitcherLine {
   readonly losses: number
 }
 
+/**
+ * **'0' 상세 창 0x5b798 이 레코드에서 읽는 칸** — 엔트리 목록 창 0x5c984 끝(0x5cfc8)이 커서 줄 레코드를 넘긴다
+ * (`widgets/player-detail-window` 가 글로 바꾼다).
+ */
+export interface PlayerDetailSource {
+  readonly isPitcher: boolean
+  /** 도형 값 `0xb6414(rec, k, 1)` */
+  readonly abilities: readonly number[]
+  /** 마선수 순번 0~4 (0xb63a0), 아니면 −1 */
+  readonly aceIndex: number
+  /** +0xb — 타자 타입(>> 5) · 타자 손(비트 4, 0xb63c0). 모르면 0 */
+  readonly profile: number
+  /** +0x14 장착 스킬 비트 */
+  readonly skillBits: number
+  /** 타자 +0x18 고른 필살 번호 (0 없음) */
+  readonly specialNumber?: number
+  /** 투수 폼(+0xb >> 4) · 마구(+0x18) · 구질 마스크(+0x1c) */
+  readonly repertoire?: { readonly form: number; readonly magicNumber: number; readonly pitchMask: number }
+  /** +0x1b 등급 — 연봉 = ×1000. 모르면 null */
+  readonly grade: number | null
+}
+
 export const EMPTY_ENTRY_BATTER_LINE: EntryBatterLine = {
   atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, runsBattedIn: 0, steals: 0, errors: 0,
 }

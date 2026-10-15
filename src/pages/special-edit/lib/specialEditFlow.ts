@@ -1,4 +1,6 @@
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { tableDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
+import type { PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 import {
   ENTRY_TAB, advanceEntrySlide, entryBatterLineOfRecord, entryPitcherLineOfRecord, openEntryEditor, pressEntryKey, tickEntryEditor,
 } from '@/entities/season-mode/model/entryEditor'
@@ -95,6 +97,8 @@ export interface EditEntryRow {
   readonly position: number
   /** +0xb & 3 — 투수 보직 딱지 */
   readonly profileLow: number
+  /** '0' 상세 창 0x5b798 레코드 칸 — 붙박이 표 행 */
+  readonly detailSource?: PlayerDetailSource
   readonly batterLine?: EntryBatterLine
   readonly pitcherLine?: EntryPitcherLine
 }
@@ -109,11 +113,12 @@ export function editEntryListsOf(team: number): EntryLists<EditEntryRow & EntryB
   return {
     pitchers: teamPitchers(team).map((player) => ({
       id: player.id, name: player.name, ability: player.ability, isAce: false, position: 0, profileLow: player.profile & 3,
-      pitcherLine: entryPitcherLineOfRecord(player.recordLine),
+      pitcherLine: entryPitcherLineOfRecord(player.recordLine), detailSource: tableDetailSourceOf(player, true, player.ability),
     })),
     batters: teamBatters(team).map((player) => ({
       id: player.id, name: player.name, ability: player.ability, isAce: false, position: player.position ?? 0,
       profileLow: player.profile & 3, batterLine: entryBatterLineOfRecord(player.recordLine),
+      detailSource: tableDetailSourceOf(player, false, player.ability),
     })),
   }
 }

@@ -78,4 +78,21 @@ describe('143 경기 전 엔트리 보기 — 진입 0x16af8 (0x5561c 셋째 인
     expect(view.lists.batters.map((row) => row.name)).toEqual(teamBatters(10).map((player) => player.name))
     expect(view.lists.pitchers.map((row) => row.name)).toEqual(teamPitchers(10).map((player) => player.name))
   })
+
+  it('기록 열 · 체력 줄 — 커리어 리그 기록표 줄 · 칸별 +0x2c 를 [ed+0x334] = 4 로 (0x16c0c~16c24 · 0x572a4)', () => {
+    const { career } = 선수()
+    const teamId = career.teamId
+    const stats = {
+      ...career.leaguePlayerStats,
+      batters: { [teamId * 12]: { atBats: 40, hits: 12, homeRuns: 3, runsBattedIn: 9 } },
+      pitchers: { [teamId * 8]: { outs: 30, runsAllowed: 4, saves: 0, strikeouts: 11, pitches: 150, wins: 1, losses: 0, games: 1 } },
+    }
+    const withStats = { ...career, leaguePlayerStats: stats, gamesPlayed: 3, leaguePitcherStaminas: { [teamId]: [6543] } }
+    const view = batterNariEntryViewOf(withStats as typeof career, true)
+    const batter = view.lists.batters.find((row) => row.name === teamBatters(teamId)[0].name)
+    expect(batter?.batterLine).toMatchObject({ atBats: 40, hits: 12, homeRuns: 3, runsBattedIn: 9 })
+    const pitcher = view.lists.pitchers.find((row) => row.name === teamPitchers(teamId)[0].name)
+    expect(pitcher?.pitcherLine).toMatchObject({ outs: 30, strikeouts: 11, wins: 1 })
+    expect(pitcher?.stamina?.percent).toBe(65)
+  })
 })

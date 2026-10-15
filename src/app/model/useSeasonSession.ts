@@ -3082,8 +3082,9 @@ export function seasonBatterLineOf(stats: LeaguePlayerStats, ownerTeamId: number
 
 /**
  * 엔트리 목록 창(0x5c984) 칸 재료 — 시즌 진입들(0x63dc · 0x5980 · 0x5870 · 0x5b28 · 0x5cd0)은 [ed+0x333] = 1 · [ed+0x334] = 2 다.
- * 시즌 줄은 시즌 저장 레코드(0x204e0 이 비운 뒤 경기가 쌓은 줄) = 리그 기록표 줄이다. ⚠️ 미확인: 투수 +0x2a(사사구) ·
- * 타자 +0x2e(실책)는 웹 기록표에 없어 0 · CPU 팀 레코드 사기는 웹이 안 들어 100 으로 둔다.
+ * 시즌 줄은 시즌 저장 레코드(0x204e0 이 비운 뒤 경기가 쌓은 줄) = 리그 기록표 줄이다. ⚠️ 미구현: 투수 +0x2a(사사구 — 0xa8024 꼬리
+ * a8b04~a8bee 가 볼넷 · 사구마다 지금 투수에게 +1) · 타자 +0x2e(실책 — 수비 그림 0x43278 4381a~43904 가 펌블 6 · 악송구 4 마다 그 칸
+ * 타자에게 +1)는 웹 기록표에 칸이 없어 0 (docs/re R8 11절) · CPU 팀 레코드 사기는 웹이 안 들어 100 으로 둔다.
  */
 export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
   const stats = save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS
