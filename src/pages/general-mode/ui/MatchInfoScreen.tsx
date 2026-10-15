@@ -10,7 +10,7 @@ import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderSc
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
-  MATCH_INFO_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, matchInfoRowY,
+  MATCH_INFO_LAYOUT, MATCH_INFO_PLAY_BALL_PRESS_RECT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, matchInfoLogoPressRectOf, isPrepareBobOn, matchInfoRowY,
 } from '@/pages/general-mode/lib/prepareLayout'
 import { generalModeMatchInfoLines } from '@/pages/general-mode/lib/matchInfoLines'
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
@@ -40,15 +40,6 @@ const generalMatchInfoFooterOf = (isQuickStart: boolean, isRespinning: boolean, 
 
 /** 누름 칸이 보내는 키 — 키 처리(`useEffect` 안 window 듣개)가 그대로 받는다 */
 const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
-
-/** 가운데 PLAY BALL 공(slt_frame 0, 46×46)의 자리 = OK */
-const PLAY_BALL_PRESS_RECT = { x: 240 / 2 - 23, y: MATCH_INFO_LAYOUT.playBall.y - 33, width: 46, height: 46 } as const
-
-/** 엠블럼(76×76)의 자리 */
-const logoPressRectOf = (anchor: { readonly x: number; readonly y: number }) => ({
-  x: anchor.x - TEAM_LOGO_HALF.width, y: anchor.y - TEAM_LOGO_HALF.height,
-  width: TEAM_LOGO_HALF.width * 2, height: TEAM_LOGO_HALF.height * 2,
-})
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 
@@ -262,11 +253,11 @@ export function MatchInfoScreen({
       */}
       {!isSettingsOpen && (
         <>
-          <PressArea label="경기 시작" rect={PLAY_BALL_PRESS_RECT} onPress={() => pressKey('Enter')} />
+          <PressArea label="경기 시작" rect={MATCH_INFO_PLAY_BALL_PRESS_RECT} onPress={() => pressKey('Enter')} />
           {onOpenEntry !== undefined && (
             <>
-              <PressArea label="PLAYER 엔트리" rect={logoPressRectOf(anchorA)} onPress={() => pressKey('ArrowLeft')} />
-              <PressArea label="COM 엔트리" rect={logoPressRectOf(anchorB)} onPress={() => pressKey('ArrowRight')} />
+              <PressArea label="PLAYER 엔트리" rect={matchInfoLogoPressRectOf(anchorA)} onPress={() => pressKey('ArrowLeft')} />
+              <PressArea label="COM 엔트리" rect={matchInfoLogoPressRectOf(anchorB)} onPress={() => pressKey('ArrowRight')} />
             </>
           )}
         </>
