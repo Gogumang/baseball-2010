@@ -1083,9 +1083,8 @@ function finishPlayerOutcome(
     defensePlay === null ? undefined : { survivorsFromBase: survivorsFromBaseOfFates(defensePlay.runnerFates) },
   )
   const runsBattedIn = nextGame.ourScore - progress.game.ourScore
-  const outsInPlay =
-    defensePlay?.advance.outsAdded ??
-    advanceRunners(progress.game.bases, outcome, progress.game.outs).outsAdded
+  const plainAdvance = defensePlay === null ? advanceRunners(progress.game.bases, outcome, progress.game.outs) : null
+  const outsInPlay = defensePlay?.advance.outsAdded ?? plainAdvance?.outsAdded ?? 0
   // 낫아웃(state[0x1a]) — 0x3e09e 갈래의 삼진 콜 0xa7c4c 가 사건 5 를 넣고 타자주자 판을 돈다(판 운명을 진루로 먹이는 삼진은
   // 이 갈래뿐이다). 정산 [sp+0x30] 에 그 사건이 판의 아웃 사건 앞에 하나 더 든다 — 0xa59c0 의 아웃(−1 · 병살 G+0x118 ·
   // 득점권 아웃) · 결과비트 B8/B10 · 상대 투수 +0x20(a8cb0, 보정 없음)이 그 값을 본다
@@ -1098,7 +1097,9 @@ function finishPlayerOutcome(
     outsInPlay: settledOuts,
     runsBattedIn,
     isWalkOff,
-    hadSecondBaseRunner: progress.game.bases.second,
+    // 0xa59c0 a5ace~a5ad8: 0xa97a1(주자 목록 ctx+0x14, 2) — **판이 끝난 뒤** 2루에 선 산 주자(+0x96 == 0 · +0x8c == 2).
+    // 반 이닝이 바뀌기 전, 판 끝 정산 0xa8024(a8c2a) 시점의 루다
+    hadSecondBaseRunner: (defensePlay?.advance.bases ?? plainAdvance?.bases ?? progress.game.bases).second,
   })
 
   // 타자 게이트 [sp+0x34] — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay`)
