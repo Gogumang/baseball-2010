@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
+import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
+import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { TEAMS } from '@/shared/config/original/teams'
 import { GRID, MY_LEAGUE_TEAM_GRID_SHAPE, TEAM_COUNT, cellPositionOf } from '@/pages/create-player/lib/teamSelectLayout'
 
@@ -168,5 +170,37 @@ describe('팀 고르기', () => {
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(onSelect).toHaveBeenCalledWith(GRID.columns)
+  })
+})
+
+describe('팀 고르기 능력치 도형 — 0x5aefc 종류 0 의 ABILITY 판 (0x63dee → 0x63f38)', () => {
+  it('바탕 · 이름 상자 넷 · 팀 축 이름 46 · 45 · 204 · 205 를 그린다', () => {
+    const { container } = 띄우기()
+    const 판 = screen.getByTestId('능력치 도형')
+    const 그림들 = Array.from(판.querySelectorAll('img')).map((image) => image.getAttribute('src'))
+
+    expect(그림들.filter((src) => src === './sprites/slt_frame/017.png')).toHaveLength(4)
+    expect(그림들.filter((src) => src === './sprites/slt_frame/003.png')).toHaveLength(2)
+    for (const frame of ['046', '045', '204', '205']) expect(그림들).toContain(`./sprites/img_text/frames/${frame}.png`)
+    expect(container.querySelectorAll('[data-part="axis"]')).toHaveLength(4)
+  })
+
+  it('넷 다 0 이면 값 도형 없이 가운데 한 점(축 선 끝)만 남는다 (0x75c88 · 0x75dc4 · 0x5b47c)', () => {
+    render(<AbilityRadarPanel center={{ x: 180, y: 100 }} radius={30} maximumLength={30} labelFrames={ABILITY_RADAR_LABELS.team}
+      targets={[0, 0, 0, 0]} restartKey={0} />)
+    const 판 = screen.getByTestId('능력치 도형')
+
+    expect(판.querySelector('[data-part="values"]') === null).toBe(true)
+    expect(판.querySelector('[data-part="center"]')?.getAttribute('x')).toBe('180')
+    expect(판.querySelectorAll('[data-part="value"]').length).toBe(0)
+  })
+
+  it('잠긴 팀([anim+0x1e4] = 0, 0x5b024)은 값이 남아 있어도 숫자 대신 물음표다', () => {
+    render(<AbilityRadarPanel center={{ x: 180, y: 100 }} radius={30} maximumLength={30} labelFrames={ABILITY_RADAR_LABELS.team}
+      targets={[500, 500, 500, 500]} restartKey={0} fromZero={false} showsNumbers={false} />)
+    const 판 = screen.getByTestId('능력치 도형')
+
+    expect(판.querySelectorAll('[data-part="value"]').length).toBe(0)
+    expect(screen.getAllByRole('img', { name: '???' }).length).toBe(8)
   })
 })

@@ -14,7 +14,9 @@ export const ABILITY_FILL_ALPHA = 0xb4 / 0xff
  * 0x5aefc 는 [anim+0x1e3] == 0 이면 0x5b344~0x5b3b8 에서 다시 만들고(0x75ebd(anim, 서술자, 4, 0)) 매 그림 0x764c9 가
  * 한 걸음 0x760e8 을 굴린 뒤 그린다. 들어옴이 +0xad = 0 으로 두므로 붙을 때 0 에서 자라고, `restartKey` 가 바뀐 그림에서
  * 지난 목표값부터 다시 오르내린다. 목표값이 비면(잠긴 팀 idx −1 · 빈 명전 칸 기록 0 — 0x5afe8 · 0x5b2d2) 네 값 0 으로 내려간다.
- * ⚠️ 네 축이 모두 0 이면 웹은 값 도형을 안 그린다 — 원본 0x75e30 이 한가운데 점 하나를 찍는지는 안 봤다.
+ * 네 축이 모두 0 이면 원본도 채우기가 없다(0x75c88 맨 위 y < 맨 아래 y 일 때만). 다만 테두리 0x75dc4 가 길이 0 흰 선 넷을 가운데에
+ * 긋고 0x5aefc 의 축 선이 그 점을 #6B92F4 로 덮는다 — ABILITY 판 전체는 `AbilityRadarPanel` 이 그 점까지 그린다(`lib/abilityRadarPanel` 머리말).
+ * 이 조각은 값 도형만 그리므로 그 점을 안 찍는다.
  */
 export function AbilityGrowthPolygon({ center, targets, maximumLength, restartKey, fromZero = true }: {
   readonly center: ChartPoint

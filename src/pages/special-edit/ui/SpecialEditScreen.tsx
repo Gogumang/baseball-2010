@@ -2,13 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { MarkupText, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { nameByteLengthOf } from '@/entities/career/model/playerCareer'
 import { EDITED_NAME_BYTES } from '@/entities/player-name/model/editedNames'
 import { pointEntryCursor } from '@/entities/season-mode/model/entryEditor'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityAxisMaximumLengthOf, abilityChartFrameOf, cellPositionOf,
+  ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityAxisMaximumLengthOf, cellPositionOf,
   teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
@@ -19,7 +18,8 @@ import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
+import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
+import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
@@ -171,8 +171,6 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
 
   const chartCenter = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
   const radius = ABILITY_CHART.radius
-  const pointsOf = (points: readonly { readonly x: number; readonly y: number }[]) =>
-    points.map((point) => `${point.x},${point.y}`).join(' ')
 
   return (
     <RawScreen>
@@ -198,18 +196,12 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
         {team.name}
       </span>
 
-      {/* 능력치 도형 0x5aefd(…, 종류 0, 팀, 반지름 30) — 팀 고르기 화면과 같은 식 */}
-      <svg className={styles.layer} width={radius * 2} height={radius * 2} shapeRendering="crispEdges"
-        viewBox={`${chartCenter.x - radius} ${chartCenter.y - radius} ${radius * 2} ${radius * 2}`}
-        style={{ left: chartCenter.x - radius, top: chartCenter.y - radius }}>
-        <polygon points={pointsOf(abilityChartFrameOf(chartCenter))}
-          fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
-        {/* 값 도형은 레이더 [skin+0xd4] 의 자라는 애니 — 들어옴 0x24804 가 +0xad = 0 으로 두어 0 에서, 커서가 움직인 그림(커서 +0x25)엔
-            0x63b14 가 +0x1e3 = 0 으로 두어 지난 값에서 (`AbilityGrowthPolygon`). 하위 1 · 2 에서 돌아오면 들어옴도 틱 0 도 안 거쳐
-            다 자란 그대로다 */}
-        <AbilityGrowthPolygon center={chartCenter} targets={team.values.slice(2)} maximumLength={abilityAxisMaximumLengthOf(radius)}
-          restartKey={cursor} fromZero={slides} />
-      </svg>
+      {/* 능력치 도형 0x5aefd(…, 종류 0, 0, 칸(≤ 9 라 잠김 없음), 반지름 30) — 공용 목록 k 9 도 점프표 0xd1edc 로 팀 고르기와 같은
+          본문 0x63dee 를 타고 0x63f38 에서 ABILITY 판 전체(바탕 · 축 · 이름 상자 46 · 45 · 204 · 205 · 숫자)를 그린다.
+          값 도형은 레이더 [skin+0xd4] 의 자라는 애니 — 들어옴 0x24804 가 +0xad = 0 으로 두어 0 에서, 커서가 움직인 그림(커서 +0x25)엔
+          0x63b14 가 +0x1e3 = 0 으로 두어 지난 값에서. 하위 1 · 2 에서 돌아오면 들어옴도 틱 0 도 안 거쳐 다 자란 그대로다 */}
+      <AbilityRadarPanel center={chartCenter} radius={radius} maximumLength={abilityAxisMaximumLengthOf(radius)}
+        labelFrames={ABILITY_RADAR_LABELS.team} targets={team.values.slice(2)} restartKey={cursor} fromZero={slides} />
 
       {/* 칸 바탕 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 [격자+8] = 1 (0x7a7da~0x7a89c) */}
       {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
