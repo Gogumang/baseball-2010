@@ -1,4 +1,4 @@
-import { style } from '@vanilla-extract/css'
+import { globalStyle, style } from '@vanilla-extract/css'
 
 /**
  * 초상화 판 높이. 가장 큰 인물(event_char_1, 101px)이 들어가는 값.
@@ -51,3 +51,15 @@ export const effectCover = style({
   pointerEvents: 'none',
   zIndex: 1,
 })
+
+/**
+ * 창 겹 — 목표 창 · 알림 · 보상 · 예아니오 창을 say 상자(`EventDialogueBox` 판 zIndex 30) 위에 둔다.
+ * 겹 자체는 누르기를 막지 않고, 그 안의 창(덮개)만 누름을 받는다
+ */
+export const windowLayer = style({
+  position: 'absolute',
+  inset: 0,
+  zIndex: 31,
+  pointerEvents: 'none',
+})
+globalStyle(`${windowLayer} > *`, { pointerEvents: 'auto' })

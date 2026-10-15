@@ -296,35 +296,41 @@ export function StoryScreen({
           }} />
       )}
 
-      {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={closeSystemWindow} />}
+      {/*
+        창(목표 창 · 알림 · 보상 · 예아니오)은 say 상자 **위**다 — 0x8b5ac 가 틀마다 0x7fbc4 로 앞 상자를 먼저 그리고 창은 그 뒤
+        공용 창 그리기가 덮는다. 상자 판(zIndex 30) 위로 한 겹 올려, 뒤 어둡게가 상자까지 덮고 상자 누름 칸이 창 누름을 가로채지 않게 한다
+      */}
+      <div className={styles.windowLayer}>
+        {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={closeSystemWindow} />}
 
-      {noticeText !== null && (
-        // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
-        <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={closeSystemWindow} />
-      )}
+        {noticeText !== null && (
+          // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
+          <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+            text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={closeSystemWindow} />
+        )}
 
-      {shownReward?.notice.kind === '알림' && (
-        // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
-        <MessageBox key={shownReward.key}
-          text={shownReward.notice.text} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-          onAnswerKey={answerReward} onAnswer={() => finishRewardWindow(shownReward.key)} />
-      )}
+        {shownReward?.notice.kind === '알림' && (
+          // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
+          <MessageBox key={shownReward.key}
+            text={shownReward.notice.text} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+            onAnswerKey={answerReward} onAnswer={() => finishRewardWindow(shownReward.key)} />
+        )}
 
-      {shownReward?.notice.kind === '스킬' && (
-        // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054 — 받은 그 갱신에 다음 명령)
-        <RewardSkillWindow key={shownReward.key}
-          text={shownReward.notice.text} gained={shownReward.notice.gained}
-          onKey={answerReward} onClose={() => finishRewardWindow(shownReward.key)} />
-      )}
+        {shownReward?.notice.kind === '스킬' && (
+          // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054 — 받은 그 갱신에 다음 명령)
+          <RewardSkillWindow key={shownReward.key}
+            text={shownReward.notice.text} gained={shownReward.notice.gained}
+            onKey={answerReward} onClose={() => finishRewardWindow(shownReward.key)} />
+        )}
 
-      {command?.op === 'yesno' && (
-        // 0x74ef4 종류 2 — 0x749d5 를 안 불러 처음 커서는 [예]. CLR 은 1 [아니오](0x7514a~0x75174: 키 −16 → 1).
-        // 답 0 → [mgr+0x2bc] = 예 이벤트([명령+8]) · 1 → 아니오 이벤트([명령+0xa]) (0x8d954~0x8d9a2)
-        <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-          text={command.text} buttons={YES_NO_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-          onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)} />
-      )}
+        {command?.op === 'yesno' && (
+          // 0x74ef4 종류 2 — 0x749d5 를 안 불러 처음 커서는 [예]. CLR 은 1 [아니오](0x7514a~0x75174: 키 −16 → 1).
+          // 답 0 → [mgr+0x2bc] = 예 이벤트([명령+8]) · 1 → 아니오 이벤트([명령+0xa]) (0x8d954~0x8d9a2)
+          <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+            text={command.text} buttons={YES_NO_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+            onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)} />
+        )}
+      </div>
 
       {effect?.overlay != null && (
         // 화면 전체 덮개 — 검정 덮기 (16 − 단계)/16 · 색 덮기 (단계 + 1)/16 (`screenEffect` 머리말)
