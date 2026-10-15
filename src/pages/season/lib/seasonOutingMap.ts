@@ -11,40 +11,9 @@
  * 0x7ee1a  말풍선은 [gfx+0x174] ∈ {0x71, 0xd2} 일 때만 — 0xd1 · 0xe3 에는 없다
  * ```
  *
- * 방향 이동 `0x7f3e4(gfx, 칸, 키)` (직접 떴다) — 표 **0xd491c** `[칸 × 4 + 방향]` (s8):
- * ```
- * 키 −1 · '2' → 0 (위) · −2 · '8' → 1 (아래) · −3 · '4' → 2 (왼쪽) · −4 · '6' → 3 (오른쪽) · 그 밖 → 그대로
- * ```
+ * 방향 이동 `0x7f3e4` 표 0xd491c 는 나리 외출 지도(키 0x13ba4)와 같은 것이라 `shared/lib/outingMap/outingMapCursor` 로 옮겼다.
  */
-export const SEASON_OUTING_MAP_MOVES: readonly (readonly [number, number, number, number])[] = [
-  [1, 4, 2, 3],
-  [4, 0, 2, 3],
-  [1, 4, 3, 0],
-  [1, 4, 0, 2],
-  [0, 1, 2, 3],
-]
+import { OUTING_MAP_MOVES } from '@/shared/lib/outingMap/outingMapCursor'
 
-/** 웹 키 → 0x7f3e4 의 방향 칸 (위 0 · 아래 1 · 왼쪽 2 · 오른쪽 3). 방향 키가 아니면 null */
-export function outingMapDirectionOf(key: string): number | null {
-  switch (key) {
-    case 'ArrowUp':
-    case '2':
-      return 0
-    case 'ArrowDown':
-    case '8':
-      return 1
-    case 'ArrowLeft':
-    case '4':
-      return 2
-    case 'ArrowRight':
-    case '6':
-      return 3
-    default:
-      return null
-  }
-}
-
-/** 0x7f3e4 — 지금 칸에서 방향으로 옮긴 칸 */
-export function moveOutingMapCursor(cursor: number, direction: number): number {
-  return SEASON_OUTING_MAP_MOVES[cursor]?.[direction] ?? cursor
-}
+export { moveOutingMapCursor, outingMapDirectionOf } from '@/shared/lib/outingMap/outingMapCursor'
+export const SEASON_OUTING_MAP_MOVES = OUTING_MAP_MOVES

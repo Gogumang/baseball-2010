@@ -39,6 +39,9 @@ export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = fa
       disabled={isDisabled}
       onClick={(event) => {
         event.stopPropagation()
+        // 마우스 · 터치로 누른 것(detail ≥ 1)이면 초점을 놓는다 — 눌린 칸에 초점이 남으면 다음 키(OK · 화살표)에서 크롬이
+        // :focus-visible 점선을 그려, 원본에 없는 점선 네모가 바닥띠 위에 남았다 (r82 나리 선수 등록 OK 뒤 Enter)
+        if (event.detail > 0) event.currentTarget.blur()
         onPress()
       }}
       onPointerDown={(event) => event.stopPropagation()}

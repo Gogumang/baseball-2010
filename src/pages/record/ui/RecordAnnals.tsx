@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { CommonPanel, FrameSprite, InsetBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -116,6 +116,11 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
   useEffect(() => reportSecretCode.current?.(secretCode), [secretCode])
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
+  /**
+   * 고른 탭 이름 img_text 는 **팔레트 3**(#2949A5 · #10246B)으로 찍는다 — 0x2e528~0x2e52e · 0x2e54a~0x2e552 가
+   * `0x913e5(img_text, 3)` 를 부른 뒤 재고(0xba815) 그린다(직접 떴다). 기본 팔레트(흰 글자)면 고른 탭의 흰 칸 위에서 안 보였다 (r82)
+   */
+  const tabNamePalette = useImgTextPalette3()
   /** 진행 탭 칸 20 — 0~14 나리 엔딩(전역기록 +0xa8 + i) · 15~19 시즌 엔딩(+0xa0 + j) (0x58b5c) */
   const endingCells = ENDING_CELL_NAMES.map((name, index) => ({
     name,
@@ -234,7 +239,8 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
           x={tabSlotXOf(tab)} y={TAB_CURSOR.y} />
       )}
       {/* 이름은 고른 탭 하나만 — 박스 안 가운데 맞춤 (0x2e568) */}
-      <FrameSprite folder={IMG_TEXT} frame={TAB_NAME_FRAMES[tab]} origins={textFrames}
+      {tabNamePalette.definition}
+      <FrameSprite folder={IMG_TEXT} frame={TAB_NAME_FRAMES[tab]} origins={textFrames} style={tabNamePalette.style}
         x={tabNameXOf(tab, nameWidthOf(textFrames, TAB_NAME_FRAMES[tab]))} y={TAB_NAME_Y} />
       {TAB_NAMES.map((name, index) => (
         <button key={name} type="button" className={styles.tab} aria-label={name}
