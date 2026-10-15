@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { MessageBox } from '@/shared/ui'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { EvaluationChangeWindow } from '@/pages/story/ui/EvaluationChangeWindow'
@@ -11,8 +12,11 @@ import { PORTRAIT_HEIGHT } from '@/pages/story/ui/StoryScreen.css'
 import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
 import { portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
 
-/** 평가 내장 이벤트를 차례로 튼다 — 명령 1 say → 명령 2 system sub 2(변화 창) → (있으면) 명령 3 say(연속 기록) */
-type EvaluationStep = '대사' | '변화' | '연속기록'
+/**
+ * 평가 내장 이벤트를 차례로 튼다 — 명령 1 say → 명령 2 system sub 2(변화 창) → (있으면) 명령 3 say(연속 기록)
+ * → (있으면) 마지막 system sub 5 알림 창
+ */
+type EvaluationStep = '대사' | '변화' | '연속기록' | '알림'
 
 /**
  * 초상화 바닥 — 0x7fbc4 끝(0x7fdee~0x7fe4c)이 0x7f998(창, y) 에 넘기는 y:
@@ -42,6 +46,11 @@ interface EvaluationEventPlayerProps {
    * 0x847e0 · 0x85944 · 0x858cc 로 그린다(`EvaluationGauge`)
    */
   readonly gauge: { readonly popularityChange: number; readonly divisor: number }
+  /**
+   * 마지막 명령 system sub 5 의 글 — 시즌 0xd3 에서 구내매점이 끝났으면 StrUSER_EVT[113] (0x8a6fc). 공용 창 0x74ef4(종류 1, OK)로
+   * 띄우고, 떠 있는 동안에도 0x8b5ac 가 틀마다 0x7fbc4 로 마지막 say 상자 · 초상화와 인기도 막대를 그린다. 없으면 null
+   */
+  readonly finalNotice?: string | null
   /** 마지막 명령이 끝나면 — 114 끝 */
   readonly onDone: () => void
 }
@@ -53,11 +62,14 @@ interface EvaluationEventPlayerProps {
  * 초상화(감독 · 오른쪽)는 0x7fbc4 끝(0x7fdee~)이 그린다 — 114 에서는 바닥 y 가 경기장 띠 아래 135 다(`PORTRAIT_BOTTOM`).
  */
 export function EvaluationEventPlayer({
-  underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, gauge, onDone,
+  underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, gauge, finalNotice = null, onDone,
 }: EvaluationEventPlayerProps) {
   const [step, setStep] = useState<EvaluationStep>('대사')
-  const afterChange = () => (streak !== '' ? setStep('연속기록') : onDone())
-  const expression = step === '연속기록' ? streakExpression : dialogueExpression
+  /** 마지막 say 가 연속 기록이었는가 — 알림 창 밑에 남는 상자가 그 글이다 */
+  const [hasStreakShown, setStreakShown] = useState(false)
+  const finish = () => (finalNotice !== null ? setStep('알림') : onDone())
+  const afterChange = () => (streak !== '' ? (setStreakShown(true), setStep('연속기록')) : finish())
+  const expression = hasStreakShown ? streakExpression : dialogueExpression
 
   return (
     <>
@@ -66,8 +78,8 @@ export function EvaluationEventPlayer({
         <EventPortraits portraits={evaluationManagerPortraitsOf(expression)} height={PORTRAIT_HEIGHT} />
       </div>
       <div role="group" aria-label="경기 평가">
-        {step === '연속기록' ? (
-          <EventDialogueBox key="연속기록" raw={streak} slideIn={false} onAdvance={onDone} />
+        {hasStreakShown ? (
+          <EventDialogueBox key="연속기록" raw={streak} slideIn={false} isActive={step === '연속기록'} onAdvance={finish} />
         ) : (
           <EventDialogueBox key="대사" raw={dialogue} slideIn isActive={step === '대사'} onAdvance={() => setStep('변화')} />
         )}
@@ -80,6 +92,11 @@ export function EvaluationEventPlayer({
         // 팝업은 상자 · 초상화 위에 그린다
         <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
           <EvaluationChangeWindow values={changeValues} goals={goals} year={year} game={game} onClose={afterChange} />
+        </div>
+      )}
+      {step === '알림' && finalNotice !== null && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
+          <MessageBox text={finalNotice} buttons={['확인']} onAnswer={onDone} />
         </div>
       )}
     </>
