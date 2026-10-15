@@ -21,14 +21,14 @@ describe('나만의리그 포스트시즌 대진 화면 (상태 128)', () => {
     const { rerender } = render(
       <PostseasonScreen edition="타자편" gamePoint={0} series={startPostseason([0, 1, 2, 3])} popup={null} onConfirm={onConfirm} onClosePopup={() => {}} />,
     )
-    fireEvent.click(screen.getByText('다음'))
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
 
     rerender(
       <PostseasonScreen edition="타자편" gamePoint={0} series={startPostseason([0, 1, 2, 3])} popup={{ kind: '정규시즌우승' }}
         onConfirm={onConfirm} onClosePopup={() => {}} />,
     )
-    expect(screen.queryByText('다음')).toBeNull()
+    expect(screen.queryByRole('button', { name: '다음' })).toBeNull()
   })
 
   it('머리띠는 편 제목, 바닥은 1 — 되돌아가기가 없다 (0x16928 상태 0x80 → 0x853ac 끝 0x7f4ec)', () => {

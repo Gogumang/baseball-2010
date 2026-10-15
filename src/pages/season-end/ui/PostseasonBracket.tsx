@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Button, FrameSprite, RawScreen, SpriteNumber } from '@/shared/ui'
+import { FrameSprite, PressArea, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   BACKDROP, LEG_ORDER, LINE_COLOR, LINE_SEGMENTS, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS,
@@ -93,13 +93,10 @@ export function PostseasonBracket({ series, onNext, nextLabel = '다음', frame 
         )
       })}
 
-      {frame}
+      {/* ⚠️ 웹 자리: 다음(확인 키 0x13da0) — 원본 화면에 그림 자리가 없다. 웹 단추를 걷고 화면 전체 투명 누름 칸으로 */}
+      {onNext !== undefined && <PressArea label={nextLabel} onPress={onNext} />}
 
-      {onNext !== undefined && (
-        <Button variant="corner" className={styles.nextButton} onClick={onNext}>
-          {nextLabel}
-        </Button>
-      )}
+      {frame}
     </RawScreen>
   )
 }

@@ -1,7 +1,7 @@
-import { Hint, Notice, Panel } from '@/shared/ui'
+import { Notice, Panel } from '@/shared/ui'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { isPitcherSkillEquipped, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { magicPitchCountOf, magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
+import { pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
 import {
   MAGIC_PITCH_CELL_NUMBERS,
   isInPitchList,
@@ -11,9 +11,6 @@ import {
 import { PITCH_TRAINING_TABLE, pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { PITCH_WINDOW_CHOICES, PITCH_WINDOW_TABS } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
-
-/** 투수 비트 23 혼신 — 마구 횟수 +2 (0xaebe4 aef06) */
-const SPIRIT_SKILL_BIT = 23
 
 /**
  * 선수정보 → [구질] 이 여는 창 — 원본 상태 **123**(진입 0x17690 · 키 0x17cec · 그리기 0x19e24).
@@ -84,17 +81,6 @@ export function PitcherRepertoirePanel({
               ? '쓰는 마구가 없습니다'
               : `사용 중 ${magicPitchNameOf(career.selectedMagicNumber, form) ?? ''}`}
           </Notice>
-          {career.selectedMagicNumber > 0 && (
-            <Hint>
-              한 경기에 쓸 수 있는 횟수{' '}
-              {magicPitchCountOf({
-                number: career.selectedMagicNumber, isAce: false, aceLevel: 0,
-                // 0xaebe4 aef06 — 장착 비트 23 혼신(0xb62b4(P, 0x17))이면 +2 (`pitcherGameOptions` 의 마구 횟수와 같다)
-                hasSpiritSkill: isPitcherSkillEquipped(career, SPIRIT_SKILL_BIT),
-              })}회 — 표 0xd84ff
-            </Hint>
-          )}
-          <Hint>배운 수 {career.magicLevel}/{MAGIC_PITCH_CELL_NUMBERS.length} — 배운 칸까지만 고를 수 있다 (저장 +0x201)</Hint>
         </>
       ) : (
         <>
@@ -114,7 +100,6 @@ export function PitcherRepertoirePanel({
               }),
             )}
           </div>
-          <Hint>한 계열(행)에 구질 하나 — 고르면 그 행의 다른 구질은 빠진다 (0x17bf4)</Hint>
         </>
       )}
     </Panel>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Button, FrameSprite, MessageBox, RawScreen, TextField } from '@/shared/ui'
+import { FrameSprite, MessageBox, PressArea, RawScreen, TextField } from '@/shared/ui'
+import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   DEFAULT_ROOKIE_PROFILE, DEFAULT_TEAM_ID, MAXIMUM_NAME_BYTES, nameByteLengthOf, rookieAbilityOf,
@@ -14,7 +15,7 @@ import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { FIGURE_BOX, FIGURE_FOOT, INFO_BOARD, RIGHT_PANEL } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
 import {
-  ACTION_ROW, ARROW, BACKDROP, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
+  ARROW, BACKDROP, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
   INFO_FRAME, ROOKIE_BATTING_ORDER, ROW_HINTS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
 } from '@/pages/create-player/lib/createPlayerLayout'
 import type { CreatePlayerRowId, InfoCellId } from '@/pages/create-player/lib/createPlayerLayout'
@@ -25,11 +26,18 @@ import * as styles from '@/pages/create-player/ui/CreatePlayerScreen.css'
 const MODE_UI = './sprites/mode_ui/frames'
 const IMG_TEXT = './sprites/img_text/frames'
 
+/** 누름 칸이 보내는 키 — 키 처리(window 듣개, 0x16f28 꼴)가 그대로 받는다 */
+const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+/** ⚠️ 웹 자리: OK — 바닥띠 왼쪽 표시 자리 (x 2, 47×12, 다 내려온 바닥띠 B = 320 의 B − 18) */
+const OK_PRESS_RECT = { x: 2, y: 320 - 18, width: 47, height: 12 } as const
+
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface CreatePlayerScreenProps {
   /** 앞 화면에서 고른 팀 (0~14). 안 넘기면 기본 팀이다 */
   readonly teamId?: number
+  /** 머리띠 G포인트 — 전역 G(+0x64). 안 넘기면 0 */
+  readonly gamePoint?: number
   readonly onCreate: (name: string, profile: RookieProfile) => void
   readonly onCancel: () => void
 }
@@ -49,7 +57,7 @@ interface CreatePlayerScreenProps {
  * `useRecoloredSprite` 가 팔레트 번호 지도(`<폴더>/frames/index/NNN.png`)와 `palette.json` 으로
  * **몸통 = 피부×15 + 팀 · 헬멧 = 팀** 벌을 그때그때 칠한다 (`batterLayerPaletteIndex`).
  */
-export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCancel }: CreatePlayerScreenProps) {
+export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, onCreate, onCancel }: CreatePlayerScreenProps) {
   const [name, setName] = useState('')
   const [profile, setProfile] = useState<RookieProfile>({ ...DEFAULT_ROOKIE_PROFILE, teamId })
   const [selectedRow, setSelectedRow] = useState(0)
@@ -79,11 +87,6 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
     // 0x16f28: 타입 줄([0x7c], 0x16f60~0x16fe0) · 포지션 줄([0x78], 0x17046~0x170cc)은 목록 키를 넘긴 뒤 값이 바뀌었든 아니든
     // 레이더 [skin+0xd4] 에 +0xac = 1 · +0xad = 0 · +0x1e3 = 0 · +0x1e0 = 0 을 쓴다 — 손 · 피부 줄은 안 쓴다
     if (id === '타입' || id === '포지션') setRadarRearms((count) => count + 1)
-  }
-
-  // 빈 이름으로는 확인할 수 없다 (R11 1b — 원본 입력기도 strlen 0 이면 OK 를 안 받는다). 공백도 글자다 (strlen 만)
-  const askToCreate = () => {
-    if (name.length > 0) setIsConfirming(true)
   }
 
   /** 줄 고르기 키 (0x16f28, `registerKeyOutcomeOf`). 이름 칸을 떠나면 입력 초점을 놓아 좌우가 값 바꾸기로 간다 */
@@ -232,15 +235,17 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, onCreate, onCance
         {ROW_HINTS[selectedId]}
       </div>
 
-      <Button variant="corner" className={styles.actionButton}
-        style={{ left: ACTION_ROW.leftX, top: ACTION_ROW.y }} onClick={onCancel}>
-        취소
-      </Button>
-      <Button variant="corner" className={styles.actionButton}
-        style={{ left: ACTION_ROW.rightX - 40, top: ACTION_ROW.y, width: 40 }}
-        disabled={name.length === 0} onClick={askToCreate}>
-        등록
-      </Button>
+      {/*
+        머리띠 · 바닥 — 그리기 0x15f34 머리(15f40)의 0x7f4ed. 칸은 나리 틀 0x16928 기본 갈래(0x169ea): 0x66 은 제목 [장면+0xcc] == 4 ? 8 : 9
+        (타자편 8) · 바닥 5(되돌아가기 = CLR). 0x66 그림은 공용 목록 0x63b14 를 안 불러 미끄러지지 않는다.
+        웹 [취소]·[등록] 회색 단추를 걷었다 — 취소는 바닥띠 되돌아가기(CLR: 이름 칸이면 한 글자씩 지우고 비면 물러난다, 0x16f28)
+      */}
+      <ScreenFrame title="나만의리그타자편" gamePoint={gamePoint} onBack={() => pressKey('Escape')} slides={false} />
+      {/*
+        ⚠️ 웹 자리: OK — 원본 등록 화면에는 OK 그림 자리가 없다(OK 키는 줄을 하나 내리고 피부 줄에서 확인 0x67, 0x16f28).
+        바닥띠 왼쪽 표시 자리(왼쪽 소프트키 자리, 이 화면 바닥 5 는 비워 둔다)를 투명 누름 칸으로 빌려 OK 키를 보낸다
+      */}
+      {!isConfirming && <PressArea label="OK" rect={OK_PRESS_RECT} onPress={() => pressKey('Enter')} />}
 
       {/*
         확인(상태 0x67)은 화면을 갈아 끼우지 않는다 — 지금 화면 위에 StrMODE[2] 메시지 상자(0xbbef8)만 얹는다.

@@ -22,6 +22,17 @@ const 커서 = () => screen.getByTestId('선수등록-커서')
 const 이름넣기 = (name: string) =>
   fireEvent.change(screen.getByRole('textbox'), { target: { value: name } })
 
+/**
+ * 웹 [등록] 단추를 걷었다 — 원본처럼 OK 키는 줄을 하나 내리고 피부 줄(마지막)에서 확인을 띄운다(0x16f28).
+ * 피부 값 칸을 눌러 그 줄로 간 뒤 OK 누름 칸(⚠️ 웹 자리)을 누른다
+ */
+const 등록 = () => {
+  const 피부칸 = screen.getAllByRole('button').find((button) => button.getAttribute('aria-label')?.startsWith('피부 '))
+  if (피부칸 === undefined) throw new Error('피부 칸이 없다')
+  fireEvent.click(피부칸)
+  fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+}
+
 describe('선수 등록 배치', () => {
   it('정보 칸 여덟을 원본 값으로 채운다 — 타순은 보여 주기만 하는 신인 8번이다 (+0xa = 0xa7)', () => {
     화면()
@@ -142,7 +153,7 @@ describe('선수 등록 — 줄 고르기 키 (0x16f28)', () => {
     let created = ''
     화면((name) => { created = name })
     이름넣기(' ')
-    fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    등록()
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(created).toBe(' ')
@@ -153,7 +164,7 @@ describe('선수 등록 — 확인 질문은 화면을 비우지 않는다', () 
   it('[등록] 을 눌러도 입력한 항목들이 그대로 보인다 — 원본은 메시지 상자만 얹는다', () => {
     화면()
     이름넣기('테스트')
-    fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    등록()
 
     // 질문이 뜨지만 뒤 화면의 항목들이 사라지지 않는다
     expect(screen.getByText(/이대로 결정/)).toBeTruthy()
@@ -167,7 +178,7 @@ describe('선수 등록 — 확인 질문은 화면을 비우지 않는다', () 
     이름넣기('테스트')
     fireEvent.click(screen.getByRole('button', { name: '손 우타' }))
     fireEvent.click(screen.getByRole('button', { name: '손 다음' }))
-    fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    등록()
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(created).not.toBeNull()
@@ -178,17 +189,20 @@ describe('선수 등록 — 확인 질문은 화면을 비우지 않는다', () 
   it('[아니오] 를 고르면 질문만 닫히고 화면은 그대로다', () => {
     화면()
     이름넣기('테스트')
-    fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    등록()
     fireEvent.click(screen.getByRole('button', { name: '아니오' }))
 
     expect(screen.queryByText(/이대로 결정/)).toBeNull()
     expect(screen.getByRole('textbox')).toBeTruthy()
   })
 
-  it('이름이 비면 등록할 수 없다 (원본 입력기도 빈 이름은 확인을 안 받는다)', () => {
+  it('이름이 비면 이름 줄의 OK 가 먹지 않는다 (원본 입력기도 빈 이름은 확인을 안 받는다)', () => {
     화면()
+    const 커서처음 = screen.getByTestId('선수등록-커서').style.top
 
-    expect(screen.getByRole('button', { name: '등록' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    expect(screen.queryByText(/이대로 결정/)).toBeNull()
+    expect(screen.getByTestId('선수등록-커서').style.top).toBe(커서처음)
   })
 })
 

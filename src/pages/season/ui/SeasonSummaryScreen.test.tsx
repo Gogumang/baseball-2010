@@ -135,8 +135,8 @@ describe('리그 1위 누적 G (StrMODE[223]) — 결산 진입(0x6900)마다 �
     expect(글).toContain('3000 G포인트')
     expect(onAward).toHaveBeenCalledWith({ threshold: 1, gamePoint: 3000, bit: 0 })
 
-    // 팝업이 떠 있는 동안 "결과" 키는 먹지 않는다
-    fireEvent.click(screen.getByRole('button', { name: '결과' }))
+    // 팝업이 떠 있는 동안 "결과" 누름 칸은 서지 않는다
+    expect(screen.queryByRole('button', { name: '결과' })).toBeNull()
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('3000 G포인트')
 
     확인() // 꼬리표 1 — 닫혀도 아무 가지에도 안 걸려 대진표로
@@ -310,7 +310,8 @@ describe('아직 안 끝난 포스트시즌', () => {
     )
 
     expect(screen.getByRole('group', { name: '포스트시즌 대진표' })).toBeDefined()
-    expect(document.body.textContent).toContain('준플레이오프 진행 중')
+    // 웹 설명 줄("… 진행 중")은 원본에 없어 걷었다
+    expect(document.body.textContent).not.toContain('진행 중')
 
     fireEvent.click(screen.getByRole('button', { name: '경기' }))
     expect(onContinue).toHaveBeenCalled()

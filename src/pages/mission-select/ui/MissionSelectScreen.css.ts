@@ -59,9 +59,3 @@ export const value = style({
 })
 
 /** 편 바꾸기 · 돌아가기 — 원본은 머리띠 제목과 바닥띠가 하는 일이다 */
-/** 웹 추가 편 바꾸기 — 머리띠(그림 끝 y ≈ 30) 아래 왼쪽 */
-export const sideButton = style({
-  position: 'absolute',
-  left: '4px',
-  top: '32px',
-})

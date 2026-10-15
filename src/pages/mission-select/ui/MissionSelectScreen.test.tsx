@@ -245,11 +245,10 @@ describe('미션 선택 격자', () => {
     })
   })
 
-  it('편을 바꾸면 커서가 처음으로 돌아간다', () => {
+  it('편 바꾸기 웹 단추가 없다 — 원본은 고른 선수가 편을 정한다', () => {
     띄우기()
 
-    fireEvent.click(screen.getByRole('button', { name: '투수편' }))
-
-    expect(screen.getByRole('button', { name: '타자편' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '투수편' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '타자편' })).toBeNull()
   })
 })

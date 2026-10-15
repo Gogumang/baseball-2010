@@ -1,4 +1,4 @@
-import { Button, FrameSprite, RawScreen, SpriteNumber } from '@/shared/ui'
+import { FrameSprite, PressArea, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -75,7 +75,7 @@ function TeamLogo({ cell, teamId }: { readonly cell: BoardBox; readonly teamId: 
  *   - 로고 0x66431 이 그리는 크기를 안 읽어 team_logo 를 칸(+2 안쪽)에 줄여 넣는다 (포스트시즌 대진표와 같은 근사).
  *   - 0xba0bd 의 "둥글기 1" 을 1px 모서리 둥글림으로 그린다.
  *   - 머리띠 0x7f4ec 의 바닥 칸은 이 상태용 값을 안 읽었다 — 되돌아가기 없이 그린다.
- *   - 확인 단추는 원본 소프트키 자리를 안 읽은 웹 단추다.
+ *   - ⚠️ 웹 자리: 확인은 원본 화면에 그림 자리가 없다 — 웹 단추를 걷고 화면 전체 투명 누름 칸으로 받는다.
  */
 export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultBoardScreenProps) {
   const origins = useFrameOrigins(BOARD_FRAME.folder)
@@ -121,9 +121,8 @@ export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultB
         })}
       </div>
 
-      <Button variant="corner" className={styles.cornerButton} onClick={onConfirm}>
-        확인
-      </Button>
+      {/* ⚠️ 웹 자리: 확인(−5) — 화면 전체 투명 누름 칸 */}
+      <PressArea label="확인" onPress={onConfirm} />
 
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} slides={false} />
     </RawScreen>

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
-import { EffectImage, FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
+import { EffectImage, FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
 import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
@@ -407,22 +408,15 @@ export function AceSelectScreen({
 
       </>)}
 
-      {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 머리띠를 가리던 것을 제자리로 옮겼다 */}
-      <div className={styles.hintLine}>
-        <Hint>
-          {isCoachMode
-            ? '코치로 채용할 마선수를 고르세요 — 방향키 이동 · Enter 결정'
-            : isLevelUpMode
-            ? '마선수 레벨업 — 방향키 이동 · Enter/0 레벨업'
-            : `${phase === ACE_PHASE.마투수 ? '마투수를 고르세요' : '마타자를 고르세요'} — 방향키 이동 · Enter 결정${onLevelUp === undefined ? '' : ' · 0 레벨업'}`}
-        </Hint>
-      </div>
+      {/* 원본에 없던 웹 키 안내 글("…를 고르세요 — 방향키 이동 · Enter 결정")은 걷었다 */}
 
       {/* 머리띠(제목 8 "마선수선택")·바닥띠 — 원본 공용 목록 k 2 도 이 둘을 얹는다 (P6 1-1 · 2a-5) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
       {/* 바닥 0x205 = 가운데 "0레벨업" + 되돌아가기 — 일반모드 0x2df78 · 0x2dfe0, 시즌 0xaa24(선수단 [+0x11c] ≠ 2) 모두 */}
       {/* 코치채용(this+0x11c == 2)은 0x54d95(skin, 4, 5) — 되돌아가기만 (0xad94~0xada0) */}
-      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} footer={isCoachMode ? 5 : 0x205} />
+      {/* 바닥띠 "0레벨업" 표시 = '0' 키 — 그 표시 위 투명 누름 칸(키 처리가 팝업 · 잠금을 그대로 본다) */}
+      <ScreenFrame title="마선수선택" gamePoint={gamePoint} onBack={onCancel} footer={isCoachMode ? 5 : 0x205}
+        footerPresses={{ [FOOTER_BITS.levelUp]: { label: '0 레벨업', onPress: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: '0' })) } }} />
 
       {/*
         **오픈 힌트 팝업** (0xa68e~0xa6dc) — 칸 4·9(드래고나·킹타이거)는 StrCOMMON[42] 알림 하나,

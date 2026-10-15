@@ -44,9 +44,3 @@ export const rankUnit = style({
   pointerEvents: 'none',
 })
 
-/** 대진표에는 없는 웹 전용 단추 — 원본은 소프트키가 한다 */
-export const nextButton = style({
-  position: 'absolute',
-  left: '4px',
-  top: '4px',
-})

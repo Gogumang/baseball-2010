@@ -66,6 +66,12 @@ const 누르기 = (key: string) => {
   포인터아래로칸이지나감()
 }
 
+/** 원본 좌표 그대로 바닥(y 320) 밖에 놓인 칸 — 단추는 있어도 화면에 안 보여 누를 수 없다 */
+const 화면밖 = (name: string) => {
+  const 칸 = view.queryByRole('button', { name })
+  return 칸 === null || parseFloat(칸.style.top) >= 320
+}
+
 function 메인메뉴(continueSaved = vi.fn()) {
   const setScreen = vi.fn()
   render(<EntryRoutes
@@ -98,7 +104,7 @@ describe('메인 메뉴 → 게임시작 → 나만의리그 → [14] 타자편 
     expect(continueSaved).toHaveBeenCalledTimes(1)
   })
 
-  it('마우스를 올리기만 해서는 커서가 안 옮겨진다 — 칸을 누르면 그 칸을 고르고 바로 시작한다', () => {
+  it('마우스를 올리기만 해서는 커서가 안 옮겨진다 — 칸을 누르면 그 칸까지 릴이 돌아 고르기만 하고, 시작은 설명 판 누름이다', () => {
     const { setScreen } = 메인메뉴()
     누르기('Enter')
     for (const key of ['ArrowDown', 'ArrowDown', 'ArrowDown']) 누르기(key)
@@ -107,7 +113,51 @@ describe('메인 메뉴 → 게임시작 → 나만의리그 → [14] 타자편 
       fireEvent.click(view.getByRole('button', { name: '나만의리그' }))
     })
     틱지남()
+    포인터아래로칸이지나감()
+    // 고르기만 했다 — 창도 안 뜨고 화면도 안 바뀐다
+    expect(view.queryByText('플레이 하시겠습니까?', { exact: false })).toBeNull()
+    expect(setScreen).not.toHaveBeenCalled()
+
+    act(() => {
+      fireEvent.click(view.getByRole('button', { name: '고른 칸 시작' }))
+    })
+    틱지남()
     expect(view.getByText('플레이 하시겠습니까?', { exact: false })).toBeTruthy()
     expect(setScreen).not.toHaveBeenCalled()
+  })
+
+  it('바닥 밖 칸도 보이는 칸을 거듭 눌러 닿는다 — 바퀴: 환경설정 → 도움말, 릴: 대전모드 → 일반모드', () => {
+    const { setScreen } = 메인메뉴()
+    const 누름 = (name: string) => {
+      act(() => {
+        fireEvent.click(view.getByRole('button', { name }))
+      })
+      틱지남()
+    }
+    // 처음 메뉴 커서 게임시작 — 스페셜(45°) · 도움말(90°)은 바닥 밖. 환경설정(180°)을 누르면 바퀴가 세 칸 돌아
+    // 도움말이 315° 자리로 들어온다
+    expect(화면밖('도움말')).toBe(true)
+    누름('환경설정')
+    expect(setScreen).not.toHaveBeenCalled()
+    누름('도움말')
+    누름('고른 칸 시작')
+    expect(setScreen).toHaveBeenCalledTimes(1)
+  })
+
+  it('릴의 바닥 밖 칸 — 최근게임에서 대전모드를 누르면 일반모드가 윗줄로 올라온다', () => {
+    메인메뉴()
+    누르기('Enter')
+    const 누름 = (name: string) => {
+      act(() => {
+        fireEvent.click(view.getByRole('button', { name }))
+      })
+      틱지남()
+    }
+    expect(화면밖('일반모드')).toBe(true)
+    누름('대전모드')
+    누름('일반모드')
+    누름('고른 칸 시작')
+    // 일반모드 진입 창 [13]
+    expect(view.getByRole('button', { name: '빠른실행' })).toBeTruthy()
   })
 })

@@ -192,12 +192,6 @@ export const HINT_BOX = {
 } as const
 
 /**
- * [등록]·[취소]. 원본에는 소프트키가 없고 OK/CLR 키로 끝낸다(0x16f28) — 웹에는 누를 곳이 있어야 해서
- * 안내 줄 아래 빈 자리에 둔다 (**웹 전용**).
- */
-export const ACTION_ROW = { y: HINT_BOX.y + 26, leftX: INFO_BOARD.x, rightX: INFO_BOARD.x + INFO_BOARD.width } as const
-
-/**
  * 등록 화면의 타순 칸 = **8** — 등록 화면에 타순 선택은 없고(C-4 확정), 생성 0x17360 이 타자면 레코드 +0xa 에
  * **0xa7** 을 쓴다(0x17646~0x1764c). 정보 칸 그리기는 `0xb6395(레코드) + 1` 을 찍는다(0x7cf78~0x7cf80) — 아래 5비트 7 → 8번.
  */

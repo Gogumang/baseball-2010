@@ -280,6 +280,8 @@ export function EntryRoutes({
     return (
       <CreatePlayerScreen
         teamId={screen.teamId}
+        // 머리띠 G — 전역 G(+0x64)
+        gamePoint={wallet.balance}
         onCreate={session.actions.startNewCareer}
         // 등록에서 물러나면 팀 고르기로 돌아간다 (원본도 한 단계씩 뒤로 간다)
         onCancel={() => setScreen({ kind: '팀선택' })}

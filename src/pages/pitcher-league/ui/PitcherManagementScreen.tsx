@@ -3,6 +3,7 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -176,6 +177,9 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
 }
 
 /** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */
+/** 누름 칸이 보내는 키 — 메뉴 훅의 window 키 듣개가 그대로 받는다 */
+const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+
 const BASIC_INFO_FOOTER = 0x87
 
 /**
@@ -326,7 +330,12 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         105 는 메인 메뉴로, 그 아래 화면은 한 단계 위로.
       */}
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false} />
+        footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false}
+        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸
+        footerPresses={{
+          [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
+          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') },
+        }} />
 
 
       {/*

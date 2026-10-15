@@ -138,6 +138,12 @@ const frameSrc = (folder: string, frame: number) => `${folder}/frames/${pad(fram
 /** 통짜 이미지 (main_ui/NNN) — 설명 판이 이쪽이다 */
 const imageSrc = (frame: number) => `${MAIN_UI}/${pad(frame)}.png`
 
+/** 고른 칸에서 `offset` 칸 떨어진 칸까지의 걸음 — 감기는 배열이라 가까운 쪽(절반 넘으면 반대쪽)으로 잰다 */
+const slotOffsetOf = (offset: number, count: number) => {
+  const forward = ((offset % count) + count) % count
+  return forward > count / 2 ? forward - count : forward
+}
+
 
 /**
  * 메인 메뉴 — 원작대로 **두 단**이다. 윗단(하위 상태 4, 처음 메뉴)에서 [게임시작] 을 고르면
@@ -232,6 +238,36 @@ export function MainMenuScreen({
   /** 도는 동안은 **돌기 전 배열**을 그린다 (회전은 마지막 틱에 한 번 일어난다) */
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
 
+  /**
+   * 칸 누름 = 고르기만 — 그 칸까지 남은 걸음(+ ↓ · − ↑). 원본 키 한 번이 한 칸을 돌리므로(0x24c58 · 0x253a6) 한 걸음씩 보내고,
+   * 앞 걸음의 회전 연출이 끝나면(`turn.direction` 이 null 로 돌아오면) 다음 걸음을 보낸다. ⚠️ 웹 조작 — 원본은 키패드뿐이다
+   */
+  const pendingStepsRef = useRef(0)
+  const hasTurnStartedRef = useRef(false)
+  const stepOnce = () => {
+    const step = pendingStepsRef.current > 0 ? 1 : -1
+    pendingStepsRef.current -= step
+    hasTurnStartedRef.current = false
+    dispatch({ type: '커서', step })
+  }
+  const stepToward = (offset: number) => {
+    // 도는 중이거나 띠가 자라는 중(하위 5·9 가 키를 버린다 0x28cc2)이면 원본 키처럼 받지 않는다
+    if (offset === 0 || pendingStepsRef.current !== 0 || turn.direction !== null || band.isGrowing) return
+    pendingStepsRef.current = offset
+    stepOnce()
+  }
+  useEffect(() => {
+    if (turn.direction !== null) {
+      hasTurnStartedRef.current = true
+      return
+    }
+    if (pendingStepsRef.current !== 0 && hasTurnStartedRef.current) stepOnce()
+  })
+  // 단이 바뀌면(뒤로 · 시작) 남은 걸음을 버린다
+  useEffect(() => {
+    pendingStepsRef.current = 0
+  }, [state.tier])
+
   /** 하위 목록 상태 번호 — 표(0xceaf2 슬롯 · 0xcea00/0xcea48 글자 · 0xcea6c 제목)를 이 번호로 색인한다 */
   const reelState = state.tier
   /**
@@ -286,11 +322,9 @@ export function MainMenuScreen({
         disabled={!isWheel}
         // ⚠️ 마우스를 올리기만 해서 커서를 옮기지 않는다(onMouseEnter 없음) — 원본은 키패드뿐이다. 바퀴·릴이 돌면 멈춘 포인터 아래로
         // 다른 칸이 들어와 브라우저가 mouseenter 를 쏘므로, 포인터를 메뉴 위에 둔 채 키로 고르면 커서가 엉뚱한 칸으로 튀었다
-        // (게임시작 → ↓↓ 나만의리그 → OK 가 일반모드 창 · 홈런더비 · 스페셜로 갔다). 누르면 그 칸을 고르고 바로 시작한다
-        onClick={() => {
-          dispatch({ type: '모드선택', id: entry.id })
-          dispatch({ type: '시작' })
-        }}
+        // (게임시작 → ↓↓ 나만의리그 → OK 가 일반모드 창 · 홈런더비 · 스페셜로 갔다).
+        // 누르면 **고르기만** 한다 — 그 칸까지 ↑/↓ 를 한 칸씩 보내 원본처럼 바퀴가 돈다. 시작은 설명 판 누름(OK)이다
+        onClick={() => stepToward(slotOffsetOf(slot, TOP_ENTRIES.length))}
       >
         <img src={frameSrc(IMG_TEXT, frame)} alt="" />
       </button>
@@ -331,11 +365,10 @@ export function MainMenuScreen({
           aria-label={entry.id}
           className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
           style={{ left: topLeft.x, top: topLeft.y }}
-          // 마우스 올리기로는 고르지 않는다 — 바퀴 칸과 같은 까닭(멈춘 포인터 아래로 릴이 돌아 들어온 칸이 커서를 빼앗는다)
-          onClick={() => {
-            dispatch({ type: '모드선택', id: entry.id })
-            dispatch({ type: '시작' })
-          }}
+          // 마우스 올리기로는 고르지 않는다 — 바퀴 칸과 같은 까닭(멈춘 포인터 아래로 릴이 돌아 들어온 칸이 커서를 빼앗는다).
+          // 누르면 고르기만 한다 — 릴이 그 칸까지 한 칸씩 돈다. 보이는 윗줄(슬롯 1·2·3)이 커서 −3·−2·−1 이고 릴이 감기므로
+          // 바닥 밖 칸(슬롯 5·6·7)도 윗줄을 거듭 눌러 닿는다
+          onClick={() => stepToward(slotOffsetOf(entryIndex - shownCursor, entries.length))}
         >
           <img src={src} alt="" />
         </button>
