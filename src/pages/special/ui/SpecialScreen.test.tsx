@@ -7,7 +7,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
-  ROW, SPECIAL_ITEMS, descriptionPanelTopOf, hallOfFameCellImagesOf, isHallOfFameCellDimmed, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, rowLeftOf, rowTopOf,
+  SPECIAL_ITEMS, hallOfFameCellImagesOf, isHallOfFameCellDimmed, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf,
 } from '@/pages/special/lib/specialLayout'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
@@ -23,10 +23,16 @@ vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) 
 
 afterEach(cleanup)
 
+/** 띠가 다 자란 목록 — 자라는 동안은 키를 버린다(0x28ba0~0x28bb4). 자라는 것은 아래 '바탕 띠' 묶음이 따로 본다 */
 const 띄우기 = (overrides: Partial<Parameters<typeof SpecialScreen>[0]> = {}) =>
-  render(<SpecialScreen collection={EMPTY_COLLECTION} onBack={vi.fn()} {...overrides} />)
+  render(<SpecialScreen collection={EMPTY_COLLECTION} onBack={vi.fn()} isBandGrown {...overrides} />)
 
-const 칸 = (name: string) => screen.getByRole('button', { name })
+/** 목록은 릴이라 고른 칸은 설명 판이 보여 준다 — ↓ 로 그 칸까지 돌리고 확인(Enter)으로 연다 */
+const 항목열기 = (name: string) => {
+  const index = SPECIAL_ITEMS.findIndex((item) => item.id === name)
+  for (let step = 0; step < index; step += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+  fireEvent.keyDown(window, { key: 'Enter' })
+}
 
 /** 명예의 전당 격자 커서를 키패드로 옮긴다 — ↓ 로 줄을 맞추고 → 로 칸을 맞춘다(마우스 올리기로는 안 옮겨진다) */
 const 슬롯으로 = (target: number) => {
@@ -38,50 +44,51 @@ const 슬롯으로 = (target: number) => {
   expect(지금()).toBe(target)
 }
 
-describe('스페셜 목록 배치', () => {
-  it('원본 여덟 칸을 모두 보여 준다 — 통신 기능도 지우지 않았다', () => {
-    띄우기()
-
-    for (const name of [
-      'G포인트 충전', 'G포인트 선물', '친구추천', '명예의전당',
-      '마선수선택', '에디트', '기록연감', '선물받기',
-    ]) {
-      expect(칸(name)).toBeTruthy()
-    }
-  })
-
-  it('줄 간격은 20px 이고 오른쪽 끝이 x = 201 에 맞는다', () => {
-    띄우기()
-
-    expect(칸('G포인트 충전').style.top).toBe(`${rowTopOf(0)}px`)
-    expect(칸('G포인트 선물').style.top).toBe(`${rowTopOf(0) + ROW.step}px`)
-    for (const item of SPECIAL_ITEMS) {
-      const 줄 = 칸(item.id)
-      expect(줄.style.left).toBe(`${rowLeftOf(item)}px`)
-      expect(Number.parseInt(줄.style.left, 10) + item.labelWidth).toBe(ROW.rightEdge)
-    }
-  })
-
-  it('칸 그림은 main_ui 프레임 15~21·28 이다 (표 0xceb2f)', () => {
+describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아랫단과 같은 그리기', () => {
+  it('고른 칸은 설명 판(main_ui 이미지 3, (96, 289)) 안 큰 글자 main_ui 프레임 15~21·28 로 보인다 (표 0xceb2f)', () => {
     const { container } = 띄우기()
-    const 그림 = [...container.querySelectorAll('img')].map((image) => image.getAttribute('src'))
-
+    const 판 = screen.getByTestId('스페셜-설명판') as HTMLImageElement
+    expect([판.getAttribute('src'), 판.style.left, 판.style.top]).toEqual(['./sprites/main_ui/003.png', '96px', '289px'])
     for (const item of SPECIAL_ITEMS) {
+      const 그림 = [...container.querySelectorAll('img')].map((image) => image.getAttribute('src'))
       expect(그림).toContain(`./sprites/main_ui/frames/${String(item.labelFrame).padStart(3, '0')}.png`)
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
     }
   })
 
-  it('고른 칸 설명 판은 main_ui 이미지 3 이고 설명은 StrMAINMENU 원문이다', () => {
-    const { container } = 띄우기()
+  it('설명은 판 안이 아니라 설명 띠 0x55545 — StrMAINMENU[0x10 + 커서] 원문', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
+    try {
+      const { container } = 띄우기()
+      const 띠지남 = () => {
+        for (let step = 0; step < 6; step += 1) act(() => { vi.advanceTimersByTime(200) })
+      }
+      띠지남()
+      expect(container.textContent).toContain('G포인트를 충전')
+      // 기록연감은 일곱째 칸 — ↑ 두 번(맨 앞에서 감겨 마지막 · 그 앞)
+      fireEvent.keyDown(window, { key: 'ArrowUp' })
+      fireEvent.keyDown(window, { key: 'ArrowUp' })
+      띠지남()
+      expect(container.textContent).toContain('각종 기록과 게임 통계를')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 
-    expect(container.querySelector('img[src="./sprites/main_ui/003.png"]')).toBeTruthy()
-    expect(screen.getByText('G포인트를 충전')).toBeTruthy()
-
-    // 기록연감은 일곱째 줄 — ↑ 두 번(맨 위에서 감겨 마지막 · 그 앞)
-    fireEvent.keyDown(window, { key: 'ArrowUp' })
-    fireEvent.keyDown(window, { key: 'ArrowUp' })
-
-    expect(screen.getByText('각종 기록과 게임 통계를')).toBeTruthy()
+  it('바탕 띠가 자라는 넉 틱 동안은 키를 버린다 (0x28ba0~0x28bb4 [메뉴+0xe2])', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] })
+    try {
+      const { container } = render(<SpecialScreen collection={EMPTY_COLLECTION} onBack={vi.fn()} />)
+      expect(container.querySelector('canvas')?.getAttribute('data-band-spread')).toBe('1')
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(screen.queryByRole('dialog')).toBeNull()
+      for (let step = 0; step < 6; step += 1) act(() => { vi.advanceTimersByTime(200) })
+      expect(container.querySelector('canvas')?.getAttribute('data-band-spread')).toBe('160')
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(screen.getByRole('dialog')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -108,7 +115,7 @@ describe('스페셜 칸 고르기', () => {
   it('통신 기능 칸은 안내만 띄운다 — 충전·선물·친구추천·선물받기', () => {
     띄우기()
 
-    fireEvent.click(칸('G포인트 충전'))
+    항목열기('G포인트 충전')
 
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
@@ -120,11 +127,11 @@ describe('스페셜 칸 고르기', () => {
     ))
     띄우기({ renderEdit })
 
-    fireEvent.click(칸('에디트'))
+    항목열기('에디트')
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '에디트-화면' }))
 
-    expect(칸('에디트')).toBeTruthy()
+    expect(screen.getByTestId('스페셜-설명판')).toBeTruthy()
   })
 
   it('마선수선택 칸은 앱이 꽂은 상태 28 화면으로 가고, 그 화면의 되돌아가기는 목록으로 온다', () => {
@@ -133,16 +140,16 @@ describe('스페셜 칸 고르기', () => {
     ))
     띄우기({ renderAceSelect })
 
-    fireEvent.click(칸('마선수선택'))
+    항목열기('마선수선택')
     fireEvent.click(screen.getByRole('button', { name: '마선수-화면' }))
 
-    expect(칸('마선수선택')).toBeTruthy()
+    expect(screen.getByTestId('스페셜-설명판')).toBeTruthy()
   })
 
   it('기록연감 칸은 기록연감 화면으로 간다', () => {
     띄우기()
 
-    fireEvent.click(칸('기록연감'))
+    항목열기('기록연감')
 
     expect(screen.getByRole('button', { name: '닉네임' })).toBeTruthy()
   })
@@ -150,7 +157,7 @@ describe('스페셜 칸 고르기', () => {
   it('명예의전당 칸은 명예의 전당 화면으로 간다', () => {
     띄우기()
 
-    fireEvent.click(칸('명예의전당'))
+    항목열기('명예의전당')
 
     // 화면 표식으로 B 딱지(ABILITY)를 본다 — A 딱지(PLAYER)는 원본이 k 8 에서 안 그려
     // 이제 웹판도 안 그린다 (0x63da0~0x63da6 이 `[sp+0xb4]` 를 0 으로 끈다)
@@ -183,7 +190,7 @@ describe('스페셜 칸 고르기', () => {
 describe('명예의 전당 격자 5×3', () => {
   const 열기 = () => {
     띄우기()
-    fireEvent.click(칸('명예의전당'))
+    항목열기('명예의전당')
   }
   /** 명예 투수 0번(칸 1)이 찬 스페셜 명예의 전당 — 말풍선은 결과 3·4(찬 칸)에서만 뜬다 (0x2ac00) */
   const 찬투수 = {
@@ -258,8 +265,8 @@ describe('명예의 전당 격자 5×3', () => {
       name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 },
       endingIndex: 6, season: 13, titleIds: [], slot: 1,
     }
-    render(<SpecialScreen collection={{ ...EMPTY_COLLECTION, hallOfFame: [famer] }} onBack={vi.fn()} />)
-    fireEvent.click(칸('명예의전당'))
+    render(<SpecialScreen collection={{ ...EMPTY_COLLECTION, hallOfFame: [famer] }} onBack={vi.fn()} isBandGrown />)
+    항목열기('명예의전당')
 
     const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
     expect([0, 5, 10].map((index) => 슬롯(index).dataset.state)).toEqual(['0', '0', '0'])
@@ -656,7 +663,7 @@ describe('머리띠 0x54d95 — 제목이 있으면 G포인트도 그린다 (0x5
 
   it('스페셜 명예의 전당(하위 27, 0x2dcd8)은 제목 16 "명예의전당"(game_frame 29) + G', () => {
     const { container } = 띄우기({ gamePoint: 7 })
-    fireEvent.click(칸('명예의전당'))
+    항목열기('명예의전당')
     const srcs = 그림들(container)
     expect(srcs).toContain('./sprites/game_frame/029.png')
     expect(srcs).not.toContain('./sprites/game_frame/003.png')
@@ -716,7 +723,7 @@ describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c
 })
 
 describe('설명 판 까딱임 (0x252c6 · 0x25716 — 표 0xce8bc · 0xce88c)', () => {
-  it('↓ 로 옮긴 줄의 설명 판이 +2 · −2 뒤 제자리로 — 판 안 그림도 같이 옮긴다', () => {
+  it('↓ 로 옮기면 설명 판(96, 289)이 +2 · −2 뒤 제자리로', () => {
     vi.useFakeTimers()
     try {
       const { container } = 띄우기()
@@ -724,7 +731,7 @@ describe('설명 판 까딱임 (0x252c6 · 0x25716 — 표 0xce8bc · 0xce88c)',
         vi.advanceTimersByTime(millisecondsPerFrame() * 3)
       })
       const 판 = () => container.querySelector('img[src$="main_ui/003.png"]') as HTMLElement
-      const 제자리 = descriptionPanelTopOf(1)
+      const 제자리 = 289
       fireEvent.keyDown(window, { key: 'ArrowDown' })
       expect(판().style.top).toBe(`${제자리 + 2}px`)
       act(() => {
@@ -814,13 +821,14 @@ describe('명전 칸 그림 0x7ac2e · 커서 튕김 0x7a7f6', () => {
 })
 
 describe('마우스 길 — 원본은 키패드뿐이라 포인터를 올려 두기만 해서는 커서가 안 옮겨진다', () => {
-  it('스페셜 목록 줄', () => {
+  it('스페셜 목록 — 설명 판 누름 칸에 올리기만 해서는 안 열린다(PressArea · 누르면 연다)', () => {
     띄우기()
-    fireEvent.mouseEnter(칸('기록연감'))
-    fireEvent.mouseOver(칸('기록연감'))
-    expect(칸('G포인트 충전').getAttribute('aria-current')).toBe('true')
-    expect(칸('기록연감').getAttribute('aria-current')).toBe('false')
-    expect(screen.getByText('G포인트를 충전')).toBeTruthy()
+    const 판 = screen.getByLabelText('G포인트 충전 열기')
+    fireEvent.mouseEnter(판)
+    fireEvent.mouseOver(판)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(판)
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('명예의 전당 슬롯 · 말풍선 칸', () => {
