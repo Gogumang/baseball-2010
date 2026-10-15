@@ -895,6 +895,7 @@ export function useCareerSession({
         newTitles: dynamite === null ? [] : [dynamite],
         evaluation,
         streakNotices: streakEventOf(advanced).notices,
+        streakRewards: streakEventOf(advanced).rewards,
         // 0x4ea0c 꼬리 4f41a~ 의 정산 효과 — 하늘 칸은 경기 끝 이닝 (구장객체 +0x14), 하늘 줄은 경기를 세울 때 고른 구장 +0x10
         settlementInning: finished.game.inning,
         settlementPlayerSide: finished.game.playerSide,
@@ -1605,6 +1606,7 @@ export function useCareerSession({
           newTitles: dynamite === null ? [] : [dynamite],
           evaluation: lastGame.evaluation,
           streakNotices: streakEventOf(counted).notices,
+          streakRewards: streakEventOf(counted).rewards,
         })
       }
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105

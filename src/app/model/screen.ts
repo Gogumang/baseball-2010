@@ -5,6 +5,7 @@ import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/mo
 import type { StoryContext } from '@/app/model/useStorySchedule'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
+import type { EventReward } from '@/entities/story/model/eventReward'
 import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
 
 /** 지금 떠 있는 화면 하나. 화면마다 필요한 값을 같이 들고 다닌다. */
@@ -57,6 +58,8 @@ export type Screen =
       readonly newTitles: readonly string[]
       readonly evaluation: GameEvaluation
       readonly streakNotices: readonly StreakNotice[]
+      /** 0x8a6fc 가 쌓은 보상 명령(종류 7) — 평판 합 · 슬럼프 ±18. 114 가 명령마다 창을 띄운다 (`streakEventOf().rewards`) */
+      readonly streakRewards?: readonly EventReward[]
       /**
        * 경기 정산 0x4ea0c 를 막 지났으면 경기 끝 이닝(1 부터) — 결과 그림 0x4a384 의 배경 · 정산 효과(밤 승리 불꽃 · 패배 비)가 쓴다.
        * 이어하기가 116 을 다시 띄울 때(정산을 다시 안 돈다)는 없다.

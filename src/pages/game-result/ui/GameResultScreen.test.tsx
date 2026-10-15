@@ -193,6 +193,44 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     expect(onContinue).toHaveBeenCalledOnce()
   })
 
+  it('연속 기록 say 뒤 보상 명령(종류 7)마다 창 — 평판 합은 공용 알림, 슬럼프 +18 은 스킬 창 0x8e054 (0x8d4c4), 다 닫으면 114 끝', () => {
+    vi.useFakeTimers()
+    const onContinue = vi.fn()
+    const 밑그림 = vi.fn((career: { readonly reputation: number }) => <div data-testid="밑그림" data-reputation={career.reputation} />)
+    const career = { ...createCareer('선수'), reputation: 100 }
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
+        streakNotices={[{ labelIndex: 102, count: 4, commentIndex: 111, reputationChange: -10 }]}
+        streakRewards={[{ kind: 1, value: -10 }, { kind: 4, value: 18 }]}
+        career={career} onContinue={onContinue} rewardUnderlay={밑그림} />,
+    )
+    for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
+      프레임(200)
+      fireEvent.keyDown(window, { key: 'Enter' })
+    }
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByTestId('밑그림').getAttribute('data-reputation')).toBe('100')
+    // 명령 3 say 중 CLR(0x8b7b0) — 다음 보상 명령으로
+    프레임(200)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onContinue).not.toHaveBeenCalled()
+    // 평판 알림 창 — 0x8c460 이 창을 띄운 갱신에 평판을 준다
+    const 알림 = screen.getByRole('dialog')
+    expect(알림.textContent).toContain('평판')
+    expect(알림.textContent).toContain('-10')
+    expect(screen.getByTestId('밑그림').getAttribute('data-reputation')).toBe('90')
+    프레임(20)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    프레임(20)
+    // 스킬 창 — img_text 370(획득)
+    expect(screen.getByTestId('스킬-보상-창')).toBeTruthy()
+    expect(screen.getByTestId('스킬-보상-창').textContent).toContain('획득')
+    expect(onContinue).not.toHaveBeenCalled()
+    프레임(20)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onContinue).toHaveBeenCalledOnce()
+  })
+
   it('이어하기로 다시 띄운 116(정산 재료 없음)은 경기 끝 판 · 정산 판 없이 곧장 평가 — 배경 · 효과도 없다', () => {
     const { container } = render(
       <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
