@@ -18,6 +18,7 @@
  * 카메라 바이트 +5 는 데드존형 카메라(0xc07a8)만 1, 따라가기형(0xc0570)은 0 이다. 웹 수비 카메라는 따라가기형만 옮겼으므로
  * (`defenseCamera` — [0x14000bc]+0xc 를 세우는 곳 미발견, U-52) **테두리 칠과 +2 비낌은 없다**.
  */
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /** 월드 크기 (I-controls 1b) */
 export const WORLD = { width: 40000, height: 32500 } as const
@@ -51,8 +52,8 @@ export const MAP_FRAME_BOX = { x: -29, y: -28, width: 61, height: 59 } as const
 export const DOT_IMAGE = './sprites/game_ui/021.png'
 export const DOT_SIZE = { width: 13, height: 11 } as const
 
-/** 효과 1 · 단계 12 — 반투명 겹치기, 그림 무게 12/16 (R6 3a) */
-export const MAP_OPACITY = 12 / 16
+/** 효과 1 · 단계 12 — 반투명 겹치기, 그림 무게 12/16 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
+export const MAP_OPACITY = translucentOpacityOf(12)
 
 /** 테두리 색 (0x39680·0x396a8) — 데드존형 카메라에서만 쓴다 */
 export const MAP_COLORS = {

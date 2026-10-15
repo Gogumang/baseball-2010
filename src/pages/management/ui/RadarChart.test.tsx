@@ -36,7 +36,8 @@ describe('기본정보 레이더 숫자 색 (0x7ba44 → 0x5a990)', () => {
     // 300 · 520 → 세 글자씩
     expect(tinted).toHaveLength(6)
     expect(tinted.slice(0, 3).every(({ color }) => color === 'rgb(255, 0, 0)')).toBe(true)
-    expect(tinted.slice(3).every(({ color }) => color === 'rgb(0, 255, 64)')).toBe(true)
+    // 효과 0xb 는 565 로 찍는다 — (0, 0xff, 0x40) → B5 8 → 66
+    expect(tinted.slice(3).every(({ color }) => color === 'rgb(0, 255, 66)')).toBe(true)
     expect(tinted[0].src).toContain('./sprites/num/023.png')
   })
 })

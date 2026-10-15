@@ -18,6 +18,7 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
+import { DRAW_EFFECT, recoloredImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import {
   BASE_WINDOW_IMAGE,
@@ -25,8 +26,6 @@ import {
   RUN_PIP_IMAGE,
   aceRunnerFramesOf,
   baseRunnerDrawsOf,
-  grayRunPipPixel,
-  halfShadeRunnerPixel,
   loopingAnimationStepAt,
   runPipDrawsOf,
   runnerBoxAnchorOf,
@@ -398,46 +397,14 @@ function drawRunPips(context: CanvasRenderingContext2D, pips: ReturnType<typeof 
   }
 }
 
-/** 효과 0xa — 그림을 픽셀마다 원본 회색 식(0x97f01)으로 바꿔 그린다 (`grayRunPipPixel`) */
+/** 효과 0xa — 그림을 픽셀마다 원본 회색 식(0x97f01)으로 바꿔 그린다 (공용 `pixelEffect`) */
 function drawGrayed(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number): void {
-  const canvas = document.createElement('canvas')
-  canvas.width = image.width
-  canvas.height = image.height
-  const layer = canvas.getContext('2d')
-  if (layer === null) return
-  layer.drawImage(image, 0, 0)
-  const pixels = layer.getImageData(0, 0, canvas.width, canvas.height)
-  const data = pixels.data
-  for (let offset = 0; offset < data.length; offset += 4) {
-    if (data[offset + 3] === 0) continue
-    const gray = grayRunPipPixel(data[offset], data[offset + 1], data[offset + 2])
-    data[offset] = gray.r
-    data[offset + 1] = gray.g
-    data[offset + 2] = gray.b
-  }
-  layer.putImageData(pixels, 0, 0)
-  context.drawImage(canvas, x, y)
+  context.drawImage(recoloredImageOf(image, DRAW_EFFECT.GRAY, 0), x, y)
 }
 
-/** 효과 0xc · 인자 0 — 픽셀마다 원본 반반 섞기(0x98351)로 채널을 반으로 (`halfShadeRunnerPixel`) */
+/** 효과 0xc · 인자 0 — 픽셀마다 원본 반반 섞기(0x98351)로 채널을 반으로 (공용 `pixelEffect`) */
 function drawHalfShaded(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number): void {
-  const canvas = document.createElement('canvas')
-  canvas.width = image.width
-  canvas.height = image.height
-  const layer = canvas.getContext('2d')
-  if (layer === null) return
-  layer.drawImage(image, 0, 0)
-  const pixels = layer.getImageData(0, 0, canvas.width, canvas.height)
-  const data = pixels.data
-  for (let offset = 0; offset < data.length; offset += 4) {
-    if (data[offset + 3] === 0) continue
-    const shaded = halfShadeRunnerPixel(data[offset] ?? 0, data[offset + 1] ?? 0, data[offset + 2] ?? 0)
-    data[offset] = shaded.r
-    data[offset + 1] = shaded.g
-    data[offset + 2] = shaded.b
-  }
-  layer.putImageData(pixels, 0, 0)
-  context.drawImage(canvas, x, y)
+  context.drawImage(recoloredImageOf(image, DRAW_EFFECT.HALF_MIX, 0), x, y)
 }
 
 function drawPitcherMistakeMark(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {

@@ -14,7 +14,7 @@ import {
  * 창 탭은 팝업 0x78 이 정한다 — **1 마구 · 2 구질**(R9 178행).
  *
  * 탭 1(마구) 칸 i(0~3):
- *   1. 이미 사용 중(레코드 `+0x18` == 표[i]) → StrMODE[69] "현재 사용 중인 스킬입니다"
+ *   1. 이미 사용 중(`0xa43c4(저장, i)` — 아래 `magicInUseNumberOfCell`) → StrMODE[69] "현재 사용 중인 스킬입니다"
  *   2. 배운 수(저장 `+0x201` = `magicLevel`) ≤ i → StrMODE[71] "트레이닝 완료 후 사용할 수 있습니다"
  *   3. 아니면 StrMODE[70] "[이름] 을 사용하시겠습니까?" → 확인하면 `+0x18 = 표[i]`
  *
@@ -32,11 +32,27 @@ export function magicNumberOfCell(cellIndex: number): number {
   return MAGIC_PITCH_CELL_NUMBERS[cellIndex] ?? 0
 }
 
+/**
+ * "사용 중" 비교값 — **0xa43c4(저장, 칸)** (2026-10-15 직접 뜸, 0x17cec 의 17d24~17d40 이 커서 칸 `행·열수 + 열` 로 부른다):
+ * ```
+ * a43ca  n = 칸 + 1
+ * a43d4  rec = 0x1fc75(게임, s8 저장[0])            ; 선수 레코드
+ * a43d8  n > 3 이면 n += rec[0xb] >> 5              ; 넷째 칸은 4 + 등록 타입(+0xb bit5~7 = `typeIndex`)
+ * a43e2  return rec[0x18] == n
+ * ```
+ * 저장은 표 0xcc368 값(1~4, 0x1816c `strb [rec+0x18]`)이라 **타입 1 · 2 투수가 넷째 마구를 고르면 저장 4 · 비교 5 · 6** 이 되어
+ * 다시 골라도 "사용 중"([69])이 안 뜬다 — 원본 어긋남 그대로 옮긴다(타자 108 창 `isSlotInUse` 와 같은 함수).
+ */
+export function magicInUseNumberOfCell(cellIndex: number, typeIndex: number): number {
+  const number = cellIndex + 1
+  return number > 3 ? number + typeIndex : number
+}
+
 export function magicSelectBlockReasonOf(career: PitcherCareer, cellIndex: number): PitchSelectBlockReason | null {
   const number = magicNumberOfCell(cellIndex)
   if (number === 0) return '훈련필요'
   // 차례가 원본 그대로다 — "사용 중" 검사가 "배운 수" 검사보다 **앞**이다 (0x17cec)
-  if (career.selectedMagicNumber === number) return '사용중'
+  if (career.selectedMagicNumber === magicInUseNumberOfCell(cellIndex, career.typeIndex)) return '사용중'
   return career.magicLevel <= cellIndex ? '훈련필요' : null
 }
 

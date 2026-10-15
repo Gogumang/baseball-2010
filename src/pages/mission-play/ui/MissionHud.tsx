@@ -10,6 +10,7 @@ import {
 } from '@/pages/mission-play/lib/missionHudLayout'
 import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 interface MissionHudProps {
   readonly mission: OriginalMission
@@ -159,7 +160,7 @@ export function MissionHud({
               <span
                 key={index}
                 className={styles.stamp}
-                style={{ left: glyph.left, top: glyph.top, background: glyph.color, maskImage: mask, WebkitMaskImage: mask }}
+                style={{ left: glyph.left, top: glyph.top, background: solidColorCss(glyph.color), maskImage: mask, WebkitMaskImage: mask }}
               />
             )
           })}

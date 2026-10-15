@@ -1,6 +1,7 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import type { GoalTickerFrame } from '@/entities/mission/model/goalTicker'
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /**
  * **미션 HUD — 원본 `0x36714`** (타자 미션 모드 6 · 투수 미션 모드 5) (2026-10-14 직접 뜸, 0x36714~0x36c90 · 줄 그리기 0x36358 · 숫자 0x3608c · 시계 0x361e4).
@@ -51,8 +52,8 @@ const STRIP_HEIGHT = 17
 /** 판 왼쪽 x0 = W − w − 6 */
 const PANEL_X = SCREEN_WIDTH - PANEL.width - 6
 
-/** 0xba759 효과 1 의 인자 — 반투명 10/16 (R6 3a) */
-export const STRIP_OPACITY = 10 / 16
+/** 0xba759 효과 1 의 인자 — 반투명 10/16 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
+export const STRIP_OPACITY = translucentOpacityOf(10)
 
 export interface HudSprite {
   /** 그림 주소 */

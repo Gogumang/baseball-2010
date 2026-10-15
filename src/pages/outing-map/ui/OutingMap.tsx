@@ -21,6 +21,7 @@ import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
 import { NIGHT_DIM_STEP } from '@/pages/management/lib/outingMapUnderlay'
 import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /**
  * [!] 표시 기준점 (0x7ed6c, F-2 2-6 확정) — `mapX + bx + (bw >> 1)`, `mapY + by`.
@@ -34,8 +35,8 @@ const markerAnchorOf = (box: MapBox) => ({ x: box.x + (box.width >> 1), y: box.y
  */
 const cursorAnchorOf = (box: MapBox) => ({ x: box.x + Math.trunc(box.width / 2), y: box.y + styles.MAP_TOP })
 
-/** 효과 1·인자 7 — 그림 무게가 7/16 이다 (R6 3a) */
-const UNSELECTED_OPACITY = 7 / 16
+/** 효과 1·인자 7 — 그림 무게가 7/16 이다 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
+const UNSELECTED_OPACITY = translucentOpacityOf(7)
 /** 고른 건물 테두리 0x7ec44~0x7ecb0 — 찍는 차례 (x−1, y) · (x, y−1) · (x+1, y) · (x, y+1) 과 색 RGB(255,255,255) */
 const SELECTED_OUTLINE_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
 const SELECTED_OUTLINE_COLOR = '#FFFFFF'
