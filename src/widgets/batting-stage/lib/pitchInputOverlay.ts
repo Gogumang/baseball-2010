@@ -66,6 +66,11 @@ export interface PitchMenuOverlay {
   readonly magicRemaining: number
   /** 0xf 에 든 뒤 그림 수 (상태 틱) */
   readonly tick: number
+  /**
+   * 빈 칸(구질 0) 키를 누른 차례 표지 — 0x50de8 이 투수 그림 객체(+0xf98)에 0x9dff8(…, 2)를 건다(대기 동작 한 바퀴).
+   * 누를 때마다 새 값(0 은 안 누름)이라 장면이 바뀐 것을 보고 그 틱부터 대기 동작을 다시 센다. 안 주면 안 누름
+   */
+  readonly pitcherIdlePress?: number
 }
 
 /** 0x10 — 조준 */

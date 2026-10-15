@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/stagePressAreas'
@@ -396,11 +397,7 @@ export function GameScreen({
             // 투수 그리기 0x38d1c — 상대 마운드 체력% ≤ 34 면 지친 눈(모드 4 도 그린다 — 38ed6 은 모드 7 만 거른다). 마투수면 null
             pitcherStaminaPercent={opponentMoundStaminaPercentOf(progress)}
             isEagleEyeEnabled={isEagleEyeEnabled}
-            acePitcher={
-              ace === null
-                ? null
-                : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
-            }
+            acePitcher={ace === null ? null : acePitcherFramesOf(ace)}
             // 조작방법 뷰어 동안도 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             // 0xe(OK 대기)에서도 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
             isPaused={isPaused || isMenuOpen || overlay !== null || sceneConfirm.isAwaiting}

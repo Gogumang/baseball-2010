@@ -5,7 +5,7 @@ import {
   passesHeldResult,
   pitcherSideStageFrameOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
-import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
+import { PITCHER_RELEASE_TICKS, pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 
 const clock = (nowTick: number, releaseTick: number | null) => ({
   nowTick,
@@ -44,6 +44,22 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
     })
     expect(pitcherSideStageFrameOf(clock(atFlightEnd + 14, release)).phase.kind).toBe('결과')
     expect(pitcherSideStageFrameOf(clock(atFlightEnd + 15, release)).phase.kind).toBe('대기')
+  })
+
+  it('0x12 에도 투수 틱이 이어진다 — 다음 0xf 진입(대기)까지 투수 그림 객체가 상태 1 의 마지막 자세다', () => {
+    const release = 50
+    const atFlightEnd = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 21
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 3, release)).pitcherTick).toBe(
+      atFlightEnd + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK,
+    )
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 15, release)).pitcherTick).toBeNull()
+  })
+
+  it('마투수는 공 틱이 0xcfbe4[순번] 단계에서 오른다 — 싸이커(0)는 상태 틱 20', () => {
+    const frame = pitcherSideStageFrameOf({ ...clock(50, 50), aceOrder: 0 })
+    expect(frame.ballFrame).toBe(HUMAN_PITCH_RELEASE_STATE_TICK - pitcherReleaseTicksOf(0))
+    expect(pitcherReleaseTicksOf(0)).toBe(20)
+    expect(cpuSwingTickOf(50, 3, 0) - cpuSwingTickOf(50, 3)).toBe(20 - PITCHER_RELEASE_TICKS)
   })
 
   it('맞은 공(0x12 를 안 지남)은 비행 뒤 곧장 대기', () => {

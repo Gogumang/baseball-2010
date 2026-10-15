@@ -10,6 +10,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
@@ -274,7 +275,10 @@ export function TeamGameScreen({
     }
     const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, thrown).outcome)
     setHeldResultTicks(waitTicks)
-    setPitchBusyTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks))
+    // 마투수가 던졌으면 공 틱이 오르는 단계가 0xcfbe4[순번]이라 0x11 이 그만큼 길다 (0x3f378)
+    setPitchBusyTicks(
+      pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks, teamPitcherSideStageOf(progress).acePitcher?.order),
+    )
   }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, progress.pendingRunnerPlay])
   useSceneTick(
     () => setPitchBusyTicks((left) => Math.max(0, left - 1)),
@@ -1013,15 +1017,7 @@ export function TeamGameScreen({
                 // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
                 pitcherEquipmentNibbles={currentPitcherEquipment(progress)}
                 // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
-                acePitcher={
-                  opposingAcePitcher === null
-                    ? null
-                    : {
-                        framesUrl: opposingAcePitcher.framesUrl,
-                        frameCount: opposingAcePitcher.frameCount,
-                        stillUrl: opposingAcePitcher.stillUrl,
-                      }
-                }
+                acePitcher={opposingAcePitcher === null ? null : acePitcherFramesOf(opposingAcePitcher)}
                 // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
                 seasonStadium={seasonStadium}
                 {...sceneryProps}

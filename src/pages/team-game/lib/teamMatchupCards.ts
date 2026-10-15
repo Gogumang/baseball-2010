@@ -6,6 +6,7 @@ import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
 import { countsAsAtBat, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import {
@@ -273,7 +274,7 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   const mound = {
     pitcherForm,
     pitcherHand,
-    acePitcher: ace === undefined ? null : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl },
+    acePitcher: ace === undefined ? null : acePitcherFramesOf(ace),
     ...(ace !== undefined || pitcher?.equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOfNibbles(pitcher.equipment) }),
   }
   if (batter === undefined) return { batterForm: 0, batterSkinIndex: 0, batterTeamIndex: teamId, ...mound }

@@ -4,7 +4,14 @@ import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-s
 import { frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
-import { judgeAnimationOf, judgeFrameAt, pitcherFrameAt, pitcherIdleFrameAt, skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
+import {
+  judgeAnimationOf,
+  judgeFrameAt,
+  pitcherAnimationAt,
+  pitcherPoseOf,
+  skyColumnOfInning,
+} from '@/widgets/batting-stage/lib/stageScenery'
+import type { PitcherAnimation } from '@/widgets/batting-stage/lib/stageScenery'
 
 import { heldBallTickOf } from '@/widgets/batting-stage/lib/heldBall'
 import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
@@ -56,6 +63,8 @@ import {
   PLAYER_EFFECT_FRAMES,
   pitcherFatigueAnimationOf,
   pitcherFatigueFrameAt,
+  pitcherHomeRunMarksOf,
+  HOME_RUN_PITCHER_ANIMATION,
   showsPitcherFatigue,
   showsPitcherMistakeMark,
 } from '@/widgets/batting-stage/lib/pitcherFatigue'
@@ -68,8 +77,22 @@ export interface StageScene {
   readonly pitch: Pitch | null
   /** 공 프레임 F (0 = 릴리스). 공이 아직 손을 떠나지 않았으면 음수 */
   readonly frame: number
-  /** 투구 시작 뒤 흐른 틱. 투구 중이 아니면 null — 투수는 대기 동작 */
+  /**
+   * 0x11 진입(투수 그림 객체 상태 1, 0x3de10) 뒤 흐른 틱 — 다음 0xf 진입(상태 0, 0x3d954 → 0x340c0)까지 센다.
+   * 공이 끝난 0x12 · 0x13 에도 이어져 투수는 마지막 단계 자세에 머문다. null 이면 상태 0(선 자세) 또는 대기 동작
+   */
   readonly pitcherTick: number | null
+  /** 빈 구질 칸 키(0x50de8 → 상태 2) 뒤 흐른 틱 — 대기 동작 한 바퀴. 안 주면 없음 */
+  readonly pitcherIdleTick?: number | null
+  /**
+   * 상태 0x13 의 타구 — 투수 그리기 0x38d1c 의 홈런 갈래(0x3908a)가 본다: 결과 코드 [경기+0xfd4](24~26 이면 0x357e0 참) ·
+   * 큰 타구 감상 플래그 +0x199a(0x392ac) · 0x13 에 든 순간의 `pitcherTick`. 안 주면 없음
+   */
+  readonly pitcherHitMark?: {
+    readonly resultCode: number | null
+    readonly isBigHit: boolean
+    readonly pitcherTickAtHit: number
+  } | null
   /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 구름 */
   readonly tick: number
   /**
@@ -173,6 +196,8 @@ export interface StageScene {
     readonly framesUrl: string
     readonly frameCount: number
     readonly stillUrl: string
+    /** 마투수 순번 0xb63a0 (0~4) — 단계 표 0xd7483 의 줄 (`AcePitcherFrames.order`) */
+    readonly order: number
   } | null
   /**
    * 차 있으면 **결과 창 뒤 배경**만 그린다 — `0x45c18` 의 0x78448(구름) · 0x78578(구장, 이 값, 1).
@@ -231,7 +256,6 @@ export function renderBattingStage(
     if (scene.particles !== null && scene.particles !== undefined) drawParticles(context, scene.particles)
     return
   }
-  const progress = scene.pitch === null || scene.frame < 0 ? -1 : scene.frame / scene.pitch.frameCount
   const pitchInput = scene.pitchInput ?? null
   // 0x4d780 이 바로 그리는 판 · 덮개 — 그리기 목록(선수)보다 먼저
   drawPitchInputUnderlay(context, pitchInput, side)
@@ -239,10 +263,15 @@ export function renderBattingStage(
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
   }
-  drawPitcher(context, scene.acePitcher, progress, scene.pitcherTick, scene.tick, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
-  // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
+  const pitcherAnimation = pitcherAnimationAt(
+    { pitchTick: scene.pitcherTick, idleTick: scene.pitcherIdleTick ?? null },
+    scene.acePitcher?.order ?? null,
+  )
+  drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
+  // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
   drawPitcherMistakeMark(context, scene, side)
-  drawPitcherFatigue(context, scene, side)
+  drawPitcherFatigue(context, scene, side, pitcherAnimation)
+  drawPitcherHomeRunMarks(context, scene, side, pitcherAnimation)
   const special = scene.specialSwingEffect ?? null
   // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
   if (special !== null && special.isBehindBatter) drawSpecialSwingPicture(context, special)
@@ -420,13 +449,14 @@ function drawPitcherMistakeMark(context: CanvasRenderingContext2D, scene: StageS
   context.drawImage(placed.image, axisX + step.dx + placed.offsetX, anchor.y + MISTAKE_MARK_OFFSET_Y + step.dy + placed.offsetY)
 }
 
-function drawPitcherFatigue(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {
+function drawPitcherFatigue(context: CanvasRenderingContext2D, scene: StageScene, side: number, pitcherAnimation: PitcherAnimation): void {
   const stamina = scene.pitcherStaminaPercent
   if (stamina === null || stamina === undefined) return
   const shows = showsPitcherFatigue({
     gameMode: scene.scenery.gameMode,
     isAcePitcher: scene.acePitcher !== null,
-    isThrowing: scene.pitcherTick !== null,
+    // 38f42 — 투구 객체 +0x14 == 0(선 자세)일 때만. 투구 뒤 마지막 자세(상태 1) · 대기 동작(상태 2)에는 안 그린다
+    isThrowing: pitcherAnimation.state !== 0,
   })
   const animation = pitcherFatigueAnimationOf(stamina)
   if (!shows || animation === null) return
@@ -454,12 +484,14 @@ export function pitcherMirrorOf(anchorX: number, hand: number): { readonly axisX
   return { axisX: anchorX + (isMirrored ? 1 : 0), isMirrored }
 }
 
+/**
+ * 투수 그림 객체의 그리기 0x79524. 마투수(+0x3d ≥ 0)는 79568 에서 갈려 실린 ace/pitcher_*.pzx 의 프레임 하나만 효과 0x11(좌투)로
+ * 그리고, 평범한 투수는 바탕 · 장비 · 덧그림 여섯 칸을 쌓는다. 프레임은 0x9e0b8 이 상태 · 단계로 고른다 (`pitcherPoseOf`).
+ */
 function drawPitcher(
   context: CanvasRenderingContext2D,
   ace: StageScene['acePitcher'],
-  progress: number,
-  pitcherTick: number | null,
-  tick: number,
+  animation: PitcherAnimation,
   side: number,
   equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT,
   form = 0,
@@ -467,13 +499,11 @@ function drawPitcher(
 ): void {
   // 투수 앵커 (프레임 원점 = 발밑) — 원본 표 0xcfb18 의 side 칸
   const { x: MOUND_CENTER_X, y: MOUND_BOTTOM_Y } = stageLayoutOf(side).pitcherAnchor
-  const ratio = progress < 0 ? 0 : Math.min(1, progress)
+  const index = pitcherPoseOf(animation, form, ace?.order ?? null)
+  // 좌투면 x + 1 (0x38db8) 자리를 축으로 거울을 놓는다 — 타자 그림과 같은 축 잡기(근사, `drawBatter` 주석)
+  const { axisX, isMirrored } = pitcherMirrorOf(MOUND_CENTER_X, hand)
 
   if (ace === null) {
-    // 투구 단계 표 (0x9e0b8, 폼 >> 1 로 갈린다) · 대기 동작 (state 2)
-    const index = pitcherTick === null ? pitcherIdleFrameAt(tick) : pitcherFrameAt(form, pitcherTick)
-    // 좌투면 x + 1 (0x38db8) 자리를 축으로 거울을 놓는다 — 타자 그림과 같은 축 잡기(근사, `drawBatter` 주석)
-    const { axisX, isMirrored } = pitcherMirrorOf(MOUND_CENTER_X, hand)
     context.save()
     if (isMirrored) {
       context.translate(axisX * 2, 0)
@@ -492,18 +522,68 @@ function drawPitcher(
     return
   }
 
-  // 마선수 단계 표(0xd7483)는 아직 옮기지 않아 합성 프레임을 진행률로 돌린다 (추정).
-  // 프레임 합성이 안 된 캐릭터는 정지 그림이라도 세운다 — 아무것도 안 그리는 것보다 낫다.
-  let image: HTMLImageElement | null
+  // 마투수 — 단계 표 0xd7483 의 프레임 (ace/pitcher_*.pzx 의 프레임 번호 = frames/NNN.png, 원점 origins.json)
   if (ace.frameCount === 0) {
-    image = ace.stillUrl === '' ? null : sprite(ace.stillUrl)
-  } else {
-    const index = Math.min(ace.frameCount - 1, Math.floor(ratio * ace.frameCount))
-    image = sprite(`${ace.framesUrl}/${String(index).padStart(3, '0')}.png`)
+    // 프레임 합성이 안 된 캐릭터는 정지 그림이라도 세운다 — 다섯 마투수 모두 프레임이 있어 지금은 안 탄다
+    const image = ace.stillUrl === '' ? null : sprite(ace.stillUrl)
+    if (image !== null) context.drawImage(image, MOUND_CENTER_X - image.width / 2, MOUND_BOTTOM_Y - image.height)
+    return
   }
-  if (image === null) return
+  const frame = placedFrame(ace.framesUrl, index)
+  if (frame === null) return
+  context.save()
+  if (isMirrored) {
+    context.translate(axisX * 2, 0)
+    context.scale(-1, 1)
+  }
+  context.drawImage(frame.image, axisX + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
+  context.restore()
+}
 
-  context.drawImage(image, MOUND_CENTER_X - image.width / 2, MOUND_BOTTOM_Y - image.height)
+/** 홈런 갈래(0x3908a)를 `pitcherHomeRunMarksOf` 로 보고 애니 12(평범한 투수) · 13 "!"(감상 플래그)를 그린다 */
+function drawPitcherHomeRunMarks(
+  context: CanvasRenderingContext2D,
+  scene: StageScene,
+  side: number,
+  animation: PitcherAnimation,
+): void {
+  const mark = scene.pitcherHitMark ?? null
+  const marks =
+    mark === null || scene.pitcherTick === null
+      ? null
+      : pitcherHomeRunMarksOf({
+          ...mark,
+          pitcherTick: scene.pitcherTick,
+          step: animation.step,
+          aceOrder: scene.acePitcher?.order ?? null,
+        })
+  if (marks === null) return
+  const animations = frameAnimations(PLAYER_EFFECT_FRAMES)
+  if (animations === null) return
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  // 390d4 · 39136 — 좌투(0xb63c1)면 효과 0x11 로 투수 점(좌투 + 1)을 축으로 뒤집는다
+  const { axisX, isMirrored } = pitcherMirrorOf(anchor.x, scene.pitcherHand ?? 0)
+  const draw = (frameIndex: number, dx: number, dy: number) => {
+    const placed = placedFrame(PLAYER_EFFECT_FRAMES, frameIndex)
+    if (placed === null) return
+    context.save()
+    if (isMirrored) {
+      context.translate(axisX * 2, 0)
+      context.scale(-1, 1)
+    }
+    context.drawImage(placed.image, axisX + dx + placed.offsetX, anchor.y + dy + placed.offsetY)
+    context.restore()
+  }
+  if (marks.showsPitcherAnimation) {
+    const entries = animations[HOME_RUN_PITCHER_ANIMATION]
+    const frameIndex = entries === undefined ? null : judgeFrameAt(entries, marks.drawCall)
+    if (frameIndex !== null) draw(frameIndex, 0, 0)
+  }
+  if (marks.showsBang) {
+    const entries = animations[MISTAKE_MARK_ANIMATION]
+    const step = entries === undefined ? null : pitcherFatigueFrameAt(entries, marks.drawCall)
+    if (step !== null) draw(step.frame, step.dx, MISTAKE_MARK_OFFSET_Y + step.dy)
+  }
 }
 
 /**

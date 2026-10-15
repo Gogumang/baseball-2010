@@ -9,6 +9,7 @@ import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
+import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
@@ -288,11 +289,7 @@ export function HomeRunDerbyScreen({
             // 루상 주자(runnerAces)는 주자가 없어, 투수 체력 · 실투 "!"(pitcherStaminaPercent)는 투수 그리기 0x38d1c 가 모드 7 이면
             // 38ed6 에서 건너뛰어 넘기지 않는다
             hud={null}
-            acePitcher={
-              ace === null
-                ? null
-                : { framesUrl: ace.framesUrl, frameCount: ace.frameCount, stillUrl: ace.stillUrl }
-            }
+            acePitcher={ace === null ? null : acePitcherFramesOf(ace)}
             // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             isPaused={session.isPaused || overlay !== null}
             // 결과 창(0x45c18)은 창 뒤에 구름·구장(+0x17e2 만큼 가라앉는다)만 그린다

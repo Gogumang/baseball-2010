@@ -1,5 +1,6 @@
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { loopingAnimationStepAt } from '@/widgets/batting-stage/lib/baseRunners'
+import { pitchLastStepOf, pitchStepStartTickOf } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
  * **마운드 투수 체력 그림** — 투수 그리기 0x38d1c 의 0x38f42~0x39086 (2026-10-14 직접 떴다).
@@ -16,7 +17,8 @@ import { loopingAnimationStepAt } from '@/widgets/batting-stage/lib/baseRunners'
  * ```
  * 투수 점 (x, y) 는 0x38e6c 가 투수 그림에 쓰는 자리(좌투면 x + 1)다. 애니 9 · 10 은 0xf 진입 0x3d954 가 되감고 돌림을 켠다
  * (돌림 비트표 0x1a610 의 비트 9 · 10). 그리기 목록은 그 뒤 비울 때 그려 k 번째 그림이 k 칸 나아간 칸이다.
- * ⚠️ 근사: 되감기 · 그린 수는 웹 장면 단계 틱으로 센다 · 던지는 동작(+0x14)은 웹 `pitcherTick` 이 있는 동안으로 본다.
+ * ⚠️ 근사: 되감기 · 그린 수는 웹 장면 단계 틱으로 센다. +0x14 는 장면의 투수 그림 객체 상태(`stageScenery.pitcherAnimationAt`)다 —
+ * 투구 뒤 다음 0xf 진입까지 상태 1 에 머물므로 0x12 · 0x13 에도 안 그린다.
  */
 export const PLAYER_EFFECT_FRAMES = './sprites/player_effect/frames'
 const EXHAUSTED_ANIMATION = 10
@@ -58,7 +60,8 @@ export function pitcherFatigueFrameAt(entries: readonly StageAnimationEntry[], d
  * — 마투수도 실투면 뜬다. 효과 0 이라 좌투도 안 뒤집고 x 는 좌투 + 1 (0x38db8) 자리 그대로다.
  * 애니 13 은 프레임 50 네 칸(지연 0, dy 0 · +2 · −1 · −2)이고 0xf 진입 0x3d954 가 player_effect 애니를 모두 되감으며 돌림 비트
  * 0x1a610(비트 4 · 9 · 10 · 13 · 15 · 16 — 즉치 마스크)으로 13 을 돌림으로 켠다. k 번째 그림은 k 칸 나아간 칸이다(체력 그림과 같은 셈).
- * 홈런 갈래의 "!"(39136 — 0x357e0 · 투수 단계 13 · +0x199a)는 웹이 투수 단계 13 을 몰라 옮기지 않았다(⚠️ 미이식).
+ * 홈런 갈래의 "!"(3912c — 0x357e0 · 투수 단계 == 마지막 단계 13(마투수 0xcfd34[순번]) · +0x199a)는 `renderBattingStage` 의
+ * `drawPitcherHomeRunMarks` 가 같은 애니 13 으로 그린다(효과는 좌투 0x11).
  * ⚠️ 근사: +8 은 그림마다 1 줄지만 웹은 놓은 틱(0x11 틱 10)부터 장면 틱으로 센다.
  */
 export const MISTAKE_MARK_ANIMATION = 13
@@ -71,4 +74,62 @@ export const MISTAKE_MARK_OFFSET_Y = -0x34
 export function showsPitcherMistakeMark(gameMode: number | undefined, drawCall: number | null): boolean {
   if (gameMode === HOME_RUN_DERBY_MODE || drawCall === null) return false
   return drawCall >= 1 && drawCall <= MISTAKE_MARK_DRAWS
+}
+
+/**
+ * **투수 그리기 0x38d1c 의 홈런 갈래** (0x3908a~0x39192, 2026-10-15 직접 떴다):
+ * ```
+ * 3908c  0x357e0(경기) — [경기+0xfd4] − 0x18 ≤ 2 (결과 코드 24~26, 홈런성)가 아니면 끝
+ * 39096  목표 단계 = 13 · 마투수(0xb633d)면 s8 0xcfd34[0xb63a0] (12,14,12,15,12 — 마지막 단계 0xd744f 와 같다)
+ * 390c0  투수 그림 객체 [+0xf98] 단계 +0x1c ≠ 목표 단계면 끝                     (상태는 안 본다)
+ * 390c6  마투수가 아니면 player_effect(+0x1030) 애니 12 를 (투수 x, 투수 y) 에 효과 (좌투 0xb63c1 ? 0x11 : 0) · 깊이 [0xcfa8c+8],
+ *        그린 뒤 0x93d91([애니표 +0x30]) 로 한 칸
+ * 3912c  [경기+0x199a](큰 타구 감상, 0x392ac) ≠ 0 이면 애니 13 "!" 를 (투수 x, 투수 y − 0x34) 에 같은 효과로, 0x93d91([애니표 +0x34])
+ * ```
+ * 투구 뒤 투수는 다음 0xf 진입까지 상태 1 의 마지막 단계에 머물므로 결과 코드가 서는 0x13 에서 참이 된다.
+ * 애니 12(56 · 57, 각 10틱)는 돌림이 아니라(0x1a610 에 비트 12 없음) 마지막 칸에 멈추고, 13 은 돌림이다 —
+ * 둘 다 0xf 진입 0x3d954 가 되감는다. k 번째 그림은 k 칸 나아간 칸이다(실투 "!" · 체력 그림과 같은 셈).
+ * ⚠️ 근사: 그림 수는 0x13 에 들거나 마지막 단계에 닿은 틱 가운데 늦은 쪽부터 투수 틱으로 센다.
+ */
+
+/** 0x390f2 `movs r2, #0xc` — 홈런 갈래의 player_effect 애니 12 (프레임 56 · 57) */
+export const HOME_RUN_PITCHER_ANIMATION = 12
+
+/** 0x357e0 — `[경기+0xfd4] − 0x18 ≤ 2`(부호 없는 비교), 곧 결과 코드 24~26(홈런성) */
+export function isHomeRunLikeResultCode(code: number | null): boolean {
+  return code !== null && code - 0x18 >= 0 && code - 0x18 <= 2
+}
+
+export interface PitcherHomeRunMarks {
+  /** 갈래가 참이 된 뒤 k 번째 그림 (1 부터) */
+  readonly drawCall: number
+  /** 애니 12 — 마투수가 아닐 때만 (390c6 0xb633d) */
+  readonly showsPitcherAnimation: boolean
+  /** 애니 13 "!" — 감상 플래그 +0x199a 가 섰을 때 (3912c) */
+  readonly showsBang: boolean
+}
+
+/** 홈런 갈래(0x3908a)가 이 그림에서 무엇을 그리는가 — 아무것도 안 그리면 null */
+export function pitcherHomeRunMarksOf(input: {
+  /** 결과 코드 [경기+0xfd4] */
+  readonly resultCode: number | null
+  /** 감상 플래그 [경기+0x199a] (0x392ac) */
+  readonly isBigHit: boolean
+  /** 0x13 에 든 순간의 투수 틱 (상태 1 에 든 뒤) */
+  readonly pitcherTickAtHit: number
+  /** 지금 투수 틱 */
+  readonly pitcherTick: number
+  /** 지금 투수 단계 +0x1c */
+  readonly step: number
+  /** 마투수 순번 (없으면 null) */
+  readonly aceOrder: number | null
+}): PitcherHomeRunMarks | null {
+  if (!isHomeRunLikeResultCode(input.resultCode)) return null
+  // 39096~390c4 — 목표 단계 13 · 마투수 0xcfd34[순번] (= 마지막 단계)
+  const lastStep = pitchLastStepOf(input.aceOrder)
+  if (input.step !== lastStep) return null
+  const firstDrawTick = Math.max(input.pitcherTickAtHit, pitchStepStartTickOf(lastStep, input.aceOrder))
+  const drawCall = input.pitcherTick - firstDrawTick + 1
+  if (drawCall < 1) return null
+  return { drawCall, showsPitcherAnimation: input.aceOrder === null, showsBang: input.isBigHit }
 }
