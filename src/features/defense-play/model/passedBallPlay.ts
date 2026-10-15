@@ -18,6 +18,7 @@ import {
 } from '@/entities/fielding/model/fieldingState'
 import { PASSED_BALL_PLAY_KIND, type PassedBallShot } from '@/entities/fielding/model/passedBall'
 import { secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
+import { batterRunnerNeedsCover } from '@/entities/fielding/model/coverAssignment'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
@@ -67,7 +68,8 @@ import {
  * - ⚠️ **포수 +0xb8 = 6(놓침 동작)** 이 포구 예보·이동에 주는 효과는 안 옮겼다(동작 잠금 칸은 +0xb4 라 따로다).
  * - ⚠️ **커버**: 0xb1c90 은 매 틱 다시 고르지만 여기서는 시작에 한 번 고른다 — 2루는 타구 진행기와 같은
  *   `secondBaseCoverSlot`, 쫓는 야수가 맡던 루는 0xb1d48 갈래대로 투수(0)가 맡되 `0xb1b88`(그 루로 올 주자가
- *   있는가)이 거짓이면 없음(−1). 0xb1b88 의 타자주자 갈래(0xb1bde~0xb1c08, P+0x168 비교)는 안 옮겼다.
+ *   있는가)이 거짓이면 없음(−1). 0xb1b88 의 타자주자 갈래(0xb1bde~0xb1c08, P+0x168 비교)도 옮겼지만 P+0x168 을
+ *   쓰는 곳이 바이너리에 없어 안 선다(`batterRunnerNeedsCover`).
  * - ⚠️ 낫아웃 타자주자는 0xa93ac 가 세우는 대로 요구 루 1 로 만들고 처음부터 1루로 뛰게 한다 —
  *   0xa93ac 뒤 누가 목표 루를 1 로 세우는지는 안 읽었다(타구 진행기와 같은 다리).
  */
@@ -244,7 +246,7 @@ export function passedBallCovers(
  * 0xb1b88(P, 루 b) — 그 루에 커버가 필요한가 (state[7] = 1 · 협살 없음 일 때, 직접 뜬 것):
  * ```
  * 주자 중 +0x94 && +0x88 == b && 산 주자 → 1
- * (타자주자 갈래 0xb1bde~0xb1c08 — 안 옮김)
+ * 주자 목록 0 번이 살았고 (P+0x168 − 12) ≤ 2 || (P+0x168 − 6) ≤ 2 (부호 없는 bls) → 1   (b1bde~b1c08)
  * r = b == 0 ? 4 : b
  * 루 r 에 닿은 주자(0xa97a0) 있으면 → 살았나
  * 없고 루 r−1 에 닿은 주자 있으면 → 살았나
@@ -254,6 +256,8 @@ export function passedBallCovers(
 function needsCover(base: number, runners: readonly RunnerState[]): boolean {
   const alive = runners.filter((runner) => !runner.isOut)
   if (alive.some((runner) => runner.settled && runner.requiredBase === base)) return true
+  // b1bde — 타자주자 갈래. P+0x168 은 쓰는 곳이 없어 생성 때 값(0)이다 (`coverAssignment` 머리말)
+  if (batterRunnerNeedsCover(runners)) return true
   const r = base === 0 ? 4 : base
   const on = (b: number) => alive.find((runner) => runner.startBase === b)
   if (on(r) !== undefined) return true

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   assignCoversForTick,
   baseAtPoint,
+  batterRunnerNeedsCover,
   needsCover,
+  PLAY_FIELD_0X168,
 } from '@/entities/fielding/model/coverAssignment'
 import { basePosition, FIELDER_START_POSITIONS, runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import {
@@ -146,5 +148,23 @@ describe('0xb1c90 커버 매 틱 다시 고르기 — 표 0xd8774 · b1d48 · b1
   it('목표점이 루 좌표와 좌표까지 같을 때만 그 루다 (0xb1268 · 야수 vt68)', () => {
     expect(baseAtPoint(basePosition(2))).toBe(2)
     expect(baseAtPoint(FIELDER_START_POSITIONS[3])).toBe(NONE)
+  })
+})
+
+describe('0xb1b88 타자주자 갈래 b1bde~b1c08 — P+0x168 ∈ {6..8, 12..14} 이고 목록 0 번이 살았으면 1', () => {
+  it('칸 값이 그 범위면 선다 — 부호 없는 비교(bls)라 5 · 9 · 11 · 15 는 안 선다', () => {
+    const 주자 = [createRunner(0, 0, 속도)]
+    for (const 값 of [6, 7, 8, 12, 13, 14]) expect(batterRunnerNeedsCover(주자, 값)).toBe(true)
+    for (const 값 of [0, 5, 9, 11, 15, -1]) expect(batterRunnerNeedsCover(주자, 값)).toBe(false)
+  })
+
+  it('목록 0 번이 없거나 아웃이면 안 선다', () => {
+    expect(batterRunnerNeedsCover([], 7)).toBe(false)
+    expect(batterRunnerNeedsCover([createRunner(0, 0, 속도, { isOut: true })], 7)).toBe(false)
+  })
+
+  it('P+0x168 은 쓰는 곳이 바이너리에 없어 생성 때 값(0)이다 — 실제 판에서는 안 선다', () => {
+    expect(PLAY_FIELD_0X168).toBe(0)
+    expect(batterRunnerNeedsCover([createRunner(0, 0, 속도)])).toBe(false)
   })
 })
