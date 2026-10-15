@@ -76,7 +76,7 @@ export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit,
 
   if (namingTeamId !== null) {
     return (
-      <SeasonTeamNameScreen teamId={namingTeamId}
+      <SeasonTeamNameScreen teamId={namingTeamId} gamePoint={gamePoint ?? 0}
         onConfirm={(name) => onChoose(namingTeamId, name)} onBack={() => setNamingTeamId(null)} />
     )
   }
@@ -110,6 +110,8 @@ interface SeasonTeamNameScreenProps {
   readonly onConfirm: (name: string) => void
   /** 이름이 빈 채로 취소 — 0xca 로 */
   readonly onBack: () => void
+  /** 머리띠 G — 제목이 있는 머리띠 0x54d95 는 늘 전역 G(+0x64)를 그린다 (0x550d8~0x550de) */
+  readonly gamePoint: number
 }
 
 /**
@@ -138,7 +140,7 @@ interface SeasonTeamNameScreenProps {
  * 0xcc 초기화 전이라 줄 값의 출처를 못 정했다 — 웹은 팀 이름만 적는다. 입력 방식 글 · 화살표 기준점(0x21 / 0x24) · 안내 줄 0x55545 의
  * 자리도 못 풀었다(웹 글 칸은 입력 방식이 없다).
  */
-function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScreenProps) {
+function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint }: SeasonTeamNameScreenProps) {
   const [name, setName] = useState('')
   const [isAsking, setAsking] = useState(false)
   const latest = useRef({ name, onBack })
@@ -199,7 +201,7 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScree
       <div style={{ position: 'absolute', left: 8, top: 260, width: 224 }}>
         <MarkupText raw={`!C${NAME_LIMIT_GUIDE}`} />
       </div>
-      <ScreenFrame title="시즌모드" gamePoint={0} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
       {isAsking && (
         <MessageBox text={DECIDE_QUESTION} buttons={['예', '아니오']}
           onAnswer={(answer) => {
