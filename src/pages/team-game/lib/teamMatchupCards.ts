@@ -146,6 +146,20 @@ export function teamBatterHandOf(teamId: number, entry: TeamEntryBatter): number
 }
 
 /**
+ * **경기 시작 인트로 배경의 타자 손** — 인트로 진입 0x3b084 가 3b0d2 에서 공격 측 `st[9]` 팀을 장면 +0x220 에 두고
+ * 3b0f2 `0xae89d`(그 팀의 지금 타자 = 팀[+0x32] 칸) → 3b0fe `0xb63c1`(손) 을 3b108 에서 경기 구장 `[장면+0xf10]` +0x60 에 쓴다.
+ * 그래서 인트로 배경 0x40ff0 은 **1회초 첫 타자(측 0 의 1번)** 손으로 좌우가 갈린다(0 이면 우타 거울).
+ * ⚠️ 미확인: 인트로 때 팀[+0x32] 가 0 인지는 직접 안 떴다 — 경기 시작이라 1번(칸 0)으로 둔다.
+ */
+export function teamIntroBatterHandOf(progress: TeamGameProgress): number {
+  const { options } = progress
+  const isOursFirst = options.playerSide === 0
+  const entry = isOursFirst ? progress.ourEntry[0] : progress.opponentEntry[0]
+  if (entry === undefined) return 0
+  return teamBatterHandOf(isOursFirst ? options.ourTeamId : options.opponentTeamId, entry)
+}
+
+/**
  * **사람 타석 타자 그림 · 판정 재료** — 지금 타자 `0xae89c(공격 팀 = 우리)` 레코드에서 (`BattingStage` 의 batterForm · batterSkinIndex ·
  * batterHand). 타석 교대 0x47d98~0x47dd6 이 타자 그림 적재 0x78ab0 에 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` ·
  * 손 0xb63c0 을 넘기고, 0x47d58~0x47d70 이 같은 손을 장면 +0x17e1(배치 side)에 쓴다. 마타자는 XlsACE_BAT +0xb

@@ -19,6 +19,9 @@ interface SceneryBackdropProps {
  * - 구름 흐르기 `0x78448` 은 부르는 장면이 따로 부를 때만 돈다 — 인트로 그리기 0x417ac 는 안 부르므로 구름은 제자리(틱 0)다.
  *   ⚠️ 미확인: 구름 자리(구장 +0x1c)는 구장 객체가 들고 있는 값이라 그 앞 장면의 흐름을 이어받는다 — 웹은 첫 자리(틱 0)로 둔다.
  * - 그림이 늦게 실리므로 그림마다 다시 칠한다(`MatchInfoStadiumBackdrop` 과 같은 방법).
+ * - **좌우(`stage.side`)** — 구장 +0x60 은 인트로 진입 0x3b084 가 3b0f2~3b108 에서 공격 팀 지금 타자(0xae89d)의 손(0xb63c1)으로
+ *   쓴다(직접 떴다). 0(우타)이면 펜스 · 바닥이 거울 길이다(`RIGHT_HANDED_MIRROR_X`). 부르는 쪽이 1회초 첫 타자 손을 넘긴다 —
+ *   팀 경기(`teamIntroBatterHandOf`)만 넘기고, ⚠️ 투수편(모드 3) · 타자편(모드 4) 인트로는 아직 안 넘겨 좌타 배치로 그린다.
  */
 export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)

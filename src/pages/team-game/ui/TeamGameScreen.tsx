@@ -80,6 +80,7 @@ import { useSubstitutionScene } from '@/features/play-game/model/useSubstitution
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import {
   teamBattingStageBatterOf,
+  teamIntroBatterHandOf,
   teamMatchupCardsOf,
   teamPitcherSideStageOf,
 } from '@/pages/team-game/lib/teamMatchupCards'
@@ -641,6 +642,8 @@ export function TeamGameScreen({
           ourTeamId: side0Team,
           opponentTeamId: side1Team,
           gameMode: options.mode,
+          // 구장 +0x60 — 인트로 진입 0x3b084 가 3b108 에서 1회초 첫 타자 손을 쓴다(0 우타면 거울 길)
+          side: teamIntroBatterHandOf(progress),
         }}
         // 라이벌전 띠 0x3b80c — 적재 상태 8 의 0xb8f68(두 팀) (표 0xd8a90 의 짝)
         isRivalry={isRivalryMatch(side0Team, side1Team)}

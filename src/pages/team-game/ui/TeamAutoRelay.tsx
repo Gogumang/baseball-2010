@@ -6,7 +6,7 @@ import { activeSound } from '@/shared/api/audio/soundPort'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { TeamAutoRelay as TeamAutoRelayState, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
-import { teamAutoRelayEntryStepOf, teamAutoRelayStepOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
+import { teamAutoRelayEntryStepOf, teamAutoRelayStepOf, teamRelayEntryFiguresOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
 import type { TeamRelayFigures as TeamRelayFiguresValue } from '@/pages/team-game/lib/teamAutoRelay'
 import { TeamRelayFigures } from '@/pages/team-game/ui/TeamRelayFigures'
 import { effectOpacityOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -108,8 +108,8 @@ interface TeamAutoRelayProps {
  */
 export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, grassPalette = null }: TeamAutoRelayProps) {
   const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
-  const [figures, setFigures] = useState<TeamRelayFiguresValue>(
-    () => teamRelayFiguresOf({ progress, before: progress.game, atBat: null }))
+  // 진입 0x47cc8 — 주자 그림판에 마선수 그림을 다시 싣는다(타자 → 가장 앞선 마선수 주자)
+  const [figures, setFigures] = useState<TeamRelayFiguresValue>(() => teamRelayEntryFiguresOf(progress))
   const [speed, setSpeed] = useState(autoRelaySpeed)
   const speedRef = useRef(speed)
   speedRef.current = speed
@@ -196,7 +196,8 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
           wait.count = AUTO_RELAY_CHANGE_WAIT
         }
         setShown(teamAutoRelayStepOf(next))
-        setFigures(teamRelayFiguresOf(next))
+        // 48572~485a6 — 실린 마선수 그림은 틱을 넘어 이어진다(속도와 상관없이 싣는다)
+        setFigures((previous) => teamRelayFiguresOf(next, previous.loadedRunnerAce))
       }
     }
     // 그리기 0x4258c 42b30 — 모드 · 속도를 안 보고 sim+0x9d 를 그림마다 1 줄이고 > 0 이면 "CHANGE"

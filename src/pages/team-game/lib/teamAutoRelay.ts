@@ -1,4 +1,6 @@
 import type { TeamAutoRelayTick, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
+import { runnerAcesFor } from '@/features/play-team-game/model/teamGameFlow'
+import { loadedRunnerAceOf } from '@/features/defense-play/model/runnerAces'
 import { lineScoreSlotsOf, PLAYER_SIDE_FIRST_BAT, type GameState } from '@/entities/game/model/gameState'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { relayCodeOf, relayLineOf, type MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
@@ -79,7 +81,9 @@ const CATCHER_POSITION = 2
 
 /**
  * **팀경기 0x21 운동장 그림의 값** — 그리기 0x4258c 머리(425bc~42812, 모드 ∈ {1, 2, 8, 9} · 속도 ≠ 2 일 때만)가 보는 것.
- * - 주자: 주자 관리 [장면+0x20c] 의 1 · 2 · 3루(0xa97a0). 3아웃 타석 틱은 넘김(0xb6b6c)이 다음 틱이라 주자가 아직 루에 있다.
+ * - 주자: 주자 관리 [장면+0x20c] 의 1 · 2 · 3루(0xa97a0). 3아웃 타석 틱은 넘김(0xb6b6c)이 다음 틱이라 주자가 아직 루에 있다 —
+ *   간이 엔진은 아웃에 주자를 안 움직이므로(E 3f — 코드 0 · 삼진, 땅볼 · 번트 진루는 플레이 전 아웃 ≤ 1 일 때만) 타석 앞 루에
+ *   그 타석 공마다의 도루(0xc1982~)만 더한 루다 (`basesAtEnd`).
  * - 투수: 수비 팀 지금 투수 0xae83c — 마선수(0xb633c)면 투수 마선수 그림.
  * - 포수: 수비 9명 칸 1([장면+0x1120])의 선수 +0xec — 마선수면 타자 마선수 그림.
  * - 타자: 공격 팀 지금 타자 0xae89c(= 두 팀 판 DUE UP 의 첫 칸 — 타석 틱이면 방금 친 타자) · 손 0xb63c0.
@@ -96,9 +100,39 @@ export interface TeamRelayFigures {
   readonly catcherAce: number
   /** 공격 팀 지금 타자 — 없으면 null */
   readonly batter: { readonly aceIndex: number; readonly isLeft: boolean } | null
+  /** 1 · 2 · 3루 주자가 마선수인가 — 주자 +0x9c ≠ −1 이면 0x79d10 이 실린 마선수 그림(+0x1c)으로 그린다 */
+  readonly aceRunners: readonly [boolean, boolean, boolean]
+  /**
+   * 주자 그림판 [장면+0xf24] +0x1c 에 실린 마선수 그림 번호(0~4) — 없으면 null. 장면에 한 장뿐이라 틱을 넘어 이어진다
+   * (`teamRelayFiguresOf` 의 `loadedBefore` · `teamRelayEntryFiguresOf`).
+   */
+  readonly loadedRunnerAce: number | null
 }
 
-export function teamRelayFiguresOf(tick: Pick<TeamAutoRelayTick, 'progress' | 'before' | 'atBat'>): TeamRelayFigures {
+/**
+ * **중계 진입의 실린 마선수 그림** — 0x18 → 0x21 이 0x47cc8(그림 다시 적재)을 부른다(R10 4절 4). 그 안 483a0~48400:
+ * 지금 타자가 마선수면 그 그림, 아니면 주자 목록을 뒤 → 앞으로 덮어써 가장 앞선 마선수 주자 그림(`loadedRunnerAceOf`).
+ * ⚠️ 미확인: 메뉴 자동진행(0x3c8da → 0x21)은 0x47cc8 을 안 거쳐 그 타석 교대 때 실린 그림이 남는다 — 같은 타석이라 같은 값으로 둔다.
+ * ⚠️ 미확인: 0x47cc8 이 보는 "지금 타자" 는 팀[+0x32](예약 확정 앞)인데 웹은 다음에 칠 타자로 둔다.
+ */
+export function teamRelayEntryFiguresOf(progress: TeamGameProgress): TeamRelayFigures {
+  const ourHalf = progress.game.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
+  const aces = runnerAcesFor(progress, progress.game.half === ourHalf)
+  return teamRelayFiguresOf({ progress, before: progress.game, atBat: null }, loadedRunnerAceOf(aces, progress.game.bases))
+}
+
+/**
+ * 한 틱 그림의 값. `loadedBefore` 는 앞 그림까지 주자 그림판에 실린 마선수 그림 번호다 — 갱신 0x48480 485a0~485a6 이
+ * 모드 ∉ {3, 4, 5, 6} 이면(속도와 상관없이) sim+0xa4 ≥ 0 일 때 0x76a09 · 0x79cbd([장면+0xf24], sim+0xa4) 로 다시 싣는다.
+ * sim+0xa4 는 간이 타석 머리 0xc0ee8 이 c0f2a~c0f7a 에서 **지금 타자가 바뀌었을 때만**(0xae89d 와 예약 0xae945 의 +0xa 가 다르면)
+ * 0xaebe5 로 새 타자를 세우고 0xb633d(마선수)면 0xb63a1(번호), 아니면 −1 로 쓴다 — 곧 이 틱의 타자가 마선수면 그 그림, 아니면 앞 그림 그대로다.
+ * 3아웃 넘김 틱(c21fc)의 0x47cc8 다시 적재는 루가 비어 있어 타자만 보므로 같은 결과다. 실린 그림이 없으면 원본 0x79d10 은
+ * 빈 그림(+0x1c = 0)을 79d68 에서 읽는다 — ⚠️ 미확인(웹은 타석 화면 `aceRunnerFramesOf` 처럼 보통 그림으로 그린다).
+ */
+export function teamRelayFiguresOf(
+  tick: Pick<TeamAutoRelayTick, 'progress' | 'before' | 'atBat'>,
+  loadedBefore: number | null = null,
+): TeamRelayFigures {
   const progress = tick.progress
   const after = progress.game
   const flipped = !after.isFinished && (after.inning !== tick.before.inning || after.half !== tick.before.half)
@@ -108,8 +142,9 @@ export function teamRelayFiguresOf(tick: Pick<TeamAutoRelayTick, 'progress' | 'b
   const { options } = progress
   const offenseTeam = offenseOurs ? options.ourTeamId : options.opponentTeamId
   const defenseTeam = offenseOurs ? options.opponentTeamId : options.ourTeamId
-  // ⚠️ 근사: 웹 간이 타석은 3아웃이면 그 자리에서 루를 비운다 — 세 번째 아웃 뒤 남은 주자는 타석 앞 루 그대로 둔다
-  const bases = flipped ? tick.before.bases : after.bases
+  // 원본은 3아웃 타석 틱에도 주자 관리 [장면+0x20c](= sim+0x80)가 그 타석 끝 그대로다 — 지우기 0xa9250 은 다음 틱 0xc2198 의
+  // c21fc 3아웃 넘김 뒤 c2222. 웹 간이 타석은 3아웃이면 그 자리에서 루를 비우므로 타석 끝 루(도루로 민 루 포함)를 따로 받는다
+  const bases = flipped ? (tick.atBat?.basesAtEnd ?? tick.before.bases) : after.bases
   const pitcher = offenseOurs
     ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
     : progress.ourPitcherEntry[progress.ourPitcherIndex]
@@ -118,6 +153,12 @@ export function teamRelayFiguresOf(tick: Pick<TeamAutoRelayTick, 'progress' | 'b
   const atBat = tick.atBat
   const order = atBat !== null ? atBat.orderIndex : offenseOurs ? after.battingOrderIndex : progress.opponentOrderIndex
   const batter = (offenseOurs ? progress.ourEntry : progress.opponentEntry)[lineupSlotOf(order)]
+  // 루 위 주자 신원 — 3아웃 틱은 웹이 지운 루 대신 타석 끝 루 · 신원(`basesAtEnd` · `runnersAtEnd`)
+  const runnerSource = flipped && tick.atBat !== null
+    ? { ...progress, game: { ...after, bases: tick.atBat.basesAtEnd, runners: tick.atBat.runnersAtEnd } }
+    : progress
+  const aces = runnerAcesFor(runnerSource, offenseOurs)
+  const batterAce = batter !== undefined && batter.aceIndex >= 0 ? batter.aceIndex : null
   return {
     offenseTeam,
     defenseTeam,
@@ -127,5 +168,11 @@ export function teamRelayFiguresOf(tick: Pick<TeamAutoRelayTick, 'progress' | 'b
     batter: batter === undefined
       ? null
       : { aceIndex: batter.aceIndex, isLeft: teamBatterHandOf(offenseTeam, batter) === 1 },
+    aceRunners: [
+      bases.first && aces.first != null,
+      bases.second && aces.second != null,
+      bases.third && aces.third != null,
+    ],
+    loadedRunnerAce: batterAce ?? loadedBefore,
   }
 }
