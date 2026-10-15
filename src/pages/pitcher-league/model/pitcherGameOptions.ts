@@ -63,7 +63,10 @@ const COOL_SKILL = 22
 /** 행운 스킬 6 — 경기 뒤 사기 +1 (pitcherGameEvaluation 의 `hasLuckSkill`) */
 const LUCK_SKILL = 6
 
-/** 팀 사기 기본값 — 팀 레코드 s16 +2 (XlsTEAM_DATA 둘째 u16). 전 팀이 100 으로 시작한다 (`entities/team/model/teamMorale`) */
+/**
+ * 팀 사기 기본값 — 팀 레코드 s16 +2 (XlsTEAM_DATA 둘째 u16). 전 팀이 100 으로 시작한다 (`entities/team/model/teamMorale`).
+ * 나리 내 팀 칸은 커리어 사기와 같은 칸이라 `pitcherGameOptionsOf` 는 커리어 사기를 쓰고, 이 표값은 국가대항전 대표팀 칸 · 상대 팀이 쓴다
+ */
 export { DEFAULT_TEAM_MORALE }
 
 export function teamMoraleOf(teamId: number): number {
@@ -135,7 +138,9 @@ export function pitcherGameOptionsOf(
       aceLevel: 0,
       hasSpiritSkill: isPitcherSkillEquipped(career, SPIRIT_SKILL),
     }),
-    teamMorale: settings.teamMorale ?? teamMoraleOf(career.teamId),
+    // 0x1f9a8(저장, 3, 내 팀) → 0x1f940 칸 +2 — 나리 사기 읽기 · 쓰기 0xa3a24 · 0xa3a44(`0x1f988(저장, R[1])` + 2)와 같은 칸이라
+    // 커리어 사기다. 국가대항전은 대표팀 칸(+0xbc4, 대회 시작 복사본)이라 부르는 쪽이 표값을 넘긴다(`cupGameOptionsOf`)
+    teamMorale: settings.teamMorale ?? career.morale,
     reputation: career.reputation,
     // 원본 기본값은 꺼짐이다 — 환경설정에서 켠 값을 그대로 받아 넘긴다
     gaugeSettingOn: settings.gaugeSettingOn ?? false,

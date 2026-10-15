@@ -1841,3 +1841,20 @@ describe('평가 타석 0xa59c0 의 득점권 아웃 G+0x11c — 2루 주자는 
     expect(after.scoringPositionOuts).toBe(before.scoringPositionOuts + 1)
   })
 })
+
+describe('나리 타자편 내 팀 사기 — 내 팀 레코드 +2 는 커리어 사기 칸이다 (0x1f9a8(저장, 4, 내 팀) · 0xa3a24 · 0xa3a44)', () => {
+  it('넘긴 사기가 우리 투수의 스태미나 용량(0x66e44 의 V[+2])에 들어간다 — 같은 씨앗이라도 1회초 소모가 달라진다', () => {
+    const start = (morale?: number) =>
+      startGame(
+        createSeededRandom(20100905), 0, undefined, undefined, undefined, 0, false, undefined, undefined, undefined, undefined,
+        morale,
+      )
+    const 표값 = start()
+    expect(표값.ourTeamMorale).toBeUndefined()
+    expect(start(100).ourMound).toEqual(표값.ourMound)
+    const 낮음 = start(5)
+    expect(낮음.ourTeamMorale).toBe(5)
+    expect(낮음.ourMound.pitches).toBeGreaterThan(0)
+    expect(낮음.ourMound.stamina).not.toBe(표값.ourMound.stamina)
+  })
+})

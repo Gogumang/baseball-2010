@@ -224,7 +224,6 @@ import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/p
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { atBatResultCodeOf, quickAtBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
-import { TEAMS } from '@/shared/config/original/teams'
 import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { rollSceneStadium, seasonNationalCupSceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
@@ -266,8 +265,7 @@ import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
  * 포스트시즌·국가대항전도 같은 화면을 쓴다 — `mode` 는 그대로 2 이고 상대 팀만 바뀐다.
  */
 
-/** 팀 사기 = 팀 레코드 s16 +2 = XlsTEAM_DATA 둘째 u16 (전 팀 100) */
-const TEAM_MORALE_VALUE_INDEX = 1
+/** 팀 사기 = 팀 레코드 s16 +2 = XlsTEAM_DATA 둘째 u16 (전 팀 100, `teamRecordMoraleOf`) */
 const DEFAULT_TEAM_MORALE = 100
 
 /** 자동 진행이 끝나지 않는 상황을 막는 안전장치 (원본에는 없다) */
@@ -1408,14 +1406,20 @@ function seasonTeamIdOf(options: TeamGameOptions): number {
  * `base+0x918`** 로 돌린다 (1f58a~1f59c). 그 슬롯은 대회를 시작할 때 `0xb7bf0 → 0x205c0` 이
  * 마스터 팀 데이터(XlsTEAM_DATA)에서 새로 만들어 사기가 **원본 표값 100** 이다 (S6 2-2).
  *
- * 그래서 시즌 팀으로 치는 경기만 시즌 사기(팀 레코드 +2)를 쓰고, 국가대항전의 대한민국은
- * 표값을 쓴다. 다른 모드는 지금까지처럼 넘긴 사기(없으면 100)다.
+ * 그래서 시즌 팀으로 치는 경기만 시즌 사기(팀 레코드 +2)를 쓰고, 국가대항전의 대한민국은 표값을 쓴다.
+ *
+ * **일반모드(1)**: `0x1f9d2` → `0x1f874` = `[g+0xb0]+0x5c8+0x1c·칸`(칸 = 팀 ≠ `[g+0xb0]+0x29`). 두 칸은 경기정보 `0x30f20` 이
+ * `0x213c0(g, 1, 0)` 뒤 두 팀마다 `0x1f8c0`(마스터 팀 레코드) 을 `0x1fdb0(g, 0x34, …)` 로 걸어 두면 `0x21d30` 이 `0x1fe5c` 로
+ * 통째 복사한다 — 경기마다 새 표값이다. 이 칸 +2 에 쓰는 곳은 없다(`0xa3a44` 는 `0x1f988` 이 모드 3·4 칸만, `0x8e3dc` 는 모드 2 만).
+ * **대전(8·9)**: `[g+0xc0]`·`[g+0xc4]` 칸은 `0x316dc` 가 통신 버퍼(net+0x2b9)에서 `0x1fe5c` 로 채운다 — 🌐 서버 값. 웹은 표값으로 둔다.
  */
 function ourTeamMoraleOf(options: TeamGameOptions): number {
-  if (options.mode === TEAM_GAME_MODE.시즌 && seasonTeamIdOf(options) !== options.ourTeamId) {
-    return TEAMS[options.ourTeamId]?.values[TEAM_MORALE_VALUE_INDEX] ?? DEFAULT_TEAM_MORALE
+  if (options.mode === TEAM_GAME_MODE.시즌) {
+    if (seasonTeamIdOf(options) !== options.ourTeamId) return teamRecordMoraleOf(options.ourTeamId)
+    return options.season?.morale ?? DEFAULT_TEAM_MORALE
   }
-  return options.season?.morale ?? DEFAULT_TEAM_MORALE
+  // 일반모드 — 경기마다 마스터에서 복사한 칸이다. 대전은 🌐 서버 값이라 표값으로 둔다
+  return options.season?.morale ?? teamRecordMoraleOf(options.ourTeamId)
 }
 
 /**
@@ -1426,7 +1430,8 @@ function ourTeamMoraleOf(options: TeamGameOptions): number {
  * 국가대항전 중이면 상대국 슬롯 `base+0x934`) · 8 `0x1f890`(`[g+0xc0]`) · 9 `0x1f8a8`(`[g+0xc4]`).
  * 시즌의 상대(CPU 팀) 레코드 +2 를 바꾸는 곳은 없다 — 사기를 쓰는 곳은 모두 `SR[1]`(내 팀) 레코드다(P4 4a · 6절 "팀 사기
  * 변화 모음"). 상대국 슬롯은 대회마다 마스터 팀 표(XlsTEAM_DATA)에서 새로 복사한다(S6 2-1). 그래서 표값(둘째 u16, 전 팀 100)이다.
- * ⚠️ 미확인: 일반모드 `[g+0xb0]` 두 칸과 대전모드 `[g+0xc0]`·`[g+0xc4]`(내려받은 상대) 를 채우는 곳은 안 읽었다 — 표값으로 둔다.
+ * 일반모드 `[g+0xb0]+0x5c8` 두 칸은 경기정보 `0x30f20` 이 경기마다 마스터 팀 레코드(`0x1f8c0`)를 통째 복사한 것이라 표값이다
+ * (`ourTeamMoraleOf` 참고). 대전모드 `[g+0xc0]`·`[g+0xc4]` 는 `0x316dc` 가 통신 버퍼에서 채운다 — 🌐 서버 값이라 표값으로 둔다.
  */
 function opponentTeamMoraleOf(options: TeamGameOptions): number {
   return teamRecordMoraleOf(options.opponentTeamId)
