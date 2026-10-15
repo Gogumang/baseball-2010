@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, CommonPanel, FrameSprite, InsetBox, MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
@@ -37,11 +37,6 @@ interface MissionSelectScreenProps {
   /** 미션별 클리어 횟수 (0xa51d0) — 보상 G 가 다시 깰수록 줄어서 횟수를 보여 준다 */
   readonly clearCounts?: Readonly<Record<string, number>>
   readonly initialSide: OriginalMission['side']
-  /**
-   * 편 바꾸기 버튼을 보이는가 (기본 보임). 원본은 선수 고르기(하위 17)에서 고른 선수가 편을 정해(투수 → 모드 5,
-   * 타자 → 모드 6) 목록 안에서 편을 바꾸는 길이 없다 — 선수를 고르고 들어오면 끈다.
-   */
-  readonly canSwitchSide?: boolean
   readonly onSelect: (mission: OriginalMission) => void
   readonly onBack: () => void
   /** 머리띠 G포인트 — 안 주면 0 */
@@ -71,7 +66,6 @@ export function MissionSelectScreen({
   clearedKeys,
   clearCounts = {},
   initialSide,
-  canSwitchSide = true,
   onSelect,
   onBack,
   gamePoint = 0,
@@ -94,7 +88,7 @@ export function MissionSelectScreen({
    */
   const gridOpen = useListPageEntry({ slides, grid: { shape: MISSION_GRID_OPEN, isAnimated: slides } }).grid
   const bounce = useGridCursorBounce()
-  const [side, setSide] = useState<OriginalMission['side']>(initialSide)
+  const side = initialSide
   const [cursor, setCursor] = useState(0)
   /** [this+0xa0] — 이벤트 미션 창의 고름(≠ 0 미션실행). 장면 진입 0x1d9a4 가 1 로 둔다 */
   const [isEventRunSelected, setIsEventRunSelected] = useState(true)
@@ -267,12 +261,8 @@ export function MissionSelectScreen({
         {clears}회
       </div>
 
-      {canSwitchSide && (
-        <Button variant="corner" className={styles.sideButton}
-          onClick={() => { setSide(side === '타자' ? '투수' : '타자'); setCursor(0) }}>
-          {side === '타자' ? '투수편' : '타자편'}
-        </Button>
-      )}
+      {/* 웹 [투수편/타자편] 바꾸기 단추는 걷었다 — 원본은 선수 고르기(하위 17)에서 고른 선수가 편을 정해(투수 → 모드 5,
+          타자 → 모드 6) 목록 안에서 편을 바꾸는 길이 없다 */}
       {frame}
 
       {eventWindow === '창' && (

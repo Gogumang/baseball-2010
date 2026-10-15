@@ -14,7 +14,7 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { Button, FrameSprite, SolidStamp } from '@/shared/ui'
+import { FrameSprite, PressArea, SolidStamp } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
 import { placeLabelTopLeftOf } from '@/pages/outing-map/lib/placeLabelPosition'
 import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
@@ -33,6 +33,9 @@ const markerAnchorOf = (box: MapBox) => ({ x: box.x + (box.width >> 1), y: box.y
  * 애니 0 은 dx −11 · dy −7→−3 으로 까딱인다. 앞서 웹은 2px 오른쪽·7px 아래였다.
  */
 const cursorAnchorOf = (box: MapBox) => ({ x: box.x + Math.trunc(box.width / 2), y: box.y + styles.MAP_TOP })
+
+/** ⚠️ 웹 자리: 취소 — 오른쪽 소프트키 글자 자리 (W − 41 − 1, H − 12 − 1), 타석 "#TIME" 과 같은 자리 */
+const OUTING_CANCEL_PRESS_RECT = { x: 198, y: 307, width: 41, height: 12 } as const
 
 /** 효과 1·인자 7 — 그림 무게가 7/16 이다 (R6 3a) */
 const UNSELECTED_OPACITY = 7 / 16
@@ -117,12 +120,13 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
         eventPlaceIds.has(place.id) ? animated(EVENT_MARKER_ANIMATION, markerAnchorOf(place.markerBox), `${place.id}-event`) : null
       ))}
 
-      <Button variant="corner" className={styles.cornerButton} onClick={onBack}>
-        ‹ 관리
-      </Button>
-      <div className={styles.noticeLine}>
-        {noticeText !== '' ? noticeText : eventPlaceIds.size > 0 ? '[!] 장소에서 들어가기 · 건물을 누르세요' : '건물을 누르세요'}
-      </div>
+      {/*
+        ⚠️ 웹 자리: 취소(CLR → 105, 키 0x13ba4) — 112 그리기 0x16854 는 지도 0x7ea64 만 그려 머리띠 · 바닥띠 · 소프트키 글자가 없다.
+        웹 [‹ 관리] 단추와 "건물을 누르세요" 안내 글을 걷고, 지도 아래 오른쪽 소프트키 자리(198, 307, 41×12)를 투명 누름 칸으로 빌린다
+      */}
+      <PressArea label="취소" rect={OUTING_CANCEL_PRESS_RECT} onPress={onBack} />
+      {/* ⚠️ 미확인: 외출 막힘 글(`outingBlockTextOf`)을 원본이 어디에 띄우는지 안 읽었다 — 그 글이 있을 때만 지도 아래 줄에 쓴다 */}
+      {noticeText !== '' && <div className={styles.noticeLine}>{noticeText}</div>}
       {children}
     </RawScreen>
   )
