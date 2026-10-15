@@ -2,7 +2,7 @@ import { globalStyle, style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
 
 /*
- * 메인 메뉴는 원본 그림으로만 그린다 — 배너(mode_back/000), 칸 글자(img_text/frames),
+ * 메인 메뉴는 원본 그림으로만 그린다 — 메뉴 바탕(0x58371), 칸 글자(img_text/frames),
  * 설명 판(main_ui/003)과 그 안 큰 글자(main_ui/frames), 바퀴 가운데 공(main_ball).
  * 좌표·색은 `lib/mainMenuLayout.ts` 가 들고 있다.
  * 윗단(처음 메뉴)은 반원 바퀴, 아랫단(게임시작 목록)은 세로 릴이고 **둘 다 배열이 도는 원본 모델**이다.

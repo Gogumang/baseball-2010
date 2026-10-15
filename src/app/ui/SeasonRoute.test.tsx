@@ -366,7 +366,7 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     expect(screen.getByTestId('shop-name').textContent).toBe('') // 커서 칸 0 은 비었다
     키('ArrowRight')
     expect(screen.getByTestId('shop-name').textContent).toBe('피칭머신')
-    expect(screen.getByRole('button', { name: '빈 칸 0' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: '빈 칸 0' })).toBeTruthy()
     키('Escape')
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
   })

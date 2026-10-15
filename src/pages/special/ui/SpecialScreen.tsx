@@ -31,7 +31,7 @@ import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
 import {
-  MENU_BANNER, MENU_DESCRIPTION_PANEL, MENU_PANEL_HEADING_COLOR, MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS,
+  MENU_DESCRIPTION_PANEL, MENU_PANEL_HEADING_COLOR, MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS,
   MENU_REEL_SHADOW_COLOR, MENU_REEL_SHADOW_OFFSET, MENU_REEL_SLOTS,
   menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf, menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf,
   menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf,
@@ -128,7 +128,8 @@ interface SpecialScreenProps {
  * 1 → 4 → 16 → 64 → 160 으로 자란다, 자라는 동안은 줄 · 설명 띠를 안 그리고 키도 버린다 0x28ba0~0x28bb4).
  * 줄은 슬롯 1·2·3 (y 213 · 233 · 253) 에 커서 −3 · −2 · −1 칸, 고른 칸은 슬롯 4 라 안 그리고 설명 판(96, 289)이 대신 보인다.
  * 슬롯 5·6·7 은 화면 밖이다(원본 그대로). ↑ · ↓ 는 릴을 돌린다(스크롤 ±1 · ±4 · ±16 뒤 회전).
- * ⚠️ 배너 mode_back/000 은 메인 메뉴 화면이 깔던 것을 그대로 따른다 — 0x24b1c 안에서 그 그림을 그리는 곳은 이번에 못 찾았다(미확인).
+ * 바탕은 판 0x24b1c 가 맨 먼저 찍는 메뉴 바탕 0x58371(skin, [메뉴+0x90] main_title, 0)(0x24c9c)이다 — 예전 웹의 mode_back/000 배너는
+ * 원본에 없다(mode_back 은 0x7b8ec 만 싣고, 그리기 0x7b9ac 를 부르는 곳은 0x7d34c · 0x84928 · 0x88572 · 0x88d76 뿐, 2026-10-15 r97 직접 뜸).
  */
 export function SpecialScreen({
   collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange,
@@ -252,7 +253,8 @@ export function SpecialScreen({
 
   return (
     <RawScreen>
-      <img className={styles.sprite} style={{ left: MENU_BANNER.x, top: MENU_BANNER.y }} src="./sprites/mode_back/000.png" alt="" />
+      {/* 메뉴 바탕 0x58371(skin, main_title, 0) — 판 0x24b1c 의 첫 그림(0x24c9c), 메인 메뉴와 같다 */}
+      <SkinBackdrop kind="메뉴바탕" />
       {/* 반원 바퀴 0x24b1c 의 바닥 — 가운데에서 도는 main_ball 애니 0 + 테두리 원 3겹 (120, 320) 반지름 93·95·97. 메인 메뉴와 같은 그림 */}
       <MenuWheel />
       <SpecialWheelLabels />

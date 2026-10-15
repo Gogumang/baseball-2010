@@ -94,7 +94,15 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
     expect(container.querySelector('svg')).toBe(band)
   })
   /** 머리띠 판 윗변 y — 다 내려오면 30 − 38 = −8 (`headerTopOf`) */
-  const 머리띠y = (container: HTMLElement) => Number(container.querySelector('svg rect')?.getAttribute('y'))
+  // 메뉴 바탕 0x58371(캔버스 없는 시험에서는 선 · 덮기 svg 근사)은 빼고 머리띠 첫 칸을 본다
+  const 머리띠y = (container: HTMLElement) => Number(Array.from(container.querySelectorAll('svg rect'))
+    .find((rect) => rect.closest('[data-testid="바탕-메뉴"]') === null)?.getAttribute('y'))
+
+  it('바탕은 메뉴 바탕 0x58371 이다 (판 0x24b1c 첫 그림 0x24c9c) — mode_back 배너는 원본 메뉴에 없다', () => {
+    const { container } = 띄우기(50)
+    expect(container.querySelector('[data-testid="바탕-메뉴"]')).not.toBeNull()
+    expect(container.querySelector('img[src*="mode_back"]')).toBeNull()
+  })
 
   it('타이틀 갱신 0x245f8 에서 왔을 때만 머리띠가 미끄러진다 — [skin+0x84] = 1 · [+0x86] = 1 → 하위 4', () => {
     const { container } = 띄우기(50, true)

@@ -4,7 +4,8 @@ import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { roundEdgePaintsOf, roundFillPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
+import { roundEdgePaintsOf } from '@/shared/lib/commonPanel/commonPanel'
+import { InputModeBox } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
@@ -33,7 +34,7 @@ import {
 } from '@/pages/pitcher-league/lib/breakingPitchCursor'
 import {
   ARROW_FRAME, ARROW_SIZE, BREAKING_CHOSEN_PLATE, BREAKING_HINT, BREAKING_NAME_OUTLINE, BREAKING_OK, BREAKING_PITCH_FRAME,
-  BREAKING_ROW_NUMBERS, BREAKING_ROW_NUMBER_BASE, INPUT_MODE_ARROWS, INPUT_MODE_BOX, INPUT_MODE_COLOR, NAME_TEXT_AT,
+  BREAKING_ROW_NUMBERS, BREAKING_ROW_NUMBER_BASE, INPUT_MODE_BOX, NAME_TEXT_AT,
   REGISTER_ROW_HINTS, REGISTER_YELLOW,
   breakingPitchBoxOf, breakingRowNumberBoxOf, cursorBoxOf, registerValueBoxOf,
   valueArrowsOf,
@@ -107,11 +108,6 @@ function frameAt(origins: FrameOrigins | null, frame: number, box: RegisterBox, 
 function RoundEdge({ box, color, testId }: { readonly box: RegisterBox; readonly color: string; readonly testId?: string }) {
   const paints = useMemo(() => roundEdgePaintsOf(box.width, box.height, color), [box.width, box.height, color])
   return <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} testId={testId} />
-}
-/** 둥근 칠 0xba0bd — (w + 1) × (h + 1) */
-function RoundFill({ box, color }: { readonly box: RegisterBox; readonly color: string }) {
-  const paints = useMemo(() => roundFillPaintsOf(box.width, box.height, color), [box.width, box.height, color])
-  return <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} />
 }
 
 export function PitcherRegisterScreen({
@@ -295,11 +291,8 @@ export function PitcherRegisterScreen({
           </form>
           {selectedRow === NAME_ROW && (
             <>
-              {/* 입력 방식 칸 0xba0bd · 화살. ⚠️ 입력 방식 글 0x676f9 는 웹 글 칸에 입력 방식이 없어 옮기지 않았다 */}
-              <RoundFill box={INPUT_MODE_BOX} color={INPUT_MODE_COLOR} />
-              <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={uiOrigins} x={INPUT_MODE_ARROWS.left.x} y={INPUT_MODE_ARROWS.left.y} />
-              <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={uiOrigins} x={INPUT_MODE_ARROWS.right.x}
-                y={INPUT_MODE_ARROWS.right.y} style={{ transform: 'scaleX(-1)' }} />
+              {/* 입력 방식 칸 0xba0bd · 화살 (0x1615c~0x161f4) — 타자 등록과 같은 0x15f34 갈래 */}
+              <InputModeBox nameBox={registerValueBoxOf(NAME_ROW)} />
             </>
           )}
           {/* 값 칸 누름 — 고르기 · 고른 줄이면 OK(↓ · 마지막 줄이면 0x67) */}

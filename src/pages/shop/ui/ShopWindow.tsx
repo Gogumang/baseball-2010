@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
-import { CommonPanel, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, PressArea, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
@@ -153,19 +153,31 @@ export function ShopWindow({
         )}
       </svg>
 
+      {/* 아이콘 — 33×33 칸 가운데 (그림만, 눌림은 아래 투명 누름 칸 몫) */}
+      {Array.from({ length: SLOT_COUNT }, (_unused, index) => {
+        const entry = entries[index] ?? null
+        if (entry === null || entry.iconFrame === null) return null
+        const { x, y } = slotPositionOf(index)
+        return (
+          <div key={entry.id} className={styles.slotIcon} style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}>
+            <img className={kind === '서브' && entry.isOwned ? styles.ownedIcon : undefined} alt=""
+              src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
+          </div>
+        )
+      })}
+
+      {/* 칸 누름 — 격자 칸 k 자리 = mode_ui 34 박스 k(0x82408 0x94a65(…, 0, k) → 0x82420 칸 바탕 0x7e764 에 그대로 넘긴다).
+          목록은 창 0x81618 이 vt+0x1c(5, 2, 1, 0x30) 으로 지은 [창+0x19c] 다. 다른 칸을 누르면 그 칸 고르기,
+          고른 칸을 누르면 OK(확인)와 같다 — 투수 등록 · 변화구 칸과 같은 방식. ⚠️ 원본은 터치가 없어 웹 전용 입력이다 */}
       {Array.from({ length: SLOT_COUNT }, (_unused, index) => {
         const entry = entries[index] ?? null
         const { x, y } = slotPositionOf(index)
         return (
-          <button key={entry?.id ?? `빈칸:${index}`} type="button" aria-label={entry?.name ?? `빈 칸 ${index}`}
-            aria-current={cursor === index} className={styles.slotButton}
-            style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}
-            onClick={() => (cursor === index ? onSelect(index) : onMoveCursor(index))}>
-            {entry !== null && entry.iconFrame !== null && (
-              <img className={kind === '서브' && entry.isOwned ? styles.ownedIcon : undefined} alt=""
-                src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
-            )}
-          </button>
+          <PressArea key={`누름:${index}`} label={entry?.name ?? `빈 칸 ${index}`}
+            rect={{ x, y, width: SLOT_SIZE, height: SLOT_SIZE }}
+            option={{ isSelected: cursor === index }}
+            isDisabled={!isKeyEnabled}
+            onPress={() => (cursor === index ? onSelect(index) : onMoveCursor(index))} />
         )
       })}
 

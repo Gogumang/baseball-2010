@@ -56,9 +56,8 @@ export function registerValueBoxOf(row: number): RegisterBox {
 export const cursorBoxOf = (box: RegisterBox): RegisterBox => ({ x: box.x - 1, y: box.y - 1, width: box.width + 2, height: box.height + 2 })
 
 export const REGISTER_YELLOW = '#FFFF00'
-/** 입력 방식 칸 0xba0bd RGB(0x2E, 0x46, 0x94) */
+/** 입력 방식 칸 M = (R.x + R.w − 20, R.y + 1, 14, 14) = (121,202,14,14) — 타자 등록과 같은 0x15f34 갈래라 `shared/ui/InputMethodText/InputModeBox` 가 그린다 */
 export const INPUT_MODE_BOX: RegisterBox = { x: 121, y: 202, width: 14, height: 14 }
-export const INPUT_MODE_COLOR = '#2E4694'
 /** 이름 글 0x677d5 (박스 2.x + 2, 이름 줄 y + 3) */
 export const NAME_TEXT_AT = { x: 62, y: 204 } as const
 
@@ -81,8 +80,6 @@ export function arrowPairOf(box: RegisterBox, leftOx: number, rightOx: number) {
 }
 /** 값 칸 화살 (ox 0 · 폭) */
 export const valueArrowsOf = (row: number) => arrowPairOf(registerValueBoxOf(row), 0, ARROW_WIDTH)
-/** 입력 방식 칸 화살 (ox −폭 · 2 × 폭) */
-export const INPUT_MODE_ARROWS = arrowPairOf(INPUT_MODE_BOX, -ARROW_WIDTH, 2 * ARROW_WIDTH)
 export const ARROW_SIZE = { width: ARROW_WIDTH, height: ARROW_HEIGHT } as const
 
 /** 줄별 설명 띠 StrMODE (점프표 0xcc6d8, 투수 갈래) */

@@ -92,7 +92,7 @@ export const SKIN_NAMES = ['황인', '백인', '흑인']
  * 0xba411(칸, StrCOMMON[i], 정렬 0x22)
  * ```
  * 타자편은 StrCOMMON[25~28] 파워 · 플레임 · 토네이도 · 미라지 스윙, 장타형(타입 1)의 4 는 [29] 메테오 스윙이다.
- * 기록 +0x18 은 1~4 만 들어간다(고르기 0x17c64 · 훈련 완료 0x1816c 둘 다 `칸 + 1`).
+ * 기록 +0x18 은 1~4 만 들어간다(고르기 0x17c64 `커서 + 1` · 훈련 완료 0x1816c `표 0xcc378[커서]`, 표 = [1,2,3,4]).
  */
 export function basicInfoSpecialNameOf(number: number, battingTypeIndex: number): string {
   if (number <= 0) return ''

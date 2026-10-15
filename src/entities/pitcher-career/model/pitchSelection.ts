@@ -40,7 +40,7 @@ export function magicNumberOfCell(cellIndex: number): number {
  * a43d8  n > 3 이면 n += rec[0xb] >> 5              ; 넷째 칸은 4 + 등록 타입(+0xb bit5~7 = `typeIndex`)
  * a43e2  return rec[0x18] == n
  * ```
- * 저장은 표 0xcc368 값(1~4, 0x1816c `strb [rec+0x18]`)이라 **타입 1 · 2 투수가 넷째 마구를 고르면 저장 4 · 비교 5 · 6** 이 되어
+ * 저장은 칸 + 1(1~4, 고르기 틀 0x17bf4 의 0x17c64 `strb [rec+0x18]` · 훈련 완료 0x1816c 도 표 0xcc378 = [1,2,3,4])이라 **타입 1 · 2 투수가 넷째 마구를 고르면 저장 4 · 비교 5 · 6** 이 되어
  * 다시 골라도 "사용 중"([69])이 안 뜬다 — 원본 어긋남 그대로 옮긴다(타자 108 창 `isSlotInUse` 와 같은 함수).
  */
 export function magicInUseNumberOfCell(cellIndex: number, typeIndex: number): number {

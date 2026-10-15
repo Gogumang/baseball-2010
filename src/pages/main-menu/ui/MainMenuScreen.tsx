@@ -6,12 +6,13 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, MainMenuOpenTier, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
 import {
-  MENU_BANNER, MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_PANEL_HEADING_COLOR,
+  MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_PANEL_HEADING_COLOR,
   MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR, MENU_REEL_SHADOW_OFFSET,
   MENU_REEL_SLOTS, MENU_WHEEL_ITEM_FRAMES, MENU_WHEEL_TURN_TICKS,
   menuWheelSlotDrawOf, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
@@ -387,12 +388,10 @@ export function MainMenuScreen({
 
   return (
     <RawScreen>
-      <img
-        className={styles.layer}
-        style={{ left: MENU_BANNER.x, top: MENU_BANNER.y }}
-        src="./sprites/mode_back/000.png"
-        alt=""
-      />
+      {/* 메뉴 바탕 0x58371(skin, main_title [메뉴+0x90], 0) — 판 0x24b1c 의 첫 그림(0x24c9c). 메뉴에 들어올 때 떠 둔 버퍼를 찍는다.
+          예전 웹은 여기 mode_back/000 배너(240×84)를 깔았는데, mode_back 은 gfx 시간대 설정자 0x7b934 → 0x7b8ec 만 싣고
+          그리는 곳(0x7b9ac)은 상태판 0x7d34c · 훈련 팝업 0x848d0 · 엔딩 0x882b4 · 0x88bb4 뿐이라 메뉴에는 없다 */}
+      <SkinBackdrop kind="메뉴바탕" />
 
       {/* 바퀴 바닥 — 가운데 공 + 테두리 원 3겹 (확정). 두 단 다 깔린다. */}
       <MenuWheel />

@@ -39,7 +39,7 @@ describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
     expect(onSelectNumber).toHaveBeenCalledWith(3)
   })
 
-  it('장타형이 메테오 스윙을 고르면 +0x18 에는 5 가 아니라 표 값 4 가 들어간다 (0x1816c)', () => {
+  it('장타형이 메테오 스윙을 고르면 +0x18 에는 5 가 아니라 칸 + 1 = 4 가 들어간다 (0x17c64)', () => {
     const onSelectNumber = vi.fn()
     render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={1}
       selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
