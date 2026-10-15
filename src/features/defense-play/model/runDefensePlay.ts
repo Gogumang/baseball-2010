@@ -1453,27 +1453,24 @@ export function stepDefensePlay(
    *   지우지 않는다 — 지워 봐야 원본에서 읽히지 않는 값이고, 웹은 콜을 **플레이 끝에 한 번**만
    *   내므로 지우면 오히려 "그 아웃을 낸 판정" 을 잃는다. 아웃이 여럿이면 **마지막 아웃**이 이긴다.
    *
-   * ⚠️ **원본 `state[0x87]` 의 나머지 절반(0xb4312)은 안 옮겼다.** 원본은 결과가 **2(루 아웃)**
-   *    이면서 그 야수의 `+0x3b` 가 서 있을 때도 이 칸을 세운다. 억지로 vt18(위치 == 목표)로
-   *    바꿔 끼우면 **땅볼 포스 아웃이 죄다 62 로 뒤집힌다**(앞 시도).
-   *
-   *    2026-10 에 둘레를 더 떴다(직접 뜬 것):
-   *    - `+0x3b` 의 뜻은 **확정**이다. 야수 vtable `0xd7934` 의 vt30 도 주자와 같은 `0xbf0dc` 라,
-   *      갱신 머리에서 지우고(bf0e6) 목표점에 **막 닿은 갱신에서만** 1 이 된다(bf146) — 한 틱짜리 맥박.
-   *    - 0xb4300~0xb4314 는 **타구 포구 틱 구역**(`b42ce`)에만 있다. 들어오는 길은 공 쥐기
-   *      `b42c8 0xb2710` 과 메시지 갈래 `b428c`(필살타법 표시 공 0xbc3 · 펌블 0xbc2 둘 다 → b4290 b b42ce) 뿐이고, 틱마다 도는 `b43da` 판정은
-   *      이 칸을 결과 2 로 세우지 않는다. 그 구역은 `b42e0`: `0xa99d8`(막 닿은 산 주자가 있나) ||
-   *      야수+0x3b 면 vt90 을 **한 번 더** 부르고(b42f2), 그 결과가 2 이고 야수+0x3b 면 1 을 적는다.
-   *    - 결과 2 는 공 쥔 야수의 발밑 루(`0xa0ae4`, 좌표 **비트까지** 같음)가 주자의 루와 같아야 서는데,
-   *      포구 틱의 야수는 목표점 = 포구점에 서 있다. 포구점이 루 좌표와 비트까지 같을 때만 닿는 갈래라
-   *      실제로는 거의 안 선다.
+   * **원본 `state[0x87]` 의 나머지 절반(0xb4312)** — 원본은 결과가 **2(루 아웃)** 이면서 공 가진 야수(F = 0xb0c90)의
+   *    `+0x3b`(막 닿음)가 서 있을 때도 이 칸을 세운다. 2026-10 r87 에 그 갈래를 다시 떠 옮겼다(6b 절 `baseOutFold`):
+   *    - `+0x3b` 는 야수 vtable `0xd7934` 의 vt30 도 주자와 같은 `0xbf0dc` 라, 갱신 머리에서 지우고(bf0e6) 목표점에
+   *      **막 닿은 갱신에서만** 1 이 된다(bf146) — 한 틱짜리 맥박. 웹은 `fielderArrivals` 다. (예전에 vt18(위치 == 목표)로
+   *      바꿔 끼웠다가 루에서 기다리던 커버까지 걸려 **땅볼 포스 아웃이 죄다 62 로 뒤집혔다** — 맥박이 아니라서다.)
+   *    - 그 갈래 b42e0 은 포구 틱 구역이 아니라 **매 플레이 틱** 지난다 — b4072(vt50 거짓) · b41aa(포구 틱 아님) ·
+   *      b4290(메시지 갈래) · 쥐기 b42c8 뒤가 모두 b42ce 로 온다(예전 메모 "포구 틱에만" 은 틀렸다).
+   *      `0xa99d8`(아웃 아닌(+0x96 == 0) 주자 중 +0x3b 가 있나) || F+0x3b 면 vt90 을 b42f2 에서 부르고, 결과가 2 이고
+   *      F+0x3b 면 1 을 적은 뒤, 협살 중(+0x1f0 ≠ −1)이고 그 주자+0x3b 면 협살을 끝내고(b4336) **b43ec 로 곧장** 간다 —
+   *      그 틱엔 협살 시작(b433c~b4378)도 b43da 판정도 없다. 아니면 b433c → (협살 시작 b4374 → b43da) 또는 b43cc(F+0xe0) → b43da.
+   *      곧 플레이 틱의 판정은 어느 갈래든 **한 번**이다.
+   *    - 들고 뛰어 루에 닿은 야수의 포스 아웃처럼 **F 가 막 닿은 틱에 판정이 루 아웃을 내면** 콜이 62 가 된다. 루에서 기다리던
+   *      커버가 송구를 받아 내는 포스 아웃은 쥐기 판정(0xb2758)이 내고 두 번째 판정은 아웃이 없어 0 으로 지워진다(콜 20).
    *    포구 틱에는 vt90 이 두 번 돈다 — 쥐기 안(0xb2758) 한 번, 그 뒤 같은 플레이 틱 0xb401c 의 `b42f2` 또는
    *    `b43de` 한 번(쥐기가 야수+0xe0 = 1 을 세우니 둘 중 하나는 반드시 돈다 — b42c8 → b42ce → b42e0 / b43cc, 직접 뜸).
-   *    두 번째도 머리(b36dc)에서 `state[0x87] = 0` 으로 지우므로, **쥐기 판정이 아웃을 내고 두 번째가 태그(3)가 아니면
-   *    결과 코드 13 을 읽는 b4540 시점의 칸은 0** 이다(콜 20). 두 번째 판정은 웹 6b 절이고 같은 그림의 슬롯 2(이동 앞)라
-   *    그 차례대로 옮겼다 — 쥐기에서 아웃이 난 틱은 6b 판정 결과로 `tagOut` 을 다시 적는다(`grabOutThisTick`).
-   *    ⚠️ 미확인: 원본은 협살 중(+0x1f0 ≠ −1)이면 b4316 갈래로 두 번째 판정 없이 b43ec 로 간다 — 쥐기에서 아웃이 난 틱에
-   *    협살이 서 있는 판은 아직 따로 안 가른다.
+   *    두 번째도 머리(b36dc)에서 `state[0x87] = 0` 으로 지우므로, **쥐기 판정이 아웃을 내고 두 번째가 태그(3)도 아니고
+   *    b4312 갈래도 아니면 결과 코드 13 을 읽는 b4540 시점의 칸은 0** 이다(콜 20). 두 번째 판정은 웹 6b 절이고 같은 그림의
+   *    슬롯 2(이동 앞)라 그 차례대로 옮겼다 — 쥐기에서 아웃이 난 틱은 6b 판정 결과로 `tagOut` 을 다시 적는다(`grabOutThisTick`).
    */
   const runOutJudgement = (): void => {
     if (play.finished) return
@@ -2215,6 +2212,16 @@ export function stepDefensePlay(
     // 원본은 플레이 틱 0xb401c 안 0xb433c~0xb4378 에서, 송구 판정 바로 뒤에 이 갈래를 본다:
     //   `P+0x1f0 == −1 이면 0xb3fa8(가능 검사) → state[0x31+수비측] == 1(CPU) 이면 0xb3a94(시작)`.
     // **사람이 수비하면 협살은 절대 안 일어난다** (S8 1-4).
+    //
+    // 그 앞 갈래 b42ce~b42ec(직접 뜬 것, 2026-10 r87): F = 야수[P+0x130](0xb0c90) ;
+    // `0xa99d8(주자관리)`(아웃 아닌(+0x96 == 0) 주자 중 +0x3b(막 닿음)가 하나라도 있나) || F+0x3b 이면 **b42ee 갈래**를 탄다 —
+    // vt90 한 번(b42f2) → 결과 2 && F+0x3b 면 state[0x87] = 1(b4312) → 협살 중(+0x1f0 ≠ −1)이고 그 주자(0xa9564)+0x3b 면
+    // 협살 종료 0xb26b8(b4336) → **b43ec 로 곧장** 간다. 곧 그 틱에는 협살 시작 b433c~b4378(0xb3fa8 · 0xb3a94)도,
+    // b43cc~b43ea 의 vt90 도 없다. b42ce 는 포구 틱만이 아니라 **매 플레이 틱** 지난다(b4072 · b41aa · b4290 이 모두 b42ce 로 온다).
+    // 두 +0x3b 는 그림 N 의 목록 틱(앞 판 틱의 6 절 이동)이 세운 값이다(`arrivedThisListTick` · `fielderArrivals`).
+    const arrivalBranch =
+      runners.some((runner) => !runner.state.isOut && runner.arrivedThisListTick) ||
+      fielderArrivals[play.ballHolderSlot] === true
     if (defenseIsCpu && !play.finished && play.everHeld) {
       // 협살 중 짝에게 던진 공이 닿았다 — 공 쥔 쪽이 바뀐다. 협살이 그사이 풀렸어도 날아간 공은 짝이 받는다
       // (원본 공은 실제 송구공이라 받는 야수의 포구 틱 갈래 b42c8 쥐기 0xb2710 으로 들어간다). 예전에는 풀리는 순간
@@ -2232,7 +2239,8 @@ export function stepDefensePlay(
         rundownThrowArrival = -1
         rundownThrowTo = NONE
       }
-      if (rundown.runnerIndex === NONE) {
+      // b42ee 갈래를 탄 틱은 협살 시작 b433c~b4378 을 건너뛴다 (위)
+      if (rundown.runnerIndex === NONE && !arrivalBranch) {
         const context = contextAt(tick)
         const target = chooseRundownRunner(context.runners)
         // 원본처럼 타자주자(0번)도 협살 대상이다 — 고르기(0xb398c)가 **뒤 주자부터** 보므로 0번은 다른 주자가 없을 때만
@@ -2333,12 +2341,26 @@ export function stepDefensePlay(
     // 플레이 틱 0xb401c 안에서 포구 틱 갈래(b4074~b42ce · 1 절) → 협살 b433c~b4378(2b 절) 바로 뒤다. 그림 N 의 슬롯 2 라 주자 · 야수
     // 자리는 그림 N 의 목록 틱(앞 판 틱의 6 절 이동)이 옮긴 그대로다 — 웹도 이 판 틱의 6 절 이동 **앞**에서 본다.
     // (예전 웹은 6b~6e 를 6 절 이동 뒤에 두어 판정이 한 목록 틱 늦은 자리를 봤다 — 옛 근사를 걷었다)
-    // ⚠️ 미확인: 원본은 협살 중(+0x1f0 ≠ −1, b4316)이거나 b42e0 갈래(0xa99d8 · 야수+0x3b)를 탄 틱에는 b43da 를 건너뛴다 — 웹은 늘 돈다
+    // 판정은 갈래마다 **한 번**이다(직접 뜬 것): b42ee 갈래(2b 절 머리의 `arrivalBranch`)는 b42f2 에서, 아니면 협살 시작 b4374 뒤
+    // b43da 에서(F+0xe0 안 보고), 그도 아니면 b43cc 의 F+0xe0(쥠) 일 때 b43da 에서. `judgeOut` 은 공을 안 쥐었으면(+0x12c)
+    // 어떤 아웃도 안 내므로 F+0xe0 거르개는 따로 두지 않는다. "협살 중이면 판정을 건너뛴다" 는 옛 메모는 틀렸다 —
+    // 건너뛰는 것은 b42ee 갈래에서의 협살 시작(2b)이고 판정 자체는 b42f2 에서 돈다.
     judgedKindThisCall = OUT_KIND.NONE
+    const outsBeforeSecondJudgement = outsAdded
     runOutJudgement()
+    const holderJustArrived = fielderArrivals[play.ballHolderSlot] === true
     // b36dc — 이 판정도 머리에서 state[0x87] = 0 으로 지우고 태그(3)일 때만 1 을 적는다. 쥐기 판정이 낸 아웃의 결과 코드 13 은
     // b4540 에서 이 값을 읽는다 (위 `runOutJudgement` 주석)
-    if (grabOutThisTick) tagOut = judgedKindThisCall === OUT_KIND.TAG
+    // b4300~b4314 — b42ee 갈래에서는 결과 2(루 아웃)이고 F+0x3b 면 state[0x87] = 1 을 덧적는다 (b43da 갈래에는 없다)
+    const baseOutFold = arrivalBranch && holderJustArrived && judgedKindThisCall === OUT_KIND.BASE
+    if (grabOutThisTick) tagOut = judgedKindThisCall === OUT_KIND.TAG || baseOutFold
+    else if (baseOutFold && outsAdded > outsBeforeSecondJudgement) tagOut = true
+    // b4316~b4336 — b42ee 갈래: 협살 중(+0x1f0 ≠ −1)이고 그 주자(0xa9564(+0x1f0))+0x3b(막 닿음)면 협살 종료 0xb26b8
+    if (arrivalBranch && rundown.runnerIndex !== NONE && runners[rundown.runnerIndex]?.arrivedThisListTick === true) {
+      fielders = endRundown(fielders)
+      rundown = NO_RUNDOWN
+      log.push(`${tick}틱 협살 종료 — 쫓던 주자가 루에 닿았다 (b4336)`)
+    }
 
     // ── 6c. 결과 코드 9·13 — 틱 끝의 CPU 송구 결정, **사람 수비·수동 송구에서도 돈다** (직접 뜬 것) ──
     // ```
