@@ -11,6 +11,7 @@ import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
 import { createPatternDeck, lastDrawnPattern, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
+import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneParticles'
 import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { canSkipHitPause, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import {
@@ -333,7 +334,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     // 공용 창(히든 오픈 알림 등)이 떠 있으면 경기 장면 갱신이 멈춘다 (0x52cc6)
     isSceneFrozen: isCommonWindowOpen,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredAtRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -537,6 +538,8 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
         BIG_HIT_PARTICLE.img,
       )
     }
+    // 0x13 → 0x17 — 0x17 진입 0x46418(4673e)이 다음 틱에 파티클 관리자를 비운다 (`useStageAnimation`)
+    inPlayEnteredAtRef.current = now
     resultTextRef.current = pending.resultText
     homeRunStartedAtRef.current = pending.isHomeRun ? now : -1
     // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
@@ -663,6 +666,8 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     }
   }, [flightProbeRef, phaseRef, pitchRef, phaseStartedAtRef])
 
+  // 타석 장면은 원본 틱 차례(갱신 → 그리기 → 프레임 끝 0x6de84)로 앱 전역 파티클 관리자를 직접 굴리고 그린다
+  useClaimSceneParticles()
   useStageAnimation(refs, { judgePitch: finishPitch, endPitch, commitHit, releaseSwing })
   const pointerHandlers = useStageControls(refs, actions)
 

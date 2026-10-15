@@ -8,7 +8,7 @@ import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { createParticleScene } from '@/entities/particle/model/particleScene'
+import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
@@ -287,8 +287,13 @@ export interface StageRefs {
   readonly resultTicksRef: MutableRefObject<number>
   /** 지금 '결과' 가 맞은 공 뒤 인플레이(0x17) 자리인가 — 아니면 상태 0x12 (`StagePhaseSnapshot.isInPlay`) */
   readonly isInPlayResultRef: MutableRefObject<boolean>
-  /** 살아 있는 파티클 이미터 목록 (원본 파티클 관리자 [0x1400068]) */
+  /** 살아 있는 파티클 이미터 목록 — 앱 전역 관리자 [0x1400068] 하나(`widgets/particles` 의 `sceneParticleScene`) */
   readonly particlesRef: MutableRefObject<ParticleScene>
+  /**
+   * 맞은 공이 0x13 을 끝내고 0x17(인플레이)로 넘어간 시각(`commitHit`) — 0x17 진입 0x46418 의 4673e 가 파티클 관리자를 갈래 없이
+   * 비운다(0x6dee4). 그 시각 뒤 첫 원본 틱에서 지우고 null 로 되돌린다
+   */
+  readonly inPlayEnteredAtRef: MutableRefObject<number | null>
   readonly pointerDownAtRef: MutableRefObject<number>
   readonly latestRef: MutableRefObject<StageLatest>
 }
@@ -321,7 +326,8 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     heldResultRef: useRef<((now: number) => void) | null>(null),
     resultTicksRef: useRef(RESULT_PHASE_TICKS),
     isInPlayResultRef: useRef(false),
-    particlesRef: useRef<ParticleScene>(createParticleScene()),
+    particlesRef: useRef<ParticleScene>(sceneParticleScene()),
+    inPlayEnteredAtRef: useRef<number | null>(null),
     pointerDownAtRef: useRef(0),
     latestRef,
   }

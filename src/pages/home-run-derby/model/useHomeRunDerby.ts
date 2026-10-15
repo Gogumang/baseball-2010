@@ -46,6 +46,8 @@ import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
+import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
+import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject'
 import {
   HOME_RUN_TEXT_SCENE_START,
   derbyHomeRunTextOn,
@@ -457,6 +459,8 @@ export function useHomeRunDerby({
    * 0x30 바이트 복사(48d8e~48dd4), 볼카운트 지우기 0x48e9c(`0xb6764`). 첫 공 앞의 0xd 도 같은 진입이다.
    */
   const enterSceneD = () => {
+    // 48ef8~48f04 — 이전 상태가 0x16 이 아니면 파티클 관리자를 비운다(0x6dee4). 더비의 0xd 는 0x16 을 안 거친다
+    clearSceneParticles()
     setMoundStage(runRef.current.stage)
     // 48ddc 0xaebe4(공격 팀, 0) — 볼넷 · 사구가 예약한 다음 타순(+0x291 · +0x293)을 여기서 확정한다. 모드 7 도 되돌리지 않는다
     const confirmed = confirmDerbyNextBatter(lineupRef.current)
@@ -779,6 +783,9 @@ export function useHomeRunDerby({
    * 처음부터 탄다 — 시작 굴림 rand(0, 9) · rand(0, 2) 도 다시 돈다(U-79 확정). 0x20094 모드 5 갈래(0x1ff98)에는 굴림이 없다.
    */
   const restart = useCallback(() => {
+    // 장면을 나간다 — 결과 창이면 0x3c0b8 의 3c11c, 어느 길이든 소멸 0x332b8 의 332e0 이 파티클 관리자를 비우고(0x6dee4)
+    // 새 장면 객체는 0 채움이다(+0xfd4 = 0)
+    leaveGameSceneObject()
     clearTimer()
     clearPlaySoundTimers()
     // 경기 시작 상태 9 의 0x39868 이 +0x84 · 표시(+0x1b60) · +0x19ec 를 지운다

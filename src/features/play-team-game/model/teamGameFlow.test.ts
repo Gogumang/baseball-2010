@@ -2428,6 +2428,8 @@ describe("사람 '#' 교체 뒤 0x16 → 0xd → 0xe → 0xf 재진입 · 교체
     const 판 = 지친상대()
     const 취소 = cancelSubstitution(판)
     expect(취소.sceneConfirm).not.toBe(판.sceneConfirm)
+    // 0x4984a 는 0xd 없이 곧장 0xe — 0xd 진입의 투수 그림 되돌리기 · 파티클 지우기가 없다
+    expect(취소.sceneConfirm).toEqual({ entries: 1, skipsSceneD: true })
     expect(취소.opponentPitcherIndex).toBe(판.opponentPitcherIndex)
     const 뒤 = confirmScene(취소, createSeededRandom(1))
     expect(뒤.opponentPitcherIndex).not.toBe(판.opponentPitcherIndex)

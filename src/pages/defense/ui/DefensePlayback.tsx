@@ -29,7 +29,9 @@ import type { HomeRunScoreBoard } from '@/pages/defense/lib/runScoreBoard'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { RunScoreBoard } from '@/pages/defense/ui/RunScoreBoard'
-import { createParticleScene, type ParticleScene } from '@/entities/particle/model/particleScene'
+import { clearParticles, type ParticleScene } from '@/entities/particle/model/particleScene'
+import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
+import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneParticles'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
@@ -170,6 +172,8 @@ export function DefensePlayback({
   freePassPlay = false,
   children,
 }: DefensePlaybackProps) {
+  // 수비 판(0x17)은 갱신마다 앱 전역 파티클 관리자를 직접 굴리고 그린다(그리기 0x46c88 → 프레임 끝 0x6de84 · 0x6dd69)
+  useClaimSceneParticles()
   if (input !== undefined) {
     return (
       <LivePlayback
@@ -248,7 +252,10 @@ interface BallParticleRun {
 }
 
 function startBallParticleRun(): BallParticleRun {
-  return { scene: createParticleScene(), effects: defenseEffectsOf(DEFENSE_SCENE_START), version: 0, cleared: false }
+  // 0x17 진입 0x46418 의 4673e — 앱 전역 관리자를 갈래 없이 비운다(0x6dee4, 굴림 없음)
+  const scene = sceneParticleScene()
+  clearParticles(scene)
+  return { scene, effects: defenseEffectsOf(DEFENSE_SCENE_START), version: 0, cleared: false }
 }
 
 /** 그림 하나 — 공 그리기의 파티클을 쏘고 프레임 끝 파티클 틱을 돌린다 */
@@ -662,8 +669,9 @@ function LivePlayback({
    * 난수는 진행기와 같은 경기 난수(`input.random`)다 — 진행기 굴림 뒤에 그 그림의 효과 · 파티클 굴림이 든다.
    */
   const effectsRef = useRef<DefenseEffects>(defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START))
-  // 0x17 진입 0x46418 이 4673e 에서 파티클 관리자를 비운다(0x6dee4) — 타석 화면(0x11 · 0x13)의 타격 불꽃은 여기로 안 이어진다
-  const particlesRef = useRef<ParticleScene>(createParticleScene())
+  // 앱 전역 파티클 관리자 [0x1400068] — 0x17 진입 0x46418 이 4673e 에서 비운다(0x6dee4, 아래 판 시작) — 타석 화면(0x11 · 0x13)의
+  // 타격 불꽃 · 메뉴에서 남은 이미터는 여기로 안 이어진다
+  const particlesRef = useRef<ParticleScene>(sceneParticleScene())
   /** 마지막으로 돈 갱신 — 판이 닫힌 뒤 건너뛴 갱신을 따라잡는다 */
   const closedUpdateRef = useRef<number | null>(null)
   /** 화면(`DefenseScreen`)이 마지막으로 그린 카메라 오프셋 (+0xfec, +0xff0) — 공 그리기 파티클의 화면 좌표 */
@@ -700,7 +708,7 @@ function LivePlayback({
       boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
       closedCountRef.current = 0
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
-      particlesRef.current = createParticleScene()
+      clearParticles(particlesRef.current)
       closedUpdateRef.current = null
       closingFrameRef.current = null
       cameraOffsetRef.current = null

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 /**
@@ -25,6 +26,20 @@ const CONFIRM_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
 
 /** 타석 등장음을 이미 낸 대기 — 화면이 다시 서도(메뉴를 열었다 닫아도) 두 번 안 낸다 */
 const announcedWaits = new WeakSet<SceneConfirmWait>()
+
+/**
+ * 0xd 첫 그림을 이미 센 (대기, 받은 OK 수) — 같은 0xd 를 화면이 다시 서도(메뉴를 열었다 닫아도) 두 번 세지 않는다
+ */
+const enteredSceneD = new WeakMap<SceneConfirmWait, Set<number>>()
+
+/** (대기, 받은 OK 수)의 0xd 를 처음 본다면 적고 참 */
+function marksSceneDEntered(wait: SceneConfirmWait, confirmed: number): boolean {
+  const seen = enteredSceneD.get(wait) ?? new Set<number>()
+  if (seen.has(confirmed)) return false
+  seen.add(confirmed)
+  enteredSceneD.set(wait, seen)
+  return true
+}
 
 /** 대기 객체마다 받은 OK 수 — 화면이 다시 서도 남는다 (진행 상태가 같은 객체를 들고 있는 동안) */
 const confirmedCounts = new WeakMap<SceneConfirmWait, number>()
@@ -68,6 +83,11 @@ export interface SceneConfirm {
   readonly acceptsConfirm: boolean
   /** OK 한 번 — 받을 수 없으면(잠금 3 갱신·메뉴 등) 아무 일도 없다 */
   readonly confirm: () => void
+  /**
+   * 0xd 진입(0x48d50)마다 오르는 표지 — 대기가 보이기 시작한 0xd 첫 그림에 오른다. 교체 창 0xb 에서 곧장 선 0xe(`skipsSceneD`)는
+   * 안 오른다. 사람 투구 장면(`PitcherSideStage`)이 48ee4 0x35650 → 0x340c0(투수 그림 객체 상태 0)을 여기에 잇는다
+   */
+  readonly sceneDEntryMark: number
 }
 
 /**
@@ -94,6 +114,7 @@ export function useSceneConfirm(
   const acceptsConfirm = isAwaiting && canAccept
 
   const isUnlockedRef = useRef(false)
+  const [sceneDEntryMark, setSceneDEntryMark] = useState(0)
   const [enteredKey, setEnteredKey] = useState<{ readonly wait: SceneConfirmWait; readonly confirmed: number } | null>(null)
   const isInConfirmState =
     isAwaiting && enteredKey !== null && enteredKey.wait === wait && enteredKey.confirmed === confirmed
@@ -102,11 +123,16 @@ export function useSceneConfirm(
   useEffect(() => {
     isUnlockedRef.current = false
     if (!acceptsConfirm || wait == null) return
-    // 0xd 첫 그림 — 메시지 0xbc1(0x522d2)의 타석 등장음. 대기 하나에 한 번(첫 0xe 몫이라 OK 를 받기 전에만)
+    // 0xd 첫 그림 — 메시지 0xbc1(0x522d2)의 타석 등장음. 대기 하나에 한 번(첫 0xe 몫이라 OK 를 받기 전에만).
+    // 등장음이 실린 대기 = 교체 연출 0x16 을 안 거친 0xd 진입이라, 같은 진입 0x48d50 이 48ef8 `[장면+0x28] != 0x16` 일 때
+    // 48f02 에서 앱 전역 파티클 관리자를 비운다(0x6dee4, 굴림 없음) — 메뉴에서 남은 이미터도 여기서 진다
     if (confirmed === 0 && wait.atBatEntrySoundId !== undefined && !announcedWaits.has(wait)) {
       announcedWaits.add(wait)
+      clearSceneParticles()
       activeSound().play(wait.atBatEntrySoundId)
     }
+    // 0xd 첫 그림 — 0x48d50 이 48ee4 에서 투수 그림 객체를 상태 0 으로 되돌린다(0x35650 → 0x340c0). 0xb 에서 곧장 선 0xe 는 0xd 가 없다
+    if (wait.skipsSceneD !== true && marksSceneDEntered(wait, confirmed)) setSceneDEntryMark((mark) => mark + 1)
     const frame = millisecondsPerFrame()
     const entered = window.setTimeout(() => setEnteredKey({ wait, confirmed }), SCENE_PREPARE_FRAMES * frame)
     const unlocked = window.setTimeout(() => {
@@ -142,5 +168,5 @@ export function useSceneConfirm(
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsConfirm, confirm])
 
-  return { isAwaiting, isInConfirmState, acceptsConfirm, confirm }
+  return { isAwaiting, isInConfirmState, acceptsConfirm, confirm, sceneDEntryMark }
 }

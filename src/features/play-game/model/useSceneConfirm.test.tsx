@@ -2,7 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
-import { chainSceneConfirm, enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { chainSceneConfirm, enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow } from '@/features/play-game/model/sceneConfirm'
+import { resetSceneParticleManagerForTest, sceneParticleScene } from '@/entities/particle/model/sceneParticleManager'
+import { emitParticles } from '@/entities/particle/model/particleScene'
+import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
@@ -90,7 +93,8 @@ describe('상태 0xe 의 OK 대기 (0x532b0 · 0x49a26)', () => {
     first.unmount()
     const again = renderHook(() => useSceneConfirm(wait, true))
     expect(again.result.current.isAwaiting).toBe(false)
-    const next = renderHook(() => useSceneConfirm(enterSceneConfirm(), true))
+    const fresh = enterSceneConfirm()
+    const next = renderHook(() => useSceneConfirm(fresh, true))
     expect(next.result.current.isAwaiting).toBe(true)
   })
 
@@ -140,7 +144,8 @@ describe('타석 등장음 — 0xd 진입 메시지 0xbc1 → 0x522d2 (마타자
 
   it('등장음이 없는 대기(교체 연출 0x16 뒤 · 교체 창 취소)는 소리가 없다', () => {
     const played = 통로()
-    renderHook(() => useSceneConfirm(enterSceneConfirm(), true))
+    const wait = enterSceneConfirm()
+    renderHook(() => useSceneConfirm(wait, true))
     expect(played).toEqual([])
   })
 
@@ -154,5 +159,43 @@ describe('타석 등장음 — 0xd 진입 메시지 0xbc1 → 0x522d2 (마타자
     키('5')
     expect(result.current.isAwaiting).toBe(true)
     expect(played).toEqual([26])
+  })
+})
+
+describe('0xd 진입 0x48d50 — 투수 그림 객체 되돌리기(48ee4) · 파티클 지우기(48f02)', () => {
+  afterEach(() => resetSceneParticleManagerForTest())
+
+  /** 51 바이트 설정 — 값은 상관없다(지우기만 본다) */
+  const config = {
+    ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 5, lifeR: 0,
+    a0: 0, a0R: 0, a1: 0, a1R: 0, ax: 0, ay: 0, w: 0, h: 0, total: 5, mode: 2,
+  } as unknown as ParticleConfig
+
+  it('0x16 을 안 거친 0xd(등장음이 실린 대기)는 첫 그림에 앱 전역 파티클 관리자를 비운다 — 메뉴에서 남은 이미터도', () => {
+    emitParticles(sceneParticleScene(), config, 60, 160, 4)
+    expect(sceneParticleScene().emitters).toHaveLength(1)
+    const wait = enterSceneConfirm(14)
+    renderHook(() => useSceneConfirm(wait, true))
+    expect(sceneParticleScene().emitters).toHaveLength(0)
+  })
+
+  it('0x16 뒤 0xd(48ef8 이전 상태 == 0x16) · 0xb 에서 곧장 선 0xe 는 안 비운다', () => {
+    emitParticles(sceneParticleScene(), config, 60, 160, 4)
+    const afterSubstitution = enterSceneConfirm()
+    const fromWindow = enterSceneConfirmFromSubstitutionWindow()
+    renderHook(() => useSceneConfirm(afterSubstitution, true))
+    renderHook(() => useSceneConfirm(fromWindow, true))
+    expect(sceneParticleScene().emitters).toHaveLength(1)
+  })
+
+  it('표지는 0xd 마다 오르고(0x16 뒤 0xd 도), 0xb 의 # · CLR 로 곧장 선 0xe(0x4984a)는 안 오른다', () => {
+    const { result, rerender } = renderHook(({ wait }: { wait: SceneConfirmWait }) => useSceneConfirm(wait, true), {
+      initialProps: { wait: enterSceneConfirm(14) },
+    })
+    expect(result.current.sceneDEntryMark).toBe(1)
+    rerender({ wait: enterSceneConfirmFromSubstitutionWindow() })
+    expect(result.current.sceneDEntryMark).toBe(1)
+    rerender({ wait: enterSceneConfirm() })
+    expect(result.current.sceneDEntryMark).toBe(2)
   })
 })

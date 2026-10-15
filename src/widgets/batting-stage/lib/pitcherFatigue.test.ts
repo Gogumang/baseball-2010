@@ -85,7 +85,7 @@ describe('투수 그리기의 홈런 갈래 (0x3908a~0x39192)', () => {
     expect(pitcherHomeRunMarksOf({ ...base, judgedTick: 15, pitcherTick: 40, step: frozenStep })).toBeNull()
   })
 
-  it('결과 코드는 0x6aa 만 쓴다 — 홈런 뒤 안 친 공에서도 마지막 단계(틱 19)부터 그린다', () => {
+  it('0x11 진입 전 값이 홈런성이면 마지막 단계(틱 19)부터 그린다 — 장면에서는 0x11 진입(3deea)이 0 으로 지워 안 나온다', () => {
     const stale = { ...base, codeBeforePitch: 24, judgedTick: null, judgedCode: null, isBigHit: false }
     expect(pitcherHomeRunMarksOf({ ...stale, pitcherTick: 18, step: 12 })).toBeNull()
     expect(pitcherHomeRunMarksOf({ ...stale, pitcherTick: 19 })).toEqual({ drawCall: 1, showsPitcherAnimation: true, showsBang: false })

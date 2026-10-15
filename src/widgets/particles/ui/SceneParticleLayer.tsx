@@ -3,6 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import {
+  isSceneParticlesClaimed,
   preloadSceneParticles,
   sceneParticleScene,
   tickSceneParticles,
@@ -20,9 +21,11 @@ interface SceneParticleLayerProps {
 }
 
 /**
- * **경기 장면 밖 화면의 파티클 층** — 장면 프레임이 그림마다 관리자 틱 0x6de85 → 그리기 0x6dd69 를 부르는 자리
- * (`sceneParticles` 머리 표). 메인 메뉴 0x103 은 공용 창(0x746cd) **다음**에 그리므로 이 층은 히든 오픈 알림 창 위에 놓는다.
+ * **장면 파티클 층** — 장면 프레임이 그림마다 관리자 틱 0x6de85 → 그리기 0x6dd69 를 부르는 자리(`sceneParticles` 머리 표).
+ * 메인 메뉴 0x103 은 공용 창(0x746cd) **다음**에 그리므로 이 층은 히든 오픈 알림 창 위에 놓는다.
  * 원본 틱(`millisecondsPerFrame`)마다 한 번 굴리고 그린다. 이미터가 없으면 굴림도 그림도 없다(난수를 안 돌린다).
+ * 경기 장면 부품(타석 · 수비 판)이 관리자를 쥔 동안(`isSceneParticlesClaimed`)은 그 부품이 제 틱 차례로 굴리고 제 캔버스에 그리므로
+ * 이 층은 굴리지도 그리지도 않는다 — 쥔 부품이 없는 경기 화면(교대 판 · 벤치 클리어링 · 사람 투구 장면 따위)은 이 층이 돌린다.
  */
 export function SceneParticleLayer({ random }: SceneParticleLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -39,7 +42,8 @@ export function SceneParticleLayer({ random }: SceneParticleLayerProps) {
     let handle = 0
     const frame = (now: number) => {
       const tick = Math.floor((now - startedAt) / millisecondsPerFrame())
-      if (scene.emitters.length === 0) {
+      const isClaimed = isSceneParticlesClaimed()
+      if (scene.emitters.length === 0 || isClaimed) {
         steppedTick = tick
       } else {
         if (tick - steppedTick > CATCH_UP_LIMIT) steppedTick = tick - CATCH_UP_LIMIT
@@ -48,7 +52,7 @@ export function SceneParticleLayer({ random }: SceneParticleLayerProps) {
           tickSceneParticles(randomRef.current)
         }
       }
-      const shows = scene.emitters.length > 0
+      const shows = scene.emitters.length > 0 && !isClaimed
       if (shows !== wasShown) {
         wasShown = shows
         setIsShown(shows)

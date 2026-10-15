@@ -60,6 +60,7 @@ import { useEditedNames } from '@/entities/player-name/model/useEditedNames'
 import { aceCellOfUnlock, recordUnlockIdOf } from '@/entities/collection/model/recordUnlock'
 import { recordUnlockNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import { isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
+import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
@@ -195,7 +196,21 @@ export function App() {
   const hiddenOpenNotice = useHiddenOpenNotice()
   /** 서 있는 경기 장면(0x104) 화면 수 — `useMarksGameScene` 이 센다 */
   const [gameSceneCount, setGameSceneCount] = useState(0)
-  const markGameScene = useCallback((isUp: boolean) => setGameSceneCount((count) => count + (isUp ? 1 : -1)), [])
+  /**
+   * 경기 장면 화면이 다 내려갔다 = 장면 0x104 를 나갔다 — 소멸 0x332b8(332e0)이 앱 전역 파티클 관리자를 비우고, 다음 경기 장면은
+   * 새 객체(+0xfd4 = 0)로 선다 (`leaveGameSceneObject`). 화면이 같은 커밋에서 바뀌면(경기 → 결과 화면) 내림 · 올림이 한 효과 차례에
+   * 들므로 그 차례가 끝난 뒤(마이크로태스크)에도 0 일 때만 내린다 — 다음 그림(rAF)의 파티클 틱보다 앞이다
+   */
+  const gameSceneCountRef = useRef(0)
+  const markGameScene = useCallback((isUp: boolean) => {
+    gameSceneCountRef.current += isUp ? 1 : -1
+    if (!isUp && gameSceneCountRef.current === 0) {
+      queueMicrotask(() => {
+        if (gameSceneCountRef.current === 0) leaveGameSceneObject()
+      })
+    }
+    setGameSceneCount((count) => count + (isUp ? 1 : -1))
+  }, [])
   /** 미션 선수 고르기가 읽는 명예의 전당 — 기록연감 훅이 선 뒤 아래에서 채운다 (`recordStatRef` 와 같은 까닭) */
   const hallOfFameForMissionRef = useRef<Collection>(EMPTY_COLLECTION)
   const recordStat = useCallback((event: AnnalsStatEvent) => recordStatRef.current(event), [])
@@ -502,9 +517,9 @@ export function App() {
           />
         </ScreenOverlay>
       )}
-      {/* 장면 파티클 [0x1400068] — 0x103 · 0x105 · 0x106 · 0x107 프레임이 공용 창(0x746cd) 뒤에 굴리고 그린다(`sceneParticles`).
-          경기 장면(0x104)을 그리는 화면은 제 관리자를 따로 들어 이 층은 그동안 멈춘다 */}
-      {gameSceneCount === 0 && <SceneParticleLayer random={random} />}
+      {/* 장면 파티클 [0x1400068] — 0x103 · 0x105 · 0x106 · 0x107 · 0x104 프레임이 굴리고 그린다(`sceneParticles`). 관리자는 앱에 하나다.
+          경기 장면의 타석 · 수비 판 부품이 관리자를 쥔 동안은 그 부품이 제 틱 차례로 굴리고 그려 이 층은 쉰다 */}
+      <SceneParticleLayer random={random} />
     </RecordAchievedContext.Provider>
   )
 

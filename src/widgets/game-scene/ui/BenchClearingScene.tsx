@@ -22,6 +22,7 @@ import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { irisHoleSpansOf } from '@/widgets/game-scene/lib/irisClose'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 
 interface BenchClearingSceneProps {
@@ -76,6 +77,13 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
     onDoneRef.current(reachedRef.current && targetRollsRef.current === null)
   }
 
+  /** 키 0x40628 — OK(−5) · '5': 소리 멈춤 0x6e418 · 파티클 +0x57 = 0 · 0x6dee4(4064c, 굴림 없음) 뒤 같은 출구 */
+  const skip = () => {
+    if (doneRef.current) return
+    clearSceneParticles()
+    finish()
+  }
+
   const tick = useSceneTick((next) => {
     if (doneRef.current) return
     if (next === BENCH_CLEARING_TARGET_TICK) {
@@ -97,7 +105,7 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !isOkKey(event.key)) return
       event.preventDefault()
-      finish()
+      skip()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -122,7 +130,7 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
         />
       )}
       {iris !== null && <IrisCloseCanvas x={iris.x} y={iris.y} size={iris.size} />}
-      <OkTapArea onTap={finish} />
+      <OkTapArea onTap={skip} />
     </RawScreen>
   )
 }
