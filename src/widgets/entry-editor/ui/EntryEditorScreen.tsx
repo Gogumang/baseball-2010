@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -12,9 +12,7 @@ import type {
 import { ENTRY_TABLES_BASIC, entrySlideOffsetOf } from '@/widgets/entry-editor/lib/entryListWindow'
 import type { EntryBatterLine, EntryColumnTables, EntryPitcherLine } from '@/widgets/entry-editor/lib/entryListWindow'
 import { EntryListWindow } from '@/widgets/entry-editor/ui/EntryListWindow'
-import { ENTRY_DETAIL_ORIGIN, PlayerDetailWindow, playerDetailOf } from '@/widgets/player-detail-window'
-import type { PlayerDetail } from '@/widgets/player-detail-window'
-import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { EntryDetailOverlay } from '@/widgets/entry-editor/ui/EntryDetailOverlay'
 
 /** 편집기 한 줄이 화면에 보여 줄 것 */
 export interface EntryFace {
@@ -88,20 +86,6 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
 /** 머리띠 0x54d95 셋째 인자 — 투수 탭 0xf · 타자 탭 0x17 (일반 0x2e09e~0x2e0aa · 시즌 0xe0 그림 0xb08c~0xb098) */
 const ENTRY_FOOTER = { 투수: 0xf, 타자: 0x17 } as const
 
-/** 커서 줄의 상세 창 값 — 레코드 칸 재료가 없으면 도형만 (⚠️ 값 칸은 비운다) */
-function entryDetailOf(row: EntryFace, isPitcher: boolean): PlayerDetail {
-  if (row.detailSource !== undefined) return playerDetailOf(row.detailSource)
-  return { kind: isPitcher ? '투수' : '타자', abilities: row.ability, values: [] }
-}
-
-/** '0' 상세 창 시계 — 연 그림 · 도형을 다시 만든 그림 (틱) */
-interface DetailClock {
-  readonly isOpen: boolean
-  readonly cursor: number
-  readonly openedAt: number
-  readonly radarAt: number
-}
-
 /**
  * **엔트리 편집 화면** — 시즌 0xe0(그림 `0xb074`) · 0xdf(`0xb010`) · 일반모드 상태 23(그림 `0x2e070`) · 스페셜 에디트 29(`0x2e1e0`):
  * 엔트리 목록 창 `0x5cfec`(`EntryListWindow` — 칸 배치 · 수비/보직 딱지 · 기록 열 · 커서 · 열 밀기 모두 원본에서 떴다)
@@ -158,15 +142,6 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
   const rows = isPitcherTab ? lists.pitchers : lists.batters
   const cursorRow = rows[editor.cursor]
 
-  // '0' 상세 창 — [ed+0x424] 를 켠 그림부터 창이 열리고(0x5c8aa), 커서가 움직이면 도형을 다시 만든다
-  const tick = useSceneTick(undefined, editor.isDetailOpen)
-  const [clock, setClock] = useState<DetailClock>({ isOpen: false, cursor: editor.cursor, openedAt: 0, radarAt: 0 })
-  if (clock.isOpen !== editor.isDetailOpen) {
-    setClock({ isOpen: editor.isDetailOpen, cursor: editor.cursor, openedAt: tick, radarAt: tick })
-  } else if (clock.isOpen && clock.cursor !== editor.cursor) {
-    setClock({ ...clock, cursor: editor.cursor, radarAt: tick })
-  }
-
   return (
     <RawScreen>
       {underlay}
@@ -192,10 +167,8 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
         />
       </div>
 
-      {editor.isDetailOpen && clock.isOpen && cursorRow !== undefined && (
-        <PlayerDetailWindow detail={entryDetailOf(cursorRow, isPitcherTab)} origin={ENTRY_DETAIL_ORIGIN} draw={tick - clock.openedAt}
-          radarDraw={tick - clock.radarAt} radarKey={clock.radarAt} />
-      )}
+      {/* '0' 상세 창 — [ed+0x424] 를 켠 그림부터 창이 열리고(0x5c8aa), 커서가 움직이면 도형을 다시 만든다 */}
+      <EntryDetailOverlay isOpen={editor.isDetailOpen} cursor={editor.cursor} row={cursorRow} isPitcherTab={isPitcherTab} />
 
       {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
           표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}

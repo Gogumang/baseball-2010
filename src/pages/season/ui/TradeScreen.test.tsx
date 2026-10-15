@@ -171,17 +171,37 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
     expect(칸(teamBatters(OPPONENT)[0].name)).toBeDefined()
   })
 
-  it('⚠️ 0xe6 에서 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로다 (원본 그대로 — 0x727c 는 this+0x154 를 본다)', () => {
+  it("0xe6 은 '*' 를 편집기에 안 넘긴다 — 0x727c 72ac `cmp r1, #0x2a ; beq` (바닥 7 에도 표시가 없다)", () => {
     // 소지금은 넉넉히 — 내 선수가 낮아 d < 0 이면 진행 가드 [77] 이 먼저 걸린다
     const { onTrade } = 띄우기(상태({ money: 9999 }), { random: 고정난수(1) })
     상대팀고르기() // 투수 탭
     영입고르기(teamPitchers(OPPONENT)[1].name)
-    fireEvent.keyDown(window, { key: '*' }) // 0xe6 목록만 타자로 (바닥 7 이라 표시는 없다)
-    누르기(teamBatters(MY_TEAM)[2].name) // 보이는 것은 타자 2번이지만 투수 탭 2번 칸이 된다
+    fireEvent.keyDown(window, { key: '*' }) // 0xe6 — 아무 일도 없다
+    expect(screen.queryByRole('button', { name: '* 투수' })).toBeNull()
+    누르기(teamPitchers(MY_TEAM)[2].name) // 목록은 0xe5 에서 정한 투수 탭 그대로
     누르기(/기본 진행/)
     누르기('예')
 
     expect(onTrade.mock.calls[0][0].swap).toEqual({ opponentTeamId: OPPONENT, tab: 0, myIndex: 2, opponentIndex: 1 })
+  })
+
+  it("'0' 은 0xe5 · 0xe6 모두 편집기 55920 에 가 선수 정보 창 0x5b798 을 연다 — 단계 진입(0x5561c 556d6)이 닫는다", () => {
+    띄우기(상태())
+    상대팀고르기()
+    expect(screen.queryByTestId('선수 정보 창')).toBeNull()
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByTestId('선수 정보 창')).toBeDefined()
+    // 다시 '0' 이면 닫힌다
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.queryByTestId('선수 정보 창')).toBeNull()
+    // 바닥띠 "0상세정보" 표시 자리
+    누르기('0 상세정보')
+    expect(screen.getByTestId('선수 정보 창')).toBeDefined()
+    // 0xe6 진입(0x5b28 → 0x5561c)이 닫고, 0xe6 에서도 '0' 이 연다
+    영입고르기(teamPitchers(OPPONENT)[1].name)
+    expect(screen.queryByTestId('선수 정보 창')).toBeNull()
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.getByTestId('선수 정보 창')).toBeDefined()
   })
 
   it('영입할 선수를 고르면 내 팀 명단(StrMODE[164])으로 넘어간다', () => {
