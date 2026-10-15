@@ -39,6 +39,8 @@ import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { aceDetailSourceOf, tableDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
+import type { PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 
 /** 목록 한 줄이 보여 줄 것 (`widgets/entry-editor` 의 `EntryFace`) */
 export interface NariEntryFace {
@@ -50,6 +52,8 @@ export interface NariEntryFace {
    * ⚠️ 기록 열(+0x20~)과 체력 줄은 나리 팀 레코드의 시즌 줄 · +0x2c 를 웹이 이 목록에 싣지 않아 비운다
    */
   readonly profileLow?: number
+  /** '0' 상세 창 0x5b798 레코드 칸 — 붙박이 표 행 · 마선수 표. ⚠️ 내 선수 줄은 커리어가 레코드 칸(+0xb · +0x1b 등)을 안 들어 비운다 */
+  readonly detailSource?: PlayerDetailSource
 }
 
 export interface NariEntryBatter extends EntryBatterRow, NariEntryFace {}
@@ -67,17 +71,17 @@ export interface NariEntryView {
 
 const aceBatterFace = (index: number): NariEntryFace => {
   const ace = ACE_BATTERS[index]
-  return ace === undefined
-    ? { name: '마타자', ability: [] }
-    : { name: ace.name, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run], profileLow: ace.profile & 3 }
+  if (ace === undefined) return { name: '마타자', ability: [] }
+  const ability = [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run]
+  return { name: ace.name, ability, profileLow: ace.profile & 3, detailSource: aceDetailSourceOf(ace, index, ability, false) }
 }
 
 /** 마투수 표의 네 칸은 타자 칸 이름으로 들었다 — 제구·구속·변화·체력 차례 (`aceOpponent` 주석) */
 export const acePitcherFace = (index: number): NariEntryFace => {
   const ace = ACE_PITCHERS[index]
-  return ace === undefined
-    ? { name: '마투수', ability: [] }
-    : { name: ace.name, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run], profileLow: ace.profile & 3 }
+  if (ace === undefined) return { name: '마투수', ability: [] }
+  const ability = [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run]
+  return { name: ace.name, ability, profileLow: ace.profile & 3, detailSource: aceDetailSourceOf(ace, index, ability, true) }
 }
 
 /**
@@ -94,7 +98,7 @@ export function nariEntryBattersOf(record: NariTeamRecord, teamId: number, me: N
     const player = table[row.slot]
     return {
       name: player?.name ?? '', ability: player?.ability ?? [], isAce: false, position: row.position,
-      ...(player === undefined ? {} : { profileLow: player.profile & 3 }),
+      ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, false, player.ability) }),
     }
   })
 }
@@ -114,7 +118,8 @@ export function nariEntryPitchersOf(
     if (found !== undefined) return found
     const player = table[slot]
     return {
-      name: player?.name ?? '', ability: player?.ability ?? [], isAce: false, ...(player === undefined ? {} : { profileLow: player.profile & 3 }),
+      name: player?.name ?? '', ability: player?.ability ?? [], isAce: false,
+      ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, true, player.ability) }),
     }
   })
 }

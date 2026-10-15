@@ -114,10 +114,8 @@ export interface PlayerDetailSource {
   readonly abilities: readonly number[]
   /** 마선수 순번 0~4 (0xb63a0), 아니면 −1 */
   readonly aceIndex: number
-  /** +0xb — 타자 타입(>> 5) */
+  /** +0xb — 타자 타입(>> 5) · 타자 손(비트 4, 0xb63c0). 모르면 0 */
   readonly profile: number
-  /** 손 0xb63c0 (타자 갈래 — 0 우타 · 1 좌타). 투수는 폼 · 마선수로 다시 셈한다 */
-  readonly hand: number
   /** +0x14 장착 스킬 비트 */
   readonly skillBits: number
   /** 타자 +0x18 고른 필살 번호 (0 없음) */

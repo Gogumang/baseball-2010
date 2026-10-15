@@ -8,7 +8,7 @@ import type { TeamEntryBatter, TeamEntryPitcher } from '@/features/play-team-gam
 import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { aceBatterProfileOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { batterPositionBadgeOf, pitcherRoleBadgeOf } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
-import { batterProfileOf, teamBatterHandOf } from '@/pages/team-game/lib/teamMatchupCards'
+import { batterProfileOf } from '@/pages/team-game/lib/teamMatchupCards'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import { teamBatterSeasonStatsOf, teamPitcherSeasonStatsOf } from '@/pages/team-game/lib/teamMatchupCards'
 
@@ -244,7 +244,6 @@ export function playerDetailOf(progress: TeamGameProgress, kind: '투수' | '대
       abilities,
       aceIndex: entry.aceIndex,
       profile: 0,
-      hand: 0,
       skillBits: entry.skillBits ?? 0,
       repertoire: { form, magicNumber: magicId, pitchMask },
       // ⚠️ 미확인: 표 밖 선수(영입 기록 · 마선수)의 +0x1b 는 웹 명단에 없어 0 으로 둔다
@@ -259,7 +258,6 @@ export function playerDetailOf(progress: TeamGameProgress, kind: '투수' | '대
     abilities,
     aceIndex: entry.aceIndex,
     profile: entryProfileOf(progress, entry),
-    hand: teamBatterHandOf(teamId, entry),
     skillBits: entry.skillBits ?? 0,
     specialNumber: 0,
     grade: batterGradeOf(teamId, entry),

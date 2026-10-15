@@ -4,6 +4,7 @@ import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import { batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import type { PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 
 /**
@@ -225,7 +226,8 @@ export function playerDetailOf(source: PlayerDetailSource): PlayerDetail {
     abilities: source.abilities,
     values: [
       textValue(isAce ? (ACE_BATTER_TYPE_TEXT[source.aceIndex] ?? '') : (BATTER_TYPE_TEXT[battingType] ?? '')),
-      textValue(HAND_TEXT.batter[source.hand] ?? ''),
+      // 손 0xb63c0 타자 갈래 — 마타자는 표 0xd88b0, 그 밖은 +0xb 비트 4
+      textValue(HAND_TEXT.batter[batterHandOf(source.profile, source.aceIndex)] ?? ''),
       tickerOrNone(skillNamesOf(source.skillBits, false)),
       special,
       salary,
