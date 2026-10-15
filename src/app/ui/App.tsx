@@ -621,6 +621,12 @@ export function App() {
         // 원본 G포인트는 전역 기록(`mgr+0x64`)이라 모드와 상관없이 하나다 — 지갑을 그대로 본다.
         // 육성 선수가 없어도 값이 있고, 육성 선수가 있으면 그쪽 화면과 같은 값이다.
         gamePoint={wallet.balance}
+        // 경기 중 자동진행 [예] 0x3c83a~0x3c84e — 전역 G 에서 30 을 뺀다. 모드 1 은 소모 통계(0x22c29)에 적지 않는다
+        // (0x3c850: 모드 2 → k3 · 8·9 → k4 만). 무한G 스위치가 켜져 있으면 지갑이 쓰기를 무시한다
+        onSpendGamePoint={wallet.spend}
+        // 경기 중 메뉴 하위 4 환경설정 — 시즌 경기와 같은 전역 설정
+        settings={gameSettings.settings}
+        onSettingsChange={gameSettings.setSettings}
         // "예" → G를 빼고 플래그를 세운다 (0xa3e2 · 0xa3f6). 모자람 판정은 화면이 이미 했다.
         // `spend` 의 자르기 [0, 99999] 와 "모자라면 한 푼도 안 깎는다" 가 원본 0xa3dc~0xa3f4 와 같다.
         onOpenAce={aceSelect.onOpenAce}

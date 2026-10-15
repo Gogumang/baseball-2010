@@ -35,6 +35,8 @@ export function PitcherCreateFlow({ openedHiddenIds = [], onCreate, onCancel, ga
   return (
     <PitcherRegisterScreen
       teamId={teamId}
+      // 머리띠 G — 제목이 있는 머리띠 0x54d95 는 늘 전역 G(+0x64)를 그린다 (0x550d8~0x550de)
+      {...(gamePoint === undefined ? {} : { gamePoint })}
       onCreate={(name, profile) => onCreate(name, { ...profile, teamId })}
       onCancel={() => setTeamId(null)}
     />

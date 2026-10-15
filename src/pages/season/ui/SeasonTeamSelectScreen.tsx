@@ -76,7 +76,7 @@ export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit,
 
   if (namingTeamId !== null) {
     return (
-      <SeasonTeamNameScreen teamId={namingTeamId}
+      <SeasonTeamNameScreen teamId={namingTeamId} gamePoint={gamePoint ?? 0}
         onConfirm={(name) => onChoose(namingTeamId, name)} onBack={() => setNamingTeamId(null)} />
     )
   }
@@ -110,6 +110,8 @@ interface SeasonTeamNameScreenProps {
   readonly onConfirm: (name: string) => void
   /** 이름이 빈 채로 취소 — 0xca 로 */
   readonly onBack: () => void
+  /** 머리띠 G — 제목이 있는 머리띠 0x54d95 는 늘 전역 G(+0x64)를 그린다 (0x550d8~0x550de) */
+  readonly gamePoint: number
 }
 
 /**
@@ -141,7 +143,7 @@ interface SeasonTeamNameScreenProps {
 /** ⚠️ 웹 자리: OK — 바닥띠 왼쪽 표시 자리 (x 2, 47×12, 다 내려온 바닥띠 B = 320 의 B − 18) */
 const NAME_OK_PRESS_RECT = { x: 2, y: 320 - 18, width: 47, height: 12 } as const
 
-function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScreenProps) {
+function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint }: SeasonTeamNameScreenProps) {
   const [name, setName] = useState('')
   const [isAsking, setAsking] = useState(false)
   const latest = useRef({ name, onBack })
@@ -202,7 +204,7 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack }: SeasonTeamNameScree
       <div style={{ position: 'absolute', left: 8, top: 260, width: 224 }}>
         <MarkupText raw={`!C${NAME_LIMIT_GUIDE}`} />
       </div>
-      <ScreenFrame title="시즌모드" gamePoint={0} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
       {/*
         ⚠️ 웹 자리: OK — 원본 이름 입력 그림 0xba28 에는 OK 그림 자리가 없다(키 0xbc44 의 확인만). 마우스 · 터치로 끝낼 길이 없어
         바닥띠 왼쪽 표시 자리(선수 등록 0x66 의 OK 와 같은 자리)를 투명 누름 칸으로 빌려 OK 키를 보낸다

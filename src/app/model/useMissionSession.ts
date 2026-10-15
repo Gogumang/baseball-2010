@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } fr
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
-import { describeOutcomeBanner, describePitchResolution } from '@/entities/at-bat/model/resolutionText'
+import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { isMissionSideAllCleared, MISSION_ALL_CLEAR_HIDDEN_ID, missionKeyOf } from '@/entities/mission/model/missionGoal'
@@ -36,7 +36,7 @@ import {
   startPitcherMission,
   withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
-import { battingRecordAt, cpuSideOf, humanSideOf, missionHumanRecordSlotOf, withMissionScore } from '@/entities/mission/model/missionGame'
+import { battingRecordAt, cpuSideOf, humanSideOf, missionHumanRecordSlotOf, missionTeamIdsOf, withMissionScore } from '@/entities/mission/model/missionGame'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import { skillIdsOfBits, teamBatters } from '@/entities/team/model/teamRoster'
@@ -795,15 +795,24 @@ export function useMissionSession({
    */
   const playAbilitiesOf = (run: MissionRun): MissionPlayAbilities => {
     const missionPitcher = missionPitcherPlateRef.current
-    return missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission), {
-      ...run,
-      ...(missionPitcher === undefined ? {} : { missionPitcher }),
-    })
+    // 야수 · 주자 팔레트 — 경기[0x28 + 칸] 두 팀 중 수비측(타자 미션 CPU · 투수 미션 사람 칸) (C-1)
+    const teamIds = missionTeamIdsOf(run)
+    const humanDefends = run.mission.side === '투수'
+    return {
+      ...missionPlayAbilitiesOf(run, specialRunnersRef.current(run.mission), {
+        ...run,
+        ...(missionPitcher === undefined ? {} : { missionPitcher }),
+      }),
+      defenseTeamIndex: humanDefends ? teamIds.human : teamIds.cpu,
+      offenseTeamIndex: humanDefends ? teamIds.cpu : teamIds.human,
+    }
   }
   /** 공 도착 판에 얹는 그림 전용 두 칸 (능력치 칸은 부르는 쪽이 따로 넣는다) */
-  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces }: MissionPlayAbilities) => ({
+  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces, defenseTeamIndex, offenseTeamIndex }: MissionPlayAbilities) => ({
     ...(fielderPlates === undefined ? {} : { fielderPlates }),
     ...(runnerAces === undefined ? {} : { runnerAces }),
+    ...(defenseTeamIndex === undefined ? {} : { defenseTeamIndex }),
+    ...(offenseTeamIndex === undefined ? {} : { offenseTeamIndex }),
   })
   /** 견제 판 꼴 — 견제는 타자주자가 없어 루 1~3 만 */
   const pickoffAbilitiesOf = (run: MissionRun) => {
@@ -1388,8 +1397,11 @@ export function useMissionSession({
     const strikesBefore = runner.atBatRef.current.strikes
     // 판을 도는 파울 각 공은 판이 파울로 닫힌 뒤에야 스트라이크가 오른다(0x35108 → 0xb6b58)
     const nextAtBat = foulContact === undefined ? runner.applyPitch(resolution) : runner.atBatRef.current
-    // 맞은 공의 결과는 수비 판이 끝나야 정해진다 — 타석에 실린 결과는 임시 값이라(`battedContact`) 판정 글자를 띄우지 않는다
-    runner.setBannerText(resolution.kind === '타구' || foulContact !== undefined ? '' : describePitchResolution(resolution))
+    // 투수 미션은 결과 띠를 세우지 않는다 — 투구 화면(`PitchingScreen`)은 띠 글을 그리지 않고, 0x11 · 0x12 동안 키를 막는 일은
+    // 화면이 마지막 공으로 센 틱(`pitchSceneBusyTicksOf`)이 맡는다. 띠 글을 남기면 그것을 걷을 곳이 없어(타자 미션의
+    // `pauseWithBanner` 같은 타이머가 없다) 삼진 · 볼넷으로 타석이 끝난 뒤 0xe 의 OK(`bannerText === ''`)와 0x21 중계가
+    // 영영 열리지 않았다 — 맞은 공(띠 없음)과 같은 길로 둔다
+    runner.setBannerText('')
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
     setLastPitcherThrow({ pitch, resolution, resultTicks: resultWaitTicksOf(outcome), cpuSwing: cpuSwingPoseOf(thrown) })

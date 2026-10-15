@@ -237,6 +237,13 @@ export interface MissionPlayAbilities {
   readonly fielderPlates?: ReturnType<typeof defenseFielderPlatesOf>
   /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (주자 그림 0x79d10 · 적재 0x483a0 — `missionRunnerAcesOf`) */
   readonly runnerAces?: RunnerAces
+  /**
+   * 야수 · 주자 그림 팔레트 — 수비 · 공격 팀 번호 (defender.mpl 15벌 = 팀 번호, C-1). 미션은 경기[0x28 + 칸]의 두 팀
+   * (`missionTeamIdsOf` — 사람 칸 · CPU 칸)에서 수비측 st[0xa] 로 고른다: 타자 미션은 CPU 수비, 투수 미션은 사람 칸 수비
+   * (`missionDefenseFieldersOf` 와 같은 갈래). 그림 전용이라 난수와 무관하다
+   */
+  readonly defenseTeamIndex?: number
+  readonly offenseTeamIndex?: number
 }
 
 /**

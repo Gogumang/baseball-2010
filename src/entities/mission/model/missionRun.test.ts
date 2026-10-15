@@ -5,6 +5,7 @@ import {
   giveUp,
   isMissionBatterUp,
   missionAdvance,
+  missionDefensePlayInputOf,
   missionFirstHalfIsHuman,
   recordSwing,
   runBatterMissionAutoHalves,
@@ -362,5 +363,17 @@ describe('미션 첫 반 이닝이 사람 몫인가 — 첫 0x18 판의 0xc2198 
     const run = applyOutcome(startMission(첫걸음), { kind: '아웃', detail: '땅볼아웃' })
     expect(isMissionBatterUp(run)).toBe(false)
     expect(missionFirstHalfIsHuman(run)).toBe(false)
+  })
+})
+
+describe('미션 수비 판의 팀 팔레트 (defender.mpl 15벌 = 팀 번호, C-1)', () => {
+  it('넘겨받은 수비 · 공격 팀 번호를 수비 판 입력에 싣고, 없으면 싣지 않는다', () => {
+    const EMPTY = { first: false, second: false, third: false }
+    const abilities = { defenseAbilities: [], runAbilities: {}, defenseTeamIndex: 7, offenseTeamIndex: 3 }
+    const input = missionDefensePlayInputOf(EMPTY, 0, { kind: '안타', bases: 1 }, undefined, undefined, undefined, abilities)
+    expect(input.defenseTeamIndex).toBe(7)
+    expect(input.offenseTeamIndex).toBe(3)
+    const bare = missionDefensePlayInputOf(EMPTY, 0, { kind: '안타', bases: 1 })
+    expect('defenseTeamIndex' in bare).toBe(false)
   })
 })
