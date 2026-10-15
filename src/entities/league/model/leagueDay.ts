@@ -315,10 +315,17 @@ export interface LeagueAbilityContext {
   /**
    * **나리(모드 3 · 4) 사기** 0xa3a24 — 간이 엔진의 0xb570c(0xc11f0 c1308 · c1320 은 두 팀 [r7+0x78] · [r7+0x74], 0xc1818 은 수비 팀)가
    * 모드 3 · 4 갈래 b5762~b5768 에서 넘겨 받은 팀 레코드 +2 에 이 값을 쓴다 → CPU 끼리 경기도 두 팀 용량(0x66e44 `V[+2]`)이 이 값이다
-   * (`entities/career/model/nariMorale`). 시즌모드(2)는 그 쓰기가 없어(b5804 갈래) 안 넘긴다 — 없으면 100.
-   * ⚠️ 미확인: 그 팀을 0xb570c 가 아직 안 건드린 경기 첫 공 앞 0xa5e14 가 있는지(차례)는 안 뜸
+   * (`entities/career/model/nariMorale`). 시즌모드(2)는 그 쓰기가 없어(b5804 갈래) 정규 · 포스트시즌 CPU 경기는 안 넘긴다 — 없으면 100.
+   * 시즌 **국가대항전 CPU 경기**(0xc2dac)는 두 나라가 같은 상대국 슬롯 `base+0x934` 레코드를 읽어(0x1f570 1f5a0) 그 +2 가 두 팀 용량의
+   * 사기다 — 같은 날 사람 경기의 돌발 보상 종류 1 이 그 칸에 쌓은 값을 넘긴다(`useSeasonSession` 정산, 이름은 나리 때 붙은 그대로).
    */
   readonly nariMorale?: number
+  /**
+   * 나리 리그 팀 레코드 +2 의 **앞 값**(팀 번호 → 값, `nariTeamRecordMoraleOf`) — 간이 엔진 0xc262c 는 공마다 c26cc 소모 0xa5e14 가
+   * c26f6 0xc11f0(c1446) · c26fe 0xc1818(c1852)의 0xb570c(b5768 쓰기)보다 먼저라, **1회초 수비 팀(home 명단)의 첫 공**만 그 팀 레코드에
+   * 지난번 남은 값으로 용량을 센다(`HalfInningDefense.staleMorale`). 안 넘기면 늘 `nariMorale`
+   */
+  readonly staleRecordMorales?: Readonly<Record<number, number>>
 }
 
 /** 팀 능력치를 먹이는 모드 비트 0x306 = {1, 2, 8, 9} (0xb593a) */
@@ -515,6 +522,11 @@ export function cpuGameAcesOf(
   return sideOfX === LEAGUE_SIDE_HOME
     ? { away: rolls.teamB, home: rolls.teamA }
     : { away: rolls.teamA, home: rolls.teamB }
+}
+
+/** 1회초 수비 팀(home)의 레코드 +2 앞 값 — 첫 투수 첫 공만 본다 (`LeagueAbilityContext.staleRecordMorales`) */
+function withStaleMorale(defense: HalfInningDefense, staleMorale: number | undefined): HalfInningDefense {
+  return staleMorale === undefined ? defense : { ...defense, staleMorale }
 }
 
 /**
@@ -848,7 +860,10 @@ export function simulateLeagueGame(
         endsGame: ({ runs, outs }) =>
           isGameOverAt({ inning, half: '초', outs, awayScore: awayRuns + runs, homeScore: homeRuns }),
       },
-      defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
+      withStaleMorale(
+        defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
+        extras?.abilityContext?.staleRecordMorales?.[matchup.home],
+      ),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, top, {

@@ -1,5 +1,6 @@
 import { DEFAULT_TEAM_MORALE, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { PlayerSide } from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
   PitcherGameOptions,
@@ -19,7 +20,7 @@ import {
   withMoraleAbilityCut,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
-import { nariMoraleOf } from '@/entities/career/model/nariMorale'
+import { nariMoraleOf, nariTeamRecordMoraleOf } from '@/entities/career/model/nariMorale'
 
 /**
  * 커리어·로테이션·환경설정으로 **경기 한 판의 옵션**을 조립한다 —
@@ -100,12 +101,14 @@ export function pitcherGameOptionsOf(
   const morale = nariMoraleOf(career)
   const beforeMorale = gamePitcherAbilityBeforeMoraleOf(career)
   const ability = withMoraleAbilityCut(beforeMorale, morale)
+  const opponentTeamId = settings.opponentTeamId ?? nextPitcherOpponentOf(career)
+  // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)의 `0xb7844(L, 내 팀)` (모드 3·4 공용). 정규시즌은 일정표 0xd89cb ·
+  // 9일 주기 뒤집기, 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공 · 아랫 시드가 원정·선공이다 (`leagueGamePlayerSideOf`)
+  const playerSide = settings.playerSide ?? leagueGamePlayerSideOf(career)
   return {
     ourTeamId: career.teamId,
-    opponentTeamId: settings.opponentTeamId ?? nextPitcherOpponentOf(career),
-    // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)의 `0xb7844(L, 내 팀)` (모드 3·4 공용). 정규시즌은 일정표 0xd89cb ·
-    // 9일 주기 뒤집기, 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공 · 아랫 시드가 원정·선공이다 (`leagueGamePlayerSideOf`)
-    playerSide: settings.playerSide ?? leagueGamePlayerSideOf(career),
+    opponentTeamId,
+    playerSide,
     role: career.role,
     positionCode: career.positionCode,
     // 수비 화면 이름 판(0x43cb0) 칸 0 — 내 투수 레코드 이름
@@ -153,6 +156,10 @@ export function pitcherGameOptionsOf(
     // 두 팀 레코드 +2 — 셋업 0x39fdc(3a332) · 0xb570c(b5768)가 두 팀 모두 0xa3a24 로 덮는다. 0xa3a24 는 `0x1f988(저장, R[1])` + 2 라
     // 대회가 아니면 커리어 사기, 대회 중이면 상대국 칸 +2 다 (원본 버그 — `nariMoraleOf`)
     teamMorale: settings.teamMorale ?? morale,
+    // 상대가 후공이면 그 첫 공만 상대 리그 팀 레코드에 남은 값 (`opponentStaleMorale`, r101). 대회 상대국 칸은 나리 사기 그 자체라 없다
+    ...(career.nationalCup !== undefined || playerSide !== PLAYER_SIDE_FIRST_BAT
+      ? {}
+      : { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId) }),
     reputation: career.reputation,
     // 원본 기본값은 꺼짐이다 — 환경설정에서 켠 값을 그대로 받아 넘긴다
     gaugeSettingOn: settings.gaugeSettingOn ?? false,

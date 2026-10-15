@@ -368,6 +368,12 @@ export interface PitcherGameOptions {
    * 지금 나리 사기 0xa3a24 로 덮어(`entities/career/model/nariMorale`) 상대 팀 용량도 이 값이다. 국가대항전이면 원본 버그로 상대국 칸 +2
    */
   readonly teamMorale: number
+  /**
+   * 상대 리그 팀 레코드 +2 의 **앞 값** — 상대가 후공(1회초 수비)일 때만. 간이 엔진 0xc262c 는 공마다 c26cc 소모 0xa5e14 가 0xb570c
+   * (c1446 · c1852 — b5768 쓰기)보다 먼저라 상대 첫 투수의 첫 공 용량은 그 레코드에 지난번 남은 나리 사기다(`HalfInningDefense.staleMorale`, r101).
+   * 안 넘기면 늘 `teamMorale`
+   */
+  readonly opponentStaleMorale?: number
   /** 평판 `career+0x62` (감독 강판 표·경기 뒤 평가) */
   readonly reputation: number
   /** 환경설정 "투구 게이지" (설정 +0x2d) — **원본 기본값은 꺼짐** (K 5-2) */
@@ -3567,10 +3573,13 @@ function perPitchDrainOf(
   batter: Pick<QuickAtBatBatter, 'skillIds'>,
 ): { readonly beforePitch: () => QuickAtBatPitcher; readonly stamina: () => number } {
   let stamina = mound.stamina
+  // 투구 수는 타석이 끝나야 더해지므로 이 타석에서 이미 던진 공을 얹는다 (`drainMoraleOf` 의 첫 공 판정)
+  let thrown = 0
   const batterIntimidates = batter.skillIds.includes(QUICK_INTIMIDATE_SKILL_ID)
   return {
     beforePitch: () => {
-      stamina = drainQuickPitcher(defense, { ...mound, stamina }, 1, batterIntimidates)
+      stamina = drainQuickPitcher(defense, { ...mound, stamina, pitches: mound.pitches + thrown }, 1, batterIntimidates)
+      thrown += 1
       // 0xc11f0 · 0xc1818 은 체력%로 부른 제구 · 구속(피로 0xb58e6)을 세 자리에서 본다 — 반 이닝 엔진과 같은 값
       return facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(stamina))
     },
@@ -3712,6 +3721,7 @@ function quickDefenseOf(
       : progress.game.opponentScore - progress.game.ourScore,
     // 0xb570c b5768 이 두 팀 레코드 +2 를 공마다 지금 나리 사기로 덮는다 — 상대 팀도 같은 값 (`PitcherGameOptions.teamMorale`)
     morale: options.teamMorale,
+    ...(isOurs || options.opponentStaleMorale === undefined ? {} : { staleMorale: options.opponentStaleMorale }),
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다

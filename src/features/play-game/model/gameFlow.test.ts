@@ -1874,6 +1874,23 @@ describe('나리 타자편 두 팀 사기 — 두 팀 레코드 +2 는 지금 �
     expect(changed.teamMorale).toBe(20)
     expect(opponentMoundOf(changed).teamMorale).toBe(20)
   })
+  it('상대가 후공이면 그 첫 공만 상대 레코드 +2 의 앞 값 — 첫 0xa5e14(3dec6)가 첫 0xb570c(0x4dc78)보다 먼저 (r101)', () => {
+    const 선공 = startGame(
+      createSeededRandom(20100905), 0, 1, 1, PLAYER_SIDE_FIRST_BAT, 0, false, undefined, undefined, undefined, undefined,
+      80, 30,
+    )
+    expect(선공.opponentStaleMorale).toBe(30)
+    expect(선공.opponentMound.pitches).toBe(0)
+    expect(opponentMoundOf(선공).teamMorale).toBe(30)
+    const 한공 = throwOpponentPitch(선공, 1, { batterIntimidates: false })
+    expect(opponentMoundOf(한공).teamMorale).toBe(80)
+    // 내가 후공이면 상대는 1회초 공격이 먼저라(0x35b94 · 간이 타석이 덮는다) 앞 값을 안 든다
+    const 후공 = startGame(
+      createSeededRandom(20100905), 0, undefined, undefined, undefined, 0, false, undefined, undefined, undefined, undefined,
+      80, 30,
+    )
+    expect(후공.opponentStaleMorale).toBeUndefined()
+  })
 })
 
 describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee · 0x43278)', () => {

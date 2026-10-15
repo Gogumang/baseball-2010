@@ -261,6 +261,15 @@ export interface HalfInningDefense {
   /** 팀 사기 (0x66e44 의 `V[+2]`). 모르면 100 */
   readonly morale?: number
   /**
+   * **그 팀 레코드 +2 의 앞 값** — 이 경기에서 0xb570c 가 아직 그 레코드를 안 덮었을 때 소모 0xa5e14 의 용량 0x66e44 가 읽는 값.
+   * 나리(모드 3·4)는 0xb570c 갈래 b5762~b5768 이 넘겨 받은 팀 레코드 +2 에 지금 나리 사기를 쓰는데, 공 하나의 차례가
+   * 소모가 먼저다(r101 직접 뜸): 간이 엔진 0xc262c 는 c26cc `0xa5e14` 뒤에 c26f6 `0xc11f0`(c1446 수비 팀) · c26fe `0xc1818`(c1852
+   * 수비 팀)이 0xb570c 를 부르고, 사람 장면은 0x11 진입 0x3de10 의 3dec6 `0xa5e14` 뒤 틱 10 놓기 0x4dc78 의 0x4dbac · 0x34968 이
+   * 수비 팀을 부른다. 그래서 **1회초 수비 팀(후공)의 첫 투수 첫 공**만 이 값이고(공격 팀은 그 앞 0xe 그리기 0x35b94 · 간이 타석이
+   * 덮는다), 그 뒤로는 `morale` 이다. 안 넘기면 늘 `morale`
+   */
+  readonly staleMorale?: number
+  /**
    * 두 팀 다 CPU 조작인가 (`state[0x31+측]`). 참이면 마무리 투입 굴림 0xac360 이 곧장 0 을
    * 돌려준다 (0xb6c20) — **CPU 끼리의 리그 경기가 바로 이 경우다**.
    */
@@ -585,6 +594,7 @@ export function* simulateHalfInningTicks(
         : pitcher
     /** 이 타석 동안 공마다 깎이는 스태미나 — 0xc262c 는 공을 던지기 **앞에** 0xa5e14 로 깎는다(c26c8) */
     let pitchStamina = mound?.stamina
+    let thrownThisAtBat = 0
     const rosterSlot = lineup !== undefined ? rosterSlotAt(lineup, order) : undefined
     const appearance = playQuickPlateAppearance(
       {
@@ -611,10 +621,12 @@ export function* simulateHalfInningTicks(
                 const current = mound as HalfInningMound
                 pitchStamina = drainQuickPitcher(
                   defense,
-                  { ...current, stamina: pitchStamina ?? current.stamina },
+                  // 투구 수는 타석이 끝나야 더해지므로 이 타석에서 이미 던진 공을 얹어 넘긴다 (`drainMoraleOf` 의 첫 공 판정)
+                  { ...current, stamina: pitchStamina ?? current.stamina, pitches: current.pitches + thrownThisAtBat },
                   1,
                   batterOn(order).skillIds.includes(INTIMIDATE_SKILL_ID),
                 )
+                thrownThisAtBat += 1
                 return facingPitcherOf(defense, current.pitcherSlot, staminaPercentOf(pitchStamina))
               },
             }),
@@ -913,9 +925,18 @@ export function drainQuickPitcher(
 ): number {
   let stamina = mound.stamina
   for (let pitch = 0; pitch < pitchCount; pitch += 1) {
-    stamina = drainPitcherForPitch(defense, { ...mound, stamina }, QUICK_PITCH_TYPE, batterIntimidates)
+    stamina = drainPitcherForPitch(defense, { ...mound, stamina, pitches: mound.pitches + pitch }, QUICK_PITCH_TYPE, batterIntimidates)
   }
   return stamina
+}
+
+/**
+ * 용량 0x66e44 가 지금 읽는 팀 레코드 +2 — 첫 투수가 아직 공을 안 던졌으면(`pitches` 0 · 등판한 투수 없음) 앞 값
+ * `staleMorale`, 아니면 `morale`(없으면 100). `HalfInningDefense.staleMorale` 참고
+ */
+export function drainMoraleOf(defense: HalfInningDefense, mound: HalfInningMound): number {
+  if (defense.staleMorale !== undefined && mound.pitches === 0 && mound.usedSlots.length === 0) return defense.staleMorale
+  return defense.morale ?? 100
 }
 
 /** 0xa5f30 `movs r1, #0x12` — 투수 스킬 18 비겁자 */
@@ -938,7 +959,7 @@ export function drainPitcherForPitch(
 ): number {
   const capacity = staminaCapacityOf(
     defense.staminaAbilityAt(mound.pitcherSlot),
-    defense.morale ?? 100,
+    drainMoraleOf(defense, mound),
     mound.usedSlots.length === 0,
   )
   const skillBits = defense.skillBitsAt?.(mound.pitcherSlot) ?? 0

@@ -54,6 +54,8 @@ export interface CpuPostseasonResult {
    * 스태미나를 안 건드리고, +20% `0xb617c` 를 부르는 곳은 경기 끝 0x4ea0c(4f2bc) 하나뿐이다.
    */
   readonly pitcherStaminas: PitcherStaminaTable
+  /** 넘긴 `abilityContext.staleRecordMorales` 에 이 경기들을 치른 팀의 레코드 +2(= 나리 사기)를 먹인 것. 안 넘겼으면 없다 */
+  readonly staleRecordMorales?: Readonly<Record<number, number>>
 }
 
 /**
@@ -140,13 +142,22 @@ export function runCpuPostseasonWithStamina(
   recordOf: (teamId: number) => LeagueTeamRecord | undefined = () => undefined,
 ): CpuPostseasonResult {
   let current: CpuPostseasonResult = { series, pitcherStaminas }
+  let context = abilityContext
+  const withMorales = (result: CpuPostseasonResult): CpuPostseasonResult =>
+    context?.staleRecordMorales === undefined ? result : { ...result, staleRecordMorales: context.staleRecordMorales }
   for (let game = 0; game < MAXIMUM_GAMES; game += 1) {
-    if (current.series.round === '종료' || isMyTurn(current.series, myTeamId)) return current
+    if (current.series.round === '종료' || isMyTurn(current.series, myTeamId)) return withMorales(current)
+    const teams = current.series.teams
     current = playCpuSeriesGameWithStamina(
-      current.series, random, current.pitcherStaminas, aceLevels, abilityContext, recordOf,
+      current.series, random, current.pitcherStaminas, aceLevels, context, recordOf,
     )
+    // 한 경기를 치른 두 팀 레코드 +2 는 0xb570c(b5768)가 나리 사기로 덮었다 — 다음 경기 첫 공의 앞 값이 그 값이다
+    const morale = context?.nariMorale
+    if (context?.staleRecordMorales !== undefined && morale !== undefined) {
+      context = { ...context, staleRecordMorales: { ...context.staleRecordMorales, [teams[0]]: morale, [teams[1]]: morale } }
+    }
   }
-  return current
+  return withMorales(current)
 }
 
 /**

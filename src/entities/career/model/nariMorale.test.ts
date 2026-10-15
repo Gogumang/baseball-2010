@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  nariLeagueRecordMoralesOf,
   nariMoraleAfterBurst,
   nariMoraleOf,
+  nariTeamRecordMoraleOf,
   withNariGameMorale,
   withNariMorale,
+  withNariTeamRecordMorales,
 } from '@/entities/career/model/nariMorale'
 import { createNariCupTeams, nextNariCupDayTeams, prepareNariCupMatch } from '@/entities/career/model/nariCupTeams'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -48,5 +51,18 @@ describe('나리 사기 0xa3a24 · 0xa3a44 — 팀 레코드 +2 (대회 중이�
     const { nationalCup: _cup, ...outside } = career
     const league = applyBurstRewards(outside, [{ name: '사기', amount: -30 }])
     expect(league.morale).toBe(10)
+  })
+})
+
+describe('리그 팀 레코드 +2 의 앞 값 teamRecordMorales — 그 팀이 마지막으로 치른 경기 때의 나리 사기 (r101)', () => {
+  it('없으면 표값 100, 경기를 치른 팀은 그때 사기로 덮인다', () => {
+    const 커리어: { readonly morale: number; readonly teamRecordMorales?: Readonly<Record<number, number>> } = { morale: 37 }
+    expect(nariTeamRecordMoraleOf(커리어, 3)).toBe(100)
+    const 뒤 = withNariTeamRecordMorales(커리어, [3, 5], 42)
+    expect(nariTeamRecordMoraleOf(뒤, 3)).toBe(42)
+    expect(nariTeamRecordMoraleOf(뒤, 5)).toBe(42)
+    expect(nariTeamRecordMoraleOf(뒤, 4)).toBe(100)
+    expect(Object.keys(nariLeagueRecordMoralesOf(뒤))).toHaveLength(10)
+    expect(nariLeagueRecordMoralesOf(뒤)[5]).toBe(42)
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   changePitcherIfNeeded,
+  drainMoraleOf,
   drainPitcherForPitch,
   drainQuickPitcher,
   simulateHalfInning,
@@ -401,5 +402,36 @@ describe('새 투수 고르기의 마무리 갈래 — 능력 합 0xb5b50 (ac0be
 
   it('안 넘기면 예전 근사(스태미나 순)로 6', () => {
     expect(changePitcherIfNeeded(수비(), 수비().mound, 상황).pitcherSlot).toBe(6)
+  })
+})
+
+describe('레코드 +2 의 앞 값 staleMorale — 첫 투수 첫 공만 (0xc262c c26cc 소모가 c1446 · c1852 의 0xb570c 보다 먼저, r101)', () => {
+  const 수비: HalfInningDefense = {
+    mound: startingMoundOf(0),
+    pitcherSlots: [0, 1, 2, 3, 4, 5, 6, 7],
+    pitcherAt: () => {
+      throw new Error('안 쓴다')
+    },
+    staminaAbilityAt: () => 500,
+    lead: 0,
+    morale: 100,
+    staleMorale: 20,
+  }
+
+  it('공을 안 던진 첫 투수만 앞 값 · 한 공이라도 던졌거나 교체로 올라왔으면 지금 사기', () => {
+    expect(drainMoraleOf(수비, startingMoundOf(0))).toBe(20)
+    expect(drainMoraleOf(수비, { ...startingMoundOf(0), pitches: 1 })).toBe(100)
+    expect(drainMoraleOf(수비, { ...startingMoundOf(1), usedSlots: [0] })).toBe(100)
+    expect(drainMoraleOf({ ...수비, staleMorale: undefined }, startingMoundOf(0))).toBe(100)
+  })
+
+  it('간이 공 여럿은 첫 공만 앞 값 용량으로 깎는다 — 사기 20 은 용량이 작아 더 깎인다', () => {
+    const 앞값 = drainQuickPitcher(수비, startingMoundOf(0), 3)
+    const 지금값 = drainQuickPitcher({ ...수비, staleMorale: undefined }, startingMoundOf(0), 3)
+    expect(앞값).toBeLessThan(지금값)
+    // 둘째 공부터는 같은 용량 — 첫 공 하나 차이만 남는다
+    const 첫공만 = drainPitcherForPitch(수비, startingMoundOf(0), 1, false)
+    const 나머지 = drainQuickPitcher({ ...수비, staleMorale: undefined }, { ...startingMoundOf(0), stamina: 첫공만, pitches: 1 }, 2)
+    expect(앞값).toBe(나머지)
   })
 })

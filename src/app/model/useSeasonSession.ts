@@ -58,6 +58,7 @@ import {
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
 import { applyCpuEquipment, rollCpuEquipment } from '@/entities/season-mode/model/cpuEquipment'
 import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { DEFAULT_TEAM_MORALE, teamRecordMoraleAfterBurst, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
@@ -86,7 +87,7 @@ import { placedMatchInfoStadium, rollStadiumNumber } from '@/features/play-team-
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
-import { KOREA_TEAM_ID, createNationalCup, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
+import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay, nationalCupAbilityContextOf } from '@/entities/national-cup/model/nationalCupPlay'
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
@@ -246,6 +247,12 @@ export interface SeasonSession {
   readonly summaryEntry: SeasonSummaryEntry | null
   /** 진행 중인 국가대항전. 없으면 null (원본 L+0xa8~ 칸) */
   readonly cup: NationalCup | null
+  /**
+   * 상태판이 그리는 **팀 사기** — 상태판 0x7d34c 의 7d76a~7d78e 가 시즌모드면 `0x1f570(저장, SR[1])` +2 를 그때그때 읽는다.
+   * 국가대항전 중(S+0x12c ≠ 0)이면 그 칸이 상대국 슬롯 base+0x934(1f5a0)라 리그 사기가 아니라 **그날 상대국 표값**이다(원본 버그) —
+   * 대회 중 상태판이 서는 곳은 461 이벤트 재생 0xd3(대화창 0x8b5ac → 0x7d34c)이고, 그 칸은 그 앞 대회 초기화 b7ca4 가 마스터에서 막 베꼈다.
+   */
+  readonly statusBoardMorale: number
   /** 선수단 화면 0xd7 의 용도 `this+0x11c` — 1 경기 전 마선수 고르기 · 2 코치채용 */
   readonly squadPurpose: SquadPurpose
   /** 0xd7 경기 전 마선수 고르기의 단계(메뉴+0xd0)와 고른 칸(rec+0xe · rec+0xd) */
@@ -1175,6 +1182,13 @@ function withSceneConstructed(save: SeasonSave | null): SeasonSave | null {
  * 리그 초기화 `0xa305c → 0xb7b34` 가 **L = SR+0x80 을 0xf8 바이트 memset** 하므로 국가대항전 플래그
  * `SR+0x12c`(= L+0xac)도 여기서 0 이 된다 — `startNextYear` 주석 참고.
  */
+/** 상태판 사기(`UseSeasonSession.statusBoardMorale`) — 대회 중이면 상대국 슬롯 +2 = 그날 상대국 표값, 아니면 리그 내 팀 사기 */
+function statusBoardMoraleOf(save: SeasonSave): number {
+  if (!save.state.record.nationalCup) return save.state.teamMorale
+  const opponent = save.cup === undefined || save.cup === null ? null : nationalCupMatchupOf(save.cup)?.opponent ?? null
+  return opponent === null ? DEFAULT_TEAM_MORALE : teamRecordMoraleOf(opponent)
+}
+
 function nextYearOf(save: SeasonSave, random: RandomPort): { readonly save: SeasonSave; readonly scene: SeasonSceneState } {
   const { record } = save.state
   // 0x6e0c 머리 — 마지막 해(연차 idx 9)면 새 해 대신 **엔딩**이다.
@@ -2164,7 +2178,8 @@ export function useSeasonSession(
       // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
       // 요약이 경기 중 `resolveBurst` 의 deltas 를 판정 차례대로 싣고 온다(`burstRewardDeltas`)
       const burstDeltas = summary.burstRewardDeltas ?? []
-      const afterBurst = applySeasonBurstRewards(savedBefore.state, burstDeltas)
+      // 국가대항전 중 사기(종류 1)는 리그 칸이 아니라 상대국 슬롯 +0x934 에 쌓인다(원본 버그 — `applySeasonBurstRewards`)
+      const afterBurst = applySeasonBurstRewards(savedBefore.state, burstDeltas, gameKind === '국가대항전')
       const current: SeasonSave = afterBurst === savedBefore.state ? savedBefore : { ...savedBefore, state: afterBurst }
       const { record } = current.state
       const opponent = summary.opponentTeamId
@@ -2254,7 +2269,11 @@ export function useSeasonSession(
             loser,
             random,
             summary.opponentPitcherStaminas,
-            nationalCupAbilityContextOf(SEASON_MODE, current.state.record.coach),
+            // 그 레코드 +2 도 사람 경기의 돌발 사기(종류 1)가 쌓인 값이다 — 두 나라 용량 0x66e44 가 읽는다 (8e3d2 → 0x1f570 1f5a0)
+            {
+              ...nationalCupAbilityContextOf(SEASON_MODE, current.state.record.coach),
+              nariMorale: teamRecordMoraleAfterBurst(teamRecordMoraleOf(opponent), burstDeltas),
+            },
           ),
           state: { ...current.state, record: played },
         })
@@ -3016,6 +3035,7 @@ export function useSeasonSession(
     openedHiddenIds,
     summaryEntry,
     cup: save?.cup ?? null,
+    statusBoardMorale: save === null ? DEFAULT_TEAM_MORALE : statusBoardMoraleOf(save),
     eventPlayback,
     tradeRequest,
     trainingResult,
@@ -3321,6 +3341,15 @@ export interface SeasonGoalSource {
 }
 
 /**
+ * `0xb7aa0(L, 팀, 0)` — 그 팀의 지금 순위(0부터). 포스트시즌 중이면 대진 칸 순위(`goalRankOf`), 아니면 정규시즌 순위.
+ * 목표 ① · 구단정보 0xd5 줄 6 · 이름 입력 0xc8 줄 6(SR[1] = 고른 팀, b9ee) 이 같은 함수다
+ */
+export function seasonTeamRankOf(source: Pick<SeasonGoalSource, 'state' | 'league' | 'series'>, team: number): number {
+  const regularRank = Math.max(0, rankingOf(source.league).indexOf(team))
+  return goalRankOf(team, regularRank, source.state.record.inPostseason ? goalBracketOf(source.series) : null)
+}
+
+/**
  * 시즌 목표 판정 `0xa37bc` 의 입력 다섯 칸 (P4 2b · 직접 떴다):
  * ```
  * ① 0xb7aa0(L, 팀, 0)      — 포스트시즌 중이면 대진 칸 순위(`goalRankOf`), 아니면 정규시즌 순위
@@ -3347,8 +3376,6 @@ export interface SeasonGoalSource {
 export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   const { record } = source.state
   const team = record.teamId
-  const ranking = rankingOf(source.league)
-  const regularRank = Math.max(0, ranking.indexOf(team))
   const order = seasonEntryOrderOf(source.roster, source.recordOf)
   // 기록을 실은 칸(영입한 명전·나리 선수)은 그 레코드에 쌓인 표 밖 줄(원본 id)로 센다 — 기록을 못 찾은 칸은 빈 줄
   const batterLines = entryBattersOfOrder(team, order).map((batter) => {
@@ -3370,7 +3397,7 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
       : leagueRecordPitcherLineOf(source.playerStats, slot.recordId)
   })
   return {
-    rank: goalRankOf(team, regularRank, record.inPostseason ? goalBracketOf(source.series) : null),
+    rank: seasonTeamRankOf(source, team),
     wins: source.league.wins[team] ?? 0,
     losses: source.league.losses[team] ?? 0,
     teamBattingAverage: teamBattingAverageOf(batterLines),

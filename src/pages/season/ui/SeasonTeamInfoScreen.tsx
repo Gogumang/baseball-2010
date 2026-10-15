@@ -94,42 +94,13 @@ export function SeasonTeamInfoScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  // 이름표 47 "순위" 는 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리에서 흰 글자로 되돌린다
-  const palettes = useImgTextPalettes()
-
   return (
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xd5 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="구단정보">
-        {palettes.definition}
         <SeasonTeamCard teamId={teamId} teamAbilities={teamAbilities} hasCardBadge={hasCardBadge} testIdPrefix="구단정보" />
-
-        <div className={styles.layer}
-          style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: BOARD_WIDTH, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
-        {rows.map((row, index) => {
-          const column = COLUMNS[index < TEAM_INFO_LEFT_ROWS ? 0 : 1]
-          const top = INFO_TOP + (index < TEAM_INFO_LEFT_ROWS ? index : index - TEAM_INFO_LEFT_ROWS) * INFO_ROW_STEP
-          // 구장 줄은 값 칸 너비가 w × 2 − 14 (0x7c9b2)
-          const width = row.value.kind === '흐르는글' ? column.value.width * 2 - 14 : column.value.width
-          return (
-            <div key={row.labelFrame} data-testid={`구단정보-줄-${index}`}>
-              <img className={styles.layer} alt="" data-frame={row.labelFrame} src={frameSrc(row.labelFrame)}
-                style={{
-                  left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)',
-                  ...palettes.styleOf(row.labelFrame, LABEL_PALETTE),
-                }} />
-              {row.value.kind === '흐르는글'
-                ? <StadiumTicker text={row.value.text} index={index} box={{ x: column.value.x, y: top + 2, width, height: INFO_ROW_HEIGHT }} />
-                : (
-                  <div className={styles.infoValue} data-testid={`구단정보-값-${index}`}
-                    style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}>
-                    {valueOf(row, palettes.styleOf)}
-                  </div>
-                )}
-            </div>
-          )
-        })}
+        <SeasonTeamInfoPanel rows={rows} />
       </div>
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
     </RawScreen>
@@ -137,12 +108,54 @@ export function SeasonTeamInfoScreen({
 }
 
 /**
+ * **정보 칸 0x7c450 시즌 갈래**의 판과 일곱 줄 — 구단정보 0xd5 · 이름 입력 0xc8(그림 0xba28 의 ba5a) 이 같이 쓴다.
+ * 이름 입력은 창+0x28 = 1 이라 줄 0 단장 값(0x7c6f4~0x7c724 `ldrb [gfx+0x28]` ≠ 0 → 건너뜀)을 안 쓴다 — 부르는 쪽이 빈 글로 넘긴다.
+ */
+export function SeasonTeamInfoPanel({ rows, testIdPrefix = '구단정보' }: {
+  readonly rows: readonly TeamInfoRow[]
+  readonly testIdPrefix?: string
+}) {
+  // 이름표 47 "순위" 는 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리에서 흰 글자로 되돌린다
+  const palettes = useImgTextPalettes()
+  return (
+    <>
+      {palettes.definition}
+      <div className={styles.layer}
+        style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: BOARD_WIDTH, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
+      {rows.map((row, index) => {
+        const column = COLUMNS[index < TEAM_INFO_LEFT_ROWS ? 0 : 1]
+        const top = INFO_TOP + (index < TEAM_INFO_LEFT_ROWS ? index : index - TEAM_INFO_LEFT_ROWS) * INFO_ROW_STEP
+        // 구장 줄은 값 칸 너비가 w × 2 − 14 (0x7c9b2)
+        const width = row.value.kind === '흐르는글' ? column.value.width * 2 - 14 : column.value.width
+        return (
+          <div key={row.labelFrame} data-testid={`${testIdPrefix}-줄-${index}`}>
+            <img className={styles.layer} alt="" data-frame={row.labelFrame} src={frameSrc(row.labelFrame)}
+              style={{
+                left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)',
+                ...palettes.styleOf(row.labelFrame, LABEL_PALETTE),
+              }} />
+            {row.value.kind === '흐르는글'
+              ? <StadiumTicker text={row.value.text} testId={`${testIdPrefix}-값-${index}`} box={{ x: column.value.x, y: top + 2, width, height: INFO_ROW_HEIGHT }} />
+              : (
+                <div className={styles.infoValue} data-testid={`${testIdPrefix}-값-${index}`}
+                  style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}>
+                  {valueOf(row, palettes.styleOf)}
+                </div>
+              )}
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+/**
  * 구장 줄 0x7ca7e — `0x5a8c8(skin, 글, 상자 x, y + 2, w, h, 1, 1, 1)`: 자르기 (x + 2, y, w − 4, h) ·
  * 글 왼쪽 = x + w − [skin+0x284] % (글폭 + w) · 그린 뒤 3 올린다 (`shared/lib/skinTicker` — 앱에 하나인 카운터).
  */
-function StadiumTicker({ text, index, box }: {
+function StadiumTicker({ text, testId, box }: {
   readonly text: string
-  readonly index: number
+  readonly testId: string
   readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
 }) {
   const tick = useUpdateCounter()
@@ -152,7 +165,7 @@ function StadiumTicker({ text, index, box }: {
   useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
   const clipLeft = box.x + SKIN_TICKER_CLIP_INSET
   return (
-    <div className={styles.layer} data-testid={`구단정보-값-${index}`}
+    <div className={styles.layer} data-testid={testId}
       style={{
         left: clipLeft, top: box.y, width: box.width - SKIN_TICKER_CLIP_INSET * 2, height: box.height, overflow: 'hidden',
       }}>

@@ -8,7 +8,7 @@ import {
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
-  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
+  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, seasonNameInfoRowsOf, FRESH_SEASON_INFO_RECORD, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
   SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay, SeasonEventEndFrame,
   SeasonScreenFade,
 } from '@/pages/season'
@@ -44,7 +44,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { seasonRewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import {
-  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
+  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf, seasonTeamRankOf,
 } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
@@ -317,7 +317,14 @@ function SeasonScreens({
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
     return (
       <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []} gamePoint={session.gamePoints}
-        onChoose={actions.chooseTeam} onExit={() => onExit(5)} />
+        onChoose={actions.chooseTeam} onExit={() => onExit(5)}
+        // 0xc8 정보 칸 — SR 은 0xcc 초기화 전 버퍼(시즌 저장이 있으면 그 레코드, 없으면 막 만든 SR), 타입은 고른 팀 마스터 레코드,
+        // 순위는 SR[1] = 고른 팀(b9ee)의 0xb7aa1(SR+0x80, 팀, 0) — 경기 수 0 이면 안 쓴다
+        nameInfoRowsOf={(teamId) => seasonNameInfoRowsOf({
+          record: state?.record ?? FRESH_SEASON_INFO_RECORD,
+          teamAbilities: TEAMS[teamId]?.values.slice(2) ?? [],
+          rank: state === null ? 0 : seasonTeamRankOf({ state, league, series }, teamId),
+        })} />
     )
   }
 
@@ -341,6 +348,7 @@ function SeasonScreens({
 
   // 이벤트 재생 0xd3 (갱신 0x5110 · 키 0x90ec · 그리기 0xa09c → 대화창 0x8b5ac).
   // 대화창 0x8b5ac 가 공 무늬 · 상태판(둘째 인자 [이벤트+0xb]) · 머리띠를 먼저 깐다 (`SeasonEventUnderlay`).
+  // 상태판 사기는 0x1f570(SR[1]) +2 를 그때 읽어 국가대항전 461 이면 상대국 슬롯 값이다 (`statusBoardMorale`)
   // 지도 갈래([gfx+0x174] 0x70 · 0x71)가 아니므로 초상화 바닥 y 는 135 다(0x7fdee — `StoryScreen` 기본).
   if (scene === SEASON_SCENE_STATE.이벤트재생 && session.eventPlayback !== null) {
     const playback = session.eventPlayback
@@ -354,14 +362,14 @@ function SeasonScreens({
           : previousScene === SEASON_SCENE_STATE.관리메뉴 && playback.eventId !== YEAR_GOAL_EVENT_ID ? '관리메뉴' : '칸없음'
         return (
           <RawScreen>
-            <SeasonEventEndFrame record={state.record} teamMorale={state.teamMorale} gamePoint={session.gamePoints}
+            <SeasonEventEndFrame record={state.record} teamMorale={session.statusBoardMorale} gamePoint={session.gamePoints}
               kind={kind} cursor={session.menuCursors.management} />
           </RawScreen>
         )
       }
       return (
         <RawScreen>
-          <SeasonEventUnderlay record={state.record} teamMorale={state.teamMorale} gamePoint={session.gamePoints} />
+          <SeasonEventUnderlay record={state.record} teamMorale={session.statusBoardMorale} gamePoint={session.gamePoints} />
           <ScreenOverlay>
             <StoryScreen
               // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
