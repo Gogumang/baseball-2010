@@ -46,6 +46,8 @@ export function SeasonInfoScreen({
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: SEASON_INFO_MENU.length, onSelect: select, onCancel: onBack, isEnabled: isKeyEnabled,
+    // 4열 × 1줄 (0x3b14 의 [this+0x74] vt+0x1c(4, 1, 1, 0x330)) — ← → 도 칸을 옮긴다
+    isCommandBar: true,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),
   })

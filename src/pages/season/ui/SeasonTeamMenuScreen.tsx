@@ -56,6 +56,8 @@ export function SeasonTeamMenuScreen({
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: TEAM_MENU.length, onSelect: select, onCancel: onBack,
+    // 4열 × 1줄 (0x3b14 의 [this+0x78] vt+0x1c(4, 1, 1, 0x330), 0x3bce~0x3be0) — ← → 도 칸을 옮긴다
+    isCommandBar: true,
     ...(state.record.tradeUsed === 1 ? { disabled: TRADE_USED_DISABLED } : {}),
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
     ...(onCursorChange === undefined ? {} : { onCursorChange }),

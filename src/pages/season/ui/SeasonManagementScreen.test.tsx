@@ -105,6 +105,22 @@ describe('시즌 관리 메뉴 (상태 0xc9)', () => {
     expect(onCursorChange).toHaveBeenLastCalledWith(1)
   })
 
+  it('6열 × 1줄 격자(vt+0x1c(6, 1, 1, 0x330))라 ← → · \'4\' \'6\' 도 칸을 옮기고 꺼진 칸을 건너뛴다 (0x6be71 · 0x6c445)', () => {
+    const onCursorChange = vi.fn()
+    render(
+      <SeasonManagementScreen state={시즌({ acted: true })} onSelect={vi.fn()} onExit={vi.fn()}
+        cursor={1} onCursorChange={onCursorChange} />,
+    )
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(4)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(0)
+    fireEvent.keyDown(window, { key: '6' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(4)
+    fireEvent.keyDown(window, { key: '4' })
+    expect(onCursorChange).toHaveBeenLastCalledWith(0)
+  })
+
   it('취소(−16)는 메인 메뉴 장면(0x103)으로 나간다', () => {
     const onExit = vi.fn()
     render(<SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={onExit} />)
