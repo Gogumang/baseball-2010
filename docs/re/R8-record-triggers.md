@@ -359,3 +359,16 @@ a8000: state[0x8c] = 0
 ## 10. 웹 판정 함수 (2026-10) — 배선 전
 남은 아홉 가지의 판정 순수 함수가 `src/entities/game/model/gameRecords.ts` 에 들어갔다: `pinchHitHomeRunRecordIdsOf`(5, 순서 유력) · `backToBackRecordOf`(6·7) · `stealPlayRecordIdsOf`(8·24) · `multiOutPlayRecordIdsOf`(26·27) · `foulRecordOf`(32·33, 리셋 유력) · `laserThrowOutRecordOf`(36). 0xa77f0 게이트 방향은 부르는 쪽이 맞춘다.
 재확인 두 가지: ① 게이트(0xa785e~)는 공격 팀이 사람이면 **수비 계열 번호를 그 자리에서 버리고**(0xa7882·0xa7886 → 0xa792e) 수비 쪽 검사로 넘어가지 않는다. ② 36 의 `state[0x8b] = 0` 은 BL 뒤(0xa8110~0xa8116)에만 있어 **아웃이 없는 정산에서는 플래그가 남는다**.
+
+## 11. 레코드 시즌 줄 투수 +0x2a(사사구) · 타자 +0x2e(실책) 를 쓰는 곳 (2026-10-16 r99)
+- **+0x2a 사사구** — 정산 0xa8024 공통 꼬리. 볼넷: a8b04 `state[5](볼) > 3` → a8b44~a8b54 수비 팀 `state[0xa]` 의 지금 투수 0xae83d →
+  a8b58~a8b74 `+0x2a += 1`, 9999(0x270f) 상한. 사구: a8b88 `state[0x12]` → a8bd2~a8bee 같은 칸 +1. 곧 볼넷 + 사구 합이고 **지금 마운드 투수**에게
+  매긴다. 게이트 0xa56dc 를 안 보므로 모드 · 포스트시즌 · 국가대항전 · CPU 경기(같은 0xa8024) 모두 쌓인다.
+- **+0x2e 실책** — 정산이 아니라 수비 화면(상태 0x17) 그리기 0x43278 이 야수 배열 `[경기+0x111c+4i]`(i = 8..0, 홈런더비는 i = 0 만)를
+  돌며 올린다. 437a4 동작 잠금 +0xb4 > 0 이면 건너뛴다. 4381a: `+0xb8 > 0` 이고 `== 6`(펌블)이면 `[야수+0xec]+0x2e += 1`(9999 상한) ·
+  0xa755d(…, 3) · 함성 29. 438c4: `+0xb8 ≤ 0` 이고 `+0xc0 == 4`(악송구 a1908 · 원바운드 a17fc · 포구 예보 b188e)면 같은 칸 +1.
+  +0x2e strh 는 4383e · 43852 · 438ea · 43904 넷뿐. 야수 +0xec = 0x3fac4 꼬리(3fe1a~3fe4c)가 `레코드 +0x1c & 0xf == 칸 + 1` 인 첫 타자.
+  게이트가 없지만 그림이 돌 때만이라 CPU 끼리 경기 · 건너뛰기(+0xfe7) 동안엔 쌓이지 않는다.
+- 웹: 리그 기록표 `LeaguePitcherLine` · `LeagueBatterLine` 에 칸이 없다. 넣으려면 `GamePitcherLine`/`chargePitcherLine`(볼넷·사구),
+  `simulateHalfInning.addLine`(CPU), `runDefensePlay` 의 `fumbleMarks`·`throwErrorMarks`(실책) → 진행기 요약 → `leaguePlayerStats` 를
+  다 고쳐야 해서 r99 는 근거만 남겼다(엔트리 창 열은 아직 0).
