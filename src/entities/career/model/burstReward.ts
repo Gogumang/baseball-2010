@@ -2,10 +2,10 @@ import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissi
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
   ORIGINAL_MONEY_UNIT,
-  gainMorale,
   gainPopularity,
   gainReputation,
 } from '@/entities/career/model/playerCareer'
+import { nariMoraleOf, withNariMorale } from '@/entities/career/model/nariMorale'
 import { BALANCE } from '@/shared/config/original/balance'
 
 /**
@@ -15,6 +15,8 @@ import { BALANCE } from '@/shared/config/original/balance'
  * 시즌 모드(2)는 팀 레코드(0x1f55d)에 붙기 때문이다. 나만의리그는 붙을 곳이 내 선수라
  * 여기서 커리어에 얹는다.
  *
+ * 사기만 커리어 칸이 아니라 나리 사기 쓰기 `0xa3a44` 의 칸이다 — 국가대항전 중에는 상대국 칸 +2 에 쌓인다(`nariMorale`).
+ *
  * 소지금만 단위를 맞춰 준다: 원본 보상 양은 **100만원 한 칸** 단위고,
  * 웹 커리어의 `money` 는 만원 단위라 `ORIGINAL_MONEY_UNIT`(100)을 곱한다.
  */
@@ -23,7 +25,8 @@ const MAXIMUM_MONEY = BALANCE.limits.moneyUnits * ORIGINAL_MONEY_UNIT
 function applyOne(career: PlayerCareer, delta: BurstRewardDelta): PlayerCareer {
   switch (delta.name) {
     case '사기':
-      return gainMorale(career, delta.amount)
+      // 종류 1 — 8e410 `0xa3a24(R)` + 양 → 8e420 `0xa3a44(R, …)`(0..100). 대회 중이면 상대국 칸 +2 다(원본 버그, `nariMorale`)
+      return withNariMorale(career, nariMoraleOf(career) + delta.amount)
     case '인기도':
       return gainPopularity(career, delta.amount)
     case '평판':

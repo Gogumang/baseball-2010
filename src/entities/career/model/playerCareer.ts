@@ -16,6 +16,7 @@ import {
 } from '@/entities/league/model/league'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
+import { nariMoraleOf } from '@/entities/career/model/nariMorale'
 import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
@@ -953,6 +954,11 @@ export function applyLeagueDay(
   random: RandomPort,
   /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
+  /**
+   * CPU 경기 때의 나리 사기 0xa3a24 (`LeagueAbilityContext.nariMorale`) — 정산 0x4ea0c 는 평가 0xa719c(4f274, 사기를 바꾼다)를 CPU 경기
+   * 0xc2a48(4f296)보다 먼저 돌리므로 부르는 쪽이 **평가 뒤** 사기를 넘긴다. 안 넘기면 지금 커리어의 나리 사기
+   */
+  nariMorale: number = nariMoraleOf(career),
 ): PlayerCareer {
   // 포스트시즌 경기 끝은 4f268 이 CPU 리그 경기(0xc2a48)를 건너뛰고 곧장 하루 끝으로 간다 — 회복만 돈다
   if (career.postseason !== null) {
@@ -971,8 +977,8 @@ export function applyLeagueDay(
     aceLevels,
     true,
     // 간이 타석의 능력 0xb570d(…, 1, 0x5a, 1) — 모드 4 는 팀 능력치 정액 0xb592c(모드 비트 0x306 = 1·2·8·9)도 코치(모드 2)도
-    // 안 탄다. 밑값 그대로다
-    { mode: BATTER_EDITION_MODE },
+    // 안 탄다. 밑값 그대로다. 같은 0xb570c 의 b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다(용량 0x66e44)
+    { mode: BATTER_EDITION_MODE, nariMorale },
   )
   return {
     ...career,
@@ -1023,6 +1029,8 @@ export function applyPostseasonCpuGames(
     random,
     career.leaguePitcherStaminas ?? {},
     aceLevels,
+    // 0xc2760 → 0xc239c 간이 엔진의 0xb570c b5768 — 두 팀 레코드 +2 = 나리 사기 (`LeagueAbilityContext.nariMorale`)
+    { mode: BATTER_EDITION_MODE, nariMorale: nariMoraleOf(career) },
   )
   return { ...career, postseason: result.series, leaguePitcherStaminas: result.pitcherStaminas }
 }

@@ -14,6 +14,8 @@ import { DEFAULT_PLAYER_SIDE, startPitcherGame } from '@/features/play-pitcher-g
 import { opponentOf, startPostseason } from '@/entities/league/model/league'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
+import { createPitcherCupTeams } from '@/entities/pitcher-career/model/pitcherCupTeams'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => {
   const base = createPitcherCareer('테스트')
@@ -145,8 +147,19 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     expect(pitcherGameOptionsOf(투수()).teamMorale).toBe(투수().morale)
     // 사기 쓰기 0xa3a44 가 0x1f988(저장, R[1]) + 2 에 적은 값을 경기의 스태미나 용량 0x66e44 가 0x1f9a8(저장, 3, 내 팀) + 2 로 읽는다
     expect(pitcherGameOptionsOf({ ...투수(), morale: 37 }).teamMorale).toBe(37)
-    // 부르는 쪽이 넘기면(국가대항전 대표팀 칸 = 표값) 그 값이다
+    // 부르는 쪽이 넘기면 그 값이다
     expect(pitcherGameOptionsOf({ ...투수(), morale: 37 }, { teamMorale: 100 }).teamMorale).toBe(100)
+  })
+
+  it('국가대항전 중에는 0xa3a24 가 상대국 칸 +2 를 읽는다(원본 버그) — 두 팀 사기 · 내 능력치 사기 감소 모두 그 값 (b5768 → b57c4)', () => {
+    const 낮은사기 = 투수({ morale: 20, ability: { control: 500, velocity: 500, breaking: 500, stamina: 500 } })
+    const 리그 = pitcherGameOptionsOf(낮은사기)
+    expect(리그.teamMorale).toBe(20)
+    // 사기 ≤ 30 −20%
+    expect(리그.stats.control).toBe(리그.statsBeforeMoraleCut?.control !== undefined ? 리그.statsBeforeMoraleCut.control - 리그.statsBeforeMoraleCut.control / 5 : -1)
+    const 대회 = pitcherGameOptionsOf({ ...낮은사기, nationalCup: createNationalCup(), nariCupTeams: createPitcherCupTeams(0, 11) })
+    expect(대회.teamMorale).toBe(100)
+    expect(대회.stats).toEqual(대회.statsBeforeMoraleCut)
   })
 
   it('조립한 옵션으로 경기가 바로 시작된다', () => {

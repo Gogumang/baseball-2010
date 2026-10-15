@@ -14,6 +14,7 @@ import {
 import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
+import { nariMoraleOf } from '@/entities/career/model/nariMorale'
 import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
 import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
@@ -773,15 +774,18 @@ const MORALE_ABILITY_CUTS: readonly (readonly [number, number])[] = [
  * 냉정 22 로 999 를 넘은 제구가 피로로 깎일 때만 차이가 난다.
  */
 export function unclampedGamePitcherAbilityOf(career: PitcherCareer, appliesCondition = true): PitcherAbility {
-  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
+  // 넷째 인자 0 — 질병 · 부상 · 사기 감소(0xb5734 → 0xb58e6)를 건너뛴다. 카드 0x7ba44 는 상태 102 · 103 에서 0 을 넘긴다(R9 12-3)
+  if (!appliesCondition) return equippedPitcherAbilityOf(career)
+  return withMoraleAbilityCut(gamePitcherAbilityBeforeMoraleOf(career), career.morale)
+}
+
+/** 0xb570c 를 사기 감소 **앞까지**(질병 −30% → 부상 −60%) 돌린 값 — 사기는 그 뒤 `withMoraleAbilityCut` 가 먹인다 */
+export function gamePitcherAbilityBeforeMoraleOf(career: PitcherCareer): PitcherAbility {
   const equipped = equippedPitcherAbilityOf(career)
   const adjust = (key: keyof PitcherAbility) => {
     let value = equipped[key]
-    // 넷째 인자 0 — 질병 · 부상 · 사기 감소(0xb5734 → 0xb58e6)를 건너뛴다. 카드 0x7ba44 는 상태 102 · 103 에서 0 을 넘긴다(R9 12-3)
-    if (!appliesCondition) return value
     if (career.isSick) value = reduceByPercent(value, ILLNESS_ABILITY_CUT)
     if (career.isInjured) value = reduceByPercent(value, INJURY_ABILITY_CUT)
-    if (moraleCut > 0) value = reduceByPercent(value, moraleCut)
     return value
   }
   return {
@@ -789,6 +793,21 @@ export function unclampedGamePitcherAbilityOf(career: PitcherCareer, appliesCond
     velocity: adjust('velocity'),
     breaking: adjust('breaking'),
     stamina: adjust('stamina'),
+  }
+}
+
+/**
+ * 0xb570c 의 사기 감소(b57c4~b5802) — 사기 ≤ 50 −10% · ≤ 30 −20% · ≤ 10 −50%. 사기는 b5768 이 넘겨 받은 팀 레코드 +2 에 쓴
+ * 0xa3a24 값이라 경기 중 돌발 보상으로 바뀌면 다음 계산부터 새 값이 먹는다(`pitcherGameFlow` 의 `withPitcherGameMorale`)
+ */
+export function withMoraleAbilityCut(ability: PitcherAbility, morale: number): PitcherAbility {
+  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => morale <= limit)?.[1] ?? 0
+  if (moraleCut <= 0) return ability
+  return {
+    control: reduceByPercent(ability.control, moraleCut),
+    velocity: reduceByPercent(ability.velocity, moraleCut),
+    breaking: reduceByPercent(ability.breaking, moraleCut),
+    stamina: reduceByPercent(ability.stamina, moraleCut),
   }
 }
 
@@ -917,6 +936,11 @@ export function applyPitcherLeagueDay(
   random: RandomPort,
   /** 전역 마선수 레벨 열 칸 `mgr[0x13a..0x143]` — CPU 끼리 경기의 마선수 배율(0xd88aa). 안 넘기면 Lv1(60%) */
   aceLevels?: Readonly<Record<number, number>>,
+  /**
+   * CPU 경기 때의 나리 사기 0xa3a24 (`LeagueAbilityContext.nariMorale`) — 정산 0x4ea0c 가 평가 0xa719c(4f274)를 CPU 경기(4f296)보다
+   * 먼저 돌리므로 부르는 쪽이 평가 뒤 사기를 넘긴다. 안 넘기면 지금 커리어의 나리 사기
+   */
+  nariMorale: number = nariMoraleOf(career),
 ): PitcherCareer {
   if (career.postseason !== null) {
     return { ...career, leaguePitcherStaminas: recoveredLeagueStaminas(career.leaguePitcherStaminas ?? {}, PITCHER_EDITION_MODE) }
@@ -936,8 +960,8 @@ export function applyPitcherLeagueDay(
     aceLevels,
     false,
     // 간이 타석의 능력 0xb570d(…, 1, 0x5a, 1) — 모드 3 은 팀 능력치 정액 0xb592c(모드 비트 0x306 = 1·2·8·9)도 코치(모드 2)도
-    // 안 탄다. 밑값 그대로다
-    { mode: PITCHER_EDITION_MODE },
+    // 안 탄다. 밑값 그대로다. 같은 0xb570c 의 b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다(용량 0x66e44)
+    { mode: PITCHER_EDITION_MODE, nariMorale },
   )
   return {
     ...career,
@@ -1088,6 +1112,8 @@ export function applyPitcherPostseasonProgress(
     random,
     career.leaguePitcherStaminas ?? {},
     aceLevels,
+    // 0xc2760 → 0xc239c 간이 엔진의 0xb570c b5768 — 두 팀 레코드 +2 = 나리 사기 (`LeagueAbilityContext.nariMorale`)
+    { mode: PITCHER_EDITION_MODE, nariMorale: nariMoraleOf(career) },
   )
   return result.series === career.postseason
     ? career

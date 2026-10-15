@@ -21,6 +21,8 @@ import {
   withAutoStopLateInningSetup,
   ourRunnerRunsOnBaseOf,
   runnerRunAbilitiesOf,
+  opponentMoundOf,
+  withGameTeamMorale,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -1842,19 +1844,33 @@ describe('평가 타석 0xa59c0 의 득점권 아웃 G+0x11c — 2루 주자는 
   })
 })
 
-describe('나리 타자편 내 팀 사기 — 내 팀 레코드 +2 는 커리어 사기 칸이다 (0x1f9a8(저장, 4, 내 팀) · 0xa3a24 · 0xa3a44)', () => {
+describe('나리 타자편 두 팀 사기 — 두 팀 레코드 +2 는 지금 나리 사기 0xa3a24 (셋업 3a332 · 0xb570c b5768)', () => {
+  const start = (morale?: number) =>
+    startGame(
+      createSeededRandom(20100905), 0, undefined, undefined, undefined, 0, false, undefined, undefined, undefined, undefined,
+      morale,
+    )
+
   it('넘긴 사기가 우리 투수의 스태미나 용량(0x66e44 의 V[+2])에 들어간다 — 같은 씨앗이라도 1회초 소모가 달라진다', () => {
-    const start = (morale?: number) =>
-      startGame(
-        createSeededRandom(20100905), 0, undefined, undefined, undefined, 0, false, undefined, undefined, undefined, undefined,
-        morale,
-      )
     const 표값 = start()
-    expect(표값.ourTeamMorale).toBeUndefined()
+    expect(표값.teamMorale).toBeUndefined()
     expect(start(100).ourMound).toEqual(표값.ourMound)
     const 낮음 = start(5)
-    expect(낮음.ourTeamMorale).toBe(5)
+    expect(낮음.teamMorale).toBe(5)
     expect(낮음.ourMound.pitches).toBeGreaterThan(0)
     expect(낮음.ourMound.stamina).not.toBe(표값.ourMound.stamina)
+  })
+
+  it('상대 마운드 용량도 같은 사기다 — 0xb570c b5768 이 상대 팀 레코드 +2 에도 0xa3a24 를 쓴다', () => {
+    expect(opponentMoundOf(start(37)).teamMorale).toBe(37)
+    expect(opponentMoundOf(start()).teamMorale).toBe(100)
+  })
+
+  it('경기 중 사기가 바뀌면(돌발 보상 0x8e34c 종류 1) 다음 공부터 그 값을 본다 (`withGameTeamMorale`)', () => {
+    const started = start(80)
+    expect(withGameTeamMorale(started, 80)).toBe(started)
+    const changed = withGameTeamMorale(started, 20)
+    expect(changed.teamMorale).toBe(20)
+    expect(opponentMoundOf(changed).teamMorale).toBe(20)
   })
 })

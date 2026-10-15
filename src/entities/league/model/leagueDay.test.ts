@@ -15,7 +15,7 @@ import {
   rollCpuGamePrep,
   simulateLeagueGame,
 } from '@/entities/league/model/leagueDay'
-import type { LeagueTeamRecord } from '@/entities/league/model/leagueDay'
+import type { LeagueAbilityContext, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import {
   EMPTY_LEAGUE,
   LEAGUE_SIDE_HOME,
@@ -879,5 +879,16 @@ describe('CPU 레코드의 장비 니블이 간이 경기 능력치(0xb6414 보�
       return plain.awayRuns !== equipped.awayRuns || plain.homeRuns !== equipped.homeRuns
     })
     expect(differs).toBe(true)
+  })
+})
+
+describe('나리 CPU 끼리 경기의 팀 사기 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다', () => {
+  it('nariMorale 을 주면 두 팀 용량(0x66e44 V[+2])이 그 값이라 같은 씨앗이라도 투수 소모가 갈린다 · 모드만 주면(시즌모드 꼴) 그대로', () => {
+    const game = (abilityContext?: LeagueAbilityContext) =>
+      simulateLeagueGame({ away: 1, home: 0 }, createSeededRandom(20101015), 0, undefined, abilityContext === undefined ? undefined : { abilityContext })
+    const 표값 = game()
+    expect(game({ mode: 4 }).pitcherStaminas).toEqual(표값.pitcherStaminas)
+    expect(game({ mode: 4, nariMorale: 100 }).pitcherStaminas).toEqual(표값.pitcherStaminas)
+    expect(game({ mode: 4, nariMorale: 3 }).pitcherStaminas).not.toEqual(표값.pitcherStaminas)
   })
 })

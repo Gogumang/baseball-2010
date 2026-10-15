@@ -131,7 +131,6 @@ import type { LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPla
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
-import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
@@ -167,6 +166,9 @@ import {
   tryTriggerBurst,
 } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
+import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
+import { withMoraleAbilityCut } from '@/entities/pitcher-career/model/pitcherCareer'
+import { nariMoraleAfterBurst } from '@/entities/career/model/nariMorale'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
 import {
@@ -344,6 +346,11 @@ export interface PitcherGameOptions {
   readonly nationalCupStage?: number
   /** 투수 능력치 0~999 (제구·구속·변화·체력) */
   readonly stats: PitcherStats
+  /**
+   * 사기 감소 **앞**의 능력치(질병 · 부상까지, `gamePitcherAbilityBeforeMoraleOf`) — 경기 중 나리 사기가 바뀌면(돌발 보상 0x8e34c 종류 1)
+   * 0xb570c 가 다음 계산부터 새 사기로 깎으므로 `stats` 를 이 값에서 다시 짓는다(`withPitcherGameMorale`). 없으면(옛 시험) `stats` 그대로
+   */
+  readonly statsBeforeMoraleCut?: PitcherStats
   /** 체력 실효 능력치 — 스태미나 용량 X 의 바탕 (`0xb6415(P, 3, 1)`) */
   readonly staminaAbility: number
   /** 경기 시작 때의 스태미나 0~10000 (레코드 +0x2c) */
@@ -351,7 +358,10 @@ export interface PitcherGameOptions {
   readonly repertoire: PitcherRepertoire
   /** 이 경기에 남은 마구 횟수 (`magicPitchCountOf` 결과) */
   readonly magicCount: number
-  /** 팀 사기 (스태미나 용량 보정) */
+  /**
+   * 팀 사기 (스태미나 용량 보정) — **두 팀 레코드 +2**. 모드 3 은 경기 셋업 0x39fdc(3a332)와 실효 능력치 0xb570c(b5768)가 두 팀 모두
+   * 지금 나리 사기 0xa3a24 로 덮어(`entities/career/model/nariMorale`) 상대 팀 용량도 이 값이다. 국가대항전이면 원본 버그로 상대국 칸 +2
+   */
   readonly teamMorale: number
   /** 평판 `career+0x62` (감독 강판 표·경기 뒤 평가) */
   readonly reputation: number
@@ -642,6 +652,12 @@ export interface PitcherGameProgress {
   readonly autoRelay?: PitcherAutoRelay | null
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
+  /**
+   * 이 경기 돌발 보상 · 페널티(0x8e34c) — 판정 차례대로. 사기(종류 1)는 판정 그 자리에서 `options.teamMorale` · `stats` 에도 먹는다
+   * (`withPitcherGameMorale`). 커리어(사기 · 인기도 · 평판 · 소지금)에는 앱이 경기 끝에 얹는다 — 0x8e34c 는 저장하지 않고 정산 0x4ea0c 의
+   * 저장이 함께 쓰므로, 경기 중 나가면(0x40140 — 저장 없음) 사라지는 것까지 같다. 없으면 빈 목록
+   */
+  readonly burstRewardDeltas?: readonly BurstRewardDelta[]
   /**
    * **공 객체 +0x10** (경기+0xf98) — 공에 실린 마구 번호. 0x34d6c 투수 쪽 보정(구속·제구 +150~220 · B/C %)이 본다.
    * 상태 0x11 진입 `0x3de10` 만 쓴다 (H2 3-4): `구질 == 22 && 0xaea10(수비 팀) > 0` 이면 `+0x10 = 투수+0x18`.
@@ -2623,10 +2639,36 @@ function resolveBurstFor(
         progress.game.isFinished && progress.game.ourScore > progress.game.opponentScore,
     }),
   )
-  return {
+  const resolved: PitcherGameProgress = {
     ...progress,
     burst: resolution.session,
     lastBurstResolution: resolution.judgement !== null ? resolution : null,
+  }
+  if (resolution.deltas.length === 0) return resolved
+  // 0x8e34c 종류 1 사기 — 8e410 0xa3a24(R) + 양 → 8e420 0xa3a44(R, …)(0..100). 다음 공부터 두 팀 용량 · 내 능력치가 새 값을 본다
+  const morale = nariMoraleAfterBurst(progress.options.teamMorale, resolution.deltas)
+  return {
+    ...withPitcherGameMorale(resolved, morale),
+    burstRewardDeltas: [...(progress.burstRewardDeltas ?? []), ...resolution.deltas],
+  }
+}
+
+/**
+ * **경기 중 나리 사기가 바뀌었다** — 두 팀 레코드 +2(0x66e44 용량)와 내 투수 능력치의 사기 감소(0xb570c b57c4 — b5768 이 쓴 같은 칸)가
+ * 다음 계산부터 새 값을 본다. 사기 감소 앞 능력치(`statsBeforeMoraleCut`)가 없으면 능력치는 그대로 둔다
+ */
+export function withPitcherGameMorale(progress: PitcherGameProgress, morale: number): PitcherGameProgress {
+  const { options } = progress
+  if (options.teamMorale === morale) return progress
+  return {
+    ...progress,
+    options: {
+      ...options,
+      teamMorale: morale,
+      ...(options.statsBeforeMoraleCut === undefined
+        ? {}
+        : { stats: withMoraleAbilityCut(options.statsBeforeMoraleCut, morale) }),
+    },
   }
 }
 
@@ -2959,7 +3001,7 @@ export function closeManagerHookWindow(
   )
 }
 
-/** 돌발 결과 창을 닫는다 (보상은 앱이 커리어에 얹는다 — `burstRewardDeltasOf` 가 판정에 들어 있다) */
+/** 돌발 결과 창을 닫는다 (보상은 판정 때 `burstRewardDeltas` 에 쌓였고 앱이 경기 끝에 커리어에 얹는다) */
 export function closeBurstWindow(progress: PitcherGameProgress): PitcherGameProgress {
   return progress.lastBurstResolution === null ? progress : { ...progress, lastBurstResolution: null }
 }
@@ -3592,8 +3634,9 @@ function applyTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomP
  *
  * `bothTeamsAreCpu` 는 거짓 — 모드 3 경기 준비 `0x3a20a` 가 내 팀을 사람 팀으로 적는다. 다만 마무리 굴림 `0xac360` 은
  * 벤치에 마선수가 있을 때만(0xb8a8d) 돌아 이 화면 로스터에서는 돌지 않는다.
- * 사기는 용량 `0x66e44` 의 `V[+2]` — 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 3 → 0x1f940)를 찾으므로 상대 투수는
- * 상대 팀 레코드 사기다(`teamRecordMoraleOf`, 표값). 간이 엔진 소모(0xa5e14)와 체력 막대가 같은 값을 본다.
+ * 사기는 용량 `0x66e44` 의 `V[+2]` — 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 3 → 0x1f940)를 찾아 읽는데, 그 칸은 셋업
+ * 0x39fdc(3a332) · 실효 능력치 0xb570c(b5768)가 두 팀 모두 지금 나리 사기 0xa3a24 로 덮는다 → 두 팀 다 `options.teamMorale`.
+ * (r87 의 "상대는 표값" 은 b5768 쓰기를 못 본 것이었다.) 간이 엔진 소모(0xa5e14)와 체력 막대가 같은 값을 본다.
  */
 function quickDefenseOf(
   progress: PitcherGameProgress,
@@ -3637,7 +3680,8 @@ function quickDefenseOf(
     lead: isOurs
       ? progress.game.ourScore - progress.game.opponentScore
       : progress.game.opponentScore - progress.game.ourScore,
-    morale: isOurs ? options.teamMorale : teamRecordMoraleOf(options.opponentTeamId),
+    // 0xb570c b5768 이 두 팀 레코드 +2 를 공마다 지금 나리 사기로 덮는다 — 상대 팀도 같은 값 (`PitcherGameOptions.teamMorale`)
+    morale: options.teamMorale,
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다
@@ -3921,6 +3965,11 @@ export interface PitcherGameSummary {
   readonly leagueStolenBases: readonly LeagueStolenBase[]
   /** 리그 타자 기록표 타석 줄 재료 (`PitcherGameProgress.leaguePlateAppearances`) — 정규시즌만 쌓는 것은 부르는 쪽 몫 */
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
+  /**
+   * 이 경기 돌발 보상 · 페널티 0x8e34c (`PitcherGameProgress.burstRewardDeltas`) — 앱이 정산 앞에 커리어에 얹는다
+   * (사기는 0xa3a44 — 대회 중이면 상대국 칸, `applyPitcherBurstRewards`)
+   */
+  readonly burstRewardDeltas?: readonly BurstRewardDelta[]
 }
 
 /**
@@ -4025,6 +4074,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     },
     leagueStolenBases: progress.leagueStolenBases ?? [],
     leaguePlateAppearances: progress.leaguePlateAppearances ?? [],
+    burstRewardDeltas: progress.burstRewardDeltas ?? [],
     leaguePitchers: {
       lines: chargeCpuPitcherLine(
         chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {

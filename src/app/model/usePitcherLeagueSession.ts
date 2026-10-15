@@ -136,8 +136,9 @@ import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitch
 import {
   pitcherGameOptionsOf,
   pitcherGameOutcomeOf,
-  teamMoraleOf,
 } from '@/pages/pitcher-league/model/pitcherGameOptions'
+import { nariMoraleAfterBurst, nariMoraleOf } from '@/entities/career/model/nariMorale'
+import { applyPitcherBurstRewards } from '@/entities/pitcher-career/model/pitcherBurstReward'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import {
@@ -521,7 +522,7 @@ function pitcherCupTeamsOf(career: PitcherCareer, opponentTeamId: number): NariC
 /**
  * **국가대항전 경기 옵션** — 경기 장면 0xb891c 가 대회 레코드 두 칸(0x1f940: S+0x12c 면 팀 10 → +0xbc4, 그 밖 → +0xbe0)으로 선다.
  * 내 팀 = 대표팀(10) · 측 = 0xb7844 의 L+0xac 갈래(대진 칸 0 이 후공, `nationalCupSideOf`) · g = 대회 날짜 L+0x32 ·
- * 대표팀 투수 배열(내 투수 복사본 — 포지션 코드는 그 칸) · 스태미나는 날마다 10000(0xb6190, 복사본 포함) · 팀 사기 = 마스터 복사본 +2 ·
+ * 대표팀 투수 배열(내 투수 복사본 — 포지션 코드는 그 칸) · 스태미나는 날마다 10000(0xb6190, 복사본 포함) · 두 팀 사기 = 상대국 칸 +2(`nariMoraleOf`) ·
  * 마선수 없음(1c5fe) · 0xa56dc 는 S+0x12c 라 거짓(기록 안 셈).
  */
 function cupGameOptionsOf(
@@ -535,7 +536,8 @@ function cupGameOptionsOf(
     ...settings,
     opponentTeamId: matchup.opponent,
     playerSide: nationalCupSideOf(cup, matchup.myTeam) as PlayerSide,
-    teamMorale: teamMoraleOf(matchup.myTeam),
+    // 팀 사기는 넘기지 않는다 — 두 팀 레코드 +2 는 셋업 3a332 · 0xb570c b5768 이 0xa3a24 로 덮고, 대회 중 0xa3a24 는 상대국 칸 +2 를
+    // 읽는다(원본 버그). `pitcherGameOptionsOf` 의 기본값 `nariMoraleOf` 가 그 값이고 내 능력치의 사기 감소도 같은 값이다
   })
   return {
     ...options,
@@ -1240,7 +1242,13 @@ export function usePitcherLeagueSession(
         opponentScore: summary.opponentScore,
       })
       // 같은 날 CPU 경기 두 나라는 상대국 칸 레코드를 쓴다 — 사람 경기 끝 상대 투수 칸별 +0x2c 에서 선다(701a7a9)
-      const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
+      // 그 CPU 경기(0xc2dac)의 간이 엔진도 0xb570c b5768 로 두 나라 레코드 +2 에 나리 사기 — 대회 중이라 상대국 칸 +2, 곧 사람 경기
+      // 끝의 그 칸(경기 중 돌발 보상 사기가 쌓인 값)이다 (`nariMorale`)
+      const burstDeltas = summary.burstRewardDeltas ?? []
+      const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent, {
+        mode: PITCHER_LEAGUE_MODE,
+        nariMorale: nariMoraleAfterBurst(options.teamMorale, burstDeltas),
+      })
       // 기록 달성 G (4ebaa~4ec7c — 사람 팀 공·수로 거른 기록이라 대회 경기도 쌓인다. 강판 뒤는 0xa77f0 이 막아 요약에 없다)
       const gamePointReward = recordGamePointsOf(summary.recordIds)
       // 0x4ec82 `0x22c7d(G, 모드 3)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
@@ -1249,8 +1257,10 @@ export function usePitcherLeagueSession(
       // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
       recordStat({ kind: '플레이시간', mode: PITCHER_LEAGUE_MODE, elapsed: lapPlayClock() })
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
+      // 경기 중 돌발 보상 0x8e34c(저장 없음 — 정산 저장이 함께 쓴다)를 먼저 얹는다. 사기는 대회 중이라 상대국 칸 +2 에 쌓였다가
+      // 바로 아래 하루 끝 b8216 의 새 복사로 지워진다(원본 버그 그대로)
       commitWith((current) => ({
-        ...settleNariCupGame(current, gamePointReward),
+        ...settleNariCupGame(applyPitcherBurstRewards(current, burstDeltas), gamePointReward),
         nationalCup: next,
         ...(current.nariCupTeams === undefined
           ? {}
@@ -1270,6 +1280,8 @@ export function usePitcherLeagueSession(
       // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (142 → 경기 → 101 → 134)
       const cupGame = cupGameRef.current
       if (cupGame !== null) return finishCupGame(summary, cupGame, gameOptions)
+      // 경기 중 돌발 보상 0x8e34c — 정산 0x4ea0c 보다 앞(경기 중)에 선수 레코드에 들어가 있던 값이다 (`applyPitcherBurstRewards`)
+      const played = applyPitcherBurstRewards(career, summary.burstRewardDeltas ?? [])
       // 경기 장면 0x104 를 지나 나리 장면이 새로 선다 — 장면+0x288 = 0 · 반복 이벤트 · 커서 · mgr+0x304
       matchPreparedRef.current = false
       setUpPitcherScene()
@@ -1283,10 +1295,10 @@ export function usePitcherLeagueSession(
       // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 리그 표에 남는다 (준비 0x1c46c 가 g == 0 이면 열 팀 10000 으로 채운 뒤)
       // 동료·상대 CPU 투수 줄과 경기 끝 판정은 리그 기록표에 (정산 0xa8024 · 0xa7de8 — 정규시즌만, 내 투수 빼고)
       const recorded = withPitcherGameLeagueRecords(
-        career,
+        played,
         withPitcherGameStaminas(
-          career,
-          applyPitcherGameResult(career, outcome),
+          played,
+          applyPitcherGameResult(played, outcome),
           gameOptions.ourTeamId,
           gameOptions.opponentTeamId,
           summary.pitcherStaminas,
@@ -1303,7 +1315,12 @@ export function usePitcherLeagueSession(
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
       recordStat({ kind: '플레이시간', mode: PITCHER_LEAGUE_MODE, elapsed: lapPlayClock() })
-      const day = applyPitcherLeagueDay(recorded, random, aceLevels)
+      // CPU 경기 0xc2a48(4f296)는 평가 0xa719c(4f274)가 사기를 바꾼 **뒤**다 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 그 사기를
+      // 쓴다. 평가는 정규시즌 경기만(아래 `isEvaluated`)
+      const moraleAtCpuGames = played.postseason === null
+        ? nariMoraleOf(gainPitcherMorale(recorded, summary.evaluation.moraleChange))
+        : nariMoraleOf(recorded)
+      const day = applyPitcherLeagueDay(recorded, random, aceLevels, moraleAtCpuGames)
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다. CPU 끼리의 포스트시즌 경기는
       // 여기서 돌리지 않는다 — 원본은 대진 128 의 [확인](0x13da0)에서 돌린다 (`pressPostseasonBracket`)
       const seasoned = applyPitcherSeasonEnd(day)
@@ -1314,7 +1331,7 @@ export function usePitcherLeagueSession(
        * 포스트시즌 표시는 45번째 경기의 하루 끝(0xb818c → 0xb80a8)에야 서므로 그 경기는 평가된다 —
        * 경기 전 커리어(`career.postseason`)로 가른다. (웹 투수편엔 국가대항전이 없다.)
        */
-      const isEvaluated = career.postseason === null
+      const isEvaluated = played.postseason === null
       const evaluated = isEvaluated
         ? gainPitcherMorale(
             gainPitcherReputation(
@@ -1353,7 +1370,7 @@ export function usePitcherLeagueSession(
         hitsAllowed: summary.record.hitsAllowed & 0xff,
         pitches: summary.pitchCount & 0xff,
       }
-      const line = isEvaluated || career.lastGame === undefined ? thisLine : career.lastGame
+      const line = isEvaluated || played.lastGame === undefined ? thisLine : played.lastGame
       /*
        * 116 진입 0x1278c — 감독 글은 116 이 고른다: 모드 3 표 [−2…6](선발형이면 칸 3~8 두 배, 0x1285a)에서 +0x4a 칸 · 평판 +0x62
        * (평가 뒤 값) 구간(0x128d2) · 38 은 보직(0xb6705) ≠ 0 && state+0x6a == state+0x6b(이 경기) && S+0x1d8[6](투구 수) == 0
@@ -1382,9 +1399,9 @@ export function usePitcherLeagueSession(
       }
       // 연속 기록 +0x1bc — 0xa719c 모드 3 갈래라 평가가 도는 정규시즌 경기만 잇는다 (`advancePitcherStreaks`)
       const streaks = isEvaluated
-        ? advancePitcherStreaks(career.streaks ?? EMPTY_PITCHER_STREAKS, {
-          role: career.role,
-          dayCounter: leagueDayCounterOf(career),
+        ? advancePitcherStreaks(played.streaks ?? EMPTY_PITCHER_STREAKS, {
+          role: played.role,
+          dayCounter: leagueDayCounterOf(played),
           endedInningIndex: summary.endedInningIndex,
           decisionCode: summary.decisionCode,
           strikeouts: summary.record.strikeouts,

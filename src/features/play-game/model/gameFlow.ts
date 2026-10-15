@@ -467,11 +467,18 @@ export interface GameProgress {
    */
   readonly myRunAbility?: number
   /**
-   * **내 팀 레코드 사기**(+2) — 우리 투수의 스태미나 용량 `0x66e44` 의 `V[+2]`. 모드 4 의 `0x1f9a8` → `0x1f8f8`(`[저장+0xbc]`)
-   * 내 팀 칸이고, 나리 사기 읽기 · 쓰기 `0xa3a24` · `0xa3a44` 가 같은 칸(`0x1f988(저장, R[1])` + 2)을 쓰므로 **커리어 사기**다.
-   * 국가대항전의 대표팀 칸(+0xbc4)은 대회 시작 복사본이라 안 넘긴다(표값). 없으면 표값(`teamRecordMoraleOf`)
+   * **두 팀 레코드 사기**(+2) — 두 팀 투수의 스태미나 용량 `0x66e44` 의 `V[+2]`. 모드 3 · 4 에서는 이 칸이 늘 **지금 나리 사기**
+   * (`0xa3a24`, `entities/career/model/nariMorale`)다 (직접 떴다):
+   * - 경기 장면 셋업 0x39fdc 3a2f8~3a332 — `0xb8680(내 팀 객체)` 레코드 +2 = 0xa3a24(R) (0..100)
+   * - 실효 능력치 0xb570c 모드 3 · 4 갈래 b574a~b5768 — 넷째 인자 ≠ 0 이면 **넘겨 받은 팀 레코드**(첫 인자 = `0xb8680(팀 객체)`) +2 =
+   *   0xa3a24(R). 투구 · 타격 화면(0x33cbc · 0x340f8 · 0x34334 · 0x34968 · 0x34cd0 · 0x35b94 · 0x4dbac)과 간이 엔진(0xc11f0 c1308 ·
+   *   c1320 은 두 팀 [r7+0x78] · [r7+0x74] 를 다, 0xc15a4 · 0xc1818)이 공마다 두 팀으로 부른다 → **상대 팀 칸도 나리 사기다**
+   * 그래서 경기 중 사기가 바뀌면(돌발 보상 0x8e34c 종류 1) 다음 공부터 두 팀 용량이 바뀐 값을 본다(`withGameTeamMorale`).
+   * 국가대항전이면 0xa3a24 가 상대국 칸 +2 를 읽는 원본 버그라 그 값이다. 없으면(옛 시험) 팀마다 표값(`teamRecordMoraleOf`)
+   * ⚠️ 미확인: 한 팀을 0xb570c 가 아직 한 번도 안 건드린 경기 첫 공의 용량은 그 칸의 앞 값(지난 경기 끝의 나리 사기 · 등록 표값)일 수
+   * 있다 — 첫 0xa5e14 와 첫 0xb570c 의 차례는 안 뜸
    */
-  readonly ourTeamMorale?: number
+  readonly teamMorale?: number
 }
 
 /** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
@@ -563,8 +570,8 @@ export function startGame(
   ourRecordLineup?: QuickLineup,
   /** 내 선수의 주력 (`GameProgress.myRunAbility`) — 첫 내 차례 앞 동료 타석의 도루 판정부터 본다 */
   myRunAbility?: number,
-  /** 내 팀 레코드 사기 = 커리어 사기 (`GameProgress.ourTeamMorale`). 안 넘기면 표값 */
-  ourTeamMorale?: number,
+  /** 두 팀 레코드 사기 = 지금 나리 사기 0xa3a24 (`GameProgress.teamMorale`). 안 넘기면 팀마다 표값 */
+  teamMorale?: number,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
   const opponentAces = aces?.opponent ?? NO_GAME_ACES
@@ -632,7 +639,7 @@ export function startGame(
     specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
     stealingFrom: [],
     ...(myRunAbility === undefined ? {} : { myRunAbility }),
-    ...(ourTeamMorale === undefined ? {} : { ourTeamMorale }),
+    ...(teamMorale === undefined ? {} : { teamMorale }),
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
@@ -1982,7 +1989,7 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
       progress.ourPitcherOrder,
       progress.ourPitcherStaminas,
       teamAcePitcherOf(progress, true),
-      progress.ourTeamMorale,
+      progress.teamMorale,
     ),
     // 상대 타자는 명단에서 고르고, 타석마다 CPU 대타(0xac228)를 먼저 본다
     {
@@ -2316,9 +2323,9 @@ function finalStaminasOf(table: readonly number[], mound: HalfInningMound): read
  * 9회 이후 마무리 상황마다 매 타자 투수가 바뀐다(58066a1 뒤의 회귀).
  *
  * 팀 사기(`0x66e44` 의 `V[+2]`)는 0xaeb08 이 **그 투수 팀**의 레코드(0x1f9a8, 모드 4 → 0x1f8f8 `[저장+0xbc]+4+0x1c·팀`)를 찾아 읽는다.
- * 그 칸 +2 에 쓰는 곳은 나리 사기 쓰기 `0xa3a44`(`0x1f988(저장, R[1])` — 내 팀 칸) 하나라 **내 팀은 커리어 사기**, 상대 팀은
- * 등록 `0x204e0` 이 마스터(0x1f8c0)에서 깊은 복사(0x1fe5c)한 표값(`teamRecordMoraleOf`)이다. 투구 소모(0xa5e14)의 용량과
- * 상대 마운드 체력 막대(`opponentMoundOf`)가 같은 값을 본다.
+ * 그 칸 +2 는 경기 셋업 0x39fdc(3a332) · 실효 능력치 0xb570c(b5768)가 두 팀 모두 **지금 나리 사기** 0xa3a24 로 덮는다
+ * (`GameProgress.teamMorale` 머리말) — 그래서 두 팀이 같은 값이다. 투구 소모(0xa5e14)의 용량과 상대 마운드 체력 막대(`opponentMoundOf`)가
+ * 같은 값을 본다. (r87 의 "상대 팀은 표값" 은 0xb570c 의 b5768 쓰기를 못 본 것이었다)
  */
 function quickDefenseOf(
   teamId: number,
@@ -2330,7 +2337,7 @@ function quickDefenseOf(
   staminas?: readonly number[],
   /** 142 가 명부 8번 칸에 넣은 마투수 (`order` 에 8 이 들어 있다) */
   ace?: GameAcePitcher,
-  /** 그 팀 레코드 +2 — 내 팀이면 커리어 사기(`GameProgress.ourTeamMorale`). 안 넘기면 표값 */
+  /** 그 팀 레코드 +2 — 나리 사기(`GameProgress.teamMorale`). 안 넘기면 표값 */
   morale: number = teamRecordMoraleOf(teamId),
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
@@ -2374,7 +2381,17 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     progress.opponentPitcherOrder,
     progress.opponentPitcherStaminas,
     teamAcePitcherOf(progress, false),
+    // 0xb570c b5768 이 상대 팀 레코드 +2 에도 나리 사기를 쓴다 (`GameProgress.teamMorale`)
+    progress.teamMorale,
   )
+}
+
+/**
+ * **경기 중 나리 사기가 바뀌었다** — 돌발 보상 0x8e34c 종류 1(8e410 0xa3a24 + 양 → 8e420 0xa3a44). 원본은 두 팀 레코드 +2 를 공마다
+ * 0xb570c(b5768)로 다시 쓰므로 다음 공부터 두 팀 용량(0x66e44)이 새 값을 본다. 대회 중이면 부르는 쪽이 상대국 칸 값을 넘긴다
+ */
+export function withGameTeamMorale(progress: GameProgress, morale: number): GameProgress {
+  return progress.teamMorale === morale ? progress : { ...progress, teamMorale: morale }
 }
 
 /**
