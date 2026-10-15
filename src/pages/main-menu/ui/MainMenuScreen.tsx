@@ -5,6 +5,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, MainMenuOpenTier, NariGameReady } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
@@ -413,6 +414,15 @@ export function MainMenuScreen({
       {gamePoint !== undefined && (
         <ScreenFrame title="2010프로야구" gamePoint={gamePoint}
           onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} slides={headerSlides} />
+      )}
+
+      {/*
+        설명 판 = 지금 고른 칸(판 안 큰 글자) — 투명 누름 칸으로 OK. 고른 칸 글자는 바퀴·릴 어디서도 화면 안에 안 그려져
+        (바퀴 아래 자리 · 릴 자리 4 는 판이 대신 보인다) 마우스로 고른 칸을 시작할 길이 없었다. 바닥띠 되돌아가기(x 206~)는 비워 둔다
+      */}
+      {state.lockedNotice === null && state.generalModeWindow === null && !state.isPickingNariEdition && (
+        <PressArea label="고른 칸 시작" onPress={() => dispatch({ type: '시작' })}
+          rect={{ x: MENU_DESCRIPTION_PANEL.x, y: MENU_DESCRIPTION_PANEL.y, width: 200 - MENU_DESCRIPTION_PANEL.x, height: 320 - MENU_DESCRIPTION_PANEL.y }} />
       )}
 
       {/* 잠긴 칸 안내 — 원본 확인 팝업 0x74ef5 종류 1(OK 하나). 바닥 판 글칸에 웹 단추를 얹던 근사를 걷고 공용 상자로 띄운다 */}
