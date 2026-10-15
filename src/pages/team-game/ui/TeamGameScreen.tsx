@@ -1059,6 +1059,8 @@ export function TeamGameScreen({
             단계 상태(0xf·0x10·0x11)와 조준점·게이지 틱은 그대로다 (0x52cc6, 투수편 `isPitchInputPaused` 와 같은 자리)
           */
           <PitcherSideStage
+            // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
+            sceneDEntryMark={sceneConfirm.sceneDEntryMark}
             pitch={progress.lastPitch}
             resolution={progress.lastResolution}
             resultTicks={heldResultTicks}

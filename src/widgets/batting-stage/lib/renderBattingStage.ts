@@ -96,8 +96,8 @@ export interface StageScene {
   /** 0xf 의 마지막 갱신 틱(`pitcherIdleTick` 셈) — 0x10 에 들면 대기 동작이 굳는다. 아직 0xf 면 null · 안 주면 null */
   readonly pitcherIdleTickEnd?: number | null
   /**
-   * 투수 그리기 0x38d1c 의 홈런 갈래(0x3908a)가 보는 것: 결과 코드 [경기+0xfd4](24~26 이면 0x357e0 참 — 0x6aa 만 쓰고 묵은 값이
-   * 다음 공까지 남는다, `PitcherResultCodeClock`) · 큰 타구 감상 플래그 +0x199a(0x392ac). 투수를 안 그리는 상태면 null · 안 주면 없음
+   * 투수 그리기 0x38d1c 의 홈런 갈래(0x3908a)가 보는 것: 결과 코드 [경기+0xfd4](24~26 이면 0x357e0 참 — 0x6aa 가 쓰고 0x11 진입
+   * 3deea 가 공마다 0 으로 지운다, `PitcherResultCodeClock`) · 큰 타구 감상 플래그 +0x199a(0x392ac). 투수를 안 그리는 상태면 null · 안 주면 없음
    */
   readonly pitcherHitMark?: (PitcherResultCodeClock & { readonly isBigHit: boolean }) | null
   /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 구름 */

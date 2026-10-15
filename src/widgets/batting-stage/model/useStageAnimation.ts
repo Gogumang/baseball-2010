@@ -25,6 +25,8 @@ import { ballFrameAt, ballFrameStartTime, pitchTickAt } from '@/widgets/batting-
 import { clearParticles } from '@/entities/particle/model/particleScene'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
+import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
+import { clearSceneResultCodeOnPitch, sceneResultCodeNow, writeSceneResultCode } from '@/widgets/batting-stage/model/sceneResultCodeStore'
 import { enterSettlementEffect, tickSettlementEffect, type SettlementEffect } from '@/entities/batting/model/settlementEffect'
 import { skyColorsOf, skyColumnOfInning } from '@/widgets/batting-stage/lib/stageScenery'
 import { settlementSkyColumnOf } from '@/widgets/batting-stage/lib/settlementSky'
@@ -73,6 +75,9 @@ export interface StageHandlers {
   readonly releaseSwing: (swing: SwingReservation) => void
 }
 
+/** 마투수 순번 0xb63a1 — 붕붕머신(XlsACE_PIT_DATA +0x18 = 7, 순번 = 번호 − 5) */
+const BOONGBOONG_MACHINE_ORDER = 2
+
 /** 캔버스 애니메이션 루프와 투구 단계 진행. */
 export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
   const {
@@ -94,6 +99,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     pitchJudgedRef,
     heldResultRef,
     particlesRef,
+    inPlayEnteredAtRef,
     latestRef,
   } = refs
   // 고리는 남은 필살 횟수 같은 props 로 자주 바뀐다 — 루프를 다시 세우면 투구 시작 시각이 지워지므로 ref 로 읽는다
@@ -162,12 +168,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      */
     let pitcherTickEnd: number | null = null
     /**
-     * 결과 코드 [경기+0xfd4] — 메시지 0x6aa(스윙 · 번트 판정)만 쓰고 아무도 안 지운다(`pitcherFatigue` 홈런 갈래). 이 장면이 산 동안
-     * 이어 든다: 0x11 진입 때 남은 값 · 이 공의 판정 틱과 그 값.
-     * ⚠️ 원본은 경기 장면 하나 동안 남지만 웹은 이 장면 부품이 내려가면(타석 화면이 바뀌면) 잃는다 — 홈런더비처럼 같은 장면에서
-     * 공이 이어지는 화면에서만 묵은 코드가 보인다
+     * 결과 코드 [경기+0xfd4] — 경기 장면 객체 칸이라 장면 부품이 바뀌어도 이어 든다(`sceneResultCodeStore`). 0x11 진입(3deea)이 공마다
+     * 0 으로 지우고 메시지 0x6aa(스윙 · 번트 판정, 5130e)가 쓴다. 이 부품은 0x11 진입 때의 값(늘 0)과 이 공의 판정 틱 · 값을 든다
+     * (`pitcherFatigue` 홈런 갈래). 부품이 새로 서면 장면 객체에 남은 값부터 본다
      */
-    let resultCodeBeforePitch: number | null = null
+    let resultCodeBeforePitch: number | null = sceneResultCodeNow()
     let judgedResultCode: { readonly tick: number; readonly code: number | null } | null = null
     /** 그 틱에 원본이 읽는 재료 — 볼카운트 · 주자 · 마구 · 투수 (`selectPitch` 와 같은 인자) */
     const cpuPitchArgsNow = (): CpuPitchArgs => {
@@ -247,8 +252,14 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           // 3de7c — 투수 그림 객체 상태 1(투구 동작)
           pitcherStartedAtRef.current = now
           pitcherTickEnd = null
-          // 앞 공의 0x6aa 가 쓴 결과 코드는 그대로 남는다 (0x3de10 은 +0xfd4 를 안 지운다)
-          if (judgedResultCode !== null) resultCodeBeforePitch = judgedResultCode.code
+          // 3de42~3de66 — 0x11 진입: 구질 +0xfc8 == 22 이고 수비 팀 지금 투수의 순번 0xb63a1 == 2(붕붕머신)면 파티클 관리자를
+          // 비운다(0x6dee4, 굴림 없음). 이 프레임의 파티클 틱보다 앞이다
+          if (cycle.typeNumber === MAGIC_PITCH_TYPE_NUMBER && latestRef.current.acePitcher?.order === BOONGBOONG_MACHINE_ORDER) {
+            clearParticles(particlesRef.current)
+          }
+          // 3deea — 0x11 진입이 +0xfd4 를 0 으로 지운다(0xfe0 − 0xc 로 만든 주소라 `xval 0xfd4` 에 안 잡혔다 — r100 정정)
+          clearSceneResultCodeOnPitch()
+          resultCodeBeforePitch = sceneResultCodeNow()
           judgedResultCode = null
         } else {
           return
@@ -336,6 +347,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             // 맞은 공만 0x13('타격')으로 넘어간다 — 헛맞음은 0x11 에 남아 공 끝을 기다린다
             const isContact = phaseRef.current !== '투구중'
             judgedResultCode = { tick: pitcherTickNow, code: isContact ? (pendingHitRef.current?.detail.resultCode ?? null) : null }
+            writeSceneResultCode(judgedResultCode.code)
             if (isContact) {
               // 0x6aa 가 0x13 을 예약한 그림 — 이 그림의 0x4e060 이 투수를 마지막으로 센다
               pitcherTickEnd = pitcherTickNow
@@ -518,8 +530,15 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         tickParticles(particlesRef.current, settlement.random)
       }
       for (let step = 0; step < steps && settlement === undefined; step += 1) {
+        const stepTime = openedAt + (firstSteppedTick + step + 1) * tickLength
+        // 0x17 진입 0x46418 의 4673e — 0x13 을 끝낸 틱(그 틱의 파티클 틱 · 그리기는 0x13 끝에 쏜 016 까지 한 번 돈다) 다음 틱에 비운다
+        const inPlayEnteredAt = inPlayEnteredAtRef.current
+        if (inPlayEnteredAt !== null && stepTime > inPlayEnteredAt) {
+          inPlayEnteredAtRef.current = null
+          clearParticles(particlesRef.current)
+        }
         stageEffects = stepStageFrame(stageEffects, {
-          time: openedAt + (firstSteppedTick + step + 1) * tickLength,
+          time: stepTime,
           millisecondsPerTick: tickLength,
           window: latestRef.current.homeRunText ?? null,
           effectsClearedAt: latestRef.current.effectsClearedAt ?? null,

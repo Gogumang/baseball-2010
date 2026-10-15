@@ -219,7 +219,7 @@ import {
 import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { atBatResultCodeOf, quickAtBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
@@ -4971,8 +4971,8 @@ export function cancelSubstitution(
   _random?: RandomPort,
 ): TeamGameProgress {
   if (progress.game.isFinished || !isHumanTurn(progress) || !progress.atBatPrepared) return progress
-  // '#'·CLR → 곧장 0xe — 사람 OK 를 다시 기다린다 (굴림은 OK 뒤, `confirmScene`)
-  return enterConfirmWait(progress)
+  // '#'·CLR → 곧장 0xe(0x4984a) — 0xd 를 안 거친다(투수 그림 · 파티클을 안 건드린다). 사람 OK 를 다시 기다린다 (굴림은 OK 뒤, `confirmScene`)
+  return { ...enterConfirmWait(progress), sceneConfirm: enterSceneConfirmFromSubstitutionWindow() }
 }
 
 /**

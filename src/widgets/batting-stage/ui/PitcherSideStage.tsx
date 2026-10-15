@@ -98,6 +98,13 @@ interface PitcherSideStageProps {
    * 0xf = 구질 목록이 실린 대기 · 0x10 = 조준 · 0x11 = 게이지 또는 공이 나는 동안. 안 넘기면 안 그린다
    */
   readonly skillPanel?: PitcherSideSkillPanelSource
+  /**
+   * 0xd 진입(0x48d50)마다 바뀌는 표지(`useSceneConfirm` 의 `sceneDEntryMark`) — 48ee4 0x35650 → 0x340c0 이 투수 그림 객체를 상태 0 으로
+   * 되돌린다. 0xf → 0xb('#' 교체 창) → '#' · CLR → 곧장 0xe(0x4984a) 길은 0xd 가 없어 안 바뀐다 — 그동안(0xb · 0xe) 투수 갱신
+   * 0x9e004 가 안 불려(0xf 0x39c1c · 0x11 0x4e060 만 부른다) 대기 동작이 굳은 채 남고, OK 뒤 0xf 진입 0x3d954 가 되돌린다.
+   * 교체를 확정한 길(0xb → 0x16 → 0xd)은 0x16 동안 굳어 있다가 0xd 에서 되돌린다. 안 넘기면 0xf 진입만 본다
+   */
+  readonly sceneDEntryMark?: number
   /** 장면 위에 얹는 UI (소개 판 · 교체 연출 · 조준 그림 따위) — 원본도 상태 그리기가 장면 다음에 그린다 */
   readonly children?: ReactNode
 }
@@ -143,6 +150,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     const stepSkillPanel = createSkillPanelDriver()
     let skillPanelStateFSerial = 0
     let wasSkillPanelStateF = false
+    /** 마지막으로 본 0xd 진입 표지 */
+    let seenSceneDEntryMark = latestRef.current.sceneDEntryMark
 
     const frame = (now: number) => {
       const current = latestRef.current
@@ -161,6 +170,12 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         shownMistake = current.pitch !== null && current.isMistakePitch === true
         // 0x11 진입 3de7c — 상태 1 이 대기 동작을 덮는다
         idleStartTick = null
+      }
+      // 0xd 진입 0x48d50 48ee4 → 0x35650 → 0x340c0 — 투수 그림 객체를 상태 0 으로 (굳은 대기 동작도 지운다)
+      if (current.sceneDEntryMark !== seenSceneDEntryMark) {
+        seenSceneDEntryMark = current.sceneDEntryMark
+        idleStartTick = null
+        idleEndTick = null
       }
       if (current.isPaused && !wasPaused) pausedSinceTick = nowTick
       wasPaused = current.isPaused

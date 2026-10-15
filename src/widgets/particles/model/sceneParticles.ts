@@ -1,5 +1,5 @@
-import { clearParticles, createParticleScene, emitParticles, tickParticles } from '@/entities/particle/model/particleScene'
-import type { ParticleScene } from '@/entities/particle/model/particleScene'
+import { emitParticles, tickParticles } from '@/entities/particle/model/particleScene'
+import { resetSceneParticleManagerForTest, sceneParticleScene } from '@/entities/particle/model/sceneParticleManager'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
@@ -15,31 +15,51 @@ import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
  * 0x105 시즌 관리            0xe9ac 의 f112~f124 — 상태 그리기 → 0x746cd → 파티클 → 0x72391 → 0xbd845
  * 0x106 나리 관리            0x1cdec 의 1d480~1d492 — 시즌과 같은 차례
  * 0x107 미션 선택            0x1eb0c 의 1eb2a~1eb3c
- * 0x104 경기                 0x52c50 의 53048~53060 — st[9] == 0 일 때만 (타석 장면은 `BattingStage` 가 따로 든다)
+ * 0x104 경기                 0x52c50 의 53048~53060 — 공용 창 [0x140005c]+9 == 0 일 때만(r6 = [0x140005c], 경기 상태 st[9] 가 아니다)
  * ```
- * 웹은 경기 장면(0x104) 밖의 화면을 이 관리자 하나로 돌린다(`SceneParticleLayer`). 그래서 메뉴에서 쏜 이미터가 메뉴 · 시즌 ·
- * 나리 화면을 오가도 이어 돈다.
- * ⚠️ 근사: 원본은 경기 장면 0x104 도 같은 관리자를 돌리고(그 진입 0xd 0x48f02 따위가 지운다) 웹 경기 화면은 제 관리자를 따로
- * 든다 — 메뉴에서 남은 이미터는 웹 경기 화면 동안 멈춰 있다.
+ * 웹도 관리자는 이 하나다 — 경기 장면(0x104)의 타석(`BattingStage`) · 수비 판(`DefensePlayback`)도 이 장면을 쏘고 굴리고 그린다.
+ * 그래서 메뉴에서 쏜 이미터가 경기 장면에서도 지우기 전까지 이어 돈다(원본 그대로).
+ *
+ * **굴리고 그리는 쪽은 한 그림에 하나** — 경기 장면 부품이 원본 틱 차례(갱신 → 그리기 → 프레임 끝 0x6de84)로 직접 굴리는 동안은
+ * 그 부품이 관리자를 "쥔다"(`claimSceneParticles`). 쥔 부품이 없으면(메뉴 · 교대 판 · 벤치 클리어링 · 사람 투구 장면 따위) 앱의
+ * `SceneParticleLayer` 가 원본 틱마다 굴리고 그린다. 굴림은 모두 같은 앱 전역 난수다(이미터 틱 0x6dad0 · 알 만들기 0x6d56c ·
+ * 갱신 0x6d878 이 전역 난수 0x9d468 을 굴린다 — 메뉴 이미터가 경기 장면까지 살아 있으면 그 굴림이 경기 굴림 사이에 든다).
+ *
+ * **지우기 0x6dee4 아홉 곳 — 언제 지우나** (2026-10-16 직접 떴다, 지우기는 0x6de30 → 0x6dc08 → 0x6d878 이 이미터 +0x28/+0x29 를
+ * 0 으로 만든 뒤 불려 6d898 → 6d9f2 로 건너뛰어 **굴림이 없다** — `benchClearingScene` 머리말):
+ * ```
+ * 0x332e0  경기 장면 소멸 0x332b8(장면 0x104 를 나갈 때) — 갈래 없음              → 앱이 경기 장면 화면이 다 내려갈 때(`leaveGameSceneObject`)
+ * 0x351e2  0x17 끝 0x35108 — 갈래 없음                                           → `endDefenseEffects` · 수비 판 끝
+ * 0x3c11c  0x1a(홈런더비 결과) 갱신 0x3c0b8 — 페이드가 끝나 0x103 으로 넘길 때       → 더비 결과 창 [예] · [아니오](장면을 나간다)
+ * 0x3de64  0x11 진입 0x3de10 — 구질(+0xfc8) == 22 && 투수 순번 0xb63a1(0xae83d(수비 팀)) == 2(붕붕머신) → 타석의 0x11 진입
+ * 0x4064c  0x1e(벤치 클리어링) 키 0x40628 — OK(−5) · '5' 건너뛰기                  → `BenchClearingScene` 의 키 건너뛰기
+ * 0x4673e  0x17 진입 0x46418 — 갈래 없음                                         → 수비 판 시작 · 타석 장면의 0x17(더비)
+ * 0x48f02  0xd 진입 0x48d50 — 이전 상태 [장면+0x28] ≠ 0x16(교체 연출) 일 때만(48ef8)  → `useSceneConfirm` 의 0xd 첫 그림(타석 등장음 자리)
+ * 0x4b3b6  0x19 정산 갱신 0x4b100 — 0x103 으로 나갈 때                             → 정산을 나갈 때(같은 장면이면 `useStageAnimation`)
+ * 0x51a30  키 건너뛰기 0x519cc(메시지 0x587)                                       → `fastForwardDefenseEffects` · 더비 `effectsClearedAt`
+ * ```
+ * (나머지 하나는 관리자 소멸자 0x6df20 ← 0x3490 · 0x34d4 — 앱 종료.)
+ * ⚠️ 미확인: 0x52c50 은 공용 창 [0x140005c]+9 == 0 일 때만 관리자를 굴린다(53048). 웹의 쥔 부품 없는 경기 화면(`SceneParticleLayer`)은
+ * 경기 중 팝업 동안에도 굴린다.
  */
-const scene: ParticleScene = createParticleScene()
-
-/** 장면 관리자 — 그리기 층이 읽는다 */
-export function sceneParticleScene(): ParticleScene {
-  return scene
-}
+export {
+  claimSceneParticles,
+  clearSceneParticles,
+  isSceneParticlesClaimed,
+  sceneParticleScene,
+} from '@/entities/particle/model/sceneParticleManager'
 
 /**
  * 원본 `0xbbc84(x, y, id, img, 0, −1, 0, 0)` 을 장면 관리자에 — 설정(particles.json)을 아직 못 받았으면 원본 캐시
  * 0x6e054 가 파일을 읽는 자리를 웹은 건너뛰어 아무것도 안 한다(그래서 층이 서면 미리 받아 둔다 — `preloadSceneParticles`).
  */
 export function emitSceneParticles(id: number, x: number, y: number, img: number): void {
-  emitParticles(scene, particleConfigOf(id), x, y, img)
+  emitParticles(sceneParticleScene(), particleConfigOf(id), x, y, img)
 }
 
 /** 관리자 틱 0x6de85(관리자, 0, 0) — 카메라 0 */
 export function tickSceneParticles(random: RandomPort): void {
-  tickParticles(scene, random)
+  tickParticles(sceneParticleScene(), random)
 }
 
 /** 설정 · 파트 그림을 미리 받아 둔다 */
@@ -48,9 +68,9 @@ export function preloadSceneParticles(): void {
   preloadPtcParts()
 }
 
-/** 시험용 — 관리자를 비운다 */
+/** 시험용 — 관리자를 비우고 쥔 수를 되돌린다 */
 export function resetSceneParticlesForTest(): void {
-  clearParticles(scene)
+  resetSceneParticleManagerForTest()
 }
 
 /** 원본 화면 크기 [[0x1400070]+8] 의 0x14008b8 · 0x14008c8 — 240 × 320 */

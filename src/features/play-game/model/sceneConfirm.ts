@@ -54,11 +54,21 @@ export interface SceneConfirmWait {
    * 타석의 0xd 는 소리를 낸다.
    */
   readonly atBatEntrySoundId?: number
+  /**
+   * 0xd 를 안 거치고 곧장 선 0xe 인가 — 교체 창 0xb 의 '#' · CLR(0x495fc 0x4984a)만 0xe 를 바로 예약한다(그 밖의 0xe 예약은 0xd 갱신
+   * 0x39e2e 하나). 그래서 0xd 진입 0x48d50 의 일(투수 그림 객체를 상태 0 으로 — 48ee4 0x35650 → 0x340c0 · 파티클 지우기 48f02)이 없다
+   */
+  readonly skipsSceneD?: true
 }
 
 /** 새로 0xe 에 들어섰다 — 앞 대기는 이미 OK 를 받은 뒤다. 0x16 을 안 거친 0xd 면 타석 등장음을 싣는다 */
 export function enterSceneConfirm(atBatEntrySoundId?: number): SceneConfirmWait {
   return atBatEntrySoundId === undefined ? { entries: 1 } : { entries: 1, atBatEntrySoundId }
+}
+
+/** 교체 창 0xb 의 '#' · CLR(0x4984a) — 0xd 없이 곧장 0xe 에 선다(`skipsSceneD`) */
+export function enterSceneConfirmFromSubstitutionWindow(): SceneConfirmWait {
+  return { entries: 1, skipsSceneD: true }
 }
 
 /**

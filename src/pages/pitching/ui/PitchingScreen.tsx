@@ -507,6 +507,8 @@ export function PitchingScreen({
           }
           return (
             <PitcherSideStage
+              // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
+              sceneDEntryMark={sceneConfirm.sceneDEntryMark}
               pitch={stage.lastThrow?.pitch ?? null}
               resolution={stage.lastThrow?.resolution ?? null}
               resultTicks={stage.lastThrow?.resultTicks ?? 0}
