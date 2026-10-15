@@ -16,10 +16,15 @@
  * 0x10   0x9afd1    0x979d9 / 0x97abd    확대 · 축소 (자리 식은 프레임 0x944b4, R6 3b) — 픽셀 색은 그대로
  * 0x11   0x9b0e1    0x97c15 / 0x97d31    뒤집기 (R6 3b) — 픽셀 색은 그대로
  * ```
- * 따로 `0x987f9(k, …)` 표에 효과 0(0x9aac5 · 0x9b235) · 1(0x9a52d · 0x9b3f5)이 또 등록된다 — ⚠️ 미확인(어느 표면 길인지 안 봤다).
+ * 따로 `0x987f9(k, 몸통, 감싸개)` 표(0x3110 · 0x3118)는 **그림 효과가 아니라 단계 덮기**(사각형 칠하기)다 — 2026-10-15 직접 뜸(웹 r83):
+ * k = 0 → [0x15605e4] = 0x9aac4 몸통 · [0x15605d4] = 0x9b234 검정 덮기, k = 1 → [0x15605e0] = 0x9a52c 몸통 · [0x15605d0] = 0x9b3f4 색 덮기.
+ * 몸통 칸은 감싸개만 읽는다(0x9b248 · 0x9b3aa → +0x5e4, 0x9b408 · 0x9b562 → +0x5e0). k = 2 · 3 칸(+0x5dc · +0x5d8 · +0x5cc)은
+ * 0x987f8 밖에서 읽는 곳도 거는 곳도 없다. 덮기 식과 쓰는 곳(창 뒤 어둡게 0x746cc · 결과 패배 0x4a384 · 스토리 0xbd844 …)은 `shared/lib/stepCover`.
  *
  * 같은 식을 쓰는 다른 길:
- * - **0xc37a8** 흑백(화면 사각형을 제자리에서 회색으로) — 효과 0xa 와 같은 식(c3802~c382c).
+ * - **0xc37a8** 흑백(화면 사각형을 제자리에서 회색으로) — 효과 0xa 와 같은 식(c3802~c382c). 커맨드 줄 0x7e418 · 필살 창 0x803d4 ·
+ *   0x882b4 가 함수 포인터로 부른다. 이미 그린 **화면**을 바꾸므로 DOM 은 그 사각형 안의 겹마다 회색 그림을 잘라 다시 얹는다
+ *   (겹이 불투명 복사라 `회색(겹친 결과) = 겹친 결과(회색 겹)`).
  * - **0xbb91d** 종류 비트(홈런 글자 · 맞수 띠) — 4 회색(효과 0xa 식) · 8 밝게(채널 8비트에 +b, 255 자름) · 0x10 섞기 0xbb8d4 (R6 3c).
  *
  * 웹 그림은 565 를 비트 복제로 늘린 8비트라 `rgbTo565` 로 원래 값이 돌아온다. 결과는 다시 비트 복제로 편다(`rgbOf565`).
@@ -270,15 +275,21 @@ export function css565(pixel: number): string {
  * `#rrggbb` · `#rgb` · `rgb(r, g, b)` 를 받는다. 못 읽으면 받은 그대로.
  */
 export function solidColorCss(color: string): string {
+  const pixel = color565Of(color)
+  return pixel === null ? color : css565(pixel)
+}
+
+/** CSS 색(`#rrggbb` · `#rgb` · `rgb(r, g, b)`)을 565 로 — 못 읽으면 null */
+export function color565Of(color: string): number | null {
   const hex = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(color.trim())
   if (hex !== null) {
     const digits = hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1]
     const value = Number.parseInt(digits, 16)
-    return css565(rgbTo565((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff))
+    return rgbTo565((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff)
   }
   const rgb = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(color.trim())
-  if (rgb !== null) return css565(rgbTo565(Number(rgb[1]), Number(rgb[2]), Number(rgb[3])))
-  return color
+  if (rgb !== null) return rgbTo565(Number(rgb[1]), Number(rgb[2]), Number(rgb[3]))
+  return null
 }
 
 /**
@@ -293,6 +304,22 @@ export function recolorRgba(rgba: ArrayLike<number>, effect: number, argument: n
   for (let at = 0; at < output.length; at += 4) {
     if (output[at + 3] === 0) continue
     writePixel(output, at, effectPixel565(effect, argument, pixelOf(output, at), 0), output[at + 3])
+  }
+  return output
+}
+
+/**
+ * 그림 아래 화면이 **한 가지 색**(565 `backdrop`)일 때 — 화면을 보는 효과(1 · 2)까지 원본 식 그대로 칠한 그림 RGBA.
+ * 그림이 덮는 칸은 `효과(그림, 바탕)` 으로 불투명하게, 투명 칸은 투명하게 둔다(그 자리는 DOM 바탕이 그대로 보인다 — 원본도 화면 그대로).
+ * 인자 검사로 통째로 안 그리면 모두 투명. 효과 4(흔들기)는 이웃 화면 칸을 옮기는데 바탕이 한 색이라 바탕 색 그대로다.
+ */
+export function composeOverSolidRgba(rgba: ArrayLike<number>, effect: number, argument: number, backdrop: number): Uint8ClampedArray {
+  const output = new Uint8ClampedArray(rgba)
+  if (!isEffectDrawn(effect, argument)) return output.fill(0)
+  for (let at = 0; at < output.length; at += 4) {
+    if (output[at + 3] === 0) continue
+    const pixel = effect === DRAW_EFFECT.JITTER ? backdrop : effectPixel565(effect, argument, pixelOf(output, at), backdrop)
+    writePixel(output, at, pixel)
   }
   return output
 }
@@ -472,6 +499,15 @@ export const brightenedImageOf = (image: DrawableImage, amount: number): Drawabl
 /* ── 주소 (DOM <img>) ──────────────────────────────────────────────────────── */
 
 const urlCache = new Map<string, Promise<string>>()
+/** 다 칠한 주소 — 같은 그림을 다시 쓰는 자리(움직이는 바탕 따위)가 한 틀도 비지 않게 바로 꺼낸다 */
+const paintedUrls = new Map<string, string>()
+
+const effectSpriteKeyOf = (url: string, effect: number, argument: number, backdrop: number | null) =>
+  `${url}#${effect}:${argument}${backdrop === null ? '' : `@${backdrop}`}`
+
+/** 이미 칠해 둔 주소 — 아직이면 null */
+export const paintedEffectSpriteUrlOf = (url: string, effect: number, argument: number, backdrop: number | null = null): string | null =>
+  paintedUrls.get(effectSpriteKeyOf(url, effect, argument, backdrop)) ?? null
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -482,7 +518,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
-async function paintUrl(url: string, effect: number, argument: number): Promise<string> {
+async function paintUrl(url: string, effect: number, argument: number, backdrop: number | null): Promise<string> {
   const image = await loadImage(url)
   const pixels = rgbaOfImage(image)
   if (pixels === null) return url
@@ -491,17 +527,25 @@ async function paintUrl(url: string, effect: number, argument: number): Promise<
   canvas.height = image.height
   const context = canvas.getContext('2d')
   if (context === null) return url
-  pixels.data.set(recolorRgba(pixels.data, effect, argument))
+  pixels.data.set(backdrop === null
+    ? recolorRgba(pixels.data, effect, argument)
+    : composeOverSolidRgba(pixels.data, effect, argument, backdrop))
   context.putImageData(pixels, 0, 0)
   return canvas.toDataURL('image/png')
 }
 
-/** 화면을 안 보는 효과를 입힌 그림 주소(data URL). 같은 그림 · 효과 · 인자는 한 번만 칠한다. 실패하면 원래 주소 */
-export function effectSpriteUrl(url: string, effect: number, argument: number): Promise<string> {
-  const key = `${url}#${effect}:${argument}`
+/**
+ * 화면을 안 보는 효과를 입힌 그림 주소(data URL). 같은 그림 · 효과 · 인자(· 바탕)는 한 번만 칠한다. 실패하면 원래 주소.
+ * `backdrop`(565)을 주면 그 한 색 화면 위에 그린 결과(`composeOverSolidRgba`) — 화면을 보는 효과 1 · 2 도 원본 식 그대로다.
+ */
+export function effectSpriteUrl(url: string, effect: number, argument: number, backdrop: number | null = null): Promise<string> {
+  const key = effectSpriteKeyOf(url, effect, argument, backdrop)
   const cached = urlCache.get(key)
   if (cached !== undefined) return cached
-  const request = paintUrl(url, effect, argument).catch(() => url)
+  const request = paintUrl(url, effect, argument, backdrop).catch(() => url).then((painted) => {
+    paintedUrls.set(key, painted)
+    return painted
+  })
   urlCache.set(key, request)
   return request
 }

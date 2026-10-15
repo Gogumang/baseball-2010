@@ -7,6 +7,8 @@ import {
   additivePixel565,
   blendPixel565,
   brightenPixel565,
+  color565Of,
+  composeOverSolidRgba,
   composeRgba,
   effectPixel565,
   grayPixel565,
@@ -139,6 +141,20 @@ describe('RGBA', () => {
     const sprite = { data: new Uint8ClampedArray([1, 1, 1, 255, 1, 1, 1, 255]), width: 2, height: 1 }
     composeRgba(screen, sprite, 0, 0, DRAW_EFFECT.JITTER, 3, () => 1)
     expect([screen.data[0], screen.data[4], screen.data[8]]).toEqual([20, 30, 30])
+  })
+
+  it('composeOverSolidRgba — 한 색 바탕 위 효과 1 은 원본 식, 투명 칸은 투명', () => {
+    const out = composeOverSolidRgba([0, 0, 0, 255, 9, 9, 9, 0], DRAW_EFFECT.TRANSLUCENT, 8, WHITE)
+    // 흰 화면 (0xffff & 0xf7de) >> 1 + 검정 그림 0 = 0x7bef
+    expect([...out]).toEqual([123, 125, 123, 255, 9, 9, 9, 0])
+  })
+
+  it('composeOverSolidRgba — 인자 검사로 안 그리면 모두 투명', () => {
+    expect([...composeOverSolidRgba([1, 2, 3, 255], DRAW_EFFECT.TRANSLUCENT, 0, WHITE)]).toEqual([0, 0, 0, 0])
+  })
+
+  it('color565Of — #rgb · #rrggbb · rgb() 를 읽고 못 읽으면 null', () => {
+    expect([color565Of('#fff'), color565Of('#ff0000'), color565Of('rgb(0, 0, 0)'), color565Of('currentColor')]).toEqual([WHITE, RED, 0, null])
   })
 
   it('원본 난수 0x9d469', () => {
