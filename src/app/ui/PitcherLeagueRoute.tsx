@@ -151,6 +151,7 @@ function PitcherLeagueScreens({
 
   if (career === null || scene === '등록') {
     return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create}
+      {...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint })}
       // 101 팀 고르기 취소 0x14114 1424c~14264: [0x140006c] = 5 — 게임시작 목록으로 바로 연다([0x1552d14] = 1 은 전역 모드를 일반으로)
       onCancel={() => onExit(5)} />
   }

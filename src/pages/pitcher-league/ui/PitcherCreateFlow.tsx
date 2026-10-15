@@ -18,14 +18,17 @@ interface PitcherCreateFlowProps {
   readonly onCreate: (name: string, profile: PitcherRookieProfile) => void
   /** 팀 고르기에서 되돌아가기 */
   readonly onCancel: () => void
+  /** 머리띠 G포인트 — 전역 G(+0x64). 안 넘기면 0 으로 찍힌다 */
+  readonly gamePoint?: number
 }
 
-export function PitcherCreateFlow({ openedHiddenIds = [], onCreate, onCancel }: PitcherCreateFlowProps) {
+export function PitcherCreateFlow({ openedHiddenIds = [], onCreate, onCancel, gamePoint }: PitcherCreateFlowProps) {
   const [teamId, setTeamId] = useState<number | null>(null)
 
   if (teamId === null) {
     return (
       <TeamSelectScreen title="나만의리그투수편" openedHiddenIds={openedHiddenIds} gridShape={MY_LEAGUE_TEAM_GRID_SHAPE}
+        {...(gamePoint === undefined ? {} : { gamePoint })}
         onSelect={setTeamId} onCancel={onCancel} />
     )
   }
