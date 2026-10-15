@@ -54,6 +54,18 @@ describe('선수 등록 배치', () => {
     expect(커서().style.width).toBe(`${rect.width}px`)
   })
 
+  it('이름 줄일 때만 입력 방식 칸 (121,202,14,14) 을 칠한다 — 0x15f34 줄 0 갈래 0xba0bd', () => {
+    화면()
+    const 칸 = screen.getByTestId('입력방식칸')
+    expect(칸.style.left).toBe('121px')
+    expect(칸.style.top).toBe('202px')
+    expect(칸.style.width).toBe('15px')
+
+    이름넣기('테스트')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.queryByTestId('입력방식칸')).toBeNull()
+  })
+
   it('아래 키로 줄을 옮기면 커서가 원본 순서(이름 → 타입)로 내려간다', () => {
     화면()
     이름넣기('테스트')

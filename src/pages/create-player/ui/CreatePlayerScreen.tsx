@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen } from '@/shared/ui'
+import { InputModeBox, inputModeLayoutOf } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
@@ -137,6 +138,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
   })
 
   const cursor = cursorRectOf(selectedRow)
+  const nameCell = INFO_CELLS.find((cell) => cell.id === '이름')
   const labelWidthOf = (frame: number) => labelOrigins?.[String(frame).padStart(3, '0')]?.width ?? 0
 
   return (
@@ -193,7 +195,8 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
                 <InputMethodText value={name} autoFocus aria-label="이름"
                   x={cell.value.x + 2} y={cell.value.y + 3} color={CURSOR_COLOR}
                   isCursorOn={selectedId === '이름'}
-                  inputRect={cell.value}
+                  // 투명 입력 칸은 입력 방식 칸 M(0x1615c) 앞에서 끊는다 — 투수 등록과 같다
+                  inputRect={{ ...cell.value, width: inputModeLayoutOf(cell.value).box.x - cell.value.x - 1 }}
                   onFocus={() => setSelectedRow(ROW_ORDER.indexOf('이름'))}
                   onChange={(event) => {
                     // CP949 8바이트까지 (R11 1b — 한글 2바이트 · 그 밖 1바이트, 섞어 써도 된다)
@@ -226,6 +229,9 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
           border: `1px solid ${CURSOR_COLOR}`,
           visibility: isCursorVisibleAt(tick) ? 'visible' : 'hidden',
         }} />
+
+      {/* 입력 방식 칸 0xba0bd · 화살 — 이름 줄(줄 0)일 때만 (0x160e8~0x161f4). 투수 등록과 같은 그리기 0x15f34 갈래다 */}
+      {selectedId === '이름' && nameCell !== undefined && <InputModeBox nameBox={nameCell.value} />}
 
       {/* 고른 줄 양옆 화살표 (0x160a8) — 이름 줄에는 고를 값이 없다 */}
       {selectedId !== '이름' && (
