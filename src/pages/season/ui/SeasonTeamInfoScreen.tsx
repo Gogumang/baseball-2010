@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { RawScreen } from '@/shared/ui'
+import type { CSSProperties } from 'react'
+import { RawScreen, useImgTextPalettes } from '@/shared/ui'
+import type { ImgTextPaletteIndex } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { TEAMS } from '@/shared/config/original/teams'
 import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
@@ -39,14 +41,27 @@ export interface SeasonTeamInfoScreenProps {
   readonly onBack: () => void
 }
 
-function valueOf(row: TeamInfoRow) {
+/**
+ * 값 칸의 img_text 는 **팔레트 1(노랑)** 이다 — 좌석 "석" 345 (0x7c914 `0x913e5(img_text, 1)` → 0x7c944) ·
+ * 타입 이름표 (0x7cca6 → 0x7ccd4). 이름표 일곱(0x7c592~0x7c696)은 그 앞에 팔레트 0 으로 찍는다(0x7c620 · 0x7c656).
+ */
+const VALUE_IMAGE_PALETTE: ImgTextPaletteIndex = 1
+const LABEL_PALETTE: ImgTextPaletteIndex = 0
+
+function valueOf(row: TeamInfoRow, styleOf: (frame: number, palette: ImgTextPaletteIndex) => CSSProperties | undefined) {
   const { value } = row
-  if (value.kind === '그림') return <img alt="" src={frameSrc(value.frame)} style={{ verticalAlign: 'middle' }} />
+  if (value.kind === '그림') {
+    return <img alt="" data-frame={value.frame} src={frameSrc(value.frame)}
+      style={{ verticalAlign: 'middle', ...styleOf(value.frame, VALUE_IMAGE_PALETTE) }} />
+  }
   if (value.kind === '숫자') {
     return (
       <>
         {value.value}
-        {value.suffixFrame !== undefined && <img alt="" src={frameSrc(value.suffixFrame)} style={{ verticalAlign: 'middle' }} />}
+        {value.suffixFrame !== undefined && (
+          <img alt="" data-frame={value.suffixFrame} src={frameSrc(value.suffixFrame)}
+            style={{ verticalAlign: 'middle', ...styleOf(value.suffixFrame, VALUE_IMAGE_PALETTE) }} />
+        )}
       </>
     )
   }
@@ -74,6 +89,8 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
   }, [])
 
   const team = TEAMS[teamId]
+  // 이름표 47 "순위" 는 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리에서 흰 글자로 되돌린다
+  const palettes = useImgTextPalettes()
   const points = (list: readonly { readonly x: number; readonly y: number }[]) => list.map((point) => `${point.x},${point.y}`).join(' ')
 
   return (
@@ -81,6 +98,7 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
       {/* 공통 앞그림 0xb810 — 0xd5 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="구단정보">
+        {palettes.definition}
         {team !== undefined && (
           <img className={styles.layer} alt={team.name} src={team.logoUrl}
             style={{ left: LOGO.x, top: LOGO.y, width: LOGO.width, height: LOGO.height }} />
@@ -108,13 +126,16 @@ export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 
           return (
             <div key={row.labelFrame} data-testid={`구단정보-줄-${index}`}>
               <img className={styles.layer} alt="" data-frame={row.labelFrame} src={frameSrc(row.labelFrame)}
-                style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }} />
+                style={{
+                  left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)',
+                  ...palettes.styleOf(row.labelFrame, LABEL_PALETTE),
+                }} />
               {row.value.kind === '흐르는글'
                 ? <StadiumTicker text={row.value.text} index={index} box={{ x: column.value.x, y: top + 2, width, height: INFO_ROW_HEIGHT }} />
                 : (
                   <div className={styles.infoValue} data-testid={`구단정보-값-${index}`}
                     style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}>
-                    {valueOf(row)}
+                    {valueOf(row, palettes.styleOf)}
                   </div>
                 )}
             </div>

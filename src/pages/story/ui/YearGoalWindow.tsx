@@ -1,5 +1,5 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { CommonPanel, FrameSprite } from '@/shared/ui'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { CommonPanel, FrameSprite, useImgTextPalettes } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
@@ -25,7 +25,8 @@ const pad = (frame: number) => String(frame).padStart(3, '0')
  */
 export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalWindowSource; readonly onClose: () => void }) {
   const modeUiOrigins = useFrameOrigins(MODE_UI)
-  const navyFilterId = `palette3-${useId().replace(/:/g, '')}`
+  // img_text 팔레트 — 제목 3 · 나머지 0. 시즌 이름표 47 "순위" 는 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리(0x8664a)에서 흰 글자로 되돌린다
+  const palettes = useImgTextPalettes()
   const layout = yearGoalWindowLayoutOf(values)
   const { window: area } = YEAR_GOAL_BOXES
   // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 여닫기 틀을 건너뛴다
@@ -61,19 +62,13 @@ export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalW
       style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
       {/* 띄운 그림은 [창+0x214] 라 그리기 콜백을 안 부른다(0x7479c) — 뒤 어둡게만 */}
       <div style={{ visibility: motion.openingHeight !== null ? 'hidden' : undefined }}>
-      <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
-        <filter id={navyFilterId} colorInterpolationFilters="sRGB">
-          {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색. 255 → 41·73·165, 239 → 16·36·107 이 되는 1차식 */}
-          <feColorMatrix type="matrix"
-            values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
-        </filter>
-      </svg>
+      {palettes.definition}
       <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
       <FrameSprite folder={MODE_UI} frame={YEAR_GOAL_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
       {layout.texts.map((piece, index) => (
         <img key={`t${index}`} className={windowStyles.layer} src={`${IMG_TEXT}/${pad(piece.frame)}.png`} alt=""
           data-frame={piece.frame}
-          style={{ left: piece.x, top: piece.y, filter: piece.palette === 3 ? `url(#${navyFilterId})` : undefined }} />
+          style={{ left: piece.x, top: piece.y, ...palettes.styleOf(piece.frame, piece.palette) }} />
       ))}
       {layout.numbers.map((piece, index) => (
         <img key={`n${index}`} className={windowStyles.layer} src={`${NUM}/${pad(piece.frame)}.png`} alt=""

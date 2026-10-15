@@ -9,9 +9,7 @@ import {
 } from '@/entities/collection/model/collection'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
-import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
-import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import {
   DESCRIPTION_PANEL, FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
@@ -42,7 +40,7 @@ import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { footerBottomOf, headerTopOf } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { HallOfFameFigure, useHallOfFameFigure } from '@/pages/special/ui/HallOfFameFigure'
-import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
+import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import type { HallOfFameListOwner } from '@/pages/special/ui/HallOfFameFigure'
 import { HALL_OF_FAME_FIGURE_TEAM } from '@/pages/special/lib/hallOfFameFigure'
@@ -788,7 +786,15 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         )
       })}
 
-      <HallOfFameAbilityChart center={chartCenter} values={chartValues} slot={slot} />
+      {/*
+        ABILITY 판 0x5aefc(…, B.x, B.y + 8, 종류, 기록, 0, 반지름 30) — 0x65690~0x65740: k 7(홈런더비 하위 16 0x2df20)은 **늘 종류 2**(타자 이름),
+        그 밖(k 6 미션 · k 8 명예의 전당)은 칸 ≤ 4 면 종류 3(투수 이름) · 아니면 2. 축 최대치 0x5e864 = 800.
+        ⚠️ 나리 145 등록이 어느 k 인지는 안 떴다 — 칸으로 가르는 쪽에 둔다.
+      */}
+      <AbilityRadarPanel center={chartCenter} radius={HALL_OF_FAME_CHART.radius} maximumLength={HALL_OF_FAME_CHART_MAXIMUM_LENGTH}
+        labelFrames={(mode.kind === '선수고르기' && mode.purpose === '홈런더비') || slot >= HALL_OF_FAME_PITCHER_SLOTS
+          ? ABILITY_RADAR_LABELS.batter : ABILITY_RADAR_LABELS.pitcher}
+        targets={chartValues} restartKey={slot} />
 
       {/* 5×3 격자 0x7a571 종류 6 — 칸 바탕 없이(시작 넷째 인자 [격자+8] = 0) 칸 틀 · 상태 그림 · (145) 다른 편 덮개 (0x7ac2e) */}
       {slots.map((entry, index) => {
@@ -898,36 +904,6 @@ function popupTextOf(popup: HallOfFamePopup): {
   // 0x2ae3a 0x74ef5(…[128], 종류 2) 바로 뒤 0x2ae42 `0x749d5(popup, 1)` — 처음 커서 "아니오"
   if (popup.kind === '삭제확인') return { text: HALL_OF_FAME_TEXT.deleteConfirm, buttons: ['예', '아니오'], initialSelected: 1 }
   return { text: popup.text, buttons: popup.buttons }
-}
-
-/**
- * 능력치 도형 (B 자리, `HALL_OF_FAME_CHART`) — 바탕 테두리(고정 29, #6B92F4)는 팀 도형과 같고, 값 마름모는 축 최대 800 이다.
- * 빈 칸·잠긴 칸은 기록이 없어 네 값이 0 이라 바탕만 남는다 (0x5b1de~0x5b1f6).
- * ⚠️ 축 딱지 그림(종류 2 → 4~7 · 종류 3 → 0~3 번)과 빨간 최대 테두리(anim+0x1e0)는 팀 도형과 같은 까닭으로 안 그린다.
- */
-/**
- * 능력치 도형 0x5aefc 종류 3(투수 칸 ≤ 4) / 2(타자), 반지름 30 — 0x65690~0x65740. k 6~8 본문은 칸이 비어도(기록 0x5ea18 = 0 →
- * 0x6535a → 0x654d4 → 0x65680) 이 도형을 부르고, 기록이 0 이면 0x5b2d2 가 네 값을 0 으로 채운다.
- * 값 도형은 레이더 [skin+0xd4] 의 자라는 애니(`AbilityGrowthPolygon`) — 들어옴(27 0x25f8c · 16 0x25e6c · 17 0x2613c · 나리 145 0x1c8ec ·
- * 시즌 0xe2)이 +0xad = 0 으로 두어 본문 첫 그림에 0 에서 자라고, 커서가 움직인 그림(커서 +0x25)에 0x63b14 가 +0x1e3 = 0 으로 두어
- * 지난 목표값에서 새 칸 값으로 오르내린다(빈 칸이면 0 으로 줄어든다).
- */
-function HallOfFameAbilityChart({ center, values, slot }: {
-  readonly center: ChartPoint
-  readonly values: readonly number[]
-  readonly slot: number
-}) {
-  const radius = HALL_OF_FAME_CHART.radius
-  const size = radius * 2
-  const pointsOf = (points: readonly ChartPoint[]) => points.map((point) => `${point.x},${point.y}`).join(' ')
-  return (
-    <svg className={styles.sprite} width={size} height={size} shapeRendering="crispEdges" aria-label="능력치 도형"
-      viewBox={`${center.x - radius} ${center.y - radius} ${size} ${size}`}
-      style={{ left: center.x - radius, top: center.y - radius }}>
-      <polygon points={pointsOf(abilityChartFrameOf(center))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
-      <AbilityGrowthPolygon center={center} targets={values} maximumLength={HALL_OF_FAME_CHART_MAXIMUM_LENGTH} restartKey={slot} />
-    </svg>
-  )
 }
 
 /**

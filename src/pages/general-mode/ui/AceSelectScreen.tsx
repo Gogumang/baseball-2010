@@ -10,7 +10,9 @@ import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
-import { ACE_LEVEL_UP_TEXT, aceLevelOf, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
+import { ACE_LEVEL_UP_TEXT, aceLevelOf, aceRecordAbilityAtLevel, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
+import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
+import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { AceLevelUpWindow } from '@/widgets/ace-level-up/ui/AceLevelUpWindow'
 import {
   ACE_GRID_OPEN, ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf, isAceCellDimmed, isAceGridCursorOn,
@@ -26,6 +28,10 @@ const SLT_IMAGE = './sprites/slt_frame'
 /** [skin+0xac] — 격자 칸 그림 (0~9 마선수 얼굴 · 10 "?") */
 const ACE_ICON = './sprites/ace_icon'
 const IMG_TEXT_FRAME = './sprites/img_text/frames'
+
+/** 0xb6415(기록, i, 1) 네 칸 — 기록 칸 차례(투수도 같은 네 칸에 제구 · 구속 · 변화 · 체력) */
+const abilityValuesOf = (ability: { readonly hit: number; readonly power: number; readonly defense: number; readonly run: number }) =>
+  [ability.hit, ability.power, ability.defense, ability.run]
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 
@@ -305,6 +311,23 @@ export function AceSelectScreen({
         style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }} />
       <FrameSprite folder={IMG_TEXT_FRAME} frame={ACE_LAYOUT.tagFrames.ability} origins={imgTextOrigins} centerX
         x={anchorB.x} y={anchorB.y + TAG.bDyDefault + TAG.textDdy} />
+
+      {/*
+        ABILITY 판 — k 2(고르기) · k 11(레벨업)만 0x64b6e~0x64bac 에서 0x5aefc(skin, 레이더 [skin+0xd4], B.x, B.y + 8,
+        종류 **1**, 기록 0, 순번 = [skin+0xd0] == 0 ? 칸 − 5 : 칸, 반지름 30) 을 부른다(직접 떴다). 코치채용(k 10)은 안 부른다.
+        종류 1 은 0x5b090: [skin+0xd0] == 1 이면 마투수 기록 0x1f825(저장, 순번) · 이름 0~3, 아니면 마타자 0x1f84d · 이름 4~7,
+        값 = 0xb6415(기록, i, 1)(레벨 배율 뒤 장착 스킬까지 = `aceRecordAbilityAtLevel`). 축 최대치는 틀 표 0xd1b2c 그대로 999.
+        잠긴 칸도 거르지 않는다. 단계 [skin+0xd0] 은 커서 줄과 늘 같다(21 은 줄을 못 옮기고 28 은 위아래가 줄과 함께 뒤집는다).
+      */}
+      {!isCoachMode && cursorPlayer !== undefined && (
+        <AbilityRadarPanel
+          center={{ x: anchorB.x + ACE_LAYOUT.abilityChart.dx, y: anchorB.y + ACE_LAYOUT.abilityChart.dy }}
+          radius={ACE_LAYOUT.abilityChart.radius}
+          maximumLength={ACE_LAYOUT.abilityChart.radius}
+          labelFrames={aceRoleOfCell(cursor) === ACE_PHASE.마투수 ? ABILITY_RADAR_LABELS.pitcher : ABILITY_RADAR_LABELS.batter}
+          targets={abilityValuesOf(aceRecordAbilityAtLevel(cursorPlayer, cursorLevel))}
+          restartKey={`${cursor}:${cursorLevel}`} />
+      )}
 
       {/* A — 커서가 짚은 마선수. 잠겼으면 원 두 개 + LOCK */}
       {isCursorOpen && cursorPlayer !== undefined ? (

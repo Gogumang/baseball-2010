@@ -1,4 +1,5 @@
-import { SpriteNumber } from '@/shared/ui'
+import type { CSSProperties } from 'react'
+import { SpriteNumber, useImgTextPalettes } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { STATUS_BOXES, moneyGlyphsOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import { StatusBoardBase } from '@/pages/management/ui/ManagementBoard'
@@ -18,8 +19,11 @@ const DIGIT_HEIGHT = 10
 
 const pad = (frame: number) => String(frame).padStart(3, '0')
 
-function ImageText({ image }: { readonly image: PlacedImage }) {
-  return <img className={styles.layer} src={`${IMG_TEXT}/${pad(image.frame)}.png`} alt="" style={{ left: image.left, top: image.top }} />
+function ImageText({ image, paletteStyle }: { readonly image: PlacedImage; readonly paletteStyle?: CSSProperties }) {
+  return (
+    <img className={styles.layer} src={`${IMG_TEXT}/${pad(image.frame)}.png`} alt="" data-frame={image.frame}
+      style={{ left: image.left, top: image.top, ...paletteStyle }} />
+  )
 }
 
 export interface SeasonStatusPanelProps {
@@ -46,9 +50,12 @@ export function SeasonStatusPanel({
   const { popularity, money, reputation, salary } = STATUS_BOXES
   const digit = layout.goalRankDigit
   const digitSource = `${NUM}/${pad(digit.frame)}.png`
+  // 관중 뒤 "명" 344 는 img_text 팔레트 1(노랑) — 0x7dbf6 `0x913e5(img_text, 1)` → 0x7dc2a 0xb9e05 (시즌 갈래)
+  const palettes = useImgTextPalettes()
 
   return (
     <div role="group" aria-label="상태판">
+      {palettes.definition}
       <StatusBoardBase hour={hour} nameBandSplit={layout.nameBandSplit} morale={teamMorale}
         nameContent={(
           <>
@@ -66,7 +73,7 @@ export function SeasonStatusPanel({
       <SpriteNumber glyphs={moneyGlyphsOf(record.money * MONEY_TO_TEN_THOUSAND)} right={valueRightOf(money)} boxTop={money.y} boxHeight={money.height} />
       <SpriteNumber glyphs={numberGlyphsOf(record.reputation)} right={valueRightOf(reputation)} boxTop={reputation.y} boxHeight={reputation.height} />
       <SpriteNumber glyphs={numberGlyphsOf(record.lastAttendance)} right={layout.attendanceRight} boxTop={salary.y} boxHeight={salary.height} />
-      <ImageText image={layout.attendanceUnit} />
+      <ImageText image={layout.attendanceUnit} paletteStyle={palettes.styleOf(layout.attendanceUnit.frame, 1)} />
       <MessageLine year={layout.year} game={layout.game} />
       <StatusIconRow state={layout.icons} />
     </div>

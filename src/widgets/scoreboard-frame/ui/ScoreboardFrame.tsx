@@ -1,5 +1,4 @@
-import { useId } from 'react'
-import { FrameSprite } from '@/shared/ui'
+import { FrameSprite, useImgTextPalettes } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   NAME_PLATE_COLOR, SCOREBOARD_FRAME, effectOpacityOf, namePlateOpacityOf, roundPlateRectsOf, scoreboardPlacementOf,
@@ -27,13 +26,14 @@ export interface ScoreboardFrameProps {
 /**
  * **점수판 틀 0x41440** — 머리말은 `lib/scoreboardFrameLayout`. 부르는 화면은 (x, y) 와 두 측만 넘기면 된다.
  *
- * PLAYER/COM 글자는 img_text 팔레트 4(회색 #7B797B · #525152)로 그린다 — 웹은 흰 글자 그림(팔레트 0
- * #FFFFFF · #EFEFEF)을 색 행렬로 바꿔 칠한다(`pages/national-cup` 의 팔레트 3 과 같은 방법).
+ * PLAYER/COM 글자는 img_text 팔레트 4(회색 #7B797B · #525152)로 그린다(0x414ca · 0x4153e `0x913e5(img_text, 4)`).
+ * 157 · 158 은 `tools/apply_mpl.py` 가 이미 팔레트 4 로 구워 둔 프레임이라 필터를 또 걸면 안 된다 — 앞서는 흰 글자용 행렬을
+ * 한 번 더 걸어 회색(123) 이 0 으로 잘려 **검정** 글자가 됐다. `useImgTextPalettes` 가 구운 팔레트를 보고 고른다.
  */
 export function ScoreboardFrame({ x, y, side0, side1, effectLevel = null, introAlpha = null }: ScoreboardFrameProps) {
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
-  const grayFilterId = `palette4-${useId().replace(/:/g, '')}`
+  const palettes = useImgTextPalettes()
   const placement = scoreboardPlacementOf(x, y, [side0, side1])
   const imageOpacity = effectOpacityOf(effectLevel)
   const plateOpacity = namePlateOpacityOf(introAlpha)
@@ -41,13 +41,7 @@ export function ScoreboardFrame({ x, y, side0, side1, effectLevel = null, introA
 
   return (
     <div className={styles.group} data-testid="점수판-틀" data-x={x} data-y={y}>
-      <svg className={styles.hiddenSvg} aria-hidden>
-        <filter id={grayFilterId} colorInterpolationFilters="sRGB">
-          {/* 흰 글자(R=G=B) → 팔레트 4 두 색. 255 → 123·121·123, 239 → 82·81·82 가 되는 1차식 */}
-          <feColorMatrix type="matrix"
-            values={'2.5625 0 0 0 -2.08015  0 2.5 0 0 -2.02549  0 0 2.5625 0 -2.08015  0 0 0 1 0'} />
-        </filter>
-      </svg>
+      {palettes.definition}
       {imageOpacity > 0 && (
         <FrameSprite folder={GAME_UI_FRAMES} frame={SCOREBOARD_FRAME} origins={gameUiOrigins}
           x={placement.frame.x} y={placement.frame.y} style={imageStyle} />
@@ -55,7 +49,7 @@ export function ScoreboardFrame({ x, y, side0, side1, effectLevel = null, introA
       {imageOpacity > 0 && placement.labels.map((label, index) => (
         <span key={`label-${index}`} data-testid={`점수판-측글자-${index}`} data-frame={label.frame}>
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={label.frame} origins={textOrigins} x={label.x} y={label.y}
-            style={{ filter: `url(#${grayFilterId})`, ...imageStyle }} />
+            style={{ ...palettes.styleOf(label.frame, 4), ...imageStyle }} />
         </span>
       ))}
       {imageOpacity > 0 && placement.logos.map((logo, index) => (

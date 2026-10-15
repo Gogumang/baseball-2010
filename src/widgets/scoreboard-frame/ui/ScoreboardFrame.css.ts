@@ -20,9 +20,3 @@ export const block = style({
   position: 'absolute',
   pointerEvents: 'none',
 })
-
-export const hiddenSvg = style({
-  position: 'absolute',
-  width: 0,
-  height: 0,
-})
