@@ -18,10 +18,11 @@ export function trainingOutcomeLinesOf(outcome: TrainingOutcome): string[] {
     for (const [key, value] of entries) lines.push(`${ABILITY_NAMES[key]} +${value} 상승하였습니다`)
     if (outcome.typeBonus > 0) lines.push(`타입 보너스 +${outcome.typeBonus}`) // StrMODE[194]
   } else if (progress.isLevelUp) {
-    lines.push(`${outcome.menuId} 훈련 완료!`) // StrMODE[87]
+    // 기술 이름 StrCOMMON[0x18 + n] + StrMODE[87] (0x18124~0x1813e)
+    lines.push(`${progress.name} 훈련 완료!`)
     lines.push('[선수정보]에서 사용 여부 변경 가능')
   } else {
-    lines.push(`[${outcome.menuId}] ${progress.sessions}/${progress.required}회 훈련`) // StrMODE[86]
+    lines.push(`[${progress.name}] ${progress.sessions}/${progress.required}회 훈련`) // StrMODE[86] (0x18170)
   }
   lines.push(`사기 -${outcome.moraleLoss}`)
   return lines
@@ -34,7 +35,9 @@ export function trainingBlockTextOf(reason: TrainingBlockReason, menuName: strin
     case '능력치최대':
       return `[${menuName}] 능력치가 최대입니다` // StrMODE[192]
     case '훈련완료':
-      return `${menuName} 훈련을 모두 마쳤습니다` // 원문 미확인 (추정)
+      // StrMODE[63] "!C이미 훈련 완료된 스킬입니다" — 최고 레벨이면 필살타법 창 0x17828 이 칸마다(i < 배운 수) 이 글로 막는다
+      // (R7 4절 · `specialSwingSlotBlockOf`). 원본에 "훈련을 모두 마쳤습니다" 같은 다른 글은 없다
+      return '이미 훈련 완료된 스킬입니다'
     case '이미행동함':
       return '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다'
   }

@@ -8,36 +8,6 @@ export const layer = style({
   pointerEvents: 'none',
 })
 
-/**
- * 바탕에 까는 공용 창 0x55e60 (F-8 확정): #335FCD 둥근 판 + #080408 1px 테두리 + 안쪽 흰 테두리.
- * 원본 바탕 0x7f4ed 의 속은 미해독이라, 이 판으로 빈 칸을 메운다.
- */
-export const backdrop = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.windowBorder}`,
-  borderRadius: '6px',
-  background: ORIGINAL_COLORS.boardFill,
-  boxShadow: `inset 0 0 0 1px ${ORIGINAL_COLORS.text}`,
-  pointerEvents: 'none',
-})
-
-/** 기본정보 카드 판 — 그림칸(11,53,93,117)·오른쪽 판(122,48,107,84). 원본 0x7ba44 그리기는 박스만 확인 (추정) */
-export const cardPanel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: `1px solid ${ORIGINAL_COLORS.boardEdge}`,
-  background: ORIGINAL_COLORS.panelDeep,
-  pointerEvents: 'none',
-})
-
-/** 정보 판 (21,176,196,83) #335FCD */
-export const infoBoard = style({
-  position: 'absolute',
-  background: ORIGINAL_COLORS.boardFill,
-  pointerEvents: 'none',
-})
-
 /** 선수 미리보기 묶음 — 좌타면 발 기준을 축으로 좌우를 뒤집는다 */
 export const figure = style({
   position: 'absolute',

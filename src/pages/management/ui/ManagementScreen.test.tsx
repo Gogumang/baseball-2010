@@ -201,6 +201,37 @@ describe('기본정보 카드는 커맨드 줄에 가리지 않는다 (QA 1회�
   })
 })
 
+describe('기본정보 카드 — 카드 판 0x7ba44 · 필살 줄 0x7cb5c', () => {
+  const 기본정보열기 = () => {
+    fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
+  }
+
+  it('계단형 판과 내 팀 로고를 깔고, 예전 근사 상자는 없다', () => {
+    const { container } = render(<ManagementScreen {...propsWith({})} />)
+    기본정보열기()
+    const 카드 = container.querySelector('[data-testid="basic-info-card"]')!
+    expect(카드.querySelector('[data-testid="카드-판"]'), '계단형 판이 없다').not.toBeNull()
+    expect(카드.querySelector('[data-testid="카드-로고"]'), '팀 로고가 없다').not.toBeNull()
+    expect(카드.querySelector('[data-testid="정보칸-판"]'), '정보 칸 판 0x7c110 이 없다').not.toBeNull()
+  })
+
+  it('필살 줄은 선수 +0x18 고른 번호의 이름이다 — 장타형 4 는 메테오 스윙', () => {
+    const career = { ...createCareer('테스터'), battingTypeIndex: 1, specialSwingLevel: 4, specialSwingNumber: 4 }
+    render(<ManagementScreen {...propsWith({ career })} />)
+    기본정보열기()
+    expect(screen.queryByText('메테오 스윙')).not.toBeNull()
+    expect(screen.queryByText('필살타법', { selector: 'div' })).toBeNull()
+  })
+
+  it('번호가 0 이면 레벨이 있어도 필살 줄이 빈다', () => {
+    const career = { ...createCareer('테스터'), specialSwingLevel: 2, specialSwingNumber: 0 }
+    render(<ManagementScreen {...propsWith({ career })} />)
+    기본정보열기()
+    expect(screen.queryByText('파워 스윙')).toBeNull()
+  })
+})
+
 describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 상태 129', () => {
   /**
    * ⚠️ 여는 키는 **'*'** 다. 원작 설명서 StrHOWTO[15] 는 "(#) 키" 라고 적었지만, 상태 119 의

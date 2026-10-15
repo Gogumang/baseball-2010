@@ -326,6 +326,8 @@ export interface PitcherLeagueSession {
     readonly eraseSaveForHallOfFame: () => void
     /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 하위 메뉴 취소 · 훈련 · 휴식 결과 창 닫기 (진입 0x11910 · 자동 훑기 0x1cf9c) */
     readonly reenterManagement: () => void
+    /** 125 · 127 결과 창이 떠 있는가 — 관리 메뉴 `onResultWindowChange` */
+    readonly setResultWindowOpen: (isOpen: boolean) => void
     /** 105 관리 메뉴 확인 키(−5 · '5') — 0x12654 가 메뉴 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
     readonly pressManagementConfirm: () => void
     /** 111 장비 상점 · 121 장비착용을 연다 */
@@ -978,6 +980,11 @@ export function usePitcherLeagueSession(
   if (scene === '상점') isFromShopRef.current = true
   else if (scene !== '관리') isFromShopRef.current = false
   const reenterManagement = useCallback(() => setManagementReentryCount((count) => count + 1), [])
+  /**
+   * 결과 상태 125(훈련) · 127(휴식)의 창이 떠 있다 — 관리 메뉴가 알린다(`onResultWindowChange`). 원본은 그동안 105 가 아니라
+   * 105 갱신 0x1aec4 끝의 칭호 판정이 돌지 않는다. 창이 닫히면 0x18dd8 · 0x1b5b8 · 0x1b466 이 `0xbcb49(0x69)` 로 105 에 들어온다
+   */
+  const [isResultWindowOpen, setIsResultWindowOpen] = useState(false)
   const pressManagementConfirm = useCallback(() => {
     freshSceneRef.current = false
   }, [])
@@ -2139,10 +2146,10 @@ export function usePitcherLeagueSession(
    * **칭호 팝업 하나** — 원본은 관리 화면(105) 갱신 0x1aec4 끝에서 판정 0x1a1c0 이 번호 순서로 **처음 맞는 하나만**
    * this+0x270 에 남겨 팝업 0x1274c 를 띄우고, 확인 0x1b1e4 가 비트·곧바로 장착(+0x1c4)·저장 뒤 다음 틀에 다시 판정한다
    * (P3 4절 — 장면 0x106 은 모드 3·4 공용). 105 에 있고 이벤트·알림이 없으면 판정한 값으로 둔다(타자편 `pendingTitle` 과 같다).
-   * ⚠️ 근사: 웹 투수 관리 화면은 훈련 결과 창을 화면 안에서 띄워(원본은 125 → 105) 그 창과 칭호 팝업이 함께 설 수 있다.
+   * 훈련 · 휴식 결과 창은 원본에서 125 · 127 상태라(창이 닫혀야 105 로 돌아온다) 그동안은 판정하지 않는다(`isResultWindowOpen`).
    */
   const pendingTitle = career !== null && scene === '관리' && story === null && fileEvents !== null
-    && storyNotice === '' && outingRecoveryNotice === ''
+    && storyNotice === '' && outingRecoveryNotice === '' && !isResultWindowOpen
     ? nextPitcherTitleOf(career)
     : null
 
@@ -2351,6 +2358,7 @@ export function usePitcherLeagueSession(
       finishEnding,
       eraseSaveForHallOfFame,
       reenterManagement,
+      setResultWindowOpen: setIsResultWindowOpen,
       pressManagementConfirm,
       openShop,
       purchase,

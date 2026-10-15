@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import {
-  TITLE_CURSOR_BOX, TITLE_LIST_BOXES, TITLE_ROW_STEP, titleNumberLeftOf, titleScrollBarRectsOf,
+  TITLE_CURSOR_BOX, TITLE_LIST_BOXES, TITLE_ROW_STEP, titleListTopAfter, titleNumberLeftOf, titleScrollBarRectsOf,
 } from '@/widgets/management/lib/titleListLayout'
 
 /** 칭호 목록 창 0x198fc — mode_ui 프레임 63 박스 · 줄 막대 64/65 */
@@ -43,5 +43,41 @@ describe('칭호 목록 창 0x198fc', () => {
     expect(titleScrollBarRectsOf(3, 0, 9)[0]).toMatchObject({ x: 200, y: 85, width: 5, height: 155 })
     const [edge] = titleScrollBarRectsOf(20, 9, 9)
     expect(edge).toMatchObject({ y: 85 + Math.trunc((9 * 155) / 20), height: Math.trunc((155 * 9 + 19) / 20) - 1 })
+  })
+})
+
+describe('칭호 목록 윗줄 — 스크롤 격자 0x6c2bd (한 줄씩)', () => {
+  it('커서가 보이는 칸 안이면 그대로 · 아래로 넘으면 커서가 맨 아랫줄 · 위로 넘으면 맨 윗줄', () => {
+    expect(titleListTopAfter(0, 8, 9)).toBe(0)
+    expect(titleListTopAfter(0, 9, 9)).toBe(1)
+    expect(titleListTopAfter(3, 2, 9)).toBe(2)
+    // 감기 — 끝에서 0 으로 · 0 에서 끝(20 개)으로
+    expect(titleListTopAfter(11, 0, 9)).toBe(0)
+    expect(titleListTopAfter(0, 19, 9)).toBe(11)
+  })
+
+  const twelve = TITLE_NAMES.slice(0, 12)
+  const careerOf = () => ({ ...createCareer('타자'), titleIds: twelve, equippedTitle: 11 })
+
+  it('진입 0x104cc 는 커서를 첫 줄에 둔다 — 장착한 칭호(12번째)로 가지 않는다', () => {
+    render(<TitleListWindow career={careerOf()} onEquip={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByText(twelve[0]!)).toBeTruthy()
+    expect(screen.queryByText(twelve[11]!)).toBeNull()
+  })
+
+  it('↓ 아홉 번이면 한 줄만 굴러 둘째 칭호부터 보이고, 바뀐 윗줄을 알린다', () => {
+    const onTopChange = vi.fn()
+    render(<TitleListWindow career={careerOf()} onEquip={vi.fn()} onClose={vi.fn()} onTopChange={onTopChange} />)
+    for (let i = 0; i < 9; i += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.queryByText(twelve[0]!)).toBeNull()
+    expect(screen.getByText(twelve[1]!)).toBeTruthy()
+    expect(screen.getByText(twelve[9]!)).toBeTruthy()
+    expect(onTopChange).toHaveBeenLastCalledWith(1)
+  })
+
+  it('다시 열면 지난 윗줄이 남는다 (장면 생성자만 0 으로 둔다)', () => {
+    render(<TitleListWindow career={careerOf()} onEquip={vi.fn()} onClose={vi.fn()} initialTop={3} />)
+    expect(screen.queryByText(twelve[0]!)).toBeNull()
+    expect(screen.getByText(twelve[3]!)).toBeTruthy()
   })
 })

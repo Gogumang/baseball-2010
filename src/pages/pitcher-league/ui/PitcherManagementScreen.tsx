@@ -72,6 +72,8 @@ export interface PitcherManagementScreenProps {
   readonly onExit: () => void
   /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 세션의 `actions.reenterManagement` (`usePitcherManagementMenu` 의 `onReenter`) */
   readonly onReenter?: () => void
+  /** 125 · 127 결과 창이 떠 있는가 — 세션의 `actions.setResultWindowOpen` (`usePitcherManagementMenu` 의 `onResultWindowChange`) */
+  readonly onResultWindowChange?: (isOpen: boolean) => void
   /** 105 메인 메뉴의 확인 키 — 0x12654 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */
   readonly onMainConfirm?: () => void
   /** 가운데 판의 선수가 미끄러져 들어오는가 — 105 진입 0x11910 의 이전 상태 1 · 114 · 100 (0x8a2d8) */
@@ -354,6 +356,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           career={titleViewOf(career)}
           onEquip={menu.equipTitle}
           onClose={menu.closeTitleWindow}
+          initialTop={mainCursor.titleListTop ?? 0}
+          onTopChange={(top) => { mainCursor.titleListTop = top }}
         />
       )}
       {/* 스킬 창 — 하위 상태 122. 타자편 위젯을 그대로 쓴다 (키 0x13140 · 대화 0x147b0 에 모드 갈림이 없다) */}

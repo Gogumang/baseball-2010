@@ -1,4 +1,5 @@
 import { BALANCE } from '@/shared/config/original/balance'
+import { PITCHER_BURSTS } from '@/shared/config/original/bursts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   GAMES_PER_MANAGEMENT_CYCLE,
@@ -156,6 +157,8 @@ export interface PitcherMagicProgress {
   readonly sessions: number
   readonly required: number
   readonly isLevelUp: boolean
+  /** 결과 글의 마구 이름 — StrCOMMON[0x1e + n], n = 배운 수 + 1 (4 면 4 + 타입) (0x180e6~0x1810e) */
+  readonly name: string
 }
 
 export interface PitcherTrainingOutcome {
@@ -253,7 +256,10 @@ function runMagicTraining(
     gamePoint: Math.max(0, career.gamePoint - (MAGIC_GAME_POINT_COST[level] ?? 0)),
     magicLevel: isLevelUp ? level + 1 : level,
     magicSessions: isLevelUp ? 0 : sessions,
+    // 0x1816c — 훈련 완료면 선수 +0x18 = 표 0xcc378[커서] = 배운 수 + 1 (타자편 `learnedSpecialNumberOf` 와 같은 줄)
+    ...(isLevelUp ? { selectedMagicNumber: level + 1 } : {}),
   }
+  const number = level + 1
   return {
     menuId: menu.id,
     gains: {},
@@ -261,7 +267,10 @@ function runMagicTraining(
     moraleLoss,
     rolledGain: 0,
     rolledMoraleLoss,
-    magic: { sessions, required, isLevelUp },
+    magic: {
+      sessions, required, isLevelUp,
+      name: PITCHER_BURSTS[number - 1 + (number === 4 ? career.typeIndex : 0)] ?? '',
+    },
     // 0x18a5c 칸 4 — 해제 카운터 짝(칸 0 · 2 · 3)에 안 맞아 0x18b70 이 다섯 칸을 0 으로
     career: countReleaseTrainingStreak(countPitcherTraining(trained, menu.id), MAGIC_TRAINING_SLOT),
   }
@@ -321,6 +330,18 @@ export function pitchTypeTrainingLinesOf(outcome: PitchTypeTrainingOutcome): str
     ? ['구질 훈련 완료!', '[선수정보]에서 사용 여부 변경 가능']
     : [`해당 구질 ${outcome.progress.sessions}/${outcome.progress.required}회 훈련`]
   return [...head, `사기 -${outcome.moraleLoss}`]
+}
+
+/**
+ * 마구 훈련 알림 글 — 0x17f5c 칸 4 갈래(모드 3)는 타자편 필살타법과 같은 줄이다(0x18116~0x181c6): 마구 이름 StrCOMMON[0x1e + n] 으로
+ * 훈련 완료면 이름 + StrMODE[87] " 훈련 완료!!N[선수정보]에서 사용!N여부 변경 가능", 아니면 [86] "[이름] %d/%d회 훈련",
+ * 다음 줄 사기. 타자편 `trainingOutcomeLinesOf` 와 같은 근사 줄 나눔이다(효과 줄 · 색은 옮기지 않았다).
+ */
+export function magicTrainingLinesOf(magic: PitcherMagicProgress, moraleLoss: number): string[] {
+  const head = magic.isLevelUp
+    ? [`${magic.name} 훈련 완료!`, '[선수정보]에서 사용 여부 변경 가능']
+    : [`[${magic.name}] ${magic.sessions}/${magic.required}회 훈련`]
+  return [...head, `사기 -${moraleLoss}`]
 }
 
 /** 몹쓸몸 · 유리몸 보유 비트 — 투수 비트 0~7 은 타자와 같은 공통 스킬이다(2 먹튀 · 5 무력감과 같은 짝) */

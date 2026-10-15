@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
@@ -18,6 +18,7 @@ import {
   magicTrainingCellBlockOf,
   magicTrainingCellCostOf,
   magicTrainingCursorOf,
+  magicTrainingLinesOf,
   PITCHER_TYPE_NAMES,
   pitcherTrainingBlockReasonOf,
   pitchTypeTrainingLinesOf,
@@ -121,6 +122,11 @@ export interface UsePitcherManagementMenuInput {
    * 0x1b466) · 마구 훈련(125) 뒤. 세션이 진입 0x11910 곁가지와 자동 훑기 0x1cf9c 를 돈다(상태가 바뀐 틀에만 — 0x1cdec 1ce02).
    */
   readonly onReenter?: () => void
+  /**
+   * 결과 상태(훈련 125 · 휴식 127)의 창이 떠 있는가 — 원본은 그동안 105 가 아니라서 105 갱신 0x1aec4 끝의 칭호 판정 0x1a1c0 이
+   * 돌지 않는다. 세션이 이 값으로 칭호 팝업을 멈춘다(`usePitcherLeagueSession` 의 `pendingTitle`).
+   */
+  readonly onResultWindowChange?: (isOpen: boolean) => void
   /** 105 메인 메뉴의 확인 키 — 0x12654 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */
   readonly onMainConfirm?: () => void
   /**
@@ -183,7 +189,7 @@ export interface PitcherManagementMenu {
 const modeTextOf = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
-  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onReenter, onMainConfirm } = input
+  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onReenter, onMainConfirm, onResultWindowChange } = input
   const [kind, setKind] = useState<PitcherMenuKind>(input.initialKind ?? '관리')
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
@@ -195,6 +201,19 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [abilityDetailOffset, setAbilityDetailOffset] = useState<number | null>(null)
   const [pitchWindowTab, setPitchWindowTab] = useState<number>(PITCH_WINDOW_TABS.마구)
   const [notice, setNotice] = useState('')
+  /**
+   * 결과 상태 125 · 127 — 창(상세 결과 창 · 알림 창)이 닫힐 때까지 105 가 아니다. 알림 창이 닫히면 125 틀 0x18dd8 이
+   * (휴식 · 상세 창은 0x1b5b8 · 0x1b466 이) `0xbcb49(0x69)` 로 105 에 다시 들어온다 — 알림 쪽 그 일을 `noticeThenRef` 에 둔다
+   */
+  const [isResultWindowOpen, setIsResultWindowOpen] = useState(false)
+  const noticeThenRef = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    onResultWindowChange?.(isResultWindowOpen)
+    // 창이 뜬 채 화면이 내려가면(장면 전환) 풀어 둔다
+    return () => {
+      if (isResultWindowOpen) onResultWindowChange?.(false)
+    }
+  }, [isResultWindowOpen, onResultWindowChange])
   const [question, setQuestion] = useState<PitcherMenuQuestion | null>(null)
   const [choice, setChoice] = useState<PitcherMenuChoice | null>(null)
   /** 두 갈래 팝업(0x78·0x80)의 커서 — 원본 `장면+0x166`. 창을 열 때마다 0 에서 시작한다 */
@@ -223,12 +242,15 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
       onSave(outcome.career)
       setKind('관리')
+      // 125 — 결과 창이 닫힐 때까지 105 가 아니다
+      setIsResultWindowOpen(true)
       const result = trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0)
       // 타입 보너스 줄 — "[" + 타입 이름(0x1400080 [2+타입]) + "]" + StrMODE[194] (0x187a8~0x187f2)
       const typeLine = outcome.typeBonus > 0 ? [`[${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}] 타입 보너스 +1`] : []
       const rows = pitcherTrainingDetailRowsOf(outcome)
       if (rows === null) {
-        onReenter?.()
+        // 알림 창이 닫히면 125 → 105
+        noticeThenRef.current = () => onReenter?.()
         return setNotice([result, ...typeLine].join('!N'))
       }
       /*
@@ -241,7 +263,9 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         afterClose: () => {
           const injury = rollTrainingInjury(outcome.career, false, random)
           if (injury.career !== outcome.career) onSave(injury.career)
+          // 부상 알림은 그 알림이 닫힐 때까지 칭호 팝업을 막는다(타자편 `CareerRoutes` 의 알림 · 상세 창 검사와 같다)
           if (injury.notice !== null) setNotice(injury.notice)
+          else setIsResultWindowOpen(false)
           // 창이 닫히면 125 → 105 (0x1b5b8 `0xbcb49(0x69)`)
           onReenter?.()
         },
@@ -256,12 +280,16 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const outcome = runPitcherTraining(career, menu, random)
       onSave(outcome.career)
       setKind('관리')
-      // 125 → 0x17f5c → 105
-      onReenter?.()
       const magic = outcome.magic
-      if (magic === null) return
-      // StrMODE[86] "%d/%d회" — 레벨이 오르면 그 사실을 알린다
-      setNotice(magic.isLevelUp ? '마구 레벨이 올랐습니다' : `마구 훈련 ${magic.sessions}/${magic.required}회`)
+      if (magic === null) return onReenter?.()
+      /*
+       * 125 → 0x17f5c 칸 4 갈래(0x18bd8 `[sp+0x40] == 4`) — 결과 글 [sp+0xfc] 를 알림 창 0xbbef8(글, 1, 코드 4, 1) 에 띄우고,
+       * 창이 닫히면 125 틀 0x18dd8 이 105 로 간다(타자편 필살타법과 같은 길). 글은 마구 이름 StrCOMMON[0x1e + n] 으로
+       * [87] "훈련 완료" 또는 [86] "[이름] %d/%d회 훈련", 그 뒤 "!N" + StrMODE[24] "사기" … (0x18116~0x181c6)
+       */
+      setIsResultWindowOpen(true)
+      noticeThenRef.current = () => onReenter?.()
+      setNotice(magicTrainingLinesOf(magic, outcome.moraleLoss).join('!N'))
     },
     [career, onReenter, onSave, random],
   )
@@ -363,6 +391,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         onYes: () => {
           const rest = runPitcherRest(career, random)
           onSave(rest.career)
+          // 127 — 결과 창이 닫힐 때까지 105 가 아니다
+          setIsResultWindowOpen(true)
           // 상세 결과 창(0x18fc2 → 0x872a1) — 글은 StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
           setDetail({
             rows: pitcherRestDetailRowsOf(rest.career, rest.moraleGain),
@@ -375,6 +405,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
               const recovered = recoverAfterPitcherRest(rest.career, random)
               onSave(recovered.career)
               if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
+              else setIsResultWindowOpen(false)
               // 127 → 105 (0x1b466 `0xbcb49(0x69)`)
               onReenter?.()
             },
@@ -590,7 +621,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     shown?.afterClose()
   }, [detail])
 
-  const dismissNotice = useCallback(() => setNotice(''), [])
+  /** 알림 창 닫기 — 결과 상태(125)의 알림이면 그때 105 에 다시 들어온다(125 틀 0x18dd8) */
+  const dismissNotice = useCallback(() => {
+    setNotice('')
+    setIsResultWindowOpen(false)
+    const then = noticeThenRef.current
+    noticeThenRef.current = null
+    then?.()
+  }, [])
 
   /** 상세 결과 창의 키 — 확인·취소로 닫는다 (타자편 `useManagementMenu` 와 같은 처리, 0x1b4c4 가 보는 닫기 키) */
   useEffect(() => {
@@ -606,8 +644,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   /**
    * 108 탭 2 확인 [예] → 125 → 0x17f5c(탭 2 갈래 0x1836a — `runPitchTypeTraining`) → 알림 창(코드 4) → 닫히면 125 틀 0x18dd8 이
-   * **105** 로. 창(108)은 떠나므로 하위 창을 닫고 알림은 관리 화면 위에 띄운다. 105 진입은 알림이 닫히기 전에 친다(근사 — 알림을
-   * 관리 화면 알림 상자로 보이는 다른 훈련 길과 같다).
+   * **105** 로. 창(108)은 떠나므로 하위 창을 닫고 알림은 관리 화면 위에 띄운다. 105 진입은 알림이 닫힐 때 친다(`dismissNotice`).
    */
   const trainPitch = useCallback(
     (row: number, column: number) => {
@@ -615,8 +652,9 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       onSave(outcome.career)
       setSubWindow(null)
       setKind('관리')
+      setIsResultWindowOpen(true)
+      noticeThenRef.current = () => onReenter?.()
       setNotice(pitchTypeTrainingLinesOf(outcome).join('!N'))
-      onReenter?.()
     },
     [career, onReenter, onSave, random],
   )

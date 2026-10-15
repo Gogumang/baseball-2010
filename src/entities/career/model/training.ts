@@ -5,6 +5,7 @@ import { countTraining, gainAbility, gainMorale, isSkillEquipped, spendCycleActi
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { subItemMoraleRelief, subItemTrainingBonus } from '@/entities/career/model/subItems'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
+import { BATTER_BURSTS } from '@/shared/config/original/bursts'
 
 /**
  * 타자 훈련 (binary.mod 0x17f5c — 누락 탐색 4·5차).
@@ -33,6 +34,20 @@ export interface SpecialSwingProgress {
   readonly sessions: number
   readonly required: number
   readonly isLevelUp: boolean
+  /**
+   * 결과 글의 기술 이름 — 0x180e6~0x1810e: n = 표 0xcc378[창 커서] (= 배운 수 + 1, 훈련할 수 있는 칸은 그 하나뿐),
+   * n == 4 면 4 + 타입 → StrCOMMON[0x18 + n] (타자편 · 투수편은 [0x1e + n])
+   */
+  readonly name: string
+}
+
+/**
+ * 결과 상태 125 의 0x17f5c 필살 · 마구 갈래 (0x18116~0x1816e, 직접 떴다): 훈련 앞 레벨 [sp+0x30] < 뒤 레벨 [sp+0x24] 이면
+ * 이름 + StrMODE[87] 을 쓰고 **선수 +0x18 = 표 0xcc378[커서]** (0x1814a 0x1fc75 로 기록을 얻어 0x1816c strb) — 배운 기술을
+ * 곧바로 쓰는 기술로 고른다. 아니면 StrMODE[86] "[이름] %d/%d회 훈련". 배운 수 L 의 칸 커서는 L 이라 번호는 L + 1 이다.
+ */
+export function learnedSpecialNumberOf(levelBefore: number): number {
+  return levelBefore + 1
 }
 
 export interface TrainingOutcome {
@@ -192,7 +207,10 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
     gamePoint: Math.max(0, career.gamePoint - SPECIAL_SWING_GAME_POINT_COST[level]),
     specialSwingLevel: isLevelUp ? level + 1 : level,
     specialSwingSessions: isLevelUp ? 0 : sessions,
+    // 0x1816c — 훈련 완료면 그 기술을 고른 번호로
+    ...(isLevelUp ? { specialSwingNumber: learnedSpecialNumberOf(level) } : {}),
   }
+  const number = learnedSpecialNumberOf(level)
   return {
     menuId: menu.id,
     gains: {},
@@ -200,7 +218,10 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
     moraleLoss,
     rolledGain: 0,
     rolledMoraleLoss,
-    specialSwing: { sessions, required, isLevelUp },
+    specialSwing: {
+      sessions, required, isLevelUp,
+      name: BATTER_BURSTS[number - 1 + (number === 4 ? career.battingTypeIndex : 0)] ?? '',
+    },
     career: trained,
   }
 }

@@ -22,6 +22,11 @@ export interface NariMainMenuCursor {
    * 다시 마운트될 때 이 값을 보고 그 하위 메뉴(`subCursor` 칸)에 선다(`nariReturnSubMenuOf`).
    */
   returnSubMenu?: NariReturnSubMenu | null
+  /**
+   * 칭호 목록(129) 객체 [this+0xa4] 의 윗줄 +0x30 — 장면 생성자 0x6c1e8 만 0 으로 두고 129 진입 0x104cc 는 안 건드린다.
+   * 장면이 사는 동안 남으므로 여기 둔다(`TitleListWindow` 의 `initialTop`). 없으면 0.
+   */
+  titleListTop?: number
 }
 
 /** 화면 밖 상태에서 돌아오는 하위 메뉴 — 110 아이템(111 상점에서) · 106 선수정보(121 장비착용에서) */

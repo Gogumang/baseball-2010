@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { TEAMS } from '@/shared/config/original/teams'
 import { batterEquipmentOf, batterLayersOf, bodyTypeOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
@@ -19,12 +18,11 @@ import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import { FigureLayers, PitcherFigure } from '@/pages/special/ui/HallOfFameFigure'
 import * as specialStyles from '@/pages/special/ui/SpecialScreen.css'
 import {
-  SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, SEASON_CARD_RADAR_LABELS,
-  initialSeasonCardFigure, stepSeasonCardFigure, steppedBoardPointsOf,
+  SEASON_CARD_FIGURE, SEASON_CARD_RADAR_LABELS, initialSeasonCardFigure, stepSeasonCardFigure,
 } from '@/pages/season/lib/seasonPlayerCard'
+import { CardPlate } from '@/pages/management/ui/CardPlate'
 import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
 import type { SeasonCardAbility } from '@/pages/season/lib/seasonPlayerDetail'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 const MODE_UI = './sprites/mode_ui/frames'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -51,17 +49,9 @@ export interface SeasonPlayerCardProps {
 /** 카드 0x7ba44 시즌 · 선수 갈래 + 선수 그림 (`lib/seasonPlayerCard.ts` 머리말) */
 export function SeasonPlayerCard({ teamId, isPitcher, look, abilities, isAnimating, children }: SeasonPlayerCardProps) {
   const pose = useSeasonCardFigurePose(!isPitcher, look.form, isAnimating)
-  const team = TEAMS[teamId]
   return (
     <div data-testid="시즌카드" data-pose={pose}>
-      <SteppedBoard />
-      {team !== undefined && (
-        <img className={managementStyles.layer} alt={team.name} data-testid="시즌카드-로고" src={team.logoUrl}
-          style={{
-            left: SEASON_CARD_LOGO.x, top: SEASON_CARD_LOGO.y, width: SEASON_CARD_LOGO.width, height: SEASON_CARD_LOGO.height,
-            opacity: SEASON_CARD_LOGO.opacity,
-          }} />
-      )}
+      <CardPlate teamId={teamId} testIdPrefix="시즌카드" />
       <SeasonCardRadar abilities={abilities} labelFrames={SEASON_CARD_RADAR_LABELS[isPitcher ? '투수' : '타자']} />
       {children}
       <SeasonCardFigure isPitcher={isPitcher} look={look} pose={pose} />
@@ -85,20 +75,6 @@ function useSeasonCardFigurePose(isBatter: boolean, form: number, isAnimating: b
   }
   memory.current = current
   return current.state.pose
-}
-
-/** 계단형 판 0x76724 — 채움 · 테두리, 위 세 변 y+1 밝은 선 · 아래 세 변 y+1 어두운 선 (관리 화면 판과 같은 그리기) */
-function SteppedBoard() {
-  const points = steppedBoardPointsOf(SEASON_CARD_BOARD.top, SEASON_CARD_BOARD.height, SEASON_CARD_BOARD.offset)
-  const line = (list: readonly { x: number; y: number }[]) => list.map((point) => `${point.x},${point.y + 1.5}`).join(' ')
-  return (
-    <svg className={managementStyles.board} viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid="시즌카드-판">
-      <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')} transform="translate(0.5 0.5)"
-        fill={ORIGINAL_COLORS.boardFill} stroke={ORIGINAL_COLORS.boardEdge} strokeWidth={1} />
-      <polyline points={line(points.slice(0, 4))} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardHighlight} />
-      <polyline points={line(points.slice(4).reverse())} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardEdge} />
-    </svg>
-  )
 }
 
 /**
