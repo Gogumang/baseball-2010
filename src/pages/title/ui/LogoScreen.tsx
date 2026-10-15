@@ -7,11 +7,13 @@ import {
   LOGO_FRAMES, LOGO_REVEAL_FRAME_HEIGHT, LOGO_VOICE_UPDATE, logoDoneUpdateOf, logoPoseAt,
 } from '@/pages/title/model/logoIntro'
 import * as styles from '@/pages/title/ui/BootScreen.css'
+import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
+import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 
 /** 그림 앵커 — 화면 가운데 (W/2, H/2) (0x68c2a · 0x68c36 `[+0x80]/2 · [+0x84]/2`) */
 const ANCHOR = { x: 120, y: 160 }
-/** 효과 1 의 인자 몫 — 반투명 겹치기 L/16 (R6 3a) */
-const WEIGHT_STEPS = 16
+/** 상태 ≤ 5 의 흰 바탕 (0x68c18) — 효과 1 이 섞는 화면 색 */
+const WHITE_BACKDROP = '#ffffff'
 
 interface LogoScreenProps {
   /** 로고 객체가 답 1 을 냈다 — 하위 3(타이틀)으로 (0x287c6~0x287d4) */
@@ -47,7 +49,7 @@ export function LogoScreen({ onDone, onVoice }: LogoScreenProps) {
     }
   }, [updates])
 
-  const frame = (index: number, extra: { readonly opacity?: number; readonly clipPath?: string } = {}) => {
+  const frame = (index: number, extra: { readonly clipPath?: string } = {}) => {
     const origin = origins?.[String(index).padStart(3, '0')]
     if (origin === undefined) return null
     return (
@@ -58,6 +60,21 @@ export function LogoScreen({ onDone, onVoice }: LogoScreenProps) {
         src={`${LOGO_FRAMES}/${String(index).padStart(3, '0')}.png`}
         alt={index === 2 ? 'GAMEVIL' : ''}
       />
+    )
+  }
+
+  /**
+   * 효과 1 · 인자 L — 아래가 흰 바탕 한 색이라 원본 표 식(0xd5e58 마스크 · 0xd5de0 밀기, 565 내림)을 흰색 위에 그대로 칠한다.
+   * ⚠️ 근사: 합성 프레임은 파트마다 따로 섞이는데(0x944b4) 웹 프레임 PNG 는 파트를 미리 겹친 한 장이다 — 파트가 겹친 칸만 다를 수 있다.
+   */
+  const translucentFrame = (index: number, level: number) => {
+    const name = String(index).padStart(3, '0')
+    const origin = origins?.[name]
+    if (origin === undefined) return null
+    return (
+      <EffectImage key={`${index}-반투명`} className={styles.layer} src={`${LOGO_FRAMES}/${name}.png`}
+        effect={DRAW_EFFECT.TRANSLUCENT} argument={level} backdrop={WHITE_BACKDROP}
+        style={{ left: ANCHOR.x + origin.x, top: ANCHOR.y + origin.y }} />
     )
   }
 
@@ -73,7 +90,7 @@ export function LogoScreen({ onDone, onVoice }: LogoScreenProps) {
           {frame(1, { clipPath: `inset(${hiddenTop}px 0 0 0)` })}
         </>
       )}
-      {pose.kind === '겹치기' && frame(pose.frame, { opacity: pose.weight / WEIGHT_STEPS })}
+      {pose.kind === '겹치기' && translucentFrame(pose.frame, pose.weight)}
       {pose.kind === '로고' && frame(2)}
     </RawScreen>
   )

@@ -2,9 +2,8 @@ import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { laserTrailStampsOf } from '@/pages/defense/lib/laserTrail'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
-/** 효과 1 의 단계 → 그림 무게 (단계/16, R6 3a — 작은 지도 `MAP_OPACITY` 와 같은 읽기) */
-const LEVEL_SCALE = 16
 
 /**
  * 레이저 잔상 (0x37076~0x3724a) — 공과 같은 깊이로 공 **뒤에**(위에) 넣는다(그리기 목록에 공 그림 0x36f70 이 먼저 들어간다).
@@ -39,7 +38,8 @@ export function DefenseLaserTrail({
         <div
           key={index}
           className={styles.actor}
-          style={{ left: stamp.x, top: stamp.y, opacity: stamp.level / LEVEL_SCALE }}
+          // 효과 1 · 단계 → 그림 무게 단계/16. ⚠️ 근사: 수비 화면은 DOM 겹이라 아래 화면을 못 읽는다(공용 `translucentOpacityOf` 머리)
+          style={{ left: stamp.x, top: stamp.y, opacity: translucentOpacityOf(stamp.level) }}
           data-testid="defense-laser-trail"
           data-level={stamp.level}
         >
