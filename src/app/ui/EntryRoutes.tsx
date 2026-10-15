@@ -263,6 +263,8 @@ export function EntryRoutes({
     return (
       <TeamSelectScreen
         title="나만의리그타자편"
+        // 머리띠 G — 전역 G(+0x64). 안 넘기면 0 으로 찍혔다
+        gamePoint={wallet.balance}
         // 히든 팀 열림은 커리어가 아니라 전역 기록 +0x70 + idx 다 — 투수편(App 의 PitcherCreateFlow)과 같은 출처
         openedHiddenIds={collection.openedHiddenIds}
         gridShape={MY_LEAGUE_TEAM_GRID_SHAPE}

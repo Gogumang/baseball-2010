@@ -1029,6 +1029,9 @@ function defensePlayInputOf(
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
     // 공 가진 야수 이름 판(0x43cb0) — 같은 칸 고르기로 상대 야수 · 지금 마운드 투수
     fielderPlates: opponentFielderPlatesOf(progress),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.opponentTeamId,
+    offenseTeamIndex: progress.ourTeamId,
     // 마선수 주자 그림(0x79d10 · 적재 0x483a0) — 우리 타자 · 루 위 주자 중 142 가 넣은 마타자 칸
     runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
@@ -2626,6 +2629,9 @@ export function arrivePitch(
       defenseAbilities: opponentDefenseAbilitiesOf(progress),
       // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 타구 판과 같은 칸
       fielderPlates: opponentFielderPlatesOf(progress),
+      // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+      defenseTeamIndex: progress.opponentTeamId,
+      offenseTeamIndex: progress.ourTeamId,
       runnerAces: ourRunnerAcesOf(progress),
       runAbilities: runAbilitiesOnBaseOf(progress),
       defenseIsCpu: true,
@@ -3008,6 +3014,9 @@ export function cpuPickoff(
     // 우리 공격이니 수비는 상대 팀이다 — 타구 진행기와 같은 아홉 칸·같은 주루 근사
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
     fielderPlates: opponentFielderPlatesOf(progress),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.opponentTeamId,
+    offenseTeamIndex: progress.ourTeamId,
     runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),
     // 루별 주자 주루 — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4(제 레코드 0xb570c(팀, 3, 주자, …, 90))를 든다

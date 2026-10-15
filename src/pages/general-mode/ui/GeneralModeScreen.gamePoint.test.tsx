@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
@@ -27,8 +28,14 @@ const base = {
 
 describe('일반모드 → 팀 경기 화면의 보유 G', () => {
   it('새 경기 — 경기정보 OK 뒤 팀 경기 화면에 지금 G 를 넘기고, 정산에서 더한 값으로 다시 그린다', () => {
+    vi.useFakeTimers()
     const { rerender } = render(<GeneralModeScreen {...base} isQuickStart gamePoint={500} />)
+    // 경기정보는 들어올 때 연출(17 그림)이 끝나야 키(누름 칸이 보내는 OK)를 받는다
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 17)
+    })
     fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
+    vi.useRealTimers()
     expect(screen.getByTestId('팀경기').dataset.gamePoint).toBe('500')
 
     rerender(<GeneralModeScreen {...base} isQuickStart gamePoint={620} />)

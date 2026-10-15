@@ -2734,6 +2734,9 @@ function batterDefenseInputOf(
     runnerTeamGrade: offenseRunnerTeamGradeOf(progress, true),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 상대 수비 · 우리 주자
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.options.opponentTeamId,
+    offenseTeamIndex: progress.options.ourTeamId,
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
     // 난수를 넘겨야 펌블·악송구·필살수비·레이저 굴림이 돈다
@@ -3431,6 +3434,9 @@ function defensiveDefenseInputOf(
     runnerTeamGrade: offenseRunnerTeamGradeOf(progress, false),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 우리 수비 · 상대 주자
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.options.ourTeamId,
+    offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
     random,
@@ -3710,6 +3716,9 @@ export function pickoff(
     // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
     sceneResultCode: progress.sceneResultCode,
     fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.options.ourTeamId,
+    offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
     random,
@@ -3752,6 +3761,9 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
     sceneResultCode: progress.sceneResultCode,
     fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.options.opponentTeamId,
+    offenseTeamIndex: progress.options.ourTeamId,
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
     random,
@@ -4023,6 +4035,9 @@ function arriveTeamPitch(
             defenseAbilities: defenseAbilitiesFor(progress, options.opponentTeamId),
             defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), options.opponentTeamId),
             fielderPlates: fielderPlatesFor(progress, options.opponentTeamId, progress.opponentPitcherIndex),
+            // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+            defenseTeamIndex: options.opponentTeamId,
+            offenseTeamIndex: options.ourTeamId,
             defenseIsCpu: true,
             offenseIsCpu: false,
             runningMode: options.runningModeManual === true ? ('수동' as const) : ('자동' as const),
@@ -4032,6 +4047,9 @@ function arriveTeamPitch(
             defenseAbilities: defenseAbilitiesFor(progress, options.ourTeamId),
             defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), options.ourTeamId),
             fielderPlates: fielderPlatesFor(progress, options.ourTeamId, progress.ourPitcherIndex),
+            // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+            defenseTeamIndex: options.ourTeamId,
+            offenseTeamIndex: options.opponentTeamId,
             defenseIsCpu: false,
             offenseIsCpu: true,
             throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),

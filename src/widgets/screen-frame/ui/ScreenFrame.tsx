@@ -2,12 +2,13 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import {
   BACK_ICON_X, FOOTER_BITS, FOOTER_CENTER_MARKS, FOOTER_CENTER_X, FOOTER_CORNER_X, FOOTER_LEFT_MARKS, FOOTER_LEFT_X,
-  FOOTER_TILE_XS, FRAME_COLORS, HEADER_CORNER_X, HEADER_GAME_POINT, HEADER_TILE_XS, TITLE_IMAGES,
-  footerBottomOf, footerMarkTopOf, headerTopOf, isGameSettingsMarkShown,
+  FOOTER_MARK_HEIGHT, FOOTER_MARK_WIDTH, FOOTER_TILE_XS, FRAME_COLORS, HEADER_CORNER_X, HEADER_GAME_POINT, HEADER_TILE_XS,
+  TITLE_IMAGES, footerBottomOf, footerMarkTopOf, headerTopOf, isGameSettingsMarkShown,
 } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
 
 const frameImage = (index: number) => `./sprites/game_frame/${String(index).padStart(3, '0')}.png`
 const markImage = (frame: number) => `./sprites/game_frame/frames/${String(frame).padStart(3, '0')}.png`
@@ -48,6 +49,11 @@ interface ScreenFrameProps {
    * 6(스페셜 목록) · 7/10(도움말) · 23(엔트리) 은 어느 쪽도 아니라 false.
    */
   readonly slides?: boolean
+  /**
+   * 바닥띠 표시(재선택 · 경기설정 …) 위의 **투명 누름 칸** — 원본은 그 표시가 가리키는 키(`*` · `0` …)를 누른다.
+   * 비트(`FOOTER_BITS`) → 누르면 할 일. 그 비트를 그릴 때만 칸이 선다(깜박여 안 보이는 틱에도 칸은 남는다).
+   */
+  readonly footerPresses?: Readonly<Partial<Record<number, { readonly label: string; readonly onPress: () => void }>>>
 }
 
 /**
@@ -55,7 +61,7 @@ interface ScreenFrameProps {
  * 뒤로 표시(y = B−6−13+3, 0x55226)는 바닥비트 0x4 일 때만, 그 밖 표시(재선택·타자·투수·닉네임 왼쪽 ·
  * 상세정보·경기설정·목표·레벨업 가운데)는 비트마다 game_frame 프레임으로 그린다(`FOOTER_BITS`, 0x552b6~0x554f4).
  */
-export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null ? 1 : 5, slides = true }: ScreenFrameProps) {
+export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null ? 1 : 5, slides = true, footerPresses }: ScreenFrameProps) {
   const updates = useUpdateCounter()
   const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
   const top = headerTopOf(slide)
@@ -95,6 +101,17 @@ export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null
         && (bit !== FOOTER_BITS.gameSettings || isGameSettingsMarkShown(updates)) && (
         <img key={frame} className={styles.layer} data-footer-mark={frame} style={{ left: FOOTER_CENTER_X, top: footerMarkTopOf(bottom) }} src={markImage(frame)} alt="" />
       ))}
+      {footerPresses !== undefined && [
+        ...FOOTER_LEFT_MARKS.map(([bit]) => [bit, FOOTER_LEFT_X] as const),
+        ...FOOTER_CENTER_MARKS.map(([bit]) => [bit, FOOTER_CENTER_X] as const),
+      ].map(([bit, x]) => {
+        const press = footerPresses[bit]
+        if (press === undefined || (footer & bit) === 0) return null
+        return (
+          <PressArea key={`press-${bit}`} label={press.label} onPress={press.onPress}
+            rect={{ x, y: footerMarkTopOf(bottom), width: FOOTER_MARK_WIDTH, height: FOOTER_MARK_HEIGHT }} />
+        )
+      })}
     </>
   )
 }

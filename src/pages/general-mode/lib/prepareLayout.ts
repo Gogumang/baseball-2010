@@ -235,6 +235,17 @@ export const MATCH_INFO_LAYOUT = {
   firstBatTag: FIRST_BAT_LAYOUT.firstBatTag,
 } as const
 
+/** 경기정보(k 4) 투명 누름 칸 — 가운데 PLAY BALL 공(slt_frame 0, 46×46) = OK */
+export const MATCH_INFO_PLAY_BALL_PRESS_RECT = {
+  x: SCREEN.width / 2 - 23, y: MATCH_INFO_LAYOUT.playBall.y - 33, width: 46, height: 46,
+} as const
+
+/** 경기정보 투명 누름 칸 — 엠블럼(76×76) 자리 = ←/→ 엔트리 */
+export const matchInfoLogoPressRectOf = (anchor: { readonly x: number; readonly y: number }) => ({
+  x: anchor.x - TEAM_LOGO_HALF.width, y: anchor.y - TEAM_LOGO_HALF.height,
+  width: TEAM_LOGO_HALF.width * 2, height: TEAM_LOGO_HALF.height * 2,
+})
+
 /**
  * 공용 목록 깜빡 [sp+0xd4] — 다섯째 인자(메인 메뉴 [메뉴+0x2c], 상태에 들어온 뒤 센 틱)가 `% 6 ≤ 3` 이면 1 (0x63b4a~0x63b5c).
  * ⚠️ 웹은 화면을 띄운 뒤 갱신 수로 센다 — 시작 위상은 원본과 같다고 본다(진입 때 0 으로 지우는 곳은 미확인).

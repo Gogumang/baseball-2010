@@ -102,6 +102,8 @@ export function paletteUrl(spriteUrl: string): string {
 // ── 브라우저에서 실제로 칠하기 ──────────────────────────────────────────────
 
 const recolored = new Map<string, Promise<string>>()
+/** 다 칠한 그림 — 같은 (그림, 벌) 이 다시 오면 기다리지 않고 바로 쓴다 (프레임마다 구운 색이 한 번 비치던 깜박임을 막는다) */
+const painted = new Map<string, string>()
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -149,9 +151,29 @@ export function recoloredSpriteUrl(
   const cached = recolored.get(key)
   if (cached !== undefined) return cached
   // 실패를 캐시에 남기면 일시적 오류가 영영 고착된다.
-  const request = paint(spriteUrl, palette).catch(() => spriteUrl)
+  const request = paint(spriteUrl, palette).then(
+    (url) => {
+      painted.set(key, url)
+      return url
+    },
+    () => spriteUrl,
+  )
   recolored.set(key, request)
   return request
+}
+
+/**
+ * 기다리지 않고 바로 쓸 수 있는 그림 — 칠할 것이 없으면 구운 그림, 이미 칠했으면 그 그림, 아직 칠하는 중이면 null.
+ */
+export function readyRecoloredSpriteUrl(
+  spriteUrl: string,
+  palettes: SpritePalettes | null,
+  paletteIndex: number | null,
+): string | null {
+  if (palettes === null || paletteIndex === null) return spriteUrl
+  if (paletteIndex === palettes.baked) return spriteUrl
+  if (palettes.palettes[paletteIndex] === undefined) return spriteUrl
+  return painted.get(`${spriteUrl}#${paletteIndex}`) ?? null
 }
 
 /** 폴더의 `palette.json`. 아직 오지 않았거나 실패하면 null. */
@@ -162,18 +184,22 @@ export function useSpritePalettes(folder: string): SpritePalettes | null {
 /** 팔레트를 갈아 끼운 그림. 칠하기 전에는 구운 그림을 그대로 내보내 화면이 비지 않는다. */
 export function useRecoloredSprite(spriteUrl: string, paletteIndex: number | null): string {
   const palettes = useSpritePalettes(paletteUrl(spriteUrl).replace(/\/palette\.json$/, ''))
-  const [url, setUrl] = useState(spriteUrl)
+  // 이미 칠한 그림이면 그리는 그 자리에서 곧장 쓴다 — 프레임이 바뀔 때마다 구운 색(다른 팀 색)이
+  // 한 번 비치고 구운 그림 요청이 끊기던 일을 막는다. 아직 칠하는 중이면 지금까지처럼 구운 그림이다
+  const ready = readyRecoloredSpriteUrl(spriteUrl, palettes, paletteIndex)
+  const key = `${spriteUrl}#${paletteIndex ?? ''}`
+  const [painted, setPainted] = useState<{ readonly key: string; readonly url: string } | null>(null)
 
   useEffect(() => {
+    if (readyRecoloredSpriteUrl(spriteUrl, palettes, paletteIndex) !== null) return
     let isActive = true
-    setUrl(spriteUrl)
-    recoloredSpriteUrl(spriteUrl, palettes, paletteIndex).then((painted) => {
-      if (isActive) setUrl(painted)
+    recoloredSpriteUrl(spriteUrl, palettes, paletteIndex).then((url) => {
+      if (isActive) setPainted({ key, url })
     })
     return () => {
       isActive = false
     }
-  }, [spriteUrl, palettes, paletteIndex])
+  }, [spriteUrl, palettes, paletteIndex, key])
 
-  return url
+  return ready ?? (painted !== null && painted.key === key ? painted.url : spriteUrl)
 }
