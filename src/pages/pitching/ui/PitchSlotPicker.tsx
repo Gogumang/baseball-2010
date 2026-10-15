@@ -36,6 +36,9 @@ interface PitchSlotPickerProps {
   readonly stageSide?: number
 }
 
+/** 빈 칸 키 표지의 차례 — 화면이 다시 서도 겹치지 않게 모듈에서 센다 */
+let idlePressSerial = 0
+
 /** 칸 → 키 (0x534d8) — 누름 칸 읽기 이름 */
 const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
 
@@ -46,10 +49,10 @@ const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
  * - 0x50da8 은 칸의 구질을 `+0xfc8` 에 적기만 한다 — 남은 마구가 0 이면 마구 칸 키를 버린다(0x50db8).
  * - 넘김은 0xf 의 틱 `0x39c1c` 몫이다: 상태 틱이 7 을 넘고 구질이 정해졌을 때만 0x10 — 그 전에 누른 키는
  *   칸만 바꿔 적는다(마지막 키가 이긴다). 0xf 진입 0x3d954 가 `+0xfc8` 을 0 으로 지우므로 들어설 때마다 처음부터다.
- * - ⚠️ 미이식: 빈 칸(구질 0)의 키는 0x50de8 에서 투수 그림 객체(+0xf98)에 0x9dff8(…, 2)를 건다 — 상태 +0x14 = 2 · 단계 · 틱 0
- *   (0x9dff8~0x9e000)이라 그 투수가 대기 동작(표 0xd73e4 · 프레임 0,19,0,19 — 0x9df8c 가 단계 3 을 넘으면 상태 0)을 **한 바퀴**
- *   한다. 장면(`PitcherSideStage`)이 투수를 그리지만 지금 웹 대기 그림은 그 한 바퀴를 늘 되풀이해 그린다
- *   (`stageScenery.pitcherIdleFrameAt` — 상태 0 의 선 자세와 갈리지 않는다). 장면이 투수 상태 0 · 2 를 가르면 이 키에서 이을 수 있다.
+ * - 빈 칸(구질 0)의 키는 0x50da8 50db6 `beq 0x50de8` 로 가 투수 그림 객체(+0xf98)에 0x9dff8(…, 2)를 건다 — 상태 +0x14 = 2 ·
+ *   단계 · 틱 0 이라 그 투수가 대기 동작(유지 0xd73e4 · 프레임 0xd7454 = 0,19,0,19 — 0x9e004 가 단계 3 을 넘으면 상태 0)을
+ *   **한 바퀴** 하고 선 자세로 돌아온다. `+0xfc8` 은 그대로다. 누를 때마다 처음부터 다시 한다.
+ *   장면(`PitcherSideStage`)은 구질 목록 그림 재료의 `pitcherIdlePress` 가 바뀐 틱부터 상태 2 를 센다(`stageScenery.pitcherAnimationAt`).
  *
  * 견제 '3' · '1' · '7'(0x53548)은 같은 상태의 다른 키라 부르는 쪽이 따로 받는다.
  *
@@ -60,11 +63,19 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
   /** 0xf 상태 틱 `[+0x2c]` */
   const tickRef = useRef(0)
   const [tick, setTick] = useState(0)
+  /** 빈 칸 키를 누른 차례 표지 (0 = 안 누름) — `PitchMenuOverlay.pitcherIdlePress` */
+  const [idlePress, setIdlePress] = useState(0)
   usePublishedOverlay(
     overlay?.ref,
     overlay === undefined
       ? null
-      : ({ kind: '구질', typeNumbers: overlay.typeNumbers, magicRemaining: overlay.magicRemaining, tick } satisfies PitchInputOverlay),
+      : ({
+          kind: '구질',
+          typeNumbers: overlay.typeNumbers,
+          magicRemaining: overlay.magicRemaining,
+          tick,
+          pitcherIdlePress: idlePress,
+        } satisfies PitchInputOverlay),
   )
   /** 고른 칸 (`+0xfc8` 이 서 있는 자리) */
   const chosenRef = useRef<number | null>(null)
@@ -88,8 +99,14 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
   const press = (slot: number) => {
     if (isDoneRef.current || propsRef.current.isPaused) return
     const choice = propsRef.current.choices.find((candidate) => candidate.slot === slot)
-    // 빈 칸 · 막힌 마구 칸 — `+0xfc8` 이 그대로다
-    if (choice === undefined || choice.isBlocked === true) return
+    // 빈 칸(구질 0, `choices` 에 없다) — 0x50de8: 투수 그림 객체에 상태 2(대기 동작 한 바퀴)를 건다. `+0xfc8` 은 그대로다
+    if (choice === undefined) {
+      idlePressSerial += 1
+      setIdlePress(idlePressSerial)
+      return
+    }
+    // 막힌 마구 칸 — 0x50db8 이 키를 버린다. `+0xfc8` 이 그대로다
+    if (choice.isBlocked === true) return
     chosenRef.current = slot
   }
   const pressRef = useRef(press)

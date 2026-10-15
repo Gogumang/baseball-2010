@@ -15,7 +15,12 @@ import {
   judgeFrameAt,
   pitcherFrameAt,
   resultBackdropOffsetAt,
-  pitcherIdleFrameAt,
+  pitcherAnimationAt,
+  pitcherPoseOf,
+  pitcherReleaseTicksOf,
+  pitchLastStepOf,
+  pitchStepAt,
+  PITCHER_IDLE_TICKS,
   skyColorsOf,
   skyColumnOfInning,
   teamIconOf,
@@ -70,15 +75,39 @@ describe('투수 투구 — 0x9e0b8 (단계 표 · 유지 dur+1)', () => {
     expect(pitcherFrameAt(0, 999)).toBe(14)
   })
 
-  it('대기 [0,19,0,19,0] 유지 [1,1,3,4,4]+1 을 되풀이한다 (추정: 반복)', () => {
-    expect([0, 1, 2, 3, 4].map(pitcherIdleFrameAt)).toEqual([0, 0, 19, 19, 0])
+  it('대기 동작(상태 2)은 [0,19,0,19] 를 유지 [1,1,3,4]+1 로 한 바퀴만 하고 선 자세(상태 0)로 돌아온다 — 0x9e004 단계 > 3', () => {
+    const poseAt = (idleTick: number, form = 0) => pitcherPoseOf(pitcherAnimationAt({ pitchTick: null, idleTick }), form)
+    expect([0, 1, 2, 3, 4, 7, 8, 12].map((tick) => poseAt(tick))).toEqual([0, 0, 19, 19, 0, 0, 19, 19])
+    expect(PITCHER_IDLE_TICKS).toBe(13)
+    expect(pitcherAnimationAt({ pitchTick: null, idleTick: 13 })).toEqual({ state: 0, step: 0 })
+    // 상태 0 은 폼 표의 단계 0 — 폼 2·3 은 1, 4·5 는 2 (대기 동작의 0 과 다르다)
+    expect([poseAt(13, 2), poseAt(99, 4), poseAt(0, 2)]).toEqual([1, 2, 0])
+  })
+
+  it('상태 걸기 사건이 없으면 상태 0 · 투구 틱이 있으면 상태 1 이고 마지막 단계에 머문다', () => {
+    expect(pitcherAnimationAt({ pitchTick: null })).toEqual({ state: 0, step: 0 })
+    expect(pitcherAnimationAt({ pitchTick: 999, idleTick: 3 })).toEqual({ state: 1, step: 13 })
+  })
+
+  it('마투수 — 유지 0xd73fa · 프레임 0xd7483 · 마지막 0xd744f · 놓는 단계 0xcfbe4', () => {
+    expect([0, 1, 2, 3, 4].map(pitchLastStepOf)).toEqual([12, 14, 12, 15, 12])
+    expect(pitchLastStepOf(null)).toBe(13)
+    // 싸이커: 단계 0 이 5틱, 단계 1~5 가 3틱씩 → 단계 6 은 틱 20
+    expect([0, 4, 5, 8, 20].map((tick) => pitchStepAt(tick, 0))).toEqual([0, 0, 1, 2, 6])
+    expect([0, 1, 2, 3, 4].map(pitcherReleaseTicksOf)).toEqual([20, 23, 20, 32, 24])
+    // 싸이커 단계 7 · 8 은 프레임 16 · 17, 마지막(12)은 14 — 표의 15 는 안 나온다
+    expect([7, 8, 12].map((step) => pitcherPoseOf({ state: 1, step }, 0, 0))).toEqual([16, 17, 14])
+    expect(pitcherPoseOf(pitcherAnimationAt({ pitchTick: 999 }, 0), 0, 0)).toBe(14)
+    // 마투수의 상태 2 는 0, 상태 0 은 표 줄의 단계 0
+    expect(pitcherPoseOf({ state: 2, step: 1 }, 0, 3)).toBe(0)
+    expect(pitcherPoseOf({ state: 0, step: 0 }, 0, 3)).toBe(0)
   })
 
   it('덧그림은 프레임 f+22 다 — 0x79662 `adds r3,r6,#0x16`', () => {
     expect(PITCHER_OVERLAY_FRAME_OFFSET).toBe(22)
     // 와인드업 3~6 의 몸통은 25~28, 대기 0~2 의 글러브 안 공은 22~24 에 들어 있다
     expect([3, 4, 5, 6].map((frame) => frame + PITCHER_OVERLAY_FRAME_OFFSET)).toEqual([25, 26, 27, 28])
-    expect(pitcherIdleFrameAt(0) + PITCHER_OVERLAY_FRAME_OFFSET).toBe(22)
+    expect(pitcherPoseOf({ state: 2, step: 0 }, 0) + PITCHER_OVERLAY_FRAME_OFFSET).toBe(22)
   })
 })
 

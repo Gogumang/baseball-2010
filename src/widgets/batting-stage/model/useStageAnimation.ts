@@ -84,6 +84,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     resultTextRef,
     homeRunStartedAtRef,
     swingStartedAtRef,
+    pitcherStartedAtRef,
     shiftRef,
     buntRef,
     pendingHitRef,
@@ -230,6 +231,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           homeRunStartedAtRef.current = -1
           phaseRef.current = '투구중'
           phaseStartedAtRef.current = now
+          // 3de7c — 투수 그림 객체 상태 1(투구 동작)
+          pitcherStartedAtRef.current = now
         } else {
           return
         }
@@ -253,7 +256,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
       const pitch = pitchRef.current
       if (phaseRef.current === '투구중' && pitch !== null) {
-        const frame = ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
+        const frame = ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame(), latestRef.current.acePitcher?.order)
         // 투구 순간 소리 12 / 28 (0x3f378) — 공 프레임이 서는 틱(릴리스 단계 도달, `ballFrameAt` 0)에 한 번.
         // 사람이 칠 때 CPU 투수가 던지는 공이다 — 원본 식은 던지는 쪽을 가르지 않는다(사람 투구는 각 진행 고리가 낸다)
         if (frame >= 0 && releaseSoundPitch !== pitch) {
@@ -291,7 +294,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             // 0xb9374 — 그림의 스윙도 그 틱부터
             const released = { ...swing, isReleased: true }
             swingRef.current = released
-            swingStartedAtRef.current = ballFrameStartTime(swingReleaseTickOf(swing.frame), phaseStartedAtRef.current, tickLength)
+            swingStartedAtRef.current = ballFrameStartTime(
+              swingReleaseTickOf(swing.frame),
+              phaseStartedAtRef.current,
+              tickLength,
+              latestRef.current.acePitcher?.order,
+            )
             releaseSwing(released)
           } else if (event.kind === '판정없는헛스윙' && swing !== null) {
             swingRef.current = { ...swing, isUnjudgedWhiff: true }
@@ -333,6 +341,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         pitchRef.current = null
         // 0xf 진입 0x3d954 → 0x35650 → 0xb9318 이 스윙 객체를 대기(상태 5)로 되돌린다 — 그때까지 스윙 끝 칸에 머문다 (`batterFrameAt`)
         swingStartedAtRef.current = -1
+        // 같은 0x35650 → 0x340c0 이 투수 그림 객체를 상태 0(선 자세)으로 — 그때까지 투구 마지막 자세에 머문다
+        pitcherStartedAtRef.current = -1
       }
     }
 
@@ -447,7 +457,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 그림 +0x48 · +0x60 에 같은 0xb63c1(타자)를 쓴다 — 마타자는 표 0xd88b0, 그 밖은 폼 & 1
       const side = latestRef.current.batterHand ?? batterSideOfForm(latestRef.current.batterForm)
       const isPitching = phaseRef.current === '투구중' && pitch !== null
-      const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength) : -1
+      const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength, latestRef.current.acePitcher?.order) : -1
+      const pitcherStartedAt = pitcherStartedAtRef.current
+      const pendingHit = phaseRef.current === '타격' ? pendingHitRef.current : null
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
       const homeRunStartedAt = homeRunStartedAtRef.current
       const isHomeRun = homeRunStartedAt >= 0
@@ -549,7 +561,16 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
-        pitcherTick: isPitching ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : null,
+        pitcherTick: pitcherStartedAt < 0 ? null : pitchTickAt(now, pitcherStartedAt, tickLength),
+        // 0x13 — 투수 그리기의 홈런 갈래(0x3908a)가 결과 코드 [+0xfd4] · 감상 플래그 +0x199a 를 본다
+        pitcherHitMark:
+          pendingHit === null || pitcherStartedAt < 0
+            ? null
+            : {
+                resultCode: pendingHit.detail.resultCode,
+                isBigHit: pendingHit.watchesBigHit,
+                pitcherTickAtHit: pitchTickAt(phaseStartedAtRef.current, pitcherStartedAt, tickLength),
+              },
         tick: nowTick,
         ...(runnerAnimationSteps === undefined ? {} : { runnerAnimationSteps }),
         // 판이 효과 층을 깔았으면 배경 캔버스에는 배경만 — 비 · 파티클은 아래에서 그 층에 그린다
@@ -615,6 +636,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       buntRef.current = null
       swingRef.current = null
       swingStartedAtRef.current = -1
+      pitcherStartedAtRef.current = -1
       pitchJudgedRef.current = false
       heldResultRef.current = null
       pendingHitRef.current = null

@@ -147,7 +147,24 @@ export function skyLightFrameAt(
   return entries[entries.length - 1].frame
 }
 
-/** 투구 단계 → pitcher.pzx 프레임 (0x9e0b8, 폼 k 는 두 개씩 같은 표 — 홀수 폼은 좌우 반전) */
+/**
+ * **투수 그림 객체** (vtable 0xd73d0 — 갱신 0x9e004 → 0x9df8c · 자세 0x9e0b8, 경기 +0xf98). 2026-10-15 직접 떴다.
+ * ```
+ * 9dff8  상태 걸기(o, s): +0x14 = s · 단계 +0x1c = 0 · 카운터 +0x20 = 0
+ * 9df8c  상태 1: 마투수(+0x24 ≥ 0)면 마지막 단계 = s8 0xd744f[u] · 유지 = s8 (0xd73fa + 17u)[단계],
+ *               아니면 마지막 = 0xd · 유지 = s8 0xd73e9[단계]
+ *        상태 2: 마지막 = 4 · 유지 = s8 0xd73e4[단계]
+ *        c = 카운터++ ; c ≥ 유지 ∧ 단계 < 마지막 이면 단계 + 1 · 카운터 = 0        (그 밖 상태는 안 센다)
+ * 9e004  갱신 뒤 상태 2 이고 단계 > 3 이면 9dff8(o, 0) — 대기는 **한 바퀴**만 하고 선 자세로 돌아온다
+ * 9e0b8  상태 0 · 1: 마투수면 s8 (0xd7483 + 17u)[단계], 아니면 폼 0·1 / 2·3 / 4·5 → 0xd7475 / 0xd7467 / 0xd7459 [단계]
+ *        상태 2: 마투수면 0, 아니면 0xd7454[단계]
+ * ```
+ * u = 마투수 순번 — 경기 장면은 0x35650 이 `0xb63a0(투수)` 를 +0x24 에 적는다(35686). 다른 화면 셋업(0x5690 · 0x61c0 · 0x108d2 · 0x65346)은 −1.
+ * 상태를 거는 곳(경기 +0xf98): **0xf 진입 0x3d954 · 0x48d50 → 0x35650 → 0x340c0 = 상태 0**,
+ * 0x11 진입 0x3de10(3de7c) = 상태 1, 빈 구질 칸 키 0x50de8 = 상태 2. 그래서 공을 던진 뒤에는 다음 0xf 진입까지
+ * **상태 1 의 마지막 단계에 머문다**(0x12 · 0x13 에서도 마지막 자세).
+ */
+/** 투구 단계 → pitcher.pzx 프레임 (0x9e0b8 — 폼 0·1 0xd7475 · 2·3 0xd7467 · 4·5 0xd7459, 홀수 폼은 좌우 반전) */
 const PITCH_STEP_FRAMES = [
   [0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14],
   [1, 3, 4, 5, 6, 7, 15, 16, 10, 11, 12, 13, 14, 14],
@@ -155,16 +172,52 @@ const PITCH_STEP_FRAMES = [
 ]
 /** 단계 유지 dur (표 0xd73e9) — 한 단계가 dur+1 틱 */
 const PITCH_STEP_DURATIONS = [1, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
-/** 공을 놓는 단계 — 공 프레임이 이 단계부터 오른다 (위치 분석 3차 릴리스 idx 6, 5차 단계 6~7 추정) */
+/** 평범한 투수의 마지막 단계 (0x9dfba `movs r4, #0xd`) */
+const PITCH_LAST_STEP = 0xd
+/** 공을 놓는 단계 — 0x3f378 이 투수 단계 ≥ 6 (3f414 `movs r4, #6`) 인 틱부터 공 틱 +0x1098 을 올린다 */
 const RELEASE_STEP = 6
-const LAST_STEP = PITCH_STEP_FRAMES[0].length - 1
 
-const stepStartTicks = PITCH_STEP_DURATIONS.reduce<number[]>(
-  (starts, duration, index) => [...starts, (starts[index] ?? 0) + duration + 1],
-  [0],
-)
+/** 마투수 순번 u 별 단계 유지 (표 0xd73fa, 17칸씩) — ace/pitcher_*.pzx 애니 0 의 지연과 같다 */
+const ACE_PITCH_STEP_DURATIONS = [
+  [4, 2, 2, 2, 2, 2, 0, 0, 0, 0, 1, 2, 2, 2, 0, 0, 0],
+  [4, 2, 2, 2, 0, 0, 0, 2, 2, 0, 0, 0, 1, 2, 3, 0, 0],
+  [4, 2, 2, 2, 2, 2, 2, 2, 0, 0, 2, 2, 3, 0, 0, 0, 0],
+  [4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0],
+  [4, 2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0],
+]
+/**
+ * 마투수 마지막 단계 (표 0xd744f). 싸이커(u 0)는 애니 0 이 14칸(… 14, 15)인데 마지막이 12 라 **프레임 15 는 안 나온다** —
+ * 원본 그대로다.
+ */
+const ACE_PITCH_LAST_STEPS = [12, 14, 12, 15, 12]
+/** 마투수 단계 → ace/pitcher_*.pzx 프레임 (표 0xd7483, 17칸씩) */
+const ACE_PITCH_STEP_FRAMES = [
+  [0, 3, 4, 5, 6, 7, 8, 16, 17, 11, 12, 13, 14, 15, 15, 15, 15],
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14],
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12, 12],
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 15],
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12, 12],
+]
+/** 마투수가 공을 놓는 단계 — 0x3f378 3f40c 의 표 0xcfbe4[u] (공 객체 0x9e038 · 0x9e074 의 표 0xd74d8 과 같은 값) */
+const ACE_RELEASE_STEPS = [6, 9, 6, 10, 8]
 
-export const PITCHER_RELEASE_TICKS = stepStartTicks[RELEASE_STEP]
+/** 표에 있는 마투수 순번인가 (0~4). 아니면 평범한 투수 표를 쓴다 */
+function aceRowOf(aceOrder: number | null | undefined): number | null {
+  return aceOrder !== null && aceOrder !== undefined && aceOrder >= 0 && aceOrder < ACE_PITCH_LAST_STEPS.length ? aceOrder : null
+}
+
+/** 단계 0..last 가 시작하는 틱 — 단계 k 는 유지 + 1 틱 */
+function startsOf(durations: readonly number[], last: number): readonly number[] {
+  return durations.slice(0, last).reduce<number[]>((starts, duration, index) => [...starts, starts[index] + duration + 1], [0])
+}
+
+const PITCH_STEP_STARTS = startsOf(PITCH_STEP_DURATIONS, PITCH_LAST_STEP)
+const ACE_PITCH_STEP_STARTS = ACE_PITCH_STEP_DURATIONS.map((durations, row) => startsOf(durations, ACE_PITCH_LAST_STEPS[row]))
+
+function pitchStepStartsOf(aceOrder: number | null | undefined): readonly number[] {
+  const row = aceRowOf(aceOrder)
+  return row === null ? PITCH_STEP_STARTS : ACE_PITCH_STEP_STARTS[row]
+}
 
 function stepAt(tick: number, starts: readonly number[], lastStep: number): number {
   let step = 0
@@ -172,20 +225,87 @@ function stepAt(tick: number, starts: readonly number[], lastStep: number): numb
   return step
 }
 
-export function pitcherFrameAt(form: number, tick: number): number {
-  const table = PITCH_STEP_FRAMES[Math.floor(Math.max(0, form) / 2)] ?? PITCH_STEP_FRAMES[0]
-  return table[stepAt(Math.max(0, tick), stepStartTicks, LAST_STEP)]
+/** 상태 1 의 마지막 단계 — 평범한 투수 13, 마투수 0xd744f[u]. 홈런 갈래 0x39096 의 비교 값(13 · 0xcfd34[u])과 같다 */
+export function pitchLastStepOf(aceOrder?: number | null): number {
+  const row = aceRowOf(aceOrder)
+  return row === null ? PITCH_LAST_STEP : ACE_PITCH_LAST_STEPS[row]
 }
 
-/** 대기 상태 (state 2) — 끝나면 처음부터 되풀이한다 (추정) */
+/** 상태 1 에 든 뒤 틱 → 단계 (0x9df8c 를 그 수만큼 돌린 것 — 마지막 단계에서 멈춘다) */
+export function pitchStepAt(tick: number, aceOrder?: number | null): number {
+  const starts = pitchStepStartsOf(aceOrder)
+  return stepAt(Math.max(0, tick), starts, starts.length - 1)
+}
+
+/** 단계 `step` 에 닿는 틱 (상태 1 에 든 뒤) */
+export function pitchStepStartTickOf(step: number, aceOrder?: number | null): number {
+  const starts = pitchStepStartsOf(aceOrder)
+  return starts[Math.min(Math.max(0, step), starts.length - 1)]
+}
+
+/**
+ * 공 틱이 오르기 시작하는 틱 (상태 1 에 든 뒤) — 투수 단계가 놓는 단계(평범 6 · 마투수 0xcfbe4[u])에 닿는 틱 (0x3f378).
+ * 평범한 투수는 11, 마투수는 20 · 23 · 20 · 32 · 24 이다.
+ */
+export function pitcherReleaseTicksOf(aceOrder?: number | null): number {
+  const row = aceRowOf(aceOrder)
+  return pitchStepStartTickOf(row === null ? RELEASE_STEP : ACE_RELEASE_STEPS[row], aceOrder)
+}
+
+/** 평범한 투수가 공을 놓는 틱 (`pitcherReleaseTicksOf(null)`) */
+export const PITCHER_RELEASE_TICKS = pitcherReleaseTicksOf(null)
+
+/** 대기 동작 (상태 2) — 프레임 0xd7454 · 유지 0xd73e4 */
 const IDLE_FRAMES = [0, 19, 0, 19, 0]
 const IDLE_DURATIONS = [1, 1, 3, 4, 4]
-const idleStarts = IDLE_DURATIONS.reduce<number[]>((starts, duration, index) => [...starts, (starts[index] ?? 0) + duration + 1], [0])
-const IDLE_CYCLE = idleStarts[IDLE_FRAMES.length]
+const IDLE_LAST_STEP = 4
+/** 0x9e026 `cmp r3, #3 / ble` — 단계가 3 을 넘으면 상태 0 */
+const IDLE_END_STEP = 4
+const IDLE_STARTS = startsOf(IDLE_DURATIONS, IDLE_LAST_STEP)
+/** 대기 한 바퀴의 길이 — 단계 4 에 닿는 그 갱신(9e004)에 상태 0 으로 돌아가므로 단계 4 는 그려지지 않는다 */
+export const PITCHER_IDLE_TICKS = IDLE_STARTS[IDLE_END_STEP]
 
-export function pitcherIdleFrameAt(tick: number): number {
-  const cycleTick = Math.max(0, tick) % IDLE_CYCLE
-  return IDLE_FRAMES[stepAt(cycleTick, idleStarts, IDLE_FRAMES.length - 1)]
+export interface PitcherAnimation {
+  /** +0x14 — 0 선 자세 · 1 투구 · 2 대기 동작 */
+  readonly state: 0 | 1 | 2
+  /** +0x1c */
+  readonly step: number
+}
+
+/** 투수 그림 객체에 상태를 건 두 사건의 틱 — 웹 장면이 드는 것 */
+export interface PitcherAnimationClock {
+  /** 0x11 진입(0x3de10 → 상태 1) 뒤 틱. 다음 0xf 진입(→ 상태 0)까지 산다. 없으면 null */
+  readonly pitchTick: number | null
+  /** 빈 구질 칸 키(0x50de8 → 상태 2) 뒤 틱. 없으면 null */
+  readonly idleTick?: number | null
+}
+
+/**
+ * 투수 그림 객체의 지금 상태. 둘 다 있으면 투구가 나중 사건이다(빈 칸 키는 0xf 에서만 받고 0x11 이 그 뒤다).
+ * ⚠️ 근사: 키를 누른 그림과 첫 갱신의 차례는 0x11 진입과 같은 셈(틱 0 = 단계 0 의 첫 그림)으로 본다.
+ */
+export function pitcherAnimationAt(clock: PitcherAnimationClock, aceOrder?: number | null): PitcherAnimation {
+  if (clock.pitchTick !== null) return { state: 1, step: pitchStepAt(clock.pitchTick, aceOrder) }
+  const idleTick = clock.idleTick ?? null
+  if (idleTick !== null && idleTick >= 0 && idleTick < PITCHER_IDLE_TICKS) {
+    return { state: 2, step: stepAt(idleTick, IDLE_STARTS, IDLE_LAST_STEP) }
+  }
+  return { state: 0, step: 0 }
+}
+
+/** 0x9e0b8 — 지금 상태의 그림 프레임. 마투수는 ace/pitcher_*.pzx, 아니면 pitcher.pzx 의 번호다 */
+export function pitcherPoseOf(animation: PitcherAnimation, form: number, aceOrder?: number | null): number {
+  const row = aceRowOf(aceOrder)
+  if (animation.state === 2) return row === null ? (IDLE_FRAMES[animation.step] ?? 0) : 0
+  if (row !== null) return ACE_PITCH_STEP_FRAMES[row][animation.step] ?? 0
+  // 0x9e0e2 `cmp r3, #5 / bhi` — 폼이 0~5 밖이면 0
+  if (form < 0 || form > 5) return 0
+  return PITCH_STEP_FRAMES[form >> 1][animation.step] ?? 0
+}
+
+/** 평범한 투수 상태 1 의 자세 (폼 표) */
+export function pitcherFrameAt(form: number, tick: number): number {
+  return pitcherPoseOf({ state: 1, step: pitchStepAt(tick) }, form)
 }
 
 /**

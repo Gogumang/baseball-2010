@@ -1,6 +1,6 @@
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
-import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
+import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
  * **사람이 던지는 타석의 장면** — 투수편(모드 3) · 투수 미션(모드 5) · 팀 경기 수비 반 이닝.
@@ -39,19 +39,24 @@ export interface PitcherSideStageClock {
   readonly isPaused: boolean
   /** 쉬기 시작한 장면 틱 (쉬지 않으면 무시) */
   readonly pausedSinceTick: number
+  /** 마운드 마투수 순번 (0~4) — 공 틱이 오르는 단계가 0xcfbe4[순번]이다(0x3f378). 없으면 평범한 투수(단계 6) */
+  readonly aceOrder?: number | null
 }
 
 export interface PitcherSideStageFrame {
   readonly phase: StagePhaseSnapshot
   /** 공 경로 번호 F (0 = 릴리스). 공이 날지 않으면 −1 */
   readonly ballFrame: number
-  /** 0x11 진입 뒤 틱 — 투수 단계 표가 본다. 투구 중이 아니면 null(대기 동작) */
+  /**
+   * 0x11 진입(투수 그림 객체 상태 1) 뒤 틱 — 투수 단계 표가 본다. 0x12 에도 이어져 마지막 자세에 머문다.
+   * '대기'(다음 0xf 진입이 상태 0 으로 되돌린 뒤)면 null
+   */
   readonly pitcherTick: number | null
 }
 
 /**
  * 지금 그림의 장면 단계.
- * - 0x11: 공을 놓은 틱 − 10 에서 들어선다. 투수 단계가 릴리스(`PITCHER_RELEASE_TICKS`)에 닿은 틱부터 공 틱이 오르고(0x3f378),
+ * - 0x11: 공을 놓은 틱 − 10 에서 들어선다. 투수 단계가 릴리스(`pitcherReleaseTicksOf`)에 닿은 틱부터 공 틱이 오르고(0x3f378),
  *   공 틱 N + 1 에서 0x12 로 간다(0x4e24e).
  * - 0x12: `resultTicks` 동안 — 공은 마지막 점(`heldBall`).
  * - 그 밖은 '대기'(0xd~0xf · 0x10 조준 — 장면은 대기 동작이다).
@@ -70,14 +75,14 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
   if (clock.releaseTick === null) return idle
   const stateTick = clock.nowTick - clock.releaseTick + HUMAN_PITCH_RELEASE_STATE_TICK
   if (stateTick < 0) return idle
-  const ballFrame = stateTick - PITCHER_RELEASE_TICKS
+  const ballFrame = stateTick - pitcherReleaseTicksOf(clock.aceOrder)
   const flightEndFrame = clock.frameCount + 1
   if (ballFrame < flightEndFrame) {
     return { phase: { kind: '투구중', tick: stateTick, isPaused: false }, ballFrame, pitcherTick: stateTick }
   }
   const resultTick = ballFrame - flightEndFrame
   if (resultTick < clock.resultTicks) {
-    return { phase: { kind: '결과', tick: resultTick, isPaused: false, isInPlay: false }, ballFrame: -1, pitcherTick: null }
+    return { phase: { kind: '결과', tick: resultTick, isPaused: false, isInPlay: false }, ballFrame: -1, pitcherTick: stateTick }
   }
   return idle
 }
@@ -93,15 +98,15 @@ export function passesHeldResult(resolution: PitchResolution): boolean {
  * 공을 놓은 틱(0x11 틱 10)부터 장면이 다시 '대기' 로 돌아올 때까지의 틱 — 남은 0x11(공 틱 N + 1 까지) + 0x12 대기.
  * 원본은 그동안 상태가 0x11 · 0x12 라 구질 키(0xf) · 견제 · '#' · 0xe 의 OK 를 받지 않는다 (키 갈래 0x53580 은 상태별 표).
  */
-export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number): number {
-  return PITCHER_RELEASE_TICKS - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + 1 + resultTicks
+export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number, aceOrder?: number | null): number {
+  return pitcherReleaseTicksOf(aceOrder) - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + 1 + resultTicks
 }
 
 /**
  * CPU 타자가 스윙을 거는 장면 틱 — 0x11 갱신 0x4e0dc: 공 틱 [+0x1098] ≥ 스윙 프레임 F(+0xfd8) 인 틱에 스윙 객체의
- * vtable +0x14 · +0x18 을 부른다. 공 틱은 놓은 틱(상태 틱 10)에서 `PITCHER_RELEASE_TICKS − 10` 지난 뒤 0 이다
+ * vtable +0x14 · +0x18 을 부른다. 공 틱은 놓은 틱(상태 틱 10)에서 `pitcherReleaseTicksOf(순번) − 10` 지난 뒤 0 이다
  * (`pitcherSideStageFrameOf` 와 같은 셈). ⚠️ 근사: 한 틱 안의 갱신 차례(공 틱 +1 과 스윙 검사)는 공 틱 0 이 그려지는 틱으로 맞췄다.
  */
-export function cpuSwingTickOf(releaseTick: number, swingFrame: number): number {
-  return releaseTick - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + Math.max(0, swingFrame)
+export function cpuSwingTickOf(releaseTick: number, swingFrame: number, aceOrder?: number | null): number {
+  return releaseTick - HUMAN_PITCH_RELEASE_STATE_TICK + pitcherReleaseTicksOf(aceOrder) + Math.max(0, swingFrame)
 }

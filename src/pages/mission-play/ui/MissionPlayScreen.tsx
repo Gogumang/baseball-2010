@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { PressArea, RawScreen } from '@/shared/ui'
@@ -380,11 +381,7 @@ export function MissionPlayScreen({
               // 위 줄 = 측 0(선공) · 아래 줄 = 측 1 (0x373d0 — 점수 0xb69b1(st, 0) · (st, 1)). 사람은 미션의 측에 앉는다
               playerSide: humanSideOf(run.mission),
             }}
-            acePitcher={
-              opponent === null
-                ? null
-                : { framesUrl: opponent.framesUrl, frameCount: opponent.frameCount, stillUrl: opponent.stillUrl }
-            }
+            acePitcher={opponent === null ? null : acePitcherFramesOf(opponent)}
             canBunt={canBunt}
             // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             // 0xe(OK 대기)에서도 공이 안 나간다

@@ -3,6 +3,8 @@ import {
   MISTAKE_MARK_OFFSET_Y,
   pitcherFatigueAnimationOf,
   pitcherFatigueFrameAt,
+  pitcherHomeRunMarksOf,
+  isHomeRunLikeResultCode,
   showsPitcherFatigue,
   showsPitcherMistakeMark,
 } from '@/widgets/batting-stage/lib/pitcherFatigue'
@@ -35,5 +37,37 @@ describe('실투 "!" (0x38d1c 38ee0~38f3e)', () => {
     expect(MISTAKE_MARK_OFFSET_Y).toBe(-52)
     const 표 = [0, 2, -1, -2].map((dy) => ({ frame: 50, delay: 0, dx: 0, dy }))
     expect([1, 2, 3, 4].map((k) => pitcherFatigueFrameAt(표, k)?.dy)).toEqual([2, -1, -2, 0])
+  })
+})
+
+describe('투수 그리기의 홈런 갈래 (0x3908a~0x39192)', () => {
+  const base = { resultCode: 25, isBigHit: true, pitcherTickAtHit: 30, pitcherTick: 30, step: 13, aceOrder: null }
+
+  it('결과 코드 24~26 만 (0x357e0)', () => {
+    expect([23, 24, 25, 26, 27, null].map(isHomeRunLikeResultCode)).toEqual([false, true, true, true, false, false])
+    expect(pitcherHomeRunMarksOf({ ...base, resultCode: 27 })).toBeNull()
+  })
+
+  it('투수 단계가 마지막 단계(13 · 마투수 0xcfd34[순번])일 때만 — 첫 그림이 1', () => {
+    expect(pitcherHomeRunMarksOf({ ...base, step: 12 })).toBeNull()
+    expect(pitcherHomeRunMarksOf(base)).toEqual({ drawCall: 1, showsPitcherAnimation: true, showsBang: true })
+    expect(pitcherHomeRunMarksOf({ ...base, pitcherTick: 34 })?.drawCall).toBe(5)
+    // 마투수: 애니 12 는 안 그리고 "!" 만, 목표 단계는 0xcfd34[3] = 15
+    expect(pitcherHomeRunMarksOf({ ...base, aceOrder: 3, step: 13 })).toBeNull()
+    expect(pitcherHomeRunMarksOf({ ...base, aceOrder: 3, step: 15, pitcherTick: 60, pitcherTickAtHit: 60 })).toEqual({
+      drawCall: 1,
+      showsPitcherAnimation: false,
+      showsBang: true,
+    })
+  })
+
+  it('감상 플래그(+0x199a)가 없으면 "!" 는 안 그린다', () => {
+    expect(pitcherHomeRunMarksOf({ ...base, isBigHit: false })?.showsBang).toBe(false)
+  })
+
+  it('0x13 에 들기 전 마지막 단계에 닿았으면 0x13 진입부터 센다', () => {
+    // 평범한 투수의 단계 13 은 투수 틱 19 — 0x13 이 틱 25 에 들었으면 틱 25 가 첫 그림
+    expect(pitcherHomeRunMarksOf({ ...base, pitcherTickAtHit: 25, pitcherTick: 25 })?.drawCall).toBe(1)
+    expect(pitcherHomeRunMarksOf({ ...base, pitcherTickAtHit: 10, pitcherTick: 19 })?.drawCall).toBe(1)
   })
 })

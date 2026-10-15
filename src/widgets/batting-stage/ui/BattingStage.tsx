@@ -548,7 +548,8 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
   }, [])
 
   const actions = useMemo(() => {
-    const frameNow = (now: number) => ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
+    const frameNow = (now: number) =>
+      ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame(), latestRef.current.acePitcher?.order)
     /** 키가 읽히는 틱 = 경기+0xfd8 — 보이던 공 틱 + 1 (`keyTickOf`) */
     const keyTickNow = (now: number) => keyTickOf(frameNow(now))
     // 스윙·번트는 공이 나는 동안(상태 0x11)만 받는다 — 릴리스 전에는 무시한다

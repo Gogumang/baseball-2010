@@ -130,6 +130,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let shownMistake = false
     let pausedSinceTick = 0
     let wasPaused = false
+    /** 빈 구질 칸 키(0x50de8 → 투수 그림 상태 2)를 본 표지와 그 장면 틱 — 새 공(상태 1)이 들면 지운다 */
+    let seenIdlePress = 0
+    let idleStartTick: number | null = null
     /** 팝업 동안 멈춘 시간 — 장면 틱에서 뺀다 */
     let frozenTotal = 0
     let frozenSince: number | null = null
@@ -154,6 +157,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         releaseTick = current.pitch === null ? null : nowTick
         shownSwing = current.cpuSwing ?? null
         shownMistake = current.pitch !== null && current.isMistakePitch === true
+        // 0x11 진입 3de7c — 상태 1 이 대기 동작을 덮는다
+        idleStartTick = null
       }
       if (current.isPaused && !wasPaused) pausedSinceTick = nowTick
       wasPaused = current.isPaused
@@ -167,13 +172,22 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         resultTicks: resolution !== null && passesHeldResult(resolution) ? current.resultTicks : 0,
         isPaused: current.isPaused,
         pausedSinceTick,
+        aceOrder: current.acePitcher?.order ?? null,
       })
       const bodyType = bodyTypeOf(current.batterForm)
       const isIdle = stage.phase.kind === '대기'
       // 스윙은 이 공이 날거나 0x12 인 동안만 — 대기로 돌아오면 대기 자세
       const swingTick =
-        releaseTick === null || shownSwing === null || isIdle ? null : cpuSwingTickOf(releaseTick, shownSwing.frame)
+        releaseTick === null || shownSwing === null || isIdle
+          ? null
+          : cpuSwingTickOf(releaseTick, shownSwing.frame, current.acePitcher?.order ?? null)
       const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
+      // 0x50de8 — 구질 목록(0xf)의 빈 칸 키. 누를 때마다 처음부터 한 바퀴(9dff8 이 단계 · 틱을 0 으로)
+      const idlePress = pitchInput?.kind === '구질' ? (pitchInput.pitcherIdlePress ?? 0) : 0
+      if (idlePress !== 0 && idlePress !== seenIdlePress) {
+        seenIdlePress = idlePress
+        idleStartTick = nowTick
+      }
       // 0x4c92e — "#TIME" 은 상태 0xe · 0xf 만
       const isTimeState = isIdle && (current.isPaused || pitchInput?.kind === '구질')
       const isResult = stage.phase.kind === '결과'
@@ -220,6 +234,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitch: stage.phase.kind === '대기' ? null : pitch,
         frame: stage.ballFrame,
         pitcherTick: stage.pitcherTick,
+        pitcherIdleTick: idleStartTick === null ? null : nowTick - idleStartTick,
         tick: nowTick,
         resultTick: isResult ? stage.phase.tick : 0,
         resultText: isResult && resolution !== null ? describePitchResolution(resolution) : '',

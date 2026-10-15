@@ -13,7 +13,9 @@ import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
-import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
+import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import type { AcePlayer } from '@/shared/config/original/acePlayers'
+import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
@@ -28,6 +30,21 @@ export interface AcePitcherFrames {
   readonly framesUrl: string
   readonly frameCount: number
   readonly stillUrl: string
+  /**
+   * 마투수 순번 `0xb63a0(투수)` (0~4) — 0x35650 이 투수 그림 객체 +0x24 에 적어 단계 표(유지 0xd73fa · 프레임 0xd7483 ·
+   * 마지막 0xd744f)와 놓는 단계(0xcfbe4)를 고른다 (`stageScenery` 의 투수 그림 객체)
+   */
+  readonly order: number
+}
+
+/** 마투수 한 명의 그림 재료 — 순번은 `ACE_PITCHERS`(XlsACE_PIT_DATA 줄 차례 = 0xb63a0) 의 칸이다 */
+export function acePitcherFramesOf(player: AcePlayer): AcePitcherFrames {
+  return {
+    framesUrl: player.framesUrl,
+    frameCount: player.frameCount,
+    stillUrl: player.stillUrl,
+    order: ACE_PITCHERS.indexOf(player),
+  }
 }
 
 /** 번트 자세 — 종류와 누른 순간의 공 프레임 (0x53670 토글) */
@@ -250,6 +267,11 @@ export interface StageRefs {
    */
   readonly homeRunStartedAtRef: MutableRefObject<number>
   readonly swingStartedAtRef: MutableRefObject<number>
+  /**
+   * 투수 그림 객체가 상태 1 에 든 시각 — 0x11 진입 0x3de10 이 걸고 다음 0xf 진입(0x3d954 → 0x340c0)이 상태 0 으로 되돌린다.
+   * −1 이면 상태 0(선 자세). 공이 끝난 0x12 · 0x13 동안에도 남아 투수가 마지막 단계 자세에 머문다
+   */
+  readonly pitcherStartedAtRef: MutableRefObject<number>
   readonly shiftRef: MutableRefObject<number>
   readonly buntRef: MutableRefObject<BuntStance | null>
   readonly deckRef: MutableRefObject<PatternDeck | null>
@@ -289,6 +311,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     resultTextRef: useRef(''),
     homeRunStartedAtRef: useRef(-1),
     swingStartedAtRef: useRef(-1),
+    pitcherStartedAtRef: useRef(-1),
     shiftRef: useRef(0),
     buntRef: useRef<BuntStance | null>(null),
     deckRef: useRef<PatternDeck | null>(null),
@@ -310,14 +333,14 @@ export function pitchTickAt(now: number, startedAt: number, millisecondsPerTick:
 }
 
 /**
- * 공 프레임 F — 투수 애니가 릴리스 단계(6)에 닿은 뒤부터 매 틱 +1 (0x3f378).
- * 그 전에는 음수라 공을 그리지 않는다.
+ * 공 프레임 F — 투수 애니가 놓는 단계(평범 6 · 마투수 0xcfbe4[순번])에 닿은 뒤부터 매 틱 +1 (0x3f378).
+ * 그 전에는 음수라 공을 그리지 않는다. `aceOrder` 는 마운드 마투수 순번(없으면 평범한 투수)
  */
-export function ballFrameAt(now: number, startedAt: number, millisecondsPerTick: number): number {
-  return pitchTickAt(now, startedAt, millisecondsPerTick) - PITCHER_RELEASE_TICKS
+export function ballFrameAt(now: number, startedAt: number, millisecondsPerTick: number, aceOrder?: number | null): number {
+  return pitchTickAt(now, startedAt, millisecondsPerTick) - pitcherReleaseTicksOf(aceOrder)
 }
 
 /** 공 프레임 F 가 시작하는 시각 — `ballFrameAt` 의 거꾸로 */
-export function ballFrameStartTime(frame: number, startedAt: number, millisecondsPerTick: number): number {
-  return startedAt + (frame + PITCHER_RELEASE_TICKS) * millisecondsPerTick
+export function ballFrameStartTime(frame: number, startedAt: number, millisecondsPerTick: number, aceOrder?: number | null): number {
+  return startedAt + (frame + pitcherReleaseTicksOf(aceOrder)) * millisecondsPerTick
 }
