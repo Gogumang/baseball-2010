@@ -22,6 +22,7 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
       phase: { kind: '대기', tick: 0, isPaused: false },
       ballFrame: -1,
       pitcherTick: null,
+      pitcherTickEnd: null,
     })
   })
 
@@ -53,6 +54,15 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
       atFlightEnd + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK,
     )
     expect(pitcherSideStageFrameOf(clock(atFlightEnd + 15, release)).pitcherTick).toBeNull()
+  })
+
+  it('투수 단계는 공 틱 N + 1 의 0x4e060 갱신까지만 센다 — 0x12 에서는 그 틱에 굳는다 (0x9e004 는 0xf · 0x11 에서만)', () => {
+    const release = 50
+    const atFlightEnd = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 21
+    const endStateTick = atFlightEnd - release + HUMAN_PITCH_RELEASE_STATE_TICK
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd - 1, release)).pitcherTickEnd).toBeNull()
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd, release)).pitcherTickEnd).toBe(endStateTick)
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 9, release)).pitcherTickEnd).toBe(endStateTick)
   })
 
   it('마투수는 공 틱이 0xcfbe4[순번] 단계에서 오른다 — 싸이커(0)는 상태 틱 20', () => {

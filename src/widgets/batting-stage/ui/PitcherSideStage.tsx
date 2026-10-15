@@ -133,6 +133,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     /** 빈 구질 칸 키(0x50de8 → 투수 그림 상태 2)를 본 표지와 그 장면 틱 — 새 공(상태 1)이 들면 지운다 */
     let seenIdlePress = 0
     let idleStartTick: number | null = null
+    /** 대기 동작의 마지막 갱신 틱 — 0xf 를 떠나면(0x10 조준 따위) 0x39c1c 가 안 불려 그 단계에 굳는다. 아직 0xf 면 null */
+    let idleEndTick: number | null = null
     /** 팝업 동안 멈춘 시간 — 장면 틱에서 뺀다 */
     let frozenTotal = 0
     let frozenSince: number | null = null
@@ -182,20 +184,29 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           ? null
           : cpuSwingTickOf(releaseTick, shownSwing.frame, current.acePitcher?.order ?? null)
       const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
+      // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
+      const inputKind = isIdle && !current.isPaused ? (current.inputOverlayRef?.current?.kind ?? null) : null
+      const isSkillPanelStateF = inputKind === '구질'
+      const entersStateF = isSkillPanelStateF && !wasSkillPanelStateF
+      // 0xf 진입 0x3d954 → 0x35650 → 0x340c0 — 투수 그림 객체를 상태 0 으로 (진입 표가 키보다 먼저 돈다)
+      if (entersStateF) {
+        idleStartTick = null
+        idleEndTick = null
+      }
       // 0x50de8 — 구질 목록(0xf)의 빈 칸 키. 누를 때마다 처음부터 한 바퀴(9dff8 이 단계 · 틱을 0 으로)
       const idlePress = pitchInput?.kind === '구질' ? (pitchInput.pitcherIdlePress ?? 0) : 0
       if (idlePress !== 0 && idlePress !== seenIdlePress) {
         seenIdlePress = idlePress
         idleStartTick = nowTick
+        idleEndTick = null
       }
+      // 0x9e004 는 0xf 갱신 0x39c1c 에서만 대기 동작을 센다 — 0xf 를 떠난 그림의 앞 틱에서 굳는다
+      if (idleStartTick !== null && idleEndTick === null && !isSkillPanelStateF) idleEndTick = Math.max(idleStartTick, nowTick - 1)
       // 0x4c92e — "#TIME" 은 상태 0xe · 0xf 만
       const isTimeState = isIdle && (current.isPaused || pitchInput?.kind === '구질')
       const isResult = stage.phase.kind === '결과'
       const side = current.batterSide ?? batterSideOfForm(current.batterForm)
-      // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
-      const inputKind = isIdle && !current.isPaused ? (current.inputOverlayRef?.current?.kind ?? null) : null
-      const isSkillPanelStateF = inputKind === '구질'
-      if (isSkillPanelStateF && !wasSkillPanelStateF) skillPanelStateFSerial += 1
+      if (entersStateF) skillPanelStateFSerial += 1
       wasSkillPanelStateF = isSkillPanelStateF
       const skillPanel = current.skillPanel
       const skillPanelView: SkillPanelView | null =
@@ -234,7 +245,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitch: stage.phase.kind === '대기' ? null : pitch,
         frame: stage.ballFrame,
         pitcherTick: stage.pitcherTick,
+        pitcherTickEnd: stage.pitcherTickEnd,
         pitcherIdleTick: idleStartTick === null ? null : nowTick - idleStartTick,
+        pitcherIdleTickEnd: idleStartTick === null || idleEndTick === null ? null : idleEndTick - idleStartTick,
         tick: nowTick,
         resultTick: isResult ? stage.phase.tick : 0,
         resultText: isResult && resolution !== null ? describePitchResolution(resolution) : '',

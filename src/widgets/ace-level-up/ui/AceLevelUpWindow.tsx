@@ -3,6 +3,7 @@ import { CommonPanel, FrameSprite, InsetBox, MessageBox, useImgTextPalette3 } fr
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { ACE_OPEN_TABLE } from '@/shared/config/original/aceOpen'
+import { emitMenuSparkle } from '@/widgets/particles/model/sceneParticles'
 import {
   ACE_LEVEL_UP_TEXT,
   aceLevelUpOutcomeOf,
@@ -64,12 +65,11 @@ export interface AceLevelUpWindowProps {
  * 5fc5c  0xbbc85(W/2 − 0x3c, H/2, id 2, 그림 4, 0, −1, 0, 0)   ; ptc/003.ptc 반짝이를 (60, 160) 에
  * 5fc64  0x5faf4(창, 0) 닫기 · [skin+0xd4]+0x1e3 = 0           ; 레이더 객체 도형 다시 만들기
  * ```
- * 성공 연출은 이 파티클 하나뿐이다. 그런데 이 창이 서는 메인 메뉴 장면 0x103(상태 21 · 28)은 파티클 관리자
- * [0x1400068] 를 돌리지도 그리지도 않는다 — 관리자 틱 0x6de85 · 그리기 0x6dd69 를 부르는 곳은 시즌 0xe9ac · 나리 0x1cdec ·
- * 미션 내려받기 0x1eb0c · 경기 0x32dd8 · 0x52c50 다섯뿐이다(xref 전수). 곧 원본에서도 레벨업 순간 **화면에 아무것도 안 보인다** —
- * 웹도 그리지 않는다(같음). 레이더 다시 만들기도 이 장면에 레이더가 없어 보이는 것이 없다.
- * ⚠️ 미구현: 그 이미터는 관리자 목록에 남아(모두 지우기 0x6dee5 는 경기 쪽만 부른다) 다음에 관리자를 돌리는 장면(나리 · 시즌)에
- * 들어서면 (60, 160) 에서 반짝일 것이다. 웹 나리 · 시즌 화면에는 전역 파티클 층이 없어 이 남은 반짝임은 옮기지 않았다.
+ * 성공 연출은 이 파티클 하나뿐이다. *(정정 2026-10-16)* 예전 주석은 "메인 메뉴 장면 0x103 은 관리자를 돌리지 않는다" 고 적었으나
+ * **틀렸다** — 관리자 틱 0x6de85 · 그리기 0x6dd69 를 부르는 0x32dd8 이 바로 0x103 의 그리기 스위치다(프레임 0x32fa0 이 32fe6 에서
+ * 그림마다 부르고, 모든 상태가 32f34 로 모여 32f48~32f5a 에서 파티클을 굴리고 그린다). 시즌 0x105(0xe9ac) · 나리 0x106(0x1cdec) ·
+ * 미션 선택 0x107(0x1eb0c) · 경기 0x104(0x52c50)도 돈다. 그래서 성공한 그 그림부터 (60, 160) 에서 반짝인다 — 장면 관리자
+ * (`widgets/particles` 의 `emitMenuSparkle` · `SceneParticleLayer`)에 쏜다. 레이더 다시 만들기는 이 장면에 레이더가 없어 보이는 것이 없다.
  */
 export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }: AceLevelUpWindowProps) {
   /** `skin+0x31e` — 1 = "예" 가 기본 (0x5faf4 가 1 로 되돌린다) */
@@ -86,6 +86,8 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
     if (!isYes) return onClose()
     if (outcome.kind === 'G부족') return setIsShortageOpen(true)
     onLevelUp(cell, outcome.cost)
+    // 5fc5c — (60, 160) 에 ptc/003 반짝이, 이어 5fc64 닫기
+    emitMenuSparkle()
     onClose()
   }
 

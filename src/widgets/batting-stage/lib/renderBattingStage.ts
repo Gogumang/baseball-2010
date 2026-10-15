@@ -64,6 +64,7 @@ import {
   pitcherFatigueAnimationOf,
   pitcherFatigueFrameAt,
   pitcherHomeRunMarksOf,
+  type PitcherResultCodeClock,
   pitchWindDrawCallOf,
   PITCH_WIND_ANIMATION,
   PITCH_WIND_OFFSET_X,
@@ -81,21 +82,24 @@ export interface StageScene {
   /** 공 프레임 F (0 = 릴리스). 공이 아직 손을 떠나지 않았으면 음수 */
   readonly frame: number
   /**
-   * 0x11 진입(투수 그림 객체 상태 1, 0x3de10) 뒤 흐른 틱 — 다음 0xf 진입(상태 0, 0x3d954 → 0x340c0)까지 센다.
-   * 공이 끝난 0x12 · 0x13 에도 이어져 투수는 마지막 단계 자세에 머문다. null 이면 상태 0(선 자세) 또는 대기 동작
+   * 0x11 진입(투수 그림 객체 상태 1, 0x3de10) 뒤 흐른 그림 수 — 다음 0xd · 0xf 진입(상태 0, 0x35650 → 0x340c0)까지 센다.
+   * 투수 곁 그림(바람 줄 · 홈런 갈래)의 그림 수 시계다. null 이면 상태 0(선 자세) 또는 대기 동작
    */
   readonly pitcherTick: number | null
+  /**
+   * 0x11 의 마지막 갱신 틱(`pitcherTick` 셈) — 단계(0x9e004)는 0x11 갱신에서만 오르므로 그 뒤 0x12 · 0x13 은 이 틱의 단계에 굳는다.
+   * 아직 0x11 이면 null · 안 주면 null
+   */
+  readonly pitcherTickEnd?: number | null
   /** 빈 구질 칸 키(0x50de8 → 상태 2) 뒤 흐른 틱 — 대기 동작 한 바퀴. 안 주면 없음 */
   readonly pitcherIdleTick?: number | null
+  /** 0xf 의 마지막 갱신 틱(`pitcherIdleTick` 셈) — 0x10 에 들면 대기 동작이 굳는다. 아직 0xf 면 null · 안 주면 null */
+  readonly pitcherIdleTickEnd?: number | null
   /**
-   * 상태 0x13 의 타구 — 투수 그리기 0x38d1c 의 홈런 갈래(0x3908a)가 본다: 결과 코드 [경기+0xfd4](24~26 이면 0x357e0 참) ·
-   * 큰 타구 감상 플래그 +0x199a(0x392ac) · 0x13 에 든 순간의 `pitcherTick`. 안 주면 없음
+   * 투수 그리기 0x38d1c 의 홈런 갈래(0x3908a)가 보는 것: 결과 코드 [경기+0xfd4](24~26 이면 0x357e0 참 — 0x6aa 만 쓰고 묵은 값이
+   * 다음 공까지 남는다, `PitcherResultCodeClock`) · 큰 타구 감상 플래그 +0x199a(0x392ac). 투수를 안 그리는 상태면 null · 안 주면 없음
    */
-  readonly pitcherHitMark?: {
-    readonly resultCode: number | null
-    readonly isBigHit: boolean
-    readonly pitcherTickAtHit: number
-  } | null
+  readonly pitcherHitMark?: (PitcherResultCodeClock & { readonly isBigHit: boolean }) | null
   /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 구름 */
   readonly tick: number
   /**
@@ -267,7 +271,12 @@ export function renderBattingStage(
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
   }
   const pitcherAnimation = pitcherAnimationAt(
-    { pitchTick: scene.pitcherTick, idleTick: scene.pitcherIdleTick ?? null },
+    {
+      pitchTick: scene.pitcherTick,
+      pitchEndTick: scene.pitcherTickEnd ?? null,
+      idleTick: scene.pitcherIdleTick ?? null,
+      idleEndTick: scene.pitcherIdleTickEnd ?? null,
+    },
     scene.acePitcher?.order ?? null,
   )
   // 0x38dc6 바람 줄(애니 11) — 투수와 같은 깊이 24500 이지만 먼저 넣어 투수 밑에 그려진다

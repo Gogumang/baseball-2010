@@ -156,6 +156,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let releasePending: { typeNumber: number; target: WorldPoint } | null = null
     /** 실투로 놓은 공 — 놓기 0x4dc78 이 투구 객체 +8 = 4 (4deae), 투수 그리기 0x38d1c 가 그림마다 1 줄이며 "!" 를 그린다 */
     let mistakeMarkPitch: object | null = null
+    /**
+     * 0x11 의 마지막 갱신 틱(투수 틱 셈) — 0x4e060 이 0x12 · 0x13 으로 넘긴 그림. 투수 단계 갱신 0x9e004 는 0xf · 0x11 갱신에서만
+     * 불리므로(`stageScenery` 투수 그림 객체) 그 뒤 단계가 굳는다. 아직 0x11 이면 null
+     */
+    let pitcherTickEnd: number | null = null
+    /**
+     * 결과 코드 [경기+0xfd4] — 메시지 0x6aa(스윙 · 번트 판정)만 쓰고 아무도 안 지운다(`pitcherFatigue` 홈런 갈래). 이 장면이 산 동안
+     * 이어 든다: 0x11 진입 때 남은 값 · 이 공의 판정 틱과 그 값.
+     * ⚠️ 원본은 경기 장면 하나 동안 남지만 웹은 이 장면 부품이 내려가면(타석 화면이 바뀌면) 잃는다 — 홈런더비처럼 같은 장면에서
+     * 공이 이어지는 화면에서만 묵은 코드가 보인다
+     */
+    let resultCodeBeforePitch: number | null = null
+    let judgedResultCode: { readonly tick: number; readonly code: number | null } | null = null
     /** 그 틱에 원본이 읽는 재료 — 볼카운트 · 주자 · 마구 · 투수 (`selectPitch` 와 같은 인자) */
     const cpuPitchArgsNow = (): CpuPitchArgs => {
       const { pitcherAbility, hud, onPickoff } = latestRef.current
@@ -233,6 +246,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           phaseStartedAtRef.current = now
           // 3de7c — 투수 그림 객체 상태 1(투구 동작)
           pitcherStartedAtRef.current = now
+          pitcherTickEnd = null
+          // 앞 공의 0x6aa 가 쓴 결과 코드는 그대로 남는다 (0x3de10 은 +0xfd4 를 안 지운다)
+          if (judgedResultCode !== null) resultCodeBeforePitch = judgedResultCode.code
+          judgedResultCode = null
         } else {
           return
         }
@@ -314,9 +331,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
               },
               now,
             )
-            if (phaseRef.current !== '투구중') return
+            // 0x6aa → 0x5130e 가 판정 결과를 +0xfcc~+0xfd7 에 쓴다 — 맞은 공이면 그 코드, 헛맞음이면 홈런성이 아닌 코드
+            const pitcherTickNow = pitchTickAt(now, pitcherStartedAtRef.current, tickLength)
+            // 맞은 공만 0x13('타격')으로 넘어간다 — 헛맞음은 0x11 에 남아 공 끝을 기다린다
+            const isContact = phaseRef.current !== '투구중'
+            judgedResultCode = { tick: pitcherTickNow, code: isContact ? (pendingHitRef.current?.detail.resultCode ?? null) : null }
+            if (isContact) {
+              // 0x6aa 가 0x13 을 예약한 그림 — 이 그림의 0x4e060 이 투수를 마지막으로 센다
+              pitcherTickEnd = pitcherTickNow
+              return
+            }
           } else {
-            // 0x4e24e — 공 틱 > N 이고 맞지 않았으면 0x12
+            // 0x4e24e — 공 틱 > N 이고 맞지 않았으면 0x12. 이 그림의 0x4e060 이 투수를 마지막으로 센다
+            pitcherTickEnd = pitchTickAt(now, pitcherStartedAtRef.current, tickLength)
             endPitch(now)
             return
           }
@@ -562,14 +589,17 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
         pitcherTick: pitcherStartedAt < 0 ? null : pitchTickAt(now, pitcherStartedAt, tickLength),
-        // 0x13 — 투수 그리기의 홈런 갈래(0x3908a)가 결과 코드 [+0xfd4] · 감상 플래그 +0x199a 를 본다
+        pitcherTickEnd: pitcherStartedAt < 0 ? null : pitcherTickEnd,
+        // 투수 그리기의 홈런 갈래(0x3908a)가 결과 코드 [+0xfd4] · 감상 플래그 +0x199a 를 본다 — 투수를 그리는 0x11 · 0x12 · 0x13 에서.
+        // 맞은 공의 인플레이(웹 '결과' isInPlay = 원본 0x17)는 그리기 0x46c88 이 0x38d1c 를 안 불러 없다
         pitcherHitMark:
-          pendingHit === null || pitcherStartedAt < 0
+          pitcherStartedAt < 0 || (phaseRef.current === '결과' && isInPlayResultRef.current)
             ? null
             : {
-                resultCode: pendingHit.detail.resultCode,
-                isBigHit: pendingHit.watchesBigHit,
-                pitcherTickAtHit: pitchTickAt(phaseStartedAtRef.current, pitcherStartedAt, tickLength),
+                codeBeforePitch: resultCodeBeforePitch,
+                judgedTick: judgedResultCode?.tick ?? null,
+                judgedCode: judgedResultCode?.code ?? null,
+                isBigHit: pendingHit?.watchesBigHit ?? false,
               },
         tick: nowTick,
         ...(runnerAnimationSteps === undefined ? {} : { runnerAnimationSteps }),
