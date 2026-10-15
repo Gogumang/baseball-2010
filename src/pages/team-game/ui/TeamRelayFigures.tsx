@@ -101,8 +101,9 @@ function PaintedImage({
  * 0x79d10(주자 그리기)은 프레임을 그대로, 0x79b48(야수 그리기)은 +17(투수 마선수 갈래 a ≠ 0 만 날값) — S12 4 · 8절.
  * 마선수 갈래는 그림 객체의 마선수 그림(+0x1c 타자 · +0x28 투수)을 팔레트 없이, 아니면 defender.pzx 를 그 객체 팀 벌로 칠한다.
  *
- * ⚠️ 미이식: 마선수 주자(주자 +0x9c ≠ −1) — 웹 루 칸이 누가 섰는지 안 들어 보통 그림으로 그린다. 그림 객체의 마선수 칸은
- * 하나라(적재 0x47cc8 · 갱신 0x48480 의 sim+0xa4) 원본은 마선수 주자를 그때 걸린 마타자 그림으로 그린다.
+ * **마선수 주자**(주자 +0x9c ≠ −1): 0x79d10 은 참이면 그림판 +0x1c(팔레트 없음)를 쓴다. 그 칸은 장면에 한 장뿐이라(적재 0x47cc8 의
+ * 483a0~48400 · 갱신 0x48480 485a0~485a6 의 sim+0xa4) 마선수 주자는 **그때 실린 마선수 그림**으로 선다 — 제 그림이 아닐 수 있다
+ * (원본 그대로, `TeamRelayFigures.loadedRunnerAce`). 실린 그림이 없으면 ⚠️ 미확인(원본은 빈 칸 +0x1c 를 읽는다) — 보통 그림으로 둔다.
  */
 export function TeamRelayFigures({ figures }: { readonly figures: TeamRelayFiguresValue }) {
   const center = RELAY_FIGURES_CENTER
@@ -112,12 +113,16 @@ export function TeamRelayFigures({ figures }: { readonly figures: TeamRelayFigur
   const pitcherAce = figures.pitcherAce
   return (
     <>
-      {RELAY_BASE_OFFSETS.map((offset, index) =>
-        figures.bases[index] ? (
-          <RelayFigure key={`base-${index}`} testId={`중계-주자-${index + 1}`} folder={DEFENDER_FRAMES} frame={RUNNER_FRAME}
-            paletteIndex={offensePalette} x={center.x + offset.x} y={center.y + offset.y} />
-        ) : null,
-      )}
+      {RELAY_BASE_OFFSETS.map((offset, index) => {
+        if (!figures.bases[index]) return null
+        const aceFolder = figures.aceRunners[index] && figures.loadedRunnerAce !== null
+          ? ACE_BATTER_DEFENDER_FRAMES[figures.loadedRunnerAce]
+          : undefined
+        return (
+          <RelayFigure key={`base-${index}`} testId={`중계-주자-${index + 1}`} folder={aceFolder ?? DEFENDER_FRAMES} frame={RUNNER_FRAME}
+            paletteIndex={aceFolder === undefined ? offensePalette : null} x={center.x + offset.x} y={center.y + offset.y} />
+        )
+      })}
       {pitcherAce !== null && (
         <>
           {pitcherAce >= 0 ? (

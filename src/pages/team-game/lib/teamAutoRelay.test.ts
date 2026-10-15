@@ -3,7 +3,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { FULL_PLAY_SETTINGS, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import { startTeamGame, stepAutoRelay } from '@/features/play-team-game/model/teamGameFlow'
-import { teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
+import { teamRelayEntryFiguresOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
 
 const 옵션 = {
   mode: 2,
@@ -56,8 +56,43 @@ describe('팀경기 0x21 운동장 그림의 값 (0x4258c 425bc~42812)', () => {
       atBat: {
         ours: false, orderIndex: 0, outcome: { kind: '삼진' }, fouled: false, strikes: 3, balls: 0,
         basesAtEnd: { first: false, second: true, third: false },
+        runnersAtEnd: { first: null, second: 8, third: null },
       },
     })
     expect(그림.bases).toEqual([false, true, false])
+  })
+})
+
+// 주자 그림 0x79d10 — 주자 +0x9c ≠ −1 이면 [장면+0xf24]+0x1c(실린 마선수 그림 한 장). 갱신 0x48480 485a0 이 sim+0xa4(0xc0ee8 —
+// 새 타자가 마선수면 그 번호, 아니면 −1) ≥ 0 일 때만 다시 싣는다
+describe('팀경기 0x21 마선수 주자 (0x79d10 · 0x48480 의 sim+0xa4)', () => {
+  function 마선수경기(aces: Record<number, number>) {
+    const 시작 = startTeamGame(옵션, createSeededRandom(1))
+    return {
+      ...시작,
+      opponentEntry: 시작.opponentEntry.map((entry, slot) => ({ ...entry, aceIndex: aces[slot] ?? -1 })),
+    }
+  }
+
+  it('루 위 마선수 주자는 그 루만 표시하고, 이 틱 타자가 마선수가 아니면 앞 그림까지 실린 번호를 그대로 쓴다', () => {
+    const 경기 = 마선수경기({ 8: 2 })
+    const 앞 = { ...경기.game, bases: { first: false, second: true, third: false }, runners: { first: null, second: 8, third: null } }
+    const 그림 = teamRelayFiguresOf({ progress: { ...경기, game: 앞, opponentOrderIndex: 0 }, before: 앞, atBat: null }, 4)
+    expect(그림.aceRunners).toEqual([false, true, false])
+    expect(그림.loadedRunnerAce).toBe(4)
+  })
+
+  it('이 틱 타자가 마선수면 그 그림으로 다시 싣는다 (sim+0xa4 ≥ 0)', () => {
+    const 경기 = 마선수경기({ 0: 3 })
+    const 그림 = teamRelayFiguresOf({ progress: { ...경기, opponentOrderIndex: 0 }, before: 경기.game, atBat: null }, 1)
+    expect(그림.loadedRunnerAce).toBe(3)
+  })
+
+  it('중계 진입 0x47cc8 — 타자가 아니면 가장 앞선 마선수 주자 그림을 싣는다', () => {
+    const 경기 = 마선수경기({ 7: 1, 8: 2 })
+    const 앞 = { ...경기.game, bases: { first: true, second: true, third: false }, runners: { first: 8, second: 7, third: null } }
+    const 그림 = teamRelayEntryFiguresOf({ ...경기, game: 앞, opponentOrderIndex: 0 })
+    expect(그림.loadedRunnerAce).toBe(1)
+    expect(그림.aceRunners).toEqual([true, true, false])
   })
 })
