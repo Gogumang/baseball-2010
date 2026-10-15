@@ -337,6 +337,13 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
  * ⚠️ S6 1절·DECISIONS 2026-09-20 은 "`+0x12c` 를 0 으로 쓰는 strb 가 없다" 는 전수 스캔으로 **리셋이 없다(원본 버그)**
  * 고 보았지만, 그 스캔은 memset 을 세지 않았다. 원본은 대회 끝(`0x896c` → `0x8b88: bl 0x6e0c`)에서 이 함수를 지나며
  * 플래그를 지우므로 **시즌이 막히지 않는다.** 그래서 웹도 여기서 내린다 — 지어낸 줄이 아니라 원본 memset 이다.
+ *
+ * ⚠️ **원본 버그 그대로 — 국가대항전을 치른 해는 사기가 100 으로 안 돌아간다** (r101 직접 뜸): 팀 사기 = 100 은 6ea0~6ea8
+ * `ldr r2, [this+0xa4] ; strh 0x64, [r2, #2]` 로 **장면에 들어올 때 잡아 둔 팀 레코드 포인터**에 쓴다. this+0xa4 를 쓰는 곳은
+ * 장면 진입 0xcb `0x4b50`(4b6a~4b7c `0x1f570(저장, SR[1])`) · 새 시즌 `0x5758`(57da~57e8) 둘뿐이고, 대회 중 경기 뒤 진입은
+ * S+0x12c ≠ 0 이라 `0x1f570` 이 **상대국 슬롯 base+0x934** 를 돌려준다(1f5a0). 대회 끝 `0x896c → 0x8b88 bl 0x6e0c` 사이에
+ * 다시 들어오는 진입이 없어 100 은 그 슬롯에 들어가고 리그 칸 사기는 지난해 값 그대로 이어진다. 곧 `record.nationalCup`(대회를 치른 해)
+ * 이면 사기를 그대로 둔다. (같은 포인터를 읽는 CPU 트레이드 요청 0x93c8(94a0)도 다음 경기 전까지 상대국 선수를 본다 — ⚠️ 웹 미반영)
  */
 export function startNextYear(state: SeasonState): SeasonState {
   const { record } = state
@@ -356,7 +363,8 @@ export function startNextYear(state: SeasonState): SeasonState {
       acted: false,
       popularityAtSeasonStart: record.popularity,
     },
-    teamMorale: MORALE_LIMIT,
+    // 6ea4 [this+0xa4]+2 = 100 — 대회를 치른 해는 그 포인터가 상대국 슬롯이라 리그 사기가 그대로 남는다(원본 버그)
+    teamMorale: record.nationalCup ? state.teamMorale : MORALE_LIMIT,
     teamAbilities: state.teamAbilities.map((abilities, team) =>
       team === record.teamId ? abilities : abilities.map((value) => Math.min(value + 30, TEAM_ABILITY_LIMIT)),
     ),

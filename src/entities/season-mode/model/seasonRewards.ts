@@ -84,12 +84,21 @@ export function applySeasonReward(record: SeasonRecord, reward: SeasonReward): S
  * ```
  * 성공은 두 칸을 더하고 실패는 한 칸을 뺀다 — 부호는 `burstRewardDeltasOf` 가 이미 먹였다.
  * 원본은 판정이 난 **그 자리(경기 중)** 에서 더하므로 경기 끝 평가(0x4ea0c)보다 앞이다.
+ *
+ * ⚠️ 원본 버그 그대로: 국가대항전 중(S+0x12c ≠ 0)이면 `0x1f570` 이 SR[1](리그 팀, 10 이 아님)을 **상대국 슬롯 base+0x934** 로 돌려
+ * (1f596~1f5a4) 사기는 리그 칸이 아니라 그날 상대국 칸 +2 에 쌓인다 — 그 칸은 하루 끝 0xb818c(b8216)의 `0x20648` 이 다음 상대로
+ * 새로 덮는다. `isNationalCup` 이면 사기를 리그 사기에 안 얹는다(그 칸 값은 경기 진행 `opponentTeamMorale` 이 든다).
  */
-export function applySeasonBurstRewards(state: SeasonState, deltas: readonly BurstRewardDelta[]): SeasonState {
+export function applySeasonBurstRewards(
+  state: SeasonState,
+  deltas: readonly BurstRewardDelta[],
+  isNationalCup = false,
+): SeasonState {
   return deltas.reduce<SeasonState>((current, delta) => {
     const { record } = current
     switch (delta.name) {
       case '사기':
+        if (isNationalCup) return current
         return { ...current, teamMorale: clampTo(current.teamMorale + delta.amount, MORALE_LIMIT) }
       case '인기도':
         return { ...current, record: { ...record, popularity: clampTo(record.popularity + delta.amount, POPULARITY_LIMIT) } }

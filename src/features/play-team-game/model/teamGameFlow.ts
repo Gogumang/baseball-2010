@@ -224,7 +224,7 @@ import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/p
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import { atBatResultCodeOf, quickAtBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
-import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
+import { teamRecordMoraleAfterBurst, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { rollSceneStadium, seasonNationalCupSceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 
@@ -309,6 +309,12 @@ export interface TeamGameOptions {
    * 그래서 국가대항전을 부르는 쪽은 `ourTeamId: 10` 과 함께 원래 시즌 팀을 여기에 넘겨야 한다.
    */
   readonly seasonTeamId?: number
+  /**
+   * **상대 팀 레코드 +2(사기)** — 안 넘기면 표값(`teamRecordMoraleOf`). 시즌 국가대항전 중 경기 돌발 보상 0x8e34c 종류 1 은
+   * `0x1f9a8(저장, 2, SR[1])` → `0x1f570` 이 SR[1](리그 팀)을 상대국 슬롯 `base+0x934` 로 돌려(1f5a0~1f5a4) **그 칸 +2** 에 쓴다
+   * (8e3d2~8e404, 원본 버그) — 그 칸이 곧 상대국 투수의 용량 `0x66e44` 가 읽는 레코드다. 경기 중에 `resolveBurstFor` 가 고친다
+   */
+  readonly opponentTeamMorale?: number
   /**
    * 리그 날짜 카운터 g (`리그+0x32` = `시즌+0xb2` = 시즌 레코드의 `games`) — **모드 2 에서만** 본다.
    * 시즌모드 경기 직전 화면 `0x6548` 이 `0xb8c80` 으로 양 팀 4인 로테이션을 한 칸 돌리는 자리다
@@ -1442,7 +1448,29 @@ function ourTeamMoraleOf(options: TeamGameOptions): number {
  * (`ourTeamMoraleOf` 참고). 대전모드 `[g+0xc0]`·`[g+0xc4]` 는 `0x316dc` 가 통신 버퍼에서 채운다 — 🌐 서버 값이라 표값으로 둔다.
  */
 function opponentTeamMoraleOf(options: TeamGameOptions): number {
-  return teamRecordMoraleOf(options.opponentTeamId)
+  return options.opponentTeamMorale ?? teamRecordMoraleOf(options.opponentTeamId)
+}
+
+/**
+ * 시즌모드(2) 돌발 보상 · 페널티의 **사기(종류 1)를 경기 중에** 팀 레코드 +2 에 먹인다 — 0x8e34c 모드 2 갈래 8e3c8~8e404 · 8e4ca~8e506
+ * (직접 떴다):
+ * ```
+ * 8e3d2  r0 = 0x1f55d(저장) = SR ; 8e3e8 r0 = 0x1f9a9(저장, [장면+0x22a](모드 2), SR[1])   ; → 0x1f570
+ * 8e3f0  v = ldrsh [r0, #2] + 양 ; 0x64 넘으면 0x64 · 0 밑이면 0 ; 8e404 strh [r0, #2]
+ * 1f58a  S+0x12c ≠ 0(국가대항전) 이면 팀 == 10 → base+0x918 · 그 밖 → base+0x934 ; 아니면 base+4+0x1c·팀
+ * ```
+ * SR[1] 은 리그 팀(0~9)이라 정규 · 포스트시즌은 **내 팀 레코드**(`season.morale` — 0xb570c 시즌 갈래의 사기 감소 b58ac 와 내 투수
+ * 용량이 읽는 칸), 국가대항전 중은 **그날 상대국 슬롯**(`opponentTeamMorale` — 상대국 투수 용량이 읽는 칸)이다. 다음 공부터 그 값을 본다.
+ * 시즌모드가 아니면(나리는 커리어 쪽이 따로 센다) 그대로 둔다.
+ */
+function withSeasonBurstMorale(options: TeamGameOptions, deltas: readonly BurstRewardDelta[]): TeamGameOptions {
+  if (options.mode !== TEAM_GAME_MODE.시즌 || !deltas.some((delta) => delta.name === '사기')) return options
+  if (seasonTeamIdOf(options) !== options.ourTeamId) {
+    return { ...options, opponentTeamMorale: teamRecordMoraleAfterBurst(opponentTeamMoraleOf(options), deltas) }
+  }
+  const season = options.season
+  if (season === undefined) return options
+  return { ...options, season: { ...season, morale: teamRecordMoraleAfterBurst(season.morale, deltas) } }
 }
 
 /**
@@ -4625,8 +4653,11 @@ function resolveBurstFor(
   if (progress.burst === null) return progress
   // 사구도 B5(출루)·B11 을 켠다 (0xa882a "볼 4개 || 사구" · 0xa8bf4) — burstResultBitsOf 가 '사구' 를 직접 받는다
   const resolution = resolveBurst(progress.burst, burstResultBitsOf(play))
+  // 시즌모드 사기(종류 1)는 판정 그 경기 중에 팀 레코드 +2 에 쌓인다 — 다음 공부터 용량 · 사기 감소가 본다 (`withSeasonBurstMorale`)
+  const options = resolution.deltas.length === 0 ? progress.options : withSeasonBurstMorale(progress.options, resolution.deltas)
   return {
     ...progress,
+    ...(options === progress.options ? {} : { options }),
     burst: resolution.session,
     lastBurstResolution: resolution.judgement !== null ? resolution : null,
     burstRewardDeltas:

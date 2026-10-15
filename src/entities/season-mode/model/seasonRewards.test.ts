@@ -7,6 +7,7 @@ import {
   LEAGUE_FIRST_GAME_POINTS,
   LEAGUE_FIRST_THRESHOLDS,
   NATIONAL_CUP_RUNNER_UP_TEXT_MONEY,
+  applySeasonBurstRewards,
   applySeasonReward,
   judgeSeasonEnding,
   koreanSeriesRewardOf,
@@ -147,5 +148,17 @@ describe('결산 0x6900 의 세 모드 해금 0x29 (0x6944~0x69d2)', () => {
 
   it('전역 표에 이미 열려 있으면(0x9f69d ≠ 0) 건너뛴다', () => {
     expect(opensSeasonAutobotBat(시즌(1), { ...입력, globalOpenedHiddenIds: [0x29] })).toBe(false)
+  })
+})
+
+describe('돌발 보상 0x8e34c 모드 2 — 국가대항전 중 사기는 리그 칸이 아니다', () => {
+  it('정규는 리그 사기에 더하고, 국가대항전이면 상대국 슬롯 +0x934 로 가서 리그 사기는 그대로다 (1f5a0, 원본 버그)', () => {
+    const state = { ...startNewSeason(0, 'T'), teamMorale: 40 }
+    const deltas = [{ name: '사기' as const, amount: 3 }, { name: '평판' as const, amount: 3 }]
+    expect(applySeasonBurstRewards(state, deltas).teamMorale).toBe(43)
+    const 대회 = applySeasonBurstRewards(state, deltas, true)
+    expect(대회.teamMorale).toBe(40)
+    // 평판 · 인기도 · 소지금은 SR 칸이라 대회 중에도 그대로 얹힌다
+    expect(대회.record.reputation).toBe(state.record.reputation + 3)
   })
 })

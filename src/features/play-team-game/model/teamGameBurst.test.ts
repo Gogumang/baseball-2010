@@ -5,6 +5,7 @@ import {
   applyBatterOutcome,
   closeBurstWindow,
   isBatterTurn,
+  moundStaminaOf,
   runAutoProgress,
   startTeamGame,
   summaryOf,
@@ -94,5 +95,39 @@ describe('요약의 돌발 보상 burstRewardDeltas — resolveBurst 의 deltas 
     expect(summaryOf(뒤).burstRewardDeltas).toEqual(뒤.lastBurstResolution?.deltas)
     // 창을 닫아도 요약 몫은 남는다
     expect(summaryOf(closeBurstWindow(뒤)).burstRewardDeltas).toEqual(뒤.lastBurstResolution?.deltas)
+  })
+})
+
+describe('시즌 돌발 사기(종류 1)는 경기 중 팀 레코드 +2 에 쌓인다 — 0x8e3d2 → 0x1f570 (r101)', () => {
+  /** 성공 보상에 사기가 있고 목표가 안타인 시즌 타자형 행 */
+  const 사기행 = BURST_TABLES.SEASON.slice(0, 31).find(
+    (candidate) => candidate.goal === BURST_GOAL.안타 && candidate.successRewards.some((reward) => reward.kind === 1),
+  )
+
+  it('정규 · 포스트시즌 — 내 팀 레코드(season.morale)에 바로 더해 다음 공부터 용량이 본다', () => {
+    expect(사기행).toBeDefined()
+    const { progress, random } = 돌발뜬판()
+    const 낮은사기 = { ...progress, options: { ...progress.options, season: { illness: 0, morale: 40, coach: -1 } } }
+    const 뒤 = applyBatterOutcome({ ...낮은사기, burst: { ...낮은사기.burst!, current: 사기행! } }, { kind: '안타', bases: 2 }, random)
+    const 양 = 뒤.lastBurstResolution!.deltas.filter((delta) => delta.name === '사기').reduce((sum, delta) => sum + delta.amount, 0)
+    expect(양).toBeGreaterThan(0)
+    expect(뒤.options.season?.morale).toBe(Math.min(100, 40 + 양))
+    expect(moundStaminaOf(뒤, true).teamMorale).toBe(Math.min(100, 40 + 양))
+    expect(뒤.options.opponentTeamMorale).toBeUndefined()
+  })
+
+  it('국가대항전 — 리그 칸이 아니라 그날 상대국 슬롯 +0x934 에 쓴다(원본 버그) — 리그 사기는 그대로, 슬롯은 100 에서 잘린다', () => {
+    const random = createSeededRandom(20100901)
+    const 대회 = startTeamGame(
+      { ...시즌옵션, ourTeamId: 10, opponentTeamId: 11, seasonTeamId: 0, season: { illness: 0, morale: 40, coach: -1 } },
+      random,
+    )
+    expect(isBatterTurn(대회)).toBe(true)
+    const 뜬판 = { ...대회, burst: { ...대회.burst!, current: 사기행!, triggeredCount: 1, judgement: null } }
+    const 뒤 = applyBatterOutcome(뜬판, { kind: '안타', bases: 2 }, random)
+    expect(뒤.lastBurstResolution?.judgement).toBe('성공')
+    expect(뒤.options.season?.morale).toBe(40)
+    expect(뒤.options.opponentTeamMorale).toBe(100)
+    expect(moundStaminaOf(뒤, false).teamMorale).toBe(100)
   })
 })

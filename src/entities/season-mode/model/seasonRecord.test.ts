@@ -88,6 +88,12 @@ describe('새 해 0x6e0c', () => {
     const 뒤 = startNextYear({ ...앞, record: { ...앞.record, nationalCup: true } })
     expect(뒤.record.nationalCup).toBe(false)
   })
+
+  it('국가대항전을 치른 해는 사기가 100 으로 안 돌아간다 — 6ea4 [this+0xa4] 가 상대국 슬롯을 가리킨다 (원본 버그)', () => {
+    const 앞 = startNewSeason(0, 'T')
+    const 뒤 = startNextYear({ ...앞, teamMorale: 37, record: { ...앞.record, nationalCup: true } })
+    expect(뒤.teamMorale).toBe(37)
+  })
 })
 
 describe('이벤트 날짜와 연차', () => {

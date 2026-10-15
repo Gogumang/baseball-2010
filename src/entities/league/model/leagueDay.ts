@@ -315,8 +315,9 @@ export interface LeagueAbilityContext {
   /**
    * **나리(모드 3 · 4) 사기** 0xa3a24 — 간이 엔진의 0xb570c(0xc11f0 c1308 · c1320 은 두 팀 [r7+0x78] · [r7+0x74], 0xc1818 은 수비 팀)가
    * 모드 3 · 4 갈래 b5762~b5768 에서 넘겨 받은 팀 레코드 +2 에 이 값을 쓴다 → CPU 끼리 경기도 두 팀 용량(0x66e44 `V[+2]`)이 이 값이다
-   * (`entities/career/model/nariMorale`). 시즌모드(2)는 그 쓰기가 없어(b5804 갈래) 안 넘긴다 — 없으면 100.
-   * ⚠️ 미확인: 그 팀을 0xb570c 가 아직 안 건드린 경기 첫 공 앞 0xa5e14 가 있는지(차례)는 안 뜸
+   * (`entities/career/model/nariMorale`). 시즌모드(2)는 그 쓰기가 없어(b5804 갈래) 정규 · 포스트시즌 CPU 경기는 안 넘긴다 — 없으면 100.
+   * 시즌 **국가대항전 CPU 경기**(0xc2dac)는 두 나라가 같은 상대국 슬롯 `base+0x934` 레코드를 읽어(0x1f570 1f5a0) 그 +2 가 두 팀 용량의
+   * 사기다 — 같은 날 사람 경기의 돌발 보상 종류 1 이 그 칸에 쌓은 값을 넘긴다(`useSeasonSession` 정산, 이름은 나리 때 붙은 그대로).
    */
   readonly nariMorale?: number
 }
