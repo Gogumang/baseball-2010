@@ -87,7 +87,7 @@ const ENTRY_FOOTER = { 투수: 0xf, 타자: 0x17 } as const
 const BATTER_ABILITY_LABELS = ['히트', '파워', '수비', '주루'] as const
 const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
 /** '0' 상세 창 근사 자리 — 판 (15, 55, 210, 220) 아래쪽 */
-const DETAIL_BOX = { x: 35, y: 205, width: 170, height: 60 } as const
+const DETAIL_BOX = { x: 35, y: 196, width: 170, height: 72 } as const
 
 /**
  * **엔트리 편집 화면** — 시즌 0xe0(그림 `0xb074`) · 0xdf(`0xb010`) · 일반모드 상태 23(그림 `0x2e070`) · 스페셜 에디트 29(`0x2e1e0`):
