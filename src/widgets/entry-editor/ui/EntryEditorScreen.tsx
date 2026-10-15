@@ -173,7 +173,8 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
 
       {editor.isDetailOpen && cursorRow !== undefined && (
         <div className={styles.detail} data-testid="엔트리-상세"
-          style={{ left: PANEL.x + 20, top: PANEL.y + PANEL.height - 70, width: PANEL.width - 40, height: 60 }}>
+          // 다섯 줄(이름 + 능력 넷) × 줄 높이 13 + 안쪽 여백 4 + 테두리 2 = 71 — 60 이면 넷째 능력(주루·체력)이 잘렸다 (r82)
+          style={{ left: PANEL.x + 20, top: PANEL.y + PANEL.height - 80, width: PANEL.width - 40, height: 72 }}>
           {[cursorRow.name, ...cursorRow.ability.map((value, i) => `${abilityLabels[i] ?? ''} ${value}`)].join('\n')}
         </div>
       )}
