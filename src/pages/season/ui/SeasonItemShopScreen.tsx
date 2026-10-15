@@ -37,8 +37,9 @@ export interface SeasonItemShopScreenProps {
  * 확인('5'·확인 키)에서 가드에 걸리면 1버튼 팝업, 통과하면 예/아니오(결과 0xc · 0xd). "예" 만 적용한다(0x7d90 은
  * 답 [+0x21c] == 0 일 때만 들어간다). 취소는 아이템 메뉴 0xd0.
  *
- * ⚠️ 근사: 창은 나리 상점 창(`ShopWindow`)을 빌렸다. GP 창은 원본이 5×2 격자 10칸(0x81618)이고 칸 7~9 는 비어 있어
- * 확인해도 아무 일이 없다 — 웹은 일곱 칸만 둔다(빈 칸 그림을 `ShopWindow` 가 못 그린다).
+ * 창은 나리 상점과 같은 창 0x81dc0 이다(`ShopWindow`). 격자는 5 열 × 2 줄 10칸(0x81618 의 vt+0x1c(5, 2, 1, 0x30))이고
+ * GP 창 칸 7~9 는 아이콘 표 0xd4662 가 −1 이라 바탕만 깔린 빈 칸이다 — 커서는 서지만 이름 · 값 · 설명이 없고(칸 > 6,
+ * 0x826a6 · 0x827c6 · 0x828b4) 확인해도 가드가 아무 일도 안 한다.
  */
 export function SeasonItemShopScreen({
   kind, record, teamMorale, gamePoint, initialCursor = 0, onBuySubItem, onBuyGpItem, onBack,

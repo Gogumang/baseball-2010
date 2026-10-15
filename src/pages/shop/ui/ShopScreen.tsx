@@ -193,7 +193,8 @@ export function ShopScreenView({
       )}
       {equipment === undefined ? (
         <ShopWindow
-          kind={kind}
+          // 장비 갈래(장착 · 착용 · 구장)는 위 `equipment` 가 서서 이 창이 아니다
+          kind={kind === 'GP' ? 'GP' : '서브'}
           entries={entries}
           cursor={cursor}
           onMoveCursor={setCursor}
