@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
-import { FrameSprite, SpriteNumber, useImgTextPalette4 } from '@/shared/ui'
+import type { ReactNode } from 'react'
+import { FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -100,18 +100,18 @@ function useSeasonCardFigurePose(isBatter: boolean, form: number, isAnimating: b
 /**
  * 로고 아래 · 위 딱지 [gfx+0x168] — 0x7bbda~0x7bdca (`SEASON_CARD_BADGE`). 로고가 있을 때만(0x7bbca 가 로고 갈래 안) 부른다.
  * 판 A slt_frame 9 + 팀 이름 img_text 0x41+팀(팔레트 0) · 판 B slt_frame 116 + img_text 157(팔레트 4).
+ * img_text 157 "PLAYER" 그림은 이미 팔레트 4 색(#7B797B · #525152)으로 떠 있어 따로 칠하지 않는다.
  */
 export function SeasonCardBadge({ teamId }: { readonly teamId: number }) {
   const origins = useFrameOrigins(IMG_TEXT)
-  const palette4 = useImgTextPalette4()
   const { name, title, align } = SEASON_CARD_BADGE
-  const text = (frame: number, part: typeof name | typeof title, testId: string, style?: CSSProperties) => {
+  const text = (frame: number, part: typeof name | typeof title, testId: string) => {
     const origin = origins?.[String(frame).padStart(3, '0')]
     if (origin === undefined) return null
     const { x, y } = alignedPositionOf(part.board, origin.width, origin.height, align, part.ox, part.oy)
     return (
       <img className={managementStyles.layer} alt="" data-testid={testId} data-frame={frame} data-palette={part.palette}
-        src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`} style={{ left: x + origin.x, top: y + origin.y, ...style }} />
+        src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`} style={{ left: x + origin.x, top: y + origin.y }} />
     )
   }
   const board = (part: typeof name | typeof title, testId: string) => (
@@ -121,11 +121,10 @@ export function SeasonCardBadge({ teamId }: { readonly teamId: number }) {
   )
   return (
     <div data-testid="시즌카드-딱지">
-      {palette4.definition}
       {board(name, '시즌카드-딱지-이름판')}
       {text(name.frameBase + teamId, name, '시즌카드-딱지-팀이름')}
       {board(title, '시즌카드-딱지-머리판')}
-      {text(title.frame, title, '시즌카드-딱지-머리글', palette4.style)}
+      {text(title.frame, title, '시즌카드-딱지-머리글')}
     </div>
   )
 }
