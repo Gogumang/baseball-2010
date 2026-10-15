@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { seasonParentSlotOf } from '@/pages/season/lib/seasonCommandBar'
 import { MessageBox } from '@/shared/ui'
 import { SEASON_SHOP_TEXT, seasonShopTextOf } from '@/entities/season-mode/model/seasonItemShop'
 import { ENTRY_TAB, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
@@ -46,7 +47,9 @@ const STAMINA_PICK_FOOTER = 7
  * 0x6f8c  팝업이 떠 있으면 결과 0x1d(· 0x14) → 0xdc, 아니면 '*'(0x2a) 를 빼고 0x55865(ed, 키) — 위·아래 · '0' 상세
  * 0xafd0  공통 틀 0x9f60(커맨드 줄 · 상태판 · 가운데 판 · 머리띠 0x7f4ec) → 엔트리 목록 창 0x5cfed → 0x54d95(skin, 7, 7, 0)
  * ```
- * ⚠️ 미확인: 커맨드 줄의 부모 칸 [gfx+0x15c] 은 앞 상태들이 남긴 값이라 비워 둔다.
+ * 커맨드 줄의 부모 칸 [gfx+0x15c] 은 0xe8 진입 0x5870 · 앞 상태 0xdc(0x5f3c)가 쓰지 않아 아이템 하위 메뉴 0xd0 진입 0x4d04 가
+ * 남긴 [this+0x88](4d28~4d3a `str [gfx+0x15c]`)이고 칸 수 [gfx+0x180] 은 0xdc 의 0x7e84c 가 남긴 0 이다 — 0x7e418(7e450~7e45a)이
+ * 부모 칸 '아이템'만 그린다(0xdc 화면과 같다, r99).
  */
 export function SeasonStaminaPickScreen({
   teamId, roster, nameOf, cells = SEASON_ENTRY_CELL_SOURCE, state, gamePoint, onPick, onBack,
@@ -84,7 +87,7 @@ export function SeasonStaminaPickScreen({
       slides={false}
       underlay={(
         <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={null}
-          commandBar={{ slots: NO_SLOTS, cursor: 0, parent: null }} showsHeader={false} />
+          commandBar={{ slots: NO_SLOTS, cursor: 0, parent: seasonParentSlotOf('아이템') }} showsHeader={false} />
       )}
       overlay={notice !== null && (
         <MessageBox text={notice.text} buttons={['OK']} onAnswer={() => {
