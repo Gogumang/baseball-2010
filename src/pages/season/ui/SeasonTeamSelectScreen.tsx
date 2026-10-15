@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { InputMethodText, MarkupText, MessageBox, PressArea, RawScreen } from '@/shared/ui'
+import { InputMethodText, MessageBox, PressArea, RawScreen } from '@/shared/ui'
+import { InputModeBox } from '@/shared/ui/InputMethodText/InputModeBox'
+import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
@@ -7,8 +9,9 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { nameWithoutLastChar } from '@/pages/create-player/lib/registerKeys'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
-import { INFO_BOARD } from '@/pages/management/lib/basicInfoLayout'
 import { SeasonTeamCard } from '@/pages/season/ui/SeasonTeamCard'
+import { SeasonTeamInfoPanel } from '@/pages/season/ui/SeasonTeamInfoScreen'
+import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
 
 /** 0xca 에서 고를 수 있는 칸의 끝 — 칸 > 9(히든 팀 10~14)는 힌트만 띄운다 (0x8e06 `cmp r3, #9`) */
 const LAST_PICKABLE_TEAM = 9
@@ -48,6 +51,11 @@ export interface SeasonTeamSelectScreenProps {
    * 그 값을 읽는 웹 화면이 없어(웹은 전역 모드 칸을 들지 않고 화면마다 모드를 넘긴다) 옮길 것이 없다.
    */
   readonly onExit: () => void
+  /**
+   * 이름 입력 0xc8 의 정보 칸 0x7c450 일곱 줄 — 고른 팀으로 (`seasonNameInfoRowsOf`). SR 은 0xcc 초기화 전 버퍼 값이라 부르는 쪽이
+   * 시즌 저장의 레코드(없으면 막 만든 SR `FRESH_SEASON_INFO_RECORD`)로 센다. 안 넘기면 판만 깐다
+   */
+  readonly nameInfoRowsOf?: (teamId: number) => readonly TeamInfoRow[]
 }
 
 /**
@@ -65,7 +73,9 @@ export interface SeasonTeamSelectScreenProps {
  * `50d2~50e0 [this+0x98]->vt+0x14(0, 0)` — vt+0x14 = `0x6c00c`(범위 안이면 +0xc = x · +0x10 = y) — 로 커서를 (0, 0) 에 놓는다.
  * 웹은 격자 화면이 새로 서며 0 이라 같다.
  */
-export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit, gamePoint }: SeasonTeamSelectScreenProps) {
+export function SeasonTeamSelectScreen({
+  openedHiddenIds = [], onChoose, onExit, gamePoint, nameInfoRowsOf,
+}: SeasonTeamSelectScreenProps) {
   const [hint, setHint] = useState<string | null>(null)
   /** 0xc8 에 들어선 팀 — null 이면 0xca */
   const [namingTeamId, setNamingTeamId] = useState<number | null>(null)
@@ -77,7 +87,7 @@ export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit,
 
   if (namingTeamId !== null) {
     return (
-      <SeasonTeamNameScreen teamId={namingTeamId} gamePoint={gamePoint ?? 0}
+      <SeasonTeamNameScreen teamId={namingTeamId} gamePoint={gamePoint ?? 0} infoRows={nameInfoRowsOf?.(namingTeamId) ?? []}
         onConfirm={(name) => onChoose(namingTeamId, name)} onBack={() => setNamingTeamId(null)} />
     )
   }
@@ -99,12 +109,12 @@ const NAME_LIMIT_GUIDE = ORIGINAL_MODE_TEXT[3] ?? ''
 const NAME_FRAME = { x: 29, y: 183, width: 113, height: 17 } as const
 /** 박스 2 + (2, 3) — 0xbb26 · 0xbb28 */
 const NAME_TEXT = { x: 62, y: 187 } as const
-/** 박스 2 의 (x + w − 0x14, y + 1, 14, 14) — 0xbb32~0xbb4a */
-const MODE_BOX = { x: 121, y: 185, width: 14, height: 14 } as const
+/** mode_ui 프레임 3 박스 2 (60,184,81,15) — 0xbae6~0xbaf4 `0x94a65(…, 0, 2)`. 입력 방식 칸 · 화살은 이 박스에서 센다 */
+const NAME_BOX = { x: 60, y: 184, width: 81, height: 15 } as const
+/** 박스 2 의 (x + w − 0x14, y + 1, 14, 14) — 0xbb32~0xbb4a (`InputModeBox` 의 칸과 같다) */
+const MODE_BOX = { x: NAME_BOX.x + NAME_BOX.width - 0x14, y: NAME_BOX.y + 1, width: 14, height: 14 } as const
 /** 0x1400748(0xff, 0xff, 0) — 테두리 · 이름 글 */
 const NAME_COLOR = 'rgb(255, 255, 0)'
-/** 0x1400748(r0 0x2e, r1 0x46, r2 0x94) — 입력 방식 칸 (0xbb36 · 0xbb40 · 0xbb4e, 나리 0x66 0x16160~0x16176 과 같다) */
-const MODE_BOX_COLOR = 'rgb(46, 70, 148)'
 
 interface SeasonTeamNameScreenProps {
   readonly teamId: number
@@ -113,6 +123,8 @@ interface SeasonTeamNameScreenProps {
   readonly onBack: () => void
   /** 머리띠 G — 제목이 있는 머리띠 0x54d95 는 늘 전역 G(+0x64)를 그린다 (0x550d8~0x550de) */
   readonly gamePoint: number
+  /** 정보 칸 0x7c450 일곱 줄 (`nameInfoRowsOf`) — 비면 판만 */
+  readonly infoRows: readonly TeamInfoRow[]
 }
 
 /**
@@ -140,16 +152,19 @@ interface SeasonTeamNameScreenProps {
  * 카드 0x7ba44 는 구단정보 0xd5 와 같은 팀 갈래다(`SeasonTeamCard` — 계단형 판 · 고른 팀 로고 효과 없이 · 딱지와 팀 이름 ·
  * ABILITY 판 0x5aefc 종류 0, 가운데 (178, 104), rec = 0x1f8c1(전역, 고른 팀) — 리터럴 0x7c100). 판은 0xca · 0xc8 진입이
  * 0x76705 를 안 불러 생성자 0x76610 기본값 (0x67, 0x38, 0) 이다.
- * ⚠️ 미해결(근사): 정보 칸 0x7c450 은 창+0x28 = 1(단장 줄 글을 안 쓴다)로 그리는데, 그때 시즌 레코드(SR)는 아직
- * 0xcc 초기화 전이라 줄 값의 출처를 못 정했다 — 웹은 판만 깐다. 입력 방식 글 · 화살표 기준점(0x21 / 0x24) · 안내 줄 0x55545 의
- * 자리도 못 풀었다(웹 글 칸은 입력 방식이 없다).
+ * 정보 칸 0x7c450 은 창+0x28 = 1 로 그려 줄 0 단장 값만 빠지고, 줄 값은 창+0x150 = SR(장면 초기화 3fb6~3fc0) — 0xcc 초기화 전 버퍼다
+ * (`seasonNameInfoRowsOf` · `FRESH_SEASON_INFO_RECORD`, r101). 입력 방식 칸 · 화살은 나리 등록 0x15f34(0x160e2~0x161f4)와 같은 식이라
+ * `InputModeBox` 를 같이 쓴다(bb32~bbd6: 칸 M = 박스 2 의 (x + w − 20, y + 1, 14, 14) · 0xb9e05(mode_ui 24, M, 0x21, ox −폭) ·
+ * (…, 0x24, 효과 0x11, ox 2 × 폭)). 안내 줄은 설명 띠 0x55545([this+0xa8], StrMODE[3]) — 진입 0xb8fc(b900~b914)가
+ * [띠+0x88] = 1 · [띠+0x8a] = 1 로 다시 펴 들어설 때마다 1 부터 자란다(`DescriptionBand`).
+ * 입력 방식 글 0x676f9(입력기, M.x + 2, M.y + 2 — bb68~bb8e)는 웹 글 칸에 폰 입력 방식(A/a/1/가)이 없어 옮기지 않았다.
  * ⚠️ 미확인: 창 종류 [창+0x1a4] 가 0 이라는 것은 시즌 장면이 새로 선 뒤 0xca → 0xc8 로만 온다는 데 기댄다(0xdc 를 거친 뒤 0xc8 에
  * 오는 길은 못 찾았다).
  */
 /** ⚠️ 웹 자리: OK — 바닥띠 왼쪽 표시 자리 (x 2, 47×12, 다 내려온 바닥띠 B = 320 의 B − 18) */
 const NAME_OK_PRESS_RECT = { x: 2, y: 320 - 18, width: 47, height: 12 } as const
 
-function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint }: SeasonTeamNameScreenProps) {
+function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint, infoRows }: SeasonTeamNameScreenProps) {
   const [name, setName] = useState('')
   const [isAsking, setAsking] = useState(false)
   const latest = useRef({ name, onBack })
@@ -185,21 +200,15 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint }: SeasonTe
         딱지 [창+0x168] 은 바로 앞 0xca 진입 0x50a8 이 [장면+0xd4] 로 세웠다(0x50be~0x50d0) — 늘 선다
       */}
       <SeasonTeamCard teamId={teamId} teamAbilities={TEAMS[teamId]?.values.slice(2) ?? []} hasCardBadge testIdPrefix="이름" />
-      {/* 정보 칸 0x7c450 의 판 — mode_ui 프레임 3 박스 0 (구단정보 0xd5 와 같은 판). 카드 뒤 창+0x28 = 1 로 그린다(ba4c~ba5a) */}
-      <div data-testid="이름-판" style={{
-        position: 'absolute', left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height,
-        background: INFO_BOARD.color,
-      }} />
+      {/* 정보 칸 0x7c450 — 판 mode_ui 프레임 3 박스 0 과 일곱 줄 (구단정보 0xd5 와 같다). 카드 뒤 창+0x28 = 1 로 그린다(ba4c~ba5a) */}
+      <SeasonTeamInfoPanel rows={infoRows} testIdPrefix="이름" />
       {/* 0xba015 — 박스 1 ∪ 박스 2 를 1 넓힌 노랑 테두리 (둥글기 1) */}
       <div data-testid="이름-테두리" style={{
         position: 'absolute', left: NAME_FRAME.x, top: NAME_FRAME.y, width: NAME_FRAME.width, height: NAME_FRAME.height,
         boxSizing: 'border-box', border: `1px solid ${NAME_COLOR}`, borderRadius: 1,
       }} />
-      {/* 0xba0bd — 입력 방식 칸 (박스 2 오른쪽 끝 − 20, +1, 14 × 14) 초록 칠 */}
-      <div data-testid="이름-입력방식" style={{
-        position: 'absolute', left: MODE_BOX.x, top: MODE_BOX.y, width: MODE_BOX.width, height: MODE_BOX.height,
-        background: MODE_BOX_COLOR, borderRadius: 1,
-      }} />
+      {/* 0xba0bd 입력 방식 칸 (박스 2 오른쪽 끝 − 20, +1, 14 × 14) 남색 칠 · mode_ui 24 좌우 화살 (bb32~bbd6) */}
+      <InputModeBox nameBox={NAME_BOX} />
       <form onSubmit={(event) => event.preventDefault()}>
         {/* 0x677d5(입력기, 박스 2 의 x + 2, y + 3, 앱 글꼴, 노랑, 커서 켬 1, 정렬 0x11, 0) — 0xbafc~0xbb2a. 누름 칸은 입력 방식 칸 앞까지 */}
         <InputMethodText value={name} autoFocus aria-label="이름"
@@ -209,9 +218,8 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint }: SeasonTe
             if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
           }} />
       </form>
-      <div style={{ position: 'absolute', left: 8, top: 260, width: 224 }}>
-        <MarkupText raw={`!C${NAME_LIMIT_GUIDE}`} />
-      </div>
+      {/* 설명 띠 0x55545([this+0xa8], StrMODE[3]) — bbda~bbf2. 진입 0xb8fc 가 띠를 다시 편다 */}
+      <DescriptionBand text={NAME_LIMIT_GUIDE} seed={0} />
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
       {/*
         ⚠️ 웹 자리: OK — 원본 이름 입력 그림 0xba28 에는 OK 그림 자리가 없다(키 0xbc44 의 확인만). 마우스 · 터치로 끝낼 길이 없어

@@ -38,7 +38,9 @@ export type { SeasonInfoAction, SeasonInfoMenuEntry } from '@/widgets/season/lib
 /** 시즌정보 칸 0 구단정보 0xd5 — 카드 0x7ba44 팀 갈래 + 정보 칸 0x7c450 */
 export { SeasonTeamInfoScreen } from '@/pages/season/ui/SeasonTeamInfoScreen'
 export type { SeasonTeamInfoScreenProps } from '@/pages/season/ui/SeasonTeamInfoScreen'
-export { seasonTeamInfoRowsOf, teamTypeFrameOf, stadiumLineOf } from '@/pages/season/lib/seasonTeamInfo'
+export {
+  FRESH_SEASON_INFO_RECORD, seasonNameInfoRowsOf, seasonTeamInfoRowsOf, teamTypeFrameOf, stadiumLineOf,
+} from '@/pages/season/lib/seasonTeamInfo'
 export type { TeamInfoRow, TeamInfoValue } from '@/pages/season/lib/seasonTeamInfo'
 
 /** 시즌정보 칸 1 아이템 0xd6 — 아이템 창 종류 5 (보유 서브아이템 보기) */

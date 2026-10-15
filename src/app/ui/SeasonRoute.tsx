@@ -8,7 +8,7 @@ import {
   SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
-  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
+  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, seasonNameInfoRowsOf, FRESH_SEASON_INFO_RECORD, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
   SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay, SeasonEventEndFrame,
   SeasonScreenFade,
 } from '@/pages/season'
@@ -44,7 +44,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { seasonRewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import {
-  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
+  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf, seasonTeamRankOf,
 } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
@@ -317,7 +317,14 @@ function SeasonScreens({
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
     return (
       <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []} gamePoint={session.gamePoints}
-        onChoose={actions.chooseTeam} onExit={() => onExit(5)} />
+        onChoose={actions.chooseTeam} onExit={() => onExit(5)}
+        // 0xc8 정보 칸 — SR 은 0xcc 초기화 전 버퍼(시즌 저장이 있으면 그 레코드, 없으면 막 만든 SR), 타입은 고른 팀 마스터 레코드,
+        // 순위는 SR[1] = 고른 팀(b9ee)의 0xb7aa1(SR+0x80, 팀, 0) — 경기 수 0 이면 안 쓴다
+        nameInfoRowsOf={(teamId) => seasonNameInfoRowsOf({
+          record: state?.record ?? FRESH_SEASON_INFO_RECORD,
+          teamAbilities: TEAMS[teamId]?.values.slice(2) ?? [],
+          rank: state === null ? 0 : seasonTeamRankOf({ state, league, series }, teamId),
+        })} />
     )
   }
 

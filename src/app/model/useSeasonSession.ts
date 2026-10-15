@@ -3322,6 +3322,15 @@ export interface SeasonGoalSource {
 }
 
 /**
+ * `0xb7aa0(L, 팀, 0)` — 그 팀의 지금 순위(0부터). 포스트시즌 중이면 대진 칸 순위(`goalRankOf`), 아니면 정규시즌 순위.
+ * 목표 ① · 구단정보 0xd5 줄 6 · 이름 입력 0xc8 줄 6(SR[1] = 고른 팀, b9ee) 이 같은 함수다
+ */
+export function seasonTeamRankOf(source: Pick<SeasonGoalSource, 'state' | 'league' | 'series'>, team: number): number {
+  const regularRank = Math.max(0, rankingOf(source.league).indexOf(team))
+  return goalRankOf(team, regularRank, source.state.record.inPostseason ? goalBracketOf(source.series) : null)
+}
+
+/**
  * 시즌 목표 판정 `0xa37bc` 의 입력 다섯 칸 (P4 2b · 직접 떴다):
  * ```
  * ① 0xb7aa0(L, 팀, 0)      — 포스트시즌 중이면 대진 칸 순위(`goalRankOf`), 아니면 정규시즌 순위
@@ -3348,8 +3357,6 @@ export interface SeasonGoalSource {
 export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   const { record } = source.state
   const team = record.teamId
-  const ranking = rankingOf(source.league)
-  const regularRank = Math.max(0, ranking.indexOf(team))
   const order = seasonEntryOrderOf(source.roster, source.recordOf)
   // 기록을 실은 칸(영입한 명전·나리 선수)은 그 레코드에 쌓인 표 밖 줄(원본 id)로 센다 — 기록을 못 찾은 칸은 빈 줄
   const batterLines = entryBattersOfOrder(team, order).map((batter) => {
@@ -3371,7 +3378,7 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
       : leagueRecordPitcherLineOf(source.playerStats, slot.recordId)
   })
   return {
-    rank: goalRankOf(team, regularRank, record.inPostseason ? goalBracketOf(source.series) : null),
+    rank: seasonTeamRankOf(source, team),
     wins: source.league.wins[team] ?? 0,
     losses: source.league.losses[team] ?? 0,
     teamBattingAverage: teamBattingAverageOf(batterLines),

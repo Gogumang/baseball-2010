@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SeasonTeamSelectScreen, hiddenTeamHintOf } from '@/pages/season/ui/SeasonTeamSelectScreen'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
+import { FRESH_SEASON_INFO_RECORD, seasonNameInfoRowsOf } from '@/pages/season/lib/seasonTeamInfo'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
 vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
@@ -24,7 +25,8 @@ describe('시즌 팀 고르기 0xca', () => {
 
     fireEvent.click(screen.getByRole('button', { name: TEAMS[9].name }))
     expect(onChoose).not.toHaveBeenCalled()
-    expect(document.body.textContent).toContain('한글 4글자, 영문 8글자')
+    // 안내 줄은 설명 띠 0x55545 — 진입 0xb8fc 가 띠를 다시 펴 자라는 동안은 글이 없다
+    expect(document.querySelector('[data-description-band]')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('이름'), { target: { value: '단장님' } })
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -134,9 +136,22 @@ describe('이름 입력 0xc8 그림 0xba28 — mode_ui 프레임 3 박스', () =
 
     const 자리 = (element: HTMLElement) => [element.style.left, element.style.top, element.style.width, element.style.height]
     expect(자리(screen.getByTestId('이름-테두리'))).toEqual(['29px', '183px', '113px', '17px'])
-    expect(자리(screen.getByTestId('이름-입력방식'))).toEqual(['121px', '185px', '14px', '14px'])
+    // 둥근 칠 0xba0bd 는 (w + 1) × (h + 1) — 나리 등록 0x15f34 와 같은 `InputModeBox`
+    expect(자리(screen.getByTestId('입력방식칸'))).toEqual(['121px', '185px', '15px', '15px'])
     const 글칸 = screen.getByLabelText('이름') as HTMLElement
     expect([글칸.style.left, 글칸.style.top]).toEqual(['62px', '187px'])
+  })
+
+  it('정보 칸 0x7c450 — 일곱 줄을 부르는 쪽 값으로, 줄 0 단장 값은 빈다(창+0x28 = 1)', () => {
+    const 줄 = seasonNameInfoRowsOf({ record: FRESH_SEASON_INFO_RECORD, teamAbilities: TEAMS[2].values.slice(2), rank: 0 })
+    render(<SeasonTeamSelectScreen onChoose={vi.fn()} onExit={vi.fn()} nameInfoRowsOf={() => 줄} />)
+    fireEvent.click(screen.getByRole('button', { name: TEAMS[2].name }))
+
+    expect(screen.getByTestId('이름-값-0').textContent).toBe('')
+    // 막 만든 SR — 코치 −1(0xa2e80 a2ea2) 이면 "----", 우승 · 순위는 0 이라 "--"
+    expect(screen.getByTestId('이름-값-1').textContent).toBe('----')
+    expect(screen.getByTestId('이름-값-5').textContent).toBe('--')
+    expect(screen.getByTestId('이름-값-6').textContent).toBe('--')
   })
 })
 

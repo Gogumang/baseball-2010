@@ -112,3 +112,31 @@ export function seasonTeamInfoRowsOf({ record, teamAbilities, rank }: SeasonTeam
   ]
   return TEAM_INFO_LABEL_FRAMES.map((labelFrame, index) => ({ labelFrame, value: values[index] }))
 }
+
+/**
+ * 이름 입력 0xc8 때의 시즌 레코드(SR) — 0xcc 새 시즌 초기화 **앞**이라 버퍼에 있던 값이다 (r101 직접 뜸):
+ * ```
+ * 장면 0x105 초기화 0x3b14  3e24 0x213c1(전역, 2, 0) → 21792: [전역+0xb4] 가 0 이면 0x950 바이트를 잡고 +0x11c 에 SR 생성자 0xa2e80
+ *                           (0xa2e9e memset(SR, 0, 0x210) · a2ea2 SR+0x185 = −1 코치 없음 · +0x188 · +0x18f · +0x196 = 1)
+ *                           → 21808 0x20fc0 이 시즌 저장 파일이 있으면 그 값으로 덮는다
+ *                           3e50 this+0xa0 = 0x1f55c(전역) = SR · 3fb6~3fc0 창+0x150 = SR (정보 칸 0x7c450 이 읽는 칸)
+ * 0xc8 진입 0xb8fc          b9ee SR[1] = 고른 팀 · b9d6 창+0x154 = 0x1f8c1(전역, 고른 팀) — 마스터 팀 레코드(XlsTEAM_DATA 줄)
+ * ```
+ * 그래서 시즌 저장이 없으면 줄 값은 막 만든 SR(코치 −1 · 좌석 · 구장 칸 0 · 우승 0 · 경기 수 0)이고, 저장이 남아 있으면 그 시즌의
+ * SR 이다. 타입 줄은 고른 팀의 마스터 레코드 +4~+0xa(표값)다.
+ */
+export const FRESH_SEASON_INFO_RECORD: SeasonTeamInfoInput['record'] = {
+  name: '',
+  coach: -1,
+  stadiumEquipped: [0, 0, 0],
+  regularSeasonFirsts: 0,
+  games: 0,
+}
+
+/**
+ * 이름 입력 0xc8 의 정보 칸 일곱 줄 — 0xba28 ba4c~ba5a 가 창+0x28 = 1 로 0x7c450 을 부르므로 줄 0 단장 값은 안 쓴다(0x7c6f4~0x7c724)
+ * (이름표 394 는 선다 — 그 칸 위에 이름 입력 테두리가 겹친다). 나머지는 `seasonTeamInfoRowsOf` 와 같다
+ */
+export function seasonNameInfoRowsOf(input: SeasonTeamInfoInput): readonly TeamInfoRow[] {
+  return seasonTeamInfoRowsOf(input).map((row, index) => (index === 0 ? { ...row, value: { kind: '글', text: '' } } : row))
+}
