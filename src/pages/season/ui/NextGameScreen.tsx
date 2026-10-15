@@ -1,9 +1,8 @@
-import { Button, RawScreen } from '@/shared/ui'
+import { PressArea, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { League } from '@/entities/league/model/league'
 import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
-import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 export interface NextGameScreenProps {
@@ -43,7 +42,8 @@ export interface NextGameScreenProps {
  * 상태판도 안 부른다). 상태별 덧그림 0xef46~0xef98 도 0xd9·0xdc·0xe2 만 본다.
  *
  * ⚠️ **미해결·근사**
- *   - 확인·취소 단추는 원본 소프트키 배치를 안 읽은 근사다 (키 −5·'5'·−16 은 원본 그대로 받는다).
+ *   - ⚠️ 웹 자리: 확인(−5)은 원본 화면에 그림 자리가 없다 — 화면 전체 투명 누름 칸으로 받는다. 취소는 바닥띠 되돌아가기
+ *     (관리 메뉴에서 왔을 때만 그린다 — 그 밖에는 원본도 아무 일이 없다).
  * *   - 순위표 줄 끝 이미지 106(내 팀 표시로 보임)은 `StandingsWindow` 에 아직 없다(P6 4a-2 조건 미확인).
  */
 export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, gamePoint }: NextGameScreenProps) {
@@ -55,12 +55,8 @@ export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, 
       <SkinBackdrop kind="공무늬" />
       <StandingsWindow league={league} onClose={onConfirm} />
 
-      <Button variant="corner" className={styles.cornerButton} onClick={onConfirm}>
-        확인
-      </Button>
-      <Button variant="corner" className={styles.cornerButton} style={{ left: 'auto', right: 4 }} onClick={onCancel}>
-        취소
-      </Button>
+      {/* ⚠️ 웹 자리: 확인 — 웹 [확인]·[취소] 단추를 걷고 화면 전체 투명 칸으로. 바닥띠 되돌아가기는 그 위에 남는다 */}
+      <PressArea label="확인" onPress={onConfirm} />
 
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isFromManagement ? onCancel : null} slides={false} />
     </RawScreen>

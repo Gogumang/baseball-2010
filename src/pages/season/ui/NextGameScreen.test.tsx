@@ -27,13 +27,14 @@ describe('다음경기 화면 0xd8', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
-  it('확인·취소 단추도 같은 일을 한다', () => {
+  it('웹 단추 없이 — 화면 누름 칸이 확인, 바닥띠 되돌아가기가 취소다', () => {
     const onConfirm = vi.fn()
     const onCancel = vi.fn()
     render(<NextGameScreen league={EMPTY_LEAGUE} onConfirm={onConfirm} onCancel={onCancel} isFromManagement gamePoint={0} />)
 
+    expect(screen.queryByRole('button', { name: '취소' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
-    fireEvent.click(screen.getByRole('button', { name: '취소' }))
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).toHaveBeenCalledTimes(1)

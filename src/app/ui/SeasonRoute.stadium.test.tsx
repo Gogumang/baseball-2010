@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { useEffect } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { useGameSettings } from '@/app/model/useGameSettings'
@@ -42,7 +43,10 @@ vi.mock('@/pages/team-game/ui/TeamGameScreen', () => ({
   },
 }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 function 메모리저장(초기: unknown = null): JsonStorePort {
   let held = 초기
@@ -81,6 +85,7 @@ function 시즌화면({ store }: { readonly store: JsonStorePort }) {
 /** "다음경기" 확인 → 마선수 고르기 0xd7 → 경기정보 0xdd → 경기(0xe1 → 0x104)까지 간다 */
 function 경기를연다(record: SeasonRecord) {
   받은Prop.값 = undefined
+  vi.useFakeTimers()
   render(<시즌화면 store={메모리저장({ state: { record } })} />)
   // 다음경기 0xd8 의 확인 (키 0x48d0 −5) → 0xd7 경기 전 마선수 고르기
   fireEvent.click(screen.getByRole('button', { name: '확인' }))
@@ -91,6 +96,10 @@ function 경기를연다(record: SeasonRecord) {
   fireEvent.click(열린칸())
   // 0xdd 경기정보 — 처음이라 경기진행 설정 창이 저절로 열린다. CLR 로 닫고 경기 시작
   fireEvent.keyDown(window, { key: 'Escape' })
+  // 경기정보 누름 칸은 키를 보낸다 — 들어올 때 연출(머리띠 · 배너 · 값 줄 펼침)이 끝나야 받는다(0x83de)
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * 40)
+  })
   fireEvent.click(screen.getByRole('button', { name: '경기 시작' }))
   return 받은Prop.값
 }

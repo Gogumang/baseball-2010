@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
@@ -13,7 +13,6 @@ import type {
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /**
@@ -104,7 +103,7 @@ const NO_CHAMPION = 0xf
  * 어긋나는 것은 국가대항전 준우승 쪽(StrMODE[200])이고, 그 버그는 `seasonRewards.ts` 가 이미
  * 그대로 옮겨 두었다. 여기서는 표시값을 **실제로 더하는 보상값에서 뽑아** 두 값이 늘 같게 했다.
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 아래 설명 줄과 단추는 원본에 없다(소프트키 몫).
+ * ⚠️ 웹 자리: 다음 키(경기 · 결과)는 화면 전체 투명 누름 칸이 받는다 — 원본 설명 줄 · 단추가 없어 걷었다.
  * 대진표 좌표는 P6 4a-1 확정값이라 근사하지 않았다.
  */
 export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
@@ -161,15 +160,11 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
       {/* 대진표 0x853ac 끝의 0x7f4ec — 공통 틀 0xb810 이 0xef 에 맡긴 (제목 10 시즌모드, 바닥 1 — 되돌아가기 없음) */}
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={1} slides={false} />
 
-      <div className={styles.caption} style={{ left: 0, top: 276, width: 240 }}>
-        {isFinished
-          ? `한국시리즈 우승 ${championName}`
-          : `포스트시즌 ${series === null ? '' : series.round} 진행 중`}
-      </div>
-
-      <Button variant="corner" className={styles.cornerButton} onClick={onPressNext}>
-        {isFinished ? '결과' : '경기'}
-      </Button>
+      {/*
+        ⚠️ 웹 자리: "경기" · "결과" 키 — 원본 화면에 그림 자리가 없다. 웹 단추와 설명 줄을 걷고 화면 전체 투명 누름 칸으로 받는다.
+        팝업이 떠 있으면 팝업이 키를 받는다(`onPressNext` 가 대진표 단계에서만 듣는다)
+      */}
+      {phase === '대진표' && <PressArea label={isFinished ? '결과' : '경기'} onPress={onPressNext} />}
 
       {phase === '해금알림' && (
         <MessageBox
