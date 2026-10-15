@@ -17,6 +17,7 @@ import type {
   DefensePlayState,
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { drawnFieldingErrorsOf, type DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
 import { runInCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -92,6 +93,11 @@ interface DefensePlaybackProps {
   /** 마지막 틱까지 다 보여 준 뒤. 실시간 갈래는 그 플레이의 결과를 함께 넘긴다 */
   readonly onDone: (result?: DefensePlayResult) => void
   /**
+   * 이 판의 그림들이 올린 **실책 +0x2e** (야수 그리기 0x43278 4381a~43904 — `features/defense-play/model/fieldingErrors`).
+   * 그린 틱마다 세어 두었다가 `onDone` **바로 앞에** 한 번 넘긴다(없으면 안 부른다). 키 건너뛰기(+0xfe7)로 안 그린 틱은 안 센다
+   */
+  readonly onFieldingErrors?: (errors: readonly DrawnFieldingError[]) => void
+  /**
    * 시즌 구장 잔디 — `stadium/defense.mpl` 줄 (`0x7885c`). `DefenseScreen` 과 같은 뜻이다.
    * 시즌 **홈경기**에서만 값이 오고, 그 밖에는 null(구운 그림 = 칸 3 특급천연잔디)이다.
    */
@@ -157,6 +163,7 @@ export function DefensePlayback({
   runnerPlay,
   side,
   onDone,
+  onFieldingErrors,
   grassPalette = null,
   runScoreBoard,
   sceneMemory,
@@ -169,6 +176,7 @@ export function DefensePlayback({
         input={input}
         side={side}
         onDone={onDone}
+        onFieldingErrors={onFieldingErrors}
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoard}
         sceneMemory={sceneMemory}
@@ -179,7 +187,13 @@ export function DefensePlayback({
   }
   if (runnerPlay !== undefined) {
     return (
-      <LiveRunnerPlayback play={runnerPlay} onDone={onDone} grassPalette={grassPalette} runScoreBoard={runScoreBoard}>
+      <LiveRunnerPlayback
+        play={runnerPlay}
+        onDone={onDone}
+        onFieldingErrors={onFieldingErrors}
+        grassPalette={grassPalette}
+        runScoreBoard={runScoreBoard}
+      >
         {children}
       </LiveRunnerPlayback>
     )
@@ -188,6 +202,7 @@ export function DefensePlayback({
     <RecordedPlayback
       ticks={ticks ?? []}
       onDone={onDone}
+      onFieldingErrors={onFieldingErrors}
       grassPalette={grassPalette}
       runScoreBoard={runScoreBoard}
       freePassPlay={freePassPlay}
@@ -271,6 +286,7 @@ const RECORDED_PARTICLE_SEED = 0x36dfc
 interface RecordedPlaybackProps {
   readonly ticks: readonly DefenseViewState[]
   readonly onDone: (result?: DefensePlayResult) => void
+  readonly onFieldingErrors?: (errors: readonly DrawnFieldingError[]) => void
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
   readonly freePassPlay: boolean
@@ -368,7 +384,9 @@ function stepRecordedBoard(
  * 와 그것으로 본다(견제는 앞 공의 값이 남아 홈런 뒤 첫 공 앞 견제면 참이다). ⚠️ 그 값이 없는 재생(패턴 없이 온 홈런 재생)은
  * "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
  */
-function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePassPlay, children }: RecordedPlaybackProps) {
+function RecordedPlayback({
+  ticks, onDone, onFieldingErrors, grassPalette, runScoreBoard, freePassPlay, children,
+}: RecordedPlaybackProps) {
   const update = useUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
@@ -377,6 +395,12 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
   if (tallyRef.current === null || tallyRef.current.ticks !== ticks) {
     tallyRef.current = { ticks, tally: EMPTY_RECORDED_TALLY }
   }
+  /** 그린 틱이 올린 실책 (0x43278) — 재생 묶음이 바뀌면 비운다 */
+  const errorsRef = useRef<{ readonly ticks: readonly DefenseViewState[]; readonly errors: DrawnFieldingError[] } | null>(null)
+  if (errorsRef.current === null || errorsRef.current.ticks !== ticks) {
+    errorsRef.current = { ticks, errors: [] }
+  }
+  const drawnErrors = errorsRef.current.errors
   // 주자 판은 판이 열린 때의 [경기+0xfd4] 를 싣고 온다(`sceneResultCode` — null 은 정해지지 않은 값이라 거짓으로 본다).
   // 싣지 않은 재생은 타자주자(칸 0)가 달리는 재생 = 홈런 비행. 밀어내기 판(종류 2)은 타자주자를 싣지만 홈런이 아니다
   const sceneResultCode = ticks[0]?.sceneResultCode
@@ -415,12 +439,20 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
     playRunInCheers(holder.tally, isHomeRun)
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 파티클 · 프레임 끝 파티클 틱. 0x35108 로 끝난 갱신은 안 그린다
     if (!holder.tally.ended) drawBallParticles(particles.run, view, cameraOffsetRef.current, particles.random)
+    // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
+    if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
   const isFinished = ticks.length === 0 || holder.tally.ended || skipped
   if (isFinished) clearBallParticles(particles.run)
 
+  // 넘길 곳은 늘 최신 것 — 부르는 쪽이 그릴 때마다 새 함수를 줘도 끝(onDone)을 다시 부르지 않게 의존에서 뺀다
+  const onFieldingErrorsRef = useRef(onFieldingErrors)
+  onFieldingErrorsRef.current = onFieldingErrors
   useEffect(() => {
-    if (isFinished) onDone()
+    if (!isFinished) return
+    if (drawnErrors.length > 0) onFieldingErrorsRef.current?.(drawnErrors)
+    onDone()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 실책 묶음은 재생 묶음(ticks)마다 하나다
   }, [isFinished, onDone])
 
   const tickState = ticks[index]
@@ -448,6 +480,7 @@ function RecordedPlayback({ ticks, onDone, grassPalette, runScoreBoard, freePass
 interface LiveRunnerPlaybackProps {
   readonly play: LiveRunnerPlay
   readonly onDone: (result?: DefensePlayResult) => void
+  readonly onFieldingErrors?: (errors: readonly DrawnFieldingError[]) => void
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
@@ -458,7 +491,7 @@ interface LiveRunnerPlaybackProps {
  * 눌린 키를 줄 세워 한 틱에 하나씩 진행기에 먹이고(상태 0x17 키 0x53420 → 송구 0x588 → +0x160), 관문이 닫힌 뒤로는 재생 갈래와
  * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
  */
-function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
+function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
   const update = useUpdateCounter(true)
   const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(
     null,
@@ -477,6 +510,12 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
   if (particlesRef.current === null || particlesRef.current.play !== play) {
     particlesRef.current = { play, run: startBallParticleRun() }
   }
+  /** 그린 틱이 올린 실책 (0x43278) — 판이 바뀌면 비운다 */
+  const errorsRef = useRef<{ readonly play: LiveRunnerPlay; readonly errors: DrawnFieldingError[] } | null>(null)
+  if (errorsRef.current === null || errorsRef.current.play !== play) {
+    errorsRef.current = { play, errors: [] }
+  }
+  const drawnErrors = errorsRef.current.errors
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -516,12 +555,19 @@ function LiveRunnerPlayback({ play, onDone, grassPalette, runScoreBoard, childre
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 튐 파티클 · 프레임 끝 파티클 틱(경기 난수 — 그 틱 진행기 굴림 뒤).
     // 0x35108 로 끝난 갱신은 안 그린다. ⚠️ 판 틱을 미리 몇 틱 앞서 돌린 갱신(따라잡기)은 굴림 차례가 그 틱들 뒤로 몰린다(근사)
     if (!holder.tally.ended && random !== undefined) drawBallParticles(particles.run, view, cameraOffsetRef.current, random)
+    // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
+    if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
   const isFinished = stepper.finished && holder.tally.ended
   if (isFinished) clearBallParticles(particles.run)
 
+  const onFieldingErrorsRef = useRef(onFieldingErrors)
+  onFieldingErrorsRef.current = onFieldingErrors
   useEffect(() => {
-    if (isFinished) onDone(stepper.result())
+    if (!isFinished) return
+    if (drawnErrors.length > 0) onFieldingErrorsRef.current?.(drawnErrors)
+    onDone(stepper.result())
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 실책 묶음은 판(play)마다 하나다
   }, [isFinished, onDone, stepper])
 
   const tickState = ticks[Math.min(Math.max(0, seen), lastIndex)]
@@ -550,6 +596,7 @@ interface LivePlaybackProps {
   readonly input: DefensePlayInput
   readonly side?: ControlSide
   readonly onDone: (result?: DefensePlayResult) => void
+  readonly onFieldingErrors?: (errors: readonly DrawnFieldingError[]) => void
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
   readonly sceneMemory?: { current: DefenseSceneMemory }
@@ -569,7 +616,7 @@ interface RunScoreBoardView {
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
 function LivePlayback({
-  input, side, onDone, grassPalette, runScoreBoard, sceneMemory, children,
+  input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children,
 }: LivePlaybackProps) {
   const update = useUpdateCounter(true)
   const stateRef = useRef<DefensePlayState | null>(null)
@@ -586,6 +633,11 @@ function LivePlayback({
    * 따라잡을 때 같은 갱신 안에서 두 번 보지 않게 여기서도 한 번으로 막는다.
    */
   const fumbleSoundPlayedRef = useRef(false)
+  /** 그린 틱이 올린 실책 (야수 그리기 0x43278 4381a~43904) · 이미 본 진행기 틱 수 */
+  const drawnErrorsRef = useRef<DrawnFieldingError[]>([])
+  const seenTickCountRef = useRef(0)
+  const onFieldingErrorsRef = useRef(onFieldingErrors)
+  onFieldingErrorsRef.current = onFieldingErrors
   /**
    * 득점 점수판 칸 — 타이머 [+0x10f8] · 수 [+0x10fc] · 간격 [+0x1101] · 홈런 판 [+0x1100] (`lib/runScoreBoard`).
    * 메시지 0x13(1점)마다 0x357e0 이면 홈런 갈래, 아니면 타이머 20 — 그릴 때마다 줄인다. 판이 닫힌 뒤에도 0x35108 까지 그린다.
@@ -643,6 +695,8 @@ function LivePlayback({
       startedAtRef.current = update
       pressesRef.current = []
       fumbleSoundPlayedRef.current = false
+      drawnErrorsRef.current = []
+      seenTickCountRef.current = 0
       boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
       closedCountRef.current = 0
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
@@ -731,6 +785,13 @@ function LivePlayback({
       // 사람 키 갈래에만 있고 진행기가 이미 걸었다 — 자동 갈래(0x5268c)는 잠금이 없어 여기서도 안 막는다.
       // 원본 입구는 예약 0x6e498 이지만 그것도 지금 소리를 끊는 한 칸이라 통로 하나 `play` 와 같다.
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
+      // 이 틱의 그림(G3) 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e. 건너뛰는 동안(+0xfe7)은 그리지 않아 안 센다.
+      // 판 끝 틱이 함께 찍은 "G2 만 닫힌 그림"(`closingListFrame`)도 목록 틱을 돌고 그리는 그림이라 센다
+      for (let at = seenTickCountRef.current; at < running.ticks.length; at += 1) {
+        const drawn = running.ticks[at]
+        if (drawn !== undefined && !running.fastForward) drawnErrorsRef.current.push(...drawnFieldingErrorsOf(drawn.fielders))
+      }
+      seenTickCountRef.current = running.ticks.length
     }
     stateRef.current = running
     // 건너뛰기가 이 그림 안에서 여러 틱을 돌고 판 끝 전에 풀리면(카메라 3f17e) 다음 그림부터는 다시 한 그림에 한 틱이다 — 앞서 돈 틱만큼
@@ -804,6 +865,7 @@ function LivePlayback({
     effectsRef.current = endDefenseEffects(effectsRef.current, particlesRef.current)
     if (sceneMemory !== undefined) sceneMemory.current = sceneMemoryOf(effectsRef.current)
     const state = stateRef.current
+    if (drawnErrorsRef.current.length > 0) onFieldingErrorsRef.current?.(drawnErrorsRef.current)
     onDone(state === null ? undefined : defensePlayResultOf(state))
   }, [ended, onDone, sceneMemory])
 

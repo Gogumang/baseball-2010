@@ -575,6 +575,8 @@ export function PitcherGameScreen({
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
+        // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
+        onFieldingErrors={actions.recordFieldingErrors}
         onDone={actions.finishDefensePlay}
       />
     )
@@ -586,6 +588,7 @@ export function PitcherGameScreen({
         runnerPlay={progress.pendingRunnerPlay}
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
+        onFieldingErrors={actions.recordFieldingErrors}
         onDone={actions.finishRunnerPlay}
       />
     )
@@ -593,7 +596,13 @@ export function PitcherGameScreen({
   // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
   if (isReplaying) {
     return (
-      <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} grassPalette={grassPalette} />
+      <DefensePlayback
+        ticks={play.ticks}
+        onDone={finishPlayback}
+        onFieldingErrors={actions.recordFieldingErrors}
+        freePassPlay={isWalkPlayResult(play)}
+        grassPalette={grassPalette}
+      />
     )
   }
   // 자동진행 중계(0x21) — 굴려 둔 틱을 매 틱 한 칸씩 (모드 3: 키 · 속도 · 배경음 없음)

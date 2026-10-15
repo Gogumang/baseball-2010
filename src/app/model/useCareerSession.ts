@@ -7,7 +7,8 @@ import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { arrivePitch, cpuPickoff, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
+import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -1447,6 +1448,19 @@ export function useCareerSession({
 
     /** 수비 화면이 끝났다 — 주자 처리를 이제 먹인다 */
     finishDefensePlay,
+
+    /**
+     * 수비 그림(0x43278)이 올린 실책 +0x2e — 화면이 판 끝(`finishDefensePlay` 바로 앞)에 넘긴다. 난수 · 소리 없음.
+     * ⚠️ 경기를 끝낸 재생 판(견제 · 도루 판 등 미리 돈 판)은 정산(`finishGame`)이 재생보다 먼저라 그 판의 실책이 요약에 안 든다
+     */
+    recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => {
+      const current = progressRef.current
+      if (current === null) return
+      const next = recordDrawnFieldingErrors(current, errors)
+      if (next === current) return
+      progressRef.current = next
+      setProgress(next)
+    },
 
     /**
      * 도루 출발 (원본 키 '3' 1루 · '2' 2루 · '1' 3루 주자 → `0x53610` → 0x583 → `0xa9bd4`).

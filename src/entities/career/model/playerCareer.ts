@@ -29,6 +29,8 @@ import {
 import { BATTER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
+  recordLeagueErrors,
+  recordLeagueFreePasses,
   recordLeaguePlateAppearances,
   recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
@@ -78,7 +80,7 @@ export type SeasonEndState = 136 | 130 | 131 | 128 | 132 | 109 | 116 | 137 | 133
  * 평가를 둔다. 경기마다 덮어쓴다.
  */
 export interface NariLastGame {
-  readonly summary: Omit<GameSummary, 'leaguePlateAppearances' | 'leagueStolenBases' | 'leaguePitchers' | 'pitcherStaminas'>
+  readonly summary: Omit<GameSummary, 'leaguePlateAppearances' | 'leagueStolenBases' | 'leagueErrors' | 'leaguePitchers' | 'pitcherStaminas'>
   /**
    * 116 이 읽는 S+0x4a · +0x64 · +7 과 그 감독 글. 평가 0xa719c 가 도는 정규시즌 경기만 덮어쓰므로 포스트시즌 경기 뒤에는
    * **앞 평가 경기 값**이다(감독 글은 116 이 그 +0x4a 와 지금 평판으로 다시 고른다).
@@ -899,15 +901,23 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     // 세고 있어 두 번 세지 않으려는 것이다 (순위표를 만들 때 `myLeagueRecordOf` 로 끼워 넣는다).
     // 미션·홈런더비처럼 리그 밖 경기는 이 칸을 주지 않으므로 그때는 표가 그대로다.
     // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 정규시즌 경기만 (0xa56dc 의 포스트시즌 거짓)
-    leaguePlayerStats: recordHumanGamePitchers(
-      recordLeagueStolenBases(
-        // 동료 · 상대 타석의 레코드 줄도 같은 게이트(0xa56dc — 타자마다)라 포스트시즌이면 안 쌓인다
-        recordLeaguePlateAppearances(career.leaguePlayerStats, regularSeason ? summary.leaguePlateAppearances ?? [] : []),
-        // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만
-        regularSeason ? summary.leagueStolenBases ?? [] : [],
+    leaguePlayerStats: recordLeagueErrors(
+      recordLeagueFreePasses(
+        recordHumanGamePitchers(
+          recordLeagueStolenBases(
+            // 동료 · 상대 타석의 레코드 줄도 같은 게이트(0xa56dc — 타자마다)라 포스트시즌이면 안 쌓인다
+            recordLeaguePlateAppearances(career.leaguePlayerStats, regularSeason ? summary.leaguePlateAppearances ?? [] : []),
+            // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만
+            regularSeason ? summary.leagueStolenBases ?? [] : [],
+          ),
+          summary.leaguePitchers,
+          regularSeason,
+        ),
+        // 사사구 +0x2a — 정산 꼬리 a8b04~a8bee 는 게이트 0xa56dc 밖이라 포스트시즌에도 쌓인다
+        summary.leaguePitchers?.lines ?? [],
       ),
-      summary.leaguePitchers,
-      regularSeason,
+      // 실책 +0x2e — 수비 그림 0x43278 은 게이트가 없다(포스트시즌에도)
+      summary.leagueErrors ?? [],
     ),
     // 두 팀 투수 레코드 +0x2c 는 경기 끝 값이 남는다 — 준비 0x1c46c 가 g == 0 이면 열 팀을 10000 으로 채운 뒤다
     ...(summary.pitcherStaminas === undefined

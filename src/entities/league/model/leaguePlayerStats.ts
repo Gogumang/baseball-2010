@@ -47,6 +47,15 @@ export interface LeagueBatterLine {
    * CPU 경기 0xc1818 끝(0xc1a42~0xc1a98, 성공한 도루의 주자마다)이 올린다. 옛 저장에는 없어 0 으로 본다.
    */
   readonly steals?: number
+  /**
+   * +0x2e 실책 — 정산이 아니라 **수비 화면(상태 0x17) 그리기 0x43278** 이 야수 아홉([경기+0x111c+4i], i = 8..0)을 그릴 때 올린다:
+   * 동작 잠금 +0xb4 > 0 이 아니고(437a4) 펌블 카운터 +0xb8 == 6(4381a~43852) 또는 +0xb8 ≤ 0 이고 악송구 카운터 +0xc0 == 4
+   * (438c4~43904)면 `[야수+0xec]+0x2e += 1`(0..9999). 야수 +0xec 는 수비 팀 레코드 차례에서 자리 니블(+0x1c & 0xf)이 칸 + 1 인
+   * 첫 타자(판 시작 0xb0fb4 b1032~b1188 — 칸 1~8, 칸 0 은 공수 교대 판 0x3fac4 3fe1a~3fe4c 의 니블 1 = **지명타자**).
+   * 게이트(0xa56dc)가 없어 포스트시즌에도 쌓이고, 그림이 돌지 않는 CPU 끼리 경기 · 자동진행 · 키 건너뛰기(+0xfe7) 동안은 안 쌓인다.
+   * 옛 저장에는 없어 0 으로 본다.
+   */
+  readonly errors?: number
 }
 
 export const EMPTY_LEAGUE_BATTER_LINE: LeagueBatterLine = {
@@ -82,6 +91,13 @@ export interface LeaguePitcherLine {
   readonly wins: number
   /** +0x2f 패 */
   readonly losses: number
+  /**
+   * +0x2a 사사구 — 정산 0xa8024 공통 꼬리: 볼넷 a8b04 `state[5](볼) > 3` → a8b44~a8b74, 사구 a8b88 `state[0x12]` → a8bd2~a8bee 가
+   * 수비 팀(state[0xa])의 **지금 마운드 투수**(0xae83d) +0x2a 를 +1(0..9999). 앞머리 게이트 0xa56dc 를 안 봐 포스트시즌에도 쌓인다.
+   * 볼을 넷째로 세는 곳은 사람 투구 판정 0x3dfac(3e1ae `state[5]++`)뿐이고 간이 엔진 판정 0x9d57c 의 포볼(c1918)은 볼을 3 에서
+   * 안 올려(c18d4 는 볼 ≤ 2 일 때만) CPU 끼리 경기 · 동료 · 자동진행 타석의 볼넷은 **안 센다**(원본 그대로). 옛 저장에는 없어 0.
+   */
+  readonly walks?: number
 }
 
 export const EMPTY_LEAGUE_PITCHER_LINE: LeaguePitcherLine = {
@@ -208,6 +224,8 @@ function addPlateAppearance(
     homeRuns: line.homeRuns + (outcome.kind === '홈런' ? 1 : 0),
     runsBattedIn: line.runsBattedIn + runsBattedIn,
     ...(line.steals === undefined ? {} : { steals: line.steals }),
+    // +0x2e 실책은 수비 그림이 쌓는다 (`recordLeagueErrors`) — 여기서는 그대로 둔다
+    ...(line.errors === undefined ? {} : { errors: line.errors }),
     // a8520~a85ac — 2루타 +0x24 · 3루타 +0x26 (9999 상한)
     ...(outcome.kind === '안타' && outcome.bases === 2
       ? { doubles: Math.min(EXTRA_BASE_HIT_LIMIT, (line.doubles ?? 0) + 1) }
@@ -245,6 +263,43 @@ export function recordLeagueStolenBases(
     }
     const id = leagueBatterIdOf(steal.teamId, steal.battingOrderIndex)
     batters[id] = addSteal(batters[id] ?? EMPTY_LEAGUE_BATTER_LINE)
+  }
+  return recordBatters === undefined ? { ...stats, batters } : { ...stats, batters, recordBatters }
+}
+
+/** 실책 한 번 — 어느 팀 어느 로스터 칸(또는 표 밖 선수 id)의 야수 레코드(+0xec)에 매기는가 */
+export interface LeagueFieldingError {
+  readonly teamId: number
+  /** 그 야수 레코드의 로스터 칸 (`LeaguePlateAppearance.battingOrderIndex` 와 같은 뜻) */
+  readonly battingOrderIndex: number
+  /** 붙박이 표 밖 선수(영입한 명전·나리)의 원본 id */
+  readonly recordId?: number
+}
+
+/** 0x43838~0x43852 · 0x438e4~0x43904 의 `0x270f` 상한 */
+const ERROR_LIMIT = 9999
+
+const addError = (line: LeagueBatterLine): LeagueBatterLine => ({
+  ...line,
+  errors: Math.min(ERROR_LIMIT, (line.errors ?? 0) + 1),
+})
+
+/** 실책을 +0x2e 에 쌓는다 (수비 그림 0x43278 4381a~43904 — `LeagueBatterLine.errors`). 게이트가 없다 */
+export function recordLeagueErrors(
+  stats: LeaguePlayerStats,
+  errors: readonly LeagueFieldingError[],
+): LeaguePlayerStats {
+  if (errors.length === 0) return stats
+  const batters: Record<number, LeagueBatterLine> = { ...stats.batters }
+  let recordBatters: Record<number, LeagueBatterLine> | undefined
+  for (const error of errors) {
+    if (error.recordId !== undefined) {
+      recordBatters ??= { ...stats.recordBatters }
+      recordBatters[error.recordId] = addError(recordBatters[error.recordId] ?? EMPTY_LEAGUE_BATTER_LINE)
+      continue
+    }
+    const id = leagueBatterIdOf(error.teamId, error.battingOrderIndex)
+    batters[id] = addError(batters[id] ?? EMPTY_LEAGUE_BATTER_LINE)
   }
   return recordBatters === undefined ? { ...stats, batters } : { ...stats, batters, recordBatters }
 }
@@ -390,6 +445,47 @@ export function leaguePitcherAppearancesOf(
   return appearances
 }
 
+/** 사사구를 낸 투수 줄 — `GamePitcherLine` 의 `walks` 칸만 본다 */
+export interface LeaguePitcherWalkLine {
+  readonly teamId: number
+  readonly pitcherSlot: number
+  readonly recordId?: number
+  readonly walks?: number
+}
+
+/** a8b5a · a8bd4 의 `0x270f` 상한 */
+const WALK_LIMIT = 9999
+
+/**
+ * 사사구(+0x2a)를 쌓는다 — 정산 0xa8024 꼬리 a8b04~a8bee 는 앞머리 게이트 0xa56dc 를 안 보므로 **정규시즌 · 포스트시즌을 가리지
+ * 않는다**(투수 줄 `recordLeaguePitcherAppearances` 는 게이트 안이라 따로 부른다). 붙박이 표 밖 칸(내 육성 선수 · 마선수)은 건너뛴다.
+ */
+export function recordLeagueFreePasses(
+  stats: LeaguePlayerStats,
+  lines: readonly LeaguePitcherWalkLine[],
+): LeaguePlayerStats {
+  const walked = lines.filter((line) => (line.walks ?? 0) > 0)
+  if (walked.length === 0) return stats
+  const pitchers: Record<number, LeaguePitcherLine> = { ...stats.pitchers }
+  let recordPitchers: Record<number, LeaguePitcherLine> | undefined
+  const add = (line: LeaguePitcherLine, walks: number): LeaguePitcherLine => ({
+    ...line,
+    walks: Math.min(WALK_LIMIT, (line.walks ?? 0) + walks),
+  })
+  for (const line of walked) {
+    const walks = line.walks ?? 0
+    if (line.recordId !== undefined) {
+      recordPitchers ??= { ...stats.recordPitchers }
+      recordPitchers[line.recordId] = add(recordPitchers[line.recordId] ?? EMPTY_LEAGUE_PITCHER_LINE, walks)
+      continue
+    }
+    if (line.pitcherSlot < 0 || line.pitcherSlot >= PITCHERS_PER_TEAM) continue
+    const id = leaguePitcherIdOf(line.teamId, line.pitcherSlot)
+    pitchers[id] = add(pitchers[id] ?? EMPTY_LEAGUE_PITCHER_LINE, walks)
+  }
+  return recordPitchers === undefined ? { ...stats, pitchers } : { ...stats, pitchers, recordPitchers }
+}
+
 /** 원본 투구 수 칸은 u16 을 0~9999 에서 자른다 (P1 3-1 · 6절) */
 const MAXIMUM_PITCH_COUNT = 9999
 
@@ -406,6 +502,8 @@ function addPitcherAppearance(
     pitches: Math.min(MAXIMUM_PITCH_COUNT, line.pitches + appearance.pitches),
     wins: line.wins + (appearance.decision === '승' ? 1 : 0),
     losses: line.losses + (appearance.decision === '패' ? 1 : 0),
+    // +0x2a 사사구는 게이트 밖 칸이라 따로 쌓는다 (`recordLeagueFreePasses`) — 여기서는 그대로 둔다
+    ...(line.walks === undefined ? {} : { walks: line.walks }),
   }
 }
 

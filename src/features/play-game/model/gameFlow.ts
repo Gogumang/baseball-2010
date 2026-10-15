@@ -1,7 +1,7 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
-import { describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { describeOutcome, isFreePass } from '@/entities/at-bat/model/atBatOutcome'
 import { atBatRecordCodeOf } from '@/entities/batting/model/swingSkills'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import {
@@ -78,7 +78,12 @@ import {
 } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
-import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import type { LeagueFieldingError, LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import {
+  fielderRecordIndexOf,
+  fieldingErrorRecordsOf,
+  type DrawnFieldingError,
+} from '@/features/defense-play/model/fieldingErrors'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import {
@@ -328,6 +333,11 @@ export interface GameProgress {
    * 주자마다. 주자 신원은 `simulateHalfInning` 의 근사(타순 커서 − 루)다.
    */
   readonly leagueStolenBases: readonly LeagueStolenBase[]
+  /**
+   * 리그 선수 기록표에 넘길 **실책**(+0x2e) — 수비 그림 0x43278 이 펌블 6 · 악송구 4 를 본 야수마다(`recordDrawnFieldingErrors`).
+   * 타자편에서 그려지는 수비는 내 타석의 상대 팀뿐이다(우리 수비 반 이닝은 간이 엔진 · 자동진행이라 그림이 없다). 옛 진행에는 없다
+   */
+  readonly leagueErrors?: readonly LeagueFieldingError[]
   /** 우리 투수가 내준 것 — 완투 계열 기록(0xa7de8)이 보는 state+0x88·0x89·0x8a */
   readonly pitching: {
     readonly hitsAllowed: number
@@ -1197,6 +1207,8 @@ function finishPlayerOutcome(
         chargePitcherLine(progress.pitcherLines, progress.opponentTeamId, progress.opponentMound.pitcherSlot, {
           outs: outsAddedBetween(progress.game, nextGame) + (droppedThirdStrike ? 1 : 0),
           strikeouts: outcome.kind === '삼진' ? 1 : 0,
+          // a8b04~a8bee — 볼넷(사람 판정 3e1ae 가 볼을 넷째로 센다) · 사구면 지금 마운드 투수 +0x2a
+          walks: isFreePass(outcome) ? 1 : 0,
         }),
         nextGame,
         lineupSlotOf(progress.game.battingOrderIndex),
@@ -1330,6 +1342,22 @@ function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
  * 수비 아홉 칸의 이름 판 선수 — `opponentDefenseAbilitiesOf` 와 같은 칸 고르기다.
  * 칸 0 은 지금 마운드 투수(보직 = 레코드 +0xb & 3). 마선수 투수는 웹에 레코드 +0xb 가 없어 보직을 안 넘긴다 → 판 없음.
  */
+/**
+ * 수비 그림이 올린 실책(+0x2e, `features/defense-play/model/fieldingErrors`)을 리그 기록 재료에 얹는다 — 화면이 판 끝에 넘긴다.
+ * 야수 +0xec 는 수비 팀(상대) 레코드 차례에서 자리 니블이 칸 + 1 인 첫 타자다(이름 판 `opponentFielderPlatesOf` 와 같은 표 —
+ * 칸 0 은 니블 1 = 지명타자). 그림의 수비 팀이 상대가 아니면 버린다.
+ */
+export function recordDrawnFieldingErrors(progress: GameProgress, drawn: readonly DrawnFieldingError[]): GameProgress {
+  const lineup = teamBatters(progress.opponentTeamId)
+  const errors = fieldingErrorRecordsOf(drawn, (error) => {
+    if (error.teamIndex !== progress.opponentTeamId) return null
+    const index = fielderRecordIndexOf(lineup, error.slot)
+    return index < 0 ? null : { teamId: progress.opponentTeamId, battingOrderIndex: index }
+  })
+  if (errors.length === 0) return progress
+  return { ...progress, leagueErrors: [...(progress.leagueErrors ?? []), ...errors] }
+}
+
 function opponentFielderPlatesOf(progress: GameProgress) {
   const ace = moundAcePitcherOf(progress, false)
   const pitcher = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
@@ -3157,6 +3185,8 @@ export function summaryOf(progress: GameProgress): GameSummary {
     leagueStolenBases: (progress.leagueStolenBases ?? []).filter(
       (steal) => steal.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT,
     ),
+    // 실책 +0x2e — 그림 0x43278 이 야수 +0xec 레코드에 올린 것. 마타자 레코드는 웹 기록표에 칸이 없다
+    leagueErrors: (progress.leagueErrors ?? []).filter((error) => error.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT),
     pitchersOfRecord: pitchersOfRecordOf(progress),
     // 경기 끝 판의 이닝별 점수판 0x41c18 — 득점 0xb6a9c 가 쌓은 칸
     lineScore: endLineScoreOf(progress.game),

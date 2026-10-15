@@ -194,6 +194,33 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
     expect(applyGameResult(가을, summary).leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]).toBeUndefined()
   })
 
+  it('사사구 +0x2a · 실책 +0x2e 는 게이트 0xa56dc 밖이라 포스트시즌에도 쌓인다 (a8b04~a8bee · 0x43278)', () => {
+    const summary = {
+      result: '승',
+      stats: EMPTY_SEASON_STATS,
+      recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 3,
+      leaguePitchers: {
+        lines: [{ teamId: 3, pitcherSlot: 2, outs: 9, runsAllowed: 1, strikeouts: 2, pitches: 40, walks: 2 }],
+        decision: { winner: null, loser: null, save: null },
+        sideTeams: [0, 3],
+      },
+      leagueErrors: [{ teamId: 3, battingOrderIndex: 5 }],
+    } as unknown as GameSummary
+    const 가을 = {
+      ...createCareer('선수'),
+      postseason: { round: '한국시리즈', teams: [0, 3], wins: [0, 0], winsNeeded: 4 } as unknown as PlayerCareer['postseason'],
+    }
+    for (const career of [createCareer('선수'), 가을]) {
+      const 뒤 = applyGameResult(career, summary).leaguePlayerStats
+      expect(뒤.pitchers?.[3 * 8 + 2]?.walks).toBe(2)
+      expect(뒤.batters[leagueBatterIdOf(3, 5)]?.errors).toBe(1)
+    }
+    // 투수 줄의 나머지 칸(아웃 · 실점 …)은 게이트 안 — 포스트시즌이면 안 쌓인다
+    expect(applyGameResult(가을, summary).leaguePlayerStats.pitchers?.[3 * 8 + 2]?.outs ?? 0).toBe(0)
+  })
+
   it('내 도루(동료 간이 타석 0xc1a42)는 내 시즌 줄 +0x2c 에 쌓인다 — 포스트시즌은 0xa56dc 가 거짓이라 안 쌓는다', () => {
     const summary = { result: '승', stats: { ...EMPTY_SEASON_STATS, stolenBases: 2 }, recordIds: [], ourTeamId: 0, opponentTeamId: 3 } as unknown as GameSummary
 

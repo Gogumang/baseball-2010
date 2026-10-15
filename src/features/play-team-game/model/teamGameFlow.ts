@@ -89,7 +89,12 @@ import {
   sceneResultCodeOfThrown,
 } from '@/features/defense-play/model/sceneResultCode'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
-import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import type { LeagueFieldingError, LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import {
+  fielderRecordIndexOf,
+  fieldingErrorRecordsOf,
+  type DrawnFieldingError,
+} from '@/features/defense-play/model/fieldingErrors'
 import {
   popularityCompleteGameOf,
   reputationCompleteGameOf,
@@ -894,6 +899,11 @@ export interface TeamGameProgress {
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
   /** 리그 기록표 +0x2c 에 넘길 도루 (`withLeagueStolenBases`). 없으면 빈 것 */
   readonly leagueStolenBases?: readonly LeagueStolenBase[]
+  /**
+   * 리그 기록표 +0x2e 에 넘길 실책 — 수비 그림 0x43278 이 펌블 6 · 악송구 4 를 본 야수마다(`recordDrawnTeamFieldingErrors`). 양 팀.
+   * 없으면 빈 것
+   */
+  readonly leagueErrors?: readonly LeagueFieldingError[]
   /** 이번 경기의 돌발미션 (경기 장면이 모드 2·3·4 에서만 만든다 — 팀 경기에서는 **시즌만**) */
   readonly burst: BurstSession | null
   readonly lastBurstResolution: BurstResolution | null
@@ -2105,6 +2115,32 @@ function quickLeagueStolenBasesOf(
   return stolen
 }
 
+/**
+ * 수비 그림이 올린 실책(+0x2e, `features/defense-play/model/fieldingErrors`)을 리그 기록 재료에 얹는다 — 화면이 판 끝에 넘긴다.
+ * 그림의 수비 팀(`teamIndex` = 판 입력 `defenseTeamIndex`)의 명단 차례에서 자리 니블이 칸 + 1 인 첫 타자(이름 판 `fielderPlatesFor`
+ * 와 같은 표 — 칸 0 은 니블 1 = 지명타자)가 야수 +0xec 다. 열쇠는 도루와 같다 — 표 밖 선수는 원본 id, 마타자는 웹 기록표에 칸이 없다.
+ */
+export function recordDrawnTeamFieldingErrors(
+  progress: TeamGameProgress,
+  drawn: readonly DrawnFieldingError[],
+): TeamGameProgress {
+  const errors = fieldingErrorRecordsOf(drawn, (error) => {
+    const teamId = error.teamIndex
+    if (teamId !== progress.options.ourTeamId && teamId !== progress.options.opponentTeamId) return null
+    const entry = entryBattersOf(progress, teamId)
+    const index = fielderRecordIndexOf(entry, error.slot)
+    const player = entry[index]
+    if (player === undefined || player.aceIndex >= 0) return null
+    const rosterSlot = player.rosterSlot
+    if (rosterSlot === NO_ROSTER_SLOT) {
+      return player.recordId === undefined ? null : { teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId: player.recordId }
+    }
+    return { teamId: player.tableTeamId ?? teamId, battingOrderIndex: rosterSlot }
+  })
+  if (errors.length === 0) return progress
+  return { ...progress, leagueErrors: [...(progress.leagueErrors ?? []), ...errors] }
+}
+
 /** 간이 타석 도루의 리그 기록을 진행에 얹을 칸 — 없으면 빈 것 */
 function withQuickSteals(
   progress: TeamGameProgress,
@@ -2830,6 +2866,8 @@ function finishBatterOutcome(
       chargeMoundLine(progress, false, {
         outs: outsAddedBetween(before, game) + (droppedThirdStrike ? 1 : 0),
         strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        // a8b04~a8bee — 볼넷(사람 판정 3e1ae 가 볼을 넷째로 센다) · 사구면 지금 마운드 투수 +0x2a
+        walks: isFreePass(outcome) ? 1 : 0,
       }),
       game,
       false,
@@ -3535,6 +3573,9 @@ function finishDefensiveAtBat(
         // 낫아웃은 a8cb0 이 삼진 사건까지 더하고 보정(−1)은 R+0x13c · R[3] 에만 건다 — +0x20 이 하나 많다(원본 그대로)
         outs: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
         strikeouts: outcome.kind === '삼진' ? 1 : 0,
+        // a8b04~a8bee — 사람 수비 타석의 볼넷 · 사구도 지금 마운드(우리) 투수 +0x2a. 간이 타석(`quick`)의 포볼 c1918 은 볼을
+        // 3 에서 안 올려(판정 0x9d57c · c18d4) `state[5] > 3` 이 서지 않는다 — 안 센다
+        walks: walk && quick === undefined ? 1 : 0,
       }),
       applied.game,
       true,
@@ -6144,6 +6185,8 @@ export interface TeamGameSummary {
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
   /** 리그 기록표 +0x2c 도루 (`recordLeagueStolenBases`) — 양 팀. 없으면 빈 것 */
   readonly leagueStolenBases?: readonly LeagueStolenBase[]
+  /** 리그 기록표 +0x2e 실책 (`recordLeagueErrors`) — 양 팀. 게이트가 없다(포스트시즌에도). 없으면 빈 것 */
+  readonly leagueErrors?: readonly LeagueFieldingError[]
   /** 시즌 평가 `evaluateSeasonGame` 에 그대로 넘기는 두 칸 (인기도·평판이 서로 다른 이닝 칸을 본다) */
   readonly popularityCompleteGame: CompleteGameKind
   readonly reputationCompleteGame: CompleteGameKind
@@ -6220,6 +6263,7 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     pitching: progress.pitching,
     leaguePlateAppearances: progress.leaguePlateAppearances,
     leagueStolenBases: progress.leagueStolenBases ?? [],
+    leagueErrors: progress.leagueErrors ?? [],
     // ⚠️ 원본 그대로 — 인기도는 `st+0x6b`(현재 이닝), 평판은 `st+0x69`(정규 마지막 이닝)를 본다.
     //    그래서 **연장 완투는 인기도만 보너스를 받는다** (P4 "원본 버그·이상" 3번)
     popularityCompleteGame: popularityCompleteGameOf(outs, game.inning - 1, flags),

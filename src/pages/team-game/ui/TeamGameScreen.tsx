@@ -753,6 +753,8 @@ export function TeamGameScreen({
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         sceneMemory={defenseSceneRef}
+        // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
+        onFieldingErrors={actions.recordFieldingErrors}
         onDone={(result) => {
           carryLivePlay(result)
           actions.finishDefensePlay(result)
@@ -771,6 +773,7 @@ export function TeamGameScreen({
         runnerPlay={runnerPlay}
         grassPalette={fieldPalette}
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
+        onFieldingErrors={actions.recordFieldingErrors}
         onDone={(result) => {
           carryLivePlay(result)
           actions.finishRunnerPlay(result)
@@ -788,6 +791,8 @@ export function TeamGameScreen({
         ticks={play.ticks}
         grassPalette={fieldPalette}
         onDone={finishPlayback}
+        // 재생 판도 같은 0x17 그림이라 실책 +0x2e 가 오른다 (수비 팀은 그림의 팀 번호로 가린다)
+        onFieldingErrors={actions.recordFieldingErrors}
         freePassPlay={isWalkPlayResult(play)}
       />
     )

@@ -84,15 +84,18 @@ describe('143 경기 전 엔트리 보기 — 진입 0x16af8 (0x5561c 셋째 인
     const teamId = career.teamId
     const stats = {
       ...career.leaguePlayerStats,
-      batters: { [teamId * 12]: { atBats: 40, hits: 12, homeRuns: 3, runsBattedIn: 9 } },
-      pitchers: { [teamId * 8]: { outs: 30, runsAllowed: 4, saves: 0, strikeouts: 11, pitches: 150, wins: 1, losses: 0, games: 1 } },
+      batters: { [teamId * 12]: { atBats: 40, hits: 12, homeRuns: 3, runsBattedIn: 9, errors: 2 } },
+      pitchers: {
+        [teamId * 8]: { outs: 30, runsAllowed: 4, saves: 0, strikeouts: 11, pitches: 150, wins: 1, losses: 0, games: 1, walks: 5 },
+      },
     }
     const withStats = { ...career, leaguePlayerStats: stats, gamesPlayed: 3, leaguePitcherStaminas: { [teamId]: [6543] } }
     const view = batterNariEntryViewOf(withStats as typeof career, true)
     const batter = view.lists.batters.find((row) => row.name === teamBatters(teamId)[0].name)
-    expect(batter?.batterLine).toMatchObject({ atBats: 40, hits: 12, homeRuns: 3, runsBattedIn: 9 })
+    // +0x2e 실책 · +0x2a 사사구도 기록표 칸 그대로 (그림 0x43278 · 정산 꼬리 a8b04~a8bee)
+    expect(batter?.batterLine).toMatchObject({ atBats: 40, hits: 12, homeRuns: 3, runsBattedIn: 9, errors: 2 })
     const pitcher = view.lists.pitchers.find((row) => row.name === teamPitchers(teamId)[0].name)
-    expect(pitcher?.pitcherLine).toMatchObject({ outs: 30, strikeouts: 11, wins: 1 })
+    expect(pitcher?.pitcherLine).toMatchObject({ outs: 30, strikeouts: 11, wins: 1, walks: 5 })
     expect(pitcher?.stamina?.percent).toBe(65)
   })
 })

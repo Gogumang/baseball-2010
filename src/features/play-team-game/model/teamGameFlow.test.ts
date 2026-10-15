@@ -56,6 +56,7 @@ import {
   resolveRunnerPlay,
   humanDefenseSkillPanelOf,
   entryBatterSkillIdsOf,
+  recordDrawnTeamFieldingErrors,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -2854,5 +2855,59 @@ describe('파울 각 공도 수비 판을 돈다 — 판이 파울로 닫히면 
     } else {
       expect(result.caughtOnTheFly).toBe(true)
     }
+  })
+})
+
+describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee · 0x43278)', () => {
+  /** 첫 굴림(벤치 클리어링 진입)만 정한 값 — 나머지는 씨앗 */
+  function 첫굴림(value: number, seed: number): RandomPort {
+    const rest = createSeededRandom(seed)
+    const head = createFractionRandom(() => value)
+    let first = true
+    return {
+      rand: (lo: number, hi: number) => {
+        if (!first) return rest.rand(lo, hi)
+        first = false
+        return head.rand(lo, hi)
+      },
+      rand9d: (n: number) => rest.rand9d(n),
+    }
+  }
+
+  it('사람 타석의 볼넷은 지금 상대 마운드 투수 줄에 walks +1', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 끝 = startBatterOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
+    const 볼넷 = 끝.pitcherLines.filter((line) => line.teamId === 1).reduce((sum, line) => sum + (line.walks ?? 0), 0)
+    expect(볼넷).toBe(1)
+    // 사구(state[0x12], a8b88~a8bee)도 같은 칸 — 벤치 클리어링이 안 들어가는 굴림
+    const 사구끝 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+    expect(사구끝.pitcherLines.filter((line) => line.teamId === 1).reduce((sum, line) => sum + (line.walks ?? 0), 0)).toBe(1)
+  })
+
+  it('전부 자동(간이 타석 c1918)의 볼넷은 볼을 3 에서 안 올려 안 센다', () => {
+    const 자동 = { ...FULL_PLAY_SETTINGS, kind: MATCH_SETTING_KIND.상세, value: 0 } as const
+    for (const seed of [1, 7, 42]) {
+      const progress = startTeamGame({ ...기본옵션, settings: 자동 }, createSeededRandom(seed))
+      expect(summaryOf(progress).leaguePitchers?.lines.every((line) => line.walks === undefined)).toBe(true)
+    }
+  })
+
+  it('그림의 수비 팀 명단에서 자리 니블이 칸 + 1 인 첫 타자 — 칸 0 은 지명타자, 다른 팀 번호는 버린다', () => {
+    const { progress } = 시작()
+    const 지명 = progress.ourEntry.findIndex((player) => (player.position & 0xf) === 1)
+    const 유격 = progress.opponentEntry.findIndex((player) => (player.position & 0xf) === 6)
+    expect(지명).toBeGreaterThanOrEqual(0)
+    expect(유격).toBeGreaterThanOrEqual(0)
+    const 끝 = recordDrawnTeamFieldingErrors(progress, [
+      { slot: 0, teamIndex: 0 },
+      { slot: 5, teamIndex: 1 },
+      { slot: 5, teamIndex: 9 },
+      { slot: 5, teamIndex: null },
+    ])
+    expect(끝.leagueErrors).toEqual([
+      { teamId: 0, battingOrderIndex: progress.ourEntry[지명]!.rosterSlot },
+      { teamId: 1, battingOrderIndex: progress.opponentEntry[유격]!.rosterSlot },
+    ])
+    expect(summaryOf(끝).leagueErrors).toEqual(끝.leagueErrors)
   })
 })

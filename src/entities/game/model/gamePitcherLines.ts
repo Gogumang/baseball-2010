@@ -20,6 +20,12 @@ export interface GamePitcherLine {
   readonly strikeouts: number
   readonly pitches: number
   /**
+   * +0x2a 사사구 — 정산 0xa8024 꼬리 a8b04~a8bee 가 볼넷(`state[5] > 3`) · 사구(`state[0x12]`)마다 **지금 마운드 투수**에게 +1.
+   * 볼 넷을 세는 것은 사람 투구 판정(0x3dfac 3e1ae)뿐이라 사람 타석에서만 오른다(`LeaguePitcherLine.walks`). 없으면 0 —
+   * 게이트 밖이라 투수 줄과 따로 쌓는다(`recordLeagueFreePasses`)
+   */
+  readonly walks?: number
+  /**
    * 붙박이 표 밖 투수(시즌에 영입한 명전·나리)의 원본 id — 있으면 `pitcherSlot` 은 −1 이고 이 열쇠로 줄을 가른다.
    * 원본은 그 선수의 팀 레코드 +0x20~ 에 쌓는다 (`LeaguePlayerStats.recordPitchers`)
    */
@@ -56,7 +62,7 @@ export function chargePitcherLine(
   lines: readonly GamePitcherLine[],
   teamId: number,
   pitcherSlot: number,
-  delta: Partial<Pick<GamePitcherLine, 'outs' | 'runsAllowed' | 'strikeouts' | 'pitches'>>,
+  delta: Partial<Pick<GamePitcherLine, 'outs' | 'runsAllowed' | 'strikeouts' | 'pitches' | 'walks'>>,
   /** 붙박이 표 밖 투수의 원본 id (`GamePitcherLine.recordId`) */
   recordId?: number,
 ): readonly GamePitcherLine[] {
@@ -64,13 +70,23 @@ export function chargePitcherLine(
   const runsAllowed = delta.runsAllowed ?? 0
   const strikeouts = delta.strikeouts ?? 0
   const pitches = delta.pitches ?? 0
+  const walks = delta.walks ?? 0
   const index = lines.findIndex(
     (line) => line.teamId === teamId && line.pitcherSlot === pitcherSlot && line.recordId === recordId,
   )
   if (index < 0) {
     return [
       ...lines,
-      { teamId, pitcherSlot, outs, runsAllowed, strikeouts, pitches, ...(recordId === undefined ? {} : { recordId }) },
+      {
+        teamId,
+        pitcherSlot,
+        outs,
+        runsAllowed,
+        strikeouts,
+        pitches,
+        ...(walks > 0 ? { walks } : {}),
+        ...(recordId === undefined ? {} : { recordId }),
+      },
     ]
   }
   return lines.map((line, at) =>
@@ -81,6 +97,7 @@ export function chargePitcherLine(
           runsAllowed: line.runsAllowed + runsAllowed,
           strikeouts: line.strikeouts + strikeouts,
           pitches: line.pitches + pitches,
+          ...(walks > 0 ? { walks: (line.walks ?? 0) + walks } : {}),
         }
       : line,
   )
