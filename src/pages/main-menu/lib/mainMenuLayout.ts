@@ -48,7 +48,7 @@
  *    윗단 진입 0x25936 이 무엇을 넣는지까지는 안 봤다.)
  *
  * 그림 치수는 직접 읽어 확정이다:
- *   배너 `mode_back/000` 240×84 · `main_ui/frames/NNN` 높이 **27** · `img_text/frames/NNN` 높이 **10**
+ *   `main_ui/frames/NNN` 높이 **27** · `img_text/frames/NNN` 높이 **10**
  *   설명 판 `main_ui/003` 149×63
  */
 
@@ -75,8 +75,6 @@ export const SCREEN_WIDTH = 240
 export const SCREEN_HEIGHT = 320
 /** 화면 가운데 */
 export const SCREEN_CENTER_X = 120
-
-export const MENU_BANNER = { x: 0, y: 0, width: 240, height: 84 } as const
 
 /** `main_ui/frames` 글자 그림의 공통 높이 (원점표에서 읽었다) — 설명 판 안 큰 글자가 이 크기다 */
 export const MENU_LABEL_HEIGHT = 27
