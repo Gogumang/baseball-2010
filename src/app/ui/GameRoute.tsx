@@ -268,13 +268,22 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
           battingSide: progress.game.half === '초' ? 0 : 1,
         }}
         sceneMemory={defenseSceneRef}
+        // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
+        onFieldingErrors={session.actions.recordFieldingErrors}
         onDone={session.actions.finishDefensePlay}
       />
     )
   }
   if (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady) {
     return (
-      <DefensePlayback ticks={play.ticks} onDone={finishPlayback} freePassPlay={isWalkPlayResult(play)} grassPalette={grassPalette} />
+      <DefensePlayback
+        ticks={play.ticks}
+        onDone={finishPlayback}
+        // 재생 판(견제 · 도루 · 폭투 등)도 같은 0x17 그림이라 실책 +0x2e 가 오른다
+        onFieldingErrors={session.actions.recordFieldingErrors}
+        freePassPlay={isWalkPlayResult(play)}
+        grassPalette={grassPalette}
+      />
     )
   }
   // 자동진행 중계(0x21) — 앞 판의 수비 재생 뒤 · 내 공의 0x12 대기(15/31 틱)가 끝난 뒤(판정 A 가 0x21 로 보낸다), 0x18 · 0xe ·

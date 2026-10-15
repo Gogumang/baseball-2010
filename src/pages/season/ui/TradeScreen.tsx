@@ -12,7 +12,7 @@ import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
 import { TRADE_REQUEST_TAB } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import { myTradeEntriesOf, opponentTradeEntriesOf } from '@/widgets/season/lib/tradeList'
-import { ENTRY_TABLES_BASIC, EntryListWindow } from '@/widgets/entry-editor'
+import { ENTRY_TABLES_BASIC, EntryDetailOverlay, EntryListWindow } from '@/widgets/entry-editor'
 import { TradeConfirmWindow } from '@/pages/season/ui/TradeConfirmWindow'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
@@ -72,10 +72,14 @@ const REQUEST_CANCEL_QUESTION = ORIGINAL_MODE_TEXT[216]
  * 0x7104 (0xe5 OK)    this+0x154 = ed+0x33f == 0 ? 1 : 0 ; this+0x150 = 커서   ; 트레이드 탭은 여기서만 정해진다
  * 0x727c (0xe6 OK)    this+0x14c = 커서 ; 0xb5695(내 팀, this+0x154, 커서) 로 나리·명전 검사
  * ```
- * ⚠️ 원본 그대로: 0xe6 에서 '*' 로 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로라, 보이는 목록과 다른 배열의
- * 같은 칸이 보상 선수가 된다. 칸이 그 배열 밖이면(타자 8~11 칸을 투수 탭으로) 원본은 0xb5695 가 0 을 돌려준 선수를
- * 읽는다 — 웹은 지어내지 않고 아무 일도 안 한다.
+ * '*' 를 편집기에 넘기는 것은 0xe5 뿐이다 — 0x7104(7164~717a)는 요청([this+0x148])일 때만 '*' 를 거르지만, 0xe6 키 0x727c 는
+ * 72ac~72b0 `cmp r1, #0x2a ; beq` 로 **늘** 거른다(바닥띠도 0xe6 은 7 이라 "*투수" · "*타자" 표시가 없다). 그래서 0xe6 목록은
+ * 0xe5 에서 정한 트레이드 탭 그대로다 *(정정 2026-10-16 r102 — 예전 웹 · J 4-4 는 0xe6 에서도 뒤집었다)*.
  * 마우스 길은 바닥띠 "*투수" · "*타자" 표시(0xe5 바닥 0xf · 0x17) 위 투명 누름 칸이다.
+ *
+ * **'0' 상세 창**: 0x7104 · 0x727c 는 '*'(위) · 요청 중 위·아래 말고 모든 키를 편집기 0x55865 에 넘기므로 '0'(55920)이 [ed+0x424] 를
+ * 뒤집고, 그림 0xb0f4 · 0xb0b4 의 목록 창 0x5cfec → 0x5c984 끝(0x5cfc8)이 선수 정보 창 0x5b798 을 그린다(`EntryDetailOverlay`).
+ * 창은 0xe5 · 0xe6 진입(0x5cd0 · 0x5b28 → 편집기 초기화 0x5561c 556d6)마다 닫힌다. 팝업이 떠 있으면([0x140005c]+9) 키가 안 간다.
  */
 
 type TradeStep =
@@ -178,6 +182,11 @@ export function TradeScreen({
    * 진행 가드를 지나면 1 이 되고(0xd45e), 게이지가 다 차는 틀(0xcecc)에 굴려 2·3 으로 간다.
    */
   const [progress, setProgress] = useState<'진행' | '성공' | '실패' | null>(null)
+  /**
+   * 편집기 [ed+0x424](상세 창) — 연 단계(`step` 객체)로 든다. 0xe5 · 0xe6 진입이 편집기를 다시 세워(0x5561c 556d6) 닫으므로
+   * 단계가 바뀌면 저절로 닫힌다
+   */
+  const [detailOpenedAt, setDetailOpenedAt] = useState<TradeStep | null>(null)
 
   const isPitcher = tradeTab === TRADE_REQUEST_TAB.투수
   const isListPitcher = listTab === TRADE_REQUEST_TAB.투수
@@ -363,7 +372,8 @@ export function TradeScreen({
     moveTo(0)
   }
 
-  const canFlip = forced === null && (step.kind === '영입' || step.kind === '보상') && !isBusy
+  // '*' 는 0xe5(요청 아님)만 편집기에 간다 — 0xe6 키 0x727c 는 늘 거른다 (위 머리 주석)
+  const canFlip = forced === null && step.kind === '영입' && !isBusy
   useEffect(() => {
     if (!canFlip) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
@@ -377,6 +387,20 @@ export function TradeScreen({
 
   // 키 셈 — 목록 창 단계(0xe5 · 0xe6)에서 키가 들어올 때마다 (팝업이 키를 먹는 동안은 편집기에 안 간다)
   const countsKeys = (step.kind === '영입' || step.kind === '보상') && !isBusy
+  // 팝업이 떠도 창은 그대로 그린다 — 닫는 것은 '0' 과 단계 진입뿐이다
+  const isDetailOpen = detailOpenedAt === step
+  /** '0' — 편집기 55920 이 [ed+0x424] 를 뒤집는다 (0x7104 · 0x727c 가 거르지 않는 키) */
+  const toggleDetail = () => setDetailOpenedAt((opened) => (opened === step ? null : step))
+  useEffect(() => {
+    if (!countsKeys) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '0') return
+      event.preventDefault()
+      toggleDetail()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
   useEffect(() => {
     if (!countsKeys) return undefined
     const onKeyDown = () => setKeyPresses((count) => count + 1)
@@ -456,6 +480,10 @@ export function TradeScreen({
           }}
         />
       )}
+      {isListStep && (
+        // 0x5cfc8 — 목록 창 끝의 선수 정보 창 0x5b798 (커서 줄 레코드)
+        <EntryDetailOverlay isOpen={isDetailOpen} cursor={shownCursor} row={listRows[shownCursor]} isPitcherTab={isListPitcher} />
+      )}
       {step.kind === '확인' && acquiredRow !== null && givenRow !== null && (
         <TradeConfirmWindow
           isPitcherTab={isPitcher}
@@ -485,9 +513,13 @@ export function TradeScreen({
 
       {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리, "*투수" · "*타자" 표시가 '*' 자리다 */}
       <ScreenFrame title={title} gamePoint={gamePoints} onBack={backOneStep} footer={footer} slides={false}
-        footerPresses={canFlip ? {
-          [FOOTER_BITS.batter]: { label: '* 타자', onPress: flipListTab },
-          [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: flipListTab },
+        footerPresses={countsKeys ? {
+          ...(canFlip ? {
+            [FOOTER_BITS.batter]: { label: '* 타자', onPress: flipListTab },
+            [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: flipListTab },
+          } : {}),
+          // 바닥띠 "0상세정보" 표시(0xf · 0x17 · 7 모두 비트 2) — '0' 자리
+          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: toggleDetail },
         } : undefined} />
     </RawScreen>
   )

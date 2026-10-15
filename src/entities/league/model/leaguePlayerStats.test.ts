@@ -5,6 +5,8 @@ import {
   leaguePitcherAppearancesOf,
   leaguePitcherIdOf,
   leaguePitcherLineOf,
+  recordLeagueErrors,
+  recordLeagueFreePasses,
   recordLeaguePitcherAppearances,
   recordLeaguePlateAppearances,
   recordLeagueStolenBases,
@@ -200,5 +202,60 @@ describe('2루타 +0x24 · 3루타 +0x26 (0xa8024 a8520~a85ac)', () => {
       { teamId: 1, battingOrderIndex: 2, outcome: { kind: '홈런' }, runsBattedIn: 1 },
     ])
     expect(쌓음.batters[14]).toMatchObject({ hits: 5, doubles: 2, triples: 1, homeRuns: 1, runsBattedIn: 2 })
+  })
+})
+
+describe('recordLeagueErrors — 실책 +0x2e (수비 그림 0x43278 4381a~43904)', () => {
+  it('야수 레코드마다 +1 하고 9999(0x270f)에서 자른다', () => {
+    const 한번 = recordLeagueErrors(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 1, battingOrderIndex: 3 },
+      { teamId: 1, battingOrderIndex: 3 },
+      { teamId: 2, battingOrderIndex: 0 },
+    ])
+    expect(한번.batters[12 + 3]?.errors).toBe(2)
+    expect(한번.batters[24]?.errors).toBe(1)
+    const 꽉참: LeaguePlayerStats = { batters: { 15: { atBats: 0, hits: 0, homeRuns: 0, runsBattedIn: 0, errors: 9999 } } }
+    expect(recordLeagueErrors(꽉참, [{ teamId: 1, battingOrderIndex: 3 }]).batters[15]?.errors).toBe(9999)
+  })
+
+  it('표 밖 선수는 원본 id 줄에 쌓고, 뒤 타석 기록이 실책 칸을 지우지 않는다', () => {
+    const 쌓음 = recordLeagueErrors(EMPTY_LEAGUE_PLAYER_STATS, [{ teamId: 0, battingOrderIndex: -1, recordId: 0xfe }])
+    expect(쌓음.recordBatters?.[0xfe]?.errors).toBe(1)
+    const 뒤 = recordLeaguePlateAppearances(recordLeagueErrors(EMPTY_LEAGUE_PLAYER_STATS, [{ teamId: 0, battingOrderIndex: 1 }]), [
+      { teamId: 0, battingOrderIndex: 1, outcome: { kind: '안타', bases: 1 }, runsBattedIn: 0 },
+    ])
+    expect(뒤.batters[1]).toMatchObject({ atBats: 1, hits: 1, errors: 1 })
+  })
+
+  it('빈 목록이면 표를 그대로 돌려준다', () => {
+    expect(recordLeagueErrors(EMPTY_LEAGUE_PLAYER_STATS, [])).toBe(EMPTY_LEAGUE_PLAYER_STATS)
+  })
+})
+
+describe('recordLeagueFreePasses — 사사구 +0x2a (정산 꼬리 a8b04~a8bee)', () => {
+  it('줄의 walks 를 그 투수에게 더하고 9999 에서 자른다', () => {
+    const 쌓음 = recordLeagueFreePasses(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 2, pitcherSlot: 1, walks: 3 },
+      { teamId: 2, pitcherSlot: 4 },
+    ])
+    expect(leaguePitcherLineOf(쌓음, leaguePitcherIdOf(2, 1)).walks).toBe(3)
+    expect(쌓음.pitchers?.[leaguePitcherIdOf(2, 4)]).toBeUndefined()
+    const 꽉참: LeaguePlayerStats = { batters: {}, pitchers: { 17: { ...EMPTY_LEAGUE_PITCHER_LINE, walks: 9998 } } }
+    expect(recordLeagueFreePasses(꽉참, [{ teamId: 2, pitcherSlot: 1, walks: 5 }]).pitchers?.[17]?.walks).toBe(9999)
+  })
+
+  it('붙박이 표 밖 칸(내 투수 · 마투수)은 건너뛰고 표 밖 선수는 원본 id 로', () => {
+    const 쌓음 = recordLeagueFreePasses(EMPTY_LEAGUE_PLAYER_STATS, [
+      { teamId: 2, pitcherSlot: PITCHERS_PER_TEAM, walks: 1 },
+      { teamId: 2, pitcherSlot: -1, walks: 2, recordId: 0xb4 },
+    ])
+    expect(Object.keys(쌓음.pitchers ?? {})).toEqual([])
+    expect(쌓음.recordPitchers?.[0xb4]?.walks).toBe(2)
+  })
+
+  it('투수 줄 쌓기(게이트 안)는 사사구 칸을 지우지도 더하지도 않는다', () => {
+    const 볼넷 = recordLeagueFreePasses(EMPTY_LEAGUE_PLAYER_STATS, [{ teamId: 2, pitcherSlot: 1, walks: 1 }])
+    const 뒤 = recordLeaguePitcherAppearances(볼넷, [등판({ outs: 3 })])
+    expect(leaguePitcherLineOf(뒤, leaguePitcherIdOf(2, 1))).toMatchObject({ outs: 3, walks: 1 })
   })
 })

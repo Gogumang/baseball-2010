@@ -23,11 +23,12 @@ import {
   runnerRunAbilitiesOf,
   opponentMoundOf,
   withGameTeamMorale,
+  recordDrawnFieldingErrors,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -1872,5 +1873,39 @@ describe('나리 타자편 두 팀 사기 — 두 팀 레코드 +2 는 지금 �
     const changed = withGameTeamMorale(started, 20)
     expect(changed.teamMorale).toBe(20)
     expect(opponentMoundOf(changed).teamMorale).toBe(20)
+  })
+})
+
+describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee · 0x43278)', () => {
+  const 볼넷합 = (p: GameProgress) =>
+    p.pitcherLines.filter((line) => line.teamId === p.opponentTeamId).reduce((sum, line) => sum + (line.walks ?? 0), 0)
+
+  it('내 타석 볼넷 · 사구는 지금 상대 마운드 투수 줄에 walks +1 (사람 판정 3e1ae 가 볼을 넷째로 센다)', () => {
+    const progress = startGame(createSeededRandom(20101016))
+    const 투수 = progress.opponentMound.pitcherSlot
+    const 끝 = startPlayerOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
+    const 그줄 = 끝.pitcherLines.find((line) => line.teamId === 끝.opponentTeamId && line.pitcherSlot === 투수)
+    expect(그줄?.walks).toBe(1)
+    // 뒤 동료 타석(간이 엔진)의 포볼 c1918 은 볼을 3 에서 안 올려 안 센다 — 합도 1
+    expect(볼넷합(끝)).toBe(1)
+    expect(summaryOf({ ...끝, game: { ...끝.game, isFinished: true } }).leaguePitchers?.lines.some((line) => line.walks === 1)).toBe(true)
+  })
+
+  it('수비 그림의 실책은 상대 명단에서 자리 니블이 칸 + 1 인 첫 타자 — 칸 0 은 지명타자', () => {
+    const progress = startGame(createSeededRandom(20101016))
+    const 명단 = teamBatters(progress.opponentTeamId)
+    const 지명 = 명단.findIndex((player) => ((player.position ?? 0) & 0xf) === 1)
+    const 포수 = 명단.findIndex((player) => ((player.position ?? 0) & 0xf) === 2)
+    const 끝 = recordDrawnFieldingErrors(progress, [
+      { slot: 0, teamIndex: progress.opponentTeamId },
+      { slot: 1, teamIndex: progress.opponentTeamId },
+      // 우리 팀 그림(타자편엔 없다)은 버린다
+      { slot: 1, teamIndex: progress.ourTeamId },
+    ])
+    expect(끝.leagueErrors).toEqual([
+      ...(지명 < 0 ? [] : [{ teamId: progress.opponentTeamId, battingOrderIndex: 지명 }]),
+      ...(포수 < 0 ? [] : [{ teamId: progress.opponentTeamId, battingOrderIndex: 포수 }]),
+    ])
+    expect(recordDrawnFieldingErrors(progress, [])).toBe(progress)
   })
 })

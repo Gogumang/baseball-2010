@@ -22,6 +22,7 @@ import {
   returnToPitchSelection,
   resolveBenchClearing,
   resolveDefensePlay,
+  recordDrawnTeamFieldingErrors,
   resolveRunnerPlay,
   resumeTeamGame,
   runAutoProgress,
@@ -46,6 +47,7 @@ import type {
   TeamPitchInput,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
@@ -158,6 +160,8 @@ export interface TeamGameSession {
      * 붙들어 둔 상태를 푼다 — 안 그러면 다음 타석이 영영 시작되지 않는다.
      */
     readonly finishDefensePlay: (result?: DefensePlayResult) => void
+    /** 수비 그림(0x43278)이 올린 실책 +0x2e — 화면이 `onDone` 바로 앞에 넘긴다 (`DefensePlayback.onFieldingErrors`) */
+    readonly recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => void
     /**
      * 수비 화면이 사람 수비의 주자 판(도루 · 폭투 · 견제 — `progress.pendingRunnerPlay`)을 다 돌렸다. 결과를 못 받았으면
      * 키 없이 끝까지 돌려서라도 붙든 상태를 푼다.
@@ -367,6 +371,14 @@ export function useTeamGame(
             pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
           ],
         )
+      },
+      recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => {
+        // 소리 · 난수 없음 — 기록 재료만 얹는다
+        const current = progressRef.current
+        const after = recordDrawnTeamFieldingErrors(current, errors)
+        if (after === current) return
+        progressRef.current = after
+        setProgress(after)
       },
       finishDefensePlay: (result?: DefensePlayResult) => {
         const pending = progressRef.current.pendingDefensePlay

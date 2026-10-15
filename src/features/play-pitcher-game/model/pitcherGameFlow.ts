@@ -9,7 +9,12 @@ import {
   resultOf,
 } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
-import type { LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import type { LeagueFieldingError, LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import {
+  fielderRecordIndexOf,
+  fieldingErrorRecordsOf,
+  type DrawnFieldingError,
+} from '@/features/defense-play/model/fieldingErrors'
 import { runnersOfGame } from '@/entities/game/model/gameState'
 import { EMPTY_BASE_RUNNERS, runnerOnBase } from '@/entities/game/model/baseRunners'
 import { EMPTY_BATTER_GAME_RECORD, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
@@ -712,6 +717,11 @@ export interface PitcherGameProgress {
    * 포스트시즌 · 국가대항전 거르기는 커리어에 먹이는 쪽이 한다. 옛 진행은 없다
    */
   readonly leagueStolenBases?: readonly LeagueStolenBase[]
+  /**
+   * **리그 타자 기록표 실책 +0x2e 재료** — 수비 그림 0x43278 이 펌블 6 · 악송구 4 를 본 야수마다(`recordDrawnPitcherFieldingErrors`).
+   * 투수편에서 그려지는 수비는 내가 던지는 반 이닝의 우리 팀뿐이다. 게이트가 없어 포스트시즌에도 쌓는다. 옛 진행은 없다
+   */
+  readonly leagueErrors?: readonly LeagueFieldingError[]
   /**
    * **리그 타자 기록표 타석 줄 재료**(+0x20 타수 · +0x22 안타 · +0x24 2루타 · +0x26 3루타 · +0x28 홈런 · +0x2a 타점) — 정산
    * 0xa8024 는 sp+0x34 = 0xa56dc(ctx, 공격 팀 지금 타자, 0) 이 참이면 그 타자 레코드에 쌓는다. 모드 3 갈래(0xa571c)는 정규시즌이면
@@ -1646,6 +1656,26 @@ export function hiddenStealBasesOf(progress: PitcherGameProgress, isPitchSceneBu
  *   마투수 칸이면 이름만(보직 없음 → 판 없음, 타자편 `opponentFielderPlatesOf` 와 같다).
  * ⚠️ 모드 3 은 강판 뒤 늘 간이 엔진(0x21 — 0xc1eac 가 0xc1d38 거짓으로 자동)이라 수비 화면이 안 서서 실제로는 그려지지 않는다.
  */
+/**
+ * 수비 그림이 올린 실책(+0x2e, `features/defense-play/model/fieldingErrors`)을 리그 기록 재료에 얹는다 — 화면이 판 끝에 넘긴다.
+ * 야수 +0xec 는 수비 팀(우리) 레코드 차례에서 자리 니블이 칸 + 1 인 첫 타자(이름 판 `myFielderPlatesOf` 와 같은 표 — 칸 0 은 니블 1 =
+ * 지명타자라 내 투수의 실책도 지명타자에게 붙는다). 그림의 수비 팀이 우리가 아니면 버린다.
+ */
+export function recordDrawnPitcherFieldingErrors(
+  progress: PitcherGameProgress,
+  drawn: readonly DrawnFieldingError[],
+): PitcherGameProgress {
+  const teamId = progress.options.ourTeamId
+  const lineup = teamBatters(teamId)
+  const errors = fieldingErrorRecordsOf(drawn, (error) => {
+    if (error.teamIndex !== teamId) return null
+    const index = fielderRecordIndexOf(lineup, error.slot)
+    return index < 0 ? null : { teamId, battingOrderIndex: index }
+  })
+  if (errors.length === 0) return progress
+  return { ...progress, leagueErrors: [...(progress.leagueErrors ?? []), ...errors] }
+}
+
 export function myFielderPlatesOf(progress: PitcherGameProgress) {
   return defenseFielderPlatesOf(teamBatters(progress.options.ourTeamId), ourMoundPlateOf(progress))
 }
@@ -3963,6 +3993,8 @@ export interface PitcherGameSummary {
   readonly leaguePitchers: GameLeaguePitchers
   /** 리그 타자 기록표 도루 +0x2c 재료 (`PitcherGameProgress.leagueStolenBases`) — 정규시즌만 쌓는 것은 부르는 쪽 몫 */
   readonly leagueStolenBases: readonly LeagueStolenBase[]
+  /** 리그 타자 기록표 실책 +0x2e 재료 (`PitcherGameProgress.leagueErrors`) — 게이트가 없다 */
+  readonly leagueErrors: readonly LeagueFieldingError[]
   /** 리그 타자 기록표 타석 줄 재료 (`PitcherGameProgress.leaguePlateAppearances`) — 정규시즌만 쌓는 것은 부르는 쪽 몫 */
   readonly leaguePlateAppearances: readonly LeaguePlateAppearance[]
   /**
@@ -4073,6 +4105,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
       opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
     },
     leagueStolenBases: progress.leagueStolenBases ?? [],
+    leagueErrors: progress.leagueErrors ?? [],
     leaguePlateAppearances: progress.leaguePlateAppearances ?? [],
     burstRewardDeltas: progress.burstRewardDeltas ?? [],
     leaguePitchers: {

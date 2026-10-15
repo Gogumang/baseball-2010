@@ -29,9 +29,16 @@ import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import {
   EMPTY_LEAGUE_PLAYER_STATS,
   recordLeaguePlateAppearances,
+  recordLeagueErrors,
+  recordLeagueFreePasses,
   recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
-import type { LeaguePlateAppearance, LeaguePlayerStats, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
+import type {
+  LeagueFieldingError,
+  LeaguePlateAppearance,
+  LeaguePlayerStats,
+  LeagueStolenBase,
+} from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
@@ -1058,12 +1065,19 @@ export function withPitcherGameLeagueRecords(
    * 거짓이라 정규시즌만 쌓는다
    */
   plateAppearances: readonly LeaguePlateAppearance[] = [],
+  /**
+   * 이 경기 수비 그림이 올린 실책(리그 타자 기록표 +0x2e 재료 — 그리기 0x43278 4381a~43904). 게이트가 없어 포스트시즌에도 쌓는다
+   */
+  errors: readonly LeagueFieldingError[] = [],
 ): PitcherCareer {
   const regularSeason = before.postseason === null
   const withPitchers = recordHumanGamePitchers(after.leaguePlayerStats, pitchers, regularSeason)
-  const leaguePlayerStats = regularSeason
+  const gated = regularSeason
     ? recordLeagueStolenBases(recordLeaguePlateAppearances(withPitchers, plateAppearances), stolenBases)
     : withPitchers
+  // 사사구 +0x2a(a8b04~a8bee) · 실책 +0x2e(0x43278)는 0xa56dc 게이트 밖이다. 사람 투구 판정이 볼넷을 세는 투수는 내 투수뿐이라
+  // CPU 줄에는 `walks` 가 없다(내 투수는 커리어가 센다) — 그래도 같은 길로 둔다
+  const leaguePlayerStats = recordLeagueErrors(recordLeagueFreePasses(gated, pitchers?.lines ?? []), errors)
   return leaguePlayerStats === after.leaguePlayerStats ? after : { ...after, leaguePlayerStats }
 }
 

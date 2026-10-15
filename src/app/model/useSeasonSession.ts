@@ -46,11 +46,11 @@ import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
   EMPTY_LEAGUE_BATTER_LINE, EMPTY_LEAGUE_PLAYER_STATS, leaguePitcherAppearancesOf, recordLeaguePitcherAppearances,
-  recordLeaguePlateAppearances, recordLeagueStolenBases,
+  recordLeagueErrors, recordLeagueFreePasses, recordLeaguePlateAppearances, recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
-import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import type { LeagueFieldingError, LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import {
   STADIUM_HIDDEN_FIRST_SLOT, STADIUM_HIDDEN_UNLOCK_IDS, STADIUM_KINDS, ownsStadiumItem, stadiumCollectorUnlocks,
@@ -759,6 +759,18 @@ function recordSeasonHumanGamePitchers(
       recordId === undefined && (pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM),
   )
   return recordLeaguePitcherAppearances(stats, appearances)
+}
+
+/**
+ * 게이트 0xa56dc 밖에서 쌓이는 두 칸 — 투수 +0x2a 사사구(정산 0xa8024 꼬리 a8b04~a8bee, 볼넷 · 사구마다 지금 마운드 투수)와
+ * 타자 +0x2e 실책(수비 그림 0x43278 4381a~43904). 정규시즌 · 포스트시즌 모두 부른다.
+ * ⚠️ 미확인: 국가대항전 사람 경기도 같은 두 칸을 그 경기 레코드(대표팀 · 상대국 슬롯)에 올리지만 웹 리그 기록표와 다른 레코드라 안 쌓는다
+ */
+function recordUngatedSeasonRecords(
+  stats: LeaguePlayerStats,
+  summary: { readonly leaguePitchers?: GameLeaguePitchers; readonly leagueErrors?: readonly LeagueFieldingError[] },
+): LeaguePlayerStats {
+  return recordLeagueErrors(recordLeagueFreePasses(stats, summary.leaguePitchers?.lines ?? []), summary.leagueErrors ?? [])
 }
 
 /** CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것, 아니면 붙박이 표 명단 */
@@ -2213,6 +2225,8 @@ export function useSeasonSession(
           const advanced = advancePostseason(series, winner)
           commit({
             ...rested,
+            // 사사구 +0x2a(정산 꼬리 a8b04~a8bee) · 실책 +0x2e(그림 0x43278)는 게이트 0xa56dc 밖이라 포스트시즌에도 쌓인다
+            playerStats: recordUngatedSeasonRecords(current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS, summary),
             series: advanced,
             state: {
               ...current.state,
@@ -2262,16 +2276,19 @@ export function useSeasonSession(
         random,
         // 투수 줄도 같은 정산 0xa8024 · 경기 끝 0xa7de8 이 쌓는다 — 0xa56dc 모드 2 갈래(0xa56fa)는 포스트시즌·국가대항전이면
         // 거짓이라 정규시즌 경기만이다(이 갈래가 곧 정규시즌이다). 요약 `leaguePitchers` 는 양 팀 표 칸으로 싣고 온다
-        recordSeasonHumanGamePitchers(
-          // 도루 +0x2c 도 같은 정산 0xa8024 가 쌓는다(도루 판 종류 5) — 같은 정규시즌 갈래
-          recordLeagueStolenBases(
-            recordLeaguePlateAppearances(
-              current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
-              summary.leaguePlateAppearances,
+        recordUngatedSeasonRecords(
+          recordSeasonHumanGamePitchers(
+            // 도루 +0x2c 도 같은 정산 0xa8024 가 쌓는다(도루 판 종류 5) — 같은 정규시즌 갈래
+            recordLeagueStolenBases(
+              recordLeaguePlateAppearances(
+                current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+                summary.leaguePlateAppearances,
+              ),
+              summary.leagueStolenBases ?? [],
             ),
-            summary.leagueStolenBases ?? [],
+            summary.leaguePitchers,
           ),
-          summary.leaguePitchers,
+          summary,
         ),
         afterGameStamina.cpuPitcherStaminas,
         aceLevels,
@@ -3082,9 +3099,10 @@ export function seasonBatterLineOf(stats: LeaguePlayerStats, ownerTeamId: number
 
 /**
  * 엔트리 목록 창(0x5c984) 칸 재료 — 시즌 진입들(0x63dc · 0x5980 · 0x5870 · 0x5b28 · 0x5cd0)은 [ed+0x333] = 1 · [ed+0x334] = 2 다.
- * 시즌 줄은 시즌 저장 레코드(0x204e0 이 비운 뒤 경기가 쌓은 줄) = 리그 기록표 줄이다. ⚠️ 미구현: 투수 +0x2a(사사구 — 0xa8024 꼬리
- * a8b04~a8bee 가 볼넷 · 사구마다 지금 투수에게 +1) · 타자 +0x2e(실책 — 수비 그림 0x43278 4381a~43904 가 펌블 6 · 악송구 4 마다 그 칸
- * 타자에게 +1)는 웹 기록표에 칸이 없어 0 (docs/re R8 11절) · CPU 팀 레코드 사기는 웹이 안 들어 100 으로 둔다.
+ * 시즌 줄은 시즌 저장 레코드(0x204e0 이 비운 뒤 경기가 쌓은 줄) = 리그 기록표 줄이다. 투수 +0x2a(사사구 — 0xa8024 꼬리
+ * a8b04~a8bee 가 사람 투구 판정의 볼넷 · 사구마다 지금 투수에게 +1) · 타자 +0x2e(실책 — 수비 그림 0x43278 4381a~43904 가 펌블 6 ·
+ * 악송구 4 마다 그 칸 타자에게 +1)도 기록표 칸(`walks` · `errors`, 옛 저장은 0)이다 (docs/re R8 11절). CPU 팀 레코드 사기는 웹이 안 들어
+ * 100 으로 둔다.
  */
 export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
   const stats = save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS
@@ -3097,14 +3115,14 @@ export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUser
       const line = seasonBatterLineOf(stats, teamId, player)
       return {
         atBats: line.atBats, hits: line.hits, doubles: line.doubles ?? 0, triples: line.triples ?? 0, homeRuns: line.homeRuns,
-        runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: 0,
+        runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: line.errors ?? 0,
       }
     },
     pitcherLineOf: (player) => {
       const line = seasonPitcherLineOf(stats, teamId, player)
       return {
         outs: line.outs, runsAllowed: line.runsAllowed, saves: line.saves, strikeouts: line.strikeouts, pitches: line.pitches,
-        walks: 0, wins: line.wins, losses: line.losses,
+        walks: line.walks ?? 0, wins: line.wins, losses: line.losses,
       }
     },
   }

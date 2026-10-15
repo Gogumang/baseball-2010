@@ -213,6 +213,42 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
     }
   })
 
+  /**
+   * **실책 +0x2e** — 같은 그리기 0x4381a 가 펌블 6 을 본 야수의 [+0xec]+0x2e 를 올린다. 화면이 그린 틱마다 세어 두었다가
+   * `onDone` 바로 앞에 넘긴다(그 뒤 정산이 요약을 만들 수 있게).
+   */
+  it('펌블이 난 틱의 그림이 실책을 한 번 넘기고, onDone 보다 먼저 부른다 (4381a~43852)', () => {
+    vi.useFakeTimers()
+    try {
+      const 늘0: RandomPort = createFractionRandom(() => 0)
+      const onDone = vi.fn()
+      const onFieldingErrors = vi.fn()
+      render(
+        <DefensePlayback
+          input={{ ...타구(단타, 주자1루), random: 늘0, defenseTeamIndex: 3 }}
+          onDone={onDone}
+          onFieldingErrors={onFieldingErrors}
+        />,
+      )
+      끝까지(onDone)
+
+      const 결 = 결과(onDone)
+      expect(결.fumbled).toBe(true)
+      // 결과 틱에서 펌블 6 을 본 야수(잠금 없음) — 그 그림마다 한 번
+      const 기대 = 결.ticks.flatMap((view) =>
+        view.fielders
+          .filter((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6)
+          .map((fielder) => ({ slot: fielder.slot, teamIndex: 3 })),
+      )
+      expect(기대.length).toBeGreaterThan(0)
+      expect(onFieldingErrors).toHaveBeenCalledTimes(1)
+      expect(onFieldingErrors.mock.calls[0]?.[0]).toEqual(expect.arrayContaining(기대))
+      expect(onFieldingErrors.mock.invocationCallOrder[0]).toBeLessThan(onDone.mock.invocationCallOrder[0] ?? 0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('펌블이 없으면 29 를 내지 않는다 — 난수를 안 주면 굴림 자체가 안 돈다', () => {
     vi.useFakeTimers()
     const 울린것: number[] = []

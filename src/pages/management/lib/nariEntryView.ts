@@ -107,10 +107,10 @@ const FULL_RECORD_STAMINA = 10000
 function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number) {
   if (cells === undefined) return {}
   const line = leagueBatterLineOf(cells.stats, leagueBatterIdOf(teamId, slot))
-  // ⚠️ 미확인: +0x2e(실책)는 웹 기록표에 없어 0
+  // +0x2e 실책 — 수비 그림 0x43278 4381a~43904 가 쌓은 칸(옛 저장은 0)
   const batterLine: EntryBatterLine = {
     atBats: line.atBats, hits: line.hits, doubles: line.doubles ?? 0, triples: line.triples ?? 0, homeRuns: line.homeRuns,
-    runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: 0,
+    runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: line.errors ?? 0,
   }
   return { batterLine }
 }
@@ -118,10 +118,10 @@ function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: numbe
 function nariPitcherCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number, staminaAbility: number) {
   if (cells === undefined) return {}
   const line = leaguePitcherLineOf(cells.stats, leaguePitcherIdOf(teamId, slot))
-  // ⚠️ 미확인: +0x2a(사사구)는 웹 기록표에 없어 0
+  // +0x2a 사사구 — 정산 0xa8024 꼬리 a8b04~a8bee 가 쌓은 칸(옛 저장은 0)
   const pitcherLine: EntryPitcherLine = {
     outs: line.outs, runsAllowed: line.runsAllowed, saves: line.saves, strikeouts: line.strikeouts, pitches: line.pitches,
-    walks: 0, wins: line.wins, losses: line.losses,
+    walks: line.walks ?? 0, wins: line.wins, losses: line.losses,
   }
   return {
     pitcherLine,
