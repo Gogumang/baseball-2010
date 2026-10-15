@@ -154,8 +154,11 @@ export function contactSoundIdOf(input: ContactSoundInput): number | null {
  * '파울' 은 콜이 없고, 판이 파울로 닫힌 자리에서 낸다(⚠️ 원본은 판이 닫히는 때가 아니라 7 이 난 그 틱 — 함성 60 과 같은 근사).
  * 낙구 전에 잡힌 파울 각 공(뜬공 아웃 13)은 7 이 안 나 25 도 없고, 아웃 콜(62)이 난다.
  *
- * ⚠️ **추정**: 39 의 조건 `[sp+0xa4]+4 == 2` 가 **올린 뒤**의 스트라이크 수인지 올리기 전인지는
- * 문서에 없다. 여기서는 올린 뒤로 읽어 두 번째 스트라이크에 39 를 낸다.
+ * **39 의 조건 `[sp+0xa4]+4 == 2` 는 올린 뒤의 스트라이크 수다 (확정, 2026-10 r87 직접 뜸)**:
+ * 공 판정 상태 0x12 진입 0x3dfac 가 0x9d57c 결과(3e05a)를 [+0x10ac] 에 두고, 표 0xcffb4[결과 − 1] 의 1(스트라이크) 갈래
+ * 3e134 가 0xa5e00 뒤 (모드 [+0x1104] ≠ 7 이면) `st[4] += 1`(3e14e~3e152)을 한 **다음** 3e1e2~3e1e8 에서 메시지 0xbba(결과)를
+ * 곧바로(0xbfbac) 보낸다. 그 처리 51a56 이 0x39578 뒤 점프표 0xd0488 로 51aa2 에 와서 `ldrsb [st, #4]`(51aa8) == 2 면 0x27(39),
+ * 아니면 0x12(18) 을 0x6ea6c 로 튼다 — 곧 두 번째 스트라이크에 39 다.
  * 볼넷 뒤에 조건부로 예약되는 함성 **29** 는 따로 `walkCheerSoundIdOf` 가 고른다.
  */
 export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatState): number | null {
