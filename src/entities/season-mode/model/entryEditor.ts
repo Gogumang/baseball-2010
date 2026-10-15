@@ -20,12 +20,25 @@
  * '6'/오른 키면 0(CPU 팀)이다 → **CPU 팀 엔트리는 보기 전용**이다(OK 가 안 먹는다).
  * R4 3b 의 "CPU 팀 엔트리도 고칠 수 있다(유력)" 는 이 인자를 못 본 것이다.
  *
+ * ## 열 밀기 `+0x337` · `+0x331` · `+0x332` · `+0x335` (2026-10-15 r89 직접 떴다)
+ * `0x557c0` 이 넘기는 열 수 > 보이는 열 `[+0x33c]`(3) 이면 `+0x337 = 1`(557c0~55854) — 넓은 표를 쓰는 시즌 선수 고르기 0xdf(0x5980) ·
+ * 스페셜 에디트(0x2b2e0)가 그렇다. 그때 왼(559f8) · 오른(55a6e)은 **타자 탭 보기 전용 · 투수 탭**에서 끝 코드 대신
+ * `+0x331 = 0`(단계) · `+0x332 = 1 / 0`(방향)을 세우고, 그림 `0x5c984` 가 한 번마다 단계를 올려 여섯째 뒤 첫 열 `+0x335` 를
+ * ±1 한다(`widgets/entry-editor/lib/entryListWindow`). 미는 동안(`+0x331 ≠ −1`)은 키가 0x5587c 에서 통째로 빠진다.
+ * 편집 가능한 타자 탭은 하위 탭 갈래가 먼저라 밀지 않는다.
+ *
+ * ## 위·아래 — 목록 객체 `[ed+0x41c]`
+ * `0x55724` 가 목록을 vt+0x1c(1열, 줄 수, 1, 꼴 **0x20**)로 만들고 커서 (0, 0) · 윗줄 0 · 보이는 줄 [+0x38] = min(10, 줄 수) 로 둔다.
+ * 위·아래는 vt+0x18 = 0x6c299 → 0x6c521 → 0x6c031 이 **세로로 감고**, vt+0x20 = 0x6c2bd 가 커서가 [윗줄, 윗줄 + 보이는 줄)
+ * 밖으로 나갈 때만 윗줄을 고친다 (나리 기록실 124 가 같은 목록을 쓴다 — `pages/nari-record-room/lib/nariRecordRoom`).
+ *
+ * ## 키 셈 `+0x40c`
+ * 0x55864 머리(55868)가 **불릴 때마다** +1 — ▲▼ · 옆 화살 깜빡과 커서 꼴이 이 값을 본다. 메인 메뉴(일반 23 · 에디트 29)는 틀마다
+ * 0x32634 → 갱신이 [메뉴+0x40] 키로 0x55864 를 부르고(0x2a370 · 0x2b2e0), 시즌 장면 0xe9ac 는 키가 들어온 틀([this+0x34])에만
+ * 부른다(0xec7e~0xec94) — 부르는 쪽이 `tickEntryEditor` 로 센다.
+ *
  * ⚠️ 미해결
- *   - `+0x337` 이 켜진 판(왼·오른 끝에서 하위 창 `+0x331/+0x332` 를 여는 갈래)은 시즌·일반 어디서도 켜는 곳을
- *     못 찾았다 — 0 으로 본다.
- *   - 위·아래는 목록 객체(`[ed+0x41c]` vtable+0x18, `+0x439 == 0` 일 때)가 받는다. 끝에서 감기는지 멈추는지는
- *     목록 객체 안을 안 떠서 모른다 — 웹은 **멈춘다**.
- *   - '0' 상세 창(`+0x424`)의 그림은 미해독 — 열림 표시만 들고 화면이 최소로 그린다.
+ *   - '0' 상세 창(`+0x424`)의 그림 0x5b798 은 엔트리 창에 아직 안 옮겼다 — 열림 표시만 들고 화면이 최소로 그린다.
  */
 
 /** `+0x33f` */
@@ -62,6 +75,57 @@ export interface EntryPitcherRow {
   readonly isAce: boolean
 }
 
+/** 타자 레코드 +0x20~+0x2e — 엔트리 목록 창 기록 열(0x56ebd)이 읽는 칸 */
+export interface EntryBatterLine {
+  readonly atBats: number
+  readonly hits: number
+  readonly doubles: number
+  readonly triples: number
+  readonly homeRuns: number
+  readonly runsBattedIn: number
+  /** +0x2c */
+  readonly steals: number
+  /** +0x2e — 머리 글 212 "실책" */
+  readonly errors: number
+}
+
+/** 투수 레코드 +0x20~+0x2f */
+export interface EntryPitcherLine {
+  readonly outs: number
+  readonly runsAllowed: number
+  readonly saves: number
+  readonly strikeouts: number
+  readonly pitches: number
+  /** +0x2a — 머리 글 219 "사사구" */
+  readonly walks: number
+  /** s8 +0x2e */
+  readonly wins: number
+  /** s8 +0x2f */
+  readonly losses: number
+}
+
+export const EMPTY_ENTRY_BATTER_LINE: EntryBatterLine = {
+  atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, runsBattedIn: 0, steals: 0, errors: 0,
+}
+export const EMPTY_ENTRY_PITCHER_LINE: EntryPitcherLine = {
+  outs: 0, runsAllowed: 0, saves: 0, strikeouts: 0, pitches: 0, walks: 0, wins: 0, losses: 0,
+}
+
+/**
+ * Xls 행 바이트 32~43(+0x20~+0x2a) 시즌 줄 여섯 칸 → 레코드 줄 — 타자 [타수, 안타, 2루타, 3루타, 홈런, 타점] ·
+ * 투수 [잡은 아웃, 실점, 세이브, 탈삼진, 투구 수, +0x2a]. 행 바이트 44~47 은 타자 0 · 투수 스태미나 10000 · 승패 0 이다
+ * (XlsBATTER_DATA · XlsPITCHER_DATA 를 직접 읽었다).
+ */
+export function entryBatterLineOfRecord(recordLine: readonly number[]): EntryBatterLine {
+  const at = (i: number) => recordLine[i] ?? 0
+  return { atBats: at(0), hits: at(1), doubles: at(2), triples: at(3), homeRuns: at(4), runsBattedIn: at(5), steals: 0, errors: 0 }
+}
+
+export function entryPitcherLineOfRecord(recordLine: readonly number[]): EntryPitcherLine {
+  const at = (i: number) => recordLine[i] ?? 0
+  return { outs: at(0), runsAllowed: at(1), saves: at(2), strikeouts: at(3), pitches: at(4), walks: at(5), wins: 0, losses: 0 }
+}
+
 /** 편집기가 들고 있는 팀 레코드의 두 배열 — 타자 `[팀+0x18]` · 투수 `[팀+0x14]` 순서 그대로 */
 export interface EntryLists<B extends EntryBatterRow, P extends EntryPitcherRow> {
   readonly batters: readonly B[]
@@ -79,7 +143,31 @@ export interface EntryEditorState {
   readonly result: EntryResult
   /** `+0x424` */
   readonly isDetailOpen: boolean
+  /** 목록 윗줄 `[목록+0x30]` */
+  readonly top: number
+  /** 보이는 첫 넘기는 열 `+0x335` */
+  readonly firstColumn: number
+  /** 열 밀기 `+0x331`(단계) · `+0x332`(방향) — 없으면 −1 */
+  readonly slide: EntryColumnSlide | null
+  /** 키 셈 `+0x40c` */
+  readonly keyPresses: number
+  /** 넘기는 열 수 — `+0x337` = 이 값 > 보이는 열 3 */
+  readonly scrollColumnCount: number
 }
+
+/** 열 밀기 — 단계 0~5 · 방향 'next'(오른 키, `+0x332 = 0`) · 'previous'(왼 키, 1) */
+export interface EntryColumnSlide {
+  readonly step: number
+  readonly direction: 'next' | 'previous'
+}
+
+/** `0x55798(ed, 3, 10)` — 보이는 넘기는 열 · 보이는 줄 */
+export const ENTRY_VISIBLE_SCROLL_COLUMNS = 3
+export const ENTRY_VISIBLE_LIST_ROWS = 10
+/** 그림 한 번에 한 단계 — 표 0xd1bbc 여섯 칸 */
+export const ENTRY_SLIDE_STEPS = 6
+/** 기본 표의 넘기는 열 수 (수비·보직 딱지 + 기록 둘) */
+export const ENTRY_BASIC_SCROLL_COLUMNS = 3
 
 /**
  * 초기화 `0x5561c(ed, &팀, 편집가능, 넷째, 다섯째=1)`:
@@ -93,7 +181,10 @@ export interface EntryEditorState {
  * ```
  * 이어 `0x55798(ed, 3, 10)` 이 `0x55724(ed, +0x33f)` 로 목록을 채우며 커서를 (0,0) 에 둔다.
  */
-export function openEntryEditor(isEditable: boolean): EntryEditorState {
+export function openEntryEditor(
+  isEditable: boolean,
+  scrollColumnCount: number = ENTRY_BASIC_SCROLL_COLUMNS,
+): EntryEditorState {
   return {
     tab: ENTRY_TAB.투수,
     subTab: isEditable ? ENTRY_SUB_TAB.타순 : ENTRY_SUB_TAB.보기전용,
@@ -101,7 +192,43 @@ export function openEntryEditor(isEditable: boolean): EntryEditorState {
     cursor: 0,
     result: ENTRY_RESULT.없음,
     isDetailOpen: false,
+    top: 0,
+    firstColumn: 0,
+    slide: null,
+    keyPresses: 0,
+    scrollColumnCount,
   }
+}
+
+/** `+0x337` — 넘기는 열이 보이는 열보다 많다 */
+export const isEntryColumnScrollable = (state: EntryEditorState) => state.scrollColumnCount > ENTRY_VISIBLE_SCROLL_COLUMNS
+
+/** 보이는 줄 [목록+0x38] = min(10, 줄 수) (0x55784~0x5578e) */
+export const entryVisibleRowCountOf = (rowCount: number) => Math.min(ENTRY_VISIBLE_LIST_ROWS, rowCount)
+
+/** 0x55864 를 키 없이 부른 틀 — 메인 메뉴의 틀마다 셈 (+0x40c 만 +1, 55868~55874) */
+export function tickEntryEditor(state: EntryEditorState): EntryEditorState {
+  return { ...state, keyPresses: state.keyPresses + 1 }
+}
+
+/** 0x5ccea~0x5cd1e — 다음 열: 첫 열 + 보이는 열 < 열 수 · 앞 열: 첫 열 > 0 */
+function canSlide(state: EntryEditorState, slide: EntryColumnSlide): boolean {
+  return slide.direction === 'next'
+    ? state.firstColumn + ENTRY_VISIBLE_SCROLL_COLUMNS < state.scrollColumnCount
+    : state.firstColumn > 0
+}
+
+/**
+ * 그림 한 번이 끝난 뒤의 밀기 (5cefa~5cf50) — 단계 + 1, 여섯이면 그만두고 첫 열 ± 1. 밀 수 없는 쪽이면 그 그림에서 곧장 그만둔다
+ * (5cd20 `+0x331 = −1`).
+ */
+export function advanceEntrySlide(state: EntryEditorState): EntryEditorState {
+  const { slide } = state
+  if (slide === null) return state
+  if (!canSlide(state, slide)) return { ...state, slide: null }
+  const step = slide.step + 1
+  if (step < ENTRY_SLIDE_STEPS) return { ...state, slide: { ...slide, step } }
+  return { ...state, firstColumn: state.firstColumn + (slide.direction === 'next' ? 1 : -1), slide: null }
 }
 
 /**
@@ -170,10 +297,11 @@ function rowCountOf(state: EntryEditorState, lists: EntryLists<EntryBatterRow, E
  *
  * - **'*'** (559b2): 탭 뒤집기 → 목록 다시 채우기(커서 0) · 보기 전용이 아니면 하위 탭 0 · 고른 줄 취소.
  * - **CLR** (55908): 고른 줄이 있으면 취소, 없으면 끝 코드 1.
- * - **왼** (559f8): 타자 탭 — 보기 전용이면 2 · 수비위치 탭이고 고른 줄이 없으면 타순 탭으로 · 그 밖은 2
- *   (⚠️ 수비위치 탭에서 고른 줄이 있을 때도 2 다). 투수 탭은 곧장 2.
- * - **오른** (55a6e): 타자 탭 — 보기 전용이면 3 · 타순 탭이고 고른 줄이 없으면 수비위치 탭으로 ·
- *   수비위치 탭이면 3 · (⚠️ 타순 탭에서 고른 줄이 있으면 **아무 일도 없다**). 투수 탭은 곧장 3.
+ * - **왼** (559f8): 타자 탭 — 보기 전용이면 `+0x337` ? 앞 열로 밀기 : 2 · 수비위치 탭이고 고른 줄이 없으면 타순 탭으로 ·
+ *   그 밖은 2 (⚠️ 수비위치 탭에서 고른 줄이 있을 때도 2 다). 투수 탭은 `+0x337` ? 밀기 : 2.
+ * - **오른** (55a6e): 타자 탭 — 보기 전용이면 `+0x337` ? 다음 열로 밀기 : 3 · 타순 탭이고 고른 줄이 없으면 수비위치 탭으로 ·
+ *   수비위치 탭이면 3 · (⚠️ 타순 탭에서 고른 줄이 있으면 **아무 일도 없다**). 투수 탭은 `+0x337` ? 밀기 : 3.
+ * - 머리(55868)에서 키 셈 `+0x40c` + 1, 미는 동안(`+0x331 ≠ −1`)은 0x5587c 가 나머지를 건너뛴다.
  * - **'0'** (55920): 상세 창 열고 닫기.
  * - **OK** (55ae6, 보기 전용이면 무시): 커서 줄이 마선수면 팝업 → 끝. 아니면
  *   - 고른 줄이 없으면 고른다 (수비위치 탭은 커서 ≤ 8 만),
@@ -186,44 +314,65 @@ export function pressEntryKey<B extends EntryBatterRow, P extends EntryPitcherRo
   lists: EntryLists<B, P>,
   key: EntryKey,
 ): EntryKeyOutcome<B, P> {
+  const counted = { ...state, keyPresses: state.keyPresses + 1 }
   const same = (next: EntryEditorState, nextLists: EntryLists<B, P> = lists): EntryKeyOutcome<B, P> => ({
     state: next, lists: nextLists, isAceLocked: false,
   })
+  // 5587c: 미는 동안은 셈만 하고 끝난다
+  if (state.slide !== null) return same(counted)
   const isBatterTab = state.tab === ENTRY_TAB.타자
   const isViewOnly = state.subTab === ENTRY_SUB_TAB.보기전용
   const hasPick = state.first !== NO_ENTRY_PICK
+  const slides = isEntryColumnScrollable(state)
 
   switch (key) {
     case '위':
-      return same({ ...state, cursor: Math.max(0, state.cursor - 1) })
+      return same(movedEntryCursor(counted, rowCountOf(state, lists), -1))
     case '아래':
-      return same({ ...state, cursor: Math.min(Math.max(0, rowCountOf(state, lists) - 1), state.cursor + 1) })
+      return same(movedEntryCursor(counted, rowCountOf(state, lists), 1))
     case '별': {
       const tab = isBatterTab ? ENTRY_TAB.투수 : ENTRY_TAB.타자
+      // 0x55724 가 목록을 다시 채운다 — 커서 (0, 0) · 윗줄 0 (첫 열 +0x335 는 그대로)
       // 559cc~559e8: 보기 전용(−1)이면 하위 탭·고른 줄을 건드리지 않고 끝난다
-      if (isViewOnly) return same({ ...state, tab, cursor: 0 })
-      return same({ ...state, tab, cursor: 0, subTab: ENTRY_SUB_TAB.타순, first: NO_ENTRY_PICK })
+      if (isViewOnly) return same({ ...counted, tab, cursor: 0, top: 0 })
+      return same({ ...counted, tab, cursor: 0, top: 0, subTab: ENTRY_SUB_TAB.타순, first: NO_ENTRY_PICK })
     }
     case '취소':
-      if (hasPick) return same({ ...state, first: NO_ENTRY_PICK })
-      return same({ ...state, result: ENTRY_RESULT.나가기 })
+      if (hasPick) return same({ ...counted, first: NO_ENTRY_PICK })
+      return same({ ...counted, result: ENTRY_RESULT.나가기 })
     case '왼':
-      if (!isBatterTab || isViewOnly) return same({ ...state, result: ENTRY_RESULT.왼쪽끝 })
+      if (!isBatterTab || isViewOnly) {
+        if (slides) return same({ ...counted, slide: { step: 0, direction: 'previous' } })
+        return same({ ...counted, result: ENTRY_RESULT.왼쪽끝 })
+      }
       if (state.subTab === ENTRY_SUB_TAB.수비위치 && !hasPick) {
-        return same({ ...state, subTab: ENTRY_SUB_TAB.타순 })
+        return same({ ...counted, subTab: ENTRY_SUB_TAB.타순 })
       }
-      return same({ ...state, result: ENTRY_RESULT.왼쪽끝 })
+      return same({ ...counted, result: ENTRY_RESULT.왼쪽끝 })
     case '오른':
-      if (!isBatterTab || isViewOnly) return same({ ...state, result: ENTRY_RESULT.오른쪽끝 })
-      if (state.subTab === ENTRY_SUB_TAB.타순) {
-        return hasPick ? same(state) : same({ ...state, subTab: ENTRY_SUB_TAB.수비위치 })
+      if (!isBatterTab || isViewOnly) {
+        if (slides) return same({ ...counted, slide: { step: 0, direction: 'next' } })
+        return same({ ...counted, result: ENTRY_RESULT.오른쪽끝 })
       }
-      return same({ ...state, result: ENTRY_RESULT.오른쪽끝 })
+      if (state.subTab === ENTRY_SUB_TAB.타순) {
+        return hasPick ? same(counted) : same({ ...counted, subTab: ENTRY_SUB_TAB.수비위치 })
+      }
+      return same({ ...counted, result: ENTRY_RESULT.오른쪽끝 })
     case '영':
-      return same({ ...state, isDetailOpen: !state.isDetailOpen })
+      return same({ ...counted, isDetailOpen: !state.isDetailOpen })
     case '확인':
-      return confirmEntry(state, lists)
+      return confirmEntry(counted, lists)
   }
+}
+
+/** 위·아래 — 세로로 감고(꼴 0x20) 커서가 보이는 줄 밖으로 나갈 때만 윗줄을 고친다 (0x6c2bd) */
+function movedEntryCursor(state: EntryEditorState, rowCount: number, dy: number): EntryEditorState {
+  if (rowCount <= 0) return state
+  const cursor = (state.cursor + dy + rowCount) % rowCount
+  const visible = entryVisibleRowCountOf(rowCount)
+  if (cursor >= state.top && cursor < state.top + visible) return { ...state, cursor }
+  const top = cursor - state.top > 0 ? cursor - visible + 1 : cursor
+  return { ...state, cursor, top }
 }
 
 function confirmEntry<B extends EntryBatterRow, P extends EntryPitcherRow>(

@@ -7,7 +7,13 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
+import {
+  entryBatterLineOfRecord, entryPitcherLineOfRecord,
+} from '@/entities/season-mode/model/entryEditor'
+import type {
+  EntryBatterLine, EntryBatterRow, EntryLists, EntryPitcherLine, EntryPitcherRow,
+} from '@/entities/season-mode/model/entryEditor'
+import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 
 /**
  * **시즌 0xe0 엔트리 편집이 보는 명단** — 갱신 `0x63dc` · 키 `0x7044` · 그림 `0xb074` (직접 떴다).
@@ -47,8 +53,21 @@ import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/sea
  *   (`useSeasonSession`, 대회를 열 때 표에서 채우고 대회가 끝나면 비운다).
  */
 
+/**
+ * 엔트리 목록 창 칸의 재료 (`widgets/entry-editor` 의 0x5c984 열) — 레코드 +0xb & 3 · 시즌 줄 +0x20~ · 체력 줄.
+ * 칸 값을 모르면(옛 사본 등) 그 칸을 비운다.
+ */
+export interface SeasonEntryCells {
+  /** 레코드 `+0xb & 3` — 타자 내야 0 · 외야 1 · 2 (0x571d8 세로 줄 색) · 투수 보직 (0xb6ded → 0x545e8) */
+  readonly profileLow?: number
+  readonly batterLine?: EntryBatterLine
+  readonly pitcherLine?: EntryPitcherLine
+  /** 체력 줄 — 용량 0x66e44(팀, rec, 0) · 퍼센트 (0x571d8) */
+  readonly stamina?: { readonly capacity: number; readonly percent: number }
+}
+
 /** 편집기 목록 한 줄 (타자) */
-export interface SeasonEntryBatter extends EntryBatterRow {
+export interface SeasonEntryBatter extends EntryBatterRow, SeasonEntryCells {
   readonly name: string
   readonly ability: readonly number[]
   /** 시즌 명단 배열의 첨자 — 마선수는 명단 밖이라 −1 */
@@ -56,10 +75,82 @@ export interface SeasonEntryBatter extends EntryBatterRow {
 }
 
 /** 편집기 목록 한 줄 (투수) */
-export interface SeasonEntryPitcher extends EntryPitcherRow {
+export interface SeasonEntryPitcher extends EntryPitcherRow, SeasonEntryCells {
   readonly name: string
   readonly ability: readonly number[]
   readonly rosterIndex: number
+}
+
+/** 레코드 +0x2c 가득 (Xls 투수 행 바이트 44~45 = 10000) */
+const FULL_RECORD_STAMINA = 10000
+
+/**
+ * 칸 재료를 어디서 읽는가 — 엔트리 목록 창이 읽는 팀 레코드 칸.
+ * - 시즌 줄: 일반모드 레코드는 Xls 행 그대로(행 바이트 32~43), 시즌 · 나리 저장 레코드는 0x204e0 이 비운 뒤 경기마다 쌓은 줄이라
+ *   부르는 쪽이 `batterLineOf` · `pitcherLineOf` 로 준다. 안 주면 붙박이 표 칸의 Xls 줄, 표 밖 선수는 비운다.
+ * - 체력 줄: S = [ed+0x334] ∈ {1, 2, 3, 4, 8, 9} ? trunc(+0x2c / 100) : 100 (0x572a4) · M = 0x66e44(팀, rec, 0) =
+ *   사기 보정 체력 + 250 (`staminaCapacityOf(…, false)`), 체력 = 칸 능력치 [3] (0xb6415(rec, 3, 1)).
+ */
+export interface SeasonEntryCellSource {
+  /** [ed+0x334] — 일반 0x2648c 는 모드 [메뉴+0x13c](1), 시즌 진입들은 2 */
+  readonly staminaMode: number
+  /** 팀 레코드 사기 (s16 +2) — 0x66e44 의 V[+2] */
+  readonly teamMorale: number
+  /** 레코드 +0x2c — 안 주면 명단의 `stamina` */
+  readonly staminaOf?: (player: SeasonPlayer, index: number) => number
+  readonly batterLineOf?: (player: SeasonPlayer) => EntryBatterLine
+  readonly pitcherLineOf?: (player: SeasonPlayer) => EntryPitcherLine
+}
+
+/** 일반모드(상태 23) — Xls 행 줄 · 스태미나 가득 · 모드 1 · ⚠️ 사기는 팀 레코드 칸을 웹이 안 들어 100 으로 둔다 */
+export const GENERAL_ENTRY_CELL_SOURCE: SeasonEntryCellSource = {
+  staminaMode: 1,
+  teamMorale: 100,
+  staminaOf: () => FULL_RECORD_STAMINA,
+}
+
+const staminaPercentOf = (mode: number, stamina: number) =>
+  mode >= 0 && mode <= 9 && ((0x31e >> mode) & 1) === 1 ? Math.trunc(stamina / 100) : 100
+
+/** 명단 선수 한 줄의 칸 재료 */
+export function seasonEntryCellsOf(
+  teamId: number,
+  player: SeasonPlayer,
+  isPitcher: boolean,
+  index: number,
+  ability: readonly number[],
+  source: SeasonEntryCellSource,
+): SeasonEntryCells {
+  const team = tableTeamOf(player, teamId)
+  const table = player.id < HALL_OF_FAME_FIRST_ID ? (isPitcher ? teamPitchers(team) : teamBatters(team))[player.id] : undefined
+  const record = player.record
+  const profile = table?.profile ?? record?.profile ?? (record !== undefined && 'role' in record ? record.role : undefined)
+  const profileLow = profile === undefined ? undefined : profile & 3
+  if (!isPitcher) {
+    const batterLine = source.batterLineOf?.(player) ?? (table === undefined ? undefined : entryBatterLineOfRecord(table.recordLine))
+    return { ...(profileLow === undefined ? {} : { profileLow }), ...(batterLine === undefined ? {} : { batterLine }) }
+  }
+  const pitcherLine = source.pitcherLineOf?.(player) ?? (table === undefined ? undefined : entryPitcherLineOfRecord(table.recordLine))
+  const stamina = source.staminaOf?.(player, index) ?? player.stamina
+  return {
+    ...(profileLow === undefined ? {} : { profileLow }),
+    ...(pitcherLine === undefined ? {} : { pitcherLine }),
+    stamina: {
+      capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false),
+      percent: staminaPercentOf(source.staminaMode, stamina),
+    },
+  }
+}
+
+/** 마선수 줄 — XlsACE 행을 통째 베낀 레코드(0xb521c · 0xb53f0): +0xb 는 표의 `profile`, 줄은 표의 `recordLine` */
+function aceCellsOf(ace: AcePlayer, ability: readonly number[], isPitcher: boolean, source: SeasonEntryCellSource): SeasonEntryCells {
+  if (!isPitcher) return { profileLow: ace.profile & 3, batterLine: entryBatterLineOfRecord(ace.recordLine) }
+  return {
+    profileLow: ace.profile & 3,
+    pitcherLine: entryPitcherLineOfRecord(ace.recordLine),
+    // ⚠️ 미확인: 마투수 레코드 +0x2c 는 웹이 따로 들지 않아 가득으로 둔다
+    stamina: { capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false), percent: staminaPercentOf(source.staminaMode, FULL_RECORD_STAMINA) },
+  }
 }
 
 export type SeasonEntryLists = EntryLists<SeasonEntryBatter, SeasonEntryPitcher>
@@ -161,6 +252,8 @@ export interface SeasonEntryInput {
    * 레벨 배율(b6438 `v · 0xd88aa[mgr[0x13a + 순번]] / 100`)이 본다. 안 넘기면 모두 Lv1
    */
   readonly aceLevels?: Readonly<Record<number, number>> | undefined
+  /** 엔트리 목록 창 칸 재료 — 안 주면 일반모드 꼴(`GENERAL_ENTRY_CELL_SOURCE`) */
+  readonly cells?: SeasonEntryCellSource
 }
 
 /**
@@ -180,34 +273,42 @@ function aceFaceAbilityOf(
 /** 0xe0 에 들어왔을 때 편집기 목록 — 로테이션을 돈 투수 배열과 마선수 두 칸을 끼운 모양 */
 export function seasonEntryListsOf(input: SeasonEntryInput): SeasonEntryLists {
   const { teamId, roster, dayCounter } = input
-  let batters: SeasonEntryBatter[] = roster.batters.map((player, index) => ({
-    ...playerFaceOf(teamId, player, false, index),
-    isAce: false,
-    position: player.fieldPosition & 0xf,
-    rosterIndex: index,
-  }))
-  let pitchers: SeasonEntryPitcher[] = rotatedPitchersOf(
-    roster.pitchers.map((player, index) => ({
-      ...playerFaceOf(teamId, player, true, index),
+  const cells = input.cells ?? GENERAL_ENTRY_CELL_SOURCE
+  let batters: SeasonEntryBatter[] = roster.batters.map((player, index) => {
+    const face = playerFaceOf(teamId, player, false, index)
+    return {
+      ...face,
+      ...seasonEntryCellsOf(teamId, player, false, index, face.ability, cells),
       isAce: false,
+      position: player.fieldPosition & 0xf,
       rosterIndex: index,
-    })),
+    }
+  })
+  let pitchers: SeasonEntryPitcher[] = rotatedPitchersOf(
+    roster.pitchers.map((player, index) => {
+      const face = playerFaceOf(teamId, player, true, index)
+      return { ...face, ...seasonEntryCellsOf(teamId, player, true, index, face.ability, cells), isAce: false, rosterIndex: index }
+    }),
     dayCounter,
   )
   const acePitcher = ACE_PITCHERS[input.acePitcherId]
   if (acePitcher !== undefined) {
+    const ability = aceFaceAbilityOf(acePitcher, input.acePitcherId, input.aceLevels)
     pitchers = seatAce(pitchers, ACE_PITCHER_SLOT, {
       name: acePitcher.name,
-      ability: aceFaceAbilityOf(acePitcher, input.acePitcherId, input.aceLevels),
+      ability,
+      ...aceCellsOf(acePitcher, ability, true, cells),
       isAce: true,
       rosterIndex: NOT_IN_ROSTER,
     })
   }
   const aceBatter = ACE_BATTERS[input.aceBatterId]
   if (aceBatter !== undefined) {
+    const ability = aceFaceAbilityOf(aceBatter, input.aceBatterId, input.aceLevels)
     batters = seatAce(batters, ACE_BATTER_SLOT, {
       name: aceBatter.name,
-      ability: aceFaceAbilityOf(aceBatter, input.aceBatterId, input.aceLevels),
+      ability,
+      ...aceCellsOf(aceBatter, ability, false, cells),
       isAce: true,
       position: 0,
       rosterIndex: NOT_IN_ROSTER,
@@ -215,6 +316,39 @@ export function seasonEntryListsOf(input: SeasonEntryInput): SeasonEntryLists {
   }
   return { batters, pitchers }
 }
+
+/**
+ * 팀 레코드 차례 그대로의 편집기 목록 — 시즌 0xdf(0x5980) · 0xe5(0x5cd0) · 0xe6(0x5b28) · 0xe8(0x5870) 은 0x5561c 에 레코드를 그대로
+ * 넘겨(투수는 로테이션으로 섞인 레코드 차례) 마선수를 끼우지 않는다. 이름은 `playerFaceOf`, `nameOf` 가 있으면 그것(표 밖 명전 기록 이름).
+ */
+export function seasonRecordEntryListsOf(
+  teamId: number,
+  roster: SeasonTeamRoster,
+  cells: SeasonEntryCellSource,
+  nameOf?: (player: SeasonPlayer, isPitcher: boolean, index: number) => string | undefined,
+): SeasonEntryLists {
+  const faceOf = (player: SeasonPlayer, isPitcher: boolean, index: number) => {
+    const face = playerFaceOf(teamId, player, isPitcher, index)
+    const name = nameOf?.(player, isPitcher, index)
+    return name === undefined ? face : { ...face, name }
+  }
+  return {
+    batters: roster.batters.map((player, index): SeasonEntryBatter => {
+      const face = faceOf(player, false, index)
+      return {
+        ...face, ...seasonEntryCellsOf(teamId, player, false, index, face.ability, cells),
+        isAce: false, position: player.fieldPosition & 0xf, rosterIndex: index,
+      }
+    }),
+    pitchers: roster.pitchers.map((player, index): SeasonEntryPitcher => {
+      const face = faceOf(player, true, index)
+      return { ...face, ...seasonEntryCellsOf(teamId, player, true, index, face.ability, cells), isAce: false, rosterIndex: index }
+    }),
+  }
+}
+
+/** 시즌 진입들의 [ed+0x333] = 1 · [ed+0x334] = 2 — 칸 재료를 따로 안 줄 때 */
+export const SEASON_ENTRY_CELL_SOURCE: SeasonEntryCellSource = { staminaMode: 2, teamMorale: 100 }
 
 /**
  * 고친 편집기 목록을 시즌 명단으로 되적는다 — 마선수 줄을 빼고(움직일 수 없으니 남은 순서가 곧 명단 순서다)

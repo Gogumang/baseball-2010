@@ -13,11 +13,11 @@ import {
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
   EDIT_GRID_SHAPE, EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
-  editEntryListsOf, editTargetOf, moveEditGrid, pointEditGrid, pressEditEntryKey,
+  editEntryListsOf, editTargetOf, frameEditEntry, moveEditGrid, pointEditGrid, pressEditEntryKey,
 } from '@/pages/special-edit/lib/specialEditFlow'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
-import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { ENTRY_TABLES_WIDE, EntryEditorScreen } from '@/widgets/entry-editor'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
@@ -25,6 +25,7 @@ import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -58,8 +59,11 @@ interface SpecialEditScreenProps {
  * - 하위 0: 머리띠 `0x54d95(skin, 1 "팀선택", 5 되돌아가기)`
  * - 하위 1·2: 그 위에 엔트리 창 `0x5d055 → 0x5cfec` + 머리띠 `0x54d95(skin, 1 "팀선택", 투수 탭 ? 0xf : 0x17)`
  *
- * ⚠️ 근사·미해결: 엔트리 창 아래에 깔린 팀 고르기 본문은 웹 엔트리 화면 판에 가려 따로 안 그린다 ·
- *    배경 0x58371 그림 · 엔트리 창 칸 배치(편집기 화면 머리글) · 입력 창 판 높이와 칸 둘레 그림(아래 `EditNamePopup`).
+ * 배경은 메뉴 바탕 0x58371(skin, main_title, 0) — 하위 0 · 1 · 2 모두 맨 먼저 깐다(0x2e1e0 의 첫 부름).
+ * 엔트리 창(넓은 표 · 커서 이름 칸만 [skin+0x438] = 1 — `EntryEditorScreen` / `widgets/entry-editor/lib/entryListWindow`).
+ *
+ * ⚠️ 근사·미해결: 엔트리 창 아래에 깔린 팀 고르기 본문(격자 · 로고 · 도형)은 모두 판(15, 55, 210, 220) 안이라 가려져 따로 안 그린다 ·
+ *    입력 창 판 높이와 칸 둘레 그림(아래 `EditNamePopup`).
  */
 export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditScreenProps) {
   const [state, setState] = useState(createSpecialEditState)
@@ -86,16 +90,25 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
 
   const lists = editEntryListsOf(state.team)
   const onKey = (key: EntryKey) => setState((previous) => pressEditEntryKey(previous, key))
+  const onFrame = () => setState(frameEditEntry)
 
   return (
     <EntryEditorScreen
       editor={state.editor}
       lists={lists}
+      underlay={<SkinBackdrop kind="메뉴바탕" />}
       teamName={TEAMS[state.team]?.name ?? ''}
       isAceLocked={false}
       gamePoint={gamePoint}
       title="팀선택"
       slides={false}
+      tables={ENTRY_TABLES_WIDE}
+      // 0x2b2e0 은 [skin+0x333] 을 세우지 않는다 — 앞 화면(일반 엔트리 0x2648c 가 1 로 세운다)이 남긴 값이다.
+      // ⚠️ 미확인: 부팅 뒤 처음이면 skin 할당(0x1239) 값이라 0 으로 본다
+      showsNameBars={false}
+      isCursorNameOnly
+      onFrame={onFrame}
+      ticksEveryFrame
       onKey={onKey}
       onMoveCursor={(index) => setState((previous) => ({ ...previous, editor: pointEntryCursor(previous.editor, lists, index) }))}
       onCloseAceLocked={() => undefined}
@@ -176,6 +189,8 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
 
   return (
     <RawScreen>
+      {/* 0x2e1e0 첫 부름 — 메뉴 바탕 0x58371(skin, main_title, 0) */}
+      <SkinBackdrop kind="메뉴바탕" />
       {gridOpen !== null && (<>
       {[
         { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },

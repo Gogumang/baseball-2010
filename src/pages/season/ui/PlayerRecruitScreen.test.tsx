@@ -103,11 +103,11 @@ describe('자리 고르기와 확정 (0xdf 목적 3 → 0xc554)', () => {
     자리로('나리투수 나리투수')
 
     expect(screen.getAllByTestId(/^엔트리-줄-/)).toHaveLength(3)
-    expect(screen.queryByTestId('엔트리-하위탭')).toBeNull() // 투수 탭
+    expect(screen.queryByTestId('엔트리-열-딱지-10000000')).toBeNull() // 투수 탭 — 수비 딱지 열이 없다
     expect(바닥()).toEqual([1])
     // 0x6fe0 — 목적 3 은 '*'(탭 뒤집기)를 목록에 안 넘긴다
     fireEvent.keyDown(window, { key: '*' })
-    expect(screen.queryByTestId('엔트리-하위탭')).toBeNull()
+    expect(screen.queryByTestId('엔트리-열-딱지-10000000')).toBeNull()
   })
 
   it('⚠️ 영입은 교체가 아니라 끼워넣기다 — 자리 수가 늘고 밀려난 선수는 맨 끝으로 간다', () => {
@@ -166,7 +166,7 @@ describe('자리 고르기와 확정 (0xdf 목적 3 → 0xc554)', () => {
   it('타자 쪽은 밀려난 선수의 칸 번호를 마지막으로 고쳐 준다 — 탭은 타자로 고정', () => {
     const onRecruit = 띄우기()
     자리로('나리타자 나리타자')
-    expect(screen.getByTestId('엔트리-하위탭')).toBeTruthy() // 타자 탭
+    expect(screen.getByTestId('엔트리-열-딱지-10000000')).toBeTruthy() // 타자 탭
     fireEvent.keyDown(window, { key: 'Enter' })
 
     const [result, asPitcher] = onRecruit.mock.calls[0] as [RecruitResult, boolean]
@@ -224,6 +224,6 @@ describe('원본 후보 목록을 꽂으면 (0xe1dc 목록 종류 0 → 키 0xe3
     expect(answers[0]).toContain('이미 영입된 선수 입니다')
     fireEvent.click(screen.getByRole('button', { name: '새선수' }))
     expect(answers[1]).toBeUndefined()
-    expect(screen.getByTestId('엔트리-하위탭')).toBeTruthy() // 자리 고르기 — 타자 탭
+    expect(screen.getByTestId('엔트리-열-딱지-10000000')).toBeTruthy() // 자리 고르기 — 타자 탭
   })
 })

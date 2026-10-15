@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react'
 import type { ReactNode } from 'react'
-import { EntryEditorScreen } from '@/widgets/entry-editor'
+import { ENTRY_TABLES_WIDE, EntryEditorScreen } from '@/widgets/entry-editor'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
-  ENTRY_TAB, openEntryEditor, pointEntryCursor, pressEntryKey,
+  ENTRY_TAB, advanceEntrySlide, openEntryEditor, pointEntryCursor, pressEntryKey,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey, EntryTab } from '@/entities/season-mode/model/entryEditor'
-import { playerFaceOf } from '@/entities/season-mode/model/seasonEntry'
-import type { SeasonEntryBatter, SeasonEntryLists, SeasonEntryPitcher } from '@/entities/season-mode/model/seasonEntry'
+import { SEASON_ENTRY_CELL_SOURCE, seasonRecordEntryListsOf } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 
 export interface SeasonPlayerPickScreenProps {
@@ -33,22 +33,13 @@ export interface SeasonPlayerPickScreenProps {
    * 그리기 0xb010 의 바닥이 7 이다.
    */
   readonly isRecruitSlot?: boolean
+  /** 엔트리 목록 창 칸 재료 — 내 팀 레코드의 시즌 줄 · 체력 (세션 `entryCellSourceOf`). 안 주면 붙박이 표 줄 */
+  readonly cells?: SeasonEntryCellSource
 }
+
 
 /** 0xb010 — 목적 3 의 바닥 7 (되돌아가기 + "0상세정보") */
 const RECRUIT_SLOT_FOOTER = 7
-
-/** 목록 칸 — 이름·능력치는 `playerFaceOf`, 타자는 수비 위치(+0x1c & 0xf) */
-function pickListsOf(teamId: number, roster: SeasonTeamRoster): SeasonEntryLists {
-  return {
-    batters: roster.batters.map((player, index): SeasonEntryBatter => ({
-      ...playerFaceOf(teamId, player, false, index), isAce: false, position: player.fieldPosition & 0xf, rosterIndex: index,
-    })),
-    pitchers: roster.pitchers.map((player, index): SeasonEntryPitcher => ({
-      ...playerFaceOf(teamId, player, true, index), isAce: false, rosterIndex: index,
-    })),
-  }
-}
 
 /**
  * **공용 선수 고르기** (장면 0x105 상태 **0xdf**, 들어옴 0x5980 · 키 0xc3e8 + 목록 키 0x6fe0 → 0x55864 · 그리기 0xb010)
@@ -72,13 +63,18 @@ function pickListsOf(teamId: number, roster: SeasonTeamRoster): SeasonEntryLists
  * 그래서 목적 1·2 의 그림은 엔트리 편집 0xe0 과 같은 창·머리띠(제목 7/6 · 바닥 0xf/0x17)다 — `EntryEditorScreen` 을
  * 보기 전용(`ed+0x330 = −1`)으로 그대로 쓴다. 들어올 때마다 목록을 다시 채워 커서는 0 이다(0x55724).
  *
- * ⚠️ 근사: 0x557c1 의 열 표(0xcbd74 …) 내용은 안 풀었다 — 줄에는 엔트리 편집과 같이 이름·수비 위치만 적는다.
+ * 열 표는 0x557c1(ed, 탭, 고정 0xcbd74 · 0xcbd88 둘, 넘기는 0xcbd9c · 0xcbdc4 열) — **넓은 표**(`ENTRY_TABLES_WIDE`)라
+ * 넘기는 열 열 개가 보이는 열 셋보다 많아 [ed+0x337] = 1, 보기 전용이라 좌·우가 열을 민다(0x559f8 · 0x55a6e).
+ * 키는 장면 0xe9ac 가 키가 들어온 틀에만 넘겨 키 셈 [ed+0x40c] 은 키마다 오른다.
  */
 export function SeasonPlayerPickScreen({
-  teamId, roster, initialTab, onPick, onBack, gamePoint = 0, overlay, isRecruitSlot = false,
+  teamId, roster, initialTab, onPick, onBack, gamePoint = 0, overlay, isRecruitSlot = false, cells = SEASON_ENTRY_CELL_SOURCE,
 }: SeasonPlayerPickScreenProps) {
-  const [editor, setEditor] = useState<EntryEditorState>(() => ({ ...openEntryEditor(false), tab: initialTab }))
-  const lists = pickListsOf(teamId, roster)
+  const [editor, setEditor] = useState<EntryEditorState>(() => ({
+    ...openEntryEditor(false, ENTRY_TABLES_WIDE.batter.scroll.length), tab: initialTab,
+  }))
+  const lists = seasonRecordEntryListsOf(teamId, roster, cells)
+  const onFrame = useCallback(() => setEditor((current) => advanceEntrySlide(current)), [])
 
   const onKey = useCallback((key: EntryKey) => {
     if (overlay !== undefined && overlay !== null) return
@@ -107,6 +103,8 @@ export function SeasonPlayerPickScreen({
       underlay={<SkinBackdrop kind="공무늬" />}
       // 0xdf 그림은 공용 목록 0x63b14 를 안 부른다 — 머리띠가 미끄러지지 않는다 (시즌 0x63b14 는 0xca · 0xd7 · 0xdd · 0xe2 · 0xe4 뿐)
       slides={false}
+      tables={ENTRY_TABLES_WIDE}
+      onFrame={onFrame}
       onKey={onKey}
       onMoveCursor={(index) => setEditor((current) => pointEntryCursor(current, lists, index))}
       onCloseAceLocked={() => undefined}

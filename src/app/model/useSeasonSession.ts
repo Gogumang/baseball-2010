@@ -75,7 +75,9 @@ import {
   playerFaceOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
-import type { SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
+import type {
+  SeasonEntryCellSource, SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource,
+} from '@/entities/season-mode/model/seasonEntry'
 import {
   HALL_OF_FAME_FIRST_ID, removeCareerPlayerFromRoster, removeHallOfFamerFromRoster, tableTeamOf,
 } from '@/entities/season-mode/model/playerRecruit'
@@ -191,6 +193,11 @@ export interface SeasonSession {
   /** 영입한 명전 선수의 기록을 찾아 준다(기록연감 명전 칸) — 순위표 이름·경기 명단이 같은 것을 본다. 없으면 undefined */
   readonly recordSource: () => SeasonEntryRecordSource | undefined
   readonly tradeRosterOf: (teamId: number) => SeasonTeamRoster
+  /**
+   * 엔트리 목록 창(0x5c984) 칸 재료 — 그 팀 레코드의 시즌 줄 · 체력 (`seasonEntryCellSourceOf`). 저장이 없으면 undefined.
+   * 0xdf · 0xe5 · 0xe6 · 0xe8 처럼 세션 밖 화면이 명단을 그릴 때 넘긴다
+   */
+  readonly entryCellSourceOf: (teamId: number) => SeasonEntryCellSource | undefined
   /** 리그 선수별 성적 — 타이틀·MVP 판정의 유일한 재료다 (B-2) */
   readonly playerStats: LeaguePlayerStats
   /** 포스트시즌 시리즈 (준PO → PO → 한국시리즈). 정규시즌 중에는 null */
@@ -2002,14 +2009,17 @@ export function useSeasonSession(
         const teamId = pending.options.ourTeamId
         return {
           teamId, roster: current.cupRoster ?? tableRosterOf(teamId), dayCounter, acePitcherId: -1, aceBatterId: -1,
+          cells: seasonEntryCellSourceOf(current, teamId, true),
         }
       }
+      const teamId = current.state.record.teamId
       return {
-        teamId: current.state.record.teamId,
+        teamId,
         roster: current.roster,
         dayCounter,
         acePitcherId: preGameAces.pitcher,
         aceBatterId: preGameAces.batter,
+        cells: seasonEntryCellSourceOf(current, teamId, true),
       }
     },
     [preGameAces],
@@ -2033,6 +2043,7 @@ export function useSeasonSession(
           dayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
           acePitcherId: options.opponentAces?.pitcher ?? -1,
           aceBatterId: options.opponentAces?.batter ?? -1,
+          cells: seasonEntryCellSourceOf(save, options.opponentTeamId, false),
         }
       setEntryEdit({
         isUserTeam,
@@ -2957,6 +2968,8 @@ export function useSeasonSession(
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
     cpuRosterOf: (teamId: number) => cpuRosterOf(save, teamId),
+    entryCellSourceOf: (teamId: number) =>
+      save === null ? undefined : seasonEntryCellSourceOf(save, teamId, teamId === save.state.record.teamId),
     recordSource: recordSourceNow,
     tradeRoster: save === null ? EMPTY_ROSTER : tradeRecordRosterOf(save, save.state.record.teamId, save.roster),
     pitcherRecordOrder: save === null ? [] : recordPitcherOrderOf(save, save.state.record.teamId, save.roster.pitchers.length),
@@ -3065,6 +3078,35 @@ export interface SeasonLeagueRecordSource {
 export function seasonBatterLineOf(stats: LeaguePlayerStats, ownerTeamId: number, player: SeasonPlayer): LeagueBatterLine {
   if (player.id >= HALL_OF_FAME_FIRST_ID) return leagueRecordBatterLineOf(stats, player.id)
   return leagueBatterLineOf(stats, leagueBatterIdOf(tableTeamOf(player, ownerTeamId), player.id))
+}
+
+/**
+ * 엔트리 목록 창(0x5c984) 칸 재료 — 시즌 진입들(0x63dc · 0x5980 · 0x5870 · 0x5b28 · 0x5cd0)은 [ed+0x333] = 1 · [ed+0x334] = 2 다.
+ * 시즌 줄은 시즌 저장 레코드(0x204e0 이 비운 뒤 경기가 쌓은 줄) = 리그 기록표 줄이다. ⚠️ 미확인: 투수 +0x2a(사사구) ·
+ * 타자 +0x2e(실책)는 웹 기록표에 없어 0 · CPU 팀 레코드 사기는 웹이 안 들어 100 으로 둔다.
+ */
+export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
+  const stats = save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS
+  const cpuStaminas = save.cpuPitcherStaminas?.[teamId]
+  return {
+    staminaMode: 2,
+    teamMorale: isUserTeam ? save.state.teamMorale : 100,
+    ...(isUserTeam ? {} : { staminaOf: (_player: SeasonPlayer, index: number) => cpuStaminas?.[index] ?? FULL_STAMINA }),
+    batterLineOf: (player) => {
+      const line = seasonBatterLineOf(stats, teamId, player)
+      return {
+        atBats: line.atBats, hits: line.hits, doubles: line.doubles ?? 0, triples: line.triples ?? 0, homeRuns: line.homeRuns,
+        runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: 0,
+      }
+    },
+    pitcherLineOf: (player) => {
+      const line = seasonPitcherLineOf(stats, teamId, player)
+      return {
+        outs: line.outs, runsAllowed: line.runsAllowed, saves: line.saves, strikeouts: line.strikeouts, pitches: line.pitches,
+        walks: 0, wins: line.wins, losses: line.losses,
+      }
+    },
+  }
 }
 
 /** 시즌 명단 선수의 이번 시즌 투수 줄 — `seasonBatterLineOf` 와 같은 열쇠 */

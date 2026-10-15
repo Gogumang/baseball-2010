@@ -8,6 +8,7 @@ import {
 import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 import type { RecruitResult, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
+import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
 import { SeasonListWindow } from '@/widgets/season/ui/SeasonListWindow'
 import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
@@ -53,6 +54,8 @@ export interface PlayerRecruitScreenProps {
    * 1단계로 그린다 (`RecruitChoice` 를 `choose` 로 넘기면 중복 검사를 하고 자리 고르기로 간다).
    */
   readonly renderCandidates?: (actions: RecruitCandidateActions) => ReactNode
+  /** 자리 고르기 0xdf 의 엔트리 목록 창 칸 재료 (`SeasonPlayerPickScreen.cells`) */
+  readonly cells?: SeasonEntryCellSource
 }
 
 /** 목록이 고른 후보 — 키 0xe340 의 결과 코드 1~4 (`[목록+0x12c]`) 와 명전 칸 (`[목록+0x130]`) */
@@ -90,7 +93,7 @@ export interface RecruitCandidateActions {
  * ⚠️ 근사: `renderCandidates` 없이 띄운 1단계(후보 목록)는 공용 판 목록이다 — 앱은 명예의 전당 목록을 꽂는다.
  */
 export function PlayerRecruitScreen({
-  teamId, roster, pitcherRecordOrder, list, gamePoint = 0, onRecruit, onDone, onBack, renderCandidates,
+  teamId, roster, pitcherRecordOrder, list, gamePoint = 0, onRecruit, onDone, onBack, renderCandidates, cells,
 }: PlayerRecruitScreenProps) {
   const [step, setStep] = useState<{ readonly candidate: RecruitCandidate; readonly isPitcher: boolean } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -183,6 +186,7 @@ export function PlayerRecruitScreen({
         initialTab={chosen.isPitcher ? ENTRY_TAB.투수 : ENTRY_TAB.타자}
         gamePoint={gamePoint}
         isRecruitSlot
+        {...(cells === undefined ? {} : { cells })}
         overlay={noticeBox}
         onPick={(_tab, index) => selectSlot(index)}
         // 0xc3e8 취소 → 목적 3 은 0xe2

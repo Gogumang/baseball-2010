@@ -36,7 +36,7 @@ describe('스페셜 에디트 화면', () => {
     render(<SpecialEditScreen gamePoint={0} onRename={onRename} onBack={vi.fn()} />)
     key('ArrowRight')
     key('Enter')
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain(teamPitchers(1)[0].name)
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain(teamPitchers(1)[0].name)
     key('ArrowDown')
     key('Enter')
     expect(screen.getByRole('dialog', { name: '이름 입력' })).toBeTruthy()
@@ -76,7 +76,7 @@ describe('스페셜 에디트 화면', () => {
     key('Enter')
     key('*')
     key('Escape')
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain(teamPitchers(0)[0].name)
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain(teamPitchers(0)[0].name)
   })
 
   it('고친 이름이 경기 명단(공용 이름 0xb62c0)에 그대로 쓰인다', () => {
@@ -92,7 +92,7 @@ describe('스페셜 에디트 화면', () => {
 
     expect(rosterEntryBattersOf(0)[0].name).toBe('Kim')
     expect(rosterEntryPitchersOf(0)[0].name).toBe(originalNameOf(teamPitchers(0)[0]))
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('Kim')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('Kim')
     expect(originalNameOf(teamBatters(0)[0])).not.toBe('Kim')
   })
 })

@@ -45,6 +45,11 @@ export interface NariEntryFace {
   readonly name: string
   /** '0' 상세 창 네 칸 — 타자 히트·파워·수비·주루 · 투수 제구·구속·변화·체력 */
   readonly ability: readonly number[]
+  /**
+   * 레코드 +0xb & 3 — 엔트리 목록 창의 보직 딱지 · 타자 이름 칸 세로 줄 색 (붙박이 표 행 · 마선수 표의 값).
+   * ⚠️ 기록 열(+0x20~)과 체력 줄은 나리 팀 레코드의 시즌 줄 · +0x2c 를 웹이 이 목록에 싣지 않아 비운다
+   */
+  readonly profileLow?: number
 }
 
 export interface NariEntryBatter extends EntryBatterRow, NariEntryFace {}
@@ -64,7 +69,7 @@ const aceBatterFace = (index: number): NariEntryFace => {
   const ace = ACE_BATTERS[index]
   return ace === undefined
     ? { name: '마타자', ability: [] }
-    : { name: ace.name, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run] }
+    : { name: ace.name, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run], profileLow: ace.profile & 3 }
 }
 
 /** 마투수 표의 네 칸은 타자 칸 이름으로 들었다 — 제구·구속·변화·체력 차례 (`aceOpponent` 주석) */
@@ -72,7 +77,7 @@ export const acePitcherFace = (index: number): NariEntryFace => {
   const ace = ACE_PITCHERS[index]
   return ace === undefined
     ? { name: '마투수', ability: [] }
-    : { name: ace.name, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run] }
+    : { name: ace.name, ability: [ace.ability.hit, ace.ability.power, ace.ability.defense, ace.ability.run], profileLow: ace.profile & 3 }
 }
 
 /**
@@ -87,7 +92,10 @@ export function nariEntryBattersOf(record: NariTeamRecord, teamId: number, me: N
       return { ...(me ?? { name: '', ability: [] }), isAce: false, position: row.position }
     }
     const player = table[row.slot]
-    return { name: player?.name ?? '', ability: player?.ability ?? [], isAce: false, position: row.position }
+    return {
+      name: player?.name ?? '', ability: player?.ability ?? [], isAce: false, position: row.position,
+      ...(player === undefined ? {} : { profileLow: player.profile & 3 }),
+    }
   })
 }
 
@@ -105,7 +113,9 @@ export function nariEntryPitchersOf(
     const found = special(slot)
     if (found !== undefined) return found
     const player = table[slot]
-    return { name: player?.name ?? '', ability: player?.ability ?? [], isAce: false }
+    return {
+      name: player?.name ?? '', ability: player?.ability ?? [], isAce: false, ...(player === undefined ? {} : { profileLow: player.profile & 3 }),
+    }
   })
 }
 

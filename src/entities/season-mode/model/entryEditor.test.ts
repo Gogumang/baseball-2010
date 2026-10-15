@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ENTRY_RESULT, ENTRY_SUB_TAB, ENTRY_TAB, NO_ENTRY_PICK, leavesEntryEditor, openEntryEditor, pressEntryKey,
+  ENTRY_RESULT, ENTRY_SUB_TAB, ENTRY_TAB, NO_ENTRY_PICK, advanceEntrySlide, leavesEntryEditor, openEntryEditor, pressEntryKey,
+  tickEntryEditor,
   swapEntryBatters, swapEntryPitchers, swapFieldPositions,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey, EntryLists } from '@/entities/season-mode/model/entryEditor'
@@ -97,7 +98,7 @@ describe('엔트리 편집기 0x55864', () => {
 
   it('⚠️ 원본 그대로 — 타순 탭에서 고른 줄이 있으면 오른 키는 아무 일도 없고, 수비위치 탭에서 고른 줄이 있으면 왼 키는 끝 코드 2', () => {
     const 타순고름 = 누르기(openEntryEditor(true), ['별', '확인']).state
-    expect(누르기(타순고름, ['오른']).state).toEqual(타순고름)
+    expect(누르기(타순고름, ['오른']).state).toEqual({ ...타순고름, keyPresses: 타순고름.keyPresses + 1 })
     const 수비고름 = 누르기(openEntryEditor(true), ['별', '오른', '확인']).state
     expect(누르기(수비고름, ['왼']).state.result).toBe(ENTRY_RESULT.왼쪽끝)
   })
@@ -130,5 +131,35 @@ describe('엔트리 편집기 0x55864', () => {
   it("'0' 은 상세 창을 열고 닫는다", () => {
     expect(누르기(openEntryEditor(true), ['영']).state.isDetailOpen).toBe(true)
     expect(누르기(openEntryEditor(true), ['영', '영']).state.isDetailOpen).toBe(false)
+  })
+
+  it('위·아래는 목록 객체 꼴 0x20 — 세로로 감고, 윗줄은 커서가 보이는 10 줄 밖으로 나갈 때만 옮긴다 (0x6c299 · 0x6c2bd)', () => {
+    const 타자탭 = 누르기(openEntryEditor(true), ['별']).state
+    const 위로 = 누르기(타자탭, ['위']).state
+    expect(위로).toMatchObject({ cursor: 11, top: 2 })
+    expect(누르기(위로, ['아래']).state).toMatchObject({ cursor: 0, top: 0 })
+    expect(누르기(타자탭, Array<EntryKey>(9).fill('아래')).state).toMatchObject({ cursor: 9, top: 0 })
+    expect(누르기(타자탭, Array<EntryKey>(10).fill('아래')).state).toMatchObject({ cursor: 10, top: 1 })
+  })
+
+  it('키마다 셈 +0x40c 가 오른다 (55868) — 틀마다 부르는 쪽은 tickEntryEditor', () => {
+    expect(누르기(openEntryEditor(true), ['위', '확인', '별']).state.keyPresses).toBe(3)
+    expect(tickEntryEditor(openEntryEditor(true)).keyPresses).toBe(1)
+  })
+
+  it('넓은 표(+0x337)는 투수 탭 · 보기 전용 타자 탭의 좌·우가 열을 민다 — 여섯 그림 뒤 첫 열 ± 1, 미는 동안 키는 셈만', () => {
+    const 넓은 = openEntryEditor(false, 10)
+    const 밀기 = 누르기(넓은, ['오른']).state
+    expect(밀기.slide).toEqual({ step: 0, direction: 'next' })
+    expect(밀기.result).toBe(ENTRY_RESULT.없음)
+    // 미는 동안 위 키는 0x5587c 에서 빠진다
+    expect(누르기(밀기, ['아래']).state).toMatchObject({ cursor: 0, keyPresses: 2 })
+    let 그림 = 밀기
+    for (let i = 0; i < 6; i += 1) 그림 = advanceEntrySlide(그림)
+    expect(그림).toMatchObject({ firstColumn: 1, slide: null })
+    // 첫 열 0 에서 왼쪽은 밀 수 없어 그 그림에서 그만둔다
+    expect(advanceEntrySlide(누르기(넓은, ['왼']).state)).toMatchObject({ firstColumn: 0, slide: null })
+    // 편집 가능한 타자 탭은 하위 탭 갈래가 먼저다
+    expect(누르기(openEntryEditor(true, 10), ['별', '오른']).state).toMatchObject({ subTab: ENTRY_SUB_TAB.수비위치, slide: null })
   })
 })

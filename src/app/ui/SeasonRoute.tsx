@@ -20,6 +20,7 @@ import { fillModeText } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { AceSelectScreen } from '@/pages/general-mode'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
+import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { TEAMS } from '@/shared/config/original/teams'
 import {
@@ -132,6 +133,11 @@ const CENTER_SLIDE_FROM: readonly number[] = [
 ]
 
 /** 나리 칸 후보 — id 0xfe · +0xa 0x80/0xa0 · 기록 사본 (`nariRecruitPlayerOf`) */
+/** 엔트리 목록 창 칸 재료 — 저장이 없으면 넘기지 않는다(받는 쪽 기본값) */
+function withEntryCells(cells: SeasonEntryCellSource | undefined): { readonly cells?: SeasonEntryCellSource } {
+  return cells === undefined ? {} : { cells }
+}
+
 function nariRecruitOf(
   record: SeasonEntryBatterRecord | SeasonEntryPitcherRecord | null | undefined,
   isPitcher: boolean,
@@ -494,13 +500,15 @@ function SeasonScreens({
   // 십전대보탕 투수 고르기 0xe8 (들어옴 0x5870 · 키 0x7c00) — 취소·회복 뒤 0xdc(GP 창 커서 3)
   if (scene === SEASON_SCENE_STATE.스태미나회복) {
     const recordOf = session.recordSource()
-    const pitchers = session.tradeRoster.pitchers.map((player, index) => ({
-      name: seasonPlayerRecordOf(state.record.teamId, player, true, index, recordOf).name,
-      stamina: player.stamina,
-    }))
     return (
       <SeasonStaminaPickScreen
-        pitchers={pitchers}
+        teamId={state.record.teamId}
+        // 0x5870 — 내 팀 레코드(로테이션으로 섞인 차례)
+        roster={session.tradeRoster}
+        nameOf={(player, isPitcher, index) => seasonPlayerRecordOf(state.record.teamId, player, isPitcher, index, recordOf).name}
+        {...withEntryCells(session.entryCellSourceOf(state.record.teamId))}
+        state={state}
+        gamePoint={session.gamePoints}
         onPick={actions.recoverSeasonPitcherStamina}
         onBack={() => {
           setShopKind(ITEM_WINDOW_KIND.GP아이템)
@@ -676,6 +684,7 @@ function SeasonScreens({
       <SeasonPlayerPickScreen
         teamId={state.record.teamId}
         roster={session.tradeRoster}
+        {...withEntryCells(session.entryCellSourceOf(state.record.teamId))}
         initialTab={pick.tab}
         gamePoint={session.gamePoints}
         overlay={pickNotice === null ? undefined : (
@@ -739,6 +748,7 @@ function SeasonScreens({
       <PlayerRecruitScreen
         teamId={state.record.teamId}
         roster={roster}
+        {...withEntryCells(session.entryCellSourceOf(state.record.teamId))}
         // 자리 고르기 0xdf 목적 3 은 내 팀 레코드 차례(투수는 로테이션으로 섞인 차례) — 고른 칸 k 를 명단 첨자로
         pitcherRecordOrder={session.pitcherRecordOrder}
         gamePoint={session.gamePoints}

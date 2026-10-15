@@ -38,7 +38,7 @@ describe('선수 고르기 0xdf', () => {
 
     키('ArrowDown')
     키('*')
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('박택용')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('박택용')
     키('Enter')
 
     expect(onPick).toHaveBeenCalledWith(ENTRY_TAB.타자, 0)
