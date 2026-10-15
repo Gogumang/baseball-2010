@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { CommonPanel, MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ACE_ENTRY_LOCKED_TEXT, ENTRY_SUB_TAB, ENTRY_TAB, NO_ENTRY_PICK, fieldPositionLabelOf,
@@ -180,7 +181,13 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
       {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
           표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}
       <ScreenFrame title={title ?? (isPitcherTab ? '투수엔트리' : '타자엔트리')} gamePoint={gamePoint}
-        onBack={() => onKey('취소')} footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)} slides={slides} />
+        onBack={() => onKey('취소')} footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)} slides={slides}
+        // 바닥띠 "#타자" · "#투수" 표시 = 탭 바꾸기 '*'(0x558c4) · "0상세정보" = '0' — 그 표시 위 투명 누름 칸. 마선수 잠금 창이 떠 있으면 키를 안 받는다
+        footerPresses={isAceLocked ? undefined : {
+          [FOOTER_BITS.batter]: { label: '* 타자', onPress: () => onKey('별') },
+          [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: () => onKey('별') },
+          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => onKey('영') },
+        }} />
 
       {isAceLocked && (
         <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />

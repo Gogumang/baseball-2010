@@ -4,6 +4,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { currentTitleOf } from '@/entities/career/model/titles'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { TrainingScene } from '@/widgets/training-scene/ui/TrainingScene'
 import { TRAINING_PRESENTATION_OF } from '@/shared/config/original/trainingAnimation'
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
@@ -88,6 +89,9 @@ export interface ManagementScreenProps {
 }
 
 /** 기본정보 카드 그림 0x166cc 의 바닥비트 (0x166f2 `movs r2, #0x87`) */
+/** 누름 칸이 보내는 키 — 메뉴 훅의 window 키 듣개가 그대로 받는다 */
+const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+
 const BASIC_INFO_FOOTER = 0x87
 
 /**
@@ -183,7 +187,12 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {/* 기본정보(119)·칭호(129 — 0x198fc 가 0x166cc 를 먼저 그린다)는 바닥 0x87 "#닉네임"·"0상세정보"·되돌아가기 (0x166f2).
           표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. 120 은 0x16928 "그 밖"이라 5, 그 밖 상태도 5 */}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false} />
+        footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false}
+        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸
+        footerPresses={{
+          [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
+          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') },
+        }} />
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
       {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (
         <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay} />
