@@ -7,6 +7,8 @@ import {
 import type {
   CardBox, FillRect, FrameSize, NumberGlyph, Placed, StaminaGauge,
 } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
+import type { CSSProperties } from 'react'
+import { useImgTextPalettes } from '@/shared/ui'
 import * as styles from '@/widgets/matchup-cards/ui/MatchupCards.css'
 
 /**
@@ -82,14 +84,15 @@ function Fill({ rect }: { readonly rect: FillRect }) {
 }
 
 function FrameImage(
-  { folder, frame, size, at, testId }: {
+  { folder, frame, size, at, testId, style }: {
     readonly folder: string; readonly frame: number; readonly size: FrameSize; readonly at: Placed; readonly testId: string
+    readonly style?: CSSProperties
   },
 ) {
   return (
     <img
       className={styles.sprite}
-      style={{ left: at.x + size.x, top: at.y + size.y }}
+      style={{ left: at.x + size.x, top: at.y + size.y, ...style }}
       src={`${folder}/${pad(frame)}.png`}
       alt=""
       data-testid={testId}
@@ -98,16 +101,22 @@ function FrameImage(
   )
 }
 
-/** img_text 글자를 박스에 (0xb9e8c) — 크기를 모르는 프레임은 그리지 않는다 */
+/**
+ * img_text 글자를 박스에 (0xb9e8c) — 크기를 모르는 프레임은 그리지 않는다.
+ * `paletteStyle` 은 그 자리의 img_text 팔레트(`useImgTextPalettes().styleOf`) — 박스 1 PLAYER/COM 은 팔레트 4
+ * (0x44b26 · 0x451f8), 나머지는 0 이다(0x44bf0 · 0x452c8 에서 0 으로 돌린 뒤 보직 · 수비 글자를 찍는다).
+ */
 function Label(
-  { frame, cardBox, anchor, origin, testId }: {
+  { frame, cardBox, anchor, origin, testId, paletteStyle }: {
     readonly frame: number; readonly cardBox: CardBox; readonly anchor: number; readonly origin: Placed; readonly testId: string
+    readonly paletteStyle?: CSSProperties
   },
 ) {
   const size = IMG_TEXT_FRAMES[frame]
   if (size === undefined) return null
   return (
-    <FrameImage folder={IMG_TEXT_FOLDER} frame={frame} size={size} at={framePlacementOf(cardBox, size, anchor, origin)} testId={testId} />
+    <FrameImage folder={IMG_TEXT_FOLDER} frame={frame} size={size} at={framePlacementOf(cardBox, size, anchor, origin)} testId={testId}
+      style={paletteStyle} />
   )
 }
 
@@ -179,6 +188,8 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
   const pitcherLabel = pitcher.isComputer ? LABEL.computer : LABEL.player
   const batterLabel = batter.isComputer ? LABEL.computer : LABEL.player
   const roleBadge = pitcher.role === undefined ? null : pitcherRoleBadgeOf(pitcher.role, pitcherLabel)
+  // img_text 팔레트 — 49 "선발" 은 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리에서는 흰 글자로 되돌린다
+  const palettes = useImgTextPalettes()
 
   const era = pitcher.earnedRunAverage === undefined ? null : earnedRunAverageGlyphsOf(pitcher.earnedRunAverage, p)
 
@@ -192,15 +203,18 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
 
   return (
     <div className={styles.stage} data-testid="소개판">
+      {palettes.definition}
       {/* ── 투수 판 (game_ui 프레임 1) ── */}
       <div data-testid="투수판" data-x={p.x} data-y={p.y}>
         <CardBase frame={PITCHER_CARD_FRAME} origin={p} />
-        <Label frame={pitcherLabel} cardBox={PITCHER_BOXES[1]} anchor={0x11} origin={p} testId="투수팀" />
+        <Label frame={pitcherLabel} cardBox={PITCHER_BOXES[1]} anchor={0x11} origin={p} testId="투수팀"
+          paletteStyle={palettes.styleOf(pitcherLabel, 4)} />
         {pitcher.name !== undefined && <NameText name={pitcher.name} cardBox={PITCHER_BOXES[3]} origin={p} />}
         {roleBadge !== null && (
           <>
             <Chip frame={roleBadge.chip} cardBox={PITCHER_BOXES[7]} origin={p} testId="보직칸" />
-            <Label frame={roleBadge.label} cardBox={PITCHER_BOXES[7]} anchor={0x22} origin={p} testId="보직" />
+            <Label frame={roleBadge.label} cardBox={PITCHER_BOXES[7]} anchor={0x22} origin={p} testId="보직"
+              paletteStyle={palettes.styleOf(roleBadge.label, 0)} />
           </>
         )}
         {pitcher.throwsLeft !== undefined && (
@@ -228,14 +242,16 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
       {/* ── 타자 판 (game_ui 프레임 2) ── */}
       <div data-testid="타자판" data-x={b.x} data-y={b.y}>
         <CardBase frame={BATTER_CARD_FRAME} origin={b} />
-        <Label frame={batterLabel} cardBox={BATTER_BOXES[1]} anchor={0x11} origin={b} testId="타자팀" />
+        <Label frame={batterLabel} cardBox={BATTER_BOXES[1]} anchor={0x11} origin={b} testId="타자팀"
+          paletteStyle={palettes.styleOf(batterLabel, 4)} />
         {batter.name !== undefined && <NameText name={batter.name} cardBox={BATTER_BOXES[3]} origin={b} />}
         {positionBadge !== null && (
           <>
             {positionBadge.chip >= 0 && <Chip frame={positionBadge.chip} cardBox={BATTER_BOXES[7]} origin={b} testId="수비칸" />}
             {/* 글자만 1px 아래 (0x452e8 `adds r2,#1`) */}
             {positionBadge.label >= 0 && (
-              <Label frame={positionBadge.label} cardBox={BATTER_BOXES[7]} anchor={0x22} origin={{ x: b.x, y: b.y + 1 }} testId="수비" />
+              <Label frame={positionBadge.label} cardBox={BATTER_BOXES[7]} anchor={0x22} origin={{ x: b.x, y: b.y + 1 }} testId="수비"
+                paletteStyle={palettes.styleOf(positionBadge.label, 0)} />
             )}
           </>
         )}

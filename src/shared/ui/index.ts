@@ -37,5 +37,8 @@ export { Button } from '@/shared/ui/Button/Button'
 export type { ButtonVariant } from '@/shared/ui/Button/Button'
 export { TextField } from '@/shared/ui/TextField/TextField'
 export { CommonPanel, InsetBox, PaintedRects, RoundBox } from '@/shared/ui/CommonPanel/CommonPanel'
-export { useImgTextPalette3 } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
+export {
+  IMG_TEXT_BAKED_PALETTE, bakedImgTextPaletteOf, imgTextPaletteMatrix, useImgTextPalette3, useImgTextPalettes,
+} from '@/shared/ui/ImgTextPalette/ImgTextPalette'
+export type { ImgTextPaletteIndex } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 export { EffectImage } from '@/shared/ui/EffectImage/EffectImage'

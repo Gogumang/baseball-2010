@@ -31,6 +31,16 @@ describe('투수·타자 소개 판 (0x44944)', () => {
     expect(srcs('타자손')).toEqual(['./sprites/img_text/frames/056.png'])
   })
 
+  it('img_text 팔레트 — PLAYER/COM 은 구워 둔 팔레트 4 그대로, 보직 49 "선발" 은 팔레트 0(흰 글자)으로 되돌린다 (0x44bf0)', () => {
+    render(<MatchupCards tick={7} batterHand={0} pitcher={{ isComputer: true, role: 0 }} batter={{ isComputer: false, position: 6 }} />)
+    expect(screen.getByTestId('투수팀').style.filter).toBe('')
+    expect(screen.getByTestId('타자팀').style.filter).toBe('')
+    expect(srcs('보직')).toEqual(['./sprites/img_text/frames/049.png'])
+    expect(screen.getByTestId('보직').style.filter).toMatch(/^url\(#img-text-palette-.*-3-0\)$/)
+    // 수비 184 "유격" 은 흰 글자로 구운 그대로
+    expect(screen.getByTestId('수비').style.filter).toBe('')
+  })
+
   it('모르는 값은 안 그린다 — 이름·숫자·막대·기록 칸이 없다', () => {
     render(<MatchupCards tick={7} batterHand={0} pitcher={{ isComputer: true }} batter={{ isComputer: false }} />)
     expect(screen.queryAllByTestId('이름')).toHaveLength(0)
