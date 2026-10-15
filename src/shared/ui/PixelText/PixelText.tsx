@@ -4,6 +4,7 @@ import { ASCII_ATLAS, HANGUL_ATLAS } from '@/shared/lib/font/atlas'
 import { FONT_SPACING, layoutPixelText } from '@/shared/lib/font/layout'
 import type { PlacedPiece } from '@/shared/lib/font/layout'
 import * as styles from '@/shared/ui/PixelText/PixelText.css'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /**
  * 원본 비트맵 글꼴로 글을 찍는다.
@@ -78,6 +79,14 @@ export function pieceMaskStyle(piece: PlacedPiece, scale: number): CSSProperties
   }
 }
 
+/**
+ * 글꼴 색은 565 로 찍힌다(글꼴 색 +0x54 는 16비트 565 값 — 기본 흰색 0xFFFF, `PixelText.css`) — `style.color` 를 `solidColorCss` 로 내린다.
+ * ⚠️ 근사: `className` · 부모에서 물려받은 색은 읽을 수 없어 그대로 둔다.
+ */
+function color565StyleOf(style: CSSProperties | undefined): CSSProperties {
+  return typeof style?.color === 'string' ? { color: solidColorCss(style.color) } : {}
+}
+
 export function PixelText({
   children,
   spacing = 'app',
@@ -103,7 +112,7 @@ export function PixelText({
   return (
     <span
       className={className === undefined ? styles.text : `${styles.text} ${className}`}
-      style={{ width: layout.width * scale, height: layout.height * scale, ...style }}
+      style={{ width: layout.width * scale, height: layout.height * scale, ...style, ...color565StyleOf(style) }}
       role="img"
       aria-label={children}
     >

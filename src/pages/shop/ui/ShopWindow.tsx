@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { CommonPanel, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -84,7 +85,8 @@ export function ShopWindow({
         key={`${frame}-${left}`}
         className={styles.tintedLabel}
         style={{
-          left, top, width: size.width, height: size.height, background: color,
+          // 효과 0xb 는 인자 색의 아래 16비트(565)를 찍는다 — `solidColorCss`
+          left, top, width: size.width, height: size.height, background: solidColorCss(color),
           maskImage: `url(${spriteSrc(IMG_TEXT, frame)})`,
           WebkitMaskImage: `url(${spriteSrc(IMG_TEXT, frame)})`,
         }}
