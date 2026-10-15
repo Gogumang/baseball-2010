@@ -1,25 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { FrameSprite, RawScreen, useImgTextPalettes } from '@/shared/ui'
+import { RawScreen, useImgTextPalettes } from '@/shared/ui'
 import type { ImgTextPaletteIndex } from '@/shared/ui'
-import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
-import { TEAMS } from '@/shared/config/original/teams'
 import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import { abilityAxisMaximumLengthOf, abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
-import { AbilityGrowthPolygon } from '@/pages/create-player/ui/AbilityGrowthPolygon'
-import { ABILITY_TITLE, INFO_BOARD, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP, RADAR_CENTER, RADAR_RADIUS } from '@/pages/management/lib/basicInfoLayout'
+import { INFO_BOARD, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP } from '@/pages/management/lib/basicInfoLayout'
+import { SeasonTeamCard } from '@/pages/season/ui/SeasonTeamCard'
 import { TEAM_INFO_LEFT_ROWS } from '@/pages/season/lib/seasonTeamInfo'
-import { SEASON_CARD_LOGO } from '@/pages/season/lib/seasonPlayerCard'
-import { SeasonCardBadge, SteppedBoard } from '@/pages/season/ui/SeasonPlayerCard'
 import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 
 /** mode_ui 프레임 3 박스 — 판 (21,176,197,83) · 이름표 1 (30,·,25) · 값 2 (60,·,81) · 이름표 3 (147,·,25) · 값 4 (176,·,32) */
@@ -79,14 +73,15 @@ function valueOf(row: TeamInfoRow, styleOf: (frame: number, palette: ImgTextPale
  * 로고 [gfx+0x140] (W/2 − w/2 − 0x3e, H/2 − h/2 − 0x32) 0xba1d5(…, 0, 0, 0)   ; 0xd9 · 0xdc 밖이라 효과 0 (0x7bb20~0x7bb70)
  * [gfx+0x168] 이 있으면 로고 아래 · 위 딱지 — 팀 이름은 이 안에서만 그린다 (0x7bbca~0x7bdca, `SEASON_CARD_BADGE`)
  * mode_ui 8 (W/2 + 0x3a − w/2, H/2 − 0x6b) · img_text 159 (…, H/2 − 0x42 − 0x25)   ; 0x7bdce~0x7bea4
- * 0x5aefd(skin, W/2 + 0x3a, H/2 − 0x42 + 10, 종류 0, 팀 레코드, …, 0x1e)         ; 0x7becc 상태 0xd5 → 0x7bf9c
+ * 0x5aefd(skin, W/2 + 0x3a, H/2 − 0x42 + 10, 종류 0, 팀 레코드, idx 0, 0x1e)    ; 0x7becc 상태 0xd5 → 0x7bf9c (리터럴 0x7c100)
  * ```
+ * 0x5aefc 종류 0 은 ABILITY 판 전체(둥근 바탕 · 축 이름 상자 img_text 46 · 45 · 204 · 205 · 숫자)다 — `SeasonTeamCard` → `AbilityRadarPanel`.
+ * 이름 입력 0xc8(그림 0xba28)도 같은 카드 갈래라 `SeasonTeamCard` 를 같이 쓴다.
  * 구장 줄은 흐르는 글 0x5a8c8 (`StadiumTicker`).
  */
 export function SeasonTeamInfoScreen({
   teamId, teamAbilities, rows, gamePoint = 0, hasCardBadge = false, onBack,
 }: SeasonTeamInfoScreenProps) {
-  const modeUiOrigins = useFrameOrigins(MODE_UI)
   const latestBack = useRef(onBack)
   latestBack.current = onBack
   useEffect(() => {
@@ -99,10 +94,8 @@ export function SeasonTeamInfoScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const team = TEAMS[teamId]
   // 이름표 47 "순위" 는 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리에서 흰 글자로 되돌린다
   const palettes = useImgTextPalettes()
-  const points = (list: readonly { readonly x: number; readonly y: number }[]) => list.map((point) => `${point.x},${point.y}`).join(' ')
 
   return (
     <RawScreen>
@@ -110,22 +103,7 @@ export function SeasonTeamInfoScreen({
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label="구단정보">
         {palettes.definition}
-        <SteppedBoard />
-        {team !== undefined && (
-          <img className={styles.layer} alt={team.name} data-testid="구단정보-로고" src={team.logoUrl}
-            style={{ left: SEASON_CARD_LOGO.x, top: SEASON_CARD_LOGO.y, width: SEASON_CARD_LOGO.width, height: SEASON_CARD_LOGO.height }} />
-        )}
-        {team !== undefined && hasCardBadge && <SeasonCardBadge teamId={teamId} />}
-
-        <FrameSprite folder={MODE_UI} frame={8} origins={modeUiOrigins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
-        <img className={styles.layer} alt="" src={frameSrc(ABILITY_TITLE.frame)}
-          style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }} />
-        <svg className={styles.board} viewBox="0 0 240 320" shapeRendering="crispEdges">
-          <polygon points={points(abilityChartFrameOf(RADAR_CENTER))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} />
-          {/* 카드 0x7ba44 의 팀 갈래 0x7bf9c → 0x5aefd(…, 종류 0, 팀 레코드, 반지름 30) — 레이더 [skin+0xd4] 의 자라는 애니.
-              들어옴 0x5324 가 +0xad = 0 으로 두어(0x534c~0x5356) 0 에서 자란다 */}
-          <AbilityGrowthPolygon center={RADAR_CENTER} targets={teamAbilities} maximumLength={abilityAxisMaximumLengthOf(RADAR_RADIUS)} />
-        </svg>
+        <SeasonTeamCard teamId={teamId} teamAbilities={teamAbilities} hasCardBadge={hasCardBadge} testIdPrefix="구단정보" />
 
         <div className={styles.layer}
           style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: BOARD_WIDTH, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
