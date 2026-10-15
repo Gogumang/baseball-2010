@@ -1,3 +1,5 @@
+import { abilityRadarAxesOf } from '@/pages/create-player/lib/abilityRadarPanel'
+import type { AbilityRadarAxis } from '@/pages/create-player/lib/abilityRadarPanel'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
@@ -278,15 +280,13 @@ export const BATTER_DETAIL_ROWS: readonly DetailRow[] = [
 export const DETAIL_RADAR = { centerX: 159, pitcherCenterY: 144, batterCenterY: 154, radius: 22 } as const
 
 /**
- * 도형 축 칸 (0x5aefc 0x5b412 루프, 반지름 22 를 돌린 값) — 축 끝(선 0x6a905 #6B92F4 → 지금 꼭짓점) · 이름 상자 slt_frame 17(26×29) ·
+ * 도형 축 칸 (0x5aefc 0x5b412 루프, 반지름 22) — 축 끝(선 0x6a905 #6B92F4 → 지금 꼭짓점) · 이름 상자 slt_frame 17(26×29) ·
  * 이름 img_text 상자 + 3 · 숫자 0x6aff8(상자 x + 0x12, 상자 y + 0x11, 앵커 4). 가운데 기준 상대값.
+ * 상자 자리는 ABILITY 판과 같은 식 `abilityRadarAxesOf`(0x5b48c~0x5b532)로 돌린다 — 반지름 22 라 d = |30 − 22| = 8 을
+ * x 는 안쪽으로(왼쪽 축 +8 · 오른쪽 축 −8), y 는 각도 ≤ 180(아래 축) 이면 +8 · 그 밖(위 축) −8 옮긴다:
+ * 상자 = (−45, −38) · (19, −38) · (19, 9) · (−45, 9). (예전 손 값 (∓19, ∓38) 은 왼쪽 x 와 아래 y 가 틀렸다)
  */
-export const DETAIL_RADAR_AXES: readonly { readonly end: { x: number; y: number }; readonly box: { x: number; y: number } }[] = [
-  { end: { x: -29, y: -29 }, box: { x: -19, y: -38 } },
-  { end: { x: 28, y: -29 }, box: { x: 19, y: -38 } },
-  { end: { x: 28, y: 28 }, box: { x: 19, y: 38 } },
-  { end: { x: -29, y: 28 }, box: { x: -19, y: 38 } },
-]
+export const DETAIL_RADAR_AXES: readonly AbilityRadarAxis[] = abilityRadarAxesOf({ x: 0, y: 0 }, DETAIL_RADAR.radius)
 
 /** 축 이름 img_text — 0xd1b14: 투수 37 제구 · 38 구속 · 39 변화 · 40 체력 / 타자 41 히트 · 42 파워 · 43 수비 · 44 주루 */
 export const DETAIL_RADAR_LABELS = { pitcher: [37, 38, 39, 40], batter: [41, 42, 43, 44] } as const

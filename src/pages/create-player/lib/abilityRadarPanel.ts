@@ -21,6 +21,16 @@ import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
  *          그 밖 → "???"(0xd2080) 를 RGB(0xff, 0xb6, 0x29) 로 상자 가운데 (상자 x + (26 − 글폭) / 2, 상자 y + 0x11) 와 x + 1 에 두 번   ; 0x5b69c~0x5b758
  * ```
  * 숫자 색은 [sp+0x194](여덟째 인자) ≠ 0 이고 다 자랐을 때만 기본값과 견준다 — 마선수 고르기 · 명전 목록은 0 이라 늘 기본색이다.
+ *
+ * **값이 넷 다 0 일 때** (0x764c9 → 0x7633c 테두리 → 0x75e30 값 도형):
+ * ```
+ * 760e8  자라는 걸음은 끝에 늘 0x75ba4(꼭짓점 넣기) 를 부르고 0x75c58~0x75c64 가 [+0x78] = 1 — 값 0 인 축의 꼭짓점 = 가운데
+ * 75c70  채우기: 맨 위 y([+0x68]) < 맨 아래 y([+0x6c]) 일 때만 줄을 긋는다(0x75c88) → 넷 다 가운데면 채우기 없음
+ * 75dc4  테두리: [+0x78] · [+0x79] 가 서면 꼭짓점 i → 다음 꼭짓점 선 0x6a905(색 [+0x7c] = 흰색) — 넷 다 가운데라 길이 0 선 넷
+ * 5b47c  그다음 축 선 넷이 축 끝 → 꼭짓점(= 가운데) 으로 #6B92F4
+ * ```
+ * 기기 선 0x14006c8 은 두 끝을 다 칠하므로(`commonPanel` 머리말과 같은 가정) 가운데 한 점은 흰 테두리 뒤 축 선 끝이 덮어 **#6B92F4** 다.
+ * ⚠️ 미확인: 기기 선(0x14006c8) 본문은 바이너리 밖이라 길이 0 선이 실제로 한 점을 찍는지는 못 봤다.
  */
 export const ABILITY_RADAR_BACK = { image: 3, width: 31 } as const
 export const ABILITY_RADAR_BOX = { image: 0x11, width: 26, height: 29, labelInset: 3, numberDx: 0x12, numberDy: 0x11 } as const
@@ -33,11 +43,30 @@ export const ABILITY_RADAR_EMPTY = { text: '???', color: '#FFB629' } as const
 
 /** 축 이름 img_text 표 0xd1b14 — [이름 번호] (투수 0~3 · 타자 4~7 · 팀 8~11) */
 const AXIS_LABEL_FRAMES = [37, 38, 39, 40, 41, 42, 43, 44, 46, 45, 204, 205] as const
-/** 종류 1 · 3(투수) 은 이름 번호 0~3 (37 제구 · 38 구속 · 39 변화 · 40 체력), 1 · 2(타자) 는 4~7 (41 히트 · 42 파워 · 43 수비 · 44 주루) */
+/**
+ * 종류 1 · 3(투수) 은 이름 번호 0~3 (37 제구 · 38 구속 · 39 변화 · 40 체력), 1 · 2(타자) 는 4~7 (41 히트 · 42 파워 · 43 수비 · 44 주루).
+ * 종류 0(팀)은 열린 팀 · 잠긴 팀(idx −1) 모두 서술자 +6 에 8 · 9 · 10 · 11 을 쓴다(0x5afe8~0x5b006 · 0x5b042~0x5b060) → 46 · 45 · 204 · 205.
+ */
 export const ABILITY_RADAR_LABELS = {
   pitcher: AXIS_LABEL_FRAMES.slice(0, 4),
   batter: AXIS_LABEL_FRAMES.slice(4, 8),
+  team: AXIS_LABEL_FRAMES.slice(8, 12),
 } as const
+
+/*
+ * **종류 0(팀) 부르는 곳** — 리터럴 0x5aefd · BL 0x5aefc 전수(BL 0x5b86a · 0x5bfbe · 0x63f38 · 0x64bac · 0x65740, 리터럴 0x7c100):
+ * ```
+ * 공용 목록 0x63b14 페이지 k 0 · 1 · 9 (점프표 0xd1edc → 0x63dee) — 팀 고르기 · 스페셜 에디트
+ *   열린 팀  0x63e5c~0x63e74 → 0x63f30: (skin, [skin+0xd4], B.x, B.y + 8, 종류 0, rec 0, idx = 커서 칸, 반지름 0x1e, 0, 0, 0)
+ *   잠긴 팀  0x63f14~0x63f38: idx −1 (칸 > 9 이고 0x1f1d9()+칸+0x70 == 0 일 때 0x63df8~0x63e10)
+ * 기본정보 카드 0x7ba44 팀 갈래 0x7bf9c~0x7bfc2 (상태 0xd5 구단정보 · 0xc8 이름 입력 등 — 0xd9 · 창 종류 3 이 아닐 때, 카드 [+0x20] == 2 일 때만)
+ *   (skin, [skin+0xd4], W/2 + 0x3a, H/2 − 0x42 + 0xa, 종류 0, rec = [카드+0x154], idx 0, 반지름 0x1e, 0, 0, 0) = 가운데 (178, 104)
+ * ```
+ * 종류 0 값 = rec(0 이면 0x1f8c1(전역, idx)) 의 +4 · +6 · +8 · +0xa (0x5b02a~0x5b08c). 축 최대는 서술자 표 0xd1b2c 의 999 그대로
+ * (종류 2 · 3 만 [sp+0x190] 표로 덮는다 0x5b1ca · 0x5b2b6) → 최대길이 = 반지름. idx −1 이면 값 네 개 0 이고 [anim+0x1e4] = 0 (0x5b024) 이라
+ * 숫자 대신 늘 "???" 다. 나머지(0x5b798 선수 정보 창 종류 2 · 3 반지름 22 · 0x6517c 종류 2 반지름 30)는 팀이 아니다.
+ * 웹: 공용 목록 쪽은 `TeamSelectScreen` · `SpecialEditScreen` 이 `ABILITY_CHART`(B + (0, 8), 반지름 30)로 `AbilityRadarPanel` 을 쓴다.
+ */
 
 export interface AbilityRadarAxis {
   /** 축 끝 — 선이 여기서 지금 꼭짓점으로 간다 */

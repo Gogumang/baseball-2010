@@ -30,4 +30,8 @@ describe('ABILITY 판 축 칸 (0x5aefc 0x5b412~0x5b532)', () => {
     expect(ABILITY_RADAR_LABELS.pitcher).toEqual([37, 38, 39, 40])
     expect(ABILITY_RADAR_LABELS.batter).toEqual([41, 42, 43, 44])
   })
+
+  it('종류 0(팀) 은 열린 · 잠긴 팀 모두 이름 번호 8~11 (0x5afe8 · 0x5b042) → 46 · 45 · 204 · 205', () => {
+    expect(ABILITY_RADAR_LABELS.team).toEqual([46, 45, 204, 205])
+  })
 })
