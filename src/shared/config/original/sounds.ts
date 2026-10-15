@@ -141,7 +141,9 @@ export const ORIGINAL_SOUNDS: readonly OriginalSound[] = [
    *     모드 7(더비)은 0x3d160 이 투수 칸을 안 세운다(3d176).
    *     웹은 사람 타석 화면(타자편 · 팀 경기 · 타자 미션)의 `BattingStage.skillPanel` 로 이었다(`widgets/batting-stage/lib/skillPanel` —
    *     판 그림 · 함성 · 칸 ≥ 8 이면 안 우는 것까지 원본 그대로). 팀 경기 사람 대타는 0x668cc 처럼 칸 비트를 다시 세운다.
-   *     ⚠️ 미이식: 사람이 던지는 화면(CPU 타자)의 판 · 함성과 CPU 대타의 비트 다시 세우기 — 그 화면은 아직 판을 안 그린다.
+   *     사람이 던지는 화면(CPU 타자 — 투수편 `PitcherGameScreen` · 투수 미션 `PitchingScreen`)도 같은 판 · 함성을 그리고,
+   *     CPU 대타의 0x668cc 다시 세우기도 진행기(pitcherGameFlow · useMissionSession · teamGameFlow)가 교체 연출
+   *     `cheerRestore` 에 실어 `useSkillCheerRestore` 로 먹인다.
    */
   { id: 29, role: 'effect', name: '관중 함성 (CPU 타자의 볼넷 뒤 · 도루 송구 · 전국구/먹튀 타자 첫 등장)', scene: '볼넷 0x51b02(공격팀이 CPU) · 도루 송구 0x43870(선수 +0xb8 == 6) · 0x4c39a(스킬 표시 판에서 전국구·먹튀 타자, 칸 비트 0x44c 가 서 있을 때 한 번)' },
   /**

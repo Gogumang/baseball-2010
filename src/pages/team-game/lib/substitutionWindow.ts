@@ -174,7 +174,8 @@ function batterRowOf(progress: TeamGameProgress, records: TeamMatchupRecords | u
 
 /**
  * 창의 줄 — 지금 선수(투수 `0xae83c` · 타자 `0xae89c`)와 벤치(`0xb8b09` · `0xb8b19`).
- * ⚠️ 미확인: 기록표가 없는 모드(일반 · 대전 — Xls 행의 줄)와 마선수는 방어율 · 탈삼진 / 타율 · 홈런 칸의 값이 웹에 없어 숫자를 비운다(소개 판과 같다).
+ * 방어율 · 탈삼진 / 타율 · 홈런 칸은 소개 판과 같은 시즌 줄(`teamPitcherSeasonStatsOf` · `teamBatterSeasonStatsOf`)이다 — 일반모드는
+ * Xls 행의 줄, 마선수는 XlsACE 행의 줄. ⚠️ 남은 것: 대전(8 · 9)은 웹에 없고, 기록표가 없을 때의 표 밖 선수는 숫자를 비운다.
  */
 export function substitutionRowsOf(
   progress: TeamGameProgress,

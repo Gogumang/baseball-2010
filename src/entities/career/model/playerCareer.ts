@@ -451,7 +451,7 @@ export const DEFAULT_TEAM_ID = 0
 
 /** 타자 시작 능력치 표 0xcc3fa (배팅 타입 → 히트·파워·수비·주루) */
 const ROOKIE_ABILITY_BY_TYPE: readonly BatterAbility[] = BALANCE.ability.rookieByBattingType
-/** 생성 화면 둘째 목록이 0 이면 수비, 아니면 주루에 더한다 (0x16e2c) — 목록 뜻은 내야/외야 (추정) */
+/** 생성 화면 둘째 목록(0 내야 · 1 외야, StrMODE[4])이 0 이면 수비, 아니면 주루에 더한다 (0x16e2c) */
 const ROOKIE_POSITION_BONUS = BALANCE.ability.rookiePositionBonus
 
 export function rookieAbilityOf(battingTypeIndex: number, positionIndex: number): BatterAbility {

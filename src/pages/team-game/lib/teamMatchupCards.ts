@@ -57,7 +57,7 @@ export interface TeamMatchupCards {
  * 투수 레코드의 시즌 줄 (경기를 세울 때) — 붙박이 표 칸 · 표 밖 id 로.
  * 마투수는 0x20094 6번 갈래가 XlsACE_PIT 행을 부은 저장 레코드(0x1f824)를 0xb521c 로 통째 베낀 칸이고 게이트 0xa56dc 가 늘 거른다
  * (모드 1 거짓 · 2 · 3 · 4 는 0xb633d) — 표의 줄 그대로다(`AcePlayer.recordLine`).
- * 기록표가 없으면(일반모드) 붙박이 표 칸은 Xls 행 줄, 표 밖 선수는 ⚠️ 미확인이라 비운다.
+ * 기록표가 없으면(일반모드) 붙박이 표 칸은 Xls 행 줄이다. ⚠️ 그때 표 밖 선수만 줄이 없어 비운다(대전 8 · 9 는 웹에 없다).
  */
 function basePitcherLineOf(records: TeamMatchupRecords, teamId: number, entry: TeamEntryPitcher): MatchupPitcherLine | null {
   if (entry.aceIndex >= 0) {

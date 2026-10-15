@@ -869,7 +869,7 @@ function* pickoffPlaySteps(
     caughtOnTheFly: false,
     tagOut,
     throwBase: targetBase,
-    // 공이 실제로 받는 쪽에 들어간 틱 — 커버를 기다렸으면 추정 도착 틱보다 늦다
+    // 공이 실제로 받는 쪽에 들어간 틱 — 커버를 기다렸으면 던질 때 잡아 둔 도착 틱(`throwArrivalTick`)보다 늦다
     throwArrivalTick: catchTick >= 0 ? catchTick : throwArrivalTick,
     voidedRuns: 0,
     fumbled,

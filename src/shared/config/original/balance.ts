@@ -3,7 +3,7 @@ import data from '@/shared/config/original/data/balance.json'
 /**
  * 원본 수치표 — 능력치·포인트·훈련·판정에 쓰는 숫자를 한곳에 모았다.
  * 값은 `data/balance.json` 에 있고 **그룹마다 `source` 로 binary.mod 주소를 적어 두었다.**
- * 근거가 없는 값은 `source` 에 "추정" 이라고 적는다 — 코드 주석이 아니라 데이터에 남긴다.
+ * 근거가 없는 값이 생기면 `source` 에 "추정" 이라고 적는다 — 코드 주석이 아니라 데이터에 남긴다(지금은 그런 값이 없다).
  *
  * 숫자를 고칠 일이 생기면 JSON 만 고치면 된다. 여기는 타입만 입힌다.
  */

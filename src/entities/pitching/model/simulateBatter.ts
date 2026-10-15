@@ -41,8 +41,8 @@ export interface BatterSituation {
 }
 
 /**
- * 아직 상황을 넘겨주지 않는 부르는 곳이 쓰는 자리표시 — 무사 0-0 주자 없음.
- * ⚠️ 원본에 이런 기본값은 없다. 이 값이 쓰이면 그 자리는 배선이 덜 된 것이다.
+ * 상황을 넘겨주지 않는 부르는 곳이 쓰는 자리표시 — 무사 0-0 주자 없음. 원본에 이런 기본값은 없다.
+ * 경기 쪽 세 부르는 곳(미션 · 투수편 · 팀 경기)은 모두 상황을 넘기고, 시험만 이 값을 쓴다.
  */
 const UNWIRED_SITUATION: BatterSituation = {
   strikes: 0,
@@ -349,7 +349,10 @@ export function cpuSwingTimingOffsetOf(hit: number, random: RandomPort, isMistak
   }
   return TIMING_OFFSETS_WIDE[random.rand(0, TIMING_OFFSETS_WIDE.length)]
 }
-/** 투수편 투수 능력치를 아직 넘겨받지 않아 쓰는 기본값 (추정) */
+/**
+ * 투수 능력치를 넘기지 않을 때의 자리표시 — 원본에 이런 기본값은 없다. 경기 쪽 세 부르는 곳(미션 `useMissionSession` ·
+ * `pitcherGameFlow` · `teamGameFlow`)은 모두 피로를 먹인 값(`fatigued`)을 넘기고, 시험만 이 값을 쓴다.
+ */
 const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
 
 /**
@@ -366,7 +369,9 @@ const DEFAULT_PITCHER_STATS = { control: 500, velocity: 500 }
  * 0xd88aa[`mgr[0x13a+칸]`])을 먼저 곱해 넘긴다 — 레벨은 전역 저장(`useAceLevels`)이고 스페셜 마선수
  * 레벨업(0x5fb24)이 올린다. 밑값은 레코드의 `0xb6414(rec, k, 1)`(장비 니블 · 장착 스킬 5 −100 · 7 +50,
  * `entities/team/model/recordAbility.recordAbilityOf`)이어야 한다 — 0xb570c 첫머리 b5728 이 플래그 1 로 부른다.
- * 투수편 `opponentBatterAbility` · 팀 경기 명단은 그 값을 넘긴다. ⚠️ 미션 쪽 부르는 곳은 따로 확인하지 않았다.
+ * 투수편 `opponentBatterAbility` · 팀 경기 명단은 그 값을 넘긴다. 미션 쪽도 마스터 줄 CPU 타자는
+ * `missionCpuBatterAbilityOf`(`0xb6415(타자, k, 1)`), 마타자는 `missionOpponentAbility`(`aceRecordAbilityAtLevel`)로
+ * 같은 값을 넘긴다.
  */
 export function pitchAgainstBatter(
   pitch: Pitch,

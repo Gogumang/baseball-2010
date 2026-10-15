@@ -25,7 +25,8 @@ export interface Pitch {
   readonly controlTier: number
   /**
    * 원본 3D 궤적 N 점 (월드 좌표, 0x4dc78). 마지막 점이 도착점이다.
-   * 사용자 투구(투수편)는 아직 원본 입력을 옮기지 않아 null — 화면은 2D 추정 곡선으로 그린다.
+   * CPU 투구 · 사용자 투구(`buildHumanPitch`) 모두 곡선을 싣는다. null 은 놓기(틱 10) 전 와인드업 자리 공
+   * (`windUpCpuPitchOf`, 그리지도 판정하지도 않는다)과 시험이 만드는 공뿐이다.
    */
   readonly worldPath: readonly WorldPoint[] | null
   /** 화면 배치 side — 투영 원점(0xcfb18)과 기준점(0xcfb54)을 고른다 */
@@ -33,7 +34,8 @@ export interface Pitch {
   /**
    * 이번 공에 실린 마구 번호 = 공 객체 +0x10 (0x3de10). 0 이면 마구 보정이 없다.
    * ⚠️ 원본이 이 칸을 되돌리지 않아서, 마구 뒤의 직구·변화구에도 값이 남는다 (H2 3-4).
-   * 아직 안 옮긴 곳(사용자 투구)은 없는 값이라 `?? 0` 으로 읽는다.
+   * 사용자 투구는 부르는 쪽(미션 · 투수편 · 팀 경기)이 `ballMagicNumberAfterPitch` 값을 싣는다. 와인드업 자리 공
+   * (`windUpCpuPitchOf`)과 시험 공은 없는 값이라 `?? 0` 으로 읽는다.
    */
   readonly magicNumber?: number
   /**

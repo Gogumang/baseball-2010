@@ -65,7 +65,8 @@ export type SkillSlotExpansion<T = PlayerCareer> =
  *   비용 = 0xcc4f7[L] × 1000. `G < 비용` 이면 StrMODE[65].
  *   아니면 G −= 비용(0~99999 로 자름), **L = min(L + 1, 2)** 를 +0x1c6 에 쓰고 StrMODE[136].
  * 그 사이 0x22c29(저장, 모드 4 면 1 아니면 2, 비용) 는 기록연감 **G 사용처 통계**(StrMAINMENU[176]·[177] 타자편·투수편 소모 GP)다
- * — `collection/model/annalsStats.ts` 의 `addGamePointUsage`. ⚠️ 이 자리에서 부르는 배선은 아직 없다.
+ * — `collection/model/annalsStats.ts` 의 `addGamePointUsage`. 이 함수는 계산만 하고, 통계는 부르는 세션이 `G사용` 으로 적는다
+ * (타자편 `useCareerSession.expandSkillSlots` · 투수편 `usePitcherLeagueSession` 의 `saveFromScreen`).
  */
 export function expandSkillSlots<T extends SkillSlots & Pick<PlayerCareer, 'gamePoint'>>(career: T): SkillSlotExpansion<T> {
   const cost = skillSlotExpansionCostOf(career)
