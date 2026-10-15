@@ -164,7 +164,8 @@ export const GENERAL_ENTRY_CELL_SOURCE: SeasonEntryCellSource = {
   staminaOf: () => FULL_RECORD_STAMINA,
 }
 
-const staminaPercentOf = (mode: number, stamina: number) =>
+/** 체력 줄 퍼센트 0x572a4 — [ed+0x334] ∈ {1, 2, 3, 4, 8, 9} 면 trunc(+0x2c / 100), 그 밖 100 */
+export const staminaPercentOf = (mode: number, stamina: number) =>
   mode >= 0 && mode <= 9 && ((0x31e >> mode) & 1) === 1 ? Math.trunc(stamina / 100) : 100
 
 /** 명단 선수 한 줄의 칸 재료 */
