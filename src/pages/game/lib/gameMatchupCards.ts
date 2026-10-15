@@ -3,9 +3,12 @@ import { opponentMoundOf } from '@/features/play-game/model/gameFlow'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { MY_RECORD_SLOT, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
 import { leaguePitcherIdOf, leaguePitcherLineOf } from '@/entities/league/model/leaguePlayerStats'
-import { lineupSlotOf } from '@/entities/game/model/quickLineup'
+import { lineupSlotOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
+import { teamBatters } from '@/entities/team/model/teamRoster'
+import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
 import {
   batterCardStatsOf,
+  batterHandOf,
   pitcherCardStatsOf,
   pitcherLineOfRecord,
   staminaGaugeOf,
@@ -79,4 +82,26 @@ export function gameMatchupCardsOf(progress: GameProgress, career: PlayerCareer)
       recentResults: progress.ourLineup.records[mySlot]?.results ?? [],
     },
   }
+}
+
+/**
+ * **경기 시작 인트로 배경의 타자 손 (타자편 모드 4)** — 인트로 진입 0x3b084 가 3b0f2 `0xae89d`(공격 팀 [+0xe + 팀[+0x32]]) →
+ * 3b0fe `0xb63c1`(손) 을 3b108 에서 경기 구장 +0x60 에 쓴다(모드를 안 가린다). 공격 측은 경기 상태 초기화 0xb6814 의 st[9] = 0,
+ * 팀[+0x32] 는 상태 7(0x3e340)이 0 으로 채워 새로 만든 팀 객체 그대로 0 이다(`pitcherIntroBatterHandOf` 주석) → **측 0 팀의 1번 타자**.
+ * - 측 0 이 내 팀이면 나리 팀 레코드 명단 칸 0 — 내 줄(타순 1번)이면 내 손 `battingSide`, 마타자 칸이면 표 0xd88b0, 그 밖은 붙박이 표 행 +0xb.
+ *   진행기는 경기를 세울 때 첫 내 타석까지 밀어 두지만 1번 칸은 그 사이 한 번밖에 안 서고 CPU 대타 0xac228 은 타석 2번(ac28e) 뒤라
+ *   명단 칸 0 은 시작 그대로다.
+ * - 측 0 이 상대 팀이면 웹 상대 명단(로스터 차례, 마타자는 9번)의 1번 = 로스터 0번.
+ */
+export function gameIntroBatterHandOf(progress: GameProgress, career: Pick<PlayerCareer, 'battingSide'>): number {
+  if (progress.game.playerSide !== 0) {
+    const profile = teamBatters(progress.opponentTeamId)[0]?.profile
+    return profile === undefined ? 0 : batterHandOf(profile)
+  }
+  if (progress.game.playerOrderIndex === 0) return career.battingSide
+  const slot = rosterSlotAt(progress.ourLineup, 0)
+  if (slot === ACE_BATTER_ROSTER_SLOT) return batterHandOf(0, progress.aces?.ours.batter ?? -1)
+  const roster = teamBatters(progress.ourTeamId)
+  const profile = roster[slot % roster.length]?.profile
+  return profile === undefined ? 0 : batterHandOf(profile)
 }

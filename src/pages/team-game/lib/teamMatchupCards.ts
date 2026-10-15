@@ -149,7 +149,8 @@ export function teamBatterHandOf(teamId: number, entry: TeamEntryBatter): number
  * **경기 시작 인트로 배경의 타자 손** — 인트로 진입 0x3b084 가 3b0d2 에서 공격 측 `st[9]` 팀을 장면 +0x220 에 두고
  * 3b0f2 `0xae89d`(그 팀의 지금 타자 = 팀[+0x32] 칸) → 3b0fe `0xb63c1`(손) 을 3b108 에서 경기 구장 `[장면+0xf10]` +0x60 에 쓴다.
  * 그래서 인트로 배경 0x40ff0 은 **1회초 첫 타자(측 0 의 1번)** 손으로 좌우가 갈린다(0 이면 우타 거울).
- * ⚠️ 미확인: 인트로 때 팀[+0x32] 가 0 인지는 직접 안 떴다 — 경기 시작이라 1번(칸 0)으로 둔다.
+ * 새 팀 객체는 상태 7(0x3e340)이 0 으로 채워 만든다(+0x32 = 0, `pitcherIntroBatterHandOf` 주석). ⚠️ 미확인: 팀 경기(모드 1)는 상태 9 의
+ * 0x21c54 가 저장 블록을 팀 · st 로 되복사하므로(R10) 그 블록의 +0x32 · st[9] 가 경기 시작 값인지는 직접 안 떴다 — 1번(칸 0)으로 둔다.
  */
 export function teamIntroBatterHandOf(progress: TeamGameProgress): number {
   const { options } = progress

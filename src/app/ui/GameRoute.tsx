@@ -1,4 +1,5 @@
 import { gameBenchOffenseOf, gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
+import { gameIntroBatterHandOf } from '@/pages/game/lib/gameMatchupCards'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
@@ -240,6 +241,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
                 ourTeamId: side0Team,
                 opponentTeamId: side1Team,
                 gameMode: BATTER_CAREER_MODE,
+                // 구장 +0x60 — 인트로 진입 0x3b084 가 3b108 에서 측 0 의 1번 타자 손을 쓴다(0 우타면 거울 길)
+                side: gameIntroBatterHandOf(progress, career),
               },
             })}
         // 라이벌전 띠 0x3b80c — 적재 상태 8 의 0xb8f68(두 팀) (표 0xd8a90 의 짝)

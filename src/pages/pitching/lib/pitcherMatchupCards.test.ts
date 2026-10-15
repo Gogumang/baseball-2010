@@ -6,7 +6,7 @@ import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { startPitcherGame, opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { leagueBatterIdOf } from '@/entities/league/model/leaguePlayerStats'
-import { pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
+import { pitcherIntroBatterHandOf, pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
 
 const 기본옵션: PitcherGameOptions = {
   ourTeamId: 0,
@@ -67,5 +67,13 @@ describe('나리 투수편 상태 0xe 소개 판 값 (0x44944)', () => {
     })
     expect(pitcher.strikeouts).toBe(12)
     expect(pitcher.earnedRunAverage).toBe(Math.trunc((4 * 2700) / 54))
+  })
+})
+
+describe('투수편 인트로 배경의 타자 손 (0x3b084 3b0f2~3b108)', () => {
+  it('측 0(선공) 팀의 1번(로스터 0번) 손 — 팀 0 의 1번은 좌타 · 팀 2 의 1번은 우타', () => {
+    expect(pitcherIntroBatterHandOf({ playerSide: 0, ourTeamId: 0, opponentTeamId: 2 })).toBe(1)
+    expect(pitcherIntroBatterHandOf({ playerSide: 1, ourTeamId: 0, opponentTeamId: 2 })).toBe(0)
+    expect(pitcherIntroBatterHandOf({ playerSide: 1, ourTeamId: 2, opponentTeamId: 0 })).toBe(1)
   })
 })

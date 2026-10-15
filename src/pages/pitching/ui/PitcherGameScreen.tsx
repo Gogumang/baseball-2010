@@ -26,7 +26,7 @@ import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
-import { pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
+import { pitcherIntroBatterHandOf, pitcherMatchupCardsOf } from '@/pages/pitching/lib/pitcherMatchupCards'
 import type { PitcherMatchupRecords } from '@/pages/pitching/lib/pitcherMatchupCards'
 import { AimCursor } from '@/pages/pitching/ui/AimCursor'
 import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
@@ -556,6 +556,8 @@ export function PitcherGameScreen({
           ourTeamId: side0Team,
           opponentTeamId: side1Team,
           gameMode: PITCHER_CAREER_MODE,
+          // 구장 +0x60 — 인트로 진입 0x3b084 가 3b108 에서 측 0 의 1번 타자 손을 쓴다(0 우타면 거울 길)
+          side: pitcherIntroBatterHandOf(options),
         }}
         // 라이벌전 띠 0x3b80c — 적재 상태 8 의 0xb8f68(두 팀) (표 0xd8a90 의 짝)
         isRivalry={isRivalryMatch(side0Team, side1Team)}

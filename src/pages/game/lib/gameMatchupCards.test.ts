@@ -5,7 +5,7 @@ import { applyPlayerOutcome, opponentMoundOf, startGame } from '@/features/play-
 import { staminaCapacityOf, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
-import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
+import { gameIntroBatterHandOf, gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
 
 describe('나리 타자편 상태 0xe 소개 판 값 (0x44944)', () => {
   it('투수 = 상대 마운드(이름·보직·체력 막대), 타자 = 내 선수(타순·손·시즌 줄 + 이 경기)', () => {
@@ -63,5 +63,22 @@ describe('나리 타자편 상태 0xe 소개 판 값 (0x44944)', () => {
     const after = applyPlayerOutcome(progress, { kind: '홈런' }, random)
     const myRecords = after.ourLineup.records[progress.game.battingOrderIndex % 9]
     expect(myRecords?.results).toEqual([4])
+  })
+})
+
+describe('타자편 인트로 배경의 타자 손 (0x3b084 3b0f2~3b108)', () => {
+  const random = () => createSeededRandom(20101015)
+  const career = { battingSide: 0 }
+
+  it('상대가 선공이면 상대 1번(로스터 0번) 손 — 팀 0 의 1번은 좌타', () => {
+    // startGame(random, 내 팀, 타순, 상대, 측)
+    expect(gameIntroBatterHandOf(startGame(random(), 2, 4, 0, 1), career)).toBe(1)
+    expect(gameIntroBatterHandOf(startGame(random(), 0, 4, 2, 1), career)).toBe(0)
+  })
+
+  it('내 팀이 선공이면 내 팀 1번 — 내가 1번이면 내 손, 아니면 명단 칸 0 의 손', () => {
+    expect(gameIntroBatterHandOf(startGame(random(), 2, 1, 0, 0), { battingSide: 1 })).toBe(1)
+    expect(gameIntroBatterHandOf(startGame(random(), 0, 4, 2, 0), career)).toBe(1)
+    expect(gameIntroBatterHandOf(startGame(random(), 2, 4, 0, 0), { battingSide: 1 })).toBe(0)
   })
 })
