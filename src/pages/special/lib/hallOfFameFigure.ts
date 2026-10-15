@@ -1,3 +1,5 @@
+import { pitcherPoseOf as stagePitcherPoseOf, pitcherStepRuleOf } from '@/widgets/batting-stage/lib/stageScenery'
+
 /**
  * 명예의 전당 목록 A 자리의 **고른 선수 몸 그림** — 공용 목록 그리기 0x63b14(목록 = 스킨 객체) 의 찬 칸 갈래와
  * 0x669c0 → 0x65e80 을 직접 떠서 옮겼다. 순수 함수만 둔다(그리기는 `ui/HallOfFameFigure.tsx`).
@@ -82,27 +84,17 @@ export interface FigureAnimation {
 
 const startAnimation = (form: number, state: number): FigureAnimation => ({ state, step: 0, count: 0, form })
 
-/** 투구 단계 유지 (0xd73e9) · 대기 단계 유지 (0xd73e4) */
-const PITCH_DURATIONS = [1, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
-const PITCH_LAST_STEP = 0xd
-const PITCHER_IDLE_DURATIONS = [1, 1, 3, 4, 4]
-const PITCHER_IDLE_LAST_STEP = 4
-/** 폼 >> 1 → 단계별 pitcher.pzx 프레임 (0xd7475 · 0xd7467 · 0xd7459) · 대기 (0xd7454) */
-const PITCH_FRAMES = [
-  [0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14],
-  [1, 3, 4, 5, 6, 7, 15, 16, 10, 11, 12, 13, 14, 14],
-  [2, 3, 4, 5, 6, 7, 17, 18, 10, 11, 12, 13, 14, 14],
-]
-const PITCHER_IDLE_FRAMES = [0, 19, 0, 19, 0]
-
-/** 0x9df8c → 0x9e004 — 카운터가 유지값에 닿으면 다음 단계, 대기(2)가 단계 3 을 넘으면 상태 0 */
+/**
+ * 0x9df8c → 0x9e004 — 카운터가 유지값에 닿으면 다음 단계, 대기(2)가 단계 3 을 넘으면 상태 0.
+ * 유지 표(0xd73e9 · 0xd73e4)와 마지막 단계는 경기 장면과 같은 객체(vtable 0xd73d0)라 `stageScenery.pitcherStepRuleOf` 하나를 쓴다.
+ */
 export function advancePitcherAnimation(animation: FigureAnimation): FigureAnimation {
   let next = animation
-  const durations = animation.state === 1 ? PITCH_DURATIONS : animation.state === 2 ? PITCHER_IDLE_DURATIONS : null
-  if (durations !== null) {
-    const last = animation.state === 1 ? PITCH_LAST_STEP : PITCHER_IDLE_LAST_STEP
-    const reached = animation.count >= (durations[animation.step] ?? 0)
-    next = reached && animation.step < last
+  // 마선수 갈래 +0x24 ≥ 0 은 이 목록에서 안 쓴다 (목록 애니 생성 뒤 +0x24 = −1)
+  const rule = pitcherStepRuleOf(animation.state, null)
+  if (rule !== null) {
+    const reached = animation.count >= (rule.durations[animation.step] ?? 0)
+    next = reached && animation.step < rule.lastStep
       ? { ...animation, step: animation.step + 1, count: 0 }
       : { ...animation, count: animation.count + 1 }
   }
@@ -110,11 +102,10 @@ export function advancePitcherAnimation(animation: FigureAnimation): FigureAnima
   return next
 }
 
-/** 0x9e0b8 — 상태 0·1 은 폼 표, 2 는 대기 표 (마선수 갈래 +0x24 ≥ 0 은 이 목록에서 안 쓴다) */
+/** 0x9e0b8 — 상태 0·1 은 폼 표(0xd7475 · 0xd7467 · 0xd7459), 2 는 대기 표(0xd7454). 표는 `stageScenery.pitcherPoseOf` 하나다 */
 export function pitcherPoseOf(animation: FigureAnimation): number {
-  if (animation.state === 2) return PITCHER_IDLE_FRAMES[animation.step] ?? 0
-  if (animation.state > 2 || animation.form < 0 || animation.form > 5) return 0
-  return PITCH_FRAMES[animation.form >> 1][animation.step] ?? 0
+  if (animation.state !== 0 && animation.state !== 1 && animation.state !== 2) return 0
+  return stagePitcherPoseOf({ state: animation.state, step: animation.step }, animation.form, null)
 }
 
 /* ── 타자 애니 0xb9014 (vtable 0xd8aa4: 갱신 0xb928d → 0xb9168 · 자세 0xb905d), 마선수 아님(+0x24 = −1) ── */

@@ -293,6 +293,24 @@ export function pitcherAnimationAt(clock: PitcherAnimationClock, aceOrder?: numb
   return { state: 0, step: 0 }
 }
 
+/**
+ * 0x9df8c 의 상태별 규칙 — 단계 유지 표와 마지막 단계. 상태 0 · 그 밖은 안 센다(null).
+ * 명예의 전당 목록 그림(`pages/special/lib/hallOfFameFigure`)도 같은 객체(vtable 0xd73d0)라 이 표를 쓴다.
+ */
+export function pitcherStepRuleOf(
+  state: number,
+  aceOrder?: number | null,
+): { readonly durations: readonly number[]; readonly lastStep: number } | null {
+  const row = aceRowOf(aceOrder)
+  if (state === 1) {
+    return row === null
+      ? { durations: PITCH_STEP_DURATIONS, lastStep: PITCH_LAST_STEP }
+      : { durations: ACE_PITCH_STEP_DURATIONS[row], lastStep: ACE_PITCH_LAST_STEPS[row] }
+  }
+  if (state === 2) return { durations: IDLE_DURATIONS, lastStep: IDLE_LAST_STEP }
+  return null
+}
+
 /** 0x9e0b8 — 지금 상태의 그림 프레임. 마투수는 ace/pitcher_*.pzx, 아니면 pitcher.pzx 의 번호다 */
 export function pitcherPoseOf(animation: PitcherAnimation, form: number, aceOrder?: number | null): number {
   const row = aceRowOf(aceOrder)
