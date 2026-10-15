@@ -23,8 +23,9 @@ export function specialSwingNumberOf(slot: number, battingTypeIndex: number): nu
 }
 
 /**
- * 칸 i 를 골랐을 때 **선수 +0x18 에 실제로 쓰는 번호** — 표 `0xcc378[i]` 그대로(1~4)다
- * (0x18166~0x1816c `ldr 표[칸] → strb [선수+0x18]`, H2 2절 확정). 넷째 칸도 타입을 안 더한다.
+ * 칸 i 를 골랐을 때 **선수 +0x18 에 실제로 쓰는 번호** — `i + 1`(1~4)이다. 고르기 창(상태 0x7b) 틀 0x17bf4 의 탭 0 · 1 갈래
+ * (0x17c50~0x17c64 `커서 + 1 → strb [선수+0x18]`, 2026-10-15 r97 직접 뜸). 넷째 칸도 타입을 안 더한다. 표 0xcc378 = [1,2,3,4] 와 값이 같아 표로 둔다.
+ * (앞서 근거로 적은 0x1816c 는 고르기가 아니라 훈련 완료 0x17f5c 쪽의 `strb 표0xcc378[커서]` 다.)
  */
 export function specialSwingStoredNumberOf(slot: number): number {
   return SPECIAL_SWING_SLOT_NUMBERS[slot] ?? SPECIAL_SWING_SLOT_NUMBERS[0]

@@ -35,7 +35,7 @@ describe('기술 고르기 — 0x17cec', () => {
   })
 
   it('배운 칸이면 StrMODE[70] 로 묻고, 저장할 번호(표 값)와 이름을 함께 준다', () => {
-    // 이름은 4 + 타입(메테오)이지만 +0x18 에 쓰는 값은 표 0xcc378[3] = 4 다 (0x1816c)
+    // 이름은 4 + 타입(메테오)이지만 +0x18 에 쓰는 값은 칸 + 1 = 4 다 (0x17c64)
     expect(specialSwingPickOf(3, 1, 4, 1)).toEqual({ kind: '묻기', number: 4, name: '메테오 스윙' })
     expect(specialSwingPickOf(3, 0, 4, 1)).toEqual({ kind: '묻기', number: 4, name: '미라지 스윙' })
   })

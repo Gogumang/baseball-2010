@@ -360,8 +360,8 @@ export interface PlayerCareer {
   readonly specialSwingSessions: number
   /**
    * **고른 필살타법 번호** — 선수 레코드 **+0x18** (H-4 · H2 1·2절 확정).
-   * 선수정보 칸 3 의 창(상태 0x7b, 키 0x17cec)에서 고른 칸의 표 값 `0xcc378[칸]` = 1~4 가 그대로 들어간다
-   * (0x18166~0x1816c `strb`). **"4 + 타입" 은 이름에만 쓰고 여기엔 안 들어간다** — 미라지·메테오 모두 4.
+   * 선수정보 칸 3 의 창(상태 0x7b, 키 0x17cec)에서 고른 칸 + 1 = 1~4 가 그대로 들어간다
+   * (틀 0x17bf4 의 0x17c50~0x17c64 `strb`). 훈련 완료(0x17f5c 의 0x18150~0x1816c)도 표 `0xcc378[커서]` = [1,2,3,4] 를 쓴다. **"4 + 타입" 은 이름에만 쓰고 여기엔 안 들어간다** — 미라지·메테오 모두 4.
    * 경기는 레벨(+0x201)이 아니라 **이 번호**만 본다: 0 이면 '0' 키가 무시되고(0x51e14 ← 0xaea30),
    * 성공 확률은 표 `0xcfdbe[번호−1]` 이다(0x34c74).
    *
@@ -714,8 +714,8 @@ export function gainMorale(career: PlayerCareer, amount: number): PlayerCareer {
 }
 
 /**
- * 필살타법 창(상태 0x7b)에서 고른 번호를 선수 +0x18 에 쓴다 (0x1816c `strb`).
- * 관리 주기 행동·G포인트는 건드리지 않는다 — 0x18150~0x1816e 사이 쓰기는 이 `strb` 하나뿐이다.
+ * 필살타법 창(상태 0x7b)에서 고른 번호를 선수 +0x18 에 쓴다 (틀 0x17bf4 의 0x17c64 `strb 커서 + 1`).
+ * 관리 주기 행동·G포인트는 건드리지 않는다 — 0x17c50~0x17c66 갈래의 쓰기는 이 `strb` 하나뿐이다.
  */
 export function selectSpecialSwingNumber(career: PlayerCareer, number: number): PlayerCareer {
   return { ...career, specialSwingNumber: number }

@@ -59,7 +59,7 @@ export interface ManagementScreenProps {
    */
   readonly onEquipTitle?: (title: string) => void
   /**
-   * 필살타법 창(상태 0x7b)에서 기술을 골랐다 — 선수 +0x18 에 쓰고 저장한다 (0x1816c,
+   * 필살타법 창(상태 0x7b)에서 기술을 골랐다 — 선수 +0x18 에 쓰고 저장한다 (틀 0x17bf4 의 0x17c64,
    * `selectSpecialSwingNumber`). 안 넘기면 창이 고른 번호를 스스로만 들고 있다(저장 안 됨).
    */
   readonly onSelectSpecialSwing?: (number: number) => void

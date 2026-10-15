@@ -159,7 +159,7 @@ describe('관리 화면 알림 상자', () => {
     expect(screen.queryByRole('dialog', { name: '필살타법' })).toBeNull()
   })
 
-  it('선수정보 → 필살타법 창에서 고른 번호를 세션에 넘긴다 (+0x18, 0x1816c)', () => {
+  it('선수정보 → 필살타법 창에서 고른 번호를 세션에 넘긴다 (+0x18, 0x17c64)', () => {
     const onSelectSpecialSwing = vi.fn()
     const career = { ...createCareer('테스터'), specialSwingLevel: 2 }
     render(<ManagementScreen {...propsWith({ career, onSelectSpecialSwing })} />)

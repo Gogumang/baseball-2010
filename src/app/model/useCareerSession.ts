@@ -1708,7 +1708,7 @@ export function useCareerSession({
     },
 
     /**
-     * 필살타법 창(상태 0x7b)에서 고른 번호(표 값 1~4)를 선수 +0x18 에 쓴다 (0x1816c `strb`).
+     * 필살타법 창(상태 0x7b)에서 고른 번호(칸 + 1 = 1~4)를 선수 +0x18 에 쓴다 (틀 0x17bf4 의 0x17c64 `strb`).
      * 경기의 '0' 키(0x51e14)와 성공 확률(0x34c74)은 이 번호만 본다.
      */
     selectSpecialSwing: (number: number) => {

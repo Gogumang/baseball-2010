@@ -16,7 +16,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * 표 `0xcfdbe` — 필살타법 **번호**(선수 +0x18) 1~5 의 성공 확률 %. 색인은 `번호 − 1` (0x34cb0).
- * 저장 번호는 1~4 뿐이라(0x1816c) 다섯째 30 은 쓰이지 않는다 — 장타형 메테오도 번호 4 → 25%.
+ * 저장 번호는 1~4 뿐이라(고르기 0x17c64 · 훈련 완료 0x1816c) 다섯째 30 은 쓰이지 않는다 — 장타형 메테오도 번호 4 → 25%.
  */
 export const SPECIAL_SWING_PERCENTS: readonly number[] = [15, 20, 25, 25, 30]
 /** 마타자는 번호와 무관하게 30% 다 (0x34c74) */
