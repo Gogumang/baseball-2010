@@ -84,6 +84,16 @@ describe('투수 투구 — 0x9e0b8 (단계 표 · 유지 dur+1)', () => {
     expect([poseAt(13, 2), poseAt(99, 4), poseAt(0, 2)]).toEqual([1, 2, 0])
   })
 
+  it('0x9e004 는 0xf · 0x11 갱신에서만 — 0x11 이 끝나면 단계가 굳고, 0xf 를 떠나면 대기 동작도 굳는다', () => {
+    // 0x11 이 틱 15 에 끝나면(공이 빨리 닿음) 단계 10 에 머문다
+    expect(pitcherAnimationAt({ pitchTick: 40, pitchEndTick: 15 })).toEqual({ state: 1, step: 10 })
+    expect(pitcherAnimationAt({ pitchTick: 12, pitchEndTick: null })).toEqual({ state: 1, step: 7 })
+    // 빈 칸 키 뒤 틱 3 에 0x10 으로 가면 단계 1(자세 19)에 굳어 선 자세로 안 돌아온다
+    expect(pitcherAnimationAt({ pitchTick: null, idleTick: 50, idleEndTick: 3 })).toEqual({ state: 2, step: 1 })
+    // 한 바퀴를 다 돈 뒤 굳으면 상태 0
+    expect(pitcherAnimationAt({ pitchTick: null, idleTick: 50, idleEndTick: 13 })).toEqual({ state: 0, step: 0 })
+  })
+
   it('상태 걸기 사건이 없으면 상태 0 · 투구 틱이 있으면 상태 1 이고 마지막 단계에 머문다', () => {
     expect(pitcherAnimationAt({ pitchTick: null })).toEqual({ state: 0, step: 0 })
     expect(pitcherAnimationAt({ pitchTick: 999, idleTick: 3 })).toEqual({ state: 1, step: 13 })

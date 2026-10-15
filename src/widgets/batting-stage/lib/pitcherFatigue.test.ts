@@ -9,7 +9,7 @@ import {
   showsPitcherFatigue,
   showsPitcherMistakeMark,
 } from '@/widgets/batting-stage/lib/pitcherFatigue'
-import { judgeFrameAt, pitchStepAt } from '@/widgets/batting-stage/lib/stageScenery'
+import { judgeFrameAt, pitchStepAt, pitcherAnimationAt } from '@/widgets/batting-stage/lib/stageScenery'
 
 describe('마운드 투수 체력 그림 (0x38f42~0x39086)', () => {
   it('체력 ≤ 19 애니 10 · 20~34 애니 9 · 35 이상 없음', () => {
@@ -43,20 +43,31 @@ describe('실투 "!" (0x38d1c 38ee0~38f3e)', () => {
 })
 
 describe('투수 그리기의 홈런 갈래 (0x3908a~0x39192)', () => {
-  const base = { resultCode: 25, isBigHit: true, pitcherTickAtHit: 30, pitcherTick: 30, step: 13, aceOrder: null }
+  // 앞 공은 홈런성이 아니고, 이 공이 투수 틱 30 에 판정(0x6aa)돼 코드 25 를 썼다
+  const base = {
+    codeBeforePitch: null,
+    judgedTick: 30,
+    judgedCode: 25,
+    isBigHit: true,
+    pitcherTick: 30,
+    step: 13,
+    aceOrder: null,
+  }
 
   it('결과 코드 24~26 만 (0x357e0)', () => {
     expect([23, 24, 25, 26, 27, null].map(isHomeRunLikeResultCode)).toEqual([false, true, true, true, false, false])
-    expect(pitcherHomeRunMarksOf({ ...base, resultCode: 27 })).toBeNull()
+    expect(pitcherHomeRunMarksOf({ ...base, judgedCode: 27 })).toBeNull()
   })
 
-  it('투수 단계가 마지막 단계(13 · 마투수 0xcfd34[순번])일 때만 — 첫 그림이 1', () => {
+  it('투수 단계가 마지막 단계(13 · 마투수 0xcfd34[순번])일 때만 — 판정 그림이 첫 그림', () => {
     expect(pitcherHomeRunMarksOf({ ...base, step: 12 })).toBeNull()
     expect(pitcherHomeRunMarksOf(base)).toEqual({ drawCall: 1, showsPitcherAnimation: true, showsBang: true })
     expect(pitcherHomeRunMarksOf({ ...base, pitcherTick: 34 })?.drawCall).toBe(5)
+    // 판정 앞 그림은 아직 앞 코드(홈런성 아님)를 본다
+    expect(pitcherHomeRunMarksOf({ ...base, pitcherTick: 29 })).toBeNull()
     // 마투수: 애니 12 는 안 그리고 "!" 만, 목표 단계는 0xcfd34[3] = 15
     expect(pitcherHomeRunMarksOf({ ...base, aceOrder: 3, step: 13 })).toBeNull()
-    expect(pitcherHomeRunMarksOf({ ...base, aceOrder: 3, step: 15, pitcherTick: 60, pitcherTickAtHit: 60 })).toEqual({
+    expect(pitcherHomeRunMarksOf({ ...base, aceOrder: 3, step: 15, pitcherTick: 60, judgedTick: 60 })).toEqual({
       drawCall: 1,
       showsPitcherAnimation: false,
       showsBang: true,
@@ -67,10 +78,22 @@ describe('투수 그리기의 홈런 갈래 (0x3908a~0x39192)', () => {
     expect(pitcherHomeRunMarksOf({ ...base, isBigHit: false })?.showsBang).toBe(false)
   })
 
-  it('0x13 에 들기 전 마지막 단계에 닿았으면 0x13 진입부터 센다', () => {
-    // 평범한 투수의 단계 13 은 투수 틱 19 — 0x13 이 틱 25 에 들었으면 틱 25 가 첫 그림
-    expect(pitcherHomeRunMarksOf({ ...base, pitcherTickAtHit: 25, pitcherTick: 25 })?.drawCall).toBe(1)
-    expect(pitcherHomeRunMarksOf({ ...base, pitcherTickAtHit: 10, pitcherTick: 19 })?.drawCall).toBe(1)
+  it('단계는 0x11 에서만 오른다 — 마지막 단계 전에 판정되면 굳은 단계라 안 그린다', () => {
+    // 틱 15 에 맞아 0x11 이 끝나면 단계 10 에 굳는다 (0x9e004 는 0x13 갱신 0x406e8 에서 안 불린다)
+    const frozenStep = pitcherAnimationAt({ pitchTick: 40, pitchEndTick: 15 }).step
+    expect(frozenStep).toBe(10)
+    expect(pitcherHomeRunMarksOf({ ...base, judgedTick: 15, pitcherTick: 40, step: frozenStep })).toBeNull()
+  })
+
+  it('결과 코드는 0x6aa 만 쓴다 — 홈런 뒤 안 친 공에서도 마지막 단계(틱 19)부터 그린다', () => {
+    const stale = { ...base, codeBeforePitch: 24, judgedTick: null, judgedCode: null, isBigHit: false }
+    expect(pitcherHomeRunMarksOf({ ...stale, pitcherTick: 18, step: 12 })).toBeNull()
+    expect(pitcherHomeRunMarksOf({ ...stale, pitcherTick: 19 })).toEqual({ drawCall: 1, showsPitcherAnimation: true, showsBang: false })
+    expect(pitcherHomeRunMarksOf({ ...stale, pitcherTick: 40 })?.drawCall).toBe(22)
+    // 이 공이 틱 25 에 헛맞음(0x6aa, 홈런성 아님)이면 그 그림부터 안 그리고, 다시 홈런성이면 앞 그림 수에 이어 센다
+    expect(pitcherHomeRunMarksOf({ ...stale, judgedTick: 25, judgedCode: 3, pitcherTick: 24 })?.drawCall).toBe(6)
+    expect(pitcherHomeRunMarksOf({ ...stale, judgedTick: 25, judgedCode: 3, pitcherTick: 25 })).toBeNull()
+    expect(pitcherHomeRunMarksOf({ ...stale, judgedTick: 25, judgedCode: 26, pitcherTick: 26 })?.drawCall).toBe(8)
   })
 })
 

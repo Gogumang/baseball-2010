@@ -52,6 +52,11 @@ export interface PitcherSideStageFrame {
    * '대기'(다음 0xf 진입이 상태 0 으로 되돌린 뒤)면 null
    */
   readonly pitcherTick: number | null
+  /**
+   * 0x11 의 마지막 갱신 틱(`pitcherTick` 셈) — 공 틱 N + 1 의 0x4e060 이 0x12 를 예약한 그림. 그 뒤로는 투수 갱신 0x9e004 가
+   * 안 불려 단계가 굳는다(0x9e004 는 0xf · 0x11 갱신에서만). 0x11 이거나 '대기' 면 null
+   */
+  readonly pitcherTickEnd: number | null
 }
 
 /**
@@ -71,6 +76,7 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
     },
     ballFrame: -1,
     pitcherTick: null,
+    pitcherTickEnd: null,
   }
   if (clock.releaseTick === null) return idle
   const stateTick = clock.nowTick - clock.releaseTick + HUMAN_PITCH_RELEASE_STATE_TICK
@@ -78,11 +84,16 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
   const ballFrame = stateTick - pitcherReleaseTicksOf(clock.aceOrder)
   const flightEndFrame = clock.frameCount + 1
   if (ballFrame < flightEndFrame) {
-    return { phase: { kind: '투구중', tick: stateTick, isPaused: false }, ballFrame, pitcherTick: stateTick }
+    return { phase: { kind: '투구중', tick: stateTick, isPaused: false }, ballFrame, pitcherTick: stateTick, pitcherTickEnd: null }
   }
   const resultTick = ballFrame - flightEndFrame
   if (resultTick < clock.resultTicks) {
-    return { phase: { kind: '결과', tick: resultTick, isPaused: false, isInPlay: false }, ballFrame: -1, pitcherTick: stateTick }
+    return {
+      phase: { kind: '결과', tick: resultTick, isPaused: false, isInPlay: false },
+      ballFrame: -1,
+      pitcherTick: stateTick,
+      pitcherTickEnd: stateTick - resultTick,
+    }
   }
   return idle
 }

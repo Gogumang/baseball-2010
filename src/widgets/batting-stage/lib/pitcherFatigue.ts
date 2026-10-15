@@ -86,10 +86,18 @@ export function showsPitcherMistakeMark(gameMode: number | undefined, drawCall: 
  *        그린 뒤 0x93d91([애니표 +0x30]) 로 한 칸
  * 3912c  [경기+0x199a](큰 타구 감상, 0x392ac) ≠ 0 이면 애니 13 "!" 를 (투수 x, 투수 y − 0x34) 에 같은 효과로, 0x93d91([애니표 +0x34])
  * ```
- * 투구 뒤 투수는 다음 0xf 진입까지 상태 1 의 마지막 단계에 머물므로 결과 코드가 서는 0x13 에서 참이 된다.
+ * 단계는 0x11 갱신 0x4e060 에서만 센다(0x9e004 — `stageScenery` 투수 그림 객체 주석). 그래서 공이 마지막 단계(평범한 투수 틱 19) 전에
+ * 타자에 닿으면 0x11 이 끝나며 단계가 굳어 **이 갈래는 그 공에서 영영 안 탄다**(원본 그대로).
  * 애니 12(56 · 57, 각 10틱)는 돌림이 아니라(0x1a610 에 비트 12 없음) 마지막 칸에 멈추고, 13 은 돌림이다 —
  * 둘 다 0xf 진입 0x3d954 가 되감는다. k 번째 그림은 k 칸 나아간 칸이다(실투 "!" · 체력 그림과 같은 셈).
- * ⚠️ 근사: 그림 수는 0x13 에 들거나 마지막 단계에 닿은 틱 가운데 늦은 쪽부터 투수 틱으로 센다.
+ *
+ * **결과 코드 [+0xfd4] 는 메시지 0x6aa 만 쓴다** — 0x509a0 의 0x6aa 가지가 판정 0xab214 의 12바이트를 +0xfcc~+0xfd7 에 통째로
+ * 옮긴다(5130c `ldr r2,[sp,#0x88]`(= 경기+0xfcc, 51264) · 5130e `ldm r5!` · 51310 `stm r2!`). 0x51226~0x5130e 사이에 빠지는 갈래가
+ * 없어 0x6aa 마다 쓴다. 0x6aa 는 0x4e060 이 0xbfbad 로 **바로** 보내므로(4e210) 판정 그림의 갱신 안에서 써지고 같은 그림의 그리기가
+ * 새 코드를 본다. 다른 곳은 +0xfd4 를 읽기만 한다(`xval 0xfd4` 여섯 곳: 357e2 · 37022 · 392c2 · 4071a · 5135e · 51484) —
+ * 0x11 진입 0x3de10 도 안 지운다. 그래서 **홈런성 타구 뒤 다음 0x6aa(스윙 · 번트 판정)까지는 묵은 코드가 남아**, 안 친 공에서도
+ * 투수가 마지막 단계에 닿으면 이 갈래가 그린다(원본 그대로 — 홈런더비처럼 장면이 이어질 때 보인다. 모드 7 은 38ede 가 곧장
+ * 0x3908a 로 건너뛰어 이 갈래는 탄다). "!" 의 감상 플래그 +0x199a 는 0xf 진입 3d978 이 지운다.
  */
 
 /** 0x390f2 `movs r2, #0xc` — 홈런 갈래의 player_effect 애니 12 (프레임 56 · 57) */
@@ -101,7 +109,7 @@ export function isHomeRunLikeResultCode(code: number | null): boolean {
 }
 
 export interface PitcherHomeRunMarks {
-  /** 갈래가 참이 된 뒤 k 번째 그림 (1 부터) */
+  /** 0xf 진입 뒤 갈래가 참이었던 그림 수 — 이 그림이 k 번째 (1 부터) */
   readonly drawCall: number
   /** 애니 12 — 마투수가 아닐 때만 (390c6 0xb633d) */
   readonly showsPitcherAnimation: boolean
@@ -109,27 +117,54 @@ export interface PitcherHomeRunMarks {
   readonly showsBang: boolean
 }
 
-/** 홈런 갈래(0x3908a)가 이 그림에서 무엇을 그리는가 — 아무것도 안 그리면 null */
-export function pitcherHomeRunMarksOf(input: {
-  /** 결과 코드 [경기+0xfd4] */
-  readonly resultCode: number | null
+/** 홈런 갈래가 보는 결과 코드 [+0xfd4] 의 이 공 동안의 값 */
+export interface PitcherResultCodeClock {
+  /** 0x11 진입 때 남아 있던 코드 — 앞 공들의 마지막 0x6aa 가 쓴 값. 없으면 null */
+  readonly codeBeforePitch: number | null
+  /** 이 공의 0x6aa 그림의 투수 틱 — 그 그림부터 `judgedCode`. 아직 판정이 없으면 null */
+  readonly judgedTick: number | null
+  /** 이 공의 0x6aa 가 쓴 코드 (헛스윙 · 번트 헛맞음은 홈런성이 아니다) */
+  readonly judgedCode: number | null
+}
+
+/** 투수 틱 `tick` 의 그림이 보는 결과 코드가 홈런성인가 */
+function isHomeRunLikeAt(clock: PitcherResultCodeClock, tick: number): boolean {
+  const isJudged = clock.judgedTick !== null && tick >= clock.judgedTick
+  return isHomeRunLikeResultCode(isJudged ? clock.judgedCode : clock.codeBeforePitch)
+}
+
+/** [from, to] 틱 가운데 코드가 홈런성인 그림 수 */
+function homeRunLikeTicksBetween(clock: PitcherResultCodeClock, from: number, to: number): number {
+  if (to < from) return 0
+  const judgedTick = clock.judgedTick
+  if (judgedTick === null) return isHomeRunLikeResultCode(clock.codeBeforePitch) ? to - from + 1 : 0
+  const before = isHomeRunLikeResultCode(clock.codeBeforePitch) ? Math.max(0, Math.min(to, judgedTick - 1) - from + 1) : 0
+  const after = isHomeRunLikeResultCode(clock.judgedCode) ? Math.max(0, to - Math.max(from, judgedTick) + 1) : 0
+  return before + after
+}
+
+/**
+ * 홈런 갈래(0x3908a)가 이 그림에서 무엇을 그리는가 — 아무것도 안 그리면 null.
+ * 투수 틱은 0x11 진입 뒤 그림 수(그리기 시계)이고, 투수를 그리는 상태(0xd~0x13 · 0xb · 0x16 · 0x1b · 0x23 — 0x38d1c 를 부르는
+ * 그리기 열한 곳)에서만 이 함수를 부른다.
+ */
+export function pitcherHomeRunMarksOf(input: PitcherResultCodeClock & {
   /** 감상 플래그 [경기+0x199a] (0x392ac) */
   readonly isBigHit: boolean
-  /** 0x13 에 든 순간의 투수 틱 (상태 1 에 든 뒤) */
-  readonly pitcherTickAtHit: number
-  /** 지금 투수 틱 */
+  /** 지금 투수 틱 (0x11 진입 뒤 그림 수) */
   readonly pitcherTick: number
-  /** 지금 투수 단계 +0x1c */
+  /** 지금 투수 단계 +0x1c — 0x11 이 끝난 뒤면 굳은 단계 (`pitcherAnimationAt` 의 `pitchEndTick`) */
   readonly step: number
   /** 마투수 순번 (없으면 null) */
   readonly aceOrder: number | null
 }): PitcherHomeRunMarks | null {
-  if (!isHomeRunLikeResultCode(input.resultCode)) return null
-  // 39096~390c4 — 목표 단계 13 · 마투수 0xcfd34[순번] (= 마지막 단계)
+  // 39096~390c4 — 목표 단계 13 · 마투수 0xcfd34[순번] (= 마지막 단계). 상태는 안 본다
   const lastStep = pitchLastStepOf(input.aceOrder)
   if (input.step !== lastStep) return null
-  const firstDrawTick = Math.max(input.pitcherTickAtHit, pitchStepStartTickOf(lastStep, input.aceOrder))
-  const drawCall = input.pitcherTick - firstDrawTick + 1
+  if (!isHomeRunLikeAt(input, input.pitcherTick)) return null
+  // 단계는 0x11 동안만 오르므로 마지막 단계에 닿은 틱부터 지금까지 — 0xf 진입이 되감은 뒤 갈래가 참이었던 그림을 센다
+  const lastStepTick = pitchStepStartTickOf(lastStep, input.aceOrder)
+  const drawCall = homeRunLikeTicksBetween(input, lastStepTick, input.pitcherTick)
   if (drawCall < 1) return null
   return { drawCall, showsPitcherAnimation: input.aceOrder === null, showsBang: input.isBigHit }
 }
@@ -151,6 +186,7 @@ export function pitcherHomeRunMarksOf(input: {
  * 0x3d954 가 되감는다. 평범한 투수의 단계 7~11 은 유지 0 · 0 · 0 · 0 · 1(0xd73e9) 이라 여섯 그림이다.
  * k 번째 그림은 k 칸 나아간 칸이다(실투 "!" · 체력 그림 · 홈런 갈래와 같은 셈) — 그래서 첫 칸 37 은 보이지 않는다(원본 그대로).
  * 좌투 x − 8 · 효과 0x11 은 투수 점을 축으로 한 거울이라 웹은 거울 안에서 x + 8 로 그린다.
+ * 0x11 이 단계 7~11 에서 끝나면(공이 빨리 닿음) 단계가 그 자리에 굳어 0x12 · 0x13 그림에서도 계속 그린다(그림 수도 계속 는다).
  */
 export const PITCH_WIND_ANIMATION = 11
 /** 38dfc · 38e04 — 투수 점에서 던지는 팔 쪽으로 8 */
