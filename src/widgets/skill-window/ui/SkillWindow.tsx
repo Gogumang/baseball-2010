@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import type { ReactNode } from 'react'
 import { FrameSprite, MarkupText, MessageBox } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -295,7 +296,7 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
     if (tint === null) return <img key={`t${frame}`} className={styles.layer} src={src} alt="" style={{ left, top }} />
     return (
       <div key={`t${frame}`} className={styles.tinted}
-        style={{ left, top, width: size.width, height: size.height, background: tint, maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
+        style={{ left, top, width: size.width, height: size.height, background: solidColorCss(tint), maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
     )
   }
   /** num 그림 한 장을 효과 11 흰색으로 — 0xb9d35 (`key` 는 같은 그림이 두 번 나올 수 있어 따로 받는다) */
@@ -303,7 +304,7 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
     const src = `${NUM}/${pad(frame)}.png`
     return (
       <div key={key} className={styles.tinted}
-        style={{ left, top, width, height, background: SKILL_WINDOW_COLORS.text, maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
+        style={{ left, top, width, height, background: solidColorCss(SKILL_WINDOW_COLORS.text), maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
     )
   }
 

@@ -44,9 +44,9 @@ describe('이벤트 재생이 끝난 한 틀 (0x8b5ac 가 0 — 0x19e64 → 0x19
       expect(screen.getByRole('button', { name: id })).toBeTruthy()
     }
     expect(screen.getByRole('button', { name: '아이템' }).getAttribute('aria-current')).toBe('true')
-    const 흑백 = (id: string) => screen.getByRole('button', { name: id }).querySelector('img')?.style.filter
-    expect(흑백('휴식')).toBe('grayscale(1)')
-    expect(흑백('다음경기')).toBe('')
+    // 0xc37a8 흑백 사각형 — 칸 안에 회색 겹을 얹는다
+    expect(screen.queryByTestId('흑백-휴식')).toBeTruthy()
+    expect(screen.queryByTestId('흑백-다음경기')).toBeNull()
   })
 
   it('시즌 0xd3 — 앞 상태 0xc9 면 시즌 관리 6칸(커서 = 메뉴 [this+0x70]), 그 밖은 칸 없음, 0xd1 이면 지도', () => {

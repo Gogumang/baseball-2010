@@ -7,6 +7,10 @@ import {
   finishMainTitleBackdrop565, mainTitleLineYs, rgbOf565, rgbTo565,
 } from '@/pages/special/lib/skinBackdrops'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
+import { DRAW_EFFECT, color565Of, css565, effectSpriteUrl, grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
+import { useScreenGrayRects } from '@/shared/lib/pixelEffect/screenGrayRects'
+import type { ScreenGrayRect } from '@/shared/lib/pixelEffect/screenGrayRects'
+import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 
 const MAIN_TITLE = './sprites/main_title'
 const GPOINT_FRAMES = './sprites/gpoint/frames'
@@ -145,12 +149,47 @@ function BallPatternBackdrop() {
   const counter = ballPatternCounterAfter(draws)
   const frame = animationStepAt(GPOINT_ANIMATION, draws)?.frame ?? 0
   const { width, height } = SKIN_SCREEN
+  const grayRects = useScreenGrayRects()
+  const tiles = ballPatternTilesOf(counter)
+  const src = `${GPOINT_FRAMES}/${pad(frame)}.png`
   return (
     <div className={styles.skinBackdrop} data-testid="바탕-공무늬" data-counter={counter}
       style={{ width, height, background: BALL_PATTERN_BACKDROP.color }}>
-      {ballPatternTilesOf(counter).map((tile, index) => (
-        <img key={index} className={styles.sprite} alt="" src={`${GPOINT_FRAMES}/${pad(frame)}.png`}
-          style={{ left: tile.x, top: tile.y }} />
+      {tiles.map((tile, index) => (
+        <img key={index} className={styles.sprite} alt="" src={src} style={{ left: tile.x, top: tile.y }} />
+      ))}
+      {grayRects.map((rect, index) => <BallPatternGrayRect key={index} rect={rect} tiles={tiles} src={src} />)}
+    </div>
+  )
+}
+
+/** 공 무늬 바탕 색의 0xc37a8 회색 (`grayPixel565`) */
+const BALL_PATTERN_GRAY = css565(grayPixel565(color565Of(BALL_PATTERN_BACKDROP.color) ?? 0))
+
+/**
+ * 0xc37a8 흑백 사각형 안의 공 무늬 — 위에 그린 것(커맨드 줄 아이콘)이 흑백 사각형을 걸면 그 아래 바탕도 회색이 된다.
+ * 바탕 색 · 공 그림을 회색 식으로 칠해 사각형으로 잘라 얹는다(`shared/lib/pixelEffect/screenGrayRects`).
+ */
+function BallPatternGrayRect({ rect, tiles, src }: {
+  readonly rect: ScreenGrayRect
+  readonly tiles: readonly { readonly x: number; readonly y: number }[]
+  readonly src: string
+}) {
+  const { tileWidth, tileHeight } = BALL_PATTERN_BACKDROP
+  // 애니 그림 여섯 장을 미리 칠해 둔다 — 그림이 바뀌는 틀에 회색 공이 한 번 빠지지 않게
+  useEffect(() => {
+    for (const entry of GPOINT_ANIMATION) void effectSpriteUrl(`${GPOINT_FRAMES}/${pad(entry.frame)}.png`, DRAW_EFFECT.GRAY, 0)
+  }, [])
+  const touches = (tile: { readonly x: number; readonly y: number }) =>
+    tile.x < rect.x + rect.width && tile.x + tileWidth > rect.x && tile.y < rect.y + rect.height && tile.y + tileHeight > rect.y
+  return (
+    <div data-testid="바탕-공무늬-흑백" style={{
+      position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: 'hidden',
+      background: BALL_PATTERN_GRAY, pointerEvents: 'none',
+    }}>
+      {tiles.filter(touches).map((tile) => (
+        <EffectImage key={`${tile.x},${tile.y}`} className={styles.sprite} src={src} effect={DRAW_EFFECT.GRAY}
+          style={{ left: tile.x - rect.x, top: tile.y - rect.y }} />
       ))}
     </div>
   )

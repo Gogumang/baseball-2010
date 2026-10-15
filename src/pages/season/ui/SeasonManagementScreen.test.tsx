@@ -193,9 +193,9 @@ describe('구단관리 하위 메뉴 (상태 0xce)', () => {
     const onSelect = vi.fn()
     render(<SeasonTeamMenuScreen state={시즌({ tradeUsed: 1 })} onSelect={onSelect} onBack={vi.fn()} />)
 
-    const 아이콘필터 = (이름: string) => screen.getByRole('button', { name: 이름 }).querySelector('img')?.style.filter ?? ''
-    expect(아이콘필터('트레이드')).toBe('grayscale(1)')
-    expect(아이콘필터('구장관리')).toBe('')
+    // 0xc37a8 흑백 사각형 — 칸 안에 회색 겹을 얹는다
+    expect(screen.queryByTestId('흑백-트레이드')).toBeTruthy()
+    expect(screen.queryByTestId('흑백-구장관리')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '트레이드' }))
     expect(onSelect).toHaveBeenLastCalledWith('트레이드', SEASON_SCENE_STATE.트레이드)
   })

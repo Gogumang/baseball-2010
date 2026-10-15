@@ -1,3 +1,5 @@
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
+
 /**
  * **점수판 틀 `0x41440(장면, x, y, 효과, 효과인자, 아래칸밀기)`** — 직접 떴다(0x41440~0x41766).
  *
@@ -130,10 +132,13 @@ export function scoreboardPlacementOf(x: number, y: number, sides: readonly [Sco
   return { frame: { x, y }, labels, logos, plates, names }
 }
 
-/** 효과 1 · 인자 L 의 그림 불투명도 — L/16, 0 이나 16 이상이면 0 (안 그린다). 효과 0 이면 1 */
+/**
+ * 효과 1 · 인자 L 의 그림 불투명도 — L/16, 0 이나 16 이상이면 0 (안 그린다). 효과 0 이면 1.
+ * ⚠️ 근사: DOM 겹치기라 아래 화면 픽셀을 못 읽는다 — 공용 `translucentOpacityOf` 머리(마스크 내림 · 565 를 못 따른다)
+ */
 export function effectOpacityOf(effectLevel: number | null): number {
   if (effectLevel === null) return 1
-  return effectLevel >= 1 && effectLevel <= 15 ? effectLevel / 16 : 0
+  return translucentOpacityOf(effectLevel)
 }
 
 /** 인트로(0x417ac) 의 효과 — `[+0x17e6] ≤ 14` 면 효과 1 · 인자 [+0x17e6], 아니면 효과 0 (0x417ce~0x417d8) */

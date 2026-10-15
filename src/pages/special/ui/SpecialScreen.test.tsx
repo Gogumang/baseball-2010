@@ -16,6 +16,12 @@ vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) 
   return { ...actual, useListPageEntry: actual.settledListPageEntry }
 })
 
+// 회색(효과 0xa) 칠하기는 캔버스가 없는 jsdom 에서 끝나지 않는다 — 칠한 주소 대신 원래 주소를 바로 돌려준다
+vi.mock('@/shared/lib/pixelEffect/pixelEffect', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/lib/pixelEffect/pixelEffect')>()
+  return { ...actual, paintedEffectSpriteUrlOf: (url: string) => url }
+})
+
 /**
  * 스페셜 목록 (메인 메뉴 상태 6, 하위 목록 0x2524c — P6 2d).
  * 여덟 칸(main_ui 프레임 15~21·28)을 오른쪽 세로 목록으로 20px 간격에 세운다.

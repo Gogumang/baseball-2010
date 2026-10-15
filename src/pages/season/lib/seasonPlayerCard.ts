@@ -1,3 +1,4 @@
+import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import {
   advanceBatterAnimation, advancePitcherAnimation, batterPoseOf, pitcherPoseOf,
 } from '@/pages/special/lib/hallOfFameFigure'
@@ -73,13 +74,16 @@ export function steppedBoardPointsOf(top: number, height: number, offset: number
   ]
 }
 
-/** team_logo 77×76 — (W/2 − w/2 − 0x3e, H/2 − h/2 − 0x32), 효과 1 · 인자 12 = 무게 12/16 (R6 3절) */
+/**
+ * team_logo 77×76 — (W/2 − w/2 − 0x3e, H/2 − h/2 − 0x32), 효과 1 · 인자 12 = 무게 12/16 (R6 3절).
+ * ⚠️ 근사: 로고가 판 위 가장자리(y 122)를 걸쳐 아래 화면이 한 색이 아니고 DOM 이라 못 읽는다 — `translucentOpacityOf` 머리
+ */
 export const SEASON_CARD_LOGO = {
   x: SCREEN.width / 2 - (77 >> 1) - 0x3e,
   y: SCREEN.height / 2 - (76 >> 1) - 0x32,
   width: 77,
   height: 76,
-  opacity: 12 / 16,
+  opacity: translucentOpacityOf(12),
 } as const
 
 /** 선수 그림 박스 — mode_ui 프레임 0 박스 0 */
