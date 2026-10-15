@@ -20,7 +20,8 @@ export const placeButton = style({
   background: 'none',
   cursor: 'pointer',
   selectors: {
-    '&:hover, &:focus-visible': { filter: 'brightness(1.3)', outline: 'none' },
+    // 포인터를 올리기만 해서 밝아지던 :hover 는 걷었다 — 원본은 키패드뿐이라 올려 두기로 고른 듯 보이면 안 된다
+    '&:focus-visible': { filter: 'brightness(1.3)', outline: 'none' },
   },
 })
 
