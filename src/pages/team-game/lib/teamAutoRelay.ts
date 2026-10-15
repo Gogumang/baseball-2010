@@ -79,7 +79,9 @@ const CATCHER_POSITION = 2
 
 /**
  * **팀경기 0x21 운동장 그림의 값** — 그리기 0x4258c 머리(425bc~42812, 모드 ∈ {1, 2, 8, 9} · 속도 ≠ 2 일 때만)가 보는 것.
- * - 주자: 주자 관리 [장면+0x20c] 의 1 · 2 · 3루(0xa97a0). 3아웃 타석 틱은 넘김(0xb6b6c)이 다음 틱이라 주자가 아직 루에 있다.
+ * - 주자: 주자 관리 [장면+0x20c] 의 1 · 2 · 3루(0xa97a0). 3아웃 타석 틱은 넘김(0xb6b6c)이 다음 틱이라 주자가 아직 루에 있다 —
+ *   간이 엔진은 아웃에 주자를 안 움직이므로(E 3f — 코드 0 · 삼진, 땅볼 · 번트 진루는 플레이 전 아웃 ≤ 1 일 때만) 타석 앞 루에
+ *   그 타석 공마다의 도루(0xc1982~)만 더한 루다 (`basesAtEnd`).
  * - 투수: 수비 팀 지금 투수 0xae83c — 마선수(0xb633c)면 투수 마선수 그림.
  * - 포수: 수비 9명 칸 1([장면+0x1120])의 선수 +0xec — 마선수면 타자 마선수 그림.
  * - 타자: 공격 팀 지금 타자 0xae89c(= 두 팀 판 DUE UP 의 첫 칸 — 타석 틱이면 방금 친 타자) · 손 0xb63c0.
@@ -108,8 +110,9 @@ export function teamRelayFiguresOf(tick: Pick<TeamAutoRelayTick, 'progress' | 'b
   const { options } = progress
   const offenseTeam = offenseOurs ? options.ourTeamId : options.opponentTeamId
   const defenseTeam = offenseOurs ? options.opponentTeamId : options.ourTeamId
-  // ⚠️ 근사: 웹 간이 타석은 3아웃이면 그 자리에서 루를 비운다 — 세 번째 아웃 뒤 남은 주자는 타석 앞 루 그대로 둔다
-  const bases = flipped ? tick.before.bases : after.bases
+  // 원본은 3아웃 타석 틱에도 주자 관리 [장면+0x20c](= sim+0x80)가 그 타석 끝 그대로다 — 지우기 0xa9250 은 다음 틱 0xc2198 의
+  // c21fc 3아웃 넘김 뒤 c2222. 웹 간이 타석은 3아웃이면 그 자리에서 루를 비우므로 타석 끝 루(도루로 민 루 포함)를 따로 받는다
+  const bases = flipped ? (tick.atBat?.basesAtEnd ?? tick.before.bases) : after.bases
   const pitcher = offenseOurs
     ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
     : progress.ourPitcherEntry[progress.ourPitcherIndex]

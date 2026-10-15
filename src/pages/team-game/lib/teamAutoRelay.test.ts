@@ -38,9 +38,26 @@ describe('팀경기 0x21 운동장 그림의 값 (0x4258c 425bc~42812)', () => {
       const 그림 = teamRelayFiguresOf(틱)
       // 1회초 3아웃 — 아직 상대(1)가 공격
       expect(그림.offenseTeam).toBe(앞.half === '초' ? 1 : 0)
-      expect(그림.bases).toEqual([앞.bases.first, 앞.bases.second, 앞.bases.third])
+      // 간이 엔진은 아웃에 주자를 안 움직인다 — 타석 끝 루(도루만 더한 루)가 그대로 남는다
+      const 끝 = 틱.atBat.basesAtEnd
+      expect(그림.bases).toEqual([끝.first, 끝.second, 끝.third])
       return
     }
     throw new Error('3아웃 틱을 못 찾았다')
+  })
+
+  it('3아웃 타석 틱 — 그 타석 공 사이 도루로 민 루를 그린다(지우기 0xa9250 은 다음 틱 c2222)', () => {
+    const 시작 = startTeamGame(옵션, createSeededRandom(1))
+    const 앞 = { ...시작.game, outs: 2, bases: { first: true, second: false, third: false } }
+    const 뒤 = { ...앞, half: 앞.half === '초' ? '말' as const : '초' as const, outs: 0, bases: { first: false, second: false, third: false } }
+    const 그림 = teamRelayFiguresOf({
+      progress: { ...시작, game: 뒤 },
+      before: 앞,
+      atBat: {
+        ours: false, orderIndex: 0, outcome: { kind: '삼진' }, fouled: false, strikes: 3, balls: 0,
+        basesAtEnd: { first: false, second: true, third: false },
+      },
+    })
+    expect(그림.bases).toEqual([false, true, false])
   })
 })

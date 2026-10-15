@@ -955,6 +955,12 @@ export interface TeamAutoRelayTick {
     /** 타석 끝 카운트 st[4] · st[5] */
     readonly strikes: number
     readonly balls: number
+    /**
+     * 타석이 끝난 그 자리의 루 — 간이 엔진은 아웃에 주자를 안 지우고(코드 0 · 삼진 · 3아웃 땅볼은 안 움직인다, 도루는 공마다 민다)
+     * 주자 지우기 0xa9250(sim+0x80 = [장면+0x20c])는 **다음** 틱 0xc2198 c2222 에서 3아웃 넘김(c21fc 0xb6b6c) 뒤에야 돈다.
+     * 그래서 3아웃 타석 틱 그림 0x4258c(0xa97a0)는 이 루를 그린다. 웹 간이 타석은 3아웃이면 그 자리에서 루를 비우므로 따로 싣는다
+     */
+    readonly basesAtEnd: GameState['bases']
   } | null
 }
 
@@ -5793,6 +5799,7 @@ function playAutoOffenseAtBat(
       swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
+      basesAtEnd: appearance.advance.bases,
     }),
   )
   return result
@@ -5883,6 +5890,7 @@ function playAutoDefenseAtBat(
       swingingStrikeOutLost: play.swingingStrikeOutLost === true,
       strikes: play.strikes,
       balls: play.balls,
+      basesAtEnd: appearance.advance.bases,
     }),
   )
   return result
