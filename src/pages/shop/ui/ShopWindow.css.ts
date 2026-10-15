@@ -22,18 +22,13 @@ export const tintedLabel = style({
   WebkitMaskRepeat: 'no-repeat',
 })
 
-/** 격자 칸을 고르는 투명 단추 — 그림은 아이콘이 따로 그린다 */
-export const slotButton = style({
+/** 격자 칸 아이콘 자리 — 33×33 칸 가운데에 놓는다(눌림은 투명 누름 칸 `PressArea` 가 받는다) */
+export const slotIcon = style({
   position: 'absolute',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: 0,
-  border: 'none',
-  background: 'transparent',
-  color: SHOP_COLORS.text,
-  fontSize: '11px',
-  cursor: 'pointer',
+  pointerEvents: 'none',
 })
 
 /** 이미 가진 칸은 아이콘을 어둡게 한다 (원본 표시 방법은 미확인 — 추정) */

@@ -27,11 +27,11 @@ const 띄우기 = (tab: string, career = 소지금많은선수, onPurchase = vi.
   return onPurchase
 }
 
-const 칸 = (name: string) => screen.getByRole('button', { name })
+const 칸 = (name: string) => screen.getByRole('option', { name })
 /** 원작은 커서를 옮긴 뒤 확인 키를 누른다 — 웹에서도 칸을 한 번 눌러 커서를 옮기고(이미 커서 칸이면 건너뜀) 다시 눌러야 고른 것이 된다 */
 const 칸고르기 = (name: string) => {
   const button = 칸(name)
-  if (button.getAttribute('aria-current') !== 'true') fireEvent.click(button)
+  if (button.getAttribute('aria-selected') !== 'true') fireEvent.click(button)
   fireEvent.click(button)
 }
 const 알림 = () => screen.queryByRole('dialog', { name: '알림' })
@@ -172,10 +172,10 @@ describe('마우스 길 — 원본은 키패드뿐', () => {
     const 둘째 = 칸(BATTER_GP_ITEMS[1].name)
     fireEvent.mouseEnter(둘째)
     fireEvent.mouseOver(둘째)
-    expect(둘째.getAttribute('aria-current')).toBe('false')
-    expect(칸(BATTER_GP_ITEMS[0].name).getAttribute('aria-current')).toBe('true')
+    expect(둘째.getAttribute('aria-selected')).toBe('false')
+    expect(칸(BATTER_GP_ITEMS[0].name).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(둘째)
-    expect(둘째.getAttribute('aria-current')).toBe('true')
+    expect(둘째.getAttribute('aria-selected')).toBe('true')
     expect(onPurchase).not.toHaveBeenCalled()
   })
 })
@@ -184,11 +184,11 @@ describe('격자 커서 감김 (0x81618 목록 꼴 0x30)', () => {
   it('오른쪽 끝에서 → 는 같은 줄 첫 칸으로, ↓ 는 같은 열 다른 줄로 간다', () => {
     띄우기('GP')
     for (let step = 0; step < 4; step += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(칸(BATTER_GP_ITEMS[4]!.name).getAttribute('aria-current')).toBe('true')
+    expect(칸(BATTER_GP_ITEMS[4]!.name).getAttribute('aria-selected')).toBe('true')
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(칸(BATTER_GP_ITEMS[0]!.name).getAttribute('aria-current')).toBe('true')
+    expect(칸(BATTER_GP_ITEMS[0]!.name).getAttribute('aria-selected')).toBe('true')
     fireEvent.keyDown(window, { key: '8' })
-    expect(칸(BATTER_GP_ITEMS[5]!.name).getAttribute('aria-current')).toBe('true')
+    expect(칸(BATTER_GP_ITEMS[5]!.name).getAttribute('aria-selected')).toBe('true')
   })
 })
 

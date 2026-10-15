@@ -17,16 +17,17 @@ const 띄우기 = () => {
 describe('GP 창 격자', () => {
   it('칸은 10개 — 칸 7~9 는 바탕만 있는 빈 칸이다 (아이콘 표 0xd4662 = −1)', () => {
     띄우기()
-    const cells = screen.getAllByRole('button').filter((button) => button.getAttribute('aria-current') !== null)
-    expect(cells).toHaveLength(10)
-    expect(['빈 칸 7', '빈 칸 8', '빈 칸 9'].map((name) => screen.getByRole('button', { name }).querySelector('img'))).toEqual([null, null, null])
+    // 칸 누름은 투명 누름 칸(role option) 10개 — 아이콘은 칸 0~6 에만 선다
+    expect(screen.getAllByRole('option')).toHaveLength(10)
+    expect(['빈 칸 7', '빈 칸 8', '빈 칸 9'].map((name) => screen.getByRole('option', { name }))).toHaveLength(3)
+    expect(document.querySelectorAll('img[src*="item_icon"]')).toHaveLength(7)
   })
 
   it('빈 칸에도 커서가 선다 — 이름 · 설명은 비고, 확인해도 아무 창이 안 뜬다', () => {
     const props = 띄우기()
     // 칸 0 → ↓ 칸 5 → → 6 → → 7
     for (const key of ['ArrowDown', 'ArrowRight', 'ArrowRight']) fireEvent.keyDown(window, { key })
-    expect(screen.getByRole('button', { name: '빈 칸 7' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('option', { name: '빈 칸 7' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByTestId('shop-description').textContent?.trim()).toBe('')
     fireEvent.keyDown(window, { key: '5' })
     expect(screen.queryByRole('dialog')).toBeNull()
