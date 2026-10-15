@@ -17,6 +17,13 @@ describe('시즌 상태판 — 0x7d34c 모드 2', () => {
     expect(글).not.toContain('332')
   })
 
+  it('"명" 344 는 img_text 팔레트 1(노랑) — 0x7dbf6 `0x913e5(img_text, 1)`', () => {
+    const record = { ...startNewSeason(0, '테스트').record, lastAttendance: 870 }
+    const { container } = render(<SeasonStatusPanel record={record} teamMorale={50} hour={12} />)
+    const 명 = container.querySelector('img[data-frame="344"]') as HTMLImageElement
+    expect(명.style.filter).toMatch(/^url\(#img-text-palette-.*-0-1\)$/)
+  })
+
   it('관중 숫자는 num 20번대로 박스 9 오른끝 − 11 에 붙는다', () => {
     const record = { ...startNewSeason(0, '테스트').record, lastAttendance: 870 }
     const { container } = render(<SeasonStatusPanel record={record} teamMorale={50} hour={12} />)
