@@ -132,7 +132,7 @@ const YEAR_KEYS: Readonly<Record<string, YearRecordKey>> = {
   Enter: '기타', 5: '기타', 1: '기타', 3: '기타', 7: '기타', 9: '기타', '#': '기타',
 }
 
-/** 머리 글 img_text — 0x5650c 가 (x, 56, 폭, 15) 가운데에 (img_text 크기는 origins.json). 팔레트 3 (0x565ac~0x565b8 `0x913e5(img_text, 3)`) */
+/** 머리 글 img_text — 0x5650c 가 (x, 56, 폭, 15) + dy 2 = (x, 58, 폭, 15) 가운데에 (img_text 크기는 origins.json). 팔레트 3 (0x565ac~0x565b8 `0x913e5(img_text, 3)`) */
 function YearLabel({ frame, x, width, alt, palette }: {
   readonly frame: number; readonly x: number; readonly width: number; readonly alt: string; readonly palette: CSSProperties
 }) {

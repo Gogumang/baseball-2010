@@ -302,8 +302,11 @@ export const YEAR_TABLE_LAYOUT = {
   statWidth: 36,
   columnStep: 39,
   clip: { x: 63, y: 58, width: 156, height: 221 },
-  /** 머리 글 칸 — (x, y − 2, 폭, 15) 가운데 */
-  labelY: 56,
+  /**
+   * 머리 글 칸 — 0x5650c 가 0xb9d74(글, x, y − 2, 폭, 15, 0x22, …, dy [sp+0x14] = 2) 로 부르므로 칸은 결국 (x, y, 폭, 15) 다
+   * (r89 — unicorn 으로 0x5cfec 를 돌려 글 그리기 vt+0x10 의 y = 61 을 받았다. 예전 56 은 dy 2 를 빠뜨렸다)
+   */
+  labelY: 58,
   upArrowY: 45,
   downArrowY: 277,
   arrowX: 114,
