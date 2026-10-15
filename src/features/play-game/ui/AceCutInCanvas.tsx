@@ -11,13 +11,14 @@ import {
   type CutInPolygon,
 } from '@/features/play-game/model/aceCutIn'
 import * as styles from '@/features/play-game/ui/SubstitutionSceneOverlay.css'
+import { DRAW_EFFECT, brightenedImageOf, drawImageWithEffect } from '@/shared/lib/pixelEffect/pixelEffect'
 
 const GAME_UI = './sprites/game_ui'
 const GAME_UI_FRAMES = `${GAME_UI}/frames`
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
-/** 효과 2 의 인자 — 화면 + 그림·230 >> 8 (0x9a2f1) */
-const ADDITIVE_WEIGHT = 230 / 256
+/** 효과 2 의 인자 — 화면 + 그림·230 >> 8 (0x9a2f1, 공용 `additivePixel565`) */
+const ADDITIVE_WEIGHT = 230
 
 const DRAWS = aceCutInDraws()
 
@@ -34,29 +35,8 @@ function imageAt(url: string): HTMLImageElement | null {
 }
 const pad = (index: number) => String(index).padStart(3, '0')
 
-const brightCache = new Map<string, HTMLCanvasElement>()
-/** 0xbb91d 종류 8 — 채널마다 +b (그림이 있는 칸만, 255 에서 자름) */
-function brightened(image: HTMLImageElement, amount: number): CanvasImageSource {
-  const key = `${image.src}#${amount}`
-  const cached = brightCache.get(key)
-  if (cached !== undefined) return cached
-  const glow = document.createElement('canvas')
-  const result = document.createElement('canvas')
-  glow.width = result.width = image.width
-  glow.height = result.height = image.height
-  const glowContext = glow.getContext('2d')
-  const resultContext = result.getContext('2d')
-  if (glowContext === null || resultContext === null) return image
-  glowContext.drawImage(image, 0, 0)
-  glowContext.globalCompositeOperation = 'source-in'
-  glowContext.fillStyle = `rgb(${amount}, ${amount}, ${amount})`
-  glowContext.fillRect(0, 0, image.width, image.height)
-  resultContext.drawImage(image, 0, 0)
-  resultContext.globalCompositeOperation = 'lighter'
-  resultContext.drawImage(glow, 0, 0)
-  brightCache.set(key, result)
-  return result
-}
+/** 0xbb91d 종류 8 — 채널마다 +b (그림이 있는 칸만, 255 에서 자름) — 공용 `brightenedImageOf` (565 내림까지 원본대로) */
+const brightened = brightenedImageOf
 
 /** 0x6a905 · 0x6a9f1 — 윗바이트 알파가 0 · 255 면 불투명 */
 function fillStyleOf(color: CutInColor): string {
@@ -104,11 +84,8 @@ function drawCutIn(context: CanvasRenderingContext2D, draw: AceCutInDraw, uiOrig
   for (const streak of draw.streaks) {
     const image = imageAt(`${GAME_UI}/${pad(streak.image)}.png`)
     if (image === null) continue
-    context.save()
-    context.globalCompositeOperation = 'lighter'
-    context.globalAlpha = ADDITIVE_WEIGHT
-    context.drawImage(image, streak.x, streak.y)
-    context.restore()
+    // 띠(불투명) 위라 화면 칸을 읽어 원본 식(565 채널 덧셈 · 내림 · 끝에서 자름)으로 섞는다
+    drawImageWithEffect(context, image, streak.x, streak.y, DRAW_EFFECT.ADDITIVE, ADDITIVE_WEIGHT)
   }
   if (draw.sweep !== null) drawPolygon(context, draw.sweep)
   if (draw.portrait !== null && portrait !== null && portrait.frame !== null) {

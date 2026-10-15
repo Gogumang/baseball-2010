@@ -13,6 +13,7 @@ import {
   RECORD_PICK_TITLE_ID, recordPickIconOffsetOf, recordPickLabelXOf,
   recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -156,7 +157,7 @@ export function RecordPickPopup({
                 // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
                 <span style={{
                   ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
-                  background: RECORD_PICK_DIM_LABEL_COLOR, maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
+                  background: solidColorCss(RECORD_PICK_DIM_LABEL_COLOR), maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
                   maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
                 }} />
               )}

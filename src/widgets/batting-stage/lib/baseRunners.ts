@@ -1,6 +1,8 @@
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { BATTER_SIDE, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
+import { grayPixel565, halfMixPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
+import { rgbOf565, rgbTo565 } from '@/shared/lib/screen565/screen565'
 
 /**
  * **타석 화면 루상 주자 0x35b94** (직접 떴다, 0x35b94~0x3605e). 타석 공용 묶음(0x50828 · 0x4cb1c · 0x4d2ac …)이 부른다.
@@ -218,22 +220,14 @@ export function halfShadeRunnerPixel(
   blue: number,
   argument = 0,
 ): { r: number; g: number; b: number } {
-  const source = ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3)
-  const mixed = ((source & 0xf7de) >> 1) + ((argument & 0xf7de) >> 1)
-  const five = (value: number) => (value << 3) | (value >> 2)
-  const r5 = (mixed >> 11) & 0x1f
-  const g6 = (mixed >> 5) & 0x3f
-  const b5 = mixed & 0x1f
-  return { r: five(r5), g: (g6 << 2) | (g6 >> 4), b: five(b5) }
+  const [r, g, b] = rgbOf565(halfMixPixel565(rgbTo565(red, green, blue), argument))
+  return { r, g, b }
 }
 
-/** 효과 0xa 한 픽셀 (0x97f01) — 8비트 RGB 를 565 로 보고 회색 g(5비트)를 내 다시 8비트로 편다 */
+/** 효과 0xa 한 픽셀 (0x97f01) — 8비트 RGB 를 565 로 보고 회색 g(5비트)를 내 다시 8비트로 편다 (공용 `grayPixel565`) */
 export function grayRunPipPixel(red: number, green: number, blue: number): { r: number; g: number; b: number } {
-  const sum = (red >> 3) + (green >> 3) + (blue >> 3) + 3
-  const gray = (sum >> 2) + (sum >> 4) + (sum >> 6)
-  const five = gray & 0x1f
-  const six = (gray << 1) & 0x3f
-  return { r: (five << 3) | (five >> 2), g: (six << 2) | (six >> 4), b: (five << 3) | (five >> 2) }
+  const [r, g, b] = rgbOf565(grayPixel565(rgbTo565(red, green, blue)))
+  return { r, g, b }
 }
 
 /** ace/defender_* — 표 0xd3f0c[번호](0x79cbc, 20바이트 간격): medica · kao · roze · death · tiger */

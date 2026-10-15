@@ -6,6 +6,7 @@ import {
   type RivalryDraw,
   rivalryDrawsOf,
 } from '@/widgets/game-scene/lib/rivalryBand'
+import { brightenedImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
@@ -27,28 +28,8 @@ function logo(): HTMLImageElement | null {
   return null
 }
 
-const brightCache = new Map<number, HTMLCanvasElement>()
-/** 0xbb91d 종류 8 — 그림이 있는 칸만 채널마다 +b (255 에서 자름) */
-function brightened(image: HTMLImageElement, amount: number): CanvasImageSource {
-  const cached = brightCache.get(amount)
-  if (cached !== undefined) return cached
-  const glow = document.createElement('canvas')
-  const result = document.createElement('canvas')
-  glow.width = result.width = image.width
-  glow.height = result.height = image.height
-  const glowContext = glow.getContext('2d')
-  const resultContext = result.getContext('2d')
-  if (glowContext === null || resultContext === null) return image
-  glowContext.drawImage(image, 0, 0)
-  glowContext.globalCompositeOperation = 'source-in'
-  glowContext.fillStyle = `rgb(${amount}, ${amount}, ${amount})`
-  glowContext.fillRect(0, 0, image.width, image.height)
-  resultContext.drawImage(image, 0, 0)
-  resultContext.globalCompositeOperation = 'lighter'
-  resultContext.drawImage(glow, 0, 0)
-  brightCache.set(amount, result)
-  return result
-}
+/** 0xbb91d 종류 8 — 채널마다 +b (그림이 있는 칸만, 255 에서 자름) — 공용 `brightenedImageOf` (565 내림까지 원본대로) */
+const brightened = brightenedImageOf
 
 /** 0x6a9f0 · 0x6a904 — 윗바이트 알파가 0 · 255 면 불투명, 그 밖은 플랫폼 섞기(⚠️ 알파/255 로 본다) */
 function styleOf(color: RivalryColor): string {

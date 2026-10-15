@@ -31,6 +31,7 @@ import {
   NOTICE_BUTTONS, NO_DETAIL_TEXT,
 } from '@/pages/match-settings/lib/matchSettingsText'
 import * as styles from '@/pages/match-settings/ui/MatchSettingsWindow.css'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 const SLT_FRAMES = './sprites/slt_frame/frames'
 const SLT_IMAGES = './sprites/slt_frame'
@@ -325,7 +326,7 @@ function TintedDigit({ digit, centerX, centerY, color }: {
       top: centerY - (DETAIL_NUMBER.height >> 1),
       width,
       height: DETAIL_NUMBER.height,
-      background: color,
+      background: solidColorCss(color),
       maskImage: image,
       WebkitMaskImage: image,
     }} />

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
-import { FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
+import { EffectImage, FrameSprite, Hint, MessageBox, RawScreen } from '@/shared/ui'
+import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
@@ -389,7 +390,7 @@ export function AceSelectScreen({
           >
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cellImage)} style={{ left: 0, top: 0 }} />
             {open && player !== undefined
-              ? <img className={`${styles.layer}${isDimmed ? ` ${styles.grayImage}` : ''}`} alt="" src={player.iconUrl}
+              ? <EffectImage className={styles.layer} src={player.iconUrl} effect={isDimmed ? DRAW_EFFECT.GRAY : null}
                   style={{ left: ACE_LAYOUT.icon.dx, top: ACE_LAYOUT.icon.dy }} />
               : <img className={styles.layer} alt="" src={imageSrc(ACE_ICON, ACE_LAYOUT.lockedIcon.image)}
                   style={{ left: ACE_LAYOUT.lockedIcon.dx, top: ACE_LAYOUT.lockedIcon.dy }} />}

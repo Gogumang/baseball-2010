@@ -49,14 +49,6 @@ export const cell = style({
   imageRendering: 'pixelated',
 })
 
-/**
- * 효과 0xa(회색) — 원본은 팔레트 픽셀 함수 0x97f01 의 회색 식이다(R6 · `widgets/batting-stage` 의 `grayRunPipPixel`).
- * ⚠️ 근사: 그림이 `<img>` 라 CSS 회색 거르개로 대신한다.
- */
-export const grayImage = style({
-  filter: 'grayscale(1)',
-})
-
 /** 두 쪽 중 하나를 누르는 자리(선공 쪽 엠블럼 원 · 구장 화살) — 그림은 화면이 원본 자리에 따로 그린다 (웹판 단추) */
 export const sideButton = style({
   position: 'absolute',
