@@ -296,8 +296,45 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
 
     누르기('구질')
 
-    expect(screen.getByText('구질 / 마구')).toBeTruthy()
+    // 그리기 0x19e24 = 관리 화면 0x19da4 위에 창 0x803d4(상태 0x7b) — 탭은 팝업이 고른 2, 아래 줄은 106 그대로
+    expect(screen.getByTestId('구질목록-창').getAttribute('data-tab')).toBe('2')
+    expect(screen.getByTestId('구질창-그림').getAttribute('data-state')).toBe('장착')
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
     expect(screen.queryByTestId('구질훈련-창')).toBeNull()
+    // 0x7b 는 G 동전 · 비용 · 횟수가 없고(805a8 · 811a0) 처음 글이 0x127 "장착"(80cea)이다
+    expect(screen.queryByTestId('구질훈련-비용-횟수')).toBeNull()
+    expect(screen.getByTestId('구질훈련-글').getAttribute('data-label')).toBe(String(0x127))
+  })
+
+  it('123 탭 2 키 0x17cec — OK 는 초점을 칸으로, CLR 은 초점이 칸이면 탭 줄로 · 아니면 106 으로', () => {
+    // 행 0 칸 0(TWO-SEAM) 이 목록에 들었다 — 커서 칸 글이 0x128 "사용중"
+    화면({ career: 투수({ pitchMask: 0b10, pitchTrainingStages: [1, 0, 0, 0, 0, 0, 0, 0] }) })
+    누르기('선수정보')
+    누르기('구질')
+    누르기('구질')
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByTestId('구질훈련-글').getAttribute('data-label')).toBe(String(0x128))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('구질훈련-글').getAttribute('data-label')).toBe(String(0x127))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByTestId('구질목록-창')).toBeNull()
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
+  })
+
+  it('123 탭 1 — 마구 창 그림(상태 0x7b), 키 OK 는 탭 격자 칸을 고른다 (0x17cec 17d1c~)', () => {
+    const onSave = vi.fn()
+    화면({ career: 투수({ magicLevel: 2 }), onSave })
+    누르기('선수정보')
+    누르기('구질')
+    누르기('마구')
+
+    expect(screen.getByTestId('필살타법-그림').getAttribute('data-state')).toBe('사용')
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByText('[웨이브 볼] 을 사용하시겠습니까?')).toBeTruthy()
+    fireEvent.click(칸('예'))
+    expect((onSave.mock.calls[0][0] as PitcherCareer).selectedMagicNumber).toBe(2)
   })
 
   it('123 창 탭 1 — 마구 칸을 고르면 StrMODE[70] 을 묻고 레코드 +0x18 에 번호를 넣는다 (0x17cec)', () => {
@@ -387,14 +424,21 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
   })
 
-  it('[기본정보] 는 능력치와 보직 한계를 보여 준다 (상태 119)', () => {
-    화면({ career: 투수({ role: PITCHER_ROLE.relief }) })
+  it('[기본정보] 는 카드 0x15e20 · 정보 칸 0x7c450 모드 3 이다 (상태 119 · 0x166cc)', () => {
+    화면({ career: 투수({ role: PITCHER_ROLE.relief, selectedMagicNumber: 4, typeIndex: 1 }) })
 
     누르기('선수정보')
     누르기('기본정보')
 
-    // 보직이 구원이면 체력 한계가 600 이다 (표 0xd80be × 10) — 타자처럼 타입으로 고르지 않는다
-    expect(screen.getByText('200 / 600')).toBeTruthy()
+    expect(screen.getByTestId('pitcher-basic-info-card')).toBeTruthy()
+    // [gfx+0x28] = 0 이라 이름 줄을 쓴다 · 보직 0x1400248[min(2, 1) + 2] = 구원 · 타입 0x1400258[1 + 2] = 사이드암
+    expect(screen.getByTestId('정보칸-이름').textContent).toBe('테스트')
+    expect(screen.getByTestId('정보칸-보직').textContent).toBe('구원')
+    expect(screen.getByTestId('정보칸-타입').textContent).toBe('사이드암')
+    // 필살 StrCOMMON[0x18 + 4 + 6 + 타입 1] = 캐넌 볼 (7cb96~7cb9e)
+    expect(screen.getByTestId('정보칸-필살').textContent).toBe('캐넌 볼')
+    // 관리 메뉴는 걷힌다 — 119 그림은 0x19da4 를 안 거친다
+    expect(칸이름들()).toEqual([])
   })
 })
 
@@ -477,7 +521,7 @@ describe('칭호 목록 창 (기본정보 119 → 129)', () => {
 
     expect(screen.queryByRole('dialog', { name: '칭호' })).toBeNull()
     // 기본정보 카드는 그대로 남는다
-    expect(screen.getByText('기본정보')).toBeTruthy()
+    expect(screen.getByTestId('기본정보-카드')).toBeTruthy()
   })
 
   it('고르면 선수 +0x1c4 가 바뀌어 저장된다 — 팝업은 이름 + StrMODE[138] 이다', () => {

@@ -91,8 +91,9 @@ export const PITCH_TRAINING_WHITE_PLATE = 42
 /** slt_pitch 프레임 21 "????" — 계열이 안 열린 히든 칸 (0x80f60 [pack+0x54]) */
 export const HIDDEN_PITCH_NAME_FRAME = 21
 
-/** 글 번호 — img_text 293 "배우기" · 296 "사용중" (0x125 · 0x128). 0x7b(123) 창은 295 "장착"을 쓴다 */
+/** 글 번호 — img_text 293 "배우기" · 295 "장착" · 296 "사용중" (0x125 · 0x127 · 0x128). 0x7b(123) 창의 처음 값이 0x127 이다 */
 export const PITCH_TRAINING_LEARN_LABEL = 0x125
+export const PITCH_WINDOW_EQUIP_LABEL = 0x127
 export const PITCH_TRAINING_IN_USE_LABEL = 0x128
 /** img_text 260 "회" */
 export const PITCH_TRAINING_TIMES_LABEL = 260
@@ -132,15 +133,24 @@ const stageOf = (career: PitcherCareer, cell: number) => career.pitchTrainingSta
 const hiddenProgressCellOf = (career: PitcherCareer, row: number) => (stageOf(career, row * 2) <= 1 ? row * 2 + 1 : row * 2)
 
 /**
- * 아래 글 (0x81120~0x8117e · 81392) — 초점이 칸에 있을 때 커서 칸만 본다. 처음 0x125 "배우기",
- * 목록에 든 구질이면 0x128 "사용중", 칸(행·2 + 열%2 — 열 4 도 보정 없이 cell0) 단계 > 열/2 면 108 은 −1(안 그림).
- * 초점이 탭 줄이면 처음 값 그대로 "배우기" 가 선다(원본 그대로).
+ * 창이 선 상태 — 108(0x6c) 구질 훈련 · 123(0x7b) 구질 고르기. 그림 0x803d4 는 같고 이 셋이 갈린다(직접 떴다):
+ * 처음 글 번호 80ce2~80cf0(0x7b 면 0x7b + 0xac = 0x127) · 배운 칸 글 8116c~8117e(0x6c 만 −1) · G 동전 805a8 · 비용 · 횟수 8119e~811a4(0x7b 면 건너뜀).
  */
-export function statusLabelOf(career: PitcherCareer, row: number, column: number, isCellFocus: boolean): number | null {
-  if (!isCellFocus) return PITCH_TRAINING_LEARN_LABEL
+export type PitchWindowState = '훈련' | '장착'
+
+/**
+ * 아래 글 (0x80ce2 · 0x81120~0x8117e · 81392) — 처음 값 0x125 "배우기"(0x7b 면 0x127 "장착"). 초점이 칸에 있을 때 커서 칸만 본다:
+ * 목록에 든 구질이면 0x128 "사용중", 칸(행·2 + 열%2 — 열 4 도 보정 없이 cell0) 단계 > 열/2 면 108 은 −1(안 그림) · 123 은 0x127.
+ * 초점이 탭 줄이면 처음 값 그대로 선다(원본 그대로).
+ */
+export function statusLabelOf(
+  career: PitcherCareer, row: number, column: number, isCellFocus: boolean, state: PitchWindowState = '훈련',
+): number | null {
+  const initial = state === '장착' ? PITCH_WINDOW_EQUIP_LABEL : PITCH_TRAINING_LEARN_LABEL
+  if (!isCellFocus) return initial
   if (isInPitchList(career, pitchTypeNumberOf(row, column))) return PITCH_TRAINING_IN_USE_LABEL
-  if (stageOf(career, row * 2 + (column % 2)) > Math.trunc(column / 2)) return null
-  return PITCH_TRAINING_LEARN_LABEL
+  if (stageOf(career, row * 2 + (column % 2)) > Math.trunc(column / 2)) return state === '장착' ? PITCH_WINDOW_EQUIP_LABEL : null
+  return initial
 }
 
 /**

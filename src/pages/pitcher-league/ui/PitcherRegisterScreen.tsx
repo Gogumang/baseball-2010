@@ -5,17 +5,13 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { roundEdgePaintsOf, roundFillPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
-  PITCHER_HAND_LABELS,
-  PITCHER_ROLE_LABELS,
   PITCHER_SKIN_LABELS,
   PITCHER_TYPE_COUNT,
-  PITCHER_TYPE_LABELS,
   ROOKIE_BREAKING_PITCH_TYPES,
   canRegisterPitcher,
   pitcherRoleChoiceOf,
@@ -27,7 +23,6 @@ import { DEFAULT_TEAM_ID, createPitcherCareer } from '@/entities/pitcher-career/
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { nameWithoutLastChar, registerKeyOf, registerKeyOutcomeOf } from '@/pages/create-player/lib/registerKeys'
 import type { RegisterKey } from '@/pages/create-player/lib/registerKeys'
-import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import {
@@ -39,12 +34,13 @@ import {
 import {
   ARROW_FRAME, ARROW_SIZE, BREAKING_CHOSEN_PLATE, BREAKING_HINT, BREAKING_NAME_OUTLINE, BREAKING_OK, BREAKING_PITCH_FRAME,
   BREAKING_ROW_NUMBERS, BREAKING_ROW_NUMBER_BASE, INPUT_MODE_ARROWS, INPUT_MODE_BOX, INPUT_MODE_COLOR, NAME_TEXT_AT,
-  REGISTER_INFO_BOARD, REGISTER_INFO_FRAME, REGISTER_LABELS, REGISTER_ROW_HINTS, REGISTER_TEXT_BOXES, REGISTER_YELLOW,
-  TEAM_NAME_BOX, breakingPitchBoxOf, breakingRowNumberBoxOf, cursorBoxOf, registerValueBoxOf, teamNameFrameOf,
+  REGISTER_ROW_HINTS, REGISTER_YELLOW,
+  breakingPitchBoxOf, breakingRowNumberBoxOf, cursorBoxOf, registerValueBoxOf,
   valueArrowsOf,
 } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
 import type { RegisterBox } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
 import { PitcherBasicInfoCard } from '@/pages/pitcher-league/ui/PitcherBasicInfoCard'
+import { PitcherInfoBoard, PitcherInfoPlate } from '@/pages/pitcher-league/ui/PitcherInfoBoard'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
 
 /**
@@ -87,7 +83,6 @@ const CONFIRM_TEXT = ORIGINAL_MODE_TEXT[2] ?? ''
 const NAME_ROW = 0
 
 const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
 const SLT_PITCH = './sprites/slt_pitch/frames'
 const pad3 = (frame: number) => String(frame).padStart(3, '0')
 /** num 50+숫자 — 8×10 */
@@ -117,12 +112,6 @@ function RoundEdge({ box, color, testId }: { readonly box: RegisterBox; readonly
 function RoundFill({ box, color }: { readonly box: RegisterBox; readonly color: string }) {
   const paints = useMemo(() => roundFillPaintsOf(box.width, box.height, color), [box.width, box.height, color])
   return <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} />
-}
-
-/** 판 0x7c110(박스, 0) — `boardRectsOf` 는 화면 좌표 칠 목록이다 */
-function InfoBoard() {
-  const paints = useMemo(() => boardRectsOf(REGISTER_INFO_BOARD, false), [])
-  return <PaintedRects x={0} y={0} width={240} height={320} paints={paints} testId="등록-정보판" />
 }
 
 export function PitcherRegisterScreen({
@@ -157,7 +146,6 @@ export function PitcherRegisterScreen({
   const tick = useUpdateCounter()
   const isBlinkOn = (phase === '변화구' ? pitchTick : tick) % 10 !== 0
   const uiOrigins = useFrameOrigins(MODE_UI)
-  const textOrigins = useFrameOrigins(IMG_TEXT)
   const pitchOrigins = useFrameOrigins(SLT_PITCH)
 
   useEffect(() => {
@@ -251,14 +239,7 @@ export function PitcherRegisterScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
-  const valueTexts: Readonly<Record<keyof typeof REGISTER_TEXT_BOXES, string>> = {
-    타입: PITCHER_TYPE_LABELS[profile.typeIndex] ?? '',
-    보직: PITCHER_ROLE_LABELS[pitcherRoleChoiceOf(profile.role)] ?? '',
-    손: PITCHER_HAND_LABELS[profile.handIndex] ?? '',
-    피부: PITCHER_SKIN_LABELS[profile.skinIndex] ?? '',
-  }
   const rowArrows = valueArrowsOf(selectedRow)
-  const teamNameAt = frameAt(textOrigins, teamNameFrameOf(teamId), TEAM_NAME_BOX, 0x22)
 
   return (
     <RawScreen>
@@ -275,28 +256,15 @@ export function PitcherRegisterScreen({
 
       {/* 카드 0x15e20 — 카드 판 · 레이더(0xb570d 넷째 인자 0) · 투수 그림 */}
       <PitcherBasicInfoCard career={cardCareer} appliesCondition={false} />
-      <InfoBoard />
+      <PitcherInfoPlate />
 
       {phase === '등록' && (
         <div data-testid="등록-정보칸">
-          {/* 정보 칸 0x7c450 (모드 3 · [gfx+0x28] = 1) */}
-          <FrameSprite folder={MODE_UI} frame={REGISTER_INFO_FRAME} origins={uiOrigins} x={0} y={0} />
-          {REGISTER_LABELS.map((label) => {
-            const at = frameAt(textOrigins, label.frame, label.box, label.align | 0x20, label.ox)
-            return at === null ? null : <FrameSprite key={label.frame} folder={IMG_TEXT} frame={label.frame} origins={textOrigins} x={at.x} y={at.y} />
-          })}
-          {teamNameAt !== null && (
-            <FrameSprite folder={IMG_TEXT} frame={teamNameFrameOf(teamId)} origins={textOrigins} x={teamNameAt.x} y={teamNameAt.y} />
-          )}
-          {(Object.keys(REGISTER_TEXT_BOXES) as (keyof typeof REGISTER_TEXT_BOXES)[]).map((id) => {
-            const box = REGISTER_TEXT_BOXES[id]
-            return (
-              <div key={id} className={managementStyles.infoValue}
-                style={{ left: box.x, top: box.y, width: box.width, height: box.height, color: ORIGINAL_COLORS.text }}>
-                {valueTexts[id]}
-              </div>
-            )
-          })}
+          {/* 정보 칸 0x7c450 (모드 3 · [gfx+0x28] = 1 — 이름 줄은 입력기 몫, 새 레코드 +0x18 = 0 이라 필살 줄도 빈다) */}
+          <PitcherInfoBoard values={{
+            teamId, name: null, typeIndex: profile.typeIndex, magicNumber: 0, role: profile.role,
+            handIndex: profile.handIndex, skinIndex: profile.skinIndex,
+          }} />
 
           {/* 커서 0xba015 — 틱 % 10 ≠ 0 일 때만 */}
           {isBlinkOn && <RoundEdge box={cursorBoxOf(registerValueBoxOf(selectedRow))} color={REGISTER_YELLOW} testId="선수등록-커서" />}

@@ -135,8 +135,6 @@ export interface PitcherManagementMenu {
   readonly subWindow: PitcherMenuWindow
   /** 구질/마구 창의 탭 (1 마구 · 2 구질 — 팝업 0x78 의 `+0x166 ? 2 : 1`) */
   readonly pitchWindowTab: number
-  /** 창 안에서 탭을 바꾼다 (원본은 좌우 키로 `+0x166` 을 토글한다) */
-  readonly changePitchTab: (tab: number) => void
   /** 123 창 탭 1 — 마구 칸 i(0~3) 고르기 */
   readonly selectMagicCell: (cellIndex: number) => void
   /** 123 창 탭 2 — 구질 칸(행, 열) 고르기 */
@@ -636,7 +634,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     kind,
     subWindow,
     pitchWindowTab,
-    changePitchTab: setPitchWindowTab,
     selectMagicCell,
     selectPitchCell: choosePitchCell,
     isTitleWindowOpen,
