@@ -3,7 +3,7 @@ import { currentBatterEntry, isOurOffense, moundStaminaOf } from '@/features/pla
 import type { TeamEntryBatter, TeamEntryPitcher } from '@/features/play-team-game/model/teamGameRoster'
 import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
-import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
+import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
@@ -18,27 +18,34 @@ import {
   leagueRecordPitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { LeagueBatterLine, LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
-import { BATTERS } from '@/shared/config/original/roster'
+import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
 import {
   aceBatterProfileOf,
   batterCardStatsOf,
   batterHandOf,
+  batterLineOfRecord,
+  pitcherLineOfRecord,
   pitcherCardStatsOf,
   staminaGaugeOf,
   sumBatterLines,
   sumPitcherLines,
 } from '@/widgets/matchup-cards/lib/matchupRecord'
-import type { MatchupPitcherLine } from '@/widgets/matchup-cards/lib/matchupRecord'
+import type { MatchupBatterLine, MatchupPitcherLine } from '@/widgets/matchup-cards/lib/matchupRecord'
 import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 
 /**
  * 팀경기 레코드 시즌 줄의 출처 — 시즌 세션이 대는 리그 선수 기록표(시즌 레코드 +0x20~ 의 웹 자리)와
  * 이 경기 줄을 더할지(기록 게이트 0xa56dc 모드 2 갈래: 국가대항전·포스트시즌이면 거짓).
+ * `stats` 가 없으면(일반모드 1) 레코드는 Xls 행 사본이라 표의 줄(`RosterPlayer.recordLine`)을 읽는다 — 게이트 0xd8204 의 모드 1 은
+ * 늘 거짓이라 경기 중에도 안 오른다(`countsThisGame` 거짓).
  */
 export interface TeamMatchupRecords {
-  readonly stats: LeaguePlayerStats
+  readonly stats?: LeaguePlayerStats
   readonly countsThisGame: boolean
 }
+
+/** 일반모드(1)의 시즌 줄 출처 — 레코드 = Xls 행 그대로(행 바이트 32~43), 게이트 거짓 */
+export const XLS_ROW_MATCHUP_RECORDS: TeamMatchupRecords = { countsThisGame: false }
 
 export interface TeamMatchupCards {
   readonly batterHand: number
@@ -46,13 +53,27 @@ export interface TeamMatchupCards {
   readonly batter: MatchupBatterCard
 }
 
-/** 투수 레코드의 시즌 줄 (경기를 세울 때) — 붙박이 표 칸 · 표 밖 id 로. 마투수는 표에 칸이 없다 */
+/**
+ * 투수 레코드의 시즌 줄 (경기를 세울 때) — 붙박이 표 칸 · 표 밖 id 로.
+ * 마투수는 0x20094 6번 갈래가 XlsACE_PIT 행을 부은 저장 레코드(0x1f824)를 0xb521c 로 통째 베낀 칸이고 게이트 0xa56dc 가 늘 거른다
+ * (모드 1 거짓 · 2 · 3 · 4 는 0xb633d) — 표의 줄 그대로다(`AcePlayer.recordLine`).
+ * 기록표가 없으면(일반모드) 붙박이 표 칸은 Xls 행 줄, 표 밖 선수는 ⚠️ 미확인이라 비운다.
+ */
 function basePitcherLineOf(records: TeamMatchupRecords, teamId: number, entry: TeamEntryPitcher): MatchupPitcherLine | null {
-  if (entry.aceIndex >= 0) return null
-  if (entry.tableSlot !== undefined) {
-    return leaguePitcherLineOf(records.stats, leaguePitcherIdOf(entry.tableTeamId ?? teamId, entry.tableSlot))
+  if (entry.aceIndex >= 0) {
+    const ace = ACE_PITCHERS[entry.aceIndex]
+    return ace === undefined ? null : pitcherLineOfRecord(ace.recordLine)
   }
-  return entry.recordId === undefined ? null : leagueRecordPitcherLineOf(records.stats, entry.recordId)
+  const { stats } = records
+  if (entry.tableSlot !== undefined) {
+    const id = leaguePitcherIdOf(entry.tableTeamId ?? teamId, entry.tableSlot)
+    if (stats === undefined) {
+      const row = PITCHERS[id]
+      return row === undefined ? null : pitcherLineOfRecord(row.recordLine)
+    }
+    return leaguePitcherLineOf(stats, id)
+  }
+  return entry.recordId === undefined || stats === undefined ? null : leagueRecordPitcherLineOf(stats, entry.recordId)
 }
 
 /** 이 경기에서 그 투수가 쌓은 줄 (`pitcherLines` — 진행기가 마운드 투수에게 매긴 아웃·실점·탈삼진) */
@@ -66,12 +87,22 @@ function gamePitcherLineOf(progress: TeamGameProgress, teamId: number, entry: Te
   return { outs: line?.outs ?? 0, runsAllowed: line?.runsAllowed ?? 0, strikeouts: line?.strikeouts ?? 0 }
 }
 
-function baseBatterLineOf(records: TeamMatchupRecords, teamId: number, entry: TeamEntryBatter): LeagueBatterLine | null {
-  if (entry.aceIndex >= 0) return null
-  if (entry.rosterSlot !== NO_ROSTER_SLOT) {
-    return leagueBatterLineOf(records.stats, leagueBatterIdOf(entry.tableTeamId ?? teamId, entry.rosterSlot))
+/** 타자 레코드의 시즌 줄 — 투수(`basePitcherLineOf`)와 같은 출처 (마타자는 XlsACE_BAT 행 줄) */
+function baseBatterLineOf(records: TeamMatchupRecords, teamId: number, entry: TeamEntryBatter): MatchupBatterLine | null {
+  if (entry.aceIndex >= 0) {
+    const ace = ACE_BATTERS[entry.aceIndex]
+    return ace === undefined ? null : batterLineOfRecord(ace.recordLine)
   }
-  return entry.recordId === undefined ? null : leagueRecordBatterLineOf(records.stats, entry.recordId)
+  const { stats } = records
+  if (entry.rosterSlot !== NO_ROSTER_SLOT) {
+    const id = leagueBatterIdOf(entry.tableTeamId ?? teamId, entry.rosterSlot)
+    if (stats === undefined) {
+      const row = BATTERS[id]
+      return row === undefined ? null : batterLineOfRecord(row.recordLine)
+    }
+    return leagueBatterLineOf(stats, id)
+  }
+  return entry.recordId === undefined || stats === undefined ? null : leagueRecordBatterLineOf(stats, entry.recordId)
 }
 
 /** 이 경기에서 그 타자가 쌓은 줄 (`leaguePlateAppearances` — 진행기가 리그 기록표로 넘길 타석) */
@@ -168,8 +199,8 @@ export function teamBatterSeasonStatsOf(
  * - 타자: 타순 `팀+0x32` · 이름 · 수비 `+0x1c & 0xf` · 손 0xb63c0 · 타율 0xb8e3c · 홈런 +0x28 · 타점 +0x2a ·
  *   오늘 타석 기록 = 그 타순 칸 기록의 링(`BatterGameRecord.results`).
  * - 시즌 줄(방어율·탈삼진·타율·홈런·타점)은 `records` 를 줄 때만 적는다 — 시즌 레코드 = 리그 기록표 줄 + (게이트가 열렸으면)
- *   이 경기 줄. ⚠️ 미해결: 일반(1)·대전(8·9)의 레코드는 Xls 행의 줄(행 바이트 32~45)인데 웹 로스터 표에 그 칸이 없어
- *   비운다(경기 중에도 안 오르는 모드라 그 값 그대로일 것이다). 마선수는 표 칸이 없어 비운다.
+ *   이 경기 줄. 일반(1)은 Xls 행의 줄(행 바이트 32~43, `XLS_ROW_MATCHUP_RECORDS`) — 게이트가 늘 거짓이라 경기 중에도 안 오른다.
+ *   마선수는 모든 모드에서 XlsACE 행의 줄이다. ⚠️ 대전(8 · 9)은 웹에 없다.
  * - ⚠️ 표 밖 선수(영입한 명전·나리)의 타자 손은 웹 명단에 폼 칸이 없어 우타(0)로 둔다.
  */
 export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMatchupRecords): TeamMatchupCards {

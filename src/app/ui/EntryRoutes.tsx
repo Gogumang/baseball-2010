@@ -4,7 +4,7 @@ import { MessageBox } from '@/shared/ui'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { myBatterIndexOf, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
-import { batterCardStatsOf } from '@/widgets/matchup-cards/lib/matchupRecord'
+import { batterCardStatsOf, batterLineOfRecord } from '@/widgets/matchup-cards/lib/matchupRecord'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { modeBatterOf, modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { nariBatterOf } from '@/app/model/useCollection'
@@ -48,15 +48,19 @@ import { lapPlayClock } from '@/entities/collection/model/playClock'
  * **홈런더비 상태 0xe 의 타자 판 값** (0x44944 — 타자 `0xae89c(팀 0)` = 모드 타자 기록 0x1fc20 의 사본).
  * - 나리 타자편 저장(0x213c0(앱, 4, 0))의 내 선수 레코드: 이름 · 시즌 줄 `career.stats`(웹이 내 레코드 +0x20~ 대신 세는 칸) —
  *   기록 게이트 0xa56dc 는 모드 7 에서 거짓이라 더비 중에는 안 오른다.
- * - 명예 타자 기록(0x1f640)은 이름만 — ⚠️ 웹 명전 기록에 시즌 줄 칸이 없어 비운다(미해결).
+ * - 명예 타자 기록(0x1f640): 이름 · 등록 때 통째 베낀 시즌 줄(`recordLine`) — 그 칸을 남기기 전 옛 명전 기록은 이름만.
  * 타순(팀+0x32)과 수비(0xb53f0 이 남긴 옛 [k] 마스터 줄의 +0x1c)는 화면이 타순(`derbyLineup`)에서 채운다.
  * ⚠️ 미해결: 오늘 타석 기록(링) — 더비 타석이 정산 0xa8024 를 지나는지 안 읽어 비운다.
  */
 function derbyMatchupBatterOf(
-  famer: { readonly name: string } | null,
+  famer: { readonly name: string; readonly recordLine?: readonly number[] } | null,
   career: PlayerCareer | null | undefined,
 ): Omit<MatchupBatterCard, 'isComputer'> | undefined {
-  if (famer !== null) return { name: famer.name }
+  if (famer !== null) {
+    return famer.recordLine === undefined
+      ? { name: famer.name }
+      : { name: famer.name, ...batterCardStatsOf(batterLineOfRecord(famer.recordLine)) }
+  }
   if (career === null || career === undefined) return undefined
   return { name: career.name, ...batterCardStatsOf(career.stats) }
 }

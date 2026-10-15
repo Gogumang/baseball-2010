@@ -1405,6 +1405,11 @@ export function opponentMoundOf(progress: GameProgress): {
   readonly role?: number
   readonly throwsLeft?: boolean
   readonly pitcherSlot: number | null
+  /**
+   * 마투수의 레코드 +0x20~+0x2b 시즌 줄 — 저장 마투수 레코드(XlsACE_PIT 행)를 통째 베낀 칸이고 기록 게이트(모드 4 0xa571c)가 마선수를
+   * 늘 걸러 표의 줄 그대로다 (`AcePlayer.recordLine`). 마투수가 아니면 없다
+   */
+  readonly aceRecordLine?: readonly number[]
   readonly staminaAbility: number
   readonly teamMorale: number
   readonly isFirstPitcher: boolean
@@ -1418,15 +1423,28 @@ export function opponentMoundOf(progress: GameProgress): {
     isFirstPitcher: mound.usedSlots.length === 0,
     stamina: mound.stamina,
   }
-  if (progress.aceOpponent !== null) return { name: progress.aceOpponent.name, pitcherSlot: null, ...stamina }
+  if (progress.aceOpponent !== null) {
+    const { aceOpponent } = progress
+    return {
+      name: aceOpponent.name,
+      // 마선수 레코드 +0xb — 아랫 2비트 보직 · 윗니블 폼(손 0xb63c0 마투수 표)
+      role: aceOpponent.profile & 3,
+      throwsLeft: pitcherHandOf(aceOpponent.profile >> 4, true) === 1,
+      pitcherSlot: null,
+      aceRecordLine: aceOpponent.recordLine,
+      ...stamina,
+    }
+  }
   const ace = moundAcePitcherOf(progress, false)
   const aceIndex = progress.aces?.opponent?.pitcher
   if (ace !== undefined && aceIndex !== undefined) {
     const form = ACE_PITCHER_REPERTOIRES[aceIndex]?.form
     return {
       name: ace.player.name,
+      role: ace.player.profile & 3,
       ...(form === undefined ? {} : { throwsLeft: pitcherHandOf(form, true) === 1 }),
       pitcherSlot: null,
+      aceRecordLine: ace.player.recordLine,
       ...stamina,
     }
   }

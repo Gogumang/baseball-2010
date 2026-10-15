@@ -5,6 +5,7 @@ import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import type { TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
+import { XLS_ROW_MATCHUP_RECORDS } from '@/pages/team-game/lib/teamMatchupCards'
 import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 import type { MatchSettingsSeenSlot } from '@/pages/general-mode/model/useGeneralMode'
@@ -188,6 +189,8 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
       onFinish={onFinish}
       // 경기 중 나가기 0x40140 — 메인 메뉴 처음 단
       onQuit={() => onExit()}
+      // 소개 판 0x44944 · 교체 창 줄 — 모드 1 레코드는 Xls 행 사본이라 표의 줄(게이트 거짓)
+      matchupRecords={XLS_ROW_MATCHUP_RECORDS}
       // 정산 판의 보유 GP · 자동진행 비용 판정(0x3c802) — 자동진행 [예] 는 G 만 뺀다(모드 1 은 소모 통계 없음, 0x3c850)
       {...(gamePoint === undefined ? {} : { gamePoint })}
       {...(onSpendGamePoint === undefined ? {} : { onSpendGamePoint })}
@@ -257,6 +260,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         onFinish={onFinish}
         // 경기 중 나가기 0x40140 — 메인 메뉴 처음 단
         onQuit={() => onExit()}
+        // 소개 판 0x44944 · 교체 창 줄 — 모드 1 레코드는 Xls 행 사본이라 표의 줄(게이트 거짓)
+        matchupRecords={XLS_ROW_MATCHUP_RECORDS}
         // 정산 판의 보유 GP · 자동진행 비용 판정(0x3c802) — 자동진행 [예] 는 G 만 뺀다(모드 1 은 소모 통계 없음, 0x3c850)
         {...(gamePoint === undefined ? {} : { gamePoint })}
         {...(onSpendGamePoint === undefined ? {} : { onSpendGamePoint })}

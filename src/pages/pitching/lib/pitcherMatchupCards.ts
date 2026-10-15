@@ -4,9 +4,11 @@ import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { leagueBatterIdOf, leagueBatterLineOf } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
+import { ACE_BATTERS } from '@/entities/game/model/aceOpponent'
 import {
   batterCardStatsOf,
   batterHandOf,
+  batterLineOfRecord,
   pitcherCardStatsOf,
   staminaGaugeOf,
   sumBatterLines,
@@ -44,7 +46,8 @@ function gameLineFromResults(results: readonly number[]): MatchupBatterLine {
  * - 타자 = 상대(COM): 타순 `팀+0x32` · 이름 · 수비 · 손 · 시즌 줄 = 리그 기록표 줄 + 이 경기 줄 · 오늘 타석 기록 = 그 타순 칸 링.
  *   ⚠️ 이 경기 줄은 링에서 타수·안타·홈런만 센다 — 웹 투수편 진행기가 상대 타자의 타점을 리그 기록표로 넘기지 않아 타점은
  *   경기 앞 값이다(미해결).
- * - `records` 가 없으면 시즌 줄 칸을 비운다(부르는 쪽이 커리어를 아직 안 넘긴다).
+ * - 마타자는 XlsACE_BAT 행의 줄 그대로(게이트가 마선수를 거른다).
+ * - `records` 가 없으면 시즌 줄 칸을 비운다(마타자 제외).
  */
 export function pitcherMatchupCardsOf(
   progress: PitcherGameProgress,
@@ -69,12 +72,16 @@ export function pitcherMatchupCardsOf(
           strikeouts: progress.record.strikeouts,
         })
       : records.mySeason
-  const batterBase = records === undefined || batter.rosterSlot === null
-    ? null
-    : leagueBatterLineOf(records.stats, leagueBatterIdOf(options.opponentTeamId, batter.rosterSlot))
+  // 마타자는 저장 레코드(XlsACE_BAT 행)를 통째 베낀 칸 — 게이트 0xa571c 가 마선수(0xb633d)를 늘 걸러 표의 줄 그대로다
+  const aceBatter = batter.aceIndex === undefined ? undefined : ACE_BATTERS[batter.aceIndex]
+  const batterBase = aceBatter !== undefined
+    ? batterLineOfRecord(aceBatter.recordLine)
+    : records === undefined || batter.rosterSlot === null
+      ? null
+      : leagueBatterLineOf(records.stats, leagueBatterIdOf(options.opponentTeamId, batter.rosterSlot))
   const batterLine = batterBase === null
     ? null
-    : countsThisGame ? sumBatterLines(batterBase, gameLineFromResults(results)) : batterBase
+    : countsThisGame && aceBatter === undefined ? sumBatterLines(batterBase, gameLineFromResults(results)) : batterBase
 
   return {
     batterHand,

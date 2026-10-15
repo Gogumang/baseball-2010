@@ -62,7 +62,7 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     expect(받은것.at(-1)).toMatchObject({ ability: modeBatterOf(나리).ability, batterForm: 2, batterSkinIndex: 2 })
   })
 
-  it('상태 0xe 소개 판의 타자 판 값을 넘긴다 — 나리 기록이면 이름·시즌 줄과 모드 타자 칸 k(+0xa & 0x1f), 명전 기록이면 이름만 · k = 0', () => {
+  it('상태 0xe 소개 판의 타자 판 값을 넘긴다 — 나리 기록이면 이름·시즌 줄과 모드 타자 칸 k(+0xa & 0x1f), 명전 기록이면 이름·등록 때 줄 · k = 0', () => {
     const 기록있는나리 = { ...나리, stats: { ...나리.stats, atBats: 20, hits: 7, homeRuns: 2, runsBattedIn: 5 } }
     띄우기(기록있는나리)
     fireEvent.click(view.getByRole('button', { name: '6번 슬롯' }))
@@ -77,7 +77,8 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     cleanup()
     띄우기(나리)
     fireEvent.click(view.getByRole('button', { name: '7번 슬롯' }))
-    expect(받은것.at(-1)?.['matchupBatter']).toEqual({ name: '전설' })
+    // 명전 기록은 등록 0x1f680 이 통째 베낀 시즌 줄(+0x20~)을 든다 — 이 시험의 등록 선수는 빈 줄
+    expect(받은것.at(-1)?.['matchupBatter']).toEqual({ name: '전설', battingAverage: 0, homeRuns: 0, runsBattedIn: 0 })
     expect(받은것.at(-1)?.['modeBatterSlot']).toBe(0)
   })
 

@@ -22,6 +22,9 @@ import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { derbyMasterBatterOf } from '@/entities/home-run-derby/model/derbyLineup'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
+import { pitcherCardStatsOf, pitcherLineOfRecord } from '@/widgets/matchup-cards/lib/matchupRecord'
+import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
+import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
@@ -339,6 +342,8 @@ export function HomeRunDerbyScreen({
               <DerbyMatchupCards
                 batterHand={batterSideOfForm(stageBatter.form ?? 0)}
                 pitcherName={pitcher.name ?? undefined}
+                pitcherRecord={pitcher.record}
+                isAcePitcher={pitcher.ace !== null}
                 batter={stageMatchupBatter}
               />
             )}
@@ -412,14 +417,17 @@ export function HomeRunDerbyScreen({
  * - 투수 이름: 단계 ≥ 1 마투수는 0x48d50 이 마투수 기록 0x30 바이트를 통째로 복사하므로 그 기록의 이름이다
  *   (⚠️ 유력 — 0xb62c0 이 마선수 기록에서 `ACE_PLAYERS` 이름을 내는지는 0x20498 을 안 봤다).
  * - 단계 0 투수 이름: 상대 팀 v(장면 시작 굴림 3a454)의 마스터 투수 줄 2 (`derbyPitcherOf` · `DERBY_ORDINARY_PITCHER_ROW`).
- * ⚠️ 비운 칸: 투수 보직·좌우·방어율·탈삼진·체력 막대
- *   (기록 +0xb · +0x20/+0x22/+0x26, 0x66e44 · 0xb8680 — 웹에 마투수·상대 투수 기록이 없다).
+ * - 투수 보직 · 좌우 · 방어율 · 탈삼진: 그 레코드의 +0xb · +0x20/+0x22/+0x26(`DerbyPitcher.record` — 마스터 줄 2 · 마투수 모두 Xls 행 줄,
+ *   게이트 0xa56dc 는 모드 7 에서 거짓).
+ * ⚠️ 비운 칸: 체력 막대 — 0xaebb0 은 모드 7 이면 100 이지만 길이 0x66e44 의 f(팀[+0x26] − [+0x33])가 난입 0x48d50 뒤 어떤지 안 읽었다.
  */
 function DerbyMatchupCards({
-  batterHand, pitcherName, batter,
+  batterHand, pitcherName, pitcherRecord, isAcePitcher, batter,
 }: {
   readonly batterHand: number
   readonly pitcherName: string | undefined
+  readonly pitcherRecord: DerbyPitcher['record']
+  readonly isAcePitcher: boolean
   readonly batter: Omit<MatchupBatterCard, 'isComputer'> | undefined
 }) {
   const tick = useUpdateCounter()
@@ -427,7 +435,17 @@ function DerbyMatchupCards({
     <MatchupCards
       tick={tick}
       batterHand={batterHand}
-      pitcher={{ isComputer: true, ...(pitcherName === undefined ? {} : { name: pitcherName }) }}
+      pitcher={{
+        isComputer: true,
+        ...(pitcherName === undefined ? {} : { name: pitcherName }),
+        ...(pitcherRecord === undefined
+          ? {}
+          : {
+              role: pitcherRecord.profile & 3,
+              throwsLeft: pitcherHandOf(pitcherRecord.profile >> 4, isAcePitcher) === 1,
+              ...pitcherCardStatsOf(pitcherLineOfRecord(pitcherRecord.recordLine)),
+            }),
+      }}
       batter={{ ...batter, isComputer: false }}
     />
   )

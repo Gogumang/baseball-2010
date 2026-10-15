@@ -11,9 +11,14 @@ import {
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 import { staminaCapacityOf, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
-import { BATTERS } from '@/shared/config/original/roster'
+import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
 import { leagueBatterIdOf, leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
-import { teamBattingStageBatterOf, teamMatchupCardsOf, teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
+import {
+  XLS_ROW_MATCHUP_RECORDS,
+  teamBattingStageBatterOf,
+  teamMatchupCardsOf,
+  teamPitcherSideStageOf,
+} from '@/pages/team-game/lib/teamMatchupCards'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { NO_ROSTER_SLOT, withAceBatter, withAcePitcher } from '@/features/play-team-game/model/teamGameRoster'
@@ -82,6 +87,32 @@ describe('팀경기 상태 0xe 소개 판 값 (0x44944)', () => {
     expect(batter.battingAverage).toBe(325)
     expect(batter.homeRuns).toBe(2)
     expect(batter.runsBattedIn).toBe(9)
+  })
+
+  it('일반모드(1)는 레코드가 Xls 행 사본 — 행 바이트 32~43 의 줄 그대로(게이트 거짓이라 이 경기 줄 없음)', () => {
+    const progress = startTeamGame({ ...기본옵션, mode: 1 }, createSeededRandom(1))
+    const entry = progress.ourPitcherEntry[progress.ourPitcherIndex]!
+    const batterEntry = progress.opponentEntry[progress.opponentOrderIndex]!
+    const { pitcher, batter } = teamMatchupCardsOf(progress, XLS_ROW_MATCHUP_RECORDS)
+    const [outs, runs, , strikeouts] = PITCHERS[leaguePitcherIdOf(0, entry.tableSlot!)]!.recordLine
+    expect(pitcher.earnedRunAverage).toBe(Math.min(9999, Math.trunc((runs! * 2700) / outs!)))
+    expect(pitcher.strikeouts).toBe(strikeouts)
+    const [atBats, hits, , , homeRuns, runsBattedIn] = BATTERS[leagueBatterIdOf(1, batterEntry.rosterSlot)]!.recordLine
+    expect(batter.battingAverage).toBe(Math.trunc((hits! * 1000) / atBats!))
+    expect(batter.homeRuns).toBe(homeRuns)
+    expect(batter.runsBattedIn).toBe(runsBattedIn)
+  })
+
+  it('마투수는 기록표에 칸이 없어도 XlsACE_PIT 행의 줄 — 게이트가 마선수를 늘 거른다', () => {
+    const started = startTeamGame({ ...기본옵션, acePitcherId: 1 }, createSeededRandom(1))
+    const aceSlot = started.ourPitcherEntry.findIndex((pitcher) => pitcher.aceIndex >= 0)
+    const { pitcher } = teamMatchupCardsOf(
+      { ...started, ourPitcherIndex: aceSlot },
+      { stats: { batters: {}, pitchers: {} }, countsThisGame: true },
+    )
+    const ace = ACE_PITCHERS[1]!
+    expect(pitcher.earnedRunAverage).toBe(Math.trunc((ace.recordLine[1]! * 2700) / ace.recordLine[0]!))
+    expect(pitcher.strikeouts).toBe(ace.recordLine[3])
   })
 })
 

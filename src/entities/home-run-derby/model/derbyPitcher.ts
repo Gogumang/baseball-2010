@@ -102,6 +102,12 @@ export interface DerbyPitcher {
    * 마투수 단계 · 상대 팀을 모를 때는 없다
    */
   readonly equipment?: readonly number[]
+  /**
+   * 그 레코드의 +0xb(보직 · 폼)와 +0x20~+0x2b 시즌 줄 — 단계 0 은 마스터 줄 2(0x1ff98 이 Xls 행을 통째 베낀 칸), 마투수는 0x48d50 이
+   * 통째 복사한 저장 마투수 레코드(XlsACE_PIT 행). 기록 게이트 0xa56dc 는 모드 7 에서 거짓이라 표의 줄 그대로다. 소개 판 0x44944 가 읽는다.
+   * 상대 팀을 모를 때는 없다
+   */
+  readonly record?: { readonly profile: number; readonly recordLine: readonly number[] }
 }
 
 /**
@@ -134,6 +140,7 @@ export function derbyPitcherOf(
       opponentTeamId === undefined
         ? { name: null, ability: LEGACY_ORDINARY_DERBY_PITCHER }
         : ordinaryDerbyPitcherOf(opponentTeamId)
+    const row = opponentTeamId === undefined ? undefined : teamPitchers(opponentTeamId)[DERBY_ORDINARY_PITCHER_ROW]
     return {
       stage,
       ace: null,
@@ -141,6 +148,7 @@ export function derbyPitcherOf(
       ability: ordinary.ability,
       pitchType,
       ...(ordinary.equipment === undefined ? {} : { equipment: ordinary.equipment }),
+      ...(row === undefined ? {} : { record: { profile: row.profile, recordLine: row.recordLine } }),
     }
   }
   // 홈런더비(모드 7)는 0xaebb0 이 늘 100 — 피로(0xb58e6, 55 이상 그대로)도 지친 제구 등급도 없다
@@ -150,5 +158,6 @@ export function derbyPitcherOf(
     name: ace.name,
     ability: pitcherAbilityOf(ace, aceLevels, HOME_RUN_DERBY_STAMINA_PERCENT),
     pitchType,
+    record: { profile: ace.profile, recordLine: ace.recordLine },
   }
 }
