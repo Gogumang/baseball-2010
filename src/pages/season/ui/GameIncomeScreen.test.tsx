@@ -81,6 +81,17 @@ describe('경기 뒤 0xe9 평가 이벤트', () => {
     expect(onDone).toHaveBeenCalled()
   })
 
+  it('say 중 CLR(Escape) 은 0x8b7b0 — 글을 다 찍기 전에도 곧장 변화 창(명령 2)으로 건너뛴다', () => {
+    const onDone = 띄우기(레코드())
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('dialog', { name: '경기 평가 변화' })).toBeTruthy()
+    // 변화 창 키 표는 −5 · '5' 뿐 — CLR 로는 닫히지 않는다 (0x8d386)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    다찍기()
+    expect(onDone).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: '경기 평가 변화' })).toBeTruthy()
+  })
+
   it('구내매점이 이 경기로 끝났으면 변화 창 뒤 StrUSER_EVT[113] 창 (system sub 5)', () => {
     const onDone = 띄우기(레코드({ storeGames: 0 }), true)
     변화창까지()

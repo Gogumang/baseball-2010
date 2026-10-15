@@ -60,6 +60,10 @@ interface EvaluationEventPlayerProps {
  * 0x8b5ac 는 틀마다 0x7fbc4 로 상자와 마지막 say 글을 그린다 — 변화 창(팝업)이 떠 있는 동안에도 앞 대사가 밑에 남는다.
  * 명령 3 say 는 [mgr+0x2c0] 이 이미 1 이라 상자가 다시 오르지 않고 글만 새로 찍는다(0x8d1f2).
  * 초상화(감독 · 오른쪽)는 0x7fbc4 끝(0x7fdee~)이 그린다 — 114 에서는 바닥 y 가 경기장 띠 아래 135 다(`PORTRAIT_BOTTOM`).
+ *
+ * 키는 다른 이벤트와 같은 0x8b804 다 — 나리 114 키 0x13b88 · 시즌 0xd3 키 0x90ec 모두 `0x8b804(관리자, 키)` 하나만 부른다.
+ * 그래서 say 중 CLR(웹 Escape · Backspace)은 0x8b7b0 건너뛰기다: [mgr+0x10] 을 늘려 가며 종류 7 · 2 · 1 · 3 · 4 · 8 명령을 찾는다.
+ * 변화 창(0x8d386, 키 표 −5 · '5' 뿐)은 CLR 을 받지 않는다.
  */
 export function EvaluationEventPlayer({
   underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, gauge, finalNotice = null, onDone,
@@ -79,9 +83,13 @@ export function EvaluationEventPlayer({
       </div>
       <div role="group" aria-label="경기 평가">
         {hasStreakShown ? (
-          <EventDialogueBox key="연속기록" raw={streak} slideIn={false} isActive={step === '연속기록'} onAdvance={finish} />
+          // 명령 3 say 중 CLR → 0x8b7b0 이 뒤의 보상 명령(종류 7, 8ad22~8adba 가 say 뒤에 쌓는다)을 찾아 돌리거나, 없으면 끝 —
+          // 어느 쪽이든 OK 로 글을 끝까지 넘긴 것과 같은 끝(114 끝)이다
+          <EventDialogueBox key="연속기록" raw={streak} slideIn={false} isActive={step === '연속기록'} onAdvance={finish} onCancel={finish} />
         ) : (
-          <EventDialogueBox key="대사" raw={dialogue} slideIn isActive={step === '대사'} onAdvance={() => setStep('변화')} />
+          // 명령 1 say 중 CLR(−16) → 0x8b7b0 이 바로 다음 명령 2(system 종류 2 · 하위 2 = 변화 창)에서 멈춘다 — 단계와 상관없이
+          <EventDialogueBox key="대사" raw={dialogue} slideIn isActive={step === '대사'} onAdvance={() => setStep('변화')}
+            onCancel={() => setStep('변화')} />
         )}
       </div>
       {/* 0x8b72c~0x8b75a — 상자 · 초상화(0x7fbc4) 다음에 그린다. 팝업(변화 창)은 그 위 */}

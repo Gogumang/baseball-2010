@@ -42,3 +42,4 @@ export {
 } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 export type { ImgTextPaletteIndex } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 export { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
+export { InputMethodText } from '@/shared/ui/InputMethodText/InputMethodText'
