@@ -15,6 +15,8 @@ export const layer = style({
   inset: 0,
   display: 'flex',
   justifyContent: 'center',
+  // 세로도 가운데 — RawScreen 이 240×320 판을 창 세로 가운데에 두므로 기둥도 같은 자리에 선다
+  alignItems: 'center',
   // 덮개가 없는 자리는 뒤 화면이 눌림을 받아야 한다
   pointerEvents: 'none',
 })
@@ -23,7 +25,9 @@ export const column = style({
   position: 'relative',
   flex: 'none',
   width: theme.size.screenWidth,
-  height: 'calc(100dvh / var(--zoom))',
+  // 판 높이 320 그대로 — 예전에는 창 높이 전체(100dvh)라 덮개의 원작 y 가 판보다 (창 높이 − 320)/2 만큼 위로 어긋났다
+  // (나리 대사창이 판 위쪽 밖 · 초상화가 판 아래로 밀려 잘렸다)
+  height: theme.size.screenHeight,
   zoom: 'var(--zoom)',
   pointerEvents: 'auto',
 })

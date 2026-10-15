@@ -1,3 +1,4 @@
+import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { useRef } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
@@ -307,21 +308,26 @@ function CareerScreens({
       // (0x7e84c(0x69) 의 관리 6칸 — '관리' 갈래, 138 을 거친 타순 이벤트는 빼고), 그 밖은 칸 수 0 이라 안 그린다
       if (eventEnd.isEnding) {
         if (screen.context === '외출진입' || screen.context === '장소') {
-          return <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
+          return <RawScreen><OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} /></RawScreen>
         }
         return (
-          <NariEventUnderlay career={career}>
-            {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
-          </NariEventUnderlay>
+          <RawScreen>
+            <NariEventUnderlay career={career}>
+              {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
+            </NariEventUnderlay>
+          </RawScreen>
         )
       }
+      // 밑그림은 240×320 판(RawScreen) 안에, 대사창 덮개(ScreenOverlay)는 그 형제로 — 밑그림을 안 감싸면 창 왼쪽 위(−120, −240)에 어긋나 그려졌다
       return (
         <>
-          {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
-          {isOverOutingMap && (
-            <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
-          )}
-          {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
+          <RawScreen>
+            {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
+            {isOverOutingMap && (
+              <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
+            )}
+            {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
+          </RawScreen>
           <ScreenOverlay>
           <StoryScreen
             // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
