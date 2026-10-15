@@ -182,7 +182,6 @@ export function StadiumShopWindow({
                 ? ORIGINAL_COLORS.highlightYellow
                 : index === equipped ? ORIGINAL_COLORS.cursorCyan : ORIGINAL_COLORS.text,
             }}
-            onMouseEnter={() => onMoveSlot(index)}
             onClick={() => {
               onMoveSlot(index)
               onSelect(kind, index)

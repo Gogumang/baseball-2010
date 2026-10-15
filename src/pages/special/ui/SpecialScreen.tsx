@@ -236,7 +236,6 @@ export function SpecialScreen({
           aria-label={item.id}
           aria-current={index === cursor}
           style={{ left: rowLeftOf(item), top: rowTopOf(index), width: item.labelWidth, height: ROW.step }}
-          onMouseEnter={() => setCursor(index)}
           onClick={() => openItem(index)}
         />
       ))}
@@ -809,7 +808,6 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
             data-kind={entry.kind}
             data-state={entry.state}
             style={{ left: x, top: y, width: box.width, height: box.height }}
-            onMouseEnter={() => setSlot(index)}
             onClick={() => { setSlot(index); pressSlot(index) }}
           >
             <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.frame.image)} style={{ left: 0, top: 0 }} />
@@ -864,7 +862,6 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
                 background: HALL_OF_FAME_BUBBLE.cell.color,
                 outline: index === bubbleCursor ? `1px solid ${HALL_OF_FAME_BUBBLE.selectedBorderColor}` : undefined,
               }}
-              onMouseEnter={() => setBubbleCursor(index)}
               onClick={() => chooseBubble(index)}
             >
               {label}

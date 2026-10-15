@@ -75,7 +75,6 @@ export function CommandBar(props: CommandBarProps) {
           className={styles.commandButton}
           style={{ left: slot.x, top: commandSlotYAt(slot.y, slideUpdates) }}
           disabled={disabledIds.has(slot.id)}
-          onMouseEnter={() => onHover(index)}
           onFocus={() => onHover(index)}
           onClick={() => onSelect(slot.id)}
         >

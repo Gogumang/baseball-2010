@@ -128,7 +128,6 @@ export function MenuList({
             role="option"
             aria-selected={index === selectedIndex}
             disabled={item.isDisabled === true}
-            onPointerEnter={() => setSelectedIndex(index)}
             onClick={() => {
               setSelectedIndex(index)
               onSelect(item.id)

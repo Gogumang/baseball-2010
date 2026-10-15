@@ -682,6 +682,23 @@ describe('설명 띠 0x55544 — y 275 · 1 → 4 → 16 → 64 → 160 으로 �
     vi.useRealTimers()
   })
 
+  it('줄 · 확인 칸에 포인터를 올려 두기만 해서는 커서가 안 옮겨진다 — 원본은 키패드뿐(띠가 다시 펴지지 않는다)', () => {
+    vi.useFakeTimers()
+    const { container } = 띄우기()
+    const 띠 = () => container.querySelector('[data-description-band]')?.getAttribute('data-description-band') ?? null
+    다섯틱()
+    expect(띠()).toBe('160')
+    act(() => {
+      for (const name of ['속도', '게임 데이터 관리', '확인']) {
+        fireEvent.mouseEnter(줄(name))
+        fireEvent.mouseOver(줄(name))
+      }
+    })
+    expect(띠()).toBe('160')
+    expect(screen.getByText('배경음과 효과음의 크기를', { exact: false })).toBeTruthy()
+    vi.useRealTimers()
+  })
+
   it('경기 중 "설정" 은 띠가 없다', () => {
     const { container } = 띄우기({ mainMenu: undefined })
     expect(container.querySelector('[data-description-band]')).toBeNull()

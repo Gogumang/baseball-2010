@@ -28,6 +28,16 @@ const 띄우기 = (overrides: Partial<Parameters<typeof SpecialScreen>[0]> = {})
 
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
+/** 명예의 전당 격자 커서를 키패드로 옮긴다 — ↓ 로 줄을 맞추고 → 로 칸을 맞춘다(마우스 올리기로는 안 옮겨진다) */
+const 슬롯으로 = (target: number) => {
+  const 지금 = () => Number(screen.getAllByRole('button').find((button) => /번 슬롯$/.test(button.getAttribute('aria-label') ?? '')
+    && button.getAttribute('aria-current') === 'true')?.dataset.slot)
+  const columns = HALL_OF_FAME_GRID.columns
+  for (let guard = 0; guard < 10 && Math.trunc(지금() / columns) < Math.trunc(target / columns); guard += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+  for (let guard = 0; guard < 10 && 지금() !== target; guard += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
+  expect(지금()).toBe(target)
+}
+
 describe('스페셜 목록 배치', () => {
   it('원본 여덟 칸을 모두 보여 준다 — 통신 기능도 지우지 않았다', () => {
     띄우기()
@@ -67,7 +77,9 @@ describe('스페셜 목록 배치', () => {
     expect(container.querySelector('img[src="./sprites/main_ui/003.png"]')).toBeTruthy()
     expect(screen.getByText('G포인트를 충전')).toBeTruthy()
 
-    fireEvent.mouseEnter(칸('기록연감'))
+    // 기록연감은 일곱째 줄 — ↑ 두 번(맨 위에서 감겨 마지막 · 그 앞)
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
 
     expect(screen.getByText('각종 기록과 게임 통계를')).toBeTruthy()
   })
@@ -256,10 +268,20 @@ describe('명예의 전당 격자 5×3', () => {
     expect(슬롯(7).dataset.kind).toBe('찬칸')
     expect([6, 8, 9].map((index) => 슬롯(index).dataset.state)).toEqual(['4', '4', '4'])
     expect([11, 12, 13, 14].map((index) => 슬롯(index).dataset.state)).toEqual(['5', '5', '5', '5'])
-    fireEvent.mouseEnter(슬롯(7))
+    슬롯으로(7)
     expect(screen.getByText('전설')).toBeTruthy()
     // 찬 칸은 능력치 도형에 값 마름모를 얹는다 (축 최대 800)
     expect(screen.getByLabelText('능력치 도형').querySelector('polygon[data-part="values"]')).not.toBeNull()
+  })
+
+  it('말풍선 칸에 포인터를 올려 두기만 해서는 커서가 안 옮겨진다 — 원본은 키패드 ↑ ↓ 뿐', () => {
+    찬칸열기()
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    const 둘째 = screen.getByRole('menuitem', { name: '슬롯에서 삭제' })
+    fireEvent.mouseEnter(둘째)
+    fireEvent.mouseOver(둘째)
+    expect(screen.getByRole('menuitem', { name: '친구에게 선물' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: '슬롯에서 삭제' }).getAttribute('aria-current')).toBe('false')
   })
 
   it('칸을 누르면 말풍선이 칸 오른쪽 26px 에 뜨고, 오른쪽 두 열에서는 왼쪽으로 뒤집는다', () => {
@@ -670,13 +692,13 @@ describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c
     // 처음 커서는 칸 0(나리 투수 없음, 상태 2)
     expect(screen.queryByTestId('명전-타자그림')).toBeNull()
     expect(container.querySelectorAll('[class*="hofCircle"]').length).toBe(2)
-    fireEvent.mouseEnter(screen.getByRole('button', { name: '6번 슬롯' }))
+    슬롯으로(5)
     expect(container.querySelectorAll('[class*="hofCircle"]').length).toBe(0)
   })
 
   it('나리 타자 칸 5 — 그림을 (A.x, A.y + 45) 에 바로, 좌타(폼 1)는 안 뒤집고 팀 로고는 나리 팀', () => {
     열기()
-    fireEvent.mouseEnter(screen.getByRole('button', { name: '6번 슬롯' }))
+    슬롯으로(5)
     const 그림 = screen.getByTestId('명전-타자그림')
     expect(그림.style.left).toBe('58px')
     expect(그림.dataset.mirrored).toBeUndefined()
@@ -685,7 +707,7 @@ describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c
 
   it('명전 투수 칸 1 — 54×75 이미지를 (A.x − 0x32, A.y − 0x61) 에 두 배로(0x98975 효과 0x10 · 2, 좌완), 팀 로고는 없다', () => {
     열기()
-    fireEvent.mouseEnter(screen.getByRole('button', { name: '2번 슬롯' }))
+    슬롯으로(1)
     const 이미지 = screen.getByTestId('명전-투수그림')
     expect([이미지.style.left, 이미지.style.top, 이미지.style.width, 이미지.style.height]).toEqual(['8px', '13px', '54px', '75px'])
     expect([이미지.style.transform, 이미지.style.transformOrigin]).toEqual(['scale(2)', '0 0'])
@@ -788,5 +810,26 @@ describe('명전 칸 그림 0x7ac2e · 커서 튕김 0x7a7f6', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('마우스 길 — 원본은 키패드뿐이라 포인터를 올려 두기만 해서는 커서가 안 옮겨진다', () => {
+  it('스페셜 목록 줄', () => {
+    띄우기()
+    fireEvent.mouseEnter(칸('기록연감'))
+    fireEvent.mouseOver(칸('기록연감'))
+    expect(칸('G포인트 충전').getAttribute('aria-current')).toBe('true')
+    expect(칸('기록연감').getAttribute('aria-current')).toBe('false')
+    expect(screen.getByText('G포인트를 충전')).toBeTruthy()
+  })
+
+  it('명예의 전당 슬롯 · 말풍선 칸', () => {
+    render(<HallOfFameScreen collection={{ ...EMPTY_COLLECTION, hallOfFamePitchers: [] }} mode={{ kind: '보기' }} onBack={vi.fn()} />)
+    const 슬롯 = (index: number) => screen.getByRole('button', { name: `${index + 1}번 슬롯` })
+    const 처음 = screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true')
+    fireEvent.mouseEnter(슬롯(8))
+    fireEvent.mouseOver(슬롯(8))
+    expect(슬롯(8).getAttribute('aria-current')).toBe('false')
+    expect(screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true')).toBe(처음)
   })
 })

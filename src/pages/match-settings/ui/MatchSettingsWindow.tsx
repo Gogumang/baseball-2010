@@ -132,7 +132,6 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
           <button type="button" className={styles.hitArea} aria-label={labels[index]} aria-current={index === selected}
             data-frame={frame}
             style={{ left: LIST_ROW.x, top: listRowTopOf(index), width: LIST_ROW.width, height: LIST_ROW.height }}
-            onMouseEnter={() => setState(moved(index))}
             onClick={() => pressAt(moved(index))} />
         </span>
       ))}
@@ -158,7 +157,6 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
             <button type="button" className={styles.hitArea} aria-label={CHANCE_LABELS[index]}
               aria-current={index === value} data-frame={slot.frame}
               style={{ left: slot.x, top: slot.y, width: CHANCE_SLOT_SIZE, height: CHANCE_SLOT_SIZE }}
-              onMouseEnter={() => setState(withValue(index))}
               onClick={() => pressAt(withValue(index))} />
           </span>
         ))}
@@ -187,7 +185,6 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
         {DETAIL_ROW_LABELS.map((label, row) => (
           <DetailRow key={label} row={row} label={label} state={state} isBlinkOn={isBlinkOn}
             text={text} sltOrigins={sltOrigins}
-            onHover={(cell) => setState({ ...state, detailRow: row, detailCell: cell })}
             onPress={(cell) => pressAt({ ...state, detailRow: row, detailCell: cell })} />
         ))}
         <OriginSprite folder={POPUP_FRAMES} origins={popupOrigins}
@@ -196,7 +193,6 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
         <button type="button" className={styles.hitArea} aria-label={DETAIL_CONFIRM_LABEL}
           aria-current={state.detailRow === DETAIL_ROW.확인}
           style={{ left: DETAIL_OK.x, top: DETAIL_OK.y, width: DETAIL_OK.width, height: DETAIL_OK.height }}
-          onMouseEnter={() => setState({ ...state, detailRow: DETAIL_ROW.확인 })}
           onClick={() => pressAt({ ...state, detailRow: DETAIL_ROW.확인 })} />
       </>
     )
@@ -243,12 +239,11 @@ interface DetailRowProps {
   readonly isBlinkOn: boolean
   readonly text: (frame: number, x: number, y: number, palette?: number, key?: string) => ReactNode
   readonly sltOrigins: FrameOrigins | null
-  readonly onHover: (cell: number) => void
   readonly onPress: (cell: number) => void
 }
 
 /** 상세 한 줄 — 네모 · 이름 두 장 · 칸들 · 켜진 칸 하늘 테 · 깜빡이는 노랑 커서 (0x60fee~0x61ae0) */
-function DetailRow({ row, label, state, isBlinkOn, text, sltOrigins, onHover, onPress }: DetailRowProps) {
+function DetailRow({ row, label, state, isBlinkOn, text, sltOrigins, onPress }: DetailRowProps) {
   const rowY = DETAIL_ROW_Y[row] ?? 0
   const shape = DETAIL_CELL_SHAPES[row]
   const isCurrentRow = state.detailRow === row
@@ -279,7 +274,6 @@ function DetailRow({ row, label, state, isBlinkOn, text, sltOrigins, onHover, on
             <button type="button" className={styles.hitArea} aria-label={`${label} ${cellLabelOf(row, cell)}`}
               aria-pressed={isOn} data-frame={isOn ? shape.onFrame : shape.offFrame}
               style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
-              onMouseEnter={() => onHover(cell)}
               onClick={() => onPress(cell)} />
           </span>
         )

@@ -137,7 +137,6 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
           aria-label={button.name}
           aria-pressed={answer === button.answer}
           onClick={() => (button.answer ? onRetry() : onExit())}
-          onMouseEnter={() => setAnswer(button.answer)}
         >
           <FrameSprite
             folder={POPUP_FRAMES}

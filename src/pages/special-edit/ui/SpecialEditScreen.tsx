@@ -228,8 +228,7 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
         return (
           <button key={entry.id} type="button" aria-label={entry.name} aria-pressed={index === cursor}
             className={styles.cell} style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
-            onClick={() => (index === cursor ? onChoose() : onPoint(index))}
-            onMouseEnter={() => onPoint(index)}>
+            onClick={() => (index === cursor ? onChoose() : onPoint(index))}>
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)} style={{ left: 0, top: 0 }} />
             <img className={styles.layer} alt="" src={entry.logoUrl}
               style={{
