@@ -15,9 +15,10 @@ import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { FIGURE_FOOT, INFO_BOARD } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
 import { CardPlate } from '@/pages/management/ui/CardPlate'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import {
-  ARROW, BACKDROP, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
+  ARROW, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
   INFO_FRAME, ROOKIE_BATTING_ORDER, ROW_HINTS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
 } from '@/pages/create-player/lib/createPlayerLayout'
 import type { CreatePlayerRowId, InfoCellId } from '@/pages/create-player/lib/createPlayerLayout'
@@ -140,9 +141,9 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
 
   return (
     <RawScreen>
-      {/* 바탕 = 공용 창 0x55e60 판 (F-8). 원본 바탕 0x7f4ed 는 미해독이라 이 판으로 빈 칸을 메운다 */}
-      <div className={styles.backdrop}
-        style={{ left: BACKDROP.x, top: BACKDROP.y, width: BACKDROP.width, height: BACKDROP.height }} />
+      {/* 장면 틀 0x16928 — 상태 0x66 은 0x8e~0x90 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다(0x1694c~0x16976).
+          투수 등록(`PitcherRegisterScreen`)과 같은 장면 0x106 틀이다 */}
+      <SkinBackdrop kind="공무늬" />
 
       {/* 기본정보 카드 0x15e20 — 카드 0x7ba44(계단형 판 · 팀 로고 · ABILITY 레이더) · 선수 그림 · 정보 칸 */}
       <CardPlate teamId={teamId} />

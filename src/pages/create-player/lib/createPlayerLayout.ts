@@ -15,17 +15,6 @@ import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
  * `pages/management/lib/basicInfoLayout.ts` 것을 그대로 가져다 쓴다 (C-6 "웹 … 와 같은 숫자").
  */
 
-/** 원작 화면 한 장 */
-const SCREEN = { width: 240, height: 320 } as const
-
-/**
- * 바탕. 0x15f34 는 [this+0xe0] 에 관리 화면 공용 바탕 **0x7f4ed** 를 꽂을 뿐이고 그 함수 속은 아직 미해독이다
- * (`docs/re/R13-season-leftovers.md` 1절도 "0x7f4ec 바탕" 까지만 적혀 있다).
- * 빈 칸이 검게 남지 않도록 `F-ui-layout.md` F-8 의 **공용 창 0x55e60**(#335FCD 판 + #080408 1px 테두리 +
- * 안쪽 흰 선)을 화면 전체에 깐다 — 판·테두리 색은 확정이고, "화면 전체" 라는 크기만 이 이식판이 정한 값이다.
- */
-export const BACKDROP = { x: 0, y: 0, width: SCREEN.width, height: SCREEN.height } as const
-
 /** 값을 고르는 줄 (이름 줄은 입력기라 따로 둔다) */
 export type CreatePlayerRowId = '타입' | '포지션' | '손' | '피부'
 /** 줄 선택 목록이 도는 다섯 줄 */
