@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
-import { Button, FrameSprite, Hint, RawScreen } from '@/shared/ui'
+import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -181,21 +181,11 @@ export function FirstBatStadiumScreen({
             { side: PLAYER_SIDE_FIRST_BAT, anchor: anchorA, label: '유저 선공' },
             { side: PLAYER_SIDE_LAST_BAT, anchor: anchorB, label: 'CPU 선공' },
           ].map(({ side, anchor, label }) => (
-            <button
-              key={label}
-              type="button"
-              aria-pressed={playerSide === side}
-              aria-label={label}
-              // 원본은 좌·우 키로 커서를 옮기고 OK 로 정한다 — 마우스는 엠블럼 원 자리(82×82)를 누른다 (웹판)
-              className={styles.sideButton}
-              style={{ left: anchor.x - 41, top: anchor.y - 41, width: 82, height: 82 }}
-              onClick={() => onChooseFirstBat(side)}
-            />
+            // 원본은 좌·우 키로 커서를 옮기고 OK 로 정한다 — 마우스는 엠블럼 원 자리(82×82)를 누른다 (웹판)
+            <PressArea key={label} label={label}
+              rect={{ x: anchor.x - 41, y: anchor.y - 41, width: 82, height: 82 }}
+              onPress={() => onChooseFirstBat(side)} />
           ))}
-          {/* 원본에 없는 웹 전용 안내 — 흐름 배치라 (0,0) 에 떨어져 있던 것을 제자리로 옮겼다 */}
-          <div className={styles.hintLine}>
-            <Hint>선공을 고르세요 — ←→ 바꾸기 · Enter 결정</Hint>
-          </div>
         </>
       )}
 
@@ -230,12 +220,10 @@ export function FirstBatStadiumScreen({
         style={{ left: arrows.rightX, top: FIRST_BAT_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
       {isStadiumPhase && (
         <>
-          <button type="button" aria-label="이전 구장" className={styles.sideButton}
-            style={{ left: FIRST_BAT_LAYOUT.arrow.leftX - 2, top: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }}
-            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))} />
-          <button type="button" aria-label="다음 구장" className={styles.sideButton}
-            style={{ left: FIRST_BAT_LAYOUT.arrow.rightX - 2, top: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }}
-            onClick={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))} />
+          <PressArea label="이전 구장" onPress={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))}
+            rect={{ x: FIRST_BAT_LAYOUT.arrow.leftX - 2, y: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }} />
+          <PressArea label="다음 구장" onPress={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))}
+            rect={{ x: FIRST_BAT_LAYOUT.arrow.rightX - 2, y: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }} />
         </>
       )}
 
@@ -261,16 +249,18 @@ export function FirstBatStadiumScreen({
         {stadium === undefined ? '' : `${stadium.capacity}석`}
       </span>
 
+      {/*
+        원본에 없던 웹 [이 구장으로] 단추와 키 안내 글을 걷고 투명 누름 칸으로 — 고른 구장 그림(stadium_symbol 91×40)과
+        깜빡이는 구장 막대 칠(26, 197, 188×16) 자리 = OK. 화살 칸과 겹치지 않게 막대는 화살 사이만 잡는다
+      */}
       {isStadiumPhase && (
         <>
-          {/* 원본에는 없는 웹 전용 OK 단추 — 원본은 소프트키가 한다. 바닥띠 왼쪽 빈 칸에 세운다 */}
-          <Button variant="corner" className={styles.softKey} style={{ left: 4 }}
-            onClick={() => onChooseStadium(stadiumId)}>
-            이 구장으로
-          </Button>
-          <div className={styles.hintLine}>
-            <Hint>구장을 고르세요 — ←→ 바꾸기 · Enter 결정</Hint>
-          </div>
+          <PressArea label="구장 그림 — 이 구장으로" onPress={() => onChooseStadium(stadiumId)}
+            rect={{ x: FIRST_BAT_LAYOUT.stadiumSymbol.x, y: FIRST_BAT_LAYOUT.stadiumSymbol.y,
+              width: FIRST_BAT_LAYOUT.stadiumSymbol.width, height: FIRST_BAT_LAYOUT.stadiumSymbol.height }} />
+          <PressArea label="이 구장으로" onPress={() => onChooseStadium(stadiumId)}
+            rect={{ x: FIRST_BAT_LAYOUT.arrow.leftX + 7, y: FIRST_BAT_LAYOUT.stadiumHighlight.y,
+              width: FIRST_BAT_LAYOUT.arrow.rightX - FIRST_BAT_LAYOUT.arrow.leftX - 9, height: FIRST_BAT_LAYOUT.stadiumHighlight.height }} />
         </>
       )}
 
