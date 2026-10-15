@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { MessageBox, Panel, RawScreen } from '@/shared/ui'
+import { MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -19,6 +19,7 @@ import { PitcherMagicTrainingPanel } from '@/pages/pitcher-league/ui/PitcherMagi
 import { NariRecordPickPopup, NariRecordView } from '@/pages/nari-record-room'
 import type { RecordRoomPick } from '@/pages/nari-record-room'
 import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScreen'
+import { PitchChoicePopup } from '@/pages/pitcher-league/ui/PitchChoicePopup'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import * as styles from '@/pages/pitcher-league/ui/PitcherManagementScreen.css'
@@ -234,27 +235,42 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     setAwaitingEntry(false)
   })
 
-  // 구질 훈련(상태 108 의 구질 탭)은 이미 있는 창을 그대로 쓴다 — 새로 만들지 않는다
   // 124 그림 0x16778 — 목록 판과 머리띠만(관리 화면은 없다). 취소 → 106
+  /**
+   * 팝업 0x78(`PitchChoicePopup`)은 화면 밖 한 자리에 둔다 — 확인 키가 그 갱신에 상태를 108 · 123 으로 바꿔 아래 화면이 갈려도
+   * 창은 그 위에서 줄어든다(0x19398 → 0xbcb49 뒤 [창+0x215]). 화면 갈래마다 따로 두면 창이 새로 서 버린다.
+   */
+  const choicePopup = menu.choice !== null && (
+    <PitchChoicePopup selected={menu.choiceIndex} onMove={menu.moveChoice}
+      onChoose={menu.chooseOption} onClosed={() => menu.chooseOption(-1)} />
+  )
+  /** 기록실 팝업이 124 위에서 다 줄어들었다 — 다시 [기록실] 을 열 때 내린다 */
+  const [isRecordPopupGone, setRecordPopupGone] = useState(false)
+  const closeRecordRoom = () => {
+    setRecordPick(null)
+    setRecordPopupGone(false)
+    menu.closeWindow()
+  }
+  /** 106 칸 4 [기록실] 팝업 0x80 — 확인한 다음 틀에 124 가 서고 창은 그 위에서 줄어든다(0x196ec → 0xbcb49). 갈래 밖 한 자리 */
+  const recordPopup = menu.subWindow === '기록실' && !isRecordPopupGone && (
+    <NariRecordPickPopup onChoose={setRecordPick} onCancel={closeRecordRoom} onClosed={() => setRecordPopupGone(true)} />
+  )
+  return <>{managementBodyOf()}{choicePopup}{recordPopup}</>
+
+  function managementBodyOf() {
   if (menu.subWindow === '기록실' && recordPick !== null) {
     return <NariRecordView edition="투수" career={career} pick={recordPick} gamePoint={career.gamePoint}
-      onBack={() => { setRecordPick(null); menu.closeWindow() }} />
-  }
-
-  if (menu.subWindow === '구질훈련') {
-    return (
-      <PitchTrainingScreen
-        career={career}
-        onTrain={menu.trainPitch}
-        onClose={menu.closeWindow}
-      />
-    )
+      onBack={closeRecordRoom} />
   }
 
   const isBasicInfo = menu.subWindow === '기본정보'
   // 106 칸 4 [기록실] 의 팝업 0x80 은 106 화면 위에 뜬다 — 124 로 가면 `NariRecordView` 가 화면을 덮는다
   const isRecordRoom = menu.subWindow === '기록실'
-  const isMenuShown = menu.subWindow === null || isRecordRoom
+  // 108 탭 2 그림 0x19e44 = 관리 화면 0x19da4 위에 창 0x803d4 — 아래 줄은 107 하위 메뉴 그대로다
+  const isPitchTraining = menu.subWindow === '구질훈련'
+  // 108 탭 1 도 같은 그림 0x19e44 — 관리 화면 위에 창 0x803d4
+  const isMagicTraining = menu.subWindow === '마구훈련'
+  const isMenuShown = menu.subWindow === null || isRecordRoom || isPitchTraining || isMagicTraining
   return (
     <RawScreen>
       {/*
@@ -266,7 +282,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={!isRecordRoom && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
           <PitcherStatusBoard career={career} />
           <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
             morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
@@ -286,41 +302,17 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
               onSelectPitch={menu.selectPitchCell}
             />
           )}
-          {menu.subWindow === '마구훈련' && (
-            <PitcherMagicTrainingPanel career={career} cursor={menu.magicTrainingCursor}
-              onMoveCursor={menu.moveMagicTrainingCursor} onConfirm={menu.confirmMagicTrainingCell} />
-          )}
         </div>
       )}
 
-      {/*
-        팝업 0x78 — StrMODE[59] "원하는 항목을 선택해주세요".
-        원본은 좌우 키로 `+0x166` 을 토글하고 확인으로 고르는 작은 창이다
-        (그리기 0x190f8 · 키 0x19398) — 키는 `usePitcherManagementMenu` 가 본다.
-        ⚠️ **원본 배치 미해독 — 근사**: 여기서는 두 칸 버튼을 가로로 놓고 고른 칸을 눌러 그린다.
-        ⚠️ 여닫기 미반영: 원본은 0x741a0(높이 0x78)이라 펼침(6 → 120) 동안 키를 안 받고, 키 0x19398 은 CLR(0x1942a) · 확인 모두
-           [창+0x215] = 1 — 폭 240 → 120 → 닫힘(`popupWindow` '줄임'). 판이 근사라 웹은 아직 곧바로 연다 · 닫는다.
-      */}
-      {menu.choice !== null && (
-        <div className={styles.choiceLayer}>
-          <Panel heading={menu.choice.text}>
-            <div className={styles.tabRow}>
-              {menu.choice.labels.map((label, index) => (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={index === menu.choiceIndex}
-                  className={`${styles.tab} ${index === menu.choiceIndex ? styles.tabSelected : ''}`}
-                  onPointerEnter={() => menu.moveChoice(index)}
-                  onClick={() => menu.chooseOption(index)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </Panel>
-        </div>
+      {/* 108 탭 2 구질 훈련 창 0x803d4 — 키는 창이 받는다(0x17828 → 0x80268), 취소는 107 */}
+      {isPitchTraining && <PitchTrainingScreen career={career} onTrain={menu.trainPitch} onClose={menu.closeWindow} />}
+      {/* 108 탭 1 마구 창 0x803d4 — 키는 `usePitcherManagementMenu`(0x17828 → 0x80268), 취소는 107 */}
+      {isMagicTraining && (
+        <PitcherMagicTrainingPanel career={career} cursor={menu.magicTrainingCursor}
+          onMoveCursor={menu.moveMagicTrainingCursor} onConfirm={menu.confirmMagicTrainingCell} />
       )}
+
 
       {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
       {isBasicInfo && menu.abilityDetailOffset !== null && (() => {
@@ -336,8 +328,6 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
         footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false} />
 
-      {/* 106 칸 4 [기록실] — 팝업 0x80(0x19448) → 124(0x116d4 · 0x1463c · 0x16778), 취소는 106 */}
-      {isRecordRoom && <NariRecordPickPopup onChoose={setRecordPick} onCancel={menu.closeWindow} />}
 
       {/*
         칭호 목록 창 — 원본 하위 상태 **129** (P3 10-1). 기본정보(119) 위에 겹쳐 뜨고
@@ -380,4 +370,5 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       )}
     </RawScreen>
   )
+  }
 }

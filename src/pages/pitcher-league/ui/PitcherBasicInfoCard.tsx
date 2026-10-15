@@ -14,6 +14,11 @@ interface PitcherBasicInfoCardProps {
   readonly career: PitcherCareer
   /** 장비 창이 입혀 보는 니블(사본 [창+0x148]) — 안 주면 지금 낀 그대로 */
   readonly figureEquipment?: PitcherCareer['equipmentLevels']
+  /**
+   * 0xb570d 넷째 인자 — 0x7c02a~0x7c054 가 `[gfx+0x174] − 0x66 ≤ 1`(등록 102 · 변화구 고르기 103)이면 0 을 넘겨
+   * 질병 · 부상 · 사기 감소를 건너뛴다. 안 주면 1(기본정보 · 상점 · 장비착용)
+   */
+  readonly appliesCondition?: boolean
 }
 
 /**
@@ -23,11 +28,11 @@ interface PitcherBasicInfoCardProps {
  * - 레이더 0x5a990 모드 3: 축 이름 37 제구 · 38 구속 · 39 변화 · 40 체력, 기본값 0xb6415(사본, k, 0) · 실효값 0xb570d(…, 사본, …)
  * 카드 판 모양(0x7ba44)은 타자 카드와 같은 박스 근사다 (`BasicInfoCard`).
  */
-export function PitcherBasicInfoCard({ career, figureEquipment }: PitcherBasicInfoCardProps) {
+export function PitcherBasicInfoCard({ career, figureEquipment, appliesCondition = true }: PitcherBasicInfoCardProps) {
   const tick = useUpdateCounter()
   const equipment = figureEquipment ?? career.equipmentLevels
   const look = pitcherCardLookOf(career, equipment)
-  const shown = effectivePitcherAbilityOf({ ...career, equipmentLevels: equipment })
+  const shown = effectivePitcherAbilityOf({ ...career, equipmentLevels: equipment }, appliesCondition)
   const { image } = HALL_OF_FAME_FIGURE
   return (
     <div data-testid="pitcher-basic-info-card">

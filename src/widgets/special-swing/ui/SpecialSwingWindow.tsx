@@ -1,29 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { CommonPanel, MessageBox, SpriteNumber } from '@/shared/ui'
-import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { MessageBox } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
   SPECIAL_SWING_REQUIRED_POPULARITY, specialSwingSlotBlockOf, specialSwingSlotCostOf,
 } from '@/entities/career/model/training'
 import {
-  COUNT_BOX, COUNT_DIGIT_OFFSET_X, COUNT_LABEL_FRAME, COUNT_LABEL_OFFSET_X, CURSOR_BLINK_PERIOD,
-  CURSOR_VISIBLE_UPDATES, DESCRIPTION_BOX, FRAME_IMAGE, NAME_BOX, SLOT_COUNT, SLOT_SIZE, SLOT_XS, SLOT_Y,
-  SPECIAL_SWING_WINDOW, TITLE_BOX, TITLE_FRAME, unlockedSlotCountOf,
-} from '@/widgets/special-swing/lib/specialSwingLayout'
-import {
-  NO_SPECIAL_SWING_NUMBER, specialSwingNameOf, specialSwingNumberOf, specialSwingPickOf,
+  NO_SPECIAL_SWING_NUMBER, specialSwingPickOf,
 } from '@/widgets/special-swing/lib/specialSwingSelection'
-import { SpecialSwingSlot } from '@/widgets/special-swing/ui/SpecialSwingSlot'
+import {
+  SPECIAL_TRAINING_SLOT_COUNT, moveSpecialTrainingCursor, specialTrainingKeyOf,
+} from '@/widgets/special-swing/lib/specialTrainingWindow'
+import { SpecialTrainingFigure } from '@/widgets/special-swing/ui/SpecialTrainingFigure'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
-import * as local from '@/widgets/special-swing/ui/SpecialSwingWindow.css'
-
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
-/** img_text 글자 그림 높이 */
-const LABEL_HEIGHT = 10
 
 /** 이 창이 쓰는 StrMODE 번호 (`modeText.json` 과 번호가 같다) */
 const TEXT = {
@@ -72,13 +60,15 @@ interface SpecialSwingWindowProps {
 }
 
 /**
- * 필살타법 창 (0x803d4) — 칸 4개 · 이름 · 설명 · 훈련 횟수. 나만의리그 장면 위에 뜬다.
+ * 필살타법 창 (0x803d4 탭 0) — 칸 4개 · 이름 · 설명 · 훈련 횟수. 나만의리그 장면 위에 뜬다. 그림은 `SpecialTrainingFigure`
+ * (투수 108 탭 1 마구 창과 같은 그림), 여기는 두 상태의 키 가드만 맡는다.
  *
  * 이름은 `StrCOMMON[24 + 기술번호]` 이고 기술 번호는 [1,2,3,4] 인데,
  * **넷째 칸만 `4 + 타입`**(레코드 +0xb 위 3비트)이다 (H-4 확정):
  * 타격형이면 미라지 스윙, 장타형이면 **메테오 스윙**.
  *
- * 칸에 붙는 주황 아이콘은 "레벨" 이 아니라 **지금 쓰는 기술**(레코드 +0x18)이다 (R7 4절 정정).
+ * 칸에 붙는 주황 아이콘은 "레벨" 이 아니라 **지금 쓰는 기술**(레코드 +0x18)이다 (R7 4절 정정) — 아이콘은 `min(+0x18, 4) == i + 1`,
+ * 아래 글 "사용중" · [69] 는 0xa43c4(4 + 타입) 로 서로 다르다(0x805f4 · 0x80be8).
  * 확인 키(Enter)는 모드에 따라 `0x17cec`(고르기) 또는 `0x17828`(배우기) 규칙을 탄다.
  */
 export function SpecialSwingWindow({
@@ -86,21 +76,13 @@ export function SpecialSwingWindow({
   popularity = 0, gamePoint = 0, onTrain, onBuyGamePoint, onClose,
 }: SpecialSwingWindowProps) {
   // 처음 커서 — '훈련'(108 진입 0x17730 177b6~17806)은 min(s8 [저장+0x201], 3) = min(L, 3) 칸.
-  // ⚠️ '사용'(0x7b) 진입의 커서는 이 커밋에서 다시 뜨지 않았다 — 예전 값 min(max(L − 1, 0), 3) 그대로
-  const [cursor, setCursor] = useState(mode === '훈련'
-    ? Math.min(level, SLOT_COUNT - 1)
-    : Math.min(Math.max(level - 1, 0), SLOT_COUNT - 1))
+  // '사용'(123 진입 0x17690)은 0x80235 가 탭 격자를 vt+0x14(0, 0) 으로 되감고 더 건드리지 않는다 — 칸 0
+  const [cursor, setCursor] = useState(mode === '훈련' ? Math.min(level, SPECIAL_TRAINING_SLOT_COUNT - 1) : 0)
   /** 바깥이 번호를 들고 있지 않을 때의 자리 — 원본 레코드 +0x18 에 이어야 한다 */
   const [ownNumber, setOwnNumber] = useState(NO_SPECIAL_SWING_NUMBER)
   const inUseNumber = selectedNumber ?? ownNumber
   const [notice, setNotice] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ readonly text: string; readonly onYes: () => void } | null>(null)
-  const textOrigins = useFrameOrigins(IMG_TEXT)
-  const update = useUpdateCounter()
-  const isCursorVisible = update % CURSOR_BLINK_PERIOD < CURSOR_VISIBLE_UPDATES
-  const unlockedCount = unlockedSlotCountOf(level)
-  const widthOf = (frame: number) => textOrigins?.[String(frame).padStart(3, '0')]?.width ?? 0
-  const countGlyphs = numberGlyphsOf(sessions)
 
   const chooseNumber = (number: number) => {
     setOwnNumber(number)
@@ -143,13 +125,13 @@ export function SpecialSwingWindow({
 
   useEffect(() => {
     // 알림·질문 상자가 떠 있으면 MessageBox 가 잡는 단계에서 키를 가져간다
+    // 키 0x17828(108) · 0x17cec(123): OK(−5 · '5')는 칸 가드, 취소(−16)는 바깥(`back`)이 받는다, 그 밖은 창 키 0x80269 → 탭 격자
     const onKey = (event: KeyboardEvent) => {
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (step !== 0) return setCursor((current) => (current + step + SLOT_COUNT) % SLOT_COUNT)
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        confirm(cursor)
-      }
+      const key = specialTrainingKeyOf(event.key)
+      if (key === null || key === 'clr') return
+      event.preventDefault()
+      if (key === 'ok') return confirm(cursor)
+      setCursor((current) => moveSpecialTrainingCursor(current, key))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -157,49 +139,9 @@ export function SpecialSwingWindow({
 
   return (
     <div className={styles.overlay} role="dialog" aria-label="필살타법" onClick={onClose}>
-      {/* 8046c 공용 판 0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0) — 박스 0 은
-          0xcaa04(…, [sp+0x70] = 그림 자료 +0x68 = mode_ui 프레임 26, 0, 0) (80420~8046c 직접 뜸). 제목 탭이 서서 위 띠는 안 본다 */}
-      <CommonPanel x={SPECIAL_SWING_WINDOW.x} y={SPECIAL_SWING_WINDOW.y} width={SPECIAL_SWING_WINDOW.width}
-        height={SPECIAL_SWING_WINDOW.height} topBand={0x10} titleTab testId="필살타법-판" />
-      <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${TITLE_FRAME}.png`}
-        style={{ left: TITLE_BOX.x + Math.trunc((TITLE_BOX.width - widthOf(TITLE_FRAME)) / 2), top: TITLE_BOX.y + Math.trunc((TITLE_BOX.height - LABEL_HEIGHT + 1) / 2) }} />
-      <img className={styles.layer} alt="" src={`${MODE_UI}/${String(FRAME_IMAGE.frame).padStart(3, '0')}.png`}
-        style={{ left: FRAME_IMAGE.x, top: FRAME_IMAGE.y }} />
-
-      {SLOT_XS.map((x, index) => (
-        <button key={x} type="button" aria-label={specialSwingNameOf(specialSwingNumberOf(index, battingTypeIndex))}
-          className={local.slotButton}
-          style={{ left: x, top: SLOT_Y, width: SLOT_SIZE.width, height: SLOT_SIZE.height }}
-          onMouseEnter={() => setCursor(index)}
-          onClick={(event) => { event.stopPropagation(); setCursor(index); confirm(index) }} />
-      ))}
-      {SLOT_XS.map((x, index) => (
-        <SpecialSwingSlot key={x} index={index} x={x} y={SLOT_Y}
-          isInUse={specialSwingNumberOf(index, battingTypeIndex) === inUseNumber}
-          isLocked={unlockedCount <= index} />
-      ))}
-      {isCursorVisible && (
-        <svg className={styles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
-          {/* 테두리는 칸을 1px 씩 둘러싼 (폭+2)×(높이+2) 상자다 — 선을 픽셀 칸 가운데에 두려고 반 칸 옮긴다 */}
-          <rect x={SLOT_XS[cursor] - 0.5} y={SLOT_Y - 0.5} width={SLOT_SIZE.width + 1} height={SLOT_SIZE.height + 1}
-            fill="none" stroke={ORIGINAL_COLORS.text} strokeWidth={1} />
-        </svg>
-      )}
-
-      <div className={local.text} style={{ left: NAME_BOX.x, top: NAME_BOX.y + 1, width: NAME_BOX.width }}>
-        {specialSwingNameOf(specialSwingNumberOf(cursor, battingTypeIndex))}
-      </div>
-      {/* 설명 문자열은 원본 문자열표 번호 계산(293/295)이 미해독이라 비워 둔다 */}
-      <div className={local.text} style={{ left: DESCRIPTION_BOX.x, top: DESCRIPTION_BOX.y, width: DESCRIPTION_BOX.width }} />
-
-      <SpriteNumber glyphs={countGlyphs}
-        right={COUNT_BOX.x + Math.trunc((COUNT_BOX.width - glyphsWidthOf(countGlyphs)) / 2) + COUNT_DIGIT_OFFSET_X + glyphsWidthOf(countGlyphs)}
-        boxTop={COUNT_BOX.y} boxHeight={COUNT_BOX.height} />
-      <img className={styles.layer} alt="" src={`${IMG_TEXT}/${COUNT_LABEL_FRAME}.png`}
-        style={{
-          left: COUNT_BOX.x + Math.trunc((COUNT_BOX.width - widthOf(COUNT_LABEL_FRAME)) / 2) + COUNT_LABEL_OFFSET_X,
-          top: COUNT_BOX.y + Math.trunc((COUNT_BOX.height - LABEL_HEIGHT + 1) / 2),
-        }} />
+      <SpecialTrainingFigure side="타자" state={mode} cursor={cursor} learnedCount={level} sessions={sessions}
+        inUseNumber={inUseNumber} typeIndex={battingTypeIndex}
+        onPressSlot={(slot) => { setCursor(slot); confirm(slot) }} />
 
       {/* 상자 클릭이 덮개(onClick = onClose)로 올라가 창째 닫히지 않게 여기서 멈춘다 — 원본은 상자가 키를 다 가져간다 */}
       <div onClick={(event) => event.stopPropagation()}>

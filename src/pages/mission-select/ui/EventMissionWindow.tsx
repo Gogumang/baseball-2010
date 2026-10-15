@@ -26,24 +26,31 @@ export type EventMissionAnswer = '미션실행' | '미션다운' | '취소'
  * 창 판·열림은 공용 0x741a0 창 그대로다: 높이 6 에서 ×2 로 100 까지(0x75556), 그동안은 키 콜백을 안 부른다 — 뒤집기도 안 된다.
  * **닫힘 애니가 있다** (2026-10-14 직접 뜸): 키 0x1dcb0 은 CLR(0x1dcda~0x1dce8) · 확인(0x1dd0e~0x1dd24) 모두 [창+0x215] = 1 을 쓴다 —
  * 다음 갱신부터 폭 240 → 120 → 닫힘 · 0x75440(대기 칸) (`popupWindow` 머리말). 줄이는 동안에도 키는 안 받는다.
- * ⚠️ 근사: 원본 키 콜백은 하위 상태([this+0x18])를 키를 받은 그 갱신에 바꾸고 창은 새 하위 상태 위에서 줄어든다.
- *    웹은 다 닫힌 뒤에 `onAnswer` 로 넘긴다(두 갱신 늦다).
+ * 키 콜백은 하위 상태([this+0x18])를 키를 받은 그 갱신에 바꾼다(0x1dcdc · 0x1dd38) — `onKey`. 그 하위 상태를 보는 것은 장면 키
+ * 함수 0x1daa4 인데(하위 3 0x1dc00 이 0x74ef5 알림 · 하위 5 가 경기), 미션 고르기 틀 0x1ea98 은 창이 떠 있는 동안(줄이는 동안 ·
+ * 닫는 갱신 포함 — 0x754f9 는 늘 1) 그 키 함수를 건너뛴다(1eaac). 그래서 하위 상태는 창이 다 닫힌 **다음 갱신**에 돈다 — `onClosed`
+ * 뒤 한 갱신은 부르는 쪽의 몫이다.
  * 뒤 어둡게: 미션 장면 생성자 0x1d784(0x1d786~0x1d79e)가 [창+0x24f] = 0 · [창+0x24c] = 1 이라 0x741a0 이 [창+0x24e] = 0 을
  * 옮겨 0x746cc 가 떠 있는 그리기마다 검정 단계 5 = 6/16 으로 덮는다 (`POPUP_DIM_OPACITY`).
  */
-export function EventMissionWindow({ isRunSelected, onToggle, onAnswer }: {
+export function EventMissionWindow({ isRunSelected, onToggle, onKey, onClosed }: {
   /** [this+0xa0] ≠ 0 — 미션실행 쪽 */
   readonly isRunSelected: boolean
   readonly onToggle: () => void
-  /** 닫힘 애니가 끝난 뒤의 답 */
-  readonly onAnswer: (answer: EventMissionAnswer) => void
+  /** 키를 받은 그 갱신에 고른 하위 상태 (0x1dcdc · 0x1dd38) */
+  readonly onKey: (answer: EventMissionAnswer) => void
+  /** 창이 다 닫혔다 (폭 99 이하 — 0x742a8) */
+  readonly onClosed: () => void
 }) {
   const motion = usePopupWindowMotion({ targetHeight: EVENT_MISSION_WINDOW.height })
-  const onAnswerRef = useRef(onAnswer)
-  onAnswerRef.current = onAnswer
+  const latest = useRef({ onKey, onClosed })
+  latest.current = { onKey, onClosed }
 
-  // 0x1dcb0 은 [창+0x215] = 1 — 다음 갱신부터 폭 240 → 120 → 닫힘(0x7558a~0x755d8)
-  const close = (answer: EventMissionAnswer) => motion.close('줄임', () => onAnswerRef.current(answer))
+  // 0x1dcb0 은 하위 상태를 쓰고 [창+0x215] = 1 — 다음 갱신부터 폭 240 → 120 → 닫힘(0x7558a~0x755d8)
+  const close = (answer: EventMissionAnswer) => {
+    if (!motion.close('줄임', () => latest.current.onClosed())) return
+    latest.current.onKey(answer)
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

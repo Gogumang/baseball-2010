@@ -93,6 +93,29 @@ describe('usePopupWindowMotion', () => {
     expect(onClosed).toHaveBeenCalledTimes(1)
   })
 
+  it('onNextUpdate 는 키를 받은 다음 갱신(첫 줄임)에, onClosed 는 닫히는 갱신에 — 키 콜백이 0xbcb49 로 건 상태가 다음 틀에 선다', () => {
+    const calls: string[] = []
+    const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100 }))
+    틀(5)
+    act(() => { result.current.close('줄임', () => calls.push('닫힘'), () => calls.push('다음갱신')) })
+    expect(calls).toEqual([])
+    틀(1)
+    expect(calls).toEqual(['다음갱신'])
+    틀(1)
+    expect(calls).toEqual(['다음갱신', '닫힘'])
+  })
+
+  it('opensAtOnce — 첫 갈래 뒤 같은 갱신에 펼침을 마친 창은 처음부터 다 펼쳐져 있고 닫힘은 줄임이다', () => {
+    const onClosed = vi.fn()
+    const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 0, opensAtOnce: true }))
+    expect(result.current.openingHeight).toBeNull()
+    act(() => { result.current.close('줄임', onClosed) })
+    틀(1)
+    expect(result.current.closingWidth).toBe(120)
+    틀(1)
+    expect(onClosed).toHaveBeenCalledTimes(1)
+  })
+
   it('목표 0 인 창은 한 갱신만 펼침 — 그동안 키를 안 받는다', () => {
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 0 }))
     expect(result.current.acceptsKeys()).toBe(false)

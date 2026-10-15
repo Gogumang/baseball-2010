@@ -1,7 +1,9 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
+  FASTBALL_TYPE_NUMBER,
   HIDDEN_PITCH_COLUMN,
   PITCH_TRAINING_TABLE,
+  isInPitchList,
   pitchTrainingStageOf,
   pitchTypeNumberOf,
 } from '@/entities/pitcher-career/model/pitchTraining'
@@ -45,28 +47,8 @@ export function selectMagicPitch(career: PitcherCareer, cellIndex: number): Pitc
   return { ...career, selectedMagicNumber: magicNumberOfCell(cellIndex) }
 }
 
-/** 등록이 무조건 주는 FASTBALL (구질 번호 1) — 마스크에 없어도 0xb6d5e 가 칸 0 에 넣는다 (J 3-1) */
-export const FASTBALL_TYPE_NUMBER = 1
-
-/** 구질 목록 칸 표 `0xd8920` — 구질 t 의 칸 (FASTBALL 0 · 표 0xcc390 의 행 r 은 칸 r + 1) */
-const LIST_SLOT_OF_TYPE: readonly number[] = [6, 0, 1, 1, 2, 2, 3, 3, 4, 4, 1, 1, 2, 2, 3, 3, 4, 4, 1, 2, 3, 4]
-const LAST_ORDINARY_TYPE = 21
-
-const hasMaskBit = (career: PitcherCareer, typeNumber: number) =>
-  typeNumber > 0 && ((career.pitchMask >>> (typeNumber - 1)) & 1) === 1
-
-/**
- * 지금 경기 구질 목록에 든 구질인가 — `0xa436c(S, t)`: 내 레코드로 목록 0xb6d2d(레코드, 칸, 6)를 세워 칸 1~5 에 t 가 있는지 본다.
- * 목록은 마스크 비트를 구질 번호 차례로 훑어 칸 0xd8920[t] 에 덮어쓰므로 **한 칸(행)에는 번호가 큰 구질 하나만** 남는다.
- */
-export function isInPitchList(career: PitcherCareer, typeNumber: number): boolean {
-  if (typeNumber <= FASTBALL_TYPE_NUMBER || typeNumber > LAST_ORDINARY_TYPE || !hasMaskBit(career, typeNumber)) return false
-  const slot = LIST_SLOT_OF_TYPE[typeNumber]
-  for (let later = typeNumber + 1; later <= LAST_ORDINARY_TYPE; later += 1) {
-    if (LIST_SLOT_OF_TYPE[later] === slot && hasMaskBit(career, later)) return false
-  }
-  return true
-}
+/** 구질 목록 판정 `0xa436c` 은 구질 훈련 창과 같이 써서 `pitchTraining` 에 둔다 */
+export { FASTBALL_TYPE_NUMBER, isInPitchList }
 
 /** 123 탭 2 의 칸 열 — 커서 열은 `min(열, 4)` 로 읽는다 (0x17e30) */
 const columnOf = (column: number) => Math.min(column, HIDDEN_PITCH_COLUMN)

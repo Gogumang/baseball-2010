@@ -764,11 +764,13 @@ const MORALE_ABILITY_CUTS: readonly (readonly [number, number])[] = [
  * 피로를 따로 먹이는 투구 흐름(`fatiguedStatsOf`)은 이 값을 받아 피로 뒤에 자른다.
  * 냉정 22 로 999 를 넘은 제구가 피로로 깎일 때만 차이가 난다.
  */
-export function unclampedGamePitcherAbilityOf(career: PitcherCareer): PitcherAbility {
+export function unclampedGamePitcherAbilityOf(career: PitcherCareer, appliesCondition = true): PitcherAbility {
   const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
   const equipped = equippedPitcherAbilityOf(career)
   const adjust = (key: keyof PitcherAbility) => {
     let value = equipped[key]
+    // 넷째 인자 0 — 질병 · 부상 · 사기 감소(0xb5734 → 0xb58e6)를 건너뛴다. 카드 0x7ba44 는 상태 102 · 103 에서 0 을 넘긴다(R9 12-3)
+    if (!appliesCondition) return value
     if (career.isSick) value = reduceByPercent(value, ILLNESS_ABILITY_CUT)
     if (career.isInjured) value = reduceByPercent(value, INJURY_ABILITY_CUT)
     if (moraleCut > 0) value = reduceByPercent(value, moraleCut)
@@ -782,9 +784,12 @@ export function unclampedGamePitcherAbilityOf(career: PitcherCareer): PitcherAbi
   }
 }
 
-/** 피로 없는(체력 인자 > 54) 0xb570c — 맨 끝 0..999 자르기(0xb5b06)까지 한 값. 화면 표시용 실효값 */
-export function effectivePitcherAbilityOf(career: PitcherCareer): PitcherAbility {
-  const unclamped = unclampedGamePitcherAbilityOf(career)
+/**
+ * 피로 없는(체력 인자 > 54) 0xb570c — 맨 끝 0..999 자르기(0xb5b06)까지 한 값. 화면 표시용 실효값.
+ * `appliesCondition` = 0xb570d 의 넷째 인자 — 거짓이면 질병 · 부상 · 사기 감소를 건너뛴다.
+ */
+export function effectivePitcherAbilityOf(career: PitcherCareer, appliesCondition = true): PitcherAbility {
+  const unclamped = unclampedGamePitcherAbilityOf(career, appliesCondition)
   const adjust = (key: keyof PitcherAbility) => clamp(unclamped[key], 0, MAXIMUM_ABILITY)
   return {
     control: adjust('control'),

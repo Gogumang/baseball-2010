@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
@@ -14,7 +14,6 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import {
   MAGIC_MAXIMUM_LEVEL,
   MAGIC_REQUIRED_POPULARITY,
-  MAGIC_TRAINING_CELL_COUNT,
   PITCHER_TRAINING_MENUS,
   magicTrainingCellBlockOf,
   magicTrainingCellCostOf,
@@ -61,6 +60,7 @@ import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pi
 import type { DetailRow } from '@/pages/management/lib/detailPopup'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { moveSpecialTrainingCursor, specialTrainingKeyOf } from '@/widgets/special-swing/lib/specialTrainingWindow'
 
 /**
  * 투수편 관리 화면의 상태 기계 — 원본 장면 0x106 의 상태 **105(허브) · 106(선수정보) · 107(트레이닝)**
@@ -335,7 +335,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         onChoose: (index) => {
           const isMagic = index === 0
           setPitchWindowTab(isMagic ? PITCH_WINDOW_TABS.마구 : PITCH_WINDOW_TABS.구질)
-          setChoice(null)
+          // 창은 여기서 치우지 않는다 — 키 0x19398 은 상태를 그 갱신에 바꾸고(0xbcb49) [창+0x215] 로 줄이므로 창은 새 상태 위에서
+          // 240 → 120 → 닫힌다. 다 닫히면 팝업이 `chooseOption(−1)` 로 치운다(`PitchChoicePopup`)
           if (!isTraining) return setSubWindow('구질목록')
           if (!isMagic) return setSubWindow('구질훈련')
           // 웹이 둔 주기 검사(한 주기에 한 가지 — 원본 키에 없다)는 예전처럼 창 앞에서 본다
@@ -483,25 +484,17 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다)
       if (question !== null || choice !== null || notice !== '') return
       /*
-       * 108 마구 창 — 확인(−5 / '5')은 0x17828 의 칸 가드, 그 밖 키는 창 객체 0x80269 가 격자 커서를 옮긴다.
-       * 칸 넷이 한 줄이라 ←→ 로 돌고 끝에서 감긴다(타자 필살타법 창 `SpecialSwingWindow` 와 같은 창 키). 취소는 `back`.
+       * 108 마구 창 — 확인(−5 / '5')은 0x17828 의 칸 가드, 그 밖 키는 창 객체 0x80269 가 탭 격자(4, 1, 0x330)를 옮긴다.
+       * 칸 넷이 한 줄이라 ←→ 로 돌고 끝에서 감기며, ↑ 는 왼쪽 · ↓ 는 오른쪽 칸이 된다(타자 필살타법 창과 같은 창 키). 취소는 `back`.
        */
       if (subWindow === '마구훈련') {
-        const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-        if (step !== 0) {
-          event.preventDefault()
-          return setMagicTrainingCursor((current) => (current + step + MAGIC_TRAINING_CELL_COUNT) % MAGIC_TRAINING_CELL_COUNT)
-        }
-        if (event.key === 'Enter' || event.key === '5') {
-          event.preventDefault()
-          return confirmMagicTrainingCell(magicTrainingCursor)
-        }
+        const key = specialTrainingKeyOf(event.key)
+        if (key === null) return undefined
+        event.preventDefault()
+        if (key === 'ok') return confirmMagicTrainingCell(magicTrainingCursor)
         // 취소(−16) → 107 (17a76 `0xbcb49(this+0x18, 0x6b)`)
-        if (event.key === 'Escape' || event.key === 'Backspace') {
-          event.preventDefault()
-          return back()
-        }
-        return undefined
+        if (key === 'clr') return back()
+        return setMagicTrainingCursor((current) => moveSpecialTrainingCursor(current, key))
       }
       // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8')
       if (abilityDetailOffset !== null) {
@@ -542,51 +535,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     (index: number) => {
       const asked = choice
       if (asked === null) return
-      // 취소(−16)로 닫으면 팝업만 사라진다
+      // 창이 다 닫혔다 — 취소(−16, 0x1942a)는 상태를 안 바꾸고 [창+0x215] 만 세우므로 팝업만 사라진다
       if (index < 0) return setChoice(null)
       asked.onChoose(index)
     },
     [choice],
   )
 
-  /*
-   * 두 갈래 팝업(0x78 구질/마구 · 0x80 기록실)의 **키**.
-   *
-   * 원본은 이 작은 창이 키를 직접 본다 — 좌우로 `장면+0x166` 을 토글하고, 확인 키로 고르며,
-   * 취소(−16)면 창만 닫는다 (그리기 0x190f8 · 키 0x19398 · R7 4절 149행).
-   *
-   * ⚠️ **웹판 버그를 고치는 자리다.** 팝업이 뜨면 커맨드 목록(`MenuList`)은 화면에서 내려가는데
-   *    팝업 쪽에는 키를 보는 데가 없어, 키보드로 몰면 **여기서 아무 키도 안 먹혀 앞으로도 뒤로도
-   *    못 갔다** (마우스로 칸을 눌러야만 진행됐다). 트레이닝 → 마구 길에서 실제로 막힌다.
-   *
-   * 알림·확인 상자(`MessageBox`)는 **잡는 단계**에서 `stopImmediatePropagation` 하므로,
-   * 그 위에 상자가 떠 있으면 이 고리에는 키가 오지 않는다 — 원본도 창 위 팝업이 키를 잡는다.
-   */
-  const choiceIndexRef = useRef(choiceIndex)
-  choiceIndexRef.current = choiceIndex
-  useEffect(() => {
-    if (choice === null) return
-    const count = choice.labels.length
-    const onKey = (event: KeyboardEvent) => {
-      // 0x19398: ← → · '4' · '6' 은 +0x166 뒤집기, OK(−5) · '5' 는 고르기, CLR(−16)은 [창+0x215] 닫기
-      const step = event.key === 'ArrowRight' || event.key === '6' ? 1 : event.key === 'ArrowLeft' || event.key === '4' ? -1 : 0
-      if (step !== 0) {
-        event.preventDefault()
-        return setChoiceIndex((previous) => (previous + step + count) % count)
-      }
-      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
-        event.preventDefault()
-        return chooseOption(choiceIndexRef.current)
-      }
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        // 취소(−16) — 고르지 않고 창만 닫는다
-        chooseOption(-1)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [choice, chooseOption])
+  // 두 갈래 팝업 0x78 의 키(0x19398)는 팝업(`PitchChoicePopup`)이 창 여닫기와 함께 본다 — 펼치는 동안 · 줄이는 동안은 안 받는다
 
   /**
    * 123 창 탭 1 — 마구 칸 i 를 고른다 (키 0x17cec).

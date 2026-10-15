@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { CommonWindowSceneContext } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 메시지 상자 (0x74ef4 배치 · F-1).
@@ -213,6 +214,27 @@ describe('메시지 상자 애니메이션', () => {
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(상자().style.width).toBe('0px')
       expect(onAnswer).not.toHaveBeenCalled()
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(onAnswer).toHaveBeenCalledWith(0)
+    } finally {
+      vi.useRealTimers()
+      되돌리기()
+    }
+  })
+
+  it('띄운 자리가 정하지 않으면 지금 장면의 [창+0x24f] 를 따른다 (0x7503c — CommonWindowSceneContext)', () => {
+    const 되돌리기 = 높이를_잴_수_있게(79)
+    vi.useFakeTimers()
+    const onAnswer = vi.fn()
+    try {
+      render(
+        <CommonWindowSceneContext.Provider value>
+          <MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />
+        </CommonWindowSceneContext.Provider>,
+      )
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 3))
+      fireEvent.keyDown(window, { key: 'Enter' })
+      expect(상자().style.width).toBe('0px')
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       expect(onAnswer).toHaveBeenCalledWith(0)
     } finally {

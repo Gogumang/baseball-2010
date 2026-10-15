@@ -78,7 +78,7 @@ describe('필살타법 고른 번호 세션 연결', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
     fireEvent.click(screen.getByRole('button', { name: '필살타법' }))
-    fireEvent.click(screen.getByRole('button', { name: '플레임 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '플레임 스윙' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(latest.career?.specialSwingNumber).toBe(2)

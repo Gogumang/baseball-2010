@@ -15,9 +15,8 @@
  *   - 107 트레이닝 칸 0~3 은 **제구·구속·변화·체력**이고, 칸 4 는 같은 팝업 0x78 → **108** 이다
  *     (R7 4절 · `pitcherManagement.ts` 모듈 주석).
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 원본 커맨드 줄은 32×32 아이콘 계단형(표 0xd4740 · 하위 0xd4758)이지만
- * 투수편 화면들(`PitcherRegisterScreen`·`PitchTrainingScreen`)은 모두 공용 판(`PixelScreen`) 위에
- * 줄만 세우는 웹판 껍데기라 여기서도 같은 관례를 따른다. 좌표는 쓰지 않는다.
+ * 이 표는 메뉴 뜻(칸 id · 글)만 담는다 — 좌표는 쓰지 않는다. 커맨드 줄 그림은 `pitcherCommandBar`(0x7e418),
+ * 등록(0x66 · 0x67)은 `pitcherRegisterLayout`, 구질 훈련 창(108 탭 2)은 `pitchTrainingWindow` 가 원본 배치를 맡는다.
  */
 
 /** 105 커맨드 여섯 칸 — 점프표 0xcc540 차례 그대로 */
@@ -70,9 +69,9 @@ export const PITCHER_ITEM_SLOTS: readonly PitcherMenuEntry[] = [
 export const PITCH_WINDOW_CHOICES: readonly [string, string] = ['마구', '구질']
 
 /**
- * ⚠️ **추정**: 팝업 0x78 은 좌우로 `+0x166` 을 토글해 탭 `+0x166 ? 2 : 1` 을 고른다(R9). 탭 1·2 중
- * 어느 쪽이 마구이고 어느 쪽이 구질인지는 문서에 없다 — `pitcherManagement.ts` 가 "그 창에 마구와
- * 구질 훈련이 함께 있다" 고만 적어 **탭 1 = 마구 · 탭 2 = 구질** 로 둔다.
+ * 팝업 0x78 은 좌우로 `+0x166` 을 토글해 탭 `+0x166 ? 2 : 1` 을 고른다 — 키 0x19398 이 [[장면+0xe0]+0x188] 에 적는다(193ca~19422).
+ * **탭 1 = 마구 · 탭 2 = 구질** 은 확정(2026-10-14): 그리기 0x190f8 이 +0x166 == 0 일 때 고르는 왼쪽 칸 글이 img_text 308 "마구",
+ * 오른쪽이 309 "변화구"다(`PitchChoicePopup`).
  */
 export const PITCH_WINDOW_TABS = { 마구: 1, 구질: 2 } as const
 

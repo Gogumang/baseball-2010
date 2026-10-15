@@ -48,6 +48,7 @@ import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
@@ -265,6 +266,8 @@ export function PitchingScreen({
   /** 0x10 에서 확정한 조준점 — 게이지(0x11) 뒤 놓을 때 쓴다 */
   const [aim, setAim] = useState<WorldPoint | null>(null)
   const menu = useInGameMenuState()
+  // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
+  useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   /** 일시정지 팝업(0x741a0)이 떠 있는가 — 경기 중 메뉴 또는 그 하위 [조작방법] 뷰어. 경기 키가 안 간다 */
@@ -666,6 +669,8 @@ export function PitchingScreen({
             mode={MISSION_PITCHER_MODE}
             cursor={menu.cursor}
             slidesIn={menu.slidesIn}
+            opening={menu.opening}
+            bindCloser={menu.bindCloser}
             onCursorChange={menu.setCursor}
             onContinue={menu.close}
             onQuit={onGiveUp}

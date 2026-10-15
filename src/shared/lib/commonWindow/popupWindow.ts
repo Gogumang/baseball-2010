@@ -22,11 +22,13 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
  *     칭호 0x1b1e4 · 스킬 보상 0x8e054 · 시즌 기록순위 0xf5d4 · 시즌 팀 트레이닝 결과 0xf2c8 · 나리 훈련 결과 0x1b4c4 ·
  *     휴식 결과 0x1b308 · 장비 구매 확정 0x1d648 · 이름 입력 0x32b7c · 선수 목록 창 0x63368.
  *   - **줄임**(`'줄임'`) — 키 콜백이 [창+0x215] = 1 을 쓴다. 다음 갱신부터 폭 240 → 120 → 60(닫힘 · 0x75440).
- *     나리 기록실 0x196ec · 투수 구질 0x19398 · 이벤트 미션 0x1dcb0 · 경기 중 메뉴 0x3c158.
+ *     나리 기록실 0x196ec · 투수 구질 0x19398 · 이벤트 미션 0x1dcb0 · 경기 중 메뉴 0x3c158(다시 띄운 창만 — 아래).
  *     줄이는 동안에도 그리기 콜백은 돈다(0x7479c 는 [+0x214] 만 본다) — 판만 가운데로 줄고((W − 폭)/2, 0x744c4) 글은 안 잘린다.
  *     목표 높이 0 인 창(판 없음 — 0x744c4 는 [+0x20e] == 0 이면 안 그린다)은 줄임이 안 보이고 글만 두 갱신 더 남는다.
  *   - 띄운 쪽이 [창+0x290] = 0 으로 두면(이벤트 system sub 2 — 0x8d39e~0x8d3a8) 0x754f8 첫 갈래가 다음 갱신에 [+0x214] 를 끄고
  *     키도 그 갱신에 받으며, [+0x215] 가 서면 다음 갱신에 줄임 없이 닫는다(`expands: false`).
+ *     경기 중 메뉴를 '*' 로 연 창(0x49930 · 0x463e6 뒤 [+0x290] = 0)이 이 길이다 — 질문 [아니오] · 뷰어 · 설정에서 대기 칸으로 다시
+ *     띄운 창은 0x75440 → 0x741a0 이 [+0x290] = 1 로 되돌려 줄임(두 갱신)으로 닫힌다(`useInGameMenuState` 의 `InGameMenuOpening`).
  */
 
 /** 0x741a0 의 [창+0x212] — 처음 그리는 높이 */
@@ -65,15 +67,17 @@ export interface PopupWindowMotion {
   /**
    * 키 콜백이 창을 닫는다. `onClosed` 는 창이 치워진 때 — `'바로'` 면 그 자리, `'줄임'` 이면 폭이 99 이하가 된 갱신이다.
    * 키를 안 받는 때면 아무것도 안 하고 false.
+   * `onNextUpdate` 는 키를 받은 **다음 갱신**(첫 줄임 갱신 — 닫히는 갱신이면 `onClosed` 앞)에 부른다: 키 콜백이 그 자리에서
+   * 0xbcb49 로 상태를 걸면 장면 틀 머리의 상태 바꿈(나리 0x1cdec 의 1ce00)이 다음 틀에 새 상태로 들어가고, 창은 그 위에서 줄어든다.
    */
-  readonly close: (kind: PopupCloseKind, onClosed?: () => void) => boolean
+  readonly close: (kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => boolean
 }
 
 /**
  * 0x741a0 창 하나의 펼침 · 닫힘. 갱신 한 번 = 원본 틀 하나(`millisecondsPerFrame`).
  * `skipsMotion` 이 참이면(레이아웃이 없는 시험 환경 따위) 다 펼친 채로 시작하고 `'줄임'` 도 바로 닫는다 — `MessageBox` 와 같은 약속.
  */
-export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expands = true }: {
+export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expands = true, opensAtOnce = false }: {
   /** [창+0x20e] — 0x741a0 의 둘째 인자 */
   readonly targetHeight: number
   readonly skipsMotion?: boolean
@@ -82,8 +86,14 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
    * 키를 받으며, 닫힘([+0x215])은 다음 갱신에 줄임 없이 치운다. 첫 그림은 여전히 [+0x214] 라 글을 안 그린다.
    */
   readonly expands?: boolean
+  /**
+   * 다 펼친 채로 처음 그린다 — 0x754f8 첫 갈래([+0x290] == 0 인 앞 창을 줄임 없이 닫는 7550a~75552)가 0x75440 으로 대기 칸을
+   * 띄운 그 갱신은 75556 펼침 갈래로 이어져, 목표 높이 0 인 새 창은 그 갱신 안에 펼침을 마친다(경기 중 메뉴를 [조작방법]·[설정]에서
+   * 다시 띄울 때). 닫힘(줄임)은 그대로다.
+   */
+  readonly opensAtOnce?: boolean
 }): PopupWindowMotion {
-  const [openingHeight, setOpeningHeight] = useState<number | null>(skipsMotion ? null : POPUP_OPEN_START_HEIGHT)
+  const [openingHeight, setOpeningHeight] = useState<number | null>(skipsMotion || opensAtOnce ? null : POPUP_OPEN_START_HEIGHT)
   const [closingWidth, setClosingWidth] = useState<number | null>(null)
   const [isClosed, setIsClosed] = useState(false)
   // 틀 · 키는 그리기를 기다리지 않고 이 값을 본다 — 틀 여럿이 한 그리기에 묶여도 한 틀씩 나아간다
@@ -91,6 +101,7 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
   const closingRef = useRef(closingWidth)
   const isClosedRef = useRef(false)
   const onClosedRef = useRef<(() => void) | undefined>(undefined)
+  const onNextUpdateRef = useRef<(() => void) | undefined>(undefined)
   const skipsMotionRef = useRef(skipsMotion)
   skipsMotionRef.current = skipsMotion
   const expandsRef = useRef(expands)
@@ -124,6 +135,9 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
         return setOpeningHeight(next)
       }
       if (closingRef.current === null) return
+      const onNextUpdate = onNextUpdateRef.current
+      onNextUpdateRef.current = undefined
+      onNextUpdate?.()
       const next = nextPopupClosingWidth(closingRef.current)
       if (next === null) return finish()
       closingRef.current = next
@@ -137,13 +151,15 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
     [],
   )
 
-  const close = useCallback((kind: PopupCloseKind, onClosed?: () => void) => {
+  const close = useCallback((kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => {
     if (!acceptsKeys()) return false
     onClosedRef.current = onClosed
     if (kind === '바로' || skipsMotionRef.current) {
+      onNextUpdate?.()
       finish()
       return true
     }
+    onNextUpdateRef.current = onNextUpdate
     // [+0x290] == 0 이면 다음 갱신의 첫 갈래가 줄임 없이 닫는다 — 폭 0 은 다음 갱신에 닫히는 값이다
     const width = expandsRef.current ? POPUP_CLOSE_START_WIDTH : 0
     openingRef.current = null

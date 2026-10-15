@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScreen'
 import { createCareer } from '@/entities/career/model/playerCareer'
@@ -121,7 +122,7 @@ describe('관리 화면 알림 상자', () => {
 
     clickCommand('트레이닝')
     clickCommand('필살타법')
-    fireEvent.click(screen.getByRole('button', { name: '파워 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '파워 스윙' }))
 
     expect(screen.queryByRole('dialog', { name: '알림' })?.textContent).toContain('인기도')
   })
@@ -134,7 +135,7 @@ describe('관리 화면 알림 상자', () => {
     clickCommand('트레이닝')
     clickCommand('필살타법')
     const 창 = screen.getByRole('dialog', { name: '필살타법' })
-    fireEvent.click(screen.getByRole('button', { name: '파워 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '파워 스윙' }))
     expect(document.body.textContent).toContain('G포인트가 부족합니다')
     // 키로 [예] (처음 커서) — 상자 단추를 누르면 클릭이 창 바깥 덮개(닫기)까지 올라간다
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -165,7 +166,7 @@ describe('관리 화면 알림 상자', () => {
 
     clickCommand('선수정보')
     clickCommand('필살타법')
-    fireEvent.click(screen.getByRole('button', { name: '플레임 스윙' }))
+    fireEvent.click(screen.getByRole('option', { name: '플레임 스윙' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
     expect(onSelectSpecialSwing).toHaveBeenCalledWith(2)
@@ -481,6 +482,34 @@ describe('106 칸 4 [기록실] — 팝업 0x80 → 124 (0x116d4 · 0x1463c · 0
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(iconOf(0)).toBe('./sprites/mode_icon/006.png')
     expect(iconOf(1)).toBe('./sprites/management/icon_selected_10.png')
+  })
+
+  it('확인한 다음 갱신에 124 가 서고 창은 그 위에서 240 → 120 → 닫힘으로 줄어든다 (0x196ec → 0xbcb49 · [창+0x215])', () => {
+    const 원래 = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 128 })
+    vi.useFakeTimers()
+    try {
+      render(<ManagementScreen {...propsWith({})} />)
+      clickCommand('선수정보')
+      clickCommand('기록실')
+      const 틀 = (n = 1) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+      틀(6)
+      fireEvent.keyDown(window, { key: 'Enter' })
+      // 키를 받은 그림은 아직 106
+      expect(screen.queryByRole('group', { name: '개인기록 타자' })).toBeNull()
+      expect(screen.getByTestId('기록실-판').style.width).toBe('240px')
+      틀()
+      // 다음 틀 — 124 위에서 폭 120
+      expect(screen.getByRole('group', { name: '개인기록 타자' })).toBeTruthy()
+      expect(screen.getByTestId('기록실-판').style.width).toBe('120px')
+      틀()
+      expect(screen.queryByRole('dialog', { name: '기록실' })).toBeNull()
+      expect(screen.getByRole('group', { name: '개인기록 타자' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+      if (원래 === undefined) Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight')
+      else Object.defineProperty(HTMLElement.prototype, 'offsetHeight', 원래)
+    }
   })
 
   it('오른쪽 칸 "순위기록"은 나리 판 순위(0x5796c) — 타자편은 타율 쪽부터', () => {
