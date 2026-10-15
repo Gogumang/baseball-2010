@@ -270,10 +270,8 @@ export function mvpResultEventId(isMostValuablePlayer: boolean): number {
  * 0xa4d50 은 bit0..12 를 세어 **통산 MVP 횟수**를 낸다 — 칭호 2(1년차 MVP)·11(6회)·12(10회)·
  * 13(7회)·32/48(2년 연속)·33/49(4회)가 이 수를 본다.
  *
- * ⚠️ 웹 `PlayerCareer` 에는 이 칸이 아직 없다(그 파일은 이번 작업 범위 밖이다). 그래서 여기서는
- * 비트를 다루는 순수 함수만 두고, 저장은 칸이 생길 때 잇는다. **올해 MVP 인지**는 저장 없이도
- * 같은 시즌 안에서 `judgeSeasonAwards` 로 다시 구할 수 있다 — 원본 0xa4d78 도 방금 세운 비트를
- * 그대로 읽는 것뿐이다.
+ * 칸은 `PlayerCareer.mvpSeasonBits`(투수편도 같은 이름)이고, 여기는 비트를 다루는 순수 함수만 둔다.
+ * 원본 0xa4d78 은 방금 세운 비트를 그대로 읽는다(`hasMvpInSeason`).
  */
 export const MVP_YEAR_COUNT = 13
 const MVP_BITS_MASK = 0xffff

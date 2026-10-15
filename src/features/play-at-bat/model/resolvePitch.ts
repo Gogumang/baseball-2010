@@ -116,7 +116,8 @@ const SWEET_SPOTS = [
 
 /**
  * 도착점 − 기준점(0xcfb54) + 좌우 이동 (0x51226). 원본 궤적이 있으면 마지막 점을 투영한 판정 좌표(0x4dff8)를 쓴다.
- * 궤적이 없는 사용자 투구는 웹 존 가운데(0,0)를 기준점으로 보고 존 좌표를 픽셀로 옮긴다 (추정).
+ * 궤적이 없는 공(와인드업 자리 공 `windUpCpuPitchOf` · 시험 공 — 경기 중 판정에는 오지 않는다)만 웹 존 가운데(0,0)를
+ * 기준점으로 보고 존 좌표를 픽셀로 옮긴다 (원본에 없는 대체 길).
  */
 export function plateErrorOf(pitch: Pitch, shift: number): { horizontal: number; vertical: number } {
   const path = pitch.worldPath
@@ -153,8 +154,8 @@ const LEFT_HANDED_BATTER = 1
  * ```
  * 판정 좌표는 공 도착점이다 — 웹은 `plateErrorOf` 와 같은 자리(궤적 마지막 점을 `projectToPlate`)를 쓴다.
  * 난수를 쓰지 않는다.
- * 궤적이 없는 투구(`worldPath === null`)는 판정 좌표가 없어 사구를 내지 않는다 — 지금 타석 화면의
- * CPU 투구는 늘 궤적이 있다.
+ * 궤적이 없는 투구(`worldPath === null`)는 판정 좌표가 없어 사구를 내지 않는다 — 경기에서 판정에 오는 공은
+ * CPU · 사용자 투구 모두 늘 궤적이 있다(없는 것은 와인드업 자리 공 · 시험 공뿐).
  */
 export function isHitByPitch(pitch: Pitch, batterSide: number): boolean {
   const path = pitch.worldPath
@@ -181,8 +182,8 @@ export const STRIKE_ZONE_BOXES = [
  * 3dff0  (px, py) = (경기+0x10dc, 경기+0x10e0)                              ; 공 도착 판정 좌표 — 사구 0x35a20 과 같은 칸
  * 3e016  x ≤ px ≤ x+w  그리고  y ≤ py ≤ y+h                                ; 경계 포함
  * ```
- * 판정 좌표는 궤적 마지막 점을 `projectToPlate` 로 옮긴 자리다(`isHitByPitch` 와 같다). 궤적이 없는 사용자 투구만
- * 예전처럼 정규화 존(|x|, |y| ≤ 1)으로 본다(추정).
+ * 판정 좌표는 궤적 마지막 점을 `projectToPlate` 로 옮긴 자리다(`isHitByPitch` 와 같다). 궤적이 없는 공(와인드업
+ * 자리 공 · 시험 공)만 정규화 존(|x|, |y| ≤ 1)으로 본다(원본에 없는 대체 길).
  */
 export function isStrikeZonePitch(pitch: Pitch): boolean {
   const path = pitch.worldPath
@@ -208,7 +209,8 @@ export function unjudgedSwingDetailOf(contactSoundId: number | null): PitchOutco
 }
 
 /**
- * 투구 하나를 끝까지 처리한다: 스윙 결과(0xab214) → 방향(0x5141c) → 원본 타구 패턴 → 안타·아웃(대체 근사, 추정).
+ * 투구 하나를 끝까지 처리한다: 스윙 결과(0xab214) → 방향(0x5141c) → 원본 타구 패턴 → 파울 각 가르기.
+ * 페어 타구의 안타·아웃은 여기서 내지 않는다 — 쏜 공을 수비 판이 돌려 결과를 낸다(`battedContact` 머리말).
  * 패턴 덱은 섞인 순서를 이어 쓰므로 새 덱을 함께 돌려준다.
  */
 export function resolvePitch(

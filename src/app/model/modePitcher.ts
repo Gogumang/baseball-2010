@@ -246,7 +246,8 @@ export function isModeMagicPitchType(type: PitchTypeInfo): boolean {
  * `구질 == 22` 면 남은 횟수(0xaea10) > 0 일 때만 받는다(0x50db8). 이름은 번호·폼으로 고른 StrCOMMON 이름에
  * 남은 횟수를 붙인다. 구질 표(`PitchTypeInfo`)에 마구 자리가 없어 구속·변화 칸은 0 이다 — 고른 뒤 무엇을 던질지는
  * 부르는 쪽이 `isModeMagicPitchType` 으로 가른다.
- * ⚠️ 근사: 투구 화면(pages/pitching)이 칸을 막는 기능이 없어, 남은 0 일 때는 고른 뒤 던질 때 무시한다(0x50db8 자리).
+ * 남은 0 일 때 칸을 막는 것(0x50db8)은 투구 화면(`PitchingScreen` 의 `isBlockedMagic`)이 `magicRemaining` 으로 하고,
+ * 세션 `handleThrow` 도 한 번 더 거른다.
  */
 export function modePitchMenuOf(pitcher: ModePitcher, magicRemaining = 0): readonly PitchTypeInfo[] {
   return pitchSlotsOf(pitcher.repertoire)

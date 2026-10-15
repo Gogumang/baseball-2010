@@ -6,8 +6,9 @@ import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 
 /**
  * 공 궤적 — 원본은 3D 곡선 N 점(0x4dc78)을 한 틱에 한 점씩 옮기고 투영한다(0xbe3d8, 0x35854).
- * CPU 투구는 원본 곡선(pitch.worldPath)을 그대로 투영한다.
- * 곡선이 없는 사용자 투구(투수편)만 화면 좌표 [릴리스, 도착점 − 변화량, 도착점] 세 점으로 같은 베지어를 돈다 (추정).
+ * CPU 투구 · 사용자 투구(`buildHumanPitch`) 모두 원본 곡선(pitch.worldPath)을 그대로 투영한다.
+ * 곡선이 없는 공은 와인드업 자리 공(`windUpCpuPitchOf`, `frameCount` 0 이라 그리지 않는다)과 시험뿐이다 — 그때만
+ * 화면 좌표 [릴리스, 도착점 − 변화량, 도착점] 세 점으로 같은 베지어를 돈다 (원본에 없는 대체 길).
  * 릴리스 지점은 원본 직구 곡선 첫 점의 side1 투영 (73,167) 이다 (위치 분석 6차 계산 — 다른 구질의 첫 점은 다를 수 있다).
  */
 export const RELEASE_PIXEL = { x: 73, y: 167 } as const

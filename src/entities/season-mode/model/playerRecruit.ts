@@ -83,8 +83,8 @@ export interface SeasonPlayer {
    * 팀 레코드는 Xls 행 0x30 바이트를 그대로 복사해 시작하므로(S6 3-1) 처음 값은 붙박이 표의 `equipment` 다 — 리그 열 팀은
    * 모두 0. 원본에서 이 칸을 바꾸는 곳은 아이템 → 장착아이템(0xd0 칸 0 → 선수 고르기 0xdf 목적 1 → 장비 창 0xdc,
    * 키 0x957c 적용 0x7d90 — P4 5절)뿐이고 트레이드·영입은 레코드를 통째로 옮긴다.
-   * **없으면 붙박이 표 값**이다(`seasonPlayerEquipmentOf`) — 옛 저장과 지금까지 만든 명단은 모두 그렇다.
-   * ⚠️ 웹에는 장비 창 0xdc 가 아직 없어 이 칸을 쓰는 곳이 없다.
+   * **없으면 붙박이 표 값**이다(`seasonPlayerEquipmentOf`) — 옛 저장이나 아직 이 칸을 쓴 적 없는 선수가 그렇다.
+   * 웹은 장비 창 0xdc 종류 3(`SeasonRoute` → `equipSeasonPlayer`)이 이 칸을 쓴다.
    */
   readonly equipment?: readonly number[]
   /**

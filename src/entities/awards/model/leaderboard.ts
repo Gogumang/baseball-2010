@@ -116,8 +116,7 @@ export function battingAverageOf(record: LeagueRecord): number | null {
 
 /**
  * 방어율 (0xb6ce8) = `min(9999, trunc(실점 × 2700 / 아웃))` — **100 배 정수**다.
- * P1-pitcher-rules.md 6절이 식까지 확정했다(9이닝 = 27아웃 × 100). 앞서 추정으로 적어 둔
- * `자책점 × 3 × 9 × 100 / 아웃` 과 **숫자가 같아** 값은 바뀌지 않고, 9999 상한만 새로 붙었다.
+ * P1-pitcher-rules.md 6절이 식까지 확정했다(9이닝 = 27아웃 × 100, 9999 상한).
  * `pitcherCareer.seasonEarnedRunAverageOf` 와 같은 식이다.
  */
 export const EARNED_RUN_AVERAGE_SCALE = 100
