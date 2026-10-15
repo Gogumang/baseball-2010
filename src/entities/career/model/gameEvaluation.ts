@@ -3,6 +3,8 @@ import type { GameResult } from '@/entities/game/model/gameState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { applySkillReward, gainReputation, hasSkill, isSkillEquipped } from '@/entities/career/model/playerCareer'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
+import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
+import type { EventReward } from '@/entities/story/model/eventReward'
 
 /**
  * 경기 후 평가 (누락 탐색 3차 — binary.mod 0xa719c · 0xa59c0 · 0xa690c · 0xa6218 · 0xa73c4 · 0x1278c · 0x8a6fc).
@@ -344,6 +346,12 @@ export function advanceStreaks(career: PlayerCareer, stats: SeasonStats): Player
  */
 export function streakEventOf(career: PlayerCareer): {
   readonly notices: readonly StreakNotice[]
+  /**
+   * 0x8a6fc 가 쌓는 **보상 명령**(종류 7) 차례 — 명령마다 항목 하나. 알림이 있으면 평판 합(8ac54~8ac64: 종류 1 · 값 [sp+0x20] s16),
+   * 이어서 슬럼프 얻기 +18(8ac68~8accc: 무안타 4 · 연차 S+0xb3 > 1 · 타자편 · 미보유) 또는 풀기 −18(8acd0~8ad32: 멀티히트 10 · 보유).
+   * 114 가 틀 때 0x8d4c4 가 명령마다 창을 띄운다(평판 = 공용 알림 · 스킬 = 스킬 창 0x8e054) — `EvaluationEventPlayer`
+   */
+  readonly rewards: readonly EventReward[]
   /** 슬럼프 스킬 얻기/풀기만 */
   readonly applySkills: (target: PlayerCareer) => PlayerCareer
   /** 스킬과 평판 합 둘 다 */
@@ -375,7 +383,11 @@ export function streakEventOf(career: PlayerCareer): {
     if (clearsSlump && hasSkill(next, SLUMP_SKILL)) next = applySkillReward(next, -(SLUMP_SKILL + 1))
     return next
   }
-  return { notices, applySkills, apply: (target) => gainReputation(applySkills(target), reputation) }
+  const rewards: EventReward[] = []
+  if (notices.length > 0) rewards.push({ kind: EVENT_REWARD_KIND.평판, value: (reputation << 16) >> 16 })
+  if (gainsSlump && !hasSkill(career, SLUMP_SKILL)) rewards.push({ kind: EVENT_REWARD_KIND.스킬, value: SLUMP_SKILL + 1 })
+  else if (clearsSlump && hasSkill(career, SLUMP_SKILL)) rewards.push({ kind: EVENT_REWARD_KIND.스킬, value: -(SLUMP_SKILL + 1) })
+  return { notices, rewards, applySkills, apply: (target) => gainReputation(applySkills(target), reputation) }
 }
 
 /**

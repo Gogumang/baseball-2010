@@ -7,7 +7,7 @@ import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
-import { arrivePitch, cpuPickoff, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -60,6 +60,7 @@ import {
 } from '@/entities/career/model/postseasonFlow'
 import type { RegularSeasonOtherModes } from '@/entities/career/model/postseasonFlow'
 import { applyBurstRewards } from '@/entities/career/model/burstReward'
+import { nariMoraleOf, withNariGameMorale } from '@/entities/career/model/nariMorale'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
@@ -629,10 +630,10 @@ export function useCareerSession({
        */
       myRunAbility?: number,
       /**
-       * 내 팀 레코드 +2 — 나리 사기 읽기 · 쓰기 `0xa3a24` · `0xa3a44` 와 같은 칸(`0x1f988(저장, R[1])` + 2)이라 **커리어 사기**다.
-       * 국가대항전은 대표팀 칸(+0xbc4, 대회 시작 복사본)이라 안 넘긴다(표값)
+       * 두 팀 레코드 +2 — 경기 셋업 0x39fdc(3a332)와 실효 능력치 0xb570c(b5768)가 두 팀 모두 **지금 나리 사기** 0xa3a24 로 덮는다
+       * (`GameProgress.teamMorale`, `nariMoraleOf`). 국가대항전이면 원본 버그로 상대국 칸 +2 값이다
        */
-      ourTeamMorale?: number,
+      teamMorale?: number,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
@@ -647,7 +648,7 @@ export function useCareerSession({
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
         ourRecordLineup, myRunAbility,
-        ourTeamMorale,
+        teamMorale,
       )
       progressRef.current = started
       setProgress(started)
@@ -717,9 +718,9 @@ export function useCareerSession({
         },
       mine === undefined ? undefined : nariQuickLineupOf(mine),
       undefined,
-      current === null || current === undefined ? undefined : effectiveAbilityOf(current).run,
-      // 0x1f9a8(저장, 4, 내 팀) + 2 = 0xa3a24 의 칸 — 커리어 사기
-      current === null || current === undefined ? undefined : current.morale,
+      current === null || current === undefined ? undefined : effectiveAbilityOf(withNariGameMorale(current)).run,
+      // 두 팀 레코드 +2 = 0xa3a24 — 대회가 아니라 커리어 사기
+      current === null || current === undefined ? undefined : nariMoraleOf(current),
     )
   }, [aceLevels, startMatch])
 
@@ -801,7 +802,10 @@ export function useCareerSession({
       nariQuickLineupOf(teams.korea),
       // 대회 중 나리 저장 +0xb2 = L+0x32 는 대회 날짜다(0xb7bf0 이 0 으로 놓고 하루 끝마다 +1)
       cup.day,
-      effectiveAbilityOf(current).run,
+      // 0xb570c 의 사기 감소는 b5768 이 쓴 0xa3a24 값 — 대회 중이면 상대국 칸 +2(원본 버그, `withNariGameMorale`)
+      effectiveAbilityOf(withNariGameMorale(current)).run,
+      // 두 팀 레코드 +2 = 0xa3a24 — 대회 중이라 상대국 칸 +2 (대표팀 칸도 3a332 · b5768 이 이 값으로 덮는다)
+      nariMoraleOf(current),
     )
   }
 
@@ -837,8 +841,11 @@ export function useCareerSession({
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다.
       // CPU 끼리의 포스트시즌 경기는 **여기서 돌리지 않는다** — 원본은 대진 화면 128 의 [확인](0x13da0)에서 돌린다
       // (`pressPostseasonBracket`).
+      const resulted = applyGameResult(currentCareer, summary)
+      // CPU 경기 0xc2a48(4f296)는 평가 0xa719c(4f274)가 사기를 바꾼 **뒤**다 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 그 사기를 쓴다
+      const moraleAtCpuGames = nariMoraleOf(applyGameEvaluation(resulted, thisEvaluation, isEvaluated))
       const settled = applySeasonEnd(
-        applyLeagueDay(applyGameResult(currentCareer, summary), summary.ourTeamId, random, aceLevels),
+        applyLeagueDay(resulted, summary.ourTeamId, random, aceLevels, moraleAtCpuGames),
       )
       // 평가 0xa719c 안 0xa690c 가 경기 뒤 누적 카운터 S+0x1f0 을 더한다 — 정규시즌(평가하는 경기)만 (`withGameSkillCounters`)
       const evaluated = applyGameEvaluation(
@@ -888,6 +895,7 @@ export function useCareerSession({
         newTitles: dynamite === null ? [] : [dynamite],
         evaluation,
         streakNotices: streakEventOf(advanced).notices,
+        streakRewards: streakEventOf(advanced).rewards,
         // 0x4ea0c 꼬리 4f41a~ 의 정산 효과 — 하늘 칸은 경기 끝 이닝 (구장객체 +0x14), 하늘 줄은 경기를 세울 때 고른 구장 +0x10
         settlementInning: finished.game.inning,
         settlementPlayerSide: finished.game.playerSide,
@@ -926,7 +934,12 @@ export function useCareerSession({
       setLiveGameInningIndex(finished.game.inning - 1)
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
-      const next = advanceNationalCupDay(cup, winner, loser, random, summary.pitcherStaminas?.opponent)
+      // 그 CPU 경기(0xc2dac)의 간이 엔진도 0xb570c b5768 로 두 나라 레코드 +2 에 나리 사기를 쓴다 — 대회 중이라 상대국 칸 +2, 곧 사람
+      // 경기 끝의 그 칸(돌발 보상 사기가 쌓인 값, `GameProgress.teamMorale`)이다
+      const next = advanceNationalCupDay(
+        cup, winner, loser, random, summary.pitcherStaminas?.opponent,
+        finished.teamMorale === undefined ? undefined : { mode: BATTER_LEAGUE_MODE, nariMorale: finished.teamMorale },
+      )
       // 기록 달성 G (4ebaa~4ec7c — 사람 팀 공·수로 거른 기록이라 대회 경기도 쌓인다)
       const gamePointReward = gamePointRewardOf(summary)
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
@@ -1511,6 +1524,17 @@ export function useCareerSession({
       if (player === null) return
       const rewarded = applyBurstRewards(player, resolution.deltas)
       if (rewarded === player) return
+      // 종류 1 사기는 0xa3a44 — 두 팀 레코드 +2 를 공마다 0xb570c 가 그 값으로 다시 덮어 다음 공부터 용량(0x66e44)이 본다.
+      // 내 주력 0xb570d(ctx, 3, 나, 1, 0x5a, 1)도 그 칸으로 사기 감소를 다시 먹는다
+      const moraleChanged = withGameTeamMorale(cleared, nariMoraleOf(rewarded))
+      const runAbility = effectiveAbilityOf(withNariGameMorale(rewarded)).run
+      const withMorale = moraleChanged === cleared || cleared.myRunAbility === undefined || cleared.myRunAbility === runAbility
+        ? moraleChanged
+        : { ...moraleChanged, myRunAbility: runAbility }
+      if (withMorale !== cleared) {
+        progressRef.current = withMorale
+        setProgress(withMorale)
+      }
       unsavedCareerRef.current = rewarded
       rawCareerRef.current = rewarded
       setCareer(rewarded)
@@ -1582,6 +1606,7 @@ export function useCareerSession({
           newTitles: dynamite === null ? [] : [dynamite],
           evaluation: lastGame.evaluation,
           streakNotices: streakEventOf(counted).notices,
+          streakRewards: streakEventOf(counted).rewards,
         })
       }
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105

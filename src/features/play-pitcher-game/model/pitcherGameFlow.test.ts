@@ -34,6 +34,7 @@ import {
   startsToday,
   summaryOf,
   throwPitch,
+  withPitcherGameMorale,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
@@ -44,6 +45,7 @@ import type {
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { SCENE_EFFECT_INIT_ROLL_COUNT } from '@/entities/batting/model/battedBallOutcome'
 import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
+import { nariMoraleAfterBurst } from '@/entities/career/model/nariMorale'
 
 const 씨앗 = (seed: number) => createSeededRandom(seed)
 
@@ -358,6 +360,40 @@ describe('강판', () => {
 
     expect(progress.hasEntered).toBe(true)
     expect(progress.managerHookText).toBeNull()
+  })
+})
+
+describe('나리 사기 — 두 팀 레코드 +2 (셋업 3a332 · 0xb570c b5768) · 경기 중 돌발 보상 사기 (0x8e34c 종류 1)', () => {
+  it('상대 마운드 용량도 options.teamMorale 이다 — 0xb570c 가 상대 팀 레코드 +2 에도 나리 사기를 쓴다', () => {
+    const 낮음 = 끝까지던지기(startPitcherGame({ ...기본옵션, teamMorale: 5 }, 씨앗(20100903)), 3)
+    const 높음 = 끝까지던지기(startPitcherGame({ ...기본옵션, teamMorale: 100 }, 씨앗(20100903)), 3)
+    // 같은 씨앗 · 같은 던지기라도 상대 투수 소모가 달라 상대 투수 칸 스태미나가 갈린다
+    expect(summaryOf(낮음).pitcherStaminas.opponent).not.toEqual(summaryOf(높음).pitcherStaminas.opponent)
+  })
+
+  it('경기 중 사기가 바뀌면 용량 사기와 내 능력치(사기 감소 앞 값에서 다시 깎음)가 함께 바뀐다', () => {
+    const 시작 = startPitcherGame({
+      ...기본옵션,
+      teamMorale: 60,
+      statsBeforeMoraleCut: { control: 500, velocity: 500, breaking: 500, stamina: 400 },
+    }, 씨앗(1))
+    expect(withPitcherGameMorale(시작, 60)).toBe(시작)
+    const 낮아짐 = withPitcherGameMorale(시작, 25)
+    expect(낮아짐.options.teamMorale).toBe(25)
+    // 사기 ≤ 30 −20%
+    expect(낮아짐.options.stats).toEqual({ control: 400, velocity: 400, breaking: 400, stamina: 320 })
+    expect(withPitcherGameMorale(낮아짐, 90).options.stats).toEqual({ control: 500, velocity: 500, breaking: 500, stamina: 400 })
+  })
+
+  it('판정 난 돌발의 보상 · 페널티는 요약에 판정 차례대로 실리고, 사기는 그 자리에서 options.teamMorale 에 먹는다', () => {
+    let 찾음 = 0
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(seed)), seed)
+      const deltas = summaryOf(끝).burstRewardDeltas ?? []
+      expect(끝.options.teamMorale).toBe(nariMoraleAfterBurst(기본옵션.teamMorale, deltas))
+      if (deltas.length > 0) 찾음 += 1
+    }
+    expect(찾음).toBeGreaterThan(0)
   })
 })
 

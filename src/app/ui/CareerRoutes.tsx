@@ -217,6 +217,9 @@ function CareerScreens({
           onConfirmTitle={actions.confirmGameResultTitle}
           evaluation={screen.evaluation}
           streakNotices={screen.streakNotices}
+          {...(screen.streakRewards === undefined ? {} : { streakRewards: screen.streakRewards })}
+          // 0x8c460 이 보상 창을 띄운 갱신에 평판을 준다 — 상태판이 그 창부터 새 값
+          rewardUnderlay={(rewarded) => <NariEventUnderlay career={rewarded} isPreviousGame />}
           // 116 의 S+0x1d8 — 정산이 남긴 줄(포스트시즌 경기 뒤에는 앞 평가 경기 줄)
           {...(career.lastGame === undefined ? {} : { recordLine: nariLastGameRecordLineOf(career.lastGame) })}
           career={career}

@@ -15,9 +15,11 @@ import {
   isPitcherSkillEquipped,
   nextPitcherOpponentOf,
   pitcherFormOfCareer,
-  unclampedGamePitcherAbilityOf,
+  gamePitcherAbilityBeforeMoraleOf,
+  withMoraleAbilityCut,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
+import { nariMoraleOf } from '@/entities/career/model/nariMorale'
 
 /**
  * 커리어·로테이션·환경설정으로 **경기 한 판의 옵션**을 조립한다 —
@@ -65,7 +67,7 @@ const LUCK_SKILL = 6
 
 /**
  * 팀 사기 기본값 — 팀 레코드 s16 +2 (XlsTEAM_DATA 둘째 u16). 전 팀이 100 으로 시작한다 (`entities/team/model/teamMorale`).
- * 나리 내 팀 칸은 커리어 사기와 같은 칸이라 `pitcherGameOptionsOf` 는 커리어 사기를 쓰고, 이 표값은 국가대항전 대표팀 칸 · 상대 팀이 쓴다
+ * 나리 경기는 두 팀 칸이 모두 지금 나리 사기(0xa3a24)로 덮여 `pitcherGameOptionsOf` 는 `nariMoraleOf` 를 쓴다
  */
 export { DEFAULT_TEAM_MORALE }
 
@@ -94,7 +96,10 @@ export function pitcherGameOptionsOf(
   career: PitcherCareer,
   settings: PitcherGameSettings = {},
 ): PitcherGameOptions {
-  const ability = unclampedGamePitcherAbilityOf(career)
+  // 0xb570c 의 사기 감소는 b5768 이 쓴 0xa3a24 값을 읽는다 — 대회 중이면 상대국 칸 +2 (원본 버그, `nariMorale`)
+  const morale = nariMoraleOf(career)
+  const beforeMorale = gamePitcherAbilityBeforeMoraleOf(career)
+  const ability = withMoraleAbilityCut(beforeMorale, morale)
   return {
     ourTeamId: career.teamId,
     opponentTeamId: settings.opponentTeamId ?? nextPitcherOpponentOf(career),
@@ -118,6 +123,13 @@ export function pitcherGameOptionsOf(
       breaking: ability.breaking,
       stamina: ability.stamina,
     },
+    // 경기 중 돌발 보상으로 사기가 바뀌면 이 값에서 다시 깎는다 (`withPitcherGameMorale`)
+    statsBeforeMoraleCut: {
+      control: beforeMorale.control,
+      velocity: beforeMorale.velocity,
+      breaking: beforeMorale.breaking,
+      stamina: beforeMorale.stamina,
+    },
     // 용량 X 의 바탕은 **체력 칸** 하나다 — 0x66e44 가 0xb570c 가 아니라 0xb6415(P, 3, 1) 를 바로 읽는다(0x66e5c)
     staminaAbility: equippedPitcherAbilityOf(career).stamina,
     stamina: career.stamina,
@@ -138,9 +150,9 @@ export function pitcherGameOptionsOf(
       aceLevel: 0,
       hasSpiritSkill: isPitcherSkillEquipped(career, SPIRIT_SKILL),
     }),
-    // 0x1f9a8(저장, 3, 내 팀) → 0x1f940 칸 +2 — 나리 사기 읽기 · 쓰기 0xa3a24 · 0xa3a44(`0x1f988(저장, R[1])` + 2)와 같은 칸이라
-    // 커리어 사기다. 국가대항전은 대표팀 칸(+0xbc4, 대회 시작 복사본)이라 부르는 쪽이 표값을 넘긴다(`cupGameOptionsOf`)
-    teamMorale: settings.teamMorale ?? career.morale,
+    // 두 팀 레코드 +2 — 셋업 0x39fdc(3a332) · 0xb570c(b5768)가 두 팀 모두 0xa3a24 로 덮는다. 0xa3a24 는 `0x1f988(저장, R[1])` + 2 라
+    // 대회가 아니면 커리어 사기, 대회 중이면 상대국 칸 +2 다 (원본 버그 — `nariMoraleOf`)
+    teamMorale: settings.teamMorale ?? morale,
     reputation: career.reputation,
     // 원본 기본값은 꺼짐이다 — 환경설정에서 켠 값을 그대로 받아 넘긴다
     gaugeSettingOn: settings.gaugeSettingOn ?? false,

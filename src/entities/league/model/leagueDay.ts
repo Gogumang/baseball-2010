@@ -312,6 +312,13 @@ export interface LeagueAbilityContext {
   readonly teamAbilities?: readonly (readonly number[])[]
   /** 시즌 코치 `SR+0x185` (−1 없음, 0~9). 원본 코치 분기에 팀 검사가 없어 상대 팀에도 붙는다 (J 4-2 유력) */
   readonly coach?: number
+  /**
+   * **나리(모드 3 · 4) 사기** 0xa3a24 — 간이 엔진의 0xb570c(0xc11f0 c1308 · c1320 은 두 팀 [r7+0x78] · [r7+0x74], 0xc1818 은 수비 팀)가
+   * 모드 3 · 4 갈래 b5762~b5768 에서 넘겨 받은 팀 레코드 +2 에 이 값을 쓴다 → CPU 끼리 경기도 두 팀 용량(0x66e44 `V[+2]`)이 이 값이다
+   * (`entities/career/model/nariMorale`). 시즌모드(2)는 그 쓰기가 없어(b5804 갈래) 안 넘긴다 — 없으면 100.
+   * ⚠️ 미확인: 그 팀을 0xb570c 가 아직 안 건드린 경기 첫 공 앞 0xa5e14 가 있는지(차례)는 안 뜸
+   */
+  readonly nariMorale?: number
 }
 
 /** 팀 능력치를 먹이는 모드 비트 0x306 = {1, 2, 8, 9} (0xb593a) */
@@ -562,6 +569,8 @@ function defenseOf(
     // 벤치 투수는 제 레코드 값으로 올라온다 — 경기 사이에 이어진 값
     staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
+    // 나리는 0xb570c b5768 이 두 팀 레코드 +2 를 나리 사기로 덮는다(`LeagueAbilityContext.nariMorale`) — 시즌모드는 표값 100
+    ...(abilityContext?.nariMorale === undefined ? {} : { morale: abilityContext.nariMorale }),
     bothTeamsAreCpu: true,
     // 보직 `+0xb & 3` — 로스터 투수 표 칸 0~3 선발 · 4~6 중간 · 7 마무리 (0xb6dec). 로테이션 0xb5ca8 은 선발 넷만
     // 섞어 칸의 보직이 그대로다. 마투수(8번)의 보직은 저장 레코드라 모른다 → 선발로 본다(changePitcherIfNeeded).

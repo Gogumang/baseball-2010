@@ -12,6 +12,16 @@ import { pitcherEvaluationExpressionOf, streakSayExpressionOf } from '@/pages/st
 import { pitcherYearGoalWindowValuesOf } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import { messageGameNumberOf } from '@/pages/management/lib/managementLayout'
+import { rewardNoticeContextOf, rewardNoticeOf } from '@/entities/story/model/rewardNotice'
+import { applyPitcherEventRewards } from '@/entities/pitcher-career/model/pitcherEventReward'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
+
+/** 보상 알림 글의 모드 — 나리 투수편 3 */
+const PITCHER_REWARD_MODE = 3
+/** 평가 이벤트의 이벤트 번호 자리 — 0x8a6fc 의 내장 이벤트([mgr+0xa] = 1)는 연차 보정(393~396)에 안 걸린다 */
+const EVALUATION_EVENT_ID = 0
+/** 평가 이벤트 보상(평판 · 스킬)은 0x8beb8 에서 굴리지 않는다(종류 11 질병만 굴린다) */
+const NO_ROLL_RANDOM = createSeededRandom(0)
 
 /** 기록 줄 끝 — 원본 글 0xcc9e0 은 "실점!N" 이라 감독 글이 다음 줄에서 시작한다 (웹 `pitcherLastGameLineOf` 는 "실점" 까지) */
 const RECORD_LINE_END = '!N'
@@ -41,7 +51,8 @@ interface PitcherGameEvaluationScreenProps {
  * 변화 창은 글(StrUSER_EVT[75])이 아니라 mode_ui 프레임 84 창이다 — 사기 · 인기도 · 평판 세 줄(현재 · ▲▼ 변화)과
  * 아래 올해의 목표 표(0x8656c, `pitcherYearGoalWindowValuesOf`), 제목 줄 오른쪽에 "N년 G/45경기"(0x7d120, 막 치른 경기).
  * 0x8a6fc 의 투수편 연속 기록 알림(모드 레코드 +0x1bc · 글 103~107 · 109~112)은 **명령 3 say**(0x8ac1a — 글 10000 = 전역 버퍼)다
- * (`pitcherStreakEventOf`) — 알림 창이 아니라 같은 대사 상자에 찍힌다. 그 보상은 [확인](114)이 먹는다.
+ * (`pitcherStreakEventOf`) — 알림 창이 아니라 같은 대사 상자에 찍힌다. 그 뒤 보상 명령(종류 7 — 평판 합 · 스킬 ±n)마다 0x8d4c4 가
+ * 창을 띄운다(평판 = 공용 알림 · 스킬 = 스킬 창 0x8e054). 보상 값은 [확인](114 끝)이 먹고, 밑그림 상태판만 창마다 먹인 값으로 그린다.
  * 대사 상자 · 찍기 · 표정 [명령+8] 은 `EvaluationEventPlayer` · `pages/story/lib/eventDialogue` · `evaluationDialogue` (직접 떴다).
  */
 export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: PitcherGameEvaluationScreenProps) {
@@ -86,6 +97,14 @@ export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: Pit
         streak={pitcherStreakMarkupOf(streakEvent, ORIGINAL_USER_EVENTS)}
         streakExpression={streakSayExpressionOf(streakEvent.bad !== null)}
         gauge={{ popularityChange: changes.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'pitcher', role: career.role }) }}
+        // 보상 명령(종류 7 — 평판 합 · 집중/새가슴/더티볼 ±n)마다 0x8beb8 글 → 창 (모드 3 — 스킬 이름 0x8457c 의 +16 갈래).
+        // 평가 이벤트 보상은 평판 · 스킬뿐이라 0x8beb8 이 굴리지 않는다
+        rewardNotices={streakEvent.rewards.map((reward) =>
+          rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, PITCHER_REWARD_MODE, NO_ROLL_RANDOM)).notice)}
+        // 0x8c460 이 창을 띄운 갱신에 보상을 준다 — 상태판(0x7d34c)의 평판이 그 창부터 새 값
+        underlayAfterRewards={(given) => (
+          <PitcherEventUnderlay career={applyPitcherEventRewards(career, streakEvent.rewards.slice(0, given))} isPreviousGame />
+        )}
         onDone={onConfirm}
       />
     </RawScreen>

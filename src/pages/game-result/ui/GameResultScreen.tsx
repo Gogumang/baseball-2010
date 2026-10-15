@@ -5,6 +5,9 @@ import { RawScreen } from '@/shared/ui'
 import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
 import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameEvaluation'
+import { applyEventRewards } from '@/entities/story/model/eventReward'
+import type { EventReward } from '@/entities/story/model/eventReward'
+import { rewardNoticeContextOf, rewardNoticeOf } from '@/entities/story/model/rewardNotice'
 import { nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
 import type { NariRecordLine, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
@@ -75,6 +78,16 @@ interface GameResultScreenProps {
   readonly evaluation?: GameEvaluation
   readonly streakNotices?: readonly StreakNotice[]
   /**
+   * 0x8a6fc 가 연속 기록 say 뒤에 쌓은 보상 명령(종류 7) 차례 — 평판 합 · 슬럼프 ±18 (`streakEventOf().rewards`). 114 가 명령마다
+   * 창(공용 알림 · 스킬 창 0x8e054)을 띄운다. 보상 자체는 [확인](`onContinue` → 114 끝)이 얹는다
+   */
+  readonly streakRewards?: readonly EventReward[]
+  /**
+   * 보상 몫을 먹인 선수로 평가 밑그림을 다시 그린다 — 0x8c460 이 창을 띄운 갱신에 보상을 줘 상태판(0x7d34c)의 평판이 그 창부터
+   * 새 값이다. 없으면 `underlay` 그대로
+   */
+  readonly rewardUnderlay?: (career: PlayerCareer) => ReactNode
+  /**
    * 116 기록 줄 S+0x1d8 (타수 · 안타 · 타점 · 홈런) — 평가 대사가 이 줄 뒤에 감독 글을 잇는다(`nariRecordLineTextOf`).
    * 포스트시즌 경기 뒤에는 앞 평가 경기의 줄이다. 안 넘기면 감독 글만.
    */
@@ -110,6 +123,16 @@ interface GameResultScreenProps {
   }
 }
 
+const NO_STREAK_REWARDS: readonly EventReward[] = []
+/** 보상 알림 글의 모드 — 나리 타자편 4 */
+const BATTER_REWARD_MODE = 4
+/**
+ * 평가 이벤트의 이벤트 번호 자리 — 0x8a6fc 가 짓는 내장 이벤트는 파일 이벤트가 아니라([mgr+0xa] = 1) 연차 보정(393~396)에 안 걸린다
+ */
+const EVALUATION_EVENT_ID = 0
+/** 평가 이벤트 보상(평판 · 스킬)은 0x8beb8 에서 굴리지 않는다(종류 11 질병만 굴린다) */
+const NO_ROLL_RANDOM = createSeededRandom(0)
+
 /** 화면 단계 — 경기 끝 판(0x18) → 정산(0x19 · 그림 0x4a384) → 116 평가(114 내장 이벤트) */
 type Phase = '끝판' | '정산' | '평가'
 
@@ -134,6 +157,8 @@ export function GameResultScreen({
   onConfirmTitle,
   evaluation,
   streakNotices = [],
+  streakRewards = NO_STREAK_REWARDS,
+  rewardUnderlay,
   recordLine,
   career,
   onContinue,
@@ -198,6 +223,12 @@ export function GameResultScreen({
           streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
           streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
           gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
+          // 보상 명령마다 0x8beb8 글 → 창 (모드 4 — 스킬 이름 0x8457c 갈래). 평가 이벤트 보상은 평판 · 스킬뿐이라 굴림이 없다
+          rewardNotices={streakRewards.map((reward) =>
+            rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, BATTER_REWARD_MODE, NO_ROLL_RANDOM)).notice)}
+          {...(rewardUnderlay === undefined
+            ? {}
+            : { underlayAfterRewards: (given: number) => rewardUnderlay(applyEventRewards(career, streakRewards.slice(0, given))) })}
           onDone={onContinue}
         />}
         {isTitlePopupOpen && title !== undefined && (

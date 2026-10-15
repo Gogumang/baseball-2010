@@ -36,6 +36,12 @@ export interface NariCupTeams {
   readonly opponent: NariTeamRecord
   /** 상대국 칸이 든 팀 번호 (11~13) */
   readonly opponentTeamId: number
+  /**
+   * **상대국 칸 +2 (팀 사기)** — 마스터 복사(`0x20648` → `0x1fe5c`)라 처음엔 그 팀 표값(`teamRecordMoraleOf`, 전 팀 100)이고, 없으면 그 값이다.
+   * ⚠️ 원본 버그로 대회 중 나리 사기 읽기 · 쓰기 `0xa3a24` · `0xa3a44` 가 이 칸을 쓴다(`entities/career/model/nariMorale`) — 대회 중
+   * 돌발 보상 사기(0x8e34c)가 여기 쌓이고, 하루 끝 b8216 의 새 복사가 지운다(`nextNariCupDayTeams`)
+   */
+  readonly opponentMorale?: number
 }
 
 /** 대표팀 팀 번호 */
@@ -65,10 +71,13 @@ export function prepareNariCupMatch(teams: NariCupTeams, cupDay: number): NariCu
   return { ...teams, korea: rotate(teams.korea), opponent: rotate(teams.opponent) }
 }
 
-/** 하루 끝 b8216 — 다음 날 사람 경기 상대를 마스터에서 새로 복사. 대회가 끝나 상대가 없으면 그대로 */
+/**
+ * 하루 끝 b8216 — 다음 날 사람 경기 상대를 마스터에서 새로 복사(+2 사기도 표값으로 — `opponentMorale` 를 뺀다).
+ * 대회가 끝나 상대가 없으면 그대로
+ */
 export function nextNariCupDayTeams(teams: NariCupTeams, nextOpponentTeamId: number | null): NariCupTeams {
   if (nextOpponentTeamId === null) return teams
-  return { ...teams, opponent: masterCupRecordOf(nextOpponentTeamId), opponentTeamId: nextOpponentTeamId }
+  return { korea: teams.korea, opponent: masterCupRecordOf(nextOpponentTeamId), opponentTeamId: nextOpponentTeamId }
 }
 
 /** 대회 칸의 팀 레코드 — 팀 10 은 대표팀 칸, 그 밖은 상대국 칸(0x1f8f8). 상대국 칸이 다른 팀이면 마스터 복사 */

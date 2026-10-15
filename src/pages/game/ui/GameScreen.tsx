@@ -12,6 +12,7 @@ import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMen
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
+import { withNariGameMorale } from '@/entities/career/model/nariMorale'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
@@ -341,7 +342,9 @@ export function GameScreen({
             웹 전용 "등판!" 띠 · 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다
           */}
           <BattingStage
-            batterAbility={effectiveAbilityOf(career)}
+            // 0xb570c 의 사기 감소는 b5768 이 넘겨 받은 팀 레코드 +2 에 쓴 0xa3a24 값을 읽는다 — 국가대항전 중이면 상대국 칸 +2
+            // (원본 버그, `withNariGameMorale`)
+            batterAbility={effectiveAbilityOf(withNariGameMorale(career))}
             // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 타자편은 내 선수가 쳐서 마선수(0xb633c)가 아니다
             canBunt
             swingMode="나만의리그"

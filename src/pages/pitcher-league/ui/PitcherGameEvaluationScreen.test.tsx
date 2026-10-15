@@ -108,6 +108,40 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
     expect(screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')).toBe('55')
     다찍기()
     fireEvent.keyDown(window, { key: 'Enter' })
+    // 명령 3 뒤 보상 명령(8ac54 — 종류 1 평판 합)은 0x8d4c4 가 공용 알림 창으로 띄운다 — 그 창 OK 가 114 끝
+    expect(onConfirm).not.toHaveBeenCalled()
+    const 알림 = screen.getByRole('dialog')
+    expect(알림.textContent).toContain('평판')
+    act(() => {
+      vi.advanceTimersByTime(20 * millisecondsPerFrame())
+    })
+    fireEvent.keyDown(window, { key: 'Enter' })
     expect(onConfirm).toHaveBeenCalled()
+  })
+
+  it('알림 없이도 스킬 보상 명령만 있으면 그 창이 뜬다 — 더티볼 +21 (8af2a~8af8a, 볼넷+사구 > 3)', () => {
+    const onConfirm = vi.fn()
+    const 볼넷경기: PitcherLastGame = { ...경기, walksAndHitByPitch: 4 }
+    const career = {
+      ...createPitcherCareer('테스터'),
+      role: 0 as const,
+      streaks: { win: 0, strikeout: 0, loss: 0 },
+      lastGame: 볼넷경기,
+      lastEvaluation: { moraleChange: 0, popularityChange: 0, reputationChange: 0 },
+    }
+    render(<PitcherGameEvaluationScreen career={career} lastGame={볼넷경기} onConfirm={onConfirm} />)
+    한틀()
+    for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
+      다찍기()
+      fireEvent.keyDown(window, { key: 'Enter' })
+    }
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByTestId('스킬-보상-창').textContent).toContain('획득')
+    act(() => {
+      vi.advanceTimersByTime(20 * millisecondsPerFrame())
+    })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onConfirm).toHaveBeenCalledOnce()
   })
 })
