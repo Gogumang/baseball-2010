@@ -191,6 +191,14 @@ export function pitcherWalksOf(stats: PitcherSeasonStats): number {
   return stats.walks ?? 0
 }
 
+/**
+ * **투수 레코드 +0x20~+0x2b 여섯 칸** — 아웃 · 실점 · 세이브 · 탈삼진 · 투구 수 · 사사구. 미션(모드 5)은 0xb8820 이 선수 게터 0x1fbd0 의
+ * 기록을 0x30 바이트 통째 명부에 넣고, 명전 등록 0x1f654 도 통째 베낀다 — 소개 판 0x44944 가 읽는다.
+ */
+export function pitcherRecordLineOf(stats: PitcherSeasonStats): readonly number[] {
+  return [stats.outs, stats.runsAllowed, stats.saves, stats.strikeouts, stats.pitches, pitcherWalksOf(stats)]
+}
+
 /** 선수 +0x1f0 u16[0..3] — 완투 계열 횟수 (통산, 새 시즌에도 지우지 않는다) */
 export interface CompleteGameCounts {
   readonly perfect: number

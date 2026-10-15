@@ -1,6 +1,7 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
+import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamer, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
@@ -40,6 +41,12 @@ export interface ModeBatter {
    * 폼 `rec[0xb] >> 4` · 피부 `(rec[0xb] >> 2) & 3` · 손 `0xb63c0`(= 폼 & 1)을 넘긴다. 모르면(선수 없음 · 옛 명전 기록) 없다
    */
   readonly look?: ModeBatterLook
+  /**
+   * 선수 레코드 +0x20~+0x2b 시즌 줄 s16 여섯 칸 — 미션(모드 6)은 0xb87cc 가 이 기록을 0x30 바이트 통째 명부에 넣어 소개 판 0x44944 가
+   * 그대로 읽는다(+ 기록 게이트 0xa5764 가 여는 이 경기 줄). 나리 = 저장 선수의 시즌 줄(`career.stats`), 명예 = 등록 때 베낀 줄.
+   * 모르면(선수 없음 · 줄을 안 남긴 옛 명전 기록) 없다
+   */
+  readonly recordLine?: readonly number[]
 }
 
 /** 선수 레코드 +0xb — 폼 `2 × 타입 + 손` · 피부 0 황인 · 1 백인 · 2 흑인 */
@@ -56,6 +63,7 @@ export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
     specialSwingNumber: career.specialSwingNumber,
     // 저장 선수의 +0xb — 폼 = 2 × 타입 + 손 (C 5절 0x16f9a) · 피부
     look: { form: career.battingTypeIndex * 2 + career.battingSide, skinIndex: career.skinIndex },
+    recordLine: batterRecordLineOf(career.stats),
   }
 }
 
@@ -75,6 +83,7 @@ export function modeBatterOfHallOfFame(famer: HallOfFamer): ModeBatter {
     ability,
     skillIds,
     specialSwingNumber: famer.specialSwingNumber ?? 0,
+    ...(famer.recordLine === undefined ? {} : { recordLine: famer.recordLine }),
     // 등록이 옮긴 +0xb — 옛 기록(생김새 칸을 남기기 전)은 모른다
     ...(famer.look === undefined
       ? {}

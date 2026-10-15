@@ -39,6 +39,7 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionResultHeldOf } from '@/pages/mission-play/lib/missionResultBoard'
 import { missionRunScoreBoardOf, missionScoreboardSidesOf } from '@/pages/mission-play/lib/missionRunScoreBoard'
 import { missionFirstBoardCardsOf } from '@/pages/mission-play/lib/missionFirstBoardCards'
+import { missionBatterMatchupCardsOf, missionPitcherMatchupCardsOf } from '@/pages/mission-play/lib/missionMatchupCards'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
@@ -271,6 +272,16 @@ export function MissionRoutes({
         // 타자 그림 · 손 — 지금 타자 레코드 +0xb (미션 타자 = 나리 저장 · 명예 기록, 마스터 차례 = 그 줄)
         {...(stageBatter.look === undefined ? {} : { batterLook: stageBatter.look })}
         batterName={stageBatter.name}
+        // 상태 0xe 소개 판 0x44944 — CPU 마운드 · 지금 사람 칸 타자 레코드 (미션 타자는 줄 + 게이트 0xa5764 가 연 이 경기 줄)
+        matchupCards={missionBatterMatchupCardsOf(
+          missionRun,
+          {
+            name: missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
+            hand: (batter.look?.form ?? 0) & 1,
+            ...(batter.recordLine === undefined ? {} : { recordLine: batter.recordLine }),
+          },
+          session.aceLevels,
+        )}
         pitcherAbility={{
           ...missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent),
           // 공이 손을 떠나며(0x3dec6 → 0xa5e14) 깎은 뒤 체력%를 놓기 0x4dc78 · 스윙 0xab214 가 본다
@@ -360,6 +371,8 @@ export function MissionRoutes({
         onThrow={session.handleThrow}
         // 타석 장면 — 마지막 공 · 마운드 미션 투수 · 지금 CPU 타자 (`PitcherSideStage`)
         stage={pitchingStageOf(session, pitcherRun)}
+        // 상태 0xe 소개 판 0x44944 — 미션 투수(줄 + 게이트 0xa5764 가 연 이 경기 줄) · 지금 CPU 타자
+        matchupCards={missionPitcherMatchupCardsOf(pitcherRun, missionCardPitcherOf(session, missionPitcherNameOf(session, hallOfFame, nari.투수)))}
         // 조준(0x10)의 틱 0x39c5c — 투수 미션 흔들림은 경기 난수로 · CLR 은 0xf 진입을 다시
         onAimTick={session.aimTick}
         onReturnToPitchSelection={session.returnToPitchSelection}
@@ -676,6 +689,8 @@ export function PitcherAceMatchRoute(
       bannerText={runner.bannerText}
       onThrow={session.handleThrow}
       stage={pitchingStageOf(session, pitcherRun)}
+      // 상태 0xe 소개 판 0x44944 — 대결은 g[0x176] 이라 늘 나리 투수(0x1fbd0)
+      matchupCards={missionPitcherMatchupCardsOf(pitcherRun, missionCardPitcherOf(session, pitcherName ?? null))}
       onAimTick={session.aimTick}
       onReturnToPitchSelection={session.returnToPitchSelection}
       // 경기 중 메뉴 나가기 0x40140 — +0x176 이 서 있어도 보통 미션과 같이 메인 메뉴(장면 0x103)로 간다(저장 없음). 진 결과
@@ -728,6 +743,19 @@ function missionCpuBatterHandOf(run: PitcherRun): number {
  * 마타자 칸은 미션 상대 마선수(`opponentAce` − 1)의 XlsACE_BAT_DATA +0xb · 손 표 0xd88b0.
  * 마타자는 순번 0xb63a0 으로 몸통 적재 0x78ab0 이 `ace/batter_*` 를 싣는다(`aceBatterOrder`).
  */
+/** 소개 판의 미션 투수 칸 재료 — 세션이 든 선수 게터 0x1fbd0 의 기록(`session.pitcher`)과 지금 +0x2c */
+function missionCardPitcherOf(session: ReturnType<typeof useMissionSession>, name: string | null) {
+  const { pitcher } = session
+  return {
+    name,
+    ...(pitcher.plate?.role === undefined ? {} : { role: pitcher.plate.role }),
+    form: pitcher.repertoire.form,
+    staminaAbility: pitcher.staminaAbility,
+    stamina: session.pitcherStamina,
+    ...(pitcher.recordLine === undefined ? {} : { recordLine: pitcher.recordLine }),
+  }
+}
+
 function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: PitcherRun): PitchingStageSource {
   const form = session.pitcher.repertoire.form
   const batter = missionCpuBatterOf(run.cpu)

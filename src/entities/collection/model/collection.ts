@@ -1,7 +1,8 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
-import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedPitcherAbilityOf, pitcherRecordLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
@@ -51,6 +52,11 @@ interface HallOfFameRecordFields<Ability> {
   readonly equipmentLevels?: Ability
   /** 장착 스킬 — 기록 +0x14 비트 (`career.equippedSkillIds` 그대로, 경기 스킬 0xb62b4 가 본다) */
   readonly equippedSkillIds?: readonly number[]
+  /**
+   * 기록 +0x20~+0x2b 시즌 줄 s16 여섯 칸 — 등록이 통째 베낀 그때 선수 레코드의 줄(타자 `batterRecordLineOf` · 투수 `pitcherRecordLineOf`).
+   * 미션(모드 5 · 6)의 소개 판 0x44944 가 이 칸에 이 경기 줄을 더해 읽는다. 2026-10-15 에 더했다 — 그 전 옛 저장에는 없다
+   */
+  readonly recordLine?: readonly number[]
 }
 
 /** 명예의 전당 타자 (+0x940 칸) */
@@ -304,6 +310,7 @@ export function registerHallOfFame(
     equippedSkillIds: career.equippedSkillIds,
     specialSwingNumber: career.specialSwingNumber,
     positionIndex: career.positionIndex,
+    recordLine: batterRecordLineOf(career.stats),
   }
   return { kind: '등록', slot: target, collection: { ...collection, hallOfFame: [...collection.hallOfFame, famer] } }
 }
@@ -335,6 +342,7 @@ export function registerHallOfFamePitcher(
     pitchMask: career.pitchMask,
     selectedMagicNumber: career.selectedMagicNumber,
     role: career.role,
+    recordLine: pitcherRecordLineOf(career.stats),
   }
   return {
     kind: '등록',
@@ -443,7 +451,8 @@ const isOptionalNumber = (value: unknown) => value === undefined || typeof value
 /** 기록 칸(장비 니블·장착 비트)은 옛 저장에 없을 수 있다 — 있으면 형식만 본다 */
 const hasRecordFields = (candidate: Record<string, unknown>, abilityKeys: readonly string[]) =>
   (candidate.equipmentLevels === undefined || hasNumbers(candidate.equipmentLevels, abilityKeys)) &&
-  (candidate.equippedSkillIds === undefined || isNumberArray(candidate.equippedSkillIds))
+  (candidate.equippedSkillIds === undefined || isNumberArray(candidate.equippedSkillIds)) &&
+  (candidate.recordLine === undefined || isNumberArray(candidate.recordLine))
 
 function isHallOfFamer(value: unknown): value is HallOfFamer {
   if (typeof value !== 'object' || value === null) return false

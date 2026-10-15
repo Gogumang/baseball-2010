@@ -26,6 +26,7 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
+import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
@@ -58,6 +59,15 @@ interface MissionPlayScreenProps {
    * 쓴다(모드 갈림 없음 — 미션 6 도 같다). 손은 스윙 판정 0xab214 · CPU 투구도 본다. 안 넘기면 폼 0(타격형 · 우타) · 피부 0
    */
   readonly batterLook?: { readonly form: number; readonly skinIndex: number }
+  /**
+   * 상태 0xe 소개 판 0x44944 의 값 — 부르는 쪽(미션 라우트)이 지금 투수 · 타자 레코드로 만든다
+   * (`pages/mission-play/lib/missionMatchupCards`). 안 넘기면 팀 글자만 그린다
+   */
+  readonly matchupCards?: {
+    readonly batterHand: number
+    readonly pitcher: MatchupPitcherCard
+    readonly batter: MatchupBatterCard
+  }
   readonly pitcherAbility: PitcherAbility
   /** 마투수 미션의 상대. 일반 투수면 null */
   readonly opponent: AcePlayer | null
@@ -179,6 +189,7 @@ export function MissionPlayScreen({
   batterSkillIds,
   batterRecordSlot,
   batterLook,
+  matchupCards,
   pitcherAbility,
   opponent,
   pitcherEquipmentNibbles,
@@ -443,9 +454,11 @@ export function MissionPlayScreen({
 
         {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
           <SceneMatchupCards
-            batterHand={batterSideOfForm(batterLook?.form ?? 0)}
-            pitcher={{ isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) }}
-            batter={{ isComputer: false, ...(batterName === undefined ? {} : { name: batterName }) }}
+            {...(matchupCards ?? {
+              batterHand: batterSideOfForm(batterLook?.form ?? 0),
+              pitcher: { isComputer: true, ...(opponent === null ? {} : { name: opponent.name }) },
+              batter: { isComputer: false, ...(batterName === undefined ? {} : { name: batterName }) },
+            })}
           />
         )}
 

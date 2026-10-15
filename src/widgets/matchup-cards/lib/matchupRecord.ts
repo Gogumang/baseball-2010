@@ -13,7 +13,8 @@ import type { StaminaGauge } from '@/widgets/matchup-cards/lib/matchupCardsLayou
  *   경기 중에 안 오른다.
  *   그래서 판 값 = (그 경기를 세울 때 레코드에 들어 있던 줄) + (게이트가 열린 모드면 이 경기에서 그 선수가 쌓은 줄)이다.
  * - 모드 1(일반)의 레코드는 XlsBATTER_DATA · XlsPITCHER_DATA 행 그대로다 — 행 바이트 32~45 에 그 줄이 차 있다
- *   (타자 예: 첫 행 타수 1000 · 안타 373 · 홈런 17 · 타점 63). 시즌·나리 저장의 레코드는 0x204e0 이 모드 2·3·4 를 만들 때
+ *   (타자 예: 첫 행 타수 1000 · 안타 373 · 홈런 17 · 타점 63). 미션(모드 5 · 6)의 두 팀도 0x1ff98 이 Xls 행 0x30 바이트를 통째
+ *   베낀 마스터 팀이고, 마선수는 0x20094 6번 갈래가 XlsACE_* 행을 그대로 부은 레코드다 — 웹은 `recordLine` 으로 든다. 시즌·나리 저장의 레코드는 0x204e0 이 모드 2·3·4 를 만들 때
  *   0xb6cc4 로 +0x20~+0x2a 를 0 으로 비운다.
  */
 
@@ -49,6 +50,24 @@ export function earnedRunAverageValueOf(line: Pick<MatchupPitcherLine, 'outs' | 
 export function battingAverageValueOf(line: Pick<MatchupBatterLine, 'atBats' | 'hits'>): number {
   if (line.atBats <= 0) return 0
   return Math.min(1000, Math.trunc((line.hits * 1000) / line.atBats))
+}
+
+/**
+ * 레코드 +0x20~+0x2b 의 s16 여섯 칸(`RosterPlayer.recordLine` · `AcePlayer.recordLine` · 명전 · 나리 기록의 같은 칸)을 타자 줄로 —
+ * [0] +0x20 타수 · [1] +0x22 안타 · [4] +0x28 홈런 · [5] +0x2a 타점
+ */
+export function batterLineOfRecord(recordLine: readonly number[]): MatchupBatterLine {
+  return {
+    atBats: recordLine[0] ?? 0,
+    hits: recordLine[1] ?? 0,
+    homeRuns: recordLine[4] ?? 0,
+    runsBattedIn: recordLine[5] ?? 0,
+  }
+}
+
+/** 같은 여섯 칸을 투수 줄로 — [0] +0x20 잡은 아웃 · [1] +0x22 실점 · [3] +0x26 탈삼진 */
+export function pitcherLineOfRecord(recordLine: readonly number[]): MatchupPitcherLine {
+  return { outs: recordLine[0] ?? 0, runsAllowed: recordLine[1] ?? 0, strikeouts: recordLine[3] ?? 0 }
 }
 
 /** 두 줄을 더한다 — 경기를 세울 때의 줄 + 이 경기 줄 */
