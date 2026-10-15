@@ -349,10 +349,12 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     expect(screen.getByAltText('승리투수')).toBeTruthy()
     // 처음 10틱은 OK 가 안 먹고(경기+0x32), 그 뒤 OK → 정산(0x19) 자리인 요약 화면
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(screen.queryByText('경기 결과')).toBeNull()
+    expect(screen.queryByTestId('정산-판')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(screen.getByText('경기 결과')).toBeTruthy()
+    // 정산(0x19)은 원본 240×320 한 장 — 웹 껍데기 제목 띠("경기 결과")가 없다
+    expect(screen.getByTestId('정산-판')).toBeTruthy()
+    expect(screen.queryByText('경기 결과')).toBeNull()
     vi.useRealTimers()
   })
 

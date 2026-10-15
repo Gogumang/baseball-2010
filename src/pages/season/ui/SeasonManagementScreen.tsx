@@ -59,7 +59,8 @@ export interface SeasonManagementScreenProps {
 /**
  * 시즌 관리 메뉴 (장면 0x105 상태 **0xc9**, 진입 0x4efc · 키 0x8f30 · 틀 0x73b8 · 그리기 0x9fe4 → 공통 틀 0x9f60).
  *
- * 6칸은 `0x6c219(메뉴, 6, 1, 1)` 로 만든 한 열짜리 메뉴다 (P4 1b 확정) — 위·아래로 옮긴다.
+ * 6칸은 `0x6c219` → `vt+0x1c(6, 1, 1, 0x330)` 으로 만든 **6열 × 1줄** 메뉴다(0x3b74~0x3b7c, 첫 인자가 열 +0x14 — 0x6bfe1).
+ * 그래서 ← → 가 칸을 옮기고, ↑ ↓ 도 꼴 0x200(세로가 감기면 가로 한 칸)으로 같은 칸을 옮긴다(`useSeasonCursor` 의 `isCommandBar`).
  * 이 화면은 **경기 수가 짝수일 때만** 열린다 — StrHOWTO[18] "2경기마다 관리 메뉴".
  *
  * 그리기는 공통 틀(`SeasonCommonFrame`): 공 무늬 바탕 · 커맨드 줄 0x7e418(표 0xd47f4 · 0xd4800 — `lib/seasonCommandBar`) ·
@@ -83,6 +84,8 @@ export function SeasonManagementScreen({
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: MANAGEMENT_MENU.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
+    // 6열 × 1줄 (0x3b14 의 vt+0x1c(6, 1, 1, 0x330)) — ← → 도 칸을 옮긴다
+    isCommandBar: true,
     // 0x6c444 — 꺼진 칸(켬 표 0)은 위·아래가 건너뛴다
     disabled,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),

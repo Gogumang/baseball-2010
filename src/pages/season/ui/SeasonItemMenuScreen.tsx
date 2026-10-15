@@ -49,6 +49,8 @@ export function SeasonItemMenuScreen({
   }
   const { cursor, moveTo } = useSeasonCursor({
     count: SEASON_ITEM_MENU.length, onSelect: select, onCancel: onBack, cursor: heldCursor, onCursorChange,
+    // 4열 × 1줄 (0x3b14 의 [this+0x88] vt+0x1c(4, 1, 1, 0x330), 0x3c3e~0x3c50) — ← → 도 칸을 옮긴다
+    isCommandBar: true,
   })
 
   return (

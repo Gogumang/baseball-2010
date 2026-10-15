@@ -427,6 +427,11 @@ export function MainMenuScreen({
         headingSize.height,
         MENU_PANEL_HEADING_COLOR,
       )}
+      {/*
+        하위 목록 설명 띠 0x55544 는 0x2524c 의 **맨 끝**(0x25860)에 그린다 — 판 0x25770 · 판 안 큰 글자 0x257c8 · 회색 제목 0x257ee 뒤라
+        띠(왼쪽 아래 (0, 275)~, 폭 160)가 판 왼쪽의 회색 제목을 덮는다. r77 점검의 "설명 판이 왼쪽 아래를 가린다"는 이 원본 차례 그대로다
+        (2026-10-15 r79 다시 떴다)
+      */}
       {bandText !== null && !band.isGrowing && <DescriptionBand text={bandText} seed={cursor} />}
       <div
         className={styles.description}

@@ -69,6 +69,11 @@ export interface RunScoredInput {
  * **정규 9이닝 경기(`state+0x69 == 8`)에서만** 갱신한다. 5회까지 점수가 나고 6회 이후로
  * 한 점도 안 나면 **승리 투수가 없는 경기**가 된다 (패전 투수는 이닝 조건이 없어 정상으로 남는다).
  * 원본에 "선발 5이닝 요건"·"구원 승 인계" 같은 진짜 규칙은 없다.
+ *
+ * 2026-10-15 r79 다시 확인: 플레이 점검(r77)의 일반모드 2:5 패배(이긴 팀 1회 5점 · 진 팀 4회 2점 · 6회 뒤 무득점)에서
+ * 결과 판 승리투수 칸이 빈 것은 이 빈틈 그대로다 — 0xa5cf6~0xa5d12 가 이닝 index ≤ 4 · state+0x69 ≠ 8 이면 승리 토막을
+ * 통째로 건너뛰고, 경기 끝 0xa7de8(0xa7dea~0xa7e0e)은 칸을 읽기만 해 측 2 면 넘어가며(채우는 대체 길 없음),
+ * 끝 판 그리기 0x4fe9c 도 0x5026e `cmp r4,#2` 로 측 2 면 이름을 안 그린다.
  */
 export function applyRunScored(state: DecisionState, input: RunScoredInput): DecisionState {
   const { offenseSide, defenseSide, scoreOf, moundPitcherOf } = input

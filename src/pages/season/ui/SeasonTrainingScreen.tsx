@@ -208,6 +208,8 @@ export function SeasonTrainingScreen({
 
   const { cursor, moveTo } = useSeasonCursor({
     count: TRAINING_SLOTS.length,
+    // 5열 × 1줄 (0x3b14 의 [this+0x84] vt+0x1c(5, 1, 1, 0x330), 0x3c00~0x3c16) — ← → 도 칸을 옮긴다
+    isCommandBar: true,
     onSelect: select,
     onCancel: onBack,
     isEnabled: popup === null && playingIndex === null,

@@ -386,8 +386,9 @@ export function AceSelectScreen({
             className={styles.cell}
             data-dimmed={isDimmed}
             style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
+            // 원본 격자(상태 21 진입 0x263f4 · 28 진입 0x262c8 의 vt+0x1c)는 키패드로만 커서를 옮긴다 — 올려 두기로 커서를 옮기던 onMouseEnter 는 걷었다(멈춘
+            // 포인터가 키 커서를 빼앗는다, 메인 메뉴 r27 과 같은 종류). 누름만 남긴다
             onClick={() => (isLevelUpMode ? requestLevelUp(cell) : isCoachMode ? pressCell(cell) : onSelect(cell))}
-            onMouseEnter={() => setCursor(cell)}
           >
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cellImage)} style={{ left: 0, top: 0 }} />
             {open && player !== undefined

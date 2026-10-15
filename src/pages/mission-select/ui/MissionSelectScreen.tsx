@@ -197,6 +197,11 @@ export function MissionSelectScreen({
         {selected?.name ?? ''}
       </div>
 
+      {/*
+        격자 칸 — 원본 미션 고르기 키 0x1dcb0 · 격자 [this+0x70](0x1d9f6 vt+0x1c(5, 3, 1, 0x330))는 키패드로만 커서를 옮긴다.
+        마우스는 누름(고르기 + OK)만 받는다. 올려 두기만 해도 커서를 옮기던 onMouseEnter 는 걷었다 — 멈춘 포인터가 키 커서를
+        빼앗는다(메인 메뉴 r27 과 같은 종류)
+      */}
       {Array.from({ length: cellCount }, (_unused, index) => {
         const mission = missions[index]
         const shake = index === cursor ? bounce.offset : null
@@ -206,7 +211,6 @@ export function MissionSelectScreen({
           return (
             <div key={index} className={styles.cell}
               style={{ left: x, top: y, width: GRID.cellWidth, height: GRID.cell, background: '#1D2A55', color: '#4A5C8F' }}
-              onMouseEnter={() => setCursor(index)}
               onClick={() => { setCursor(index); openEventWindowOrSelect(index) }} />
           )
         }
@@ -219,7 +223,6 @@ export function MissionSelectScreen({
               background: isLocked ? '#1D2A55' : isCleared ? '#2E4694' : '#213473',
               color: isLocked ? '#4A5C8F' : '#FFFFFF',
             }}
-            onMouseEnter={() => setCursor(index)}
             onClick={() => { setCursor(index); openEventWindowOrSelect(index) }}>
             {isLocked ? '' : isCleared ? '★' : index + 1}
           </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CommonPanel, InsetBox, RawScreen, ScreenOverlay, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, InsetBox, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import {
   HELP_PAGER_GLYPH_HEIGHT,
@@ -179,11 +179,17 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
 
   const tabBox = HELP_VIEWER.tabBoxes[section]
   const name = HELP_VIEWER.names[section]
+  /**
+   * 장 이름 · 잠긴 제목 img_text 는 **팔레트 3**(#2949A5 · #10246B)으로 찍는다 — 0x58e30~0x58e58 · 0x58ff2~0x5901c 가
+   * `0x913e5(img_text, 3)` 를 부른 뒤 0xba759 로 그린다(직접 떴다). 기본 팔레트(흰 글자)로 찍으면 흰 띠 위에서 안 보인다.
+   */
+  const namePalette = useImgTextPalette3()
   /** 웹판 단추 줄 — 원본은 키뿐이라 판 아래(y = 판 끝 + 4)에 둔다 */
   const webButtonTop = centerY + HELP_PANEL_FULL_HEIGHT / 2 + 4
 
   const body = (
     <>
+      {namePalette.definition}
       {/* 판 0x55e60(skin, W/2, H/2, 192, +0x90, 0, 0x22, …) — [+0x45c] 면 (띠 0, 0, 제목 탭 1) 아니면 (띠 0x10, 0, 0) (0x58dea~0x58ec6) */}
       <CommonPanel
         x={x0}
@@ -203,6 +209,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
               alt="게임문의"
               src={frameSrc(IMG_TEXT_FRAMES, HELP_VIEWER.lockedTitle.frame)}
               style={{
+                ...namePalette.style,
                 left: HELP_VIEWER.lockedTitle.x - Math.trunc(HELP_VIEWER.lockedTitle.width / 2),
                 top: HELP_VIEWER.lockedTitle.y,
               }}
@@ -221,6 +228,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
                 alt={`장 ${section + 1}`}
                 src={frameSrc(IMG_TEXT_FRAMES, name.frame)}
                 style={{
+                  ...namePalette.style,
                   left: x0 + tabBox[0] + Math.trunc((tabBox[2] - name.width) / 2),
                   top: HELP_VIEWER.y0 + tabBox[1] + 2,
                 }}

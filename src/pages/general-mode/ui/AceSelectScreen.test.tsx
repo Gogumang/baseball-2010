@@ -425,3 +425,12 @@ describe('마선수 열 칸이 다 열리면 히든 팀 외인구단 (0x7b408 �
     expect(onAllAcesOpen).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('마우스 길', () => {
+  it('칸에 포인터를 올려 두기만 해서는 커서가 안 옮겨진다 — 원본 격자는 키패드뿐이다(멈춘 포인터가 키 커서를 빼앗지 않게)', () => {
+    띄우기()
+    const 처음 = screen.getByTestId('마선수-이름').textContent
+    for (const 칸 of 칸들()) fireEvent.mouseEnter(칸)
+    expect(screen.getByTestId('마선수-이름').textContent).toBe(처음)
+  })
+})
