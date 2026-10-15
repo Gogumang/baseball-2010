@@ -20,8 +20,11 @@ import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
  * - 관리 105 등 다른 상태는 (0x23, 0xbe, 0x1e) 를 쓴다(0x11ac6 · 0x10c00 …) — 카드가 서는 상태는 모두 위 둘이다
  * 로고는 셋업 0x17360 도 내 팀으로 싣는다(0x175fe) — 등록은 팀을 고른 0x65 뒤라 그 팀이다.
  *
- * ⚠️ 미확인: 딱지 [gfx+0x168] 이 나리에서 0 이라는 것은 쓰는 곳이 시즌 함수(0x47b2 · 0x50c8)뿐이라는 데서 미루었다
- * (gfx 생성 0xfa5c 의 0xcaa00 이 0 으로 채우는지는 안 읽었다).
+ * 딱지 [gfx+0x168] 은 나리에서 0 이다: gfx 생성 0xfa5c 의 0xcaa00 은 `bx r5` 이고 r5 = new 0x1239(0xfa28) → 0x2ac4 가
+ * 0x28b8 로 받은 뒤 memset 0x1400428(p, 0, 크기) 로 채운다. `#0xb4 << 1` 꼴로 그 칸을 적는 곳은 시즌 0xe4 · 0xca 진입(0x47b2 · 0x50c8)
+ * 뿐이고 나리 쪽 0xfb2a · 0xfeb8 · 0xff5c 는 장면 칸이다.
+ * 카드 갈래: 나리 셋업 0xf69c~0xf6ae · 0xfa6a~0xfa72 가 [gfx+0x20] = 전역 모드(3 · 4)라 0x7b998 이 서지 않아
+ * 로고는 효과 1 · 12(7bb72~7bbc6) · 레이더는 0x7bfc8 선수 갈래다(0x7beb6~0x7bec0).
  */
 export function CardPlate({ teamId, testIdPrefix = '카드' }: { readonly teamId: number; readonly testIdPrefix?: string }) {
   const points = steppedBoardPointsOf(SEASON_CARD_BOARD.top, SEASON_CARD_BOARD.height, SEASON_CARD_BOARD.offset)

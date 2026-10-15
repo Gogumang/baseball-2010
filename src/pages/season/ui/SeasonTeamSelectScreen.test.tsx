@@ -139,3 +139,18 @@ describe('이름 입력 0xc8 그림 0xba28 — mode_ui 프레임 3 박스', () =
     expect([글칸.style.left, 글칸.style.top]).toEqual(['62px', '187px'])
   })
 })
+
+describe('이름 입력 0xc8 카드 0x7ba44 — 팀 갈래 (그림 0xba28 ba46)', () => {
+  it('계단형 판 · 고른 팀 로고(효과 없음) · 딱지와 팀 이름 · ABILITY 판(축 이름 46 · 45 · 204 · 205)', () => {
+    render(<SeasonTeamSelectScreen onChoose={vi.fn()} onExit={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: TEAMS[3].name }))
+
+    expect(screen.getByTestId('시즌카드-판')).toBeTruthy()
+    const 로고 = screen.getByTestId('이름-로고') as HTMLImageElement
+    expect([로고.getAttribute('src'), 로고.style.left, 로고.style.top, 로고.style.opacity]).toEqual([TEAMS[3].logoUrl, '20px', '72px', ''])
+    expect(screen.getByTestId('시즌카드-딱지-이름판')).toBeTruthy()
+    const 판 = screen.getByTestId('능력치 도형')
+    const 그림들 = Array.from(판.querySelectorAll('img')).map((image) => image.getAttribute('src'))
+    for (const frame of ['046', '045', '204', '205']) expect(그림들).toContain(`./sprites/img_text/frames/${frame}.png`)
+  })
+})

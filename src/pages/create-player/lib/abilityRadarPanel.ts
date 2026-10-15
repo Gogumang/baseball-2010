@@ -66,6 +66,10 @@ export const ABILITY_RADAR_LABELS = {
  * (종류 2 · 3 만 [sp+0x190] 표로 덮는다 0x5b1ca · 0x5b2b6) → 최대길이 = 반지름. idx −1 이면 값 네 개 0 이고 [anim+0x1e4] = 0 (0x5b024) 이라
  * 숫자 대신 늘 "???" 다. 나머지(0x5b798 선수 정보 창 종류 2 · 3 반지름 22 · 0x6517c 종류 2 반지름 30)는 팀이 아니다.
  * 웹: 공용 목록 쪽은 `TeamSelectScreen` · `SpecialEditScreen` 이 `ABILITY_CHART`(B + (0, 8), 반지름 30)로 `AbilityRadarPanel` 을 쓴다.
+ * 카드 쪽은 `pages/season/ui/SeasonTeamCard`(구단정보 0xd5 · 이름 입력 0xc8)가 (178, 104) 반지름 30 으로 쓴다.
+ * 카드 갈래 판정 (0x7beb6~0x7bedc): [gfx+0x20] 은 장면 셋업이 전역 모드로 둔다(시즌 0x3f92 = 2 · 나리 0xfa72 = 3 · 4).
+ * 시즌 0xd5 → 팀 · 0xc8 → 팀([+0x1a4] = 0) · 0xd9(그림 0xae98) → 선수 · 0xdc(그림 0xb1f8 은 [+0x1a4] == 3 일 때만 카드를 부른다 b266~b272)
+ * → 선수 · 나리 기본정보 0x15e20 → 0x7b998 이 안 서 0x7bfc8 선수 갈래.
  */
 
 export interface AbilityRadarAxis {

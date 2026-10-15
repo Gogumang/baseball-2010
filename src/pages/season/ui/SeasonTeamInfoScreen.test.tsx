@@ -57,3 +57,17 @@ describe('구단정보 0xd5 카드', () => {
     expect((screen.getByTestId('시즌카드-딱지-머리판') as HTMLElement).dataset.image).toBe('116')
   })
 })
+
+describe('구단정보 0xd5 ABILITY 판 — 카드 팀 갈래 0x7bf9c → 0x5aefd 종류 0 (리터럴 0x7c100)', () => {
+  it('가운데 (178, 104) 반지름 30 의 ABILITY 판 전체 — 둥근 바탕 · 이름 상자 넷 · 축 이름 46 · 45 · 204 · 205', () => {
+    띄우기()
+    const 판 = screen.getByTestId('능력치 도형')
+    const 그림들 = Array.from(판.querySelectorAll('img'))
+    const 바탕 = 그림들.filter((image) => image.getAttribute('src') === './sprites/slt_frame/003.png')
+    expect(바탕.map((image) => [image.style.left, image.style.top])).toEqual([['147px', '73px'], ['177px', '73px']])
+    expect(그림들.filter((image) => image.getAttribute('src') === './sprites/slt_frame/017.png')).toHaveLength(4)
+    for (const frame of ['046', '045', '204', '205']) {
+      expect(그림들.map((image) => image.getAttribute('src'))).toContain(`./sprites/img_text/frames/${frame}.png`)
+    }
+  })
+})

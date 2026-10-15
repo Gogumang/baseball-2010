@@ -6,7 +6,6 @@ import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { yearCellDrawingOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import { abilityChartFrameOf, abilityGrowthVerticesOf } from '@/pages/create-player/lib/teamSelectLayout'
 import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
-import { ABILITY_FILL_ALPHA } from '@/pages/create-player/ui/AbilityGrowthPolygon'
 import {
   ABILITY_RADAR_BACK, ABILITY_RADAR_BOX, ABILITY_RADAR_EMPTY, abilityRadarAxesOf,
 } from '@/pages/create-player/lib/abilityRadarPanel'
@@ -20,9 +19,18 @@ const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imag
 const CELL_DIGIT_X = 0x18
 
 /**
+ * 값 도형 채움 알파 — `anim+0x80 = 0xb4ffff00`(0x5b386) 의 위 바이트 0xb4.
+ * 아래 세 바이트 ffff00 이 `radarFill`(#FFFF00) 과 같고 `anim+0x7c = makeColor(255,255,255)`(0x5b380) 가 `radarEdge`(#FFFFFF) 다.
+ */
+export const ABILITY_FILL_ALPHA = 0xb4 / 0xff
+
+/**
  * **ABILITY 판** — 능력치 도형 0x5aefc 를 통째로 (`lib/abilityRadarPanel` 머리말의 차례):
  * 둥근 바탕(slt_frame 3 두 쪽) · 바탕 테두리 · 값 도형(레이더 [skin+0xd4] 의 자라는 애니) · 축 선 · 이름 상자 · 이름 · 숫자 또는 "???".
  * 숫자는 **지금값**(자라는 중의 값)을 찍어 도형과 같이 오른다. 값이 0 인 축(빈 칸·자라기 전)은 "???" 다.
+ * 값 도형: 0x5aefc 는 [anim+0x1e3] == 0 이면 0x5b344~0x5b3b8 에서 다시 만들고(0x75ebd(anim, 서술자, 4, 0)) 매 그림 0x764c9 가
+ * 한 걸음 0x760e8 을 굴린 뒤 그린다. 들어옴이 +0xad = 0 으로 두므로 붙을 때 0 에서 자라고, `restartKey` 가 바뀐 그림에서
+ * 지난 목표값부터 다시 오르내린다.
  */
 export function AbilityRadarPanel({ center, radius, maximumLength, labelFrames, targets, restartKey, showsNumbers = true, fromZero = true }: {
   readonly center: ChartPoint
