@@ -40,7 +40,7 @@ import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
-import { RecordAlertPanel, RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { RecordAlertPanel, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
@@ -1180,7 +1180,7 @@ export function TeamGameScreen({
           (예전 웹 안내 "자동 진행 중…" 은 원본에 없다)
         */}
 
-        {canPitch && !canBat && <RecordAlertScreenOverlay frame={recordAlert} />}
+        {canPitch && !canBat && <RecordAlertStageOverlay frame={recordAlert} />}
 
         {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
         {isAwaitingConfirm && !isPopupOpen && changeWindow === null && (

@@ -58,7 +58,7 @@ export function RecordAlertPanel({ frame }: { readonly frame: RecordAlertFrame }
 /**
  * 화면 기둥 위에 얹는 알림 — 웹 투구 화면(팀경기 우리 수비 · 투수편)처럼 240×320 장면 캔버스가 없는 화면에서 쓴다.
  * 원본은 같은 프레임 0x52c50 이 타석·투구 구분 없이 화면 좌표 (0, 0) 기준으로 그리므로 화면 기둥 왼쪽 위가 기준이다.
- * 부르는 쪽은 `position: relative` 판(화면과 형제 자리)에 넣는다.
+ * 부르는 쪽은 `position: relative` 판(화면과 형제 자리)에 넣는다 — 240×320 판(RawScreen) **안**이면 `RecordAlertStageOverlay`.
  * ⚠️ 근사: 원본은 팝업(경기 중 메뉴 등)을 알림 **위에** 그린다(0x53066 다음 0x746cd) — 웹 메뉴는 화면 본문 안이라 알림이 위에 온다.
  */
 export function RecordAlertScreenOverlay({ frame }: { readonly frame: RecordAlertFrame }) {
@@ -68,6 +68,19 @@ export function RecordAlertScreenOverlay({ frame }: { readonly frame: RecordAler
       <div className={styles.screenColumn}>
         <RecordAlertPanel frame={frame} />
       </div>
+    </div>
+  )
+}
+
+/**
+ * 240×320 판(RawScreen) **안**에 얹는 알림 — 판이 이미 화면 배율을 먹었으므로 기둥(zoom)을 다시 씌우지 않는다.
+ * 예전에는 판 안에서도 `RecordAlertScreenOverlay` 를 써서 배율 2 · 3 창에서 알림이 두 번 커졌다(배율 1 에서만 맞았다).
+ */
+export function RecordAlertStageOverlay({ frame }: { readonly frame: RecordAlertFrame }) {
+  if (frame.panel === null) return null
+  return (
+    <div className={styles.stageLayer}>
+      <RecordAlertPanel frame={frame} />
     </div>
   )
 }
