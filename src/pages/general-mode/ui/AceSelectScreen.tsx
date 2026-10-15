@@ -14,6 +14,7 @@ import { ACE_LEVEL_UP_TEXT, aceLevelOf, aceRecordAbilityAtLevel, isAceMaxLevel }
 import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
 import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { AceLevelUpWindow } from '@/widgets/ace-level-up/ui/AceLevelUpWindow'
+import { emitMenuSparkle } from '@/widgets/particles/model/sceneParticles'
 import {
   ACE_GRID_OPEN, ACE_LAYOUT, LOCKED_CIRCLES, NAME_BAR, TAG, aceCellPositionOf, isAceCellDimmed, isAceGridCursorOn,
 } from '@/pages/general-mode/lib/prepareLayout'
@@ -241,6 +242,8 @@ export function AceSelectScreen({
     if (answer !== 0 || !aceOpensWithGamePoint(cell) || onOpenAce === undefined) return
     if (gamePoint < aceOpenPriceOf(cell)) return setIsShortageOpen(true)
     onOpenAce(cell)
+    // 0xa45c · 0x2a24c · 0x2b20c — 산 뒤 (60, 160) 에 ptc/003 반짝이. 장면 프레임이 관리자를 돌려 곧바로 보인다
+    emitMenuSparkle()
   }
 
   useEffect(() => {

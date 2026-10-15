@@ -17,6 +17,7 @@ import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageM
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useCollection'
 import { useHiddenOpenNotice } from '@/app/model/useHiddenOpenNotice'
+import { SceneParticleLayer } from '@/widgets/particles/ui/SceneParticleLayer'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { EMPTY_COLLECTION, hallOfFameRecordIdOf, pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { hasCareerPlayerInSeasonTeam, isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
@@ -501,6 +502,9 @@ export function App() {
           />
         </ScreenOverlay>
       )}
+      {/* 장면 파티클 [0x1400068] — 0x103 · 0x105 · 0x106 · 0x107 프레임이 공용 창(0x746cd) 뒤에 굴리고 그린다(`sceneParticles`).
+          경기 장면(0x104)을 그리는 화면은 제 관리자를 따로 들어 이 층은 그동안 멈춘다 */}
+      {gameSceneCount === 0 && <SceneParticleLayer random={random} />}
     </RecordAchievedContext.Provider>
   )
 
