@@ -20,9 +20,9 @@ export const skinBackdrop = style({
 /**
  * 못 쓰는 칸 — 원본에 있는 칸이라 지우지 않고 흐리게만 그린다.
  * (원본에는 이런 상태가 없다. 통신 기능·아직 안 만든 화면을 구분해 보여 주려고 웹판이 더한 것이다.)
+ * 회색은 `EffectImage`(효과 0xa · 0xc37a8 과 같은 식)가 칠하고, 옅게 하는 것만 여기서 한다(웹 표시).
  */
 export const dimmed = style({
-  filter: 'grayscale(1)',
   opacity: 0.4,
 })
 

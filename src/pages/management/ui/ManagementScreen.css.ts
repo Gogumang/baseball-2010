@@ -33,9 +33,20 @@ export const commandButton = style({
   cursor: 'pointer',
   selectors: {
     '&:focus-visible': { outline: `1px dashed ${ORIGINAL_COLORS.text}` },
-    // 비활성 칸은 흑백으로 바꾼다 (0xc37a8 은 RGB565 채널 평균 — CSS grayscale 은 근사)
-    '&:disabled': { filter: 'grayscale(1)', cursor: 'not-allowed' },
+    // 비활성 칸의 흑백(0xc37a8)은 `CommandBar` 가 칸 사각형 안 겹마다 회색 그림을 얹는다
+    '&:disabled': { cursor: 'not-allowed' },
   },
+})
+
+/** 0xc37a8 흑백 사각형 — 칸(32×32) 밖은 자른다 */
+export const grayRect = style({
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: '32px',
+  height: '32px',
+  overflow: 'hidden',
+  pointerEvents: 'none',
 })
 
 export const commandIcon = style([layer, { left: '-1px' }])

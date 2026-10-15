@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as styles from '@/shared/ui/IconMenu/IconMenu.css'
+import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
+import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 
 /**
  * 원작 메뉴.
@@ -92,7 +94,10 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
             }}
           >
             <img className={styles.slotBack} src={SLOT_BACKGROUND} alt="" aria-hidden />
-            <img className={styles.slotIcon} src={item.iconUrl} alt="" aria-hidden />
+            {/* 못 고르는 칸 아이콘 — 회색은 원본 효과 0xa 식(`EffectImage`). 어둡게 하는 것은 웹이 더한 표시다(IconMenu.css) */}
+            {item.isDisabled === true
+              ? <EffectImage className={`${styles.slotIcon} ${styles.slotIconDisabled}`} src={item.iconUrl} effect={DRAW_EFFECT.GRAY} />
+              : <img className={styles.slotIcon} src={item.iconUrl} alt="" aria-hidden />}
             {index === selectedIndex && (
               <img className={styles.slotFrame} src={SELECTION_FRAME} alt="" aria-hidden />
             )}

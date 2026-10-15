@@ -23,6 +23,8 @@ import {
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
+import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
+import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
@@ -190,10 +192,10 @@ export function SpecialScreen({
       {/* 여덟 칸 — 고른 줄은 설명 판이 그리므로 목록에서는 빼고 그린다 (원본도 판이 그 자리를 덮는다) */}
       {SPECIAL_ITEMS.map((item, index) => (
         index === cursor ? null : (
-          <img
+          <EffectImage
             key={item.id}
             className={`${styles.sprite} ${item.availability === '됨' ? '' : styles.dimmed}`}
-            alt=""
+            effect={item.availability === '됨' ? null : DRAW_EFFECT.GRAY}
             src={imageSrc(MAIN_UI_FRAMES, item.labelFrame)}
             style={{ left: rowLeftOf(item), top: rowTopOf(index) }}
           />
@@ -207,9 +209,9 @@ export function SpecialScreen({
         src={imageSrc(MAIN_UI, DESCRIPTION_PANEL.image)}
         style={{ left: DESCRIPTION_PANEL.x + shakeDx, top: descriptionPanelTopOf(cursor) + shakeDy }}
       />
-      <img
+      <EffectImage
         className={`${styles.sprite} ${selected.availability === '됨' ? '' : styles.dimmed}`}
-        alt=""
+        effect={selected.availability === '됨' ? null : DRAW_EFFECT.GRAY}
         src={imageSrc(MAIN_UI_FRAMES, selected.labelFrame)}
         style={{
           left: DESCRIPTION_PANEL.x + DESCRIPTION_PANEL.padding + shakeDx,

@@ -1,7 +1,10 @@
 import {
-  COMMAND_LABEL_HEIGHT, COMMAND_LABEL_OFFSET_Y, PARENT_SLOT_TARGET, commandLabelAlignOf, commandLabelLeftOf,
+  COMMAND_LABEL_HEIGHT, COMMAND_LABEL_OFFSET_Y, COMMAND_SLOT_SIZE, PARENT_SLOT_TARGET, commandLabelAlignOf, commandLabelLeftOf,
   commandSlotYAt, slidePositionAt,
 } from '@/pages/management/lib/managementLayout'
+import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
+import { usePublishScreenGrayRects } from '@/shared/lib/pixelEffect/screenGrayRects'
+import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 import type { MenuSlot } from '@/pages/management/lib/managementLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 
@@ -48,6 +51,12 @@ const BRACKET = { left: -5, top: -9 + 11 }
 export function CommandBar(props: CommandBarProps) {
   const { slots, cursor, bounce, slideUpdates, disabledIds, labelWidths, parent, onHover, onSelect } = props
   const isSubMenu = props.isSubMenu ?? parent !== null
+  const isGray = (slot: MenuSlot) => disabledIds.has(slot.id) || props.grayedIds?.has(slot.id) === true
+  // 0x7e6f8~0x7e710 — 꺼진 칸은 아이콘(· 고른 칸이면 이름표)까지 그린 뒤 0xc37a8(칸.x, 칸.y + 미끄럼, 칸.w, 칸.h) 로 화면을 흑백으로.
+  // 칸 크기는 32×32(0x7b590). 이름표는 y + 34 라 사각형 밖이다. 사각형 아래 바탕(공 무늬)은 바탕이 이 알림을 읽어 회색으로 다시 얹는다
+  usePublishScreenGrayRects(slots.filter(isGray).map((slot) => ({
+    x: slot.x, y: commandSlotYAt(slot.y, slideUpdates), width: COMMAND_SLOT_SIZE, height: COMMAND_SLOT_SIZE,
+  })))
   // 칸이 하나도 없으면(0x7e84c 가 표를 비운 상태 — 시즌 0xd6 · 0xdc) 부모 칸만 그린다
   const selected = slots[cursor] as MenuSlot | undefined
   const selectedY = selected === undefined ? 0 : commandSlotYAt(selected.y, slideUpdates)
@@ -78,9 +87,15 @@ export function CommandBar(props: CommandBarProps) {
           onFocus={() => onHover(index)}
           onClick={() => onSelect(slot.id)}
         >
-          <img className={styles.commandIcon}
-            style={{ top: -1 + (index === cursor ? bounce : 0), ...(props.grayedIds?.has(slot.id) === true ? { filter: 'grayscale(1)' } : {}) }}
+          <img className={styles.commandIcon} style={{ top: -1 + (index === cursor ? bounce : 0) }}
             src={iconOf(slot.icon, index === cursor)} alt="" />
+          {/* 0xc37a8 흑백 — 칸 사각형 안만 회색(아이콘이 사각형 밖으로 1px 나온 왼쪽 · 위 줄은 색 그대로) */}
+          {isGray(slot) && (
+            <span className={styles.grayRect} data-testid={`흑백-${slot.id}`}>
+              <EffectImage className={styles.commandIcon} effect={DRAW_EFFECT.GRAY}
+                style={{ top: -1 + (index === cursor ? bounce : 0) }} src={iconOf(slot.icon, index === cursor)} />
+            </span>
+          )}
         </button>
       ))}
       {selected !== undefined && (
