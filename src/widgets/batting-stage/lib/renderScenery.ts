@@ -502,13 +502,22 @@ function drawField(context: CanvasRenderingContext2D, grassPalette: number | nul
  * 그림 함수는 경기 배경(`drawScenery` 의 시즌 구장 길)과 같고 카메라만 (−120, −70) 대신 (−165, −80) 이다. 하늘 0x77fe8 은 구장+4 에서
  * 폭 480 으로 칠하므로 화면을 다 덮는다.
  *
+ * **우타 거울** (2026-10-15 직접 떴다): 이 구장([this+0x10c])은 0x3b14 가 `0x1239(0x94)`(4028 · 할당 0x2ac4 가 0x1400428 memset 으로
+ * 0 을 채운다) → 생성자 0x76b24(4032) → 0x76ac8 로 만들고 76ade~76ae2 가 **+0x60 = 0** 으로 둔다. 진입 0xe4d0 은 +0x60 을 안 쓰고
+ * (0x78741 관중석 · +0x89 = 0 · +0x8a = 기록+0x1b9 · 0x76b6c · 0x76ba4(1) · 0x783b0 · 0x76fc4 · 카메라 · 0x786c9 잔디), 장면 +0x10c 를
+ * 읽는 시즌 장면 함수(0x3b14 · 0x4180 · 0x5f3c · 0x7958 · 0x957c · 0xb158 · 0xb1f8 · 0xe4d0 · 0xe9ac · 0xf684 · 0x10004) 어디도 +0x60 을
+ * 안 쓴다. 그래서 시즌 구장 0x77494(774e6 `ldrb [+0x60]` == 0 → 77540 x + 490 · 효과 0x11)와 바닥 0x7725c(77272 == 0 → 772ca
+ * x = 구장+4 − 0x21 · 효과 0x11)가 **우타 거울 길**로 그린다. 거울 축은 2·구장+4 + 479 라 카메라 (−165) 에서는 화면 149 − x 다 —
+ * 웹은 캔버스를 dx(= −165 + 120) 만큼 옮긴 뒤 경기 우타 길(`RIGHT_HANDED_MIRROR_X`, 바닥 통째)을 그대로 그리면 같은 축이 된다.
+ * 바닥 그림(폭 585)은 우타 자리 −198~387 이 화면을 다 덮는다.
+ *
+ * **전광판 팀 아이콘**(칸 3, 0x77654~0x77722): 구장+0x7c(아이콘 그림)는 적재 0x76ba4 가 76ec2 에서 늘 싣고(0 이 아니다), 아이콘 칸
+ * +0x84(박스 0) · +0x80(박스 1)은 위 함수들 어디도 안 쓴다 — 할당 memset 의 **0 그대로**다. 0x77494 는 0x77974 와 달리 모드 5·6 덮기가
+ * 없고 14 → 10 · 9 초과 → 11 만 고르므로 두 상자 모두 **아이콘 0** 이 그려진다.
+ *
  * ⚠️ 미해결(근사):
  * - 하늘 칸 구장+0x18 은 0x783b0 이 `[0x1552d0c]+0x6b`(마지막 경기 상태의 이닝)를 읽는다 — 웹은 그 값을 안 들어 부르는 쪽이 넘긴다.
  * - 구름 자리(구장 안 구름 칸)와 전광판 글자 자리(+0x8c)는 마지막으로 흐른 값 그대로인데 웹은 처음 값(틱 0)으로 둔다.
- * - 전광판 칸 3 의 팀 아이콘(구장+0x80 · +0x84)은 이 장면에서 누가 채우는지 못 찾아 안 그린다.
- * - ⚠️ 미이식: 이 구장([this+0x10c])도 0x3b14 의 4032 가 생성자 0x76b24 로 만들어 +0x60 = 0(76ae2)이다 — 경기정보 무대
- *   (`MATCH_INFO_STADIUM_MIRRORED`)처럼 시즌 구장 0x77494 · 바닥 0x7725c 가 우타 거울 길로 그려질 것이다. 이 장면에서 +0x60 을 다시
- *   쓰는 곳은 없다(쓰는 곳 전수 — 경기정보 무대 주석). 미리보기 카메라(−165)에서 바닥 자르기와 거울을 맞추는 일이 남아 안 뒤집는다.
  */
 export const STADIUM_PREVIEW_CAMERA = { x: -165, y: -80 } as const
 
@@ -543,25 +552,33 @@ export function drawStadiumPreview(context: CanvasRenderingContext2D, state: Sta
   context.save()
   context.translate(dx, dy)
   if (isCloudVisible(colorIndex)) drawClouds(context, 0, cloudPaletteRowOf(colorIndex))
-  // 시즌 구장 0x77494 — 팀 아이콘(칸 3)은 위 미해결이라 뺀다
-  const season = state.seasonStadium
-  const fence = seasonFenceFramesOf(season.stand, season.crowd)
-  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.standFrame))
-  drawAtFenceAnchor(context, placedFrame(fence.folder, fence.crowdFrame))
-  const board = seasonBoardFrameOf(season.board)
-  drawAtFenceAnchor(context, placedFrame(board.folder, board.frame))
-  if (state.isScoreboardOn !== false) drawScoreboardText(context, seasonScoreboardBoxOf(season.board) ?? undefined, 0)
+  // 시즌 구장 0x77494 — +0x60 == 0 이라 우타 거울 길(관중석 · 덧그림 · 전광판 그림 뒤집기, 아이콘 · 글자는 잰 박스만큼 옮김)
+  drawSeasonFenceParts(context, stadiumPreviewSceneryOf(state), state.seasonStadium, STADIUM_PREVIEW_MIRRORED)
   context.restore()
 
-  // 바닥 0x7725c — 그림 x 는 구장+4 를 따라 옮겨 간다(원본 쪽 자르기 시작점이 −dx 만큼 오른쪽)
-  const field = fieldBackground(season.grassPalette)
-  if (field === null) return
-  const sourceX = STAGE_LAYOUT.fieldSourceX - dx
-  context.drawImage(
-    field,
-    sourceX, 0, STAGE_WIDTH, field.height,
-    0, STAGE_LAYOUT.fieldTopY + dy, STAGE_WIDTH, field.height,
-  )
+  // 바닥 0x7725c — +0x60 == 0 이라 772ca 우타 갈래(x = 구장+4 − 0x21, 효과 0x11). 카메라 x 를 따라 dx 만큼 옮긴다
+  context.save()
+  context.translate(dx, 0)
+  drawField(context, state.seasonStadium.grassPalette, dy, STADIUM_PREVIEW_MIRRORED)
+  context.restore()
+}
+
+/** 구장관리 미리보기 구장 +0x60 == 0 (생성자 76ae2, 위 주석) — 우타 거울 길로 그린다 */
+export const STADIUM_PREVIEW_MIRRORED = true
+/** 미리보기 구장의 아이콘 칸 +0x84 · +0x80 — 아무도 안 써서 할당 memset 의 0 (위 주석) */
+export const STADIUM_PREVIEW_ICON_TEAM = 0
+
+function stadiumPreviewSceneryOf(state: StadiumPreviewState): SceneryState {
+  return {
+    skyRow: state.skyRow,
+    skyColumn: state.skyColumn,
+    tick: 0,
+    stadium: 0,
+    seasonStadium: state.seasonStadium,
+    ourTeamId: STADIUM_PREVIEW_ICON_TEAM,
+    opponentTeamId: STADIUM_PREVIEW_ICON_TEAM,
+    ...(state.isScoreboardOn === undefined ? {} : { isScoreboardOn: state.isScoreboardOn }),
+  }
 }
 
 /**

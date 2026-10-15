@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
-  MATCH_INFO_STADIUM_MIRRORED, RIGHT_HANDED_CROWD_SHIFT, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
+  MATCH_INFO_STADIUM_MIRRORED, RIGHT_HANDED_CROWD_SHIFT, STADIUM_PREVIEW_ICON_TEAM, STADIUM_PREVIEW_MIRRORED, drawStadiumPreview, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
   drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
@@ -233,5 +233,37 @@ describe('우타 거울 — 구장 +0x60 (0x779a4 · 0x772ca)', () => {
 
   it('거울 축은 (239, 0) — 좌타 XL + p 와 우타 XR − 1 − p 의 합이 238', () => {
     expect(RIGHT_HANDED_MIRROR_X).toBe(239)
+  })
+})
+
+// 구장관리 0xea 그리기 0xb158 — 구장은 0x3b14 가 새로 만든 것(+0x60 = 0 · +0x80 · +0x84 = 0)이라 우타 거울 길 · 아이콘 0
+describe('drawStadiumPreview — 구장관리 미리보기', () => {
+  function 기록컨텍스트() {
+    const translates: [number, number][] = []
+    const context = {
+      fillStyle: '',
+      fillRect: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      save: () => {},
+      restore: () => {},
+      translate: (x: number, y: number) => translates.push([x, y]),
+      scale: () => {},
+      drawImage: () => {},
+      beginPath: () => {},
+      rect: () => {},
+      clip: () => {},
+    }
+    return { context: context as unknown as CanvasRenderingContext2D, translates }
+  }
+
+  it('구장 +0x60 == 0 이라 우타 거울 · 아이콘 칸은 0 그대로', () => {
+    expect(STADIUM_PREVIEW_MIRRORED).toBe(true)
+    expect(STADIUM_PREVIEW_ICON_TEAM).toBe(0)
+  })
+
+  it('구장 묶음은 카메라 (−165, −80) 만큼, 바닥은 가로 dx 만 옮겨 그린다', () => {
+    const { context, translates } = 기록컨텍스트()
+    drawStadiumPreview(context, { skyRow: 0, skyColumn: 0, seasonStadium: { stand: 0, crowd: 0, board: 3, grassPalette: null } })
+    expect(translates).toEqual([[-45, -10], [-45, 0]])
   })
 })
