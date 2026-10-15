@@ -2,16 +2,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EntryEditorScreen } from '@/widgets/entry-editor/ui/EntryEditorScreen'
-import { ENTRY_TAB, openEntryEditor } from '@/entities/season-mode/model/entryEditor'
+import { ENTRY_SUB_TAB, ENTRY_TAB, openEntryEditor } from '@/entities/season-mode/model/entryEditor'
+import type { EntryBatterRow, EntryLists, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
+import type { EntryFace } from '@/widgets/entry-editor/ui/EntryEditorScreen'
 
 /** 엔트리 편집 화면 — 키를 편집기 키로 바꿔 넘기고 목록을 그린다 */
 
 afterEach(cleanup)
 
-const 목록 = {
-  batters: [{ name: '김타자', isAce: false, position: 2, ability: [500, 400, 300, 200] }],
+const 목록: EntryLists<EntryBatterRow & EntryFace, EntryPitcherRow & EntryFace> = {
+  batters: [
+    { name: '김타자', isAce: false, position: 2, ability: [500, 400, 300, 200], profileLow: 1,
+      batterLine: { atBats: 100, hits: 31, doubles: 0, triples: 0, homeRuns: 7, runsBattedIn: 20, steals: 0, errors: 0 } },
+  ],
   pitchers: [
-    { name: '박투수', isAce: false, ability: [600, 500, 400, 300] },
+    { name: '박투수', isAce: false, ability: [600, 500, 400, 300], profileLow: 0 },
     { name: '마투수', isAce: true, ability: [] },
   ],
 }
@@ -34,10 +39,13 @@ const 띄우기 = (overrides: Partial<Parameters<typeof EntryEditorScreen>[0]> =
 }
 
 describe('엔트리 편집 화면', () => {
-  it('투수 탭으로 열려 투수 명단을 보여 준다', () => {
+  it('투수 탭으로 열려 투수 명단을 원본 열(순서 · 이름 | 보직 · 방어 · 삼진)로 보여 준다 — 0x5c984', () => {
     띄우기()
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('박투수')
-    expect(screen.queryByTestId('엔트리-하위탭')).toBeNull()
+    expect(screen.getByTestId('엔트리-칸-0-이름').getAttribute('aria-label')).toBe('박투수')
+    expect(screen.getByTestId('엔트리-열-등판순서-8000000')).toBeTruthy()
+    expect(screen.getByTestId('엔트리-열-딱지-20000000')).toBeTruthy()
+    expect(screen.getByTestId('엔트리-열-기록-100')).toBeTruthy()
+    expect(screen.getByTestId('엔트리-열-기록-4000')).toBeTruthy()
   })
 
   it('키를 편집기 키로 넘긴다 — 숫자 키패드와 화살표 둘 다', () => {
@@ -48,10 +56,17 @@ describe('엔트리 편집 화면', () => {
     expect(onKey.mock.calls.map(([key]) => key)).toEqual(['확인', '확인', '왼', '오른', '별', '영', '취소', '아래'])
   })
 
-  it('타자 탭은 수비 위치 글자와 하위 탭을 보여 준다', () => {
+  it('타자 탭은 타순 · 이름 | 수비 딱지 · 타율 · 홈런 열 — 하위 탭은 글이 아니라 커서 꼴로 보인다', () => {
     띄우기({ editor: { ...openEntryEditor(true), tab: ENTRY_TAB.타자 } })
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('포수')
-    expect(screen.getByTestId('엔트리-하위탭').textContent).toBe('타순 / 수비위치')
+    expect(screen.getByTestId('엔트리-열-타순-1000000')).toBeTruthy()
+    expect(screen.getByTestId('엔트리-열-딱지-10000000')).toBeTruthy()
+    expect(screen.getByTestId('엔트리-열-기록-0')).toBeTruthy()
+    // 하위 탭 0 — 이름 칸(48) + 딱지 칸(36) + 3 = 93 폭 커서 · 1 — 딱지 칸(105, 36)만. 키 셈 0 이라 안쪽 꼴(x + 1)
+    const 커서 = () => [...screen.getByTestId('엔트리-커서').querySelectorAll('span')].map((node) => (node as HTMLElement).style.left)
+    expect(커서()).toContain('49px')
+    cleanup()
+    띄우기({ editor: { ...openEntryEditor(true), tab: ENTRY_TAB.타자, subTab: ENTRY_SUB_TAB.수비위치 } })
+    expect(커서()).toContain('106px')
   })
 
   it('마선수 잠금 팝업이 뜨면 키를 넘기지 않는다', () => {

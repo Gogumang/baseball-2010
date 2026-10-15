@@ -1,15 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { CommonPanel, MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox, RawScreen } from '@/shared/ui'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
-import {
-  ACE_ENTRY_LOCKED_TEXT, ENTRY_SUB_TAB, ENTRY_TAB, NO_ENTRY_PICK, fieldPositionLabelOf,
-} from '@/entities/season-mode/model/entryEditor'
+import { ACE_ENTRY_LOCKED_TEXT, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import type {
   EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherRow,
 } from '@/entities/season-mode/model/entryEditor'
+import { ENTRY_TABLES_BASIC, entrySlideOffsetOf } from '@/widgets/entry-editor/lib/entryListWindow'
+import type { EntryBatterLine, EntryColumnTables, EntryPitcherLine } from '@/widgets/entry-editor/lib/entryListWindow'
+import { EntryListWindow } from '@/widgets/entry-editor/ui/EntryListWindow'
 import * as styles from '@/widgets/entry-editor/ui/EntryEditorScreen.css'
 
 /** 편집기 한 줄이 화면에 보여 줄 것 */
@@ -17,6 +19,14 @@ export interface EntryFace {
   readonly name: string
   /** 능력치 네 칸 — '0' 상세 창에 적는다 (없으면 빈 배열) */
   readonly ability: readonly number[]
+  /** 레코드 `+0xb & 3` — 타자 이름 칸 세로 줄 색 · 투수 보직 딱지 (없으면 비운다) */
+  readonly profileLow?: number
+  /** 타자 레코드 +0x20~+0x2e — 기록 열 (없으면 비운다) */
+  readonly batterLine?: EntryBatterLine
+  /** 투수 레코드 +0x20~+0x2f */
+  readonly pitcherLine?: EntryPitcherLine
+  /** 투수 체력 줄 재료 — 용량 0x66e44(팀, rec, 0) · 퍼센트 */
+  readonly stamina?: { readonly capacity: number; readonly percent: number }
 }
 
 export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace> {
@@ -53,35 +63,44 @@ export interface EntryEditorScreenProps<B extends EntryBatterRow & EntryFace, P 
    * 세우는 0x63b14 를 안 불러 false 를 넘긴다
    */
   readonly slides?: boolean
+  /**
+   * 열 표 — 안 주면 기본 표(타순 · 이름 | 수비 · 타율 · 홈런 / 등판순서 · 이름 | 보직 · 방어 · 삼진). 시즌 선수 고르기 0xdf 와 스페셜
+   * 에디트는 넓은 표(`ENTRY_TABLES_WIDE`)다
+   */
+  readonly tables?: EntryColumnTables
+  /** [ed+0x333] — 이름 칸 덧그림 0x571d8 (안 주면 켠다 — 일반 0x2648c · 시즌 진입들이 1 로 세운다) */
+  readonly showsNameBars?: boolean
+  /** [ed+0x438] — 커서가 이름 칸만 (스페셜 에디트 0x2b424) */
+  readonly isCursorNameOnly?: boolean
+  /**
+   * 그림 한 틀 — 열 밀기([ed+0x331])가 서 있거나 `ticksEveryFrame` 이면 틀마다 부른다. 부르는 쪽이 `advanceEntrySlide` ·
+   * `tickEntryEditor` 로 편집기를 고친다
+   */
+  readonly onFrame?: () => void
+  /** 틀마다 0x55864 를 부르는 쪽(메인 메뉴 0x32634 → 0x2a370 · 0x2b2e0)인가 — 키 셈 [ed+0x40c] 이 틀마다 오른다 */
+  readonly ticksEveryFrame?: boolean
 }
-
-/**
- * 판 (15, 55, 210, 220) — 0x5cfec → 0x5c984 의 5ca4e 공용 판 0x55e60(편집기, W/2, H/2 + 5, 0xd2, 0xdc, 0, 0x22, 위 띠 0x12,
- * 아래 띠 ((s8)[편집기+0x3e8] == 1 ? 0x12 : 0), 0, 0) (5ca2c~5ca4e 직접 뜸). [편집기+0x3e8] 은 초기화 0x5561c(556a0)가 0 으로만
- * 쓰므로 아래 띠는 늘 0 이다. ⚠️ 판 안 줄·칸 그림은 아직 근사다.
- */
-const PANEL = { x: 15, y: 55, width: 210, height: 220 } as const
-/** `0x55798(ed, 3, 10)` — 한 번에 보이는 줄 10 */
-const VISIBLE_ROWS = 10
-const ROW = { x: 22, firstY: 92, height: 17, width: 196 } as const
 
 /** 머리띠 0x54d95 셋째 인자 — 투수 탭 0xf · 타자 탭 0x17 (일반 0x2e09e~0x2e0aa · 시즌 0xe0 그림 0xb08c~0xb098) */
 const ENTRY_FOOTER = { 투수: 0xf, 타자: 0x17 } as const
 
 const BATTER_ABILITY_LABELS = ['히트', '파워', '수비', '주루'] as const
 const PITCHER_ABILITY_LABELS = ['제구', '구속', '변화', '체력'] as const
+/** '0' 상세 창 근사 자리 — 판 (15, 55, 210, 220) 아래쪽 */
+const DETAIL_BOX = { x: 35, y: 196, width: 170, height: 72 } as const
 
 /**
- * **엔트리 편집 화면** — 시즌 0xe0(그림 `0xb074`) · 일반모드 상태 23(그림 `0x2e070`):
- * 엔트리 목록 창 `0x5cfec` + 머리띠 `0x54d95(skin, 탭 1 ? 7 "투수엔트리"/바닥 0xf : 6 "타자엔트리"/바닥 0x17)`.
+ * **엔트리 편집 화면** — 시즌 0xe0(그림 `0xb074`) · 0xdf(`0xb010`) · 일반모드 상태 23(그림 `0x2e070`) · 스페셜 에디트 29(`0x2e1e0`):
+ * 엔트리 목록 창 `0x5cfec`(`EntryListWindow` — 칸 배치 · 수비/보직 딱지 · 기록 열 · 커서 · 열 밀기 모두 원본에서 떴다)
+ * + 머리띠 `0x54d95(skin, 탭 1 ? 7 "투수엔트리"/바닥 0xf : 6 "타자엔트리"/바닥 0x17)`.
  * 키는 `entities/season-mode/model/entryEditor.pressEntryKey`(0x55864)가 다 들고, 이 화면은 그리고 키만 넘긴다.
+ * 원본 창에는 팀 이름 · 하위 탭 글이 없다 — 하위 탭(타순 · 수비위치)은 커서 꼴(이름+딱지 칸 / 딱지 칸만)로만 보인다.
  *
- * ⚠️ 근사·미해결: 목록 창 안 칸 배치(0x5698d·0x573e9… 가로로 넘기는 열, P6 2f)와 수비 위치 아이콘(0x54591),
- *    투수 보직 아이콘(0x545e9), '0' 상세 창 그림이 미해독이다. 판 자리와 보이는 줄 수(10)만 원본에서 왔고,
- *    줄에는 이름·수비 위치 글자만 적는다. 화면 밀기(0xbdae9, 1000) 연출도 없다.
+ * ⚠️ 근사·미해결: '0' 상세 창 그림 0x5b798 은 아직 엔트리 창에 옮기지 않아 능력치 글로 적는다.
  */
 export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace>({
   editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, footer, slides, onKey, onMoveCursor, onCloseAceLocked,
+  tables = ENTRY_TABLES_BASIC, showsNameBars = true, isCursorNameOnly = false, onFrame, ticksEveryFrame = false,
 }: EntryEditorScreenProps<B, P>) {
   useEffect(() => {
     if (isAceLocked) return undefined
@@ -108,73 +127,51 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isAceLocked, onKey])
 
+  // 그림 한 틀 — 열 밀기 한 단계(0x5c984) · 메인 메뉴의 틀마다 키 셈
+  const isSliding = editor.slide !== null
+  const frameRef = useRef(onFrame)
+  frameRef.current = onFrame
+  const hasFrame = onFrame !== undefined
+  useEffect(() => {
+    if (!hasFrame || (!isSliding && !ticksEveryFrame)) return undefined
+    const timer = window.setInterval(() => frameRef.current?.(), millisecondsPerFrame())
+    return () => window.clearInterval(timer)
+  }, [hasFrame, isSliding, ticksEveryFrame])
+
   const isPitcherTab = editor.tab === ENTRY_TAB.투수
-  const rows: readonly (EntryFace & { readonly isAce: boolean; readonly value: string })[] = isPitcherTab
-    ? lists.pitchers.map((row) => ({ ...row, value: '' }))
-    : lists.batters.map((row) => ({ ...row, value: fieldPositionLabelOf(row.position) }))
-  const first = rows.length <= VISIBLE_ROWS
-    ? 0
-    : Math.min(Math.max(0, editor.cursor - VISIBLE_ROWS + 1), rows.length - VISIBLE_ROWS)
-  const visible = rows.slice(first, first + VISIBLE_ROWS)
+  const table = isPitcherTab ? tables.pitcher : tables.batter
+  const rows = isPitcherTab ? lists.pitchers : lists.batters
   const cursorRow = rows[editor.cursor]
   const abilityLabels = isPitcherTab ? PITCHER_ABILITY_LABELS : BATTER_ABILITY_LABELS
-
-  const subTabLine = isPitcherTab
-    ? null
-    : editor.subTab === ENTRY_SUB_TAB.보기전용
-      ? '보기 전용'
-      : null
 
   return (
     <RawScreen>
       {underlay}
-      <CommonPanel x={PANEL.x} y={PANEL.y} width={PANEL.width} height={PANEL.height} topBand={0x12} testId="엔트리-판" />
-      <div className={styles.teamLine} style={{ left: PANEL.x, top: PANEL.y + 4, width: PANEL.width }}>
-        {teamName}
+      <div aria-label={teamName}>
+        <EntryListWindow
+          rows={rows}
+          table={table}
+          cursor={editor.cursor}
+          top={editor.top}
+          firstColumn={editor.firstColumn}
+          slideOffset={entrySlideOffsetOf(editor.slide, editor.firstColumn, table.scroll.length)}
+          keyPresses={editor.keyPresses}
+          subTab={editor.subTab}
+          picked={editor.first}
+          showsNameBars={showsNameBars}
+          isCursorNameOnly={isCursorNameOnly}
+          // 웹 전용: 처음 누르면 커서만 옮기고, 커서 줄을 다시 누르면 확인 — 원본은 위·아래 키뿐이다
+          onPressRow={isAceLocked ? undefined : (index) => {
+            if (index === editor.cursor) onKey('확인')
+            else onMoveCursor(index)
+          }}
+          onPressArrow={isAceLocked ? undefined : onKey}
+        />
       </div>
-      {/* 타자 탭의 하위 탭 `+0x330` — 0 타순 · 1 수비위치 (좌·우로 옮긴다) */}
-      {!isPitcherTab && (
-        <div className={styles.tabLine} style={{ left: PANEL.x, top: PANEL.y + 19, width: PANEL.width }}
-          data-testid="엔트리-하위탭">
-          {subTabLine ?? (
-            <>
-              <span className={editor.subTab === ENTRY_SUB_TAB.타순 ? styles.tabActive : undefined}>타순</span>
-              {' / '}
-              <span className={editor.subTab === ENTRY_SUB_TAB.수비위치 ? styles.tabActive : undefined}>수비위치</span>
-            </>
-          )}
-        </div>
-      )}
-
-      {visible.map((row, offset) => {
-        const index = first + offset
-        const classes = [
-          styles.row,
-          index === editor.cursor ? styles.rowCursor : '',
-          index === editor.first && editor.first !== NO_ENTRY_PICK ? styles.rowPicked : '',
-          row.isAce ? styles.rowAce : '',
-        ].filter(Boolean).join(' ')
-        return (
-          <button key={`${index}-${row.name}`} type="button" className={classes}
-            data-testid={`엔트리-줄-${index}`}
-            aria-current={index === editor.cursor}
-            style={{ left: ROW.x, top: ROW.firstY + offset * ROW.height, width: ROW.width, height: ROW.height }}
-            onClick={() => {
-              // 웹 전용: 처음 누르면 커서만 옮기고, 커서 줄을 다시 누르면 확인 — 원본은 위·아래 키뿐이다
-              if (index === editor.cursor) onKey('확인')
-              else onMoveCursor(index)
-            }}>
-            <span className={styles.rowNumber}>{index + 1}</span>
-            <span className={styles.rowName}>{row.name}</span>
-            <span className={styles.rowValue}>{row.value}</span>
-          </button>
-        )
-      })}
 
       {editor.isDetailOpen && cursorRow !== undefined && (
         <div className={styles.detail} data-testid="엔트리-상세"
-          // 다섯 줄(이름 + 능력 넷) × 줄 높이 13 + 안쪽 여백 4 + 테두리 2 = 71 — 60 이면 넷째 능력(주루·체력)이 잘렸다 (r82)
-          style={{ left: PANEL.x + 20, top: PANEL.y + PANEL.height - 80, width: PANEL.width - 40, height: 72 }}>
+          style={{ left: DETAIL_BOX.x, top: DETAIL_BOX.y, width: DETAIL_BOX.width, height: DETAIL_BOX.height }}>
           {[cursorRow.name, ...cursorRow.ability.map((value, i) => `${abilityLabels[i] ?? ''} ${value}`)].join('\n')}
         </div>
       )}

@@ -81,6 +81,11 @@ export interface SeasonCommonFrameProps {
   readonly children?: ReactNode
   /** 머리띠 위에 얹는 팝업 */
   readonly overlay?: ReactNode
+  /**
+   * 0x7f4ec 머리띠를 그리는가 — 0xe8(0xafd0)처럼 틀 뒤에 다른 머리띠 0x54d95 를 덧그리는 화면은 그 머리띠가 같은 띠를 덮으므로
+   * 웹은 하나만 둔다(바닥 5 ⊂ 위 바닥이라 보이는 것이 같다)
+   */
+  readonly showsHeader?: boolean
 }
 
 /**
@@ -97,6 +102,7 @@ export interface SeasonCommonFrameProps {
  */
 export function SeasonCommonFrame({
   record, teamMorale, gamePoint, commandBar, showsCenterStage = true, centerSlidesIn = false, onBack, children, overlay,
+  showsHeader = true,
 }: SeasonCommonFrameProps) {
   return (
     <>
@@ -108,7 +114,7 @@ export function SeasonCommonFrame({
           characters={seasonStageCharactersOf({ teamMorale, illness: record.illness, coach: record.coach })} />
       )}
       {children}
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
+      {showsHeader && <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />}
       {overlay}
     </>
   )

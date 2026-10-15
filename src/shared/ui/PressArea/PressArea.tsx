@@ -19,6 +19,8 @@ interface PressAreaProps {
    * 안 주면 보통 단추다.
    */
   readonly option?: { readonly isSelected: boolean }
+  /** 시험이 칸을 찾는 이름 (`data-testid`) */
+  readonly testId?: string
 }
 
 /** 화면 전체 240×320 */
@@ -28,13 +30,14 @@ const WHOLE_SCREEN: PressRect = { x: 0, y: 0, width: 240, height: 320 }
  * **투명한 누름 칸** — 원본 화면에는 없는 웹 단추를 걷어 내되, 마우스 · 터치로 조작할 길은 남긴다.
  * 원본 그림 자리(소프트키 글자 "*MENU" 따위) 위에 투명하게 얹는다. 눌림이 아래 캔버스(스윙)로 내려가지 않게 막는다.
  */
-export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = false, option }: PressAreaProps) {
+export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = false, option, testId }: PressAreaProps) {
   return (
     <button
       type="button"
       className={styles.pressArea}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
       aria-label={label}
+      {...(testId === undefined ? {} : { 'data-testid': testId })}
       {...(option === undefined ? {} : { role: 'option', 'aria-selected': option.isSelected })}
       disabled={isDisabled}
       onClick={(event) => {

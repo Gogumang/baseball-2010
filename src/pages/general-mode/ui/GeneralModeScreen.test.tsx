@@ -225,7 +225,7 @@ describe('경기진행 설정', () => {
 
 describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
   const 줄이름 = (index: number) =>
-    screen.getByTestId(`엔트리-줄-${index}`).querySelectorAll('span')[1]?.textContent ?? ''
+    screen.getByTestId(`엔트리-칸-${index}-이름`).getAttribute('aria-label') ?? ''
   // 빠른실행 22 는 들어올 때 연출이 있어 머리띠 5 · 배너 4 · 값 줄 펼침 8 그림 뒤(그림 16)부터 키를 받는다 (0x311b2)
   const 연출_뒤_띄우기 = (overrides: Partial<Props>) => {
     vi.useFakeTimers()

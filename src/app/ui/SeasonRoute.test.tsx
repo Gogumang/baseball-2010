@@ -402,7 +402,7 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
 
     // 0x5980 — 이전 상태 0xcd 라 탭 1(투수), 보기 전용
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('봉은중')
     키('Enter')
     expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('봉은중')
 
@@ -414,7 +414,7 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('봉은중')
 
     키('Escape')
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('봉은중')
     키('Escape')
     expect(screen.getByRole('button', { name: '선수정보' })).toBeTruthy()
   })
@@ -427,8 +427,8 @@ describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 
     키('Enter')
     expect(screen.getByTestId('선수상세-정보값-1').textContent).toBe('이태형')
     키('Escape')
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('박택용')
-    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-current')).toBe('true')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('박택용')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-selected')).toBe('true')
   })
 
   it('상세 창 글 — 팀 사기 줄과 코치 줄 (0x897e8)', () => {
@@ -450,7 +450,7 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('봉은중')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('봉은중')
     키('Enter')
     expect(screen.getByRole('group', { name: '장비 봉은중' })).toBeTruthy()
 
@@ -490,11 +490,11 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('나리투수')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('나리투수')
     키('Enter')
     expect(알림글()).toContain('나만의리그에서 영입된 선수는')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
-    expect(screen.getByTestId('엔트리-줄-0').textContent).toContain('나리투수')
+    expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('나리투수')
   })
 })
 

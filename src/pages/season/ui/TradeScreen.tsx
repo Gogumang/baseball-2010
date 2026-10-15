@@ -6,21 +6,19 @@ import {
   TRADE_BOOST_COUNT, markTradeUsed, rollTradeSuccess,
   tradeBoostCostOf, tradeMoneyChangeOf, tradeSuccessRate, withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
-import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
+import { SEASON_ENTRY_CELL_SOURCE, seasonRecordEntryListsOf, tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
 import type { TradeSettlement } from '@/entities/season-mode/model/playerTrade'
 import { TRADE_REQUEST_TAB } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import { myTradeEntriesOf, opponentTradeEntriesOf } from '@/widgets/season/lib/tradeList'
-import type { TradePlayerEntry } from '@/widgets/season/lib/tradeList'
-import { ENTRY_LIST_PANEL, SeasonListWindow, TRADE_CONFIRM_PANEL } from '@/widgets/season/ui/SeasonListWindow'
-import type { SeasonListRow } from '@/widgets/season/ui/SeasonListWindow'
+import { ENTRY_TABLES_BASIC, EntryListWindow } from '@/widgets/entry-editor'
+import { TradeConfirmWindow } from '@/pages/season/ui/TradeConfirmWindow'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
-import { TEAMS } from '@/shared/config/original/teams'
-import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -32,8 +30,7 @@ const CHOOSE_ACQUIRED = ORIGINAL_MODE_TEXT[163] // "상대 팀에서 우리 팀�
 const CHOOSE_GIVEN = ORIGINAL_MODE_TEXT[164] // "상대 팀에게 보상할 우리 팀의 선수를 선택합니다"
 const REFUSE_CAREER = ORIGINAL_MODE_TEXT[165] // "나만의 리그 선수는 트레이드 할 수 없습니다"
 const REFUSE_HALL_OF_FAME = ORIGINAL_MODE_TEXT[166] // "명예의 전당 선수는 트레이드 할 수 없습니다"
-const COST_LABEL = ORIGINAL_MODE_TEXT[167] // "트레이드 비용 :"
-const BOOST_FIRST_TEXT = 168 // [168] 기본 진행 · [169] +50% · [170] +20%
+// [167] "트레이드 비용 :" · [168]~[170] 비용 칸 글은 확인 판(`TradeConfirmWindow` · `lib/tradeConfirmLayout`)이 그린다
 const TRADE_QUESTION = ORIGINAL_MODE_TEXT[171] // "!C트레이드를 하시겠습니까?"
 const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // "!cFFFF00G포인트!cFFFFFF가 소모됩니다"
 
@@ -78,12 +75,8 @@ const REQUEST_CANCEL_QUESTION = ORIGINAL_MODE_TEXT[216]
  * ⚠️ 원본 그대로: 0xe6 에서 '*' 로 목록을 뒤집어도 트레이드 탭은 0xe5 에서 정한 그대로라, 보이는 목록과 다른 배열의
  * 같은 칸이 보상 선수가 된다. 칸이 그 배열 밖이면(타자 8~11 칸을 투수 탭으로) 원본은 0xb5695 가 0 을 돌려준 선수를
  * 읽는다 — 웹은 지어내지 않고 아무 일도 안 한다.
- * 웹은 '*' 키와 함께 탭 단추 두 개(투수 · 타자, 원본 편집기 탭 그림의 자리 — 좌표 미해독)로 같은 뒤집기를 준다.
+ * 마우스 길은 바닥띠 "*투수" · "*타자" 표시(0xe5 바닥 0xf · 0x17) 위 투명 누름 칸이다.
  */
-const TAB_LABELS: readonly { readonly tab: number; readonly label: string }[] = [
-  { tab: TRADE_REQUEST_TAB.투수, label: '투수' },
-  { tab: TRADE_REQUEST_TAB.타자, label: '타자' },
-]
 
 type TradeStep =
   | { readonly kind: '팀' }
@@ -123,6 +116,8 @@ export interface TradeScreenProps {
   readonly onBack: () => void
   /** 전역 저장 +0x70 + 칸 — 0xe4 히든 칸 힌트 글이 해금에 따라 [0] 줄을 넣고 뺀다 */
   readonly openedHiddenIds?: readonly number[]
+  /** 엔트리 목록 창 칸 재료 — 그 팀 레코드의 시즌 줄 · 체력 (세션 `entryCellSourceOf`). 안 주면 붙박이 표 줄 */
+  readonly entryCellSourceOf?: (teamId: number) => SeasonEntryCellSource | undefined
 }
 
 /**
@@ -150,15 +145,15 @@ export interface TradeScreenProps {
  * 키 0x8250 이 칸 == SR+1(내 팀)이면 아무것도 안 하고 칸 > 9 면 히든 힌트를 띄우므로 칸 번호는 15팀 격자 그대로다
  * (내 팀 칸은 그림 0xa14c → 칸 그리기 0x7a570 이 로고 위를 검정 덮기 단계 7 로 어둡게 한다 — `TeamSelectScreen.coveredTeamId`).
  *
- * ⚠️ **원본 배치 미해독 — 근사**: 0xe5·0xe6 의 엔트리 목록 창(0x5cfec)과 0xe7 의 진행 화면
- * (0xd4e8) 안 칸 배치(mode_ui 프레임 70 박스 1~10)를 아직 옮기지 못해 공용 판 목록으로 그린다. 판만 원본 인자다.
- * 머리띠 제목도 트레이드 그림이 따로 없어 **시즌모드** 제목을 쓴다.
+ * 0xe5 · 0xe6 은 엔트리 목록 창 0x5cfec(`EntryListWindow` — 기본 표 · 보기 전용)과 머리띠 0x54d95(제목 탭 ? 7 : 6),
+ * 0xe7 은 확인 판 0xd4e8(`TradeConfirmWindow` — mode_ui 프레임 70 · 71 박스)과 머리띠 0x7f4ed("시즌모드")다.
+ * ⚠️ 웹 커서: 목록 커서는 예전 시즌 목록 커서(`useSeasonCursor`)를 그대로 쓰고 윗줄만 0x6c2bd 대로 셈한다.
  * 요청 중 위·아래를 바꿔 넣는 키 −3 은 보기 전용 편집기의 왼쪽 갈래(0x559f8)라 끝 코드만 적고 아무도 안 읽는다 —
  * 곧 커서가 안 움직일 뿐이다(`lockedCursor` 주석).
  */
 export function TradeScreen({
   state, roster, opponentRosterOf = tableRosterOf, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest,
-  onBack, openedHiddenIds = [],
+  onBack, openedHiddenIds = [], entryCellSourceOf,
 }: TradeScreenProps) {
   const { record } = state
   const forced = request !== null && request.isRequested ? request : null
@@ -176,6 +171,8 @@ export function TradeScreen({
   // 오고, 0xe4 진입 0x4774 도 그 칸을 안 본다. 막는 것은 구단관리 위·아래 이동 0x6c444 가 꺼진 칸을 건너뛰는 것뿐이다
   // (`SeasonTeamMenuScreen` 의 `disabled`). CPU 요청은 0xc9 → 0xe5 로 바로 가 [204] 부터 띄운다
   const [notice, setNotice] = useState<string | null>(() => (forced !== null ? REQUEST_ACQUIRED : null))
+  /** 키 셈 [ed+0x40c] — 0x7104 · 0x727c 가 키마다 편집기 0x55864 를 부른다 (▲▼ 깜빡 · 목록 창) */
+  const [keyPresses, setKeyPresses] = useState(0)
   /**
    * 0xe7 단계 this+0x160 — 0 고르기 · 1 진행(게이지, [173]) · 2 성공 [174] · 3 실패 [175].
    * 진행 가드를 지나면 1 이 되고(0xd45e), 게이지가 다 차는 틀(0xcecc)에 굴려 2·3 으로 간다.
@@ -210,26 +207,15 @@ export function TradeScreen({
     boost: which,
   })
 
-  const rowsOf = (entries: readonly TradePlayerEntry[]): readonly SeasonListRow[] =>
-    entries.map((entry) => ({ id: `${entry.index}`, label: entry.name }))
-
-  const boostRows: readonly SeasonListRow[] = Array.from(
-    { length: TRADE_BOOST_COUNT },
-    (_unused, which) => ({
-      id: `비용${which}`,
-      label: stripGameMarkup(ORIGINAL_MODE_TEXT[BOOST_FIRST_TEXT + which] ?? ''),
-      value: `${rateOf(which)}%`,
-    }),
-  )
 
   /** 요청이면 단계에 들어갈 때마다 진입 알림 [204]/[205] 를 다시 띄운다 (0x5cd0·0x5b28 은 진입 함수다) */
   const enterStep = (next: TradeStep) => {
     setStep(next)
     // 0x5cd0 · 0x5b28 — 편집기를 this+0x154 탭으로 다시 세운다
     if (next.kind === '영입' || next.kind === '보상') setListTab(tradeTab)
-    if (forced === null) return
-    if (next.kind === '영입') setNotice(REQUEST_ACQUIRED)
-    if (next.kind === '보상') setNotice(REQUEST_GIVEN)
+    // 0x5cd0 · 0x5b28 진입이 늘 알림을 띄운다 — 요청이면 [204] · [205], 아니면 [163] · [164] (0x5cf0~0x5d18 · 0x5b2a~0x5b56)
+    if (next.kind === '영입') setNotice(forced === null ? CHOOSE_ACQUIRED : REQUEST_ACQUIRED)
+    if (next.kind === '보상') setNotice(forced === null ? CHOOSE_GIVEN : REQUEST_GIVEN)
   }
 
   /**
@@ -247,6 +233,8 @@ export function TradeScreen({
     setTradeTab(TRADE_REQUEST_TAB.투수)
     setListTab(TRADE_REQUEST_TAB.투수)
     setStep({ kind: '영입', teamId })
+    // 0x5cd0 — StrMODE[163] 알림
+    setNotice(CHOOSE_ACQUIRED)
   }
 
   const chooseAcquired = (index: number) => {
@@ -260,7 +248,8 @@ export function TradeScreen({
     setTradeTab(nextTab)
     setStep({ kind: '보상', teamId: step.teamId, acquired: chosen })
     setListTab(nextTab)
-    if (forced !== null) setNotice(REQUEST_GIVEN)
+    // 0x5b28 — [164] (요청이면 [205]) 알림
+    setNotice(forced === null ? CHOOSE_GIVEN : REQUEST_GIVEN)
   }
 
   const chooseGiven = (index: number) => {
@@ -344,7 +333,7 @@ export function TradeScreen({
 
   const listEntries = shownEntries
   const listSelect = step.kind === '영입' ? chooseAcquired : chooseGiven
-  const listCount = step.kind === '확인' ? boostRows.length : listEntries.length
+  const listCount = step.kind === '확인' ? TRADE_BOOST_COUNT : listEntries.length
 
   /**
    * 요청이면 커서가 묶인다 — 0xe5 는 상대 칸, 0xe6 은 내 칸, 0xe7 은 비용 칸 0.
@@ -386,6 +375,15 @@ export function TradeScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
+  // 키 셈 — 목록 창 단계(0xe5 · 0xe6)에서 키가 들어올 때마다 (팝업이 키를 먹는 동안은 편집기에 안 간다)
+  const countsKeys = (step.kind === '영입' || step.kind === '보상') && !isBusy
+  useEffect(() => {
+    if (!countsKeys) return undefined
+    const onKeyDown = () => setKeyPresses((count) => count + 1)
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [countsKeys])
+
   function backOneStep() {
     if (step.kind === '확인') return enterStep({ kind: '보상', teamId: step.teamId, acquired: step.acquired })
     if (step.kind === '보상') return enterStep({ kind: '영입', teamId: step.teamId })
@@ -395,6 +393,15 @@ export function TradeScreen({
     return onBack()
   }
 
+  const isListStep = step.kind === '영입' || step.kind === '보상'
+  const listTeamId = step.kind === '영입' ? step.teamId : record.teamId
+  const listRoster = step.kind === '영입' ? opponentRoster : roster
+  const lists = isListStep && listRoster !== null
+    ? seasonRecordEntryListsOf(listTeamId, listRoster, entryCellSourceOf?.(listTeamId) ?? SEASON_ENTRY_CELL_SOURCE)
+    : null
+  const listRows = lists === null ? [] : isListPitcher ? lists.pitchers : lists.batters
+  /** 목록 윗줄 [목록+0x30] — 커서가 보이는 10 줄 밖으로 나갈 때만 옮긴다 (0x6c2bd) */
+  const top = useListTop(shownCursor, listRows.length)
   if (step.kind === '팀' && notice === null) {
     return (
       <TeamSelectScreen title="시즌모드" gamePoint={gamePoints} openedHiddenIds={openedHiddenIds}
@@ -406,53 +413,63 @@ export function TradeScreen({
     )
   }
 
-  const opponentName = step.kind === '팀' ? '' : TEAMS[step.teamId]?.name ?? ''
-  const title = step.kind === '영입' ? `트레이드 - ${opponentName}` : step.kind === '보상' ? '보상 선수' : '트레이드'
-  const footer = step.kind === '영입'
-    ? stripGameMarkup(forced === null ? CHOOSE_ACQUIRED : REQUEST_ACQUIRED)
-    : step.kind === '보상'
-      ? stripGameMarkup(forced === null ? CHOOSE_GIVEN : REQUEST_GIVEN)
-      : [
-        `${acquiredEntry?.name ?? ''} ↔ ${givenEntry?.name ?? ''}`,
-        `${COST_LABEL} ${tradeBoostCostOf(boost)} G`,
-      ].join('\n')
+  /**
+   * 머리띠 — 0xe5 그림 0xb0f4: 0x54d95(skin, 탭 ? 7 : 6, 요청 [this+0x148] ? 7 : (탭 ? 0xf : 0x17), 0) ·
+   * 0xe6 그림 0xb0b4: (…, 7, 0) · 0xe7 은 0xd4e8 끝의 0x7f4ed(공통 앞그림이 세운 "시즌모드" · 되돌아가기)
+   */
+  const footer = step.kind === '영입' ? (forced !== null ? 7 : isListPitcher ? 0xf : 0x17) : step.kind === '보상' ? 7 : 5
+  const title = isListStep ? (isListPitcher ? '투수엔트리' : '타자엔트리') : '시즌모드'
+  const acquiredRow = acquiredEntry === null || step.kind === '팀' ? null : {
+    name: acquiredEntry.name, teamId: step.teamId, profileLow: acquiredEntry.profileLow ?? -1, grade: acquiredEntry.grade,
+  }
+  const givenRow = givenEntry === null ? null : {
+    name: givenEntry.name, teamId: record.teamId, profileLow: givenEntry.profileLow ?? -1, grade: givenEntry.grade,
+  }
 
   return (
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xe4~0xe7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
-      {step.kind !== '확인' && forced === null && (
-        // 목록 탭(ed+0x33f) — 단추는 '*' 뒤집기와 같다. 요청이면 '*' 가 편집기에 안 가(0x7104 `키 == 0x2a` 거르기)
-        // 탭이 요청 값으로 묶여 단추를 안 둔다. ⚠️ 단추 자리는 원본 편집기 탭 그림 좌표를 못 풀어 근사다
-        <div role="group" aria-label="트레이드 탭">
-          {TAB_LABELS.map(({ tab, label }, index) => (
-            <button
-              key={label}
-              type="button"
-              className={`${styles.row}${tab === listTab ? ` ${styles.rowSelected}` : ''}`}
-              aria-current={tab === listTab}
-              style={{ left: 28 + index * 60, top: 36, width: 56, height: 16 }}
-              onClick={() => {
-                if (tab !== listTab) flipListTab()
-              }}
-            >
-              <span className={styles.rowLabel}>{label}</span>
-            </button>
-          ))}
-        </div>
+      {isListStep && (
+        // 0xe5 · 0xe6 — 엔트리 목록 창 0x5cfec (기본 표 · 보기 전용 · [ed+0x333] = 1 · [ed+0x334] = 2)
+        <EntryListWindow
+          rows={listRows}
+          table={isListPitcher ? ENTRY_TABLES_BASIC.pitcher : ENTRY_TABLES_BASIC.batter}
+          cursor={shownCursor}
+          top={top}
+          firstColumn={0}
+          slideOffset={0}
+          keyPresses={keyPresses}
+          subTab={-1}
+          picked={-1}
+          showsNameBars
+          // 웹 전용: 줄을 누르면 그 줄을 고른다(예전 목록과 같다) — 원본은 위·아래 · 확인 키뿐이다
+          onPressRow={isBusy ? undefined : (index) => {
+            moveCursor(index)
+            listSelect(lockedCursor ?? index)
+          }}
+          onPressArrow={isBusy ? undefined : (direction) => {
+            if (direction === '위' || direction === '아래') {
+              const count = listRows.length
+              if (count > 0) moveCursor((shownCursor + (direction === '위' ? -1 : 1) + count) % count)
+            }
+          }}
+        />
       )}
-
-      <SeasonListWindow
-        // 판 — 0xe5(그림 0xb0f4) · 0xe6(0xb0b4) 은 엔트리 목록 창 0x5cfec → 0x5c984 판, 0xe7 은 그림 0xd4e8 의 d5b4 공용 판
-        // (mode_ui 프레임 70 박스 0, 정렬 0x11, 위 띠 0x10, 제목 탭 1). 그리기 점프표 0xcc024 의 f042 · f04a · f0b2 로 확인
-        panel={step.kind === '확인' ? TRADE_CONFIRM_PANEL : ENTRY_LIST_PANEL}
-        title={title}
-        rows={step.kind === '확인' ? boostRows : rowsOf(listEntries)}
-        cursor={shownCursor}
-        onMoveCursor={moveCursor}
-        onSelect={(index) => (step.kind === '확인' ? chooseBoost(index) : listSelect(index))}
-        footer={footer}
-      />
+      {step.kind === '확인' && acquiredRow !== null && givenRow !== null && (
+        <TradeConfirmWindow
+          isPitcherTab={isPitcher}
+          given={givenRow}
+          acquired={acquiredRow}
+          showsChoices={progress === null}
+          cursor={shownCursor}
+          rateOf={rateOf}
+          onPressRow={isBusy ? undefined : (index) => {
+            moveCursor(index)
+            chooseBoost(index)
+          }}
+        />
+      )}
 
       {question !== null && (
         <MessageBox
@@ -466,10 +483,25 @@ export function TradeScreen({
         <TradeProgress stage={progress} onComplete={runTrade} onFinish={onFinish} />
       )}
 
-      {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리다 */}
-      <ScreenFrame title="시즌모드" gamePoint={gamePoints} onBack={backOneStep} slides={false} />
+      {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리, "*투수" · "*타자" 표시가 '*' 자리다 */}
+      <ScreenFrame title={title} gamePoint={gamePoints} onBack={backOneStep} footer={footer} slides={false}
+        footerPresses={canFlip ? {
+          [FOOTER_BITS.batter]: { label: '* 타자', onPress: flipListTab },
+          [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: flipListTab },
+        } : undefined} />
     </RawScreen>
   )
+}
+
+/** 목록 윗줄 — 0x6c2bd: 커서가 [윗줄, 윗줄 + 보이는 줄) 밖이면 아래로 나갔을 때 커서 − 보이는 줄 + 1, 위로 나갔을 때 커서 */
+function useListTop(cursor: number, count: number): number {
+  const topRef = useRef(0)
+  const visible = Math.min(10, count)
+  let top = Math.min(topRef.current, Math.max(0, count - visible))
+  if (cursor < top) top = cursor
+  else if (cursor >= top + visible) top = cursor - visible + 1
+  topRef.current = Math.max(0, top)
+  return topRef.current
 }
 
 /**

@@ -25,7 +25,7 @@ import {
 import type { QuickStartOpenState } from '@/pages/general-mode/lib/quickStart'
 import { teamGameOptionsOf } from '@/pages/general-mode/lib/generalModeSetup'
 import {
-  leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey,
+  advanceEntrySlide, leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey, tickEntryEditor,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
@@ -138,6 +138,11 @@ export interface GeneralModeSession {
     readonly pressEntryKey: (key: EntryKey) => void
     /** 상태 23 — 웹 전용, 줄을 눌러 커서를 옮긴다 */
     readonly pointEntryCursor: (index: number) => void
+    /**
+     * 상태 23 의 한 틀 — 메인 메뉴 틀(0x32fa0 → 0x32634)이 갱신 0x2a370 으로 틀마다 0x55864 를 불러 키 셈 [ed+0x40c] 이 오른다
+     * (기본 표는 넘기는 열이 셋이라 밀기는 없다)
+     */
+    readonly frameEntry: () => void
     readonly closeEntryAceLocked: () => void
   }
 }
@@ -359,6 +364,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     [entryEdit],
   )
 
+  const frameEntryAction = useCallback(() => {
+    setEntryEdit((current) => (current === null ? null : { ...current, editor: advanceEntrySlide(tickEntryEditor(current.editor)) }))
+  }, [])
+
   const closeEntryAceLocked = useCallback(() => {
     setEntryEdit((current) => (current === null ? null : { ...current, isAceLocked: false }))
   }, [])
@@ -405,10 +414,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       },
       pressEntryKey: pressEntryKeyAction,
       pointEntryCursor: pointEntryCursorAction,
+      frameEntry: frameEntryAction,
       closeEntryAceLocked,
     }),
     [
-      respin, isRespinning, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, closeEntryAceLocked,
+      respin, isRespinning, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, frameEntryAction, closeEntryAceLocked,
       onSettingsConfirm,
     ],
   )

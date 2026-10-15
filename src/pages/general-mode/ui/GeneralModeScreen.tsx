@@ -360,6 +360,9 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             onKey={actions.pressEntryKey}
             onMoveCursor={actions.pointEntryCursor}
             onCloseAceLocked={actions.closeEntryAceLocked}
+            // 메인 메뉴는 틀마다 0x2a370 → 0x55864 를 불러 키 셈 [ed+0x40c] 이 오른다 (▲▼ 깜빡 · 커서 꼴)
+            onFrame={actions.frameEntry}
+            ticksEveryFrame
             // 그림 0x2e070 도 22 진입이 떠 둔 구장 바탕(0x581dc(skin, [메뉴+0xb8], 0))을 먼저 깐다
             underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
             // 23 진입 0x2648c 는 [skin+0x84] 를 안 세우고 그림 0x2e070 도 공용 목록 0x63b14 를 안 부른다

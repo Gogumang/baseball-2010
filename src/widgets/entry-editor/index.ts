@@ -1,2 +1,8 @@
 export { EntryEditorScreen } from '@/widgets/entry-editor/ui/EntryEditorScreen'
 export type { EntryEditorScreenProps, EntryFace } from '@/widgets/entry-editor/ui/EntryEditorScreen'
+export { EntryListWindow } from '@/widgets/entry-editor/ui/EntryListWindow'
+export type { EntryListRow, EntryListWindowProps } from '@/widgets/entry-editor/ui/EntryListWindow'
+export {
+  ENTRY_TABLES_BASIC, ENTRY_TABLES_WIDE, entrySlideOffsetOf,
+} from '@/widgets/entry-editor/lib/entryListWindow'
+export type { EntryBatterLine, EntryColumnTables, EntryPitcherLine } from '@/widgets/entry-editor/lib/entryListWindow'

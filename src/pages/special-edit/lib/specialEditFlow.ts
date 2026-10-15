@@ -1,9 +1,9 @@
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import {
-  ENTRY_TAB, openEntryEditor, pressEntryKey,
+  ENTRY_TAB, advanceEntrySlide, entryBatterLineOfRecord, entryPitcherLineOfRecord, openEntryEditor, pressEntryKey, tickEntryEditor,
 } from '@/entities/season-mode/model/entryEditor'
 import type {
-  EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherRow,
+  EntryBatterLine, EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherLine, EntryPitcherRow,
 } from '@/entities/season-mode/model/entryEditor'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
@@ -46,8 +46,23 @@ export interface SpecialEditState {
   readonly editor: EntryEditorState
 }
 
+/**
+ * 0x2b2e0 의 열 표 — 0x557c1(skin, 탭, 고정 0xceb3c · 0xceb50 둘, 넘기는 0xcec28 · 0xcec50 열 개). 넘기는 열이 보이는 열 셋보다
+ * 많아 [ed+0x337] = 1 — 보기 전용이라 좌·우가 열을 민다. 이어 2b424 가 [skin+0x438] = 1(커서가 이름 칸만)을 세운다.
+ */
+export const EDIT_SCROLL_COLUMN_COUNT = 10
+
 export function createSpecialEditState(): SpecialEditState {
-  return { step: SPECIAL_EDIT_STEP.팀고르기, gridCursor: 0, team: 0, editor: openEntryEditor(false) }
+  return { step: SPECIAL_EDIT_STEP.팀고르기, gridCursor: 0, team: 0, editor: openEntryEditor(false, EDIT_SCROLL_COLUMN_COUNT) }
+}
+
+/**
+ * 메인 메뉴의 한 틀 — 갱신 0x2b2e0 이 하위 1 에서 틀마다 0x55865(skin, [메뉴+0x40]) 를 불러 키 셈 [ed+0x40c] 이 오르고,
+ * 그림 0x5c984 가 열 밀기를 한 단계 나아간다
+ */
+export function frameEditEntry(state: SpecialEditState): SpecialEditState {
+  if (state.step !== SPECIAL_EDIT_STEP.선수고르기) return state
+  return { ...state, editor: advanceEntrySlide(tickEntryEditor(state.editor)) }
 }
 
 /** 격자 커서 한 칸 옮기기 — 꼴 0x10 (`EDIT_GRID_SHAPE`) */
@@ -66,7 +81,9 @@ export function pointEditGrid(state: SpecialEditState, index: number): SpecialEd
  * `0x5561d(ed, &팀레코드(0x1f8c1(save, 팀)), 0, 0, 1)` — 셋째 0 = **보기 전용**, 다섯째 1 = **투수 탭**으로 연다.
  */
 export function chooseEditTeam(state: SpecialEditState): SpecialEditState {
-  return { ...state, step: SPECIAL_EDIT_STEP.선수고르기, team: state.gridCursor, editor: openEntryEditor(false) }
+  return {
+    ...state, step: SPECIAL_EDIT_STEP.선수고르기, team: state.gridCursor, editor: openEntryEditor(false, EDIT_SCROLL_COLUMN_COUNT),
+  }
 }
 
 /** 엔트리 창 한 줄 — 편집기 규칙이 보는 칸 + 화면에 쓸 이름·능력치 · 이름표가 거는 선수 id */
@@ -76,20 +93,27 @@ export interface EditEntryRow {
   readonly ability: readonly number[]
   readonly isAce: boolean
   readonly position: number
+  /** +0xb & 3 — 투수 보직 딱지 */
+  readonly profileLow: number
+  readonly batterLine?: EntryBatterLine
+  readonly pitcherLine?: EntryPitcherLine
 }
 
 /**
  * 고른 팀의 **기본 명단** — 원본은 저장 속 팀 레코드(0x1f8c1) 의 투수 `+0x14` · 타자 `+0x18` 배열이다.
  * 웹은 그 팀 레코드를 따로 두지 않아 붙박이 표 차례(XlsPITCHER_DATA · XlsBATTER_DATA)로 세운다.
+ * 목록 창 기록 열은 그 행의 시즌 줄(행 바이트 32~43)이다 — ⚠️ 미확인: 0x1f8c1 레코드가 Xls 행을 그대로 베낀 것인지는 안 떴다.
  * 이름은 `player.name` = 0xb62c0 (고친 이름이 있으면 그것).
  */
 export function editEntryListsOf(team: number): EntryLists<EditEntryRow & EntryBatterRow, EditEntryRow & EntryPitcherRow> {
   return {
     pitchers: teamPitchers(team).map((player) => ({
-      id: player.id, name: player.name, ability: player.ability, isAce: false, position: 0,
+      id: player.id, name: player.name, ability: player.ability, isAce: false, position: 0, profileLow: player.profile & 3,
+      pitcherLine: entryPitcherLineOfRecord(player.recordLine),
     })),
     batters: teamBatters(team).map((player) => ({
       id: player.id, name: player.name, ability: player.ability, isAce: false, position: player.position ?? 0,
+      profileLow: player.profile & 3, batterLine: entryBatterLineOfRecord(player.recordLine),
     })),
   }
 }
