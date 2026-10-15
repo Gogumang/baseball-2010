@@ -24,6 +24,8 @@ const OK통과 = () => {
   for (let 번 = 0; 번 < 3; 번 += 1) {
     if (screen.queryByRole('button', { name: '메뉴' }) === null) return
     if (screen.queryByRole('button', { name: '확인' }) === null) return
+    // 감독 강판 창(0x23)의 '확인' 누름 칸은 장면 OK 가 아니다 — 그 창은 시험이 따로 본다
+    if (screen.queryByText(/\[감독님\]/) !== null) return
     act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
   }
@@ -240,8 +242,10 @@ describe('투수편 경기 화면', () => {
   it('감독 대사 창은 확인 키 하나뿐이라 강판을 무를 수 없다', () => {
     띄우기({ stamina: 0, reputation: 0 })
 
-    expect(screen.getByText('확인')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     expect(screen.queryByText('아니오')).toBeNull()
+    // 웹 글자 단추가 아니라 투명 누름 칸이다
+    expect(screen.queryByText('확인')).toBeNull()
   })
 
   it('등판일이 아니면 경기가 끝나 있어 결과 판(0x18) 뒤 정산 화면이 뜬다', () => {

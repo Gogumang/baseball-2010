@@ -42,16 +42,3 @@ export const text = style({
 export const speaker = style({
   color: '#00CC00',
 })
-
-export const key = style({
-  display: 'block',
-  width: '100%',
-  padding: '4px',
-  border: 'none',
-  background: 'none',
-  color: theme.color.accent,
-  font: 'inherit',
-  fontSize: '11px',
-  textAlign: 'right',
-  cursor: 'pointer',
-})
