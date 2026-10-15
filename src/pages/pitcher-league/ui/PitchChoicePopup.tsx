@@ -11,6 +11,7 @@ import {
   RECORD_PICK_CELL_SIZE, RECORD_PICK_LABEL_GAP, recordPickIconOffsetOf, recordPickLabelXOf, recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { PITCH_WINDOW_CHOICES } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -165,7 +166,7 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
                     // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
                     <span style={{
                       ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
-                      background: PITCH_CHOICE_DIM_LABEL_COLOR, maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
+                      background: solidColorCss(PITCH_CHOICE_DIM_LABEL_COLOR), maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
                       maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
                     }} />
                   )}

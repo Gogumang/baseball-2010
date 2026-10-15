@@ -8,6 +8,7 @@ import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { ATTENDANCE_LABEL_FRAME, seasonStatusPanelLayoutOf } from '@/pages/season/lib/seasonStatusPanel'
 import type { PlacedImage } from '@/pages/season/lib/seasonStatusPanel'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const NUM = './sprites/num'
@@ -56,7 +57,7 @@ export function SeasonStatusPanel({
             {/* 효과 0xb(단색) 흰색 — 그림을 마스크로 쓰고 흰색을 칠한다 */}
             <div className={styles.tintedGlyph} style={{
               left: digit.left, top: digit.top, width: digit.frame % 10 === 1 ? 4 : 6, height: DIGIT_HEIGHT,
-              background: ORIGINAL_COLORS.text, maskImage: `url(${digitSource})`, WebkitMaskImage: `url(${digitSource})`,
+              background: solidColorCss(ORIGINAL_COLORS.text), maskImage: `url(${digitSource})`, WebkitMaskImage: `url(${digitSource})`,
             }} />
           </>
         )} />

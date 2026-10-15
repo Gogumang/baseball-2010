@@ -4,6 +4,7 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
+import { DRAW_EFFECT, drawImageWithEffect } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /**
  * **사람 투구 UI — 장면 위 그림** (구질 목록 0xf · 조준 0x10 · 게이지 0x11). 2026-10-09 직접 떴다.
@@ -268,10 +269,11 @@ export function drawPitchInputSprites(context: CanvasRenderingContext2D, overlay
       drawFrame(context, draw.folder, draw.frame, point.x, point.y + draw.dy)
       continue
     }
-    const alpha = context.globalAlpha
-    context.globalAlpha = alpha * draw.alpha
-    drawFrame(context, draw.folder, draw.frame, point.x, point.y + draw.dy)
-    context.globalAlpha = alpha
+    // 효과 1 · 단계 L — 화면 칸을 읽어 원본 표 0xd5e58 · 0xd5de0 식으로 섞는다(공용 `drawImageWithEffect`)
+    const placed = placedFrame(draw.folder, draw.frame)
+    if (placed === null) continue
+    drawImageWithEffect(context, placed.image, Math.round(point.x) + placed.offsetX, Math.round(point.y + draw.dy) + placed.offsetY,
+      DRAW_EFFECT.TRANSLUCENT, Math.round(draw.alpha * EFFECT_LEVELS))
   }
 }
 

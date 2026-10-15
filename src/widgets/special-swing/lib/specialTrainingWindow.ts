@@ -205,11 +205,10 @@ export function cursorBoxOf(slot: number): TrainingBox {
 /** 깜빡임 — 0xca911(틱, 10) ≠ 0 */
 export const isSpecialTrainingBlinkOn = (tick: number) => tick % 10 !== 0
 
-/**
- * 0xc37a8 흑백 — RGB565 한 점의 R5 + G 위 5비트 + B5 + 3 = s 에서 회색 g5 = ⌊s/4⌋ + ⌊s/16⌋ + ⌊s/64⌋ (≈ 0.328 s).
- * 웹은 feColorMatrix 세 칸 0.328 로 옮긴다(⚠️ 내림 · 565 양자화는 안 따른다).
+/*
+ * 0xc37a8 흑백 — RGB565 한 점의 R5 + G 위 5비트 + B5 + 3 = s 에서 회색 g5 = ⌊s/4⌋ + ⌊s/16⌋ + ⌊s/64⌋.
+ * 식은 공용 `shared/lib/pixelEffect` 의 `grayPixel565`(효과 0xa 와 같은 식) — 그림 쪽 `SpecialTrainingFigure` 가 내림 · 565 까지 그대로 칠한다.
  */
-export const SPECIAL_TRAINING_GRAY_WEIGHT = 0.328
 
 export type SpecialTrainingKey = 'left' | 'right' | 'up' | 'down' | 'ok' | 'clr'
 

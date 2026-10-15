@@ -27,6 +27,7 @@ import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
 export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드' | '일반모드빠른실행' | '일반모드경기이어하기'
 
@@ -288,7 +289,7 @@ export function MainMenuScreen({
   const tinted = (src: string, left: number, top: number, width: number, height: number, color: string) => (
     <div
       className={styles.tintedLabel}
-      style={{ left, top, width, height, background: color, maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }}
+      style={{ left, top, width, height, background: solidColorCss(color), maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }}
     />
   )
 

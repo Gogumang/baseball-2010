@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { useMemo } from 'react'
 import { CommonPanel, FrameSprite, PaintedRects, PressArea, SolidStamp, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -6,9 +6,12 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { roundEdgePaintsOf } from '@/shared/lib/commonPanel/commonPanel'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { DRAW_EFFECT, css565, grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
+import { useEffectSpriteUrl } from '@/shared/lib/pixelEffect/useEffectSpriteUrl'
+import { rgbTo565 } from '@/shared/lib/screen565/screen565'
 import {
   LEVEL_LABEL_FRAME, LEVEL_LABEL_OFFSET, SPECIAL_TRAINING_COST_BOX, SPECIAL_TRAINING_COUNT_BOX, SPECIAL_TRAINING_CURSOR_COLOR,
-  SPECIAL_TRAINING_DESCRIPTION_BOX, SPECIAL_TRAINING_GRAY_WEIGHT, SPECIAL_TRAINING_INNER, SPECIAL_TRAINING_INNER_COLORS,
+  SPECIAL_TRAINING_DESCRIPTION_BOX, SPECIAL_TRAINING_INNER, SPECIAL_TRAINING_INNER_COLORS,
   SPECIAL_TRAINING_LAYOUT_FRAME, SPECIAL_TRAINING_NAME_BOX, SPECIAL_TRAINING_NAME_COLOR, SPECIAL_TRAINING_PANEL,
   SPECIAL_TRAINING_SLASH_IMAGE, SPECIAL_TRAINING_SLOT_BOXES, SPECIAL_TRAINING_STATUS_BOX, SPECIAL_TRAINING_TIMES_LABEL,
   SPECIAL_TRAINING_TITLE_BOX, SPECIAL_TRAINING_TITLE_COLOR, SPECIAL_TRAINING_TITLE_OX, cursorBoxOf, isSlotIconInUse,
@@ -56,6 +59,53 @@ function imageAt(box: TrainingBox, width: number, height: number, align: 0x22 | 
   return { left: box.x + Math.trunc(d / 2) + (d % 2) + ox, top: box.y + Math.trunc((box.height - height) / 2) + oy }
 }
 
+/** 그림 한 장 — `gray` 면 0xc37a8 회색 식(`grayPixel565`)으로 칠한 주소를 쓰고, 칠하는 동안은 안 그린다 */
+function SlotImage({ src, left, top, gray }: { readonly src: string; readonly left: number; readonly top: number; readonly gray: boolean }) {
+  const grayed = useEffectSpriteUrl(gray ? src : null, DRAW_EFFECT.GRAY, 0)
+  const shown = gray ? grayed : src
+  if (shown === null) return null
+  return <img alt="" src={shown} style={{ position: 'absolute', left, top, pointerEvents: 'none' }} />
+}
+
+/** 칸 그림 셋 — 아이콘 · "LV" · 칸 번호 (0x80620~0x80724). `gray` 는 0xc37a8 흑백 칸에 다시 그릴 때 */
+function SlotArt({ slot, dx, dy, iconFrame, inUseNumber, textOrigins, gray }: {
+  readonly slot: number
+  readonly dx: number
+  readonly dy: number
+  readonly iconFrame: number
+  readonly inUseNumber: number
+  readonly textOrigins: FrameOrigins | null
+  readonly gray: boolean
+}) {
+  const box = SPECIAL_TRAINING_SLOT_BOXES[slot]
+  const shifted = { ...box, x: box.x + dx, y: box.y + dy }
+  const icon = isSlotIconInUse(slot, inUseNumber) ? `${ICON_ORANGE}${iconFrame}.png` : `${MODE_ICON}/${pad3(iconFrame)}.png`
+  const lvAt = frameAt(textOrigins, LEVEL_LABEL_FRAME, shifted, 0x44, LEVEL_LABEL_OFFSET.x, LEVEL_LABEL_OFFSET.y)
+  const lvOrigin = textOrigins?.[pad3(LEVEL_LABEL_FRAME)]
+  const digit = slot + 1
+  const digitOffset = levelDigitOffsetOf(slot)
+  const digitAt = imageAt(shifted, whiteDigitWidthOf(digit), WHITE_DIGIT_HEIGHT, 0x44, digitOffset.x, digitOffset.y)
+  // 아이콘 33×33 을 칸(33×34)에 정렬 0x22 — 세로 trunc(1/2) = 0 이라 왼쪽 위 그대로
+  return (
+    <>
+      <SlotImage src={icon} left={shifted.x} top={shifted.y} gray={gray} />
+      {lvAt !== null && lvOrigin !== undefined && (
+        <SlotImage src={`${IMG_TEXT}/${pad3(LEVEL_LABEL_FRAME)}.png`} left={lvAt.x + lvOrigin.x} top={lvAt.y + lvOrigin.y} gray={gray} />
+      )}
+      <SlotImage src={`${NUM}/${pad3(digit)}.png`} left={digitAt.left} top={digitAt.top} gray={gray} />
+    </>
+  )
+}
+
+/**
+ * 0xc37a8 흑백 칸의 바탕 — 안쪽 칠(565)을 회색 식으로 바꾼 색.
+ * 칸 그림은 알파가 0 · 255 뿐이라 겹친 뒤 회색으로 바꾸는 것과 장마다 회색으로 바꿔 겹치는 것이 같다.
+ */
+const GRAY_INNER_FILL = (() => {
+  const value = Number.parseInt(SPECIAL_TRAINING_INNER_COLORS.fill.slice(1), 16)
+  return css565(grayPixel565(rgbTo565((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff)))
+})()
+
 export interface SpecialTrainingFigureProps {
   readonly side: SpecialTrainingSide
   readonly state: SpecialTrainingState
@@ -82,7 +132,6 @@ export function SpecialTrainingFigure({
 }: SpecialTrainingFigureProps) {
   const uiOrigins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
-  const grayFilterId = `special-training-gray-${useId().replace(/:/g, '')}`
   // ⚠️ 상태 틱 [장면+0x2c] 의 첫 그림 값은 안 읽었다 — 창이 선 뒤의 갱신 수로 센다
   const tick = useUpdateCounter()
   const isBlinkOn = isSpecialTrainingBlinkOn(tick)
@@ -104,36 +153,13 @@ export function SpecialTrainingFigure({
     [cursorBox.width, cursorBox.height],
   )
   const descriptionLines = parseGameMarkup(slotDescriptionOf(side, cursor, typeIndex))
-  const w = SPECIAL_TRAINING_GRAY_WEIGHT
 
-  /** 칸 그림 셋 — 아이콘 · "LV" · 칸 번호 (0x80620~0x80724) */
-  const slotArt = (slot: number, dx: number, dy: number) => {
-    const box = SPECIAL_TRAINING_SLOT_BOXES[slot]
-    const shifted = { ...box, x: box.x + dx, y: box.y + dy }
-    const icon = isSlotIconInUse(slot, inUseNumber) ? `${ICON_ORANGE}${iconFrame}.png` : `${MODE_ICON}/${pad3(iconFrame)}.png`
-    const lvAt = frameAt(textOrigins, LEVEL_LABEL_FRAME, shifted, 0x44, LEVEL_LABEL_OFFSET.x, LEVEL_LABEL_OFFSET.y)
-    const digit = slot + 1
-    const digitOffset = levelDigitOffsetOf(slot)
-    const digitAt = imageAt(shifted, whiteDigitWidthOf(digit), WHITE_DIGIT_HEIGHT, 0x44, digitOffset.x, digitOffset.y)
-    // 아이콘 33×33 을 칸(33×34)에 정렬 0x22 — 세로 trunc(1/2) = 0 이라 왼쪽 위 그대로
-    return (
-      <>
-        <img alt="" src={icon} style={{ position: 'absolute', left: shifted.x, top: shifted.y, pointerEvents: 'none' }} />
-        {lvAt !== null && (
-          <FrameSprite folder={IMG_TEXT} frame={LEVEL_LABEL_FRAME} origins={textOrigins} x={lvAt.x} y={lvAt.y} />
-        )}
-        <img alt="" src={`${NUM}/${pad3(digit)}.png`} style={{ position: 'absolute', ...digitAt, pointerEvents: 'none' }} />
-      </>
-    )
-  }
+  const slotArt = (slot: number, dx: number, dy: number, gray = false) => (
+    <SlotArt slot={slot} dx={dx} dy={dy} iconFrame={iconFrame} inUseNumber={inUseNumber} textOrigins={textOrigins} gray={gray} />
+  )
 
   return (
     <div data-testid="필살타법-그림" data-side={side} data-state={state}>
-      <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
-        <filter id={grayFilterId} colorInterpolationFilters="sRGB">
-          <feColorMatrix type="matrix" values={`${w} ${w} ${w} 0 0  ${w} ${w} ${w} 0 0  ${w} ${w} ${w} 0 0  0 0 0 1 0`} />
-        </filter>
-      </svg>
       {/* 8046c 공용 판 0x55e61(skin, 박스 0, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0) — 제목 탭이 서서 위 띠는 안 본다 */}
       <CommonPanel x={SPECIAL_TRAINING_PANEL.x} y={SPECIAL_TRAINING_PANEL.y} width={SPECIAL_TRAINING_PANEL.width}
         height={SPECIAL_TRAINING_PANEL.height} topBand={0x10} titleTab testId="필살타법-판" />
@@ -165,13 +191,13 @@ export function SpecialTrainingFigure({
               <PaintedRects x={cursorBox.x} y={cursorBox.y} width={cursorBox.width + 1} height={cursorBox.height + 1}
                 paints={cursorPaints} testId="필살칸-커서" />
             )}
-            {/* 0xc37a9 흑백 — 화면에 이미 그린 자리를 바꾼다. 같은 자리(안쪽 칠 + 칸 그림)를 잘라 회색으로 다시 그린다 */}
+            {/* 0xc37a9 흑백 — 화면에 이미 그린 자리를 바꾼다. 같은 자리(안쪽 칠 + 칸 그림)를 원본 회색 식으로 칠해 다시 그린다 */}
             {isLocked && (
               <div data-testid={`필살칸-흑백-${slot}`} style={{
                 position: 'absolute', left: region.x, top: region.y, width: region.width, height: region.height,
-                overflow: 'hidden', filter: `url(#${grayFilterId})`, pointerEvents: 'none', background: SPECIAL_TRAINING_INNER_COLORS.fill,
+                overflow: 'hidden', pointerEvents: 'none', background: GRAY_INNER_FILL,
               }}>
-                {slotArt(slot, -region.x, -region.y)}
+                {slotArt(slot, -region.x, -region.y, true)}
               </div>
             )}
           </div>
