@@ -397,6 +397,38 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     rendered.unmount()
   })
 
+  /**
+   * 플레이 객체 +0x160(사람 송구 목표)은 장면과 함께 한 번 만들어지고(0xb0b6e) 판 시작 · 0x17 진입이 안 지운다 — 앞 판에서 못 쓴
+   * 키가 다음 판으로 남는다. 미션도 판마다 수비 장면 칸을 넘긴다
+   */
+  it('판이 남긴 수비 장면 칸(+0x160 송구 목표 포함)을 다음 판이 이어받는다', () => {
+    const rendered = setUpBatterMission(1)
+    const 안타 = () =>
+      act(() => {
+        rendered.result.current.session.handleMissionPitch({
+          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: null,
+        })
+      })
+
+    안타()
+    const 첫판 = rendered.result.current.session.pendingDefensePlay
+    expect(첫판).not.toBeNull()
+    expect(첫판!.input.scene).toBeUndefined()
+    const 돌린판 = runDefensePlay(첫판!.input)
+    act(() => {
+      rendered.result.current.session.actions.finishDefensePlay({ ...돌린판, scene: { ...돌린판.scene, throwTarget: 2 } })
+    })
+
+    안타()
+    const 다음판 = rendered.result.current.session.pendingDefensePlay
+    expect(다음판).not.toBeNull()
+    expect(다음판!.input.scene?.throwTarget).toBe(2)
+    rendered.unmount()
+  })
+
   it('삼진은 수비가 개입할 것이 없어 그 자리에서 끝난다', () => {
     const rendered = setUpBatterMission(1)
 

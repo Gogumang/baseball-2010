@@ -1,4 +1,5 @@
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
+import { judgeCallSoundIdOf } from '@/features/defense-play/model/judgeCall'
 import {
   drawDefenseScene,
   enterDefenseScene,
@@ -9,6 +10,7 @@ import {
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import {
   battedBallTrajectory,
+  carryDistanceOf,
   isBallTrajectory,
   launchTrajectory,
   spliceTrajectory,
@@ -32,6 +34,7 @@ import {
 import {
   autoSlideRunnerIndexes,
   slideOnKey,
+  SLIDING_SOUND_EFFECT,
   SLIDING_SPEED_BONUS,
   type SlidingRunner,
 } from '@/entities/defense-controls/model/sliding'
@@ -183,6 +186,24 @@ const HIT_STAGGER_LOCK_TICKS = 15
 const DEFAULT_MAXIMUM_TICKS = 240
 /** 보류 해제 0xaa39e 가 메시지 0x13 에 싣는 주자 칸 (`movs r2, #0x64`) — 타자주자(0)가 아니다 */
 export const RELEASED_RUN_SLOT = 0x64
+
+/** 필살타법 타구에 맞은 야수 — 0xa1e60 의 `movs r1, #0x35` (b4588 vt74 → 0xb3420 → 야수 vte4) */
+export const HIT_STAGGER_SOUND_EFFECT = 53
+
+/**
+ * 공+0xac4 의 거리 문턱 — 낙구점이 홈 (20000, 0, 29445)(표 0xd7be8)에서 **10274 넘게** 떨어지면 깊은 낙구(P2 2절).
+ * `atBatSounds.deepHitCheerSoundIdOf` 의 문턱과 같은 값이다
+ */
+const DEEP_LANDING_DISTANCE = 10_274
+
+/**
+ * 진행기 한 틱의 소리 한 칸 (`DefensePlayState.tickSounds`) — 번호가 정해진 소리, 메시지 0x13 의 주자 칸(함성 0x51fb8 은 결과 코드
+ * [경기+0xfd4] 의 0x357e0 을 보므로 화면이 고른다), 깊은 낙구 함성 60 의 후보(0x357e0 은 화면이 본다)
+ */
+export type DefenseTickSound =
+  | { readonly kind: 'sound'; readonly soundId: number }
+  | { readonly kind: 'runIn'; readonly slot: number }
+  | { readonly kind: 'deepLanding' }
 /** 홈을 가리키는 루 번호 — 원본 루 표의 [4] 가 홈의 사본이라 진루는 4 로 센다 */
 const HOME_BASE = 4
 
@@ -862,6 +883,19 @@ export interface DefensePlayState {
    * 보류 해제 0xaa39e 는 0x64(100). 수비 장면 득점 점수판(0x51fb8 → 0x52030 홈런 갈래 · 0x52074 보통 갈래)이 본다
    */
   runInsThisTick: readonly number[]
+  /**
+   * **방금 돈 틱의 소리 차례** — 진행기는 소리를 못 내므로 틱을 돌리는 수비 재생(`DefensePlayback`)이 이 차례대로 낸다.
+   * 한 그림의 원본 차례(직접 뜸):
+   * 1. 키 처리 0x498d4(52d9e) — OK 슬라이딩 0x585 → 0x518da → 0x5199c 의 10 (`sound`)
+   * 2. 그림 머리 0x3f060(52e16) 카메라 3f17e — 메시지 0x13(타자주자) → 0x51fb8 함성 (`runIn`)
+   * 3. 슬롯 2 플레이 틱 vt48(525e8) 꼬리 — b4562 결과 메시지 0xbba → 0x51a56 판정 콜(`judgeCall`, `sound`) → b4588 vt74 → 0xa1e60 의 53
+   * 4. 슬롯 2 주자관리 vt18 0xaa0a8(525fc) — 바로 득점 aa1b0 · 보류 해제 aa39e 의 메시지 0x13 → 0x51fb8 함성 (`runIn`)
+   * 5. 슬롯 2 자동 슬라이딩 0x52670 → 0x5268c 의 10 (`sound`)
+   * 6. 건너뛰는 동안 52b26 의 0x3f060 카메라 3f17e (`runIn`) — 그 뒤 슬롯 2 꼬리 52b62 의 깊은 낙구 함성 60 (`deepLanding`)
+   * 0xbfbac 는 큐가 아니라 받는 곳 vt+0xc 를 곧바로 부르므로(0xbfb78 bfb9a — 경기 장면 vtable 0xcfa30 +0xc = 0x509a0) 메시지 0x13 · 0xbba 의
+   * 소리는 보낸 그 자리에서 난다. 펌블 함성 29 는 그리기 G3(0x4381a) 몫이라 여기 없다 — 화면이 그린 틱마다 낸다.
+   */
+  tickSounds: readonly DefenseTickSound[]
   /** 경기+0x19ad(반짝임) */
   laserShining: boolean
   /** **그림 전용** 야수 +0xb8(펌블 표시, 칸별) — 펌블 b4280 이 6, 야수 틱 a12da 가 잠금 없을 때 −1 */
@@ -1186,6 +1220,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     slidingSoundThisTick: false,
     hitStaggerSoundThisTick: false,
     runInsThisTick: [],
+    tickSounds: [],
     laserShining: false,
     fumbleMarks: Array.from({ length: FIELDER_COUNT }, () => 0),
     throwErrorMarks: Array.from({ length: FIELDER_COUNT }, () => 0),
@@ -1326,6 +1361,9 @@ export function stepDefensePlay(
   let slidingSoundThisTick = false
   let hitStaggerSoundThisTick = false
   const runInsThisTick: number[] = []
+  const tickSounds: DefenseTickSound[] = []
+  /** 6d 절 b4492 — 아무도 쥐기 전에 공이 이 틱에 처음 땅에 닿았다(+0x113 = 1, 공+0x68 == 공+0xaa0) */
+  let landedUncaughtThisTick = false
   let laserShining = state.laserShining
   let fumbleMarks = state.fumbleMarks
   let throwErrorMarks = state.throwErrorMarks
@@ -1416,6 +1454,7 @@ export function stepDefensePlay(
     firstRunner.state = { ...firstRunner.state, scored: true }
     held = { ...held, scoreboardRuns: held.scoreboardRuns + 1 }
     runInsThisTick.push(firstRunner.state.index)
+    tickSounds.push({ kind: 'runIn', slot: firstRunner.state.index })
     log.push(`${tick}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
   }
   // 이 그림에 막 누른 건너뛰기 — 그림 머리 52e16 의 0x3f060(목록 틱은 앞 판 틱의 6 절 이동)이 키 처리 뒤라 그 카메라가 벌써 본다.
@@ -1966,6 +2005,8 @@ export function stepDefensePlay(
           if (decision.playsSound) {
             slidingSoundPlayed = true
             slidingSoundThisTick = true
+            // 키 처리 0x498d4 는 그림 머리 0x3f060(52e16) 카메라보다 먼저다 — 이 틱 소리 차례의 맨 앞
+            tickSounds.unshift({ kind: 'sound', soundId: SLIDING_SOUND_EFFECT })
           }
           for (const index of decision.slidRunnerIndexes) {
             const runner = runners[index]
@@ -2469,6 +2510,8 @@ export function stepDefensePlay(
       } else if (tick === trajectory.landingTick) {
         ballContacted = true
         landedNow = true
+        // b4492 — +0x112 = +0x113 = 1 (낙구 틱에 아무도 안 쥐었다). 슬롯 2 꼬리 52b62 의 함성 60 이 이 칸을 본다
+        landedUncaughtThisTick = true
       }
       if (ballContacted) {
         const endState: PlayEndState = {
@@ -2530,6 +2573,14 @@ export function stepDefensePlay(
         runOutJudgement()
       }
     }
+    // b4562 의 메시지 0xbba → 0x51a56 → 표 0xd0488 — 콜은 판 끝이 아니라 결과 코드가 선 **이 틱**에 곧바로 난다(`judgeCall`).
+    // 13 의 0x51b36 은 state[0x1f](`flyOut` — 쥐기 0xb2774) · state[0x87](`tagOut` — 그 아웃을 낸 판정)을 이 자리 값으로 본다
+    if (resultCode !== 0) {
+      const call = judgeCallSoundIdOf(resultCode, { caughtOnTheFly: flyOut, tagOut })
+      if (call !== null) tickSounds.push({ kind: 'sound', soundId: call })
+    }
+    // b4588 — 플레이.vt74 = 0xb3420 → 야수.vte4 = 0xa1e60 a1e82 즉시 재생 53. 0xbba 메시지(b457c~b4584) 바로 뒤다
+    if (hitStaggerSoundThisTick) tickSounds.push({ kind: 'sound', soundId: HIT_STAGGER_SOUND_EFFECT })
     // 0x51d40 — 결과 코드 9·13 일 때만 `아웃 ≤ 2` 면 +0x128 = 1 · 0xafa60 한 번
     if ((resultCode === 9 || resultCode === 13) && outs <= 2 && !play.finished && !uncatchable) {
       play = { ...play, wantsThrow: true }
@@ -2564,7 +2615,10 @@ export function stepDefensePlay(
           scoringRunnerIsBatterRunner: runner.state.index === 0,
         })
         // 바로 득점 0xaa1b0 — 메시지 0x13(주자 칸)
-        if (held.scoreboardRuns > scoredBefore) runInsThisTick.push(runner.state.index)
+        if (held.scoreboardRuns > scoredBefore) {
+          runInsThisTick.push(runner.state.index)
+          tickSounds.push({ kind: 'runIn', slot: runner.state.index })
+        }
         // aa1de~aa1fe — 홈에 닿은 주자가 이번 타자(+0x98)이고 담장 · 폴 홈런 사건이 없으면 state[0x25] = 1 (그라운드 홈런)
         if (runner.state.isBatterRunner && !homeRunEvent) groundHomeRun = true
         log.push(`${tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${held.heldRuns} / 득점 ${held.scoreboardRuns}`)
@@ -2585,7 +2639,10 @@ export function stepDefensePlay(
       someRunnerStillActive: stillActive,
     })
     // 보류 해제 0xaa39e — 푼 수만큼 메시지 0x13(0x64)
-    for (let run = scoredBeforeRelease; run < held.scoreboardRuns; run += 1) runInsThisTick.push(RELEASED_RUN_SLOT)
+    for (let run = scoredBeforeRelease; run < held.scoreboardRuns; run += 1) {
+      runInsThisTick.push(RELEASED_RUN_SLOT)
+      tickSounds.push({ kind: 'runIn', slot: RELEASED_RUN_SLOT })
+    }
 
     // 1a~1c 는 플레이 vt4c = 0xb45dc 다 — 슬롯 2 의 52612 라 플레이 틱 vt48(0xb401c, 525e8) · 득점 0xaa0a8(525fc) 뒤에 돈다
     // (vtable 0xd8618: +0x48 = 0xb401d · +0x4c = 0xb45dd — 직접 뜸). 예전 웹은 포구(1 절) 바로 뒤에 두었다.
@@ -2726,6 +2783,7 @@ export function stepDefensePlay(
       }
       if (slid.length > 0) {
         slidingSoundThisTick = true
+        tickSounds.push({ kind: 'sound', soundId: SLIDING_SOUND_EFFECT })
         log.push(`${tick}틱 자동 슬라이딩 — 주자 ${slid.join('·')}`)
       }
     }
@@ -3016,6 +3074,14 @@ export function stepDefensePlay(
     // ── 9. 카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192 — `cameraFastForwardRunIn`) ──
     // 건너뛰는 동안 0x3f060 은 52b26(슬롯 2 뒤)에서 돈다 — 웹의 이 틱 6 절 이동 뒤 자리다
     if (fastForward && gate.listTickOpen === true) cameraFastForwardRunIn()
+    // ── 9b. 슬롯 2 꼬리 52b62~52bb2 — 깊은 낙구 함성 60 (직접 뜸) ──
+    // 52b26 건너뛰기 되풀이가 끝난 뒤(+0xfe7 == 0) 한 번: 공+0xaa0(낙구 틱) ≠ −1 && == 공+0x68 && 공+0xac4(깊은 페어 낙구) &&
+    // ¬0x357e0(결과 코드 24~26) && 플레이+0x113(b4492 — 낙구 틱에 아무도 안 쥐었다) → 즉시 60. 결과 코드(0x357e0)는 화면이 본다.
+    // 공+0xac4 = 낙구점이 홈에서 10274 넘게 · 각이 페어(P2 2절) — 웹은 이 궤적의 낙구 거리와 쏜 공의 파울 각(state[0x1c])으로 본다
+    // (예전 판 끝 `atBatSounds.deepHitCheerSoundIdOf` 와 같은 근사). 건너뛰는 채로 끝난 틱은 52b40 이 524f8 로 돌아가 이 꼬리가 없다
+    if (landedUncaughtThisTick && !fastForward && !state.foulAngle && carryDistanceOf(trajectory) > DEEP_LANDING_DISTANCE) {
+      tickSounds.push({ kind: 'deepLanding' })
+    }
 
     // ── 10. G2 만 닫힌 그림 — 원본은 그 그림도 그린다 (`DefenseViewState.closingListFrame`) ──
     // G3 · G4 · G1 이 열리고 G2(52502)에서 닫히면(쥔 채 다 선 판의 +0x120 세기는 목록 틱 뒤 주자부터 세어 G2 에서 51 이 되기 쉽다)
@@ -3073,6 +3139,7 @@ export function stepDefensePlay(
   state.slidingSoundThisTick = slidingSoundThisTick
   state.hitStaggerSoundThisTick = hitStaggerSoundThisTick
   state.runInsThisTick = runInsThisTick
+  state.tickSounds = tickSounds
   state.laserShining = laserShining
   state.laserConfirmed = laserConfirmed
   state.laserRolled = laserRolled

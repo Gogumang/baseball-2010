@@ -22,6 +22,7 @@ import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import {
@@ -187,8 +188,11 @@ export function usePitcherGame(
               releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
               // 공 도착 0x3dfac 가 연 판의 판정 콜 — 도루 · 폭투 판은 붙들어(`live`) 화면이 판 안의 그 틱에 내므로 여기서는
-              // `lastArrivalPlay` 가 밀어내기(콜 없음)일 때만 바뀐다. 미리 돌린 판이면 연 자리에서 낸다(근사)
-              after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
+              // `lastArrivalPlay` 가 밀어내기(콜 없음)일 때만 바뀐다. 미리 돌려 재생 칸에 넣은 판은 재생 화면이 기록된 틱에 내고
+              // (`replayCallsOnScreen`), 재생하지 않는 판만 연 자리에서 낸다(근사)
+              after.lastArrivalPlay !== null &&
+              after.lastArrivalPlay !== before.lastArrivalPlay &&
+              !replayCallsOnScreen(before.lastDefensePlay, after.lastDefensePlay, after.lastArrivalPlay.result)
                 ? after.lastArrivalPlay.callSoundId
                 : null,
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
@@ -217,13 +221,13 @@ export function usePitcherGame(
         const played = result ?? runDefensePlay(pending)
         step(
           (current) => resolveDefensePlay(current, played, random),
-          // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)·홈런 함성(11)은 여기서야 난다.
-          // **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다
-          // (`atBatSounds.inPlayCallSoundIdOf` 둘째 인자). 함성 60 은 원본이 **낙구 틱**에
-          // 내는 것이라 이 자리는 근사다 — 타자편(`useCareerSession`)과 같은 근사·같은 순서다
-          // 파울 각 공 판은 타석 칸에 결과가 없다(타석이 아직 안 끝났다) — 파울로 닫히면 결과 코드 7 메시지 51c5c 의 25,
+          // 판 끝 근사의 콜은 **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다
+          // (`atBatSounds.inPlayCallSoundIdOf` 둘째 인자). 파울 각 공 판은 타석 칸에 결과가 없다(타석이 아직 안 끝났다) — 파울로 닫히면 결과 코드 7 메시지 51c5c 의 25,
           // 낙구 전에 잡히면(파울 뜬공 아웃) 판 끝 정산의 아웃 콜이다(`inPlayCallSoundIdOf` 는 `played.outcome` 을 먼저 본다)
+          // 판정 콜 · 깊은 낙구 함성 60 은 원본처럼 판 안의 그 틱에 화면이 냈다(`DefensePlayback` 의 `tickSounds` — 결과 메시지 0xbba →
+          // 0x51a56 · 슬롯 2 꼬리 52b62). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 근사로 낸다
           (before) => {
+            if (result !== undefined) return []
             const outcome = before.atBat.outcome ?? played.outcome ?? pending.outcome
             return [
               deepHitCheerSoundIdOf({
@@ -269,9 +273,12 @@ export function usePitcherGame(
           // 견제 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 화면이 판 안의 그 틱에 낸다
           (current) => pickoff(current, key, random, true),
           // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36). 붙든 판은 `lastDefensePlay` 가 안 바뀌어
-          // 여기서는 안 난다(화면 `LiveRunnerPlayback` 이 결과 메시지 0xbba 의 틱에 낸다) — 미리 돈 판(재생)일 때만 연 자리에서 낸다
+          // 여기서는 안 난다(화면 `LiveRunnerPlayback` 이 결과 메시지 0xbba 의 틱에 낸다). 미리 돌려 재생 칸에 넣은 판은 재생 화면이
+          // 기록된 틱에 낸다(`replayCallsOnScreen`) — 재생할 틱이 없는 판만 연 자리에서 낸다
           (before, after) =>
-            after.lastDefensePlay !== before.lastDefensePlay && isPickoffPlayResult(after.lastDefensePlay)
+            after.lastDefensePlay !== before.lastDefensePlay &&
+            isPickoffPlayResult(after.lastDefensePlay) &&
+            !replayCallsOnScreen(before.lastDefensePlay, after.lastDefensePlay, after.lastDefensePlay)
               ? [pickoffCallSoundIdOf(after.lastDefensePlay)]
               : [],
         ),

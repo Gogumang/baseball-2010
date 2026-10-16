@@ -1,4 +1,5 @@
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import { inPlayCommandOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import {
   JUDGE_POPUP_START,
   NO_ZOOM_PUNCH,
@@ -90,6 +91,28 @@ export function enterDefenseScene(scene: DefenseScene | undefined, afterPitch: b
   const base = scene ?? DEFENSE_SCENE_START
   const popup = afterPitch ? { ...base.popup, shown: true, bigOutDraws: 0, textAdvances: 0 } : base.popup
   return { ...base, popup: { ...popup, timer: -1 } }
+}
+
+/**
+ * **판이 닫힌 뒤에 온 사람 송구 키** — 판 진행 관문이 닫혀도 상태 0x17 은 0x35108 까지(+0x1094 셈) 돌고, 그동안 온 키도 키 분배
+ * 0x498d4 → 0x536bc → 0x53420 을 지난다(직접 뜸). 조작 [+0xc] ≠ 0(사람 수비)이면 0x5344a → 0x533c8 이 키를 루로 바꿔
+ * ('8'/아래 → 홈 · '6'/오른 → 1루 · '2'/위 → 2루 · '4'/왼 → 3루, 그 밖은 아무것도 안 보냄) 메시지 0x588 을 곧바로 보내고
+ * 0x51890 이 플레이 vt60 0xb3118(`str r1,[r0,#0x160]`)을 **조건 없이** 부른다. 닫힌 판에서는 vt4c(b4660)가 안 돌아 그 값을 쓰는
+ * 곳이 없으므로 +0x160 은 다음 판으로 남는다 — 진행기 밖의 이 키들을 차례대로 접어 판이 넘길 장면 칸(`throwTarget`)에 적는다.
+ * 사람 공격(조작 [+0xc] == 0)은 0x5331c 주루 갈래라 +0x160 을 안 건드린다. 키 반복은 송구 갈래에 게이트가 없다.
+ */
+export function withClosedThrowKeys(
+  scene: DefenseScene,
+  presses: readonly { readonly key: string; readonly isRepeat?: boolean }[],
+  side: ControlSide | undefined,
+): DefenseScene {
+  if (side !== '수비') return scene
+  let throwTarget = scene.throwTarget
+  for (const press of presses) {
+    const command = inPlayCommandOf(press.key, '수비', { isHoldRepeat: press.isRepeat === true })
+    if (command?.kind === '송구') throwTarget = command.target
+  }
+  return throwTarget === scene.throwTarget ? scene : { ...scene, throwTarget }
 }
 
 /** 레이저 발사 0x400bc(40100) — +0x1992 = 0 · +0x1991 = +0x1990 = 1 (+0x1993 · 플레이 vt64(1) 은 진행기 몫) */
