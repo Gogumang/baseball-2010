@@ -76,4 +76,36 @@ describe('playQuickPlateAppearance — 간이 타석 하나를 주자까지 (0xc
     )
     expect(result.steals).toBe(0)
   })
+  describe('공격 팀 레코드 +2 덮기 — 스윙 경로 0xab214(ab4c0~ab4d8) · 주자 있는 판정 경로 c19ec 만 (r104)', () => {
+    const 빈루 = {
+      batter: 타자,
+      pitcher: 투수,
+      situation: { inning: 1 },
+      bases: { first: false, second: false, third: false },
+      outs: 0,
+      runners: { first: null, second: null, third: null },
+      batterId: 0,
+      runnerRunOf: () => 500,
+    } as const
+
+    it('주자 없이 판정 경로만으로 끝난 삼진은 공격 팀을 안 덮는다 (c1990 → c1ae2)', () => {
+      const result = playQuickPlateAppearance(빈루, 차례난수([], 0.99))
+      expect(result.play.outcome).toEqual({ kind: '삼진' })
+      expect(result.touchesOffenseRecord).toBe(false)
+    })
+
+    it('스윙 경로를 한 번이라도 타면 덮는다 (c14e4 0xab214)', () => {
+      const result = playQuickPlateAppearance(빈루, 차례난수([], 0))
+      expect(result.touchesOffenseRecord).toBe(true)
+    })
+
+    it('판정 경로라도 주자가 있으면 앞선 주자 주력을 읽어 덮는다 (c19ec)', () => {
+      const result = playQuickPlateAppearance(
+        { ...빈루, bases: { first: true, second: false, third: false }, runners: { first: 5, second: null, third: null } },
+        차례난수([], 0.99),
+      )
+      expect(result.play.outcome).toEqual({ kind: '삼진' })
+      expect(result.touchesOffenseRecord).toBe(true)
+    })
+  })
 })

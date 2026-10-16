@@ -431,6 +431,11 @@ export interface QuickAtBatHooks {
    * 바뀌므로 공마다 묻는다. 안 넘기면 빈 루다. 난수를 쓰지 않는다.
    */
   readonly basesAtPitch?: () => BaseState
+  /**
+   * 스윙 경로(0xc11f0)로 간 공 — 그 길은 늘 0xab214 에 닿고 0xab214 는 ab4c0~ab4d8 에서 **공격 팀 레코드**로 0xb570c 를 부른다
+   * (c1428 → c14e4 사이 빠지는 갈래 없음 · ab214 머리 → ab4b4 사이 pop 없음, r104 직접 뜸). 난수를 쓰지 않는다
+   */
+  readonly onSwingPath?: () => void
 }
 
 /**
@@ -457,6 +462,7 @@ export function playQuickAtBat(
     const pitcher = hooks.beforePitch?.() ?? startingPitcher
     const isSwing =
       random.rand(0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
+    if (isSwing) hooks.onSwingPath?.()
     if (!isSwing) {
       const judged = judgePitchOf(pitcher, strikes, balls, random)
       // 볼·스트라이크를 가른 뒤 도루를 굴린다 (0xc1818 안, E-5). 타석을 끝내는 투구에서도 돈다

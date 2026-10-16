@@ -1884,12 +1884,29 @@ describe('나리 타자편 두 팀 사기 — 두 팀 레코드 +2 는 지금 �
     expect(opponentMoundOf(선공).teamMorale).toBe(30)
     const 한공 = throwOpponentPitch(선공, 1, { batterIntimidates: false })
     expect(opponentMoundOf(한공).teamMorale).toBe(80)
-    // 내가 후공이면 상대는 1회초 공격이 먼저라(0x35b94 · 간이 타석이 덮는다) 앞 값을 안 든다
+    expect(한공.opponentRecordMorale).toBe(80)
+    // 내가 후공이면 상대는 1회초 공격(자동진행)이 먼저다 — 그 반 이닝이 상대 레코드를 덮었으면(스윙 경로 · 주자 있는 판정 경로) 앞 값은
+    // 더 안 보고, 안 덮었으면 1회말 첫 공이 앞 값을 본다 (r104)
     const 후공 = startGame(
       createSeededRandom(20100905), 0, undefined, undefined, undefined, 0, false, undefined, undefined, undefined, undefined,
       80, 30,
     )
-    expect(후공.opponentStaleMorale).toBeUndefined()
+    expect(후공.opponentStaleMorale).toBe(30)
+    expect(opponentMoundOf(후공).teamMorale).toBe(후공.opponentRecordMorale === undefined ? 30 : 80)
+  })
+
+  it('돌발 보상이 사기를 바꿔도 상대 레코드 +2 는 다음에 덮일 때까지 바뀌기 전 값 — 마지막 타석이면 경기 끝 칸이 그 값 (r104)', () => {
+    const 선공 = startGame(
+      createSeededRandom(20100905), 0, 1, 1, PLAYER_SIDE_FIRST_BAT, 0, false, undefined, undefined, undefined, undefined,
+      80, 30,
+    )
+    const 한공 = throwOpponentPitch(선공, 1, { batterIntimidates: false })
+    // 0x1c · 0x1d 진입 0x8e34c 가 사기를 바꾼다 — 그 뒤 0x18 · 0x19 는 상대 칸을 안 덮는다
+    const 바뀜 = withGameTeamMorale(한공, 95)
+    expect(바뀜.teamMorale).toBe(95)
+    expect(바뀜.opponentRecordMorale).toBe(80)
+    // 상대가 다시 던지면 틱 10 놓기 0x4dc78 이 새 값으로 덮는다
+    expect(throwOpponentPitch(바뀜, 1, { batterIntimidates: false }).opponentRecordMorale).toBe(95)
   })
 })
 

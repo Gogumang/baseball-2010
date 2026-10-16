@@ -524,7 +524,10 @@ export function cpuGameAcesOf(
     : { away: rolls.teamA, home: rolls.teamB }
 }
 
-/** 1회초 수비 팀(home)의 레코드 +2 앞 값 — 첫 투수 첫 공만 본다 (`LeagueAbilityContext.staleRecordMorales`) */
+/**
+ * 1회초 수비 팀(home)의 레코드 +2 앞 값 — 첫 투수 첫 공만 본다 (`LeagueAbilityContext.staleRecordMorales`).
+ * 원정 팀도 1회초 공격에서 한 번도 안 덮였으면 1회말 첫 공에 같은 값을 본다 (`HalfInningResult.offenseRecordTouched`, r104)
+ */
 function withStaleMorale(defense: HalfInningDefense, staleMorale: number | undefined): HalfInningDefense {
   return staleMorale === undefined ? defense : { ...defense, staleMorale }
 }
@@ -845,6 +848,8 @@ export function simulateLeagueGame(
   /** 승·패·세 칸 `state+0x44..+0x64` — 경기 상태 초기화 0xb6814 가 셋 다 2(없음)로 둔다 */
   let decision: DecisionState = EMPTY_DECISION_STATE
 
+  /** 원정 팀 레코드 +2 를 이 경기에서 0xb570c 가 덮었는가 — 1회초 공격 중에만 갈린다 (`HalfInningResult.offenseRecordTouched`) */
+  let awayRecordTouched = false
   // 상한 없이 점수가 갈릴 때까지 (0xc2198 → 0xb68fc)
   for (let inning = 1; ; inning += 1) {
     homeMound = resynced(homeMound, homeStaminas)
@@ -886,6 +891,7 @@ export function simulateLeagueGame(
 
     // 0xb68fc 가 끝을 냈으면(초 3아웃 뒤 — 9회 이후 홈이 앞섬 · 7회 이후 홈 10점 차) 말은 치르지 않는다
     if (top.gameEnded === true) break
+    if (top.offenseRecordTouched) awayRecordTouched = true
 
     awayMound = resynced(awayMound, awayStaminas)
     const bottom = simulateHalfInning(
@@ -899,7 +905,13 @@ export function simulateLeagueGame(
         endsGame: ({ runs, outs }) =>
           isGameOverAt({ inning, half: '말', outs, awayScore: awayRuns, homeScore: homeRuns + runs }),
       },
-      defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext, awayRecord),
+      // 원정 팀 첫 투수 첫 공도 앞 값일 수 있다 — 1회초에 그 팀(공격)을 0xb570c 가 한 번도 안 덮었으면(스윙 경로 0xab214 · 주자 있는
+      // 판정 경로 c19ec 가 없던 반 이닝) 1회말 첫 공의 소모 c26cc 가 c1446 · c1852 보다 먼저라 레코드에 남은 값을 본다 (r104).
+      // 두 팀이 한 레코드면(`sharedRoster`) 1회초 첫 공의 c1446 이 이미 덮었다
+      withStaleMorale(
+        defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext, awayRecord),
+        inning === 1 && !awayRecordTouched && !sharedRoster ? extras?.abilityContext?.staleRecordMorales?.[matchup.away] : undefined,
+      ),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },
     )
     decision = decisionsAfterHalfInning(decision, bottom, {

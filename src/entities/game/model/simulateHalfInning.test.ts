@@ -435,3 +435,16 @@ describe('레코드 +2 의 앞 값 staleMorale — 첫 투수 첫 공만 (0xc262
     expect(앞값).toBe(나머지)
   })
 })
+
+describe('반 이닝의 공격 팀 레코드 +2 덮기 — 스윙 경로 0xab214 · 주자 있는 판정 경로 c19ec 만 (r104)', () => {
+  it('판정 경로 삼진 셋(주자 없음)으로 끝나면 공격 팀을 한 번도 안 덮는다', () => {
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, createConstantRandom(0.99))
+    expect(result.strikeouts).toBe(3)
+    expect(result.offenseRecordTouched).toBe(false)
+  })
+
+  it('스윙 경로를 한 번이라도 타면 덮는다', () => {
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, createSeededRandom(2010))
+    expect(result.offenseRecordTouched).toBe(true)
+  })
+})
