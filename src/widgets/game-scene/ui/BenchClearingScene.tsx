@@ -24,6 +24,7 @@ import { irisHoleSpansOf } from '@/widgets/game-scene/lib/irisClose'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface BenchClearingSceneProps {
   /** 운동장 18명 — 안 주면 바탕을 안 그린다(검정) */
@@ -60,6 +61,9 @@ interface BenchClearingSceneProps {
  * 화면을 누르는 투명 칸(`OkTapArea`)은 웹 전용이다(원본은 OK 키).
  */
 export function BenchClearingScene({ field, random, onDone, walkStateRef }: BenchClearingSceneProps) {
+  // 벤치 클리어링 0x1e도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
+  // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
+  useMarksGameScene()
   const reachedRef = useRef(false)
   const targetRollsRef = useRef<readonly number[] | null>(null)
   const doneRef = useRef(false)

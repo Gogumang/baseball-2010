@@ -9,6 +9,7 @@ import { HalfInningCards } from '@/widgets/game-scene/ui/HalfInningCards'
 import type { HalfInningCardsData } from '@/widgets/game-scene/ui/HalfInningCards'
 import { HalfInningField } from '@/widgets/field-walk/ui/HalfInningField'
 import type { HalfInningFieldProps } from '@/widgets/field-walk/ui/HalfInningField'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface HalfInningBoardProps {
   /** 판이 서는 반 이닝 — 그림에는 안 쓴다(시험 · 부르는 쪽이 판을 가려 보는 표시) */
@@ -46,6 +47,9 @@ interface HalfInningBoardProps {
  * - 화면을 누르는 투명 칸(`OkTapArea`)은 웹 전용이다(원본은 OK 키). 예전 웹의 "N회초" 글자는 원본에 없어 뺐다.
  */
 export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, field, onConfirm }: HalfInningBoardProps) {
+  // 교대 판 0x18도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
+  // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
+  useMarksGameScene()
   const tick = useSceneTick(onTick)
   const confirmRef = useRef(onConfirm)
   confirmRef.current = onConfirm

@@ -162,6 +162,7 @@ import {
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -839,6 +840,9 @@ export function useMissionSession({
   useEffect(() => {
     if (!isBatterRunning && !isPitcherRunning) return
     const handle = window.setInterval(() => {
+      // 0xaada4 는 프레임 0x52c50 의 갱신 쪽(52ed0~52ee4)이라 공용 창이 서 있으면(52cc6) 안 돈다 — 그동안 남은 초가 안 준다.
+      // ⚠️ 근사: 원본은 창이 닫힌 첫 갱신에 마지막 초 셈(0xa5bb0) 뒤 1000ms 가 넘었으면 곧바로 1초를 빼고(aae20~aae2c) 시각을 다시 적는다
+      if (isGameSceneFrozen()) return
       if (isBatterRunning) {
         setMissionRun((previous) => (previous === null ? previous : tickMission(previous, 1)))
       } else {

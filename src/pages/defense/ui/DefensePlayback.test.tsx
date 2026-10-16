@@ -25,6 +25,12 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { openPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import {
+  GameSceneMarkContext,
+  markCommonWindowShown,
+  resetCommonWindowShownForTest,
+  useMarksGameScene,
+} from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 수비 한 플레이 재생 (원본 경기 장면 상태 0x17).
@@ -633,5 +639,101 @@ describe('득점 메시지 0x13 의 함성 — 0x51fb8 머리 (홈런성이 아�
       setActiveSound(null)
       vi.useRealTimers()
     }
+  })
+})
+
+describe('수비 재생 — 공용 창이 서면 판이 멈춘다 (경기 장면 0x52c50 의 52cc6)', () => {
+  afterEach(() => {
+    // 화면을 먼저 내려야 장면 셈이 0 으로 돌아온다(밖의 `cleanup` 은 이 뒤에 돈다)
+    cleanup()
+    resetCommonWindowShownForTest()
+  })
+
+  /** 끝날 때까지 흘린 갱신 수 — `창` 을 주면 `창.at` 번째 갱신 뒤에 창을 세우고 `창.frames` 갱신 동안 둔다 */
+  function 끝난갱신(input: DefensePlayInput, 창?: { readonly at: number; readonly frames: number; readonly key?: string }): {
+    readonly updates: number
+    readonly onDone: ReturnType<typeof vi.fn>
+  } {
+    const onDone = vi.fn()
+    render(<DefensePlayback input={input} side="수비" onDone={onDone} />)
+    let updates = 0
+    for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
+      if (창 !== undefined && i === 창.at) {
+        const release = markCommonWindowShown()
+        for (let frozen = 0; frozen < 창.frames; frozen += 1) {
+          if (창.key !== undefined) fireEvent.keyDown(window, { key: 창.key })
+          act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        }
+        // 창이 떠 있는 동안은 판이 끝나지 않는다
+        expect(onDone).not.toHaveBeenCalled()
+        act(() => release())
+      }
+      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      updates += 1
+    }
+    return { updates, onDone }
+  }
+
+  it('창이 떠 있는 동안 진행기 틱이 안 돌고, 닫히면 건너뛴 틱을 따라잡지 않고 이어 돈다', () => {
+    vi.useFakeTimers()
+    try {
+      const input = 타구(단타, 주자1루)
+      const 그냥 = 끝난갱신(input)
+      cleanup()
+      const 멈춤 = 끝난갱신(input, { at: 10, frames: 200 })
+      // 창 밖 갱신 수가 같다 — 멈춘 200 갱신은 판에 안 든다
+      expect(멈춤.updates).toBe(그냥.updates)
+      expect(결과(멈춤.onDone).log).toEqual(결과(그냥.onDone).log)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("창이 떠 있는 동안 누른 키는 판이 안 받는다 — 키는 창(0x754f9)이 가져가고 0x498d4 는 안 돈다", () => {
+    vi.useFakeTimers()
+    try {
+      const input = 타구(단타, 주자1루)
+      const 멈춤 = 끝난갱신(input, { at: 3, frames: 30, key: '2' })
+      expect(결과(멈춤.onDone).log.some((line) => line.includes('사람이 2루로 송구 지시'))).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('수비 판도 경기 장면이라고 센다 — 타석 화면이 내려가고 이 판만 서도 장면 객체가 안 내려간다(0x3874 new 는 장면 전환 때뿐)', async () => {
+    let up = 0
+    let leaves = 0
+    // 앱(`App` 의 markGameScene)처럼 — 한 커밋 안의 내림 · 올림이 끝난 뒤(마이크로태스크)에도 0 일 때만 장면 객체를 내린다
+    const mark = (isUp: boolean) => {
+      up += isUp ? 1 : -1
+      if (!isUp && up === 0) {
+        queueMicrotask(() => {
+          if (up === 0) leaves += 1
+        })
+      }
+    }
+    function 타석(): null {
+      useMarksGameScene()
+      return null
+    }
+    const { rerender } = render(
+      <GameSceneMarkContext.Provider value={mark}>
+        <타석 />
+      </GameSceneMarkContext.Provider>,
+    )
+    expect(up).toBe(1)
+    rerender(
+      <GameSceneMarkContext.Provider value={mark}>
+        <DefensePlayback ticks={[틱(), 틱()]} onDone={() => {}} />
+      </GameSceneMarkContext.Provider>,
+    )
+    await Promise.resolve()
+    // 타석 화면이 내려가도 수비 판이 같은 커밋에 서서 장면 객체(+0xfd4 · 파티클 관리자)를 안 내린다
+    expect(up).toBe(1)
+    expect(leaves).toBe(0)
+    cleanup()
+    await Promise.resolve()
+    expect(up).toBe(0)
+    expect(leaves).toBe(1)
   })
 })

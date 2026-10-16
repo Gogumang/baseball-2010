@@ -55,6 +55,7 @@ import {
   type HomeRunTextState,
   type HomeRunTextWindow,
 } from '@/widgets/batting-stage/lib/homeRunBanner'
+import { gameSceneNow } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
@@ -126,7 +127,7 @@ export function derbyHomeRunTextOf(
  * 숫자는 표시 비거리 +0x36 이라 공이 나는 동안 틱마다 따라 오른다(`derbyDisplayDistanceAt`, `previous` = 앞 공이 남긴 값).
  */
 export interface DerbyDistanceBoard {
-  /** 판을 넘겨받은 시각(공 틱 0) — `performance.now()` 기준 ms */
+  /** 판을 넘겨받은 시각(공 틱 0) — `gameSceneNow()` 기준 ms */
   readonly startedAt: number
   readonly batted: DerbyBattedBall
   /** 이 판이 다시 쓰기 전의 +0x36 */
@@ -593,7 +594,7 @@ export function useHomeRunDerby({
     // 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 글자 창의 첫 그림(홈런 틱)에 타석 화면이 깔고, 유지 단계 그림마다 굴린다
     // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
     clearPlaySoundTimers()
-    const startedAt = performance.now()
+    const startedAt = gameSceneNow()
     if (batted !== null) {
       schedulePlaySounds(batted, startedAt, 0)
       playRef.current = {
@@ -632,7 +633,7 @@ export function useHomeRunDerby({
       ...batted.homeRunTicks.map((tick) => ({ tick, soundId: DERBY_HOME_RUN_SOUND })),
       ...(batted.foulCallTick === null ? [] : [{ tick: batted.foulCallTick, soundId: FOUL_CALL_SOUND }]),
     ].filter(({ tick }) => tick >= fromTick)
-    const elapsed = performance.now() - startedAt
+    const elapsed = gameSceneNow() - startedAt
     for (const { tick, soundId } of soundTicks) {
       playSoundTimersRef.current.push(
         window.setTimeout(
@@ -689,7 +690,7 @@ export function useHomeRunDerby({
         onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID)
       }
       // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
-      if (playRef.current !== null) setEffectsClearedAt(performance.now())
+      if (playRef.current !== null) setEffectsClearedAt(gameSceneNow())
       playRef.current = null
       setIsEventZoneShown(false)
       // 0x17 끝 0x35108 — HOMERUN 글자를 끄고(0x351d0) 0x17 그리기(비거리 판)도 더는 안 돈다
@@ -754,7 +755,7 @@ export function useHomeRunDerby({
   const skipHomeRun = useCallback(() => {
     const play = playRef.current
     if (play === null) return
-    const now = performance.now()
+    const now = gameSceneNow()
     // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 지금 흐르는 틱 다음 틱이 키를 받은 틱이다
     const keyTick = Math.floor((now - play.startedAt) / millisecondsPerFrame()) + 1
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
