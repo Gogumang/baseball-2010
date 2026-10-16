@@ -362,6 +362,13 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: './sprites/mode_ui/frames', frames: [11, 14, 19], json: ['animations.json', 'origins.json'] },
     { folder: './sprites/num', frames: [90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 106, 127] },
     { folder: './sprites/team_s_icon', frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+    /**
+     * r124 측정 — 투수편 관리 첫 판: 머리띠 제목 "나만의리그투수편"(game_frame 11) · 스태미나 딱지(img_text 396) ·
+     * 가운데 무대 투수 인물(event_char_0 합성 4~6). 메뉴에서 곧바로 들어가면 첫 0.5초에 이 셋이 비었다
+     */
+    { folder: './sprites/game_frame', frames: [11] },
+    { folder: './sprites/img_text/frames', frames: [396], json: ['origins.json'] },
+    { folder: './sprites/event_char_0/frames', frames: [4, 5, 6], json: ['animations.json', 'origins.json'] },
   ],
   /** 경기 끝 판 · 정산 결과 · 결과 뒤 이벤트(나리) — r111 측정. 경기 장면이 서 있는 동안 유휴로 */
   afterGame: [
@@ -381,6 +388,11 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
   ],
   /** 미션 고르기 화면(메인메뉴에서 유휴로) — r111 측정. 관리 화면과 같은 칸(mode_icon · mode_ui · num)은 `nariMenu` 가 받는다 */
   missionSelect: [
+    /**
+     * 머리띠 제목 "미션모드" — 선수 고르기(0x54d95(skin, 11, 5, 0) 제목 11) · 미션 목록(제목 12/13) 둘 다 game_frame 18 이다.
+     * r124 측정: 메뉴에 10초 머물러 이 목록을 다 받아 두어도 선수 고르기 첫 0.5초에 이것 하나가 비었다(21프레임)
+     */
+    { folder: './sprites/game_frame', frames: [18] },
     { folder: './sprites/img_text/frames', frames: [88, 258], json: ['origins.json'] },
     { folder: './sprites/slt_frame', frames: [21, 23, 30, 51, 113] },
     { folder: './sprites/slt_frame/frames', frames: [0, 1, 15], json: ['origins.json'] },

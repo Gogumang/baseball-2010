@@ -154,6 +154,48 @@ describe('createSpritePreloader', () => {
   })
 })
 
+describe('r124 — 유휴 줄 차례', () => {
+  it('나중에 부른 유휴 묶음이 먼저다 — 묶음 안에서는 부른 차례대로', async () => {
+    const h = harness({ idleConcurrency: 1 })
+    void h.preloader.preload([{ folder: './sprites/num', frames: [0, 1] }], 'idle')
+    void h.preloader.preload([{ folder: './sprites/mode_ui', frames: [2, 3] }, { folder: './sprites/slt_frame', frames: [4] }], 'idle')
+    await h.flush()
+    for (let i = 0; i < 5; i += 1) {
+      await h.runIdle()
+      h.pending.splice(0).forEach((item) => item.resolve())
+      await h.flush()
+    }
+    expect(h.started).toEqual([
+      './sprites/mode_ui/002.png',
+      './sprites/mode_ui/003.png',
+      './sprites/slt_frame/004.png',
+      './sprites/num/000.png',
+      './sprites/num/001.png',
+    ])
+  })
+
+  it('지난 묶음에 서 있던 그림을 새 묶음이 다시 부르면 새 묶음 차례로 앞당긴다', async () => {
+    const h = harness({ idleConcurrency: 1 })
+    void h.preloader.preload([{ folder: './sprites/num', frames: [0, 1, 2] }], 'idle')
+    void h.preloader.preload([{ folder: './sprites/num', frames: [2] }, { folder: './sprites/game', frames: [7] }], 'idle')
+    await h.flush()
+    for (let i = 0; i < 4; i += 1) {
+      await h.runIdle()
+      h.pending.splice(0).forEach((item) => item.resolve())
+      await h.flush()
+    }
+    expect(h.started).toEqual(['./sprites/num/002.png', './sprites/game/007.png', './sprites/num/000.png', './sprites/num/001.png'])
+  })
+
+  it('유휴 줄 기본 동시 수는 4 다', async () => {
+    const h = harness()
+    void h.preloader.preload([{ folder: './sprites/num', frames: [0, 1, 2, 3, 4, 5] }], 'idle')
+    await h.flush()
+    await h.runIdle()
+    expect(h.started).toHaveLength(4)
+  })
+})
+
 describe('r111 — 마스크 · 이름 · 원점 표 거르기 · 합치기', () => {
   it('마스크 프레임은 ?mask 주소로, 이름 PNG 는 이름 그대로 받는다', async () => {
     const h = harness()
