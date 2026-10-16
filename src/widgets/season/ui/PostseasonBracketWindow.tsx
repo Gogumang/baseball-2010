@@ -1,12 +1,14 @@
 import { FrameSprite, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
-  BRACKET_BACKDROP, LEG_ORDER, LINE_COLOR, LINE_SEGMENTS, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS,
-  RANK_UNIT, TEAM_CELLS, WON_LINE_COLOR, bracketViewOf, cellIndexOfRank, rankDigitBoxTopOf, rankDigitRightOf, rankGlyphsOf,
-  rankUnitPositionOf,
+  BRACKET_BACKDROP, DARK_CELL_STEP, LINE_COLOR, LINE_FRAMES, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS, RANK_UNIT,
+  TEAM_CELLS, WON_LINE_COLOR, bracketViewOf, darkCellBoxOf, lineFrameOfCell, rankDigitBoxTopOf, rankDigitRightOf,
+  rankGlyphsOf, rankLabelOfCell, rankUnitPositionOf,
 } from '@/widgets/season/lib/postseasonBracketLayout'
+import type { BracketBox } from '@/widgets/season/lib/postseasonBracketLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 
 export interface PostseasonBracketWindowProps {
@@ -14,25 +16,23 @@ export interface PostseasonBracketWindowProps {
   readonly series: PostseasonSeries | null
 }
 
+const placeOf = (box: BracketBox) => ({ left: box.x, top: box.y, width: box.width, height: box.height })
+
 /**
- * 포스트시즌 대진표 (그리기 **0x853ac** — P6 4a-1 **확정**).
+ * 포스트시즌 대진표 (그리기 **0x853ac** — 직접 떴다. 부르는 곳 0xb7b8 시즌 0xef · 0x168e8 나리 128).
  *
- * mode_ui 프레임 53(195×210) 계단 그림을 앵커 (0,0) 에 통째로 깔고, 그 프레임 박스 0~3 에 팀 로고를
- * (+3), 박스 4~7 에 순위 딱지(숫자 그림 + img_text 307 "위")를 얹는다. 대진 선은 그림 없는 프레임 54~57 의 2px 박스를 먼저
- * **#08044A** 로 모두 채운 뒤, **이긴 길만 빨강 RGB(255,0,0)** 으로 다시 채운다 (0x855b4~0x857ec).
- *
- * 안 옮긴 것 (원본에 있으나 문서가 '유력'·'다른 몫'이라 뺐다):
- *  - "프레임 54 박스 0 영역을 단계 7 로 어둡게" — P6 도 '유력'. (P6 이 붙인 주소 0x7f4ed 는 어둡게가 아니라
- *    끝(0x8585c)의 **머리띠·바닥 그리기** 0x7f4ec 다 — 시즌 0xef 는 `SeasonSummaryScreen` 이 ScreenFrame 으로 그린다)
- *  - 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이다 (P6 4a-3) → `SeasonSummaryScreen` 이 띄운다
- *
- * ⚠️ 타자편 `src/pages/season-end/ui/PostseasonBracket.tsx` 와 **같은 그림**이다.
- * 페이지끼리는 못 쓰므로 위젯으로 따로 두었고, 좌표는 `postseasonBracketLayout.ts` 에 옮겨 적었다.
+ * 1. mode_ui 프레임 53(195×210) 계단 그림을 앵커 (0,0) 에 통째로 (0x853f6).
+ * 2. 칸 k = 0..3 마다 (0x8540e~0x85532): 선 프레임 54 + k 의 박스를 모두 **#08044A** 로 채우고, 칸 k(프레임 53 박스 k)
+ *    + 3 에 로고(35×34), 딱지(박스 4 + k)에 숫자 4 − k 와 "위".
+ * 3. 이긴 길을 **빨강 RGB(255,0,0)** 으로 다시 채운다(0x85536~0x857f6 — `bracketViewOf`).
+ * 4. 진 팀 칸을 [0x15605d4] 검정 단계 7 로 덮는다(0x8580e~0x85858 — 프레임 53 박스 k 를 (x, y, w, h + 1)).
+ * 5. 끝(0x8585c)의 머리띠·바닥 0x7f4ec 는 부르는 화면이 ScreenFrame 으로 그린다.
+ * 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이다(P6 4a-3).
  */
 export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps) {
   const origins = useFrameOrigins(BRACKET_BACKDROP.folder)
   const view = bracketViewOf(series)
-  const wonLegs = new Set(view.wonLegs)
+  const darkOpacity = blackStepCoverOpacityOf(DARK_CELL_STEP)
 
   return (
     <div role="group" aria-label="포스트시즌 대진표">
@@ -44,46 +44,32 @@ export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps
         y={BRACKET_BACKDROP.anchorY}
       />
 
-      {LEG_ORDER.flatMap((leg) =>
-        LINE_SEGMENTS[leg].map((box, index) => (
-          <div
-            key={`${leg}-${index}`}
-            className={styles.segment}
-            data-leg={leg}
-            data-won={wonLegs.has(leg) ? 'true' : 'false'}
-            style={{
-              left: box.x,
-              top: box.y,
-              width: box.width,
-              height: box.height,
-              background: wonLegs.has(leg) ? WON_LINE_COLOR : LINE_COLOR,
-            }}
-          />
-        )),
-      )}
-
-      {[1, 2, 3, 4].map((rank) => {
-        const cell = TEAM_CELLS[cellIndexOfRank(rank)]
-        const tag = RANK_TAGS[cellIndexOfRank(rank)]
-        const teamId = view.seeds[rank - 1]
+      {TEAM_CELLS.map((cell, k) => {
+        const frame = lineFrameOfCell(k)
+        const tag = RANK_TAGS[k]
+        const rank = rankLabelOfCell(k)
+        const teamId = view.cellTeams[k]
         const team = teamId === null || teamId === undefined ? undefined : TEAMS[teamId]
-        const box = {
+        const logoBox = {
           left: cell.x + LOGO_INSET,
           top: cell.y + LOGO_INSET,
           width: cell.width - LOGO_INSET * 2,
           height: cell.height - LOGO_INSET * 2,
         }
         return (
-          <div key={rank}>
+          <div key={k} data-cell={k}>
+            {LINE_FRAMES[frame].map((box, index) => (
+              <div key={index} className={styles.segment} data-frame={frame} data-box={index}
+                style={{ ...placeOf(box), background: LINE_COLOR }} />
+            ))}
             {team === undefined ? (
               // 아직 자리가 안 정해진 칸 — 원본은 빈 칸을 그냥 비워 둔다
-              <div className={styles.emptyCell} style={box} />
+              <div className={styles.emptyCell} style={logoBox} />
             ) : (
-              <img className={styles.logo} src={team.logoUrl} alt={team.name} style={box} />
+              <img className={styles.logo} src={team.logoUrl} alt={team.name} style={logoBox} />
             )}
             {/* 순위 딱지 = num 0~9 숫자 (x + 8 왼쪽 붙임) + img_text 307 "위" 오른쪽 정렬 ox −6 — `rankGlyphsOf` 주석 */}
-            <div className={styles.rankTag} data-rank={rank}
-              style={{ left: tag.x, top: tag.y, width: tag.width, height: tag.height }} />
+            <div className={styles.rankTag} data-rank={rank} style={placeOf(tag)} />
             <SpriteNumber glyphs={rankGlyphsOf(rank)} right={rankDigitRightOf(tag, rank)}
               boxTop={rankDigitBoxTopOf(tag)} boxHeight={tag.height} glyphHeight={RANK_GLYPH_HEIGHT} />
             <img className={styles.rankUnit} alt="위"
@@ -92,6 +78,16 @@ export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps
           </div>
         )
       })}
+
+      {view.redBoxes.map(({ frame, box }, index) => (
+        <div key={`red-${index}`} className={styles.segment} data-frame={frame} data-box={box} data-won="true"
+          style={{ ...placeOf(LINE_FRAMES[frame][box]), background: WON_LINE_COLOR }} />
+      ))}
+
+      {view.darkCells.map((dark, k) => dark && (
+        <div key={`dark-${k}`} className={styles.segment} data-dark-cell={k}
+          style={{ ...placeOf(darkCellBoxOf(k)), background: '#000', opacity: darkOpacity }} />
+      ))}
     </div>
   )
 }

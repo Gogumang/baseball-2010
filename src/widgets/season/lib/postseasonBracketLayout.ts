@@ -1,3 +1,4 @@
+import { withSemiPlayoffWinner } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { glyphsWidthOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
@@ -10,11 +11,8 @@ import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
  * + 순위 딱지 4개)을 앵커 (0,0) 으로 통째로 깔고, 그 프레임 박스로 로고·딱지 자리를 잡는다.
  * 대진 선은 그림이 없는 **프레임 54~57**(박스만 있는 2px 선분 목록)이다.
  *
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * **출처**: 같은 값이 `src/pages/season-end/lib/bracketLayout.ts` 에도 있다(타자편 대진표).
- * 페이지→페이지는 서로 못 쓰므로 여기(widgets)에 **옮겨 적었다** — 값은 한 칸도 다르지 않다.
- * 원본 프레임 박스가 바뀔 일은 없지만, 둘 중 하나를 고치면 다른 하나도 고쳐야 한다.
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 시즌 상태 0xef(`SeasonSummaryScreen`)와 나만의리그 상태 128(`pages/season-end` 의 `PostseasonScreen`)이
+ * 이 위젯 하나(`PostseasonBracketWindow`)를 함께 쓴다 — 원본도 같은 함수 0x853ac 다.
  */
 
 /** 박스 하나 — 원본 프레임 박스(x, y, w, h)는 화면 절대 좌표다 */
@@ -34,155 +32,191 @@ export const BRACKET_BACKDROP = {
 } as const
 
 /**
- * 프레임 53 박스 0~3 — 팀 칸. **4위·3위·2위·1위 순 계단**(1위가 가장 높다).
- * 칸 안 로고는 `team_logo 0x66431(skin, [this+0x384], [this+0x388], 박스x + 3, 박스y + 3)`.
+ * 프레임 53 박스 0~3 — 팀 칸 계단(칸 3 이 가장 높다).
+ * 칸 k 로고는 `team_logo 0x66431(skin, [this+0x384], [this+0x388 + 4k], 박스x + 3, 박스y + 3)` — 앉는 팀은 `CELL_QUALIFIER_INDEX`.
  */
 export const TEAM_CELLS: readonly BracketBox[] = [
-  { x: 25, y: 195, width: 41, height: 40 }, // 4위
-  { x: 75, y: 195, width: 41, height: 40 }, // 3위
-  { x: 125, y: 171, width: 41, height: 40 }, // 2위
-  { x: 175, y: 147, width: 41, height: 40 }, // 1위
+  { x: 25, y: 195, width: 41, height: 40 }, // 칸 0 — 딱지 "4위", 정규 3위 팀
+  { x: 75, y: 195, width: 41, height: 40 }, // 칸 1 — 딱지 "3위", 정규 4위 팀
+  { x: 125, y: 171, width: 41, height: 40 }, // 칸 2 — 2위
+  { x: 175, y: 147, width: 41, height: 40 }, // 칸 3 — 1위
 ]
 
 /** 로고 안쪽 여백 (0x66431 인자 박스x + 3) */
 export const LOGO_INSET = 3
 
 /**
- * 프레임 53 박스 4~7 — 순위 딱지.
- * 원본은 `numBox(순위, 1, 4, 33, 8)` + `img_text 307 "위"` **오른쪽 정렬(0x24)** 이다 (P6 4a-1).
+ * 프레임 53 박스 4~7 — 순위 딱지. 칸 k 의 딱지 = 박스 4 + k, 숫자 4 − k (아래 `rankGlyphsOf` 주석).
  */
 export const RANK_TAGS: readonly BracketBox[] = [
-  { x: 26, y: 243, width: 39, height: 15 }, // 4위
-  { x: 76, y: 243, width: 39, height: 15 }, // 3위
-  { x: 126, y: 219, width: 39, height: 15 }, // 2위
-  { x: 176, y: 195, width: 39, height: 15 }, // 1위
+  { x: 26, y: 243, width: 39, height: 15 }, // 칸 0 "4위"
+  { x: 76, y: 243, width: 39, height: 15 }, // 칸 1 "3위"
+  { x: 126, y: 219, width: 39, height: 15 }, // 칸 2 "2위"
+  { x: 176, y: 195, width: 39, height: 15 }, // 칸 3 "1위"
 ]
 
 /**
- * 대진 선 묶음. 프레임 54~57 은 각 팀 칸에서 결승 꼭짓점 (120,87) 까지 가는 **한 길**인데,
- * 네 프레임이 위로 갈수록 박스를 나눠 쓴다. 겹치는 부분을 빼고 아래 일곱 묶음으로 쪼개면
- * 프레임 박스 목록이 정확히 복원된다 — 라운드별로 빨강을 칠하려면 이 쪼갬이 필요하다.
- *
- *   프레임 54 (4위 길) = rank4 + semiAdvance + finalAdvance + champion  (박스 7개)
- *   프레임 55 (3위 길) = rank3 + semiAdvance + finalAdvance + champion  (박스 7개)
- *   프레임 56 (2위 길) = rank2 +               finalAdvance + champion  (박스 5개)
- *   프레임 57 (1위 길) = rank1 +                             champion   (박스 3개)
- *
- * 합류점: 준플레이오프 (69,162) → 플레이오프 (95,138) → 한국시리즈 (120,114) → 꼭짓점 (120,87).
+ * 대진 선 = mode_ui 프레임 **54~57** 의 박스 목록 그대로(그림 없는 2px 선분). `frame_boxes(mode_ui.pzx)` 로 다시 읽어 맞췄다.
+ * 프레임 54 + k 는 팀 칸 k(프레임 53 박스 k) 에서 결승 꼭짓점 (120,87) 까지 가는 길이다 — 합류점 (69,162) → (95,138)
+ * → (120,114) → (120,87).
  */
-export const LINE_SEGMENTS = {
-  /** 4위 칸 → 준플레이오프 합류점 (프레임 54 박스 0·1) */
-  rank4: [
-    { x: 44, y: 162, width: 2, height: 32 },
-    { x: 46, y: 162, width: 25, height: 2 },
+export const LINE_FRAMES: Readonly<Record<54 | 55 | 56 | 57, readonly BracketBox[]>> = {
+  54: [
+    { x: 44, y: 162, width: 2, height: 32 }, { x: 46, y: 162, width: 25, height: 2 },
+    { x: 69, y: 138, width: 2, height: 24 }, { x: 71, y: 138, width: 26, height: 2 },
+    { x: 95, y: 114, width: 2, height: 24 }, { x: 97, y: 114, width: 25, height: 2 },
+    { x: 120, y: 87, width: 2, height: 29 },
   ],
-  /** 3위 칸 → 준플레이오프 합류점 (프레임 55 박스 0·1) */
-  rank3: [
-    { x: 95, y: 162, width: 2, height: 32 },
-    { x: 70, y: 162, width: 25, height: 2 },
+  55: [
+    { x: 95, y: 162, width: 2, height: 32 }, { x: 70, y: 162, width: 25, height: 2 },
+    { x: 69, y: 138, width: 2, height: 24 }, { x: 71, y: 138, width: 26, height: 2 },
+    { x: 95, y: 114, width: 2, height: 24 }, { x: 97, y: 114, width: 25, height: 2 },
+    { x: 120, y: 87, width: 2, height: 29 },
   ],
-  /** 준플레이오프 승자 → 플레이오프 합류점 (프레임 54·55 박스 2·3) */
-  semiAdvance: [
-    { x: 69, y: 138, width: 2, height: 24 },
-    { x: 71, y: 138, width: 26, height: 2 },
+  56: [
+    { x: 145, y: 138, width: 2, height: 32 }, { x: 95, y: 138, width: 50, height: 2 },
+    { x: 95, y: 114, width: 2, height: 24 }, { x: 97, y: 114, width: 25, height: 2 },
+    { x: 120, y: 87, width: 2, height: 29 },
   ],
-  /** 2위 칸 → 플레이오프 합류점 (프레임 56 박스 0·1) */
-  rank2: [
-    { x: 145, y: 138, width: 2, height: 32 },
-    { x: 95, y: 138, width: 50, height: 2 },
+  57: [
+    { x: 196, y: 114, width: 2, height: 31 }, { x: 120, y: 114, width: 76, height: 2 },
+    { x: 120, y: 87, width: 2, height: 29 },
   ],
-  /** 플레이오프 승자 → 한국시리즈 합류점 (프레임 54·55 박스 4·5 = 56 박스 2·3) */
-  finalAdvance: [
-    { x: 95, y: 114, width: 2, height: 24 },
-    { x: 97, y: 114, width: 25, height: 2 },
-  ],
-  /** 1위 칸 → 한국시리즈 합류점 (프레임 57 박스 0·1) */
-  rank1: [
-    { x: 196, y: 114, width: 2, height: 31 },
-    { x: 120, y: 114, width: 76, height: 2 },
-  ],
-  /** 한국시리즈 승자 → 결승 꼭짓점 (모든 프레임의 마지막 박스) */
-  champion: [{ x: 120, y: 87, width: 2, height: 29 }],
-} as const satisfies Readonly<Record<string, readonly BracketBox[]>>
+}
 
-export type BracketLeg = keyof typeof LINE_SEGMENTS
+export type LineFrame = keyof typeof LINE_FRAMES
 
-/** 그리는 순서 — 원본도 프레임 54 → 57 순으로 채운다 (0x853fa~0x85474) */
-export const LEG_ORDER: readonly BracketLeg[] = [
-  'rank4', 'rank3', 'semiAdvance', 'rank2', 'finalAdvance', 'rank1', 'champion',
-]
+/** 팀 칸 k 의 선 프레임 = 54 + k (0x8540e~0x85474 `adds r1, #0x36`) */
+export function lineFrameOfCell(cell: number): LineFrame {
+  return (54 + cell) as LineFrame
+}
 
-/** 선분 바탕색 #08044A = RGB(8,4,74) (0x853fa~0x85474) */
+/** 선분 바탕색 #08044A = RGB(8,4,74) (0x85450~0x85456) */
 export const LINE_COLOR = '#08044A'
-/** 이긴 길은 빨강 RGB(255,0,0) 으로 다시 채운다 (0x855b4~0x857ec) */
+/** 이긴 길은 빨강 RGB(255,0,0) 으로 다시 채운다 (0x85586~0x857f6) */
 export const WON_LINE_COLOR = '#FF0000'
 
-/** 순위 1~4 → 계단 칸 색인. 칸은 4위부터이므로 뒤집는다 */
-export function cellIndexOfRank(rank: number): number {
-  return 4 - rank
+/**
+ * 팀 칸 k 에 앉는 팀 = 대진 칸 (직접 떴다 — 0x8533c, 부르는 곳 0x693e 시즌 · 0x12110 나리):
+ * ```
+ * [this+0x388] = 0xb7649(L, 2, 0) = L[0x3c] (정규 3위)   ← 칸 0
+ * [this+0x38c] = 0xb7649(L, 2, 1) = L[0x3d] (정규 4위)   ← 칸 1
+ * [this+0x390] = 0xb7649(L, 1, 0) = L[0x3a] (정규 2위)   ← 칸 2
+ * [this+0x394] = 0xb7649(L, 0, 0) = L[0x38] (정규 1위)   ← 칸 3
+ * ```
+ * 0x853ac 는 칸 k 에 로고 `0x66431(…, [this+0x388 + 4k], …)` 와 딱지 숫자 **4 − k** 를 그린다(0x85512).
+ * 그래서 **"4위" 딱지 칸에 정규 3위 팀, "3위" 딱지 칸에 정규 4위 팀**이 앉는다 — 원본 그대로.
+ * 값은 `qualifiers`(1~4위) 의 색인이다.
+ */
+export const CELL_QUALIFIER_INDEX: readonly number[] = [2, 3, 1, 0]
+
+/** 칸 k 의 딱지 숫자 (0x85512 `movs r3, #4; subs r3, r3, r7`) */
+export function rankLabelOfCell(cell: number): number {
+  return 4 - cell
+}
+
+/** 빨강으로 다시 채우는 박스 하나 — 프레임 54~57 의 박스 번호 */
+export interface RedBox {
+  readonly frame: LineFrame
+  readonly box: number
 }
 
 /** 대진표에 그릴 상태 */
 export interface BracketView {
-  /** 1~4위 자리에 앉은 팀 번호. 아직 모르면 null (index 0 = 1위) */
-  readonly seeds: readonly (number | null)[]
-  /** 빨강으로 다시 칠할 선분 묶음 */
-  readonly wonLegs: readonly BracketLeg[]
-  /** 한국시리즈 우승 팀 (L+0x37 = SR+0xb7) */
+  /** 팀 칸 0~3 에 앉은 팀 번호 (`CELL_QUALIFIER_INDEX`). 모르면 null */
+  readonly cellTeams: readonly (number | null)[]
+  /** 빨강으로 다시 채울 박스 — 원본이 칠하는 차례 그대로(겹쳐도 그대로 둔다) */
+  readonly redBoxes: readonly RedBox[]
+  /** 팀 칸 k 를 검정 단계 7 로 덮는가 (진 팀 표시 — 0x8580e~0x85858) */
+  readonly darkCells: readonly boolean[]
+  /** 한국시리즈 우승 팀 (L+0x37) */
   readonly champion: number | null
 }
 
-const EMPTY_VIEW: BracketView = { seeds: [null, null, null, null], wonLegs: [], champion: null }
+const EMPTY_VIEW: BracketView = {
+  cellTeams: [null, null, null, null],
+  redBoxes: [],
+  darkCells: [false, false, false, false],
+  champion: null,
+}
+
+/** 대진 칸 L[0x39] · L[0x3b] 의 '미정' 값 (0xb80a8 `movs r5, #0xa`) */
+const UNDECIDED = 10
+
+/** 진 팀 칸 덮기 — [0x15605d4] 검정 몸통 단계 7 (0x8584a `movs r3, #7`): 화면을 7/16 남긴다 */
+export const DARK_CELL_STEP = 7
+
+/** 덮는 칸 = 프레임 53 박스 k 를 (x, y, w, h + 1) 로 (0x85840 `adds r5, r3, #1`) */
+export function darkCellBoxOf(cell: number): BracketBox {
+  const box = TEAM_CELLS[cell]
+  return { x: box.x, y: box.y, width: box.width, height: box.height + 1 }
+}
+
+const boxesOf = (frame: LineFrame, count: number): RedBox[] =>
+  Array.from({ length: count }, (_, box) => ({ frame, box }))
 
 /**
- * 진행 중인 시리즈에서 대진표 상태를 뽑는다 (P6 4a-1).
+ * 진행 중인 시리즈에서 대진표 상태를 뽑는다 — 0x853ac 의 0x85536~0x8580e 를 직접 떴다.
  *
- * 원본은 대진 칸 `L+0x38~0x43` 을 통째로 들고 있어 `0xb7649(L, 라운드 0~2, 쪽)` 로 라운드마다
- * 누가 이겼는지 바로 읽는다. 웹 `PostseasonSeries`(entities/league) 는 **지금 라운드**만 들고 있어
- * 지나간 라운드 승자는 되살려야 한다 — 플레이오프의 아랫 시드 = 준PO 승자(L+0x3b),
- * 한국시리즈의 아랫 시드 = PO 승자(L+0x39).
+ * 원본은 대진 칸 여섯 개를 읽는다: a = L[0x3d](4위) · b = L[0x3c](3위) · s = L[0x3b](준PO 승자) · c = L[0x3a](2위)
+ * · p = L[0x39](PO 승자) · d = L[0x38](1위). s · p 는 0xb80a8 이 10 으로 깔고 0xb7724 가 시리즈가 끝날 때 채운다(R13 8절).
+ * ```
+ * s != 10:  f = s == b ? 54 : 55 ; f 박스 0..2 빨강 ; 55 박스 0 · 56 박스 0 빨강 ; s == b ? 덮기[1] : 덮기[0]
+ * p != 10:  (f, n) = p == b ? (54, 5) : p == a ? (55, 5) : (56, 3) ; f 박스 0..n−1 빨강 ; 56 박스 0 · 57 박스 0 빨강
+ *           p == c ? 덮기[0] · 덮기[1] : 덮기[2]
+ * L[0x36]:  e = L[0x37] ; f = e == a ? 55 : e == b ? 54 : e == c ? 56 : 57 ; f 박스 전부 빨강
+ *           e == d ? 덮기[0..2] : 덮기[3]
+ * ```
+ * 준PO 뒤 "55 박스 0 · 56 박스 0", PO 뒤 "56 박스 0 · 57 박스 0" 은 **누가 이겼든** 칠한다 — 진 쪽 칸 세로선도
+ * 빨개지는 것은 원본 그대로다.
  *
- * ⚠️ **근사**: 플레이오프를 2위가 이기면 준PO 승자가 3위인지 4위인지 알 길이 없다. 그때는 3·4위 칸
- * 선분을 파랑으로 두고 합류 선분만 빨갛게 둔다(원본은 칸 값이 남아 있어 끝까지 빨갛다).
- * 웹 모델에 라운드 기록이 생기면 그대로 채워 넣으면 된다.
- * (같은 판단이 `src/pages/season-end/lib/postseasonBracket.ts` 에도 있다 — 옮겨 적은 것이다.)
+ * 웹 모델과 맞춤: s = `semiPlayoffWinner`(L+0x3b — `advancePostseason` 이 남긴다. 옛 저장은 `withSemiPlayoffWinner`
+ * 로 되살리고, 그래도 모르면 10), p = 한국시리즈·종료의 아랫 시드 `teams[1]`(L+0x39), L[0x36] = `round === '종료'`.
  */
 export function bracketViewOf(series: PostseasonSeries | null): BracketView {
   if (series === null) return EMPTY_VIEW
 
   const qualifiers = series.qualifiers
-  const seeds = [0, 1, 2, 3].map((index) => qualifiers[index] ?? null)
+  const team = (index: number) => qualifiers[index] ?? null
+  const [d, c, b, a] = [team(0), team(1), team(2), team(3)]
+  const cellTeams = CELL_QUALIFIER_INDEX.map(team)
 
-  const isSemifinalDone = series.round !== '준플레이오프'
-  const isFinalDone = series.round === '한국시리즈' || series.round === '종료'
-  const isChampionDone = series.round === '종료'
+  const semiplayoffWinner =
+    series.round === '준플레이오프' ? UNDECIDED : withSemiPlayoffWinner(series).semiPlayoffWinner ?? UNDECIDED
+  const playoffWinner = series.round === '한국시리즈' || series.round === '종료' ? series.teams[1] : UNDECIDED
 
-  // 지금 시리즈의 아랫 시드 = 바로 앞 라운드 승자
-  const lowerSeed = series.teams[1] ?? null
-  const semifinalWinner =
-    !isSemifinalDone ? null
-    : series.round === '플레이오프' ? lowerSeed
-    // 한국시리즈·종료: 남은 건 플레이오프 승자뿐이다. 그게 2위면 준PO 승자는 알 수 없다.
-    : lowerSeed === qualifiers[1] ? null
-    : lowerSeed
-  const finalWinner = isFinalDone ? lowerSeed : null
+  const redBoxes: RedBox[] = []
+  const darkCells = [false, false, false, false]
 
-  const wonLegs: BracketLeg[] = []
-  if (isSemifinalDone) {
-    if (semifinalWinner !== null) wonLegs.push(semifinalWinner === qualifiers[3] ? 'rank4' : 'rank3')
-    wonLegs.push('semiAdvance')
+  if (semiplayoffWinner !== UNDECIDED) {
+    redBoxes.push(...boxesOf(semiplayoffWinner === b ? 54 : 55, 3), { frame: 55, box: 0 }, { frame: 56, box: 0 })
+    darkCells[semiplayoffWinner === b ? 1 : 0] = true
   }
-  if (isFinalDone) {
-    // 2위가 이겼으면 2위 칸 선분부터, 준PO 승자가 이겼으면 그 길은 이미 빨갛다
-    if (finalWinner === qualifiers[1]) wonLegs.push('rank2')
-    wonLegs.push('finalAdvance')
+  if (playoffWinner !== UNDECIDED) {
+    const [frame, count]: [LineFrame, number] =
+      playoffWinner === b ? [54, 5] : playoffWinner === a ? [55, 5] : [56, 3]
+    redBoxes.push(...boxesOf(frame, count), { frame: 56, box: 0 }, { frame: 57, box: 0 })
+    if (playoffWinner === c) {
+      darkCells[0] = true
+      darkCells[1] = true
+    } else {
+      darkCells[2] = true
+    }
   }
-  if (isChampionDone) {
-    if (series.champion === qualifiers[0]) wonLegs.push('rank1')
-    wonLegs.push('champion')
+  if (series.round === '종료') {
+    const champion = series.champion
+    const frame: LineFrame = champion === a ? 55 : champion === b ? 54 : champion === c ? 56 : 57
+    redBoxes.push(...boxesOf(frame, LINE_FRAMES[frame].length))
+    if (champion === d) {
+      darkCells[0] = true
+      darkCells[1] = true
+      darkCells[2] = true
+    } else {
+      darkCells[3] = true
+    }
   }
 
-  return { seeds, wonLegs, champion: series.champion }
+  return { cellTeams, redBoxes, darkCells, champion: series.champion }
 }
 
 /**
