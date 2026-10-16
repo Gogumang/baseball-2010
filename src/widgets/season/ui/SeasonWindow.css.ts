@@ -95,32 +95,6 @@ export const backButton = style({
   cursor: 'pointer',
 })
 
-/** 구장 아이템 창 판 (0x83378 — 선 #4A7BDE·#29318C, 칸 #1D44A8, 테두리 #18244A·#4A7DDE) */
-export const stadiumPanel = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  background: ORIGINAL_COLORS.panelDeep,
-  border: '1px solid #18244A',
-  boxShadow: 'inset 0 0 0 1px #4A7DDE',
-})
-
-/**
- * 칸 막대가 굴러가는 창 — 줄이 13px 이라 넉 줄만 보인다. 나머지 줄은 **지우지 않고** 넘침을 잘라
- * 감춘다 (지우면 읽어 주는 도구도 시험도 그 줄을 못 본다).
- */
-export const stadiumSlotList = style({
-  position: 'absolute',
-  overflow: 'hidden',
-})
-
-/** 창 안에서 통째로 밀려 올라가는 줄 묶음 */
-export const stadiumSlotTrack = style({
-  position: 'absolute',
-  left: 0,
-  top: 0,
-  width: '100%',
-})
-
 /** 구장 아이템 창의 칸 막대 (파란 막대 7개) */
 export const stadiumBar = style({
   position: 'absolute',

@@ -285,9 +285,10 @@ function EquipmentWindow({
               onClick={() => onPickLevel(index)}>
               {name}
             </button>
+            {/* 0xb9ed5 → 0x6a978 은 폭 · 높이에 1 을 더해 (w + 1) × (h + 1) 칸을 덮는다 (U-113, R12 6절) */}
             {isCursor && isBlinkOn(tick) && (
               <div data-testid="장비-커서"
-                style={{ ...pixel, left: box.x, top: box.y, width: box.width, height: box.height, boxSizing: 'border-box',
+                style={{ ...pixel, left: box.x, top: box.y, width: box.width + 1, height: box.height + 1, boxSizing: 'border-box',
                   border: `1px solid ${EQUIPMENT_COLORS.cursor}` }} />
             )}
           </div>

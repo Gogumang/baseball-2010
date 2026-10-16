@@ -1510,7 +1510,9 @@ export function useSeasonSession(
       if (poll.kind === '연초목표') return startEvent(YEAR_GOAL_EVENT_ID, scene)
       if (poll.kind === '이벤트') return startEvent(poll.eventId, scene)
       // 0xec10 — 아무 이벤트도 안 틀었고 0xc9 이고 this+0x148 ≠ 0 이면 요청 알림 [203] (팝업 0x27).
-      // ⚠️ 그 앞 0xebfc 의 엔딩 플래그(0x1552adc) 갈래는 웹에 그 전역 칸이 없어 건너뛴다 — 시즌 중엔 늘 0 이다(유력)
+      // 그 앞 0xec04 — 엔딩 플래그 [0x1552adc](이벤트 실행기 종류 21 명령이 0x8d4d2 에서 1)가 서 있으면 지우고 그 틀만 알림을
+      // 건너뛴다(0xec0c · 0xec0e → 0xec6a). 0xe9ac 는 0xc9 · 0xd1 에서 **틀마다** 폴링하므로(P4 1a) 다음 틀에 알림이 그대로 뜬다 —
+      // 한 틀 늦을 뿐이라 웹은 따로 두지 않는다.
       if (scene === SEASON_SCENE_STATE.관리메뉴 && tradeRequest.isRequested) setTradeRequestAlertOpen(true)
       return
     }
