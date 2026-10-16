@@ -406,8 +406,9 @@ export interface GameProgress {
    * `0x52660` 의 자동 진루 제어기(`0xaf8c0` = vt8 = `0xaf918`)를 **통째로 안 돌린다**.
    * 곧 **사람이 공격 중이고 설정이 수동일 때만** 자동 진루가 멎는다.
    *
-   * ⚠️ 이 화면은 나만의리그 **타자편** 이라 사람이 늘 공격이다 — 설정이 그대로 먹는다.
-   * ⚠️ 수동이라고 주자가 굳는 것이 아니다. 밀려 뛰는 포스 진루는 자동 제어기와 무관하게 간다.
+   * 이 화면은 나만의리그 **타자편** 이라 사람이 늘 공격이다 — 둘째 항(설정)이 그대로 먹는다.
+   * 수동이라고 주자가 굳는 것이 아니다. 밀려 뛰는 포스 진루는 타자주자 끼우기 0xa93ac(+0x88 = 1)에서 잇는 요구 루 사슬
+   * (0xa9f60 · `runDefensePlay.createPlayRunners`)이라 0xaf918 바깥이다 — 자동 제어기와 무관하게 간다.
    */
   readonly runningModeManual: boolean
   /**
@@ -447,7 +448,8 @@ export interface GameProgress {
    * 읽는 순간 채우든 값이 같다 — 웹은 읽는 쪽(`mySpecialSwingRemainingOf`)이 채운다.
    * 다시 −1 로 되돌리는 곳은 교체(대타 0xaede0 등)뿐인데 나는 대타로 안 바뀌므로 경기 내내 한 번만 찬다.
    * 줄이는 곳은 스윙 틱 `0x4e136` 하나다 (`spendMySpecialSwing`).
-   * ⚠️ −1 로 처음 깔아 두는 자리(팀 초기화)는 찾지 못했다 — 0 으로 깔리면 필살이 아예 안 나가므로 −1 로 본다.
+   * −1 로 처음 깔아 두는 자리는 팀 초기화 `0xb891c` 다 (직접 뜬 것): 팀 전체 0x290 바이트를 0 으로 지운 뒤
+   * b89ae~b89c8 `memset(team+0x28, −1, 1)` · `memset(team+0x29, −1, 9)` — 타순 9칸 모두 −1 로 시작한다.
    */
   readonly specialSwingRemaining: number
   /**
@@ -713,10 +715,10 @@ function withFirstInningBoard(progress: GameProgress, random: RandomPort): GameP
  * 삼진·볼넷·사구는 수비가 개입할 것이 없어 지금까지의 길(0xc11f0 과 같은 규칙)을 그대로 쓴다.
  *
  * 패턴은 `options.pattern` 이나, `resolvePitch` 가 결과 객체에 묶어 둔 것(`contactOfOutcome`)을 쓴다.
- * ⚠️ 둘 다 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
+ * 둘 다 없으면(시험·옛 호출 — 원본에 없는 웹 전용 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
  * `isUncatchable` 은 필살타법 성공 타구 — 야수가 포구를 건너뛴다 (0x51800, S13 6절).
  *
- * ⚠️ 사람이 주루를 조작하는 화면은 이것을 쓰지 않는다 — `startPlayerOutcome` 으로 타석 결과만
+ * 사람이 주루를 조작하는 화면은 이것을 쓰지 않는다 — `startPlayerOutcome` 으로 타석 결과만
  * 먼저 정하고, 화면이 틱을 다 돌린 뒤 `resolveDefensePlay` 로 주자 처리를 먹인다.
  * 여기는 그 둘을 한 줄로 이어 붙인 **얇은 껍데기**다 (미션·테스트처럼 끼어들 사람이 없는 자리용).
  */
@@ -900,12 +902,12 @@ export function startPlayerOutcome(
     if (arrival !== null && arrivalApplicationOf(arrival) === 'batterRuns') {
       return finishPlayerOutcome(withoutSteal(progress), outcome, random, arrival.result, arrival.result)
     }
-    // ⚠️ 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다
+    // 웹 전용 길: 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다
     const playback =
       homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrival?.result ?? null
     return finishPlayerOutcome(withoutSteal(progress), outcome, random, null, playback)
   }
-  // ⚠️ 패턴 없이 들어온 안타·아웃(시험·옛 호출) — 원본에 없는 길이다. 결과에 맞는 패턴을 원본 표에서 골라 판을 돌린다
+  // 웹 전용 길: 패턴 없이 들어온 안타·아웃(시험·옛 호출) — 원본에 없는 길이다. 결과에 맞는 패턴을 원본 표에서 골라 판을 돌린다
   //    (`fixturePatternFor`). 실제 타석(`resolvePitch`)은 늘 패턴을 싣는다
   return {
     ...withoutStealDisplay(progress),
@@ -1191,13 +1193,15 @@ function finishPlayerOutcome(
             // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
             outsAdded: settledOuts,
             strikeoutWhileRunning: droppedThirdStrike,
-            inningEnded: progress.game.outs + outsInPlay >= OUTS_PER_INNING,
             humanTeamWalkOff: isWalkOff,
             // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
             batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
-            // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8). ⚠️ B7(a88fc 고리)은 아직 안 싣는다
+            // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
             isBunt: defensePlay?.buntBall === true,
             runnersAdvanced: defensePlay?.sacrifice === true,
+            // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+            foulBall: defensePlay?.buntFoulOut === true,
+            runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
             homeRunCounted,
           }),
         )
@@ -1406,7 +1410,8 @@ const STAGE_PITCHER_DIVISOR = 10
  * 투구 AI 는 `gameAbility`(피로 앞 밑값)와 `staminaPercent`(지금 마운드 +0x2c / 100)로 피로를 먹인다 (`cpuPitchStatsOf`).
  * 폼·구질·마구는 같은 레코드의 +0xb · +0x1c · +0x18 (`ROSTER_PITCHER_REPERTOIRES`, 전역 번호 팀 × 8 + 칸).
  *
- * ⚠️ 마선수 등판(`aceOpponent`)은 부르는 쪽이 `pitcherAbilityOf` 로 따로 고른다 — 정규 리그 경기엔 없다.
+ * 마선수 대결 경기의 상대 투수(`aceOpponent` — 나리 이벤트 `match`)는 이 함수가 아니라 부르는 쪽(`app/ui/GameRoute`)이
+ * `pitcherAbilityOf` 로 고른다. 142 가 8번 칸에 넣은 마투수는 아래 `moundAcePitcherOf` 가 본다.
  */
 export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility {
   const slot = progress.opponentMound.pitcherSlot
@@ -1695,9 +1700,6 @@ function addReputationCounts(
 /** 만루 홈런 — 그 플레이 득점이 4 점 (0xa8696) */
 const GRAND_SLAM_RUNS = 4
 
-/** 한 이닝 아웃 수 — 돌발 결과비트 B5 가 "이닝이 안 끝났는가" 를 볼 때 쓴다 */
-const OUTS_PER_INNING = 3
-
 /** 타순 칸 수 — 상대 타순 슬롯(team+0x32)은 0~8 로 돈다 */
 const BATTING_ORDER_SIZE = 9
 
@@ -1718,7 +1720,7 @@ const BATTING_ORDER_SIZE = 9
  * 내 타석이 끝나는 자리(0x4e7ae · 0x528b0 → 0x35108 → 0x350d4)도 `0xc1e04` 가 참(다음이 자동)이면 다음 상태
  * +0x1b6c 를 **0x21** 로 덮는다 — 다음 타자는 늘 동료나 상대라 내 타석 뒤에는 늘 0x21 진입(0x8f628)이 온다.
  *
- * ⚠️ K 4절 1-6 의 "매 타석 시작 때" 는 **0xf 를 지나는 타석마다** 라는 뜻이다. 예전 웹은 이것을 동료·상대 타석까지로
+ * 정정: K 4절 1-6 의 "매 타석 시작 때" 는 **0xf 를 지나는 타석마다** 라는 뜻이다. 예전 웹은 이것을 동료·상대 타석까지로
  * 읽어 세 자리(내 타석·동료 `playTeammateAtBat`·상대 `onAtBatStart`)에서 굴리고 판정했다 — 원본에 없는 굴림이었다.
  *
  * 상대 마선수(b0=10~22): 마투수 행(0xae83d)은 142 가 상대 명부 8번에 넣은 마투수가 마운드에 섰을 때 걸린다. 마타자 행(0xae89d)은
@@ -3073,7 +3075,6 @@ function withWildPitchSettlement(
       runsBattedIn: 0,
       outsBefore: before.game.outs,
       outsAdded: outs,
-      inningEnded: before.game.outs + outs >= OUTS_PER_INNING,
       humanTeamWalkOff: isWalkOff,
       // B5 의 r5 — 목록 0번(가장 뒤 주자)이 들어왔는가
       batterRunnerSafe: batterRunnerSafeOfFates(result.runnerFates),
@@ -3211,7 +3212,7 @@ export function summaryOf(progress: GameProgress): GameSummary {
         inningsPlayed: progress.game.inning,
         outsRecorded: progress.pitching.outsRecorded,
         hitsAllowed: progress.pitching.hitsAllowed,
-        // 모드 4 라 위에서 걸러져 읽히지 않는다 — ⚠️ 근사: 간이 엔진 볼넷 수로 state[0x88] 을 대신한다
+        // 모드 4 라 0xa7de8 이 완투 계열 앞에서 걸러 이 값을 읽지 않는다(R8 6절) — 간이 엔진 볼넷 수로 state[0x88] 을 대신해도 결과가 같다
         baserunnerAllowed: progress.pitching.walksAllowed > 0,
         runsAllowed: progress.game.opponentScore,
       }),

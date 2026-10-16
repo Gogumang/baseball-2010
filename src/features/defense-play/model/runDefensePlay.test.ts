@@ -2085,8 +2085,13 @@ describe('희생 [sp+8] · 번트 타구 state[0x13] — 정산 a83e2 · a88e0 �
       outsAdded: 1,
       isBunt: 결과.buntBall,
       runnersAdvanced: 결과.sacrifice,
+      foulBall: 결과.buntFoulOut,
+      runnerInScoringPositionAfter: 결과.scoringBaseRunnerAfter,
     })
     expect(hasBit(bits, BURST_RESULT_BIT.번트진루)).toBe(true)
+    // B7 루프 0xa88fc — 판 끝 2루에 1루에서 온 주자(타자주자 아님)가 산 채 서 있다
+    expect(결과.scoringBaseRunnerAfter).toBe(true)
+    expect(hasBit(bits, BURST_RESULT_BIT.번트득점권)).toBe(true)
   })
 
   it('스윙 땅볼로 같은 판이면 희생(타수 없음)이지만 번트 타구가 아니라 B6 은 없다', () => {

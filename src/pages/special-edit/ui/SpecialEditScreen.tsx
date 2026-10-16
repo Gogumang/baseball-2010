@@ -104,7 +104,9 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
       slides={false}
       tables={ENTRY_TABLES_WIDE}
       // 0x2b2e0 은 [skin+0x333] 을 세우지 않는다 — 앞 화면(일반 엔트리 0x2648c 가 1 로 세운다)이 남긴 값이다.
-      // ⚠️ 미확인: 부팅 뒤 처음이면 skin 할당(0x1239) 값이라 0 으로 본다
+      // 부팅 뒤 처음이면 0 — skin 할당 0x1238 → 0x2ac4 가 할당 뒤 memset(0) 한다(2ad4, 직접 뜬 것).
+      // ⚠️ 근사: 앞서 다른 화면(0x2648c 엔트리 · 0x16af8 · 0x37904 · 0x37e5c · 0x571da 등 [+0x333] 을 쓰는 곳)을 거쳤으면 그 값이 남는데
+      //    웹은 화면 사이에 이 칸을 들고 다니지 않아 늘 부팅 값(0)으로 그린다
       showsNameBars={false}
       isCursorNameOnly
       onFrame={onFrame}
@@ -284,8 +286,10 @@ interface EditNamePopupProps {
  * 원본 입력기([0x1552d00], 모드 A·a·1·가 를 좌우로 바꾸고 한글 조합은 폰 플랫폼이 한다 — R11 2절)는
  * 웹 입력 칸으로 대신하고 CP949 8 바이트 검사만 원본대로 둔다. Escape = CLR, Enter = OK.
  *
- * ⚠️ 미해결: 같은 틱에 CLR 이 마지막 한 글자를 지운 뒤 0x32b7d 가 빈 버퍼를 보고 곧장 취소까지 하는지
- *    (두 콜백의 부르는 차례)를 확정 못 했다 — 웹은 글자가 있으면 지우기만 한다.
+ * ⚠️ 미해결: 같은 틱에 CLR 이 마지막 한 글자를 지운 뒤 0x32b7d 가 빈 버퍼를 보고 곧장 취소까지 하는지 확정 못 했다 —
+ *    웹은 글자가 있으면 지우기만 한다. 뜬 것: 키 콜백 0x32b5c 는 키를 입력기 0x54279 에 넘길 뿐이고, 취소 · 확인 검사는
+ *    **그리기 콜백** 0x32b7c 안(32cf6~32d30)에서 키를 인자가 아니라 장면 칸 [장면+0x40](지금 키 — 0x1daa4 · R9 의 키 처리와 같은 칸)
+ *    으로 읽는다. 남은 것은 [장면+0x40] 이 키를 처리한 그 그림 뒤에 언제 지워지는지(틀 쪽) 하나다.
  *    칸 둘레의 흰 선(0x541a9·0x541ed)과 [this+0x9c] 프레임 20·17 두 조각은 인자 뜻을 다 못 읽어 안 그렸다.
  */
 function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {

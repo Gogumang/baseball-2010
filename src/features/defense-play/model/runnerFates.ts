@@ -158,6 +158,28 @@ export function survivorsFromBaseOfFates(fates: readonly RunnerFate[]): readonly
 }
 
 /**
+ * **결과비트 B7 루프의 주자 조건** — 정산 `0xa88fc~0xa8944` (직접 뜬 것):
+ * ```
+ * a88fc  for r = 2..3:
+ * a88fe    0xb68dc(state)(파울) → 다음 r
+ * a890c    p = 0xa97a0(관리, r) ; p == 0 → 다음 r     ; 목록 앞에서부터 +0x96 == 0 이고 +0x8c == r 인 첫 주자
+ * a891a    p+0x98(이번 타자) ≠ 0 → 다음 r
+ * a892a    state[0x13](번트) → 0xa87a8: B7(0x80) 켜고 a8946 로
+ * ```
+ * 여기는 가운데 두 줄 — 판이 끝난 뒤 2루나 3루에 **처리 끝이 아닌**(+0x96 == 0) 주자가 서 있고, 그 루를 목록 앞에서 처음
+ * 찾은 주자가 타자주자가 아니다. 파울(`0xb68dc`)과 번트(`state[0x13]`)는 `burstResultBitsOf` 가 본다.
+ * 이닝 · 경기 끝은 안 본다 — 3아웃으로 끝나도 루에 남은 주자는 +0x96 이 없어 걸린다(원본 그대로).
+ */
+export function scoringBaseRunnerAfterOf(
+  runners: readonly Pick<RunnerState, 'startBase' | 'isOut' | 'scored' | 'isBatterRunner'>[],
+): boolean {
+  return [2, 3].some((base) => {
+    const found = runners.find((runner) => !(runner.isOut || runner.scored) && runner.startBase === base)
+    return found !== undefined && !found.isBatterRunner
+  })
+}
+
+/**
  * 이 정산(`0xa8024`)이 `state[0x88]`(출루 허용)을 세우는가 — `0xa8c5c~0xa8ca6`:
  * ```
  * a8c2e  r5 = 0 ; r4 = 0

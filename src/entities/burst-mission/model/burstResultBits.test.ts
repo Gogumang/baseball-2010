@@ -95,7 +95,7 @@ describe('타석 결과 → 결과비트', () => {
     expect(hasBit(헛번트, B.번트진루)).toBe(false)
   })
 
-  it('B7 은 번트 뒤 2·3루에 주자가 남고 이닝이 안 끝났을 때다 (0xa87ac)', () => {
+  it('B7 은 번트 뒤 2·3루에 주자가 남고 파울이 아닐 때다 — 이닝 끝은 안 본다 (0xa88fc → 0xa87ac)', () => {
     const 공통 = {
       outcome: 땅볼아웃,
       runsBattedIn: 0,
@@ -106,7 +106,9 @@ describe('타석 결과 → 결과비트', () => {
     } as const
 
     expect(hasBit(burstResultBitsOf(공통), B.번트득점권)).toBe(true)
-    expect(hasBit(burstResultBitsOf({ ...공통, inningEnded: true }), B.번트득점권)).toBe(false)
+    expect(hasBit(burstResultBitsOf({ ...공통, outsBefore: 2 }), B.번트득점권)).toBe(true)
+    expect(hasBit(burstResultBitsOf({ ...공통, foulBall: true }), B.번트득점권)).toBe(false)
+    expect(hasBit(burstResultBitsOf({ ...공통, isBunt: false }), B.번트득점권)).toBe(false)
   })
 
   it('아웃 하나면 B8, 한 플레이에 둘이면 B10 까지 켜진다 (0xa8e44·0xa8e54)', () => {

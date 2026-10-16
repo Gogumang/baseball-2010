@@ -20,7 +20,7 @@ export const MENU_PRESS_RECT: PressRect = { ...MENU_LABEL_POSITION, width: 41, h
 export const TIME_PRESS_RECT: PressRect = { ...TIME_LABEL_POSITION, width: 41, height: 12 }
 
 /**
- * CLR — 원본 화면에는 CLR 글자가 없다(하드웨어 키). ⚠️ 웹 자리: 조준(0x10) · 게이지(0x11)는 "#TIME" 을 안 그리는 상태라(0x4c92e)
+ * CLR — 원본 화면에는 CLR 글자가 없다(하드웨어 키). 웹 전용 자리(원본에 없음 — 확정): 조준(0x10) · 게이지(0x11)는 "#TIME" 을 안 그리는 상태라(0x4c92e)
  * 오른쪽 소프트키 글자 자리를 빌린다.
  */
 export const CLEAR_PRESS_RECT: PressRect = TIME_PRESS_RECT
@@ -28,7 +28,7 @@ export const CLEAR_PRESS_RECT: PressRect = TIME_PRESS_RECT
 /**
  * 도루 '3' · '2' · '1' — 원본은 도루 키에 그림을 두지 않는다. 그 주자가 선 루를 점수판 0x373d0 의 루 그림
  * (game_ui 파트 6, 14 × 7 — 1루 (68, 14) · 2루 (59, 9) · 3루 (50, 14), `renderHud` 의 `BASES`) 자리로 삼는다.
- * ⚠️ 웹 자리: 원본에는 이 누름 자리가 없다(키뿐) — 누르면 그 루 주자의 도루 키와 같다.
+ * 웹 전용 자리(확정): 원본에는 이 누름 자리가 없다(키뿐) — 누르면 그 루 주자의 도루 키와 같다.
  */
 const BASE_ICON_RECTS: Readonly<Record<StealBase, PressRect>> = {
   1: { x: 68, y: 14, width: 14, height: 7 },

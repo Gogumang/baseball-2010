@@ -136,7 +136,7 @@ import {
   tickMarkCounter,
 } from '@/features/defense-play/model/playerEffects'
 import { forecastOptionsOf, launchThrow, type ThrownBall } from '@/features/defense-play/model/throwLaunch'
-import { runnerFateOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
+import { runnerFateOf, scoringBaseRunnerAfterOf, type RunnerFate } from '@/features/defense-play/model/runnerFates'
 import { carryContact, contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
@@ -524,6 +524,11 @@ export interface DefensePlayResult {
    * a88e0 이 결과비트 B6(0x40)을 켠다(`burstResultBits` 의 `runnersAdvanced`). 파울로 닫힌 판은 정산이 없어 없다
    */
   readonly sacrifice?: boolean
+  /**
+   * **판 끝에 2·3루에 (타자주자가 아닌) 산 주자가 있나** — 정산 B7 루프 0xa88fc 의 주자 조건 (`scoringBaseRunnerAfterOf`).
+   * 파울로 닫힌 판(정산 없음)은 없다
+   */
+  readonly scoringBaseRunnerAfter?: boolean
   /**
    * **그라운드 홈런 state[0x25]** — 주자 틱 0xaa0a8 이 홈에 막 닿은 주자(+0x8c == 4)가 이번 타자(+0x98)이고 담장 홈런 state[0x1d](코드 8) ·
    * 폴 홈런 state[0xf](코드 12)가 둘 다 0 일 때만 세운다(aa1e2~aa1fe — 바로 득점 · 보류 둘 다). 정산 a84cc~a84e8 이 이때만 미션
@@ -3131,6 +3136,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     outcome: foulEnded ? undefined : settledBatterOutcomeOf(settleInput),
     ...((state.input.buntKind ?? 0) !== 0 ? { buntBall: true } : {}),
     ...(!foulEnded && isSacrificeOf(settleInput) ? { sacrifice: true } : {}),
+    ...(!foulEnded && scoringBaseRunnerAfterOf(runners.map((runner) => runner.state)) ? { scoringBaseRunnerAfter: true } : {}),
     ...(!foulEnded && state.groundHomeRun ? { groundHomeRun: true } : {}),
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,

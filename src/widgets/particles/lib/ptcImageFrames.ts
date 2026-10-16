@@ -5,7 +5,7 @@
  * 그리기 0x6dc4c 가 그 프레임의 **파트 목록**을 애니 칸처럼 써서 `파트[ life % 파트수 ]` 를 고른다
  * (R5 7·8절 확정, 나머지 0xca911).
  *
- * ⚠️ `public/sprites/ptcimg/frames/*.png` 는 **파트를 겹쳐 합성한 그림**이라 파티클에 쓰면 안 된다.
+ * **주의**: `public/sprites/ptcimg/frames/*.png` 는 **파트를 겹쳐 합성한 그림**이라 파티클에 쓰면 안 된다.
  *    쓸 것은 파트 한 장씩인 `public/sprites/ptcimg/000~050.png` 51장이다.
  *
  * 표는 `tools/decode_pzx.py` 의 `parse_frame` 으로 `base/work/jar/ptc/ptcimg.pzx` 를 읽어 뽑았다

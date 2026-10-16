@@ -148,7 +148,7 @@ function pressKindKey(state: MatchSettingsWindowState, key: MatchSettingsKey): M
     return 유지({
       ...state,
       stage: SETTINGS_STAGE.값,
-      // ⚠️ **원본 그대로**: 종류를 고르면 값(+0x2bd)이 무조건 0 이 된다.
+      // **원본 그대로**(R4 4절 — 0x5ffcc 6003a~60044 `+0x2bd = 0`): 종류를 고르면 값(+0x2bd)이 무조건 0 이 된다.
       //    저장에 "6이닝 자동진행"(값 2)이 들어 있어도 창을 다시 열어 종류에서 OK 를 누르는 순간
       //    "자동진행 없음"(값 0)으로 되돌아간다. 버그로 보이지만 고치지 않는다.
       settings: { ...state.settings, value: 0 },
@@ -165,7 +165,7 @@ function pressKindKey(state: MatchSettingsWindowState, key: MatchSettingsKey): M
 function pressValueKey(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsAction {
   const { kind } = state.settings
   if (kind === MATCH_SETTING_KIND.찬스 && (key === '왼쪽' || key === '오른쪽')) {
-    // ⚠️ **원본 그대로**: 찬스는 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다 (R4 4절).
+    // **원본 그대로**: 찬스는 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다 (R4 4절).
     //    오른쪽 끝에서 오른쪽을 눌러도 되돌아온다 — 칸이 둘뿐이라 원본이 방향을 안 본다.
     const flipped = state.settings.value === CHANCE_VALUE.공격득점권
       ? CHANCE_VALUE.수비삼루
@@ -214,8 +214,9 @@ function pressDetailKey(state: MatchSettingsWindowState, key: MatchSettingsKey):
  * 확인창 대답 (0x60376).
  *
  * - [125] 확인창에서 '예' → 저장 칸에 되쓰고 창을 닫는다
- * - '아니오' → 확인창만 닫는다 (⚠️ 원본이 어느 단계로 돌아가는지는 문서에 없다 —
- *   **단계는 그대로 두는 것으로 판단**했다. 값을 다시 고르던 자리가 남는 쪽이 자연스럽다)
+ * - '아니오' → 확인창만 닫는다 — 단계는 그대로 (직접 뜬 것: 0x5ffcc 의 확인창 갈래 60376 은 답 [팝업+0x21c] 이 0(예)이면
+ *   저장 칸에 되쓰고 +0x2ba(창 열림) · +0x2bb(단계) · +0x314(확인창) 를 0 으로(603ea~603f8), 1(아니오)이면 603fc~60402 에서
+ *   +0x314 = 0 만 한다)
  * - [126] 알림은 대답이 하나뿐이라 무엇을 눌러도 알림만 닫는다
  */
 export function answerMatchSettingsPopup(

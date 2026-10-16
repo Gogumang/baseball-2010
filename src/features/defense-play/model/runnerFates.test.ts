@@ -10,6 +10,7 @@ import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import {
   baserunnerAllowedOfFates,
   batterRunnerSafeOfFates,
+  scoringBaseRunnerAfterOf,
   chargedRunsOfFates,
   runnerFatesWithoutPlay,
   type RunnerFate,
@@ -148,5 +149,21 @@ describe('타자주자 생존 r5 (0xa87ba~0xa87fa) — 결과비트 B5 출루', 
     // 목록 0번이 타자가 아닌 판(도루 · 폭투)
     expect(batterRunnerSafeOfFates([fate(1, false, false)])).toBe(false)
     expect(batterRunnerSafeOfFates([fate(3, true, true)])).toBe(true)
+  })
+})
+
+describe('결과비트 B7 루프의 주자 조건 (0xa88fc · 0xa97a0)', () => {
+  const runner = (startBase: number, isBatterRunner = false, isOut = false, scored = false) =>
+    ({ startBase, isBatterRunner, isOut, scored })
+
+  it('2루나 3루에 처리 끝이 아닌 앞 주자가 있으면 참 — 이닝이 끝났는지는 안 본다', () => {
+    expect(scoringBaseRunnerAfterOf([runner(1, true, true), runner(2)])).toBe(true)
+    expect(scoringBaseRunnerAfterOf([runner(1, true), runner(3)])).toBe(true)
+    expect(scoringBaseRunnerAfterOf([runner(1, true), runner(1)])).toBe(false)
+  })
+
+  it('아웃 · 득점(+0x96)은 빼고, 그 루를 목록 앞에서 처음 찾은 주자가 타자주자(+0x98)면 거짓', () => {
+    expect(scoringBaseRunnerAfterOf([runner(2, false, true), runner(4, false, false, true)])).toBe(false)
+    expect(scoringBaseRunnerAfterOf([runner(2, true)])).toBe(false)
   })
 })

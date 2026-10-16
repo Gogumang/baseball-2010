@@ -276,7 +276,6 @@ const DEFAULT_TEAM_MORALE = 100
 /** 자동 진행이 끝나지 않는 상황을 막는 안전장치 (원본에는 없다) */
 const MAXIMUM_AUTO_STEPS = 2_000
 const MAXIMUM_LOG_LENGTH = 40
-const OUTS_PER_INNING = 3
 const BATTING_ORDER_SIZE = 9
 /** 정규 마지막 이닝의 0-기준 번호 (상태 +0x69, 기본 8) */
 const REGULATION_LAST_INNING_INDEX = 8
@@ -2864,7 +2863,6 @@ function finishBatterOutcome(
   const outsAdded =
     defensePlay?.advance.outsAdded ?? advanceRunners(before.bases, outcome, before.outs).outsAdded
   const slot = before.battingOrderIndex
-  const inningEnded = before.outs + outsAdded >= OUTS_PER_INNING
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
   const runnerPlay = stealPlay !== undefined
   // 낫아웃(state[0x1a]) — 0x3e09e 갈래의 삼진 콜 0xa7c4c 가 사건 5 를 넣고 판(타자주자 포함)을 돈다. 정산 [sp+0x30] 에 그 사건이
@@ -2949,12 +2947,14 @@ function finishBatterOutcome(
     // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
     outsAdded: outsAdded + (droppedThirdStrike ? 1 : 0),
     strikeoutWhileRunning: droppedThirdStrike,
-    inningEnded,
     humanTeamWalkOff: isWalkOff,
     batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
     // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
     isBunt: defensePlay?.buntBall === true,
     runnersAdvanced: defensePlay?.sacrifice === true,
+    // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+    foulBall: defensePlay?.buntFoulOut === true,
+    runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
     homeRunCounted,
   })
 
@@ -3580,7 +3580,6 @@ function finishDefensiveAtBat(
   const hit = isHit(outcome)
   // 투수 +0x2a 는 볼넷·사구를 함께 센다
   const walk = isFreePass(outcome)
-  const inningEnded = before.outs + applied.outsAdded >= OUTS_PER_INNING
   const stealPlayOuts = stealPlay?.result.advance.outsAdded
   // 정산 홈런 수 [sp+0x24] > 0 — 상대 타자의 장내 홈런도 타자 게이트 [sp+0x34](a84d6)를 본다 (`homeRunCountedOf`)
   const homeRunCounted = homeRunCountedOf(progress, outcome, defensePlay, false)
@@ -3711,7 +3710,6 @@ function finishDefensiveAtBat(
         // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
         outsAdded: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
         strikeoutWhileRunning: droppedThirdStrike,
-        inningEnded,
         // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
         humanTeamWalkOff:
           applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
@@ -3719,6 +3717,9 @@ function finishDefensiveAtBat(
         // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
         isBunt: defensePlay?.buntBall === true,
         runnersAdvanced: defensePlay?.sacrifice === true,
+        // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+        foulBall: defensePlay?.buntFoulOut === true,
+        runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
         homeRunCounted,
       })
     : recorded
@@ -4374,7 +4375,6 @@ function withTeamWildPitchSettlement(
     runsBattedIn: 0,
     outsBefore: before.game.outs,
     outsAdded: outs,
-    inningEnded: before.game.outs + outs >= OUTS_PER_INNING,
     humanTeamWalkOff: next.game.isFinished && next.game.ourScore > next.game.opponentScore,
     // B5 의 r5 — 목록 0번(가장 뒤 주자)이 들어왔는가
     batterRunnerSafe: batterRunnerSafeOfFates(result.runnerFates),
@@ -4677,7 +4677,6 @@ function resolveBurstFor(
     runsBattedIn: number
     outsBefore: number
     outsAdded: number
-    inningEnded: boolean
     humanTeamWalkOff: boolean
     /** B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5). 판 없는 타석은 undefined */
     batterRunnerSafe?: boolean
@@ -4685,6 +4684,10 @@ function resolveBurstFor(
     isBunt?: boolean
     /** B6 — 희생 [sp+8] (`DefensePlayResult.sacrifice`) */
     runnersAdvanced?: boolean
+    /** B7 — 0xb68dc 파울 (`DefensePlayResult.buntFoulOut`) */
+    foulBall?: boolean
+    /** B7 — 판 끝 2·3루의 산 앞 주자 (`DefensePlayResult.scoringBaseRunnerAfter`) */
+    runnerInScoringPositionAfter?: boolean
     /** B0 — 정산 홈런 수 [sp+0x24] > 0 (`homeRunCountedOf`) */
     homeRunCounted?: boolean
     /** B9 — 낫아웃(state[0x1a])이면 삼진이어도 안 켠다 (a8fc6) */

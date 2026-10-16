@@ -119,7 +119,7 @@ describe('단계 1 — 이닝', () => {
     expect(줄('3이닝 자동진행')).toBeTruthy()
   })
 
-  it('⚠️ 원본 버그 그대로 — 저장된 값이 있어도 종류에서 OK 하면 "자동진행 없음"(0)으로 되돌아간다', () => {
+  it('원본 버그 그대로 — 저장된 값이 있어도 종류에서 OK 하면 "자동진행 없음"(0)으로 되돌아간다', () => {
     const props = 띄우기({
       settings: { ...빈설정, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터 },
     })

@@ -55,7 +55,7 @@ describe('단계 0 — 종류 고르기', () => {
     expect(상태.detailCell).toBe(0)
   })
 
-  it('⚠️ 원본 버그 그대로 — 종류에서 OK 를 누르면 저장돼 있던 값이 0 으로 날아간다', () => {
+  it('원본 버그 그대로 — 종류에서 OK 를 누르면 저장돼 있던 값이 0 으로 날아간다', () => {
     // "6이닝 자동진행"(값 2)으로 저장해 뒀다가 창을 다시 연 상황
     const 저장 = { ...빈설정, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터 }
     const 열림 = openMatchSettings(저장)
@@ -73,7 +73,7 @@ describe('단계 0 — 종류 고르기', () => {
 describe('단계 1 — 찬스', () => {
   const 찬스 = () => 누르기(openMatchSettings({ ...빈설정, kind: MATCH_SETTING_KIND.찬스 }), '확인')
 
-  it('⚠️ 원본 그대로 — 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다', () => {
+  it('원본 그대로 — 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다', () => {
     expect(누르기(찬스(), '오른쪽').settings.value).toBe(CHANCE_VALUE.수비삼루)
     expect(누르기(찬스(), '왼쪽').settings.value).toBe(CHANCE_VALUE.수비삼루)
     // 오른쪽 끝에서 오른쪽을 눌러도 되돌아온다 — 칸이 둘뿐이라 방향을 안 본다

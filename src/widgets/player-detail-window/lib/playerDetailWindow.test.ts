@@ -22,4 +22,12 @@ describe('선수 정보 창 값', () => {
     const detail = playerDetailOf({ isPitcher: false, abilities: [1, 2, 3, 4], aceIndex: -1, profile: 0x30, skillBits: 0, specialNumber: 4, grade: 12 })
     expect(detail.values.map((value) => value.text)).toEqual(['장타형', '좌타', '-', '메테오 스윙', '1억2000'])
   })
+
+  it('마선수는 등급을 몰라도 XlsACE 행 +0x1b 로 연봉을 낸다 — 싸이커 50 · 크라이져 50 (5c87c 육성 아님 갈래)', () => {
+    const salaryOf = (isPitcher: boolean, aceIndex: number) =>
+      playerDetailOf({ isPitcher, abilities: [1, 2, 3, 4], aceIndex, profile: 0, skillBits: 0, grade: null }).values.at(-1)?.text
+    expect(salaryOf(true, 0)).toBe('5억')
+    expect(salaryOf(true, 4)).toBe('1억')
+    expect(salaryOf(false, 3)).toBe('5억')
+  })
 })

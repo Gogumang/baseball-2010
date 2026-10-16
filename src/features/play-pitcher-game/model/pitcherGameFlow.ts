@@ -2095,7 +2095,6 @@ function withMyWildPitchSettlement(
     0,
     game.outs,
     outs,
-    game.outs + outs >= OUTS_PER_INNING,
     result,
     false,
   )
@@ -2559,7 +2558,6 @@ function applyDefensivePlay(
       before.outs,
       // 결과비트 B8 · B10 · B5 가 보는 [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 든다
       settledOuts,
-      inningEnded,
       defensePlay,
       homeRunCounted,
       droppedThirdStrike,
@@ -2654,7 +2652,6 @@ function resolveBurstFor(
   runsScored: number,
   outsBefore: number,
   outsAdded: number,
-  inningEnded: boolean,
   defensePlay: DefensePlayResult | null,
   /** 정산 홈런 수 [sp+0x24] > 0 — B0 을 켜는 홈런 갈래에 드는가 (`applyDefensivePlay`) */
   homeRunCounted: boolean,
@@ -2670,12 +2667,14 @@ function resolveBurstFor(
       runsBattedIn: runsScored,
       outsBefore,
       outsAdded,
-      inningEnded,
       // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
       batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
       // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
       isBunt: defensePlay?.buntBall === true,
       runnersAdvanced: defensePlay?.sacrifice === true,
+      // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+      foulBall: defensePlay?.buntFoulOut === true,
+      runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
       homeRunCounted,
       strikeoutWhileRunning,
       // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)

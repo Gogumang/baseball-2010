@@ -15,7 +15,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
  * | B4 | 0x010 | 0xa89c4 (득점 > 0) | 타점 |
  * | B5 | 0x020 | 0xa882a | 타자 출루이고 **이닝이 안 끝남** |
  * | B6 | 0x040 | 0xa88f8 | 번트로 주자 진루·득점 (희생번트·스퀴즈 성공) |
- * | B7 | 0x080 | 0xa87ac | 번트 뒤 2·3루에 주자가 남음 |
+ * | B7 | 0x080 | 0xa87ac (루프 0xa88fc) | 번트 뒤 2·3루에 주자가 남음 (파울 아님) |
  * | B8 | 0x100 | 0xa8e44 (이번 플레이 아웃 ≥ 1) | 아웃 |
  * | B9 | 0x200 | 0xa8fdc | 보통 삼진 |
  * | B10 | 0x400 | 0xa8e54 (이번 플레이 아웃 ≥ 2) | 병살 |
@@ -61,10 +61,17 @@ export interface BurstResultBitsInput {
   readonly batterRunnerSafe?: boolean
   /** **희생 [sp+8]** (0xa83e2~0xa8472, `playOutcome.isSacrificeOf` → `DefensePlayResult.sacrifice`) — 득점 · 주자 아웃 없이 투구 때 주자가 섰던 루가 비고 타자만 죽은 땅에 닿은 공 */
   readonly runnersAdvanced?: boolean
-  /** 플레이가 끝난 뒤 2루나 3루에 (아웃되지 않은) 주자가 있는가 — B7 의 루프 0xa88fc */
+  /**
+   * 플레이가 끝난 뒤 2루나 3루에 (처리 끝이 아닌, 타자주자가 아닌) 주자가 있는가 — B7 의 루프 0xa88fc
+   * (`DefensePlayResult.scoringBaseRunnerAfter`, `runnerFates.scoringBaseRunnerAfterOf`)
+   */
   readonly runnerInScoringPositionAfter?: boolean
-  /** 이 플레이로 이닝·경기가 끝났는가 (0xb68dc) */
-  readonly inningEnded?: boolean
+  /**
+   * `0xb68dc(state)` — **이 타구가 파울인가** (CORRECTIONS.md: 예전에 "이닝·경기 끝" 으로 잘못 읽었다).
+   * 정산까지 오는 판 가운데 이것이 참인 것은 2스트라이크 번트 파울 아웃(판 끝 결과 코드 11, `DefensePlayResult.buntFoulOut`)뿐이다
+   * — 파울 판(7)은 정산이 없고 뜬공 아웃(13)은 state[0x1f] 로 거짓이다. B7 루프만 본다. 이닝 · 경기 끝은 B7 이 안 본다
+   */
+  readonly foulBall?: boolean
   /** 이 플레이로 **사람 팀 승리**로 경기가 끝났는가 (0xa89f0) */
   readonly humanTeamWalkOff?: boolean
   /**
@@ -119,8 +126,8 @@ export function burstResultBitsOf(input: BurstResultBitsInput): number {
   if (isBunt && ((input.runnersAdvanced ?? false) || input.runsBattedIn > 0)) {
     bits |= BURST_RESULT_BIT.번트진루
   }
-  // B7 — 번트 뒤 2·3루에 주자가 남았다 (이닝·경기가 끝나지 않았을 때만 본다)
-  if (isBunt && !(input.inningEnded ?? false) && (input.runnerInScoringPositionAfter ?? false)) {
+  // B7 — 번트 뒤 2·3루에 주자가 남았다 (a88fc~a8944: 파울이 아니고 · 그 루의 첫 산 주자가 타자주자가 아니고 · 번트)
+  if (isBunt && !(input.foulBall ?? false) && (input.runnerInScoringPositionAfter ?? false)) {
     bits |= BURST_RESULT_BIT.번트득점권
   }
 

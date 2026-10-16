@@ -77,10 +77,12 @@ describe('미션 소개 판 0x44944 — 타자 미션(모드 6)', () => {
     })
   })
 
-  it('기록 줄을 모르는 미션 타자(옛 명전 기록)는 줄 칸을 비운다 · k 를 모르면 수비도 비운다', () => {
+  it('기록 줄을 모르는 미션 타자(옛 명전 기록)는 줄 칸을 비운다 · k 가 끝 칸(12)이면 수비 0', () => {
+    // k 를 안 넘기면 명부 끝 12 로 둔다(`MISSION_NARI_RECORD_FALLBACK`). 끝 칸은 0xb4e34 가 늘린 새 칸 —
+    // 0xb8de4 가 0x30 바이트를 0 으로 지운 레코드라 옛 레코드[12]+0x1c = 0 이다
     const cards = missionBatterMatchupCardsOf(startMission(missionOf('타자', 1)), { name: '옛명전', hand: 0 })
     expect(cards.batter.battingAverage).toBeUndefined()
-    expect(cards.batter.position).toBeUndefined()
+    expect(cards.batter.position).toBe(0)
     expect(cards.batter.name).toBe('옛명전')
   })
 
