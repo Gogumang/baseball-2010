@@ -24,6 +24,7 @@ import {
   batterMissionAutoTicks,
   startMission,
   tick as tickMission,
+  missionClockStep,
 } from '@/entities/mission/model/missionRun'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
 import {
@@ -162,7 +163,7 @@ import {
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
-import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { isGameSceneFrozen, setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -830,25 +831,31 @@ export function useMissionSession({
     [clearCounts],
   )
 
-  // 미션 제한 시간. 타자편·투수편 모두 진행 중일 때만 1초씩 흘린다.
+  // 미션 제한 시간 0xaada4. 타자편·투수편 모두 진행 중일 때만 갱신마다 돈다(`missionClockStep`).
   // 로딩 판(상태 7 · 9 · 8 의 적재) 동안은 흐르지 않는다 — 원본 시작 시각은 상태 9 의 0xa5bb0(3fa16)이 적고 상태 8 적재가 1초를
-  // 넘기면 그 틀 끝 0xaada4 가 1초를 곧바로 빼지만, 웹 로딩 판 길이는 근사라 그 1초는 안 뺀다(`tick` 머리글). 남은 초 1 에서 실패(0xaa940)
+  // 넘기면 그 틀 끝 0xaada4 가 1초를 곧바로 빼지만, 웹 로딩 판 길이는 근사라 그 1초는 안 뺀다(`tick` 머리글) — 시각은 로딩 판이 끝나
+  // 진행이 서는 때 적는다. 남은 초 1 에서 실패(0xaa940)
   const isLoading = loadingTip !== null
   const isBatterRunning = !isLoading && (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
   const isPitcherRunning =
     !isLoading && (screen.kind === '투수미션' || pitcherAceMatchMission !== null) && pitcherRun?.status === '진행중'
   useEffect(() => {
     if (!isBatterRunning && !isPitcherRunning) return
+    // [st+0xac] — 0xa5bb0 이 적은 벽시계 시각. 벽시계는 공용 창과 무관하게 흐른다(0x14005c8)
+    let markedAt = performance.now()
     const handle = window.setInterval(() => {
       // 0xaada4 는 프레임 0x52c50 의 갱신 쪽(52ed0~52ee4)이라 공용 창이 서 있으면(52cc6) 안 돈다 — 그동안 남은 초가 안 준다.
-      // ⚠️ 근사: 원본은 창이 닫힌 첫 갱신에 마지막 초 셈(0xa5bb0) 뒤 1000ms 가 넘었으면 곧바로 1초를 빼고(aae20~aae2c) 시각을 다시 적는다
+      // 창이 닫힌 첫 갱신은 벽시계가 1000ms 를 넘었으므로 곧바로 1초를 빼고 시각을 다시 적는다(aae20~aae2c)
       if (isGameSceneFrozen()) return
+      const step = missionClockStep(markedAt, performance.now())
+      markedAt = step.markedAt
+      if (!step.elapsed) return
       if (isBatterRunning) {
         setMissionRun((previous) => (previous === null ? previous : tickMission(previous, 1)))
       } else {
         setPitcherRun((previous) => (previous === null ? previous : tickMission(previous, 1)))
       }
-    }, 1000)
+    }, millisecondsPerFrame())
     return () => window.clearInterval(handle)
   }, [isBatterRunning, isPitcherRunning])
 
@@ -961,7 +968,8 @@ export function useMissionSession({
     const scene = substitutionScene
     if (scene === null) return
     setSubstitutionScene(null)
-    window.setTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+    // 경기 장면 시계로 잰다 — 공용 창이 서 있으면 0xd 의 장면 틱(52cc6) · 0xe 그리기(52efe)가 서기 때문이다
+    setGameSceneTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
   }
 
   /**

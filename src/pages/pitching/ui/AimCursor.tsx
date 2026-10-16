@@ -14,7 +14,7 @@ import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 interface AimCursorProps {
   /** 존 중심 표 0xcfbcc 의 칸 — 진행기가 투구에 쓰는 side 와 같다 */
@@ -80,12 +80,13 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
 
   useEffect(() => {
     if (isPaused) return
+    const drawGate = createGameSceneDrawGate()
     const handle = window.setInterval(() => {
       if (isDoneRef.current) return
-      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
-      if (isGameSceneFrozen()) return
-      tickRef.current()
-      setDrawTick((previous) => previous + 1)
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신(0x39c5c 조준점 이동)을 건너뛴다 — 닫히면 이어 돈다.
+      // 애니 0 칸은 그림마다 나가는 그리기 쪽이라 창이 선 첫 그림([창+0x250], 52efe)에만 한 번 더 나간다
+      if (!isGameSceneFrozen()) tickRef.current()
+      if (drawGate.allowsDraw()) setDrawTick((previous) => previous + 1)
     }, millisecondsPerFrame())
     return () => window.clearInterval(handle)
   }, [isPaused])

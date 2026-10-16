@@ -124,6 +124,22 @@ describe('공용 창이 서 있는 동안 (경기 장면 0x52c50 의 52cc6 — �
     장면()
   })
 
+  it("창이 떠 있는 동안 뗀 '7'~'9' 는 버려진다 — 사건은 그 프레임 0xbca05 만 들고 0x498d4(52d9e)는 게이트 뒤라, 닫혀도 자세가 남는다", () => {
+    const 장면 = markGameSceneUp()
+    const 손잡이 = 붙이기({})
+    fireEvent.keyDown(window, { key: '8' })
+    expect(손잡이.pressBunt).toHaveBeenCalledTimes(1)
+    const 창 = markCommonWindowShown()
+    fireEvent.keyUp(window, { key: '8' })
+    창()
+    expect(손잡이.releaseBunt).not.toHaveBeenCalled()
+    // 닫힌 뒤 다시 누르고 떼야 푼다
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyUp(window, { key: '8' })
+    expect(손잡이.releaseBunt).toHaveBeenCalledTimes(1)
+    장면()
+  })
+
   it('창이 닫힌 뒤 키 시각은 경기 장면 시계다 — 창이 떠 있던 만큼 빠진다(단계 시작 시각과 같은 시계)', () => {
     const now = vi.spyOn(performance, 'now')
     now.mockReturnValue(1000)

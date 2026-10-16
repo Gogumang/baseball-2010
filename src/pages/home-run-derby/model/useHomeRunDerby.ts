@@ -55,7 +55,7 @@ import {
   type HomeRunTextState,
   type HomeRunTextWindow,
 } from '@/widgets/batting-stage/lib/homeRunBanner'
-import { gameSceneNow } from '@/shared/lib/commonWindow/commonWindow'
+import { clearGameSceneTimeout, gameSceneNow, setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
@@ -414,35 +414,39 @@ export function useHomeRunDerby({
     startScene()
   }, [])
 
+  // 아래 시계는 모두 경기 장면 시계로 잰다(`setGameSceneTimeout`) — 더비도 경기 장면 0x104(모드 7)라 공용 창이 서 있으면 0x52c50 이
+  // 52cc6 에서 장면 틱 · 진입 · 갱신을, 53086 에서 공 틱 0x3f378 을 건너뛴다. 판 끝 · 0xd 두 그림 · 0xe 잠금 · 판 안 소리가 그동안 서고
+  // 닫히면 남은 만큼 이어 센다. ⚠️ 미확인: 콤보 표시(21 번 그림)는 그리기 셈이라 창이 선 첫 그림([창+0x250])에 한 번 더 오르는데,
+  // 시계로는 그 한 그림을 세지 않는다
   const timerRef = useRef<number | null>(null)
   /** 판 안 소리(홈런 11 · 파울 25)를 그 공 틱에 내는 시계들 */
   const playSoundTimersRef = useRef<number[]>([])
   const clearTimer = () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+    if (timerRef.current !== null) clearGameSceneTimeout(timerRef.current)
     timerRef.current = null
   }
   const clearPlaySoundTimers = () => {
-    for (const timer of playSoundTimersRef.current) window.clearTimeout(timer)
+    for (const timer of playSoundTimersRef.current) clearGameSceneTimeout(timer)
     playSoundTimersRef.current = []
   }
   /** HUD 콤보 표시(+0x1b60)가 꺼질 때 — 상태 0xf 에서 켠 뒤 21 번 그리면 끈다 */
   const comboTimerRef = useRef<number | null>(null)
   const clearComboTimer = () => {
-    if (comboTimerRef.current !== null) window.clearTimeout(comboTimerRef.current)
+    if (comboTimerRef.current !== null) clearGameSceneTimeout(comboTimerRef.current)
     comboTimerRef.current = null
   }
   /** 상태 0xe 의 키 잠금(틱 ≤ 2)이 풀렸나 */
   const isConfirmUnlockedRef = useRef(false)
   const confirmLockTimerRef = useRef<number | null>(null)
   const clearConfirmLockTimer = () => {
-    if (confirmLockTimerRef.current !== null) window.clearTimeout(confirmLockTimerRef.current)
+    if (confirmLockTimerRef.current !== null) clearGameSceneTimeout(confirmLockTimerRef.current)
     confirmLockTimerRef.current = null
   }
   /** 0xe 의 키 잠금 시계 — 들어선 뒤 `CONFIRM_LOCK_FRAMES` 갱신이 지나야 OK 를 받는다 */
   const armConfirmLock = () => {
     clearConfirmLockTimer()
     isConfirmUnlockedRef.current = false
-    confirmLockTimerRef.current = window.setTimeout(() => {
+    confirmLockTimerRef.current = setGameSceneTimeout(() => {
       confirmLockTimerRef.current = null
       isConfirmUnlockedRef.current = true
     }, CONFIRM_LOCK_FRAMES * millisecondsPerFrame())
@@ -475,7 +479,7 @@ export function useHomeRunDerby({
   /** 상태 0xd — `SCENE_D_FRAMES` 갱신 뒤 0xe 로 간다 (0x39e14) */
   const prepareTimerRef = useRef<number | null>(null)
   const clearPrepareTimer = () => {
-    if (prepareTimerRef.current !== null) window.clearTimeout(prepareTimerRef.current)
+    if (prepareTimerRef.current !== null) clearGameSceneTimeout(prepareTimerRef.current)
     prepareTimerRef.current = null
   }
   const armScenePrepare = () => {
@@ -488,7 +492,7 @@ export function useHomeRunDerby({
     // 모드 7 은 ae270 `cmp 7` 에서 ae274~ae336(기회 셈 → 0xd 또는 0x1a)으로 갈라 0x17 을 안 지난다 → 0xa97a1(2·3루)이 늘 거짓이라
     // 15 가 아니라 늘 14 다. 웹 더비에 주자 칸이 없는 것도 원본 그대로다
     playSoundIds(audioRef.current, [DERBY_AT_BAT_ENTRY_SOUND])
-    prepareTimerRef.current = window.setTimeout(() => {
+    prepareTimerRef.current = setGameSceneTimeout(() => {
       prepareTimerRef.current = null
       setIsPreparing(false)
       enterConfirmWait()
@@ -547,7 +551,7 @@ export function useHomeRunDerby({
     if (shouldShowComboAtNextPitch(runRef.current)) {
       setShownCombo(runRef.current.comboDisplay)
       clearComboTimer()
-      comboTimerRef.current = window.setTimeout(endShownCombo, COMBO_DISPLAY_FRAMES * millisecondsPerFrame())
+      comboTimerRef.current = setGameSceneTimeout(endShownCombo, COMBO_DISPLAY_FRAMES * millisecondsPerFrame())
     }
   }
 
@@ -636,7 +640,7 @@ export function useHomeRunDerby({
     const elapsed = gameSceneNow() - startedAt
     for (const { tick, soundId } of soundTicks) {
       playSoundTimersRef.current.push(
-        window.setTimeout(
+        setGameSceneTimeout(
           () => playSoundIds(audioRef.current, [soundId]),
           Math.max(0, tick * millisecondsPerFrame() - elapsed),
         ),
@@ -679,7 +683,7 @@ export function useHomeRunDerby({
   /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 */
   const armPlayEnd = (delay: number) => {
     clearTimer()
-    timerRef.current = window.setTimeout(() => {
+    timerRef.current = setGameSceneTimeout(() => {
       timerRef.current = null
       // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
       // 맞지 않은 공(0xae24c)은 이 갈래가 없다

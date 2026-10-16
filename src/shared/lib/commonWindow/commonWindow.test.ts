@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  clearGameSceneTimeout,
+  createGameSceneDrawGate,
   gameSceneNow,
   gameSceneTimeOf,
   isGameSceneFrozen,
   markCommonWindowShown,
   markGameSceneUp,
   resetCommonWindowShownForTest,
+  setGameSceneTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
@@ -57,6 +60,89 @@ describe('경기 장면 시계 — 공용 창 게이트 52cc6', () => {
     now.mockReturnValue(1300)
     window()
     expect(gameSceneTimeOf(1400)).toBe(400)
+    scene()
+  })
+})
+
+describe('경기 장면 시계 setTimeout — 상태 길이는 창 아래에서 서고 닫히면 남은 만큼만 더 기다린다(52cc6)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    resetCommonWindowShownForTest()
+  })
+
+  it('멈춘 동안 붙잡고, 풀리면 남은 시간만 더 잰다', () => {
+    vi.useFakeTimers()
+    const scene = markGameSceneUp()
+    const fired = vi.fn()
+    setGameSceneTimeout(fired, 300)
+    vi.advanceTimersByTime(100)
+    const window = markCommonWindowShown()
+    vi.advanceTimersByTime(5_000)
+    expect(fired).not.toHaveBeenCalled()
+    window()
+    vi.advanceTimersByTime(199)
+    expect(fired).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(fired).toHaveBeenCalledTimes(1)
+    scene()
+  })
+
+  it('멈춘 동안 건 시계는 풀린 때부터 잰다 · 거두면 울리지 않는다', () => {
+    vi.useFakeTimers()
+    const scene = markGameSceneUp()
+    const window = markCommonWindowShown()
+    const fired = vi.fn()
+    const cleared = vi.fn()
+    setGameSceneTimeout(fired, 50)
+    const id = setGameSceneTimeout(cleared, 50)
+    vi.advanceTimersByTime(1_000)
+    window()
+    clearGameSceneTimeout(id)
+    vi.advanceTimersByTime(49)
+    expect(fired).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(fired).toHaveBeenCalledTimes(1)
+    expect(cleared).not.toHaveBeenCalled()
+    scene()
+  })
+
+  it('경기 장면이 아니면 창이 떠도 그냥 흐른다', () => {
+    vi.useFakeTimers()
+    const window = markCommonWindowShown()
+    const fired = vi.fn()
+    setGameSceneTimeout(fired, 100)
+    vi.advanceTimersByTime(100)
+    expect(fired).toHaveBeenCalledTimes(1)
+    window()
+  })
+})
+
+describe('창이 선 첫 그림 — 52efe [창+0x250] 이면 갱신 없이도 그리기가 한 번 돈다', () => {
+  afterEach(() => resetCommonWindowShownForTest())
+
+  it('멈출 때마다 부품마다 한 번만 그린다', () => {
+    const scene = markGameSceneUp()
+    const gate = createGameSceneDrawGate()
+    const other = createGameSceneDrawGate()
+    expect(gate.allowsDraw()).toBe(true)
+    const first = markCommonWindowShown()
+    expect(gate.allowsDraw()).toBe(true)
+    expect(gate.allowsDraw()).toBe(false)
+    expect(other.allowsDraw()).toBe(true)
+    expect(other.allowsDraw()).toBe(false)
+    // 웹이 한 창을 둘로 겹쳐 세는 동안(같은 멈춤)은 다시 그리지 않는다
+    const overlapped = markCommonWindowShown()
+    first()
+    expect(gate.allowsDraw()).toBe(false)
+    // 대기 칸 창이 이어 선다 — 창 갱신 0x754f8(75552 · 755d4) → 0x75440 이 0x74ef4 · 0x741a0 으로 다음 창을 띄워 [+0x250] 을
+    // 다시 세운다. 웹은 앞 창이 내려가고 같은 때 다음 창이 선다 — 그 첫 그림이 또 돈다
+    overlapped()
+    const third = markCommonWindowShown()
+    expect(gate.allowsDraw()).toBe(true)
+    expect(gate.allowsDraw()).toBe(false)
+    // 멈춘 동안 만든 부품은 그 멈춤의 첫 그림을 지난 것으로 본다
+    expect(createGameSceneDrawGate().allowsDraw()).toBe(false)
+    third()
     scene()
   })
 })

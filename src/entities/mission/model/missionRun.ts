@@ -522,6 +522,24 @@ export function tick<T extends MissionRun>(run: T, elapsedSeconds: number): T {
   }
 }
 
+/** aae18~aae1e — `0xfa << 2` = 1000ms. 이 값을 **넘어야**(같으면 아님, `bls`) 1초를 뺀다 */
+export const MISSION_SECOND_MILLISECONDS = 1000
+
+/**
+ * **제한 시간 한 갱신 0xaada4 의 초 셈** — 경기 장면 갱신(52ed0~52ee4)마다 한 번 돈다.
+ * ```
+ * aae02  0x14005c8()(벽시계) − [st+0xac](64비트 sbcs) 가 1000 을 넘으면(aae10~aae1e)
+ * aae20    남은 초 [0x1552af0] −1
+ * aae2a    0xa5bb1(st) — 0xa5bb0 이 벽시계를 다시 읽어 [st+0xac] 에 적는다(a5bb6~a5bbe). 시작 + 1000 이 아니라 **지금** 이다
+ * ```
+ * 그래서 한 초는 늘 1000ms 를 넘긴 첫 갱신까지라 조금씩 늦고, 공용 창이 서 있어 갱신을 건너뛴(52cc6) 뒤 닫힌 첫 갱신은
+ * 벽시계가 그동안 흘렀으므로 곧바로 1초를 빼고 시각을 다시 적는다 — 몇 초를 멈췄든 1초뿐이다.
+ * `markedAt` 은 마지막으로 적은 벽시계 시각, `now` 는 이번 갱신의 벽시계 시각(같은 단위 ms).
+ */
+export function missionClockStep(markedAt: number, now: number): { readonly elapsed: boolean; readonly markedAt: number } {
+  return now - markedAt > MISSION_SECOND_MILLISECONDS ? { elapsed: true, markedAt: now } : { elapsed: false, markedAt }
+}
+
 /** 0xaa940(미션, 1, 남은 초) — 남은 초가 이 값에 닿으면 실패 */
 const LAST_SECOND = 1
 

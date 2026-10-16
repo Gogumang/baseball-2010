@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { confirmedCountOf, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
@@ -53,7 +54,9 @@ export function useSubstitutionScene(
     seenSerials.add(current)
     setVersion((version) => version + 1)
     const entry = current.entrySoundId
-    window.setTimeout(() => activeSound().play(entry), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+    // 0xd 두 그림 뒤 0xe 그리기(0x38b64)의 등판음 — 0xd · 0xe 는 경기 장면 상태라 공용 창이 서 있으면 52cc6 이 장면 틱을, 52efe 가
+    // 그리기를 건너뛴다. 경기 장면 시계로 잰다
+    setGameSceneTimeout(() => activeSound().play(entry), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
   }, [])
 
   return {

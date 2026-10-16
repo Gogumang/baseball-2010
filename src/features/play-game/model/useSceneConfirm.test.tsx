@@ -9,6 +9,9 @@ import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
+import {
+  markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
+} from '@/shared/lib/commonWindow/commonWindow'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -70,6 +73,53 @@ describe('상태 0xe 의 OK 대기 (0x532b0 · 0x49a26)', () => {
     잠금풀기()
     키('Enter')
     expect(result.current.isAwaiting).toBe(false)
+  })
+
+  it('공용 창(경기 중 메뉴)이 덮으면 0xd · 0xe 잠금 셈이 서고, 닫히면 처음부터가 아니라 그 자리에서 잇는다 (52cc6 — 장면 틱 0xbc9c9)', () => {
+    const scene = markGameSceneUp()
+    try {
+      const wait = enterSceneConfirm()
+      const { result, rerender } = renderHook(({ canAccept }) => useSceneConfirm(wait, canAccept), {
+        initialProps: { canAccept: true },
+      })
+      const frame = millisecondsPerFrame()
+      // 0xd 두 그림을 지나 0xe 잠금 한 그림째에 메뉴가 선다 — 창이 먼저 서고(레이아웃 효과) 화면이 덮개를 세운다
+      act(() => {
+        vi.advanceTimersByTime((SCENE_PREPARE_FRAMES + 1) * frame)
+      })
+      expect(result.current.isInConfirmState).toBe(true)
+      let menu = () => {}
+      act(() => {
+        menu = markCommonWindowShown()
+        rerender({ canAccept: false })
+      })
+      act(() => {
+        vi.advanceTimersByTime(60 * frame)
+      })
+      // 창이 서 있는 채로 덮개가 걷혀도(닫히는 동안) OK 는 창이 가져간다
+      rerender({ canAccept: true })
+      expect(result.current.isInConfirmState).toBe(true)
+      act(() => {
+        vi.advanceTimersByTime(10 * frame)
+      })
+      키('5')
+      expect(result.current.isAwaiting).toBe(true)
+      act(() => menu())
+      // 남은 잠금 두 그림만 더
+      act(() => {
+        vi.advanceTimersByTime(2 * frame - 1)
+      })
+      키('5')
+      expect(result.current.isAwaiting).toBe(true)
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+      키('5')
+      expect(result.current.isAwaiting).toBe(false)
+    } finally {
+      scene()
+      resetCommonWindowShownForTest()
+    }
   })
 
   it('같은 걸음에 0xe 를 두 번 지났으면 OK 를 두 번 받아야 하고, 두 번째도 잠금이 다시 걸린다', () => {

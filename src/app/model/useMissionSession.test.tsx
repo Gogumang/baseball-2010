@@ -46,6 +46,9 @@ import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import {
+  markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
+} from '@/shared/lib/commonWindow/commonWindow'
 import { AIM_STILL, aimAfterTicks, aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
 
 /**
@@ -1782,8 +1785,13 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
       expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds)
       act(() => rendered.result.current.actions.finishLoading())
       expect(rendered.result.current.loadingTip).toBeNull()
+      // 0xaada4 는 갱신마다 벽시계 − 적은 시각 > 1000 을 본다 — 1000ms 를 넘긴 첫 갱신(62ms 틀이면 1054ms)에야 1초를 뺀다
       act(() => {
         vi.advanceTimersByTime(1_000)
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
       })
       expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds! - 1)
       // 마선수 대결도 미션 장면 — 로딩 판이 다시 선다
@@ -1792,6 +1800,46 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
       ))
       expect(rendered.result.current.loadingTip).not.toBeNull()
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('공용 창이 서 있는 동안 제한 시간이 안 흐르고, 닫힌 첫 갱신에 곧바로 1초를 뺀다(0xaada4 aae20~aae2c — 몇 초를 멈췄든 1초)', () => {
+    vi.useFakeTimers()
+    const scene = markGameSceneUp()
+    try {
+      const mission = MISSIONS.find((row) => row.side === '타자' && row.id === 14)!
+      const { rendered } = sessionOf(7, { kind: '미션진행', mission })
+      act(() => rendered.result.current.actions.begin(mission))
+      act(() => rendered.result.current.actions.finishLoading())
+      const seconds = rendered.result.current.missionRun!.remainingSeconds!
+      // 600ms 흐른 뒤 창이 선다
+      act(() => {
+        vi.advanceTimersByTime(600)
+      })
+      const window = markCommonWindowShown()
+      act(() => {
+        vi.advanceTimersByTime(5_000)
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds)
+      act(() => window())
+      // 닫힌 첫 갱신 — 벽시계가 1000ms 를 넘었으므로 곧바로 1초(5초를 멈췄어도 1초뿐)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds - 1)
+      // 그때 시각을 다시 적어 다음 1초는 그로부터 1000ms 를 넘긴 갱신이다
+      act(() => {
+        vi.advanceTimersByTime(1_000 - millisecondsPerFrame())
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds - 1)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 2)
+      })
+      expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds - 2)
+    } finally {
+      scene()
+      resetCommonWindowShownForTest()
       vi.useRealTimers()
     }
   })
