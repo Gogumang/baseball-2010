@@ -150,7 +150,7 @@ describe('코치 보너스 (0xb5a74, 모드 2)', () => {
     expect(coachBonusOf(9, false, BATTER_SLOT.수비)).toBe(0)
   })
 
-  it('⚠️ 팀 검사가 없어 **상대 팀 선수에게도** 붙는다 (원본 그대로, 유력)', () => {
+  it('팀 검사가 없어 **상대 팀 선수에게도** 붙는다 (원본 그대로, 0xb5a74~0xb5b04)', () => {
     const 남의팀 = gameAbilityOf({
       mode: 2,
       base: 500,

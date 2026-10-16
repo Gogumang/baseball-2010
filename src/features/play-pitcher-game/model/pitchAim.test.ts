@@ -68,6 +68,11 @@ describe('조준 키 — 메시지 8 0x50e3a', () => {
     expect(aimKeyActionOf('Escape')).toEqual({ kind: 'cancel' })
     expect(aimKeyActionOf('0')).toEqual({ kind: 'move', direction: AIM_STILL })
   })
+
+  it("'*' · '#' 도 메시지 8 로 와서 멈춤이다 (0x498d4 499fa → 0x53290 → 0x534b0)", () => {
+    expect(aimKeyActionOf('*')).toEqual({ kind: 'move', direction: AIM_STILL })
+    expect(aimKeyActionOf('#')).toEqual({ kind: 'move', direction: AIM_STILL })
+  })
 })
 
 describe('조준점 0x39894 · 0x39c5c', () => {

@@ -527,7 +527,7 @@ describe('자동진행 (경기 중 메뉴 동작 4 = 0x3c60c)', () => {
     expect(runAutoProgress(progress, random).game.isFinished).toBe(true)
   })
 
-  it('⚠️ 근사 — 대전모드는 6회를 마치면 멈춘다 (원본이 멈추는 지점은 미해독)', () => {
+  it('대전모드는 6회를 마치면 멈춘다 — 0xc1e04 모드 8·9 갈래 c1f04 가 0-기준 이닝 > 5 면 거짓 (R10 7절)', () => {
     const { progress, random } = 시작({ mode: 8 })
     const 소화 = runAutoProgress(progress, random)
 
