@@ -140,15 +140,21 @@ OUTFIT_RULES: dict[str, str] = {
     #   t 는 0xb8fbd(휴대폰 시계 0x6f391 의 한국 시각): 6~15 → 0 · 16~19 → 1 · 그 밖 → 2.
     #   부르는 곳은 나리 상태 100 진입 0x1c154(1c418~1c424) · 시즌 장면 진입 0xcb 0x4b50(4c7a~4c8a) 둘뿐이다.
     'ui/mode_back': '시간대 t: 0 → 기본색(mpl 안 씀) · 1 → 줄 0 · 2 → 줄 1 (0x7b934)',
+    # ── 구장 하늘 · 빛 효과 (0x76fd0 디스어셈으로 확정) ──
+    #
+    # 팔레트를 고르는 것은 `widgets/batting-stage/lib/renderScenery.ts` 다. 런타임이 실제로 칠하므로
+    # 번호 지도도 붙인다 (없으면 paletteSwap 이 지도를 404 로 계속 다시 청했다 — r111 측정).
+    #   76ff6: v ≤ 8 → 0xb9719("stadium/attack_sky_cloud.pzx", 1, ".mpl", v − 1)  → 구장+0x34
+    #   7703e: v ≤ 7 → 0xb9719("effect/sky_effect_light.pzx", 1, ".mpl", v ≤ 1 ? −1 : v − 2) → 구장+0x38
+    #   (0x77028 의 effect/sky_effect_light1.pzx 는 팔레트 인자 0 · 줄 −1 — mpl 이 없다)
+    'stadium/attack_sky_cloud': '줄 = 하늘 색 번호 v − 1 (v ≤ 8 일 때만 싣는다, v = 0 이면 −1 = 구운 벌). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절)',
+    'effect/sky_effect_light': '줄 = v ≤ 1 ? −1(구운 벌) : v − 2 (v ≤ 7 일 때만 싣는다). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절), 그리기 0x78490',
 }
 
 # 벌을 고르는 규칙을 아직 못 찾은 것들. 팔레트는 내보내되 굽지도 지도를 붙이지도 않는다.
 UNKNOWN_RULE = '미해결 — 원본이 몇 번을 고르는지 아직 못 찾았다'
 KNOWN_BULK_RULES: dict[str, str] = {
     'ui/img_text': '로드 때 0번 고정, 그릴 때 0x913e4 가 고른다 (여기서 프레임에 구워 둔다)',
-    # 구장 하늘 · 빛 효과 — 팔레트를 고르는 것은 `widgets/batting-stage/lib/renderScenery.ts` 다 (palette.json 의 select 글만 지킨다)
-    'stadium/attack_sky_cloud': '줄 = 하늘 색 번호 v − 1 (v ≤ 8 일 때만 싣는다, v = 0 이면 −1 = 구운 벌). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절)',
-    'effect/sky_effect_light': '줄 = v ≤ 1 ? −1(구운 벌) : v − 2 (v ≤ 7 일 때만 싣는다). v = 표 0xd37a4[행][min(이닝,12)] — 구장 배경 적재 0x76fd0 (R6 6절), 그리기 0x78490',
     'ui/mode_icon': '1벌뿐 — 관리 화면 "선택된 커맨드 아이콘" 주황. '
                     'tools/generate_management_sprites.py 가 이미 이 벌로 사본을 만든다',
 }

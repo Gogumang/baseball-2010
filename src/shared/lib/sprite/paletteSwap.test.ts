@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   TEAM_COUNT,
@@ -80,6 +80,16 @@ describe('구워 둔 원본 데이터', () => {
 
   it('투수는 45벌인데 구워진 벌이 0(팀 0) 이다 — 타자와 다르다', () => {
     expect(loadPalettes('pitcher').baked).toBe(0)
+  })
+
+  it('시간대 하늘 구름·조명은 런타임에 칠하므로 프레임마다 번호 지도가 있다 (0x76ff6 · 0x7703e)', () => {
+    for (const folder of ['attack_sky_cloud', 'sky_effect_light']) {
+      const frames = readdirSync(`public/sprites/${folder}/frames`).filter((name) => /^\d{3}\.png$/.test(name))
+      expect(frames.length).toBeGreaterThan(0)
+      for (const name of frames) expect(existsSync(`public/sprites/${folder}/frames/index/${name}`)).toBe(true)
+    }
+    expect(loadPalettes('attack_sky_cloud').palettes).toHaveLength(8)
+    expect(loadPalettes('sky_effect_light').palettes).toHaveLength(6)
   })
 
   it('헬멧·수비수는 팀만 있어 15벌이다', () => {

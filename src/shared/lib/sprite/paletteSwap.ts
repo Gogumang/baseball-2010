@@ -141,8 +141,20 @@ const RECENT_PIXELS_LIMIT = 48
 /** 픽셀을 읽는 캔버스 — 읽기가 잦다고 알려 GPU→CPU 동기 읽기를 피한다(값은 같다) */
 const READ_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
 
+/**
+ * 받지 못한 번호 지도 — 다시 청하지 않는다. 벌·프레임마다 새로 칠할 때 같은 지도를 거듭 404 로 청하던
+ * 일(r111 측정: 하늘·구름 지도가 디스크에 없어 경기 중 계속 다시 청했다)을 막는다. 지도가 없으면 구운 그림을 쓴다.
+ */
+const failedIndexMaps = new Set<string>()
+
 async function readSpritePixels(spriteUrl: string): Promise<SpritePixels | null> {
-  const [sprite, indexMap] = await Promise.all([loadImage(spriteUrl), loadImage(indexMapUrl(spriteUrl))])
+  const indexUrl = indexMapUrl(spriteUrl)
+  if (failedIndexMaps.has(indexUrl)) return null
+  const indexRequest = loadImage(indexUrl).catch((error: unknown) => {
+    failedIndexMaps.add(indexUrl)
+    throw error
+  })
+  const [sprite, indexMap] = await Promise.all([loadImage(spriteUrl), indexRequest])
   const canvas = document.createElement('canvas')
   canvas.width = sprite.width
   canvas.height = sprite.height
@@ -239,7 +251,8 @@ export function useSpritePalettes(folder: string): SpritePalettes | null {
 
 /** 팔레트를 갈아 끼운 그림. 칠하기 전에는 구운 그림을 그대로 내보내 화면이 비지 않는다. */
 export function useRecoloredSprite(spriteUrl: string, paletteIndex: number | null): string {
-  const palettes = useSpritePalettes(paletteUrl(spriteUrl).replace(/\/palette\.json$/, ''))
+  // 벌을 안 고르면(null) palette.json 을 청하지 않는다 — 팔레트가 없는 폴더(batter_batter 따위)가 404 를 내던 일 (r124 측정)
+  const palettes = useSpriteJson<SpritePalettes>(paletteIndex === null ? null : paletteUrl(spriteUrl))
   // 이미 칠한 그림이면 그리는 그 자리에서 곧장 쓴다 — 프레임이 바뀔 때마다 구운 색(다른 팀 색)이
   // 한 번 비치고 구운 그림 요청이 끊기던 일을 막는다. 아직 칠하는 중이면 지금까지처럼 구운 그림이다
   const ready = readyRecoloredSpriteUrl(spriteUrl, palettes, paletteIndex)
