@@ -393,19 +393,201 @@ export function composeRgba(
 
 type DrawableImage = HTMLImageElement | HTMLCanvasElement
 
+/**
+ * 화면 칸을 읽는(`drawImageWithEffect`) 캔버스의 2D 문맥 옵션 — 읽기가 잦다고 알려 CPU 버퍼에 둔다.
+ * GPU 가속 캔버스는 `getImageData` 마다 GPU→CPU 동기 읽기가 걸린다. 픽셀 값은 바뀌지 않는다(저장 위치만 다르다).
+ * ⚠️ 캔버스의 **첫** `getContext` 가 옵션을 정한다 — 그 캔버스를 여는 모든 자리가 이 옵션으로 열어야 한다.
+ */
+export const EFFECT_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
+
+/** 효과로 그릴 캔버스의 2D 문맥 (`EFFECT_CONTEXT_OPTIONS`) */
+export const effectContextOf = (canvas: HTMLCanvasElement | null | undefined): CanvasRenderingContext2D | null =>
+  canvas?.getContext('2d', EFFECT_CONTEXT_OPTIONS) ?? null
+
 function rgbaOfImage(image: DrawableImage): ImageData | null {
   const canvas = document.createElement('canvas')
   canvas.width = image.width
   canvas.height = image.height
-  const context = canvas.getContext('2d')
+  const context = canvas.getContext('2d', EFFECT_CONTEXT_OPTIONS)
   if (context === null || image.width === 0 || image.height === 0) return null
   context.drawImage(image, 0, 0)
   return context.getImageData(0, 0, image.width, image.height)
 }
 
 /**
- * 캔버스에 그림을 효과로 그린다 — 그 자리 화면을 읽어(`getImageData`) `composeRgba` 로 섞고 다시 놓는다.
+ * 키(그림)마다 한 번 읽어 두는 캐시 — `signatureOf` 가 null 이면 캐시하지 않고(바뀔 수 있는 그림) 매번 읽는다.
+ * 같은 그림이라도 서명(크기 · 주소)이 바뀌면 다시 읽는다. 읽기가 null(아직 못 읽음)이면 남기지 않는다.
+ */
+export function createReadCache<K extends object, V>(
+  read: (key: K) => V | null,
+  signatureOf: (key: K) => string | null,
+): (key: K) => V | null {
+  const entries = new WeakMap<K, { readonly signature: string; readonly value: V }>()
+  return (key) => {
+    const signature = signatureOf(key)
+    if (signature === null) return read(key)
+    const hit = entries.get(key)
+    if (hit !== undefined && hit.signature === signature) return hit.value
+    const value = read(key)
+    if (value === null) entries.delete(key)
+    else entries.set(key, { signature, value })
+    return value
+  }
+}
+
+/** 다 그린 뒤 다시 안 그리는 캔버스 — 픽셀을 캐시해도 된다(`markCanvasImmutable`) */
+const immutableCanvases = new WeakSet<HTMLCanvasElement>()
+
+/** 이 캔버스는 이제 안 바뀐다 — `drawImageWithEffect` 가 그 픽셀을 한 번만 읽는다 */
+export function markCanvasImmutable(canvas: HTMLCanvasElement): void {
+  immutableCanvases.add(canvas)
+}
+
+/**
+ * 그림 RGBA 를 그림마다 한 번만 읽는다 — 다 받은 `<img>`(주소 · 크기로 서명) 와 안 바뀌는 캔버스만 캐시한다.
+ * 받는 중인 `<img>` · 그냥 캔버스는 지금처럼 매번 읽는다. 돌려준 버퍼는 **읽기 전용**이다.
+ */
+const spriteRgbaOf = createReadCache<DrawableImage, ImageData>(rgbaOfImage, (image) => {
+  if (image.width === 0 || image.height === 0) return null
+  if (image instanceof HTMLImageElement) {
+    if (!image.complete || image.naturalWidth === 0) return null
+    return `${image.width}x${image.height}@${image.naturalWidth}x${image.naturalHeight}:${image.currentSrc || image.src}`
+  }
+  return immutableCanvases.has(image) ? `${image.width}x${image.height}` : null
+})
+
+/** 효과 그리기 한 번 — 그림 RGBA · 화면 좌표(정수로 내린다) */
+export interface EffectDraw {
+  readonly sprite: RgbaSurface
+  readonly x: number
+  readonly y: number
+  readonly effect: number
+  readonly argument: number
+}
+
+interface PixelRect {
+  readonly left: number
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+}
+
+/** 화면(width × height) 안으로 자른 그리기 칸 — 안 보이면 null */
+function clippedRectOf(draw: EffectDraw, width: number, height: number): PixelRect | null {
+  const x = Math.floor(draw.x)
+  const y = Math.floor(draw.y)
+  const rect = {
+    left: Math.max(0, x),
+    top: Math.max(0, y),
+    right: Math.min(width, x + draw.sprite.width),
+    bottom: Math.min(height, y + draw.sprite.height),
+  }
+  return rect.right <= rect.left || rect.bottom <= rect.top ? null : rect
+}
+
+const overlaps = (a: PixelRect, b: PixelRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+
+/** 칸 묶음의 테두리 */
+function boundsOf(rects: readonly PixelRect[]): PixelRect {
+  return {
+    left: Math.min(...rects.map((rect) => rect.left)),
+    top: Math.min(...rects.map((rect) => rect.top)),
+    right: Math.max(...rects.map((rect) => rect.right)),
+    bottom: Math.max(...rects.map((rect) => rect.bottom)),
+  }
+}
+
+/** 버퍼 칸 안이 모두 불투명(알파 255)인가 */
+function isOpaque(surface: RgbaSurface, rect: PixelRect, origin: PixelRect): boolean {
+  for (let row = rect.top; row < rect.bottom; row += 1) {
+    let at = ((row - origin.top) * surface.width + (rect.left - origin.left)) * 4 + 3
+    for (let column = rect.left; column < rect.right; column += 1, at += 4) if (surface.data[at] !== 255) return false
+  }
+  return true
+}
+
+/** `drawImageWithEffect` 가 쓰는 캔버스 쪽 — 시험에서 가짜로 바꿔 끼운다 */
+export type EffectCanvasContext = Pick<CanvasRenderingContext2D, 'getImageData' | 'putImageData'> & {
+  readonly canvas: { readonly width: number; readonly height: number }
+}
+
+/**
+ * 그림 RGBA 를 캔버스에 효과로 그린다(변환 없는 캔버스) — 그 자리 화면을 읽어(`getImageData`) `composeRgba` 로 섞고 다시 놓는다.
  * 좌표는 정수로 내린다(원본 화면 좌표는 정수다).
+ */
+export function drawRgbaWithEffect(context: EffectCanvasContext, draw: EffectDraw): void {
+  if (!isEffectDrawn(draw.effect, draw.argument)) return
+  const rect = clippedRectOf(draw, context.canvas.width, context.canvas.height)
+  if (rect === null) return
+  const region = context.getImageData(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
+  composeRgba(
+    { data: region.data, width: region.width, height: region.height },
+    draw.sprite,
+    Math.floor(draw.x) - rect.left,
+    Math.floor(draw.y) - rect.top,
+    draw.effect,
+    draw.argument,
+  )
+  context.putImageData(region, rect.left, rect.top)
+}
+
+/**
+ * 효과 그리기 여럿을 차례대로 — `drawRgbaWithEffect` 를 하나씩 부른 것과 **같은 픽셀**을 내되 화면 읽기 · 쓰기를 모은다.
+ *
+ * - 모두의 테두리를 한 번 읽는다. 그 칸이 다 불투명하면 버퍼 위에서 차례대로 섞고 한 번 놓는다
+ *   (불투명 칸은 읽기 · 놓기 왕복이 값을 안 바꾸고, 불투명 화면에 섞은 결과도 불투명이다 — 하나씩 그린 것과 같다).
+ * - 투명 · 반투명 칸이 있으면(겹치기 층) 왕복이 반투명 값을 반올림할 수 있다 — 그래서 **서로 안 겹치는** 이어진 그리기끼리만
+ *   한 번 읽은 버퍼에서 섞고, 저마다 제 칸만(dirty 사각형) 놓는다. 겹치면 그 앞에서 끊고 다시 읽는다.
+ * - 효과 4(흔들기)는 버퍼 줄 끝을 넘어 읽어 읽은 칸 크기에 따라 결과가 달라진다 — 그 앞뒤로 끊어 하나씩 그린다.
+ */
+export function drawRgbasWithEffect(context: EffectCanvasContext, draws: readonly EffectDraw[]): void {
+  const { width, height } = context.canvas
+  const pending: { readonly draw: EffectDraw; readonly rect: PixelRect }[] = []
+  for (const draw of draws) {
+    if (!isEffectDrawn(draw.effect, draw.argument)) continue
+    if (draw.effect === DRAW_EFFECT.JITTER) {
+      flushEffectDraws(context, pending.splice(0))
+      drawRgbaWithEffect(context, draw)
+      continue
+    }
+    const rect = clippedRectOf(draw, width, height)
+    if (rect !== null) pending.push({ draw, rect })
+  }
+  flushEffectDraws(context, pending)
+}
+
+function flushEffectDraws(
+  context: EffectCanvasContext,
+  pending: readonly { readonly draw: EffectDraw; readonly rect: PixelRect }[],
+): void {
+  let start = 0
+  while (start < pending.length) {
+    const bounds = boundsOf(pending.slice(start).map((item) => item.rect))
+    const region = context.getImageData(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top)
+    const surface = { data: region.data, width: region.width, height: region.height }
+    const composeAt = (draw: EffectDraw) =>
+      composeRgba(surface, draw.sprite, Math.floor(draw.x) - bounds.left, Math.floor(draw.y) - bounds.top, draw.effect, draw.argument)
+    if (isOpaque(surface, bounds, bounds)) {
+      for (let index = start; index < pending.length; index += 1) composeAt(pending[index].draw)
+      context.putImageData(region, bounds.left, bounds.top)
+      return
+    }
+    // 서로 안 겹치는 이어진 그리기 — 이 버퍼(읽은 그대로의 화면)에서 섞고 제 칸만 놓는다
+    let end = start
+    while (end < pending.length && pending.slice(start, end).every((item) => !overlaps(item.rect, pending[end].rect))) end += 1
+    for (let index = start; index < end; index += 1) {
+      const { draw, rect } = pending[index]
+      composeAt(draw)
+      context.putImageData(region, bounds.left, bounds.top,
+        rect.left - bounds.left, rect.top - bounds.top, rect.right - rect.left, rect.bottom - rect.top)
+    }
+    start = end
+  }
+}
+
+/**
+ * 캔버스에 그림을 효과로 그린다 — 그 자리 화면을 읽어(`getImageData`) `composeRgba` 로 섞고 다시 놓는다.
+ * 좌표는 정수로 내린다(원본 화면 좌표는 정수다). 그림 RGBA 는 그림마다 한 번만 읽는다(`spriteRgbaOf`).
  * 변환(scale · translate)이 걸려 캔버스 칸이 화면 칸과 안 맞으면 ⚠️ 근사로 그린다 — 화면을 안 보는 효과는 다시 칠한 그림,
  * 효과 1 은 globalAlpha L/16, 효과 2 는 'lighter' · globalAlpha b/256.
  */
@@ -417,28 +599,35 @@ export function drawImageWithEffect(
   effect: number,
   argument: number,
 ): void {
-  if (!isEffectDrawn(effect, argument)) return
+  drawImagesWithEffect(context, [{ image, x, y, effect, argument }])
+}
+
+/** 효과 그리기 한 번 — 그림 · 화면 좌표 */
+export interface ImageEffectDraw {
+  readonly image: DrawableImage
+  readonly x: number
+  readonly y: number
+  readonly effect: number
+  readonly argument: number
+}
+
+/**
+ * `drawImageWithEffect` 를 차례대로 여러 번 부른 것과 같다 — 변환 없는 캔버스면 화면 읽기 · 쓰기를 모은다(`drawRgbasWithEffect`).
+ */
+export function drawImagesWithEffect(context: CanvasRenderingContext2D, draws: readonly ImageEffectDraw[]): void {
+  const shown = draws.filter((draw) => isEffectDrawn(draw.effect, draw.argument))
+  if (shown.length === 0) return
   if (!context.getTransform().isIdentity) {
-    drawApproximately(context, image, x, y, effect, argument)
+    for (const draw of shown) drawApproximately(context, draw.image, draw.x, draw.y, draw.effect, draw.argument)
     return
   }
-  const sprite = rgbaOfImage(image)
-  if (sprite === null) return
-  const left = Math.max(0, Math.floor(x))
-  const top = Math.max(0, Math.floor(y))
-  const right = Math.min(context.canvas.width, Math.floor(x) + image.width)
-  const bottom = Math.min(context.canvas.height, Math.floor(y) + image.height)
-  if (right <= left || bottom <= top) return
-  const region = context.getImageData(left, top, right - left, bottom - top)
-  composeRgba(
-    { data: region.data, width: region.width, height: region.height },
-    { data: sprite.data, width: sprite.width, height: sprite.height },
-    Math.floor(x) - left,
-    Math.floor(y) - top,
-    effect,
-    argument,
-  )
-  context.putImageData(region, left, top)
+  const rgbaDraws: EffectDraw[] = []
+  for (const draw of shown) {
+    const sprite = spriteRgbaOf(draw.image)
+    if (sprite !== null) rgbaDraws.push({ sprite, x: draw.x, y: draw.y, effect: draw.effect, argument: draw.argument })
+  }
+  if (rgbaDraws.length === 1) drawRgbaWithEffect(context, rgbaDraws[0])
+  else drawRgbasWithEffect(context, rgbaDraws)
 }
 
 /** 변환이 걸린 캔버스용 근사 그리기 (`drawImageWithEffect` 머리 참고) */
@@ -481,6 +670,7 @@ function paintedCanvasOf(
   if (context === null) return image
   pixels.data.set(paint(pixels.data))
   context.putImageData(pixels, 0, 0)
+  markCanvasImmutable(canvas)
   if (key !== null) recolorCache.set(key, canvas)
   return canvas
 }

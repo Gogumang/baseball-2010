@@ -2,7 +2,8 @@ import { drawStrengthOf, particlePixelOf } from '@/entities/particle/model/parti
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { PTC_IMAGE_FRAMES, ptcPartOf, PTC_PART_IMAGE } from '@/widgets/particles/lib/ptcImageFrames'
-import { DRAW_EFFECT, drawImageWithEffect } from '@/shared/lib/pixelEffect/pixelEffect'
+import { DRAW_EFFECT, drawImagesWithEffect, markCanvasImmutable } from '@/shared/lib/pixelEffect/pixelEffect'
+import type { ImageEffectDraw } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /** A 가 그리기로 넘어갈 때의 최대 (8.8 로 잘라 0~256, 0x6dd26) */
 export const DRAW_STRENGTH_MAX = 256
@@ -38,6 +39,9 @@ export function preloadPtcParts(): void {
  * (카메라 칸 `relCam`·`followCam` 은 타석 화면 호출지가 전부 0 이라 옮기지 않았다 — R5 7절.)
  */
 export function drawParticles(context: CanvasRenderingContext2D, scene: ParticleScene): void {
+  // 효과 입자는 모아 두었다가 한꺼번에 그린다 — 화면 읽기 · 쓰기를 모을 뿐 차례 · 픽셀은 하나씩 그린 것과 같다(`drawImagesWithEffect`).
+  // 그냥 복사(효과 0) 입자가 끼면 그 앞까지 먼저 그려 겹침 차례를 지킨다
+  const effectDraws: ImageEffectDraw[] = []
   for (const emitter of scene.emitters) {
     const { mode } = emitter.config
     for (const particle of emitter.particles) {
@@ -50,11 +54,15 @@ export function drawParticles(context: CanvasRenderingContext2D, scene: Particle
       const { effect, argument } = particleEffectOf(mode, drawStrengthOf(particle))
       // 파트 효과 3 = 좌우 뒤집기 — 파트 원점을 축으로 거울을 놓은 그림을 같은 자리에
       const drawn = part.flip === true ? mirroredOf(image) : image
-      if (effect === DRAW_EFFECT.COPY) context.drawImage(drawn, x + part.dx, y + part.dy)
+      if (effect === DRAW_EFFECT.COPY) {
+        drawImagesWithEffect(context, effectDraws.splice(0))
+        context.drawImage(drawn, x + part.dx, y + part.dy)
+      }
       // 화면 칸을 읽어 원본 식으로 섞는다(`drawImageWithEffect` — 565 · 내림 · 끝에서 자름)
-      else drawImageWithEffect(context, drawn, x + part.dx, y + part.dy, effect, argument)
+      else effectDraws.push({ image: drawn, x: x + part.dx, y: y + part.dy, effect, argument })
     }
   }
+  drawImagesWithEffect(context, effectDraws)
 }
 
 const mirrored = new WeakMap<CanvasImageSource, HTMLCanvasElement>()
@@ -71,6 +79,7 @@ function mirroredOf(image: HTMLImageElement | HTMLCanvasElement): HTMLImageEleme
   context.translate(image.width, 0)
   context.scale(-1, 1)
   context.drawImage(image, 0, 0)
+  markCanvasImmutable(canvas)
   mirrored.set(image, canvas)
   return canvas
 }

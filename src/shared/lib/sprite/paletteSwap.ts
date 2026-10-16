@@ -73,7 +73,7 @@ export function recolorPixels(
   index: Uint8ClampedArray,
   palette: readonly string[],
 ): Uint8ClampedArray {
-  const table = palette.map(parseHexColor)
+  const table = paletteTableOf(palette)
   const output = new Uint8ClampedArray(color)
   for (let at = 0; at < output.length; at += 4) {
     if (index[at + 3] === 0) continue
@@ -84,6 +84,17 @@ export function recolorPixels(
     output[at + 2] = replacement[2]
   }
   return output
+}
+
+const paletteTables = new WeakMap<readonly string[], readonly (readonly [number, number, number])[]>()
+
+/** 벌의 `#rrggbb` 를 [r, g, b] 표로 — 같은 벌(배열)은 한 번만 푼다 */
+function paletteTableOf(palette: readonly string[]): readonly (readonly [number, number, number])[] {
+  const cached = paletteTables.get(palette)
+  if (cached !== undefined) return cached
+  const table = palette.map(parseHexColor)
+  paletteTables.set(palette, table)
+  return table
 }
 
 /** `./sprites/pitcher/frames/003.png` → `./sprites/pitcher/frames/index/003.png` */
@@ -114,21 +125,66 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
-async function paint(spriteUrl: string, palette: readonly string[]): Promise<string> {
+interface SpritePixels {
+  readonly width: number
+  readonly height: number
+  /** 구운 색 RGBA (읽기 전용) */
+  readonly colors: Uint8ClampedArray
+  /** 번호 지도 RGBA (읽기 전용) */
+  readonly indices: Uint8ClampedArray
+}
+
+/** 그림 · 번호 지도 픽셀 — 같은 그림을 다른 벌로 또 칠할 때(두 팀 타자 따위) 다시 받고 읽지 않게 최근 것만 둔다 */
+const recentPixels = new Map<string, Promise<SpritePixels | null>>()
+const RECENT_PIXELS_LIMIT = 48
+
+/** 픽셀을 읽는 캔버스 — 읽기가 잦다고 알려 GPU→CPU 동기 읽기를 피한다(값은 같다) */
+const READ_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
+
+async function readSpritePixels(spriteUrl: string): Promise<SpritePixels | null> {
   const [sprite, indexMap] = await Promise.all([loadImage(spriteUrl), loadImage(indexMapUrl(spriteUrl))])
   const canvas = document.createElement('canvas')
   canvas.width = sprite.width
   canvas.height = sprite.height
-  const context = canvas.getContext('2d')
-  if (context === null) return spriteUrl
+  const context = canvas.getContext('2d', READ_CONTEXT_OPTIONS)
+  if (context === null) return null
 
   context.drawImage(sprite, 0, 0)
   const colors = context.getImageData(0, 0, canvas.width, canvas.height)
   context.clearRect(0, 0, canvas.width, canvas.height)
   context.drawImage(indexMap, 0, 0)
   const indices = context.getImageData(0, 0, canvas.width, canvas.height)
+  return { width: canvas.width, height: canvas.height, colors: colors.data, indices: indices.data }
+}
 
-  colors.data.set(recolorPixels(colors.data, indices.data, palette))
+function spritePixelsOf(spriteUrl: string): Promise<SpritePixels | null> {
+  const cached = recentPixels.get(spriteUrl)
+  if (cached !== undefined) {
+    // 최근에 쓴 것을 맨 뒤로
+    recentPixels.delete(spriteUrl)
+    recentPixels.set(spriteUrl, cached)
+    return cached
+  }
+  const request = readSpritePixels(spriteUrl)
+  // 실패는 남기지 않는다
+  request.catch(() => recentPixels.delete(spriteUrl))
+  recentPixels.set(spriteUrl, request)
+  if (recentPixels.size > RECENT_PIXELS_LIMIT) recentPixels.delete(recentPixels.keys().next().value as string)
+  return request
+}
+
+async function paint(spriteUrl: string, palette: readonly string[]): Promise<string> {
+  const pixels = await spritePixelsOf(spriteUrl)
+  if (pixels === null) return spriteUrl
+  const canvas = document.createElement('canvas')
+  canvas.width = pixels.width
+  canvas.height = pixels.height
+  // toDataURL 도 픽셀을 읽는다
+  const context = canvas.getContext('2d', READ_CONTEXT_OPTIONS)
+  if (context === null) return spriteUrl
+
+  const colors = context.createImageData(pixels.width, pixels.height)
+  colors.data.set(recolorPixels(pixels.colors, pixels.indices, palette))
   context.putImageData(colors, 0, 0)
   return canvas.toDataURL('image/png')
 }
