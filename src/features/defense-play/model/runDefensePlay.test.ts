@@ -710,6 +710,23 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     expect(필살.log[잡음]).toBe('23틱 3번 야수가 잡았다 (종류 0)')
   })
 
+  it('맞은 틱에만 효과음 53 칸이 선다 — 틱 끝 b4588 → 0xa1e60 a1e82 즉시 재생', () => {
+    let state = startDefensePlay({
+      outcome: 뜬공아웃,
+      trajectory: battedBallTrajectory(깊은뜬공),
+      bases: EMPTY_BASES,
+      outs: 0,
+      isUncatchable: true,
+    })
+    const 소리틱: number[] = []
+    while (!isDefensePlayFinished(state)) {
+      const tick = state.tick
+      state = stepDefensePlay(state)
+      if (state.hitStaggerSoundThisTick) 소리틱.push(tick)
+    }
+    expect(소리틱).toEqual([23])
+  })
+
   it('튕기는 동안에도 3루 주자는 홈을 밟는다', () => {
     const 필살 = 필살타구(뜬공아웃, 주자3루, 2, 깊은뜬공)
 

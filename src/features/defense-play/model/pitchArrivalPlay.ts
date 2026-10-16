@@ -411,7 +411,8 @@ export function stealRecordIdsOf(result: Pick<StealPlayResult, 'stolenFrom' | 'c
  *   진루가 판과 같다(판정 B → 정산 0xa8024 → 0xd). 판은 재생 칸에만 넣는다.
  *
  * 판에서 3아웃이 나는 것은 볼·스트라이크(카운트만 오른 공)뿐이다 — 판정 B 0xae3e8 이 0x18 로 보내 그 타석은 끊긴다
- * (다음 이닝 같은 타자부터 — ⚠️ 정산 0xa8024 가 종류 5 에서 타순을 미는지는 안 읽었다). 삼진은 판 앞에서 아웃이 붙고
+ * (다음 이닝 같은 타자부터 — 정산 0xa8024 는 0xaf020(다음 타자 예약)을 안 부르고, 판 끝 0x35108 이 35138~3515e 에서
+ * 판 종류 [+0x118] ∈ {4, 5, 8} 이면 0xaf020 을 건너뛴다(9 는 [0x1552d0c]+0xc == 5 일 때만 민다)). 삼진은 판 앞에서 아웃이 붙고
  * (위 머리말), 볼넷·사구는 도루 판이 안 열린다.
  */
 export function arrivalApplicationOf(play: PitchArrivalPlay): 'runnerOnly' | 'batterRuns' | 'freePass' {

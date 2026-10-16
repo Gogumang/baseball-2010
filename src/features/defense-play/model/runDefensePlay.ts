@@ -847,6 +847,12 @@ export interface DefensePlayState {
    */
   slidingSoundThisTick: boolean
   /**
+   * **방금 돈 틱에서 필살타법 타구에 맞은 야수의 효과음 53 을 낸다.** 틱 끝 b4588 플레이.vt74 = 0xb3420 → 야수.vte4 = 0xa1e60 이
+   * 자세 13 · +0xb4 = 15 뒤 a1e82 에서 **즉시 재생** 0x6ea6c(소리, 0x35, −1, 0) 한다(예약이 아니다). 진행기는 소리를 못 내므로
+   * 수비 재생(`DefensePlayback`)이 이 칸을 보고 그 틱에 낸다.
+   */
+  hitStaggerSoundThisTick: boolean
+  /**
    * 이번 틱의 메시지 0x13(주자 하나 홈인 — 점수판에 1점) 인자 차례 — 바로 득점 0xaa1b0 은 그 주자 칸(0 = 타자주자),
    * 보류 해제 0xaa39e 는 0x64(100). 수비 장면 득점 점수판(0x51fb8 → 0x52030 홈런 갈래 · 0x52074 보통 갈래)이 본다
    */
@@ -1173,6 +1179,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     autoBaserunning: true,
     slidingSoundPlayed: false,
     slidingSoundThisTick: false,
+    hitStaggerSoundThisTick: false,
     runInsThisTick: [],
     laserShining: false,
     fumbleMarks: Array.from({ length: FIELDER_COUNT }, () => 0),
@@ -1312,6 +1319,7 @@ export function stepDefensePlay(
   let autoBaserunning = state.autoBaserunning
   let slidingSoundPlayed = state.slidingSoundPlayed
   let slidingSoundThisTick = false
+  let hitStaggerSoundThisTick = false
   const runInsThisTick: number[] = []
   let laserShining = state.laserShining
   let fumbleMarks = state.fumbleMarks
@@ -1773,14 +1781,11 @@ export function stepDefensePlay(
       readonly thrownSlot?: number
       readonly secondPass?: { readonly movable: boolean }
       readonly onlySlot?: number
-      /** 송구 0xb2e38 이 깐 공 — 아래 AI 1 목표 · 0xb3b38 머리의 AI 1 · 0xc 되돌리기를 원본대로 한다 */
+      /** 송구 0xb2e38 이 깐 공 — 아래 AI 1 목표를 원본대로 한다 */
       readonly thrownBall?: boolean
     },
   ): void => {
     receivingThrow = false
-    // 고르기 vt34 = 0xb3b38(b3da4) 가 플레이+0x1f7 = 0 을 늘 적는다. ⚠️ +0x1f8 은 b3dac 의 r0 가 0 일 때만 지우는데 그 r0 의
-    // 뜻을 다 못 읽어 옮기지 않았다 — C 끝(0x44564)이 어차피 지운다
-    deadlyJumpArmed = false
     trajectory = spliceTrajectory(trajectory, tick, next)
     ballSegmentStart = next.pointAt(0)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
@@ -1797,6 +1802,11 @@ export function stepDefensePlay(
       const thrower = options.thrownSlot
       throwErrorMarks = throwErrorMarks.map((value, slot) => (slot === thrower ? THROW_ERROR_MARK_TICKS : value))
     }
+    // 고르기 vt34 = 0xb3b38 끝의 필살 표시 지우기 — r0 는 b3cb2 에서 0 이고 슬라이딩 갈래(+0x16c = 4, b3d2c)만 1 이다:
+    //   b3da4 +0x1f7 = 0 → b3dac r0 == 0 이면 b3db0 +0x1f8 = 0. 점프 갈래(+0x16c = 3)는 b3d16 에서 b3db0 으로 곧장 뛰어
+    //   +0x1f7 을 안 지운다. 곧 점프면 +0x1f8 만 · 슬라이딩이면 +0x1f7 만 · 그 밖은 둘 다 지운다(원본 그대로)
+    if (forecast.choice.kind !== CATCH_KIND.JUMP) deadlyJumpArmed = false
+    if (forecast.choice.kind !== CATCH_KIND.SLIDE) deadlySlideArmed = false
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
     const caughtAt = next.pointAt(catchTick - tick)
@@ -1815,8 +1825,9 @@ export function stepDefensePlay(
               aiState: fielder.aiState === AI_STATE.PICK_UP ? AI_STATE.PICK_UP : AI_STATE.CHASE,
               holdingBall: false,
             }
-        : options.thrownBall === true && (fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP)
-          ? // 0xb3b38 머리 — AI 1 · 0xc 인 야수는 AI 0 으로 되돌린다(P2 1a). ⚠️ 다시 쏘기 갈래엔 아직 안 옮겼다
+        : fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP
+          ? // 0xb3b38 머리 b3b7a~b3b9a — AI(+0x84) 1 · 0xc 인 야수는 0xb8dbc(야수+0x80, 0)로 AI 0. 송구(0xb2e38)도 다시 쏘기도
+            // 같은 고르기를 부른다 — 다시 쏘기 0xb3148 은 b3294 vt24(1) → b32a4 vt34(= 0xb3b38) → b32ae vt30
             { ...fielder, aiState: AI_STATE.IDLE, holdingBall: false }
           : fielder.holdingBall
             ? { ...fielder, holdingBall: false }
@@ -2104,6 +2115,7 @@ export function stepDefensePlay(
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot ? { ...fielder, actionLockTicks: HIT_STAGGER_LOCK_TICKS } : fielder,
       )
+      hitStaggerSoundThisTick = true
       log.push(`${tick}틱 ${chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
     }
     if (tick === catchTick && catchGateOpen && !uncatchable && input.random !== undefined) {
@@ -3039,6 +3051,7 @@ export function stepDefensePlay(
   state.autoBaserunning = autoBaserunning
   state.slidingSoundPlayed = slidingSoundPlayed
   state.slidingSoundThisTick = slidingSoundThisTick
+  state.hitStaggerSoundThisTick = hitStaggerSoundThisTick
   state.runInsThisTick = runInsThisTick
   state.laserShining = laserShining
   state.laserConfirmed = laserConfirmed
