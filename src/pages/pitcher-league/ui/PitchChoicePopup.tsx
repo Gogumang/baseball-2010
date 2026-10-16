@@ -28,7 +28,7 @@ export const PITCH_CHOICE_POPUP_HEIGHT = 0x78
 /** 제목 StrMODE[59] "!C원하는 항목을 선택해주세요" — 0x19128 `movs r1, #0x3b` */
 export const PITCH_CHOICE_TITLE_ID = 0x3b
 /** 제목 0xba269(글, W/2 − 0x46, H/2 − 0x1e, …) — 0x1914c `subs r1, #0x46` · 0x19150 `subs r2, #0x1e` */
-const TITLE_HALF_WIDTH = 0x46
+const TITLE_BACK = 0x46
 const TITLE_RISE = 0x1e
 /**
  * 칸 둘 — 0x19162~0x19170 칸 0 (W/2 − 0x38, H/2, 0x20, 0x20) 프레임 0x13 · 0x19272~0x19284 칸 1 (W/2 + 0x18, H/2, 0x20, 0x20)
@@ -131,9 +131,10 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
           style={{ ...box, top: recordPickPopupTopOf(box.height), transform: 'none', padding: 0 }} />
         {/* 펼치는 동안은 판만 긋는다(0x7479c) — 줄이는 동안은 그리기 0x190f8 이 그대로 돈다 */}
         {motion.openingHeight === null && (<>
-          {/* ⚠️ 미확인: 0xba269 넷째 인자 −1(폭)의 뜻 — 기록실 제목처럼 x 를 가운데로 두는 폭(0x46 × 2)으로 근사 */}
+          {/* 0xba269 넷째 인자 −1(폭) = **글 폭을 재서 쓴다**(직접 떴다): 0xba268 이 폭을 0x6ef4c 의 다섯째 인자로 넘기고, 6efb0 이
+              −1 이면 0x9c52c 로 글을 재 그 값을 폭으로 쓴다 → "!C" 가 제 폭 안에서 가운데라 글은 x = W/2 − 0x46 에서 그대로 시작한다 */}
           <div className={styles.title}
-            style={{ left: 120 - TITLE_HALF_WIDTH, top: 160 - TITLE_RISE, width: TITLE_HALF_WIDTH * 2, whiteSpace: 'normal' }}>
+            style={{ left: 120 - TITLE_BACK, top: 160 - TITLE_RISE, width: 'max-content', whiteSpace: 'nowrap' }}>
             <MarkupText raw={ORIGINAL_MODE_TEXT[PITCH_CHOICE_TITLE_ID] ?? ''} />
           </div>
           {PITCH_CHOICE_CELLS.map((cell, index) => {

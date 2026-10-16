@@ -126,12 +126,14 @@ export type AimKeyAction =
  * ```
  * 방향은 다른 키를 누를 때까지 남는다 — 키를 떼도(0x536bc 가 0x10 에 안 넘긴다) 조준점은 계속 흐른다.
  *
- * ⚠️ 미확인: '*'(경기 중 메뉴) · '#' 가 공용 키 0x498d4 와 함께 조작 객체에도 가서 dx · dy 를 지우는지는 안 봤다.
- * 웹은 그 둘을 조준 키로 보지 않는다(부르는 쪽이 null 을 받는다).
+ * '*'(경기 중 메뉴) · '#' 도 **멈춤**이다 (직접 떴다): 공용 키 0x498d4 는 '*'(49918 → 메뉴 0x3c02c) · '#'(4994a) 를 따로 본 뒤
+ * **같은 키로** 499fa 의 조작 객체 고리(장면+0xfa0)를 그대로 돈다 — 사람 조작 객체(vtable 0xd0a14)의 vt+8 0x53290 이
+ * +0x14 = 키 · +0x18 = 상태로 적고, vt+0xc 0x536bc → 상태 0x10 칸(표 0xd0a24[2]) 0x534b0 이 수비([+0xc] ≠ 0)면 그 키 그대로
+ * 메시지 8 을 보낸다 → 0x50e3a 머리가 dx · dy 를 지우고 어느 갈래에도 안 걸려 멈춘다.
  */
 export function aimKeyActionOf(key: string): AimKeyAction | null {
   const code = originalKeyCodeOf(key)
-  if (code === null || code === 0x2a || code === 0x23) return null
+  if (code === null) return null
   const move = (dx: number, dy: number): AimKeyAction => ({ kind: 'move', direction: { dx, dy } })
   switch (code) {
     case KEY_OK:

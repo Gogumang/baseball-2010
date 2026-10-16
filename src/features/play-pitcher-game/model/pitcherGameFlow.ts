@@ -2735,7 +2735,8 @@ function prepareAtBat(
   afterSubstitution = false,
 ): PitcherGameProgress {
   // 사람 장면 상대 타석 — 0xe 그리기 0x4d9ec → 0x35b94(35f70~35fb4)가 공격 팀(상대) 레코드 +2 를 덮는다.
-  // ⚠️ 미확인: 강판(0xe 진입 0x504cc → 0x23)이면 0xe 그리기가 한 틱이라도 도는지는 안 봤다 — 웹은 덮였다고 본다
+  // 강판(0xe 진입 0x50674 의 506ea 0x504cc 참 → 506fc 0xbcb48(장면+0x18, 0x23))이어도 덮인다(직접 떴다): 0xbcb48 은 다음 상태 칸(+8)만
+  // 적어 다음 틀의 0xbc9c8 이 옮기고, 같은 틀의 그리기 표 0xd05a0 은 52f3a 에서 지금 상태 [+0x1c] = 0xe 로 고르므로 0x4d9ec 가 한 번 돈다
   progress = withOpponentRecordTouched(progress)
   const { options } = progress
   const bases = progress.game.bases
@@ -2762,7 +2763,8 @@ function prepareAtBat(
 
   // 강판이 아니면 0xe 에 머물러 사람 OK 를 기다린다 (0x532b0) — 그 뒤가 메시지 1 의 돌발 굴림이다.
   // 0x16 을 안 거친 0xd 라 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음(상대 타자가 142 가 넣은 마타자면 26 · 2·3루 주자 15 · 14).
-  // ⚠️ 강판(0xe 진입 0x504cc → 0x23)이 나도 원본은 앞선 0xd 에서 이 소리를 낸다 — 웹은 대기를 안 세워 그 갈래는 안 낸다(미이식)
+  // ⚠️ 미이식: 강판(0xe 진입 0x504cc → 0x23)이 나도 원본은 앞선 0xd 에서 이 소리를 내고 0xd 두 그림 · 0xe 한 그림을 그린다 — 웹 강판 갈래는
+  // 0xd · 0xe 대기를 안 세우고 곧장 강판 창으로 가서 소리 · 그림이 없다(화면 `pages/pitching` 쪽 일이라 이 과제에서 안 옮겼다)
   const atBatEntrySoundId = afterSubstitution
     ? undefined
     : substitutionEntrySoundIdOf({
@@ -3865,9 +3867,12 @@ function changeOpponentPitcher(progress: PitcherGameProgress, random: RandomPort
 }
 
 /**
- * 교체가 확정된 자리 — 새 마운드를 놓고 그 투수의 이닝 실점 A 를 0 으로(0xaec64), 세이브 후보 `0xa60c0` 을 잡는다
- * (간이 엔진 c26a2 — 수비 팀 `+0x296` 이 서 있으면. 강판 `0xc1b48` 의 교체도 다음 `0xc262c` 가 확정하며 같은 자리를 지난다).
- * ⚠️ c269c 가 함께 보는 `engine[1]` 의 뜻은 안 읽었다 — 타자편 `gameFlow` 처럼 늘 부른다.
+ * 교체가 확정된 자리 — 새 마운드를 놓고 그 투수의 이닝 실점 A 를 0 으로(0xaec64) 둔다.
+ * 세이브 후보 `0xa60c0` 은 **안 잡는다** (직접 떴다): 간이 엔진 c268e~c26b2 는 수비 팀 `+0x296` 과 함께 `engine[1]` 을 보고
+ * 둘 다 서야 0xa60c0 을 부른다. engine[1] 은 시뮬 초기화 0xc0dac 의 열두째 인자([sp+0x34] → c0e18)인데 경기 장면(0x3f584 의 3fa06 — r4 = 0)과
+ * 자동진행(0x3c8da 의 3c93a — r6 = 0)은 0 을 넘기고, 1 을 쓰는 곳은 CPU 끼리 경기 0xc2760(c2858)뿐이다. 투수편 경기의 이 세
+ * 교체(우리 CPU 투수 · 상대 투수 · 강판)는 모두 간이 엔진 몫이라 후보가 안 잡힌다. 장면 쪽 후보는 0xe 그림 0x38b64 → 메시지 0xbc0 →
+ * 0x5227c 뿐이고, 웹에서 후보를 잡는 곳은 내 구원 등판 `enterAsRelief` 하나다. 세이브는 어차피 `state+0x64` 가 안 지워져 기록되지 않으므로(S1 4-1) 결과 판 글자는 같다.
  */
 function withPitcherChanged(
   progress: PitcherGameProgress,
@@ -3875,22 +3880,7 @@ function withPitcherChanged(
   mound: HalfInningMound,
 ): PitcherGameProgress {
   const game = progress.game
-  const ourSide = game.playerSide
-  const opponentSide = 1 - ourSide
-  const defenseSide = isOurs ? ourSide : opponentSide
-  const decision = applyPitcherChange(progress.decision, {
-    lastInningIndex: REGULATION_LAST_INNING_INDEX,
-    inningIndex: game.inning - 1,
-    outs: game.outs,
-    defenseSide,
-    offenseSide: 1 - defenseSide,
-    scoreOf: (side) => (side === ourSide ? game.ourScore : game.opponentScore),
-    moundPitcherOf: (side) =>
-      side === ourSide
-        ? teammatePitcherNumberOf(isOurs ? mound.pitcherSlot : progress.ourMound.pitcherSlot)
-        : opponentPitcherNumberOf(isOurs ? progress.opponentMound.pitcherSlot : mound.pitcherSlot),
-    runnerCount: runnerCountOf(game.bases),
-  })
+  const decision = progress.decision
   // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다. 그 투수의 투구 수(+0x27c)는 줄에 얹는다
   const outgoing = isOurs ? progress.ourMound : progress.opponentMound
   const pitcherLines = chargeCpuPitcherLine(

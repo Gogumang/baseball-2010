@@ -139,7 +139,9 @@ export interface PinchHitSoundProgress {
  * (`features/play-game/model/useSubstitutionScene`) 진행기가 실은 `substitutionScene.entrySoundId` 로 낸다. 여기는 1 의 22 만.
  *
  * 사람 장면을 안 지난 CPU 대타(간이 엔진 0xc1ba4)는 연출도 소리도 없다 — 진행기가 `scenePinchHit` 을 안 바꾼다.
- * ⚠️ 0x38b64 는 `[게임+0xf10]+0x64 == 0` 일 때만 낸다(38b78) — 그 칸의 뜻은 안 읽었다.
+ * 0x38b64 는 `[게임+0xf10]+0x64 == 0` 일 때만 낸다(38b78) — 그 칸은 구장 객체의 미끄럼 값인데 **늘 0** 이라 막지 않는다(직접 떴다):
+ * 만들기 0x76b14 가 0, 바꾸는 곳은 갱신 0x785a8 의 [+0x6c] 갈래뿐인데 +0x6c 에 들어가는 값은 0 · 2 뿐(R10 4절 전수)이고
+ * 갈래 2 는 +0x64 −= +0x68(≥ 1) 뒤 ≤ 0 이면 같은 호출 안에서 0 으로 되돌린다(78602~7860c).
  */
 export function pinchHitSoundIdsOf(
   before: PinchHitSoundProgress,

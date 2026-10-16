@@ -99,8 +99,8 @@ export interface FieldingAssignment {
 /**
  * 보직 불일치 **−20%** (0xb5844~0xb58a4) — **시즌모드 내 팀 타자의 수비 칸에만** 붙는다.
  *
- * ⚠️ 설명서는 일반·대전에도 벌점이 있다고 하지만 **코드에는 모드 2 분기뿐이다** (J-3 미해결).
- *    원본대로 시즌에만 붙인다.
+ * 설명서는 일반·대전에도 벌점이 있다고 하지만 **코드에는 모드 2 분기뿐이다** (J-3) — 0xb5804 갈래는 시즌 내 팀
+ * (`[SR+1] == 팀레코드+0`, b5818)에서만 돌고 그 안의 b5844~b58a4 가 벌점이다. 원본대로 시즌에만 붙인다.
  */
 export function hasPositionMismatch(assignment: FieldingAssignment): boolean {
   if (assignment.isAce === true) return false
@@ -162,14 +162,15 @@ export function coachBonusOf(coach: number, isPitcher: boolean, slot: number): n
 
 /** 시즌모드가 함께 넘기는 팀 상태 (시즌 레코드·팀 레코드에서 온다) */
 export interface SeasonTeamCondition {
-  /** SR+5 팀 질병 종류 — 0 이 아니면 −30% */
+  /** 질병 벌점 칸 — **SR+6 > 0** 이면 −30% (0xb5824 `ldrsb [SR, #6]`, 질병 종류 SR+5 가 아니다 — `illnessPenaltyFieldOf`) */
   readonly illness: number
   /** 팀 레코드 +2 팀 사기 0~100 */
   readonly morale: number
   /**
    * SR+0x185 코치 (−1 없음, 0~9).
-   * ⚠️ **유력**: 원본 코치 분기에는 팀 검사가 없어 **상대 팀 선수에게도 붙는 것으로 보인다** (J 4-2).
-   *    원본 동작이므로 그대로 옮긴다 — `applyToEveryTeam` 참고.
+   * 원본 코치 분기에는 팀 검사가 없어 **상대 팀 선수에게도 붙는다** (J 4-2, 직접 떴다): 0xb5a74 `[sp+4] == 2`(모드) →
+   *   SR+0x185 ≥ 0 → 점프표 0xd8858[코치] 가 칸(r7)·투수 여부(0xb6279)만 보고 b5b04 `r4 += 0xd884c[코치]` — 팀 비교가 없고,
+   *   b5a16 뒤로는 모든 갈래가 b5a74 로 모인다. 원본 동작이므로 그대로 옮긴다 — `applyToEveryTeam` 참고.
    */
   readonly coach: number
 }
@@ -234,7 +235,7 @@ export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
     bonus += teamAbilityBonusOf(teamAbilities[teamAbilitySlotFor(isPitcher, slot)] ?? 0)
   }
 
-  // ── 코치 보너스 (모드 2). 팀 검사가 없다 — 유력 ──
+  // ── 코치 보너스 (모드 2). 팀 검사가 없다 (0xb5a74~0xb5b04) ──
   if (isSeason && season !== undefined && season.coach >= 0) {
     bonus += coachBonusOf(season.coach, isPitcher, slot)
   }

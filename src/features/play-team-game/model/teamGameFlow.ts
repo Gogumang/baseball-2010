@@ -2546,8 +2546,9 @@ function batterPitch(
 
 /**
  * **32·33 연속 파울** — 파울 판정 `0x51408` 의 v = 7 갈래가 `0xa7dbc` 로 `ctx+0x15f` 를 올리고 3·4 에서 준다(사람 공격).
- * 파울이 아닌 공이 오면 공 도착 판정 `0x3dfac` 끝의 `0xa5fdc` 가 0 으로 되돌린다 — ⚠️ R8 4-4 의 **유력**
- * (0x3dfac 의 모든 갈래가 끝을 지나는지는 안 봤다). 타석 초기화 0xa5bcc 도 지운다(`prepareAtBat`).
+ * 파울이 아닌 공이 오면 공 도착 판정 `0x3dfac` 끝의 `0xa5fdc` 가 0 으로 되돌린다 — **모든 갈래가 지난다**(직접 떴다): 0x3dfac 의
+ * 나가는 곳은 3e1fc 의 pop 하나이고, 점프표 0xcffb4(결과 1~13)의 열세 칸과 그 밖 갈래가 모두 3e1d4 → 3e1ec → 3e1f6 `0xa5fdc` 를
+ * 지난다(R8 4-4 의 "유력" 을 닫는다). 타석 초기화 0xa5bcc 도 지운다(`prepareAtBat`).
  */
 function withFoulRecords(progress: TeamGameProgress, isFoul: boolean): TeamGameProgress {
   if (!isFoul) {
@@ -4721,7 +4722,7 @@ export function closeBurstWindow(progress: TeamGameProgress): TeamGameProgress {
  * `defendingIsOurs` 가 참이면 우리 팀이 수비(= 우리 투수), 거짓이면 상대 투수를 본다.
  * 사람이 직접 던지는 타석은 우리 투수를 이 길로 바꾸지 않는다 — 그때는 `#` 메뉴(`changePitcher`)뿐이다.
  *
- * ⚠️ 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 8회에 벤치 마선수로 교체)는 **투수편 전용**이라 여기 없다.
+ * 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 8회에 벤치 마선수로 교체)는 **투수편 전용**이라 여기 없다 — c1bbe `[state+1]` 이 3 이 아니면 c1bc8 에서 c1c4a 로 건너뛴다.
  */
 function judgeAutoPitcherChange(
   progress: TeamGameProgress,
@@ -4799,7 +4800,7 @@ function judgeAutoPitcherChange(
   )
   if (next < 0) return progress
 
-  const changed = applyPitcherChange(progress, defendingIsOurs, next)
+  const changed = applyPitcherChange(progress, defendingIsOurs, next, inScene)
   return appendLog(
     inScene
       ? {
@@ -4944,12 +4945,22 @@ function applyPitcherChange(
   progress: TeamGameProgress,
   ours: boolean,
   nextIndex: number,
+  /**
+   * 사람 경기 장면에서 바뀌었는가 — 그러면 세이브 후보 `0xa60c0` 을 잡는다. 장면 교체(사람 `#` 교체 · 0xf 진입의 CPU 교체)는
+   * 0x16 진입 0x3d458 이 +0x195c 비트1 을 세우고 0xe 그림 0x38b64(38ba2 비트1 → 38bdc)가 메시지 0xbc0 을 보내 0x5227c 가 0xa60c0 을
+   * 부른다(그 사이 플레이가 없어 이닝·아웃·주자·점수는 교체 순간과 같다). 간이 엔진 교체는 c268e~c26b2 가 수비 팀 +0x296 과 함께
+   * `engine[1]` 을 보는데, 경기 장면(3fa06)·자동진행(3c93a)은 시뮬 초기화 0xc0dac 에 0 을 넘기고(c0e18) 1 은 CPU 끼리 경기
+   * 0xc2760(c2858)만 쓴다 — 그래서 **간이 엔진 교체는 후보를 안 잡는다**(직접 떴다). 세이브는 어차피 +0x64 때문에 기록되지 않는다(S1 4-1).
+   */
+  inScene: boolean,
 ): TeamGameProgress {
-  // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측의 새 투수, 그 순간 이닝·아웃·주자)
-  const decisions = decisionsAfterPitcherChange(progress.decisions, progress.game, {
-    our: ours ? nextIndex : progress.ourPitcherIndex,
-    opponent: ours ? progress.opponentPitcherIndex : nextIndex,
-  })
+  // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측의 새 투수, 그 순간 이닝·아웃·주자) — 장면 교체만
+  const decisions = inScene
+    ? decisionsAfterPitcherChange(progress.decisions, progress.game, {
+        our: ours ? nextIndex : progress.ourPitcherIndex,
+        opponent: ours ? progress.opponentPitcherIndex : nextIndex,
+      })
+    : progress.decisions
   // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
   const runnerPitchers = freezeRunnerPitchers(
     progress.runnerPitchers,
@@ -5017,7 +5028,7 @@ export function changePitcher(
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
   if (!availablePitchers(progress).includes(benchIndex)) return progress
-  const applied = applyPitcherChange(progress, true, benchIndex)
+  const applied = applyPitcherChange(progress, true, benchIndex, true)
   const changed = appendLog(
     {
       ...applied,
