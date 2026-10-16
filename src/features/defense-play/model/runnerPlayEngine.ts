@@ -1,6 +1,12 @@
 import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { autoSlideRunnerIndexes, slideOnKey, SLIDING_SPEED_BONUS, type SlidingRunner } from '@/entities/defense-controls/model/sliding'
+import {
+  autoSlideRunnerIndexes,
+  slideOnKey,
+  SLIDING_SOUND_EFFECT,
+  SLIDING_SPEED_BONUS,
+  type SlidingRunner,
+} from '@/entities/defense-controls/model/sliding'
 import { applyBaserunningKey } from '@/entities/fielding/model/baserunningKey'
 import { previousTargetAfterLead } from '@/entities/fielding/model/runnerLead'
 import {
@@ -236,18 +242,49 @@ export interface RunnerPlayStepper {
    * 0x5268c(잠금 없음). 진행기는 소리를 못 내므로 화면이 이 칸을 보고 그 틱에 낸다(`runDefensePlay` 의 같은 칸)
    */
   readonly slidingSoundThisTick: boolean
+  /**
+   * 방금 돈 틱에 낸 소리 — 낸 차례대로. 사람 슬라이딩 키(틱 머리) → 결과 메시지 0xbba 의 판정 콜(플레이 틱 b4562 →
+   * 0xbfbac → 0xbfb78 이 받는 곳 vt+0xc 를 곧바로 부른다 → 0x51a56 → 표 0xd0488: 9 → 0x51c14(17) · 13 → 0x51b36(62/20)) →
+   * 자동 슬라이딩 0x5268c(슬롯 2 의 vt48 플레이 틱 0x525e8 뒤). 화면은 이것을 그 틱에 차례로 낸다 (`runnerPlayCallSoundIdOf`)
+   */
+  readonly soundsThisTick: readonly number[]
   step(press: DefenseKeyPress | null): void
   result(): RunnerPlayEngineResult
 }
 
+/** 진행기가 틱마다 적는 소리 칸 — 슬라이딩 10 이 났나 · 그 틱에 낸 소리(차례대로) */
+export interface RunnerPlayTickSound {
+  slidingThisTick: boolean
+  thisTick: number[]
+}
+
+/**
+ * **판 안의 판정 콜** — 플레이 틱 꼬리 b4562 가 결과 코드(포구 b4292 의 9 · b4540 의 13)를 메시지 0xbba 로 보내면
+ * (0xbfbac → 0xbfb78 이 받는 곳의 vt+0xc 를 곧바로 부른다 — 큐가 아니다) 0x51a56 이 판정 스위치 0xd0488 로 가른다:
+ * - 9 → 0x51c14: 플레이 +0x118(종류)이 4 · 5 면 다른 검사 없이 17(51c1e~51c24 → 51c38). 그 밖(종류 9)은 소리 객체
+ *   `[[0x1400058]+5]` 가 서 있으면 17, 아니면 `+0x14 == 0` 일 때만 17(51c40~51c4e — 아니면 소리 없이 0x51d40).
+ *   ⚠️ 미확인: 소리 객체 +5 · +0x14 의 뜻(재생 중 칸으로 보임)은 안 풀었다 — 웹은 종류 9 도 17 로 둔다(`passedBallCallSoundIdOf` 와 같다).
+ * - 13 → 0x51b36: state[0x1f](바운드 없이 잡은 아웃) 또는 state[0x87](그 아웃을 낸 판정이 태그)이면 62, 아니면 20.
+ *   주자 판에는 타구가 없어 state[0x1f] 는 안 선다 — 그 틱의 태그 칸(`tagOut`)만 본다.
+ * 소리는 play 0x6ea6c(…, −1, 0) — 51b18 → 51c54. 판 결과 칸은 첫 번째만 적지만 메시지는 그 틱마다 가므로 콜도 그 틱마다 난다.
+ */
+export function runnerPlayCallSoundIdOf(messageCode: number, tagOut: boolean): number | null {
+  if (messageCode === RUNNER_PLAY_RESULT.SAFE) return 17
+  if (messageCode === RUNNER_PLAY_RESULT.OUT) return tagOut ? 62 : 20
+  return null
+}
+
 export function startRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayStepper {
   const ticks: DefensePlayView[] = []
-  const sound = { slidingThisTick: false }
+  const sound: RunnerPlayTickSound = { slidingThisTick: false, thisTick: [] }
   const steps = runnerPlaySteps(input, ticks, sound)
   let current = steps.next(null)
   return {
     get slidingSoundThisTick() {
       return sound.slidingThisTick
+    },
+    get soundsThisTick() {
+      return sound.thisTick
     },
     get tick() {
       return current.done === true ? ticks.length : current.value
@@ -280,7 +317,7 @@ const VT4C_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
 function* runnerPlaySteps(
   input: RunnerPlayEngineInput,
   ticks: DefensePlayView[],
-  sound: { slidingThisTick: boolean } = { slidingThisTick: false },
+  sound: RunnerPlayTickSound = { slidingThisTick: false, thisTick: [] },
 ): Generator<number, RunnerPlayEngineResult, DefenseKeyPress | null> {
   const abilities = input.abilities
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
@@ -568,6 +605,7 @@ function* runnerPlaySteps(
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
     const press = yield tick
     sound.slidingThisTick = false
+    sound.thisTick = []
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 0. 야수 틱 0xa1284 — 공용 갱신 0x3f060 이 슬롯 2(0x524c0)보다 먼저 돈다. 쥔 동안 +0xc8 −= 1 (타구 진행기 0' 절) ──
@@ -606,6 +644,7 @@ function* runnerPlaySteps(
         if (decision.playsSound) {
           slidingSoundPlayed = true
           sound.slidingThisTick = true
+          sound.thisTick.push(SLIDING_SOUND_EFFECT)
         }
         for (const index of decision.slidRunnerIndexes) {
           const runner = runners[index]
@@ -702,7 +741,12 @@ function* runnerPlaySteps(
 
     // ── 2b. 결과 메시지 0xbba(b4562) → 51a56 결과 판 칸 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다. 공 가진 야수는 이 자리 값 ──
     if (outJudgedThisTick) tickMessageCode = 13
-    if (tickMessageCode !== 0) scene = { ...scene, popup: postJudgeMessage(scene.popup, tickMessageCode, play.ballHolderSlot) }
+    if (tickMessageCode !== 0) {
+      scene = { ...scene, popup: postJudgeMessage(scene.popup, tickMessageCode, play.ballHolderSlot) }
+      // 같은 메시지의 판정 스위치가 그 자리에서 콜을 낸다 (`runnerPlayCallSoundIdOf`)
+      const call = runnerPlayCallSoundIdOf(tickMessageCode, tagOut)
+      if (call !== null) sound.thisTick.push(call)
+    }
 
     // ── 2c. 아웃이 난 틱 — 같은 메시지의 0x51d40~0x51db4 → 0xafa60 한 번 ──
     // 수비 조작이 사람이든 CPU 든 `아웃 ≤ 2` 면 플레이+0x128 = 1 로 세우고 CPU 송구 결정을 부른다
@@ -820,7 +864,10 @@ function* runnerPlaySteps(
         log.push(`${tick}틱 ${runner.state.index}번 주자 자동 슬라이딩`)
       }
       // 0x52670 — 슬라이딩시킨 수 > 0 이면 그 자리에서 효과음 10 (0x5268c, 잠금 없음)
-      if (slid.length > 0) sound.slidingThisTick = true
+      if (slid.length > 0) {
+        sound.slidingThisTick = true
+        sound.thisTick.push(SLIDING_SOUND_EFFECT)
+      }
     }
 
     // ── 4c. CPU 송구 결정 0xafa60 (슬롯 2 의 526ae, 매 틱 — `0xae6c8` = 수비 CPU || 송구 설정 자동) ──

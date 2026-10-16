@@ -366,11 +366,15 @@ export function useTeamGame(
         const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
         step(
           (current) => resolveRunnerPlay(current, played, random),
-          // 판정 콜 — 도루 · 폭투는 공 도착 판(`lastArrivalPlay`), 견제는 그 결과. ⚠️ 원본은 공이 잡히는 틱에 낸다(판 끝 근사)
-          (before, after) => [
-            arrivalCallSoundIdOf(before, after),
-            pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
-          ],
+          // 판정 콜(도루 · 폭투 · 견제)은 원본처럼 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 화면이 냈다
+          // (`LiveRunnerPlayback` 의 `soundsThisTick`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
+          (before, after) =>
+            result !== undefined
+              ? []
+              : [
+                  arrivalCallSoundIdOf(before, after),
+                  pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
+                ],
         )
       },
       recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => {

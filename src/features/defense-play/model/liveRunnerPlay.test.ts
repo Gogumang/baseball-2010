@@ -144,3 +144,52 @@ describe('실시간 손잡이 — 화면이 한 틱씩 키를 먹여도 미리 �
     expect(random.count()).toBeGreaterThan(2)
   })
 })
+
+describe('판 안의 판정 콜 — 결과 메시지 0xbba(b4562) → 0x51a56 → 0x51c14(17) · 0x51b36(62/20), 그 틱에 난다', () => {
+  /** 판을 한 틱씩 돌리며 그 틱의 소리를 (틱, 소리)로 모은다 — 화면 `LiveRunnerPlayback` 이 하는 일 */
+  const 틱소리 = (play: Parameters<typeof startLiveRunnerPlay>[0], presses: Readonly<Record<number, string>> = {}) => {
+    const stepper = startLiveRunnerPlay(play)
+    const sounds: { readonly tick: number; readonly id: number }[] = []
+    while (!stepper.finished) {
+      const tick = stepper.tick
+      stepper.step(presses[tick] === undefined ? null : { key: presses[tick] })
+      for (const id of stepper.soundsThisTick) sounds.push({ tick, id })
+    }
+    return { sounds, result: stepper.result(), lastTick: stepper.ticks.length - 1 }
+  }
+
+  /** 로그 줄에서 그 틱 */
+  const 틱of = (log: readonly string[], pattern: RegExp) => Number(/^(\d+)틱/.exec(log.find((line) => pattern.test(line)) ?? '')?.[1])
+
+  it('견제사: 받은 야수가 태그한 틱(결과 13 · state[0x87])에 62 — 판 끝이 아니다', () => {
+    const { sounds, result, lastTick } = 틱소리({ kind: 'pickoff', input: { targetBase: 1, bases: 일루, outs: 0 } })
+    const 아웃틱 = 틱of(result.log, /견제사 \(0xb36d0/)
+    expect((result as { readonly resultCode?: number | null }).resultCode).toBe(13)
+    expect(sounds).toEqual([{ tick: 아웃틱, id: 62 }])
+    expect(아웃틱).toBeLessThan(lastTick)
+  })
+
+  it('도루 판: 키 2 로 2루에 던져 세이프 — 받은 야수가 쥐는 틱(결과 9)에 17 (종류 5 는 0x51c14 51c22 에서 곧장 17)', () => {
+    const opened = openPitchArrivalPlay(
+      { gameMode: 2, pitchJudgement: 2, stealingFrom: [1], bases: 일루, outs: 0, defenseIsCpu: false, offenseIsCpu: true },
+      createSeededRandom(1),
+    )
+    if (opened === null || opened.kind === 2) throw new Error('도루 판이 안 열렸다')
+    const { sounds, result, lastTick } = 틱소리({ kind: 'arrival', opened }, { 4: '2' })
+    const 세이프틱 = 틱of(result.log, /2루 세이프 \(결과 9\)/)
+    expect((result as { readonly resultCode?: number | null }).resultCode).toBe(9)
+    expect(sounds).toEqual([{ tick: 세이프틱, id: 17 }])
+    expect(세이프틱).toBeLessThan(lastTick)
+  })
+
+  it('키 없는 수동 도루 판(포수가 든 채 끝)은 결과 메시지가 없어 콜도 없다', () => {
+    const opened = openPitchArrivalPlay(
+      { gameMode: 2, pitchJudgement: 2, stealingFrom: [1], bases: 일루, outs: 0, defenseIsCpu: false, offenseIsCpu: true },
+      createSeededRandom(1),
+    )
+    if (opened === null || opened.kind === 2) throw new Error('도루 판이 안 열렸다')
+    const { sounds, result } = 틱소리({ kind: 'arrival', opened })
+    expect((result as { readonly resultCode?: number | null }).resultCode).toBeNull()
+    expect(sounds).toEqual([])
+  })
+})

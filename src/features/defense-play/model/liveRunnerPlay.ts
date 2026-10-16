@@ -43,6 +43,11 @@ export interface LiveRunnerStepper {
   readonly ticks: readonly DefensePlayView[]
   /** 방금 돈 틱에서 슬라이딩 효과음 10 을 낸다 (사람 키 0x5199c · 자동 0x5268c) */
   readonly slidingSoundThisTick: boolean
+  /**
+   * 방금 돈 틱에 낸 소리(차례대로) — 슬라이딩 10 과 **판정 콜**(결과 메시지 0xbba → 0x51a56: 9 → 17 · 13 → 62/20).
+   * 원본은 콜을 판 끝이 아니라 그 결과 코드가 선 플레이 틱에 낸다 (`runnerPlayEngine.runnerPlayCallSoundIdOf`)
+   */
+  readonly soundsThisTick: readonly number[]
   step(press: DefenseKeyPress | null): void
   result(): DefensePlayResult
 }

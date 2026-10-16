@@ -8,7 +8,7 @@ import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import type { TeamGameOptions } from '@/pages/team-game/model/useTeamGame'
 import { PITCHER_CHANGE_SOUND, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { runDefensePlay, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
+import { runLiveRunnerPlayWithoutKeys, startLiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 import { GAME_INTRO_SOUND, HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { isPickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
@@ -274,11 +274,18 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
     expect(result.current.progress.pendingRunnerPlay?.kind).toBe('pickoff')
     expect(result.current.canPitch).toBe(false)
     expect(녹음.played).toEqual([])
+    // 화면(`LiveRunnerPlayback`)처럼 한 틱씩 돌리며 그 틱의 소리를 모은다 — 판정 콜은 결과 메시지 0xbba 가 선 틱에 난다
     let played: DefensePlayResult | undefined
+    const tickSounds: number[] = []
     act(() => {
       const pending = result.current.progress.pendingRunnerPlay
       if (pending == null) return
-      played = runLiveRunnerPlayWithoutKeys(pending)
+      const stepper = startLiveRunnerPlay(pending)
+      while (!stepper.finished) {
+        stepper.step(null)
+        tickSounds.push(...stepper.soundsThisTick)
+      }
+      played = stepper.result()
       result.current.actions.finishRunnerPlay(played)
     })
 
@@ -287,7 +294,9 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
     expect(result.current.progress.lastDefensePlay).toBe(전.lastDefensePlay)
     expect(isPickoffPlayResult(played ?? null)).toBe(true)
     expect(result.current.progress.pitchCount).toBe(전.pitchCount)
-    if (played !== undefined && isPickoffPlayResult(played) && !played.errantThrow) expect(녹음.played).toEqual([17])
+    // 콜은 판 안의 틱에 났고 판 끝에는 다시 안 난다
+    expect(녹음.played).toEqual([])
+    if (played !== undefined && isPickoffPlayResult(played) && !played.errantThrow) expect(tickSounds).toEqual([17])
   })
 
   it('CPU 견제: 사람이 칠 차례에 주자 있는 루로 걸리면 17 이 나고 타석은 그대로다', () => {
@@ -311,7 +320,8 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
       const pending = result.current.progress.pendingRunnerPlay
       if (pending == null) return
       played = runLiveRunnerPlayWithoutKeys(pending)
-      result.current.actions.finishRunnerPlay(played)
+      // 화면이 결과를 못 넘긴 판 — 판 안의 콜을 못 냈으니 판 끝에 낸다
+      result.current.actions.finishRunnerPlay()
     })
 
     expect(result.current.progress.pendingRunnerPlay ?? null).toBeNull()

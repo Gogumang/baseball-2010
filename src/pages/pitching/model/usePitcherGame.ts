@@ -186,8 +186,8 @@ export function usePitcherGame(
             return [
               releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
-              // 공 도착 0x3dfac 가 연 도루·폭투 판의 판정 콜(도루 17 · 62/20, 폭투 17) — 원본은 판 안의 그 틱에 낸다.
-              // 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (견제와 같은 근사)
+              // 공 도착 0x3dfac 가 연 판의 판정 콜 — 도루 · 폭투 판은 붙들어(`live`) 화면이 판 안의 그 틱에 내므로 여기서는
+              // `lastArrivalPlay` 가 밀어내기(콜 없음)일 때만 바뀐다. 미리 돌린 판이면 연 자리에서 낸다(근사)
               after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
                 ? after.lastArrivalPlay.callSoundId
                 : null,
@@ -251,22 +251,25 @@ export function usePitcherGame(
         const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
         step(
           (current) => resolveRunnerPlay(current, played, random),
-          // 판정 콜 — 도루 · 폭투는 공 도착 판(`lastArrivalPlay`), 견제는 그 결과. ⚠️ 원본은 공이 잡히는 틱에 낸다(판 끝 근사)
-          (before, after) => [
-            after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
-              ? after.lastArrivalPlay.callSoundId
-              : null,
-            pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
-          ],
+          // 판정 콜(도루 · 폭투 · 견제)은 원본처럼 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 화면이 냈다
+          // (`LiveRunnerPlayback` 의 `soundsThisTick`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
+          (before, after) =>
+            result !== undefined
+              ? []
+              : [
+                  after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
+                    ? after.lastArrivalPlay.callSoundId
+                    : null,
+                  pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
+                ],
         )
       },
       pickoff: (key: string) =>
         step(
-          // 견제 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 판이 끝나 결과를 먹일 때(`finishRunnerPlay`)
+          // 견제 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 화면이 판 안의 그 틱에 낸다
           (current) => pickoff(current, key, random, true),
-          // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-          // ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 견제 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다
-          // — 홈런 비행 재생과 같은 근사다
+          // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36). 붙든 판은 `lastDefensePlay` 가 안 바뀌어
+          // 여기서는 안 난다(화면 `LiveRunnerPlayback` 이 결과 메시지 0xbba 의 틱에 낸다) — 미리 돈 판(재생)일 때만 연 자리에서 낸다
           (before, after) =>
             after.lastDefensePlay !== before.lastDefensePlay && isPickoffPlayResult(after.lastDefensePlay)
               ? [pickoffCallSoundIdOf(after.lastDefensePlay)]
