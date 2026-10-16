@@ -302,10 +302,24 @@ describe('견제 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈
 
     act(() => result.current.actions.cpuPickoff(base))
 
-    const play = result.current.progress.lastDefensePlay
-    expect(isPickoffPlayResult(play)).toBe(true)
+    // 판은 수비 화면이 사람 주루 키(0x5331c · 0x585)를 받으며 돌린다 — 아직 콜도 재생 칸도 없다
+    expect(result.current.progress.pendingRunnerPlay?.kind).toBe('pickoff')
+    expect(result.current.progress.pendingRunnerPlay?.side).toBe('공격')
+    expect(녹음.played).toEqual([])
+    let played: DefensePlayResult | undefined
+    act(() => {
+      const pending = result.current.progress.pendingRunnerPlay
+      if (pending == null) return
+      played = runLiveRunnerPlayWithoutKeys(pending)
+      result.current.actions.finishRunnerPlay(played)
+    })
+
+    expect(result.current.progress.pendingRunnerPlay ?? null).toBeNull()
+    // 이미 실시간으로 본 판이라 재생 칸에 다시 안 넣는다
+    expect(result.current.progress.lastDefensePlay).toBe(전.lastDefensePlay)
+    expect(isPickoffPlayResult(played ?? null)).toBe(true)
     expect(result.current.progress.game.battingOrderIndex).toBe(전.game.battingOrderIndex)
-    if (isPickoffPlayResult(play) && !play.errantThrow) expect(녹음.played).toEqual([17])
+    if (isPickoffPlayResult(played ?? null) && !played!.errantThrow) expect(녹음.played).toEqual([17])
   })
 })
 

@@ -36,7 +36,10 @@ import {
 } from '@/entities/fielding/model/fieldingState'
 import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { startPickoff } from '@/entities/fielding/model/pickoff'
-import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
+import { applyRunnerLead, previousTargetAfterLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
+import { applyBaserunningKey } from '@/entities/fielding/model/baserunningKey'
+import { slideOnKey, SLIDING_SPEED_BONUS } from '@/entities/defense-controls/model/sliding'
+import { slidingRunnerOf } from '@/features/defense-play/model/runnerPlayEngine'
 import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
@@ -187,7 +190,8 @@ export interface PickoffPlayInput {
   /**
    * 사람 조작 — 이 판 동안 틱마다 눌린 키. 상태 0x17 키 0x53420 은 판 종류를 안 가린다 — 사람이 수비면 0x533c8 이
    * 메시지 0x588 → 플레이 vt60 → +0x160, 종류 4 는 vt4c 가 도니 b4660 이 준비된 쥔 야수를 그 루로 보낸다.
-   * ⚠️ 공격 쪽 키(진루 · 귀루 · 슬라이딩)는 아직 안 받는다.
+   * 사람이 공격(`side: '공격'`)이면 같은 키가 주루 0x5331c(0x582 진루 · 0x584 귀루 → 0xa9b04, 종류 4 는 마스크 0x232 안이라
+   * 먹는다) · OK 슬라이딩 0x585(0x518da — 종류 2 · 3 만 막는다)다(`entities/fielding/model/baserunningKey`).
    */
   readonly controls?: DefensePlayControls
 }
@@ -203,6 +207,8 @@ interface PickoffRunner {
   counted: boolean
   /** 주자 +0x3b — 마지막 목록 틱(이동)에서 목표 루에 막 닿았다. 득점 0xaa0a8(aa12a)이 본다 */
   arrivedThisListTick: boolean
+  /** 주자 +0x84 — 직전 목표 루 (`runnerPlayEngine` 의 같은 칸). 사람 진루 키의 앞길 검사가 본다 */
+  previousTarget: number
 }
 
 /**
@@ -213,15 +219,21 @@ export interface PickoffPlayStepper {
   readonly tick: number
   readonly finished: boolean
   readonly ticks: readonly DefensePlayView[]
+  /** 방금 돈 틱에서 슬라이딩 효과음 10 을 낸다 — 사람 슬라이딩 키 0x518da → 0x5199c(+0x31c 잠금, 한 판 한 번) */
+  readonly slidingSoundThisTick: boolean
   step(press: DefenseKeyPress | null): void
   result(): PickoffPlayResult
 }
 
 export function startPickoffPlay(input: PickoffPlayInput): PickoffPlayStepper {
   const ticks: DefensePlayView[] = []
-  const steps = pickoffPlaySteps(input, ticks)
+  const sound = { slidingThisTick: false }
+  const steps = pickoffPlaySteps(input, ticks, sound)
   let current = steps.next(null)
   return {
+    get slidingSoundThisTick() {
+      return sound.slidingThisTick
+    },
     get tick() {
       return current.done === true ? ticks.length : current.value
     },
@@ -249,6 +261,7 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
 function* pickoffPlaySteps(
   input: PickoffPlayInput,
   ticks: DefensePlayView[],
+  sound: { slidingThisTick: boolean } = { slidingThisTick: false },
 ): Generator<number, PickoffPlayResult, DefenseKeyPress | null> {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const speedOf = (base: 1 | 2 | 3) =>
@@ -286,12 +299,15 @@ function* pickoffPlaySteps(
     if (!occupied) return
     const runner = createRunner(runners.length + 1, base, speedOf(base), { isBatterRunner: false })
     const lead = runnerLeadOf(runner, { playKind: PICKOFF_PLAY_KIND, stealing: false, random: input.random })
-    runners.push({ state: applyRunnerLead(runner, lead), counted: false, arrivedThisListTick: false })
+    const led = applyRunnerLead(runner, lead)
+    runners.push({ state: led, counted: false, arrivedThisListTick: false, previousTarget: previousTargetAfterLead(led) })
   })
 
   let outs = input.outs
   let outsAdded = 0
   let runsScored = 0
+  /** 주자관리+0x31c — 사람 슬라이딩 키의 효과음 잠금(한 판 한 번). 0x17 진입 0xa9fd0 이 지운다 */
+  let slidingSoundPlayed = false
   let tagOut = false
   let throwArrivalTick = -1
   let errantThrow = false
@@ -522,6 +538,7 @@ function* pickoffPlaySteps(
 
   for (let tick = 0; tick <= MAXIMUM_TICKS && !play.finished; tick += 1) {
     const press = yield tick
+    sound.slidingThisTick = false
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
@@ -540,6 +557,51 @@ function* pickoffPlaySteps(
       if (command !== null && command.kind === '송구') {
         manualThrowBase = command.target
         log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
+      }
+    }
+    // ── 2c'. 사람 조작 — 공격이면 0x53420 이 주루 0x5331c(0x582 진루 · 0x584 귀루) · OK 0x585(슬라이딩) ──
+    if (press !== null && input.controls?.side === '공격' && !play.finished) {
+      const command = inPlayCommandOf(press.key, '공격', { isHoldRepeat: press.isRepeat === true })
+      if (command?.kind === '슬라이딩') {
+        // 0x518da — 종류 4 는 막히지 않는다. 0xa96ec 로 슬라이딩이 걸린 뒤에야 소리 재생 중 · +0x31c 잠금을 본다
+        const decision = slideOnKey({
+          playKind: PICKOFF_PLAY_KIND,
+          isFoulBattedBall: false,
+          runners: runners.map((runner) => slidingRunnerOf(runner.state)),
+          isSoundPlaying: false,
+          hasPlayedSoundThisPlay: slidingSoundPlayed,
+        })
+        if (decision.playsSound) {
+          slidingSoundPlayed = true
+          sound.slidingThisTick = true
+        }
+        for (const index of decision.slidRunnerIndexes) {
+          const runner = runners[index]
+          if (runner === undefined || runner.state.sliding) continue
+          // 0xa04d0: +0xb8 = 1 · vt44(6) — 0xa0164 가 속도 = vt64() + 40
+          runner.state = { ...runner.state, sliding: true, speed: runner.state.speed + SLIDING_SPEED_BONUS }
+        }
+        if (decision.slidRunnerIndexes.length > 0) log.push(`${tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
+      } else if (command?.kind === '진루' || command?.kind === '귀루') {
+        // 0x5209e / 0x5222a → 0xa9b04 — 성공하면 플레이+0x128 = 1
+        const keyed = applyBaserunningKey(
+          {
+            playKind: PICKOFF_PLAY_KIND,
+            homeRunFlag: false,
+            runners: runnerStates(),
+            previousTargets: runners.map((runner) => runner.previousTarget),
+          },
+          command.kind,
+          command.runner,
+        )
+        runners.forEach((runner, index) => {
+          runner.state = keyed.runners[index] ?? runner.state
+          runner.previousTarget = keyed.previousTargets[index] ?? runner.previousTarget
+        })
+        if (keyed.succeeded) {
+          play = { ...play, wantsThrow: true }
+          log.push(`${tick}틱 ${command.kind} 키 — 주자 ${keyed.retargeted.map((index) => runners[index]?.state.index).join('·')}`)
+        }
       }
     }
     // ── 5. 포구 틱 갈래 0xb401c — 받는(줍는) 야수가 포구 틱(+0x174)에 ──
@@ -701,6 +763,8 @@ function* pickoffPlaySteps(
           continue
         }
         if (decision.toBase > HOME_BASE) continue
+        // a07b0 vt48 — 새 목표가 지금 +0x7c 와 다르면 +0x84 = 옛 +0x7c
+        if (runner.state.targetBase !== decision.toBase) runner.previousTarget = runner.state.targetBase
         runner.state = {
           ...runner.state,
           legStart: runner.state.position,
@@ -723,6 +787,8 @@ function* pickoffPlaySteps(
     const snapshotAt = (at: number, fieldersNow: readonly FielderState[]): DefensePlayView =>
       viewStateOf({
         tick: at,
+        // 슬라이딩 먼지 방향 0x9ff40 의 0x9fe80 이 보는 +0x84
+        previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
         ball: chase !== null ? chase.trajectory.pointAt(at) : (fielders[play.ballHolderSlot]?.position ?? basePosition(targetBase)),
         ballIsFlying: chase !== null,
         // 공 그리기 0x36dfc(36e90) — 쥔 공(+0x12c)은 공 · 그림자를 안 그린다
@@ -812,7 +878,9 @@ function* pickoffPlaySteps(
         position: stepToward(runner.state.position, basePosition(runner.state.targetBase), runner.state.speed),
       }
       if (!isAtTarget(runner.state) || runner.state.settled) continue
+      // 0xa040c 도착 — +0x84 = +0x8c = +0x7c
       const touched = runner.state.targetBase
+      runner.previousTarget = touched
       runner.state = { ...runner.state, settled: true, startBase: touched }
       runner.arrivedThisListTick = true
     }

@@ -163,7 +163,7 @@ export interface TeamGameSession {
     /** 수비 그림(0x43278)이 올린 실책 +0x2e — 화면이 `onDone` 바로 앞에 넘긴다 (`DefensePlayback.onFieldingErrors`) */
     readonly recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => void
     /**
-     * 수비 화면이 사람 수비의 주자 판(도루 · 폭투 · 견제 — `progress.pendingRunnerPlay`)을 다 돌렸다. 결과를 못 받았으면
+     * 수비 화면이 사람이 잡은 주자 판(도루 · 폭투 · 견제 — 수비면 송구 키, 공격이면 주루 키 · `progress.pendingRunnerPlay`)을 다 돌렸다. 결과를 못 받았으면
      * 키 없이 끝까지 돌려서라도 붙든 상태를 푼다.
      */
     readonly finishRunnerPlay: (result?: DefensePlayResult) => void
@@ -330,8 +330,9 @@ export function useTeamGame(
       // — 투수편(`usePitcherGame.pickoff`)과 같은 근사다
       // 사람 견제는 판을 붙들고 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 판이 끝나 결과를 먹일 때 낸다
       pickoff: (key: string) => step((current) => pickoff(current, key, random, true), pickoffCallSoundsOf),
+      // CPU 견제(사람 공격) — 판을 붙들고 수비 화면이 실시간으로 돌린다(사람 주루 키 0x5331c · OK 슬라이딩 0x585). 콜은 판 끝에 낸다
       cpuPickoff: (base: PickoffBase) =>
-        step((current) => cpuPickoff(current, base, random), pickoffCallSoundsOf),
+        step((current) => cpuPickoff(current, base, random, true), pickoffCallSoundsOf),
       closeBurst: () => step((current) => closeBurstWindow(current)),
       specialSwingUsed: (remaining: number) => step((current) => spendOurSpecialSwing(current, remaining)),
       // 교체 연출(상태 0x16)을 지나 상태 0xe 로 오면 등판음이 예약된다 (0x38b64 → 0x38c34) — 화면이 "CHANGE" 애니를 다 그린 뒤

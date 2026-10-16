@@ -1,6 +1,8 @@
 import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { autoSlideRunnerIndexes, SLIDING_SPEED_BONUS, type SlidingRunner } from '@/entities/defense-controls/model/sliding'
+import { autoSlideRunnerIndexes, slideOnKey, SLIDING_SPEED_BONUS, type SlidingRunner } from '@/entities/defense-controls/model/sliding'
+import { applyBaserunningKey } from '@/entities/fielding/model/baserunningKey'
+import { previousTargetAfterLead } from '@/entities/fielding/model/runnerLead'
 import {
   autoAdvanceDecisions,
   clearsRequirement,
@@ -104,7 +106,13 @@ import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/th
  * - ⚠️ 중계 이어 던지기(b4616)는 이 판에 없다 — 중계맨이 받으면 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다.
  * - 자동 추가 진루는 결과 코드가 선 뒤에도 판이 닫힐 때까지 매 틱 묻는다 — +0x111 은 "끝" 이 아니라 홈런 코드 8 이다
  *   (`playGate`). 판은 0xb0d28 대로 주자가 다 서고 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17틱) 닫힌다.
- * - 사람 주루 키(0x582·0x584)·슬라이딩 키(0x585)·레이저(0x400bc)는 받지 않는다 — 미리 끝까지 돌려 재생만 한다.
+ * - 레이저(0x400bc)는 받지 않는다.
+ *
+ * ## 사람 공격 키 (2026-10-16 직접 뜸 — `entities/fielding/model/baserunningKey`)
+ * 상태 0x17 키 0x53420 은 조작 [+0xc] == 0(사람 공격)이면 판 종류를 안 보고 주루 0x5331c(0x582 진루 · 0x584 귀루) 뒤 OK → 0x585
+ * (슬라이딩)를 보낸다. 0x582 · 0x584 → 0x5209e · 0x5222a → 0xa9b04 는 판 종류 {1, 4, 5, 9}(0xae794)에서만 주자를 움직여 도루 ·
+ * 폭투 판은 받고 밀어내기(종류 2)는 안 받는다. 성공하면 플레이+0x128 = 1(CPU 송구 결정을 다시 부른다). 슬라이딩 0x518da 는 종류 2 · 3 만
+ * 막는다(`slideOnKey`). 굴림 없음.
  */
 
 /** 진행기가 이 틱을 넘기면 끊는다 — 우리 쪽 안전망 (타구 진행기 240 과 같다) */
@@ -159,7 +167,7 @@ export interface RunnerPlayEngineInput {
   /**
    * 사람 조작 — 이 판 동안 틱마다 눌린 키(`runDefensePlay` 와 같은 꼴). 상태 0x17 키 0x53420 은 판 종류를 안 가린다 —
    * 사람이 수비면 0x533c8 이 메시지 0x588(목표 루) → 0x51890 → 플레이 vt60 → +0x160. 안 주면 키가 없다.
-   * ⚠️ 공격 쪽 키(진루 · 귀루 · 슬라이딩 — 0x5331c · 0x585)는 이 진행기가 아직 안 받는다.
+   * 사람이 공격(`side: '공격'`)이면 같은 키가 주루 0x5331c(0x582 진루 · 0x584 귀루) · OK 슬라이딩 0x585 다.
    */
   readonly controls?: DefensePlayControls
   readonly offenseIsCpu?: boolean
@@ -199,6 +207,11 @@ interface PlayRunner {
   counted: boolean
   /** 주자 +0x3b — 마지막 목록 틱(6 절 이동)에서 목표 루에 막 닿았다. 득점 0xaa0a8(aa12a)이 본다 */
   arrivedThisListTick: boolean
+  /**
+   * 주자 +0x84 — 직전 목표 루. vt88(0xa0820, 루에 세우기)과 도착 0xa040c 가 +0x8c 로, vt48(0xa07b0)이 목표가 바뀔 때 옛 +0x7c 로 적는다.
+   * 사람 진루 키의 앞길 검사(0xa9924 → 방향 판정 0x9fe80)가 본다
+   */
+  previousTarget: number
 }
 
 /** 날아가는 송구 — 던진 야수 · 목표 루 · 손을 떠난 틱 (받는 틱 · 받는 야수는 쫓는 공 `LooseBallChase`) */
@@ -218,15 +231,24 @@ export interface RunnerPlayStepper {
   readonly finished: boolean
   /** 지금까지 그린 그림 */
   readonly ticks: readonly DefensePlayView[]
+  /**
+   * 방금 돈 틱에서 슬라이딩 효과음 10 을 낸다 — 사람 슬라이딩 키 0x518da 의 0x5199c(+0x31c 잠금으로 한 판 한 번) · 자동 슬라이딩
+   * 0x5268c(잠금 없음). 진행기는 소리를 못 내므로 화면이 이 칸을 보고 그 틱에 낸다(`runDefensePlay` 의 같은 칸)
+   */
+  readonly slidingSoundThisTick: boolean
   step(press: DefenseKeyPress | null): void
   result(): RunnerPlayEngineResult
 }
 
 export function startRunnerPlay(input: RunnerPlayEngineInput): RunnerPlayStepper {
   const ticks: DefensePlayView[] = []
-  const steps = runnerPlaySteps(input, ticks)
+  const sound = { slidingThisTick: false }
+  const steps = runnerPlaySteps(input, ticks, sound)
   let current = steps.next(null)
   return {
+    get slidingSoundThisTick() {
+      return sound.slidingThisTick
+    },
     get tick() {
       return current.done === true ? ticks.length : current.value
     },
@@ -258,6 +280,7 @@ const VT4C_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
 function* runnerPlaySteps(
   input: RunnerPlayEngineInput,
   ticks: DefensePlayView[],
+  sound: { slidingThisTick: boolean } = { slidingThisTick: false },
 ): Generator<number, RunnerPlayEngineResult, DefenseKeyPress | null> {
   const abilities = input.abilities
   const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
@@ -272,7 +295,15 @@ function* runnerPlaySteps(
 
   let fielders = input.fielders
   let play: PlayView = { ...input.play, manualThrowBase }
-  const runners: PlayRunner[] = input.runners.map((state) => ({ state, counted: false, arrivedThisListTick: false }))
+  // +0x84 — 판을 연 0x3d7b8 의 vt48 두 번 뒤 값(`previousTargetAfterLead`)
+  const runners: PlayRunner[] = input.runners.map((state) => ({
+    state,
+    counted: false,
+    arrivedThisListTick: false,
+    previousTarget: previousTargetAfterLead(state),
+  }))
+  /** 주자관리+0x31c — 사람 슬라이딩 키의 효과음 잠금(한 판 한 번). 0x17 진입 0xa9fd0 이 지운다 */
+  let slidingSoundPlayed = false
   let outs = input.outs
   let outsAdded = 0
   let held: HeldRunState = EMPTY_HELD_RUNS
@@ -531,6 +562,7 @@ function* runnerPlaySteps(
 
   for (let tick = 0; tick <= maximumTicks && !play.finished; tick += 1) {
     const press = yield tick
+    sound.slidingThisTick = false
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 0. 야수 틱 0xa1284 — 공용 갱신 0x3f060 이 슬롯 2(0x524c0)보다 먼저 돈다. 쥔 동안 +0xc8 −= 1 (타구 진행기 0' 절) ──
@@ -551,6 +583,55 @@ function* runnerPlaySteps(
         manualThrowBase = command.target
         play = { ...play, manualThrowBase }
         log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
+      }
+    }
+    // ── 0c. 사람 조작 — 공격이면 0x53420 이 주루 0x5331c(0x582 진루 · 0x584 귀루) · OK 0x585(슬라이딩) ──
+    if (press !== null && input.controls?.side === '공격' && !play.finished) {
+      const command = inPlayCommandOf(press.key, '공격', { isHoldRepeat: press.isRepeat === true })
+      if (command?.kind === '슬라이딩') {
+        // 0x518da — 종류 2 · 3 · 파울(이 판엔 타구가 없다) · 걸어 나가는 주자(이 진행기에 +0xba 연출이 없다) 뒤 0xa96ec 로 슬라이딩,
+        // 그 뒤에야 소리 재생 중 · +0x31c 잠금을 본다
+        const decision = slideOnKey({
+          playKind: input.kind,
+          isFoulBattedBall: false,
+          runners: runners.map((runner) => slidingRunnerOf(runner.state)),
+          isSoundPlaying: false,
+          hasPlayedSoundThisPlay: slidingSoundPlayed,
+        })
+        if (decision.playsSound) {
+          slidingSoundPlayed = true
+          sound.slidingThisTick = true
+        }
+        for (const index of decision.slidRunnerIndexes) {
+          const runner = runners[index]
+          if (runner === undefined || runner.state.sliding) continue
+          // 0xa04d0: +0xb8 = 1 · vt44(6) — 0xa0164 가 속도 = vt64() + 40
+          runner.state = { ...runner.state, sliding: true, speed: runner.state.speed + SLIDING_SPEED_BONUS }
+        }
+        if (decision.slidRunnerIndexes.length > 0) log.push(`${tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
+      } else if (command?.kind === '진루' || command?.kind === '귀루') {
+        // 0x5209e / 0x5222a → 0xa9b04 — 성공하면 플레이+0x128 = 1
+        const keyed = applyBaserunningKey(
+          {
+            playKind: input.kind,
+            // 플레이 +0x111(홈런 사건 8) — 타구가 없는 이 판에서는 서지 않는다
+            homeRunFlag: false,
+            runners: runnerStates(),
+            previousTargets: runners.map((runner) => runner.previousTarget),
+          },
+          command.kind,
+          command.runner,
+        )
+        runners.forEach((runner, index) => {
+          runner.state = keyed.runners[index] ?? runner.state
+          runner.previousTarget = keyed.previousTargets[index] ?? runner.previousTarget
+        })
+        if (keyed.succeeded) {
+          play = { ...play, wantsThrow: true }
+          log.push(
+            `${tick}틱 ${command.kind} 키 — 주자 ${keyed.retargeted.map((index) => runners[index]?.state.index).join('·')}`,
+          )
+        }
       }
     }
     // ── 1. 포구 틱 갈래 0xb401c — 쫓는 공을 고른 야수가 포구 틱(+0x174)에 ──
@@ -733,6 +814,8 @@ function* runnerPlaySteps(
         runner.state = { ...runner.state, sliding: true, speed: runner.state.speed + SLIDING_SPEED_BONUS }
         log.push(`${tick}틱 ${runner.state.index}번 주자 자동 슬라이딩`)
       }
+      // 0x52670 — 슬라이딩시킨 수 > 0 이면 그 자리에서 효과음 10 (0x5268c, 잠금 없음)
+      if (slid.length > 0) sound.slidingThisTick = true
     }
 
     // ── 4c. CPU 송구 결정 0xafa60 (슬롯 2 의 526ae, 매 틱 — `0xae6c8` = 수비 CPU || 송구 설정 자동) ──
@@ -743,6 +826,8 @@ function* runnerPlaySteps(
     const snapshotAt = (at: number, fieldersNow: readonly FielderState[]): DefensePlayView =>
       viewStateOf({
         tick: at,
+        // 슬라이딩 먼지 방향 0x9ff40 의 0x9fe80 이 보는 +0x84
+        previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
         ball:
           chase !== null
             ? chase.trajectory.pointAt(at)
@@ -842,8 +927,9 @@ function* runnerPlaySteps(
         position: stepToward(runner.state.position, basePosition(runner.state.targetBase), runner.state.speed),
       }
       if (!isAtTarget(runner.state) || runner.state.settled) continue
-      // 0xa040c 도착 — +0x8c = +0x7c, 요구 루를 밟았으면 푼다
+      // 0xa040c 도착 — +0x84 = +0x8c = +0x7c, 요구 루를 밟았으면 푼다
       const touched = runner.state.targetBase
+      runner.previousTarget = touched
       runner.state = {
         ...runner.state,
         settled: true,
@@ -932,6 +1018,8 @@ function isAtTarget(runner: RunnerState): boolean {
 
 /** 다음 구간 시작 — 출발점(+0x14)과 닿은 루(+0x8c)를 새로 잡는다 (타구 진행기 `startLeg` 와 같다) */
 function startLeg(runner: PlayRunner, toBase: number): void {
+  // a07b0 vt48 — 새 목표가 지금 +0x7c 와 다르면 +0x84 = 옛 +0x7c
+  if (runner.state.targetBase !== toBase) runner.previousTarget = runner.state.targetBase
   runner.state = {
     ...runner.state,
     legStart: runner.state.position,
@@ -953,8 +1041,8 @@ function basesOf(runners: readonly PlayRunner[]): BaseState {
   return bases
 }
 
-/** 슬라이딩 판정(0xa9690)이 보는 모양 — 타구 진행기 `slidingRunnerOf` 와 같다 */
-function slidingRunnerOf(runner: RunnerState): SlidingRunner {
+/** 슬라이딩 판정(0xa9690)이 보는 모양 — 타구 진행기 `slidingRunnerOf` 와 같다 (견제 진행기도 쓴다) */
+export function slidingRunnerOf(runner: RunnerState): SlidingRunner {
   const target = basePosition(runner.targetBase)
   return {
     progressPercent: progressPercent(runner.legStart, runner.position, target),

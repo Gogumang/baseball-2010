@@ -504,8 +504,9 @@ interface LiveRunnerPlaybackProps {
 }
 
 /**
- * 사람이 수비하는 **주자 판**(도루 · 폭투 · 견제)을 매 갱신 한 틱씩 돌린다 — 타구 판(`LivePlayback`)과 같은 모양이다.
- * 눌린 키를 줄 세워 한 틱에 하나씩 진행기에 먹이고(상태 0x17 키 0x53420 → 송구 0x588 → +0x160), 관문이 닫힌 뒤로는 재생 갈래와
+ * 사람이 잡은 **주자 판**(도루 · 폭투 · 견제)을 매 갱신 한 틱씩 돌린다 — 타구 판(`LivePlayback`)과 같은 모양이다.
+ * 눌린 키를 줄 세워 한 틱에 하나씩 진행기에 먹이고(상태 0x17 키 0x53420 → 수비면 송구 0x588 → +0x160, 공격이면 주루 0x5331c →
+ * 0x582 · 0x584 와 OK 슬라이딩 0x585 — 어느 쪽인지는 판의 `side`), 관문이 닫힌 뒤로는 재생 갈래와
  * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
  */
 function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
@@ -552,6 +553,8 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   let guard = 0
   while (!stepper.finished && stepper.tick < wanted && guard < MAX_CLOSED_CATCH_UP) {
     stepper.step(pressesRef.current.shift() ?? null)
+    // 슬라이딩 소리 10 — 사람 공격 쪽 판의 OK 키(0x518da → 0x5199c, +0x31c 잠금) · 자동 슬라이딩(0x5268c). `LivePlayback` 과 같은 자리
+    if (stepper.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
     guard += 1
   }
   const ticks = stepper.ticks
