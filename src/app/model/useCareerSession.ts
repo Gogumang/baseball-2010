@@ -4,6 +4,7 @@ import type { Screen } from '@/app/model/screen'
 import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
@@ -982,8 +983,8 @@ export function useCareerSession({
    * 인플레이 타구는 **수비 화면이 끝난 뒤에야** 여기까지 온다.
    */
   const finishAtBat = useCallback(
-    (advanced: GameProgress, outcome: AtBatOutcome, runnersOnBase: number) => {
-      runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase), () => {
+    (advanced: GameProgress, outcome: AtBatOutcome, runnersOnBase: number, endFrames: number) => {
+      runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase), endFrames, () => {
         if (!advanced.game.isFinished) {
           runner.setIsPaused(false)
           return
@@ -1123,7 +1124,9 @@ export function useCareerSession({
         inPlayCallSoundIdOf(nextAtBat.outcome),
         ...gameStepSoundIdsOf(currentProgress, advanced),
       ])
-      finishAtBat(advanced, nextAtBat.outcome, runnersOnBase)
+      // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
+      const arrivalKind = arrival?.play?.kind ?? null
+      finishAtBat(advanced, nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(nextAtBat.outcome, arrivalKind))
     },
     [audio, finishAtBat, finishCupGame, finishGame, random, runner],
   )
@@ -1426,7 +1429,8 @@ export function useCareerSession({
         inPlayCallSoundIdOf(outcome, played),
         ...gameStepSoundIdsOf(current, resolved),
       ])
-      finishAtBat(resolved, outcome, runnersOnBase)
+      // 0x17 판 끝 → 판정 B 가 곧장 0xd
+      finishAtBat(resolved, outcome, runnersOnBase, 0)
     },
     [audio, finishAtBat, random, runner],
   )
@@ -1446,7 +1450,8 @@ export function useCareerSession({
       progressRef.current = resolved
       setProgress(resolved)
       playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome), ...gameStepSoundIdsOf(current, resolved)])
-      finishAtBat(resolved, pending.outcome, runnersOnBase)
+      // 벤치 클리어링 출구 0xae24c → 밀어내기 판(0x17)을 대기 없이 바로 세우고(`useFreePassPlayStart`) 그 판 끝에서 0xd
+      finishAtBat(resolved, pending.outcome, runnersOnBase, 0)
     },
     [audio, finishAtBat, random],
   )
