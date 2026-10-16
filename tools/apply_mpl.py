@@ -273,8 +273,10 @@ def write_index_png(path: Path, width: int, height: int, rows) -> None:
     """
     팔레트 번호 지도. 빨강 = 번호, 알파 255 = 그 번호로 다시 칠해도 되는 자리.
 
-    반투명(0x66)·채우기(0x6E) 로 섞인 자리는 번호가 뜻을 잃으므로 알파 0 으로 두고
-    런타임이 구워 둔 색을 그대로 쓰게 한다 — **근사다** (defender 그림자·event_char_0 잔상).
+    채우기(0x6E) 자리와 반투명(0x66) 파트가 아래 파트와 섞인 자리는 번호가 뜻을 잃으므로 알파 0 으로 두고
+    런타임이 구워 둔 색을 그대로 쓰게 한다 — **근사다**. 반투명 파트가 아래 없이 놓인 자리는 번호를
+    남긴다 — 원본도 그 자리를 갈아 끼운 팔레트로 칠한다 (0xc9f98 → 0x97769, decode_pzx.compose_frame 주석).
+    구운 PNG 의 알파는 그대로 두고 색만 바꾸므로 기본 팔레트로 칠하면 구운 PNG 와 같다.
     """
     image = Image.new('RGBA', (width, height))
     image.putdata([(value, 0, 0, 255) if value is not None else (0, 0, 0, 0)

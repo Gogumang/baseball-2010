@@ -399,7 +399,18 @@ def compose_frame(parts: list[dict], images, variants=None):
       0x05~0x64 붙은 0x40 mpl 의 (효과−5)번 변형 팔레트 (UI 선택/비활성 색, 0xc8bb4)
 
     팔레트 번호 캔버스도 함께 돌려준다 — 팀·피부 팔레트를 웹에서 런타임에 갈아 끼울 때 쓴다.
-    반투명·채우기로 섞인 자리와 변형 팔레트를 쓴 자리는 번호가 뜻을 잃으므로 None 으로 둔다.
+    채우기 · 변형 팔레트를 쓴 자리, 반투명 파트가 **아래 파트와 섞인** 자리는 번호가 뜻을 잃으므로 None 이다.
+
+    반투명 파트가 아래에 아무것도 없는 자리에 놓이면 번호를 남긴다 (r134). 원본도 반투명 파트를
+    그 그림의 (mpl 로 갈아 끼운) 팔레트로 칠하기 때문이다:
+      그리기 0xc9f98 (ca19e~ca1b0): 파트+0x10 효과 0x65~0x74 → 표 0xda988[효과 − 0x65] 의 픽셀 효과 번호
+        (= [1, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 19, 19, 19, 19] → 0x66 은 픽셀 효과 1) 와 값 파트+0x14
+        를 이미지 그리기(vtable +0xc)에 넘긴다.
+      픽셀 효과 1 의 팔레트판 0x97769 (R6 3a): 977ce `ldrb r3,[src]` 번호 → 977d4 `ldrh r4,[r3·2 + 팔레트]`
+        (팔레트 = 인자 r2) 로 색을 얻은 뒤 화면과 L/16 로 섞는다. 효과 0 복사 0x9a9b5 도 같은 인자
+        r2(9a9b6 `adds r6,r2,#0` → 9a9f4 `ldrh r3,[r3,r6]`) 를 쓴다 — 두 길이 같은 팔레트를 본다.
+      그 팔레트는 적재 때 mpl 줄로 덮인 그림 팔레트다 (0xb9718 → 0xc8c7c · 0xc8eed, C-create-palette).
+    그래서 아래가 비어 있으면 결과 = 팔레트[번호] × 불투명도 이고, 색만 갈아 끼우면 원본과 같다.
     """
     variants = variants or {}
     usable = [p for p in parts if p['image'] < len(images) and images[p['image']][0] > 0]
@@ -431,7 +442,7 @@ def compose_frame(parts: list[dict], images, variants=None):
                 red, green, blue = fill if fill is not None else palette[value]
                 x, y = part['x'] - left + column, part['y'] - top + row
                 below = canvas[y][x]
-                index_canvas[y][x] = value if plain and alpha >= 1.0 else None
+                index_canvas[y][x] = value if plain and (alpha >= 1.0 or below is None) else None
                 if alpha >= 1.0 or below is None:
                     canvas[y][x] = (red, green, blue, round(255 * alpha))
                     continue
