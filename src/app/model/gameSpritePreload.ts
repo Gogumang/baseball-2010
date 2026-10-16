@@ -55,7 +55,7 @@ export function gameSpritePreloadsOf(...casts: readonly StageCast[]): SpriteFold
 
 /**
  * 경기 첫 그림 몫 — 두 몸통 폼의 대기 자세 · 투수 선 자세 · 루 주자 · 수비 바탕과 서 있기 · 달리기 칸.
- * 로딩 판이 없는 길(나리 투수편)도 경기 첫 판(DUE UP · 수비 위치 걷기)부터 이 그림을 쓰므로 앞 화면에서 바로 받는다.
+ * 경기 첫 판(DUE UP · 수비 위치 걷기)부터 이 그림을 쓰므로 앞 화면에서 바로 받고, 로딩 판 동안에도 받는다.
  */
 export function gameEntryCastPreloadsOf(): SpriteFolderPreload[] {
   return mergeSpritePreloads(stageEntrySpritePreloadsOf(), defenseEntrySpritePreloadsOf())

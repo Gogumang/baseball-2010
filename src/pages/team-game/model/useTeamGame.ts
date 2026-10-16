@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { autoRelayModeSlotOf, autoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -82,6 +83,14 @@ import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/str
  */
 export interface TeamGameSession {
   readonly progress: TeamGameProgress
+  /**
+   * **로딩 판(상태 7 · 9 · 8)의 팁 글** — 경기 장면 0x104 를 세울 때마다(새 경기 · 이어하기) 생성자 0x3301c 가 33100 에서 상태 7 을
+   * 모드 갈래 없이 예약하고, 진입 0x39f88 이 판을 싣고 0x53dbc 가 팁을 굴린다. 서 있으면 화면이 `LoadingTip`(진행 칸 끝 0x24 —
+   * 모드 ≠ 4)을 그리고, 다 그리면 `finishLoading`
+   */
+  readonly loadingTip: string | null
+  /** 로딩 판을 다 그렸다 — 상태 8 끝(48b20)이 모드 1~4 면 인트로 0xc 로 간다. 그 진입 예약음 61 을 이때 낸다. 굴림 없음 */
+  readonly finishLoading: () => void
   /** 사람이 칠 차례인가 */
   readonly canBat: boolean
   /** 사람이 던질 차례인가 */
@@ -192,10 +201,10 @@ export function useTeamGame(
    */
   resumeFrom?: TeamGameProgress,
 ): TeamGameSession {
+  // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 모드를 안 가려 새 경기 · 이어하기 모두
+  // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 이 칸이 아래 진행 칸보다 먼저 선다
+  const [loadingTip, setLoadingTip] = useState<string | null>(() => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
   const [progress, setProgress] = useState<TeamGameProgress>(() => {
-    // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 모드를 안 가려 새 경기 · 이어하기 모두
-    // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 웹 팀경기는 팁 판을 안 그려 값은 버린다
-    rollSceneLoadingTip(random)
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다. 그리는 자리라
     // 자식 화면(자동진행 중계 0x21 의 33 · 인트로 61)의 효과보다 먼저다
     activeSound().stop()
@@ -248,13 +257,12 @@ export function useTeamGame(
     }
   }, [audio])
 
-  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 화면(`TeamGameScreen` 의 `GameIntro`)이 서는 자리다.
-  // 인트로는 모드 1~4 만 선다(적재 상태 8 끝 0x48b20) — 대전(8·9)은 0xc 를 안 지나 이 소리도 없다
-  useEffect(() => {
+  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 적재 상태 8 끝(48b20)에서 0xc 로 오는 자리, 곧 로딩 판이 끝나는 자리다.
+  // 인트로는 모드 1~4 만 선다 — 대전(8·9)은 0xc 를 안 지나 이 소리도 없다
+  const finishLoading = useCallback(() => {
+    setLoadingTip(null)
     if (hasGameIntro(options.mode)) playSoundIds(audio, [GAME_INTRO_SOUND])
-    // 경기 한 판에 한 번 — 고리가 살아 있는 동안 다시 내지 않는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [audio, options.mode])
 
   const actions = useMemo(
     () => ({
@@ -425,6 +433,8 @@ export function useTeamGame(
 
   return {
     progress,
+    loadingTip,
+    finishLoading,
     canBat: isBatterTurn(progress),
     canPitch: isPitchTurn(progress),
     summary,

@@ -5,10 +5,31 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { createMemoryAutoRelayRecordPort, setAutoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
 import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+
+/**
+ * 경기 장면 0x104 의 로딩 판(상태 7 · 9 · 8 — 생성자 0x3301c 가 모드 갈래 없이 상태 7 을 예약한다) — 그림 대신 그리자마자 끝낸다
+ * (적재를 다 그린 꼴). 받은 팁 · 진행 칸 끝을 남긴다
+ */
+const 로딩판 = vi.hoisted(() => [] as { tip: string; steps: number | undefined }[])
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, steps, onDone }: { tip: string; steps?: number; onDone: () => void }) => {
+      useEffect(() => {
+        로딩판.push({ tip, steps })
+        onDone()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+      return null
+    },
+  }
+})
 
 /**
  * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
@@ -541,5 +562,13 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     OK통과()
     expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
+  })
+})
+
+describe('로딩 판 (상태 7 · 9 · 8 — 생성자 0x3301c 33100 이 모드 갈래 없이 상태 7)', () => {
+  it.each([1, 2, 8])('모드 %i 도 경기 화면보다 먼저 로딩 판이 선다 — 팁은 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n] · 진행 칸 끝 0x24(기본)', (mode) => {
+    로딩판.length = 0
+    띄우기({ mode }, 7)
+    expect(로딩판).toEqual([{ tip: LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(7))], steps: undefined }])
   })
 })

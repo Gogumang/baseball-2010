@@ -12,6 +12,25 @@ import { setAutoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
 import { createMemoryAutoRelayRecordPort, setAutoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 import type { AutoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
 
+/**
+ * 경기 장면 0x104 의 로딩 판(상태 7 · 9 · 8 — 생성자 0x3301c 가 모드 갈래 없이 상태 7 을 예약한다) — 그림 대신 그리자마자 끝낸다
+ * (적재를 다 그린 꼴). 받은 팁 · 진행 칸 끝을 남긴다
+ */
+const 로딩판 = vi.hoisted(() => [] as { tip: string; steps: number | undefined }[])
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, steps, onDone }: { tip: string; steps?: number; onDone: () => void }) => {
+      useEffect(() => {
+        로딩판.push({ tip, steps })
+        onDone()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+      return null
+    },
+  }
+})
+
 const 기본옵션: TeamGameOptions = {
   mode: 2,
   ourTeamId: 0,

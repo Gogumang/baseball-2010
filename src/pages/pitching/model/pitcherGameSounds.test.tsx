@@ -69,9 +69,13 @@ const 띄우기 = (seed = 20100901) =>
   renderHook(() => usePitcherGame(기본옵션, createSeededRandom(seed)))
 
 describe('투수편 화면의 소리 배선', () => {
-  it('경기가 서면 인트로 예약음 61 이 난다 (상태 0xc 진입 0x3b148)', () => {
-    띄우기()
-    expect(녹음.played[0]).toBe(GAME_INTRO_SOUND)
+  it('로딩 판(상태 7 · 9 · 8)이 끝나 인트로(0xc)로 갈 때 예약음 61 이 난다 (상태 0xc 진입 0x3b148) — 판 동안은 안 난다', () => {
+    const { result } = 띄우기()
+    expect(result.current.loadingTip).not.toBeNull()
+    expect(녹음.played).not.toContain(GAME_INTRO_SOUND)
+    act(() => result.current.finishLoading())
+    expect(result.current.loadingTip).toBeNull()
+    expect(녹음.played[녹음.played.length - 1]).toBe(GAME_INTRO_SOUND)
   })
 
   it('한 개 던지면 투구 순간 소리 12 가 먼저, 이어서 심판 콜이 난다 (0x3f378 → 0x51a94)', () => {

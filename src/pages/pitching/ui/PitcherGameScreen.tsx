@@ -24,6 +24,9 @@ import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMen
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
+import type { PitcherGameSession } from '@/pages/pitching/model/usePitcherGame'
+import { GAME_LOADING_PRELOADS } from '@/pages/team-game/lib/gameLoadingPreloads'
+import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
@@ -163,7 +166,25 @@ interface PitcherGameScreenProps {
   readonly fieldLineups?: PitcherFieldLineups
 }
 
-export function PitcherGameScreen({
+/**
+ * 나리 투수편 경기 화면 — 경기 장면 0x104 하나. 생성자 0x3301c 가 33100 `0xbcb49(상태, 7)` 로 모드 갈래 없이 상태 7 을 예약해
+ * 로딩 판(상태 7 · 9 · 8)을 먼저 지난다. 진행 칸 끝은 0x24(모드 3 ≠ 4 — 0x39f88 39f92~39f98), 팁은 0x53dbc 의 굴림(`usePitcherGame`
+ * 의 맨 앞). 판이 다 그려지면(상태 8 끝 → 인트로 0xc) 경기 화면이 선다.
+ * ⚠️ 근사(시간): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
+ */
+export function PitcherGameScreen(props: PitcherGameScreenProps) {
+  const session = usePitcherGame(props.options, props.random, props.settings?.isVibrationOn)
+  if (session.loadingTip !== null) {
+    return (
+      <RawScreen>
+        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} preloadRequests={GAME_LOADING_PRELOADS} />
+      </RawScreen>
+    )
+  }
+  return <PitcherGameScene {...props} session={session} />
+}
+
+function PitcherGameScene({
   options,
   random,
   onFinish,
@@ -175,8 +196,8 @@ export function PitcherGameScreen({
   gamePoint,
   pitcherEquipmentLevels,
   fieldLineups: recordFieldLineups,
-}: PitcherGameScreenProps) {
-  const session = usePitcherGame(options, random, settings?.isVibrationOn)
+  session,
+}: PitcherGameScreenProps & { readonly session: PitcherGameSession }) {
   const { progress, canPitch, summary, actions } = session
   const audio = activeSound()
   /** 경기 시작 인트로(상태 0xc)가 끝났는가 — 모드 3 은 인트로가 선다 (`hasGameIntro`) */

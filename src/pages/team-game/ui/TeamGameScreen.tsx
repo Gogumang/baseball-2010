@@ -103,6 +103,9 @@ import type {
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
+import type { TeamGameSession } from '@/pages/team-game/model/useTeamGame'
+import { GAME_LOADING_PRELOADS } from '@/pages/team-game/lib/gameLoadingPreloads'
+import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { PITCHER_CHANGE_SOUND } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
 // 조작방법·환경설정 화면은 메인 메뉴 쪽에 이미 있다 — 경기 중 메뉴도 **같은 화면**을 연다
@@ -212,7 +215,26 @@ interface TeamGameScreenProps {
   readonly matchupRecords?: TeamMatchupRecords
 }
 
-export function TeamGameScreen({
+/**
+ * 팀 경기 화면 — 경기 장면 0x104 하나. 생성자 0x3301c 가 33100 `0xbcb49(상태, 7)` 로 **모드 갈래 없이** 상태 7 을 예약하므로
+ * 일반(1) · 시즌(2) · 대전(8 · 9) 모두 새 경기 · 이어하기마다 로딩 판(상태 7 · 9 · 8)을 먼저 지난다. 진입 0x39f88 이 진행 칸 끝을
+ * 0x24(모드 ≠ 4, 39f92~39f98)로 두고 0x53dbc 가 팁을 굴린다(`useTeamGame` 의 맨 앞 굴림). 판이 다 그려지면(상태 8 끝) 경기 화면이 선다 —
+ * 경기 화면의 키 · 상태 틱 · 인트로(0xc)는 그 뒤에 시작한다.
+ * ⚠️ 근사(시간): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
+ */
+export function TeamGameScreen(props: TeamGameScreenProps) {
+  const session = useTeamGame(props.options, props.random, props.settings?.isVibrationOn, props.resumeFrom)
+  if (session.loadingTip !== null) {
+    return (
+      <RawScreen>
+        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} preloadRequests={GAME_LOADING_PRELOADS} />
+      </RawScreen>
+    )
+  }
+  return <TeamGameScene {...props} session={session} />
+}
+
+function TeamGameScene({
   options,
   random,
   onFinish,
@@ -222,12 +244,11 @@ export function TeamGameScreen({
   settings,
   onSettingsChange,
   seasonStadium,
-  resumeFrom,
   onHalfInningSave,
   onSettlementEnter,
   matchupRecords,
-}: TeamGameScreenProps) {
-  const session = useTeamGame(options, random, settings?.isVibrationOn, resumeFrom)
+  session,
+}: TeamGameScreenProps & { readonly session: TeamGameSession }) {
   const { progress, canBat, canPitch, summary, actions } = session
   // 이어하기 저장 0x4f928 — 진행기가 새 저장 진행을 담을 때마다 한 번씩 넘긴다
   const halfInningSave = progress.halfInningSave ?? null

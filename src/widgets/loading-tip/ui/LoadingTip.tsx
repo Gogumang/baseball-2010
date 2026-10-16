@@ -35,12 +35,12 @@ const rgbOf = ([red, green, blue]: readonly number[]) => `rgb(${red}, ${green}, 
  * 상태 7 갱신 0x3e340 · 9 0x3f584 · 8 0x48658 이 적재 한 단계마다 0x54128 → 0x53e04 로 판을 다시 그린다. 셋 다 경기 장면 프레임
  * 0x52c50 의 52cc6 게이트 **뒤**(진입 표 52cee · 갱신 표 0xd0530)라 공용 창이 서 있으면 적재 · 판 그리기가 같이 선다. 상태 7~9 는
  * 0x41230 을 안 부르고(52f28~52f32), 그리기 표 0xd05a0 은 상태 9 만 0x3e328(= 판 그리기 0x53e04)이다 — 이것도 52efe 게이트 안이다. 그래서 이 판도 경기 장면으로 센다(`useMarksGameScene` — 창이 줄임
- * 없이 닫히고 [창+0x24f]) 진행은 경기 장면 시계로 잰다. 쓰는 곳은 경기 · 미션 · 더비뿐이다(시즌 0x105 의 0x75fc 판은 웹에 없다).
+ * 없이 닫히고 [창+0x24f]) 진행은 경기 장면 시계로 잰다. 쓰는 곳은 나리 타자편 · 팀 경기(일반 · 시즌 · 대전) · 나리 투수편 · 미션 · 더비다(시즌 0x105 의 0x75fc 판은 웹에 없다).
  */
 const FOLDER = './sprites/loadingbar/frames'
 const NUM_FOLDER = './sprites/num'
 const RUNNER_ANIMATION = 0
-/** 진행 칸 끝 — 0x39f88 의 0x24 (모드 4 가 아닌 모든 경기 장면: 미션 · 마선수 대결 · 홈런더비) */
+/** 진행 칸 끝 — 0x39f88 의 0x24 (모드 4 가 아닌 모든 경기 장면: 팀 경기 일반 · 시즌 · 대전 · 나리 투수편 · 미션 · 마선수 대결 · 홈런더비) */
 export const LOADING_STEPS_DEFAULT = 0x24
 /** 진행 칸 끝 — 0x39f88 39f94~39f98: 모드 4(나리 타자편)면 0x25 */
 export const LOADING_STEPS_BATTER_CAREER = 0x25
