@@ -78,7 +78,7 @@ import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/Settlement
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { MAXIMUM_GAME_POINT, STARTING_ABILITY } from '@/entities/career/model/playerCareer'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
-import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
@@ -236,6 +236,8 @@ export function PitcherGameScreen({
   useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
+  useMarksCommonWindowShown(overlay !== null)
   /** 일시정지 팝업이 떠 있는가 — 경기 중 메뉴, 또는 그 하위 4 [조작방법] 뷰어 (둘 다 0x741a0 팝업이라 경기 키·갱신이 멈춘다) */
   const isPopupOpen = isMenuOpen || overlay === '조작방법'
   /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */

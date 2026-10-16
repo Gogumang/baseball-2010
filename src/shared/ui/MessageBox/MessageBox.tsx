@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
+import { useMarksCommonWindowShown, useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 
 interface MessageBoxProps {
@@ -190,6 +190,12 @@ export function MessageBox({
   const closesWithoutShrinkRef = useRef(closesWithoutShrink)
   closesWithoutShrinkRef.current = closesWithoutShrink
   const isFinishedRef = useRef(false)
+  /**
+   * 창이 치워졌다 — [창+9] = 0 (닫힘 0x7558a~ 이 폭 99 이하에서 0x742a8). 그 전까지(펼침 · 닫힘 포함) 공용 창이 떠 있다고 센다
+   * (`isCommonWindowShown` — 경기 장면 0x52c50 의 파티클 게이트 53048)
+   */
+  const [isGone, setIsGone] = useState(false)
+  useMarksCommonWindowShown(!isGone)
 
   const boxRef = useRef<HTMLDivElement>(null)
   /** 다 펼쳐졌을 때의 상자 높이. 레이아웃이 없으면 0 이라 애니메이션을 아예 안 한다 */
@@ -218,6 +224,7 @@ export function MessageBox({
     shownTextRef.current = text
     isAnsweredRef.current = false
     isFinishedRef.current = false
+    setIsGone(false)
     setSelected(firstSelected)
     setAnimation(fullHeightRef.current > OPEN_START_HEIGHT ? { kind: '열림', height: OPEN_START_HEIGHT } : null)
     // 새 상자는 글이 바뀔 때만 생긴다 — 같은 글에서 처음 칸 값만 바뀌어도 커서를 옮기지 않는다
@@ -229,7 +236,10 @@ export function MessageBox({
     isAnsweredRef.current = true
     onAnswerKeyRef.current?.(index)
     // 원본은 닫힘 애니메이션이 끝난 뒤에 콜백을 부른다 (0x755d8). 레이아웃이 없으면 곧바로.
-    if (fullHeightRef.current <= 0) return onAnswerRef.current(index)
+    if (fullHeightRef.current <= 0) {
+      setIsGone(true)
+      return onAnswerRef.current(index)
+    }
     setAnimation({ kind: '닫힘', width: closesWithoutShrinkRef.current ? 0 : CLOSE_START_WIDTH, answer: index })
   }, [])
 
@@ -256,6 +266,7 @@ export function MessageBox({
       advance({ kind: '닫힘', width: next, answer: previous.answer })
       if (next > CLOSE_END_WIDTH) return
       isFinishedRef.current = true
+      setIsGone(true)
       onAnswerRef.current(previous.answer)
     }, millisecondsPerFrame())
     return () => window.clearInterval(timer)

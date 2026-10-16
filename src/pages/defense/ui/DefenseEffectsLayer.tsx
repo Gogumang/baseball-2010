@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
+import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 import { DEFENSE_DISTANCE_BOARD, defenseDistanceGlyphsOf } from '@/pages/defense/lib/defenseDistanceBoard'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
@@ -39,7 +40,10 @@ export function DefenseHomeRunText({ frame }: { readonly frame: HomeRunTextFrame
   )
 }
 
-/** 프레임 끝 0x6dd68 — 파티클은 그 그림의 맨 위, 화면 좌표 그대로(카메라 칸 0) */
+/**
+ * 프레임 끝 0x6dd68 — 파티클은 그 그림의 맨 위, 화면 좌표 그대로(카메라 칸 0).
+ * 공용 창 [0x140005c]+9 가 서 있는 그림은 그리지 않는다(경기 장면 0x52c50 의 53048 게이트 — 틱 0x6de85 와 그리기 0x6dd69 를 둘 다 건너뛴다)
+ */
 export function DefenseParticles({ scene, version }: { readonly scene: ParticleScene; readonly version: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   useEffect(() => preloadPtcParts(), [])
@@ -47,7 +51,7 @@ export function DefenseParticles({ scene, version }: { readonly scene: ParticleS
     const context = canvasRef.current?.getContext('2d') ?? null
     if (context === null) return
     context.clearRect(0, 0, styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)
-    drawParticles(context, scene)
+    if (!isCommonWindowShown()) drawParticles(context, scene)
   }, [scene, version])
   return <canvas ref={canvasRef} className={styles.overlay} width={styles.SCREEN_WIDTH} height={styles.SCREEN_HEIGHT} />
 }

@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 
 /**
  * 원본 파티클 이미터 — `ptc/%03d.ptc` 51바이트 한 벌 (R5 8절 확정).
@@ -39,8 +40,10 @@ export interface ParticleConfig {
   /** 이 이미터가 평생 만들 입자 총수 */
   readonly total: number
   /**
-   * 그리기 가상함수(+0x14) 의 4번째 인자 **그대로**. 001 만 0, 나머지 25개는 2.
-   * ⚠️ "0 = 그냥 그리기 / 2 = A 를 쓰는 섞기" 는 **유력**일 뿐이라 숫자만 든다 (R5 `_meta.likelyOnlyFields`).
+   * 그리기 가상함수(+0x14) 의 4번째 인자 **그대로**(설정 +0x32 바이트 — 0x6dd14 · 0x6dd20). 001 만 0, 나머지 25개는 2.
+   * 확정(웹 r83 · 2026-10-16 다시 뜸): 0x6dc4c 가 파트 그림의 vtbl+0x14(그림, x, y, **mode**, **A >> 8**, 0) 을 부르고(0x6dd26~0x6dd38),
+   * 두 그림 클래스(0xda914 → 0xc9f08 · 0xda960 → 0xca54c) 모두 넷째 · 다섯째 인자를 그리기 **효과 번호 · 인자**로 넘긴다 —
+   * 0 = 효과 0 그냥 복사 · 2 = 효과 2 더하기(`widgets/particles` 의 `particleEffectOf`).
    */
   readonly mode: number
 }
@@ -57,8 +60,8 @@ export interface Particle {
   vx: number
   vy: number
   /**
-   * A (16.16). ⚠️ **불투명도인지 세기인지 미해결** — 갱신식만 확정이라 `alpha` 로 이름 붙이지 않았다
-   * (R5 8절 · `_meta.likelyOnlyFields`).
+   * A (16.16). 그리기는 `A >> 8`(0x6dd26 `asrs #8`)을 효과 인자 b 로 넘긴다 — mode 2(효과 2 더하기)면 화면 + (그림 · b) >> 8 의
+   * **더하는 세기**다(불투명도 섞기가 아니다 — `widgets/particles` 의 `particleEffectOf`). mode 0 이면 쓰이지 않는다.
    */
   a: number
   /** 틱마다 A 에 더하는 값 = `(a1 − a0)/life` */
@@ -167,8 +170,9 @@ function spawn(emitter: ParticleEmitter, random: RandomPort): Particle | null {
   const offX = (roll(random, config.w + 1) - (config.w >> 1)) << 7
   const offY = (roll(random, config.h + 1) - (config.h >> 1)) << 7
   const direction = jitter(random, config.ang, config.spread)
-  // ⚠️ 원본은 sin 표 0xd2eec(16.16) 을 쓴다. 웹은 Math 삼각함수로 대신하므로 끝자리가 다를 수 있다 — **근사**
-  const radians = (direction * Math.PI) / 180
+  // 0x6d688~0x6d6a6 — 방향을 굴린 바로 뒤 cos16 0x6c7f5 → +0x18 · sin16 0x6c7c1 → +0x1c (표 0xd2eec, ×65535 — 굴림 없음)
+  const cos = cosineSixteen(direction)
+  const sin = sineSixteen(direction)
   const speed = jitter(random, config.spd, config.spdR)
   const a = jitter(random, config.a0, config.a0R)
   const target = jitter(random, config.a1, config.a1R)
@@ -182,8 +186,9 @@ function spawn(emitter: ParticleEmitter, random: RandomPort): Particle | null {
     y: emitter.y,
     offX,
     offY,
-    vx: Math.trunc(speed * Math.cos(radians)),
-    vy: Math.trunc(speed * Math.sin(radians)),
+    // 0x6d6e8~0x6d704 · 0x6d70e~0x6d728 — 32비트 `muls` 뒤 `asrs #16`(음수는 −∞ 쪽으로 내림)
+    vx: Math.imul(cos, speed) >> 16,
+    vy: Math.imul(sin, speed) >> 16,
     a,
     // 0xca7b5 — (끝 − 시작) / (수명 & 0xffff), 0 쪽으로 자른다
     da: Math.trunc((target - a) / (life & 0xffff)),

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { isCommonWindowShown, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import {
   nextPopupClosingWidth, nextPopupOpeningHeight, popupBoxStyleOf, usePopupWindowMotion,
 } from '@/shared/lib/commonWindow/popupWindow'
@@ -121,5 +122,29 @@ describe('usePopupWindowMotion', () => {
     expect(result.current.acceptsKeys()).toBe(false)
     틀(1)
     expect(result.current.acceptsKeys()).toBe(true)
+  })
+
+  it('공용 창 [0x140005c]+9 — 서 있는 동안(펼침 · 줄임 포함) 세고, 치우면(0x742a8) 내린다', () => {
+    resetCommonWindowShownForTest()
+    const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100 }))
+    expect(isCommonWindowShown()).toBe(true)
+    틀(5)
+    act(() => { result.current.close('줄임') })
+    틀(1)
+    expect(isCommonWindowShown()).toBe(true)
+    틀(1)
+    expect(result.current.isClosed).toBe(true)
+    expect(isCommonWindowShown()).toBe(false)
+  })
+
+  it('공용 창이 아닌 자리(isCommonWindow: false)는 세지 않는다 — 내려가면 센 것도 내린다', () => {
+    resetCommonWindowShownForTest()
+    const own = renderHook(() => usePopupWindowMotion({ targetHeight: 0, isCommonWindow: false }))
+    expect(isCommonWindowShown()).toBe(false)
+    own.unmount()
+    const common = renderHook(() => usePopupWindowMotion({ targetHeight: 0 }))
+    expect(isCommonWindowShown()).toBe(true)
+    common.unmount()
+    expect(isCommonWindowShown()).toBe(false)
   })
 })

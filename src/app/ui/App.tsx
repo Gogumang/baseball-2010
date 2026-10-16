@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import {
   CommonWindowOpenContext, CommonWindowPushContext, CommonWindowSceneContext, GameSceneMarkContext,
 } from '@/shared/lib/commonWindow/commonWindow'
-import { sceneClosesWithoutShrinkOf } from '@/app/model/commonWindowScene'
+import { isGameSceneScreenKind, sceneClosesWithoutShrinkOf } from '@/app/model/commonWindowScene'
 import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -518,8 +518,9 @@ export function App() {
         </ScreenOverlay>
       )}
       {/* 장면 파티클 [0x1400068] — 0x103 · 0x105 · 0x106 · 0x107 · 0x104 프레임이 굴리고 그린다(`sceneParticles`). 관리자는 앱에 하나다.
-          경기 장면의 타석 · 수비 판 부품이 관리자를 쥔 동안은 그 부품이 제 틱 차례로 굴리고 그려 이 층은 쉰다 */}
-      <SceneParticleLayer random={random} />
+          경기 장면의 타석 · 수비 판 부품이 관리자를 쥔 동안은 그 부품이 제 틱 차례로 굴리고 그려 이 층은 쉰다.
+          경기 장면(0x104)이 서 있고 공용 창이 떠 있으면 굴리지도 그리지도 않는다(0x52c50 의 53048 게이트) */}
+      <SceneParticleLayer random={random} isGameScene={gameSceneCount > 0 || isGameSceneScreenKind(screen.kind)} />
     </RecordAchievedContext.Provider>
   )
 

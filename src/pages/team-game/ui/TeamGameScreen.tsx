@@ -84,7 +84,7 @@ import {
   teamMatchupCardsOf,
   teamPitcherSideStageOf,
 } from '@/pages/team-game/lib/teamMatchupCards'
-import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -248,6 +248,8 @@ export function TeamGameScreen({
   useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
+  useMarksCommonWindowShown(overlay !== null)
   /** 구질 · 조준 · 게이지 그림 재료 — 사람 수비 타석 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
   const inputOverlayRef = usePitchInputOverlayRef()
   /**

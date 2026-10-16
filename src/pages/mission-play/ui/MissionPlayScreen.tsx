@@ -37,7 +37,7 @@ import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState
 import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
-import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -249,6 +249,8 @@ export function MissionPlayScreen({
   useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
+  useMarksCommonWindowShown(overlay !== null)
   // 일시정지 팝업 0x741a0(메뉴 · 그 하위 조작방법 · 설정)이 떠 있으면 0x12 상태 틱이 멈춘다 (0x52cc6) — 든 쪽에 알린다
   const isPopupFrozen = isMenuOpen || overlay !== null
   useEffect(() => {
