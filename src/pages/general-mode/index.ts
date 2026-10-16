@@ -28,7 +28,7 @@ export type { GeneralModeScreenProps } from '@/pages/general-mode/ui/GeneralMode
 export { generalGameOfSave } from '@/pages/general-mode/lib/generalModeResume'
 
 export { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
-export type { FirstBatStadiumScreenProps, StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
+export type { FirstBatStadiumScreenProps } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 
 export { AceSelectScreen } from '@/pages/general-mode/ui/AceSelectScreen'
 export type { AceSelectScreenProps } from '@/pages/general-mode/ui/AceSelectScreen'

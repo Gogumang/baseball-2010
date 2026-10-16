@@ -399,7 +399,8 @@ export function AceSelectScreen({
         const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell) + (shake?.dy ?? 0)
         const player = acePlayerOfCell(cell)
         const open = isCellOpen(cell)
-        // [skin+0x105](레벨업 화면)이면 흐리지 않는다 — ⚠️ 코치채용(종류 8)도 흐리지 않는 것으로 둔다(미확인)
+        // [skin+0x105] 가 서 있으면 흐리지 않는다(0x7b17a) — 레벨업 화면, 그리고 코치채용: 시즌 0xd7 진입 0x5268 이
+        // this+0x11c == 2(코치채용)면 [skin+0x105] = 1 로 둔다(0x52ac~0x52ba, [this+0xa8] = [0x1552cfc] 는 생성자 0x3b3c~0x3b4c) — 확정
         const isDimmed = !isLevelUpMode && !isCoachMode
           && isAceCellDimmed(cell, phase === ACE_PHASE.마투수, chosenPitcherCell)
         return (
