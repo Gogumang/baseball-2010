@@ -19,6 +19,7 @@ import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
 import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 /** 이미지 폴더 (128장) — 노트가 "slt_frame 이미지 N" 이라 부르는 막대들이 여기 있다.
  *  프레임 폴더(`slt_frame/frames`, 62장)와 **번호 체계가 다르다** — 116·117 은 프레임 쪽에 없다 */
@@ -158,6 +159,12 @@ export function TeamSelectScreen({
 
   return (
     <RawScreen>
+      {/*
+        공 무늬 바탕 0x5fd61(skin, 0, 0, W, H) — 이 화면을 쓰는 모든 자리가 목록보다 먼저 깐다:
+        일반모드 18 · 19 그림 0x2de3c · 0x2ddb0 (맨 앞에서 직접) · 나만의리그 타자편/투수편 0x65 (장면 틀 0x16a34 → 0x16928, 142~144 밖) ·
+        시즌 0xca · 트레이드 0xe4 (공통 앞그림 0xb810, 0xdd · 0xe0 · 0xe1 밖 → 0xb864). 공용 목록 0x63b15 는 화면을 칠하지 않는다
+      */}
+      <SkinBackdrop kind="공무늬" />
       {gridOpen !== null && (<>
       {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
       {[
