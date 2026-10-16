@@ -9,7 +9,7 @@ import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -18,6 +18,8 @@ import type { DefensePlayResult } from '@/features/defense-play/model/runDefense
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import type { PitchArrivalStep } from '@/features/play-game/model/gameFlow'
+import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import type { AtBatPitchTally } from '@/features/play-at-bat/model/atBatPitchTally'
 import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
@@ -517,6 +519,11 @@ export function useCareerSession({
    * 잡히면(파울 뜬공 아웃) 이 타석에서 앞서 난 연속 파울 기록을 판 끝 정산과 함께 넘긴다.
    */
   const foulPlayRef = useRef(false)
+  /**
+   * 붙든 공 도착 판(`progress.pendingRunnerPlay` — 사람 주루 키를 받는 도루 · 폭투 판)이 끝나면 `handlePitchResolved` 의 나머지가
+   * 쓸 이 공의 값 — 판이 도는 동안 들고 있는다
+   */
+  const arrivalContextRef = useRef<ArrivalContext | null>(null)
   // 경기를 세우는 `startMatch` 가 읽는다 — 설정이 바뀔 때마다 콜백 신원이 흔들리지 않게 ref 로 둔다
   const runningModeManualRef = useRef(runningModeManual)
   runningModeManualRef.current = runningModeManual
@@ -999,6 +1006,80 @@ export function useCareerSession({
     [finishCupGame, finishGame, runner],
   )
 
+  /**
+   * 공 하나의 **공 도착 뒤 나머지** — 판 소리 · 판에서 끊긴 타석 · 끝난 타석의 결과(`startPlayerOutcome`).
+   * 판을 미리 돌린 공은 `handlePitchResolved` 가 곧바로, 사람 주루 키를 받으며 실시간으로 돈 판(`pendingRunnerPlay`)은
+   * 판 끝(`finishRunnerPlay`)이 부른다.
+   */
+  const continueAfterArrival = useCallback(
+    (beforeArrival: GameProgress | null, arrival: PitchArrivalStep | null, context: ArrivalContext) => {
+      if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
+        progressRef.current = arrival.progress
+        setProgress(arrival.progress)
+        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리 — 원본은 판 안의 그 틱에 낸다 (견제와 같은 근사)
+        playSoundIds(audio, [arrival.play?.callSoundId ?? null, ...gameStepSoundIdsOf(beforeArrival, arrival.progress)])
+      }
+      if (arrival !== null && arrival.interrupted) {
+        // 판에서 반 이닝·경기가 끝났다 — 내 타석이 끊긴다 (견제사와 같은 길)
+        pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+        runner.resetAtBat()
+        if (!arrival.progress.game.isFinished) return
+        const cup = cupGameRef.current
+        if (cup !== null) return finishCupGame(arrival.progress, cup)
+        const currentCareer = careerRef.current
+        if (currentCareer !== null) finishGame(arrival.progress, currentCareer)
+        return
+      }
+      if (!isAtBatFinished(context.nextAtBat) || context.nextAtBat.outcome === null) return
+
+      // 타석이 끝났다 — 다음 타석은 새 카운터로 (타석 초기화 0xa5bcc 가 ctx+0x15f 를 지운다)
+      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+
+      const currentProgress = progressRef.current
+      if (currentProgress === null) return
+
+      const { bases } = currentProgress.game
+      const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
+      // 타석 결과(안타/아웃 코드)만 먼저 정한다 — 인플레이 타구면 주자 처리는 화면 뒤로 미뤄진다.
+      // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
+      // 판정 11(2스트라이크 번트 파울)은 파울 각 공 판이 판 끝 결과 코드 11 로 낸다 — 콜 62 는 판 결과(`played.buntFoulOut`)가 고정한다
+      const advanced = startPlayerOutcome(currentProgress, context.nextAtBat.outcome, random, {
+        isUncatchable: context.isUncatchable,
+        // 쏜 패턴(0xb0930 덱에서 뽑은 것)을 그대로 판에 싣는다 — 타석 결과 객체에 묶인 것과 같은 값을 명시적으로 넘긴다
+        pattern: context.pattern,
+        foulRecordIds: context.tally.foulRecordIds,
+        arrivalPlay: arrival?.play ?? null,
+        // 이 공의 번트 종류(장면 +0xfdc) — 타구 판 시작 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다
+        buntKind: context.buntKind,
+        // 삼진 + 도루 판의 한 정산이 0xa59c0 에 보는 타자 게이트 0xa56dc(ctx, 지금 타자, 1)
+        isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+      })
+      progressRef.current = advanced
+      setProgress(advanced)
+
+      // 수비 진행 중 — 화면이 틱을 돌리는 동안 타석을 멈춰 둔다. 원본도 상태 0x17 이 도는 동안
+      // 0xf(타석 준비)로 돌아가지 않아 다음 투구가 나가지 않는다
+      if (advanced.pendingDefensePlay !== null) {
+        runner.setIsPaused(true)
+        return
+      }
+      // 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 화면이 연출을 끝낼 때(`finishBenchClearing`)까지 붙든다
+      if (advanced.pendingBenchClearing !== null) {
+        runner.setIsPaused(true)
+        return
+      }
+      // 홈런·삼진·볼넷은 수비를 기다리지 않는다 — 홈런 함성(11)과 진행 소리를 여기서 낸다
+      playSoundIds(audio, [
+        inPlayCallSoundIdOf(context.nextAtBat.outcome),
+        ...gameStepSoundIdsOf(currentProgress, advanced),
+      ])
+      // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
+      const arrivalKind = arrival?.play?.kind ?? null
+      finishAtBat(advanced, context.nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(context.nextAtBat.outcome, arrivalKind))
+    },
+    [audio, finishAtBat, finishCupGame, finishGame, random, runner],
+  )
+
   const handlePitchResolved = useCallback(
     (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean, buntKind?: number) => {
       // 공이 손을 떠날 때 상대 투수 투구 수·스태미나를 깎는다 (0x3dec6 → 0xa5e14(ctx, 구질)).
@@ -1063,74 +1144,25 @@ export function useCareerSession({
                 resultCode: detail.resultCode,
               },
               random,
-              // 정산 0xa59c0 의 타자 게이트 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓
-              { isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null },
+              {
+                // 정산 0xa59c0 의 타자 게이트 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓
+                isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+                // 도루 · 폭투 판(종류 5 · 9)은 사람 주루 키(0x5331c · 0x585)를 받으므로 붙들어 화면이 실시간으로 돌린다
+                live: true,
+              },
             )
-      if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
+      const context: ArrivalContext = { nextAtBat, tally, isUncatchable, pattern: detail.pattern, buntKind: buntKind ?? 0 }
+      if (beforeArrival !== null && arrival !== null && arrival.deferred === true) {
+        // 판이 도는 동안(상태 0x17) 다음 공은 없다 — 판 끝에서 `finishRunnerPlay` 가 아래 나머지를 잇는다
         progressRef.current = arrival.progress
         setProgress(arrival.progress)
-        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리 — 원본은 판 안의 그 틱에 낸다 (견제와 같은 근사)
-        playSoundIds(audio, [arrival.play?.callSoundId ?? null, ...gameStepSoundIdsOf(beforeArrival, arrival.progress)])
-      }
-      if (arrival !== null && arrival.interrupted) {
-        // 판에서 반 이닝·경기가 끝났다 — 내 타석이 끊긴다 (견제사와 같은 길)
-        pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
-        runner.resetAtBat()
-        if (!arrival.progress.game.isFinished) return
-        const cup = cupGameRef.current
-        if (cup !== null) return finishCupGame(arrival.progress, cup)
-        const currentCareer = careerRef.current
-        if (currentCareer !== null) finishGame(arrival.progress, currentCareer)
-        return
-      }
-      if (!isAtBatFinished(nextAtBat) || nextAtBat.outcome === null) return
-
-      // 타석이 끝났다 — 다음 타석은 새 카운터로 (타석 초기화 0xa5bcc 가 ctx+0x15f 를 지운다)
-      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
-
-      const currentProgress = progressRef.current
-      if (currentProgress === null) return
-
-      const { bases } = currentProgress.game
-      const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
-      // 타석 결과(안타/아웃 코드)만 먼저 정한다 — 인플레이 타구면 주자 처리는 화면 뒤로 미뤄진다.
-      // 필살타법이 성공한 타구면 야수가 쥐지 않는다 (0x51800)
-      // 판정 11(2스트라이크 번트 파울)은 파울 각 공 판이 판 끝 결과 코드 11 로 낸다 — 콜 62 는 판 결과(`played.buntFoulOut`)가 고정한다
-      const advanced = startPlayerOutcome(currentProgress, nextAtBat.outcome, random, {
-        isUncatchable,
-        // 쏜 패턴(0xb0930 덱에서 뽑은 것)을 그대로 판에 싣는다 — 타석 결과 객체에 묶인 것과 같은 값을 명시적으로 넘긴다
-        pattern: detail.pattern,
-        foulRecordIds: tally.foulRecordIds,
-        arrivalPlay: arrival?.play ?? null,
-        // 이 공의 번트 종류(장면 +0xfdc) — 타구 판 시작 리드(0x3d7b8)가 도루 안 한 주자에게 +3 틱을 더한다
-        buntKind: buntKind ?? 0,
-        // 삼진 + 도루 판의 한 정산이 0xa59c0 에 보는 타자 게이트 0xa56dc(ctx, 지금 타자, 1)
-        isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
-      })
-      progressRef.current = advanced
-      setProgress(advanced)
-
-      // 수비 진행 중 — 화면이 틱을 돌리는 동안 타석을 멈춰 둔다. 원본도 상태 0x17 이 도는 동안
-      // 0xf(타석 준비)로 돌아가지 않아 다음 투구가 나가지 않는다
-      if (advanced.pendingDefensePlay !== null) {
+        arrivalContextRef.current = context
         runner.setIsPaused(true)
         return
       }
-      // 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 화면이 연출을 끝낼 때(`finishBenchClearing`)까지 붙든다
-      if (advanced.pendingBenchClearing !== null) {
-        runner.setIsPaused(true)
-        return
-      }
-      // 홈런·삼진·볼넷은 수비를 기다리지 않는다 — 홈런 함성(11)과 진행 소리를 여기서 낸다
-      playSoundIds(audio, [
-        inPlayCallSoundIdOf(nextAtBat.outcome),
-        ...gameStepSoundIdsOf(currentProgress, advanced),
-      ])
-      // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
-      const arrivalKind = arrival?.play?.kind ?? null
-      finishAtBat(advanced, nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(nextAtBat.outcome, arrivalKind))
+      continueAfterArrival(beforeArrival, arrival, context)
     },
-    [aceLevels, audio, finishAtBat, finishCupGame, finishGame, random, runner],
+    [aceLevels, audio, continueAfterArrival, random, runner],
   )
 
   const story = useStorySchedule(career)
@@ -1458,6 +1490,29 @@ export function useCareerSession({
     [audio, finishAtBat, random],
   )
 
+  /**
+   * CPU 견제 판을 먹인 뒤 — 판정 콜과 판에서 끊긴 타석. 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
+   * ⚠️ 원본은 공이 잡히는 **틱**에 낸다 — 웹은 판 끝에 낸다(팀 경기와 같은 근사).
+   */
+  const afterCpuPickoff = (current: GameProgress, next: GameProgress, play: DefensePlayResult | null) => {
+    playSoundIds(audio, [
+      isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
+      ...gameStepSoundIdsOf(current, next),
+    ])
+    const interrupted =
+      next.game.isFinished || next.game.inning !== current.game.inning || next.game.half !== current.game.half
+    if (!interrupted) return
+    // 견제 판에서 반 이닝이 끝났거나(3아웃) 경기가 끝났다(끝내기 득점) — 내 타석이 끊긴다.
+    // 다음 내 타석은 새 볼카운트·새 파울 카운터로 (타석 초기화 0xa5bcc)
+    pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
+    runner.resetAtBat()
+    if (!next.game.isFinished) return
+    const cup = cupGameRef.current
+    if (cup !== null) return finishCupGame(next, cup)
+    const currentCareer = careerRef.current
+    if (currentCareer !== null) finishGame(next, currentCareer)
+  }
+
   const actions = {
     syncOpenedHidden,
     finishBenchClearing,
@@ -1493,38 +1548,56 @@ export function useCareerSession({
 
     /**
      * **CPU 투수의 견제** — 타석 화면(`BattingStage.onPickoff`)이 상대 투수 AI 가 목표점 대신 고른 루를 알려 준다
-     * (0x345fc 종류 4 → 0x34848 → 메시지 0x10). 견제 판은 `lastDefensePlay` 로 재생되고(GameRoute),
-     * 같은 타석·같은 볼카운트로 다음 공이 이어진다 (0xae3e8 → 상태 0xf).
-     *
-     * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-     * ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기와 같은 근사).
+     * (0x345fc 종류 4 → 0x34848 → 메시지 0x10). 견제 판은 붙들어(`pendingRunnerPlay`) 수비 화면이 사람 주루 키를 받으며
+     * 실시간으로 돌리고(GameRoute), 끝나면 같은 타석·같은 볼카운트로 다음 공이 이어진다 (0xae3e8 → 상태 0xf).
+     * 판정 콜은 판 끝(`afterCpuPickoff`)에서 낸다.
      */
     cpuPickoff: (base: PickoffBase) => {
       const current = progressRef.current
       if (current === null) return
       const next = cpuPickoff(current, base, random, {
         isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+        // 견제 판(종류 4)은 사람 주루 키(0x5331c → 0x582 · 0x584 → 0xa9b04)와 OK 슬라이딩(0x585)을 받는다 — 붙들어 화면이
+        // 실시간으로 돌리고, 판정 콜 · 끊긴 타석은 판 끝(`finishRunnerPlay`)에서 낸다
+        live: true,
       })
       if (next === current) return
       progressRef.current = next
       setProgress(next)
-      const play = next.lastDefensePlay
-      playSoundIds(audio, [
-        isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
-        ...gameStepSoundIdsOf(current, next),
-      ])
-      const interrupted =
-        next.game.isFinished || next.game.inning !== current.game.inning || next.game.half !== current.game.half
-      if (!interrupted) return
-      // 견제 판에서 반 이닝이 끝났거나(3아웃) 경기가 끝났다(끝내기 득점) — 내 타석이 끊긴다.
-      // 다음 내 타석은 새 볼카운트·새 파울 카운터로 (타석 초기화 0xa5bcc)
-      pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
-      runner.resetAtBat()
-      if (!next.game.isFinished) return
-      const cup = cupGameRef.current
-      if (cup !== null) return finishCupGame(next, cup)
-      const currentCareer = careerRef.current
-      if (currentCareer !== null) finishGame(next, currentCareer)
+      if (next.pendingRunnerPlay != null) {
+        runner.setIsPaused(true)
+        return
+      }
+      afterCpuPickoff(current, next, next.lastDefensePlay)
+    },
+
+    /**
+     * 수비 화면이 사람 주루 키를 받으며 붙든 주자 판(도루 · 폭투 · CPU 견제 — `progress.pendingRunnerPlay`)을 다 돌렸다.
+     * 결과를 못 받았으면 키 없이 끝까지 돌려서라도 붙든 상태를 푼다. 공 도착 판이면 그 공의 나머지(`continueAfterArrival`)를,
+     * 견제 판이면 견제 뒤(`afterCpuPickoff`)를 잇는다.
+     */
+    finishRunnerPlay: (result?: DefensePlayResult) => {
+      const current = progressRef.current
+      const pending = current?.pendingRunnerPlay ?? null
+      if (current === null || pending === null) return
+      const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
+      const step = resolveRunnerPlay(current, played, random)
+      runner.setIsPaused(false)
+      if (pending.kind === 'pickoff') {
+        progressRef.current = step.progress
+        setProgress(step.progress)
+        afterCpuPickoff(current, step.progress, played)
+        return
+      }
+      const context = arrivalContextRef.current
+      arrivalContextRef.current = null
+      if (context === null) {
+        // 붙든 공의 값이 없다(세션이 다시 섰다) — 판만 먹이고 같은 타석으로 둔다
+        progressRef.current = step.progress
+        setProgress(step.progress)
+        return
+      }
+      continueAfterArrival(current, step, context)
     },
 
     /** 필살 스윙이 나갔다 (`0x4e136`) — 줄인 남은 횟수를 진행기에 적는다. 난수·소리 없음 */
@@ -2444,4 +2517,18 @@ function isOutingMapEntry(previous: Screen | null, next: Screen): boolean {
   if (previous === null) return true
   if (previous.kind === '외출') return false
   return !(previous.kind === '이벤트' && previous.context === '장소')
+}
+
+/** 붙든 공 도착 판이 끝난 뒤 `continueAfterArrival` 이 쓰는 이 공의 값 (`handlePitchResolved` 가 받은 것) */
+interface ArrivalContext {
+  /** 이 공을 먹인 뒤의 타석 (`runner.applyPitch`) */
+  readonly nextAtBat: ReturnType<AtBatRunner['applyPitch']>
+  /** 이 공까지 센 공 수 · 연속 파울 */
+  readonly tally: AtBatPitchTally
+  /** 필살타법이 성공한 타구인가 (0x517e6 → 0x51800) */
+  readonly isUncatchable: boolean | undefined
+  /** 쏜 패턴 (0xb0930 덱) */
+  readonly pattern: PitchOutcomeDetail['pattern']
+  /** 장면 +0xfdc — 이 공의 번트 종류 */
+  readonly buntKind: number
 }
