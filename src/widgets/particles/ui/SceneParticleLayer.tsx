@@ -10,6 +10,7 @@ import {
   tickSceneParticles,
 } from '@/widgets/particles/model/sceneParticles'
 import * as styles from '@/widgets/particles/ui/SceneParticleLayer.css'
+import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /** 탭이 쉬다 돌아왔을 때 한꺼번에 따라잡는 틱 수 상한 (타석 장면과 같은 값) */
 const CATCH_UP_LIMIT = 4
@@ -68,7 +69,7 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
         wasShown = shows
         setIsShown(shows)
       }
-      const context = canvasRef.current?.getContext('2d', { willReadFrequently: true }) ?? null
+      const context = effectContextOf(canvasRef.current)
       if (context !== null && shows) {
         context.fillStyle = '#000'
         context.fillRect(0, 0, WIDTH, HEIGHT)

@@ -6,6 +6,7 @@ import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner
 import { drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import { drawParticles, preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
+import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /**
  * 비거리 판 0x36cd4 — 그리기 0x46c88 의 머리(0x46cb6)가 그리기 목록보다 **먼저** 곧바로 칠하므로 바탕 · 공 그림자 위,
@@ -48,7 +49,7 @@ export function DefenseParticles({ scene, version }: { readonly scene: ParticleS
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   useEffect(() => preloadPtcParts(), [])
   useEffect(() => {
-    const context = canvasRef.current?.getContext('2d') ?? null
+    const context = effectContextOf(canvasRef.current)
     if (context === null) return
     context.clearRect(0, 0, styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)
     if (!isCommonWindowShown()) drawParticles(context, scene)

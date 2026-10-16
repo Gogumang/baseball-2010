@@ -22,6 +22,7 @@ import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { gameSceneNow, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 interface PitcherSideStageProps {
   /** 이 화면에서 마지막으로 던진 공(진행기 `lastPitch`). 화면이 설 때 이미 있던 공은 다시 날리지 않는다 */
@@ -125,7 +126,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
   latestRef.current = props
 
   useEffect(() => {
-    const context = canvasRef.current?.getContext('2d')
+    const context = effectContextOf(canvasRef.current)
     if (!context) return
     const tickLength = millisecondsPerFrame()
     // 장면 시각은 경기 장면 시계로 잰다 — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다(`gameSceneTimeOf`)

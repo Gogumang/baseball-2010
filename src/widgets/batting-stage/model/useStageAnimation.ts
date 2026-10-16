@@ -49,6 +49,7 @@ import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
+import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
@@ -109,7 +110,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const context = canvas?.getContext('2d')
+    const context = effectContextOf(canvas)
     if (!canvas || !context) return
 
     let animationHandle = 0
@@ -679,7 +680,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (layers !== undefined) {
         const rainContext = layers.rain.current?.getContext('2d') ?? null
         if (rainContext !== null) renderSettlementLayer(rainContext, { rain: settlementRain })
-        const particleContext = layers.particles.current?.getContext('2d') ?? null
+        const particleContext = effectContextOf(layers.particles.current)
         if (particleContext !== null) renderSettlementLayer(particleContext, { particles: isParticleGated ? null : particlesRef.current })
       }
 
