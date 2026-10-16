@@ -11,6 +11,7 @@
  *  - 받은 그림(HTMLImageElement)을 붙들고 있어서 브라우저 메모리 캐시에서 밀려나지 않는다 —
  *    같은 주소의 `<img>` 를 다시 세워도 서버에 다시 묻지 않고(`Cache-Control: no-cache` 재검증 없이) 곧바로 뜬다.
  */
+import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 
 type ImageStatus = 'loading' | 'ready' | 'failed'
 
@@ -43,6 +44,8 @@ function startImage(url: string, isLowPriority: boolean): ImageEntry {
   image.onload = () => {
     entry.status = 'ready'
     settle(image)
+    // 캔버스 그리기 건너뛰기(`shared/lib/canvas/drawMemo`)가 늦게 온 그림으로 다시 그리게 한다
+    noteAssetLoaded()
   }
   image.onerror = () => {
     entry.status = 'failed'
@@ -130,6 +133,7 @@ function startJson(url: string): JsonEntry {
         (value) => {
           entry.status = 'ready'
           entry.value = value
+          noteAssetLoaded()
           return value
         },
         (error: unknown) => {

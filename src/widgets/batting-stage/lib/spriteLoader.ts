@@ -5,6 +5,7 @@
  */
 import { paletteUrl, recoloredSpriteUrl } from '@/shared/lib/sprite/paletteSwap'
 import type { SpritePalettes } from '@/shared/lib/sprite/paletteSwap'
+import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 
 /** 캐시는 DOM·미리 받기와 같이 쓴다 (`shared/lib/sprite/spriteCache`) */
@@ -101,7 +102,10 @@ function recoloredSprite(folder: string, url: string, paletteIndex: number): HTM
   void recoloredSpriteUrl(url, palettes, paletteIndex)
     .then((dataUrl) => (dataUrl === url ? null : loadSprite(dataUrl)))
     .then((image) => {
-      if (image !== null) painted.set(key, image)
+      if (image !== null) {
+        painted.set(key, image)
+        noteAssetLoaded()
+      }
     })
     .catch(() => {})
   return sprite(url)

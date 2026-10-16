@@ -14,8 +14,14 @@ export function useGameSceneUpdateCounter(isRunning = true): number {
     if (!isRunning) return
     const startedAt = gameSceneNow()
     let handle = 0
+    /** 마지막으로 올린 값 — 같은 값이면 상태를 안 건드린다(틀마다 같은 값을 넣어 React 를 깨우지 않게) */
+    let lastUpdate: number | null = null
     const tick = (now: number) => {
-      setUpdate(Math.floor((gameSceneTimeOf(now) - startedAt) / millisecondsPerFrame()))
+      const next = Math.floor((gameSceneTimeOf(now) - startedAt) / millisecondsPerFrame())
+      if (next !== lastUpdate) {
+        lastUpdate = next
+        setUpdate(next)
+      }
       handle = requestAnimationFrame(tick)
     }
     handle = requestAnimationFrame(tick)

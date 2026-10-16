@@ -19,6 +19,9 @@ import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { renderBattingStage, renderSettlementLayer } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
+import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameAt, ballFrameStartTime, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
@@ -114,6 +117,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     if (!canvas || !context) return
 
     let animationHandle = 0
+    /** 그림 입력이 바뀐 틀에서만 다시 그린다 — 루프를 다시 세우면 새로 그린다 */
+    const drawMemo = createDrawMemo()
     // 장면의 모든 시각은 경기 장면 시계로 잰다 — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다(`gameSceneTimeOf`)
     const openedAt = gameSceneNow()
     /**
@@ -592,7 +597,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
               stageHud.hiddenRunnerBases ?? [],
               runnerFrames,
             )
-      renderBattingStage(context, {
+      const stageScene: StageScene = {
         pitcherForm,
         pitcherHand,
         pitch,
@@ -674,10 +679,23 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           // 환경설정 전광판(+0x3a) OFF 면 흐르는 글자를 안 그린다 (0x77726)
           isScoreboardOn: latestRef.current.isScoreboardOn,
         },
-      })
+      }
       // 정산 효과 층 — 비는 효과 틱 0x4a452 자리(진 판 덮개 위 · 띠 아래), 파티클은 프레임 끝 0x6dd69 자리(판 맨 위)
       const layers = settlement?.layers
-      if (layers !== undefined) {
+      const rainLayer = layers?.rain.current ?? null
+      const particleLayer = layers?.particles.current ?? null
+      // 위까지가 이 틀의 상태 갱신이다(틱 · 굴림은 틀마다 그대로). 그림은 입력이 앞 틀과 같으면 캔버스에 남은 그림이 곧 이 틀의
+      // 그림이라 건너뛴다(`createDrawMemo`) — 파티클 관리자 · 비는 제자리에서 고쳐 쓰므로 그 모습(`particleSignatureOf` · 틱)으로 견준다
+      const shouldDraw = drawMemo.needsDraw(canvas, {
+        scene: { ...stageScene, particles: particleSignatureOf(stageScene.particles) },
+        layerParticles: layers === undefined || isParticleGated ? null : particleSignatureOf(particlesRef.current),
+        rainLayer,
+        rainLayerSize: rainLayer === null ? null : [rainLayer.width, rainLayer.height],
+        particleLayer,
+        particleLayerSize: particleLayer === null ? null : [particleLayer.width, particleLayer.height],
+      })
+      if (shouldDraw) renderBattingStage(context, stageScene)
+      if (shouldDraw && layers !== undefined) {
         const rainContext = layers.rain.current?.getContext('2d') ?? null
         if (rainContext !== null) renderSettlementLayer(rainContext, { rain: settlementRain })
         const particleContext = effectContextOf(layers.particles.current)
