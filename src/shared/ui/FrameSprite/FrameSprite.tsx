@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { spriteImage } from '@/shared/lib/sprite/spriteCache'
 import * as styles from '@/shared/ui/FrameSprite/FrameSprite.css'
 
 interface FrameSpriteProps {
@@ -24,11 +25,14 @@ export function FrameSprite({ folder, frame, origins, x, y, style, centerX = fal
   const origin = origins?.[key]
   if (origin === undefined) return null
   const left = x + origin.x - (centerX ? origin.width / 2 : 0)
+  const src = `${folder}/${key}.png`
+  // 공용 캐시에 붙들어 둔다 — 같은 그림을 다시 세울 때 서버 재검증 없이 바로 뜨게(미리 받은 그림이면 이미 있다)
+  spriteImage(src)
   return (
     <img
       className={styles.sprite}
       style={{ left, top: y + origin.y, ...style }}
-      src={`${folder}/${key}.png`}
+      src={src}
       alt=""
     />
   )
