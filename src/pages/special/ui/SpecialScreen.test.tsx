@@ -158,6 +158,8 @@ describe('스페셜 칸 고르기', () => {
     항목열기('기록연감')
 
     expect(screen.getByRole('button', { name: '닉네임' })).toBeTruthy()
+    // 하위 30 그리기 0x2e29c 는 판보다 먼저 메뉴 바탕 0x58371 을 깐다 (0x2e2b6) — 검정 바탕이 아니다
+    expect(screen.getByTestId('바탕-메뉴')).toBeTruthy()
   })
 
   it('명예의전당 칸은 명예의 전당 화면으로 간다', () => {
