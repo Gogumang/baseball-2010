@@ -157,6 +157,10 @@ describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린�
       expect(screen.queryByTestId('소개판')).toBeNull()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
       expect(screen.getByTestId('소개판')).toBeTruthy()
+      // '*' 일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛰어 마지막 그림이 그대로다
+      fireEvent.keyDown(window, { key: '*' })
+      expect(screen.getByTestId('소개판')).toBeTruthy()
+      fireEvent.keyDown(window, { key: '*' })
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(구질단계()).toBeNull()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
