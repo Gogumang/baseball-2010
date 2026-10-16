@@ -5,6 +5,7 @@ import {
   LOADING_STEPS_BATTER_CAREER, LOADING_STEPS_DEFAULT, LoadingTip,
 } from '@/widgets/loading-tip/ui/LoadingTip'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 
 const NO_PRELOADS: readonly never[] = []
 
@@ -33,5 +34,17 @@ describe('LoadingTip — 진행 칸 0x54120 · 0x54128', () => {
       vi.advanceTimersByTime(millisecondsPerFrame() + 20)
     })
     expect(onDone).toHaveBeenCalled()
+  })
+
+  it('팁 번호 n + 1 을 num 90 + 숫자로 · 막대 바탕과 채움 띠 넷을 그린다 (0x53e04)', () => {
+    const { getAllByTestId } = render(
+      <LoadingTip tip={LOADING_TIPS[16] ?? ''} onDone={vi.fn()} steps={LOADING_STEPS_DEFAULT} preloadScenes={NO_PRELOADS} />,
+    )
+    expect(getAllByTestId('로딩-팁-번호').map((element) => element.getAttribute('data-image'))).toEqual(['91', '97'])
+    expect(getAllByTestId('로딩-막대')).toHaveLength(1)
+    const stripes = getAllByTestId('로딩-채움')
+    expect(stripes).toHaveLength(4)
+    // 첫 그림은 1/끝 — 150 − 35 · 4
+    expect(stripes[0]?.style.width).toBe('10px')
   })
 })

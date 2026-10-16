@@ -3,7 +3,10 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { RUNNER_PLAY_RESULT } from '@/features/defense-play/model/runnerPlayEngine'
-import { isStealPlayResult, runStealPlay, stealCallSoundIdOf } from '@/features/defense-play/model/stealPlay'
+import { isStealPlayResult, runStealPlay, stealCallSoundIdOf, stealPlayEngineInputOf } from '@/features/defense-play/model/stealPlay'
+import { assignCoversForTick } from '@/entities/fielding/model/coverAssignment'
+import { basePosition } from '@/entities/fielding/model/fieldGeometry'
+import { AI_STATE } from '@/entities/fielding/model/fieldingState'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 
 function 세는난수(ratio: number): RandomPort & { readonly count: () => number } {
@@ -92,6 +95,34 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     expect(result.stolenFrom).toEqual([1])
     // 굴림은 리드 rand(0,9) 한 번뿐 — 악송구 굴림이 없다
     expect(counted.count()).toBe(1)
+  })
+
+  it('홈 커버는 포수 — b297a 가 야수 1~4 를 루 위에 놓고(0xbee60) 목표 = 루, 고르기 b3e54 가 포수를 AI 1 로 둬도 b23a4 가 홈을 되돌린다', () => {
+    const start = stealPlayEngineInputOf({ bases: 일루, stealingFrom: [1], outs: 0 })
+    const 포수 = start.fielders[1]
+    expect(포수?.position).toEqual(basePosition(0))
+    expect(포수?.target).toEqual(basePosition(0))
+    expect(포수?.aiState).toBe(AI_STATE.CHASE)
+    expect([2, 3, 4].map((slot) => start.fielders[slot]?.position)).toEqual([1, 2, 3].map((base) => basePosition(base)))
+    // 0xb1c90 를 판 시작 상태로 — b1d48 이 홈을 투수에게 넘기려 해도 b23a4(포수 목표 = 홈 · AI ≠ 9)가 포수로 되돌린다
+    const covers = assignCoversForTick({
+      context: { play: start.play, fielders: start.fielders, runners: start.runners, currentTick: 0, landingTick: -1 },
+      ballToFirstSide: false,
+      // 0xa276c 종류 5 — 공 첫 점 0xd7c30
+      ballStartPoint: { x: 20_000, y: 0, z: 29_705 },
+    })
+    expect(covers.covers).toEqual([1, 2, 3, 4])
+    // b2564 — AI 1 인 포수는 커버 상태로 안 바뀐다
+    expect(covers.coverStates.map((state) => state.slot)).toEqual([2, 3, 4])
+  })
+
+  it('포수가 던지면 vt34 가 AI 1 을 내리고 vt30 의 b2564 가 커버 표의 포수를 홈 커버(AI 2)로 보낸다', () => {
+    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, manualThrowBase: 2 })
+    expect(result.throwBase).toBe(2)
+    expect(result.log[0]).toContain('1번 야수가 2루로 송구')
+    // 판 내내 홈 위 — 시작 자리 0xd86ec[1] = (20000, 0, 29705) 로 돌아가지 않는다
+    expect(result.ticks.length).toBeGreaterThan(10)
+    expect(result.ticks.every((tick) => tick.fielders[1]?.z === basePosition(0).z && tick.fielders[1]?.x === basePosition(0).x)).toBe(true)
   })
 
   it('재생 칸에 든 결과가 도루 판인지 가를 수 있다 — 견제 결과는 아니다', () => {

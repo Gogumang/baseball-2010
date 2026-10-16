@@ -109,7 +109,7 @@ export interface StageScene {
    * 3deea 가 공마다 0 으로 지운다, `PitcherResultCodeClock`) · 큰 타구 감상 플래그 +0x199a(0x392ac). 투수를 안 그리는 상태면 null · 안 주면 없음
    */
   readonly pitcherHitMark?: (PitcherResultCodeClock & { readonly isBigHit: boolean }) | null
-  /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 구름 */
+  /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 전광판 글자 (구름은 `scenery.cloudCalls`) */
   readonly tick: number
   /**
    * 루상 주자 애니 1 · 2 · 3 루의 지금 진행 수 — 장면에 남는 애니 시계(`stepRunnerAnimationClock`). 안 주면 `tick`(시험 · 옛 호출)

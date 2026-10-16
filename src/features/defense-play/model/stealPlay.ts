@@ -48,10 +48,23 @@ import {
  *   홈에 들어온 주자는 2아웃 보류 규칙을 탄다.
  * - 커버: `0xb1c90` 은 부를 때마다 `+0xf0` 을 표 `0xd8774` = [1, 2, 3, 4] 로 되돌린 뒤 고친다. 2루는
  *   공 첫 점(포수 자리)이 0xd8758 (20000, 1000, 30000) 과 달라 `0xb1e86` 의 "2루에 더 가까운 쪽(2루수 3 ·
- *   유격수 5)" 갈래로 가는데, 2루수가 이 고리에서 이미 2루로 가고 있어 늘 2루수다. 1·3루는 표 그대로.
- *   ⚠️ 홈 커버만 미해결이다 — 포수의 AI 상태(0xb3b38 고르기가 세우는 값)에 따라 포수(1) 그대로이거나
- *   투수(0)/없음(−1)으로 바뀐다(0xb1d14~0xb1d94). 홈으로 던질 일은 공 쥔 포수가 홈에 있는 홈 도루뿐이고,
- *   그때는 어느 쪽이든 송구 없이 포수가 홈에서 태그하는 같은 판이라 [1, 2, 3, 4] 로 둔다.
+ *   유격수 5)" 갈래로 가는데, 2루수가 이 고리에서 이미 2루 위에 서 있어 늘 2루수다. 1·3루는 표 그대로.
+ * - **홈 커버 = 포수(1)** (r120 확정 — 아래 차례를 직접 떴다):
+ *   ```
+ *   b29a2  0xbef58(포수, 0xd86b0[0] = (20000, 0, 29445)) = 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 홈) → 야수 vt14 0xa14c8:
+ *          +0xb4 ≤ 0 · vtc8(0xa2118: +0xb1 == 0 && +0xcc ≤ 0) 이고 목표가 다르면 0xbf2cc 로 **목표 +0x2c = 홈 좌표**
+ *   b29b4  vt24(0) 예보 0xb12d0 — 공은 0xa276c 가 점 하나(+0x6c = 1, (20000, 0, 29705))만 깔아 표가 빈다
+ *   b29c4  vt34 0xb3b38 — 표가 비어 마지막 갈래(낮은 공 점 Q = 마지막 점에 가장 가까운 야수) → 홈 위의 포수(거리 260).
+ *          b3e40 +0x130 = 포수 · b3e54 **포수 AI 1**(0xb8dbc). 목표는 안 바꾼다
+ *   b29d0  vt30 0xb1c90 — b1d0a k = 0xb1268(포수 목표) = 0 = +0x130 − 1 이지만 포수 AI 1 이라 b1d1a 갈래가 아니고 b1d48 이
+ *          +0xf0[0] = 0(투수, 0xb1b88(0) 거짓이면 −1) — 그러나 **b23a4** 가 b = 포수.vt68() = 0(목표가 홈) · AI ≠ 9 라
+ *          +0xf0[0] = 포수로 되돌린다. b23dc 는 c == d(1) 이고 투수 목표가 홈이 아니라 지나가고, b2564 는 포수 AI 1 이라 건너뛴다
+ *   b29d4  0xb2710(P, 1, 0) — 쥐기는 AI · 목표를 안 건드린다. 쥔 AI 1 야수는 AI 1 처리 0xb4aca 가 +0xe0 == 0 일 때만 움직여 선다
+ *   ```
+ *   그래서 판 내내(포수가 쥐고 있는 동안) 홈은 포수다 — 표 [1, 2, 3, 4] 그대로. 포수가 던지면 0xb2e38 의 vt34 가 AI 1 을 0 으로
+ *   내리고(b3b7a) vt30 의 b2564 가 커버 표의 포수에게 vt14(홈) · AI 2 를 준다(`runnerPlayEngine` 의 던진 야수 처리).
+ *   ⚠️ 미확인: 포수가 앞 판의 송구 잠금(+0xb1)·+0xcc · 동작 잠금 +0xb4 를 지닌 채 판이 열리면 vt14 가 목표를 안 바꿔 앞 판 목표가
+ *   남는다 — 그때 홈 커버가 투수/없음이 될 수 있는데 웹 진행기는 판 사이 야수 상태를 넘겨받지 않아 이 길은 없다.
  *
  * ## 판정
  * - 송구 판단·도착·아웃·세이프는 `runnerPlayEngine` (+0x160 b4660 / 0xafa60 → 0xb2c90 · 0xb36d0 · 0xb4292).
@@ -186,15 +199,18 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const covers = [...PICKOFF_COVER_OF_BASE]
 
-  // ── b297a: 야수 1~4 를 제 루로 · 커버 = 루 + 1 ──
+  // ── b297a: 야수 1~4 를 제 루로(위치 · 목표 = 루 좌표) · 커버 = 루 + 1 — 홈은 b23a4 가 포수로 되돌려 표 그대로(머리말) ──
   const fielders: FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
     const base = covers.indexOf(fielder.slot)
     if (base < 0) return fielder
     return {
       ...fielder,
+      // 0xbef58 = 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 루 좌표) → vt14(루 좌표) — 판이 열리는 순간 **루 위에 서 있다**
+      position: basePosition(base),
       target: basePosition(base),
       targetBase: base,
-      aiState: AI_STATE.COVER_HOME + base,
+      // b2564 가 커버 1·2·3루 야수에게 AI 루 + 2 · 포수는 고르기 0xb3b38 의 b3e54 가 AI 1(쫓기 — 쥐고 있어 안 움직인다)
+      aiState: fielder.slot === CATCHER_SLOT ? AI_STATE.CHASE : AI_STATE.COVER_HOME + base,
       // b29d4·b29de: 포수가 공을 쥐고(0xb2710 → 야수+0xe0 = 1) 준비 틱은 0 (vt88(0) → +0xc8 = 0)
       holdingBall: fielder.slot === CATCHER_SLOT,
       actionRemainingTicks: 0,

@@ -74,8 +74,13 @@ export interface SceneryState {
   readonly skyRow: number
   /** 하늘 칸 — 구장 +0x14 = min(경기 상태 +0x6b, 12), 0부터 (`skyColumnOfInning`) */
   readonly skyColumn: number
-  /** 타석 화면이 열린 뒤 흐른 틱 — 구름·전광판 이동 */
+  /** 타석 화면이 열린 뒤 흐른 틱 — 전광판 글자 흐름 */
   readonly tick: number
+  /**
+   * 구름 흐르기 0x78448 이 센 부름 수(`cloudScrollAt` 의 `calls`) — 경기 장면 동안 이어지는 셈(`model/sceneCloudClock`).
+   * 생략하면 0(구름 칸 처음 자리 — 0x78448 을 안 부르는 미리보기 0xb158 따위)
+   */
+  readonly cloudCalls?: number
   /**
    * 구장 번호 = 구장 객체 +0x70. 모드 1·8·9 는 장면 셋업 0x39fdc 가 st+0x30 으로(9 보다 크면 rand(0, 10)), 3·4 는 홈 팀 ·
    * 대회 2/8, 7 은 내 팀, 시즌 대회는 0x352e8 이 2/8 로 채운다(`features/play-team-game/model/sceneStadium`).
@@ -208,7 +213,7 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   const colorIndex = drawSky(context, state)
   // 구장 8 은 하늘 0x77fe8 이 단색만 칠하고 구름 갈래까지 가지 않는다(78088 → 783a8)
   if (state.stadium !== FLAT_SKY_STADIUM && isCloudVisible(colorIndex)) {
-    drawClouds(context, state.tick, cloudPaletteRowOf(colorIndex))
+    drawClouds(context, state.cloudCalls ?? 0, cloudPaletteRowOf(colorIndex))
   }
   const offsetY = state.offsetY ?? 0
   drawFence(context, state, offsetY)
@@ -241,11 +246,11 @@ function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number
 }
 
 /** 구름 (0x782d6~) — 그림은 0x76fd0 이 `.mpl` 줄 `v − 1` 로 실어 둔 것이다 (`cloudPaletteRowOf`) */
-function drawClouds(context: CanvasRenderingContext2D, tick: number, paletteRow: number | null): void {
+function drawClouds(context: CanvasRenderingContext2D, cloudCalls: number, paletteRow: number | null): void {
   for (let index = 0; index < CLOUD_COUNT; index += 1) {
     const frame = placedFrame(CLOUD_FRAMES, index, paletteRow)
     if (frame === null) continue
-    const x = CAMERA.x + cloudScrollAt(index, tick) + frame.offsetX
+    const x = CAMERA.x + cloudScrollAt(index, cloudCalls) + frame.offsetX
     const y = CAMERA.y + frame.offsetY
     context.drawImage(frame.image, x, y)
     context.drawImage(frame.image, x + CLOUD_WRAP_WIDTH, y)

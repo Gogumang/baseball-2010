@@ -7,14 +7,18 @@ import { gameSceneNow, gameSceneTimeOf, useMarksGameScene } from '@/shared/lib/c
 import { preloadSpriteScene, preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
+import {
+  LOADING_BAR, LOADING_FILL_STRIPES, loadingFillWidthOf, loadingRunnerAnchorOf, tipNumberGlyphsOf,
+} from '@/widgets/loading-tip/lib/loadingTipLayout'
+
+const rgbOf = ([red, green, blue]: readonly number[]) => `rgb(${red}, ${green}, ${blue})`
 
 /**
- * 원작 로딩 화면 — ui/loadingbar.pzx.
- *   프레임 0: "TIP:" 상자(170×147) + "DATA LOADING", 안쪽 칸 (7,16)~(162,87) 에 StrTIP 을 쓴다
- *   애니메이션 0: 프레임 1~4 달리는 선수
- * ⚠️ 미확인: 상자를 화면 가운데 두는 것, 선수가 상자 아래 띠를 왼쪽→오른쪽으로 달리는 것은 웹 배치다 — 원본 좌표는 그리기 0x53e04
- * (53f30~5404c 의 막대 · 54060~5407e 의 선수)에 있고 아직 안 옮겼다.
+ * 원작 로딩 화면 — ui/loadingbar.pzx. 배치는 그리기 0x53e04 그대로다(`lib/loadingTipLayout` 머리말, r120 직접 떴다):
+ * 바탕 RGB(0x11, 0x20, 0x7f) · 프레임 0 상자를 화면 가운데((W − 170) >> 1, (H − 147) >> 1) = (35, 86) ·
+ * "TIP:" 옆 팁 번호(num 90 + 숫자) · 팁 글 (10, 30) 폭 150 · 진행 막대 (10, 112) 150×10 · 막대 채움 끝에 달리는 선수(애니 0).
  *
  * **진행 칸** (0x1552cfc 객체, 2026-10-16 직접 떴다): 진입 0x39f88 이 0x54120(+0x14 = 끝, +0x10 = 0)으로 끝을 **0x24**, 모드
  * (+0x1104) == 4(나리 타자편)면 **0x25** 로 둔다(39f92~39f98). 적재 한 단계마다 0x54128(+0x10 = min(+0x10 + 1, 끝)) → 0x53e04 가
@@ -34,14 +38,12 @@ import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
  * 없이 닫히고 [창+0x24f]) 진행은 경기 장면 시계로 잰다. 쓰는 곳은 경기 · 미션 · 더비뿐이다(시즌 0x105 의 0x75fc 판은 웹에 없다).
  */
 const FOLDER = './sprites/loadingbar/frames'
+const NUM_FOLDER = './sprites/num'
 const RUNNER_ANIMATION = 0
 /** 진행 칸 끝 — 0x39f88 의 0x24 (모드 4 가 아닌 모든 경기 장면: 미션 · 마선수 대결 · 홈런더비) */
 export const LOADING_STEPS_DEFAULT = 0x24
 /** 진행 칸 끝 — 0x39f88 39f94~39f98: 모드 4(나리 타자편)면 0x25 */
 export const LOADING_STEPS_BATTER_CAREER = 0x25
-const RUNNER_START_X = 20
-const RUNNER_END_X = 150
-const RUNNER_FOOT_Y = 112
 
 /** 로딩 판 뒤에 열릴 경기 장면 — 타석 진입·진행 그림 */
 const GAME_SCENE_PRELOADS: readonly SpriteSceneKey[] = ['gameEntry', 'gameAtBat']
@@ -100,20 +102,35 @@ export function LoadingTip({
   const frameKey = step === null ? null : String(step.frame).padStart(3, '0')
   const origin = frameKey === null ? undefined : origins?.[frameKey]
   // 0x54128 이 먼저 칸을 올린 뒤 0x53e04 가 그린다 — 첫 그림이 1/끝
-  const progress = Math.min(steps, update + 1) / steps
-  const runnerX = RUNNER_START_X + (RUNNER_END_X - RUNNER_START_X) * progress
+  const fillWidth = loadingFillWidthOf(Math.min(steps, update + 1), steps)
+  const runner = loadingRunnerAnchorOf(fillWidth)
+  // 팁 번호 = +0x315 + 1 — 팁 글은 StrTIP[1 + n] 이고 73 줄이 모두 달라 글로 n 을 되찾는다
+  const tipIndex = LOADING_TIPS.indexOf(tip)
+  const numberGlyphs = tipIndex < 0 ? [] : tipNumberGlyphsOf(tipIndex + 1)
 
   return (
     <div className={styles.overlay} role="status" aria-label="로딩 중">
       <div className={styles.box}>
         <img className={styles.sprite} src={`${FOLDER}/000.png`} alt="" />
+        {numberGlyphs.map((glyph) => (
+          <img key={glyph.x} className={styles.sprite} data-testid="로딩-팁-번호" data-image={glyph.image}
+            style={{ left: glyph.x, top: glyph.y }}
+            src={`${NUM_FOLDER}/${String(glyph.image).padStart(3, '0')}.png`} alt="" />
+        ))}
         <div className={styles.tipArea}>
           <MarkupText raw={tip} />
         </div>
+        <div className={styles.bar} data-testid="로딩-막대"
+          style={{ left: LOADING_BAR.x, top: LOADING_BAR.y, width: LOADING_BAR.width, height: LOADING_BAR.height, background: rgbOf(LOADING_BAR.rgb) }} />
+        {fillWidth > 0 && LOADING_FILL_STRIPES.map((stripe) => (
+          <div key={stripe.y} className={styles.bar} data-testid="로딩-채움"
+            style={{ left: LOADING_BAR.x + 1, top: LOADING_BAR.y + stripe.y, width: fillWidth, height: stripe.height, background: rgbOf(stripe.rgb) }} />
+        ))}
         {origin !== undefined && frameKey !== null && (
           <img
             className={styles.sprite}
-            style={{ left: runnerX + origin.x, top: RUNNER_FOOT_Y + origin.y }}
+            data-testid="로딩-선수"
+            style={{ left: runner.x + origin.x, top: runner.y + origin.y }}
             src={`${FOLDER}/${frameKey}.png`}
             alt=""
           />
