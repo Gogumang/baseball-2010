@@ -159,7 +159,8 @@ export function endingWalkInPaletteOf(look: EndingWalkInLook): number {
 /**
  * e 0·1 의 글 (0x88974~0x88a94) — StrENDING[e] 를 띠 아래 칸 `(0, y'+h+11, W, H − (y'+h+11))` = (0, 207, 240, 113)
  * 의 **세로 가운데 줄 y = 207 + 113/2 = 263** 에 `0xba269(글, 0, y, W, −1, 0)` 로 그린다.
- * ⚠️ 0xba269 의 y 가 글 위끝인지 가운데인지는 안 읽었다 — 다른 호출(올라오는 글)과 같이 위끝으로 둔다.
+ * y 는 글 **위끝**이다 — 확정: 0xba269 는 y 를 그대로(여섯째 인자가 0 이 아닐 때만 전역 [0x15606f4] 를 더함, 0xba276~0xba280 —
+ * 여기는 0) 0x6ef4d 에 넘기고, 0x6ef4d 는 첫 줄을 y 에서 그린다(say 상자 (5, H − h + 5) 와 같은 쓰임, A-events 6).
  */
 export const SHORT_ENDING_TEXT_TOP = (() => {
   const top = BAND_WINDOW_BOTTOM + BAND_WINDOW.edgeHeight
