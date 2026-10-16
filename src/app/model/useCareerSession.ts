@@ -49,6 +49,7 @@ import {
   isManagementCycleOpen,
   isSeasonFinished,
   startNextSeason,
+  withNariSceneSetupOutings,
   gainGamePoint,
   countGameForSkills,
   MAXIMUM_GAME_POINT,
@@ -490,7 +491,17 @@ export function useCareerSession({
     matchPreparedRef.current = false
     storySceneSetUpRef.current()
     setShouldForgetRepeatable(true)
+    setSceneSetUpCount((count) => count + 1)
   }, [])
+  /**
+   * 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 셋업은 경기 뒤 커리어가 들어오기 전에 불리므로(경기 정산이 경기 수를
+   * 올린 뒤의 장면이다) 그 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`)
+   */
+  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
+  useEffect(() => {
+    if (sceneSetUpCount === 0) return
+    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current)))
+  }, [sceneSetUpCount])
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
   nariGameSaveRef.current = nariGameSave

@@ -240,15 +240,15 @@ export interface PlayerCareer {
    * r_event_txt[176] "한번에 트레이닝, 휴식, 외출 중 딱 한 가지 일만 할 수 있으니"
    */
   readonly hasActedThisCycle: boolean
-  /** 이번 시즌 외출 횟수 (선수 +0x6a) */
+  /** 이번 시즌(새 시즌 전환 뒤) 외출 횟수 — 원본 +0x6a 의 몫 (`outingsLastSeason` 주석) */
   readonly outingsThisSeason: number
   /**
    * 지난 시즌 외출 횟수 — 칭호 25·26 "1년간 외출 2회 이하/20회 이상" (StrNICKNAME[89][90]) 전용.
    *
-   * 원본은 칸을 하나(+0x6a)만 두고 **새 시즌 첫 경기 전**에 그 값을 본다(0x1a590·0x1a5d0, P3 9절).
-   * 시즌 전환 0x1b768·0xa39a8 어디에도 +0x6a 를 지우는 줄이 없어 **어디서 지우는지는 미확인**이라,
-   * 웹은 전환 때 이 칸에 지난해 값을 떠 두고 세는 칸은 0 으로 되돌린다 — 문서가 확정한
-   * "지난해 값으로 판정" 은 그대로이고, 지우는 시점만 **근사**다.
+   * 원본은 칸을 하나(+0x6a)만 두고 **새 시즌 첫 경기 전**에 그 값을 본다(0x1a590·0x1a5d0, P3 9절). 쓰는 곳은 외출 +1(1c05e~1c066 ·
+   * 0x156e4~0x156ec)과 **나리 장면 셋업 0xf684 의 fb92~fba8 — `s8 S+0xb2(경기 수) == 2` 면 +0x6a = 0** 뿐이다(시즌 전환 0x1b768 은
+   * 안 지운다, U-31). 그래서 원본 칸 값 = `outingsLastSeason + outingsThisSeason` 이다 — 새 시즌 g == 0 창의 외출은 지난해 값에 더해져
+   * 칭호 25 · 26 에 들고, 2경기 뒤 셋업(`withNariSceneSetupOutings`)이 둘 다 지운다(g == 2 창에서 외출한 뒤 이어하면 또 지운다 — 원본 그대로)
    */
   readonly outingsLastSeason: number
   /** 한 경기 최다 홈런 — 칭호 "한 경기 홈런 4회 달성" */
@@ -1131,6 +1131,17 @@ export function endNationalCup<T extends { readonly nationalCup?: NationalCup }>
   return next
 }
 
+/** 나리 장면 셋업 0xf684 fb92~fba8 의 외출 칸 지우기 — 경기 수(S+0xb2)가 2 일 때만 +0x6a = 0. 투수편도 같은 꼴(`PitcherCareer`) */
+export const NARI_OUTING_RESET_GAMES = 2
+
+export function withNariSceneSetupOutings<T extends Pick<PlayerCareer, 'gamesPlayed' | 'outingsThisSeason' | 'outingsLastSeason'>>(
+  career: T,
+): T {
+  if (career.gamesPlayed !== NARI_OUTING_RESET_GAMES) return career
+  if (career.outingsThisSeason === 0 && career.outingsLastSeason === 0) return career
+  return { ...career, outingsThisSeason: 0, outingsLastSeason: 0 }
+}
+
 export function startNextSeason(career: PlayerCareer): PlayerCareer {
   return {
     ...endNationalCup(career),
@@ -1138,9 +1149,10 @@ export function startNextSeason(career: PlayerCareer): PlayerCareer {
     yearlyStats: [...yearlyStatsOf(career), career.stats],
     season: career.season + 1,
     gamesPlayed: 0,
-    // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절) — 세는 칸을 비우기 전에 떠 둔다
+    // +0x6a 는 시즌 전환에서 안 지운다(1b768) — 두 칸의 합이 원본 칸이라 지난해 몫을 옮겨 두면 합이 그대로다.
+    // (지난해 g == 2 셋업이 그 앞 몫을 이미 지웠다 — `withNariSceneSetupOutings`)
     outingsThisSeason: 0,
-    outingsLastSeason: career.outingsThisSeason,
+    outingsLastSeason: career.outingsLastSeason + career.outingsThisSeason,
     // 인기도 스냅샷 (+0x78 ← 지금 인기도, 0xa39e0) — 올해의 목표 "인기도 상승" 의 기준점
     popularityAtSeasonStart: career.popularity,
     // 올해의 목표 플래그 두 개를 되돌린다 — +0x1b7(0xa39d0) 창을 봤다 · +0x1bc(0x1b882) 연초 이벤트

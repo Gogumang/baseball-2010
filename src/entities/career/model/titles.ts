@@ -119,7 +119,7 @@ export interface TitleSubject {
   readonly championships: number
   /** 훈련 칸별 누적의 합 (Σ +0x4b..+0x4f) */
   readonly trainingTotal: number
-  /** 지난 1년 외출 수 (+0x6a) — 칭호 25·26 이 **새 시즌 첫 경기 전**에 이 값을 본다 */
+  /** 외출 칸 +0x6a(지난해 몫 + 새 시즌 g == 0 창 몫) — 칭호 25·26 이 **새 시즌 첫 경기 전**에 이 값을 본다 */
   readonly outingsLastSeason: number
   /** 또또복권 1등 횟수 (+0x185) · 구매 수 (+0x186) */
   readonly lotteryFirstPrizes: number
@@ -226,7 +226,8 @@ export function titleSubjectOfBatter(career: PlayerCareer): TitleSubject {
     mvpSeasonBits: career.mvpSeasonBits,
     championships: career.regularSeasonFirstCount,
     trainingTotal: trainingTotalOf(career),
-    outingsLastSeason: career.outingsLastSeason,
+    // 원본 +0x6a 한 칸 = 두 칸의 합 (`PlayerCareer.outingsLastSeason` 주석 — 새 시즌 g == 0 창의 외출도 든다)
+    outingsLastSeason: career.outingsLastSeason + career.outingsThisSeason,
     lotteryFirstPrizes: career.lotteryFirstPrizes,
     lotteryPurchases: career.lotteryPurchases,
     seenEventIds: career.seenEventIds,
