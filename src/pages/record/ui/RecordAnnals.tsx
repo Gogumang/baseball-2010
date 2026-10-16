@@ -12,7 +12,7 @@ import { useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
-  ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_NAME, LIST_ROW_FRAME_DY, listFirstYOf, STAT_NAME, STAT_VALUE, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
   ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
@@ -599,7 +599,7 @@ function ListRows({ page, names }: { readonly page: number; readonly names: read
     <>
       {names.slice(start, start + LIST_GRID.rows).map((name, offset) => (
         <div key={name} className={styles.rowText}
-          style={{ left: LIST_GRID.x, top: LIST_GRID.firstY + LIST_GRID.step * offset, width: LIST_GRID.width }}>
+          style={{ left: LIST_GRID.cellX + LIST_NAME.dx, top: LIST_GRID.firstY + LIST_GRID.step * offset + LIST_NAME.dy }}>
           {name}
         </div>
       ))}
@@ -620,9 +620,9 @@ function RecordCounts({ page, stats }: { readonly page: number; readonly stats: 
         return (
           <div key={cell} className={styles.statValue} data-cell={cell}
             style={{
-              left: LIST_GRID.x + RECORD_COUNT.dx,
+              left: LIST_GRID.cellX + RECORD_COUNT.dx,
               top: LIST_GRID.firstY + LIST_GRID.step * row + RECORD_COUNT.dy,
-              width: LIST_GRID.width - RECORD_COUNT.widthInset,
+              width: LIST_GRID.cellWidth - RECORD_COUNT.widthInset,
             }}>
             {recordCountOf(stats, cell)}
           </div>
@@ -643,7 +643,7 @@ function AchievementMarks({ page, stats }: { readonly page: number; readonly sta
           <img key={cell} className={styles.sprite} alt="달성" data-cell={cell}
             src={imageSrc(SLT_FRAME, ACHIEVEMENT_MARK.image)}
             style={{
-              left: LIST_GRID.x + LIST_GRID.width - ACHIEVEMENT_MARK.width + ACHIEVEMENT_MARK.dx,
+              left: LIST_GRID.cellX + LIST_GRID.cellWidth - ACHIEVEMENT_MARK.width + ACHIEVEMENT_MARK.dx,
               top: LIST_GRID.firstY + LIST_GRID.step * row + ACHIEVEMENT_MARK.dy,
             }} />
         )
@@ -662,11 +662,13 @@ function StatRows({ page, stats }: { readonly page: number; readonly stats: Anna
         const value = cell.valueOf(stats)
         return (
           <div key={cell.nameIndex}>
-            <div className={styles.rowText} style={{ left: LIST_GRID.x, top, width: LIST_GRID.width }}>
+            <div className={styles.rowText}
+              style={{ left: LIST_GRID.cellX + STAT_NAME.dx, top: top + STAT_NAME.dy, width: LIST_GRID.cellWidth - STAT_NAME.widthInset }}>
               {STAT_NAMES[statNameOffsetOf(cell)]}
             </div>
             {value !== null && (
-              <div className={styles.statValue} style={{ left: LIST_GRID.x, top, width: LIST_GRID.width }}>
+              <div className={styles.statValue}
+                style={{ left: LIST_GRID.cellX + STAT_VALUE.dx, top: top + STAT_VALUE.dy, width: LIST_GRID.cellWidth - STAT_VALUE.widthInset }}>
                 {statValueTextOf(cell.valueKind, value)}
               </div>
             )}
@@ -690,13 +692,13 @@ function TotalRow({
     <>
       <img className={styles.sprite} alt=""
         src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
-        style={{ left: TOTAL_ROW.bulletX, top: TOTAL_ROW.y + 4 }} />
+        style={{ left: TOTAL_ROW.bulletX, top: TOTAL_ROW.y + TOTAL_ROW.bulletDy }} />
       <FrameSprite folder={IMG_TEXT} frame={TOTAL_ROW.labelFrame} origins={textFrames}
-        x={TOTAL_ROW.labelX} y={TOTAL_ROW.y} />
+        x={TOTAL_ROW.labelX} y={TOTAL_ROW.y + TOTAL_ROW.labelDy} />
       <FrameSprite folder={SLT_FRAMES} frame={TOTAL_ROW.frame} origins={frames}
-        x={TOTAL_ROW.frameX} y={TOTAL_ROW.y - 3} />
+        x={TOTAL_ROW.frameX} y={TOTAL_ROW.y} />
       <div className={styles.totalValue}
-        style={{ left: TOTAL_ROW.frameX, top: TOTAL_ROW.y + 1, width: 101, textAlign: isRightAligned ? 'right' : undefined }}>
+        style={{ left: TOTAL_ROW.value.x, top: TOTAL_ROW.y + TOTAL_ROW.value.dy, width: TOTAL_ROW.value.width, textAlign: isRightAligned ? 'right' : undefined }}>
         {value}
       </div>
     </>

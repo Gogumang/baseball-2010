@@ -55,8 +55,10 @@ export const MENU_ROW = {
   selectedBulletImage: 38,
   bullet: { x: PANEL.x + 14, dy: 44 },
   barFrame: 37,
-  bar: { x: PANEL.x + 32, dy: 38, width: 142, height: 18 },
-  name: { x: PANEL.x + 32, dy: 42, width: 142 },
+  /** 프레임 0x25 를 (x0 + 0x20, Y + 0x25) — 0x59834~0x59850. *(정정 r129 — 전에는 dy 38)* */
+  bar: { x: PANEL.x + 32, dy: 0x25, width: 142, height: 18 },
+  /** 0xba269(글, x0 + 0x20, Y + 0x29, 프레임 0x25 폭 142, −1, 0) — 호출 59896(0x59876~0x59896). *(정정 r129 — 전에는 dy 42)* */
+  name: { x: PANEL.x + 32, dy: 0x29, width: 142 },
 } as const
 
 /** 아이콘 바탕 이미지 87 은 20×20 파란 네모다 — 아이콘은 이 안 **가운데**에 놓인다 (P6 5절) */

@@ -7,7 +7,7 @@ import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import {
-  CELL_GRID, ENDING_CELL_NAMES, PANEL, PROGRESS_ROW, TAB_CURSOR, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
+  CELL_GRID, ENDING_CELL_NAMES, PANEL, PROGRESS_ROW, TAB_CURSOR, TOTAL_ROW, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
   cellPositionOf, endingCellFrameOf, endingProgressOf, tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
@@ -187,6 +187,27 @@ describe('기록연감 칸 격자', () => {
     expect(screen.queryByText(STAT_NAMES[7])).toBeNull()
   })
 
+  it('통계 탭 글 자리 — 이름 (36, 92 + 18줄, 164) · 값 (31, 91 + 18줄, 170) 오른쪽 (0x7a542 · 0x7a1f8 꼴 8갈래)', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+
+    const name = screen.getByText(STAT_NAMES[1])
+    expect(name.style.left).toBe('36px')
+    expect(name.style.top).toBe(`${92 + 18}px`)
+    expect(name.style.width).toBe('164px')
+    const value = name.nextElementSibling as HTMLElement
+    expect(value.style.left).toBe('31px')
+    expect(value.style.top).toBe(`${91 + 18}px`)
+    expect(value.style.width).toBe('170px')
+  })
+
+  it('통계 탭 아래 합계 값은 (110, 246, 폭 91) 오른쪽 맞춤 — 0xba269 호출 2fb90', () => {
+    expect(TOTAL_ROW.value).toEqual({ x: 110, dy: 4, width: 91 })
+    expect(TOTAL_ROW.y + TOTAL_ROW.value.dy).toBe(246)
+    expect(TOTAL_ROW.y + TOTAL_ROW.labelDy).toBe(246)
+    expect(TOTAL_ROW.y + TOTAL_ROW.bulletDy).toBe(247)
+  })
+
   it('통계 탭은 비밀 번호 없이 2쪽만 돈다 — 쪽 1 은 [136]~[140] 다섯 줄', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
@@ -324,8 +345,8 @@ describe('탭 0 스페셜기록 쪽 — 셀 40~47 이름 StrGAME[48~55] · 달�
 
     const marks = [...container.querySelectorAll('img[alt="달성"]')] as HTMLElement[]
     expect(marks.map((mark) => mark.dataset.cell)).toEqual(['40', '42'])
-    // x = 32 + 176 − 28 − 1 = 179, y = 90 + 18·줄 − 1
-    expect(marks[0]?.style.left).toBe('179px')
+    // x = 칸 x 33 + 칸너비 174 − 28 − 1 = 178 (0x7a12a~0x7a13c), y = 90 + 18·줄 − 1
+    expect(marks[0]?.style.left).toBe('178px')
     expect(marks[0]?.style.top).toBe('89px')
     expect(marks[1]?.style.top).toBe('125px')
   })
@@ -346,9 +367,18 @@ describe('탭 0 달성 횟수 — 셀 0~39 "!R!cffff00%d" (0x7a0d0~0x7a0fc)', ()
     const counts = [...container.querySelectorAll('[data-cell]')].filter((node) => node.tagName === 'DIV') as HTMLElement[]
     expect(counts.map((node) => node.dataset.cell)).toEqual(['0', '1', '2', '3', '4', '5', '6', '7'])
     expect(counts.map((node) => node.textContent)).toEqual(['0', '2', '0', '0', '0', '0', '0', '1'])
-    expect(counts[1]?.style.left).toBe('35px')
+    // 0x7a0fc: (칸 x 33 + 3, (칸 y + 2) + 1, 174 − 10)
+    expect(counts[1]?.style.left).toBe('36px')
     expect(counts[1]?.style.top).toBe('111px')
-    expect(counts[1]?.style.width).toBe('166px')
+    expect(counts[1]?.style.width).toBe('164px')
+  })
+
+  it('칸 이름은 (칸 x + 5, 칸 y + 2) 왼쪽 맞춤 — 0xba269 호출 7a9a2 (폭 자리에 색이 들어가 줄을 안 끊는다)', () => {
+    const { container } = 띄우기()
+    const names = [...container.querySelectorAll('div')].filter((node) => node.style.left === '38px') as HTMLElement[]
+    expect(names).toHaveLength(8)
+    expect(names[1]?.style.top).toBe(`${92 + 18}px`)
+    expect(names[1]?.style.width).toBe('')
   })
 
   it('마지막 쪽(셀 40~47)에는 횟수가 없다', () => {
