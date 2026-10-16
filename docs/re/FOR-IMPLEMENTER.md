@@ -111,6 +111,7 @@
   - 그라운드 룰 2루타(state[0x20]>0 && state[0x1e] → 결과 10), 장내 홈런(state[0x25])
 - **근거 문서**: `I-controls.md` 0·1a·2a~2d·3a·3c · `P2-fielding-ai.md` 전체·7절 · `R3-field-view.md` 1~5·6절 · `R2-game-effects.md` 2절(deadly_effect)
 - **필요한 데이터/표**: `stadium/defense.pzx`(310×500) · `defender` 스프라이트 + `defender.mpl`(팀 15색) · `ace/defender_<마선수>` 10폴더(이름 표 0xd3f10) · 선수 수비 위치 코드(레코드 +0x1c, C 참조)
+  > ❌ 감사(2026-10-16): 이름 표는 **0xd3f0c** 에서 시작한다(0xd3f10 은 "ace/defender_medica" 문자열 한가운데) — `xval 0xd3f0c` → 0x79a70(함수 0x79a5c) · 0x79cd0(함수 0x79cbc). R3 7절이 바르다.
 - **남은 미해결**: U-01 페어/파울 문턱(`0x9d660`), U-02 2아웃 득점 보류, U-07~U-11 (송구 목표 점수식·도착 틱·충돌·AI 상태 8·9·0xe)
 
 ### B-2. 투수편(나만의리그 투수) — 예상 크기 **상**
@@ -324,6 +325,7 @@
 | C-19 | **미션 조건코드의 뜻** | 미션 레코드 바이트 13 = **투수 미션 조준점 흔들림 세기**(0x39c5c). 바이트 4 = 아웃(bit0-1)·볼(bit2-3)·스트라이크(bit4-5) 는 생성기와 **같다** | `generate_game_data.py:392-394` 주석 "뜻은 미해독" 을 고치고, 값을 투수 미션 조준 입력에 넣을 것 | E-defense-rules.md E-7 · 4a · 4b |
 | C-20 | **경기 밸런스 표** | `d_level.dat` 488바이트 = 경기 밸런스 설정표(타격 cfg+0x10/0x12, 제구 등급 배율 0x1e0, 수비 이동 cfg+0x28, 송구 cfg+0x1a/+0x2a, 에러 cfg+0x2c). **난이도 옵션이 아니다** — 파일 하나를 모든 모드가 쓴다 | 지금은 값 일부를 손으로 옮겨 씀(`swingTiming.ts:5,12` · `swingResult.ts:12,69` · `quickAtBat.ts:26` · `data/balance.json`). **생성기가 파일을 직접 읽게 할 것** | L-sound-effects.md 4-D |
 | C-21 | **마구 레코드** | pitch.zt1 구질 22 블록 17레코드. 고르기 = `3(m−1) + f/2`(육성·일반 1~4) · `m + 7`(마투수 5~9) | 데이터는 이미 `pitchRecords.ts` PITCH_RECORDS[21] 에 있다 — **고르는 식만 넣으면 된다** | H2-special-skills.md 3-5 |
+> ❌ 감사(2026-10-16): 위 표 C-16 줄의 "이름 표 `0xd3f10`" 은 **`0xd3f0c`** 이다(20바이트 간격은 맞다) — `bytes 0xd3f0c` = "ace/defender_medica\0", 읽는 곳 0x79a5c · 0x79cbc.
 
 ---
 
