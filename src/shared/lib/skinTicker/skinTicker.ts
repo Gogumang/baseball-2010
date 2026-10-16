@@ -41,16 +41,17 @@ export function skinTickerTextXOf(x: number, width: number, counter: number, tex
 }
 
 /**
- * 흐르는 글 하나를 갱신마다 그릴 때 쓸 카운터 값. 그린 **뒤** 3 올리므로 올리기는 그림이 나간 뒤(effect)에 한다.
+ * 흐르는 글을 갱신마다 그릴 때 쓸 카운터 값. 그린 **뒤** 3 올리므로 올리기는 그림이 나간 뒤(effect)에 한다.
  * 건너뛴 갱신(그림을 못 낸 틱)도 원본에선 한 번씩 그렸다 — 그만큼 앞당겨 센 값을 돌려준다.
- * ⚠️ 한 그림에 흐르는 글이 여럿인 화면(선수 정보 창 0x5b798 은 다섯 곳)은 원본에서 k 번째 글이 c + 3k 로 그려지고
- *    그림마다 3 × 개수만큼 오른다 — 그런 화면을 옮길 때 이 훅을 넓혀야 한다(지금 쓰는 곳은 글 하나뿐이다).
+ * 한 그림에 흐르는 글이 여럿이면(선수 정보 창 0x5b798 은 다섯 곳) 원본은 0x5a8c8 을 차례로 불러 k 번째 글이 c + 3k 로 그려지고
+ * 그림마다 3 × 개수만큼 오른다 — `perDraw` 가 그 개수다(이 그림에 글을 안 그리면 0). k 번째 글의 값은 부르는 쪽이 c + 3k 로 더한다.
  */
-export function useSkinTickerCounter(tick: number): number {
+export function useSkinTickerCounter(tick: number, perDraw = 1): number {
   const lastDrawnTick = useRef(tick - 1)
+  const step = SKIN_TICKER_STEP * perDraw
   useEffect(() => {
-    skinTickerCounter.value += SKIN_TICKER_STEP * Math.max(0, tick - lastDrawnTick.current)
+    skinTickerCounter.value += step * Math.max(0, tick - lastDrawnTick.current)
     lastDrawnTick.current = tick
-  }, [tick])
-  return skinTickerCounter.value + SKIN_TICKER_STEP * Math.max(0, tick - lastDrawnTick.current - 1)
+  }, [tick, step])
+  return skinTickerCounter.value + step * Math.max(0, tick - lastDrawnTick.current - 1)
 }

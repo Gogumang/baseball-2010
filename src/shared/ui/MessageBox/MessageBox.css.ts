@@ -30,6 +30,12 @@ export const dim = style({
 })
 
 /** 판 #335FCD, 위 5줄 #1E1AA6·#1E1AA6·#FFFFFF·#7B9EFF·#7B9EFF, 아래는 거꾸로 (0x744c4) */
+const PANEL_BACKGROUND = [
+  `linear-gradient(to bottom, ${ORIGINAL_COLORS.boxEdgeOuter} 0 2px, ${ORIGINAL_COLORS.boxEdgeWhite} 2px 3px, ${ORIGINAL_COLORS.boxEdgeInner} 3px 5px, transparent 5px)`,
+  `linear-gradient(to top, ${ORIGINAL_COLORS.boxEdgeOuter} 0 2px, ${ORIGINAL_COLORS.boxEdgeWhite} 2px 3px, ${ORIGINAL_COLORS.boxEdgeInner} 3px 5px, transparent 5px)`,
+  ORIGINAL_COLORS.boardFill,
+].join(', ')
+
 export const box = style({
   position: 'absolute',
   left: 0,
@@ -38,11 +44,19 @@ export const box = style({
   transform: 'translateY(-50%)',
   boxSizing: 'border-box',
   padding: `${TEXT_TOP}px 0 ${BUTTONS_TO_BOTTOM}px`,
-  background: [
-    `linear-gradient(to bottom, ${ORIGINAL_COLORS.boxEdgeOuter} 0 2px, ${ORIGINAL_COLORS.boxEdgeWhite} 2px 3px, ${ORIGINAL_COLORS.boxEdgeInner} 3px 5px, transparent 5px)`,
-    `linear-gradient(to top, ${ORIGINAL_COLORS.boxEdgeOuter} 0 2px, ${ORIGINAL_COLORS.boxEdgeWhite} 2px 3px, ${ORIGINAL_COLORS.boxEdgeInner} 3px 5px, transparent 5px)`,
-    ORIGINAL_COLORS.boardFill,
-  ].join(', '),
+  background: PANEL_BACKGROUND,
+})
+
+/**
+ * 닫히는 동안의 판 — 폭 [+0x210] 만 줄고 x = (W − 폭) >> 1 (0x744de~0x74520). 글 · 버튼보다 아래에 그린다
+ * (상자의 transform 이 쌓임 맥락을 만들어 z-index −1 이 상자 안 글 · 버튼 밑에 깔린다)
+ */
+export const closingPanel = style({
+  position: 'absolute',
+  top: 0,
+  bottom: 0,
+  zIndex: -1,
+  background: PANEL_BACKGROUND,
 })
 
 /** 글은 (45, 상자y+20) 부터 폭 150 으로 줄바꿈한다 (0x6ef4c · 0x74664) */
