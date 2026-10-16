@@ -3,6 +3,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { PressArea } from '@/shared/ui'
 import * as styles from '@/pages/pitching/ui/ManagerHookWindow.css'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 창 높이 0 → 55, 틱마다 +15 (0x7fae2 의 `+= 0xf`, 0x37 에서 멈춤) */
 const WINDOW_HEIGHT = 55
@@ -38,6 +39,8 @@ export function ManagerHookWindow({ userEventIndex, onConfirm }: ManagerHookWind
   useEffect(() => {
     let current = 0
     const tick = window.setInterval(() => {
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
+      if (isGameSceneFrozen()) return
       // 상자가 다 올라온 뒤에야 글을 그린다 (0x7fba6 의 반환값)
       if (current < WINDOW_HEIGHT) {
         current = Math.min(current + HEIGHT_STEP, WINDOW_HEIGHT)

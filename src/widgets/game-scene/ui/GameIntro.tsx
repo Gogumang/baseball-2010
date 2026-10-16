@@ -29,6 +29,7 @@ import { SceneryBackdrop } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { rivalryStepAt } from '@/widgets/game-scene/lib/rivalryBand'
 import { RivalryBandCanvas } from '@/widgets/game-scene/ui/RivalryBandCanvas'
 import type { SceneryBackdropStage } from '@/widgets/batting-stage/ui/SceneryBackdrop'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 const GAME_UI_FRAMES = './sprites/game_ui/frames'
 const IMG_TEXT_FRAMES = './sprites/img_text/frames'
@@ -71,6 +72,9 @@ interface GameIntroProps {
  * 알파는 max(1, +0x17e4 − 0x55) = 1~170 이라 늘 섞는다. ⚠️ 미확인: 섞기 식은 단말 몫이라 바이너리에 없다 — 웹은 "윗바이트/255" 로 섞는다.
  */
 export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRivalry = false, onDone }: GameIntroProps) {
+  // 인트로 0xc도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
+  // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
+  useMarksGameScene()
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone

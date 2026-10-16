@@ -36,7 +36,7 @@ import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneNow, gameSceneTimeOf, isCommonWindowShown, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
@@ -113,7 +113,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     if (!canvas || !context) return
 
     let animationHandle = 0
-    const openedAt = performance.now()
+    // 장면의 모든 시각은 경기 장면 시계로 잰다 — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다(`gameSceneTimeOf`)
+    const openedAt = gameSceneNow()
     /**
      * 루상 주자 애니 시계(장면 +0xf24 의 애니 0~2) — 부르는 쪽이 경기 장면 수명의 칸을 넘기면 그것, 아니면 이 화면이 사는 동안.
      * `runnerTick` 은 이 화면에서 마지막으로 센 틱 — 첫 그림이 0x35b94 첫 부름이다
@@ -399,7 +400,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     /**
      * 결과 창 뒤 배경(`isResultBackdrop`)으로 바뀐 시각 — 그때부터 +0x17e2 를 센다. 타석이면 null.
      * 공용 창이 떠 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신 0x4b100 을 건너뛰어 +0x17e2 가 안 오르므로 시계가 선다
-     * (그리기는 늘 돌아 구름 · 정산 효과는 그대로 흐른다 — `frozenClock`)
+     * (`frozenClock`). ⚠️ 정정(r106): 그리기도 52efe 에서 창이 선 첫 그림 말고는 건너뛰어 구름 · 정산 효과도 멈춘다 — 경기 장면이
+     * 서 있으면 아래 `frame` 머리의 `isGameSceneFrozen` 이 그림을 통째로 세우고, 이 시계는 경기 장면 셈 밖에서 히든 오픈 알림 문맥만
+     * 선 경우(`isSceneFrozen`)에 남는다
      */
     let backdropClock: FrozenClock | null = null
     /**
@@ -473,7 +476,16 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       }
     }
 
-    const frame = (now: number) => {
+    const frame = (rawNow: number) => {
+      // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신(장면 틱 · 키 · 갱신 표)을, 52efe 가 상태 그리기를,
+      // 53048 이 파티클 틱 · 그리기를 건너뛴다. 창이 선 첫 그림([창+0x250])은 장면을 한 번 더 그리지만 갱신이 없어 앞 그림과 같은
+      // 모습이라, 웹은 그 그림부터 캔버스를 그대로 둔다(굳은 화면). 시계도 서 있다가 창이 닫히면 이어 흐른다 — 따라잡지 않는다.
+      // ⚠️ 미확인: [+0x250] 그림의 그리기 쪽 셈(그리기마다 오르는 깜빡임 칸 따위) 한 번은 웹에 없다
+      if (isGameSceneFrozen()) {
+        animationHandle = requestAnimationFrame(frame)
+        return
+      }
+      const now = gameSceneTimeOf(rawNow)
       const isBackdrop = latestRef.current.isResultBackdrop === true
       if (!isBackdrop) {
         if (settlementEffect !== undefined) {
@@ -674,7 +686,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       animationHandle = requestAnimationFrame(frame)
     }
 
-    phaseStartedAtRef.current = performance.now()
+    phaseStartedAtRef.current = gameSceneNow()
     animationHandle = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(animationHandle)
     // ref 묶음은 값이 바뀌지 않는다. 고리는 handlersRef 로 읽는다 — 루프를 다시 세우는 때는 예전처럼 판정 · 0x13 고리가 바뀔 때뿐이다
@@ -688,7 +700,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 통째로 쌓여 있으면 진행 중이던 투구가 곧바로 스트라이크로 처리되므로
       // 타석을 다시 준비 상태로 되돌린다.
       phaseRef.current = '대기'
-      phaseStartedAtRef.current = performance.now()
+      phaseStartedAtRef.current = gameSceneNow()
       pitchRef.current = null
       buntRef.current = null
       swingRef.current = null

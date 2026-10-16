@@ -59,7 +59,11 @@ export function useMarksGameScene(): void {
   const mark = useContext(GameSceneMarkContext)
   useLayoutEffect(() => {
     mark(true)
-    return () => mark(false)
+    const release = markGameSceneUp()
+    return () => {
+      release()
+      mark(false)
+    }
   }, [mark])
 }
 
@@ -84,11 +88,14 @@ let shownCommonWindows = 0
 /** 창 하나가 섰다 — 돌려준 함수로 내린다(두 번 불러도 한 번만 내린다) */
 export function markCommonWindowShown(): () => void {
   shownCommonWindows += 1
+  syncGameSceneFreeze()
+  const generation = testGeneration
   let released = false
   return () => {
-    if (released) return
+    if (released || generation !== testGeneration) return
     released = true
     shownCommonWindows -= 1
+    syncGameSceneFreeze()
   }
 }
 
@@ -102,7 +109,77 @@ export function useMarksCommonWindowShown(isShown: boolean): void {
   useLayoutEffect(() => (isShown ? markCommonWindowShown() : undefined), [isShown])
 }
 
+/**
+ * **경기 장면이 멈췄는가 — 경기 장면(0x104)이 서 있고 공용 창 [0x140005c]+9 가 서 있다**. 경기 장면 프레임 0x52c50 은 그때
+ * (2026-10-16 직접 떴다):
+ * ```
+ * 52cc6  0x754f9(창, 키) ≠ 0 → 52ef2 로 — 장면 틱 0xbc9c9([장면+0x2c] +1 · 진입 표 0xd04bc) · 키 0x498d4 · 갱신 표 0xd0530 ·
+ *        목록 틱 0x3f060 · 0xaada5 · 0xbfc8d 를 모두 건너뛴다
+ * 52ef2  창이 서 있으면 0x457cc(자르기를 화면 전체로)
+ * 52efe  [창+0x24f](경기 장면 1) && [창+9] && [창+0x250] == 0 이면 53032 로 — 0x41230 · 그리기 표 0xd05a0 을 건너뛴다
+ *        ([+0x250] 은 창을 띄운 0x74ef4 · 0x741a0 이 1, 같은 그림 끝 창 그리기 0x746cc 가 0 — 창이 선 첫 그림만 장면을 다시 그린다)
+ * 53048  창이 서 있으면 파티클 관리자 틱 0x6de85 · 그리기 0x6dd69 를 건너뛴다
+ * 53086  창이 서 있으면 0x3f378 을 건너뛴다
+ * ```
+ * 곧 창이 떠 있는 동안 장면은 한 틱도 안 흐르고(틱을 모아 두었다 따라잡지도 않는다) 화면은 창이 선 첫 그림 모습으로 굳는다.
+ * 다른 장면 프레임(메인 메뉴 0x32dd8 · 시즌 0xe9ac · 나리 0x1cdec · 미션 고르기 0x1eb0c)은 이 게이트가 없다.
+ */
+let gameScenesUp = 0
+/** 멈추기 시작한 실제 시각(`performance.now()` 기준) — 흐르는 중이면 null */
+let frozenSince: number | null = null
+/** 지금까지 멈춰 있던 실제 시간의 합 */
+let frozenTotal = 0
+/** `resetCommonWindowShownForTest` 마다 오른다 */
+let testGeneration = 0
+
+function syncGameSceneFreeze(now: number = performance.now()): void {
+  const isFrozen = gameScenesUp > 0 && shownCommonWindows > 0
+  if (isFrozen && frozenSince === null) frozenSince = now
+  else if (!isFrozen && frozenSince !== null) {
+    frozenTotal += Math.max(0, now - frozenSince)
+    frozenSince = null
+  }
+}
+
+/** 경기 장면 화면 하나가 섰다 — 돌려준 함수로 내린다(`useMarksGameScene`) */
+export function markGameSceneUp(): () => void {
+  gameScenesUp += 1
+  syncGameSceneFreeze()
+  const generation = testGeneration
+  let released = false
+  return () => {
+    // 시험이 셈을 되돌린 뒤 늦게 내리는 화면은 무시한다
+    if (released || generation !== testGeneration) return
+    released = true
+    gameScenesUp -= 1
+    syncGameSceneFreeze()
+  }
+}
+
+/** 경기 장면 0x52c50 이 52cc6 · 52efe · 53048 에서 이 그림을 건너뛰는가 (`gameScenesUp` 머리말) */
+export function isGameSceneFrozen(): boolean {
+  return frozenSince !== null
+}
+
+/**
+ * **경기 장면 시계** — 실제 시각 `raw`(`performance.now()` · requestAnimationFrame 시각)를 장면이 흐른 시각으로 바꾼다.
+ * 장면이 멈춘 동안은 멈춘 시각에 서 있고, 풀리면 멈춰 있던 만큼 빼고 이어 흐른다(52cc6 — 건너뛴 틱을 따라잡지 않는다).
+ * 경기 장면 부품이 쓰는 시각(단계 시작 · 키를 받은 시각 · 그림 시각)은 모두 이 시계로 재야 서로 맞는다.
+ */
+export function gameSceneTimeOf(raw: number): number {
+  return (frozenSince === null ? raw : Math.min(raw, frozenSince)) - frozenTotal
+}
+
+/** 지금 경기 장면 시각 — `gameSceneTimeOf(performance.now())` */
+export function gameSceneNow(): number {
+  return gameSceneTimeOf(performance.now())
+}
+
 /** 시험용 — 센 수를 되돌린다 */
 export function resetCommonWindowShownForTest(): void {
+  testGeneration += 1
   shownCommonWindows = 0
+  gameScenesUp = 0
+  frozenSince = null
+  frozenTotal = 0
 }

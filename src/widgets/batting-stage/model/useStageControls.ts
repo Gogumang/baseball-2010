@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { PointerEvent } from 'react'
 import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
+import { gameSceneNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 이만큼 길게 누르고 있으면 번트 자세 — 떼면 푼다 (모바일용, 웹판 추가) */
 const BUNT_HOLD_MILLISECONDS = 350
@@ -51,7 +52,11 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      const now = performance.now()
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다.
+      // 시각은 경기 장면 시계(`gameSceneNow`)로 잰다 — 단계 시작 시각과 같은 시계라야 키 틱이 맞는다
+      // ⚠️ 미확인: 창이 떠 있는 동안 뗀 '7'~'9'(0x5364c)가 원본에서 사라지는지 — 웹은 떼기를 그대로 받는다
+      if (isGameSceneFrozen()) return
+      const now = gameSceneNow()
       if (SWING_KEYS.has(event.key)) {
         event.preventDefault()
         actions.swing(now)
@@ -72,7 +77,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
     }
     // 0x5364c — 뗀 키가 '7'~'9' 면 0x6a8 (종류를 가리지 않는다)
     const onKeyUp = (event: KeyboardEvent) => {
-      if (BUNT_KEYS[event.key] !== undefined) actions.releaseBunt(performance.now())
+      if (BUNT_KEYS[event.key] !== undefined) actions.releaseBunt(gameSceneNow())
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -92,7 +97,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
   return {
     onPointerDown: (event: PointerEvent<HTMLCanvasElement>) => {
       event.preventDefault()
-      pointerDownAtRef.current = performance.now()
+      pointerDownAtRef.current = gameSceneNow()
       isPointerBuntingRef.current = false
       const bounds = event.currentTarget.getBoundingClientRect()
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
@@ -103,7 +108,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       buntHoldTimerRef.current = setTimeout(() => {
         buntHoldTimerRef.current = null
         isPointerBuntingRef.current = true
-        actions.pressBunt(1, performance.now())
+        actions.pressBunt(1, gameSceneNow())
       }, BUNT_HOLD_MILLISECONDS)
     },
 
@@ -113,11 +118,13 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
         clearTimeout(buntHoldTimerRef.current)
         buntHoldTimerRef.current = null
       }
-      const now = performance.now()
+      const now = gameSceneNow()
       if (isPointerBuntingRef.current) {
         isPointerBuntingRef.current = false
         return actions.releaseBunt(now)
       }
+      // 공용 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 위 `onKeyDown` 과 같다
+      if (isGameSceneFrozen()) return
       const bounds = event.currentTarget.getBoundingClientRect()
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
       if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return actions.moveBatter(-1)

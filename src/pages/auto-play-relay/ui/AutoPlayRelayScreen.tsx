@@ -12,6 +12,7 @@ import * as styles from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen.css'
 import { relayFieldBackgroundAt } from '@/pages/auto-play-relay/lib/relayFieldBackground'
 import { DEFENSE_BACKGROUND_HEIGHT, DEFENSE_BACKGROUND_URL, DEFENSE_BACKGROUND_WIDTH } from '@/pages/defense/lib/defenseView'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 /** "공격팀(%s)" 의 %s — st[0x31 + st[9]] == 0(사람 칸)이면 "PLAYER"(0xd0724), 아니면 "COM"(0xd072c) */
 export const OFFENSE_LABEL = { player: 'PLAYER', computer: 'COM' } as const
@@ -142,6 +143,9 @@ function RelayFieldBackground({ grassPalette }: { readonly grassPalette: number 
 export function AutoPlayRelayScreen({
   step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay, field, grassPalette = null,
 }: AutoPlayRelayScreenProps) {
+  // 자동진행 중계 0x21도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
+  // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
+  useMarksGameScene()
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
   const tick = useSceneTick((next) => onTick(next), !isPaused)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)

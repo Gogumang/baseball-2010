@@ -11,6 +11,7 @@ import {
 import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionHudProps {
   readonly mission: OriginalMission
@@ -95,7 +96,10 @@ export function MissionHud({
   const [tick, setTick] = useState(0)
   useEffect(() => {
     if (lineCount <= 1 || isFrozen) return
-    const timer = window.setInterval(() => setTick((value) => value + 1), millisecondsPerFrame())
+    const timer = window.setInterval(() => {
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
+      if (!isGameSceneFrozen()) setTick((value) => value + 1)
+    }, millisecondsPerFrame())
     return () => window.clearInterval(timer)
   }, [lineCount, isFrozen])
 

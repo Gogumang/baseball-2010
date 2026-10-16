@@ -4,6 +4,11 @@ import { cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import type { StageActions } from '@/widgets/batting-stage/model/useStageControls'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
+import {
+  markCommonWindowShown,
+  markGameSceneUp,
+  resetCommonWindowShownForTest,
+} from '@/shared/lib/commonWindow/commonWindow'
 
 afterEach(cleanup)
 
@@ -93,5 +98,43 @@ describe('번트는 누르고 있는 동안만 — 뗄 때 0x5364c → 0x6a8 (0x
 
     fireEvent.keyUp(window, { key: '5' })
     expect(손잡이.releaseBunt).not.toHaveBeenCalled()
+  })
+})
+
+describe('공용 창이 서 있는 동안 (경기 장면 0x52c50 의 52cc6 — 키 처리 0x498d4 를 건너뛴다)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    resetCommonWindowShownForTest()
+  })
+
+  it('경기 장면 위에 창이 떠 있으면 스윙 · 이동 · 번트 키를 안 받는다', () => {
+    const 장면 = markGameSceneUp()
+    const 창 = markCommonWindowShown()
+    const 손잡이 = 붙이기({ specialSwing: vi.fn() })
+
+    for (const key of ['5', '4', '6', '8', '0']) fireEvent.keyDown(window, { key })
+
+    expect(손잡이.swing).not.toHaveBeenCalled()
+    expect(손잡이.moveBatter).not.toHaveBeenCalled()
+    expect(손잡이.pressBunt).not.toHaveBeenCalled()
+    expect(손잡이.specialSwing).not.toHaveBeenCalled()
+    창()
+    fireEvent.keyDown(window, { key: '5' })
+    expect(손잡이.swing).toHaveBeenCalledTimes(1)
+    장면()
+  })
+
+  it('창이 닫힌 뒤 키 시각은 경기 장면 시계다 — 창이 떠 있던 만큼 빠진다(단계 시작 시각과 같은 시계)', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000)
+    const 장면 = markGameSceneUp()
+    const 창 = markCommonWindowShown()
+    now.mockReturnValue(4000)
+    창()
+    now.mockReturnValue(4500)
+    const 손잡이 = 붙이기({})
+    fireEvent.keyDown(window, { key: '5' })
+    expect(손잡이.swing).toHaveBeenCalledWith(1500)
+    장면()
   })
 })

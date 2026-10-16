@@ -131,7 +131,8 @@ export function useRecordAlert(
     stateRef.current = drawn.next
     // 빈 그림이 이어지면 다시 그리지 않는다 — 부르는 화면을 갱신마다 다시 그리지 않게
     setFrame((previous) => (previous.panel === null && drawn.frame.panel === null ? previous : drawn.frame))
-  }, isDrawing)
+    // 0x4e35c 는 경기 장면 프레임 53064 에서 공용 창 게이트(52cc6 · 52efe · 53048) 밖이라 창이 떠 있어도 그림마다 돈다
+  }, isDrawing, true)
 
   return isDrawing ? frame : NO_FRAME
 }

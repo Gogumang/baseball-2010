@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
-import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
 import { shinedSpriteUrl } from '@/pages/defense/lib/laserShine'
 import {
   CAMERA_FOLLOW_PERCENT,
@@ -193,7 +193,8 @@ export function DefenseScreen({
   cameraOffsetRef,
   children,
 }: DefenseScreenProps) {
-  const update = useUpdateCounter(isRunning)
+  // 카메라 0x3f060 은 경기 장면 갱신이다 — 공용 창이 서 있으면 52cc6 이 건너뛰어 카메라도 선다(`useGameSceneUpdateCounter`)
+  const update = useGameSceneUpdateCounter(isRunning)
   // 시즌 잔디 (`0x7885c`) — 아직 다 안 칠했거나 캔버스가 없으면 구운 그림을 그대로 쓴다.
   const backgroundUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
   const bounds = cameraBoundsOf(styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)

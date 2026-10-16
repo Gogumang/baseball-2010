@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
+import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
+import { isCommonWindowShown, isGameSceneFrozen, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
@@ -175,6 +175,10 @@ export function DefensePlayback({
 }: DefensePlaybackProps) {
   // 수비 판(0x17)은 갱신마다 앱 전역 파티클 관리자를 직접 굴리고 그린다(그리기 0x46c88 → 프레임 끝 0x6de84 · 0x6dd69)
   useClaimSceneParticles()
+  // 수비 판도 경기 장면 0x104 의 한 상태(0x17)다 — 0x3874 가 장면 객체를 new 하는 것은 장면 전환 때뿐이라 타석 화면이 내려가고 이
+  // 판이 서도 장면은 그대로다(결과 코드 +0xfd4 · 파티클 관리자가 남는다). 타석 화면을 내리고 이 판만 그리는 길(`GameRoute` ·
+  // `MissionRoutes`)에서도 경기 장면이 서 있다고 센다 — 공용 창이 뜨면 이 판도 멈춘다(`isGameSceneFrozen`)
+  useMarksGameScene()
   if (input !== undefined) {
     return (
       <LivePlayback
@@ -396,7 +400,7 @@ function stepRecordedBoard(
 function RecordedPlayback({
   ticks, onDone, onFieldingErrors, grassPalette, runScoreBoard, freePassPlay, children,
 }: RecordedPlaybackProps) {
-  const update = useUpdateCounter(ticks.length > 0)
+  const update = useGameSceneUpdateCounter(ticks.length > 0)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
   /** 셈 — 갱신을 한 번씩만 지나도록 ref 로 든다 (재생 묶음이 바뀌면 처음부터) */
@@ -425,6 +429,8 @@ function RecordedPlayback({
     const onKeyDown = (event: KeyboardEvent) => {
       // 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x519cc — 원본이 아는 키만
       if (originalKeyOf(event.key) === null) return
+      // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
+      if (isGameSceneFrozen()) return
       setSkipped(true)
     }
     window.addEventListener('keydown', onKeyDown)
@@ -501,7 +507,7 @@ interface LiveRunnerPlaybackProps {
  * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
  */
 function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
-  const update = useUpdateCounter(true)
+  const update = useGameSceneUpdateCounter(true)
   const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(
     null,
   )
@@ -530,6 +536,8 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     const onKeyDown = (event: KeyboardEvent) => {
       // 원본이 아는 키만 담는다 (숫자·방향·OK·CLR)
       if (originalKeyOf(event.key) === null) return
+      // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
+      if (isGameSceneFrozen()) return
       pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
     }
     window.addEventListener('keydown', onKeyDown)
@@ -627,7 +635,7 @@ interface RunScoreBoardView {
 function LivePlayback({
   input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children,
 }: LivePlaybackProps) {
-  const update = useUpdateCounter(true)
+  const update = useGameSceneUpdateCounter(true)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
   const builtSideRef = useRef<ControlSide | undefined>(undefined)
@@ -690,6 +698,8 @@ function LivePlayback({
     const onKeyDown = (event: KeyboardEvent) => {
       // 원본이 아는 키만 담는다 (숫자·방향·OK·CLR)
       if (originalKeyOf(event.key) === null) return
+      // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
+      if (isGameSceneFrozen()) return
       // 누르고 있는 중인가 — 레이저 확정은 새로 누른 키만 받는다 (0x4e858 키 반복 계수 0)
       pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
     }
@@ -748,7 +758,8 @@ function LivePlayback({
     let board: RunScoreBoardView | null | undefined
     // 53048 — 공용 창 [0x140005c]+9 가 서 있으면 경기 장면 프레임이 관리자 틱 0x6de85 를 건너뛴다(그리기 쪽 0x40faa 효과 틱도 상태 그리기와
     // 함께 건너뛴다 — 52f24). 난수를 안 넘기면 `stepDefenseEffects` 가 두 틱을 안 돈다.
-    // ⚠️ 미확인 · 근사: 원본은 그동안 갱신(52cc6)도 멈춰 판이 서지만 웹 수비 판은 창이 떠도 진행한다 — 파티클 틱 · 그리기만 멈춘다
+    // 갱신(52cc6)도 멈춘다 — 갱신 계수가 경기 장면 시계로 서므로(`useGameSceneUpdateCounter`) 창이 떠 있는 동안 진행기 틱이 안 돌고,
+    // 창이 닫히면 건너뛴 틱을 따라잡지 않고 그 자리에서 이어 돈다
     const effectsPorts = {
       particles: particlesRef.current,
       random: isCommonWindowShown() ? undefined : input.random,

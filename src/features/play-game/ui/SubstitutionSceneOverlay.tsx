@@ -10,6 +10,7 @@ import {
 import * as styles from '@/features/play-game/ui/SubstitutionSceneOverlay.css'
 import { ACE_CUT_IN_DRAWS } from '@/features/play-game/model/aceCutIn'
 import { AceCutInCanvas } from '@/features/play-game/ui/AceCutInCanvas'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 const GAME_UI_FOLDER = './sprites/game_ui/frames'
 
@@ -41,6 +42,8 @@ export function SubstitutionSceneOverlay({ onDone, aceSlot = null }: Substitutio
   const totalDraws = aceSlot === null ? SUBSTITUTION_SCENE_DRAWS : ACE_CUT_IN_DRAWS
   useEffect(() => {
     const handle = window.setInterval(() => {
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
+      if (isGameSceneFrozen()) return
       drawRef.current += 1
       const next = drawRef.current
       if (next >= totalDraws) {

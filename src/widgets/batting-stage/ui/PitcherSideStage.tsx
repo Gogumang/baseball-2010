@@ -21,6 +21,7 @@ import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { gameSceneNow, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 interface PitcherSideStageProps {
   /** 이 화면에서 마지막으로 던진 공(진행기 `lastPitch`). 화면이 설 때 이미 있던 공은 다시 날리지 않는다 */
@@ -127,7 +128,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     const context = canvasRef.current?.getContext('2d')
     if (!context) return
     const tickLength = millisecondsPerFrame()
-    const openedAt = performance.now()
+    // 장면 시각은 경기 장면 시계로 잰다 — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다(`gameSceneTimeOf`)
+    const openedAt = gameSceneNow()
     /** 화면이 설 때 있던 공 — 수비 화면에서 돌아와 다시 서도 같은 공을 또 날리지 않는다 */
     let shownPitch: Pitch | null = latestRef.current.pitch
     let releaseTick: number | null = null
@@ -153,7 +155,14 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     /** 마지막으로 본 0xd 진입 표지 */
     let seenSceneDEntryMark = latestRef.current.sceneDEntryMark
 
-    const frame = (now: number) => {
+    const frame = (rawNow: number) => {
+      // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신을, 52efe 가 상태 그리기를 건너뛴다(창이 선 첫 그림
+      // [창+0x250] 의 다시 그리기는 갱신이 없어 앞 그림과 같다) — 캔버스를 그대로 두고 시계도 세운다
+      if (isGameSceneFrozen()) {
+        handle = requestAnimationFrame(frame)
+        return
+      }
+      const now = gameSceneTimeOf(rawNow)
       const current = latestRef.current
       if (current.isFrozen === true) {
         if (frozenSince === null) frozenSince = now

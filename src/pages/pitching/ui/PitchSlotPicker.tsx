@@ -7,6 +7,7 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 구질 칸 하나 — 칸 번호는 0xb6d2c 의 칸 0~5 (5 = 마구) */
 export interface PitchSlotChoice {
@@ -88,6 +89,8 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
     if (isPaused) return
     const handle = window.setInterval(() => {
       if (isDoneRef.current) return
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
+      if (isGameSceneFrozen()) return
       tickRef.current += 1
       setTick(tickRef.current)
       if (!isPitchSelectionDue(tickRef.current, chosenRef.current)) return

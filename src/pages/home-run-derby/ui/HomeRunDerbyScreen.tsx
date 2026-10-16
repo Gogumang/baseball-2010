@@ -7,7 +7,7 @@ import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
-import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
@@ -30,7 +30,7 @@ import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
-import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneNow, useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface HomeRunDerbyScreenProps {
   /**
@@ -126,7 +126,7 @@ export function HomeRunDerbyScreen({
   const session = useHomeRunDerby({
     bestDistance, onFinish, aceLevels, random, myTeamId, modeBatterSlot, ...(onOpenHidden === undefined ? {} : { onOpenHidden }),
   })
-  const tick = useUpdateCounter()
+  const tick = useGameSceneUpdateCounter()
   const menu = useInGameMenuState()
   // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
   useMarksGameScene()
@@ -329,7 +329,7 @@ export function HomeRunDerbyScreen({
                   ? null
                   : derbyDisplayDistanceAt(
                       session.distanceBoard.batted,
-                      Math.floor((performance.now() - session.distanceBoard.startedAt) / millisecondsPerFrame()),
+                      Math.floor((gameSceneNow() - session.distanceBoard.startedAt) / millisecondsPerFrame()),
                       session.distanceBoard.previous,
                     )
               }
@@ -429,7 +429,7 @@ function DerbyMatchupCards({
   readonly isAcePitcher: boolean
   readonly batter: Omit<MatchupBatterCard, 'isComputer'> | undefined
 }) {
-  const tick = useUpdateCounter()
+  const tick = useGameSceneUpdateCounter()
   return (
     <MatchupCards
       tick={tick}

@@ -14,6 +14,7 @@ import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 interface AimCursorProps {
   /** 존 중심 표 0xcfbcc 의 칸 — 진행기가 투구에 쓰는 side 와 같다 */
@@ -81,6 +82,8 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     if (isPaused) return
     const handle = window.setInterval(() => {
       if (isDoneRef.current) return
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
+      if (isGameSceneFrozen()) return
       tickRef.current()
       setDrawTick((previous) => previous + 1)
     }, millisecondsPerFrame())
