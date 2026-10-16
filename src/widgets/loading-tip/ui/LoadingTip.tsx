@@ -4,8 +4,9 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { gameSceneNow, gameSceneTimeOf, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
-import { preloadSpriteScene } from '@/shared/lib/sprite/scenePreload'
+import { preloadSpriteScene, preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
+import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
 
 /**
@@ -55,9 +56,16 @@ interface LoadingTipProps {
    * 덜 받았으면 장면에서 예전처럼 늦게 뜬다.
    */
   readonly preloadScenes?: readonly SpriteSceneKey[]
+  /**
+   * 장면 그림 뒤에 이어 받을 계산 목록 — 이 경기 두 팀의 선수 그림(마선수 · 사람 선수 장비 · 몸통 폼, `app/model/gameSpritePreload`).
+   * 역시 기다리지 않는다.
+   */
+  readonly preloadRequests?: readonly SpriteFolderPreload[]
 }
 
-export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preloadScenes = GAME_SCENE_PRELOADS }: LoadingTipProps) {
+export function LoadingTip({
+  tip, onDone, steps = LOADING_STEPS_DEFAULT, preloadScenes = GAME_SCENE_PRELOADS, preloadRequests,
+}: LoadingTipProps) {
   const origins = useFrameOrigins(FOLDER)
   const animations = useAnimations(FOLDER)
   const [update, setUpdate] = useState(0)
@@ -68,7 +76,8 @@ export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preload
 
   useEffect(() => {
     for (const scene of preloadScenes) preloadSpriteScene(scene)
-  }, [preloadScenes])
+    if (preloadRequests !== undefined) preloadSprites(preloadRequests)
+  }, [preloadScenes, preloadRequests])
 
   useEffect(() => {
     const startedAt = gameSceneNow()

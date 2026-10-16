@@ -32,6 +32,7 @@ import {
 } from '@/pages/match-settings/lib/matchSettingsText'
 import * as styles from '@/pages/match-settings/ui/MatchSettingsWindow.css'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const SLT_FRAMES = './sprites/slt_frame/frames'
 const SLT_IMAGES = './sprites/slt_frame'
@@ -313,7 +314,7 @@ function TintedDigit({ digit, centerX, centerY, color }: {
   readonly color: string
 }) {
   const width = detailDigitWidthOf(digit)
-  const image = `url(${pngOf(NUM_IMAGES, DETAIL_NUMBER.base + digit)})`
+  const image = spriteMaskImage(pngOf(NUM_IMAGES, DETAIL_NUMBER.base + digit))
   return (
     <span className={styles.tintedDigit} data-digit={digit} data-color={color} style={{
       left: centerX - (width >> 1),

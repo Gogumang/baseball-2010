@@ -12,6 +12,7 @@
  *  - 유휴 줄(`idle`): 앱 첫 진입의 공용 폴더 등. 장면 줄이 비었을 때, 브라우저가 한가할 때(requestIdleCallback) 조금씩 받는다.
  *    유휴 줄에 서 있던 것을 장면이 부르면 장면 줄로 올린다.
  */
+import { spriteMaskSrc } from '@/shared/lib/sprite/spriteMask'
 
 /** 폴더 하나에서 받을 것 */
 export interface SpriteFolderPreload {
@@ -21,6 +22,18 @@ export interface SpriteFolderPreload {
   readonly frames: readonly number[] | 'all'
   /** 같이 받을 JSON (폴더 기준 이름) — 합성 프레임 폴더면 보통 `origins.json` */
   readonly json?: readonly string[]
+  /**
+   * CSS `mask-image` 로 쓰는 프레임 번호 — `?mask` 주소를 CORS 모드로 받는다 (`spriteMask` 머리말: `<img>` 몫과 캐시 칸이 갈린다)
+   */
+  readonly masks?: readonly number[]
+  /**
+   * 이 폴더의 `origins.json` 에 **있는 프레임만** 받는다 — 그리기(`placedFrame`)가 원점 없는 칸을 아예 안 받는 것과 같게.
+   * 계산으로 만든 목록(자세표 × 겹 규칙)은 파일이 없는 칸(번트 앞몸 · 덧그림 없는 투구 단계 따위)을 낼 수 있어 이것으로 거른다.
+   * 번호 지도 폴더(`frames/index`)는 원점 표가 없으니 그림 폴더(`frames`)를 가리킨다.
+   */
+  readonly framesListedIn?: string
+  /** 번호가 아닌 이름의 PNG (`management/icon_selected_5` 따위) — 확장자 없이 */
+  readonly names?: readonly string[]
 }
 
 export type SpritePreloadPriority = 'scene' | 'idle'
@@ -44,6 +57,47 @@ export interface SpritePreloader {
 
 export function frameUrl(folder: string, frame: number): string {
   return `${folder}/${String(frame).padStart(3, '0')}.png`
+}
+
+/** 목록이 받을 PNG 주소 (프레임 · 마스크, `'all'` 은 빼고) — 시험 · 측정용 */
+export function preloadImageUrlsOf(requests: readonly SpriteFolderPreload[]): string[] {
+  return requests.flatMap((request) => [
+    ...(request.frames === 'all' ? [] : request.frames.map((frame) => frameUrl(request.folder, frame))),
+    ...(request.masks ?? []).map((frame) => spriteMaskSrc(frameUrl(request.folder, frame))),
+    ...(request.names ?? []).map((name) => `${request.folder}/${name}.png`),
+  ])
+}
+
+/**
+ * 여러 목록을 폴더별로 합친다 — 프레임·JSON·마스크는 합집합(오름차순), `'all'` 이 하나라도 있으면 `'all'`.
+ * 계산으로 만든 목록(선수 그림)과 측정 목록을 겹쳐 쓸 때 같은 폴더가 두 번 나오지 않게 한다. 폴더는 처음 나온 차례다.
+ */
+export function mergeSpritePreloads(...lists: readonly (readonly SpriteFolderPreload[])[]): SpriteFolderPreload[] {
+  const byFolder = new Map<string, { frames: Set<number> | 'all'; json: Set<string>; masks: Set<number>; names: Set<string>; listedIn?: string }>()
+  for (const list of lists) {
+    for (const request of list) {
+      let entry = byFolder.get(request.folder)
+      if (entry === undefined) {
+        entry = { frames: new Set(), json: new Set(), masks: new Set(), names: new Set() }
+        byFolder.set(request.folder, entry)
+      }
+      if (request.framesListedIn !== undefined) entry.listedIn = request.framesListedIn
+      if (request.frames === 'all') entry.frames = 'all'
+      else if (entry.frames !== 'all') for (const frame of request.frames) entry.frames.add(frame)
+      for (const name of request.json ?? []) entry.json.add(name)
+      for (const frame of request.masks ?? []) entry.masks.add(frame)
+      for (const name of request.names ?? []) entry.names.add(name)
+    }
+  }
+  const ascending = (a: number, b: number) => a - b
+  return [...byFolder].map(([folder, entry]) => ({
+    folder,
+    frames: entry.frames === 'all' ? 'all' : [...entry.frames].sort(ascending),
+    ...(entry.json.size === 0 ? {} : { json: [...entry.json].sort() }),
+    ...(entry.masks.size === 0 ? {} : { masks: [...entry.masks].sort(ascending) }),
+    ...(entry.names.size === 0 ? {} : { names: [...entry.names].sort() }),
+    ...(entry.listedIn === undefined ? {} : { framesListedIn: entry.listedIn }),
+  }))
 }
 
 interface Task {
@@ -129,10 +183,19 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
           .map(Number)
           .filter((frame) => Number.isInteger(frame))
       }
+    } else if (request.framesListedIn !== undefined && request.frames.length > 0) {
+      const origins = await deps.loadJson(`${request.framesListedIn}/origins.json`).catch(() => null)
+      const listed = origins !== null && typeof origins === 'object' ? (origins as Record<string, unknown>) : null
+      // 원점 표를 못 받았으면 목록대로 받는다(없는 칸은 실패로 끝날 뿐 진행은 같다)
+      frames = listed === null ? request.frames : request.frames.filter((frame) => String(frame).padStart(3, '0') in listed)
     } else {
       frames = request.frames
     }
-    const imageDone = frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority))
+    const imageDone = [
+      ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority)),
+      ...frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority)),
+      ...(request.masks ?? []).map((frame) => enqueue(spriteMaskSrc(frameUrl(request.folder, frame)), priority)),
+    ]
     pump()
     await Promise.all([...jsonDone, ...imageDone])
   }

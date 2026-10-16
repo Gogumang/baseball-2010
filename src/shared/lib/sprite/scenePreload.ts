@@ -7,7 +7,7 @@ import { SPRITE_PRELOAD_SCENES } from '@/shared/config/spritePreloadScenes'
 import type { SpriteSceneKey } from '@/shared/config/spritePreloadScenes'
 import { loadSpriteImage, loadSpriteJson, retainDisplayedSprites } from '@/shared/lib/sprite/spriteCache'
 import { createSpritePreloader } from '@/shared/lib/sprite/spritePreload'
-import type { SpritePreloadPriority } from '@/shared/lib/sprite/spritePreload'
+import type { SpriteFolderPreload, SpritePreloadPriority } from '@/shared/lib/sprite/spritePreload'
 
 /**
  * 시험(vitest)에서는 받지 않는다 — 가짜 fetch·가짜 타이머로 도는 화면 시험에 요청을 끼워 넣지 않게.
@@ -31,6 +31,12 @@ const preloader = createSpritePreloader({
 export function preloadSpriteScene(scene: SpriteSceneKey, priority: SpritePreloadPriority = 'scene'): void {
   if (isDisabled) return
   void preloader.preload(SPRITE_PRELOAD_SCENES[scene], priority)
+}
+
+/** 계산으로 만든 목록(선수 그림 따위)을 미리 받는다. 기다리지 않는다 */
+export function preloadSprites(requests: readonly SpriteFolderPreload[], priority: SpritePreloadPriority = 'scene'): void {
+  if (isDisabled || requests.length === 0) return
+  void preloader.preload(requests, priority)
 }
 
 /** 화면 `<img>` 가 띄운 스프라이트를 공용 캐시에 붙들기 시작한다(앱 첫 진입에 한 번). 떼는 함수를 돌려준다 */

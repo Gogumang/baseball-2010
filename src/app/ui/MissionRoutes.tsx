@@ -62,6 +62,16 @@ import {
 } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import type { WalkerLineSeats, WalkerSeat } from '@/widgets/field-walk/lib/walkerAces'
+import { gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
+import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
+
+/**
+ * 미션 경기 로딩 판 동안 받을 그림 — 미션은 로딩 판 뒤 곧바로 첫 판(0x18, 미션 목표 · 경기 끝 판과 같은 글자 칸)이라 `afterGame` 도,
+ * 선수는 첫 그림 몫(대기 자세 · 수비 서 있기)을 먼저 그 뒤 기본 출연진 전부(두 몸통 폼 · 평범한 투수 · 루 주자)
+ */
+const MISSION_LOADING_SCENES: readonly SpriteSceneKey[] = ['gameEntry', 'gameAtBat', 'afterGame']
+const MISSION_STAGE_PRELOADS = mergeSpritePreloads(gameEntryCastPreloadsOf(), stageSpritePreloadsOf())
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -451,7 +461,7 @@ function missionOverlayOf(
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
-        <LoadingTip tip={session.loadingTip} onDone={actions.finishLoading} />
+        <LoadingTip tip={session.loadingTip} onDone={actions.finishLoading} preloadScenes={MISSION_LOADING_SCENES} preloadRequests={MISSION_STAGE_PRELOADS} />
       </RawScreen>
     )
   }

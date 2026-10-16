@@ -60,6 +60,7 @@ import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const MAIN_UI = './sprites/main_ui'
 const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
@@ -220,7 +221,7 @@ export function SpecialScreen({
   /** 단색으로 찍는 글자 (원본 효과 0xb) — 그림을 마스크로 쓰고 색을 칠한다 */
   const tinted = (src: string, left: number, top: number, width: number, height: number, color: string) => (
     <div className={menuStyles.tintedLabel}
-      style={{ left, top, width, height, background: solidColorCss(color), maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
+      style={{ left, top, width, height, background: solidColorCss(color), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }} />
   )
 
   // ── 세로 릴 0x2524c(…, 6) — 슬롯 1·2·3 · 5·6·7 (4 는 판이 대신) ──
