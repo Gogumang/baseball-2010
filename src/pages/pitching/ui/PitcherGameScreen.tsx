@@ -349,7 +349,8 @@ export function PitcherGameScreen({
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
-   * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 기다리지 않는다.
+   * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 OK 를 기다리지 않고 0xd 두 그림 ·
+   * 0xe 한 그림만 지난다(`hooksAtEntry`).
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·강판 물음·돌발 결과 창·감독 대사 창이 덮으면 받지 않는다.
    * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954 의 CPU 대타)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
@@ -372,8 +373,8 @@ export function PitcherGameScreen({
       resolution === null,
   )
   const sceneConfirm = useSceneConfirm(
-    // 진행기가 OK 를 아직 안 받은 0xe 대기
-    progress.sceneConfirmPending === true ? progress.sceneConfirm : null,
+    // 진행기가 OK 를 아직 안 받은 0xe 대기 — 또는 0xe 진입에서 감독 강판으로 빠지는 지나감(0xd 두 그림 · 0xe 한 그림, `hooksAtEntry`)
+    progress.sceneConfirmPending === true || progress.managerHookText !== null ? progress.sceneConfirm : null,
     !isSceneShowing &&
       progress.pendingDefensePlay === null &&
       progress.pendingRunnerPlay == null &&
@@ -385,11 +386,15 @@ export function PitcherGameScreen({
       !asksGiveUp &&
       // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c)
       resolution === null &&
-      progress.managerHookText === null &&
       !substitution.isShown,
     actions.confirmScene,
   )
-  const isAwaitingConfirm = sceneConfirm.isAwaiting && canPitch
+  /**
+   * 감독 강판의 0xd · 0xe 지나감 — 진입 0x50674 506ea 0x504cc 참이어도 앞선 0xd 두 그림 · 0xe 한 그림(0x4d9ec)은 그린다. 다 지나면
+   * 다음 틀 0xbc9c8 이 0x23 으로 옮겨 강판 창이 선다
+   */
+  const isHookPassing = progress.managerHookText !== null && sceneConfirm.isAwaiting
+  const isAwaitingConfirm = sceneConfirm.isAwaiting && (canPitch || isHookPassing)
   /** 돌발 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 굴려 예약한다(0x50c42) — OK 전에는 안 띄운다. 결과 창은 0xe 앞이다 */
   const visibleBurstLines = resolution === null && isAwaitingConfirm ? null : burstLines
   const acceptsPickoff =
@@ -1023,7 +1028,7 @@ export function PitcherGameScreen({
         )}
 
         {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다 */}
-        {progress.managerHookText !== null && !substitution.isShown && (
+        {progress.managerHookText !== null && !substitution.isShown && !isHookPassing && (
           <ManagerHookWindow
             userEventIndex={progress.managerHookText}
             onConfirm={actions.confirmManagerHook}
