@@ -15,7 +15,7 @@ import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
   ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_NAME, LIST_ROW_FRAME_DY, listFirstYOf, STAT_NAME, STAT_VALUE, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
-  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_BADGE, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, skillBitOfCell, skillGradeOf, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
+  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_BADGE, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, skillGradeOf, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
@@ -34,7 +34,7 @@ import {
 } from '@/pages/record/lib/statCells'
 import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
-import { RECORD_COUNT_KINDS, achievementMarkOf, recordCountOf } from '@/entities/collection/model/annalsStats'
+import { RECORD_COUNT_KINDS, achievementMarkOf, annalsSkillOfCell, isAnnalsSkillGained, recordCountOf } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -298,9 +298,10 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
             isBlinking={isBlinking}
             cursorShake={cursorShake}
             onSelect={selectCell}
+            // 얻음 = 표 [+0x13c](0x58a3c) 가 −1 이 아님 — 켠 스킬 비트 +0xf4/+0xf8 (0x2f150~0x2f162)
             items={ORIGINAL_SKILLS.map((skill) => ({
               name: skill.name,
-              isGained: collection.skills.includes(skill.id),
+              isGained: isAnnalsSkillGained(collection.stats, skill.id),
             }))}
           />
           <FrameSprite folder={SLT_FRAMES} frame={SKILL_DESCRIPTION.tabFrame} origins={frames}
@@ -313,19 +314,19 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
             height={SKILL_DESCRIPTION.box.height}
           />
           {/* 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488) — img_text 등급(팔레트 0) · slt_frame 이미지 0x7c/0x7d 화살 */}
-          {collection.skills.includes(cursor) && (
+          {isAnnalsSkillGained(collection.stats, cursor) && (
             <>
               <FrameSprite folder={IMG_TEXT} frame={SKILL_BADGE.gradeFrames[skillGradeOf(cursor)]} origins={textFrames}
                 x={SKILL_BADGE.gradeX} y={SKILL_BADGE.gradeY} />
               <img className={styles.sprite} alt="" data-testid="스킬-화살"
-                src={imageSrc(SLT_FRAME, isMinusSkill(skillBitOfCell(cursor)) ? SKILL_BADGE.minusImage : SKILL_BADGE.plusImage)}
+                src={imageSrc(SLT_FRAME, isMinusSkill(annalsSkillOfCell(collection.stats, cursor)) ? SKILL_BADGE.minusImage : SKILL_BADGE.plusImage)}
                 style={{ left: SKILL_BADGE.arrowX, top: SKILL_BADGE.arrowY + (isBlinking ? 1 : 0) }} />
             </>
           )}
           {/* 0xba269(글, 39, 202, 폭 −1) — 날 글 폭이라 `!N` 에서만 줄이 끊긴다 (0x2f3a0 · 0x2f4d8 → 0x2fb8e) */}
           <div className={styles.descriptionText} data-testid="스킬-설명"
             style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y }}>
-            {parseGameMarkup(collection.skills.includes(cursor)
+            {parseGameMarkup(isAnnalsSkillGained(collection.stats, cursor)
               // `"%s!N효과 : !cFFFF00%s"`(0xcf978) — StrSKILL[i] · StrSKILL[i + 40]
               ? `${ORIGINAL_SKILLS[cursor]?.description ?? ''}!N효과 : !cFFFF00${ORIGINAL_SKILLS[cursor]?.effect ?? ''}`
               : SKILL_NOT_GAINED_TEXT).map((line, lineIndex) => (

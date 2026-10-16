@@ -264,8 +264,7 @@ export const SKILL_BADGE = {
 /** 스킬 등급 (0x2f3b0~0x2f3c0) — 0 공통 · 1 타자 · 2 투수 */
 export const skillGradeOf = (cell: number): 0 | 1 | 2 => (cell <= 7 ? 0 : cell <= 0x17 ? 1 : 2)
 
-/** 칸 → 스킬 비트 번호 (0x58a3c 가 표 [+0x13c] 에 적는 값) — 칸 0~23 은 그대로, 투수 칸 24~39 는 −16 */
-export const skillBitOfCell = (cell: number): number => (cell <= 0x17 ? cell : cell - 16)
+/* 칸 → 스킬 비트 번호(표 [+0x13c], 0x58a3c)는 `entities/collection` 의 `annalsSkillOfCell` — 켠 스킬 비트로 −1 도 가른다 */
 
 /** 못 얻은 스킬 설명 `"!cffffff아직 획득하지 못한!N스킬입니다."`(0xcf950) — 0x2f37e~0x2f3ae (칸 > 0x27 이거나 표 [+0x13c + 4i] == −1) */
 export const SKILL_NOT_GAINED_TEXT = '!cffffff아직 획득하지 못한!N스킬입니다.'

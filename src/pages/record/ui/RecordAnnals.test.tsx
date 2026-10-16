@@ -14,6 +14,16 @@ import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
 
+/** 켠 스킬 비트(+0xf4 타자 · +0xf8 투수)만 세운 기록연감 — 스킬 탭 '얻음' 은 0x58a3c 가 이 비트로 가른다 */
+const 켠스킬 = (batterBits: number[], pitcherBits: number[] = []) => ({
+  ...EMPTY_COLLECTION,
+  stats: {
+    ...EMPTY_COLLECTION.stats,
+    batterEquippedSkillBits: batterBits.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+    pitcherEquippedSkillBits: pitcherBits.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+  },
+})
+
 /**
  * 기록연감 (0x2e29c — P6 2c). 탭 다섯이 192 판 위에 놓이고
  * 진행·스킬은 41×25 칸 격자, 닉네임은 164×18 줄이다.
@@ -156,7 +166,7 @@ describe('기록연감 칸 격자', () => {
   })
 
   it('얻은 칸은 이름이 나오고, 칸은 41×25 에 4열로 놓인다', () => {
-    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0, 1] } })
+    띄우기({ collection: 켠스킬([0, 1]) })
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     const first = screen.getByRole('button', { name: ORIGINAL_SKILLS[0].name })
@@ -169,14 +179,14 @@ describe('기록연감 칸 격자', () => {
   })
 
   it('스킬 탭은 고른 칸의 설명을 보여 준다 — 못 얻었으면 ???', () => {
-    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0] } })
+    띄우기({ collection: 켠스킬([0]) })
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     expect(screen.getByText(/효과 :/)).toBeTruthy()
   })
 
   it('스킬 설명은 (39, 202) 에 폭 없이 `!N` 에서만 끊고, 효과는 노랑 — 못 얻었으면 "아직 획득하지 못한 / 스킬입니다." (0x2f3a0 · 0x2f4d8 → 0x2fb8e)', () => {
-    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0] } })
+    띄우기({ collection: 켠스킬([0]) })
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     const box = screen.getByTestId('스킬-설명')
@@ -196,7 +206,7 @@ describe('기록연감 칸 격자', () => {
   })
 
   it('스킬 탭에는 아래 합계 줄이 없다 — 프레임 15 합계는 탭 3 · 4 뿐 (0x2f834 · 0x2fa60)', () => {
-    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0, 1] } })
+    띄우기({ collection: 켠스킬([0, 1]) })
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     expect(screen.queryByText(`2/${ORIGINAL_SKILLS.length}`)).toBeNull()
@@ -344,14 +354,14 @@ describe('진행·스킬 격자 — 보이는 3줄 창이 커서를 따라간다
   })
 
   it('스킬 탭 — 숫자 8 도 ↓ 다. 끝 줄(칸 36~39)까지 내려간다', () => {
-    본문('스킬', { ...EMPTY_COLLECTION, skills: [39] })
+    본문('스킬', 켠스킬([], [39 - 16]))
     for (let i = 0; i < 9; i += 1) fireEvent.keyDown(window, { key: '8' })
 
     expect(screen.getByRole('button', { name: ORIGINAL_SKILLS[39].name }).style.left).toBe(`${cellPositionOf(3).x}px`)
   })
 
   it('← 는 같은 줄 끝으로 감긴다 — 고른 칸이 바뀌어 설명이 따라간다', () => {
-    본문('스킬', { ...EMPTY_COLLECTION, skills: [3] })
+    본문('스킬', 켠스킬([3]))
     expect(screen.queryByText(/효과 :/)).toBeNull()
 
     fireEvent.keyDown(window, { key: 'ArrowLeft' })

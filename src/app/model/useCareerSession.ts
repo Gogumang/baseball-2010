@@ -1700,7 +1700,11 @@ export function useCareerSession({
       saveGame.clear()
       // 104 → 100 — 나리 장면이 새로 선다(커서 0 · mgr+0x304 = 1 — 새 선수라 본 표시는 비어 있다)
       setUpNariScene()
-      setCareer(createCareer(name, profile))
+      const created = createCareer(name, profile)
+      setCareer(created)
+      // 0x112d0~0x112dc 0xa4bd8(P, 0) · (P, 8) — 얻자마자 0xa4b04 → 0xb663c 가 켠 스킬 비트(+0xf4)도 세운다.
+      // 새 선수는 아래 장착 비교 효과가 견주지 않으니(앞이 없거나 다른 선수) 여기서 적는다
+      skillEquipStatEventsOf(BATTER_LEAGUE_MODE, [], created.equippedSkillIds).forEach(recordStat)
       setScreen({ kind: '관리' })
     },
 
