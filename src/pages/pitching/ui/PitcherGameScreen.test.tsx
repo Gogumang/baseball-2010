@@ -7,9 +7,30 @@ import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/mod
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
+import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { SCENE_CONFIRM_READY_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 import { liveGameInningIndex, resetLiveGameState } from '@/shared/lib/liveGameState/liveGameState'
+
+/**
+ * 경기 장면 0x104 의 로딩 판(상태 7 · 9 · 8 — 생성자 0x3301c 가 모드 갈래 없이 상태 7 을 예약한다) — 그림 대신 그리자마자 끝낸다
+ * (적재를 다 그린 꼴). 받은 팁 · 진행 칸 끝을 남긴다
+ */
+const 로딩판 = vi.hoisted(() => [] as { tip: string; steps: number | undefined }[])
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, steps, onDone }: { tip: string; steps?: number; onDone: () => void }) => {
+      useEffect(() => {
+        로딩판.push({ tip, steps })
+        onDone()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+      return null
+    },
+  }
+})
 
 afterEach(() => {
   cleanup()
@@ -431,5 +452,13 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('로딩 판 (상태 7 · 9 · 8 — 생성자 0x3301c 33100 이 모드 갈래 없이 상태 7)', () => {
+  it('투수편(모드 3)도 경기 화면보다 먼저 로딩 판이 선다 — 팁은 0x53dbc 의 rand(0, 73) 칸 · 진행 칸 끝 0x24(기본, 모드 4 만 0x25)', () => {
+    로딩판.length = 0
+    띄우기({}, 7)
+    expect(로딩판).toEqual([{ tip: LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(7))], steps: undefined }])
   })
 })

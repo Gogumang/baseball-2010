@@ -20,6 +20,25 @@ import { SCENE_CONFIRM_READY_FRAMES } from '@/features/play-game/model/useSceneC
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
+ * 경기 장면 0x104 의 로딩 판(상태 7 · 9 · 8 — 생성자 0x3301c 가 모드 갈래 없이 상태 7 을 예약한다) — 그림 대신 그리자마자 끝낸다
+ * (적재를 다 그린 꼴). 받은 팁 · 진행 칸 끝을 남긴다
+ */
+const 로딩판 = vi.hoisted(() => [] as { tip: string; steps: number | undefined }[])
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, steps, onDone }: { tip: string; steps?: number; onDone: () => void }) => {
+      useEffect(() => {
+        로딩판.push({ tip, steps })
+        onDone()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+      return null
+    },
+  }
+})
+
+/**
  * 경기 시작 인트로(상태 0xc)와 1회초 판(0x18) — 첫 사람 타석 앞에 서면 OK 로 넘긴다.
  * 둘 다 경기 화면(PixelScreen)을 통째로 덮으므로 '메뉴' 소프트키가 없다.
  */
@@ -109,9 +128,19 @@ describe('진행 소리 고르기 — `gameSounds.gameStepSoundIdsOf` 와 같은
 })
 
 describe('팀 경기 화면의 소리 배선', () => {
-  it('경기가 서면 인트로 예약음 61 이 난다 (상태 0xc 진입 0x3b148)', () => {
-    띄우기()
-    expect(녹음.played[0]).toBe(GAME_INTRO_SOUND)
+  it('로딩 판(상태 7 · 9 · 8)이 끝나 인트로(0xc)로 갈 때 예약음 61 이 난다 (상태 0xc 진입 0x3b148) — 판 동안은 안 난다', () => {
+    const { result } = 띄우기()
+    expect(result.current.loadingTip).not.toBeNull()
+    expect(녹음.played).not.toContain(GAME_INTRO_SOUND)
+    act(() => result.current.finishLoading())
+    expect(result.current.loadingTip).toBeNull()
+    expect(녹음.played[녹음.played.length - 1]).toBe(GAME_INTRO_SOUND)
+  })
+
+  it('대전(모드 8)은 인트로를 안 지나 로딩 판이 끝나도 61 이 없다 (적재 상태 8 끝 0x48b20 — 모드 1~4 만 0xc)', () => {
+    const { result } = 띄우기({ mode: 8 })
+    act(() => result.current.finishLoading())
+    expect(녹음.played).not.toContain(GAME_INTRO_SOUND)
   })
 
   it('사람 타석 — 타구음 뒤에 심판 콜이 붙는다 (0x515de~ → 0x51a94)', () => {

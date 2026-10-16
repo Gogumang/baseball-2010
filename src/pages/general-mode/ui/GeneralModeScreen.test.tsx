@@ -9,6 +9,25 @@ import { GeneralModeScreen } from '@/pages/general-mode/ui/GeneralModeScreen'
 import { generalGameOfSave } from '@/pages/general-mode/lib/generalModeResume'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
+/**
+ * 경기 장면 0x104 의 로딩 판(상태 7 · 9 · 8 — 생성자 0x3301c 가 모드 갈래 없이 상태 7 을 예약한다) — 그림 대신 그리자마자 끝낸다
+ * (적재를 다 그린 꼴). 받은 팁 · 진행 칸 끝을 남긴다
+ */
+const 로딩판 = vi.hoisted(() => [] as { tip: string; steps: number | undefined }[])
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
+  const { useEffect } = await import('react')
+  return {
+    LoadingTip: ({ tip, steps, onDone }: { tip: string; steps?: number; onDone: () => void }) => {
+      useEffect(() => {
+        로딩판.push({ tip, steps })
+        onDone()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+      return null
+    },
+  }
+})
+
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
 vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/widgets/screen-frame/model/useListPageEntry')>()

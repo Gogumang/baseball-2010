@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
+import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   closeBurstWindow,
@@ -56,6 +57,13 @@ import type {
  */
 export interface PitcherGameSession {
   readonly progress: PitcherGameProgress
+  /**
+   * **로딩 판(상태 7 · 9 · 8)의 팁 글** — 경기 장면 0x104 생성자 0x3301c 가 33100 에서 상태 7 을 모드 갈래 없이 예약하고, 진입
+   * 0x39f88 이 판을 싣고 0x53dbc 가 팁을 굴린다. 서 있으면 화면이 `LoadingTip`(진행 칸 끝 0x24 — 모드 3 ≠ 4)을 그리고, 다 그리면 `finishLoading`
+   */
+  readonly loadingTip: string | null
+  /** 로딩 판을 다 그렸다 — 상태 8 끝(48b20)이 모드 3 이라 인트로 0xc 로 간다. 그 진입 예약음 61 을 이때 낸다. 굴림 없음 */
+  readonly finishLoading: () => void
   /** 지금 사람이 공을 던질 차례인가 */
   readonly canPitch: boolean
   /** 경기가 끝났으면 요약, 아니면 null */
@@ -109,10 +117,10 @@ export function usePitcherGame(
   /** 환경설정 진동(저장 +0x3b) — 거짓이면 0x3a44 가 안 울린다. 없으면 켬 (`BattingStage` 와 같다) */
   isVibrationOn?: boolean,
 ): PitcherGameSession {
+  // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 의 덱 1275 보다 먼저 (`rollSceneLoadingTip`).
+  // 이 칸이 아래 진행 칸보다 먼저 선다
+  const [loadingTip, setLoadingTip] = useState<string | null>(() => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
   const [progress, setProgress] = useState<PitcherGameProgress>(() => {
-    // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 의 덱 1275 보다 먼저 (`rollSceneLoadingTip`).
-    // 웹 투수편은 팁 판을 안 그려 값은 버린다
-    rollSceneLoadingTip(random)
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다 (인트로 61 효과보다 먼저)
     activeSound().stop()
     // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
@@ -155,13 +163,11 @@ export function usePitcherGame(
     }
   }, [audio])
 
-  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 모드 3 은 적재 상태 8 끝에서 0xc 로 오므로
-  // 화면(`PitcherGameScreen` 의 `GameIntro`)이 서는 자리, 곧 경기가 서는 자리다
-  useEffect(() => {
+  // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 모드 3 은 적재 상태 8 끝(48b20)에서 0xc 로 오므로 로딩 판이 끝나는 자리다
+  const finishLoading = useCallback(() => {
+    setLoadingTip(null)
     playSoundIds(audio, [GAME_INTRO_SOUND])
-    // 경기 한 판에 한 번 — 고리가 살아 있는 동안 다시 내지 않는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [audio])
 
   const actions = useMemo(
     () => ({
@@ -304,7 +310,7 @@ export function usePitcherGame(
     [progress],
   )
 
-  return { progress, canPitch: isPitchTurn(progress), summary, actions }
+  return { progress, loadingTip, finishLoading, canPitch: isPitchTurn(progress), summary, actions }
 }
 
 /** 화면이 쓰는 타입을 한 번 더 내보낸다 — 앱이 진행기 경로를 몰라도 되게 한다 */
