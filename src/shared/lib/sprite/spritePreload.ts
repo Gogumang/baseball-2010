@@ -34,6 +34,13 @@ export interface SpriteFolderPreload {
   readonly framesListedIn?: string
   /** 번호가 아닌 이름의 PNG (`management/icon_selected_5` 따위) — 확장자 없이 */
   readonly names?: readonly string[]
+  /**
+   * 이 애니 번호들이 쓰는 프레임도 받는다 — `animationsIn`(없으면 이 폴더)의 `animations.json` 칸의 `frame` 을 모은다.
+   * 이벤트 초상화처럼 **애니 번호만 아는** 계산 목록(`afterGameEventPreload`)이 프레임 번호를 손으로 옮겨 적지 않게 한다.
+   */
+  readonly animations?: readonly number[]
+  /** `animations.json` 이 놓인 폴더 — 번호 지도 폴더(`frames/index`)는 그림 폴더(`frames`)를 가리킨다 */
+  readonly animationsIn?: string
 }
 
 export type SpritePreloadPriority = 'scene' | 'idle'
@@ -59,7 +66,7 @@ export function frameUrl(folder: string, frame: number): string {
   return `${folder}/${String(frame).padStart(3, '0')}.png`
 }
 
-/** 목록이 받을 PNG 주소 (프레임 · 마스크, `'all'` 은 빼고) — 시험 · 측정용 */
+/** 목록이 받을 PNG 주소 (프레임 · 마스크, `'all'` · `animations` 는 빼고 — 표를 받아야 안다) — 시험 · 측정용 */
 export function preloadImageUrlsOf(requests: readonly SpriteFolderPreload[]): string[] {
   return requests.flatMap((request) => [
     ...(request.frames === 'all' ? [] : request.frames.map((frame) => frameUrl(request.folder, frame))),
@@ -73,12 +80,15 @@ export function preloadImageUrlsOf(requests: readonly SpriteFolderPreload[]): st
  * 계산으로 만든 목록(선수 그림)과 측정 목록을 겹쳐 쓸 때 같은 폴더가 두 번 나오지 않게 한다. 폴더는 처음 나온 차례다.
  */
 export function mergeSpritePreloads(...lists: readonly (readonly SpriteFolderPreload[])[]): SpriteFolderPreload[] {
-  const byFolder = new Map<string, { frames: Set<number> | 'all'; json: Set<string>; masks: Set<number>; names: Set<string>; listedIn?: string }>()
+  const byFolder = new Map<string, {
+    frames: Set<number> | 'all'; json: Set<string>; masks: Set<number>; names: Set<string>; listedIn?: string
+    animations: Set<number>; animationsIn?: string
+  }>()
   for (const list of lists) {
     for (const request of list) {
       let entry = byFolder.get(request.folder)
       if (entry === undefined) {
-        entry = { frames: new Set(), json: new Set(), masks: new Set(), names: new Set() }
+        entry = { frames: new Set(), json: new Set(), masks: new Set(), names: new Set(), animations: new Set() }
         byFolder.set(request.folder, entry)
       }
       if (request.framesListedIn !== undefined) entry.listedIn = request.framesListedIn
@@ -87,6 +97,8 @@ export function mergeSpritePreloads(...lists: readonly (readonly SpriteFolderPre
       for (const name of request.json ?? []) entry.json.add(name)
       for (const frame of request.masks ?? []) entry.masks.add(frame)
       for (const name of request.names ?? []) entry.names.add(name)
+      for (const animation of request.animations ?? []) entry.animations.add(animation)
+      if (request.animationsIn !== undefined) entry.animationsIn = request.animationsIn
     }
   }
   const ascending = (a: number, b: number) => a - b
@@ -97,7 +109,27 @@ export function mergeSpritePreloads(...lists: readonly (readonly SpriteFolderPre
     ...(entry.masks.size === 0 ? {} : { masks: [...entry.masks].sort(ascending) }),
     ...(entry.names.size === 0 ? {} : { names: [...entry.names].sort() }),
     ...(entry.listedIn === undefined ? {} : { framesListedIn: entry.listedIn }),
+    ...(entry.animations.size === 0 ? {} : { animations: [...entry.animations].sort(ascending) }),
+    ...(entry.animationsIn === undefined ? {} : { animationsIn: entry.animationsIn }),
   }))
+}
+
+/**
+ * `animations.json`(애니 × 칸 `{ frame, … }`)에서 고른 애니들이 쓰는 프레임 번호. 모양이 틀리면 빈 목록이다
+ * — 받지 못한 표는 미리 받기를 줄일 뿐 진행은 같다.
+ */
+export function animationFramesOf(table: unknown, animations: readonly number[]): number[] {
+  if (!Array.isArray(table)) return []
+  const frames = new Set<number>()
+  for (const animation of animations) {
+    const steps: unknown = table[animation]
+    if (!Array.isArray(steps)) continue
+    for (const step of steps) {
+      const frame = typeof step === 'object' && step !== null ? (step as { frame?: unknown }).frame : undefined
+      if (typeof frame === 'number' && Number.isInteger(frame) && frame >= 0) frames.add(frame)
+    }
+  }
+  return [...frames].sort((a, b) => a - b)
 }
 
 interface Task {
@@ -208,6 +240,10 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
       frames = listed === null ? request.frames : request.frames.filter((frame) => String(frame).padStart(3, '0') in listed)
     } else {
       frames = request.frames
+    }
+    if (request.animations !== undefined && request.animations.length > 0) {
+      const table = await deps.loadJson(`${request.animationsIn ?? request.folder}/animations.json`).catch(() => null)
+      frames = [...new Set([...frames, ...animationFramesOf(table, request.animations)])]
     }
     const imageDone = [
       ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority, generation)),

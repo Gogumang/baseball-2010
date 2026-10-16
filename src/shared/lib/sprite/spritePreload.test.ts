@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSpritePreloader, frameUrl, mergeSpritePreloads, preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
+import { animationFramesOf, createSpritePreloader, frameUrl, mergeSpritePreloads, preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
 import type { SpritePreloadDeps } from '@/shared/lib/sprite/spritePreload'
 
 interface Pending {
@@ -92,6 +92,37 @@ describe('createSpritePreloader', () => {
       './sprites/a/frames/002.png',
       './sprites/a/frames/010.png',
     ])
+  })
+
+  it('animations 는 animations.json 의 그 애니 칸 프레임을 받는다 — 번호 지도 폴더는 animationsIn 의 표를 본다', async () => {
+    const h = harness()
+    h.jsonValues.set('./sprites/a/frames/animations.json', [[{ frame: 0 }], [{ frame: 5 }, { frame: 3 }, { frame: 5 }], [{ frame: 9 }]])
+    void h.preloader.preload(
+      [
+        { folder: './sprites/a/frames', frames: [1], animations: [1], json: ['animations.json'] },
+        { folder: './sprites/a/frames/index', frames: [], animations: [2], animationsIn: './sprites/a/frames' },
+      ],
+      'scene',
+    )
+    await h.flush()
+    await h.finishAll()
+    expect([...h.started].sort()).toEqual([
+      './sprites/a/frames/001.png',
+      './sprites/a/frames/003.png',
+      './sprites/a/frames/005.png',
+      './sprites/a/frames/index/009.png',
+    ])
+    expect(animationFramesOf(null, [0])).toEqual([])
+    expect(animationFramesOf([[{ frame: 2 }, { frame: 'x' }]], [0, 7])).toEqual([2])
+  })
+
+  it('mergeSpritePreloads 는 animations 도 합친다', () => {
+    expect(
+      mergeSpritePreloads(
+        [{ folder: './f', frames: [], animations: [3] }],
+        [{ folder: './f', frames: [1], animations: [1, 3], animationsIn: './g' }],
+      ),
+    ).toEqual([{ folder: './f', frames: [1], animations: [1, 3], animationsIn: './g' }])
   })
 
   it('JSON·그림이 실패해도 약속은 풀린다 (기다리는 쪽이 멈추지 않게)', async () => {

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { Screen } from '@/app/model/screen'
+import { afterGameEvaluationPreloads } from '@/app/model/afterGameEventPreload'
 import { defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
 import { mainMenuSpritePreloads } from '@/pages/main-menu/lib/mainMenuSpritePreload'
 import { SPRITE_PRELOAD_SCENES } from '@/shared/config/spritePreloadScenes'
@@ -13,9 +14,10 @@ import type { SpriteFolderPreload, SpritePreloadPriority } from '@/shared/lib/sp
  *  - `stageCast`: 타석 선수 그림 — 두 몸통 폼 · 평범한 투수 · 루 주자 (명단을 모를 때의 기본 출연진)
  *  - `defense`: 수비 화면 야수 · 주자 · 공
  *  - `gameEntryCast`: 경기 첫 그림 몫 — 타자 대기 자세 · 투수 선 자세 · 수비 서 있기 · 달리기 (`gameEntryCastPreloadsOf`)
+ *  - `afterGameEvaluation`: 경기 뒤 평가 감독이 띄울 수 있는 표정 전부 (`afterGameEvaluationPreloads`, 표 0xcc600 · 0xcc570)
  */
 export type AppSpriteSceneKey = SpriteSceneKey | ComputedSceneKey
-type ComputedSceneKey = 'mainMenu' | 'stageCast' | 'defense' | 'gameEntryCast'
+type ComputedSceneKey = 'mainMenu' | 'stageCast' | 'defense' | 'gameEntryCast' | 'afterGameEvaluation'
 
 export interface ScreenSpritePreload {
   readonly scene: AppSpriteSceneKey
@@ -72,6 +74,7 @@ export function screenSpritePreloadsOf(kind: Screen['kind'], isInGameScene: bool
       { scene: 'gamePlay', priority: 'idle' },
       { scene: 'defense', priority: 'idle' },
       { scene: 'afterGame', priority: 'idle' },
+      { scene: 'afterGameEvaluation', priority: 'idle' },
     )
   }
   return list
@@ -85,6 +88,7 @@ const COMPUTED_SCENES: Readonly<Record<ComputedSceneKey, () => readonly SpriteFo
   stageCast: () => stageSpritePreloadsOf(),
   defense: () => defensePreloadsOf(),
   gameEntryCast: gameEntryCastPreloadsOf,
+  afterGameEvaluation: afterGameEvaluationPreloads,
 }
 
 function isComputedScene(scene: AppSpriteSceneKey): scene is ComputedSceneKey {

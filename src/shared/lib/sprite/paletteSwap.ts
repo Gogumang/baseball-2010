@@ -65,8 +65,11 @@ export function parseHexColor(text: string): readonly [number, number, number] {
 /**
  * 구운 그림(color)을 번호 지도(index)와 팔레트로 다시 칠한다. 캔버스 없이 도는 순수 함수다.
  *
- * 번호 지도의 알파가 0 인 자리는 반투명·채우기 효과로 색이 섞인 자리라 번호가 뜻을 잃는다 —
- * 구운 색을 그대로 둔다 (**근사다**: defender 그림자, event_char_0 잔상이 피부색을 안 따라간다).
+ * 번호 지도의 알파가 0 인 자리는 채우기 효과 자리나 반투명 파트가 **아래 파트와** 섞인 자리라 번호가
+ * 뜻을 잃는다 — 구운 색을 그대로 둔다 (**근사다**). 반투명 파트가 아래 없이 놓인 자리(하늘 조명 ·
+ * defender 그림자 · event_char_0 볼터치)는 번호가 있다: 원본도 반투명 그리기 0x97769 · 0x973c5 에서
+ * 그 그림의 (갈아 끼운) 팔레트[번호] 로 색을 얻는다 (r134, 그리기 0xc9f98 · 표 0xda988).
+ * 알파는 구운 그림 것을 그대로 두고 RGB 만 바꾼다.
  */
 export function recolorPixels(
   color: Uint8ClampedArray,
