@@ -289,10 +289,19 @@ export function MissionPlayScreen({
   const stealIfFlying = (base: StealBase) => {
     if (flightProbeRef.current?.() === true) onSteal(base)
   }
-  // 원본 공용 키 처리 0x498d4 — 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
+  // 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
+  const { toggle: toggleMenu } = menu
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || isMenuOpen || overlay !== null) return
+      if (event.repeat) return
+      // '*'(소프트키1 −6 도 '*', 498e8)는 상태 0xd~0x15 에서 경기 중 메뉴 0x3c02c 를 연다(4991c~49922 — 모드를 안 본다).
+      // 미션 장면도 경기 장면 0x104 다. 결과 판(끝난 미션)은 범위 밖 · 조작방법 뷰어의 키는 뷰어 0x637d0 만 받는다(0x3ca36)
+      if (event.key === '*') {
+        if (isOver || overlay === '조작방법') return
+        event.preventDefault()
+        return toggleMenu()
+      }
+      if (isMenuOpen || overlay !== null) return
       const base = stealBaseOfKey(event.key)
       if (base !== null && stealableBases.includes(base)) {
         event.preventDefault()
@@ -301,7 +310,7 @@ export function MissionPlayScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isMenuOpen, onSteal, overlay, stealableBases])
+  }, [isMenuOpen, isOver, onSteal, overlay, stealableBases, toggleMenu])
 
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {

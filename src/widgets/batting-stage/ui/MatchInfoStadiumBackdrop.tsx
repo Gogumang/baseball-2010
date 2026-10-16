@@ -7,6 +7,8 @@ import { finishSkinBackdropOnCanvas } from '@/shared/lib/screen565/screen565'
 
 /** 그림이 다 실렸는지 가늠하는 표본 간격 — 날 그림이 바뀌었을 때만 흐리기를 다시 한다 */
 const SAMPLE_STEP = 97
+/** 보이는 캔버스의 2D 문맥 옵션 — 흐리기(`finishSkinBackdropOnCanvas`)가 화소를 읽어 되놓는다 */
+export const TARGET_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
 
 function checksumOf(context: CanvasRenderingContext2D): number {
   const { data } = context.getImageData(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
@@ -46,7 +48,9 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
       raw = null
     }
     const draw = () => {
-      const target = canvasRef.current?.getContext('2d') ?? null
+      // 흐리기가 이 캔버스를 그림이 실릴 때마다 다시 읽는다 — CPU 버퍼로 열어야 Chrome 의
+      // "Multiple readback operations using getImageData" 경고가 안 난다(픽셀 값은 같다)
+      const target = canvasRef.current?.getContext('2d', TARGET_CONTEXT_OPTIONS) ?? null
       const current = stageRef.current
       if (raw !== null && target !== null && current !== null && current !== undefined && drawMemo.needsDraw(canvasRef.current, current)) {
         drawMatchInfoStadium(raw, current)

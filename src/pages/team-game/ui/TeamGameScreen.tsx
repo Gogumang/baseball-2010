@@ -1059,8 +1059,8 @@ export function TeamGameScreen({
             </div>
             {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (아이콘은 g[0x31 + 공격 측] 로 — 사람 공격이면 방망이 8) */}
             <BurstBand row={burstBandRow} role={burstBandRole} />
-            {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 */}
-            {isMatchupShown && !isPopupOpen && matchupCards}
+            {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 (일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛸 뿐이다) */}
+            {isMatchupShown && matchupCards}
             {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
             {substitutionOverlay}
             {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
@@ -1130,8 +1130,8 @@ export function TeamGameScreen({
               role={burstBandRole}
               isDimmed={phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null}
             />
-            {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 */}
-            {isMatchupShown && !isPopupOpen && matchupCards}
+            {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 (일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛸 뿐이다) */}
+            {isMatchupShown && matchupCards}
             {/* 교체 연출 0x16 "CHANGE" (0x4da30) */}
             {substitutionOverlay}
             {/* 투구 입력 — 그림은 장면이 그린다. 부품은 키 · 틱과 그림 자리의 투명한 누름 칸만 낸다 (교체 창 0xb 동안은 내린다) */}

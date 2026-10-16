@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, InsetBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -58,6 +59,11 @@ interface RecordAnnalsProps {
    */
   readonly secretCode?: SecretCodeState
   readonly onSecretCodeChange?: (next: SecretCodeState) => void
+  /**
+   * 판 아래 바탕 — 그리기 0x2e29c 는 맨 앞(0x2e2b6)에 메뉴 바탕 0x58371(skin, [this+0x90], 0) 을 깐다.
+   * 그 그림은 스페셜 쪽(`SkinBackdrop` "메뉴바탕")이 들고 있어 부르는 쪽이 넘긴다. 안 넘기면 검정이다
+   */
+  readonly underlay?: ReactNode
 }
 
 /** 화면 크기 — 판 안 그림을 자르는 clip-path 를 잴 때 쓴다 */
@@ -84,7 +90,9 @@ const SCREEN = { width: 240, height: 320 } as const
  * OK·↓ 로 본문에 들어가 ←→ 는 쪽(진행·스킬은 같은 줄 안 커서 감기), ↑↓ 는 커서 — 진행·스킬은 보이는 3줄 창이
  * 커서를 따라 한 줄씩 움직인다. 취소는 본문 → 탭 막대 → 닫기. 탭 아이콘·칸 누르기는 웹 덧붙임이다.
  */
-export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: heldSecretCode, onSecretCodeChange }: RecordAnnalsProps) {
+export function RecordAnnals({
+  collection, onBack, gamePoint = 0, secretCode: heldSecretCode, onSecretCodeChange, underlay,
+}: RecordAnnalsProps) {
   const [tab, setTab] = useState(0)
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState(0)
@@ -226,6 +234,7 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
 
   return (
     <RawScreen>
+      {underlay}
       {/* 판 (24, 160 − h/2, 192, h) — 들어올 때 32 에서 그림마다 커진다 (0x2fb94).
           0x55e60(skin, W/2, H/2, 192, h, 0, 정렬 0x22, 위 띠 0x10, 0, 0, 0) (0x2e40a~0x2e42a) */}
       <CommonPanel x={PANEL.x} y={panelTopOf(panelHeight)} width={PANEL.width} height={panelHeight} topBand={0x10} />

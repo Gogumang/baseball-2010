@@ -18,6 +18,7 @@ import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import { MessageBox } from '@/shared/ui'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { TEAMS } from '@/shared/config/original/teams'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 
@@ -340,6 +341,8 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           {...(onLevelUpAce === undefined ? {} : { onLevelUp: onLevelUpAce })}
           onSelect={actions.selectAce}
           onCancel={back}
+          // 그림 0x2dfe0 은 맨 앞(0x2e012)에서 공 무늬 바탕 0x5fd61(skin, 0, 0, W, H) 을 깐다
+          underlay={<SkinBackdrop kind="공무늬" />}
         />
       )
     default:

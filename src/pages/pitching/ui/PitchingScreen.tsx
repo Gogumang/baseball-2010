@@ -494,7 +494,8 @@ export function PitchingScreen({
               onDone={() => onSubstitutionSceneDone?.()}
             />
           )
-          const matchupCards = !isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+          // 일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛰어 마지막 그림(소개 판 포함)이 그대로다
+          const matchupCards = isAwaitingConfirm && sceneConfirm.isInConfirmState && (
             <SceneMatchupCards
               {...(matchupCardValues ?? { batterHand: 0, pitcher: { isComputer: false }, batter: { isComputer: true } })}
             />

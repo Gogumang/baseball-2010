@@ -54,15 +54,21 @@ describe('준비 흐름', () => {
   it('유저 팀 → AI 팀 → 선공 → 구장 → 마투수 → 마타자 → 경기정보 로 이어진다', async () => {
     띄우기()
 
+    // 18 · 19 · 20 · 21 그림(0x2de3c · 0x2ddb0 · 0x2dd30 · 0x2dfe0)은 모두 맨 앞에서 공 무늬 바탕 0x5fd61 을 깐다 — 검정 바탕이 아니다
+    const 공무늬 = () => screen.queryByTestId('바탕-공무늬')
     // 18 유저 팀
+    expect(공무늬()).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: TEAMS[2].name }))
     // 19 AI 팀
+    expect(공무늬()).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: TEAMS[5].name }))
     // 20 단계 0 선공
+    expect(공무늬()).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '유저 선공' }))
     // 20 단계 1 구장
     fireEvent.click(screen.getByRole('button', { name: '이 구장으로' }))
     // 21 마투수 → 마타자
+    expect(공무늬()).not.toBeNull()
     fireEvent.click(칸들()[0])
     fireEvent.click(칸들()[5])
 

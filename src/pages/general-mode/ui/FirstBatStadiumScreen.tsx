@@ -14,6 +14,7 @@ import {
 import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter, stadiumInfoOf } from '@/pages/general-mode/lib/generalModeSetup'
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const GAME_UI_FRAME = './sprites/game_ui/frames'
@@ -119,6 +120,8 @@ export function FirstBatStadiumScreen({
 
   return (
     <RawScreen>
+      {/* 그림 0x2dd30 은 맨 앞에서 공 무늬 바탕 0x5fd61(skin, 0, 0, W, H) 을 깐다 (0x2dd62) */}
+      <SkinBackdrop kind="공무늬" />
       {/* A·B 딱지 — k 3 은 둘 다 흰 막대(116)에 53 위 */}
       {[
         { anchor: anchorA, frame: 157, dy: TAG.aDy },

@@ -26,6 +26,7 @@ import type { Collection } from '@/entities/collection/model/collection'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
 import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
+import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { UsageNoticeScreen } from '@/pages/title/ui/UsageNoticeScreen'
@@ -234,6 +235,8 @@ export function EntryRoutes({
               onLevelUp={aceSelect.onLevelUp}
               onSelect={() => undefined}
               onCancel={onBack}
+              // 하위 28 그리기 0x2df78 도 맨 앞(0x2df8e)에 메뉴 바탕 0x58371(skin, [this+0x90], 0) 을 깐다
+              underlay={<SkinBackdrop kind="메뉴바탕" />}
             />
           ),
         })}

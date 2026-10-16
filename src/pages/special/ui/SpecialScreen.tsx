@@ -188,6 +188,8 @@ export function SpecialScreen({
       <RecordAnnals collection={collection} {...(gamePoint === undefined ? {} : { gamePoint })}
         {...(annalsSecretCode === undefined ? {} : { secretCode: annalsSecretCode })}
         {...(onAnnalsSecretCodeChange === undefined ? {} : { onSecretCodeChange: onAnnalsSecretCodeChange })}
+        // 하위 30 그리기 0x2e29c 도 맨 앞(0x2e2b6)에 메뉴 바탕 0x58371 을 깐다
+        underlay={<SkinBackdrop kind="메뉴바탕" />}
         onBack={() => setView('목록')} />
     )
   }

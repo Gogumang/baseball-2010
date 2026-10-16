@@ -170,6 +170,24 @@ export function HomeRunDerbyScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsConfirm, confirm])
+  /**
+   * 원본 공용 키 처리 `0x498d4` 의 '\*'(소프트키1 −6 도 '\*', 498e8) — 경기 상태 0xd~0x15 면 경기 중 메뉴 0x3c02c 를 연다
+   * (4991c~49922 — 모드를 안 본다). 더비(모드 7)도 경기 장면 0x104 라 그대로다. 로딩 판(7 · 9 · 8) · 판(0x17) · 결과 창(0x1a) ·
+   * 벤치 클리어링(0x1e)은 범위 밖이고, 조작방법 뷰어의 키는 뷰어 0x637d0 만 받는다(0x3ca36).
+   */
+  const acceptsMenuKey = !isResultShown && session.loadingTip === null && !session.isBenchClearing
+    && (isMenuOpen || session.distanceBoard === null) && overlay !== '조작방법'
+  const { toggle: toggleMenu } = menu
+  useEffect(() => {
+    if (!acceptsMenuKey) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.key !== '*') return
+      event.preventDefault()
+      toggleMenu()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [acceptsMenuKey, toggleMenu])
 
   // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(로딩 판 0x667f8 · 진행 칸 0x54120 끝 0x24 · 팁 rand(0, 73) 0x53dbc) 뒤 7 · 9 · 8 의 적재가
   // 한 단계마다 0x54128 · 0x53e04(바탕 · loadingbar 판 · StrTIP 팁 · 진행 막대 · 막대 끝 달리는 선수)를 그린다. 모드를 안 가려 더비도

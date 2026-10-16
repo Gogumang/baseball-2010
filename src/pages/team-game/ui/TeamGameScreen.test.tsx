@@ -524,6 +524,17 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
     expect(screen.queryByTestId('소개판')).toBeNull()
   })
 
+  it("'*' 일시정지 창 아래에도 소개 판이 남는다 — 0x52efe 가 장면 그리기를 건너뛰어 마지막 그림이 그대로다", () => {
+    판까지()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_PREPARE_FRAMES))
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByRole('option', { name: /계속/ })).toBeTruthy()
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByTestId('소개판')).toBeTruthy()
+  })
+
   it('공격 차례도 같다 — 타석 장면은 서지만 OK 전에는 공이 안 나간다', () => {
     판까지({ playerSide: PLAYER_SIDE_FIRST_BAT })
     expect(타석보임()).toBe(true)

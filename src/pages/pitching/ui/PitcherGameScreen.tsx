@@ -885,7 +885,8 @@ export function PitcherGameScreen({
           role={burstBandRoleOf(progress.game.half, progress.game.playerSide)}
           isDimmed={canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질'}
         />
-        {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (
+        {/* 일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛰어 마지막 그림(소개 판 포함)이 그대로다 */}
+        {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
           <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />
         )}
         {substitution.isShown && (
