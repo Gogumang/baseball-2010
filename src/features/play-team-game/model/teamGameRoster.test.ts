@@ -119,6 +119,37 @@ describe('기록으로 선 영입 선수의 니블 · +0xb — 영입 0xc554 가
   })
 })
 
+describe('기록으로 선 영입 선수의 +0x1b(연봉 칸) — 교체 창 상세 0x5b798 5c87c~5c884', () => {
+  const 투수기록 = {
+    name: '명전투',
+    ability: [500, 500, 500, 500] as const,
+    repertoire: { name: '명전투', form: 1, pitchMask: 1, magicId: 0 },
+    recordId: 0x100,
+    salaryGrade: 33,
+  }
+  const 타자기록 = { name: '나리타', ability: [500, 500, 500, 500] as const, recordId: 0xfe, salaryGrade: 255 }
+  const order: TeamEntryOrder = {
+    batters: [{ rosterSlot: -1, position: 3, record: 타자기록 }, ...Array.from({ length: 8 }, (_, slot) => ({ rosterSlot: slot, position: slot + 1 }))],
+    pitchers: [투수기록, 1, 2, 3, 4],
+  }
+
+  it('명단 칸이 기록 사본의 +0x1b 를 든다 — 표 선수는 안 든다', () => {
+    expect(entryPitchersOfOrder(0, order)[0]?.salaryGrade).toBe(33)
+    expect(entryPitchersOfOrder(0, order)[1]?.salaryGrade).toBeUndefined()
+    expect(entryBattersOfOrder(0, order)[0]?.salaryGrade).toBe(255)
+    expect(entryBattersOfOrder(0, order)[1]?.salaryGrade).toBeUndefined()
+  })
+
+  it('옛 경기 블록은 같은 원본 id 의 지금 기록에서 채우고, 채울 것이 없으면 그 객체를 그대로 돌려준다', () => {
+    const { salaryGrade: _p, ...옛투수 } = entryPitchersOfOrder(0, order)[0]!
+    const { salaryGrade: _b, ...옛타자 } = entryBattersOfOrder(0, order)[0]!
+    expect(withPitcherRecordNibbles([옛투수], order)).toEqual([{ ...옛투수, salaryGrade: 33 }])
+    expect(withBatterRecordNibbles([옛타자], order)[0]?.salaryGrade).toBe(255)
+    const 그대로 = entryPitchersOfOrder(0, order)[0]!
+    expect(withPitcherRecordNibbles([그대로], order)[0]).toBe(그대로)
+  })
+})
+
 describe('수비 팀 보너스 — 판 시작 0xb0fb4 b10d0~b10f2', () => {
   it('모드 1·2·8·9 만 0xbbe98(팀레코드+8 = 집중) 등급, 나머지 모드는 0', () => {
     // 서울 드래곤즈(0) 집중 430 → 등급 3 · 인천 돌핀즈(2) 집중 320 → 등급 2

@@ -324,6 +324,12 @@ export interface TeamEntryBatter {
    */
   readonly recordId?: number
   /**
+   * 레코드 +0x1b(연봉 칸) — 기록으로 선 영입 선수(명전 · 나리)만 든다. 상세 창 0x5b798 이 모드 2 에서 5c87c~5c884 로
+   * `rec+0x1b × 10 × 100` 을 연봉으로 찍는다(나리 사본은 0xa4fd8 의 min(연봉/10, 255) — `SeasonEntryBatterRecord.salaryGrade`).
+   * 옛 사본엔 없다(연봉 칸을 0 으로)
+   */
+  readonly salaryGrade?: number
+  /**
    * 레코드 `+0x14` 장착 스킬 비트 — 간이 타석 스윙 0xab214 의 스킬 갈래(ab91c~)가 모드 검사 없이 `0xb62b4(타자, n)` 로 읽는다.
    * 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 기록으로 선 영입 선수는 그 기록의 비트(옛 사본은 없어 0),
    * 마타자는 0xb53f0 이 통째 베낀 XlsACE_BAT 행 그대로(`withAceBatter` — 킹타이거 압도 22)
@@ -483,6 +489,8 @@ export interface TeamEntryPitcher {
   readonly tableTeamId?: number
   /** 붙박이 표 밖 투수(영입한 명전·나리)의 원본 id — `TeamEntryBatter.recordId` 주석 */
   readonly recordId?: number
+  /** 레코드 +0x1b(연봉 칸) — `TeamEntryBatter.salaryGrade` 주석 */
+  readonly salaryGrade?: number
   /**
    * 레코드 `+0x14` 장착 스킬 비트 — 공 하나 소모 0xa5e14 가 `0xb62b4(투수, 18)`(비겁자 ×2) · `(…, 10)`(끈기 −1)로, 실투 판정
    * 0x33cbc 가 16 안정감 · 17 새가슴 · 22 냉정으로 본다. 붙박이 표 줄은 Xls 행 그대로(`RosterPlayer.skillBits`), 마투수는 0xb521c 가
@@ -605,6 +613,8 @@ export interface TeamEntryBatterRecord {
   readonly ability: readonly [number, number, number, number]
   /** 그 선수의 원본 id(+0) — 있으면 리그 기록표의 표 밖 줄로 쌓는다 (`TeamEntryBatter.recordId`) */
   readonly recordId?: number
+  /** 레코드 +0x1b(연봉 칸) — 상세 창 0x5b798 이 연봉으로 찍는다 (`TeamEntryBatter.salaryGrade`). 옛 사본엔 없다 */
+  readonly salaryGrade?: number
   /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryBatter.skillBits`). 시즌 명단은 기록 사본에 있으면 싣는다(옛 사본은 없어 0) */
   readonly skillBits?: number
   /**
@@ -627,6 +637,8 @@ export interface TeamEntryPitcherRecord {
   readonly role?: PitcherRole
   /** 그 선수의 원본 id(+0) — 있으면 리그 기록표의 표 밖 줄로 쌓는다 (`TeamEntryBatter.recordId`) */
   readonly recordId?: number
+  /** 레코드 +0x1b(연봉 칸) — 상세 창 0x5b798 이 연봉으로 찍는다 (`TeamEntryBatter.salaryGrade`). 옛 사본엔 없다 */
+  readonly salaryGrade?: number
   /** 레코드 `+0x14` 장착 스킬 비트 (`TeamEntryPitcher.skillBits`). 시즌 명단은 기록 사본에 있으면 싣는다(옛 사본은 없어 0) */
   readonly skillBits?: number
   /** 레코드 +0x19 · +0x1a 장비 니블 네 칸 — `TeamEntryBatterRecord.equipment` 와 같다. 마운드 장비 겹 0x79790 이 고른다 */
@@ -669,7 +681,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
   return order.batters.map((batter, index) => {
     const position = batter.position & 0xf
     if (batter.record !== undefined) {
-      const { recordId, skillBits, equipment, profile } = batter.record
+      const { recordId, salaryGrade, skillBits, equipment, profile } = batter.record
       return {
         name: batter.record.name,
         ability: batter.record.ability,
@@ -677,6 +689,7 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
         aceIndex: NO_ACE_BATTER,
         rosterSlot: NO_ROSTER_SLOT,
         ...(recordId === undefined ? {} : { recordId }),
+        ...(salaryGrade === undefined ? {} : { salaryGrade }),
         ...(skillBits === undefined ? {} : { skillBits }),
         ...equipmentOf(equipment),
         ...(profile === undefined ? {} : { profile }),
@@ -723,29 +736,40 @@ export function withBatterRecordNibbles(
   order: TeamEntryOrder,
 ): readonly TeamEntryBatter[] {
   return entry.map((batter) => {
-    if (batter.recordId === undefined || (batter.equipment !== undefined && batter.profile !== undefined)) return batter
+    if (
+      batter.recordId === undefined
+      || (batter.equipment !== undefined && batter.profile !== undefined && batter.salaryGrade !== undefined)
+    ) return batter
     const record = order.batters.find((candidate) => candidate.record?.recordId === batter.recordId)?.record
     if (record === undefined) return batter
     return {
       ...batter,
       ...(batter.equipment !== undefined || record.equipment === undefined ? {} : { equipment: record.equipment }),
       ...(batter.profile !== undefined || record.profile === undefined ? {} : { profile: record.profile }),
+      ...(batter.salaryGrade !== undefined || record.salaryGrade === undefined ? {} : { salaryGrade: record.salaryGrade }),
     }
   })
 }
 
-/** `withBatterRecordNibbles` 의 투수 쪽 — 기록으로 선 영입 투수의 니블(마운드 장비 겹 0x79790)만 채운다 */
+/** `withBatterRecordNibbles` 의 투수 쪽 — 기록으로 선 영입 투수의 니블(마운드 장비 겹 0x79790) · +0x1b(상세 창 연봉)만 채운다 */
 export function withPitcherRecordNibbles(
   entry: readonly TeamEntryPitcher[],
   order: TeamEntryOrder,
 ): readonly TeamEntryPitcher[] {
   return entry.map((pitcher) => {
-    if (pitcher.recordId === undefined || pitcher.equipment !== undefined) return pitcher
+    if (pitcher.recordId === undefined || (pitcher.equipment !== undefined && pitcher.salaryGrade !== undefined)) return pitcher
     const record = order.pitchers.find(
       (candidate): candidate is TeamEntryPitcherRecord =>
         typeof candidate !== 'number' && 'recordId' in candidate && candidate.recordId === pitcher.recordId,
     )
-    return record?.equipment === undefined ? pitcher : { ...pitcher, equipment: record.equipment }
+    const fillsEquipment = pitcher.equipment === undefined && record?.equipment !== undefined
+    const fillsSalary = pitcher.salaryGrade === undefined && record?.salaryGrade !== undefined
+    if (record === undefined || (!fillsEquipment && !fillsSalary)) return pitcher
+    return {
+      ...pitcher,
+      ...(fillsEquipment ? { equipment: record.equipment } : {}),
+      ...(fillsSalary ? { salaryGrade: record.salaryGrade } : {}),
+    }
   })
 }
 
@@ -794,6 +818,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
         orderIndex,
         ...(pitcher.role === undefined ? {} : { role: pitcher.role }),
         ...(pitcher.recordId === undefined ? {} : { recordId: pitcher.recordId }),
+        ...(pitcher.salaryGrade === undefined ? {} : { salaryGrade: pitcher.salaryGrade }),
         ...(pitcher.skillBits === undefined ? {} : { skillBits: pitcher.skillBits }),
         ...equipmentOf(pitcher.equipment),
       }

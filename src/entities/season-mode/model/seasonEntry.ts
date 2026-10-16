@@ -601,6 +601,8 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
               name: record.name,
               ability: seasonRecordAbilityOf(record, player.equipment, false),
               recordId: player.id,
+              // +0x1b(연봉 칸) — 팀 경기 교체 창의 상세 창 0x5b798 이 5c87c~5c884 로 연봉을 찍는다(옛 사본엔 없다)
+              ...(record.salaryGrade === undefined ? {} : { salaryGrade: record.salaryGrade }),
               // 장착 비트(+0x14) — 간이 타석 0xab214 의 스킬 판정이 본다(옛 사본은 없다)
               ...(record.skillBits === undefined ? {} : { skillBits: record.skillBits }),
               // 니블 +0x19 · +0x1a(타석 그림 장비 겹 0x78fd8) · +0xb(폼 · 피부 · 손) — 영입 0xc554 가 통째로 옮긴 0x30 바이트의 칸
