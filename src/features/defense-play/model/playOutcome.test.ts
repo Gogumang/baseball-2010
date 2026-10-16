@@ -77,7 +77,7 @@ describe('판 끝 정산 0xa8024 의 타자 갈래 (a8096 ~ a8266)', () => {
   it('야수 선택 [sp+0x18] — 타자주자가 살았고 목록 i 번째 주자가 +0x7c == i + 1 로 죽었으면 안타가 아니다', () => {
     const 포스아웃 = [주자(0, 0, { reached: 1 }), 주자(1, 1, { reached: 1, target: 2, out: true })]
     expect(settledBatterOutcomeOf({ ...기본, outEvents: 1, runners: 포스아웃 })).toEqual({ kind: '아웃', detail: '땅볼아웃' })
-    // ⚠️ 원본 그대로 목록 번호와 루를 견준다 — 2루 주자 혼자(i = 1) 3루에서 죽은 판은 야수 선택이 아니라 안타다
+    // 원본 그대로 목록 번호와 루를 견준다 — 2루 주자 혼자(i = 1) 3루에서 죽은 판은 야수 선택이 아니라 안타다
     const 이루주자 = [주자(0, 0, { reached: 1 }), 주자(1, 2, { reached: 2, target: 3, out: true })]
     expect(settledBatterOutcomeOf({ ...기본, outEvents: 1, runners: 이루주자 })).toEqual({ kind: '안타', bases: 1 })
   })

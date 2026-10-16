@@ -159,7 +159,7 @@ export function creditedBasesOf(input: PlayOutcomeInput): number {
 
 /**
  * **야수 선택 [sp+0x18]** (a8118 ~ a8190) — 타자주자가 살아 있고, 목록 i 번째(1부터) 주자가 득점 없이 끝났는데
- * 그 주자의 `+0x7c`(달려가던 루)가 i + 1 이면 선다. ⚠️ 원본 그대로 **목록 번호**와 루를 견준다 — 1루부터 빈 루 없이
+ * 그 주자의 `+0x7c`(달려가던 루)가 i + 1 이면 선다. 원본 그대로 **목록 번호**와 루를 견준다 — 1루부터 빈 루 없이
  * 찬 사슬의 포스 아웃만 잡히고, 2루 주자 혼자 3루에서 죽은 판(i = 1, +0x7c = 3)은 야수 선택이 아니다.
  */
 function isFieldersChoice(runners: readonly RunnerState[]): boolean {

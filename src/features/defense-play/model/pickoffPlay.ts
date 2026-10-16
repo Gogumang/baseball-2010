@@ -82,7 +82,7 @@ import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/th
  *    → `entities/fielding/model/pickoff.startPickoff` 가 그대로 만든다.
  * 2. **상태 0x17 진입 0x46418**: 주자 고리 0x4657e 가 주자마다 `0x3d7b8` — 다음 루로 5 틱(1% 로 10 틱) 몰아
  *    돌리고 목표를 닿은 루로 되돌린다(9976cb7, `runnerLead`). 이어 0x4677a 가 살아 있는 주자를 모두
- *    `vt0x48(+0x8c)` = 마지막으로 닿은 루로. ⚠️ S8 6-3 의 "리드 폭이 없다" 는 이 고리를 놓친 것 — 판이 열리면
+ *    `vt0x48(+0x8c)` = 마지막으로 닿은 루로. 정정: S8 6-3 의 "리드 폭이 없다" 는 이 고리를 놓친 것 — 판이 열리면
  *    주자는 루를 떠나 돌아오는 중이라 **태그될 수 있다**.
  * 3. **AI 상태 0xe 0xb47da**: `플레이.vt0x58(state[0x27])` = 0xb2c90 → 커버가 있고 그 커버의 목표 루가
  *    대상 루면 던진다. 던지기는 야수 vt0xac = 0xa1620 이고 그 안에서 **악송구 굴림 0xa1828** · 긴 송구 흔들림 a198c 가 돈다.
