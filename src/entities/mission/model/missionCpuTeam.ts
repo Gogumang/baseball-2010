@@ -241,6 +241,20 @@ export function insertMissionAceBatter(batting: MissionCpuBatting): MissionCpuBa
   return { ...batting, records, specialSwing }
 }
 
+/**
+ * **레코드 k 의 수비 자리 니블(+0x1c & 0xf)이 어느 줄의 것인가** — 마타자 맞바꿈 `0xb8cb8(팀, team+0x32, 9)` → `0xb5e98(…, r3 = 0)`
+ * 은 0x30 바이트를 맞바꾼 뒤(b5ee0~b5f0c) 두 칸 중 하나라도 자리가 0 이면 **자리를 칸에 그대로 되쓴다**(b5f10~b5f30 → b5f48, 0xb8e84),
+ * 둘 다 0 이 아닐 때만 자리가 선수를 따라간다(b5f32~b5f4a). 마타자 행 +0x1c 는 다섯 줄 모두 0 이라 늘 앞 갈래 — 마타자가 선 칸은
+ * 옛 그 칸 선수의 니블, 레코드 9(밀려난 붙박이)는 0 이다. 0 이면 null. 마타자가 없으면 레코드 줄 그대로
+ */
+export function missionRecordNibbleRowOf(records: readonly number[], record: number): number | null {
+  const aceRecord = records.indexOf(MISSION_ACE_ROSTER_SLOT)
+  if (aceRecord < 0 || aceRecord === QUICK_LINEUP_SIZE) return records[record] ?? record
+  if (record === QUICK_LINEUP_SIZE) return null
+  if (record === aceRecord) return records[QUICK_LINEUP_SIZE] ?? record
+  return records[record] ?? record
+}
+
 /** 0x4e136 — 필살 스윙이 나간 틱에 그 타순 칸의 남은 횟수를 줄인 값으로 */
 export function withMissionCpuSpecialSwing(team: MissionCpuTeam, order: number, remaining: number): MissionCpuTeam {
   const batting = team.batting

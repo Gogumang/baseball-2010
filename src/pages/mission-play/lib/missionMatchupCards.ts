@@ -7,9 +7,11 @@ import {
   masterGameAbilityOf,
   missionAcePitcherOf,
   missionCpuBatterOf,
+  missionRecordNibbleRowOf,
 } from '@/entities/mission/model/missionCpuTeam'
+import type { MissionCpuBatting } from '@/entities/mission/model/missionCpuTeam'
 import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
-import { lineupSlotOf } from '@/entities/game/model/quickLineup'
+import { lineupSlotOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
@@ -103,6 +105,11 @@ function missionPitcherGameLineOf(run: PitcherRun): MatchupPitcherLine {
     runsAllowed: run.allowed.runs,
     strikeouts: run.progress.counts['탈삼진'] ?? 0,
   }
+}
+
+/** 지금 타순 칸이 가리키는 레코드 번호 (명단 `team+0xe`) */
+function batterRecordIndexOf(batting: MissionCpuBatting): number {
+  return rosterSlotAt(batting.lineup, batting.order)
 }
 
 /** 타자 미션의 CPU 마운드 판 — 마스터 줄이면 그 행, 마투수면 XlsACE_PIT 행 */
@@ -223,6 +230,8 @@ export function missionPitcherMatchupCardsOf(run: PitcherRun, missionPitcher: Mi
   }
   const batting = run.cpu.batting
   const cpuBatter = missionCpuBatterOf(run.cpu)
+  const positionOfRow = (row: number | null) =>
+    row === null || row < 0 || batting === null ? 0 : (teamBatters(batting.teamId)[row]?.position ?? 0) & 0xf
   if (batting === null || cpuBatter === null) return { batterHand: 0, pitcher, batter: { isComputer: true } }
   const slot = lineupSlotOf(batting.order)
   const common = { isComputer: true, battingOrder: slot, recentResults: ringOf(batting.lineup.records, slot) }
@@ -238,10 +247,9 @@ export function missionPitcherMatchupCardsOf(run: PitcherRun, missionPitcher: Mi
         : {
             ...common,
             name: ace.name,
-            // XlsACE_BAT 행 +0x1c — 다섯 줄 모두 0. 0xaae7c 의 0xb53f0(명부, 마타자, 0) 마선수 0x40 갈래(b5418~b547c, 직접 뜬 것)는
-            // 명부 9번이 이미 마선수가 아니면 0xb4e34 로 늘려 옛 9번을 끝으로 옮긴 뒤 9번에 행을 0x30 바이트 통째로 베낄 뿐(b546a)
-            // 0x80 갈래의 0xb8e84(수비 위치 쓰기)가 없다 — 행 값 그대로다
-            position: 0,
+            // XlsACE_BAT 행 +0x1c 는 다섯 줄 모두 0 이지만, 0xaae7c 의 맞바꿈 0xb8cb8(팀, team+0x32, 9) → 0xb5e98(r3 = 0)이
+            // 한쪽 자리가 0 이면 자리를 칸에 되써(b5f10~b5f4a) 마타자는 옛 그 칸 선수의 자리로 선다(`missionRecordNibbleRowOf`)
+            position: positionOfRow(missionRecordNibbleRowOf(batting.records, batterRecordIndexOf(batting))),
             ...batterCardStatsOf(batterLineOfRecord(ace.recordLine)),
           },
     }
