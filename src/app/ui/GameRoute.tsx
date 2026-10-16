@@ -9,7 +9,7 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { opponentPitcherAbilityOf, opponentStaminaPercentAfterPitchOf } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
-import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
+import { LOADING_STEPS_BATTER_CAREER, LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { ScreenOverlay } from '@/shared/ui'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
@@ -216,7 +216,12 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
-        <LoadingTip tip={session.loadingTip} onDone={session.actions.finishLoading} />
+        <LoadingTip
+          tip={session.loadingTip}
+          // 모드 4 — 진행 칸 끝 0x25 (0x39f88 39f94)
+          steps={LOADING_STEPS_BATTER_CAREER}
+          onDone={session.actions.finishLoading}
+        />
       </RawScreen>
     )
   }
