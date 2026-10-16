@@ -139,39 +139,37 @@ describe('팀 경기 화면의 소리 배선', () => {
     expect(result.current.progress.substitutionScene).toMatchObject({ serial: 1, incomingIsAce: false, entrySoundId: 14 })
   })
 
-  it('인플레이 타구의 아웃 콜(20)은 수비 화면이 끝난 뒤에야 난다 (0x51b36)', () => {
+  it('인플레이 타구의 아웃 콜(20)은 공 판정 자리에서 안 난다 — 화면이 결과를 못 넘긴 판은 판 끝에 낸다 (0x51b36)', () => {
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
     녹음.played.length = 0
 
     act(() => result.current.actions.applyOutcome({ kind: '아웃', detail: '땅볼아웃' }))
     expect(녹음.played).toEqual([])
 
-    const 결과 = runDefensePlay(result.current.pendingDefensePlay!.input)
-    act(() => result.current.actions.finishDefensePlay(결과))
+    // 결과 없이 끝나면 세션이 판을 끝까지 돌리고 판 끝에 근사로 낸다
+    act(() => result.current.actions.finishDefensePlay())
     expect(녹음.played[0]).toBe(20)
   })
 
   /**
-   * 세이프 17 과 함성 60 은 **수비 결과를 넘겨야** 열리는 갈래다 — 한동안 타자편
-   * (`useCareerSession`)만 넘겨 주어 팀 경기에서는 둘 다 안 났다.
+   * 판정 콜(결과 메시지 0xbba → 0x51a56)과 깊은 낙구 함성 60(슬롯 2 꼬리 52b62)은 원본처럼 **판 안의 그 틱**에 화면
+   * (`DefensePlayback` 의 `tickSounds`)이 낸다 — 화면이 결과를 넘긴 판은 판 끝에 다시 안 낸다.
    */
-  it('안타인데 그 루로 송구가 도착했으면 세이프 17 이 난다 (0x51c14)', () => {
+  it('화면이 결과를 넘긴 판은 판 끝에 콜 · 함성 60 을 다시 안 낸다 — 그 틱에 화면이 냈다', () => {
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    act(() => result.current.actions.applyOutcome({ kind: '안타', bases: 1 }))
+    act(() => result.current.actions.applyOutcome({ kind: '안타', bases: 3 }))
 
-    // 송구 칸만 원본 세이프 조건("아웃 될 뻔했는데 살았다")에 맞춰 둔다 — 나머지는 진행기 그대로다
-    const 결과 = {
-      ...runDefensePlay(result.current.pendingDefensePlay!.input),
-      throwBase: 2,
-      throwArrivalTick: 10,
-    }
+    const 결과 = runDefensePlay(result.current.pendingDefensePlay!.input)
     녹음.played.length = 0
 
     act(() => result.current.actions.finishDefensePlay(결과))
-    expect(녹음.played).toContain(17)
+    expect(녹음.played).not.toContain(60)
+    expect(녹음.played).not.toContain(17)
+    expect(녹음.played).not.toContain(20)
+    expect(녹음.played).not.toContain(62)
   })
 
-  it('깊은 타구가 아무도 못 잡고 떨어지면 함성 60 이 난다 (0x52b62)', () => {
+  it('화면이 결과를 못 넘긴 깊은 타구 판은 판 끝에 함성 60 을 낸다 (0x52b62 근사)', () => {
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
     act(() => result.current.actions.applyOutcome({ kind: '안타', bases: 3 }))
 
@@ -179,7 +177,7 @@ describe('팀 경기 화면의 소리 배선', () => {
     expect(결과.caughtOnTheFly).toBe(false)
     녹음.played.length = 0
 
-    act(() => result.current.actions.finishDefensePlay(결과))
+    act(() => result.current.actions.finishDefensePlay())
     expect(녹음.played).toContain(60)
   })
 

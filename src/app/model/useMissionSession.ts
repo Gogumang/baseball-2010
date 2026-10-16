@@ -120,6 +120,7 @@ import { recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model
 import { registerContact } from '@/entities/batting/model/battedContact'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { PickoffPlayInput, PickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
 import { pickoffPlayForKey } from '@/entities/defense-controls/model/pickoff'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
@@ -639,6 +640,14 @@ export function useMissionSession({
    * 휘두른 공만 판정(5130e)이 덮는다. 주자 판의 튐 파티클 · 홈런성 조건이 본다 — 견제는 앞 공의 값. 경기 장면을 새로 열면 0
    */
   const sceneResultCodeRef = useRef<number | null>(SCENE_RESULT_CODE_START)
+  /**
+   * **수비 장면 칸** (`DefenseScene`) — 결과 판 · 연출 단계 · deadly_effect 애니 · 줌과 **플레이 객체 +0x160(사람 송구 목표)**.
+   * 경기 장면 0x104 를 만들 때 플레이 객체도 한 번 만들어지고(장면 +0x200, 생성자 0xb0b68 이 +0x160 = −1 — 0xb0b6e), +0x160 을 쓰는
+   * 곳은 키 메시지 0x588 → vt60 0xb3118 과 던진 뒤 b46a4 의 −1 뿐이다(즉치 `0xb0 << 1` 전수 — 읽기 0xb1f42 · 0xb264c · 0x400da ·
+   * b4662). 0x17 진입 0x46418 · 판 시작 vt1c 0xb0edc · 0x17 끝 0x35108 도 안 지운다 — 앞 판에서 못 쓴 송구 키는 다음 판의 첫 준비된
+   * 쥔 야수를 그 루로 보낸다. 미션도 판마다 이 칸을 넘기고(나리 · 팀 경기의 `defenseScene` 과 같다), 새 경기(장면 new)에서 비운다
+   */
+  const missionSceneRef = useRef<DefenseScene | undefined>(undefined)
   const takeStealingFrom = () => {
     const taken = stealingFromRef.current
     stealingFromRef.current = []
@@ -1013,8 +1022,10 @@ export function useMissionSession({
     const interrupted = current.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
     setMissionRun((previous) => (previous === null ? previous : settleBatterRun(applyPickoff(previous, result.advance, result.runnerFates))))
     // 실시간으로 돈 판의 콜은 화면이 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 이미 냈다
-    if (!callShown) playSoundIds(audio, [pickoffCallSoundIdOf(result)])
-    if (result.ticks.length > 0 && !shownLive) setPickoffReplay(result)
+    // 재생 칸에 넣는 판은 재생 화면이 기록된 틱(`tickSoundIds`)에 낸다
+    const replayed = result.ticks.length > 0 && !shownLive
+    if (!callShown && !replayed) playSoundIds(audio, [pickoffCallSoundIdOf(result)])
+    if (replayed) setPickoffReplay(result)
     // 견제 판 끝 판정 B 0xae3e8 — 아웃 > 2 면 0x18(이 타석은 끊기고 다음은 새 타석 0xd → 0xe), 아니면 같은 타석 0xf(ae592).
     // 공 도착 판의 3아웃(`handleMissionPitch`)과 같은 길 — 볼카운트는 새 타석 것, 남은 타석 · 스윙은 안 줄인다
     if (interrupted) resetAtBatWithConfirm()
@@ -1028,8 +1039,10 @@ export function useMissionSession({
    */
   const afterPitcherMissionPickoff = (run: PitcherRun, result: PickoffPlayResult, shownLive: boolean, callShown = shownLive) => {
     const interrupted = run.outs + result.advance.outsAdded >= MISSION_OUTS_PER_INNING
-    if (!callShown) playSoundIds(audio, [pickoffCallSoundIdOf(result)])
-    if (result.ticks.length > 0 && !shownLive) setPickoffReplay(result)
+    // 재생 칸에 넣는 판은 재생 화면이 기록된 틱(`tickSoundIds`)에 낸다
+    const replayed = result.ticks.length > 0 && !shownLive
+    if (!callShown && !replayed) playSoundIds(audio, [pickoffCallSoundIdOf(result)])
+    if (replayed) setPickoffReplay(result)
     setPitcherRun(settlePitcherRun(withPitcherMissionRunnerResult(run, result, true)))
     if (interrupted) resetAtBatWithConfirm()
     else signalPitchSelection('same')
@@ -1151,6 +1164,8 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random, undefined, undefined, playAbilitiesOf(foulRun)),
+            // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+            scene: missionSceneRef.current,
             stealingFrom: foulStealing,
             buntKind,
             // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
@@ -1194,6 +1209,8 @@ export function useMissionSession({
                 buntKind,
                 // 경기 +0xfd4 — 이 공의 값
                 sceneResultCode: sceneResultCodeRef.current,
+                // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+                scene: missionSceneRef.current,
               },
               random,
             )
@@ -1208,14 +1225,17 @@ export function useMissionSession({
         return
       }
       const play = opened === null ? null : runOpenedPitchArrivalPlay(opened)
+      // 판이 남긴 수비 장면 칸(+0x160 포함)은 다음 판으로
+      if (play !== null) missionSceneRef.current = play.result.scene
 
       // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다). 공 도착 판이 열렸으면 그 판정 콜(도루 17 · 62/20,
-      // 폭투 17)이 심판 콜 뒤다 — 원본은 판 안의 그 틱에 내지만 웹은 판을 미리 다 돌려 재생하므로 연 자리에서 낸다.
+      // 폭투 17)이 심판 콜 뒤다 — 원본은 판 안의 그 틱에 낸다. 재생 칸에 넣는 판(진루만 하는 판)은 재생 화면이 기록된 틱에 내고
+      // (`continueMissionArrival` → `setPickoffReplay`), 재생하지 않는 판만 연 자리에서 낸다(근사).
       // 삼진·볼넷·홈런은 수비가 개입할 것이 없어 아웃 콜도 여기서 같이 난다 (0xae24c 갈래)
       playSoundIds(audio, [
         detail.contactSoundId,
         pitchCallSoundIdOf(detail.resolution, nextAtBat),
-        play?.callSoundId ?? null,
+        play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
         outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
       ])
 
@@ -1238,6 +1258,8 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random, undefined, undefined, playAbilitiesOf(current)),
+            // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+            scene: missionSceneRef.current,
             isUncatchable,
             // 공이 나는 동안 출발한 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
             stealingFrom: stealing,
@@ -1612,6 +1634,8 @@ export function useMissionSession({
             buntKind: thrown.buntKind ?? 0,
             // 경기 +0xfd4 — 이 공의 값
             sceneResultCode: sceneResultCodeRef.current,
+            // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+            scene: missionSceneRef.current,
           },
           random,
         )
@@ -1619,6 +1643,8 @@ export function useMissionSession({
     // 밀어내기(종류 2)는 vt4c 가 안 돌아 키가 +0x160 만 적는다 — 미리 돌려 재생한다. 도루 · 폭투 판은 붙든다
     const held = opened !== null && opened.kind !== 2 ? opened : null
     const play = opened !== null && held === null ? runOpenedPitchArrivalPlay(opened) : null
+    // 판이 남긴 수비 장면 칸(+0x160 포함)은 다음 판으로 — 밀어내기 판은 vt4c 가 안 돌아 키가 +0x160 에 남는다
+    if (play !== null) missionSceneRef.current = play.result.scene
     // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c).
     // MAX게이지(R+0x158)는 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래만 센다 — 낫아웃 판(종류 9 · 타자주자)은 v 를 0 으로 지워 건너뛴다
     let nextRun = recordPitch(
@@ -1645,8 +1671,8 @@ export function useMissionSession({
       pitchReleaseSoundIdOf({ typeNumber, pitcherMagicNumber: 0, ballMagicNumber: nextBallMagicNumber }),
       pitchCallSoundIdOf(resolution, nextAtBat),
       // 공 도착 판의 판정 콜 — 붙든 도루 · 폭투 판은 화면이 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 낸다.
-      // 여기 오는 것은 밀어내기(콜 없음)뿐이다
-      play?.callSoundId ?? null,
+      // 여기 오는 것은 밀어내기(콜 없음)뿐이다. 재생 칸에 넣는 판이면 재생 화면이 기록된 틱에 낸다
+      play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
       outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
     ])
 
@@ -1676,6 +1702,8 @@ export function useMissionSession({
             throwModeManual,
             playAbilitiesOf(nextRun),
           ),
+          // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+          scene: missionSceneRef.current,
           stealingFrom,
           // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
           strikes: strikesBefore,
@@ -1708,6 +1736,8 @@ export function useMissionSession({
             throwModeManual,
             playAbilitiesOf(nextRun),
           ),
+          // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+          scene: missionSceneRef.current,
           // 0x517e6 — 마타자 필살이 성공한 타구는 필살타법 표시 속성 4(0xaf180 — 송구 공과 무관)가 서서 야수가 쥐지 못한다
           isUncatchable: thrown.isUncatchable,
           // CPU 가 공이 나는 동안 건 도루 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
@@ -1737,11 +1767,14 @@ export function useMissionSession({
       const pending = pendingDefensePlayRef.current
       if (pending === null) return
       const played = result ?? runDefensePlay(pending.input)
+      // 판이 남긴 수비 장면 칸 — 못 쓴 사람 송구 키(+0x160)는 다음 판으로 남는다
+      missionSceneRef.current = played.scene
       setPendingDefensePlay(null)
       if (pending.isFoulPlay === true && played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산 없이 0xf(같은 타석 다음 공) · 0x35108 이 0xa975c(주자를 판 앞 자리로) ·
         // 0xb6b58(스트라이크 ≤ 1 이면 +1). 콜은 결과 코드 7 메시지 51c5c 의 25(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
-        playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played)])
+        // 화면이 돌린 판이면 25 는 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
+        if (result === undefined) playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played)])
         runner.applyPitch({ kind: '파울' })
         if (pending.side === '투수') {
           setPitcherRun((previous) => (previous === null ? previous : checkPitchExhausted(previous)))
@@ -1752,18 +1785,20 @@ export function useMissionSession({
         runner.setIsPaused(false)
         return
       }
-      // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 장타 함성은 여기서야 난다.
-      // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
       // 판 끝 정산(0xa8024)이 낸 결과 — `pending.outcome` 은 타석을 끝낸 임시 값이다(`battedContact`)
       const settled = recordedOutcomeOf(pending.input, played)
-      playSoundIds(audio, [
-        deepHitCheerSoundIdOf({
-          outcome: settled,
-          carryDistance: carryDistanceOf(pending.input.trajectory),
-          caughtOnTheFly: played.caughtOnTheFly,
-        }),
-        inPlayCallSoundIdOf(settled, played),
-      ])
+      // 판정 콜(결과 메시지 0xbba → 0x51a56) · 깊은 낙구 함성 60(52b62)은 원본처럼 판 안의 그 틱에 화면이 냈다(`DefensePlayback` 의
+      // `tickSounds`) — 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 근사로 낸다
+      if (result === undefined) {
+        playSoundIds(audio, [
+          deepHitCheerSoundIdOf({
+            outcome: settled,
+            carryDistance: carryDistanceOf(pending.input.trajectory),
+            caughtOnTheFly: played.caughtOnTheFly,
+          }),
+          inPlayCallSoundIdOf(settled, played),
+        ])
+      }
 
       if (pending.side === '투수') {
         // `played.runnerFates`(주자별 +0x95·+0x96)로 실점 R+0x128 · 출루 허용 R+0x130 을 원본대로 센다
@@ -1971,6 +2006,8 @@ export function useMissionSession({
     setPendingRunnerPlay(null)
     setPendingBenchClearing(null)
     stealingFromRef.current = []
+    // 새 경기 장면 — 플레이 객체 new(0xb0b68)라 수비 장면 칸 · +0x160 이 처음 값이다
+    missionSceneRef.current = undefined
     sceneResultCodeRef.current = SCENE_RESULT_CODE_START
     setStealingFrom([])
     setPitcherStealDisplay(null)
@@ -2102,6 +2139,8 @@ export function useMissionSession({
       setPendingRunnerPlay(null)
       setPendingBenchClearing(null)
       stealingFromRef.current = []
+      // 새 경기 장면 — 수비 장면 칸 · 플레이 객체 +0x160 이 처음 값이다
+      missionSceneRef.current = undefined
       sceneResultCodeRef.current = SCENE_RESULT_CODE_START
       setStealingFrom([])
       setPitcherStealDisplay(null)
@@ -2223,6 +2262,8 @@ export function useMissionSession({
         ...pickoffAbilitiesOf(current),
         // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
         sceneResultCode: sceneResultCodeRef.current,
+        // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+        scene: missionSceneRef.current,
       }
       // 견제 판(종류 4)은 0xae794 마스크 0x232 안이라 사람 주루 키(0x5331c → 0x582 · 0x584 → 0xa9b04)와 OK 슬라이딩(0x585)을
       // 받는다 — 붙들어 화면이 실시간으로 돌리고, 판 끝(`finishRunnerPlay`)이 `afterMissionCpuPickoff` 로 먹인다
@@ -2238,6 +2279,8 @@ export function useMissionSession({
       const pending = pendingRunnerPlayRef.current
       if (pending === null) return
       const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
+      // 판이 남긴 수비 장면 칸 — 못 쓴 사람 송구 키(+0x160)는 다음 판으로 남는다
+      missionSceneRef.current = played.scene
       setPendingRunnerPlay(null)
       // 화면이 결과를 넘겼으면 판정 콜은 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 이미 났다
       const callShown = result !== undefined
@@ -2328,6 +2371,8 @@ export function useMissionSession({
         ...pickoffAbilitiesOf(pitcherRun),
         // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
         sceneResultCode: sceneResultCodeRef.current,
+        // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+        scene: missionSceneRef.current,
       }
       setPendingRunnerPlay({ kind: 'pickoff', input, side: '수비' })
     },
@@ -2934,4 +2979,13 @@ interface PitcherArrivalContext {
   readonly outcome: AtBatOutcome | null
   /** 이 공을 깎은 뒤 미션 투수 체력 — 사구 벤치 클리어링(0x3ab7c)이 본다 */
   readonly pitcherStamina: number
+}
+
+/**
+ * 미리 돌린 공 도착 판이 재생 칸(`pickoffReplay`)에 들어가는가 — 진루만 하는 판(`continueMissionArrival` ·
+ * `finishPitcherMissionArrival`)은 그릴 틱이 있고 실시간으로 안 보여 준 판이면 넣는다. 넣으면 판정 콜은 재생 화면이 기록된 틱
+ * (`tickSoundIds`)에 낸다. 밀어내기 판(종류 2)도 재생하지만 콜이 없다
+ */
+function missionArrivalReplayed(play: PitchArrivalPlay): boolean {
+  return arrivalApplicationOf(play) === 'runnerOnly' && play.result.ticks.length > 0 && play.shownLive !== true
 }

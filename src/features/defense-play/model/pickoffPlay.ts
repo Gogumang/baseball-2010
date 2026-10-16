@@ -850,7 +850,9 @@ function* pickoffPlaySteps(
         defenseTeamIndex: input.defenseTeamIndex,
         offenseTeamIndex: input.offenseTeamIndex,
       })
-    ticks.push(snapshotAt(tick, fielders))
+    // 이 판 틱에 낸 소리(차례대로)를 그림에 싣는다 — 미리 돌린 판을 재생만 하는 화면(`DefensePlayback` 의 재생 갈래)이 그 틱에 낸다
+    const tickView = snapshotAt(tick, fielders)
+    ticks.push(sound.thisTick.length > 0 ? { ...tickView, tickSoundIds: [...sound.thisTick] } : tickView)
     // ── 이 그림의 수비 화면 그리기 0x46c88 의 연출 몫 (`defenseScene`) — 관문을 안 보고 그리기마다 돈다(46de4~46e24) ──
     const drawSceneEffects = (): void => {
       const view = ticks[ticks.length - 1]

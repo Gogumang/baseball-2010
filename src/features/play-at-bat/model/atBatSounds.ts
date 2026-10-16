@@ -384,9 +384,10 @@ export interface DeepHitCheerInput {
  * `경기+0xfd4` 는 경기 상태가 아니라 **타구 결과 코드**다(E 2-1a · R15 9-1 · R2 3-3).
  * 홈런에는 60 이 아니라 11 이 따로 있다.
  *
- * ⚠️ **근사**: 웹에는 틱 단위 낙구가 없어 "떨어지는 그 틱" 을 잡을 수 없다. 수비 플레이가 끝나는
- * 자리에서 한 번 낸다. 결과 코드도 그 자리까지 오지 않아 **홈런 결과**로 대신 걸렀다 —
- * 세기가 모자라 홈런이 되지 못한 24~26 타구는 원본이라면 안 낼 함성을 내게 된다.
+ * 수비 화면이 판을 실시간으로 돌리면 진행기가 낙구 틱에 후보를 적고(`runDefensePlay` 의 `tickSounds` 9b 절) 화면이
+ * `deepLandingCheerSoundIdOf` 로 **그 틱**에 낸다. 이 함수는 화면이 결과를 못 넘겨 세션이 판을 돌린 때만 판 끝에 쓰는 근사다 —
+ * 결과 코드가 그 자리까지 오지 않아 **홈런 결과**로 대신 거른다(세기가 모자라 홈런이 되지 못한 24~26 타구는 원본이라면 안 낼
+ * 함성을 내게 된다).
  */
 export function deepHitCheerSoundIdOf(input: DeepHitCheerInput): number | null {
   if (input.foulEnded === true) return null
@@ -396,6 +397,14 @@ export function deepHitCheerSoundIdOf(input: DeepHitCheerInput): number | null {
     return null
   }
   return input.carryDistance > DEEP_HIT_DISTANCE ? DEEP_HIT_CHEER_SOUND : null
+}
+
+/**
+ * **낙구 틱의 함성 60** — 슬롯 2 꼬리 52b62~52bb2 가 깊은 페어 낙구(공+0xac4)를 아무도 못 쥔 틱(플레이+0x113)에 본다. 진행기가
+ * 그 후보를 적고(`DefenseTickSound` 의 `deepLanding`) 남은 조건 0x357e0(결과 코드 [경기+0xfd4] 24~26 이면 안 낸다)만 여기서 본다
+ */
+export function deepLandingCheerSoundIdOf(homeRunHit: boolean): number | null {
+  return homeRunHit ? null : DEEP_HIT_CHEER_SOUND
 }
 
 /** 관중 함성 — 홈런성 타구에서 타자주자(주자 칸 0)가 홈을 밟을 때 (0x51fd2~0x51fdc) */
