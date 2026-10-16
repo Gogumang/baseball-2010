@@ -10,8 +10,8 @@ import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
   RECORD_PICK_CELL_SIZE, RECORD_PICK_CELLS, RECORD_PICK_DIM_LABEL_COLOR, RECORD_PICK_LABEL_GAP, RECORD_PICK_POPUP_HEIGHT,
-  RECORD_PICK_TITLE_ID, recordPickIconOffsetOf, recordPickLabelXOf,
-  recordPickPopupTopOf,
+  RECORD_PICK_TITLE_ID, RECORD_PICK_TITLE_X, RECORD_PICK_TITLE_Y, measuredTitleCenterXOf, recordPickIconOffsetOf,
+  recordPickLabelXOf, recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 
@@ -25,6 +25,10 @@ const modeIconOf = (frame: number) => `./sprites/mode_icon/${String(frame).padSt
 const selectedModeIconOf = (frame: number) => `./sprites/management/icon_selected_${frame}.png`
 
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
+
+const TITLE_RAW = ORIGINAL_MODE_TEXT[RECORD_PICK_TITLE_ID] ?? ''
+/** 제목 가운데 x — 0x1949c (W/2 − 0x54) + (0x9c52c 폭 >> 1) */
+const TITLE_CENTER_X = measuredTitleCenterXOf(RECORD_PICK_TITLE_X, TITLE_RAW)
 
 export interface RecordPickCell {
   /** 칸 이름 (접근성) */
@@ -126,9 +130,10 @@ export function RecordPickPopup({
       <div className={boxStyles.box} data-testid={`${testIdPrefix}-판`} ref={boxRef}
         style={{ ...box, top: recordPickPopupTopOf(box.height), transform: 'none', padding: 0 }} />
       {motion.openingHeight === null && (<>
-      {/* "!C보고 싶은 기록을!N선택해주세요" — 두 줄 가운데 */}
-      <div className={styles.title} style={{ left: 120 - 0x54, top: 160 - 0x28, width: 0x54 * 2, whiteSpace: 'normal' }}>
-        <MarkupText raw={ORIGINAL_MODE_TEXT[RECORD_PICK_TITLE_ID] ?? ''} />
+      {/* "!C보고 싶은 기록을!N선택해주세요" — 0xba269 폭 −1: 날 글 전체를 잰 폭(서식 넉 자 포함, 165)의 반을 두 줄 모두의 가운데로
+          (`measuredTitleCenterXOf`) — 가운데 x = 0x24 + 82 = 118 이라 화면 가운데보다 2px 왼쪽이다 */}
+      <div className={styles.title} style={{ left: TITLE_CENTER_X - 120, top: RECORD_PICK_TITLE_Y, width: 240, whiteSpace: 'nowrap' }}>
+        <MarkupText raw={TITLE_RAW} />
       </div>
       {cells.map((cell, index) => {
         const geometry = RECORD_PICK_CELLS[index]

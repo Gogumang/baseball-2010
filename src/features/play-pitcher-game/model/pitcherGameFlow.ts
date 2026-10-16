@@ -223,7 +223,7 @@ import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/pla
 import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
-import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
+import { enterSceneConfirm, enterSceneHookPassage } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
@@ -468,7 +468,8 @@ export interface PitcherGameProgress {
   readonly atBatPrepared: boolean
   /**
    * **상태 0xe 의 OK 대기** — 내가 던지는 타석의 0xe 진입마다 새 객체다 (`features/play-game/model/sceneConfirm`).
-   * 진입에서 감독 강판(0x504cc)이 참이면 0x23 으로 빠져 기다리지 않는다(이 칸을 안 바꾼다). 화면이 OK 를 받을 때까지
+   * 진입에서 감독 강판(0x504cc)이 참이면 0x23 으로 빠져 OK 를 기다리지 않는다 — 그때는 0xd 두 그림 · 0xe 한 그림만 세는
+   * 지나감 대기(`hooksAtEntry`)를 싣고, 화면은 그것을 다 센 뒤 강판 창을 세운다. 화면이 OK 를 받을 때까지
    * 구질 고르기를 안 띄운다.
    */
   readonly sceneConfirm?: SceneConfirmWait | null
@@ -2751,9 +2752,20 @@ function prepareAtBat(
     progress.hookFlags,
     random,
   )
+  // 0x16 을 안 거친 0xd 라 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음(상대 타자가 142 가 넣은 마타자면 26 · 2·3루 주자 15 · 14).
+  // 0xd 는 강판 판정(0xe 진입)보다 앞이라 강판이 나도 낸다
+  const atBatEntrySoundId = afterSubstitution
+    ? undefined
+    : substitutionEntrySoundIdOf({
+        isAce: rosterSlotAt(progress.opponentLineup, progress.opponentOrderIndex) === ACE_BATTER_ROSTER_SLOT,
+        bases,
+      })
   if (hook.hooked) {
     return {
       ...progress,
+      // 강판(0xe 진입 0x50674 의 506ea 0x504cc 참 → 506fc 0xbcb48(장면+0x18, 0x23))이어도 앞선 0xd 두 그림(등장음 포함)과
+      // 0xe 한 그림(0x4d9ec)은 지난다 — 화면이 이 지나감을 다 센 뒤 강판 창을 세운다(`enterSceneHookPassage`). OK 는 안 받는다
+      sceneConfirm: enterSceneHookPassage(atBatEntrySoundId),
       hookFlags: hook.flags,
       managerHookText: hook.userEventIndex,
       atBatPrepared: true,
@@ -2761,15 +2773,6 @@ function prepareAtBat(
   }
 
   // 강판이 아니면 0xe 에 머물러 사람 OK 를 기다린다 (0x532b0) — 그 뒤가 메시지 1 의 돌발 굴림이다.
-  // 0x16 을 안 거친 0xd 라 48ecc 메시지 0xbc1 → 0x522d2 의 타석 등장음(상대 타자가 142 가 넣은 마타자면 26 · 2·3루 주자 15 · 14).
-  // ⚠️ 미이식: 강판(0xe 진입 0x504cc → 0x23)이 나도 원본은 앞선 0xd 에서 이 소리를 내고 0xd 두 그림 · 0xe 한 그림을 그린다 — 웹 강판 갈래는
-  // 0xd · 0xe 대기를 안 세우고 곧장 강판 창으로 가서 소리 · 그림이 없다(화면 `pages/pitching` 쪽 일이라 이 과제에서 안 옮겼다)
-  const atBatEntrySoundId = afterSubstitution
-    ? undefined
-    : substitutionEntrySoundIdOf({
-        isAce: rosterSlotAt(progress.opponentLineup, progress.opponentOrderIndex) === ACE_BATTER_ROSTER_SLOT,
-        bases,
-      })
   return {
     ...progress,
     sceneConfirm: enterSceneConfirm(atBatEntrySoundId),

@@ -157,6 +157,10 @@ import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/m
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
+import {
+  FRESH_HELD_CPU_MAGIC, cpuMagicStateOf, heldCpuMagicAfterPitch, heldCpuMagicAfterPitcherChange,
+  type HeldCpuMagic,
+} from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
@@ -258,6 +262,13 @@ export interface GameProgress {
    */
   readonly ourMound: HalfInningMound
   readonly opponentMound: HalfInningMound
+  /**
+   * **상대(수비) 팀 남은 마구 +0x28 · 공 객체 +0x10** — 내 타석의 CPU 투구가 고르고(0x344dc) 줄이고(0x345fc) 싣는다(0x3de10).
+   * 타석 교대 0xaebe4 는 +0x28 이 음수일 때만 채우므로(aeea8 → aeeae `bge`) 같은 투수가 서 있는 동안 경기 내내 이어지고,
+   * 투수 교체 가지만 −1 로 비운다(aec7a). 공 +0x10 은 되돌리는 코드가 없다. 타석 화면은 이 값의 사본으로 고른다
+   * (`BattingStage.cpuMagic`) — 그래서 화면이 다시 서도(반 이닝 · 수비 판) 남은 횟수가 다시 차지 않는다. 없으면 새 경기 값
+   */
+  readonly opponentCpuMagic?: HeldCpuMagic
   /**
    * 상대 투수의 **이번 이닝 실점 A(`+0x284`)** — 반 이닝 교대 `0xa5b00` 이 0 으로 되돌린다.
    * 우리 투수 쪽 A 는 상대 공격을 한 번에 도는 `simulateHalfInning` 이 안에서 센다.
@@ -636,6 +647,8 @@ export function startGame(
     // 선발이 막 올라온 마운드 — 레코드 +0x2c 그대로 선다 (부르는 쪽이 리그 표를 안 넘기면 10000)
     ourMound: startingMoundOf(ourStarter, ourPitcherStaminas[ourStarter] ?? FULL_STAMINA),
     opponentMound: startingMoundOf(opponentStarter, opponentPitcherStaminas[opponentStarter] ?? FULL_STAMINA),
+    // 팀 new 0xb891c 의 +0x28 = −1 · 공 new 의 +0x10 = 0
+    opponentCpuMagic: FRESH_HELD_CPU_MAGIC,
     opponentInningRunsAllowed: 0,
     // 마타자는 첫 벤치 칸(9번)에 앉는다 — 타석에 서는 길은 CPU 대타(0xac228)뿐이다 (0xb8870)
     ourLineup: ourRecordLineup ?? withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), ourAces.batter),
@@ -807,13 +820,30 @@ export function recordMyBuntAttempt(progress: GameProgress, options: { readonly 
 export function throwOpponentPitch(
   progress: GameProgress,
   pitchTypeNumber: number,
-  options: { readonly batterIntimidates: boolean },
+  options: {
+    readonly batterIntimidates: boolean
+    /**
+     * 던진 마운드 투수(`stageOpponentPitcherAbilityOf`)와 마선수 레벨 — 주면 마구 두 칸(+0x28 · 공+0x10)을 0x345fc · 0x3de10
+     * 차례로 고친다(`opponentCpuMagic`). 안 주면 그대로
+     */
+    readonly magic?: { readonly pitcher: PitcherAbility; readonly aceLevels?: Readonly<Record<number, number>> }
+  },
 ): GameProgress {
   if (progress.game.isFinished) return progress
   const mound = progress.opponentMound
   // 소모(0x11 진입 3dec6 0xa5e14) 뒤 틱 10 놓기 0x4dc78 의 0x4dbac · 0x34968 이 상대(수비) 레코드 +2 를 덮는다
   return withOpponentRecordTouched({
     ...progress,
+    ...(options.magic === undefined
+      ? {}
+      : {
+          opponentCpuMagic: heldCpuMagicAfterPitch(
+            progress.opponentCpuMagic ?? FRESH_HELD_CPU_MAGIC,
+            options.magic.pitcher,
+            options.magic.aceLevels,
+            pitchTypeNumber,
+          ),
+        }),
     opponentMound: {
       ...mound,
       stamina: opponentStaminaAfterPitch(progress, pitchTypeNumber, options),
@@ -825,6 +855,28 @@ export function throwOpponentPitch(
     // 같은 0xa5e14 가 정산 사건 목록을 비운다 (a5e80 ctx+0x2c = 0)
     pendingSettlementEvents: undefined,
   })
+}
+
+/**
+ * **내 타석 마운드 상대 투수의 타석 화면 능력치** — 마선수 대결 투수(`aceOpponent`)면 `pitcherAbilityOf`(부르는 쪽 레벨), 아니면
+ * `opponentPitcherAbilityOf`. 타석 화면(`app/ui/GameRoute`)과 마구 두 칸 고치기(`throwOpponentPitch` 의 `magic`)가 함께 쓴다
+ */
+export function stageOpponentPitcherAbilityOf(
+  progress: GameProgress,
+  aceLevels: Readonly<Record<number, number>> | undefined,
+): PitcherAbility {
+  return progress.aceOpponent === null
+    ? opponentPitcherAbilityOf(progress)
+    : pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina))
+}
+
+/** 타석 화면에 넘길 CPU 마구 두 칸(`BattingStage.cpuMagic`) — 안 채웠으면 지금 마운드 투수로 채운 값(0xaebe4 aeea8) */
+export function opponentCpuMagicStateOf(
+  progress: GameProgress,
+  pitcher: PitcherAbility,
+  aceLevels: Readonly<Record<number, number>> | undefined,
+): { readonly remaining: number; readonly ballMagicNumber: number } {
+  return cpuMagicStateOf(progress.opponentCpuMagic ?? FRESH_HELD_CPU_MAGIC, pitcher, aceLevels)
 }
 
 /** 상대 투수가 이 구질을 던져 깎은 뒤의 +0x2c (0xa5e14 → 0xaeb08) — `throwOpponentPitch` 와 타석 화면의 투구 AI 가 함께 쓴다 */
@@ -1966,12 +2018,12 @@ function selectPitchAfterClear(progress: GameProgress, random: RandomPort, after
   for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
     if (current.game.isFinished || !isPlayerTurn(current.game)) return current
     if (current.burst !== null && current.burst.current !== null) return current
-    const changed = changeOpponentPitcher(current, random)
+    const changed = changeOpponentPitcher(current, random, true)
     if (changed === current) return current
     // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수의 구질 목록으로
     // (`rollCpuPitchTypeOnPitcherChangeTick`). 마구 칸이 없으면 0x344dc 는 볼카운트 · 주자 · 남은 마구를 안 보고 rand(0,6) 한 번이다.
-    // ⚠️ 미해결: 내려가는 투수가 마구를 들면(142 의 마투수) 굴림 여부가 볼카운트 · 남은 마구에 갈리는데, 타자편 진행기는
-    //    둘 다 들고 있지 않다(볼카운트는 타석 세션, 남은 마구는 타석 화면) — 그 경우는 굴리지 않는다
+    // ⚠️ 미해결: 내려가는 투수가 마구를 들면(142 의 마투수) 굴림 여부가 볼카운트 · 남은 마구에 갈리는데, 남은 마구는 이제
+    //    진행기가 들지만(`opponentCpuMagic`) 볼카운트는 타석 세션이 들어 이 자리에서 모른다 — 그 경우는 굴리지 않는다
     const outgoing = opponentPitcherAbilityOf(current).repertoire
     if ((outgoing?.magicId ?? 0) === 0) {
       rollCpuPitchTypeOnPitcherChangeTick(
@@ -2172,7 +2224,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   // (우리가 공격 중이니 **상대 투수**, 0xc1ce2). 하나라도 바뀌면 0xc262c 가 공 없이 돌아갔다가(c266c) 같은
   // 타석으로 0xc1ba4 를 다시 지난다 — 바뀐 쪽은 state[0xe]·state[0xd] 로 빠지고 안 바뀐 쪽은 다시 판정한다
   for (let call = 0; call < MAXIMUM_SUBSTITUTION_CALLS; call += 1) {
-    const substituted = changeOpponentPitcher(applyOurCpuPinchHit(progress, random), random)
+    const substituted = changeOpponentPitcher(applyOurCpuPinchHit(progress, random), random, false)
     if (substituted === progress) break
     progress = substituted
     // 0x21 의 한 틱 — 공 없이 돌아간 부름(글 없음)
@@ -2512,7 +2564,19 @@ function applyOurCpuPinchHit(progress: GameProgress, random: RandomPort): GamePr
  * (`0x3d954` 의 `0x3da3e` — 수비가 CPU 이고 `0x66864` 가 참일 때. 리그 경기는 미션이 아니라 참이다).
  * 바꾸면 카운터(+0x27c·+0x280·+0x284)가 한꺼번에 0 이 된다 (교체 0xaec64).
  */
-function changeOpponentPitcher(progress: GameProgress, random: RandomPort): GameProgress {
+function changeOpponentPitcher(
+  progress: GameProgress,
+  random: RandomPort,
+  /**
+   * 경기 장면(내 타석 시작 3da3e)에서 바뀌었는가 — 그러면 세이브 후보 `0xa60c0` 을 잡는다. 3da3e 가 참이면 3da94 에서 0x16 으로
+   * 가고, 0x16 진입 0x3d458 이 팀 +0x290/+0x291(0xae9a0)을 보고 +0x195c 를 세운 뒤 0xe 그림 0x38b64 가 메시지 0xbc0 을 보내
+   * 0x5227c 가 0xa60c0 을 부른다(그 사이 플레이가 없어 이닝·아웃·주자·점수는 교체 순간과 같다).
+   * 동료 타석의 간이 엔진 교체(c1ce2 → c262c)는 c268e~c26b2 가 수비 팀 +0x296 과 함께 `engine[1]` 을 보는데, 경기 장면(3fa06)·
+   * 자동진행(3c93a)은 시뮬 초기화 0xc0dac 에 0 을 넘기고(c0e18) 1 은 CPU 끼리 경기 0xc2760(c2858)만 쓴다 — **후보를 안 잡는다**
+   * (r114 가 직접 떴다 — 0xa60c0 을 부르는 곳은 0x52284 · 0xc26a2 둘뿐). 세이브는 어차피 +0x64 때문에 기록되지 않는다(S1 4-1).
+   */
+  inScene: boolean,
+): GameProgress {
   if (progress.game.isFinished) return progress
   const before = progress.opponentMound
   const after = changePitcherIfNeeded(opponentQuickDefenseOf(progress), before, {
@@ -2528,6 +2592,8 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
     {
       ...progress,
       opponentMound: after,
+      // 교체 가지 0xaebe4 aec7a `0xae9c4(팀, −1)` — 새 투수는 다음 타석 교대(aeea8)에서 다시 찬다. 공 +0x10 은 그대로
+      opponentCpuMagic: heldCpuMagicAfterPitcherChange(progress.opponentCpuMagic ?? FRESH_HELD_CPU_MAGIC),
       // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
       runnerPitchers: freezeRunnerPitchers(progress.runnerPitchers, runnersOfGame(progress.game), before.pitcherSlot),
       // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다
@@ -2537,11 +2603,13 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
         pitches: before.pitches,
       }),
       opponentInningRunsAllowed: 0,
-      // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대)
-      decisions: decisionsAfterPitcherChange(progress.decisions, progress.game, {
-        our: progress.ourMound.pitcherSlot,
-        opponent: after.pitcherSlot,
-      }),
+      // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대) — 장면 교체만(`inScene`)
+      decisions: inScene
+        ? decisionsAfterPitcherChange(progress.decisions, progress.game, {
+            our: progress.ourMound.pitcherSlot,
+            opponent: after.pitcherSlot,
+          })
+        : progress.decisions,
     },
     `${progress.game.inning}회${progress.game.half} 상대 투수 교체`,
     false,
@@ -2561,7 +2629,9 @@ function moundsOf(progress: GameProgress): MoundBySide {
 
 /**
  * 상대 공격 반 이닝(간이 엔진)의 승·패·세 칸 — 교체 자리를 경계로 점수를 나눠 한 점씩 먹인다.
- * 교체 전 점수는 이전 투수, 교체 뒤 점수는 새 투수가 마운드에 있을 때 난 것이다 (0xc26a2 → 0xa60c0).
+ * 교체 전 점수는 이전 투수, 교체 뒤 점수는 새 투수가 마운드에 있을 때 난 것이다.
+ * 교체 자리의 세이브 후보 `0xa60c0` 은 **안 잡는다**: 간이 엔진 c268e~c26b2 는 수비 팀 +0x296 과 `engine[1]` 이 둘 다 서야 부르는데
+ * 타자편 경기 장면(3fa06)·자동진행(3c93a)은 0xc0dac 에 engine[1] = 0 을 넘긴다(c0e18 — 1 은 CPU 끼리 경기 0xc2760 c2858 뿐).
  */
 function opponentHalfDecisionsOf(
   progress: GameProgress,
@@ -2582,13 +2652,6 @@ function opponentHalfDecisionsOf(
     })
     counted = change.runsBefore
     ourSlot = change.pitcherSlot
-    decisions = decisionsAfterPitcherChange(
-      decisions,
-      scoredGame(counted),
-      { our: ourSlot, opponent: progress.opponentMound.pitcherSlot },
-      change.outs,
-      change.runnerCount,
-    )
   }
   return decisionsAfterRuns(decisions, scoredGame(counted), runs - counted, {
     our: ourSlot,

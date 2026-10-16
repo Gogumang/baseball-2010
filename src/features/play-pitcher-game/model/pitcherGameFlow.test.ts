@@ -329,6 +329,10 @@ describe('강판', () => {
     expect(progress.managerHookText).toBeGreaterThanOrEqual(88)
     expect(progress.managerHookText).toBeLessThanOrEqual(90)
     expect(isPitchTurn(progress)).toBe(false)
+    // 강판이어도 앞선 0xd 두 그림(등장음) · 0xe 한 그림은 지난다 — OK 없는 지나감 대기 (0x50674 506ea → 506fc 0x23)
+    expect(progress.sceneConfirm?.hooksAtEntry).toBe(true)
+    expect(progress.sceneConfirm?.atBatEntrySoundId).toBe(14)
+    expect(progress.sceneConfirmPending).not.toBe(true)
   })
 
   it('감독 대사 창을 닫으면 남은 경기가 자동으로 끝난다 (0x50804 → 상태 0x21)', () => {

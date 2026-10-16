@@ -110,6 +110,8 @@ interface MissionPlayScreenProps {
    * 상대 마투수의 마구 횟수가 `0xd8509[레벨]` = [3,4,5,6,7] 을 따른다 (타석 교대 0xaebe4). 안 넘기면 Lv1 = 3회.
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /** CPU 팀 +0x28 · 공 +0x10 — 세션이 미션 한 판 내내 드는 CPU 마구 두 칸 (`BattingStage.cpuMagic`) */
+  readonly cpuMagic?: { readonly remaining: number; readonly ballMagicNumber: number }
   /**
    * **CPU 투수의 견제** — `BattingStage.onPickoff` 로 그대로 넘긴다. 미션(모드 6)도 견제 길에 모드·미션 갈림이 없다
    * (0x50f28 · 0x345fc 의 갈림은 홈런더비 하나). 안 넘기면 견제가 꺼진다.
@@ -204,6 +206,7 @@ export function MissionPlayScreen({
   onSpecialSwingUsed,
   sceneBuntKind,
   aceLevels,
+  cpuMagic,
   onPickoff,
   onGiveUp,
   onFinish,
@@ -413,6 +416,7 @@ export function MissionPlayScreen({
                   },
                 })}
             aceLevels={aceLevels}
+            {...(cpuMagic === undefined ? {} : { cpuMagic })}
             onPitchResolved={onPitchResolved}
             onPickoff={onPickoff}
             flightProbeRef={flightProbeRef}

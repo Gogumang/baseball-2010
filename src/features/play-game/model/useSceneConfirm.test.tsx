@@ -2,7 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
-import { chainSceneConfirm, enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow } from '@/features/play-game/model/sceneConfirm'
+import {
+  chainSceneConfirm, enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow, enterSceneHookPassage,
+} from '@/features/play-game/model/sceneConfirm'
 import { resetSceneParticleManagerForTest, sceneParticleScene } from '@/entities/particle/model/sceneParticleManager'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
@@ -247,5 +249,32 @@ describe('0xd 진입 0x48d50 — 투수 그림 객체 되돌리기(48ee4) · 파
     expect(result.current.sceneDEntryMark).toBe(1)
     rerender({ wait: enterSceneConfirm() })
     expect(result.current.sceneDEntryMark).toBe(2)
+  })
+})
+
+describe('0xe 진입의 감독 강판 지나감 (0x50674 506ea 0x504cc → 0x23)', () => {
+  afterEach(() => setActiveSound(null))
+
+  it('등장음을 내고 0xd 두 그림 · 0xe 한 그림을 센 뒤 끝난다 — OK 는 안 받는다', () => {
+    const played: number[] = []
+    setActiveSound({ ...createSilentSound(), play: (id: number) => { played.push(id) } })
+    const wait = enterSceneHookPassage(14)
+    const { result } = renderHook(() => useSceneConfirm(wait, true))
+    expect(played).toEqual([14])
+    expect(result.current.isAwaiting).toBe(true)
+    expect(result.current.acceptsConfirm).toBe(false)
+    expect(result.current.sceneDEntryMark).toBe(1)
+    act(() => {
+      vi.advanceTimersByTime(SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+    })
+    // 0xe 한 그림 — 소개 판(0x4d9ec)이 그려진다
+    expect(result.current.isInConfirmState).toBe(true)
+    키('5')
+    expect(result.current.isAwaiting).toBe(true)
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame())
+    })
+    expect(result.current.isAwaiting).toBe(false)
+    expect(played).toEqual([14])
   })
 })

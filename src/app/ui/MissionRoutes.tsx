@@ -4,6 +4,7 @@ import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import {
   missionBatterSpecialSwingRemainingOf,
+  missionCpuMagicStateOf,
   missionMoundOpponent,
   missionMoundPitcherAbility,
   missionPitchingSkillPanelOf,
@@ -307,6 +308,8 @@ export function MissionRoutes({
         onSpecialSwingUsed={actions.specialSwingUsed}
         // 상대 마투수 마구 횟수 0xd8509[레벨] (타석 교대 0xaebe4) — 안 넘기면 늘 Lv1 의 3회다
         aceLevels={session.aceLevels}
+        // CPU 팀 +0x28 · 공 +0x10 — 미션 한 판 내내 세션이 든다(0xaebe4 aeea8 은 음수일 때만 채운다). 화면이 다시 서도 다시 차지 않는다
+        cpuMagic={missionCpuMagicStateOf(missionRun, session.aceLevels)}
         // CPU 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 미션(모드 6)에서도 돈다
         onPickoff={actions.cpuPickoff}
         // 도루 출발 (0x53610 → 0x583 → 0xa9bd4) — 판정은 공이 도착할 때 도루 판(종류 5)이 한다

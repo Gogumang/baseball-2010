@@ -59,11 +59,26 @@ export interface SceneConfirmWait {
    * 0x39e2e 하나). 그래서 0xd 진입 0x48d50 의 일(투수 그림 객체를 상태 0 으로 — 48ee4 0x35650 → 0x340c0 · 파티클 지우기 48f02)이 없다
    */
   readonly skipsSceneD?: true
+  /**
+   * **0xe 진입에서 감독 강판으로 빠지는 지나감** (나리 투수편) — 0xe 진입 0x50674 의 506ea 에서 0x504cc 가 참이면 506fc 가
+   * 0xbcb48(장면+0x18, 0x23) 으로 다음 상태만 적는다. 그래서 앞선 0xd 는 여느 때처럼 두 그림(진입 0x48d50 의 등장음 0xbc1 ·
+   * 파티클 지우기 · 투수 그림 상태 0 포함)이고, 0xe 는 그리기 표 0xd05a0 이 지금 상태 0xe 로 0x4d9ec 를 **한 번** 그린 뒤
+   * 다음 틀의 0xbc9c8 이 0x23 으로 옮긴다. OK 는 안 받는다(0xd 의 OK 는 0x536bc 점프표 밖, 0xe 의 첫 틀은 49a26 잠금).
+   * 화면(`useSceneConfirm`)은 0xd 두 그림 + 0xe 한 그림을 장면 시계로 센 뒤 이 대기를 끝내고, 그때 강판 창(0x23)이 선다.
+   */
+  readonly hooksAtEntry?: true
 }
 
 /** 새로 0xe 에 들어섰다 — 앞 대기는 이미 OK 를 받은 뒤다. 0x16 을 안 거친 0xd 면 타석 등장음을 싣는다 */
 export function enterSceneConfirm(atBatEntrySoundId?: number): SceneConfirmWait {
   return atBatEntrySoundId === undefined ? { entries: 1 } : { entries: 1, atBatEntrySoundId }
+}
+
+/** 0xd → 0xe 진입에서 감독 강판(0x504cc 참 → 0x23)으로 빠진다 — OK 없이 0xd 두 그림 · 0xe 한 그림만 지난다(`hooksAtEntry`) */
+export function enterSceneHookPassage(atBatEntrySoundId?: number): SceneConfirmWait {
+  return atBatEntrySoundId === undefined
+    ? { entries: 1, hooksAtEntry: true }
+    : { entries: 1, atBatEntrySoundId, hooksAtEntry: true }
 }
 
 /** 교체 창 0xb 의 '#' · CLR(0x4984a) — 0xd 없이 곧장 0xe 에 선다(`skipsSceneD`) */

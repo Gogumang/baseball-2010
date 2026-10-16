@@ -68,6 +68,8 @@ interface GameScreenProps {
    * 0xd8509[레벨] (0xaebe4) 이 이 칸을 본다 — 안 넘기면 Lv1(3 회).
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /** 수비 팀 +0x28 · 공 +0x10 — 진행기가 경기 내내 드는 CPU 마구 두 칸 (`BattingStage.cpuMagic`) */
+  readonly cpuMagic?: { readonly remaining: number; readonly ballMagicNumber: number }
   readonly isPaused: boolean
   readonly bannerText: string
   readonly random: RandomPort
@@ -149,6 +151,7 @@ export function GameScreen({
   atBat,
   pitcherAbility,
   aceLevels,
+  cpuMagic,
   isPaused,
   bannerText,
   random,
@@ -375,6 +378,7 @@ export function GameScreen({
             pitcherEquipmentNibbles={opponentPitcherEquipmentOf(progress)}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
             aceLevels={aceLevels}
+            {...(cpuMagic === undefined ? {} : { cpuMagic })}
             hud={{
               inning: progress.game.inning,
               half: progress.game.half,

@@ -1,4 +1,5 @@
-import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
+import type { PitcherAbility, PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
+import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch, magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
 
 /**
@@ -90,4 +91,74 @@ export function advanceMagicPitchGameState(
     pitcherMagicNumber,
     state.remaining,
   )
+}
+
+/**
+ * **팀+0x28 의 "안 채움"** — 팀 new 0xb891c 가 −1 로 두고(b89b4~b89ba), 투수 교체 가지가 다시 −1 로 비운다(0xaebe4 aec7a).
+ * 타석 교대 0xaebe4 는 aeea8 `0xaea10(팀) ≥ 0` 이면 채우지 않고 건너뛰므로(aeeae `bge`) **같은 투수가 서 있는 동안 남은 횟수는
+ * 경기 내내 이어진다** — 반 이닝이 바뀌거나 화면이 다시 서도 다시 차지 않는다.
+ */
+export const UNFILLED_MAGIC_REMAINING = -1
+
+/** 0xaebe4 aef08 `0xb62b4(투수, 0x17)` — 투수 스킬 비트 23 혼신이면 채운 값 + 2 */
+const SPIRIT_SKILL_BIT = 23
+
+/**
+ * **진행기가 경기 동안 드는 CPU 마구 두 칸** — 수비 팀 +0x28(`remaining`, 안 채웠으면 −1)과 경기에 하나뿐인 공 객체 +0x10.
+ * 타석 화면(`BattingStage.cpuMagic`)은 공마다 이 값의 사본으로 고르고, 던진 뒤 진행기가 같은 차례로 고친다
+ * (`heldCpuMagicAfterPitch`).
+ */
+export interface HeldCpuMagic {
+  readonly remaining: number
+  readonly ballMagicNumber: number
+}
+
+/** 새 경기 — 팀 new 의 −1 · 공 객체 new 의 0 (0x1239 new 의 0 채움은 원본 미확인 — H2 3-4) */
+export const FRESH_HELD_CPU_MAGIC: HeldCpuMagic = { remaining: UNFILLED_MAGIC_REMAINING, ballMagicNumber: 0 }
+
+/**
+ * 0xaebe4 가 마운드 투수로 채우는 횟수 (aeea8~aef24): 마투수(0xb633d)면 `0xd8509[mgr[0x13a + 순번(0xb63a1)]]`,
+ * 아니면 `0xd84ff[+0x18]` 에 혼신(스킬 23) +2. 마구가 없는 투수(+0x18 = 0)는 0xae9c4 가 안 쓴다(0 과 같다).
+ */
+export function magicCountOfPitcherAbility(
+  pitcher: PitcherAbility,
+  aceLevels: Readonly<Record<number, number>> | undefined,
+): number {
+  const magicId = pitcher.repertoire?.magicId ?? 0
+  const order = aceOrderOfMagicNumber(magicId)
+  return magicPitchCountOf({
+    number: magicId,
+    isAce: order >= 0,
+    aceLevel: order < 0 ? 0 : aceLevelOf(aceLevels, aceLevelSlotOf('투수', order + 1)),
+    hasSpiritSkill: (((pitcher.skillBits ?? 0) >>> SPIRIT_SKILL_BIT) & 1) === 1,
+  })
+}
+
+/** 이번 공을 고를 때 볼 두 칸 — 안 채웠으면(−1) 지금 마운드 투수로 채운다(0xaebe4 aeea8 의 갈래) */
+export function cpuMagicStateOf(
+  held: HeldCpuMagic,
+  pitcher: PitcherAbility,
+  aceLevels: Readonly<Record<number, number>> | undefined,
+): MagicPitchGameState {
+  return {
+    remaining: held.remaining < 0 ? magicCountOfPitcherAbility(pitcher, aceLevels) : held.remaining,
+    ballMagicNumber: held.ballMagicNumber,
+  }
+}
+
+/** 던진 뒤 — 소모 0x345fc · 싣기 0x3de10 을 원본 차례로 밟은 두 칸 */
+export function heldCpuMagicAfterPitch(
+  held: HeldCpuMagic,
+  pitcher: PitcherAbility,
+  aceLevels: Readonly<Record<number, number>> | undefined,
+  typeNumber: number,
+): HeldCpuMagic {
+  const state = cpuMagicStateOf(held, pitcher, aceLevels)
+  advanceMagicPitchGameState(state, typeNumber, pitcher.repertoire?.magicId ?? 0)
+  return { remaining: state.remaining, ballMagicNumber: state.ballMagicNumber }
+}
+
+/** 수비 팀 투수 교체 — 0xaebe4 aec7a `0xae9c4(팀, −1)` 로 남은 횟수를 비운다. 공 +0x10 은 경기에 하나라 그대로다 */
+export function heldCpuMagicAfterPitcherChange(held: HeldCpuMagic): HeldCpuMagic {
+  return held.remaining === UNFILLED_MAGIC_REMAINING ? held : { ...held, remaining: UNFILLED_MAGIC_REMAINING }
 }

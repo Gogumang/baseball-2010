@@ -6,14 +6,14 @@ import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import { opponentPitcherAbilityOf, opponentStaminaPercentAfterPitchOf } from '@/features/play-game/model/gameFlow'
+import {
+  opponentCpuMagicStateOf, opponentStaminaPercentAfterPitchOf, stageOpponentPitcherAbilityOf,
+} from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { LOADING_STEPS_BATTER_CAREER, LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { ScreenOverlay } from '@/shared/ui'
-import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
-import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { useGameSettings } from '@/app/model/useGameSettings'
@@ -317,6 +317,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const burstLines =
     burst === null || burstRow === null ? null : ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null
 
+  /** 지금 마운드의 상대 투수 — 타석 화면과 마구 두 칸(`cpuMagic`)이 함께 본다 */
+  const moundPitcher = stageOpponentPitcherAbilityOf(progress, aceLevels)
   return (
     <>
       <GameScreen
@@ -330,14 +332,14 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         // 체력%는 공이 손을 떠나며(0x3dec6 → 0xa5e14) 깎은 뒤 값을 놓기 0x4dc78 · 스윙 0xab214 가 본다 — 압도 22 는
         // `handlePitchResolved` 의 `throwOpponentPitch` 와 같은 장착 비트다
         pitcherAbility={{
-          ...(progress.aceOpponent === null
-            ? opponentPitcherAbilityOf(progress)
-            : pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina))),
+          ...moundPitcher,
           staminaPercentAfterPitch: opponentStaminaPercentAfterPitchOf(progress, {
             batterIntimidates: career.equippedSkillIds.includes(INTIMIDATE_SKILL_ID),
           }),
         }}
         aceLevels={aceLevels}
+        // 수비 팀 +0x28 · 공 +0x10 — 경기 내내 진행기가 든다(0xaebe4 aeea8 은 음수일 때만 채운다). 화면이 다시 서도 다시 차지 않는다
+        cpuMagic={opponentCpuMagicStateOf(progress, moundPitcher, aceLevels)}
         isPaused={runner.isPaused || burstLines !== null}
         bannerText={runner.bannerText}
         // 구장 하늘 줄 — 경기를 세울 때(0x783b0) 한 번 정했다
