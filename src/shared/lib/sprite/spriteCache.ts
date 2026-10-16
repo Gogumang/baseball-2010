@@ -12,6 +12,8 @@
  *    같은 주소의 `<img>` 를 다시 세워도 서버에 다시 묻지 않고(`Cache-Control: no-cache` 재검증 없이) 곧바로 뜬다.
  */
 
+import { isSpriteMaskSrc } from '@/shared/lib/sprite/spriteMask'
+
 type ImageStatus = 'loading' | 'ready' | 'failed'
 
 interface ImageEntry {
@@ -29,6 +31,8 @@ function canLoadImages(): boolean {
 
 function startImage(url: string, isLowPriority: boolean): ImageEntry {
   const image = new Image()
+  // 마스크용 주소(`?mask`)는 CSS mask-image 처럼 CORS 모드로 받아야 마스크가 이 캐시를 그대로 쓴다 (`spriteMask`)
+  if (isSpriteMaskSrc(url)) image.crossOrigin = 'anonymous'
   // 유휴 미리 받기는 지금 화면이 부르는 그림보다 뒤에 서게 한다.
   if (isLowPriority) image.setAttribute('fetchpriority', 'low')
   let settle: (value: HTMLImageElement | null) => void = () => {}
@@ -86,23 +90,51 @@ export function isSpriteImageRequested(url: string): boolean {
 }
 
 /**
- * 화면의 `<img>` 가 띄운 스프라이트도 공용 캐시에 붙들어 둔다 — 문서에 `load` 를 잡는 귀 하나(캡처 단계).
+ * 화면의 `<img>` 가 띄우는 스프라이트도 공용 캐시에 붙들어 둔다.
  *
  * 붙들지 않은 그림은 `<img>` 가 내려가거나 src 가 바뀌면(애니 칸 넘기기) 브라우저 메모리 캐시에서 밀려날 수 있고,
  * 그러면 다음에 다시 띄울 때 `Cache-Control: no-cache` 재검증 한 바퀴(지연 80ms 면 80ms 남짓) 동안 빈 그림이 된다.
  * 그 `<img>` 요소 자체가 아니라 같은 주소의 새 Image 를 캐시에 둔다(요소는 src 를 바꿔 다른 그림이 될 수 있다).
+ *
+ * 귀는 둘이다.
+ *  - 문서 `load`(캡처 단계): 다 받은 `<img>` 의 주소를 붙든다.
+ *  - **src 가 걸리는 순간**(MutationObserver — `<img>` 가 붙거나 src 가 바뀔 때): 받기를 곧바로 따로 시작해 붙든다.
+ *    애니처럼 src 가 받기 한 바퀴보다 빨리 넘어가면 `<img>` 는 받던 것을 버리고 다음 칸을 받으므로 `load` 가 영영 안 온다 —
+ *    로딩 판의 달리는 선수가 지연 80ms 에서 판 내내 비고 같은 세 장을 끝없이 다시 받았다. 따로 받은 Image 는 버려지지 않아
+ *    한 바퀴 뒤부터는 그 칸들이 곧바로 뜬다(같은 주소를 동시에 받으면 브라우저가 요청 하나로 합친다).
  * 돌려주는 함수로 귀를 뗀다.
  */
 export function retainDisplayedSprites(target: Document): () => void {
-  const onLoad = (event: Event) => {
-    const element = event.target
-    if (!(element instanceof HTMLImageElement)) return
-    const src = element.getAttribute('src')
+  const retain = (src: string | null) => {
     if (src === null || !src.includes('sprites/') || images.has(src)) return
     spriteImage(src)
   }
+  const onLoad = (event: Event) => {
+    const element = event.target
+    if (element instanceof HTMLImageElement) retain(element.getAttribute('src'))
+  }
   target.addEventListener('load', onLoad, true)
-  return () => target.removeEventListener('load', onLoad, true)
+  const retainTree = (node: Node) => {
+    if (!(node instanceof Element)) return
+    if (node instanceof HTMLImageElement) retain(node.getAttribute('src'))
+    else if (node.firstElementChild !== null) for (const image of node.getElementsByTagName('img')) retain(image.getAttribute('src'))
+  }
+  const observer = typeof MutationObserver === 'undefined'
+    ? null
+    : new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === 'attributes') {
+            if (record.target instanceof HTMLImageElement) retain(record.target.getAttribute('src'))
+          } else {
+            for (const node of record.addedNodes) retainTree(node)
+          }
+        }
+      })
+  observer?.observe(target, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] })
+  return () => {
+    target.removeEventListener('load', onLoad, true)
+    observer?.disconnect()
+  }
 }
 
 // ── JSON (origins·animations·boxes …) ─────────────────────────────────────────

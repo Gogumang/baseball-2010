@@ -1,7 +1,7 @@
 import { gameBenchOffenseOf, gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
 import { gameIntroBatterHandOf } from '@/pages/game/lib/gameMatchupCards'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
@@ -29,6 +29,9 @@ import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissio
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { castOfAces, castOfCareer, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
+import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -78,6 +81,16 @@ const INTIMIDATE_SKILL_ID = 22
  * 창이 떠 있는 동안 타석을 멈춰 둔다 — 원본도 장면 상태가 0xf 를 떠나 있어 투구가 나가지 않는다.
  */
 export function GameRoute({ session, progress, runner, random, career, gameSettings, aceLevels }: GameRouteProps) {
+  // 이 경기 두 팀의 선수 그림 — 로딩 판 동안 타석 선수(마선수 · 내 선수 장비 · 몸통 폼)를, 경기 장면 동안 수비 그림을 받는다(안 기다린다)
+  const { battingTypeIndex, battingSide, equipmentLevels } = career
+  const gameCast = useMemo(
+    () => [castOfAces(progress.aces), castOfCareer({ battingTypeIndex, battingSide, equipmentLevels })],
+    [progress.aces, battingTypeIndex, battingSide, equipmentLevels],
+  )
+  const stagePreloads = useMemo(() => mergeSpritePreloads(gameEntryCastPreloadsOf(), stageSpritePreloadsOf(...gameCast)), [gameCast])
+  useEffect(() => {
+    preloadSprites(defensePreloadsOf(...gameCast), 'idle')
+  }, [gameCast])
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않으려고 기억해 둔다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -216,7 +229,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
-        <LoadingTip tip={session.loadingTip} onDone={session.actions.finishLoading} />
+        <LoadingTip tip={session.loadingTip} onDone={session.actions.finishLoading} preloadRequests={stagePreloads} />
       </RawScreen>
     )
   }

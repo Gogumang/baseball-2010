@@ -262,6 +262,22 @@ export function batterFrameAt({ tick, swingTick, isBunting, bodyType, aceOrder }
   return pose.idle[cell]
 }
 
+/**
+ * 일반 타자 자세표가 그리는 **몸통 프레임 전부** — 대기 · 스윙 · 번트 (`batterFrameAt` 이 낼 수 있는 값). 미리 받기가 쓴다.
+ */
+export function batterPoseFramesOf(bodyType: number): number[] {
+  const pose = POSES[bodyType] ?? POSES[0]
+  const swing = Array.from({ length: pose.swingLength }, (_, step) => pose.swingStart + step)
+  return [...new Set([...pose.idle, ...swing, pose.bunt])]
+}
+
+/** 마타자 자세표가 그리는 프레임 전부 — 대기 · 스윙 · 번트(0). 순번이 0~4 가 아니면 빈 목록 */
+export function aceBatterPoseFramesOf(aceOrder: number): number[] {
+  if (!isAceBatterOrder(aceOrder)) return []
+  const swing = ACE_SWING_STEPS[aceOrder].map((step) => ACE_SWING_START + step)
+  return [...new Set([...ACE_IDLE_FRAMES[aceOrder], ...swing, ACE_BUNT_FRAME])]
+}
+
 /** 겹침 규칙 표 order[f + adj] (0xd3a54) */
 const ORDER_RULES = [
   [1, 1, 1, 1, 0, 0, 1, 1, 2, 1, 1, 1, 1, 2],

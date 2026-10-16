@@ -278,6 +278,19 @@ const IDLE_STARTS = startsOf(IDLE_DURATIONS, IDLE_LAST_STEP)
 /** 대기 한 바퀴의 길이 — 단계 4 에 닿는 그 갱신(9e004)에 상태 0 으로 돌아가므로 단계 4 는 그려지지 않는다 */
 export const PITCHER_IDLE_TICKS = IDLE_STARTS[IDLE_END_STEP]
 
+/**
+ * 투수 그림 객체가 그릴 수 있는 **바탕 프레임 전부** (자세 0x9e0b8) — 미리 받기가 쓴다.
+ * 평범한 투수는 폼 세 줄의 투구 단계 + 대기 동작, 마투수는 그 순번 줄의 단계 0..마지막 (대기 동작은 0 이다).
+ * 평범한 투수의 덧그림(+0x16)은 `pitcherLayersOf` 가 붙인다.
+ */
+export function pitcherPoseFramesOf(aceOrder?: number | null): number[] {
+  const row = aceRowOf(aceOrder)
+  const frames = row === null
+    ? [...PITCH_STEP_FRAMES.flat(), ...IDLE_FRAMES]
+    : [0, ...ACE_PITCH_STEP_FRAMES[row].slice(0, ACE_PITCH_LAST_STEPS[row] + 1)]
+  return [...new Set(frames)].sort((a, b) => a - b)
+}
+
 export interface PitcherAnimation {
   /** +0x14 — 0 선 자세 · 1 투구 · 2 대기 동작 */
   readonly state: 0 | 1 | 2

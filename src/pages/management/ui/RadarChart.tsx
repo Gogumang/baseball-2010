@@ -12,6 +12,7 @@ import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import type { RadarGrowthOptions } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
 const IMG_TEXT = './sprites/img_text/frames'
@@ -38,7 +39,7 @@ export function TintedNumber({ glyphs, right, top, color }: {
         const src = `${NUM_FOLDER}/${String(glyph.frame).padStart(3, '0')}.png`
         return (
           <div key={index} className={styles.tintedGlyph}
-            style={{ left, top, width: glyph.width, height: NUMBER_HEIGHT, background: solidColorCss(color), maskImage: `url(${src})`, WebkitMaskImage: `url(${src})` }} />
+            style={{ left, top, width: glyph.width, height: NUMBER_HEIGHT, background: solidColorCss(color), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }} />
         )
       })}
     </>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSpritePreloader, frameUrl } from '@/shared/lib/sprite/spritePreload'
+import { createSpritePreloader, frameUrl, mergeSpritePreloads, preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
 import type { SpritePreloadDeps } from '@/shared/lib/sprite/spritePreload'
 
 interface Pending {
@@ -151,5 +151,49 @@ describe('createSpritePreloader', () => {
     await h.flush()
     await h.runIdle()
     expect(h.started.slice(2)).toEqual(['./sprites/num/000.png', './sprites/num/001.png'])
+  })
+})
+
+describe('r111 — 마스크 · 이름 · 원점 표 거르기 · 합치기', () => {
+  it('마스크 프레임은 ?mask 주소로, 이름 PNG 는 이름 그대로 받는다', async () => {
+    const h = harness()
+    void h.preloader.preload([{ folder: './sprites/img_text/frames', frames: [6], masks: [6, 9] }, { folder: './sprites/management', frames: [], names: ['icon_selected_5'] }], 'scene')
+    await h.flush()
+    expect(h.started).toEqual([
+      './sprites/img_text/frames/006.png',
+      './sprites/img_text/frames/006.png?mask',
+      './sprites/img_text/frames/009.png?mask',
+      './sprites/management/icon_selected_5.png',
+    ])
+  })
+
+  it('framesListedIn 이면 그 폴더 origins.json 에 있는 칸만 받는다 — 표를 못 받으면 목록대로', async () => {
+    const h = harness()
+    h.jsonValues.set('./sprites/pitcher/frames/origins.json', { '000': {}, '022': {} })
+    void h.preloader.preload([
+      { folder: './sprites/pitcher/frames', frames: [0, 22, 29], json: ['origins.json'], framesListedIn: './sprites/pitcher/frames' },
+      { folder: './sprites/pitcher/frames/index', frames: [0, 29], framesListedIn: './sprites/pitcher/frames' },
+      { folder: './sprites/x/frames', frames: [1], framesListedIn: './sprites/x/frames' },
+    ], 'scene')
+    await h.flush()
+    expect(h.started.sort()).toEqual([
+      './sprites/pitcher/frames/000.png',
+      './sprites/pitcher/frames/022.png',
+      './sprites/pitcher/frames/index/000.png',
+      './sprites/x/frames/001.png',
+    ])
+  })
+
+  it('mergeSpritePreloads 는 폴더별 합집합이고 all 이 이긴다', () => {
+    const merged = mergeSpritePreloads(
+      [{ folder: 'a', frames: [3, 1], json: ['origins.json'] }, { folder: 'b', frames: 'all' }],
+      [{ folder: 'a', frames: [2, 1], masks: [5], framesListedIn: 'a' }, { folder: 'b', frames: [1] }, { folder: 'c', frames: [], names: ['z', 'y'] }],
+    )
+    expect(merged).toEqual([
+      { folder: 'a', frames: [1, 2, 3], json: ['origins.json'], masks: [5], framesListedIn: 'a' },
+      { folder: 'b', frames: 'all' },
+      { folder: 'c', frames: [], names: ['y', 'z'] },
+    ])
+    expect(preloadImageUrlsOf(merged)).toEqual(['a/001.png', 'a/002.png', 'a/003.png', 'a/005.png?mask', 'c/y.png', 'c/z.png'])
   })
 })

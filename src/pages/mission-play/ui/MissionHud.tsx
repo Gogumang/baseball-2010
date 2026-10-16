@@ -12,6 +12,7 @@ import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState }
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { createGameSceneDrawGate } from '@/shared/lib/commonWindow/commonWindow'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 interface MissionHudProps {
   readonly mission: OriginalMission
@@ -160,7 +161,7 @@ export function MissionHud({
           <Sprite sprite={TIMER_STRIP} />
           <Sprite sprite={TIMER_ICON} />
           {timer.glyphs.map((glyph, index) => {
-            const mask = `url(${glyph.src})`
+            const mask = spriteMaskImage(glyph.src)
             return (
               <span
                 key={index}
