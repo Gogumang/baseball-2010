@@ -112,13 +112,23 @@ describe('팀 고르기', () => {
     expect(container.querySelectorAll('img[src$="slt_frame/000.png"]')).toHaveLength(TEAM_COUNT)
   })
 
-  it('칸 안 로고는 큰 team_logo 를 칸에 맞게 줄여 그린다 (근사)', () => {
+  it('칸 안 로고는 35×34 를 칸 + (2, 2) 에 — 0x66431 (0x7b326~0x7b33e)', () => {
     const { container } = 띄우기()
 
     const 로고 = container.querySelector<HTMLImageElement>(`img[src$="team_logo/003.png"]`)
 
     expect(로고).toBeTruthy()
-    expect(로고?.style.width).toBe('38px')
+    expect([로고?.style.left, 로고?.style.top, 로고?.style.width, 로고?.style.height]).toEqual(['2px', '2px', '35px', '34px'])
+  })
+
+  it('잠긴 히든 칸은 team_logo 이미지 15 "?" 를 절반(16×24)으로 칸 + (12, 7) 에 — 0xbb91d 종류 2 · a 5', () => {
+    띄우기()
+
+    const 물음표 = screen.getAllByTestId('팀칸-물음표')
+    expect(물음표).toHaveLength(5)
+    expect(물음표[0].getAttribute('src')).toMatch(/team_logo\/015\.png$/)
+    expect([물음표[0].style.left, 물음표[0].style.top, 물음표[0].style.width, 물음표[0].style.height])
+      .toEqual(['12px', '7px', '16px', '24px'])
   })
 
   it('고른 칸에만 노란 테두리 그림(slt_frame 1)이 붙는다', () => {
