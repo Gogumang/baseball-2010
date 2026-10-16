@@ -1,4 +1,5 @@
-import { FrameSprite, PressArea, RawScreen, SpriteNumber } from '@/shared/ui'
+import { FrameSprite, OriginalScaledImage, PressArea, RawScreen, SpriteNumber } from '@/shared/ui'
+import { TEAM_LOGO_BOX } from '@/shared/lib/sprite/originalScale'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -65,16 +66,14 @@ function TeamLogo({ cell, teamId }: { readonly cell: BoardBox; readonly teamId: 
   const team = TEAMS[teamId]
   if (team === undefined) return null
   return (
-    <img
+    // 0x66431 — 0x663c4 가 원본 식으로 미리 줄인 35×34 버퍼를 (칸 + 2) 에 제 크기로 (`OriginalScaledImage`)
+    <OriginalScaledImage
       className={styles.logo}
       src={team.logoUrl}
       alt={team.name}
-      style={{
-        left: cell.x + LOGO_INSET,
-        top: cell.y + LOGO_INSET,
-        width: cell.width - LOGO_INSET * 2,
-        height: cell.height - LOGO_INSET * 2,
-      }}
+      boxWidth={TEAM_LOGO_BOX.width}
+      boxHeight={TEAM_LOGO_BOX.height}
+      style={{ left: cell.x + LOGO_INSET, top: cell.y + LOGO_INSET }}
     />
   )
 }
