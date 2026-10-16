@@ -30,8 +30,8 @@ import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoad
  *   - 그 밖(2·3, 폼이 다른 4)은 아예 안 싣는다 — 원본도 이 두 경우엔 그림 이펙트가 없고
  *     파티클(`0xbbc85` id 0x15~0x18)만 쓴다 (`0x3b4fa`·`0x3b510`·`0x3b5ae`·`0x3b5cc`).
  *
- * ⚠️ 마선수 마구(번호 5~9)의 이펙트는 여기 없다 — 그쪽은 경기+0x1038 을 쓰는 `0x46fa8` 이고
- * 투구 단계표(0xd00dc)를 타서 아직 다 못 옮겼다.
+ * 마선수 마구(번호 5~9)의 이펙트는 여기 없다 — 그쪽은 경기+0x1038 을 쓰는 `0x46fa8` 과 투수 쪽 effect_pitcher(+0x1044)이고
+ * `acePitcherEffect.ts` 가 옮겼다(r112 — 레오니는 원본에서도 화면에 안 나온다).
  */
 
 /** `effect/effect_fire.pzx` — 마구 번호 1 */

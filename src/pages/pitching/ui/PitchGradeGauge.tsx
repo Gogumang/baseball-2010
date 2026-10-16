@@ -92,7 +92,8 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
             : {
                 showsTargetFrame: showsGaugeTargetFrameOf({
                   mode: overlay.gameMode,
-                  // ⚠️ 웹 난이도(설정 +0x2c)는 늘 2 — 4d366 의 난이도 0 갈래는 안 탄다
+                  // 난이도(설정 +0x2c)는 원본도 늘 기본 2 다 — 바꾸는 화면이 없다(P7 K2). 게다가 이 화면은 미션(모드 5)이라
+                  // 4d366 의 난이도 0 갈래는 모드 5 · 6 에서 안 탄다
                   difficulty: 2,
                   isAttackSideHuman: false,
                   eagleEyeGames: 0,

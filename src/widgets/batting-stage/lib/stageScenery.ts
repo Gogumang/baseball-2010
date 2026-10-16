@@ -61,7 +61,12 @@ export function skyColorsOf(row: number, skyColumn: number): { top: string; bott
   }
 }
 
-/** 구름 (0x78448) — 3틱마다 구름 i 가 i+1 px 이동, −480 미만이면 +480 */
+/**
+ * 구름 (0x78448) — 3틱마다 구름 i 가 i+1 px 이동, −480 미만이면 +480.
+ * ⚠️ 근사(r112 확인 — 틱 시계 원점 문제와 묶여 남김): 원본은 이 셈을 공용 갱신 0x3f060(3f2f6)이 갱신마다 부르고, 0x78448 은
+ * 구장+0x50(3f07c 가 갱신마다 적는 장면 상태)이 0x11 · 0x12 면 안 센다(7844a~78450). 0x3f060 도 0x13(3f1e0) · 야외 화면 상태
+ * (0x33c98) · 상태 7 · 0x18 · 0x19 · 0x1a 에서는 안 부른다. 웹은 화면 틱을 그대로 써서 투구 비행 · 판정 동안에도 흐른다.
+ */
 export const CLOUD_WRAP_WIDTH = 480
 const CLOUD_TICKS_PER_STEP = 3
 const NIGHT_COLOR_INDEX = 9
