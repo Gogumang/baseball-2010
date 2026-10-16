@@ -58,7 +58,7 @@ import {
   entryBatterSkillIdsOf,
   recordDrawnTeamFieldingErrors,
 } from '@/features/play-team-game/model/teamGameFlow'
-import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
+import { runLiveRunnerPlayWithoutKeys, startLiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates } from '@/features/defense-play/model/runnerFates'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
@@ -672,6 +672,58 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
       expect(실시간Random.rand(0, 0x7fffffff)).toBe(미리Random.rand(0, 0x7fffffff))
     }
     expect(deferred).toBeGreaterThan(0)
+  })
+
+  it('화면이 도는 갈래(`startBatterPitch`)는 우리 공격의 도루 판도 붙든다(사람 주루 키 0x5331c) — 키 없이 끝내면 미리 돌린 판과 같다', () => {
+    for (const seed of [1, 2, 3]) {
+      const { progress } = 일루주자()
+      const started = startSteal(progress, 1)
+      const 미리Random = createSeededRandom(seed)
+      const 미리 = applyBatterPitch(started, 볼, 미리Random)
+      const 실시간Random = createSeededRandom(seed)
+      const 붙듦 = startBatterPitch(started, 볼, 실시간Random)
+      const pending = 붙듦.pendingRunnerPlay
+      expect(pending?.kind).toBe('arrival')
+      expect(pending?.side).toBe('공격')
+      // 판이 도는 동안은 다음 공이 안 나간다 (상태 0x17)
+      expect(isBatterTurn(붙듦)).toBe(false)
+      expect(붙듦.game).toBe(started.game)
+      if (pending == null) continue
+      const 끝 = resolveRunnerPlay(붙듦, runLiveRunnerPlayWithoutKeys(pending), 실시간Random)
+      expect(끝.pendingRunnerPlay ?? null).toBeNull()
+      expect(끝.game).toEqual(미리.game)
+      expect(끝.recordIds).toEqual(미리.recordIds)
+      expect(끝.atBat).toEqual(미리.atBat)
+      // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+      expect(끝.lastDefensePlay).toBe(started.lastDefensePlay)
+      expect(실시간Random.rand(0, 0x7fffffff)).toBe(미리Random.rand(0, 0x7fffffff))
+    }
+  })
+
+  it('붙든 도루 판에서 귀루 키(\'3\' — 0x584 · 인자 1)를 누르면 1루 주자가 돌아서고 도루 기록 8 이 안 선다', () => {
+    const { progress } = 일루주자()
+    const started = startSteal(progress, 1)
+    const random = createSeededRandom(1)
+    const 붙듦 = startBatterPitch(started, 볼, random)
+    const pending = 붙듦.pendingRunnerPlay
+    if (pending == null) throw new Error('도루 판이 안 붙들렸다')
+    const stepper = startLiveRunnerPlay(pending)
+    stepper.step({ key: '3' })
+    while (!stepper.finished) stepper.step(null)
+    const result = stepper.result()
+    expect(result.log[0]).toBe('0틱 귀루 키 — 주자 1')
+    const 끝 = resolveRunnerPlay(붙듦, result, random)
+    expect(끝.recordIds).not.toContain(8)
+    expect(끝.game.bases.second).toBe(false)
+    expect(끝.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
+  })
+
+  it('CPU 견제(사람 공격)도 화면 갈래면 붙든다 — 견제 판(종류 4)은 사람 주루 키를 받는다', () => {
+    const { progress } = 일루주자()
+    const 붙듦 = cpuPickoff(progress, 1, createSeededRandom(1), true)
+    expect(붙듦.pendingRunnerPlay?.kind).toBe('pickoff')
+    expect(붙듦.pendingRunnerPlay?.side).toBe('공격')
+    expect(붙듦.game).toBe(progress.game)
   })
 })
 

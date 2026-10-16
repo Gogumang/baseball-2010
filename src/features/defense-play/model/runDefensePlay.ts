@@ -18,11 +18,8 @@ import {
 import { displayPatternOf, isFairAngle, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import {
-  inPlayCommandOf,
-  type ControlSide,
-  type RunnerTarget,
-} from '@/entities/defense-controls/model/defenseKeys'
+import { inPlayCommandOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
+import { applyBaserunningKey } from '@/entities/fielding/model/baserunningKey'
 import {
   isLaserWindowOpen,
   judgeLaserInput,
@@ -1984,14 +1981,29 @@ export function stepDefensePlay(
             log.push(`${tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
           }
         } else {
-          // 메시지 0x582(진루) · 0x584(귀루) → 0x5209e / 0x5222a → 0xa9b04
-          // 0x5209e 는 먼저 경기+0x24 = 0(자동 끄기), 0xa9b04 는 성공한 주자마다 다시 1 로 되돌린다.
-          // 앞뒤가 서로 밀어내는 것이 **원본 그대로**라 그 순서를 지킨다.
-          autoBaserunning = false
-          const moved = runBaserunningCommand(runners, command.kind, command.runner)
-          if (moved.length > 0) {
+          // 메시지 0x582(진루) · 0x584(귀루) → 0x5209e / 0x5222a → 0xa9b04 (`entities/fielding/model/baserunningKey`)
+          // 0x5209e 는 플레이+0x111(홈런)이면 아무것도 안 하고, 아니면 경기+0x24 = 0 뒤 0xa9b04 — 주자를 움직이면 경기+0x24 = 1 ·
+          // 플레이+0x128 = 1. 앞뒤가 서로 밀어내는 것이 **원본 그대로**라 그 순서를 지킨다. 판 종류는 0xae794 가 {1, 4, 5, 9} 만 받는다
+          // (사건 6 · 7 · 10 이 판 종류를 바꾼 뒤로는 안 먹는다)
+          const keyed = applyBaserunningKey(
+            {
+              playKind: play.kind,
+              homeRunFlag,
+              runners: runners.map((runner) => runner.state),
+              previousTargets: runners.map((runner) => runner.previousTarget),
+            },
+            command.kind,
+            command.runner,
+          )
+          if (keyed.handled) autoBaserunning = false
+          runners.forEach((runner, index) => {
+            runner.state = keyed.runners[index] ?? runner.state
+            runner.previousTarget = keyed.previousTargets[index] ?? runner.previousTarget
+          })
+          if (keyed.succeeded) {
             autoBaserunning = true
-            log.push(`${tick}틱 ${command.kind} — 주자 ${moved.join('·')}`)
+            play = { ...play, wantsThrow: true }
+            log.push(`${tick}틱 ${command.kind} — 주자 ${keyed.retargeted.map((index) => runners[index]?.state.index).join('·')}`)
           }
         }
       }
@@ -3275,57 +3287,6 @@ function slidingRunnerOf(runner: MutableRunner): SlidingRunner {
     targetBase: runner.state.targetBase,
     ticksToArrive: ticksToReach(runner.state.position, target, runner.state.speed),
   }
-}
-
-/**
- * 주루 키 한 번 — 0xa9b04(주자관리, 루, 방향).
- * 인자는 **주자 번호**다 — 1·2·3 = 투구 때 1·2·3루에 있던 주자, −1 = 전원 (I-controls 0절).
- * 전원이면 **진루는 1→2→3루 주자 순, 귀루는 3→2→1루 주자 순**으로 하나씩 부른다.
- *
- * 앞길 검사(0xa99a8)는 "가려는 루를 다른 주자가 목표로 삼고 있지 않을 것" 만 옮겼고,
- * 뒷길 검사(0xa9924)는 **달리는 중인 주자를 출발 루로 되돌리는 것**으로 좁혔다.
- * 원본의 나머지 조건은 문서가 **유력**으로만 적어 두어 지어내지 않는다 (I-controls 3b).
- */
-function runBaserunningCommand(
-  runners: readonly MutableRunner[],
-  kind: '진루' | '귀루',
-  target: RunnerTarget,
-): readonly number[] {
-  const order: RunnerTarget[] =
-    target === '전원' ? (kind === '진루' ? [1, 2, 3] : [3, 2, 1]) : [target]
-  const moved: number[] = []
-  for (const pitchBase of order) {
-    // 0xa97a0(루의 주자) — 인자가 가리키는 것은 "투구 때 그 루에 있던 주자" 다
-    const runner = runners.find(
-      (candidate) =>
-        !candidate.state.isOut &&
-        !candidate.state.scored &&
-        candidate.state.pitchBase === pitchBase,
-    )
-    if (runner === undefined) continue
-
-    if (kind === '귀루') {
-      // 달리는 중인 주자만 되돌린다 (이미 루에 붙어 있으면 되돌릴 곳이 없다)
-      if (isAtTarget(runner.state)) continue
-      startLeg(runner, runner.state.startBase)
-      moved.push(runner.state.index)
-      continue
-    }
-
-    const toBase = runner.state.targetBase + 1
-    if (toBase > HOME_BASE) continue
-    const blocked = runners.some(
-      (other) =>
-        other !== runner &&
-        !other.state.isOut &&
-        !other.state.scored &&
-        wrapBase(other.state.targetBase) === wrapBase(toBase),
-    )
-    if (blocked) continue
-    startLeg(runner, toBase)
-    moved.push(runner.state.index)
-  }
-  return moved
 }
 
 /** 패턴에서 궤적까지 한 번에 만들어 돌린다 — 부르는 쪽이 편하게 */

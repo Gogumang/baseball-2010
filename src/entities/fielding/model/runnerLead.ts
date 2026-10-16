@@ -130,3 +130,18 @@ export function applyRunnerLead(runner: RunnerState, lead: RunnerLead): RunnerSt
     targetBase: lead.restoredTargetBase ?? lead.leadTargetBase,
   }
 }
+
+/**
+ * 판이 열린 뒤(0x3d7b8 다음) 주자의 **+0x84(직전 목표 루)** — 닿은 루 s · 리드 뒤 목표 t 에서 되짚는다.
+ * ```
+ * vt88(0xa0820) · 도루 출발 0xa9bd4 의 vt48 → +0x84 = s
+ * 3d7fa  vt48(s + 1)  — 목표가 s 였으면 +0x84 = s, 이미 s + 1(도루)이면 그대로 s
+ * 3d912  vt48(둠)     — 둠 = 리드 앞 목표. s 였으면 목표 s + 1 → s 로 바뀌어 +0x84 = s + 1, s + 1(도루)이면 안 바뀐다
+ *                      (종류 2 · 3 의 도루 주자는 되돌리기가 없어 목표 s + 1 · +0x84 = s)
+ * ```
+ * 곧 **리드 뒤 목표가 제 루(t == s)면 +0x84 = s + 1(0xb6228 — 3루는 홈 4), 아니면 s.** 사람 진루 키의 앞길 검사(0xa9924 →
+ * 방향 판정 0x9fe80)가 이 값으로 "제 루로 돌아오는 중" 을 본다.
+ */
+export function previousTargetAfterLead(runner: Pick<RunnerState, 'startBase' | 'targetBase'>): number {
+  return runner.targetBase === runner.startBase ? stealTargetBaseOf(runner.startBase) : runner.startBase
+}

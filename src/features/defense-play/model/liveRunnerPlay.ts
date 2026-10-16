@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import type { DefenseKeyPress, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
 import { runRunnerPlay, startRunnerPlay } from '@/features/defense-play/model/runnerPlayEngine'
@@ -6,7 +7,7 @@ import { runPickoffPlay, startPickoffPlay, type PickoffPlayInput } from '@/featu
 import type { OpenedPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 
 /**
- * **사람이 수비하며 실시간으로 도는 주자 판** — 도루(종류 5) · 폭투·포일(종류 9) · 견제(종류 4) (2026-10-08 직접 뜸).
+ * **사람이 잡고 실시간으로 도는 주자 판** — 도루(종류 5) · 폭투·포일(종류 9) · 견제(종류 4) (2026-10-08 직접 뜸 · 공격 쪽 2026-10-16).
  *
  * 상태 0x17 의 키 처리 0x53420 은 판 종류를 안 가린다 — 사람이 수비면 0x533c8 이 '8'/아래 홈 · '6'/오른 1루 · '2'/위 2루 ·
  * '4'/왼 3루를 메시지 0x588 로 보내고 0x51890 이 플레이 vt60 0xb3118 로 **+0x160** 에 적는다(조건 없음). 그 값을 쓰는 것은
@@ -17,7 +18,7 @@ import type { OpenedPitchArrivalPlay } from '@/features/defense-play/model/pitch
  * 굴림 차례: 판 시작 굴림(공 도착의 0.1% · 폭투 쏘기 · 도루 리드 · 견제 리드)은 판을 열 때 · 진행기를 세울 때 돌고, 판 안의
  * 굴림(펌블 · 악송구 · 특수 송구)은 틱마다 — 그 사이에 다른 굴림이 없어 미리 돌리던 때와 같은 차례다(키가 같으면 같은 판).
  */
-export type LiveRunnerPlay =
+export type LiveRunnerPlay = (
   | {
       readonly kind: 'arrival'
       /** 공 도착 판 — 판 시작까지 굴려 둔 것 (`openPitchArrivalPlay`) */
@@ -27,18 +28,27 @@ export type LiveRunnerPlay =
       readonly kind: 'pickoff'
       readonly input: PickoffPlayInput
     }
+) & {
+  /**
+   * 사람이 잡은 쪽 — 조작 [+0xc]. 안 주면 수비(송구 0x533c8 → 0x588 → +0x160). 공격이면 같은 0x53420 이 주루 0x5331c
+   * (0x582 진루 · 0x584 귀루 → 0xa9b04)와 OK 슬라이딩 0x585 를 보낸다(`entities/fielding/model/baserunningKey`)
+   */
+  readonly side?: ControlSide
+}
 
 /** 판을 한 틱씩 돌리는 손잡이 — `step(키)` 한 번이 그 틱 하나다 */
 export interface LiveRunnerStepper {
   readonly tick: number
   readonly finished: boolean
   readonly ticks: readonly DefensePlayView[]
+  /** 방금 돈 틱에서 슬라이딩 효과음 10 을 낸다 (사람 키 0x5199c · 자동 0x5268c) */
+  readonly slidingSoundThisTick: boolean
   step(press: DefenseKeyPress | null): void
   result(): DefensePlayResult
 }
 
-/** 사람 수비 조작을 달아 진행기를 세운다 — 키는 `step` 으로 받으므로 `keyAt` 은 안 쓴다 */
-const HUMAN_DEFENSE = { side: '수비' as const, keyAt: () => null }
+/** 사람 조작을 달아 진행기를 세운다 — 키는 `step` 으로 받으므로 `keyAt` 은 안 쓴다 */
+const controlsOf = (play: LiveRunnerPlay) => ({ side: play.side ?? ('수비' as const), keyAt: () => null })
 
 /** 그 판이 굴리는 경기 난수 — 재생 화면의 그림 쪽 굴림(공 그리기 파티클 · 프레임 끝 파티클 틱)도 같은 난수에 이어서 든다 */
 export function liveRunnerPlayRandomOf(play: LiveRunnerPlay): RandomPort | undefined {
@@ -46,12 +56,12 @@ export function liveRunnerPlayRandomOf(play: LiveRunnerPlay): RandomPort | undef
 }
 
 export function startLiveRunnerPlay(play: LiveRunnerPlay): LiveRunnerStepper {
-  if (play.kind === 'arrival') return startRunnerPlay({ ...play.opened.engineInput, controls: HUMAN_DEFENSE })
-  return startPickoffPlay({ ...play.input, controls: HUMAN_DEFENSE })
+  if (play.kind === 'arrival') return startRunnerPlay({ ...play.opened.engineInput, controls: controlsOf(play) })
+  return startPickoffPlay({ ...play.input, controls: controlsOf(play) })
 }
 
 /** 화면이 결과를 못 넘겼을 때 — 남은 틱을 키 없이 끝까지 돌린다(붙든 경기는 반드시 푼다) */
 export function runLiveRunnerPlayWithoutKeys(play: LiveRunnerPlay): DefensePlayResult {
-  if (play.kind === 'arrival') return runRunnerPlay({ ...play.opened.engineInput, controls: HUMAN_DEFENSE })
-  return runPickoffPlay({ ...play.input, controls: HUMAN_DEFENSE })
+  if (play.kind === 'arrival') return runRunnerPlay({ ...play.opened.engineInput, controls: controlsOf(play) })
+  return runPickoffPlay({ ...play.input, controls: controlsOf(play) })
 }
