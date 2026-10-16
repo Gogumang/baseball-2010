@@ -77,7 +77,9 @@ export function MissionSelectScreen({
    * 제목 12/13 은 점프표 0xd19b0 의 5502a · 55058 — game_frame 18 "미션모드" + 부제 타자편/투수편.
    * 상태 1 진입 0x1d9a4(1d9be)가 [skin+0x84] = 1 을 세워 머리띠가 미끄러져 들어오고, 그동안은 판 · 격자 · 설명을 하나도 안 그린다
    * (0x1df08 머리 1df22~1df2a 도 같은 깃발로 끝 0x1e730 에 빠진다). 깃발은 머리띠가 다 내려온 그림에서 지워진다(`isFrameSlideClearedAt`).
-   * ⚠️ 미확인: 미끄러지는 동안의 키 처리 0x1daa4 가 깃발을 보는지는 안 떴다 — 웹은 키를 그대로 받는다.
+   * 미끄러지는 동안에도 키는 그대로 받는다 (직접 뜬 것): 장면 메시지 0x1e76c 가 메시지 2 를 곧장 0x1daa4 로 넘기고(1e786),
+   * 0x1daa4 는 머리에서 격자 vt+0x18 · 0x5550c(skin, 키 — 방향키 −1~−4 를 [skin+0x8c] 에 적을 뿐) 뒤 하위 상태 [this+0x18] 로
+   * 갈라질 뿐 [skin+0x84] 를 읽지 않는다 — 웹도 키를 그대로 받는다.
    */
   const updates = useUpdateCounter()
   const isBodyShown = !slides || isFrameSlideClearedAt(updates)

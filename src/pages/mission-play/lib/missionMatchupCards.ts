@@ -166,8 +166,12 @@ export function missionBatterMatchupCardsOf(
   const pitcher = cpuMoundCardOf(run, aceLevels)
   if (isMissionBatterUp(run)) {
     const k = run.game.humanRecordSlot
-    // ⚠️ 미확인: k 를 모르거나 끝 칸(12 — 0xb4e34 가 늘린 빈 칸)이면 옛 레코드[k] 의 수비를 알 수 없어 비운다
-    const position = k === undefined || k >= MISSION_NARI_RECORD_FALLBACK ? undefined : teamBatters(batting.teamId)[k]?.position
+    // 끝 칸(12)은 0xb4e34 가 늘린 새 칸이다 — 새 배열의 칸마다 0xb8de4 가 0x30 바이트를 0 으로 지운 뒤(memset 0x1400428) 옛 칸만
+    // 베끼므로(b4f6e) 옛 레코드[12]+0x1c = 0 → 수비 0 (직접 뜬 것). k > 12 는 웹이 12 로 둔다(`missionRecordSlotOf`).
+    // k 를 모르면(부르는 쪽이 안 넘김) 비운다
+    const position = k === undefined
+      ? undefined
+      : k >= MISSION_NARI_RECORD_FALLBACK ? 0 : teamBatters(batting.teamId)[k]?.position
     const line = missionBatter.recordLine === undefined
       ? null
       : sumBatterLines(batterLineOfRecord(missionBatter.recordLine), missionBatterGameLineOf(run))
@@ -234,8 +238,9 @@ export function missionPitcherMatchupCardsOf(run: PitcherRun, missionPitcher: Mi
         : {
             ...common,
             name: ace.name,
-            // XlsACE_BAT 행 +0x1c — 다섯 줄 모두 0. ⚠️ 미확인: 0xaae7c 의 0xb53f0(명부, 마타자, 0)(마선수 0x40 갈래)이 +0x1c 를
-            // 고치는지는 안 읽었다 — 행 값 그대로 둔다
+            // XlsACE_BAT 행 +0x1c — 다섯 줄 모두 0. 0xaae7c 의 0xb53f0(명부, 마타자, 0) 마선수 0x40 갈래(b5418~b547c, 직접 뜬 것)는
+            // 명부 9번이 이미 마선수가 아니면 0xb4e34 로 늘려 옛 9번을 끝으로 옮긴 뒤 9번에 행을 0x30 바이트 통째로 베낄 뿐(b546a)
+            // 0x80 갈래의 0xb8e84(수비 위치 쓰기)가 없다 — 행 값 그대로다
             position: 0,
             ...batterCardStatsOf(batterLineOfRecord(ace.recordLine)),
           },

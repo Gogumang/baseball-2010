@@ -440,7 +440,8 @@ export function MissionPlayScreen({
 
         {/*
           0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 투수·타자 소개 판 0x44944 (모드 검사 없음). 사람이 치므로 타자 PLAYER · 투수 COM.
-          ⚠️ 웹 미션 상태에 없는 칸(이름·기록 등)은 비운다 — 마투수 미션이면 투수 이름만 적는다. 타자 손은 레코드 +0xb 의 0xb63c0.
+          값은 미션 라우트가 `missionMatchupCards` 로 지금 투수 · 타자 레코드에서 채워 넘긴다(`matchupCards`). 안 넘기면(시험)
+          팀 글자와 이름만 — 타자 손은 레코드 +0xb 의 0xb63c0.
         */}
         {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
         {isSubstituting && substitutionScene !== null && (

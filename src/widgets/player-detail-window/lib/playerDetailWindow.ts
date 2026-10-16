@@ -186,12 +186,22 @@ export function specialSwingTextOf(number: number, battingType: number): string 
 }
 
 /**
+ * 마선수 레코드 +0x1b — XlsACE_PIT_DATA · XlsACE_BAT_DATA 행 바이트 0x1b (base/extracted 행을 직접 읽었다, 행 차례 = 순번).
+ * 마선수 레코드는 행을 0x30 바이트 통째로 베낀 것이라(0x20094 · 0x1f824 · 0xb53f0 0x40 갈래 · 0x48d50) 이 칸을 고치는 곳이 없다.
+ */
+const ACE_PITCHER_GRADES: readonly number[] = [50, 40, 30, 20, 10]
+const ACE_BATTER_GRADES: readonly number[] = [20, 30, 40, 50, 40]
+
+/**
  * 레코드 한 장의 상세 창 값 (0x5b798 의 투수 갈래 0x5bf64~ · 타자 갈래 0x5b81e~).
- * 연봉 = 레코드 +0x1b × 10 × 100. ⚠️ 미확인: 표 밖 선수(영입 기록 · 마선수)의 +0x1b 는 웹 명단에 없어 0 으로 둔다(`grade` null).
+ * 연봉 = 레코드 +0x1b × 10 × 100 (5c848~5c886: 모드 [0x1552d10] 3 · 4 이고 육성 0xb6389 면 저장 0x1f8d5(모드)+0x1c8 u16, 아니면 +0x1b).
+ * 마선수는 육성이 아니라 +0x1b — 행 값(`ACE_*_GRADES`)이다.
+ * ⚠️ 미확인: 그 밖에 등급을 모르는 선수(부르는 쪽이 `grade` null 로 넘긴 영입 기록 등)는 0 으로 둔다.
  */
 export function playerDetailOf(source: PlayerDetailSource): PlayerDetail {
   const isAce = source.aceIndex >= 0
-  const salary = textValue(salaryTextOf((source.grade ?? 0) * 1000))
+  const aceGrade = isAce ? (source.isPitcher ? ACE_PITCHER_GRADES : ACE_BATTER_GRADES)[source.aceIndex] : undefined
+  const salary = textValue(salaryTextOf((source.grade ?? aceGrade ?? 0) * 1000))
   if (source.isPitcher) {
     const { form, magicNumber, pitchMask } = source.repertoire ?? { form: 0, magicNumber: 0, pitchMask: 0 }
     const pitches: string[] = []

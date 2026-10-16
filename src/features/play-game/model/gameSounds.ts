@@ -49,7 +49,8 @@ export const LOSE_SOUND = 32
  * ```
  * 0xb6a0c 는 `점수(측 1) > 점수(측 0) ? 1 : 0` 이라 **동점이면 측 0(선공)이 이긴 칸**이다 — 무승부는 사람이 선공이면 31,
  * 후공이면 32 (원본 그대로). `playerSide` 를 안 넘기면 무승부는 고르지 않는다(null).
- * ⚠️ 미션 모드는 4ef36 · 4efb4 가 [sp+0x50] 을 미션 성공 여부로 덮는다 — 이 함수가 아니라 미션 결과 쪽 몫이다(미해결).
+ * 미션 모드(5·6)는 모드 표 0xd0428 → 0x4ef18 이 4ef36 · 4efb4 에서 [sp+0x50] 을 [미션+0xbc](성공 여부)로 덮는다 —
+ * 이 함수가 아니라 미션 세션(`app/model/useMissionSession` 결과 징글 자리)이 성공 여부로 31 · 32 를 고른다.
  */
 export function gameResultSoundIdOf(result: GameResult, playerSide?: PlayerSide): number | null {
   if (result === '승') return WIN_SOUND

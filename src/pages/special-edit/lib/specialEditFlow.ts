@@ -106,7 +106,8 @@ export interface EditEntryRow {
 /**
  * 고른 팀의 **기본 명단** — 원본은 저장 속 팀 레코드(0x1f8c1) 의 투수 `+0x14` · 타자 `+0x18` 배열이다.
  * 웹은 그 팀 레코드를 따로 두지 않아 붙박이 표 차례(XlsPITCHER_DATA · XlsBATTER_DATA)로 세운다.
- * 목록 창 기록 열은 그 행의 시즌 줄(행 바이트 32~43)이다 — ⚠️ 미확인: 0x1f8c1 레코드가 Xls 행을 그대로 베낀 것인지는 안 떴다.
+ * 목록 창 기록 열은 그 행의 시즌 줄(행 바이트 32~43)이다 — 확정: 0x1f8c1 = [저장+0xac]+0xac0 + 팀 × 0x1c 의 마스터 팀은 적재 0x1ff98 이
+ * Xls 행을 투수 8 × 0x30 · 타자 12 × 0x30 통째로 memcpy 해 채운다(2001a · 2004e — CORRECTIONS 510 · J 329) → 레코드 +0x20~+0x2b = 행 바이트 32~43.
  * 이름은 `player.name` = 0xb62c0 (고친 이름이 있으면 그것).
  */
 export function editEntryListsOf(team: number): EntryLists<EditEntryRow & EntryBatterRow, EditEntryRow & EntryPitcherRow> {
