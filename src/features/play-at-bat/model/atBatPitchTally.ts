@@ -9,7 +9,7 @@ import { foulRecordOf } from '@/entities/game/model/gameRecords'
  *   공마다 gameFlow `throwOpponentPitch` 가 한다 — 구질 번호는 `PitchOutcomeDetail.pitchTypeNumber` 로 온다.
  * - `foulStreak`·`foulRecordIds`: 연속 파울 카운터 ctx+0x15f 와 그로 난 기록 32·33 (`0xa7dbc`,
  *   호출지는 사람 타석 판정 0x51408 의 v=7 갈래 하나). 파울이 아닌 공이 오면 0 으로 끊긴다
- *   (0x3dfac 끝의 0xa5fdc — ⚠️ **유력**, `foulRecordOf` 주석).
+ *   (0x3dfac 끝의 0xa5fdc — 모든 갈래가 지난다, r126 확정, `foulRecordOf` 주석).
  *
  * 타석이 바뀌면 `EMPTY_AT_BAT_PITCH_TALLY` 로 새로 시작한다 — 타석 초기화 0xa5bcc 가 ctx+0x15f 를 지운다.
  * 견제는 공이 아니라 `resolvePitch` 를 지나지 않으므로 여기에 들어오지 않는다.

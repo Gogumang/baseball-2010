@@ -1,15 +1,21 @@
-import { useEffect, useRef } from 'react'
-import { MarkupText } from '@/shared/ui'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { MarkupText, PressArea } from '@/shared/ui'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
+import { useCommonWindowPush } from '@/shared/lib/commonWindow/commonWindow'
 import type { BurstJudgement } from '@/entities/burst-mission/model/burstMissionJudge'
+import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { OriginalBurstLine } from '@/shared/config/original/burstMissions'
 import {
-  BURST_HEADLINE_BAND, BURST_HEADLINE_TEXT, BURST_RESULT_HEADLINE, BURST_TEXT, BURST_TEXT_BOX,
-  BURST_WINDOW, burstLineIndexOf,
+  BURST_BAND_HEIGHT, BURST_BAND_SLASH_LENGTH, BURST_BAND_SLASH_X, BURST_COLORS, BURST_NEXT_MARK_IMAGE, BURST_SCREEN,
+  BURST_WINDOW_START, burstBandTopOf, burstLineIndexOf, burstNextMarkAt, burstPortraitAnchorOf, burstPortraitOf,
+  burstResultPopupTextOf, burstShakeOffsetOf, burstSpeakerPrefixOf, burstTextBoxOf, isBurstWindowOpen, tickBurstWindow,
 } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
+import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
-
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface BurstMissionWindowProps {
   /**
@@ -22,78 +28,145 @@ interface BurstMissionWindowProps {
    * `resolveBurst` 가 돌려주는 판정을 그대로 넘긴다.
    */
   readonly judgement: BurstJudgement | null
-  /** 대사 안 %s 를 순서대로 채울 값 (보통 선수 이름) */
+  /**
+   * 판정이 난 행 — 결과를 닫을 때 공용 창에 띄울 보상 글(0x8e5b8)을 짓는다. 없으면 창을 안 띄운다.
+   * `resolveBurst` 의 `row` 를 그대로 넘긴다.
+   */
+  readonly row?: BurstMissionRow | null
+  /** 지금 타자가 좌타인가 — 0xb63c0(지금 타자). 초상이 왼쪽에 뒤집혀 선다. 안 넘기면 우타 */
+  readonly isBatterLeftHanded?: boolean
+  /** 대사 안 %s 를 순서대로 채울 값 */
   readonly replacements?: readonly string[]
   /** 창을 닫고 다음으로 간다 — 제안이면 타석(상태 0xf), 결과면 보상 적용 뒤 원래 흐름 */
   readonly onClose: () => void
 }
 
 /**
- * 돌발미션 창 — 경기 장면 **상태 0x1b** (K 4절 1-6).
+ * **돌발미션 창** — 경기 장면 상태 0x1b (그리기 0x8f3c0 · 갱신 0x8e5b8 — 배치 · 차례는 `lib/burstMissionWindowLayout` 머리글).
  *
- * 발동하면 제안 대사(줄 0)를 띄우고, 타석이 끝나면 결과 대사(줄 1/2/3)와 함께
- * "돌발미션 성공!!"·"실패!!"(0xd5114 · 0xd512c) 문구를 얹는다. **무효는 문구가 없다** —
- * 원본 문자열이 성공·실패 둘뿐이다.
+ * 대사를 실은 뒤 판이 아래에서 오르고(0 → 2 → 6 → 14 → 30 → 55), 다 오르면 화면이 세 그림 위아래로 흔들린 뒤(+1 · −1 · +1)
+ * 화자 이름 머리와 대사 · 넘김 표시가 나온다. 그때부터 아무 키나 받아 닫는다(원본 키 [장면+0x40] 은 키를 가리지 않는다).
+ * 결과(성공 · 실패)를 닫을 때 보상 글을 공용 창 [0x140005c] 에 띄운다(0x74ef5).
  *
- * 안 하는 것 둘:
- *   - **화자 초상·이름**. `_TEXT` 의 화자·표정 번호가 미해독이라(원본 값은 데이터에 그대로 있다)
- *     초상(0x8e2dc)도 이름 머리(0xd5108 `"!C!cffffff["`)도 고르지 않는다.
- *   - **효과음** (제안 0x2a · 성공 0x24 · 실패 0x20 · 무효 0x25). 웹에 소리 장치가 없다.
- *     번호는 `BURST_SOUND` 에 있으니 나중에 붙이면 된다.
+ * 효과음(제안 0x2a · 성공 0x24 · 실패 0x20 · 무효 0x25)은 싣는 쪽(발동 0x8f000 · 판정 0x8f414)이 낸다 — 이 창 몫이 아니다.
  *
- * 좌표는 `burstMissionWindowLayout.ts` 에 있고, **원본 배치가 안 풀려 모두 근사**다.
+ * ⚠️ 근사(넘김 표시 위아래 차례): [+0x224] 는 경기 내내 이어 세는데 웹은 창마다 0 에서 센다 — 결과 창의 위아래 차례만 다를 수 있다.
+ * ⚠️ 유력: 초상 깃발 0x11 을 좌우 뒤집기로 본 것(엔딩 · 제작진과 같은 읽기, `FramePiece`).
  */
-export function BurstMissionWindow({ lines, judgement, replacements = [], onClose }: BurstMissionWindowProps) {
+export function BurstMissionWindow({
+  lines, judgement, row = null, isBatterLeftHanded = false, replacements = [], onClose,
+}: BurstMissionWindowProps) {
   const line = lines[burstLineIndexOf(judgement)]
-  const headline = judgement === null ? null : BURST_RESULT_HEADLINE[judgement]
+  const [state, setState] = useState<BurstWindowState>(() => tickBurstWindow(BURST_WINDOW_START))
+  /** 그린 수 — 초상 애니는 그린 뒤 한 칸 나아간다(0x93d91) */
+  const [draws, setDraws] = useState(0)
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const next = tickBurstWindow(stateRef.current)
+      stateRef.current = next
+      setState(next)
+      setDraws((count) => count + 1)
+    }, millisecondsPerFrame())
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useWholeScreenOffset(burstShakeOffsetOf(state))
+
+  const pushCommonWindow = useCommonWindowPush()
+  const closeRef = useRef(() => {})
+  closeRef.current = () => {
+    if (!isBurstWindowOpen(stateRef.current)) return
+    const popup = burstResultPopupTextOf(judgement, row)
+    if (popup !== null) pushCommonWindow(popup)
+    onClose()
+  }
 
   // 창이 떠 있는 동안 키는 창 것이다 — 뒤 타석 화면이 같은 Enter 를 같이 받으면 스윙이 나간다.
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 잡는 단계에서 멈춰 뒤쪽 타석·커맨드 줄의 window 리스너까지 막는다
       event.stopImmediatePropagation()
-      // 원본은 상태 0x1b 에서 아무 키나 받으면 다음으로 간다 (0x3b014 → 0x3b032)
       event.preventDefault()
-      onCloseRef.current()
+      // 0x8e60c — 다 열리기 전(c ≠ −1)의 키는 버려진다
+      closeRef.current()
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
+  const isOpen = isBurstWindowOpen(state)
+  const bandTop = burstBandTopOf(state.height)
+  const bodyTop = BURST_SCREEN.height - state.height
+  const textBox = burstTextBoxOf(state.height)
+  const nextMark = burstNextMarkAt(state.ticks)
+
   return (
-    <div className={styles.overlay} role="dialog" aria-label="돌발미션" onClick={onClose}>
-      {headline !== null && (
+    <div className={styles.overlay} role="dialog" aria-label="돌발미션">
+      {line !== undefined && (
+        <BurstPortrait speaker={line.speaker} expression={line.expression} draws={draws}
+          anchor={burstPortraitAnchorOf(state.height, isBatterLeftHanded)} />
+      )}
+      <svg className={styles.layer} width={BURST_SCREEN.width} height={BURST_SCREEN.height}
+        viewBox={`0 0 ${BURST_SCREEN.width} ${BURST_SCREEN.height}`} shapeRendering="crispEdges" aria-hidden>
+        {/* 0x8f194 윗 띠 */}
+        <rect x={0} y={bandTop} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT} fill={BURST_COLORS.bandEdge} />
+        <rect x={0} y={bandTop + 1} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT - 2} fill={BURST_COLORS.bandLight} />
+        <rect x={0} y={bandTop + 2} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT - 2} fill={BURST_COLORS.bandFill} />
+        {Array.from({ length: BURST_BAND_SLASH_LENGTH }, (_, i) => {
+          const x = BURST_BAND_SLASH_X + i
+          const y = bandTop + BURST_BAND_HEIGHT - 1 - i
+          return (
+            <g key={i}>
+              <rect x={x} y={y} width={1} height={1} fill={BURST_COLORS.bandEdge} />
+              <rect x={x - 1} y={y} width={1} height={1} fill={BURST_COLORS.bandLight} />
+              <rect x={x + 1} y={y} width={1} height={1} fill={BURST_COLORS.bandLight} />
+            </g>
+          )
+        })}
+        {/* 0x8f392 본체 — 검정 알파 0xB4 */}
+        <rect x={0} y={bodyTop} width={BURST_SCREEN.width} height={state.height} fill={BURST_COLORS.body} />
+      </svg>
+      {isOpen && line !== undefined && (
         <>
-          {/* game_ui 프레임 8 — 171×25 파란 둥근 막대, 원점 (0,0) */}
-          <img
-            className={styles.sprite}
-            style={{ left: BURST_HEADLINE_BAND.x, top: BURST_HEADLINE_BAND.y }}
-            src={frameSrc(GAME_UI_FRAMES, BURST_HEADLINE_BAND.frame)}
-            alt=""
-          />
-          <div
-            className={styles.headline}
-            style={{ left: BURST_HEADLINE_TEXT.x, top: BURST_HEADLINE_TEXT.y, width: BURST_HEADLINE_TEXT.width }}
-          >
-            <MarkupText raw={headline} />
+          <div className={styles.dialogue} style={{ left: textBox.x, top: textBox.y, width: textBox.width }}>
+            <MarkupText raw={burstSpeakerPrefixOf(line.speaker) + line.text} replacements={replacements} />
           </div>
+          <img className={styles.sprite} style={{ left: nextMark.x, top: nextMark.y }} src={BURST_NEXT_MARK_IMAGE} alt="" />
         </>
       )}
-
-      <div
-        className={styles.window}
-        style={{ left: BURST_WINDOW.x, top: BURST_WINDOW.y, width: BURST_WINDOW.width, height: BURST_WINDOW.height }}
-      />
-      <div
-        className={styles.innerBox}
-        style={{ left: BURST_TEXT_BOX.x, top: BURST_TEXT_BOX.y, width: BURST_TEXT_BOX.width, height: BURST_TEXT_BOX.height }}
-      />
-      <div className={styles.dialogue} style={{ left: BURST_TEXT.x, top: BURST_TEXT.y, width: BURST_TEXT.width }}>
-        {/* 줄이 모자란 행은 원본에도 없지만, 없으면 빈 칸으로 둔다 */}
-        <MarkupText raw={line?.text ?? ''} replacements={replacements} />
+      <div className={styles.pressLayer}>
+        <PressArea label="돌발미션 넘기기" rect={{ x: 0, y: bandTop, width: BURST_SCREEN.width, height: BURST_SCREEN.height - bandTop }}
+          onPress={() => closeRef.current()} isDisabled={!isOpen} testId="돌발미션-넘기기" />
       </div>
     </div>
   )
+}
+
+/** 0x8f29c 초상 — 0x63a04 애니를 그린 뒤 한 칸 나아간다(되풀이) */
+function BurstPortrait({ speaker, expression, draws, anchor }: {
+  readonly speaker: number
+  readonly expression: number
+  readonly draws: number
+  readonly anchor: { readonly x: number; readonly y: number; readonly isFlipped: boolean }
+}) {
+  const portrait = burstPortraitOf(speaker, expression)
+  const folder = `./sprites/${portrait?.file ?? 'event_char_0'}/frames`
+  const origins = useFrameOrigins(folder)
+  const animations = useAnimations(folder)
+  if (portrait === null) return null
+  const entries = animations?.[portrait.animation]
+  const step = entries === undefined ? null : animationStepAt(entries, draws)
+  if (step === null) return null
+  const key = String(step.frame).padStart(3, '0')
+  const origin = origins?.[key]
+  if (origin === undefined) return null
+  const x = anchor.x + step.dx
+  const y = anchor.y + step.dy
+  const style: CSSProperties = anchor.isFlipped
+    ? { left: x - origin.x - origin.width, top: y + origin.y, transform: 'scaleX(-1)' }
+    : { left: x + origin.x, top: y + origin.y }
+  return <img className={styles.sprite} style={style} src={`${folder}/${key}.png`} alt="" data-frame={step.frame} />
 }

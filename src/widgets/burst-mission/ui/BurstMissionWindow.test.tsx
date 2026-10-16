@@ -1,130 +1,103 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
-import {
-  BURST_HEADLINE_BAND, BURST_PROPOSAL_LINE, BURST_RESULT_HEADLINE, BURST_WINDOW, burstLineIndexOf,
-} from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
-import { BURST_TEXT_LINE } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { OriginalBurstLine } from '@/shared/config/original/burstMissions'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
+import { CommonWindowPushContext } from '@/shared/lib/commonWindow/commonWindow'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
 
 /**
- * 돌발미션 창 (경기 장면 상태 0x1b — K 4절 1-6).
- * 제안 대사(줄 0) 한 모습과, 결과 대사(줄 1/2/3) + "돌발미션 성공!!"·"실패!!" 한 모습이다.
+ * 돌발미션 창 (경기 장면 상태 0x1b — 그리기 0x8f3c0 · 갱신 0x8e5b8).
+ * 판이 오르고(5 갱신) 세 번 흔들린 뒤(3 갱신) 9 번째 갱신에서 글이 나오고 키를 받는다.
  */
 
-afterEach(cleanup)
+beforeEach(() => vi.useFakeTimers())
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
-/** 원본 타자 표 첫 행의 대사 4줄 — 줄 0 에 !cFFFF00 색이 들어 있다 */
+/** 원본 타자 표 첫 행의 대사 4줄 */
 const 원본줄 = ORIGINAL_BURST_TABLES.BATTER.lines[0] as readonly OriginalBurstLine[]
 
-const 띄우기 = (
-  judgement: Parameters<typeof BurstMissionWindow>[0]['judgement'],
-  overrides: Partial<Parameters<typeof BurstMissionWindow>[0]> = {},
-) => {
-  const onClose = overrides.onClose ?? vi.fn()
-  render(<BurstMissionWindow lines={원본줄} judgement={judgement} {...overrides} onClose={onClose} />)
-  return { onClose, dialog: screen.getByRole('dialog', { name: '돌발미션' }) }
+/** 첫 그림은 갱신 1 뒤다 — 갱신 9 에 열리므로 8 틀을 더 돌린다 */
+const 다열기 = () => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 8) })
+
+const 띄우기 = (props: Partial<Parameters<typeof BurstMissionWindow>[0]> = {}) => {
+  const onClose = props.onClose ?? vi.fn()
+  const push = vi.fn()
+  render(
+    <CommonWindowPushContext.Provider value={push}>
+      <BurstMissionWindow lines={원본줄} judgement={null} {...props} onClose={onClose} />
+    </CommonWindowPushContext.Provider>,
+  )
+  return { onClose, push, dialog: screen.getByRole('dialog', { name: '돌발미션' }) }
 }
 
-describe('돌발미션 창 세 모습', () => {
-  it('제안은 줄 0 대사만 띄우고 결과 문구가 없다', () => {
-    const { dialog } = 띄우기(null)
-
-    expect(burstLineIndexOf(null)).toBe(BURST_PROPOSAL_LINE)
-    expect(dialog.textContent).toContain(stripGameMarkup(원본줄[BURST_PROPOSAL_LINE].text))
-    expect(dialog.textContent).not.toContain('돌발미션')
+describe('돌발미션 창 — 오르기 · 흔들기 · 글', () => {
+  it('다 열리기 전에는 글이 없고 키도 버려진다 (0x8ea18 · 0x8e60c — c ≠ −1)', () => {
+    const { onClose, dialog } = 띄우기()
+    expect(dialog.textContent).toBe('')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('성공은 줄 1 대사와 "돌발미션 성공!!"(0xd5114) 을 함께 띄운다', () => {
-    const { dialog } = 띄우기('성공')
-
-    expect(BURST_TEXT_LINE.성공).toBe(1)
-    expect(dialog.textContent).toContain(stripGameMarkup(원본줄[1].text))
-    expect(screen.getByText('돌발미션 성공!!')).toBeTruthy()
+  it('열리면 화자 이름 머리와 대사를 함께 찍는다 — StrCOMMON[0x71 + 화자]', () => {
+    const { dialog } = 띄우기()
+    다열기()
+    const 화자 = 원본줄[0].speaker
+    expect(화자).toBe(3)
+    expect(dialog.textContent).toContain(`[주장] : ${stripGameMarkup(원본줄[0].text)}`)
   })
 
-  it('실패는 줄 2 대사와 "돌발미션 실패!!"(0xd512c) 을 함께 띄운다', () => {
-    const { dialog } = 띄우기('실패')
-
-    expect(BURST_TEXT_LINE.실패).toBe(2)
+  it('결과는 판정 줄(성공 1 · 실패 2 · 무효 3)을 찍는다', () => {
+    const { dialog } = 띄우기({ judgement: '실패' })
+    다열기()
     expect(dialog.textContent).toContain(stripGameMarkup(원본줄[2].text))
-    expect(screen.getByText('돌발미션 실패!!')).toBeTruthy()
   })
 
-  it('무효는 줄 3 대사만 나간다 — 원본에 무효 문구가 없다', () => {
-    const { dialog } = 띄우기('무효')
-
-    expect(BURST_TEXT_LINE.무효).toBe(3)
-    expect(BURST_RESULT_HEADLINE.무효).toBeNull()
-    expect(dialog.textContent).toContain(stripGameMarkup(원본줄[3].text))
-    expect(dialog.textContent).not.toContain('돌발미션')
-  })
-})
-
-describe('돌발미션 창 배치', () => {
-  it('결과 문구 띠는 game_ui 프레임 8 을 가로 가운데(34) 에 둔다', () => {
-    const { dialog } = 띄우기('성공')
-    const band = dialog.querySelector('img') as HTMLImageElement
-
-    expect(band.getAttribute('src')).toBe('./sprites/game_ui/frames/008.png')
-    expect(band.style.left).toBe(`${BURST_HEADLINE_BAND.x}px`)
-    expect(BURST_HEADLINE_BAND.x).toBe(34)
-  })
-
-  it('제안 모습에는 띠 그림이 없다', () => {
-    const { dialog } = 띄우기(null)
-    expect(dialog.querySelector('img')).toBeNull()
-  })
-
-  it('대사 판은 근사 좌표 (8, 212) 에 224×96 이다', () => {
-    const { dialog } = 띄우기(null)
-    const panel = dialog.querySelector(`div[style*="${BURST_WINDOW.width}px"]`) as HTMLElement
-
-    expect(panel.style.left).toBe(`${BURST_WINDOW.x}px`)
-    expect(panel.style.top).toBe(`${BURST_WINDOW.y}px`)
-    expect(panel.style.height).toBe(`${BURST_WINDOW.height}px`)
-  })
-})
-
-describe('돌발미션 창 마크업', () => {
-  it('!cFFFF00 은 노란 글씨가 된다 — 목표 낱말만 노랗다', () => {
-    띄우기(null)
-
-    // 원본 줄 0 = "!cFFFF00안타!cFFFFFF 쳐주지 않겠나? …" — !cFFFFFF 는 기본색으로 되돌린다
-    expect(screen.getByText('안타').style.color).toBe('rgb(255, 255, 0)')
-    expect(screen.getByText(/쳐주지 않겠나/).style.color).toBe('')
-  })
-
-  it('결과 문구도 마크업 색을 그대로 쓴다 (0xd5114 의 !cffff00)', () => {
-    띄우기('성공')
-    expect(screen.getByText('돌발미션 성공!!').style.color).toBe('rgb(255, 255, 0)')
-  })
-
-  it('!N 은 줄을 바꾼다', () => {
-    const 두줄: readonly OriginalBurstLine[] = [
-      { speaker: 3, expression: 0, text: '첫 줄!N둘째 줄' },
-      ...원본줄.slice(1),
-    ]
-    const { dialog } = 띄우기(null, { lines: 두줄 })
-    const paragraphs = [...dialog.querySelectorAll('p')].map((p) => p.textContent)
-
-    expect(paragraphs).toEqual(['첫 줄', '둘째 줄'])
+  it('넘김 표시는 game_ui 이미지 0x34 를 (225, H − 8 · H − 10) 에 둔다', () => {
+    const { dialog } = 띄우기()
+    다열기()
+    const mark = dialog.querySelector('img[src="./sprites/game_ui/052.png"]') as HTMLImageElement
+    expect(mark.style.left).toBe('225px')
+    // [+0x224] = 9 → 9 % 8 = 1 ≤ 3 → H − 8
+    expect(mark.style.top).toBe('312px')
   })
 })
 
 describe('돌발미션 창 닫기', () => {
-  it('아무 키나 누르면 다음으로 간다 (상태 0x1b → 0xf)', () => {
-    const { onClose } = 띄우기(null)
-    fireEvent.keyDown(window, { key: 'Enter' })
+  it('열린 뒤 아무 키나 누르면 다음으로 간다 (상태 0x1b → 0xf)', () => {
+    const { onClose } = 띄우기()
+    다열기()
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('화면을 눌러도 닫힌다', () => {
-    const { onClose, dialog } = 띄우기('성공')
-    fireEvent.click(dialog)
+  it('판 자리 누름 칸으로도 닫힌다', () => {
+    const { onClose } = 띄우기()
+    다열기()
+    fireEvent.click(screen.getByTestId('돌발미션-넘기기'))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('성공을 닫으면 보상 글을 공용 창에 띄운다 (0x8e5b8 → 0x74ef5)', () => {
+    const row = 행({ successRewards: [{ kind: 2, amount: 5 }, { kind: 4, amount: 3 }] })
+    const { push } = 띄우기({ judgement: '성공', row })
+    다열기()
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(push).toHaveBeenCalledWith(
+      '!C!cffffff[!cffff00돌발미션 성공!!!cffffff]!N!C!cffffff인기도 +5!N!C!cffffff소지금 +300',
+    )
+  })
+
+  it('제안 · 무효는 공용 창이 없다', () => {
+    const { push } = 띄우기({ judgement: '무효', row: 행() })
+    다열기()
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(push).not.toHaveBeenCalled()
   })
 })

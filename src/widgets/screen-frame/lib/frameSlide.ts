@@ -16,14 +16,16 @@ export function frameSlideOf(updates: number): number {
  * 0x54d95 는 그릴 때마다 +0x86 을 두 배로 하고(0x54e00~0x54e08) 끝(30)에 닿는 그림에서 +0x84 를 지운다(0x54e16).
  * 머리띠는 화면 그림의 **마지막**이라(예: 환경설정 0x2dc90 = 배경 0x58371 → 페이지 0x593c9 → 머리띠 0x54d95) 그 그림의
  * 페이지는 아직 깃발을 본다 — 깃발이 지워진 것을 보는 것은 **다음 그림**부터다. 웹 `frameSlideOf(n)` 을 n 째 그림의 머리띠 자리로 보면
- * n 째 그림 앞의 깃발은 n − 1 째 그림이 끝(30)에 닿았는가와 같다. ⚠️ 시작값 1 이 추정이라 그림 수도 그만큼 추정이다.
+ * n 째 그림 앞의 깃발은 n − 1 째 그림이 끝(30)에 닿았는가와 같다. 시작값 1 은 r126 에 전수로 확정했다
+ * (`adds rX,#0x86 ; strh` 전수 18곳 — 두 배 0x54e08 말고 17곳이 모두 1: 0x1d9c4 · 0x23fa2 · 0x24032 · 0x24260 · 0x242e8 ·
+ * 0x243b2 · 0x24636 · 0x2484c · 0x25930 · 0x25a64 · 0x25b10 · 0x25ebe · 0x25ff6 · 0x26192 · 0x26312 · 0x2671e · 0x63baa.
+ * 0x1d9c4 · 0x24636 · 0x25ff6 은 같은 레지스터로 깃발 +0x84 도 켜며 값은 1 — 0x1d9aa `cmp r1,#1` 갈래 · 0x24610 · 0x25fd8).
  */
 export const isFrameSlideClearedAt = (updates: number): boolean => updates > 0 && frameSlideOf(updates - 1) >= FRAME_SLIDE_END
 
 /**
  * 머리띠 미끄러짐 깃발 [skin+0x84] 이 그 그리기 **앞에** 서 있는가 — 머리띠 0x54d95 는 화면 그림의 마지막이고 +0x86 을 두 배로 해
  * 끝에 닿는 그리기에서 +0x84 를 지운다(0x54e00~0x54e16). 그래서 끝에 닿는 그리기까지는 서 있고 그다음 그리기부터 내려가 있다.
- * (시작값이 추정이라 몇 그리기인지도 추정이다.)
  */
 export function isFrameSlidingAt(updates: number): boolean {
   return updates <= 0 || frameSlideOf(updates - 1) < FRAME_SLIDE_END

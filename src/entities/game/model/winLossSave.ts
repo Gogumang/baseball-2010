@@ -36,7 +36,7 @@ export interface DecisionState {
   readonly winner: PitcherOfRecord
   readonly loser: PitcherOfRecord
   readonly save: PitcherOfRecord
-  /** state+0x64. ⚠️ 원본에는 이 칸을 0 으로 되돌리는 코드가 없다 (아래 주석) */
+  /** state+0x64. 원본에는 이 칸을 0 으로 되돌리는 코드가 없다 (아래 주석, r126 확정) */
   readonly saveCode: number
 }
 
@@ -178,10 +178,16 @@ export interface GameEndDecision {
 /**
  * 경기 끝에 실제로 기록되는 셋 (0xa7de8 의 0xa7e0e·0xa7e9a~0xa7ed8).
  *
- * ⚠️ **원본 버그 그대로 (유력)**: `state+0x64` 를 0 으로 되돌리는 코드가 원본 어디에도 없다.
+ * **원본 버그 그대로 (r126 확정)**: `state+0x64` 를 0 으로 되돌리는 코드가 원본 어디에도 없다.
  * 세이브 후보가 한 번이라도 잡히면 코드가 1·3·9 로 남고, 경기 끝의 `코드 > 0 이면 건너뜀` 에 걸려
  * **세이브가 한 번도 기록되지 않는다** (S1 4-1). 고치지 않는다 — 그래서 이 함수는
  * 후보가 있어도 거의 늘 `save: null` 을 돌려준다.
+ * 근거(r126, S1 이 남긴 "memset 경유" 고리를 닫음): state 는 전역 `[0x1552d0c]` 하나로, 앱 시작 0x2ed8 의
+ * 0x300a~0x301a 에서 **한 번만** 0xa4 바이트를 할당(0x1239 → 0x2ac4 가 memset 0x1400428 로 0 채움)하고
+ * 생성자 0xb68a4 → 0xb6814 를 부른다. 0xb6814 는 +0x44·+0x50·+0x5c = 2 · +0x40 = 0 만 쓰고 +0x64 는 안 쓴다.
+ * 0x1552d0c 에 쓰는 곳은 0x301a 하나뿐(전수)이라 경기마다 새로 지우는 일이 없다. `str …,[r,#0x64]` 전수 중
+ * 전역 state 근처 것은 0x351b0 하나인데 그 대상은 구장 객체 `[장면+0xf10]` 이다. 0xa6168 이 쓰는 코드는
+ * a6118/a6120/a613c 갈래만 지나 늘 1 이상이다 — 그래서 +0x5c 가 2 가 아니면 +0x64 > 0 이다.
  */
 export function gameEndDecisionOf(state: DecisionState): GameEndDecision {
   const winner = state.winner.side === NO_SIDE ? null : state.winner
