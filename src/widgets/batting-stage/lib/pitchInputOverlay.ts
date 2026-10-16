@@ -1,4 +1,5 @@
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
+import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
@@ -199,7 +200,10 @@ function frameBoxes(folder: string): Readonly<Record<string, readonly (readonly 
   boxesCache.set(folder, null)
   void fetch(`${folder}/boxes.json`)
     .then((response) => (response.ok ? response.json() : null))
-    .then((data) => boxesCache.set(folder, data))
+    .then((data) => {
+      boxesCache.set(folder, data)
+      noteAssetLoaded()
+    })
     .catch(() => boxesCache.set(folder, null))
   return null
 }

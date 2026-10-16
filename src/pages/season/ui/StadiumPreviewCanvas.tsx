@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { drawStadiumPreview } from '@/widgets/batting-stage/lib/renderScenery'
+import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { StadiumPreviewState } from '@/widgets/batting-stage/lib/renderScenery'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -14,9 +15,11 @@ export function StadiumPreviewCanvas({ state }: { readonly state: StadiumPreview
 
   useEffect(() => {
     let frame = 0
+    /** 값 · 실린 그림이 바뀐 틀에서만 다시 칠한다(`createDrawMemo`) */
+    const drawMemo = createDrawMemo()
     const draw = () => {
       const context = canvasRef.current?.getContext('2d') ?? null
-      if (context !== null) drawStadiumPreview(context, stateRef.current)
+      if (context !== null && drawMemo.needsDraw(canvasRef.current, stateRef.current)) drawStadiumPreview(context, stateRef.current)
       frame = requestAnimationFrame(draw)
     }
     draw()

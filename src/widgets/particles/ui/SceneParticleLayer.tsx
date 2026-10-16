@@ -3,6 +3,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
+import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
+import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import {
   isSceneParticlesClaimed,
   preloadSceneParticles,
@@ -48,6 +50,8 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
     let steppedTick = 0
     let wasShown = false
     let handle = 0
+    /** 입자 모습이 바뀐 틀에서만 다시 칠한다(`createDrawMemo`) — 굴림은 위에서 틀마다 그대로 */
+    const drawMemo = createDrawMemo()
     const frame = (now: number) => {
       const tick = Math.floor((now - startedAt) / millisecondsPerFrame())
       const isClaimed = isSceneParticlesClaimed()
@@ -69,7 +73,7 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
         setIsShown(shows)
       }
       const context = canvasRef.current?.getContext('2d', { willReadFrequently: true }) ?? null
-      if (context !== null && shows) {
+      if (context !== null && shows && drawMemo.needsDraw(canvasRef.current, particleSignatureOf(scene))) {
         context.fillStyle = '#000'
         context.fillRect(0, 0, WIDTH, HEIGHT)
         drawParticles(context, scene)

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { drawMatchInfoStadium } from '@/widgets/batting-stage/lib/renderScenery'
+import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { finishSkinBackdropOnCanvas } from '@/shared/lib/screen565/screen565'
@@ -33,6 +34,8 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
     if (stageKey === null) return undefined
     let frame = 0
     let lastChecksum: number | null = null
+    /** 날 그림은 값 · 실린 그림이 바뀐 틀에서만 다시 뜬다(`createDrawMemo`) — 화소 읽기(`checksumOf`)도 그때만 */
+    const drawMemo = createDrawMemo()
     let raw: CanvasRenderingContext2D | null = null
     try {
       const offscreen = document.createElement('canvas')
@@ -45,7 +48,7 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
     const draw = () => {
       const target = canvasRef.current?.getContext('2d') ?? null
       const current = stageRef.current
-      if (raw !== null && target !== null && current !== null && current !== undefined) {
+      if (raw !== null && target !== null && current !== null && current !== undefined && drawMemo.needsDraw(canvasRef.current, current)) {
         drawMatchInfoStadium(raw, current)
         const checksum = checksumOf(raw)
         if (checksum !== lastChecksum) {

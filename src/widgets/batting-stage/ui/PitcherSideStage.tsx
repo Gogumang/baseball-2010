@@ -5,6 +5,8 @@ import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { bodyTypeOf, NO_EQUIPMENT, NO_PITCHER_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
@@ -148,6 +150,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let frozenTotal = 0
     let frozenSince: number | null = null
     let handle = 0
+    /** 그림 입력이 바뀐 틀에서만 다시 그린다(`createDrawMemo`) — 위 갱신은 틀마다 그대로 돈다 */
+    const drawMemo = createDrawMemo()
     /** 경기 스킬 표시 판 — 0xf 에 들 때마다 하나씩 올리는 표지(구질 목록이 새로 실리면 새 0xf 진입) */
     const stepSkillPanel = createSkillPanelDriver()
     let skillPanelStateFSerial = 0
@@ -265,7 +269,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
                 }
               },
             })
-      renderBattingStage(context, {
+      const stageScene: StageScene = {
         pitch: stage.phase.kind === '대기' ? null : pitch,
         frame: stage.ballFrame,
         pitcherTick: stage.pitcherTick,
@@ -320,7 +324,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           isScoreboardOn: current.isScoreboardOn,
           ...(current.seasonStadium === undefined ? {} : { seasonStadium: current.seasonStadium }),
         },
-      })
+      }
+      if (drawMemo.needsDraw(canvasRef.current, stageScene)) renderBattingStage(context, stageScene)
       handle = requestAnimationFrame(frame)
     }
     handle = requestAnimationFrame(frame)

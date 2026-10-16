@@ -5,6 +5,7 @@
  */
 import { paletteUrl, recoloredSpriteUrl } from '@/shared/lib/sprite/paletteSwap'
 import type { SpritePalettes } from '@/shared/lib/sprite/paletteSwap'
+import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 
 const cache = new Map<string, HTMLImageElement | null>()
 
@@ -14,7 +15,10 @@ export function sprite(url: string): HTMLImageElement | null {
 
   cache.set(url, null)
   const image = new Image()
-  image.onload = () => cache.set(url, image)
+  image.onload = () => {
+    cache.set(url, image)
+    noteAssetLoaded()
+  }
   image.onerror = () => cache.set(url, null)
   image.src = url
   return null
@@ -65,7 +69,10 @@ function frameOrigins(folder: string): Readonly<Record<string, FrameOrigin>> | n
   originsCache.set(folder, null)
   void fetch(`${folder}/origins.json`)
     .then((response) => (response.ok ? response.json() : null))
-    .then((data) => originsCache.set(folder, data))
+    .then((data) => {
+      originsCache.set(folder, data)
+      noteAssetLoaded()
+    })
     .catch(() => originsCache.set(folder, null))
   return null
 }
@@ -93,7 +100,10 @@ export function frameAnimations(folder: string): readonly (readonly StageAnimati
   animationsCache.set(folder, null)
   void fetch(`${folder}/animations.json`)
     .then((response) => (response.ok ? response.json() : null))
-    .then((data) => animationsCache.set(folder, data))
+    .then((data) => {
+      animationsCache.set(folder, data)
+      noteAssetLoaded()
+    })
     .catch(() => animationsCache.set(folder, null))
   return null
 }
@@ -112,7 +122,10 @@ function spritePalettes(folder: string): SpritePalettes | null {
   palettesCache.set(folder, null)
   void fetch(paletteUrl(`${folder}/000.png`))
     .then((response) => (response.ok ? response.json() : null))
-    .then((data) => palettesCache.set(folder, data))
+    .then((data) => {
+      palettesCache.set(folder, data)
+      noteAssetLoaded()
+    })
     .catch(() => palettesCache.set(folder, null))
   return null
 }
@@ -138,7 +151,10 @@ function recoloredSprite(folder: string, url: string, paletteIndex: number): HTM
   void recoloredSpriteUrl(url, palettes, paletteIndex)
     .then((dataUrl) => (dataUrl === url ? null : loadSprite(dataUrl)))
     .then((image) => {
-      if (image !== null) painted.set(key, image)
+      if (image !== null) {
+        painted.set(key, image)
+        noteAssetLoaded()
+      }
     })
     .catch(() => {})
   return sprite(url)
