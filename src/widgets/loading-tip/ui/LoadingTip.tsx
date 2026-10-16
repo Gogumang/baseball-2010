@@ -3,6 +3,8 @@ import { MarkupText } from '@/shared/ui'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import { preloadSpriteScene } from '@/shared/lib/sprite/scenePreload'
+import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
 
 /**
@@ -19,17 +21,29 @@ const RUNNER_START_X = 20
 const RUNNER_END_X = 150
 const RUNNER_FOOT_Y = 112
 
+/** 로딩 판 뒤에 열릴 경기 장면 — 타석 진입·진행 그림 */
+const GAME_SCENE_PRELOADS: readonly SpriteSceneKey[] = ['gameEntry', 'gameAtBat']
+
 interface LoadingTipProps {
   readonly tip: string
   readonly onDone: () => void
+  /**
+   * 로딩 판이 떠 있는 동안 미리 받을 장면 그림. **기다리지 않는다** — 판 길이(LOADING_UPDATES)는 그대로이고,
+   * 덜 받았으면 장면에서 예전처럼 늦게 뜬다.
+   */
+  readonly preloadScenes?: readonly SpriteSceneKey[]
 }
 
-export function LoadingTip({ tip, onDone }: LoadingTipProps) {
+export function LoadingTip({ tip, onDone, preloadScenes = GAME_SCENE_PRELOADS }: LoadingTipProps) {
   const origins = useFrameOrigins(FOLDER)
   const animations = useAnimations(FOLDER)
   const [update, setUpdate] = useState(0)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
+
+  useEffect(() => {
+    for (const scene of preloadScenes) preloadSpriteScene(scene)
+  }, [preloadScenes])
 
   useEffect(() => {
     const startedAt = performance.now()

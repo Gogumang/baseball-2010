@@ -28,9 +28,13 @@ import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
+import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { gameSceneNow, useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+
+/** 더비 로딩 판 동안 받아 둘 그림 — 기다리지 않는다 */
+const DERBY_PRELOADS: readonly SpriteSceneKey[] = ['homeRunDerby']
 
 interface HomeRunDerbyScreenProps {
   /**
@@ -173,7 +177,7 @@ export function HomeRunDerbyScreen({
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
-        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} />
+        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} preloadScenes={DERBY_PRELOADS} />
       </RawScreen>
     )
   }

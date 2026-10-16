@@ -39,6 +39,7 @@ import {
   screenEnterSoundOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useSceneEnterStop, useScreenBgm, useSeasonMenuBgm,
 } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
+import { useScreenSpritePreload } from '@/app/model/screenSpritePreload'
 import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
@@ -496,6 +497,8 @@ export function App() {
    * 지금 장면의 [창+0x24f] — 메인 메뉴 0x234d4 · 경기 0x3301c 는 1. 화면으로 정하고, 경기 장면(0x104)을 그리는 화면이 서 있으면
    * 그 동안 1 이다(`useMarksGameScene`). 이 아래 `MessageBox` 와 히든 오픈 알림 창이 줄임 없이 닫힌다(0x7503c → [창+0x24e]).
    */
+  // 다음 장면 그림 미리 받기 — 기다리지 않는다(덜 받았으면 예전처럼 늦게 뜰 뿐)
+  useScreenSpritePreload(screen.kind, gameSceneCount > 0)
   const sceneClosesWithoutShrink = gameSceneCount > 0 || sceneClosesWithoutShrinkOf(screen.kind, mission.player !== null)
   const withHiddenOpenNotice = (routes: ReactNode) => (
     <RecordAchievedContext.Provider value={unlockByRecord}>

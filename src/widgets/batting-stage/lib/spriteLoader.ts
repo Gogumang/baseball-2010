@@ -1,23 +1,15 @@
 /**
  * 원본에서 뽑은 PNG를 캔버스에 쓰기 위해 불러오고 캐시한다.
  * 아직 안 불러온 그림은 null을 돌려주고, 도착하면 다음 프레임부터 그려진다 —
- * 로딩 때문에 게임 루프가 멈추면 안 된다.
+ * 로딩 때문에 게임 루프가 멈추면 안 된다. 장면 앞에서 미리 받아 두면(`spritePreload`) 첫 프레임부터 있다.
  */
 import { paletteUrl, recoloredSpriteUrl } from '@/shared/lib/sprite/paletteSwap'
 import type { SpritePalettes } from '@/shared/lib/sprite/paletteSwap'
+import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 
-const cache = new Map<string, HTMLImageElement | null>()
-
+/** 캐시는 DOM·미리 받기와 같이 쓴다 (`shared/lib/sprite/spriteCache`) */
 export function sprite(url: string): HTMLImageElement | null {
-  const cached = cache.get(url)
-  if (cached !== undefined) return cached
-
-  cache.set(url, null)
-  const image = new Image()
-  image.onload = () => cache.set(url, image)
-  image.onerror = () => cache.set(url, null)
-  image.src = url
-  return null
+  return spriteImage(url)
 }
 
 /** 판정 글자 애니메이션 폴더 (game_judge.pzx, 0x393b4) */
@@ -56,18 +48,8 @@ export interface FrameOrigin {
   readonly height: number
 }
 
-const originsCache = new Map<string, Readonly<Record<string, FrameOrigin>> | null>()
-
 function frameOrigins(folder: string): Readonly<Record<string, FrameOrigin>> | null {
-  const cached = originsCache.get(folder)
-  if (cached !== undefined) return cached
-
-  originsCache.set(folder, null)
-  void fetch(`${folder}/origins.json`)
-    .then((response) => (response.ok ? response.json() : null))
-    .then((data) => originsCache.set(folder, data))
-    .catch(() => originsCache.set(folder, null))
-  return null
+  return spriteJsonNow<Readonly<Record<string, FrameOrigin>>>(`${folder}/origins.json`)
 }
 
 export interface PlacedFrame {
@@ -84,37 +66,18 @@ export interface StageAnimationEntry {
   readonly dy?: number
 }
 
-const animationsCache = new Map<string, readonly (readonly StageAnimationEntry[])[] | null>()
-
 /** 폴더의 animations.json. 아직 안 불러왔으면 null */
 export function frameAnimations(folder: string): readonly (readonly StageAnimationEntry[])[] | null {
-  const cached = animationsCache.get(folder)
-  if (cached !== undefined) return cached
-  animationsCache.set(folder, null)
-  void fetch(`${folder}/animations.json`)
-    .then((response) => (response.ok ? response.json() : null))
-    .then((data) => animationsCache.set(folder, data))
-    .catch(() => animationsCache.set(folder, null))
-  return null
+  return spriteJsonNow<readonly (readonly StageAnimationEntry[])[]>(`${folder}/animations.json`)
 }
 
 // ── 대체 팔레트(.mpl) 갈아 끼우기 ───────────────────────────────────────────
 // <img> 쪽은 `shared/lib/sprite/paletteSwap` 의 훅이 맡지만 캔버스에는 훅을 쓸 수 없어
-// 원점·애니 표와 같은 방식(비동기로 받아 두고 도착하면 다음 프레임부터)으로 캐시한다.
+// 원점·애니 표와 같은 공용 JSON 캐시(비동기로 받아 두고 도착하면 다음 프레임부터)를 쓴다.
 
-const palettesCache = new Map<string, SpritePalettes | null>()
-
-/** 폴더의 palette.json. 아직 안 불러왔으면 null */
+/** 폴더의 palette.json. 아직 안 불러왔으면 null (DOM 의 `useSpritePalettes` 와 같은 캐시) */
 function spritePalettes(folder: string): SpritePalettes | null {
-  const cached = palettesCache.get(folder)
-  if (cached !== undefined) return cached
-
-  palettesCache.set(folder, null)
-  void fetch(paletteUrl(`${folder}/000.png`))
-    .then((response) => (response.ok ? response.json() : null))
-    .then((data) => palettesCache.set(folder, data))
-    .catch(() => palettesCache.set(folder, null))
-  return null
+  return spriteJsonNow<SpritePalettes>(paletteUrl(`${folder}/000.png`))
 }
 
 /**
