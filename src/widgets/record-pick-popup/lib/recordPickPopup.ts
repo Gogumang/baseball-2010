@@ -1,4 +1,5 @@
 import { nextPopupOpeningHeight } from '@/shared/lib/commonWindow/popupWindow'
+import { measurePixelTextWidth } from '@/shared/lib/font'
 
 /**
  * **두 칸 고르기 팝업 0x80 — 시즌 기록순위(그리기 0xf334 · 키 0xf5d4)와 나리 기록실(그리기 0x19448 · 키 0x196ec)이 같은 꼴**
@@ -32,6 +33,22 @@ export const RECORD_PICK_LABEL_GAP = 4
 export const RECORD_PICK_DIM_LABEL_COLOR = '#b2b2b2'
 /** 팝업 제목 StrMODE[74] "!C보고 싶은 기록을!N선택해주세요" (0xf362 · 0x1947a `movs r1, #0x4a`) */
 export const RECORD_PICK_TITLE_ID = 74
+
+/** 제목 x — 0xf36a · 0x1949c `subs r1, #0x54` (W/2 − 0x54) */
+export const RECORD_PICK_TITLE_X = 120 - 0x54
+/** 제목 y — 0xf36e · 0x194a0 `subs r2, #0x28` (H/2 − 0x28) */
+export const RECORD_PICK_TITLE_Y = 160 - 0x28
+
+/**
+ * **0xba269 폭 −1 제목의 가운데 x** (직접 떴다, 0x194a2 `rsbs r3` = −1). 0xba268 이 폭을 0x6ef4c 의 다섯째 인자로 넘기고
+ * 6efb0~6efd0 이 −1 이면 `0x9c52c(글꼴, 글, 바이트 길이, &폭, …)` 로 **날 글 전체**를 재 그 값을 폭으로 쓴다. 0x9c52c 는 줄을
+ * 0x0a 에서만 끊고(0x9c660) '!' 서식을 거르지 않는다 — 거르개 [글꼴+0x78] 은 글꼴을 짓는 0x9c9d0 → 0x9b650 이 0 으로 두고
+ * 다른 곳이 안 쓴다. 그래서 `!C` · `!N` 도 영문 두 자(6px 씩)로 들어가고 두 줄 글은 한 줄로 이어 잰다.
+ * `!C` 줄은 x + (폭 >> 1) 를 가운데로 둔다(6f12c → 0x6ed88 6edc6 `x − (줄 폭 >> 1)`).
+ */
+export function measuredTitleCenterXOf(x: number, raw: string): number {
+  return x + (measurePixelTextWidth(raw) >> 1)
+}
 
 /** 0xb9c5c 꼴 0x22 — 가로: (칸 − 그림)/2 몫 + 나머지(C 나눗셈) · 세로: (칸 − 그림)/2 몫 */
 export function recordPickIconOffsetOf(imageWidth: number, imageHeight: number): { readonly x: number; readonly y: number } {

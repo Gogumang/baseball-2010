@@ -1966,7 +1966,7 @@ function selectPitchAfterClear(progress: GameProgress, random: RandomPort, after
   for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
     if (current.game.isFinished || !isPlayerTurn(current.game)) return current
     if (current.burst !== null && current.burst.current !== null) return current
-    const changed = changeOpponentPitcher(current, random)
+    const changed = changeOpponentPitcher(current, random, true)
     if (changed === current) return current
     // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수의 구질 목록으로
     // (`rollCpuPitchTypeOnPitcherChangeTick`). 마구 칸이 없으면 0x344dc 는 볼카운트 · 주자 · 남은 마구를 안 보고 rand(0,6) 한 번이다.
@@ -2172,7 +2172,7 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
   // (우리가 공격 중이니 **상대 투수**, 0xc1ce2). 하나라도 바뀌면 0xc262c 가 공 없이 돌아갔다가(c266c) 같은
   // 타석으로 0xc1ba4 를 다시 지난다 — 바뀐 쪽은 state[0xe]·state[0xd] 로 빠지고 안 바뀐 쪽은 다시 판정한다
   for (let call = 0; call < MAXIMUM_SUBSTITUTION_CALLS; call += 1) {
-    const substituted = changeOpponentPitcher(applyOurCpuPinchHit(progress, random), random)
+    const substituted = changeOpponentPitcher(applyOurCpuPinchHit(progress, random), random, false)
     if (substituted === progress) break
     progress = substituted
     // 0x21 의 한 틱 — 공 없이 돌아간 부름(글 없음)
@@ -2512,7 +2512,19 @@ function applyOurCpuPinchHit(progress: GameProgress, random: RandomPort): GamePr
  * (`0x3d954` 의 `0x3da3e` — 수비가 CPU 이고 `0x66864` 가 참일 때. 리그 경기는 미션이 아니라 참이다).
  * 바꾸면 카운터(+0x27c·+0x280·+0x284)가 한꺼번에 0 이 된다 (교체 0xaec64).
  */
-function changeOpponentPitcher(progress: GameProgress, random: RandomPort): GameProgress {
+function changeOpponentPitcher(
+  progress: GameProgress,
+  random: RandomPort,
+  /**
+   * 경기 장면(내 타석 시작 3da3e)에서 바뀌었는가 — 그러면 세이브 후보 `0xa60c0` 을 잡는다. 3da3e 가 참이면 3da94 에서 0x16 으로
+   * 가고, 0x16 진입 0x3d458 이 팀 +0x290/+0x291(0xae9a0)을 보고 +0x195c 를 세운 뒤 0xe 그림 0x38b64 가 메시지 0xbc0 을 보내
+   * 0x5227c 가 0xa60c0 을 부른다(그 사이 플레이가 없어 이닝·아웃·주자·점수는 교체 순간과 같다).
+   * 동료 타석의 간이 엔진 교체(c1ce2 → c262c)는 c268e~c26b2 가 수비 팀 +0x296 과 함께 `engine[1]` 을 보는데, 경기 장면(3fa06)·
+   * 자동진행(3c93a)은 시뮬 초기화 0xc0dac 에 0 을 넘기고(c0e18) 1 은 CPU 끼리 경기 0xc2760(c2858)만 쓴다 — **후보를 안 잡는다**
+   * (r114 가 직접 떴다 — 0xa60c0 을 부르는 곳은 0x52284 · 0xc26a2 둘뿐). 세이브는 어차피 +0x64 때문에 기록되지 않는다(S1 4-1).
+   */
+  inScene: boolean,
+): GameProgress {
   if (progress.game.isFinished) return progress
   const before = progress.opponentMound
   const after = changePitcherIfNeeded(opponentQuickDefenseOf(progress), before, {
@@ -2537,11 +2549,13 @@ function changeOpponentPitcher(progress: GameProgress, random: RandomPort): Game
         pitches: before.pitches,
       }),
       opponentInningRunsAllowed: 0,
-      // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대)
-      decisions: decisionsAfterPitcherChange(progress.decisions, progress.game, {
-        our: progress.ourMound.pitcherSlot,
-        opponent: after.pitcherSlot,
-      }),
+      // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측 = 상대) — 장면 교체만(`inScene`)
+      decisions: inScene
+        ? decisionsAfterPitcherChange(progress.decisions, progress.game, {
+            our: progress.ourMound.pitcherSlot,
+            opponent: after.pitcherSlot,
+          })
+        : progress.decisions,
     },
     `${progress.game.inning}회${progress.game.half} 상대 투수 교체`,
     false,
@@ -2561,7 +2575,9 @@ function moundsOf(progress: GameProgress): MoundBySide {
 
 /**
  * 상대 공격 반 이닝(간이 엔진)의 승·패·세 칸 — 교체 자리를 경계로 점수를 나눠 한 점씩 먹인다.
- * 교체 전 점수는 이전 투수, 교체 뒤 점수는 새 투수가 마운드에 있을 때 난 것이다 (0xc26a2 → 0xa60c0).
+ * 교체 전 점수는 이전 투수, 교체 뒤 점수는 새 투수가 마운드에 있을 때 난 것이다.
+ * 교체 자리의 세이브 후보 `0xa60c0` 은 **안 잡는다**: 간이 엔진 c268e~c26b2 는 수비 팀 +0x296 과 `engine[1]` 이 둘 다 서야 부르는데
+ * 타자편 경기 장면(3fa06)·자동진행(3c93a)은 0xc0dac 에 engine[1] = 0 을 넘긴다(c0e18 — 1 은 CPU 끼리 경기 0xc2760 c2858 뿐).
  */
 function opponentHalfDecisionsOf(
   progress: GameProgress,
@@ -2582,13 +2598,6 @@ function opponentHalfDecisionsOf(
     })
     counted = change.runsBefore
     ourSlot = change.pitcherSlot
-    decisions = decisionsAfterPitcherChange(
-      decisions,
-      scoredGame(counted),
-      { our: ourSlot, opponent: progress.opponentMound.pitcherSlot },
-      change.outs,
-      change.runnerCount,
-    )
   }
   return decisionsAfterRuns(decisions, scoredGame(counted), runs - counted, {
     our: ourSlot,

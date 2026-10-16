@@ -8,7 +8,8 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
-  RECORD_PICK_CELL_SIZE, RECORD_PICK_LABEL_GAP, recordPickIconOffsetOf, recordPickLabelXOf, recordPickPopupTopOf,
+  RECORD_PICK_CELL_SIZE, RECORD_PICK_LABEL_GAP, measuredTitleCenterXOf, recordPickIconOffsetOf, recordPickLabelXOf,
+  recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { PITCH_WINDOW_CHOICES } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -30,6 +31,9 @@ export const PITCH_CHOICE_TITLE_ID = 0x3b
 /** 제목 0xba269(글, W/2 − 0x46, H/2 − 0x1e, …) — 0x1914c `subs r1, #0x46` · 0x19150 `subs r2, #0x1e` */
 const TITLE_BACK = 0x46
 const TITLE_RISE = 0x1e
+const TITLE_RAW = ORIGINAL_MODE_TEXT[PITCH_CHOICE_TITLE_ID] ?? ''
+/** 제목 가운데 x — (W/2 − 0x46) + (0x9c52c 폭 >> 1) */
+const TITLE_CENTER_X = measuredTitleCenterXOf(120 - TITLE_BACK, TITLE_RAW)
 /**
  * 칸 둘 — 0x19162~0x19170 칸 0 (W/2 − 0x38, H/2, 0x20, 0x20) 프레임 0x13 · 0x19272~0x19284 칸 1 (W/2 + 0x18, H/2, 0x20, 0x20)
  * 프레임 0x12 를 0x858fd([장면+0xe0], 칸, 프레임, 팔레트) 로 (0x1919c · 0x192a4). 칸 글은 img_text +0x4d0(308 "마구") ·
@@ -132,10 +136,11 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
         {/* 펼치는 동안은 판만 긋는다(0x7479c) — 줄이는 동안은 그리기 0x190f8 이 그대로 돈다 */}
         {motion.openingHeight === null && (<>
           {/* 0xba269 넷째 인자 −1(폭) = **글 폭을 재서 쓴다**(직접 떴다): 0xba268 이 폭을 0x6ef4c 의 다섯째 인자로 넘기고, 6efb0 이
-              −1 이면 0x9c52c 로 글을 재 그 값을 폭으로 쓴다 → "!C" 가 제 폭 안에서 가운데라 글은 x = W/2 − 0x46 에서 그대로 시작한다 */}
+              −1 이면 0x9c52c 로 날 글을 재 그 값을 폭으로 쓴다. 0x9c52c 는 '!' 서식을 거르지 않아 "!C" 두 자(12px)까지 들어간다(143) —
+              그래서 글은 x 에서 시작하지 않고 가운데 x + (143 >> 1) 에 맞춘다(`measuredTitleCenterXOf`, r114 의 "x 에서 시작" 을 고친다) */}
           <div className={styles.title}
-            style={{ left: 120 - TITLE_BACK, top: 160 - TITLE_RISE, width: 'max-content', whiteSpace: 'nowrap' }}>
-            <MarkupText raw={ORIGINAL_MODE_TEXT[PITCH_CHOICE_TITLE_ID] ?? ''} />
+            style={{ left: TITLE_CENTER_X - 120, top: 160 - TITLE_RISE, width: 240, whiteSpace: 'nowrap' }}>
+            <MarkupText raw={TITLE_RAW} />
           </div>
           {PITCH_CHOICE_CELLS.map((cell, index) => {
             const isOn = index === (selected === 0 ? 0 : 1)
