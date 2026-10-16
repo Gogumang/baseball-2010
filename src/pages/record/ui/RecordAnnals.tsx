@@ -5,6 +5,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
+import { isMinusSkill } from '@/entities/career/model/playerCareer'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -14,7 +15,7 @@ import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
   ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_NAME, LIST_ROW_FRAME_DY, listFirstYOf, STAT_NAME, STAT_VALUE, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
-  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
+  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_BADGE, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, skillBitOfCell, skillGradeOf, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
@@ -92,10 +93,14 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
   /** 보이는 줄 창 윗줄 [skin+0x1f4] (아랫줄 [skin+0x1f8] = 윗줄 + 3) */
   const [gridTop, setGridTop] = useState(0)
   const tick = useUpdateCounter()
-  const isBlinking = isBlinkOn(tick)
   /** 탭 막대에서 CLR 을 누른 틱 — 판을 닫는 중 ([skin+0x99] = 0) */
   const [closingAt, setClosingAt] = useState<number | null>(null)
   const panelHeight = closingAt === null ? openingPanelHeightOf(tick) : closingPanelHeightOf(tick - closingAt)
+  /**
+   * 깜박임 [sp+0xa8] — 0x2e2f4 가 `% 8 ≤ 3` 으로 세우지만 판 높이가 0xd3(211) 이하인 동안(여닫는 중)은
+   * 0x2e42e~0x2e456 이 자르기를 걸면서 0 으로 덮는다. 그 뒤 쓰는 곳(탭 커서 · ▲▼ · 고른 칸 · 스킬 화살)은 모두 이 값을 읽는다
+   */
+  const isBlinking = panelHeight >= PANEL_FULL_HEIGHT && isBlinkOn(tick)
   /** 키를 받는가 — 여는 중이고 끝났고 높이 212 (0x2b87c~0x2b8b6) */
   const isPanelOpen = closingAt === null && tick >= PANEL_ANIMATION_DRAWS
   const hasLeftRef = useRef(false)
@@ -307,6 +312,16 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
             width={SKILL_DESCRIPTION.box.width}
             height={SKILL_DESCRIPTION.box.height}
           />
+          {/* 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488) — img_text 등급(팔레트 0) · slt_frame 이미지 0x7c/0x7d 화살 */}
+          {collection.skills.includes(cursor) && (
+            <>
+              <FrameSprite folder={IMG_TEXT} frame={SKILL_BADGE.gradeFrames[skillGradeOf(cursor)]} origins={textFrames}
+                x={SKILL_BADGE.gradeX} y={SKILL_BADGE.gradeY} />
+              <img className={styles.sprite} alt="" data-testid="스킬-화살"
+                src={imageSrc(SLT_FRAME, isMinusSkill(skillBitOfCell(cursor)) ? SKILL_BADGE.minusImage : SKILL_BADGE.plusImage)}
+                style={{ left: SKILL_BADGE.arrowX, top: SKILL_BADGE.arrowY + (isBlinking ? 1 : 0) }} />
+            </>
+          )}
           {/* 0xba269(글, 39, 202, 폭 −1) — 날 글 폭이라 `!N` 에서만 줄이 끊긴다 (0x2f3a0 · 0x2f4d8 → 0x2fb8e) */}
           <div className={styles.descriptionText} data-testid="스킬-설명"
             style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y }}>
