@@ -80,7 +80,8 @@ const detailRepertoireOf = (repertoire: Pick<PitcherRepertoire, 'form' | 'magicI
  * 명단 선수 레코드의 상세 창 칸 — 0xe0 그림 0xb074 → 0x5cfec(0x5c984) 끝 0x5cfc8 이 커서 줄 레코드를 0x5b798 에 넘긴다.
  * 붙박이 표 선수는 Xls 행(+0xb · +0x14 · +0x1b · 레퍼토리 `ROSTER_PITCHER_REPERTOIRES`, 같은 차례), 영입 사본은 옮긴 기록 칸.
  * 레코드 +0x18(필살)은 붙박이 표가 0 이고 타자 사본은 `specialNumber` 다.
- * ⚠️ 미확인: 영입 사본의 +0x1b(연봉)는 웹 사본에 없어 비운다(0). 명전 칸에서만 이름을 찾는 표 밖 선수(사본 없음)는 칸을 모른다.
+ * 영입 사본의 +0x1b(연봉)는 나리 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255) 이다(`salaryGrade` — 나리 사본은 영입 때 커리어 연봉,
+ * 명전 칸은 등록 때 연봉으로 센다). 그 칸이 없는 옛 사본 · 옛 명전 기록은 비운다. 명전 칸에서만 이름을 찾는 표 밖 선수(사본 없음)는 칸을 모른다.
  */
 export function seasonDetailSourceOf(
   teamId: number,
@@ -95,13 +96,13 @@ export function seasonDetailSourceOf(
   if (record === undefined) return undefined
   if ('repertoire' in record) {
     return {
-      isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0, grade: null,
-      repertoire: detailRepertoireOf(record.repertoire),
+      isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0,
+      grade: record.salaryGrade ?? null, repertoire: detailRepertoireOf(record.repertoire),
     }
   }
   return {
-    isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0, grade: null,
-    specialNumber: record.specialNumber ?? 0,
+    isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0,
+    grade: record.salaryGrade ?? null, specialNumber: record.specialNumber ?? 0,
   }
 }
 
@@ -470,6 +471,8 @@ export interface SeasonEntryBatterRecord {
   readonly skillBits?: number
   /** +0x19 · +0x1a 장비 니블 네 칸 — 영입 0xc554 가 옮긴 기록의 니블. 옛 사본엔 없다 */
   readonly equipment?: readonly number[]
+  /** +0x1b — 나리 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255) (`nariRecordSalaryGradeOf`). 옛 사본엔 없다 */
+  readonly salaryGrade?: number
 }
 
 /**
@@ -522,6 +525,8 @@ export interface SeasonEntryPitcherRecord {
   readonly baseAbility?: readonly [number, number, number, number]
   readonly skillBits?: number
   readonly equipment?: readonly number[]
+  /** +0x1b — `SeasonEntryBatterRecord.salaryGrade` 와 같다 */
+  readonly salaryGrade?: number
 }
 
 /** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */

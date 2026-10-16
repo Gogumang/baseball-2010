@@ -142,6 +142,8 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
     expect(pitcher.collection.hallOfFamePitchers[0]).toMatchObject({
       pitchMask: 0b1011, selectedMagicNumber: 3, equippedSkillIds: [16, 22],
       equipmentLevels: { control: 2, velocity: 0, breaking: 0, stamina: 4 },
+      // +0x1b — 등록 0x10fb4 의 연봉 50 을 0xa4fd8 가 1/10 로 둔 값
+      salaryGrade: 5,
     })
     // 저장했다 읽어도 그대로 남는다
     expect(normalizeCollection(JSON.parse(JSON.stringify(pitcher.collection))).hallOfFamePitchers).toEqual(pitcher.collection.hallOfFamePitchers)

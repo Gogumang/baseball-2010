@@ -7,7 +7,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
+import { nariRecordSalaryGradeOf, romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
 import { FIRST_HIDDEN_LEVEL, hiddenOpenIdOf, ownsEquipment } from '@/entities/career/model/equipment'
 import { ownsPitcherEquipment, pitcherHiddenOpenIdOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
@@ -57,6 +57,11 @@ interface HallOfFameRecordFields<Ability> {
    * 미션(모드 5 · 6)의 소개 판 0x44944 가 이 칸에 이 경기 줄을 더해 읽는다. 2026-10-15 에 더했다 — 그 전 옛 저장에는 없다
    */
   readonly recordLine?: readonly number[]
+  /**
+   * 기록 +0x1b — 나리 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255) (`nariRecordSalaryGradeOf`). 시즌 영입 선수의 상세 창 연봉이
+   * 이 칸 × 1000 이다. 2026-10-16 에 더했다 — 그 전 옛 저장에는 없다(읽는 쪽은 칸을 비운다)
+   */
+  readonly salaryGrade?: number
 }
 
 /** 명예의 전당 타자 (+0x940 칸) */
@@ -311,6 +316,7 @@ export function registerHallOfFame(
     specialSwingNumber: career.specialSwingNumber,
     positionIndex: career.positionIndex,
     recordLine: batterRecordLineOf(career.stats),
+    salaryGrade: nariRecordSalaryGradeOf(career.salary),
   }
   return { kind: '등록', slot: target, collection: { ...collection, hallOfFame: [...collection.hallOfFame, famer] } }
 }
@@ -343,6 +349,7 @@ export function registerHallOfFamePitcher(
     selectedMagicNumber: career.selectedMagicNumber,
     role: career.role,
     recordLine: pitcherRecordLineOf(career.stats),
+    salaryGrade: nariRecordSalaryGradeOf(career.salary),
   }
   return {
     kind: '등록',
@@ -452,7 +459,8 @@ const isOptionalNumber = (value: unknown) => value === undefined || typeof value
 const hasRecordFields = (candidate: Record<string, unknown>, abilityKeys: readonly string[]) =>
   (candidate.equipmentLevels === undefined || hasNumbers(candidate.equipmentLevels, abilityKeys)) &&
   (candidate.equippedSkillIds === undefined || isNumberArray(candidate.equippedSkillIds)) &&
-  (candidate.recordLine === undefined || isNumberArray(candidate.recordLine))
+  (candidate.recordLine === undefined || isNumberArray(candidate.recordLine)) &&
+  isOptionalNumber(candidate.salaryGrade)
 
 function isHallOfFamer(value: unknown): value is HallOfFamer {
   if (typeof value !== 'object' || value === null) return false
