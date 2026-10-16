@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
+import { FRESH_HELD_CPU_MAGIC, cpuMagicStateOf } from '@/entities/pitching/model/magicPitchGame'
 import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
@@ -2509,7 +2510,22 @@ function missionCpuAfterThrow(
     pitchTypeNumber,
     batterIntimidates: skillIds.includes(INTIMIDATE_SKILL_ID),
     ...(aceStamina === undefined ? {} : { aceStamina }),
+    // 소모 0x345fc · 싣기 0x3de10 — CPU 팀 +0x28 · 공 +0x10 을 미션 한 판 동안 이어 든다
+    magic: { pitcher: missionMoundPitcherAbility(run, aceLevels), aceLevels },
   })
+}
+
+/**
+ * **타자 미션 타석 화면에 넘길 CPU 마구 두 칸**(`BattingStage.cpuMagic`) — CPU 팀 +0x28 이 아직 안 찼으면(−1) 지금 마운드 투수로 채운 값
+ * (타석 교대 0xaebe4 aeea8). 투수진이 없으면(투수 미션) undefined
+ */
+export function missionCpuMagicStateOf(
+  run: MissionRun,
+  aceLevels?: Readonly<Record<number, number>>,
+): { readonly remaining: number; readonly ballMagicNumber: number } | undefined {
+  const pitching = run.cpu.pitching
+  if (pitching === null) return undefined
+  return cpuMagicStateOf(pitching.magic ?? FRESH_HELD_CPU_MAGIC, missionMoundPitcherAbility(run, aceLevels), aceLevels)
 }
 
 /** 투수 미션 지금 CPU 타자의 0xab214 스킬 번호 — 마타자 칸이면 미션 마선수 행(`aceSkillIdsOf`), 아니면 마스터 줄 +0x14 */

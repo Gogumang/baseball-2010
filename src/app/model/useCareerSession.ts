@@ -9,7 +9,7 @@ import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -1007,6 +1007,8 @@ export function useCareerSession({
       if (beforePitch !== null && detail.pitchTypeNumber !== undefined) {
         const thrown = throwOpponentPitch(beforePitch, detail.pitchTypeNumber, {
           batterIntimidates: careerRef.current?.equippedSkillIds.includes(INTIMIDATE_SKILL_ID) ?? false,
+          // 소모 0x345fc(0x51214 → 0x5121e) · 싣기 0x3de10 — 수비 팀 +0x28 · 공 +0x10 을 경기 동안 이어 든다
+          magic: { pitcher: stageOpponentPitcherAbilityOf(beforePitch, aceLevels), aceLevels },
         })
         progressRef.current = thrown
         setProgress(thrown)
@@ -1128,7 +1130,7 @@ export function useCareerSession({
       const arrivalKind = arrival?.play?.kind ?? null
       finishAtBat(advanced, nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(nextAtBat.outcome, arrivalKind))
     },
-    [audio, finishAtBat, finishCupGame, finishGame, random, runner],
+    [aceLevels, audio, finishAtBat, finishCupGame, finishGame, random, runner],
   )
 
   const story = useStorySchedule(career)

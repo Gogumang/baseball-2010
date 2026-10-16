@@ -138,8 +138,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      *
      * 마운드에 선 투수가 바뀌면 새로 만든다 — 남은 횟수는 원본도 그렇다: 교체 가지가 팀+0x28 을 −1 로
      *    비우고(0xaebe4 aec7a) 같은 함수 끝이 새 투수로 채운다. ⚠️ 다만 공+0x10 은 경기에 하나라 원본은
-     *    이어지는데 여기서는 0 으로 돌아가고, 화면이 내려가면(반 이닝) 둘 다 잃는다 — 그래서 사람 투구와 공을
-     *    함께 드는 진행기는 `cpuMagic` 으로 넘긴다(팀 경기).
+     *    이어지는데 여기서는 0 으로 돌아가고, 화면이 내려가면(반 이닝) 둘 다 잃는다 — 그래서 경기를 드는 진행기는
+     *    `cpuMagic` 으로 넘긴다(팀 경기 · 나리 타자편 · 타자 미션 — 0xaebe4 aeea8 은 +0x28 이 음수일 때만 채운다).
+     *    안 넘기는 화면(투수편 · 홈런더비 · 결과 배경)만 이 자리 상태를 쓴다.
      */
     let magic: { readonly magicId: number; readonly state: MagicPitchGameState } | null = null
     const magicStateOf = (repertoire: PitcherRepertoireInfo | undefined): MagicPitchGameState => {

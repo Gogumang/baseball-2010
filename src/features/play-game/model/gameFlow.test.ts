@@ -18,6 +18,8 @@ import {
   summaryOf,
   resolveBenchClearing,
   throwOpponentPitch,
+  opponentCpuMagicStateOf,
+  stageOpponentPitcherAbilityOf,
   withAutoStopLateInningSetup,
   ourRunnerRunsOnBaseOf,
   runnerRunAbilitiesOf,
@@ -1186,6 +1188,20 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     const 끝 = startPlayerOutcome(돌발중, { kind: '사구' }, 첫굴림(0, 3))
 
     expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+  })
+})
+
+describe('상대 마구 두 칸을 경기 동안 든다 — 팀+0x28 · 공+0x10 (0xaebe4 aeea8 · 0x345fc · 0x3de10)', () => {
+  it('공마다 진행기가 고친 값을 다음 공 · 다음 화면이 그대로 본다 — 다시 차지 않는다', () => {
+    const progress = startGame(createSeededRandom(20100901))
+    const pitcher = { ...stageOpponentPitcherAbilityOf(progress, undefined), repertoire: { form: 0, pitchMask: 0, magicId: 5 } }
+    expect(progress.opponentCpuMagic).toEqual({ remaining: -1, ballMagicNumber: 0 })
+    expect(opponentCpuMagicStateOf(progress, pitcher, undefined)).toEqual({ remaining: 3, ballMagicNumber: 0 })
+    const 첫마구 = throwOpponentPitch(progress, 22, { batterIntimidates: false, magic: { pitcher } })
+    const 둘째 = throwOpponentPitch(첫마구, 22, { batterIntimidates: false, magic: { pitcher } })
+    expect(opponentCpuMagicStateOf(둘째, pitcher, undefined)).toEqual({ remaining: 2, ballMagicNumber: 5 })
+    // magic 을 안 주면 그대로
+    expect(throwOpponentPitch(둘째, 22, { batterIntimidates: false }).opponentCpuMagic).toEqual(둘째.opponentCpuMagic)
   })
 })
 

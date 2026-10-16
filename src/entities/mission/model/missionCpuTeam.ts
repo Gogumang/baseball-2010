@@ -7,6 +7,9 @@ import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/s
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
+  FRESH_HELD_CPU_MAGIC, heldCpuMagicAfterPitch, heldCpuMagicAfterPitcherChange, type HeldCpuMagic,
+} from '@/entities/pitching/model/magicPitchGame'
+import {
   QUICK_LINEUP_SIZE,
   lineupSlotOf,
   recordLineupPlay,
@@ -128,6 +131,12 @@ export interface MissionCpuPitching {
   readonly inningRunsAllowed: number
   /** 사람 팀이 낸 점수(점수판) — 리드(0xb69b0 수비 − 공격)의 우리 쪽 = 시작 점수 + 이 값 */
   readonly ourRuns: number
+  /**
+   * **CPU 팀 남은 마구 +0x28 · 공 객체 +0x10** — 타자 미션 사람 타석의 CPU 투구가 고르고(0x344dc) 줄이고(0x345fc) 싣는다(0x3de10).
+   * 타석 교대 0xaebe4 가 +0x28 이 음수일 때만 채우므로(aeea8 → aeeae `bge`) 같은 투수가 서 있는 동안 미션 한 판 내내 이어지고,
+   * 교체 가지만 −1 로 비운다(aec7a). 타석 화면(`BattingStage.cpuMagic`)은 이 값의 사본으로 고른다. 없으면 새 경기 값
+   */
+  readonly magic?: HeldCpuMagic
 }
 
 /** 투수 미션(모드 5) — CPU 공격 타선 */
@@ -183,6 +192,8 @@ export function startMissionCpuPitching(mission: OriginalMission): MissionCpuPit
     mound: { pitcherSlot: 0, stamina: FULL_STAMINA, runsAllowed: 0, pitches: 0, usedSlots: [], justChanged: false },
     inningRunsAllowed: 0,
     ourRuns: 0,
+    // 팀 new 0xb891c 의 +0x28 = −1 · 공 new 의 +0x10 = 0
+    magic: FRESH_HELD_CPU_MAGIC,
   }
 }
 
@@ -503,6 +514,11 @@ export function missionCpuAfterPitch(
     readonly batterIntimidates: boolean
     /** 마투수가 마운드면 세션이 깎은 그 레코드 +0x2c (`missionOpponentStaminaAfterPitch`) — 안 주면 그대로 */
     readonly aceStamina?: number
+    /**
+     * 던진 마운드 투수(`missionMoundPitcherAbility`)와 마선수 레벨 — 주면 마구 두 칸(`MissionCpuPitching.magic`)을 소모 0x345fc ·
+     * 싣기 0x3de10 차례로 고친다. 안 주면 그대로
+     */
+    readonly magic?: { readonly pitcher: PitcherAbility; readonly aceLevels?: Readonly<Record<number, number>> }
   },
 ): MissionCpuTeam {
   const pitching = team.pitching
@@ -518,6 +534,16 @@ export function missionCpuAfterPitch(
     pitching: {
       ...pitching,
       mound: { ...mound, stamina, pitches: Math.min(MAXIMUM_COUNTER * 100, mound.pitches + 1), justChanged: false },
+      ...(pitch.magic === undefined
+        ? {}
+        : {
+            magic: heldCpuMagicAfterPitch(
+              pitching.magic ?? FRESH_HELD_CPU_MAGIC,
+              pitch.magic.pitcher,
+              pitch.magic.aceLevels,
+              pitch.pitchTypeNumber,
+            ),
+          }),
     },
   }
 }
@@ -583,7 +609,16 @@ export function enterMissionPitchSelection(
     )
     if (after === mound) return unchanged
     return {
-      team: { ...team, pitching: { ...pitching, mound: after, inningRunsAllowed: 0 } },
+      team: {
+        ...team,
+        pitching: {
+          ...pitching,
+          mound: after,
+          inningRunsAllowed: 0,
+          // 교체 가지 0xaebe4 aec7a `0xae9c4(팀, −1)` — 새 투수는 타석 교대(aeea8)에서 다시 찬다. 공 +0x10 은 그대로
+          magic: heldCpuMagicAfterPitcherChange(pitching.magic ?? FRESH_HELD_CPU_MAGIC),
+        },
+      },
       substitution: { kind: '투수교체', incomingIsAce: pitching.roster[after.pitcherSlot] === MISSION_ACE_ROSTER_SLOT },
     }
   }

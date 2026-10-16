@@ -17,6 +17,7 @@ import {
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
+import { FRESH_HELD_CPU_MAGIC, heldCpuMagicAfterPitcherChange } from '@/entities/pitching/model/magicPitchGame'
 import type { MissionAcePitcher, MissionCpuPitching } from '@/entities/mission/model/missionCpuTeam'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { drainMissionAutoTicks, missionAutoRelayStepOfTick } from '@/entities/mission/model/missionAutoRelay'
@@ -466,7 +467,15 @@ export function* simulateMissionAutoHalfTicks(
   scores[offenseSide] += result.runs
   return {
     batting: { ...batting, lineup: result.lineup ?? batting.lineup, order: result.nextBattingOrderIndex },
-    pitching: { ...pitching, mound: result.mound ?? pitching.mound, inningRunsAllowed },
+    pitching: {
+      ...pitching,
+      mound: result.mound ?? pitching.mound,
+      inningRunsAllowed,
+      // 간이 엔진 교체(0xc1ba4 → 0xac428 ac644 → 0xaf09c af0d4 → 0xaebe4 aec7a)도 +0x28 을 −1 로 비운다
+      ...((result.pitcherChanges?.length ?? 0) > 0
+        ? { magic: heldCpuMagicAfterPitcherChange(pitching.magic ?? FRESH_HELD_CPU_MAGIC) }
+        : {}),
+    },
     runs: result.runs,
     outs: result.outs,
     bases: result.bases ?? EMPTY_BASES,

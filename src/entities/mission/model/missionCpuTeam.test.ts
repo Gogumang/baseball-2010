@@ -116,6 +116,19 @@ describe('타자 미션 CPU 투수 교체 — 0xf 진입 0x3d954 → 0xac428 (3d
     )
   })
 
+  it('마구 두 칸 — 공마다 고쳐 미션 한 판 내내 이어 들고, 교체가 +0x28 만 −1 로 비운다 (0xaebe4 aeea8 · aec7a)', () => {
+    const mission = missionOf('타자', 9)
+    const start = startMissionCpuTeam(mission)
+    expect(start.pitching?.magic).toEqual({ remaining: -1, ballMagicNumber: 0 })
+    const pitcher = { control: 60, velocity: 60, repertoire: { form: 0, pitchMask: 0, magicId: 5 } }
+    const 첫 = missionCpuAfterPitch(start, { pitchTypeNumber: 22, batterIntimidates: false, magic: { pitcher } })
+    const 둘 = missionCpuAfterPitch(첫, { pitchTypeNumber: 22, batterIntimidates: false, magic: { pitcher } })
+    expect(둘.pitching?.magic).toEqual({ remaining: 2, ballMagicNumber: 5 })
+    const scored = missionCpuAfterRuns(둘, 3, false)
+    const { team } = enterMissionPitchSelection(scored, 상황(mission), 굴림금지)
+    expect(team.pitching?.magic).toEqual({ remaining: -1, ballMagicNumber: 5 })
+  })
+
   it('2점이면 안 바꾼다 — 3아웃(이닝 교대 0xa5b00)이 A 를 0 으로 되돌린다', () => {
     const mission = missionOf('타자', 9)
     const twoRuns = missionCpuAfterRuns(startMissionCpuTeam(mission), 2, false)
