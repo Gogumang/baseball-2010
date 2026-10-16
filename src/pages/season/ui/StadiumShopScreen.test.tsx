@@ -5,6 +5,7 @@ import { StadiumShopScreen } from '@/pages/season/ui/StadiumShopScreen'
 import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
+import { seasonScoreboardRewindXOf } from '@/widgets/batting-stage/lib/renderScenery'
 import {
   boardBonusOf, standCapacityOf, stadiumOwnedIndexOf,
 } from '@/entities/season-mode/model/stadiumItems'
@@ -180,6 +181,40 @@ describe('구장관리 교체 (0x7958)', () => {
     resetLiveGameState()
     띄우기(레코드(), { mode: '구장관리' })
     expect(screen.getByTestId('구장-미리보기').getAttribute('data-sky-column')).toBe('0')
+  })
+
+  it('구장관리 진입이 잰 하늘은 장면 구장 칸으로 돌려준다 — 상점은 0x783b0 을 안 불러 그 값을 쓴다 (0x5f3c 6250)', () => {
+    setLiveGameInningIndex(9)
+    const onPreviewSceneChange = vi.fn()
+    띄우기(레코드(), { mode: '구장관리', onPreviewSceneChange })
+    expect(onPreviewSceneChange).toHaveBeenCalledWith(expect.objectContaining({ skyColumn: 9 }))
+    cleanup()
+    resetLiveGameState()
+    // 상점은 지금 경기 상태가 아니라 장면 칸(앞서 구장관리가 둔 4)을 쓴다
+    띄우기(레코드(), { previewScene: { skyRow: 1, skyColumn: 4, scoreboardX: 0 } })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-sky-column')).toBe('4')
+  })
+
+  it('상점 진입은 전광판 글자를 상자 폭 + 2 로 되감고(0x62ee 0x77edc), 나갈 때 그 자리를 장면 칸에 남긴다', () => {
+    const record = { ...레코드(), stadiumEquipped: [0, 2, 0] }
+    const onPreviewSceneChange = vi.fn()
+    const { unmount } = render(
+      <StadiumShopScreen record={record} onChange={vi.fn()} onBack={vi.fn()}
+        previewScene={{ skyRow: 0, skyColumn: 0, scoreboardX: -40 }} onPreviewSceneChange={onPreviewSceneChange} />,
+    )
+    const rewound = seasonScoreboardRewindXOf(2)
+    expect(rewound).not.toBeNull()
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-scoreboard-x')).toBe(String(rewound))
+    unmount()
+    expect(onPreviewSceneChange).toHaveBeenLastCalledWith({ skyRow: 0, skyColumn: 0, scoreboardX: rewound })
+  })
+
+  it('전광판 칸 0 · 5 는 되감기가 아무것도 안 해 장면 칸 값 그대로다 · 구장관리는 글자를 안 흘린다', () => {
+    띄우기({ ...레코드(), stadiumEquipped: [0, 0, 0] }, { previewScene: { skyRow: 0, skyColumn: 0, scoreboardX: -40 } })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-scoreboard-x')).toBe('-40')
+    cleanup()
+    띄우기({ ...레코드(), stadiumEquipped: [0, 2, 0] }, { mode: '구장관리', previewScene: { skyRow: 0, skyColumn: 0, scoreboardX: -40 } })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-scoreboard-x')).toBe('-40')
   })
 
   it('⚠️ 원본 버그: 가드가 하나도 없어 **안 산 칸도 그대로 끼워진다**', () => {

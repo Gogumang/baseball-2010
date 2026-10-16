@@ -15,6 +15,8 @@ export type { SeasonTeamMenuScreenProps, TeamMenuItem } from '@/pages/season/ui/
 
 export { StadiumShopScreen } from '@/pages/season/ui/StadiumShopScreen'
 export type { StadiumShopScreenProps } from '@/pages/season/ui/StadiumShopScreen'
+export { INITIAL_STADIUM_PREVIEW_SCENE } from '@/pages/season/lib/stadiumPreviewScene'
+export type { StadiumPreviewScene } from '@/pages/season/lib/stadiumPreviewScene'
 
 export { PlayerRecruitScreen } from '@/pages/season/ui/PlayerRecruitScreen'
 export type {
