@@ -6,7 +6,7 @@ import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 afterEach(cleanup)
 
 const 띄우기 = (onBack = vi.fn()) => render(
-  <OutingMapScreen noticeText="" onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()} onEnter={vi.fn()} />,
+  <OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()} onEnter={vi.fn()} />,
 )
 const 누르기 = (key: string) => act(() => { fireEvent.keyDown(window, { key }) })
 
@@ -27,5 +27,21 @@ describe('나리 외출 지도 키 0x13ba4', () => {
     누르기('Enter')
     expect(screen.getByRole('button', { name: '들어가기' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '입원' })).toBeTruthy()
+  })
+
+  it('막힘 글은 공용 팝업 0xbbef9(글, 1, 1, 1)로 뜨고 113 에 남는다 — 말풍선은 그대로, 키는 팝업이 받는다 (0x16dc6 · 0x7ee1a)', () => {
+    const onRun = vi.fn()
+    const onCloseNotice = vi.fn()
+    const props = { onCloseNotice, onRun, onBack: vi.fn(), eventPlaceIds: new Set<string>(), onEnter: vi.fn() }
+    const { rerender } = render(<OutingMapScreen noticeText="" {...props} />)
+    누르기('Enter')
+    fireEvent.click(screen.getByRole('button', { name: '팬미팅' }))
+    expect(onRun).toHaveBeenCalledTimes(1)
+    rerender(<OutingMapScreen noticeText="인기도가 부족합니다. 필요한 인기도 : 600" {...props} />)
+    expect(screen.getByText(/인기도가 부족합니다/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '들어가기' })).toBeTruthy()
+    누르기('ArrowDown')
+    누르기('Enter')
+    expect(onRun).toHaveBeenCalledTimes(1)
   })
 })

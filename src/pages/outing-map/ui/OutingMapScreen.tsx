@@ -8,7 +8,12 @@ import { MessageBox } from '@/shared/ui'
 import { moveOutingMapCursor, outingMapDirectionOf } from '@/shared/lib/outingMap/outingMapCursor'
 
 interface OutingMapScreenProps {
+  /**
+   * 113 가드 0x16cf0 의 막힘 글(StrMODE[62] · [77] · [196] · [91]) — 원본은 공용 팝업 `0xbbef9(글, 1, 1, 1)`(0x16dc6~0x16dce)로
+   * 띄우고 상태를 113 에 둔다(말풍선이 그대로 남는다). '' 이면 팝업 없음. [확인] 으로 닫으면 `onCloseNotice`.
+   */
   readonly noticeText: string
+  readonly onCloseNotice: () => void
   readonly onRun: (activityId: string) => void
   readonly onBack: () => void
   /** 원작: [!] 장소에서 [들어가기]를 고르면 특별 이벤트가 발생한다 — 이벤트가 기다리는 장소 */
@@ -33,7 +38,7 @@ interface OutingMapScreenProps {
  * [들어가기]/[기능] 두 칸만 띄운다 (0x7ee1a, F-2 2-7) — 전체 화면 목록이 아니다.
  */
 export function OutingMapScreen({
-  noticeText, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult, presentation = null,
+  noticeText, onCloseNotice, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult, presentation = null,
 }: OutingMapScreenProps) {
   const [openPlace, setOpenPlace] = useState<OutingPlace | null>(null)
   const [selectedPlaceId, setSelectedPlaceId] = useState(OUTING_PLACES[0].id)
@@ -47,7 +52,7 @@ export function OutingMapScreen({
    * ```
    * 말풍선(113) · 효과 팝업 · 126 연출이 떠 있으면 그쪽이 키를 받는다. 앞서 웹은 이 키를 안 받아 지도가 마우스로만 움직였다 (r82)
    */
-  const isMapKeyOn = openPlace === null && resultText === null && presentation === null
+  const isMapKeyOn = openPlace === null && resultText === null && presentation === null && noticeText === ''
   const latest = useRef({ selectedPlaceId, onBack })
   latest.current = { selectedPlaceId, onBack }
   useEffect(() => {
@@ -76,25 +81,27 @@ export function OutingMapScreen({
     <OutingMap
       selectedPlaceId={selectedPlaceId}
       eventPlaceIds={eventPlaceIds}
-      noticeText={noticeText}
       onOpen={(place) => {
         setSelectedPlaceId(place.id)
         setOpenPlace(place)
       }}
       onBack={openPlace === null ? onBack : () => setOpenPlace(null)}
     >
-      {openPlace !== null && (
+      {/*
+        말풍선은 0x7ee1a 가 [gfx+0x174] == 0x71(113) 일 때만 그린다 — 기능이 막히면 113 에 남아 팝업 밑에 그대로 있고,
+        통과하면 126(연출 · 효과 팝업)이라 사라진다(0x16dd4~0x16ddc)
+      */}
+      {openPlace !== null && presentation === null && resultText === null && (
         <PlaceBubble
           place={openPlace}
+          isKeyEnabled={noticeText === ''}
           onEnter={() => onEnter(openPlace)}
-          onRun={(activityId) => {
-            onRun(activityId)
-            setOpenPlace(null)
-          }}
+          onRun={onRun}
           onClose={() => setOpenPlace(null)}
         />
       )}
       {presentation}
+      {noticeText !== '' && <MessageBox text={noticeText} buttons={['확인']} onAnswer={onCloseNotice} />}
       {resultText !== null && (
         <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />
       )}

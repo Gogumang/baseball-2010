@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { StadiumShopScreen } from '@/pages/season/ui/StadiumShopScreen'
+import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
@@ -160,6 +161,16 @@ describe('구장관리 교체 (0x7958)', () => {
     cleanup()
     띄우기(레코드())
     expect(screen.queryByTestId('구장-미리보기')).toBeNull()
+  })
+
+  it('하늘 칸은 진입 때의 마지막 경기 상태 +0x6b 다 (0xe558 0x783b0 → 구장 +0x18 · 0xe560 0x76fc5)', () => {
+    setLiveGameInningIndex(9)
+    띄우기(레코드(), { mode: '구장관리' })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-sky-column')).toBe('9')
+    cleanup()
+    resetLiveGameState()
+    띄우기(레코드(), { mode: '구장관리' })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-sky-column')).toBe('0')
   })
 
   it('⚠️ 원본 버그: 가드가 하나도 없어 **안 산 칸도 그대로 끼워진다**', () => {

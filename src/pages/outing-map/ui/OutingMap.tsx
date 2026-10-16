@@ -49,7 +49,6 @@ const NIGHT_TIME_SLOT = 2
 interface OutingMapProps {
   readonly selectedPlaceId: string
   readonly eventPlaceIds: ReadonlySet<string>
-  readonly noticeText: string
   readonly onOpen: (place: OutingPlace) => void
   readonly onBack: () => void
   /** 지도 위에 얹을 것 — 장소 기능 말풍선 (F-2 2-7) */
@@ -62,7 +61,7 @@ interface OutingMapProps {
 }
 
 /** 원작 외출 지도 — event_map 프레임 그대로 (건물·이름·[!]·선택 화살표) */
-export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, onBack, children, hour }: OutingMapProps) {
+export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, children, hour }: OutingMapProps) {
   const origins = useFrameOrigins(MAP_FRAMES)
   const labelOrigins = useFrameOrigins(PLACE_LABEL_FRAMES)
   const animations = useAnimations(MAP_FRAMES)
@@ -126,8 +125,6 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, noticeText, onOpen, 
         웹 [‹ 관리] 단추와 "건물을 누르세요" 안내 글을 걷고, 지도 아래 오른쪽 소프트키 자리(198, 307, 41×12)를 투명 누름 칸으로 빌린다
       */}
       <PressArea label="취소" rect={OUTING_CANCEL_PRESS_RECT} onPress={onBack} />
-      {/* ⚠️ 미확인: 외출 막힘 글(`outingBlockTextOf`)을 원본이 어디에 띄우는지 안 읽었다 — 그 글이 있을 때만 지도 아래 줄에 쓴다 */}
-      {noticeText !== '' && <div className={styles.noticeLine}>{noticeText}</div>}
       {children}
     </RawScreen>
   )

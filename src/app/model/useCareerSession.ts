@@ -2030,6 +2030,9 @@ export function useCareerSession({
       setCareer(outcome.career)
     },
 
+    /** 113 막힘 팝업(0xbbef9(글, 1, 1, 1)) [확인] — 상태는 113(말풍선) 그대로다 */
+    closeOutingNotice: () => setOutingNotice(''),
+
     /**
      * 126 효과 팝업 [확인] — 틀 0x1575c: 입원이면 회복 글 팝업(코드 1)을 띄우고, 어느 쪽이든 **105(관리)** 로 간다.
      * 회복 팝업은 105 위에 남으므로 관리 화면 알림 상자로 띄운다.

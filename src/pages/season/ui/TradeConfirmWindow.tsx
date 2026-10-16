@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { CommonPanel, FrameSprite, PressArea, SolidStamp } from '@/shared/ui'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
-import { measurePixelTextWidth } from '@/shared/lib/font/layout'
+import { LINE_HEIGHT, measurePixelTextWidth } from '@/shared/lib/font/layout'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -128,8 +128,16 @@ function CenteredImgText({ origins, frame, box }: { readonly origins: FrameOrigi
 }
 
 /**
- * 0xba411(박스, 글, 정렬 0x22) — 한 줄 글을 박스 가운데. ⚠️ 근사: 세로는 글 높이 11 을 박스 안 가운데로 둔다(0xba411 의 세로 셈은 안 떴다)
+ * 0xba411(박스, 글, 정렬 0x22) → 0xba2e4 (직접 떴다) — 한 줄 글을 박스 가운데.
+ * 가로(정렬 0x2, 0xba342~0xba352): x += (w − 글폭(0x9c52d)) asr 1.
+ * 세로(정렬 0x20, 0xba368~0xba396): d = h − 글꼴 높이(0x9baf0 = 글꼴 +0x6c = 11) → d > 0 이면 y += ceil(d/2), 아니면 y += d asr 1.
  */
+/** 0xba2e4 의 세로 가운데(정렬 0x20) — 0xba37c~0xba396 */
+function centeredTextDyOf(boxHeight: number): number {
+  const d = boxHeight - LINE_HEIGHT
+  return d > 0 ? (d >> 1) + (d % 2) : d >> 1
+}
+
 function CenteredMarkup({ raw, box, color, testId }: {
   readonly raw: string; readonly box: Box; readonly color: string; readonly testId?: string
 }) {
@@ -137,7 +145,7 @@ function CenteredMarkup({ raw, box, color, testId }: {
   const text = segments.map((segment) => segment.text).join('')
   const width = measurePixelTextWidth(text)
   let x = box.x + ((box.width - width) >> 1)
-  const top = box.y + ((box.height - 11) >> 1)
+  const top = box.y + centeredTextDyOf(box.height)
   return (
     <div data-testid={testId} aria-label={text}>
       {segments.map((segment, index) => {

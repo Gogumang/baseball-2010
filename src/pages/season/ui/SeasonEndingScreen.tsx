@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { MAP_FRAME, MAP_FRAMES } from '@/shared/config/outingPlaces'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import { ENDING_BONUS_GAME_POINTS } from '@/entities/season-mode/model/seasonRewards'
 import {
-  ENDING_BACKDROP_COLOR, ENDING_IRIS, ENDING_IRIS_STAGES, ENDING_MAP, ENDING_SCREEN,
+  ENDING_BACKDROP_COLOR, ENDING_IRIS, ENDING_IRIS_STAGES, ENDING_SCREEN,
   SEASON_ENDING_TEXT, endingIrisRadiusOf, seasonEndingTextIndexOf,
 } from '@/widgets/season/lib/seasonEndingLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
+import { SeasonOutingMap } from '@/pages/season/ui/SeasonOutingMap'
 
 /** 엔딩 보너스 안내 — StrMODE[214] 원문 그대로 (J 4-8) */
 const BONUS_TEXT = '!C엔딩 보너스 획득!N[!cFFFF00%d G포인트!cFFFFFF]'
@@ -60,7 +60,7 @@ type Phase = '엔딩' | '보너스'
  * ⚠️ **안 옮긴 것 — 제작진 `StrENDING[21]`**: P6 4b 는 제작진 흐름을 나리 엔딩 `0x882b4` 에만
  * 적어 두었다. 시즌 엔딩에서도 흐르는지는 문서에 없어 지어내지 않았다
  * (`widgets/season/lib/seasonEndingLayout.ts` 의 `CREDITS_TEXT_INDEX` 주석 참고).
- * ⚠️ **근사**: 지도 그리기 인자 `1` 의 뜻을 몰라 장소 표시·커서 없이 지도 한 장만 깐다.
+ * 지도는 `0x7ea64(gfx, −1, 1)` — 고른 칸 없음 · 이름숨김 1 (0x87a30~0x87a38, `SeasonOutingMap` 머리말).
  *
  * **닿지 않는 갈래** — 그리기 `0x8bd8` 의 8c86~8cc8 은 팝업 0x2c 가 답 0 으로 닫히면 단계 + 1 · 효과기 종류 1 을 건다. 그러나 팝업 번호
  * [app+0x248] 을 적는 0xbbef8(글, 종류, 번호, …)를 부르는 62 곳(re.py xval 0xbbef9)의 번호는 모두 0x2c 가 아닌 상수이거나 −1 이고,
@@ -104,13 +104,8 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
         <rect x={0} y={0} width={ENDING_SCREEN.width} height={ENDING_SCREEN.height} fill={ENDING_BACKDROP_COLOR} />
       </svg>
 
-      {/* 배경 = 외출 지도 한 장 (0x7ea65) */}
-      <img
-        className={styles.sprite}
-        alt=""
-        src={`${MAP_FRAMES}/${String(MAP_FRAME).padStart(3, '0')}.png`}
-        style={{ left: 0, top: ENDING_MAP.top }}
-      />
+      {/* 배경 = 외출 지도 0x7ea64(gfx, −1, 1) — 건물 다섯 보통 · 이름 숨김 · 밤이면 어둡게 */}
+      <SeasonOutingMap selected={-1} hidesNames />
 
       {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다 (S9 8-2). evenodd 라 원 안쪽이 구멍이 된다 */}
       <svg

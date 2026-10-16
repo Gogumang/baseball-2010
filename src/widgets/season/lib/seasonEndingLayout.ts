@@ -19,19 +19,10 @@
 /** 원본 화면 한 장 */
 export const ENDING_SCREEN = { width: 240, height: 320 } as const
 
-/**
- * 배경 = **외출 지도** `0x7ea65(…, 1)`.
- *
- * 지도 그리기 자체는 `pages/outing-map` 안에만 있어 여기서 쓸 수 없다. 대신 지도가 쓰는
- * 그림·원점은 `shared/config/outingPlaces.ts` 의 `MAP_FRAMES` / `MAP_FRAME`(240×297 한 장) 이라
- * 그 한 장을 그대로 깐다.
- *
- * ⚠️ **둘째 인자 `1` 의 뜻은 미확인**이다 (외출 화면 쪽은 `0x7ea64(gfx, 장소, 0)` 로 부른다).
- * 장소 번호 1(번화가)인지 다른 표시인지 문서에 없어 **장소 표시·커서는 하나도 그리지 않고**
- * 지도 한 장만 배경으로 깐다.
- * 지도 세로 위치 11px 은 `pages/outing-map/ui/OutingMapScreen.css.ts` 의 `MAP_TOP` 과 같은 값이다.
+/*
+ * 배경 = **외출 지도** `0x7ea64(gfx, −1, 1)` (0x87a30~0x87a38 직접 떴다) — 둘째 인자는 고른 칸(−1 = 없음), 셋째는 이름숨김.
+ * 그리기는 `pages/season/ui/SeasonOutingMap`(selected −1 · hidesNames)이 맡는다.
  */
-export const ENDING_MAP = { top: 11 } as const
 
 /** 화면을 먼저 검정으로 지운다 (`0x6a735`) */
 export const ENDING_BACKDROP_COLOR = '#000000'

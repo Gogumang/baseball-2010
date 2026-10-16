@@ -6,6 +6,7 @@ import {
   stadiumCollectorUnlocks, stadiumPreviewOf,
 } from '@/entities/season-mode/model/stadiumItems'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { liveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { StadiumPreviewCanvas } from '@/pages/season/ui/StadiumPreviewCanvas'
 import type { StadiumKind, StadiumPurchaseRefusal } from '@/entities/season-mode/model/stadiumItems'
 import { StadiumShopWindow, stadiumItemNameOf } from '@/widgets/season/ui/StadiumShopWindow'
@@ -68,6 +69,8 @@ export function StadiumShopScreen({
   record, mode = '상점', isHiddenOpen = () => false, onChange, onUnlock, onBack,
 }: StadiumShopScreenProps) {
   const [kind, setKind] = useState<StadiumKind>(STADIUM_KINDS[0])
+  /** 구장관리 진입 0xe4d0(0xe558 · 0xe560) 때의 하늘 칸 — 마지막 경기 상태 +0x6b */
+  const [entrySkyColumn] = useState(liveGameInningIndex)
   const [notice, setNotice] = useState<string | null>(null)
   /** 구매 완료 팝업(결과코드 15)이 닫힐 때 0x81d0 이 볼 레코드 — 산 그 판의 것 */
   const [purchased, setPurchased] = useState<SeasonRecord | null>(null)
@@ -133,14 +136,15 @@ export function StadiumShopScreen({
       {/*
         구장관리 0xea 그리기 0xb158 — 아이템 창 0x83378 앞에 구장 미리보기(0x77fe8 · 0x77494 · 0x7725c). 진입 0xe4d0 이 저장값으로
         세우고 키 0x7958 이 지금 종류의 커서 칸으로 그 한 칸만 갈아 끼운다(`stadiumPreviewOf`). 하늘 줄은 0x783b0 모드 2 갈래 —
-        SR+0xb2(경기 수) mod 6. ⚠️ 미해결: 하늘 칸은 [0x1552d0c]+0x6b(마지막 경기 상태의 이닝)라 웹이 안 들어 0 으로 둔다.
+        SR+0xb2(경기 수) mod 6. 하늘 칸은 0x783b0 이 구장 +0x18 = (s8)[0x1552d0c]+0x6b(마지막으로 돈 경기의 0 부터 세는 이닝)
+        로 두고 0x76fc5(구장, 0)(0xe560)가 min(·, 12) 로 자른다 — 진입 때 한 번 읽는다(`liveGameInningIndex`, 자르기는 `skyColorsOf`).
         ⚠️ 근사: 웹은 칸 목록 포커스를 따로 두지 않아(종류는 눌러서 바꾼다) 늘 지금 종류의 커서 칸을 끼워 보인다.
         상점(0xdc 종류 4)의 미리보기(0xb1f8)는 아직 없다.
       */}
       {mode === '구장관리' && (
         <StadiumPreviewCanvas state={{
           skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: record.games }) ?? 0,
-          skyColumn: 0,
+          skyColumn: entrySkyColumn,
           seasonStadium: stadiumPreviewOf(record, { kind, slot }),
         }} />
       )}

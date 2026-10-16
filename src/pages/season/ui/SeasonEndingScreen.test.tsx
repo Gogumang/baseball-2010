@@ -141,6 +141,14 @@ describe('엔딩 보너스 StrMODE[214] — 키 0x6b3c 는 SR+0x7b 만 본다', 
 })
 
 describe('연출', () => {
+  it('배경은 외출 지도 0x7ea64(gfx, −1, 1) — 건물 다섯을 보통으로, 장소 이름은 숨긴다', () => {
+    const { container } = render(<SeasonEndingScreen endingIndex={1} onFinish={vi.fn()} />)
+
+    const map = screen.getByTestId('시즌-외출지도')
+    expect(map.getAttribute('data-selected')).toBe('-1')
+    expect(container.querySelectorAll('img[src*="map_label_"]').length).toBe(0)
+  })
+
   it('원형 전환을 그린다 (0x87a1c 는 나리와 같은 식을 쓴다)', () => {
     render(<SeasonEndingScreen endingIndex={1} onFinish={vi.fn()} />)
 

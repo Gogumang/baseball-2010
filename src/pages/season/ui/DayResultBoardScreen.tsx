@@ -71,10 +71,11 @@ function TeamLogo({ cell, teamId }: { readonly cell: BoardBox; readonly teamId: 
  * 진입 0x953c 는 CPU 트레이드 요청을 굴리고(`tradeRequest.ts`) 배경음 4 를 트는데, 그것은 세션이 맡는다.
  * 키는 확인(−5 · '5')만 받는다 — 취소는 없다.
  *
+ * 로고 0x66431 은 미리 35×34 로 늘려 둔 버퍼를 (칸 + 2) 에 찍는다 — 칸 39×38 의 안쪽과 꼭 같다(`SeasonEndWindow.css` logo 주석).
+ * 머리띠는 공통 틀 0xb810 이 0xf1 에 맡긴 (제목 10 시즌모드, 바닥 1) — 0xb880 → 0xb89e~0xb8a6, 되돌아가기 없음.
+ *
  * ⚠️ **근사**
- *   - 로고 0x66431 이 그리는 크기를 안 읽어 team_logo 를 칸(+2 안쪽)에 줄여 넣는다 (포스트시즌 대진표와 같은 근사).
  *   - 0xba0bd 의 "둥글기 1" 을 1px 모서리 둥글림으로 그린다.
- *   - 머리띠 0x7f4ec 의 바닥 칸은 이 상태용 값을 안 읽었다 — 되돌아가기 없이 그린다.
  *   - ⚠️ 웹 자리: 확인은 원본 화면에 그림 자리가 없다 — 웹 단추를 걷고 화면 전체 투명 누름 칸으로 받는다.
  */
 export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultBoardScreenProps) {
@@ -124,7 +125,7 @@ export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultB
       {/* ⚠️ 웹 자리: 확인(−5) — 화면 전체 투명 누름 칸 */}
       <PressArea label="확인" onPress={onConfirm} />
 
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} slides={false} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={null} footer={1} slides={false} />
     </RawScreen>
   )
 }

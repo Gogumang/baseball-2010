@@ -37,6 +37,8 @@ interface PlaceBubbleProps {
   readonly onEnter: () => void
   readonly onRun: (functionId: string) => void
   readonly onClose: () => void
+  /** 거짓이면 키를 안 받는다 — 막힘 팝업(0xbbef9)이 떠 있는 동안은 팝업이 키를 받는다 */
+  readonly isKeyEnabled?: boolean
 }
 
 function cellsOf(box: MapBox) {
@@ -46,7 +48,7 @@ function cellsOf(box: MapBox) {
   return [first, { ...first, y: first.y + height + CELL_GAP }]
 }
 
-export function PlaceBubble({ place, onEnter, onRun, onClose }: PlaceBubbleProps) {
+export function PlaceBubble({ place, onEnter, onRun, onClose, isKeyEnabled = true }: PlaceBubbleProps) {
   const [selected, setSelected] = useState(0)
   const activity = place.functions[0]
   const labels = ['들어가기', activity?.name ?? '']
@@ -58,6 +60,7 @@ export function PlaceBubble({ place, onEnter, onRun, onClose }: PlaceBubbleProps
   }
 
   useEffect(() => {
+    if (!isKeyEnabled) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       event.stopImmediatePropagation()
       const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0

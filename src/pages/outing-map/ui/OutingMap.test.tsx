@@ -6,7 +6,7 @@ import { OutingMap } from '@/pages/outing-map/ui/OutingMap'
 afterEach(cleanup)
 
 const 띄우기 = (hour: number) => render(
-  <OutingMap selectedPlaceId="hospital" eventPlaceIds={new Set()} noticeText="" onOpen={vi.fn()} onBack={vi.fn()} hour={hour} />,
+  <OutingMap selectedPlaceId="hospital" eventPlaceIds={new Set()} onOpen={vi.fn()} onBack={vi.fn()} hour={hour} />,
 )
 
 describe('외출 지도 밤 (0x7eba2 — 시간대 [gfx+0x1c] == 2)', () => {
