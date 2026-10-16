@@ -605,3 +605,118 @@ d 는 인자다. 호출지:
 - **흐르는 글 [skin+0x284]**: 한 그림에 0x5a8c8 이 k 번 돌면 3k 오른다(선수 정보 창 0x5b798).
 - **로고 프레임 1 사각형**: 프레임 vtable +0x1c = 0x948cc → (x + [+0xe], y + [+0x10], [+0x12], [+0x14]), 크기는 0x94754 의 조각 합집합.
 - **자간 2 글꼴**: 0x679d4(로고 객체 가상 함수)가 객체 +0x88 에 만든다(0x9c9d0) — 공용 글 0xba269 는 늘 [[0x1400070]+0x3c] 앱 글꼴.
+
+## 0xba269 폭 전수 (r122, 2026-10-16)
+
+리터럴 0xba269 를 읽는 ldr 92곳 + 같은 레지스터를 다시 부르는 호출 9곳(2edcc · 2f2ba · 3832 · 4ac6c · 5d4e8 · 5d51c · 6472c · 659ac · 7a542).
+폭 −1 은 0x6ef4c 6efb0 `[sp+0x74] + 1 == 0` 일 때만 → 0x9c52c 날 글 폭(서식 글자 포함 · 0x0a 줄 중 최댓값). `!C` = x + (폭>>1) 가운데(6f12c), `!R` = x + 폭 − 1 오른쪽(6f134).
+
+### 폭 −1 호출 (14곳)
+| 호출 | 함수 · 화면 | 글 | 웹 |
+|---|---|---|---|
+| f390 · 194a6 | 0xf334 · 0x19448 기록 고르기 팝업 제목 | StrMODE[74] "!C…" | r118 measuredTitleCenterXOf — 같음 |
+| 19156 | 0x190f8 구질 고르기 팝업 | StrMODE[0x3b] "!C…" | 같음 |
+| 2f816 | 0x2e4e0 기록연감 탭 3 닉네임 (W/2 − 0x32 = 70) | 이름 (서식 없음) | 왼쪽 70 — 같음 |
+| 4e344 | 0x4e304 기록 달성 알림 줄 | "!cffff00%s" | 왼쪽 — 같음 |
+| 544ee · 54516 | 0x54330 등급표 | 표 글 | 왼쪽 — 같음 |
+| 555f6 | 0x55544 설명 띠 | StrMAINMENU 설명(!C 없음) | 왼쪽 — 같음 |
+| 596c2 · 59fb6 | 0x593c8 환경설정 줄 이름 | "!cffffff%s" | 왼쪽 — 같음 |
+| 5a94c | 0x5a8c8 흐르는 글 | 부르는 쪽 글 | 그리기 같음 · **글폭(0x5a91a 0x9c52c)이 날 글 폭** → r122 기록연감 · 정산 고침 |
+| 646cc · 6472c | 0x63b14 선공/구장 값 | "!C!cffffff%s" (W/2+46+8, H/2+0x3e) · "!C!cffffff%d석" (W/2+46−1, H/2+0x52) | **다름 → r122 고침** |
+| 8a174 | 0x8a0a4 상세 창 글 줄 | 메시지(!C 없음) | 왼쪽 — 같음 |
+
+폭 자리에 색(RGB) 이 들어간 호출: 4ac28(정산 기록 이름) · 7a9a2(기록연감 탭 0 이름) — 둘 다 !C 없음.
+⚠️ 흐르는 글 중 시즌 구장 줄(0x7ca7e) · 선수 정보 창(0x5b798) 의 날 글 서식 여부는 안 봤다.
+
+### 폭 ≠ −1 호출 대조표 (조사 보조 에이전트, r122 트리 기준 — r120 · r121 머지 전)
+# 0xba269 폭 ≠ −1 호출 대조표 (웹 = baseball-2010-wt/r122/src)
+
+- 원본 값은 직접 디스어셈해서 읽었다. W = 240, H = 320. x0/y0 같은 기준값은 그 함수 안에서 정의된 곳까지 따라갔다.
+- 웹 경로는 `src/` 기준이다. 판정 칸 값: 같음 / 다름 / 웹에 없음 / ⚠️ 미확인.
+- 정렬 표기: C = 글이 '!C' 로 시작, R = '!R', L = 둘 다 없음.
+- **646cc · 6472c 는 제외했다**: widths.txt 에는 "adds r3, r5" 로 적혀 있지만, 이때 r5 = −1(0x6468e `movs r5,#1; rsbs r5,r5,#0`, 그 뒤로 r5 를 다시 쓰지 않는다)이라 실제 폭은 −1 이다.
+- main 트리(`baseball-2010/src`)도 '다름' 항목을 같이 확인했다. r122 와 다른 것은 53f2c 하나뿐이다(main 은 이미 고쳐져 있다).
+
+| 호출 | 원본 함수 · 화면 | 글 | x | y | 폭 | 정렬 | 웹 파일:줄 | 판정 |
+|---|---|---|---|---|---|---|---|---|
+| 37f6 | 0x37ac 오류 화면 | "!CError code :: %d"(0xcbb70) | 0 | 0x14 | W | C | — | 웹에 없음 |
+| 3832 (extra) | 0x37ac | 버퍼 0x15528d0 | 10 | 0x32 | W−0x14 | 동적 | — | 웹에 없음 |
+| 1b0fe | 0x1afe8 칭호 팝업 | "!C"+조건 | (W−180)/2 | H/2−15 | 180 | C | widgets/title-window/lib/titleWindow.ts:33-35 · ui/TitleWindow.tsx:84 | 같음 |
+| 1b18c | 0x1afe8 | "!C\""+이름+"\"" | (W−180)/2 | H/2+12 | 180 | C | titleWindow.ts:36 · TitleWindow.tsx:87 | 같음 |
+| 1e2a6 | 0x1df08 미션 선택(칸 14, 내려받은 미션 없음) | "!C이벤트 미션"(0xcd740), 색 #335FCD | W/2−0x60=24 | y0+7=58 | 0xc0 | C | pages/mission-select/ui/MissionSelectScreen.tsx:197-199 | 다름(글): 자리는 같은데 웹은 칸 14 에서 빈 글(`selected` undefined) |
+| 1e302 | 0x1df08 칸 14 | StrMAINMENU[57] | W/2−0x4b=45 | y0+0x92=197 | 0x96 | L | MissionSelectScreen.tsx:247-249 | 자리는 같음 · 웹 글은 원문 첫 줄만(NO_MISSION_TEXT) |
+| 1e34c | 0x1df08 칸 14 보상 | "!C%dG"(0) | W/2−(w₁>>1)+0x24 = **72** | y0+0xbe=241 | 0x2e | C | MissionSelectScreen.tsx:258-259 | **다름**: 웹 x = labelX+36 = 70 |
+| 1e390 | 0x1df08 칸 14 성공 | "!C%d회"(0) | W/2−(w₁>>1)+0x72 = **150** | 241 | 0x2e | C | MissionSelectScreen.tsx:264-265 | **다름**: 웹 x = 148 |
+| 1e3ea | 0x1df08 칸 14(내려받은 미션) | "!C%s" | 24 | 58 | 0xc0 | C | — | 웹에 없음(웹에는 미션 내려받기가 없다) |
+| 1e42c | 같음 | "%s" 설명 | 45 | 197 | 0x96 | L | — | 웹에 없음 |
+| 1e482 | 같음 | "!C%dG" | 72 | 241 | 0x2e | C | — | 웹에 없음 |
+| 1e4de | 같음 | "!C%d회" | 150 | 241 | 0x2e | C | — | 웹에 없음 |
+| 1e5e4 | 0x1df08 보통 칸 | "!C%s" 미션 이름 | 24 | 58 | 0xc0 | C | MissionSelectScreen.tsx:197 · missionSelectLayout.ts:19 | 같음 |
+| 1e624 | 0x1df08 보통 칸 | "%s" 설명 | 45 | 197 | 0x96 | L | MissionSelectScreen.tsx:247 · missionSelectLayout.ts:63 | 같음 |
+| 1e672 | 0x1df08 보통 칸 | "!C%dG" | **72** | 241 | 46 | C | MissionSelectScreen.tsx:258-259 | **다름**: 웹 70 |
+| 1e6ca | 0x1df08 보통 칸 | "!C%d회" | **150** | 241 | 46 | C | MissionSelectScreen.tsx:264-265 | **다름**: 웹 148 |
+| 26bc6 | 0x268d0 메인 메뉴 상태 15 대전(통신) | "!C!cffffff%s"/"!C!c7B93D4%s" | [sp+0x20]+0x32 | [sp+0x1c]+0x28 | slt_frame 프레임 0x24 의 폭 | C | — | 웹에 없음(대전 🌐 — skinTicker.ts:17) |
+| 26eb6 | 0x26d3c 상태 15 | [0x1400060]+0x26a 칸 글 | W/2−0x54 | [sp+0x1c]−0x44 | 0xa0 | 동적 | — | 웹에 없음 |
+| 2cb32 | 0x2cabc 이용안내 | 0xce904 "!C …<이용안내>…" | 20 | H/2−0x50=80 | W−0x28=200 | C | pages/title/ui/UsageNoticeScreen.tsx:16,19,20 | 같음 |
+| 2cb7c | 0x2cabc | 0xce8e4 "!C …아무키나 누르세요!!" | 20 | H−0x28=280 | 200 | C | UsageNoticeScreen.tsx:17 | 같음 |
+| 2edaa | 0x2e4e0 기록연감 탭 1 엔딩 칸(검정 그림자) | "!C%s" StrMAINMENU[189+i] | 칸 x | 칸 y+7 | 프레임 18 폭 = 41 | C | pages/record/ui/RecordAnnals.tsx:441 | 같음 |
+| 2edcc (extra) | 같음(흰 글) | 같음 | 칸 x−1 | 칸 y+6 | 41 | C | RecordAnnals.tsx:444 | 같음 |
+| 2ef58 | 탭 1 진행도 값 | "!C!cffffff%d%%"(0xcf940) | x0−67+0xb8 | [sp+0x58](줄 y) | 프레임 14 폭 = 67 | C | RecordAnnals.tsx:365 · recordAnnalsLayout.ts:166 | 같음 |
+| 2f298 | 탭 2 스킬 칸(그림자) | "!C%s"([0x1552cf8] 표 i+0x37) | 칸 x | 칸 y+7 | 프레임 18 폭 = 41 | C | RecordAnnals.tsx:441 | 같음 |
+| 2f2ba (extra) | 같음(흰 글) | 같음 | 칸 x−1 | 칸 y+6 | 41 | C | RecordAnnals.tsx:444 | 같음 |
+| 2fb90 | 탭 4 통계 아래 합계 | "!R!cFFFF00…"(0x588d1 · 0x58801) | x0−101+0xbb = **110** | y0−18+0xd2 = **246** | 101−10 = **91** | R | RecordAnnals.tsx:698-699 | **다름**: 웹은 x 105 · y 243 · 폭 101 (오른쪽 끝 원본 201 → 웹 206) |
+| 2feb2 | 0x2fccc 랭킹 표(상태 37) | StrMAINMENU[100] "!C…" | W/2−0x54 | [sp+0x3c]−0x3c | 0xa0 | C | — | 웹에 없음(랭킹 서버 🌐 — main-menu/model/mainMenu.ts:18) |
+| 32bf8 | 0x32b7c 이름·아이디 입력 창 | StrMAINMENU[109]/[108] "!C…" | W/2−0x64=20 | 0x82 | 0xc8 | C | pages/special-edit/ui/SpecialEditScreen.tsx:269,346 | 같음(웹은 [108] 만 쓴다) |
+| 36560 | 0x36358 미션 HUD 목표 글 | "!C%s"(0xcd760) | x0+(w−0x4b)/2−[+0x17fc] | 0x19 | 0x4b | C | pages/mission-play/lib/missionHudLayout.ts:256 · ui/MissionHud.tsx:128 | 같음 |
+| 4224e | 0x420dc "PITCHER" 판 | "!R!cffffff%s"(0xd0714) | x+0x15 | y+0xf | 0x34 | R | widgets/game-scene/lib/halfInningCardsLayout.ts:142 · ui/HalfInningCards.tsx:45 | 같음 |
+| 4252e | 0x42364 "DUE UP" 판 | "!R!cffffff%s" | x+0x15 | yᵢ+0x10−1 | 0x34 | R | halfInningCardsLayout.ts:197 | 같음 |
+| 429aa | 0x4258c 자동진행 중계 띠 | "!cffff00공격팀(%s)"(0xd0730) | W/2−w/2+5 | 높이+0x13 | 띠 폭 | L | pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx:49,201 | 같음(웹은 폭을 안 주지만 왼쪽 정렬·nowrap 이라 결과가 같다) |
+| 42aae | 0x4258c 중계 글 칸 | "!C!cffff00%s"(0xd0744) | 칸 x | 칸 y+4 | 0x7c | C | AutoPlayRelayScreen.tsx:62-66,213 | 같음 |
+| 46268 | 0x45c18 홈런더비 결과 | StrMAINMENU[53] "!C…재도전" | [sp+0x68]=W/2−81 | [sp+0x64]+0x39=H/2+61 | 0xa2 | C | pages/home-run-derby/lib/derbyResultLayout.ts:102 | 같음 |
+| 4a804 | 0x4a384 미션 결과 판 | StrMAINMENU[53] | W/2−0x51 | H/2+0x17 | 0xa2 | C | pages/mission-play/lib/missionResultBoard.ts:78 | 같음 |
+| 4ac28 | 0x4a384 정산 기록 판 줄 이름 | StrGAME[k+8] | W/2−0x51+0xf | r7+16k+0x16 | **RGB(255,255,255) 값**(폭 자리에 색) | L | pages/team-game/ui/SettlementBoard.tsx:190 · lib/settlementBoard.ts:179 | 같음(웹은 폭을 안 준다 · 왼쪽 정렬) |
+| 4ac6c (extra) | 같음 · 횟수 | "!R%d회"(0xd0970) | W/2−0x51+0x14 | 같음 | 0x7a | R | SettlementBoard.tsx:193-194 · settlementBoard.ts:180-181 | 같음 |
+| 4ad14 | 같음 · 기록 없음 | "!C기록이 없습니다!"(0xd0978) | W/2−0x51 | r7+0x28 | 0xa2 | C | SettlementBoard.tsx:216-217 · settlementBoard.ts:182 | 같음 |
+| 502c4 | 0x4fe9c 경기 끝 판 승리투수 | "!C!cffffff%s"(0xcf2e0) | W/2 | 줄 위+2 | w₅d(54) | C | widgets/game-scene/lib/endBoardLayout.ts:117 · ui/EndBoardRows.tsx:52 | 같음 |
+| 50326 | 같음 · 패전 | 같음 | W/2 | y+h+3(=줄 1 위+2) | 54 | C | 같음 | 같음 |
+| 50396 | 같음 · 세이브 | 같음 | W/2 | y+2h+4(=줄 2 위+2) | 54 | C | 같음 | 같음 |
+| 53f2c | 0x53e04 로딩 판 TIP | StrTIP | (W−170)/2+0xa = 45 | (H−147)/2+0x1e = **116** | 170−0x14 = 150 | 글 따라 | widgets/loading-tip/ui/LoadingTip.css.ts:19-20,34-37 | **다름(r122)**: 웹 top = 86.5+19 = 105.5 (main 은 이미 `LOADING_TIP_TEXT {0xa, 0x1e, w−0x14}` 로 고쳐져 있다) |
+| 59896 | 0x593c8 환경설정 메뉴 줄 이름 | "!C!cffffff%s"/"!C!c7B93D4%s" | x0+0x20 = x0+32 | Y+0x29 = **Y+41** | 프레임 37 폭 = 142 | C | pages/settings/lib/settingsLayout.ts:59 · ui/SettingsScreen.tsx:404 | **다름**: 웹 dy 42 (막대도 원본 Y+0x25=37 인데 웹 MENU_ROW.bar.dy 38) |
+| 59ae8 | 0x593c8 소리 0 "OFF" | "!C!c7B93D4%s" StrMAINMENU[0x4e] | x0+0x62 | Y+0x29 | 프레임 35 폭 = 77 | C | SettingsScreen.tsx:372 | 같음 |
+| 59d0c | 0x593c8 진동 OFF | "!C…%s" | x0+0x61 | Y+0x29 | 0x26 | C | settingsLayout.ts:140 · SettingsScreen.tsx:386 | 같음 |
+| 59d6c | 0x593c8 진동 ON | 같음 | x0+0x88 | Y+0x29 | 0x26 | C | settingsLayout.ts:141 · SettingsScreen.tsx:393 | 같음 |
+| 5a170 | 0x593c8 상세 설정 값 칸 | "!C…%s" | x0+98+39j | Y+0x29 | 0x27 | C | settingsLayout.ts:248-251 | 같음 |
+| 5a480 | 0x593c8 모드 초기화 줄 | "!C!cffffff%s"/"!C!c7B93D4%s" | x0+0x32 | Y+0x28 | 프레임 36 폭 = 114 | C | settingsLayout.ts:284 | 같음 |
+| 5a682 | 0x593c8 다른 하위 페이지(제목 img_text 0x92 · 프레임 36 줄) | "!C…%s" | x0+0x32 | Y+0x28 | 프레임 폭 | C | — | 웹에 없음(유력: 게임 데이터 관리 🌐 — SettingsScreen.tsx:107) ⚠️ 페이지가 무엇인지는 확정하지 못했다 |
+| 5d4b0 | 0x5d054 스페셜 통신 화면(G 충전 · 선물 등) | 표[0x2b] | W/2−0x54 | [sp+0x28]+0x24 | 0xa0 | 동적 | — | 웹에 없음(🌐 — special/ui/SpecialScreen.tsx:118) |
+| 5d4e8 (extra) | 같음 | 표 [sp+0xe0][i] | [r4]−0x52 | [sp+0x28]+0x93 | 0xa4 | 동적 | — | 웹에 없음 |
+| 5d51c (extra) | 같음 | 표 [sp+0x88][i] | 같음 | [sp+0x28]+0xb9 | 0xa4 | 동적 | — | 웹에 없음 |
+| 5d7a8 | 같음 | 표[0x2c] | W/2−0x54 | [sp+0x28]+0x24 | 0xa0 | 동적 | — | 웹에 없음 |
+| 5d802 | 같음 | — | W/2−0x52 | [sp+0x28]+0x93 | 0xa4 | 동적 | — | 웹에 없음 |
+| 5da14 | 같음 | — | W/2−0x54 | [sp+0x28]+0x24 | 0xa0 | 동적 | — | 웹에 없음 |
+| 5dae4 | 같음 | StrMAINMENU[94] "!C…선물 받은…" | [sp+0x2c]+0xa | [sp+0x28]+0x3c | 0x98 | C | — | 웹에 없음 |
+| 5f8de | 0x5f394 마선수 레벨업 비용 | sprintf(StrCOMMON[0x31], …) | W/2−0x52 | H/2+0x24 | 0xa4 | 글 따라 | widgets/ace-level-up/lib/aceLevelUpLayout.ts:125 · ui/AceLevelUpWindow.tsx:174 | 같음 |
+| 60e0a | 0x6042c 경기진행 설정 설명 | 표 글 | W/2−0x60 | H/2+0x2a | 0xc0 | L | pages/match-settings/lib/matchSettingsLayout.ts:22 | 같음 |
+| 61b62 | 0x6042c 상세 설명 | StrMAINMENU[121+줄] | W/2−0x56 | H/2+0x2e | 0xac | L | matchSettingsLayout.ts:38 | 같음 |
+| 633bc | 0x63368 목록 안 입력 창 | 표[0x6e] = StrMAINMENU[110] "!C…상대 전화번호…" | W/2−0x64 | 0x82 | 0xc8 | C | — | 웹에 없음(P3 노트: 0x62972 입력 창은 웹에 없음) |
+| 63fbc | 0x63b14 목록(팀 고르기) 잠긴 팀 이름 | "!C!cFFFFFF???"(0xd2478) | A.x−(82>>1) | A.y+0x2a | 82 | C | pages/create-player/ui/TeamSelectScreen.tsx:189-191 | 같음 |
+| 64b6a | 0x63b14 마선수 이름 막대 | "!C!cFFFFFF%s !cFFFF00LV.%d" / "???" | A.x−41 | A.y+0x2a | 82 | C | pages/general-mode/ui/AceSelectScreen.tsx:355-358 · lib/prepareLayout.ts:34 | 같음 |
+| 6567c | 0x6517c 슬롯 이름 막대 | "!C!cFFFFFF%s"(0xd24b4) | A.x−41 | A.y+0x2a | 82 | C | pages/special/ui/SpecialScreen.tsx:783-787 | 같음 |
+| 6599a | 0x6517c 명예의 전당 말풍선 칸 1 | "!C!cffffff친구에게 선물"(0xd24c4) | x+3 | gy−3(칸 위+2) | 0x46 | C | SpecialScreen.tsx:913-921 | 다름(경미): 웹은 글을 칸 위(gy−5)에 두고 줄높이 14 로 세로 가운데에 놓는다(≈ 칸 위+1.5) |
+| 659ac (extra) | 같음 · 칸 2 | "!C!cffffff슬롯에서 삭제"(0xd24dc) | x+3 | gy+0xd(칸 위+2) | 0x46 | C | 같음 | 다름(경미): 같은 이유 |
+| 72460 | 0x72390 접속 중 판 | "접속중입니다. …"(0xd35d4) | x+0xa | y+0x1e | w−0x14 | L | — | 웹에 없음 |
+| 746ae | 0x74664 공용 메시지 상자 글 | 상자+0xa | W/2−0x4b = 45 | [+0x20c]+0x14+[+0x244] | 0x96 | 글 따라 | shared/ui/MessageBox/MessageBox.tsx:80 | 같음 |
+| 74c7a | 0x74c4c 글 단추 위젯(vtable 0xd3644, 0x74ef4 가 짓는다) | 객체+0x16 | [+4] | [+8] | [+0xc] | 글 따라 | — | ⚠️ 미확인: 웹 MessageBox 는 단추를 popup 그림으로 그린다. 이 글 단추 갈래(0x753b8)가 어떤 상자에서 쓰이는지 확인하지 못했다 |
+| 7a0fc | 0x7a08c 탭 0 달성 횟수 | "!R!cffff00%d"(0xd4140) | 칸 x+3 = **36** | 칸 y+3 | 174−10 = **164** | R | pages/record/ui/RecordAnnals.tsx:623-625 | **다름**: 웹 x 35 · 폭 166 (LIST_GRID.x 32 · width 176 에서 셈) → 오른쪽 끝 200 → 201 |
+| 7a1f8 · 7a2b2 · 7a306 · 7a366 · 7a3ba · 7a418 · 7a4b6 · 7a502 | 0x7a08c 탭 4 통계 값(8갈래) | "!R!cffff00…"(%04d:%02d:%02d · %d회 · %d개 · %dG …) | 칸 x−2 = **31** | 칸 y+2 = **91+18r** | 174−4 = **170** | R | RecordAnnals.tsx:668 | **다름**: 웹 (32, 89+18r, 176) → 오른쪽 끝 201 → 208 · y −2 |
+| 7a542 (extra) | 0x7a08c 탭 4 통계 이름 | "!cffffff%s"(0xd09a8) 표[n+0xaf] | 칸 x+3 = **36** | 칸 y+3 = **92+18r** | 164 | L | RecordAnnals.tsx:664 | **다름**: 웹 (32, 89+18r, 176) |
+| 7a9a2 | 0x7a690 탭 0 칸 이름(종류 0·1) | "%s" StrGAME[8+n] | 칸 x+5 = **38** | 칸 y+2 = **92+18r** | **RGB(255,255,255) 값**(폭 자리에 색) | L | RecordAnnals.tsx:600-601 | **다름**: 웹 (32, 90+18r, 176) |
+| 871c4 | 0x87108 스킬 보상 창 | 0x1552af4 | 0 | H/2−5 | W | 글 따라 | pages/story/ui/RewardSkillWindow.tsx:34,86 | 같음 |
+| 87c2e | 0x87a1c 시즌 엔딩 | StrENDING[15+결과] | 0 | H/2+0x37 | W | 글 따라 | widgets/season/lib/seasonEndingLayout.ts:81-83 | 같음 |
+| 88a90 | 0x882b4 나리 엔딩 e 0·1 | StrENDING[e] | 0 | 칸 위+칸 높이/2 = 263 | W | 글 따라 | pages/ending/lib/endingLayout.ts:160-166 | 같음 |
+| 88b4e | 0x882b4 e 2~9 올라오는 글 | "!C"+[20]+… | 0 | H−n | W | C | endingLayout.ts:268-272 | 같음 |
+| 88f76 | 0x88bb4 제작진 | "!C"+…+[21] | 0 | H−n/2 | W | C | endingLayout.ts:281-282 | 같음 |
+| 8e962 | 0x8e858 타석 HUD 돌발 띠(0x4c4bc) | 표[0x14002dc][목표] | 띠 x+3 | 0x18 | 띠 폭−6 | 동적 | — | 웹에 없음(skillPanel.ts:478 에 이름만 있다) |
+| 8e9ce | 같음 · 보상 글 | 표[0x14002c8]+… | 띠 x+3 | 0x28 | 띠 폭 | 동적 | — | 웹에 없음 |
+| 8eadc | 0x8ea18 돌발 대사 줄 | "!cFFFFFF[" 화자 "] : " … | 5 | H−[obj+0x220]+3 | W−0x19 = 215 | L | widgets/burst-mission/lib/burstMissionWindowLayout.ts:80-84 | **다름**: 웹은 근사 BURST_TEXT (22, 226, 196) — 원본 좌표를 아직 안 옮겼다 |
+| (제외) 646cc · 6472c | 0x63b14 | — | — | — | 실제 −1 | — | — | 범위 밖(폭 −1) |
