@@ -873,7 +873,7 @@ describe('훈련·휴식 결과 창 — 변화량은 굴린 값 그대로, 필�
   })
 })
 
-describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 재생하고 같은 타석을 잇는다', () => {
+describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 돌리고 같은 타석을 잇는다', () => {
   const 볼: PitchOutcomeDetail = {
     resolution: { kind: '볼' },
     hasSwung: false,
@@ -882,7 +882,7 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
     contactSoundId: null,
   }
 
-  it('주자 있는 루면 견제 판이 재생 칸에 들고 볼카운트·투구 수는 그대로다 — 빈 루면 아무 일도 없다', () => {
+  it('주자 있는 루면 견제 판을 붙들어 실시간으로 돌리고 볼카운트·투구 수는 그대로다 — 빈 루면 아무 일도 없다', () => {
     const saveGame = 메모리저장(createCareer('견제'))
     // 씨앗 1 — 볼넷으로 주자가 서는 판. 장면 덱 섞기(경기 시작 0x3e340)가 끼며 20100901 은 볼넷 타석 앞에 이닝이 바뀌는 판이 됐다
     const random = createSeededRandom(1)
@@ -917,12 +917,36 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
       act(() => rendered.result.current.session.handlePitchResolved(볼))
       const counted = rendered.result.current.session.progress!
       act(() => rendered.result.current.session.actions.cpuPickoff(occupied!))
+      // 견제 판은 붙들어 수비 화면이 사람 주루 키(0x5331c)를 받으며 실시간으로 돌린다 — 그동안 경기 상태 · 다음 공은 그대로
+      const held = rendered.result.current.session.progress!
+      expect(held.pendingRunnerPlay?.kind).toBe('pickoff')
+      expect(held.pendingRunnerPlay?.side).toBe('공격')
+      expect(held.game).toBe(counted.game)
+      expect(rendered.result.current.runner.isPaused).toBe(true)
+      // 화면이 결과를 못 넘기면 키 없이 끝까지 돌려 푼다
+      act(() => rendered.result.current.session.actions.finishRunnerPlay())
       const after = rendered.result.current.session.progress!
-      expect(after.lastDefensePlay).not.toBeNull()
-      expect(after.lastDefensePlay).not.toBe(counted.lastDefensePlay)
+      expect(after.pendingRunnerPlay ?? null).toBeNull()
+      // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+      expect(after.lastDefensePlay).toBe(counted.lastDefensePlay)
       expect(after.opponentMound.pitches).toBe(counted.opponentMound.pitches)
       if (after.game.half === counted.game.half && !after.game.isFinished) {
         expect(rendered.result.current.runner.atBat.balls).toBe(1)
+        expect(rendered.result.current.runner.isPaused).toBe(false)
+        // 도루 판(종류 5)도 붙든다 — 공 도착 0x3dfac 뒤 판이 끝나야(`finishRunnerPlay`) 그 공의 나머지가 돈다
+        const { bases: 지금 } = after.game
+        const 도루루 = 지금.first && !지금.second ? 1 : 지금.second && !지금.third ? 2 : null
+        expect(도루루).not.toBeNull()
+        if (도루루 !== null) {
+          act(() => rendered.result.current.session.actions.stealBase(도루루))
+          act(() => rendered.result.current.session.handlePitchResolved(볼))
+          const 붙듦 = rendered.result.current.session.progress!
+          expect(붙듦.pendingRunnerPlay?.kind).toBe('arrival')
+          expect(rendered.result.current.runner.isPaused).toBe(true)
+          act(() => rendered.result.current.session.actions.finishRunnerPlay())
+          expect(rendered.result.current.session.progress!.pendingRunnerPlay ?? null).toBeNull()
+          expect(rendered.result.current.session.progress!.lastDefensePlay).toBe(붙듦.lastDefensePlay)
+        }
       }
     } finally {
       act(() => rendered.unmount())

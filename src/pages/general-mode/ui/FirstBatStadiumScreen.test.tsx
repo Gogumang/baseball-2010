@@ -103,18 +103,22 @@ describe('단계 1 — 구장 고르기', () => {
     expect(onChooseStadium).toHaveBeenCalledWith(7)
   })
 
-  it('구장 표를 받으면 연고지·좌석 두 줄을 채운다', () => {
-    구장단계({ stadiumId: 1, stadiums: [{ city: '서울', capacity: 30000 }, { city: '인천', capacity: 25000 }] })
+  it('연고지·좌석 두 줄은 원본 표 0xd1e0c · 0xd1e34 를 쓴다', () => {
+    구장단계({ stadiumId: 1 })
+    expect(screen.getByTestId('구장-연고지').textContent).toBe('서울')
+    expect(screen.getByTestId('구장-좌석').textContent).toBe('30000석')
 
-    expect(screen.getByTestId('구장-연고지').textContent).toBe('인천')
-    expect(screen.getByTestId('구장-좌석').textContent).toBe('25000석')
+    cleanup()
+    구장단계({ stadiumId: 9 })
+    expect(screen.getByTestId('구장-연고지').textContent).toBe('독도')
+    expect(screen.getByTestId('구장-좌석').textContent).toBe('15000석')
   })
 
-  it('⚠️ 구장 표가 없으면 두 줄을 비워 둔다 — 도시명 0xd1df8·좌석 0xd1e34 가 웹판에 없다', () => {
-    구장단계()
+  it('⚠️ 원본 그대로 — 히든 번호(12)는 좌석 줄이 스택 옆 연고지 포인터 값(0xd2440)을 찍는다', () => {
+    구장단계({ stadiumId: 12 })
 
     expect(screen.getByTestId('구장-연고지').textContent).toBe('')
-    expect(screen.getByTestId('구장-좌석').textContent).toBe('')
+    expect(screen.getByTestId('구장-좌석').textContent).toBe('861248석')
   })
 })
 

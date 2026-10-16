@@ -15,6 +15,7 @@ import type { ItemGridWindowKind, ShopBox } from '@/pages/shop/lib/shopLayout'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/pages/shop/ui/ShopWindow.css'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const MODE_UI = './sprites/mode_ui/frames'
@@ -81,8 +82,8 @@ export function ShopWindow({
         style={{
           // 효과 0xb 는 인자 색의 아래 16비트(565)를 찍는다 — `solidColorCss`
           left, top, width: size.width, height: size.height, background: solidColorCss(color),
-          maskImage: `url(${spriteSrc(IMG_TEXT, frame)})`,
-          WebkitMaskImage: `url(${spriteSrc(IMG_TEXT, frame)})`,
+          maskImage: spriteMaskImage(spriteSrc(IMG_TEXT, frame)),
+          WebkitMaskImage: spriteMaskImage(spriteSrc(IMG_TEXT, frame)),
         }}
       />
     )

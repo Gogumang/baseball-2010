@@ -79,7 +79,7 @@ export interface ViewStateInput {
   // ── 아래 셋은 **그림에만 쓰인다**. 안 주면 지금까지와 똑같이 논다. ──
   // (필살 포구 번쩍임은 여기서 안 고른다 — 진행기의 `defenseScene` 이 연출 단계대로 싣는다)
 
-  /** 수비 칸별 마선수 번호 0~4 (없으면 null·undefined). 이름 표 0xd3f10, 20바이트 간격 — C-16 */
+  /** 수비 칸별 마선수 번호 0~4 (없으면 null·undefined). 이름 표 0xd3f0c("ace/defender_medica"), 20바이트 간격 — 읽는 함수 0x79a5c · 0x79cbc */
   readonly aceIndexes?: readonly (number | null | undefined)[]
   /**
    * 레이저 송구 반짝임(경기+0x19ad)을 띄울 야수 칸. 안 주면 아무도 안 반짝인다.

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 interface SolidStampProps {
   readonly folder: string
@@ -22,7 +23,7 @@ export function SolidStamp({ folder, frame, origins, x, y, color }: SolidStampPr
   const key = String(frame).padStart(3, '0')
   const origin = origins?.[key]
   if (origin === undefined) return null
-  const mask = `url(${folder}/${key}.png)`
+  const mask = spriteMaskImage(`${folder}/${key}.png`)
   const style: CSSProperties = {
     position: 'absolute', left: x + origin.x, top: y + origin.y, width: origin.width, height: origin.height,
     background: solidColorCss(color), maskImage: mask, WebkitMaskImage: mask, maskSize: '100% 100%', WebkitMaskSize: '100% 100%',

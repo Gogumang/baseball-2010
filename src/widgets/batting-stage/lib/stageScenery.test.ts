@@ -6,6 +6,7 @@ import {
   PITCHER_RELEASE_TICKS,
   cloudPaletteRowOf,
   cloudScrollAt,
+  LOADING_CLOUD_CALLS,
   isCloudVisible,
   isSkyLightModeShown,
   skyLightFrameAt,
@@ -49,6 +50,19 @@ describe('구름 — 0x78448', () => {
     expect([0, 2, 3, 6].map((tick) => cloudScrollAt(0, tick))).toEqual([0, 0, -1, -2])
     expect(cloudScrollAt(2, 3)).toBe(-3)
     expect(cloudScrollAt(2, 3 * 161)).toBe(-483 + CLOUD_WRAP_WIDTH)
+  })
+
+  it('−480 은 "미만" 이 아니라 그대로 남고, 한 번 돈 뒤로는 0 대신 −480 에 선다 (7846c bge)', () => {
+    expect(cloudScrollAt(0, 3 * 480)).toBe(-480)
+    expect(cloudScrollAt(0, 3 * 481)).toBe(-1)
+    expect(cloudScrollAt(1, 3 * 240)).toBe(-480)
+    expect(cloudScrollAt(1, 3 * 241)).toBe(-2)
+  })
+
+  it('로딩 판은 상태 9 가 0 으로 둔 뒤 상태 8 두 그림에서 센다 — 다음 첫 그림이 세 번째 부름(한 칸)', () => {
+    expect(LOADING_CLOUD_CALLS).toBe(2)
+    expect(cloudScrollAt(0, LOADING_CLOUD_CALLS)).toBe(0)
+    expect(cloudScrollAt(0, LOADING_CLOUD_CALLS + 1)).toBe(-1)
   })
 
   it('색 번호 9(밤)에는 구름을 그리지 않는다', () => {

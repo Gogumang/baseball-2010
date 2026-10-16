@@ -274,14 +274,20 @@ export interface GridCell {
   readonly row: number
 }
 
-/** 칸 i 의 자리 (0x7a708~0x7a78e, 열림 애니가 끝난 뒤의 값) */
-export function hallOfFameCellOf(index: number): GridCell {
+/**
+ * 홈런더비 선수 고르기(공용 목록 k 7, 격자 종류 4)의 첫 줄 위쪽 y = H/2 + 0x18 = 184 — 0x65152~0x65158 이 k 7 이면
+ * dy 를 0x13 대신 0x18 로 둔다(행 2). 열별 보정 0xd40b8 은 종류 4 에도 걸린다(0x7a79c~0x7a7a2).
+ */
+export const HOME_RUN_DERBY_FIRST_ROW_Y = SCREEN.height / 2 + 0x18
+
+/** 칸 i 의 자리 (0x7a708~0x7a78e, 열림 애니가 끝난 뒤의 값). `firstRowY` 는 격자 cy(첫 줄 위쪽) */
+export function hallOfFameCellOf(index: number, firstRowY: number = HALL_OF_FAME_GRID.firstRowY): GridCell {
   const column = index % HALL_OF_FAME_GRID.columns
   const row = Math.trunc(index / HALL_OF_FAME_GRID.columns)
   return {
     x: HALL_OF_FAME_GRID_LEFT + column * (HALL_OF_FAME_GRID.cellWidth + HALL_OF_FAME_GRID.horizontalGap),
     y:
-      HALL_OF_FAME_GRID.firstRowY +
+      firstRowY +
       row * (HALL_OF_FAME_GRID.rowHeight + HALL_OF_FAME_GRID.verticalGap) -
       HALL_OF_FAME_GRID.columnYAdjust[column],
     width: HALL_OF_FAME_GRID.cellWidth,

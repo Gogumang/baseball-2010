@@ -1,7 +1,7 @@
 import { gameBenchOffenseOf, gameFieldTeamsOf } from '@/pages/game/lib/gameFieldTeams'
 import { gameIntroBatterHandOf } from '@/pages/game/lib/gameMatchupCards'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
@@ -29,6 +29,9 @@ import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissio
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
+import { castOfAces, castOfCareer, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
+import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -78,6 +81,16 @@ const INTIMIDATE_SKILL_ID = 22
  * 창이 떠 있는 동안 타석을 멈춰 둔다 — 원본도 장면 상태가 0xf 를 떠나 있어 투구가 나가지 않는다.
  */
 export function GameRoute({ session, progress, runner, random, career, gameSettings, aceLevels }: GameRouteProps) {
+  // 이 경기 두 팀의 선수 그림 — 로딩 판 동안 타석 선수(마선수 · 내 선수 장비 · 몸통 폼)를, 경기 장면 동안 수비 그림을 받는다(안 기다린다)
+  const { battingTypeIndex, battingSide, equipmentLevels } = career
+  const gameCast = useMemo(
+    () => [castOfAces(progress.aces), castOfCareer({ battingTypeIndex, battingSide, equipmentLevels })],
+    [progress.aces, battingTypeIndex, battingSide, equipmentLevels],
+  )
+  const stagePreloads = useMemo(() => mergeSpritePreloads(gameEntryCastPreloadsOf(), stageSpritePreloadsOf(...gameCast)), [gameCast])
+  useEffect(() => {
+    preloadSprites(defensePreloadsOf(...gameCast), 'idle')
+  }, [gameCast])
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않으려고 기억해 둔다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -150,8 +163,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     progress.pendingBenchClearing !== null,
     alertSceneFrozenRef.current,
   )
+  /** 사람 주루 키를 받으며 실시간으로 도는 주자 판(도루 · 폭투 · CPU 견제) — `progress.pendingRunnerPlay` */
+  const runnerPlay = progress.pendingRunnerPlay ?? null
   const isDefenseShown =
-    progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady)
+    progress.pendingDefensePlay !== null || runnerPlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady)
   /**
    * 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 교대 판 0x3fac4(1회초 판) · 수비 판 시작 0xb0fb4 · 벤치 클리어링 0x3a5f0.
    * 타자편의 수비 판은 늘 내 타석이라 수비 팀은 상대다. GameScreen 은 수비 재생 동안 내려가므로 여기서 든다
@@ -161,7 +176,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const boardOursOffense = boardNow !== null && (boardNow.half === '초' ? 0 : 1) === progress.game.playerSide
   const walkerSeats = useWalkerLineSeats({
     sceneKey: sceneSerialRef.current,
-    playKey: progress.pendingDefensePlay ?? play,
+    playKey: progress.pendingDefensePlay ?? runnerPlay ?? play,
     playDefenseRecords: fieldTeams.opponent.aces.records,
     board:
       boardNow === null
@@ -221,6 +236,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
           // 모드 4 — 진행 칸 끝 0x25 (0x39f88 39f94)
           steps={LOADING_STEPS_BATTER_CAREER}
           onDone={session.actions.finishLoading}
+          preloadRequests={stagePreloads}
         />
       </RawScreen>
     )
@@ -276,6 +292,28 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
         onFieldingErrors={session.actions.recordFieldingErrors}
         onDone={session.actions.finishDefensePlay}
+      />
+    )
+  }
+  /**
+   * 주자 판(도루 · 폭투 · CPU 견제) — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 진루 · 0x584 귀루 → 0xa9b04)와
+   * OK 슬라이딩 0x585 를 보내므로 **실시간으로 한 틱씩** 돌린다(`features/defense-play/model/liveRunnerPlay`, 팀 경기와 같은 길).
+   * 다 돌면 `finishRunnerPlay` 가 결과를 먹이고 그 공(또는 견제)의 나머지를 잇는다
+   */
+  if (runnerPlay !== null) {
+    return (
+      <DefensePlayback
+        runnerPlay={runnerPlay}
+        grassPalette={grassPalette}
+        runScoreBoard={{
+          sides: humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId),
+          scores: progress.game.playerSide === 0
+            ? [progress.game.ourScore, progress.game.opponentScore]
+            : [progress.game.opponentScore, progress.game.ourScore],
+          battingSide: progress.game.half === '초' ? 0 : 1,
+        }}
+        onFieldingErrors={session.actions.recordFieldingErrors}
+        onDone={session.actions.finishRunnerPlay}
       />
     )
   }
@@ -353,7 +391,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         skillPanelScene={skillPanelSceneRef}
         onQuit={session.actions.quitGame}
         onSteal={session.actions.stealBase}
-        // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다
+        // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 주자 판 갈래(`pendingRunnerPlay`)가 실시간으로 돌린다
         onPickoff={session.actions.cpuPickoff}
         // 사구 뒤 벤치 클리어링 연출(상태 0x1e)이 끝나면 사구를 먹인다
         onBenchClearingDone={session.actions.finishBenchClearing}

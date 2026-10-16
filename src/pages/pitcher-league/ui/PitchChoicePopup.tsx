@@ -14,6 +14,7 @@ import {
 import { PITCH_WINDOW_CHOICES } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
+import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const IMG_TEXT = './sprites/img_text/frames'
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -173,7 +174,7 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
                     // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
                     <span style={{
                       ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
-                      background: solidColorCss(PITCH_CHOICE_DIM_LABEL_COLOR), maskImage: `url(${labelSrc})`, WebkitMaskImage: `url(${labelSrc})`,
+                      background: solidColorCss(PITCH_CHOICE_DIM_LABEL_COLOR), maskImage: spriteMaskImage(labelSrc), WebkitMaskImage: spriteMaskImage(labelSrc),
                       maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
                     }} />
                   )}

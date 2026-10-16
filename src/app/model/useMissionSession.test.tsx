@@ -16,7 +16,8 @@ import { applyOutcome, isMissionBatterUp, startMission } from '@/entities/missio
 import { battingRecordAt, missionHumanTeamIdOf } from '@/entities/mission/model/missionGame'
 import { masterBatterAbilityOf } from '@/entities/mission/model/missionCpuTeam'
 import { teamBatters } from '@/entities/team/model/teamRoster'
-import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { finishPitchArrivalPlay, runOpenedPitchArrivalPlay, type PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
 import { aceMatchMissionOf, EMPTY_STORY_CARRY } from '@/entities/story/model/aceMatch'
@@ -30,6 +31,8 @@ import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
+import { runLiveRunnerPlayWithoutKeys, startLiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isModeMagicPitchType, modePitchMenuOf, modePitcherOf } from '@/app/model/modePitcher'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -134,6 +137,18 @@ function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {
   return { afterStart, status, afterFinish: screenNow(), save }
 }
 
+
+/**
+ * 붙든 주자 판(도루 · 폭투 · CPU 견제 — `pendingRunnerPlay`)을 키 없이 끝까지 돌려 세션에 먹인다 — 화면 `DefensePlayback` 의
+ * `runnerPlay` 갈래가 하는 일. 판이 없으면 null
+ */
+function 주자판끝(rendered: { readonly result: { readonly current: { readonly session: ReturnType<typeof useMissionSession> } } }): DefensePlayResult | null {
+  const pending = rendered.result.current.session.pendingRunnerPlay
+  if (pending === null) return null
+  const played = runLiveRunnerPlayWithoutKeys(pending)
+  act(() => rendered.result.current.session.actions.finishRunnerPlay(played))
+  return played
+}
 describe('마선수 대결 화면 전환', () => {
   it('match 명령을 받으면 공략 레코드로 대결 화면을 연다', () => {
     const { afterStart } = playAceMatch(true)
@@ -329,9 +344,8 @@ describe('투수 미션 투구 게이지 — 누른 칸 g 를 그대로 받는�
 
 /* ── ㉡ 미션 인플레이 타구 → 수비 화면(상태 0x17) ────────────────────────────── */
 
-function setUpBatterMission(missionId: number) {
+function setUpBatterMission(missionId: number, random: RandomPort = createSeededRandom(7)) {
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
-  const random = createSeededRandom(7)
   let screen: Screen = { kind: '미션선택' }
   const setScreen = vi.fn((next: Screen) => {
     screen = next
@@ -423,12 +437,20 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
         resultCode: null,
       })
     })
+    // 도루 판은 붙들어 수비 화면이 사람 주루 키(0x5331c)를 받으며 실시간으로 돈다 — 그동안 루 · 다음 공은 그대로
+    expect(rendered.result.current.session.pendingRunnerPlay?.kind).toBe('arrival')
+    expect(rendered.result.current.session.pendingRunnerPlay?.side).toBe('공격')
+    expect(rendered.result.current.session.missionRun?.bases.first).toBe(true)
+    expect(rendered.result.current.runner.isPaused).toBe(true)
+    expect(주자판끝(rendered)).not.toBeNull()
 
     const after = rendered.result.current.session.missionRun!
     expect(after.bases).toEqual({ first: false, second: true, third: false })
     expect(after.outs).toBe(0)
     expect(after.progress.counts['도루']).toBe(1)
-    expect(rendered.result.current.session.pickoffReplay).not.toBeNull()
+    expect(rendered.result.current.session.pendingRunnerPlay).toBeNull()
+    // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
     // 타석은 이어진다 — 볼 하나
     expect(rendered.result.current.runner.atBat.balls).toBe(3)
     rendered.unmount()
@@ -452,8 +474,10 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
         resultCode: null,
       })
     })
-    // 도루 판(종류 5)은 표시를 안 지운다 — 결과 띠 · 판 재생 동안 1루는 비어 보인다
-    expect(rendered.result.current.session.pickoffReplay).not.toBeNull()
+    // 도루 판(종류 5)은 표시를 안 지운다 — 결과 띠 · 판이 도는 동안 1루는 비어 보인다
+    expect(rendered.result.current.session.pendingRunnerPlay).not.toBeNull()
+    expect(rendered.result.current.session.stealingFrom).toEqual([1])
+    주자판끝(rendered)
     expect(rendered.result.current.session.stealingFrom).toEqual([1])
 
     // 결과 띠가 걷히면(0x12 끝) 0xf 진입 — 그때 지운다
@@ -461,6 +485,58 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
       rendered.result.current.runner.setBannerText('')
     })
     expect(rendered.result.current.session.stealingFrom).toEqual([])
+    rendered.unmount()
+  })
+
+  it('키 없이 끝낸 실시간 도루 판은 미리 돌린 판과 같다 — 진루 · 기록 후보 · 판 안 굴림 수', () => {
+    const 볼 = { resolution: { kind: '볼' as const }, hasSwung: false, isBunt: false, resultCode: null }
+    const 실시간Random = createSeededRandom(7)
+    const 실시간 = setUpBatterMission(5, 실시간Random)
+    act(() => 실시간.result.current.session.actions.steal(1))
+    act(() => 실시간.result.current.session.handleMissionPitch(볼))
+    const 실시간판 = 실시간.result.current.session.pendingRunnerPlay
+    if (실시간판 === null || 실시간판.kind !== 'arrival') throw new Error('도루 판이 안 붙들렸다')
+    const played = runLiveRunnerPlayWithoutKeys(실시간판)
+    const 실시간다음 = 실시간Random.rand(0, 0x7fffffff)
+
+    const 미리Random = createSeededRandom(7)
+    const 미리 = setUpBatterMission(5, 미리Random)
+    act(() => 미리.result.current.session.actions.steal(1))
+    act(() => 미리.result.current.session.handleMissionPitch(볼))
+    const 미리판 = 미리.result.current.session.pendingRunnerPlay
+    if (미리판 === null || 미리판.kind !== 'arrival') throw new Error('도루 판이 안 붙들렸다')
+    // 예전 길 — 판 시작 굴림 뒤 곧바로 끝까지 돌린다
+    const 미리돈판 = runOpenedPitchArrivalPlay(미리판.opened)
+    expect(실시간다음).toBe(미리Random.rand(0, 0x7fffffff))
+
+    const 실시간돈판 = finishPitchArrivalPlay(실시간판.opened, played as RunnerPlayEngineResult, true)
+    expect(실시간돈판.result.advance).toEqual(미리돈판.result.advance)
+    expect(실시간돈판.recordIds).toEqual(미리돈판.recordIds)
+    expect(실시간돈판.callSoundId).toBe(미리돈판.callSoundId)
+    expect(played.ticks).toHaveLength(미리돈판.result.ticks.length)
+    act(() => 실시간.result.current.session.actions.finishRunnerPlay(played))
+    expect(실시간.result.current.session.missionRun?.bases).toEqual(미리돈판.result.advance.bases)
+    실시간.unmount()
+    미리.unmount()
+  })
+
+  it("붙든 도루 판에서 귀루 키('3' — 0x584 · 인자 1)를 누르면 1루 주자가 돌아서고 도루 목표가 안 오른다", () => {
+    const rendered = setUpBatterMission(5)
+    act(() => rendered.result.current.session.actions.steal(1))
+    act(() => {
+      rendered.result.current.session.handleMissionPitch({ resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null })
+    })
+    const pending = rendered.result.current.session.pendingRunnerPlay
+    if (pending === null) throw new Error('도루 판이 안 붙들렸다')
+    const stepper = startLiveRunnerPlay(pending)
+    stepper.step({ key: '3' })
+    while (!stepper.finished) stepper.step(null)
+    const result = stepper.result()
+    expect(result.log[0]).toBe('0틱 귀루 키 — 주자 1')
+    act(() => rendered.result.current.session.actions.finishRunnerPlay(result))
+    const after = rendered.result.current.session.missionRun!
+    expect(after.bases.second).toBe(false)
+    expect(after.progress.counts['도루'] ?? 0).toBe(0)
     rendered.unmount()
   })
 
@@ -564,11 +640,17 @@ describe('타자 미션 CPU 견제 — 0x345fc 종류 4 → 0x34848 → 0x50f28 
     act(() => {
       rendered.result.current.session.actions.cpuPickoff(3)
     })
+    // 견제 판은 붙들어 사람 주루 키를 받으며 실시간으로 돈다 — 판이 끝나기 전엔 루 · 아웃이 그대로
+    expect(rendered.result.current.session.pendingRunnerPlay?.kind).toBe('pickoff')
+    expect(rendered.result.current.session.missionRun).toBe(before)
+    const played = 주자판끝(rendered)
 
     const after = rendered.result.current.session.missionRun!
-    expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
+    // 키 없이 끝낸 판은 미리 돌린 판과 같다
+    expect(played?.advance).toEqual(expected.advance)
     // 받은 야수의 0xafa60 매 틱 갈래가 도는 판 — 틱 수까지 같다
-    expect(rendered.result.current.session.pickoffReplay?.ticks).toHaveLength(expected.ticks.length)
+    expect(played?.ticks).toHaveLength(expected.ticks.length)
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
     expect(after.outs).toBe(before.outs + expected.advance.outsAdded)
     expect(after.remainingPlateAppearances).toBe(before.remainingPlateAppearances)
     expect(after.progress).toBe(before.progress)
@@ -606,8 +688,9 @@ describe('타자 미션 CPU 견제 3아웃 — 판정 B 0xae3e8 아웃 > 2 → 0
       // 새 타석 대기는 메시지 0xbc1 → 0x522d2 의 타석 등장음을 단다 — 나리 타자 · 3루 주자라 15
       expect(confirmBefore?.atBatEntrySoundId).toBe(15)
       act(() => probe.result.current.session.actions.cpuPickoff(3))
+      const played = 주자판끝(probe)
       const after = probe.result.current.session.missionRun!
-      if (probe.result.current.session.pickoffReplay?.advance.outsAdded === 1) {
+      if (played?.advance.outsAdded === 1) {
         found = { seed }
         // 3아웃이면 새 타석 대기(0xd → 0xe)가 새로 선다
         expect(probe.result.current.session.sceneConfirm).not.toBe(confirmBefore)
@@ -1667,7 +1750,7 @@ describe('자동진행 0x21 — 3아웃 뒤 판은 halfEnded 로 서서 기다�
     for (let seed = 1; seed < 400; seed += 1) {
       const probe = setUpBatterMissionWithSeed(mission, seed)
       act(() => probe.result.current.session.actions.cpuPickoff(3))
-      if (probe.result.current.session.pickoffReplay?.advance.outsAdded !== 1) {
+      if (주자판끝(probe)?.advance.outsAdded !== 1) {
         probe.unmount()
         continue
       }

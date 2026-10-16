@@ -693,7 +693,7 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  * 파일 저장은 이 상태에 없다 — 환경설정 첫 화면을 CLR·OK 로 나갈 때 0x295e2 가 0x1f1b9 로 저장한다.
  * 웹 저장 고리들은 지우는 즉시 저장한다(웹 환경설정 값들도 바꾸는 즉시 저장한다) — 창을 닫아 버리는 경우만 다르다.
  *
- * ⚠️ 칸 1 시즌모드: `onResetSeason` 을 안 받으면 OK 가 아무 일도 안 한다.
+ * 칸 1 시즌모드: 앱은 늘 `onResetSeason` 을 넘긴다(App.tsx → EntryRoutes) — 안 받는 시험 등에서만 OK 가 아무 일도 안 한다.
  */
 function ModeResetPage({
   onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, panelHeight, isPageShown, onBack,

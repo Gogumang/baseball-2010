@@ -170,7 +170,7 @@ export const ACE_LAYOUT = {
  *
  * 가로만 가운데를 맞추고 **세로는 `top` 을 그대로** 쓴다 — 줄 사이는 줄높이 40 + 세로틈 18 = 58.
  * 5열 화면이라 열별 보정 `0xd40b8 = [3,3,3,13,13]` 도 받는다 (종류 7·8 이 대상이다).
- * 열림 애니(위에서 한 줄씩 떨어짐 — `ACE_GRID_OPEN`)와 커서 튕김(2px 2틱)이 끝난 자리다 — ⚠️ 튕김은 아직 옮기지 않았다.
+ * 열림 애니(위에서 한 줄씩 떨어짐 — `ACE_GRID_OPEN`)와 커서 튕김(2px 2틱)이 끝난 자리다 — 튕김은 화면이 `useGridCursorBounce`(0x7a7f6)로 고른 칸에 더한다.
  */
 export function aceCellPositionOf(index: number) {
   const { columns, cell, centerX, top, hGap, vGap } = ACE_LAYOUT.grid
@@ -291,12 +291,16 @@ export function stadiumArrowsOf(isStadiumStage: boolean, isBob: boolean, cursor:
  * 구장 값 두 줄의 보이는 글과 가운데 x — `FIRST_BAT_LAYOUT.infoValues` 의 서식에 값을 넣은 **날 글**을 재서
  * x + (폭 >> 1) 를 가운데로 둔다 (0xba269 폭 −1, 0x646ca · 0x6472c). 값이 없으면(구장 표 미추출) 빈 글.
  */
-export function stadiumInfoValuesOf(stadium: { readonly city: string; readonly capacity: number } | undefined) {
+export function stadiumInfoValuesOf(
+  stadium: { readonly city: string | null; readonly capacity: number } | null | undefined,
+) {
   const [cityLine, seatLine] = FIRST_BAT_LAYOUT.infoValues
-  if (stadium === undefined) return [{ text: '', centerX: cityLine.x }, { text: '', centerX: seatLine.x }]
+  if (stadium === null || stadium === undefined) return [{ text: '', centerX: cityLine.x }, { text: '', centerX: seatLine.x }]
+  // 히든 번호(10~14)는 연고지 칸이 없다(`stadiumInfoOf` 의 city null) — 화면처럼 빈 글로 잰다
+  const city = stadium.city ?? ''
   const seats = `${stadium.capacity}석`
   return [
-    { text: stadium.city, centerX: measuredTitleCenterXOf(cityLine.x, cityLine.format.replace('%s', stadium.city)) },
+    { text: city, centerX: measuredTitleCenterXOf(cityLine.x, cityLine.format.replace('%s', city)) },
     { text: seats, centerX: measuredTitleCenterXOf(seatLine.x, seatLine.format.replace('%d석', seats)) },
   ]
 }

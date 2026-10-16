@@ -48,6 +48,39 @@ export const NO_ACE = -1
 /** 구장은 0~9 열 칸뿐이다 — 상태 20 의 목록이 **10열 × 1줄**이고 히든 구장이 없다 (R4 3a) */
 export const STADIUM_COUNT = 10
 
+/**
+ * 구장 0~9 의 연고지 · 좌석 — 그리기 0x63b14 가 스택으로 베끼는 두 표 (k 3 줄 0x64678 · 0x646de).
+ *   - 연고지: 포인터 표 `0xd1e0c` 10개 → `"!C!cffffff%s"`(0xcf2e0). 서울·서울·인천·대전·대구·광주·부산·제주·서울·독도
+ *   - 좌석: u32 표 `0xd1e34` 10개 → `"!C!cffffff%d석"`(0xd2488)
+ *
+ * **원본 그대로 — 구장 10~14(빠른실행이 남긴 히든 팀 번호)는 표 끝을 넘어 스택 옆 칸을 읽는다.**
+ * 스택 배치가 [sp+0x244] 좌석 10개 · [sp+0x26c] 연고지 포인터 10개 · [sp+0x294] 표 0xd1df8 다섯 낱말(모두 40)이라
+ *   - 좌석 10~14 = 연고지 포인터 0~4 의 값(0xd2438 = 861240 · 861240 · 861248 · 861256 · 861264)
+ *   - 연고지 10~14 = 포인터 40 — ⚠️ 확인 불가: 기기 메모리 주소 40 의 글자는 바이너리 밖이라 웹은 비운다.
+ */
+const STADIUM_CITY = ['서울', '서울', '인천', '대전', '대구', '광주', '부산', '제주', '서울', '독도'] as const
+const STADIUM_CAPACITY = [30000, 30000, 30000, 20000, 15000, 15000, 30000, 20000, 35000, 15000] as const
+/** 연고지 포인터 표 0xd1e0c 의 값 0~4 — 넘친 좌석 칸이 이 값을 숫자로 읽는다 */
+const STADIUM_CITY_POINTER = [0xd2438, 0xd2438, 0xd2440, 0xd2448, 0xd2450] as const
+
+export interface StadiumInfo {
+  /** 연고지 — 읽을 수 없는 칸(10~14)은 null */
+  readonly city: string | null
+  readonly capacity: number
+}
+
+/** 구장 번호의 연고지 · 좌석 (위 설명). 스택 밖까지 넘는 15 이상 · 음수는 null */
+export function stadiumInfoOf(stadiumId: number): StadiumInfo | null {
+  if (stadiumId >= 0 && stadiumId < STADIUM_COUNT) {
+    return { city: STADIUM_CITY[stadiumId], capacity: STADIUM_CAPACITY[stadiumId] }
+  }
+  const over = stadiumId - STADIUM_COUNT
+  if (over >= 0 && over < STADIUM_CITY_POINTER.length) {
+    return { city: null, capacity: STADIUM_CITY_POINTER[over] }
+  }
+  return null
+}
+
 /** 마투수 5 · 마타자 5 (저장 +0x30..0x34 · +0x35..0x39) */
 export const ACE_PER_ROLE = 5
 

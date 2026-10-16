@@ -129,10 +129,10 @@ export function isPathClear(
     runners.find((candidate) => candidate.index === index)?.startBase ?? NONE,
 ): boolean {
   const mine = runner.startBase
-  // 0xa97d4 — 목록 번호 i+1 부터 오름차순으로 처음 만나는 산 주자
+  // 0xa97d4 — 목록 번호 i+1 부터 오름차순으로 처음 만나는 산(+0x96 == 0) 주자. 득점도 +0x96 을 세운다(0xaa0a8 → aa1da 0xa9520)
   let front: RunnerState | undefined
   for (const other of runners) {
-    if (other.index <= runner.index || other.isOut) continue
+    if (other.index <= runner.index || other.isOut || other.scored) continue
     if (front === undefined || other.index < front.index) front = other
   }
   if (front === undefined) return true

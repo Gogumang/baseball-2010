@@ -38,6 +38,7 @@ import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/
 import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
+import { useStageCastPreload } from '@/widgets/batting-stage/model/useStageCastPreload'
 import { useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import { acceptsBattingKey, keyTickOf, swingReleaseTickOf } from '@/widgets/batting-stage/lib/swingWindow'
@@ -314,6 +315,14 @@ interface BattingStageProps {
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
 export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
   const isCommonWindowOpen = useIsCommonWindowOpen()
+  // 지금 선 타자 · 투수의 스윙 · 번트 · 투구 그림을 미리 받는다(안 기다린다 — 그리기는 그대로)
+  useStageCastPreload({
+    batterForm,
+    aceBatterIndex,
+    batterEquipmentLevels,
+    acePitcherOrder: props.acePitcher?.order ?? null,
+    pitcherEquipmentNibbles,
+  })
   const refs = useStageRefs({
     ...props,
     canBunt,

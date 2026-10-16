@@ -2528,14 +2528,18 @@ function batterPitch(
   progress = withFoulRecords(progress, detail.resolution.kind === '파울')
   const atBat = applyPitchResolution(progress.atBat, detail.resolution)
   const outcome = atBat.outcome
-  // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 출발한 도루(종류 5) 판을 연다
+  // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 출발한 도루(종류 5) 판을 연다.
+  // 화면이 도는 갈래(`startBatterPitch`)면 판을 붙들어 사람 주루 키(0x5331c · 0x585)를 받으며 실시간으로 돌린다
   const arrival = arriveTeamPitch(
     { ...progress, atBat },
     // 사람 타자의 이 공 번트 종류 — 못 맞힌 번트면 그 종류 (useTeamGame 이 타석 화면에서 받아 넘긴다)
     { resolution: detail.resolution, outcomeAfter: outcome, buntKind: options.buntKind ?? 0 },
     '공격',
     random,
+    undefined,
+    applyOutcome === startBatterOutcome ? { outcome, options } : undefined,
   )
+  if (arrival.deferred === true) return arrival.progress
   // 판에서 반 이닝·경기가 끝났다 — 이 타석은 끊긴다 (판정 B 0xae3e8: 아웃 > 2 → 0x18)
   if (arrival.interrupted) return advance(arrival.progress, random)
   // 판정 A(0xae24c)의 "그 밖 → 0xf" — 같은 타석 다음 공. 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 묻는다
@@ -3320,11 +3324,20 @@ export function resolveRunnerPlay(progress: TeamGameProgress, result: DefensePla
   const pending = progress.pendingRunnerPlay
   if (pending == null) return progress
   const cleared: TeamGameProgress = { ...progress, pendingRunnerPlay: null }
+  const side = pending.side ?? '수비'
   if (pending.kind === 'pickoff') {
     if (!isPickoffPlayResult(result)) return cleared
-    return applyPickoffPlay(cleared, result, '수비', random, true)
+    return applyPickoffPlay(cleared, result, side, random, true)
   }
   const play = finishPitchArrivalPlay(pending.opened, result as RunnerPlayEngineResult, true)
+  if (side === '공격') {
+    // 사람 공격 — `batterPitch` 의 나머지(판에서 끊김 → 다음 타석 · 같은 타석 → 0xf · 타석 끝 → 타석 결과)
+    const arrival = applyTeamArrival(cleared, play, '공격')
+    if (arrival.interrupted) return advance(arrival.progress, random)
+    const batter = pending.batter
+    if (batter === undefined || batter.outcome === null) return enterPitchSelection(arrival.progress, random)
+    return startBatterOutcome(arrival.progress, batter.outcome, random, { ...batter.options, arrivalPlay: arrival.play })
+  }
   return afterOurPitchArrival(
     applyTeamArrival(cleared, play, '수비'),
     pending.resume ?? { buntKind: 0 },
@@ -3830,11 +3843,20 @@ export function pickoff(
  *
  * 그 루가 비었으면 원본 루프가 거기서 안 멈추므로 부르는 쪽 잘못이다 — 아무 일도 없다.
  */
-export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random: RandomPort): TeamGameProgress {
+export function cpuPickoff(
+  progress: TeamGameProgress,
+  base: PickoffBase,
+  random: RandomPort,
+  /**
+   * 화면이 판을 실시간으로 돌린다 — 판을 붙들고(`pendingRunnerPlay`, 사람 공격) 끝나면 `resolveRunnerPlay`. 견제 판(종류 4)은
+   * 0xae794 마스크 안이라 사람 주루 키(0x5331c → 0x582 · 0x584 → 0xa9b04)와 OK 슬라이딩(0x585)을 받는다
+   */
+  live = false,
+): TeamGameProgress {
   if (!isBatterTurn(progress) || !progress.atBatPrepared) return progress
   const bases = progress.game.bases
   if (!hasRunnerOn(bases, base)) return progress
-  const result = runPickoffPlay({
+  const input: PickoffPlayInput = {
     targetBase: base,
     bases,
     outs: progress.game.outs,
@@ -3857,8 +3879,9 @@ export function cpuPickoff(progress: TeamGameProgress, base: PickoffBase, random
     // 수비는 CPU 다 — 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
     defenseIsCpu: true,
     scene: progress.defenseScene,
-  })
-  return applyPickoffPlay(progress, result, '공격', random)
+  }
+  if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input, side: '공격' } }
+  return applyPickoffPlay(progress, runPickoffPlay(input), '공격', random)
 }
 
 function hasRunnerOn(bases: GameState['bases'], base: number): boolean {
@@ -3989,7 +4012,7 @@ function applyPickoffPlay(
     : {
         ...progress,
         defenseScene: result.scene,
-        lastDefensePlay: result,
+        lastDefensePlay: shownLive ? progress.lastDefensePlay : result,
         ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, before.battingOrderIndex, null),
       }
   const applied = withRunnerOnlyAdvance(recorded, result.advance, humanSide, result.runnerFates)
@@ -4026,6 +4049,11 @@ function applyPickoffPlay(
 export type TeamPendingRunnerPlay = LiveRunnerPlay & {
   /** 공 도착 판이면 `pitchOnce` 의 나머지가 쓰는 이 공의 값 */
   readonly resume?: { readonly isUncatchable?: boolean; readonly buntKind: number }
+  /**
+   * 사람 공격 쪽 판의 공 도착 판이면 `batterPitch` 의 나머지(타석 결과)가 쓰는 값 — 이 공 뒤 타석 결과(없으면 같은 타석 다음 공)와
+   * 타석 결과 선택지(`startBatterOutcome`)
+   */
+  readonly batter?: { readonly outcome: AtBatOutcome | null; readonly options: BatterOutcomeOptions }
 }
 
 /** 도루 판(종류 5) — 정산 0xa8024 를 `state[0x26] = 5` 로 부르는 판 */
@@ -4068,7 +4096,9 @@ interface TeamPitchArrival {
  * - 기록: 도루 판의 8(도루)·24(도루 저지)는 0xa77f0 게이트를 지난다 — 사람 공격이면 8, 사람 수비면 24 만 남는다.
  * - 사람 수비 쪽 도루 · 폭투 판은 상태 0x17 동안 사람 송구 키(0x533c8 → 0x588 → +0x160)로 던진다 — 화면이 도는 갈래(`live`)는
  *   판을 붙들어(`pendingRunnerPlay`) 화면이 한 틱씩 돌리게 하고 `resolveRunnerPlay` 가 잇는다(`liveRunnerPlay`). 밀어내기(종류 2)는
- *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다. ⚠️ 사람 공격 쪽 판의 주루 키(0x5331c)는 아직 안 받는다(미리 돌린다).
+ *   vt4c 가 안 돌아 키 송구가 없으니 미리 돌린다. 사람 공격 쪽 판도 같은 0x17 에서 주루 키(0x5331c → 0x582 진루 · 0x584 귀루 →
+ *   0xa9b04)와 OK 슬라이딩(0x585)을 받는다 — 화면 갈래(`batterLive`)면 붙들어 실시간으로 돌리고 `resolveRunnerPlay` 가
+ *   `batterPitch` 의 나머지를 잇는다(`entities/fielding/model/baserunningKey`).
  *
  * - 루별 주루: 루에 선 주자의 신원(`GameState.runners`, 원본 주자 목록)대로 그 팀 타순 칸 선수(`runAbilitiesOnBaseOf`).
  * - 주자 속도의 팀 등급: 0xa93ac a9488 — 모드 1·2·8 에서 공격 팀 근성 등급(`offenseRunnerTeamGradeOf`). 타구·견제 판도 같다.
@@ -4093,6 +4123,11 @@ function arriveTeamPitch(
    * 미리 돌린다(`throwPitch` · 시험)
    */
   live?: TeamPendingRunnerPlay['resume'],
+  /**
+   * 사람 공격의 도루 · 폭투 판을 화면이 실시간으로 돌리게 붙들 때 — `batterPitch` 의 나머지가 쓸 값. 상태 0x17 키 0x53420 은
+   * 사람 공격이면 판 종류를 안 보고 주루 0x5331c · OK 0x585 를 보낸다(종류 거르기는 0xa9b04 의 0xae794 · 0x518da 몫)
+   */
+  batterLive?: TeamPendingRunnerPlay['batter'],
 ): TeamPitchArrival {
   if (!arrivesUnhit(pitch.resolution)) {
     const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
@@ -4152,6 +4187,16 @@ function arriveTeamPitch(
   if (live !== undefined && humanSide === '수비' && opened.kind !== 2) {
     return {
       progress: { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } },
+      play: null,
+      interrupted: false,
+      deferred: true,
+    }
+  }
+  // 사람 공격의 도루 · 폭투 판 — 주루 키(0x582 · 0x584)와 OK 슬라이딩(0x585)을 받으므로 화면이 실시간으로 돌린다. 밀어내기(종류 2)는
+  // 0xae794 · 0x518da 가 둘 다 막아 키가 할 일이 없으니 미리 돌린다
+  if (batterLive !== undefined && humanSide === '공격' && opened.kind !== 2) {
+    return {
+      progress: { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, side: '공격', batter: batterLive } },
       play: null,
       interrupted: false,
       deferred: true,
@@ -4725,7 +4770,9 @@ export function closeBurstWindow(progress: TeamGameProgress): TeamGameProgress {
  * `defendingIsOurs` 가 참이면 우리 팀이 수비(= 우리 투수), 거짓이면 상대 투수를 본다.
  * 사람이 직접 던지는 타석은 우리 투수를 이 길로 바꾸지 않는다 — 그때는 `#` 메뉴(`changePitcher`)뿐이다.
  *
- * 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 8회에 벤치 마선수로 교체)는 **투수편 전용**이라 여기 없다 — c1bbe `[state+1]` 이 3 이 아니면 c1bc8 에서 c1c4a 로 건너뛴다.
+ * 원본 `0xc1ba4` 의 첫 갈래(모드 3 · `0xb6ded`(내 투수 0x1fbd0) == 2 구원 보직 c1bd0 · 수비 팀이 사람 팀 c1bd8~c1bec ·
+ * 지금 투수가 내 투수(`0xb6388` = +0xa 비트7 내 육성 선수, 마선수 판정은 0xb633c 비트6)가 아님 c1bf8 → 벤치의 **내 투수**를
+ * 0-기준 7 = **8회**에 올림 c1c2e `cmp r3,#7`)는 **투수편 전용**이라 여기 없다 — c1bbe `[state+1]` 이 3 이 아니면 c1bc8 에서 c1c4a 로 건너뛴다.
  */
 function judgeAutoPitcherChange(
   progress: TeamGameProgress,

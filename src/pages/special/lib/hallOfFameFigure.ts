@@ -262,7 +262,7 @@ export function drawListFigure(memory: FigureListMemory, entry: FigureEntryState
     nextEntry = { ...nextEntry, slot: input.slot }
   } else if (entry.slot !== input.slot) {
     // 0x63c46~0x63c7a — 커서가 움직이면 자세 0 · 다시 싣기
-    // ⚠️ 원본 표지는 격자 +0x25(키로 움직였다)라 가장자리에서 제자리로 민 키도 켤 수 있다 — 웹은 칸이 바뀔 때만 켠다
+    // 원본 표지 격자 +0x25 는 칸이 바뀐 키에서만 선다 — 확정: 격자 키 0x6c17c~0x6c192 가 옮긴 뒤 +0xc · +0x10 을 옛 값과 견줘 다를 때만 1
     nextMemory = { ...nextMemory, pose: 0 }
     nextEntry = { ...nextEntry, slot: input.slot, reload: true }
   }

@@ -11,7 +11,7 @@ import {
   FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, stadiumArrowsOf,
   stadiumInfoValuesOf,
 } from '@/pages/general-mode/lib/prepareLayout'
-import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
+import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter, stadiumInfoOf } from '@/pages/general-mode/lib/generalModeSetup'
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 
@@ -25,19 +25,6 @@ const SCREEN_HALF_WIDTH = 120
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 
-/**
- * 구장 한 줄의 글자 값.
- * ⚠️ **값이 없어 못 채운 자리**: 도시 이름 표 `0xd1df8`("서울"…"독도")과 수용 인원 표 `0xd1e34`
- *    (30000…)는 아직 웹판 데이터로 뽑혀 있지 않다(`shared/config/original` 에 없다). 생성기가
- *    두 표를 뽑아 주면 여기로 넘기면 된다 — 없으면 화면은 빈칸으로 둔다.
- */
-export interface StadiumEntry {
-  /** 표 0xd1df8 — img_text 190 "연고지" 줄 */
-  readonly city: string
-  /** 표 0xd1e34 — img_text 191 "좌석" 줄 (`"!C!cffffff%d석"`) */
-  readonly capacity: number
-}
-
 export interface FirstBatStadiumScreenProps {
   readonly userTeamId: number
   readonly aiTeamId: number
@@ -45,8 +32,6 @@ export interface FirstBatStadiumScreenProps {
   readonly phase: FirstBatPhase
   readonly playerSide: PlayerSide
   readonly stadiumId: number
-  /** 도시·좌석 표 (위 주석 참고). 안 넘기면 두 줄이 비어 있다 */
-  readonly stadiums?: readonly StadiumEntry[]
   /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
   readonly gamePoint?: number
   /** 선공 커서 `skin+0x74` 만 뒤집을 때 */
@@ -68,17 +53,18 @@ export interface FirstBatStadiumScreenProps {
  *
  * ⚠️ 구장 목록은 **0~9 열 칸뿐**이다(히든 구장 없음). 빠른실행이 구장을 "유저 팀 번호" 로 넣기
  *    때문에 유저 팀이 히든(10~14)이면 여기 없는 번호가 들어올 수 있다 — 원본이 자르지 않으므로
- *    그림만 빈칸이 된다.
+ *    그림은 빈칸, 좌석 줄은 스택 옆 칸(연고지 포인터 값)을 숫자로 찍는다 (`stadiumInfoOf`).
  */
 export function FirstBatStadiumScreen({
-  userTeamId, aiTeamId, phase, playerSide, stadiumId, stadiums, gamePoint = 0,
+  userTeamId, aiTeamId, phase, playerSide, stadiumId, gamePoint = 0,
   onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel,
 }: FirstBatStadiumScreenProps) {
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
 
   const isStadiumPhase = phase === FIRST_BAT_PHASE.구장
-  const stadium = stadiums?.[stadiumId]
+  // 연고지 · 좌석 — 표 0xd1e0c · 0xd1e34 (히든 번호 10~14 는 스택 옆 칸, `stadiumInfoOf`)
+  const stadium = stadiumInfoOf(stadiumId)
 
   // 머리띠가 미끄러지는 동안 키 함수가 [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useFrameSlideKeyLock`)
   const keyLock = useFrameSlideKeyLock()

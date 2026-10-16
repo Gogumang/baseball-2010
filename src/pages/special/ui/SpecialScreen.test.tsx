@@ -7,7 +7,7 @@ import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
-  SPECIAL_ITEMS, hallOfFameCellImagesOf, isHallOfFameCellDimmed, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf,
+  SPECIAL_ITEMS, hallOfFameCellImagesOf, isHallOfFameCellDimmed, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, HOME_RUN_DERBY_FIRST_ROW_Y,
 } from '@/pages/special/lib/specialLayout'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
@@ -614,8 +614,10 @@ describe('홈런더비 선수 고르기 — 하위 16 (0x25e6c 목록 종류 1 �
     const first = screen.getByRole('button', { name: '6번 슬롯' })
     expect(first.getAttribute('aria-current')).toBe('true')
     expect(first.style.left).toBe(`${hallOfFameCellOf(0).x}px`)
+    // k 7 은 cy = H/2 + 0x18 = 184 (0x65152~0x65158) — 아랫줄 끝 칸 = 184 + 40 − 열 보정 13
+    expect(hallOfFameCellOf(9, HOME_RUN_DERBY_FIRST_ROW_Y).y).toBe(211)
     expect(screen.getByRole('button', { name: '15번 슬롯' }).style.top)
-      .toBe(`${hallOfFameCellOf(9).y}px`)
+      .toBe(`${hallOfFameCellOf(9, HOME_RUN_DERBY_FIRST_ROW_Y).y}px`)
   })
 
   it('나리 타자 → 코드 2 · 명예 타자 → 코드 4 (+0xa6 = 명전 번호)', () => {

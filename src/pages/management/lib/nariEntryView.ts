@@ -89,8 +89,10 @@ export interface NariEntryView {
  * 그 줄 +0x20~ 는 0x204e1 → 0x204e0/0xb6cc4 가 시즌 처음 0(+0x2c 10000)으로 두고 0xa8024 가 게이트 0xa56dc 모드 3 · 4 갈래(정규시즌)를
  * 지날 때 쌓은 것 — 웹은 커리어의 리그 기록표(`leaguePlayerStats`, 정규시즌만 쌓는다)가 같은 값이다. +0x2c 는 커리어의
  * `leaguePitcherStaminas`(142 가 g == 0 이면 10000 으로 채운다 — `humanGamePitcherStaminasOf`).
- * 사기 V[+2] — 투수편 내 팀은 커리어 사기(0x1f988(저장, R[1]) +2 와 같은 칸, `PitcherStatusBoard`). ⚠️ 미확인: 그 밖 팀 레코드 사기는
- * 웹이 안 들어 100 으로 둔다.
+ * 사기 V[+2] — 투수편 내 팀은 커리어 사기(0x1f988(저장, R[1]) +2 와 같은 칸, `PitcherStatusBoard`).
+ * ⚠️ 남김(웹 저장 한계): 그 밖 팀 레코드 +2 는 원본에서 **그 팀이 마지막으로 선 경기 때의 나리 사기**다 — 실효 능력치 0xb570c 모드 3·4 갈래
+ * b5762~b576a 가 공마다 넘겨 받은 팀 레코드 +2 에 0xa3a24 를 쓰고, CPU 끼리 간이 엔진도 두 팀 모두 부른다(0xc1308 · 0xc1320, 넷째 인자 1).
+ * 웹 커리어는 그 스냅숏을 안 들어 100(시즌 처음 마스터 값)으로 둔다.
  * ⚠️ 미확인: 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다. 내 선수 줄(표 밖)도 비운다.
  */
 export interface NariEntryCellSource {
@@ -278,7 +280,7 @@ export function batterNariEntryViewOf(
     stats: career.leaguePlayerStats,
     staminas: humanGamePitcherStaminasOf(career, leagueDayCounterOf(career), teamId),
     staminaMode: BATTER_EDITION_MODE,
-    // ⚠️ 미확인: 타자편 팀 레코드 사기 V[+2] 를 웹이 안 들어 100
+    // ⚠️ 남김: 원본은 그 팀이 마지막으로 선 경기 때의 나리 사기(0xb570c b5762~b576a) — 웹 커리어에 그 스냅숏이 없어 100 (위 NariEntryCellSource 머리말)
     morale: 100,
   }
   return openNariEntryView(isMyTeam, teamId, {
