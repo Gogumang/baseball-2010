@@ -6,7 +6,8 @@ import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/mode
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
-import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
+import { applyPitchResolution, isAtBatFinished } from '@/entities/at-bat/model/atBatState'
+import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
@@ -288,6 +289,9 @@ function pendingAceMatchScreenOf(port: AceMatchPendingPort): Screen | null {
 
 /** 타자 스킬 22 압도 — 상대 투수 투구 스태미나 소모 ×2 (0xa5f0e) */
 const INTIMIDATE_SKILL_ID = 22
+
+/** 세션 타석의 볼카운트 — 진행기 0xf 진입(`AtBatCount`)에 넘긴다 */
+const countOf = (atBat: AtBatState) => ({ strikes: atBat.strikes, balls: atBat.balls })
 
 interface CareerSessionInput {
   readonly runner: AtBatRunner
@@ -1063,8 +1067,12 @@ export function useCareerSession({
                 resultCode: detail.resultCode,
               },
               random,
-              // 정산 0xa59c0 의 타자 게이트 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓
-              { isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null },
+              {
+                // 정산 0xa59c0 의 타자 게이트 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓
+                isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+                // 판정 A 0xae24c 가 이 공을 먹인 카운트 — 타석이 이어지면 0xf 진입의 교체 틱 굴림(0x344dc)이 본다
+                countAfter: { strikes: nextAtBat.strikes, balls: nextAtBat.balls },
+              },
             )
       if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
         progressRef.current = arrival.progress
@@ -1402,6 +1410,9 @@ export function useCareerSession({
         foulRecordIds: isFoulPlay && played.foulEnded !== true ? pitchTallyRef.current.foulRecordIds : undefined,
         // 정산 0xa8024 의 타자 게이트 [sp+0x34] — 국가대항전 · 포스트시즌이면 거짓 (장내 홈런 a84d6 · 번트 안타 a8506)
         isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+        // 파울로 닫힌 판 — 같은 틱 0x35108 이 0xb6b58 로 스트라이크를 먹인 뒤 다음 틱 0xf 진입이 교체 틱 굴림(0x344dc)을 본다.
+        // 세션 카운트는 아래 `runner.applyPitch` 가 같은 규칙(`applyPitchResolution` 파울)으로 올린다
+        countAfterFoul: countOf(applyPitchResolution(runner.atBatRef.current, { kind: '파울' })),
       })
       progressRef.current = resolved
       setProgress(resolved)
@@ -1504,6 +1515,8 @@ export function useCareerSession({
       if (current === null) return
       const next = cpuPickoff(current, base, random, {
         isRecorded: cupGameRef.current === null && careerRef.current?.postseason === null,
+        // 견제는 카운트를 안 바꾼다 — 판 끝 0xf 진입의 교체 틱 굴림(0x344dc)이 지금 카운트를 본다
+        count: countOf(runner.atBatRef.current),
       })
       if (next === current) return
       progressRef.current = next
