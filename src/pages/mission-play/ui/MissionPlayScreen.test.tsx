@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
@@ -233,6 +233,14 @@ describe('웹 테두리 걷기 — 원본 240×320 판 한 장 · 목표는 HUD 
     expect([press.style.left, press.style.top, press.style.width, press.style.height]).toEqual(['0px', '307px', '41px', '12px'])
     act(() => press.click())
     expect(view.getByRole('option', { name: /계속/ })).toBeTruthy()
+  })
+
+  it("키패드 '*' 로도 메뉴를 열고 닫는다 — 공용 키 0x498d4 의 '*' 는 모드를 안 본다(4991c, 미션도 경기 장면 0x104)", () => {
+    const view = 띄우기('명품 타자의 첫 걸음')
+    act(() => { fireEvent.keyDown(window, { key: '*' }) })
+    expect(view.getByRole('option', { name: /계속/ })).toBeTruthy()
+    act(() => { fireEvent.keyDown(window, { key: '*' }) })
+    expect(view.queryByRole('option', { name: /계속/ })).toBeNull()
   })
 
   it('도루는 점수판 루 그림 자리의 투명한 누름 칸 — 공이 날 때만 출발한다', () => {

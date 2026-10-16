@@ -86,6 +86,16 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 1 — 자동진행 자리에 다시
     expect(screen.queryByRole('option', { name: '계속하기' })).toBeNull()
   })
 
+  it("키패드 '*' 로도 열고 닫는다 — 공용 키 0x498d4 의 '*' 는 모드를 안 본다(4991c, 더비도 경기 장면 0x104)", () => {
+    띄우기()
+
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.getByRole('option', { name: '계속하기' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: '*' })
+    expect(screen.queryByRole('option', { name: '계속하기' })).toBeNull()
+  })
+
   it('**다시하기** 칸이 있다 — 자동진행이 아니다 (홈런더비는 행 1)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
