@@ -19,6 +19,7 @@ import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
+import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
@@ -153,6 +154,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let handle = 0
     /** 그림 입력이 바뀐 틀에서만 다시 그린다(`createDrawMemo`) — 위 갱신은 틀마다 그대로 돈다 */
     const drawMemo = createDrawMemo()
+    /** 구름 셈(`sceneCloudClock`)에서 이 루프가 마지막으로 본 그림 */
+    const cloudCursor = createCloudFrameCursor()
     /** 경기 스킬 표시 판 — 0xf 에 들 때마다 하나씩 올리는 표지(구질 목록이 새로 실리면 새 0xf 진입) */
     const stepSkillPanel = createSkillPanelDriver()
     let skillPanelStateFSerial = 0
@@ -318,6 +321,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판
         skillPanel: skillPanelView,
         scenery: {
+          // 구름 0x78448 — 0x3f060 은 '대기'(0xd~0x10)에서만 센다. 팝업으로 장면이 선 동안(`isFrozen`)은 안 센다
+          cloudCalls: observeSceneCloudFrame(sceneCloudFrameOf(rawNow), isIdle && current.isFrozen !== true, cloudCursor),
           skyRow: current.skyRow,
           stadium: current.stadium,
           fieldPalette: current.fieldPalette,

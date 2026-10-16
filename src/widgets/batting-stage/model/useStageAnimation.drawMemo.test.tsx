@@ -14,6 +14,7 @@ import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import { emitMenuSparkle, resetSceneParticlesForTest } from '@/widgets/particles/model/sceneParticles'
 import { resetSceneResultCode } from '@/widgets/batting-stage/model/sceneResultCodeStore'
+import { resetSceneCloudClock } from '@/widgets/batting-stage/model/sceneCloudClock'
 
 /**
  * **그림 건너뛰기(`createDrawMemo`)가 화면을 안 바꾸는가** — 같은 씨앗 · 같은 키 · 같은 rAF 시각(틱 하나에 네 번)으로 두 번 돌린다.
@@ -101,6 +102,8 @@ const 틀간격 = () => millisecondsPerFrame() / 4 + 0.37
 
 function 타석돌리기(bypass: boolean): 돌림 {
   setDrawMemoBypassForTest(bypass)
+  // 구름 셈은 경기 장면 하나 동안 남는다 — 두 번 돌리는 사이 장면을 새로 세운 것으로 본다
+  resetSceneCloudClock()
   clock = 0
   그린입력.length = 0
   그린장면.length = 0
@@ -215,6 +218,7 @@ describe('그림 건너뛰기 — 타석(useStageAnimation)', () => {
 describe('그림 건너뛰기 — 투수편(PitcherSideStage)', () => {
   function 투수편돌리기(bypass: boolean, pitch: Pitch): readonly string[] {
     setDrawMemoBypassForTest(bypass)
+    resetSceneCloudClock()
     clock = 0
     그린입력.length = 0
     const props = {

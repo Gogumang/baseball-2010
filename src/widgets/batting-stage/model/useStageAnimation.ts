@@ -48,6 +48,7 @@ import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derby
 import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
@@ -127,6 +128,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      */
     const localRunnerClock = createRunnerAnimationClock()
     let runnerTick = -1
+    /** 구름 셈(`sceneCloudClock`)에서 이 루프가 마지막으로 본 그림 */
+    const cloudCursor = createCloudFrameCursor()
     // 파티클 파트 그림은 연출이 뜨기 전에 받아 둬야 첫 연출이 보인다
     preloadPtcParts()
 
@@ -591,6 +594,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const runnerFrames = runnerTick < 0 ? 1 : nowTick - runnerTick
       runnerTick = nowTick
       const stageHud = latestRef.current.hud
+      // 구름 0x78448 — 0x3f060 은 '대기'(0xd~0x10)에서만 부르고 0x11 · 0x12 · 0x13 · 0x17 은 안 센다. 결과 창 0x19 · 0x1a 는 그리기
+      // 0x4a384 · 0x45c18 이 그림마다 부른다 (`stageScenery` 의 `cloudScrollAt`)
+      const cloudCalls = observeSceneCloudFrame(sceneCloudFrameOf(rawNow), isBackdrop || phaseRef.current === '대기', cloudCursor)
       const runnerAnimationSteps =
         stageHud === null || isBackdrop
           ? undefined
@@ -673,6 +679,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         // 구장 번호(구장 +0x70)는 장면 셋업 0x39fdc 가 채운다 — 모드 1·8·9 만 넘어오고, 그 밖은 0 번 구장이다.
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {
+          cloudCalls,
           skyRow: skyRowNow(),
           stadium: latestRef.current.stadium ?? 0,
           fieldPalette: latestRef.current.fieldPalette ?? null,
