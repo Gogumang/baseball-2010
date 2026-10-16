@@ -14,7 +14,9 @@ import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
  *   main_ball 애니 0 을 기준점 (120,320) 에 그리고 (진행=1 이라 매 갱신 다음 칸으로 넘어간다),
  *   그 위에 `0x6ba3d(ctx, 120, 320, 93+k, 색)` 으로 반지름 93·95·97 원을 얹는다.
  *
- * ⚠️ 공을 그리는 조건 `[+0xe6] ≥ 0` 의 뜻을 몰라 늘 그린다 — **근사**.
+ * 공을 그리는 조건 `[+0xe6] ≥ 0`(0x24ca6~0x24cae, ldrsb)은 늘 참이다 — 확정: .text 의 `#0xe6` 쓰기를 전수로 훑으면
+ * 메뉴 +0xe6 에 넣는 값은 0(생성자 0x234f4 의 r5 → 0x237b4 · 0x2486c · 0x2593a · 0x2b4a0) · 1(0x2b37e · 0x2b5a4 ·
+ * 0x24bb8 · 0x24c68) · 2(0x2b46e · 0x24c34) · 6(0x266bc) · 랭킹 커서 0~5(0x28b46) 뿐이라 음수가 없다.
  */
 const BALL_FOLDER = './sprites/main_ball/frames'
 const BALL_ANIMATION = 0

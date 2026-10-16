@@ -17,7 +17,7 @@ import {
   HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, SCREEN, SLT_FRAME, SPECIAL_ITEMS, SPECIAL_REEL_STATE,
   hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH, HALL_OF_FAME_CELL_ART, hallOfFameCellImagesOf,
   hallOfFameCellImageTopLeftOf, isHallOfFameCellDimmed,
-  hallOfFameEntryOfSlot, hallOfFameKeyCodeOf,
+  hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, HOME_RUN_DERBY_FIRST_ROW_Y,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
@@ -536,7 +536,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   const slots = hallOfFameSlotsOf(collection, mode)
   const view = hallOfFameGridViewOf(mode)
   const current = slots[slot]
-  const cell = hallOfFameCellOf(slot - view.firstSlot)
+  const cell = hallOfFameCellOf(slot - view.firstSlot, view.firstRowY)
   const { a, b } = HALL_OF_FAME_DETAIL
   const owner = listOwner ?? (mode.kind === '등록' ? '나리' : '메뉴')
   const menuGrid = hallOfFameGridOf(mode, owner)
@@ -848,7 +848,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       {/* 5×3 격자 0x7a571 종류 6 — 칸 바탕 없이(시작 넷째 인자 [격자+8] = 0) 칸 틀 · 상태 그림 · (145) 다른 편 덮개 (0x7ac2e) */}
       {slots.map((entry, index) => {
         if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
-        const box = hallOfFameCellOf(index - view.firstSlot)
+        const box = hallOfFameCellOf(index - view.firstSlot, view.firstRowY)
         const shake = index === slot ? bounce.offset : null
         const x = box.x + (shake?.dx ?? 0)
         const y = box.y + gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot) + (shake?.dy ?? 0)
@@ -887,8 +887,8 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       {gridOpen.state.isDone && gridOpen.blink % 8 <= 4 && slot >= view.firstSlot && (
         <img className={styles.sprite} alt="" data-testid="명전-커서" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.cursor.image)}
           style={{
-            left: hallOfFameCellOf(slot - view.firstSlot).x + HALL_OF_FAME_CELL_ART.cursor.dx + bounce.offset.dx,
-            top: hallOfFameCellOf(slot - view.firstSlot).y + HALL_OF_FAME_CELL_ART.cursor.dy + bounce.offset.dy,
+            left: hallOfFameCellOf(slot - view.firstSlot, view.firstRowY).x + HALL_OF_FAME_CELL_ART.cursor.dx + bounce.offset.dx,
+            top: hallOfFameCellOf(slot - view.firstSlot, view.firstRowY).y + HALL_OF_FAME_CELL_ART.cursor.dy + bounce.offset.dy,
           }} />
       )}
 
@@ -1106,15 +1106,18 @@ function hallOfFameGridOf(mode: HallOfFameMode, owner: HallOfFameListOwner): Ann
 interface HallOfFameGridView {
   readonly firstSlot: number
   readonly rows: number
+  /** 격자 cy — 첫 줄 위쪽 y (0x65130~0x651d8) */
+  readonly firstRowY: number
 }
 
-const FULL_GRID: HallOfFameGridView = { firstSlot: 0, rows: HALL_OF_FAME_GRID.rows }
+const FULL_GRID: HallOfFameGridView = { firstSlot: 0, rows: HALL_OF_FAME_GRID.rows, firstRowY: HALL_OF_FAME_GRID.firstRowY }
 
 /**
  * 홈런더비 선수 고르기는 칸 5 부터 5×2 (0x25e6c 위젯 (5열, 2행) · 0x29ae0 셋째 인자 5).
- * ⚠️ 그리는 자리: 두 줄을 미션·스페셜 격자의 첫 두 줄 자리(y 179·219)에 둔다 — 하위 16 그리기의 격자 y 는 안 읽었다(근사).
+ * 그리는 자리: 하위 16 그리기 0x2df20 = 공용 목록 k 7 — 0x65152~0x65158 이 cy = H/2 + 0x18 = 184 · 행 2 · 종류 4 로 둔다(확정).
+ *   두 줄은 y 184 · 224 (미션·명전 k 6 · 8 은 H/2 + 0x13 = 179).
  */
 function hallOfFameGridViewOf(mode: HallOfFameMode): HallOfFameGridView {
-  if (mode.kind === '선수고르기' && mode.purpose === '홈런더비') return { firstSlot: NARI_BATTER_SLOT, rows: 2 }
+  if (mode.kind === '선수고르기' && mode.purpose === '홈런더비') return { firstSlot: NARI_BATTER_SLOT, rows: 2, firstRowY: HOME_RUN_DERBY_FIRST_ROW_Y }
   return FULL_GRID
 }

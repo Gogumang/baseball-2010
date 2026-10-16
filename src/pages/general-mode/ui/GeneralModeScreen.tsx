@@ -11,7 +11,6 @@ import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 import type { MatchSettingsSeenSlot } from '@/pages/general-mode/model/useGeneralMode'
 import { AceSelectScreen } from '@/pages/general-mode/ui/AceSelectScreen'
 import { FirstBatStadiumScreen } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
-import type { StadiumEntry } from '@/pages/general-mode/ui/FirstBatStadiumScreen'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 import { MatchSettingsWindow } from '@/pages/match-settings'
 import { hiddenTeamHintMessage } from '@/pages/general-mode/lib/hiddenTeam'
@@ -62,8 +61,6 @@ export interface GeneralModeScreenProps {
   readonly onOpenAce?: (cell: number) => void
   /** 상태 21 마선수 격자(종류 7)가 서 있는 동안 열 칸이 다 열렸으면 — 히든 팀 외인구단 12 (0x7b408, `AceSelectScreen`) */
   readonly onAllAcesOpen?: () => void
-  /** 구장 표 — 도시명 0xd1df8 · 수용 인원 0xd1e34 (웹판 데이터에 아직 없다) */
-  readonly stadiums?: readonly StadiumEntry[]
   /**
    * 전역기록의 경기진행 설정 (모드 칸 m = 0) — 설정 창이 열 때 읽고(0x5fef4), 경기 · **이어하기 경기**가 이 값으로 사람 타석을
    * 가른다(0xc1e04 는 타석마다 전역 칸을 읽는다)
@@ -205,7 +202,7 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
 function GeneralModePrepare(props: GeneralModeScreenProps) {
   const {
     random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, onLevelUpAce, gamePoint, onOpenAce, onAllAcesOpen, stadiums, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
+    aceLevels, onLevelUpAce, gamePoint, onOpenAce, onAllAcesOpen, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
     gaugeSettingOn, runningModeManual, throwModeManual, onSpendGamePoint, settings, onSettingsChange, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
   } = props
   /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
@@ -320,7 +317,6 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           // 선공 칸은 커서 skin+0x74 를 그린다 — 기록 rec+8 은 OK 때만 옮겨 적힌다
           playerSide={flow.firstBatCursor}
           stadiumId={flow.setup.stadiumId}
-          {...(stadiums === undefined ? {} : { stadiums })}
           {...(gamePoint === undefined ? {} : { gamePoint })}
           onMoveFirstBat={actions.moveFirstBat}
           onChooseFirstBat={actions.selectFirstBat}
