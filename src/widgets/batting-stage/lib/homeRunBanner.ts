@@ -311,7 +311,7 @@ export function homeRunTextAfterDraws(
 
 /**
  * 부르는 쪽이 모는 HOMERUN 글자 창 — 홈런더비처럼 글자를 켜는 때(홈런 틱)와 그리기가 멈추는 때(관문이 닫힌 틱 · 키 건너뛰기)를
- * 진행기가 아는 화면이 넘긴다. 시각은 `performance.now()` 기준 ms.
+ * 진행기가 아는 화면이 넘긴다. 시각은 경기 장면 시계(`gameSceneNow()`) 기준 ms.
  */
 export interface HomeRunTextWindow {
   /** 첫 그림 시각 */

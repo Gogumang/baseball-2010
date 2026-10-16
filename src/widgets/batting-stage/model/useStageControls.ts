@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react'
 import type { PointerEvent } from 'react'
 import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
-import { gameSceneNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  clearGameSceneTimeout, gameSceneNow, isGameSceneFrozen, setGameSceneTimeout,
+} from '@/shared/lib/commonWindow/commonWindow'
 
 /** 이만큼 길게 누르고 있으면 번트 자세 — 떼면 푼다 (모바일용, 웹판 추가) */
 const BUNT_HOLD_MILLISECONDS = 350
@@ -46,7 +48,7 @@ const SPECIAL_SWING_KEY = '0'
 export function useStageControls(refs: StageRefs, actions: StageActions) {
   const { pointerDownAtRef, latestRef } = refs
   /** 길게 누르기 번트 타이머와 그것이 번트를 걸었는지 (모바일용, 웹판 추가) */
-  const buntHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const buntHoldTimerRef = useRef<number | null>(null)
   const isPointerBuntingRef = useRef(false)
 
   useEffect(() => {
@@ -54,7 +56,6 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       if (event.repeat) return
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다.
       // 시각은 경기 장면 시계(`gameSceneNow`)로 잰다 — 단계 시작 시각과 같은 시계라야 키 틱이 맞는다
-      // ⚠️ 미확인: 창이 떠 있는 동안 뗀 '7'~'9'(0x5364c)가 원본에서 사라지는지 — 웹은 떼기를 그대로 받는다
       if (isGameSceneFrozen()) return
       const now = gameSceneNow()
       if (SWING_KEYS.has(event.key)) {
@@ -75,9 +76,15 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
         actions.pressBunt(BUNT_KEYS[event.key], now)
       }
     }
-    // 0x5364c — 뗀 키가 '7'~'9' 면 0x6a8 (종류를 가리지 않는다)
+    // 0x5364c — 뗀 키가 '7'~'9' 면 0x6a8 (종류를 가리지 않는다).
+    // 창이 서 있는 동안 뗀 키는 버려진다 (2026-10-16 직접 떴다): 키 사건은 프레임마다 0x52c50 52cbc 의 0xbca05 가 만든다 —
+    // 머리 bca0a~bca16 이 +0x1c · 사건 비트 +0x54 · 뗀 키 +0x3c 를 0 으로 지우고, 뗀 키 [+0x24] 가 있으면 bcaf0~bcb02 가 +0x54 |= 0x200
+    // (뗌) · +0x3c = 그 키 · 누름 +0x48 = 0 을 적은 뒤 bcb04~bcb08 이 받은 칸 [+0x20] · [+0x24] 를 비운다. 이 사건을 읽는 키 0x498d4 는
+    // 52cc6 게이트 **뒤**(52d9e)라 창이 서 있으면 안 불리고, 다음 프레임 0xbca05 가 사건을 지운다 — 모아 두는 칸이 없다.
+    // 그래서 창 아래에서 번트 키를 떼면 0x6a8 이 안 가고, 창이 닫힌 뒤에도 자세(+0xfdc)가 남는다(원본 그대로)
     const onKeyUp = (event: KeyboardEvent) => {
-      if (BUNT_KEYS[event.key] !== undefined) actions.releaseBunt(gameSceneNow())
+      if (BUNT_KEYS[event.key] === undefined || isGameSceneFrozen()) return
+      actions.releaseBunt(gameSceneNow())
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -89,7 +96,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
 
   useEffect(
     () => () => {
-      if (buntHoldTimerRef.current !== null) clearTimeout(buntHoldTimerRef.current)
+      clearGameSceneTimeout(buntHoldTimerRef.current)
     },
     [],
   )
@@ -103,9 +110,10 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
       const isEdge = x < STAGE_WIDTH * SHIFT_EDGE_RATIO || x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)
       if (isEdge || !latestRef.current.canBunt) return
-      if (buntHoldTimerRef.current !== null) clearTimeout(buntHoldTimerRef.current)
-      // 길게 누르고 있으면 번트 1 을 누른 것으로 — 떼면 푼다(키 '8' 과 같다)
-      buntHoldTimerRef.current = setTimeout(() => {
+      clearGameSceneTimeout(buntHoldTimerRef.current)
+      // 길게 누르고 있으면 번트 1 을 누른 것으로 — 떼면 푼다(키 '8' 과 같다). 누르고 있는 시간은 경기 장면 시계로 잰다 —
+      // 창이 서 있는 동안은 키 처리가 없으므로(52cc6) 그동안은 세지 않는다
+      buntHoldTimerRef.current = setGameSceneTimeout(() => {
         buntHoldTimerRef.current = null
         isPointerBuntingRef.current = true
         actions.pressBunt(1, gameSceneNow())
@@ -115,12 +123,14 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
     onPointerUp: (event: PointerEvent<HTMLCanvasElement>) => {
       event.preventDefault()
       if (buntHoldTimerRef.current !== null) {
-        clearTimeout(buntHoldTimerRef.current)
+        clearGameSceneTimeout(buntHoldTimerRef.current)
         buntHoldTimerRef.current = null
       }
       const now = gameSceneNow()
       if (isPointerBuntingRef.current) {
         isPointerBuntingRef.current = false
+        // 키 '8' 떼기와 같다 — 창이 서 있는 동안 뗀 것은 버려진다(위 `onKeyUp`)
+        if (isGameSceneFrozen()) return
         return actions.releaseBunt(now)
       }
       // 공용 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 위 `onKeyDown` 과 같다

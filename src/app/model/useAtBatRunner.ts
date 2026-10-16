@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
+import { clearGameSceneTimeout, setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
 
-/** 타석이 끝난 뒤 결과를 보여주는 시간 */
+/**
+ * 타석이 끝난 뒤 결과를 보여주는 시간 — 경기 장면 시계로 잰다(`setGameSceneTimeout`): 결과 판은 경기 장면 상태라 공용 창이 서 있는
+ * 동안(0x52c50 52cc6 이 장면 틱 · 갱신을 건너뛴다) 서고 닫히면 남은 만큼 이어 센다
+ */
 const AT_BAT_BANNER_MILLISECONDS = 1500
 
 export interface AtBatRunner {
@@ -37,7 +41,7 @@ export function useAtBatRunner(): AtBatRunner {
   const bannerTimerRef = useRef<number | null>(null)
   useEffect(
     () => () => {
-      if (bannerTimerRef.current !== null) window.clearTimeout(bannerTimerRef.current)
+      clearGameSceneTimeout(bannerTimerRef.current)
     },
     [],
   )
@@ -59,8 +63,9 @@ export function useAtBatRunner(): AtBatRunner {
       setIsPaused(true)
       setBannerText(text)
 
-      if (bannerTimerRef.current !== null) window.clearTimeout(bannerTimerRef.current)
-      bannerTimerRef.current = window.setTimeout(() => {
+      clearGameSceneTimeout(bannerTimerRef.current)
+      bannerTimerRef.current = setGameSceneTimeout(() => {
+        bannerTimerRef.current = null
         resetAtBat()
         setBannerText('')
         if (onElapsed === undefined) {

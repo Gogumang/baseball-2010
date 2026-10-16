@@ -132,12 +132,105 @@ let frozenTotal = 0
 /** `resetCommonWindowShownForTest` 마다 오른다 */
 let testGeneration = 0
 
+/** 멈추기 시작할 때마다 오른다 — 창이 선 첫 그림([창+0x250])을 부품마다 한 번 세는 데 쓴다(`createGameSceneDrawGate`) */
+let freezeSerial = 0
+
 function syncGameSceneFreeze(now: number = performance.now()): void {
   const isFrozen = gameScenesUp > 0 && shownCommonWindows > 0
-  if (isFrozen && frozenSince === null) frozenSince = now
-  else if (!isFrozen && frozenSince !== null) {
+  if (isFrozen && frozenSince === null) {
+    frozenSince = now
+    freezeSerial += 1
+    for (const timer of sceneTimers.values()) pauseSceneTimer(timer, now)
+  } else if (!isFrozen && frozenSince !== null) {
     frozenTotal += Math.max(0, now - frozenSince)
     frozenSince = null
+    for (const [id, timer] of sceneTimers) runSceneTimer(id, timer, now)
+  }
+}
+
+/**
+ * **경기 장면 시계로 재는 setTimeout** — 경기 장면의 상태 길이(상태 틱 [장면+0x2c] 를 세는 갱신 · 진입 · 그 그림의 소리)는
+ * 공용 창이 서 있는 동안 52cc6 이 장면 틱 0xbc9c9 · 진입 표 0xd04bc · 갱신 표 0xd0530 을 통째로 건너뛰어 서고, 닫히면 그 자리에서
+ * 이어 센다(따라잡지 않는다). 웹 시계도 그동안 남은 시간을 붙잡아 두었다가 닫히면 남은 만큼만 더 기다린다.
+ * 장면이 멈춰 있지 않으면 `setTimeout` 과 같고, 멈춘 동안 건 시계는 풀린 때부터 잰다. 경기 장면 밖에서는 늘 그냥 흐른다.
+ */
+interface SceneTimer {
+  readonly callback: () => void
+  /** 아직 남은 장면 시간(ms) */
+  remaining: number
+  /** 지금 도는 실제 시계를 건 실제 시각 — 붙잡혀 있으면 null */
+  startedAt: number | null
+  handle: ReturnType<typeof setTimeout> | null
+}
+const sceneTimers = new Map<number, SceneTimer>()
+let nextSceneTimerId = 1
+
+function runSceneTimer(id: number, timer: SceneTimer, now: number): void {
+  if (timer.handle !== null) return
+  timer.startedAt = now
+  timer.handle = setTimeout(() => {
+    sceneTimers.delete(id)
+    timer.handle = null
+    timer.callback()
+  }, timer.remaining)
+}
+
+function pauseSceneTimer(timer: SceneTimer, now: number): void {
+  if (timer.handle === null) return
+  clearTimeout(timer.handle)
+  timer.handle = null
+  timer.remaining = Math.max(0, timer.remaining - (now - (timer.startedAt ?? now)))
+  timer.startedAt = null
+}
+
+/** 경기 장면 시계로 `delay` ms 뒤 `callback` — `clearGameSceneTimeout` 으로 거둔다 */
+export function setGameSceneTimeout(callback: () => void, delay: number): number {
+  const id = nextSceneTimerId
+  nextSceneTimerId += 1
+  const timer: SceneTimer = { callback, remaining: Math.max(0, delay), startedAt: null, handle: null }
+  sceneTimers.set(id, timer)
+  if (frozenSince === null) runSceneTimer(id, timer, performance.now())
+  return id
+}
+
+/** `setGameSceneTimeout` 으로 건 시계를 거둔다(이미 울렸거나 없는 번호면 아무 일 없다) */
+export function clearGameSceneTimeout(id: number | null | undefined): void {
+  if (id == null) return
+  const timer = sceneTimers.get(id)
+  if (timer === undefined) return
+  if (timer.handle !== null) clearTimeout(timer.handle)
+  sceneTimers.delete(id)
+}
+
+/**
+ * **창이 선 첫 그림의 그리기 셈** — 52efe 는 [창+0x24f](경기 장면 1) && [창+9] && **[창+0x250] == 0** 일 때만 0x41230 · 그리기 표
+ * 0xd05a0 을 건너뛴다. [+0x250] 은 창을 띄운 0x74ef4(7503c~) · 0x741a0 이 1 로 세우고 같은 그림 끝 창 그리기 0x746cc(53078)가 0 으로
+ * 지운다 — 곧 창이 선 첫 그림은 갱신(52cc6)이 없어도 장면 그리기가 한 번 더 돈다. 그리기 함수가 스스로 올리는 칸(조준 애니 0 칸 ·
+ * 게이지 커서 0x4d708 · 미션 목표 줄 0x36714 따위)은 그 그림에 한 번 오른다.
+ *
+ * 부품마다 하나 만들어 그림 틀마다 `allowsDraw()` 를 묻는다 — 장면이 흐르면 참, 멈춘 뒤 처음 묻는 한 번만 참, 그 뒤로 거짓.
+ * 만든 때 이미 멈춰 있었으면 그 멈춤의 첫 그림은 지난 것으로 본다(멈춘 동안 새 상태가 서는 일은 없다).
+ *
+ * 대기 칸 창이 이어 설 때도 같다 — 창 갱신 0x754f8 이 75552 · 755d4 에서 0x75440 을 불러 0x74ef4 · 0x741a0 으로 다음 창을 띄우므로
+ * [+0x250] 이 다시 선다(웹은 앞 창이 내려가고 같은 때 다음 창이 서서 멈춤이 새로 센다).
+ *
+ * ⚠️ 근사(때): 원본은 창을 연 자리가 갱신(52cc6) 앞(대기 칸 창이 0x754f9 안에서 서는 때 · 폰 인터럽트 0x463ac)이면 그 그림이 갱신 없이
+ * 그리기만 하고, 갱신 뒤(키 0x498d4 의 '*' 메뉴 · 진입 · 갱신의 히든 오픈 알림)면 그 그림은 갱신 · 그리기를 다 한다. 웹은 창이 서는
+ * 커밋에서 곧장 멈추고 그리기 셈만 한 번 더 올린다 — 뒤 경우의 갱신 한 틱은 웹에 없다.
+ */
+export interface GameSceneDrawGate {
+  readonly allowsDraw: () => boolean
+}
+
+export function createGameSceneDrawGate(): GameSceneDrawGate {
+  let seenSerial = frozenSince === null ? -1 : freezeSerial
+  return {
+    allowsDraw: () => {
+      if (frozenSince === null) return true
+      if (seenSerial === freezeSerial) return false
+      seenSerial = freezeSerial
+      return true
+    },
   }
 }
 
@@ -180,6 +273,8 @@ export function resetCommonWindowShownForTest(): void {
   testGeneration += 1
   shownCommonWindows = 0
   gameScenesUp = 0
+  // 붙잡혀 있던 시계는 다시 흘린다
+  syncGameSceneFreeze()
   frozenSince = null
   frozenTotal = 0
 }

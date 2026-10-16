@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
+import {
+  clearGameSceneTimeout, gameSceneNow, isGameSceneFrozen, setGameSceneTimeout,
+} from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
 /**
@@ -96,8 +99,11 @@ export interface SceneConfirm {
  * - `canAccept` 가 거짓이면(경기 중 메뉴·조작방법·설정·교대 판·인트로가 덮고 있으면) 키를 안 받는다 — 일시정지 팝업
  *   0x754f9 가 떠 있으면 경기 키가 안 가고, 0x498d4 의 OK 는 0xe 의 사람 조작 객체에게만 간다.
  * - 받기 시작하면 0xd 두 그림(`SCENE_PREPARE_FRAMES`) 뒤 0xe 로 보고, 그 뒤 `SCENE_CONFIRM_LOCK_FRAMES` 갱신 안의 OK 는
- *   무시한다 (0x49a26). ⚠️ 근사: 원본은 0xd 에 들어선 때부터 센다. 웹은 화면이 받기 시작한 때(덮개가 걷힌 때)부터 세고,
- *   메뉴를 열었다 닫으면 처음부터 다시 센다 — 일시정지 팝업 동안 장면 틱이 도는지는 안 봤다.
+ *   무시한다 (0x49a26). ⚠️ 근사: 원본은 0xd 에 들어선 때부터 센다. 웹은 화면이 받기 시작한 때(덮개가 걷힌 때)부터 센다.
+ * - 셈은 경기 장면 시계로 한다(`setGameSceneTimeout`): 공용 창(경기 중 메뉴 · 조작방법 · 설정 · 히든 오픈 알림)이 서 있으면
+ *   0x52c50 52cc6 이 장면 틱 0xbc9c9([장면+0x2c]) · 키 0x498d4 를 건너뛰어 0xd 두 그림 · 0xe 잠금 셈이 서고, 닫히면 그 자리에서
+ *   이어 센다. 그래서 창이 덮어 `canAccept` 가 잠시 거짓이 되어도(창이 서 있는 채로 내려갔다가) 같은 대기로 돌아오면 처음부터
+ *   다시 세지 않고 멈춘 자리에서 잇는다. 창이 서 있는 동안 OK 는 받지 않는다(키는 창 0x754f9 가 가져간다).
  * - Enter·스페이스·'5' 를 OK 로 받는다. 화면 누르기는 부르는 쪽이 `confirm` 을 잇는다.
  */
 export function useSceneConfirm(
@@ -114,6 +120,8 @@ export function useSceneConfirm(
   const acceptsConfirm = isAwaiting && canAccept
 
   const isUnlockedRef = useRef(false)
+  /** 공용 창 아래에서 내려간 대기와 그 0xd 첫 그림의 장면 시각 — 창이 닫혀 다시 받으면 여기서 잇는다 */
+  const suspendedRef = useRef<{ readonly wait: SceneConfirmWait; readonly confirmed: number; readonly startedAt: number } | null>(null)
   const [sceneDEntryMark, setSceneDEntryMark] = useState(0)
   const [enteredKey, setEnteredKey] = useState<{ readonly wait: SceneConfirmWait; readonly confirmed: number } | null>(null)
   const isInConfirmState =
@@ -134,13 +142,24 @@ export function useSceneConfirm(
     // 0xd 첫 그림 — 0x48d50 이 48ee4 에서 투수 그림 객체를 상태 0 으로 되돌린다(0x35650 → 0x340c0). 0xb 에서 곧장 선 0xe 는 0xd 가 없다
     if (wait.skipsSceneD !== true && marksSceneDEntered(wait, confirmed)) setSceneDEntryMark((mark) => mark + 1)
     const frame = millisecondsPerFrame()
-    const entered = window.setTimeout(() => setEnteredKey({ wait, confirmed }), SCENE_PREPARE_FRAMES * frame)
-    const unlocked = window.setTimeout(() => {
+    // 공용 창이 서 있는 채로 내려갔던 같은 대기면 그때 센 장면 시간에서 잇는다 — 장면 시계는 창 아래에서 안 흐른다
+    const suspended = suspendedRef.current
+    suspendedRef.current = null
+    const startedAt =
+      suspended !== null && suspended.wait === wait && suspended.confirmed === confirmed ? suspended.startedAt : gameSceneNow()
+    const elapsed = gameSceneNow() - startedAt
+    const enteredDelay = SCENE_PREPARE_FRAMES * frame - elapsed
+    const unlockedDelay = SCENE_CONFIRM_READY_FRAMES * frame - elapsed
+    const entered = enteredDelay <= 0 ? null : setGameSceneTimeout(() => setEnteredKey({ wait, confirmed }), enteredDelay)
+    if (enteredDelay <= 0) setEnteredKey((key) => (key?.wait === wait && key.confirmed === confirmed ? key : { wait, confirmed }))
+    const unlocked = setGameSceneTimeout(() => {
       isUnlockedRef.current = true
-    }, SCENE_CONFIRM_READY_FRAMES * frame)
+    }, Math.max(0, unlockedDelay))
     return () => {
-      window.clearTimeout(entered)
-      window.clearTimeout(unlocked)
+      clearGameSceneTimeout(entered)
+      clearGameSceneTimeout(unlocked)
+      // 창이 덮어 내려가는 것이면 센 자리를 남긴다 — 다른 덮개(결과 띠 · 교대 판 따위)면 다음에 처음부터 센다
+      if (isGameSceneFrozen()) suspendedRef.current = { wait, confirmed, startedAt }
     }
   }, [acceptsConfirm, wait, confirmed])
 
@@ -149,6 +168,8 @@ export function useSceneConfirm(
   const confirm = useCallback(() => {
     const current = stateRef.current
     if (!current.acceptsConfirm || current.wait == null || !isUnlockedRef.current) return
+    // 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 키는 창이 가져간다
+    if (isGameSceneFrozen()) return
     // 메시지 1 → 0x50c18 → 0xf 예약 (같은 걸음에 0xe 가 더 남았으면 그 대기로)
     confirmedCounts.set(current.wait, current.confirmed + 1)
     isUnlockedRef.current = false
