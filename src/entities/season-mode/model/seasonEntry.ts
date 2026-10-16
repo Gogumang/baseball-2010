@@ -209,7 +209,9 @@ function aceCellsOf(ace: AcePlayer, aceIndex: number, ability: readonly number[]
     profileLow: ace.profile & 3,
     detailSource,
     pitcherLine: entryPitcherLineOfRecord(ace.recordLine),
-    // ⚠️ 미확인: 마투수 레코드 +0x2c 는 웹이 따로 들지 않아 가득으로 둔다
+    // 레코드 +0x2c = 10000 — 0xdd 진입 66da `0xb88c8` 이 저장의 마투수 레코드 `0x1f825(app, 번호)`(앱 데이터 +0xc64 + 번호×0x30,
+    // 0x20094 6번 갈래가 XlsACE_PIT 행을 부은 것 — 다섯 줄 모두 0x2710)를 0xb521c 로 +0x2c 까지 통째 8번 칸에 넣는다(b5296~b529c).
+    // 0x1f824 를 부르는 넷(0x48d50 · 0x5aefc · 0xaae7c · 0xb88c8)은 모두 베껴 가는 쪽이고, 0xe0 에서 돌아온 0xdd 는 다시 안 넣는다
     stamina: { capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false), percent: staminaPercentOf(source.staminaMode, FULL_RECORD_STAMINA) },
   }
 }
