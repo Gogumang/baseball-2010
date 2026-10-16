@@ -12,7 +12,6 @@ import {
   endSituationOf,
   isGameOverAt,
   PLAYER_BATTING_ORDER_INDEX,
-  PLAYER_SIDE_FIRST_BAT,
   PLAYER_SIDE_LAST_BAT,
   isPlayerTurn,
   ourHalfOf,
@@ -496,6 +495,16 @@ export interface GameProgress {
    * 덮은 나리 사기(`PlayerCareer.teamRecordMorales`)다. 내 팀 칸은 셋업 0x39fdc 3a332 가 먼저 덮어 없다 (`HalfInningDefense.staleMorale`)
    */
   readonly opponentStaleMorale?: number
+  /**
+   * **이 경기에서 0xb570c(b5768)가 상대 팀 레코드 +2 에 마지막으로 쓴 값** — 아직 한 번도 안 덮었으면 없다(그동안 상대 첫 공은
+   * `opponentStaleMorale`). 덮는 자리: 상대가 던지는 공마다(사람 장면 틱 10 놓기 0x4dc78 의 0x4dbac · 0x34968 / 동료 간이 타석의
+   * c1446 · c1852) · 상대 공격 반 이닝(자동진행 0x21 간이 엔진)의 스윙 경로 0xab214(ab4c0~ab4d8) · 주자 있는 판정 경로 c19ec.
+   * 돌발 보상(0x1c · 0x1d 진입 0x3b068 · 0x3b04c → 0x8e34c)이 사기를 바꾼 뒤 상대 칸이 다시 안 덮이면(경기 마지막 타석의 돌발 등)
+   * 경기 끝의 그 칸은 **바뀌기 전 값**이다 — 0x1c · 0x1d · 0x18 · 0x19 의 진입 · 갱신 · 그리기에서 0xb570c 에 닿는 길은
+   * 0x1d 그리기 0x4d1e0 → 0x4ce9c → 0x35b94 하나인데 35f70 `상태 == 0xe` 일 때만 부른다 (r104 직접 뜸). 경기 끝 정산이
+   * 리그 레코드 앞 값(`PlayerCareer.teamRecordMorales`)으로 이 값을 남긴다
+   */
+  readonly opponentRecordMorale?: number
 }
 
 /** `team[+0x29 + 타순]` 의 "아직 안 채움" 값 — `0xaebe4` 가 음수를 보고 채운다 */
@@ -589,7 +598,7 @@ export function startGame(
   myRunAbility?: number,
   /** 두 팀 레코드 사기 = 지금 나리 사기 0xa3a24 (`GameProgress.teamMorale`). 안 넘기면 팀마다 표값 */
   teamMorale?: number,
-  /** 상대 팀 레코드 +2 의 앞 값 (`GameProgress.opponentStaleMorale`) — 상대가 후공일 때만 쓴다. 안 넘기면 없다 */
+  /** 상대 팀 레코드 +2 의 앞 값 (`GameProgress.opponentStaleMorale`) — 상대 레코드가 이 경기에서 아직 안 덮였을 때만 본다. 안 넘기면 없다 */
   opponentStaleMorale?: number,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
@@ -659,8 +668,9 @@ export function startGame(
     stealingFrom: [],
     ...(myRunAbility === undefined ? {} : { myRunAbility }),
     ...(teamMorale === undefined ? {} : { teamMorale }),
-    // 1회초 수비 = 후공. 내가 선공이면 상대가 먼저 던진다 — 그 첫 공만 앞 값을 본다
-    ...(opponentStaleMorale === undefined || playerSide !== PLAYER_SIDE_FIRST_BAT ? {} : { opponentStaleMorale }),
+    // 상대 첫 투수 첫 공은 이 경기에서 상대 레코드가 아직 안 덮였으면 앞 값을 본다(`opponentRecordMorale` 이 없을 때만).
+    // 상대가 후공이면 1회초 첫 공, 선공이면 1회초 공격(자동진행)에서 한 번도 안 덮였을 때의 1회말 첫 공이다 (r104)
+    ...(opponentStaleMorale === undefined ? {} : { opponentStaleMorale }),
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
@@ -799,7 +809,8 @@ export function throwOpponentPitch(
 ): GameProgress {
   if (progress.game.isFinished) return progress
   const mound = progress.opponentMound
-  return {
+  // 소모(0x11 진입 3dec6 0xa5e14) 뒤 틱 10 놓기 0x4dc78 의 0x4dbac · 0x34968 이 상대(수비) 레코드 +2 를 덮는다
+  return withOpponentRecordTouched({
     ...progress,
     opponentMound: {
       ...mound,
@@ -811,7 +822,7 @@ export function throwOpponentPitch(
     pinchHitUsed: false,
     // 같은 0xa5e14 가 정산 사건 목록을 비운다 (a5e80 ctx+0x2c = 0)
     pendingSettlementEvents: undefined,
-  }
+  })
 }
 
 /** 상대 투수가 이 구질을 던져 깎은 뒤의 +0x2c (0xa5e14 → 0xaeb08) — `throwOpponentPitch` 와 타석 화면의 투구 AI 가 함께 쓴다 */
@@ -2097,6 +2108,11 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
     {
       ...progress,
       game,
+      // 자동진행 반 이닝이 상대(공격) 레코드 +2 를 덮었으면(스윙 경로 0xab214 · 주자 있는 판정 경로 c19ec) 그때 사기다 — 이 반 이닝에는
+      // 돌발이 없어(상태 0xf 를 안 지난다) 사기가 그대로다 (`HalfInningResult.offenseRecordTouched`, r104)
+      ...(half.offenseRecordTouched
+        ? { opponentRecordMorale: progress.teamMorale ?? teamRecordMoraleOf(progress.opponentTeamId) }
+        : {}),
       opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
       ourMound: half.mound ?? progress.ourMound,
       // 우리 투수 줄 — 반 이닝 엔진이 던진 투수마다 낸 줄 (투구 수 포함)
@@ -2245,6 +2261,8 @@ function playTeammateAtBat(progress: GameProgress, random: RandomPort, relay?: G
     {
       ...progress,
       game,
+      // 간이 타석의 공마다 c1446 · c1852 가 상대(수비) 레코드 +2 를 덮는다 (`GameProgress.opponentRecordMorale`)
+      opponentRecordMorale: progress.teamMorale ?? teamRecordMoraleOf(progress.opponentTeamId),
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, progress.game, game, moundsOf(progress)),
       teammateLogs: { ...progress.teammateLogs, [slot]: recorded.log },
@@ -2429,8 +2447,15 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     teamAcePitcherOf(progress, false),
     // 0xb570c b5768 이 상대 팀 레코드 +2 에도 나리 사기를 쓴다 (`GameProgress.teamMorale`)
     progress.teamMorale,
-    progress.opponentStaleMorale,
+    // 이 경기에서 아직 안 덮였을 때만 앞 값 (`GameProgress.opponentRecordMorale`)
+    progress.opponentRecordMorale === undefined ? progress.opponentStaleMorale : undefined,
   )
+}
+
+/** 0xb570c(b5768)가 상대 팀 레코드 +2 를 지금 나리 사기로 덮었다 (`GameProgress.opponentRecordMorale`) */
+function withOpponentRecordTouched(progress: GameProgress): GameProgress {
+  const morale = progress.teamMorale ?? teamRecordMoraleOf(progress.opponentTeamId)
+  return progress.opponentRecordMorale === morale ? progress : { ...progress, opponentRecordMorale: morale }
 }
 
 /**

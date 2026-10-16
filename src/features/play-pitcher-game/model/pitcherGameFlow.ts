@@ -670,6 +670,14 @@ export interface PitcherGameProgress {
    */
   readonly burstRewardDeltas?: readonly BurstRewardDelta[]
   /**
+   * **이 경기에서 0xb570c(b5768)가 상대 팀 레코드 +2 에 마지막으로 쓴 값** — 아직 안 덮었으면 없다(그동안 상대 첫 공은
+   * `PitcherGameOptions.opponentStaleMorale`). 덮는 자리: 사람 장면 상대 타석의 0xe 그리기 0x4d9ec → 0x35b94(35f70 `상태 == 0xe` →
+   * 공격 팀 +0x220) · 우리 공격(자동진행 0x21)의 공마다 c1446 · c1852(수비 = 상대) · 강판 뒤 상대 자동 타석의 스윙 경로 0xab214 ·
+   * 주자 있는 판정 경로 c19ec. 돌발 보상(0x1c · 0x1d 진입 → 0x8e34c)이 사기를 바꾼 뒤 다시 안 덮이면(경기 마지막 타석의 돌발)
+   * 경기 끝 그 칸은 **바뀌기 전 값**이다 — 0x1c · 0x1d · 0x18 · 0x19 에서 0xb570c 에 닿는 길은 35f70 에 막힌다 (r104 직접 뜸)
+   */
+  readonly opponentRecordMorale?: number
+  /**
    * **공 객체 +0x10** (경기+0xf98) — 공에 실린 마구 번호. 0x34d6c 투수 쪽 보정(구속·제구 +150~220 · B/C %)이 본다.
    * 상태 0x11 진입 `0x3de10` 만 쓴다 (H2 3-4): `구질 == 22 && 0xaea10(수비 팀) > 0` 이면 `+0x10 = 투수+0x18`.
    * 마구 횟수는 그보다 앞(코스 확정 0x50e9c)에서 줄어 **마지막 한 번(1 → 0)은 새로 안 싣는다**.
@@ -2714,12 +2722,21 @@ export function withPitcherGameMorale(progress: PitcherGameProgress, morale: num
  * 타석 준비 — 상태 0xe 진입 0x50674 의 **감독 강판 판정**. 강판되면 0x23 으로 빠져 기다리지 않는다.
  * 아니면 0xe 에 서서 사람 OK 를 기다린다 — 돌발 발동 판정(0xe → 0xf 의 메시지 1)과 0xf 진입은 OK 뒤다 (`confirmScene`).
  */
+/** 0xb570c(b5768)가 상대 팀 레코드 +2 를 지금 나리 사기로 덮었다 (`PitcherGameProgress.opponentRecordMorale`) */
+function withOpponentRecordTouched(progress: PitcherGameProgress): PitcherGameProgress {
+  const morale = progress.options.teamMorale
+  return progress.opponentRecordMorale === morale ? progress : { ...progress, opponentRecordMorale: morale }
+}
+
 function prepareAtBat(
   progress: PitcherGameProgress,
   random: RandomPort,
   /** 교체 연출 0x16 뒤의 0xd 인가 — 그러면 0x522d2 가 이전 상태 0x16 을 보고 메시지 0xbc1 의 타석 등장음을 안 낸다 */
   afterSubstitution = false,
 ): PitcherGameProgress {
+  // 사람 장면 상대 타석 — 0xe 그리기 0x4d9ec → 0x35b94(35f70~35fb4)가 공격 팀(상대) 레코드 +2 를 덮는다.
+  // ⚠️ 미확인: 강판(0xe 진입 0x504cc → 0x23)이면 0xe 그리기가 한 틱이라도 도는지는 안 봤다 — 웹은 덮였다고 본다
+  progress = withOpponentRecordTouched(progress)
   const { options } = progress
   const bases = progress.game.bases
   const hook = judgeManagerHook(
@@ -3056,7 +3073,8 @@ function advance(progress: PitcherGameProgress, random: RandomPort): PitcherGame
 
     if (current.game.half === ourHalfOf(current.game)) {
       // 우리 공격은 모드 3 에서 늘 자동진행(0x21, 0xc1eac) — 진입 0x3abf0 이 남은 돌발을 내린다 (0x8f628)
-      current = markAuto(playTeammateAtBat(withoutPendingBurst(current), random, relay))
+      // 간이 타석의 공마다 c1446 · c1852 가 수비(상대) 레코드 +2 를 덮는다
+      current = withOpponentRecordTouched(markAuto(playTeammateAtBat(withoutPendingBurst(current), random, relay)))
       continue
     }
 
@@ -3363,7 +3381,12 @@ function playDefensiveAtBat(
       : Math.min(MAXIMUM_PITCHER_COUNTER, progress.ourInningRunsAllowed + runs),
   }
   // 0xc1a42 — 간이 타석 도루 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c (상대 팀 주자)
-  const withSteals = withLeagueSteals(result, false, appearance.stolenRunners)
+  // 상대(공격) 레코드 +2 는 스윙 경로 0xab214 · 주자 있는 판정 경로 c19ec 에서만 덮인다 (`touchesOffenseRecord`)
+  const withSteals = withLeagueSteals(
+    appearance.touchesOffenseRecord ? withOpponentRecordTouched(result) : result,
+    false,
+    appearance.stolenRunners,
+  )
   relay?.push(
     relayTickOf(withSteals, before, {
       ours: false,
@@ -3721,7 +3744,10 @@ function quickDefenseOf(
       : progress.game.opponentScore - progress.game.ourScore,
     // 0xb570c b5768 이 두 팀 레코드 +2 를 공마다 지금 나리 사기로 덮는다 — 상대 팀도 같은 값 (`PitcherGameOptions.teamMorale`)
     morale: options.teamMorale,
-    ...(isOurs || options.opponentStaleMorale === undefined ? {} : { staleMorale: options.opponentStaleMorale }),
+    // 상대 첫 투수 첫 공의 앞 값 — 이 경기에서 상대 레코드가 아직 안 덮였을 때만 (`PitcherGameProgress.opponentRecordMorale`, r104)
+    ...(isOurs || options.opponentStaleMorale === undefined || progress.opponentRecordMorale !== undefined
+      ? {}
+      : { staleMorale: options.opponentStaleMorale }),
     bothTeamsAreCpu: false,
     isOwnPlayerAt: (slot) => isOurs && slot === MY_PITCHER_SLOT,
     // 0xb6dec 보직 — 로스터 칸 0~3 선발 · 4~6 중간 · 7 마무리. 내 투수(칸 8)는 표 밖이라 0xabfcc 목록에 안 든다
@@ -4012,6 +4038,8 @@ export interface PitcherGameSummary {
    * (사기는 0xa3a44 — 대회 중이면 상대국 칸, `applyPitcherBurstRewards`)
    */
   readonly burstRewardDeltas?: readonly BurstRewardDelta[]
+  /** 상대 팀 레코드 +2 에 이 경기가 남긴 값 (`PitcherGameProgress.opponentRecordMorale`) — 없으면 한 번도 안 덮였다 */
+  readonly opponentRecordMorale?: number
 }
 
 /**
@@ -4118,6 +4146,7 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     leagueErrors: progress.leagueErrors ?? [],
     leaguePlateAppearances: progress.leaguePlateAppearances ?? [],
     burstRewardDeltas: progress.burstRewardDeltas ?? [],
+    ...(progress.opponentRecordMorale === undefined ? {} : { opponentRecordMorale: progress.opponentRecordMorale }),
     leaguePitchers: {
       lines: chargeCpuPitcherLine(
         chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {

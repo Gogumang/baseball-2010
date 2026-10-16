@@ -635,7 +635,7 @@ export function useCareerSession({
        * (`GameProgress.teamMorale`, `nariMoraleOf`). 국가대항전이면 원본 버그로 상대국 칸 +2 값이다
        */
       teamMorale?: number,
-      /** 상대 리그 팀 레코드 +2 의 앞 값 — 상대가 후공이면 그 첫 공만 본다 (`GameProgress.opponentStaleMorale`). 대회는 안 넘긴다 */
+      /** 상대 리그 팀 레코드 +2 의 앞 값 — 이 경기에서 그 칸이 아직 안 덮였을 때 상대 첫 공만 본다 (`GameProgress.opponentStaleMorale`). 대회는 안 넘긴다 */
       opponentStaleMorale?: number,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
@@ -849,12 +849,13 @@ export function useCareerSession({
       const resulted = applyGameResult(currentCareer, summary)
       // CPU 경기 0xc2a48(4f296)는 평가 0xa719c(4f274)가 사기를 바꾼 **뒤**다 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 그 사기를 쓴다
       const moraleAtCpuGames = nariMoraleOf(applyGameEvaluation(resulted, thisEvaluation, isEvaluated))
-      // 사람 경기 상대의 리그 레코드 +2 는 경기 마지막 0xb570c 때의 나리 사기로 남는다 (`teamRecordMorales`, r101)
-      // ⚠️ 마지막 공 뒤에 돌발 보상 사기가 바뀌면 원본 그 칸은 바뀌기 전 값이다 — 웹은 경기 끝 값을 쓴다(미확인 차이)
+      // 사람 경기 상대의 리그 레코드 +2 는 이 경기에서 0xb570c 가 마지막으로 그 칸을 덮을 때의 나리 사기로 남는다 (`teamRecordMorales`, r101).
+      // 마지막 타석의 돌발 보상이 사기를 바꾸면(0x1c · 0x1d 진입) 그 뒤 0x18 · 0x19 는 그 칸을 안 덮어 **바뀌기 전 값**이다
+      // (`GameProgress.opponentRecordMorale`, r104). 그 값이 없는 옛 진행(경기 중 저장)은 경기 끝 값 그대로
       const settled = withNariTeamRecordMorales(
         applySeasonEnd(applyLeagueDay(resulted, summary.ourTeamId, random, aceLevels, moraleAtCpuGames)),
         [finished.opponentTeamId],
-        finished.teamMorale ?? nariMoraleOf(currentCareer),
+        finished.opponentRecordMorale ?? finished.teamMorale ?? nariMoraleOf(currentCareer),
       )
       // 평가 0xa719c 안 0xa690c 가 경기 뒤 누적 카운터 S+0x1f0 을 더한다 — 정규시즌(평가하는 경기)만 (`withGameSkillCounters`)
       const evaluated = applyGameEvaluation(

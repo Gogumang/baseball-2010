@@ -151,6 +151,12 @@ export interface HalfInningResult {
   readonly bases?: BaseState
   /** 그 루에 선 주자의 신원 — 반 이닝 타순 커서(`battingOrderIndex` 와 같은 셈, 원본 주자 목록 sim+0x80) */
   readonly runners?: BaseRunners
+  /**
+   * 이 반 이닝에서 0xb570c 가 **공격 팀 레코드 +2** 를 한 번이라도 덮었는가 (나리 b5768, `QuickPlateAppearance.touchesOffenseRecord`).
+   * 간이 엔진은 수비 팀은 공마다(c1446 · c1852) 덮지만 공격 팀은 스윙 경로 0xab214(ab4c0~ab4d8) · 주자가 있는 판정 경로(c19ec)에서만
+   * 덮는다 — 투구 판정 경로만으로 끝난 주자 없는 반 이닝(삼진 셋)이면 거짓이다. CPU 대타 0xac228 은 0xb570c 를 안 부른다 (r104 직접 뜸)
+   */
+  readonly offenseRecordTouched: boolean
 }
 
 /* ── 공격 쪽: 명단과 CPU 대타 (0xc1ba4 → 0xac228 → 0xaebe4) ───────────────────── */
@@ -459,6 +465,8 @@ export function* simulateHalfInningTicks(
   swing?: HalfInningSwingContext,
 ): Generator<HalfInningTick, HalfInningResult, void> {
   let bases = EMPTY_BASES
+  /** 공격 팀 레코드 +2 를 0xb570c 가 덮었는가 (`HalfInningResult.offenseRecordTouched`) */
+  let offenseRecordTouched = false
   /** 루에 선 주자의 타순 커서 — 원본 주자 목록(sim+0x80, `baseRunners.ts`). 반 이닝은 빈 루에서 시작한다 */
   let runners = EMPTY_BASE_RUNNERS
   /** 루별 책임 투수(주자+0x30) — 반 이닝은 빈 목록에서 시작한다(0xa9250) */
@@ -634,6 +642,7 @@ export function* simulateHalfInningTicks(
       random,
     )
     const play = appearance.play
+    if (appearance.touchesOffenseRecord) offenseRecordTouched = true
     // 0xc1a42 — 루를 옮긴 주자마다 (그 주자의 타순 커서)
     for (const cursor of appearance.stolenRunners) {
       stolenBases.push({
@@ -770,6 +779,7 @@ export function* simulateHalfInningTicks(
     ...(stoppedBeforeBatter ? { stoppedBeforeBatter } : {}),
     bases,
     runners,
+    offenseRecordTouched,
   }
 }
 

@@ -1322,12 +1322,12 @@ export function usePitcherLeagueSession(
       const moraleAtCpuGames = played.postseason === null
         ? nariMoraleOf(gainPitcherMorale(recorded, summary.evaluation.moraleChange))
         : nariMoraleOf(recorded)
-      // 사람 경기 상대의 리그 레코드 +2 는 경기 마지막 0xb570c 때의 나리 사기로 남는다 (`teamRecordMorales`, r101)
-      // ⚠️ 마지막 공 뒤에 돌발 보상 사기가 바뀌면 원본 그 칸은 바뀌기 전 값이다 — 웹은 경기 끝 값을 쓴다(미확인 차이)
+      // 사람 경기 상대의 리그 레코드 +2 는 이 경기에서 0xb570c 가 그 칸을 마지막으로 덮을 때의 나리 사기로 남는다 (`teamRecordMorales`, r101).
+      // 마지막 타석의 돌발 보상이 사기를 바꾸면 그 뒤로는 안 덮여 **바뀌기 전 값**이다 (`PitcherGameSummary.opponentRecordMorale`, r104)
       const day = withNariTeamRecordMorales(
         applyPitcherLeagueDay(recorded, random, aceLevels, moraleAtCpuGames),
         [gameOptions.opponentTeamId],
-        nariMoraleAfterBurst(gameOptions.teamMorale, summary.burstRewardDeltas ?? []),
+        summary.opponentRecordMorale ?? nariMoraleAfterBurst(gameOptions.teamMorale, summary.burstRewardDeltas ?? []),
       )
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다. CPU 끼리의 포스트시즌 경기는
       // 여기서 돌리지 않는다 — 원본은 대진 128 의 [확인](0x13da0)에서 돌린다 (`pressPostseasonBracket`)

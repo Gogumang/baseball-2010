@@ -65,6 +65,12 @@ export interface QuickPlateAppearance {
   readonly stolenRunners: readonly number[]
   /** 한 루씩 간 도루 주자 수 합 */
   readonly steals: number
+  /**
+   * 이 타석에서 **공격 팀 레코드 +2 를 0xb570c 가 덮었는가** (나리 b5768) — 스윙 경로(0xc11f0 → 0xab214 ab4c0~ab4d8)를 한 번이라도
+   * 탔거나, 투구 판정 경로(0xc1818)에서 볼넷을 민 뒤 주자가 하나라도 있어(c1982 `0xa9599 > 0`) 앞선 주자 주력 c19d6~c19ec 을 읽었다.
+   * 판정 경로에서 주자가 없으면(c1990 → c1ae2) 공격 팀은 안 닿는다 (r104 직접 뜸)
+   */
+  readonly touchesOffenseRecord: boolean
 }
 
 export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, random: RandomPort): QuickPlateAppearance {
@@ -74,8 +80,12 @@ export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, rando
   let walkRuns: number | null = null
   const stolenRunners: number[] = []
   let steals = 0
+  let touchesOffenseRecord = false
   const play = playQuickAtBat(input.batter, input.pitcher, input.situation, random, {
     basesAtPitch: () => bases,
+    onSwingPath: () => {
+      touchesOffenseRecord = true
+    },
     ...(input.beforePitch === undefined ? {} : { beforePitch: input.beforePitch }),
     onPitchJudged: (judged) => {
       if (judged === '포볼') {
@@ -85,6 +95,8 @@ export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, rando
         walkRuns = walked.runsScored
         runners = shiftRunners(runners, 1, input.batterId).runners
       }
+      // c1982~c19ec — 주자 목록이 비지 않았으면 앞선 주자 주력을 0xb570c(공격 팀 레코드, 3, …)로 읽는다 (도루 굴림 앞, 3루가 차도)
+      if (bases.first || bases.second || bases.third) touchesOffenseRecord = true
       const base = quickStealBaseOf(bases)
       if (base === null) return
       // 가장 앞선 주자 = 앞선 루의 주자 (목록 n−1)
@@ -125,5 +137,5 @@ export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, rando
       runners = shiftRunners(runners, 1).runners
     }
   }
-  return { play, advance, runners, stolenRunners, steals }
+  return { play, advance, runners, stolenRunners, steals, touchesOffenseRecord }
 }

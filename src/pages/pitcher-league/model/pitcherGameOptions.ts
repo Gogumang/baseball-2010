@@ -1,6 +1,5 @@
 import { DEFAULT_TEAM_MORALE, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { PlayerSide } from '@/entities/game/model/gameState'
-import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type {
   PitcherGameOptions,
@@ -156,8 +155,9 @@ export function pitcherGameOptionsOf(
     // 두 팀 레코드 +2 — 셋업 0x39fdc(3a332) · 0xb570c(b5768)가 두 팀 모두 0xa3a24 로 덮는다. 0xa3a24 는 `0x1f988(저장, R[1])` + 2 라
     // 대회가 아니면 커리어 사기, 대회 중이면 상대국 칸 +2 다 (원본 버그 — `nariMoraleOf`)
     teamMorale: settings.teamMorale ?? morale,
-    // 상대가 후공이면 그 첫 공만 상대 리그 팀 레코드에 남은 값 (`opponentStaleMorale`, r101). 대회 상대국 칸은 나리 사기 그 자체라 없다
-    ...(career.nationalCup !== undefined || playerSide !== PLAYER_SIDE_FIRST_BAT
+    // 상대 리그 팀 레코드에 남은 값 — 이 경기에서 그 칸이 아직 안 덮였을 때 상대 첫 공만 본다 (`opponentStaleMorale`, r101 · r104).
+    // 대회 상대국 칸은 나리 사기 그 자체라 없다
+    ...(career.nationalCup !== undefined
       ? {}
       : { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId) }),
     reputation: career.reputation,

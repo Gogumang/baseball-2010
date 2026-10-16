@@ -80,7 +80,9 @@ export interface NariTeamRecordMoraleCareer {
 }
 
 /**
- * 그 리그 팀 레코드 +2 에 지금 남은 값 — 그 팀이 마지막으로 치른 경기 때의 나리 사기(없으면 표값). 1회초 수비 팀(후공)의 첫 공 용량만
+ * 그 리그 팀 레코드 +2 에 지금 남은 값 — 그 팀이 마지막으로 치른 경기 때의 나리 사기(없으면 표값).
+ * 새 시즌 0x1b768 은 이 칸을 다시 짓지 않는다 — 1b83e `0x204e0(저장, 모드, 0)` 은 셋째 인자 0 이라 20524~2053e 의 레코드 통째 복사
+ * `0x1fe5c` 를 건너뛰고 선수마다 `0xb6cc4` · `0xb8e28`(시즌 줄 · 스태미나)만 돈다. 1b790 `0xa3a44(R, 100)` 은 내 팀 칸뿐이다 (r104 직접 뜸). 1회초 수비 팀(후공)의 첫 공 용량만
  * 이 값을 본다: 공 하나의 소모 0xa5e14 가 0xb570c(b5768 쓰기)보다 먼저 돈다(간이 엔진 c26cc → c26f6/c26fe, 사람 장면 3dec6 → 0x4dc78)
  */
 export function nariTeamRecordMoraleOf(career: NariTeamRecordMoraleCareer, teamId: number): number {
