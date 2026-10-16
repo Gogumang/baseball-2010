@@ -2,7 +2,7 @@ import { BOARD_BOXES, FENCE_BOXES } from '@/shared/config/original/stadiumScene'
 import {
   CLOUD_FRAMES, CROWD_FRAMES, FENCE_BOARD_FRAMES, FENCE_FRAMES, FENCE_SEASON_FRAMES,
   HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, SKY_LIGHT_FRAMES, TEAM_ICON, fieldBackground,
-  frameAnimations, placedFrame, sprite,
+  drawFrameAt, frameAnimations, placedFrame, sprite,
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { PlacedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
@@ -496,10 +496,11 @@ function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, co
   if (frameIndex === null) return
   const paletteRow = skyLightPaletteRowOf(colorIndex)
   const first = placedFrame(SKY_LIGHT_FRAMES, 0, paletteRow)
-  const frame = placedFrame(SKY_LIGHT_FRAMES, frameIndex, paletteRow)
-  if (first === null || frame === null) return
+  if (first === null) return
   const originX = STAGE_WIDTH - first.offsetX - first.image.width
-  context.drawImage(frame.image, originX + frame.offsetX, frame.offsetY)
+  // 애니 그리기 0x93c45(…, 효과 r3 = 0) → 프레임 0xc9f98 이 파트 효과 0x67 을 픽셀 효과 2(더하기 b = 200 ~ 100)로 그린다 —
+  // 하늘 · 구름 · 펜스 · 바닥을 칠한 화면에 더한다(`drawFrameAt` → `layers.json`). 겹이 아직이면 구운 근사(알파 b/255)
+  drawFrameAt(context, SKY_LIGHT_FRAMES, frameIndex, originX, 0, { paletteIndex: paletteRow })
 }
 
 /**

@@ -50,6 +50,7 @@ describe('screenSpritePreloadsOf', () => {
       { scene: 'defense', priority: 'idle' },
       { scene: 'gameAtBat', priority: 'scene' },
       { scene: 'stageCast', priority: 'idle' },
+      { scene: 'burstPortraits', priority: 'idle' },
       { scene: 'gamePlay', priority: 'idle' },
       { scene: 'defense', priority: 'idle' },
       { scene: 'afterGame', priority: 'idle' },

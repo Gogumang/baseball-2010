@@ -67,6 +67,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from decode_pzx import (  # noqa: E402
     compose_frame,
     decode_image,
+    frame_layers,
     frame_boxes,
     is_transparent,
     read_image_section,
@@ -318,6 +319,21 @@ def write_index_maps(pzx: Path, folder: Path, dry_run: bool) -> tuple[int, int]:
             if not dry_run:
                 write_index_png(target / f'{index:03d}.png', width, height, index_canvas)
             composed += 1
+
+        # 0x67 더하기 겹(`decode_pzx.write_frame_layers`)도 같은 팔레트로 칠한다 — 효과 2 팔레트판 0x973c5 도
+        # 그림 팔레트[번호](9741a · 97420)로 색을 얻는다(r134). 겹 그림 자리 `frames/layers/index/NNN_k.png`.
+        layer_dir = frame_dir / 'layers'
+        if (frame_dir / 'layers.json').exists():
+            target = layer_dir / 'index'
+            if not dry_run:
+                target.mkdir(parents=True, exist_ok=True)
+            for index, frame in enumerate(frames):
+                for order, layer in enumerate(frame_layers(frame['parts'], images) or []):
+                    if not (layer_dir / f'{index:03d}_{order}.png').exists():
+                        continue
+                    if not dry_run:
+                        write_index_png(target / f'{index:03d}_{order}.png', layer['width'], layer['height'], layer['index'])
+                    composed += 1
 
     return loose, composed
 

@@ -6,7 +6,7 @@
  * 웹은 캔버스라 확대는 imageSmoothingEnabled 를 꺼 최근접으로 맞추고,
  * 밝히기는 공용 `pixelEffect` 의 0xbb91d 종류 8 식(비트 복제 없이 펴서 +b · 255 자름 · 565 내림)으로 칠한다.
  */
-import { GAME_EFFECT_FRAMES, GAME_EFFECT_IMAGE, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { drawFrameAt, GAME_EFFECT_FRAMES, GAME_EFFECT_IMAGE, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { homeRunBurstFrameAt, homeRunLettersAt, type HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { brightenedImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -41,13 +41,7 @@ export function drawHomeRunTextFrame(context: CanvasRenderingContext2D, frame: H
   context.imageSmoothingEnabled = smoothing
 
   if (frame.burstFrame !== null) {
-    const placed = placedFrame(GAME_EFFECT_FRAMES, frame.burstFrame)
-    if (placed !== null) {
-      context.drawImage(
-        placed.image,
-        Math.floor(STAGE_WIDTH / 2) + placed.offsetX,
-        Math.floor(STAGE_HEIGHT / 2) + placed.offsetY,
-      )
-    }
+    // 40de4 0xba759(그림, 0x11 + 단계, 종류 1, W/2, H/2, 효과 0, …) — 칸 18~20 은 모두 0x67 파트라 화면에 더한다(0xc9f98 ca198)
+    drawFrameAt(context, GAME_EFFECT_FRAMES, frame.burstFrame, Math.floor(STAGE_WIDTH / 2), Math.floor(STAGE_HEIGHT / 2))
   }
 }

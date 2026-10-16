@@ -112,6 +112,11 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: './sprites/sky_effect_light/frames', frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], json: ['animations.json', 'origins.json'] },
     /** 하늘 조명의 시간대 팔레트 (구름 palette.json 은 gamePlay 에 있다) */
     { folder: './sprites/sky_effect_light', frames: [], json: ['palette.json'] },
+    /**
+     * 하늘 조명 0x67 더하기 겹(r139) — 11 프레임이 같은 날 그림 한 장 `layers/000_0` 을 b = 200 ~ 100 으로 더한다(`frameLayers`).
+     * 겹 그림은 위 프레임 줄이 같이 받는다(`spritePreload` 가 layers.json 을 본다). 시간대 팔레트로 칠할 겹 번호 지도만 여기서
+     */
+    { folder: './sprites/sky_effect_light/frames/layers/index', frames: [], names: ['000_0'] },
     { folder: './sprites/slt_frame', frames: [0, 1, 3, 6, 7, 8, 9, 10, 17, 18, 19, 20, 40, 116, 117, 122] },
     { folder: './sprites/slt_frame/frames', frames: [0, 15], json: ['origins.json'] },
     { folder: './sprites/stadium_symbol', frames: [0] },

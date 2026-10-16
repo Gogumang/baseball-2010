@@ -1,0 +1,176 @@
+{
+ "000": [
+  {
+   "argument": 200,
+   "effect": 2,
+   "png": "000_0.png",
+   "x": -33,
+   "y": -31
+  },
+  {
+   "argument": 200,
+   "effect": 2,
+   "png": "000_1.png",
+   "x": 0,
+   "y": -31
+  }
+ ],
+ "001": [
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_0.png",
+   "x": -48,
+   "y": -42
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_1.png",
+   "x": -16,
+   "y": -46
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_2.png",
+   "x": 15,
+   "y": -43
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_3.png",
+   "x": -48,
+   "y": -6
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_4.png",
+   "x": -33,
+   "y": 8
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_5.png",
+   "x": -11,
+   "y": 0
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_6.png",
+   "x": 9,
+   "y": -6
+  },
+  {
+   "argument": 180,
+   "effect": 2,
+   "png": "001_7.png",
+   "x": 9,
+   "y": 10
+  }
+ ],
+ "002": [
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_0.png",
+   "x": -20,
+   "y": -61
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_1.png",
+   "x": -2,
+   "y": -62
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_2.png",
+   "x": -46,
+   "y": -42
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_3.png",
+   "x": -62,
+   "y": -11
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_4.png",
+   "x": -41,
+   "y": 2
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_5.png",
+   "x": -63,
+   "y": 11
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_6.png",
+   "x": -28,
+   "y": 28
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_7.png",
+   "x": -8,
+   "y": 13
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_8.png",
+   "x": 33,
+   "y": 31
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_9.png",
+   "x": 20,
+   "y": -2
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_10.png",
+   "x": 20,
+   "y": -39
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_11.png",
+   "x": 51,
+   "y": -33
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_12.png",
+   "x": 5,
+   "y": -49
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "002_13.png",
+   "x": -15,
+   "y": -38
+  }
+ ]
+}

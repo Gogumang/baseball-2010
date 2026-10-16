@@ -328,6 +328,10 @@ def parse_animation(block: bytes) -> list[dict]:
 
 
 def write_rgba_png(path: Path, width: int, height: int, canvas) -> None:
+    path.write_bytes(rgba_png_bytes(width, height, canvas))
+
+
+def rgba_png_bytes(width: int, height: int, canvas) -> bytes:
     rows = bytearray()
     for row in canvas:
         rows.append(0)
@@ -339,7 +343,7 @@ def write_rgba_png(path: Path, width: int, height: int, canvas) -> None:
                 + struct.pack('>I', zlib.crc32(tag + payload) & 0xFFFFFFFF))
 
     header = struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)
-    path.write_bytes(
+    return (
         b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header)
         + chunk(b'IDAT', zlib.compress(bytes(rows), 9)) + chunk(b'IEND', b'')
     )
@@ -395,7 +399,7 @@ def compose_frame(parts: list[dict], images, variants=None):
 
     효과 (서브 에이전트 E 가 렌더 결과로 확인, 뜻은 추정):
       0x03 좌우 뒤집기 · 0x04 상하 뒤집기(certi 화살표) · 0x66 n 반투명 n/16(잔상·볼터치)
-      0x67 n 반투명 n/255 · 0x6E/0x6F 값 = 파트 모양대로 그 색으로 채우기(번쩍임·실루엣)
+      0x67 n 반투명 n/255 (⚠️ 근사 — 원본은 픽셀 효과 2 더하기, 겹 목록 `write_frame_layers` 를 따로 낸다) · 0x6E/0x6F 값 = 파트 모양대로 그 색으로 채우기(번쩍임·실루엣)
       0x05~0x64 붙은 0x40 mpl 의 (효과−5)번 변형 팔레트 (UI 선택/비활성 색, 0xc8bb4)
 
     팔레트 번호 캔버스도 함께 돌려준다 — 팀·피부 팔레트를 웹에서 런타임에 갈아 끼울 때 쓴다.
@@ -455,6 +459,91 @@ def compose_frame(parts: list[dict], images, variants=None):
     return left, top, width, height, canvas, index_canvas
 
 
+# ── 파트 효과 0x67 = 픽셀 효과 2 더하기 — 화면 위에서 섞으므로 PNG 로 못 굽는다 ─────────────
+#
+# 그리기 0xc9f98 (ca198~ca1e6): 부른 쪽 효과(sp+0x2c)가 0 이면 파트+0x10 효과 0x65~0x74 를 표 0xda988
+# [1, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 19, 19, 19, 19] 로 픽셀 효과 번호로 바꾸고 값 파트+0x14 를 인자로
+# 파트마다 이미지 그리기(vtable +0xc)를 부른다 → 0x67 = 픽셀 효과 2. 부른 쪽 효과가 0 이 아니면(ca19c bne → ca1e8)
+# 파트 효과는 안 보고 부른 쪽 효과로 그린다.
+# 효과 2 (16비트 0x9a2f1 · 팔레트판 0x973c5): 채널마다 화면 + (그림 · b) >> 8, 끝에서 자름 · b = 255 는 그냥 더하기.
+# 파트는 파일 차례대로 **화면에 바로** 그려지므로 더하기 파트 아래는 앞 파트들 + 그 밑 화면이다.
+#
+# 그래서 0x67 파트가 있는 프레임은 `frames/layers.json` 에 겹 목록을 따로 낸다 (구운 `frames/NNN.png` 는 그대로 —
+# 겹을 안 쓰는 자리는 지금처럼 알파 n/255 근사로 그린다):
+#   {"NNN": [{"png": "NNN_0.png", "x": 프레임 좌표, "y": …, "effect": 0},
+#            {"png": "NNN_1.png", "x": …, "y": …, "effect": 2, "argument": b}, …]}
+#   - effect 0 겹 = 이어진 보통 파트들을 지금 합성(compose_frame)대로 겹친 그림
+#   - effect 2 겹 = 0x67 파트 하나를 **섞지 않은 날 그림**(좌우 · 상하 뒤집기만 입힘, 불투명) — 화면에 더하기로 얹는다
+# 그림은 `frames/layers/` 에 둔다. x · y 는 origins.json 과 같은 프레임 좌표다.
+ADDITIVE_PIXEL_EFFECT = 2
+
+
+def _is_additive(part: dict) -> bool:
+    return any(kind == ALPHA_BYTE_EFFECT for kind, _ in part['effects'])
+
+
+def _additive_weight(part: dict) -> int:
+    return next(value for kind, value in part['effects'] if kind == ALPHA_BYTE_EFFECT)
+
+
+def frame_layers(parts: list[dict], images, variants=None) -> list[dict] | None:
+    """
+    0x67 파트가 있는 프레임을 겹 목록으로 나눈다. 0x67 파트가 없거나 그릴 파트가 없으면 None.
+    겹마다 x · y · 폭 · 높이 · RGBA 캔버스 · 번호 캔버스(compose_frame 과 같은 규칙) · 효과 · 인자.
+    """
+    usable = [p for p in parts if p['image'] < len(images) and images[p['image']][0] > 0]
+    if not any(_is_additive(p) for p in usable):
+        return None
+    runs: list[tuple[list[dict], int | None]] = []
+    for part in usable:
+        if _is_additive(part):
+            plain = dict(part, effects=[(k, v) for k, v in part['effects'] if k != ALPHA_BYTE_EFFECT])
+            runs.append(([plain], _additive_weight(part)))
+        elif runs and runs[-1][1] is None:
+            runs[-1][0].append(part)
+        else:
+            runs.append(([part], None))
+    layers = []
+    for run, weight in runs:
+        left, top, width, height, canvas, index_canvas = compose_frame(run, images, variants)
+        if width <= 0 or height <= 0:
+            continue
+        layers.append({'x': left, 'y': top, 'width': width, 'height': height, 'canvas': canvas,
+                       'index': index_canvas,
+                       'effect': 0 if weight is None else ADDITIVE_PIXEL_EFFECT, 'argument': weight})
+    return layers
+
+
+def write_frame_layers(frame_dir: Path, frames: list[dict], images, variants=None) -> int:
+    """`frames/layers.json` 과 `frames/layers/NNN_k.png` — 0x67 파트가 없는 PZX 는 json 을 지운다. 겹 그림 수를 돌려준다."""
+    listing: dict[str, list[dict]] = {}
+    layer_dir = frame_dir / 'layers'
+    # 같은 그림(같은 파트 이미지 · 같은 뒤집기)은 처음 낸 파일 하나를 함께 쓴다
+    written: dict[bytes, str] = {}
+    for index, frame in enumerate(frames):
+        layers = frame_layers(frame['parts'], images, variants)
+        if not layers:
+            continue
+        entries = []
+        for order, layer in enumerate(layers):
+            encoded = rgba_png_bytes(layer['width'], layer['height'], layer['canvas'])
+            name = written.get(encoded)
+            if name is None:
+                name = written[encoded] = f'{index:03d}_{order}.png'
+                layer_dir.mkdir(parents=True, exist_ok=True)
+                (layer_dir / name).write_bytes(encoded)
+            entry = {'png': name, 'x': layer['x'], 'y': layer['y'], 'effect': layer['effect']}
+            if layer['argument'] is not None:
+                entry['argument'] = layer['argument']
+            entries.append(entry)
+        listing[f'{index:03d}'] = entries
+    if not listing:
+        (frame_dir / 'layers.json').unlink(missing_ok=True)
+        return 0
+    (frame_dir / 'layers.json').write_text(json.dumps(listing, indent=1, sort_keys=True), encoding='utf-8')
+    return len(written)
+
+
 def decode_file(path: Path, output_dir: Path) -> int:
     raw = path.read_bytes()
     if raw[0:3] != b'PZX':
@@ -502,6 +591,7 @@ def decode_file(path: Path, output_dir: Path) -> int:
         written += 1
     (frame_dir / 'origins.json').write_text(json.dumps(origins, indent=1, sort_keys=True), encoding='utf-8')
     write_boxes(frame_dir, boxes)
+    written += write_frame_layers(frame_dir, frames, images, variants)
     if animations:
         (frame_dir / 'animations.json').write_text(json.dumps(animations, indent=1), encoding='utf-8')
     return written

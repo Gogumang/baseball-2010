@@ -7,6 +7,8 @@ import { paletteUrl, recoloredSpriteUrl } from '@/shared/lib/sprite/paletteSwap'
 import type { SpritePalettes } from '@/shared/lib/sprite/paletteSwap'
 import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
+import { drawFrameLayers, frameLayersUrl, hasFrameLayers, placedFrameLayersOf } from '@/shared/lib/sprite/frameLayers'
+import type { FrameLayerListing, PlacedFrameLayer } from '@/shared/lib/sprite/frameLayers'
 
 /** 캐시는 DOM·미리 받기와 같이 쓴다 (`shared/lib/sprite/spriteCache`) */
 export function sprite(url: string): HTMLImageElement | null {
@@ -137,6 +139,46 @@ export function placedFrame(folder: string, index: number, paletteIndex: number 
   const image = paletteIndex === null ? sprite(url) : recoloredSprite(folder, url, paletteIndex)
   if (image === null) return null
   return { image, offsetX: origin.x, offsetY: origin.y }
+}
+
+/**
+ * 0x67(더하기) 파트가 든 프레임의 겹 (`shared/lib/sprite/frameLayers`). `FRAME_LAYER_FOLDERS` 폴더만 목록을 청한다 —
+ * 겹 목록 · 겹 그림이 아직 안 왔거나 그 프레임에 0x67 파트가 없으면 null 이라 부르는 쪽은 구운 프레임(`placedFrame`)을 그린다.
+ * `paletteIndex` 는 `placedFrame` 과 같다 — 겹 번호 지도는 `frames/layers/index/` 에 있다.
+ */
+export function placedFrameLayers(
+  folder: string,
+  index: number,
+  paletteIndex: number | null = null,
+): readonly PlacedFrameLayer[] | null {
+  if (!hasFrameLayers(folder)) return null
+  return placedFrameLayersOf(folder, index, spriteJsonNow<FrameLayerListing>(frameLayersUrl(folder)), (url) =>
+    paletteIndex === null ? sprite(url) : recoloredSprite(folder, url, paletteIndex),
+  )
+}
+
+/**
+ * 프레임 한 장을 (x, y) 기준에 그린다 — 겹이 있으면 0x67 파트를 화면에 더하고(`drawFrameLayers`), 없으면 구운 프레임.
+ * `partEffects` 는 부른 쪽 효과가 0 인가(0xc9f98 ca198) — 0x11 뒤집기로 부르면 거짓.
+ * 그린 것이 없으면(구운 프레임도 아직) false.
+ */
+export function drawFrameAt(
+  context: CanvasRenderingContext2D,
+  folder: string,
+  index: number,
+  x: number,
+  y: number,
+  options: { readonly paletteIndex?: number | null; readonly partEffects?: boolean } = {},
+): boolean {
+  const layers = placedFrameLayers(folder, index, options.paletteIndex ?? null)
+  if (layers !== null) {
+    drawFrameLayers(context, layers, x, y, options.partEffects ?? true)
+    return true
+  }
+  const placed = placedFrame(folder, index, options.paletteIndex ?? null)
+  if (placed === null) return false
+  context.drawImage(placed.image, x + placed.offsetX, y + placed.offsetY)
+  return true
 }
 
 /** 마선수가 아닐 때 마운드에 서는 평범한 투수 */
