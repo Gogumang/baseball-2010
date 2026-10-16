@@ -1,0 +1,342 @@
+{
+ "026": [
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "026_0.png",
+   "x": -36,
+   "y": -53
+  }
+ ],
+ "027": [
+  {
+   "argument": 30,
+   "effect": 2,
+   "png": "026_0.png",
+   "x": -36,
+   "y": -53
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "027_1.png",
+   "x": -29,
+   "y": -53
+  }
+ ],
+ "028": [
+  {
+   "argument": 10,
+   "effect": 2,
+   "png": "026_0.png",
+   "x": -36,
+   "y": -53
+  },
+  {
+   "argument": 80,
+   "effect": 2,
+   "png": "027_1.png",
+   "x": -29,
+   "y": -53
+  },
+  {
+   "argument": 200,
+   "effect": 2,
+   "png": "028_2.png",
+   "x": -6,
+   "y": -53
+  }
+ ],
+ "029": [
+  {
+   "argument": 20,
+   "effect": 2,
+   "png": "027_1.png",
+   "x": -29,
+   "y": -53
+  },
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "028_2.png",
+   "x": -6,
+   "y": -53
+  },
+  {
+   "argument": 200,
+   "effect": 2,
+   "png": "029_2.png",
+   "x": 14,
+   "y": -41
+  }
+ ],
+ "030": [
+  {
+   "argument": 20,
+   "effect": 2,
+   "png": "028_2.png",
+   "x": -6,
+   "y": -53
+  },
+  {
+   "argument": 70,
+   "effect": 2,
+   "png": "029_2.png",
+   "x": 14,
+   "y": -41
+  },
+  {
+   "argument": 220,
+   "effect": 2,
+   "png": "030_2.png",
+   "x": -24,
+   "y": -6
+  }
+ ],
+ "031": [
+  {
+   "argument": 20,
+   "effect": 2,
+   "png": "029_2.png",
+   "x": 13,
+   "y": -41
+  },
+  {
+   "argument": 70,
+   "effect": 2,
+   "png": "030_2.png",
+   "x": -24,
+   "y": -6
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "031_2.png",
+   "x": -35,
+   "y": -41
+  }
+ ],
+ "032": [
+  {
+   "argument": 10,
+   "effect": 2,
+   "png": "030_2.png",
+   "x": -24,
+   "y": -6
+  },
+  {
+   "argument": 50,
+   "effect": 2,
+   "png": "031_2.png",
+   "x": -35,
+   "y": -41
+  },
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "026_0.png",
+   "x": -36,
+   "y": -53
+  }
+ ],
+ "033": [
+  {
+   "argument": 10,
+   "effect": 2,
+   "png": "026_0.png",
+   "x": -36,
+   "y": -53
+  },
+  {
+   "argument": 50,
+   "effect": 2,
+   "png": "027_1.png",
+   "x": -29,
+   "y": -53
+  }
+ ],
+ "054": [
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "054_0.png",
+   "x": -15,
+   "y": -15
+  }
+ ],
+ "055": [
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "055_0.png",
+   "x": -23,
+   "y": -23
+  }
+ ],
+ "056": [
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "056_0.png",
+   "x": -20,
+   "y": -20
+  }
+ ],
+ "057": [
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "057_0.png",
+   "x": -21,
+   "y": -21
+  }
+ ],
+ "068": [
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "068_0.png",
+   "x": -25,
+   "y": -24
+  },
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "068_1.png",
+   "x": 1,
+   "y": -24
+  },
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "068_2.png",
+   "x": -25,
+   "y": 1
+  },
+  {
+   "argument": 255,
+   "effect": 2,
+   "png": "068_3.png",
+   "x": 1,
+   "y": 1
+  }
+ ],
+ "069": [
+  {
+   "argument": 240,
+   "effect": 2,
+   "png": "069_0.png",
+   "x": -27,
+   "y": -27
+  },
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "069_0.png",
+   "x": -33,
+   "y": -32
+  },
+  {
+   "argument": 240,
+   "effect": 2,
+   "png": "069_2.png",
+   "x": 0,
+   "y": -27
+  },
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "069_2.png",
+   "x": 5,
+   "y": -32
+  },
+  {
+   "argument": 240,
+   "effect": 2,
+   "png": "069_4.png",
+   "x": -27,
+   "y": -3
+  },
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "069_4.png",
+   "x": -33,
+   "y": 2
+  },
+  {
+   "argument": 240,
+   "effect": 2,
+   "png": "069_6.png",
+   "x": 0,
+   "y": -3
+  },
+  {
+   "argument": 100,
+   "effect": 2,
+   "png": "069_6.png",
+   "x": 5,
+   "y": 2
+  }
+ ],
+ "070": [
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "069_0.png",
+   "x": -37,
+   "y": -36
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "069_2.png",
+   "x": 9,
+   "y": -36
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "069_4.png",
+   "x": -37,
+   "y": 6
+  },
+  {
+   "argument": 150,
+   "effect": 2,
+   "png": "069_6.png",
+   "x": 9,
+   "y": 6
+  }
+ ],
+ "071": [
+  {
+   "argument": 60,
+   "effect": 2,
+   "png": "069_0.png",
+   "x": -39,
+   "y": -38
+  },
+  {
+   "argument": 60,
+   "effect": 2,
+   "png": "069_2.png",
+   "x": 11,
+   "y": -38
+  },
+  {
+   "argument": 60,
+   "effect": 2,
+   "png": "069_4.png",
+   "x": -39,
+   "y": 8
+  },
+  {
+   "argument": 60,
+   "effect": 2,
+   "png": "069_6.png",
+   "x": 11,
+   "y": 8
+  }
+ ]
+}

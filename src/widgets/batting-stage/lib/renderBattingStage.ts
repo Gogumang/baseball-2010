@@ -1,7 +1,7 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
-import { frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import {
@@ -576,14 +576,15 @@ function drawPitcher(
     if (image !== null) context.drawImage(image, MOUND_CENTER_X - image.width / 2, MOUND_BOTTOM_Y - image.height)
     return
   }
-  const frame = placedFrame(ace.framesUrl, index)
-  if (frame === null) return
+  const mirrors = acePitcherMirrorsOf(ace.order, isMirrored, side)
   context.save()
-  if (acePitcherMirrorsOf(ace.order, isMirrored, side)) {
+  if (mirrors) {
     context.translate(axisX * 2, 0)
     context.scale(-1, 1)
   }
-  context.drawImage(frame.image, axisX + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
+  // 효과 0 이면 프레임 0xc9f98 이 파트 효과를 따른다 — 드래고나 프레임 5~7 의 0x67 파트(b = 255)는 화면에 더한다.
+  // 효과 0x11(뒤집기)은 ca074 갈래라 파트 효과 없이 모두 복사한다(`drawFrameAt` 의 partEffects)
+  drawFrameAt(context, ace.framesUrl, index, axisX, MOUND_BOTTOM_Y, { partEffects: !mirrors })
   context.restore()
 }
 
@@ -667,8 +668,7 @@ function drawSpecialSwingPicture(
 ): void {
   const entries = frameAnimations(special.folder)?.[0]
   const frameIndex = entries === undefined ? null : specialSwingEffectFrameAt(entries, special.drawCall)
-  const frame = frameIndex === null ? null : placedFrame(special.folder, frameIndex)
-  if (frame === null) return
+  if (frameIndex === null) return
   const x = Math.round(special.x)
   const y = Math.round(special.y) + special.offsetY
   context.save()
@@ -676,7 +676,9 @@ function drawSpecialSwingPicture(
     context.translate(x * 2, 0)
     context.scale(-1, 1)
   }
-  context.drawImage(frame.image, x + frame.offsetX, y + frame.offsetY)
+  // 0xbe8a5(…, 애니 0, 효과 0 | 0x11, …) — 효과 0 이면 medica_effect · effect_power 의 0x67 파트를 화면에 더한다(0xc9f98 ca198).
+  // 0x11 이면 ca074 갈래 — 파트 효과 없이 복사
+  drawFrameAt(context, special.folder, frameIndex, x, y, { partEffects: !special.isMirrored })
   context.restore()
 }
 
@@ -858,10 +860,9 @@ function drawFastballFlame(
   if (entries === undefined) return
   const frameIndex = fastballFlameFrameAt(entries, ballTick, pitch.frameCount)
   if (frameIndex === null) return
-  const placed = placedFrame(GAME_EFFECT_FRAMES, frameIndex)
-  if (placed === null) return
   const position = ballPixelAt(pitch, ballTick)
-  context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
+  // 3b7ce 0xbe8a5(…, 애니 1, 효과 0, …) — 칸 12~17 은 모두 0x67 파트라 화면에 더한다(0xc9f98 ca198 · 효과 2)
+  drawFrameAt(context, GAME_EFFECT_FRAMES, frameIndex, Math.round(position.x), Math.round(position.y))
 }
 
 /**
@@ -875,8 +876,8 @@ function drawResultText(context: CanvasRenderingContext2D, text: string, resultT
   if (animation === null) return
   const entries = frameAnimations(JUDGE_FRAMES)?.[animation]
   const frameIndex = entries === undefined ? null : judgeFrameAt(entries, resultTick)
-  const frame = frameIndex === null ? null : placedFrame(JUDGE_FRAMES, frameIndex)
-  if (frame !== null) context.drawImage(frame.image, centerX + frame.offsetX, centerY + frame.offsetY)
+  // 0x39474 0xba759(그림, 애니, 종류 2, x, y, 효과 0, …) — 애니 0 · 9 의 칸 20~29 에 든 0x67 파트는 화면에 더한다(0xc9f98 ca198)
+  if (frameIndex !== null) drawFrameAt(context, JUDGE_FRAMES, frameIndex, centerX, centerY)
 }
 
 /**

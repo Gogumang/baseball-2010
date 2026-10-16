@@ -3,6 +3,7 @@ import type { Screen } from '@/app/model/screen'
 import { afterGameEvaluationPreloads } from '@/app/model/afterGameEventPreload'
 import { defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
 import { mainMenuSpritePreloads } from '@/pages/main-menu/lib/mainMenuSpritePreload'
+import { burstPortraitPreloads } from '@/widgets/burst-mission/lib/burstPortraitPreload'
 import { SPRITE_PRELOAD_SCENES } from '@/shared/config/spritePreloadScenes'
 import { preloadSpriteScene, preloadSprites, retainScreenSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
@@ -15,9 +16,10 @@ import type { SpriteFolderPreload, SpritePreloadPriority } from '@/shared/lib/sp
  *  - `defense`: 수비 화면 야수 · 주자 · 공
  *  - `gameEntryCast`: 경기 첫 그림 몫 — 타자 대기 자세 · 투수 선 자세 · 수비 서 있기 · 달리기 (`gameEntryCastPreloadsOf`)
  *  - `afterGameEvaluation`: 경기 뒤 평가 감독이 띄울 수 있는 표정 전부 (`afterGameEvaluationPreloads`, 표 0xcc600 · 0xcc570)
+ *  - `burstPortraits`: 경기 안 돌발미션 창 초상 — 세 돌발 표 대사의 화자 · 표정 전부 (`burstPortraitPreloads`, 0x8e2dc → 0x63a04)
  */
 export type AppSpriteSceneKey = SpriteSceneKey | ComputedSceneKey
-type ComputedSceneKey = 'mainMenu' | 'stageCast' | 'defense' | 'gameEntryCast' | 'afterGameEvaluation'
+type ComputedSceneKey = 'mainMenu' | 'stageCast' | 'defense' | 'gameEntryCast' | 'afterGameEvaluation' | 'burstPortraits'
 
 export interface ScreenSpritePreload {
   readonly scene: AppSpriteSceneKey
@@ -71,6 +73,8 @@ export function screenSpritePreloadsOf(kind: Screen['kind'], isInGameScene: bool
     list.push(
       { scene: 'gameAtBat', priority: 'scene' },
       { scene: 'stageCast', priority: 'idle' },
+      // 돌발미션 창은 경기 중 언제든 뜬다 — 경기 진행 그림보다 앞에 둔다(r134 측정: event_char_0 104~106 이 비었다)
+      { scene: 'burstPortraits', priority: 'idle' },
       { scene: 'gamePlay', priority: 'idle' },
       { scene: 'defense', priority: 'idle' },
       { scene: 'afterGame', priority: 'idle' },
@@ -89,6 +93,7 @@ const COMPUTED_SCENES: Readonly<Record<ComputedSceneKey, () => readonly SpriteFo
   defense: () => defensePreloadsOf(),
   gameEntryCast: gameEntryCastPreloadsOf,
   afterGameEvaluation: afterGameEvaluationPreloads,
+  burstPortraits: burstPortraitPreloads,
 }
 
 function isComputedScene(scene: AppSpriteSceneKey): scene is ComputedSceneKey {

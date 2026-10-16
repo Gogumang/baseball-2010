@@ -2,7 +2,7 @@ import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { drawFrameAt, frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { DRAW_EFFECT, drawImageWithEffect } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -208,10 +208,12 @@ function frameBoxes(folder: string): Readonly<Record<string, readonly (readonly 
   return null
 }
 
+/**
+ * 효과 0 으로 그리는 칸 — 고리(slt_pitch 애니 1 · 4d602 0xbe8a5 효과 r5 = 0)와 퍼펙트(game_effect 애니 0 · 4d624 효과 0)의
+ * 0x67 파트는 화면에 더한다(0xc9f98 ca198 · `drawFrameAt`)
+ */
 function drawFrame(context: CanvasRenderingContext2D, folder: string, index: number, x: number, y: number): void {
-  const placed = placedFrame(folder, index)
-  if (placed === null) return
-  context.drawImage(placed.image, Math.round(x) + placed.offsetX, Math.round(y) + placed.offsetY)
+  drawFrameAt(context, folder, index, Math.round(x), Math.round(y))
 }
 
 /** 반복 없는 애니의 칸 — 끝 칸에 멈춘다 */

@@ -12,6 +12,7 @@
  *  - 유휴 줄(`idle`): 앱 첫 진입의 공용 폴더 등. 장면 줄이 비었을 때, 브라우저가 한가할 때(requestIdleCallback) 조금씩 받는다.
  *    유휴 줄에 서 있던 것을 장면이 부르면 장면 줄로 올린다.
  */
+import { frameLayersUrl, frameLayerUrlsOf, hasFrameLayers } from '@/shared/lib/sprite/frameLayers'
 import { spriteMaskSrc } from '@/shared/lib/sprite/spriteMask'
 
 /** 폴더 하나에서 받을 것 */
@@ -245,9 +246,14 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
       const table = await deps.loadJson(`${request.animationsIn ?? request.folder}/animations.json`).catch(() => null)
       frames = [...new Set([...frames, ...animationFramesOf(table, request.animations)])]
     }
+    // 0x67(더하기) 파트가 든 폴더면 받는 프레임의 겹 그림도 받는다 — 그리기(`drawFrameAt`)가 구운 프레임 대신 겹을 쓴다
+    const layerUrls = hasFrameLayers(request.folder) && frames.length > 0
+      ? frameLayerUrlsOf(request.folder, await deps.loadJson(frameLayersUrl(request.folder)).catch(() => null), frames)
+      : []
     const imageDone = [
       ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority, generation)),
       ...frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority, generation)),
+      ...layerUrls.map((url) => enqueue(url, priority, generation)),
       ...(request.masks ?? []).map((frame) => enqueue(spriteMaskSrc(frameUrl(request.folder, frame)), priority, generation)),
     ]
     pump()

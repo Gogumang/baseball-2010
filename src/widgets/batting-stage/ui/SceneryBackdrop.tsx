@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
+import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
@@ -45,7 +46,8 @@ export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
       const cloudCalls = observeSceneCloudFrame(sceneCloudFrameOf(rawNow), true, cloudCursor)
       let context: CanvasRenderingContext2D | null = null
       try {
-        context = canvasRef.current?.getContext('2d') ?? null
+        // 하늘 조명(0x67 더하기 겹)이 화면 칸을 읽는다 — 읽기 잦은 캔버스로 연다(`effectContextOf`)
+        context = effectContextOf(canvasRef.current)
       } catch {
         context = null
       }

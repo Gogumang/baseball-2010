@@ -12,6 +12,8 @@ import {
 } from '@/features/play-game/model/aceCutIn'
 import * as styles from '@/features/play-game/ui/SubstitutionSceneOverlay.css'
 import { DRAW_EFFECT, brightenedImageOf, drawImageWithEffect, effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { drawFrameLayers, frameLayersUrl, placedFrameLayersOf, type FrameLayerListing } from '@/shared/lib/sprite/frameLayers'
+import { spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 
 const GAME_UI = './sprites/game_ui'
 const GAME_UI_FRAMES = `${GAME_UI}/frames`
@@ -69,10 +71,14 @@ function drawCutIn(context: CanvasRenderingContext2D, draw: AceCutInDraw, uiOrig
   context.fillStyle = fillStyleOf(draw.band.color)
   context.fillRect(draw.band.x, draw.band.y, draw.band.width, draw.band.height)
   if (draw.speedLines !== null) {
+    // 474f0 0xba759(game_ui, 0x55 + 단계 mod 5, 종류 1, cx, cy − 39, 효과 0, …) — 칸 85~88 의 파트는 모두 0x67(b = 240 · 230)이라
+    // 프레임 0xc9f98 이 화면에 더한다(ca198 · `frameLayers`). 겹이 아직이면 구운 근사(알파 b/255)
+    const layers = placedFrameLayersOf(GAME_UI_FRAMES, draw.speedLines.frame, spriteJsonNow<FrameLayerListing>(frameLayersUrl(GAME_UI_FRAMES)), imageAt)
     const origin = uiOrigins?.[pad(draw.speedLines.frame)]
-    const image = origin === undefined ? null : imageAt(`${GAME_UI_FRAMES}/${pad(draw.speedLines.frame)}.png`)
+    const image = layers !== null || origin === undefined ? null : imageAt(`${GAME_UI_FRAMES}/${pad(draw.speedLines.frame)}.png`)
+    if (layers !== null) drawFrameLayers(context, layers, draw.speedLines.x, draw.speedLines.y)
     // 프레임 89 는 그림이 없는 빈 칸이다(뽑힌 PNG 가 없다)
-    if (origin !== undefined && image !== null) {
+    else if (origin !== undefined && image !== null) {
       context.drawImage(image, draw.speedLines.x + origin.x, draw.speedLines.y + origin.y)
     }
   }
