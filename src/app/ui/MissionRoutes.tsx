@@ -198,7 +198,7 @@ export function MissionRoutes({
   const benchRun = session.pendingBenchClearing?.run ?? null
   const walkerSeats = useWalkerLineSeats({
     sceneKey: playScreenRef.current,
-    playKey: session.pendingDefensePlay ?? session.pickoffReplay,
+    playKey: session.pendingDefensePlay ?? session.pendingRunnerPlay ?? session.pickoffReplay,
     playDefenseRecords: playingRun === null ? null : missionWalkTeamOf(playingRun, true)?.records ?? null,
     board:
       session.halfInningBoard === null || playingRun === null
@@ -482,6 +482,26 @@ function missionOverlayOf(
         runScoreBoard={runScoreBoard}
         sceneMemory={defenseScene}
         onDone={actions.finishDefensePlay}
+      />
+    )
+  }
+
+  // 타자 미션의 주자 판(도루 · 폭투 · CPU 견제) — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 진루 · 0x584 귀루 →
+  // 0xa9b04)와 OK 슬라이딩 0x585 를 보내므로 실시간으로 한 틱씩 돌린다(`features/defense-play/model/liveRunnerPlay`, 팀 경기와 같은 길)
+  if (session.pendingRunnerPlay !== null) {
+    const run = session.missionRun
+    return (
+      <DefensePlayback
+        runnerPlay={session.pendingRunnerPlay}
+        runScoreBoard={
+          run === null
+            ? undefined
+            : missionRunScoreBoardOf(missionWithSideTeamsOf(run.mission, run.game.humanBatting.teamId), {
+                ours: run.game.scores[humanSideOf(run.mission)],
+                opponents: run.game.scores[cpuSideOf(run.mission)],
+              })
+        }
+        onDone={actions.finishRunnerPlay}
       />
     )
   }
