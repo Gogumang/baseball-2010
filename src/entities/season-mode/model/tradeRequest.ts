@@ -38,7 +38,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * `useSeasonSession` 의 `cpuRosters`)을 부르는 쪽이 넘긴다. 표에는 나리·명전 선수가 없어 A 는 한 번에 끝나지만, 트레이드로
  * 옮겨 간 선수도 리그 선수라 마찬가지다.
  *
- * ⚠️ 나리·명전 판정은 `tradeRefusalOf`(영입 화면과 같은 규칙, 근사)로 본다.
+ * 나리·명전 판정은 `tradeRefusalOf`(0xb6389 · 0xb6349 그대로)로 본다.
  */
 export interface TradeRequest {
   /** +0 — 요청이 섰는가 (트레이드 진행 0xcf24 의 강제 성공 플래그로도 쓰인다) */

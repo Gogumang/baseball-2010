@@ -104,7 +104,7 @@ export function BurstMissionWindow({
   const nextMark = burstNextMarkAt(state.ticks)
 
   return (
-    <div className={styles.overlay} role="dialog" aria-label="돌발미션">
+    <div className={styles.overlay} role="dialog" aria-label="돌발미션" onPointerDown={(event) => event.stopPropagation()}>
       {line !== undefined && (
         <BurstPortrait speaker={line.speaker} expression={line.expression} draws={draws}
           anchor={burstPortraitAnchorOf(state.height, isBatterLeftHanded)} />
@@ -137,10 +137,8 @@ export function BurstMissionWindow({
           <img className={styles.sprite} style={{ left: nextMark.x, top: nextMark.y }} src={BURST_NEXT_MARK_IMAGE} alt="" />
         </>
       )}
-      <div className={styles.pressLayer}>
-        <PressArea label="돌발미션 넘기기" rect={{ x: 0, y: bandTop, width: BURST_SCREEN.width, height: BURST_SCREEN.height - bandTop }}
-          onPress={() => closeRef.current()} isDisabled={!isOpen} testId="돌발미션-넘기기" />
-      </div>
+      <PressArea label="돌발미션 넘기기" rect={{ x: 0, y: bandTop, width: BURST_SCREEN.width, height: BURST_SCREEN.height - bandTop }}
+        onPress={() => closeRef.current()} isDisabled={!isOpen} testId="돌발미션-넘기기" />
     </div>
   )
 }

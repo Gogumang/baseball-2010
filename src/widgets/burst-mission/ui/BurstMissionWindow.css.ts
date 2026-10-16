@@ -3,13 +3,13 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
 
 /**
  * 돌발미션 창 (경기 장면 상태 0x1b — 0x8f3c0 · 배치는 `lib/burstMissionWindowLayout`).
- * 타석 화면 위에 덮는다 — 판 밖은 비어 있어 뒤 화면이 그대로 보인다.
+ * 타석 화면 위에 덮는다 — 판 밖은 비어 있어 뒤 화면이 그대로 보인다. 상태 0x1b 동안 키는 돌발 창 것이라(0x3b014)
+ * 덮개가 눌림을 받아 뒤 타석 화면(스윙 따위)으로 내려보내지 않는다 — 넘기기는 판 자리 누름 칸만 한다.
  */
 export const overlay = style({
   position: 'absolute',
   inset: 0,
   zIndex: 5,
-  pointerEvents: 'none',
   overflow: 'hidden',
 })
 
@@ -33,9 +33,4 @@ export const dialogue = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
   pointerEvents: 'none',
-})
-
-/** 누름 칸이 덮개의 `pointerEvents: none` 을 다시 켠다 */
-export const pressLayer = style({
-  pointerEvents: 'auto',
 })
