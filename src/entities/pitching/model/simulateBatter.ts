@@ -521,7 +521,7 @@ export function pitchAgainstBatterDetailed(
     // 같은 판이다 — 판 끝 결과 코드 0x9d5bc 가 이 공 앞 스트라이크 · 번트 종류로 11 을 낸다(9d5e2~9d600)
     return {
       ...swung({ kind: '파울' }, false),
-      foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
+      foulContact: { pattern, resultCode: code, batterHand: pitch.stageSide, ...(specialSwing === undefined ? {} : { specialSwing }) },
       buntKind,
     }
   }
@@ -539,6 +539,8 @@ export function pitchAgainstBatterDetailed(
         outcome: registerContact(provisionalOutcomeOf(pattern), {
           pattern,
           resultCode: code,
+          // 0x51682 0xb63c1(타자) = 화면 배치 `stageSide` (0x3b084 가 같은 함수로 둔다) — [경기+0xf2c] 공의 d
+          batterHand: pitch.stageSide,
           ...(specialSwing === undefined ? {} : { specialSwing }),
         }),
       },

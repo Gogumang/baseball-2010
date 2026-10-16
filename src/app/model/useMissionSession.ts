@@ -272,7 +272,8 @@ interface MissionSessionInput {
  * 0xb53f0 은 0x40(b5406 마선수) · 0x80(b547e) · 0xc0(b548e) 갈래를 안 타고 b5532 의 0x20 갈래로 가서 같은 0xb6720 으로
  * k = 0x20 & 0x1f = **0** 을 꺼내 0x80 갈래와 같은 옮김(b5546 배열 늘림 · b5576 옛 [k] 를 끝으로 · b55ae [k] ← 선수 · b55c2 수비 위치는
  * 옛 선수 것 · b55d6 0xb6605 다시 매김)을 한다. aa7c2 의 0xb6394(0x1fc20(저장)) 도 같은 기록이라 0 이다.
- * (웹 명전 기록에는 +0xa 칸이 없지만 등록이 늘 0x20 을 적으므로 값이 하나뿐이다.)
+ * 시즌 영입 0xc554 의 c578 `0xb6605(명전 기록, j)` 가 그 아랫 5비트를 고른 자리 j 로 고치고 전역 블록째 저장한다(0x22755 → 0x1f1b8) —
+ * 그 뒤로는 k = j (`ModeBatter.recordSlot`). 이 상수는 영입한 적 없는 기록의 값이다.
  */
 const HALL_OF_FAME_BATTER_RECORD_SLOT = 0x20 & 0x1f
 
@@ -2117,7 +2118,7 @@ export function useMissionSession({
         return
       }
       // 0xaa57c aa7b0 — 미션 타자(0x1fc20: 명예 타자 또는 나리 타자편 저장 선수)가 드는 레코드 칸 k = +0xa & 0x1f
-      const nariRecordSlot = hallOfFameBatter !== null ? HALL_OF_FAME_BATTER_RECORD_SLOT : nariBatterRecordSlot
+      const nariRecordSlot = hallOfFameBatter !== null ? hallOfFameBatter.recordSlot ?? HALL_OF_FAME_BATTER_RECORD_SLOT : nariBatterRecordSlot
       const started = startMission(mission, { ...heldSetup, ...(nariRecordSlot === undefined ? {} : { nariRecordSlot }) })
       setMissionRun(started)
       openFirstHalfBoard(started)

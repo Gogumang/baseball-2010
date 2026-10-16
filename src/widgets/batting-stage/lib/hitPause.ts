@@ -1,6 +1,7 @@
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
 
 /**
@@ -112,8 +113,7 @@ export function groundPathIndexOf(trajectory: { readonly length: number; pointAt
  * 40774  isqrt((p.x − 25068)² + (p.z − 23275)²) ÷ 265 − 40 ≤ 15 (부호 없음)   → 넘긴다
  * ```
  * 곧 조건이 맞으면 공 틱 g − 1 에 넘긴다(틱 8 보다 이르면). 맞지 않으면 null.
- * ⚠️ [경기+0xf2c] 는 타구 순간 0x50faa 가 같은 타격점 0xcfb64 = (20000, 1000, 30000) 에 놓고 0x51408 51722 가 같은 vt44 로
- *    쏘는 공이다 — 판 공 [경기+0x204] 와 같은 궤적으로 본다(유력 — 그 공의 세계 충돌 깔기는 따로 확인하지 않았다).
+ * `trajectory` 는 [경기+0xf2c] 공의 궤적이다 — 판 공과 수평각이 d 만큼 다른 공(`earlyPassPatternOf`).
  */
 export function earlyHitPauseTickOf(
   resultCode: number,
@@ -164,7 +164,7 @@ export function canSkipHitPause(watchesBigHit: boolean): boolean {
  * 여기서 나오는 틱·거리도 그만큼 **근사다**.
  * 패턴을 못 찾으면(있을 수 없는 코드) 붙잡지 않는 쪽 — 폴 접촉으로 두어 틱 8 이 된다.
  */
-export function pauseInputOf(resultCode: number, deck: PatternDeck): HitPauseInput {
+export function pauseInputOf(resultCode: number, deck: PatternDeck, batterHand: number): HitPauseInput {
   const pattern = lastDrawnPattern(deck, resultCode)
   if (pattern === null) return { resultCode, angle: 90, landingTick: 0, poleTick: 0, carryScale: 0, earlyTick: null }
   const trajectory = battedBallTrajectory(pattern)
@@ -174,6 +174,7 @@ export function pauseInputOf(resultCode: number, deck: PatternDeck): HitPauseInp
     landingTick: trajectory.landingTick,
     poleTick: trajectory.poleTick,
     carryScale: trajectory.carryScale,
-    earlyTick: earlyHitPauseTickOf(resultCode, trajectory),
+    // 이른 넘김은 [경기+0xf2c] 공 — 판 공과 수평각이 d 다른 공을 따로 깐다 (0x5174c)
+    earlyTick: earlyHitPauseTickOf(resultCode, battedBallTrajectory(earlyPassPatternOf(pattern, batterHand))),
   }
 }

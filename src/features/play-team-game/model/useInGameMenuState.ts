@@ -18,6 +18,22 @@ import { activeSound } from '@/shared/api/audio/soundPort'
 export type InGameMenuOpening = '별표' | '복귀' | '질문뒤'
 
 /**
+ * **'*' 로 메뉴를 여는 그림의 남은 갱신** — 경기 장면 프레임 0x52c50 은 공용 창 게이트 0x754f9 를 52cc6 에서 **키보다 먼저** 보고,
+ * 키 0x498d4(52d9e — '*' 49918 → 0x741a0 · 0x3c02c 가 창을 세운다) 뒤 52e14~ 의 갱신 표를 다시 묻지 않고 돈다. 그래서 '*' 를 누른
+ * 그림에도 그 상태의 갱신(0x10 이면 0x39c5c)이 한 번 돈다. 웹은 키가 그림 사이에 들어와 다음 틱이 이미 멈춘 장면을 보므로, 그
+ * 한 틱을 여는 자리에서 곧바로 돌린다 — 그 틱이 있는 부품(조준 `AimCursor`)이 여기에 건다. 장면 시계 구조는 그대로다.
+ */
+const starOpenFrameListeners = new Set<() => void>()
+
+/** '*' 로 메뉴를 새로 열기 직전에 부른다 — 돌려준 함수로 뗀다 */
+export function subscribeInGameMenuStarOpen(listener: () => void): () => void {
+  starOpenFrameListeners.add(listener)
+  return () => {
+    starOpenFrameListeners.delete(listener)
+  }
+}
+
+/**
  * 창이 닫기를 맡는다 — `finish` 는 창이 치워진 갱신에 부른다. 창이 키를 안 받는 때(펼침 · 줄임 중, 질문 창이 떠 있음)면 아무것도
  * 안 하고 true, 창이 이미 내려간 자리(질문 [예] 뒤 · 뷰어로 넘어감)면 false — 부르는 쪽이 곧바로 닫는다.
  */
@@ -85,6 +101,8 @@ export function useInGameMenuState(): InGameMenuState {
   }, [])
   const toggle = useCallback(() => {
     if (isOpenRef.current) return close()
+    // 그 그림의 키 뒤 갱신(52e14~) — 창은 이미 섰지만 게이트(52cc6)는 키 앞에서 지나갔다
+    for (const listener of [...starOpenFrameListeners]) listener()
     // 0x3c02c 맨 앞 0x3c036 — 울리던 소리를 끊는다(0x6e418)
     activeSound().stop()
     // 0x3c02c → 0x6c00c(메뉴, 0, 0) — 새로 열면 첫 칸

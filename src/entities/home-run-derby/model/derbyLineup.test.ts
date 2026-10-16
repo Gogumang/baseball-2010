@@ -56,6 +56,11 @@ describe('홈런더비 공격 팀 타순 — 0x39fdc · 0xaf020 · 0xaebe4', () 
   it('모드 타자의 수비는 옛 [k] 마스터 줄의 +0x1c (0xb53f0 b54b6 · b551a)', () => {
     expect(derbyModeBatterPositionOf(createDerbyLineup(4, 3))).toBe(teamBatters(4)[3]!.position! & 0xf)
   })
+
+  it('k 가 마스터 줄 수(12)면 옛 [k] 는 0xb4e34 가 늘린 0 채운 끝 칸이라 수비 0 (0xb8de5 memset)', () => {
+    expect(teamBatters(4)).toHaveLength(12)
+    expect(derbyModeBatterPositionOf(createDerbyLineup(4, 12))).toBe(0)
+  })
 })
 
 describe('마스터 타자 줄의 타석 재료', () => {

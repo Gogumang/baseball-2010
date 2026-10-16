@@ -46,11 +46,12 @@ describe('명예 타자 — 0x1fc20 의 +0xa6 ≥ 0 갈래 = 0x1f640 명전 기�
   const collection = 등록.collection
 
   it('같은 기록이라 나리 타자와 같은 값 — 0xb6414 · 장착 비트 · 필살 번호 +0x18', () => {
-    expect(modeBatterOfHallOfFame(collection.hallOfFame[0])).toEqual(modeBatterOf(나리))
+    // 명예 타자만 +0xa 아랫 5비트(등록 0)를 더 든다
+    expect(modeBatterOfHallOfFame(collection.hallOfFame[0])).toEqual({ ...modeBatterOf(나리), recordSlot: 0 })
   })
 
   it('고른 선수가 명예 타자일 때만 — 나리 선수(−1)·투수·빈 칸은 null', () => {
-    expect(hallOfFameModeBatterOf({ side: '타자', hallOfFameIndex: 1 }, collection)).toEqual(modeBatterOf(나리))
+    expect(hallOfFameModeBatterOf({ side: '타자', hallOfFameIndex: 1 }, collection)).toEqual({ ...modeBatterOf(나리), recordSlot: 0 })
     expect(hallOfFameModeBatterOf({ side: '타자', hallOfFameIndex: null }, collection)).toBeNull()
     expect(hallOfFameModeBatterOf({ side: '투수', hallOfFameIndex: 1 }, collection)).toBeNull()
     expect(hallOfFameModeBatterOf({ side: '타자', hallOfFameIndex: 0 }, collection)).toBeNull()
@@ -60,7 +61,7 @@ describe('명예 타자 — 0x1fc20 의 +0xa6 ≥ 0 갈래 = 0x1f640 명전 기�
   it('옛 저장은 남긴 장비 얹은 능력치(없으면 기본)로 — 스킬 없음, 필살 0', () => {
     const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, look: _l, recordLine: _r, ...옛기록 } =
       collection.hallOfFame[0]
-    expect(modeBatterOfHallOfFame(옛기록)).toEqual({ ability: 옛기록.equippedAbility, skillIds: [], specialSwingNumber: 0 })
+    expect(modeBatterOfHallOfFame(옛기록)).toEqual({ ability: 옛기록.equippedAbility, skillIds: [], specialSwingNumber: 0, recordSlot: 0 })
     const { equippedAbility: _a, ...더옛기록 } = 옛기록
     expect(modeBatterOfHallOfFame(더옛기록).ability).toEqual(나리.ability)
   })

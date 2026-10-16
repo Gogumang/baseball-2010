@@ -5,6 +5,8 @@ import {
   pitcherCollectorHiddenIdsOf,
   hallOfFameEquipmentNibblesOf,
   syncHallOfFameEquipment,
+  withHallOfFameRecordSlot,
+  hallOfFameRecordSlotOf,
   hallOfFameRecordIdOf,
   EMPTY_COLLECTION,
   HALL_OF_FAME_COST,
@@ -232,6 +234,34 @@ describe('0x2328c — 시즌에서 명예 선수가 산 장비 니블을 명전 
     const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0)] }
     expect(syncHallOfFameEquipment(collection, '타자', 0xc9, [1, 1, 1, 1])).toBe(collection)
     expect(syncHallOfFameEquipment(collection, '투수', 0xb4, [1, 1, 1, 1])).toBe(collection)
+  })
+})
+
+describe('0xc554 c578 0xb6605 — 시즌 영입이 명전 기록 +0xa 아랫 5비트를 고른 자리로 (전역 블록째 저장)', () => {
+  const famer = (slot: number) => ({
+    name: `타자${slot}`, ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot,
+  })
+
+  it('영입한 적 없으면 0 (등록 0x1f680 의 0x20 & 0x1f) · 영입하면 그 칸만 j', () => {
+    const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0), famer(3)] }
+    expect(hallOfFameRecordSlotOf(collection.hallOfFame[1]!)).toBe(0)
+    const next = withHallOfFameRecordSlot(collection, '타자', 0xcb, 7)
+    expect(hallOfFameRecordSlotOf(next.hallOfFame[1]!)).toBe(7)
+    expect(next.hallOfFame[0]?.recordSlot).toBeUndefined()
+  })
+
+  it('j 는 아랫 5비트만 (0xb6605 의 & 0x1f) · 같은 값이거나 없는 칸이면 같은 객체', () => {
+    const collection = { ...EMPTY_COLLECTION, hallOfFame: [famer(0)] }
+    expect(withHallOfFameRecordSlot(collection, '타자', 0xc8, 0x25).hallOfFame[0]?.recordSlot).toBe(5)
+    expect(withHallOfFameRecordSlot(collection, '타자', 0xc9, 3)).toBe(collection)
+    expect(withHallOfFameRecordSlot(collection, '투수', 0xb4, 3)).toBe(collection)
+    const set = withHallOfFameRecordSlot(collection, '타자', 0xc8, 4)
+    expect(withHallOfFameRecordSlot(set, '타자', 0xc8, 4)).toBe(set)
+  })
+
+  it('저장 칸 — recordSlot 은 normalize 를 지나 남는다 (옛 저장은 없어 0)', () => {
+    const saved = { ...EMPTY_COLLECTION, hallOfFame: [{ ...famer(0), recordSlot: 9 }] }
+    expect(normalizeCollection(JSON.parse(JSON.stringify(saved))).hallOfFame[0]?.recordSlot).toBe(9)
   })
 })
 

@@ -307,7 +307,7 @@ describe('resolvePitch — 필살 성공 굴림 0x34c74 → 0x517e6', () => {
         expect(b.detail.resolution).toEqual({ kind: '파울' })
         expect(b.isUncatchable).toBe(false)
         expect(필살.count()).toBe(보통.count())
-        expect(a.detail.foulContact).toEqual({ pattern: a.detail.pattern, resultCode: a.detail.resultCode })
+        expect(a.detail.foulContact).toEqual({ pattern: a.detail.pattern, resultCode: a.detail.resultCode, batterHand: a.detail.batterHand })
         expect(b.detail.foulContact?.specialSwing).toEqual({ number: 1, isAceBatter: false })
         expect(b.detail.foulContact?.pattern).toEqual(b.detail.pattern)
       }
@@ -348,7 +348,7 @@ describe('2스트라이크 번트 파울(판정 11)도 판을 도는 파울 각 
       const b = resolvePitch(직구(), { frame: 16, shift: 0, buntKind: 1 }, 이스트, createPatternDeck(createSeededRandom(seed)), 뒤.random)
       찾음 = true
       expect(b.detail).toEqual(a.detail)
-      expect(b.detail.foulContact).toEqual({ pattern: b.detail.pattern, resultCode: b.detail.resultCode })
+      expect(b.detail.foulContact).toEqual({ pattern: b.detail.pattern, resultCode: b.detail.resultCode, batterHand: b.detail.batterHand })
       expect('isBuntFoulOut' in b.detail).toBe(false)
       expect(b.isUncatchable).toBe(false)
       expect(뒤.count()).toBe(앞.count())

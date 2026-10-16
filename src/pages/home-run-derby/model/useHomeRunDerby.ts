@@ -587,11 +587,12 @@ export function useHomeRunDerby({
 
     // **맞은 공은 홈런더비 판(종류 8)을 돈다** (2026-10-07 직접 뜸 — `derbyBattedBall` 머리말). 원본은 모드 7 도 맞은 공이면
     // 각과 무관하게(파울 · 번트 포함) 판(상태 0x17)을 돌고 그 끝 0x52a52 → 0xae3e8 모드 7 갈래로 간다(H-2). 판 시작은 폴 충돌
-    // rand(−25, 25)(쏘기 · 세계 51172~511a4 안 — 필살수비 굴림은 0x50fba 가 모드 7 이면 없다) 하나만 굴린다. 공 틱 0xb401c 가
+    // rand(−25, 25)(쏘기 · 세계 51172~511a4 안 — 필살수비 굴림은 0x50fba 가 모드 7 이면 없다)와 [경기+0xf2c] 공의 같은 굴림만 돈다. 공 틱 0xb401c 가
     // 안 돌아 포구 · 쥐기(b2766) · 펌블 · 판 끝 결과 코드 · 메시지 0xbba 가 없다 — **파울 뜬공 아웃도 없다**.
     // 필살타법은 더비 타석에 번호가 없어(`HomeRunDerbyScreen` 이 `specialSwingNumber` 를 안 넘김) 0x517e6 굴림 차례 문제가 없다.
     // 홈런 = 땅에 닿기 전에 담장선 · 폴을 넘은 페어 공(0x52720). 예전 웹은 타석의 임시 결과(`provisionalOutcomeOf`)로 정했다
-    const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current)
+    // 이어 [경기+0xf2c] 공(수평각 d)의 점 깔기 — 폴에 맞으면 굴림이 하나 더 (`derbyBattedBallOf` 머리말)
+    const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // ⚠️ 근사(때): 공 틱 0 을 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 때)로 센다
     // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.

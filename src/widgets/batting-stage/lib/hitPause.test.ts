@@ -12,6 +12,7 @@ import {
   SHORT_HIT_TICKS,
 } from '@/widgets/batting-stage/lib/hitPause'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { earlyPassAngleOffsetOf, earlyPassPatternOf, earlyPassZoneOf } from '@/entities/batting/model/earlyPassBall'
 import { createPatternDeck, drawPattern } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
@@ -123,7 +124,7 @@ describe('덱에서 방금 친 패턴을 되읽어 판정값을 만든다', () =
     const random = createSeededRandom(7)
     const drawn = drawPattern(createPatternDeck(random), 24, random)
 
-    const input = pauseInputOf(24, drawn.deck)
+    const input = pauseInputOf(24, drawn.deck, 0)
 
     expect(input.angle).toBe(drawn.pattern[0])
     expect(input.resultCode).toBe(24)
@@ -133,6 +134,36 @@ describe('덱에서 방금 친 패턴을 되읽어 판정값을 만든다', () =
   it('패턴이 없는 코드면 붙잡지 않고 틱 8 로 둔다', () => {
     const 빈덱 = { orders: {}, cursors: {} }
 
-    expect(hitPauseTicksOf(pauseInputOf(24, 빈덱))).toBe(SHORT_HIT_TICKS)
+    expect(hitPauseTicksOf(pauseInputOf(24, 빈덱, 0))).toBe(SHORT_HIT_TICKS)
+  })
+})
+
+describe('[경기+0xf2c] 공 — 판 공과 수평각 d 만 다르다 (0x51408 51682~5174c)', () => {
+  it('구역 0x494b4: 각 −185~−115 → 1 · −65~5 → 2 · 그 밖 0 (u16 비교)', () => {
+    expect([-186, -185, -115, -114].map(earlyPassZoneOf)).toEqual([0, 1, 1, 0])
+    expect([-66, -65, 5, 6].map(earlyPassZoneOf)).toEqual([0, 2, 2, 0])
+    expect(earlyPassZoneOf(-90)).toBe(0)
+  })
+
+  it('d = 좌타 −5 · 우타 +5, 좌타 구역 1 · 우타 구역 2 면 0', () => {
+    expect(earlyPassAngleOffsetOf(-90, 0)).toBe(5)
+    expect(earlyPassAngleOffsetOf(-90, 1)).toBe(-5)
+    expect(earlyPassAngleOffsetOf(-120, 1)).toBe(0)
+    expect(earlyPassAngleOffsetOf(-120, 0)).toBe(5)
+    expect(earlyPassAngleOffsetOf(-60, 0)).toBe(0)
+    expect(earlyPassAngleOffsetOf(-60, 1)).toBe(-5)
+  })
+
+  it('웹 패턴 각은 a − d (원본 각 −a + d) — 속도 · 높이 · 플래그는 그대로', () => {
+    expect(earlyPassPatternOf([90, 800, 300, 1], 0)).toEqual([85, 800, 300, 1])
+    expect(earlyPassPatternOf([90, 800, 300, 1], 1)).toEqual([95, 800, 300, 1])
+    expect(earlyPassPatternOf([120, 800, 300, 0], 1)).toEqual([120, 800, 300, 0])
+  })
+
+  it('이른 넘김은 d 를 더한 공의 궤적으로 본다', () => {
+    const random = createSeededRandom(7)
+    const drawn = drawPattern(createPatternDeck(random), 1, random)
+    const input = pauseInputOf(1, drawn.deck, 0)
+    expect(input.earlyTick).toBe(earlyHitPauseTickOf(1, battedBallTrajectory(earlyPassPatternOf(drawn.pattern, 0))))
   })
 })
