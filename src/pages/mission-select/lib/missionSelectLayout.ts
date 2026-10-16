@@ -88,6 +88,15 @@ export const REWARD_ROW = {
 export const SUCCESS_ROW = { labelFrame: 258, labelX: ROW_BASE_X + 0x58, valueX: ROW_BASE_X + 0x72 } as const
 
 /**
+ * 등급 표시 네모 — 성공 값 바로 뒤 0x1e6ce~0x1e722: i = 0 .. 개수 − 1 에
+ * `0xba759(slt_frame [this+0x78], 이미지 0x26, 종류 0, W/2 + (169 >> 1) − 0x27 + 8i, y0 + 0x84, 0, 0, 0, 1)` → (165 + 8i, 183).
+ * 개수 = 레코드 byte1 `lsls #0x1c ; lsrs #0x1d` = (byte1 >> 1) & 7 — 보상 등급 d(0xa52b0 a52d8 과 같은 식, `missionRewardTierOf`).
+ * 레코드는 칸 ≠ 14 면 모드 6 0xa5269 / 그 밖 0xa5295(칸)(0x1e558~0x1e5a6). 칸 14 는 받은 미션이 있을 때만 같은 꼴(0x1e4e2~0x1e53a)이고
+ * 받은 미션이 없으면(웹은 늘) 0x1e394 에서 끝나 안 그린다. 잠긴 칸도 거르지 않는다.
+ */
+export const GRADE_MARKS = { image: 0x26, x: SCREEN_WIDTH / 2 + (169 >> 1) - 0x27, step: 8, y: 51 + 0x84 } as const
+
+/**
  * 칸 14(이벤트 미션)에 받은 미션이 없을 때([[this+0x84]+0xa4] == 0 — 웹은 통신이 없어 늘 그렇다):
  * 제목 `"!C이벤트 미션"`(0xcd740) 을 미션 이름 자리(24, 58, 폭 0xc0) 에 같은 색 #335FCD 로 — 0xba269 호출 1e2a6.
  */

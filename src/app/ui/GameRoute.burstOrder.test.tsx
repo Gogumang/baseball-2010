@@ -14,9 +14,10 @@ import { SCENE_CONFIRM_READY_FRAMES, useSceneConfirm } from '@/features/play-gam
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /** 경기 화면 대신 — 진짜 화면처럼 0xe 대기를 `useSceneConfirm` 으로 받는다(덮개가 있으면 안 받음) */
-const 화면: { confirm?: () => void; isPaused?: boolean } = {}
+const 화면: { confirm?: () => void; isPaused?: boolean; burstRow?: unknown } = {}
 vi.mock('@/pages/game/ui/GameScreen', () => ({
-  GameScreen: (props: { progress: { sceneConfirm?: SceneConfirmWait | null }; isPaused: boolean }) => {
+  GameScreen: (props: { progress: { sceneConfirm?: SceneConfirmWait | null }; isPaused: boolean; burstRow?: unknown }) => {
+    화면.burstRow = props.burstRow
     const scene = useSceneConfirm(props.progress.sceneConfirm, !props.isPaused)
     화면.confirm = scene.confirm
     화면.isPaused = props.isPaused
@@ -90,5 +91,10 @@ describe('나리 타자편 돌발 제안 창(0x1b)은 상태 0xe 의 OK 뒤에 �
     잠금풀기()
     act(() => 화면.confirm!())
     expect(screen.getByTestId('돌발창')).toBeTruthy()
+  })
+
+  it('타석 HUD 돌발 띠 0x8e858 은 [M+0xc] 가 차 있으면 제안 창 OK 전에도 선다 (0x4c4bc 4c510~4c524)', () => {
+    띄우기(enterSceneConfirm())
+    expect(화면.burstRow).toBe(BURST_TABLES[createBurstSession(4)!.table][0])
   })
 })

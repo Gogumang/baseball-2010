@@ -206,21 +206,26 @@ export const PROGRESS_ROW = {
 export const endingProgressOf = (row: number, gained: number) =>
   (row === 0 ? Math.trunc((gained * 100) / NARI_ENDING_CELL_COUNT) : gained * 20)
 
-/** 스킬 설명 — 꼬리 탭 프레임 2 (91×15) + 설명 상자 0xbb28d(120, …, 173, 60) */
+/** 스킬 설명 — 꼬리 탭 프레임 2 (91×15) + 설명 상자 0xbb28d(120, …, 173, 60) + 글 */
 export const SKILL_DESCRIPTION = {
   tabFrame: 2,
   tabX: SCREEN_WIDTH / 2 - 86,
   tabY: 176,
   box: { centerX: 120, y: 190, width: 173, height: 60 },
   /**
-   * 글 칸 — 상자(34~207) 안쪽에 3px 여백만 남기고 **폭을 150 → 168 로 넓혔다**.
-   * 글꼴을 11px 로 올리니 150px 에서는 스킬 40개 중 5개가 상자(54px) 밖으로 흘러
-   * 아래 쪽번호 줄을 덮었다. 폭을 넓혀 줄 수를 줄이면 40개 모두 52px 안에 들어온다
-   * (브라우저에서 40개를 다 재서 확인했다). 원본 글 칸 좌표는 미해독이라 **근사다**.
+   * 글 — 0xba269(글, W/2 − 0x51 = 39, y0 + 0x94 = 202, 폭 −1, 색 −1, 0) (0x2f3a0 · 0x2f4d8 → 0x2f4e6~0x2f4ec 가 **0x2fb8e 로 뛴다**).
+   * 0x2fb8c `subs r3, #0xa` 는 뛰어든 자리(0x2fb8e) 앞이라 안 지난다 — 폭은 −1 그대로다 *(정정 r133 — r129 노트의 "폭 −11" 은 이 뜀을 잘못 읽었다)*.
+   * 폭 −1 이면 0x6ef4c 가 6efb0~6efd0 에서 0x9c52c 로 날 글 폭(0x0a 줄 중 최댓값)을 재어 폭으로 쓰므로 **줄은 `!N` 에서만 끊긴다**.
+   * 글에 `!C` 가 없어 왼쪽 맞춤 · 줄 높이는 글꼴 +0x6c(11) + 줄간 +0x67(3) = 14 (0x6ef90~0x6efa4, R5).
+   * 얻은 스킬은 `"%s!N효과 : !cFFFF00%s"`(0xcf978) = StrSKILL[i] · StrSKILL[i + 40](0x702b5) · 못 얻었으면 `"!cffffff아직 획득하지 못한!N스킬입니다."`(0xcf950).
+   * 원본 그대로라 네 줄짜리 설명(202 + 56 = 258)은 상자(190~250) 아래로 넘친다.
    */
-  text: { x: 37, y: 196, width: 168 },
+  text: { x: SCREEN_WIDTH / 2 - 0x51, y: PANEL.y + 0x94 },
 } as const
 
+
+/** 못 얻은 스킬 설명 `"!cffffff아직 획득하지 못한!N스킬입니다."`(0xcf950) — 0x2f37e~0x2f3ae (칸 > 0x27 이거나 표 [+0x13c + 4i] == −1) */
+export const SKILL_NOT_GAINED_TEXT = '!cffffff아직 획득하지 못한!N스킬입니다.'
 /**
  * 기록·통계 탭의 목록 격자 — 탭 0 `0x79ed5(격자, 종류, 120, y0 + 0x24 = 90, 칸너비 [174], 줄높이 18, 1열, 8줄)` (0x2e8e6~0x2e92e) ·
  * 탭 4 는 같은 꼴에 종류 2 · **y0 + 0x23 = 89** (0x2f96a~0x2f9ae). 칸 x = 120 − 174/2 = 33, 칸 y = 첫 y + 18 × 줄.

@@ -7,14 +7,14 @@ import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
-import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
   ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_NAME, LIST_ROW_FRAME_DY, listFirstYOf, STAT_NAME, STAT_VALUE, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
-  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
+  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
@@ -307,12 +307,19 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
             width={SKILL_DESCRIPTION.box.width}
             height={SKILL_DESCRIPTION.box.height}
           />
-          <div className={styles.descriptionText}
-            style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y, width: SKILL_DESCRIPTION.text.width }}>
-            {collection.skills.includes(cursor)
-              // `"%s!N효과 : !cFFFF00%s"` — 이름 + 효과 (0xcf978)
-              ? `${stripGameMarkup(ORIGINAL_SKILLS[cursor]?.description ?? '')}\n효과 : ${stripGameMarkup(ORIGINAL_SKILLS[cursor]?.effect ?? '')}`
-              : '???'}
+          {/* 0xba269(글, 39, 202, 폭 −1) — 날 글 폭이라 `!N` 에서만 줄이 끊긴다 (0x2f3a0 · 0x2f4d8 → 0x2fb8e) */}
+          <div className={styles.descriptionText} data-testid="스킬-설명"
+            style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y }}>
+            {parseGameMarkup(collection.skills.includes(cursor)
+              // `"%s!N효과 : !cFFFF00%s"`(0xcf978) — StrSKILL[i] · StrSKILL[i + 40]
+              ? `${ORIGINAL_SKILLS[cursor]?.description ?? ''}!N효과 : !cFFFF00${ORIGINAL_SKILLS[cursor]?.effect ?? ''}`
+              : SKILL_NOT_GAINED_TEXT).map((line, lineIndex) => (
+              <div key={lineIndex}>
+                {line.segments.map((segment, segmentIndex) => (
+                  <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+                ))}
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -369,14 +376,14 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
         )
       })}
 
-      {(tab === 2 || tab === 3) && (
+      {/* 합계 줄(프레임 15 · 이미지 0x26 · img_text 0x10d)은 탭 3(0x2f834~0x2f8ca) · 탭 4(0x2fa60~0x2faf6)에만 있다 —
+          탭 2 그리기(0x2efa4~0x2f4ec)는 이 셋을 안 그리고, 함께 쓰는 0x2fb8e 호출은 합계가 아니라 스킬 설명이다 */}
+      {tab === 3 && (
         <TotalRow
           frames={frames}
           textFrames={textFrames}
-          value={tab === 2
-            ? `${collection.skills.length}/${ORIGINAL_SKILLS.length}`
-            // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
-            : `${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
+          // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
+          value={`${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
         />
       )}
 

@@ -151,8 +151,8 @@ export function burstLineIndexOf(judgement: BurstJudgement | null): number {
   return judgement === null ? BURST_PROPOSAL_LINE : BURST_TEXT_LINE[judgement]
 }
 
-/** 보상 이름 표 [0x14002c8] — 0 없음 · 1 사기 · 2 인기도 · 3 평판 · 4 소지금 (0xd4fb4~0xd4ff8) */
-const REWARD_NAMES: readonly string[] = [
+/** 보상 이름 표 [0x14002c8] — 0 없음 · 1 사기 · 2 인기도 · 3 평판 · 4 소지금 (0xd4fb4~0xd4ff8). 돌발 띠 0x8e858 도 같은 표를 쓴다 */
+export const BURST_REWARD_NAMES: readonly string[] = [
   '!C!cffffff없음', '!C!cffffff사기', '!C!cffffff인기도', '!C!cffffff평판', '!C!cffffff소지금',
 ]
 /** 소지금(4) 보상은 표시 값을 ×100 (0x8e68e · 0x8e6ee) */
@@ -180,15 +180,15 @@ export function burstResultPopupTextOf(judgement: BurstJudgement | null, row: Bu
     const [first, second] = row.successRewards
     const valueOf = (reward: { readonly kind: number; readonly amount: number }) =>
       reward.kind === MONEY_KIND ? asSignedByte(reward.amount) * MONEY_DISPLAY_SCALE : asSignedByte(reward.amount)
-    if (first.kind !== 0) text += `${REWARD_NAMES[first.kind] ?? ''} +${valueOf(first)}`
-    if (second.kind !== 0) text += `!N${REWARD_NAMES[second.kind] ?? ''} +${valueOf(second)}`
+    if (first.kind !== 0) text += `${BURST_REWARD_NAMES[first.kind] ?? ''} +${valueOf(first)}`
+    if (second.kind !== 0) text += `!N${BURST_REWARD_NAMES[second.kind] ?? ''} +${valueOf(second)}`
     return text
   }
   if (judgement === '실패') {
     const penalty = row.failurePenalty
     if (penalty.amount === 0) return null
     let text = '!C!cffffff[!cff5500돌발미션 실패!!!cffffff]!N'
-    if (penalty.kind !== 0) text += `${REWARD_NAMES[penalty.kind] ?? ''} -${asSignedByte(penalty.amount)}`
+    if (penalty.kind !== 0) text += `${BURST_REWARD_NAMES[penalty.kind] ?? ''} -${asSignedByte(penalty.amount)}`
     return text
   }
   return null

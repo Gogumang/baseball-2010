@@ -4,11 +4,11 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
-import { missionRewardOf } from '@/entities/mission/model/missionReward'
+import { missionRewardOf, missionRewardTierOf } from '@/entities/mission/model/missionReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, EVENT_MISSION_TITLE, EVENT_TAB_LABEL, GRID, MISSION_GRID_SHAPE,
-  MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
+  GRADE_MARKS, MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
@@ -269,6 +269,12 @@ export function MissionSelectScreen({
         style={{ left: SUCCESS_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {clears}회
       </div>
+      {/* 0x1e6ce~0x1e722 — 등급 표시 네모 (byte1 >> 1) & 7 개를 (165 + 8i, 183) */}
+      {selected !== undefined && Array.from({ length: missionRewardTierOf(selected.stage) }, (_, index) => (
+        <img key={index} className={styles.sprite} alt="" data-testid="미션-등급-네모"
+          src={imageSrc(SLT_FRAME, GRADE_MARKS.image)}
+          style={{ left: GRADE_MARKS.x + GRADE_MARKS.step * index, top: GRADE_MARKS.y }} />
+      ))}
 
       {/* 웹 [투수편/타자편] 바꾸기 단추는 걷었다 — 원본은 선수 고르기(하위 17)에서 고른 선수가 편을 정해(투수 → 모드 5,
           타자 → 모드 6) 목록 안에서 편을 바꾸는 길이 없다 */}

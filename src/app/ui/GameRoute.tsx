@@ -401,6 +401,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onSettingsChange={gameSettings.setSettings}
         recordAlert={recordAlert}
         onRecordAlertSceneChange={reportAlertScene}
+        // 돌발 띠 0x8e858 — [M+0xc] 는 판정 뒤에도 결과 창을 닫을 때(0x8e5b8 8e7ee~8e800)까지 남는다
+        burstRow={burst?.current ?? resolution?.row ?? null}
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstLines !== null && (

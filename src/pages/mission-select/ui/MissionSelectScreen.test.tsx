@@ -109,6 +109,23 @@ describe('미션 선택 격자', () => {
     expect(screen.getByAltText('MISSION').style.left).toBe('39px')
   })
 
+  it('등급 표시 네모 — (byte1 >> 1) & 7 개를 slt_frame 이미지 0x26 으로 (165 + 8i, 183), 칸 14(받은 미션 없음)는 없다 (0x1e6ce~0x1e722)', () => {
+    띄우기()
+    const marks = () => screen.queryAllByTestId('미션-등급-네모') as HTMLElement[]
+    const first = marks()
+    expect(first).toHaveLength((BATTER_MISSIONS[0].stage >> 1) & 7)
+    expect(first.length).toBeGreaterThan(0)
+    expect(first.map((mark) => [mark.style.left, mark.style.top])).toEqual(first.map((_, i) => [`${165 + 8 * i}px`, '183px']))
+    expect(first[0].getAttribute('src')).toBe('./sprites/slt_frame/038.png')
+
+    // 칸 13 → 등급 5
+    for (let i = 0; i < 13; i += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(marks()).toHaveLength((BATTER_MISSIONS[13].stage >> 1) & 7)
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(marks()).toHaveLength(0)
+  })
+
   it('좌우 키로 칸을 옮긴다 — 꼴 0x330 이라 15칸을 감는다 (칸 0 ← → 칸 14, 칸 14 → → 칸 0)', () => {
     const key = missionKeyOf(BATTER_MISSIONS[0])
     띄우기({ clearedKeys: [key] })
