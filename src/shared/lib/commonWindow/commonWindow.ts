@@ -68,3 +68,41 @@ export function GameSceneMark(): null {
   useMarksGameScene()
   return null
 }
+
+/**
+ * **공용 창 [0x140005c] 이 지금 떠 있는가([창+9] ≠ 0)** — 앱 전역 한 칸. `MessageBox`(0x74ef4) · `usePopupWindowMotion`(0x741a0) 창이
+ * 서 있는 동안, 그리고 경기 중 메뉴의 [조작방법] · [설정](0x3c212 · 0x3c326 이 같은 일시정지 창을 대기 칸으로 다시 띄워 그 위에
+ * 뷰어 · 설정 판을 그린다 — I 4c-3)이 떠 있는 동안 센다.
+ *
+ * 그리기 루프(requestAnimationFrame)가 React 를 거치지 않고 읽는 값이라 문맥(`CommonWindowOpenContext` — 히든 오픈 알림만)과 따로 둔다.
+ * 지금 읽는 곳: 경기 장면 0x52c50 의 파티클 게이트(53048~5304c `ldrb r3, [r6, #9]` · `bne 0x53064` — 떠 있으면 관리자 틱 0x6de85 ·
+ * 그리기 0x6dd69 를 **둘 다** 건너뛴다). 다른 장면 프레임(0x32dd8 의 32f48 · 0xe9ac 의 f112 · 0x1cdec 의 1d480 · 0x1eb0c 의 1eb2a)은
+ * 이 게이트가 없다 — 창이 떠 있어도 굴리고 그린다(2026-10-16 직접 떴다).
+ */
+let shownCommonWindows = 0
+
+/** 창 하나가 섰다 — 돌려준 함수로 내린다(두 번 불러도 한 번만 내린다) */
+export function markCommonWindowShown(): () => void {
+  shownCommonWindows += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    shownCommonWindows -= 1
+  }
+}
+
+/** [0x140005c]+9 — 공용 창이 하나라도 떠 있는가 */
+export function isCommonWindowShown(): boolean {
+  return shownCommonWindows > 0
+}
+
+/** `isShown` 인 동안 공용 창이 떠 있다고 센다 */
+export function useMarksCommonWindowShown(isShown: boolean): void {
+  useLayoutEffect(() => (isShown ? markCommonWindowShown() : undefined), [isShown])
+}
+
+/** 시험용 — 센 수를 되돌린다 */
+export function resetCommonWindowShownForTest(): void {
+  shownCommonWindows = 0
+}

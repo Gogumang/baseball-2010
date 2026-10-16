@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { useMarksCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * **공용 창 [0x140005c] 의 0x741a0 계열 여닫기** — 그리기 · 키 콜백을 받는 창(칭호 · 스킬 보상 · 이벤트 미션 · 기록 고르기 …).
@@ -77,7 +78,9 @@ export interface PopupWindowMotion {
  * 0x741a0 창 하나의 펼침 · 닫힘. 갱신 한 번 = 원본 틀 하나(`millisecondsPerFrame`).
  * `skipsMotion` 이 참이면(레이아웃이 없는 시험 환경 따위) 다 펼친 채로 시작하고 `'줄임'` 도 바로 닫는다 — `MessageBox` 와 같은 약속.
  */
-export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expands = true, opensAtOnce = false }: {
+export function usePopupWindowMotion({
+  targetHeight, skipsMotion = false, expands = true, opensAtOnce = false, isCommonWindow = true,
+}: {
   /** [창+0x20e] — 0x741a0 의 둘째 인자 */
   readonly targetHeight: number
   readonly skipsMotion?: boolean
@@ -92,6 +95,11 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
    * 다시 띄울 때). 닫힘(줄임)은 그대로다.
    */
   readonly opensAtOnce?: boolean
+  /**
+   * 공용 창 [0x140005c] 으로 뜬 창인가 — 참이면 치워질 때까지([+9] = 0, 0x742a8) `isCommonWindowShown` 에 센다.
+   * 공용 창이 아닌 자리(선수 상세가 제 판으로 뜨는 때 — `DetailWindow` 의 `opensAsCommonPopup` 거짓)는 거짓.
+   */
+  readonly isCommonWindow?: boolean
 }): PopupWindowMotion {
   const [openingHeight, setOpeningHeight] = useState<number | null>(skipsMotion || opensAtOnce ? null : POPUP_OPEN_START_HEIGHT)
   const [closingWidth, setClosingWidth] = useState<number | null>(null)
@@ -123,6 +131,8 @@ export function usePopupWindowMotion({ targetHeight, skipsMotion = false, expand
     openingRef.current = null
     setOpeningHeight(null)
   }, [skipsMotion])
+
+  useMarksCommonWindowShown(isCommonWindow && !isClosed)
 
   const isMoving = openingHeight !== null || closingWidth !== null
   useEffect(() => {

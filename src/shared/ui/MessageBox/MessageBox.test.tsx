@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { CommonWindowSceneContext } from '@/shared/lib/commonWindow/commonWindow'
+import { CommonWindowSceneContext, isCommonWindowShown, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 메시지 상자 (0x74ef4 배치 · F-1).
@@ -324,5 +324,27 @@ describe('메시지 상자 애니메이션', () => {
       vi.useRealTimers()
       되돌리기()
     }
+  })
+})
+
+describe('공용 창 [0x140005c]+9 — 경기 장면 파티클 게이트(0x52c50 의 53048)가 읽는 칸', () => {
+  it('상자가 서 있는 동안 세고, 답해 치워지면(레이아웃 없는 자리는 그 자리) 내린다', () => {
+    resetCommonWindowShownForTest()
+    const onAnswer = vi.fn()
+    const { unmount } = render(<MessageBox text="알림" buttons={['확인']} onAnswer={onAnswer} />)
+    expect(isCommonWindowShown()).toBe(true)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onAnswer).toHaveBeenCalledTimes(1)
+    expect(isCommonWindowShown()).toBe(false)
+    unmount()
+    expect(isCommonWindowShown()).toBe(false)
+  })
+
+  it('답하지 않고 내려가도 내린다', () => {
+    resetCommonWindowShownForTest()
+    const { unmount } = render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={vi.fn()} />)
+    expect(isCommonWindowShown()).toBe(true)
+    unmount()
+    expect(isCommonWindowShown()).toBe(false)
   })
 })

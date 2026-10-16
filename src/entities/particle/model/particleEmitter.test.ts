@@ -57,8 +57,16 @@ describe('입자 만들기 0x6d56c', () => {
     const 아래 = createEmitter(고정설정({ ang: 90, spd: 512 }), 0, 0, 10)
     tickEmitter(오른쪽, 난수0)
     tickEmitter(아래, 난수0)
-    expect([오른쪽.particles[0].vx, 오른쪽.particles[0].vy]).toEqual([512, 0])
-    expect([아래.particles[0].vx, 아래.particles[0].vy]).toEqual([0, 512])
+    // 표 0xd2eec 의 sin 90° 는 65535 라 (65535 × 512) >> 16 = 511 — 원본 그대로 한 눈금 모자란다
+    expect([오른쪽.particles[0].vx, 오른쪽.particles[0].vy]).toEqual([511, 0])
+    expect([아래.particles[0].vx, 아래.particles[0].vy]).toEqual([0, 511])
+  })
+
+  it('속도는 32비트 곱 뒤 asrs 16 — 음수는 −∞ 쪽으로 내린다 (0x6d702 · 0x6d726)', () => {
+    // ang 180: cos16 = −65535 · sin16 = 0 → (−65535 × 512) >> 16 = −512 (0 쪽 자르기면 −511)
+    const 왼쪽 = createEmitter(고정설정({ ang: 180, spd: 512 }), 0, 0, 10)
+    tickEmitter(왼쪽, 난수0)
+    expect([왼쪽.particles[0].vx, 왼쪽.particles[0].vy]).toEqual([-512, 0])
   })
 
   it('A 는 a0 에서 시작해 틱마다 (a1−a0)/life 만큼 움직인다', () => {
@@ -87,9 +95,9 @@ describe('입자 갱신 0x6d878', () => {
     tickEmitter(emitter, 난수0)
     tickEmitter(emitter, 난수0)
     const 입자 = emitter.particles[0]
-    // 2틱: off = 512 (v 는 1024 가 됨) · 3틱: off = 1536
-    expect([입자.offY, 입자.vy]).toEqual([1536, 1536])
-    expect(particlePixelOf(입자)).toEqual({ x: 100, y: 53 })
+    // 처음 vy = (65535 × 512) >> 16 = 511 · 2틱: off = 511 (v 는 1023 이 됨) · 3틱: off = 1534
+    expect([입자.offY, 입자.vy]).toEqual([1534, 1535])
+    expect(particlePixelOf(입자)).toEqual({ x: 100, y: 52 })
   })
 
   it('life 가 0 이 된 입자는 다음 틱 갱신에서 빠지고, 끝(3)은 그 다음 틱 머리에서 선다 (0x6dad0)', () => {

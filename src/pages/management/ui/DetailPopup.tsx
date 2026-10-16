@@ -97,7 +97,9 @@ export function DetailWindow({
   useLayoutEffect(() => {
     if ((overlayRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
   }, [])
-  const motion = usePopupWindowMotion({ targetHeight: 0, skipsMotion: !opensAsCommonPopup || hasNoLayout })
+  const motion = usePopupWindowMotion({
+    targetHeight: 0, skipsMotion: !opensAsCommonPopup || hasNoLayout, isCommonWindow: opensAsCommonPopup,
+  })
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const close = () => {

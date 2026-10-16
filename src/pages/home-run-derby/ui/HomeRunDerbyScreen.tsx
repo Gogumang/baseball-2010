@@ -30,7 +30,7 @@ import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
-import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 interface HomeRunDerbyScreenProps {
   /**
@@ -132,6 +132,8 @@ export function HomeRunDerbyScreen({
   useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
+  useMarksCommonWindowShown(overlay !== null)
   /**
    * 결과 창의 "예"(재도전)는 메인 메뉴 하위 39 를 거쳐 모드 7 장면을 **새로 세운다** — 타석 캔버스도 새로 띄운다
    * (하늘 행 굴림이 새 장면마다 한 번이다). 경기 중 메뉴의 다시하기도 같은 길(0x3c98e → 0x27)이라 캔버스를 새로 띄운다.

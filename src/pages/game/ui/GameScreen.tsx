@@ -52,7 +52,7 @@ import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
@@ -173,6 +173,8 @@ export function GameScreen({
   useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
+  useMarksCommonWindowShown(overlay !== null)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
   const ace = progress.aceOpponent
   /** 운동장 전경 · 벤치 클리어링의 두 팀 — 레코드 타자 배열 차례 · 지금 투수 마선수 (`gameFieldTeamsOf`) */

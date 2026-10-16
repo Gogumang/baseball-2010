@@ -39,8 +39,14 @@ import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
  * 0x51a30  키 건너뛰기 0x519cc(메시지 0x587)                                       → `fastForwardDefenseEffects` · 더비 `effectsClearedAt`
  * ```
  * (나머지 하나는 관리자 소멸자 0x6df20 ← 0x3490 · 0x34d4 — 앱 종료.)
- * ⚠️ 미확인: 0x52c50 은 공용 창 [0x140005c]+9 == 0 일 때만 관리자를 굴린다(53048). 웹의 쥔 부품 없는 경기 화면(`SceneParticleLayer`)은
- * 경기 중 팝업 동안에도 굴린다.
+ *
+ * **공용 창 게이트 — 경기 장면만** (2026-10-16 직접 떴다): 0x52c50 의 53048 `ldrb r3, [r6, #9]`(r6 = [0x140005c], 52c5a) · `bne 0x53064` —
+ * 창이 떠 있으면 틱 0x6de85 와 그리기 0x6dd69 를 **둘 다** 건너뛴다. 그동안 상태 갱신(52cc6)과 상태 그리기(52f0e~52f24 — [창+0x24f] 인
+ * 경기 장면은 창이 선 첫 그림 [창+0x250] 에만 장면을 다시 그린다)도 없어 멈춘 화면에 파티클이 남지 않는다. 틱은 따라잡지 않는다.
+ * 메뉴 0x32dd8(32f34~32f5a — 머리 32dda~32e02 의 창 검사는 상태 그리기만 건너뛴다) · 시즌 0xe9ac(f108~f124) · 나리 0x1cdec
+ * (1d476~1d492) · 미션 0x1eb0c(1eb2a~1eb3c)는 창을 안 보고 늘 굴리고 그린다.
+ * 웹: 창이 떠 있는지는 `isCommonWindowShown`(`MessageBox` · `usePopupWindowMotion` · 경기 중 메뉴의 [조작방법] · [설정])이고,
+ * 타석(`useStageAnimation`) · 수비 판(`DefensePlayback` · `DefenseParticles`) · 경기 장면의 `SceneParticleLayer`(`isGameScene`)가 이 게이트를 본다.
  */
 export {
   claimSceneParticles,

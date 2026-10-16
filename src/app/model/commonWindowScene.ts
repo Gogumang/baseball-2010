@@ -35,3 +35,12 @@ export function sceneClosesWithoutShrinkOf(kind: Screen['kind'], isMissionPlayer
       return false
   }
 }
+
+/**
+ * 이 화면 갈래가 경기 장면 0x104 자체인가(`sceneClosesWithoutShrinkOf` 의 경기 갈래와 같은 넷) — 경기 화면 부품이 내려간 틈
+ * (수비 재생 · 중계 · 벤치 클리어링 따위를 길이 따로 세우는 때)에도 장면은 0x104 라 그 프레임 0x52c50 의 파티클 게이트(53048)가 선다.
+ * 시즌 · 나리의 경기 화면은 스스로 `useMarksGameScene` 으로 알린다.
+ */
+export function isGameSceneScreenKind(kind: Screen['kind']): boolean {
+  return kind === '경기' || kind === '미션진행' || kind === '투수미션' || kind === '마선수대결'
+}

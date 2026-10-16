@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import {
   isSceneParticlesClaimed,
@@ -18,6 +19,11 @@ const HEIGHT = 320
 interface SceneParticleLayerProps {
   /** 원본 전역 난수 — 이미터 틱 0x6dad0 · 알 만들기 0x6d56c · 갱신 0x6d878 이 굴린다 */
   readonly random: RandomPort
+  /**
+   * 경기 장면(0x104)이 서 있는가 — 그 프레임 0x52c50 만 공용 창 [0x140005c]+9 가 서 있으면 관리자 틱 0x6de85 · 그리기 0x6dd69 를
+   * 둘 다 건너뛴다(53048~5304c). 메뉴 0x32dd8(32f48) · 시즌 0xe9ac(f112) · 나리 0x1cdec(1d480) · 미션 0x1eb0c(1eb2a)는 게이트가 없다
+   */
+  readonly isGameScene?: boolean
 }
 
 /**
@@ -27,10 +33,12 @@ interface SceneParticleLayerProps {
  * 경기 장면 부품(타석 · 수비 판)이 관리자를 쥔 동안(`isSceneParticlesClaimed`)은 그 부품이 제 틱 차례로 굴리고 제 캔버스에 그리므로
  * 이 층은 굴리지도 그리지도 않는다 — 쥔 부품이 없는 경기 화면(교대 판 · 벤치 클리어링 · 사람 투구 장면 따위)은 이 층이 돌린다.
  */
-export function SceneParticleLayer({ random }: SceneParticleLayerProps) {
+export function SceneParticleLayer({ random, isGameScene = false }: SceneParticleLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const randomRef = useRef(random)
   randomRef.current = random
+  const isGameSceneRef = useRef(isGameScene)
+  isGameSceneRef.current = isGameScene
   const [isShown, setIsShown] = useState(false)
 
   useEffect(() => {
@@ -43,7 +51,10 @@ export function SceneParticleLayer({ random }: SceneParticleLayerProps) {
     const frame = (now: number) => {
       const tick = Math.floor((now - startedAt) / millisecondsPerFrame())
       const isClaimed = isSceneParticlesClaimed()
-      if (scene.emitters.length === 0 || isClaimed) {
+      // 53048 — 경기 장면에 공용 창이 서 있으면 이 그림의 틱도 그림도 없다(따라잡지 않는다 — 원본 틀이 관리자를 안 부른 것이다).
+      // 장면은 창이 선 첫 그림([창+0x250])에만 다시 그려지고(52efe~52f24) 그 그림에 파티클이 없으므로 멈춘 화면에도 파티클이 안 남는다
+      const isGated = isGameSceneRef.current && isCommonWindowShown()
+      if (scene.emitters.length === 0 || isClaimed || isGated) {
         steppedTick = tick
       } else {
         if (tick - steppedTick > CATCH_UP_LIMIT) steppedTick = tick - CATCH_UP_LIMIT
@@ -52,7 +63,7 @@ export function SceneParticleLayer({ random }: SceneParticleLayerProps) {
           tickSceneParticles(randomRef.current)
         }
       }
-      const shows = scene.emitters.length > 0 && !isClaimed
+      const shows = scene.emitters.length > 0 && !isClaimed && !isGated
       if (shows !== wasShown) {
         wasShown = shows
         setIsShown(shows)

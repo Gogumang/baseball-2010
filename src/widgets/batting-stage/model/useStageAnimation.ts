@@ -36,6 +36,7 @@ import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
@@ -485,7 +486,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       } else {
         backdropClock = observeFrozenClock(backdropClock ?? startFrozenClock(now), now, latestRef.current.isSceneFrozen === true)
       }
-      // 결과 창(상태 0x1a)에는 투구·파티클 갱신이 없다 — 투구 단계를 멈추고 파티클 틱도 그 자리에 묶어 둔다
+      // 결과 창 뒤 배경(0x19 · 0x1a)에는 투구 갱신이 없다 — 투구 단계를 멈춘다(파티클 틱은 아래 — 프레임 끝 0x6de85 는 돈다)
       if (!isBackdrop) advancePhase(now)
 
       const pitch = pitchRef.current
@@ -506,9 +507,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const nowTick = pitchTickAt(now, openedAt, tickLength)
       if (particleTick === 0) particleTick = nowTick
       const settlement = isBackdrop ? latestRef.current.settlement : undefined
-      // 결과 배경은 정산 효과가 있을 때만 틱을 돈다 — 0x4a384 의 효과 틱 → 프레임 끝 파티클 틱 (둘 다 경기 난수)
-      const steps =
-        isBackdrop && settlement === undefined ? 0 : Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
+      // 경기 장면 프레임 0x52c50 의 파티클 게이트 53048~5304c — 공용 창 [0x140005c]+9 가 서 있으면 관리자 틱 0x6de85 · 그리기 0x6dd69 를
+      // 둘 다 건너뛴다. 그동안 상태 갱신(52cc6 → 52ef2)과 상태 그리기(52f0e~52f24 → 53032, 장면을 다시 그리는 첫 그림 [+0x250] 말고)도
+      // 건너뛰므로 그 안의 효과 틱(0x40faa · 정산 0x4a384)도 없다 — 이 그림들의 틱은 따라잡지 않고 버린다(원본 틀이 돌지 않은 것과 같다)
+      const isParticleGated = isCommonWindowShown()
+      const steps = isParticleGated ? 0 : Math.min(PARTICLE_CATCH_UP_LIMIT, nowTick - particleTick)
       if (settlement !== undefined && settlementEffect === undefined) {
         settlementEffect = enterSettlementEffect(
           {
@@ -529,7 +532,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         }
         tickParticles(particlesRef.current, settlement.random)
       }
-      for (let step = 0; step < steps && settlement === undefined; step += 1) {
+      // 정산 효과가 없는 결과 배경(홈런더비 결과 창 0x1a — 갱신 0x3c0b8 · 그리기 0x45c18 는 구름 0x78449 · 배경 0x78579 · 창뿐, 효과 틱 없음)도
+      // 프레임 끝 관리자 틱 0x6de85 는 돈다(53048 의 게이트는 공용 창만 본다 — 경기 상태를 안 가린다). 굴림은 경기 난수
+      for (let step = 0; step < steps && isBackdrop && settlement === undefined; step += 1) {
+        tickParticles(particlesRef.current, latestRef.current.random)
+      }
+      for (let step = 0; step < steps && !isBackdrop; step += 1) {
         const stepTime = openedAt + (firstSteppedTick + step + 1) * tickLength
         // 0x17 진입 0x46418 의 4673e — 0x13 을 끝낸 틱(그 틱의 파티클 틱 · 그리기는 0x13 끝에 쏜 016 까지 한 번 돈다) 다음 틱에 비운다
         const inPlayEnteredAt = inPlayEnteredAtRef.current
@@ -623,7 +631,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         tick: nowTick,
         ...(runnerAnimationSteps === undefined ? {} : { runnerAnimationSteps }),
         // 판이 효과 층을 깔았으면 배경 캔버스에는 배경만 — 비 · 파티클은 아래에서 그 층에 그린다
-        particles: settlement?.layers === undefined ? particlesRef.current : null,
+        particles: settlement?.layers === undefined && !isParticleGated ? particlesRef.current : null,
         rain: settlement?.layers === undefined ? settlementRain : null,
         // 정산 결과 배경의 하늘 칸 — 0x4a384 는 +0x14 를 안 바꾸므로 경기 끝 이닝 그대로, 지면 진입 0x4ea0c 4f4fe~4f506 이
         // 구장객체 +0x18 = 12 → 0x76fc5(구장, 0) 으로 마지막 칸(밤)에 둔다
@@ -660,7 +668,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         const rainContext = layers.rain.current?.getContext('2d') ?? null
         if (rainContext !== null) renderSettlementLayer(rainContext, { rain: settlementRain })
         const particleContext = layers.particles.current?.getContext('2d') ?? null
-        if (particleContext !== null) renderSettlementLayer(particleContext, { particles: particlesRef.current })
+        if (particleContext !== null) renderSettlementLayer(particleContext, { particles: isParticleGated ? null : particlesRef.current })
       }
 
       animationHandle = requestAnimationFrame(frame)

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
@@ -269,7 +270,8 @@ function drawBallParticles(
   const frame = stepDefenseEffects(
     run.effects,
     null,
-    { particles: run.scene, random, configOf: particleConfigOf },
+    // 53048 — 공용 창이 서 있는 그림은 관리자 틱이 없다(위 `effectsPorts` 와 같은 게이트)
+    { particles: run.scene, random: isCommonWindowShown() ? undefined : random, configOf: particleConfigOf },
     ballShotsAt(drawn, cameraOffset),
   )
   run.effects = frame.effects
@@ -744,7 +746,14 @@ function LivePlayback({
     let running = state
     let moved = false
     let board: RunScoreBoardView | null | undefined
-    const effectsPorts = { particles: particlesRef.current, random: input.random, configOf: particleConfigOf }
+    // 53048 — 공용 창 [0x140005c]+9 가 서 있으면 경기 장면 프레임이 관리자 틱 0x6de85 를 건너뛴다(그리기 쪽 0x40faa 효과 틱도 상태 그리기와
+    // 함께 건너뛴다 — 52f24). 난수를 안 넘기면 `stepDefenseEffects` 가 두 틱을 안 돈다.
+    // ⚠️ 미확인 · 근사: 원본은 그동안 갱신(52cc6)도 멈춰 판이 서지만 웹 수비 판은 창이 떠도 진행한다 — 파티클 틱 · 그리기만 멈춘다
+    const effectsPorts = {
+      particles: particlesRef.current,
+      random: isCommonWindowShown() ? undefined : input.random,
+      configOf: particleConfigOf,
+    }
     let effectsFrame: ReturnType<typeof stepDefenseEffects> | null = null
     let skippedNow = false
     // 키 건너뛰기(+0xfe7)가 서면 52b26~52b40 이 한 그림 안에서 판 끝까지 되풀이한다 — 따라잡을 틱 수와 상관없이 끝까지 돈다
