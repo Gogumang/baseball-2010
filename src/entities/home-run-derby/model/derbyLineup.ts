@@ -49,15 +49,18 @@ export interface DerbyLineup {
 const LINEUP_SIZE = 9
 
 /**
- * **명예 타자의 칸 k** — 등록 0x1f680 이 +0xa = 0x20 을 통째로 적어(1f682 · 1f684) 0xb53f0 의 0x20 갈래가 k = 0x20 & 0x1f = 0 으로
- * 옮긴다(미션 사람 칸 팀과 같은 길 — Q2 2e-2). ⚠️ 미해결: 시즌 영입 0xc554 의 `0xb6604(원본, j)` 가 명전 기록 +0xa 아래 5비트를
- * 고친다(S6 4-4)는데 웹 명전 기록에는 그 칸이 없다 — 미션과 같이 0 으로 둔다.
+ * **명예 타자의 칸 k (영입한 적 없는 기록)** — 등록 0x1f680 이 +0xa = 0x20 을 통째로 적어(1f682 · 1f684) 0xb53f0 의 0x20 갈래가
+ * k = 0x20 & 0x1f = 0 으로 옮긴다(미션 사람 칸 팀과 같은 길 — Q2 2e-2). 시즌 영입 0xc554 c578 `0xb6605(명전 기록, j)` 가 그
+ * 아랫 5비트를 고른 자리 j 로 고치고 0x22755 → 0x1f1b8 이 전역 블록째 저장한다 — 그 뒤 k = j (`hallOfFameRecordSlotOf`).
+ * 윗 3비트(0x20)는 남아 늘 0x20 갈래다(0xb6720 `tst`).
  */
 export const DERBY_HALL_OF_FAME_BATTER_SLOT = 0x20 & 0x1f
 
 /**
- * **나리 저장 선수의 내 줄이 레코드에 없을 때의 칸** — 미션 `nariBatterRecordSlot` 과 같은 자리값(끝 칸 12).
- * ⚠️ 미해결: 원본은 0x1faa1 이 못 찾아 [저장+0x38] 에 옛 칸 주소가 남는다 — 그때 k 가 무엇인지는 안 읽었다.
+ * **나리 저장 선수의 내 줄이 레코드에 없을 때의 칸** — 미션 `nariBatterRecordSlot` 과 같은 자리값(끝 칸 12). 웹 근사다.
+ * 원본(직접 떴다): 더비 진입 0x327b8 의 모드 7 갈래 328c8 이 `0x213c0(앱, 4, 0)` — 셋째 인자 0 이라 모든 모드 저장을 풀고
+ * 2169e 에서 [앱+0x38] = 0 을 적은 뒤 타자편 저장을 올리고 219b0 `0x1faa1` 이 내 줄(+0xa 음수)을 찾는다. 못 찾으면 [앱+0x38] 은
+ * 0 그대로라 경기 초기화 3a53c 의 P = 0x1fc20(앱) = **NULL** — 0xb53f0 · 0xb6394 가 주소 0 을 읽는다. 옮길 값이 없어 웹은 12 로 둔다.
  */
 export const DERBY_MISSING_BATTER_SLOT = BATTERS_PER_TEAM
 
@@ -94,7 +97,11 @@ export function derbyLineupBatterOf(lineup: DerbyLineup): DerbyLineupBatter {
  * 상태 0xe 소개 판의 수비 칸(0x54590)이 이 값을 그린다. k 가 마스터 줄 밖이면 undefined.
  */
 export function derbyModeBatterPositionOf(lineup: DerbyLineup): number | undefined {
-  const row = teamBatters(lineup.teamId)[lineup.modeBatterSlot]
+  const batters = teamBatters(lineup.teamId)
+  // k 가 마스터 줄 수와 같으면(영입 자리 12) 옛 [k] 는 0xb4e34 가 늘린 끝 칸 — 새 칸 생성자 0xb8de5 가 0x30 바이트를 0 으로(memset)
+  // 채운 줄이라 수비 위치 0 이다. ⚠️ k > 12 는 0xb53d0 이 null → b55dc 가 모드 타자를 rec[0] 에 덮는다(U-111 (b)) — 웹은 안 옮겼다
+  if (lineup.modeBatterSlot === batters.length) return 0
+  const row = batters[lineup.modeBatterSlot]
   return row?.position === undefined ? undefined : row.position & 0xf
 }
 

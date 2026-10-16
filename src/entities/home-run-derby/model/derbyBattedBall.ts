@@ -4,6 +4,7 @@ import {
   trajectoryWithRandom,
 } from '@/entities/batting/model/battedBallFlight'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
+import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
@@ -139,9 +140,14 @@ export function derbyBallStopTickOf(trajectory: BattedBallTrajectory): number {
  *
  * `random` 을 주면 폴 충돌 굴림(0xa2c64)이 돈다 — 폴에 맞는 궤적만 하나를 쓰고, 그 밖의 궤적은 난수를 안 쓴다.
  * 안 주면 굴림 없는 궤적 그대로다(시험 · 판 길이 미리 보기).
+ * `batterHand`(0xb63c1)를 주면 이어 [경기+0xf2c] 공(수평각 d, 0x51408 5174c · 517ce)의 점 깔기도 돌린다 — 그 공이 폴에 맞으면
+ * 굴림이 하나 더 돈다(모드 갈림 없음). 판은 그 공을 안 본다.
  */
-export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPort): DerbyBattedBall {
+export function derbyBattedBallOf(pattern: BattedBallPattern, random?: RandomPort, batterHand?: number): DerbyBattedBall {
   const trajectory = trajectoryWithRandom(battedBallTrajectory(pattern), random)
+  if (random !== undefined && batterHand !== undefined) {
+    trajectoryWithRandom(battedBallTrajectory(earlyPassPatternOf(pattern, batterHand)), random)
+  }
   return derbyPlayOf(pattern, trajectory, null)
 }
 

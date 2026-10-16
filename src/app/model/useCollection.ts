@@ -9,6 +9,7 @@ import {
   registerHallOfFamePitcher,
   deleteHallOfFame,
   syncHallOfFameEquipment,
+  withHallOfFameRecordSlot,
   HALL_OF_FAME_COST,
   countSeasonRegularWin,
 } from '@/entities/collection/model/collection'
@@ -149,6 +150,11 @@ export function useCollection(
     setCollection((previous) => syncHallOfFameEquipment(previous, side, recordId, nibbles))
   }, [])
 
+  /** 시즌 영입 0xc554 c578 `0xb6605(명전 기록, j)` — 영입한 명전 선수 기록의 +0xa 아랫 5비트를 고른 자리로 (`withHallOfFameRecordSlot`) */
+  const syncSeasonHallOfFameRecruit = useCallback((side: HallOfFameSide, recordId: number, recordSlot: number) => {
+    setCollection((previous) => withHallOfFameRecordSlot(previous, side, recordId, recordSlot))
+  }, [])
+
   /**
    * **`0x62368(ui, k, 0)` — 히든 k 를 열고 알림 창** (직접 떴다). 셋째 인자 0 이라 이미 열린 k(0x61f5c)면 아무것도 안 한다.
    * 새로 열면 전역 해금표(`app+0xc0`, 웹 `openedHiddenIds`)에 켜고 공용 창에 글을 띄운다(`hiddenOpenNoticeTextOf`).
@@ -242,7 +248,7 @@ export function useCollection(
   )
 
   return {
-    collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, recordStat, claimCollectionReward,
+    collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, syncSeasonHallOfFameRecruit, recordStat, claimCollectionReward,
     openHidden, openHiddenQuietly, recordSeasonRegularWin,
     /** 기록달성 누계 해금 0x62234 가 문턱에 견주는 지금 통계 (렌더를 기다리지 않는다) */
     readStats,

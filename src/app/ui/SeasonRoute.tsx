@@ -57,7 +57,7 @@ import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection, HallOfFameSide } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
-import { isHallOfFameRecord, nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
+import { isHallOfFameRecord, nariRecruitPlayerOf, slotOf } from '@/entities/season-mode/model/playerRecruit'
 import {
   NARI_EQUIP_REFUSAL_TEXT_ID, PLAYER_PICK_PURPOSE, playerPickCancelTarget, refusesEquipment,
 } from '@/entities/season-mode/model/playerPick'
@@ -106,6 +106,12 @@ interface SeasonRouteProps {
    * 앱의 `collection.syncSeasonHallOfFameEquipment` 를 넘기면 된다. 안 넘기면 명전 기록은 그대로다.
    */
   readonly onHallOfFameEquipment?: (side: HallOfFameSide, recordId: number, nibbles: readonly number[]) => void
+  /**
+   * 선수영입 확정 0xc554 의 c578 `0xb6605(원본, j)` — 명전 칸에서 영입하면 그 **명전 기록**의 +0xa 아랫 5비트를 고른 자리 j 로 고치고
+   * 0x22755 → 0x1f1b8 이 전역 블록째 저장한다(홈런더비 · 타자 미션의 k 가 이 값). 앱의 `collection.syncSeasonHallOfFameRecruit`.
+   * 나리 칸은 그 저장을 쓰지 않고 풀어 남지 않는다 — 부르지 않는다. 안 넘기면 명전 기록은 그대로다.
+   */
+  readonly onHallOfFameRecruit?: (side: HallOfFameSide, recordId: number, recordSlot: number) => void
   /**
    * 영입 목록 나리 칸 0·5 (0x5eb8c 목록 종류 0 — 나리 투수편·타자편 저장이 있으면 상태 1, 없으면 2).
    * 안 넘기면 둘 다 없음(상태 2)으로 그린다.
@@ -202,7 +208,7 @@ export function SeasonRoute(props: SeasonRouteProps) {
  * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
  */
 function SeasonScreens({
-  session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords, onHallOfFameEquipment,
+  session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords, onHallOfFameEquipment, onHallOfFameRecruit,
 }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
@@ -819,9 +825,13 @@ function SeasonScreens({
             onBack={back}
           />
         )}
-        onRecruit={(result) => {
+        onRecruit={(result, asPitcher) => {
           // 원본은 밀려난 선수를 빼지 않고 **끼워넣는다** — 그 규칙은 recruitPlayer 안에 있다
           actions.updateRoster(result.roster)
+          // c578 0xb6605 — 명전 칸 영입이면 명전 기록 +0xa 아랫 5비트도 고른 자리로 (나리 칸 기록은 저장 안 됨)
+          if (isHallOfFameRecord(result.source)) {
+            onHallOfFameRecruit?.(asPitcher ? '투수' : '타자', result.source.id, slotOf(result.source))
+          }
         }}
         // [180] 팝업(0x19)을 닫으면 0xce — 0x6fe0 (예전에는 영입하자마자 나가 팝업이 안 보였다)
         onDone={backToTeamMenu}

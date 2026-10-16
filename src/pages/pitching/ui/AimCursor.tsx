@@ -15,6 +15,7 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { createGameSceneDrawGate, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { subscribeInGameMenuStarOpen } from '@/features/play-team-game/model/useInGameMenuState'
 
 interface AimCursorProps {
   /** 존 중심 표 0xcfbcc 의 칸 — 진행기가 투구에 쓰는 side 와 같다 */
@@ -105,6 +106,18 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   }
   const applyRef = useRef(apply)
   applyRef.current = apply
+
+  // '*'(소프트키1 · "*MENU" 누름 칸도) — 공용 키 0x498d4 가 메뉴를 세운 뒤 같은 키로 메시지 8 을 보내 dx · dy 를 지우고(499fa →
+  // 0x534b0 → 0x50e3a), 그 그림의 갱신 0x39c5c 가 게이트(52cc6, 키 앞) 뒤라 한 번 더 돈다. 다음 그림부터는 창이 멈춘다
+  useEffect(
+    () =>
+      subscribeInGameMenuStarOpen(() => {
+        if (isDoneRef.current || propsRef.current.isPaused || isGameSceneFrozen()) return
+        directionRef.current = AIM_STILL
+        tickRef.current()
+      }),
+    [],
+  )
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

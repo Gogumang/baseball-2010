@@ -3,7 +3,7 @@ import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
+import { hallOfFameBatterAt, hallOfFameRecordSlotOf } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamer, HallOfFamePlayerPick } from '@/entities/collection/model/collection'
 
 /**
@@ -47,6 +47,12 @@ export interface ModeBatter {
    * 모르면(선수 없음 · 줄을 안 남긴 옛 명전 기록) 없다
    */
   readonly recordLine?: readonly number[]
+  /**
+   * 선수 레코드 +0xa 아랫 5비트 — 명예 타자만 (`hallOfFameRecordSlotOf`: 등록 0 · 시즌 영입 0xc554 의 0xb6605 가 고른 자리).
+   * 0xb53f0 의 0x20 갈래(b5532~)가 이 칸 k 에 넣는다 — 홈런더비 3a550 · 타자 미션 aa7c2 의 0xb6394(0x1fc20(앱)).
+   * 나리 타자는 나리 팀 레코드의 내 줄 첨자라 여기 없다
+   */
+  readonly recordSlot?: number
 }
 
 /** 선수 레코드 +0xb — 폼 `2 × 타입 + 손` · 피부 0 황인 · 1 백인 · 2 흑인 */
@@ -84,6 +90,8 @@ export function modeBatterOfHallOfFame(famer: HallOfFamer): ModeBatter {
     skillIds,
     specialSwingNumber: famer.specialSwingNumber ?? 0,
     ...(famer.recordLine === undefined ? {} : { recordLine: famer.recordLine }),
+    // +0xa 아랫 5비트 — 등록 0x1f680 의 0x20 → 0, 시즌 영입이 고친 자리 j (전역 블록째 저장)
+    recordSlot: hallOfFameRecordSlotOf(famer),
     // 등록이 옮긴 +0xb — 옛 기록(생김새 칸을 남기기 전)은 모른다
     ...(famer.look === undefined
       ? {}

@@ -62,6 +62,14 @@ interface HallOfFameRecordFields<Ability> {
    * 이 칸 × 1000 이다. 2026-10-16 에 더했다 — 그 전 옛 저장에는 없다(읽는 쪽은 칸을 비운다)
    */
   readonly salaryGrade?: number
+  /**
+   * 기록 **+0xa 아랫 5비트** — 등록이 0(투수 +0xa = 0 · 타자 +0xa = 0x20)으로 적고, 시즌 영입 0xc554 의 c578 `0xb6605(원본, j)` 가
+   * 이 전역 기록(0x1f62d · 0x1f641 = [전역+0xac] + 0x880 | 0x940 + 칸 × 0x30)에 **고른 자리 j** 를 적는다. 영입 끝 0xc5dc
+   * `0x22755(앱, 1)` 이 지금 모드 파일 저장에 이어 22bee `0x1f1b8` 로 전역 블록(크기 [+0xcc] = 0xe44, game_o.sav)을 통째로 써서
+   * 파일에 남는다. 홈런더비 · 타자 미션의 0x1fc20 이 이 기록 자체를 주므로 0xb53f0 0x20 갈래의 k 가 이 값이다.
+   * 2026-10-16 에 더했다 — 없으면(옛 저장 · 영입한 적 없음) 0
+   */
+  readonly recordSlot?: number
 }
 
 /** 명예의 전당 타자 (+0x940 칸) */
@@ -425,6 +433,46 @@ export function syncHallOfFameEquipment(
   }
 }
 
+/** 기록 +0xa 아랫 5비트 마스크 — `0xb6605` 의 `(+0xa & 0xe0) | (j & 0x1f)` */
+const RECORD_SLOT_MASK = 0x1f
+
+/** 명전 기록의 +0xa 아랫 5비트 (`HallOfFameRecordFields.recordSlot`, 없으면 등록이 적은 0) */
+export function hallOfFameRecordSlotOf(famer: HallOfFamer | HallOfFamePitcher): number {
+  return (famer.recordSlot ?? 0) & RECORD_SLOT_MASK
+}
+
+/**
+ * **시즌 영입 0xc554 의 원본 기록 칸 고치기** — c536~c550 이 명전 칸 `0x1f62d(투수) / 0x1f641(타자)(앱, [목록+0x130])` 을 받고
+ * c578 `0xb6605(그 기록, j)` 가 +0xa 아랫 5비트를 고른 자리 j 로 (윗 3비트는 둔다). 그 뒤 0xc5dc `0x22755(앱, 1)` → 22bee
+ * `0x1f1b8` 이 전역 블록을 game_o.sav 에 쓴다 — 명전 기록은 그 블록 안이라 저장된다. 칸은 기록 번호(칸 + 0xb4 / + 0xc8)로 찾는다.
+ * 나리 칸(0 · 5)은 `0x22169 / 0x220ed` 가 `0x213c0(앱, 3|4, 1)` 로 올린 나리 저장의 기록을 고치나, 0x22755 는 지금 모드
+ * ([앱+0x40], 시즌) 파일과 전역 블록만 쓰고 0xc5fa~0xc608 `0x1f24d(앱, 4) · (앱, 3)` 가 그 저장을 쓰지 않고 풀어(0x1f3c6 ·
+ * 0x1f4e6) 파일에 안 남는다 — 그래서 여기는 명전 칸만 받는다. 없는 칸이면 같은 객체.
+ */
+export function withHallOfFameRecordSlot(
+  collection: Collection,
+  side: HallOfFameSide,
+  recordId: number,
+  recordSlot: number,
+): Collection {
+  const slot = recordId - (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID)
+  const value = recordSlot & RECORD_SLOT_MASK
+  if (side === '투수') {
+    const famer = slot < 0 || slot >= HALL_OF_FAME_MAX_PITCHERS ? null : hallOfFamePitcherAt(collection, slot)
+    if (famer === null || famer.recordSlot === value) return collection
+    return {
+      ...collection,
+      hallOfFamePitchers: collection.hallOfFamePitchers.map((entry) => (entry.slot === slot ? { ...entry, recordSlot: value } : entry)),
+    }
+  }
+  const famer = slot < 0 || slot >= HALL_OF_FAME_MAX_BATTERS ? null : hallOfFameBatterAt(collection, slot)
+  if (famer === null || famer.recordSlot === value) return collection
+  return {
+    ...collection,
+    hallOfFame: collection.hallOfFame.map((entry, index) => ((entry.slot ?? index) === slot ? { ...entry, recordSlot: value } : entry)),
+  }
+}
+
 /**
  * 명전 칸 삭제 — 스페셜 명예의 전당 말풍선 "슬롯에서 삭제" 확인 "예" (0x62994, R11 3-2):
  * 투수 칸 `0x22371(저장, 칸)` · 타자 칸 `0x22339(저장, 칸)` 이 시즌 명단 정리 0x221dc 뒤 칸 0x30 바이트를 0 으로
@@ -460,7 +508,8 @@ const hasRecordFields = (candidate: Record<string, unknown>, abilityKeys: readon
   (candidate.equipmentLevels === undefined || hasNumbers(candidate.equipmentLevels, abilityKeys)) &&
   (candidate.equippedSkillIds === undefined || isNumberArray(candidate.equippedSkillIds)) &&
   (candidate.recordLine === undefined || isNumberArray(candidate.recordLine)) &&
-  isOptionalNumber(candidate.salaryGrade)
+  isOptionalNumber(candidate.salaryGrade) &&
+  isOptionalNumber(candidate.recordSlot)
 
 function isHallOfFamer(value: unknown): value is HallOfFamer {
   if (typeof value !== 'object' || value === null) return false

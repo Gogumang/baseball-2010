@@ -426,7 +426,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     if (result.detail.resultCode !== null) {
       vibrateNow()
       buntRef.current = null
-      const pauseInput = pauseInputOf(result.detail.resultCode, result.deck)
+      const pauseInput = pauseInputOf(result.detail.resultCode, result.deck, latest.batterHand ?? batterSideOfForm(latest.batterForm))
       const watchesBigHit = isBigHit(pauseInput)
       // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 맞은 틱의 공 자리로 본다 (근사)
       const pattern = lastDrawnPattern(result.deck, result.detail.resultCode)

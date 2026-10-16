@@ -30,6 +30,12 @@ export interface BattedContact {
    * 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다. 필살 스윙이 아니면 없다.
    */
   readonly specialSwing?: { readonly number: number; readonly isAceBatter: boolean }
+  /**
+   * 친 타자의 손 `0xb63c1(0xae89d(공격 팀))` (≠ 0 좌타) — 0x51408 이 [경기+0xf2c] 공의 수평각 d 를 고른다(`earlyPassAngleOffsetOf`).
+   * 그 공도 세계 0xbfed0 에 점을 깔아(517ce) 폴에 맞으면 굴림 rand(−25, 25) 가 하나 더 돈다 — 판 시작이 판 공 굴림 뒤 · 필살타법
+   * 굴림 앞에서 돌린다. 없으면(시험 · 옛 길) 그 굴림을 건너뛴다
+   */
+  readonly batterHand?: number
 }
 
 const CONTACTS = new WeakMap<object, BattedContact>()

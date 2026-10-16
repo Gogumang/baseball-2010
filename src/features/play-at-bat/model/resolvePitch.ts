@@ -89,6 +89,8 @@ export interface PitchOutcomeDetail {
    * 받는 쪽(`app/model`)이 `pitchCallSoundIdOf` 로 따로 고른다.
    */
   readonly contactSoundId?: number | null
+  /** 맞은 공이면 친 타자의 손 0xb63c1 (`situation.batterSide`) — [경기+0xf2c] 공의 수평각 d (`BattedContact.batterHand`) */
+  readonly batterHand?: number
   /**
    * 이 공의 **구질 번호** 1~22 (`game+0xfc8`). 원본은 공이 손을 떠날 때(0x3de10 의 0x3dec6)
    * `0xa5e14(ctx, 구질)` 로 상대 투수 투구 수·스태미나를 깎는다 — 받는 쪽이 그 일을 하라고 싣는다.
@@ -330,6 +332,8 @@ export function resolvePitch(
   // (state[4] > 1 && 번트) 로 11 을 낸다(9d5e2~9d600). 판 시작 · 판 끝은 부르는 쪽이 이 공 앞의 스트라이크 · 번트 종류를 실어 돌린다.
   // 낙구 전에 잡히면 다른 파울처럼 뜬공 아웃(13)이다
   const isFoulAngle = contact.kind === '파울' || contact.kind === '번트파울아웃'
+  // 0x51682 0xb63c1(지금 타자) — [경기+0xf2c] 공의 d 를 고른다 (좌타 뒤집기 0x35a6c 와 같은 손)
+  const batterHand = context.situation.batterSide
   const detail: PitchOutcomeDetail = isFoulAngle
     ? {
         resolution: { kind: '파울' },
@@ -338,8 +342,9 @@ export function resolvePitch(
         resultCode: code,
         pattern,
         // 파울 각이라도 판을 돈다 — 부르는 쪽이 이 쏜 공으로 판을 돌린다(필살타법 굴림까지 판 시작에 맡긴다)
-        foulContact: { pattern, resultCode: code, ...(specialSwing === undefined ? {} : { specialSwing }) },
+        foulContact: { pattern, resultCode: code, batterHand, ...(specialSwing === undefined ? {} : { specialSwing }) },
         contactSoundId,
+        batterHand,
       }
     : {
         // 페어 타구 — 결과는 수비 판이 낸다. 타석에 싣는 결과는 **타석을 끝내기 위한 임시 값**이고(`provisionalOutcomeOf`),
@@ -349,6 +354,7 @@ export function resolvePitch(
           outcome: registerContact(provisionalOutcomeOf(pattern), {
             pattern,
             resultCode: code,
+            batterHand,
             ...(specialSwing === undefined ? {} : { specialSwing }),
           }),
         },
@@ -357,6 +363,7 @@ export function resolvePitch(
         resultCode: code,
         pattern,
         contactSoundId,
+        batterHand,
       }
   return { detail, deck: drawn.deck, isUncatchable: false }
 }

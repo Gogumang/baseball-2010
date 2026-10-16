@@ -581,6 +581,8 @@ export function App() {
         hallOfFame={collection.collection}
         // 시즌 장비 창에서 명예 선수가 장비를 사면 명전 기록에도 (0x2328c)
         onHallOfFameEquipment={collection.syncSeasonHallOfFameEquipment}
+        // 시즌 영입 0xc554 가 명전 기록 +0xa 아랫 5비트를 고른 자리로 고치고 전역 블록과 함께 저장한다 (더비 · 미션 k)
+        onHallOfFameRecruit={collection.syncSeasonHallOfFameRecruit}
         // 영입 목록(종류 0) 나리 칸 0·5 — 나리 투수편·타자편 저장 (미션 선수 고르기와 같은 값)
         nari={{
           투수: nariPitcherOf(pitcherSession.career),

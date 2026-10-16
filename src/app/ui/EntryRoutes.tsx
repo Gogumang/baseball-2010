@@ -8,12 +8,12 @@ import { batterCardStatsOf, batterLineOfRecord } from '@/widgets/matchup-cards/l
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { modeBatterOf, modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { nariBatterOf } from '@/app/model/useCollection'
-import { hallOfFameBatterAt } from '@/entities/collection/model/collection'
+import { hallOfFameBatterAt, hallOfFameRecordSlotOf } from '@/entities/collection/model/collection'
 import type { AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
 import { derbyHallOfFameBatterIndexOf } from '@/pages/home-run-derby/lib/derbyModeBatter'
 import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
 import { DERBY_HALL_OF_FAME_BATTER_SLOT, DERBY_MISSING_BATTER_SLOT } from '@/entities/home-run-derby/model/derbyLineup'
-import type { HallOfFamePlayerPick } from '@/entities/collection/model/collection'
+import type { HallOfFamePlayerPick, HallOfFamer } from '@/entities/collection/model/collection'
 import { createLocalStorageJsonStore } from '@/shared/api/save/localStorageJsonStore'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -70,10 +70,12 @@ function derbyMatchupBatterOf(
 
 /**
  * **모드 타자가 든 명부 칸 k** = 3a550 의 `0xb6394(0x1fc20(앱))` = 기록 +0xa & 0x1f — 나리 저장 선수면 나리 팀 레코드의 내 줄 첨자
- * (142 · 경기 장면이 0xb8768 로 다시 매긴 칸, 미션 `nariBatterRecordSlot` 과 같은 값), 명예 타자면 0. 내 줄이 없으면 끝 칸 12(미해결).
+ * (142 · 경기 장면이 0xb8768 로 다시 매긴 칸, 미션 `nariBatterRecordSlot` 과 같은 값), 명예 타자면 그 전역 기록의 아랫 5비트
+ * (등록 0 · 시즌 영입이 고른 자리 — `hallOfFameRecordSlotOf`). 내 줄이 없으면 끝 칸 12 — 원본은 P = NULL 이라 옮길 값이 없다
+ * (`DERBY_MISSING_BATTER_SLOT`).
  */
-function derbyModeBatterSlotOf(famer: object | null, career: PlayerCareer | null | undefined): number {
-  if (famer !== null) return DERBY_HALL_OF_FAME_BATTER_SLOT
+function derbyModeBatterSlotOf(famer: HallOfFamer | null, career: PlayerCareer | null | undefined): number {
+  if (famer !== null) return hallOfFameRecordSlotOf(famer)
   if (career === null || career === undefined) return DERBY_HALL_OF_FAME_BATTER_SLOT
   const index = myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(career), career.teamId))
   return index < 0 ? DERBY_MISSING_BATTER_SLOT : index

@@ -17,6 +17,7 @@ import {
   trajectoryWithRandom,
   type BallTrajectory,
 } from '@/entities/batting/model/battedBallFlight'
+import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import { displayPatternOf, isFairAngle, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -1103,9 +1104,15 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
       slideUnlocked: specialDefense.slideUnlocked,
     })
   }
+  // ── [경기+0xf2c] 공 쏘기 + 세계 0xbfed0 (0x51408 5174c · 517ce) — 판 공과 수평각만 d 다른 공(`earlyPassPatternOf`, 50faa 가
+  // 고친 +0xfcc 그대로 + d). 그 공도 점을 깔며 폴에 맞으면 rand(−25, 25) 를 하나 굴린다 — 판 공 굴림 뒤 · 필살타법 굴림 앞.
+  // 궤적은 이른 넘김(상태 0x13 0x406e8)만 보고 판은 안 본다 — 여기서는 굴림 차례만 맞춘다. 손을 모르는 결과(시험 · 옛 길)는 건너뛴다
+  if (input.random !== undefined && launchedPattern !== undefined && swungContact?.batterHand !== undefined) {
+    trajectoryWithRandom(battedBallTrajectory(earlyPassPatternOf(launchedPattern, swungContact.batterHand)), input.random)
+  }
   // ── 필살타법 성공 굴림 0x517e6 (0x34c74 · p·10 > rand(0, 1000)) — 메시지 0x11(515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 ·
-  // 51188 쏘기의 폴 굴림) **뒤**다. 515c6 과 517e6 사이(0x392ac · 0x35988 · 0x39304 · 0x34be0 · 0xac758 · 메시지 0xbc5 진동 ·
-  // 0x494b4 · 0xae89c)에는 굴림이 없다(호출 그래프). 성공하면 517ec 0xaf180(공+0x5c, 4) — 포구 틱 b4246 이 보고 0xbc3.
+  // 51188 쏘기의 폴 굴림) · [경기+0xf2c] 의 폴 굴림 **뒤**다. 515c6 과 517e6 사이(0x392ac · 0x35988 · 0x39304 · 0x34be0 · 0xac758 ·
+  // 메시지 0xbc5 진동 · 0x494b4 · 0xae89c)에는 그 밖의 굴림이 없다(호출 그래프). 성공하면 517ec 0xaf180(공+0x5c, 4) — 포구 틱 b4246 이 보고 0xbc3.
   // 예전 웹은 타석 판정 안(방향 · 패턴 바로 뒤)에서 굴려 필살수비 · 폴 굴림보다 앞섰고, "필살타법 타구면 필살수비를 안 굴린다"
   // 를 두었다 — 원본 차례에서는 필살수비를 굴릴 때 성공 여부를 아직 모른다
   if (!uncatchable && swungContact?.specialSwing !== undefined && input.random !== undefined) {

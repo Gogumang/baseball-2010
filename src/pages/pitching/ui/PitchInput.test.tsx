@@ -6,6 +6,11 @@ import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import { PitchSlotPicker } from '@/pages/pitching/ui/PitchSlotPicker'
 import { AimCursor } from '@/pages/pitching/ui/AimCursor'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
+import { useEffect } from 'react'
+import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { aimTickOf } from '@/features/play-pitcher-game/model/pitchAim'
+import type { AimDirection } from '@/features/play-pitcher-game/model/pitchAim'
+import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -96,6 +101,34 @@ describe('조준 0x10 — 흐르는 조준점', () => {
     키('Escape')
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onConfirm).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("'*' 로 메뉴를 연 그림에도 0x39c5c 가 한 번 돈다 (52cc6 게이트는 키 앞)", () => {
+  function 메뉴와조준({ onTick }: { readonly onTick: (aim: WorldPoint, direction: AimDirection) => WorldPoint }) {
+    const menu = useInGameMenuState()
+    const { toggle } = menu
+    useEffect(() => {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === '*') toggle()
+      }
+      window.addEventListener('keydown', onKeyDown)
+      return () => window.removeEventListener('keydown', onKeyDown)
+    }, [toggle])
+    return <AimCursor side={1} onConfirm={() => undefined} isPaused={menu.isOpen} onTick={onTick} />
+  }
+
+  it("방향을 지운 뒤(메시지 8) 그 자리에서 한 틱 — 열린 뒤로는 멈춘다", () => {
+    const onTick = vi.fn((aim: WorldPoint, direction: AimDirection) => aimTickOf(aim, direction, 1))
+    render(<메뉴와조준 onTick={onTick} />)
+    키('6')
+    틱(2)
+    expect(onTick).toHaveBeenCalledTimes(2)
+    키('*')
+    expect(onTick).toHaveBeenCalledTimes(3)
+    expect(onTick.mock.calls[2]?.[1]).toEqual({ dx: 0, dy: 0 })
+    틱(5)
+    expect(onTick).toHaveBeenCalledTimes(3)
   })
 })
 
