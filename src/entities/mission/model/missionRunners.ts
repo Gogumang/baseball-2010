@@ -183,13 +183,14 @@ export interface MissionDefenseSituation {
  * 지금 타순 칸 s 에 선 레코드가 시작 때 칸 s 레코드의 자리를 갖고, 타순 밖 레코드는 0(어느 칸에도 안 맞는다)이 된다.
  * 대타는 명단(`lineup`)만 바꾸므로 명단에서 그대로 읽는다.
  *
- * **칸 0(투수)**: 원본은 선수를 찾지 않아 g = 2 고정 · 야수+0xec 가 비어 있다(펌블 표 b41e4 는 선수가 없으면 0). 진행기가 이 칸을
- * 선수 없는 칸으로 다루므로(`fielderAbilityOf` — 입력을 읽지 않는다) 자리만 기본값으로 채운다. 모든 모드가 같다(`defenseAbilitiesOf`).
+ * **칸 0(투수)**: 판 시작은 선수를 찾지 않아 g = 2 · 악송구 보정 8 고정이다(송구 쪽은 이 칸을 안 읽는다 — `fielderAbilityOf`).
+ * 공수 교대 판 0x3fac4 가 칸 0 의 +0xec 에 니블 1(지명타자)을 넣어 펌블 · 레이저가 그 수비를 보므로 칸 0 에는 지명타자 값을
+ * 넣는다(`recordPlayerAbilityOf`, 모든 모드가 같다 — `defenseAbilitiesOf`).
  * ⚠️ 찾는 레코드가 미션 타자 · 마타자 표지면(수비 팀에는 안 생긴다) 진행기 기본값이다.
  */
 export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[] {
   const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_RUN_ABILITY)
-  for (const { slot, player } of missionDefenseFieldersOf(run)) {
+  for (const { slot, player } of missionDefenseFieldersOf(run, true)) {
     if (player !== undefined) abilities[slot] = masterGameAbilityOf(player, false, DEFENSE_SLOT)
   }
   return abilities
@@ -201,6 +202,7 @@ export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[
  */
 function missionDefenseFieldersOf(
   run: MissionDefenseSituation,
+  withDesignated = false,
 ): { readonly slot: number; readonly positionCode: number; readonly player: RosterPlayer | undefined }[] {
   const defense = run.mission.side === '타자' ? run.game.cpuAutoBatting : run.game.humanBatting
   if (defense === null) return []
@@ -212,12 +214,13 @@ function missionDefenseFieldersOf(
   for (let order = 0; order < QUICK_LINEUP_SLOTS; order += 1) {
     positions.set(rosterSlotAt(defense.lineup, order), positionOfRow(rowOf(order)))
   }
-  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
+  // 칸 0 은 판 시작이 안 찾지만 공수 교대 판 0x3fac4 는 니블 1(지명타자)을 칸 0 의 +0xec 에 넣는다 — 능력치(펌블 · 레이저)만 본다
+  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0 && !withDesignated)
   const fielders: { slot: number; positionCode: number; player: RosterPlayer | undefined }[] = []
   for (let record = 0; record < defense.records.length; record += 1) {
     const positionCode = positions.get(record) ?? 0
     const slot = positionCode - 1
-    if (slot < 1 || slot >= FIELDER_COUNT || filled[slot]) continue
+    if (slot < 0 || slot >= FIELDER_COUNT || filled[slot]) continue
     filled[slot] = true
     const row = rowOf(record)
     const player = row === MISSION_NARI_RECORD || row === MISSION_ACE_ROSTER_SLOT ? undefined : roster[row]

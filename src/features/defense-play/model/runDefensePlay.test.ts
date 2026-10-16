@@ -423,24 +423,21 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
     expect(결과.log.some((line) => line.includes('잡았다'))).toBe(false)
   })
 
-  it('투수(칸 0)는 늘 0 인 난수에도 펌블하지 않는다 — 판 시작 0xb0fb4 가 선수를 안 찾아(b1032) +0xec 가 없다 (b41e4 확률 0)', () => {
-    // 대표 땅볼은 투수가 6틱에 줍는다. 펌블 굴림(b4224)은 먹지만 확률이 0 이다.
-    // 레이저 굴림 0x66a8c 도 쫓는 야수+0xec 가 없으면 난수 없이 실패한다(66aa6) — 그래서 입력 능력치를 바꿔도 결과가 같다
+  it('투수(칸 0)의 펌블은 +0xec = 지명타자의 수비로 굴린다 — 공수 교대 판 0x3fac4 가 넣는다 (b41e4)', () => {
+    // 대표 땅볼은 투수가 6틱에 줍는다. 판 시작 0xb0fb4 는 칸 0 의 선수를 안 찾지만(b1032 — 송구 g · 악송구 보정만)
+    // 펌블 표 b41e4 는 야수+0xec 를 본다 — 칸 0 의 +0xec 는 0x3fac4 가 넣은 지명타자다
     const 결과 = 굴림포함(고정난수(0))
-    const 능력치바꿈 = 굴림포함(고정난수(0), { defenseAbilities: [0, 500, 500, 500, 500, 500, 500, 500, 500] })
 
-    expect(결과.log).toContain('6틱 0번 야수가 잡았다 (종류 1)')
-    expect(결과.fumbled).toBe(false)
-    expect(결과.laserThrow).toBe(false)
-    expect(능력치바꿈.log).toEqual(결과.log)
+    expect(결과.fumbled).toBe(true)
+    expect(결과.log).toContain('6틱 0번 야수 펌블 (0xbc2)')
   })
 
   it('악송구가 나면 받을 야수가 아니라 예보 vt24(0)가 고른 야수가 줍는다 (0xa1828 · 0xb2e38 b2f8c 세계 · b307c)', () => {
     // 굴림 순서대로 값을 먹인다: (필살수비 A → B) → (레이저) → 펌블 → 악송구.
     // 대표 땅볼(원본 궤적)은 투수(0)가 줍는다 — 쫓는 야수가 투수·포수면 필살수비를 안 굴린다(0x50faa).
-    // 레이저 굴림 0x66a8c 도 쫓는 야수+0xec(선수)가 없으면 난수 없이 실패한다(66aa6) — 투수 칸은 판 시작 0xb0fb4 가
-    // 선수를 안 찾는다(b1032). 그래서 펌블(확률 0 이지만 굴림은 먹는다)은 0.9, 악송구만 성공(0) 시켜 **악송구만** 떼어 본다.
-    // 투수의 악송구 보정은 선수 없는 칸의 8 이다(b10a2).
+    // 레이저 굴림 0x66a8c 는 쫓는 야수+0xec 를 본다 — 투수 칸은 공수 교대 판 0x3fac4 가 넣은 지명타자라 굴린다.
+    // 그래서 레이저 0.9 · 펌블 0.9, 악송구만 성공(0) 시켜 **악송구만** 떼어 본다.
+    // 투수의 악송구 보정은 선수 없는 칸의 8 이다(b10a2 — 판 시작이 칸 0 의 선수를 안 찾는다, b1032).
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
@@ -448,7 +445,7 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
       outs: 0,
       // 키 없는 사람 수동 송구는 안 던지므로 사람이 '8'(홈 송구)을 누른 판으로 본다 — 사람 송구는 특수 굴림이 없다
       controls: 계속누름('수비', '8'),
-      random: 차례난수([0.9, 0, 0.9]),
+      random: 차례난수([0.9, 0.9, 0, 0.9]),
     })
 
     expect(결과.fumbled).toBe(false)
@@ -735,20 +732,20 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
 })
 
 describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (0xb103e~0xb105e)', () => {
-  it('자리 코드 2~9 가 칸 1~8 로 가고, 칸 0(투수)은 선수를 찾지 않는다 (b1032)', () => {
+  it('자리 코드 2~9 가 칸 1~8 로 가고, 칸 0 은 지명타자(니블 1)다 — 공수 교대 판 0x3fac4 의 +0xec (b1032 는 송구 쪽만)', () => {
     const 능력치 = defenseAbilitiesOf(
       [
         { position: 2, defense: 610 }, // 포수 → 칸 1
         { position: 3, defense: 620 }, // 1루수 → 칸 2
         { position: 9, defense: 690 }, // 중견 → 칸 8
-        { position: 1, defense: 999 }, // 지명 — 수비 자리가 없다
+        { position: 1, defense: 999 }, // 지명 — 칸 0 의 +0xec(펌블 · 레이저)
         { position: 0, defense: 999 }, // 후보 — 자리 없음
       ],
     )
 
     expect(능력치).toHaveLength(FIELDER_COUNT)
-    // 칸 0 은 진행기가 읽지 않는 자리 — 기본값으로만 채운다
-    expect(능력치[0]).toBe(500)
+    // 칸 0 은 송구 쪽(g · 악송구 보정)은 안 읽고 펌블 · 레이저만 본다(`recordPlayerAbilityOf`)
+    expect(능력치[0]).toBe(999)
     expect(능력치[1]).toBe(610)
     expect(능력치[2]).toBe(620)
     expect(능력치[8]).toBe(690)
@@ -1434,8 +1431,8 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     })
 
     it('받는 것도 포구 틱 갈래다 — 펌블 굴림 b4228 을 먹고, 움직이는 송구공을 놓치면 0xb3148 로 튕긴다 (b307c → 포구 틱)', () => {
-      // 씨앗 95 — 투수 칸의 송구 속도가 선수 없는 칸의 g = 2(0xb0fb4 b106a)로 바뀌며 6221 에서 다시 골랐다
-      const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(95) })
+      // 씨앗 301 — 투수 칸의 레이저 굴림이 +0xec(지명타자, 0x3fac4)로 돌며 난수 차례가 하나 늘어 95 에서 다시 골랐다
+      const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(301) })
 
       expect(결과.log).toContain('8틱 0루로 송구 — 11틱 도착 (CPU 결정) (0번 야수)')
       expect(결과.log).toContain('11틱 1번 야수 펌블 (0xbc2)')
@@ -2184,8 +2181,8 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
       bases: 주자1루,
       outs: 0,
       controls: 계속누름('수비', '8'),
-      // 펌블(0.9) → 악송구(0) — 투수가 쫓는 공이라 필살수비 · 레이저 굴림이 없다(레이저 0x66a8c 는 +0xec 없음으로 난수 없이 실패)
-      random: 차례난수([0.9, 0, 0.9]),
+      // 레이저(0.9) → 펌블(0.9) → 악송구(0) — 투수가 쫓는 공이라 필살수비는 없고 레이저는 +0xec(지명타자)로 굴린다
+      random: 차례난수([0.9, 0.9, 0, 0.9]),
     })
     expect(결과.errantThrow).toBe(true)
     expect(야수(결과, 9, 0)?.throwErrorTicks).toBe(4)
