@@ -686,6 +686,60 @@ export const recoloredImageOf = (image: DrawableImage, effect: number, argument:
 export const brightenedImageOf = (image: DrawableImage, amount: number): DrawableImage =>
   paintedCanvasOf(image, sourceKeyOf(image, `b${amount}`), (rgba) => brightenRgba(rgba, amount))
 
+/**
+ * 0xbb91d 종류 0x12 — 종류 2 크기 a/10 배(0xbb9d2~0xbb9f0: 그린 폭 = w·a/10 · 0xbbabc~0xbbacc: 원본 줄 = 그린 줄·10/a, a 가 20 이면
+ * 시프트) · 종류 0x10 화면 섞기 0xbb8d4(b, `blendPixel565`). 투명 칸(풀어 둔 자홍 0xbbb4e~0xbbb5e)은 건너뛴다.
+ * 그 자리 화면을 읽어 섞고 다시 놓는다. 변환이 걸린 캔버스는 ⚠️ 근사(globalAlpha (32 − b)/32 · 최근접 키우기).
+ * 화면 칸이 비어 있으면(겹치기 층) 그림 색에 알파 (32 − b)/32 로 남긴다(⚠️ 근사 — `composeRgba` 와 같은 처리).
+ */
+export function drawImageScaledBlend(
+  context: CanvasRenderingContext2D,
+  image: DrawableImage,
+  x: number,
+  y: number,
+  scaleTenths: number,
+  weight: number,
+): void {
+  const width = Math.trunc((image.width * scaleTenths) / 10)
+  const height = Math.trunc((image.height * scaleTenths) / 10)
+  if (width <= 0 || height <= 0) return
+  if (!context.getTransform().isIdentity) {
+    context.save()
+    context.imageSmoothingEnabled = false
+    context.globalAlpha *= (32 - weight) / 32
+    context.drawImage(image, x, y, width, height)
+    context.restore()
+    return
+  }
+  const sprite = spriteRgbaOf(image)
+  if (sprite === null) return
+  const originX = Math.floor(x)
+  const originY = Math.floor(y)
+  const left = Math.max(0, originX)
+  const top = Math.max(0, originY)
+  const right = Math.min(context.canvas.width, originX + width)
+  const bottom = Math.min(context.canvas.height, originY + height)
+  if (right <= left || bottom <= top) return
+  const region = context.getImageData(left, top, right - left, bottom - top)
+  const out = region.data
+  for (let row = top; row < bottom; row += 1) {
+    const sourceRow = Math.trunc(((row - originY) * 10) / scaleTenths)
+    for (let column = left; column < right; column += 1) {
+      const sourceColumn = Math.trunc(((column - originX) * 10) / scaleTenths)
+      const from = (sourceRow * sprite.width + sourceColumn) * 4
+      if (sprite.data[from + 3] === 0) continue
+      const at = ((row - top) * region.width + (column - left)) * 4
+      const source = pixelOf(sprite.data, from)
+      if (out[at + 3] === 0) {
+        writePixel(out, at, source, Math.round(((32 - weight) * 255) / 32))
+        continue
+      }
+      writePixel(out, at, blendPixel565(source, pixelOf(out, at), weight), out[at + 3])
+    }
+  }
+  context.putImageData(region, left, top)
+}
+
 /* ── 주소 (DOM <img>) ──────────────────────────────────────────────────────── */
 
 const urlCache = new Map<string, Promise<string>>()

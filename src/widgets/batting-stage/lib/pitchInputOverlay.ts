@@ -391,7 +391,7 @@ export function gaugeDrawsOf(
  * 4d3a8  0x33fb8 거짓이고 게이지 설정(+0x2d) == 0 → 넣음
  * ```
  * 레코드 +0x54 는 이글아이 남은 경기다(G 노트 · P4 — 상점 아이템 "투구 목표점 보기"). 곧 이글아이는 원 그림이 아니라 이 프레임이다.
- * 웹 난이도는 늘 2(hard)라 둘째 줄은 안 탄다. 부르는 쪽이 아직 이 값을 다 싣지 않아 그림 쪽 판정만 둔다.
+ * 난이도 +0x2c 는 원본도 늘 기본 2(hard)다 — 바꾸는 화면이 없다(P7 K2) — 그래서 둘째 줄은 안 탄다. 부르는 쪽이 아직 이 값을 다 싣지 않아 그림 쪽 판정만 둔다.
  */
 export function showsGaugeTargetFrameOf(input: {
   readonly mode: number
@@ -422,7 +422,10 @@ export function drawPitchMenu(context: CanvasRenderingContext2D, overlay: PitchM
     const typeNumber = overlay.typeNumbers[slot] ?? 0
     if (typeNumber === MAGIC_TYPE_NUMBER) {
       if (overlay.magicRemaining <= 0) continue
-      // 애니 5 는 되감는 곳이 없어 기본(멈춤) 첫 칸 — ⚠️ 유력
+      // 애니 5 는 늘 첫 칸 (확인 r112): 4c6ba 0xba759(slt, 5, 종류 2, …, 진행 1)가 0x93c45 로 그리고 0x93d91 로 진행하지만,
+      // 애니 객체는 만들 때 0x938d4 가 +2 = 1(멈춤 비트)로 두고 0x93d90 은 비트 0 이 서 있으면 안 나간다(93da8). 비트 0 을 내리는
+      // 켜기 0x93cfd 는 +0x1010 을 읽는 곳(0x35afc · 0x398da 애니 1 · 0x3db20 애니 0 · 0x48900 적재 · 0x4c4bc · 0x4ce9c · 0x4d2ac ·
+      // 0x4d780 · 0x4dc78) 중 애니 0 · 1 에만 건다 → 애니 5 는 멈춘 첫 칸 그대로다.
       const entries = frameAnimations(SLT_FRAMES)?.[MAGIC_BADGE_ANIMATION]
       if (entries?.[0] !== undefined) drawFrame(context, SLT_FRAMES, entries[0].frame, anchor.x, anchor.y)
       const digit = sprite(NUM_IMAGE(overlay.magicRemaining))

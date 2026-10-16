@@ -16,6 +16,15 @@ import type { PitcherAnimation } from '@/widgets/batting-stage/lib/stageScenery'
 import { heldBallTickOf } from '@/widgets/batting-stage/lib/heldBall'
 import { magicBallEffectFolderOf, magicBallEffectFrameAt } from '@/widgets/batting-stage/lib/magicBallEffect'
 import {
+  ACE_EFFECT_BLEND_WEIGHT,
+  EFFECT_PITCHER_FRAMES,
+  aceMagicAnimationDrawOf,
+  aceMagicScaledDrawOf,
+  aceMagicScaledOriginOf,
+  effectPitcherFrameAt,
+  type AcePitcherEffectInput,
+} from '@/widgets/batting-stage/lib/acePitcherEffect'
+import {
   FASTBALL_FLAME_ANIMATION,
   fastballFlameBallTickOf,
   fastballFlameFrameAt,
@@ -25,7 +34,7 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
-import { DRAW_EFFECT, recoloredImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { DRAW_EFFECT, drawImageScaledBlend, recoloredImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import {
   BASE_WINDOW_IMAGE,
@@ -266,6 +275,9 @@ export function renderBattingStage(
   const pitchInput = scene.pitchInput ?? null
   // 0x4d780 이 바로 그리는 판 · 덮개 — 그리기 목록(선수)보다 먼저
   drawPitchInputUnderlay(context, pitchInput, side)
+  const aceEffect = acePitcherEffectInputOf(scene)
+  // 마투수 effect_pitcher(+0x1044) — 0x38d1c 꼬리 39258 이 깊이 24499 로 넣는다. 같은 깊이의 루상 주자(0x35b94)보다 먼저 넣어 그 밑이다
+  drawEffectPitcher(context, aceEffect, side)
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
     drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
@@ -286,6 +298,8 @@ export function renderBattingStage(
   drawPitcherMistakeMark(context, scene, side)
   drawPitcherFatigue(context, scene, side, pitcherAnimation)
   drawPitcherHomeRunMarks(context, scene, side, pitcherAnimation)
+  // 0x46fa8(장면, 0) 붕붕머신 · 발렌타인 — 깊이 24501 이라 투수 덧그림(24500)들 다음 · 타자(29705) 앞이다
+  drawAceMagicAnimation(context, aceEffect, side)
   const special = scene.specialSwingEffect ?? null
   // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
   if (special !== null && special.isBehindBatter) drawSpecialSwingPicture(context, special)
@@ -314,6 +328,8 @@ export function renderBattingStage(
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — ⚠️ 깊이 정렬 대신 선수 다음
   drawPitchInputSprites(context, pitchInput, side)
+  // 0x46fa8(장면, 1) 싸이커 · 드래고나 — 목록 비우기(0x4d744) 뒤 · HUD(0x4c4bc) 앞에 화면에 바로 섞어 그린다
+  drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
     drawHud(context, scene.hud, scene.tick)
@@ -749,6 +765,46 @@ function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: numb
   const frame = placedFrame(ZONE_FRAME_FOLDER, GAUGE_TARGET_FRAME)
   if (frame === null) return
   context.drawImage(frame.image, Math.round(center.x) + frame.offsetX, Math.round(center.y) + frame.offsetY)
+}
+
+/** 마투수 이펙트 재료 — 0x11 그림 수는 0x11 진입 뒤 그림 수가 그 마지막 갱신 틱을 넘지 않을 때만(0x12 · 0x13 은 0x11 이 아니다) */
+function acePitcherEffectInputOf(scene: StageScene): AcePitcherEffectInput {
+  const tick = scene.pitcherTick
+  const end = scene.pitcherTickEnd ?? null
+  return {
+    aceOrder: scene.acePitcher?.order ?? null,
+    pitch: scene.pitch,
+    pitchStateDraw: tick !== null && tick >= 0 && (end === null || tick <= end) ? tick : null,
+  }
+}
+
+/** effect_pitcher 애니 0 — 투수 앵커(뒤집기 · 좌투 +1 없음, 0x391c4) */
+function drawEffectPitcher(context: CanvasRenderingContext2D, input: AcePitcherEffectInput, side: number): void {
+  const entries = frameAnimations(EFFECT_PITCHER_FRAMES)?.[0]
+  if (entries === undefined) return
+  const frame = effectPitcherFrameAt(input, entries)
+  const placed = frame === null ? null : placedFrame(EFFECT_PITCHER_FRAMES, frame)
+  if (placed === null) return
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  context.drawImage(placed.image, anchor.x + placed.offsetX, anchor.y + placed.offsetY)
+}
+
+/** 0x47250 붕붕머신 · 발렌타인 애니 0 — 투수 앵커 */
+function drawAceMagicAnimation(context: CanvasRenderingContext2D, input: AcePitcherEffectInput, side: number): void {
+  const draw = aceMagicAnimationDrawOf(input, (folder) => frameAnimations(folder)?.[0] ?? null)
+  const placed = draw === null ? null : placedFrame(draw.framesFolder, draw.frame)
+  if (placed === null) return
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  context.drawImage(placed.image, anchor.x + placed.offsetX, anchor.y + placed.offsetY)
+}
+
+/** 0x472ba · 0x47368 — 그림 0번 이미지를 s 배로 키워 투수 앵커 가운데에 반반 섞기 (0xbb91d 종류 0x12) */
+function drawAceMagicScaled(context: CanvasRenderingContext2D, input: AcePitcherEffectInput, side: number, pose: number): void {
+  const draw = aceMagicScaledDrawOf(input, pose)
+  const image = draw === null ? null : sprite(draw.imageUrl)
+  if (draw === null || image === null) return
+  const origin = aceMagicScaledOriginOf(stageLayoutOf(side).pitcherAnchor, draw.scale, image.width, image.height)
+  drawImageScaledBlend(context, image, origin.x, origin.y, draw.scale * 10, ACE_EFFECT_BLEND_WEIGHT)
 }
 
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */

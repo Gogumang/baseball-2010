@@ -358,6 +358,10 @@ export function releaseCpuPitch(
 export function windUpCpuPitchOf(args: CpuPitchArgs, typeNumber: number, target: WorldPoint): Pitch {
   const repertoire = args.pitcher.repertoire ?? DEFAULT_REPERTOIRE
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
+  // 공+0x10 은 0x11 **진입** 0x3de10(3de3e)이 싣는다 — 웹은 마구 칸을 놓기(틱 10)에 고치므로(`releaseCpuPitch`) 와인드업 자리 공에는
+  // 같은 셈을 사본에 돌린 값을 미리 싣는다(마투수 투수 이펙트 0x39192 가 0x11 첫 그림부터 본다). 굴림 · 상태는 안 바꾼다
+  const magicPreview = { ...(args.magic ?? { remaining: 0, ballMagicNumber: 0 }) }
+  advanceMagicPitchGameState(magicPreview, typeNumber, repertoire.magicId, args.derbyPitchType !== undefined)
   const type = PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0]
   return {
     type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
@@ -368,6 +372,7 @@ export function windUpCpuPitchOf(args: CpuPitchArgs, typeNumber: number, target:
     controlTier: 0,
     worldPath: null,
     stageSide: args.situation.side,
+    magicNumber: magicPreview.ballMagicNumber,
     isMagicPitch: isMagic,
     pitcherMagicNumber: repertoire.magicId,
     pitcherForm: repertoire.form,
