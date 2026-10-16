@@ -94,8 +94,7 @@ export function seasonEndingTextIndexOf(endingIndex: number): number {
 }
 
 /**
- * ⚠️ **제작진은 넣지 않았다.** P6 4b 는 `StrENDING[21]` 제작진 흐름을 **나만의리그 엔딩
- * `0x882b4` 차례 6** 에만 적어 두었고, 시즌 엔딩 `0x87a1c` 설명에는 제작진이 없다.
- * 시즌 엔딩에서도 흐르는지는 문서에 없어 **지어내지 않았다** — 밝혀지면 여기에 붙이면 된다.
+ * **제작진은 시즌 엔딩에 없다** — 0x87a1c 가 StrENDING 에서 꺼내는 글은 `[결과] + 15`(0x87be2~0x87bf4) 하나뿐이다(직접 떴다).
+ * `StrENDING[21]` 제작진 흐름은 나만의리그 엔딩 `0x882b4` 차례 6 의 것이다.
  */
 export const CREDITS_TEXT_INDEX = 21

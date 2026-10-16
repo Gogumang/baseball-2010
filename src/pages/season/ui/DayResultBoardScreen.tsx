@@ -12,6 +12,7 @@ import {
 import type { BoardBox, PanelRect } from '@/pages/season/lib/dayResultBoard'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { roundFillPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
 
 export interface DayResultBoardScreenProps {
   /** SR+0x1c0 — 오늘 리그 다섯 경기 점수표 (내 경기 줄은 −1) */
@@ -22,16 +23,30 @@ export interface DayResultBoardScreenProps {
   readonly gamePoint: number
 }
 
-const rectStyle = (rect: PanelRect) => ({
+const paintStyle = (x: number, y: number, width: number, height: number, color: string) => ({
   position: 'absolute' as const,
-  left: rect.x,
-  top: rect.y,
-  width: rect.width,
-  height: rect.height,
-  background: rect.color,
-  borderRadius: rect.round,
+  left: x,
+  top: y,
+  width,
+  height,
+  background: color,
   pointerEvents: 'none' as const,
 })
+
+/**
+ * 0xb9f75(상자, 색) → 0x6a9f1 네모 칠 w × h · 0xba0bd(상자, 둥글기 1, 색) → 0x6b7d5 둥근 칠 — (w + 1) × (h + 1) 에 네 모서리 점만 빈다
+ * (직접 떴다 — 0xb9fb6 · 0xba106, 칠 목록은 공용 `roundFillPaintsOf`)
+ */
+function PanelLayer({ rect }: { readonly rect: PanelRect }) {
+  if (rect.round === 0) return <div style={paintStyle(rect.x, rect.y, rect.width, rect.height, rect.color)} />
+  return (
+    <>
+      {roundFillPaintsOf(rect.width, rect.height, rect.color).map((paint, index) => (
+        <div key={index} style={paintStyle(rect.x + paint.x, rect.y + paint.y, paint.width, paint.height, paint.color)} />
+      ))}
+    </>
+  )
+}
 
 function ResultMark({ cell, isWin }: { readonly cell: BoardBox; readonly isWin: boolean }) {
   const image = isWin ? RESULT_IMAGE.win : RESULT_IMAGE.lose
@@ -74,9 +89,7 @@ function TeamLogo({ cell, teamId }: { readonly cell: BoardBox; readonly teamId: 
  * 로고 0x66431 은 미리 35×34 로 늘려 둔 버퍼를 (칸 + 2) 에 찍는다 — 칸 39×38 의 안쪽과 꼭 같다(`SeasonEndWindow.css` logo 주석).
  * 머리띠는 공통 틀 0xb810 이 0xf1 에 맡긴 (제목 10 시즌모드, 바닥 1) — 0xb880 → 0xb89e~0xb8a6, 되돌아가기 없음.
  *
- * ⚠️ **근사**
- *   - 0xba0bd 의 "둥글기 1" 을 1px 모서리 둥글림으로 그린다.
- *   - ⚠️ 웹 자리: 확인은 원본 화면에 그림 자리가 없다 — 웹 단추를 걷고 화면 전체 투명 누름 칸으로 받는다.
+ * ⚠️ 웹 자리: 확인은 원본 화면에 그림 자리가 없다 — 웹 단추를 걷고 화면 전체 투명 누름 칸으로 받는다.
  */
 export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultBoardScreenProps) {
   const origins = useFrameOrigins(BOARD_FRAME.folder)
@@ -91,11 +104,11 @@ export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultB
         {rows.map((_row, index) => (
           <div key={`판${index}`}>
             {rowPanelRectsOf(shifted(BOARD_FRAME.row, index)).map((rect, layer) => (
-              <div key={`줄${layer}`} style={rectStyle(rect)} />
+              <PanelLayer key={`줄${layer}`} rect={rect} />
             ))}
             {[BOARD_FRAME.logoA, BOARD_FRAME.logoB].flatMap((cell, side) =>
               logoPanelRectsOf(shifted(cell, index)).map((rect, layer) => (
-                <div key={`로고칸${side}-${layer}`} style={rectStyle(rect)} />
+                <PanelLayer key={`로고칸${side}-${layer}`} rect={rect} />
               )),
             )}
             <FrameSprite folder={BOARD_FRAME.folder} frame={BOARD_FRAME.frame} origins={origins} x={0}
