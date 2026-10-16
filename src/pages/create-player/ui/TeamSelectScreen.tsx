@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
-import { RawScreen } from '@/shared/ui'
+import { OriginalScaledImage, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -235,8 +235,10 @@ export function TeamSelectScreen({
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)}
               style={{ left: 0, top: 0 }} />
             {open
-              ? <img className={styles.layer} alt="" src={entry.logoUrl}
-                  style={{ left: CELL_LOGO.x, top: CELL_LOGO.y, width: CELL_LOGO.width, height: CELL_LOGO.height }} />
+              // 0x66431 — 0x663c4 가 원본 식(0x662dc → 0x65f64)으로 미리 줄인 35×34 버퍼를 칸 + (2, 2) 에 제 크기로
+              ? <OriginalScaledImage className={styles.layer} alt="" src={entry.logoUrl}
+                  boxWidth={CELL_LOGO.width} boxHeight={CELL_LOGO.height}
+                  style={{ left: CELL_LOGO.x, top: CELL_LOGO.y }} />
               : <img className={styles.layer} alt="?" data-testid="팀칸-물음표" src={imageSrc(TEAM_LOGO_IMAGE, CELL_LOCKED_MARK.image)}
                   style={{
                     left: CELL_LOCKED_MARK.x, top: CELL_LOCKED_MARK.y,

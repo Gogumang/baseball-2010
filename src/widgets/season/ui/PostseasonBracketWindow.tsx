@@ -1,4 +1,5 @@
-import { FrameSprite, SpriteNumber } from '@/shared/ui'
+import { FrameSprite, OriginalScaledImage, SpriteNumber } from '@/shared/ui'
+import { TEAM_LOGO_BOX } from '@/shared/lib/sprite/originalScale'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { TEAMS } from '@/shared/config/original/teams'
@@ -66,7 +67,10 @@ export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps
               // 아직 자리가 안 정해진 칸 — 원본은 빈 칸을 그냥 비워 둔다
               <div className={styles.emptyCell} style={logoBox} />
             ) : (
-              <img className={styles.logo} src={team.logoUrl} alt={team.name} style={logoBox} />
+              // 0x66431 — 0x663c4 가 원본 식으로 미리 줄인 35×34 버퍼를 (칸 + 3) 에 제 크기로
+              <OriginalScaledImage className={styles.logo} src={team.logoUrl} alt={team.name}
+                boxWidth={TEAM_LOGO_BOX.width} boxHeight={TEAM_LOGO_BOX.height}
+                style={{ left: logoBox.left, top: logoBox.top }} />
             )}
             {/* 순위 딱지 = num 0~9 숫자 (x + 8 왼쪽 붙임) + img_text 307 "위" 오른쪽 정렬 ox −6 — `rankGlyphsOf` 주석 */}
             <div className={styles.rankTag} data-rank={rank} style={placeOf(tag)} />

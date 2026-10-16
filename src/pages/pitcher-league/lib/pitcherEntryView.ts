@@ -8,7 +8,7 @@ import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import {
-  acePitcherFace, nariEntryBattersOf, nariEntryPitchersOf, openNariEntryView,
+  acePitcherFace, nariEntryBattersOf, nariEntryPitchersOf, nariEntryTeamMoraleOf, openNariEntryView,
 } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryCellSource, NariEntryView } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
@@ -36,8 +36,8 @@ export function pitcherNariEntryViewOf(
     stats: career.leaguePlayerStats,
     staminas: humanGamePitcherStaminasOf(career, options.dayCounter, teamId),
     staminaMode: PITCHER_EDITION_MODE,
-    // 투수편 팀 레코드 사기 = 커리어 사기 (0x1f988 +2) · ⚠️ 상대 팀은 100
-    morale: isMyTeam ? career.morale : 100,
+    // 팀 레코드 +2 — 내 팀은 커리어 사기(0x1f988 +2), 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기 (`teamRecordMorales`, r128)
+    morale: nariEntryTeamMoraleOf(career, isMyTeam, teamId),
   }
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, null, cells),

@@ -50,6 +50,8 @@ import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamin
 import { BATTER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import { humanGamePitcherStaminasOf } from '@/entities/pitcher-career/model/leaguePitcherRecords'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
+import { nariTeamRecordMoraleOf } from '@/entities/career/model/nariMorale'
+import type { NariTeamRecordMoraleCareer } from '@/entities/career/model/nariMorale'
 
 /** 목록 한 줄이 보여 줄 것 (`widgets/entry-editor` 의 `EntryFace`) */
 export interface NariEntryFace {
@@ -89,10 +91,12 @@ export interface NariEntryView {
  * 그 줄 +0x20~ 는 0x204e1 → 0x204e0/0xb6cc4 가 시즌 처음 0(+0x2c 10000)으로 두고 0xa8024 가 게이트 0xa56dc 모드 3 · 4 갈래(정규시즌)를
  * 지날 때 쌓은 것 — 웹은 커리어의 리그 기록표(`leaguePlayerStats`, 정규시즌만 쌓는다)가 같은 값이다. +0x2c 는 커리어의
  * `leaguePitcherStaminas`(142 가 g == 0 이면 10000 으로 채운다 — `humanGamePitcherStaminasOf`).
- * 사기 V[+2] — 투수편 내 팀은 커리어 사기(0x1f988(저장, R[1]) +2 와 같은 칸, `PitcherStatusBoard`).
- * ⚠️ 남김(웹 저장 한계): 그 밖 팀 레코드 +2 는 원본에서 **그 팀이 마지막으로 선 경기 때의 나리 사기**다 — 실효 능력치 0xb570c 모드 3·4 갈래
- * b5762~b576a 가 공마다 넘겨 받은 팀 레코드 +2 에 0xa3a24 를 쓰고, CPU 끼리 간이 엔진도 두 팀 모두 부른다(0xc1308 · 0xc1320, 넷째 인자 1).
- * 웹 커리어는 그 스냅숏을 안 들어 100(시즌 처음 마스터 값)으로 둔다.
+ * 사기 V[+2] — 체력 줄 용량 0x66e44(팀 레코드, rec, 0) 이 읽는 그 레코드 +2 (`nariEntryTeamMoraleOf`):
+ *   내 팀은 0xa3a24 · 0xa3a44 가 읽고 쓰는 칸 0x1f988(저장, R[1]) +2 = 커리어 사기 (타자편 · 투수편 같다, `PitcherStatusBoard`).
+ *   그 밖 팀은 **그 팀이 마지막으로 선 경기 때의 나리 사기**다 — 실효 능력치 0xb570c 모드 3·4 갈래 b5762~b576a 가 공마다 넘겨 받은
+ *   팀 레코드 +2 에 0xa3a24 를 쓰고, CPU 끼리 간이 엔진도 두 팀 모두 부른다(0xc1308 · 0xc1320, 넷째 인자 1). 커리어
+ *   `teamRecordMorales`(r101 — 사람 경기 상대 · 그날 CPU 경기 여덟 팀 · CPU 포스트시즌 두 팀, 새 시즌 0x1b768 은 안 건드림)가 그 값이고
+ *   옛 저장에 없으면 표값 100 (`nariTeamRecordMoraleOf`, r128 이음).
  * ⚠️ 미확인: 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다. 내 선수 줄(표 밖)도 비운다.
  */
 export interface NariEntryCellSource {
@@ -105,6 +109,18 @@ export interface NariEntryCellSource {
 }
 
 const FULL_RECORD_STAMINA = 10000
+
+/**
+ * 143 의 나리 리그 팀 레코드 +2 (`NariEntryCellSource.morale`). 내 팀 칸은 0xa3a24 가 읽는 칸 그 자체라 커리어 사기
+ * (대회 중에도 리그 칸은 그대로 — 대회 동안 0xa3a24 는 상대국 칸을 읽는다, `nariMoraleOf`), 그 밖 팀은 `teamRecordMorales`.
+ */
+export function nariEntryTeamMoraleOf(
+  career: NariTeamRecordMoraleCareer & { readonly morale: number },
+  isMyTeam: boolean,
+  teamId: number,
+): number {
+  return isMyTeam ? career.morale : nariTeamRecordMoraleOf(career, teamId)
+}
 
 function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number) {
   if (cells === undefined) return {}
@@ -280,8 +296,8 @@ export function batterNariEntryViewOf(
     stats: career.leaguePlayerStats,
     staminas: humanGamePitcherStaminasOf(career, leagueDayCounterOf(career), teamId),
     staminaMode: BATTER_EDITION_MODE,
-    // ⚠️ 남김: 원본은 그 팀이 마지막으로 선 경기 때의 나리 사기(0xb570c b5762~b576a) — 웹 커리어에 그 스냅숏이 없어 100 (위 NariEntryCellSource 머리말)
-    morale: 100,
+    // 팀 레코드 +2 — 내 팀은 0xa3a24 가 읽는 그 칸(커리어 사기), 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기 (r128)
+    morale: nariEntryTeamMoraleOf(career, isMyTeam, teamId),
   }
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, me, cells),
