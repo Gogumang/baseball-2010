@@ -77,3 +77,13 @@ export function streakSayExpressionOf(hasBad: boolean): number {
 export function evaluationManagerPortraitsOf(expression: number): readonly EventPortrait[] {
   return [{ file: 'event_char_0', animation: MANAGER_PORTRAIT_BASE + expression, side: 'right' }]
 }
+
+/**
+ * 평가 내장 이벤트 0x8a6fc 가 띄울 수 있는 **감독 애니 전부** — 경기 뒤 미리 받기용(`app/model/afterGameEventPreload`).
+ * 명령 1 표정 = 표 0xcc600(타자편) · 0xcc570(투수편) 의 값이거나 칸이 없을 때 · 글 38 일 때 0, 명령 3(연속 기록) 표정 = 3 · 1
+ * (0x8ac32~0x8ac3e). 시즌 0xdea0 의 표정(3 · 0 · 1, 0x8a73a~0x8a756)도 이 안에 든다. 애니 = 0xd0ae6[2] = 16 + 표정.
+ */
+export function evaluationManagerAnimations(): number[] {
+  const expressions = new Set<number>([0, ...BATTER_EXPRESSIONS, ...PITCHER_EXPRESSIONS, STREAK_EXPRESSION.bad, STREAK_EXPRESSION.good])
+  return [...expressions].sort((a, b) => a - b).map((expression) => MANAGER_PORTRAIT_BASE + expression)
+}

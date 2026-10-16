@@ -370,9 +370,12 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: './sprites/img_text/frames', frames: [396], json: ['origins.json'] },
     { folder: './sprites/event_char_0/frames', frames: [4, 5, 6], json: ['animations.json', 'origins.json'] },
   ],
-  /** 경기 끝 판 · 정산 결과 · 결과 뒤 이벤트(나리) — r111 측정. 경기 장면이 서 있는 동안 유휴로 */
+  /**
+   * 경기 끝 판 · 정산 결과 · 결과 뒤 이벤트(나리) — r111 측정. 경기 장면이 서 있는 동안 유휴로.
+   * 평가 감독 초상(r111 이 잰 event_char_0 116~119 = 애니 19 한 표정)과 경기 뒤 이야기 이벤트 초상은 r134 부터 이벤트 데이터에서
+   * 계산한다 — `app/model/afterGameEventPreload` (장면 `afterGameEvaluation` · 나리 타자편 `useAfterGameEventPreload`)
+   */
   afterGame: [
-    { folder: './sprites/event_char_0/frames', frames: [116, 117, 118, 119], json: ['animations.json', 'origins.json'] },
     { folder: './sprites/game_ui', frames: [12, 78] },
     { folder: './sprites/game_ui/frames', frames: [93, 94], json: ['origins.json'] },
     { folder: './sprites/gpoint', frames: [1, 3, 10] },
