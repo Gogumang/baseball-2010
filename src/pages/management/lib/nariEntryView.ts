@@ -38,6 +38,8 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
+import type { RosterPlayer } from '@/shared/config/original/roster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { aceDetailSourceOf, staminaPercentOf, tableDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
 import type { EntryBatterLine, EntryPitcherLine, PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
@@ -194,9 +196,11 @@ export function nariEntryBattersOf(
       return { ...(me ?? { name: '', ability: [] }), isAce: false, position: row.position }
     }
     const player = table[row.slot]
+    // 레코드 장비 니블(나리 새 시즌 CPU 장비 굴림 0x665e8)이 있으면 상세 창 도형 값 0xb6414(rec, k, 1) 이 그 보너스를 먹는다
+    const ability = player === undefined ? [] : equippedRowAbilityOf(player, row.equipment, false)
     return {
-      name: player?.name ?? '', ability: player?.ability ?? [], isAce: false, position: row.position,
-      ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, false, player.ability) }),
+      name: player?.name ?? '', ability, isAce: false, position: row.position,
+      ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, false, ability) }),
       ...(player === undefined ? {} : nariBatterCellsOf(cells, teamId, row.slot)),
     }
   })
@@ -212,6 +216,8 @@ export function nariEntryPitchersOf(
   special: (slot: number) => (NariEntryFace & { readonly isAce: boolean }) | undefined = () => undefined,
   cells?: NariEntryCellSource,
   aceRecordLineOf: (slot: number) => readonly number[] | undefined = () => undefined,
+  /** 레코드 투수 장비 니블 — 붙박이 표 칸 → 네 칸 (`NariTeamRecord.pitcherEquipment`, 나리 새 시즌 0x665e8). 없으면 Xls 행 */
+  pitcherEquipment?: Readonly<Record<number, readonly number[]>>,
 ): NariEntryPitcher[] {
   const table = teamPitchers(teamId)
   return order.map((slot) => {
@@ -220,9 +226,10 @@ export function nariEntryPitchersOf(
     if (found !== undefined && aceLine !== undefined) return { ...found, ...aceCellsOf(cells, aceLine, true, found.ability[3] ?? 0) }
     if (found !== undefined) return found
     const player = table[slot]
+    const ability = player === undefined ? [] : equippedRowAbilityOf(player, pitcherEquipment?.[slot], true)
     return {
-      name: player?.name ?? '', ability: player?.ability ?? [], isAce: false,
-      ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, true, player.ability) }),
+      name: player?.name ?? '', ability, isAce: false,
+      ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, true, ability) }),
       ...(player === undefined ? {} : nariPitcherCellsOf(cells, teamId, slot, player.ability[3])),
     }
   })
@@ -307,6 +314,15 @@ export function batterNariEntryViewOf(
       recordAcePitcherSpecial(record),
       cells,
       recordAcePitcherLineOf(record),
+      record.pitcherEquipment,
     ),
   })
+}
+
+/**
+ * 붙박이 표 줄의 상세 창 도형 값 — 레코드 장비 니블이 있으면 `0xb6414(rec, k, 1)`(니블 보너스 뒤 장착 스킬 단계), 없으면 행 그대로
+ * (리그 열 팀 Xls 행은 니블 0 이고 스킬 5 · 7 · 20 · 22 비트도 없어 예전 값과 같다).
+ */
+function equippedRowAbilityOf(player: RosterPlayer, equipment: readonly number[] | undefined, isPitcher: boolean): readonly number[] {
+  return equipment === undefined ? player.ability : recordAbilityOf({ ...player, equipment }, isPitcher)
 }

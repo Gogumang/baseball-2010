@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { pitcherOrdersAfterPostseason } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { describe, expect, it } from 'vitest'
@@ -60,24 +61,24 @@ describe('리그 전적 — 0xb76dc · 0xb77e0', () => {
 
 describe('새 시즌 전환 — 0x1b768', () => {
   it('사기를 100 으로 되돌리고 연봉(100만 단위)을 소지금(만원)에 더한다', () => {
-    const next = startNextSeason({ ...createCareer('선수'), morale: 20, money: 1000, salary: 50 })
+    const next = startNextSeason({ ...createCareer('선수'), morale: 20, money: 1000, salary: 50 }, createConstantRandom(0))
 
     expect(next.morale).toBe(100)
     expect(next.money).toBe(1000 + 5000)
   })
 
   it('소지금은 9999×100만 을 넘지 않는다', () => {
-    expect(startNextSeason({ ...createCareer('선수'), money: 999_000, salary: 100 }).money).toBe(999_900)
+    expect(startNextSeason({ ...createCareer('선수'), money: 999_000, salary: 100 }, createConstantRandom(0)).money).toBe(999_900)
   })
 
   it('지난 해 시즌 줄을 연도별 칸 S[0xb3] − 1 에 쌓고 시즌 줄을 비운다 (1b7c4~1b834 · 0xb8e28) — 옛 저장은 빈 목록에서', () => {
     const 첫해 = { ...createCareer('선수').stats, atBats: 120, hits: 40, homeRuns: 7 }
-    const 둘째해시작 = startNextSeason({ ...createCareer('선수'), stats: 첫해 })
+    const 둘째해시작 = startNextSeason({ ...createCareer('선수'), stats: 첫해 }, createConstantRandom(0))
     expect(둘째해시작.yearlyStats).toEqual([첫해])
     expect(둘째해시작.stats.atBats).toBe(0)
 
     const 둘째해 = { ...둘째해시작.stats, atBats: 90, hits: 20 }
-    expect(startNextSeason({ ...둘째해시작, stats: 둘째해 }).yearlyStats).toEqual([첫해, 둘째해])
+    expect(startNextSeason({ ...둘째해시작, stats: 둘째해 }, createConstantRandom(0)).yearlyStats).toEqual([첫해, 둘째해])
   })
 
   it('올해의 목표 플래그 둘을 되돌린다 — +0x1b7(0xa39d0) · +0x1bc(0x1b882)', () => {
@@ -85,13 +86,13 @@ describe('새 시즌 전환 — 0x1b768', () => {
       ...createCareer('선수'),
       hasSeenYearGoalWindow: true,
       yearGoalEventDone: true,
-    })
+    }, createConstantRandom(0))
 
     expect([next.hasSeenYearGoalWindow, next.yearGoalEventDone]).toEqual([false, false])
   })
 
   it('인기도 스냅샷을 지금 인기도로 다시 뜬다 (+0x78 ← 0xb6e78, 0xa39e0)', () => {
-    const next = startNextSeason({ ...createCareer('선수'), popularity: 820, popularityAtSeasonStart: 100 })
+    const next = startNextSeason({ ...createCareer('선수'), popularity: 820, popularityAtSeasonStart: 100 }, createConstantRandom(0))
 
     expect(next.popularityAtSeasonStart).toBe(820)
   })
@@ -103,7 +104,7 @@ describe('새 시즌 전환 — 0x1b768', () => {
       postseason: { round: '한국시리즈', teams: [0, 1], wins: [2, 1], winsNeeded: 4 },
     } as unknown as Parameters<typeof startNextSeason>[0]
 
-    const next = startNextSeason(지난시즌)
+    const next = startNextSeason(지난시즌, createConstantRandom(0))
 
     // 승패는 비우고 투수 레코드 차례는 잇는다 — 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않는다 (nextSeasonLeague)
     const { pitcherOrders, ...rest } = next.league
@@ -128,7 +129,7 @@ describe('새 시즌 전환 — 0x1b768', () => {
       },
     } as unknown as Parameters<typeof startNextSeason>[0]
     // 3 칸 더 돈다 — [1,2,3,0] → [0,1,2,3]
-    expect(startNextSeason(지난시즌).league.pitcherOrders?.[3]).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+    expect(startNextSeason(지난시즌, createConstantRandom(0)).league.pitcherOrders?.[3]).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
   })
 
   it('리그 선수 시즌 성적도 0 으로 되돌린다 (0x204e0 — 순위표 재료가 해를 넘기지 않는다)', () => {
@@ -137,7 +138,7 @@ describe('새 시즌 전환 — 0x1b768', () => {
       leaguePlayerStats: { batters: { 7: { atBats: 300, hits: 120, homeRuns: 40, runsBattedIn: 99 } } },
     }
 
-    expect(startNextSeason(지난시즌).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
+    expect(startNextSeason(지난시즌, createConstantRandom(0)).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
   })
 })
 
@@ -477,7 +478,7 @@ describe('사람 경기 투수 줄 — 정산 0xa8024 · 경기 끝 0xa7de8 (정
 describe('새 시즌 0x1b882 — memset(S+0x1bc, 0, 4)', () => {
   it('연속 기록 세 칸을 지운다', () => {
     const career = { ...createCareer('연속'), streaks: { multiHit: 4, homeRun: 2, hitless: 1 } }
-    expect(startNextSeason(career).streaks).toEqual({ multiHit: 0, homeRun: 0, hitless: 0 })
+    expect(startNextSeason(career, createConstantRandom(0)).streaks).toEqual({ multiHit: 0, homeRun: 0, hitless: 0 })
   })
 })
 

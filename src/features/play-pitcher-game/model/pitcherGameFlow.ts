@@ -43,6 +43,7 @@ import {
 } from '@/features/play-game/model/gameAces'
 import type { GameAcePitcher, GameAceSetup, GameTeamAces } from '@/features/play-game/model/gameAces'
 import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel } from '@/entities/mission/model/aceLevel'
+import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import {
@@ -374,6 +375,11 @@ export interface PitcherGameOptions {
    * 안 넘기면 늘 `teamMorale`
    */
   readonly opponentStaleMorale?: number
+  /**
+   * 상대 팀 레코드 장비 니블 덮개 — 나리 새 시즌 CPU 장비 굴림 `0x665e8` 이 쓴 값(붙박이 표 칸 → 네 칸). 상대 팀 객체는
+   * 0xb8680 → 0x1f989(모드 3 → 0x1f940)로 저장 레코드를 읽어 0xb6414 로 니블 보너스를 먹는다. 없으면 Xls 행 그대로
+   */
+  readonly opponentEquipment?: TeamRecordEquipment
   /** 평판 `career+0x62` (감독 강판 표·경기 뒤 평가) */
   readonly reputation: number
   /** 환경설정 "투구 게이지" (설정 +0x2d) — **원본 기본값은 꺼짐** (K 5-2) */
@@ -898,7 +904,8 @@ function opponentBatterAbility(options: PitcherGameOptions, rosterSlot: number) 
   // 142 가 상대 명단 9번에 넣은 마타자가 CPU 대타로 서면 그 레코드 — 0xb6415 첫 단계가 레벨 배율을 먹인다
   const ace = rosterSlot === ACE_BATTER_ROSTER_SLOT ? aceBatterAbilityOf(options) : undefined
   const roster = teamBatters(options.opponentTeamId)
-  const record = ace ?? recordBatterAbilityOf(roster[rosterSlot % roster.length])
+  const slot = rosterSlot % roster.length
+  const record = ace ?? recordBatterAbilityOf(roster[slot], options.opponentEquipment?.batters?.[slot])
   const gameAbility = (base: number, slot: number) =>
     gameAbilityOf({ mode: PITCHER_EDITION_MODE, base, isPitcher: false, slot, isMyTeam: false })
   return {
@@ -909,9 +916,9 @@ function opponentBatterAbility(options: PitcherGameOptions, rosterSlot: number) 
   }
 }
 
-/** 붙박이 줄 레코드의 `0xb6414(rec, k, 1)` 네 칸 (히트·파워·수비·주루) */
-function recordBatterAbilityOf(player: RosterPlayer) {
-  const [hit, power, defense, run] = recordAbilityOf(player, false)
+/** 붙박이 줄 레코드의 `0xb6414(rec, k, 1)` 네 칸 (히트·파워·수비·주루) — `equipment` 는 레코드 장비 니블(없으면 Xls 행) */
+function recordBatterAbilityOf(player: RosterPlayer, equipment?: readonly number[]) {
+  const [hit, power, defense, run] = recordAbilityOf({ ...player, equipment: equipment ?? player.equipment }, false)
   return { hit, power, defense, run }
 }
 
@@ -973,7 +980,8 @@ function quickBatterOfTeam(options: PitcherGameOptions, isOurs: boolean, rosterS
     const ace = gameAceBatterOf(teamAcesOf(options, isOurs).batter, options.aces?.levels)
     if (ace !== undefined) return ace
   }
-  return batterAt(isOurs ? options.ourTeamId : options.opponentTeamId, rosterSlot)
+  // 상대 줄은 레코드 장비 니블(나리 새 시즌 0x665e8)을 0xb6414 로 먹는다 — 내 팀은 굴리지 않는다
+  return isOurs ? batterAt(options.ourTeamId, rosterSlot) : batterAt(options.opponentTeamId, rosterSlot, options.opponentEquipment)
 }
 
 /* ── 시작 ────────────────────────────────────────────────────────────────────── */
@@ -3710,6 +3718,8 @@ function quickDefenseOf(
 ): HalfInningDefense {
   const { options } = progress
   const roster = teamPitchers(isOurs ? options.ourTeamId : options.opponentTeamId)
+  // 상대 레코드 장비 니블 (나리 새 시즌 0x665e8) — 내 팀은 굴리지 않는다
+  const equipmentAt = (slot: number) => (isOurs ? undefined : options.opponentEquipment?.pitchers?.[slot % roster.length])
   // 142 가 명부 8번 칸에 넣은 마투수 — 웹 칸 번호는 우리 9(`OUR_ACE_PITCHER_SLOT`) · 상대 8
   const ace = teamAcePitcherOf(options, isOurs)
   const isAce = (slot: number) => ace !== undefined && slot === acePitcherSlotOf(isOurs)
@@ -3735,7 +3745,7 @@ function quickDefenseOf(
         ? myPitcher
         : isAce(slot) && ace !== undefined
           ? ace.quick
-          : quickPitcherOf(roster[slot % roster.length]),
+          : quickPitcherOf(roster[slot % roster.length], equipmentAt(slot)),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) =>
       isOurs && slot === MY_PITCHER_SLOT
@@ -3780,8 +3790,16 @@ function quickDefenseOf(
           ])
         : isAce(slot) && ace !== undefined
           ? pitcherAbilitySumOf([ace.control, ace.velocity, ace.breaking, ace.staminaAbility].map(clampAbility))
-          : pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
+          : pitcherAbilitySumOf(rosterPitcherAbilityOf(roster[slot % roster.length], equipmentAt(slot)).map(clampAbility)),
   }
+}
+
+/**
+ * 붙박이 투수 줄의 능력치 — 레코드 장비 니블이 있으면 `0xb6414(rec, k, 1)`(니블 보너스 뒤 장착 스킬 단계), 없으면 행 그대로
+ * (리그 열 팀 Xls 행은 니블 0 이고 스킬 5 · 7 · 22 비트도 없어 예전 값과 같다).
+ */
+function rosterPitcherAbilityOf(player: RosterPlayer, equipment: readonly number[] | undefined): readonly number[] {
+  return equipment === undefined ? player.ability : recordAbilityOf({ ...player, equipment }, true)
 }
 
 /** 0xb5b06 — 경기용 능력치를 0..999 로 자른다 */

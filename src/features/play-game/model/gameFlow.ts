@@ -46,6 +46,9 @@ import {
   teamBatters,
   teamPitchers,
 } from '@/entities/team/model/teamRoster'
+import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
+import type { RosterPlayer } from '@/shared/config/original/roster'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import { FULL_STAMINA, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
   lineupSlotOf,
@@ -521,6 +524,11 @@ export interface GameProgress {
    */
   readonly opponentStaleMorale?: number
   /**
+   * 상대 팀 레코드 장비 니블 덮개 — 나리 새 시즌 CPU 장비 굴림 `0x665e8` 이 쓴 값(붙박이 표 칸 → 네 칸). 상대 팀 객체는
+   * 0xb8680 → 0x1f989 로 저장 레코드를 읽어 0xb6414 로 니블 보너스를 먹는다. 없으면 Xls 행 그대로(첫 시즌 · 옛 저장)
+   */
+  readonly opponentEquipment?: TeamRecordEquipment
+  /**
    * **이 경기에서 0xb570c(b5768)가 상대 팀 레코드 +2 에 마지막으로 쓴 값** — 아직 한 번도 안 덮었으면 없다(그동안 상대 첫 공은
    * `opponentStaleMorale`). 덮는 자리: 상대가 던지는 공마다(사람 장면 틱 10 놓기 0x4dc78 의 0x4dbac · 0x34968 / 동료 간이 타석의
    * c1446 · c1852) · 상대 공격 반 이닝(자동진행 0x21 간이 엔진)의 스윙 경로 0xab214(ab4c0~ab4d8) · 주자 있는 판정 경로 c19ec.
@@ -625,6 +633,8 @@ export function startGame(
   teamMorale?: number,
   /** 상대 팀 레코드 +2 의 앞 값 (`GameProgress.opponentStaleMorale`) — 상대 레코드가 이 경기에서 아직 안 덮였을 때만 본다. 안 넘기면 없다 */
   opponentStaleMorale?: number,
+  /** 상대 팀 레코드 장비 니블 (`GameProgress.opponentEquipment`) — 안 넘기면 Xls 행 그대로 */
+  opponentEquipment?: TeamRecordEquipment,
 ): GameProgress {
   const ourAces = aces?.ours ?? NO_GAME_ACES
   const opponentAces = aces?.opponent ?? NO_GAME_ACES
@@ -698,6 +708,7 @@ export function startGame(
     // 상대 첫 투수 첫 공은 이 경기에서 상대 레코드가 아직 안 덮였으면 앞 값을 본다(`opponentRecordMorale` 이 없을 때만).
     // 상대가 후공이면 1회초 첫 공, 선공이면 1회초 공격(자동진행)에서 한 번도 안 덮였을 때의 1회말 첫 공이다 (r104)
     ...(opponentStaleMorale === undefined ? {} : { opponentStaleMorale }),
+    ...(opponentEquipment === undefined ? {} : { opponentEquipment }),
   }
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
@@ -1496,9 +1507,10 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
   if (ace !== undefined) {
     return pitcherAbilityOf(ace.player, progress.aces?.levels ?? {}, staminaPercentOf(progress.opponentMound.stamina))
   }
-  const pitcher = teamPitchers(progress.opponentTeamId)[slot]
+  const row = teamPitchers(progress.opponentTeamId)[slot]
   const repertoire = ROSTER_PITCHER_REPERTOIRES[progress.opponentTeamId * PITCHERS_PER_TEAM + slot]
-  if (pitcher === undefined) return DEFAULT_PITCHER_ABILITY
+  if (row === undefined) return DEFAULT_PITCHER_ABILITY
+  const pitcher = withRecordEquipment(row, progress.opponentEquipment?.pitchers?.[slot], true)
   return {
     control: Math.round(pitcher.ability[0] / STAGE_PITCHER_DIVISOR),
     velocity: Math.round(pitcher.ability[1] / STAGE_PITCHER_DIVISOR),
@@ -1526,7 +1538,8 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
 export function opponentPitcherEquipmentOf(progress: GameProgress): readonly number[] | undefined {
   if (progress.aceOpponent !== null) return undefined
   if (moundAcePitcherOf(progress, false) !== undefined) return undefined
-  return teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]?.equipment
+  const slot = progress.opponentMound.pitcherSlot
+  return progress.opponentEquipment?.pitchers?.[slot] ?? teamPitchers(progress.opponentTeamId)[slot]?.equipment
 }
 
 /**
@@ -1708,7 +1721,8 @@ function teamBatterAt(progress: GameProgress, isOurs: boolean, rosterSlot: numbe
     const ace = aces === undefined ? undefined : gameAceBatterOf(aces.batter, progress.aces?.levels)
     if (ace !== undefined) return ace
   }
-  return batterAt(isOurs ? progress.ourTeamId : progress.opponentTeamId, rosterSlot)
+  // 상대 줄은 레코드 장비 니블(나리 새 시즌 0x665e8)을 0xb6414 로 먹는다 — 내 팀은 굴리지 않는다
+  return isOurs ? batterAt(progress.ourTeamId, rosterSlot) : batterAt(progress.opponentTeamId, rosterSlot, progress.opponentEquipment)
 }
 
 /** 그 팀 명부 8번 칸의 마투수 (142 가 넣은 것) — 없으면 undefined */
@@ -2521,14 +2535,19 @@ function quickDefenseOf(
   morale: number = teamRecordMoraleOf(teamId),
   /** 그 레코드 +2 의 앞 값 — 첫 투수 첫 공만 (`HalfInningDefense.staleMorale`) */
   staleMorale?: number,
+  /** 그 팀 레코드 장비 니블 (`GameProgress.opponentEquipment`) — 상대 팀만. 없으면 Xls 행 */
+  equipment?: TeamRecordEquipment,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
+  const recordAt = (slot: number) => withRecordEquipment(roster[slot % roster.length], equipment?.pitchers?.[slot % roster.length], true)
   const isAce = (slot: number) => ace !== undefined && slot === ACE_PITCHER_SLOT
   return {
     mound,
     pitcherSlots: order,
     ...(staminas === undefined ? {} : { staminaAt: (slot: number) => staminas[slot] ?? FULL_STAMINA }),
-    pitcherAt: (slot) => (isAce(slot) && ace !== undefined ? ace.quick : quickPitcherOf(roster[slot % roster.length])),
+    pitcherAt: (slot) => (isAce(slot) && ace !== undefined
+      ? ace.quick
+      : quickPitcherOf(roster[slot % roster.length], equipment?.pitchers?.[slot % roster.length])),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) =>
       isAce(slot) && ace !== undefined ? ace.staminaAbility : roster[slot % roster.length].ability[3],
@@ -2542,7 +2561,7 @@ function quickDefenseOf(
     abilitySumAt: (slot) =>
       isAce(slot) && ace !== undefined
         ? pitcherAbilitySumOf([ace.control, ace.velocity, ace.breaking, ace.staminaAbility].map(clampAbility))
-        : pitcherAbilitySumOf(roster[slot % roster.length].ability.map(clampAbility)),
+        : pitcherAbilitySumOf(recordAt(slot).ability.map(clampAbility)),
     // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
     // 마무리 굴림 0xac360 을 지나고, 0xabfcc 는 고르지 않는다 (`leagueDay.defenseOf` 와 같다). 보직은 칸 8 이 표 밖이라 없다
     isSpecialPitcherAt: isAce,
@@ -2550,6 +2569,15 @@ function quickDefenseOf(
     // (`acePlayers.skillBits` — 다섯 줄 모두 두 비트가 0 이라 소모는 같다)
     skillBitsAt: (slot) => (isAce(slot) && ace !== undefined ? ace.player.skillBits : roster[slot % roster.length].skillBits),
   }
+}
+
+/**
+ * 레코드 장비 니블이 있으면 그 행의 능력치를 `0xb6414(rec, k, 1)` 값으로 — 니블 보너스 뒤 장착 스킬 단계(`recordAbilityOf`).
+ * 니블이 없으면 행 그대로 둔다(리그 열 팀 Xls 행은 니블 0 이고 스킬 5 · 7 · 20 · 22 비트도 없어 예전 값과 같다).
+ */
+function withRecordEquipment<T extends RosterPlayer>(row: T, equipment: readonly number[] | undefined, isPitcher: boolean): T {
+  if (equipment === undefined) return row
+  return { ...row, ability: recordAbilityOf({ ...row, equipment }, isPitcher) }
 }
 
 /** 0xb5b06 — 경기용 능력치를 0..999 로 자른다 */
@@ -2568,6 +2596,7 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     progress.teamMorale,
     // 이 경기에서 아직 안 덮였을 때만 앞 값 (`GameProgress.opponentRecordMorale`)
     progress.opponentRecordMorale === undefined ? progress.opponentStaleMorale : undefined,
+    progress.opponentEquipment,
   )
 }
 

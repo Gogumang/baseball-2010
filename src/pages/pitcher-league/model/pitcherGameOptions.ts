@@ -20,6 +20,17 @@ import {
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherGameOutcome } from '@/entities/pitcher-career/model/pitcherCareer'
 import { nariMoraleOf, nariTeamRecordMoraleOf } from '@/entities/career/model/nariMorale'
+import { nariTeamRecordEquipmentOf } from '@/entities/career/model/nariCpuEquipment'
+import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
+
+/** 상대 리그 팀 레코드 장비 니블 (`PitcherGameOptions.opponentEquipment`) — 굴린 니블이 없으면 칸째 뺀다 */
+function opponentEquipmentOf(
+  career: PitcherCareer,
+  opponentTeamId: number,
+): { readonly opponentEquipment?: TeamRecordEquipment } {
+  const equipment = nariTeamRecordEquipmentOf(career.nariTeams, opponentTeamId)
+  return equipment === undefined ? {} : { opponentEquipment: equipment }
+}
 
 /**
  * 커리어·로테이션·환경설정으로 **경기 한 판의 옵션**을 조립한다 —
@@ -160,6 +171,9 @@ export function pitcherGameOptionsOf(
     ...(career.nationalCup !== undefined
       ? {}
       : { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId) }),
+    // 상대 팀 객체 0xb8680 → 0x1f989(모드 3 → 0x1f940)가 읽는 저장 레코드의 장비 니블 — 나리 새 시즌 CPU 장비 굴림 0x665e8 이 쓴 값.
+    // 대회 상대국은 리그 레코드가 아니라 없다
+    ...(career.nationalCup !== undefined ? {} : opponentEquipmentOf(career, opponentTeamId)),
     reputation: career.reputation,
     // 원본 기본값은 꺼짐이다 — 환경설정에서 켠 값을 그대로 받아 넘긴다
     gaugeSettingOn: settings.gaugeSettingOn ?? false,

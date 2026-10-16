@@ -6,6 +6,7 @@ import {
   advancePostseason,
   nextSeasonLeague,
   opponentOf,
+  pitcherOrderOf,
   pitcherOrdersAfterPostseason,
   recordLeagueResult,
   rotateLeaguePitchers,
@@ -77,7 +78,8 @@ import {
 } from '@/entities/pitcher-career/model/myPitcherRecord'
 import type { MyPitcherDay } from '@/entities/pitcher-career/model/myPitcherRecord'
 import { myPitcherRegistrationSlotOf, registeredMyPitcherOrderOf } from '@/entities/pitcher-career/model/myPitcherRecord'
-import { createNariTeamRecords } from '@/entities/career/model/nariTeamRecord'
+import { createNariTeamRecords, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
+import { nariLeagueTeamRecordOf, rollNariCpuEquipment } from '@/entities/career/model/nariCpuEquipment'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
   pitcherFormOf,
@@ -976,6 +978,8 @@ export function applyPitcherLeagueDay(
     // 간이 타석의 능력 0xb570d(…, 1, 0x5a, 1) — 모드 3 은 팀 능력치 정액 0xb592c(모드 비트 0x306 = 1·2·8·9)도 코치(모드 2)도
     // 안 탄다. 밑값 그대로다. 같은 0xb570c 의 b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다(용량 0x66e44) — 1회초 수비 팀 첫 공만 앞 값
     { mode: PITCHER_EDITION_MODE, nariMorale, staleRecordMorales: nariLeagueRecordMoralesOf(career) },
+    // 0xc239c → 0xb8680(모드 3·4 → 0x1f989)이 나리 레코드를 읽는다 — 새 시즌 CPU 장비 굴림 0x665e8 이 쓴 니블이 0xb6414 보너스로 먹는다
+    (teamId) => nariLeagueTeamRecordOf(career.nariTeams, teamId),
   )
   // 그날 CPU 경기를 치른 여덟 팀(내 팀 · 사람 경기 상대 말고 모두)의 레코드 +2 는 이 사기로 덮였다
   const cpuTeams = NARI_LEAGUE_TEAM_IDS.filter((teamId) => teamId !== career.teamId && teamId !== opponent)
@@ -1138,6 +1142,8 @@ export function applyPitcherPostseasonProgress(
     // 0xc2760 → 0xc239c 간이 엔진의 0xb570c b5768 — 두 팀 레코드 +2 = 나리 사기 (`LeagueAbilityContext.nariMorale`).
     // 1회초 수비 팀 첫 공만 그 레코드의 앞 값 (`staleRecordMorales`, r101)
     { mode: PITCHER_EDITION_MODE, nariMorale: nariMoraleOf(career), staleRecordMorales: nariLeagueRecordMoralesOf(career) },
+    // 0xc2760 도 0xc239c 로 나리 레코드를 읽는다 — 새 시즌 CPU 장비 니블(0x665e8)
+    (teamId) => nariLeagueTeamRecordOf(career.nariTeams, teamId),
   )
   return result.series === career.postseason
     ? career
@@ -1171,7 +1177,16 @@ export function isPitcherSeasonFinished(career: PitcherCareer): boolean {
  * 시즌을 넘긴다 (0x1b768). 타자편 `startNextSeason` 과 같은 자리에
  * **스태미나 되돌리기**(시즌 시작 0xb6cc4 → 10000)가 하나 더 붙는다.
  */
-export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
+export function startNextPitcherSeason(career: PitcherCareer, random: RandomPort): PitcherCareer {
+  const next = startNextPitcherSeasonRecords(career)
+  // 1b86c — 0x665e8(g, S+0xb3(새 연차 = 지난 season), S[1]) 가 내 팀 뺀 아홉 팀 레코드의 장비 니블을 굴린다
+  // (투수편 모드 3 → 0x1f940). 0x1b684(1b852)의 내 투수 옮기기 뒤다 — 내 팀은 굴리지 않으니 차례만 지킨다 (`nariCpuEquipment`)
+  const records = nariTeamsOf(next)
+  const rolled = rollNariCpuEquipment(records, random, career.season, career.teamId, (team) => pitcherOrderOf(next.league, team))
+  return rolled === records ? next : { ...next, nariTeams: rolled }
+}
+
+function startNextPitcherSeasonRecords(career: PitcherCareer): PitcherCareer {
   // 0x1b768 → 0x1b852 `0x1b684` — 보직 2 가 아니면 내 투수를 레코드 0번으로 (레코드에 배열이 있을 때만 — 옛 저장은 142 가 세운다)
   const recorded = recordedMyPitcherOrderOf(career)
   const order = recorded === null ? null : moveMyPitcherToStart(recorded, career.role)

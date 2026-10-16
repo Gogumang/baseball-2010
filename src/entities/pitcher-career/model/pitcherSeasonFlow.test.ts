@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -111,8 +112,7 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
 
   it('부상 엔딩을 이어하면 같은 시즌에 남고 부상 누적만 풀린다', () => {
     const 이어함 = continueAfterPitcherEnding(
-      투수({ season: 4, gamesPlayed: 12, gamePoint: 6000, endingIndex: 0, isInjured: true, injuredGamesPlayed: 20 }),
-    )
+      투수({ season: 4, gamesPlayed: 12, gamePoint: 6000, endingIndex: 0, isInjured: true, injuredGamesPlayed: 20 }), createConstantRandom(0))
 
     expect(이어함.season).toBe(4)
     expect(이어함.gamesPlayed).toBe(12)
@@ -124,8 +124,7 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
 
   it('방출 엔딩을 이어하면 새 시즌으로 넘어간다 (0x1b768) — 스태미나도 되돌아온다', () => {
     const 이어함 = continueAfterPitcherEnding(
-      투수({ season: 7, gamesPlayed: 45, gamePoint: 5000, endingIndex: 1, stamina: 1200 }),
-    )
+      투수({ season: 7, gamesPlayed: 45, gamePoint: 5000, endingIndex: 1, stamina: 1200 }), createConstantRandom(0))
 
     expect(이어함.season).toBe(8)
     expect(이어함.gamesPlayed).toBe(0)

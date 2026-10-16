@@ -1,3 +1,4 @@
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hasSkill, startNextSeason } from '@/entities/career/model/playerCareer'
 import { ROMANCE_EVENT_IDS, TITLE_NAMES } from '@/entities/career/model/titles'
@@ -241,11 +242,11 @@ const INJURY_ENDING = 0
  * "현재 상태에서 이어하기" (0x1bd36, 점검 9차) — 5000 G포인트를 쓰고
  * 부상 엔딩은 부상만 풀고 같은 시즌 관리 화면으로, 방출 엔딩은 새 시즌 전환(0x1b768)으로 간다.
  */
-export function continueAfterEnding(career: PlayerCareer): PlayerCareer {
+export function continueAfterEnding(career: PlayerCareer, random: RandomPort): PlayerCareer {
   const paid: PlayerCareer = { ...career, gamePoint: career.gamePoint - CONTINUE_COST_GAME_POINT, endingIndex: null }
   // 0x1bddc~0x1bdfa: 부상 기간 +0x1b5 · +0x1ce · 부상 경기 수 +0x1b6 을 0 으로 (원본 부상 판정은 +0x1b5 > 0)
   if (career.endingIndex === INJURY_ENDING) return { ...paid, isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0 }
-  return startNextSeason(paid)
+  return startNextSeason(paid, random)
 }
 
 /** 부상 엔딩 이벤트 — 105 진입 0x11b32 의 판정 0 → 0x113e8 이 번호로 튼다(대상 0) */

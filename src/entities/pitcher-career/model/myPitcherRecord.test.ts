@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   gameMyPitcherOrderOf,
@@ -79,6 +80,6 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
   it('새 시즌 0x1b684 — 선발은 내 투수를 0번으로', () => {
     const base = createPitcherCareer('선발')
     const swapped = { ...base, nariTeams: base.nariTeams?.map((record, team) => team === base.teamId ? { ...record, pitchers: [1, 나, 2, 3, 4, 5, 6, 7, 0] } : record) }
-    expect(startNextPitcherSeason(swapped).nariTeams?.[base.teamId]?.pitchers?.[0]).toBe(나)
+    expect(startNextPitcherSeason(swapped, createConstantRandom(0)).nariTeams?.[base.teamId]?.pitchers?.[0]).toBe(나)
   })
 })

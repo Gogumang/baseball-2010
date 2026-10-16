@@ -80,10 +80,20 @@ export function quickPitcherOf(player: RosterPlayer, equipment?: readonly number
  * 0xb8768 → 0xb603c 도 마선수 아닌 줄을 배열 첨자로 다시 매기므로 붙박이 칸 그대로다. 명단이 다른 차례(마타자를 넣어 밀린 칸 ·
  * 나리 명단)면 부르는 쪽이 `withLineupRecordSlot` 으로 그 첨자를 단다
  */
-export function batterAt(teamId: number, battingOrderIndex: number): QuickAtBatBatter {
+export function batterAt(teamId: number, battingOrderIndex: number, equipment?: TeamRecordEquipment): QuickAtBatBatter {
   const roster = teamBatters(teamId)
   const slot = battingOrderIndex % roster.length
-  return { ...quickBatterOf(roster[slot]), recordSlot: slot }
+  return { ...quickBatterOf(roster[slot], equipment?.batters?.[slot]), recordSlot: slot }
+}
+
+/**
+ * **팀 레코드 장비 니블 덮개** — 붙박이 표 칸 → 레코드 +0x19 · +0x1a 네 칸. 없는 칸(또는 덮개 없음)은 Xls 행 그대로다.
+ * 나리 새 시즌 CPU 장비 굴림 `0x665e8`(1b86c)이 레코드에 쓴 값을 경기에 싣는다 (`entities/career/model/nariCpuEquipment`).
+ * 경기는 레코드를 `0xb6414(rec, k, 1)` 로 읽어 니블 보너스를 먹는다(`recordAbilityOf`).
+ */
+export interface TeamRecordEquipment {
+  readonly batters?: Readonly<Record<number, readonly number[]>>
+  readonly pitchers?: Readonly<Record<number, readonly number[]>>
 }
 
 /**
