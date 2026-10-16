@@ -105,12 +105,8 @@ function PlayerRow({ player, row, isPitcherTab, modeUi, imgText, testId }: {
     <div data-testid={testId} aria-label={player.name}>
       <CenteredMarkup raw={player.name} box={row.name} color="#ffffff" />
       <CenteredImgText origins={imgText} frame={teamNameFrameOf(player.teamId)} box={row.team} />
-      {badge !== null && (
-        <>
-          <FrameSprite folder={MODE_UI_FRAMES} frame={badge.chip} origins={modeUi} x={row.badge.x} y={row.badge.y} />
-          <CenteredImgText origins={imgText} frame={badge.label} box={row.badge} />
-        </>
-      )}
+      <FrameSprite folder={MODE_UI_FRAMES} frame={badge.chip} origins={modeUi} x={row.badge.x} y={row.badge.y} />
+      <CenteredImgText origins={imgText} frame={badge.label} box={row.badge} />
     </div>
   )
 }

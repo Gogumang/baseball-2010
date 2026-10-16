@@ -51,13 +51,14 @@ export const TRADE_CONFIRM = {
 export const teamNameFrameOf = (teamId: number) => 0x41 + teamId
 
 /** 딱지 — mode_ui 프레임 · img_text (0xd7d6~0xd82c 내 선수 · 0xd8ee~0xd940 상대 선수) */
-export function tradeBadgeOf(isPitcherTab: boolean, profileLow: number): { readonly chip: number; readonly label: number } | null {
+export function tradeBadgeOf(isPitcherTab: boolean, profileLow: number): { readonly chip: number; readonly label: number } {
   if (isPitcherTab) {
     if (profileLow === 0) return { chip: 0x49, label: 0x31 }
     if (profileLow === 1) return { chip: 0x4c, label: 0xaa }
     if (profileLow === 2) return { chip: 0x4a, label: 0xb6 }
-    // 그 밖은 r6 · r5 가 0 그대로 — mode_ui 프레임 0 · img_text 0 을 그린다 (⚠️ 미확인: 보직 3 은 붙박이 표에 없다)
-    return null
+    // 그 밖(보직 3)은 r6 · r5 가 0 그대로(0xd7e0 · 0xd7e4 → 0xd82c) — mode_ui 프레임 0 · img_text 0 을 그린다. 보직은 0xb6704 =
+    // 레코드 +0xb 하위 2비트인데 붙박이 투수 120 명(roster.json)은 0 · 1 · 2 뿐이라 실제로는 닿지 않는다 — 원본 그대로 둔다
+    return { chip: 0, label: 0 }
   }
   if (profileLow === 0) return { chip: 0x4a, label: 0x130 }
   if (profileLow === 1) return { chip: 0x49, label: 0x131 }
