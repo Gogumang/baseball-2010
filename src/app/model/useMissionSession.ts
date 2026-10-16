@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
+import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
@@ -1152,7 +1153,11 @@ export function useMissionSession({
       })
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
       enterNewAtBatConfirm()
-      runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase))
+      // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
+      runner.pauseWithBanner(
+        describeOutcomeBanner(outcome, runnersOnBase),
+        atBatEndFramesOf(outcome, play?.kind ?? null),
+      )
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [aceLevels, audio, batterSkillIds, random, runner],
@@ -1650,7 +1655,8 @@ export function useMissionSession({
       )
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
       enterNewAtBatConfirm()
-      runner.pauseWithBanner(describeOutcomeBanner(settled, pending.runnersOnBase))
+      // 0x17 판 끝 → 판정 B 가 곧장 0xd
+      runner.pauseWithBanner(describeOutcomeBanner(settled, pending.runnersOnBase), 0)
     },
     [aceLevels, audio, random, runner],
   )

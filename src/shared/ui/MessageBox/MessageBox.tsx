@@ -55,7 +55,8 @@ interface MessageBoxProps {
    * 장면이 [창+0x24f] = 1 을 세운 자리(경기 장면 0x3301c · 메인 메뉴 0x234d4)면 참 — 창을 띄울 때 [창+0x24e] 로 옮겨지고(0x7503c),
    * 키를 받은 갱신의 격자 · 키 표 갈래가 [+0x215] 와 함께 **폭 [+0x210] = 0** 을 적는다(0x75656~0x7566c · 0x756a4~0x756b4).
    * 그래서 다음 갱신 0x75596 이 0 ÷ 2 ≤ 99 로 곧장 닫는다 — 240 → 120 줄임이 없고 답은 한 갱신 뒤다.
-   * ⚠️ 그 한 갱신 동안 폭 0 판 위 글 · 버튼을 그리는지는 미확인 — 웹은 판과 함께 안 보이게 둔다.
+   * 그 한 갱신의 그리기에서도 글 · 버튼은 그려진다 — 그리기 0x746cc 는 판(0x744c4)을 [+0x290] · [+0x20e] 로만 가르고(0x7477e~0x74798)
+   * 글 0x74664 · 버튼 0x7448c 는 펼침 칸 [+0x214] 만 본다(0x7479c~0x747d0). 폭 0 판은 아무것도 안 덮어 글 · 버튼만 어둡게 위에 남는다.
    * 안 주면 지금 장면의 값(`CommonWindowSceneContext` — 앱이 화면 · 경기 장면으로 정한다)이다.
    */
   readonly closesWithoutShrink?: boolean
@@ -310,14 +311,19 @@ export function MessageBox({
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [answer, buttons.length, columns, cancelAnswer])
 
-  // 펼치는 동안에는 높이만, 닫는 동안에는 폭만 원본 값으로 눌러 그린다.
-  // 세로 가운데는 CSS(top 50% + translateY(−50%))가 이미 맞춰 준다.
+  // 펼치는 동안에는 높이만 원본 값으로 눌러 그린다. 세로 가운데는 CSS(top 50% + translateY(−50%))가 이미 맞춰 준다.
+  // 닫는 동안에는 판만 폭을 줄인다 — 판 0x744c4 는 채움 0x6a9f0 · 가로줄 0x6a904 뿐이고 자르기 칸을 안 세워, 뒤에 그리는 글 0x74664 ·
+  // 버튼 0x7448c 는 (W/2 − 75, …) · 버튼 자리 그대로 판 밖까지 그려진다. 그래서 상자는 240 폭 그대로 두고 판만 따로 줄인다.
   const boxStyle =
     animation === null
       ? undefined
       : animation.kind === '열림'
         ? { height: animation.height, overflow: 'hidden' as const }
-        : { left: Math.floor((CLOSE_START_WIDTH - animation.width) / 2), width: animation.width, overflow: 'hidden' as const }
+        : { background: 'none' }
+  const closingPanelStyle =
+    animation?.kind === '닫힘'
+      ? { left: Math.floor((CLOSE_START_WIDTH - animation.width) / 2), width: animation.width }
+      : null
   // 펼치는 동안은 글·버튼을 안 그린다 (0x7479c). 닫는 동안에는 원본도 그대로 그린다.
   const contentStyle = animation?.kind === '열림' ? { visibility: 'hidden' as const } : undefined
 
@@ -344,6 +350,7 @@ export function MessageBox({
     <div className={styles.dim} role="dialog" aria-label="알림"
       style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
       <div className={styles.box} ref={boxRef} style={boxStyle}>
+        {closingPanelStyle !== null && <div className={styles.closingPanel} style={closingPanelStyle} />}
         <div className={styles.text} style={contentStyle}>
           <MarkupText raw={text} />
         </div>

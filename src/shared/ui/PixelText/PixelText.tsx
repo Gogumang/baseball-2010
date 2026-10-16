@@ -22,8 +22,6 @@ import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
  * <PixelText maxWidth={220} scale={2} style={{ color: '#ffe680' }}>{긴글}</PixelText>
  * ```
  * 색은 CSS `color` 를 따른다 (원본 기본값은 흰색 0xFFFF).
- *
- * ⚠️ 아직 기존 화면에 끼우지 않았다. 갈아 끼우는 일은 따로 한다.
  */
 
 interface PixelTextProps {
@@ -31,8 +29,10 @@ interface PixelTextProps {
   /**
    * 어느 글꼴 객체의 자간·줄간을 쓸지.
    *
-   * ⚠️ **어느 화면이 무엇을 쓰는지는 해독 문서도 미확인이다** (R5 5절 "남은 것").
-   * 문서의 유력한 추측이 "게임 전역 글꼴 = 자간 1" 이라 'app' 을 기본값으로 둔다.
+   * 공용 글 그리기 0xba269 는 늘 앱 전역 글꼴 `[[0x1400070]+0x3c]`(자간 1)을 쓰고(0xba282~0xba28e — 2026-10-16 직접 떴다), 입력기
+   * 0x677d4 도 같다. 자간 2 글꼴은 0x679d4 가 객체 +0x88 에 만드는 것(0x67a32~0x67a3a 의 0x9c9d0)인데, 0x679d4 는 로고 객체
+   * (0x67989 가 만든다 — 같은 +0x94 상태 · +0x95 다음 상태 · +0x97 틱 칸)의 가상 함수라 그 글꼴은 로고 · 인증 창(웹 미이식) 몫이다.
+   * ⚠️ 미확인: R5 가 꼽은 다른 그리기 호출지(0x56b5c · 0x5acf0 · 0x5b25c · 0x5dcc0 · 0x6f278)가 넘기는 글꼴 객체는 하나씩 안 읽었다.
    */
   readonly spacing?: keyof typeof FONT_SPACING
   /** 자간을 직접 주면 spacing 보다 우선한다 */

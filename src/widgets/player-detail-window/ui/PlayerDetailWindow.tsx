@@ -109,7 +109,9 @@ export function PlayerDetailWindow({ detail, origin, draw, radarDraw, radarKey }
   const height = DETAIL_WINDOW.height
   const isPitcher = detail.kind === '투수'
   const rows = isPitcher ? PITCHER_DETAIL_ROWS : BATTER_DETAIL_ROWS
-  const tickerCounter = useSkinTickerCounter(draw)
+  // 다 열린 그림은 흐르는 글 칸마다 0x5a8c8 이 한 번씩 돌아 [skin+0x284] 가 3 × 칸 수만큼 오른다
+  const tickerCount = frame.isOpen ? rows.filter((_, index) => detail.values[index]?.kind === 'ticker').length : 0
+  const tickerCounter = useSkinTickerCounter(draw, tickerCount)
   const openDraw = openDrawOf(origin)
   let tickerIndex = 0
   return (

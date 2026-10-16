@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import type { InputHTMLAttributes } from 'react'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
-import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as styles from '@/shared/ui/InputMethodText/InputMethodText.css'
 
 /**
@@ -22,10 +23,43 @@ import * as styles from '@/shared/ui/InputMethodText/InputMethodText.css'
  * 브라우저 기본 `letter-spacing: normal`(자간 0) · 가운데 맞춤의 반 픽셀 때문에 "Kim" 이 "Ki m" 처럼 뭉개져 보였다.
  * 이제 `<input>` 은 글자 · 캐럿을 투명하게 두고 키만 받는다.
  *
- * ⚠️ 근사: 깜빡임 셈 [0x1552d80] 은 전역이라 처음 값을 모른다 — 주기(5 프레임 켜짐 · 5 프레임 꺼짐)는 원본과 같고 위상만 이 칸이 뜬 때부터 센다.
+ * 깜빡임 셈 [0x1552d80] 은 .bss 라 켤 때 0 이고, 이 칸을 읽고 쓰는 곳은 0x672f4 하나뿐이다(리터럴 0x6731c 하나 — xval 확인).
+ * 0x677d4 는 `커서 켬 && 0x672f4(I)` 라 커서가 켜진 칸을 그릴 때만 오르고, 칸이 바뀌어도 지우지 않아 **앱 전체에 이어진다**.
+ * 0x672f4 는 먼저 올리고(672fe~67304) 나눈다 → 처음 그림이 셈 1. 웹은 같은 모듈 셈(`cursorBlinkCount`)을 틀마다 올린다.
  */
 export function inputBufferTextOf(buffer: string, isCursorOn: boolean, counter: number): string {
   return isCursorOn && Math.floor(counter / 5) % 2 === 1 ? `${buffer}|` : buffer
+}
+
+/** [0x1552d80] — 위 머리말 */
+let cursorBlinkCount = 0
+
+/** 시험 전용 — [0x1552d80] 을 켤 때 값(0)으로 */
+export function resetCursorBlinkCountForTest(): void {
+  cursorBlinkCount = 0
+}
+
+/** 커서가 켜진 동안 그림마다 [0x1552d80] 을 1 올린 값 (0x672f4 의 672fc~67304). 꺼져 있으면 셈을 안 건드린다 */
+function useCursorBlinkCount(isCursorOn: boolean): number {
+  const [count, setCount] = useState(cursorBlinkCount)
+  useEffect(() => {
+    if (!isCursorOn) return
+    const startedAt = performance.now()
+    let lastFrame = -1
+    let handle = 0
+    const tick = (now: number) => {
+      const frame = Math.floor((now - startedAt) / millisecondsPerFrame())
+      if (frame > lastFrame) {
+        cursorBlinkCount += frame - lastFrame
+        lastFrame = frame
+        setCount(cursorBlinkCount)
+      }
+      handle = requestAnimationFrame(tick)
+    }
+    handle = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(handle)
+  }, [isCursorOn])
+  return count
 }
 
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'style' | 'className' | 'type'>
@@ -44,7 +78,7 @@ interface InputMethodTextProps extends InputProps {
 }
 
 export function InputMethodText({ value, x, y, inputRect, color, isCursorOn, ...inputProps }: InputMethodTextProps) {
-  const counter = useUpdateCounter(isCursorOn)
+  const counter = useCursorBlinkCount(isCursorOn)
   return (
     <>
       <PixelText style={{ position: 'absolute', left: x, top: y, color, pointerEvents: 'none' }}>

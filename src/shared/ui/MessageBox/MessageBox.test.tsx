@@ -89,6 +89,8 @@ describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
 const 상자 = () => document.querySelector('[role="dialog"] > div') as HTMLElement
 /** 펼치는 동안에는 visibility 가 hidden 이라 byRole 로 못 찾는다 — DOM 으로 직접 본다 */
 const 버튼줄 = () => 상자().lastElementChild as HTMLElement
+/** 닫히는 동안만 서는 판 — 상자 첫 자식. 상자 자체는 240 폭 그대로라 글 · 버튼이 판 밖까지 그려진다 (0x744c4 는 자르기 칸을 안 세운다) */
+const 닫힘판 = () => 상자().firstElementChild as HTMLElement
 
 function 높이를_잴_수_있게(height: number) {
   const 원래 = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
@@ -212,7 +214,11 @@ describe('메시지 상자 애니메이션', () => {
       render(<MessageBox text="질문" buttons={['예', '아니오']} closesWithoutShrink onAnswer={onAnswer} />)
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 3))
       fireEvent.keyDown(window, { key: 'Enter' })
-      expect(상자().style.width).toBe('0px')
+      expect(닫힘판().style.width).toBe('0px')
+      // 폭 0 판이어도 글 · 버튼은 그린다 — 0x746cc 의 0x7479c 는 펼침 칸 [+0x214] 만 본다
+      expect(상자().style.width).toBe('')
+      expect(상자().style.overflow).toBe('')
+      expect(버튼줄().style.visibility).toBe('')
       expect(onAnswer).not.toHaveBeenCalled()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       expect(onAnswer).toHaveBeenCalledWith(0)
@@ -234,7 +240,7 @@ describe('메시지 상자 애니메이션', () => {
       )
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 3))
       fireEvent.keyDown(window, { key: 'Enter' })
-      expect(상자().style.width).toBe('0px')
+      expect(닫힘판().style.width).toBe('0px')
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       expect(onAnswer).toHaveBeenCalledWith(0)
     } finally {
@@ -254,14 +260,14 @@ describe('메시지 상자 애니메이션', () => {
 
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(onAnswer).not.toHaveBeenCalled()
-      expect(상자().style.width).toBe('240px')
+      expect(닫힘판().style.width).toBe('240px')
 
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
-      expect(상자().style.width).toBe('120px')
+      expect(닫힘판().style.width).toBe('120px')
       expect(onAnswer).not.toHaveBeenCalled()
 
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
-      expect(상자().style.width).toBe('60px')
+      expect(닫힘판().style.width).toBe('60px')
       expect(onAnswer).toHaveBeenCalledWith(0)
 
       // 한 번 넘긴 뒤에는 더 부르지 않는다
@@ -290,7 +296,7 @@ describe('메시지 상자 애니메이션', () => {
       expect(뒤화면).not.toHaveBeenCalled()
 
       fireEvent.keyDown(window, { key: 'Enter' })
-      expect(상자().style.width).toBe('240px')
+      expect(닫힘판().style.width).toBe('240px')
       // 닫히는 동안: 커서가 안 옮겨지고(고른 [예] 그대로) 뒤 화면에도 안 간다
       fireEvent.keyDown(window, { key: 'ArrowRight' })
       expect(버튼줄().querySelectorAll('img')[0].getAttribute('src')).toContain('006.png')
