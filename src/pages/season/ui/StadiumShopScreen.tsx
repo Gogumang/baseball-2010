@@ -5,6 +5,7 @@ import {
   STADIUM_KINDS, buyStadiumItem, checkStadiumPurchase, equipStadiumItem, stadiumCollectorUnlocks, stadiumPreviewOf,
 } from '@/entities/season-mode/model/stadiumItems'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { stepSeasonScoreboardX } from '@/widgets/batting-stage/lib/renderScenery'
 import { liveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { StadiumPreviewCanvas } from '@/pages/season/ui/StadiumPreviewCanvas'
@@ -12,6 +13,8 @@ import { StadiumItemWindow } from '@/pages/season/ui/StadiumItemWindow'
 import type { StadiumKind, StadiumPurchaseRefusal } from '@/entities/season-mode/model/stadiumItems'
 import { moveStadiumKind, moveStadiumSlot, stadiumItemNameOf } from '@/pages/season/lib/stadiumItemWindow'
 import { scrolledEquipmentTopOf } from '@/pages/season/lib/seasonEquipmentWindow'
+import { INITIAL_STADIUM_PREVIEW_SCENE, rewoundScoreboardX } from '@/pages/season/lib/stadiumPreviewScene'
+import type { StadiumPreviewScene } from '@/pages/season/lib/stadiumPreviewScene'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -56,6 +59,13 @@ export interface StadiumShopScreenProps {
   readonly onBack: () => void
   /** 머리띠 G포인트 */
   readonly gamePoint?: number
+  /**
+   * 장면 구장 칸(하늘 줄 +0x10 · 하늘 칸 +0x18 · 전광판 글자 +0x8c) — 장면 0x105 가 사는 동안 남는다(`StadiumPreviewScene`).
+   * 들어올 때 이 값으로 서고, 구장관리 진입은 하늘을 새로 잰다. 생략하면 막 세운 장면(모두 0)
+   */
+  readonly previewScene?: StadiumPreviewScene
+  /** 이 화면이 바꾼 장면 구장 칸 — 구장관리는 들어올 때 하늘을, 상점은 나갈 때 전광판 글자 자리를 돌려준다 */
+  readonly onPreviewSceneChange?: (scene: StadiumPreviewScene) => void
 }
 
 /** 확인 키 −5 · '5' / 취소 −16 */
@@ -86,6 +96,7 @@ const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
  */
 export function StadiumShopScreen({
   record, mode = '상점', isHiddenOpen = () => false, onChange, onUnlock, onBack, gamePoint = 0,
+  previewScene = INITIAL_STADIUM_PREVIEW_SCENE, onPreviewSceneChange,
 }: StadiumShopScreenProps) {
   const isShop = mode === '상점'
   const [kind, setKind] = useState<StadiumKind>(STADIUM_KINDS[0])
@@ -94,8 +105,20 @@ export function StadiumShopScreen({
   const [isSlotFocus, setSlotFocus] = useState(false)
   /** 상점 미리보기에 끼운 칸 — 칸 목록이 움직였을 때만 선다(0x9cb2 [목록+0x25]), 취소면 저장값으로 */
   const [shopPreviewSlot, setShopPreviewSlot] = useState<number | null>(null)
-  /** 구장관리 진입 0xe4d0(0xe558 · 0xe560) 때의 하늘 칸 — 마지막 경기 상태 +0x6b */
-  const [entrySkyColumn] = useState(liveGameInningIndex)
+  /**
+   * 들어올 때의 장면 구장 칸. 구장관리 진입 0xe4d0 은 0x783b0 으로 하늘 줄(모드 2 — SR+0xb2 mod 6)과 +0x18(마지막 경기 상태 +0x6b)
+   * 을 새로 잰다. 상점 진입 0x5f3c 는 0x783b0 을 안 불러 앞서 구장관리가 둔 값(없으면 0)이고, 0x77edc(구장, 1)로 전광판 글자를
+   * 저장된 전광판 칸으로 되감는다(62ee).
+   */
+  const [entryScene] = useState<StadiumPreviewScene>(() => isShop
+    ? { ...previewScene, scoreboardX: rewoundScoreboardX(previewScene.scoreboardX, stadiumPreviewOf(record).board) }
+    : {
+      ...previewScene,
+      skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: record.games }) ?? 0,
+      skyColumn: liveGameInningIndex(),
+    })
+  /** 구장 +0x8c — 상점 그리기 0xb1f8 만 0x77fb5(구장, 1)로 흘린다. 구장관리 0xb158 은 그대로 둔다 */
+  const [scoreboardX, setScoreboardX] = useState(entryScene.scoreboardX)
   const [notice, setNotice] = useState<string | null>(null)
   /** 구매 완료 팝업(결과코드 15)이 닫힐 때 0x81d0 이 볼 레코드 — 산 그 판의 것 */
   const [purchased, setPurchased] = useState<SeasonRecord | null>(null)
@@ -103,6 +126,17 @@ export function StadiumShopScreen({
   const [hiddenNotices, setHiddenNotices] = useState<readonly string[]>([])
   const [question, setQuestion] = useState<{ readonly kind: StadiumKind; readonly slot: number; readonly text: string } | null>(null)
   const tick = useUpdateCounter()
+  const sceneOut = useRef({ entryScene, scoreboardX, onPreviewSceneChange })
+  sceneOut.current = { entryScene, scoreboardX, onPreviewSceneChange }
+  useEffect(() => {
+    // 구장관리 진입이 잰 하늘은 곧장 장면 칸에 남는다
+    if (!isShop) sceneOut.current.onPreviewSceneChange?.(sceneOut.current.entryScene)
+    // 나갈 때 흘린 전광판 글자 자리를 장면 칸에 돌려준다
+    return () => {
+      const out = sceneOut.current
+      if (isShop) out.onPreviewSceneChange?.({ ...out.entryScene, scoreboardX: out.scoreboardX })
+    }
+  }, [])
 
   const select = (nextKind: StadiumKind, nextSlot: number) => {
     // 구장관리(0x7958)는 `rec[0x1b8 + 종류] = 선택칸` 한 줄이 전부다 — ⚠️ 가드가 없다
@@ -155,16 +189,24 @@ export function StadiumShopScreen({
     setSlot(0)
     setTop(0)
     setShopPreviewSlot(null)
+    // 상점 칸 목록 취소 — 미리보기를 저장값으로 되돌린 뒤 0x77edc(구장, 1) (0x9c0a~0x9c84)
+    const current = latest.current
+    if (current.isShop && current.isSlotFocus) {
+      setScoreboardX((held) => rewoundScoreboardX(held, stadiumPreviewOf(current.record).board))
+    }
   }
   const moveSlotTo = (next: number) => {
     setSlot(next)
     setTop((held) => scrolledEquipmentTopOf(held, next))
     setShopPreviewSlot(next)
+    // 상점에서 전광판(종류 1) 칸을 갈아 끼우면 +0x8a = 그 칸 · 0x76ba5 · 0x77edc(구장, 1) (0x9d48~0x9d72)
+    const current = latest.current
+    if (current.isShop && current.kind === '전광판') setScoreboardX((held) => rewoundScoreboardX(held, next))
   }
 
   const isPopup = notice !== null || question !== null || hiddenNotices.length > 0
-  const latest = useRef({ kind, slot, isSlotFocus, isPopup, select, onBack })
-  latest.current = { kind, slot, isSlotFocus, isPopup, select, onBack }
+  const latest = useRef({ kind, slot, isSlotFocus, isPopup, select, onBack, isShop, record })
+  latest.current = { kind, slot, isSlotFocus, isPopup, select, onBack, isShop, record }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
@@ -189,6 +231,16 @@ export function StadiumShopScreen({
 
   // 미리보기 — 구장관리는 초점 1 이면 늘 커서 칸(0x7b10), 상점은 칸 목록이 움직였을 때만(0x9cb2)
   const previewSlot = !isSlotFocus ? null : isShop ? shopPreviewSlot : slot
+  const previewStadium = stadiumPreviewOf(record, previewSlot === null ? undefined : { kind, slot: previewSlot })
+
+  // 상점 그리기 0xb1f8 — 구장을 그린 **뒤** 0x77fb5(구장, 1) 로 +0x8c 를 한 칸 흘린다(b24e). 갱신 한 번에 그리기 한 번
+  const steppedTick = useRef(tick)
+  const previewBoard = previewStadium.board
+  useEffect(() => {
+    const steps = tick - steppedTick.current
+    steppedTick.current = tick
+    if (isShop && steps > 0) setScoreboardX((held) => stepSeasonScoreboardX(held, previewBoard, steps))
+  }, [tick])
 
   return (
     <RawScreen>
@@ -197,17 +249,14 @@ export function StadiumShopScreen({
       {/*
         구장 미리보기 — 0xea 그리기 0xb158 · 0xdc 그리기 0xb1f8 의 메뉴 칸 1 갈래(0xb216~0xb262) 모두 구장 [장면+0x10c] 를 (−165, −80) 에
         두고 하늘 0x77fe8 · 시즌 구장 0x77494 · 바닥 0x7725c 뒤 아이템 창 0x83378 을 그린다. 진입(0xe4d0 · 0x5f3c)이 저장값으로 세우고
-        키가 지금 종류의 칸 하나만 갈아 끼운다(`stadiumPreviewOf`). 하늘 줄은 0x783b0 모드 2 갈래 — SR+0xb2(경기 수) mod 6. 하늘 칸은
-        0x783b0 이 구장 +0x18 = (s8)[0x1552d0c]+0x6b(마지막으로 돈 경기의 0 부터 세는 이닝)로 두고 0x76fc5(구장, 0)(0xe560)가 min(·, 12)
-        로 자른다 — 진입 때 한 번 읽는다(`liveGameInningIndex`, 자르기는 `skyColorsOf`).
-        ⚠️ 미확인 · 미구현(상점): 0x5f3c 는 0x783b0 · 0x76fc5 를 부르지 않아 하늘 줄 · 칸이 같은 장면에서 앞서 구장관리 진입이 둔 값(없으면
-        생성 때 0)으로 남는다 — 웹은 그 장면 공유 칸을 들지 않아 구장관리와 같은 셈으로 둔다. 0xb1f8 만 부르는 전광판 흐르기
-        0x77fb5(구장, 1)도 웹 미리보기에 없다(글자가 처음 자리에 멈춘다).
+        키가 지금 종류의 칸 하나만 갈아 끼운다(`stadiumPreviewOf`). 하늘 줄 · 칸과 전광판 글자 자리는 장면 구장 칸이다
+        (`StadiumPreviewScene` — 상점은 구장관리가 앞서 둔 하늘을 쓰고, 0xb1f8 만 0x77fb5 로 글자를 흘린다).
       */}
       <StadiumPreviewCanvas state={{
-        skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: record.games }) ?? 0,
-        skyColumn: entrySkyColumn,
-        seasonStadium: stadiumPreviewOf(record, previewSlot === null ? undefined : { kind, slot: previewSlot }),
+        skyRow: entryScene.skyRow,
+        skyColumn: entryScene.skyColumn,
+        scoreboardX,
+        seasonStadium: previewStadium,
       }} />
       <StadiumItemWindow record={record} kind={kind} slot={slot} top={top} isSlotFocus={isSlotFocus} tick={tick}
         isShop={isShop} isHiddenOpen={isHiddenOpen}

@@ -5,7 +5,7 @@ import {
   GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
   SeasonEndingScreen, SeasonInfoScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonChainFrameScreen,
   SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen,
-  SeasonTrainingScreen, StadiumShopScreen, TradeScreen, CoachHireScreen,
+  SeasonTrainingScreen, StadiumShopScreen, INITIAL_STADIUM_PREVIEW_SCENE, TradeScreen, CoachHireScreen,
   SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
   SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
   SeasonTeamInfoScreen, seasonTeamInfoRowsOf, seasonNameInfoRowsOf, FRESH_SEASON_INFO_RECORD, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
@@ -237,6 +237,14 @@ function SeasonScreens({
   const [outingCursor, setOutingCursor] = useState(0)
   useEffect(() => {
     if (scene === SEASON_SCENE_STATE.경기직전) setOutingCursor(0)
+  }, [scene])
+  /**
+   * 장면 구장 [장면+0x10c] 의 하늘 줄 · 하늘 칸 · 전광판 글자 자리 — 0x3b14 가 장면마다 새로 만든다(`StadiumPreviewScene`).
+   * 상점(0xdc 종류 4)은 앞서 구장관리(0xea)가 잰 하늘을 그대로 쓰고, 구장관리는 상점이 흘려 둔 글자 자리에 멈춰 있다.
+   */
+  const [stadiumPreviewScene, setStadiumPreviewScene] = useState(INITIAL_STADIUM_PREVIEW_SCENE)
+  useEffect(() => {
+    if (scene === SEASON_SCENE_STATE.경기직전) setStadiumPreviewScene(INITIAL_STADIUM_PREVIEW_SCENE)
   }, [scene])
   /**
    * 카드 딱지 [창+0x168] — 같은 창 칸이라 수명이 장면 0x105 와 같다. 팀 고르기 0xca 진입 0x50a8 · 트레이드 0xe4 진입 0x4774 만
@@ -550,6 +558,8 @@ function SeasonScreens({
           || (unlockId > LAST_HIDDEN_TEAM_ID && (hallOfFame?.openedHiddenIds ?? []).includes(unlockId))}
         onUnlock={actions.openStadiumItems}
         onChange={actions.updateRecord}
+        previewScene={stadiumPreviewScene}
+        onPreviewSceneChange={setStadiumPreviewScene}
         // 상점(0xdc 종류 4) 취소는 아이템 메뉴 0xd0 (0x957c 종류 4 갈래 0x9aa2 → 0x9bd4~0x9bec)
         onBack={scene === SEASON_SCENE_STATE.구장관리 ? backToTeamMenu : () => actions.goto(SEASON_SCENE_STATE.아이템)}
       />

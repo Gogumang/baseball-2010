@@ -2,11 +2,33 @@
 import { describe, expect, it } from 'vitest'
 import {
   MATCH_INFO_STADIUM_MIRRORED, RIGHT_HANDED_CROWD_SHIFT, STADIUM_PREVIEW_ICON_TEAM, STADIUM_PREVIEW_MIRRORED, drawStadiumPreview, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
-  drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
+  drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonScoreboardRewindXOf, stepSeasonScoreboardX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
 // 전광판 흐르는 글자 (0x77fb4, R2-game-effects.md 6절): 상자 폭+2 에서 시작해 틱당 1px 씩
 // 왼쪽으로 흐르고, −153 밑으로 완전히 빠지면 시작값으로 되감는다.
+describe('시즌 전광판 글자 0x77fb4(구장, 1) · 되감기 0x77edc(구장, 1)', () => {
+  it('되감기는 전광판 박스 폭 + 2, 칸 0 · 5 는 안 건드린다', () => {
+    expect(seasonScoreboardRewindXOf(2)).toBe((seasonScoreboardBoxOf(2) ?? [])[2] + 2)
+    expect(seasonScoreboardRewindXOf(0)).toBeNull()
+    expect(seasonScoreboardRewindXOf(5)).toBeNull()
+  })
+
+  it('한 번에 1 씩 줄고 −153 밑으로 빠지면 되감는다 — tick 으로 센 scoreboardScrollX 와 같은 차례', () => {
+    const width = (seasonScoreboardBoxOf(2) ?? [])[2]
+    const start = width + 2
+    expect(stepSeasonScoreboardX(start, 2, 1)).toBe(start - 1)
+    expect(stepSeasonScoreboardX(-153, 2, 1)).toBe(start)
+    for (const steps of [0, 5, start + 153, start + 154, 1000]) {
+      expect(stepSeasonScoreboardX(start, 2, steps)).toBe(scoreboardScrollX(width, steps))
+    }
+  })
+
+  it('칸 0 · 5 는 되감지 않아 계속 줄어든다', () => {
+    expect(stepSeasonScoreboardX(-153, 0, 10)).toBe(-163)
+  })
+})
+
 describe('scoreboardScrollX — 전광판 글자 x 이동', () => {
   const boxWidth = 48
 
@@ -263,7 +285,7 @@ describe('drawStadiumPreview — 구장관리 미리보기', () => {
 
   it('구장 묶음은 카메라 (−165, −80) 만큼, 바닥은 가로 dx 만 옮겨 그린다', () => {
     const { context, translates } = 기록컨텍스트()
-    drawStadiumPreview(context, { skyRow: 0, skyColumn: 0, seasonStadium: { stand: 0, crowd: 0, board: 3, grassPalette: null } })
+    drawStadiumPreview(context, { skyRow: 0, skyColumn: 0, scoreboardX: 0, seasonStadium: { stand: 0, crowd: 0, board: 3, grassPalette: null } })
     expect(translates).toEqual([[-45, -10], [-45, 0]])
   })
 })

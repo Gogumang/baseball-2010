@@ -101,6 +101,11 @@ export interface SceneryState {
    */
   readonly isScoreboardOn?: boolean
   /**
+   * 시즌 구장 전광판 글자 x 이동 = 구장 **+0x8c** 그대로. 있으면 `tick` 대신 이 값을 쓴다 — 구장관리·상점 미리보기는 장면 구장의
+   * 칸을 직접 들고 흘린다(`stepSeasonScoreboardX`). 생략하면 `scoreboardScrollX(상자 폭, tick)`.
+   */
+  readonly scoreboardX?: number
+  /**
    * 차 있으면 배경을 **시즌 구장 그리기 0x77494** 로 그린다 (전광판 칸이 여기서 온다).
    *
    * 원본 배경 고르기 `0x40ff0` 은 **모드 2(시즌)이고 내 팀 == 홈팀**이거나 **모드 8·9(대전)** 일 때만
@@ -161,6 +166,29 @@ export function scoreboardScrollX(boxWidth: number, tick: number): number {
   const start = boxWidth + SCOREBOARD_SCROLL_START_MARGIN
   const cycleLength = start - SCOREBOARD_REWIND_THRESHOLD + 1
   return start - (Math.max(0, tick) % cycleLength)
+}
+
+/**
+ * **되감기 0x77edc(구장, 1)** — 시즌 구장(+0x40 전광판 그림이 있다)이면 전광판 칸 +0x8a 가 0 · 5 일 때 **아무것도 안 하고**,
+ * 그 밖이면 +0x8c = 전광판 그림 박스(칸 3 이면 2, 아니면 0)의 폭 + 2 (0x77ee8~0x77fa6, 직접 떴다). 안 건드리면 null.
+ */
+export function seasonScoreboardRewindXOf(board: number): number | null {
+  const box = seasonScoreboardBoxOf(board)
+  return box === null ? null : box[2] + SCOREBOARD_SCROLL_START_MARGIN
+}
+
+/**
+ * **흐르기 0x77fb4(구장, 1)** 를 `steps` 번 — 부를 때마다 +0x8c −= 1, `−(board_ani 프레임 0 폭) − 10 > +0x8c` 면 0x77edc(구장, 1)
+ * 로 되감는다(직접 떴다, 0x77fb4~0x77fe4). 칸 0 · 5 는 되감기가 아무것도 안 해 값이 계속 줄어든다(그 칸은 글자를 안 그린다).
+ */
+export function stepSeasonScoreboardX(x: number, board: number, steps: number): number {
+  const rewindTo = seasonScoreboardRewindXOf(board)
+  let next = x
+  for (let step = 0; step < steps; step += 1) {
+    next -= 1
+    if (next < SCOREBOARD_REWIND_THRESHOLD && rewindTo !== null) next = rewindTo
+  }
+  return next
 }
 
 /**
@@ -345,7 +373,8 @@ function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState, 
 
   // 전광판 (board_ani) — 환경설정 +0x3a OFF 면 그리지 않는다 (R2-game-effects.md 6절)
   if (state.isScoreboardOn === false) return
-  if (shift !== null) drawScoreboardText(context, boxes[SCOREBOARD_BOX], state.tick, shift)
+  const box = boxes[SCOREBOARD_BOX]
+  if (shift !== null && box !== undefined) drawScoreboardText(context, box, scoreboardScrollX(box[2], state.tick), shift)
 }
 
 /**
@@ -378,7 +407,9 @@ function drawSeasonFenceParts(
   drawTeamIcons(context, state, seasonTeamIconBoxesOf(season.board), shift)
 
   if (state.isScoreboardOn === false) return
-  drawScoreboardText(context, seasonScoreboardBoxOf(season.board) ?? undefined, state.tick, shift)
+  const box = seasonScoreboardBoxOf(season.board)
+  if (box === null) return
+  drawScoreboardText(context, box, state.scoreboardX ?? scoreboardScrollX(box[2], state.tick), shift)
 }
 
 /** 펜스 기준에 그림 하나 — 우타 거울(`RIGHT_HANDED_MIRROR_X`)이면 캔버스를 뒤집어 같은 자리에 그린다. `shiftX` 는 안 뒤집는 옮김 */
@@ -418,12 +449,12 @@ function drawTeamIcons(
 /** 전광판 화면 — board_ani 프레임 0 을 상자 안에서 틱당 1px 씩 흘린다 (0x77726~0x777d8) */
 function drawScoreboardText(
   context: CanvasRenderingContext2D,
-  box: readonly number[] | undefined,
-  tick: number,
+  box: readonly number[],
+  scrollX: number,
   shiftX = 0,
 ): void {
   const board = placedFrame(SCOREBOARD_FRAMES, 0)
-  if (box === undefined || board === null) return
+  if (board === null) return
   const left = FENCE_ANCHOR.x + shiftX + box[0]
   const top = FENCE_ANCHOR.y + box[1]
   context.save()
@@ -432,7 +463,7 @@ function drawScoreboardText(
   context.rect(left + 1, top, box[2] - 1, box[3])
   context.clip()
   // 글자는 상자 왼쪽 끝 + 이동값(구장+0x8c) 에 그린다 — 틱마다 1px 씩 흘러간다 (0x77fb4)
-  context.drawImage(board.image, left + scoreboardScrollX(box[2], tick), top + board.offsetY)
+  context.drawImage(board.image, left + scrollX, top + board.offsetY)
   context.restore()
 }
 
@@ -522,7 +553,8 @@ function drawField(context: CanvasRenderingContext2D, grassPalette: number | nul
  *
  * ⚠️ 미해결(근사):
  * - 하늘 칸 구장+0x18 은 0x783b0 이 `[0x1552d0c]+0x6b`(마지막 경기 상태의 이닝)를 읽는다 — 웹은 그 값을 안 들어 부르는 쪽이 넘긴다.
- * - 구름 자리(구장 안 구름 칸)와 전광판 글자 자리(+0x8c)는 마지막으로 흐른 값 그대로인데 웹은 처음 값(틱 0)으로 둔다.
+ * - 구름 자리(구장 안 구름 칸)는 마지막으로 흐른 값 그대로인데 웹은 처음 값(틱 0)으로 둔다.
+ *   전광판 글자 자리(+0x8c)는 부르는 쪽이 장면 구장 칸으로 넘긴다(`scoreboardX`).
  */
 export const STADIUM_PREVIEW_CAMERA = { x: -165, y: -80 } as const
 
@@ -532,6 +564,8 @@ export interface StadiumPreviewState {
   readonly seasonStadium: SeasonStadium
   /** 환경설정 전광판(+0x3a) — OFF 면 전광판 글자를 안 그린다 (0x77726). 생략하면 켠 것 */
   readonly isScoreboardOn?: boolean
+  /** 전광판 글자 x 이동 = 장면 구장 +0x8c (`StadiumPreviewScene`) */
+  readonly scoreboardX: number
 }
 
 export function drawStadiumPreview(context: CanvasRenderingContext2D, state: StadiumPreviewState): void {
@@ -582,6 +616,7 @@ function stadiumPreviewSceneryOf(state: StadiumPreviewState): SceneryState {
     seasonStadium: state.seasonStadium,
     ourTeamId: STADIUM_PREVIEW_ICON_TEAM,
     opponentTeamId: STADIUM_PREVIEW_ICON_TEAM,
+    scoreboardX: state.scoreboardX,
     ...(state.isScoreboardOn === undefined ? {} : { isScoreboardOn: state.isScoreboardOn }),
   }
 }

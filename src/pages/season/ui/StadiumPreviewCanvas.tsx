@@ -6,7 +6,7 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayo
 
 /**
  * 구장관리 0xea 의 구장 그림 (그리기 `0xb158` — `drawStadiumPreview`). 그림이 늦게 실려도 보이도록 틀마다 다시 그린다 —
- * 원본도 이 상태에서는 구름·전광판을 흘리지 않아 같은 그림이다.
+ * 구름은 흘리지 않고, 전광판 글자는 상점(0xb1f8)만 부르는 쪽이 `scoreboardX` 로 흘린다.
  */
 export function StadiumPreviewCanvas({ state }: { readonly state: StadiumPreviewState }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -27,7 +27,7 @@ export function StadiumPreviewCanvas({ state }: { readonly state: StadiumPreview
   }, [])
 
   return (
-    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="구장-미리보기" data-sky-column={state.skyColumn}
+    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="구장-미리보기" data-sky-column={state.skyColumn} data-scoreboard-x={state.scoreboardX}
       style={{ position: 'absolute', left: 0, top: 0 }} />
   )
 }

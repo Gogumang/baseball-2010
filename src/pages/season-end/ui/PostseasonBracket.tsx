@@ -1,15 +1,7 @@
 import type { ReactNode } from 'react'
-import { FrameSprite, PressArea, RawScreen, SpriteNumber } from '@/shared/ui'
-import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import {
-  BACKDROP, LEG_ORDER, LINE_COLOR, LINE_SEGMENTS, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS,
-  RANK_UNIT, TEAM_CELLS, WON_LINE_COLOR, cellIndexOfRank, rankDigitRightOf, rankGlyphsOf,
-  rankUnitPositionOf,
-} from '@/pages/season-end/lib/bracketLayout'
-import { bracketViewOf } from '@/pages/season-end/lib/postseasonBracket'
-import { TEAMS } from '@/shared/config/original/teams'
+import { PressArea, RawScreen } from '@/shared/ui'
+import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import * as styles from '@/pages/season-end/ui/PostseasonBracket.css'
 
 interface PostseasonBracketProps {
   readonly series: PostseasonSeries | null
@@ -17,85 +9,24 @@ interface PostseasonBracketProps {
   readonly nextLabel?: string
   /**
    * 머리띠·바닥띠 — 0x853ac 는 끝(0x8585c)에서 `0x7f4ec(판)` 으로 판에 맡겨 둔 제목·바닥비트(+0xc · +0x14,
-   * 장면 공통 틀이 0x7f53c 로 넣는다)를 0x54d95 로 그린다. 제목이 −1 이면 안 그린다. 대진 위·웹 단추 아래에 둔다.
+   * 장면 공통 틀이 0x7f53c 로 넣는다)를 0x54d95 로 그린다. 제목이 −1 이면 안 그린다. 대진 위·누름 칸 아래에 둔다.
    */
   readonly frame?: ReactNode
 }
 
 /**
- * 포스트시즌 대진표 (0x853ac — P6 4a-1 확정).
+ * 나만의리그 포스트시즌 대진표 (상태 128 의 그리기 0x168e8 → **0x853ac**).
  *
- * mode_ui 프레임 53(195×210) 계단 그림을 앵커 (0,0) 에 통째로 깔고,
- * 그 프레임 박스 0~3 에 팀 로고를(+3), 박스 4~7 에 순위 딱지(숫자 + img_text 307 "위")를 얹는다.
- * 대진 선은 그림 없는 프레임 54~57 의 2px 박스를 먼저 #08044A 로 모두 채운 뒤,
- * **이긴 길만 빨강 RGB(255,0,0)** 으로 다시 채운다 (0x855b4~0x857ec).
+ * 시즌모드 상태 0xef(0xb7b8)와 **같은 원본 함수**라 그림은 위젯 `PostseasonBracketWindow` 하나로 그린다
+ * (대진 칸은 두 길 모두 0x8533c 가 깐다 — 부르는 곳 0x693e 시즌 · 0x12110 나리).
  *
- * 안 옮긴 것:
- *  - "프레임 54 박스 0 을 단계 7 로 어둡게" 는 P6 도 '유력' 이라 빼 뒀다. (P6 이 붙인 0x7f4ed 는 끝 0x8585c 의
- *    머리띠·바닥 그리기 0x7f4ec 다 — `frame` 칸으로 받는다.)
- *  - 우승/탈락 문구(0x85e6c)는 공용 팝업 몫이라 여기서는 안 띄운다 (4a-3).
+ * 다음(확인 키 0x13da0)은 원본 화면에 그림 자리가 없어 화면 전체 투명 누름 칸으로 둔다.
  */
 export function PostseasonBracket({ series, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {
-  const origins = useFrameOrigins(BACKDROP.folder)
-  const view = bracketViewOf(series)
-  const wonLegs = new Set(view.wonLegs)
-
   return (
     <RawScreen>
-      <FrameSprite folder={BACKDROP.folder} frame={BACKDROP.frame} origins={origins}
-        x={BACKDROP.anchorX} y={BACKDROP.anchorY} />
-
-      {LEG_ORDER.flatMap((leg) =>
-        LINE_SEGMENTS[leg].map((box, index) => (
-          <div key={`${leg}-${index}`} className={styles.segment}
-            data-leg={leg}
-            data-won={wonLegs.has(leg) ? 'true' : 'false'}
-            style={{
-              left: box.x,
-              top: box.y,
-              width: box.width,
-              height: box.height,
-              background: wonLegs.has(leg) ? WON_LINE_COLOR : LINE_COLOR,
-            }} />
-        )),
-      )}
-
-      {[1, 2, 3, 4].map((rank) => {
-        const cell = TEAM_CELLS[cellIndexOfRank(rank)]
-        const tag = RANK_TAGS[cellIndexOfRank(rank)]
-        const teamId = view.seeds[rank - 1]
-        const team = teamId === null ? undefined : TEAMS[teamId]
-        return (
-          <div key={rank}>
-            {team === undefined ? (
-              // 아직 자리가 안 정해진 칸 — 원본은 빈 칸(팀 번호 10)을 그냥 비워 둔다
-              <div className={styles.emptyCell}
-                style={{
-                  left: cell.x + LOGO_INSET, top: cell.y + LOGO_INSET,
-                  width: cell.width - LOGO_INSET * 2, height: cell.height - LOGO_INSET * 2,
-                }} />
-            ) : (
-              <img className={styles.logo} src={team.logoUrl} alt={team.name}
-                style={{
-                  left: cell.x + LOGO_INSET, top: cell.y + LOGO_INSET,
-                  width: cell.width - LOGO_INSET * 2, height: cell.height - LOGO_INSET * 2,
-                }} />
-            )}
-            {/* 순위 딱지 = 숫자 + img_text 307 "위" 오른쪽 정렬 (0x24) */}
-            <div className={styles.rankTag} data-rank={rank}
-              style={{ left: tag.x, top: tag.y, width: tag.width, height: tag.height }} />
-            <SpriteNumber glyphs={rankGlyphsOf(rank)} right={rankDigitRightOf(tag)}
-              boxTop={tag.y} boxHeight={tag.height} glyphHeight={RANK_GLYPH_HEIGHT} />
-            <img className={styles.rankUnit} alt="위"
-              src={`${RANK_UNIT.folder}/${String(RANK_UNIT.frame).padStart(3, '0')}.png`}
-              style={{ left: rankUnitPositionOf(tag).x, top: rankUnitPositionOf(tag).y }} />
-          </div>
-        )
-      })}
-
-      {/* ⚠️ 웹 자리: 다음(확인 키 0x13da0) — 원본 화면에 그림 자리가 없다. 웹 단추를 걷고 화면 전체 투명 누름 칸으로 */}
+      <PostseasonBracketWindow series={series} />
       {onNext !== undefined && <PressArea label={nextLabel} onPress={onNext} />}
-
       {frame}
     </RawScreen>
   )
