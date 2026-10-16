@@ -17,7 +17,7 @@ import {
   TITLE_NAMES,
   titleListOf,
   titleNumberOf, gameResultTitleOf } from '@/entities/career/model/titles'
-import { createCareer, GAMES_PER_SEASON, startNextSeason } from '@/entities/career/model/playerCareer'
+import { createCareer, GAMES_PER_SEASON, startNextSeason, withNariSceneSetupOutings } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
@@ -107,6 +107,19 @@ describe('evaluateNewTitles — 원문 조건', () => {
 
     expect(넘긴.outingsLastSeason).toBe(7)
     expect(넘긴.outingsThisSeason).toBe(0)
+  })
+
+  it('외출 칸 +0x6a 는 하나 — 새 시즌 g == 0 창의 외출이 지난해 값에 더해져 칭호에 들고, 셋업 0xf684 가 g == 2 에서 지운다 (fb92~fba8)', () => {
+    // 지난해 19 + 새 시즌 첫 창 외출 1 = 20 → 자유로운 영혼 (원본은 칸을 새 시즌에 안 지운다)
+    expect(evaluateNewTitles(선수({ outingsLastSeason: 19, outingsThisSeason: 1, season: 2, gamesPlayed: 0 }))).toContain('자유로운 영혼')
+    // 셋업은 경기 수 2 일 때만 둘 다 지운다
+    const 둘째경기뒤 = 선수({ outingsLastSeason: 19, outingsThisSeason: 1, gamesPlayed: 2 })
+    expect(withNariSceneSetupOutings(둘째경기뒤)).toMatchObject({ outingsLastSeason: 0, outingsThisSeason: 0 })
+    const 첫경기뒤 = 선수({ outingsLastSeason: 19, outingsThisSeason: 1, gamesPlayed: 1 })
+    expect(withNariSceneSetupOutings(첫경기뒤)).toBe(첫경기뒤)
+    // 새 시즌 전환은 합을 그대로 둔다
+    const 넘긴 = startNextSeason(선수({ outingsLastSeason: 2, outingsThisSeason: 5, season: 3 }))
+    expect(넘긴.outingsLastSeason + 넘긴.outingsThisSeason).toBe(7)
   })
 
   it('평판 700·999, 인기도 2000·4000', () => {

@@ -70,7 +70,7 @@ export interface BattedBallFlightOptions {
   readonly body?: BallBody
 }
 
-/** 공을 놓고 쏜 뒤 세계 0xbfed0 을 돌린다 — 타구 · 펌블(0xb32e8) · 튕김(0xb3148) 이 모두 이 순서다 */
+/** 공을 놓고 쏜 뒤 세계 0xbfed0 을 돌린다 — 타구 · 펌블 · 튕김(둘 다 0xb3148 — vt78 0xb32e8 은 부르는 곳이 없다, U-101) 이 모두 이 순서다 */
 export function launchTrajectory(input: {
   readonly from: WorldPoint
   readonly speed: number

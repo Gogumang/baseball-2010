@@ -1720,6 +1720,9 @@ export function useSeasonSession(
         return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나최대), recovered: false }
       }
       // 0x7ca2~0x7ce8: G −= 0xcbbe3[3] × 100 · 0x22c29(3, 값) · 0x22e35(2, 3) · 스태미나 = 10000 · 저장
+      // 대상 팀은 0x7c38 `0x1f9a9(저장, 모드, SR[1])` → 0x1f570 — 대회 중(S+0x12c)이면 상대국 칸 +0x934 를 돌려줄 꼴이지만,
+      // 0xe8 에 들어오는 길이 GP 상점 0x7d90(8014) 하나 · 0xdc ← 0xd0 ← 관리 메뉴 0xc9 뿐이고 대회 중 진입 0x4b50(4bc2~4bd2)은 0xf3 으로,
+      // 대회 고리(0xf3 0xe6f8 → 0xf4 0x4a18 → 0xdd ⇄ 0xe0 → 경기)에는 0xc9 를 세우는 곳이 없어 대회 중엔 닿지 않는다 — 늘 리그 칸(R9 19-2)
       spendGamePoint(seasonGpItemPriceOf(SEASON_STAMINA_ITEM))
       recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: SEASON_STAMINA_ITEM })
       const pitchers = current.roster.pitchers.map((player, index) =>

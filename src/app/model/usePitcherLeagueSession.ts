@@ -142,7 +142,7 @@ import { applyPitcherBurstRewards } from '@/entities/pitcher-career/model/pitche
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import {
-  MAXIMUM_GAME_POINT, rebuildEquippedSkillIds,
+  MAXIMUM_GAME_POINT, rebuildEquippedSkillIds, withNariSceneSetupOutings,
 } from '@/entities/career/model/playerCareer'
 import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
@@ -796,7 +796,14 @@ export function usePitcherLeagueSession(
     cursorRef.current = 0
     freshSceneRef.current = true
     setShouldForgetRepeatable(true)
+    setSceneSetUpCount((count) => count + 1)
   }, [])
+  /** 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 경기 뒤 커리어 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`) */
+  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
+  useEffect(() => {
+    if (sceneSetUpCount === 0) return
+    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current)))
+  }, [sceneSetUpCount])
   // 메인 메뉴 따위에서 투수편 화면으로 들어선다 — 장면 0x106 이 새로 선다(떠나면 헐린다)
   const wasOnScreenRef = useRef(isOnScreen)
   if (wasOnScreenRef.current !== isOnScreen) {

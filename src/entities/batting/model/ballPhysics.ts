@@ -80,7 +80,7 @@ export interface BallEvents {
   readonly deepHit: boolean
 }
 
-/** 공 객체의 물리 칸 — 미리 계산이 끝난 뒤의 값을 다음 발사(펌블 0xb32e8 · 튕김 0xb3148)가 이어 받는다 */
+/** 공 객체의 물리 칸 — 미리 계산이 끝난 뒤의 값을 다음 발사(펌블 · 튕김 0xb3148 — vt78 0xb32e8 은 부르는 곳이 없다, U-101)가 이어 받는다 */
 export interface BallBody {
   /** +0x20 위치 */
   x: number

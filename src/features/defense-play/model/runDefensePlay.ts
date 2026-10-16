@@ -2137,8 +2137,9 @@ export function stepDefensePlay(
     // ── 0d. 필살 포구 연출 켜기 — 슬롯 2 머리 5256c~525dc (관문 G2 52502 가 열리고 판 종류가 마스크 0x58c 밖일 때) ──
     // 플레이+0x1f7 이면 +0x1994(B), 아니고 +0x1f8 이면 +0x1995(C) — 단계가 −1 이면 0. 켜짐 칸은 앞 그림 플레이 틱의 동작 시작이 세웠다
     // 5254c — +0x1991(레이저 잔상) && 0xb4c9d(포구 대기 · 동작 시작 틱 − 1 == 공 틱)면 +0x1991 = 0 · 이 그림의 켜기를 건너뛴다(525de).
-    // 근사: 0xb4c9d 의 vt50 은 "아직 안 쥠" 으로 본다
-    if (laserTrailOn && !play.held && tick === play.actionStartTick - 1) {
+    // 0xb4c9c = 플레이 vt50(0xb2ac8 — 아래 포구 관문과 같은 다섯 칸 +0x12c · +0x111 · +0x124 · +0x129 · +0x110 이 모두 0) && 공 틱 == +0x176 − 1
+    const catchGateOpen = !play.held && !homeRunFlag && !groundRuleFlag && !play.suppressed && !foulFlag
+    if (laserTrailOn && catchGateOpen && tick === play.actionStartTick - 1) {
       laserTrailOn = false
     } else if (!play.finished && !DEADLY_FLASH_BLOCKED_PLAY_KINDS.includes(play.kind)) {
       scene = turnOnDeadlyFlash(scene, { jump: deadlyJumpArmed, slide: deadlySlideArmed })
@@ -2156,7 +2157,7 @@ export function stepDefensePlay(
     // 사건이 선 공을 쫓아간 야수가 쥐고 던져 홈에서 타자주자를 잡았다(원본 표 전체 CPU 수비 130판).
     // 아웃 판정 0xb36d0 의 종류 거르개 0x58d 에 6(홈런 — 0xb2bd8 의 0xb0cb8(6))이 없는 것은 원본 그대로다 — 쥔 야수가 없으니
     // 그 판정은 아무도 죽이지 못한다. 0xb2c58(vt54)도 사건 7 · 12 에만 야수 동작 0xf 를 주고 8 에는 안 준다(그대로 쫓는다)
-    const catchGateOpen = !play.held && !homeRunFlag && !groundRuleFlag && !play.suppressed && !foulFlag
+    // (catchGateOpen 은 위 0d 절에서 셌다 — 그 사이 다섯 칸을 바꾸는 줄이 없다)
     // b4134~b419c — 공 틱이 동작 시작 틱(플레이+0x176)이면 포구 종류(+0x16c)대로 동작을 걸고, 표 0xd87f4 의 종류 3 은
     // 플레이+0x1f7 = 1(필살 점프 캐치) · 종류 4 는 +0x1f8 = 1(필살 슬라이딩 캐치)
     if (catchGateOpen && tick === play.actionStartTick) {

@@ -19,9 +19,9 @@ const STRIKEOUT_STRIKES_BEFORE = 2
  *   스트라이크 수(HUD) — 모르면(null, 점수판 없는 홈런더비) 울리지 않는다
  * - 그 밖의 헛스윙·스트라이크·볼은 울리지 않는다
  *
- * ⚠️ 미해결(드묾): 원본은 삼진을 `state[0xc] == 5` 로 보는데 이 칸은 0x3dfac 가 v ≠ 0 일 때만 쓴다 — 0.1% 낫아웃이
- *    v 를 0 으로 지우면 앞 공의 값이 남는다. 또 삼진 + 도루처럼 진입에서 곧장 0x17 을 예약할 때 0x12 그리기가 한 번
- *    도는지는 확인 안 했다. 둘 다 진행기 쪽 판정이라 이 화면은 "세 번째 스트라이크면 100ms" 로만 본다.
+ * (U-71 닫음) 0.1% 낫아웃: 0x3dfac 는 v = 5 면 3e0a8 에서 state[0xc] = 5 를 **먼저 쓴 뒤** 3e0aa 에서 v 를 지운다(3e0cc 가 되살리기도 한다).
+ *    삼진 + 도루: 3e0fe~3e116 이 0x17 을 예약해도 점프표 0xcffb4[4] 3e15e → 3e196 → 3e1da 가 state[0xc] = 5 를 쓰고, 예약은 다음
+ *    프레임 0xbc9c8 에서 서므로 진입 프레임의 0x12 그리기 0x4ce9c 가 틱 0 으로 돈다. 둘 다 "세 번째 스트라이크면 100ms" 가 맞다.
  */
 export function pitchVibrationMillisecondsOf(
   detail: PitchOutcomeDetail,

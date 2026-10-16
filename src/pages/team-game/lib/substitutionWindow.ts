@@ -220,12 +220,19 @@ export {
 } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 export type { DetailRow, DetailRowValue, DetailWindowFrame, PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 
+/**
+ * 레코드 +0x1b — 상세 창 0x5b798 은 모드 2 에서 이 칸을 표 선수 · 영입 선수 가리지 않고 연봉으로 찍는다(5c87c~5c884).
+ * 영입 선수(명전 · 나리 사본)는 기록 사본의 `salaryGrade`, 표 선수는 붙박이 표 행 값이다.
+ * ⚠️ 미확인: 옛 사본이라 `salaryGrade` 가 없는 영입 선수는 값을 몰라 비운다(0)
+ */
 function pitcherGradeOf(teamId: number, entry: TeamEntryPitcher): number | null {
+  if (entry.salaryGrade !== undefined) return entry.salaryGrade
   if (entry.aceIndex >= 0 || entry.tableSlot === undefined) return null
   return PITCHERS[leaguePitcherIdOf(entry.tableTeamId ?? teamId, entry.tableSlot)]?.grade ?? null
 }
 
 function batterGradeOf(teamId: number, entry: TeamEntryBatter): number | null {
+  if (entry.salaryGrade !== undefined) return entry.salaryGrade
   if (entry.aceIndex >= 0 || entry.rosterSlot === NO_ROSTER_SLOT) return null
   return BATTERS[leagueBatterIdOf(entry.tableTeamId ?? teamId, entry.rosterSlot)]?.grade ?? null
 }
@@ -246,7 +253,7 @@ export function playerDetailOf(progress: TeamGameProgress, kind: '투수' | '대
       profile: 0,
       skillBits: entry.skillBits ?? 0,
       repertoire: { form, magicNumber: magicId, pitchMask },
-      // ⚠️ 미확인: 표 밖 선수(영입 기록 · 마선수)의 +0x1b 는 웹 명단에 없어 0 으로 둔다
+      // 영입 기록 선수는 `salaryGrade`(+0x1b), 마선수는 행 값(`ACE_*_GRADES`) — `pitcherGradeOf`
       grade: pitcherGradeOf(teamId, entry),
     })
   }

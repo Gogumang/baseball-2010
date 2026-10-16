@@ -823,7 +823,8 @@ export function useHomeRunDerby({
   /**
    * 결과 창 [예] 0x40a08 (0x40a54~0x40a98): +0x17f9(예) 이고 단계 state+0x38 > 0 이면
    * `r = rand(1, 4)` → `0xb89dc([장면+0x224], r)` 기록 0x30 바이트를 지금 투수 `0xae83c([장면+0x224])` 에 복사한 뒤 0x27.
-   * ⚠️ 복사는 웹에 상대 팀 기록이 없어 굴림 차례만 맞춘다 (뜻은 미해결 — 마투수로 덮인 상대 투수 칸을 팀의 r 번째 투수로 되돌리는 것으로 보인다).
+   * ⚠️ 복사는 웹에 상대 팀 기록이 없어 굴림 차례만 맞춘다 (뜻 확정 U-102 — 난입 0x48d50 48d9c~48dca 가 덮은 상대 투수 칸을 40a68~40a94 가 같은 팀 r 번째 투수 사본으로 되돌린다. 모드 7 레코드는 마스터
+   * 명부(0xb8728 → 0x1f8c1)이고 결과 진입 0x4f574 4f696 `0x20094(g, 5)` 가 [예] 앞에서 마스터를 다시 지어 화면에 드러나지 않는다).
    */
   const retryFromResult = useCallback(() => {
     if (runRef.current.stage > 0 && randomRef.current !== undefined) randomRef.current.rand(1, 4)
