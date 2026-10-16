@@ -48,6 +48,8 @@ export function pitcherNariEntryViewOf(
       }
       if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
       return undefined
-    }, cells, (slot) => (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE ? ACE_PITCHERS[record.acePitcher]?.recordLine ?? [] : undefined)),
+    }, cells, (slot) => (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE ? ACE_PITCHERS[record.acePitcher]?.recordLine ?? [] : undefined),
+    // 레코드 투수 장비 니블 (나리 새 시즌 CPU 장비 굴림 0x665e8) — 상세 창 도형 값이 그 보너스를 먹는다
+    record.pitcherEquipment),
   })
 }

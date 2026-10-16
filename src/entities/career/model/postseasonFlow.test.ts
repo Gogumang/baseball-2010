@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   applyKoreanSeriesReward,
@@ -143,6 +144,6 @@ describe('128 틀 0x15984 — 팝업 닫힘', () => {
 
   it('새 시즌 0x1b7c0 이 보상 플래그를 지운다', () => {
     const career = { ...createCareer('일위'), regularSeasonRewardTaken: true }
-    expect(startNextSeason(career).regularSeasonRewardTaken).toBe(false)
+    expect(startNextSeason(career, createConstantRandom(0)).regularSeasonRewardTaken).toBe(false)
   })
 })

@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { opponentOf, rotateLeaguePitchers, startPostseason } from '@/entities/league/model/league'
 import { describe, expect, it } from 'vitest'
 import {
@@ -206,7 +207,7 @@ describe('경기 뒤 반영', () => {
 
 describe('시즌 넘기기 · 방어율', () => {
   it('새 시즌은 스태미나를 10000 으로 되돌린다 (0xb6cc4) — 타자편에 없는 한 줄이다', () => {
-    const next = startNextPitcherSeason(투수({ stamina: 1200, gamesPlayed: GAMES_PER_SEASON }))
+    const next = startNextPitcherSeason(투수({ stamina: 1200, gamesPlayed: GAMES_PER_SEASON }), createConstantRandom(0))
 
     expect(next.stamina).toBe(FULL_STAMINA)
     expect(next.gamesPlayed).toBe(0)
@@ -215,7 +216,7 @@ describe('시즌 넘기기 · 방어율', () => {
 
   it('지난 해 시즌 줄을 연도별 칸 0x1fa78(S[0xb3] − 1)에 쌓는다 (1b7c4~1b834 투수편) — 옛 저장은 빈 목록에서', () => {
     const 첫해 = { ...투수().stats, outs: 300, runsAllowed: 40, wins: 9 }
-    const next = startNextPitcherSeason(투수({ stats: 첫해, gamesPlayed: GAMES_PER_SEASON }))
+    const next = startNextPitcherSeason(투수({ stats: 첫해, gamesPlayed: GAMES_PER_SEASON }), createConstantRandom(0))
 
     expect(next.yearlyStats).toEqual([첫해])
     expect(next.stats.outs).toBe(0)

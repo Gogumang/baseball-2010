@@ -1,3 +1,4 @@
+import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { startNextPitcherSeason } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -147,7 +148,7 @@ export function canContinueAfterPitcherEnding(career: PitcherCareer, endingIndex
  * 5000 G포인트를 쓰고 **부상 엔딩이면 부상만 풀어 같은 시즌 관리 화면(105)** 으로,
  * 그 밖이면 새 시즌 처리(0x1b768) 뒤 137 → 105 로 간다.
  */
-export function continueAfterPitcherEnding(career: PitcherCareer): PitcherCareer {
+export function continueAfterPitcherEnding(career: PitcherCareer, random: RandomPort): PitcherCareer {
   const paid: PitcherCareer = {
     ...career,
     gamePoint: career.gamePoint - PITCHER_CONTINUE_COST_GAME_POINT,
@@ -156,7 +157,7 @@ export function continueAfterPitcherEnding(career: PitcherCareer): PitcherCareer
   if (career.endingIndex === PITCHER_INJURY_ENDING) {
     return { ...paid, isInjured: false, injuredGamesPlayed: 0, injuryRemaining: 0 }
   }
-  return startNextPitcherSeason(paid)
+  return startNextPitcherSeason(paid, random)
 }
 
 /* ── 개인 타이틀(130) · MVP(131) · 연봉협상 등급 k ──────────────────────────── */

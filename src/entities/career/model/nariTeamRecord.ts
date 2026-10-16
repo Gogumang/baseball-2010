@@ -55,6 +55,11 @@ export interface NariRecordBatter {
   readonly position: number
   /** 마타자 번호 0~4 (`slot` 이 `ACE_BATTER_ROSTER_SLOT` 일 때만) */
   readonly ace?: number
+  /**
+   * 레코드 +0x19 · +0x1a 장비 니블 네 칸 — 나리 새 시즌 CPU 장비 굴림 `0x665e8`(1b86c)이 쓴 값(`nariCpuEquipment`).
+   * 없으면 Xls 행 그대로(리그 열 팀은 0 — 굴리지 않은 첫 시즌 값). 줄째 옮겨 다닌다(0xb53f0 · 0xb5d09 는 레코드 포인터를 옮긴다)
+   */
+  readonly equipment?: readonly number[]
 }
 
 /** 팀 하나의 레코드 */
@@ -68,6 +73,11 @@ export interface NariTeamRecord {
    * 마투수는 `acePitcher` 가 들고 8번 칸에 끼운다(옛 8번은 맨 끝 — 0xb521c 0x60 갈래). 없으면(옛 저장) 보직·날짜로 세운다.
    */
   readonly pitchers?: readonly number[]
+  /**
+   * 투수 레코드 장비 니블 네 칸 — **붙박이 표 칸(0~7) → 니블**. 나리 새 시즌 CPU 장비 굴림 `0x665e8` 이 레코드 칸에 쓴 것을
+   * 리그 투수 차례(`League.pitcherOrders`)로 표 칸에 옮겨 둔다(`nariCpuEquipment`). 없는 칸은 Xls 행 그대로
+   */
+  readonly pitcherEquipment?: Readonly<Record<number, readonly number[]>>
 }
 
 /** 열 팀 레코드 (첨자 = 팀 번호 0~9) */

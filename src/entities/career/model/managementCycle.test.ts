@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   applyGameResult,
@@ -82,7 +83,7 @@ describe('시즌 외출 횟수 — 칭호 "1년간 외출" 조건', () => {
     const outed = runOuting(부자선수(), 외식, createSeededRandom(1))
     expect(outed.outingsThisSeason).toBe(1)
 
-    expect(startNextSeason(outed).outingsThisSeason).toBe(0)
+    expect(startNextSeason(outed, createConstantRandom(0)).outingsThisSeason).toBe(0)
   })
 })
 

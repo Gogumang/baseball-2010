@@ -151,6 +151,8 @@ import type { EventReward } from '@/entities/story/model/eventReward'
 import type { ManagementCommand } from '@/pages/management/ui/ManagementScreen'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
+import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
+import { nariTeamRecordEquipmentOf } from '@/entities/career/model/nariCpuEquipment'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
@@ -661,6 +663,8 @@ export function useCareerSession({
       teamMorale?: number,
       /** 상대 리그 팀 레코드 +2 의 앞 값 — 이 경기에서 그 칸이 아직 안 덮였을 때 상대 첫 공만 본다 (`GameProgress.opponentStaleMorale`). 대회는 안 넘긴다 */
       opponentStaleMorale?: number,
+      /** 상대 리그 팀 레코드 장비 니블 — 나리 새 시즌 CPU 장비 굴림 0x665e8 이 쓴 값 (`GameProgress.opponentEquipment`). 대회는 안 넘긴다 */
+      opponentEquipment?: TeamRecordEquipment,
     ) => {
       // 경기 장면 셋업 0x39fdc 모드 3·4 갈래(0x3a200) — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`)
       resetLiveGameState()
@@ -675,7 +679,7 @@ export function useCareerSession({
       const started = startGame(
         random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
         ourRecordLineup, myRunAbility,
-        teamMorale, opponentStaleMorale,
+        teamMorale, opponentStaleMorale, opponentEquipment,
       )
       progressRef.current = started
       setProgress(started)
@@ -750,6 +754,8 @@ export function useCareerSession({
       current === null || current === undefined ? undefined : nariMoraleOf(current),
       // 상대 리그 팀 레코드 +2 에 남은 값 — 그 팀이 지난번 치른 경기 때의 나리 사기 (`nariTeamRecordMoraleOf`, r101)
       current === null || current === undefined || opponent === undefined ? undefined : nariTeamRecordMoraleOf(current, opponent),
+      // 상대 팀 객체 0xb8680 → 0x1f989 가 읽는 저장 레코드의 장비 니블 (새 시즌 0x665e8 — `nariCpuEquipment`)
+      opponent === undefined ? undefined : nariTeamRecordEquipmentOf(records, opponent),
     )
   }, [aceLevels, startMatch])
 
@@ -1339,7 +1345,8 @@ export function useCareerSession({
    * MVP 비트(career+0x1ca)는 여기서가 아니라 상태 131 이 375 를 틀기 전에 남긴다 (`enterSeasonEvent`).
    */
   const startNewSeason = (finished: PlayerCareer) => {
-    const next = startNextSeason(finished)
+    // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
+    const next = startNextSeason(finished, random)
     setCareer(next)
     setScreen({ kind: '관리' })
   }
@@ -2491,7 +2498,7 @@ export function useCareerSession({
     continueAfterEnding: () => {
       if (career === null || career.endingIndex === null) return false
       if (!canContinueAfterEnding(career, career.endingIndex)) return false
-      const continued = continueAfterEnding(career)
+      const continued = continueAfterEnding(career, random)
       setCareer(continued)
       // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 4 → 1, 5000)`
       recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: CONTINUE_COST_GAME_POINT })

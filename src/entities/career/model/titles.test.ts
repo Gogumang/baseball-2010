@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   ALL_TITLES_REWARD_GAME_POINT,
@@ -103,7 +104,7 @@ describe('evaluateNewTitles — 원문 조건', () => {
   })
 
   it('시즌을 넘기면 이번 시즌 외출 수가 지난해 칸으로 옮겨간다', () => {
-    const 넘긴 = startNextSeason(선수({ outingsThisSeason: 7, season: 3 }))
+    const 넘긴 = startNextSeason(선수({ outingsThisSeason: 7, season: 3 }), createConstantRandom(0))
 
     expect(넘긴.outingsLastSeason).toBe(7)
     expect(넘긴.outingsThisSeason).toBe(0)
@@ -118,7 +119,7 @@ describe('evaluateNewTitles — 원문 조건', () => {
     const 첫경기뒤 = 선수({ outingsLastSeason: 19, outingsThisSeason: 1, gamesPlayed: 1 })
     expect(withNariSceneSetupOutings(첫경기뒤)).toBe(첫경기뒤)
     // 새 시즌 전환은 합을 그대로 둔다
-    const 넘긴 = startNextSeason(선수({ outingsLastSeason: 2, outingsThisSeason: 5, season: 3 }))
+    const 넘긴 = startNextSeason(선수({ outingsLastSeason: 2, outingsThisSeason: 5, season: 3 }), createConstantRandom(0))
     expect(넘긴.outingsLastSeason + 넘긴.outingsThisSeason).toBe(7)
   })
 

@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import {
   GAMES_PER_SEASON,
@@ -130,7 +131,7 @@ describe('한 시즌 통째로 — 경기 정산 흐름이 이어지는가', () 
     const 지난시즌 = 한시즌(2010)
 
     expect(Object.keys(지난시즌.leaguePlayerStats.batters).length).toBeGreaterThan(0)
-    expect(startNextSeason(지난시즌).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
+    expect(startNextSeason(지난시즌, createConstantRandom(0)).leaguePlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
   })
 
   /**

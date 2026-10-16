@@ -5,6 +5,8 @@ import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlay
 /**
  * **새 해 CPU 선수 장비 굴림 `0x665e8`** — 새 해 0x6e0c 가 연차 +1 · 사기 100 · SR+0x187 = 0 뒤, CPU 능력치 +30 고리 앞에서
  * `0x665e8([0x1552cfc], SR+0xb3(새 연차), SR[1](내 팀))` 을 부른다(6eb4~6ec6, 직접 떴다).
+ * 나리 새 시즌 0x1b768 도 1b86c 에서 같은 함수를 부른다 — 모드 ≠ 2 라 문턱 13 · 레코드 0x1f989(나리 열 팀)
+ * (`entities/career/model/nariCpuEquipment`).
  *
  * ```
  * 0x665e8(g, y, 팀)   r4 = y + 1
@@ -20,8 +22,10 @@ import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlay
  * 부르는 쪽이 레코드 칸 → 명단 첨자로 바꾼다.
  */
 
-/** [0x1552d10] == 2 — 시즌모드 연차 상한 (r4 = 새 연차 + 1 ≤ 10). 그 밖 모드(나리 0x1b86c)는 13 */
-const SEASON_YEAR_LIMIT = 10
+/** [0x1552d10] == 2 — 시즌모드 연차 상한 (r4 = 새 연차 + 1 ≤ 10, 665f6~665fe) */
+export const SEASON_CPU_EQUIPMENT_YEAR_LIMIT = 10
+/** 그 밖 모드(나리 새 시즌 0x1b768 의 1b86c — 모드 3 · 4)는 r4 ≤ 13 (66600~66604) */
+export const NARI_CPU_EQUIPMENT_YEAR_LIMIT = 13
 const LEAGUE_TEAM_COUNT = 10
 
 /** s8 표 (0xd0a80 ~ 0xd0ada, 직접 떴다) */
@@ -54,9 +58,12 @@ export interface CpuEquipmentCall {
 }
 
 /** `0x665e8` 의 열 줄 차례 (0x665f6~0x6677c) — 새 연차 idx 로 걸리는 줄만 */
-export function cpuEquipmentCallsOf(newYearIndex: number): readonly CpuEquipmentCall[] {
+export function cpuEquipmentCallsOf(
+  newYearIndex: number,
+  yearLimit: number = SEASON_CPU_EQUIPMENT_YEAR_LIMIT,
+): readonly CpuEquipmentCall[] {
   const r4 = newYearIndex + 1
-  if (r4 > SEASON_YEAR_LIMIT) return []
+  if (r4 > yearLimit) return []
   const calls: CpuEquipmentCall[] = []
   const add = (when: boolean, isBatter: boolean, part: number, recordIndex: number, table: readonly number[], offset: number) => {
     if (when) calls.push({ isBatter, part, recordIndex, base: table[r4 - offset] ?? 0 })
@@ -83,10 +90,18 @@ export interface CpuEquipmentWrite {
   readonly value: number
 }
 
-/** 난수 차례 그대로 — 줄마다 팀 0..9(내 팀 빼고) 한 번씩 `rand(0, 2)` */
-export function rollCpuEquipment(random: RandomPort, newYearIndex: number, myTeamId: number): readonly CpuEquipmentWrite[] {
+/**
+ * 난수 차례 그대로 — 줄마다 팀 0..9(내 팀 빼고) 한 번씩 `rand(0, 2)`. `yearLimit` 은 모드 갈래(시즌 10 · 나리 13).
+ * 표는 s8 이고 첨자는 r4 − (2..6) 이라 r4 ≤ 13 이면 0..11 — 표마다 12 칸으로 떠 둔 범위 안이다(뒤 칸은 다음 표의 앞 바이트).
+ */
+export function rollCpuEquipment(
+  random: RandomPort,
+  newYearIndex: number,
+  myTeamId: number,
+  yearLimit: number = SEASON_CPU_EQUIPMENT_YEAR_LIMIT,
+): readonly CpuEquipmentWrite[] {
   const writes: CpuEquipmentWrite[] = []
-  for (const call of cpuEquipmentCallsOf(newYearIndex)) {
+  for (const call of cpuEquipmentCallsOf(newYearIndex, yearLimit)) {
     for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
       if (teamId === myTeamId) continue
       const value = call.base + random.rand(0, 2) + 1

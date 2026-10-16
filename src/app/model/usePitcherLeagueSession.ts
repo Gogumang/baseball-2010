@@ -592,13 +592,13 @@ interface PitcherResume {
   readonly point: PitcherResumePoint
 }
 
-function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
+function pitcherResumeOf(saved: PitcherCareer | null, random: RandomPort): PitcherResume {
   const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
   return {
     career: saved !== null && point.kind === '이벤트'
       ? enterPitcherYearEndEvent(saved, point.eventId)
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
-      : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved)
+      : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved, random)
       // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
       // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
       : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
@@ -718,7 +718,7 @@ export function usePitcherLeagueSession(
    * 타자편 794c8d9 `continueSaved` 와 같은 꼴이다.
    */
   const resumed = useRef<PitcherResume | null>(null)
-  if (resumed.current === null) resumed.current = pitcherResumeOf(loaded.current)
+  if (resumed.current === null) resumed.current = pitcherResumeOf(loaded.current, random)
   /** 이어할 자리 — 엔딩을 등록 없이 떠나면(`finishEnding(false)`) 남은 저장으로 다시 고른다 */
   const [resumePoint, setResumePoint] = useState<PitcherResumePoint>(resumed.current.point)
   const [career, setCareer] = useState<PitcherCareer | null>(resumed.current.career)
@@ -1442,10 +1442,11 @@ export function usePitcherLeagueSession(
   /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
   const startNewSeason = useCallback(
     (finished: PitcherCareer) => {
-      commit(startNextPitcherSeason(finished))
+      // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
+      commit(startNextPitcherSeason(finished, random))
       setScene('관리')
     },
-    [commit],
+    [commit, random],
   )
 
   /**
@@ -1619,12 +1620,12 @@ export function usePitcherLeagueSession(
   const continueAfterEnding = useCallback(() => {
     if (career === null || career.endingIndex === null) return false
     if (!canContinueAfterPitcherEnding(career, career.endingIndex)) return false
-    commit(continueAfterPitcherEnding(career))
+    commit(continueAfterPitcherEnding(career, random))
     // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 3 → 2, 5000)`
     recordStat({ kind: 'G사용', usage: leagueUsageOf(PITCHER_LEAGUE_MODE), amount: PITCHER_CONTINUE_COST_GAME_POINT })
     setScene('관리')
     return true
-  }, [career, commit, recordStat])
+  }, [career, commit, random, recordStat])
 
   /**
    * 엔딩을 떠나 메인 메뉴로 (직접 떴다). 커리어 저장을 지우는 곳은 **명예의 전당 등록** 하나다 — 0x62d40~0x62d7e 의 투수 갈래가
@@ -1660,7 +1661,7 @@ export function usePitcherLeagueSession(
      * 연말 사슬 이벤트)는 굴림 · 저장 · 소리가 없다. 105 진입 곁가지(부상 엔딩 · 나간 대결 140 · 115 · 훑기 굴림)는 들어와 관리 장면에
      * 닿을 때 도는 도착 고리(`isOnScreen` — 투수편 화면일 때만)라 원본 진입 때와 같은 차례다.
      */
-    const next = pitcherResumeOf(normalizePitcherCareer(store.load()))
+    const next = pitcherResumeOf(normalizePitcherCareer(store.load()), random)
     resumed.current = next
     replayedEvaluationRef.current = false
     resumedNewSeasonRef.current = false
@@ -1670,7 +1671,7 @@ export function usePitcherLeagueSession(
     setStory(pitcherStoryOfResume(next.point))
     setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
     setCupView(cupViewOfResume(next.point))
-  }, [store])
+  }, [random, store])
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
 

@@ -1,3 +1,4 @@
+import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -182,7 +183,7 @@ describe('엔딩 뒤 — 0x1220c', () => {
   })
 
   it('방출 엔딩을 이어하면 5000 G포인트를 쓰고 다음 연차로 간다 (0x1bd36, 점검 9차)', () => {
-    const continued = continueAfterEnding(선수({ gamePoint: 6000, endingIndex: 1, season: 3, morale: 10 }))
+    const continued = continueAfterEnding(선수({ gamePoint: 6000, endingIndex: 1, season: 3, morale: 10 }), createConstantRandom(0))
 
     expect(continued.gamePoint).toBe(1000)
     expect(continued.endingIndex).toBeNull()
@@ -191,14 +192,14 @@ describe('엔딩 뒤 — 0x1220c', () => {
   })
 
   it('부상 엔딩을 이어하면 같은 시즌 그 자리에서 부상만 풀고 계속한다', () => {
-    const continued = continueAfterEnding(선수({ gamePoint: 5000, endingIndex: 0, season: 3, gamesPlayed: 20, isInjured: true }))
+    const continued = continueAfterEnding(선수({ gamePoint: 5000, endingIndex: 0, season: 3, gamesPlayed: 20, isInjured: true }), createConstantRandom(0))
 
     expect([continued.season, continued.gamesPlayed, continued.isInjured]).toEqual([3, 20, false])
   })
 
   it('부상 엔딩 이어하기는 남은 부상 기간(+0x1b5)·부상 경기 수(+0x1b6)도 0 으로 지운다 (0x1bddc~0x1bdfa)', () => {
     const injured = 선수({ gamePoint: 5000, endingIndex: 0, isInjured: true, injuryRemaining: 2, injuredGamesPlayed: 20 })
-    const continued = continueAfterEnding(injured)
+    const continued = continueAfterEnding(injured, createConstantRandom(0))
 
     expect([continued.isInjured, continued.injuryRemaining, continued.injuredGamesPlayed]).toEqual([false, 0, 0])
     // 부상 −60%(0xb57b4) 는 풀린 뒤 남지 않는다
