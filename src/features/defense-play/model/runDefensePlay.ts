@@ -234,7 +234,7 @@ export interface DefensePlayInput {
   readonly stealingFrom?: readonly number[]
   /**
    * 장면 +0xfdc — 이번 투구의 번트 종류(0 = 없음). 서 있으면 도루 안 한 주자 리드가 +3 틱(`0x3d7b8`).
-   * ⚠️ 부르는 쪽이 아직 안 싣는다(번트 종류가 타구 결과까지 안 넘어온다) — 안 주면 0.
+   * 부르는 쪽이 싣는다 — 타자편 `gameFlow.defensePlayInputOf`(타석 화면 넷째 인자) · 투수편 `pitcherGameFlow`(`thrown.buntKind`). 안 주면 0.
    */
   readonly buntKind?: number
   /**
