@@ -163,8 +163,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     progress.pendingBenchClearing !== null,
     alertSceneFrozenRef.current,
   )
+  /** 사람 주루 키를 받으며 실시간으로 도는 주자 판(도루 · 폭투 · CPU 견제) — `progress.pendingRunnerPlay` */
+  const runnerPlay = progress.pendingRunnerPlay ?? null
   const isDefenseShown =
-    progress.pendingDefensePlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady)
+    progress.pendingDefensePlay !== null || runnerPlay !== null || (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady)
   /**
    * 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 교대 판 0x3fac4(1회초 판) · 수비 판 시작 0xb0fb4 · 벤치 클리어링 0x3a5f0.
    * 타자편의 수비 판은 늘 내 타석이라 수비 팀은 상대다. GameScreen 은 수비 재생 동안 내려가므로 여기서 든다
@@ -174,7 +176,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const boardOursOffense = boardNow !== null && (boardNow.half === '초' ? 0 : 1) === progress.game.playerSide
   const walkerSeats = useWalkerLineSeats({
     sceneKey: sceneSerialRef.current,
-    playKey: progress.pendingDefensePlay ?? play,
+    playKey: progress.pendingDefensePlay ?? runnerPlay ?? play,
     playDefenseRecords: fieldTeams.opponent.aces.records,
     board:
       boardNow === null
@@ -293,6 +295,28 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       />
     )
   }
+  /**
+   * 주자 판(도루 · 폭투 · CPU 견제) — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 진루 · 0x584 귀루 → 0xa9b04)와
+   * OK 슬라이딩 0x585 를 보내므로 **실시간으로 한 틱씩** 돌린다(`features/defense-play/model/liveRunnerPlay`, 팀 경기와 같은 길).
+   * 다 돌면 `finishRunnerPlay` 가 결과를 먹이고 그 공(또는 견제)의 나머지를 잇는다
+   */
+  if (runnerPlay !== null) {
+    return (
+      <DefensePlayback
+        runnerPlay={runnerPlay}
+        grassPalette={grassPalette}
+        runScoreBoard={{
+          sides: humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId),
+          scores: progress.game.playerSide === 0
+            ? [progress.game.ourScore, progress.game.opponentScore]
+            : [progress.game.opponentScore, progress.game.ourScore],
+          battingSide: progress.game.half === '초' ? 0 : 1,
+        }}
+        onFieldingErrors={session.actions.recordFieldingErrors}
+        onDone={session.actions.finishRunnerPlay}
+      />
+    )
+  }
   if (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady) {
     return (
       <DefensePlayback
@@ -367,7 +391,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         skillPanelScene={skillPanelSceneRef}
         onQuit={session.actions.quitGame}
         onSteal={session.actions.stealBase}
-        // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 재생 갈래(`lastDefensePlay`)로 보인다
+        // CPU 견제 (0x345fc 종류 4 → 0x34848) — 판은 위 주자 판 갈래(`pendingRunnerPlay`)가 실시간으로 돌린다
         onPickoff={session.actions.cpuPickoff}
         // 사구 뒤 벤치 클리어링 연출(상태 0x1e)이 끝나면 사구를 먹인다
         onBenchClearingDone={session.actions.finishBenchClearing}
