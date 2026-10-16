@@ -4770,7 +4770,9 @@ export function closeBurstWindow(progress: TeamGameProgress): TeamGameProgress {
  * `defendingIsOurs` 가 참이면 우리 팀이 수비(= 우리 투수), 거짓이면 상대 투수를 본다.
  * 사람이 직접 던지는 타석은 우리 투수를 이 길로 바꾸지 않는다 — 그때는 `#` 메뉴(`changePitcher`)뿐이다.
  *
- * 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 8회에 벤치 마선수로 교체)는 **투수편 전용**이라 여기 없다 — c1bbe `[state+1]` 이 3 이 아니면 c1bc8 에서 c1c4a 로 건너뛴다.
+ * 원본 `0xc1ba4` 의 첫 갈래(모드 3 · `0xb6ded`(내 투수 0x1fbd0) == 2 구원 보직 c1bd0 · 수비 팀이 사람 팀 c1bd8~c1bec ·
+ * 지금 투수가 내 투수(`0xb6388` = +0xa 비트7 내 육성 선수, 마선수 판정은 0xb633c 비트6)가 아님 c1bf8 → 벤치의 **내 투수**를
+ * 0-기준 7 = **8회**에 올림 c1c2e `cmp r3,#7`)는 **투수편 전용**이라 여기 없다 — c1bbe `[state+1]` 이 3 이 아니면 c1bc8 에서 c1c4a 로 건너뛴다.
  */
 function judgeAutoPitcherChange(
   progress: TeamGameProgress,

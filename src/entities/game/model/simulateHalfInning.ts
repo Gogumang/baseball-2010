@@ -795,8 +795,10 @@ export function* simulateHalfInningTicks(
  * −1 이다. 사람 타석 시작 `0x3da34` 도 0 을 넘긴다. 곧 벤치가 **한 명이라도** 남으면 바꿀 수 있다
  * (`judgePitcherChange` 의 기본값 1 은 이 두 자리와 맞지 않는다).
  *
- * ⚠️ 원본 `0xc1ba4` 의 첫 갈래(모드 3 에서 **8회**에 벤치 마선수로 교체 — CORRECTIONS 2절이
- * "7회" 를 8회로 정정했다)는 **나만의리그 투수편 전용**이라 CPU 끼리의 리그 경기에는 없다.
+ * ⚠️ 원본 `0xc1ba4` 의 첫 갈래 — 모드 3(c1bc6) · `0xb6ded`(내 투수 0x1fbd0) == 2 구원 보직(c1bd0 `cmp r0,#2`) ·
+ * 수비 팀이 사람 팀(c1bd8~c1bec `state[0x31+state[0xa]] == 0`) · 지금 투수가 내 투수가 아님(c1bf8 `0xb6388`;
+ * 0xb6388 은 +0xa 비트7 = 내 육성 선수, 마선수 판정은 0xb633c 비트6)이면 벤치의 **내 투수**를 0-기준 7 = **8회**
+ * (c1c2e `cmp r3,#7`)에 올린다 — 는 **나만의리그 투수편 전용**이라 CPU 끼리의 리그 경기에는 없다.
  * 그 갈래는 `entities/pitcher-career/model/pitcherRotation` 이 이미 갖고 있다.
  *
  * 리그·타자편·투수편이 **한 길**로 0xac428 을 지난다 (ac428~ac656 전체 대조는 `entities/pitching/model/pitcherChange`
