@@ -10,6 +10,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
+import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
@@ -570,6 +571,8 @@ export function TeamGameScreen({
   const visibleBurstLines = resolution === null && isAwaitingConfirm ? null : burstLines
   /** 돌발 띠 0x8e858 의 [M+0xc] — 발동부터 결과 창을 닫을 때(0x8e5b8 8e7ee~8e800)까지 */
   const burstBandRow = burst?.current ?? resolution?.row ?? null
+  /** 띠 아이콘 0x8e8c4 — 화면 갈래가 아니라 진행 상태의 공격 측(g[9])과 사람 측(g[0x31 + 측] == 0)으로 고른다 */
+  const burstBandRole = burstBandRoleOf(progress.game.half, progress.game.playerSide)
   const acceptsPickoff =
     canPitch &&
     !isAwaitingConfirm &&
@@ -1054,8 +1057,8 @@ export function TeamGameScreen({
                 onPickoff={(base) => actions.cpuPickoff(base)}
               />
             </div>
-            {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (사람 공격 → 방망이 8) */}
-            <BurstBand row={burstBandRow} role="공격" />
+            {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (아이콘은 g[0x31 + 공격 측] 로 — 사람 공격이면 방망이 8) */}
+            <BurstBand row={burstBandRow} role={burstBandRole} />
             {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 */}
             {isMatchupShown && !isPopupOpen && matchupCards}
             {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
@@ -1124,7 +1127,7 @@ export function TeamGameScreen({
             {/* 돌발 띠 0x8e858 (0x4c4bc 4c522, 사람 수비 → 공 7) — 0xf 구질 목록이면 뒤의 빛 지도 4c5a6 이 같이 어둡게 한다 */}
             <BurstBand
               row={burstBandRow}
-              role="수비"
+              role={burstBandRole}
               isDimmed={phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null}
             />
             {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 */}

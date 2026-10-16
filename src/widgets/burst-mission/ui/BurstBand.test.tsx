@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
-import { burstBandOf } from '@/widgets/burst-mission/lib/burstBandLayout'
+import { burstBandOf, burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 
 afterEach(cleanup)
@@ -61,6 +61,19 @@ describe('타석 HUD 돌발 띠 0x8e858', () => {
     expect(burstBandOf(행(0, 4, 4), '공격')?.rewardText).toBe('!C!cffffff소지금 +400')
     expect(burstBandOf(행(5, 0, 0), '공격')).toMatchObject({ goalText: '!C!cffffff주자진루', rewardText: '!C!cffffff없음 +0' })
     expect(burstBandOf(행(9, 3, 0xfe), '공격')?.rewardText).toBe('!C!cffffff평판 +-2')
+  })
+
+  it('음수 보상은 0xbc73d → 0xbc6c0 이 \'-\' 를 먼저 붙여 " +" 뒤에 "+-n" 이 된다 · 소지금 음수도 ×100 (bc6c6~bc6d2)', () => {
+    expect(burstBandOf(행(0, 1, 0x80), '공격')?.rewardText).toBe('!C!cffffff사기 +-128')
+    expect(burstBandOf(행(0, 4, 0xff), '공격')?.rewardText).toBe('!C!cffffff소지금 +-100')
+  })
+
+  it('아이콘 갈래는 진행 상태에서 — 공격 측(초 0 · 말 1)이 사람 측이면 방망이, 수비 측이면 공, 사람 측이 없으면 없음 (0x8e8c4)', () => {
+    expect(burstBandRoleOf('초', 0)).toBe('공격')
+    expect(burstBandRoleOf('말', 0)).toBe('수비')
+    expect(burstBandRoleOf('말', 1)).toBe('공격')
+    expect(burstBandRoleOf('초', 1)).toBe('수비')
+    expect(burstBandRoleOf('초', null)).toBeNull()
   })
 
   it('0xf 구질 목록이면 빛 지도 4c5a6 이 띠까지 15/32 로 어둡게 한다', () => {

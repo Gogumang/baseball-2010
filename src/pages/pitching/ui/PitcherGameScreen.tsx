@@ -6,6 +6,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
+import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -881,7 +882,7 @@ export function PitcherGameScreen({
         {/* 돌발 띠 0x8e858 (0x4c4bc 4c522, 사람 수비 → 공 7) — 0xf 구질 목록이면 뒤의 빛 지도 4c5a6 이 같이 어둡게 한다 */}
         <BurstBand
           row={burstBandRow}
-          role="수비"
+          role={burstBandRoleOf(progress.game.half, progress.game.playerSide)}
           isDimmed={canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질'}
         />
         {!isPopupOpen && isAwaitingConfirm && sceneConfirm.isInConfirmState && (

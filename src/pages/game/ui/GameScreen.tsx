@@ -24,6 +24,7 @@ import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
+import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { RecordAlertFrame } from '@/widgets/game-scene/lib/recordAlert'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -450,7 +451,7 @@ export function GameScreen({
           />
         </div>
         {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (모드 2~4 · 돌발 객체가 있을 때) */}
-        <BurstBand row={burstRow} role="공격" />
+        <BurstBand row={burstRow} role={burstBandRoleOf(progress.game.half, progress.game.playerSide)} />
         {/*
           0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 타석 장면 위에 투수·타자 소개 판 0x44944. 팀 글자는 0xb6c20: 내 팀 PLAYER · 상대 COM.
           값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).
