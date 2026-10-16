@@ -8,11 +8,12 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
-  RECORD_PICK_CELL_SIZE, RECORD_PICK_LABEL_GAP, measuredTitleCenterXOf, recordPickIconOffsetOf, recordPickLabelXOf,
+  RECORD_PICK_CELL_SIZE, RECORD_PICK_LABEL_GAP, recordPickIconOffsetOf, recordPickLabelXOf,
   recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { PITCH_WINDOW_CHOICES } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
+import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const IMG_TEXT = './sprites/img_text/frames'

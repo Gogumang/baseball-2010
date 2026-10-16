@@ -32,7 +32,7 @@ import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { gamePointRewardOf } from '@/entities/career/model/playerCareer'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
@@ -1605,6 +1605,57 @@ describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스�
     const { progress: 뒤, play } = arrivePitch(진행중, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
     expect(play).toBeNull()
     expect(뒤.opponentMound.pitcherSlot).toBe(진행중.opponentMound.pitcherSlot)
+  })
+
+  /**
+   * 내려가는 투수가 마구를 든 마투수(142 가 상대 명부 8번 칸에 넣은)일 때 교체 틱 굴림 0x344dc —
+   * 마구 조건(주자 2+ · 2스트라이크 · 0-0 · 0-3)이고 남은 마구(팀 +0x28)가 있으면 굴리지 않고, 아니면 rand(0,6) 한 번 (34516~34566)
+   */
+  function 마구투수교체(seed: number) {
+    const k = ACE_PITCHERS.findIndex((ace) => (ACE_PITCHER_REPERTOIRES.find(({ name }) => name === ace.name)?.magicId ?? 0) !== 0)
+    expect(k).toBeGreaterThanOrEqual(0)
+    const 시작 = startGame(createSeededRandom(seed))
+    const progress: GameProgress = {
+      ...시작,
+      burst: null,
+      aces: { ours: { batter: -1, pitcher: -1 }, opponent: { batter: -1, pitcher: k } },
+      opponentMound: { ...시작.opponentMound, pitcherSlot: 8, stamina: 0, justChanged: false },
+    }
+    return progress
+  }
+  const 굴림기록 = (seed: number) => {
+    const calls: [number, number][] = []
+    const inner = createSeededRandom(seed)
+    const random: RandomPort = {
+      rand: (lo: number, hi: number) => {
+        calls.push([lo, hi])
+        return inner.rand(lo, hi)
+      },
+      rand9d: inner.rand9d,
+    }
+    return { calls, random }
+  }
+
+  it('마구 투수 교체 틱 — 1-1 이면 rand(0,6) 한 번 더 · 0-0(마구 조건)이면 안 굴린다 · 남은 마구 0 이면 0-0 도 굴린다', () => {
+    const progress = 마구투수교체(11)
+    expect(opponentPitcherAbilityOf(progress).repertoire?.magicId ?? 0).toBeGreaterThan(0)
+    const 굴려 = (count: { strikes: number; balls: number }, base: GameProgress = progress) => {
+      const { calls, random } = 굴림기록(7)
+      const { progress: 뒤, play } = arrivePitch(base, { resolution: { kind: '볼' }, outcomeAfter: null }, random, { countAfter: count })
+      return { calls, 뒤, play }
+    }
+    const 조건 = 굴려({ strikes: 0, balls: 0 })
+    const 아님 = 굴려({ strikes: 1, balls: 1 })
+    expect(조건.play).toBeNull()
+    expect(조건.뒤.opponentMound.pitcherSlot).not.toBe(8)
+    // 같은 씨앗 — 갈리는 첫 굴림이 교체 틱의 rand(0,6) 이다
+    const 갈림 = 아님.calls.findIndex((call, index) => call[0] !== 조건.calls[index]?.[0] || call[1] !== 조건.calls[index]?.[1])
+    expect(갈림).toBeGreaterThanOrEqual(0)
+    expect(아님.calls[갈림]).toEqual([0, 6])
+    expect(아님.calls.length).toBe(조건.calls.length + 1)
+    // 남은 마구 0 — 마구 조건이어도 굴린다 (34524 0xaea10 ≤ 0)
+    const 바닥 = 굴려({ strikes: 0, balls: 0 }, { ...progress, opponentCpuMagic: { remaining: 0, ballMagicNumber: 0 } })
+    expect(바닥.calls).toEqual(아님.calls)
   })
 
   it('견제 판이 끝나 같은 타석이 이어지면 0xf 진입이 교체를 본다', () => {

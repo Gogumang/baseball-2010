@@ -10,10 +10,11 @@ import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
   RECORD_PICK_CELL_SIZE, RECORD_PICK_CELLS, RECORD_PICK_DIM_LABEL_COLOR, RECORD_PICK_LABEL_GAP, RECORD_PICK_POPUP_HEIGHT,
-  RECORD_PICK_TITLE_ID, RECORD_PICK_TITLE_X, RECORD_PICK_TITLE_Y, measuredTitleCenterXOf, recordPickIconOffsetOf,
+  RECORD_PICK_TITLE_ID, RECORD_PICK_TITLE_X, RECORD_PICK_TITLE_Y, recordPickIconOffsetOf,
   recordPickLabelXOf, recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
+import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 const IMG_TEXT = './sprites/img_text/frames'

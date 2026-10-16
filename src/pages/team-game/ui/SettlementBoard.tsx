@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
+import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import {
@@ -288,15 +289,15 @@ function RewardTicker({ text, box }: {
 }) {
   const tick = useSceneTick()
   const counter = useSkinTickerCounter(tick)
-  const textRef = useRef<HTMLSpanElement>(null)
-  const [textWidth, setTextWidth] = useState(0)
-  useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
+  // 글폭은 0x5a91a 의 0x9c52c 가 **서식까지** 잰 날 글 폭 — 글 = "" + "승리 추가 보상[!cffff00"(0xd060c) + 수 + " G포인트!cffffff]"(0xd0624)
+  // (0x4ae56~0x4ae96)이라 서식 글자 열여섯도 폭에 든다
+  const textWidth = measureRawTextWidth(text)
   const segments = parseGameMarkup(`!cffffff${text}`).flatMap((line) => line.segments)
   const clipLeft = box.x + SKIN_TICKER_CLIP_INSET
   return (
     <div className={styles.tickerClip} data-testid="정산-흐르는-글"
       style={{ left: clipLeft, top: box.y, width: box.width - SKIN_TICKER_CLIP_INSET * 2, height: box.height }}>
-      <span ref={textRef} className={styles.tickerText}
+      <span className={styles.tickerText}
         style={{ left: skinTickerTextXOf(box.x, box.width, counter, textWidth) - clipLeft }}>
         {segments.map((segment, index) => (
           <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>

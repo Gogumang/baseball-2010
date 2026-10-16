@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CommonPanel, FrameSprite, InsetBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -9,6 +9,7 @@ import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
+import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
   ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
@@ -481,15 +482,15 @@ export { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
  */
 function DescriptionTicker({ text, tick }: { readonly text: string; readonly tick: number }) {
   const counter = useSkinTickerCounter(tick)
-  const textRef = useRef<HTMLSpanElement>(null)
-  const [textWidth, setTextWidth] = useState(0)
-  useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
-  const segments = parseGameMarkup(`!cffffff${text}`).flatMap((line) => line.segments)
+  // 글 = "" + "!cffffff"(0xcf934) + 설명 (0x2e9e0~0x2ea1e). 글폭은 0x5a91a 의 0x9c52c 가 **서식까지** 잰 날 글 폭이다
+  const raw = `!cffffff${text}`
+  const textWidth = measureRawTextWidth(raw)
+  const segments = parseGameMarkup(raw).flatMap((line) => line.segments)
   const { x, y, width, height, clipInset } = DESCRIPTION_TICKER
   return (
     <div className={styles.tickerClip} data-testid="기록-설명"
       style={{ left: x + clipInset, top: y, width: width - clipInset * 2, height }}>
-      <span ref={textRef} className={styles.tickerText}
+      <span className={styles.tickerText}
         style={{ left: tickerTextXOf(counter, textWidth) - (x + clipInset) }}>
         {segments.map((segment, index) => (
           <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>

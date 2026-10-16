@@ -14,6 +14,7 @@
  * "프레임 0" 이라 하면 뒤쪽이다.
  */
 import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
+import { measuredTitleCenterXOf } from '@/shared/lib/font'
 
 export const SCREEN = { width: 240, height: 320 } as const
 
@@ -110,8 +111,19 @@ export const FIRST_BAT_LAYOUT = {
     { frame: 190, x: 125, y: 223 },
     { frame: 191, x: 130, y: 243 },
   ],
-  /** 값은 막대 안 흰 글 가운데 — 연고지 y = 222 · 좌석 y = 242 */
-  infoValueY: [222, 242],
+  /**
+   * 값 두 줄 — **0xba269 폭 −1** 이라 막대 가운데가 아니다 (0x64688~0x6472c 직접 뜸):
+   * ```
+   * 646ca  연고지 0xba269("!C!cffffff%s"(0xcf2e0) 도시, W/2 + 막대폭/2 + 8, H/2 + 0x3e, −1, −1)    ; 막대폭 = game_ui 프레임 21 의 92
+   * 6472c  좌석   0xba269("!C!cffffff%d석"(0xd2488) 수, W/2 + 막대폭/2 − 1, H/2 + 0x52, −1, −1)   ; 같은 r6 = 0xba269 를 다시 부른다
+   * ```
+   * 폭 −1 = 날 글 폭(서식 글자까지 잰 0x9c52c)이고 `!C` 줄은 x + (폭 >> 1) 이 가운데다(`measuredTitleCenterXOf`).
+   * 막대폭/2 는 C 나눗셈 `(v + 부호) >> 1` (0x646a2~0x646ae) — 92 → 46.
+   */
+  infoValues: [
+    { x: SCREEN.width / 2 + (92 >> 1) + 8, y: SCREEN.height / 2 + 0x3e, format: '!C!cffffff%s' },
+    { x: SCREEN.width / 2 + (92 >> 1) - 1, y: SCREEN.height / 2 + 0x52, format: '!C!cffffff%d석' },
+  ],
 } as const
 
 /* ── k = 2 마선수 고르기 (0x647b4~0x64d2e) ───────────────────────────────────── */
@@ -273,4 +285,22 @@ export function stadiumArrowsOf(isStadiumStage: boolean, isBob: boolean, cursor:
     leftX: leftX - (active && cursor > 0 ? bob : 0),
     rightX: rightX + (active && cursor < count - 1 ? bob : 0),
   }
+}
+
+/**
+ * 구장 값 두 줄의 보이는 글과 가운데 x — `FIRST_BAT_LAYOUT.infoValues` 의 서식에 값을 넣은 **날 글**을 재서
+ * x + (폭 >> 1) 를 가운데로 둔다 (0xba269 폭 −1, 0x646ca · 0x6472c). 값이 없으면(구장 표 미추출) 빈 글.
+ */
+export function stadiumInfoValuesOf(
+  stadium: { readonly city: string | null; readonly capacity: number } | null | undefined,
+) {
+  const [cityLine, seatLine] = FIRST_BAT_LAYOUT.infoValues
+  if (stadium === null || stadium === undefined) return [{ text: '', centerX: cityLine.x }, { text: '', centerX: seatLine.x }]
+  // 히든 번호(10~14)는 연고지 칸이 없다(`stadiumInfoOf` 의 city null) — 화면처럼 빈 글로 잰다
+  const city = stadium.city ?? ''
+  const seats = `${stadium.capacity}석`
+  return [
+    { text: city, centerX: measuredTitleCenterXOf(cityLine.x, cityLine.format.replace('%s', city)) },
+    { text: seats, centerX: measuredTitleCenterXOf(seatLine.x, seatLine.format.replace('%d석', seats)) },
+  ]
 }

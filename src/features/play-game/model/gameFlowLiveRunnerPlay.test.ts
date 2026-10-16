@@ -186,3 +186,26 @@ describe('타자편 CPU 견제 판(종류 4)도 붙들어 사람 주루 키를 �
     }
   })
 })
+
+describe('붙든 판도 판 끝 0xf 진입의 볼카운트를 들고 간다 — 교체 틱 굴림 0x344dc (r122)', () => {
+  it('도루 판은 이 공 뒤 카운트(countAfter) · 견제 판은 지금 카운트(count)를 붙든 칸에 싣는다', () => {
+    let held = 0
+    for (let seed = 1; seed <= 20 && held === 0; seed += 1) {
+      const 시작 = startGame(createSeededRandom(seed))
+      const 출발 = startSteal(주자(시작, 일루), 1)
+      const step = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, createSeededRandom(seed), {
+        live: true,
+        countAfter: { strikes: 1, balls: 2 },
+      })
+      if (step.progress.pendingRunnerPlay == null) continue
+      held += 1
+      expect(step.progress.pendingRunnerPlay.arrival?.countAfter).toEqual({ strikes: 1, balls: 2 })
+    }
+    expect(held).toBe(1)
+    const 견제 = cpuPickoff(주자(startGame(createSeededRandom(3)), 일루), 1, createSeededRandom(3), {
+      live: true,
+      count: { strikes: 2, balls: 1 },
+    })
+    expect(견제.pendingRunnerPlay?.pickoff?.count).toEqual({ strikes: 2, balls: 1 })
+  })
+})

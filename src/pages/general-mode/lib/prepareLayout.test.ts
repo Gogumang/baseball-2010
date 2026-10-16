@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACE_LAYOUT, FIRST_BAT_LAYOUT, MATCH_INFO_LAYOUT, aceCellPositionOf, firstBatTagPlacementOf, isAceCellDimmed,
-  isAceGridCursorOn, isPrepareBobOn, stadiumArrowsOf,
+  isAceGridCursorOn, isPrepareBobOn, stadiumArrowsOf, stadiumInfoValuesOf,
 } from '@/pages/general-mode/lib/prepareLayout'
 
 /** 일반모드 준비 화면 배치 (공용 목록 페이지 0x63b15 — P6 2a) */
@@ -63,5 +63,17 @@ describe('공용 목록 깜빡 [sp+0xd4] (0x63b4a)', () => {
 
   it('경기정보 값 칸 — 유저 (16, 줄y + 3) · CPU 뒤집어 (138, 줄y − 3), 이미지 10 은 86×15', () => {
     expect(MATCH_INFO_LAYOUT.valueCell).toMatchObject({ userX: 16, cpuX: 138, userDy: 3, cpuDy: -3, width: 86 })
+  })
+})
+
+describe('구장 값 두 줄 — 0xba269 폭 −1 (0x646ca · 0x6472c)', () => {
+  it('가운데 = x + (날 글 폭 >> 1) — 연고지 x 174 · 좌석 x 165, 서식 글자까지 잰다', () => {
+    // "!C!cffffff인천" = 영문 10 × 6 + 한글 2 × 10 − 1 = 79 → 174 + 39
+    // "!C!cffffff25000석" = 영문 15 × 6 + 한글 10 − 1 = 99 → 165 + 49
+    expect(stadiumInfoValuesOf({ city: '인천', capacity: 25000 })).toEqual([
+      { text: '인천', centerX: 213 },
+      { text: '25000석', centerX: 214 },
+    ])
+    expect(FIRST_BAT_LAYOUT.infoValues.map(({ y }) => y)).toEqual([222, 242])
   })
 })
