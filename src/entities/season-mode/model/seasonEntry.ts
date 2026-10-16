@@ -158,7 +158,11 @@ export interface SeasonEntryCellSource {
   readonly pitcherLineOf?: (player: SeasonPlayer) => EntryPitcherLine
 }
 
-/** 일반모드(상태 23) — Xls 행 줄 · 스태미나 가득 · 모드 1 · ⚠️ 사기는 팀 레코드 칸을 웹이 안 들어 100 으로 둔다 */
+/**
+ * 일반모드(상태 23) — Xls 행 줄 · 스태미나 가득 · 모드 1 · 사기 100. 모드 1 의 팀 레코드(`0x1f9d2` → `0x1f874` = [g+0xb0]+0x5c8 칸)는
+ * 경기정보 0x30f20 이 `0x1f8c0`(마스터)을 `0x21d30` → `0x1fe5c` 로 통째 복사한 것이고 +2 에 쓰는 곳이 없다(0xa3a44 는 모드 3·4 칸만,
+ * 0x8e3dc 는 모드 2 만 — `teamGameFlow.ourTeamMoraleOf`) → XlsTEAM_DATA 표값 = 전 팀 100
+ */
 export const GENERAL_ENTRY_CELL_SOURCE: SeasonEntryCellSource = {
   staminaMode: 1,
   teamMorale: 100,
