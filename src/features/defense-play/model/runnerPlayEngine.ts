@@ -461,16 +461,21 @@ function* runnerPlaySteps(
       firstThrowArrival = chase?.catchTick ?? tick
     }
     // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다.
-    // 0xb2c90 b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리 0xd86ec 로 돌아간다(b476a)
+    // b3094 vt30 = 0xb1c90 의 b2564: 던진 야수가 커버 표 +0xf0 에 있고 AI ∉ {8, 1, 9} 면 vt14(그 루) · AI 루 + 2 — 고르기 vt34 가 AI 1 을
+    // 0 으로 내린 뒤라(b3b7a) 공을 쥐고 AI 1 이던 도루 판 포수도 여기서 홈 커버로 돌아간다(`stealPlay` 머리말).
+    // 그다음 0xb2c90 b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리 0xd86ec 로 돌아간다(b476a)
+    const thrownCoverBase = play.coverOfBase.indexOf(holderSlot)
     fielders = fielders.map((fielder) => {
       if (fielder.slot !== holderSlot) return fielder
       const released = { ...fielder, holdingBall: false, actionRemainingTicks: 0 }
       const keeps =
         (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
         fielder.aiState === AI_STATE.RECEIVE
-      return keeps
-        ? released
-        : { ...released, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
+      if (keeps) return released
+      if (thrownCoverBase !== NONE && fielder.aiState !== AI_STATE.RUNDOWN && fielder.aiState !== AI_STATE.CHASE) {
+        return { ...released, aiState: AI_STATE.COVER_HOME + thrownCoverBase, target: basePosition(thrownCoverBase), targetBase: thrownCoverBase }
+      }
+      return { ...released, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
     })
     log.push(
       `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${chase?.catchTick ?? tick}틱 도착` +
