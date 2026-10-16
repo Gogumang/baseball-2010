@@ -326,6 +326,8 @@ export function releaseCpuPitch(
   const pitch: Pitch = {
     type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
     plate: plateOf(finalTarget, situation.side),
+    // 이글아이가 그리는 0x10 목표점(+0x10b8) — 오차 · 실투 바꾸기 전 점
+    aimTarget: target,
     breakOffset: { x: type.horizontalBreak, y: type.verticalBreak },
     flightDurationMilliseconds: worldPath.length * millisecondsPerFrame(),
     frameCount: worldPath.length,

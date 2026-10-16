@@ -29,6 +29,12 @@ export interface Pitch {
    * (`windUpCpuPitchOf`, 그리지도 판정하지도 않는다)과 시험이 만드는 공뿐이다.
    */
   readonly worldPath: readonly WorldPoint[] | null
+  /**
+   * CPU 투수의 **0x10 목표점**(제구 오차 전) = 경기+0x10b8 — 0x10 틱 6 의 0x345fc 가 쓰고, 놓기 0x4dc78 은 4dc9a~4dca4 에서
+   * 사본(sp+0x50)을 떠 오차를 그 사본에만 먹인다(4de36~4de5e, 되쓰지 않는다). 이글아이 0x4d2ac(4d2dc~4d2ea)가 놓은 뒤에도 이 점을 그린다.
+   * 사용자 투구 · 시험 공은 없다
+   */
+  readonly aimTarget?: WorldPoint
   /** 화면 배치 side — 투영 원점(0xcfb18)과 기준점(0xcfb54)을 고른다 */
   readonly stageSide: number
   /**
