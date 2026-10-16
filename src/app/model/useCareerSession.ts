@@ -1016,8 +1016,12 @@ export function useCareerSession({
       if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
         progressRef.current = arrival.progress
         setProgress(arrival.progress)
-        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리 — 원본은 판 안의 그 틱에 낸다 (견제와 같은 근사)
-        playSoundIds(audio, [arrival.play?.callSoundId ?? null, ...gameStepSoundIdsOf(beforeArrival, arrival.progress)])
+        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리. 실시간으로 돈 판(`shownLive`)의 콜은 화면이 판 안의 그 틱
+        // (결과 메시지 0xbba → 0x51a56)에 이미 냈다 — 미리 돌린 판만 여기서(근사) 낸다
+        playSoundIds(audio, [
+          arrival.play?.shownLive === true ? null : (arrival.play?.callSoundId ?? null),
+          ...gameStepSoundIdsOf(beforeArrival, arrival.progress),
+        ])
       }
       if (arrival !== null && arrival.interrupted) {
         // 판에서 반 이닝·경기가 끝났다 — 내 타석이 끊긴다 (견제사와 같은 길)
@@ -1492,11 +1496,11 @@ export function useCareerSession({
 
   /**
    * CPU 견제 판을 먹인 뒤 — 판정 콜과 판에서 끊긴 타석. 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-   * ⚠️ 원본은 공이 잡히는 **틱**에 낸다 — 웹은 판 끝에 낸다(팀 경기와 같은 근사).
+   * 원본은 결과 코드가 선 플레이 틱(메시지 0xbba)에 낸다 — 화면이 실시간으로 돌린 판은 그 틱에 이미 냈으므로(`callShown`) 안 낸다.
    */
-  const afterCpuPickoff = (current: GameProgress, next: GameProgress, play: DefensePlayResult | null) => {
+  const afterCpuPickoff = (current: GameProgress, next: GameProgress, play: DefensePlayResult | null, callShown = false) => {
     playSoundIds(audio, [
-      isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
+      !callShown && isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
       ...gameStepSoundIdsOf(current, next),
     ])
     const interrupted =
@@ -1586,9 +1590,11 @@ export function useCareerSession({
       if (pending.kind === 'pickoff') {
         progressRef.current = step.progress
         setProgress(step.progress)
-        afterCpuPickoff(current, step.progress, played)
+        afterCpuPickoff(current, step.progress, played, result !== undefined)
         return
       }
+      // 화면이 결과를 못 넘겨 여기서 돌린 판 — 판 안의 콜을 못 냈으니 판 끝에 낸다
+      if (result === undefined) playSoundIds(audio, [step.play?.callSoundId ?? null])
       const context = arrivalContextRef.current
       arrivalContextRef.current = null
       if (context === null) {

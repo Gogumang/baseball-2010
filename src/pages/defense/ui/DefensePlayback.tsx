@@ -553,8 +553,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   let guard = 0
   while (!stepper.finished && stepper.tick < wanted && guard < MAX_CLOSED_CATCH_UP) {
     stepper.step(pressesRef.current.shift() ?? null)
-    // 슬라이딩 소리 10 — 사람 공격 쪽 판의 OK 키(0x518da → 0x5199c, +0x31c 잠금) · 자동 슬라이딩(0x5268c). `LivePlayback` 과 같은 자리
-    if (stepper.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
+    // 그 틱의 소리 차례대로 — 슬라이딩 10(사람 OK 키 0x518da → 0x5199c · 자동 0x5268c)과 판정 콜(플레이 틱 b4562 의 메시지 0xbba →
+    // 0x51a56 → 9 는 0x51c14 의 17 · 13 은 0x51b36 의 62/20). 콜은 판 끝이 아니라 결과 코드가 선 이 틱에 난다
+    for (const soundId of stepper.soundsThisTick) activeSound().play(soundId)
     guard += 1
   }
   const ticks = stepper.ticks

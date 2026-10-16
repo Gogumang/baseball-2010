@@ -581,6 +581,37 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
     }
   })
 
+  it('판정 콜은 결과 메시지 0xbba 가 선 틱에 낸다 — 판 끝(onDone)보다 먼저, 한 번', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    let 콜때끝났나: boolean | null = null
+    setActiveSound({
+      play: (id) => {
+        울린것.push(id)
+        if (id === 17 && 콜때끝났나 === null) 콜때끝났나 = 눌렀다.mock.calls.length > 0
+      },
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      stop: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
+    const 눌렀다 = vi.fn()
+    try {
+      render(<DefensePlayback runnerPlay={도루판()} onDone={눌렀다} />)
+      끝까지(눌렀다, '2')
+      // 키 2 로 2루에 던져 세이프(결과 9) — 종류 5 는 0x51c14 51c22 에서 곧장 17
+      expect((결과(눌렀다) as { readonly resultCode?: number | null }).resultCode).toBe(9)
+      expect(울린것.filter((id) => id === 17)).toHaveLength(1)
+      expect(콜때끝났나).toBe(false)
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+
   it('판이 닫힌 뒤 닫힌 갱신(+0x1094)을 지나야 끝났다고 알린다 — 판 틱 수보다 늦게', () => {
     vi.useFakeTimers()
     try {

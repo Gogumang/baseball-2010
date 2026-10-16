@@ -38,8 +38,12 @@ import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/enti
 import { startPickoff } from '@/entities/fielding/model/pickoff'
 import { applyRunnerLead, previousTargetAfterLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { applyBaserunningKey } from '@/entities/fielding/model/baserunningKey'
-import { slideOnKey, SLIDING_SPEED_BONUS } from '@/entities/defense-controls/model/sliding'
-import { slidingRunnerOf } from '@/features/defense-play/model/runnerPlayEngine'
+import { slideOnKey, SLIDING_SOUND_EFFECT, SLIDING_SPEED_BONUS } from '@/entities/defense-controls/model/sliding'
+import {
+  runnerPlayCallSoundIdOf,
+  slidingRunnerOf,
+  type RunnerPlayTickSound,
+} from '@/features/defense-play/model/runnerPlayEngine'
 import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
@@ -221,18 +225,23 @@ export interface PickoffPlayStepper {
   readonly ticks: readonly DefensePlayView[]
   /** 방금 돈 틱에서 슬라이딩 효과음 10 을 낸다 — 사람 슬라이딩 키 0x518da → 0x5199c(+0x31c 잠금, 한 판 한 번) */
   readonly slidingSoundThisTick: boolean
+  /** 방금 돈 틱에 낸 소리 — 낸 차례대로 (슬라이딩 키 → 결과 메시지 0xbba 의 판정 콜, `runnerPlayEngine.RunnerPlayStepper` 와 같다) */
+  readonly soundsThisTick: readonly number[]
   step(press: DefenseKeyPress | null): void
   result(): PickoffPlayResult
 }
 
 export function startPickoffPlay(input: PickoffPlayInput): PickoffPlayStepper {
   const ticks: DefensePlayView[] = []
-  const sound = { slidingThisTick: false }
+  const sound: RunnerPlayTickSound = { slidingThisTick: false, thisTick: [] }
   const steps = pickoffPlaySteps(input, ticks, sound)
   let current = steps.next(null)
   return {
     get slidingSoundThisTick() {
       return sound.slidingThisTick
+    },
+    get soundsThisTick() {
+      return sound.thisTick
     },
     get tick() {
       return current.done === true ? ticks.length : current.value
@@ -261,7 +270,7 @@ export function runPickoffPlay(input: PickoffPlayInput): PickoffPlayResult {
 function* pickoffPlaySteps(
   input: PickoffPlayInput,
   ticks: DefensePlayView[],
-  sound: { slidingThisTick: boolean } = { slidingThisTick: false },
+  sound: RunnerPlayTickSound = { slidingThisTick: false, thisTick: [] },
 ): Generator<number, PickoffPlayResult, DefenseKeyPress | null> {
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const speedOf = (base: 1 | 2 | 3) =>
@@ -539,6 +548,7 @@ function* pickoffPlaySteps(
   for (let tick = 0; tick <= MAXIMUM_TICKS && !play.finished; tick += 1) {
     const press = yield tick
     sound.slidingThisTick = false
+    sound.thisTick = []
     outJudgedThisTick = false
     tickMessageCode = 0
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
@@ -574,6 +584,7 @@ function* pickoffPlaySteps(
         if (decision.playsSound) {
           slidingSoundPlayed = true
           sound.slidingThisTick = true
+          sound.thisTick.push(SLIDING_SOUND_EFFECT)
         }
         for (const index of decision.slidRunnerIndexes) {
           const runner = runners[index]
@@ -671,7 +682,12 @@ function* pickoffPlaySteps(
 
     // ── 결과 메시지 0xbba(b4562) → 51a56 결과 판 칸 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다. 0x51d40 송구보다 먼저 ──
     if (outJudgedThisTick) tickMessageCode = 13
-    if (tickMessageCode !== 0) scene = { ...scene, popup: postJudgeMessage(scene.popup, tickMessageCode, play.ballHolderSlot) }
+    if (tickMessageCode !== 0) {
+      scene = { ...scene, popup: postJudgeMessage(scene.popup, tickMessageCode, play.ballHolderSlot) }
+      // 같은 메시지의 판정 스위치가 그 자리에서 콜을 낸다 — 종류 4 는 9 면 늘 17(0x51c14 51c1e), 13 이면 62/20(0x51b36)
+      const call = runnerPlayCallSoundIdOf(tickMessageCode, tagOut)
+      if (call !== null) sound.thisTick.push(call)
+    }
 
     // ── 결과 메시지 0xbba — 견제사(결과 13) 뒤 0x51d40 이 `아웃 ≤ 2` 면 +0x128 = 1 · 0xafa60 한 번 (사람·CPU 모두) ──
     // 0xafa60 은 공 쥔 야수가 준비(+0xc8 ≤ 0)돼야 고른다. 견제사는 송구를 받는 틱(쥐기가 준비 틱 3 을 막 넣은 틱)이나
