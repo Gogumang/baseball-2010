@@ -7,6 +7,7 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { batterNariEntryViewOf, pressNariEntryKey } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
+import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 
 const 선수 = () => {
   const career = createCareer('보기')
@@ -97,5 +98,19 @@ describe('143 경기 전 엔트리 보기 — 진입 0x16af8 (0x5561c 셋째 인
     const pitcher = view.lists.pitchers.find((row) => row.name === teamPitchers(teamId)[0].name)
     expect(pitcher?.pitcherLine).toMatchObject({ outs: 30, strikeouts: 11, wins: 1, walks: 5 })
     expect(pitcher?.stamina?.percent).toBe(65)
+  })
+
+  it('사기 V[+2] — 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기(teamRecordMorales), 내 팀은 커리어 사기, 옛 저장은 100 (r128)', () => {
+    const { career, opponent } = 선수()
+    const capacityOf = (view: NariEntryView) => view.lists.pitchers[0]?.stamina?.capacity
+    const staminaOf = (view: NariEntryView) => view.lists.pitchers[0]?.ability[3] ?? 0
+    const stale = { ...career, morale: 70, teamRecordMorales: { [opponent]: 20, [career.teamId]: 5 } }
+    const theirs = batterNariEntryViewOf(stale, false)
+    expect(capacityOf(theirs)).toBe(staminaCapacityOf(staminaOf(theirs), 20, false))
+    expect(capacityOf(theirs)).not.toBe(staminaCapacityOf(staminaOf(theirs), 100, false))
+    const mine = batterNariEntryViewOf(stale, true)
+    expect(capacityOf(mine)).toBe(staminaCapacityOf(staminaOf(mine), 70, false))
+    const old = batterNariEntryViewOf(career, false)
+    expect(capacityOf(old)).toBe(staminaCapacityOf(staminaOf(old), 100, false))
   })
 })
