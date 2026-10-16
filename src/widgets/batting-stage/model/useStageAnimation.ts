@@ -159,7 +159,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let releaseSoundPitch: object | null = null
     // 하늘 줄 = 구장 +0x10 (0x783b0 — `stadiumSkyRowOf`). 원본은 경기 장면을 세울 때 한 번 고른다 — 부르는 쪽이 그 줄을 넘긴다
     // (미션 · 홈런더비도 세션이 장면마다 한 번 굴린 rand(0, 6) 을 넘긴다 — 홈런더비는 결과 진입 0x4f574 에서 한 번 더).
-    // 그리는 그림마다 넘겨받은 줄을 읽는다. ⚠️ 안 넘기는 화면만 예전대로 그림을 세울 때 여기서 굴린다(장면당 한 번이 아니다)
+    // 그리는 그림마다 넘겨받은 줄을 읽는다. ⚠️ 안 넘기는 화면만 예전대로 그림을 세울 때 여기서 굴린다(장면당 한 번이 아니다) —
+    // r112 확인: 타석 화면을 세우는 일곱 곳(팀 경기 · 나리 타자편 · 미션 · 투수 미션 · 투수편 · 홈런더비 · 결과 배경)이 모두 넘기고,
+    // 결과 배경(CareerRoutes)만 정산 기록에 하늘 줄이 없을 때 안 넘긴다
     const fallbackSkyRow =
       latestRef.current.skyRow === undefined ? latestRef.current.random.rand(0, SKY_ROW_COUNT) : 0
     const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
@@ -486,7 +488,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신(장면 틱 · 키 · 갱신 표)을, 52efe 가 상태 그리기를,
       // 53048 이 파티클 틱 · 그리기를 건너뛴다. 창이 선 첫 그림([창+0x250])은 장면을 한 번 더 그리지만 갱신이 없어 앞 그림과 같은
       // 모습이라, 웹은 그 그림부터 캔버스를 그대로 둔다(굳은 화면). 시계도 서 있다가 창이 닫히면 이어 흐른다 — 따라잡지 않는다.
-      // ⚠️ 미확인: [+0x250] 그림의 그리기 쪽 셈(그리기마다 오르는 깜빡임 칸 따위) 한 번은 웹에 없다
+      // ⚠️ 미구현(원본 확인 — R10 7절 r107 보강): [+0x250] 그림은 갱신 없이 그리기만 한 번 돌아 그리기 쪽 셈(0x10 조준 애니 0 칸 ·
+      // 0x11 커서 0x4d708 / 결과 원 0x4d700 · 점수판 0x36714 목표 줄)이 한 번 오른다 — 웹은 그 한 그림을 그리지 않아 안 오른다
       if (isGameSceneFrozen()) {
         animationHandle = requestAnimationFrame(frame)
         return
