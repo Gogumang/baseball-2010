@@ -1,5 +1,5 @@
 import type { SeasonDayBoard } from '@/entities/season-mode/model/seasonRecord'
-import { GLYPH_SPACING, glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
+import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 
 /**
  * 경기 뒤 마무리 판 — 장면 0x105 상태 **0xf1** 의 그림 **0xb400** (직접 떴다).
@@ -157,11 +157,14 @@ export function imageCenterOf(cell: BoardBox, width: number, height: number): { 
 
 /**
  * 점수 숫자 (0xba719, 기준 20 = num 주황 숫자) 를 박스 가운데에 — `SpriteNumber` 에 넘길 오른쪽 끝.
- * ⚠️ 0xba719 의 가운데 맞춤 반올림은 안 읽었다 — 글자 폭(마지막 간격 뺌)을 박스 안에서 내림으로 가운데 둔다(**근사**).
+ * 0xb71c · 0xb758 이 0xba719(박스, 자간 1, 값, 기준 0x14, num, 정렬 0x22, 0, 0, 0) → 0xba51c 로 넘긴다.
+ * 0xba51c(직접 떴다): Σ = 자리마다 (글자폭 + 자간) — **마지막 글자 뒤 자간까지 넣는다**(0xba566~0xba56a),
+ * 정렬 0x2 → x0 += (w − Σ) asr 1 (0xba5e4~0xba5ee, 내림) · 정렬 0x20 → y0 += ceil((h − 최대높이)/2)
+ * (0xba5ae~0xba5c6 — `SpriteNumber` 의 세로 셈과 같다).
  */
 export function scoreRightOf(cell: BoardBox, score: number): number {
   const glyphs = numberGlyphsOf(score)
   const advance = glyphsWidthOf(glyphs)
-  const left = cell.x + Math.trunc((cell.width - (advance - GLYPH_SPACING)) / 2)
+  const left = cell.x + ((cell.width - advance) >> 1)
   return left + advance
 }

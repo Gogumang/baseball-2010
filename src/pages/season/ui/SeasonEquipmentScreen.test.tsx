@@ -34,7 +34,7 @@ describe('장비 창 0xdc 종류 3 (0x83378 · 0x819ac)', () => {
     expect(니블()).toBe('0,1,0,0')
     expect(screen.getByTestId('장비-가격').getAttribute('aria-label')).toBe('5000')
     expect(screen.getByTestId('장비-효과').getAttribute('aria-label')).toBe('+30')
-    expect(screen.getByTestId('장비-설명').textContent).toBe('인기도 제한 없음')
+    expect(screen.getByTestId('장비-설명').getAttribute('aria-label')).toBe('인기도 제한 없음')
   })
 
   it('칸을 옮기면 끼워 보고(감는다 · 다섯 줄 굴림), 취소하면 진짜 니블로 되돌린다', () => {
@@ -45,7 +45,7 @@ describe('장비 창 0xdc 종류 3 (0x83378 · 0x819ac)', () => {
     expect(니블()).toBe('0,11,0,0')
     expect(screen.getByTestId('장비-칸-10').textContent).toBe('????')
     expect(screen.queryByTestId('장비-칸-0')).toBeNull()
-    expect(screen.getByTestId('장비-설명').textContent).toBe('이벤트 오픈!\ngamevil.com')
+    expect(screen.getByTestId('장비-설명').getAttribute('aria-label')).toBe('이벤트 오픈!\ngamevil.com')
     키('Escape')
     expect(니블()).toBe('0,3,0,0')
     expect(screen.getByTestId('장비-칸-0')).toBeTruthy()

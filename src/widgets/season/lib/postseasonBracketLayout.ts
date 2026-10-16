@@ -1,4 +1,6 @@
 import type { PostseasonSeries } from '@/entities/league/model/league'
+import { glyphsWidthOf } from '@/shared/lib/pixelNumber/pixelNumber'
+import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
 
 /**
  * 포스트시즌 대진표 배치 (그리기 `0x853ac` — P6 4a-1 **확정**).
@@ -184,28 +186,45 @@ export function bracketViewOf(series: PostseasonSeries | null): BracketView {
 }
 
 /**
- * 순위 딱지의 "위" 글자 = img_text 프레임 **307** (9×10) — 딱지 칸 오른쪽 끝에 세로 가운데 (정렬 0x24).
+ * 순위 딱지 (직접 떴다, 0x854c8~0x85524 — k = 0..3 이 프레임 53 박스 4 + k):
+ * ```
+ * 854f4  0xb9e05(img_text 307 "위", 박스, 정렬 0x24, 0, 0, ox −6, 0, 0)
+ *        → 0xb9d74: x = 박스x − 6 + (박스폭 − 9) (비트 0x4) · y = 박스y + ceil((15 − 10)/2) (비트 0x20, 0xb9db0~0xb9dc4)
+ * 85522  0xba719(박스, 자간 0, 값 4 − k, 기준 0, [[this+0x13c]+8]+8 = num, 정렬 0x21, ox 8, oy 1, 0)
+ *        → 0xba51c: x0 = 박스x + 8 · y0 = 박스y + 1 + ceil((15 − 10)/2) — 비트 0x1 은 아무도 안 봐 **왼쪽 붙임**이다
+ * ```
+ * 숫자 그림은 num **0~9**(기준 0 — 흰 테두리 8×10, '1' 만 4×10)다. [this+0x13c] 는 순위표 0x7f070 이 "%"(num 106)를 꺼내는
+ * 같은 num 이다(0x7f35e). 예전 웹은 P6 의 "numBox(…, 33, 8)" 를 못 풀어 하늘색 숫자(90번대)로 두었다.
  */
 export const RANK_UNIT = { folder: './sprites/img_text/frames', frame: 307, width: 9, height: 10 } as const
+/** "위" 의 ox (0x854ec `movs r3, #6; rsbs`) */
+const RANK_UNIT_DX = -6
+/** 숫자의 ox · oy (0x85508 · 0x8550e) */
+const RANK_DIGIT_DX = 8
+const RANK_DIGIT_DY = 1
+/** num 0~9 의 높이 */
+export const RANK_GLYPH_HEIGHT = 10
 
-/**
- * ⚠️ **미해독 — 근사**: `numBox` 의 인자 `33` 이 **어느 숫자 글자꼴인지** 못 읽었다.
- * `num.pzx` 의 숫자 묶음은 10칸 단위(0·10·20·30·40·50·90…)라 33 은 묶음 머리가 아니고,
- * P6 이 같은 자리를 "글꼴 34 가운데"·"글꼴 36" 이라고도 적는데 34 = 0x22 · 36 = 0x24 는
- * 다른 화면에서 쓰는 **정렬 상수**와 겹친다 — 글자꼴 번호가 아닐 수 있다.
- * 그래서 순위표(0x7f070)와 같은 **하늘색 숫자(num 90번대, 8×8)** 로 둔다.
- */
-export { SKY_BLUE_GLYPH_HEIGHT as RANK_GLYPH_HEIGHT, skyBlueNumberGlyphsOf as rankGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
+/** 순위 숫자 — num 프레임 0 + 숫자, 자간 0 (한 자리뿐이다: 1~4) */
+export function rankGlyphsOf(rank: number): Glyph[] {
+  return [...String(rank)].map((digit) => ({ frame: Number(digit), width: digit === '1' ? 4 : 8, spacing: 0 }))
+}
 
-/** "위" 그림 왼쪽 위 — 딱지 칸 오른쪽 끝, 세로 가운데 */
+/** "위" 그림 왼쪽 위 — 오른쪽 맞춤 ox −6, 세로 가운데(올림) */
 export function rankUnitPositionOf(tag: BracketBox): { x: number; y: number } {
+  const dy = tag.height - RANK_UNIT.height
   return {
-    x: tag.x + tag.width - RANK_UNIT.width,
-    y: tag.y + Math.floor((tag.height - RANK_UNIT.height) / 2),
+    x: tag.x + RANK_UNIT_DX + tag.width - RANK_UNIT.width,
+    y: tag.y + (dy >> 1) + (dy & 1),
   }
 }
 
-/** 숫자는 "위" 바로 왼쪽에 오른쪽 정렬로 붙는다 */
-export function rankDigitRightOf(tag: BracketBox): number {
-  return tag.x + tag.width - RANK_UNIT.width
+/** 숫자는 박스 x + 8 에서 왼쪽 붙임 — `SpriteNumber` 에 넘길 오른쪽 끝 */
+export function rankDigitRightOf(tag: BracketBox, rank: number): number {
+  return tag.x + RANK_DIGIT_DX + glyphsWidthOf(rankGlyphsOf(rank))
+}
+
+/** 숫자 세로 칸 — oy 1 을 더한 박스(`SpriteNumber` 가 올림 가운데를 한다) */
+export function rankDigitBoxTopOf(tag: BracketBox): number {
+  return tag.y + RANK_DIGIT_DY
 }

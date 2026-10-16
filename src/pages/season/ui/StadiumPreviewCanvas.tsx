@@ -27,7 +27,7 @@ export function StadiumPreviewCanvas({ state }: { readonly state: StadiumPreview
   }, [])
 
   return (
-    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="구장-미리보기"
+    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="구장-미리보기" data-sky-column={state.skyColumn}
       style={{ position: 'absolute', left: 0, top: 0 }} />
   )
 }

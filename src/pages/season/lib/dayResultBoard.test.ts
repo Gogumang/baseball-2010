@@ -65,4 +65,9 @@ describe('가운데 맞춤', () => {
     // 왼쪽 = 71 + trunc((25 − 6) / 2) = 80, 전진 = 7
     expect(scoreRightOf(BOARD_FRAME.scoreA, 3)).toBe(87)
   })
+
+  it('Σ 는 마지막 자간까지 넣고 (w − Σ) asr 1 로 내린다 (0xba51c 0xba566 · 0xba5e4) — "11" 은 왼쪽 78', () => {
+    // Σ = (4 + 1) × 2 = 10, 왼쪽 = 71 + (15 >> 1) = 78, 오른쪽 끝 = 88
+    expect(scoreRightOf(BOARD_FRAME.scoreA, 11)).toBe(88)
+  })
 })

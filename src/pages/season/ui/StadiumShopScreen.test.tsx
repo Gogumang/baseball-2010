@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { StadiumShopScreen } from '@/pages/season/ui/StadiumShopScreen'
+import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
@@ -40,7 +41,11 @@ const 띄우기 = (record: SeasonRecord, 나머지: Partial<Parameters<typeof St
   return onChange
 }
 
-const 칸고르기 = (이름: string) => fireEvent.click(screen.getByRole('button', { name: 이름 }))
+/** 칸 줄 누름 칸 — 처음 누르면 그 칸으로 초점 · 커서를 옮기고, 커서 칸을 다시 누르면 확인(−5) */
+const 칸고르기 = (이름: string) => {
+  fireEvent.click(screen.getByRole('option', { name: 이름 }))
+  fireEvent.click(screen.getByRole('option', { name: 이름 }))
+}
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 describe('구장 아이템 상점 — 가드 순서 (0x9a84~0x9bd2)', () => {
@@ -68,14 +73,19 @@ describe('구장 아이템 상점 — 가드 순서 (0x9a84~0x9bd2)', () => {
     expect(알림글()).toContain('이미 가지고 있는 아이템입니다')
   })
 
-  it('히든 칸(4~6)은 해금 전이면 이름도 안 보이고 StrMODE[76] 로 막힌다', () => {
+  it('히든 칸(4~6)은 해금 전이면 이름이 "????"(0xd4c18)이고 StrMODE[76] 로 막힌다', () => {
     띄우기(레코드({ popularity: 9999, money: 9999 }))
 
-    // 히든 세 칸은 "???" 로만 보인다
-    expect(screen.getAllByRole('button', { name: '관중석 ???' })).toHaveLength(3)
-    fireEvent.click(screen.getAllByRole('button', { name: '관중석 ???' })[0])
+    // 보이는 다섯 줄(0~4) 중 칸 4 가 잠긴 히든 — 설명은 힌트 StrITEM[249]
+    칸고르기('관중석 ????')
 
     expect(알림글()).toContain('아직 구매할 수 없는 아이템입니다')
+  })
+
+  it('히든 칸 힌트는 설명 상자에 — 관중석 칸 4 StrITEM[249] · 전광판은 +3 (0x83e4c~0x83e5a)', () => {
+    띄우기(레코드())
+    fireEvent.click(screen.getByRole('option', { name: '관중석 ????' }))
+    expect(screen.getByTestId('구장-설명').getAttribute('aria-label')).toBe('나는야\n관중석 컬렉터')
   })
 
   it('해금된 히든 칸은 살 수 있다', () => {
@@ -154,12 +164,22 @@ describe('구장 아이템 상점 — 구매 확정 (0x812c)', () => {
 })
 
 describe('구장관리 교체 (0x7958)', () => {
-  it('구장관리(0xea)만 구장 미리보기(0xb158)를 깐다 — 상점은 없다', () => {
+  it('구장관리(0xb158)도 상점(0xb1f8 메뉴 칸 1 갈래)도 구장 미리보기를 깐다', () => {
     띄우기(레코드(), { mode: '구장관리' })
     expect(screen.getByTestId('구장-미리보기')).toBeTruthy()
     cleanup()
     띄우기(레코드())
-    expect(screen.queryByTestId('구장-미리보기')).toBeNull()
+    expect(screen.getByTestId('구장-미리보기')).toBeTruthy()
+  })
+
+  it('하늘 칸은 진입 때의 마지막 경기 상태 +0x6b 다 (0xe558 0x783b0 → 구장 +0x18 · 0xe560 0x76fc5)', () => {
+    setLiveGameInningIndex(9)
+    띄우기(레코드(), { mode: '구장관리' })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-sky-column')).toBe('9')
+    cleanup()
+    resetLiveGameState()
+    띄우기(레코드(), { mode: '구장관리' })
+    expect(screen.getByTestId('구장-미리보기').getAttribute('data-sky-column')).toBe('0')
   })
 
   it('⚠️ 원본 버그: 가드가 하나도 없어 **안 산 칸도 그대로 끼워진다**', () => {
@@ -180,14 +200,38 @@ describe('구장관리 교체 (0x7958)', () => {
   })
 })
 
-describe('키 조작 (0x957c)', () => {
-  it('↑↓ 로 칸을 옮기고 확인 키로 고른다', () => {
+describe('키 조작 (0x957c · 창 키 0x819ac)', () => {
+  it('종류 목록에서 확인 · 아래 → 칸 목록(커서 0), ↑↓ 로 칸을 옮기고 확인 키로 고른다', () => {
     띄우기(레코드({ popularity: 0, money: 9999 }))
 
+    expect(screen.getByTestId('구장-창').getAttribute('data-focus')).toBe('종류')
+    fireEvent.keyDown(window, { key: 'ArrowDown' }) // 초점 → 칸 목록, 칸 0
+    expect(screen.getByTestId('구장-창').getAttribute('data-focus')).toBe('칸')
     fireEvent.keyDown(window, { key: 'ArrowDown' }) // 0 → 1 (2단 관중석)
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(알림글()).toContain('필요한 인기도 : 200')
+  })
+
+  it('칸 목록에서 취소는 종류 목록으로, 종류 목록에서 ← → 로 종류를 감아 옮긴다 (0x81a6c · 0x81ca2)', () => {
+    const onBack = vi.fn()
+    띄우기(레코드(), { onBack })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onBack).not.toHaveBeenCalled()
+    expect(screen.getByTestId('구장-창').getAttribute('data-focus')).toBe('종류')
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByTestId('구장-창').getAttribute('data-kind')).toBe('잔디')
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByTestId('구장-창').getAttribute('data-kind')).toBe('관중석')
+  })
+
+  it('칸은 끝에서 감고 보이는 다섯 줄 밖이면 굴린다 (깃발 0x30 · 0x6c2bd)', () => {
+    띄우기(레코드())
+    fireEvent.keyDown(window, { key: 'Enter' })
+    fireEvent.keyDown(window, { key: 'ArrowUp' }) // 0 → 6
+    expect(screen.getByTestId('구장-칸-6')).toBeTruthy()
+    expect(screen.queryByTestId('구장-칸-1')).toBeNull()
   })
 
   it('취소(−16)로 되돌아간다', () => {
@@ -206,7 +250,7 @@ describe('잔디', () => {
   it('⚠️ 원본 버그: 1·2·3억을 받으면서 **관중 계산에 하나도 안 들어간다** (S3 8절)', () => {
     const onChange = 띄우기(레코드({ popularity: 0, money: 9999 }))
 
-    fireEvent.click(screen.getByRole('button', { name: '잔디' }))
+    fireEvent.click(screen.getByRole('option', { name: '잔디' }))
     칸고르기('잔디 인조잔디')
     expect(알림글()).toContain('소지금 1억') // 표값 1 × 100 = 100(100만) = 1억
     fireEvent.click(screen.getByRole('button', { name: '예' }))
@@ -222,9 +266,28 @@ describe('잔디', () => {
   it('잔디에는 히든이 없어 네 칸뿐이고 인기도 제한도 없다', () => {
     띄우기(레코드())
 
-    fireEvent.click(screen.getByRole('button', { name: '잔디' }))
+    fireEvent.click(screen.getByRole('option', { name: '잔디' }))
 
-    expect(screen.getAllByRole('button', { name: /^잔디 / })).toHaveLength(4)
-    expect(screen.getByRole('group', { name: '구장 아이템' }).textContent).toContain('인기도 제한 없음')
+    expect(screen.getAllByRole('option', { name: /^잔디 / })).toHaveLength(4)
+    // 잔디 설명은 StrITEM[144 + 칸] 한 줄뿐이다 (0x83ebe~0x83ee6)
+    expect(screen.getByTestId('구장-설명').getAttribute('aria-label')).toBe('조금은 거친\n인조잔디')
+  })
+})
+
+describe('창 그림 (0x83378 종류 4)', () => {
+  it('설명은 인기도 줄 → 효과 줄 차례다 (0x83f30 · 0x83f38 · 0x83f40)', () => {
+    띄우기(레코드())
+    fireEvent.click(screen.getByRole('option', { name: '관중석 2단 관중석' }))
+    expect(screen.getByTestId('구장-설명').getAttribute('aria-label')).toBe('인기도 200 이상\n25000명 수용\n가능')
+    fireEvent.click(screen.getByRole('option', { name: '전광판' }))
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.getByTestId('구장-설명').getAttribute('aria-label')).toBe('인기도 100 이상\n관중 +2000')
+  })
+
+  it('가격은 0xd45c0 × 10000 만원 — 커서 칸에만, 칸 목록에 있을 때만', () => {
+    띄우기(레코드())
+    expect(screen.queryByTestId('구장-가격')).toBeNull()
+    fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
+    expect(screen.getByTestId('구장-가격').getAttribute('aria-label')).toBe('100000')
   })
 })

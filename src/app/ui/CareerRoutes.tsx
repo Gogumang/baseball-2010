@@ -266,6 +266,7 @@ function CareerScreens({
       return (
         <OutingMapScreen
           noticeText={session.outingNotice}
+          onCloseNotice={actions.closeOutingNotice}
           onRun={actions.runOutingFunction}
           onBack={backToManagement}
           // [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 에 찍은 값 그대로(0x7ed6c 는 행동 여부를 안 본다)

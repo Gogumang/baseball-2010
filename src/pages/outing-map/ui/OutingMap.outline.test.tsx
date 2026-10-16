@@ -15,7 +15,7 @@ afterEach(cleanup)
 describe('외출 지도 고른 건물 (0x7ec04~0x7ecc0)', () => {
   it('효과 0xb · 흰색으로 (x−1,y)(x,y−1)(x+1,y)(x,y+1) 네 번 찍은 뒤 건물을 그린다 — 고르지 않은 건물은 테두리가 없다', () => {
     const { container } = render(
-      <OutingMap selectedPlaceId="hospital" eventPlaceIds={new Set()} noticeText="" onOpen={vi.fn()} onBack={vi.fn()} hour={10} />,
+      <OutingMap selectedPlaceId="hospital" eventPlaceIds={new Set()} onOpen={vi.fn()} onBack={vi.fn()} hour={10} />,
     )
     const stamps = Array.from(container.querySelectorAll<HTMLElement>('[data-solid-stamp="#FFFFFF"]'))
     // 지도 원점 (0, 11) + 프레임 원점 (10, 20)

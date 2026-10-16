@@ -4,7 +4,7 @@ import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
   BRACKET_BACKDROP, LEG_ORDER, LINE_COLOR, LINE_SEGMENTS, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS,
-  RANK_UNIT, TEAM_CELLS, WON_LINE_COLOR, bracketViewOf, cellIndexOfRank, rankDigitRightOf, rankGlyphsOf,
+  RANK_UNIT, TEAM_CELLS, WON_LINE_COLOR, bracketViewOf, cellIndexOfRank, rankDigitBoxTopOf, rankDigitRightOf, rankGlyphsOf,
   rankUnitPositionOf,
 } from '@/widgets/season/lib/postseasonBracketLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
@@ -81,11 +81,11 @@ export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps
             ) : (
               <img className={styles.logo} src={team.logoUrl} alt={team.name} style={box} />
             )}
-            {/* 순위 딱지 = 숫자 그림 + img_text 307 "위" 오른쪽 정렬 (0x24) — 숫자 글꼴은 `rankGlyphsOf` 주석(근사) */}
+            {/* 순위 딱지 = num 0~9 숫자 (x + 8 왼쪽 붙임) + img_text 307 "위" 오른쪽 정렬 ox −6 — `rankGlyphsOf` 주석 */}
             <div className={styles.rankTag} data-rank={rank}
               style={{ left: tag.x, top: tag.y, width: tag.width, height: tag.height }} />
-            <SpriteNumber glyphs={rankGlyphsOf(rank)} right={rankDigitRightOf(tag)}
-              boxTop={tag.y} boxHeight={tag.height} glyphHeight={RANK_GLYPH_HEIGHT} />
+            <SpriteNumber glyphs={rankGlyphsOf(rank)} right={rankDigitRightOf(tag, rank)}
+              boxTop={rankDigitBoxTopOf(tag)} boxHeight={tag.height} glyphHeight={RANK_GLYPH_HEIGHT} />
             <img className={styles.rankUnit} alt="위"
               src={`${RANK_UNIT.folder}/${String(RANK_UNIT.frame).padStart(3, '0')}.png`}
               style={{ left: rankUnitPositionOf(tag).x, top: rankUnitPositionOf(tag).y }} />

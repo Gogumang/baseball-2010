@@ -349,6 +349,8 @@ export interface PitcherLeagueSession {
     readonly enterOutingPlace: (place: OutingPlace) => void
     /** 126 효과 팝업 [확인] → (입원이면 회복 글) → 105 (틀 0x1575c) */
     readonly closeOutingResult: () => void
+    /** 113 막힘 팝업(0xbbef9(글, 1, 1, 1)) [확인] — 상태는 113(말풍선) 그대로다 */
+    readonly closeOutingNotice: () => void
     /** 105 위 입원 회복 팝업 [확인] */
     readonly dismissOutingRecoveryNotice: () => void
     /**
@@ -1855,6 +1857,7 @@ export function usePitcherLeagueSession(
     setScene('관리')
   }, [outingResult])
   const dismissOutingRecoveryNotice = useCallback(() => setOutingRecoveryNotice(''), [])
+  const closeOutingNotice = useCallback(() => setOutingNotice(''), [])
   /**
    * 외출 지도 [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 → 0x8cdc0 이 장소마다 파일 순서 첫 이벤트(대상 1·3, trigger 2~6)를
    * **들어설 때 한 번** 넣는다(`outingPlaceSlotsOf`). 지도 그림 0x7ed6c 의 [!] 와 [들어가기] 0x8ce58 이 다음 112 진입까지 이 값을 쓴다.
@@ -2393,6 +2396,7 @@ export function usePitcherLeagueSession(
       finishOutingPresentation,
       enterOutingPlace,
       closeOutingResult,
+      closeOutingNotice,
       dismissOutingRecoveryNotice,
       giveStoryReward,
       confirmStoryChoice,

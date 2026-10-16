@@ -3,6 +3,8 @@ import { FrameSprite, MessageBox, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
+import { FONT_SPACING, LINE_HEIGHT } from '@/shared/lib/font/layout'
+import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
@@ -30,8 +32,11 @@ const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).pa
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
 /** num "+" 105 크기 */
 const PLUS_SIZE = 6
-/** 설명 글 줄 — 다른 시즌 창과 같은 13px (⚠️ 원본 글꼴 크기는 근사) */
-const TEXT_LINE = 13
+/**
+ * 설명 글 줄 간격 — 0xba411(박스 4, 글, 정렬 0x11, 5, 5) → 0xba2e4 가 글상자 0x6ecd0 으로 그려 **앱 전역 글꼴**(줄 11 + 줄간 3)이다.
+ * 정렬 0x11 의 비트 0x1 · 0x10 은 0xba2e4 가 안 본다(0x2 · 0x4 · 0x20 · 0x40 만) — (x + 5, y + 5) 왼쪽 위 그대로.
+ */
+const TEXT_LINE = LINE_HEIGHT + FONT_SPACING.app.lineGap
 
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
 const isConfirmKey = (key: string) => key === 'Enter' || key === '5'
@@ -73,7 +78,9 @@ const withNibble = (nibbles: readonly number[], part: number, level: number) =>
  * 취소(0x81a9a)는 0xb5695 로 진짜 줄 니블을 **읽어** 사본에 되쓴다 — 진짜 줄을 고치는 곳은 구매 적용 0x7d90 뿐이다(나리 0x108f8 과 같은 꼴).
  * 0x81938 이 레이더 애니([[skin+0xd4]+0x1e3] = 0)를 다시 거는 것은 카드 레이더의 `useRadarGrowth` 가 목표값이 바뀐 그림에서
  * 지난 목표값부터 새 값으로 오르내려 맞춘다.
- * ⚠️ 미확인: 숫자 키 '2'(위) · '4' · '6' 은 목록 객체가 방향키로 바꿔 받는다고 보고 같은 걸음으로 둔다.
+ * 숫자 키: 종류 3 의 두 목록은 0x81792~0x817ba 가 vt+0x10(4, 1, **키 방식 1**, 0x30) · vt+0x1c(1, 11, 1, 0x30) 로 세우고, 격자 키
+ * 0x6c030 의 방식 1 갈래(0x6c096 — 표 0xd2e7c)가 '2' → −1(위) · '4' → −3(왼) · '6' → −4(오른) · '8' → −2(아래) · '5' → −5 로
+ * 바꿔 받는다(직접 떴다) — 방향키와 같은 걸음이다.
  */
 export function SeasonEquipmentScreen({
   record, teamMorale, view, equipment, isHiddenOpen, gamePoint = 0, onPurchase, onBack,
@@ -278,9 +285,10 @@ function EquipmentWindow({
               onClick={() => onPickLevel(index)}>
               {name}
             </button>
+            {/* 0xb9ed5 → 0x6a978 은 폭 · 높이에 1 을 더해 (w + 1) × (h + 1) 칸을 덮는다 (U-113, R12 6절) */}
             {isCursor && isBlinkOn(tick) && (
               <div data-testid="장비-커서"
-                style={{ ...pixel, left: box.x, top: box.y, width: box.width, height: box.height, boxSizing: 'border-box',
+                style={{ ...pixel, left: box.x, top: box.y, width: box.width + 1, height: box.height + 1, boxSizing: 'border-box',
                   border: `1px solid ${EQUIPMENT_COLORS.cursor}` }} />
             )}
           </div>
@@ -302,11 +310,13 @@ function EquipmentWindow({
             <SpriteNumber glyphs={numberGlyphsOf(bonus)} right={valueRight} boxTop={effectRow.y} boxHeight={values.height} />
           </div>
           {descriptionText !== null && (
-            <div className={styles.notice} data-testid="장비-설명"
-              style={{ left: description.x + EQUIPMENT_WINDOW.descriptionInset, top: description.y + EQUIPMENT_WINDOW.descriptionInset,
-                width: description.width - EQUIPMENT_WINDOW.descriptionInset * 2, lineHeight: `${TEXT_LINE}px`,
-                color: EQUIPMENT_COLORS.cursor }}>
-              {descriptionText.replaceAll('!N', '\n')}
+            <div data-testid="장비-설명" aria-label={descriptionText.replaceAll('!N', '\n')}>
+              {descriptionText.split('!N').map((line, index) => (
+                <PixelText key={index} style={{
+                  ...pixel, left: description.x + EQUIPMENT_WINDOW.descriptionInset,
+                  top: description.y + EQUIPMENT_WINDOW.descriptionInset + index * TEXT_LINE, color: EQUIPMENT_COLORS.cursor,
+                }}>{line}</PixelText>
+              ))}
             </div>
           )}
         </>

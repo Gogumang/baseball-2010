@@ -41,10 +41,11 @@ export interface NextGameScreenProps {
  * 곧 이 화면은 **순위표 한 장**이다 — 상대·구장·홈원정 글은 그리지 않는다(공통 틀 0x9f60·
  * 상태판도 안 부른다). 상태별 덧그림 0xef46~0xef98 도 0xd9·0xdc·0xe2 만 본다.
  *
- * ⚠️ **미해결·근사**
- *   - ⚠️ 웹 자리: 확인(−5)은 원본 화면에 그림 자리가 없다 — 화면 전체 투명 누름 칸으로 받는다. 취소는 바닥띠 되돌아가기
- *     (관리 메뉴에서 왔을 때만 그린다 — 그 밖에는 원본도 아무 일이 없다).
- * *   - 순위표 줄 끝 이미지 106(내 팀 표시로 보임)은 `StandingsWindow` 에 아직 없다(P6 4a-2 조건 미확인).
+ * 순위표 줄 끝 이미지 106 은 내 팀 표시가 아니라 num 106 "%" 다 — 0x7f366~0x7f37e 가 줄마다 조건 없이 0xba759(num, 106,
+ * 박스 4 x + 0x19, 줄 y + 5)로 찍는다(직접 떴다). `StandingsWindow` 의 `PERCENT_OFFSET` 이 그것이다.
+ *
+ * ⚠️ 웹 자리: 확인(−5)은 원본 화면에 그림 자리가 없다 — 화면 전체 투명 누름 칸으로 받는다. 취소는 바닥띠 되돌아가기
+ * (관리 메뉴에서 왔을 때만 그린다 — 그 밖에는 원본도 아무 일이 없다).
  */
 export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, gamePoint }: NextGameScreenProps) {
   useSeasonCursor({ count: 1, onSelect: onConfirm, onCancel })

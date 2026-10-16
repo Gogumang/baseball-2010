@@ -253,6 +253,7 @@ function PitcherLeagueScreens({
   const outingMap = (
     <OutingMapScreen
       noticeText={session.outingNotice}
+      onCloseNotice={actions.closeOutingNotice}
       onRun={actions.runOutingFunction}
       // 112 취소 → 105 (키 0x13ba4)
       onBack={() => actions.goto('관리')}

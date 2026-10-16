@@ -221,26 +221,30 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
   it('기본 4칸을 모으면 히든 칸이 **열린 채로 남는다** — 예전에는 onUnlock 이 없어 사라졌다', () => {
     const store = 메모리저장(세이브(관중석([0, 1, 2])))
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
-    // 사기 전에는 히든 세 칸이 모두 "???" 다
-    expect(screen.getAllByRole('button', { name: '관중석 ???' })).toHaveLength(3)
+    // 사기 전에는 보이는 다섯 줄의 히든 칸 4 가 "????"(0xd4c18) 다
+    expect(screen.getByRole('option', { name: '관중석 ????' })).toBeDefined()
 
-    fireEvent.click(screen.getByRole('button', { name: '관중석 4단 관중석' }))
+    fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
+    fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     fireEvent.click(screen.getByRole('button', { name: '확인' })) // 구매 완료 팝업 닫기
 
     // 컬렉터 해금 13 이 열려 관중석 히든 4(트로피컬) 이름이 보인다
-    expect(screen.getByRole('button', { name: '관중석 트로피컬' })).toBeDefined()
-    expect(screen.getAllByRole('button', { name: '관중석 ???' })).toHaveLength(2)
+    expect(screen.getByRole('option', { name: '관중석 트로피컬' })).toBeDefined()
+    expect(screen.queryByRole('option', { name: '관중석 ????' })).toBeNull()
   })
 
   it('열린 히든 칸은 실제로 살 수 있다 (checkStadiumPurchase 의 미오픈 가드를 지난다)', () => {
     const store = 메모리저장(세이브(관중석([0, 1, 2])))
     render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: '관중석 4단 관중석' }))
+    fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
+    fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '확인' })) // 히든 오픈 알림(0x62368) 닫기 — 떠 있는 동안은 창이 키를 안 받는다
 
-    fireEvent.click(screen.getByRole('button', { name: '관중석 트로피컬' }))
+    fireEvent.click(screen.getByRole('option', { name: '관중석 트로피컬' }))
+    fireEvent.click(screen.getByRole('option', { name: '관중석 트로피컬' }))
 
     // 미오픈(StrMODE[76]) 이 아니라 구매 확인(StrMODE[79]) 이 뜬다
     expect(알림글()).toContain('구매하겠습니까')
@@ -332,7 +336,7 @@ describe('아이템 메뉴 0xd0 배선', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
 
     fireEvent.click(screen.getByRole('button', { name: '구장아이템' }))
-    expect(screen.getAllByRole('button', { name: /관중석/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('option', { name: /관중석/ }).length).toBeGreaterThan(0)
   })
 })
 
