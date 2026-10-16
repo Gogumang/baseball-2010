@@ -395,7 +395,9 @@ export function multiOutPlayRecordIdsOf(input: {
  * 3 이 되면 32, 4 가 되면 33. 5 번째부터는 아무것도 없고 4 에서 되돌리지도 않는다.
  * 부르는 곳은 사람 타석 판정 0x51408 의 v = 7(파울) 갈래 하나뿐 → 간이 엔진 동료 타석에서는 안 나온다.
  * 0 으로: 타석 초기화 0xa5bcc, 그리고 공 도착 판정 0x3dfac 끝의 0xa5fdc → 파울 아닌 공이 오면 끊긴다
- *   (⚠️ **유력** — 0x3dfac 의 모든 갈래가 끝을 지나는지는 안 봤다. 리셋은 부르는 쪽이 0 을 넘겨 한다).
+ *   (r126 확정 — 0x3dfac 의 출구는 0x3e1fa 의 pop 하나뿐이고, 0x3e064·0x3e068·0x3e06c → 0x3e0e4 ·
+ *   0x3e0a4 → 0x3e11a · 점프표 0xcffb4 열세 칸(0x3e134·0x3e156·0x3e15e·0x3e196·0x3e1ae·0x3e1b4·0x3e1d4) 모두
+ *   0x3e1d4 → 0x3e1ec 를 지나 0x3e1f6 에서 0xa5fdc(ctx) 를 부른다. 리셋은 부르는 쪽이 0 을 넘겨 한다).
  * 게이트상 사람 공격 때만.
  * 배선: 공마다 `features/play-at-bat/model/atBatPitchTally.tallyPitch` 가 부르고(파울 아닌 공이면 0 으로),
  *   모인 id 를 `startPlayerOutcome`(·`applyPlayerOutcome`) 의 `foulRecordIds` 로 넘기면 gameFlow 가 얹는다.

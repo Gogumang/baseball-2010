@@ -1285,6 +1285,9 @@ export function TeamGameScreen({
           <BurstMissionWindow
             lines={visibleBurstLines}
             judgement={resolution?.judgement ?? null}
+            row={resolution?.row ?? null}
+            // 0xb63c0(지금 타자) — 타석 소개 판과 같은 값
+            isBatterLeftHanded={matchup.batterHand !== 0}
             onClose={
               resolution !== null
                 ? actions.closeBurst

@@ -66,7 +66,11 @@ export type RewardNotice =
   | { readonly kind: '알림'; readonly text: string }
   /** 0x741a0 — 그리기 0x87108(img_text 370 획득 / 371 제거 + 글) */
   | { readonly kind: '스킬'; readonly text: string; readonly gained: boolean }
-  /** 첫 종류 7 인데 0x62368 글을 웹이 못 짓는 id(≤ 12 · ≥ 51 — 데이터에 없다) — 창 없이 지나간다(⚠️ 미해결) */
+  /**
+   * 첫 종류 7 인데 0x62368 이 이름을 못 짓는 id(< 0 · ≥ 51 — 0x61e8c 가 NULL) — 창 없이 지나간다. 원본은 NULL 을 단말 sprintf 로
+   * 넘겨 무엇이 찍히는지 바이너리에서 읽을 수 없다(`hiddenOpenNotice` 머리글). 이벤트 데이터의 종류 7 값은 19 · 29 · 35 · 43
+   * 뿐이라(events.json 전수 · seasonEvents.json 없음, r126) 실제로는 안 난다.
+   */
   | { readonly kind: '없음' }
   /** 첫 종류 21 — 엔딩(0x8d4c4), 글 · 창 없음 */
   | { readonly kind: '엔딩' }
@@ -273,7 +277,7 @@ export interface SeasonRewardNoticeRecord {
 /**
  * 시즌모드(모드 2)의 알림 맥락 — 0x8beb8 은 모드 2 에서도 같은 함수다: 13~16 이름 +9 · GP 이름 StrITEM 119 + 값 − 1 ·
  * 연차 보정(0x8d508) 모드 2 갈래. 선수 칸은 시즌 기록(SR)이다.
- * ⚠️ 연봉(종류 20)의 0xa39fc(선수) 는 s_event 에 그 종류가 없어(전수) 값을 두지 않는다 — 0 (미해결, 쓰이지 않는다).
+ * 연봉(종류 20)의 0xa39fc(선수) 는 s_event 에 그 종류가 없어(seasonEvents.json 종류 0 · 1 · 3 · 10 · 11 · 21 뿐 — r126 전수) 값을 두지 않는다 — 0(쓰이지 않는다).
  */
 export function seasonRewardNoticeContextOf(record: SeasonRewardNoticeRecord, random: RandomPort): RewardNoticeContext {
   return { mode: SEASON_MODE, years: record.yearIndex, illness: record.illness, salaryBase: 0, random }

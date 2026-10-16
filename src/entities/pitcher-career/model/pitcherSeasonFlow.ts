@@ -177,7 +177,7 @@ export function pitcherAwardRoleOf(career: PitcherCareer): AwardRole {
 /**
  * 내 투수의 순위표 한 줄 — 칸 대응은 P1 6절 그대로다
  * (아웃 +0x20 · 실점 +0x22 · 세이브 +0x24 · 탈삼진 +0x26 · 승 +0x2e · 패 +0x2f).
- * ⚠️ 실점이 곧 자책점이다 — 웹에 실책 개념이 없다 (**근사다**. 원본 +0x22 도 자책을 가르지 않는다).
+ * 실점이 곧 자책점이다 — 원본 +0x22 도 자책을 가르지 않아(S1 · 0xa8ed4) 원본과 같다.
  */
 export function myPitcherLeagueRecordOf(career: PitcherCareer): LeagueRecord {
   return {

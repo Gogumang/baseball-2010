@@ -1021,6 +1021,9 @@ export function PitcherGameScreen({
           <BurstMissionWindow
             lines={visibleBurstLines}
             judgement={resolution?.judgement ?? null}
+            row={resolution?.row ?? null}
+            // 0xb63c0(지금 타자) — 타석 장면이 그리는 타자 손
+            isBatterLeftHanded={stageSide !== 0}
             onClose={
               resolution !== null ? actions.closeBurst : () => setShownProposal(proposal)
             }

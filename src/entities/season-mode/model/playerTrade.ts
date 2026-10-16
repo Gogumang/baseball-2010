@@ -1,5 +1,5 @@
 import {
-  HALL_OF_FAME_FIRST_ID, OWN_PLAYER_ID, PLAYER_OWN_BIT, PLAYER_SLOT_MASK, tableTeamOf, withSlot, withTableTeam,
+  HALL_OF_FAME_FIRST_ID, PLAYER_OWN_BIT, PLAYER_SLOT_MASK, isHallOfFameRecord, tableTeamOf, withSlot, withTableTeam,
 } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
@@ -185,16 +185,15 @@ export function withTradeMoney(record: SeasonRecord, myGrade: number, opponentGr
 export type TradeRefusal = '나리선수' | '명예선수'
 
 /**
- * 트레이드 못 하는 선수인가 — 원본은 `0xb6389`(나만의리그)·`0xb6349`(명예의 전당) 로 본다
- * (P4 5절 · J 4-5: CPU 요청 대상에서도 빠진다).
- *
- * ⚠️ 그 두 판정 함수의 속은 해독되지 않았다. 웹에는 같은 뜻의 칸이 이미 있어
- * **영입 화면과 같은 규칙**으로 읽는다 — 명예의 전당은 id 구간(`0xb4~`), 나만의리그 육성
- * 선수는 `+0xa` 의 bit7(`PLAYER_OWN_BIT`)이다. 판정 대응은 **근사다**.
+ * 트레이드 못 하는 선수인가 — 트레이드 확인 0x7346 이 `0xb6389`(나만의리그) → StrMODE[165](0x733a~0x7342) ·
+ * `0xb6349`(명예의 전당) → [166](0x7346~0x7358) **차례로** 본다(r126 직접 떴다). CPU 요청 0x93c8(0x9472 · 0x94e2)도
+ * 둘 중 하나면 다시 뽑는다(P4 5절 · J 4-5).
+ * - `0xb6388` = `+0xa` bit7 (`PLAYER_OWN_BIT`, AUDIT 2026-10-16 확정)
+ * - `0xb6348` = 마선수(bit6)가 아니고 투수면 id 0xb4..0xcc · 타자면 0xc8..0xd0 (`isHallOfFameRecord`)
  */
 export function tradeRefusalOf(player: SeasonPlayer): TradeRefusal | null {
-  if (player.id !== OWN_PLAYER_ID && player.id >= HALL_OF_FAME_FIRST_ID) return '명예선수'
   if ((player.kindByte & PLAYER_OWN_BIT) !== 0) return '나리선수'
+  if (isHallOfFameRecord(player)) return '명예선수'
   return null
 }
 

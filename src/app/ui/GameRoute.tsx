@@ -408,6 +408,9 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         <BurstMissionWindow
           lines={burstLines}
           judgement={resolution?.judgement ?? null}
+          row={resolution?.row ?? null}
+          // 0xb63c0(지금 타자) — 모드 4 의 돌발은 사람 장면(내 타석)에서만 뜨므로 내 선수 손으로 본다(⚠️ 유력: 결과 창은 타석이 끝난 뒤다)
+          isBatterLeftHanded={battingSide !== 0}
           onClose={resolution !== null ? closeBurstResult : closeProposal}
         />
         </ScreenOverlay>

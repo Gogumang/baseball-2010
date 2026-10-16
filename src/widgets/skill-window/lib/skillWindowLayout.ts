@@ -193,7 +193,9 @@ export const isBlinkVisible = (update: number) => update % 10 !== 0
  *   스킬 (0x831e4~0x8323c): 소개 StrSKILL[표 번호] 를 (박스x + 3, 박스y + 3) · "효과 : !cFFFF00" + StrSKILL[40 + 표 번호]
  *   를 (박스x + 3, 박스y + 30), 둘 다 정렬 0x11 · 줄 너비는 박스 폭 174 그대로.
  *   서브아이템 (0x82a02 · 0x82b72): 박스를 (+3, +3, −6, −6) 으로 줄여 정렬 0x11 로 한 덩어리.
- * ⚠️ 글 엔진 0x6ef4d 의 줄 간격은 읽지 않았다 — 웹은 공용 MarkupText(14px) 를 쓴다 (근사).
+ * 줄 간격 14 는 확정(r126): 글은 0xba411 → 0xba2e4 가 0x6ecd1(글꼴 상자 = 앱 전역 글꼴 [[0x1400070]+0x3c]) 뒤 0x6ef4d 로
+ * 그린다(0xba2fc · 0xba3d8). 전역 글꼴은 높이 11 · 줄간 +0x67 = 3 → 줄 14 (UNRESOLVED U-86 확정, 메인 71f6c11).
+ * 웹 공용 MarkupText 도 11px · 줄 14 다.
  */
 export const SKILL_TEXT_OFFSET = { x: 3, introY: 3, effectY: 30 } as const
 export const ITEM_TEXT_INSET = 3

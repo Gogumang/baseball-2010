@@ -64,7 +64,7 @@ export const valueGlyphsOf = numberGlyphsOf
  * 0xca7b4 로 나눈다 — 디스어셈 대조).
  *
  * 원본은 소수점 없는 숫자(5할이면 `50`)를 numBox 로 오른쪽 맞춤해 그리고 그 옆에 "%" 를 붙인다(`PERCENT_OFFSET`).
- * ⚠️ 0d40bcb 가 P6 4a-2 문서(×1000)를 따라 ×1000 으로 바꿨으나 바이너리는 `movs r3,#0x64` 다 — 다시 ×100.
+ * 0d40bcb 가 P6 4a-2 문서(×1000)를 따라 ×1000 으로 바꿨으나 바이너리는 `movs r3,#0x64` 다 — ×100 (r126 다시 떠 확인: 0x7f31c~0x7f32a).
  * 한 경기도 치르지 않았으면 0 이다(원본도 승+패 == 0 이면 나눗셈을 건너뛰어 승×100 = 0 이 남는다).
  */
 export function winningPercentOf(wins: number, losses: number): number {
