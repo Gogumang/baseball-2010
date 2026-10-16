@@ -1,6 +1,8 @@
 import { lapPlayClock, startPlayClock } from '@/entities/collection/model/playClock'
 import { describe, expect, it } from 'vitest'
 import {
+  annalsSkillOfCell,
+  isAnnalsSkillGained,
   addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
   gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
   addRecordCounts, recordCountOf, RECORD_COUNT_KINDS, addPlayTime, playTimeHiddenIdOf, totalPlayTimeOf, earnedGamePointHiddenIdOf,
@@ -63,6 +65,39 @@ describe('켠 스킬 비트 0xb663c (+0xf4 · +0xf8)', () => {
     expect(stats.batterEquippedSkillBits).toBe((1 << 3) | (1 << 23))
     expect(stats.pitcherEquippedSkillBits).toBe(1 << 8)
     expect(markSkillEquipped(stats, 2, 1)).toBe(stats)
+  })
+})
+
+describe('기록연감 스킬 탭 표 [+0x13c] = 0x58a3c', () => {
+  const 비트 = (batter: number[], pitcher: number[]) => ({
+    ...EMPTY_ANNALS_STATS,
+    batterEquippedSkillBits: batter.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+    pitcherEquippedSkillBits: pitcher.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+  })
+
+  it('칸 0~7 은 두 편 어느 쪽 비트든 i — 칸 8~23 은 타자 비트 · 칸 24~39 는 투수 비트 칸 − 16', () => {
+    const stats = 비트([0, 9], [3, 8, 23])
+    expect(annalsSkillOfCell(stats, 0)).toBe(0)
+    expect(annalsSkillOfCell(stats, 3)).toBe(3)
+    expect(annalsSkillOfCell(stats, 1)).toBe(-1)
+    expect(annalsSkillOfCell(stats, 9)).toBe(9)
+    // 투수 비트 8 은 칸 8 이 아니라 칸 24
+    expect(annalsSkillOfCell(stats, 8)).toBe(-1)
+    expect(annalsSkillOfCell(stats, 24)).toBe(8)
+    expect(annalsSkillOfCell(stats, 39)).toBe(23)
+    // 타자 비트 9 는 투수 칸 25 를 켜지 않는다
+    expect(annalsSkillOfCell(stats, 25)).toBe(-1)
+  })
+
+  it('표 밖 칸(> 0x27)은 못 얻은 칸이다 (0x2f37e `cmp #0x27; bhi`)', () => {
+    const stats = 비트([0], [0])
+    expect(isAnnalsSkillGained(stats, 40)).toBe(false)
+    expect(isAnnalsSkillGained(stats, -1)).toBe(false)
+    expect(isAnnalsSkillGained(stats, 0)).toBe(true)
+  })
+
+  it('보유가 아니라 켠 스킬 — 비트가 없으면 빈 표', () => {
+    expect(Array.from({ length: 40 }, (_unused, cell) => annalsSkillOfCell(EMPTY_ANNALS_STATS, cell)).every((v) => v === -1)).toBe(true)
   })
 })
 

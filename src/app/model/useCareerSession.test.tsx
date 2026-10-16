@@ -9,7 +9,7 @@ import { applyGameEvaluation, isEvaluatedGame, useCareerSession } from '@/app/mo
 import { advancePostseason, EMPTY_LEAGUE, LEAGUE_TEAM_COUNT, startPostseason } from '@/entities/league/model/league'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
-import { createCareer } from '@/entities/career/model/playerCareer'
+import { DEFAULT_ROOKIE_PROFILE, createCareer } from '@/entities/career/model/playerCareer'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -1185,6 +1185,14 @@ describe('기록연감 통계 고리 [mgr+0xc8] — 타자편 모드 4 (0x22e35 
     act(() => rendered.result.current.session.actions.equipSkill(20, true))
     act(() => rendered.result.current.session.actions.equipSkill(20, false))
     expect(events).toEqual([{ kind: '스킬장착', mode: 4, skillId: 20 }])
+    act(() => rendered.unmount())
+  })
+
+  it('새 선수 등록은 신인 스킬 0 · 8 을 얻자마자 켜 0xb663c 비트를 적는다 (0x112d0 0xa4bd8(P, 0) · (P, 8))', () => {
+    const { rendered, events } = 통계띄우기(createCareer('이전'))
+    events.length = 0
+    act(() => rendered.result.current.session.actions.startNewCareer('신인', DEFAULT_ROOKIE_PROFILE))
+    expect(events).toEqual([{ kind: '스킬장착', mode: 4, skillId: 0 }, { kind: '스킬장착', mode: 4, skillId: 8 }])
     act(() => rendered.unmount())
   })
 

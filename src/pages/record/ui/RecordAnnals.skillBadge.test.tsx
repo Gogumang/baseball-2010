@@ -4,6 +4,16 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 
+/** 켠 스킬 비트(+0xf4 타자 · +0xf8 투수)만 세운 기록연감 — 스킬 탭 '얻음' 은 0x58a3c 가 이 비트로 가른다 */
+const 켠스킬 = (batterBits: number[], pitcherBits: number[] = []) => ({
+  ...EMPTY_COLLECTION,
+  stats: {
+    ...EMPTY_COLLECTION.stats,
+    batterEquippedSkillBits: batterBits.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+    pitcherEquippedSkillBits: pitcherBits.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+  },
+})
+
 /** 프레임 원점을 (0, 0) 으로 박아 FrameSprite 가 바로 서게 한다 — 같은 객체를 늘 돌려준다 */
 vi.mock('@/shared/lib/sprite/useFrameOrigins', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/shared/lib/sprite/useFrameOrigins')>()
@@ -29,7 +39,7 @@ const 띄우기 = (collection = EMPTY_COLLECTION) => {
 
 describe('기록연감 탭 2 — 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488)', () => {
   it('얻은 스킬은 등급 img_text(281 공통 · 149 타자 · 150 투수)를 (59, 185) 에, 화살 이미지 0x7c/0x7d 를 (84, 184 + 깜박임) 에 그린다 (0x2f3b0~0x2f488)', () => {
-    띄우기({ ...EMPTY_COLLECTION, skills: [0, 2, 33] })
+    띄우기(켠스킬([0, 2], [33 - 16]))
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
     const 등급 = (frame: number) => document.querySelector(`img[src="./sprites/img_text/frames/${frame}.png"]`) as HTMLImageElement | null
     const 화살 = () => screen.getByTestId('스킬-화살') as HTMLImageElement
@@ -64,7 +74,7 @@ describe('기록연감 탭 2 — 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488)'
 
   it('판이 여닫히는 동안(높이 ≤ 211)은 깜박임 [sp+0xa8] 이 꺼진다 (0x2e42e~0x2e456)', () => {
     vi.useFakeTimers()
-    render(<RecordAnnals collection={{ ...EMPTY_COLLECTION, skills: [0] }} onBack={vi.fn()} />)
+    render(<RecordAnnals collection={켠스킬([0])} onBack={vi.fn()} />)
     시계맞추기()
     const 탭커서 = () => document.querySelector('img[src="./sprites/slt_frame/frames/009.png"]')
     // 첫 그림(높이 32) — 틱 0 은 `% 8 ≤ 3` 이지만 판이 열리는 중이라 꺼진다(탭 막대 초점이라 탭 커서가 안 보인다)

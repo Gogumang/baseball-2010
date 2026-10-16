@@ -1832,6 +1832,12 @@ describe('기록연감 통계 고리 — 투수편 모드 3 (0x22e35 · 0x22c29 
     expect(events).toEqual([{ kind: '스킬장착', mode: 3, skillId: 40 }])
   })
 
+  it('새 선수 등록은 신인 스킬 0 · 8 을 켜 0xb663c(모드 3) 비트를 적는다 (0x112d0)', () => {
+    const { rendered, events } = 통계띄우기(createPitcherCareer('이전'))
+    act(() => rendered.result.current.actions.create('신인투수', 신인))
+    expect(events).toEqual([{ kind: '스킬장착', mode: 3, skillId: 0 }, { kind: '스킬장착', mode: 3, skillId: 8 }])
+  })
+
   it('GP 아이템 구매가 확정되면 0x22e35(3, 칸) + 0x22c29(2, 가격)', () => {
     const { rendered, events } = 통계띄우기({ ...createPitcherCareer('투수'), gamePoint: 5000 })
     act(() => rendered.result.current.actions.purchase(shopItemId('GP', 3)))

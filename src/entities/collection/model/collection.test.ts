@@ -32,7 +32,8 @@ describe('기록연감 — 모은 닉네임·스킬·엔딩 (StrHOWTO[28])', () 
     const twice = mergeCareerIntoCollection(once, 선수({ titleIds: ['이름 없는 신인', '안타제조기'], skillIds: [2, 7] }))
 
     expect(twice.titles).toEqual(['이름 없는 신인', '안타제조기'])
-    expect(twice.skills).toEqual([2, 7])
+    // 보유 스킬(+0x1b8)은 모으지 않는다 — 스킬 탭은 켠 스킬 비트(stats +0xf4/+0xf8, 0x58a3c)를 본다
+    expect('skills' in twice).toBe(false)
     // 본 엔딩 5 에 연애 엔딩 10(짝 없음 — 본 연애 이벤트 0)이 같이 켜진다 (0x87c7c)
     expect(twice.endings).toEqual([5, 10])
   })
@@ -47,6 +48,14 @@ describe('기록연감 — 모은 닉네임·스킬·엔딩 (StrHOWTO[28])', () 
     const raw = { titles: [], skills: [], endings: [], hallOfFame: [famer, { name: 3 }, null] }
 
     expect(normalizeCollection(raw).hallOfFame).toEqual([{ ...famer, slot: 0 }])
+  })
+
+  it('옛 저장의 skills(보유 합집합)는 버리고 나머지는 그대로 읽는다 — 새 저장엔 skills 가 없어도 된다 (r138)', () => {
+    const old = normalizeCollection({ titles: ['안타제조기'], skills: [2, 7], endings: [5] })
+    expect(old.titles).toEqual(['안타제조기'])
+    expect(old.endings).toEqual([5])
+    expect('skills' in old).toBe(false)
+    expect(normalizeCollection({ titles: [], endings: [] })).toEqual(EMPTY_COLLECTION)
   })
 })
 

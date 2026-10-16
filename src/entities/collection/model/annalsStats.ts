@@ -9,7 +9,7 @@
  * | `+0x6c + 4k` (k 0~7) | u32 | `0x22c29(mgr, k, 액수)` — 더하고 0~99999999 로 자름 | `0x2322d(mgr, k)` → 기록연감 통계 셀 56~63, 합계 `0x58801(…, 5)` |
  * | `+0x8c + 4j` (j 0~6) | u32 | `0x22c7d(mgr, 액수, 모드)` — 점프표 `0xcda88` 로 모드 → 칸 j, 더하고 0~99999999 로 자름 | `0x2325d(mgr, j)` → 셀 48~54 |
  * | `+0xa8 + 2(10m + i)` (m 0~2, i 0~9) | u16 | `0x22e35(mgr, 모드, i)` — 1 더함(16비트 넘침은 0 으로) | `0x22eb5(mgr, 모드, i)` → 셀 16~46 |
- * | `+0xf4` / `+0xf8` | u32 비트 | 스킬 켜기 `0xb663c` — 모드 4 → +0xf4, 모드 3 → +0xf8 에 `1 << 스킬` OR. `0xb663c` 는 장착 `0xa4b04` 만 부르고, 그건 스킬 창(0x147b0)과 **획득 0xa4bd8**(0x10fb4 · 이벤트 0x8c460, 얻자마자 켠다)이 부른다 | 전부 수집 보상 k=5 "스킬 모두 수집"(`0x28f8a`) 하나뿐 |
+ * | `+0xf4` / `+0xf8` | u32 비트 | 스킬 켜기 `0xb663c` — 모드 4 → +0xf4, 모드 3 → +0xf8 에 `1 << 스킬` OR. `0xb663c` 는 장착 `0xa4b04` 만 부르고, 그건 스킬 창(0x147b0)과 **획득 0xa4bd8**(등록 0x10fb4 의 0x112d0 — 신인 스킬 0 · 8 · 이벤트 0x8c460, 얻자마자 켠다)이 부른다. **지우는 곳은 없다** — 통째로 0 이 되는 것은 game_rg.sav 를 지우고 다시 세우는 0x20388(→ 0x20138 이 0x10e 바이트 memset) 뿐 | 전부 수집 보상 k=5 "스킬 모두 수집"(`0x28f8a`) · 기록연감 스킬 탭 표 `0x58a3c`(`annalsSkillOfCell`) — *(정정 r138: 예전 "k=5 하나뿐")* |
  *
  * | `+0x2c + 8i` (i 0~7) | u64 밀리초 | `0x22efc(mgr, 늘린 시간 lo, hi, 모드)` — 점프표 `0xcdaac` 로 모드 → 칸 i, 64비트로 더한다(자르지 않음). 부르는 곳은 `0x4e8b0(장면)` 하나(아래 `PLAY_TIME_MODE_SLOTS`) | 기록연감 통계 셀 0~6 `"%04d:%02d:%02d"` · 합계 `0x588d1`(여덟 칸 합) · 컬렉터 31 · 47 (`playTimeHiddenIdOf`) |
  * | `+0x106 + k` (k 0~7) | u8 | `0x22dd4(mgr, k)` — k ≤ 7 이면 1 (0x22dd6 `cmp r1,#7; bhi`) | `0x22db4(mgr, k)` (k > 7 이면 0) → 기록연감 탭 0 셀 40~47 의 달성 표시 |
@@ -263,6 +263,38 @@ export function markSkillEquipped(stats: AnnalsStats, mode: number, skillId: num
   if (mode === 3) return { ...stats, pitcherEquippedSkillBits: (stats.pitcherEquippedSkillBits | bit) >>> 0 }
   return stats
 }
+
+/** 기록연감 스킬 탭 칸 수 — 0x58a3c 가 40칸을 −1 로 채운다(`movs r0,#0x27` … `bpl`) */
+export const ANNALS_SKILL_CELLS = 40
+const COMMON_SKILL_CELLS = 8
+const BATTER_SKILL_LAST_CELL = 0x17
+/** 투수 칸 24~39 ↔ +0xf8 비트 8~23 */
+const PITCHER_CELL_OFFSET = 16
+
+/**
+ * **기록연감 스킬 탭 표 `[+0x13c]` = `0x58a3c`** (탭 고름 0x2b640 의 0x2b6fc 가 부른다, 직접 떴다) — 칸 → 스킬 비트 번호, 못 얻었으면 −1.
+ * ```
+ * 표 40칸 = −1                                   ; 58a4a~58a5a
+ * 칸 0~7   : +0xf4 비트 i 또는 +0xf8 비트 i → i   ; 58a64~58ad4 (두 편 어느 쪽이든)
+ * 칸 8~23  : +0xf4 비트 k → k                    ; 58ad6~58b06
+ * 칸 24~39 : +0xf8 비트 k(8~23) → k              ; 58b08~58b3a (칸 = k + 16)
+ * ```
+ * 칸 그리기(0x2f150~0x2f20e)·설명(0x2f37e~0x2f3ae)·그림 두 장(0x2f3b0~)이 모두 이 값이 −1 인지로 '얻음' 을 가른다.
+ * 비트는 스킬 켜기 0xb663c 만 세우니 **보유(+0x1b8)가 아니라 "한 번이라도 장착한 스킬"** 이다 — 칸이 가득 차 못 낀 플러스 스킬은 안 뜬다.
+ */
+export function annalsSkillOfCell(stats: AnnalsStats, cell: number): number {
+  if (!Number.isInteger(cell) || cell < 0 || cell >= ANNALS_SKILL_CELLS) return -1
+  const batter = stats.batterEquippedSkillBits
+  const pitcher = stats.pitcherEquippedSkillBits
+  const has = (bits: number, bit: number) => ((bits >>> bit) & 1) !== 0
+  if (cell < COMMON_SKILL_CELLS) return has(batter, cell) || has(pitcher, cell) ? cell : -1
+  if (cell <= BATTER_SKILL_LAST_CELL) return has(batter, cell) ? cell : -1
+  const bit = cell - PITCHER_CELL_OFFSET
+  return has(pitcher, bit) ? bit : -1
+}
+
+/** 0x2f37e `adds r3,#1; bne` — 표 값이 −1 이 아니면 얻은 칸 */
+export const isAnnalsSkillGained = (stats: AnnalsStats, cell: number): boolean => annalsSkillOfCell(stats, cell) !== -1
 
 /**
  * `0x22e10(mgr)` — 이번 경기 기록달성 횟수 배열을 `0x22df0(mgr, 횟수, n)` 으로 n = 0..39 차례로 더한다.

@@ -107,7 +107,10 @@ export interface HallOfFamePitcher extends HallOfFameRecordFields<PitcherAbility
 
 export interface Collection {
   readonly titles: readonly string[]
-  readonly skills: readonly number[]
+  /*
+   * 스킬 탭 '얻음' 은 `stats` 의 켠 스킬 비트(+0xf4/+0xf8)로 가른다(0x58a3c, `annalsSkillOfCell`). 예전의 `skills`(타자편 보유
+   * +0x1b8 합집합)는 원본에 없는 칸이라 뺐다(r138) — 옛 저장에 남은 `skills` 는 읽을 때 버린다.
+   */
   readonly endings: readonly number[]
   /**
    * 본 시즌모드 엔딩 e (0~4) — 전역기록 `+0xa0 + e`. 새 해 0x6e0c 가 10년차 엔딩 판정 0xa3084 ≥ 0 이면 1 을 쓴다(P4 1c).
@@ -148,7 +151,7 @@ export function countSeasonRegularWin(collection: Collection): { readonly collec
 }
 
 export const EMPTY_COLLECTION: Collection = {
-  titles: [], skills: [], endings: [], seasonEndings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
+  titles: [], endings: [], seasonEndings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
 }
 
 const union = <T>(left: readonly T[], right: readonly T[]): T[] => [...new Set([...left, ...right])]
@@ -157,7 +160,6 @@ export function mergeCareerIntoCollection(collection: Collection, career: Player
   return {
     ...mergeEndingIntoCollection(collection, career),
     titles: union(collection.titles, career.titleIds),
-    skills: union(collection.skills, career.skillIds),
     openedHiddenIds: union(collection.openedHiddenIds, union(career.openedHiddenIds, batterCollectorHiddenIdsOf(career))),
   }
 }
@@ -503,7 +505,7 @@ function isHallOfFamePitcher(value: unknown): value is HallOfFamePitcher {
 export function normalizeCollection(raw: unknown): Collection {
   if (typeof raw !== 'object' || raw === null) return EMPTY_COLLECTION
   const candidate = raw as Record<string, unknown>
-  if (!isStringArray(candidate.titles) || !isNumberArray(candidate.skills) || !isNumberArray(candidate.endings)) {
+  if (!isStringArray(candidate.titles) || !isNumberArray(candidate.endings)) {
     return EMPTY_COLLECTION
   }
   // 옛 저장은 칸 번호 없이 앞에서부터 채웠다 — 목록 순서를 칸 번호로 굳혀 둔다
@@ -516,7 +518,6 @@ export function normalizeCollection(raw: unknown): Collection {
   const openedHiddenIds = isNumberArray(candidate.openedHiddenIds) ? candidate.openedHiddenIds : []
   return {
     titles: candidate.titles,
-    skills: candidate.skills,
     endings: candidate.endings,
     seasonEndings: isNumberArray(candidate.seasonEndings) ? candidate.seasonEndings : [],
     hallOfFame,
