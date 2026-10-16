@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CommonPanel, FrameSprite, InsetBox, MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
@@ -7,7 +7,7 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, GRID, MISSION_GRID_SHAPE,
+  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, EVENT_MISSION_TITLE, EVENT_TAB_LABEL, GRID, MISSION_GRID_SHAPE,
   MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
@@ -196,7 +196,7 @@ export function MissionSelectScreen({
 
       <div className={styles.title}
         style={{ left: TITLE.x, top: TITLE.y, width: TITLE.width, color: TITLE.color }}>
-        {selected?.name ?? ''}
+        {cursor === EVENT_MISSION_CELL ? EVENT_MISSION_TITLE : selected?.name ?? ''}
       </div>
 
       {/*
@@ -238,8 +238,12 @@ export function MissionSelectScreen({
 
       <FrameSprite folder={`${SLT_FRAME}/frames`} frame={BOTTOM_FRAME.frame} origins={frames}
         x={BOTTOM_FRAME.x} y={BOTTOM_FRAME.y} />
-      <img className={styles.sprite} alt="MISSION"
-        src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />
+      {/* 0x1e018: 고른 칸이 14 면 이미지 52, 아니면 51 */}
+      {cursor === EVENT_MISSION_CELL
+        ? <img className={styles.sprite} alt="EVENT"
+            src={imageSrc(SLT_FRAME, EVENT_TAB_LABEL.image)} style={{ left: EVENT_TAB_LABEL.x, top: EVENT_TAB_LABEL.y }} />
+        : <img className={styles.sprite} alt="MISSION"
+            src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />}
 
       {/* 1dfe0 칸 0xbb28d(W/2, H/2 + 0x21, 173, 65, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 */}
       <InsetBox x={DESCRIPTION_BOX.centerX - (DESCRIPTION_BOX.width >> 1)} y={DESCRIPTION_BOX.y}
@@ -247,7 +251,7 @@ export function MissionSelectScreen({
       <div className={styles.descriptionText}
         style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
         {selected === undefined
-          ? NO_MISSION_TEXT
+          ? <MarkupText raw={NO_MISSION_TEXT} />
           : isLockedAt(cursor)
             ? '오픈 되지 않은 미션입니다 이전 단계를 클리어해주세요'
             : stripGameMarkup(selected.briefing)}
@@ -256,13 +260,13 @@ export function MissionSelectScreen({
       <FrameSprite folder={IMG_TEXT} frame={REWARD_ROW.labelFrame} origins={textFrames}
         x={REWARD_ROW.labelX} y={REWARD_ROW.y} />
       <div className={styles.value}
-        style={{ left: REWARD_ROW.labelX + 36, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
+        style={{ left: REWARD_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {reward}G
       </div>
       <FrameSprite folder={IMG_TEXT} frame={SUCCESS_ROW.labelFrame} origins={textFrames}
-        x={REWARD_ROW.labelX + 88} y={REWARD_ROW.y} />
+        x={SUCCESS_ROW.labelX} y={REWARD_ROW.y} />
       <div className={styles.value}
-        style={{ left: REWARD_ROW.labelX + 114, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
+        style={{ left: SUCCESS_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {clears}회
       </div>
 

@@ -125,13 +125,22 @@ export const NAME_ROW = {
   visibleRows: 8,
 } as const
 
-/** 아래 합계 줄 — 프레임 15 (101×18) + 노란 네모 38 + img_text 269 "전체합계", 값은 노랑 */
+/**
+ * 아래 합계 줄 — 프레임 15 (101×18) + 노란 네모 38 + img_text 269 "전체합계", 값은 노랑. 탭 3 (0x2f834~0x2f920) · 탭 4 (0x2fa60~0x2fb90)
+ * 가 같은 꼴이다 — w·h = 프레임 15 상자(101, 18), x0 = 24 · y0 = 54:
+ * 프레임 15 (x0 − w + 0xb6 = 105, y0 − h + 0xce = 242) · 이미지 0x26 (x0 + 0x10 = 40, y0 − h + 0xd3 = **247**) ·
+ * img_text 0x10d (x0 + 0x1a = 50, y0 − h + 0xd2 = **246**) · 값 0xba269(글, x0 − w + 0xbb = **110**, y0 − h + 0xd2 = **246**, w − 10 = **91**)
+ * 호출 2fb90 (탭 3 `"!C!cffff00%d/%d"` 가운데 · 탭 4 `"!R!cFFFF00…"` 오른쪽). *(정정 r129 — 전에는 네모 246 · 글씨 242 · 값 (105, 243, 101))*
+ */
 export const TOTAL_ROW = {
   frame: 15,
-  frameX: PANEL.x - 101 + 182,
-  bulletX: PANEL.x + 16,
+  frameX: PANEL.x - 101 + 0xb6,
+  bulletX: PANEL.x + 0x10,
+  bulletDy: 5,
   labelFrame: 269,
-  labelX: PANEL.x + 26,
+  labelX: PANEL.x + 0x1a,
+  labelDy: 4,
+  value: { x: PANEL.x - 101 + 0xbb, dy: 4, width: 101 - 10 },
   y: 242,
 } as const
 
@@ -215,9 +224,20 @@ export const SKILL_DESCRIPTION = {
 /**
  * 기록·통계 탭의 목록 격자 — 탭 0 `0x79ed5(격자, 종류, 120, y0 + 0x24 = 90, 칸너비 [174], 줄높이 18, 1열, 8줄)` (0x2e8e6~0x2e92e) ·
  * 탭 4 는 같은 꼴에 종류 2 · **y0 + 0x23 = 89** (0x2f96a~0x2f9ae). 칸 x = 120 − 174/2 = 33, 칸 y = 첫 y + 18 × 줄.
- * `x` 는 칸 바탕 프레임을 놓는 x(= 칸 x − 1)다.
+ * `x` 는 칸 바탕 프레임을 놓는 x(= 칸 x − 1)다. 칸 그리기 0x7a571 은 칸 (x, y) 와 칸너비 174 로 글을 놓는다 —
+ * 이름 (칸 x + 5, 칸 y + 2)(0x7a98c~0x7a9a2) · 0x7a08c(격자, 칸 x, 칸 y + 2, 칸너비 [격자+0x1c+4열], n)(0x7a9b4~0x7aa26).
+ * *(정정 r129 — 전에는 글을 프레임 x 32 · 폭 176 에서 셌다)*
  */
-export const LIST_GRID = { x: PANEL.x + 8, firstY: PANEL.y + 36, step: 18, rows: 8, width: 176 } as const
+export const LIST_GRID = { x: PANEL.x + 8, cellX: PANEL.x + 9, cellWidth: 174, firstY: PANEL.y + 36, step: 18, rows: 8 } as const
+/** 탭 0 칸 이름 `"%s"`(0xd09bc) StrGAME[8 + n] 흰 글 — 0xba269(글, 칸 x + 5, 칸 y + 2, 폭 자리 = RGB(255,255,255) 값, −1, 0) 호출 7a9a2. 폭 자리에 색이 들어가 줄을 안 끊는다 */
+export const LIST_NAME = { dx: 5, dy: 2 } as const
+/**
+ * 탭 4 통계 — 0x7a08c 종류 2 갈래. 값 `"!R!cffff00…"` 은 0xba269(글, x − 2, y, 칸너비 − 4)(7a1f8 · 7a2b2 · 7a306 · 7a366 ·
+ * 7a3ba · 7a418 · 7a4b6 · 7a502 — 8갈래 모두 `subs r1,#2` · `subs r3,#4`), 이름 `"!cffffff%s"`(0xd09a8) 은
+ * 0xba269(글, x + 3, y + 1, 칸너비 − 10)(7a52e~7a542). 여기 x·y 는 0x7a08c 가 받은 (칸 x, 칸 y + 2) 다.
+ */
+export const STAT_VALUE = { dx: -2, dy: 2, widthInset: 4 } as const
+export const STAT_NAME = { dx: 3, dy: 3, widthInset: 10 } as const
 /** 탭 4 통계 격자의 첫 칸 y — 0x2f9a6 `adds r3, #0x23` (탭 0 은 #0x24) */
 export const STAT_LIST_FIRST_Y = PANEL.y + 0x23
 /** 탭별 목록 격자 첫 칸 y (탭 0 · 4 만) */

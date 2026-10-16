@@ -417,6 +417,11 @@ export const HALL_OF_FAME_BUBBLE = {
   borderColor: '#FFFFFF',
   cornerRadius: 1,
   cell: { width: 70, height: 14, color: '#213473', dx: 3, dys: [-5, 11] },
+  /**
+   * 글 `"!C!cffffff친구에게 선물"`(0xd24c4) · `"!C!cffffff슬롯에서 삭제"`(0xd24dc) 를 0xba269(글, x + 3, gy − 3 / gy + 0xd, 폭 0x46)
+   * — 호출 6599a · 659ac. 칸 위(gy − 5 / gy + 0xb, 0x65940~0x6597a)보다 **2px 아래**다. *(정정 r129 — 전에는 칸 안 세로 가운데)*
+   */
+  labelDy: 2,
   selectedBorderColor: '#FFFF00',
   /** 0xd24c4 · 0xd24dc */
   labels: ['친구에게 선물', '슬롯에서 삭제'],
