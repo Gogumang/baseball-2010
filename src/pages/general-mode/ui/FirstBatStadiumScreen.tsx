@@ -9,6 +9,7 @@ import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/mod
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import {
   FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, stadiumArrowsOf,
+  stadiumInfoValuesOf,
 } from '@/pages/general-mode/lib/prepareLayout'
 import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter } from '@/pages/general-mode/lib/generalModeSetup'
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
@@ -18,6 +19,9 @@ const SLT_IMAGE = './sprites/slt_frame'
 const GAME_UI_FRAME = './sprites/game_ui/frames'
 const IMG_TEXT_FRAME = './sprites/img_text/frames'
 const STADIUM_SYMBOL = './sprites/stadium_symbol'
+
+/** 화면 폭의 반 — 가운데 맞춤 글을 (가운데 − 120, 폭 240) 상자에 둔다 */
+const SCREEN_HALF_WIDTH = 120
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 
@@ -240,14 +244,13 @@ export function FirstBatStadiumScreen({
         <FrameSprite key={label.frame} folder={IMG_TEXT_FRAME} frame={label.frame} origins={imgTextOrigins}
           x={label.x} y={label.y} />
       ))}
-      <span className={styles.centeredText} data-testid="구장-연고지"
-        style={{ left: FIRST_BAT_LAYOUT.infoBars[0].x, top: FIRST_BAT_LAYOUT.infoValueY[0], width: FIRST_BAT_LAYOUT.infoBars[0].width }}>
-        {stadium?.city ?? ''}
-      </span>
-      <span className={styles.centeredText} data-testid="구장-좌석"
-        style={{ left: FIRST_BAT_LAYOUT.infoBars[1].x, top: FIRST_BAT_LAYOUT.infoValueY[1], width: FIRST_BAT_LAYOUT.infoBars[1].width }}>
-        {stadium === undefined ? '' : `${stadium.capacity}석`}
-      </span>
+      {/* 값 두 줄 — 0xba269 폭 −1: 가운데 = x + (날 글 폭 >> 1) (`FIRST_BAT_LAYOUT.infoValues`, 0x646ca · 0x6472c) */}
+      {stadiumInfoValuesOf(stadium).map((value, index) => (
+        <span key={index} className={styles.centeredText} data-testid={index === 0 ? '구장-연고지' : '구장-좌석'}
+          style={{ left: value.centerX - SCREEN_HALF_WIDTH, top: FIRST_BAT_LAYOUT.infoValues[index].y, width: SCREEN_HALF_WIDTH * 2 }}>
+          {value.text}
+        </span>
+      ))}
 
       {/*
         원본에 없던 웹 [이 구장으로] 단추와 키 안내 글을 걷고 투명 누름 칸으로 — 고른 구장 그림(stadium_symbol 91×40)과

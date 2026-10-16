@@ -24,3 +24,4 @@ export {
   measurePixelTextWidth,
 } from '@/shared/lib/font/layout'
 export type { PixelTextLayout, PixelTextOptions, PlacedPiece } from '@/shared/lib/font/layout'
+export { measureRawTextWidth, measuredTitleCenterXOf } from '@/shared/lib/font/rawText'
