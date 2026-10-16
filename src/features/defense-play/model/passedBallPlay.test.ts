@@ -9,6 +9,7 @@ import {
   isPassedBallPlayResult,
   passedBallCallSoundIdOf,
   passedBallCovers,
+  passedBallPlayEngineInputOf,
   passedBallTrajectoryOf,
   runPassedBallPlay,
 } from '@/features/defense-play/model/passedBallPlay'
@@ -114,5 +115,40 @@ describe('폭투·포일 판 그림 칸 — 포수 +0xb8 = 6(0x3e062) · 고리'
     expect(result.ticks[0].holderMark).toBeNull()
     const 쥔틱 = result.ticks.find((view) => view.holderMark != null)
     expect(쥔틱?.holderMark?.anim).toBe(3)
+  })
+})
+
+describe('판 시작 리드 0x3d7b8 — 종류 9 도 돈다 (0x46418 4657e)', () => {
+  it('도루 안 한 주자는 0xcffb0 틱 앞서 나갔다가 목표를 제 루로 되돌린다 — 굴림 없음', () => {
+    const 난수 = 세는난수(0)
+    const 시작 = passedBallPlayEngineInputOf({ shot: 가운데, bases: { ...EMPTY_BASES, second: true }, outs: 0, random: 난수 })
+    const 주자 = 시작.runners[0]
+    expect(주자.startBase).toBe(2)
+    expect(주자.targetBase).toBe(2)
+    expect(주자.position).not.toEqual(basePosition(2))
+    expect(난수.count()).toBe(0)
+  })
+
+  it('도루 주자는 rand(0,9) 한 번 · 목표는 다음 루 그대로 (0xcffa8 + 덧틱)', () => {
+    const 난수 = 세는난수(0)
+    const 시작 = passedBallPlayEngineInputOf({
+      shot: 가운데,
+      bases: { ...EMPTY_BASES, first: true },
+      outs: 0,
+      random: 난수,
+      stealingFrom: [1],
+    })
+    expect(시작.runners[0].targetBase).toBe(2)
+    expect(난수.count()).toBe(1)
+  })
+
+  it('낫아웃이면 0xa9e44 가 돌아 타자주자에 밀리는 1루 주자는 2루가 목표다 (2아웃)', () => {
+    const 시작 = passedBallPlayEngineInputOf({
+      shot: 가운데,
+      bases: { ...EMPTY_BASES, first: true, third: true },
+      outs: 2,
+      batterRuns: true,
+    })
+    expect(시작.runners.map((runner) => runner.targetBase)).toEqual([1, 2, 3])
   })
 })

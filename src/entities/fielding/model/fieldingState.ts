@@ -94,7 +94,7 @@ export interface RunnerState {
   /**
    * **마지막으로 닿은 루 = 지금 발을 붙이고 있는(있었던) 루 — 원본 `+0x8c`**.
    *
-   * ⚠️ 예전 주석은 이 칸을 `+0x7c`, 아래 `targetBase` 를 `+0x8c` 라고 **거꾸로** 적고 있었다.
+   * 정정: 예전 주석은 이 칸을 `+0x7c`, 아래 `targetBase` 를 `+0x8c` 라고 **거꾸로** 적고 있었다.
    * 원본 세 자리가 한목소리로 반대를 가리킨다 (전부 직접 뜬 것):
    * - `0xa04e8`(vt90, 구간 진행률): `100 − 100 × 거리(루[+0x7c], 지금) / 거리(루[+0x8c], 루[+0x7c])`
    *   — 곧 **+0x8c 에서 +0x7c 로 가는 중**이고 +0x7c 에 닿으면 100 이다.
@@ -159,7 +159,7 @@ export interface PlayView {
   /**
    * 자동 주루의 **또 하나의 무조건 진루 갈래** (+0x129).
    *
-   * ⚠️ 예전 주석의 `+0x12a` 는 오프셋 오독이었다 — 0xaf918 이 직접 뜨는 자리는
+   * 정정: 예전 주석의 `+0x12a` 는 오프셋 오독이었다 — 0xaf918 이 직접 뜨는 자리는
    * `af964: subs r2,#7`(0x118 − 7 = **0x111**) · `af970: adds r2,#0x18`(0x111 + 0x18 = **0x129**) 다.
    * `R3-field-view.md` 도 같은 두 칸을 `+0x111`·`+0x129` 로 적고 있다.
    * 이름이 "막는 칸" 이었던 것도 거꾸로였다 — 이 칸이 서면 자동 진루가 **꺼지는 것이 아니라
@@ -204,10 +204,15 @@ export function throwErrorBiasOf(defenseGrade: number): number {
  * b10c4    악송구 보정 +0xe4 = cfg+0x2c(2) − r0 + 8
  * b1184    선수를 찾은 칸만 야수+0xec = 선수                                         ; 칸 0 은 안 쓴다
  * ```
- * 그래서 칸 0 은 **어느 모드든** 송구 속도 g = 2(= 940 + 16), 악송구 보정 8, 펌블 확률 0(펌블 b41e4 는 +0xec 가 없으면 0)이다.
- * 능력치 하나로는 이 셋을 나타낼 수 없다(g = 2 는 등급 1, 보정 8 은 등급 2 의 값) — 진행기는 이 칸의 입력 능력치를 **읽지 않는다**.
- * ⚠️ 미확인: 야수+0xec 는 이 함수가 칸 0 에 쓰지 않을 뿐 비우지도 않는다. 야수 객체를 만든 뒤 칸 0 의 +0xec 를 쓰는 곳은
- *    찾지 못해 "늘 비어 있다" 로 옮긴다.
+ * 그래서 칸 0 은 **어느 모드든** 송구 속도 g = 2(= 940 + 16), 악송구 보정 8 이다(둘 다 r5 로 세고 +0xec 는 안 본다).
+ * 능력치 하나로는 이 둘을 나타낼 수 없다(g = 2 는 등급 1, 보정 8 은 등급 2 의 값) — 송구 쪽은 이 칸의 능력치를 **읽지 않는다**.
+ *
+ * 그러나 야수+0xec 는 이 함수가 칸 0 에 쓰지 않을 뿐 비우지도 않는다 — **공수 교대 판 0x3fac4** 가 3fe0a~3fe4c 에서 야수 아홉
+ * ([장면+0x111c+4i])마다 수비 팀(팀[st[0xa]], 3fd3c~3fd4e) 레코드 차례로 자리 니블 == i + 1 인 첫 선수를 +0xec 에 넣는다 —
+ * 칸 0 은 니블 1 = **지명타자**다. +0xec 를 읽는 펌블(b41e4 → 표 0xd87d4[등급]) · 레이저(66a94 → 66aba 등급) 굴림은 그래서
+ * 투수 칸이면 지명타자의 수비로 돈다(`recordPlayerAbilityOf`).
+ * ⚠️ 근사: 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만 불려(R10) 판이 안 선 반 이닝 뒤에는 앞 판의 값이 남고, 장면을 만든
+ *    뒤 첫 판 앞에는 0(new 의 memset)이다 — 웹은 늘 지금 수비 팀의 지명타자로 본다(`fieldingErrors.fielderRecordIndexOf` 와 같은 다리).
  */
 export const UNSEARCHED_FIELDER_SLOT = 0
 
@@ -218,8 +223,9 @@ const NO_PLAYER_THROW_G = 2
 export const NO_PLAYER_THROW_ERROR_BIAS = 8
 
 /**
- * 야수 칸의 **선수 수비 능력치** — 칸 0(투수)은 선수가 없어 `null` 이다(`UNSEARCHED_FIELDER_SLOT`).
- * 펌블(`rollFumble`) · 악송구(`rollThrowError`) 가 `null` 을 "선수 없음"(확률 0 · 보정 8)으로 읽는다.
+ * 판 시작 0xb0fb4 가 찾은 **선수 수비 능력치** — 칸 0(투수)은 선수가 없어 `null` 이다(`UNSEARCHED_FIELDER_SLOT`).
+ * 악송구(`rollThrowError` — 보정 +0xe4 는 b10a2 의 r5)가 `null` 을 "선수 없음"(보정 8)으로 읽는다.
+ * 펌블 · 레이저는 +0xec 를 보므로 `recordPlayerAbilityOf` 를 쓴다.
  */
 export function fielderAbilityOf(
   defenseAbilities: readonly number[],
@@ -227,6 +233,14 @@ export function fielderAbilityOf(
   fallback: number,
 ): number | null {
   if (slot === UNSEARCHED_FIELDER_SLOT) return null
+  return defenseAbilities[slot] ?? fallback
+}
+
+/**
+ * 야수 **+0xec 선수**의 수비 능력치 — 펌블(b41e4) · 레이저(66a94)가 읽는 칸. 칸 1~8 은 판 시작 b1184 가, 칸 0 은 공수 교대 판
+ * 0x3fac4 가 넣은 지명타자다(`UNSEARCHED_FIELDER_SLOT` 머리말). 능력치 배열의 칸 0 은 그 지명타자 값이다(`defenseAbilitiesOf`).
+ */
+export function recordPlayerAbilityOf(defenseAbilities: readonly number[], slot: number, fallback: number): number {
   return defenseAbilities[slot] ?? fallback
 }
 

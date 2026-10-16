@@ -175,7 +175,7 @@ export interface PitchArrivalPlayInput {
    * 장면 +0xfdc — 공이 도착할 때의 번트 종류(0 = 없음). 판 시작 리드 `0x3d7b8`(3d8e0 이 장면 +0xfdc 를 바로 읽는다)이
    * 도루 안 한 주자에게 +3 틱을 더한다 — 도루 판(종류 5)의 `runStealPlay` 로 넘긴다. 못 맞힌 번트(번트 헛스윙 · 번트 자세로 맞이한 볼)면
    * 그 공의 번트 종류가 서 있다. 기본 0.
-   * ⚠️ 종류 9(폭투·포일) 판은 웹이 판 시작 리드를 아직 안 옮겨(`runPassedBallPlay`) 이 값을 안 본다.
+   * 종류 9(폭투·포일) 판도 같은 리드를 돈다(`passedBallPlay` 의 `leadRunnersForPassedBall`).
    * +0xfdc 를 쓰는 곳은 CPU 스윙 결정 0x34436(휘두를 때만 0 → 번트면 rand(1, 4)) · 사람 키 0x51dce · 0x51e2c(스윙 0) ·
    *   0x51e84(번트 종류) · 0x51eba(번트 거두기 0) 다섯이고 모두 상태 0x11 안이다. 그 0x11 **진입** 0x3de10 이 3deb8 에서
    *   0x340dc = `memset(장면+0xfd8, 0, 12)` 로 공마다 지우므로 안 휘두른 공은 0 이다 — 부르는 쪽은 이 공의 값을 넘긴다.
@@ -328,6 +328,9 @@ export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: Rando
       shot,
       batterRuns: strikeout === 'batterRuns',
       runAbilities: input.runAbilities,
+      // 0x3d7b8 — 도루 주자 리드(rand(0,9)) · 도루 안 한 주자의 번트 +3 틱
+      stealingFrom: input.stealingFrom,
+      buntKind: input.buntKind,
     }
     return { kind: 9, strikeout, playInput, engineInput: passedBallPlayEngineInputOf(playInput) }
   }
@@ -411,7 +414,8 @@ export function stealRecordIdsOf(result: Pick<StealPlayResult, 'stolenFrom' | 'c
  *   진루가 판과 같다(판정 B → 정산 0xa8024 → 0xd). 판은 재생 칸에만 넣는다.
  *
  * 판에서 3아웃이 나는 것은 볼·스트라이크(카운트만 오른 공)뿐이다 — 판정 B 0xae3e8 이 0x18 로 보내 그 타석은 끊긴다
- * (다음 이닝 같은 타자부터 — ⚠️ 정산 0xa8024 가 종류 5 에서 타순을 미는지는 안 읽었다). 삼진은 판 앞에서 아웃이 붙고
+ * (다음 이닝 같은 타자부터 — 정산 0xa8024 는 0xaf020(다음 타자 예약)을 안 부르고, 판 끝 0x35108 이 35138~3515e 에서
+ * 판 종류 [+0x118] ∈ {4, 5, 8} 이면 0xaf020 을 건너뛴다(9 는 [0x1552d0c]+0xc == 5 일 때만 민다)). 삼진은 판 앞에서 아웃이 붙고
  * (위 머리말), 볼넷·사구는 도루 판이 안 열린다.
  */
 export function arrivalApplicationOf(play: PitchArrivalPlay): 'runnerOnly' | 'batterRuns' | 'freePass' {

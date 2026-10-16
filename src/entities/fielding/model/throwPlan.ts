@@ -77,7 +77,7 @@ function arcsineDegrees(value: number): number {
  * ```
  * 곧 **70/80 % 는 속도가 아니라 중력 배율**이고, 공은 수평 속도 v·cosθ 로 큰 축을 따라 한 틱씩 간다
  * (공 틱 0xa28c0 의 `x += cos·속도 >> 16` 과 같은 걸음). 송구 0xa1620 도 같은 식으로 쏜다.
- * ⚠️ 원본 그대로: v 는 +0xdc **지난 송구의 속도**다(`FielderState.throwSpeed`) — 0xa1620 이 송구마다 특수면 +0xd8(130%),
+ * 원본 그대로: v 는 +0xdc **지난 송구의 속도**다(`FielderState.throwSpeed`) — 0xa1620 이 송구마다 특수면 +0xd8(130%),
  * 아니면 +0xd4 로 덮어쓰고(a16ec), 판 시작 0xb0fb4 → 0xa0fc4 가 +0xd4 로 되돌린다. `thrownWith` 가 그 덮어쓰기다.
  * (거리 20400 을 넘으면 원바운드가 되는 것은 0xa1620 쪽이다 — `BOUNCE_THROW_DISTANCE`)
  */

@@ -22,6 +22,7 @@ import {
 import {
   AI_STATE,
   fielderAbilityOf,
+  recordPlayerAbilityOf,
   fielderArrivalTicks,
   NONE,
   type DefenseContext,
@@ -565,7 +566,7 @@ function* runnerPlaySteps(
         current.trajectory.isStoppedAt === undefined
           ? tick < current.trajectory.length - 1
           : !current.trajectory.isStoppedAt(tick)
-      if (input.random !== undefined && rollFumble(fielderAbilityOf(abilities, current.slot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
+      if (input.random !== undefined && rollFumble(recordPlayerAbilityOf(abilities, current.slot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
         fumbled = true
         ballEventThisTick = true
         // b4280 — 야수 +0xb8 = 6

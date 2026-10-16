@@ -18,7 +18,7 @@ import type {
   DefensePlayState,
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { drawnFieldingErrorsOf, type DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
+import { drawnFieldingErrorsOf, drawnFumbleCheerOf, type DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import { SLIDING_SOUND_EFFECT } from '@/entities/defense-controls/model/sliding'
 import { runInCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -143,13 +143,15 @@ const UPDATES_PER_TICK = 1
  * +0xb8 은 야수 틱 0xa1284(a12da)가 잠금이 없을 때 틱마다 −1 한다. 한 그림의 차례는 G1 0x3f060(목록 틱 — 야수 틱) →
  * 슬롯 2(플레이 틱 — 펌블 굴림 0xb41d0) → G3 그리기라, **펌블이 난 틱의 그림**만 6 을 본다 → 그 틱에 29 한 번.
  * 키 건너뛰기(+0xfe7) 동안은 52b26 이 G1 → G2 만 되풀이하고 그리지 않아 소리가 없다.
- * ⚠️ 한 판에 펌블이 둘 나면 원본은 두 번 내지만 진행기 칸(`fumbled`)이 한 번만 알려 웹은 첫 펌블만 낸다.
- * ⚠️ 필살타법 타구에 맞은 야수의 53(0xa1e60)은 아직 안 잇는다.
+ * 한 판에 펌블이 둘 나면 원본은 두 번 낸다 — 웹도 그린 틱마다 야수 칸(+0xb8 == 6)을 보고 낸다(`drawnFumbleCheerOf`).
+ * 필살타법 타구에 맞은 야수의 53(0xa1e60 a1e82 즉시 재생)은 진행기 칸 `hitStaggerSoundThisTick` 으로 그 틱에 낸다.
  *
  * 펌블을 굴리는 곳은 진행기(`runDefensePlay` 의 0xb41d0 굴림)지만 그쪽은 순수 함수라 소리를 못 낸다 —
  * 틱을 실제로 돌리는 **이 화면**이 원본과 같은 틱에 낸다.
  */
 const FUMBLE_CHEER_SOUND = 29
+/** 필살타법 타구에 맞은 야수 — 0xa1e60 의 `movs r1, #0x35` */
+const HIT_STAGGER_SOUND = 53
 
 /**
  * 수비 한 플레이를 보여 준다 — 갈래가 둘이다.
@@ -643,13 +645,6 @@ function LivePlayback({
   const startedAtRef = useRef(0)
   /** 아직 진행기에 안 먹인 키들 */
   const pressesRef = useRef<DefenseKeyPress[]>([])
-  /**
-   * 이 플레이에서 펌블 소리 53 을 이미 냈는가.
-   *
-   * 진행기는 펌블을 한 플레이에 한 번만 굴리지만(`!fumbled` 게이트), 갱신이 건너뛰어 여러 틱을
-   * 따라잡을 때 같은 갱신 안에서 두 번 보지 않게 여기서도 한 번으로 막는다.
-   */
-  const fumbleSoundPlayedRef = useRef(false)
   /** 그린 틱이 올린 실책 (야수 그리기 0x43278 4381a~43904) · 이미 본 진행기 틱 수 */
   const drawnErrorsRef = useRef<DrawnFieldingError[]>([])
   const seenTickCountRef = useRef(0)
@@ -714,7 +709,6 @@ function LivePlayback({
       stateRef.current = startDefensePlay(withSide(input, side))
       startedAtRef.current = update
       pressesRef.current = []
-      fumbleSoundPlayedRef.current = false
       drawnErrorsRef.current = []
       seenTickCountRef.current = 0
       boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
@@ -785,7 +779,10 @@ function LivePlayback({
       // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래.
       // 그 머리 51fb8~51fdc 가 먼저 함성을 예약한다 — 홈런성이 아니면 60, 홈런성이면 주자 칸 0 일 때만 30(+0xfe7 은 안 본다).
       // 예약 0x6e498 은 울리던 소리를 끊는 한 칸이라 통로 하나 `play` 와 같다(`soundPort` 머리 주석).
-      // ⚠️ 미확인: 같은 그림의 슬라이딩 10(0x5268c) · 펌블 29(그리기 0x4381a)와의 앞뒤 — 웹은 득점 함성을 먼저 낸다
+      // 슬라이딩 10(슬롯 2 0x5268c) · 53(슬롯 2 플레이 틱 끝 b4588) · 펌블 29(G3 그리기 0x4381a)는 그 차례가 맞다.
+      // ⚠️ 미확인: 함성의 자리 — 바로 득점 aa1b0 은 슬롯 2 의 525fc 주자관리 vt18(0xaa0a8)에서 돌지만(플레이 틱 vt48 525e8 뒤 ·
+      //   슬라이딩 52670 앞) 메시지 0x13 을 0xbfbac **큐**에 넣을 뿐이라, 큐를 비워 0x509a0 → 0x51fb8 이 도는 자리를 못 짚었다 —
+      //   웹은 득점 함성을 먼저 낸다
       for (const slot of running.runInsThisTick) {
         const cheer = runInCheerSoundIdOf(slot, homeRunHit)
         if (cheer !== null) activeSound().play(cheer)
@@ -802,22 +799,23 @@ function LivePlayback({
         // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
         board = drawBoard(running.held.scoreboardRuns)
       }
-      // 펌블 함성 29 — 진행기가 `state.fumbled` 를 세우는 **그 틱**의 그림에 낸다 (0xb41d0 굴림 → +0xb8 = 6 → 그리기 0x4381a).
-      // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
-      if (running.fumbled && !fumbleSoundPlayedRef.current) {
-        fumbleSoundPlayedRef.current = true
-        // 그리기 0x4381a 의 예약 29 — 건너뛰는 동안(+0xfe7)은 그리지 않아 안 난다
-        if (!running.fastForward) activeSound().play(FUMBLE_CHEER_SOUND)
-      }
       // 슬라이딩 소리 10 — 진행기가 그 틱에 낸다고 표시한 대로 낸다. 한 플레이 한 번 잠금(+0x31c)은
       // 사람 키 갈래에만 있고 진행기가 이미 걸었다 — 자동 갈래(0x5268c)는 잠금이 없어 여기서도 안 막는다.
       // 원본 입구는 예약 0x6e498 이지만 그것도 지금 소리를 끊는 한 칸이라 통로 하나 `play` 와 같다.
       if (running.slidingSoundThisTick) activeSound().play(SLIDING_SOUND_EFFECT)
+      // 필살타법 타구에 맞은 야수 53 — 틱 끝 b4588 → 0xa1e60 a1e82 즉시 재생(0x6ea6c). 슬롯 2 플레이 틱 안이라 그리기(29)보다 앞이다.
+      // 건너뛰기(+0xfe7) 동안에도 플레이 틱은 돌아 원본은 그대로 낸다
+      if (running.hitStaggerSoundThisTick) activeSound().play(HIT_STAGGER_SOUND)
       // 이 틱의 그림(G3) 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e. 건너뛰는 동안(+0xfe7)은 그리지 않아 안 센다.
       // 판 끝 틱이 함께 찍은 "G2 만 닫힌 그림"(`closingListFrame`)도 목록 틱을 돌고 그리는 그림이라 센다
+      // 같은 고리의 펌블 함성 29(4381a~43870) — 펌블이 난 **그 틱**의 그림만 +0xb8 == 6 을 본다(0xb41d0 굴림 → b4280). 그리기 G3 은
+      // 슬롯 2(슬라이딩 10, 0x5268c)보다 뒤라 같은 그림이면 예약 칸을 29 가 덮는다 — 웹도 슬라이딩 뒤에 낸다.
+      // 플레이 끝에 몰아서 내면 아웃 콜(0x51b36)을 덮는다 — 소리 통로가 하나뿐이기 때문이다.
       for (let at = seenTickCountRef.current; at < running.ticks.length; at += 1) {
         const drawn = running.ticks[at]
-        if (drawn !== undefined && !running.fastForward) drawnErrorsRef.current.push(...drawnFieldingErrorsOf(drawn.fielders))
+        if (drawn === undefined || running.fastForward) continue
+        drawnErrorsRef.current.push(...drawnFieldingErrorsOf(drawn.fielders))
+        if (drawnFumbleCheerOf(drawn.fielders)) activeSound().play(FUMBLE_CHEER_SOUND)
       }
       seenTickCountRef.current = running.ticks.length
     }

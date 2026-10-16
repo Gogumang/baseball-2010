@@ -50,6 +50,15 @@ export function drawnFieldingErrorsOf(fielders: readonly DrawnFielderCounters[])
 }
 
 /**
+ * 그림 하나가 펌블 함성 29 를 예약하는가 — 4381a 의 `+0xb8 == 6` 갈래는 [+0xec] 를 보기 **앞**에서 갈라 4383a~43852(+0x2e) ·
+ * 43854(0xa755d)만 [+0xec] != 0 일 때 돌고, 43866~43870 `0x6e499(소리, 0x1d, 0)` 은 늘 지난다. 야수마다 따로 예약하지만 예약은
+ * 한 칸 덮어쓰기(L 1-A2)라 같은 번호를 여러 번 넣어도 한 번이다.
+ */
+export function drawnFumbleCheerOf(fielders: readonly DrawnFielderCounters[]): boolean {
+  return fielders.some((fielder) => (fielder.lockTicks ?? 0) <= 0 && (fielder.fumbleTicks ?? 0) === FUMBLE_RECORD_TICKS)
+}
+
+/**
  * 야수 +0xec — 수비 팀 레코드 차례에서 자리 니블(`+0x1c & 0xf`)이 **칸 + 1** 인 첫 선수.
  * - 칸 1~8: 판 시작 0xb0fb4 b1032~b1060 · b1184 가 판마다 다시 찾는다(못 찾으면 앞 값이 남는다).
  * - 칸 0(투수): 판 시작은 건너뛰고(b1032 `cmp r4, #0 ; beq`) 공수 교대 판 0x3fac4 3fe1a~3fe4c 가 같은 식으로 넣은 값 —

@@ -130,18 +130,20 @@ describe('미션 수비 판 아홉 칸 수비 — 0xb0fb4 (수비 팀 레코드�
     const abilities = Array.from({ length: 9 }, () => 500)
     teamBatters(teamId).forEach((player) => {
       const slot = ((player.position ?? 0) & 0xf) - 1
-      if (slot >= 1 && slot < 9) abilities[slot] = masterGameAbilityOf(player, false, 2)
+      // 칸 0 은 니블 1(지명타자) — 공수 교대 판 0x3fac4 가 야수 0 의 +0xec 에 넣어 펌블 · 레이저가 본다
+      if (slot >= 0 && slot < 9) abilities[slot] = masterGameAbilityOf(player, false, 2)
     })
     return abilities
   }
 
-  it('타자 미션은 CPU 팀(수비) 마스터 줄 — 칸 0(투수)은 원본이 선수를 안 찾아 진행기 기본값', () => {
+  it('타자 미션은 CPU 팀(수비) 마스터 줄 — 칸 0(투수)은 지명타자(0x3fac4 3fe28~3fe4c)', () => {
     const mission = MISSIONS.find((m) => m.side === '타자')!
     const run = startMission(mission)
     const cpuTeamId = run.game.cpuAutoBatting!.teamId
     const abilities = missionDefenseAbilitiesOf(run)
     expect(abilities).toEqual(expectedOf(cpuTeamId))
-    expect(abilities[0]).toBe(500)
+    const designated = teamBatters(cpuTeamId).find((player) => ((player.position ?? 0) & 0xf) === 1)
+    if (designated !== undefined) expect(abilities[0]).toBe(masterGameAbilityOf(designated, false, 2))
   })
 
   it('투수 미션은 사람 칸 팀(수비) 마스터 줄', () => {
@@ -162,7 +164,7 @@ describe('미션 수비 판 아홉 칸 수비 — 0xb0fb4 (수비 팀 레코드�
     const swapped = { ...run, game: { ...run.game, humanBatting: { ...batting, lineup: { ...batting.lineup, rosterSlots } } } }
     const slot = ((roster[0]!.position ?? 0) & 0xf) - 1
     const abilities = missionDefenseAbilitiesOf(swapped)
-    if (slot >= 1) expect(abilities[slot]).toBe(masterGameAbilityOf(roster[9]!, false, 2))
+    if (slot >= 0) expect(abilities[slot]).toBe(masterGameAbilityOf(roster[9]!, false, 2))
     // 나머지 칸은 그대로
     expect(abilities.filter((_v, index) => index !== slot)).toEqual(
       expectedOf(batting.teamId).filter((_v, index) => index !== slot),

@@ -26,7 +26,7 @@ import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
  * af9b6:   틱 비교 + 앞길 검사 → 0xafa0e
  * afa0e:   주자.vt48(0xb6228(주자+0x78)) ; 플레이+0x128 = 1
  * ```
- * ⚠️ **예전 옮김은 `+0x111`·`+0x129` 를 거꾸로 읽어 "서 있으면 빈 목록" 으로 두었다.**
+ * 정정: **예전 옮김은 `+0x111`·`+0x129` 를 거꾸로 읽어 "서 있으면 빈 목록" 으로 두었다.**
  * 디스어셈은 그 반대다 — 두 칸이 서면 **틱 비교 없이 전원 한 루 진루**다. 그대로 고쳤다.
  *
  * ⚠️ 원본이 진루와 함께 적는 `플레이+0x128 = 1`(송구 필요)은 이 함수가 돌려주는 목록에 담기지
@@ -171,7 +171,7 @@ export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdva
     // 움직이지 않으니, 부르는 쪽은 그 결정에 +0x128 만 세우고 주자는 옮기지 않는다.
     // 0xaf950~0xaf95a — `r0 = vt18(주자) ; r0 != 0 → 계속 ; 아니면 force == 0 이면 건너뜀`.
     // 곧 **루에 붙어 멈춘 주자는 언제나 보고, 달리는 중인 주자는 force 일 때만 본다.**
-    // ⚠️ 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
+    // 정정: 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
     // 부르는 자리는 이제 원본 인자 그대로다 — 매 틱 force 0(52660), 판 시작 한 번 force 1(0x46766).
     if (!isRunnerStopped(runner) && input.force !== true) continue
 

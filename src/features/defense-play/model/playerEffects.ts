@@ -85,7 +85,7 @@ export function stepDustTrail(
  *        거짓:                       g == 3 → (t == 4 ? 3 : ↓) ; g == 2 → (t == 1 ? 3 : t == 3 ? 4 : 0)
  *                                     ↓ g == 1 → (t == 0 ? 4 : 0) ; g == 2 → (t == 3 ? 4 : 0) ; 그 밖 0
  * ```
- * ⚠️ **원본 그대로**: 앞으로 가는 1 → 2루 · 홈 → 1루 슬라이딩은 0 이라 먼지가 없다(갈래 짝이 0x9fe80 의 참 · 거짓과
+ * **원본 그대로**: 앞으로 가는 1 → 2루 · 홈 → 1루 슬라이딩은 0 이라 먼지가 없다(갈래 짝이 0x9fe80 의 참 · 거짓과
  * 어긋나 있다). 고치지 않는다.
  */
 export function slideDustDirectionOf(runner: RunnerState, previousTarget: number): number {

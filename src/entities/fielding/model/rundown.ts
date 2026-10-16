@@ -98,7 +98,7 @@ export const NO_RUNDOWN: RundownPlan = {
  * b3a3c  [2] = 주자+0x7c(달려가는 루) ; [3] = +0x7c == +0x8c ? +0x8c + 1 : +0x8c ; [4] = i
  * b3a52  k = 0, 1: [k] = 커버[[2 + k] % 4](+0xf0 표) ; [k] == 플레이+0x130(공 가진 야수) 이면 [5] = k
  * ```
- * ⚠️ 예전 웹은 주자 칸 이름이 거꾸로 적혀 있던 때(`fieldingState` 의 `startBase` 주석)를 따라 [2] 를 +0x8c 로 두어
+ * 정정: 예전 웹은 주자 칸 이름이 거꾸로 적혀 있던 때(`fieldingState` 의 `startBase` 주석)를 따라 [2] 를 +0x8c 로 두어
  * 두 루 · 두 야수가 서로 바뀌어 있었다.
  */
 export function buildRundownPlan(context: DefenseContext, runnerIndex: number): RundownPlan {
@@ -168,7 +168,7 @@ export interface RundownTickInput extends DefenseContext {
 /**
  * 협살 한 틱. 공을 쥔 쪽과 아닌 쪽의 여유 틱이 **5 와 4 로 다르다** — 원본 그대로 옮긴다.
  *
- * ⚠️ **원본 그대로**: 공을 쥔 야수가 **주자가 달려가는 루(+0x7c)의 커버면 `coversBack` 이 늘 참**이라
+ * **원본 그대로**: 공을 쥔 야수가 **주자가 달려가는 루(+0x7c)의 커버면 `coversBack` 이 늘 참**이라
  * 짝에게 던지지 않고 주자를 쫓기만 한다(b4976 → 0xb4a96). 마주 달려오는 주자라 태그(≤ 499)로 끝나기 쉽다.
  * (예전 웹은 이 칸을 지나온 루 +0x8c 로 보아 "뒤에서 쫓기만 해 절대 못 잡는다" 고 적었다 — 칸 이름이 거꾸로였던 때의 해석)
  */
@@ -213,7 +213,7 @@ export function rundownAction(input: RundownTickInput): RundownAction {
  * 원본은 이 판정을 AI 상태와 무관하게 아웃 판정 함수가 돌리고, 아웃이 나면 그 안에서
  * 협살 종료 0xb26b8 을 부른다 (0xb3946).
  *
- * ⚠️ 예전 이 자리의 **근사**("공 쥔 야수가 한 걸음(220) 안까지 붙으면 아웃")는 지웠다.
+ * 정정: 예전 이 자리의 **근사**("공 쥔 야수가 한 걸음(220) 안까지 붙으면 아웃")는 지웠다.
  * 원본 숫자 499 가 문서에 확정으로 박혀 있어 그대로 쓴다.
  */
 export function tagsRunner(fielder: FielderState, runner: RunnerState): boolean {

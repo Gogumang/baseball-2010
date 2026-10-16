@@ -17,6 +17,8 @@ import {
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 import { PASSED_BALL_PLAY_KIND, type PassedBallShot } from '@/entities/fielding/model/passedBall'
+import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
+import { stealTargetBaseOf, type StealBase } from '@/entities/fielding/model/stealStart'
 import { secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
 import { batterRunnerNeedsCover } from '@/entities/fielding/model/coverAssignment'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -65,13 +67,16 @@ import {
  * - ⚠️ **공 궤적**은 웹 타구 근사(`battedBallFlight`)에 0x3507c 의 각·세기·수직 속도를 넣은 것이다.
  *   원본 물리 루프(0xb401c)는 해독 금지 구역이다. 각은 0x3507c 가 부호 없이 넣고(+0xfcc = +60…+130),
  *   타격은 −a 를 넣으므로 웹 패턴 각으로는 −각 이다(S8 5-4: 홈플레이트 뒤쪽).
- * - ⚠️ **포수 +0xb8 = 6(놓침 동작)** 이 포구 예보·이동에 주는 효과는 안 옮겼다(동작 잠금 칸은 +0xb4 라 따로다).
+ * - **포수 +0xb8 = 6(놓침 동작)** 은 포구 예보·이동에 효과가 없다 — `.text` 를 훑어(`adds rX, #0xb8` · `adds #0x80 + [#0x38]` ·
+ *   `movs #0xb8` 레지스터 오프셋) 야수 +0xb8 을 만지는 곳은 쓰기 b4276(펌블) · 3e08e(폭투) · 줄이기 a12da(야수 틱) · 읽기
+ *   4381a(그리기 — 29 · 실책 · "!") 넷뿐이다(나머지 `+0xb8` 은 vtable 칸 호출 · 주자 객체 베끼기 af786). 동작 잠금 칸은 +0xb4 라 따로다.
  * - ⚠️ **커버**: 0xb1c90 은 매 틱 다시 고르지만 여기서는 시작에 한 번 고른다 — 2루는 타구 진행기와 같은
  *   `secondBaseCoverSlot`, 쫓는 야수가 맡던 루는 0xb1d48 갈래대로 투수(0)가 맡되 `0xb1b88`(그 루로 올 주자가
  *   있는가)이 거짓이면 없음(−1). 0xb1b88 의 타자주자 갈래(0xb1bde~0xb1c08, P+0x168 비교)도 옮겼지만 P+0x168 을
  *   쓰는 곳이 바이너리에 없어 안 선다(`batterRunnerNeedsCover`).
- * - ⚠️ 낫아웃 타자주자는 0xa93ac 가 세우는 대로 요구 루 1 로 만들고 처음부터 1루로 뛰게 한다 —
- *   0xa93ac 뒤 누가 목표 루를 1 로 세우는지는 안 읽었다(타구 진행기와 같은 다리).
+ * - 낫아웃 타자주자는 0xa93ac 가 세우는 대로 처음부터 1루로 뛴다 — a93f8~a9400 `주자.vt48(1)`(= 0xa07b0 → +0x80 · +0x7c ·
+ *   +0x84 = 1)로 목표 루 1, a940a `+0x88 = 1`(요구 루) · a940c `+0x94 = 1` · a940e `+0x98 = 1`(타자주자). 판 시작 목표 0xa9e44 는
+ *   목록 1 번부터 돌아(a9e5c `movs r1, #1`) 타자주자(0 번)를 건드리지 않는다.
  */
 export interface PassedBallPlayInput {
   /** 0x3507c 가 굴린 값 — `passedBallShot(random)` 을 rollPassedBall 이 선 투구에서 그대로 */
@@ -85,6 +90,13 @@ export interface PassedBallPlayInput {
   readonly outs: number
   /** `passedBallStrikeoutOf` 가 `'batterRuns'` 면 참 — 타자주자를 맨 앞에 만든다 (state[0x1a]) */
   readonly batterRuns?: boolean
+  /**
+   * 이번 투구에 출발한 도루 주자들의 루 — state[0x14 + 루] (`0xa9bd4`, 종류 마스크 0xae794 = {1, 4, 5, 9}). 출발한 주자는 목표가
+   * 이미 다음 루이고, 판 시작 리드(0x3d7b8)가 `0xcffa8`[루] + rand(0,9)(2 이하 → 3) 틱 몰아 돌린다. 안 주면 아무도 출발 안 했다
+   */
+  readonly stealingFrom?: readonly StealBase[]
+  /** 장면 +0xfdc — 이번 투구의 번트 종류(0 = 없음). 서 있으면 도루 안 한 주자 리드가 +3 틱(`0x3d7b8` 3d8e0). 기본 0 */
+  readonly buntKind?: number
   readonly defenseAbilities?: readonly number[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
@@ -134,6 +146,51 @@ export function passedBallTrajectoryOf(shot: PassedBallShot): BattedBallTrajecto
   return battedBallTrajectory([-shot.angle, shot.strength, shot.verticalSpeed, 0], { origin: BATTING_POINT })
 }
 
+/**
+ * **판 시작 목표 · 리드** — 상태 0x17 진입 0x46418 (직접 뜬 것):
+ * ```
+ * 464a8  state[0x11](맞은 공) || 종류 ∈ {2, 3} || 0xb6c3c(state[0x1a] 낫아웃) 가 아니면 4657e 로 — 종류 9 는 낫아웃일 때만 아래 둘
+ * 4650e    0xa93ac 타자주자(목표 1 — vt48(1))
+ * 4653e    주자관리.vt1c = 0xa9e44(vt94, +0x111, state[6]): 목록 1 번부터 — 도루 아니면 vt88(제 루), 포스(0..i 산 주자 수 > 루)
+ *          || 아웃 == 2 || 도루면 앞 주자 +0x7c ≥ 루 → 목표 = 루 + 1 (종류 1 의 2아웃 갈래 a9efa 는 종류 9 에 없다).
+ *          1루 예외(a9ed6)는 1루 주자 · 아웃 != 2 라 낫아웃(1루 빔 || 2아웃)과 안 겹친다
+ * 4657e  주자 목록 차례로 0x3d7b8 리드 — 도루 주자 0xcffa8[루] + rand(0,9) 틱 · 목표 그대로, 그 밖 0xcffb0[루](+ 번트 3) 틱 뒤 되돌리기
+ * 465ca  사슬 끊긴 도루 주자 되돌리기는 종류 2·3 만 — 종류 9 엔 없다
+ * ```
+ * 낫아웃이 아니면 0xa9e44 가 안 돌아 도루 안 한 주자의 목표는 제 루, 도루 주자는 0xa9bd4 가 세운 다음 루 그대로다.
+ * 굴림은 도루 주자마다 rand(0,9) 한 번(목록 차례) — 0x3507c 의 두 굴림 뒤 · 판 틱 굴림 앞.
+ */
+function leadRunnersForPassedBall(runners: RunnerState[], input: PassedBallPlayInput, batterRuns: boolean): void {
+  const stealing = input.stealingFrom ?? []
+  let previousTarget = Number.NEGATIVE_INFINITY
+  for (let index = 0; index < runners.length; index += 1) {
+    const runner = runners[index]
+    if (runner.isBatterRunner) {
+      previousTarget = runner.targetBase
+      continue
+    }
+    const base = runner.startBase
+    const isStealing = stealing.includes(base as StealBase)
+    let target = isStealing ? stealTargetBaseOf(base) : base
+    if (batterRuns) {
+      const forced = index + 1 > base
+      if ((forced || input.outs === 2 || isStealing) && previousTarget >= base) target = base + 1
+    }
+    previousTarget = target
+    runners[index] = { ...runner, targetBase: target }
+  }
+  for (let index = 0; index < runners.length; index += 1) {
+    const runner = runners[index]
+    const lead = runnerLeadOf(runner, {
+      playKind: PASSED_BALL_PLAY_KIND,
+      stealing: !runner.isBatterRunner && stealing.includes(runner.startBase as StealBase),
+      buntKind: input.buntKind,
+      random: input.random,
+    })
+    runners[index] = applyRunnerLead(runner, lead)
+  }
+}
+
 /** 판 하나를 끝까지 돌린다 — 시작 → 진행기 → 정리 */
 export function runPassedBallPlay(input: PassedBallPlayInput): PassedBallPlayResult {
   return passedBallPlayResultOf(input, runRunnerPlay(passedBallPlayEngineInputOf(input)))
@@ -160,6 +217,7 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     const index = batterRuns ? runners.length : runners.length + 1
     runners.push(createRunner(index, base, speedOf(base), { isBatterRunner: false }))
   })
+  leadRunnersForPassedBall(runners, input, batterRuns)
 
   // ── 0xb284a: 예보(vt24, 추적야수 = 포수라 t ≤ 4 동안 포수를 건너뜀) → 고르기(vt34) ──
   const startFielders = createFielders(abilities, input.defenseTeamBonus ?? 0)

@@ -78,6 +78,7 @@ import {
   createFielders,
   createRunner,
   fielderAbilityOf,
+  recordPlayerAbilityOf,
   fielderArrivalTicks,
   initialPlayView,
   NONE,
@@ -234,7 +235,7 @@ export interface DefensePlayInput {
   readonly stealingFrom?: readonly number[]
   /**
    * 장면 +0xfdc — 이번 투구의 번트 종류(0 = 없음). 서 있으면 도루 안 한 주자 리드가 +3 틱(`0x3d7b8`).
-   * ⚠️ 부르는 쪽이 아직 안 싣는다(번트 종류가 타구 결과까지 안 넘어온다) — 안 주면 0.
+   * 부르는 쪽이 싣는다 — 타자편 `gameFlow.defensePlayInputOf`(타석 화면 넷째 인자) · 투수편 `pitcherGameFlow`(`thrown.buntKind`). 안 주면 0.
    */
   readonly buntKind?: number
   /**
@@ -336,7 +337,7 @@ export interface DefensePlayInput {
    * 0xbba 하나다 — 결과 코드 9·13(아웃)이 나면 0x51d40~0x51db4 가 수비 조작이 사람(0x33fe4)이든 CPU(0x3403c)든
    * `아웃 ≤ 2` 일 때 플레이+0x128 = 1 로 세우고 `0xafa60` 을 **한 번** 부른다(이 파일 6c 절).
    *
-   * ⚠️ 예전 해독(S8 4-3 · I-controls 2b)의 "메시지 처리기 `0x509a0` 앞머리가 메시지마다 0xafa60 을 부른다" 는
+   * 정정: 예전 해독(S8 4-3 · I-controls 2b)의 "메시지 처리기 `0x509a0` 앞머리가 메시지마다 0xafa60 을 부른다" 는
    * **틀렸다**. 앞머리가 부르는 것은 `[장면+0x214]`(경기 로직, 생성 0xae1d8 · vtable **0xd84cc**)의 vt0xc =
    * **`0xae5f8` = `sub sp ; movs r0,#0 ; add sp ; bx lr` 빈 함수**다. 0xafa60 은 `[장면+0x210]`(제어기,
    * 생성 0xaf20c · vtable 0xd8554, 0x3ea84 가 +0x210 에 넣는다)의 vt0xc 이고 둘은 다른 객체다.
@@ -365,7 +366,7 @@ export interface DefensePlayInput {
    * 타자 마선수 다섯의 그림 이름은 표 `0xd3f10`(20바이트 간격, C-16 · R3 7-1)에서 고른다:
    * 0 메디카 · 1 어거지죠 · 2 로제 · 3 크라이져 · 4 킹타이거.
    *
-   * ⚠️ **원본 그대로**: 원본은 타자 마선수 그림을 **팀당 첫 한 명만** 적재해 놓고 그리는 쪽
+   * **원본 그대로**: 원본은 타자 마선수 그림을 **팀당 첫 한 명만** 적재해 놓고 그리는 쪽
    * (`0x79b48` 의 b 갈래)은 "그 칸 선수가 마선수인가" 만 보므로, 한 팀에 타자 마선수가 둘 이상이면
    * 둘째부터도 첫째의 그림으로 나온다(R3 7-3). 그 버그를 되살리려면 **부르는 쪽이** 마선수인 칸에
    * 전부 같은(첫째의) 번호를 넣어 주면 된다 — 여기서 고쳐 주지 않는다.
@@ -422,18 +423,20 @@ export interface DefenseLineupPlayer {
  * 타순에 선 선수들을 **수비 칸 9개**(0 투수 … 8 중견)의 능력치 배열로 옮긴다.
  *
  * 칸 0(투수)은 판 시작 0xb0fb4 가 **선수를 찾지 않는다**(b1032 — `fielderAbilityOf` 주석). 그래서 송구 속도 g = 2 ·
- * 악송구 보정 8 · 펌블 0 · 레이저 굴림 없음으로 고정이고, 진행기는 이 칸의 값을 읽지 않는다 — 자리만 기본값으로 채운다.
+ * 악송구 보정 8 로 고정이고 송구 쪽은 이 칸의 값을 읽지 않는다. 대신 공수 교대 판 0x3fac4 가 칸 0 의 +0xec 에 **지명타자**
+ * (니블 1)를 넣어 펌블 · 레이저 굴림이 그 수비를 본다 — 칸 0 에는 지명타자의 수비를 넣는다(`recordPlayerAbilityOf`).
  * (예전 웹은 마운드 투수의 능력치 칸 2(투수 레코드에서는 변화)를 넣었다 — 원본에 없는 길이라 걷었다.)
  *
  * 자리 코드가 없거나 겹치는 칸은 원본 평균대(등급 3 = 500)로 둔다.
  */
 export function defenseAbilitiesOf(lineup: readonly DefenseLineupPlayer[]): number[] {
   const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_ABILITY)
-  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0)
+  const filled = Array.from({ length: FIELDER_COUNT }, () => false)
   for (const player of lineup) {
     const code = (player.position ?? 0) & 0xf
+    // 칸 0 은 니블 1(지명타자) — 공수 교대 판 0x3fac4 의 고리(3fe28~3fe4c)는 칸 0 도 같은 식으로 찾는다
     const slot = code - 1
-    if (slot < 1 || slot >= FIELDER_COUNT) continue
+    if (slot < 0 || slot >= FIELDER_COUNT) continue
     if (filled[slot]) continue
     abilities[slot] = player.defense
     filled[slot] = true
@@ -720,7 +723,7 @@ function pushedRunnersWithFirstBaseException(fromBases: readonly number[], excep
  *    플레이+0x111(끝남, 판 시작이라 0). 웹은 잡힐 뜬공을 결과 코드(뜬공·직선타 아웃 = `onTheFly`)로 본다.
  * - 도루 표시 없는 주자의 R.vt88(+0x8c) = `0xa0820`: 루 좌표 0xd77d8[b] 에 세우고(0xbef58) +0x7c·+0x80·+0x88·+0x8c·+0x90 = b,
  *   +0x94 = 0, vt10(동작 0). 리드는 루 좌표에서 출발하므로(applyRunnerLead) 웹과 같다.
- * ⚠️ S8 6-3 의 "0x46418 의 주자 움직임은 0x46664 걷기 루프뿐" 은 이 고리를 놓친 것이다.
+ * 정정: S8 6-3 의 "0x46418 의 주자 움직임은 0x46664 걷기 루프뿐" 은 이 고리를 놓친 것이다.
  */
 function leadRunnersForBattedBall(runners: readonly MutableRunner[], input: DefensePlayInput): void {
   const stealing = input.stealingFrom ?? []
@@ -774,7 +777,7 @@ export interface DefensePlayState {
   onTheFly: boolean
   /** 공을 쫓는 야수 칸 */
   chaserSlot: number
-  /** 포구 지점 — 펌블로 포구 틱이 밀려도 **자리는 그대로다** (⚠️ 원본 그대로) */
+  /** 포구 지점 — 펌블로 포구 틱이 밀려도 **자리는 그대로다** (원본 그대로) */
   catchPoint: WorldPoint
   /** 루 커버 배정 (0xd85a8 + 0xb1e24) */
   readonly covers: readonly number[]
@@ -851,6 +854,12 @@ export interface DefensePlayState {
    * 사람 키 0x5199c(+0x31c 잠금으로 한 플레이 한 번) · 자동 0x5268c(잠금 없음, 슬라이딩시킨 수 > 0) 둘 다 여기로 온다.
    */
   slidingSoundThisTick: boolean
+  /**
+   * **방금 돈 틱에서 필살타법 타구에 맞은 야수의 효과음 53 을 낸다.** 틱 끝 b4588 플레이.vt74 = 0xb3420 → 야수.vte4 = 0xa1e60 이
+   * 자세 13 · +0xb4 = 15 뒤 a1e82 에서 **즉시 재생** 0x6ea6c(소리, 0x35, −1, 0) 한다(예약이 아니다). 진행기는 소리를 못 내므로
+   * 수비 재생(`DefensePlayback`)이 이 칸을 보고 그 틱에 낸다.
+   */
+  hitStaggerSoundThisTick: boolean
   /**
    * 이번 틱의 메시지 0x13(주자 하나 홈인 — 점수판에 1점) 인자 차례 — 바로 득점 0xaa1b0 은 그 주자 칸(0 = 타자주자),
    * 보류 해제 0xaa39e 는 0x64(100). 수비 장면 득점 점수판(0x51fb8 → 0x52030 홈런 갈래 · 0x52074 보통 갈래)이 본다
@@ -1178,6 +1187,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     autoBaserunning: true,
     slidingSoundPlayed: false,
     slidingSoundThisTick: false,
+    hitStaggerSoundThisTick: false,
     runInsThisTick: [],
     laserShining: false,
     fumbleMarks: Array.from({ length: FIELDER_COUNT }, () => 0),
@@ -1317,6 +1327,7 @@ export function stepDefensePlay(
   let autoBaserunning = state.autoBaserunning
   let slidingSoundPlayed = state.slidingSoundPlayed
   let slidingSoundThisTick = false
+  let hitStaggerSoundThisTick = false
   const runInsThisTick: number[] = []
   let laserShining = state.laserShining
   let fumbleMarks = state.fumbleMarks
@@ -1778,14 +1789,11 @@ export function stepDefensePlay(
       readonly thrownSlot?: number
       readonly secondPass?: { readonly movable: boolean }
       readonly onlySlot?: number
-      /** 송구 0xb2e38 이 깐 공 — 아래 AI 1 목표 · 0xb3b38 머리의 AI 1 · 0xc 되돌리기를 원본대로 한다 */
+      /** 송구 0xb2e38 이 깐 공 — 아래 AI 1 목표를 원본대로 한다 */
       readonly thrownBall?: boolean
     },
   ): void => {
     receivingThrow = false
-    // 고르기 vt34 = 0xb3b38(b3da4) 가 플레이+0x1f7 = 0 을 늘 적는다. ⚠️ +0x1f8 은 b3dac 의 r0 가 0 일 때만 지우는데 그 r0 의
-    // 뜻을 다 못 읽어 옮기지 않았다 — C 끝(0x44564)이 어차피 지운다
-    deadlyJumpArmed = false
     trajectory = spliceTrajectory(trajectory, tick, next)
     ballSegmentStart = next.pointAt(0)
     ballLandingTick = next.landingTick < 0 ? -1 : tick + next.landingTick
@@ -1802,6 +1810,11 @@ export function stepDefensePlay(
       const thrower = options.thrownSlot
       throwErrorMarks = throwErrorMarks.map((value, slot) => (slot === thrower ? THROW_ERROR_MARK_TICKS : value))
     }
+    // 고르기 vt34 = 0xb3b38 끝의 필살 표시 지우기 — r0 는 b3cb2 에서 0 이고 슬라이딩 갈래(+0x16c = 4, b3d2c)만 1 이다:
+    //   b3da4 +0x1f7 = 0 → b3dac r0 == 0 이면 b3db0 +0x1f8 = 0. 점프 갈래(+0x16c = 3)는 b3d16 에서 b3db0 으로 곧장 뛰어
+    //   +0x1f7 을 안 지운다. 곧 점프면 +0x1f8 만 · 슬라이딩이면 +0x1f7 만 · 그 밖은 둘 다 지운다(원본 그대로)
+    if (forecast.choice.kind !== CATCH_KIND.JUMP) deadlyJumpArmed = false
+    if (forecast.choice.kind !== CATCH_KIND.SLIDE) deadlySlideArmed = false
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
     const caughtAt = next.pointAt(catchTick - tick)
@@ -1820,8 +1833,9 @@ export function stepDefensePlay(
               aiState: fielder.aiState === AI_STATE.PICK_UP ? AI_STATE.PICK_UP : AI_STATE.CHASE,
               holdingBall: false,
             }
-        : options.thrownBall === true && (fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP)
-          ? // 0xb3b38 머리 — AI 1 · 0xc 인 야수는 AI 0 으로 되돌린다(P2 1a). ⚠️ 다시 쏘기 갈래엔 아직 안 옮겼다
+        : fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP
+          ? // 0xb3b38 머리 b3b7a~b3b9a — AI(+0x84) 1 · 0xc 인 야수는 0xb8dbc(야수+0x80, 0)로 AI 0. 송구(0xb2e38)도 다시 쏘기도
+            // 같은 고르기를 부른다 — 다시 쏘기 0xb3148 은 b3294 vt24(1) → b32a4 vt34(= 0xb3b38) → b32ae vt30
             { ...fielder, aiState: AI_STATE.IDLE, holdingBall: false }
           : fielder.holdingBall
             ? { ...fielder, holdingBall: false }
@@ -2014,8 +2028,8 @@ export function stepDefensePlay(
         laserRolled = true
         const passed = rollLaserThrow(
           {
-            // 66a94: 공 쫓는 야수+0xec 가 없으면(투수 칸 0) 굴림 없이 실패 — `rollLaserThrow`
-            defenseAbility: fielderAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY),
+            // 66a94: 공 쫓는 야수+0xec 의 수비 — 투수 칸 0 은 공수 교대 판이 넣은 지명타자(`recordPlayerAbilityOf`)
+            defenseAbility: recordPlayerAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY),
             skillIds: input.fielderSkillIds?.[chaserSlot] ?? [],
           },
           input.random,
@@ -2109,6 +2123,7 @@ export function stepDefensePlay(
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot ? { ...fielder, actionLockTicks: HIT_STAGGER_LOCK_TICKS } : fielder,
       )
+      hitStaggerSoundThisTick = true
       log.push(`${tick}틱 ${chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
     }
     if (tick === catchTick && catchGateOpen && !uncatchable && input.random !== undefined) {
@@ -2117,7 +2132,7 @@ export function stepDefensePlay(
       // 손으로 만든 시험 궤적(원본 칸 없음)은 마지막 점을 멈춘 점으로 본다.
       const ballIsMoving =
         trajectory.isStoppedAt === undefined ? tick < trajectory.length - 1 : !trajectory.isStoppedAt(tick)
-      if (rollFumble(fielderAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
+      if (rollFumble(recordPlayerAbilityOf(abilities, chaserSlot, DEFAULT_ABILITY), ballIsMoving, input.random)) {
         fumbled = true
         fumbleMarks = fumbleMarks.map((value, slot) => (slot === chaserSlot ? FUMBLE_MARK_TICKS : value))
         // b4280: 야수+0xb8 = 6(놓침 동작) · 메시지 0xbc2 · 사건(sp+0x24) = 1 — 쥐지 않는다. 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 로
@@ -2637,7 +2652,7 @@ export function stepDefensePlay(
     //   거짓이어도 플레이+0x111(홈런)·플레이+0x129(폴 홈런)·종류 7(바운드 2루타)이면 그래도 돈다.
     // 곧 **사람이 공격하면서 주루 설정이 수동이면 자동 진루가 통째로 안 돈다.**
     //
-    // ⚠️ 예전 줄은 `경기+0x24`(autoBaserunning)로 이 판단을 막았는데 **원본에는 그런 게이트가
+    // 정정: 예전 줄은 `경기+0x24`(autoBaserunning)로 이 판단을 막았는데 **원본에는 그런 게이트가
     //    없다** — 0x24 를 읽는 곳은 0x3e0e6·0x521fa 둘뿐이고 둘 다 자동 진루와 무관하다
     //    (위 `autoBaserunning` 칸 주석). 그래서 그 항을 뺐다.
     // +0x111 · +0x129 는 판 끝 결과 코드 8(홈런) · 12(폴 홈런)가 사건 코드 처리 0xb2bc4 에서 세운다(6d 절) — 서면
@@ -2675,7 +2690,7 @@ export function stepDefensePlay(
     // 사람/CPU·주루 설정 갈림이 없다. 슬라이딩시킨 주자가 하나라도 있으면 그 자리에서 효과음 10
     // (0x5267e `ble` → 0x5268c request(10)) — 사람 키와 달리 +0x31c 잠금도, 소리 재생 중 검사도 없다.
     //
-    // ⚠️ 원본 그대로: 0xb030c 는 `주자+0x7c == 계획[+0xf]` 를 **mod 4 없이** 견준다(b0368~b036c).
+    // 원본 그대로: 0xb030c 는 `주자+0x7c == 계획[+0xf]` 를 **mod 4 없이** 견준다(b0368~b036c).
     // 홈으로 가는 주자의 목표 루는 4(루 표 [4] = 홈 사본)이고 송구 목표 홈은 0 이라 **홈 송구로는 자동
     // 슬라이딩이 걸리지 않는다.** 고치지 않는다.
     //
@@ -3044,6 +3059,7 @@ export function stepDefensePlay(
   state.autoBaserunning = autoBaserunning
   state.slidingSoundPlayed = slidingSoundPlayed
   state.slidingSoundThisTick = slidingSoundThisTick
+  state.hitStaggerSoundThisTick = hitStaggerSoundThisTick
   state.runInsThisTick = runInsThisTick
   state.laserShining = laserShining
   state.laserConfirmed = laserConfirmed
@@ -3093,7 +3109,7 @@ export function stepDefensePlay(
  * - 3아웃이 막는 것은 `state[0]` 보류분뿐이다 — 해제 꼬리 0xaa388 `state[6] > 2 → return`, 다음 판 0xb67d0 이 지운다.
  * - 판 끝 판정 0xae3e8: 아웃 > 2 면 ae554 → 0x18 로 정산 0xa8024(ae5b2)를 부를 뿐 점수판은 안 건드린다.
  * 곧 아웃 ≤ 1 때 · 공이 안 닿았을 때 · 타자주자가 살아 뛰던 때 바로 올린 득점은 뒤에 타자주자가 죽어 3아웃이 돼도 남는다
- * (⚠️ 원본 그대로 — 야구 규칙과 다를 수 있다).
+ * (원본 그대로 — 야구 규칙과 다를 수 있다).
  *
  * 예전 웹은 S2 2-5 의 "타석 단위 엔진에 옮길 때의 같은 결과 규칙"(3아웃 · 땅볼 · 타자주자 아웃이면 득점 0)을 여기에 한 번 더
  * 걸었다. 그 규칙은 보류 개념이 없던 타석 단위 엔진을 위한 근사였고, 이 진행기는 보류·해제를 틱 단위로 원본대로 돌리므로 뺐다.

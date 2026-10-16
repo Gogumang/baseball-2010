@@ -190,7 +190,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
    * 굴림은 진행기가 하지만 소리는 **틱을 도는 이 화면**이 낸다 — 플레이 끝에 몰아서 내면
    * 아웃 콜(0x51b36)을 덮기 때문이다.
    */
-  it('펌블이 난 그 틱에 29 를 한 번만 내고 53 은 안 낸다 (0xb41d0 → +0xb8 = 6 → 0x4381a)', () => {
+  it('펌블이 난 그 틱마다 29 를 내고 53 은 안 낸다 (0xb41d0 → +0xb8 = 6 → 0x4381a)', () => {
     vi.useFakeTimers()
     const 울린것: number[] = []
     setActiveSound({
@@ -210,8 +210,14 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       render(<DefensePlayback input={{ ...타구(단타, 주자1루), random: 늘0 }} onDone={onDone} />)
       끝까지(onDone)
 
-      expect(결과(onDone).fumbled).toBe(true)
-      expect(울린것.filter((id) => id === 29)).toEqual([29])
+      const 결 = 결과(onDone)
+      expect(결.fumbled).toBe(true)
+      // 늘 0 이면 잡을 때마다 펌블이다 — 원본처럼 펌블 6 을 본 그림마다 한 번씩(한 판에 여럿이면 여럿)
+      const 펌블그림 = 결.ticks.filter((view) =>
+        view.fielders.some((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6),
+      ).length
+      expect(펌블그림).toBeGreaterThan(0)
+      expect(울린것.filter((id) => id === 29)).toHaveLength(펌블그림)
       expect(울린것).not.toContain(53)
     } finally {
       setActiveSound(null)

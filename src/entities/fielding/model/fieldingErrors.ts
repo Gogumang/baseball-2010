@@ -15,7 +15,7 @@ export const FUMBLE_PERMYRIAD: readonly number[] = [200, 180, 160, 140, 120, 100
 
 /**
  * 만분율 펌블 확률. 수비 ≤125 면 2.0%, 925 초과면 0.5%.
- * `null` = 야수+0xec(선수)가 없는 칸(투수 칸 0, `fielderAbilityOf`) — b41e4 가 0 을 쓴다.
+ * `null` = 야수+0xec(선수)가 없는 칸 — b41e4 가 0 을 쓴다. 진행기는 +0xec 의 수비(`recordPlayerAbilityOf` — 칸 0 은 지명타자)를 넘긴다.
  */
 export function fumbleChanceOf(defenseAbility: number | null): number {
   if (defenseAbility === null) return 0
