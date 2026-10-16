@@ -21,6 +21,11 @@ const 띄우기 = (overrides: Partial<Parameters<typeof TeamSelectScreen>[0]> = 
   render(<TeamSelectScreen onSelect={vi.fn()} onCancel={vi.fn()} {...overrides} />)
 
 describe('팀 고르기', () => {
+  it('공 무늬 바탕 0x5fd61 을 먼저 깐다 — 일반모드 18·19 · 나리 0x65(틀 0x16928) · 시즌 0xca · 트레이드 0xe4(앞그림 0xb810) 모두', () => {
+    띄우기()
+    expect(screen.getByTestId('바탕-공무늬')).toBeTruthy()
+  })
+
   it('팀 칸 15개를 5열 격자로 놓는다', () => {
     띄우기()
 
