@@ -167,7 +167,16 @@
   즉 반투명 · 더하기 파트도 **그 그림의 팔레트(.mpl 로 덮인 것, 0xb9718 → 0xc8c7c · 0xc8eed)** 로 칠한다.
 - 웹: `tools/decode_pzx.compose_frame` 이 반투명 파트가 아래 파트 없이 놓인 자리의 팔레트 번호를 남기게 고쳤다 — 하늘 조명
   `sky_effect_light`(효과 0x67) 시간대 팔레트, defender 그림자(0x66 7), event_char_0 볼터치(0x66)가 번호 지도를 갖는다.
-- ⚠️ 남은 차이: decode_pzx 는 0x67 을 알파 n/255 로 굽는데 원본은 **더하기**(픽셀 효과 2, 표 위)다. 이번에 안 고쳤다.
+- ⚠️ 남은 차이: decode_pzx 는 0x67 을 알파 n/255 로 굽는데 원본은 **더하기**(픽셀 효과 2, 표 위)다. 이번에 안 고쳤다. → r139 에서 겹 목록으로 고침(아래).
+- **r139 (2026-10-16, 웹 round9-r139 3a3cc48f)**: 부른 쪽 효과 갈래를 더 떴다 — c9fae `cmp r3,#0x10` → 확대 갈래, ca074 `cmp #0x11` →
+  ca07c 뒤집기 갈래(파트마다 효과 0x11 로 0xca9fc, 파트+0x10 안 읽음 → 0x66 · 0x67 파트도 **그냥 복사**), 그 밖 ca198 에서
+  `[sp+0x2c] == 0` 일 때만 파트 효과(ca19c bne → ca1e8 은 부른 쪽 효과). 0x93c45 는 r3(효과)를 프레임 vt+0x10 에 그대로 넘기고(93caa),
+  목록 그리기 0xbe6a0 종류 2 는 칸 +0x18 을 r3 로(be74c~be756) — 0xbe8a5 의 [sp+8] 이 그 칸이다.
+  0x67 파트를 쓰는 PZX 전수 13개: ace/leony_effect · medica_effect · pitcher_dragona(5~7) · effect/effect_power · game_effect ·
+  sky_effect_light · sky_effect_light1 · mainui/main_title · touch · ui/game_judge(20~29) · game_ui(85~88) · slt_pitch · trainning(21~23).
+  웹: decode_pzx `write_frame_layers` 가 `frames/layers.json`(보통 파트 묶음 · 0x67 날 그림 + b)을 내고 캔버스가 화면 위에 더한다.
+  부른 쪽 효과 0 확인: 하늘 조명 78526 · 판정 393f6/39474 · 강속구 불꽃 3b7ce · 홈런 칸 40de4 · 게이지 4d602/4d624 · 컷인 속도선 474f0.
+  ⚠️ DOM 화면(main_title · touch · trainning · 수비/투수편의 game_judge · slt_pitch · game_effect)은 아직 구운 근사.
 
 ## 3c. 0xbb91d 픽셀 효과 (종류 비트 · a · b) — 확정
 
