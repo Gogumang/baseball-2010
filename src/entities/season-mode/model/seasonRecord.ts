@@ -343,7 +343,11 @@ export function startNewSeason(teamId: number, name: string): SeasonState {
  * 장면 진입 0xcb `0x4b50`(4b6a~4b7c `0x1f570(저장, SR[1])`) · 새 시즌 `0x5758`(57da~57e8) 둘뿐이고, 대회 중 경기 뒤 진입은
  * S+0x12c ≠ 0 이라 `0x1f570` 이 **상대국 슬롯 base+0x934** 를 돌려준다(1f5a0). 대회 끝 `0x896c → 0x8b88 bl 0x6e0c` 사이에
  * 다시 들어오는 진입이 없어 100 은 그 슬롯에 들어가고 리그 칸 사기는 지난해 값 그대로 이어진다. 곧 `record.nationalCup`(대회를 치른 해)
- * 이면 사기를 그대로 둔다. (같은 포인터를 읽는 CPU 트레이드 요청 0x93c8(94a0)도 다음 경기 전까지 상대국 선수를 본다 — ⚠️ 웹 미반영)
+ * 이면 사기를 그대로 둔다. 같은 포인터를 읽는 CPU 트레이드 요청 0x93c8(94a0)은 그동안 **돌지 않는다**(확인, U-135 · r130 다시 뜸):
+ * 0x93c8 은 0xf1 진입 0x953c(진입 분기 0xe9ac 의 ead0)에서만 돌고, 상태 0xf1 을 세우는 곳은 `movs r1, #0xf1` 전수로 0xe9 진입의
+ * e10a 하나 · 0xe9 는 0x4b50 의 4ba6(phase 2) 하나다. 대회 중 경기 끝 0x4ea0c 는 4f02e~4f038 에서 L+0x34 · L+0xac 면 phase 2 를
+ * 안 세우고, 새 해 뒤 첫 0xcb 진입 0x4b50 은 4b6a~4b7c 에서 [this+0xa4] 를 (L+0xac 가 지워진 뒤라) 리그 칸으로 다시 잡는다
+ * — 상대국 명단을 보는 트레이드 요청은 없다 (`useSeasonSession` 0xf1 진입 주석).
  */
 export function startNextYear(state: SeasonState): SeasonState {
   const { record } = state

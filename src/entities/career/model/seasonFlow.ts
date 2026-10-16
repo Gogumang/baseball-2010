@@ -307,3 +307,23 @@ export function applySalaryChange<C extends SalaryHolder>(career: C, code: numbe
   const change = Math.sign(rate) * Math.trunc((base * Math.abs(rate)) / 100)
   return { ...career, salary: (base + change) & SALARY_MASK }
 }
+
+/** 레코드 +0x1b 는 바이트 — 0xa4ffe `movs r3, #0xff ; cmp r0, #0xff ; bge` */
+const RECORD_SALARY_GRADE_MAXIMUM = 0xff
+const RECORD_SALARY_GRADE_DIVISOR = 10
+
+/**
+ * **나리 선수 레코드 +0x1b** — 연봉 쓰기 `0xa4fd8(S, v)` (직접 떴다):
+ * ```
+ * a4fda~a4fe2  S+0x1c8 = v (strh)
+ * a4fec        rec = 0x1fc75(app, [0x1552d10] 모드)            ; 내 나리 선수 레코드
+ * a4ff2~a5006  rec+0x1b = min(v / 10 (부호 나눗셈 0xca7b4), 0xff)
+ * ```
+ * 부르는 곳은 등록 0x10fb4(11246, v = 0x32) · 보상 종류 20(8cb84) 둘뿐이라 +0x1b 는 늘 지금 연봉의 1/10 이다. 등록 0x1f654 ·
+ * 0x1f680 과 시즌 영입 0xc554 는 이 0x30 바이트를 통째로 옮기므로 명전 · 영입 선수도 그때의 값을 든다. 시즌(모드 2) 상세 창
+ * 0x5b798(5c848~5c886)은 이 칸 × 1000 을 연봉으로 찍는다.
+ * ⚠️ 웹 연봉은 u16 으로 감긴 값만 든다 — 원본 v 는 감기기 전 정수라 v ≥ 65536 이면 원본은 0xff, 웹은 감긴 값의 1/10 이다(그 전에는 같다).
+ */
+export function nariRecordSalaryGradeOf(salary: number): number {
+  return Math.min(Math.trunc(salary / RECORD_SALARY_GRADE_DIVISOR), RECORD_SALARY_GRADE_MAXIMUM)
+}

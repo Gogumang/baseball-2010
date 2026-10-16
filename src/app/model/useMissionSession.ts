@@ -924,11 +924,15 @@ export function useMissionSession({
     if (substitution === null) return
     // 투수 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850(수비 쪽)이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수의
     // 구질 목록으로 (`rollCpuPitchTypeOnPitcherChangeTick`). CPU 대타(투수 미션)는 CPU 가 공격 쪽이라 없다.
-    // ⚠️ 미해결: 내려가는 마투수의 남은 마구는 타석 화면이 들고 있어 넘기지 않는다(남았다고 본다)
+    // 맞바꿈은 다음 확정 0xaebe4 라 0x344dc 의 0xae83c[+0x18] 마구 · 0xaea10(팀 +0x28 남은 마구)이 모두 내려가는 투수 쪽이다
+    // (34516 · 34524 — 마구 > 0 · 남은 > 0 · 마구 조건이면 22 를 적고 안 굴린다, 아니면 34566 rand(0,6)). 남은 마구는 미션 CPU 팀이
+    // 드는 +0x28(`missionCpuMagicStateOf` — 소모 0x345fc 가 줄인 값, 안 찼으면 0xd 진입 0xaebe4 aeea8 처럼 지금 마운드 투수로 채움),
+    // 볼카운트는 타석 세션의 이 0xf 진입 때 값 — 타자편 진행기(`AtBatCount`)와 같다
     if (substitution.kind === '투수교체') {
       rollCpuPitchTypeOnPitcherChangeTick(
         {
           repertoire: missionMoundPitcherAbility({ ...run, cpu }, aceLevels).repertoire,
+          magicRemaining: missionCpuMagicStateOf({ ...run, cpu }, aceLevels)?.remaining,
           runnerCount: runnerCountOf(run.bases),
           strikes: runner.atBatRef.current.strikes,
           balls: runner.atBatRef.current.balls,
