@@ -175,6 +175,33 @@ describe('기록연감 칸 격자', () => {
     expect(screen.getByText(/효과 :/)).toBeTruthy()
   })
 
+  it('스킬 설명은 (39, 202) 에 폭 없이 `!N` 에서만 끊고, 효과는 노랑 — 못 얻었으면 "아직 획득하지 못한 / 스킬입니다." (0x2f3a0 · 0x2f4d8 → 0x2fb8e)', () => {
+    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0] } })
+    fireEvent.click(screen.getByRole('button', { name: '스킬' }))
+
+    const box = screen.getByTestId('스킬-설명')
+    expect(box.style.left).toBe('39px')
+    expect(box.style.top).toBe('202px')
+    expect(box.style.width).toBe('')
+    const lines = Array.from(box.children).map((line) => line.textContent)
+    expect(lines[0]).toBe('샛노란 병아리 신인')
+    expect(lines[1]).toBe('어느 정도는 봐줘야겠지?')
+    expect(lines[2]).toBe('효과 : 감독 평가 +1')
+    expect((screen.getByText('감독 평가 +1') as HTMLElement).style.color).toBe('rgb(255, 255, 0)')
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(Array.from(screen.getByTestId('스킬-설명').children).map((line) => line.textContent))
+      .toEqual(['아직 획득하지 못한', '스킬입니다.'])
+  })
+
+  it('스킬 탭에는 아래 합계 줄이 없다 — 프레임 15 합계는 탭 3 · 4 뿐 (0x2f834 · 0x2fa60)', () => {
+    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0, 1] } })
+    fireEvent.click(screen.getByRole('button', { name: '스킬' }))
+
+    expect(screen.queryByText(`2/${ORIGINAL_SKILLS.length}`)).toBeNull()
+  })
+
   it('통계 탭 줄 이름은 StrMAINMENU[129~182] 그대로다 (P6 2c)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
