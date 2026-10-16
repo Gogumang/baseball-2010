@@ -46,7 +46,7 @@ export interface SpritePreloadDeps {
   readonly scheduleIdle: (callback: () => void) => void
   /** 장면 줄 동시 요청 수 */
   readonly sceneConcurrency?: number
-  /** 유휴 줄 동시 요청 수 */
+  /** 유휴 줄 동시 요청 수 (기본 4 — 2 로는 지연 80ms 에서 메뉴에 머무는 동안 다음 화면 목록에 닿지 못했다, r124 측정) */
   readonly idleConcurrency?: number
 }
 
@@ -103,6 +103,8 @@ export function mergeSpritePreloads(...lists: readonly (readonly SpriteFolderPre
 interface Task {
   readonly url: string
   priority: SpritePreloadPriority
+  /** 유휴 줄 차례 — 나중에 부른 `preload` 일수록 크다. 유휴 줄은 큰 것부터(지금 화면에서 갈 수 있는 다음 화면이 먼저), 같으면 부른 차례대로 */
+  generation: number
   readonly done: Promise<void>
   readonly finish: () => void
   isStarted: boolean
@@ -110,13 +112,21 @@ interface Task {
 
 export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader {
   const sceneConcurrency = deps.sceneConcurrency ?? 6
-  const idleConcurrency = deps.idleConcurrency ?? 2
+  const idleConcurrency = deps.idleConcurrency ?? 4
   const tasks = new Map<string, Task>()
   const sceneQueue: Task[] = []
   const idleQueue: Task[] = []
   let sceneActive = 0
   let idleActive = 0
   let isIdleScheduled = false
+  let latestGeneration = 0
+
+  /** 유휴 줄에 차례대로 끼운다 — 더 나중에 부른 묶음 뒤 · 더 먼저 부른 묶음 앞 */
+  function insertIdle(task: Task) {
+    const at = idleQueue.findIndex((queued) => queued.generation < task.generation)
+    if (at < 0) idleQueue.push(task)
+    else idleQueue.splice(at, 0, task)
+  }
 
   function run(task: Task, priority: SpritePreloadPriority) {
     task.isStarted = true
@@ -152,13 +162,20 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
     }
   }
 
-  function enqueue(url: string, priority: SpritePreloadPriority): Promise<void> {
+  function enqueue(url: string, priority: SpritePreloadPriority, generation: number): Promise<void> {
     const existing = tasks.get(url)
     if (existing !== undefined) {
-      if (priority === 'scene' && existing.priority === 'idle' && !existing.isStarted) {
-        existing.priority = 'scene'
-        idleQueue.splice(idleQueue.indexOf(existing), 1)
-        sceneQueue.push(existing)
+      if (existing.priority === 'idle' && !existing.isStarted) {
+        if (priority === 'scene') {
+          existing.priority = 'scene'
+          idleQueue.splice(idleQueue.indexOf(existing), 1)
+          sceneQueue.push(existing)
+        } else if (generation > existing.generation) {
+          // 지금 화면이 다시 부른 유휴 그림은 그 묶음 차례로 앞당긴다
+          idleQueue.splice(idleQueue.indexOf(existing), 1)
+          existing.generation = generation
+          insertIdle(existing)
+        }
       }
       return existing.done
     }
@@ -166,13 +183,14 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
     const done = new Promise<void>((resolve) => {
       finish = resolve
     })
-    const task: Task = { url, priority, done, finish, isStarted: false }
+    const task: Task = { url, priority, generation, done, finish, isStarted: false }
     tasks.set(url, task)
-    ;(priority === 'scene' ? sceneQueue : idleQueue).push(task)
+    if (priority === 'scene') sceneQueue.push(task)
+    else insertIdle(task)
     return done
   }
 
-  async function preloadFolder(request: SpriteFolderPreload, priority: SpritePreloadPriority): Promise<void> {
+  async function preloadFolder(request: SpriteFolderPreload, priority: SpritePreloadPriority, generation: number): Promise<void> {
     const jsonNames = request.json ?? []
     const jsonDone = jsonNames.map((name) => deps.loadJson(`${request.folder}/${name}`).catch(() => null))
     let frames: readonly number[] = []
@@ -192,9 +210,9 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
       frames = request.frames
     }
     const imageDone = [
-      ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority)),
-      ...frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority)),
-      ...(request.masks ?? []).map((frame) => enqueue(spriteMaskSrc(frameUrl(request.folder, frame)), priority)),
+      ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority, generation)),
+      ...frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority, generation)),
+      ...(request.masks ?? []).map((frame) => enqueue(spriteMaskSrc(frameUrl(request.folder, frame)), priority, generation)),
     ]
     pump()
     await Promise.all([...jsonDone, ...imageDone])
@@ -202,7 +220,9 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
 
   return {
     preload: async (requests, priority) => {
-      await Promise.all(requests.map((request) => preloadFolder(request, priority)))
+      latestGeneration += 1
+      const generation = latestGeneration
+      await Promise.all(requests.map((request) => preloadFolder(request, priority, generation)))
     },
   }
 }

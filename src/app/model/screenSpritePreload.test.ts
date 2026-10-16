@@ -17,6 +17,12 @@ describe('screenSpritePreloadsOf', () => {
     ])
   })
 
+  it('메인메뉴 앞 화면(이용안내 · 로고 · 타이틀)도 메뉴에서 갈 화면 그림을 유휴로 받는다 (r124)', () => {
+    for (const kind of ['이용안내', '로고', '타이틀'] as const) {
+      expect(screenSpritePreloadsOf(kind, false)).toEqual(screenSpritePreloadsOf('메인메뉴', false))
+    }
+  })
+
   it('팀선택처럼 경기로 이어지는 화면은 경기 진입 그림 · 첫 그림 선수 몫을 바로, 나머지 선수 · 수비 그림을 유휴로 받는다', () => {
     expect(screenSpritePreloadsOf('팀선택', false)).toEqual([
       { scene: 'gameEntry', priority: 'scene' },
