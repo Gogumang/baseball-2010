@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import { CommonPanel, FrameSprite, InsetBox, MessageBox, RawScreen } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
-import { missionRewardOf } from '@/entities/mission/model/missionReward'
+import { missionRewardOf, missionRewardTierOf } from '@/entities/mission/model/missionReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, GRID, MISSION_GRID_SHAPE,
-  MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
+  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, EVENT_MISSION_TITLE, EVENT_TAB_LABEL, GRID, MISSION_GRID_SHAPE,
+  GRADE_MARKS, MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
@@ -196,7 +196,7 @@ export function MissionSelectScreen({
 
       <div className={styles.title}
         style={{ left: TITLE.x, top: TITLE.y, width: TITLE.width, color: TITLE.color }}>
-        {selected?.name ?? ''}
+        {cursor === EVENT_MISSION_CELL ? EVENT_MISSION_TITLE : selected?.name ?? ''}
       </div>
 
       {/*
@@ -238,8 +238,12 @@ export function MissionSelectScreen({
 
       <FrameSprite folder={`${SLT_FRAME}/frames`} frame={BOTTOM_FRAME.frame} origins={frames}
         x={BOTTOM_FRAME.x} y={BOTTOM_FRAME.y} />
-      <img className={styles.sprite} alt="MISSION"
-        src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />
+      {/* 0x1e018: 고른 칸이 14 면 이미지 52, 아니면 51 */}
+      {cursor === EVENT_MISSION_CELL
+        ? <img className={styles.sprite} alt="EVENT"
+            src={imageSrc(SLT_FRAME, EVENT_TAB_LABEL.image)} style={{ left: EVENT_TAB_LABEL.x, top: EVENT_TAB_LABEL.y }} />
+        : <img className={styles.sprite} alt="MISSION"
+            src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />}
 
       {/* 1dfe0 칸 0xbb28d(W/2, H/2 + 0x21, 173, 65, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 */}
       <InsetBox x={DESCRIPTION_BOX.centerX - (DESCRIPTION_BOX.width >> 1)} y={DESCRIPTION_BOX.y}
@@ -247,7 +251,7 @@ export function MissionSelectScreen({
       <div className={styles.descriptionText}
         style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
         {selected === undefined
-          ? NO_MISSION_TEXT
+          ? <MarkupText raw={NO_MISSION_TEXT} />
           : isLockedAt(cursor)
             ? '오픈 되지 않은 미션입니다 이전 단계를 클리어해주세요'
             : stripGameMarkup(selected.briefing)}
@@ -256,15 +260,21 @@ export function MissionSelectScreen({
       <FrameSprite folder={IMG_TEXT} frame={REWARD_ROW.labelFrame} origins={textFrames}
         x={REWARD_ROW.labelX} y={REWARD_ROW.y} />
       <div className={styles.value}
-        style={{ left: REWARD_ROW.labelX + 36, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
+        style={{ left: REWARD_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {reward}G
       </div>
       <FrameSprite folder={IMG_TEXT} frame={SUCCESS_ROW.labelFrame} origins={textFrames}
-        x={REWARD_ROW.labelX + 88} y={REWARD_ROW.y} />
+        x={SUCCESS_ROW.labelX} y={REWARD_ROW.y} />
       <div className={styles.value}
-        style={{ left: REWARD_ROW.labelX + 114, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
+        style={{ left: SUCCESS_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {clears}회
       </div>
+      {/* 0x1e6ce~0x1e722 — 등급 표시 네모 (byte1 >> 1) & 7 개를 (165 + 8i, 183) */}
+      {selected !== undefined && Array.from({ length: missionRewardTierOf(selected.stage) }, (_, index) => (
+        <img key={index} className={styles.sprite} alt="" data-testid="미션-등급-네모"
+          src={imageSrc(SLT_FRAME, GRADE_MARKS.image)}
+          style={{ left: GRADE_MARKS.x + GRADE_MARKS.step * index, top: GRADE_MARKS.y }} />
+      ))}
 
       {/* 웹 [투수편/타자편] 바꾸기 단추는 걷었다 — 원본은 선수 고르기(하위 17)에서 고른 선수가 편을 정해(투수 → 모드 5,
           타자 → 모드 6) 목록 안에서 편을 바꾸는 길이 없다 */}

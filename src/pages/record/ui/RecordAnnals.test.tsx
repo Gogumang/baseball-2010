@@ -7,12 +7,22 @@ import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import {
-  CELL_GRID, ENDING_CELL_NAMES, PANEL, PROGRESS_ROW, TAB_CURSOR, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
+  CELL_GRID, ENDING_CELL_NAMES, PANEL, PROGRESS_ROW, TAB_CURSOR, TOTAL_ROW, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
   cellPositionOf, endingCellFrameOf, endingProgressOf, tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
+
+/** 켠 스킬 비트(+0xf4 타자 · +0xf8 투수)만 세운 기록연감 — 스킬 탭 '얻음' 은 0x58a3c 가 이 비트로 가른다 */
+const 켠스킬 = (batterBits: number[], pitcherBits: number[] = []) => ({
+  ...EMPTY_COLLECTION,
+  stats: {
+    ...EMPTY_COLLECTION.stats,
+    batterEquippedSkillBits: batterBits.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+    pitcherEquippedSkillBits: pitcherBits.reduce((bits, bit) => (bits | (1 << bit)) >>> 0, 0),
+  },
+})
 
 /**
  * 기록연감 (0x2e29c — P6 2c). 탭 다섯이 192 판 위에 놓이고
@@ -156,7 +166,7 @@ describe('기록연감 칸 격자', () => {
   })
 
   it('얻은 칸은 이름이 나오고, 칸은 41×25 에 4열로 놓인다', () => {
-    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0, 1] } })
+    띄우기({ collection: 켠스킬([0, 1]) })
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     const first = screen.getByRole('button', { name: ORIGINAL_SKILLS[0].name })
@@ -169,10 +179,37 @@ describe('기록연감 칸 격자', () => {
   })
 
   it('스킬 탭은 고른 칸의 설명을 보여 준다 — 못 얻었으면 ???', () => {
-    띄우기({ collection: { ...EMPTY_COLLECTION, skills: [0] } })
+    띄우기({ collection: 켠스킬([0]) })
     fireEvent.click(screen.getByRole('button', { name: '스킬' }))
 
     expect(screen.getByText(/효과 :/)).toBeTruthy()
+  })
+
+  it('스킬 설명은 (39, 202) 에 폭 없이 `!N` 에서만 끊고, 효과는 노랑 — 못 얻었으면 "아직 획득하지 못한 / 스킬입니다." (0x2f3a0 · 0x2f4d8 → 0x2fb8e)', () => {
+    띄우기({ collection: 켠스킬([0]) })
+    fireEvent.click(screen.getByRole('button', { name: '스킬' }))
+
+    const box = screen.getByTestId('스킬-설명')
+    expect(box.style.left).toBe('39px')
+    expect(box.style.top).toBe('202px')
+    expect(box.style.width).toBe('')
+    const lines = Array.from(box.children).map((line) => line.textContent)
+    expect(lines[0]).toBe('샛노란 병아리 신인')
+    expect(lines[1]).toBe('어느 정도는 봐줘야겠지?')
+    expect(lines[2]).toBe('효과 : 감독 평가 +1')
+    expect((screen.getByText('감독 평가 +1') as HTMLElement).style.color).toBe('rgb(255, 255, 0)')
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(Array.from(screen.getByTestId('스킬-설명').children).map((line) => line.textContent))
+      .toEqual(['아직 획득하지 못한', '스킬입니다.'])
+  })
+
+  it('스킬 탭에는 아래 합계 줄이 없다 — 프레임 15 합계는 탭 3 · 4 뿐 (0x2f834 · 0x2fa60)', () => {
+    띄우기({ collection: 켠스킬([0, 1]) })
+    fireEvent.click(screen.getByRole('button', { name: '스킬' }))
+
+    expect(screen.queryByText(`2/${ORIGINAL_SKILLS.length}`)).toBeNull()
   })
 
   it('통계 탭 줄 이름은 StrMAINMENU[129~182] 그대로다 (P6 2c)', () => {
@@ -185,6 +222,27 @@ describe('기록연감 칸 격자', () => {
     // 쪽 0 = 칸 0~6 플레이 시간 [129]~[135] — 칸 7 은 비어 있다 (0x7a08c)
     for (const name of STAT_NAMES.slice(0, 7)) expect(screen.getByText(name)).toBeTruthy()
     expect(screen.queryByText(STAT_NAMES[7])).toBeNull()
+  })
+
+  it('통계 탭 글 자리 — 이름 (36, 92 + 18줄, 164) · 값 (31, 91 + 18줄, 170) 오른쪽 (0x7a542 · 0x7a1f8 꼴 8갈래)', () => {
+    띄우기()
+    fireEvent.click(screen.getByRole('button', { name: '통계' }))
+
+    const name = screen.getByText(STAT_NAMES[1])
+    expect(name.style.left).toBe('36px')
+    expect(name.style.top).toBe(`${92 + 18}px`)
+    expect(name.style.width).toBe('164px')
+    const value = name.nextElementSibling as HTMLElement
+    expect(value.style.left).toBe('31px')
+    expect(value.style.top).toBe(`${91 + 18}px`)
+    expect(value.style.width).toBe('170px')
+  })
+
+  it('통계 탭 아래 합계 값은 (110, 246, 폭 91) 오른쪽 맞춤 — 0xba269 호출 2fb90', () => {
+    expect(TOTAL_ROW.value).toEqual({ x: 110, dy: 4, width: 91 })
+    expect(TOTAL_ROW.y + TOTAL_ROW.value.dy).toBe(246)
+    expect(TOTAL_ROW.y + TOTAL_ROW.labelDy).toBe(246)
+    expect(TOTAL_ROW.y + TOTAL_ROW.bulletDy).toBe(247)
   })
 
   it('통계 탭은 비밀 번호 없이 2쪽만 돈다 — 쪽 1 은 [136]~[140] 다섯 줄', () => {
@@ -296,14 +354,14 @@ describe('진행·스킬 격자 — 보이는 3줄 창이 커서를 따라간다
   })
 
   it('스킬 탭 — 숫자 8 도 ↓ 다. 끝 줄(칸 36~39)까지 내려간다', () => {
-    본문('스킬', { ...EMPTY_COLLECTION, skills: [39] })
+    본문('스킬', 켠스킬([], [39 - 16]))
     for (let i = 0; i < 9; i += 1) fireEvent.keyDown(window, { key: '8' })
 
     expect(screen.getByRole('button', { name: ORIGINAL_SKILLS[39].name }).style.left).toBe(`${cellPositionOf(3).x}px`)
   })
 
   it('← 는 같은 줄 끝으로 감긴다 — 고른 칸이 바뀌어 설명이 따라간다', () => {
-    본문('스킬', { ...EMPTY_COLLECTION, skills: [3] })
+    본문('스킬', 켠스킬([3]))
     expect(screen.queryByText(/효과 :/)).toBeNull()
 
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
@@ -324,8 +382,8 @@ describe('탭 0 스페셜기록 쪽 — 셀 40~47 이름 StrGAME[48~55] · 달�
 
     const marks = [...container.querySelectorAll('img[alt="달성"]')] as HTMLElement[]
     expect(marks.map((mark) => mark.dataset.cell)).toEqual(['40', '42'])
-    // x = 32 + 176 − 28 − 1 = 179, y = 90 + 18·줄 − 1
-    expect(marks[0]?.style.left).toBe('179px')
+    // x = 칸 x 33 + 칸너비 174 − 28 − 1 = 178 (0x7a12a~0x7a13c), y = 90 + 18·줄 − 1
+    expect(marks[0]?.style.left).toBe('178px')
     expect(marks[0]?.style.top).toBe('89px')
     expect(marks[1]?.style.top).toBe('125px')
   })
@@ -346,9 +404,18 @@ describe('탭 0 달성 횟수 — 셀 0~39 "!R!cffff00%d" (0x7a0d0~0x7a0fc)', ()
     const counts = [...container.querySelectorAll('[data-cell]')].filter((node) => node.tagName === 'DIV') as HTMLElement[]
     expect(counts.map((node) => node.dataset.cell)).toEqual(['0', '1', '2', '3', '4', '5', '6', '7'])
     expect(counts.map((node) => node.textContent)).toEqual(['0', '2', '0', '0', '0', '0', '0', '1'])
-    expect(counts[1]?.style.left).toBe('35px')
+    // 0x7a0fc: (칸 x 33 + 3, (칸 y + 2) + 1, 174 − 10)
+    expect(counts[1]?.style.left).toBe('36px')
     expect(counts[1]?.style.top).toBe('111px')
-    expect(counts[1]?.style.width).toBe('166px')
+    expect(counts[1]?.style.width).toBe('164px')
+  })
+
+  it('칸 이름은 (칸 x + 5, 칸 y + 2) 왼쪽 맞춤 — 0xba269 호출 7a9a2 (폭 자리에 색이 들어가 줄을 안 끊는다)', () => {
+    const { container } = 띄우기()
+    const names = [...container.querySelectorAll('div')].filter((node) => node.style.left === '38px') as HTMLElement[]
+    expect(names).toHaveLength(8)
+    expect(names[1]?.style.top).toBe(`${92 + 18}px`)
+    expect(names[1]?.style.width).toBe('')
   })
 
   it('마지막 쪽(셀 40~47)에는 횟수가 없다', () => {

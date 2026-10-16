@@ -50,14 +50,14 @@ import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
-  EMPTY_COLLECTION, HALL_OF_FAME_BATTER_FIRST_RECORD_ID, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS,
-  HALL_OF_FAME_PITCHER_FIRST_RECORD_ID, hallOfFameEquipmentNibblesOf, hallOfFameRecordIdOf,
+  EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS,
+  hallOfFameEquipmentNibblesOf, hallOfFameRecordIdOf,
 } from '@/entities/collection/model/collection'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection, HallOfFameSide } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
-import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
+import { isHallOfFameRecord, nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
 import {
   NARI_EQUIP_REFUSAL_TEXT_ID, PLAYER_PICK_PURPOSE, playerPickCancelTarget, refusesEquipment,
 } from '@/entities/season-mode/model/playerPick'
@@ -469,8 +469,9 @@ function SeasonScreens({
       const opened = [...(hallOfFame?.openedHiddenIds ?? []), ...session.openedHiddenIds]
       // 명예 선수(0xb6348) — 영입 0xc554 가 옮긴 명전 기록의 니블이 처음 값이다(웹 명단엔 사본이 없어 지금 명전 칸을 읽는다)
       const side: HallOfFameSide = isPitcher ? '투수' : '타자'
-      // 0xb6348: 타자면 id − 0xc8 ≤ 8, 투수면 id − 0xb4 ≤ 0x18 (나리 0xfe 는 둘 다 아니다)
-      const isHallOfFamer = player.id >= HALL_OF_FAME_PITCHER_FIRST_RECORD_ID && player.id <= HALL_OF_FAME_BATTER_FIRST_RECORD_ID + HALL_OF_FAME_MAX_BATTERS
+      // 0xb6348: 마선수 비트(P[0xa]&0x40)면 아니다 · 투수(0xb6278)면 id − 0xb4 ≤ 0x18, 타자면 id − 0xc8 ≤ 8
+      // (나리 0xfe 는 둘 다 아니다) — 적용 0x7d90 의 0x7ef4 가 이 함수를 그대로 부른다
+      const isHallOfFamer = isHallOfFameRecord(player)
       const equipment = player.equipment === undefined && isHallOfFamer && hallOfFame !== undefined
         ? hallOfFameEquipmentNibblesOf(hallOfFame, side, player.id) ?? seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)
         : seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)

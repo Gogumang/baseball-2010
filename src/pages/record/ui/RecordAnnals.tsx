@@ -6,16 +6,17 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
+import { isMinusSkill } from '@/entities/career/model/playerCareer'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
-import { parseGameMarkup, stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
-  ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
+  ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_NAME, LIST_ROW_FRAME_DY, listFirstYOf, STAT_NAME, STAT_VALUE, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
   SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
-  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_DESCRIPTION, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
+  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_BADGE, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, skillGradeOf, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
   TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
   tabIconXOf, tabNameXOf, tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
@@ -34,7 +35,7 @@ import {
 } from '@/pages/record/lib/statCells'
 import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
-import { RECORD_COUNT_KINDS, achievementMarkOf, recordCountOf } from '@/entities/collection/model/annalsStats'
+import { RECORD_COUNT_KINDS, achievementMarkOf, annalsSkillOfCell, isAnnalsSkillGained, recordCountOf } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 
 const SLT_FRAME = './sprites/slt_frame'
@@ -100,10 +101,14 @@ export function RecordAnnals({
   /** 보이는 줄 창 윗줄 [skin+0x1f4] (아랫줄 [skin+0x1f8] = 윗줄 + 3) */
   const [gridTop, setGridTop] = useState(0)
   const tick = useUpdateCounter()
-  const isBlinking = isBlinkOn(tick)
   /** 탭 막대에서 CLR 을 누른 틱 — 판을 닫는 중 ([skin+0x99] = 0) */
   const [closingAt, setClosingAt] = useState<number | null>(null)
   const panelHeight = closingAt === null ? openingPanelHeightOf(tick) : closingPanelHeightOf(tick - closingAt)
+  /**
+   * 깜박임 [sp+0xa8] — 0x2e2f4 가 `% 8 ≤ 3` 으로 세우지만 판 높이가 0xd3(211) 이하인 동안(여닫는 중)은
+   * 0x2e42e~0x2e456 이 자르기를 걸면서 0 으로 덮는다. 그 뒤 쓰는 곳(탭 커서 · ▲▼ · 고른 칸 · 스킬 화살)은 모두 이 값을 읽는다
+   */
+  const isBlinking = panelHeight >= PANEL_FULL_HEIGHT && isBlinkOn(tick)
   /** 키를 받는가 — 여는 중이고 끝났고 높이 212 (0x2b87c~0x2b8b6) */
   const isPanelOpen = closingAt === null && tick >= PANEL_ANIMATION_DRAWS
   const hasLeftRef = useRef(false)
@@ -302,9 +307,10 @@ export function RecordAnnals({
             isBlinking={isBlinking}
             cursorShake={cursorShake}
             onSelect={selectCell}
+            // 얻음 = 표 [+0x13c](0x58a3c) 가 −1 이 아님 — 켠 스킬 비트 +0xf4/+0xf8 (0x2f150~0x2f162)
             items={ORIGINAL_SKILLS.map((skill) => ({
               name: skill.name,
-              isGained: collection.skills.includes(skill.id),
+              isGained: isAnnalsSkillGained(collection.stats, skill.id),
             }))}
           />
           <FrameSprite folder={SLT_FRAMES} frame={SKILL_DESCRIPTION.tabFrame} origins={frames}
@@ -316,12 +322,29 @@ export function RecordAnnals({
             width={SKILL_DESCRIPTION.box.width}
             height={SKILL_DESCRIPTION.box.height}
           />
-          <div className={styles.descriptionText}
-            style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y, width: SKILL_DESCRIPTION.text.width }}>
-            {collection.skills.includes(cursor)
-              // `"%s!N효과 : !cFFFF00%s"` — 이름 + 효과 (0xcf978)
-              ? `${stripGameMarkup(ORIGINAL_SKILLS[cursor]?.description ?? '')}\n효과 : ${stripGameMarkup(ORIGINAL_SKILLS[cursor]?.effect ?? '')}`
-              : '???'}
+          {/* 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488) — img_text 등급(팔레트 0) · slt_frame 이미지 0x7c/0x7d 화살 */}
+          {isAnnalsSkillGained(collection.stats, cursor) && (
+            <>
+              <FrameSprite folder={IMG_TEXT} frame={SKILL_BADGE.gradeFrames[skillGradeOf(cursor)]} origins={textFrames}
+                x={SKILL_BADGE.gradeX} y={SKILL_BADGE.gradeY} />
+              <img className={styles.sprite} alt="" data-testid="스킬-화살"
+                src={imageSrc(SLT_FRAME, isMinusSkill(annalsSkillOfCell(collection.stats, cursor)) ? SKILL_BADGE.minusImage : SKILL_BADGE.plusImage)}
+                style={{ left: SKILL_BADGE.arrowX, top: SKILL_BADGE.arrowY + (isBlinking ? 1 : 0) }} />
+            </>
+          )}
+          {/* 0xba269(글, 39, 202, 폭 −1) — 날 글 폭이라 `!N` 에서만 줄이 끊긴다 (0x2f3a0 · 0x2f4d8 → 0x2fb8e) */}
+          <div className={styles.descriptionText} data-testid="스킬-설명"
+            style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y }}>
+            {parseGameMarkup(isAnnalsSkillGained(collection.stats, cursor)
+              // `"%s!N효과 : !cFFFF00%s"`(0xcf978) — StrSKILL[i] · StrSKILL[i + 40]
+              ? `${ORIGINAL_SKILLS[cursor]?.description ?? ''}!N효과 : !cFFFF00${ORIGINAL_SKILLS[cursor]?.effect ?? ''}`
+              : SKILL_NOT_GAINED_TEXT).map((line, lineIndex) => (
+              <div key={lineIndex}>
+                {line.segments.map((segment, segmentIndex) => (
+                  <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+                ))}
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -378,14 +401,14 @@ export function RecordAnnals({
         )
       })}
 
-      {(tab === 2 || tab === 3) && (
+      {/* 합계 줄(프레임 15 · 이미지 0x26 · img_text 0x10d)은 탭 3(0x2f834~0x2f8ca) · 탭 4(0x2fa60~0x2faf6)에만 있다 —
+          탭 2 그리기(0x2efa4~0x2f4ec)는 이 셋을 안 그리고, 함께 쓰는 0x2fb8e 호출은 합계가 아니라 스킬 설명이다 */}
+      {tab === 3 && (
         <TotalRow
           frames={frames}
           textFrames={textFrames}
-          value={tab === 2
-            ? `${collection.skills.length}/${ORIGINAL_SKILLS.length}`
-            // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
-            : `${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
+          // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
+          value={`${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
         />
       )}
 
@@ -608,7 +631,7 @@ function ListRows({ page, names }: { readonly page: number; readonly names: read
     <>
       {names.slice(start, start + LIST_GRID.rows).map((name, offset) => (
         <div key={name} className={styles.rowText}
-          style={{ left: LIST_GRID.x, top: LIST_GRID.firstY + LIST_GRID.step * offset, width: LIST_GRID.width }}>
+          style={{ left: LIST_GRID.cellX + LIST_NAME.dx, top: LIST_GRID.firstY + LIST_GRID.step * offset + LIST_NAME.dy }}>
           {name}
         </div>
       ))}
@@ -629,9 +652,9 @@ function RecordCounts({ page, stats }: { readonly page: number; readonly stats: 
         return (
           <div key={cell} className={styles.statValue} data-cell={cell}
             style={{
-              left: LIST_GRID.x + RECORD_COUNT.dx,
+              left: LIST_GRID.cellX + RECORD_COUNT.dx,
               top: LIST_GRID.firstY + LIST_GRID.step * row + RECORD_COUNT.dy,
-              width: LIST_GRID.width - RECORD_COUNT.widthInset,
+              width: LIST_GRID.cellWidth - RECORD_COUNT.widthInset,
             }}>
             {recordCountOf(stats, cell)}
           </div>
@@ -652,7 +675,7 @@ function AchievementMarks({ page, stats }: { readonly page: number; readonly sta
           <img key={cell} className={styles.sprite} alt="달성" data-cell={cell}
             src={imageSrc(SLT_FRAME, ACHIEVEMENT_MARK.image)}
             style={{
-              left: LIST_GRID.x + LIST_GRID.width - ACHIEVEMENT_MARK.width + ACHIEVEMENT_MARK.dx,
+              left: LIST_GRID.cellX + LIST_GRID.cellWidth - ACHIEVEMENT_MARK.width + ACHIEVEMENT_MARK.dx,
               top: LIST_GRID.firstY + LIST_GRID.step * row + ACHIEVEMENT_MARK.dy,
             }} />
         )
@@ -671,11 +694,13 @@ function StatRows({ page, stats }: { readonly page: number; readonly stats: Anna
         const value = cell.valueOf(stats)
         return (
           <div key={cell.nameIndex}>
-            <div className={styles.rowText} style={{ left: LIST_GRID.x, top, width: LIST_GRID.width }}>
+            <div className={styles.rowText}
+              style={{ left: LIST_GRID.cellX + STAT_NAME.dx, top: top + STAT_NAME.dy, width: LIST_GRID.cellWidth - STAT_NAME.widthInset }}>
               {STAT_NAMES[statNameOffsetOf(cell)]}
             </div>
             {value !== null && (
-              <div className={styles.statValue} style={{ left: LIST_GRID.x, top, width: LIST_GRID.width }}>
+              <div className={styles.statValue}
+                style={{ left: LIST_GRID.cellX + STAT_VALUE.dx, top: top + STAT_VALUE.dy, width: LIST_GRID.cellWidth - STAT_VALUE.widthInset }}>
                 {statValueTextOf(cell.valueKind, value)}
               </div>
             )}
@@ -699,13 +724,13 @@ function TotalRow({
     <>
       <img className={styles.sprite} alt=""
         src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
-        style={{ left: TOTAL_ROW.bulletX, top: TOTAL_ROW.y + 4 }} />
+        style={{ left: TOTAL_ROW.bulletX, top: TOTAL_ROW.y + TOTAL_ROW.bulletDy }} />
       <FrameSprite folder={IMG_TEXT} frame={TOTAL_ROW.labelFrame} origins={textFrames}
-        x={TOTAL_ROW.labelX} y={TOTAL_ROW.y} />
+        x={TOTAL_ROW.labelX} y={TOTAL_ROW.y + TOTAL_ROW.labelDy} />
       <FrameSprite folder={SLT_FRAMES} frame={TOTAL_ROW.frame} origins={frames}
-        x={TOTAL_ROW.frameX} y={TOTAL_ROW.y - 3} />
+        x={TOTAL_ROW.frameX} y={TOTAL_ROW.y} />
       <div className={styles.totalValue}
-        style={{ left: TOTAL_ROW.frameX, top: TOTAL_ROW.y + 1, width: 101, textAlign: isRightAligned ? 'right' : undefined }}>
+        style={{ left: TOTAL_ROW.value.x, top: TOTAL_ROW.y + TOTAL_ROW.value.dy, width: TOTAL_ROW.value.width, textAlign: isRightAligned ? 'right' : undefined }}>
         {value}
       </div>
     </>

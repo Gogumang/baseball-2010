@@ -923,7 +923,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
               }}
               onClick={() => chooseBubble(index)}
             >
-              {label}
+              <span className={styles.hofBubbleLabel} style={{ top: HALL_OF_FAME_BUBBLE.labelDy, width: HALL_OF_FAME_BUBBLE.cell.width }}>
+                {label}
+              </span>
             </button>
           ))}
         </div>

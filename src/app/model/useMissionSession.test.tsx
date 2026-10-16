@@ -397,6 +397,38 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     rendered.unmount()
   })
 
+  /**
+   * 플레이 객체 +0x160(사람 송구 목표)은 장면과 함께 한 번 만들어지고(0xb0b6e) 판 시작 · 0x17 진입이 안 지운다 — 앞 판에서 못 쓴
+   * 키가 다음 판으로 남는다. 미션도 판마다 수비 장면 칸을 넘긴다
+   */
+  it('판이 남긴 수비 장면 칸(+0x160 송구 목표 포함)을 다음 판이 이어받는다', () => {
+    const rendered = setUpBatterMission(1)
+    const 안타 = () =>
+      act(() => {
+        rendered.result.current.session.handleMissionPitch({
+          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: null,
+        })
+      })
+
+    안타()
+    const 첫판 = rendered.result.current.session.pendingDefensePlay
+    expect(첫판).not.toBeNull()
+    expect(첫판!.input.scene).toBeUndefined()
+    const 돌린판 = runDefensePlay(첫판!.input)
+    act(() => {
+      rendered.result.current.session.actions.finishDefensePlay({ ...돌린판, scene: { ...돌린판.scene, throwTarget: 2 } })
+    })
+
+    안타()
+    const 다음판 = rendered.result.current.session.pendingDefensePlay
+    expect(다음판).not.toBeNull()
+    expect(다음판!.input.scene?.throwTarget).toBe(2)
+    rendered.unmount()
+  })
+
   it('삼진은 수비가 개입할 것이 없어 그 자리에서 끝난다', () => {
     const rendered = setUpBatterMission(1)
 
@@ -734,9 +766,13 @@ function setUpPitcherMission(missionId: number, seed: number, throwModeManual?: 
   return setUpPitcherMissionOf(mission, seed, throwModeManual)
 }
 
-function setUpPitcherMissionOf(mission: (typeof MISSIONS)[number], seed: number, throwModeManual?: boolean) {
+function setUpPitcherMissionOf(
+  mission: (typeof MISSIONS)[number],
+  seed: number,
+  throwModeManual?: boolean,
+  random: RandomPort = createSeededRandom(seed),
+) {
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
-  const random = createSeededRandom(seed)
   let screen: Screen = { kind: '미션선택' }
   const setScreen = vi.fn((next: Screen) => {
     screen = next
@@ -787,7 +823,17 @@ describe('투수 미션 CPU 도루 출발 표시 — st[0x15 + i] (0x520de → 0
           act(() => session.actions.finishBenchClearing(false))
           continue
         }
+        if (session.pendingRunnerPlay !== null) {
+          주자판끝(rendered)
+          continue
+        }
         act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+        // 도루 판(종류 5)은 붙들어 수비 화면이 송구 키(+0x160)를 받으며 돈다 — 판 끝이 같은 타석 다음 공(0xf)을 낸다
+        const held = rendered.result.current.session.pendingRunnerPlay
+        if (held !== null) {
+          expect(held.side).toBe('수비')
+          주자판끝(rendered)
+        }
         const after = rendered.result.current.session
         const display = after.pitcherStealDisplay
         if (display === null) continue
@@ -803,6 +849,72 @@ describe('투수 미션 CPU 도루 출발 표시 — st[0x15 + i] (0x520de → 0
       rendered.unmount()
     }
     expect(found).toBe(true)
+  })
+})
+
+/** 미션 12 를 씨앗 난수로 세우고 같은 공(직구 · 시작 조준)을 던져 공 도착 판(도루 · 폭투)이 붙들릴 때까지 간다. 없으면 null */
+function 투수미션붙든판까지(seed: number, random: RandomPort) {
+  const mission12 = MISSIONS.find((row) => row.side === '투수' && row.id === 12)!
+  const rendered = setUpPitcherMissionOf(mission12, seed, undefined, random)
+  for (let pitch = 0; pitch < 40; pitch += 1) {
+    const session = rendered.result.current.session
+    if (session.pitcherRun?.status !== '진행중') break
+    if (session.pendingDefensePlay !== null) {
+      act(() => session.actions.finishDefensePlay())
+      continue
+    }
+    if (session.pendingBenchClearing !== null) {
+      act(() => session.actions.finishBenchClearing(false))
+      continue
+    }
+    act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+    if (rendered.result.current.session.pendingRunnerPlay !== null) return rendered
+  }
+  rendered.unmount()
+  return null
+}
+
+describe('투수 미션 공 도착 판 — 사람 수비 송구 키(0x53420 → 0x533c8 → 0x588 → +0x160)라 붙들어 실시간으로', () => {
+  it('키 없이 끝낸 실시간 도루 · 폭투 판은 미리 돌린 판과 같다 — 진루 · 판 틱 수 · 다음 굴림, 재생 칸에 다시 안 넣는다', () => {
+    let seed = 1
+    let found: ReturnType<typeof 투수미션붙든판까지> = null
+    for (; seed < 3000 && found === null; seed += 1) found = 투수미션붙든판까지(seed, createSeededRandom(seed))
+    if (found === null) throw new Error('붙든 판을 못 찾았다')
+    seed -= 1
+    const pending = found.result.current.session.pendingRunnerPlay
+    if (pending === null || pending.kind !== 'arrival') throw new Error('공 도착 판이 아니다')
+    expect(pending.side).toBe('수비')
+    found.unmount()
+
+    const 실시간Random = createSeededRandom(seed)
+    const 실시간 = 투수미션붙든판까지(seed, 실시간Random)!
+    const 실시간판 = 실시간.result.current.session.pendingRunnerPlay
+    if (실시간판 === null || 실시간판.kind !== 'arrival') throw new Error('공 도착 판이 아니다')
+    const runBefore = 실시간.result.current.session.pitcherRun!
+    const played = runLiveRunnerPlayWithoutKeys(실시간판)
+    const 실시간다음 = 실시간Random.rand(0, 0x7fffffff)
+
+    const 미리Random = createSeededRandom(seed)
+    const 미리 = 투수미션붙든판까지(seed, 미리Random)!
+    const 미리판 = 미리.result.current.session.pendingRunnerPlay
+    if (미리판 === null || 미리판.kind !== 'arrival') throw new Error('공 도착 판이 아니다')
+    // 예전 길 — 판 시작 굴림 뒤 곧바로 끝까지 돌린다
+    const 미리돈판 = runOpenedPitchArrivalPlay(미리판.opened)
+    expect(실시간다음).toBe(미리Random.rand(0, 0x7fffffff))
+
+    const 실시간돈판 = finishPitchArrivalPlay(실시간판.opened, played as RunnerPlayEngineResult, true)
+    expect(실시간돈판.result.advance).toEqual(미리돈판.result.advance)
+    expect(실시간돈판.callSoundId).toBe(미리돈판.callSoundId)
+    expect(played.ticks).toHaveLength(미리돈판.result.ticks.length)
+
+    act(() => 실시간.result.current.session.actions.finishRunnerPlay(played))
+    expect(실시간.result.current.session.pendingRunnerPlay).toBeNull()
+    // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+    expect(실시간.result.current.session.pickoffReplay).toBeNull()
+    const after = 실시간.result.current.session.pitcherRun!
+    expect(after.totalOuts).toBe(runBefore.totalOuts + 미리돈판.result.advance.outsAdded)
+    실시간.unmount()
+    미리.unmount()
   })
 })
 
@@ -827,18 +939,25 @@ describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 �
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
 
+    // 견제 판(종류 4)은 사람 송구 키(0x53420 → 0x533c8 → 0x588 → +0x160)를 받으므로 붙들어 화면이 실시간으로 돌린다
+    const pending = rendered.result.current.session.pendingRunnerPlay
+    expect(pending?.kind).toBe('pickoff')
+    expect(pending?.side).toBe('수비')
+    expect(rendered.result.current.session.pitcherRun).toBe(before)
+    const played = 주자판끝(rendered)!
+    expect(played.advance).toEqual(expected.advance)
+    expect(played.ticks).toHaveLength(expected.ticks.length)
+    // 실시간으로 본 판은 재생 칸에 다시 안 넣는다
+    expect(rendered.result.current.session.pickoffReplay).toBeNull()
+    expect(rendered.result.current.session.pendingRunnerPlay).toBeNull()
+
     const after = rendered.result.current.session.pitcherRun!
-    expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
-    expect(rendered.result.current.session.pickoffReplay?.ticks).toHaveLength(expected.ticks.length)
     expect(after.outs).toBe(before.outs + expected.advance.outsAdded)
     expect(after.totalOuts).toBe(before.totalOuts + expected.advance.outsAdded)
     // 견제는 투구가 아니다 — 남은 투구 수·볼카운트·목표를 안 건드린다
     expect(after.remainingPitches).toBe(before.remainingPitches)
     expect(after.progress).toBe(before.progress)
     expect(rendered.result.current.runner.atBat.balls).toBe(ballsBefore)
-
-    act(() => rendered.result.current.session.actions.finishPickoffReplay())
-    expect(rendered.result.current.session.pickoffReplay).toBeNull()
     rendered.unmount()
   })
 
@@ -857,8 +976,9 @@ describe('투수 미션 사람 견제 — 구질 고르기 0xf 의 0x53548 은 �
 
     act(() => rendered.result.current.session.actions.pickoff('7'))
 
-    expect(rendered.result.current.session.pickoffReplay?.advance).toEqual(expected.advance)
-    expect(rendered.result.current.session.pickoffReplay?.ticks).toHaveLength(expected.ticks.length)
+    const played = 주자판끝(rendered)!
+    expect(played.advance).toEqual(expected.advance)
+    expect(played.ticks).toHaveLength(expected.ticks.length)
     rendered.unmount()
   })
 
@@ -909,6 +1029,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     const before = rendered.result.current.session.pitcherRun!
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
+    주자판끝(rendered)
 
     const after = rendered.result.current.session.pitcherRun!
     expect(after.progress.counts['아웃']).toBe((before.progress.counts['아웃'] ?? 0) + 1)
@@ -925,6 +1046,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     const rendered = setUpPitcherMissionOf(아웃한개, 102)
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
+    주자판끝(rendered)
 
     expect(rendered.result.current.session.pitcherRun!.status).toBe('성공')
     rendered.unmount()
@@ -936,6 +1058,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
     const before = rendered.result.current.session.pitcherRun!
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
+    주자판끝(rendered)
 
     expect(rendered.result.current.session.pitcherRun!.progress).toBe(before.progress)
     rendered.unmount()

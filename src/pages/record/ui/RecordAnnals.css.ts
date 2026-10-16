@@ -96,10 +96,10 @@ export const descriptionText = style({
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
   fontSize: '11px',
-  // 줄 높이 13px — 원본 줄간(11+3=14)보다 1px 좁다. 설명 상자가 60px 이라 14px 로는
-  // 네 줄짜리 설명이 상자 밖으로 흐른다. **근사다** (줄 높이는 도트 또렷함과 무관하다).
-  lineHeight: '13px',
-  whiteSpace: 'pre-line',
+  // 줄 높이 = 글꼴 11 + 줄간 3 = 14 (0x6ef4c 의 [sp+0x84] = −1 → 0x9baf1 + 0x9bad9). 네 줄짜리 설명은 원본처럼 상자 밖으로 넘친다
+  lineHeight: '14px',
+  // 폭 −1 → 날 글 폭이라 자동 줄바꿈이 없다 — `!N` 에서만 끊긴다
+  whiteSpace: 'pre',
   pointerEvents: 'none',
 })
 

@@ -5,6 +5,8 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
+import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
+import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { canSelectSlot } from '@/features/play-pitcher-game/model/pitcherPitch'
@@ -397,6 +399,8 @@ export function PitcherGameScreen({
   const isAwaitingConfirm = sceneConfirm.isAwaiting && (canPitch || isHookPassing)
   /** 돌발 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 굴려 예약한다(0x50c42) — OK 전에는 안 띄운다. 결과 창은 0xe 앞이다 */
   const visibleBurstLines = resolution === null && isAwaitingConfirm ? null : burstLines
+  /** 돌발 띠 0x8e858 의 [M+0xc] — 발동부터 결과 창을 닫을 때(0x8e5b8 8e7ee~8e800)까지 */
+  const burstBandRow = burst?.current ?? resolution?.row ?? null
   const acceptsPickoff =
     canPitch &&
     !isAwaitingConfirm &&
@@ -875,6 +879,12 @@ export function PitcherGameScreen({
           ...pitcherSceneSkillPanelOf(progress),
         }}
       >
+        {/* 돌발 띠 0x8e858 (0x4c4bc 4c522, 사람 수비 → 공 7) — 0xf 구질 목록이면 뒤의 빛 지도 4c5a6 이 같이 어둡게 한다 */}
+        <BurstBand
+          row={burstBandRow}
+          role={burstBandRoleOf(progress.game.half, progress.game.playerSide)}
+          isDimmed={canPitch && !isAwaitingConfirm && !isPitchSceneBusy && phase === '구질'}
+        />
         {/* 일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛰어 마지막 그림(소개 판 포함)이 그대로다 */}
         {isAwaitingConfirm && sceneConfirm.isInConfirmState && (
           <SceneMatchupCards {...pitcherMatchupCardsOf(progress, pitcherName, matchupRecords)} />

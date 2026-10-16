@@ -190,7 +190,8 @@ export function SettingsScreen({
 
   /**
    * 첫 화면을 나간다 — 메인 메뉴는 OK 칸·CLR 모두 0x295e2(저장 0x1f1b9 → 접힘 → 상태 4).
-   * 경기 중은 0x3cccc 가 목록을 닫는다(접힘 여부는 안 읽었다 — 곧바로 돌아간다).
+   * 경기 중은 0x3cccc(3cccc~3cd5a)가 판을 접지 않고 목록을 곧바로 지운 뒤 0x1f1b9 저장 · 메뉴 0x741a1 을 다시 띄운다([앱+0x290] = 0 ·
+   * 하위 +0x18 = 0 이라 0x593c9 판을 더 안 그린다) — 곧바로 돌아간다. CLR(3cb0e~3cb9c)도 같다(U-84).
    */
   const leave = () => {
     if (isInGame) return onBack()

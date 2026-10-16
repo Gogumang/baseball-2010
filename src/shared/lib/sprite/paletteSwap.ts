@@ -65,8 +65,11 @@ export function parseHexColor(text: string): readonly [number, number, number] {
 /**
  * 구운 그림(color)을 번호 지도(index)와 팔레트로 다시 칠한다. 캔버스 없이 도는 순수 함수다.
  *
- * 번호 지도의 알파가 0 인 자리는 반투명·채우기 효과로 색이 섞인 자리라 번호가 뜻을 잃는다 —
- * 구운 색을 그대로 둔다 (**근사다**: defender 그림자, event_char_0 잔상이 피부색을 안 따라간다).
+ * 번호 지도의 알파가 0 인 자리는 채우기 효과 자리나 반투명 파트가 **아래 파트와** 섞인 자리라 번호가
+ * 뜻을 잃는다 — 구운 색을 그대로 둔다 (**근사다**). 반투명 파트가 아래 없이 놓인 자리(하늘 조명 ·
+ * defender 그림자 · event_char_0 볼터치)는 번호가 있다: 원본도 반투명 그리기 0x97769 · 0x973c5 에서
+ * 그 그림의 (갈아 끼운) 팔레트[번호] 로 색을 얻는다 (r134, 그리기 0xc9f98 · 표 0xda988).
+ * 알파는 구운 그림 것을 그대로 두고 RGB 만 바꾼다.
  */
 export function recolorPixels(
   color: Uint8ClampedArray,
@@ -141,8 +144,20 @@ const RECENT_PIXELS_LIMIT = 48
 /** 픽셀을 읽는 캔버스 — 읽기가 잦다고 알려 GPU→CPU 동기 읽기를 피한다(값은 같다) */
 const READ_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
 
+/**
+ * 받지 못한 번호 지도 — 다시 청하지 않는다. 벌·프레임마다 새로 칠할 때 같은 지도를 거듭 404 로 청하던
+ * 일(r111 측정: 하늘·구름 지도가 디스크에 없어 경기 중 계속 다시 청했다)을 막는다. 지도가 없으면 구운 그림을 쓴다.
+ */
+const failedIndexMaps = new Set<string>()
+
 async function readSpritePixels(spriteUrl: string): Promise<SpritePixels | null> {
-  const [sprite, indexMap] = await Promise.all([loadImage(spriteUrl), loadImage(indexMapUrl(spriteUrl))])
+  const indexUrl = indexMapUrl(spriteUrl)
+  if (failedIndexMaps.has(indexUrl)) return null
+  const indexRequest = loadImage(indexUrl).catch((error: unknown) => {
+    failedIndexMaps.add(indexUrl)
+    throw error
+  })
+  const [sprite, indexMap] = await Promise.all([loadImage(spriteUrl), indexRequest])
   const canvas = document.createElement('canvas')
   canvas.width = sprite.width
   canvas.height = sprite.height
@@ -239,7 +254,8 @@ export function useSpritePalettes(folder: string): SpritePalettes | null {
 
 /** 팔레트를 갈아 끼운 그림. 칠하기 전에는 구운 그림을 그대로 내보내 화면이 비지 않는다. */
 export function useRecoloredSprite(spriteUrl: string, paletteIndex: number | null): string {
-  const palettes = useSpritePalettes(paletteUrl(spriteUrl).replace(/\/palette\.json$/, ''))
+  // 벌을 안 고르면(null) palette.json 을 청하지 않는다 — 팔레트가 없는 폴더(batter_batter 따위)가 404 를 내던 일 (r124 측정)
+  const palettes = useSpriteJson<SpritePalettes>(paletteIndex === null ? null : paletteUrl(spriteUrl))
   // 이미 칠한 그림이면 그리는 그 자리에서 곧장 쓴다 — 프레임이 바뀔 때마다 구운 색(다른 팀 색)이
   // 한 번 비치고 구운 그림 요청이 끊기던 일을 막는다. 아직 칠하는 중이면 지금까지처럼 구운 그림이다
   const ready = readyRecoloredSpriteUrl(spriteUrl, palettes, paletteIndex)

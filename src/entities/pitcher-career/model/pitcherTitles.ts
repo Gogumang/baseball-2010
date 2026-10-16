@@ -64,7 +64,8 @@ export function titleSubjectOfPitcher(career: PitcherCareer): TitleSubject {
     mvpSeasonBits: career.mvpSeasonBits,
     championships: career.regularSeasonFirstCount,
     trainingTotal: trainingTotalOf(career),
-    outingsLastSeason: career.outingsLastSeason,
+    // 원본 +0x6a 한 칸 = 두 칸의 합 (`PlayerCareer.outingsLastSeason` 주석 — 새 시즌 g == 0 창의 외출도 든다)
+    outingsLastSeason: career.outingsLastSeason + career.outingsThisSeason,
     lotteryFirstPrizes: career.lotteryFirstPrizes,
     lotteryPurchases: career.lotteryPurchases,
     seenEventIds: career.seenEventIds,

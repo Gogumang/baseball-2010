@@ -30,6 +30,7 @@ import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindo
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { castOfAces, castOfCareer, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { useAfterGameEventPreload } from '@/app/model/afterGameEventPreload'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
@@ -91,6 +92,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   useEffect(() => {
     preloadSprites(defensePreloadsOf(...gameCast), 'idle')
   }, [gameCast])
+  // 경기 뒤 관리 화면의 이야기 이벤트 · 평가 감독 초상 — 이벤트 데이터에서 계산해 유휴로 (안 기다린다, r134)
+  useAfterGameEventPreload(career)
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않으려고 기억해 둔다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
@@ -401,6 +404,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onSettingsChange={gameSettings.setSettings}
         recordAlert={recordAlert}
         onRecordAlertSceneChange={reportAlertScene}
+        // 돌발 띠 0x8e858 — [M+0xc] 는 판정 뒤에도 결과 창을 닫을 때(0x8e5b8 8e7ee~8e800)까지 남는다
+        burstRow={burst?.current ?? resolution?.row ?? null}
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstLines !== null && (

@@ -1,6 +1,6 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
-import { ballFrameIndexAt, ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
+import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
 import { frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
@@ -310,7 +310,7 @@ export function renderBattingStage(
   }
   if (special !== null && !special.isBehindBatter) drawSpecialSwingPicture(context, special)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
-    drawEagleEyeMarker(context, platePixelOf(scene.pitch))
+    drawEagleEyeMarker(context, eagleEyePixelOf(scene.pitch))
   }
   if (scene.pitch !== null && scene.frame >= 0 && scene.frame < scene.pitch.frameCount) {
     drawBall(context, scene.pitch, scene.frame)
@@ -759,7 +759,7 @@ function drawStrikeZone(context: CanvasRenderingContext2D, side: number): void {
 /**
  * 이글아이 — 원본은 0x11 그리기 0x4d2ac 가 목표점에 ui/slt_pitch 프레임 0x23 을 넣는다(모드 4 · 레코드 +0x54 > 0, 0x4d380 ·
  * `pitchInputOverlay.showsGaugeTargetFrameOf`). 예전 웹이 그리던 원 · 십자는 원본에 없다.
- * ⚠️ 근사: 목표점은 투영 0xb94b5 를 다시 풀지 않고 공 도착점(`platePixelOf`)을 쓴다.
+ * 놓은 뒤에도 오차 전 0x10 목표점(+0x10b8)이다 — `eagleEyePixelOf`. ⚠️ +0xff4/+0xff8 흔들림은 안 얹는다.
  */
 function drawEagleEyeMarker(context: CanvasRenderingContext2D, center: { x: number; y: number }): void {
   const frame = placedFrame(ZONE_FRAME_FOLDER, GAUGE_TARGET_FRAME)

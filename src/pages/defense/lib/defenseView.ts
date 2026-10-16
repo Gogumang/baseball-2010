@@ -512,6 +512,11 @@ export interface DefenseViewState {
    * 재생 화면은 이 그림을 판이 닫힌 첫 갱신으로 세고(+0x1094) 카메라를 이 그림까지 움직인 뒤 그 다음부터 세운다. 안 주면 거짓.
    */
   readonly closingListFrame?: boolean
+  /**
+   * **이 판 틱에 진행기가 낸 소리**(차례대로) — 주자 판(도루 · 폭투 · 견제)의 판정 콜(결과 메시지 0xbba → 0x51a56: 9 → 17 · 13 → 62/20)과
+   * 슬라이딩 10. 미리 돌린 판을 재생만 하는 화면이 그 틱을 그릴 때 낸다(실시간 화면은 진행기 칸 `soundsThisTick` 을 읽는다). 없으면 소리 없음
+   */
+  readonly tickSoundIds?: readonly number[]
   /** 플레이 +0x111 — 사건 코드 8(홈런). 안 주면 거짓 */
   readonly homeRunFlag?: boolean
   /** 플레이 +0x129 — 사건 코드 12(폴 홈런). 안 주면 거짓 */

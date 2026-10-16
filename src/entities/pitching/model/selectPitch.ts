@@ -326,6 +326,8 @@ export function releaseCpuPitch(
   const pitch: Pitch = {
     type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
     plate: plateOf(finalTarget, situation.side),
+    // 이글아이가 그리는 0x10 목표점(+0x10b8) — 오차 · 실투 바꾸기 전 점
+    aimTarget: target,
     breakOffset: { x: type.horizontalBreak, y: type.verticalBreak },
     flightDurationMilliseconds: worldPath.length * millisecondsPerFrame(),
     frameCount: worldPath.length,
@@ -384,7 +386,8 @@ export interface PitcherChangeTickRoll {
   /** 지금 마운드 투수 레코드 +0x1c · +0x18 — 구질 목록 scene+0xfac 는 그 투수로 채워져 있다(0x47fc4) */
   readonly repertoire: Pick<PitcherRepertoireInfo, 'pitchMask' | 'magicId'> | undefined
   /**
-   * 그 투수 팀의 남은 마구 0xaea11(팀) — 타자편 진행기는 `opponentCpuMagic`(0xd 진입 48ddc 의 0xaebe4 aeea8 이 채운 값)로 넘긴다.
+   * 그 투수 팀의 남은 마구 0xaea11(팀) — 타자편 진행기는 `opponentCpuMagic`(0xd 진입 48ddc 의 0xaebe4 aeea8 이 채운 값)로, 타자 미션은
+   * 미션 CPU 팀이 든 +0x28(`missionCpuMagicStateOf`)로 넘긴다.
    * 안 넘기면 "남았다(1)" 로 본다 — 마구 칸이 있고 마구 조건(주자 2+ · 2스트라이크 · 0-0 · 0-3)일 때만 결과가 갈린다
    */
   readonly magicRemaining?: number

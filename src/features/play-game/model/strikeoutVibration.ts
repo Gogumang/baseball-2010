@@ -21,8 +21,7 @@ const STRIKEOUT_STRIKES_BEFORE = 2
  * 맞힌 공(파울·타구)은 0x12 가 아니라 0x13 으로 가므로 2S 파울은 울리지 않는다.
  *
  * ⚠️ 근사(때): 웹 투구 화면은 던지는 순간에 판정이 나오므로 그 자리에서 울린다 (심판 콜과 같은 근사).
- * ⚠️ 미해결(드묾): 타석 화면 `pitchVibrationMillisecondsOf` 와 같다 — 0.1% 낫아웃·삼진 + 도루의 0x12 첫 그리기는
- *    "세 번째 스트라이크면 100ms" 로만 본다.
+ * 0.1% 낫아웃 · 삼진 + 도루도 진입 프레임 0x12 첫 그리기가 돌아 100ms 다 — 타석 화면 `pitchVibrationMillisecondsOf` 주석(U-71).
  *
  * @param strikesBefore 이 공 **전** 스트라이크 수
  */

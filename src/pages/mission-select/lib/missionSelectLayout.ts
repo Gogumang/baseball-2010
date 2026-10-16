@@ -55,25 +55,55 @@ export function cellPositionOf(index: number) {
 
 /** 아래 틀 — slt_frame 프레임 1 (169×78: 꼬리 탭 + 점 5개 + 버튼 두 개) */
 export const BOTTOM_FRAME = { frame: 1, x: 34, y: 175 } as const
-/** 탭 글씨 — slt_frame 이미지 51 "MISSION" (45×8) */
-export const TAB_LABEL = { image: 51, x: 101, y: 179 } as const
+/**
+ * 아래 줄 기준 x — `0xba815([this+0x78] = slt_frame, 프레임 1, 종류 1)`(0x1dfb4~0x1dfc4) 가 잰 **아래 틀 프레임 1 의 폭 169** 로
+ * `W/2 − (169 >> 1) = 36`. 탭 글씨 · 보상 · 성공 · 표시 네모가 모두 이 폭에서 잰다(0x1e026~0x1e034 · 0x1e0b0~0x1e0b8 ·
+ * 0x1e0ee~0x1e0fa · 0x1e136~0x1e140 · 0x1e31e~0x1e32a · 0x1e648~0x1e654 · 0x1e6a2~0x1e6ac · 0x1e6e6~0x1e6f2).
+ * *(정정 r129 — 전에는 판 폭 192 · 그림 폭 45 로 셌다)*
+ */
+const ROW_BASE_X = SCREEN_WIDTH / 2 - (169 >> 1)
+/**
+ * 탭 글씨 — slt_frame **이미지** 0x33 = 51 "MISSION"(45×8) 을 (기준 + 3 = 39, H/2 + 0x13 = 179) — 0x1e04a~0x1e078.
+ * 칸 14(이벤트 미션)를 고르면 대신 이미지 0x34 = 52 를 (기준 + 0xf = 51, 179) — 0x1e01c~0x1e048.
+ */
+export const TAB_LABEL = { image: 51, x: ROW_BASE_X + 3, y: 179 } as const
+export const EVENT_TAB_LABEL = { image: 52, x: ROW_BASE_X + 0xf, y: 179 } as const
 /** 설명 상자 0xbb28d(120, 193, 173, 65, 2) — 가운데 기준이라 왼쪽 x = 120 − (173 >> 1) = 34 (1dfd2~1dfe2) */
 export const DESCRIPTION_BOX = { centerX: 120, y: 193, width: 173, height: 65 } as const
 /** 설명 글 — 흰 글 (45, 197, 폭 150) */
 export const DESCRIPTION_TEXT = { x: 45, y: 197, width: 150 } as const
 
-/** 보상·성공 줄 (y0 + 190 = 241). img_text 88 "보상" · 258 "성공" */
+/**
+ * 보상·성공 줄 (y0 + 0xbe = 241). img_text 88 "보상" 을 기준 + 10 = 46 (0x1e0ee~0x1e114) · 값 `"!C%dG"`(0xcd750) 를
+ * (기준 + 0x24 = 72, 241, 폭 0x2e) — 0xba269 호출 1e672(칸 14 는 1e34c).
+ */
 export const REWARD_ROW = {
   y: 241,
   labelFrame: 88,
-  valueWidth: 46,
-  /** (W/2 − w/2 + 10) — w 는 판 폭 192 */
-  labelX: SCREEN_WIDTH / 2 - 192 / 2 + 10,
+  labelX: ROW_BASE_X + 10,
+  valueX: ROW_BASE_X + 0x24,
+  valueWidth: 0x2e,
 } as const
-export const SUCCESS_ROW = { labelFrame: 258 } as const
+/** img_text 258 "성공" 을 기준 + 0x58 = 124 (0x1e136~0x1e158) · 값 `"!C%d회"`(0xcd758) (기준 + 0x72 = 150, 241, 폭 0x2e) — 1e6ca(칸 14 는 1e390) */
+export const SUCCESS_ROW = { labelFrame: 258, labelX: ROW_BASE_X + 0x58, valueX: ROW_BASE_X + 0x72 } as const
 
-/** 미션이 하나도 없을 때 StrMAINMENU[57] */
-export const NO_MISSION_TEXT = '미션이 존재하지 않습니다'
+/**
+ * 등급 표시 네모 — 성공 값 바로 뒤 0x1e6ce~0x1e722: i = 0 .. 개수 − 1 에
+ * `0xba759(slt_frame [this+0x78], 이미지 0x26, 종류 0, W/2 + (169 >> 1) − 0x27 + 8i, y0 + 0x84, 0, 0, 0, 1)` → (165 + 8i, 183).
+ * 개수 = 레코드 byte1 `lsls #0x1c ; lsrs #0x1d` = (byte1 >> 1) & 7 — 보상 등급 d(0xa52b0 a52d8 과 같은 식, `missionRewardTierOf`).
+ * 레코드는 칸 ≠ 14 면 모드 6 0xa5269 / 그 밖 0xa5295(칸)(0x1e558~0x1e5a6). 칸 14 는 받은 미션이 있을 때만 같은 꼴(0x1e4e2~0x1e53a)이고
+ * 받은 미션이 없으면(웹은 늘) 0x1e394 에서 끝나 안 그린다. 잠긴 칸도 거르지 않는다.
+ */
+export const GRADE_MARKS = { image: 0x26, x: SCREEN_WIDTH / 2 + (169 >> 1) - 0x27, step: 8, y: 51 + 0x84 } as const
+
+/**
+ * 칸 14(이벤트 미션)에 받은 미션이 없을 때([[this+0x84]+0xa4] == 0 — 웹은 통신이 없어 늘 그렇다):
+ * 제목 `"!C이벤트 미션"`(0xcd740) 을 미션 이름 자리(24, 58, 폭 0xc0) 에 같은 색 #335FCD 로 — 0xba269 호출 1e2a6.
+ */
+export const EVENT_MISSION_TITLE = '이벤트 미션'
+
+/** 같은 때의 설명 StrMAINMENU[57] (45, 197, 폭 0x96, 흰 글) — 0x702b5(…, 0x39) → 0xba269 호출 1e302. 0x0a(!N)에서 줄을 끊는다 */
+export const NO_MISSION_TEXT = '미션이 존재하지 않습니다!N[!cFFFF00미션다운!cFFFFFF] 메뉴를 통해서!N등록해주세요'
 
 /**
  * 미션 고르기 격자 [this+0x70] 의 꼴 — 장면 진입 0x1d9a4 가 `new` → 0x6c219(vtable 0xd2ea0) 뒤

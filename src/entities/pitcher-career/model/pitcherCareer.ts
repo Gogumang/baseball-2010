@@ -1184,8 +1184,9 @@ export function startNextPitcherSeason(career: PitcherCareer): PitcherCareer {
     season: career.season + 1,
     gamesPlayed: 0,
     // 칭호 25·26 은 새 시즌 첫 경기 전에 **지난해** 외출 수로 본다 (P3 9절)
+    // +0x6a 는 시즌 전환에서 안 지운다(1b768) — 두 칸의 합이 원본 칸(타자편 `outingsLastSeason` 주석)
     outingsThisSeason: 0,
-    outingsLastSeason: career.outingsThisSeason,
+    outingsLastSeason: career.outingsLastSeason + career.outingsThisSeason,
     popularityAtSeasonStart: career.popularity,
     hasSeenYearGoalWindow: false,
     yearGoalEventDone: false,

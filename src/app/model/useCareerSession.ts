@@ -17,6 +17,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { PitchArrivalStep } from '@/features/play-game/model/gameFlow'
@@ -49,6 +50,7 @@ import {
   isManagementCycleOpen,
   isSeasonFinished,
   startNextSeason,
+  withNariSceneSetupOutings,
   gainGamePoint,
   countGameForSkills,
   MAXIMUM_GAME_POINT,
@@ -490,7 +492,17 @@ export function useCareerSession({
     matchPreparedRef.current = false
     storySceneSetUpRef.current()
     setShouldForgetRepeatable(true)
+    setSceneSetUpCount((count) => count + 1)
   }, [])
+  /**
+   * 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 셋업은 경기 뒤 커리어가 들어오기 전에 불리므로(경기 정산이 경기 수를
+   * 올린 뒤의 장면이다) 그 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`)
+   */
+  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
+  useEffect(() => {
+    if (sceneSetUpCount === 0) return
+    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current)))
+  }, [sceneSetUpCount])
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
   nariGameSaveRef.current = nariGameSave
@@ -1020,8 +1032,16 @@ export function useCareerSession({
       if (beforeArrival !== null && arrival !== null && arrival.progress !== beforeArrival) {
         progressRef.current = arrival.progress
         setProgress(arrival.progress)
-        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리 — 원본은 판 안의 그 틱에 낸다 (견제와 같은 근사)
-        playSoundIds(audio, [arrival.play?.callSoundId ?? null, ...gameStepSoundIdsOf(beforeArrival, arrival.progress)])
+        // 판정 콜(도루 17 · 62/20, 폭투 17) 뒤 공수 교대 소리. 원본은 판 안의 결과 코드가 선 틱(결과 메시지 0xbba → 0x51a56)에
+        // 낸다 — 실시간으로 돈 판(`shownLive`)은 화면이 그 틱에 이미 냈고, 미리 돌린 판은 재생 칸(`lastDefensePlay` — 진루만 하는 판은
+        // 공 도착에서, 낫아웃 · 밀어내기 판은 타석 결과 `finishPlayerOutcome` 에서 넣는다)에 들어가 재생 화면이 기록된 틱에 낸다
+        // (`DefensePlayback` 재생 갈래의 `tickSoundIds`). 그릴 틱이 없는 판만 여기서(근사) 낸다
+        playSoundIds(audio, [
+          arrival.play == null || arrival.play.shownLive === true || arrival.play.result.ticks.length > 0
+            ? null
+            : arrival.play.callSoundId,
+          ...gameStepSoundIdsOf(beforeArrival, arrival.progress),
+        ])
       }
       if (arrival !== null && arrival.interrupted) {
         // 판에서 반 이닝·경기가 끝났다 — 내 타석이 끊긴다 (견제사와 같은 길)
@@ -1451,7 +1471,11 @@ export function useCareerSession({
         // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)과 파울 콜 25 가 이 판의 것이다(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
         runner.applyPitch({ kind: '파울' })
         pitchTallyRef.current = tallyPitch(pitchTallyRef.current, { kind: '파울' })
-        playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played), ...gameStepSoundIdsOf(current, resolved)])
+        // 파울 콜 25 는 결과 코드 7 메시지(51c5c)가 낸다 — 화면이 돌린 판이면 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
+        playSoundIds(audio, [
+          result !== undefined ? null : inPlayCallSoundIdOf(pending.outcome, played),
+          ...gameStepSoundIdsOf(current, resolved),
+        ])
         runner.setIsPaused(false)
         return
       }
@@ -1460,16 +1484,19 @@ export function useCareerSession({
       // 배너·소리는 **판 끝 정산 0xa8024 가 낸 결과**로 낸다 — `pending.outcome` 은 판 앞 예측(`predictedOutcomeOf`)이라
       // 판이 다르게 끝나면(예: 예측 아웃인데 판에서 안타) 어긋난다. 타구 판이 아닌 결과(옛 호출)만 예측으로 남는다
       const outcome = played.outcome ?? pending.outcome
-      // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)과 진행 소리는 여기서야 난다.
-      // 함성 60 은 원본이 **낙구 틱**에 내는 것이라 이 자리는 근사다 (atBatSounds 주석)
+      // 판정 콜(결과 메시지 0xbba → 0x51a56)과 깊은 낙구 함성 60(슬롯 2 꼬리 52b62)은 원본처럼 판 안의 그 틱에 화면이 냈다
+      // (`DefensePlayback` 의 `tickSounds`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 근사로 낸다. 진행 소리는 판 끝 그대로다
+      const shownLive = result !== undefined
       playSoundIds(audio, [
-        deepHitCheerSoundIdOf({
-          outcome,
-          carryDistance: carryDistanceOf(pending.trajectory),
-          caughtOnTheFly: played.caughtOnTheFly,
-        }),
+        shownLive
+          ? null
+          : deepHitCheerSoundIdOf({
+              outcome,
+              carryDistance: carryDistanceOf(pending.trajectory),
+              caughtOnTheFly: played.caughtOnTheFly,
+            }),
         // 판정 11(2스트라이크 번트 파울)은 판 끝 결과 코드가 낸다(`played.buntFoulOut`) — 콜은 조건 없이 62 (0x51b20)
-        inPlayCallSoundIdOf(outcome, played),
+        shownLive ? null : inPlayCallSoundIdOf(outcome, played),
         ...gameStepSoundIdsOf(current, resolved),
       ])
       // 0x17 판 끝 → 판정 B 가 곧장 0xd
@@ -1501,11 +1528,14 @@ export function useCareerSession({
 
   /**
    * CPU 견제 판을 먹인 뒤 — 판정 콜과 판에서 끊긴 타석. 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-   * ⚠️ 원본은 공이 잡히는 **틱**에 낸다 — 웹은 판 끝에 낸다(팀 경기와 같은 근사).
+   * 원본은 결과 코드가 선 플레이 틱(메시지 0xbba)에 낸다 — 화면이 실시간으로 돌린 판은 그 틱에 이미 냈으므로(`callShown`) 안 내고,
+   * 미리 돌려 재생 칸에 넣은 판은 재생 화면이 기록된 틱에 낸다.
    */
-  const afterCpuPickoff = (current: GameProgress, next: GameProgress, play: DefensePlayResult | null) => {
+  const afterCpuPickoff = (current: GameProgress, next: GameProgress, play: DefensePlayResult | null, callShown = false) => {
+    // 미리 돌려 재생 칸에 새로 넣은 판은 재생 화면이 기록된 틱에 낸다(`replayCallsOnScreen`)
+    const replayed = replayCallsOnScreen(current.lastDefensePlay, next.lastDefensePlay, play)
     playSoundIds(audio, [
-      isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
+      !callShown && !replayed && isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
       ...gameStepSoundIdsOf(current, next),
     ])
     const interrupted =
@@ -1597,9 +1627,11 @@ export function useCareerSession({
       if (pending.kind === 'pickoff') {
         progressRef.current = step.progress
         setProgress(step.progress)
-        afterCpuPickoff(current, step.progress, played)
+        afterCpuPickoff(current, step.progress, played, result !== undefined)
         return
       }
+      // 화면이 결과를 못 넘겨 여기서 돌린 판 — 판 안의 콜을 못 냈으니 판 끝에 낸다
+      if (result === undefined) playSoundIds(audio, [step.play?.callSoundId ?? null])
       const context = arrivalContextRef.current
       arrivalContextRef.current = null
       if (context === null) {
@@ -1668,7 +1700,11 @@ export function useCareerSession({
       saveGame.clear()
       // 104 → 100 — 나리 장면이 새로 선다(커서 0 · mgr+0x304 = 1 — 새 선수라 본 표시는 비어 있다)
       setUpNariScene()
-      setCareer(createCareer(name, profile))
+      const created = createCareer(name, profile)
+      setCareer(created)
+      // 0x112d0~0x112dc 0xa4bd8(P, 0) · (P, 8) — 얻자마자 0xa4b04 → 0xb663c 가 켠 스킬 비트(+0xf4)도 세운다.
+      // 새 선수는 아래 장착 비교 효과가 견주지 않으니(앞이 없거나 다른 선수) 여기서 적는다
+      skillEquipStatEventsOf(BATTER_LEAGUE_MODE, [], created.equippedSkillIds).forEach(recordStat)
       setScreen({ kind: '관리' })
     },
 

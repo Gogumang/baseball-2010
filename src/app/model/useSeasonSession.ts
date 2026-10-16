@@ -1720,6 +1720,9 @@ export function useSeasonSession(
         return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나최대), recovered: false }
       }
       // 0x7ca2~0x7ce8: G −= 0xcbbe3[3] × 100 · 0x22c29(3, 값) · 0x22e35(2, 3) · 스태미나 = 10000 · 저장
+      // 대상 팀은 0x7c38 `0x1f9a9(저장, 모드, SR[1])` → 0x1f570 — 대회 중(S+0x12c)이면 상대국 칸 +0x934 를 돌려줄 꼴이지만,
+      // 0xe8 에 들어오는 길이 GP 상점 0x7d90(8014) 하나 · 0xdc ← 0xd0 ← 관리 메뉴 0xc9 뿐이고 대회 중 진입 0x4b50(4bc2~4bd2)은 0xf3 으로,
+      // 대회 고리(0xf3 0xe6f8 → 0xf4 0x4a18 → 0xdd ⇄ 0xe0 → 경기)에는 0xc9 를 세우는 곳이 없어 대회 중엔 닿지 않는다 — 늘 리그 칸(R9 19-2)
       spendGamePoint(seasonGpItemPriceOf(SEASON_STAMINA_ITEM))
       recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: SEASON_STAMINA_ITEM })
       const pitchers = current.roster.pitchers.map((player, index) =>
@@ -2037,7 +2040,16 @@ export function useSeasonSession(
         const teamId = pending.options.ourTeamId
         return {
           teamId, roster: current.cupRoster ?? tableRosterOf(teamId), dayCounter, acePitcherId: -1, aceBatterId: -1,
-          cells: seasonEntryCellSourceOf(current, teamId, true),
+          cells: {
+            ...seasonEntryCellSourceOf(current, teamId, true),
+            // 대표팀 칸 +0x918 은 대회 초기화 b7c72 0x205c0 이 마스터 팀 10 으로 새로 채운 것이라 사기 +2 는 표값이다 —
+            // 시즌 사기 칸(0x1f570(저장, SR[1]))은 대회 중 상대국 슬롯 +0x934 로 돌아가 이 칸을 안 쓴다(1f58a~1f5a4)
+            teamMorale: teamRecordMoraleOf(teamId),
+            // 투수 +0x2c 는 대회 초기화 b7c88 · 하루 끝 b81e0 의 0xb6190(팀 10) 이 전원 10000 으로 채운다 — 사람 경기가 깎은 값은
+            // 그 경기 결과 장면의 하루 끝에서 다시 차므로 0xe0 에 들어올 때는 늘 10000 이다. 웹 `cupRoster` 는 경기 끝 값을 받지
+            // 않고(옛 저장은 0 으로 들었다) 이 칸을 쓰지 않는다
+            staminaOf: () => FULL_STAMINA,
+          },
         }
       }
       const teamId = current.state.record.teamId
@@ -3128,15 +3140,18 @@ export function seasonBatterLineOf(stats: LeaguePlayerStats, ownerTeamId: number
  * 엔트리 목록 창(0x5c984) 칸 재료 — 시즌 진입들(0x63dc · 0x5980 · 0x5870 · 0x5b28 · 0x5cd0)은 [ed+0x333] = 1 · [ed+0x334] = 2 다.
  * 시즌 줄은 시즌 저장 레코드(0x204e0 이 비운 뒤 경기가 쌓은 줄) = 리그 기록표 줄이다. 투수 +0x2a(사사구 — 0xa8024 꼬리
  * a8b04~a8bee 가 사람 투구 판정의 볼넷 · 사구마다 지금 투수에게 +1) · 타자 +0x2e(실책 — 수비 그림 0x43278 4381a~43904 가 펌블 6 ·
- * 악송구 4 마다 그 칸 타자에게 +1)도 기록표 칸(`walks` · `errors`, 옛 저장은 0)이다 (docs/re R8 11절). CPU 팀 레코드 사기는 웹이 안 들어
- * 100 으로 둔다.
+ * 악송구 4 마다 그 칸 타자에게 +1)도 기록표 칸(`walks` · `errors`, 옛 저장은 0)이다 (docs/re R8 11절). CPU 팀 레코드 사기는 표값
+ * (`teamRecordMoraleOf` — 시즌 중 그 칸을 쓰는 곳이 없다).
  */
 export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
   const stats = save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS
   const cpuStaminas = save.cpuPitcherStaminas?.[teamId]
   return {
     staminaMode: 2,
-    teamMorale: isUserTeam ? save.state.teamMorale : 100,
+    // 리그 CPU 팀 레코드 +2 — 시즌 중 쓰는 곳은 돌발 보상 0x8e34c 종류 1(8e3d2, `0x1f570(저장, SR[1])` 내 팀 칸 · 대회 중이면
+    // 상대국 슬롯) 하나뿐이라(r101 `0x1f570` 부르는 곳 전수) 다른 팀 칸은 표값 그대로다. 국가대항전 상대국 슬롯 +0x934 도
+    // 하루마다 마스터에서 새로 복사되고(b8216 0x20648) 돌발 사기는 경기 안에서만 쌓이므로 0xe0 에서는 표값이다
+    teamMorale: isUserTeam ? save.state.teamMorale : teamRecordMoraleOf(teamId),
     ...(isUserTeam ? {} : { staminaOf: (_player: SeasonPlayer, index: number) => cpuStaminas?.[index] ?? FULL_STAMINA }),
     batterLineOf: (player) => {
       const line = seasonBatterLineOf(stats, teamId, player)

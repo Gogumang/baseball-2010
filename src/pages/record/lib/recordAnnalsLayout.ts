@@ -125,13 +125,22 @@ export const NAME_ROW = {
   visibleRows: 8,
 } as const
 
-/** 아래 합계 줄 — 프레임 15 (101×18) + 노란 네모 38 + img_text 269 "전체합계", 값은 노랑 */
+/**
+ * 아래 합계 줄 — 프레임 15 (101×18) + 노란 네모 38 + img_text 269 "전체합계", 값은 노랑. 탭 3 (0x2f834~0x2f920) · 탭 4 (0x2fa60~0x2fb90)
+ * 가 같은 꼴이다 — w·h = 프레임 15 상자(101, 18), x0 = 24 · y0 = 54:
+ * 프레임 15 (x0 − w + 0xb6 = 105, y0 − h + 0xce = 242) · 이미지 0x26 (x0 + 0x10 = 40, y0 − h + 0xd3 = **247**) ·
+ * img_text 0x10d (x0 + 0x1a = 50, y0 − h + 0xd2 = **246**) · 값 0xba269(글, x0 − w + 0xbb = **110**, y0 − h + 0xd2 = **246**, w − 10 = **91**)
+ * 호출 2fb90 (탭 3 `"!C!cffff00%d/%d"` 가운데 · 탭 4 `"!R!cFFFF00…"` 오른쪽). *(정정 r129 — 전에는 네모 246 · 글씨 242 · 값 (105, 243, 101))*
+ */
 export const TOTAL_ROW = {
   frame: 15,
-  frameX: PANEL.x - 101 + 182,
-  bulletX: PANEL.x + 16,
+  frameX: PANEL.x - 101 + 0xb6,
+  bulletX: PANEL.x + 0x10,
+  bulletDy: 5,
   labelFrame: 269,
-  labelX: PANEL.x + 26,
+  labelX: PANEL.x + 0x1a,
+  labelDy: 4,
+  value: { x: PANEL.x - 101 + 0xbb, dy: 4, width: 101 - 10 },
   y: 242,
 } as const
 
@@ -197,27 +206,85 @@ export const PROGRESS_ROW = {
 export const endingProgressOf = (row: number, gained: number) =>
   (row === 0 ? Math.trunc((gained * 100) / NARI_ENDING_CELL_COUNT) : gained * 20)
 
-/** 스킬 설명 — 꼬리 탭 프레임 2 (91×15) + 설명 상자 0xbb28d(120, …, 173, 60) */
+/**
+ * slt_frame 프레임 2(꼬리 탭)의 높이 h — 0x2f300~0x2f318 이 `0xba815(slt_frame, 2, 종류 1)` 상자를 [sp+0x140] 에 두고
+ * 탭 2 그림이 그 +6(s16 h, 0x2f326 · 0x2f414 · 0x2f456)을 `y0 − h + …` 로 쓴다. 상자는 0x94962~0x9497c 가 (x, y, w, h) 를
+ * strh 넷으로 채운다 — 프레임 2 는 91×15 다.
+ */
+const SKILL_TAB_FRAME_HEIGHT = 15
+
+/** 스킬 설명 — 꼬리 탭 프레임 2 (91×15) + 설명 상자 0xbb28d(120, …, 173, 60) + 글 */
 export const SKILL_DESCRIPTION = {
   tabFrame: 2,
+  /** 0x2f330~0x2f34e — 0xba759(slt_frame, 2, 종류 1, W/2 − 0x56 = 34, y0 − h + 0x90 = 183) *(정정 r136 — 전에는 176)* */
   tabX: SCREEN_WIDTH / 2 - 86,
-  tabY: 176,
-  box: { centerX: 120, y: 190, width: 173, height: 60 },
+  tabY: PANEL.y - SKILL_TAB_FRAME_HEIGHT + 0x90,
   /**
-   * 글 칸 — 상자(34~207) 안쪽에 3px 여백만 남기고 **폭을 150 → 168 로 넓혔다**.
-   * 글꼴을 11px 로 올리니 150px 에서는 스킬 40개 중 5개가 상자(54px) 밖으로 흘러
-   * 아래 쪽번호 줄을 덮었다. 폭을 넓혀 줄 수를 줄이면 40개 모두 52px 안에 들어온다
-   * (브라우저에서 40개를 다 재서 확인했다). 원본 글 칸 좌표는 미해독이라 **근사다**.
+   * 0x2f35e~0x2f36e — 0xbb28d(W/2, y0 + 0x91 = 199, 0xad, 0x3c, 정렬 2). 정렬 2 는 비트 1 만이라 x 만 가운데(bb29c~bb2a6),
+   * y 는 그대로다(비트 5·6 이 y 를 옮긴다) *(정정 r136 — 전에는 190)*. 글(202)은 상자 위 3 아래다.
    */
-  text: { x: 37, y: 196, width: 168 },
+  box: { centerX: 120, y: PANEL.y + 0x91, width: 173, height: 60 },
+  /**
+   * 글 — 0xba269(글, W/2 − 0x51 = 39, y0 + 0x94 = 202, 폭 −1, 색 −1, 0) (0x2f3a0 · 0x2f4d8 → 0x2f4e6~0x2f4ec 가 **0x2fb8e 로 뛴다**).
+   * 0x2fb8c `subs r3, #0xa` 는 뛰어든 자리(0x2fb8e) 앞이라 안 지난다 — 폭은 −1 그대로다 *(정정 r133 — r129 노트의 "폭 −11" 은 이 뜀을 잘못 읽었다)*.
+   * 폭 −1 이면 0x6ef4c 가 6efb0~6efd0 에서 0x9c52c 로 날 글 폭(0x0a 줄 중 최댓값)을 재어 폭으로 쓰므로 **줄은 `!N` 에서만 끊긴다**.
+   * 글에 `!C` 가 없어 왼쪽 맞춤 · 줄 높이는 글꼴 +0x6c(11) + 줄간 +0x67(3) = 14 (0x6ef90~0x6efa4, R5).
+   * 얻은 스킬은 `"%s!N효과 : !cFFFF00%s"`(0xcf978) = StrSKILL[i] · StrSKILL[i + 40](0x702b5) · 못 얻었으면 `"!cffffff아직 획득하지 못한!N스킬입니다."`(0xcf950).
+   * 원본 그대로라 네 줄짜리 설명(202 + 56 = 258)은 상자(190~250) 아래로 넘친다.
+   */
+  text: { x: SCREEN_WIDTH / 2 - 0x51, y: PANEL.y + 0x94 },
 } as const
 
+
+/**
+ * **얻은 스킬 그림 두 장** (0x2f3b0~0x2f488, r136 직접 떴다) — 표 [+0x13c + 4i] ≠ −1(얻음)일 때만 상자 위에 그린다.
+ * ```
+ * 2f3b0  등급 = 칸 ≤ 7 ? 0 : 칸 ≤ 0x17 ? 1 : 2
+ * 2f3e4  s = 칸 ≤ 0x27 ? [[this+0x120]+0x13c + 4·칸] : −1 ; 0x5f351(_, s) 비트 1(마이너스) 이면 이미지 0x7d, 아니면 0x7c
+ * 2f3fc  0x913e5([0x1552ae8], 0)                                      ; img_text 팔레트 0(흰 글자)
+ * 2f444  0xba759(img_text [0x1552aec], 표[sp+0x2a4][등급], 종류 1, W/2 − 0x3d = 59, y0 − h + 0x92 = 185)
+ *        표 = 0xced88 [281 공통, 149 타자, 150 투수] (0x2e358~0x2e35e 가 스택에 옮긴다)
+ * 2f488  0xba759(slt_frame, 0x7c/0x7d, 종류 0(이미지), W/2 − 0x24 = 84, y0 − h + 0x91 (+1 = [sp+0xa8] 깜박임이 켜졌으면))
+ * ```
+ * 표 [+0x13c] 는 탭을 고를 때 0x58a3c(0x2b6fc)가 채운다 — 모두 −1 로 두고 칸 0~7 은 스킬 비트 i 가 +0xf4(타자편)·+0xf8(투수편)
+ * "한 번이라도 켠 스킬" 중 하나에 있으면 i, 칸 8~23 은 +0xf4 의 비트 k = 칸, 칸 24~39 는 +0xf8 의 비트 k = 칸 − 16 이면 k 를 적는다.
+ * 곧 0x5f351 이 받는 값은 칸이 아니라 **스킬 비트 번호**다(투수 칸 33~36 새가슴 · 비겁자 · 깃털 · 더티볼 → 비트 17~20 → 빨간 아래 화살).
+ */
+export const SKILL_BADGE = {
+  gradeFrames: [281, 149, 150],
+  gradeX: SCREEN_WIDTH / 2 - 0x3d,
+  gradeY: PANEL.y - SKILL_TAB_FRAME_HEIGHT + 0x92,
+  /** 0x7c 파란 위 화살 · 0x7d 빨간 아래 화살 (slt_frame 이미지) */
+  plusImage: 0x7c,
+  minusImage: 0x7d,
+  arrowX: SCREEN_WIDTH / 2 - 0x24,
+  arrowY: PANEL.y - SKILL_TAB_FRAME_HEIGHT + 0x91,
+} as const
+
+/** 스킬 등급 (0x2f3b0~0x2f3c0) — 0 공통 · 1 타자 · 2 투수 */
+export const skillGradeOf = (cell: number): 0 | 1 | 2 => (cell <= 7 ? 0 : cell <= 0x17 ? 1 : 2)
+
+/* 칸 → 스킬 비트 번호(표 [+0x13c], 0x58a3c)는 `entities/collection` 의 `annalsSkillOfCell` — 켠 스킬 비트로 −1 도 가른다 */
+
+/** 못 얻은 스킬 설명 `"!cffffff아직 획득하지 못한!N스킬입니다."`(0xcf950) — 0x2f37e~0x2f3ae (칸 > 0x27 이거나 표 [+0x13c + 4i] == −1) */
+export const SKILL_NOT_GAINED_TEXT = '!cffffff아직 획득하지 못한!N스킬입니다.'
 /**
  * 기록·통계 탭의 목록 격자 — 탭 0 `0x79ed5(격자, 종류, 120, y0 + 0x24 = 90, 칸너비 [174], 줄높이 18, 1열, 8줄)` (0x2e8e6~0x2e92e) ·
  * 탭 4 는 같은 꼴에 종류 2 · **y0 + 0x23 = 89** (0x2f96a~0x2f9ae). 칸 x = 120 − 174/2 = 33, 칸 y = 첫 y + 18 × 줄.
- * `x` 는 칸 바탕 프레임을 놓는 x(= 칸 x − 1)다.
+ * `x` 는 칸 바탕 프레임을 놓는 x(= 칸 x − 1)다. 칸 그리기 0x7a571 은 칸 (x, y) 와 칸너비 174 로 글을 놓는다 —
+ * 이름 (칸 x + 5, 칸 y + 2)(0x7a98c~0x7a9a2) · 0x7a08c(격자, 칸 x, 칸 y + 2, 칸너비 [격자+0x1c+4열], n)(0x7a9b4~0x7aa26).
+ * *(정정 r129 — 전에는 글을 프레임 x 32 · 폭 176 에서 셌다)*
  */
-export const LIST_GRID = { x: PANEL.x + 8, firstY: PANEL.y + 36, step: 18, rows: 8, width: 176 } as const
+export const LIST_GRID = { x: PANEL.x + 8, cellX: PANEL.x + 9, cellWidth: 174, firstY: PANEL.y + 36, step: 18, rows: 8 } as const
+/** 탭 0 칸 이름 `"%s"`(0xd09bc) StrGAME[8 + n] 흰 글 — 0xba269(글, 칸 x + 5, 칸 y + 2, 폭 자리 = RGB(255,255,255) 값, −1, 0) 호출 7a9a2. 폭 자리에 색이 들어가 줄을 안 끊는다 */
+export const LIST_NAME = { dx: 5, dy: 2 } as const
+/**
+ * 탭 4 통계 — 0x7a08c 종류 2 갈래. 값 `"!R!cffff00…"` 은 0xba269(글, x − 2, y, 칸너비 − 4)(7a1f8 · 7a2b2 · 7a306 · 7a366 ·
+ * 7a3ba · 7a418 · 7a4b6 · 7a502 — 8갈래 모두 `subs r1,#2` · `subs r3,#4`), 이름 `"!cffffff%s"`(0xd09a8) 은
+ * 0xba269(글, x + 3, y + 1, 칸너비 − 10)(7a52e~7a542). 여기 x·y 는 0x7a08c 가 받은 (칸 x, 칸 y + 2) 다.
+ */
+export const STAT_VALUE = { dx: -2, dy: 2, widthInset: 4 } as const
+export const STAT_NAME = { dx: 3, dy: 3, widthInset: 10 } as const
 /** 탭 4 통계 격자의 첫 칸 y — 0x2f9a6 `adds r3, #0x23` (탭 0 은 #0x24) */
 export const STAT_LIST_FIRST_Y = PANEL.y + 0x23
 /** 탭별 목록 격자 첫 칸 y (탭 0 · 4 만) */

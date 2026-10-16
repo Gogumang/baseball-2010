@@ -142,7 +142,7 @@ import { applyPitcherBurstRewards } from '@/entities/pitcher-career/model/pitche
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import {
-  MAXIMUM_GAME_POINT, rebuildEquippedSkillIds,
+  MAXIMUM_GAME_POINT, rebuildEquippedSkillIds, withNariSceneSetupOutings,
 } from '@/entities/career/model/playerCareer'
 import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
@@ -796,7 +796,14 @@ export function usePitcherLeagueSession(
     cursorRef.current = 0
     freshSceneRef.current = true
     setShouldForgetRepeatable(true)
+    setSceneSetUpCount((count) => count + 1)
   }, [])
+  /** 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 경기 뒤 커리어 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`) */
+  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
+  useEffect(() => {
+    if (sceneSetUpCount === 0) return
+    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current)))
+  }, [sceneSetUpCount])
   // 메인 메뉴 따위에서 투수편 화면으로 들어선다 — 장면 0x106 이 새로 선다(떠나면 헐린다)
   const wasOnScreenRef = useRef(isOnScreen)
   if (wasOnScreenRef.current !== isOnScreen) {
@@ -1116,12 +1123,15 @@ export function usePitcherLeagueSession(
     (name: string, profile: PitcherRookieProfile) => {
       // 104 등록 확정 0x10fb4 — 전역기록 +0x40 + 모드 = 1 · +0x4c + 모드(+0x4f) = 0 (0x112b2 · 0x112c0)
       nariGameSaveRef.current?.clear()
-      commit(createPitcherCareer(name, profile))
+      const created = createPitcherCareer(name, profile)
+      commit(created)
+      // 0x112d0~0x112dc 0xa4bd8(P, 0) · (P, 8) → 0xa4b04 → 0xb663c 가 켠 스킬 비트(+0xf8, 모드 3)를 세운다 — 새 선수는 장착 비교 효과가 안 견준다
+      skillEquipStatEventsOf(PITCHER_LEAGUE_MODE, [], created.equippedSkillIds).forEach(recordStat)
       // 등록 104 → 100 진입 끝(0x1c3be)이 이전 상태 104 를 보고 새 선수 플래그를 켠다 → 105 첫 틀에 오프닝 451
       newPlayerRef.current = true
       setScene('관리')
     },
-    [commit],
+    [commit, recordStat],
   )
 
   /**

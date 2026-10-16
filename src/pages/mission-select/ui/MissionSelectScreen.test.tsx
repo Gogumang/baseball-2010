@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MissionSelectScreen } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { BATTER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
-import { GRID, NO_MISSION_TEXT, PANEL, cellPositionOf } from '@/pages/mission-select/lib/missionSelectLayout'
+import { GRID, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, cellPositionOf } from '@/pages/mission-select/lib/missionSelectLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
@@ -97,6 +97,35 @@ describe('미션 선택 격자', () => {
     expect(screen.getByText('3회')).toBeTruthy()
   })
 
+  it('보상·성공 줄과 탭 글씨는 아래 틀 프레임 1 폭 169 에서 잰다 — 기준 W/2 − 84 = 36 (0x1dfb8 · 1e672 · 1e6ca)', () => {
+    띄우기()
+    expect(REWARD_ROW.labelX).toBe(46)
+    expect(REWARD_ROW.valueX).toBe(72)
+    expect(SUCCESS_ROW.labelX).toBe(124)
+    expect(SUCCESS_ROW.valueX).toBe(150)
+    expect(TAB_LABEL.x).toBe(39)
+    const 성공값 = screen.getByText('0회')
+    expect(성공값.style.left).toBe('150px')
+    expect(screen.getByAltText('MISSION').style.left).toBe('39px')
+  })
+
+  it('등급 표시 네모 — (byte1 >> 1) & 7 개를 slt_frame 이미지 0x26 으로 (165 + 8i, 183), 칸 14(받은 미션 없음)는 없다 (0x1e6ce~0x1e722)', () => {
+    띄우기()
+    const marks = () => screen.queryAllByTestId('미션-등급-네모') as HTMLElement[]
+    const first = marks()
+    expect(first).toHaveLength((BATTER_MISSIONS[0].stage >> 1) & 7)
+    expect(first.length).toBeGreaterThan(0)
+    expect(first.map((mark) => [mark.style.left, mark.style.top])).toEqual(first.map((_, i) => [`${165 + 8 * i}px`, '183px']))
+    expect(first[0].getAttribute('src')).toBe('./sprites/slt_frame/038.png')
+
+    // 칸 13 → 등급 5
+    for (let i = 0; i < 13; i += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(marks()).toHaveLength((BATTER_MISSIONS[13].stage >> 1) & 7)
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(marks()).toHaveLength(0)
+  })
+
   it('좌우 키로 칸을 옮긴다 — 꼴 0x330 이라 15칸을 감는다 (칸 0 ← → 칸 14, 칸 14 → → 칸 0)', () => {
     const key = missionKeyOf(BATTER_MISSIONS[0])
     띄우기({ clearedKeys: [key] })
@@ -107,7 +136,11 @@ describe('미션 선택 격자', () => {
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(screen.queryByText(BATTER_MISSIONS[0].name)).toBeNull()
-    expect(screen.getByText(NO_MISSION_TEXT)).toBeTruthy()
+    // 칸 14 (받은 미션 없음): 제목 "!C이벤트 미션"(1e2a6) · 설명 StrMAINMENU[57] 세 줄(1e302)
+    expect(screen.getByText('이벤트 미션')).toBeTruthy()
+    expect(screen.getByText('미션이 존재하지 않습니다')).toBeTruthy()
+    expect(screen.getByText('미션다운')).toBeTruthy()
+    expect(screen.getByText('등록해주세요')).toBeTruthy()
 
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(screen.getByText(BATTER_MISSIONS[0].name)).toBeTruthy()

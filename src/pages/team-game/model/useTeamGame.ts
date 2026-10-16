@@ -50,6 +50,7 @@ import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
+import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
@@ -277,7 +278,7 @@ export function useTeamGame(
               detail.contactSoundId ?? null,
               pitchCallSoundIdOf(detail.resolution, nextAtBat),
               // 공 도착 0x3dfac 가 연 도루·폭투 판의 판정 콜(도루 17 · 62/20, 폭투 17) — 원본은 판 안의 그 틱에 낸다.
-              // 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (견제와 같은 근사)
+              // 재생할 판은 재생 화면이 기록된 틱에, 재생하지 않는 판만 판을 연 이 자리에서 낸다 (`arrivalCallSoundIdOf`)
               arrivalCallSoundIdOf(before, after),
               after.pendingDefensePlay !== null || nextAtBat.outcome === null
                 ? null
@@ -312,7 +313,7 @@ export function useTeamGame(
             return [
               releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
-              // CPU 가 건 도루·폭투 판의 판정 콜 — 판을 연 자리에서 낸다 (견제와 같은 근사)
+              // CPU 가 건 도루·폭투 판의 판정 콜 — 재생할 판은 재생 화면이 그 틱에, 아니면 판을 연 이 자리에서 (`arrivalCallSoundIdOf`)
               arrivalCallSoundIdOf(before, after),
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
               // (`state[0x31 + state[9]] == 1`, 0x51adc~0x51af8) 일 때만 예약한다.
@@ -325,10 +326,9 @@ export function useTeamGame(
             ]
           },
         ),
-      // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-      // ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 견제 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다
-      // — 투수편(`usePitcherGame.pickoff`)과 같은 근사다
-      // 사람 견제는 판을 붙들고 수비 화면이 실시간으로 돌린다(송구 키 +0x160) — 콜은 판이 끝나 결과를 먹일 때 낸다
+      // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36). 원본은 결과 코드가 선 **틱**에 낸다 —
+      // 사람 견제는 판을 붙들고 수비 화면이 실시간으로 돌리며 그 틱에 내고(송구 키 +0x160 · `soundsThisTick`), 미리 돌려 재생 칸에 넣은
+      // 판은 재생 화면이 기록된 틱에 낸다. 재생하지 않는 판만 판을 연 자리에서 낸다(`pickoffCallSoundsOf`)
       pickoff: (key: string) => step((current) => pickoff(current, key, random, true), pickoffCallSoundsOf),
       // CPU 견제(사람 공격) — 판을 붙들고 수비 화면이 실시간으로 돌린다(사람 주루 키 0x5331c · OK 슬라이딩 0x585). 콜은 판 끝에 낸다
       cpuPickoff: (base: PickoffBase) =>
@@ -366,11 +366,15 @@ export function useTeamGame(
         const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
         step(
           (current) => resolveRunnerPlay(current, played, random),
-          // 판정 콜 — 도루 · 폭투는 공 도착 판(`lastArrivalPlay`), 견제는 그 결과. ⚠️ 원본은 공이 잡히는 틱에 낸다(판 끝 근사)
-          (before, after) => [
-            arrivalCallSoundIdOf(before, after),
-            pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
-          ],
+          // 판정 콜(도루 · 폭투 · 견제)은 원본처럼 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 화면이 냈다
+          // (`LiveRunnerPlayback` 의 `soundsThisTick`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
+          (before, after) =>
+            result !== undefined
+              ? []
+              : [
+                  arrivalCallSoundIdOf(before, after),
+                  pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
+                ],
         )
       },
       recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => {
@@ -388,11 +392,10 @@ export function useTeamGame(
         const played = result ?? runDefensePlay(pending.input)
         step(
           (current) => resolveDefensePlay(current, played, random),
-          // 플레이가 끝난 자리 — 아웃 콜(0x51b36)·세이프 콜(0x51c14)·홈런 함성(11)은 여기서야 난다.
-          // **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다
-          // (`atBatSounds.inPlayCallSoundIdOf` 둘째 인자). 함성 60 은 원본이 **낙구 틱**에
-          // 내는 것이라 이 자리는 근사다 — 타자편(`useCareerSession`)과 같은 근사·같은 순서다
-          () => [
+          // 판정 콜(결과 메시지 0xbba → 0x51a56: 7 → 25 · 8/12 → 11 · 9 → 17 · 11 → 62 · 13 → 62/20)과 깊은 낙구 함성 60(52b62)은
+          // 원본처럼 판 안의 그 틱에 화면이 냈다(`DefensePlayback` 의 `tickSounds`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에
+          // 근사로 낸다 — **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다(`inPlayCallSoundIdOf` 둘째 인자)
+          () => result !== undefined ? [] : [
             deepHitCheerSoundIdOf({
               outcome: pending.outcome,
               carryDistance: carryDistanceOf(pending.input.trajectory),
@@ -435,15 +438,21 @@ export function useTeamGame(
   }
 }
 
-/** 이번 걸음에 공 도착 판(0x3dfac — 종류 9·5)이 새로 열렸으면 그 판정 콜 */
+/**
+ * 이번 걸음에 공 도착 판(0x3dfac — 종류 9·5)이 새로 열렸으면 그 판정 콜. 원본은 판 안의 결과 코드가 선 틱(메시지 0xbba)에 낸다 —
+ * 재생 칸에 들어가 화면이 재생할 판은 화면이 그 틱에 낸다(`replayCallsOnScreen`). 재생하지 않는 판만 판을 연 이 자리에서 낸다(근사)
+ */
 function arrivalCallSoundIdOf(before: TeamGameProgress, after: TeamGameProgress): number | null {
   const play = after.lastArrivalPlay
-  return play !== null && play !== before.lastArrivalPlay ? play.callSoundId : null
+  if (play === null || play === before.lastArrivalPlay) return null
+  return replayCallsOnScreen(before.lastDefensePlay, after.lastDefensePlay, play.result) ? null : play.callSoundId
 }
 
-/** 견제 판이 새로 열렸으면 그 판정 콜 하나 */
+/** 견제 판이 새로 열렸으면 그 판정 콜 하나 — 재생 칸에 들어간 판(재생할 틱이 있는 판)은 재생 화면이 그 틱에 낸다 */
 function pickoffCallSoundsOf(before: TeamGameProgress, after: TeamGameProgress): readonly (number | null)[] {
-  return after.lastDefensePlay !== before.lastDefensePlay && isPickoffPlayResult(after.lastDefensePlay)
+  return after.lastDefensePlay !== before.lastDefensePlay &&
+    isPickoffPlayResult(after.lastDefensePlay) &&
+    !replayCallsOnScreen(before.lastDefensePlay, after.lastDefensePlay, after.lastDefensePlay)
     ? [pickoffCallSoundIdOf(after.lastDefensePlay)]
     : []
 }

@@ -215,13 +215,16 @@ describe('미션 수비 판 이름 판(0x43cb0) · 마선수 주자(0x79d10)', (
     expect(missionRunnerAcesOf(run).batter).toBe(mission.opponentAce - 1)
   })
 
-  it('운동장 줄 팀 — 투수 미션 CPU 타선의 마타자 레코드는 니블 0(XlsACE_BAT +0x1c = 0) · 타자 미션 CPU 수비 마운드 마투수', () => {
+  it('운동장 줄 팀 — 투수 미션 CPU 타선의 마타자는 옛 그 칸 니블(0xb5e98 b5f10~b5f4a) · 타자 미션 CPU 수비 마운드 마투수', () => {
     const pitcherMission = MISSIONS.find((m) => m.side === '투수' && m.opponentAce > 0)!
     const run = startPitcherMission(pitcherMission)
     const offense = missionWalkTeamOf(run, false)!
-    const ace = offense.records.find((record) => record.ace !== null)!
-    expect(ace).toEqual({ position: 0, ace: pitcherMission.opponentAce - 1 })
-    // 붙박이 아홉 니블은 칸마다 하나씩 그대로 남는다(마타자에게 밀린 붙박이는 9번으로 가도 제 니블)
+    const aceRecord = offense.records.findIndex((record) => record.ace !== null)
+    const displaced = teamBatters(run.cpu.batting!.teamId)[aceRecord]!
+    // 마타자 행 +0x1c 가 0 이라 맞바꿈이 자리를 칸에 되쓴다 — 마타자는 옛 그 칸 선수의 니블, 밀려난 붙박이(레코드 9)는 0
+    expect(offense.records[aceRecord]).toEqual({ position: (displaced.position ?? 0) & 0xf, ace: pitcherMission.opponentAce - 1 })
+    expect(offense.records[9]?.position).toBe(0)
+    // 붙박이 아홉 니블은 칸마다 하나씩 그대로 남는다(자리는 레코드 칸을 따른다)
     const nibbles = offense.records.map((record) => record.position).filter((position) => position > 0)
     expect(new Set(nibbles).size).toBe(9)
     expect(missionWalkTeamOf(run, true)!.pitcherAce).toBeNull()

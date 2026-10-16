@@ -25,6 +25,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { openPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { runStealPlay, stealCallSoundIdOf } from '@/features/defense-play/model/stealPlay'
 import {
   GameSceneMarkContext,
   markCommonWindowShown,
@@ -581,6 +582,37 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
     }
   })
 
+  it('판정 콜은 결과 메시지 0xbba 가 선 틱에 낸다 — 판 끝(onDone)보다 먼저, 한 번', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    let 콜때끝났나: boolean | null = null
+    setActiveSound({
+      play: (id) => {
+        울린것.push(id)
+        if (id === 17 && 콜때끝났나 === null) 콜때끝났나 = 눌렀다.mock.calls.length > 0
+      },
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      stop: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
+    const 눌렀다 = vi.fn()
+    try {
+      render(<DefensePlayback runnerPlay={도루판()} onDone={눌렀다} />)
+      끝까지(눌렀다, '2')
+      // 키 2 로 2루에 던져 세이프(결과 9) — 종류 5 는 0x51c14 51c22 에서 곧장 17
+      expect((결과(눌렀다) as { readonly resultCode?: number | null }).resultCode).toBe(9)
+      expect(울린것.filter((id) => id === 17)).toHaveLength(1)
+      expect(콜때끝났나).toBe(false)
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+
   it('판이 닫힌 뒤 닫힌 갱신(+0x1094)을 지나야 끝났다고 알린다 — 판 틱 수보다 늦게', () => {
     vi.useFakeTimers()
     try {
@@ -591,6 +623,122 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
         act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       }
       expect(갱신).toBeGreaterThan(결과(onDone).ticks.length)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+const 땅볼아웃: AtBatOutcome = { kind: '아웃', detail: '땅볼아웃' }
+
+/** 울린 번호와 그때 판이 끝났다고 알렸는지 적는 소리 포트 */
+function 소리기록(onDone: ReturnType<typeof vi.fn>) {
+  const 울린것: { readonly id: number; readonly 끝난뒤: boolean }[] = []
+  setActiveSound({
+    play: (id) => {
+      울린것.push({ id, 끝난뒤: onDone.mock.calls.length > 0 })
+    },
+    playBgm: () => {},
+    stopBgm: () => {},
+    resumeBgm: () => {},
+    stop: () => {},
+    currentBgm: () => null,
+    setVolume: () => {},
+    getVolume: () => 100,
+  })
+  return 울린것
+}
+
+/**
+ * 타구 판 · 미리 돌린 판의 판정 콜도 결과 코드가 선 **그 틱**에 난다 — b4562 의 메시지 0xbba → 0xbfbac(곧바로) → 0x509a0 →
+ * 0x51a56 → 표 0xd0488. 실시간 갈래는 진행기 칸(`tickSounds`), 재생 갈래는 그림에 실린 칸(`tickSoundIds`)을 그 틱에 낸다.
+ */
+describe('판정 콜은 판 안의 그 틱 (결과 메시지 0xbba)', () => {
+  it('실시간 타구 판 — 주자 없는 땅볼의 포스 아웃 콜 20 을 판 끝(onDone)보다 먼저 한 번 낸다', () => {
+    vi.useFakeTimers()
+    const onDone = vi.fn()
+    const 울린것 = 소리기록(onDone)
+    try {
+      // CPU 수비 — 0xafa60 이 1루로 던져 타자주자를 잡는다
+      render(<DefensePlayback input={{ ...타구(땅볼아웃, { first: false, second: false, third: false }), defenseIsCpu: true }} onDone={onDone} />)
+      끝까지(onDone)
+      expect(결과(onDone).advance.outsAdded).toBe(1)
+      const 콜 = 울린것.filter(({ id }) => id === 20)
+      expect(콜).toHaveLength(1)
+      expect(콜[0]!.끝난뒤).toBe(false)
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+
+  it('재생 갈래 — 미리 돌린 도루 판은 그림에 실린 판정 콜을 그 틱에 낸다(판을 연 자리가 아니라)', () => {
+    vi.useFakeTimers()
+    // 판을 열 때 앞 판에서 남은 사람 송구 키 2(+0x160)가 있던 도루 판 — 포수가 2루로 던져 세이프(결과 9 → 17)
+    const result = runStealPlay({ bases: { first: true, second: false, third: false }, stealingFrom: [1], outs: 0, runAbility: 500, manualThrowBase: 2 })
+    const play = { result, callSoundId: stealCallSoundIdOf(result) }
+    expect(play.callSoundId).toBe(17)
+    const 콜틱 = play.result.ticks.findIndex((view) => (view.tickSoundIds ?? []).includes(play.callSoundId!))
+    expect(콜틱).toBeGreaterThanOrEqual(0)
+
+    const onDone = vi.fn()
+    const 울린것 = 소리기록(onDone)
+    try {
+      render(<DefensePlayback ticks={play.result.ticks} onDone={onDone} />)
+      // 콜이 실린 그림 앞까지는 안 난다
+      for (let 갱신 = 0; 갱신 < 콜틱; 갱신 += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(울린것.some(({ id }) => id === play.callSoundId)).toBe(false)
+      끝까지(onDone)
+      const 콜 = 울린것.filter(({ id }) => id === play.callSoundId)
+      expect(콜).toHaveLength(1)
+      expect(콜[0]!.끝난뒤).toBe(false)
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+})
+
+/**
+ * 플레이 객체 +0x160 — 판이 닫힌 뒤(+0x1094 셈) 온 사람 수비 송구 키도 0x53420 → 0x533c8 → 0x588 → vt60 이 적고, 닫힌 판에서는
+ * b4660 이 안 돌아 다음 판으로 남는다(장면 칸 `throwTarget`).
+ */
+describe('판이 닫힌 뒤 온 사람 송구 키는 다음 판으로 남는다 (+0x160)', () => {
+  const 판끝까지 = (input: DefensePlayInput) => runDefensePlay(input).ticks.length + 2
+
+  it('사람 수비 — 닫힌 갱신에 누른 \'4\' 가 장면 칸 throwTarget 3 으로 넘어간다 · 안 누르면 그대로 −1', () => {
+    vi.useFakeTimers()
+    try {
+      const input = 타구(땅볼아웃, { first: false, second: false, third: false })
+      const 안눌렀다 = vi.fn()
+      render(<DefensePlayback input={input} side="수비" onDone={안눌렀다} />)
+      끝까지(안눌렀다)
+      expect(결과(안눌렀다).scene.throwTarget).toBe(-1)
+      cleanup()
+
+      const 눌렀다 = vi.fn()
+      render(<DefensePlayback input={input} side="수비" onDone={눌렀다} />)
+      for (let 갱신 = 0; 갱신 < 판끝까지(input); 갱신 += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(눌렀다).not.toHaveBeenCalled()
+      fireEvent.keyDown(window, { key: '4' })
+      끝까지(눌렀다)
+      expect(결과(눌렀다).scene.throwTarget).toBe(3)
+      expect(결과(눌렀다).advance).toEqual(결과(안눌렀다).advance)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('사람 공격이면 닫힌 갱신의 키가 +0x160 을 안 건드린다 (주루 0x5331c)', () => {
+    vi.useFakeTimers()
+    try {
+      const input = 타구(땅볼아웃, { first: false, second: false, third: false })
+      const onDone = vi.fn()
+      render(<DefensePlayback input={input} side="공격" onDone={onDone} />)
+      for (let 갱신 = 0; 갱신 < 판끝까지(input); 갱신 += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      fireEvent.keyDown(window, { key: '4' })
+      끝까지(onDone)
+      expect(결과(onDone).scene.throwTarget).toBe(-1)
     } finally {
       vi.useRealTimers()
     }

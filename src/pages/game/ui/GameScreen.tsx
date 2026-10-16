@@ -23,6 +23,9 @@ import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
+import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
+import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { RecordAlertFrame } from '@/widgets/game-scene/lib/recordAlert'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
@@ -126,6 +129,11 @@ interface GameScreenProps {
   readonly recordAlert?: RecordAlertFrame
   /** 알림을 든 쪽에 이 화면의 팝업 · 장면 갈래를 알린다 (`RecordAlertScene`) — 바뀔 때마다 */
   readonly onRecordAlertSceneChange?: (scene: RecordAlertScene) => void
+  /**
+   * 타석 HUD 돌발 띠 0x8e858 의 지금 돌발 행 [M+0xc] — 발동부터 결과 창을 닫을 때까지(0x8e5b8 · 0x8f628 만 −1 로 되돌린다).
+   * 모드 4 는 사람 장면이 늘 내 타석이라 아이콘은 방망이(공격)다
+   */
+  readonly burstRow?: BurstMissionRow | null
 }
 
 /**
@@ -170,6 +178,7 @@ export function GameScreen({
   sceneStadium = null,
   recordAlert,
   onRecordAlertSceneChange,
+  burstRow = null,
 }: GameScreenProps) {
   const menu = useInGameMenuState()
   // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
@@ -441,6 +450,8 @@ export function GameScreen({
             onPickoff={onPickoff}
           />
         </div>
+        {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (모드 2~4 · 돌발 객체가 있을 때) */}
+        <BurstBand row={burstRow} role={burstBandRoleOf(progress.game.half, progress.game.playerSide)} />
         {/*
           0xe 그리기 0x4d9ec — 0xd 두 그림 뒤 타석 장면 위에 투수·타자 소개 판 0x44944. 팀 글자는 0xb6c20: 내 팀 PLAYER · 상대 COM.
           값은 `gameMatchupCardsOf` (내 레코드 · 상대 마운드).

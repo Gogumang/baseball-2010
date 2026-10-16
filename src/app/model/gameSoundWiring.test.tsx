@@ -205,7 +205,11 @@ describe('경기 소리 배선', () => {
   })
 })
 
-describe('내 타석의 파울 각 공 — 판을 돌고 판이 파울로 닫힐 때 "Foul!" 25 (결과 코드 7 메시지 51c5c)', () => {
+/**
+ * "Foul!" 25 · 잡은 아웃 62 는 결과 코드 7 · 13 메시지(51c5c · 0x51b36)가 **판 안의 그 틱**에 낸다 — 화면(`DefensePlayback` 의
+ * `tickSounds`)이 결과를 넘긴 판은 판 끝에 다시 안 낸다(번호 고르기는 `judgeCall` · `runDefensePlay` 시험).
+ */
+describe('내 타석의 파울 각 공 — 판을 돌고, 콜은 판 안의 그 틱 (결과 코드 7 메시지 51c5c)', () => {
   const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
     patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
   )[0]
@@ -236,7 +240,7 @@ describe('내 타석의 파울 각 공 — 판을 돌고 판이 파울로 닫힐
     return { rendered, played: 녹음.played }
   }
 
-  it('공 판정 자리에서는 타격음만 — 스트라이크는 판이 닫힐 때까지 안 오르고, 파울로 닫히면 +1 · 25 · 다음 공', () => {
+  it('공 판정 자리에서는 타격음만 — 스트라이크는 판이 닫힐 때까지 안 오르고, 파울로 닫히면 +1 · 다음 공(25 는 판 안에서 났다)', () => {
     const { rendered, played } = 띄우기()
     act(() => rendered.result.current.session.handlePitchResolved(파울))
 
@@ -258,14 +262,14 @@ describe('내 타석의 파울 각 공 — 판을 돌고 판이 파울로 닫힐
       }),
     )
 
-    expect(played).toEqual([6, 25])
+    expect(played).toEqual([6])
     expect(rendered.result.current.session.progress?.pendingDefensePlay).toBeNull()
     expect(rendered.result.current.session.progress?.game).toEqual(경기전)
     expect(rendered.result.current.runner.atBat.strikes).toBe(1)
     expect(rendered.result.current.runner.isPaused).toBe(false)
   })
 
-  it('낙구 전에 잡힌 파울 각 공(파울 뜬공 아웃)은 25 없이 잡은 아웃 콜 62 로 타석이 끝난다', () => {
+  it('낙구 전에 잡힌 파울 각 공(파울 뜬공 아웃)은 타석이 끝난다 — 판 끝에 25 · 62 를 다시 안 낸다', () => {
     const { rendered, played } = 띄우기()
     act(() => rendered.result.current.session.handlePitchResolved(파울))
     const pending = rendered.result.current.session.progress!.pendingDefensePlay!
@@ -282,7 +286,8 @@ describe('내 타석의 파울 각 공 — 판을 돌고 판이 파울로 닫힐
       }),
     )
 
-    expect(played.slice(0, 2)).toEqual([6, 62])
+    expect(played[0]).toBe(6)
+    expect(played).not.toContain(62)
     expect(played).not.toContain(25)
     const 뒤 = rendered.result.current.session.progress!.game
     expect(뒤.outs !== 경기전.outs || 뒤.half !== 경기전.half || 뒤.inning !== 경기전.inning).toBe(true)

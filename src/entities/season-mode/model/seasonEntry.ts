@@ -80,7 +80,8 @@ const detailRepertoireOf = (repertoire: Pick<PitcherRepertoire, 'form' | 'magicI
  * 명단 선수 레코드의 상세 창 칸 — 0xe0 그림 0xb074 → 0x5cfec(0x5c984) 끝 0x5cfc8 이 커서 줄 레코드를 0x5b798 에 넘긴다.
  * 붙박이 표 선수는 Xls 행(+0xb · +0x14 · +0x1b · 레퍼토리 `ROSTER_PITCHER_REPERTOIRES`, 같은 차례), 영입 사본은 옮긴 기록 칸.
  * 레코드 +0x18(필살)은 붙박이 표가 0 이고 타자 사본은 `specialNumber` 다.
- * ⚠️ 미확인: 영입 사본의 +0x1b(연봉)는 웹 사본에 없어 비운다(0). 명전 칸에서만 이름을 찾는 표 밖 선수(사본 없음)는 칸을 모른다.
+ * 영입 사본의 +0x1b(연봉)는 나리 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255) 이다(`salaryGrade` — 나리 사본은 영입 때 커리어 연봉,
+ * 명전 칸은 등록 때 연봉으로 센다). 그 칸이 없는 옛 사본 · 옛 명전 기록은 비운다. 명전 칸에서만 이름을 찾는 표 밖 선수(사본 없음)는 칸을 모른다.
  */
 export function seasonDetailSourceOf(
   teamId: number,
@@ -95,13 +96,13 @@ export function seasonDetailSourceOf(
   if (record === undefined) return undefined
   if ('repertoire' in record) {
     return {
-      isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0, grade: null,
-      repertoire: detailRepertoireOf(record.repertoire),
+      isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0,
+      grade: record.salaryGrade ?? null, repertoire: detailRepertoireOf(record.repertoire),
     }
   }
   return {
-    isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0, grade: null,
-    specialNumber: record.specialNumber ?? 0,
+    isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0,
+    grade: record.salaryGrade ?? null, specialNumber: record.specialNumber ?? 0,
   }
 }
 
@@ -157,7 +158,11 @@ export interface SeasonEntryCellSource {
   readonly pitcherLineOf?: (player: SeasonPlayer) => EntryPitcherLine
 }
 
-/** 일반모드(상태 23) — Xls 행 줄 · 스태미나 가득 · 모드 1 · ⚠️ 사기는 팀 레코드 칸을 웹이 안 들어 100 으로 둔다 */
+/**
+ * 일반모드(상태 23) — Xls 행 줄 · 스태미나 가득 · 모드 1 · 사기 100. 모드 1 의 팀 레코드(`0x1f9d2` → `0x1f874` = [g+0xb0]+0x5c8 칸)는
+ * 경기정보 0x30f20 이 `0x1f8c0`(마스터)을 `0x21d30` → `0x1fe5c` 로 통째 복사한 것이고 +2 에 쓰는 곳이 없다(0xa3a44 는 모드 3·4 칸만,
+ * 0x8e3dc 는 모드 2 만 — `teamGameFlow.ourTeamMoraleOf`) → XlsTEAM_DATA 표값 = 전 팀 100
+ */
 export const GENERAL_ENTRY_CELL_SOURCE: SeasonEntryCellSource = {
   staminaMode: 1,
   teamMorale: 100,
@@ -209,7 +214,9 @@ function aceCellsOf(ace: AcePlayer, aceIndex: number, ability: readonly number[]
     profileLow: ace.profile & 3,
     detailSource,
     pitcherLine: entryPitcherLineOfRecord(ace.recordLine),
-    // ⚠️ 미확인: 마투수 레코드 +0x2c 는 웹이 따로 들지 않아 가득으로 둔다
+    // 레코드 +0x2c = 10000 — 0xdd 진입 66da `0xb88c8` 이 저장의 마투수 레코드 `0x1f825(app, 번호)`(앱 데이터 +0xc64 + 번호×0x30,
+    // 0x20094 6번 갈래가 XlsACE_PIT 행을 부은 것 — 다섯 줄 모두 0x2710)를 0xb521c 로 +0x2c 까지 통째 8번 칸에 넣는다(b5296~b529c).
+    // 0x1f824 를 부르는 넷(0x48d50 · 0x5aefc · 0xaae7c · 0xb88c8)은 모두 베껴 가는 쪽이고, 0xe0 에서 돌아온 0xdd 는 다시 안 넣는다
     stamina: { capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false), percent: staminaPercentOf(source.staminaMode, FULL_RECORD_STAMINA) },
   }
 }
@@ -468,6 +475,8 @@ export interface SeasonEntryBatterRecord {
   readonly skillBits?: number
   /** +0x19 · +0x1a 장비 니블 네 칸 — 영입 0xc554 가 옮긴 기록의 니블. 옛 사본엔 없다 */
   readonly equipment?: readonly number[]
+  /** +0x1b — 나리 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255) (`nariRecordSalaryGradeOf`). 옛 사본엔 없다 */
+  readonly salaryGrade?: number
 }
 
 /**
@@ -520,6 +529,8 @@ export interface SeasonEntryPitcherRecord {
   readonly baseAbility?: readonly [number, number, number, number]
   readonly skillBits?: number
   readonly equipment?: readonly number[]
+  /** +0x1b — `SeasonEntryBatterRecord.salaryGrade` 와 같다 */
+  readonly salaryGrade?: number
 }
 
 /** 표 밖 선수의 기록을 찾아 준다 — 없으면 undefined */
@@ -590,6 +601,8 @@ export function seasonEntryOrderOf(roster: SeasonTeamRoster, recordOf?: SeasonEn
               name: record.name,
               ability: seasonRecordAbilityOf(record, player.equipment, false),
               recordId: player.id,
+              // +0x1b(연봉 칸) — 팀 경기 교체 창의 상세 창 0x5b798 이 5c87c~5c884 로 연봉을 찍는다(옛 사본엔 없다)
+              ...(record.salaryGrade === undefined ? {} : { salaryGrade: record.salaryGrade }),
               // 장착 비트(+0x14) — 간이 타석 0xab214 의 스킬 판정이 본다(옛 사본은 없다)
               ...(record.skillBits === undefined ? {} : { skillBits: record.skillBits }),
               // 니블 +0x19 · +0x1a(타석 그림 장비 겹 0x78fd8) · +0xb(폼 · 피부 · 손) — 영입 0xc554 가 통째로 옮긴 0x30 바이트의 칸

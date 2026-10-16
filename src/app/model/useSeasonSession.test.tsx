@@ -1805,6 +1805,32 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
     expect(result.current.gameOptions?.dayCounter).toBe(0)
   })
 
+  it('국가대항전 0xe0 대한민국 투수 체력은 100% — 0xb6190(팀 10) b7c88 · b81e0', () => {
+    const { result } = 띄우기()
+    시작(result, 3)
+    act(() => result.current.actions.confirmIncome({
+      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+    }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.openEntryEdit(true))
+    const pitchers = result.current.entryEdit?.lists.pitchers ?? []
+    expect(pitchers.length).toBeGreaterThan(0)
+    for (const pitcher of pitchers) expect(pitcher.stamina?.percent).toBe(100)
+    // 둘째 날도 — 사람 경기가 깎은 값은 하루 끝 b81e0 에서 다시 찬다
+    act(() => result.current.actions.pressEntryKey('오른'))
+    act(() => result.current.actions.startPendingGame())
+    act(() => result.current.actions.finishGame(요약({ ourTeamId: 10, opponentTeamId: 11 })))
+    act(() => result.current.actions.playCupGame(10, 12))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.openEntryEdit(true))
+    const second = result.current.entryEdit?.lists.pitchers ?? []
+    expect(second.length).toBeGreaterThan(0)
+    for (const pitcher of second) expect(pitcher.stamina?.percent).toBe(100)
+  })
+
   it("'6' 은 CPU 팀 엔트리 — 보기 전용이라 OK 가 안 먹고, 왼쪽 끝(2)으로 돌아온다", () => {
     const { result } = 경기정보까지()
     const before = result.current.roster

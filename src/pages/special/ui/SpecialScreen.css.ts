@@ -97,6 +97,16 @@ export const hofBubbleCell = style({
   cursor: 'pointer',
 })
 
+/** 말풍선 칸 글 — 칸 위 + 2 에서 폭 70 가운데 (0xba269 호출 6599a · 659ac) */
+export const hofBubbleLabel = style({
+  position: 'absolute',
+  left: 0,
+  lineHeight: '11px',
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+  pointerEvents: 'none',
+})
+
 /** 명예의 전당 A 자리 몸 그림 — 그림 x 에 놓은 폭 0 상자(뒤집을 때 축) */
 export const hofFigureAxis = style({
   position: 'absolute',

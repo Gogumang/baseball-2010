@@ -486,10 +486,11 @@ function missionOverlayOf(
     )
   }
 
-  // 타자 미션의 주자 판(도루 · 폭투 · CPU 견제) — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 진루 · 0x584 귀루 →
-  // 0xa9b04)와 OK 슬라이딩 0x585 를 보내므로 실시간으로 한 틱씩 돌린다(`features/defense-play/model/liveRunnerPlay`, 팀 경기와 같은 길)
+  // 미션의 주자 판(도루 · 폭투 · 견제) — 상태 0x17 키 0x53420 이 사람 공격(타자 미션)이면 주루 0x5331c(0x582 진루 · 0x584 귀루 →
+  // 0xa9b04)와 OK 슬라이딩 0x585 를, 사람 수비(투수 미션)면 송구 0x533c8 → 0x588 → +0x160 을 보내므로 실시간으로 한 틱씩 돌린다
+  // (`features/defense-play/model/liveRunnerPlay`, 팀 경기와 같은 길). 판정 콜은 화면이 판 안의 그 틱에 낸다
   if (session.pendingRunnerPlay !== null) {
-    const run = session.missionRun
+    const run = session.pendingRunnerPlay.side === '수비' ? session.pitcherRun : session.missionRun
     return (
       <DefensePlayback
         runnerPlay={session.pendingRunnerPlay}

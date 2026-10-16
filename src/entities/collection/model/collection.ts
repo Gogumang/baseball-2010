@@ -7,7 +7,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
+import { nariRecordSalaryGradeOf, romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
 import { FIRST_HIDDEN_LEVEL, hiddenOpenIdOf, ownsEquipment } from '@/entities/career/model/equipment'
 import { ownsPitcherEquipment, pitcherHiddenOpenIdOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
@@ -57,6 +57,11 @@ interface HallOfFameRecordFields<Ability> {
    * 미션(모드 5 · 6)의 소개 판 0x44944 가 이 칸에 이 경기 줄을 더해 읽는다. 2026-10-15 에 더했다 — 그 전 옛 저장에는 없다
    */
   readonly recordLine?: readonly number[]
+  /**
+   * 기록 +0x1b — 나리 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255) (`nariRecordSalaryGradeOf`). 시즌 영입 선수의 상세 창 연봉이
+   * 이 칸 × 1000 이다. 2026-10-16 에 더했다 — 그 전 옛 저장에는 없다(읽는 쪽은 칸을 비운다)
+   */
+  readonly salaryGrade?: number
 }
 
 /** 명예의 전당 타자 (+0x940 칸) */
@@ -102,7 +107,10 @@ export interface HallOfFamePitcher extends HallOfFameRecordFields<PitcherAbility
 
 export interface Collection {
   readonly titles: readonly string[]
-  readonly skills: readonly number[]
+  /*
+   * 스킬 탭 '얻음' 은 `stats` 의 켠 스킬 비트(+0xf4/+0xf8)로 가른다(0x58a3c, `annalsSkillOfCell`). 예전의 `skills`(타자편 보유
+   * +0x1b8 합집합)는 원본에 없는 칸이라 뺐다(r138) — 옛 저장에 남은 `skills` 는 읽을 때 버린다.
+   */
   readonly endings: readonly number[]
   /**
    * 본 시즌모드 엔딩 e (0~4) — 전역기록 `+0xa0 + e`. 새 해 0x6e0c 가 10년차 엔딩 판정 0xa3084 ≥ 0 이면 1 을 쓴다(P4 1c).
@@ -143,7 +151,7 @@ export function countSeasonRegularWin(collection: Collection): { readonly collec
 }
 
 export const EMPTY_COLLECTION: Collection = {
-  titles: [], skills: [], endings: [], seasonEndings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
+  titles: [], endings: [], seasonEndings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
 }
 
 const union = <T>(left: readonly T[], right: readonly T[]): T[] => [...new Set([...left, ...right])]
@@ -152,7 +160,6 @@ export function mergeCareerIntoCollection(collection: Collection, career: Player
   return {
     ...mergeEndingIntoCollection(collection, career),
     titles: union(collection.titles, career.titleIds),
-    skills: union(collection.skills, career.skillIds),
     openedHiddenIds: union(collection.openedHiddenIds, union(career.openedHiddenIds, batterCollectorHiddenIdsOf(career))),
   }
 }
@@ -311,6 +318,7 @@ export function registerHallOfFame(
     specialSwingNumber: career.specialSwingNumber,
     positionIndex: career.positionIndex,
     recordLine: batterRecordLineOf(career.stats),
+    salaryGrade: nariRecordSalaryGradeOf(career.salary),
   }
   return { kind: '등록', slot: target, collection: { ...collection, hallOfFame: [...collection.hallOfFame, famer] } }
 }
@@ -343,6 +351,7 @@ export function registerHallOfFamePitcher(
     selectedMagicNumber: career.selectedMagicNumber,
     role: career.role,
     recordLine: pitcherRecordLineOf(career.stats),
+    salaryGrade: nariRecordSalaryGradeOf(career.salary),
   }
   return {
     kind: '등록',
@@ -452,7 +461,8 @@ const isOptionalNumber = (value: unknown) => value === undefined || typeof value
 const hasRecordFields = (candidate: Record<string, unknown>, abilityKeys: readonly string[]) =>
   (candidate.equipmentLevels === undefined || hasNumbers(candidate.equipmentLevels, abilityKeys)) &&
   (candidate.equippedSkillIds === undefined || isNumberArray(candidate.equippedSkillIds)) &&
-  (candidate.recordLine === undefined || isNumberArray(candidate.recordLine))
+  (candidate.recordLine === undefined || isNumberArray(candidate.recordLine)) &&
+  isOptionalNumber(candidate.salaryGrade)
 
 function isHallOfFamer(value: unknown): value is HallOfFamer {
   if (typeof value !== 'object' || value === null) return false
@@ -495,7 +505,7 @@ function isHallOfFamePitcher(value: unknown): value is HallOfFamePitcher {
 export function normalizeCollection(raw: unknown): Collection {
   if (typeof raw !== 'object' || raw === null) return EMPTY_COLLECTION
   const candidate = raw as Record<string, unknown>
-  if (!isStringArray(candidate.titles) || !isNumberArray(candidate.skills) || !isNumberArray(candidate.endings)) {
+  if (!isStringArray(candidate.titles) || !isNumberArray(candidate.endings)) {
     return EMPTY_COLLECTION
   }
   // 옛 저장은 칸 번호 없이 앞에서부터 채웠다 — 목록 순서를 칸 번호로 굳혀 둔다
@@ -508,7 +518,6 @@ export function normalizeCollection(raw: unknown): Collection {
   const openedHiddenIds = isNumberArray(candidate.openedHiddenIds) ? candidate.openedHiddenIds : []
   return {
     titles: candidate.titles,
-    skills: candidate.skills,
     endings: candidate.endings,
     seasonEndings: isNumberArray(candidate.seasonEndings) ? candidate.seasonEndings : [],
     hallOfFame,

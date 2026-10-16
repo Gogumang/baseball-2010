@@ -9,7 +9,14 @@ import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
 import type { PitcherGameOptions } from '@/pages/pitching/model/usePitcherGame'
 import { GAME_INTRO_SOUND } from '@/features/play-game/model/gameSounds'
 import { PITCH_RELEASE_SOUND } from '@/features/play-at-bat/model/atBatSounds'
-import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  defensePlayResultOf,
+  isDefensePlayFinished,
+  runDefensePlay,
+  startDefensePlay,
+  stepDefensePlay,
+  type DefensePlayInput,
+} from '@/features/defense-play/model/runDefensePlay'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
@@ -109,10 +116,10 @@ describe('투수편 화면의 소리 배선', () => {
   })
 
   /**
-   * 세이프 17 · 함성 60 은 **수비 결과를 넘겨야** 열리는 갈래다 — 한동안 타자편
-   * (`useCareerSession`)만 넘겨 주어 투수편에서는 둘 다 안 났다.
+   * 세이프 17 · 함성 60 은 원본처럼 판 안의 그 틱에 화면(`DefensePlayback` 의 `tickSounds`)이 낸다 — 화면이 결과를 넘긴 판은
+   * 판 끝에 다시 안 낸다. 판 끝 근사(`inPlayCallSoundIdOf` · `deepHitCheerSoundIdOf`)는 화면이 결과를 못 넘긴 판만이다.
    */
-  it('안타인데 그 루로 송구가 도착했으면 세이프 17 이 난다 (0x51c14)', () => {
+  it('화면이 결과를 넘긴 안타 판은 판 끝에 세이프 17 을 다시 안 낸다 (0x51c14 는 그 틱)', () => {
     // 씨앗 6 은 첫 인플레이 타구가 **안타**다 (기본 씨앗은 그 앞에 감독 강판이 와 더 못 던진다).
     // CPU 타자 타이밍이 원본 0x340f8 로 바뀌며 굴림 수가 늘어 1 → 6 으로 옮겼다.
     // 실투 판정 0x33cbc 가 공마다 rand(0,100) 을 하나 더 굴리게 되어 6 → 2 로 옮겼다.
@@ -148,7 +155,7 @@ describe('투수편 화면의 소리 배선', () => {
     녹음.played.length = 0
 
     act(() => result.current.actions.finishDefensePlay(결과))
-    expect(녹음.played).toContain(17)
+    expect(녹음.played).not.toContain(17)
   })
 
   it('승리 31 · 패배 32 징글은 경기가 끝난 자리가 아니라 결과 판 OK 뒤 정산(0x19 진입 0x4ea0c)에서 난다', () => {
@@ -205,7 +212,18 @@ describe('투수편 화면의 소리 배선', () => {
   })
 })
 
-describe('CPU 타자의 파울 각 공 판 — 판이 끝날 때 콜 (결과 코드 7 메시지 51c5c)', () => {
+/** `runDefensePlay` 와 같은 차례로 한 틱씩 돌리며 판 안의 번호 소리(`tickSounds` 의 `sound`)를 모은다 */
+function 틱소리와함께돌리기(input: DefensePlayInput) {
+  let state = startDefensePlay(input)
+  const tickSoundIds: number[] = []
+  while (!isDefensePlayFinished(state)) {
+    state = stepDefensePlay(state, input.controls?.keyAt(state.tick) ?? null)
+    for (const sound of state.tickSounds) if (sound.kind === 'sound') tickSoundIds.push(sound.soundId)
+  }
+  return { played: defensePlayResultOf(state), tickSoundIds }
+}
+
+describe('CPU 타자의 파울 각 공 판 — 콜은 판 안의 그 틱 (결과 코드 7 메시지 51c5c)', () => {
   it('파울로 닫힌 판은 "Foul!" 25, 낙구 전에 잡힌 판(파울 뜬공 아웃)은 잡은 아웃 콜 62 — 공 판정 자리에서는 25 가 안 난다', () => {
     let 파울 = 0
     let 뜬공 = 0
@@ -220,17 +238,21 @@ describe('CPU 타자의 파울 각 공 판 — 판이 끝날 때 콜 (결과 코
           const pending = 진행.pendingDefensePlay
           // 파울 각 공 판은 타석이 아직 안 끝났다(타석 칸에 결과가 없다)
           const 파울판 = 진행.atBat.outcome === null
-          const played = runDefensePlay(pending)
+          // 화면처럼 한 틱씩 돌려 판 안의 소리(`tickSounds`)를 모은다 — 콜은 결과 코드가 선 그 틱에 난다
+          const { played, tickSoundIds } = 틱소리와함께돌리기(pending)
           녹음.played.length = 0
           act(() => result.current.actions.finishDefensePlay(played))
+          // 화면이 결과를 넘긴 판 — 판 끝에는 콜이 다시 안 난다
+          expect(녹음.played).not.toContain(25)
+          expect(녹음.played).not.toContain(62)
           if (파울판 && played.foulEnded === true) {
             파울 += 1
-            expect(녹음.played[0]).toBe(25)
+            expect(tickSoundIds).toContain(25)
           } else if (파울판) {
             뜬공 += 1
             expect(played.caughtOnTheFly).toBe(true)
-            expect(녹음.played).toContain(62)
-            expect(녹음.played).not.toContain(25)
+            expect(tickSoundIds).toContain(62)
+            expect(tickSoundIds).not.toContain(25)
           }
           continue
         }

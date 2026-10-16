@@ -38,6 +38,15 @@ export function ballPixelAt(pitch: Pitch, frame: number): { x: number; y: number
 }
 
 /** 공이 도착할 화면 좌표 — 이글아이 표시용 */
+/**
+ * 이글아이 자리 — 0x4d2ac 는 [경기+0x10b8](0x10 목표점, 오차 전)을 투영한다(4d2dc~4d2ea). 놓은 공은 그 점(`aimTarget`)을,
+ * 놓기 전 와인드업 자리 공은 존 자리 목표(`platePixelOf` 의 plate 갈래)를 쓴다. 목표점이 없는 공(사용자 투구 · 시험 공)은 도착점
+ */
+export function eagleEyePixelOf(pitch: Pitch): { x: number; y: number } {
+  if (pitch.aimTarget !== undefined && pitch.worldPath !== null) return projectToScreen(pitch.aimTarget, pitch.stageSide)
+  return platePixelOf(pitch)
+}
+
 export function platePixelOf(pitch: Pitch): { x: number; y: number } {
   const path = pitch.worldPath
   if (path !== null && path.length > 0) return projectToScreen(path[path.length - 1], pitch.stageSide)
