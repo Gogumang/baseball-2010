@@ -1980,7 +1980,8 @@ export function stepDefensePlay(
     // ```
     // 곧 **야수 틱이 플레이 틱보다 먼저** 돈다 — 포구 틱에 쥐기(0xb2710)가 넣은 준비 틱 R 은 다음 틱부터 줄어
     // 포구 R 틱 뒤에 0 이 된다. 쥔 동안만 줄고, +0xc8 을 넣는 곳은 쥐기(vt88, b27aa·b27be)뿐이다.
-    // a12b4: 동작 잠금 +0xb4 > 0 이면 −1 만 하고(0 이 되면 vt10) 그 틱은 준비 틱 · 이동이 없다 — `lockedThisTick` 이 이동도 막는다
+    // a12b4: 동작 잠금 +0xb4 > 0 이면 −1 만 하고(0 이 되면 a12c8 +0xbd = 1 · vt10) a12c6/a12d6 에서 끝 — 그 틱은 +0xb8 · +0xc0 ·
+    // +0xc8 · +0xcc 줄이기도 이동(a1376 0xbf094)도 없다. 이동을 막는 쪽은 6 절이 그때의 +0xb4 로 본다(그 걸음은 다음 야수 틱 몫)
     const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
     // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱(야수 · 주자)이 없다
     if (!pausedAtHead) {
@@ -2989,7 +2990,11 @@ export function stepDefensePlay(
     const chaseTarget =
       landingChase && ballLandingTick >= tick ? { x: landingPoint.x, y: 0, z: landingPoint.z } : catchPoint
     fielders = fielders.map((fielder, slot) =>
-      lockedThisTick[slot] === true || thrownThisTick.includes(slot)
+      // 이 걸음은 원본의 **다음** 야수 틱 0xa1284 몫이다(0x3f060 목록 틱이 슬롯 2 플레이 틱보다 먼저 — 9 · 10 절).
+      // 그 틱은 a12b4 에서 +0xb4 > 0 이면 −1 만 하고 a12c6/a12d6 에서 끝나 a1376 이동(0xbf094)까지 못 간다 — 곧 막는 값은
+      // **지금(이 틱 플레이 갈래 뒤)의 +0xb4** 다. 머리 0' 절의 `lockedThisTick` 은 원본 이 틱 몫이라 한 틱 이르다(r155):
+      // 포구 틱 b4588 vt74 가 +0xb4 = 15 를 세운 그 틱의 걸음부터 15번을 막고, 잠금이 0 이 된 틱(머리 1 → 0)의 걸음은 걷는다
+      fielder.actionLockTicks > 0 || thrownThisTick.includes(slot)
         ? fielder
         : moveFielder(fielder, { chaserSlot, catchPoint: chaseTarget, tick, catchTick }),
     )

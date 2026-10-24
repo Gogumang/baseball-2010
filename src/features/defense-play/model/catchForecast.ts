@@ -254,7 +254,7 @@ interface ForecastClone {
   lockTicks: number
   slackTicks: number
   throwMotionTicks: number
-  /** a143e 의 vt10(0xa124c → 0xbf2b0) 이 목표를 제 위치로 둔 복제 — 던진 야수가 잠금을 푼 뒤 */
+  /** vt10(0xa124c → 0xbf2b0) 이 목표를 제 위치로 둔 복제 — 던진 야수가 +0xb1 을 푼 뒤(a143e) · 동작 잠금 +0xb4 가 0 이 된 뒤(a12c8) */
   anchored: boolean
 }
 
@@ -266,6 +266,8 @@ interface ForecastClone {
 function tickClone(clone: ForecastClone, target: WorldPoint | null, speed: number): void {
   if (clone.lockTicks > 0) {
     clone.lockTicks -= 1
+    // a12c8~a12d2 — 잠금이 막 0 이 된 틱은 vt10(0xa124c → 0xbf2b0 목표 = 위치)을 부르고 끝(a12d6). 그 뒤 물려받은 목표로 걷지 않는다
+    if (clone.lockTicks <= 0) clone.anchored = true
     return
   }
   if (clone.slackTicks > 0) clone.slackTicks = Math.max(0, clone.slackTicks - 1)
