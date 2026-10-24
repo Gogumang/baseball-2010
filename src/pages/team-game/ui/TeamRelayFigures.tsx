@@ -103,7 +103,8 @@ function PaintedImage({
  *
  * **마선수 주자**(주자 +0x9c ≠ −1): 0x79d10 은 참이면 그림판 +0x1c(팔레트 없음)를 쓴다. 그 칸은 장면에 한 장뿐이라(적재 0x47cc8 의
  * 483a0~48400 · 갱신 0x48480 485a0~485a6 의 sim+0xa4) 마선수 주자는 **그때 실린 마선수 그림**으로 선다 — 제 그림이 아닐 수 있다
- * (원본 그대로, `TeamRelayFigures.loadedRunnerAce`). 실린 그림이 없으면 ⚠️ 미확인(원본은 빈 칸 +0x1c 를 읽는다) — 보통 그림으로 둔다.
+ * (원본 그대로, `TeamRelayFigures.loadedRunnerAce`). 실린 그림이 없으면 ⚠️ 미확인(원본은 빈 칸 +0x1c = 0 을 79d68 `ldr r3, [r5, #0xc]` 로 읽는
+ * 널 포인터 읽기라 기기 메모리에 달린다, r180) — 보통 그림으로 둔다.
  */
 export function TeamRelayFigures({ figures }: { readonly figures: TeamRelayFiguresValue }) {
   const center = RELAY_FIGURES_CENTER

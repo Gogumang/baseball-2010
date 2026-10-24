@@ -1,11 +1,14 @@
 import type { BattedBallTrajectory, CatchTable, CatchOpportunity, ChaseChoice } from '@/entities/fielding/model/catchPrediction'
 import {
+  approachedDistanceOf,
   CATCH_KIND,
   catchKindsAt,
   chooseChaser,
+  DIVE_DISTANCE,
   EMPTY_CATCH_TABLE,
+  HEIGHT_WINDOW,
 } from '@/entities/fielding/model/catchPrediction'
-import { horizontalDistance, stepToward, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import { horizontalDistance, isOutfieldSlot, stepToward, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import { POSE, isFreezeOpen, shouldClearPose, withThrowMotion } from '@/entities/fielding/model/fielderPose'
 
@@ -63,7 +66,26 @@ export interface CatchForecast {
    * 그림 0x438c4 의 "!"(애니 13)만 본다. `secondPass` 를 안 준 예보(a = 1)는 늘 거짓
    */
   readonly secondPassStarted: boolean
+  /**
+   * **다이빙 후보 틱 +0x178[칸]** (b15e4~b1642, 직접 뜬 것 — r180): 예보 머리 b130c~b1334 가 아홉 칸을 1000(+0x19c 거리는 9999)으로
+   * 채우고, 판정 갈래(잠금 · vtc8 관문 뒤 b14d0)에서 `공 첫 점 0xa25b0(공, 0) == 0xd8758 (20000, 1000, 30000)`(0xbc0f4 — 세 칸 같음) &&
+   * h ≤ 500 && 1000 < d ≤ 2000 && d < +0x19c[칸] 이면 +0x178[칸] = t · +0x19c[칸] = d (d 는 포구 판정과 같은 값 — 정지면 220 × n 을 뺀 것).
+   * 판정보다 앞이라 +0x1e8(지정 야수) 모드에 안 닫힌다. 웹 틱 구간(`window`)과도 상관없다. 없으면 1000 — `DIVE_TICK_NONE`
+   */
+  readonly diveTicks: readonly number[]
+  /**
+   * **고르기 0xb3b38 의 백업 갈래 b3ebe~b3f62** (직접 뜬 것, r180): 담장 갈래(`fenceChasePoint`)가 아니고 고른 야수가 외야(칸 6~8 —
+   * 0xb8da8 `+0x88 − 6 ≤ 2`)면, 칸 5~8 중 외야이고 고른 야수가 아닌 야수 가운데 위치(+0x20)와 낮은 공 점 Q(sp+0x74 — `nearestSlotTo`
+   * 의 점) 거리(0xbfa2c)가 가장 짧은(처음 최소 400000, `<`) 야수 하나를 AI 0xc(백업)로. 없으면 −1. 목표는 안 바꾼다 —
+   * AI 고리 b4b78 이 매 틱 정한다(`backupPointOf`)
+   */
+  readonly backupSlot: number
 }
+
+/** +0x178[칸] 의 빈 값 (b1314 `#0xfa << 2`) — AI 고리 b46fa 가 1000 이면 다이빙 검사를 건너뛴다 */
+export const DIVE_TICK_NONE = 1000
+/** +0x19c[칸] 의 첫 값 (b1330 0x270f) */
+const DIVE_DISTANCE_START = 9999
 
 /** 아무도 못 잡을 때 원본이 쓰는 큰 값 (플레이 +0x11c 초기값) */
 const NO_CATCH_TICK = 0xffff
@@ -155,6 +177,8 @@ export function forecastCatch(
   let movable = options.secondPass === undefined ? true : options.secondPass.movable
   let firstPass = options.secondPass !== undefined
   let remainingTicks = EXTRA_TICKS_AFTER_FIRST
+  const diveTicks = fielders.map(() => DIVE_TICK_NONE)
+  const diveDistances = fielders.map(() => DIVE_DISTANCE_START)
   for (let tick = FIRST_FORECAST_TICK; tick <= last; tick += 1) {
     const ball = trajectory.pointAt(tick)
     const recording = tick >= window.from
@@ -178,6 +202,28 @@ export function forecastCatch(
       }
       // b14d0 — 정지면 vt10(0xa124c → 0xbf2b0 목표 = 위치): 판정 뒤 복제 틱은 제자리다
       if (standing) clone.target = clone.position
+      // b15d8~b1642 — 다이빙 후보: 공 첫 점이 표준 배팅 지점 · h ≤ 500 · 1000 < d ≤ 2000 · 지금까지 가장 가까운 d
+      {
+        const distance = approachedDistanceOf({
+          slot: fielder.slot,
+          fielder: clone.position,
+          runTicks: standing ? clone.runTicks : 0,
+          speed: fielder.speed,
+          ball,
+          tick,
+          landingTick: trajectory.landingTick,
+        })
+        if (
+          trajectory.startedAtPlate &&
+          ball.y <= HEIGHT_WINDOW.grounder &&
+          distance > DIVE_DISTANCE.minimum &&
+          distance <= DIVE_DISTANCE.maximum &&
+          diveDistances[index]! > distance
+        ) {
+          diveTicks[index] = tick
+          diveDistances[index] = distance
+        }
+      }
       if (recording) {
         const kinds = catchKindsAt({
           slot: fielder.slot,
@@ -221,6 +267,7 @@ export function forecastCatch(
   const lowPoint = trajectory.pointAt(table.low?.tick ?? NO_LOW_TICK)
   const nearestSlot = nearestSlotTo(fielders, lowPoint)
   const choice = chooseChaser(table, trajectory.landingTick, nearestSlot)
+  const fenceChasePoint = fenceChasePointOf(trajectory, table)
   const ticks = [table.low, table.chest, table.grounder, table.jump, table.slide]
     .filter((entry): entry is CatchOpportunity => entry !== null)
     .map((entry) => entry.tick)
@@ -230,8 +277,10 @@ export function forecastCatch(
     choice,
     earliestCatchTick: ticks.length === 0 ? NO_CATCH_TICK : Math.min(...ticks),
     point: trajectory.pointAt(choice.catchTick),
-    fenceChasePoint: fenceChasePointOf(trajectory, table),
+    fenceChasePoint,
     secondPassStarted: options.secondPass !== undefined && !firstPass,
+    diveTicks,
+    backupSlot: fenceChasePoint === null ? backupSlotOf(fielders, choice.slot, lowPoint) : -1,
   }
 }
 
@@ -255,6 +304,27 @@ function fenceChasePointOf(trajectory: BattedBallTrajectory, table: CatchTable):
   if (fenceTick >= earliest) return null
   const point = trajectory.pointAt(fenceTick - 2)
   return { x: point.x, y: 0, z: point.z }
+}
+
+/** b3ece — 백업 거리의 처음 최소 0x61a80 */
+const BACKUP_DISTANCE_START = 400_000
+
+/** b3ebe~b3f62 — 백업 야수 (`CatchForecast.backupSlot`) */
+function backupSlotOf(fielders: readonly FielderState[], chaserSlot: number, lowPoint: WorldPoint): number {
+  if (!isOutfieldSlot(chaserSlot)) return -1
+  let best = -1
+  let bestDistance = BACKUP_DISTANCE_START
+  // b3ed2 칸 5 부터 8 까지 — 0xb8da8 이 외야(6~8)만 남긴다
+  for (let slot = 5; slot <= 8; slot += 1) {
+    const fielder = fielders[slot]
+    if (fielder === undefined || !isOutfieldSlot(fielder.slot) || fielder.slot === chaserSlot) continue
+    const distance = horizontalDistance(fielder.position, lowPoint)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      best = fielder.slot
+    }
+  }
+  return best
 }
 
 /** 0xb3b60 — 표가 비었을 때의 틱 100000 */

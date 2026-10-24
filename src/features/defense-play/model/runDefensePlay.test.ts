@@ -50,6 +50,8 @@ const 주자1루: BaseState = { first: true, second: false, third: false }
 const 주자3루: BaseState = { first: false, second: false, third: true }
 const 만루: BaseState = { first: true, second: true, third: true }
 
+const isSamePointXZ = (a: { x: number; z: number }, b: { x: number; z: number }) => a.x === b.x && a.z === b.z
+
 /** 외야 깊숙한 뜬공 — 송구가 늦어 태그업이 걸린다. 원본 코드 0 [92, 895, 1017] (중견수가 낙구 24 전 23틱에 잡는다) */
 const 깊은뜬공: BattedBallPattern = [92, 895, 1017, 0]
 /** 내야 뒤에 겨우 뜬 공 — 송구가 빨라 태그업이 안 걸린다 */
@@ -721,8 +723,10 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     expect(필살.caughtOnTheFly).toBe(false)
     expect(필살.log).toContain('23틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
     // 지금 점 속도 → 60% · v0 min(30%, 100) · 각 그대로(난수 없음).
-    // 맞은 중견수는 b4588 vt74 → 0xa1e60 으로 +0xb4 = 15 — 새 예보의 복제가 그 잠금을 물려받아 t = 5(건너뛴 4틱 뒤) ~ 19 는 판정이 없다
-    expect(필살.log).toContain('23틱 공 튕김 (0xb3148) — 속도 537 · v0 100 · 각 -92 · 8번 야수가 61틱에 줍는다')
+    // 맞은 중견수는 b4588 vt74 → 0xa1e60 으로 +0xb4 = 15 — 새 예보의 복제가 그 잠금을 물려받아 t = 5(건너뛴 4틱 뒤) ~ 19 는 판정이 없다.
+    // 좌익수(7)는 첫 고르기의 백업 갈래(b3f5c — 외야 추적야수 곁의 가장 가까운 외야수 AI 0xc)로 중견수 목표 2000 뒤(b4b78)까지 와
+    // 있어 다시 쏜 공을 줍는다(r180 — 백업이 없던 예전 웹은 중견수가 61틱에 주웠다)
+    expect(필살.log).toContain('23틱 공 튕김 (0xb3148) — 속도 537 · v0 100 · 각 -92 · 7번 야수가 60틱에 줍는다')
   })
 
   it('다시 쏜 공은 보통 공이다 — 속성 목록 +0x5c 를 0xa2610 이 비워 새 예보의 야수가 그대로 쥔다', () => {
@@ -749,7 +753,9 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     }
     expect(중견수(23)).not.toBeNull()
     for (let tick = 24; tick <= 38; tick += 1) expect(중견수(tick)).toEqual(중견수(23))
-    expect(중견수(39)).not.toEqual(중견수(38))
+    // 잠금이 풀린 뒤에도 그 자리다(r180): 다시 쏜 공의 고르기가 좌익수를 고르고 중견수를 백업(AI 0xc)으로 둔다. 풀리는 a12c8 의 vt10 이
+    // 목표 = 위치로 두고, b4b78 은 좌익수 목표와의 차가 `dx > 2000 || dz > 2000`(음수 쪽은 안 봄 — 원본 그대로)일 때만 vt14 라 안 움직인다
+    for (let tick = 39; tick <= 45; tick += 1) expect(중견수(tick)).toEqual(중견수(23))
   })
 
   it('맞은 틱에만 효과음 53 칸이 선다 — 틱 끝 b4588 → 0xa1e60 a1e82 즉시 재생', () => {
@@ -1673,12 +1679,18 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       defenseIsCpu: true,
     })
     while (state.tick <= 41) stepDefensePlay(state)
-    const 던진뒤 = state.fielders[7]
-    expect(던진뒤.aiState).toBe(AI_STATE.IDLE)
-    expect(던진뒤.target).toEqual(FIELDER_START_POSITIONS[7])
+    // b2e14 는 AI 칸(+0x84)만 0 으로 — 목표는 그대로다(r180). 다음 목록 틱이 던진 뒤 워드(+0xb1)를 지우며 vt10 으로 목표 = 위치,
+    // 그다음 AI 고리 b476a 가 vtcc 면 시작 자리로 고친다
+    expect(state.fielders[7].aiState).toBe(AI_STATE.IDLE)
+    let 고친틱 = -1
+    for (let step = 0; step < 4 && 고친틱 < 0; step += 1) {
+      stepDefensePlay(state)
+      if (isSamePointXZ(state.fielders[7].target, FIELDER_START_POSITIONS[7])) 고친틱 = state.tick
+    }
+    expect(고친틱).toBeGreaterThan(0)
     const 거리 = (point: { x: number; z: number }) =>
       Math.hypot(point.x - FIELDER_START_POSITIONS[7].x, point.z - FIELDER_START_POSITIONS[7].z)
-    const 전 = 거리(던진뒤.position)
+    const 전 = 거리(state.fielders[7].position)
     stepDefensePlay(state)
     expect(거리(state.fielders[7].position)).toBeLessThan(전)
   })

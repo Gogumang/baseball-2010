@@ -235,8 +235,13 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
 
   // ── b2884 vt30 = 0xb1c90 — 판 시작 커버 · 키스톤 자리 (`coverTick.runCoverTick`, 그 뒤로는 진행기가 vt4c 끝에서 매 틱) ──
   // 고르기 vt34(b2878)가 쫓는 야수를 AI 1 로 둔다(b3e54 — 목표는 안 바꾼다). 공 첫 점 · 각은 메시지 0x11 이 쏜 폭투 공이다
+  // b3f5c — 외야 추적야수면 가장 가까운 외야수 AI 0xc(백업, `CatchForecast.backupSlot`, r180)
   const chased = startFielders.map((fielder) =>
-    fielder.slot === chaserSlot ? { ...fielder, aiState: AI_STATE.CHASE } : fielder,
+    fielder.slot === chaserSlot
+      ? { ...fielder, aiState: AI_STATE.CHASE }
+      : fielder.slot === forecast.backupSlot
+        ? { ...fielder, aiState: AI_STATE.BACKUP }
+        : fielder,
   )
   const startPlay: PlayView = {
     ...initialPlayView(PASSED_BALL_PLAY_KIND),
@@ -265,7 +270,7 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     abilities,
     outs: input.outs,
     ballOnGround: false,
-    chase: { trajectory, slot: chaserSlot, catchTick },
+    chase: { trajectory, slot: chaserSlot, catchTick, diveTicks: forecast.diveTicks, forecastCatchTick: forecast.choice.catchTick },
     random: input.random,
     defenseIsCpu: input.defenseIsCpu,
     throwMode: input.throwMode,

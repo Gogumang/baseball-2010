@@ -298,8 +298,9 @@ function choiceOf(kind: CatchKind, slot: number, catchTick: number): ChaseChoice
 }
 
 /**
- * 외야 백업 (AI 상태 0xc, 0xb4b78): 추적야수 목표 T 와 내 위치 P 의 차이가 x 또는 z 로 2000 을 넘으면
- * `T − 부호(차)×2000` 지점으로 간다.
+ * 외야 백업 (AI 상태 0xc, 0xb4b78 — 직접 뜬 것): T = 공 가진 야수(+0x130, 0xb0c90)의 목표점 +0x2c, P = 내 위치 +0x20.
+ * dx = T.x − P.x · dz = T.z − P.z 가 `dx > 2000 || dz > 2000` 이면 (T.x − 부호(dx)×2000, **0**, T.z − 부호(dz)×2000) 로 vt14
+ * (b4bf8 이 점을 0 으로 비우고 x · z 만 채운다). 아니면 아무것도 안 한다(b4c60).
  *
  * **원본 버그 그대로**: 조건을 `dx > 2000 || dz > 2000` 로만 보아 음수 쪽 큰 차이는 무시한다 (0xb4bae).
  */
@@ -309,7 +310,7 @@ export function backupPointOf(chaserTarget: WorldPoint, position: WorldPoint): W
   if (!(dx > 2000 || dz > 2000)) return null
   return {
     x: chaserTarget.x - Math.sign(dx) * 2000,
-    y: chaserTarget.y,
+    y: 0,
     z: chaserTarget.z - Math.sign(dz) * 2000,
   }
 }

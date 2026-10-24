@@ -35,6 +35,12 @@ export interface LooseBallChase {
    * +0xc0 = 4 를 적는다(그림 "!" 만 본다, `catchForecast.secondPassStarted`). 다른 예보는 늘 거짓
    */
   readonly secondPassStarted?: boolean
+  /** 예보가 적은 다이빙 후보 틱 +0x178[칸](공 틱 — `catchForecast.diveTicks`). 없으면 모두 1000 으로 본다 */
+  readonly diveTicks?: readonly number[]
+  /** 고르기 0xb3b38 이 적은 +0x174(공 틱, 판 끝으로 자르기 전) — 다이빙 검사 b4704 가 `ldrsh` 로 읽는다 */
+  readonly forecastCatchTick?: number
+  /** 고르기의 백업 갈래 b3f5c 가 AI 0xc 로 둔 외야수(`CatchForecast.backupSlot`). 없으면 −1 */
+  readonly backupSlot?: number
 }
 
 /** 예보 칸 — 필살수비 창 · +0x127 은 타구 판(메시지 0x11 · 0x51408)만 세운다. 이 판들에선 늘 꺼져 있다 */
@@ -64,6 +70,9 @@ export function chaseLooseBall(
     body: ball.flight.body,
     startTick: atTick,
     secondPassStarted: forecast.secondPassStarted,
+    diveTicks: forecast.diveTicks,
+    forecastCatchTick: forecast.choice.catchTick,
+    backupSlot: forecast.backupSlot,
   }
 }
 
@@ -72,6 +81,7 @@ export function initialLooseBallChase(
   trajectory: BattedBallTrajectory,
   slot: number,
   catchTick: number,
+  dive?: Pick<LooseBallChase, 'diveTicks' | 'forecastCatchTick'>,
 ): LooseBallChase {
   const at = trajectory.pointAt(catchTick)
   return {
@@ -82,6 +92,8 @@ export function initialLooseBallChase(
     body: isBallTrajectory(trajectory) ? trajectory.flight.body : undefined,
     // 판 시작 vt18 b284a → vt24(1) 0xb12d0 이 공+0x68 = 0
     startTick: 0,
+    diveTicks: dive?.diveTicks,
+    forecastCatchTick: dive?.forecastCatchTick,
   }
 }
 

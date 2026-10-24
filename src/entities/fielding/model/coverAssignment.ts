@@ -2,7 +2,6 @@ import { isFreeToRetarget } from '@/entities/fielding/model/fielderPose'
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
-  FIELDER_START_POSITIONS,
   horizontalDistance,
   isSamePoint,
   ticksToReach,
@@ -317,7 +316,7 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
   return { ran: true, covers, secondBaseHelper: helper, secondBaseCover: cover, idleSlots, coverStates, fielders: working }
 }
 
-/** `assignCoversForTick` 의 답을 야수에게 — AI 0(시작 자리로) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */
+/** `assignCoversForTick` 의 답을 야수에게 — AI 0(b1d38 · b2540 0xb8dbc — AI 칸만, 목표는 다음 AI 0 b476a 가 고친다) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */
 export function applyCoverAssignment(
   fielders: readonly FielderState[],
   assigned: CoverAssignment,
@@ -325,7 +324,7 @@ export function applyCoverAssignment(
   return fielders.map((fielder) => {
     let next = fielder
     if (assigned.idleSlots.includes(fielder.slot)) {
-      next = { ...next, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot] ?? next.target, targetBase: NONE }
+      next = { ...next, aiState: AI_STATE.IDLE }
     }
     const cover = assigned.coverStates.find((entry) => entry.slot === fielder.slot)
     if (cover !== undefined) {
