@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { playerDetailOf } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitcherGameOptionsOf } from '@/pages/pitcher-league/model/pitcherGameOptions'
@@ -25,5 +26,18 @@ describe('투수편 143 — 체력 줄 용량 0x66e44 의 팀 레코드 +2 (r128
     const view = pitcherNariEntryViewOf({ ...base, teamRecordMorales: { [base.teamId]: 90 } }, options, true)
     const slot = view.lists.pitchers.findIndex((row) => row.name !== '보기' && row.stamina !== undefined)
     expect(capacityOf(view, slot)).toBe(staminaCapacityOf(staminaOf(view, slot), 40, false))
+  })
+})
+
+describe("투수편 143 '0' 상세 창 — 내 투수 줄 (0x5b798 투수 갈래 · 육성 연봉 5c848~5c872)", () => {
+  it('타입 · 손 · 구질 · 마구 · 연봉(저장 +0x1c8 × 100)을 커리어에서 채운다', () => {
+    const base = { ...createPitcherCareer('보기'), salary: 50 }
+    const view = pitcherNariEntryViewOf(base, pitcherGameOptionsOf(base), true)
+    const row = view.lists.pitchers.find((candidate) => candidate.name === '보기')
+    expect(row?.detailSource).toBeDefined()
+    const detail = playerDetailOf(row!.detailSource!)
+    expect(detail.kind).toBe('투수')
+    expect(detail.values.at(-1)?.text).toBe('5000')
+    expect(detail.values[2].text).not.toBe('')
   })
 })

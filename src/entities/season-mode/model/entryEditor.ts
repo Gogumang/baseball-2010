@@ -124,6 +124,11 @@ export interface PlayerDetailSource {
   readonly repertoire?: { readonly form: number; readonly magicNumber: number; readonly pitchMask: number }
   /** +0x1b 등급 — 연봉 = ×1000. 모르면 null */
   readonly grade: number | null
+  /**
+   * 육성 선수(+0xa 비트 7, 0xb6388)의 연봉 칸 — 모드 3 · 4 면 +0x1b 대신 저장 0x1f8d5(모드) **+0x1c8 u16 × 100** 을 찍는다
+   * (0x5b798 5c848~5c886). 나리 143 · 124 의 내 선수 줄만 든다(커리어 `salary` = S+0x1c8)
+   */
+  readonly nurturedSalary?: number
 }
 
 export const EMPTY_ENTRY_BATTER_LINE: EntryBatterLine = {
