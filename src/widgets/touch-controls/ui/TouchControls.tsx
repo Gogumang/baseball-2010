@@ -9,7 +9,7 @@ export type TouchControlsLayout = 'below' | 'sides'
 
 /** 가로 배치에서 상황 버튼을 세로 한 줄로 쌓는 최대 개수 — 넘으면 두 줄 격자(`optionGrid`) */
 export const SIDES_COLUMN_MAX = 3
-/** 세로 배치에서 상황 버튼 글자를 줄이기 시작하는 개수 (`denseOption`) */
+/** 세로 배치에서 상황 버튼을 네 칸 격자로 쌓고 글자를 줄이기 시작하는 개수 (`optionGridFour` · `denseOption`) */
 export const BELOW_DENSE_FROM = 5
 
 /**
@@ -18,7 +18,8 @@ export const BELOW_DENSE_FROM = 5
  * - **확인** — 원본 OK(Enter). 늘 있다.
  * - **뒤로** — 원본 CLR(Escape). 늘 있다(작게) — 대사 "CLR:SKIP" · 순위 판처럼 화면 안에 되돌아갈 누름 칸이 없는 곳이 있다.
  * - **상황 버튼** — 그 순간 화면이 받는 특수 키만(`touchKeyOffer`): 필살타 · 마구 '0', 번트 '8'(누르고 있는 동안), 도루 '3'/'2'/'1',
- *   견제 '3'/'1'/'7', 교체 '#', 메뉴 '*' 따위. 가로 배치에서 넷 이상이면 두 줄 격자로 쌓는다(왼쪽 칸 높이 넘침).
+ *   견제 '3'/'1'/'7', 교체 '#', 메뉴 '*' 따위. 가로 배치에서 넷 이상이면 두 칸 격자, 세로 배치에서 다섯 이상이면 네 칸 격자로
+ *   쌓는다(왼쪽 칸 높이 넘침 · 버튼이 손가락보다 좁아짐). 수비 인플레이 송구 · 주루, 목록 ▲ · ▼, 쪽 ◀ · ▶ 도 여기 뜬다.
  * 숫자 · 방향은 화면 안 터치(투명 누름 칸 · 타석 캔버스)로 한다.
  *
  * 누르면(pointerdown) keydown, 떼면(pointerup · pointercancel) keyup 을 **키보드와 같은 이름으로** 쏜다(`keyDispatch`) — 화면은
@@ -83,9 +84,8 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
     </button>
   )
 
-  const optionClass = layout === 'below' && offers.length >= BELOW_DENSE_FROM
-    ? `${styles.optionButton} ${styles.denseOption}`
-    : styles.optionButton
+  const isDense = offers.length >= BELOW_DENSE_FROM
+  const optionClass = isDense ? `${styles.optionButton} ${styles.denseOption}` : styles.optionButton
   const optionButtons = offers.map((offer) =>
     keyButton(touchKeyOf(offer.key), offer.label, offer.label, optionClass))
   const sidesOptionClass = optionButtons.length > SIDES_COLUMN_MAX
@@ -108,7 +108,12 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
   }
   return (
     <div className={styles.panel} style={{ gridArea: 'pad' }} role="group" aria-label="터치 조작">
-      {optionButtons.length > 0 && <div className={styles.optionRow}>{optionButtons}</div>}
+      {optionButtons.length > 0 && (
+        <div className={isDense ? `${styles.optionGrid} ${styles.optionGridFour}` : styles.optionRow}
+          data-option-layout={isDense ? 'grid' : 'row'}>
+          {optionButtons}
+        </div>
+      )}
       <div className={styles.mainRow}>
         {back}
         {keyButton(OK_KEY, '확인', '확인', styles.okButton)}

@@ -134,7 +134,12 @@ export const optionGrid = style({
   gap: GAP,
 })
 
-/** 세로 배치에서 상황 버튼이 많을 때 — 한 줄은 지키되 글자를 줄여 "1루 견제" 같은 이름이 잘리지 않게 */
+/** 세로 배치에서 상황 버튼이 많을 때(수비 송구 넷 · 주루 일곱 따위) — 한 줄이면 버튼이 손가락보다 좁아져 네 칸 격자로 쌓는다 */
+export const optionGridFour = style({
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+})
+
+/** 많은 상황 버튼의 글자 — "1루주자 진루" 같은 이름이 좁은 칸에서 덜 잘리게 */
 export const denseOption = style({
   fontSize: '13px',
   padding: '0 2px',

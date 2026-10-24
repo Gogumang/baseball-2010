@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { SEASON_CARD_INFO_LABELS } from '@/pages/season/lib/seasonPlayerDetail'
 import type { SeasonCardAbility, SeasonCardInfo } from '@/pages/season/lib/seasonPlayerDetail'
@@ -9,7 +11,7 @@ import { INFO_BOARD, INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP } fr
 import * as infoStyles from '@/pages/management/ui/ManagementScreen.css'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import type { DetailView } from '@/pages/management/lib/detailPopup'
-import { abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
+import { ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { SeasonPlayerCard } from '@/pages/season/ui/SeasonPlayerCard'
 import { seasonCardLookOf } from '@/pages/season/lib/seasonPlayerCard'
@@ -97,6 +99,9 @@ export function SeasonPlayerCardScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  // 터치 기기 — 0xda 글이 4줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 0x8a044). 원본 그림에는 막대뿐이다
+  useTouchScrollKeys(isDetailOpen && detail.messages.length > ABILITY_DETAIL_VISIBLE_LINES)
+
   return (
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xd9 · 0xda 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
@@ -127,7 +132,9 @@ export function SeasonPlayerCardScreen({
         )}
       </SeasonPlayerCard>
 
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isDetailOpen ? onCloseDetail : onBack} footer={7} slides={false} />
+      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isDetailOpen ? onCloseDetail : onBack} footer={7} slides={false}
+        // 웹 덧붙임 — 바닥띠 "0상세정보" 글자 자리(가운데) 위 투명 칸 = 원본 '0' (0x48a0 → 0xda)
+        footerPresses={{ [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: isDetailOpen ? onCloseDetail : onOpenDetail } }} />
 
       {isDetailOpen && (
         <DetailWindow rows={detail.rows} messages={detail.messages} scrollOffset={scrollOffset} onClose={onCloseDetail} />

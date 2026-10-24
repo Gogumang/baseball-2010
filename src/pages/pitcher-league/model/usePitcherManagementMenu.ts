@@ -38,7 +38,8 @@ import {
 } from '@/entities/pitcher-career/model/pitchSelection'
 import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
 import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles'
-import { abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
+import { ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import {
   PITCHER_COMMAND_SLOTS,
@@ -677,6 +678,12 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   }, [career, onSave])
 
   const items = itemsOf(kind, career)
+
+  // 터치 기기 — 120 글이 4줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 0x8a044 스크롤). 원본 그림에는 막대뿐이다
+  useTouchScrollKeys(
+    question === null && choice === null && notice === '' && abilityDetailOffset !== null &&
+      pitcherAbilityDetailViewOf(career).messages.length > ABILITY_DETAIL_VISIBLE_LINES,
+  )
 
   return {
     kind,

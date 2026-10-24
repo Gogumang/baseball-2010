@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FrameSprite, MessageBox, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { FONT_SPACING, LINE_HEIGHT } from '@/shared/lib/font/layout'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
@@ -156,6 +157,9 @@ export function SeasonEquipmentScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
+  // 터치 기기 — 레벨 목록(11칸 중 5줄만 보인다)에 들어가 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 줄은 눌러서 고른다
+  useTouchScrollKeys(isItemFocus && notice === null && question === null)
 
   const cardView = { ...view, equipment: cardNibbles }
   const abilities = seasonCardAbilitiesOf(cardView, { record, teamMorale })

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { ABILITY_DETAIL_VISIBLE_LINES } from '@/pages/management/lib/abilityDetail'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import {
   HELL_TRAINING_INDEX, TRAINING_GUARD_CEILING, TRAINING_SLOTS,
@@ -161,6 +163,8 @@ function SeasonTrainingResultPopup({ result, onClose, firstLine, onFirstLineChan
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [lineCount, onClose])
+  // 터치 기기 — 글이 창(4줄)을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 원본 그림에는 막대뿐이다
+  useTouchScrollKeys(lineCount > ABILITY_DETAIL_VISIBLE_LINES)
   return (
     <DetailWindow
       rows={detailRowsFromSlots(SEASON_TEAM_DETAIL_LABEL_FRAMES, result.current, SEASON_TRAINING_MAXIMUMS, result.change, result.bonus)}

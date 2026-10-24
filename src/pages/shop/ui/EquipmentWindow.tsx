@@ -4,6 +4,7 @@ import { SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import type { ShopBox } from '@/pages/shop/lib/shopLayout'
@@ -75,6 +76,9 @@ export function EquipmentWindow({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  // 터치 기기 — 줄 목록이 5줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 줄은 눌러서 고른다
+  useTouchScrollKeys(isKeyEnabled && isListFocused && rows.length > EQUIPMENT_VISIBLE_ROWS)
 
   const visibleRows = rows.slice(state.top, state.top + EQUIPMENT_VISIBLE_ROWS)
   const selected = isListFocused ? rows[state.cursor] : undefined

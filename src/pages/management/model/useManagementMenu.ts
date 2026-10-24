@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useTrainingPlayback } from '@/widgets/training-scene/model/useTrainingPlayback'
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
 import type { ManagementCommand, MenuSlot, SubMenuKind } from '@/pages/management/lib/managementLayout'
 import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScreen'
 import {
-  abilityDetailScrollKeyOf, batterAbilityDetailViewOf, scrollAbilityDetail,
+  ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, batterAbilityDetailViewOf, scrollAbilityDetail,
 } from '@/pages/management/lib/abilityDetail'
 import {
   createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
@@ -210,6 +211,13 @@ export function useManagementMenu(props: ManagementScreenProps) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+
+  // 터치 기기 — 120 글이 4줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 위 0x8a044 스크롤). 원본 그림에는 막대뿐이다
+  useTouchScrollKeys(
+    props.detail === null &&
+      abilityDetailOffset !== null &&
+      batterAbilityDetailViewOf(props.career).messages.length > ABILITY_DETAIL_VISIBLE_LINES,
+  )
 
   return {
     kind,

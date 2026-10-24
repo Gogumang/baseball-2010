@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CommonPanel, InsetBox, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
+import { CommonPanel, InsetBox, PressArea, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
+import { SCROLL_DOWN_OFFER, SCROLL_UP_OFFER, tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
@@ -192,7 +193,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   const showsPageArrows = viewer.isChoosingChapter || isBlinkOn
   const pager = helpPagerOf(page, pageCount)
   const knobTop = helpScrollKnobTopOf(lines.length, viewer.scrollTop)
-  const { knobLength } = helpScrollMetricsOf(lines.length)
+  const { knobLength, maxTop } = helpScrollMetricsOf(lines.length)
   const visibleLines = lines.slice(viewer.scrollTop, viewer.scrollTop + HELP_TEXT_BOX.visibleLines)
 
   const tabBox = HELP_VIEWER.tabBoxes[section]
@@ -323,6 +324,15 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
               transform: 'scaleY(-1)',
             }}
           />
+          {/* 웹 덧붙임 — 막대 위 · 아래 끝 화살(7×5) 위 투명 칸: 원본 ↑ · ↓ 키 한 번. 넘칠 글이 있으면 ▲ · ▼ 상황 버튼도 띄운다 */}
+          {maxTop > 0 && !viewer.isChoosingChapter && (
+            <>
+              <PressArea label="위 줄" touchKey={SCROLL_UP_OFFER} onPress={() => tapKey('ArrowUp')}
+                rect={{ x: HELP_SCROLL_BAR.x - 4, y: HELP_SCROLL_BAR.y - 10, width: 15, height: 14 }} />
+              <PressArea label="아래 줄" touchKey={SCROLL_DOWN_OFFER} onPress={() => tapKey('ArrowDown')}
+                rect={{ x: HELP_SCROLL_BAR.x - 4, y: HELP_SCROLL_BAR.y + HELP_SCROLL_BAR.trackLength - 2, width: 15, height: 14 }} />
+            </>
+          )}
           <div
             className={styles.scrollKnob}
             data-testid="스크롤손잡이"
