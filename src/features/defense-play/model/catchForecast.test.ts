@@ -125,6 +125,13 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
     expect(forecastCatch(멈춘공, 야수들, 전구간, { onlySlot: 8, initialChaserSlot: 8 }).table.low).toEqual({ tick: 10, slot: 8 })
   })
 
+  it('던진 야수(+0xb1)의 복제는 첫 복제 틱 하나만 판정 없이 지나 잠금을 푼다 — 4틱 건너뜀 + 1 이라 11틱에 닿는다 (a1406 · a143e, U-78)', () => {
+    // 야수 틱 0xa1284 는 동작 14~18 이 아니면 vtc8 거짓에 곧장 a143e 로 가 +0xb0~+0xb3 을 지운다 — +0xac == 2(a13ae)를 기다리지 않는다
+    expect(
+      forecastCatch(멈춘공, 야수들, 전구간, { onlySlot: 8, initialChaserSlot: 8, thrownSlot: 8 }).table.low,
+    ).toEqual({ tick: 11, slot: 8 })
+  })
+
   it('동작 잠금 +0xb4 를 복제가 물려받는다 — 잠긴 틱은 판정 없이 n 을 되돌리고(b148e) 복제 틱이 잠금을 하나씩 푼다', () => {
     const 잠긴 = 야수들.map((야수) => (야수.slot === 8 ? { ...야수, actionLockTicks: 5 } : 야수))
     expect(forecastCatch(멈춘공, 잠긴, 전구간, { onlySlot: 8 }).table.low).toEqual({ tick: 11, slot: 8 })

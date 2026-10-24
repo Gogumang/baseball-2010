@@ -1568,6 +1568,13 @@ export function stepDefensePlay(
 
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba (6c 절) */
   let outJudgedThisTick = false
+  /**
+   * 이번 틱에 공을 던진 야수 — 던지기 0xa1620 끝(a1a3a)의 **+0xb1 잠금**이 다음 야수 틱 0xa1284 의 이동(a1346 `vtc8()` =
+   * 0xa2118 `+0xb1 == 0 && +0xcc ≤ 0`)을 막는다. 그 야수 틱은 걸음 없이 a1406~a141a(`vtc8()` 거짓 → a143e)에서
+   * +0xb0~+0xb3 을 지우고 vt10(0xa124c — 목표 = 위치 · 동작 0)만 한다(에뮬 확인). 6 절 이동은 원본의 다음 야수 틱 몫이라
+   * 이 칸의 야수는 그 한 번을 쉰다 — 다음 틱부터 AI 0(b476a)이 시작 자리로 걷는다 (U-78)
+   */
+  let thrownThisTick: number[] = []
   /** 이번 틱 쥐기 0xb2710 안의 판정(0xb2758)이 아웃을 냈나 — 같은 플레이 틱의 두 번째 판정(6b 절)이 state[0x87] 을 다시 적는다 */
   let grabOutThisTick = false
   /** 바로 앞 `runOutJudgement` 한 번의 결과 종류 — 쥐기의 뜬공 아웃(결과 1)을 가른다 */
@@ -1620,8 +1627,8 @@ export function stepDefensePlay(
     if (holder === undefined || receiverFinal === undefined) return false
     // vtC4 = 0xa20ec(+0xb0 == 0 && +0xb4 ≤ 0 && +0xc8 ≤ 0). 던지기 0xa1620 은 끝(a1a32)에서 야수+0xb1 = 1 을 세워
     // +0xb0 워드를 0 이 아니게 만든다 — 던진 야수는 그 동작이 끝날 때까지 vtC4 가 거짓이라 다시 못 던진다.
-    // ⚠️ 그 잠금이 풀리는 틱(야수 갱신 a143e~a144c 의 동작 칸 +0xa8·+0xac 조건)은 다 뜨지 않았다 — 웹은 공을 안 쥔
-    //    야수는 못 던지는 것으로 본다(0xa1620 머리 a165a 도 공 칸 +0xd0 이 비면 0 을 돌려준다).
+    // 그 잠금은 다음 야수 틱 0xa1284 의 a1406~a141a(`vtc8()` 거짓 → a143e)에서 걸음 없이 풀린다(U-78 — `thrownThisTick`).
+    // 웹은 공을 안 쥔 야수는 못 던지는 것으로 본다(0xa1620 머리 a165a 도 공 칸 +0xd0 이 비면 0 을 돌려준다).
     if (!holder.holdingBall || holder.actionRemainingTicks > 0) return false
     // 레이저 송구 — 반짝임 창 안에 새로 누른 키가 들어왔고 공을 쥐었으면 +0x1f4 (0x400bc)
     // b2f06 — 레이저 발사 0x400bc 가 세운 플레이+0x1f4 를 본다(발사는 슬롯 2 머리에서 따로 — 0b 절 끝)
@@ -1716,6 +1723,8 @@ export function stepDefensePlay(
     fielders = fielders.map((fielder) =>
       fielder.slot === fromSlot ? { ...fielder, holdingBall: false, actionRemainingTicks: 0 } : fielder,
     )
+    // a1a3a 야수+0xb1 = 1 — 다음 야수 틱 하나는 걸음이 없다(`thrownThisTick`)
+    thrownThisTick = [...thrownThisTick, fromSlot]
     play = {
       ...play,
       held: false,
@@ -1723,7 +1732,7 @@ export function stepDefensePlay(
       catchTick: throwArrivalTick,
     }
     {
-      // b307c vt24(0) — +0x130 = 던진 야수(t ≤ 4 건너뜀) · 그 복제는 +0xb1(a1a3a)로 두 틱 더 빠진다 · a = 0 이라 궤적 끝까지
+      // b307c vt24(0) — +0x130 = 던진 야수(t ≤ 4 건너뜀) · 그 복제는 +0xb1(a1a3a)로 첫 복제 틱 하나 더 빠진다 · a = 0 이라 궤적 끝까지
       // 못 줍으면 t = 10 부터 두 번째 패스 · vt34 = 0xb3b38 이 받을(주울) 야수를 AI 1 로. 받는 틱 = 그 포구 틱이다.
       // 보통 · 흔들린 · 레이저 송구는 공+0xaac = 0 이라 움직임허용 없음(복제가 제자리 · n 없음)이고, 던진 야수 · C(+0x154)가
       // 둘 다 내야(칸 ≤ 5)면 +0x1e8 = 1(b305a~b306c) — C 만 낮은 공 · 가슴 높이로 잡는다. 악송구는 움직임허용 모두 · +0x1e8 없음
@@ -1960,6 +1969,7 @@ export function stepDefensePlay(
   // 한 줄도 안 옮기려고 묶음(블록)만 씌워 두었다 — 결과가 한 톨도 달라지면 안 되는 자리다.
   {
     outJudgedThisTick = false
+    thrownThisTick = []
 
     // ── 0'. 야수 틱 0xa1284 의 준비 틱 줄이기 (직접 뜬 것) ──
     // ```
@@ -2833,10 +2843,9 @@ export function stepDefensePlay(
             ? at < trajectory.landingTick
             : at < catchTick || (throwArrivalTick >= 0 && at < throwArrivalTick),
         // 카메라 0x3f060 — 홈런(+0x111) · 폴 홈런(+0x129) 판에서 공.vt18(멈춤)이면 타자주자를 본다.
-        // 멈춤은 관문 파울 갈래와 같은 읽기다 — 쥔 공은 손에 붙어 안 움직인다(유력)
-        ballStopped:
-          play.held ||
-          (trajectory.isStoppedAt === undefined ? at >= trajectory.length - 1 : trajectory.isStoppedAt(at)),
+        // 멈춤은 관문 파울 갈래와 같은 읽기(지금 점의 속도 0)다. 홈런 판엔 쥔 공이 없다 — +0x111 · +0x129 는 아무도 쥐기 전(+0x112 == 0)의
+        // 0x9d5bc 만 세우고, 선 뒤엔 포구 관문 b2af6 이 쥐기를 막는다 (U-115)
+        ballStopped: trajectory.isStoppedAt === undefined ? at >= trajectory.length - 1 : trajectory.isStoppedAt(at),
         homeRunFlag,
         poleHomeRunFlag: play.suppressed,
         // 공 그리기 0x36dfc — 쥔 공(+0x12c)과 담장 뒤로 사라진 공은 공 · 그림자를 안 그린다
@@ -2980,7 +2989,9 @@ export function stepDefensePlay(
     const chaseTarget =
       landingChase && ballLandingTick >= tick ? { x: landingPoint.x, y: 0, z: landingPoint.z } : catchPoint
     fielders = fielders.map((fielder, slot) =>
-      lockedThisTick[slot] === true ? fielder : moveFielder(fielder, { chaserSlot, catchPoint: chaseTarget, tick, catchTick }),
+      lockedThisTick[slot] === true || thrownThisTick.includes(slot)
+        ? fielder
+        : moveFielder(fielder, { chaserSlot, catchPoint: chaseTarget, tick, catchTick }),
     )
     // 야수+0x3b — 이번 갱신에 목표점에 막 닿았나 (0xbf0dc: 머리에서 지우고 닿은 갱신에서만 1). 다음 판 틱 6c 절이 본다
     fielderArrivals = fielders.map(
@@ -3042,11 +3053,13 @@ export function stepDefensePlay(
         // 파울 갈래(b0d2c)만 본다 — 멈춤 · 담장선 넘은 뒤 떨어지는 틱 · 홈 뒤(z > 32599, −315 < 각 < −225)
         foulBall: foulFlag
           ? {
-              // 공.vt18 = 0xa27f0(속도 · 수직 속도 워드 0) — 야수가 쥔 공(쥐기 0xb2710 의 메시지 0x15)은 손에 붙어 움직이지 않는다.
-              // ⚠️ 쥔 공의 속도 칸이 0 이 되는 자리(메시지 0x15 처리)는 안 떴다 — 쥔 공을 멈춘 공으로 본다(유력)
-              stopped:
-                play.held ||
-                (trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick)),
+              // 공.vt18 = 0xa27f0 = 지금 점(공+0x68)의 속도 · 수직 속도 워드 == 0 && (공+0x24(높이) == 0 || 공+0x20 == 공+0x2c).
+              // 공+0x20 · +0x2c 는 세계 0xbfed0 이 멈출 때(vt18 참)까지 돌린 마지막 물리 상태이고 재생 중엔 아무도 안 고친다
+              // (공은 장면 +0x1e4 목록에 없다 — 3e5e0 new(0xac8) 뒤 0xc0104 를 안 부름) → 뒷 조건은 늘 참, 멈춤 = 지금 점의 속도 0.
+              // 쥔 공은 0x3f378 3f3aa 가 +0x12c 이면 +0x68 을 안 올려 쥔 틱의 점에 머문다 — 쥐었다고 멈춘 공이 아니다.
+              // 이 갈래(+0x110)에는 쥔 공이 오지 않는다: 쥐기 0xb2710 b2760 이 +0x112 = 1 을 세워 0x9d5bc(코드 7)가 안 돌고(b444e),
+              // +0x110 이 서면 포구 관문 b2af6 이 쥐기를 막는다 (U-115)
+              stopped: trajectory.isStoppedAt === undefined ? tick >= trajectory.length - 1 : trajectory.isStoppedAt(tick),
               currentTick: tick,
               landingTick: trajectory.landingTick,
               fenceTick: trajectory.fenceTick,
