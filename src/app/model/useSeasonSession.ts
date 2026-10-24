@@ -1282,6 +1282,9 @@ function recordAceSlotOf(save: SeasonSave, isPitcher: boolean): number | undefin
   return aces.batter >= 0 ? SEASON_RECORD_ACE_BATTER_SLOT : undefined
 }
 
+/** 시즌 경기에 싣는 환경설정 세 칸 (`useSeasonSession` 의 `gameSettingsNow`) */
+export type SeasonGameSettingOptions = Pick<TeamGameOptions, 'gaugeSettingOn' | 'runningModeManual' | 'throwModeManual'>
+
 /**
  * @param wallet 전역 G 지갑(`useGamePointWallet`). 넘기면 **지갑이 G 의 주인**이고
  *   시즌은 자기 주머니를 안 쓴다. 안 넘기면 예전처럼 세션 주머니로 논다(테스트용) —
@@ -1323,7 +1326,22 @@ export function useSeasonSession(
    * 기록연감 훅이 든다(`recordSeasonRegularWin`). 안 넘기면 세지 않는다
    */
   onRegularSeasonWin?: () => void,
+  /**
+   * 경기를 세울 때 읽는 환경설정 세 칸 — 투구 게이지(설정 +0x2d) · 주루(+0xbd) · 송구(+0xf4).
+   * 원본은 모드를 가리지 않고 경기 중에 이 칸을 본다:
+   * - 게이지 0x3f500: `설정[+0x2d] != 0 && 0xb6c21(...) == 0 && 경기[+0xfc8] != 0x16` — 모드 검사 없음
+   * - 주루 0xae690: `경기[0x31 + 경기[9]] == 1 || 설정+0xbd != 0` (0x46418 이 설정+0xbd 를 넘긴다)
+   * - 송구 0xae6c8: 같은 꼴, 수비 측 경기[0xa] (0x526ac)
+   * 일반모드(`GeneralModeScreen` 의 `gaugeSettingOn` · `runningModeManual` · `throwModeManual`)처럼 경기를 세울 때
+   * 옵션에 싣는다. 안 넘기면 팀 경기 기본(게이지 끔 · 주루 자동 · 송구 수동)이다.
+   */
+  gameSettingsNow?: () => SeasonGameSettingOptions,
 ): SeasonSession {
+  /** 경기 옵션에 환경설정 세 칸을 싣는다 (`gameSettingsNow`) */
+  const withGameSettings = useCallback(
+    (options: TeamGameOptions): TeamGameOptions => (gameSettingsNow === undefined ? options : { ...options, ...gameSettingsNow() }),
+    [gameSettingsNow],
+  )
   /** 내 팀 명단 차례 — 영입한 명전 선수에게 기록을 싣는다 (7da5044 의 받는 쪽 `TeamEntryOrder.record`) */
   const recordSourceNow = useCallback((): SeasonEntryRecordSource | undefined => {
     const hallOfFame = readHallOfFame?.()
@@ -1909,9 +1927,9 @@ export function useSeasonSession(
     setResumeGame(null)
     const prepared = withOwnRecordRotation({ ...options, ...staminaOptionsOf(save, options.opponentTeamId) })
     setOwnRotationShift(prepared.shift)
-    setGameOptions(prepared.options)
+    setGameOptions(withGameSettings(prepared.options))
     setScene(SEASON_SCENE_STATE.경기직전)
-  }, [clearGameRecord, optionsFor, save])
+  }, [clearGameRecord, optionsFor, save, withGameSettings])
 
   /**
    * 다음경기 화면 0xd8 에 들어간다 — 들어옴 `0x4cb8`:
@@ -2073,10 +2091,10 @@ export function useSeasonSession(
       ...withAces,
     })
     setOwnRotationShift(prepared.shift)
-    setGameOptions(prepared.options)
+    setGameOptions(withGameSettings(prepared.options))
     setPendingGame(null)
     setScene(SEASON_SCENE_STATE.경기직전)
-  }, [clearGameRecord, pendingGame, preGameAces, save])
+  }, [clearGameRecord, pendingGame, preGameAces, save, withGameSettings])
 
   /** 0xdd CLR (0x844e) — 국가대항전이면 0xf4(웹은 대회 화면), 아니면 0xd7 을 다시 들어온다(0x5268) */
   const cancelMatchInfo = useCallback(() => {
@@ -3063,7 +3081,8 @@ export function useSeasonSession(
       commit({ ...current, isGameInProgress: false, gameSave: null })
       return false
     }
-    const options: TeamGameOptions = { ...saved.options, ...(aceLevels === undefined ? {} : { aceLevels }) }
+    // 이어하기도 지금 환경설정으로 선다 (일반모드 `GeneralModeResume` 와 같다 — 원본은 설정 칸을 경기 중에 읽는다)
+    const options: TeamGameOptions = withGameSettings({ ...saved.options, ...(aceLevels === undefined ? {} : { aceLevels }) })
     // 옛 블록 이사 — 기록으로 선 영입 선수의 니블 · +0xb 가 없으면 같은 레코드(지금 시즌 명단의 기록 사본)에서 채운다
     const order = entryOrderOf(current.roster)
     const restored: TeamGameProgress = {
@@ -3085,7 +3104,7 @@ export function useSeasonSession(
     setResumeGame(restored)
     setScene(SEASON_SCENE_STATE.경기직전)
     return true
-  }, [aceLevels, commit, entryOrderOf])
+  }, [aceLevels, commit, entryOrderOf, withGameSettings])
 
   /** 경기 중 "나가기" — 장면만 내린다(+0x4e · 블록은 그대로). 다음 진입이 `resumeSavedGame` 으로 다시 세운다 */
   const leaveGame = useCallback(() => {

@@ -75,6 +75,12 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
   let rememberedBgmId: number | null = null
   /** 원본 +0x2c — 지금 울리는 배경음 */
   let playingBgmId: number | null = null
+  /**
+   * 원본 +0x2c 그대로 — 0x6ea6c 가 **반복을 가리지 않고** 적는다(r197 직접 뜸): 볼륨 0 이면 6ea8a `+0x2c = −1`, 물리면
+   * 6eaae `+0x2c = n`. 볼륨 0 으로 내리는 0x6e4d0 은 미디어(+0x14)만 끊고(0x6e258) 이 칸은 안 건드린다 — 소리 단축키 0x2ddc 가
+   * 0 → 1 로 켤 때 이 번호(1~4)를 다시 튼다 (`lastPlayed`)
+   */
+  let lastPlayedId: number | null = null
 
   const openContext = (): AudioContext | null => {
     if (contextOpened) return context
@@ -127,6 +133,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
   const resumeRemembered = () => {
     if (rememberedBgmId === null || volume === 0) return
     playingBgmId = rememberedBgmId
+    lastPlayedId = rememberedBgmId
     start(rememberedBgmId, true)
   }
 
@@ -161,16 +168,24 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
   return {
     play: (id) => {
       // 원본 0x6ea76: 볼륨 0 이면 재생하지 않는다. 반복이 아니면 번호도 기억하지 않는다.
-      if (volume === 0) return
+      if (volume === 0) {
+        lastPlayedId = null
+        return
+      }
       playingBgmId = null
+      lastPlayedId = id
       start(id, false)
     },
 
     playBgm: (id) => {
       // 원본 0x6ea6c 는 번호를 견주지 않는다 — 같은 번호가 울리고 있어도 0x6e9d4 가 끊고 처음부터 튼다
       rememberedBgmId = id
-      if (volume === 0) return
+      if (volume === 0) {
+        lastPlayedId = null
+        return
+      }
       playingBgmId = id
+      lastPlayedId = id
       start(id, true)
     },
 
@@ -212,5 +227,14 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     },
 
     getVolume: () => volume,
+
+    lastPlayed: () => lastPlayedId,
+
+    suspendOutput: () => {
+      // 0x6e690 → [0x1400598](6, 1) — 단말 쪽 미디어를 멈춘다. 사운드 객체 칸(+0x28 · +0x2c)은 안 건드린다.
+      // 아직 받는 중인 소리도 울리지 않게 표를 넘긴다
+      playToken += 1
+      stopActive()
+    },
   }
 }

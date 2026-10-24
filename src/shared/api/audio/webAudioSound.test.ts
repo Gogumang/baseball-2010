@@ -348,6 +348,32 @@ describe('소리 크기', () => {
 
     expect(fake.stopped).toEqual(['sounds/001.mp3'])
   })
+
+  it('+0x2c — 볼륨 0 으로 내려도 마지막에 물린 번호는 남고, 볼륨 0 에서 부르면 비운다 (0x6ea6c 6ea8a · 0x6e4d0)', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(3)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    sound.setVolume(0)
+    expect(sound.lastPlayed?.()).toBe(3)
+
+    sound.playBgm(4)
+    expect(sound.lastPlayed?.()).toBeNull()
+    expect(sound.currentBgm()).toBe(4)
+  })
+
+  it('단말 일시정지 0x6e690 — 울리던 소리를 멈추되 기억한 배경음은 둔다', async () => {
+    const fake = createFakeAudio()
+    const sound = createWebAudioSound(fake.options)
+
+    sound.playBgm(1)
+    await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+    sound.suspendOutput?.()
+
+    expect(fake.stopped).toEqual(['sounds/001.mp3'])
+    expect(sound.currentBgm()).toBe(1)
+  })
 })
 
 describe('소리 없는 포트', () => {

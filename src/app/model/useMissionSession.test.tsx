@@ -344,7 +344,7 @@ describe('투수 미션 투구 게이지 — 누른 칸 g 를 그대로 받는�
 
 /* ── ㉡ 미션 인플레이 타구 → 수비 화면(상태 0x17) ────────────────────────────── */
 
-function setUpBatterMission(missionId: number, random: RandomPort = createSeededRandom(7)) {
+function setUpBatterMission(missionId: number, random: RandomPort = createSeededRandom(7), runningModeManual?: boolean) {
   const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
   let screen: Screen = { kind: '미션선택' }
   const setScreen = vi.fn((next: Screen) => {
@@ -354,7 +354,9 @@ function setUpBatterMission(missionId: number, random: RandomPort = createSeeded
     const runner = useAtBatRunner()
     return {
       runner,
-      session: useMissionSession({ runner, random, missionRecord, screen, setScreen }),
+      session: useMissionSession({
+        runner, random, missionRecord, screen, setScreen, ...(runningModeManual === undefined ? {} : { runningModeManual }),
+      }),
     }
   })
   const mission = MISSIONS.find((row) => row.side === '타자' && row.id === missionId)
@@ -368,6 +370,26 @@ function setUpBatterMission(missionId: number, random: RandomPort = createSeeded
 }
 
 describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 0x17 (R10 8절)', () => {
+  it('사람 공격이라 환경설정 주루(+0xbd)가 판에 실린다 — 0xae690 둘째 항 (0x46418)', () => {
+    const 타구 = (manual?: boolean) => {
+      const rendered = setUpBatterMission(1, createSeededRandom(7), manual)
+      act(() => {
+        rendered.result.current.session.handleMissionPitch({
+          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: null,
+        })
+      })
+      const mode = rendered.result.current.session.pendingDefensePlay?.input.runningMode
+      rendered.unmount()
+      return mode
+    }
+    expect(타구(true)).toBe('수동')
+    expect(타구(false)).toBe('자동')
+    expect(타구()).toBe('자동')
+  })
+
   /**
    * 원본 미션은 모드 5·6 짜리 **보통 경기**(장면 0x104)다. 상태 전이표가 모드를 가르지 않아
    * 맞은 공은 0x11 → 메시지 0x6aa → 0x13 → **늘 0x17**(`0xae5f0` = `movs r0,#0x17; bx lr`)로 가고,

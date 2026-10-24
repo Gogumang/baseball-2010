@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type {
@@ -47,6 +47,8 @@ import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
+import { cursorShakeDirectionOfKey } from '@/shared/lib/cursorShake/cursorShake'
+import type { CursorShakeDirection } from '@/shared/lib/cursorShake/cursorShake'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -108,6 +110,20 @@ interface SpecialScreenProps {
 }
 
 /**
+ * 스페셜 목록(하위 6) 갱신 0x28b9c 의 키 (격자 없이 날 키를 본다, r197 직접 뜸):
+ * ```
+ * ↑(−1) · ←(−3) · '2' · '4'  → 28c56  [this+0x100] = −1 (앞 칸)
+ * ↓(−2) · →(−4) · '6' · '8'  → 28c60  [this+0x100] = −2 (뒤 칸)
+ * OK(−5) · '5'               → 28c02  고른 칸 열기
+ * CLR(−16)                   → 28bfa  하위 4
+ * ```
+ */
+const SPECIAL_LIST_STEP: Readonly<Record<string, number>> = {
+  ArrowUp: -1, ArrowLeft: -1, '2': -1, '4': -1,
+  ArrowDown: 1, ArrowRight: 1, '6': 1, '8': 1,
+}
+
+/**
  * 원작 메인 메뉴 [스페셜] = 하위 상태 6 (그리기 0x2860c — P6 2d).
  *
  * 반원 바퀴(0x24b1c) 위에 **하위 목록 0x2524c** 여덟 칸이 오른쪽 세로로 서고, 머리띠 0x54d95(제목 0
@@ -141,6 +157,11 @@ export function SpecialScreen({
   const [notice, setNotice] = useState<string | null>(null)
   /** 설명 판 까딱임 — 표 0xce8bc · 0xce88c (`specialLayout` 의 까딱임 주석) */
   const panelShake = useCursorShake(useUpdateCounter())
+  /**
+   * 0x5550d 가 마지막으로 적은 방향 [skin+0x8c] — 숫자키는 이 칸을 안 바꾼다. ⚠️ 근사(남김 — 웹 구조): 원본 칸은 skin 공용이라 앞 화면에서
+   * 적힌 방향이 남아 있을 수 있지만, 웹은 이 화면에서 화살표를 누르기 전엔 없음(까딱이지 않음)으로 둔다
+   */
+  const shakeDirectionRef = useRef<CursorShakeDirection | null>(null)
   /** 바탕 띠 [메뉴+0xe4] — 처음 메뉴 OK(0x294b8)가 1 로 두고 이 화면에서 자란다. 하위 화면을 다녀와도 되돌리지 않는다 */
   const band = useMenuBand(true, isBandGrown)
   /** 릴 돌기 — 스크롤 석 장 뒤 회전 (0x25386) */
@@ -163,14 +184,17 @@ export function SpecialScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       // 0x28ba0~0x28bb4 — 바탕 띠가 자라는 동안([메뉴+0xe2] ≠ 0)은 키를 통째로 버린다
       if (band.isGrowing) return
-      const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      const step = SPECIAL_LIST_STEP[event.key] ?? 0
       if (step !== 0) {
         event.preventDefault()
-        // 갱신 0x28b9c: ↑ · ↓ 가 [메뉴+0xf4] = 1 을 세우고 0x5550d 로 방향을 적는다 → 그리기 머리 0x252c6 가 까딱임을 건다
-        panelShake.start(step > 0 ? 'down' : 'up')
+        // 갱신 0x28b9c: 앞 칸 · 뒤 칸 키가 [메뉴+0xf4] = 1 을 세우고 0x5550d 에 **날 키**를 넘긴다 → 그리기 머리 0x252c6 가 까딱임을 건다.
+        // 0x5550d 는 화살표(−1~−4)만 방향 칸 [skin+0x8c] 에 적어, 숫자키는 앞서 적힌 방향 그대로 까딱인다 (`cursorShakeDirectionOfKey`)
+        const direction = cursorShakeDirectionOfKey(event.key)
+        if (direction !== null) shakeDirectionRef.current = direction
+        if (shakeDirectionRef.current !== null) panelShake.start(shakeDirectionRef.current)
         return setCursor((previous) => (previous + step + ITEM_COUNT) % ITEM_COUNT)
       }
-      if (event.key === 'Enter' || event.key === ' ') {
+      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
         return openItem(cursor)
       }
