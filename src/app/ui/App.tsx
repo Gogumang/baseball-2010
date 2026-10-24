@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   CommonWindowOpenContext, CommonWindowPushContext, CommonWindowSceneContext, GameSceneMarkContext,
@@ -36,7 +36,8 @@ import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
 import {
-  screenEnterSoundOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useSceneEnterStop, useScreenBgm, useSeasonMenuBgm,
+  screenEnterSoundOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useResumeCoverStop, useSceneEnterStop, useScreenBgm,
+  useSeasonMenuBgm,
 } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { useScreenSpritePreload } from '@/app/model/screenSpritePreload'
@@ -273,11 +274,14 @@ export function App() {
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(
     screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null, pitcherSession.story?.context ?? null,
+    pitcherSession.managementBgmRestart,
   )
   // 메인 메뉴는 환경설정에서 돌아올 때(0x24a40) · 게임시작 목록으로 새로 설 때(0x25b88) 1 을, 관리 화면은 외출 지도에서
   // 돌아올 때(0x1aec4) 4 를 처음부터 다시 튼다
-  const screenBgm = useScreenBgm(screen)
-  const pitcherBgmRestart = usePitcherLeagueBgmRestart(screen.kind === '투수편', pitcherSession.scene)
+  // 화면이 '관리' 인 채 125 → 105 로 다시 들어오면(훈련 결과 창 · 훈련 알림을 닫을 때) 0x1aec4 가 4 를 처음부터 — 타자편 세션이 올린다
+  const [batterManagementBgmRestart, bumpBatterManagementBgmRestart] = useReducer((count: number) => count + 1, 0)
+  const screenBgm = useScreenBgm(screen, batterManagementBgmRestart)
+  const pitcherBgmRestart = usePitcherLeagueBgmRestart(screen.kind === '투수편', pitcherSession.scene, pitcherSession.managementBgmRestart)
   useSceneBgm(
     sound,
     screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm,
@@ -285,6 +289,9 @@ export function App() {
   )
   // 시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4 (위 화면 표 뒤에 돌아야 이긴다)
   useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene, seasonSession.trainingResult !== null)
+  // 이어하기 길의 137 — 100 진입 1c15e 의 stopBgm (`useResumeCoverStop`)
+  useResumeCoverStop(sound, (screen.kind === '연차표지' && screen.fromResume === true) ||
+    (screen.kind === '투수편' && pitcherSession.scene === '연차표지' && pitcherSession.yearCoverFromResume))
   const careerSession = useCareerSession({
     runner, random, saveGame, screen, setScreen, sound, wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)
@@ -299,6 +306,7 @@ export function App() {
     nariGameSave: batterNariGameSave,
     // 나간 마선수 대결 대기 — 전역기록 g[0xec] · g[0xee] · g[0x11f] · g[0x144] (선수를 새로 만들어도 남는다)
     aceMatchPending: aceMatchPendingPorts[NARI_BATTER_MODE],
+    onManagementBgmRestart: bumpBatterManagementBgmRestart,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다

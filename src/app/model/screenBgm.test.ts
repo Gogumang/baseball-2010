@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { pitcherLeagueBgmOf, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { NARI_STATE, pitcherLeagueBgmOf, restartsManagementBgmFrom, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useResumeCoverStop, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
@@ -336,5 +336,61 @@ describe('137 "N년차" 표지 뒤 배경음 — 105 처리 0x1aec4 의 이전 �
     expect(result.current).toBe(40)
     rerender({ scene: '관리' })
     expect(result.current).toBe(4)
+  })
+})
+
+describe('화면이 관리인 채 105 로 다시 들어올 때 — 0x1aec4 목록(125 든다 · 127 빠진다)', () => {
+  it('목록은 100 · 116 · 132 · 125 · 126 · 114 · 134 · 1 · 112 — 127 휴식 · 106/107/110 하위 메뉴는 밖', () => {
+    expect([0x64, 0x74, 0x84, 0x7d, 0x7e, 0x72, 0x86, 1, 0x70].every(restartsManagementBgmFrom)).toBe(true)
+    expect([NARI_STATE.휴식, 0x6a, 0x6b, 0x6e, 0x89].some(restartsManagementBgmFrom)).toBe(false)
+    expect(restartsManagementBgmFrom(NARI_STATE.훈련결과)).toBe(true)
+  })
+
+  it('타자편: 125 → 105 수가 오르면 다시 틀기 표가 오르고, 137 뒤 잇던 배경음도 끝나 4', () => {
+    const { result, rerender } = renderHook(
+      ({ screen, restart }: { screen: Screen; restart: number }) => useScreenBgm(screen, restart),
+      { initialProps: { screen: { kind: '연차표지' } as Screen, restart: 0 } },
+    )
+    rerender({ screen: { kind: '관리' }, restart: 0 })
+    expect(result.current.bgm).toBeNull()
+    const before = result.current.restartSerial
+    rerender({ screen: { kind: '관리' }, restart: 1 })
+    expect(result.current.bgm).toBe(4)
+    expect(result.current.restartSerial).toBe(before + 1)
+    // 같은 수로 다시 그려도 더 오르지 않는다
+    rerender({ screen: { kind: '관리' }, restart: 1 })
+    expect(result.current.restartSerial).toBe(before + 1)
+  })
+
+  it('투수편: 같은 수가 다시 틀기 표와 137 뒤 잇기를 함께 친다', () => {
+    const bgm = renderHook(
+      ({ restart }: { restart: number }) => usePitcherLeagueBgm(true, '관리', null, null, restart),
+      { initialProps: { restart: 0 } },
+    )
+    const serial = renderHook(
+      ({ restart }: { restart: number }) => usePitcherLeagueBgmRestart(true, '관리', restart),
+      { initialProps: { restart: 0 } },
+    )
+    const before = serial.result.current
+    bgm.rerender({ restart: 1 })
+    serial.rerender({ restart: 1 })
+    expect(bgm.result.current).toBe(4)
+    expect(serial.result.current).toBe(before + 1)
+  })
+})
+
+describe('이어하기 길의 137 — 100 진입 1c15e stopBgm', () => {
+  it('표지가 이어하기 길로 설 때 한 번 배경음을 멈춘다', () => {
+    const sound = createSilentSound()
+    let stops = 0
+    const counted = { ...sound, stopBgm: () => { stops += 1 } }
+    const { rerender } = renderHook(({ on }: { on: boolean }) => useResumeCoverStop(counted, on), { initialProps: { on: false } })
+    expect(stops).toBe(0)
+    rerender({ on: true })
+    rerender({ on: true })
+    expect(stops).toBe(1)
+    rerender({ on: false })
+    rerender({ on: true })
+    expect(stops).toBe(2)
   })
 })

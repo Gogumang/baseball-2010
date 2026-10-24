@@ -389,7 +389,8 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     // 464 거절 — 이어하기가 새 시즌 0x1b768 → 105
     const 거절 = 끊고다시(132, 464, [{ kind: 1, value: -20 }], [461, 464])
     expect(거절.저장.seasonEndState).toBe(137)
-    expect(거절.다시.current.scene).toBe('관리')
+    // 1c25e → 0x1b768 → 1c3be 로 빠져도 남은 +0x289 를 연초 114 틀이 받아 137 (`nariYearCover` 의 이어하기 길)
+    expect(거절.다시.current.scene).toBe('연차표지')
     expect(거절.다시.current.career).toMatchObject({ season: 3, seasonEndState: null, reputation: 거절.받은뒤.reputation })
     // 0x1b768 은 그 자리(1b894~1b8a4)에서 저장한다 — 띄우기만 해도 저장이 새 시즌이다
     expect(거절.store.load()).toMatchObject({ season: 3, seasonEndState: null })
@@ -397,7 +398,8 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     // 연봉 결과(384, 종류 20) — 8cb90 이 S+0x50 = 0xa. 이어하기는 380 을 다시 안 틀고 0xa 갈래: 2년차(연차idx 1 홀수)는 새 시즌
     const 연봉 = 끊고다시(132, 384, [{ kind: 20, value: 0 }], [380, 384])
     expect(연봉.저장.seasonEndState).toBe(133)
-    expect(연봉.다시.current.scene).toBe('관리')
+    // 0xa 의 새 시즌 갈래 1c308 도 1c3be 로 빠져 남은 +0x289 로 137
+    expect(연봉.다시.current.scene).toBe('연차표지')
     expect(연봉.다시.current.career).toMatchObject({ season: 3, seasonEndState: null, salary: 연봉.받은뒤.salary })
 
     // 선택지 확인 0x8b804 → 0x8b0e4 — 떠나온 줄(502)을 본 표시하고 저장한다. 지금 이벤트는 아직 줄에 없다
@@ -441,7 +443,9 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
 
     // 투수편에 들어서면 100 → 1c25e → 0x1b768: 2년차 → 3년차 · 굴림(새 연차 2 의 줄 수 × 9) · 곧바로 저장
     rerender({ onScreen: true })
-    expect(result.current.scene).toBe('관리')
+    // 1c3be 로 빠져도 남은 +0x289 를 연초 114 틀(1c0dc)이 9 틀째에 받아 137 — 앞 화면은 100 · 1 · 105 · 115 · 114
+    expect(result.current.scene).toBe('연차표지')
+    expect(result.current.yearCoverFromResume).toBe(true)
     expect(result.current.career).toMatchObject({ season: 3, seasonEndState: null })
     expect(store.load()).toMatchObject({ season: 3, seasonEndState: null })
     expect(굴림).toBeGreaterThan(0)

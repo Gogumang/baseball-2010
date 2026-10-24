@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { LeftFrame } from '@/shared/ui/LeftFrame/LeftFrame'
 import { useImgTextPalettes } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
@@ -18,6 +19,12 @@ interface NariYearCoverScreenProps {
   readonly yearIndex: number
   /** 105 관리 화면으로 — 0x12190 의 `0xbcb49(0x69)` 가 적용되는 틀 */
   readonly onDone: () => void
+  /**
+   * 앞 화면 틀(0 = 0x1b768 을 부른 틀, 0~9)에 **앞 상태가 그 틀에 그리는 그림** — 원본은 0x1b768 뒤에도 앞 상태(114 끝 틀 0x19da4 ·
+   * 이어하기 길의 100 · 1 · 105 · 115 · 114)가 매 틀 그리기를 돈다. 상태판은 새 시즌이 고친 S 를 읽는다. null 이면(또는 안 넘기면)
+   * 화면 버퍼에 남은 앞 판을 멈춘 채 깐다(`LeftFrame`)
+   */
+  readonly previousScreenAt?: (frame: number) => ReactNode | null
 }
 
 /** 효과기 덮개 — 종류 1 은 '검정에서밝아짐'(실제로는 어두워짐) · 종류 2 는 '검게어두워짐'(실제로는 밝아짐), 이름은 `screenEffect` 그대로 */
@@ -32,7 +39,7 @@ function coverOpacityOf(step: YearCoverStep): number {
  * **나리 137 새 시즌 "N년차" 표지** — 차례 · 그림 근거는 `lib/nariYearCover`. 새 시즌 처리 뒤 앞 화면이 아홉 틀 어두워지고,
  * 검정에서 밝아지며 "N년차" 의 숫자가 지난 연차에서 새 연차로 굴러 올라온 뒤 81 틀째(아무 키면 곧바로) 어두워져 105 로 간다.
  */
-export function NariYearCoverScreen({ yearIndex, onDone }: NariYearCoverScreenProps) {
+export function NariYearCoverScreen({ yearIndex, onDone, previousScreenAt }: NariYearCoverScreenProps) {
   const frame = useUpdateCounter()
   /** 키를 받은 137 틀 — 키 0x106a4 가 [장면+0x28c] = 0x51 을 넣는 틀(키가 든 그리기의 다음 틀) */
   const [skipAt, setSkipAt] = useState<number | null>(null)
@@ -62,7 +69,7 @@ export function NariYearCoverScreen({ yearIndex, onDone }: NariYearCoverScreenPr
   const opacity = coverOpacityOf(step)
   return (
     <RawScreen>
-      {step.kind === '앞화면' ? <LeftFrame part="year-cover-left" /> : (
+      {step.kind === '앞화면' ? (previousScreenAt?.(frame) ?? <LeftFrame part="year-cover-left" />) : (
         <YearCover yearIndex={yearIndex} counter={step.kind === '표지' ? step.counter : 0} />
       )}
       {/* 효과기 0xbd844 — 장면 그리기 끝에 칠한다 */}
@@ -73,6 +80,11 @@ export function NariYearCoverScreen({ yearIndex, onDone }: NariYearCoverScreenPr
       <PressArea label="건너뛰기" onPress={press} />
     </RawScreen>
   )
+}
+
+/** 앞 화면 틀의 검정 — 그리기가 없는 상태(이어하기 길의 100 · 1)에 버퍼가 검정 덮기로 덮인 틀 (`resumeCoverUnderlayAt`) */
+export function YearCoverBlackFrame() {
+  return <div data-part="year-cover-black" style={{ position: 'absolute', inset: 0, background: '#000000', pointerEvents: 'none' }} />
 }
 
 /** 그리기 0x1cc4c — 검정 · 자르기 (0, 154, 240, 22) 안에 "년차"(img_text 398 팔레트 1) · 굴러가는 연차 숫자, 모두 두 배 */
