@@ -3,7 +3,7 @@ import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import { PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_REQUEST_TAB, playerGradeOf, rollTradeRequest,
+  ACE_BATTER_RECORD_GRADES, TRADE_REQUEST_TAB, playerGradeOf, rollTradeRequest, tradeRecordRowsOf,
 } from '@/entities/season-mode/model/tradeRequest'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -167,5 +167,65 @@ describe('상대 팀 레코드', () => {
     const { request } = rollTradeRequest(random, 레코드(), 명단(), (team) => (team === 상대팀 ? 바뀐상대 : tableRosterOf(team)))
 
     expect(request).toMatchObject({ isRequested: true, myIndex: 넘는칸, opponentIndex: 0 })
+  })
+})
+
+/**
+ * U-105 r154 — 0xf1 은 경기 끝 뒤라 그날 넣은 마선수가 열 팀 레코드에 남아 있다(빼는 0xb512c 는 0xdf · 0xe5 진입만).
+ * 0xb5695 가 보는 타자 배열은 [0..8, 마타자, 10, 11, 옛 9] — 뽑기 0..11 의 9번이 마타자다.
+ */
+describe('레코드에 남은 마선수 (0xb53f0 0x40 · 0xb521c 0x60 갈래)', () => {
+  it('타자는 9번에 앉고 옛 9번은 맨 끝 · 투수는 8번 뒤에 붙는다', () => {
+    const roster = 명단()
+    const batters = tradeRecordRowsOf(roster, TRADE_REQUEST_TAB.타자, { pitcher: 1, batter: 3 })
+    const pitchers = tradeRecordRowsOf(roster, TRADE_REQUEST_TAB.투수, { pitcher: 1, batter: 3 })
+
+    expect(batters).toHaveLength(13)
+    expect(batters[9]).toEqual({ kind: '마선수', aceIndex: 3 })
+    expect(batters[12]).toEqual({ kind: '선수', player: roster.batters[9] })
+    expect(batters[10]).toEqual({ kind: '선수', player: roster.batters[10] })
+    expect(pitchers).toHaveLength(9)
+    expect(pitchers[8]).toEqual({ kind: '마선수', aceIndex: 1 })
+  })
+
+  it('마타자 +0x1b 는 XlsACE_BAT_DATA 행 바이트 27 — 20 · 30 · 40 · 50 · 40', () => {
+    expect(ACE_BATTER_RECORD_GRADES).toEqual([20, 30, 40, 50, 40])
+  })
+
+  it('상대 9번을 뽑으면 마타자(크라이져 50)와 견준다 — 표 9번(7)이면 섰을 내 칸이 모자라 더 뽑는다', () => {
+    const 상대팀 = 3
+    const draws = [
+      [0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [9, 0, 12],
+      [1, 0, 12], // 내 1번 +0x1b 10 — 표 9번 7 은 넘고 크라이져 50 은 못 넘는다
+      [3, 0, 12], // 내 3번 50 — 넘는다
+    ] as const
+    // 시험 전제: 표 값
+    expect(teamBatters(상대팀)[9]!.grade).toBe(7)
+    expect(teamBatters(MY_TEAM)[1]!.grade).toBe(10)
+    expect(teamBatters(MY_TEAM)[3]!.grade).toBe(50)
+
+    const 마선수없음 = 차례난수(draws)
+    expect(rollTradeRequest(마선수없음, 레코드(), 명단()).request.myIndex).toBe(1)
+    expect(마선수없음.used()).toBe(5)
+
+    const random = 차례난수(draws)
+    const { request } = rollTradeRequest(random, 레코드(), 명단(), tableRosterOf,
+      (team) => (team === 상대팀 ? { pitcher: 0, batter: 3 } : undefined))
+
+    expect(request).toMatchObject({ isRequested: true, myIndex: 3, opponentIndex: 9, tab: TRADE_REQUEST_TAB.타자 })
+    expect(random.used()).toBe(6)
+  })
+
+  it('내 9번을 뽑으면 내 마타자 — 표 9번(6)으로는 못 넘던 상대 0번(25)을 넘는다', () => {
+    const 상대팀 = 3
+    expect(teamBatters(상대팀)[0]!.grade).toBe(25)
+    expect(teamBatters(MY_TEAM)[9]!.grade).toBe(6)
+    const random = 차례난수([[0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [0, 0, 12], [9, 0, 12]])
+
+    const { request } = rollTradeRequest(random, 레코드(), 명단(), tableRosterOf,
+      (team) => (team === MY_TEAM ? { pitcher: 2, batter: 3 } : undefined))
+
+    expect(request).toMatchObject({ isRequested: true, myIndex: 9, opponentIndex: 0 })
+    expect(random.used()).toBe(5)
   })
 })
