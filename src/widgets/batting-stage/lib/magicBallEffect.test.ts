@@ -7,6 +7,7 @@ import {
   MAGIC_BALL_EFFECT_FIRST_PATH_INDEX,
   magicBallEffectFolderOf,
   magicBallEffectFrameAt,
+  magicBallParticlesOf,
 } from '@/widgets/batting-stage/lib/magicBallEffect'
 
 const 공: Pitch = {
@@ -89,5 +90,29 @@ describe('마구 공 이펙트 칸 (0x3b554 · 0x3b576)', () => {
 
   it('칸이 하나뿐인 애니는 그릴 칸이 없다', () => {
     expect(magicBallEffectFrameAt([{ frame: 0, delay: 0 }], 8)).toBeNull()
+  })
+})
+
+describe('0x11 마구 공 파티클 (0x3b2f4 갈래표 0xcff20)', () => {
+  const 마구 = (pitcherMagicNumber: number, pitcherForm = 0) => ({ isMagicPitch: true, pitcherMagicNumber, pitcherForm })
+
+  it('마구가 아니면 없다 · 1 · 5~8 은 파티클이 없다', () => {
+    expect(magicBallParticlesOf({ isMagicPitch: false, pitcherMagicNumber: 2 }, 3, 20)).toEqual([])
+    for (const number of [1, 5, 6, 7, 8]) expect(magicBallParticlesOf(마구(number), 3, 20)).toEqual([])
+  })
+
+  it('2 · 3 · 9 는 그림마다 id 0x15 — img 15 · 16 · 14', () => {
+    expect(magicBallParticlesOf(마구(2), 0, 20)).toEqual([{ id: 0x15, img: 15 }])
+    expect(magicBallParticlesOf(마구(3), 9, 20)).toEqual([{ id: 0x15, img: 16 }])
+    expect(magicBallParticlesOf(마구(9), 30, 20)).toEqual([{ id: 0x15, img: 14 }])
+  })
+
+  it('4 는 폼 >> 1 로 — 1 이면 공 틱 0 에만 0x18, 2 면 공 틱 ≤ N/2 에 0x16 · 0x17, 0 · 3 은 없다', () => {
+    expect(magicBallParticlesOf(마구(4, 2), 0, 20)).toEqual([{ id: 0x18, img: 15 }])
+    expect(magicBallParticlesOf(마구(4, 3), 1, 20)).toEqual([])
+    expect(magicBallParticlesOf(마구(4, 4), 10, 21)).toEqual([{ id: 0x16, img: 14 }, { id: 0x17, img: 14 }])
+    expect(magicBallParticlesOf(마구(4, 5), 11, 21)).toEqual([])
+    expect(magicBallParticlesOf(마구(4, 1), 0, 20)).toEqual([])
+    expect(magicBallParticlesOf(마구(4, 6), 0, 20)).toEqual([])
   })
 })

@@ -28,6 +28,10 @@ import { ballFrameOf, ballFrameStartTick } from '@/widgets/batting-stage/model/s
 import { clearParticles, emitParticles } from '@/entities/particle/model/particleScene'
 import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
 import { HIT_STOP_TICKS } from '@/widgets/batting-stage/lib/hitPause'
+import { bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
+import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PendingHit } from '@/widgets/batting-stage/model/stageRefs'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
@@ -44,8 +48,8 @@ import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
-  appTickOfGameSceneTick, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, gameSceneTimeOf, isCommonWindowShown,
-  isGameSceneFrozen,
+  appTickOfGameSceneTick, createGameSceneDrawGate, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, gameSceneTimeOf,
+  isCommonWindowShown, isGameSceneFrozen,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
@@ -151,6 +155,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let animationHandle = 0
     /** 그림 입력이 바뀐 틀에서만 다시 그린다 — 루프를 다시 세우면 새로 그린다 */
     const drawMemo = createDrawMemo()
+    /** 창이 선 첫 그림([창+0x250], 52efe)을 한 번 다시 그린다 — 마지막으로 그린 장면 그림 입력을 든다 */
+    const frozenDrawGate = createGameSceneDrawGate()
+    let lastStageScene: StageScene | null = null
     // 장면의 모든 때는 경기 장면 틱 하나로 센다(`gameSceneTickOf`) — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다.
     // 단계 시작은 그 단계가 선 장면 틱이고, 단계 안 틱은 (지금 장면 틱 − 시작 틱)이다
     /**
@@ -221,6 +228,37 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let judgedResultCode: { readonly tick: number; readonly code: number | null } | null = null
     /** 큰 타구 멈춤을 푼(016 을 쏜) 타구 — 한 번만 */
     let hitStopReleased: PendingHit | null = null
+    /**
+     * 이번 0x13('타격') — 0x13 이 선 장면 틱 · 다음 상태가 서는 장면 틱(0x13 갱신이 0x17 을 예약한 틀 + 1, 아직이면 null) · 그때의 스윙
+     * 시작 틱. 0x13 을 끝내는 틀(`commitHit`)은 결과를 넘기며 `pendingHitRef` 를 비우지만 그 틀의 그림은 아직 0x13 이라 여기서 든다
+     * (그리기 꼬리 `bigHitScreen` · 스윙 멈춤 `bigHitSwingSkipsOf`)
+     */
+    let hitInStage: { readonly pending: PendingHit; readonly startTick: number; endTick: number | null; readonly swingStartTick: number | null } | null = null
+    /**
+     * 공 경로 [경기+0x1140](점 N 개, N = [+0x109c])를 마지막으로 채운 공 — 놓기 0x4dc78 만 쓰므로 0x11 의 놓기 전 그림은 앞 공의 경로를
+     * 본다(`magicBallParticlesOf` 의 자리 · N). ⚠️ 근사: 이 부품이 서고 처음 던지는 공의 놓기 전에는 앞 공을 몰라 그 파티클을 안 쏜다
+     */
+    let lastPathPitch: Pitch | null = null
+    /**
+     * 0x11 그림의 마구 공 파티클(0x3b2f4 3b496~3b62c — `magicBallParticlesOf`) — 장면 틱 `tick` 의 그림 몫. 그 틀 끝 관리자 틱(0x6de84)
+     * 앞이다. 파티클이 늘면 관리자 틱의 굴림(경기 난수)도 그만큼 는다 — 원본과 같은 차례
+     */
+    const emitMagicBallParticlesAt = (tick: number) => {
+      const pitch = pitchRef.current
+      if (phaseRef.current !== '투구중' || pitch === null || tick < phaseStartTickRef.current) return
+      if (pitch.worldPath !== null) lastPathPitch = pitch
+      const path = lastPathPitch
+      if (path === null) return
+      // 공 틱 [+0x1098] — 0x11 진입이 0 으로 두고 투수가 놓는 단계에 닿은 틀 끝부터 오른다(`ballFrameOf` 가 음수인 동안 0)
+      const ballTick = Math.max(0, ballFrameOf(tick - phaseStartTickRef.current, latestRef.current.acePitcher?.order))
+      const particles = magicBallParticlesOf(pitch, ballTick, path.frameCount)
+      if (particles.length === 0) return
+      // [sp+0x4c] — 0x35854(공 틱) 은 경로를 0 ~ N − 1 로 잘라 투영한다(`ballPixelAt` 이 같은 자르기)
+      const at = ballPixelAt(path, ballTick)
+      for (const particle of particles) {
+        emitParticles(particlesRef.current, particleConfigOf(particle.id), at.x, at.y, particle.img)
+      }
+    }
     /**
      * 0x13 그리기 0x4cb1c 4ccba~4cd14 — 큰 타구(+0x199a)면 공 틱이 0 인 그림마다 멈춤 셈 [+0x10a8](맞을 때 6)을 1 주고, 옛값이 −1 인
      * 여덟째 그림(상태 틱 7)이 막음을 풀며 공 자리에 016(id 15, 프레임 10)을 쏜다(`hitPause.HIT_STOP_TICKS`) — 이 틀의 파티클
@@ -449,12 +487,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (phaseRef.current === '타격') {
         const pending = pendingHitRef.current
         const held = sceneTick - phaseStartTickRef.current
+        if (pending !== null && hitInStage?.pending !== pending) {
+          hitInStage = { pending, startTick: phaseStartTickRef.current, endTick: null, swingStartTick: swingStartTickRef.current }
+        }
         // 이 틀의 0x13 그리기 0x4cb1c 몫(갱신과 같은 틀 — 0x17 을 예약한 틀도 0x13 을 그린다) — 큰 타구 멈춤이 풀리는 그림
         if (pending !== null) drawHitStop(pending, held)
         // 건너뛰기 키는 키 다음 틀의 이 갱신(0x406e8 40708)이 읽는다
         const skipKeyTick = hitSkipKeyTickRef.current
         const isSkipped = skipKeyTick !== null && sceneTick >= skipKeyTick
-        if (pending === null || held >= pending.ticks || isSkipped) handlersRef.current.commitHit(sceneTick)
+        if (pending === null || held >= pending.ticks || isSkipped) {
+          // 0x13 갱신이 이 틀에 0x17 을 예약한다 — 다음 틀부터 0x13 이 아니다(스윙 멈춤 셈의 끝)
+          if (hitInStage !== null && hitInStage.pending === pending) hitInStage.endTick = sceneTick + 1
+          handlersRef.current.commitHit(sceneTick)
+        }
         return
       }
 
@@ -583,11 +628,32 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신(장면 틱 · 키 · 갱신 표)을, 52efe 가 상태 그리기를,
       // 53048 이 파티클 틱 · 그리기를 건너뛴다. 창이 선 첫 그림([창+0x250])은 장면을 한 번 더 그리지만 갱신이 없어 앞 그림과 같은
       // 모습이라, 웹은 그 그림부터 캔버스를 그대로 둔다(굳은 화면). 시계도 서 있다가 창이 닫히면 이어 흐른다 — 따라잡지 않는다.
-      // ⚠️ 미구현(원본 확인 — R10 7절 r107 보강): [+0x250] 그림은 갱신 없이 그리기만 한 번 돌아 그리기 쪽 셈(0x10 조준 애니 0 칸 ·
-      // 0x11 커서 0x4d708 / 결과 원 0x4d700 · 점수판 0x36714 목표 줄)이 한 번 오른다 — 웹은 그 한 그림을 그리지 않아 안 오른다
+      // [+0x250] 그림은 갱신 없이 그리기만 한 번 돈다 — 배경 0x41230 이 전광판 글자 자리 [구장+0x8c] 를 한 번 더 줄이고(r170 — 그 셈은
+      // `sceneScoreboardTickOf` 가 멈춤 횟수로 센다), 53048 이 파티클 그리기를 건너뛰어 그 그림엔 파티클이 없다. 웹은 마지막 그림 입력에
+      // 전광판 셈만 고쳐 한 번 다시 그린다. ⚠️ 미구현(원본 확인 — R10 7절 r107 보강): 그 밖의 그리기 쪽 셈(0x10 조준 애니 0 칸 ·
+      // 0x11 커서 0x4d708 / 결과 원 0x4d700 · 점수판 0x36714 목표 줄 · 큰 타구 [+0x10a8] 따위)은 그 그림에 안 오른다
       if (isGameSceneFrozen()) {
         // 창이 서 있는 틀은 키 0x498d4 가 안 돌고 다음 틀 0xbca05 머리가 받은 키를 지운다 — 모아 두지 않는다
         keyLatch.clear()
+        const frozenScene = lastStageScene
+        if (frozenDrawGate.allowsDraw() && frozenScene !== null && latestRef.current.settlement?.layers === undefined) {
+          const redrawn: StageScene = {
+            ...frozenScene,
+            particles: null,
+            scenery: { ...frozenScene.scenery, scoreboardTick: sceneScoreboardTickOf(gameSceneTickOf(gameSceneTimeOf(rawNow))) },
+          }
+          // 다음 그림이 이 그림과 견주도록 입력을 남긴다
+          drawMemo.needsDraw(canvas, {
+            scene: { ...redrawn, particles: particleSignatureOf(null) },
+            layerParticles: null,
+            rainLayer: null,
+            rainLayerSize: null,
+            particleLayer: null,
+            particleLayerSize: null,
+          })
+          renderBattingStage(context, redrawn)
+          lastStageScene = redrawn
+        }
         animationHandle = requestAnimationFrame(frame)
         return
       }
@@ -682,6 +748,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           inPlayEnteredTickRef.current = null
           clearParticles(particlesRef.current)
         }
+        // 이 틱의 0x11 그림이 쏘는 마구 공 파티클 — 그 틀 끝 관리자 틱(아래 `stepStageFrame` 의 0x6de84) 앞
+        emitMagicBallParticlesAt(steppedTick)
         stageEffects = stepStageFrame(stageEffects, {
           time: stepTime,
           millisecondsPerTick: tickLength,
@@ -720,6 +788,13 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
               stageHud.hiddenRunnerBases ?? [],
               runnerFrames,
             )
+      // 이번 0x13 — 0x13 을 끝내는 틀도 아직 0x13 그림이다(`hitInStage`)
+      const hitNow = phaseRef.current === '타격' && hitInStage !== null && hitInStage.startTick === phaseStartTickRef.current ? hitInStage : null
+      // 0x13 의 스윙 멈춤 · 반 속도(3f1ea · 3f2dc) — 건너뛴 칸만큼 스윙 시작을 늦춰 본다(0x13 뒤에도 그 칸만큼 늦다)
+      const swingStartTick = swingStartTickRef.current
+      const swingHold = hitInStage !== null && swingStartTick !== null && hitInStage.swingStartTick === swingStartTick ? hitInStage : null
+      const swingSkips =
+        swingHold === null ? 0 : bigHitSwingSkipsOf(swingHold.pending.watchesBigHit, swingHold.startTick, swingHold.endTick, sceneTick)
       const stageScene: StageScene = {
         pitcherForm,
         pitcherHand,
@@ -737,9 +812,20 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             : latestRef.current.homeRunText === null
               ? null
               : homeRunTextFrameAt(latestRef.current.homeRunText, tickTime, tickLength),
-        swingFrame: batterFrameNow(sceneTick, swingStartTickRef.current, buntRef.current !== null, bodyType, latestRef.current.aceBatterOrder),
+        swingFrame: batterFrameNow(
+          sceneTick,
+          swingStartTick === null ? null : swingStartTick + swingSkips,
+          buntRef.current !== null,
+          bodyType,
+          latestRef.current.aceBatterOrder,
+        ),
         // 필살 스윙 연출 그림 0x49aec — 맞은 틀(0x11)에 처음, 이어 상태 0x13('타격') 그림마다 (k = 단계 틱 + 2, `specialSwingEffect`)
         specialSwingEffect: specialSwingEffectNow(sceneTick),
+        // 큰 타구 0x13 그리기 0x4cb1c 의 꼬리(확대 · 흐리기 · 번쩍임 · 테두리 / 애니 3) — 0x13 틱으로 센다 (`bigHitScreen`)
+        bigHitScreen:
+          hitNow === null || isBackdrop
+            ? null
+            : bigHitScreenOf(hitNow.pending.watchesBigHit, sceneTick - hitNow.startTick, side, hitNow.pending.bigHitAt),
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
         batterSkinIndex: latestRef.current.batterSkinIndex,
@@ -821,6 +907,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         particleLayerSize: particleLayer === null ? null : [particleLayer.width, particleLayer.height],
       })
       if (shouldDraw) renderBattingStage(context, stageScene)
+      lastStageScene = stageScene
       if (shouldDraw && layers !== undefined) {
         const rainContext = layers.rain.current?.getContext('2d') ?? null
         if (rainContext !== null) renderSettlementLayer(rainContext, { rain: settlementRain })
