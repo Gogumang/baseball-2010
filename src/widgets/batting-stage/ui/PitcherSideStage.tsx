@@ -323,7 +323,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         side,
         hud: current.hud,
         pitcherStaminaPercent: current.pitcherStaminaPercent ?? null,
-        // 실투 "!" — 놓은 틱(0x11 틱 10)의 그림이 첫 그림(1)이다. ⚠️ 근사: 그림마다가 아니라 장면 틱으로 센다(타자편과 같다)
+        // 실투 "!" — 놓은 틱(0x11 틱 10)의 그림이 첫 그림(1)이다. 그림 한 번 = 장면 틱 하나로 센다(타자편과 같다 — `pitcherFatigue`)
         pitcherMistakeMarkDraw:
           shownMistake && releaseTick !== null && stage.phase.kind === '투구중' ? nowTick - releaseTick + 1 : null,
         ...(current.runnerAces === undefined ? {} : { runnerAces: current.runnerAces }),

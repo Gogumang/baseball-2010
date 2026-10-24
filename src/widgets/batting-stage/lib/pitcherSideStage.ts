@@ -65,7 +65,9 @@ export interface PitcherSideStageFrame {
  *   공 틱 N + 1 에서 0x12 로 간다(0x4e24e).
  * - 0x12: `resultTicks` 동안 — 공은 마지막 점(`heldBall`).
  * - 그 밖은 '대기'(0xd~0xf · 0x10 조준 — 장면은 대기 동작이다).
- * ⚠️ 근사: 웹 게이지는 rAF 가 아니라 setInterval 로 틱을 세므로 놓은 틱이 한 틱 안쪽으로 어긋날 수 있다.
+ * 게이지(`PitchGradeGauge`)도 경기 장면 틱 머리마다 센다(`setGameSceneTickInterval`) — 놓은 틱은 게이지가 놓은 그 장면 틱이다.
+ * ⚠️ 남은 차이: 게이지 셈은 게이지 화면이 선 장면 틱에서 시작한다 — 원본 0x11 진입 틀(예약 다음 틀, 0xbc9c8)과 같은 틀인지는 웹 화면
+ * 갈래(조준 → 게이지)가 서는 때에 달렸다.
  */
 export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSideStageFrame {
   const idle: PitcherSideStageFrame = {
