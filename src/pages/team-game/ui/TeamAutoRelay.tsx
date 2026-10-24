@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { FrameSprite, MessageBox } from '@/shared/ui'
+import { FrameSprite, MessageBox, PressArea } from '@/shared/ui'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay'
@@ -252,6 +253,15 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
               style={imageStyle(SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 8, ARROW_Y, { transform: 'scaleX(-1)' })} />
             <img alt="" src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
               style={imageStyle(SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) + 3, ARROW_Y)} />
+          </>
+        )}
+        {/* 웹 덧붙임 — 속도 화살(5×8, 깜박임) 위 투명 칸: 원본 ← · → 키 한 번(속도 −1 · +1). 상황 버튼도 띄운다 */}
+        {!isAsking && (
+          <>
+            <PressArea label="속도 느리게" touchKey={{ key: 'ArrowLeft', label: '◀ 느리게' }} onPress={() => tapKey('ArrowLeft')}
+              rect={{ x: SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 13, y: ARROW_Y - 4, width: 14, height: 16 }} />
+            <PressArea label="속도 빠르게" touchKey={{ key: 'ArrowRight', label: '빠르게 ▶' }} onPress={() => tapKey('ArrowRight')}
+              rect={{ x: SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) - 1, y: ARROW_Y - 4, width: 14, height: 16 }} />
           </>
         )}
         {[0, 1, 2].map((index) => (

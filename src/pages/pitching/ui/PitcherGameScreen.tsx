@@ -111,6 +111,7 @@ import { usePitchArrivalHold } from '@/widgets/batting-stage/model/usePitchArriv
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
+import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -493,6 +494,8 @@ function PitcherGameScene({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, pickoff])
+  // 터치 기기 — 주자가 있는 루마다 "N루 견제" 상황 버튼(같은 키 사건을 쏜다)
+  usePickoffTouchKeys(acceptsPickoff, progress.game.bases)
 
   /**
    * '#' — 공용 키 0x498d4 의 '#' 가지(0x4994a): 0x38984 참이고 경기 상태가 **0xe 또는 0xf** 면, 모드 3 은 StrGAME[104]

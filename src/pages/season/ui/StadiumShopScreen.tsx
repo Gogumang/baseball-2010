@@ -8,6 +8,7 @@ import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { stepSeasonScoreboardX } from '@/widgets/batting-stage/lib/renderScenery'
 import { liveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { StadiumPreviewCanvas } from '@/pages/season/ui/StadiumPreviewCanvas'
 import { StadiumItemWindow } from '@/pages/season/ui/StadiumItemWindow'
 import type { StadiumKind, StadiumPurchaseRefusal } from '@/entities/season-mode/model/stadiumItems'
@@ -228,6 +229,9 @@ export function StadiumShopScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
+  // 터치 기기 — 칸 목록(5줄만 보인다)에 들어가 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 줄은 눌러서 고른다
+  useTouchScrollKeys(isSlotFocus && !isPopup)
 
   // 미리보기 — 구장관리는 초점 1 이면 늘 커서 칸(0x7b10), 상점은 칸 목록이 움직였을 때만(0x9cb2)
   const previewSlot = !isSlotFocus ? null : isShop ? shopPreviewSlot : slot

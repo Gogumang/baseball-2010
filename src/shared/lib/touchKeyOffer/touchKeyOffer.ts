@@ -15,6 +15,8 @@ export interface TouchKeyOffer {
   readonly label: string
   /** 누르고 있는 동안만 뜻이 있는 키(번트 '8') — 버튼을 떼면 keyup. 아닌 키도 떼면 keyup 은 간다(키보드와 같다) */
   readonly isHold?: boolean
+  /** 버튼 차례를 직접 줄 때(작을수록 앞) — 안 주면 `KEY_ORDER`. 한 화면이 같은 무리의 키를 제 차례로 세울 때(수비 송구 1·2·3루 · 홈) */
+  readonly order?: number
 }
 
 interface OfferEntry {
@@ -23,15 +25,16 @@ interface OfferEntry {
 }
 
 /** 버튼 차례 — 앞일수록 앞(확인 쪽)에 선다. 없는 키는 뒤로 */
-const KEY_ORDER: readonly string[] = ['0', '8', '3', '2', '1', '#', '*']
+const KEY_ORDER: readonly string[] = ['0', '8', '3', '2', '1', '7', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', '#', '*']
 
 let entries: OfferEntry[] = []
 let snapshot: readonly TouchKeyOffer[] = []
 let nextId = 1
 const listeners = new Set<() => void>()
 
-const rankOf = (key: string) => {
-  const rank = KEY_ORDER.indexOf(key)
+const rankOf = (offer: TouchKeyOffer) => {
+  if (offer.order !== undefined) return offer.order
+  const rank = KEY_ORDER.indexOf(offer.key)
   return rank < 0 ? KEY_ORDER.length : rank
 }
 
@@ -39,7 +42,7 @@ function rebuild(): void {
   // 같은 키를 둘이 알리면 나중 것 하나만 — 버튼 하나가 키 하나다
   const byKey = new Map<string, TouchKeyOffer>()
   for (const entry of entries) byKey.set(entry.offer.key, entry.offer)
-  snapshot = [...byKey.values()].sort((a, b) => rankOf(a.key) - rankOf(b.key))
+  snapshot = [...byKey.values()].sort((a, b) => rankOf(a) - rankOf(b))
   for (const listener of listeners) listener()
 }
 
@@ -74,10 +77,30 @@ export function useTouchKeyOffer(offer: TouchKeyOffer | null): void {
   const key = offer?.key
   const label = offer?.label
   const isHold = offer?.isHold === true
+  const order = offer?.order
   useEffect(() => {
     if (key === undefined || label === undefined) return undefined
-    return offerTouchKey({ key, label, ...(isHold ? { isHold } : {}) })
-  }, [key, label, isHold])
+    return offerTouchKey({ key, label, ...(isHold ? { isHold } : {}), ...(order === undefined ? {} : { order }) })
+  }, [key, label, isHold, order])
+}
+
+/** 목록 · 글 위아래 넘기기 상황 버튼 (↑ · ↓) — 화면 안에 그 칸이 없거나 손가락보다 작을 때 */
+export const SCROLL_UP_OFFER: TouchKeyOffer = { key: 'ArrowUp', label: '▲ 위' }
+export const SCROLL_DOWN_OFFER: TouchKeyOffer = { key: 'ArrowDown', label: '▼ 아래' }
+/** 쪽 · 탭 앞뒤 넘기기 상황 버튼 (← · →) */
+export const PAGE_PREVIOUS_OFFER: TouchKeyOffer = { key: 'ArrowLeft', label: '◀ 앞' }
+export const PAGE_NEXT_OFFER: TouchKeyOffer = { key: 'ArrowRight', label: '뒤 ▶' }
+
+/** `isActive` 동안 ↑ · ↓ 상황 버튼을 알린다 */
+export function useTouchScrollKeys(isActive: boolean): void {
+  useTouchKeyOffer(isActive ? SCROLL_UP_OFFER : null)
+  useTouchKeyOffer(isActive ? SCROLL_DOWN_OFFER : null)
+}
+
+/** `isActive` 동안 ← · → 상황 버튼을 알린다 */
+export function useTouchPageKeys(isActive: boolean): void {
+  useTouchKeyOffer(isActive ? PAGE_PREVIOUS_OFFER : null)
+  useTouchKeyOffer(isActive ? PAGE_NEXT_OFFER : null)
 }
 
 /** 상황 버튼 목록을 읽는다 (`widgets/touch-controls`) */
@@ -89,4 +112,16 @@ export function useTouchKeyOffers(): readonly TouchKeyOffer[] {
 export function resetTouchKeyOffersForTest(): void {
   entries = []
   rebuild()
+}
+
+/**
+ * 투명 누름 칸(`PressArea`)이 원본 키 한 번을 그대로 내게 한다 — keydown · keyup 을 초점 요소(없으면 body)에 쏘아 `window` 까지 올린다.
+ * 화면은 키보드 · 상황 버튼 · 누름 칸을 가리지 않는다(원본 그림 자리 위 칸 — 기록실 ◀ · ▶ 따위).
+ */
+export function tapKey(key: string, doc: Document = document): void {
+  const code = key.length === 1 && key >= '0' && key <= '9' ? `Digit${key}` : key
+  const target = doc.activeElement instanceof HTMLElement ? doc.activeElement : doc.body
+  for (const type of ['keydown', 'keyup'] as const) {
+    target.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true, composed: true }))
+  }
 }

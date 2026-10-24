@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { CommonPanel, MessageBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import {
   currentTitleOf, equipTitleNoticeOf, titleListOf, TITLE_ROWS_PER_PAGE,
 } from '@/entities/career/model/titles'
@@ -63,6 +64,9 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
   const pageTop = top
   const page = titles.slice(pageTop, pageTop + TITLE_ROWS_PER_PAGE)
   const visibleRows = Math.min(titles.length, TITLE_ROWS_PER_PAGE)
+
+  // 터치 기기 — 9줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 줄은 눌러서 고르지만 그 밖의 줄은 커서로만 닿는다
+  useTouchScrollKeys(notice === null && titles.length > TITLE_ROWS_PER_PAGE)
 
   /** 확인 키 — 이미 장착한 것이면 원본도 **아무 일도 하지 않는다** (0x11fd6 의 `!=` 검사) */
   const confirm = (index: number) => {

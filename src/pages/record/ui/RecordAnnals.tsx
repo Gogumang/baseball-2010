@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CommonPanel, FrameSprite, InsetBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
+import { CommonPanel, FrameSprite, InsetBox, PressArea, RawScreen, useImgTextPalette3 } from '@/shared/ui'
+import { PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, tapKey, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -234,6 +235,9 @@ export function RecordAnnals({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
+  // 터치 기기 — 본문에 초점이 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ — 보이는 행 밖 칸 · 닉네임 글 스크롤). ◀ · ▶ 는 아래 쪽 화살 칸이 띄운다
+  useTouchScrollKeys(isPanelOpen && !isTabFocused)
+
   /** 웹 덧붙임 — 보이는 칸을 누르면 본문에 들어가 그 칸을 고른다 (창은 그대로) */
   const selectCell = (index: number) => {
     if (!isPanelOpen) return
@@ -286,6 +290,15 @@ export function RecordAnnals({
           <div className={styles.pagerText} style={{ left: PAGER.numberX, top: PAGER.y }}>
             {page + 1}/{pageCount}
           </div>
+          {/* 웹 덧붙임 — 쪽 화살 그림(5×8) 위 투명 칸: 원본 ← · → 키 한 번. 본문 초점이면 ◀ · ▶ 상황 버튼도 띄운다 */}
+          {isPanelOpen && (
+            <>
+              <PressArea label="앞 쪽" rect={{ x: PAGER.leftArrow.x - 3, y: PAGER.leftArrow.y - 3, width: 11, height: 14 }}
+                onPress={() => tapKey('ArrowLeft')} {...(isTabFocused ? {} : { touchKey: PAGE_PREVIOUS_OFFER })} />
+              <PressArea label="뒤 쪽" rect={{ x: PAGER.rightArrow.x - 3, y: PAGER.rightArrow.y - 3, width: 11, height: 14 }}
+                onPress={() => tapKey('ArrowRight')} {...(isTabFocused ? {} : { touchKey: PAGE_NEXT_OFFER })} />
+            </>
+          )}
         </>
       )}
 

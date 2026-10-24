@@ -2,11 +2,12 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { skinBlinkCounterValue } from '@/shared/lib/skinBlink/skinBlink'
 import { useSkinStepCounterValue } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { CommonPanel, useImgTextPalette3 } from '@/shared/ui'
+import { CommonPanel, PressArea, useImgTextPalette3 } from '@/shared/ui'
+import { PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { yearLabelOffsetOf, yearNumberGlyphsOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import {
-  RANKING_BOARD, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
+  RANKING_BLINK_AT_REST, RANKING_BOARD, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
 } from '@/pages/nari-record-room/lib/rankingBoard'
 import { seasonRankingValueTextOf } from '@/entities/season-mode/model/seasonRecordRanking'
 import type { SeasonRankingEntry } from '@/entities/season-mode/model/seasonRecordRanking'
@@ -71,6 +72,15 @@ export function RankingBoard({
       {hasNextPage && (
         <img alt="다음 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
           style={{ ...pixel, left: rankingSideArrowXOf('right', counters), top: arrowTop, transform: 'scaleX(-1)' }} />
+      )}
+      {/* 웹 덧붙임 — 쪽 화살(5×8, 깜박이며 2px 까딱) 위 투명 칸: 원본 ← · → 키 한 번. ◀ · ▶ 상황 버튼도 띄운다(부르는 화면이 키를 받는다) */}
+      {hasPreviousPage && (
+        <PressArea label="앞 쪽" touchKey={PAGE_PREVIOUS_OFFER} onPress={() => tapKey('ArrowLeft')}
+          rect={{ x: rankingSideArrowXOf('left', RANKING_BLINK_AT_REST) - 4, y: arrowTop - 3, width: 13, height: 14 }} />
+      )}
+      {hasNextPage && (
+        <PressArea label="다음 쪽" touchKey={PAGE_NEXT_OFFER} onPress={() => tapKey('ArrowRight')}
+          rect={{ x: rankingSideArrowXOf('right', RANKING_BLINK_AT_REST) - 4, y: arrowTop - 3, width: 13, height: 14 }} />
       )}
       {Array.from({ length: RANKING_BOARD.rowCount }, (_unused, row) => {
         const entry = entries[row]

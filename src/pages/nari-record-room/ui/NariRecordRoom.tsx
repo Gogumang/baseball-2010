@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { addSkinStepCounter, useMirrorSkinStepCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import type { CSSProperties } from 'react'
-import { CommonPanel, RawScreen, ScreenOverlay, useImgTextPalette3 } from '@/shared/ui'
+import { CommonPanel, PressArea, RawScreen, ScreenOverlay, useImgTextPalette3 } from '@/shared/ui'
+import {
+  PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, SCROLL_DOWN_OFFER, SCROLL_UP_OFFER, tapKey,
+} from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
@@ -249,6 +252,23 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
             ))}
           </div>
         ))}
+        {/* 웹 덧붙임 — 위 · 아래 · 앞 열 · 다음 열 화살 위 투명 칸: 원본 ↑ · ↓ · ← · → 키 한 번. 상황 버튼(▲ ▼ ◀ ▶)도 띄운다 */}
+        {rows.length > 1 && (
+          <>
+            <PressArea label="위 줄" touchKey={SCROLL_UP_OFFER} onPress={() => tapKey('ArrowUp')}
+              rect={{ x: layout.arrowX - 4, y: layout.upArrowY - 4, width: 20, height: 16 }} />
+            <PressArea label="아래 줄" touchKey={SCROLL_DOWN_OFFER} onPress={() => tapKey('ArrowDown')}
+              rect={{ x: layout.arrowX - 4, y: layout.downArrowY - 2, width: 20, height: 16 }} />
+          </>
+        )}
+        {columns.length > VISIBLE_YEAR_COLUMNS && (
+          <>
+            <PressArea label="앞 열" touchKey={PAGE_PREVIOUS_OFFER} onPress={() => tapKey('ArrowLeft')}
+              rect={{ x: layout.statX - 11, y: layout.sideArrowY - 3, width: 11, height: 14 }} />
+            <PressArea label="다음 열" touchKey={PAGE_NEXT_OFFER} onPress={() => tapKey('ArrowRight')}
+              rect={{ x: layout.statX + layout.clip.width - 5, y: layout.sideArrowY - 3, width: 11, height: 14 }} />
+          </>
+        )}
         {view.firstColumn !== 0 && (
           <img alt="앞 열" src={imageOf(SLT_FRAME, SIDE_ARROW_IMAGE)}
             style={{ ...pixel, left: layout.statX - blink - 5, top: layout.sideArrowY }} />

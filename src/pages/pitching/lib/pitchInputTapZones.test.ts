@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { aimTapRectsOf, gaugeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { AIM_TAP_MIN_CELL, aimTapRectsOf, gaugeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 
@@ -26,5 +26,22 @@ describe('투구 입력 누름 칸', () => {
     expect(centerX).toBeLessThanOrEqual(middle.x + middle.width)
     expect(centerY).toBeGreaterThanOrEqual(middle.y)
     expect(centerY).toBeLessThanOrEqual(middle.y + middle.height)
+  })
+
+  it('조준 칸은 손가락 크기까지 바깥으로 넓힌다 — 칸끼리 안 겹치고 빈틈 없이, 소프트키 글자 칸(y 307~)에 안 닿는다', () => {
+    for (const side of [0, 1]) {
+      const rects = aimTapRectsOf(side)
+      for (const rect of rects) {
+        expect(rect.width).toBeGreaterThanOrEqual(AIM_TAP_MIN_CELL.width)
+        expect(rect.height).toBeGreaterThanOrEqual(AIM_TAP_MIN_CELL.height)
+        expect(rect.y + rect.height).toBeLessThan(MENU_PRESS_RECT.y)
+      }
+      // 이웃 칸은 경계를 맞댄다 (겹침 · 틈 없음)
+      for (let index = 0; index < 9; index += 1) {
+        const rect = rects[index]
+        if (index % 3 < 2) expect(rects[index + 1].x).toBe(rect.x + rect.width)
+        if (index < 6) expect(rects[index + 3].y).toBe(rect.y + rect.height)
+      }
+    }
   })
 })

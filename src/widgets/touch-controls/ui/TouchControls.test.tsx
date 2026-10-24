@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TouchControls } from '@/widgets/touch-controls/ui/TouchControls'
-import { offerTouchKey, resetTouchKeyOffersForTest, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { offerTouchKey, resetTouchKeyOffersForTest, tapKey, useTouchKeyOffer, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
 
@@ -143,3 +143,80 @@ describe('상황 버튼 — 화면이 알린 키만, 같은 키 사건으로', (
     expect(screen.getByRole('button', { name: '마구' })).toBeTruthy()
   })
 })
+
+describe('견제 · 많은 상황 버튼', () => {
+  it("견제 '3'/'1'/'7' 은 1루 · 2루 · 3루 차례로 서고, 누르면 그 숫자 키 사건이다", () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      offerTouchKey({ key: '7', label: '3루 견제' })
+      offerTouchKey({ key: '*', label: '메뉴' })
+      offerTouchKey({ key: '3', label: '1루 견제' })
+      offerTouchKey({ key: '1', label: '2루 견제' })
+      offerTouchKey({ key: '0', label: '마구' })
+    })
+    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(names).toEqual(['마구', '1루 견제', '2루 견제', '3루 견제', '메뉴', '뒤로', '확인'])
+    const third = screen.getByRole('button', { name: '3루 견제' })
+    press(third)
+    lift(third)
+    expect(seen.map((event) => `${event.type}:${event.key}:${event.code}`)).toEqual(['keydown:7:Digit7', 'keyup:7:Digit7'])
+  })
+
+  it('가로 배치 — 셋까지는 세로 한 줄, 넷부터는 두 줄 격자(왼쪽 칸 높이를 넘지 않게)', () => {
+    render(<TouchControls layout="sides" />)
+    const optionBox = () => screen.getByRole('group', { name: '상황 버튼' }).querySelector('[data-option-layout]')
+    act(() => {
+      offerTouchKey({ key: '0', label: '마구' })
+      offerTouchKey({ key: '3', label: '1루 견제' })
+      offerTouchKey({ key: '*', label: '메뉴' })
+    })
+    expect(optionBox()?.getAttribute('data-option-layout')).toBe('column')
+    act(() => {
+      offerTouchKey({ key: '1', label: '2루 견제' })
+      offerTouchKey({ key: '7', label: '3루 견제' })
+      offerTouchKey({ key: '#', label: '강판' })
+    })
+    expect(optionBox()?.getAttribute('data-option-layout')).toBe('grid')
+    expect(optionBox()?.children).toHaveLength(6)
+  })
+})
+
+describe('넘기기 · 차례 · 누름 칸 키', () => {
+  it('order 를 준 버튼은 그 차례로 선다 (수비 송구 1루 · 2루 · 3루 · 홈)', () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      offerTouchKey({ key: '8', label: '홈 송구', order: 3 })
+      offerTouchKey({ key: '6', label: '1루 송구', order: 0 })
+      offerTouchKey({ key: '4', label: '3루 송구', order: 2 })
+      offerTouchKey({ key: '2', label: '2루 송구', order: 1 })
+    })
+    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(names).toEqual(['1루 송구', '2루 송구', '3루 송구', '홈 송구', '뒤로', '확인'])
+  })
+
+  it('세로 배치 — 다섯부터 네 칸 격자', () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      for (const key of ['2', '4', '8', '0', '3']) offerTouchKey({ key, label: `키 ${key}` })
+    })
+    expect(screen.getByRole('group', { name: '터치 조작' }).querySelector('[data-option-layout]')?.getAttribute('data-option-layout')).toBe('grid')
+  })
+
+  it('▲ · ▼ 버튼은 ArrowUp · ArrowDown 키 사건이다', () => {
+    const Scroll = () => {
+      useTouchScrollKeys(true)
+      return null
+    }
+    render(<><TouchControls layout="below" /><Scroll /></>)
+    const down = screen.getByRole('button', { name: '▼ 아래' })
+    press(down)
+    lift(down)
+    expect(keys()).toEqual(['keydown:ArrowDown', 'keyup:ArrowDown'])
+  })
+
+  it('tapKey — 누름 칸이 쓰는 키 한 번(keydown · keyup, 숫자는 Digit 코드)', () => {
+    tapKey('7')
+    expect(seen.map((event) => `${event.type}:${event.key}:${event.code}`)).toEqual(['keydown:7:Digit7', 'keyup:7:Digit7'])
+  })
+})
+

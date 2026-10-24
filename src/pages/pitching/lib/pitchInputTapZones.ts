@@ -44,22 +44,35 @@ export function slotTapRectOf(slot: number, side: number): PressRect | null {
 export const AIM_KEYPAD_KEYS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
 
 /**
+ * 조준 칸 하나의 **최소 크기**(240×320 장면 점) — 웹 터치 껍데기. 자르기 상자의 투영은 75 × 30 쯤이라 칸 하나가 25 × 10 밖에 안 돼
+ * 손가락으로 못 고른다. 칸 격자를 **같은 가운데에서 바깥으로** 이만큼까지 넓힌다(칸끼리 겹치지 않고, 원본 칸을 다 품는다).
+ * 그림(조준 십자 · 존)은 장면이 그대로 그린다 — 넓히는 것은 보이지 않는 누름 칸뿐이다. 넓힌 격자(약 108 × 84)는 소프트키
+ * 글자 칸(y 307~)에 닿지 않는다.
+ */
+export const AIM_TAP_MIN_CELL = { width: 36, height: 28 } as const
+
+/**
  * 조준 영역 — 0x39c5c 가 자르는 범위(존 중심 0xcfbcc[side] 의 x ±600 · y ±400)를 조준 그림과 같은 투영(0xbe3d8,
  * `projectToScreen`)으로 화면에 옮긴 상자를 3 × 3 으로 나눈다. 칸 차례는 `AIM_KEYPAD_KEYS` 다.
+ * 칸은 `AIM_TAP_MIN_CELL` 보다 작으면 상자 가운데를 축으로 넓힌다(방향 뜻 — 위 줄은 위, 왼 줄은 왼 — 은 그대로).
  */
 export function aimTapRectsOf(aimSide: number): PressRect[] {
   const center = ZONE_CENTERS[aimSide] ?? ZONE_CENTERS[0]
   const topLeft = projectToScreen({ x: center.x - AIM_CLAMP.x, y: center.y + AIM_CLAMP.y, z: center.z }, aimSide)
   const bottomRight = projectToScreen({ x: center.x + AIM_CLAMP.x, y: center.y - AIM_CLAMP.y, z: center.z }, aimSide)
-  const left = Math.min(topLeft.x, bottomRight.x)
-  const top = Math.min(topLeft.y, bottomRight.y)
-  const cellWidth = Math.abs(bottomRight.x - topLeft.x) / 3
-  const cellHeight = Math.abs(bottomRight.y - topLeft.y) / 3
+  const boxWidth = Math.abs(bottomRight.x - topLeft.x)
+  const boxHeight = Math.abs(bottomRight.y - topLeft.y)
+  const middleX = Math.min(topLeft.x, bottomRight.x) + boxWidth / 2
+  const middleY = Math.min(topLeft.y, bottomRight.y) + boxHeight / 2
+  const cellWidth = Math.round(Math.max(boxWidth / 3, AIM_TAP_MIN_CELL.width))
+  const cellHeight = Math.round(Math.max(boxHeight / 3, AIM_TAP_MIN_CELL.height))
+  const left = Math.round(middleX - (cellWidth * 3) / 2)
+  const top = Math.round(middleY - (cellHeight * 3) / 2)
   return AIM_KEYPAD_KEYS.map((_, index) => ({
-    x: Math.round(left + (index % 3) * cellWidth),
-    y: Math.round(top + Math.floor(index / 3) * cellHeight),
-    width: Math.round(cellWidth),
-    height: Math.round(cellHeight),
+    x: left + (index % 3) * cellWidth,
+    y: top + Math.floor(index / 3) * cellHeight,
+    width: cellWidth,
+    height: cellHeight,
   }))
 }
 

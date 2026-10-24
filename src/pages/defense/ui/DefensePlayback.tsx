@@ -7,6 +7,7 @@ import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/sceneKeyLatch/keyHold'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
+import { useInPlayTouchKeys } from '@/features/defense-play/model/inPlayTouchKeys'
 import {
   acceptsFastForwardKey,
   defensePlayResultOf,
@@ -597,6 +598,8 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   if (stepperRef.current === null || stepperRef.current.play !== play) {
     stepperRef.current = { play, stepper: startLiveRunnerPlay(play), startedAt: update }
   }
+  // 터치 기기 — 사람이 잡은 쪽(판의 side, 안 주면 수비)의 송구 · 주루 상황 버튼
+  useInPlayTouchKeys(play.side ?? '수비')
   const pressesRef = useRef<DefenseKeyPress[]>([])
   /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
   const pressTicksRef = useRef<number[]>([])
@@ -752,6 +755,8 @@ function LivePlayback({
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
+  // 터치 기기 — 사람이 잡은 쪽의 송구 · 주루 상황 버튼 (자동 판은 없음)
+  useInPlayTouchKeys(side)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
   const builtSideRef = useRef<ControlSide | undefined>(undefined)

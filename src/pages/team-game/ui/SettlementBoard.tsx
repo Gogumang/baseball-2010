@@ -8,6 +8,7 @@ import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import {
   NO_RECORD_TEXT, SETTLEMENT_BAND, SETTLEMENT_INFO_BAR, SETTLEMENT_INFO_POINT, SETTLEMENT_LOSE_DIM_STEP,
   SETTLEMENT_RESULT_SPRITE, SETTLEMENT_SCORE, SETTLEMENT_SCROLL_TRACK, SETTLEMENT_TITLE_BAR, SETTLEMENT_VISIBLE_ROWS,
@@ -138,6 +139,9 @@ export function SettlementBoard({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   })
+
+  // 터치 기기 — 기록 판이 열려 있고 줄이 넘치면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 0x61ce5 스크롤)
+  useTouchScrollKeys(isPanelOpen && rows.length > SETTLEMENT_VISIBLE_ROWS)
 
   const hasRewardLine = isVersusMode(mode) && isWin
   const panel = settlementPanelLayoutOf(settlementPanelHeightOf(mode, isWin), rows.length, hasRewardLine)

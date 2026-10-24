@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import type { ReactNode } from 'react'
+import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { FrameSprite, MarkupText, MessageBox } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
@@ -20,7 +21,7 @@ import {
   ITEM_ROWS, ITEM_TEXT_INSET, MODE_UI_FRAME, NAME_BOX, SIDE_LABEL_FRAME, SKILL_CELL_BOXES, SKILL_COLUMNS,
   SKILL_SIGN_ANIMATION, SKILL_SIGN_POSITION, SKILL_TEXT_OFFSET, SKILL_WINDOW_COLORS, TAB_BOXES,
   TAB_COUNT, TAB_LABEL_FRAMES, WINDOW_BOX, WINDOW_COLORS, gridIndexOf, isBlinkVisible, moveGridCursor,
-  scrolledTopRowOf, skillCellFrameOf, skillGridRowsOf, skillListOf,
+  SKILL_VISIBLE_ROWS, scrolledTopRowOf, skillCellFrameOf, skillGridRowsOf, skillListOf,
 } from '@/widgets/skill-window/lib/skillWindowLayout'
 import type { GridCursor, GridDirection, LayoutBox } from '@/widgets/skill-window/lib/skillWindowLayout'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
@@ -259,6 +260,9 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
     }
     setItemCursor(moveGridCursor(itemCursor, direction, ITEM_COLUMNS, ITEM_ROWS))
   }
+
+  // 터치 기기 — 스킬이 3행을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 칸은 눌러 고르지만 넷째 행부터는 커서로만 닿는다
+  useTouchScrollKeys(prompt === null && tab === 0 && skillRows > SKILL_VISIBLE_ROWS)
 
   useEffect(() => {
     // 대화가 떠 있으면 MessageBox 가 먼저 키를 가져간다
