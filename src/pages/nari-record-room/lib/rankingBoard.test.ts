@@ -19,8 +19,13 @@ describe('순위 판 0x5796c', () => {
   })
 
   it('[판+0x410] 은 앞 화면들이 남긴 앱 하나의 값을 그대로 읽는다 (U-90) — 4 면 꺼짐 ◀ 183 − 0 − 7', () => {
-    expect(rankingBlinkCountersOf(4)).toEqual({ drawCount: 4, keyCount: 0 })
-    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4))).toBe(176)
+    expect(rankingBlinkCountersOf(4, 0)).toEqual({ drawCount: 4, keyCount: 0 })
+    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4, 0))).toBe(176)
+  })
+
+  it('[판+0x40c] 도 앞 화면들이 남긴 스킨 칸을 읽는다 (r166 — 0x5761c 첫 인자 0 은 0x5561c 를 안 지난다) — 5 면 ◀ 183 − 0 − 5', () => {
+    expect(rankingBlinkCountersOf(4, 5)).toEqual({ drawCount: 4, keyCount: 5 })
+    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4, 5))).toBe(178)
   })
 
   it('값 0x6aff8 — 칸 x + 0x19 에서 오른쪽부터, 타율은 점', () => {

@@ -56,7 +56,8 @@ import {
   type HomeRunTextWindow,
 } from '@/widgets/batting-stage/lib/homeRunBanner'
 import {
-  clearGameSceneTimeout, gameSceneNow, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, setGameSceneTickTimeout, setGameSceneTimeout,
+  clearGameSceneTimeout, createGameSceneDrawGate, gameSceneNow, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime,
+  setGameSceneTickInterval, setGameSceneTickTimeout, setGameSceneTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
@@ -423,8 +424,9 @@ export function useHomeRunDerby({
 
   // 아래 시계는 모두 경기 장면 시계로 잰다(`setGameSceneTimeout`) — 더비도 경기 장면 0x104(모드 7)라 공용 창이 서 있으면 0x52c50 이
   // 52cc6 에서 장면 틱 · 진입 · 갱신을, 53086 에서 공 틱 0x3f378 을 건너뛴다. 판 끝 · 0xd 두 그림 · 0xe 잠금 · 판 안 소리가 그동안 서고
-  // 닫히면 남은 만큼 이어 센다. ⚠️ 미확인: 콤보 표시(21 번 그림)는 그리기 셈이라 창이 선 첫 그림([창+0x250])에 한 번 더 오르는데,
-  // 시계로는 그 한 그림을 세지 않는다
+  // 닫히면 남은 만큼 이어 센다. 콤보 표시만은 그리기 셈이다 — HUD 그리기 0x45a54 → 0x4585c 가 [+0x19ec] 를 그릴 때마다 +1 하고
+  // 0x14 를 넘으면(45a00~45a0a) 끈다. 52efe 가 창이 선 첫 그림([창+0x250])은 그리기를 한 번 더 돌리므로 그 한 그림도 센다(확정 r166 —
+  // `createGameSceneDrawGate`)
   const timerRef = useRef<number | null>(null)
   /** 판 안 소리(홈런 11 · 파울 25)를 그 공 틱에 내는 시계들 */
   const playSoundTimersRef = useRef<number[]>([])
@@ -437,9 +439,9 @@ export function useHomeRunDerby({
     playSoundTimersRef.current = []
   }
   /** HUD 콤보 표시(+0x1b60)가 꺼질 때 — 상태 0xf 에서 켠 뒤 21 번 그리면 끈다 */
-  const comboTimerRef = useRef<number | null>(null)
+  const comboTimerRef = useRef<(() => void) | null>(null)
   const clearComboTimer = () => {
-    if (comboTimerRef.current !== null) clearGameSceneTimeout(comboTimerRef.current)
+    comboTimerRef.current?.()
     comboTimerRef.current = null
   }
   /** 상태 0xe 의 키 잠금(틱 ≤ 2)이 풀렸나 */
@@ -558,7 +560,14 @@ export function useHomeRunDerby({
     if (shouldShowComboAtNextPitch(runRef.current)) {
       setShownCombo(runRef.current.comboDisplay)
       clearComboTimer()
-      comboTimerRef.current = setGameSceneTickTimeout(endShownCombo, COMBO_DISPLAY_FRAMES)
+      // 그린 수 [+0x19ec] — 장면 틱마다 한 그림, 창이 서 있으면 첫 그림만 (0x4585c 45a00~45a0a)
+      const drawGate = createGameSceneDrawGate()
+      let draws = 0
+      comboTimerRef.current = setGameSceneTickInterval(() => {
+        if (!drawGate.allowsDraw()) return
+        draws += 1
+        if (draws >= COMBO_DISPLAY_FRAMES) endShownCombo()
+      })
     }
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { resetSkinStepCounter, setSkinStepCounter, skinStepCounterValue } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { outfitPaletteIndex, useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
@@ -93,27 +94,34 @@ function FigureLayer({ layer, y, paletteIndex }: {
 }
 
 /**
- * 목록 객체 — 메인 메뉴 스킨 [this+0x120](하위 16 홈런더비 · 17 미션 · 27 스페셜 명전이 같이 쓴다) · 나리 [this+0xd8](상태 145 등록) ·
- * 시즌 [this+0xa8](0xe2 선수영입). 그린 수·머무름·자세는 이 객체 칸이라 화면을 건너 잇는다.
+ * 목록 객체를 든 장면 — 메인 메뉴 [this+0x120](하위 16 홈런더비 · 17 미션 · 27 스페셜 명전) · 나리 [this+0xd8](상태 145 등록) ·
+ * 시즌 [this+0xa8](0xe2 선수영입). 셋 다 **같은 전역 스킨 [0x1552cfc]** 이다(확정 r166 — 생성자 0x234d4 의 23620~23634 · 나리 셋업
+ * 0xf684 의 f6b0~f6be · 시즌 0x3b14 의 3b3c~3b4c 가 그 값을 적는다). 그래서 그린 수 [+0x40c] · 머무름 +0x208 · 자세 +0x204 는 앱에
+ * 하나다 — 그린 수는 엔트리 편집기 · 순위 판 · 경기설정 창과도 같은 칸(`shared/lib/skinStepCounter`).
  */
 export type HallOfFameListOwner = '메뉴' | '나리' | '시즌'
 
-const listMemories = new Map<HallOfFameListOwner, FigureListMemory>()
+/** 머무름 · 자세 — 앱에 하나 (그린 수는 `skinStepCounterValue`) */
+let listMemory: FigureListMemory = INITIAL_FIGURE_LIST_MEMORY
 /** 앱을 새로 띄운 것과 같다 — 테스트용 */
-export const resetHallOfFameFigureMemory = () => listMemories.clear()
+export const resetHallOfFameFigureMemory = () => {
+  listMemory = INITIAL_FIGURE_LIST_MEMORY
+  resetSkinStepCounter()
+}
 
 /**
  * 갱신 한 번에 그림 한 번 — 그린 **뒤** 목록 칸을 굳힌다(그림이 나간 뒤 effect). 건너뛴 갱신은 그만큼 앞당겨 그린다.
  * 그림·애니 객체는 진입마다 새로 만들므로 이 훅(화면)마다 따로 든다.
  */
-export function useHallOfFameFigure(owner: HallOfFameListOwner, input: FigureSlotInput): FigureDrawing {
+export function useHallOfFameFigure(input: FigureSlotInput): FigureDrawing {
   const tick = useUpdateCounter()
   const committed = useRef<{ tick: number; entry: FigureEntryState }>({ tick: tick - 1, entry: INITIAL_FIGURE_ENTRY })
-  const memory = listMemories.get(owner) ?? INITIAL_FIGURE_LIST_MEMORY
+  const memory: FigureListMemory = { ...listMemory, draws: skinStepCounterValue() }
   const frame = drawListFigureTimes(memory, committed.current.entry, input, tick - committed.current.tick)
   useEffect(() => {
     if (committed.current.tick === tick) return
-    listMemories.set(owner, frame.memory)
+    listMemory = frame.memory
+    setSkinStepCounter(frame.memory.draws)
     committed.current = { tick, entry: frame.entry }
   })
   return frame.drawing

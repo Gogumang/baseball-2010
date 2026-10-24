@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
+import { addSkinStepCounter, useMirrorSkinStepCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import type { CSSProperties } from 'react'
 import { CommonPanel, RawScreen, ScreenOverlay, useImgTextPalette3 } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -200,6 +201,8 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
     return () => timer()
   }, [isSliding, columns.length])
 
+  // [편집기+0x40c] 는 전역 스킨 칸 — 0x5561c 의 0 에서 센 값을 옮겨 다음 화면이 잇게 한다 (`shared/lib/skinStepCounter`)
+  useMirrorSkinStepCounter(view.keyPresses)
   const layout = YEAR_TABLE_LAYOUT
   const offset = yearSlideOffsetOf(view, columns.length)
   const visibleCount = visibleYearRowCountOf(rows.length)
@@ -287,6 +290,9 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
   )
 }
 
+/** 순위 판 키 0x5787d 까지 가지만 쪽을 안 넘기는 키 — 0x1463c 가 '0' · '*' 는 버린다 */
+const RANKING_OTHER_KEYS: ReadonlySet<string> = new Set(['ArrowUp', 'ArrowDown', 'Enter', '1', '2', '3', '5', '7', '8', '9', '#'])
+
 interface NariRankingScreenProps {
   readonly edition: NariRecordEdition
   readonly career: PlayerCareer | PitcherCareer
@@ -306,9 +312,15 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
   latest.current = { onBack }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 0x1463c: 취소 → 106 · '0' · '*' 는 버린다 · 그 밖은 0x5787d — 쪽이 바뀌든 말든 [편집기+0x40c] += 1 (5793e~57948)
       if (isCancelKey(event.key)) latest.current.onBack()
-      else if (event.key === 'ArrowRight' || event.key === '6') setPage((held) => moveRankingPage(side, held, 1))
-      else if (event.key === 'ArrowLeft' || event.key === '4') setPage((held) => moveRankingPage(side, held, -1))
+      else if (event.key === 'ArrowRight' || event.key === '6') {
+        addSkinStepCounter()
+        setPage((held) => moveRankingPage(side, held, 1))
+      } else if (event.key === 'ArrowLeft' || event.key === '4') {
+        addSkinStepCounter()
+        setPage((held) => moveRankingPage(side, held, -1))
+      } else if (RANKING_OTHER_KEYS.has(event.key)) addSkinStepCounter()
       else return
       event.preventDefault()
       event.stopPropagation()

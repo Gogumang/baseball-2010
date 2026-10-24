@@ -4,6 +4,7 @@ import { CommonPanel, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useSkinStepDrawCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { wrapHelpText } from '@/pages/help/lib/helpPages'
 import { MATCH_SETTING_KIND, confirmedMatchSettings } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -69,8 +70,9 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const sltOrigins = useFrameOrigins(SLT_FRAMES)
   const popupOrigins = useFrameOrigins(POPUP_FRAMES)
-  // 그릴 때마다 [skin+0x40c] += 1 뒤 `% 8 ≤ 4` — 웹은 창을 연 뒤 갱신 수 + 1 (⚠️ 시작 값 미확인)
-  const isBlinkOn = isSettingsBlinkOn(useUpdateCounter() + 1)
+  // 그릴 때마다 [skin+0x40c] += 1 뒤 `% 8 ≤ 4` — 앱에 하나인 스킨 칸이라 앞 화면(엔트리 편집기 · 순위 판 · 명전 몸 그림)이
+  // 남긴 값에서 이어 센다 (`shared/lib/skinStepCounter`, 확정 r166)
+  const isBlinkOn = isSettingsBlinkOn(useSkinStepDrawCounter(useUpdateCounter()))
   const filterId = `palette-${useId().replace(/:/g, '')}`
 
   const apply = (action: MatchSettingsAction) => {

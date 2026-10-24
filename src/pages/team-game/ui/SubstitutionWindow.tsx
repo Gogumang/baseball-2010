@@ -7,6 +7,7 @@ import { measurePixelTextWidth } from '@/shared/lib/font/layout'
 import { CommonPanel, FrameSprite, PressArea, useImgTextPalette3 } from '@/shared/ui'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { useMarkSkinNameBars } from '@/shared/lib/skinNameBars/skinNameBars'
 import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { yearCellDrawingOf, yearLabelOffsetOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import {
@@ -50,6 +51,8 @@ interface SubstitutionWindowProps {
  */
 export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, onConfirm, onCancel }: SubstitutionWindowProps) {
   const tick = useSceneTick()
+  // 0x37904 · 0x37e5c 그리기가 [skin+0x333] = 1 을 적는다(37a4a · 38044) — 앱에 하나인 스킨 칸이라 스페셜 에디트가 이어 본다
+  useMarkSkinNameBars()
   const [list, setList] = useState({ cursor: 0, top: 0 })
   /** [skin+0x424] — 연 그림 수 (창 걸음 · 도형 자람). null 이면 닫힘 */
   const [detailOpenedAt, setDetailOpenedAt] = useState<number | null>(null)

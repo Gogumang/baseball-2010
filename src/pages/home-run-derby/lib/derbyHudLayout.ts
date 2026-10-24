@@ -248,5 +248,6 @@ export function comboDisplayPlacementOf(value: number, batterSide: number, drawI
  * 구장 0x78931 다음에 늘 그린다(존이 없으면 효과 0 그대로).
  * ⚠️ 근사: 이식판 더비는 판의 필드 화면이 없어(타구 비행을 안 그린다) 필드 좌표에 놓을 수 없다 — 존이 선 공에서만 HUD 위쪽
  * 1/3 한가운데에 부품 0 하나를 띄운다. **이 자리는 내가 정했다.** 깜빡임 규칙만 원본이다(`isEventZoneTranslucentAt`).
+ * 남김(r166): 원본 자리에 놓으려면 더비 판의 필드 화면(타구 비행 그리기 · 공 궤적 투영)이 먼저 서야 한다.
  */
 export const EVENT_ZONE_SPOT = { x: 120 - 35, y: Math.trunc(320 / 3) - 66, src: './sprites/event_zone/000.png' } as const

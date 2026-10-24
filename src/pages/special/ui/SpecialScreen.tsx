@@ -524,8 +524,8 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
    */
   readonly backdrop?: SkinBackdropKind
   /**
-   * 목록 객체 — 몸 그림의 그린 수·머무름·자세([목록+0x40c] · +0x208 · +0x204)가 이 객체 칸이라 화면을 건너 잇는다.
-   * 안 주면 등록은 '나리'(나리 [this+0xd8]), 그 밖은 '메뉴'(스킨 [this+0x120]). 시즌 선수영입 0xe2 는 '시즌' 을 넘겨야 원본과 같다.
+   * 목록 객체를 든 장면 — 안 주면 등록은 '나리'(나리 [this+0xd8]), 그 밖은 '메뉴'([this+0x120]). 시즌 선수영입 0xe2 는 '시즌'.
+   * 셋 다 같은 전역 스킨이라 몸 그림의 그린 수·머무름·자세는 앱에 하나다(`HallOfFameFigure` 머리말) — 여기서는 격자 꼴만 가른다.
    */
   readonly listOwner?: HallOfFameListOwner
 }) {
@@ -542,7 +542,7 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   const { a, b } = HALL_OF_FAME_DETAIL
   const owner = listOwner ?? (mode.kind === '등록' ? '나리' : '메뉴')
   const menuGrid = hallOfFameGridOf(mode, owner)
-  const figure = useHallOfFameFigure(owner, {
+  const figure = useHallOfFameFigure({
     slot,
     isBatterSlot: slot >= HALL_OF_FAME_PITCHER_SLOTS,
     look: current.kind === '찬칸' ? current.figure : null,

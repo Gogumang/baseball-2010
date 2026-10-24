@@ -1,5 +1,6 @@
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { skinBlinkCounterValue } from '@/shared/lib/skinBlink/skinBlink'
+import { useSkinStepCounterValue } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { CommonPanel, useImgTextPalette3 } from '@/shared/ui'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
@@ -49,6 +50,8 @@ export function RankingBoard({
   const headerTop = RANKING_BOARD.headerY + RANKING_BOARD.headerTextDy
   const arrowTop = RANKING_BOARD.headerY + RANKING_BOARD.sideArrowDy
   const palette3 = useImgTextPalette3()
+  // [판+0x410] · [판+0x40c] — 둘 다 앱에 하나인 스킨 칸 (0x579ca · 0x57b5c 읽기만)
+  const counters = rankingBlinkCountersOf(skinBlinkCounterValue(), useSkinStepCounterValue())
 
   return (
     <>
@@ -63,11 +66,11 @@ export function RankingBoard({
       })}
       {hasPreviousPage && (
         <img alt="앞 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
-          style={{ ...pixel, left: rankingSideArrowXOf('left', rankingBlinkCountersOf(skinBlinkCounterValue())), top: arrowTop }} />
+          style={{ ...pixel, left: rankingSideArrowXOf('left', counters), top: arrowTop }} />
       )}
       {hasNextPage && (
         <img alt="다음 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
-          style={{ ...pixel, left: rankingSideArrowXOf('right', rankingBlinkCountersOf(skinBlinkCounterValue())), top: arrowTop, transform: 'scaleX(-1)' }} />
+          style={{ ...pixel, left: rankingSideArrowXOf('right', counters), top: arrowTop, transform: 'scaleX(-1)' }} />
       )}
       {Array.from({ length: RANKING_BOARD.rowCount }, (_unused, row) => {
         const entry = entries[row]
