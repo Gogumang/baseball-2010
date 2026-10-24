@@ -69,7 +69,7 @@ export interface NariEntryFace {
   readonly pitcherLine?: EntryPitcherLine
   /** 체력 줄 — 용량 0x66e44(팀 레코드, rec, 0) · 퍼센트 0x572a4 */
   readonly stamina?: { readonly capacity: number; readonly percent: number }
-  /** '0' 상세 창 0x5b798 레코드 칸 — 붙박이 표 행 · 마선수 표. ⚠️ 내 선수 줄은 커리어가 레코드 칸(+0xb · +0x1b 등)을 안 들어 비운다 */
+  /** '0' 상세 창 0x5b798 레코드 칸 — 붙박이 표 행 · 마선수 표. ⚠️ 미구현(남김 — 웹 기록 꼴): 내 선수 줄은 커리어가 레코드 칸(+0xb · +0x1b 등)을 안 들어 비운다 */
   readonly detailSource?: PlayerDetailSource
 }
 

@@ -204,7 +204,7 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
       magicNumber: famer.selectedMagicNumber ?? 0,
     },
     { equippedSkillIds, ...(famer.equipmentLevels === undefined ? {} : { equipmentLevels: famer.equipmentLevels }) },
-    // ⚠️ 미해결: 명전 기록 +0x2c 는 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값인데 웹 명전 기록(`HallOfFamePitcher`)이
+    // ⚠️ 미구현(남김 — 웹 기록 꼴): 명전 기록 +0x2c 는 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값인데 웹 명전 기록(`HallOfFamePitcher`)이
     //    그 칸을 안 남긴다 — 남길 때까지 10000 으로 둔다
     MISSION_STAMINA,
     // ⚠️ 보직을 안 남긴 옛 명전 기록은 보직이 없다(판 없음) — 원본 기록에는 늘 있는 칸이다

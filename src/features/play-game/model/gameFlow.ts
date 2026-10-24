@@ -605,7 +605,7 @@ export function startGame(
   /**
    * 환경설정 "주루" 가 수동인가 (설정 +0xbd). 안 넘기면 자동 — 지금까지와 한 톨도 다르지 않다.
    *
-   * ⚠️ **근사**: 원본은 이 칸을 매 틱 다시 읽지만(`0x5261c`), 웹은 경기를 세울 때 한 번 받아
+   * ⚠️ 근사(남김 — 웹 구조 · 결과는 같다): 원본은 이 칸을 매 틱 다시 읽지만(`0x5261c`), 웹은 경기를 세울 때 한 번 받아
    *    들고 다닌다. 경기 중에 설정을 바꾸는 길은 `useCareerSession` 이 이 칸을 갈아 끼워 잇는다.
    */
   runningModeManual = false,
@@ -2097,7 +2097,7 @@ function selectPitchAfterClear(
     const outgoingPitcher = opponentPitcherAbilityOf(current)
     const outgoing = outgoingPitcher.repertoire
     const outgoingHasMagic = (outgoing?.magicId ?? 0) !== 0
-    // ⚠️ 볼카운트를 안 넘긴 입구(옛 시험 호출)는 마구 투수일 때 굴림 여부를 못 가려 굴리지 않는다 — 앱 세션은 늘 넘긴다
+    // ⚠️ 근사(남김 — 시험 전용 입구, 앱 길엔 없다): 볼카운트를 안 넘긴 입구(옛 시험 호출)는 마구 투수일 때 굴림 여부를 못 가려 굴리지 않는다 — 앱 세션은 늘 넘긴다
     if (!outgoingHasMagic || count !== undefined) {
       rollCpuPitchTypeOnPitcherChangeTick(
         {
@@ -3379,7 +3379,7 @@ const OUT_RESULT_CODE = 5
  * 내 타석이 아니거나(경기 끝·수비 진행 중) 그 루가 비었으면 아무 일도 없다 — 같은 객체를 돌려준다
  * (`0x34848` 은 주자 있는 루가 나올 때까지 굴리므로 빈 루가 들어오면 부르는 쪽 잘못이다).
  *
- * ⚠️ 미해결·근사 (`teamGameFlow.cpuPickoff` 와 같은 자리)
+ * ⚠️ 미확인(남김 — 0xae3e8 의 3아웃 갈래 타순 커서는 따로 안 떴다 · 판은 웹이 미리 돌린다) (`teamGameFlow.cpuPickoff` 와 같은 자리)
  * - 견제사·진루·득점은 루·아웃·점수·반 이닝 교대와 상대 투수 실점 A·B 에 먹이고, 0xa8024(종류 4)의 거르지 않는 칸은
  *   `withRunnerPlaySettlement`(상대 투수 +0x20 · 모드 4 의 0xa59c0 인기도 · 병살 · 득점권 아웃) — 같은 투구 틈 앞 판의 사건까지.
  *   돌발 판정 0x8f414 는 결과비트 0 이라 판정이 없다.

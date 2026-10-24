@@ -130,7 +130,7 @@ describe('0xe4 팀 고르기', () => {
     expect(screen.getAllByRole('button', { name: TEAMS[OPPONENT].name }).length).toBeGreaterThan(0)
   })
 
-  it('⚠️ 원본 목록에는 내 팀이 없다 — 골라도 넘어가지 않는다 (근사)', () => {
+  it('내 팀 칸은 골라도 넘어가지 않는다 — 키 0x8250 이 칸 == SR+1 이면 아무것도 안 한다 (82be · 82c0 → 8392)', () => {
     띄우기(상태())
 
     누르기(TEAMS[MY_TEAM].name)
