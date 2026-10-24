@@ -1,14 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import type { PointerEvent } from 'react'
 import type { SceneKeyKind } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
-import {
-  clearGameSceneTimeout, gameSceneNow, gameSceneTickNow, isGameSceneFrozen, setGameSceneTimeout,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneNow, gameSceneTickNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
-/** 이만큼 길게 누르고 있으면 번트 자세 — 떼면 푼다 (모바일용, 웹판 추가) */
-const BUNT_HOLD_MILLISECONDS = 350
 /** 화면 좌우 이 비율 안쪽을 누르면 타자를 옮긴다 (모바일용, 웹판 추가) */
 const SHIFT_EDGE_RATIO = 0.25
 
@@ -49,9 +45,6 @@ const SPECIAL_SWING_KEY = '0'
 
 export function useStageControls(refs: StageRefs, actions: StageActions) {
   const { pointerDownAtRef, latestRef, keyLatch } = refs
-  /** 길게 누르기 번트 타이머와 그것이 번트를 걸었는지 (모바일용, 웹판 추가) */
-  const buntHoldTimerRef = useRef<number | null>(null)
-  const isPointerBuntingRef = useRef(false)
 
   /**
    * 키는 받은 그 자리에서 처리하지 않고 키 칸(`keyLatch`)에 든다 — 원본은 키 콜백이 [+0x20] 에 적기만 하고 다음 틀의 0xbca05 →
@@ -110,44 +103,17 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸(`keyLatch`)은 부품마다 하나다
   }, [actions])
 
-  useEffect(
-    () => () => {
-      clearGameSceneTimeout(buntHoldTimerRef.current)
-    },
-    [],
-  )
-
   return {
+    /**
+     * 화면 탭 (웹판 추가 — 원본은 키뿐). **손가락이 닿는 순간** 키를 받는다(떼는 순간이 아니다 — 키패드 키도 누름에 keydown 이다).
+     * 가운데 = OK 스윙, 양 끝(`SHIFT_EDGE_RATIO`) = '4'/'6' 타자 이동. 번트('8', 누르고 있는 동안)는 터치 상황 버튼 · 키로 한다
+     * (r173 — 예전에는 길게 누르면 번트라 스윙이 손을 뗄 때 나가 한두 틀 늦었다).
+     */
     onPointerDown: (event: PointerEvent<HTMLCanvasElement>) => {
       event.preventDefault()
       pointerDownAtRef.current = gameSceneNow()
-      isPointerBuntingRef.current = false
-      const bounds = event.currentTarget.getBoundingClientRect()
-      const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
-      const isEdge = x < STAGE_WIDTH * SHIFT_EDGE_RATIO || x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)
-      if (isEdge || !latestRef.current.canBunt) return
-      clearGameSceneTimeout(buntHoldTimerRef.current)
-      // 길게 누르고 있으면 번트 1 을 누른 것으로 — 떼면 푼다(키 '8' 과 같다). 누르고 있는 시간은 경기 장면 시계로 잰다 —
-      // 창이 서 있는 동안은 키 처리가 없으므로(52cc6) 그동안은 세지 않는다
-      buntHoldTimerRef.current = setGameSceneTimeout(() => {
-        buntHoldTimerRef.current = null
-        isPointerBuntingRef.current = true
-        latch((tick) => actions.pressBunt(1, tick))
-      }, BUNT_HOLD_MILLISECONDS)
-    },
-
-    onPointerUp: (event: PointerEvent<HTMLCanvasElement>) => {
-      event.preventDefault()
-      if (buntHoldTimerRef.current !== null) {
-        clearGameSceneTimeout(buntHoldTimerRef.current)
-        buntHoldTimerRef.current = null
-      }
-      if (isPointerBuntingRef.current) {
-        isPointerBuntingRef.current = false
-        // 키 '8' 떼기와 같다 — 창이 서 있는 동안 뗀 것은 버려진다(위 `onKeyUp`)
-        if (isGameSceneFrozen()) return
-        return latch((tick) => actions.releaseBunt(tick), 'release')
-      }
+      // 주 단추(터치 · 펜 · 마우스 왼쪽)만
+      if (event.button > 0) return
       // 공용 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 위 `onKeyDown` 과 같다
       if (isGameSceneFrozen()) return
       const bounds = event.currentTarget.getBoundingClientRect()

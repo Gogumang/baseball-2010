@@ -23,7 +23,7 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
-import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
+import { STEAL_KEY_OF_BASE, stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
@@ -506,9 +506,11 @@ export function MissionPlayScreen({
         )}
         {!isAwaitingConfirm && !isMenuOpen && canSteal &&
           stealableBases.map((base) => (
-            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
+            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
+              touchKey={{ key: STEAL_KEY_OF_BASE[base], label: `도루 ${base}루` }} onPress={() => stealIfFlying(base)} />
           ))}
-        {!isOver && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.pressStar} />}
+        {!isOver && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT}
+          touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.pressStar} />}
 
         {isMenuOpen && (
           <div className={stageScreen.menuLayer}>

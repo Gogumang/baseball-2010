@@ -94,8 +94,8 @@ globalStyle('body', {
  * 창 전체를 격자로 나눈다 — 노치·홈 막대(safe-area)를 빼고, 주소창이 오르내리면 `100dvh` 로 따라간다.
  * `body[data-layout]` (`useViewportFit`):
  * - `plain`  — 화면 칸(`#root`) 하나.
- * - `below`  — 세로 폰: 화면 칸(확대한 판 높이 `--game-track`) 위, 키패드 두 덩이(`padL` · `padR`) 아래.
- * - `sides`  — 가로 폰: 키패드 왼쪽 · 화면 칸(확대한 판 폭) · 키패드 오른쪽.
+ * - `below`  — 세로 폰: 화면 칸(확대한 판 높이 `--game-track`) 위, 터치 버튼 덩이(`pad`) 아래.
+ * - `sides`  — 가로 폰: 상황 버튼 · 뒤로(`padL`) 왼쪽 · 화면 칸(확대한 판 폭) · 확인(`padR`) 오른쪽.
  */
 globalStyle('body', {
   position: 'fixed',
@@ -112,9 +112,9 @@ globalStyle('body', {
 })
 
 globalStyle('body[data-layout="below"]', {
-  gridTemplateAreas: '"game game" "padL padR"',
+  gridTemplateAreas: '"game" "pad"',
   gridTemplateRows: 'var(--game-track) minmax(0, 1fr)',
-  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
 })
 
 globalStyle('body[data-layout="sides"]', {
@@ -123,7 +123,7 @@ globalStyle('body[data-layout="sides"]', {
   gridTemplateColumns: 'minmax(0, 1fr) var(--game-track) minmax(0, 1fr)',
 })
 
-/** 키패드 자리는 감싸개 없이 두 덩이를 격자 칸에 바로 세운다 */
+/** 터치 버튼 자리는 감싸개 없이 덩이를 격자 칸에 바로 세운다 */
 globalStyle('#keypad-root', {
   display: 'contents',
 })
