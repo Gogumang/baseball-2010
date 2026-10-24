@@ -177,6 +177,13 @@
   웹: decode_pzx `write_frame_layers` 가 `frames/layers.json`(보통 파트 묶음 · 0x67 날 그림 + b)을 내고 캔버스가 화면 위에 더한다.
   부른 쪽 효과 0 확인: 하늘 조명 78526 · 판정 393f6/39474 · 강속구 불꽃 3b7ce · 홈런 칸 40de4 · 게이지 4d602/4d624 · 컷인 속도선 474f0.
   ⚠️ DOM 화면(main_title · touch · trainning · 수비/투수편의 game_judge · slt_pitch · game_effect)은 아직 구운 근사.
+- **r142 (2026-10-24, 웹 round9-r142 c8754e2b)**: 타이틀 적재 0x258fc — 0x93cfd(애니 0, 0) 한 번 · (애니 1, 1) 되풀이. 그리기 0x2cbac 는
+  2cbbc 검정 지우기 → 애니 0(효과 0, 그린 뒤 넘김) → 2cbf2 끝 깃발이면 애니 1 · 저작권. 지연 합 20 → 그리기 차례 19 부터 애니 1.
+  메뉴 바탕 0x58371 583a8 = 프레임 13 효과 0(흰 화면 위 더하기). 웹: 타이틀 · 메뉴 바탕은 캔버스 겹, 수비 DOM 판정 글자는
+  EffectImage(효과 2 · 검정) + plus-lighter. touch.pzx 는 binary.mod 에 이름이 없다(안 씀). trainning 21~23(애니 3)은 더비 0x41098
+  (0x93c45(애니 3, 50|140, 70, 효과 0)) 몫인데 웹에 그 그리기가 없다. slt_pitch DOM(구질 이름 0~21)에는 0x67 칸이 없다.
+  **0x11 뒤집기의 0x66**: ca07c 갈래는 파트+0x10 을 안 읽어 0x66 도 복사 — 우타 타자(78d16, item_bat_head_3~6 전 칸) · 좌투 투구 바람
+  (38df0, player_effect 40 · 41) · 좌타 돌발 초상(0x8f310, event_char_0/1). 웹: decode_pzx `write_frame_copies` 의 frames/copy 판.
 
 ## 3c. 0xbb91d 픽셀 효과 (종류 비트 · a · b) — 확정
 
