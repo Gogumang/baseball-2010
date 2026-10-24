@@ -1,4 +1,4 @@
-import { isFreeToRetarget } from '@/entities/fielding/model/fielderPose'
+import { acceptsTargetVt14, isFreeToRetarget } from '@/entities/fielding/model/fielderPose'
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
@@ -328,7 +328,10 @@ export function applyCoverAssignment(
     }
     const cover = assigned.coverStates.find((entry) => entry.slot === fielder.slot)
     if (cover !== undefined) {
-      next = { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
+      // b25b6 vt14(루 좌표) = 0xa14c8 — 잠금 +0xb4 ≤ 0 · vtc8(+0xb1 · +0xcc)일 때만 목표를 받는다(r196). AI 는 b25c4 가 늘 루 + 2
+      next = acceptsTargetVt14(next)
+        ? { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
+        : { ...next, aiState: AI_STATE.COVER_HOME + cover.base }
     }
     return next
   })
@@ -361,7 +364,10 @@ export function claimCoverOfBase<P extends Pick<PlayView, 'coverOfBase' | 'ballH
       fielder.slot === previous
         ? { ...fielder, aiState: AI_STATE.IDLE }
         : fielder.slot === slot
-          ? { ...fielder, target: basePosition(base), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
+          ? // vt48 0xa0a18 → vt14(루 좌표) — 관문(`acceptsTargetVt14`)이 막으면 목표는 그대로(r196)
+            acceptsTargetVt14(fielder)
+            ? { ...fielder, target: basePosition(base), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
+            : { ...fielder, aiState: AI_STATE.COVER_HOME + base }
           : fielder,
     ),
   }

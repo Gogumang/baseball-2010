@@ -56,6 +56,16 @@ export interface DefenseScene {
    * (종류 2 · 3 — vt4c 도 vt30 도 안 돈다)도 그 값을 그대로 둔다. 진행기는 끝날 때 제 +0xf0 을 여기에 적는다
    */
   readonly playCovers: readonly number[]
+  /**
+   * **야수 +0xcc — 칸 0~8** (r196, 직접 뜬 것). 야수 9명은 경기 장면 초기화 0x3e340(상태 7 — 새 경기 · 이어하기 모두 여기서 장면을
+   * 새로 연다)이 한 번 만들고(생성자 a0df0 +0xcc = 0) 판마다 다시 쓴다. +0xcc 를 쓰는 곳은 a0df0 · vt8c a0ee0(AI 0xf b4c52 의 5) ·
+   * 판 시작 vt20 0xb0fb4 의 b1156(**인자 ≠ 0 일 때만** — b1144 가 인자 0 이면 건너뛴다) · 목록 틱 a1330(−1) 넷뿐이고, 목록 틱은
+   * 0x3f060 이 관문 G1(3f0b8)이 열리고 상태 0x17 일 때만 돈다. 그래서 판 사이(정산 · 다음 투구)에는 안 줄고, vt20(0)으로 여는 판
+   * (판 시작 표 0xd877c — 종류 2 · 3 밀어내기 b288c · 4 견제 b28be · 5 도루 b2950 · 9 폭투 b284a)이 앞 판의 값을 들고 연다.
+   * 타구 판(종류 1 b280a)과 홈런더비(8 b29f2)는 vt20(1)이라 0 으로 지운다. 진행기는 끝날 때 제 +0xcc 를 여기에 적는다
+   * (`fielderSlackAtPlayEnd`). 저장 블록(0x4f928 — 팀 둘 · st 0xa4 · 플레이 시간)에는 야수 객체가 없다
+   */
+  readonly fielderSlack?: readonly number[]
 }
 
 /** deadly_effect 애니 0 의 상태 칸 (애니 +8 객체의 [0] 칸 · [2] 비트) — 지연 0 이라 셈 칸은 늘 0 이다 */
@@ -82,6 +92,8 @@ export const DEFENSE_SCENE_START: DefenseScene = {
   deadlyAnim: { frameIndex: 0, playing: false, ended: false },
   // new(0x1fc) 의 memset 0
   playCovers: [0, 0, 0, 0],
+  // 야수 생성자 a0df0 — +0xcc = 0
+  fielderSlack: [0, 0, 0, 0, 0, 0, 0, 0, 0],
 }
 
 /**

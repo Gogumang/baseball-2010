@@ -50,7 +50,9 @@ import { baseAtPoint, claimCoverOfBase, needsCover } from '@/entities/fielding/m
 import { DIVE_TICK_NONE } from '@/features/defense-play/model/catchForecast'
 import { diveCheckOf, logDiveCheck } from '@/features/defense-play/model/diveCheck'
 import {
+  acceptsTargetVt14,
   canStepNextListTick,
+  fielderSlackAtPlayEnd,
   isFreeToRetarget,
   isFreeToStep,
   isReadyToThrow,
@@ -424,6 +426,8 @@ function* runnerPlaySteps(
   let laserOutFlag = false
   /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 */
   let endCounter = 0
+  /** 판을 닫은 관문 다음 그림의 G1 이 열렸나 (`fielderSlackAtPlayEnd`) */
+  let closingListTickOpen = false
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
@@ -522,7 +526,12 @@ function* runnerPlaySteps(
       // 커버가 없으면 공 가진 야수가 직접 들고 뛴다 (b2cc4 — 상태 6 · vt48(루)). AI 6 은 분기표가 아무것도 안 해(b4c60) 6 절 걸음의
       // AI 0 시작 자리 고치기를 안 탄다 (r180 — 예전 웹은 AI 를 안 바꿔 AI 0 인 공 가진 야수가 시작 자리로 되돌아갔다)
       fielders = fielders.map((fielder) =>
-        fielder.slot === holderSlot ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY } : fielder,
+        // vt48 0xa0a18 → vt14 — 관문(잠금 · vtc8)이 막으면 목표는 그대로(`acceptsTargetVt14`, r196)
+        fielder.slot === holderSlot
+          ? acceptsTargetVt14(fielder)
+            ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY }
+            : { ...fielder, aiState: AI_STATE.CARRY }
+          : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
       return false
@@ -566,7 +575,10 @@ function* runnerPlaySteps(
       deferredThrowBase = plan.base
       fielders = fielders.map((fielder) =>
         fielder.slot === holderSlot
-          ? { ...fielder, aiState: AI_STATE.RECEIVE, target: basePosition(plan.base), targetBase: wrapBase(plan.base) }
+          ? // b30d0 vt48(루) → vt14 — 관문이 막으면 목표는 그대로(r196)
+            acceptsTargetVt14(fielder)
+            ? { ...fielder, aiState: AI_STATE.RECEIVE, target: basePosition(plan.base), targetBase: wrapBase(plan.base) }
+            : { ...fielder, aiState: AI_STATE.RECEIVE }
           : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)`)
@@ -971,12 +983,15 @@ function* runnerPlaySteps(
           }
         }
         // AI 1 b4aca~b4b5a — vtcc 이고 쥐지 않았으면(+0xe0, b4ae6) 포구 지점(x, 0, z)으로 0xa100c(= vt14). 고리 안이라 같은 틱 끝
-        // b4c72 의 커버 다시 고르기가 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐면 `chase` 가 비어 안 고친다
+        // b4c72 의 커버 다시 고르기가 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐면 `chase` 가 비어 안 고친다.
+        // b4af6 — 움직임 허용 +0x13c[칸](마지막 예보가 적은 값, `LooseBallChase.movable`)이 0 이면 안 고친다: 보통 송구(a = 0 ·
+        // 공+0xaac == 0)를 받는 야수는 두 번째 패스가 아니면 고르기 0xb3b38 이 준 목표 그대로다(r196)
         const chased = chase
         if (
           dispatchState === AI_STATE.CHASE &&
           chased !== null &&
           chased.slot === slot &&
+          chased.movable !== false &&
           isFreeToRetarget(self) &&
           !isSamePoint(self.target, chased.catchPoint)
         ) {
@@ -1217,6 +1232,8 @@ function* runnerPlaySteps(
     )
     endCounter = gate.endCounter
     if (!gate.open) play = { ...play, finished: true }
+    // 닫힌 그림 다음의 G1 — 열렸으면 목록 틱 a1330 이 +0xcc 를 하나 더 줄인다(`fielderSlackAtPlayEnd`, r196)
+    if (!gate.open) closingListTickOpen = gate.listTickOpen === true
     // G2 만 닫힌 그림 — 다음 그림의 목록 틱(이동 · 야수 준비 틱 줄이기)과 카메라는 돌고 슬롯 2 는 빠진 채 그려진다
     // (`DefenseViewState.closingListFrame`, 타구 진행기 10 절과 같다)
     if (!gate.open && gate.listTickOpen === true) {
@@ -1247,7 +1264,8 @@ function* runnerPlaySteps(
     laserThrow: false,
     laserOutFlag,
     // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`, r171)
-    scene: { ...scene, playCovers: play.coverOfBase },
+    // 야수 +0xcc 도 다음 판으로 남는다 — vt20(0) 판이 들고 연다(`DefenseScene.fielderSlack`, r196)
+    scene: { ...scene, playCovers: play.coverOfBase, fielderSlack: fielderSlackAtPlayEnd(fielders, closingListTickOpen) },
     rundowns: 0,
     rundownOuts: 0,
     runnerFates: runners.map((runner) => runnerFateOf(runner.state)),
