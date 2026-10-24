@@ -1,4 +1,4 @@
-import { PressArea, RawScreen } from '@/shared/ui'
+import { FOOTER_BACK_PRESS_RECT, PressArea, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import type { League } from '@/entities/league/model/league'
 import { StandingsWindow } from '@/widgets/standings/ui/StandingsWindow'
@@ -58,6 +58,8 @@ export function NextGameScreen({ league, onConfirm, onCancel, isFromManagement, 
 
       {/* ⚠️ 웹 자리: 확인 — 웹 [확인]·[취소] 단추를 걷고 화면 전체 투명 칸으로. 바닥띠 되돌아가기는 그 위에 남는다 */}
       <PressArea label="확인" onPress={onConfirm} />
+      {/* 되돌아가기 표시(z 없음)는 위 화면 전체 칸(z 7)에 가려 눌리지 않았다 — 같은 자리에 누름 칸을 그 위로 둔다(r186, 늘 있던 뒤로 버튼을 걷었다) */}
+      {isFromManagement && <PressArea label="되돌아가기 칸" rect={FOOTER_BACK_PRESS_RECT} onPress={onCancel} />}
 
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isFromManagement ? onCancel : null} slides={false} />
     </RawScreen>

@@ -44,34 +44,37 @@ afterEach(() => {
   act(() => resetTouchKeyOffersForTest())
 })
 
-describe('TouchControls — 확인 · 뒤로는 늘, 숫자판은 없다', () => {
-  it('세로 배치는 뒤로 · 확인 두 버튼뿐 — 숫자 · 방향 키가 없다', () => {
+describe('TouchControls — 늘 있던 확인 · 뒤로는 걷었다 (r186), 숫자판도 없다', () => {
+  it('세로 배치 — 알린 키가 없으면 버튼이 하나도 없다(확인 · 뒤로 · 숫자 · 방향 없음)', () => {
     render(<TouchControls layout="below" />)
-    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    expect(names).toEqual(['뒤로', '확인'])
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '뒤로' })).toBeNull()
   })
 
-  it('확인은 닿는 순간 keydown Enter, 떼면 keyup — window 에서 받는다 · 되풀이는 없다', () => {
-    render(<TouchControls layout="below" />)
-    const ok = screen.getByRole('button', { name: '확인' })
-    press(ok)
-    expect(seen).toEqual([{ type: 'keydown', key: 'Enter', code: 'Enter', repeat: false }])
-    lift(ok)
-    expect(keys()).toEqual(['keydown:Enter', 'keyup:Enter'])
-  })
-
-  it('뒤로는 CLR(Escape)', () => {
-    render(<TouchControls layout="below" />)
-    const back = screen.getByRole('button', { name: '뒤로' })
-    press(back)
-    lift(back)
-    expect(keys()).toEqual(['keydown:Escape', 'keyup:Escape'])
-  })
-
-  it('가로 배치 — 왼쪽 덩이(상황 · 뒤로) · 오른쪽 덩이(확인)', () => {
+  it('가로 배치 — 왼쪽 상황 버튼 덩이 하나뿐, 오른쪽 확인 덩이는 없다', () => {
     render(<TouchControls layout="sides" />)
     expect(screen.getByRole('group', { name: '상황 버튼' })).toBeTruthy()
-    expect(screen.getByRole('group', { name: '확인' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: '확인' })).toBeNull()
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('화면이 OK · CLR 을 상황 버튼으로 알리면(수비 슬라이딩 · 전원 귀루) Enter · Escape 키 사건이다', () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      offerTouchKey({ key: 'Enter', label: '슬라이딩', isHold: true })
+      offerTouchKey({ key: 'Escape', label: '전원 귀루' })
+    })
+    const slide = screen.getByRole('button', { name: '슬라이딩' })
+    press(slide)
+    expect(seen).toEqual([{ type: 'keydown', key: 'Enter', code: 'Enter', repeat: false }])
+    lift(slide)
+    const back = screen.getByRole('button', { name: '전원 귀루' })
+    press(back)
+    lift(back)
+    expect(seen.map((event) => `${event.type}:${event.key}:${event.code}`)).toEqual([
+      'keydown:Enter:Enter', 'keyup:Enter:Enter', 'keydown:Escape:Escape', 'keyup:Escape:Escape',
+    ])
   })
 })
 
@@ -114,7 +117,7 @@ describe('상황 버튼 — 화면이 알린 키만, 같은 키 사건으로', (
       offerTouchKey({ key: '*', label: '메뉴' })
     })
     const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    expect(names).toEqual(['필살타', '도루 1루', '교체', '메뉴', '뒤로', '확인'])
+    expect(names).toEqual(['필살타', '도루 1루', '교체', '메뉴'])
   })
 
   it('PressArea 의 touchKey — 칸이 서 있고 막히지 않은 동안만 알린다', () => {
@@ -138,7 +141,7 @@ describe('상황 버튼 — 화면이 알린 키만, 같은 키 사건으로', (
       return null
     }
     const { rerender } = render(<><TouchControls layout="below" /><Offer offer={null} /></>)
-    expect(screen.getAllByRole('button')).toHaveLength(2)
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
     rerender(<><TouchControls layout="below" /><Offer offer={{ key: '0', label: '마구' }} /></>)
     expect(screen.getByRole('button', { name: '마구' })).toBeTruthy()
   })
@@ -155,7 +158,7 @@ describe('견제 · 많은 상황 버튼', () => {
       offerTouchKey({ key: '0', label: '마구' })
     })
     const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    expect(names).toEqual(['마구', '1루 견제', '2루 견제', '3루 견제', '메뉴', '뒤로', '확인'])
+    expect(names).toEqual(['마구', '1루 견제', '2루 견제', '3루 견제', '메뉴'])
     const third = screen.getByRole('button', { name: '3루 견제' })
     press(third)
     lift(third)
@@ -191,7 +194,7 @@ describe('넘기기 · 차례 · 누름 칸 키', () => {
       offerTouchKey({ key: '2', label: '2루 송구', order: 1 })
     })
     const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
-    expect(names).toEqual(['1루 송구', '2루 송구', '3루 송구', '홈 송구', '뒤로', '확인'])
+    expect(names).toEqual(['1루 송구', '2루 송구', '3루 송구', '홈 송구'])
   })
 
   it('세로 배치 — 다섯부터 네 칸 격자', () => {

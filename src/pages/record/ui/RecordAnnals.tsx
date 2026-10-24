@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, InsetBox, PressArea, RawScreen, useImgTextPalette3 } from '@/shared/ui'
-import { PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, tapKey, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, tapKey, useTouchKeyOffer, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -71,6 +72,9 @@ interface RecordAnnalsProps {
 
 /** 화면 크기 — 판 안 그림을 자르는 clip-path 를 잴 때 쓴다 */
 const SCREEN = { width: 240, height: 320 } as const
+
+/** 탭 막대 → 본문 — OK(Enter) */
+const ANNALS_ENTER_BODY_OFFER: TouchKeyOffer = { key: 'Enter', label: '본문 보기' }
 
 /**
  * 기록연감 (메인 메뉴 상태 30, 그리기 0x2e29c — P6 2c 확정).
@@ -237,6 +241,9 @@ export function RecordAnnals({
 
   // 터치 기기 — 본문에 초점이 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ — 보이는 행 밖 칸 · 닉네임 글 스크롤). ◀ · ▶ 는 아래 쪽 화살 칸이 띄운다
   useTouchScrollKeys(isPanelOpen && !isTabFocused)
+  // 탭 막대 초점의 OK(본문으로)는 칸 그림이 없는 탭(0 · 3 · 4)에서 누를 자리가 없어 '본문 보기' 상황 버튼으로 낸다(r186 — 늘 있던
+  // 확인 버튼을 걷었다). Enter 키 사건이라 위 듣는 곳과 같은 길이다
+  useTouchKeyOffer(isPanelOpen && isTabFocused ? ANNALS_ENTER_BODY_OFFER : null)
 
   /** 웹 덧붙임 — 보이는 칸을 누르면 본문에 들어가 그 칸을 고른다 (창은 그대로) */
   const selectCell = (index: number) => {

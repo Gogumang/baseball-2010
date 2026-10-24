@@ -1,8 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react'
 
 /**
- * **상황 버튼 알림판** (웹 껍데기 — 원본에 없음). 터치 기기에서는 숫자 키패드를 걷고 확인 · 뒤로 두 버튼만 둔다
- * (`widgets/touch-controls`). 그 밖의 원본 키('0' 필살타 · 마구, '8' 번트, '3'/'2'/'1' 도루, '#' 교체, '*' 메뉴)는
+ * **상황 버튼 알림판** (웹 껍데기 — 원본에 없음). 터치 기기에서는 숫자 키패드도, 늘 있던 확인 · 뒤로 버튼도
+ * 없다(`widgets/touch-controls`, r186). 원본 키('0' 필살타 · 마구, '8' 번트, '3'/'2'/'1' 도루, '#' 교체, '*' 메뉴)는
  * **지금 그 키를 받는 화면 부품이 여기에 알리는 동안만** 버튼으로 뜬다.
  *
  * 버튼은 키보드와 같은 키 사건(keydown · keyup)을 쏜다 — 화면은 키보드 · 버튼을 가리지 않고, 받은 키는 화면이 늘 하던 대로
@@ -24,7 +24,7 @@ interface OfferEntry {
   readonly offer: TouchKeyOffer
 }
 
-/** 버튼 차례 — 앞일수록 앞(확인 쪽)에 선다. 없는 키는 뒤로 */
+/** 버튼 차례 — 앞일수록 앞에 선다. 없는 키는 뒤로 */
 const KEY_ORDER: readonly string[] = ['0', '8', '3', '2', '1', '7', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', '#', '*']
 
 let entries: OfferEntry[] = []

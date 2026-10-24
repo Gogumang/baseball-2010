@@ -38,6 +38,9 @@ describe('다음경기 화면 0xd8', () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).toHaveBeenCalledTimes(1)
+    // 화면 전체 확인 칸(z 7)이 되돌아가기 그림을 덮으므로 그 자리에 누름 칸을 위로 둔다 (r186 — 늘 있던 뒤로 버튼을 걷었다)
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기 칸' }))
+    expect(onCancel).toHaveBeenCalledTimes(2)
   })
 
   it('머리띠 시즌모드 · 바닥은 관리 메뉴에서 왔으면 5(되돌아가기), 아니면 1 (0xb8aa~0xb8c4)', () => {

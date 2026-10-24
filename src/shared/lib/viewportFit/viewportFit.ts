@@ -3,8 +3,8 @@
  * 원본 화면 안 좌표·그림은 건드리지 않는다: 화면은 `zoom: var(--zoom)` 으로 통째로 키워질 뿐이다.
  *
  * - `plain`  — 터치 버튼 없음. 화면만 가운데.
- * - `below`  — 세로 폰: 화면을 폭 가득 위에, 터치 버튼(상황 버튼 줄 · 뒤로 · 확인) 아래.
- * - `sides`  — 가로 폰: 화면을 높이 가득 가운데에, 왼쪽은 상황 버튼 · 뒤로, 오른쪽은 확인.
+ * - `below`  — 세로 폰: 화면을 폭 가득 위에, 터치 상황 버튼 아래.
+ * - `sides`  — 가로 폰: 화면을 높이 가득 가운데에, 왼쪽은 상황 버튼(오른쪽 칸은 비워 화면을 가운데 둔다).
  *
  * 숫자 키패드는 걷었다(r173) — 버튼 자리는 두 줄만 남겨 화면을 되도록 크게 한다.
  *
@@ -16,7 +16,10 @@
 export const SCREEN_WIDTH = 240
 export const SCREEN_HEIGHT = 320
 
-/** 세로 배치에서 터치 버튼에 남겨 둘 최소 높이 — 상황 버튼 줄 48 + 확인 줄 64 + 틈 + 여백 (`TouchControls.css`) */
+/**
+ * 세로 배치에서 터치 버튼에 남겨 둘 최소 높이 — 예전 상황 버튼 줄 48 + 확인 줄 64 + 틈 + 여백 (`TouchControls.css`).
+ * 확인 · 뒤로는 r186 에 걷었지만 상황 버튼이 두 줄(격자)로 서는 화면이 있어 자리는 그대로 둔다(화면 배율도 그대로)
+ */
 export const CONTROLS_MIN_HEIGHT = 48 + 64 + 8 + 2 * 8
 /** 가로 배치에서 버튼 한쪽에 남겨 둘 최소 폭 — 버튼 72 + 여백 */
 export const CONTROLS_MIN_SIDE_WIDTH = 72 + 2 * 8
@@ -36,7 +39,7 @@ export interface ViewportInput {
   readonly height: number
   /** 터치가 주 입력인가 (`pointer: coarse`) — 아니면 데스크톱 규칙 */
   readonly isTouch: boolean
-  /** 터치 버튼(확인 · 뒤로 · 상황 버튼)을 보이는가 */
+  /** 터치 상황 버튼을 보이는가 */
   readonly showControls: boolean
 }
 

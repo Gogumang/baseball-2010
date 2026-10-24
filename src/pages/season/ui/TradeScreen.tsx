@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -522,7 +523,8 @@ export function TradeScreen({
       )}
 
       {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리, "*투수" · "*타자" 표시가 '*' 자리다 */}
-      <ScreenFrame title={title} gamePoint={gamePoints} onBack={backOneStep} footer={footer} slides={false}
+      {/* 진행 판이 서 있으면 되돌아가기는 그 판의 CLR(건너뛰기 · 끝) 그대로 — 키와 같은 길(r186). 예전엔 판 밑 단계를 되돌렸다 */}
+      <ScreenFrame title={title} gamePoint={gamePoints} onBack={progress !== null ? () => tapKey('Escape') : backOneStep} footer={footer} slides={false}
         footerPresses={countsKeys ? {
           ...(canFlip ? {
             [FOOTER_BITS.batter]: { label: '* 타자', onPress: flipListTab },

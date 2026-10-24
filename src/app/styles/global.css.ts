@@ -95,7 +95,7 @@ globalStyle('body', {
  * `body[data-layout]` (`useViewportFit`):
  * - `plain`  — 화면 칸(`#root`) 하나.
  * - `below`  — 세로 폰: 화면 칸(확대한 판 높이 `--game-track`) 위, 터치 버튼 덩이(`pad`) 아래.
- * - `sides`  — 가로 폰: 상황 버튼 · 뒤로(`padL`) 왼쪽 · 화면 칸(확대한 판 폭) · 확인(`padR`) 오른쪽.
+ * - `sides`  — 가로 폰: 상황 버튼(`padL`) 왼쪽 · 화면 칸(확대한 판 폭) · 빈 칸(`padR`) 오른쪽.
  */
 globalStyle('body', {
   position: 'fixed',

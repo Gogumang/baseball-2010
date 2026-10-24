@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { MarkupText } from '@/shared/ui'
+import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea } from '@/shared/ui'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
@@ -106,6 +107,8 @@ export function EventMissionWindow({ isRunSelected, onToggle, onKey, onClosed }:
           })}
         </div>
       </div>
+      {/* CLR(취소) — 창 그림에 글자가 없어, 창 아래 미션 고르기가 그대로 그리는 바닥띠 되돌아가기 표시 자리에 웹 전용 누름 칸(r186) */}
+      {!isOpening && <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />}
     </div>
   )
 }
