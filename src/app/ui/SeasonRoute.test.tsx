@@ -308,6 +308,9 @@ describe('이벤트 재생 0xd3 배선', () => {
       vi.advanceTimersByTime(200 * millisecondsPerFrame())
     })
     expect(screen.getByTestId('대사-상자').textContent).toContain('올해의 목표다!!')
+    // 대사창 덮개(ScreenOverlay — 제 zoom 을 건다)는 240×320 판(RawScreen — 이미 zoom)의 형제다. 판 안에 들면 배율을 두 번 먹어
+    // 배율 ≠ 1 창에서 대사창이 커지고 잘렸다 (r157, 나리 `CareerRoutes` 와 같은 배치)
+    expect(screen.getByTestId('대사-상자').closest('[data-original-screen]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
     vi.useRealTimers()
     // SYS(sub 1) 창 — 0x8656c 모드 2 갈래: 이름 0xd41f4 [순위 · 승률 · 타율 · 방어 · 인기도]

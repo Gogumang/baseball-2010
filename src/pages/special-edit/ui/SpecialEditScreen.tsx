@@ -352,8 +352,15 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
-  if (motion.isClosed) return null
   const isOpening = motion.openingHeight !== null
+  // 펼치는 동안 칸은 visibility: hidden 이라 autoFocus 가 초점을 못 잡는다 — 다 펼쳐진 그 그림에 초점을 준다
+  // (안 그러면 키보드 · 화면 자판 글자가 칸에 안 들어간다)
+  const fieldRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!isOpening) fieldRef.current?.focus()
+  }, [isOpening])
+
+  if (motion.isClosed) return null
   const bandHeight = motion.openingHeight ?? POPUP_HEIGHT
 
   return (
@@ -370,7 +377,7 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
       <div className={styles.prompt} data-testid="입력방식" style={{ left: INPUT_MODE_MARK.x, top: INPUT_MODE_MARK.y, visibility: isOpening ? 'hidden' : undefined }}>
         <MarkupText raw={`!cFFFFFF${INPUT_MODE_MARK.label}`} />
       </div>
-      <input className={styles.field} aria-label="이름" value={name} autoFocus readOnly={isOpening}
+      <input ref={fieldRef} className={styles.field} aria-label="이름" value={name} autoFocus readOnly={isOpening}
         style={{ left: FIELD.x, top: FIELD.y, width: FIELD.width, height: FIELD.height, visibility: isOpening ? 'hidden' : undefined }}
         onChange={(event) => {
           // CP949 8 바이트까지 (입력기 최대 I+8 = min(8, 64), R11 1b — 한글 2 · 그 밖 1, 섞어 써도 된다)

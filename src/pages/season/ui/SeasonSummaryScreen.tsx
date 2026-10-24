@@ -12,6 +12,7 @@ import type {
 } from '@/entities/season-mode/model/seasonRewards'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
+import { usePostseasonNextKey } from '@/widgets/season/model/usePostseasonNextKey'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 
@@ -151,6 +152,9 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
     }
     setPhase('우승문구')
   }
+
+  // 키 0x9dc8 — −5(OK) · '5' 가 "경기" · "결과" 다(팝업이 떠 있으면 팝업이 받는다)
+  usePostseasonNextKey(phase === '대진표' ? onPressNext : undefined)
 
   return (
     <RawScreen>
