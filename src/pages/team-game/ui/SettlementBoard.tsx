@@ -7,6 +7,7 @@ import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from 
 import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import {
   NO_RECORD_TEXT, SETTLEMENT_BAND, SETTLEMENT_INFO_BAR, SETTLEMENT_INFO_POINT, SETTLEMENT_LOSE_DIM_STEP,
   SETTLEMENT_RESULT_SPRITE, SETTLEMENT_SCORE, SETTLEMENT_SCROLL_TRACK, SETTLEMENT_TITLE_BAR, SETTLEMENT_VISIBLE_ROWS,
@@ -85,15 +86,24 @@ export function SettlementBoard({
   mode, isWin, side0Score, side1Score, scoreboardSides, recordIds, gamePoints, heldGamePoints, versusWinBonus, onExit,
   effectLayers, versusReward,
 }: SettlementBoardProps) {
-  const [isPanelOpen, setPanelOpen] = useState(false)
+  const [isPanelOpen, setPanelOpenState] = useState(false)
+  /** 판 열림 [장면+0x17e8] — 키 처리가 꺼낸 차례대로 고치고 읽는다 */
+  const isPanelOpenRef = useRef(false)
+  const setPanelOpen = (isOpen: boolean) => {
+    isPanelOpenRef.current = isOpen
+    setPanelOpenState(isOpen)
+  }
   const pushCommonWindow = useCommonWindowPush()
   // 0x4b100 은 [장면+0x17e8](기록 판) && 모드 8·9 일 때 틱 [장면+0x2c] == 0x14 에서 이겼으면 승리 팝업을 공용 창에 띄운다
   // (4b17a~4b2d4). 틱은 들어선 그림이 0 이고, 공용 창이 떠 있는 동안 경기 장면 0x52c50 은 상태 바꿈(틱 +1)을 건너뛴다(52cc6)
+  // 키 0x407f0 은 상태 0x19 의 상태 키 함수(52da2~)라 받은 다음 틀의 진입 뒤 · 갱신 앞에서 돈다 — 받은 키는 이 판의 칸에 들고 이
+  // 판의 틱 머리에서 꺼낸다(`sceneKeyLatch`)
+  const keyLatch = useSceneKeyLatchOwner()
   useSceneTick((tick) => {
-    if (tick !== VERSUS_WIN_POPUP_TICK || !isPanelOpen || !isVersusMode(mode) || !isWin || versusReward === undefined) return
+    if (tick !== VERSUS_WIN_POPUP_TICK || !isPanelOpenRef.current || !isVersusMode(mode) || !isWin || versusReward === undefined) return
     const text = versusWinPopupTextOf(versusReward, hiddenNameOf)
     if (text !== null) pushCommonWindow(text)
-  }, !useIsCommonWindowOpen())
+  }, !useIsCommonWindowOpen(), false, keyLatch)
   const rows = settlementRecordRowsOf(recordIds)
   const [scroll, setScroll] = useState(() => startSettlementScroll(rows.length))
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
@@ -111,13 +121,19 @@ export function SettlementBoard({
     else if (action === '아래로') setScroll((current) => scrollSettlementRecords(current, 'down'))
   }
 
+  const actRef = useRef(act)
+  actRef.current = act
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      const action = settlementKeyActionOf(event.key, isPanelOpen)
-      if (action === null) return
+      const { key } = event
+      if (settlementKeyActionOf(key, isPanelOpenRef.current) === null && settlementKeyActionOf(key, !isPanelOpenRef.current) === null) return
       event.preventDefault()
-      act(action)
+      // 판 열림은 꺼낸 틀의 값으로 가른다
+      keyLatch.push(() => {
+        const action = settlementKeyActionOf(key, isPanelOpenRef.current)
+        if (action !== null) actRef.current(action)
+      })
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

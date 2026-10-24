@@ -4,6 +4,7 @@ import { FrameSprite, MessageBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { TeamAutoRelay as TeamAutoRelayState, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { teamAutoRelayEntryStepOf, teamAutoRelayStepOf, teamRelayEntryFiguresOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
@@ -140,26 +141,36 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
     if (autoRelaySpeed() !== AUTO_RELAY_SPEED_MAX) audio.playBgm(AUTO_RELAY_BGM)
   }, [audio])
 
-  // 키 0x3e25c
+  /**
+   * 키 0x3e25c — 상태 0x21 의 상태 키 함수(52da2~)라 받은 다음 틀의 진입 뒤 · 갱신 0x48480 앞에서 돈다(`sceneKeyLatch`). 받은 키는 이
+   * 부품의 칸에 들고 장면 틱(`AutoPlayRelayScreen` 의 `useSceneTick`)이 틱 머리에서 꺼낸다 — 속도는 그 틀의 갱신부터 본다
+   */
+  const keyLatch = useSceneKeyLatchOwner()
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isAskingRef.current || isDoneRef.current) return
       const change = (delta: number) => {
         event.preventDefault()
-        setAutoRelaySpeed(speedRef.current + delta)
-        setSpeed(autoRelaySpeed())
+        keyLatch.push(() => {
+          if (isAskingRef.current || isDoneRef.current) return
+          setAutoRelaySpeed(speedRef.current + delta)
+          speedRef.current = autoRelaySpeed()
+          setSpeed(speedRef.current)
+        })
       }
       if (event.key === 'ArrowLeft' || event.key === '4') return change(-1)
       if (event.key === 'ArrowRight' || event.key === '6') return change(1)
       if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
         // 원본은 키 단계(0x3e25c → 0xbbef8)에서 창을 열고 **같은 그림의** 갱신 0x48480 · 그리기 0x4258c 를 그대로 마친다
-        clrPendingRef.current = true
+        keyLatch.push(() => {
+          if (!isAskingRef.current && !isDoneRef.current) clrPendingRef.current = true
+        })
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [keyLatch])
 
   const onTick = (tick: number) => {
     if (isDoneRef.current || isAskingRef.current) return
@@ -270,7 +281,7 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
   )
 
   return (
-    <AutoPlayRelayScreen step={shown} onTick={onTick} isPaused={isAsking} sideTeams={sideTeams} humanSide={humanSide}
+    <AutoPlayRelayScreen step={shown} onTick={onTick} isPaused={isAsking} keyLatch={keyLatch} sideTeams={sideTeams} humanSide={humanSide}
       overlay={overlay} grassPalette={grassPalette}
       // 운동장 그림은 v ≠ 2 일 때만 (`[sp+0x5c]`)
       field={fast ? null : <TeamRelayFigures figures={figures} />} />

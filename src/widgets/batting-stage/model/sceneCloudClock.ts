@@ -1,4 +1,4 @@
-import { gameSceneFreezeSerialNow, gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneBackdropFreezeSerialNow, gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
 import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
@@ -29,14 +29,15 @@ let scoreboardOriginFreezes = 0
  * 그림마다 배경 0x41230(52f26~52f36)이 413e6 에서 0x77fb5 로 그린 뒤 1 줄인다 — 곧 로딩 뒤 첫 배경 그림이 시작값이다.
  * 웹은 경기 장면 틱으로 센다: 이 장면에서 배경을 처음 그린 틱이 0 이다(`scoreboardScrollX`). 장면 시계라 공용 창 아래에서는 선다.
  * 창이 선 첫 그림([창+0x250], 52efe)은 갱신 없이 배경을 한 번 더 그려 +0x8c 가 한 번 더 준다 — 0 점 뒤로 경기 장면이 멈추기 시작한
- * 횟수(`gameSceneFreezeSerialNow`)를 더 센다(r170). ⚠️ 미확인: 0x41230 은 상태 7 · 8 · 9(로딩)에서 안 그리는데, 웹은 그때 선 창도 센다.
+ * 횟수를 더 센다(r170). 0x41230 은 상태 7 · 8 · 9(로딩 판)에서 안 그리므로(52f26~52f32) 로딩 판이 서 있는 동안 선 창은 빼고 센다
+ * (`gameSceneBackdropFreezeSerialNow` — `LoadingTip` 이 `useMarksGameSceneLoading` 으로 알린다, r175).
  */
 export function sceneScoreboardTickOf(sceneTick: number): number {
   if (scoreboardOrigin === null) {
     scoreboardOrigin = sceneTick
-    scoreboardOriginFreezes = gameSceneFreezeSerialNow()
+    scoreboardOriginFreezes = gameSceneBackdropFreezeSerialNow()
   }
-  return Math.max(0, sceneTick - scoreboardOrigin) + (gameSceneFreezeSerialNow() - scoreboardOriginFreezes)
+  return Math.max(0, sceneTick - scoreboardOrigin) + (gameSceneBackdropFreezeSerialNow() - scoreboardOriginFreezes)
 }
 
 /** 그림 고리마다 하나 — 그 고리가 마지막으로 본 그림 번호 */

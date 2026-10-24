@@ -284,8 +284,9 @@ export interface HomeRunDerbySession {
    * 판(0x17)이 도는 동안 받은 키 — 0x17 키 처리 0x53420 이 키마다 보내는 메시지 0x587 → 0x519cc (`skipDerbyBattedBall` 머리말).
    * 홈런 틱 다음부터 판 끝 전까지만 효과가 있다: 공 틱을 끝으로 넘겨 다음 틱에 관문을 닫고(판 끝 = 키 틱 + 1 + 10),
    * HOMERUN 글자를 끄고, 울리던 소리를 끊는다(0x519fe 의 0x6e418 — 소리 포트 `stop`).
+   * `keyTick` 은 키를 처리하는 틀의 장면 틱(받은 틀 + 1 — 0xbca05 → 0x498d4, `sceneKeyLatch`). 안 주면 지금 틱 + 1
    */
-  readonly skipHomeRun: () => void
+  readonly skipHomeRun: (keyTick?: number) => void
   /**
    * **경기 장면 로딩 판의 팁 글** (StrTIP[1 + rand(0, 73)]) — 상태 7 진입 0x39f88 이 세운 로딩 판이 7 · 9 · 8 적재 내내 선다.
    * 서 있으면 화면이 로딩 판(`LoadingTip`)을 그리고 다 그리면 `finishLoading`. 난수가 없으면(예전 시험) 늘 null
@@ -774,12 +775,13 @@ export function useHomeRunDerby({
     enterNextPitch()
   }
 
-  const skipHomeRun = useCallback(() => {
+  const skipHomeRun = useCallback((keySceneTick: number = gameSceneTickNow() + 1) => {
     const play = playRef.current
     if (play === null) return
-    // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 지금 흐르는 틱 다음 틱이 키를 받은 틱이다 (판 시각은 공 틱 0 의 머리)
-    const elapsedTicks = gameSceneTickNow() - gameSceneTickOf(play.startedAt)
-    const keyTick = elapsedTicks + 1
+    // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 받은 틱 다음 틱이 키를 처리하는 틱이다 (판 시각은 공 틱 0 의 머리)
+    const startTick = gameSceneTickOf(play.startedAt)
+    const elapsedTicks = gameSceneTickNow() - startTick
+    const keyTick = keySceneTick - startTick
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
     if (skipped === play.batted) return
     playRef.current = { ...play, batted: skipped }
