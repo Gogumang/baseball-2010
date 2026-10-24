@@ -10,7 +10,8 @@ interface LeftFrameProps {
 /**
  * **화면 버퍼에 남은 앞 화면** — 새 상태가 아무것도 안 그리는 틀(엔딩 141 단계 0 · 새 시즌 0x1b768 뒤 앞 상태가 어두워지는 틀)에
  * 원본 버퍼에 남는 그림. 같은 커밋에 내려간 앞 화면 판(`takeLeftFrames`)을 한 번 복제해 깐다. 앞 화면 판이 없으면(판 없는
- * 화면에서 왔다) 검정이다. ⚠️ 근사: 원본은 앞 상태가 그동안에도 그리기를 돌지만 웹은 마지막 판을 멈춘 채 깐다.
+ * 화면에서 왔다) 검정이다. ⚠️ 근사: 원본은 앞 상태가 그동안에도 그리기를 돌지만 웹은 마지막 판을 멈춘 채 깐다 — 137 표지는
+ * 114 끝 · 이어하기 길에서 앞 상태 그림을 매 틀 다시 그리고(`NariYearCoverScreen` 의 `previousScreenAt`) 134 · 141 에서만 이 판을 쓴다.
  */
 export function LeftFrame({ part }: LeftFrameProps) {
   const hostRef = useRef<HTMLDivElement>(null)

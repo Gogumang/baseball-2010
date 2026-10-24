@@ -122,21 +122,51 @@ export function restartsMenuBgm(previousKind: Screen['kind'] | null, screen: Scr
  * 외출 지도(112)에서 관리 화면(105)으로 돌아올 때 배경음 4 를 **처음부터** 다시 트는가 — 105 처리 0x1aec4 의 첫 틀
  * (+0x2c == 2)이 이전 상태 ∈ {100, 116, 132, 125, 126, 114, 134, 1, 112} 면 `0x6ea6d(소리, 4, −1, 1)`(1aef4~1af02)를 부르고,
  * 0x6ea6c 는 번호를 견주지 않아 112 동안 이어지던 4 를 끊고 새로 튼다. 웹 '외출' 에서 곧장 '관리' 로 오는 길은 지도 취소
- * (112 → 105)다 — 장소(113)는 이벤트 114 를 지나 40 → 4 로 번호가 바뀌어 저절로 튼다. 상점(111 → 110)은 105 진입이 아니다.
- * ⚠️ 화면이 '관리' 인 채 105 에 다시 드는 길 중 훈련 결과 창(125) · 외출 효과(126)도 목록에 들지만 웹 화면 표가 그 앞 상태를
- * 몰라 다시 틀지 않는다(미이식).
+ * (112 → 105)와 외출 효과 팝업 [확인](126 → 105, 틀 0x1575c — 웹은 지도 화면 위 팝업)이다 — 장소(113)는 이벤트 114 를 지나
+ * 40 → 4 로 번호가 바뀌어 저절로 튼다. 상점(111 → 110)은 105 진입이 아니다.
+ * 화면이 '관리' 인 채 105 에 다시 드는 길(`reenterManagement`)은 화면 표가 앞 상태를 못 보므로 세션이 그 앞 상태를 넘겨
+ * `restartsManagementBgmFrom` 이 참이면 다시 틀기 표를 올린다 — 훈련 결과 창 · 필살타법 · 마구 · 구질 훈련 알림(125 → 105, 0x1b5b8 ·
+ * 0x18dd8)이 그 길이다. 휴식(127 → 105, 0x1b466) · 하위 메뉴 취소(106 · 107 · 110)는 목록 밖이라 안 튼다.
  */
 export function restartsManagementBgm(previousKind: string | null, kind: string): boolean {
   return kind === '관리' && previousKind === '외출'
+}
+
+/** 105 처리 0x1aec4 의 배경음 4 목록 (1aece~1aef2) — 이전 상태가 이 가운데 하나면 105 의 첫 틀(+0x2c == 2)이 4 를 처음부터 튼다 */
+const MANAGEMENT_BGM_FROM: ReadonlySet<number> = new Set([0x64, 0x74, 0x84, 0x7d, 0x7e, 0x72, 0x86, 1, 0x70])
+
+/** 화면이 '관리' 인 채 105 로 돌아오는 결과 상태 — 125 훈련 결과(0x18dd8 · 0x1b5b8) · 127 휴식(0x1b466) */
+export const NARI_STATE = { 훈련결과: 0x7d, 휴식: 0x7f } as const
+
+/** 원본 상태 `from` 에서 105 로 다시 들어오면 배경음 4 를 처음부터 다시 트는가 (`MANAGEMENT_BGM_FROM`) */
+export function restartsManagementBgmFrom(from: number): boolean {
+  return MANAGEMENT_BGM_FROM.has(from)
+}
+
+/**
+ * 화면이 '관리' 인 채 105 에 다시 들어와 배경음 4 를 다시 튼 수(`restartsManagementBgmFrom` — 세션이 센다)가 오른 그리기에서
+ * 참을 한 번 돌려준다. 오른 그리기에 화면이 '관리' 가 아니면(같은 손짓으로 다른 화면으로 갔다) 무시한다.
+ */
+function useManagementBgmRestart(isAtManagement: boolean, managementBgmRestart: number): boolean {
+  const [seen, setSeen] = useState(managementBgmRestart)
+  if (seen === managementBgmRestart) return false
+  setSeen(managementBgmRestart)
+  return isAtManagement
 }
 
 /**
  * 투수편(장면 0x106) 안쪽 장면의 **다시 틀기 표** — 타자편과 같은 105 처리 0x1aec4 라 외출 지도(112) → 관리(105)에서
  * 오른다(`restartsManagementBgm`). `useSceneBgm` 의 다시 틀기 표에 더해 넘긴다.
  */
-export function usePitcherLeagueBgmRestart(isActive: boolean, scene: PitcherScene): number {
+export function usePitcherLeagueBgmRestart(
+  isActive: boolean,
+  scene: PitcherScene,
+  /** 화면이 '관리' 인 채 105 에 다시 들어와 4 를 다시 튼 수 — 투수편 세션의 `managementBgmRestart` */
+  managementBgmRestart = 0,
+): number {
   const [previousScene, setPreviousScene] = useState<PitcherScene | null>(null)
   const [restartSerial, setRestartSerial] = useState(0)
+  if (useManagementBgmRestart(isActive && scene === '관리', managementBgmRestart)) setRestartSerial((serial) => serial + 1)
   const current = isActive ? scene : null
   if (current !== previousScene) {
     setPreviousScene(current)
@@ -149,9 +179,9 @@ export function usePitcherLeagueBgmRestart(isActive: boolean, scene: PitcherScen
  * **137 "N년차" 표지 뒤 이어지는 배경음** — 137 진입 0x1055c · 틀 0x12190 · 그리기 0x1cc4c 는 소리를 안 건드리고, 105 처리 0x1aec4 의
  * 첫 틀 배경음 4 는 이전 상태가 {0x64, 0x74, 0x84, 0x7d, 0x7e, 0x72, 0x86, 1, 0x70} 일 때만이라(1aece~1aef2, r148 직접 뜸) 0x89 는
  * 빠진다. 곧 137 → 105 는 앞의 배경음(연말 114 의 40 · 141 엔딩의 46/52 · 대회 경기 뒤 끊긴 채)을 그대로 잇고, 105 에서 들어가
- * 소리를 안 건드리는 109(이전 105) · 110/111 상점 · 112 외출 지도에서도 이어진다. 112 → 105(`restartsManagementBgm`) 나
- * 그 밖 화면으로 가면 끝난다. ⚠️ 근사: 웹 '관리' 화면 안의 125 훈련 결과 · 126 외출 효과 → 105 (목록에 든다 — 4 를 다시 튼다)는
- * 화면 표가 못 봐 그대로 잇는다.
+ * 소리를 안 건드리는 109(이전 105) · 110/111 상점 · 112 외출 지도에서도 이어진다. 112 · 126 → 105(`restartsManagementBgm`),
+ * 화면이 '관리' 인 채 125 → 105(`restartsManagementBgmFrom` — 훈련 결과 창 · 훈련 알림을 닫을 때) 나 그 밖 화면으로 가면 끝나고
+ * 4 가 처음부터 운다. 127 휴식 → 105 · 하위 메뉴 취소는 목록 밖이라 잇는다.
  */
 const YEAR_COVER_CARRY_KINDS: ReadonlySet<string> = new Set(['관리', '다음경기순위', '아이템', '상점', '외출'])
 
@@ -166,11 +196,20 @@ export function carriesYearCoverBgm(isCarrying: boolean, previous: string | null
  * 최상위 화면의 배경음과 **다시 틀기 표** — 화면이 바뀐 그리기에서 `restartsMenuBgm` · `restartsManagementBgm` 이 참이면 표가 하나 오른다.
  * `useSceneBgm` 이 표가 오르면 같은 번호라도 끊고 처음부터 튼다.
  */
-export function useScreenBgm(screen: Screen): { readonly bgm: number | null; readonly restartSerial: number } {
+export function useScreenBgm(
+  screen: Screen,
+  /** 화면이 '관리' 인 채 105 에 다시 들어와 4 를 다시 튼 수 — 나리 타자편 세션 쪽 `managementBgmRestart` */
+  managementBgmRestart = 0,
+): { readonly bgm: number | null; readonly restartSerial: number } {
   const [previousKind, setPreviousKind] = useState<Screen['kind'] | null>(null)
   const [enteredFrom, setEnteredFrom] = useState<Screen['kind'] | null>(null)
   const [restartSerial, setRestartSerial] = useState(0)
   const [isYearCoverCarry, setYearCoverCarry] = useState(false)
+  // 125 → 105 — 0x1aec4 가 4 를 처음부터 다시 튼다(137 뒤 잇던 배경음도 여기서 끝난다)
+  if (useManagementBgmRestart(screen.kind === '관리', managementBgmRestart)) {
+    setRestartSerial((serial) => serial + 1)
+    setYearCoverCarry(false)
+  }
   // 그리는 중에 앞 값과 견줘 고친다 (`usePitcherLeagueBgm` 과 같은 꼴 — 효과 한 틀 늦지 않게)
   if (screen.kind !== previousKind) {
     setPreviousKind(screen.kind)
@@ -263,6 +302,8 @@ export function usePitcherLeagueBgm(
   scene: PitcherScene,
   endingIndex: number | null = null,
   storyContext: PitcherStoryContext | null = null,
+  /** 화면이 '관리' 인 채 105 에 다시 들어와 4 를 다시 튼 수 (`usePitcherLeagueBgmRestart` 와 같은 값) — 137 뒤 잇기를 끝낸다 */
+  managementBgmRestart = 0,
 ): number | null {
   const [wasActive, setWasActive] = useState(false)
   const [fromReentry, setFromReentry] = useState(false)
@@ -270,6 +311,7 @@ export function usePitcherLeagueBgm(
   const [previousScene, setPreviousScene] = useState<PitcherScene | null>(null)
   const [postseasonAfterGame, setPostseasonAfterGame] = useState(false)
   const [isYearCoverCarry, setYearCoverCarry] = useState(false)
+  if (useManagementBgmRestart(isActive && scene === '관리', managementBgmRestart)) setYearCoverCarry(false)
   if (scene !== previousScene) {
     setPreviousScene(scene)
     setYearCoverCarry(carriesYearCoverBgm(isYearCoverCarry, previousScene, scene))
@@ -374,6 +416,21 @@ export function useSceneEnterStop(sound: SoundPort, screen: Screen): void {
     lastKindRef.current = screen.kind
     if (stops) sound.stop()
   }, [sound, screen.kind, stops])
+}
+
+/**
+ * **이어하기 길의 137 앞에서 배경음을 끊는다** — 상태 100 진입 0x1c154 의 머리 1c15e 가 `0x6e439([0x1400058])` = stopBgm 을 부른다.
+ * 그 뒤 100 · 1 · 105(한 틀 — 0x1aec4 의 4 는 머문 틀 2 에만) · 115 · 114(내장 연초라 40 안 틂) · 137 · 105(이전 137 은 목록 밖) ·
+ * 115 · 114 를 지나 연초 이벤트 뒤 105(이전 114)에서야 4 가 운다 — 그동안 소리가 없다. 웹은 표지가 이어하기 길에서 섰을 때
+ * (`fromResume`) 한 번 멈춘다. ⚠️ 다른 이어하기 길(100 → 1 → 105 · 128 · 134 …)의 1c15e 는 아직 옮기지 않았다
+ */
+export function useResumeCoverStop(sound: SoundPort, isResumeCover: boolean): void {
+  const wasRef = useRef(false)
+  useEffect(() => {
+    const was = wasRef.current
+    wasRef.current = isResumeCover
+    if (isResumeCover && !was) sound.stopBgm()
+  }, [sound, isResumeCover])
 }
 
 /** 이 화면에 들어설 때 낼 효과음. 없으면 null */

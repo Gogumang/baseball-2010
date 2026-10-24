@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  YEAR_COVER_CLIP, YEAR_COVER_ORIGIN, yearCoverDigitsOf, yearCoverRollOf, yearCoverStepAt,
+  YEAR_COVER_CLIP, YEAR_COVER_ORIGIN, resumeCoverUnderlayAt, yearCoverDigitsOf, yearCoverRollOf, yearCoverStepAt,
 } from '@/pages/management/lib/nariYearCover'
 
 describe('137 "N년차" 표지 그리기 0x1cc4c', () => {
@@ -69,5 +69,19 @@ describe('137 틀 차례 — 0x1b768 효과기 → 137 → 0x12190 → 105', () 
     expect(yearCoverStepAt(10 + 21, 20)).toMatchObject({ counter: 0x52, fadeOutFrame: 1 })
     expect(yearCoverStepAt(10 + 29, 20)).toMatchObject({ isLeaving: true })
     expect(yearCoverStepAt(10 + 30, 20)).toEqual({ kind: '관리' })
+  })
+})
+
+describe('이어하기 길의 137 — 100 · 1 · 100 · 1 · 105 · 115 · 114 를 지나 9 틀째 연초 114 틀이 +0x289 를 받는다', () => {
+  it('앞 화면: 그리기가 없는 100 · 1 은 검정(상태 1 의 검정 덮기), 105 부터는 상태판', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(resumeCoverUnderlayAt)).toEqual([
+      '검정', '검정', '검정', '검정', '상태판', '상태판', '상태판', '상태판', '상태판', '상태판',
+    ])
+  })
+
+  it('표지 차례는 다른 길과 같다 — 아홉 틀 어두워진 뒤 9 틀째에 종류 2 를 새로 건다', () => {
+    expect(yearCoverStepAt(8, null)).toEqual({ kind: '앞화면', fadeOutFrame: 8, fadeInFrame: null })
+    expect(yearCoverStepAt(9, null)).toEqual({ kind: '앞화면', fadeOutFrame: null, fadeInFrame: 0 })
+    expect(yearCoverStepAt(10, null).kind).toBe('표지')
   })
 })
