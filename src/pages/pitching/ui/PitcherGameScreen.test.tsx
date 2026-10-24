@@ -411,12 +411,19 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
     틱(11)
   }
 
-  /** 인플레이 타구가 떠서 수비 화면이 설 때까지 던진다 */
+  /**
+   * 인플레이 타구가 떠서 수비 화면이 설 때까지 던진다 — 맞은 공은 판정 틀까지 0x11 · 이어 0x13 을 타석 장면이 그린 뒤에야 0x17
+   * (`usePitcherHitScene`)이라 그 틱을 흘려 보낸다
+   */
   function 수비화면까지던지기(최대 = 80) {
     for (let pitch = 0; pitch < 최대; pitch += 1) {
       // 새 타자면 0xe 에서 OK 부터
       OK통과()
-      if (!구질보임()) return
+      if (screen.queryAllByTestId('defense-background-left').length > 0) return
+      if (!구질보임()) {
+        for (let 갱신 = 0; 갱신 < 80 && screen.queryAllByTestId('defense-background-left').length === 0; 갱신 += 1) 틱(1)
+        return
+      }
       한개던지기()
     }
   }
@@ -427,6 +434,29 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
 
     // 원본이 0x17 을 도는 동안 0xf(구질 고르기)로 안 돌아가는 그 자리다
     expect(구질보임()).toBe(false)
+    expect(screen.getAllByTestId('defense-background-left').length).toBeGreaterThan(0)
+  })
+
+  it('맞은 공은 놓는 순간이 아니라 0x11 끝(판정 틀) · 0x13 을 타석 장면이 그린 뒤 0x17 에 수비 화면이 선다', () => {
+    띄우기({}, 3)
+    let 맞은공 = false
+    for (let pitch = 0; pitch < 80 && !맞은공; pitch += 1) {
+      OK통과()
+      if (!구질보임()) break
+      한개던지기()
+      맞은공 = !구질보임() && screen.queryAllByTestId('defense-background-left').length === 0
+    }
+    expect(맞은공).toBe(true)
+    // 놓은 틱 뒤 한 틱 — 아직 0x11 이다(공이 판정 틀까지 난다)
+    틱(1)
+    expect(screen.queryAllByTestId('defense-background-left')).toHaveLength(0)
+    let 틱수 = 1
+    while (틱수 < 80 && screen.queryAllByTestId('defense-background-left').length === 0) {
+      틱(1)
+      틱수 += 1
+    }
+    // 남은 0x11(판정 틀까지) + 0x13(틱 8 · 큰 타구면 문턱 + 7) 뒤 — 놓자마자가 아니다
+    expect(틱수).toBeGreaterThan(8)
     expect(screen.getAllByTestId('defense-background-left').length).toBeGreaterThan(0)
   })
 

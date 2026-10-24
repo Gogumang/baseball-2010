@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   cpuSwingTickOf,
+  hitEndTickOf,
   HUMAN_PITCH_RELEASE_STATE_TICK,
+  pitchHitSceneTicksOf,
+  pitcherHitSceneOf,
   passesHeldResult,
   pitchSceneBusyTicksOf,
   pitcherSideStageFrameOf,
   pitcherSideStateEntriesOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { PITCHER_RELEASE_TICKS, pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { SHORT_HIT_TICKS } from '@/widgets/batting-stage/lib/hitPause'
 
 const clock = (nowTick: number, releaseTick: number | null) => ({
   nowTick,
@@ -119,5 +123,58 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
     expect(pitcherSideStateEntriesOf(release, 20, 31).at(-1)).toEqual({ tick: resultEntry + 32, state: 0xd })
     // 맞은 공은 0x11 만
     expect(pitcherSideStateEntriesOf(release, 20, 0)).toEqual([{ tick: release - HUMAN_PITCH_RELEASE_STATE_TICK, state: 0x11 }])
+  })
+})
+
+describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다음 틀이 0x13 틱 0, 0x13 끝의 다음 틀이 0x17', () => {
+  const release = 50
+  const hit = { judgeBallTick: 13, ticks: 8 }
+  const hitClock = (nowTick: number) => ({ ...clock(nowTick, release), resultTicks: 0, hit })
+  const judgeTick = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 13
+
+  it('판정 틀까지는 공이 난다 — 다음 틀이 0x13(타격) 틱 0, 투수는 판정 틀에 굳는다', () => {
+    expect(pitcherSideStageFrameOf(hitClock(judgeTick)).phase.kind).toBe('투구중')
+    expect(pitcherSideStageFrameOf(hitClock(judgeTick)).ballFrame).toBe(13)
+    const entry = pitcherSideStageFrameOf(hitClock(judgeTick + 1))
+    expect(entry.phase).toEqual({ kind: '타격', tick: 0, isPaused: false })
+    expect(entry.ballFrame).toBe(-1)
+    expect(entry.pitcherTickEnd).toBe(PITCHER_RELEASE_TICKS + 13)
+    // 0x13 은 틱 0 ~ 8 의 아홉 그림 — 그 뒤(0x17)도 마지막 그림에 둔다(화면이 수비 판으로 넘긴다)
+    expect(pitcherSideStageFrameOf(hitClock(judgeTick + 9)).phase).toEqual({ kind: '타격', tick: 8, isPaused: false })
+    expect(pitcherSideStageFrameOf(hitClock(judgeTick + 30)).phase).toEqual({ kind: '타격', tick: 8, isPaused: false })
+  })
+
+  it('상태 경계 — 0x11 · 0x13 · 0x17, 수비 판을 띄우는 틱과 같다', () => {
+    expect(pitcherSideStateEntriesOf(release, 20, 0, null, hit)).toEqual([
+      { tick: release - HUMAN_PITCH_RELEASE_STATE_TICK, state: 0x11 },
+      { tick: judgeTick + 1, state: 0x13 },
+      { tick: judgeTick + 1 + 9, state: 0x17 },
+    ])
+    expect(release + pitchHitSceneTicksOf(hit)).toBe(judgeTick + 1 + 9)
+  })
+
+  it('OK · 5 건너뛰기를 읽은 0x13 틱에 0x17 을 예약한다 (0x406e8 40708)', () => {
+    expect(hitEndTickOf({ ...hit, ticks: 30, skipTick: 4 })).toBe(4)
+    expect(hitEndTickOf({ ...hit, ticks: 3, skipTick: 4 })).toBe(3)
+    // 문턱이 0 아래면 진입 틀(0)이 넘긴다
+    expect(hitEndTickOf({ ...hit, ticks: -5 })).toBe(0)
+  })
+
+  it('판정 공 틱 — 스윙은 F + 1(스윙이 나간 다음 틀), 번트는 N − 1 (0x4e15c)', () => {
+    const pattern = [90, 900, 300, 0] as const
+    const contact = { pattern, resultCode: 10 }
+    expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).judgeBallTick).toBe(16)
+    expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).contactFrame).toBe(15)
+    expect(pitcherHitSceneOf(contact, { frame: 5, buntKind: 2 }, 20, 0).judgeBallTick).toBe(19)
+    // 0x13 길이는 타자편과 같은 셈(`hitPauseTicksOf`)
+    const scene = pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0)
+    expect(scene.ticks).toBeLessThanOrEqual(SHORT_HIT_TICKS)
+    expect(scene.watchesBigHit).toBe(false)
+  })
+
+  it('필살 스윙으로 맞은 공은 보통 불꽃을 안 쏜다 (0x49aec 가 [sp+0x60] 을 세운다)', () => {
+    const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10, specialSwing: { number: 1, isAceBatter: false } }
+    expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).particleId).toBeNull()
+    expect(pitcherHitSceneOf({ ...contact, specialSwing: undefined }, { frame: 15, buntKind: 0 }, 20, 0).particleId).toBe(5)
   })
 })

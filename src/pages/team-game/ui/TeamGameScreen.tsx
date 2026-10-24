@@ -43,7 +43,9 @@ import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameE
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
-import { usePitchEndSerial, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
+import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
 import { RecordAlertPanel, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
@@ -90,7 +92,7 @@ import {
 } from '@/pages/team-game/lib/teamMatchupCards'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
-import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { passesHeldResult, pitchResultEntryDelayTicksOf, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
@@ -296,6 +298,8 @@ function TeamGameScene({
    */
   const atBatBeforeThrowRef = useRef(progress.atBat)
   const isThrowPendingRef = useRef(false)
+  /** 던진 공의 판정이 들면 공 끝 대기(`useBatterPitchEnd`)에 싣는다 — 아래 공 끝 효과가 내린다 */
+  const isThrowPitchEndPendingRef = useRef(false)
   const [pitchBusyTicks, setPitchBusyTicks] = useState(0)
   const [heldResultTicks, setHeldResultTicks] = useState(0)
   const pitchBusyTicksRef = useRef(0)
@@ -425,6 +429,22 @@ function TeamGameScene({
   useSkillCheerRestore(progress.substitutionScene, skillPanelSceneRef)
   /** 수비 화면이 실시간으로 도는 판(타구 · 사람 수비의 주자 판)이 있는가 — 원본 상태 0x17 */
   const isDefenseInPlay = session.pendingDefensePlay !== null || progress.pendingRunnerPlay != null
+  /**
+   * 사람이 던진 공을 CPU 타자가 맞혔으면 판정 틀까지 0x11 · 이어 0x13 을 사람 수비 타석 장면이 그린 뒤 0x17(수비 판)이다
+   * (`usePitcherHitScene` — 투수편과 같다). 그동안 수비 판은 진행기에 서 있지만 화면은 아직 안 띄운다.
+   * ⚠️ 키 막음(`isDefenseInPlay`)은 그대로라 0x11 끝 · 0x13 동안 '*' 메뉴가 안 열린다 — 원본은 0xd~0x15 에서 연다
+   */
+  const pendingHumanDefense = session.pendingDefensePlay?.side === '수비' ? session.pendingDefensePlay.input : null
+  const humanDefenseStage = teamPitcherSideStageOf(progress)
+  const teamHitScene = usePitcherHitScene({
+    play: pendingHumanDefense,
+    pitch: progress.lastPitch,
+    cpuSwing: progress.lastCpuSwing ?? null,
+    batterHand: humanDefenseStage.batterSide ?? humanDefenseStage.batterForm & 1,
+    aceOrder: humanDefenseStage.acePitcher?.order ?? null,
+    isFrozen: isMenuOpen || overlay === '조작방법',
+  })
+  const isHitSceneShowing = teamHitScene.isShowing
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
   const isAwaitingConfirmRef = useRef(false)
   /** 대기 중 0xd 두 그림을 지나 0xe 에 들어섰는가 — '#' 는 0xe·0xf 에서만 열린다 */
@@ -642,16 +662,31 @@ function TeamGameScene({
    *   기록은 줄에 남았다가 다음 사람 공이 끝날 때 뜬다(일반·시즌은 경기 끝까지 돌아 끝내 안 뜬다).
    * - 경기 끝 0xa7de8 몫(28~31·37~39)은 0x19 에서 쌓여 줄에 남는다. 팝업(경기 중 메뉴 · 조작방법)이 떠 있으면 멈춘다.
    */
-  const [battingPitchEnds, setBattingPitchEnds] = useState(0)
-  const pitchEndSerial = usePitchEndSerial([
-    progress.lastResolution,
-    progress.lastDefensePlay,
-    progress.pendingDefensePlay === null,
-    progress.pendingRunnerPlay == null,
-    battingPitchEnds,
-  ])
+  /**
+   * 공 끝 0x4e600 의 때(`useBatterPitchEnd` — 타자편 `GameRoute` 와 같은 셈): 0x12 끝(문턱 갱신 0x4e796) · 0x17 끝(0x52a60).
+   * 타석 공은 판정 틀(`onPitchResolved`)에, 내 공은 진행기가 판정을 낸 그림(놓은 틱)에 싣고 0x12 틱 0 까지(`pitchResultEntryDelayTicksOf`)를
+   * 앞에 붙인다. 판(타구 · 주자 판 · 견제 · 밀어내기 재생)은 그 판이 끝나는 그림이다
+   */
+  const pitchEnd = useBatterPitchEnd({ isPlayShown: isDefenseInPlay || isReplaying, isFrozen: isMenuOpen || overlay === '조작방법' })
+  const { notePitchResolved } = pitchEnd
+  useEffect(() => {
+    if (!isThrowPitchEndPendingRef.current) return
+    const thrown = progress.lastResolution
+    if (thrown === null) return
+    isThrowPitchEndPendingRef.current = false
+    const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, thrown).outcome)
+    notePitchResolved({
+      isHit: session.pendingDefensePlay !== null,
+      waitTicks:
+        pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order) - 1 + waitTicks,
+    })
+    // 진행 한 걸음에 한 번 — 판정이 든 그림의 값으로 싣는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, notePitchResolved])
+  const pitchEndSerial = pitchEnd.serial
   const recordAlert = useRecordAlert(progress.recordIds, {
-    isDrawing: isIntroDone && summary === null && !isDefenseInPlay && !isReplaying,
+    // 0x11 끝 · 0x13 을 그리는 동안은 아직 0x17 이 아니다
+    isDrawing: isIntroDone && summary === null && (!isDefenseInPlay || isHitSceneShowing) && !isReplaying,
     isFrozen: isMenuOpen || overlay === '조작방법',
     isSettled: progress.game.isFinished,
     // 상태 틱 [+0x2c] 의 0 점 — 화면 갈래(판 · 타석/투구 입력 단계 · 확인 대기)가 바뀐 틱과, 원본 상태 경계(타석 장면이 적는
@@ -795,7 +830,7 @@ function TeamGameScene({
    * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
    */
   const pending = session.pendingDefensePlay
-  if (pending !== null) {
+  if (pending !== null && !isHitSceneShowing) {
     return (
       <DefensePlayback
         input={pending.input}
@@ -971,6 +1006,7 @@ function TeamGameScene({
     if (slot === null) return
     atBatBeforeThrowRef.current = progress.atBat
     isThrowPendingRef.current = true
+    isThrowPitchEndPendingRef.current = true
     actions.throwPitch({ typeNumber: slot.typeNumber, ...(throwAim === null ? {} : { aim: throwAim }), gaugeCell })
     setPhase('구질')
     setSlot(null)
@@ -1091,9 +1127,11 @@ function TeamGameScene({
                 {...(stadiumSkyRow === null ? {} : { skyRow: stadiumSkyRow })}
                 random={random}
                 onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
+                  // 타석 공 하나가 판정됐다 — 공 끝은 0x12 문턱 갱신 0x4e796(15/31 틱 뒤) · 인플레이면 0x17 끝(수비 판이 풀릴 때).
+                  // 판정 틀에 싣고(진행기에 넘기기 전) 대기 틱은 이 공으로 끝난 타석 결과로 정한다 (`GameRoute` 와 같다)
+                  const outcomeAfter = applyPitchResolution(progress.atBat, detail.resolution).outcome
+                  notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
                   actions.resolvePitch(detail, isUncatchable, buntKind)
-                  // 타석 공 하나가 끝났다 — 0x12 끝 0x4e796 (인플레이면 0x17 끝은 수비 플레이가 풀릴 때)
-                  setBattingPitchEnds((count) => count + 1)
                 }}
                 flightProbeRef={flightProbeRef}
                 // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
@@ -1109,7 +1147,7 @@ function TeamGameScene({
             {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
             <RecordAlertPanel frame={recordAlert} />
           </>
-        ) : canPitch ? (
+        ) : canPitch || isHitSceneShowing ? (
           /*
             사람 수비 타석 장면 — 원본은 누가 던지든 같은 프레임 0x52c50 · 그리기 표 0xd05a0 이 구장 · 투수 0x38d1c · 타자 0x49e64 ·
             주자 0x35b94 · HUD 0x4c4bc 를 그린다(`widgets/batting-stage/lib/pitcherSideStage`). 그 위에 0xe 소개 판 0x44944 ·
@@ -1123,6 +1161,9 @@ function TeamGameScene({
             resolution={progress.lastResolution}
             resultTicks={heldResultTicks}
             cpuSwing={progress.lastCpuSwing ?? null}
+            // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
+            hitScene={teamHitScene.hitScene}
+            onHitSceneEnd={teamHitScene.end}
             hud={{
               inning: game.inning,
               half: game.half,
@@ -1178,7 +1219,7 @@ function TeamGameScene({
             {/* 교체 연출 0x16 "CHANGE" (0x4da30) */}
             {substitutionOverlay}
             {/* 투구 입력 — 그림은 장면이 그린다. 부품은 키 · 틱과 그림 자리의 투명한 누름 칸만 낸다 (교체 창 0xb 동안은 내린다) */}
-            {phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null && (
+            {canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null && (
               <div hidden={isPopupOpen}>
                 <PitchSlotPicker
                   choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
@@ -1198,7 +1239,7 @@ function TeamGameScene({
                 />
               </div>
             )}
-            {phase === '코스' && (
+            {canPitch && phase === '코스' && (
               <div hidden={isPopupOpen}>
                 <AimCursor
                   side={options.stageSide ?? 1}
@@ -1219,7 +1260,7 @@ function TeamGameScene({
                 />
               </div>
             )}
-            {phase === '게이지' && (
+            {canPitch && phase === '게이지' && (
               <div hidden={isPopupOpen}>
                 <PitchGradeGauge
                   isPaused={isPopupOpen}
@@ -1247,7 +1288,7 @@ function TeamGameScene({
           (예전 웹 안내 "자동 진행 중…" 은 원본에 없다)
         */}
 
-        {canPitch && !canBat && <RecordAlertStageOverlay frame={recordAlert} />}
+        {(canPitch || isHitSceneShowing) && !canBat && <RecordAlertStageOverlay frame={recordAlert} />}
 
         {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
         {isAwaitingConfirm && !isPopupOpen && changeWindow === null && (
