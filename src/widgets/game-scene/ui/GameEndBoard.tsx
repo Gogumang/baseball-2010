@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { GAME_END_INPUT_LOCK_TICKS } from '@/widgets/game-scene/lib/endBoardLayout'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { EndBoardRows } from '@/widgets/game-scene/ui/EndBoardRows'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
@@ -65,29 +66,35 @@ interface GameEndBoardProps {
  * 있을 가능성은 남는다.)
  */
 export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, lineScore, onConfirm }: GameEndBoardProps) {
-  const tick = useSceneTick()
+  /**
+   * 받은 키 칸 — OK 는 받은 다음 틀의 키 0x498d4(52d9e → 0x536bc → 메시지 1)가 그 틀의 갱신 0x4f928 보다 먼저 처리한다
+   * (`sceneKeyLatch`). 잠금은 그 틀의 상태 틱으로 본다 — 앞 틀 갱신이 적은 +0x32 = (틱 ≤ 9) 를 다음 틀 머리 0xbc9c8 이 보고
+   * 예약(0x19)을 되돌리므로, 틱 t 의 키 자리에서 낸 OK 는 t ≥ 10 일 때만 남는다
+   */
+  const keyLatch = useSceneKeyLatchOwner()
+  const tick = useSceneTick(undefined, true, false, keyLatch)
   const isLocked = tick < GAME_END_INPUT_LOCK_TICKS
   const confirmRef = useRef(onConfirm)
   confirmRef.current = onConfirm
   const doneRef = useRef(false)
 
-  const confirm = () => {
-    if (isLocked || doneRef.current) return
+  const confirmAt = (stateTick: number) => {
+    if (stateTick < GAME_END_INPUT_LOCK_TICKS || doneRef.current) return
     doneRef.current = true
     confirmRef.current()
   }
+  const confirm = () => keyLatch.push(confirmAt)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !isOkKey(event.key)) return
       event.preventDefault()
-      if (isLocked || doneRef.current) return
-      doneRef.current = true
-      confirmRef.current()
+      keyLatch.push(confirmAt)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isLocked])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸은 부품마다 하나 · 처리는 ref 만 본다
+  }, [keyLatch])
 
   return (
     <RawScreen>

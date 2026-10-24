@@ -294,7 +294,7 @@ export function MissionPlayScreen({
     })
   }
   // 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
-  const { toggle: toggleMenu } = menu
+  const { pressStar } = menu
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -303,7 +303,7 @@ export function MissionPlayScreen({
       if (event.key === '*') {
         if (isOver || overlay === '조작방법') return
         event.preventDefault()
-        return toggleMenu()
+        return pressStar()
       }
       if (isMenuOpen || overlay !== null) return
       const base = stealBaseOfKey(event.key)
@@ -314,7 +314,7 @@ export function MissionPlayScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isMenuOpen, isOver, onSteal, overlay, stealableBases, toggleMenu])
+  }, [isMenuOpen, isOver, onSteal, overlay, stealableBases, pressStar])
 
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
@@ -508,7 +508,7 @@ export function MissionPlayScreen({
           stealableBases.map((base) => (
             <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
           ))}
-        {!isOver && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.toggle} />}
+        {!isOver && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.pressStar} />}
 
         {isMenuOpen && (
           <div className={stageScreen.menuLayer}>

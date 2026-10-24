@@ -19,6 +19,7 @@ import {
   INTRO_TEXT_Y,
 } from '@/widgets/game-scene/lib/introLayout'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import {
@@ -59,7 +60,7 @@ interface GameIntroProps {
 /**
  * **경기 시작 인트로** — 경기 장면 상태 0xc (`lib/introSchedule` 머리말, 그리기 자리는 `lib/introLayout`, R10 3절).
  *
- * - 54틱(270 → 0, 5씩)이 지나면 끝, OK(−5)·'5' 면 곧바로 끝 (0x39b54). 웹은 Enter·Space 도 받는다.
+ * - 54틱(270 → 0, 5씩)이 지나면 끝, OK(−5)·'5' 면 받은 다음 틀의 키 자리(52da2 → 0x39b54, 갱신 앞)에서 끝. 웹은 Enter·Space 도 받는다.
  * - 효과음 61 은 진입 예약음이라 부르는 쪽(경기를 세우는 세션)이 이미 낸다.
  *
  * 그리기 차례(0x417ac): 배경 0x40ff0(카운터) → 띠 0x6a9f0(색 0x304ea2 · 알파 `max(1, +0x17e4 − 0x55)`) → game_ui 프레임 8 막대 →
@@ -83,9 +84,11 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
     doneRef.current = true
     onDoneRef.current()
   }
+  /** 받은 키 칸 — 인트로 키 0x39b54 는 받은 다음 틀의 52da2~ 상태 키 자리(갱신 표 52e14 앞)에서 돈다(`sceneKeyLatch`) */
+  const keyLatch = useSceneKeyLatchOwner()
   const tick = useSceneTick((next) => {
     if (next >= INTRO_TICKS) finish()
-  })
+  }, true, false, keyLatch)
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
 
@@ -93,7 +96,7 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !isOkKey(event.key)) return
       event.preventDefault()
-      finish()
+      keyLatch.push(finish)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -107,7 +110,7 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   const imageStyle = imageOpacity === 1 ? undefined : { opacity: imageOpacity }
   const { r, g, b } = INTRO_BAND_RGB
   return (
-    <RawScreen onPress={finish}>
+    <RawScreen onPress={() => keyLatch.push(finish)}>
       {backdrop !== undefined && <SceneryBackdrop stage={backdrop} offsetY={counter} />}
       <div
         className={styles.introBand}

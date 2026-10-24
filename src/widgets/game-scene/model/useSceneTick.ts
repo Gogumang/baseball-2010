@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
+import { runSceneKeys, type SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /**
  * 경기 장면 상태의 **틱** (경기+0x2c) — 상태가 바뀐 틱이 0 이고 갱신마다 1 씩 오른다.
@@ -13,8 +14,17 @@ import { isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/common
  * 경기 장면 위에 공용 창 [0x140005c]+9 가 서 있으면 0x52c50 이 52cc6 에서 장면 틱 0xbc9c9(+0x2c +1) · 갱신 표 0xd0530 을
  * 건너뛰므로 틱이 안 오른다 — 창이 닫히면 건너뛴 갱신을 따라잡지 않고 이어 오른다(`isGameSceneFrozen`).
  * `runsUnderCommonWindow` 는 그 게이트 밖에서 늘 도는 그림(53064 의 기록 달성 알림 0x4e35c 따위)이 쓴다.
+ *
+ * `keyLatch` 를 주면 틱이 오른 뒤 · `onTick`(갱신) 앞에서 받은 키를 꺼내 처리한다 — 0x52c50 의 0xbc9c9(틱) → 진입 → 키(52d9e 0x498d4 ·
+ * 52da2~ 상태 키 함수) → 갱신 표(52e14) 차례(`sceneKeyLatch`). 키 처리는 이 상태의 틱(진입 틱 0 부터 센 값)을 받는다.
+ * 창이 서 있는 틀은 키 칸을 비운다(52cc6 — 다음 틀 0xbca05 가 지운다).
  */
-export function useSceneTick(onTick?: (tick: number) => void, isRunning = true, runsUnderCommonWindow = false): number {
+export function useSceneTick(
+  onTick?: (tick: number) => void,
+  isRunning = true,
+  runsUnderCommonWindow = false,
+  keyLatch?: SceneKeyLatch,
+): number {
   const [tick, setTick] = useState(0)
   // 틱은 ref 로 센다 — setState 갱신 함수 안에서 `onTick` 을 부르면 StrictMode 가 두 번 불러
   // 굴림이 두 번 나간다
@@ -23,14 +33,21 @@ export function useSceneTick(onTick?: (tick: number) => void, isRunning = true, 
   onTickRef.current = onTick
   const runsUnderCommonWindowRef = useRef(runsUnderCommonWindow)
   runsUnderCommonWindowRef.current = runsUnderCommonWindow
+  const keyLatchRef = useRef(keyLatch)
+  keyLatchRef.current = keyLatch
 
   useEffect(() => {
     if (!isRunning) return
     const handle = setGameSceneTickInterval(() => {
-      if (!runsUnderCommonWindowRef.current && isGameSceneFrozen()) return
+      if (!runsUnderCommonWindowRef.current && isGameSceneFrozen()) {
+        keyLatchRef.current?.clear()
+        return
+      }
       tickRef.current += 1
       const next = tickRef.current
       setTick(next)
+      // 52d9e 키 — 앞 틀 뒤에 받은 키를 진입 뒤 · 갱신 앞에서
+      if (keyLatchRef.current !== undefined) runSceneKeys(keyLatchRef.current, gameSceneTickNow(), next)
       onTickRef.current?.(next)
     })
     return () => handle()

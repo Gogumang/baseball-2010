@@ -115,11 +115,17 @@ describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x5
   it('구질 단계의 키를 그대로 넘긴다 — 루 가르기·주자 확인은 부르는 쪽이 한다', () => {
     const onPickoffKey = 견제띄우기()
     fireEvent.keyDown(window, { key: '3' })
-    fireEvent.keyDown(window, { key: '7' })
-    // 견제 키도 다음 틀의 키 0x498d4 가 읽는다 — 구질 고르기의 키 칸에서 받은 차례대로
+    // 견제 키도 다음 틀의 키 0x498d4 가 읽는다 — 구질 고르기의 키 칸에서
     expect(onPickoffKey).not.toHaveBeenCalled()
     틱(1)
+    fireEvent.keyDown(window, { key: '7' })
+    틱(1)
     expect(onPickoffKey.mock.calls).toEqual([['3'], ['7']])
+    // 한 틀에 둘이 오면 받은 칸 [+0x20] 에는 뒤 키만 남는다(누름 0x39f4c 는 덮어쓰기만)
+    fireEvent.keyDown(window, { key: '1' })
+    fireEvent.keyDown(window, { key: '9' })
+    틱(1)
+    expect(onPickoffKey.mock.calls).toEqual([['3'], ['7'], ['9']])
   })
 
   it('누르고 있는 반복 키는 한 번만이다', () => {
@@ -177,6 +183,7 @@ describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린�
 
 describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*\' 로 연다 (0x498d4 · 표 0xcfcfc 행 1)', () => {
   function 메뉴화면(props: { onGiveUp?: () => void; onRestart?: () => void } = {}) {
+    vi.useFakeTimers()
     render(
       <PitchingScreen
         run={startPitcherMission(PITCHER_MISSIONS[0]!)}
@@ -196,24 +203,29 @@ describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*
     메뉴화면({ onRestart: vi.fn() })
     expect(screen.queryByRole('button', { name: '포기' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
+    // '*' 는 받은 다음 틀의 키 0x498d4(49918)가 연다
+    틱(1)
     for (const 메뉴칸 of ['계속하기', '재도전', '게임방법', '환경설정', '메인메뉴']) {
       expect(screen.getByRole('option', { name: 메뉴칸 })).toBeTruthy()
     }
     expect(screen.queryByRole('option', { name: '자동진행' })).toBeNull()
     // 투구 단계(누름 칸)는 가려진다 — 단계 상태는 그대로다
     expect(구질단계()?.closest('[hidden]')).toBeTruthy()
-    // '*' 로 닫는다
+    // '*' 로 닫는다 — 창이 서 있는 동안 키는 창 몫이다
     fireEvent.keyDown(window, { key: '*' })
     expect(구질단계()?.closest('[hidden]')).toBeNull()
+    vi.useRealTimers()
   })
 
   it('메뉴 소프트키로도 열리고, [나가기]를 확인하면 나가기 손잡이를 부른다', () => {
     const onGiveUp = vi.fn()
     메뉴화면({ onGiveUp })
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    틱(1)
     fireEvent.click(screen.getByRole('option', { name: '메인메뉴' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(onGiveUp).toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })
 

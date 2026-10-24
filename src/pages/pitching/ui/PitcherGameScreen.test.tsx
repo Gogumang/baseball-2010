@@ -145,9 +145,12 @@ const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) =
       onFinish={vi.fn()}
     />,
   )
+  // 키는 받은 다음 틀의 키 자리에서 처리된다(`sceneKeyLatch`) — 한 틀씩 흘린다
   fireEvent.keyDown(window, { key: '5' })
+  act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
   if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByTestId(/^교대-판-/) !== null) {
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
   }
   OK통과()
   return rendered
@@ -233,6 +236,8 @@ describe('투수편 경기 화면', () => {
   it('`#` 를 누르면 StrGAME[104] "그만 던지시겠습니까?" 가 뜬다 — 모드 3 은 교체 화면이 없다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '# 강판' }))
+    // '#' 는 받은 다음 틀의 키 0x498d4(4994a)가 처리한다
+    틱(1)
 
     expect(screen.getByText('그만 던지시겠습니까?')).toBeTruthy()
     expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
@@ -242,14 +247,17 @@ describe('투수편 경기 화면', () => {
     vi.useFakeTimers()
     render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} />)
     fireEvent.keyDown(window, { key: '5' })
+    틱(1)
     if (screen.queryByRole('button', { name: '메뉴' }) === null && screen.queryByTestId(/^교대-판-/) !== null) {
       fireEvent.click(screen.getByRole('button', { name: '확인' }))
+      틱(1)
     }
     expect(screen.getByRole('button', { name: '확인' })).toBeTruthy()
     fireEvent.keyDown(window, { key: '#' })
     expect(screen.queryByText('그만 던지시겠습니까?')).toBeNull()
     act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: '#' })
+    틱(1)
     expect(screen.getByText('그만 던지시겠습니까?')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '아니오' }))
     expect(구질보임()).toBe(false)
@@ -284,6 +292,7 @@ describe('투수편 경기 화면', () => {
       expect(screen.getByAltText('세이브')).toBeTruthy()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
       fireEvent.keyDown(window, { key: '5' })
+      틱(1)
     } finally {
       vi.useRealTimers()
     }
@@ -322,10 +331,12 @@ describe('투수편 경기 화면', () => {
       )
       // 인트로(0xc)를 '5' 로 건너뛰면 자동진행 중계(0x21) 뒤 경기 끝 결과 판(0x18) — 10틱 잠금 뒤 OK 로 정산(0x19)
       fireEvent.keyDown(window, { key: '5' })
+      틱(1)
       중계넘기기()
       expect(screen.getByAltText('세이브')).toBeTruthy()
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
       fireEvent.keyDown(window, { key: '5' })
+      틱(1)
     } finally {
       vi.useRealTimers()
     }
@@ -339,18 +350,22 @@ describe('투수편 경기 화면', () => {
 
 describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
   it('인트로가 먼저 서고, 후공·선발이면 그 뒤 1회초 판이 OK 를 기다린다 — 그 동안 메뉴 키가 안 먹는다', () => {
+    vi.useFakeTimers()
     render(<PitcherGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={vi.fn()} />)
     expect(screen.getByTestId('인트로-띠')).toBeTruthy()
     expect(구질보임()).toBe(false)
 
+    // 키는 받은 다음 틀의 키 자리에서 처리된다(`sceneKeyLatch`)
     fireEvent.keyDown(window, { key: '5' })
+    틱(1)
     expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
+    틱(1)
     expect(screen.queryByRole('option', { name: '게임방법' })).toBeNull()
 
-    vi.useFakeTimers()
     fireEvent.keyDown(window, { key: 'Enter' })
+    틱(1)
     // 판 OK → 0xd → 0xe — 이번엔 사람 OK 를 기다린다
     expect(구질보임()).toBe(false)
     OK통과()
@@ -379,6 +394,8 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
   it('네 칸뿐이다 — 자동진행·다시하기가 없다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    // '*' 는 받은 다음 틀의 키 0x498d4(49918)가 연다
+    틱(1)
 
     for (const 칸 of ['계속하기', '게임방법', '환경설정', '메인메뉴']) {
       expect(screen.getByRole('option', { name: 칸 })).toBeTruthy()
@@ -390,6 +407,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 2 — 나만의리그)', () => {
   it('메뉴가 떠 있는 동안에는 투구 단계가 가려진다', () => {
     띄우기()
     fireEvent.keyDown(window, { key: '*' })
+    틱(1)
 
     expect(구질보임()).toBe(false)
   })

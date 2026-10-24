@@ -137,13 +137,16 @@ const UPDATES_PER_TICK = 1
 /**
  * 받은 키 줄 — 키마다 받은 장면 틱을 함께 든다. 원본은 키 콜백이 [+0x20] 에 적기만 하고 다음 틀의 0xbca05 → 키 0x498d4(52d9e) →
  * 0x53420 이 그 틀의 갱신보다 먼저 처리한다(`sceneKeyLatch`) — 받은 틱의 갱신에는 먹이지 않고 그 뒤 갱신부터 먹인다.
- * 웹은 한 갱신에 하나씩 먹인다(⚠️ 근사 — 원본 받은 칸은 하나라 한 틀에 둘이 오면 뒤 키만 남는다).
+ * 받은 칸 [+0x20] 은 하나라(누름 0x39f4c 가 덮어쓰기만 한다, r167) 한 틀에 둘이 오면 뒤 키만 남는다 — 같은 틱에 받은 키는 마지막
+ * 하나만 먹이고 앞 키는 버린다. 틱이 다른 키는 한 갱신에 하나씩 먹인다.
  */
 function takePressFor(presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null): DefenseKeyPress | null {
   const arrived = ticks[0]
   if (arrived === undefined || (sceneTick !== null && arrived >= sceneTick)) return null
-  ticks.shift()
-  return presses.shift() ?? null
+  let count = 1
+  while (ticks[count] === arrived) count += 1
+  ticks.splice(0, count)
+  return presses.splice(0, count).at(-1) ?? null
 }
 
 /**

@@ -68,8 +68,11 @@ const 띄우기 = (wait: SceneConfirmWait) => {
       gameSettings={{ settings: {}, setSettings: noop } as never}
     />,
   )
-  // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다
+  // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다 — 다음 틀의 상태 키 자리(0x39b54)에서
   fireEvent.keyDown(window, { key: 'Enter' })
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame())
+  })
 }
 
 describe('나리 타자편 돌발 제안 창(0x1b)은 상태 0xe 의 OK 뒤에 선다 (0x50c18 → 0x50c42 0x8f158)', () => {

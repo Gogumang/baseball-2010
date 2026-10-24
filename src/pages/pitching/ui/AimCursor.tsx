@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { createSceneKeyLatch, isRunningSceneKeys, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
   AIM_STILL,
@@ -124,13 +124,14 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   applyRef.current = apply
 
   // '*'(소프트키1 · "*MENU" 누름 칸도) — 공용 키 0x498d4 가 메뉴를 세운 뒤 같은 키로 메시지 8 을 보내 dx · dy 를 지우고(499fa →
-  // 0x534b0 → 0x50e3a), 그 그림의 갱신 0x39c5c 가 게이트(52cc6, 키 앞) 뒤라 한 번 더 돈다. 다음 그림부터는 창이 멈춘다
+  // 0x534b0 → 0x50e3a), 그 그림의 갱신 0x39c5c 가 게이트(52cc6, 키 앞) 뒤라 한 번 더 돈다. 다음 그림부터는 창이 멈춘다.
+  // '*' 가 키 칸으로 들어 이 틀의 키 자리에서 열렸으면(`isRunningSceneKeys`) 그 갱신은 위 틀이 뒤이어 돌린다 — 방향만 지운다
   useEffect(
     () =>
       subscribeInGameMenuStarOpen(() => {
         if (isDoneRef.current || propsRef.current.isPaused || isGameSceneFrozen()) return
         directionRef.current = AIM_STILL
-        tickRef.current()
+        if (!isRunningSceneKeys()) tickRef.current()
       }),
     [],
   )

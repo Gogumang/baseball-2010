@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PointerEvent } from 'react'
+import type { SceneKeyKind } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import {
@@ -57,9 +58,9 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
    * 키 0x498d4(52d9e)가 진입(52cdc) 뒤 · 갱신(52e14) 앞에서 처리한다. 루프(`useStageAnimation`)가 그 자리에서 꺼낸다.
    * 각 동작은 받은 장면 틱 `tick` 을 받는다 — 스윙 예약의 공 틱(`keyTickOf` = 보이던 공 틱 + 1)은 그 틱으로 센다.
    */
-  const latch = (apply: (tick: number) => void) => {
+  const latch = (apply: (tick: number) => void, kind: SceneKeyKind = 'press') => {
     const tick = gameSceneTickNow()
-    keyLatch.push(() => apply(tick))
+    keyLatch.push(() => apply(tick), kind)
   }
 
   useEffect(() => {
@@ -97,8 +98,8 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
     // 그래서 창 아래에서 번트 키를 떼면 0x6a8 이 안 가고, 창이 닫힌 뒤에도 자세(+0xfdc)가 남는다(원본 그대로)
     const onKeyUp = (event: KeyboardEvent) => {
       if (BUNT_KEYS[event.key] === undefined || isGameSceneFrozen()) return
-      // 뗌 [+0x24] 도 다음 틀의 0xbca05(bcaf0~) → 0x5364c 가 읽는다
-      latch((tick) => actions.releaseBunt(tick))
+      // 뗌 [+0x24] 도 다음 틀의 0xbca05(bcaf0~) → 0x5364c 가 읽는다 — 뗌 칸도 하나라 한 틀의 마지막 뗌만, 누름 뒤에 처리된다
+      latch((tick) => actions.releaseBunt(tick), 'release')
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -145,7 +146,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
         isPointerBuntingRef.current = false
         // 키 '8' 떼기와 같다 — 창이 서 있는 동안 뗀 것은 버려진다(위 `onKeyUp`)
         if (isGameSceneFrozen()) return
-        return latch((tick) => actions.releaseBunt(tick))
+        return latch((tick) => actions.releaseBunt(tick), 'release')
       }
       // 공용 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 위 `onKeyDown` 과 같다
       if (isGameSceneFrozen()) return

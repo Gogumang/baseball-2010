@@ -28,7 +28,7 @@ afterEach(() => {
 })
 
 describe('벤치 클리어링 연출 (상태 0x1e)', () => {
-  it('진입에 소리 44, 틱 10 전에 OK 면 목표 굴림 전에 나간다', () => {
+  it('진입에 소리 44, 틱 9 에 받은 OK 는 틱 10 의 키 자리(갱신 앞)에서 처리되어 목표 굴림 전에 나간다', () => {
     setActiveSound(소리)
     vi.useFakeTimers()
     const onDone = vi.fn()
@@ -37,6 +37,9 @@ describe('벤치 클리어링 연출 (상태 0x1e)', () => {
 
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
     fireEvent.keyDown(window, { key: '5' })
+    // 받은 틀에는 아무 일 없다 — 다음 틀 52de8 0x40628
+    expect(onDone).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onDone).toHaveBeenCalledWith(false)
     expect(녹음.stopped).toBe(1)
   })
@@ -48,6 +51,7 @@ describe('벤치 클리어링 연출 (상태 0x1e)', () => {
     render(<BenchClearingScene onDone={onDone} />)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
     fireEvent.keyDown(window, { key: 'Enter' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onDone).toHaveBeenCalledWith(true)
   })
 
@@ -95,6 +99,7 @@ describe('벤치 클리어링 연출 (상태 0x1e)', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(asked).toEqual([[1000, 2000], [2000, 3000], [1000, 1500], [2500, 3000], [1000, 1500], [2500, 3000], [0, 2000], [0, 2000]])
     fireEvent.keyDown(window, { key: '5' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onDone).toHaveBeenCalledWith(false)
   })
 })

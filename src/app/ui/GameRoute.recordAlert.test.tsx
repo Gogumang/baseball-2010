@@ -74,8 +74,9 @@ describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 �
       gameSettings: { settings: {}, setSettings: noop } as never,
     })
     const { rerender } = render(<GameRoute {...props(base, 3)} />)
-    // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다
+    // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다 — 다음 틀의 상태 키 자리(0x39b54)에서
     fireEvent.keyDown(window, { key: 'Enter' })
+    tick()
 
     // 볼 넷째 — 판정과 진행기 걸음이 한 그림에 든다
     act(() => {

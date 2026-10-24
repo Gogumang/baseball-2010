@@ -139,6 +139,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
   })
 
   it('들어서면 투수 미션 레코드로 대결을 세워 투구 화면을 띄우고, 결과 [확인]에서 이겼나를 넘긴다', () => {
+    vi.useFakeTimers()
     const mission = aceMatchMissionOf(18, '투수')
     if (mission === null) throw new Error('투수 미션 18 이 없다')
     const onFinish = vi.fn()
@@ -165,6 +166,8 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(받은것).toHaveLength(0)
     expect(view.getByTestId(/^교대-판-/)).toBeTruthy()
     act(() => view.getByText('확인').click())
+    // 판 OK 는 받은 다음 틀의 키 0x498d4 가 처리한다(`sceneKeyLatch`)
+    act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
 
     const shown = 받은것.at(-1)
     expect(shown?.run.mission).toMatchObject({ side: '투수', id: 18, name: '로제' })
@@ -173,6 +176,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(finished?.run.status).toBe('실패')
     act(() => finished?.onFinish())
     expect(onFinish).toHaveBeenCalledWith(false)
+    vi.useRealTimers()
   })
 
   it('들어서면 첫 0x18 판보다 먼저 로딩 판 — 팁은 상태 7 진입 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n] (다시하기도 다시 선다)', () => {
