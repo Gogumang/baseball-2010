@@ -137,6 +137,9 @@ export function advanceBatterAnimation(animation: FigureAnimation): FigureAnimat
   return rule.wraps ? { ...animation, step: 0, count: 0 } : { ...animation, count: count + 1 }
 }
 
+/** `batterPoseOf` 가 낼 수 있는 자세 0 ~ 13 — 그림을 미리 칠할 때 쓴다 */
+export const FIGURE_BATTER_POSES: readonly number[] = Array.from({ length: 14 }, (_, pose) => pose)
+
 /** 0xb905c — 2 준비 4·5(폼 2·3 은 5·6) · 3 스윙 6~12(7~11) · 4 번트 13(12) · 5 대기 0~3(0~4) */
 export function batterPoseOf(animation: FigureAnimation): number {
   const { state, step, form } = animation

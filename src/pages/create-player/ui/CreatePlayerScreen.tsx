@@ -9,9 +9,9 @@ import {
 } from '@/entities/career/model/playerCareer'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { TEAMS } from '@/shared/config/original/teams'
-import { batterLayerPaletteIndex, batterLayersOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterLayerPaletteIndex, batterLayersOf, layerRecolorRequestsOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 // 원본은 등록 화면을 관리 화면 기본정보 카드(0x15e20)로 그린다 — 카드 좌표·레이더를 그대로 가져다 쓴다
 import { FIGURE_FOOT, INFO_BOARD } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
@@ -64,6 +64,13 @@ interface CreatePlayerScreenProps {
 export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, onCreate, onCancel }: CreatePlayerScreenProps) {
   const [name, setName] = useState('')
   const [profile, setProfile] = useState<RookieProfile>({ ...DEFAULT_ROOKIE_PROFILE, teamId })
+  // 타입 · 피부 줄을 바꾸면 원본은 그림을 다시 적재해 곧바로 제 색이다 — 고를 수 있는 타입 × 피부 그림을 미리 칠해
+  // 바꾼 그 그림에 구운 벌이 한 박자 비치지 않게
+  useWarmRecoloredSprites(CHOICES.타입.options.flatMap((_, battingTypeIndex) =>
+    CHOICES.피부.options.flatMap((__, skinIndex) => layerRecolorRequestsOf(
+      batterLayersOf(FIGURE_POSE_FRAME, battingTypeIndex, NO_EQUIPMENT, false),
+      (layer) => batterLayerPaletteIndex(layer.folder, skinIndex, teamId),
+    ))))
   const [selectedRow, setSelectedRow] = useState(0)
   const [isConfirming, setIsConfirming] = useState(false)
   const [tick, setTick] = useState(1)

@@ -1,13 +1,15 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
-import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite, warmRecoloredFrame } from '@/widgets/batting-stage/lib/spriteLoader'
+import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite, warmRecoloredFrames } from '@/widgets/batting-stage/lib/spriteLoader'
+import type { RecolorFrame, StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import {
   judgeAnimationOf,
   judgeFrameAt,
   pitcherAnimationAt,
+  pitcherPoseFramesOf,
   pitcherPoseOf,
   skyColumnOfInning,
 } from '@/widgets/batting-stage/lib/stageScenery'
@@ -447,6 +449,26 @@ function isRunPipState(phase: StagePhaseSnapshot | undefined): boolean {
 
 const RUNNER_BASE_OF_ANIMATION: readonly BaseKey[] = ['first', 'second', 'third']
 
+/**
+ * 보통 주자(defender, 공격 팀 벌)가 그릴 수 있는 칸 — 애니 0 · 1 · 2 의 프레임 전부 — 를 미리 칠한다(`warmRecoloredFrames`).
+ * 주자가 처음 서는 그림 · 처음 흔드는 칸에 구운 벌이 한 박자 비치지 않게. 애니 표가 아직이면 다음 그림에 다시 본다
+ */
+function warmRunnerRecolors(paletteIndex: number | null): void {
+  if (paletteIndex === null) return
+  const animations = frameAnimations(RUNNER_FRAMES)
+  if (animations === null) return
+  warmRecoloredFrames(`runner|${paletteIndex}`, () => runnerRecolorFramesOf(animations, paletteIndex))
+}
+
+/** 주자 애니 0 · 1 · 2(1 · 2 · 3루)의 칸 전부를 공격 팀 벌로 — 같은 칸은 한 번 */
+export function runnerRecolorFramesOf(
+  animations: readonly (readonly StageAnimationEntry[])[],
+  paletteIndex: number,
+): RecolorFrame[] {
+  const frames = new Set(RUNNER_BASE_OF_ANIMATION.flatMap((_, animation) => (animations[animation] ?? []).map((entry) => entry.frame)))
+  return [...frames].map((frame) => ({ folder: RUNNER_FRAMES, frame, paletteIndex }))
+}
+
 function drawBaseRunners(
   context: CanvasRenderingContext2D,
   hud: HudState,
@@ -457,6 +479,7 @@ function drawBaseRunners(
   runnerAces?: RunnerAces,
 ): void {
   const paletteIndex = runnerPaletteIndexOf(offenseTeamIdOf(hud))
+  warmRunnerRecolors(paletteIndex)
   const loadedAce = runnerAces === undefined ? null : loadedRunnerAceOf(runnerAces, hud.bases)
   // st[0x15 + i] — 도루를 출발한 주자의 루는 창도 주자도 안 그린다 (35c4a 가 그 루의 몸통을 통째로 건너뛴다)
   const hidden = hud.hiddenRunnerBases ?? []
@@ -613,6 +636,21 @@ export function acePitcherMirrorsOf(aceOrder: number, isLeftHanded: boolean, sid
 }
 
 /**
+ * 평범한 투수가 그릴 수 있는 자세(선 자세 · 투구 · 대기 동작, `pitcherPoseFramesOf`)의 등급 색 장비 겹을 미리 칠한다 —
+ * 첫 와인드업 · 첫 투구 칸에 구운 벌이 한 박자 비치지 않게(`warmBatterRecolors` 와 같은 까닭). 바탕 pitcher 겹은 구운 색 그대로다
+ */
+function warmPitcherRecolors(equipment: PitcherEquipment): void {
+  warmRecoloredFrames(`pitcher|${JSON.stringify(equipment)}`, () => pitcherRecolorFramesOf(equipment))
+}
+
+/** 평범한 투수 자세 전부의 겹 — 벌은 `drawPitcher` 와 같은 `layerPaletteIndexOf(겹, 0, 0)`(등급 줄만) */
+export function pitcherRecolorFramesOf(equipment: PitcherEquipment): RecolorFrame[] {
+  return pitcherPoseFramesOf(null).flatMap((pose) =>
+    pitcherLayersOf(pose, equipment).map((layer) => ({ folder: layer.folder, frame: layer.frame, paletteIndex: layerPaletteIndexOf(layer, 0, 0) })),
+  )
+}
+
+/**
  * 투수 그림 객체의 그리기 0x79524. 마투수(+0x3d ≥ 0)는 79568 에서 갈려 실린 ace/pitcher_*.pzx 의 프레임 하나만 효과 0x11(좌투)로
  * 그리고, 평범한 투수는 바탕 · 장비 · 덧그림 여섯 칸을 쌓는다. 프레임은 0x9e0b8 이 상태 · 단계로 고른다 (`pitcherPoseOf`).
  */
@@ -641,6 +679,7 @@ function drawPitcher(
     // f+22 에 몸통·던지는 팔·글러브 안 공이 들어 있다 (PITCHER_OVERLAY_FRAME_OFFSET 주석).
     // 장비 칸은 등급 줄(.mpl)로 색만 갈리므로 타자와 같은 `layerPaletteIndexOf` 를 그대로 쓴다 —
     // 투수 폴더는 피부·팀 벌이 없어 뒤 두 인자는 무시된다 (`batterLayerPaletteIndex` 가 null).
+    warmPitcherRecolors(equipment)
     for (const layer of pitcherLayersOf(index, equipment)) {
       const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, 0, 0))
       if (frame === null) continue
@@ -798,24 +837,18 @@ function drawHitByPitchMark(context: CanvasRenderingContext2D, scene: StageScene
   )
 }
 
-/** 칠하기를 다 걸어 둔 타자 (몸통 폼 · 피부 · 팀 · 장비) */
-const warmedBatters = new Set<string>()
-
 /**
  * 이 타자가 그릴 수 있는 자세(대기 · 스윙 · 번트, `batterPoseFramesOf`)의 다시 칠할 겹을 미리 칠해 둔다 — 처음 스윙하는 틱에
  * 칠하기를 걸면 칠이 끝날 때까지 구운 벌이 비친다(`warmRecoloredFrame`). 원점 · 팔레트가 다 와서 다 걸면 다시 안 본다.
  */
 function warmBatterRecolors(bodyType: number, skinIndex: number, teamIndex: number, equipment: BatterEquipment): void {
-  const key = `${bodyType}|${skinIndex}|${teamIndex}|${JSON.stringify(equipment)}`
-  if (warmedBatters.has(key)) return
-  let isAllWarmed = true
-  for (const pose of batterPoseFramesOf(bodyType)) {
-    for (const layer of batterLayersOf(pose, bodyType, equipment)) {
-      const paletteIndex = layerPaletteIndexOf(layer, skinIndex, teamIndex)
-      if (paletteIndex !== null && !warmRecoloredFrame(layer.folder, layer.frame, paletteIndex)) isAllWarmed = false
-    }
-  }
-  if (isAllWarmed) warmedBatters.add(key)
+  warmRecoloredFrames(`batter|${bodyType}|${skinIndex}|${teamIndex}|${JSON.stringify(equipment)}`, () =>
+    batterPoseFramesOf(bodyType).flatMap((pose) =>
+      batterLayersOf(pose, bodyType, equipment).map((layer) => ({
+        folder: layer.folder, frame: layer.frame, paletteIndex: layerPaletteIndexOf(layer, skinIndex, teamIndex),
+      })),
+    ),
+  )
 }
 
 /**

@@ -9,7 +9,7 @@ import {
   EVENT_CHAR_0, EVENT_CHAR_1, OUTING_PANEL, OUTING_PANEL_BAND, SEASON_OUTING_PRESENTATIONS, isSeasonOutingSkipKey,
 } from '@/pages/season/lib/seasonOutingPopup'
 import type { SeasonOutingPresentation } from '@/pages/season/lib/seasonOutingPopup'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
@@ -156,6 +156,8 @@ function AnimationSprite({ folder, origins, entries, update, palette = null }: {
   readonly update: number
   readonly palette?: number | null
 }) {
+  // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
+  useWarmRecoloredSprites(recolorRequestsOf(folder, (entries ?? []).map((entry) => entry.frame), palette))
   const step = entries === undefined ? null : animationStepAt(entries, update)
   if (step === null) return null
   const key = String(step.frame).padStart(3, '0')

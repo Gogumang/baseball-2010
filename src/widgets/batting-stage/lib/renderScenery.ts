@@ -2,7 +2,7 @@ import { BOARD_BOXES, FENCE_BOXES } from '@/shared/config/original/stadiumScene'
 import {
   CLOUD_FRAMES, CROWD_FRAMES, FENCE_BOARD_FRAMES, FENCE_FRAMES, FENCE_SEASON_FRAMES,
   HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, SKY_LIGHT_FRAMES, TEAM_ICON, fieldBackground,
-  drawFrameAt, frameAnimations, placedFrame, sprite,
+  drawFrameAt, frameAnimations, placedFrame, sprite, warmRecoloredFrames,
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { PlacedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
@@ -500,6 +500,9 @@ function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, co
   const frameIndex = skyLightFrameAt(entries, state.tick)
   if (frameIndex === null) return
   const paletteRow = skyLightPaletteRowOf(colorIndex)
+  // 애니 0 의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
+  warmRecoloredFrames(`sky-light|${paletteRow}`, () =>
+    [...new Set(entries.map((entry) => entry.frame))].map((frame) => ({ folder: SKY_LIGHT_FRAMES, frame, paletteIndex: paletteRow })))
   const first = placedFrame(SKY_LIGHT_FRAMES, 0, paletteRow)
   if (first === null) return
   const originX = STAGE_WIDTH - first.offsetX - first.image.width

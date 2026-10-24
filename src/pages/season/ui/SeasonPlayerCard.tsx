@@ -15,7 +15,7 @@ import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
 import { HALL_OF_FAME_FIGURE, figureHandOf } from '@/pages/special/lib/hallOfFameFigure'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
-import { FigureLayers, PitcherFigure } from '@/pages/special/ui/HallOfFameFigure'
+import { FigureLayers, PitcherFigure, figureBatterWarmLayersOf } from '@/pages/special/ui/HallOfFameFigure'
 import * as specialStyles from '@/pages/special/ui/SpecialScreen.css'
 import {
   SEASON_CARD_BADGE, SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_RADAR_LABELS,
@@ -209,9 +209,11 @@ function SeasonCardFigure({ isPitcher, look, pose }: {
     )
   }
   const [hit, power, , run] = look.equipment
-  const layers = batterLayersOf(pose, bodyTypeOf(look.form), batterEquipmentOf({ hit, power, run }), false)
+  const bodyType = bodyTypeOf(look.form)
+  const equipment = batterEquipmentOf({ hit, power, run })
+  const layers = batterLayersOf(pose, bodyType, equipment, false)
   return <FigureLayers layers={layers} x={SEASON_CARD_FIGURE.batter.x} y={SEASON_CARD_FIGURE.batter.y}
     isMirrored={figureHandOf(look) === 0} paletteOf={(layer) => layerPaletteIndexOf(layer, look.skin, look.team)}
-    testId="시즌카드-타자그림" />
+    testId="시즌카드-타자그림" warmLayers={figureBatterWarmLayersOf(bodyType, equipment)} />
 }
 

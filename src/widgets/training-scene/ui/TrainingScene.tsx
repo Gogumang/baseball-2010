@@ -107,6 +107,7 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, bat
         {figure !== null && step !== null && (
           <TrainingFigure
             pose={figurePoseAt(figurePosesOf(figure, battingTypeIndex), step.entryIndex)}
+            warmPoses={figurePosesOf(figure, battingTypeIndex)}
             equipment={equipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(equipmentLevels)}
             skinIndex={skinIndex}
             teamIndex={teamIndex}

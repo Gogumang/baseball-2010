@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useRecoloredSprite, outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+import { useRecoloredSprite, useWarmRecoloredSprites, outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import { animationFolderOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt, figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
 import { TrainingFigure } from '@/widgets/training-scene/ui/TrainingFigure'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
-import { pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { layerRecolorRequestsOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
@@ -107,11 +107,11 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
             src={`${folder}/${frameKey}.png`} alt="" />
         )}
         {figure !== null && step !== null && figure.kind === '타자' && (
-          <TrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} skinIndex={SEASON_TRAINING_SKIN} teamIndex={teamIndex}
+          <TrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} warmPoses={figure.poses} skinIndex={SEASON_TRAINING_SKIN} teamIndex={teamIndex}
             form={SEASON_TRAINING_BATTER_FORM} x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
         )}
         {figure !== null && step !== null && figure.kind === '투수' && (
-          <PitcherTrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} teamIndex={teamIndex}
+          <PitcherTrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} poses={figure.poses} teamIndex={teamIndex}
             x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
         )}
       </div>
@@ -124,17 +124,21 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
  * 단일 PZX 투수 그림 0x79525 — 동작 번호 = pitcher.pzx 프레임 번호(0x795f6), +0x3d < 0(마투수 아님) 갈래의 겹 여섯 칸
  * (`pitcherLayersOf` — 새로 만든 객체라 장비 칸은 비어 있다). +0x3c = 0 이라 안 뒤집는다. 바탕 팔레트 = 피부 0 × 15 + 팀.
  */
-function PitcherTrainingFigure({ pose, teamIndex, x, y }: {
+function PitcherTrainingFigure({ pose, poses, teamIndex, x, y }: {
   readonly pose: number
+  /** 이 애니가 낼 자세들 — 그 겹을 미리 칠해 둔다(자세가 넘어가는 그림에 구운 벌이 비치지 않게) */
+  readonly poses: readonly number[]
   readonly teamIndex: number
   readonly x: number
   readonly y: number
 }) {
+  const paletteOf = (layer: BatterLayer) =>
+    layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(SEASON_TRAINING_SKIN, teamIndex) : null)
+  useWarmRecoloredSprites(layerRecolorRequestsOf([...new Set(poses)].flatMap((shown) => pitcherLayersOf(shown)), paletteOf))
   return (
     <div data-testid="시즌-훈련-투수" style={{ position: 'absolute', left: x, top: 0 }}>
       {pitcherLayersOf(pose).map((layer, index) => (
-        <PitcherLayer key={`${layer.folder}#${index}`} layer={layer} y={y}
-          paletteIndex={layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(SEASON_TRAINING_SKIN, teamIndex) : null)} />
+        <PitcherLayer key={`${layer.folder}#${index}`} layer={layer} y={y} paletteIndex={paletteOf(layer)} />
       ))}
     </div>
   )

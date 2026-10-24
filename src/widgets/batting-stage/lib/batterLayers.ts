@@ -19,6 +19,7 @@
  * `BatterLayer`·`layerPaletteIndexOf` 를 쓰기 때문이다. 두 쪽 차이는 `PitcherEquipment` 주석 참고.
  */
 import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+import type { RecolorRequest } from '@/shared/lib/sprite/paletteSwap'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import { PITCHER_OVERLAY_FRAME_OFFSET } from '@/widgets/batting-stage/lib/stageScenery'
 
@@ -164,6 +165,20 @@ export function batterLayerPaletteIndex(folder: string, skinIndex: number, teamI
  */
 export function layerPaletteIndexOf(layer: BatterLayer, skinIndex: number, teamIndex: number): number | null {
   return layer.gradePaletteRow ?? batterLayerPaletteIndex(layer.folder, skinIndex, teamIndex)
+}
+
+/**
+ * 겹들 → 미리 칠하기 요청 (`useWarmRecoloredSprites`) — 그림 객체가 그릴 수 있는 자세의 겹을 모아 넘기면
+ * 자세가 넘어가는 그 그림부터 칠한 색이 나간다(원본은 적재 때 팔레트를 갈아 끼운다). 벌이 없는 겹은 뺀다.
+ */
+export function layerRecolorRequestsOf(
+  layers: readonly BatterLayer[],
+  paletteOf: (layer: BatterLayer) => number | null,
+): RecolorRequest[] {
+  return layers.flatMap((layer) => {
+    const paletteIndex = paletteOf(layer)
+    return paletteIndex === null ? [] : [{ url: `${layer.folder}/${String(layer.frame).padStart(3, '0')}.png`, paletteIndex }]
+  })
 }
 
 interface PoseTable {
