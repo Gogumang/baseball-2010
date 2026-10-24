@@ -189,3 +189,23 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
     ).toEqual({ tick: 19, slot: 8 })
   })
 })
+
+describe('고르기 0xb3b38 의 백업 갈래 b3ebe~b3f62 (r180)', () => {
+  const 야수 = createFielders(Array.from({ length: 9 }, () => 500), 0)
+  it('외야 추적야수면 곁의 가장 가까운 외야수 하나가 백업 — 내야 추적야수면 없다', () => {
+    const 외야 = forecastCatch(battedBallTrajectory([92, 895, 1017, 0]), 야수, { from: 0, to: Number.POSITIVE_INFINITY })
+    expect(외야.choice.slot).toBe(8)
+    expect([6, 7]).toContain(외야.backupSlot)
+    const 내야 = forecastCatch(battedBallTrajectory([70, 1000, 202, 0]), 야수, { from: 0, to: Number.POSITIVE_INFINITY })
+    expect(내야.choice.slot).toBeLessThanOrEqual(5)
+    expect(내야.backupSlot).toBe(-1)
+  })
+
+  it('다이빙 후보 표 +0x178 — 공 첫 점이 표준 배팅 지점이 아니면 모두 1000', () => {
+    const 예보 = forecastCatch(battedBallTrajectory([70, 1000, 202, 0], { origin: { x: 20_000, y: 0, z: 25_000 } }), 야수, {
+      from: 0,
+      to: Number.POSITIVE_INFINITY,
+    })
+    expect(예보.diveTicks.every((tick) => tick === 1000)).toBe(true)
+  })
+})

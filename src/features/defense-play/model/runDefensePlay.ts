@@ -57,7 +57,7 @@ import {
   rollFumble,
   rollSpecialDefense,
 } from '@/entities/fielding/model/fieldingErrors'
-import { CATCH_KIND, type BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
+import { backupPointOf, CATCH_KIND, type BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import {
   basePosition,
   FIELDER_COUNT,
@@ -106,12 +106,13 @@ import {
   OUT_KIND,
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
-import { baseAtPoint, claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
+import { baseAtPoint, claimCoverOfBase, needsCover } from '@/entities/fielding/model/coverAssignment'
 import { runCoverTick } from '@/features/defense-play/model/coverTick'
 import {
   FIELDER_ACTION,
   canStepNextListTick,
   isFreeToRetarget,
+  isFreeToStep,
   isReadyToThrow,
   listTickFielder,
   withAction,
@@ -144,7 +145,8 @@ import {
   someRunnerStillActive,
   type PlayEndState,
 } from '@/entities/fielding/model/playGate'
-import { forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { DIVE_TICK_NONE, forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { diveCheckOf, logDiveCheck } from '@/features/defense-play/model/diveCheck'
 import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import {
   FUMBLE_MARK_TICKS,
@@ -1032,6 +1034,13 @@ export interface DefensePlayState {
    */
   ballLaunchTick: number
   /**
+   * 플레이 +0x178[칸] — 지금 공의 예보가 적은 다이빙 후보 틱(공 틱, 없으면 1000 — `catchForecast.diveTicks`, r180). 송구 · 다시 쏘기의
+   * 예보(`takeLooseBall`)가 새로 채운다 — 첫 점이 표준 배팅 지점이 아니라 모두 1000 이 된다.
+   */
+  diveTicks: readonly number[]
+  /** 플레이 +0x174 — 고르기 0xb3b38 이 적은 포구 틱(공 틱, 웹 판 틱 끝으로 자르기 전 값). AI 고리 b470a 가 `ldrsh` 로 읽는다 */
+  diveCatchTick: number
+  /**
    * 지금 쫓는 공이 **받을 야수에게 던진 송구공**(공+0xaac == 0 — 보통 · 흔들린 · 레이저 송구)인가. 받는 것도 포구 틱 갈래(1 절)다.
    */
   receivingThrow: boolean
@@ -1179,7 +1188,10 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
       ? forecast.fenceChasePoint !== null
         ? { ...fielder, target: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP }
         : { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE }
-      : fielder,
+      : // b3f5c — 백업 갈래: 외야 추적야수 곁의 가장 가까운 외야수 AI 0xc (목표는 AI 고리 b4b78 이 고른다, r180)
+        fielder.slot === forecast.backupSlot
+        ? { ...fielder, aiState: AI_STATE.BACKUP }
+        : fielder,
   )
   // state[7] — 0x511ae 가 1 로 세운 뒤 state[0x19](0.1% 사건)가 아니면 0x511ce 가 0x9d640(쏜 a)로 덮는다
   const wideFairAtStart = input.specialEvent === true || launchedPattern === undefined || isWideFairAngle(launchedPattern[0])
@@ -1319,6 +1331,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     landingChase,
     ballLandingTick: trajectory.landingTick,
     ballLaunchTick: 0,
+    diveTicks: forecast.diveTicks,
+    diveCatchTick: forecast.choice.catchTick,
     receivingThrow: false,
     fielderArrivals: [],
   }
@@ -1469,6 +1483,8 @@ export function stepDefensePlay(
   let landingChase = state.landingChase
   let ballLandingTick = state.ballLandingTick
   let ballLaunchTick = state.ballLaunchTick
+  let diveTicks = state.diveTicks
+  let diveCatchTick = state.diveCatchTick
   let receivingThrow = state.receivingThrow
   let fielderArrivals = state.fielderArrivals
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2 · 필살타법 표시 공 0xbc3 — 송구 받기는 사건 없이 b42c8 쥐기). 서면 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 */
@@ -1865,23 +1881,18 @@ export function stepDefensePlay(
       return false
     }
     const cover = fielders[coverSlot]
-    if (cover === undefined || cover.targetBase !== base) return false
+    // b2cf0 C.vt68() = 0xa0b4c — 목표점(+0x2c)이 어느 루 좌표와 같은가(아니면 −1). 칸으로 든 목표 루가 아니라 목표점으로 본다(r180)
+    if (cover === undefined || baseAtPoint(cover.target) !== base) return false
     const runTicks = ticksToReach(holder.position, basePoint, holder.speed)
     const throwTicks = throwTicksTo(holder, cover.target)
     const receiveTicks = fielderArrivalTicks(cover)
     if (runTicks <= Math.max(throwTicks, receiveTicks)) {
-      // 0xb2a48 — 공 가진 야수가 그 루의 커버가 된다
+      // 0xb2a48 — 공 가진 야수가 그 루의 커버가 된다(`claimCoverOfBase`). 옛 커버는 AI 0 만 — 목표 · 목표 루(+0x7c)는 그대로
+      // 두고 다음 걸음 전 AI 0 b476a 가 vtcc 면 시작 자리로 고친다(r180 — 예전 웹은 여기서 시작 자리 · 목표 루 −1 로 바로 적었다)
       if (coverSlot !== fromSlot) {
-        const coverOfBase = [...play.coverOfBase]
-        coverOfBase[wrapBase(base)] = fromSlot
-        play = { ...play, coverOfBase }
-        fielders = fielders.map((fielder) =>
-          fielder.slot === coverSlot
-            ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot], targetBase: NONE }
-            : fielder.slot === fromSlot
-              ? { ...fielder, target: basePoint, targetBase: wrapBase(base), aiState: AI_STATE.COVER_HOME + wrapBase(base) }
-              : fielder,
-        )
+        const claimed = claimCoverOfBase(play, fielders, fromSlot, base)
+        play = claimed.play
+        fielders = claimed.fielders
         if (runTicks > 0) log.push(`${tick}틱 ${fromSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
       }
       return true
@@ -1894,7 +1905,7 @@ export function stepDefensePlay(
       // b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리로 돌아간다
       fielders = fielders.map((fielder) =>
         fielder.slot === fromSlot && !isCoverState(fielder.aiState) && fielder.aiState !== AI_STATE.RECEIVE
-          ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot], targetBase: NONE }
+          ? { ...fielder, aiState: AI_STATE.IDLE }
           : fielder,
       )
     }
@@ -1940,6 +1951,9 @@ export function stepDefensePlay(
     if (forecast.choice.kind !== CATCH_KIND.SLIDE) deadlySlideArmed = false
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
+    // b12da~b1334 · b3b38 — 새 공의 +0x178 · +0x174 (첫 점이 표준 배팅 지점이 아니면 다이빙 후보가 없다)
+    diveTicks = forecast.diveTicks
+    diveCatchTick = forecast.choice.catchTick
     const caughtAt = next.pointAt(catchTick - tick)
     // 추적야수 AI 1(0xb4aca~0xb4b5a)은 포구 틱 점의 (x, 0, z) 로 간다(0xa100c) — 송구공 · 타구 · 다시 쏘기(0xb3148) 모두.
     // 송구는 받는 점 (목표 x, 1000, 목표 z) 에서 받으면 그 루 위에 선다(쥐기 0xb2710 은 야수를 옮기지 않는다)
@@ -1964,6 +1978,12 @@ export function stepDefensePlay(
             ? { ...fielder, holdingBall: false }
             : fielder,
     )
+    // b3f5c — 백업 갈래(`CatchForecast.backupSlot`, r180): 머리 b3b7a 가 AI 1 · 0xc 를 0 으로 내린 뒤 고른다
+    if (forecast.backupSlot >= 0) {
+      fielders = fielders.map((fielder) =>
+        fielder.slot === forecast.backupSlot ? { ...fielder, aiState: AI_STATE.BACKUP } : fielder,
+      )
+    }
     play = {
       ...play,
       held: false,
@@ -2067,7 +2087,9 @@ export function stepDefensePlay(
     // AI 1 → 0 으로 내려 이 밖의 상태(6 · 7 · 9 · 0xd · 0xe — 목표를 안 고치는 칸)에 있을 수 없고, 웹 6 절은 AI 상태로 목표를 다시
     // 고르므로 걸음이 같다. 그 사이 목표를 읽는 b1268(H 목표, b1d10)도 AI 고리 뒤다. +0xe8 · +0xbc 는 웹 판에 칸이 없다.
     // 동작 번호 +0xa8 · 프레임 +0xac · 자세 워드 +0xb0 는 r171 부터 든다(`fielderPose` — 지우기 a137a~a1456 도 이 야수 틱이다)
-    // ⚠️ 미확인: 잠긴 채 AI 0xc(백업 b4b78 — 차가 2000 을 넘을 때만 vt14) · 0xa(b1c90 이 앞 관문에서 끝나는 틱)가 되면 원본은 제자리다
+    // 잠긴 야수(+0xb4 > 0)는 6 절 걸음이 없고 vt14 도 목표를 안 받는다 — AI 0xc(백업 b4b78)는 1c 절이 같은 관문으로 고친다(r180).
+    // ⚠️ 미확인: 잠긴 채 AI 0xa 가 되면 원본 b203a 의 vt14 는 목표를 안 받는데 웹 자리 잡기(`coverTick`)는 관문 없이 적는다 — 잠긴 동안은
+    // 안 걷고 풀리는 a12c8 vt10 이 목표 = 위치로 되돌려 다음 b203a 가 다시 적으므로 같다고 보지만, 그 틱에 b203a 가 안 돌면 갈린다
     const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
     // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱(야수 · 주자)이 없다
     if (!pausedAtHead) {
@@ -2847,11 +2869,46 @@ export function stepDefensePlay(
     // (`claimCoverOfBase`). 그 뒤 b4818~b482e vt14(루 좌표)는 6 절 걸음이 한다. 고리는 칸 차례라 AI 9 와 섞어 돈다
     if (vt4cOpen && !play.finished) {
       for (let slot = 0; slot < fielders.length; slot += 1) {
+        // b46c2~b475a 다이빙 검사 — 분기 앞에서 칸마다 (`diveCheckOf`, r180)
+        const dive = diveCheckOf({
+          fielder: fielders[slot],
+          diveTick: diveTicks[slot] ?? DIVE_TICK_NONE,
+          catchTick: diveCatchTick,
+          // 공+0x68 — 쥔 동안은 0x3f378(3f3aa)이 안 올려 쥔 틱(첫 포구 = +0x174)에 머문다
+          ballTick: (play.held ? Math.min(tick, catchTick) : tick) - ballLaunchTick,
+          coverNeeded: (base) => needsCover(contextAt(tick), base),
+          ballPointAt: (at) => trajectory.pointAt(ballLaunchTick + at),
+        })
+        if (dive !== null) {
+          const before = fielders[slot]
+          fielders = fielders.map((fielder) => (fielder.slot === slot ? dive.fielder : fielder))
+          logDiveCheck(log, tick, slot, before, dive)
+          // 분기는 옛 상태로 한다(b475c 의 r5) — AI 0xd 가 된 칸은 분기 없이 다음 칸(b4c5c)
+          if (dive.skipDispatch) continue
+        }
         const self = fielders[slot]
         if (self === undefined) continue
-        if (isCoverState(self.aiState)) {
+        const dispatchState = dive?.dispatchState ?? self.aiState
+        // AI 0 b476a — vtcc 면 목표가 시작 자리 0xd86ec[칸] 와 다를 때 vt50(= vt14)로 그 자리로 (r180 — 예전 웹은 6 절 걸음에서 골랐다).
+        // 고리 안이라 같은 틱 끝 b4c72 의 커버 다시 고르기(0xb1c90)가 고친 목표를 보고, 고리 뒤에 AI 0 이 된 야수(커버 다시 고르기
+        // b1d38 · b2540, CPU 송구 526ae 의 b2e14, 뒤 칸의 커버 가져가기 b2a7e)와 다이빙 검사가 AI 0 으로 내린 칸(분기는 옛 상태)은
+        // 다음 목록 틱에 옛 목표로 한 걸음 더 가고 다음 고리에서 돌아선다. vt4c 가 안 도는 틱(판 종류 마스크 · 관문 G2)은 아무도 안 고친다
+        if (dispatchState === AI_STATE.IDLE && isFreeToRetarget(self)) {
+          const home = FIELDER_START_POSITIONS[slot]
+          if (home !== undefined && !isSamePoint(self.target, home)) {
+            fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: home } : fielder))
+          }
+        }
+        // AI 0xc b4b78 — 공 가진 야수(+0x130)의 목표 T 에서 2000 뒤(`backupPointOf`)로 vt14(잠금 +0xb4 ≤ 0 · vtc8 일 때만, r180)
+        if (dispatchState === AI_STATE.BACKUP) {
+          const backup = backupPointOf(fielders[play.ballHolderSlot]?.target ?? self.target, self.position)
+          if (backup !== null && self.actionLockTicks <= 0 && isFreeToStep(self)) {
+            fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: backup } : fielder))
+          }
+        }
+        if (isCoverState(dispatchState)) {
           if (fielderArrivals[slot] === true && isFreeToRetarget(self)) {
-            const base = self.aiState - AI_STATE.COVER_HOME
+            const base = dispatchState - AI_STATE.COVER_HOME
             const claimed = claimCoverOfBase(play, fielders, slot, base)
             if (claimed.play !== play) log.push(`${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
             play = claimed.play
@@ -2868,7 +2925,7 @@ export function stepDefensePlay(
         if (sendToBase(play.ballHolderSlot, deferredThrowBase, '미룬', false)) {
           fielders = fielders.map((fielder) =>
             fielder.slot === slot
-              ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[slot], targetBase: NONE }
+              ? { ...fielder, aiState: AI_STATE.IDLE }
               : fielder,
           )
         }
@@ -3326,6 +3383,8 @@ export function stepDefensePlay(
   state.landingChase = landingChase
   state.ballLandingTick = ballLandingTick
   state.ballLaunchTick = ballLaunchTick
+  state.diveTicks = diveTicks
+  state.diveCatchTick = diveCatchTick
   state.tick = tick + 1
   return state
 }
@@ -3605,8 +3664,8 @@ interface FielderMoveInput {
  * - AI 6(들고 뛰기) · 9(미룬 송구, b30d0 vt48(루)) · 0xa(키스톤 자리) — 세워 둔 목표점으로
  * - AI 2~5(루 커버) — 그 루 좌표로 (b2564 가 커버 야수에게 vt14(루) · AI 루 + 2 를 준다 — `assignCoversForTick`)
  * - 쫓는 야수는 포구 전까지 포구 지점으로(AI 1)
- * - AI 0 — 플레이 틱 b476a: vtcc(+0xb0 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0)면 목표점이 시작 자리 0xd86ec 와 다를 때
- *   그 자리로 (vt50 = vt14). 던진 뒤(b2e14 · b48ac)·커버를 내준 뒤(b2540) AI 0 이 된 야수가 돌아간다
+ * - AI 0 — 그 목표로 걷는다. 시작 자리 고치기(b476a: vtcc 면 목표점이 시작 자리 0xd86ec 와 다를 때 vt50 = vt14)는 AI 고리(1c 절)가
+ *   한다 — 던진 뒤(b2e14 · b48ac)·커버를 내준 뒤(b1d38 · b2540)·커버를 빼앗긴 뒤(b2a7e) AI 0 이 된 야수가 다음 고리에서 돌아선다 (r180)
  */
 function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderState {
   // 협살(상태 8) 중인 야수는 분기표가 0xb48b6 으로 가므로 커버 이동을 하지 않는다 — 2b 절이 이미 옮겼다
@@ -3618,6 +3677,10 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
   if (
     fielder.aiState === AI_STATE.CARRY ||
     fielder.aiState === AI_STATE.RECEIVE ||
+    // AI 0xd(다이빙) — 분기표 0xd8808[0xd] = b4c60 아무것도 안 함. 다이빙 검사(`diveCheckOf`)가 세운 공점(n)으로 걷는다
+    fielder.aiState === AI_STATE.DIVE ||
+    // AI 0xc(백업) — AI 고리 b4b78 이 고친 목표로
+    fielder.aiState === AI_STATE.BACKUP ||
     (fielder.aiState === AI_STATE.BUSY && fielder.slot !== input.chaserSlot)
   ) {
     return walk(fielder.target)
@@ -3643,9 +3706,8 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
     if (fielder.aiState !== AI_STATE.IDLE && fielder.holdingBall) return walk(fielder.target)
     if (fielder.aiState !== AI_STATE.IDLE) return fielder
   }
-  if (fielder.aiState === AI_STATE.IDLE) {
-    return walk(retarget ? (FIELDER_START_POSITIONS[fielder.slot] ?? fielder.target) : fielder.target)
-  }
+  // AI 0 — 시작 자리 고치기(b476a)는 AI 고리(1c 절)가 한다. 걸음은 그 목표로
+  if (fielder.aiState === AI_STATE.IDLE) return walk(fielder.target)
   return fielder
 }
 

@@ -92,12 +92,15 @@ export const PITCHER_BALL_POINT: WorldPoint = { x: 20_000, y: 0, z: 24_500 }
 export interface CurrentBallPath {
   readonly trajectory: BattedBallTrajectory
   readonly startTick: number
+  /** 이 공을 쥔 판 틱 — 쥔 동안 G4 0x3f378 이 공+0x68 을 안 올린다(3f3aa `+0x12c`). 새 공을 깔면 없다 */
+  readonly heldAt?: number
 }
 
 /**
  * 주자 판의 `0xb1c90` 공 입력 — 공 첫 점(공.vt68(0))과 지금 점 각(공.vt60() = 0xa2b78(공, 공+0x68), 점 +0x10).
  * - 깐 궤적이 없으면 0xa276c 의 점 하나: 각 0 → 0 + 90 > 0 이라 1루 쪽.
- * - 지금 점은 공+0x68 = 판 틱으로 읽는다(0xa2b78 이 점 수 − 1 로 자른다). ⚠️ 근사: 쥔 뒤에도 공 틱이 판 틱대로 간다고 본다.
+ * - 지금 점은 공+0x68 로 읽는다(0xa2b78 이 점 수 − 1 로 자른다). 공+0x68 은 G4 0x3f378 이 그림마다 +1(3f3c6 → 0xa2594) 하되
+ *   플레이 +0x12c(쥠)이면 안 올린다(3f3aa) — 쥔 뒤에는 쥔 틱의 점에 머문다(`heldAt`, r180 확정 — 예전 웹은 판 틱대로 갔다).
  * - 원본 점 칸이 없는 손으로 만든 시험 궤적은 각을 몰라 포구 지점 x 로 읽는다(타구 진행기와 같은 근사).
  */
 export function runnerPlayBallInput(
@@ -107,8 +110,9 @@ export function runnerPlayBallInput(
 ): { readonly ballStartPoint: WorldPoint; readonly ballToFirstSide: boolean } {
   if (path === null) return { ballStartPoint: fallbackPoint, ballToFirstSide: true }
   const ballStartPoint = path.trajectory.pointAt(path.startTick)
+  const ballTick = path.heldAt !== undefined && path.heldAt < tick ? path.heldAt : tick
   if (isBallTrajectory(path.trajectory)) {
-    return { ballStartPoint, ballToFirstSide: path.trajectory.pointDetailAt(tick).angle + 90 > 0 }
+    return { ballStartPoint, ballToFirstSide: path.trajectory.pointDetailAt(ballTick).angle + 90 > 0 }
   }
-  return { ballStartPoint, ballToFirstSide: path.trajectory.pointAt(tick).x > 20_000 }
+  return { ballStartPoint, ballToFirstSide: path.trajectory.pointAt(ballTick).x > 20_000 }
 }

@@ -35,11 +35,12 @@ import {
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
-import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
-import { claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
+import { backupPointOf, CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
+import { baseAtPoint, claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
 import {
   canStepNextListTick,
   isFreeToRetarget,
+  isFreeToStep,
   isReadyToThrow,
   listTickFielder,
   withCatchMotion,
@@ -461,30 +462,26 @@ function* pickoffPlaySteps(
     const coverSlot = play.coverOfBase[wrapBase(base)] ?? NONE
     const basePoint = basePosition(base)
     if (coverSlot === NONE) {
+      // b2cc4 — 상태 6 · vt48(루) (r180 — 예전 웹은 AI 를 안 바꿨다)
       fielders = fielders.map((fielder) =>
-        fielder.slot === holderSlot ? { ...fielder, target: basePoint, targetBase: base } : fielder,
+        fielder.slot === holderSlot ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY } : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
       return false
     }
     const cover = fielders[coverSlot]
-    if (cover === undefined || cover.targetBase !== base) return false
+    // b2cf0 C.vt68() = 0xa0b4c — 목표점(+0x2c)이 어느 루 좌표와 같은가(아니면 −1). 칸으로 든 목표 루가 아니라 목표점으로 본다(r180)
+    if (cover === undefined || baseAtPoint(cover.target) !== base) return false
     const runTicks = ticksToReach(holder.position, basePoint, holder.speed)
     if (runTicks <= Math.max(throwTicksTo(holder, cover.target), fielderArrivalTicks(cover))) {
-      // 0xb2a48(P, f, 루) — 옛 커버 C(f 가 아니면) AI 0 · +0xf0[루] = f · f.vt48(루) · f AI 루 + 2
+      // 0xb2a48(P, f, 루) — 옛 커버 C(f 가 아니면) AI 0 **만**(목표 · 목표 루 그대로) · +0xf0[루] = f · f.vt48(루) · f AI 루 + 2.
+      // C == f 면 아무것도 안 한다(b2a6e) (`claimCoverOfBase`, r180 — 예전 웹은 옛 커버를 시작 자리 · 목표 루 −1 로 바로 적었다)
       if (coverSlot !== holderSlot) {
-        const coverOfBase = [...play.coverOfBase]
-        coverOfBase[wrapBase(base)] = holderSlot
-        play = { ...play, coverOfBase }
+        const claimed = claimCoverOfBase(play, fielders, holderSlot, base)
+        play = claimed.play
+        fielders = claimed.fielders
+        if (runTicks > 0) log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
       }
-      fielders = fielders.map((fielder) =>
-        fielder.slot === holderSlot
-          ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.COVER_HOME + wrapBase(base) }
-          : fielder.slot === coverSlot && coverSlot !== holderSlot
-            ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot] ?? fielder.target, targetBase: NONE }
-            : fielder,
-      )
-      if (runTicks > 0) log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
       return true
     }
     if (coverSlot === holderSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
@@ -546,7 +543,7 @@ function* pickoffPlaySteps(
         fielder.aiState === AI_STATE.RECEIVE
       return keeps
         ? fielder
-        : { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
+        : { ...fielder, aiState: AI_STATE.IDLE }
     })
     log.push(
       (chooser === PICKOFF_THROW
@@ -578,6 +575,11 @@ function* pickoffPlaySteps(
             ? { ...fielder, holdingBall: false }
             : fielder,
     )
+    // b3f5c — 백업 갈래(`CatchForecast.backupSlot`, r180): 머리 b3b7a 가 AI 1 · 0xc 를 0 으로 내린 뒤 고른다
+    const backupSlot = next.backupSlot ?? -1
+    if (backupSlot >= 0) {
+      fielders = fielders.map((fielder) => (fielder.slot === backupSlot ? { ...fielder, aiState: AI_STATE.BACKUP } : fielder))
+    }
     play = {
       ...play,
       held: false,
@@ -721,6 +723,9 @@ function* pickoffPlaySteps(
         log.push(`${tick}틱 ${current.slot}번 야수 펌블 (0xbc2)`)
       } else {
         chase = null
+        // 쥔 동안 공+0x68 이 멈춘다(0x3f378 3f3aa) — 커버 다시 고르기의 공 각이 이 점을 본다(`runnerPlayBallInput`)
+        const heldPath = ballPath as CurrentBallPath | null
+        if (heldPath !== null) ballPath = { ...heldPath, heldAt: tick }
         flight = null
         if (catchTick < 0) catchTick = tick
         const receiver = current.slot
@@ -839,6 +844,21 @@ function* pickoffPlaySteps(
       for (let slot = 0; slot < fielders.length; slot += 1) {
         const self = fielders[slot]
         if (self === undefined) continue
+        // AI 0 b476a — vtcc 면 목표가 시작 자리 0xd86ec[칸] 와 다를 때 vt50(= vt14)로 그 자리로. 고리 안이라 같은 틱 끝 b4c72 의
+        // 커버 다시 고르기(0xb1c90)가 고친 목표를 본다 — 고리 뒤에 AI 0 이 된 야수는 다음 고리에서 돌아선다 (r180, `runDefensePlay` 1c 절)
+        if (self.aiState === AI_STATE.IDLE && isFreeToRetarget(self)) {
+          const home = FIELDER_START_POSITIONS[slot]
+          if (home !== undefined && !isSamePoint(self.target, home)) {
+            fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: home } : fielder))
+          }
+        }
+        // AI 0xc b4b78 — 공 가진 야수(+0x130)의 목표 T 에서 2000 뒤(`backupPointOf`)로 vt14(잠금 +0xb4 ≤ 0 · vtc8 일 때만, r180)
+        if (self.aiState === AI_STATE.BACKUP) {
+          const backup = backupPointOf(fielders[play.ballHolderSlot]?.target ?? self.target, self.position)
+          if (backup !== null && self.actionLockTicks <= 0 && isFreeToStep(self)) {
+            fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: backup } : fielder))
+          }
+        }
         if (self.aiState >= AI_STATE.COVER_HOME && self.aiState <= AI_STATE.COVER_THIRD) {
           if (fielderArrivals[slot] === true && isFreeToRetarget(self)) {
             const base = self.aiState - AI_STATE.COVER_HOME
@@ -858,7 +878,7 @@ function* pickoffPlaySteps(
         if (sendToBase(tick, deferredThrowBase, ' (AI 9 미룬 송구)', false)) {
           fielders = fielders.map((fielder) =>
             fielder.slot === slot
-              ? { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[slot] ?? fielder.target, targetBase: NONE }
+              ? { ...fielder, aiState: AI_STATE.IDLE }
               : fielder,
           )
         }
@@ -987,13 +1007,10 @@ function* pickoffPlaySteps(
     const chasing = chase
     const beforeMove = fielders
     fielders = fielders.map((fielder) => {
-      // 목표: AI 1(b4aca) — vtcc 면 포구 지점(포구 동작 중이면 안 고친다, b4ad6) · AI 0(b476a) — vtcc 면 시작 자리 0xd86ec 로
-      // (r176: 던지기 · 포구 동작을 지운 vt10 이 목표 = 위치로 둔 뒤 돌아가는 갈래 — `runnerPlayEngine` 6 절과 같다)
+      // 목표: AI 1(b4aca) — vtcc 면 포구 지점(포구 동작 중이면 안 고친다, b4ad6). AI 0(b476a)의 시작 자리 고치기는 AI 고리가 한다(r180)
       let target = fielder.target
       if (chasing !== null && fielder.slot === chasing.slot) {
         if (isFreeToRetarget(fielder)) target = chasing.catchPoint
-      } else if (fielder.aiState === AI_STATE.IDLE && isFreeToRetarget(fielder)) {
-        target = FIELDER_START_POSITIONS[fielder.slot] ?? target
       }
       // 걸음: 다음 야수 틱의 이동 관문 a1346~a1376(`canStepNextListTick`) — 던진 야수(+0xb1)는 한 틱 쉬고, 쥔 야수도 목표로 걷는다
       if (isSamePoint(fielder.position, target) || !canStepNextListTick(fielder)) return { ...fielder, target }

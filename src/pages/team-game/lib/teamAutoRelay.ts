@@ -127,7 +127,8 @@ export function teamRelayEntryFiguresOf(progress: TeamGameProgress): TeamRelayFi
  * sim+0xa4 는 간이 타석 머리 0xc0ee8 이 c0f2a~c0f7a 에서 **지금 타자가 바뀌었을 때만**(0xae89d 와 예약 0xae945 의 +0xa 가 다르면)
  * 0xaebe5 로 새 타자를 세우고 0xb633d(마선수)면 0xb63a1(번호), 아니면 −1 로 쓴다 — 곧 이 틱의 타자가 마선수면 그 그림, 아니면 앞 그림 그대로다.
  * 3아웃 넘김 틱(c21fc)의 0x47cc8 다시 적재는 루가 비어 있어 타자만 보므로 같은 결과다. 실린 그림이 없으면 원본 0x79d10 은
- * 빈 그림(+0x1c = 0)을 79d68 에서 읽는다 — ⚠️ 미확인(웹은 타석 화면 `aceRunnerFramesOf` 처럼 보통 그림으로 그린다).
+ * 빈 그림(+0x1c = 0)을 79d68 에서 읽는다 — `ldr r3, [r5, #0xc]` 가 r5 = 0 으로 주소 0xc 를 읽는 널 포인터 읽기라(직접 뜬 것, r180)
+ * 기기 메모리에 달린다. ⚠️ 미확인(옮길 수 없음 — 웹은 타석 화면 `aceRunnerFramesOf` 처럼 보통 그림으로 그린다).
  */
 export function teamRelayFiguresOf(
   tick: Pick<TeamAutoRelayTick, 'progress' | 'before' | 'atBat'>,

@@ -83,10 +83,11 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
   it('악송구면 수평·수직 속도 · 방향 크기 · 부호 넷을 더 굴리고(0xa1868~0xa1924), 예보 vt24(0)가 고른 야수가 줍는다', () => {
     // 늘 0 인 난수 — 줍는 족족 움직이는 공을 펌블해 0xb3148 로 튕기고(튕김 rand(−20, 20) · 다시 줍는 펌블 굴림),
     // 그사이 자동 진루가 주자를 홈까지 보낸다. 루 위에서 쥔 적이 없어 결과 코드는 안 선다.
-    // (굴림 수는 투수 칸이 선수 없는 칸 — 송구 g = 2 · 악송구 보정 8 · 펌블 0(0xb0fb4 b1032) — 이 되며 34 → 36)
+    // (굴림 수는 투수 칸이 선수 없는 칸 — 송구 g = 2 · 악송구 보정 8 · 펌블 0(0xb0fb4 b1032) — 이 되며 34 → 36,
+    // r180: 외야 추적야수의 백업(AI 0xc) · AI 0 의 시작 자리 고치기를 AI 고리로 옮겨 줍는 외야수 차례가 바뀌며 36 → 34)
     const random = 세는난수(0)
     const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
-    expect(random.count()).toBe(36)
+    expect(random.count()).toBe(34)
     expect(result.errantThrow).toBe(true)
     expect(result.fumbled).toBe(true)
     expect(result.resultCode).toBeNull()
