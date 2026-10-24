@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { SeasonOutingScreen } from '@/pages/season/ui/SeasonOutingScreen'
 import { SEASON_OUTING_MAP_MOVES, moveOutingMapCursor, outingMapDirectionOf } from '@/pages/season/lib/seasonOutingMap'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
@@ -12,7 +13,10 @@ import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/sea
  * ⚠️ 나만의리그 외출과 값·가드가 다르다 — 여기 숫자를 나리 표와 맞추면 안 된다.
  */
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  resetTouchKeyOffersForTest()
+})
 
 const 시즌 = (덮어쓰기: Partial<SeasonRecord> = {}, 사기 = 50): SeasonState => {
   const state = startNewSeason(0, '테스터')
@@ -126,5 +130,18 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
     키('Escape')
 
     expect(onBack).toHaveBeenCalled()
+  })
+
+  it('지도 그림 0xa04c 에 CLR 글자 자리가 없어 \'뒤로\' 상황 버튼(Escape)을 낸다 — 팝업이 뜨면 걷는다 (r194)', () => {
+    const onBack = vi.fn()
+    render(<지도 state={시즌({ money: 50, illness: 0 })} onBack={onBack} />)
+    expect(touchKeyOffersNow()).toContainEqual({ key: 'Escape', label: '뒤로' })
+    // 투명 "취소" 칸은 그대로
+    expect(screen.getByRole('button', { name: '취소' })).toBeTruthy()
+
+    fireEvent.click(건물('병원'))
+    expect(알림글()).toContain('건강한 상태입니다')
+    expect(touchKeyOffersNow().some((offer) => offer.key === 'Escape')).toBe(false)
+    expect(onBack).not.toHaveBeenCalled()
   })
 })

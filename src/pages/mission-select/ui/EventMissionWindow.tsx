@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea } from '@/shared/ui'
-import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { CANCEL_KEY_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
@@ -67,6 +67,9 @@ export function EventMissionWindow({ isRunSelected, onToggle, onKey, onClosed }:
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   })
+  // 창 그림에 CLR 글자 자리가 없다(아래 바닥띠 표시는 뒤 어둡게에 덮인다) — 키를 받는 동안 '취소' 상황 버튼을 낸다(r194). Escape 키 사건이라
+  // 위 듣는 곳과 같은 길이다
+  useTouchKeyOffer(!motion.isClosed && motion.openingHeight === null && motion.closingWidth === null ? CANCEL_KEY_OFFER : null)
 
   if (motion.isClosed) return null
 

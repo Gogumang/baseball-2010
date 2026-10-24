@@ -91,6 +91,13 @@ export const SCROLL_DOWN_OFFER: TouchKeyOffer = { key: 'ArrowDown', label: '▼ 
 export const PAGE_PREVIOUS_OFFER: TouchKeyOffer = { key: 'ArrowLeft', label: '◀ 앞' }
 export const PAGE_NEXT_OFFER: TouchKeyOffer = { key: 'ArrowRight', label: '뒤 ▶' }
 
+/**
+ * CLR(Escape) 상황 버튼 — 원본 그림에 CLR 글자 자리가 없어 투명 누름 칸만으로는 안 보이는 화면(외출 지도 · 구질 두 칸 팝업 따위, r194).
+ * 버튼은 Escape 키 사건을 쏘아 키 CLR 과 같은 길을 탄다
+ */
+export const BACK_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '뒤로' }
+export const CANCEL_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '취소' }
+
 /** `isActive` 동안 ↑ · ↓ 상황 버튼을 알린다 */
 export function useTouchScrollKeys(isActive: boolean): void {
   useTouchKeyOffer(isActive ? SCROLL_UP_OFFER : null)
