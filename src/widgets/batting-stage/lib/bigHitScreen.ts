@@ -109,7 +109,7 @@ export function bigHitZoomCenterOf(side: number, width: number, height: number):
   return { x: Math.trunc((width * x) / 480), y: Math.trunc((height * y) / 390) }
 }
 
-/** 4cc7a — 흐리기 n (멈춤 갈래 2 · 뒤 갈래 1) */
+/** 흐리기 n — 멈춤 갈래 4cc52 `movs r3, #2` · 뒤 갈래 4cdc6 `movs r3, #1` (감사 2026-10-24: 예전 주소 4cc7a 는 번쩍임 표 복사 크기 자리였다) */
 export const BIG_HIT_HOLD_BLUR = 2
 export const BIG_HIT_FOLLOW_BLUR = 1
 
