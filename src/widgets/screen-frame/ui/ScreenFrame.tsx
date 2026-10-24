@@ -1,6 +1,6 @@
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
+import { useSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import {
   BACK_ICON_X, FOOTER_BITS, FOOTER_CENTER_MARKS, FOOTER_CENTER_X, FOOTER_CORNER_X, FOOTER_LEFT_MARKS, FOOTER_LEFT_X,
   FOOTER_MARK_HEIGHT, FOOTER_MARK_WIDTH, FOOTER_TILE_XS, FRAME_COLORS, HEADER_CORNER_X, HEADER_GAME_POINT, HEADER_TILE_XS,
@@ -29,8 +29,9 @@ interface ScreenFrameProps {
    */
   readonly footer?: number
   /**
-   * 머리띠·바닥띠가 미끄러져 들어오는가 ([skin+0x84]). 하위 상태 들어옴이 [+0x84] 를 안 세우면(예: 기록연감 0x2407c 는
-   * 0 으로 둔다) 앞 화면에서 다 내려온 그대로다 — false 면 처음부터 다 내려온 자리에 그린다.
+   * 이 화면의 들어옴이 머리띠·바닥띠 미끄러짐을 세우는가 ([skin+0x84] = 1 · [+0x86] = 1). false 면 세우지 않고
+   * **앞 화면이 남긴 전역 칸을 잇는다** — 앞 화면이 다 내려왔으면 끝 자리, 미끄러지던 도중이면 남은 걸음을 이 머리띠가 마저 간다
+   * (`shared/lib/skinFrameSlide`, r168). 깃발을 0 으로 쓰는 들어옴(기록연감 0x2407c …)은 그 화면이 `stopSkinFrameSlide` 를 부른다.
    *
    * **[skin+0x84] = 1 을 쓰는 곳 전수** (2026-10-09, `strb …, [+0x84]` 를 바이너리 전체에서 훑었다 — 나머지 +0x84 쓰기는 다른 객체):
    * 메인 메뉴 하위 상태 들어옴 · 키(0x23f98 ~ 0x26718, P6) · 미션 고르기 0x107 진입 0x1d9a4(1d9be) ·
@@ -47,7 +48,8 @@ interface ScreenFrameProps {
    * 공통 틀 0x9f60(0xc9 · 0xcd~0xd0 …) · 0xc8 이름 입력 · 0xd8 · 0xd9/0xda · 0xdc · 0xdf · 0xe0 · 0xe5~0xe7 · 0xef · 0xf3/0xf4 등은 false.
    * 메인 메뉴 장면(0x103)에서는 그림표 0xcf164 의 16 · 17 · 18 · 19 · 20 · 21 · 22 · 27 · 28 · 29 가 0x63b14 를 부르고, 들어옴 표
    * 0xcf06c 중 3 · 8(조건) · 15 · 16 · 17 · 25 · 26 · 27 · 28 · 29 · 32 · 33 · 34(조건) · 37 이 +0x84 = 1, 30 · 31 · 38 이 0 을 쓴다.
-   * 6(스페셜 목록) · 7/10(도움말) · 23(엔트리) 은 어느 쪽도 아니라 false.
+   * 6(스페셜 목록) · 23(엔트리) 은 어느 쪽도 아니라 false. 7/10(도움말) 들어옴 0x2668c 는 직접 쓰지 않지만 뷰어 열기
+   * 0x63688(skin, 장) 이 63728~63730 에서 +0x84 = 1 · +0x86 = 1 을 쓴다 → 참(r168 정정).
    */
   readonly slides?: boolean
   /**
@@ -65,7 +67,8 @@ interface ScreenFrameProps {
 export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null ? 1 : 5, slides = true, footerPresses }: ScreenFrameProps) {
   const updates = useUpdateCounter()
   const blinkCounter = useSkinBlinkCounter(updates, (footer & FOOTER_BITS.gameSettings) !== 0 ? 1 : 0)
-  const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
+  // [skin+0x84] · [+0x86] 은 앱에 하나 — 세우는 들어옴(slides)이 아니면 앞 화면이 남긴 미끄러짐을 잇는다 (r168)
+  const slide = useSkinFrameSlide(updates, slides)
   const top = headerTopOf(slide)
   const bottom = footerBottomOf(slide)
 

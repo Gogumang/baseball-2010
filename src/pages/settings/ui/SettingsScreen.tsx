@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
+import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, MessageBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -111,6 +112,12 @@ function SettingsFrame({ mainMenu, onBack, slides = true }: {
 export function SettingsScreen({
   settings, onChange, onSave, onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack,
 }: SettingsScreenProps) {
+  // 경기 중 [설정] — 경기 중 메뉴 0x3c326 갈래가 판을 세우며 [skin+0x84] = 0 을 쓴다(3c3b0~3c3ba). 머리띠는 없지만 전역 칸이라
+  // 끊어 둔다(r168). 들어옴은 첫 그림보다 앞이다
+  useState(() => {
+    if (mainMenu === undefined) stopSkinFrameSlide()
+    return null
+  })
   const [cursor, setCursor] = useState(0)
   /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
   const [hasReturned, setHasReturned] = useState(false)

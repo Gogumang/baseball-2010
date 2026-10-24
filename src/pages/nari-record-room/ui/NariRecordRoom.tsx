@@ -179,9 +179,14 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // 0x1463c: 취소 → 106 · '0' · '*' 는 버린다 · 그 밖은 0x55864 로 간다(보기 전용이라 확인은 [+0x40c] 만 센다)
-      if (isCancelKey(event.key)) latest.current.onBack()
-      else {
+      // 0x1463c: 취소(−16)는 106 을 걸고 **돌아가지 않고** 아래로 흐른다(14644~1464c 뒤 14650) — [+0x164] == 0 갈래에서 '0'(0x30) ·
+      // '*'(0x2a) 만 버리고(1465e~14664) 취소를 포함한 나머지는 0x55865 로 간다. 0x55864 머리가 [+0x40c] += 1(55868~55874) 한 뒤
+      // 취소는 보기 전용 갈래 558d6 → 55908([+0x418] == −1 → +0x338 = 1)뿐이라 판은 그대로다 — 곧 취소도 한 번 센다(r168).
+      if (isCancelKey(event.key)) {
+        addSkinStepCounter()
+        setView((held) => pressYearRecordKey(held, '기타', latest.current.rowCount))
+        latest.current.onBack()
+      } else {
         const key = YEAR_KEYS[event.key]
         if (key !== undefined) setView((held) => pressYearRecordKey(held, key, latest.current.rowCount))
         else if (!['0', '*'].includes(event.key)) return
@@ -290,8 +295,11 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
   )
 }
 
-/** 순위 판 키 0x5787d 까지 가지만 쪽을 안 넘기는 키 — 0x1463c 가 '0' · '*' 는 버린다 */
-const RANKING_OTHER_KEYS: ReadonlySet<string> = new Set(['ArrowUp', 'ArrowDown', 'Enter', '1', '2', '3', '5', '7', '8', '9', '#'])
+/**
+ * 순위 판 키 0x5787d 까지 가지만 쪽을 안 넘기는 키 — 0x1463c 의 '0' · '*' 버리기(1465e~14664)는 [+0x164] == 0(연도 기록) 갈래에만 있고
+ * 순위([+0x164] ≠ 0 → 1465c 에서 14670)는 키를 가리지 않고 0x5787d 로 넘긴다(r168). 시즌 0xdb 의 0x74c4 와 같은 키 묶음.
+ */
+const RANKING_OTHER_KEYS: ReadonlySet<string> = new Set(['ArrowUp', 'ArrowDown', 'Enter', '0', '1', '2', '3', '5', '7', '8', '9', '*', '#'])
 
 interface NariRankingScreenProps {
   readonly edition: NariRecordEdition
@@ -312,9 +320,13 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
   latest.current = { onBack }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // 0x1463c: 취소 → 106 · '0' · '*' 는 버린다 · 그 밖은 0x5787d — 쪽이 바뀌든 말든 [편집기+0x40c] += 1 (5793e~57948)
-      if (isCancelKey(event.key)) latest.current.onBack()
-      else if (event.key === 'ArrowRight' || event.key === '6') {
+      // 0x1463c: 취소는 106 을 걸고도 아래로 흘러(14650) 순위 갈래(14670)에서 0x5787d(−16) 로 간다 — 쪽은 안 바뀌고
+      // [편집기+0x40c] 만 += 1 (5793e~57948). 시즌 0xdb 의 0x74c4 는 취소를 0xcd 로 보내고 0x5787d 를 건너뛰는 것과 다르다(r168).
+      // 그 밖의 키는 모두 0x5787d — 쪽이 바뀌든 말든 += 1.
+      if (isCancelKey(event.key)) {
+        addSkinStepCounter()
+        latest.current.onBack()
+      } else if (event.key === 'ArrowRight' || event.key === '6') {
         addSkinStepCounter()
         setPage((held) => moveRankingPage(side, held, 1))
       } else if (event.key === 'ArrowLeft' || event.key === '4') {
