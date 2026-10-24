@@ -72,7 +72,7 @@ import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/featur
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import type { DefenseKeyPress, DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { inPlayCommandOf } from '@/entities/defense-controls/model/defenseKeys'
-import { cpuSpecialThrowOf } from '@/features/defense-play/model/runDefensePlay'
+import { cpuSpecialThrowOf, framePressesOf } from '@/features/defense-play/model/runDefensePlay'
 import { runnerFateOf } from '@/features/defense-play/model/runnerFates'
 import {
   bounceOffFielder,
@@ -653,8 +653,10 @@ function* runnerPlaySteps(
     ballEventThisTick = false
     // ── 0b. 사람 조작 — 상태 0x17 키 0x53420: 수비면 0x533c8 → 메시지 0x588(목표 루) → 0x51890 → 플레이 vt60 0xb3118 → +0x160.
     //        판 종류를 안 가린다. 키 반복(누르고 있기)도 0x536bc 가 0x17 갈래로 보낸다 ──
-    if (press !== null && input.controls?.side === '수비' && !play.finished) {
-      const command = inPlayCommandOf(press.key, '수비', { isHoldRepeat: press.isRepeat === true })
+    // 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 둘 다 0x53420 에 보낸다(`framePressesOf`)
+    for (const keyPress of input.controls?.side === '수비' ? framePressesOf(press) : []) {
+      if (play.finished) break
+      const command = inPlayCommandOf(keyPress.key, '수비', { isHoldRepeat: keyPress.isRepeat === true })
       if (command !== null && command.kind === '송구') {
         manualThrowBase = command.target
         play = { ...play, manualThrowBase }
@@ -662,8 +664,10 @@ function* runnerPlaySteps(
       }
     }
     // ── 0c. 사람 조작 — 공격이면 0x53420 이 주루 0x5331c(0x582 진루 · 0x584 귀루) · OK 0x585(슬라이딩) ──
-    if (press !== null && input.controls?.side === '공격' && !play.finished) {
-      const command = inPlayCommandOf(press.key, '공격', { isHoldRepeat: press.isRepeat === true })
+    // 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 둘 다 0x53420 에 보낸다(`framePressesOf`)
+    for (const keyPress of input.controls?.side === '공격' ? framePressesOf(press) : []) {
+      if (play.finished) break
+      const command = inPlayCommandOf(keyPress.key, '공격', { isHoldRepeat: keyPress.isRepeat === true })
       if (command?.kind === '슬라이딩') {
         // 0x518da — 종류 2 · 3 · 파울(이 판엔 타구가 없다) · 걸어 나가는 주자(이 진행기에 +0xba 연출이 없다) 뒤 0xa96ec 로 슬라이딩,
         // 그 뒤에야 소리 재생 중 · +0x31c 잠금을 본다

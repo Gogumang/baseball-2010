@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   BIG_HIT_FLASH_TRIANGLES,
   bigHitBorderRectsOf,
+  bigHitEndTickOf,
+  bigHitReleaseTickOf,
   bigHitFlashesAt,
   bigHitScreenOf,
   bigHitSwingSkipsOf,
@@ -53,5 +55,39 @@ describe('0x13 의 스윙 멈춤 · 반 속도 (3f1ea · 3f2dc)', () => {
     expect(bigHitSwingSkipsOf(true, 100, 110, 140)).toBe(9)
     expect(bigHitSwingSkipsOf(false, 100, null, 120)).toBe(0)
     expect(bigHitSwingSkipsOf(true, 100, null, 99)).toBe(0)
+  })
+})
+
+describe('창이 선 첫 그림([창+0x250])의 0x13 그리기 — 갱신 없이 0x4cb1c 가 한 번 더 돈다 (r175)', () => {
+  const 점 = { x: 120, y: 250 }
+
+  it('창 그림이 없으면 틱 7 에 풀리고 끝은 그대로', () => {
+    expect(bigHitReleaseTickOf([])).toBe(7)
+    expect(bigHitEndTickOf(20, 7)).toBe(20)
+    expect(bigHitEndTickOf(0, 7)).toBe(0)
+  })
+
+  it('틱 3 뒤 창 그림 하나 — [+0x10a8] 이 한 번 더 줄어 틱 6 에 풀리고 공 틱 · 끝 · 스윙이 한 틱 당겨진다', () => {
+    // 창 그림 자신은 틱 4 자리의 그림(옛값 2)
+    expect(bigHitScreenOf(true, 4, 0, 점, [])).toEqual({ kind: '멈춤', counter: 2, side: 0 })
+    expect(bigHitReleaseTickOf([3])).toBe(6)
+    expect(bigHitScreenOf(true, 4, 0, 점, [3])).toEqual({ kind: '멈춤', counter: 1, side: 0 })
+    expect(bigHitScreenOf(true, 6, 0, 점, [3])).toEqual({ kind: '멈춤', counter: -1, side: 0 })
+    expect(bigHitScreenOf(true, 7, 0, 점, [3])).toEqual({ kind: '뒤', drawCall: 0, point: 점 })
+    expect(bigHitEndTickOf(20, 6)).toBe(19)
+    expect(bigHitSwingSkipsOf(true, 100, null, 107, 6)).toBe(8)
+    expect(bigHitSwingSkipsOf(true, 100, null, 108, 6)).toBe(8)
+  })
+
+  it('틱 6 뒤 창 그림이 막음을 풀어도 공 틱은 그 틀에 안 올라 틱 7 그림이 다시 푼다', () => {
+    // 창 그림(틱 7 자리) 옛값 −1 → 풀고 016
+    expect(bigHitScreenOf(true, 7, 0, 점, [])).toEqual({ kind: '멈춤', counter: -1, side: 0 })
+    expect(bigHitReleaseTickOf([6])).toBe(7)
+    expect(bigHitScreenOf(true, 7, 0, 점, [6])).toEqual({ kind: '멈춤', counter: -2, side: 0 })
+    expect(bigHitScreenOf(true, 8, 0, 점, [6])).toEqual({ kind: '뒤', drawCall: 0, point: 점 })
+  })
+
+  it('풀린 뒤의 창 그림은 애니 3 을 한 칸 더 넘긴다', () => {
+    expect(bigHitScreenOf(true, 10, 0, 점, [9])).toEqual({ kind: '뒤', drawCall: 2 + 1, point: 점 })
   })
 })

@@ -4,6 +4,7 @@ import { appTickOf } from '@/shared/lib/frameClock/frameClock'
 import {
   clearGameSceneTimeout,
   createGameSceneDrawGate,
+  gameSceneBackdropFreezeSerialNow,
   gameSceneNow,
   gameSceneTickNow,
   gameSceneTickOf,
@@ -15,6 +16,7 @@ import {
   resetCommonWindowShownForTest,
   setGameSceneTickTimeout,
   setGameSceneTimeout,
+  markGameSceneLoading,
 } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
@@ -149,6 +151,25 @@ describe('창이 선 첫 그림 — 52efe [창+0x250] 이면 갱신 없이도 �
     // 멈춘 동안 만든 부품은 그 멈춤의 첫 그림을 지난 것으로 본다
     expect(createGameSceneDrawGate().allowsDraw()).toBe(false)
     third()
+    scene()
+  })
+})
+
+describe('창 첫 그림의 배경 0x41230 — 로딩 판(상태 7 · 8 · 9)에서는 안 그린다(52f26~52f36)', () => {
+  afterEach(() => resetCommonWindowShownForTest())
+
+  it('로딩 판이 서 있는 동안 선 창은 배경 다시 그리기 수에 안 든다', () => {
+    const scene = markGameSceneUp()
+    const start = gameSceneBackdropFreezeSerialNow()
+    const loading = markGameSceneLoading()
+    const duringLoading = markCommonWindowShown()
+    expect(isGameSceneFrozen()).toBe(true)
+    expect(gameSceneBackdropFreezeSerialNow()).toBe(start)
+    duringLoading()
+    loading()
+    const afterLoading = markCommonWindowShown()
+    expect(gameSceneBackdropFreezeSerialNow()).toBe(start + 1)
+    afterLoading()
     scene()
   })
 })

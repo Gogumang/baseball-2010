@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { gameSceneTickNow, gameSceneTickOf, gameSceneTimeOf, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, gameSceneTickOf, gameSceneTimeOf, useMarksGameScene, useMarksGameSceneLoading } from '@/shared/lib/commonWindow/commonWindow'
 import { preloadSpriteScene, preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
@@ -73,6 +73,8 @@ export function LoadingTip({
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
 
+  // 로딩 판(상태 7 · 9 · 8)은 배경 0x41230 을 안 그린다(52f28~52f32) — 그 동안 선 창은 전광판 셈에 안 든다. 장면 표시보다 먼저 센다
+  useMarksGameSceneLoading()
   useMarksGameScene()
 
   useEffect(() => {

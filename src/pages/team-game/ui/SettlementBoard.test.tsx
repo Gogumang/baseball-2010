@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { createRef } from 'react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 afterEach(() => {
   cleanup()
@@ -15,7 +16,28 @@ const 기본 = {
   scoreboardSides: [{ team: 2, isComputer: false }, { team: 7, isComputer: true }],
 } as const
 
+/** 키 0x407f0 은 상태 0x19 의 상태 키 함수라 받은 다음 틀에 돈다(`sceneKeyLatch`) — 누르고 한 틀 흘린다 */
+const 누르기 = (key: string) => {
+  fireEvent.keyDown(window, { key })
+  act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+}
+
 describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('키는 받은 틀이 아니라 다음 틀에 처리된다', () => {
+    render(<SettlementBoard {...기본} onExit={vi.fn()} />)
+    fireEvent.keyDown(window, { key: '0' })
+    expect(screen.queryByTestId('정산-기록-3')).toBeNull()
+    act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+    expect(screen.getByTestId('정산-기록-3')).toBeTruthy()
+  })
+
   it('기본 화면은 점수와 "0:INFO" 만 — \'0\' 으로 기록 판을 열고 OK 로 닫는다', () => {
     const onExit = vi.fn()
     render(<SettlementBoard {...기본} onExit={onExit} />)
@@ -23,16 +45,16 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     expect(screen.getByTestId('정산-점수-1').dataset.value).toBe('5')
     expect(screen.queryByTestId('정산-기록-3')).toBeNull()
 
-    fireEvent.keyDown(window, { key: '0' })
+    누르기('0')
     expect(screen.getByTestId('정산-기록-3').textContent).toContain('2회')
     expect(screen.getByTestId('정산-기록-7').textContent).toContain('1회')
 
-    fireEvent.keyDown(window, { key: 'Enter' })
+    누르기('Enter')
     expect(screen.queryByTestId('정산-기록-3')).toBeNull()
     expect(onExit).not.toHaveBeenCalled()
 
     // 닫힌 판에서 '0' 이 아닌 키 → 메시지 0x3f3
-    fireEvent.keyDown(window, { key: 'Enter' })
+    누르기('Enter')
     expect(onExit).toHaveBeenCalledTimes(1)
   })
 
@@ -62,7 +84,7 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     expect(earned.querySelector('[data-badge-plate]')).not.toBeNull()
     expect(earned.querySelector('[data-badge-plus]')).not.toBeNull()
 
-    fireEvent.keyDown(window, { key: '0' })
+    누르기('0')
     expect(screen.getByTestId('정산-획득-G').querySelector('[data-badge-plus]')).not.toBeNull()
     const held = screen.getByTestId('정산-보유-G')
     expect(held.dataset.value).toBe('900')
@@ -78,7 +100,7 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
 
   it('흐르는 글 0x4aef0 은 대전모드(8·9)에서 이겼을 때만 — 자르기 (x + 2, y, w − 4, h)', () => {
     const { unmount } = render(<SettlementBoard {...기본} mode={8} versusWinBonus={100} onExit={vi.fn()} />)
-    fireEvent.keyDown(window, { key: '0' })
+    누르기('0')
     const clip = screen.getByTestId('정산-흐르는-글')
     expect(clip.style.left).toBe('41px')
     expect(clip.style.top).toBe('224px')
@@ -87,7 +109,7 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     unmount()
 
     render(<SettlementBoard {...기본} mode={2} versusWinBonus={100} onExit={vi.fn()} />)
-    fireEvent.keyDown(window, { key: '0' })
+    누르기('0')
     expect(screen.queryByTestId('정산-흐르는-글')).toBeNull()
   })
 })

@@ -511,6 +511,18 @@ export interface DefenseKeyPress {
    * (0x4e858 `this+0x6c & 0xf == 0` = 키 반복 계수 0).
    */
   readonly isRepeat?: boolean
+  /**
+   * 같은 틀에 이 누름 **뒤에** 오는 되풀이 [장면+0x50] — 키 분배 0x498d4 는 사람 조작 객체마다 이 틀의 누름 [+0x40](49a3a~49a52,
+   * 표시 0) → 되풀이 [+0x50](49a56~49a76, 표시 [+0x6c]) → 뗌 [+0x54](49a7a~) 차례로 vtable[2](0x536bc)에 보낸다. 앞 키를 누르고
+   * 있는 채 새 키를 누른 틀이면 둘 다 0x53420 에 간다(`framePressesOf`)
+   */
+  readonly thenRepeat?: DefenseKeyPress
+}
+
+/** 한 틀의 키를 0x498d4 차례대로 — 누름 [+0x40] → 되풀이 [+0x50] (`DefenseKeyPress.thenRepeat`) */
+export function framePressesOf(press: DefenseKeyPress | null): readonly DefenseKeyPress[] {
+  if (press === null) return []
+  return press.thenRepeat === undefined ? [press] : [press, press.thenRepeat]
 }
 
 /**
@@ -2070,10 +2082,13 @@ export function stepDefensePlay(
     // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
     // 예전에는 `input.controls?.keyAt(tick)` 로 미리 물어봤다. 이제는 **이번 틱에 눌린 키**를 받는다
     const press = key
-    if (input.controls !== undefined && press !== null) {
+    // 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 0x53420 에 둘 다 보낸다
+    const keyControls = input.controls
+    for (const keyPress of framePressesOf(press)) {
+      if (keyControls === undefined) break
       // 누르고 있어서 되풀이된 키는 귀루 셋이 안 먹는다 — 원본 `[조작+0x1c] & 0xf0`(경기+0x6c 비트 4~7)
-      const command = inPlayCommandOf(press.key, input.controls.side, {
-        isHoldRepeat: press.isRepeat === true,
+      const command = inPlayCommandOf(keyPress.key, keyControls.side, {
+        isHoldRepeat: keyPress.isRepeat === true,
       })
       if (command !== null && !play.finished) {
         if (command.kind === '송구') {

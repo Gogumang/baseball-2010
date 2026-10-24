@@ -117,7 +117,9 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
     )
     끝판넘기기()
     expect(screen.getByTestId('정산-번-G')).toBeTruthy()
+    // 정산 키 0x407f0 은 받은 다음 틀에 처리된다(`sceneKeyLatch`)
     fireEvent.keyDown(window, { key: '0' })
+    프레임(1)
     expect(screen.getByTestId('정산-기록-3').textContent).toContain('2회')
     expect(screen.getByTestId('정산-획득-G')).toBeTruthy()
     expect(screen.getByTestId('정산-보유-G')).toBeTruthy()
@@ -134,6 +136,7 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
     expect(onContinue).not.toHaveBeenCalled()
     // 닫힌 판에서 '0' 이 아닌 키 → 메시지 0x3f3
     fireEvent.keyDown(window, { key: 'Enter' })
+    프레임(1)
     expect(onContinue).toHaveBeenCalledOnce()
   })
 })
@@ -151,6 +154,8 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     끝판넘기기()
     expect(screen.queryByTestId('밑그림')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    // 정산 키 0x407f0 은 받은 다음 틀에 처리된다(`sceneKeyLatch`)
+    프레임(1)
     expect(screen.getByTestId('밑그림')).toBeTruthy()
     expect(onContinue).not.toHaveBeenCalled()
     // 116 이 선 틀 — 114 는 다음 틀

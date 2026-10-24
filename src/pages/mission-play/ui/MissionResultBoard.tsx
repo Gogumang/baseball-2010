@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -72,6 +73,7 @@ export function MissionResultBoard({
   const act = (action: MissionResultKeyAction, current: boolean) => {
     if (doneRef.current) return
     const step = missionResultStepOf(action, current, flags)
+    answerRef.current = step.answer
     setAnswer(step.answer)
     if (step.exit !== null) {
       doneRef.current = true
@@ -79,17 +81,23 @@ export function MissionResultBoard({
     }
   }
 
+  // 키 0x407f0 은 상태 0x19 의 상태 키 함수(52da2~)라 받은 다음 틀에 돈다 — 장면 키 칸(`pushSceneKey`, 밑의 결과 배경 타석이 올려 둔
+  // 칸)에 넣고 그 틀 머리에서 꺼낸다. 고른 답은 꺼낸 차례대로 고치고 읽는다
+  const answerRef = useRef(answer)
+  answerRef.current = answer
+  const actRef = useRef(act)
+  actRef.current = act
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
       const action = missionResultKeyActionOf(event.key)
       if (action === null) return
       event.preventDefault()
-      act(action, answer)
+      pushSceneKey(() => actRef.current(action, answerRef.current))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  })
+  }, [])
 
   const question = parseGameMarkup(MISSION_RETRY_QUESTION)[0]
 
