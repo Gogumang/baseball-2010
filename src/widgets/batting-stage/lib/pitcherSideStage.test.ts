@@ -4,6 +4,7 @@ import {
   hitEndTickOf,
   HUMAN_PITCH_RELEASE_STATE_TICK,
   pitchHitSceneTicksOf,
+  pitcherHitContactOf,
   pitcherHitSceneOf,
   passesHeldResult,
   pitchSceneBusyTicksOf,
@@ -12,6 +13,7 @@ import {
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { PITCHER_RELEASE_TICKS, pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { SHORT_HIT_TICKS } from '@/widgets/batting-stage/lib/hitPause'
+import { HIT_PARTICLE_IMAGE } from '@/widgets/batting-stage/lib/hitParticles'
 
 const clock = (nowTick: number, releaseTick: number | null) => ({
   nowTick,
@@ -172,9 +174,21 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
     expect(scene.watchesBigHit).toBe(false)
   })
 
-  it('필살 스윙으로 맞은 공은 보통 불꽃을 안 쏜다 (0x49aec 가 [sp+0x60] 을 세운다)', () => {
+  it('필살 스윙으로 맞은 공은 보통 불꽃 대신 필살 파티클을 쏜다 (0x49aec 가 [sp+0x60] 을 세운다)', () => {
     const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10, specialSwing: { number: 1, isAceBatter: false } }
-    expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).particleId).toBeNull()
-    expect(pitcherHitSceneOf({ ...contact, specialSwing: undefined }, { frame: 15, buntKind: 0 }, 20, 0).particleId).toBe(5)
+    const special = pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0)
+    expect(special.specialSwing).toEqual({ number: 1, isAceBatter: false })
+    expect(special.resultCode).toBe(10)
+    // 번호 1 파워 스윙 — effect_power 그림 · 002.ptc(id 1, img 6)
+    const contactOut = pitcherHitContactOf(special, 0, null, 0)
+    expect(contactOut.effect?.folder).toBe('./sprites/effect_power/frames')
+    expect(contactOut.particles).toEqual([{ id: 1, img: 6, offsetY: 0 }])
+    // 마타자(순번 3 크라이져) — 번호를 안 보고 점프표 0xd01e4
+    const ace = pitcherHitSceneOf({ ...contact, specialSwing: { number: 0, isAceBatter: true } }, { frame: 15, buntKind: 0 }, 20, 0)
+    expect(pitcherHitContactOf(ace, 0, 3, 0).particles).toEqual([{ id: 20, img: 5, offsetY: 25 }])
+    // 필살이 아니면 보통 불꽃
+    const plain = pitcherHitSceneOf({ ...contact, specialSwing: undefined }, { frame: 15, buntKind: 0 }, 20, 0)
+    expect(plain.particleId).toBe(5)
+    expect(pitcherHitContactOf(plain, 0, null, 0)).toEqual({ effect: null, particles: [{ id: 5, img: HIT_PARTICLE_IMAGE, offsetY: 0 }] })
   })
 })
