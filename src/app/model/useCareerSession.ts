@@ -1343,12 +1343,17 @@ export function useCareerSession({
   /**
    * 새 시즌 처리 `0x1b768` → 137 "N년차" → 105 관리 화면.
    * MVP 비트(career+0x1ca)는 여기서가 아니라 상태 131 이 375 를 틀기 전에 남긴다 (`enterSeasonEvent`).
+   * 0x1b768 꼬리가 효과기 종류 1 · 장면+0x289 = 1 을 세우고, 부른 상태(114 · 134 · 141)의 틀이 효과기 끝에 137 을 예약한다
+   * (`pages/management/lib/nariYearCover`). 난수는 1b86c 의 CPU 장비 굴림 하나뿐이고 137 은 난수를 안 쓴다.
+   * `showsCover` 가 거짓이면 곧장 105 — 이어하기 100 진입 1c25e(S+0x50 == 0x11)는 0x1b768 뒤 1c3be 로 빠져 0xbcb49(1) 만 걸고
+   * +0x289 를 보는 틀(114 0x1c014 · 134 0x1b92c · 141 0x1bbc4)을 안 지난다. ⚠️ 미확인: 그 길에서 남은 +0x289 가 뒤에 어디서
+   * 137 을 부르는지(상태 1 다음 칸 · 다음 114 끝)는 따라가지 않았다 — 예전대로 105.
    */
-  const startNewSeason = (finished: PlayerCareer) => {
+  const startNewSeason = (finished: PlayerCareer, showsCover = true) => {
     // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
     const next = startNextSeason(finished, random)
     setCareer(next)
-    setScreen({ kind: '관리' })
+    setScreen(showsCover ? { kind: '연차표지' } : { kind: '관리' })
   }
 
   /**
@@ -1766,8 +1771,8 @@ export function useCareerSession({
           streakRewards: streakEventOf(counted).rewards,
         })
       }
-      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
-      if (point.kind === '새시즌') return startNewSeason(savedCareer)
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 1c3be(0xbcb49(1)) — 137 을 안 거친다(`startNewSeason`)
+      if (point.kind === '새시즌') return startNewSeason(savedCareer, false)
       if (point.kind === '이벤트') {
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
         return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })

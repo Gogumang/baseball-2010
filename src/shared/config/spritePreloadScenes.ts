@@ -384,6 +384,8 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
      */
     { folder: './sprites/game_frame', frames: [11] },
     { folder: './sprites/img_text/frames', frames: [396], json: ['origins.json'] },
+    /** 137 새 시즌 "N년차" 표지(그리기 0x1cc4c)의 "년차" — 숫자 num 20~29 는 `common` 이 받는다 */
+    { folder: './sprites/img_text/frames', frames: [398], json: ['origins.json'] },
     { folder: './sprites/event_char_0/frames', frames: [4, 5, 6], json: ['animations.json', 'origins.json'] },
   ],
   /**

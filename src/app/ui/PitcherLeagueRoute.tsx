@@ -21,6 +21,8 @@ import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoSt
 import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
+import { NariYearCoverScreen } from '@/pages/management/ui/NariYearCoverScreen'
+import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
 import { PitcherShopScreen } from '@/pages/shop/ui/PitcherShopScreen'
@@ -465,9 +467,16 @@ function PitcherLeagueScreens({
 
   if (scene === '외출') return outingMap
 
+  if (scene === '연차표지') {
+    // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다 — 타자편과 같은 137
+    return <NariYearCoverScreen yearIndex={career.season - 1} onDone={() => actions.goto('관리')} />
+  }
+
   return (
     <>
       {management}
+      {/* 137 틀 0x12190 이 105 를 예약하며 건 효과기 종류 2(밝아짐) — 칠하기 0 은 137 위였으니 105 는 1 부터 */}
+      {scene === '관리' && previousScene === '연차표지' && <SeasonScreenFade kind="검게어두워짐" startFrame={1} />}
       {/* 관리 화면(RawScreen)의 형제라 240×320 기둥(ScreenOverlay)에 가둔다 — 안 가두면 창 판(left 0 · 폭 240)이 창 전체 왼쪽에 붙어 그려졌다.
           기둥은 누름을 받으므로 창이 있을 때만 세운다 */}
       {(session.outingRecoveryNotice !== '' || session.storyNotice !== '' || session.pendingTitle !== null) && (

@@ -22,8 +22,8 @@ describe('titleSceneAt — main_title 애니 0 · 1 그대로 (0x2cbac · 0x93d9
 
   it('지연 합 20 — 20 번째 그리기(차례 19)가 넘기며 끝 깃발이 서고 그 그리기부터 애니 1 을 그린다', () => {
     expect(INTRO_FRAME_COUNT).toBe(19)
-    expect(titleSceneAt(그리기(18))).toEqual({ introFrame: 15, promptFrame: null, isSettled: false })
-    expect(titleSceneAt(그리기(19))).toEqual({ introFrame: 13, promptFrame: 13, isSettled: true })
+    expect(titleSceneAt(그리기(18))).toEqual({ draw: 18, introFrame: 15, promptFrame: null, isSettled: false })
+    expect(titleSceneAt(그리기(19))).toEqual({ draw: 19, introFrame: 13, promptFrame: 13, isSettled: true })
     // 한 번만 도는 애니라 마지막 칸 13 에 선다
     expect(titleSceneAt(그리기(400)).introFrame).toBe(13)
   })

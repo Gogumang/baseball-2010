@@ -43,7 +43,7 @@ const MAIN_MENU_NEXT_SCENES: readonly SpriteSceneKey[] = ['nariMenu', 'teamSelec
 
 /** 나리(나만의리그) 관리 쪽 화면 — 관리 · 순위 · 경기 준비 그림을 바로 받는다 */
 const NARI_MENU_SCREENS: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>([
-  '관리', '다음경기순위', '경기준비', '투수편', '이벤트', '외출', '아이템',
+  '관리', '다음경기순위', '경기준비', '투수편', '이벤트', '외출', '아이템', '연차표지',
 ])
 
 /**

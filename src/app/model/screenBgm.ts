@@ -146,6 +146,23 @@ export function usePitcherLeagueBgmRestart(isActive: boolean, scene: PitcherScen
 }
 
 /**
+ * **137 "N년차" 표지 뒤 이어지는 배경음** — 137 진입 0x1055c · 틀 0x12190 · 그리기 0x1cc4c 는 소리를 안 건드리고, 105 처리 0x1aec4 의
+ * 첫 틀 배경음 4 는 이전 상태가 {0x64, 0x74, 0x84, 0x7d, 0x7e, 0x72, 0x86, 1, 0x70} 일 때만이라(1aece~1aef2, r148 직접 뜸) 0x89 는
+ * 빠진다. 곧 137 → 105 는 앞의 배경음(연말 114 의 40 · 141 엔딩의 46/52 · 대회 경기 뒤 끊긴 채)을 그대로 잇고, 105 에서 들어가
+ * 소리를 안 건드리는 109(이전 105) · 110/111 상점 · 112 외출 지도에서도 이어진다. 112 → 105(`restartsManagementBgm`) 나
+ * 그 밖 화면으로 가면 끝난다. ⚠️ 근사: 웹 '관리' 화면 안의 125 훈련 결과 · 126 외출 효과 → 105 (목록에 든다 — 4 를 다시 튼다)는
+ * 화면 표가 못 봐 그대로 잇는다.
+ */
+const YEAR_COVER_CARRY_KINDS: ReadonlySet<string> = new Set(['관리', '다음경기순위', '아이템', '상점', '외출'])
+
+/** 화면이 `previous` → `kind` 로 바뀔 때 137 뒤 배경음을 이어 가나 */
+export function carriesYearCoverBgm(isCarrying: boolean, previous: string | null, kind: string): boolean {
+  if (previous === '연차표지') return kind === '관리'
+  if (!isCarrying || !YEAR_COVER_CARRY_KINDS.has(kind)) return false
+  return !restartsManagementBgm(previous, kind)
+}
+
+/**
  * 최상위 화면의 배경음과 **다시 틀기 표** — 화면이 바뀐 그리기에서 `restartsMenuBgm` · `restartsManagementBgm` 이 참이면 표가 하나 오른다.
  * `useSceneBgm` 이 표가 오르면 같은 번호라도 끊고 처음부터 튼다.
  */
@@ -153,15 +170,17 @@ export function useScreenBgm(screen: Screen): { readonly bgm: number | null; rea
   const [previousKind, setPreviousKind] = useState<Screen['kind'] | null>(null)
   const [enteredFrom, setEnteredFrom] = useState<Screen['kind'] | null>(null)
   const [restartSerial, setRestartSerial] = useState(0)
+  const [isYearCoverCarry, setYearCoverCarry] = useState(false)
   // 그리는 중에 앞 값과 견줘 고친다 (`usePitcherLeagueBgm` 과 같은 꼴 — 효과 한 틀 늦지 않게)
   if (screen.kind !== previousKind) {
     setPreviousKind(screen.kind)
     setEnteredFrom(previousKind)
+    setYearCoverCarry(carriesYearCoverBgm(isYearCoverCarry, previousKind, screen.kind))
     if (restartsMenuBgm(previousKind, screen) || restartsManagementBgm(previousKind, screen.kind)) {
       setRestartSerial((serial) => serial + 1)
     }
   }
-  return { bgm: screenBgmOf(screen, enteredFrom), restartSerial }
+  return { bgm: isYearCoverCarry ? null : screenBgmOf(screen, enteredFrom), restartSerial }
 }
 
 /**
@@ -227,6 +246,8 @@ export function pitcherLeagueBgmOf(
   // 키 표 0xcc7e0 134 0x19fdc · 135 0x10680, 그리기 표 0xcc884 130 0x19f18 · 131 0x19f24 · 132 · 136 0x11e0c · 134 0x19fc8 ·
   // 135 0x168dc — 이들과 그 아래 세 단계 호출에 0x6ea6c · 0x6e498 · 0x6e418 · 0x6e438 · 0x6eaf0 이 없다
   if (scene === '국가대항전') return null
+  // 137 "N년차" 표지(진입 0x1055c · 틀 0x12190 · 그리기 0x1cc4c)는 배경음을 안 건드린다 — 뒤 105 도 잇는다(`carriesYearCoverBgm`)
+  if (scene === '연차표지') return null
   return SCREEN_BGM.투수편
 }
 
@@ -248,8 +269,10 @@ export function usePitcherLeagueBgm(
   /** 앞 그리기의 장면 · 128 에 들어선 앞 장면이 116(경기 결과)이었나 */
   const [previousScene, setPreviousScene] = useState<PitcherScene | null>(null)
   const [postseasonAfterGame, setPostseasonAfterGame] = useState(false)
+  const [isYearCoverCarry, setYearCoverCarry] = useState(false)
   if (scene !== previousScene) {
     setPreviousScene(scene)
+    setYearCoverCarry(carriesYearCoverBgm(isYearCoverCarry, previousScene, scene))
     // 142 를 들렀다 128 로 물러나는 것은 같은 진입으로 본다(142 는 배경음을 안 바꾼다)
     if (scene !== '포스트시즌' && scene !== '경기준비') setPostseasonAfterGame(false)
     else if (scene === '포스트시즌' && previousScene !== '경기준비') setPostseasonAfterGame(previousScene === '경기결과')
@@ -263,7 +286,8 @@ export function usePitcherLeagueBgm(
     setFromReentry(false)
   }
   // 위에서 상태를 고쳤으면 React 가 이 그리기를 버리고 곧바로 다시 그린다 — 돌려주는 값은 고친 상태로 다시 구한다
-  return isActive ? pitcherLeagueBgmOf(scene, fromReentry, endingIndex, { storyContext, postseasonAfterGame }) : null
+  if (!isActive || isYearCoverCarry) return null
+  return pitcherLeagueBgmOf(scene, fromReentry, endingIndex, { storyContext, postseasonAfterGame })
 }
 
 /** 시즌 트레이닝 0xcf · 그 연출 0xde (웹은 0xde 를 0xcf 화면 안 결과 팝업으로 갈음한다) */

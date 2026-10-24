@@ -114,7 +114,7 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
 
     이벤트보기(rendered, [462])
 
-    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.screen).toEqual({ kind: '연차표지' })
     expect(rendered.result.current.session.career?.season).toBe(2)
   })
 
@@ -122,7 +122,7 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
     const rendered = 띄우기(목표달성선수({ season: 2 }))
     연봉사슬끝내기(rendered)
 
-    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.screen).toEqual({ kind: '연차표지' })
     expect(rendered.result.current.session.career?.season).toBe(3)
   })
 
@@ -153,7 +153,7 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
     연봉사슬끝내기(거절)
     이벤트보기(거절, [461, 464])
 
-    expect(거절.result.current.screen).toEqual({ kind: '관리' })
+    expect(거절.result.current.screen).toEqual({ kind: '연차표지' })
     expect(거절.result.current.session.career?.season).toBe(2)
     expect(거절.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[8])
   })
@@ -524,7 +524,7 @@ describe('대회 끝 정산 (0x1b92c)', () => {
     expect(끝난뒤?.gamePoint).toBe(1000)
     expect(끝난뒤?.openedHiddenIds).toEqual([])
     expect(끝난뒤?.season).toBe(2)
-    expect(rendered.result.current.screen).toEqual({ kind: '관리' })
+    expect(rendered.result.current.screen).toEqual({ kind: '연차표지' })
   })
 
   it('⚠️ 나만의리그는 준우승·탈락에 보상이 없다 — 빈손으로 새 시즌이다 (원본 그대로)', () => {

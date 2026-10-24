@@ -24,6 +24,8 @@ import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
+import { NariYearCoverScreen } from '@/pages/management/ui/NariYearCoverScreen'
+import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
 import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
@@ -190,6 +192,8 @@ function CareerScreens({
     <>
       {management}
       {titlePopup}
+      {/* 137 틀 0x12190 이 105 를 예약하며 건 효과기 종류 2(밝아짐) — 칠하기 0 은 137 위였으니 105 는 1 부터. 그동안 키 문 0x10758 이 닫힌다 */}
+      {previousKind === '연차표지' && <SeasonScreenFade kind="검게어두워짐" startFrame={1} />}
     </>
   )
 
@@ -367,6 +371,10 @@ function CareerScreens({
         </>
       )
     }
+
+    case '연차표지':
+      // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다
+      return <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} />
 
     case '다음경기순위':
       return (

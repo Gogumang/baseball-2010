@@ -26,7 +26,19 @@ import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
  *
  * 두 애니 모두 부른 쪽 효과 0 이라 프레임 그리기 0xc9f98 이 파트 효과를 따른다 — 흙먼지(그림 4)의 0x67 은 화면에 더하고
  * (겹 `frames/layers.json`), 0x66 반투명 · 0x6E/0x6F 채우기는 구운 프레임대로다.
- * ⚠️ 미확인: 키를 보는 갱신 0x245f8 과 그리기의 차례 — 웹은 깃발이 선 그리기부터 키를 받는다(원본이면 한 틱 늦을 수 있다).
+ *
+ * **키를 보는 차례 (r148 직접 뜸 — 장면 0x103 틀 0x32fa0)**:
+ * ```
+ * 32fb8  0xbc9c9(this+0x18)   ; 예약된 다음 상태를 적용
+ * 32fc0  0xbca05(this+0x18)   ; 이번 틱 키 [this+0x40] = 지난 틱 뒤 들어온 키(0xbca04 가 먼저 +0x28 · +0x38 · +0x3c 를 지운다 — 쌓아 두지 않는다)
+ * 32fce  상태가 바뀌었으면 진입(0x3299c) · 배경음(0x24ab8)
+ * 32fe0  갱신 0x32634 → 하위 3 타이틀 0x245f8   ; 깃발이 섰고 [this+0x40] ≠ 0 이면 0xbcb49(this+0x18, 4) **예약**
+ * 32fe6  그리기 0x32dd8 → 0x2cbac               ; 그린 뒤 애니를 넘기며 깃발을 세운다
+ * ```
+ * 깃발은 그리기 차례 19 가 세우므로 그 틀의 갱신은 아직 못 보고, 차례 20 틀의 갱신이 처음 본다. 그 틀의 키는 차례 19 를
+ * 그린 뒤 들어온 키뿐이라 **"PRESS ANY KEY" 가 선 그리기(19) 뒤에 누른 키부터 받는다** — 웹 `isSettled` 판정 그대로다.
+ * 받은 키는 예약이라 그 틀의 그리기는 타이틀을 한 번 더 그리고, 다음 틀의 0xbc9c9 가 하위 4 를 세운다 —
+ * 곧 그리기 d 가 보이는 동안 누른 키는 d + 1 을 그린 뒤 d + 2 틀에 메뉴로 넘어간다(`TITLE_KEY_FRAMES_TO_MENU`).
  */
 
 export const TITLE_FRAMES = './sprites/main_title/frames'
@@ -48,7 +60,12 @@ const INTRO_DRAWS = INTRO_ANIMATION.reduce((total, entry) => total + Math.max(1,
 /** 끝 깃발이 서는 그리기 차례 — 이 그리기부터 애니 1 · 저작권 · 판 번호 · 전체이용가를 그리고 키를 받는다 */
 export const INTRO_FRAME_COUNT = INTRO_DRAWS - 1
 
+/** 받은 키가 메뉴(하위 4)로 넘기기까지의 틀 수 — 다음 틀 갱신이 키를 보고 예약, 그다음 틀에 적용 (0x32fa0 차례) */
+export const TITLE_KEY_FRAMES_TO_MENU = 2
+
 export interface TitleScene {
+  /** 그리기 차례 (0 부터) */
+  readonly draw: number
   /** 애니 0 의 지금 프레임 (끝나면 마지막 칸 13 에 선다) */
   readonly introFrame: number
   /** 애니 1 의 지금 프레임 — 끝 깃발 전에는 null */
@@ -60,7 +77,7 @@ export function titleSceneAt(elapsedMilliseconds: number): TitleScene {
   const draw = Math.max(0, Math.floor(elapsedMilliseconds / millisecondsPerFrame()))
   const last = INTRO_ANIMATION[INTRO_ANIMATION.length - 1].frame
   const introFrame = draw < INTRO_DRAWS ? (animationStepAt(INTRO_ANIMATION, draw)?.frame ?? last) : last
-  if (draw < INTRO_FRAME_COUNT) return { introFrame, promptFrame: null, isSettled: false }
+  if (draw < INTRO_FRAME_COUNT) return { draw, introFrame, promptFrame: null, isSettled: false }
   const promptFrame = animationStepAt(PROMPT_ANIMATION, draw - INTRO_FRAME_COUNT)?.frame ?? null
-  return { introFrame, promptFrame, isSettled: true }
+  return { draw, introFrame, promptFrame, isSettled: true }
 }
