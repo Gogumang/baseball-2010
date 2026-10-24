@@ -1706,7 +1706,7 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       const 미룬동안 = 기록.filter((entry) => entry.tick >= 16 && entry.tick < 17)
       expect(미룬동안.every((entry) => entry.ai === AI_STATE.RECEIVE)).toBe(true)
       expect(미룬동안[0]?.target).toEqual(basePosition(1))
-      // b48ac 가 AI 0 으로 놓아준 뒤 — 송구의 vt34 가 받을 1루수를 +0x130 으로 세워 같은 틱 0xb1c90(6 절)이 3루 커버를 그에게 준다
+      // b48ac 가 AI 0 으로 놓아준 뒤 — 송구의 vt34 가 받을 1루수를 +0x130 으로 세워 같은 틱 vt4c 끝 0xb1c90(1d 절)이 3루 커버를 그에게 준다
       expect(기록.find((entry) => entry.tick === 17)?.ai).toBe(AI_STATE.COVER_THIRD)
     })
 
@@ -2114,6 +2114,30 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
     expect(굴림.log.some((line) => line.includes('잡았다'))).toBe(false)
     expect(굴림.foulEnded).toBe(true)
     expect(굴림.ticks.length).toBe(48)
+  })
+
+  it('넓은 페어 각(0x9d640, 35~145) 밖 파울은 state[7] = 0 — 커버 0xb1c90 이 머리(b1cc6)에서 끝나 아무도 루 커버를 안 받는다', () => {
+    const 커버받음 = (pattern: BattedBallPattern, resultCode: number) => {
+      let state = startDefensePlay({
+        outcome: registerContact(땅볼아웃, { pattern, resultCode }),
+        trajectory: battedBallTrajectory(pattern),
+        bases: 주자1루,
+        outs: 0,
+      })
+      let 받음 = false
+      for (let step = 0; step < 40 && !isDefensePlayFinished(state); step += 1) {
+        받음 ||= state.fielders.some(
+          (fielder) => fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD,
+        )
+        state = stepDefensePlay(state, null)
+      }
+      return 받음
+    }
+    // 각 311 · 209 는 넓은 쐐기 밖 — 1루 주자가 있어도 커버 AI(루 + 2)가 하나도 안 선다
+    expect(커버받음([311, 273, 247, 1], 9)).toBe(false)
+    expect(커버받음([209, 317, 295, 1], 9)).toBe(false)
+    // 같은 1루 주자 · 페어 땅볼은 판 시작부터 커버가 선다
+    expect(커버받음([51, 435, 315, 1], 1)).toBe(true)
   })
 })
 

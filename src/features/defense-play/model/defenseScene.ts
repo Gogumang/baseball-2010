@@ -1,5 +1,4 @@
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
-import { inPlayCommandOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import {
   JUDGE_POPUP_START,
   NO_ZOOM_PUNCH,
@@ -49,13 +48,6 @@ export interface DefenseScene {
   readonly zoomPunch: ZoomPunchState
   /** deadly_effect 애니 0 — 경기 내내 되감기지 않는다 */
   readonly deadlyAnim: DeadlyAnimState
-  /**
-   * 플레이 객체 +0x160 — 사람이 고른 송구 목표 루(−1 없음). 플레이 객체도 장면과 함께 한 번 만들어지고(생성자 0xb0b3a · 0xb0b6e),
-   * +0x160 을 쓰는 곳은 그 둘 · 키 메시지 0x588 의 vt60 0xb3118 · 던진 뒤 b46a8 의 −1 뿐이다(즉치 0xb0 << 1 전수) — 판 시작
-   * vt1c 0xb0edc 도 안 지운다. 그래서 판 안에서 못 쓴 키(공을 아무도 안 쥐었거나 밀어내기 판처럼 vt4c 가 안 도는 판)는 다음 판의
-   * 첫 쥔 야수가 준비되면 그 루로 보낸다.
-   */
-  readonly throwTarget: number
 }
 
 /** deadly_effect 애니 0 의 상태 칸 (애니 +8 객체의 [0] 칸 · [2] 비트) — 지연 0 이라 셈 칸은 늘 0 이다 */
@@ -80,7 +72,6 @@ export const DEFENSE_SCENE_START: DefenseScene = {
   slideDirection: 0,
   zoomPunch: NO_ZOOM_PUNCH,
   deadlyAnim: { frameIndex: 0, playing: false, ended: false },
-  throwTarget: -1,
 }
 
 /**
@@ -91,28 +82,6 @@ export function enterDefenseScene(scene: DefenseScene | undefined, afterPitch: b
   const base = scene ?? DEFENSE_SCENE_START
   const popup = afterPitch ? { ...base.popup, shown: true, bigOutDraws: 0, textAdvances: 0 } : base.popup
   return { ...base, popup: { ...popup, timer: -1 } }
-}
-
-/**
- * **판이 닫힌 뒤에 온 사람 송구 키** — 판 진행 관문이 닫혀도 상태 0x17 은 0x35108 까지(+0x1094 셈) 돌고, 그동안 온 키도 키 분배
- * 0x498d4 → 0x536bc → 0x53420 을 지난다(직접 뜸). 조작 [+0xc] ≠ 0(사람 수비)이면 0x5344a → 0x533c8 이 키를 루로 바꿔
- * ('8'/아래 → 홈 · '6'/오른 → 1루 · '2'/위 → 2루 · '4'/왼 → 3루, 그 밖은 아무것도 안 보냄) 메시지 0x588 을 곧바로 보내고
- * 0x51890 이 플레이 vt60 0xb3118(`str r1,[r0,#0x160]`)을 **조건 없이** 부른다. 닫힌 판에서는 vt4c(b4660)가 안 돌아 그 값을 쓰는
- * 곳이 없으므로 +0x160 은 다음 판으로 남는다 — 진행기 밖의 이 키들을 차례대로 접어 판이 넘길 장면 칸(`throwTarget`)에 적는다.
- * 사람 공격(조작 [+0xc] == 0)은 0x5331c 주루 갈래라 +0x160 을 안 건드린다. 키 반복은 송구 갈래에 게이트가 없다.
- */
-export function withClosedThrowKeys(
-  scene: DefenseScene,
-  presses: readonly { readonly key: string; readonly isRepeat?: boolean }[],
-  side: ControlSide | undefined,
-): DefenseScene {
-  if (side !== '수비') return scene
-  let throwTarget = scene.throwTarget
-  for (const press of presses) {
-    const command = inPlayCommandOf(press.key, '수비', { isHoldRepeat: press.isRepeat === true })
-    if (command?.kind === '송구') throwTarget = command.target
-  }
-  return throwTarget === scene.throwTarget ? scene : { ...scene, throwTarget }
 }
 
 /** 레이저 발사 0x400bc(40100) — +0x1992 = 0 · +0x1991 = +0x1990 = 1 (+0x1993 · 플레이 vt64(1) 은 진행기 몫) */

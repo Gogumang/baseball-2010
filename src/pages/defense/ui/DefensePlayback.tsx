@@ -20,7 +20,6 @@ import type {
   DefensePlayState,
 } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { withClosedThrowKeys } from '@/features/defense-play/model/defenseScene'
 import { drawnFieldingErrorsOf, drawnFumbleCheerOf, type DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import { deepLandingCheerSoundIdOf, runInCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -630,11 +629,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   useEffect(() => {
     if (!isFinished) return
     if (drawnErrors.length > 0) onFieldingErrorsRef.current?.(drawnErrors)
-    // 판이 닫힌 뒤(+0x1094 셈) 온 키 · 판 끝까지 못 먹인 키도 키 처리 0x53420 을 지난다 — 사람 수비면 송구 0x533c8 → 0x588 → vt60 이
-    // +0x160 에 적고, 닫힌 판에서는 쓰는 곳(b4660)이 없어 다음 판으로 남는다(`withClosedThrowKeys`)
-    const result = stepper.result()
-    const scene = withClosedThrowKeys(result.scene, pressesRef.current, play.side ?? '수비')
-    onDone(scene === result.scene ? result : { ...result, scene })
+    // 판이 닫힌 뒤(+0x1094 셈) 온 키 · 판 끝까지 못 먹인 키도 키 처리 0x53420 을 지나 사람 수비면 송구 0x533c8 → 0x588 → vt60 이
+    // +0x160 에 적지만, 다음 판 시작 vt18 0xb27ec 가 부르는 vt1c 0xb0edc(b0f66~b0f68)가 −1 로 지워 넘어가지 않는다
+    onDone(stepper.result())
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 실책 묶음은 판(play)마다 하나다
   }, [isFinished, onDone, stepper])
 
@@ -698,8 +695,6 @@ function LivePlayback({
   const pressesRef = useRef<DefenseKeyPress[]>([])
   /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
   const pressTicksRef = useRef<number[]>([])
-  /** 판이 닫힌 뒤(+0x1094 셈) 온 키들 — 사람 수비면 0x533c8 → 0x588 → vt60 이 +0x160 에 적어 다음 판으로 남는다(`withClosedThrowKeys`) */
-  const closedPressesRef = useRef<DefenseKeyPress[]>([])
   /** 그린 틱이 올린 실책 (야수 그리기 0x43278 4381a~43904) · 이미 본 진행기 틱 수 */
   const drawnErrorsRef = useRef<DrawnFieldingError[]>([])
   const seenTickCountRef = useRef(0)
@@ -766,7 +761,6 @@ function LivePlayback({
       startedAtRef.current = update
       pressesRef.current = []
       pressTicksRef.current = []
-      closedPressesRef.current = []
       drawnErrorsRef.current = []
       seenTickCountRef.current = 0
       boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
@@ -904,8 +898,8 @@ function LivePlayback({
       arrivedPresses.push(press)
     }
     if (!moved && finished && arrivedPresses.length > 0) {
-      // 같은 키 처리 0x53420 이 0x587(건너뛰기)보다 먼저 사람 수비 송구 0x533c8 → 0x588 → +0x160 을 적는다 — 판 끝에 장면 칸으로 넘긴다
-      closedPressesRef.current.push(...arrivedPresses)
+      // 같은 키 처리 0x53420 이 0x587(건너뛰기)보다 먼저 사람 수비 송구 0x533c8 → 0x588 → +0x160 을 적는다 — 닫힌 판이라 쓰는 곳이 없고
+      // 다음 판 시작 vt1c 0xb0edc 가 지운다
       if (acceptsFastForwardKey(running)) {
         // 0x519fe — 소리 끊기(0x6e418)
         activeSound().stop()
@@ -982,10 +976,8 @@ function LivePlayback({
       onDone(undefined)
       return
     }
-    // 판이 닫힌 뒤에 온 사람 송구 키(+0x160)는 다음 판으로 남는다 — 경기 흐름이 넘기는 장면 칸에 적는다
-    const result = defensePlayResultOf(state)
-    const scene = withClosedThrowKeys(result.scene, closedPressesRef.current, builtSideRef.current)
-    onDone(scene === result.scene ? result : { ...result, scene })
+    // 판이 닫힌 뒤에 온 사람 송구 키(+0x160)는 다음 판 시작 vt1c 0xb0edc 가 지워 넘어가지 않는다
+    onDone(defensePlayResultOf(state))
   }, [ended, onDone, sceneMemory])
 
   if (view === null) return null

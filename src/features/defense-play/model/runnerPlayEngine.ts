@@ -177,9 +177,9 @@ export interface RunnerPlayEngineInput {
   readonly defenseIsCpu?: boolean
   readonly throwMode?: ManualAutoMode
   /**
-   * 판이 열릴 때의 사람 송구 목표 루 (플레이+0x160). 안 주면 앞 판에서 넘어온 값(`scene.throwTarget`)이다 —
-   * +0x160 을 쓰는 곳은 플레이 생성자(0xb0b3a · 0xb0b6e) · 키 메시지 0x588 의 vt60 0xb3118 · 던진 뒤 b46a8 의 −1 셋뿐이라
-   * 판을 넘어 남는다. 그 키로 한 번 던지면 −1 로 지운다(b46a8).
+   * 판이 열릴 때의 사람 송구 목표 루 (플레이+0x160, 시험용). 안 주면 −1 — 0x17 진입 0x46418 의 판 시작 vt18 0xb27ec 가
+   * 종류 2·3(0xb288c) · 5(0xb2950) · 9(0xb284a) 모두 vt1c 0xb0edc 를 먼저 부르고 그 b0f66~b0f68 이 +0x160 = −1 을 적으므로
+   * 앞 판의 키는 넘어오지 않는다. 그 키로 한 번 던지면 −1 로 지운다(b46a8).
    */
   readonly manualThrowBase?: number
   /**
@@ -335,7 +335,7 @@ function* runnerPlaySteps(
   const autoBaserunningEnabled = input.offenseIsCpu === true || (input.runningMode ?? '자동') !== '수동'
   const cpuThrowEnabled = input.defenseIsCpu === true || (input.throwMode ?? '수동') !== '수동'
   /** 플레이+0x160 — 사람이 고른 송구 목표 (키 메시지 0x588 이 쓰고 b46a8 이 −1) */
-  let manualThrowBase = input.manualThrowBase ?? input.scene?.throwTarget ?? NONE
+  let manualThrowBase = input.manualThrowBase ?? NONE
   /** 플레이 vt4c 0xb45dc(사람 목표 b4660 · AI 9 b4838)가 도는 판인가 */
   const vt4cRuns = !VT4C_BLOCKED_PLAY_KINDS.includes(input.kind)
   const log: string[] = []
@@ -834,7 +834,7 @@ function* runnerPlaySteps(
 
     // 3b · 3c 는 플레이 vt4c 0xb45dc 다 — 슬롯 2 52612 라 플레이 틱(vt48) · 득점 0xaa0a8 뒤에 돈다
     // ── 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비(vtC4) 이면 발밑 루가 아닐 때 vt58, 그리고 −1 ──
-    // vt4c 는 판 종류가 마스크 0x58c 밖일 때만 돈다(0x52602) — 밀어내기(종류 2)는 키가 +0x160 만 적고 안 던진다(다음 판으로 남는다)
+    // vt4c 는 판 종류가 마스크 0x58c 밖일 때만 돈다(0x52602) — 밀어내기(종류 2)는 키가 +0x160 만 적고 안 던진다(다음 판 시작 vt1c 가 지운다)
     if (!play.finished && vt4cRuns && manualThrowBase !== NONE && isHolderReady()) {
       const target = manualThrowBase
       manualThrowBase = NONE
@@ -1095,7 +1095,7 @@ function* runnerPlaySteps(
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene: { ...scene, throwTarget: manualThrowBase },
+    scene,
     rundowns: 0,
     rundownOuts: 0,
     runnerFates: runners.map((runner) => runnerFateOf(runner.state)),

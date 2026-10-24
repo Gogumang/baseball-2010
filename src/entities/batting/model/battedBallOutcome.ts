@@ -69,6 +69,24 @@ export function isFairAngle(angle: number): boolean {
 }
 
 /**
+ * **0x9d640 — 넓은 페어 각** (직접 뜬 것): 원본 각 a(> 0 이면 a − 360)가 −145 ≤ a ≤ −35 면 1 — 페어 쐐기를 양쪽으로 10도씩 넓힌 것.
+ * ```
+ * 9d642  a > 0 → a += −360 ; 9d64c  (unsigned)(a + 0x91) ≤ 0x6e ? 1 : 0
+ * ```
+ * 타구 0x511ce · 사건 7(파울) b2c06 이 state[7] 에 적고, 커버 0xb1c90 머리(b1cc6)와 0xb1b88(b1b9e)가 0 이면 안 돈다.
+ * 이 함수는 **원본 부호의 각**(궤적 점의 각 — `pointDetailAt(t).angle`)을 받는다
+ */
+export function isWideFairOriginalAngle(angle: number): boolean {
+  const a = angle > 0 ? angle - 360 : angle
+  return (a + 0x91) >>> 0 <= 0x6e
+}
+
+/** 0x9d640 을 웹 패턴 각(원본 a 의 부호를 뒤집은 값)으로 — 35 ≤ 각 ≤ 145 */
+export function isWideFairAngle(angle: number): boolean {
+  return isWideFairOriginalAngle(-angle)
+}
+
+/**
  * 맞은 공을 가른다 — 난수를 쓰지 않는다. 결과 코드는 번트 성공 표시(isBunt)에만 쓴다 — 원본도 쏜 뒤로는
  * 코드를 보지 않고 패턴(궤적)만 본다.
  */

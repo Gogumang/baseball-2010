@@ -5,9 +5,7 @@ import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { DefenseKeyPress, DefensePlayControls } from '@/features/defense-play/model/runDefensePlay'
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
-import { runWalkPlay } from '@/features/defense-play/model/walkPlay'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
-import { DEFENSE_SCENE_START } from '@/features/defense-play/model/defenseScene'
 import {
   openPitchArrivalPlay,
   runPitchArrivalPlay,
@@ -42,8 +40,6 @@ describe('판 중 사람 송구 키 — 상태 0x17 키 0x53420 → 0x533c8 → 
     expect(키.log).toContain('4틱 사람이 2루로 송구 지시')
     expect(키.log.some((line) => line.startsWith('4틱 1번 야수가 2루로 송구'))).toBe(true)
     expect(키.throwBase).toBe(2)
-    // 던진 뒤 +0x160 = −1 (b46a8) — 다음 판으로 남는 것이 없다
-    expect(키.scene.throwTarget).toBe(-1)
   })
 
   it('공격 쪽 조작(사람이 주루)이면 송구 키가 아니다 — 0x533c8 은 수비일 때만', () => {
@@ -57,20 +53,8 @@ describe('판 중 사람 송구 키 — 상태 0x17 키 0x53420 → 0x533c8 → 
     expect(공격.throwBase).toBe(-1)
   })
 
-  it('밀어내기 판(종류 2)은 vt4c 가 안 돈다(52602 의 마스크 0x58c) — 남은 +0x160 으로도 안 던지고 다음 판으로 그대로 남긴다', () => {
-    const 남은 = runWalkPlay({ bases: 일루, outs: 0, pitchJudgement: 3, scene: { ...DEFENSE_SCENE_START, throwTarget: 1 } })
-    expect(남은.throwBase).toBe(-1)
-    expect(남은.scene.throwTarget).toBe(1)
-  })
-
-  it('앞 판에서 남은 +0x160 은 다음 판의 첫 쥔 야수가 준비되면 그 루로 보낸다 — 판 시작 vt1c 가 안 지운다', () => {
-    const 남음 = runStealPlay({
-      bases: 일루,
-      stealingFrom: [1],
-      outs: 0,
-      runAbility: 500,
-      scene: { ...DEFENSE_SCENE_START, throwTarget: 2 },
-    })
+  it('판이 열릴 때 +0x160 이 서 있으면(시험용 입력) 첫 쥔 야수가 준비되면 그 루로 보낸다 — 실제 판 시작은 vt1c 0xb0edc 가 −1 로 지운다', () => {
+    const 남음 = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500, manualThrowBase: 2 })
     expect(남음.throwBase).toBe(2)
     expect(남음.log.some((line) => line.startsWith('0틱 1번 야수가 2루로 송구'))).toBe(true)
   })
@@ -83,12 +67,6 @@ describe('판 중 사람 송구 키 — 상태 0x17 키 0x53420 → 0x533c8 → 
     const 키 = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, controls: 수비키({ [받은틱 + 1]: '2' }) })
     expect(키.log).toContain(`${받은틱 + 1}틱 사람이 2루로 송구 지시`)
     expect(키.log.some((line) => /\d+틱 2번 야수가 2루로 송구/.test(line) || line.includes('2루로 공을 들고 뛴다'))).toBe(true)
-  })
-
-  it('견제 판도 앞 판에서 남은 +0x160 을 이어받는다 — 판 시작에 쥔 투수(준비 틱 0)가 견제(AI 0xe b47da)보다 먼저 그 루로 보낸다', () => {
-    const 남음 = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, scene: { ...DEFENSE_SCENE_START, throwTarget: 2 } })
-    expect(남음.log.some((line) => line.startsWith('0틱 0번 야수가 2루로') && line.includes('(사람 송구 키)'))).toBe(true)
-    expect(남음.scene.throwTarget).toBe(-1)
   })
 })
 

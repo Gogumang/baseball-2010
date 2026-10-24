@@ -646,11 +646,10 @@ export function useMissionSession({
    */
   const sceneResultCodeRef = useRef<number | null>(SCENE_RESULT_CODE_START)
   /**
-   * **수비 장면 칸** (`DefenseScene`) — 결과 판 · 연출 단계 · deadly_effect 애니 · 줌과 **플레이 객체 +0x160(사람 송구 목표)**.
-   * 경기 장면 0x104 를 만들 때 플레이 객체도 한 번 만들어지고(장면 +0x200, 생성자 0xb0b68 이 +0x160 = −1 — 0xb0b6e), +0x160 을 쓰는
-   * 곳은 키 메시지 0x588 → vt60 0xb3118 과 던진 뒤 b46a4 의 −1 뿐이다(즉치 `0xb0 << 1` 전수 — 읽기 0xb1f42 · 0xb264c · 0x400da ·
-   * b4662). 0x17 진입 0x46418 · 판 시작 vt1c 0xb0edc · 0x17 끝 0x35108 도 안 지운다 — 앞 판에서 못 쓴 송구 키는 다음 판의 첫 준비된
-   * 쥔 야수를 그 루로 보낸다. 미션도 판마다 이 칸을 넘기고(나리 · 팀 경기의 `defenseScene` 과 같다), 새 경기(장면 new)에서 비운다
+   * **수비 장면 칸** (`DefenseScene`) — 결과 판 · 연출 단계 · deadly_effect 애니 · 줌. 경기 장면 0x104 를 만들 때 한 번 만들어져
+   * 판을 넘어 남는다. 미션도 판마다 이 칸을 넘기고(나리 · 팀 경기의 `defenseScene` 과 같다), 새 경기(장면 new)에서 비운다.
+   * 플레이 객체 +0x160(사람 송구 목표)은 넘기지 않는다 — 0x17 진입 0x46418 이 부르는 판 시작 vt18 0xb27ec 가 종류 1·2·3·4·5·8·9
+   * 모두 vt1c 0xb0edc 를 먼저 부르고 그 b0f66~b0f68 이 +0x160 = −1 을 적는다(종류 6·7 은 판 도중 0xb2bc4 만 쓴다)
    */
   const missionSceneRef = useRef<DefenseScene | undefined>(undefined)
   const takeStealingFrom = () => {
@@ -1169,7 +1168,7 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random, undefined, undefined, playAbilitiesOf(foulRun)),
-            // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+            // 수비 장면 칸은 판을 넘어 남는다
             scene: missionSceneRef.current,
             stealingFrom: foulStealing,
             buntKind,
@@ -1214,7 +1213,7 @@ export function useMissionSession({
                 buntKind,
                 // 경기 +0xfd4 — 이 공의 값
                 sceneResultCode: sceneResultCodeRef.current,
-                // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+                // 수비 장면 칸 — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
                 scene: missionSceneRef.current,
               },
               random,
@@ -1230,7 +1229,7 @@ export function useMissionSession({
         return
       }
       const play = opened === null ? null : runOpenedPitchArrivalPlay(opened)
-      // 판이 남긴 수비 장면 칸(+0x160 포함)은 다음 판으로
+      // 판이 남긴 수비 장면 칸은 다음 판으로
       if (play !== null) missionSceneRef.current = play.result.scene
 
       // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다). 공 도착 판이 열렸으면 그 판정 콜(도루 17 · 62/20,
@@ -1263,7 +1262,7 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random, undefined, undefined, playAbilitiesOf(current)),
-            // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+            // 수비 장면 칸은 판을 넘어 남는다
             scene: missionSceneRef.current,
             isUncatchable,
             // 공이 나는 동안 출발한 주자 — 판 시작 리드(0x3d7b8)가 다음 루로 몰아 돌린다
@@ -1639,16 +1638,16 @@ export function useMissionSession({
             buntKind: thrown.buntKind ?? 0,
             // 경기 +0xfd4 — 이 공의 값
             sceneResultCode: sceneResultCodeRef.current,
-            // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+            // 수비 장면 칸 — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
             scene: missionSceneRef.current,
           },
           random,
         )
       : null
-    // 밀어내기(종류 2)는 vt4c 가 안 돌아 키가 +0x160 만 적는다 — 미리 돌려 재생한다. 도루 · 폭투 판은 붙든다
+    // 밀어내기(종류 2)는 vt4c 가 안 돌아 키가 +0x160 만 적고 쓰이지 않는다 — 미리 돌려 재생한다. 도루 · 폭투 판은 붙든다
     const held = opened !== null && opened.kind !== 2 ? opened : null
     const play = opened !== null && held === null ? runOpenedPitchArrivalPlay(opened) : null
-    // 판이 남긴 수비 장면 칸(+0x160 포함)은 다음 판으로 — 밀어내기 판은 vt4c 가 안 돌아 키가 +0x160 에 남는다
+    // 판이 남긴 수비 장면 칸은 다음 판으로 (+0x160 은 다음 판 시작 vt1c 0xb0edc 가 −1 로 지운다)
     if (play !== null) missionSceneRef.current = play.result.scene
     // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c).
     // MAX게이지(R+0x158)는 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래만 센다 — 낫아웃 판(종류 9 · 타자주자)은 v 를 0 으로 지워 건너뛴다
@@ -1711,7 +1710,7 @@ export function useMissionSession({
             throwModeManual,
             playAbilitiesOf(nextRun),
           ),
-          // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+          // 수비 장면 칸은 판을 넘어 남는다
           scene: missionSceneRef.current,
           stealingFrom,
           // state[4] — 판 끝 결과 코드 11 · 판 뒤 스트라이크(0xb6b58)가 이 공 앞의 스트라이크를 본다
@@ -1745,7 +1744,7 @@ export function useMissionSession({
             throwModeManual,
             playAbilitiesOf(nextRun),
           ),
-          // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함)은 판을 넘어 남는다
+          // 수비 장면 칸은 판을 넘어 남는다
           scene: missionSceneRef.current,
           // 0x517e6 — 마타자 필살이 성공한 타구는 필살타법 표시 속성 4(0xaf180 — 송구 공과 무관)가 서서 야수가 쥐지 못한다
           isUncatchable: thrown.isUncatchable,
@@ -1776,7 +1775,7 @@ export function useMissionSession({
       const pending = pendingDefensePlayRef.current
       if (pending === null) return
       const played = result ?? runDefensePlay(pending.input)
-      // 판이 남긴 수비 장면 칸 — 못 쓴 사람 송구 키(+0x160)는 다음 판으로 남는다
+      // 판이 남긴 수비 장면 칸은 다음 판으로 — 못 쓴 사람 송구 키(+0x160)는 다음 판 시작 vt1c 0xb0edc(b0f68)가 −1 로 지운다
       missionSceneRef.current = played.scene
       setPendingDefensePlay(null)
       if (pending.isFoulPlay === true && played.foulEnded === true) {
@@ -2015,7 +2014,7 @@ export function useMissionSession({
     setPendingRunnerPlay(null)
     setPendingBenchClearing(null)
     stealingFromRef.current = []
-    // 새 경기 장면 — 플레이 객체 new(0xb0b68)라 수비 장면 칸 · +0x160 이 처음 값이다
+    // 새 경기 장면 — 플레이 객체 new(0xb0b68)라 수비 장면 칸이 처음 값이다
     missionSceneRef.current = undefined
     sceneResultCodeRef.current = SCENE_RESULT_CODE_START
     setStealingFrom([])
@@ -2148,7 +2147,7 @@ export function useMissionSession({
       setPendingRunnerPlay(null)
       setPendingBenchClearing(null)
       stealingFromRef.current = []
-      // 새 경기 장면 — 수비 장면 칸 · 플레이 객체 +0x160 이 처음 값이다
+      // 새 경기 장면 — 수비 장면 칸이 처음 값이다
       missionSceneRef.current = undefined
       sceneResultCodeRef.current = SCENE_RESULT_CODE_START
       setStealingFrom([])
@@ -2271,7 +2270,7 @@ export function useMissionSession({
         ...pickoffAbilitiesOf(current),
         // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
         sceneResultCode: sceneResultCodeRef.current,
-        // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+        // 수비 장면 칸 — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
         scene: missionSceneRef.current,
       }
       // 견제 판(종류 4)은 0xae794 마스크 0x232 안이라 사람 주루 키(0x5331c → 0x582 · 0x584 → 0xa9b04)와 OK 슬라이딩(0x585)을
@@ -2288,7 +2287,7 @@ export function useMissionSession({
       const pending = pendingRunnerPlayRef.current
       if (pending === null) return
       const played = result ?? runLiveRunnerPlayWithoutKeys(pending)
-      // 판이 남긴 수비 장면 칸 — 못 쓴 사람 송구 키(+0x160)는 다음 판으로 남는다
+      // 판이 남긴 수비 장면 칸은 다음 판으로 — 못 쓴 사람 송구 키(+0x160)는 다음 판 시작 vt1c 0xb0edc(b0f68)가 −1 로 지운다
       missionSceneRef.current = played.scene
       setPendingRunnerPlay(null)
       // 화면이 결과를 넘겼으면 판정 콜은 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 이미 났다
@@ -2380,7 +2379,7 @@ export function useMissionSession({
         ...pickoffAbilitiesOf(pitcherRun),
         // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
         sceneResultCode: sceneResultCodeRef.current,
-        // 수비 장면 칸(플레이 객체 +0x160 사람 송구 목표 포함) — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
+        // 수비 장면 칸 — 경기 장면 · 플레이 객체는 경기 하나에 한 번 만들어져 판을 넘어 남는다
         scene: missionSceneRef.current,
       }
       setPendingRunnerPlay({ kind: 'pickoff', input, side: '수비' })
