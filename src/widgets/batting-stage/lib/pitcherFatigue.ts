@@ -161,6 +161,10 @@ export function pitcherHomeRunMarksOf(input: PitcherResultCodeClock & {
   readonly step: number
   /** 마투수 순번 (없으면 null) */
   readonly aceOrder: number | null
+  /**
+   * 창이 선 첫 그림([창+0x250])이 든 투수 틱 — 그 그림도 이 갈래를 돌아 애니 12 · 13 을 한 칸 더 넘긴다(`stageRedraws`). 안 주면 없음
+   */
+  readonly redrawPitcherTicks?: readonly number[]
 }): PitcherHomeRunMarks | null {
   // 39096~390c4 — 목표 단계 13 · 마투수 0xcfd34[순번] (= 마지막 단계). 상태는 안 본다
   const lastStep = pitchLastStepOf(input.aceOrder)
@@ -168,7 +172,10 @@ export function pitcherHomeRunMarksOf(input: PitcherResultCodeClock & {
   if (!isHomeRunLikeAt(input, input.pitcherTick)) return null
   // 단계는 0x11 동안만 오르므로 마지막 단계에 닿은 틱부터 지금까지 — 0xf 진입이 되감은 뒤 갈래가 참이었던 그림을 센다
   const lastStepTick = pitchStepStartTickOf(lastStep, input.aceOrder)
-  const drawCall = homeRunLikeTicksBetween(input, lastStepTick, input.pitcherTick)
+  const redraws = (input.redrawPitcherTicks ?? []).filter(
+    (at) => at >= lastStepTick && at <= input.pitcherTick && isHomeRunLikeAt(input, at),
+  ).length
+  const drawCall = homeRunLikeTicksBetween(input, lastStepTick, input.pitcherTick) + redraws
   if (drawCall < 1) return null
   return { drawCall, showsPitcherAnimation: input.aceOrder === null, showsBang: input.isBigHit }
 }

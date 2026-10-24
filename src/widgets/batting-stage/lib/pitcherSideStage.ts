@@ -8,6 +8,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { earlyHitPauseTickOf, hitPauseTicksOf, isBigHit } from '@/widgets/batting-stage/lib/hitPause'
+import { bigHitEndTickOf, bigHitReleaseTickOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import type { HitPauseInput } from '@/widgets/batting-stage/lib/hitPause'
 import { HIT_PARTICLE_IMAGE, hitParticleIdOf, hitParticleInputOf, specialSwingParticlesOf } from '@/widgets/batting-stage/lib/hitParticles'
 import { specialSwingStageEffectOf } from '@/widgets/batting-stage/lib/specialSwingEffect'
@@ -70,6 +71,11 @@ export interface PitcherHitClock {
   readonly ticks: number
   /** OK · '5' 건너뛰기(0x406e8 40708)를 읽은 0x13 상태 틱 — 없으면 null (큰 타구만) */
   readonly skipTick?: number | null
+  /**
+   * 큰 타구 0x13 동안 창이 선 첫 그림([창+0x250])이 든 자리 — 그 앞에 마지막으로 갱신한 0x13 틱(`bigHitScreen.bigHitReleaseTickOf`).
+   * 그 그림의 0x4cb1c 가 [+0x10a8] 을 한 번 더 줄여 막음이 일찍 풀리고 0x13 이 그만큼 일찍 끝난다. 안 주면 없음
+   */
+  readonly frozenDraws?: readonly number[]
 }
 
 export interface PitcherSideStageFrame {
@@ -218,7 +224,9 @@ export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number, a
 /**
  * CPU 타자가 스윙을 거는 장면 틱 — 0x11 갱신 0x4e0dc: 공 틱 [+0x1098] ≥ 스윙 프레임 F(+0xfd8) 인 틱에 스윙 객체의
  * vtable +0x14 · +0x18 을 부른다. 공 틱은 놓은 틱(상태 틱 10)에서 `pitcherReleaseTicksOf(순번) − 10` 지난 뒤 0 이다
- * (`pitcherSideStageFrameOf` 와 같은 셈). ⚠️ 근사: 한 틱 안의 갱신 차례(공 틱 +1 과 스윙 검사)는 공 틱 0 이 그려지는 틱으로 맞췄다.
+ * (`pitcherSideStageFrameOf` 와 같은 셈). 한 틱 안의 차례(r178 직접 떴다): 공 틱 [+0x1098] 을 올리는 곳은 틀 끝 0x3f378 의
+3f450~3f454(53086 — 갱신 · 그리기 뒤) 하나뿐이고 0x11 진입 3de82 가 0 으로 둔다 — 그래서 같은 틀의 갱신 0x4e0d0(스윙 검사)과 그리기가
+같은 공 틱을 본다. 공 경로 F 를 그리는 틱이 곧 스윙을 거는 틱이다.
  */
 export function cpuSwingTickOf(releaseTick: number, swingFrame: number, aceOrder?: number | null): number {
   return releaseTick - HUMAN_PITCH_RELEASE_STATE_TICK + pitcherReleaseTicksOf(aceOrder) + Math.max(0, swingFrame)
@@ -230,7 +238,10 @@ export function cpuSwingTickOf(releaseTick: number, swingFrame: number, aceOrder
  */
 export function hitEndTickOf(hit: PitcherHitClock): number {
   const skip = hit.skipTick ?? null
-  const end = skip === null ? hit.ticks : Math.min(hit.ticks, skip)
+  // 창 첫 그림이 막음을 당긴 만큼 공 틱이 일찍 올라 문턱에 일찍 닿는다(`bigHitEndTickOf` — 타자편 `useStageAnimation` 과 같은 셈).
+  // 창 첫 그림은 큰 타구에서만 적으므로 아니면 그대로다
+  const ticks = bigHitEndTickOf(hit.ticks, bigHitReleaseTickOf(hit.frozenDraws ?? []))
+  const end = skip === null ? ticks : Math.min(ticks, skip)
   return Math.max(0, end)
 }
 

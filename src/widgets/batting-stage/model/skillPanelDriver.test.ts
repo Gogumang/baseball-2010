@@ -82,4 +82,15 @@ describe('경기 스킬 표시 판 돌림 — 사람 타석 · 사람 투구 공
     expect(scene.current.panel.pitcherBits).toBe(doctorK)
     expect(scene.current.panel.remaining).toBe(SKILL_PANEL_LIFETIME - 1)
   })
+
+  it('창이 선 첫 그림([창+0x250])은 틱이 안 흘러도 0x4b5b4 를 한 번 더 돌린다 — 마지막으로 센 틱은 그대로 (r178)', () => {
+    const scene = { current: createSkillPanelScene() }
+    const step = createSkillPanelDriver()
+    step(그림({ nowTick: 0 }, scene))
+    step(그림({ nowTick: 0, extraDraw: true }, scene))
+    expect(scene.current.panel.remaining).toBe(SKILL_PANEL_LIFETIME - 2)
+    // 창이 닫힌 뒤 다음 틱은 한 번만
+    step(그림({ nowTick: 1 }, scene))
+    expect(scene.current.panel.remaining).toBe(SKILL_PANEL_LIFETIME - 3)
+  })
 })
