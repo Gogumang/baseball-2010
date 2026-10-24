@@ -494,13 +494,13 @@ S = 커리어 기록 [장면+0xb0].
 ### 웹판 대조 — `src/app/ui/CareerRoutes.tsx` · `src/app/model/useCareerSession.ts` · `src/app/model/screen.ts`
 - 웹은 상태 46칸 대신 화면 종류 10여 개(`screen.ts:9~49`)로 줄였다: 타이틀·메인메뉴·선수등록·경기·경기결과·관리·아이템·외출·이벤트·성적·시즌종료·엔딩·마선수대결·미션*.
 - **맞는 것**: 관리 주기 2경기(`balance.json:51 gamesPerManagementCycle: 2` ↔ S+0xb2 짝수), 한 시즌 45경기(`:50`), 22경기 중간 성적표(`useCareerSession.ts:314 MID_SEASON_GAME`↔117), 이어하기 5000 G(seasonFlow), 휴식/외출/트레이닝 중 하나만(105 커맨드 1회).
-- **빠진 상태**(웹에 대응 화면이 없음):
-  - 109 순위표 · **142 경기 준비 · 143 경기 전 엔트리 · 144 전환** — 웹 `confirmGameResult`(`useCareerSession.ts:310~324`) 는 홀수 경기면 곧바로 `beginGame()` 을 부르고, 관리 화면의 [다음경기]도 `beginGame()` 직행(`:262`). 원본에서 경기 앞에 늘 끼는 **순위표 → 매치업 → (엔트리 편집) → 밀기** 세 화면이 없다.
-  - 128 포스트시즌 대진 화면(웹은 `useCareerSession.ts:131` 이 CPU 경기만 돌림) · 그 우승 보상(StrMODE[190]/[191]).
-  - 130 타이틀 · 131 MVP · 133 국가대표 · 134·135 국가대항전 — `seasonFlow.ts` 에 없음(B·P5 와 같은 결론).
-  - 115 연초 처리(내장 이벤트 + 올해의 목표 창), 137 "N년차" 표지, 139 G 충전, 145 명예의 전당(엔딩 화면의 `onRegisterHallOfFame`, `CareerRoutes.tsx:143` 로 축약).
+- **빠진 상태**(웹에 대응 화면이 없음): *(2026-10-25 r202 정정 — 아래는 2026-10 초 기록이다. 지금은 모두 웹에 있다. 줄마다 "→ 웹 반영됨(파일)")*
+  - 109 순위표 · **142 경기 준비 · 143 경기 전 엔트리 · 144 전환** — 웹 `confirmGameResult`(`useCareerSession.ts:310~324`) 는 홀수 경기면 곧바로 `beginGame()` 을 부르고, 관리 화면의 [다음경기]도 `beginGame()` 직행(`:262`). 원본에서 경기 앞에 늘 끼는 **순위표 → 매치업 → (엔트리 편집) → 밀기** 세 화면이 없다. → 웹 반영됨(109 `pages/management/ui/NextGameStandingsScreen.tsx` · 142 `NariMatchInfoScreen.tsx` · 143 `widgets/entry-editor/ui/EntryEditorScreen.tsx` · 144 `confirmMatchPrepare` — `app/ui/CareerRoutes.tsx` · `PitcherLeagueRoute.tsx`) *(2026-10-25 r202 정정 — GAP-2026-10-25 0x106 표)*
+  - ~~128 포스트시즌 대진 화면(웹은 `useCareerSession.ts:131` 이 CPU 경기만 돌림) · 그 우승 보상(StrMODE[190]/[191]).~~ → 웹 반영됨(`pages/season-end/ui/PostseasonScreen.tsx` · 보상 `useCareerSession.ts` · `usePitcherLeagueSession.ts`) *(2026-10-25 r202 정정 — GAP-2026-10-25 0x106 표)*
+  - ~~130 타이틀 · 131 MVP · 133 국가대표 · 134·135 국가대항전 — `seasonFlow.ts` 에 없음(B·P5 와 같은 결론).~~ → 웹 반영됨(130 · 131 `StoryScreen` system 3 · 4 · 133 461/462 이벤트 · 134 · 135 `pages/national-cup/ui/NationalCupScreen.tsx`) *(2026-10-25 r202 정정 — GAP-2026-10-25 0x106 표)*
+  - ~~115 연초 처리(내장 이벤트 + 올해의 목표 창), 137 "N년차" 표지, 139 G 충전, 145 명예의 전당(엔딩 화면의 `onRegisterHallOfFame`, `CareerRoutes.tsx:143` 로 축약).~~ → 웹 반영됨(115 문맥 '연초' · 137 `pages/management/ui/NariYearCoverScreen.tsx` · 145 `pages/ending/ui/EndingScreen.tsx` '등록목록'). 139 G 충전은 ⛔ 서버(U-35) *(2026-10-25 r202 정정 — GAP-2026-10-25 0x106 표)*
   - 119 기본정보 카드 · 120 능력치 상세 · 121 장비 · 122 아이템/스킬 · 123 필살타법 · 124 기록실 목록 — `openPlayerInfo`(`useCareerSession.ts:303~308`) 가 장비착용만 상점 '착용' 탭으로 보내고 **나머지는 전부 '성적' 화면으로** 보낸다(주석에도 "임시"라 적혀 있음). *(해결 2026-10-14, 웹 r71 7846ec95 — 119 · 120 · 122 · 123 · 124 는 관리 화면이 원본 상태로 띄우고 '성적' 화면을 걷었다, 13절)*
-  - 106 칸4 [기록실] 을 웹은 순위표 창(`ManagementScreen.tsx:83 StandingsWindow`)으로 띄운다 — 원본은 두 갈래 팝업 → 124 선수 기록 목록이고, 순위표는 109 쪽이다.
+  - ~~106 칸4 [기록실] 을 웹은 순위표 창(`ManagementScreen.tsx:83 StandingsWindow`)으로 띄운다 — 원본은 두 갈래 팝업 → 124 선수 기록 목록이고, 순위표는 109 쪽이다.~~ → 웹 반영됨(124 `pages/nari-record-room` — 원본처럼 기록실 판, 순위표는 109) *(2026-10-25 r202 정정 — GAP-2026-10-25 0x106 표)*
 - **화면 구조 차이**: 원본은 한 장면(0x106) 안의 상태 번호 하나로 모든 화면을 돌리고 `[장면+0x24]`(뒤 상태) 한 칸으로 되돌아온다. 웹은 `Screen` 유니온 + `context`('관리'·'시즌'·'외출진입'·'장소') 문자열로 같은 일을 한다(`useCareerSession.ts:417~422`). 원본의 "다음 + 뒤" 두 칸 구조 덕에 **114 이벤트 재생을 어느 상태에서나 끼워 넣고 제자리로 돌아올 수 있는데**, 웹은 `context` 가 4가지뿐이라 같은 일반성이 없다.
 
 ## 10. 2026-10-07 보강 — 나리 팀 레코드 · 142/143 · 116 · 국가대항전 저장 — 확정 (메인 커밋 메시지의 직접 뜬 것만)

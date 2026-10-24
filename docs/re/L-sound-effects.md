@@ -534,7 +534,7 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
 - 일반 타자: 필살타법 바이트 [선수+0x18]: 1 → effect_power(파워 스윙) · 2 → effect_frame(**플레임**, 파일명 오타) · 3 → effect_tornado · 4 → effect_meteor (0x47ec0~0x47f0a). 0 이하면 없음.
 - **투수**: 늘 effect/effect_pitcher 를 먼저 올리고, 마선수(0xb633d)면 순번 표 0xd01bc: 0 psyker · 1 leony · 2 bbmachine · 3 (0x480e4, 조건 뒤 ballantine) · 4 dragona.
   일반 투수: 마구 바이트 [선수+0x18]: 1 → effect_fire(파이어 볼) · 4 → 0xb6e25 거짓이면 effect_shinning(샤이닝 볼). 웨이브·썬더·캐넌·미라지는 effect_pitcher 만.
-- 웹판: `/usr/bin/grep -rl effect_ src` 결과 없음 → 필살기 연출 그림 미사용.
+- ~~웹판: `/usr/bin/grep -rl effect_ src` 결과 없음 → 필살기 연출 그림 미사용.~~ → 웹 반영됨: 필살타법 그림 `widgets/batting-stage/lib/specialSwingEffect.ts`(0x49aec) · 마구 공 이펙트 `magicBallEffect.ts`(effect_fire · effect_shinning) · effect_pitcher · 마투수 *_effect `acePitcherEffect.ts` *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 
 ### 2-B. 경기 초기화 0x48658 의 연출 에셋 → 게임 객체 칸 (칸은 유력: 적재 직후 저장 주소를 스택에서 역추적)
 | 에셋 | 칸 | 칸을 읽는 함수 (xval) |
@@ -580,7 +580,7 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
   → 파일 44개 = 타자 머리 11 + 손 12(바탕 1 · 덧 4 · 셋째 3 · 7~10 넷) + 다리 2 + 투수 머리 11 + 손 2 + 몸 4 + 다리 2. public/sprites/item_* 44폴더(+item_icon)와 정확히 같다. ("57폴더"는 .mpl 포함 셈으로 보임)
 - 팔레트 입히기: 같은 PZX 를 .mpl 의 다른 줄로 칠해 색만 바꾼 등급을 만든다 → 웹에서는 decode_pzx 가 .mpl 줄별 PNG 를 만들어야 한다 (현재 public/sprites 는 기본색만일 가능성 — 미확인).
 - 겹침 순서: RALPH 노트 "순서표 0xd3a54" (0xd3a54 는 vtable 바로 뒤 바이트열 01 01 01 01 01 01 00 00 …) — 이번에 새로 읽지 않음.
-- 웹판: `src/widgets/batting-stage/lib/batterLayers.ts:6,14` 가 다리를 item_bat_leg_0 고정, 손 아이템 없으면 bat/batter_batter 를 쓴다 (추정 표기). 장착 아이템별 머리·손·팔레트 교체는 없음. `training-scene/ui/TrainingFigure.tsx:14` 도 미반영이라 적어 둠.
+- ~~웹판: `src/widgets/batting-stage/lib/batterLayers.ts:6,14` 가 다리를 item_bat_leg_0 고정, 손 아이템 없으면 bat/batter_batter 를 쓴다 (추정 표기). 장착 아이템별 머리·손·팔레트 교체는 없음. `training-scene/ui/TrainingFigure.tsx:14` 도 미반영이라 적어 둠.~~ → 웹 반영됨: `batterLayers.ts` 가 장비 등급 순번 n 으로 머리 +0x1c · 손 +0x14/+0x20/+0x44 · 다리 +0x28 를 고르고 `.mpl` 등급 줄로 칠한다(`warmRecoloredFrames`). 투수 겹은 `renderBattingStage.drawPitcher`(`pitcherLayersOf` — 장비 니블 0x47cc8 48138~), 훈련 그림은 `TrainingFigure.tsx` *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 
 ## 4. 데이터 파일
 
@@ -615,7 +615,7 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
 - 선택 0x9f224: `r = rand(0,100)`; r < c0 → 0, r < c0+c1 → 1, 아니면 2.
 - 쓰는 곳 **0x34334 = CPU 타자 행동 결정**(경기 장면): 결과 0·1 이면 타격 시도 경로(0x34418~, +0xfe0 플래그 세움), 2 면 건너뜀. [+0xf98]+8 이 켜져 있으면 결과를 0 으로 강제.
   → c0 = 치기, c1 = 번트(주자 없음 열에서 10%, 2스트라이크에서 0% — 유력), c2 = 지켜보기. 난이도 파일 구분 없음.
-- 웹판: `/usr/bin/grep -rl battingPattern src tools` → 0건. CPU 타자는 웹의 확률표를 쓴다 (원본 표 미사용).
+- ~~웹판: `/usr/bin/grep -rl battingPattern src tools` → 0건. CPU 타자는 웹의 확률표를 쓴다 (원본 표 미사용).~~ → 웹 반영됨: `shared/config/original/battingPatterns.ts` → `entities/pitching/model/simulateBatter.ts` · `pitchPatterns.ts` → `selectPitch.ts` · `pitchTarget.ts` *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 
 ### 4-D. d_level.dat (확정 — E 노트 1c 참고)
 488 바이트, 적재 0xb7370 / 0xb7414(앱 초기화 0x2ed8 가 포인터로 넘김) / 0x7262c. **경기 밸런스 설정표**(타격 cfg+0x10/0x12 스윙 세기, 제구 등급 배율 0x1e0, 수비 이동 cfg+0x28·송구 cfg+0x1a/+0x2a·에러 cfg+0x2c 등 — E 노트·웹 swingResult.ts)이고, 읽기 실패 시 폴백 0xb6f28 과 값이 같다(RALPH 864행). **난이도 옵션이 아니다** — 파일 하나를 모든 모드가 쓴다.
@@ -643,7 +643,7 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
 - **파일 51바이트 배치** (필드 경계는 값 분포로 본 추정, 뜻은 **미해결** — 소비 함수 0x6d56c 이후를 읽어야 함):
   `u16 방향(도) · u16 방향 폭(도, 360=사방) · u32 속도(16.16 고정소수, 예 0x147b=0.08) · u32 속도 난수폭 · u16 개수(1~200) · u16 개수 난수 · u16 수명 · u16 수명 난수 · u16(0xb333=0.7/0xe666=0.9 감쇠로 보임) · u16 · u32×4(0x3333·0x051f·0x028f 등 크기/알파 변화로 보임) · s32 · s32(음수 = 위쪽 가속/중력으로 보임) · u16 w · u16 h(발생 범위) · u8 그림 프레임? · u8 · u8 종류(1·2)`
   전체 표: snd/ptc_fields.txt (`struct.unpack("<HHIIHHHHHHIIIIIHHBBB")`).
-- 웹판: 파티클 없음 (`/usr/bin/grep -rl ptc src` 0건; public/sprites/ptcimg 폴더는 있음).
+- ~~웹판: 파티클 없음 (`/usr/bin/grep -rl ptc src` 0건; public/sprites/ptcimg 폴더는 있음).~~ → 웹 반영됨: 관리자 `entities/particle/model/particleScene.ts` · `particleEmitter.ts` · 장면 관리자 `widgets/particles`(`sceneParticles.ts` · `SceneParticleLayer.tsx`) · 설정 `public/sprites/ptcimg/particles.json`. 호출지는 R5 7절 표대로(메뉴 반짝이 · 삼진 양끝 · 교체 등판 r202 · 타격 불꽃 · 홈런 불꽃 · 돌발 …) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 
 ### 5-B. ui/slt_pitch.raw (확정: 형식 / 유력: 용도)
 - 900 바이트 = **30×30, 한 바이트 한 점, 값 0 또는 31(0x1f)** → 5비트 알파 마스크. 모양은 지름 30 의 꽉 찬 원 (snd/ 에 그림 없음 — `python3` 로 30열씩 찍으면 원).
@@ -665,7 +665,7 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
     0xd7332[21] = 가로모음 여부, 0xd7347[21] = 복합모음 여부, 3바이트 표 0xd7290(15행) 과 글꼴 객체 +0x38/+0x40/+0x71 의 조각 너비 표로 벌·자리를 정하고 0x9baf8 로 조각을 OR 합성한다.
     **정확한 벌 번호 식·조각 시작 순번은 미해결** (0x9bba2~0x9bd94 약 200줄을 끝까지 읽어야 함).
 - 웹에서 쓰려면: 영문은 바로 쓸 수 있다(94자 표). 한글은 ① 위 합성 루틴을 끝까지 옮기거나 ② 에뮬레이션으로 2350자를 한 번 그려 PNG 시트로 굽는 방법이 있다.
-- 웹판: `src/pages/main-menu/ui/MainMenuScreen.css.ts` 한 곳만 ft2 를 언급 (글꼴 파일 자체는 안 씀).
+- ~~웹판: `src/pages/main-menu/ui/MainMenuScreen.css.ts` 한 곳만 ft2 를 언급 (글꼴 파일 자체는 안 씀).~~ → 웹 반영됨: `public/font/synGak9_11.png` · `synGulimAsc5_11.png` 조각을 `shared/lib/font/atlas.ts`(`fontAtlas.generated.json`) · `shared/ui/PixelText/PixelText.tsx` 가 그대로 찍는다 *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 
 ### 5-D. stadium/fence.pzd · fence.pzf · fence_season.pzf (확정: 적재 규칙 / 유력: 시즌 프레임 뜻)
 - **PZD = 이미지 구간만, PZF = 프레임 구간만** 인 짝 파일 (머리 'PZD\x02' / 'PZF\x01', 구간은 오프셋 4). `tools/decode_pzx.py:382 decode_split_pair` 가 이미 푼다.
@@ -678,5 +678,5 @@ ADPCM 샘플은 영어 심판 콜이다. 받아쓰기 결과 → 번호. 코드 
   - fence.pzf 11개: 폭 594~768 의 서로 다른 외야 펜스+관중석 → 일반 구장 11종 (웹 public/sprites/fence/frames 의 11장과 같다).
   - fence_season.pzf 20개 = **5개씩 4묶음**: 묶음 첫 프레임은 펜스·관중석 바탕(높이 67→99→108→116 으로 점점 커짐, 조명탑·관람 시설이 늘어남), 뒤 4개는 파란 좌석 줄 덧그림(높이 28/28/46/43).
     → 시즌 **구장관리 아이템**(StrITEM 126~129 1~4단 관중석, 130~132 트로피컬·콜로세움·스페이스)으로 구장이 커지는 단계 그림 — 유력 (어느 아이템 값이 몇 번 프레임인지는 미해결).
-- 웹판: `src/widgets/batting-stage/lib/spriteLoader.ts:98` 가 fence 만 쓴다. **fence_season 은 풀지도 않았다** (public/sprites 에 폴더 없음) → 시즌 구장 성장 그림 미반영.
+- ~~웹판: `src/widgets/batting-stage/lib/spriteLoader.ts:98` 가 fence 만 쓴다. **fence_season 은 풀지도 않았다** (public/sprites 에 폴더 없음) → 시즌 구장 성장 그림 미반영.~~ → 웹 반영됨: `public/sprites/fence_season` · `hidden_fence_0~2` 를 `widgets/batting-stage/lib/renderScenery.ts`(0x77494 시즌 갈래 — 관중석 +0x88 · 관중 단계 +0x89 · 전광판 +0x8a)가 고른다 *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 

@@ -58,16 +58,16 @@
 - 🌐 데이터 백업/복구
 
 ## 9. 소리·연출·에셋
-- ❌ **사운드 52개 (sound/*.mmf, 야마하 SMAF)** — 변환·재생 시점 전부 미착수
+- ~~❌ **사운드 52개 (sound/*.mmf, 야마하 SMAF)** — 변환·재생 시점 전부 미착수~~ → 웹 반영됨(`public/sounds` 52개 · 번호표 `shared/config/original/sounds.ts` · 재생 `shared/api/audio/webAudioSound.ts`) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 - 🔎 **이펙트 그림 18폴더 — 정체·적재·조건은 전부 확정됐다 (R2 12~15절, 6차)**. 열쇠는 `게임+0xfc8 == 0x16`(이번 구질 22 = 마구)이다.
   - ✅ `deadly_effect` (수비 포구 번쩍임, 필살기와 무관 — R2 2절) · `game_effect` (R2 3절 일부)
   - ✅ **`effect_fire`·`effect_shinning`** — 마구 1·4(폼 묶음 0) 의 공 이펙트. 2026-09-25 이식 (웹 `magicBallEffect.ts`, R2 14-1)
-  - ❌ `effect_pitcher` (+0x1044) — 자리·프레임 확정, **`게임+0xfc8` 이 22 가 되는 틱을 못 찾아 시작 시점 미확정** (R2 14-0)
-  - ❌ 마선수 마구 이펙트 5종 `psyker·leony·bbmachine·ballantine·dragona` (+0x1038) — leony 만 투구 단계표까지 풀림 (R2 14-2)
-  - ❌ `player_effect` (+0x1030) — R2 4절
+  - ~~❌ `effect_pitcher` (+0x1044) — 자리·프레임 확정, **`게임+0xfc8` 이 22 가 되는 틱을 못 찾아 시작 시점 미확정** (R2 14-0)~~ → 웹 반영됨(`widgets/batting-stage/lib/acePitcherEffect.ts` · `renderBattingStage.drawEffectPitcher`, 틱은 U-64 해결) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
+  - ~~❌ 마선수 마구 이펙트 5종 `psyker·leony·bbmachine·ballantine·dragona` (+0x1038) — leony 만 투구 단계표까지 풀림 (R2 14-2)~~ → 웹 반영됨(`acePitcherEffect.ts` · `renderBattingStage.drawAceMagicAnimation`, U-65 닫힘) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
+  - ~~❌ `player_effect` (+0x1030) — R2 4절~~ → 웹 반영됨(타석 `pitcherFatigue` · `batterOverlayMarks` · 실투 "!" · 바람 줄 — `renderBattingStage.ts`, 수비 `features/defense-play/model/playerEffects.ts`) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
   - ⛔ **`effect_frame`·`effect_power`·`effect_tornado`·`effect_meteor`·`medica_effect` 다섯은 그리는 코드가 없다** (R2 15절) → **이식 불필요**
-  - ❌ `sky_effect_light`·`sky_effect_light1` — 구장 배경 쪽이다. 팔레트 줄까지 확정 (R6 6절)
+  - ~~❌ `sky_effect_light`·`sky_effect_light1` — 구장 배경 쪽이다. 팔레트 줄까지 확정 (R6 6절)~~ → 웹 반영됨(`sky_effect_light` 하늘 조명 `widgets/batting-stage/lib/renderScenery.ts` · `settlementSky.ts`. `sky_effect_light1` 은 원본도 싣기만 한다 — GAP ③) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
 - ⛔ 콤보 그림 ui/combo.pzx — **원본도 안 그린다** (R2 5절)
-- ❌ 전광판 board_ani, stadium_symbol, event_ani, trainning(미니게임), certi, touch
-- ❌ 장비 외형 스프라이트 57폴더(item_bat_*/item_pit_*) — 장착 시 겉모습
-- ❌ 데이터 파일: battingPattern.arr, pitchpattern_easy/hard.arr (난이도?) — 웹·도구 참조 0
+- ~~❌ 전광판 board_ani, stadium_symbol, event_ani, trainning(미니게임), certi, touch~~ → 웹 반영됨: board_ani `renderScenery.ts`(흐르기 0x77fb4) · stadium_symbol `pages/general-mode/ui/FirstBatStadiumScreen.tsx` · `prepareLayout.ts` · event_ani `widgets/training-scene`(`RestScene` · `EventAnimationSprite`) · `seasonOutingPopup.ts` · trainning `derbyPitchingMachine.ts` · `missionHudLayout.ts` · `defenseDistanceBoard.ts` · certi `pages/title/model/logoIntro.ts`(싣기만 — 인증 창 6~19 는 ⛔ U-131) · touch 는 ⛔ 원본 참조 없음(L 2-0) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
+- ~~❌ 장비 외형 스프라이트 57폴더(item_bat_*/item_pit_*) — 장착 시 겉모습~~ → 웹 반영됨(`widgets/batting-stage/lib/batterLayers.ts` 타자 · 투수 겹 · `.mpl` 줄 칠하기 `warmRecoloredFrames` · `widgets/training-scene/ui/TrainingFigure.tsx`) *(2026-10-25 r202 정정 — GAP-2026-10-25)*
+- ~~❌ 데이터 파일: battingPattern.arr, pitchpattern_easy/hard.arr (난이도?) — 웹·도구 참조 0~~ → 웹 반영됨(`shared/config/original/battingPatterns.ts` → `entities/pitching/model/simulateBatter.ts` · `pitchPatterns.ts` → `selectPitch.ts` · `pitchTarget.ts`) *(2026-10-25 r202 정정 — GAP-2026-10-25)*

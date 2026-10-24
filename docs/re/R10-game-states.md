@@ -389,16 +389,17 @@ v 가 바뀌면 +0xbc 에 쓰고 0x1f1b8(mgr) (저장 표시).
 - **반 이닝 끝 0x18 저장**: 0x4f928 의 4f990 저장(0x22754)이 4fac2 0xc2198(자동 반 이닝)보다 앞 — 다음 반 이닝이 자동이어도 0x18 저장이 먼저 쓰인다(웹 d4d5b8a). 같은 함수 0x4fa9e 가 플레이 시간 누계 0x4e8b0 을 부른다(모드 1 · 2 · 8 · 9, B 문서 · 웹 998cb02).
 
 ## 9. 웹판 대응 (고치지 않음, 읽기만)
+> *(2026-10-25 r202 정정 — GAP-2026-10-25)* 아래 "없음" 은 2026-10 초 기록이다. 지금은 장면 상태가 모두 웹에 있다(GAP 0x104 표) — 줄마다 "→ 웹 반영됨(파일)" 을 달았다.
 | 원본 | 웹판 지금 | 다른 점 |
 |---|---|---|
-| 상태 기계 전체(7→9→8→0xc→0x18→0xd→0xe→0xf→…) | `src/features/play-game/model/gameFlow.ts:170-181` `advanceUntilPlayerTurn` — 사람 타석 사이를 반 이닝 시뮬(`simulateHalfInning`)로 한 번에 넘김 | 장면 단계가 없다. 아래 연출 모두 빠짐 |
-| 0xc 경기 시작 인트로(54틱, 효과음 61, OK 건너뛰기) + 라이벌전 띠 | 라이벌 짝은 `src/entities/career/model/gameEvaluation.ts:98-114` `RIVAL_PAIRS` 로 **사기 ×2 에만** 쓴다(같은 0xb8f68 표) | 인트로 화면·라이벌 띠 없음. 짝 표는 이미 맞다 |
-| 0x18 공수 교대 판(70틱 운동장 → 점수판·두 팀 판, 징글 13, OK 대기) · 반 이닝마다 이어하기 자동 저장 | 없음 | 교대 화면 없음. 반 이닝 자동 저장도 없음(웹 저장 방식은 별도) |
-| 0x18 경기 끝 결과 판(점수 두 개 + 승·패·세 투수 3줄, 10틱 입력 잠금) | 없음 (`grep winPitcher/savePitcher` 0건) | 승·패·세 표시 없음 |
-| 0x21 자동진행 중계(속도 3단계 +0xbc, 좌우 키, CLR 중단 질문 StrGAME[6], 배경음 33, 다이아몬드·"공격팀(PLAYER/COM)" 띠) | `gameFlow.ts` 는 결과만 계산 | 중계 화면·속도 칸·중단 없음. *(2026-10-06, 3876358 · dcfcef7)* 들어가기 rand(0, 2)·끝나는 조건은 원본대로, 기록은 막지 않는다. 경기 시작 rand(0, 2)는 팀경기·타자편·투수편에 들어갔고 미션(모드 5·6)·홈런더비(모드 7, 0x39fdc 의 rand(0, 9) 뒤)는 아직 |
-| 0x13 맞은 직후 단계(8틱 또는 공 틱 조건, OK 건너뛰기) | 타격 결과를 한 번에 판정 | 단계 없음 |
-| 0x1e 사구 뒤 20/99 벤치 클리어링(100틱, OK 건너뛰기) | 사구는 `src/widgets/batting-stage/lib/stageScenery.ts:90` 판정 글자 애니 7 로만 나온다 | 벤치 클리어링 없음 |
-| 0x23 강판 뒤 감독 대사 → 자동진행(0x21) | 없음 | — |
+| 상태 기계 전체(7→9→8→0xc→0x18→0xd→0xe→0xf→…) | `src/features/play-game/model/gameFlow.ts:170-181` `advanceUntilPlayerTurn` — 사람 타석 사이를 반 이닝 시뮬(`simulateHalfInning`)로 한 번에 넘김 | ~~장면 단계가 없다. 아래 연출 모두 빠짐~~ → 웹 반영됨(타석 장면 0xd · 0xe `useSceneConfirm` · 0xf~0x13 `widgets/batting-stage` · 0x16 `useSubstitutionScene` · 0x17 `pages/defense` — 사람 타석 사이 간이 엔진은 원본 0x21 처럼 남는다) |
+| 0xc 경기 시작 인트로(54틱, 효과음 61, OK 건너뛰기) + 라이벌전 띠 | 라이벌 짝은 `src/entities/career/model/gameEvaluation.ts:98-114` `RIVAL_PAIRS` 로 **사기 ×2 에만** 쓴다(같은 0xb8f68 표) | ~~인트로 화면·라이벌 띠 없음~~ → 웹 반영됨(`widgets/game-scene/ui/GameIntro.tsx` · `RivalryBandCanvas.tsx`). 짝 표는 이미 맞다 |
+| 0x18 공수 교대 판(70틱 운동장 → 점수판·두 팀 판, 징글 13, OK 대기) · 반 이닝마다 이어하기 자동 저장 | ~~없음~~ → 웹 반영됨(`widgets/game-scene/ui/HalfInningBoard.tsx` · `HalfInningCards.tsx`, 이어하기 저장 모드 1 `onGameSave` · 모드 2 `onHalfInningSave`) | ~~교대 화면 없음. 반 이닝 자동 저장도 없음~~ |
+| 0x18 경기 끝 결과 판(점수 두 개 + 승·패·세 투수 3줄, 10틱 입력 잠금) | ~~없음 (`grep winPitcher/savePitcher` 0건)~~ → 웹 반영됨(`widgets/game-scene/ui/GameEndBoard.tsx` · `EndBoardRows.tsx` — 승 · 패 · 세 이름 줄) | ~~승·패·세 표시 없음~~ |
+| 0x21 자동진행 중계(속도 3단계 +0xbc, 좌우 키, CLR 중단 질문 StrGAME[6], 배경음 33, 다이아몬드·"공격팀(PLAYER/COM)" 띠) | `gameFlow.ts` 는 결과만 계산 | ~~중계 화면·속도 칸·중단 없음.~~ → 웹 반영됨(`pages/team-game/ui/TeamAutoRelay.tsx` · `pages/auto-play-relay` — 속도 · CLR 중단 StrGAME[6]). *(2026-10-06, 3876358 · dcfcef7)* 들어가기 rand(0, 2)·끝나는 조건은 원본대로, 기록은 막지 않는다. 경기 시작 rand(0, 2)는 팀경기·타자편·투수편에 들어갔고 미션(모드 5·6)·홈런더비(모드 7, 0x39fdc 의 rand(0, 9) 뒤)는 아직 |
+| 0x13 맞은 직후 단계(8틱 또는 공 틱 조건, OK 건너뛰기) | ~~타격 결과를 한 번에 판정~~ → 웹 반영됨(`widgets/batting-stage/lib/bigHitScreen.ts` · 0x13 단계 `stagePhaseTicks.ts`) | ~~단계 없음~~ |
+| 0x1e 사구 뒤 20/99 벤치 클리어링(100틱, OK 건너뛰기) | 사구는 `src/widgets/batting-stage/lib/stageScenery.ts:90` 판정 글자 애니 7 로만 나온다 | ~~벤치 클리어링 없음~~ → 웹 반영됨(`widgets/game-scene/ui/BenchClearingScene.tsx`) |
+| 0x23 강판 뒤 감독 대사 → 자동진행(0x21) | ~~없음~~ → 웹 반영됨(`pages/pitching/ui/ManagerHookWindow.tsx`) | — |
 
 ## 13. 인트로 0x3b084 의 타자 손 — 모드 3 · 4 **확정** (2026-10-15, 웹 r94 ee00e851)
 

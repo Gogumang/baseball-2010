@@ -486,22 +486,23 @@
 ---
 
 ## 9. 웹판 비교 모음 (고치지 않음)
+> *(2026-10-25 r202 정정 — GAP-2026-10-25)* 아래 "없음" 은 2026-09 기록이다. 지금 웹에 들어온 줄에 "→ 웹 반영됨(파일)" 을 달았다.
 | 항목 | 웹 (파일:줄) | 원본 |
 |---|---|---|
-| 판정 글자 번호표 | `src/widgets/batting-stage/lib/stageScenery.ts:82-93` "(추정)" | 표 0xcfe90 과 같다 → 확정으로 바꿔도 됨 |
-| 애니 지연 0 | `stageScenery.ts:110` "1틱 (추정)" | 확정: 칸 길이 = max(1, 지연 + 보정) (0x93d90) |
-| 삼진 양끝 파티클 | 없음 | 0x394a6: ptc 008 을 (0,y)·(scrW,y) |
-| 전광판 | `renderScenery.ts:31` 박스 2 · `:86-98` 첫 프레임 고정 | 박스 0(종류 3 만 2), x 이동 +0x8c 틱당 −1, 되감기 −153 → 상자w+2, 환경설정 저장 +0x3a OFF 면 안 그림 |
-| game_effect | 없음 | 강속구 불꽃(>151km/h), HOMERUN 글자, 타격 불꽃 2·3 + ptc 006/007, MAX 투구 링 |
-| player_effect | 없음 | 투수 지친 눈(체력 ≤34%/≤19%), "!", 바람 줄, 수비 먼지·고리 |
-| deadly_effect | 없음 (수비 화면 없음) | 수비 포구 번쩍임 + 줌 펀치 → 큰 OUT |
+| 판정 글자 번호표 | `src/widgets/batting-stage/lib/stageScenery.ts:82-93` "(추정)" → 웹 반영됨(`stageScenery.judgeAnimationOf` — "확정" 으로 고쳐짐) | 표 0xcfe90 과 같다 → 확정으로 바꿔도 됨 |
+| 애니 지연 0 | `stageScenery.ts:110` "1틱 (추정)" → 웹 반영됨(`stageScenery.ts` `max(1, 지연)` 0x93d90) | 확정: 칸 길이 = max(1, 지연 + 보정) (0x93d90) |
+| 삼진 양끝 파티클 | ~~없음~~ → 웹 반영됨(`widgets/batting-stage/lib/judgeParticles.ts` `strikeoutJudgeParticlesOf`, r197 28549eb3) | 0x394a6: ptc 008 을 (0,y)·(scrW,y) |
+| 전광판 | ~~`renderScenery.ts:31` 박스 2 · `:86-98` 첫 프레임 고정~~ → 웹 반영됨(`renderScenery.ts` 흐르기 0x77fb4 · 환경설정 +0x3a OFF) | 박스 0(종류 3 만 2), x 이동 +0x8c 틱당 −1, 되감기 −153 → 상자w+2, 환경설정 저장 +0x3a OFF 면 안 그림 |
+| game_effect | ~~없음~~ → 웹 반영됨(강속구 불꽃 `fastballFlame.ts` · HOMERUN `homeRunEffects.ts` · 타격 불꽃 `batterOverlayMarks.ts` · `hitParticles.ts` · 투구 링 `pages/pitching/ui/PitchGradeGauge.tsx`) | 강속구 불꽃(>151km/h), HOMERUN 글자, 타격 불꽃 2·3 + ptc 006/007, MAX 투구 링 |
+| player_effect | ~~없음~~ → 웹 반영됨(지친 눈 `pitcherFatigue.ts` · "!" · 바람 줄 `renderBattingStage.ts` · 수비 `features/defense-play/model/playerEffects.ts`) | 투수 지친 눈(체력 ≤34%/≤19%), "!", 바람 줄, 수비 먼지·고리 |
+| deadly_effect | ~~없음 (수비 화면 없음)~~ → 웹 반영됨(수비 화면 `pages/defense/lib/defenseView.ts` · `features/defense-play/model/redrawDefensePlay.ts`) | 수비 포구 번쩍임 + 줌 펀치 → 큰 OUT |
 | combo.pzx | 없음 | 원본도 안 그림 → 이식 불필요 |
-| 마선수 등장 컷인 0x473f0 | 없음 | 11절 |
+| 마선수 등장 컷인 0x473f0 | ~~없음~~ → 웹 반영됨(`features/play-game/ui/AceCutInCanvas.tsx` · `SubstitutionSceneOverlay.tsx`) | 11절 |
 | 마구 1·4 공 이펙트 | **2026-09-25 이식됨** `src/widgets/batting-stage/lib/magicBallEffect.ts` (웹 7f83bb9) | 14-1절 그대로 |
-| effect_pitcher (+0x1044) | 없음 | 13절 조건 · 투수 앵커 · 애니 0 8칸. **`게임+0xfc8` 이 22 로 바뀌는 틱을 못 찾아 시작 시점 미확정** |
-| 마선수 마구 이펙트 (+0x1038) | 없음 | 14-2절 (leony 만 단계표까지 풀림) |
+| effect_pitcher (+0x1044) | ~~없음~~ → 웹 반영됨(`widgets/batting-stage/lib/acePitcherEffect.ts` — 시작 틱은 U-64 해결) | 13절 조건 · 투수 앵커 · 애니 0 8칸. **`게임+0xfc8` 이 22 로 바뀌는 틱을 못 찾아 시작 시점 미확정** |
+| 마선수 마구 이펙트 (+0x1038) | ~~없음~~ → 웹 반영됨(`acePitcherEffect.ts` · `renderBattingStage.drawAceMagicAnimation` — U-65 닫힘) | 14-2절 (leony 만 단계표까지 풀림) |
 | 필살타법·타자 마선수 이펙트 (+0x103c·+0x1034) | ~~없음~~ 웹 r61 64070328 | ~~원본도 안 그린다 (15절)~~ **0x49aec → 0x49d9e 가 그린다 (15절 정정)** |
-| 소리 | 없음 | 8절 번호표 |
+| 소리 | ~~없음~~ → 웹 반영됨(`public/sounds` 52개 · `shared/config/original/sounds.ts` · 장면별 `atBatSounds.ts` · `teamGameSounds.ts` 등) | 8절 번호표 |
 
 ## 16. 투수 그림 객체 갱신 0x9e004 를 부르는 상태 — 전수 (2026-10-16, 웹 round8-r100 4f484244 — 직접 뜸)
 - 0x9e004 = vtable 0xd73d0 +8(0x9e005 는 vtable 0xd73d8 칸에만, BL 없음). 0x9df8c(단계 세기)를 BL 하는 곳도 0x9e008 하나.
