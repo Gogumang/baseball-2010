@@ -119,21 +119,20 @@ import {
  * ## 난수 — 이 판이 굴리는 것
  * 판이 열릴 때 도루 주자마다 리드 덧틱 `rand(0,9)` 한 번(`0x3d7b8`, 주자 목록 차례). 그다음 송구가 나갈 때
  * 악송구 굴림(0xa1828) 한 번(악송구면 +4 — `errantThrowFlight`). CPU 송구가 홈을 고르면 그 앞에 특수 송구 굴림 `rand(0,100)` 한 번.
-
-## 도루 시작 0x583 끝의 0xafa60 한 번 — 칸 값은 확정, 옮기지 않았다
-0x520de(메시지 0x583) 는 0xa9bd4 로 주자를 출발시키고 `state[0x14+루]`·`[0x90+루]` = 1, 0x457cc 뒤 **52222 에서
-제어기.vt0xc = 0xafa60 을 한 번** 부른다(투구 중 — 판은 아직 안 열렸다). 그 순간 플레이 칸 (직접 뜬 것):
-- +0x128 을 쓰는 곳은 쥐기 b2716 · 자동 진루 afa26 · 결과 메시지 51d9c · 진루 키 520d2 · 귀루 키 52260(모두 1) 과
-  0xafa60 성공 afafc(0) 뿐이다. 판 시작 vt1c(0xb0edc)는 +0x110~+0x12d 의 다른 바이트만 지우고 +0x128 은 안 건드린다
-- +0x130 은 판 시작 vt1c(b0f58)가 −1 로 되돌리고 쥐기가 세운다. 투구 시작 0x3d954 는 플레이.vt64·vt68·vt6c(0)만 부른다
-- 야수 +0xe0 을 지우는 곳은 송구 b2f80 · 튕김 b3362 · 판 시작 vt20(b1140) 뿐이고, +0xc8·위치·AI 를 바꾸는 야수 틱은
-  상태 0x17 에서만 돈다
-→ 곧 **앞 판이 끝난 그대로**다: 앞 판의 마지막 쥔 야수가 공을 쥔 채(+0xe0)·+0x128 = 1(그 판의 마지막 일이 0xafa60
-  성공이 아니면)로 남아 있어, 그 야수가 준비(+0xc8 ≤ 0, AI ∉ {8,9})면 0xafb24 가 **앞 판의 야수 자리와 지금 주자**로
-  루를 고르고, 고르면 홈일 때 특수 굴림 · 0xb2c90 → 0xb2e38 송구(악송구 굴림)까지 돈다 — 그 공은 다음 판 시작
-  (vt1c · vt20 · 0xa276c)이 지운다. 효과(난수 차례 · 투구 중 공)는 있지만 앞 판의 끝 상태(쥔 야수 · 야수 자리 · +0xc8 ·
-  +0x128)를 판 사이로 넘겨받아야 옮길 수 있다 — 웹 진행기는 판마다 새로 만들고 그 상태를 넘기는 쪽(play-* 경기 흐름)이
-  없어 **안 옮겼다**(미해결: 넘길 칸을 정하는 일).
+ *
+ * ## 도루 시작 0x583 끝의 0xafa60 한 번 — 옮겼다(r201, `stealStartThrowDecision`)
+ * 0x520de(메시지 0x583) 는 0xa9bd4 로 주자를 출발시키고 `state[0x14+루]`·`[0x90+루]` = 1, 0x457cc 뒤 **52222 에서
+ * 제어기 0xaf8e0 → vt0xc = 0xafa60 을 한 번** 부른다(투구 중 — 판은 아직 안 열렸다. 수비 조작을 안 본다). 그 순간 플레이 칸 (직접 뜬 것):
+ * - +0x128 을 쓰는 곳은 쥐기 b2716 · 자동 진루 afa26 · 결과 메시지 51d9c · 진루 키 520d2 · 귀루 키 52260(모두 1) 과
+ *   0xafa60 성공 afafc(0) 뿐이다. 판 시작 vt1c(0xb0edc)는 +0x110~+0x12d 의 다른 바이트만 지우고 +0x128 은 안 건드린다
+ * - +0x130 은 판 시작 vt1c(b0f58)가 −1 로 되돌리고 쥐기가 세운다. 투구 시작 0x3d954 는 플레이.vt64·vt68·vt6c(0)만 부른다
+ * - 야수 +0xe0 을 지우는 곳은 송구 b2f80 · 튕김 b3362 · 판 시작 vt20(b1140) 뿐이고, +0xc8·위치·AI 를 바꾸는 야수 틱은
+ *   상태 0x17 에서만 돈다
+ * → 곧 **앞 판이 끝난 그대로**다. 진행기 넷(타구 · 주자 판 · 견제)은 끝날 때 플레이 · 야수를 `DefenseScene.playEnd` 로 남기고, 공 도착 판
+ *   `openPitchArrivalPlay` 가 도루 출발마다(`stealingFrom` 의 차례대로) 그 상태와 막 출발한 주자로 0xafa60 → 0xafb24 → (홈이면 특수 굴림) →
+ *   0xb2c90 → 0xb2e38(악송구 굴림)을 돌린다. 공은 다음 판 시작이 지우고, 남는 것은 난수 차례와 +0x128 = 0 이다.
+ * ⚠️ 근사: 원본 굴림 자리는 키를 받은 투구 틱이다. 웹은 공 도착 판의 맨 앞(폭투 굴림 0x35034 앞)에서 돌린다 — 사람 공격 도루는
+ *   그 사이 굴림이 없어 같고, CPU 공격 도루(상태 0x11 의 10번째 틱)는 그 뒤 11번째 틱의 CPU 타자 결정 0x34334 굴림보다 늦게 돈다.
  *
  * ## 주자의 출발 시각 — 판이 열릴 때 이미 달려 나가 있다 (확정, `entities/fielding/model/runnerLead`)
  * 도루는 투구 중(상태 0x11, CPU 는 그 10번째 틱)에 걸고 판은 공이 도착한 뒤(0x12 → 0x17) 연다.
@@ -171,6 +170,8 @@ export interface StealPlayInput {
   readonly buntKind?: number
   /** 주면 악송구(0xa1828)·특수 송구(0xafa60) 굴림이 돈다 */
   readonly random?: RandomPort
+  /** 수비 9명의 스킬 번호 (칸 순서) — 레이저 굴림 0x66a8c 의 초감각(21) (`DefensePlayInput.fielderSkillIds`) */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
   readonly defenseIsCpu?: boolean
   /** 송구 설정 +0xf4 (기본 수동) */
   readonly throwMode?: ManualAutoMode
@@ -290,6 +291,7 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
     outs: input.outs,
     ballOnGround: true,
     random: input.random,
+    fielderSkillIds: input.fielderSkillIds,
     defenseIsCpu: input.defenseIsCpu,
     throwMode: input.throwMode,
     manualThrowBase: input.manualThrowBase,
@@ -304,6 +306,82 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
     scene: input.scene,
     sceneResultCode: input.sceneResultCode,
     controls: input.controls,
+  }
+}
+
+export interface StealStartThrowInput {
+  /** 앞 판이 남긴 수비 장면 — `playEnd`(앞 판이 끝난 그대로의 플레이 · 야수)가 없으면 아무것도 안 한다 */
+  readonly scene: DefenseScene | undefined
+  /** 투구 때 루 상황 */
+  readonly bases: BaseState
+  /** 지금까지 출발한 도루 주자의 루 — 출발한 차례대로(0x583 한 번마다 하나씩 는다). 마지막 것이 이번 키다 */
+  readonly stealingFrom: readonly StealBase[]
+  /** state[6] — 지금 아웃 수 (0xafb24 가 본다) */
+  readonly outs: number
+  readonly defenseAbilities?: readonly number[]
+  readonly runAbilities?: Partial<Record<1 | 2 | 3, number>>
+  readonly runAbility?: number
+  readonly runnerTeamGrade?: number
+  readonly random?: RandomPort
+}
+
+export interface StealStartThrowResult {
+  /** `playEnd` 를 0xafa60 뒤 상태로 바꾼 장면 (던졌으면 +0x128 = 0 · 던진 야수는 공을 놓았다) */
+  readonly scene: DefenseScene | undefined
+  /** 0xafa60 이 루를 골라 0xb2c90 을 불렀나 */
+  readonly decided: boolean
+  readonly log: readonly string[]
+}
+
+/**
+ * **도루 키 0x583 끝의 CPU 송구 결정 0xafa60 한 번** (0x520de 52222 — 직접 뜸, r201).
+ * ```
+ * 521ea  0xa9bd4(주자관리, 루) — 출발 (`canStartSteal`) ; 루 ≤ 0 이거나 state[0x24](도루 중) == 0 이면 끝
+ * 52204  state[0x14 + 루] = state[0x90 + 루] = 1 ; 0x457cc
+ * 52222  0xaf8e0(제어기 [장면+0x210]) — 0xaf8b8(state[3]) 뒤 vt0xc = 0xafa60 : 수비 조작이 사람이든 CPU 든 조건 없이 부른다
+ * afa60  +0x128 && 공 가진 야수(+0x130) && vtC4(준비) && +0xe0(쥠) && AI ∉ {8, 9} && +0xc8 ≤ 0 → 0xafb24(점수식) → 루 b
+ * afad2  b == 0(홈)이면 rand(0, 100) < 20 이면 특수 ; 0xb2c90(b, 특수) 가 참이면 +0x128 = 0 · 0xb0ea0
+ * ```
+ * 투구 중(상태 0x11)이라 판은 아직 안 열렸다 — 플레이 칸 · 야수는 **앞 판이 끝난 그대로**(`DefenseScene.playEnd`)이고, 주자는 루 위에서
+ * 막 출발했다(목표 = 다음 루). 0xb2c90 이 던지면(0xb2e38 — 악송구 굴림 0xa1828 · 흔들림 a198c) 그 공은 다음 판 시작(vt1c · vt20 ·
+ * 0xa276c)이 지운다 — 남는 것은 난수 차례와 +0x128 = 0 · 던진 야수가 놓은 공(같은 투구의 다음 도루 키는 더 안 던진다)이다.
+ * 진행기는 같은 0xafa60 · 0xb2c90 · 0xb2e38 길을 그대로 쓴다(`RunnerPlayEngineInput.throwDecisionOnly`).
+ */
+export function stealStartThrowDecision(input: StealStartThrowInput): StealStartThrowResult {
+  const carried = input.scene?.playEnd
+  if (carried === undefined || !carried.play.wantsThrow) return { scene: input.scene, decided: false, log: [] }
+  const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
+  // 0xa9bd4 → vt48(0xb6228) — 출발한 주자의 목표 루는 한 루 앞. 리드(0x3d7b8)는 판이 열릴 때라 아직 루 위다
+  const runners: RunnerState[] = []
+  ;([1, 2, 3] as const).forEach((base) => {
+    const occupied = base === 1 ? input.bases.first : base === 2 ? input.bases.second : input.bases.third
+    if (!occupied) return
+    const ability = input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY
+    const runner = createRunner(runners.length + 1, base, runnerSpeedOf(ability, input.runnerTeamGrade ?? 0), {
+      isBatterRunner: false,
+    })
+    runners.push(input.stealingFrom.includes(base) ? { ...runner, targetBase: stealTargetBaseOf(base) } : runner)
+  })
+  const result = runRunnerPlay({
+    kind: carried.play.kind,
+    fielders: carried.fielders,
+    play: carried.play,
+    runners,
+    abilities,
+    outs: input.outs,
+    ballOnGround: true,
+    random: input.random,
+    // 0xafa60 은 제어기 vt0xc 를 곧바로 부른다 — 수비 CPU · 송구 설정을 안 본다
+    defenseIsCpu: true,
+    manualThrowBase: carried.play.manualThrowBase,
+    throwDecisionOnly: true,
+  })
+  const after = result.scene.playEnd
+  const decided = result.log.length > 0
+  return {
+    scene: input.scene === undefined || after === undefined ? input.scene : { ...input.scene, playEnd: after },
+    decided,
+    log: result.log.map((line) => `도루 키 0x583 · ${line}`),
   }
 }
 

@@ -372,3 +372,16 @@ export function claimCoverOfBase<P extends Pick<PlayView, 'coverOfBase' | 'ballH
     ),
   }
 }
+
+/**
+ * **AI 2~5 b4818~b482e — 커버 야수의 vt14(루 좌표)** (직접 뜸, r201). 분기표 0xd8808[2..5] = b47f2 는 +0x3b && vtcc 면 0xb2a48 을 부른 뒤
+ * 조건 없이 `vt14(야수, 0xd86b0[상태 − 2])` 로 간다. vt14 = 0xa14c8 은 잠금 +0xb4 ≤ 0 · vtc8 일 때만 목표 +0x2c 를 받는다
+ * (`acceptsTargetVt14`). 걸음 a1376 은 그 목표로만 가므로, 막힌 동안은 앞서 받은 목표(지우기 vt10 이면 제자리)로 간다.
+ */
+export function withCoverBaseTarget(fielders: readonly FielderState[], slot: number, base: number): readonly FielderState[] {
+  const self = fielders[slot]
+  if (self === undefined || !acceptsTargetVt14(self)) return fielders
+  const point = basePosition(base)
+  if (isSamePoint(self.target, point) && self.targetBase === base) return fielders
+  return fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: point, targetBase: base } : fielder))
+}

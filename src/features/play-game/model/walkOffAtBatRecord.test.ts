@@ -122,8 +122,8 @@ describe('끝내기 타석의 기록 — 정산 0xa8024 가 경기 끝(0x18) 앞
 
   it('끝내기 실책(펌블) — 원본에는 실책 갈래가 없어 산 타자는 안타다 (a81a6~a8210: 안타 사건 + 산 타자주자)', () => {
     const 판 = 끝내기판({ bases: { first: false, second: false, third: true }, outs: 0, ourScore: 3, opponentScore: 3 })
-    // 굴림 차례: 필살수비 A · B 실패 → 레이저 실패 → 펌블 성공(0) → 0xb3148 튕김
-    const { played, finished } = 타구를친다(판, 이루수땅볼, 차례난수([0.9, 0.9, 0.9, 0, 0.9]), { kind: '아웃', detail: '땅볼아웃' })
+    // 굴림 차례: 필살수비 A · B 실패 → 펌블 성공(0) → 0xb3148 튕김 (레이저 굴림은 외야수만 — 0x523e6, r201 에서 하나 빠졌다)
+    const { played, finished } = 타구를친다(판, 이루수땅볼, 차례난수([0.9, 0.9, 0, 0.9]), { kind: '아웃', detail: '땅볼아웃' })
 
     expect(played.fumbled).toBe(true)
     expect(played.outcome).toEqual({ kind: '안타', bases: 1 })
@@ -133,8 +133,8 @@ describe('끝내기 타석의 기록 — 정산 0xa8024 가 경기 끝(0x18) 앞
 
   it('끝내기 땅볼(득점 + 아웃) — 타수에 안 들고(a882e) 안타 0 · 타점 1 — "0안타" 가 정상인 끝내기', () => {
     const 판 = 끝내기판({ bases: { first: false, second: false, third: true }, outs: 0, ourScore: 3, opponentScore: 3 })
-    // 펌블 없이 1루 아웃 — 3루 주자는 들어온다
-    const { played, finished } = 타구를친다(판, 이루수땅볼, 차례난수([0.9, 0.9, 0, 0.9]), { kind: '아웃', detail: '땅볼아웃' })
+    // 펌블 없이 1루 아웃 — 3루 주자는 들어온다 (필살수비 A · B · 펌블 실패 — 레이저 굴림은 외야수만, 0x523e6 · r201)
+    const { played, finished } = 타구를친다(판, 이루수땅볼, 차례난수([0.9, 0.9, 0.9]), { kind: '아웃', detail: '땅볼아웃' })
 
     expect(played.advance.runsScored).toBe(1)
     expect(played.advance.outsAdded).toBe(1)

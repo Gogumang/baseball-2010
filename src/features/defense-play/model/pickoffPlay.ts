@@ -36,7 +36,7 @@ import {
 } from '@/entities/fielding/model/fieldingState'
 import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 import { backupPointOf, CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
-import { baseAtPoint, claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
+import { baseAtPoint, claimCoverOfBase, withCoverBaseTarget } from '@/entities/fielding/model/coverAssignment'
 import {
   acceptsTargetVt14,
   canStepNextListTick,
@@ -61,7 +61,7 @@ import {
   slidingRunnerOf,
   type RunnerPlayTickSound,
 } from '@/features/defense-play/model/runnerPlayEngine'
-import { planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
+import { LASER_THROW_SPEED, planThrow, readyTicksOf, thrownWith, throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
@@ -76,7 +76,8 @@ import {
   THROW_ERROR_MARK_TICKS,
   tickMarkCounter,
 } from '@/features/defense-play/model/playerEffects'
-import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/features/defense-play/model/defenseScene'
+import { drawDefenseScene, enterDefenseScene, fireLaser, playEndStateOf, type DefenseScene } from '@/features/defense-play/model/defenseScene'
+import { canFireLaserNow, laserWindowTick, NO_LASER_FLAGS, type LaserFlags } from '@/features/defense-play/model/laserTick'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import {
   cpuSpecialThrowOf,
@@ -138,8 +139,10 @@ import {
  *   (예전 웹은 "보내고" 를 목표점 걷기로 읽었다 — 0xbef58 은 기반 캐릭터의 위치 · 기준점 · 목표를 함께 놓는 함수다)
  *   그 뒤 첫 틱부터 vt4c 끝(b4c72)의 0xb1c90 이 매 틱 커버를 다시 골라 b2564 가 AI 루 + 2 를 주고, 2루 커버가 아닌 유격수는
  *   0xb203a 로 기본 자리 0xd8764 에 간다(`coverTick.runCoverTick`, r162). 견제 시작은 vt30 을 부르지 않는다(b2942 → b29ec)
- * - ⚠️ **레이저 굴림(0x66a8c)을 안 굴린다**: 창 0xb2648 이 보는 포구 틱(P+0x174)을 견제 시작이
- *   세우지 않아 그 값이 무엇인지 문서에 없다. 굴림 차례를 지어 넣지 않는다 — **미해결**.
+ * - **레이저 송구** (r201, `laserTick`): 슬롯 2 머리의 굴림 0x523bc 는 공 가진 야수(+0x130)가 외야수일 때만(523e6 0xb8da8) 돈다.
+ *   견제 시작은 투수가 공 가진 야수라(b28be) 앞 판이 남긴 +0x174 로 창 0xb2648 이 열려도 굴림이 없고, 견제를 받는 커버도 내야수다 —
+ *   악송구 · 튕긴 공을 외야수가 쫓을 때만 송구 b307c 의 고르기가 적은 +0x174 로 창이 열린다(예전 "미해결" 은 이것으로 풀렸다).
+ *   발사 0x400bc · 경기 멈춤 +0x1993 · 레이저 송구 b2f06 은 타구 진행기와 같다.
  * - 메시지 처리기 0x509a0 앞머리는 CPU 송구 결정이 아니라 경기 로직의 빈 함수 0xae5f8 을 부른다(S8 4-3 정정,
  *   `runDefensePlay` 의 `throwMode` 주석). 0xafa60 을 부르는 곳은 둘이다 — 견제 아웃(결과 13) 뒤 결과 메시지 0xbba 의
  *   한 번(사람·CPU 모두)과 슬롯 2 의 매 틱(`0xae6c8` = 수비 CPU || 송구 설정 자동, `defenseIsCpu` · `throwMode`).
@@ -190,6 +193,8 @@ export interface PickoffPlayInput {
   readonly runAbilities?: Partial<Record<1 | 2 | 3, number>>
   /** 주면 악송구 굴림(0xa1828)이 돈다 */
   readonly random?: RandomPort
+  /** 수비 9명의 스킬 번호 (칸 순서) — 레이저 굴림 0x66a8c 의 초감각(21) +3%p (`DefensePlayInput.fielderSkillIds`). 안 주면 없음 */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
   /** `0xae690` 앞 항 — 공격이 CPU 인가 (자동 진루 제어기 0xaf918 을 켜는 조건) */
   readonly offenseIsCpu?: boolean
   /** 주루 설정 +0xbd. 안 주면 자동 */
@@ -388,6 +393,18 @@ function* pickoffPlaySteps(
   let manualThrowBase: number = NONE
   /** state[0x8b] — 결과 판 큰 OUT 이 +0x1999 를 보고 세운다 */
   let laserOutFlag = false
+  /** 경기+0x19ad · +0x19ae · +0x19af — 레이저 반짝임 · 확정 · 굴림 마침 (`laserTick`, r201) */
+  let laserFlags: LaserFlags = NO_LASER_FLAGS
+  /** 플레이+0x1f4 — 레이저 발사 0x400bc 가 세우고 다음 송구 b2f06 이 레이저(vtb0 0xa222c)로 던진 뒤 내린다 */
+  let laserArmed = false
+  /** 레이저로 던졌다 (판 결과 `laserThrow`) */
+  let laserThrow = false
+  /** **그림 전용** 장면 +0x1991 — 레이저 잔상 */
+  let laserTrailOn = false
+  /** 장면 +0x1993 — 경기 멈춤. 0x400bc 가 세우고 연출 0x4403c 단계 1 이 내린다 */
+  let gamePaused = false
+  /** 앞 틱 끝 G2 앞의 +0x120 — 이 틱 머리에서 멈추면 G2 를 안 부른 것으로 되돌린다 */
+  let counterBeforeHead = 0
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
@@ -504,7 +521,9 @@ function* pickoffPlaySteps(
     }
     // ── 0xb2e38 ──
     if (!holder.holdingBall || !isReadyToThrow(holder)) return false
-    const plan = planThrow({ fielders, fromSlot: holderSlot, finalSlot: coverSlot, base, special: cpuSpecial })
+    // b2f06 — 레이저 발사 0x400bc 가 세운 플레이+0x1f4 를 본다. 레이저는 특수라 계획 0xb3444 가 중계를 안 끼운다(b3528)
+    let laser = laserArmed
+    const plan = planThrow({ fielders, fromSlot: holderSlot, finalSlot: coverSlot, base, special: laser || cpuSpecial })
     const receiver = fielders[plan.toSlot]
     if (
       receiver !== undefined &&
@@ -525,16 +544,31 @@ function* pickoffPlaySteps(
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)`)
       return true
     }
-    const special = cpuSpecial ? cpuSpecialThrowOf(fielders, holderSlot, coverSlot) : null
+    // b2ee6: 내야수 → 내야수 송구면 레이저 표시를 지운다 (vt64(0))
+    if (plan.toSlot <= 5 && holderSlot <= 5) {
+      laser = false
+      laserArmed = false
+    }
+    if (laser) laserThrow = true
+    const special = !laser && cpuSpecial ? cpuSpecialThrowOf(fielders, holderSlot, coverSlot) : null
     const isSpecial = special !== null && special.special
-    // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4
-    fielders = fielders.map((fielder) => (fielder.slot === holderSlot ? thrownWith(fielder, isSpecial) : fielder))
-    // 0xa1620 · 세계 · 받는 점 끼워 넣기 — 공은 계획 [3](중계면 중계맨)의 목표점으로 (b2f52)
+    // a16dc~a16ec: +0xdc = 특수 ? +0xd8 : +0xd4. 레이저(0xa222c a229c)는 +0xdc = 2000 고정
+    fielders = fielders.map((fielder) =>
+      fielder.slot === holderSlot
+        ? laser
+          ? { ...fielder, throwSpeed: LASER_THROW_SPEED }
+          : thrownWith(fielder, isSpecial)
+        : fielder,
+    )
+    // b2f06 — 레이저로 던진 뒤 vt64(0)
+    if (laser) laserArmed = false
+    // 0xa1620 · 세계 · 받는 점 끼워 넣기 — 공은 계획 [3](중계면 중계맨)의 목표점으로 (b2f52). 레이저 0xa222c 는 난수 굴림이 없다
     const thrown = launchThrow({
       thrower: fielders[holderSlot],
       target: fielders[plan.toSlot]?.target ?? basePosition(base),
       special: isSpecial,
       bounce: isSpecial && special.bounce,
+      laser,
       ability: fielderAbilityOf(abilities, holderSlot, DEFAULT_ABILITY),
       random: input.random,
       body: ballBody,
@@ -566,7 +600,7 @@ function* pickoffPlaySteps(
     log.push(
       (chooser === PICKOFF_THROW
         ? `${tick}틱 ${base}루 견제 송구 — ${chase?.catchTick ?? tick}틱 도착`
-        : `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${chase?.catchTick ?? tick}틱 도착`) +
+        : `${tick}틱 ${holderSlot}번 야수가 ${base}루로 ${laser ? '레이저 ' : ''}송구 — ${chase?.catchTick ?? tick}틱 도착`) +
         (cpuSpecial ? ' (특수)' : '') +
         (thrown.bounce ? ' (원바운드)' : '') +
         (thrown.errant ? ' (악송구)' : thrown.wobbled ? ' (흔들린 긴 송구)' : '') +
@@ -577,7 +611,7 @@ function* pickoffPlaySteps(
   }
 
   /**
-   * 새로 깐 공을 쫓게 한다 — 고르기 0xb3b38: AI 1 · 0xc 인 야수는 AI 0 으로, 고른 야수(+0x130)는 AI 1 · 목표 = 포구 지점(x, 0, z).
+   * 새로 깐 공을 쫓게 한다 — 고르기 0xb3b38: AI 1 · 0xc 인 야수는 AI 0 으로, 고른 야수(+0x130)는 AI 1(목표는 AI 고리 b4aca 몫).
    * 공은 아무도 안 쥔다(b2f80 · b3070 · 0xb3148).
    */
   const takeLooseBall = (next: LooseBallChase): void => {
@@ -586,7 +620,9 @@ function* pickoffPlaySteps(
     ballPath = { trajectory: next.trajectory, startTick: next.startTick }
     fielders = fielders.map((fielder) =>
       fielder.slot === next.slot
-        ? { ...fielder, target: next.catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
+        ? // b3e54 — AI 1 만 걸고 목표(+0x2c)는 안 적는다. 포구점은 AI 고리 b4aca 가 움직임 허용 +0x13c 를 보고 적는다(r201 —
+          // 예전 웹은 여기서 바로 적어, 슬롯 2 뒤쪽 CPU 송구(526ae)를 받는 야수가 한 틱 일찍 걸었다)
+          { ...fielder, aiState: AI_STATE.CHASE, holdingBall: false }
         : fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.BACKUP
           ? { ...fielder, aiState: AI_STATE.IDLE, holdingBall: false }
           : fielder.holdingBall
@@ -633,12 +669,19 @@ function* pickoffPlaySteps(
     sound.thisTick = []
     outJudgedThisTick = false
     tickMessageCode = 0
+    /** 이 틱이 멈춘 그림인가 — 머리에서 이미 +0x1993 이 서 있다(목록 틱 · 슬롯 2 가 통째로 없다, 타구 진행기와 같다) */
+    const pausedAtHead = gamePaused
+    /** 이 틱 머리(슬롯 2 머리)에서 0x400bc 가 경기를 멈췄는가 */
+    let pausedThisTick = false
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
-    // a12da · a12e6 — 동작 잠금(+0xb4)이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 만 본다)
-    fumbleMarks = fumbleMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
-    throwErrorMarks = throwErrorMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
-    // a1286 프레임 +1 · 잠금 · 준비 틱 · 자세 워드 지우기 a137a~a1456(vt10 — 목표 = 위치) (`fielderPose.listTickFielder`, r176)
-    fielders = fielders.map(listTickFielder)
+    // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱이 없다
+    if (!pausedAtHead) {
+      // a12da · a12e6 — 동작 잠금(+0xb4)이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 만 본다)
+      fumbleMarks = fumbleMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
+      throwErrorMarks = throwErrorMarks.map((value, slot) => tickMarkCounter(value, (fielders[slot]?.actionLockTicks ?? 0) > 0))
+      // a1286 프레임 +1 · 잠금 · 준비 틱 · 자세 워드 지우기 a137a~a1456(vt10 — 목표 = 위치) (`fielderPose.listTickFielder`, r176)
+      fielders = fielders.map(listTickFielder)
+    }
     ballEventThisTick = false
     // ── 2b. 사람 조작 — 수비면 0x533c8 → 메시지 0x588 → 0x51890 → 플레이 vt60 0xb3118 → +0x160 (판 종류를 안 가린다) ──
     // 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 둘 다 0x53420 에 보낸다(`framePressesOf`)
@@ -698,6 +741,52 @@ function* pickoffPlaySteps(
         }
       }
     }
+    // ── 4d. 레이저 송구 — 슬롯 2 머리 524c4(+0x1992 == −1)의 0x523bc 굴림 · 0x4e858 반짝임 · 0x400bc 발사 (`laserTick`, r201) ──
+    // 굴림은 공 가진 야수(+0x130)가 외야수일 때만(523e6) — 판 시작은 투수가 쥐고(b28be) 견제를 받는 커버도 내야수라, 악송구 · 튕긴 공을
+    // 외야수가 쫓을 때만 선다. 창(0xb2648)은 송구 b307c 의 고르기 0xb3b38 이 적은 포구 틱(+0x174) 기준 −10 ~ +8 틱이다(앞 판이 남긴
+    // +0x174 를 견제 시작이 안 고쳐도 그동안은 투수가 공 가진 야수라 굴림이 없다)
+    {
+      const holder = fielders[play.ballHolderSlot]
+      laserFlags = laserWindowTick({
+        flags: laserFlags,
+        random: input.random,
+        effectStep: scene.effectStep,
+        ticksSinceCatch: tick - (chase?.catchTick ?? play.catchTick),
+        hasChosenThrowTarget: manualThrowBase !== NONE,
+        isBallHeld: play.held,
+        holder,
+        holderAbility: recordPlayerAbilityOf(abilities, play.ballHolderSlot, DEFAULT_ABILITY),
+        holderSkillIds: input.fielderSkillIds?.[play.ballHolderSlot] ?? [],
+        defenseIsCpu: input.defenseIsCpu === true,
+        press,
+      }).flags
+      if (
+        canFireLaserNow({
+          effectStep: scene.effectStep,
+          pausedAtHead,
+          confirmed: laserFlags.confirmed,
+          hasChosenThrowTarget: manualThrowBase !== NONE,
+          isBallHeld: play.held,
+          holder,
+        })
+      ) {
+        scene = fireLaser(scene)
+        gamePaused = true
+        laserArmed = true
+        laserTrailOn = true
+        pausedThisTick = true
+        // 앞 틱 끝에서 센 G2(52502)는 524e6 뒤라 원본은 부르지 않았다
+        endCounter = counterBeforeHead
+        log.push(`${tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
+      }
+    }
+
+    // 멈춘 그림은 슬롯 2(포구 · 판정 · 득점 · AI · 자동 진루 · CPU 송구)가 없다 — 그림은 그대로 남긴다
+    slot2: {
+    if (gamePaused) break slot2
+    // 5254c — +0x1991(레이저 잔상) && 포구 관문(아무도 안 쥠) && 동작 시작 틱 − 1 == 공 틱이면 +0x1991 = 0
+    if (laserTrailOn && !play.held && tick === play.actionStartTick - 1) laserTrailOn = false
+
     // ── 5. 포구 틱 갈래 0xb401c — 받는(줍는) 야수가 포구 틱(+0x174)에 ──
     // ```
     // b4224  r4 = 펌블표[등급] > rand(0, 10000)       ; 늘 먹는다
@@ -781,10 +870,19 @@ function* pickoffPlaySteps(
     // ── 아웃 판정 0xb36d0 — 플레이 틱 b43cc~b43ea (포구 갈래 뒤 · 같은 그림의 슬롯 2 — 이동 앞, 타구 진행기 6b 절) ──
     // 쥐기 판정(0xb2758)이 이 틱에 아웃을 냈으면 같은 플레이 틱의 두 번째 판정(b42f2 · b43de)이 머리 b36dc 에서 state[0x87] 을
     // 지우고 태그(3)일 때만 다시 세운다 — 결과 코드 13 은 b4540 에서 그 값을 읽는다(타구 진행기 6b 절)
+    // b42ce~b4314 (타구 진행기 2b · 6b 절, r201): 아웃 아닌 주자 중 +0x3b(막 닿음)가 있거나(0xa99d8) 공 가진 야수 F+0x3b 면 b42ee 갈래 —
+    // 판정 b42f2 한 번 뒤 결과 2(루 아웃)이고 F+0x3b 면 state[0x87] = 1(b4312) — 포스 아웃도 콜 62 다. 아니면 b43cc~b43ea 판정 한 번
+    const arrivalBranch =
+      runners.some((runner) => !runner.state.isOut && runner.arrivedThisListTick) ||
+      fielderArrivals[play.ballHolderSlot] === true
     const grabbedOut = outJudgedThisTick
+    const outsBeforeSecondJudgement = outsAdded
     lastJudgedKind = OUT_KIND.NONE
     runOutJudgement(tick)
-    if (grabbedOut) tagOut = lastJudgedKind === OUT_KIND.TAG
+    const baseOutFold =
+      arrivalBranch && fielderArrivals[play.ballHolderSlot] === true && lastJudgedKind === OUT_KIND.BASE
+    if (grabbedOut) tagOut = lastJudgedKind === OUT_KIND.TAG || baseOutFold
+    else if (baseOutFold && outsAdded > outsBeforeSecondJudgement) tagOut = true
 
     // ── 결과 메시지 0xbba(b4562) → 51a56 결과 판 칸 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다. 0x51d40 송구보다 먼저 ──
     if (outJudgedThisTick) tickMessageCode = 13
@@ -893,13 +991,15 @@ function* pickoffPlaySteps(
           }
         }
         if (self.aiState >= AI_STATE.COVER_HOME && self.aiState <= AI_STATE.COVER_THIRD) {
+          const base = self.aiState - AI_STATE.COVER_HOME
           if (fielderArrivals[slot] === true && isFreeToRetarget(self)) {
-            const base = self.aiState - AI_STATE.COVER_HOME
             const claimed = claimCoverOfBase(play, fielders, slot, base)
             if (claimed.play !== play) log.push(`${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
             play = claimed.play
             fielders = claimed.fielders
           }
+          // b4818~b482e — 조건 없이 vt14(0xd86b0[루]) — 관문(잠금 +0xb4 · vtc8)이 막으면 목표는 그대로(r201)
+          fielders = withCoverBaseTarget(fielders, slot, base)
           continue
         }
         if (deferredThrowReceiver === NONE) continue
@@ -955,6 +1055,7 @@ function* pickoffPlaySteps(
     // ── CPU 송구 결정 0xafa60 (슬롯 2 의 526ae, 매 틱 — `0xae6c8` = 수비 CPU || 송구 자동) ──
     // 견제를 받은 야수도 쥐기 0xb2710 이 +0x128 = 1 을 세우므로, 준비 틱(내야 3)이 지난 틱에 점수식이 루를 고른다
     if (!play.finished && cpuThrowEnabled) cpuThrowDecision(tick)
+    }
 
     // ── 화면 스냅샷 ──
     /** 판 틱 `at` 의 그림 — 판이 G2 에서만 닫힌 그림(`closingListFrame`)은 다음 틱 자리로 한 번 더 찍는다 */
@@ -976,12 +1077,18 @@ function* pickoffPlaySteps(
         throwingSlot: at < 3 ? PITCHER_SLOT : NONE,
         throwBase: flight?.base ?? targetBase,
         previousActions,
-        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac · +0x130 · 공격 주체. 이 판은 레이저(+0x19ad)를 안 옮겼다
+        // 머리에서 경기 멈춤(+0x1993)이 서 있던 그림 — 0x3f060 이 3f0a4 에서 돌아가 카메라가 안 움직인다
+        cameraFrozen: pausedAtHead,
+        // 레이저 반짝임(경기+0x19ad) — 공 쥔 야수(+0x130) · 반짝임 켜짐 (타구 진행기와 같은 근사)
+        laserShiningSlot: laserFlags.shining && play.held ? play.ballHolderSlot : NONE,
+        // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
+        laserTrailFrom: laserTrailOn && ballPath !== null ? ballPath.trajectory.pointAt(ballPath.startTick) : null,
+        // 공 가진 야수 고리 0x43cb0 — 경기+0x19ac · +0x130 · 공격 주체 · +0x19ad
         holderMark: holderMarkOf({
           grabbed,
           holderSlot: play.ballHolderSlot,
           offenseIsCpu: input.offenseIsCpu === true,
-          isShining: false,
+          isShining: laserFlags.shining,
         }),
         holderPlate: input.fielderPlates?.[play.ballHolderSlot] ?? null,
         fumbleTicks: fumbleMarks,
@@ -1021,7 +1128,12 @@ function* pickoffPlaySteps(
       })
       scene = drawn.scene
       if (drawn.recordsLaserOut) laserOutFlag = true
-      // ⚠️ 이 판은 레이저 발사 · 경기 멈춤(+0x1993)을 안 옮겼다 — 앞 판에서 이어진 연출이 내리는 칸(unpaused · flashEnded)은 볼 것이 없다
+      // 4412e — 레이저 단계 0: +0x19ad · +0x19ae = 0
+      if (drawn.laserStepZero) laserFlags = { ...laserFlags, shining: false, confirmed: false }
+      // 레이저 단계 1 — +0x1993 = 0
+      if (drawn.unpaused) gamePaused = false
+      // 44330 · 44564 — B · C 끝: 플레이+0x1f4 = 0
+      if (drawn.flashEnded) laserArmed = false
       if (view !== undefined && (drawn.zoom !== null || drawn.bigOut !== null || drawn.judgeText !== null || drawn.flash !== null)) {
         ticks[ticks.length - 1] = {
           ...view,
@@ -1036,6 +1148,9 @@ function* pickoffPlaySteps(
     // 관문 G3 · G4 · G1 은 다음 그림의 목록 틱(아래 이동) 앞 주자를 본다 (`playGate.gateRunnerViewsOf`)
     const runnersBeforeListTick = runnerStates()
 
+    // 이동은 다음 그림의 목록 틱(0x3f060)이다 — 이 틱에 멈췄으면 다음 그림도 멈춰 있어 없다(타구 진행기 nextFrame 과 같다)
+    nextFrame: {
+    if (pausedThisTick) break nextFrame
     // ── 한 틱 움직이기 — 커버는 제 루로, 쫓는 야수는 포구 지점(x, 0, z)으로(AI 1), 나머지는 제자리 ──
     const beforeMove = fielders
     fielders = fielders.map((fielder) => {
@@ -1065,6 +1180,7 @@ function* pickoffPlaySteps(
       runner.state = { ...runner.state, settled: true, startBase: touched }
       runner.arrivedThisListTick = true
     }
+    }
 
     // ── 판 진행 관문 0xb0d28 (`playGate.passPlayGateBetweenTicks`) — 이 틱 그리기 G3 · 0x3f378 G4 · 다음 틱 0x3f060 G1 · 슬롯 2 머리 G2 ──
     // 3아웃 · 처리 안 끝난 주자(0xaa05c, +0x94 까지) · 공을 쥔 채 관문 51 번(+0x120 — 그림마다 3 번, 17 틱). state[0xb] 는 이 판의 결과 코드(9 · 13)다.
@@ -1084,7 +1200,8 @@ function* pickoffPlaySteps(
         endCounter,
       },
       false,
-      false,
+      // 경기 멈춤(+0x1993) — 그리기 G3 뒤 0x3f378 · 0x3f060 · 슬롯 2 머리가 모두 건너뛴다
+      gamePaused,
       // G2(슬롯 2 머리 52502) — 목록 틱(이동) 뒤 · 득점 0xaa0a8 앞
       {
         someRunnerActive: someRunnerStillActive(gateRunners.head, isAtTarget),
@@ -1092,6 +1209,7 @@ function* pickoffPlaySteps(
       },
     )
     endCounter = gate.endCounter
+    counterBeforeHead = gate.counterBeforeHead
     if (!gate.open) play = { ...play, finished: true }
     // 닫힌 그림 다음의 G1 — 열렸으면 목록 틱 a1330 이 +0xcc 를 하나 더 줄인다(`fielderSlackAtPlayEnd`, r196)
     if (!gate.open) closingListTickOpen = gate.listTickOpen === true
@@ -1123,11 +1241,18 @@ function* pickoffPlaySteps(
     fumbled,
     errantThrow,
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
-    laserThrow: false,
+    laserThrow,
     laserOutFlag,
     // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`, r171)
     // 야수 +0xcc 도 다음 판으로 남는다 — vt20(0) 판이 들고 연다(`DefenseScene.fielderSlack`, r196)
-    scene: { ...scene, playCovers: play.coverOfBase, fielderSlack: fielderSlackAtPlayEnd(fielders, closingListTickOpen) },
+    // 판이 끝난 그대로의 플레이 · 야수 — 다음 도루 키 0x583 의 0xafa60 이 본다(`DefenseScene.playEnd`, r201).
+    // 플레이 +0x160 은 이 진행기의 `manualThrowBase` 다(`play.manualThrowBase` 는 다리라 비워 둔다)
+    scene: {
+      ...scene,
+      playCovers: play.coverOfBase,
+      fielderSlack: fielderSlackAtPlayEnd(fielders, closingListTickOpen),
+      playEnd: playEndStateOf({ ...play, manualThrowBase }, fielders, closingListTickOpen),
+    },
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)
