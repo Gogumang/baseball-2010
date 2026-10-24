@@ -222,7 +222,13 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
       ],
     },
     { folder: './sprites/defense', frames: [0], json: ['palette.json'] },
-    { folder: './sprites/game_judge/frames', frames: [6, 7, 18, 19, 20, 21, 22, 23, 24, 35, 36, 37, 38], json: ['animations.json', 'origins.json'] },
+    // 8 · 10 · 11 = 애니 5 — 수비 결과 판 판정 코드 9 → 표 0xcfe90 의 애니 5 (DOM 판정 글자 0x393b4, `laserPresentation`).
+    // 측정 판에서는 안 나왔지만 판정 때 처음 받으면 늦게 뜬다. 끝 칸 39 는 빈 프레임(원점 없음)이라 안 받는다
+    {
+      folder: './sprites/game_judge/frames',
+      frames: [6, 7, 8, 10, 11, 18, 19, 20, 21, 22, 23, 24, 35, 36, 37, 38],
+      json: ['animations.json', 'origins.json'],
+    },
     { folder: './sprites/game_ui', frames: [6, 21, 22, 75, 79, 81, 97] },
     {
       folder: './sprites/game_ui/frames',

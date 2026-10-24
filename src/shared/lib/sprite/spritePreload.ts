@@ -13,6 +13,7 @@
  *    유휴 줄에 서 있던 것을 장면이 부르면 장면 줄로 올린다.
  */
 import { frameLayersUrl, frameLayerUrlsOf, hasFrameLayers } from '@/shared/lib/sprite/frameLayers'
+import { frameCopiesUrl, frameCopyUrlsOf, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
 import { spriteMaskSrc } from '@/shared/lib/sprite/spriteMask'
 
 /** 폴더 하나에서 받을 것 */
@@ -250,10 +251,15 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
     const layerUrls = hasFrameLayers(request.folder) && frames.length > 0
       ? frameLayerUrlsOf(request.folder, await deps.loadJson(frameLayersUrl(request.folder)).catch(() => null), frames)
       : []
+    // 반투명 파트를 뒤집어(0x11) 그리는 폴더면 복사판도 받는다 — 뒤집을지는 그릴 때 정해지므로 목록에 든 칸을 다 받는다(`frameCopies`)
+    const copyUrls = hasFrameCopies(request.folder) && frames.length > 0
+      ? frameCopyUrlsOf(request.folder, await deps.loadJson(frameCopiesUrl(request.folder)).catch(() => null), frames)
+      : []
     const imageDone = [
       ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority, generation)),
       ...frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority, generation)),
       ...layerUrls.map((url) => enqueue(url, priority, generation)),
+      ...copyUrls.map((url) => enqueue(url, priority, generation)),
       ...(request.masks ?? []).map((frame) => enqueue(spriteMaskSrc(frameUrl(request.folder, frame)), priority, generation)),
     ]
     pump()

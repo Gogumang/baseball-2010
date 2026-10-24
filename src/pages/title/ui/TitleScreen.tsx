@@ -1,22 +1,20 @@
+import { useEffect, useRef } from 'react'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { useTitleIntro } from '@/pages/title/model/useTitleIntro'
+import { INTRO_ANIMATION, PROMPT_ANIMATION, TITLE_FRAMES } from '@/pages/title/model/titleIntro'
+import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
+import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { drawFrameLayers, frameLayersUrl, placedFrameLayersOf, type FrameLayerListing } from '@/shared/lib/sprite/frameLayers'
+import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
+import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as styles from '@/pages/title/ui/TitleScreen.css'
 
 const SPRITE = './sprites/main_title'
 /** 판 번호는 main_title 이 아니라 ui/num.pzx 의 131 번 그림이다 (0x2cd2a: 기준 0x81 = 129 + 값 2) */
 const NUM_SPRITE = './sprites/num'
 
-/** 원본 좌표. titleIntro.ts 주석에 프레임 번호별 근거가 있다. */
-const PLAYER_X = 126
-const LOGO_Y = 144
-const DUST = { x: 131, y: 226 }
-/**
- * 이 빌드의 문구는 **PRESS ANY KEY**(이미지 1, 82×10)다 — TOUCH SCREEN(이미지 8)은 안 쓴다.
- * 좌표는 원본이 프레임 16·17 안에 넣어 두었고 그 프레임을 파서가 못 읽어 예전 값(88,254)을 그대로 둔다 (근사).
- */
-const PROMPT = { x: 88, y: 254 }
-/** 흐린 프레임 16 은 같은 글자의 어두운 판이라 따로 뽑힌 그림이 없다 — 반투명으로 흉내 낸다 (근사) */
-const DIM_PROMPT_OPACITY = 0.45
+const SCREEN_WIDTH = 240
+const SCREEN_HEIGHT = 320
 /** 저작권 프레임 18(129×10) — x = W/2 − w/2 + 3 = 59, y = H − h − 2 = 308 (0x2cc78 확정) */
 const COPYRIGHT = { x: 59, y: 308 }
 /** 판 번호 num 131 "2" — x = W/2 − w/2 + w + 4 = 189, y = 308 (0x2cd2a 확정) */
@@ -24,62 +22,79 @@ const VERSION = { x: 189, y: 308 }
 /** 전체이용가 이미지 7(40×46) — x = W − w − 2 = 198, y = 2 (0x2ccbc 확정) */
 const RATING = { x: 198, y: 2 }
 
+const TITLE_ANIMATION_FRAMES = [...new Set([...INTRO_ANIMATION, ...PROMPT_ANIMATION].map((entry) => entry.frame))]
+
 interface TitleScreenProps {
   readonly onStart: () => void
 }
 
+/** main_title 프레임 한 장을 앵커 (0, 0) 에 — 0x67 겹이 있으면 화면에 더하고(`drawFrameLayers`), 아직이면 구운 프레임 */
+function drawTitleFrame(context: CanvasRenderingContext2D, frame: number): void {
+  const layers = placedFrameLayersOf(TITLE_FRAMES, frame, spriteJsonNow<FrameLayerListing>(frameLayersUrl(TITLE_FRAMES)), spriteImage)
+  if (layers !== null) {
+    drawFrameLayers(context, layers, 0, 0)
+    return
+  }
+  const key = String(frame).padStart(3, '0')
+  const origin = spriteJsonNow<FrameOrigins>(`${TITLE_FRAMES}/origins.json`)?.[key]
+  const image = spriteImage(`${TITLE_FRAMES}/${key}.png`)
+  if (origin !== undefined && image !== null) context.drawImage(image, origin.x, origin.y)
+}
+
 /**
- * 원작 타이틀. 인트로가 끝나면 PRESS ANY KEY 가 깜빡이고, 누르면 메인 메뉴로 간다.
- *
- * 저작권·판 번호·**전체이용가**는 그리기 0x2cbac 가 애니 0 이 끝난 **뒤에만** 지나가는 자리라
- * 셋 다 `isSettled` 에 걸어 둔다 (F-4·4-1 확정). 예전에는 전체이용가를 인트로 중에만
- * (0,5) 에 붙여, 원본과 정반대로 왼쪽 끝에 나왔다가 인트로가 끝나면 사라졌다.
+ * 원작 타이틀 (그리기 0x2cbac — 차례 · 근거는 `model/titleIntro`). 화면을 검정으로 지우고 애니 0 의 프레임,
+ * 끝 깃발이 선 뒤에는 애니 1(PRESS ANY KEY)을 한 캔버스에 그린다 — 흙먼지의 0x67 더하기가 아래 화면을 읽기 때문이다.
+ * 저작권 · 판 번호 · 전체이용가는 효과 없는 그림이라 그 위 DOM 으로 둔다(원본도 애니 1 다음에 그린다).
  */
 export function TitleScreen({ onStart }: TitleScreenProps) {
-  const { pose, press } = useTitleIntro(onStart)
+  const { scene, press } = useTitleIntro(onStart)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // 애니 0 · 1 의 프레임과 0x67 겹을 먼저 받는다 — 칸이 바뀔 때마다 처음 받으면 그 칸이 비어 보인다
+  useEffect(() => {
+    preloadSprites([{ folder: TITLE_FRAMES, frames: TITLE_ANIMATION_FRAMES, json: ['origins.json'] }])
+  }, [])
+
+  // 그림이 늦게 와도 다음 그리기(매 rAF 다시 그린다)부터 보인다
+  useEffect(() => {
+    let context: CanvasRenderingContext2D | null = null
+    try {
+      context = effectContextOf(canvasRef.current)
+    } catch {
+      context = null
+    }
+    if (context === null) return
+    // 2cbbc 0x6a735(화면, 0) — 검정
+    context.fillStyle = '#000'
+    context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+    drawTitleFrame(context, scene.introFrame)
+    if (scene.promptFrame !== null) drawTitleFrame(context, scene.promptFrame)
+  })
 
   return (
     <RawScreen onPress={press}>
-      <Layer kind="under" sprite="003" x={PLAYER_X} y={pose.playerY} />
-      {pose.logoX !== null && <Layer kind="under" sprite="002" x={pose.logoX} y={LOGO_Y} label="2010 프로야구" />}
-      {pose.isBackgroundVisible && <Layer kind="background" sprite="000" x={0} y={0} />}
-      {pose.isDustVisible && <Layer kind="over" sprite="004" x={DUST.x} y={DUST.y} />}
-      <Layer kind="over" sprite="005" x={pose.ball.x} y={pose.ball.y} />
-      {pose.promptPhase !== 'hidden' && (
-        <Layer kind="over" sprite="001" x={PROMPT.x} y={PROMPT.y} label="PRESS ANY KEY"
-          opacity={pose.promptPhase === 'dim' ? DIM_PROMPT_OPACITY : 1} />
-      )}
-      {pose.isSettled && (
+      <canvas ref={canvasRef} className={styles.canvas} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
+        data-intro-frame={scene.introFrame} data-prompt-frame={scene.promptFrame ?? undefined}
+        aria-label="2010 프로야구" />
+      {scene.isSettled && (
         <>
-          <Layer kind="over" sprite="006" x={COPYRIGHT.x} y={COPYRIGHT.y} label="© 2009 GAMEVIL" />
-          <Layer kind="over" sprite="131" folder={NUM_SPRITE} x={VERSION.x} y={VERSION.y} label="2" />
-          <Layer kind="over" sprite="007" x={RATING.x} y={RATING.y} label="전체이용가" />
+          <Layer src={`${SPRITE}/006.png`} x={COPYRIGHT.x} y={COPYRIGHT.y} label="© 2009 GAMEVIL" />
+          <Layer src={`${NUM_SPRITE}/131.png`} x={VERSION.x} y={VERSION.y} label="2" />
+          <Layer src={`${SPRITE}/007.png`} x={RATING.x} y={RATING.y} label="전체이용가" />
         </>
       )}
     </RawScreen>
   )
 }
 
-const LAYER_CLASS = {
-  under: styles.underBackground,
-  background: styles.background,
-  over: styles.overBackground,
-} as const
-
 interface LayerProps {
-  readonly kind: keyof typeof LAYER_CLASS
-  readonly sprite: string
+  readonly src: string
   readonly x: number
   readonly y: number
-  readonly label?: string
-  /** 판 번호만 ui/num.pzx 에서 가져온다 */
-  readonly folder?: string
-  readonly opacity?: number
+  readonly label: string
 }
 
-/** main_title 조각 하나를 원본 좌표에 찍는다. */
-function Layer({ kind, sprite, x, y, label = '', folder = SPRITE, opacity = 1 }: LayerProps) {
-  return (
-    <img className={LAYER_CLASS[kind]} style={{ left: x, top: y, opacity }} src={`${folder}/${sprite}.png`} alt={label} />
-  )
+/** 효과 없는 그림 한 장을 원본 좌표에 */
+function Layer({ src, x, y, label }: LayerProps) {
+  return <img className={styles.overCanvas} style={{ left: x, top: y }} src={src} alt={label} />
 }

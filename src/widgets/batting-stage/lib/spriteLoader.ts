@@ -9,6 +9,7 @@ import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 import { drawFrameLayers, frameLayersUrl, hasFrameLayers, placedFrameLayersOf } from '@/shared/lib/sprite/frameLayers'
 import type { FrameLayerListing, PlacedFrameLayer } from '@/shared/lib/sprite/frameLayers'
+import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
 
 /** 캐시는 DOM·미리 받기와 같이 쓴다 (`shared/lib/sprite/spriteCache`) */
 export function sprite(url: string): HTMLImageElement | null {
@@ -127,7 +128,12 @@ function loadSprite(url: string): Promise<HTMLImageElement | null> {
  * `paletteIndex` 를 주면 그 폴더의 대체 팔레트 벌로 칠한 그림을 쓴다 (C-1 — 몸통 피부×15+팀 · 헬멧 팀).
  * 칠하기 전에는 구운 그림이 나가므로 첫 몇 프레임은 구워진 벌(palette.json 의 baked)이 보인다.
  */
-export function placedFrame(folder: string, index: number, paletteIndex: number | null = null): PlacedFrame | null {
+export function placedFrame(
+  folder: string,
+  index: number,
+  paletteIndex: number | null = null,
+  isFlipped = false,
+): PlacedFrame | null {
   const origins = frameOrigins(folder)
   if (origins === null) return null
 
@@ -135,7 +141,12 @@ export function placedFrame(folder: string, index: number, paletteIndex: number 
   const origin = origins[key]
   if (origin === undefined) return null
 
-  const url = `${folder}/${key}.png`
+  // 효과 0x11(뒤집기)로 부르면 0xc9f98 ca07c 갈래 — 0x66 반투명 파트도 섞지 않고 복사한 판(`frameCopies`)을 쓴다.
+  // 목록이 아직이면 구운 프레임(예전 근사). 복사판에는 팔레트 번호 지도가 없어 다시 칠하는 그림은 구운 판 그대로다
+  // (복사판 폴더 — 머리 장비 · player_effect · event_char — 는 타석에서 다시 칠하지 않는다)
+  const url = isFlipped && paletteIndex === null && hasFrameCopies(folder)
+    ? flippedFrameUrlOf(folder, index, spriteJsonNow<unknown>(frameCopiesUrl(folder)))
+    : `${folder}/${key}.png`
   const image = paletteIndex === null ? sprite(url) : recoloredSprite(folder, url, paletteIndex)
   if (image === null) return null
   return { image, offsetX: origin.x, offsetY: origin.y }

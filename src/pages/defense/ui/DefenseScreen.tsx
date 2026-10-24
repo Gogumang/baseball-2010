@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { FrameSprite, RawScreen } from '@/shared/ui'
+import { FrameSprite, LayeredFrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
@@ -128,6 +128,12 @@ function ActorSprite({
       top={origin.y}
     />
   )
+}
+
+/** 판정 글자 한 장 — 0x67 겹은 아래 수비 화면에 더한다 */
+function JudgeTextSprite({ frame }: { readonly frame: number }) {
+  const origins = useFrameOrigins(JUDGE_FRAMES)
+  return <LayeredFrameSprite folder={JUDGE_FRAMES} frame={frame} origins={origins} x={0} y={0} />
 }
 
 /**
@@ -405,7 +411,9 @@ export function DefenseScreen({
             data-testid="defense-judge-text"
             data-frame={judgeText.frame}
           >
-            <ActorSprite folder={JUDGE_FRAMES} frame={judgeText.frame} />
+            {/* 0x393b4 → 0xbe8a5 효과 [sp+8] = 0 (393f6) — 0xc9f98 이 파트 효과를 따른다: 애니 0 · 9 의 0x67 파트(칸 20 · 21 · 23 · 24 ·
+                26 · 28 · 29)는 화면에 더한다(`LayeredFrameSprite` — plus-lighter) */}
+            <JudgeTextSprite frame={judgeText.frame} />
           </div>
         )}
 

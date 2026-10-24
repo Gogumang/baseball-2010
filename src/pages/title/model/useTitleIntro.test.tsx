@@ -21,7 +21,7 @@ describe('타이틀 키 — 갱신 0x245f8 은 애니 끝 깃발이 서야 키�
       vi.advanceTimersByTime(millisecondsPerFrame())
     })
     expect(onStart).not.toHaveBeenCalled()
-    expect(result.current.pose.isSettled).toBe(false)
+    expect(result.current.scene.isSettled).toBe(false)
   })
 
   it('인트로가 끝난 뒤에는 아무 키나 처음 메뉴로', () => {
@@ -30,7 +30,7 @@ describe('타이틀 키 — 갱신 0x245f8 은 애니 끝 깃발이 서야 키�
     act(() => {
       vi.advanceTimersByTime(millisecondsPerFrame() * (INTRO_FRAME_COUNT + 1))
     })
-    expect(result.current.pose.isSettled).toBe(true)
+    expect(result.current.scene.isSettled).toBe(true)
     act(() => {
       fireEvent.keyDown(window, { key: 'a' })
     })

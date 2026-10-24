@@ -33,14 +33,18 @@ export type FrameLayerListing = Readonly<Record<string, readonly FrameLayerEntry
 /**
  * `layers.json` 을 둔 폴더(`public/sprites/<이름>/frames`) — 0x67 파트를 쓰는 PZX 13개 가운데 캔버스가 그리는 것만 실었다
  * (`frameLayers.test` 가 파일과 맞춰 본다). 다른 폴더는 목록을 청하지 않는다(없는 파일을 404 로 청하지 않게).
+ * main_title 은 타이틀 캔버스(`pages/title`)와 메뉴 바탕 0x58371(`SkinBackdrops`)이, game_judge 는 수비 화면 DOM 판정 글자도
+ * (`shared/ui/LayeredFrameSprite` — plus-lighter) 쓴다.
  * 0x67 을 쓰지만 안 실은 것: leony_effect(원본도 화면에 안 나온다 — `acePitcherEffect`) · sky_effect_light1(그리는 자리 없음) ·
- * main_title · touch · trainning(DOM 그림) — ⚠️ DOM 화면의 game_judge · slt_pitch · game_effect 그림도 아직 구운 근사다.
+ * touch(원본 binary.mod 에 파일 이름조차 없다 — 안 쓰는 그림) · trainning 21~23(애니 3 — 더비 0x41098 이 효과 0 으로 그리는데
+ * 웹에 그 그리기가 아직 없다).
  */
 export const FRAME_LAYER_FOLDERS: ReadonlySet<string> = new Set([
   'effect_power',
   'game_effect',
   'game_judge',
   'game_ui',
+  'main_title',
   'medica_effect',
   'pitcher_dragona',
   'sky_effect_light',
