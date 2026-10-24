@@ -16,6 +16,7 @@ import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { shopItemId } from '@/features/shop/model/shopSelection'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
@@ -2028,5 +2029,37 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
     expect(result.current.nextGameFromManagement).toBe(false)
     // 저장 쓰기도 없다
     expect(store.load()).toEqual(saved)
+  })
+})
+
+describe('투수편 이어하기 — 100 진입 0x1c154 머리 1c15e stopBgm (r163)', () => {
+  it('저장이 있으면 투수편 화면에 들어설 때마다 한 번 끊고, 저장이 없으면(등록 104) 안 끊는다', () => {
+    let stops = 0
+    setActiveSound({ ...createSilentSound(), stopBgm: () => { stops += 1 } })
+    try {
+      const store = 메모리저장()
+      store.save(createPitcherCareer('이어'))
+      const { rerender } = renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
+        store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
+        undefined, onScreen,
+      ), { initialProps: { onScreen: false } })
+      expect(stops).toBe(0)
+      rerender({ onScreen: true })
+      rerender({ onScreen: true })
+      expect(stops).toBe(1)
+      rerender({ onScreen: false })
+      rerender({ onScreen: true })
+      expect(stops).toBe(2)
+
+      stops = 0
+      const empty = renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
+        메모리저장(), createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
+        undefined, onScreen,
+      ), { initialProps: { onScreen: false } })
+      empty.rerender({ onScreen: true })
+      expect(stops).toBe(0)
+    } finally {
+      setActiveSound(null)
+    }
   })
 })

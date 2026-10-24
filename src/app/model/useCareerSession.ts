@@ -1762,6 +1762,10 @@ export function useCareerSession({
       if (savedCareer === null) return
       // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c) · 반복 이벤트 · 커서 · mgr+0x304 (0xf684)
       setUpNariScene()
+      // 100 진입 0x1c154 의 머리 1c15e `0x6e439` stopBgm — S+0x50 갈래보다 먼저 늘 부른다(r163 직접 뜸). 메인 메뉴 1 이 끊겨
+      // 134 대진판 · 116 경기 결과처럼 배경음을 안 트는 자리는 소리 없이 선다. 105 · 109 · 128 · 141 은 화면 배경음 표가 이 뒤
+      // 그리기에서 제 소리를 튼다(`useSceneBgm` — 번호가 1 에서 바뀐다)
+      audio.stopBgm()
       const point = resumePointOf(savedCareer)
       // 1c24e — S+0x50 == 6|7 이 맨 앞 갈래다: 141 진입 0x12300 을 다시 밟는다. 보너스를 받은 뒤 저장이라(S+0x7b) 키 0x1220c 가
       // 보너스 팝업 없이 등록 팝업 0x2d 를 띄운다(`EndingScreen.isBonusReceived`)

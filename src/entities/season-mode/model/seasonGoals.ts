@@ -204,6 +204,31 @@ export function teamEarnedRunAverageOf(lines: readonly GoalPitcherLine[]): numbe
   return Math.trunc(sum / lines.length)
 }
 
+/**
+ * 레코드에 남은 마투수 줄의 +0x20 · +0x22 (U-105 r163) — 0xdd · CPU 넣기(`0xb521c` 0x60 갈래)가 8번 칸에 덮는 줄은 저장의
+ * 마선수 레코드 `0x1f825`(0x20094 6번 갈래가 XlsACE_PIT_DATA 행을 통째 부은 것)의 사본이고, 경기 끝 기록 게이트 `0xa56dc` 모드 2
+ * 갈래가 마선수를 걸러 그 칸에 쌓이지 않는다 — 그래서 행 바이트 0x20 · 0x22 그대로다(base/extracted 행에서 읽음:
+ * 싸이커 · 레오니 · 붕붕머신 · 발렌타인 · 드래고나 = 아웃 300 · 실점 23 · 22 · 18 · 15 · 5).
+ * `0xa3764`(a3774~a3796)는 마선수 거름 없이 팀 +0xc(마투수를 넣으며 하나 는 수)만큼 돈다 → 0xdf · 0xe5 를 지나기 전까지 목표 ④ 에
+ * 이 줄(방어율 207 · 198 · 162 · 135 · 45)이 하나 더 든다. 타율 ③ `0xa3700(S, 1)` 은 0~8번만 보아 9번 마타자가 닿지 않는다.
+ */
+export const ACE_PITCHER_GOAL_LINES: readonly GoalPitcherLine[] = [
+  { outs: 300, runsAllowed: 23 },
+  { outs: 300, runsAllowed: 22 },
+  { outs: 300, runsAllowed: 18 },
+  { outs: 300, runsAllowed: 15 },
+  { outs: 300, runsAllowed: 5 },
+]
+
+/** 목표 ④ 가 도는 투수 줄 — 레코드에 마투수(0..4)가 남았으면 그 줄을 하나 더 (차례는 합에 닿지 않는다) */
+export function goalPitcherLinesWithAce(
+  lines: readonly GoalPitcherLine[],
+  acePitcher: number | undefined,
+): readonly GoalPitcherLine[] {
+  const ace = acePitcher === undefined || acePitcher < 0 ? undefined : ACE_PITCHER_GOAL_LINES[acePitcher]
+  return ace === undefined ? lines : [...lines, ace]
+}
+
 /** 포스트시즌 대진 칸 — `L+0x38 + 2i` 의 두 팀 (i 0 한국시리즈 · 1 플레이오프 · 2 준플레이오프) */
 export interface GoalPostseasonBracket {
   /** 우승팀 L+0x37 (없으면 null) */

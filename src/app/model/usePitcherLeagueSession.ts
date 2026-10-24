@@ -833,6 +833,19 @@ export function usePitcherLeagueSession(
       if (!shouldForgetRepeatable) setShouldForgetRepeatable(true)
     }
   }
+  /**
+   * 상태 100 진입 0x1c154 의 머리 1c15e `0x6e439([0x1400058])` = stopBgm — S+0x50 갈래(1c24e~)보다 먼저 늘 부른다(r163 직접 뜸).
+   * 이어하기로 투수편에 들어서면 메인 메뉴 배경음 1 이 끊긴다: 134 대진판 · 116 경기 결과 · 이벤트 재생(40 가드가 막으면) 같은
+   * 배경음을 안 트는 자리는 소리 없이 선다. 105 · 109 · 128(이전 1 → 4) · 141(46/52)은 App 의 `useSceneBgm` 이 이 효과 뒤(같은 커밋,
+   * 훅 차례 — 이 세션이 먼저 선다)에 제 배경음을 튼다. 저장이 없어 등록(104)으로 가는 길은 거치지 않는다.
+   */
+  const wasOnScreenForBgmRef = useRef(isOnScreen)
+  const hasCareer = career !== null
+  useEffect(() => {
+    const was = wasOnScreenForBgmRef.current
+    wasOnScreenForBgmRef.current = isOnScreen
+    if (isOnScreen && !was && hasCareer) activeSound().stopBgm()
+  }, [isOnScreen, hasCareer])
   /** 판정 없음(e = −1) 엔딩 · 명예의 전당 등록 뒤 저장 막기 — 아래 `commit` 머리글 */
   const isSaveErasedRef = useRef(false)
   /**
