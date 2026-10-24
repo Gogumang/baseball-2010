@@ -5,9 +5,14 @@ import {
   observeSceneCloudFrame,
   resetSceneCloudClock,
   sceneCloudCallsNow,
+  sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 
-afterEach(() => resetSceneCloudClock())
+afterEach(() => {
+  resetSceneCloudClock()
+  resetCommonWindowShownForTest()
+})
 
 describe('경기 장면 구름 셈 — 구장 +0x1c~+0x28 (0x78448)', () => {
   it('로딩 판의 두 부름에서 시작하고 첫 그림이 세 번째 부름이다', () => {
@@ -37,5 +42,20 @@ describe('경기 장면 구름 셈 — 구장 +0x1c~+0x28 (0x78448)', () => {
     observeSceneCloudFrame(0, true, createCloudFrameCursor())
     resetSceneCloudClock()
     expect(sceneCloudCallsNow()).toBe(LOADING_CLOUD_CALLS)
+  })
+})
+
+describe('전광판 글자 자리 [구장+0x8c] — 배경 0x41230 을 그린 수', () => {
+  it('처음 그린 틱이 0 이고, 창이 선 첫 그림([창+0x250])마다 배경을 한 번 더 그려 하나 더 센다', () => {
+    expect(sceneScoreboardTickOf(40)).toBe(0)
+    expect(sceneScoreboardTickOf(45)).toBe(5)
+    const scene = markGameSceneUp()
+    const window = markCommonWindowShown()
+    expect(sceneScoreboardTickOf(45)).toBe(6)
+    window()
+    const next = markCommonWindowShown()
+    next()
+    expect(sceneScoreboardTickOf(47)).toBe(9)
+    scene()
   })
 })

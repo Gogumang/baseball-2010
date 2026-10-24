@@ -4,6 +4,7 @@ import {
   appTickOfGameSceneTick, gameSceneTickNow, isCommonWindowShown, isGameSceneFrozen, useMarksGameScene,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
+import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/sceneKeyLatch/keyHold'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import {
@@ -139,13 +140,50 @@ const UPDATES_PER_TICK = 1
  * 받은 칸 [+0x20] 은 하나라(누름 0x39f4c 가 덮어쓰기만 한다, r167) 한 틀에 둘이 오면 뒤 키만 남는다 — 같은 틱에 받은 키는 마지막
  * 하나만 먹이고 앞 키는 버린다. 틱이 다른 키는 한 갱신에 하나씩 먹인다.
  */
-function takePressFor(presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null): DefenseKeyPress | null {
+function takePressFor(
+  presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null, hold?: DefenseKeyHold,
+): DefenseKeyPress | null {
+  const press = takeArrivedPress(presses, ticks, sceneTick)
+  if (hold === undefined || sceneTick === null || (hold.lastTick !== null && sceneTick <= hold.lastTick)) return press
+  // 틀마다 한 번 — 키 처리가 안 돈 틀(건너뛰기 · 따라잡기)도 0xbca05 는 틀 머리마다 돈다
+  const from = hold.lastTick === null ? sceneTick : hold.lastTick + 1
+  let repeat: string | null = null
+  for (let tick = from; tick <= sceneTick; tick += 1) {
+    const hasRelease = hold.releaseTicks.some((at) => at < tick)
+    if (hasRelease) hold.releaseTicks = hold.releaseTicks.filter((at) => at >= tick)
+    const out = hold.hold.frame(tick === sceneTick ? press?.key ?? null : null, hasRelease)
+    // 길게 누른 뒤 뗌(비트 8 만)은 0x536bc 가 상태 0x11 로만 보낸다 — 0x17 에 오는 것은 단계 비트 4~7 이 선 되풀이뿐
+    repeat = tick === sceneTick && (out.flags & HOLD_STAGE_MASK) !== 0 ? out.repeat : null
+  }
+  hold.lastTick = sceneTick
+  if (press !== null || repeat === null) return press
+  return { key: repeat, isRepeat: true }
+}
+
+function takeArrivedPress(presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null): DefenseKeyPress | null {
   const arrived = ticks[0]
   if (arrived === undefined || (sceneTick !== null && arrived >= sceneTick)) return null
   let count = 1
   while (ticks[count] === arrived) count += 1
   ticks.splice(0, count)
   return presses.splice(0, count).at(-1) ?? null
+}
+
+/**
+ * **누른 채 되풀이** — 0x498d4 는 이 틀의 누름(49a3a, 표시 0) 다음에 되풀이 [장면+0x50](49a5c, 표시 [장면+0x6c])을 조작 객체에 준다.
+ * 되풀이는 키 객체 틀 머리 0xbca05 가 누른 틀 뒤 4틀마다 스스로 센다(`keyHold`) — 브라우저 자동 되풀이 keydown 은 버리고, keyup 이
+ * 뗌 [+0x24] 이다. 한 틀에 누름과 되풀이가 함께 오면(두 키를 겹쳐 누름) 누름만 먹인다(⚠️ 근사 — 진행기 걸음은 키 하나를 받는다).
+ */
+interface DefenseKeyHold {
+  readonly hold: KeyHold
+  /** 받은 뗌의 장면 틱 */
+  releaseTicks: number[]
+  /** 마지막으로 센 틀 */
+  lastTick: number | null
+}
+
+function newDefenseKeyHold(): DefenseKeyHold {
+  return { hold: createKeyHold(), releaseTicks: [], lastTick: null }
 }
 
 /**
@@ -552,6 +590,8 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   const pressesRef = useRef<DefenseKeyPress[]>([])
   /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
   const pressTicksRef = useRef<number[]>([])
+  /** 누른 채 되풀이 셈 (`DefenseKeyHold`) */
+  const holdRef = useRef<DefenseKeyHold>(newDefenseKeyHold())
   const tallyRef = useRef<{ readonly play: LiveRunnerPlay; tally: RecordedBoardTally } | null>(null)
   const particlesRef = useRef<{ readonly play: LiveRunnerPlay; readonly run: BallParticleRun } | null>(null)
   const cameraOffsetRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
@@ -559,6 +599,7 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     tallyRef.current = { play, tally: EMPTY_RECORDED_TALLY }
     pressesRef.current = []
     pressTicksRef.current = []
+    holdRef.current = newDefenseKeyHold()
   }
   if (particlesRef.current === null || particlesRef.current.play !== play) {
     particlesRef.current = { play, run: startBallParticleRun() }
@@ -576,11 +617,21 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
       if (originalKeyOf(event.key) === null) return
       // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
       if (isGameSceneFrozen()) return
-      pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
+      // 누른 채 되풀이는 0xbca05 가 센다(`keyHold`) — 브라우저 되풀이는 버린다
+      if (event.repeat) return
+      pressesRef.current.push({ key: event.key })
       pressTicksRef.current.push(gameSceneTickNow())
     }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (originalKeyOf(event.key) === null || isGameSceneFrozen()) return
+      holdRef.current.releaseTicks.push(gameSceneTickNow())
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [])
 
   const { stepper, startedAt } = stepperRef.current
@@ -591,7 +642,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     // 이 걸음은 갱신 (startedAt + 틱) — 그 장면 틱보다 앞 틱에 받은 키만 먹인다
     const updateStartTick = updateStartTickRef.current
     stepper.step(
-      takePressFor(pressesRef.current, pressTicksRef.current, updateStartTick === null ? null : updateStartTick + startedAt + stepper.tick),
+      takePressFor(
+        pressesRef.current, pressTicksRef.current, updateStartTick === null ? null : updateStartTick + startedAt + stepper.tick, holdRef.current,
+      ),
     )
     // 그 틱의 소리 차례대로 — 슬라이딩 10(사람 OK 키 0x518da → 0x5199c · 자동 0x5268c)과 판정 콜(플레이 틱 b4562 의 메시지 0xbba →
     // 0x51a56 → 9 는 0x51c14 의 17 · 13 은 0x51b36 의 62/20). 콜은 판 끝이 아니라 결과 코드가 선 이 틱에 난다
@@ -698,6 +751,8 @@ function LivePlayback({
   const pressesRef = useRef<DefenseKeyPress[]>([])
   /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
   const pressTicksRef = useRef<number[]>([])
+  /** 누른 채 되풀이 셈 (`DefenseKeyHold`) */
+  const holdRef = useRef<DefenseKeyHold>(newDefenseKeyHold())
   /** 그린 틱이 올린 실책 (야수 그리기 0x43278 4381a~43904) · 이미 본 진행기 틱 수 */
   const drawnErrorsRef = useRef<DrawnFieldingError[]>([])
   const seenTickCountRef = useRef(0)
@@ -748,12 +803,22 @@ function LivePlayback({
       if (originalKeyOf(event.key) === null) return
       // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
       if (isGameSceneFrozen()) return
-      // 누르고 있는 중인가 — 레이저 확정은 새로 누른 키만 받는다 (0x4e858 키 반복 계수 0)
-      pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
+      // 누른 채 되풀이는 0xbca05 가 센다(`keyHold`) — 브라우저 되풀이는 버린다. 레이저 확정은 새로 누른 키만 받는다(0x4e858 —
+      // 이 틀 누름 [장면+0x40] 이 있어야 한다)
+      if (event.repeat) return
+      pressesRef.current.push({ key: event.key })
       pressTicksRef.current.push(gameSceneTickNow())
     }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (originalKeyOf(event.key) === null || isGameSceneFrozen()) return
+      holdRef.current.releaseTicks.push(gameSceneTickNow())
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [])
 
   useEffect(() => {
@@ -764,6 +829,7 @@ function LivePlayback({
       startedAtRef.current = update
       pressesRef.current = []
       pressTicksRef.current = []
+      holdRef.current = newDefenseKeyHold()
       drawnErrorsRef.current = []
       seenTickCountRef.current = 0
       boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
@@ -826,7 +892,7 @@ function LivePlayback({
       const stepSceneTick = updateStartTick === null ? null : updateStartTick + startedAtRef.current + running.tick
       running = stepDefensePlay(
         running,
-        wasFastForward ? null : takePressFor(pressesRef.current, pressTicksRef.current, stepSceneTick),
+        wasFastForward ? null : takePressFor(pressesRef.current, pressTicksRef.current, stepSceneTick, holdRef.current),
       )
       moved = true
       const facts = defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running))
@@ -896,7 +962,9 @@ function LivePlayback({
     const updateStartTickNow = updateStartTickRef.current
     const arrivedPresses: DefenseKeyPress[] = []
     while (!moved && finished) {
-      const press = takePressFor(pressesRef.current, pressTicksRef.current, updateStartTickNow === null ? null : updateStartTickNow + update)
+      const press = takePressFor(
+        pressesRef.current, pressTicksRef.current, updateStartTickNow === null ? null : updateStartTickNow + update, holdRef.current,
+      )
       if (press === null) break
       arrivedPresses.push(press)
     }

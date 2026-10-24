@@ -1,4 +1,4 @@
-import { gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneFreezeSerialNow, gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
 import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
@@ -21,16 +21,22 @@ let calls = LOADING_CLOUD_CALLS
 let lastFrame: number | null = null
 /** 이 장면에서 배경(0x41230)을 처음 그린 경기 장면 틱 — 전광판 글자 셈의 0 점. 아직 안 그렸으면 null */
 let scoreboardOrigin: number | null = null
+/** 0 점을 잡을 때의 멈춤 횟수 — 그 뒤 창이 선 첫 그림마다 배경을 한 번 더 그린다 */
+let scoreboardOriginFreezes = 0
 
 /**
  * **구장 전광판 글자 자리 [구장+0x8c] 의 셈** — 상태 7 의 구장 생성이 0x77edc 로 시작값(상자 폭 + 2)을 두고, 상태 7 · 8 · 9 를 뺀
  * 그림마다 배경 0x41230(52f26~52f36)이 413e6 에서 0x77fb5 로 그린 뒤 1 줄인다 — 곧 로딩 뒤 첫 배경 그림이 시작값이다.
  * 웹은 경기 장면 틱으로 센다: 이 장면에서 배경을 처음 그린 틱이 0 이다(`scoreboardScrollX`). 장면 시계라 공용 창 아래에서는 선다.
- * ⚠️ 남은 차이: 창이 선 첫 그림([창+0x250], 52efe)은 원본이 배경을 한 번 더 그려 +0x8c 가 한 번 더 준다 — 웹은 안 센다.
+ * 창이 선 첫 그림([창+0x250], 52efe)은 갱신 없이 배경을 한 번 더 그려 +0x8c 가 한 번 더 준다 — 0 점 뒤로 경기 장면이 멈추기 시작한
+ * 횟수(`gameSceneFreezeSerialNow`)를 더 센다(r170). ⚠️ 미확인: 0x41230 은 상태 7 · 8 · 9(로딩)에서 안 그리는데, 웹은 그때 선 창도 센다.
  */
 export function sceneScoreboardTickOf(sceneTick: number): number {
-  if (scoreboardOrigin === null) scoreboardOrigin = sceneTick
-  return Math.max(0, sceneTick - scoreboardOrigin)
+  if (scoreboardOrigin === null) {
+    scoreboardOrigin = sceneTick
+    scoreboardOriginFreezes = gameSceneFreezeSerialNow()
+  }
+  return Math.max(0, sceneTick - scoreboardOrigin) + (gameSceneFreezeSerialNow() - scoreboardOriginFreezes)
 }
 
 /** 그림 고리마다 하나 — 그 고리가 마지막으로 본 그림 번호 */

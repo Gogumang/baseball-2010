@@ -78,3 +78,48 @@ export function magicBallEffectFrameAt(
   }
   return null
 }
+
+/** 마구 공 파티클 한 벌 — 0xbbc85(x, y, id, img, 0, −1, 0, 0) */
+export interface MagicBallParticle {
+  readonly id: number
+  readonly img: number
+}
+
+/**
+ * **0x11 의 마구 공 파티클** — 공 그리기 0x3b2f4 의 3b496 갈래(상태 [+0x1c] == 0x11)가 구질 [+0xfc8] == 22 이면 지금 투수 레코드 +0x18
+ * (마구 번호 1~9)로 갈래표 0xcff20 을 탄다 (2026-10-24 직접 떴다). 그림마다 공의 화면 자리 [sp+0x4c] · [sp+0x50](0x35854 —
+ * 공 틱 [+0x1098] 을 0 ~ N − 1 로 자른 점)에 쏜다:
+ * ```
+ * 0xcff20  1 → 3b546 (effect_fire 그림 — 파티클 없음) · 2 → 3b4fa · 3 → 3b510 · 4 → 3b528 · 5~8 → 3b62c(없음) · 9 → 3b610
+ * 3b4fa  번호 2: id 0x15, img 15                 3b510  번호 3: id 0x15, img 16            3b610  번호 9: id 0x15, img 14
+ * 3b528  번호 4: 폼(0xb6e25) >> 1 이 0 → 3b546(effect_shinning 그림) · 1 → 3b5ae · 2 → 3b5cc · 그 밖 없음
+ * 3b5ae    공 틱 == 0 일 때만 id 0x18, img 15
+ * 3b5cc    공 틱 ≤ trunc(N / 2) 일 때만 id 0x16, img 14 · id 0x17, img 14 (N = [+0x109c])
+ * ```
+ * 0x11 진입(0x3de10)이 보임 칸을 세워 0x11 그리기 0x4d64c 는 첫 그림부터 0x3b2f4 를 부르므로 놓기(틱 10) 전 와인드업 그림에도 쏜다.
+ */
+export function magicBallParticlesOf(
+  pitch: Pick<Pitch, 'isMagicPitch' | 'pitcherMagicNumber' | 'pitcherForm'>,
+  ballTick: number,
+  frameCount: number,
+): readonly MagicBallParticle[] {
+  if (pitch.isMagicPitch !== true) return []
+  switch (pitch.pitcherMagicNumber ?? 0) {
+    case 2:
+      return [{ id: 0x15, img: 15 }]
+    case 3:
+      return [{ id: 0x15, img: 16 }]
+    case 9:
+      return [{ id: 0x15, img: 14 }]
+    case SHINNING_MAGIC_NUMBER: {
+      const formGroup = (pitch.pitcherForm ?? 0) >> 1
+      if (formGroup === 1) return ballTick === 0 ? [{ id: 0x18, img: 15 }] : []
+      if (formGroup === 2) {
+        return ballTick <= Math.trunc(frameCount / 2) ? [{ id: 0x16, img: 14 }, { id: 0x17, img: 14 }] : []
+      }
+      return []
+    }
+    default:
+      return []
+  }
+}

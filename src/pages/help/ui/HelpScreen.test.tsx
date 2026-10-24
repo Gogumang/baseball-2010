@@ -10,6 +10,8 @@ import {
   RANKING_MENU_ITEMS,
 } from '@/pages/help/lib/helpLayout'
 import { GAME_INQUIRY_CHAPTER } from '@/shared/config/helpSections'
+import { FRAME_SLIDE_BODY_FIRST_DRAW } from '@/widgets/screen-frame/lib/frameSlide'
+import { isSkinFrameSliding, resetSkinFrameSlide, startSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 
 /**
  * 도움말 = 메인 메뉴 **상태 7** 의 StrHOWTO 뷰어 (0x2fc8c → 0x639a5 → 0x58d10 — S12 2절).
@@ -248,10 +250,34 @@ describe('닫기 연출 — [뷰어+0x125] 가 없으면(메인 메뉴) CLR 뒤 
       띄우기({ onBack, gamePoint: 0 })
       fireEvent.keyDown(window, { key: 'Escape' })
       expect(onBack).not.toHaveBeenCalled()
+      // 메인 메뉴 7 은 뷰어 열기 0x63688 이 머리띠 미끄러짐을 세워(r168) 판 여닫기가 본문 첫 그림부터 걸음을 간다
       act(() => {
-        vi.advanceTimersByTime(62 * 6)
+        vi.advanceTimersByTime(62 * (FRAME_SLIDE_BODY_FIRST_DRAW + 6))
       })
       expect(onBack).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('메인 메뉴 7 · 10 — 뷰어 열기 0x63688 이 머리띠 미끄러짐을 세운다 (63728~63730, r168)', () => {
+  it('미끄러지는 동안은 0x58d10 이 판도 글도 안 그린다(58d54~58d60) · 경기 중은 0x3c26a 가 깃발을 지워 바로 본문', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout'] })
+    try {
+      resetSkinFrameSlide()
+      띄우기({ gamePoint: 0 })
+      expect(screen.queryByRole('img', { name: '1/5' })).toBeNull()
+      act(() => {
+        vi.advanceTimersByTime(62 * (FRAME_SLIDE_BODY_FIRST_DRAW + 1))
+      })
+      expect(screen.getByRole('img', { name: '1/5' })).toBeTruthy()
+      cleanup()
+
+      startSkinFrameSlide()
+      띄우기()
+      expect(isSkinFrameSliding()).toBe(false)
+      expect(screen.getByRole('img', { name: '1/5' })).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }

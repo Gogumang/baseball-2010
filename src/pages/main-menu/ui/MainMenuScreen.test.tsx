@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
+import { resetSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 
 /**
  * 메인 메뉴 머리띠 — 두 단 그리기가 다 끝에 0x54d95 를 부른다.
@@ -111,6 +112,8 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
   })
 
   it('그 밖 길(하위 16·17 에서 CLR · 다른 장면이 메뉴를 새로 세움)은 다 내려온 자리에 선다 — 하위 4·5 들어옴 · 생성자는 +0x84 를 안 쓴다', () => {
+    // 앞 시험이 세운 미끄러짐(전역 칸, r168)이 남지 않게 — 앞 화면에서 다 내려온 것과 같다
+    resetSkinFrameSlide()
     const { container } = 띄우기(50)
     expect(머리띠y(container)).toBe(30 - 38)
   })

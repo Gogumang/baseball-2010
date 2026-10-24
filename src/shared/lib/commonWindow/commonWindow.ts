@@ -238,6 +238,14 @@ export function clearGameSceneTimeout(id: number | null | undefined): void {
  * 그리기만 하고, 갱신 뒤(키 0x498d4 의 '*' 메뉴 · 진입 · 갱신의 히든 오픈 알림)면 그 그림은 갱신 · 그리기를 다 한다. 웹은 창이 서는
  * 커밋에서 곧장 멈추고 그리기 셈만 한 번 더 올린다 — 뒤 경우의 갱신 한 틱은 웹에 없다.
  */
+/**
+ * 경기 장면이 멈추기 시작한 횟수 — 곧 창이 선 첫 그림([창+0x250], 52efe)의 수다. 그 그림은 배경 0x41230 을 한 번 더 그리므로
+ * 배경이 스스로 올리는 칸(전광판 글자 자리 [구장+0x8c] — `sceneCloudClock.sceneScoreboardTickOf`)이 이 수를 더 센다
+ */
+export function gameSceneFreezeSerialNow(): number {
+  return freezeSerial
+}
+
 export interface GameSceneDrawGate {
   readonly allowsDraw: () => boolean
 }
@@ -267,6 +275,14 @@ export function markGameSceneUp(): () => void {
     gameScenesUp -= 1
     syncGameSceneFreeze()
   }
+}
+
+/**
+ * 경기 장면(0x104)이 서 있는가 — 그 장면의 받은 키는 장면 부품의 칸(`sceneKeyLatch` — 장면 틱)이 맡는다. 앱 키 문(`appKeyGate`)은
+ * 장면이 서 있고 창이 없을 때 키를 그 칸에 그대로 넘긴다
+ */
+export function isGameSceneUp(): boolean {
+  return gameScenesUp > 0
 }
 
 /** 경기 장면 0x52c50 이 52cc6 · 52efe · 53048 에서 이 그림을 건너뛰는가 (`gameScenesUp` 머리말) */
