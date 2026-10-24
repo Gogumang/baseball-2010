@@ -422,7 +422,8 @@ export function useSceneEnterStop(sound: SoundPort, screen: Screen): void {
  * **이어하기 길의 137 앞에서 배경음을 끊는다** — 상태 100 진입 0x1c154 의 머리 1c15e 가 `0x6e439([0x1400058])` = stopBgm 을 부른다.
  * 그 뒤 100 · 1 · 105(한 틀 — 0x1aec4 의 4 는 머문 틀 2 에만) · 115 · 114(내장 연초라 40 안 틂) · 137 · 105(이전 137 은 목록 밖) ·
  * 115 · 114 를 지나 연초 이벤트 뒤 105(이전 114)에서야 4 가 운다 — 그동안 소리가 없다. 웹은 표지가 이어하기 길에서 섰을 때
- * (`fromResume`) 한 번 멈춘다. ⚠️ 다른 이어하기 길(100 → 1 → 105 · 128 · 134 …)의 1c15e 는 아직 옮기지 않았다
+ * (`fromResume`) 한 번 멈춘다. 다른 이어하기 길(100 → 1 → 105 · 109 · 116 · 128 · 134 · 141 …)의 1c15e 는 세션이 들어서는 때에
+ * 끊는다 — 타자편 `continueSaved` · 투수편 화면이 서는 효과(r163). 이 훅은 표지 길에서 한 번 더 끊을 뿐이다(같은 결과)
  */
 export function useResumeCoverStop(sound: SoundPort, isResumeCover: boolean): void {
   const wasRef = useRef(false)

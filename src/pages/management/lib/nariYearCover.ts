@@ -163,18 +163,21 @@ export type YearCoverStep =
  * 9 틀에 끊겨 다시 안 뜬다 — 464 거절 보상에서 끊긴 저장에 대결 대기가 함께 남는 길이 사실상 없어(대기는 다음 105 진입이 먼저
  * 지운다) 웹은 대기를 그대로 둔다.
  */
-export type ResumeCoverUnderlay = '검정' | '상태판'
+export type ResumeCoverUnderlay = '검정' | '관리' | '상태판'
 
 /** 이어하기 길이 0x1b768 을 부른 뒤 105 에 들어서는 틀 (위 표의 4) */
 const RESUME_MANAGEMENT_FRAME = 4
 
 /**
  * 이어하기 길의 앞 화면 틀 `frame`(0 = 0x1b768 을 부른 틀) — 100 · 1 은 그리기가 없고 상태 1 이 버퍼에 검정 덮기(단계 4)를 겹쳐
- * 칠해 검게, 105 · 115 · 114 는 상태판 · 머리띠를 그린다(105 0x19f0c 는 관리 판 · 커맨드 줄도, 114 0x8b5ac 는 공 무늬 · 대화창도).
- * ⚠️ 근사: 0 틀의 버퍼(장면 바꾸기 0x37ac 의 그림)와 105 의 관리 판 · 114 의 대화창은 그리지 않는다 — 모두 효과기가 절반 이상 덮는 틀이다
+ * 칠해 검게, 105(4 틀)는 0x19f0c = 0x19da4(커맨드 줄 칸 등장 0 · 상태판 · 가운데 판 미끄러짐 첫 자리 · 머리띠 — r163,
+ * `NariResumeManagementFrame`), 115 · 114 는 공 무늬 · 상태판 · 머리띠를 그린다(114 0x8b5ac 는 대화창도).
+ * ⚠️ 근사: 0 틀의 버퍼(장면 바꾸기 0x37ac 가 남긴 메인 메뉴 그림 — 웹은 앞 화면을 붙잡아 두지 않는다)와 114 의 대화창(연초 내장
+ * 이벤트 첫 대사 — 재생기를 이 자리에 세우지 않는다)은 그리지 않는다. 둘 다 효과기가 절반 이상 덮는 틀이다
  */
 export function resumeCoverUnderlayAt(frame: number): ResumeCoverUnderlay {
-  return frame < RESUME_MANAGEMENT_FRAME ? '검정' : '상태판'
+  if (frame < RESUME_MANAGEMENT_FRAME) return '검정'
+  return frame === RESUME_MANAGEMENT_FRAME ? '관리' : '상태판'
 }
 
 /** 앞 화면이 어두워지는 틀 수 + 137 예약 틀 */

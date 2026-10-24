@@ -73,7 +73,7 @@ import {
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  SEASON_RECORD_ACE_PITCHER_SLOT, playerFaceOf, recordAceSeatOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  SEASON_RECORD_ACE_BATTER_SLOT, SEASON_RECORD_ACE_PITCHER_SLOT, playerFaceOf, recordAceSeatOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type {
@@ -124,7 +124,7 @@ import type { SeasonEventCursor, SeasonEventReward } from '@/entities/season-mod
 import { rewardResumePatchOf } from '@/entities/story/model/storyScene'
 import {
   achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, seasonGoalWindowNumbersOf, seasonGoalWindowRankOf,
-  teamBattingAverageOf, teamEarnedRunAverageOf,
+  goalPitcherLinesWithAce, teamBattingAverageOf, teamEarnedRunAverageOf,
 } from '@/entities/season-mode/model/seasonGoals'
 import type { GoalPostseasonBracket, SeasonGoalInput, SeasonGoalWindowNumbers } from '@/entities/season-mode/model/seasonGoals'
 import {
@@ -1272,6 +1272,17 @@ function nextYearOf(save: SeasonSave, random: RandomPort): { readonly save: Seas
 }
 
 /**
+ * 내 팀 레코드에 마선수가 남은 칸 — 마투수 8 · 마타자 9 (`SeasonSave.recordAces`), 없으면 undefined.
+ * 명전 삭제 0x221dc · 나리 초기화 0x223a8 는 마선수를 거르지 않고 레코드 맨 끝 줄을 옮긴다(U-105 r163 — `removeHallOfFamerFromRoster`)
+ */
+function recordAceSlotOf(save: SeasonSave, isPitcher: boolean): number | undefined {
+  const aces = save.recordAces?.[save.state.record.teamId]
+  if (aces === undefined) return undefined
+  if (isPitcher) return aces.pitcher >= 0 ? SEASON_RECORD_ACE_PITCHER_SLOT : undefined
+  return aces.batter >= 0 ? SEASON_RECORD_ACE_BATTER_SLOT : undefined
+}
+
+/**
  * @param wallet 전역 G 지갑(`useGamePointWallet`). 넘기면 **지갑이 G 의 주인**이고
  *   시즌은 자기 주머니를 안 쓴다. 안 넘기면 예전처럼 세션 주머니로 논다(테스트용) —
  *   그 자리는 새로 고치면 사라진다.
@@ -1663,7 +1674,7 @@ export function useSeasonSession(
   const removeHallOfFamer = useCallback(
     (id: number, isPitcher: boolean) => {
       if (save === null) return
-      const roster = removeHallOfFamerFromRoster(save.roster, id, isPitcher)
+      const roster = removeHallOfFamerFromRoster(save.roster, id, isPitcher, recordAceSlotOf(save, isPitcher))
       if (roster !== save.roster) commit({ ...save, roster })
     },
     [commit, save],
@@ -1673,7 +1684,7 @@ export function useSeasonSession(
     (isPitcher: boolean) => {
       const current = latestSave.current
       if (current === null) return
-      const roster = removeCareerPlayerFromRoster(current.roster, isPitcher)
+      const roster = removeCareerPlayerFromRoster(current.roster, isPitcher, recordAceSlotOf(current, isPitcher))
       if (roster !== current.roster) commit({ ...current, roster })
     },
     [commit],
@@ -2887,6 +2898,8 @@ export function useSeasonSession(
             playerStats: next.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
             series: next.series ?? null,
             ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+            // 392 는 포스트시즌 첫날 — 마지막 정규 경기 날 넣은 마투수가 내 팀 레코드에 남아 있다 (0xa3764, U-105 r163)
+            recordAces: next.recordAces?.[applied.state.record.teamId],
           }),
         )))
       // 실행기 끝 0x8d134~0x8d19c: 370 · 371 은 0x8b04c, 376 은 0x8b370 이 결과 이벤트를 고른다(시즌 갈래)
@@ -3444,6 +3457,8 @@ export interface SeasonGoalSource {
   readonly series: PostseasonSeries | null
   /** 영입한 명전 선수의 기록 — 경기 명단(`entryOrderOf`)과 같은 칸을 보려고 같은 것을 넘긴다 */
   readonly recordOf?: SeasonEntryRecordSource
+  /** 내 팀 레코드에 남은 마선수 (`SeasonSave.recordAces[내 팀]`) — 목표 ④ 가 마투수 줄까지 센다 (`goalPitcherLinesWithAce`) */
+  readonly recordAces?: SeasonRecordAces | undefined
 }
 
 /**
@@ -3507,7 +3522,8 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
     wins: source.league.wins[team] ?? 0,
     losses: source.league.losses[team] ?? 0,
     teamBattingAverage: teamBattingAverageOf(batterLines),
-    teamEarnedRunAverage: teamEarnedRunAverageOf(pitcherLines),
+    // 0xa3764 는 마선수를 거르지 않는다 — 0xdf · 0xe5 전이면 레코드 8번 마투수 줄이 하나 더 든다 (U-105 r163)
+    teamEarnedRunAverage: teamEarnedRunAverageOf(goalPitcherLinesWithAce(pitcherLines, source.recordAces?.pitcher)),
     popularityGain: record.popularity - record.popularityAtSeasonStart,
   }
 }

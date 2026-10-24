@@ -29,6 +29,7 @@ import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { NariResumeManagementFrame } from '@/pages/management/ui/NariResumeManagementFrame'
 import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
 import { isBattingOrderEventId } from '@/entities/career/model/battingOrder'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
@@ -382,7 +383,11 @@ function CareerScreens({
        */
       const statusBoard = <NariEventUnderlay career={career} />
       const previousScreenAt = screen.fromResume === true
-        ? (frame: number) => (resumeCoverUnderlayAt(frame) === '검정' ? <YearCoverBlackFrame /> : statusBoard)
+        ? (frame: number) => {
+          const underlay = resumeCoverUnderlayAt(frame)
+          if (underlay === '검정') return <YearCoverBlackFrame />
+          return underlay === '관리' ? <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
+        }
         : previousKind === '이벤트' ? () => statusBoard : undefined
       // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다
       return <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} previousScreenAt={previousScreenAt} />

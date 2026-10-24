@@ -349,6 +349,8 @@ function SeasonScreens({
   const goalRecordOf = session.recordSource()
   const goalSource = {
     state, league, roster, playerStats, series, ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+    // 레코드에 남은 마투수 — 목표 ④ 0xa3764 가 거르지 않고 센다 (U-105 r163)
+    recordAces: session.myRecordAces,
   }
   const goalInput = seasonGoalInputOf(goalSource)
   // 시상 순위표의 재료 — 시상 화면에서만 만든다(명전 기록을 그때 읽는다)
