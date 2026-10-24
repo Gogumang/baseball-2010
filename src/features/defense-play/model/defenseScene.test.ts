@@ -3,7 +3,6 @@ import {
   DEFENSE_SCENE_START,
   drawDefenseScene,
   enterDefenseScene,
-  withClosedThrowKeys,
   fireLaser,
   turnOnDeadlyFlash,
   type DefenseScene,
@@ -98,24 +97,5 @@ describe('레이저 연출 0x4403c 와 판을 넘는 칸', () => {
     const 남음 = { ...DEFENSE_SCENE_START, popup: { ...DEFENSE_SCENE_START.popup, timer: 4, shown: false, bigOutDraws: 7 } }
     expect(enterDefenseScene(남음, false).popup).toMatchObject({ timer: -1, shown: false, bigOutDraws: 7 })
     expect(enterDefenseScene(남음, true).popup).toMatchObject({ timer: -1, shown: true, bigOutDraws: 0 })
-  })
-})
-
-/**
- * 판이 닫힌 뒤(+0x1094 셈) 온 키도 0x53420 을 지나 사람 수비면 0x533c8 → 0x588 → 0x51890 → vt60 0xb3118 이 +0x160 을 적는다.
- * 닫힌 판은 b4660 이 안 돌아 그 값이 다음 판으로 남는다.
- */
-describe('판이 닫힌 뒤 온 사람 송구 키 (+0x160)', () => {
-  it('사람 수비면 마지막 송구 키의 루를 적는다 — 송구 갈래가 아닌 키는 안 건드린다', () => {
-    const scene = withClosedThrowKeys(DEFENSE_SCENE_START, [{ key: '2' }, { key: 'Enter' }, { key: '4' }, { key: '5' }], '수비')
-    expect(scene.throwTarget).toBe(3)
-    expect(withClosedThrowKeys(DEFENSE_SCENE_START, [{ key: 'ArrowDown' }], '수비').throwTarget).toBe(0)
-  })
-
-  it('사람 공격(주루 0x5331c)이거나 키가 없으면 그대로다', () => {
-    expect(withClosedThrowKeys(DEFENSE_SCENE_START, [{ key: '2' }], '공격')).toBe(DEFENSE_SCENE_START)
-    expect(withClosedThrowKeys(DEFENSE_SCENE_START, [{ key: '2' }], undefined)).toBe(DEFENSE_SCENE_START)
-    const 남은키 = { ...DEFENSE_SCENE_START, throwTarget: 1 }
-    expect(withClosedThrowKeys(남은키, [], '수비')).toBe(남은키)
   })
 })

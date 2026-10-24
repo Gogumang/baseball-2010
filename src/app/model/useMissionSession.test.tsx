@@ -398,10 +398,10 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
   })
 
   /**
-   * 플레이 객체 +0x160(사람 송구 목표)은 장면과 함께 한 번 만들어지고(0xb0b6e) 판 시작 · 0x17 진입이 안 지운다 — 앞 판에서 못 쓴
-   * 키가 다음 판으로 남는다. 미션도 판마다 수비 장면 칸을 넘긴다
+   * 수비 장면 칸(결과 판 · 연출 · 줌)은 경기 장면과 함께 한 번 만들어져 판을 넘어 남는다 — 미션도 판마다 넘긴다.
+   * (플레이 객체 +0x160 사람 송구 목표는 판 시작 vt1c 0xb0edc 가 −1 로 지워 넘기지 않는다)
    */
-  it('판이 남긴 수비 장면 칸(+0x160 송구 목표 포함)을 다음 판이 이어받는다', () => {
+  it('판이 남긴 수비 장면 칸을 다음 판이 이어받는다', () => {
     const rendered = setUpBatterMission(1)
     const 안타 = () =>
       act(() => {
@@ -419,13 +419,13 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     expect(첫판!.input.scene).toBeUndefined()
     const 돌린판 = runDefensePlay(첫판!.input)
     act(() => {
-      rendered.result.current.session.actions.finishDefensePlay({ ...돌린판, scene: { ...돌린판.scene, throwTarget: 2 } })
+      rendered.result.current.session.actions.finishDefensePlay({ ...돌린판, scene: { ...돌린판.scene, slideDirection: 7 } })
     })
 
     안타()
     const 다음판 = rendered.result.current.session.pendingDefensePlay
     expect(다음판).not.toBeNull()
-    expect(다음판!.input.scene?.throwTarget).toBe(2)
+    expect(다음판!.input.scene?.slideDirection).toBe(7)
     rendered.unmount()
   })
 

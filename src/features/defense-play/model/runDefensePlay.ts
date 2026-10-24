@@ -18,7 +18,13 @@ import {
   type BallTrajectory,
 } from '@/entities/batting/model/battedBallFlight'
 import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
-import { displayPatternOf, isFairAngle, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
+import {
+  displayPatternOf,
+  isFairAngle,
+  isWideFairAngle,
+  isWideFairOriginalAngle,
+  scenePatternDeckOf,
+} from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { inPlayCommandOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
@@ -101,8 +107,6 @@ import {
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
 import {
-  applyCoverAssignment,
-  assignCoversForTick,
   baseAtPoint,
 } from '@/entities/fielding/model/coverAssignment'
 import { runCoverTick } from '@/features/defense-play/model/coverTick'
@@ -151,6 +155,9 @@ import {
   type DefensePlayView,
   type HolderPlate,
 } from '@/features/defense-play/model/defensePlayView'
+
+/** 슬롯 2 의 52602 — 판 종류가 이 마스크(0x58c)면 플레이 vt4c 0xb45dc 를 안 부른다 (`runnerPlayEngine` 과 같은 표) */
+const VT4C_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
 
 /**
  * 타구 하나를 **틱 단위로 돌리는 진행기**.
@@ -976,6 +983,11 @@ export interface DefensePlayState {
   foulFlag: boolean
   /** state[0x1c] — 쏜 공의 파울 각 (511b8 0x9d660(a) 의 반대). 표시 패턴으로 바꿔 쏘면 바꾼 각이다 */
   foulAngle: boolean
+  /**
+   * state[7] — 넓은 페어 각(0x9d640). 0 이면 커버 0xb1c90 이 머리(b1cc6)에서 끝난다(`coverTick` 머리말).
+   * 타구 0x511ae = 1 · state[0x19] == 0 이면 0x511ce = 0x9d640(쏜 a) · 사건 7 b2c06 = 0x9d640(공+0x70) · 아웃 꼬리 b3716 = 1
+   */
+  wideFair: boolean
   /** 플레이 +0x111 — 사건 코드 8(홈런). `PlayView.finished` 는 이 진행기의 판 끝 표시라 따로 든다 */
   homeRunFlag: boolean
   /** 플레이 +0x124 — 사건 코드 10(바운드로 담장을 넘은 2루타) */
@@ -1138,7 +1150,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   // 야수 목표는 늘 땅 위다. 포구 틱 다리(6b 절 쥐기)도 이 점에 세운다(r162 — 예전 웹은 높이째 포구 지점이었다)
   const catchPoint = groundPointOf(trajectory.pointAt(catchTick))
   // 시작 목표를 미리 세워 둔다 — 첫 틱부터 쫓는 야수는 공 쪽, 커버 야수는 제 루 쪽을 보고 있어야 한다.
-  // 커버는 판 시작 상태로 0xb1c90 을 한 번 돌린 것이다(`assignCoversForTick` — 매 틱 6절이 다시 고른다)
+  // 커버는 판 시작 상태로 0xb1c90 을 한 번 돌린 것이다(`runCoverTick` — 매 틱 1d 절이 다시 고른다)
   // 0xb3b38 담장 갈래 — 담장선이 먼저면 고른 야수는 AI 0xb 로 담장 앞 공점(aa4 − 2)에 간다(`fenceChasePoint`)
   fielders = fielders.map((fielder) =>
     fielder.slot === chaserSlot
@@ -1147,9 +1159,18 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
         : { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE }
       : fielder,
   )
-  const startCovers = assignCoversForTick({
+  // state[7] — 0x511ae 가 1 로 세운 뒤 state[0x19](0.1% 사건)가 아니면 0x511ce 가 0x9d640(쏜 a)로 덮는다
+  const wideFairAtStart = input.specialEvent === true || launchedPattern === undefined || isWideFairAngle(launchedPattern[0])
+  // 판 시작 vt18 종류 1(0xb280a): vt1c · vt20(1)(+0x126 = 1, b11fe) · 추적야수 · vt24 · vt34 · **vt30 = 0xb1c90 한 번**(커버 · 자리 잡기 0xb203a).
+  // state[7] == 0(넓은 파울 각)이면 머리에서 끝나 아무것도 안 고른다 — ⚠️ 근사: 그때 +0xf0 은 앞 판이 남긴 값인데 웹은 기본 표로 둔다
+  const startCovered = runCoverTick({
     context: {
-      play: { ...initialPlayView(1), coverOfBase: [...BASE_DEFAULT_FIELDER], ballHolderSlot: chaserSlot },
+      play: {
+        ...initialPlayView(1),
+        coverOfBase: [...BASE_DEFAULT_FIELDER],
+        ballHolderSlot: chaserSlot,
+        catchFielderSlot: chaserSlot,
+      },
       fielders,
       runners: runners.map((runner) => runner.state),
       currentTick: 0,
@@ -1157,14 +1178,17 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     },
     ballToFirstSide: catchPoint.x > basePosition(0).x,
     ballStartPoint: trajectory.pointAt(0),
+    relayFlag: true,
+    gateClosed: !wideFairAtStart,
   })
-  const covers = startCovers.covers
-  fielders = applyCoverAssignment(fielders, startCovers)
+  const covers = startCovered.play.coverOfBase
+  fielders = startCovered.fielders
 
   let play: PlayView = {
     ...initialPlayView(1),
-    // 플레이+0x160 — 판 시작이 안 지운다. 앞 판에서 못 쓴 사람 송구 키가 남아 있으면 이어받는다 (`DefenseScene.throwTarget`)
-    manualThrowBase: input.scene?.throwTarget ?? NONE,
+    // 플레이+0x160 — 판 시작 vt18 0xb27ec(종류 1 → 0xb280a)가 먼저 부르는 vt1c 0xb0edc 의 b0f66~b0f68 이 −1 로 지운다.
+    // 앞 판에서 못 쓴 사람 송구 키는 넘어오지 않는다
+    manualThrowBase: NONE,
     coverOfBase: covers,
     ballHolderSlot: chaserSlot,
     catchFielderSlot: chaserSlot,
@@ -1253,7 +1277,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     rundowns: 0,
     rundownOuts: 0,
     tagOut: false,
-    relayFlag: true,
+    relayFlag: startCovered.relayFlag,
     relayFinalSlot: NONE,
     relayBase: NONE,
     deferredThrowReceiver: NONE,
@@ -1266,6 +1290,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     foulFlag: false,
     // 511b8 state[0x1c] = 0x9d660(쏜 a) — 쏜 공(쏜 패턴)이 없는 호출(궤적만 받은 시험 · 옛 길)은 페어로 본다
     foulAngle: launchedPattern !== undefined && !isFairAngle(launchedPattern[0]),
+    wideFair: wideFairAtStart,
     homeRunFlag: false,
     groundRuleFlag: false,
     landingChase,
@@ -1415,6 +1440,7 @@ export function stepDefensePlay(
   let lastEventCode = state.lastEventCode
   let ballContacted = state.ballContacted
   let foulFlag = state.foulFlag
+  let wideFair = state.wideFair
   let homeRunFlag = state.homeRunFlag
   let groundRuleFlag = state.groundRuleFlag
   let landingChase = state.landingChase
@@ -1545,6 +1571,8 @@ export function stepDefensePlay(
     outs += 1
     outsAdded += 1
     outJudgedThisTick = true
+    // 아웃 꼬리 0xb36fa — state[6]++ · +0x110 = 0 · state[0x1c] = 0 · **state[7] = 1**(b3716) · 주자+0x96 = 1 · 0xa9648
+    wideFair = true
     // 0xb394e — state[0x87] = (결과 == 3). 아웃이 적히는 이 자리에서만 갈아 끼운다 (위 주석)
     tagOut = judged.kind === OUT_KIND.TAG
     // 결과 3(태그)이면 원본은 그 자리에서 협살을 끝낸다 (0xb3946 → 0xb26b8)
@@ -2576,7 +2604,14 @@ export function stepDefensePlay(
       // 11 도 메시지 0xbba → 표 0xd0488[10] = 0x51b20 이 0xa7d0c(사건 0xd)를 부른다 (2스트라이크 번트 파울 아웃)
       if (resultCode === 13 || resultCode === BUNT_FOUL_OUT_RESULT_CODE) outEvents += 1
       const effect = eventCodeEffectOf(resultCode)
-      if (effect.foulFlag) foulFlag = true
+      if (effect.foulFlag) {
+        foulFlag = true
+        // b2bfa~b2c06 state[7] = 0x9d640(공+0x70) — 공+0x70 은 쏘기(a288a) · 폴(a2c70) · 벽(a2cca)이 적는 각이라 미리 깐 궤적의
+        // 마지막 점 각이다. 원본 각 칸이 없는 손으로 만든 궤적은 쏜 값 그대로 둔다
+        if (isBallTrajectory(trajectory) && trajectory.length > 0) {
+          wideFair = isWideFairOriginalAngle(trajectory.pointDetailAt(trajectory.length - 1).angle)
+        }
+      }
       if (effect.homeRunFlag) homeRunFlag = true
       if (effect.groundRuleFlag) groundRuleFlag = true
       if (effect.poleHomeRunFlag) play = { ...play, suppressed: true }
@@ -2735,6 +2770,25 @@ export function stepDefensePlay(
           )
         }
       }
+    }
+
+    // ── 1d. vt4c 의 끝 b4c72 — 플레이 vt30 = 0xb1c90: 커버(+0xf0) 다시 고르기 · 키스톤 자리 잡기 0xb203a (`runCoverTick`) ──
+    // 슬롯 2 의 vt4c(52612)는 자동 진루(52660) · CPU 송구(526ae)보다 앞이고, 판 종류가 마스크 0x58c {2, 3, 7, 8, 10} 이면
+    // 안 돈다(52602 — 바운드 2루타 7 · 폴 홈런 10 이 된 판). 머리 관문: (+0x111 || +0x129) && 공+0x68 > 공+0xaa4 · state[7] == 0
+    if (!play.finished && !VT4C_BLOCKED_PLAY_KINDS.includes(play.kind)) {
+      const covered = runCoverTick({
+        context: contextAt(tick),
+        ballToFirstSide: catchPoint.x > basePosition(0).x,
+        // b1ddc 공.vt68(0) — **지금** 공 궤적의 첫 점: 타구는 0xd8758, 송구 · 다시 쏘기(0xb3148)는 새로 깐 궤적의 첫 점(r162)
+        ballStartPoint: ballSegmentStart,
+        relayFlag,
+        gateClosed:
+          !wideFair || ((homeRunFlag || play.suppressed) && tick - ballLaunchTick > trajectory.fenceTick),
+        foulFlag,
+      })
+      play = covered.play
+      fielders = covered.fielders
+      relayFlag = covered.relayFlag
     }
 
     // ── 4. 자동 추가 진루 (0xaf918) ──
@@ -2963,21 +3017,6 @@ export function stepDefensePlay(
     nextFrame: {
     if (pausedThisTick) break nextFrame
     // ── 6. 한 틱 움직이기 ──
-    // 0xb1c90(플레이 vt30, 매 틱) — 커버(+0xf0) 다시 고르기(`assignCoversForTick`)와 그 가운데의 커버 배치 갈래 0xb203a
-    // (2루 커버가 아닌 키스톤 야수의 자리 — 중계 자리 · 기본 자리). 자리 잡기는 원본에서 b1f06 뒤 · b23a4 앞이라
-    // 공 가진 야수의 루(b23a4) 넣기 전의 2루 커버로 본다
-    if (!play.finished) {
-      const covered = runCoverTick({
-        context: contextAt(tick),
-        ballToFirstSide: catchPoint.x > basePosition(0).x,
-        // b1ddc 공.vt68(0) — **지금** 공 궤적의 첫 점: 타구는 0xd8758, 송구 · 다시 쏘기(0xb3148)는 새로 깐 궤적의 첫 점(r162)
-        ballStartPoint: ballSegmentStart,
-        relayFlag,
-      })
-      play = covered.play
-      fielders = covered.fielders
-      relayFlag = covered.relayFlag
-    }
     const beforeMove = fielders
     // 추적야수 AI 1(0xb4afe): +0x127 && 낙구 틱 ≥ 공+0x68 이면 낙구 지점(x, 0, z), 아니면 포구 지점으로
     const landingPoint = trajectory.pointAt(ballLandingTick)
@@ -3190,6 +3229,7 @@ export function stepDefensePlay(
   state.lastEventCode = lastEventCode
   state.ballContacted = ballContacted
   state.foulFlag = foulFlag
+  state.wideFair = wideFair
   state.homeRunFlag = homeRunFlag
   state.groundRuleFlag = groundRuleFlag
   state.landingChase = landingChase
@@ -3262,7 +3302,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     specialDefense: state.specialDefense,
     laserThrow: state.laserThrow,
     laserOutFlag: state.laserOutFlag,
-    scene: { ...state.scene, throwTarget: state.play.manualThrowBase },
+    scene: state.scene,
     rundowns: state.rundowns,
     rundownOuts: state.rundownOuts,
     // 진행기 주자 배열이 곧 원본 목록 순서다 — 0 = 타자주자, 그 뒤 찬 루 오름차순 (`createPlayRunners`)

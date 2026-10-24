@@ -355,8 +355,11 @@ function* pickoffPlaySteps(
   let tickMessageCode = 0
   /** 수비 장면 연출 칸 — 0x17 진입 0x46418 이 결과 판 타이머를 −1 로 (`defenseScene`) */
   let scene = enterDefenseScene(input.scene, false)
-  /** 플레이+0x160 — 판을 넘어 남는 사람 송구 목표 (`DefenseScene.throwTarget`). 키 메시지 0x588 이 쓰고 b46a8 이 −1 */
-  let manualThrowBase = scene.throwTarget
+  /**
+   * 플레이+0x160 — 사람 송구 목표. 판 시작 vt18 0xb27ec 의 견제 갈래 0xb28be 가 vt1c 0xb0edc 를 먼저 불러 b0f66~b0f68 이 −1 로 지운다
+   * (앞 판의 키는 넘어오지 않는다). 키 메시지 0x588 이 쓰고 b46a8 이 −1
+   */
+  let manualThrowBase: number = NONE
   /** state[0x8b] — 결과 판 큰 OUT 이 +0x1999 를 보고 세운다 */
   let laserOutFlag = false
   /** +0x15c · +0x158 — 0xb2e38 이 미룬 송구(AI 9)의 받을 야수 · 목표 루 */
@@ -1007,7 +1010,7 @@ function* pickoffPlaySteps(
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene: { ...scene, throwTarget: manualThrowBase },
+    scene,
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)

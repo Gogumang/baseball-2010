@@ -65,7 +65,8 @@ import {
  *   에서 +0x168 에 쓰는 자리를 찾지 못했고, 플레이 객체(new(0x1fc) 0x3e756, 생성자 0xb0b68)도 이 칸을 안 적는다.
  *   그래서 갈래는 그대로 옮기되(`batterRunnerNeedsCover`) 칸 값은 생성 때 값 0 으로 둔다 → 안 선다.
  *   타자주자는 +0x8c == 0 이라 루 1 은 "루 r−1 의 주자" 로 어차피 선다
- * - ⚠️ 근사: state[7] · +0x110 · 판 끝(+0x111 · +0x129 && 공 틱 > 담장 틱, b1ca2) 관문은 판이 도는 동안 막지 않는다고 본다
+ * - 머리 관문 state[7] · 홈런(+0x111 · +0x129 && 공 틱 > 담장 틱, b1ca2)은 `coverTick.runCoverTick` 의 `gateClosed` 로 본다(r164).
+ *   +0x110 은 b1c90 머리 관문이 아니다(b2564 줄의 +0x110 == 0 만 — 아래)
  * - b1d96 의 H.vtcc()(0xa2138 = +0xb0 워드 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0, 직접 뜬 것) 중 **동작 잠금 +0xb4**(필살타법 타구에
  *   맞은 야수 vte4 0xa1e60 의 15)와 +0xcc 는 옮겼다(r158). vt30 은 AI 고리 vt4c 0xb45dc 끝(b4c72)이라 이 틱 머리 야수 틱이 줄인 값이다.
  *   ⚠️ 근사: +0xb0 워드(바이트 +0xb0~+0xb3 — 포구 · 다이빙 동작 vt 0xa1490(동작 7) · 0xa14ac(0xe) · 0xa1e28(6) · 0xa1ec4/0xa1f00
@@ -75,8 +76,14 @@ import {
  *   동작 0xe~0x12 면 0xe 는 프레임 0xf · 0xf~0x12 는 프레임 0xc 에서만 지운다(a141c~a143c). 그 밖의 동작은 (7 · 프레임 5) ·
  *   (0xe · 0xf) · (5 · 2) · (6 · 2) · (+0xb3 && 프레임 5) 중 하나거나 **vtc8(0xa2118 = +0xb1 == 0 && +0xcc ≤ 0)이 참이면** 지운다
  *   (a13f2~a141a) — 곧 가슴 높이 포구(7)가 세운 +0xb0 은 던진 뒤 잠금 +0xb1 · +0xcc 가 없으면 다음 야수 틱에 바로 지워진다.
- *   지울 때 +0xb0 · +0xb1 · +0xb2 · +0xb3 = 0 · vt10(a143e~a1456). 세터 vt 는 야수 vtable(0xd7934) +0x5c(0xa1490) · +0x90(0xa14ac) ·
- *   +0x94(0xa1e28) — 누가 어느 포구 종류에서 부르는지는 ⚠️ 미확인이라 옮기지 않았다
+ *   지울 때 +0xb0 · +0xb1 · +0xb2 · +0xb3 = 0 · vt10(a143e~a1456).
+ *   세터를 부르는 곳(r164 직접 뜸 — 야수 vtable 0xd7934 의 +0x5c · +0x60 · +0x90 · +0x94 · +0x98 을 부르는 곳은 이 한 곳뿐):
+ *   플레이 틱 0xb401c 의 b4134~b419c — 공 틱이 동작 시작 틱(플레이+0x176)이면 포구 종류 +0x16c 로 표 0xd87f4 를 뛰어 잡을 야수에게
+ *   종류 0 → vt94 0xa1e28(동작 6 · **+0xb2** = 1) · 1 → vt5c 0xa1490(동작 7 · **+0xb0** = 1) · 2 → vt60 0xa1ed8(동작 8~0xb · **+0xb3** = 1) ·
+ *   3 → vt90 0xa14ac(동작 0xe · **+0xb0** = 1, 플레이+0x1f7 = 1) · 4 → vt98 0xa1e9c(동작 0xf~0x12 · **+0xb3** = 1, 플레이+0x1f8 = 1).
+ *   곧 모든 포구 종류가 동작 시작 틱에 워드를 세운다 — 그 틱의 vt30(b1c90)은 그 야수(공 가진 야수 H 가 추적 야수)를 막힘으로 본다.
+ *   ⚠️ 남은 근사: 같은 워드를 vtC4(0xa20ec — 던질 준비)도 읽어 점프 · 슬라이딩 포구(프레임 0xf · 0xc 까지 남음)의 송구 시각까지 바뀌고,
+ *   지우는 규칙이 동작 번호 +0xa8(쥐기 뒤 바뀔 수 있음)을 봐서, 동작 칸 없이 반쪽만 옮기지 않았다
  * - +0x94 는 웹의 `requiredBase ≠ −1` 로 읽는다(0xa95e8 · 0xa9620 이 둘을 함께 세우고 지운다)
  */
 
@@ -89,6 +96,14 @@ export interface CoverAssignmentInput {
   readonly ballToFirstSide: boolean
   /** 공.vt68(0) — 공 궤적의 첫 점 (b1ddc) */
   readonly ballStartPoint: WorldPoint
+  /**
+   * b1f06 바로 뒤 · b23a4 앞의 키스톤 자리 잡기 0xb203a — 2루 커버(+0xf0[2])를 받아 그때까지의 야수(b1d38 의 투수 AI 0 이 이미
+   * 들어간)를 돌려준다. 자리 잡기가 바꾼 도움 야수의 목표점 · AI 0xa 를 b23a4(공 가진 야수의 목표 루) · b23dc(S.vt18 · d AI == 0) ·
+   * b2564(c AI) 가 본다(`coverTick.runCoverTick`). 안 주면 자리 잡기가 없다
+   */
+  readonly placeHelper?: (fielders: readonly FielderState[], secondBaseCover: number) => readonly FielderState[]
+  /** 플레이 +0x110(사건 7 파울) — 서 있으면 b2564(b2592~b259c)가 커버 야수에게 루 · AI 를 안 준다. 안 주면 0 */
+  readonly foulFlag?: boolean
 }
 
 export interface CoverAssignment {
@@ -104,6 +119,11 @@ export interface CoverAssignment {
   readonly idleSlots: readonly number[]
   /** AI 루 + 2 · 루 좌표를 받는 야수들 (b2564) */
   readonly coverStates: readonly { readonly slot: number; readonly base: number }[]
+  /**
+   * b2564 앞까지의 야수 — 자리 잡기(`placeHelper`)가 바꾼 것과 b1d38 · b2540 이 곧바로 적은 AI 0 이 들어 있다.
+   * `applyCoverAssignment` 는 이것에 얹는다
+   */
+  readonly fielders: readonly FielderState[]
 }
 
 /** 목표점(+0x2c)이 루 좌표와 좌표까지 같은 첫 루 (0xb1268 · 야수 vt68 = 0xa0b4c) — 없으면 −1 */
@@ -180,12 +200,18 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
       secondBaseCover: NONE,
       idleSlots: [],
       coverStates: [],
+      fielders,
     }
   }
   const covers = [...BASE_DEFAULT_FIELDER]
   const idleSlots: number[] = []
   const holderSlot = play.ballHolderSlot
-  const holder = fielders[holderSlot]
+  /** 함수 안에서 곧바로 바뀌는 야수 — b1d38 · b2540 의 AI 0(0xb8dbc 는 상태 칸만 적는다) · 자리 잡기 0xb203a */
+  let working = fielders
+  const idleNow = (slot: number): void => {
+    working = working.map((fielder) => (fielder.slot === slot ? { ...fielder, aiState: AI_STATE.IDLE } : fielder))
+  }
+  const holder = working[holderSlot]
 
   // ── b1d0a · b1d48: 기본 야수가 공을 가졌으면 그 루를 투수에게 ──
   const holderTargetBase = holder === undefined ? NONE : baseAtPoint(holder.target)
@@ -197,6 +223,7 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
     holder.aiState !== AI_STATE.RECEIVE
   ) {
     idleSlots.push(0)
+    idleNow(0)
   } else {
     const handed = holderSlot === 1 ? 0 : holderSlot === 2 ? 1 : holderSlot === 4 ? 3 : NONE
     if (handed !== NONE) {
@@ -243,9 +270,14 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
   }
   covers[2] = cover
 
-  // ── b23a4: 공 가진 야수가 루로 가고 있으면 그 루의 커버다 ──
-  if (holder !== undefined && holderTargetBase !== NONE && holder.aiState !== AI_STATE.RECEIVE) {
-    covers[holderTargetBase] = holderSlot
+  // ── b1f06 → 0xb203a: 2루 커버가 아닌 키스톤 야수의 자리 잡기 (b23a4 앞 — 공 가진 야수가 도움 야수면 그 목표점도 바뀐다) ──
+  if (input.placeHelper !== undefined) working = input.placeHelper(working, cover)
+
+  // ── b23a4: 공 가진 야수가 루로 가고 있으면 그 루의 커버다 (b23a6 0xb0c90 을 다시 읽는다) ──
+  const holderNow = working[holderSlot]
+  const holderNowBase = holderNow === undefined ? NONE : baseAtPoint(holderNow.target)
+  if (holderNow !== undefined && holderNowBase !== NONE && holderNow.aiState !== AI_STATE.RECEIVE) {
+    covers[holderNowBase] = holderSlot
   }
 
   // ── b23dc: 쉬고 있는 기본 야수가 먼저 닿을 수 있으면 커버를 되찾는다 ──
@@ -255,20 +287,21 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
     const fallbackSlot = BASE_DEFAULT_FIELDER[base]
     let substitute: FielderState | undefined
     if (current === fallbackSlot) {
-      const pitcher = fielders[0]
+      const pitcher = working[0]
       if (pitcher === undefined || baseAtPoint(pitcher.target) !== base) continue
       substitute = pitcher
       covers[base] = 0
     } else {
-      substitute = fielders[current]
+      substitute = working[current]
     }
     if (substitute === undefined || !isSamePoint(substitute.position, substitute.target)) continue
-    const fallback = fielders[fallbackSlot]
+    const fallback = working[fallbackSlot]
     if (fallback === undefined || fallback.aiState !== AI_STATE.IDLE) continue
     if (!defaultFielderBeatsARunner(runners, base, fallback)) continue
     // b2536: 대신 선 야수가 AI 8 이면 아무것도 안 바꾼다
     if (substitute.aiState === AI_STATE.RUNDOWN) continue
     idleSlots.push(substitute.slot)
+    idleNow(substitute.slot)
     covers[base] = fallbackSlot
   }
 
@@ -277,7 +310,7 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
   for (let base = 0; base <= 3; base += 1) {
     const slot = covers[base]
     if (slot === NONE) continue
-    const fielder = fielders[slot]
+    const fielder = working[slot]
     if (fielder === undefined) continue
     if (
       fielder.aiState === AI_STATE.RUNDOWN ||
@@ -286,9 +319,11 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
     ) {
       continue
     }
+    // b2592 — 플레이 +0x110(파울)이 서 있으면 건너뛴다
+    if (input.foulFlag === true) continue
     coverStates.push({ slot, base })
   }
-  return { ran: true, covers, secondBaseHelper: helper, secondBaseCover: cover, idleSlots, coverStates }
+  return { ran: true, covers, secondBaseHelper: helper, secondBaseCover: cover, idleSlots, coverStates, fielders: working }
 }
 
 /** `assignCoversForTick` 의 답을 야수에게 — AI 0(시작 자리로) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */

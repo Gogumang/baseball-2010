@@ -4,7 +4,6 @@ import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPredic
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import {
   AI_STATE,
-  NONE,
   type DefenseContext,
   type FielderState,
   type PlayView,
@@ -23,8 +22,16 @@ import { secondBaseHelperPlacement } from '@/entities/fielding/model/throwArriva
  *   부르지 않는다(b2942 → b29ec 0xb8dbc(투수, 0xe) → b2a1e 끝).
  * - 송구 `0xb2e38` 의 꼬리 b3094 — 예보 vt24(0) · 고르기 vt34 뒤 (판 종류를 안 본다).
  *
- * 차례는 원본이 b1f06(2루 커버) → b203a(자리 잡기) → b23a4 · b23dc · b2564 이지만, 웹은 타구 진행기와 같이 커버를 다 정한 뒤
- * 자리 잡기를 한다(⚠️ 근사 — 도움 야수가 다른 루 커버로 b2564 에 걸리는 드문 틱에서만 다르다).
+ * 차례도 원본대로다 — b1f06(2루 커버 · +0x138 도움) → **b203a 자리 잡기** → b23a4(공 가진 야수의 목표 루) · b23dc(되찾기) · b2564
+ * (커버 AI). 자리 잡기는 `assignCoversForTick` 의 `placeHelper` 로 그 사이에 끼워, 바뀐 도움 야수의 목표점 · AI 0xa 를 뒤의 셋이 본다.
+ *
+ * 머리 관문(b1c96~b1cce, 직접 뜬 것) — 하나라도 서면 이번 호출은 커버도 자리 잡기도 없이 끝난다(b1cd0 → b25d6):
+ * - 어느 야수든 AI 8(협살) — `assignCoversForTick` · `secondBaseHelperPlacement` 가 본다.
+ * - (+0x111 홈런 || +0x129 폴 홈런) && 공+0x68(공 틱) > 공+0xaa4(담장 넘는 틱) — 부르는 쪽이 `gateClosed` 로 넘긴다.
+ * - state[7] == 0 — 쓰는 곳은 0xb67d0(b6808, 타석 · 공마다 0xf 진입 0x3d954 → 0x35650 → 0xb68bc 가 부른다) = 1 ·
+ *   타구 0x511ae = 1 뒤 state[0x19] == 0 이면 0x511ce = 0x9d640(쏜 각) · 사건 7(파울) b2c06 = 0x9d640(공+0x70) · 아웃 꼬리 b3716 = 1
+ *   뿐이다(즉치 #7 strb 전수). 주자 판(도루 · 폭투 · 견제 · 밀어내기)은 0xf 진입 뒤라 늘 1 이고, 타구 판은 넓은 페어 각
+ *   (−145 ≤ a ≤ −35) 밖으로 친 파울이면 0 이라 아웃이 나기 전까지 이 함수가 안 돈다 — 부르는 쪽이 `gateClosed` 로 넘긴다.
  */
 export interface CoverTickInput {
   readonly context: DefenseContext
@@ -34,6 +41,10 @@ export interface CoverTickInput {
   readonly ballStartPoint: WorldPoint
   /** 플레이 +0x126 — 판 시작 vt20(b11fe)이 1, 중계 자리를 잡으면(b22f6) 0 */
   readonly relayFlag: boolean
+  /** 머리 관문의 홈런 · state[7] 갈래가 닫혔나 (머리말). 안 주면 열림 */
+  readonly gateClosed?: boolean
+  /** 플레이 +0x110(사건 7 파울) — b2564 가 커버 AI 를 안 준다. 주자 판은 사건 7 이 없어 늘 0 */
+  readonly foulFlag?: boolean
 }
 
 export interface CoverTickResult {
@@ -44,30 +55,32 @@ export interface CoverTickResult {
 
 export function runCoverTick(input: CoverTickInput): CoverTickResult {
   const { context } = input
-  let { play, fielders } = context
+  if (input.gateClosed === true) return { play: context.play, fielders: context.fielders, relayFlag: input.relayFlag }
+  let { play } = context
   let relayFlag = input.relayFlag
   const assigned = assignCoversForTick({
     context,
     ballToFirstSide: input.ballToFirstSide,
     ballStartPoint: input.ballStartPoint,
+    foulFlag: input.foulFlag,
+    // b1f06 → 0xb203a — 그때의 +0xf0(기본 표 · b1d48 넘기기 · 2루 커버)와 야수로 자리를 잡는다
+    placeHelper: (fielders, secondBaseCover) => {
+      const placement = secondBaseHelperPlacement({
+        context: { ...context, fielders },
+        secondBaseCover,
+        ballToFirstSide: input.ballToFirstSide,
+        relayFlag,
+      })
+      if (placement.kind !== '자리') return fielders
+      if (placement.relayPlaced) relayFlag = false
+      return fielders.map((fielder) =>
+        fielder.slot === placement.slot ? { ...fielder, target: placement.target, aiState: AI_STATE.BUSY } : fielder,
+      )
+    },
   })
-  if (assigned.ran) {
-    play = { ...play, coverOfBase: assigned.covers }
-    fielders = applyCoverAssignment(fielders, assigned)
-  }
-  const placement = secondBaseHelperPlacement({
-    context: { ...context, play, fielders },
-    secondBaseCover: assigned.ran ? assigned.secondBaseCover : NONE,
-    ballToFirstSide: input.ballToFirstSide,
-    relayFlag,
-  })
-  if (placement.kind === '자리') {
-    if (placement.relayPlaced) relayFlag = false
-    fielders = fielders.map((fielder) =>
-      fielder.slot === placement.slot ? { ...fielder, target: placement.target, aiState: AI_STATE.BUSY } : fielder,
-    )
-  }
-  return { play, fielders, relayFlag }
+  if (!assigned.ran) return { play, fielders: context.fielders, relayFlag }
+  play = { ...play, coverOfBase: assigned.covers }
+  return { play, fielders: applyCoverAssignment(assigned.fielders, assigned), relayFlag }
 }
 
 /** 0xa276c — 판 시작이 공 첫 점 하나만 깐 공(종류 5 = 0xd7c30 포수 자리 · 그 밖 0xd7c24 투수판). 점 칸은 0xa2610 이 지워 각 0 */

@@ -700,20 +700,19 @@ describe('판정 콜은 판 안의 그 틱 (결과 메시지 0xbba)', () => {
 })
 
 /**
- * 플레이 객체 +0x160 — 판이 닫힌 뒤(+0x1094 셈) 온 사람 수비 송구 키도 0x53420 → 0x533c8 → 0x588 → vt60 이 적고, 닫힌 판에서는
- * b4660 이 안 돌아 다음 판으로 남는다(장면 칸 `throwTarget`).
+ * 플레이 객체 +0x160 — 판이 닫힌 뒤(+0x1094 셈) 온 사람 수비 송구 키도 0x53420 → 0x533c8 → 0x588 → vt60 이 적지만, 닫힌 판에서는
+ * b4660 이 안 돌고 다음 판 시작 vt18 0xb27ec 가 부르는 vt1c 0xb0edc(b0f66~b0f68)가 −1 로 지워 아무것도 넘어가지 않는다.
  */
-describe('판이 닫힌 뒤 온 사람 송구 키는 다음 판으로 남는다 (+0x160)', () => {
+describe('판이 닫힌 뒤 온 사람 송구 키는 다음 판으로 안 넘어간다 (+0x160 — vt1c 가 지운다)', () => {
   const 판끝까지 = (input: DefensePlayInput) => runDefensePlay(input).ticks.length + 2
 
-  it('사람 수비 — 닫힌 갱신에 누른 \'4\' 가 장면 칸 throwTarget 3 으로 넘어간다 · 안 누르면 그대로 −1', () => {
+  it('사람 수비 — 닫힌 갱신에 누른 \'4\' 가 있어도 결과 · 장면 칸이 안 누른 판과 같다', () => {
     vi.useFakeTimers()
     try {
       const input = 타구(땅볼아웃, { first: false, second: false, third: false })
       const 안눌렀다 = vi.fn()
       render(<DefensePlayback input={input} side="수비" onDone={안눌렀다} />)
       끝까지(안눌렀다)
-      expect(결과(안눌렀다).scene.throwTarget).toBe(-1)
       cleanup()
 
       const 눌렀다 = vi.fn()
@@ -722,23 +721,8 @@ describe('판이 닫힌 뒤 온 사람 송구 키는 다음 판으로 남는다 
       expect(눌렀다).not.toHaveBeenCalled()
       fireEvent.keyDown(window, { key: '4' })
       끝까지(눌렀다)
-      expect(결과(눌렀다).scene.throwTarget).toBe(3)
       expect(결과(눌렀다).advance).toEqual(결과(안눌렀다).advance)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('사람 공격이면 닫힌 갱신의 키가 +0x160 을 안 건드린다 (주루 0x5331c)', () => {
-    vi.useFakeTimers()
-    try {
-      const input = 타구(땅볼아웃, { first: false, second: false, third: false })
-      const onDone = vi.fn()
-      render(<DefensePlayback input={input} side="공격" onDone={onDone} />)
-      for (let 갱신 = 0; 갱신 < 판끝까지(input); 갱신 += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
-      fireEvent.keyDown(window, { key: '4' })
-      끝까지(onDone)
-      expect(결과(onDone).scene.throwTarget).toBe(-1)
+      expect(결과(눌렀다).scene).toEqual(결과(안눌렀다).scene)
     } finally {
       vi.useRealTimers()
     }

@@ -183,3 +183,47 @@ describe('0xb1b88 타자주자 갈래 b1bde~b1c08 — P+0x168 ∈ {6..8, 12..14}
     expect(batterRunnerNeedsCover([createRunner(0, 0, 속도)])).toBe(false)
   })
 })
+
+describe('0xb203a 자리 잡기의 차례 — b1f06(2루 커버) 뒤 · b23a4 앞', () => {
+  it('자리 잡기가 받은 2루 커버로 부르고, 그 뒤 b23a4 는 자리 잡기가 바꾼 공 가진 야수의 목표점을 본다', () => {
+    // 2루수(3)가 공을 쥐었다 — b1e12 로 커버 5 · 도움 3(= 공 가진 야수)
+    const context = 문맥({ ballHolderSlot: 3 })
+    const 받은커버: number[] = []
+    const 결과 = assignCoversForTick({
+      context,
+      ballToFirstSide: false,
+      ballStartPoint: 타격점,
+      placeHelper: (fielders, secondBaseCover) => {
+        받은커버.push(secondBaseCover)
+        // 도움 야수(3)를 1루 좌표로 — b23a4 가 공 가진 야수의 목표 루 1 을 그의 커버로 넣는다
+        return 고치기(3, { target: basePosition(1), aiState: AI_STATE.BUSY }, fielders)
+      },
+    })
+    expect(받은커버).toEqual([5])
+    expect(결과.covers[2]).toBe(5)
+    expect(결과.covers[1]).toBe(3)
+    expect(결과.fielders[3].aiState).toBe(AI_STATE.BUSY)
+    // 자리 잡기가 없으면 b23a4 는 제자리(시작 위치 = 루 좌표 아님)를 본다
+    expect(돌리기(context).covers[1]).toBe(2)
+  })
+
+  it('b23dc 의 "기본 야수 d AI == 0" 은 자리 잡기 뒤 AI 를 본다 — 도움 야수가 AI 0xa 가 되면 2루를 되찾지 않는다', () => {
+    const 이루주자 = [createRunner(1, 1, 속도, { targetBase: 2 })]
+    // 공은 중견수(7) — 공 각 1루 쪽이면 (커버 5, 도움 3). 유격수가 2루 위에 서 있다(S.vt18 참)
+    const 선수들 = 고치기(5, { position: basePosition(2), target: basePosition(2) })
+    const context = 문맥({ ballHolderSlot: 7 }, 이루주자, 선수들)
+    const 안잡음 = assignCoversForTick({ context, ballToFirstSide: true, ballStartPoint: 타격점 })
+    const 잡음 = assignCoversForTick({
+      context,
+      ballToFirstSide: true,
+      ballStartPoint: 타격점,
+      placeHelper: (fielders) => 고치기(3, { aiState: AI_STATE.BUSY }, fielders),
+    })
+    // 자리 잡기가 없으면 쉬던 2루수(AI 0)가 주자보다 먼저 닿아 2루를 되찾고(b2540 유격수 AI 0), 자리 잡기 뒤면 AI 0xa 라 못 되찾는다
+    expect(안잡음.covers[2]).toBe(3)
+    expect(안잡음.idleSlots).toContain(5)
+    expect(잡음.covers[2]).toBe(5)
+    expect(잡음.idleSlots).not.toContain(5)
+  })
+})
+
