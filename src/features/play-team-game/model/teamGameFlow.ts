@@ -4553,6 +4553,8 @@ function substitutionSceneAfter(
   const incomingIsAce = aceIndex >= 0
   return {
     serial: (progress.substitutionScene?.serial ?? 0) + 1,
+    // 0x38b64 의 가지 — 투수 ptc/004 · 타자 ptc/003
+    entryKind: side,
     incomingIsAce,
     entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: progress.game.bases }),
     ...(incomingIsAce ? { aceSlot: aceCutInSlotOf(side, aceIndex) } : {}),

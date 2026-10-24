@@ -453,7 +453,7 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
     // state[0xd] — 다음 한 투구 동안은 다시 안 바뀐다
     expect(바꾼뒤.pitcherJustChanged).toBe(true)
     // 0x496f0 → 교체 연출 0x16 — 화면이 "CHANGE" 를 그린 뒤 0xe 에서 등판음(마투수 26 · 2·3루 15 · 그 밖 14)
-    expect(바꾼뒤.substitutionScene).toEqual({ serial: 1, incomingIsAce: false, entrySoundId: 14 })
+    expect(바꾼뒤.substitutionScene).toEqual({ serial: 1, entryKind: '투수', incomingIsAce: false, entrySoundId: 14 })
     expect(바꾼뒤.sceneConfirm).not.toBe(progress.sceneConfirm)
     // 0x16 → 0xd 는 0x522d2 가 이전 상태 0x16 을 보고 메시지 0xbc1 의 타석 등장음을 안 낸다
     expect(바꾼뒤.sceneConfirm?.atBatEntrySoundId).toBeUndefined()

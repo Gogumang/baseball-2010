@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { FRESH_HELD_CPU_MAGIC, cpuMagicStateOf } from '@/entities/pitching/model/magicPitchGame'
@@ -970,6 +971,8 @@ export function useMissionSession({
     playSoundIds(audio, [PITCHER_CHANGE_SOUND])
     setSubstitutionScene((previous) => ({
       serial: (previous?.serial ?? 0) + 1,
+      // 0x38b64 의 가지 — 투수 교체는 투수 ptc/004 · 대타는 타자 ptc/003
+      entryKind: substitution.kind === '대타' ? '타자' : '투수',
       incomingIsAce: substitution.incomingIsAce,
       entrySoundId: pitcherEntrySoundIdOf({ isAce: substitution.incomingIsAce, bases: run.bases }),
       // 마선수 등장 컷인 0x473f0 번호 — 미션 상대 마선수(1 부터) 0xb63a1 = opponentAce − 1, 대타면 +5
@@ -1014,7 +1017,8 @@ export function useMissionSession({
   }
 
   /**
-   * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 → 0x38b64)가 등판음을 낸다.
+   * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 · 0x49e64 49f76 → 0x38b64)가
+   * 들어온 선수 자리에 파티클을 쏘고 등판음을 낸다.
    * ⚠️ 근사(남김 — 웹 구조): 웹은 0xd 두 그림을 타이머로 센다(화면의 0xe 대기는 같은 때부터 0xd 두 그림을 센다).
    */
   const finishSubstitutionScene = () => {
@@ -1022,7 +1026,11 @@ export function useMissionSession({
     if (scene === null) return
     setSubstitutionScene(null)
     // 경기 장면 틱으로 센다 — 공용 창이 서 있으면 0xd 의 장면 틱(52cc6) · 0xe 그리기(52efe)가 서기 때문이다
-    setGameSceneTickTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES)
+    // 0x38b64 — 들어온 선수 자리에 파티클(투수 ptc/004 · 타자 ptc/003)을 먼저 쏘고 등판음
+    setGameSceneTickTimeout(() => {
+      emitSubstitutionEntryParticle(scene.entryKind)
+      playSoundIds(audio, [scene.entrySoundId])
+    }, SCENE_PREPARE_FRAMES)
   }
 
   /**

@@ -124,7 +124,7 @@ describe('교체 연출 0x16 — 그리기 0x4da30 의 "CHANGE" 애니 (0xf 진�
           onFinish={vi.fn()}
           onSteal={vi.fn()}
           sceneConfirm={{ entries: 1 }}
-          substitutionScene={{ serial: 1, incomingIsAce: false, entrySoundId: 14 }}
+          substitutionScene={{ serial: 1, entryKind: '투수', incomingIsAce: false, entrySoundId: 14 }}
           onSubstitutionSceneDone={onDone}
         />,
       )

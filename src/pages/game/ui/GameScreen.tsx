@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { MutableRefObject } from 'react'
@@ -233,7 +234,13 @@ export function GameScreen({
    * 타석 중간(볼 · 스트라이크 · 파울 · 판 끝 · 견제 끝의 0xf 진입, be9a27f)이면 진행기가 새 대기(entries 1)와 `confirmsBefore` 0
    * 연출을 싣는다 — 곧장 서고, 카운트는 그대로(0xd 가 앞 상태 0x16 이라 타석 초기화를 건너뜀, 48e94) 0xe 의 OK 를 기다린다.
    */
-  const substitution = useSubstitutionScene(progress.substitutionScene, progress.sceneConfirm, isSceneUncovered)
+  const substitution = useSubstitutionScene(
+    progress.substitutionScene,
+    progress.sceneConfirm,
+    isSceneUncovered,
+    // 0xe 첫 그림의 0x38b64 — 타석 캔버스가 그린 투수 · 타자 자리에 등판 파티클
+    (scene) => emitSubstitutionEntryParticle(scene.entryKind),
+  )
   const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {

@@ -23,7 +23,8 @@ export interface SubstitutionScenePlayback {
  *
  * - 0xe 대기가 `confirmsBefore` 번 OK 를 받은 뒤(없으면 곧장), `canRun`(덮개 · 팝업 · 결과 띠가 없을 때)이면 선다.
  * - 선 첫 그림에 `timeSoundId`(CPU 교체의 "Time!" 22 — 진행기가 안 낸 경우)를 낸다.
- * - 다 그리면(`finish`) 0xd 두 그림 뒤 0xe 그리기 0x38d1c(38dc2) → 0x38b64 가 등판음(26 · 15 · 14)을 낸다.
+ * - 다 그리면(`finish`) 0xd 두 그림 뒤 0xe 그리기 0x38d1c(38dc2) · 0x49e64(49f76) → 0x38b64 가 들어온 선수 자리에 파티클을 쏘고
+ *   (`onEntryDraw` — 투수 ptc/004 · 타자 ptc/003) 등판음(26 · 15 · 14)을 낸다.
  *   ⚠️ 근사(남김 — 웹 구조): 0xd 두 그림을 타이머로 센다 — 화면의 0xe 대기도 같은 때부터 0xd 두 그림을 센다(`useSceneConfirm`).
  * 한 번 다 본 번호는 다시 세우지 않는다(화면이 다시 서도 — 진행 상태가 같은 객체를 들고 있는 동안).
  */
@@ -31,6 +32,11 @@ export function useSubstitutionScene(
   scene: SubstitutionScene | null | undefined,
   wait: SceneConfirmWait | null | undefined,
   canRun: boolean,
+  /**
+   * 0xe 첫 그림의 0x38b64 — 등판음 **앞**에 들어온 선수 자리로 파티클을 쏜다(38bd0 · 38c6e). 화면이
+   * `widgets/batting-stage` 의 `emitSubstitutionEntryParticle` 를 넘긴다(그림 자리는 타석 캔버스가 안다)
+   */
+  onEntryDraw?: (scene: SubstitutionScene) => void,
 ): SubstitutionScenePlayback {
   const [, setVersion] = useState(0)
   const isDone = scene == null || seenSerials.has(scene)
@@ -47,6 +53,8 @@ export function useSubstitutionScene(
 
   const sceneRef = useRef(scene)
   sceneRef.current = scene
+  const onEntryDrawRef = useRef(onEntryDraw)
+  onEntryDrawRef.current = onEntryDraw
   const finish = useCallback(() => {
     const current = sceneRef.current
     if (current == null || seenSerials.has(current)) return
@@ -55,7 +63,11 @@ export function useSubstitutionScene(
     const entry = current.entrySoundId
     // 0xd 두 그림 뒤 0xe 그리기(0x38b64)의 등판음 — 0xd · 0xe 는 경기 장면 상태라 공용 창이 서 있으면 52cc6 이 장면 틱을, 52efe 가
     // 그리기를 건너뛴다. 경기 장면 틱으로 센다(0xe 첫 그림 = 장면 틱 격자의 틱 머리)
-    setGameSceneTickTimeout(() => activeSound().play(entry), SCENE_PREPARE_FRAMES)
+    // 0x38b64 는 파티클(38bd0 · 38c6e)을 먼저 쏘고 등판음을 낸다
+    setGameSceneTickTimeout(() => {
+      onEntryDrawRef.current?.(current)
+      activeSound().play(entry)
+    }, SCENE_PREPARE_FRAMES)
   }, [])
 
   return {
