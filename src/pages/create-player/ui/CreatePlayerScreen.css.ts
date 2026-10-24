@@ -41,7 +41,7 @@ export const valueButton = style({
   },
 })
 
-/** 고른 줄 양옆 화살표 (그림은 근사) */
+/** 고른 줄 양옆 화살표 — mode_ui 프레임 24 (0x160a8, `createPlayerLayout` 의 ARROW) */
 export const arrowButton = style({
   position: 'absolute',
   padding: 0,

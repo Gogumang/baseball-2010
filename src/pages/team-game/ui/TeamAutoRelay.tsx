@@ -47,6 +47,14 @@ const SPEED_MARKS_Y = 196 + 18 + SPEED_PLATE_HEIGHT + 4
 /** game_ui 그림 93 (98×19) "CHANGE" — 화면 가운데 */
 const CHANGE_IMAGE = 93
 const CHANGE_SIZE = { width: 98, height: 19 } as const
+/**
+ * "CHANGE" 자리 (42b44~42bba, U-57 — 직접 뜸): 0xba815(game_ui, 0x5d, 종류 0) 상자 뒤 `x = W/2 − (w / 2)` · `y = H/2 − (h / 2)` —
+ * 반은 부호 있는 정수 나눗셈(`lsrs #0x1f ; adds ; asrs #1`)이라 19 → 9 · (71, 151). (앞서 웹은 `trunc(160 − 9.5)` = 150 이었다)
+ */
+export const changeImagePosition = {
+  x: (SCREEN_WIDTH >> 1) - Math.trunc(CHANGE_SIZE.width / 2),
+  y: (SCREEN_HEIGHT >> 1) - Math.trunc(CHANGE_SIZE.height / 2),
+} as const
 
 /**
  * 질문 창 뒤 어둡게 — 경기 장면은 [창+0x24f] = 1(0x3301c)이라 창을 연 그림에 한 번만 0x746cc 가 검정 단계 5 = (5 + 1)/16 로 덮는다
@@ -243,7 +251,7 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
       </div>
       {isChangeShown && (
         <img alt="CHANGE" data-testid="중계-CHANGE" src={`${GAME_UI}/${String(CHANGE_IMAGE).padStart(3, '0')}.png`}
-          style={imageStyle(SCREEN_WIDTH / 2 - CHANGE_SIZE.width / 2, Math.trunc(SCREEN_HEIGHT / 2 - CHANGE_SIZE.height / 2))} />
+          style={imageStyle(changeImagePosition.x, changeImagePosition.y)} />
       )}
       {isAsking && (
         <MessageBox

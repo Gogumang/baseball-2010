@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, MessageBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { isFrameSlideClearedAt, isFrameSlidingAt } from '@/widgets/screen-frame/lib/frameSlide'
@@ -114,14 +115,15 @@ export function SettingsScreen({
   /** 하위 페이지(상세 설정·모드 초기화)에서 돌아왔는가 — 돌아온 첫 화면은 머리띠가 다시 미끄러지지 않는다 */
   const [hasReturned, setHasReturned] = useState(false)
   const updates = useUpdateCounter()
-  const isOutlineShown = isSelectedOutlineShown(updates)
+  const [isDetailOpen, setDetailOpen] = useState(false)
+  const [isModeResetOpen, setModeResetOpen] = useState(false)
+  /** [skin+0x410] — 하위 페이지가 떠 있으면 그 페이지가 0x593c8 을 그리며 올린다(이 첫 화면은 안 그린다) */
+  const isOutlineShown = isSelectedOutlineShown(useSkinBlinkCounter(updates, isDetailOpen || isModeResetOpen ? 0 : 1))
   /** 고른 줄 까딱임 — 표 0xd1784 · 0xd1754 (`settingsLayout` 의 `ROW_SHAKE_TABLES` 머리말) */
   const rowShake = useCursorShake(updates)
   /** 머리띠가 미끄러지는 그리기 — 메인 메뉴 환경설정만 머리띠가 있고, 하위 페이지에서 돌아온 화면은 미끄러지지 않는다 */
   const isHeaderSliding = mainMenu !== undefined && !hasReturned && isFrameSlidingAt(updates)
   const [notice, setNotice] = useState<string | null>(null)
-  const [isDetailOpen, setDetailOpen] = useState(false)
-  const [isModeResetOpen, setModeResetOpen] = useState(false)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
   const titleFrames = useFrameOrigins(IMG_TEXT)
   const titlePalette = useImgTextPalette3()
@@ -526,7 +528,7 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
 }) {
   const [cursor, setCursor] = useState(0)
   const tick = useUpdateCounter()
-  const isOutlineShown = isSelectedOutlineShown(tick)
+  const isOutlineShown = isSelectedOutlineShown(useSkinBlinkCounter(tick))
   /** 고른 줄 까딱임 — 같은 표 0xd1784 · 0xd1754 (0x59f04~0x59f4a) */
   const rowShake = useCursorShake(tick)
   const frames = useFrameOrigins(`${SLT_FRAME}/frames`)
@@ -712,7 +714,7 @@ function ModeResetPage({
 }) {
   const [cursor, setCursor] = useState(0)
   const tick = useUpdateCounter()
-  const isOutlineShown = isSelectedOutlineShown(tick)
+  const isOutlineShown = isSelectedOutlineShown(useSkinBlinkCounter(tick))
   /** 고른 줄 까딱임 — 같은 표 0xd1784 · 0xd1754 (0x5a386~0x5a3cc) */
   const rowShake = useCursorShake(tick)
   const [popup, setPopup] = useState<ModeResetPopup | null>(null)

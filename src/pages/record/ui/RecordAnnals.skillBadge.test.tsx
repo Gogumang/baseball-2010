@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
+import { resetSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 
 /** 켠 스킬 비트(+0xf4 타자 · +0xf8 투수)만 세운 기록연감 — 스킬 탭 '얻음' 은 0x58a3c 가 이 비트로 가른다 */
 const 켠스킬 = (batterBits: number[], pitcherBits: number[] = []) => ({
@@ -73,13 +74,15 @@ describe('기록연감 탭 2 — 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488)'
   })
 
   it('판이 여닫히는 동안(높이 ≤ 211)은 깜박임 [sp+0xa8] 이 꺼진다 (0x2e42e~0x2e456)', () => {
+    // [skin+0x410] 은 앱에 하나라 앞 시험이 남긴 값을 지운다 — 앱을 막 켠 것처럼 0 (U-90)
+    resetSkinBlinkCounter()
     vi.useFakeTimers()
     render(<RecordAnnals collection={켠스킬([0])} onBack={vi.fn()} />)
     시계맞추기()
     const 탭커서 = () => document.querySelector('img[src="./sprites/slt_frame/frames/009.png"]')
-    // 첫 그림(높이 32) — 틱 0 은 `% 8 ≤ 3` 이지만 판이 열리는 중이라 꺼진다(탭 막대 초점이라 탭 커서가 안 보인다)
+    // 첫 그림(높이 32) — 카운터 1 은 `% 8 ≤ 3` 이지만 판이 열리는 중이라 꺼진다(탭 막대 초점이라 탭 커서가 안 보인다)
     expect(탭커서()).toBeNull()
-    // 다 열린 뒤(그림 4) 틱 4 는 `% 8 ≤ 3` 이 아니라 꺼짐, 틱 8 은 켜짐
+    // 다 열린 뒤 틱 4(카운터 5)는 `% 8 ≤ 3` 이 아니라 꺼짐, 틱 8(카운터 9)은 켜짐
     틱(4)
     expect(탭커서()).toBeNull()
     틱(4)

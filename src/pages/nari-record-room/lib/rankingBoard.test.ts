@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  RANKING_BLINK_AT_REST, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
+  RANKING_BLINK_AT_REST, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
 } from '@/pages/nari-record-room/lib/rankingBoard'
 
 describe('순위 판 0x5796c', () => {
@@ -16,6 +16,11 @@ describe('순위 판 0x5796c', () => {
     expect(rankingSideArrowXOf('left', RANKING_BLINK_AT_REST)).toBe(174)
     expect(rankingSideArrowXOf('right', RANKING_BLINK_AT_REST)).toBe(221)
     expect(rankingSideArrowXOf('left', { drawCount: 5, keyCount: 6 })).toBe(178)
+  })
+
+  it('[판+0x410] 은 앞 화면들이 남긴 앱 하나의 값을 그대로 읽는다 (U-90) — 4 면 꺼짐 ◀ 183 − 0 − 7', () => {
+    expect(rankingBlinkCountersOf(4)).toEqual({ drawCount: 4, keyCount: 0 })
+    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4))).toBe(176)
   })
 
   it('값 0x6aff8 — 칸 x + 0x19 에서 오른쪽부터, 타율은 점', () => {

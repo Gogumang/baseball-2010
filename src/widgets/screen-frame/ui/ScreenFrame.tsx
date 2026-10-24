@@ -1,3 +1,4 @@
+import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { FRAME_SLIDE_END, frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 import {
@@ -63,6 +64,7 @@ interface ScreenFrameProps {
  */
 export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null ? 1 : 5, slides = true, footerPresses }: ScreenFrameProps) {
   const updates = useUpdateCounter()
+  const blinkCounter = useSkinBlinkCounter(updates, (footer & FOOTER_BITS.gameSettings) !== 0 ? 1 : 0)
   const slide = slides ? frameSlideOf(updates) : FRAME_SLIDE_END
   const top = headerTopOf(slide)
   const bottom = footerBottomOf(slide)
@@ -97,8 +99,8 @@ export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null
         <img key={frame} className={styles.layer} data-footer-mark={frame} style={{ left: FOOTER_LEFT_X, top: footerMarkTopOf(bottom) }} src={markImage(frame)} alt="" />
       ))}
       {FOOTER_CENTER_MARKS.map(([bit, frame]) => (footer & bit) !== 0
-        // "0경기설정" 은 [skin+0x410] 카운터로 깜박인다 — 웹은 화면 갱신 수로 센다 (시작 위상 미확인)
-        && (bit !== FOOTER_BITS.gameSettings || isGameSettingsMarkShown(updates)) && (
+        // "0경기설정" 은 [skin+0x410] 카운터로 깜박인다 — 바닥비트 0x40 일 때만 그릴 때마다 올린다(0x553ec, 앱에 하나 — U-90)
+        && (bit !== FOOTER_BITS.gameSettings || isGameSettingsMarkShown(blinkCounter)) && (
         <img key={frame} className={styles.layer} data-footer-mark={frame} style={{ left: FOOTER_CENTER_X, top: footerMarkTopOf(bottom) }} src={markImage(frame)} alt="" />
       ))}
       {footerPresses !== undefined && [

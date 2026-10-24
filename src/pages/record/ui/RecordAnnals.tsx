@@ -4,6 +4,7 @@ import { CommonPanel, FrameSprite, InsetBox, RawScreen, useImgTextPalette3 } fro
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { isMinusSkill } from '@/entities/career/model/playerCareer'
@@ -108,7 +109,8 @@ export function RecordAnnals({
    * 깜박임 [sp+0xa8] — 0x2e2f4 가 `% 8 ≤ 3` 으로 세우지만 판 높이가 0xd3(211) 이하인 동안(여닫는 중)은
    * 0x2e42e~0x2e456 이 자르기를 걸면서 0 으로 덮는다. 그 뒤 쓰는 곳(탭 커서 · ▲▼ · 고른 칸 · 스킬 화살)은 모두 이 값을 읽는다
    */
-  const isBlinking = panelHeight >= PANEL_FULL_HEIGHT && isBlinkOn(tick)
+  const blinkCounter = useSkinBlinkCounter(tick)
+  const isBlinking = panelHeight >= PANEL_FULL_HEIGHT && isBlinkOn(blinkCounter)
   /** 키를 받는가 — 여는 중이고 끝났고 높이 212 (0x2b87c~0x2b8b6) */
   const isPanelOpen = closingAt === null && tick >= PANEL_ANIMATION_DRAWS
   const hasLeftRef = useRef(false)
