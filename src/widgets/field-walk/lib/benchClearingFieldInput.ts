@@ -64,7 +64,7 @@ const BATTER_INDEX = 8
  * 낱말과 O[8 − b]+0xec(타자면 O[8])를 맞바꾼다 — 그 칸에는 장면 밖 메모리의 쓰레기가 들어간다. 니블 0 인 마선수는 미션의 마타자다
  * (0xb53f0 의 0x40 갈래 b544a~b5470 이 XlsACE_BAT 행 0x30 바이트를 통째 베끼는데 그 +0x1c 가 다섯 행 모두 0 — 대타 0xaebe4 로 들어온
  * 마타자는 나가는 타자 니블을 받아 0 이 아니다).
- * ⚠️ 미확인: 그 번지의 값(기기 메모리)은 옮길 수 없다 — 웹은 맞바꾼 칸(O[8 − b])을 0(보통 그림)으로 둔다.
+ * ⚠️ 미확인: 웹은 맞바꾼 칸(O[8 − b])을 0(보통 그림)으로 둔다(남김 — 그 번지의 값은 장면 밖 기기 메모리라 옮길 수 없다).
  */
 export function benchOffenseSeatsOf(team: BenchClearingOffenseAces): readonly WalkerSeat[] {
   const seated: WalkerSeat[] = walkerRecordsOf(team.records).map((record) => (record === null ? null : { ace: record.ace }))

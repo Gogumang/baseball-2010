@@ -26,7 +26,7 @@ import { bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widge
 import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
-import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
@@ -40,6 +40,7 @@ import type { SkillPanelFrame } from '@/widgets/batting-stage/model/skillPanelDr
 import {
   createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { rememberSceneBallPath } from '@/widgets/batting-stage/model/sceneBallPath'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
@@ -266,7 +267,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           ) {
             // 마지막 갱신 0x13 틱 + 1 자리의 그림으로 센다(`bigHitScreenOf` 머리말)
             const lastHeld = frozenPhase.tick
-            const contact = ballPixelAt(frozenPitch, shownHit.contactFrame)
+            const contact = platePixelOf(frozenPitch)
             frozenBigHitScreen = bigHitScreenOf(true, lastHeld + 1, frozenScene.side ?? 0, contact, hitFrozenDraws)
             // 4ccba — 옛값이 음수면 이 그림이 막음을 풀고 016 을 쏜다(파티클 틱 53048 은 건너뛴다)
             if (frozenBigHitScreen?.kind === '멈춤' && frozenBigHitScreen.counter < 0) {
@@ -305,6 +306,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       if (current.pitch !== shownPitch) {
         shownPitch = current.pitch
         releaseTick = current.pitch === null ? null : nowTick
+        // 놓기 0x4dc78 이 경로 칸 [경기+0x1140] 을 채운다 — 다음 공의 놓기 전 그림이 본다(`sceneBallPath`)
+        rememberSceneBallPath(current.pitch)
         shownSwing = current.cpuSwing ?? null
         shownMistake = current.pitch !== null && current.isMistakePitch === true
         // 0x11 진입 3de7c — 상태 1 이 대기 동작을 덮는다
@@ -370,7 +373,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         // 0x49aec 의 그림 갈래를 타면 보통 불꽃 대신 필살 파티클이다(49fa2 → 4a0ce · 49dbc · 49de0 — `pitcherHitContactOf`)
         if (stateTickNow >= judgeStateTick && !hitSparkShot) {
           hitSparkShot = true
-          const contact = ballPixelAt(pitch, hitBase.contactFrame)
+          const contact = platePixelOf(pitch)
           const side = current.batterSide ?? batterSideOfForm(current.batterForm)
           const chosen = pitcherHitContactOf(hitBase, current.batterForm, current.aceBatterOrder ?? null, side)
           for (const particle of chosen.particles) {
@@ -385,7 +388,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         const hitStopTick = bigHitReleaseTickOf(hitFrozenDraws)
         if (hitBase.watchesBigHit && !hitStopShot && hitTickRaw >= hitStopTick && endTick >= hitStopTick) {
           hitStopShot = true
-          const contact = ballPixelAt(pitch, hitBase.contactFrame)
+          const contact = platePixelOf(pitch)
           emitParticles(sceneParticleScene(), particleConfigOf(BIG_HIT_PARTICLE.id), contact.x, contact.y, BIG_HIT_PARTICLE.img)
         }
         // 0x13 틱 endTick 의 갱신 0x406e8 이 0x17 을 예약 — 다음 틀(0x17 틱 0)에 부르는 화면이 수비 판으로 넘긴다
@@ -396,7 +399,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       }
       // 0x11 그림의 마구 공 파티클 — 공 그리기 0x3b2f4 3b496~3b62c(구질 22 · 투수 레코드 +0x18, `magicBallParticlesOf`). 0x11 그림마다
       // 공 틱 [+0x1098](0 ~ N − 1 로 자른 점 0x35854)에 쏜다 — 타자편 `useStageAnimation` 과 같은 셈. 그림 한 번 = 장면 틱 하나.
-      // ⚠️ 근사: 진행기가 놓는 순간(0x11 틱 10)에 공을 알려 주므로 그 앞 0x11 그림(틱 0~9 — 원본은 앞 공 경로 자리)에는 안 쏜다
+      // ⚠️ 근사(남김 — 진행기 구조): 진행기가 놓는 순간(0x11 틱 10)에 공(구질 22 인가)을 알려 주므로 그 앞 0x11 그림(틱 0~9 — 원본은
+      // 앞 공 경로 자리)에는 안 쏜다. 사람 투수가 고른 구질을 장면이 놓기 전에 받는 길이 없다
       if (pitch !== null && releaseTick !== null && pitch.isMagicPitch === true) {
         const from = magicEmittedTick === null ? releaseTick : magicEmittedTick + 1
         for (let tick = from; tick <= nowTick; tick += 1) {
@@ -516,7 +520,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       /** 이 공의 판정 틀 J 의 0x11 상태 틱(= 투수 틱) — 맞은 공이 아니면 null */
       const judgePitcherTick = hitBase === null ? null : pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
       const isHitState = stage.phase.kind === '타격'
-      const contactPoint = hitBase === null || pitch === null ? null : ballPixelAt(pitch, hitBase.contactFrame)
+      const contactPoint = hitBase === null || pitch === null ? null : platePixelOf(pitch)
       /** 보통 타격 불꽃의 game_effect 애니 — 필살 그림 갈래(0x49aec 가 [sp+0x57] 을 세운다) · 큰 타구면 null */
       const hitFlameAnimation =
         hitBase === null ||

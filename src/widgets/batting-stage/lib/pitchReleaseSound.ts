@@ -37,7 +37,8 @@ export interface PitchReleaseSoundInput {
  *    불러 +4 = 1 로 세우고, 지우는 곳은 vt+0xc(0xf · 0xd 진입 0x35650)와 0x18 진입 0x3ac9e 뿐이라 0x11 안에서는 1 이다.
  *    [게임+0xf1c] 는 경기 준비(상태 7) 갱신 0x3e340 이 만드는 그림 객체 포인터로, 지우는 곳은 0x355b8(정산 0x4ea0c ·
  *    더비 결과 0x4f574 가 부른다)과 소멸 0x332b8 뿐이라 투구 중에는 0 이 아니다. → 웹은 두 문을 따로 두지 않는다.
- * ⚠️ 미확인(바이너리 밖): 28 의 이름("마구 투구음")은 갈래 조건에서 읽은 것이다 — 소리 파일을 들어 보는 일은 역어셈으로 할 수 없다.
+ * ⚠️ 미확인(바이너리 밖): 28 의 이름("마구 투구음")은 갈래 조건에서 읽은 것이다(남김 — 소리 파일을 들어 보는 일은 역어셈으로 할 수 없다.
+ *    번호 28 을 고르는 갈래는 원본과 같다).
  */
 export function pitchReleaseSoundIdOf(input: PitchReleaseSoundInput): number {
   if (input.typeNumber === MAGIC_PITCH_TYPE_NUMBER) return MAGIC_PITCH_RELEASE_SOUND

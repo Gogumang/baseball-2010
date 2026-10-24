@@ -19,7 +19,8 @@ import { STRONG_HIT_PARTICLE_ID } from '@/widgets/batting-stage/lib/hitParticles
  *   애니 14 는 한 번만 돈다.
  * - 스윙 칸 s 는 맞은 틀 J(0x11)에서 7 이고(0x4a0ca 의 ptc 가 그 그림에 한 번 난다) 스윙은 끝 칸에 머물러(`batterLayers.batterFrameAt`)
  *   0x13 동안 6 을 안 내려온다 — 불꽃은 필살 그림 0x49aec 와 같은 부름 차례다(J 의 그림이 첫 부름, 0x13 틱 d 의 그림이 d + 2 번째).
- *   ⚠️ 근사: [+0xf9c]+8 칸은 웹 타석에 없다(`hitParticles` 와 같다). 타격점은 맞은 틱의 공 자리다(`BattingStage` 의 불꽃 ptc 와 같다).
+ *   ⚠️ 근사: [+0xf9c]+8 칸은 웹 타석에 없다(`hitParticles` 와 같다).
+ *   타격점 (+0x10dc, +0x10e0) 은 놓기 0x4dc78(4dffa~4e024)만 적는 공 도착점이라 `platePixelOf` 다(`BattingStage` 의 `contact` — r184).
  * - 사구 표시는 0x12 틱 0~7 의 그림 여덟 번이다(0x12 그리기 0x4ce9c 도 0x49e64 를 부른다). 사구는 스윙이 없을 때만 난다(0x35a2c).
  */
 

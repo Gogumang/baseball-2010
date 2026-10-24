@@ -174,7 +174,6 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
     const pattern = [90, 900, 300, 0] as const
     const contact = { pattern, resultCode: 10 }
     expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).judgeBallTick).toBe(16)
-    expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).contactFrame).toBe(15)
     expect(pitcherHitSceneOf(contact, { frame: 5, buntKind: 2 }, 20, 0).judgeBallTick).toBe(19)
     // 0x13 길이는 타자편과 같은 셈(`hitPauseTicksOf`)
     const scene = pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0)
