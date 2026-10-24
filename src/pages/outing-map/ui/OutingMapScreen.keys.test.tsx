@@ -61,11 +61,18 @@ describe('나리 외출 지도 키 0x13ba4', () => {
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
-  it('말풍선(113)이 떠 있으면 지도가 키를 안 받으니 \'뒤로\' 버튼도 걷는다', () => {
-    띄우기()
+  it('말풍선(113)이 떠 있어도 \'뒤로\' 버튼(Escape)은 남아 말풍선을 닫고, 한 번 더 누르면 관리로 간다 — 터치 기기에서 건물을 누른 뒤 나갈 길 (r206)', () => {
+    const onBack = vi.fn()
+    띄우기(onBack)
     누르기('Enter')
     expect(screen.getByRole('button', { name: '들어가기' })).toBeTruthy()
-    expect(뒤로버튼()).toBeUndefined()
+    expect(뒤로버튼()).toEqual({ key: 'Escape', label: '뒤로' })
+    누르기('Escape')
+    expect(screen.queryByRole('button', { name: '들어가기' })).toBeNull()
+    expect(onBack).not.toHaveBeenCalled()
+    expect(뒤로버튼()).toEqual({ key: 'Escape', label: '뒤로' })
+    누르기('Escape')
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 
   it('막힘 글 팝업이 떠 있어도 걷는다', () => {
