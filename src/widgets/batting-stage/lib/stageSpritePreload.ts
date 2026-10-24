@@ -18,7 +18,9 @@ import {
   batterFrameAt,
   aceBatterPoseFramesOf,
   batterLayersOf,
+  batterEquipmentOf,
   batterPoseFramesOf,
+  bodyTypeOf,
   layerPaletteIndexOf,
   NO_EQUIPMENT,
   NO_PITCHER_EQUIPMENT,
@@ -152,6 +154,21 @@ export interface StageCast {
   readonly aceBatters?: readonly number[]
   /** 두 팀에 실린 마투수 순번 (0~4) */
   readonly acePitchers?: readonly number[]
+}
+
+/**
+ * 레코드 +0xb 폼 바이트와 +0x19 · +0x1a 장비 니블(히트 · 파워 · 수비 · 주루)을 든 일반 타자들 → 장비 입은 타자 출연진.
+ * 타석 교대 0x47cc8 이 마타자가 아니면 47e80~47eb6 에서 이 니블 − 1 로 장비 겹(0x78fd8)을 싣는다 — 부위 2(밴드)는 그림이 없다.
+ * 니블이 없는 타자(옛 사본)는 뺀다 — 맨몸 겹은 `bodyTypes` 가 받는다
+ */
+export function equippedBattersOfRecords(
+  batters: readonly { readonly profile: number; readonly equipment?: readonly number[] | undefined }[],
+): NonNullable<StageCast['equippedBatters']> {
+  return batters.flatMap(({ profile, equipment }) => {
+    if (equipment === undefined) return []
+    const [hit = 0, power = 0, , run = 0] = equipment
+    return [{ bodyType: bodyTypeOf(profile >> 4), equipment: batterEquipmentOf({ hit, power, run }) }]
+  })
 }
 
 const isAceOrder = (order: number) => Number.isInteger(order) && order >= 0 && order <= 4

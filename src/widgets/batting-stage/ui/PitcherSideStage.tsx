@@ -26,6 +26,8 @@ import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { gameSceneNow, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
+import { stageCastSpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
 
 interface PitcherSideStageProps {
   /** 이 화면에서 마지막으로 던진 공(진행기 `lastPitch`). 화면이 설 때 이미 있던 공은 다시 날리지 않는다 */
@@ -133,6 +135,20 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestRef = useRef(props)
   latestRef.current = props
+
+  // 지금 타자의 장비 겹 그림(타석 교대 0x47cc8 47e80 → 0x78fd8) — 경기 진입 때 받은 목록이 놓친 타자(대타 · 굴린 장비)를 잡는다.
+  // 아무도 안 기다린다 (타자편 `useStageCastPreload` 와 같다)
+  const { batterForm, batterEquipment, aceBatterOrder } = props
+  const head = batterEquipment?.head
+  const hand = batterEquipment?.hand
+  const leg = batterEquipment?.leg
+  useEffect(() => {
+    if (aceBatterOrder !== undefined || head === undefined || hand === undefined || leg === undefined) return
+    preloadSprites(
+      stageCastSpritePreloadsOf({ bodyTypes: [], equippedBatters: [{ bodyType: bodyTypeOf(batterForm), equipment: { head, hand, leg } }] }),
+      'scene',
+    )
+  }, [batterForm, aceBatterOrder, head, hand, leg])
 
   useEffect(() => {
     const context = effectContextOf(canvasRef.current)

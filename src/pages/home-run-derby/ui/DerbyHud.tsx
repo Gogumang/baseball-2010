@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
-import { isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
+import { EVENT_ZONE_REWARD, eventZoneRewardFrameAt, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
+import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { LayeredFrameSprite } from '@/shared/ui/LayeredFrameSprite/LayeredFrameSprite'
 import {
   COMBO_DISPLAY, DISTANCE_BOARD, EVENT_ZONE_SPOT, HUD_PANEL,
   ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, distanceBoardGlyphsOf, totalDistanceGlyphsOf,
@@ -34,6 +36,11 @@ interface DerbyHudProps {
    * 안 부르고 비거리 판 0x36cd4 만 얹는다. 그래서 판 동안은 판 · 공 번호 · 최고 · 현재 칸과 콤보를 안 그린다.
    */
   readonly isPlayShown?: boolean
+  /**
+   * 이벤트 존 보상 "200G"(trainning 애니 3)의 x(0x32 · 0x8c) — 존이 서 있는 동안만, 아니면 null (`EVENT_ZONE_REWARD` · 0x41098).
+   * 값이 선 갱신부터 첫 칸으로 반복 재생한다(0x93d31 · 0x93cfd(애니, 1) 뒤 그릴 때마다 0x93d91)
+   */
+  readonly eventZoneRewardX?: number | null
 }
 
 const spriteSrcOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
@@ -62,7 +69,13 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
  */
 export function DerbyHud({
   run, bestDistance, isEventZoneShown, tick, shownCombo = null, batterSide = 0, distanceBoardValue = null, isPlayShown = false,
+  eventZoneRewardX = null,
 }: DerbyHudProps) {
+  // 존을 놓은 갱신 — 0x36dfc 가 그 자리에서 애니 3 을 첫 칸으로 돌려 반복 재생을 건다(0x3730e · 0x37328)
+  const [rewardShownAt, setRewardShownAt] = useState<{ value: number | null; tick: number }>({ value: eventZoneRewardX, tick })
+  if (rewardShownAt.value !== eventZoneRewardX) setRewardShownAt({ value: eventZoneRewardX, tick })
+  const rewardFrame = eventZoneRewardX === null ? null : eventZoneRewardFrameAt(tick - rewardShownAt.tick)
+  const trainningOrigins = useFrameOrigins(EVENT_ZONE_REWARD.folder)
   // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
   const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
   if (comboShownAt.value !== shownCombo) setComboShownAt({ value: shownCombo, tick })
@@ -132,6 +145,22 @@ export function DerbyHud({
           style={{ left: EVENT_ZONE_SPOT.x, top: EVENT_ZONE_SPOT.y }}
           src={EVENT_ZONE_SPOT.parts[isEventZoneVisibleAt(tick) ? 0 : 1]}
           alt="이벤트 존"
+        />
+      )}
+
+      {/*
+        존 보상 "200G" — 0x41098 이 event_zone 다음에 trainning 애니 3 을 효과 0 으로 그린다(4115c 0x93c45). 21~23 의 0x67 겹은
+        화면에 더한다(layers.json — 캔버스 `drawFrameLayers` 와 같은 목록을 DOM 에서 plus-lighter 로).
+        ⚠️ 근사(자리): 원본은 판(0x17)의 필드 그리기(0x46c88 → 0x43228 → 0x411e0) 안, 구장 바로 위 · 공과 선수 아래다. 웹 더비는
+        판의 필드 화면이 없어 타석 캔버스 위 HUD 에 이벤트 존과 같이 얹는다
+      */}
+      {eventZoneRewardX !== null && rewardFrame !== null && (
+        <LayeredFrameSprite
+          folder={EVENT_ZONE_REWARD.folder}
+          frame={rewardFrame}
+          origins={trainningOrigins}
+          x={eventZoneRewardX}
+          y={EVENT_ZONE_REWARD.y}
         />
       )}
     </div>

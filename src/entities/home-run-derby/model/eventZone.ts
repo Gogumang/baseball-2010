@@ -1,4 +1,5 @@
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 
 /**
  * 이벤트 존 (H-2 · P7 H1).
@@ -58,4 +59,57 @@ export function isEventZoneHit({ pattern, isZonePlaced = false }: EventZoneCondi
 export function isEventZoneVisibleAt(tick: number): boolean {
   return ((tick % EVENT_ZONE_BLINK_PERIOD) + EVENT_ZONE_BLINK_PERIOD) % EVENT_ZONE_BLINK_PERIOD <
     EVENT_ZONE_BLINK_PERIOD / 2
+}
+
+/**
+ * **존 보상 "200G" 애니** — `ui/trainning.pzx`(장면 +0x19e8) 애니 3 = 프레임 15~24(지연 2 × 9 · 7, trainning/frames/animations.json [3]).
+ * 21~23 은 0x67 파트(빛 줄이 글자를 훑는 더하기 겹 b = 200)가 든 프레임이다. 직접 뜸(2026-10-24):
+ * ```
+ * 372f8  존을 놓는 그 자리(0x36dfc, 위 머리말의 +0x3f = 1 바로 뒤):
+ *        애니 = [[[장면+0x19e8]+0x10]+8]+0xc (애니 표 칸 3)
+ * 3730e  0x93d31(애니, 1)   ; 멈춤 · 첫 칸 · 끝 비트 지움
+ * 37328  0x93cfd(애니, 1)   ; 재생 — 인자 1 이 +2 비트 0x10(반복)을 세운다(93d18~93d1e)
+ * 41098  모드 7(장면+0x1104) 이고 존 x(+0x17cc) > 0 · 존 y(+0x17d0) > 0 이면 event_zone 다음에
+ * 4111c  x = (s16 +0xfcc) + 0x5a < 0 ? 0x32 : 0x8c          ; +0xfcc = 판정 0xab214 의 수평각(웹 패턴 각의 부호 뒤집음)
+ * 4115c  0x93c45(애니, x, 0x46, 0, 0, 0)   ; 부른 쪽 효과 0 → 0x67 파트는 화면 더하기(0xc9f98 ca198)
+ * 4116e  0x93d91(애니)                      ; 그린 뒤 한 칸 — 반복이라 끝 칸(24) 뒤 첫 칸(15)으로 돈다(93e16~93e30)
+ * ```
+ * 0x41098 은 필드 그리기 0x411e0(구장 0x78931 다음)이 부르고, 0x411e0 은 판(0x17) 그리기 0x46c88 → 0x43228 과 그리기 표 0x52c50 →
+ * 0x41230 이 부른다. 존(+0x17cc/+0x17d0)은 다음 공 0x3de10 이 −1 로 비울 때까지 남는다.
+ */
+export const EVENT_ZONE_REWARD = {
+  folder: './sprites/trainning/frames',
+  /** 애니 표 칸 3 */
+  animation: 3,
+  /** 0x41158 `movs r2, #0x46` */
+  y: 0x46,
+} as const
+
+/** 애니 3 의 칸 (animations.json [3] — 시험이 맞춰 본다). 프레임 15 는 빈 그림이다(frames/015.png 없음) */
+export const EVENT_ZONE_REWARD_ENTRIES: readonly { readonly frame: number; readonly delay: number }[] = [
+  { frame: 15, delay: 2 },
+  { frame: 16, delay: 2 },
+  { frame: 17, delay: 2 },
+  { frame: 18, delay: 2 },
+  { frame: 19, delay: 2 },
+  { frame: 20, delay: 2 },
+  { frame: 21, delay: 2 },
+  { frame: 22, delay: 2 },
+  { frame: 23, delay: 2 },
+  { frame: 24, delay: 7 },
+]
+
+/**
+ * "200G" 의 x — 0x4111c: 원본 각 `+0xfcc`(= −웹 패턴 각, `hitParticles` 와 같은 뒤집음) + 0x5a 가 음수면 0x32(왼쪽), 아니면 0x8c(오른쪽).
+ * 곧 웹 패턴 각 > 90(3루 쪽)이면 왼쪽 · ≤ 90(1루 쪽)이면 오른쪽이다.
+ */
+export function eventZoneRewardXOf(patternAngle: number): number {
+  return -patternAngle + 0x5a < 0 ? 0x32 : 0x8c
+}
+
+/**
+ * 존을 놓은 뒤 `updates` 번째 그림의 프레임 — 첫 그림이 첫 칸(그린 뒤 0x93d91 로 한 칸), 반복이라 지연 합 25 마다 돈다
+ */
+export function eventZoneRewardFrameAt(updates: number): number {
+  return animationStepAt(EVENT_ZONE_REWARD_ENTRIES, updates)?.frame ?? EVENT_ZONE_REWARD_ENTRIES[0]!.frame
 }

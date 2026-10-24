@@ -344,7 +344,12 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: './sprites/ppl/frames', frames: [0], json: ['origins.json'] },
     { folder: './sprites/slt_pitch/frames', frames: [73], json: ['origins.json'] },
     { folder: './sprites/team_s_icon', frames: [11] },
-    { folder: './sprites/trainning/frames', frames: [0, 2, 11], json: ['origins.json'] },
+    // 16~24 — 이벤트 존 보상 "200G" 애니 3(0x41098, `EVENT_ZONE_REWARD`). 21~23 의 0x67 겹(layers.json)도 같이 받는다
+    {
+      folder: './sprites/trainning/frames',
+      frames: [0, 2, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      json: ['origins.json'],
+    },
   ],
   /**
    * 나리 관리 화면 · 다음경기 순위 · 경기 준비 (타자편 · 투수편 공통) — r111 측정. 메인메뉴에서 유휴로, 관리 화면에서 바로.

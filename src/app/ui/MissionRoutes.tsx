@@ -52,7 +52,7 @@ import type { PitchingStageSource } from '@/pages/pitching/ui/PitchingScreen'
 import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
-import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { missionFielderPlatesOf, missionRunnerAcesOf, missionWalkTeamOf } from '@/entities/mission/model/missionRunners'
 import {
@@ -62,8 +62,9 @@ import {
 } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import type { WalkerLineSeats, WalkerSeat } from '@/widgets/field-walk/lib/walkerAces'
-import { gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { castOfRosterBatters, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
+import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 
 /**
@@ -72,6 +73,20 @@ import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
  */
 const MISSION_LOADING_SCENES: readonly SpriteSceneKey[] = ['gameEntry', 'gameAtBat', 'afterGame']
 const MISSION_STAGE_PRELOADS = mergeSpritePreloads(gameEntryCastPreloadsOf(), stageSpritePreloadsOf())
+
+/**
+ * 로딩 판 목록 — 투수 미션이면 CPU 팀 마스터 줄의 장비 니블 그림(타석 교대 0x47cc8 47e80 → 0x78fd8)까지.
+ * 같은 팀이면 같은 배열을 돌려준다(`LoadingTip` 이 다시 받지 않게)
+ */
+const missionStagePreloadCache = new Map<number, readonly SpriteFolderPreload[]>()
+function missionStagePreloadsOf(cpuTeamId: number | undefined): readonly SpriteFolderPreload[] {
+  if (cpuTeamId === undefined) return MISSION_STAGE_PRELOADS
+  const cached = missionStagePreloadCache.get(cpuTeamId)
+  if (cached !== undefined) return cached
+  const preloads = mergeSpritePreloads(MISSION_STAGE_PRELOADS, stageSpritePreloadsOf(castOfRosterBatters(cpuTeamId)))
+  missionStagePreloadCache.set(cpuTeamId, preloads)
+  return preloads
+}
 
 /*
  * **마선수 대결의 경기 중 "나가기"** — 확정 (0x40140 · 0xa5368 · SYS 8 0x8d764~0x8d846 · 105 진입 0x11b46~0x11bbe · 0x10df8 직접 뜸):
@@ -461,7 +476,12 @@ function missionOverlayOf(
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
-        <LoadingTip tip={session.loadingTip} onDone={actions.finishLoading} preloadScenes={MISSION_LOADING_SCENES} preloadRequests={MISSION_STAGE_PRELOADS} />
+        <LoadingTip
+          tip={session.loadingTip}
+          onDone={actions.finishLoading}
+          preloadScenes={MISSION_LOADING_SCENES}
+          preloadRequests={missionStagePreloadsOf(session.pitcherRun?.cpu.batting?.teamId)}
+        />
       </RawScreen>
     )
   }
@@ -808,6 +828,17 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     batterForm: profile >> 4,
     batterSkinIndex: (profile >> 2) & 3,
     ...(aceIndex >= 0 ? { batterSide: batterHandOf(profile, aceIndex), aceBatterOrder: aceIndex } : {}),
+    // 타석 교대 0x47cc8 — 0x768b4 로 장비 칸을 비운 뒤 마타자가 아니면 47e80~47eb6 이 지금 타자 레코드(0xae89c(공격 팀))
+    // +0x19 · +0x1a 니블 − 1 로 장비 겹 0x78fd8 을 싣는다(모드 갈래 없음). 미션 CPU 팀은 마스터 줄(Xls 행)이라 그 행의 니블
+    ...(aceIndex < 0 && batter?.row != null
+      ? {
+          batterEquipment: batterEquipmentOf({
+            hit: batter.row.equipment[0],
+            power: batter.row.equipment[1],
+            run: batter.row.equipment[3],
+          }),
+        }
+      : {}),
     batterTeamIndex: run.cpu.batting?.teamId ?? 0,
     // 경기 스킬 표시 판 — 지금 CPU 타자 · 미션 투수(장착 비트 + 16) · 공격 측(CPU 칸)
     skillPanel: missionPitchingSkillPanelOf(run, session.pitcher.skillIds),

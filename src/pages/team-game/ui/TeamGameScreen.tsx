@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
@@ -85,6 +85,7 @@ import {
   teamIntroBatterHandOf,
   teamMatchupCardsOf,
   teamPitcherSideStageOf,
+  opponentBatterRecordsOf,
 } from '@/pages/team-game/lib/teamMatchupCards'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
@@ -105,6 +106,8 @@ import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMen
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
 import type { TeamGameSession } from '@/pages/team-game/model/useTeamGame'
 import { GAME_LOADING_PRELOADS } from '@/pages/team-game/lib/gameLoadingPreloads'
+import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
+import { equippedBattersOfRecords, stageCastSpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { PITCHER_CHANGE_SOUND } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -224,10 +227,20 @@ interface TeamGameScreenProps {
  */
 export function TeamGameScreen(props: TeamGameScreenProps) {
   const session = useTeamGame(props.options, props.random, props.settings?.isVibrationOn, props.resumeFrom)
+  // 로딩 판 목록 + 상대 명단 타자의 장비 겹 그림(타석 교대 0x47cc8 47e80 → 0x78fd8) — 명단은 경기 세우기 0x30f20 에서 서고 안 바뀐다
+  const { opponentEntry } = session.progress
+  const { opponentTeamId } = session.progress.options
+  const loadingPreloads = useMemo(
+    () => mergeSpritePreloads(
+      GAME_LOADING_PRELOADS,
+      stageCastSpritePreloadsOf({ bodyTypes: [], equippedBatters: equippedBattersOfRecords(opponentBatterRecordsOf(opponentTeamId, opponentEntry)) }),
+    ),
+    [opponentTeamId, opponentEntry],
+  )
   if (session.loadingTip !== null) {
     return (
       <RawScreen>
-        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} preloadRequests={GAME_LOADING_PRELOADS} />
+        <LoadingTip tip={session.loadingTip} onDone={session.finishLoading} preloadRequests={loadingPreloads} />
       </RawScreen>
     )
   }

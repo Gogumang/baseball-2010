@@ -17,10 +17,11 @@ import {
   XLS_ROW_MATCHUP_RECORDS,
   teamBattingStageBatterOf,
   teamMatchupCardsOf,
+  opponentBatterRecordsOf,
   teamPitcherSideStageOf,
 } from '@/pages/team-game/lib/teamMatchupCards'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { NO_ROSTER_SLOT, withAceBatter, withAcePitcher } from '@/features/play-team-game/model/teamGameRoster'
 
 const 기본옵션: TeamGameOptions = {
@@ -190,5 +191,32 @@ describe('사람 타석 타자 폼 · 피부 · 손 — 타석 교대 0x47d58~0x
       index === 0 ? { ...batter, rosterSlot: NO_ROSTER_SLOT, recordId: 0xfe, profile: 0x34 } : batter)
     const stage = teamBattingStageBatterOf({ ...started, ourEntry, game: { ...started.game, battingOrderIndex: 0 } })
     expect(stage).toEqual({ batterForm: 3, batterSkinIndex: 1, batterHand: 1 })
+  })
+})
+
+describe('사람 수비 장면의 상대 타자 장비 겹 — 타석 교대 0x47cc8 47e80~47eb6 → 0x78fd8 (모드 무관)', () => {
+  it('지금 상대 타자 명단 칸의 니블(히트 · 파워 · 주루)로 장비 겹을 싣는다 — 시즌 CPU 명단 니블이 있으면 그 값', () => {
+    const batters = Array.from({ length: 12 }, (_, rosterSlot) => ({
+      rosterSlot,
+      position: rosterSlot < 9 ? rosterSlot + 1 : 0,
+      equipment: [3, 4, 2, 5],
+    }))
+    const progress = startTeamGame({ ...기본옵션, opponentEntryOrder: { batters, pitchers: [0, 1, 2, 3, 4, 5, 6, 7] } }, createSeededRandom(1))
+    const batter = progress.opponentEntry[progress.opponentOrderIndex]!
+    expect(batter.aceIndex).toBeLessThan(0)
+    expect(teamPitcherSideStageOf(progress).batterEquipment).toEqual(batterEquipmentOf({ hit: 3, power: 4, run: 5 }))
+    // 로딩 판이 받는 상대 명단 재료 — 마타자는 뺀다
+    const records = opponentBatterRecordsOf(progress.options.opponentTeamId, progress.opponentEntry)
+    expect(records.length).toBe(progress.opponentEntry.filter((entry) => entry.aceIndex < 0).length)
+    expect(records.every((record) => record.equipment?.join() === '3,4,2,5')).toBe(true)
+  })
+
+  it('마타자가 타석에 서면 장비 겹이 없다 (0xb63a0 ≥ 0 이면 47e80 갈래를 안 탄다)', () => {
+    const started = startTeamGame(기본옵션, createSeededRandom(1))
+    const aceEntry = withAceBatter(started.opponentEntry, 0)
+    const aceSlot = aceEntry.findIndex((entry) => entry.aceIndex >= 0)
+    const stage = teamPitcherSideStageOf({ ...started, opponentEntry: aceEntry, opponentOrderIndex: aceSlot })
+    expect(stage.aceBatterOrder).toBe(0)
+    expect(stage.batterEquipment).toBeUndefined()
   })
 })
