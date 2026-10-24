@@ -21,7 +21,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 const REST_MORALE_RANGE = { minimum: 10, maximumExclusive: 16 }
 const MAXIMUM_MORALE = BALANCE.limits.morale
 
-export type PitcherRestBlockReason = '이미행동함' | '사기최고'
+export type PitcherRestBlockReason = '사기최고'
 
 /**
  * 휴식 가드 (0x12682).
@@ -29,11 +29,10 @@ export type PitcherRestBlockReason = '이미행동함' | '사기최고'
  * ⚠️ **원본 그대로**: 사기가 최고면 **아프거나 다쳤어도** StrMODE[91] 로 거절한다 — 회복 판정을
  * 굴릴 기회 자체가 없다 (G 2절 "아파도 거절"). 고치지 않는다.
  *
- * 주기 검사(한 주기에 한 가지)는 원본 105 키에는 없고 r_event_txt[176] 규칙 쪽이라
- * 타자편 `restBlockReasonOf` 와 같은 차례로 먼저 본다.
+ * 행동함(S+4)은 보지 않는다 — 105 키 0x1261c 휴식 칸(12682~126bc)은 사기 최고만 본다. r_event_txt[176] "한 가지만" 은
+ * 안내 글이고 원본 코드는 막지 않는다(타자편 `restBlockReasonOf` 와 같다).
  */
 export function pitcherRestBlockReasonOf(career: PitcherCareer): PitcherRestBlockReason | null {
-  if (career.hasActedThisCycle) return '이미행동함'
   return career.morale >= MAXIMUM_MORALE ? '사기최고' : null
 }
 

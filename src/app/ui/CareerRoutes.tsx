@@ -274,7 +274,8 @@ function CareerScreens({
           noticeText={session.outingNotice}
           onCloseNotice={actions.closeOutingNotice}
           onRun={actions.runOutingFunction}
-          onBack={backToManagement}
+          // 112 취소 → 105 — 키 0x13ba4 가 S+4(행동함) = 0 으로 내린다(13bc8)
+          onBack={actions.leaveOutingMap}
           // [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 에 찍은 값 그대로(0x7ed6c 는 행동 여부를 안 본다)
           eventPlaceIds={session.eventPlaceIds}
           onEnter={actions.enterPlace}

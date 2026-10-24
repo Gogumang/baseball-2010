@@ -498,12 +498,12 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('한 주기에 한 가지만 — 이미 행동했으면 막는다 (r_event_txt[176])', () => {
+  it('행동함이어도 휴식을 막지 않는다 — 105 키 0x1261c 휴식 칸(12682)은 사기 최고만 본다', () => {
     화면({ career: 투수({ hasActedThisCycle: true }) })
 
     누르기('휴식')
 
-    expect(screen.getByText('트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다')).toBeTruthy()
+    expect(screen.getByText(/휴식.*을 취하시겠습니까/)).toBeTruthy()
   })
 })
 
