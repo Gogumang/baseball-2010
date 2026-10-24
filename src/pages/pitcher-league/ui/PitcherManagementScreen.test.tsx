@@ -63,6 +63,9 @@ const 칸 = (name: string) => screen.getByRole('button', { name })
 const 칸이름 = (element: Element) => (element.textContent ?? '').replace('▶', '').trim()
 const 칸이름들 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')].map((button) => button.getAttribute('aria-label'))
 
+/** 125 훈련 연출(0x848d0)을 확인 키 0x105a4 처럼 끝으로 보낸다 — 그 틀의 0x84e58 이 참이라 훈련 0x17f5c 가 돈다 */
+const 연출넘기기 = () => fireEvent.click(screen.getByTestId('투수-훈련팝업'))
+
 /** 커맨드·하위 메뉴 칸 (`role="option"`) 과 보통 버튼을 함께 찾는다 */
 function 누르기(name: string) {
   const candidates = [...screen.queryAllByRole('option'), ...screen.queryAllByRole('button')]
@@ -150,6 +153,53 @@ describe('상태판 0x7d34c 모드 3 · 커맨드 줄 0x7e418 투수 표', () =>
 })
 
 describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
+  it('[85] 예 → 125 연출 — 0xd4990 모드 3 표: 칸 0 raise 4t+3 · 칸 1 4t+5 · 칸 2 4t+4 · 칸 3 team 3 (0x84664)', () => {
+    const 연출 = (typeIndex: number, name: string) => {
+      화면({ career: 투수({ typeIndex }) })
+      누르기('트레이닝')
+      누르기(name)
+      fireEvent.click(칸('예'))
+      const 팝업 = screen.getByTestId('투수-훈련팝업')
+      const 값 = [팝업.dataset.file, Number(팝업.dataset.animation)]
+      cleanup()
+      return 값
+    }
+    expect(연출(0, '제구')).toEqual(['raise_traning_ani', 3])
+    expect(연출(1, '구속')).toEqual(['raise_traning_ani', 9])
+    expect(연출(2, '변화')).toEqual(['raise_traning_ani', 12])
+    expect(연출(2, '체력')).toEqual(['team_traning_ani', 3])
+  })
+
+  it('125 는 가운데 판을 빼고(0x19da4 19dc6) 취소를 안 받는다(0x105a4) — 결과 창이 닫히면 105 로 돌아와 다시 깐다', () => {
+    const onExit = vi.fn()
+    render(
+      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onExit={onExit} />,
+    )
+    누르기('트레이닝')
+    누르기('제구')
+    fireEvent.click(칸('예'))
+
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('투수-훈련팝업')).toBeTruthy()
+    expect(onExit).not.toHaveBeenCalled()
+
+    연출넘기기()
+    // 0x84e58 이 애니를 지워 팝업은 안 그리지만 결과 창 동안은 아직 125 다
+    expect(screen.queryByTestId('투수-훈련팝업')).toBeNull()
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+    fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
+    expect(screen.getByTestId('가운데판')).toBeTruthy()
+  })
+
+  it('투수 그림은 칸 0 · 1 · 2 · 4 에만 — 칸 3(team) 에는 없다 (0x11744 · 0x848d0 마스크 0x17)', () => {
+    화면()
+    누르기('트레이닝')
+    누르기('체력')
+    fireEvent.click(칸('예'))
+    expect(screen.queryByTestId('투수-훈련-투수')).toBeNull()
+  })
+
   it('칸 0~3 이 제구·구속·변화·체력이고 칸 4 가 마구다', () => {
     화면()
 
@@ -168,6 +218,9 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     expect(screen.getByText('[제구훈련]을 하시겠습니까?')).toBeTruthy()
     fireEvent.click(칸('예'))
 
+    // 125 — 연출이 도는 동안은 굴리지 않는다(틀 0x18dd8 이 0x84e58 을 본 뒤 0x17f5c)
+    expect(onSave).not.toHaveBeenCalled()
+    연출넘기기()
     expect(onSave).toHaveBeenCalledOnce()
     const trained = onSave.mock.calls[0][0] as PitcherCareer
     // 고정 난수 0 → bfa55(4,7) 의 최솟값 4
@@ -185,6 +238,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     누르기('트레이닝')
     누르기('구속')
     fireEvent.click(칸('예'))
+    연출넘기기()
 
     const 그림들 = Array.from(screen.getByRole('dialog', { name: '상세정보' }).querySelectorAll('img'))
       .map((image) => image.getAttribute('src') ?? '')
@@ -199,6 +253,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     누르기('트레이닝')
     누르기('제구')
     fireEvent.click(칸('예'))
+    연출넘기기()
     expect(onSave).toHaveBeenCalledOnce()
 
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -661,6 +716,10 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('Enter')
     // StrMODE[66] 확인 팝업의 [예]
     키('Enter')
+    // 125 연출(칸 4) — 확인 키 0x105a4 가 게이지를 끝으로 보낸다
+    expect(screen.getByTestId('투수-훈련팝업')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+    키('Enter')
 
     expect(onSave).toHaveBeenCalled()
     // 0x17f5c 칸 4 — 마구 이름 StrCOMMON[0x1e + 1] 로 StrMODE[86] "[이름] %d/%d회 훈련"
@@ -679,6 +738,9 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키로마구칸까지()
     키('Enter')
     키('Enter')
+    키('Enter')
+    // 125 연출 동안도 105 가 아니다
+    expect(onResultWindowChange).toHaveBeenLastCalledWith(true)
     키('Enter')
 
     // 125 — 알림이 떠 있는 동안은 105 진입이 아니다
