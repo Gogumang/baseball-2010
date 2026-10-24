@@ -68,6 +68,11 @@ import { BATTER_SIDE, STAGE_HEIGHT, STAGE_SIDE, STAGE_WIDTH, stageLayoutOf } fro
 import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { drawCallWithRedraws, redrawsBetween, redrawsUpTo } from '@/widgets/batting-stage/lib/stageRedraws'
 import {
+  HIT_BY_PITCH_MARK_ANIMATION,
+  HIT_BY_PITCH_MARK_OFFSET_Y,
+  onceAnimationStepAt,
+} from '@/widgets/batting-stage/lib/batterOverlayMarks'
+import {
   MISTAKE_MARK_ANIMATION,
   MISTAKE_MARK_OFFSET_Y,
   PLAYER_EFFECT_FRAMES,
@@ -265,6 +270,16 @@ export interface StageScene {
    */
   readonly specialSwingEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number; readonly drawCall: number }) | null
   /**
+   * 보통 타격 불꽃 (0x49e64 49faa~4a0a2 — `batterOverlayMarks`) — game_effect 애니 2 · 3 을 타격점 (x, y) 에, 그 애니의 `drawCall` 번째
+   * 부름 칸. 필살 그림 갈래 · 큰 타구가 아닌 맞은 공의 맞은 틀(0x11)과 0x13 동안만 부르는 쪽이 채운다. 없거나 null 이면 안 그린다
+   */
+  readonly hitFlame?: { readonly animation: number; readonly x: number; readonly y: number; readonly drawCall: number } | null
+  /**
+   * 사구 표시 (0x49e64 4a0ce~4a12e — `batterOverlayMarks`) — player_effect 애니 14 의 몇 번째 부름인가(장면 틱으로 센 값). 사구 0x12 의
+   * 틱 0~7 만 부르는 쪽이 채운다. 없거나 null 이면 안 그린다
+   */
+  readonly hitByPitchMarkDraw?: number | null
+  /**
    * 사람 투구 UI (구질 목록 0xf · 조준 0x10 · 게이지 0x11) — 상태 그리기가 장면 위에 그리는 것 (`pitchInputOverlay`).
    * 구질 목록이면 존 자리(0x4c53c)에 존 대신 그린다
    */
@@ -342,6 +357,10 @@ export function renderBattingStage(
     drawBatter(context, scene.swingFrame, 0, scene.bodyType, side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
   }
   if (special !== null && !special.isBehindBatter) drawSpecialSwingPicture(context, special)
+  // 0x49e64 꼬리 — 보통 타격 불꽃(깊이 타자 + 10) · 사구 표시(타자 깊이, 타자 뒤에 넣는다). 둘 다 그림마다 한 칸(4a0a0 · 4a12a 0x93d91)
+  // — 창 첫 그림도 센다(`stageRedraws`)
+  drawHitFlame(context, scene)
+  drawHitByPitchMark(context, scene, side)
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
     drawEagleEyeMarker(context, eagleEyePixelOf(scene.pitch))
   }
@@ -747,6 +766,36 @@ function drawSpecialSwingPicture(
   // 0x11 이면 ca074 갈래 — 파트 효과 없이 복사
   drawFrameAt(context, special.folder, frameIndex, x, y, { partEffects: !special.isMirrored })
   context.restore()
+}
+
+/** 보통 타격 불꽃 — game_effect 애니 2 · 3 의 지금 칸을 타격점에 (0xbe8a5 효과 0 → 0x93c45) */
+function drawHitFlame(context: CanvasRenderingContext2D, scene: StageScene): void {
+  const flame = scene.hitFlame ?? null
+  if (flame === null) return
+  const drawCall = drawCallWithRedraws(flame.drawCall, scene.tick, scene.redrawTicks)
+  const entries = frameAnimations(GAME_EFFECT_FRAMES)?.[flame.animation]
+  const step = entries === undefined ? null : onceAnimationStepAt(entries, drawCall)
+  // 다 돈 애니는 마지막 칸 21(그림에 없는 칸)에 서 있다 — 아무것도 안 그린다
+  if (step === null || placedFrame(GAME_EFFECT_FRAMES, step.frame) === null) return
+  drawFrameAt(context, GAME_EFFECT_FRAMES, step.frame, Math.round(flame.x) + step.dx, Math.round(flame.y) + step.dy)
+}
+
+/** 사구 표시 — player_effect 애니 14 의 지금 칸을 (타자 x + 좌우 이동, 타자 y − 0x51) 에 효과 0 으로 */
+function drawHitByPitchMark(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {
+  const tickDraw = scene.hitByPitchMarkDraw ?? null
+  if (tickDraw === null) return
+  const drawCall = drawCallWithRedraws(tickDraw, scene.tick, scene.redrawTicks)
+  const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[HIT_BY_PITCH_MARK_ANIMATION]
+  const step = entries === undefined ? null : onceAnimationStepAt(entries, drawCall)
+  const placed = step === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, step.frame)
+  if (step === null || placed === null) return
+  const anchor = stageLayoutOf(side).batterAnchor
+  // 49f3e r7 = 타자 앵커 x + 카메라 + 좌우 이동(+0xfe4) ± 흔들기(웹은 카메라 · 흔들기 0 — `drawBatter` 와 같다)
+  context.drawImage(
+    placed.image,
+    anchor.x + scene.shift + step.dx + placed.offsetX,
+    anchor.y + HIT_BY_PITCH_MARK_OFFSET_Y + step.dy + placed.offsetY,
+  )
 }
 
 /**

@@ -835,6 +835,71 @@ describe('수비 재생 — 공용 창이 서면 판이 멈춘다 (경기 장면
     }
   })
 
+  /**
+   * **창이 선 첫 그림([창+0x250])** 은 갱신 없이 0x46c88 을 한 번 더 돈다 — 야수 그리기 0x43278 4381a 가 펌블 6 을 다시 보고 실책 +0x2e 를
+   * 한 번 더 올리고 함성 29 를 다시 예약한다(+0xb8 을 줄이는 야수 틱은 갱신 쪽). 펌블 그림 바로 뒤에 창이 서면 원본도 두 번 센다(r183)
+   */
+  it('펌블 6 을 그린 그림 바로 뒤에 창이 서면 실책 · 함성 29 를 한 번 더 센다 — 다른 그림 뒤면 그대로', () => {
+    vi.useFakeTimers()
+    const 울린것: number[] = []
+    setActiveSound({
+      play: (id) => void 울린것.push(id),
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      stop: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
+    try {
+      const 펌블판 = (창at: number | null) => {
+        울린것.length = 0
+        const onDone = vi.fn()
+        const onFieldingErrors = vi.fn()
+        render(
+          <DefensePlayback
+            input={{ ...타구(단타, 주자1루), random: createFractionRandom(() => 0) }}
+            onDone={onDone}
+            onFieldingErrors={onFieldingErrors}
+          />,
+        )
+        for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
+          if (i === 창at) {
+            const release = markCommonWindowShown()
+            for (let frozen = 0; frozen < 3; frozen += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+            act(() => release())
+          }
+          act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+        }
+        const errors = (onFieldingErrors.mock.calls[0]?.[0] ?? []) as readonly unknown[]
+        const cheers = 울린것.filter((id) => id === 29).length
+        const result = 결과(onDone)
+        cleanup()
+        resetCommonWindowShownForTest()
+        return { errors: errors.length, cheers, result }
+      }
+      const 그냥 = 펌블판(null)
+      expect(그냥.errors).toBeGreaterThan(0)
+      const 첫펌블 = 그냥.result.ticks.findIndex((view) =>
+        view.fielders.some((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6),
+      )
+      expect(첫펌블).toBeGreaterThanOrEqual(0)
+      const 늘어난 = [] as number[]
+      for (let at = Math.max(0, 첫펌블 - 2); at <= 첫펌블 + 3; at += 1) {
+        const 멈춤 = 펌블판(at)
+        // 판 진행은 같다 — 그리기 쪽 셈만 는다
+        expect(멈춤.result.log).toEqual(그냥.result.log)
+        expect(멈춤.errors - 그냥.errors).toBe(멈춤.cheers - 그냥.cheers)
+        if (멈춤.errors > 그냥.errors) 늘어난.push(멈춤.errors - 그냥.errors)
+      }
+      expect(늘어난).toEqual([1])
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+
   it("창이 떠 있는 동안 누른 키는 판이 안 받는다 — 키는 창(0x754f9)이 가져가고 0x498d4 는 안 돈다", () => {
     vi.useFakeTimers()
     try {

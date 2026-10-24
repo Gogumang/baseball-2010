@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
+import { useGameSceneRedrawCount } from '@/shared/lib/commonWindow/useGameSceneRedrawCount'
 import {
   appTickOfGameSceneTick, gameSceneTickNow, isCommonWindowShown, isGameSceneFrozen, useMarksGameScene,
 } from '@/shared/lib/commonWindow/commonWindow'
@@ -45,6 +46,7 @@ import {
   defenseTickFactsOf,
   endDefenseEffects,
   fastForwardDefenseEffects,
+  redrawDefenseEffects,
   sceneMemoryOf,
   stepDefenseEffects,
   tickBeforeOf,
@@ -62,6 +64,7 @@ import {
   type LiveRunnerPlay,
   type LiveRunnerStepper,
 } from '@/features/defense-play/model/liveRunnerPlay'
+import { redrawDefensePlayScene } from '@/features/defense-play/model/redrawDefensePlay'
 
 /** 수비 장면 득점 점수판 0x41a64 의 재료 — 플레이가 시작될 때의 경기 (`lib/runScoreBoard`) */
 export interface RunScoreBoardSource {
@@ -450,6 +453,41 @@ function stepRecordedBoard(
 }
 
 /**
+ * 창이 선 첫 그림([창+0x250]) — 갱신 없이 그리기 0x46c88 만 한 번 더(52efe): 득점 점수판 0x41a64 가 타이머를 한 번 더 줄인다.
+ * 함성(메시지 0x13)은 갱신 몫이라 없다
+ */
+function redrawRecordedBoard(tally: RecordedBoardTally, isHomeRun: boolean): RecordedBoardTally {
+  if (tally.ended) return tally
+  const drawn = drawRunScoreBoardScene(tally.board, isHomeRun)
+  return { ...tally, board: drawn.next, visible: drawn.visible, hidden: drawn.hidden, runIns: [] }
+}
+
+/**
+ * 재생 · 주자 판 갈래의 창 첫 그림 — 마지막으로 그린 갱신(`tally.nextIndex − 1`)의 그림을 한 번 더: 공 그리기 0x36dfc 파티클을 다시
+ * 쏘고(창이 서 있어 파티클 틱은 없다), 판 틱 그림이면 야수 그리기 0x43278 이 실책 +0x2e 를 한 번 더 올린다(4381a~43904 — 줄이는 야수 틱은
+ * 갱신 쪽이라 원본도 두 번 센다), 득점 점수판 타이머를 한 번 더 줄인다.
+ * ⚠️ 이 갈래의 판정 글자 · 연출(0x46844 …)은 진행기가 미리 그림에 얹어 둔 것이라 한 칸 더 넘기지 않는다(근사)
+ */
+function redrawPlaybackPicture(
+  holder: { tally: RecordedBoardTally },
+  ticks: readonly DefenseViewState[],
+  isHomeRunOf: (view: DefenseViewState) => boolean,
+  run: BallParticleRun,
+  cameraOffset: { readonly x: number; readonly y: number } | null,
+  random: RandomPort | undefined,
+  drawnErrors: DrawnFieldingError[],
+): void {
+  if (holder.tally.ended || holder.tally.nextIndex === 0 || ticks.length === 0) return
+  const lastIndex = ticks.length - 1
+  const at = holder.tally.nextIndex - 1
+  const view = ticks[Math.min(at, lastIndex)]
+  if (view === undefined) return
+  if (random !== undefined) drawBallParticles(run, view, cameraOffset, random, null)
+  if (at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
+  holder.tally = redrawRecordedBoard(holder.tally, isHomeRunOf(view))
+}
+
+/**
  * 미리 계산해 둔 틱을 차례대로 보여 주기만 한다 — 한 갱신에 한 틱, 마지막 틱(관문이 닫힌 틱) 뒤로는 원본 닫힌 갈래대로
  * +0x1094 가 11 이 되는 갱신(홈런 재생은 홈런 점수판이 내려갈 때까지 더)에 끝낸다 — 그동안 마지막 그림과 점수판을 그린다.
  *
@@ -467,6 +505,9 @@ function RecordedPlayback({
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(ticks.length > 0, updateStartTickRef)
+  /** 창이 선 첫 그림([창+0x250])의 수 — 다시 그린 수는 재생 묶음마다 센다 */
+  const redraws = useGameSceneRedrawCount(ticks.length > 0)
+  const redrawnRef = useRef<{ readonly ticks: readonly DefenseViewState[]; count: number } | null>(null)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
   /** 셈 — 갱신을 한 번씩만 지나도록 ref 로 든다 (재생 묶음이 바뀌면 처음부터) */
@@ -534,6 +575,12 @@ function RecordedPlayback({
     // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
     if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
+  // 창이 선 첫 그림 — 마지막 그림을 한 번 더 (`redrawPlaybackPicture`)
+  if (redrawnRef.current === null || redrawnRef.current.ticks !== ticks) redrawnRef.current = { ticks, count: redraws }
+  while (redrawnRef.current.count < redraws) {
+    redrawnRef.current.count += 1
+    redrawPlaybackPicture(holder, ticks, () => isHomeRun, particles.run, cameraOffsetRef.current, particles.random, drawnErrors)
+  }
   // 받은 틱 뒤 틱의 갱신이 왔는가 — 갱신 u 의 장면 틱은 (갱신 0 의 장면 틱) + u
   const recordedUpdateStart = updateStartTickRef.current
   const skipped = skipTick !== null && skipTick.ticks === ticks && recordedUpdateStart !== null && recordedUpdateStart + update > skipTick.at
@@ -564,7 +611,7 @@ function RecordedPlayback({
     board = runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, holder.tally.hidden)
   }
   return (
-    <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef}>
+    <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef} drawRedraws={redraws}>
       {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
       <DefenseParticles scene={particles.run.scene} version={particles.run.version} />
       {children}
@@ -591,6 +638,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
+  /** 창이 선 첫 그림([창+0x250])의 수 — 다시 그린 수는 판마다 센다 */
+  const redraws = useGameSceneRedrawCount()
+  const redrawnRef = useRef<{ readonly play: LiveRunnerPlay; count: number } | null>(null)
   const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(
     null,
   )
@@ -687,6 +737,12 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
     if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
+  // 창이 선 첫 그림 — 마지막 그림을 한 번 더 (`redrawPlaybackPicture`)
+  if (redrawnRef.current === null || redrawnRef.current.play !== play) redrawnRef.current = { play, count: redraws }
+  while (redrawnRef.current.count < redraws) {
+    redrawnRef.current.count += 1
+    redrawPlaybackPicture(holder, ticks, (drawn) => isHomeRunHitCode(drawn.sceneResultCode), particles.run, cameraOffsetRef.current, random, drawnErrors)
+  }
   const isFinished = stepper.finished && holder.tally.ended
   if (isFinished) clearBallParticles(particles.run)
 
@@ -715,7 +771,7 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     board = runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, holder.tally.hidden)
   }
   return (
-    <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef}>
+    <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef} drawRedraws={redraws}>
       {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
       <DefenseParticles scene={particles.run.scene} version={particles.run.version} />
       {children}
@@ -804,6 +860,13 @@ function LivePlayback({
     readonly distanceBoard: number | null
     readonly version: number
   }>({ text: null, distanceBoard: null, version: 0 })
+  /**
+   * 창이 선 첫 그림([창+0x250])의 수 (`useGameSceneRedrawCount`) · 그 그림이 다시 그릴 마지막 그림. 판 틱의 그림(`isPlay`)이면 야수 그리기
+   * 0x43278 의 실책 · 펌블 함성과 연출(0x46844 · 레이저 · B · C · 줌)도 한 번 더 돈다. `drawsText` 는 그 그림의 HOMERUN 글자 관문
+   */
+  const redraws = useGameSceneRedrawCount()
+  const redrawnRef = useRef(0)
+  const lastPictureRef = useRef<{ readonly view: DefenseViewState; readonly isPlay: boolean; readonly drawsText: boolean } | null>(null)
   /** 0x357e0 — 이 타구의 결과 코드 [+0xfd4] 가 24~26(홈런성)인가. 타석이 묶어 둔 쏜 공(`contactOfOutcome`)에서 읽는다 */
   const homeRunHit = isHomeRunHitCode(contactOfOutcome(input.outcome)?.resultCode)
 
@@ -849,6 +912,7 @@ function LivePlayback({
       closedUpdateRef.current = null
       closingFrameRef.current = null
       cameraOffsetRef.current = null
+      lastPictureRef.current = null
       setEnded(false)
       setClosed(false)
       setView(null)
@@ -892,6 +956,8 @@ function LivePlayback({
     }
     let effectsFrame: ReturnType<typeof stepDefenseEffects> | null = null
     let skippedNow = false
+    /** 이 갱신이 마지막으로 그린 판 틱 그림의 HOMERUN 글자 관문 (창 첫 그림이 같은 관문으로 다시 그린다) */
+    let lastDrawsText = false
     // 키 건너뛰기(+0xfe7)가 서면 52b26~52b40 이 한 그림 안에서 판 끝까지 되풀이한다 — 따라잡을 틱 수와 상관없이 끝까지 돈다
     while ((running.tick < wanted || running.fastForward) && !isDefensePlayFinished(running)) {
       const tickBefore = tickBeforeOf(running)
@@ -946,6 +1012,7 @@ function LivePlayback({
           ballShotsOf(running.ticks[running.ticks.length - 1]),
         )
         effectsRef.current = effectsFrame.effects
+        lastDrawsText = facts.drawsText
         // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
         board = drawBoard(running.held.scoreboardRuns)
       }
@@ -1003,6 +1070,9 @@ function LivePlayback({
         const closing = closingFrameRef.current
         if (closing !== null && closedCountRef.current === 1) setView(closing)
         else setClosed(true)
+        // 닫힌 뒤 그림 — 창 첫 그림이 다시 그리면 공 · 득점 점수판만 다시 돈다(연출 · 실책은 진행기 틱 그림 몫)
+        const closedView = closing !== null && closedCountRef.current === 1 ? closing : running.ticks[running.ticks.length - 1]
+        lastPictureRef.current = closedView === undefined ? null : { view: closedView, isPlay: false, drawsText: false }
         if (closesDefenseScene(closedCountRef.current, homeRunHit, boardRef.current)) {
           endsNow = true
           break
@@ -1024,14 +1094,14 @@ function LivePlayback({
     if (moved) {
       // 판 끝 틱이 "G2 만 닫힌 그림" 을 함께 찍었으면 그 그림은 다음(닫힌 첫) 갱신 몫이다
       const last = running.ticks[running.ticks.length - 1] ?? null
-      if (last?.closingListFrame === true) {
-        closingFrameRef.current = last
-        setView(running.ticks[running.ticks.length - 2] ?? null)
-      } else {
-        setView(last)
-      }
+      const shown = last?.closingListFrame === true ? (running.ticks[running.ticks.length - 2] ?? null) : last
+      if (last?.closingListFrame === true) closingFrameRef.current = last
+      setView(shown)
+      // 건너뛰는 동안(+0xfe7)은 그림이 없다 — 창 첫 그림도 다시 그릴 판 그림이 없다
+      lastPictureRef.current = shown === null || running.fastForward ? null : { view: shown, isPlay: true, drawsText: lastDrawsText }
     }
     if (endsNow) {
+      lastPictureRef.current = null
       // 0x35108 — 타이머 [+0x10f8] = 0 · +0x1100 = 0 · 글자 끄기 · 파티클 치우기 (아래 끝 효과)
       boardRef.current = { ...boardRef.current, timer: 0, active: false }
       setRunBoard(null)
@@ -1045,6 +1115,56 @@ function LivePlayback({
       setEffectsView((previous) => ({ text: drawn.text, distanceBoard: drawn.distanceBoard, version: previous.version + 1 }))
     }
   }, [update, input, side, ended, runScoreBoard, sceneMemory, homeRunHit])
+
+  // 창이 선 첫 그림([창+0x250], 52efe) — 갱신 없이 그리기 0x46c88 을 한 번 더 돈다. 앞 그림과 같은 상태를 그리므로 (r183 직접 떴다):
+  //   0x43278 야수 4381a~43904 — +0xb8 == 6(펌블) · +0xc0 == 4(악송구)를 다시 보고 [+0xec]+0x2e(실책)를 **한 번 더** 올린다 · 함성 29 예약
+  //           (+0xb8 · +0xc0 을 줄이는 야수 틱 0xa1284 는 갱신 쪽이라 안 돈다 — 원본 그대로 두 번 센다)
+  //   0x46844 · 0x4403c · 0x441c4 · 0x44398 · 0xbb84c — 연출 한 칸 더 (`redrawDefensePlayScene`)
+  //   0x36dfc 공 파티클 다시 쏘기 · 0x40b18 HOMERUN 글자 · 유지면 효과 틱 0x40faa(경기 난수) · 0x41a64 득점 점수판 타이머
+  //   부착 효과 · 공 가진 야수 고리 애니는 `DefenseScreen` 의 `drawRedraws` 가 센다. 프레임 끝 파티클 틱(53048)은 없다
+  useEffect(() => {
+    if (redraws === redrawnRef.current) return
+    const pending = redraws - redrawnRef.current
+    redrawnRef.current = redraws
+    const state = stateRef.current
+    if (ended || state === null) return
+    for (let at = 0; at < pending; at += 1) {
+      const picture = lastPictureRef.current
+      if (picture === null) return
+      if (picture.isPlay) {
+        drawnErrorsRef.current.push(...drawnFieldingErrorsOf(picture.view.fielders))
+        if (drawnFumbleCheerOf(picture.view.fielders)) activeSound().play(FUMBLE_CHEER_SOUND)
+        if (!isDefensePlayFinished(state)) {
+          const redrawn = redrawDefensePlayScene(state)
+          if (redrawn !== null) {
+            lastPictureRef.current = { ...picture, view: redrawn }
+            setView(redrawn)
+          }
+        }
+      }
+      const frame = redrawDefenseEffects(
+        effectsRef.current,
+        picture.drawsText,
+        { particles: particlesRef.current, random: input.random, configOf: particleConfigOf },
+        ballShotsAt(state.ticks[state.ticks.length - 1], cameraOffsetRef.current),
+      )
+      effectsRef.current = frame.effects
+      setEffectsView((previous) => ({ text: frame.text, distanceBoard: frame.distanceBoard, version: previous.version + 1 }))
+      // 0x41a64 — 그림마다 타이머를 줄인다
+      const drawnBoard = drawRunScoreBoardScene(boardRef.current, homeRunHit)
+      boardRef.current = drawnBoard.next
+      if (runScoreBoard === undefined || !drawnBoard.visible) {
+        setRunBoard(null)
+      } else {
+        const runs = state.held.scoreboardRuns
+        const scores: readonly [number, number] = [
+          runScoreBoard.scores[0] + (runScoreBoard.battingSide === 0 ? runs : 0),
+          runScoreBoard.scores[1] + (runScoreBoard.battingSide === 1 ? runs : 0),
+        ]
+        setRunBoard({ scores: runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, drawnBoard.hidden) })
+      }
+    }
+  }, [redraws, ended, input, runScoreBoard, homeRunHit])
 
   useEffect(() => {
     if (!ended) return
@@ -1069,6 +1189,7 @@ function LivePlayback({
       state={closed ? frozenCamera(view) : view}
       grassPalette={grassPalette}
       cameraOffsetRef={cameraOffsetRef}
+      drawRedraws={redraws}
       underActors={
         effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined
       }
