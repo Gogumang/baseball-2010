@@ -1,4 +1,6 @@
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import type { FielderState, PlayView } from '@/entities/fielding/model/fieldingState'
+import { listTickFielder } from '@/entities/fielding/model/fielderPose'
 import {
   JUDGE_POPUP_START,
   NO_ZOOM_PUNCH,
@@ -66,6 +68,21 @@ export interface DefenseScene {
    * (`fielderSlackAtPlayEnd`). 저장 블록(0x4f928 — 팀 둘 · st 0xa4 · 플레이 시간)에는 야수 객체가 없다
    */
   readonly fielderSlack?: readonly number[]
+  /**
+   * **판이 끝난 그대로의 플레이 객체 · 야수** (r201, 직접 뜸). 도루 키 메시지 0x583(0x520de)은 주자를 출발시킨 뒤(0xa9bd4) 52222 에서
+   * 제어기 0xaf8e0 → vt0xc = **0xafa60(CPU 송구 결정)을 한 번** 부른다 — 수비가 사람이든 CPU 든, 투구 중(판이 열리기 전)에. 그 순간의
+   * 플레이 칸은 앞 판이 끝난 그대로다: +0x128(쥐기 · 자동 진루 · 결과 메시지 · 주루 키가 1, 0xafa60 성공만 0 — 판 시작 vt1c 는 안 지운다) ·
+   * +0x130(공 가진 야수) · 야수 +0xe0(쥠 — 송구 b2f80 · 튕김 b3362 · 판 시작 vt20 b1140 만 지운다) · +0xc8 · 자리 · AI(야수 틱은 상태
+   * 0x17 에서만 돈다). 진행기는 끝날 때 제 플레이 · 야수를 여기에 적고(닫힌 그림의 G1 이 열렸으면 그 목록 틱 몫까지), 공 도착 판
+   * (`pitchArrivalPlay`)이 도루 출발마다 그 상태로 0xafa60 을 돌린다(`stealPlay.stealStartThrowDecision`). 0x3e340 이 장면을 새로 열면 없다
+   */
+  readonly playEnd?: PlayEndState
+}
+
+/** 판이 끝난 그대로의 플레이 · 야수 (`DefenseScene.playEnd`) */
+export interface PlayEndState {
+  readonly play: PlayView
+  readonly fielders: readonly FielderState[]
 }
 
 /** deadly_effect 애니 0 의 상태 칸 (애니 +8 객체의 [0] 칸 · [2] 비트) — 지연 0 이라 셈 칸은 늘 0 이다 */
@@ -305,4 +322,9 @@ export function drawDefenseScene(scene: DefenseScene, context: SceneDrawContext)
     unpaused,
     flashEnded,
   }
+}
+
+/** 판 끝 — 플레이 · 야수를 `playEnd` 로 남긴다. 판을 닫은 그림의 G1 이 열렸으면 그 목록 틱(a1286~a1456)을 한 번 더 지난 야수다 */
+export function playEndStateOf(play: PlayView, fielders: readonly FielderState[], closingListTickOpen: boolean): PlayEndState {
+  return { play, fielders: closingListTickOpen ? fielders.map(listTickFielder) : fielders }
 }

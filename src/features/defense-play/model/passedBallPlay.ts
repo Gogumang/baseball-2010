@@ -107,6 +107,8 @@ export interface PassedBallPlayInput {
   readonly runnerTeamGrade?: number
   /** 주면 펌블(0xb41d0) · 악송구(0xa1828) · 특수 송구(0xafa60) 굴림이 돈다 */
   readonly random?: RandomPort
+  /** 수비 9명의 스킬 번호 (칸 순서) — 레이저 굴림 0x66a8c 의 초감각(21) (`DefensePlayInput.fielderSkillIds`) */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
   readonly defenseIsCpu?: boolean
   readonly throwMode?: ManualAutoMode
   readonly manualThrowBase?: number
@@ -275,6 +277,7 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     ballOnGround: false,
     chase: { trajectory, slot: chaserSlot, catchTick, diveTicks: forecast.diveTicks, forecastCatchTick: forecast.choice.catchTick },
     random: input.random,
+    fielderSkillIds: input.fielderSkillIds,
     defenseIsCpu: input.defenseIsCpu,
     throwMode: input.throwMode,
     manualThrowBase: input.manualThrowBase,
