@@ -247,9 +247,13 @@ export const MATCH_INFO_LAYOUT = {
   firstBatTag: FIRST_BAT_LAYOUT.firstBatTag,
 } as const
 
-/** 경기정보(k 4) 투명 누름 칸 — 가운데 PLAY BALL 공(slt_frame 0, 46×46) = OK */
+/**
+ * 경기정보(k 4) 투명 누름 칸 — 가운데 PLAY BALL 공(slt_frame 0, 46×46) = OK.
+ * `playBall.y` 는 이미 공의 왼쪽 위(y0 − 33)라 그대로 쓴다 — 예전에는 33 을 한 번 더 빼 칸이 공보다 33px 위에 떠서
+ * 공을 눌러도 경기가 안 열렸다 (r157)
+ */
 export const MATCH_INFO_PLAY_BALL_PRESS_RECT = {
-  x: SCREEN.width / 2 - 23, y: MATCH_INFO_LAYOUT.playBall.y - 33, width: 46, height: 46,
+  x: SCREEN.width / 2 - 23, y: MATCH_INFO_LAYOUT.playBall.y, width: 46, height: 46,
 } as const
 
 /** 경기정보 투명 누름 칸 — 엠블럼(76×76) 자리 = ←/→ 엔트리 */

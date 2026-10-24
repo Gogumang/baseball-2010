@@ -5,6 +5,7 @@ import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { INITIAL_SETUP } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
+import { MATCH_INFO_LAYOUT } from '@/pages/general-mode/lib/prepareLayout'
 
 /** 경기정보 (하위 상태 22, 목록 k = 4) */
 
@@ -137,6 +138,18 @@ describe('머리띠·바닥띠 (ScreenFrame)', () => {
 
     expect(onStart).toHaveBeenCalled()
     expect(onOpenSettings).toHaveBeenCalled()
+  })
+})
+
+describe('PLAY BALL 공 누름 칸 (r157)', () => {
+  it("'경기 시작' 누름 칸은 그려진 공(slt_frame 0, 46×46) 자리 그대로다 — 공보다 33px 위에 뜨지 않는다", () => {
+    띄우기({})
+    const 칸 = screen.getByRole('button', { name: '경기 시작' })
+    // 공은 FrameSprite (120 − 23, playBall.y) 에 그린다 (`MatchInfoScreen` · `NariMatchInfoScreen`)
+    expect(칸.style.top).toBe(`${MATCH_INFO_LAYOUT.playBall.y}px`)
+    expect(칸.style.left).toBe(`${120 - 23}px`)
+    expect(칸.style.width).toBe('46px')
+    expect(칸.style.height).toBe('46px')
   })
 })
 

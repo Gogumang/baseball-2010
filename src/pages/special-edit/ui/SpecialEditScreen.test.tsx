@@ -70,6 +70,30 @@ describe('스페셜 에디트 화면', () => {
     expect(onRename).not.toHaveBeenCalled()
   })
 
+  it('입력 창이 다 펼쳐지면 이름 칸에 초점이 간다 — 펼치는 동안 칸이 숨어 있어 autoFocus 가 못 잡는 브라우저에서도 (r157)', () => {
+    vi.useFakeTimers()
+    // 레이아웃이 있는 환경 — 펼침 연출(0x741a0 6 → 110)이 돈다
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(10)
+    try {
+      render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={vi.fn()} />)
+      key('Enter')
+      key('Enter')
+      const field = screen.getByLabelText('이름') as HTMLInputElement
+      expect(field.readOnly).toBe(true)
+      // 브라우저는 visibility: hidden 칸에 초점을 주지 않는다 — 그 자리를 흉내 낸다
+      field.blur()
+      expect(document.activeElement).not.toBe(field)
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      expect(field.readOnly).toBe(false)
+      expect(document.activeElement).toBe(field)
+    } finally {
+      height.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
   it('입력 창이 떠 있는 동안 숫자·* 키는 뒤의 명단으로 안 간다', () => {
     render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={vi.fn()} />)
     key('Enter')

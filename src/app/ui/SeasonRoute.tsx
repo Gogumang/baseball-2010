@@ -381,9 +381,14 @@ function SeasonScreens({
           </RawScreen>
         )
       }
+      // 밑그림은 240×320 판(RawScreen) 안에, 대사창 덮개(ScreenOverlay)는 그 **형제**로 (나리 `CareerRoutes` 와 같다) —
+      // 판 안에 넣으면 덮개 기둥의 zoom 이 판의 zoom 위에 한 번 더 걸려, 배율이 1 이 아닌 창(모바일 · 480 폭)에서 대사창이
+      // 커지고 왼쪽 위로 밀려 글 첫머리 · 오른쪽 · 아랫줄이 잘렸다 (r157)
       return (
-        <RawScreen>
-          <SeasonEventUnderlay record={state.record} teamMorale={session.statusBoardMorale} gamePoint={session.gamePoints} />
+        <>
+          <RawScreen>
+            <SeasonEventUnderlay record={state.record} teamMorale={session.statusBoardMorale} gamePoint={session.gamePoints} />
+          </RawScreen>
           <ScreenOverlay>
             <StoryScreen
               // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
@@ -413,7 +418,7 @@ function SeasonScreens({
               onChoiceConfirm={actions.confirmSeasonEventChoice}
             />
           </ScreenOverlay>
-        </RawScreen>
+        </>
       )
     }
   }
