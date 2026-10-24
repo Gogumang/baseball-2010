@@ -6,6 +6,7 @@ import type { HalfInningCardsAt } from '@/widgets/game-scene/ui/HalfInningCards'
 import { roundPlateRectsOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { LineScoreBoard } from '@/widgets/line-score/ui/LineScoreBoard'
 import { LINE_SCORE_AT } from '@/widgets/line-score/lib/lineScoreLayout'
+import type { SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import * as styles from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen.css'
@@ -102,6 +103,8 @@ interface AutoPlayRelayScreenProps {
   readonly field?: ReactNode
   /** 시즌 홈 경기 잔디 팔레트 (`0x7885c` — 수비 화면과 같은 배경 그림). 없으면 구운 그림 */
   readonly grassPalette?: number | null
+  /** 받은 장면 키 칸 — 틱이 오른 뒤 · `onTick`(갱신 0x48480) 앞에서 꺼낸다(키 0x3e25c, `useSceneTick`) */
+  readonly keyLatch?: SceneKeyLatch
 }
 
 /** 운동장 배경 — 0x41230 → 0x411e0 → 0x78930 (`relayFieldBackgroundAt`) */
@@ -141,13 +144,13 @@ function RelayFieldBackground({ grassPalette }: { readonly grassPalette: number 
  *   안 가린다.
  */
 export function AutoPlayRelayScreen({
-  step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay, field, grassPalette = null,
+  step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay, field, grassPalette = null, keyLatch,
 }: AutoPlayRelayScreenProps) {
   // 자동진행 중계 0x21도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
   // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
   useMarksGameScene()
   // 틱 n(1부터)은 n 번째 0x48480 갱신 — 굴림은 부르는 쪽이 그 틱에 한다
-  const tick = useSceneTick((next) => onTick(next), !isPaused)
+  const tick = useSceneTick((next) => onTick(next), !isPaused, false, keyLatch)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   if (step === null) {
     return (

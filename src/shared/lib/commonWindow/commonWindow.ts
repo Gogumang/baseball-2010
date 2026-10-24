@@ -142,6 +142,10 @@ let testGeneration = 0
 
 /** 멈추기 시작할 때마다 오른다 — 창이 선 첫 그림([창+0x250])을 부품마다 한 번 세는 데 쓴다(`createGameSceneDrawGate`) */
 let freezeSerial = 0
+/** 서 있는 경기 장면 로딩 판(상태 7 · 9 · 8 — `LoadingTip`) 수 (`useMarksGameSceneLoading`) */
+let loadingScenesUp = 0
+/** 멈추기 시작한 횟수 중 로딩 판(상태 7 · 8 · 9)이 아닐 때 선 것 — 그 첫 그림만 배경 0x41230 을 다시 그린다(52f26~52f36) */
+let backdropFreezeSerial = 0
 
 function syncGameSceneFreeze(now: number = performance.now()): void {
   const isFrozen = gameScenesUp > 0 && shownCommonWindows > 0
@@ -149,6 +153,7 @@ function syncGameSceneFreeze(now: number = performance.now()): void {
     frozenSince = now
     frozenSinceAppTick = appTickOf(now)
     freezeSerial += 1
+    if (loadingScenesUp === 0) backdropFreezeSerial += 1
     for (const timer of sceneTimers.values()) pauseSceneTimer(timer, now)
   } else if (!isFrozen && frozenSince !== null) {
     frozenTotal += Math.max(0, now - frozenSince)
@@ -244,6 +249,35 @@ export function clearGameSceneTimeout(id: number | null | undefined): void {
  */
 export function gameSceneFreezeSerialNow(): number {
   return freezeSerial
+}
+
+/**
+ * 창이 선 첫 그림([창+0x250]) 중 배경 0x41230 을 그린 그림의 수 — 52f26~52f36 은 상태 [장면+0x1c] 가 7 · 9 · 8(로딩 판)이면 0x41230 을
+ * 건너뛴다(2026-10-24 직접 떴다). 그래서 로딩 판 동안 선 창은 전광판 글자 자리 [구장+0x8c] 를 줄이지 않는다
+ * (`sceneCloudClock.sceneScoreboardTickOf`)
+ */
+export function gameSceneBackdropFreezeSerialNow(): number {
+  return backdropFreezeSerial
+}
+
+/**
+ * 경기 장면 로딩 판(상태 7 · 9 · 8)이 서 있는 동안 센다 — 그때 선 창의 첫 그림은 배경 0x41230 을 안 그린다(52f28~52f32).
+ * 같은 판의 `useMarksGameScene` 보다 **먼저** 불러야 판이 서는 커밋에 이미 떠 있던 창도 로딩 판 몫으로 센다
+ */
+export function useMarksGameSceneLoading(): void {
+  useLayoutEffect(() => markGameSceneLoading(), [])
+}
+
+/** 로딩 판 하나가 섰다 — 돌려준 함수로 내린다(`useMarksGameSceneLoading`) */
+export function markGameSceneLoading(): () => void {
+  loadingScenesUp += 1
+  const generation = testGeneration
+  let released = false
+  return () => {
+    if (released || generation !== testGeneration) return
+    released = true
+    loadingScenesUp -= 1
+  }
 }
 
 export interface GameSceneDrawGate {
@@ -369,6 +403,7 @@ export function resetCommonWindowShownForTest(): void {
   testGeneration += 1
   shownCommonWindows = 0
   gameScenesUp = 0
+  loadingScenesUp = 0
   // 붙잡혀 있던 시계는 다시 흘린다
   syncGameSceneFreeze()
   frozenSince = null

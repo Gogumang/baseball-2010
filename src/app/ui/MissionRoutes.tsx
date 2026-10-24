@@ -49,6 +49,8 @@ import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PitchingStageSource } from '@/pages/pitching/ui/PitchingScreen'
+import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
+import { usePitchArrivalHold } from '@/widgets/batting-stage/model/usePitchArrivalHold'
 import { missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
@@ -206,6 +208,7 @@ export function MissionRoutes({
   const isFreePassReady = useFreePassPlayStart(
     session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
   )
+  const pitchScene = useMissionPitchSceneBeforePlay(session, isPopupFrozen)
   /**
    * 미션 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 미션 시작 첫 0x18 판 0x3fac4 · 사람 반 이닝의 수비 판 시작 0xb0fb4 ·
    * 투수 미션 벤치 클리어링 0x3a5f0. 자동진행 0x21 이 돌아온 0x18 은 판 없이 지나가 0x3fac4 를 안 부른다(Q2)
@@ -233,6 +236,7 @@ export function MissionRoutes({
     missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
     missionPitcherNameOf(session, hallOfFame, nari.투수),
     walkerSeats,
+    pitchScene,
   )
   if (overlay !== null) return overlay
 
@@ -398,8 +402,9 @@ export function MissionRoutes({
         atBat={runner.atBat}
         bannerText={runner.bannerText}
         onThrow={session.handleThrow}
-        // 타석 장면 — 마지막 공 · 마운드 미션 투수 · 지금 CPU 타자 (`PitcherSideStage`)
-        stage={pitchingStageOf(session, pitcherRun)}
+        // 타석 장면 — 마지막 공 · 마운드 미션 투수 · 지금 CPU 타자 (`PitcherSideStage`). 맞은 공의 0x11 끝 · 0x13 · 공 도착 판의
+        // 0x12 틱 0 도 이 장면이 그린 뒤 수비 판(0x17)으로 넘긴다 (`useMissionPitchSceneBeforePlay`)
+        stage={{ ...pitchingStageOf(session, pitcherRun), ...pitchScene.stage }}
         // 상태 0xe 소개 판 0x44944 — 미션 투수(줄 + 게이트 0xa5764 가 연 이 경기 줄) · 지금 CPU 타자
         matchupCards={missionPitcherMatchupCardsOf(pitcherRun, missionCardPitcherOf(session, missionPitcherNameOf(session, hallOfFame, nari.투수)))}
         // 조준(0x10)의 틱 0x39c5c — 투수 미션 흔들림은 경기 난수로 · CLR 은 0xf 진입을 다시
@@ -466,6 +471,8 @@ function missionOverlayOf(
   missionPitcherName?: string | null,
   /** 장면 두 줄의 +0xec — 판 앞 값 · 벤치 클리어링 때 수비 줄 (`useWalkerLineSeats`) */
   walkerSeats?: { readonly boardBefore: WalkerLineSeats; readonly benchDefense: readonly WalkerSeat[] },
+  /** 투수 미션 판이 섰지만 아직 0x17 전(0x11 끝 · 0x13 · 공 도착 판의 0x12 틱 0) — 그동안은 투구 화면이 그린다 */
+  pitchScene?: MissionPitchSceneBeforePlay,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(0x667f8 로딩 판 · 0x54120 진행 칸 끝 0x24 · 0x53dbc 팁 rand(0, 73)) 뒤 상태 7 · 9 · 8 의
@@ -485,7 +492,7 @@ function missionOverlayOf(
       </RawScreen>
     )
   }
-  if (pendingDefensePlay !== null) {
+  if (pendingDefensePlay !== null && pitchScene?.isHitShowing !== true) {
     const isPitcher = pendingDefensePlay.side === '투수'
     const run = isPitcher ? session.pitcherRun : session.missionRun
     const runScoreBoard =
@@ -509,7 +516,7 @@ function missionOverlayOf(
   // 미션의 주자 판(도루 · 폭투 · 견제) — 상태 0x17 키 0x53420 이 사람 공격(타자 미션)이면 주루 0x5331c(0x582 진루 · 0x584 귀루 →
   // 0xa9b04)와 OK 슬라이딩 0x585 를, 사람 수비(투수 미션)면 송구 0x533c8 → 0x588 → +0x160 을 보내므로 실시간으로 한 틱씩 돌린다
   // (`features/defense-play/model/liveRunnerPlay`, 팀 경기와 같은 길). 판정 콜은 화면이 판 안의 그 틱에 낸다
-  if (session.pendingRunnerPlay !== null) {
+  if (session.pendingRunnerPlay !== null && pitchScene?.isArrivalHolding !== true) {
     const run = session.pendingRunnerPlay.side === '수비' ? session.pitcherRun : session.missionRun
     return (
       <DefensePlayback
@@ -723,9 +730,10 @@ export function PitcherAceMatchRoute(
   const isFreePassReady = useFreePassPlayStart(
     session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
   )
+  const pitchScene = useMissionPitchSceneBeforePlay(session, isPopupFrozen)
   const overlay = missionOverlayOf(
     session, defenseSceneRef, session.pitcherAceMatchMission === mission ? session.pitcherRun : null, runner.bannerText,
-    isFreePassReady, null, pitcherName ?? null,
+    isFreePassReady, null, pitcherName ?? null, undefined, pitchScene,
   )
   if (overlay !== null) return overlay
 
@@ -744,7 +752,7 @@ export function PitcherAceMatchRoute(
       atBat={runner.atBat}
       bannerText={runner.bannerText}
       onThrow={session.handleThrow}
-      stage={pitchingStageOf(session, pitcherRun)}
+      stage={{ ...pitchingStageOf(session, pitcherRun), ...pitchScene.stage }}
       // 상태 0xe 소개 판 0x44944 — 대결은 g[0x176] 이라 늘 나리 투수(0x1fbd0)
       matchupCards={missionPitcherMatchupCardsOf(pitcherRun, missionCardPitcherOf(session, pitcherName ?? null))}
       onAimTick={session.aimTick}
@@ -809,6 +817,56 @@ function missionCardPitcherOf(session: ReturnType<typeof useMissionSession>, nam
     staminaAbility: pitcher.staminaAbility,
     stamina: session.pitcherStamina,
     ...(pitcher.recordLine === undefined ? {} : { recordLine: pitcher.recordLine }),
+  }
+}
+
+/** 투수 미션의 판이 섰지만 아직 0x17 전인 동안 — `useMissionPitchSceneBeforePlay` */
+interface MissionPitchSceneBeforePlay {
+  /** 맞은 공의 0x11 끝 · 0x13 을 투구 장면이 그리는 중 — 수비 판(`pendingDefensePlay`)을 아직 안 띄운다 */
+  readonly isHitShowing: boolean
+  /** 공 도착 판(도루 · 폭투)의 0x11 끝 · 0x12 틱 0 을 투구 장면이 그리는 중 — 주자 판(`pendingRunnerPlay`)을 아직 안 띄운다 */
+  readonly isArrivalHolding: boolean
+  /** 투구 화면 장면 재료에 얹을 값 (`PitchingStageSource`) */
+  readonly stage: Pick<PitchingStageSource, 'hitScene' | 'onHitSceneEnd' | 'isBeforePlay'>
+}
+
+/**
+ * **투수 미션의 0x11 끝 · 0x13 · 0x12 틱 0 — 수비 판(0x17)을 그 뒤로 미룬다** (투수편 `PitcherGameScreen` 과 같은 길).
+ * 세션은 공을 놓는 순간(0x11 틱 10) 판정과 함께 판을 세운다(`handleThrow`). 원본은 CPU 타자가 맞힌 공이면 판정 틀(스윙 F + 1 ·
+ * 번트 N − 1)까지 0x11 · 이어 0x13(큰 타구면 문턱 + 7)을 지나 0x17 로 가고(`usePitcherHitScene`), 못 맞힌 공의 도루 · 폭투 판은
+ * 0x12 진입 0x3dfac 이 열어 다음 그림이 0x17 이다(`usePitchArrivalHold`). 그동안 투구 화면(`PitchingScreen`)이 장면을 그린다.
+ * 판 입력 · 판 시작 굴림은 세션이 이미 냈으니 미뤄도 그 굴림 차례는 그대로다.
+ */
+function useMissionPitchSceneBeforePlay(
+  session: ReturnType<typeof useMissionSession>,
+  isPopupFrozen: boolean,
+): MissionPitchSceneBeforePlay {
+  const lastThrow = session.lastPitcherThrow
+  const run = session.pitcherRun
+  const stage = run === null ? null : pitchingStageOf(session, run)
+  const pending = session.pendingDefensePlay
+  const hitScene = usePitcherHitScene({
+    play: pending !== null && pending.side === '투수' ? pending.input : null,
+    pitch: lastThrow?.pitch ?? null,
+    cpuSwing: lastThrow?.cpuSwing ?? null,
+    batterHand: stage === null ? 0 : (stage.batterSide ?? stage.batterForm & 1),
+    // 일시정지 팝업(0x741a0)이 장면 틱을 세운다(0x52cc6) — 투구 화면이 알린다
+    isFrozen: isPopupFrozen,
+  })
+  const runnerPlay = session.pendingRunnerPlay
+  const isArrivalHolding = usePitchArrivalHold({
+    play: runnerPlay !== null && runnerPlay.kind === 'arrival' && runnerPlay.side === '수비' ? runnerPlay : null,
+    pitch: lastThrow?.pitch ?? null,
+    isFrozen: isPopupFrozen,
+  })
+  return {
+    isHitShowing: hitScene.isShowing,
+    isArrivalHolding,
+    stage: {
+      hitScene: hitScene.hitScene,
+      onHitSceneEnd: hitScene.end,
+      isBeforePlay: hitScene.isShowing || isArrivalHolding,
+    },
   }
 }
 

@@ -74,12 +74,20 @@ describe('수비 재생', () => {
     render(<DefensePlayback ticks={밀어내기.ticks} onDone={가만히} freePassPlay />)
     expect(가만히).not.toHaveBeenCalled()
     cleanup()
-    const 눌렀다 = vi.fn()
-    render(<DefensePlayback ticks={밀어내기.ticks} onDone={눌렀다} freePassPlay />)
-    act(() => {
-      fireEvent.keyDown(window, { key: '5' })
-    })
-    expect(눌렀다).toHaveBeenCalled()
+    vi.useFakeTimers()
+    try {
+      const 눌렀다 = vi.fn()
+      render(<DefensePlayback ticks={밀어내기.ticks} onDone={눌렀다} freePassPlay />)
+      act(() => {
+        fireEvent.keyDown(window, { key: '5' })
+      })
+      // 키는 받은 다음 틀의 키 0x498d4 → 0x53420 → 0x519cc 가 처리한다(`sceneKeyLatch`) — 받은 틀에는 아직 안 끝난다
+      expect(눌렀다).not.toHaveBeenCalled()
+      for (let i = 0; i < 4 && 눌렀다.mock.calls.length === 0; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(눌렀다).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('밀어내기 판이 아닌 재생(견제 · 도루 · 폭투)은 키를 받지 않는다', () => {

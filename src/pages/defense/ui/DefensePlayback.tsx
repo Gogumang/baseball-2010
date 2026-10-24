@@ -156,8 +156,10 @@ function takePressFor(
     repeat = tick === sceneTick && (out.flags & HOLD_STAGE_MASK) !== 0 ? out.repeat : null
   }
   hold.lastTick = sceneTick
-  if (press !== null || repeat === null) return press
-  return { key: repeat, isRepeat: true }
+  if (repeat === null) return press
+  const repeated: DefenseKeyPress = { key: repeat, isRepeat: true }
+  // 누름과 되풀이가 한 틀에 오면(앞 키를 누른 채 새 키) 0x498d4 가 누름(49a3a) → 되풀이(49a56) 차례로 둘 다 보낸다
+  return press === null ? repeated : { ...press, thenRepeat: repeated }
 }
 
 function takeArrivedPress(presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null): DefenseKeyPress | null {
@@ -172,7 +174,9 @@ function takeArrivedPress(presses: DefenseKeyPress[], ticks: number[], sceneTick
 /**
  * **누른 채 되풀이** — 0x498d4 는 이 틀의 누름(49a3a, 표시 0) 다음에 되풀이 [장면+0x50](49a5c, 표시 [장면+0x6c])을 조작 객체에 준다.
  * 되풀이는 키 객체 틀 머리 0xbca05 가 누른 틀 뒤 4틀마다 스스로 센다(`keyHold`) — 브라우저 자동 되풀이 keydown 은 버리고, keyup 이
- * 뗌 [+0x24] 이다. 한 틀에 누름과 되풀이가 함께 오면(두 키를 겹쳐 누름) 누름만 먹인다(⚠️ 근사 — 진행기 걸음은 키 하나를 받는다).
+ * 뗌 [+0x24] 이다. 한 틀에 누름과 되풀이가 함께 오면(앞 키를 누른 채 새 키를 누름) 누름 → 되풀이 차례로 둘 다 먹인다
+ * (`DefenseKeyPress.thenRepeat` — 진행기가 그 틀의 0x53420 을 키마다 한 번씩 돈다). 뗌 [+0x54] 은 표시에 0x200 이 서 있어
+ * 0x536bc(536f8~53702)가 상태 0x11 로만 보낸다 — 0x17 에는 안 온다.
  */
 interface DefenseKeyHold {
   readonly hold: KeyHold
@@ -483,17 +487,20 @@ function RecordedPlayback({
     sceneResultCode !== undefined
       ? isHomeRunHitCode(sceneResultCode)
       : !freePassPlay && ticks[0]?.runners.some((runner) => runner.index === 0) === true
-  /** 0x519cc 키 건너뛰기를 받았다 — 그 그림 안에서 0x35108 까지 끝난다 */
-  const [skipped, setSkipped] = useState(false)
+  /**
+   * 0x519cc 키 건너뛰기를 받은 장면 틱 — 키는 받은 다음 틀의 0xbca05 → 키 0x498d4 → 0x53420 이 그 틀의 갱신보다 먼저 처리한다
+   * (`sceneKeyLatch` · 위 `takePressFor` 와 같은 차례). 받은 틱보다 뒤 틱의 갱신이 오면 그 그림 안에서 0x35108 까지 끝난다
+   */
+  const [skipTick, setSkipTick] = useState<{ readonly ticks: readonly DefenseViewState[]; readonly at: number } | null>(null)
   useEffect(() => {
-    setSkipped(false)
     if (!freePassPlay) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       // 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x519cc — 원본이 아는 키만
       if (originalKeyOf(event.key) === null) return
       // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
       if (isGameSceneFrozen()) return
-      setSkipped(true)
+      const at = gameSceneTickNow()
+      setSkipTick((current) => (current !== null && current.ticks === ticks ? current : { ticks, at }))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -527,6 +534,9 @@ function RecordedPlayback({
     // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
     if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
+  // 받은 틱 뒤 틱의 갱신이 왔는가 — 갱신 u 의 장면 틱은 (갱신 0 의 장면 틱) + u
+  const recordedUpdateStart = updateStartTickRef.current
+  const skipped = skipTick !== null && skipTick.ticks === ticks && recordedUpdateStart !== null && recordedUpdateStart + update > skipTick.at
   const isFinished = ticks.length === 0 || holder.tally.ended || skipped
   if (isFinished) clearBallParticles(particles.run)
 

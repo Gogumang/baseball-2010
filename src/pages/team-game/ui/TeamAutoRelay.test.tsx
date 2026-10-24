@@ -84,17 +84,25 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
 
   it('←/4 · →/6 이 속도를 0..2 안에서 바꾼다 — 2 여도 안내 띠 · 속도 칸은 서고(42ab2 · 42bbe 는 모드만 본다) 운동장 그림만 없다', () => {
     띄우기()
-    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    // 키 0x3e25c 는 받은 다음 틀(진입 뒤 · 갱신 앞)에 돈다(`sceneKeyLatch`)
+    const 누르기 = (key: string) => {
+      fireEvent.keyDown(window, { key })
+      흘리기(1)
+    }
+    누르기('ArrowLeft')
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')
     fireEvent.keyDown(window, { key: '6' })
+    // 받은 틀에는 아직 안 바뀐다
+    expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')
+    흘리기(1)
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
     expect(screen.getByTestId('중계-투수')).toBeTruthy()
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    누르기('ArrowRight')
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('2')
     expect(screen.queryByTestId('중계-투수')).toBeNull()
     expect(screen.queryByTestId('중계-타자')).toBeNull()
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
-    fireEvent.keyDown(window, { key: '4' })
+    누르기('ArrowRight')
+    누르기('4')
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
   })
 
@@ -176,6 +184,7 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
     띄우기()
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('1')
     fireEvent.keyDown(window, { key: '4' })
+    흘리기(1)
     cleanup()
     띄우기()
     expect(screen.getByTestId('중계-속도').dataset.speed).toBe('0')

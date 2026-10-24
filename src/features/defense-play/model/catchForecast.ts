@@ -7,6 +7,7 @@ import {
 } from '@/entities/fielding/model/catchPrediction'
 import { horizontalDistance, stepToward, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
+import { POSE, isFreezeOpen, shouldClearPose, withThrowMotion } from '@/entities/fielding/model/fielderPose'
 
 /**
  * 포구 예보 — 타구가 떠난 순간 "누가 몇 틱에 잡는가" 를 한 번에 정한다.
@@ -101,8 +102,6 @@ export interface CatchForecastOptions {
   readonly thrownSlot?: number
 }
 
-/** a1406~a143e — 던진 야수(+0xb1)의 복제는 첫 복제 틱에 잠금이 풀린다(그 틱은 판정 · 걸음 없음) */
-const THROW_MOTION_CLEAR_TICKS = 1
 /** b18b6 — 두 번째 패스는 t = 10 부터 */
 const SECOND_PASS_FIRST_TICK = 10
 
@@ -137,14 +136,21 @@ export function forecastCatch(
   // vt14 → 0xa100c(야수, x, 0, z) — 낙구 지점의 높이는 버린다
   const landingTarget: WorldPoint = { x: landing.x, y: 0, z: landing.z }
   // 복제 9명 — 위치 · n · 동작 잠금 +0xb4 · +0xcc 를 원본 복제처럼 따로 굴린다
-  const clones = fielders.map((fielder) => ({
-    position: fielder.position,
-    runTicks: 0,
-    lockTicks: fielder.actionLockTicks,
-    slackTicks: fielder.arrivalSlackTicks,
-    throwMotionTicks: fielder.slot === options.thrownSlot ? THROW_MOTION_CLEAR_TICKS : 0,
-    target: fielder.target,
-  }))
+  // 자세 워드 +0xb0 · 동작 +0xa8 · 프레임 +0xac 도 베낀다(r171 — 복제 틱이 원본 야수 틱 0xa1284 를 통째로 돈다, `fielderPose`).
+  // 던진 야수(`thrownSlot`)는 던지기 끝(a1a26~a1a3a)의 동작 5 · +0xb1 을 얹는다 — 진행기가 이미 세웠으면 같은 값이다
+  const clones = fielders.map((fielder): ForecastClone => {
+    const thrown = fielder.slot === options.thrownSlot ? withThrowMotion(fielder) : fielder
+    return {
+      position: fielder.position,
+      runTicks: 0,
+      lockTicks: fielder.actionLockTicks,
+      slackTicks: fielder.arrivalSlackTicks,
+      pose: thrown.pose,
+      action: thrown.action,
+      frame: thrown.actionFrame,
+      target: fielder.target,
+    }
+  })
   // 움직임허용 — a = 1 이면 모두. a = 0 이면 공+0xaac(악송구 · 원바운드 송구)일 때만
   let movable = options.secondPass === undefined ? true : options.secondPass.movable
   let firstPass = options.secondPass !== undefined
@@ -159,7 +165,7 @@ export function forecastCatch(
       const runningToLanding = movable && options.chaseToLanding === true && trajectory.landingTick >= tick
       const standing = movable && !runningToLanding
       if (standing) clone.runTicks += 1
-      const unlocked = clone.throwMotionTicks <= 0 && clone.slackTicks <= 0 && clone.lockTicks <= 0
+      const unlocked = (clone.pose & POSE.THROWN) === 0 && clone.slackTicks <= 0 && clone.lockTicks <= 0
       // b1416 vt14 = 0xa14c8 — +0xb4 ≤ 0 · vtc8(+0xb1 == 0 && +0xcc ≤ 0)일 때만 목표를 받는다(잠긴 복제는 앞 목표 그대로)
       if (runningToLanding && unlocked) clone.target = landingTarget
       // b146c — vtc8(+0xb1 == 0 && +0xcc ≤ 0) && +0xb4 ≤ 0 이 아니면 판정 없이 복제 틱만 (정지면 n 을 되돌린다)
@@ -259,36 +265,49 @@ interface ForecastClone {
   runTicks: number
   lockTicks: number
   slackTicks: number
-  throwMotionTicks: number
+  /** 자세 워드 +0xb0 (`fielderPose.POSE`) */
+  pose: number
+  /** 동작 +0xa8 */
+  action: number
+  /** 동작 프레임 +0xac */
+  frame: number
   /**
    * 복제의 목표점 +0x2c — 진짜 야수의 것을 물려받는다. vt10(0xa124c → 0xbf2b0)이 제 위치로 둔다: 정지 판정(b14d0) ·
-   * 던진 야수가 +0xb1 을 푼 틱(a143e) · 동작 잠금 +0xb4 가 0 이 된 틱(a12c8)
+   * 자세 워드를 지운 틱(a143e) · 동작 잠금 +0xb4 가 0 이 된 틱(a12c8)
    */
   target: WorldPoint
 }
 
 /**
- * 복제의 야수 틱 0xa1284 — 동작 잠금 +0xb4 가 있으면 −1 만 하고 끝(a12b4~a12d6), 아니면 +0xcc −1(a1330) 뒤
- * 이동 조건(vtc8 && +0xb4 ≤ 0, a1346~a1376)이 서면 목표로 한 틱(기반 캐릭터 이동 0xbf158 = `stepToward`),
- * 끝에 vtc8 이 거짓이면(던진 뒤 +0xb1) a1406~a141a → a143e 가 +0xb0~+0xb3 을 지우고 vt10(목표 = 위치)을 부른다.
+ * 복제의 야수 틱 0xa1284 — 프레임 +1(a1286) · 동작 잠금이 있으면 −1 만 하고 끝(a12b4~a12d6, 0 이 되면 vt10), 아니면 +0xcc −1(a1330)
+ * 뒤 이동 관문(0xa0f7c && vtc8 && +0xb4 ≤ 0, a1346~a1376)이 서면 목표로 한 틱(기반 캐릭터 이동 0xbf158 = `stepToward`), 끝에
+ * 지우기 규칙(a137a~a143e — `fielderPose.shouldClearPose`: 던진 뒤 +0xb1 이면 vtc8 거짓으로 곧바로)이 서면 워드 · 동작 0 · vt10(목표 = 위치).
+ * 던진 야수의 첫 복제 틱은 그래서 걸음 없이 풀린다(U-78, 에뮬 확인 — 동작 5 · +0xac 0 · +0xb1 1 로 한 번 돌리면 +0xb1 = 0 · 동작 0 ·
+ * 위치 그대로). 점프 · 가슴 높이 포구 동작 중인 복제는 프레임 1 · 2 에만 걷는다.
  */
 function tickClone(clone: ForecastClone, speed: number): void {
+  clone.frame += 1
   if (clone.lockTicks > 0) {
     clone.lockTicks -= 1
-    // a12c8~a12d2 — 잠금이 막 0 이 된 틱은 vt10(0xa124c → 0xbf2b0 목표 = 위치)을 부르고 끝(a12d6). 그 뒤 물려받은 목표로 걷지 않는다
-    if (clone.lockTicks <= 0) clone.target = clone.position
+    // a12c8~a12d2 — 잠금이 막 0 이 된 틱은 vt10(0xa124c → 0xbf2b0 목표 = 위치 · 동작 · 워드 0)을 부르고 끝(a12d6)
+    if (clone.lockTicks <= 0) {
+      clone.target = clone.position
+      clone.pose = 0
+      clone.action = 0
+    }
     return
   }
   // a1330 — +0xcc 를 먼저 줄이고 a1346 의 vtc8 이 같은 틱에 본다
   if (clone.slackTicks > 0) clone.slackTicks = Math.max(0, clone.slackTicks - 1)
-  // a1346 이동은 vtc8(+0xb1 · +0xcc) 뒤 · a143e 의 +0xb1 지우기는 이동 뒤다
-  if (clone.slackTicks <= 0 && clone.throwMotionTicks <= 0) {
+  // a1346 이동은 0xa0f7c · vtc8(+0xb1 · +0xcc) 뒤 · a143e 의 지우기는 이동 뒤다
+  if (isFreezeOpen(clone.pose, clone.frame) && (clone.pose & POSE.THROWN) === 0 && clone.slackTicks <= 0) {
     clone.position = stepToward(clone.position, clone.target, speed)
   }
-  if (clone.throwMotionTicks > 0) {
-    clone.throwMotionTicks -= 1
-    // a143e — +0xb0~+0xb3 지우기 · vt10(목표 = 위치)
-    if (clone.throwMotionTicks <= 0) clone.target = clone.position
+  if (shouldClearPose({ pose: clone.pose, action: clone.action, actionFrame: clone.frame, arrivalSlackTicks: clone.slackTicks })) {
+    // a143e — +0xb0~+0xb3 지우기 · vt10(목표 = 위치 · 동작 0)
+    clone.pose = 0
+    clone.action = 0
+    clone.target = clone.position
   }
 }
 

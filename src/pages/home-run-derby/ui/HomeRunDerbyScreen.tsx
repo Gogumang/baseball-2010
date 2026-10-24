@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PressArea } from '@/shared/ui'
 import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
@@ -33,6 +33,7 @@ import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { gameSceneTickNow, gameSceneTickOf, useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /** 더비 로딩 판 동안 받아 둘 그림 — 기다리지 않는다 */
 const DERBY_PRELOADS: readonly SpriteSceneKey[] = ['homeRunDerby']
@@ -148,29 +149,47 @@ export function HomeRunDerbyScreen({
 
   // 상태 0xe — 사람 OK 를 기다린다 (0x532b0). 경기 중 메뉴·조작방법·설정이 떠 있으면 경기 키가 안 간다(일시정지 팝업 0x754f9)
   const acceptsConfirm = session.isAwaitingConfirm && session.result === null && !isMenuOpen && overlay === null
-  const { confirm } = session
   // 판(0x17)이 도는 동안의 키 — 0x53420 이 키마다 0x587 을 보내 홈런 뒤면 건너뛴다(0x519cc). 경기 중 메뉴 · 조작방법 · 설정이 떠 있으면 안 간다
   const isPlayRunning = session.distanceBoard !== null && session.result === null && !isMenuOpen && overlay === null
-  const { skipHomeRun } = session
+  /**
+   * 0xe 의 OK · 판(0x17)의 건너뛰기 키는 받은 그 자리에서 처리하지 않고 장면 키 칸에 든다 — 원본은 키 콜백이 [+0x20] 에 적기만 하고
+   * 다음 틀의 0xbca05 → 키 0x498d4(52d9e) → 0x536bc 가 그 틀의 상태로 가른다(0xe 0x532b0 · 0x17 0x53420 → 0x587 → 0x519cc).
+   * 타석(`BattingStage`)이 칸을 올려 두었으면 그 틀 머리에서 꺼낸다(`pushSceneKey` — 없으면 바로). 꺼낸 틀의 상태를 다시 본다
+   */
+  const { confirm, skipHomeRun } = session
+  const sceneKeyStateRef = useRef({ acceptsConfirm, isPlayRunning })
+  sceneKeyStateRef.current = { acceptsConfirm, isPlayRunning }
+  const pressConfirm = useCallback(() => {
+    pushSceneKey(() => {
+      if (sceneKeyStateRef.current.acceptsConfirm) confirm()
+    })
+  }, [confirm])
+  const pressSkip = useCallback(() => {
+    // 처리하는 틀 = 받은 틀 + 1 — 판 시각은 그 틀(키 틱)로 센다
+    const keyTick = gameSceneTickNow() + 1
+    pushSceneKey(() => {
+      if (sceneKeyStateRef.current.isPlayRunning) skipHomeRun(keyTick)
+    })
+  }, [skipHomeRun])
   useEffect(() => {
     if (!isPlayRunning) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      skipHomeRun()
+      pressSkip()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isPlayRunning, skipHomeRun])
+  }, [isPlayRunning, pressSkip])
   useEffect(() => {
     if (!acceptsConfirm) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !CONFIRM_KEYS.has(event.key)) return
       event.preventDefault()
-      confirm()
+      pressConfirm()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [acceptsConfirm, confirm])
+  }, [acceptsConfirm, pressConfirm])
   /**
    * 원본 공용 키 처리 `0x498d4` 의 '\*'(소프트키1 −6 도 '\*', 498e8) — 경기 상태 0xd~0x15 면 경기 중 메뉴 0x3c02c 를 연다
    * (4991c~49922 — 모드를 안 본다). 더비(모드 7)도 경기 장면 0x104 라 그대로다. 로딩 판(7 · 9 · 8) · 판(0x17) · 결과 창(0x1a) ·
@@ -383,7 +402,7 @@ export function HomeRunDerbyScreen({
           결과 창(상태 0x1a)은 키 0x40a08 이 예 · 아니오만 받는다 — 경기 중 메뉴 칸을 안 둔다.
         */}
         {!isMenuOpen && (acceptsConfirm || isPlayRunning) && (
-          <PressArea label={acceptsConfirm ? '확인' : '건너뛰기'} onPress={acceptsConfirm ? confirm : skipHomeRun} />
+          <PressArea label={acceptsConfirm ? '확인' : '건너뛰기'} onPress={acceptsConfirm ? pressConfirm : pressSkip} />
         )}
         {!isResultShown && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT}
           touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.toggle} />}

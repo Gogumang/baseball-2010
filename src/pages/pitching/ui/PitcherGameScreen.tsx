@@ -105,8 +105,9 @@ import { batterEquipmentOf, pitcherEquipmentOf } from '@/widgets/batting-stage/l
 import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
-import { pitchResultEntryDelayTicksOf, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { passesHeldResult, pitchResultEntryDelayTicksOf, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
+import { usePitchArrivalHold } from '@/widgets/batting-stage/model/usePitchArrivalHold'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
@@ -361,6 +362,15 @@ function PitcherGameScene({
   })
   const isHitSceneShowing = pitcherHitScene.isShowing
   /**
+   * **공 도착 판(도루 · 폭투)의 0x11 끝 · 0x12 틱 0** — 진행기는 놓는 순간 주자 판(`pendingRunnerPlay`)을 세우지만 원본은 0x12 진입
+   * 0x3dfac 이 판을 열어 0x17 을 예약한다 — 그 다음 그림까지 타석 장면을 두고 수비 화면을 띄운다 (`usePitchArrivalHold`)
+   */
+  const isArrivalHolding = usePitchArrivalHold({
+    play: progress.pendingRunnerPlay?.kind === 'arrival' ? progress.pendingRunnerPlay : null,
+    pitch: progress.lastPitch,
+    isFrozen: isPopupOpen || asksGiveUp,
+  })
+  /**
    * **공 끝 0x4e600 의 때** — 0x12 끝(문턱 갱신 0x4e796) · 0x17 끝(0x52a60). 진행기는 놓는 순간(0x11 틱 10) 판정을 내므로 그 판정이
    * 든 그림에서 0x12 틱 0 까지(`pitchResultEntryDelayTicksOf`) 를 대기 앞에 붙인다. 맞은 공 · 공 도착 판(도루 · 폭투)은 그 판(0x13 을
    * 그리는 동안 포함)이 끝날 때, 견제 · 밀어내기 판도 그 판이 끝날 때다 (`useBatterPitchEnd` — 타자편과 같은 셈)
@@ -385,7 +395,10 @@ function PitcherGameScene({
       isHit: progress.pendingDefensePlay !== null,
       waitTicks: pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0) - 1 + waitTicks,
     })
-    if (progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) return
+    if (progress.pendingDefensePlay !== null) return
+    // 공 도착 판 — 장면은 0x12 틱 0 까지 그린다(0x12 문턱은 그 그림의 판정 글자 틱만 본다). 키 막음은 판이 맡는다
+    if (progress.pendingRunnerPlay?.kind === 'arrival' && passesHeldResult(lastResolution)) setHeldResultTicks(waitTicks)
+    if (progress.pendingRunnerPlay != null) return
     if (lastResolution.kind === '타구') return
     setPitchWaitTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks))
     setHeldResultTicks(waitTicks)
@@ -399,7 +412,8 @@ function PitcherGameScene({
    * 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정(`lastResolution`)이 들어온 그림도 그동안으로 친다
    */
   /** 내 공이 날거나 0x12 인 동안(0x11 · 0x12) — 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정이 든 그림도 친다 */
-  const isPitchFlightShown = isPitchSceneBusy || lastResolutionRef.current !== lastResolution || isHitSceneShowing
+  const isPitchFlightShown =
+    isPitchSceneBusy || lastResolutionRef.current !== lastResolution || isHitSceneShowing || isArrivalHolding
   const hiddenRunnerBases = hiddenStealBasesOf(progress, isPitchFlightShown)
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
   /**
@@ -556,9 +570,11 @@ function PitcherGameScene({
    *   던지시겠습니까?" 질문 창)이 떠 있으면 [0x140005c]+9 — 폭·시간·틱이 멈춘다.
    */
   const pitchEndSerial = pitchEnd.serial
-  // 0x11 끝 · 0x13 을 그리는 동안은 아직 0x17 이 아니다 — 알림을 그린다
+  // 0x11 끝 · 0x13 · 공 도착 판의 0x12 틱 0 을 그리는 동안은 아직 0x17 이 아니다 — 알림을 그린다
   const isInPlayShown =
-    (progress.pendingDefensePlay !== null && !isHitSceneShowing) || progress.pendingRunnerPlay != null || isReplaying
+    (progress.pendingDefensePlay !== null && !isHitSceneShowing) ||
+    (progress.pendingRunnerPlay != null && !isArrivalHolding) ||
+    isReplaying
   const recordAlert = useRecordAlert(progress.recordIds, {
     isDrawing: !isInPlayShown,
     isFrozen: isPopupOpen || asksGiveUp,
@@ -658,7 +674,7 @@ function PitcherGameScene({
     )
   }
   // 내 수비의 주자 판(도루 · 폭투 · 견제) — 송구 키(+0x160)로 던지므로 실시간으로 한 틱씩 돌린다 (`liveRunnerPlay`)
-  if (progress.pendingRunnerPlay != null) {
+  if (progress.pendingRunnerPlay != null && !isArrivalHolding) {
     return (
       <DefensePlayback
         runnerPlay={progress.pendingRunnerPlay}

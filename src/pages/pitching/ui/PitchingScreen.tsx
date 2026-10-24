@@ -44,6 +44,7 @@ import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import type { PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
@@ -90,6 +91,17 @@ export interface PitchingStageSource {
     readonly pitcherSkillIds: readonly number[]
     readonly recentAtBatCodes: readonly number[]
   }
+  /**
+   * CPU 타자가 맞힌 마지막 공의 0x11 끝 · 0x13 재료 (`usePitcherHitScene`) — 장면이 그리고 0x17 이 선 틀에 `onHitSceneEnd` 를 부른다.
+   * 그동안 부르는 쪽은 수비 판을 안 띄운다
+   */
+  readonly hitScene?: PitcherHitScene | null
+  readonly onHitSceneEnd?: () => void
+  /**
+   * 판(맞은 공 · 공 도착 판)이 섰지만 아직 0x17 전 — 장면이 0x11 끝 · 0x13 · 0x12 틱 0 을 그리는 동안. 원본은 그동안 상태 0x11 · 0x12 ·
+   * 0x13 이라 구질 키 · 견제 · 0xe 의 OK 를 안 받는다('*' 는 0xd~0x15 라 받는다)
+   */
+  readonly isBeforePlay?: boolean
 }
 
 /**
@@ -308,7 +320,8 @@ export function PitchingScreen({
     )
   }
   useSceneTick(() => setBusyTicks((left) => Math.max(0, left - 1)), busyTicks > 0 && !isPopupOpen)
-  const isPitchSceneBusy = busyTicks > 0
+  // 판이 섰지만 아직 0x17 전(0x11 끝 · 0x13 · 공 도착 판의 0x12 틱 0)도 0x11 · 0x12 · 0x13 이다
+  const isPitchSceneBusy = busyTicks > 0 || stage?.isBeforePlay === true
   // 결과 배경 캔버스의 난수 — 하늘 줄은 세션이 장면마다 한 번 굴린 `skyRow` 를 넘기므로 여기서 굴리지 않는다(넘기지 않은
   // 화면만 이 따로 든 난수로 굴린다 — 경기 난수에 새지 않게)
   const [backdropRandom] = useState(() => createSeededRandom(0))
@@ -521,6 +534,9 @@ export function PitchingScreen({
               resolution={stage.lastThrow?.resolution ?? null}
               resultTicks={stage.lastThrow?.resultTicks ?? 0}
               cpuSwing={stage.lastThrow?.cpuSwing ?? null}
+              // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다 (투수편과 같다)
+              hitScene={stage.hitScene ?? null}
+              {...(stage.onHitSceneEnd === undefined ? {} : { onHitSceneEnd: stage.onHitSceneEnd })}
               // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0 · 팀 st[0x28 + 칸]) — 타자 미션 화면과 같다
               hud={{
                 inning: run.game.inning + 1,

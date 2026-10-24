@@ -63,6 +63,7 @@ import { drawDefenseScene, enterDefenseScene, type DefenseScene } from '@/featur
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import {
   cpuSpecialThrowOf,
+  framePressesOf,
   type DefenseKeyPress,
   type DefensePlayControls,
   type DefensePlayResult,
@@ -602,16 +603,20 @@ function* pickoffPlaySteps(
     )
     ballEventThisTick = false
     // ── 2b. 사람 조작 — 수비면 0x533c8 → 메시지 0x588 → 0x51890 → 플레이 vt60 0xb3118 → +0x160 (판 종류를 안 가린다) ──
-    if (press !== null && input.controls?.side === '수비' && !play.finished) {
-      const command = inPlayCommandOf(press.key, '수비', { isHoldRepeat: press.isRepeat === true })
+    // 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 둘 다 0x53420 에 보낸다(`framePressesOf`)
+    for (const keyPress of input.controls?.side === '수비' ? framePressesOf(press) : []) {
+      if (play.finished) break
+      const command = inPlayCommandOf(keyPress.key, '수비', { isHoldRepeat: keyPress.isRepeat === true })
       if (command !== null && command.kind === '송구') {
         manualThrowBase = command.target
         log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
       }
     }
     // ── 2c'. 사람 조작 — 공격이면 0x53420 이 주루 0x5331c(0x582 진루 · 0x584 귀루) · OK 0x585(슬라이딩) ──
-    if (press !== null && input.controls?.side === '공격' && !play.finished) {
-      const command = inPlayCommandOf(press.key, '공격', { isHoldRepeat: press.isRepeat === true })
+    // 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 둘 다 0x53420 에 보낸다(`framePressesOf`)
+    for (const keyPress of input.controls?.side === '공격' ? framePressesOf(press) : []) {
+      if (play.finished) break
+      const command = inPlayCommandOf(keyPress.key, '공격', { isHoldRepeat: keyPress.isRepeat === true })
       if (command?.kind === '슬라이딩') {
         // 0x518da — 종류 4 는 막히지 않는다. 0xa96ec 로 슬라이딩이 걸린 뒤에야 소리 재생 중 · +0x31c 잠금을 본다
         const decision = slideOnKey({
@@ -1010,7 +1015,8 @@ function* pickoffPlaySteps(
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene,
+    // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`, r171)
+    scene: { ...scene, playCovers: play.coverOfBase },
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)

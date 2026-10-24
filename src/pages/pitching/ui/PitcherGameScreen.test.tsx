@@ -340,12 +340,14 @@ describe('투수편 경기 화면', () => {
       act(() => void vi.advanceTimersByTime(millisecondsPerFrame() * 10))
       fireEvent.keyDown(window, { key: '5' })
       틱(1)
+      expect(screen.getByTestId('정산-판')).toBeTruthy()
+
+      // 정산 판 키 0x407f0 도 받은 다음 틀에 처리한다(장면 키 칸 — r175)
+      fireEvent.keyDown(window, { key: '5' })
+      틱(1)
     } finally {
       vi.useRealTimers()
     }
-    expect(screen.getByTestId('정산-판')).toBeTruthy()
-
-    fireEvent.keyDown(window, { key: '5' })
 
     expect(onFinish).toHaveBeenCalledTimes(1)
   })

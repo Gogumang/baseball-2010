@@ -14,12 +14,16 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import {
-  cpuSwingTickOf, hitEndTickOf, HUMAN_PITCH_RELEASE_STATE_TICK, passesHeldResult, pitcherSideStageFrameOf, pitcherSideStateEntriesOf,
+  cpuSwingTickOf, hitEndTickOf, HUMAN_PITCH_RELEASE_STATE_TICK, passesHeldResult, pitcherHitContactOf, pitcherSideStageFrameOf,
+  pitcherSideStateEntriesOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { PitcherHitClock, PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { HIT_STOP_TICKS, canSkipHitPause } from '@/widgets/batting-stage/lib/hitPause'
-import { BIG_HIT_PARTICLE, HIT_PARTICLE_IMAGE } from '@/widgets/batting-stage/lib/hitParticles'
+import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
+import { bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
+import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
@@ -210,6 +214,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let hitSparkShot = false
     let hitStopShot = false
     let hitEndNotified = false
+    /** 판정 틀에 고른 0x49aec 그림 갈래(필살 스윙)와 타격점 — 맞은 틀 · 0x13 그림마다 그린다. 없으면 null */
+    let hitSpecialEffect: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null = null
+    /** 마구 공 파티클(0x3b2f4 3b496)을 마지막으로 쏜 장면 틱 — 그림(장면 틱) 하나에 한 번 */
+    let magicEmittedTick: number | null = null
     /** OK · '5' 를 읽은 0x13 상태 틱 (0x406e8 40708) */
     let hitSkipTick: number | null = null
     /** 0x13 동안 받은 OK · '5' — 다음 틀 머리의 키 처리(0x498d4)가 꺼낸다(`sceneKeyLatch`) */
@@ -256,6 +264,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         hitSparkShot = false
         hitStopShot = false
         hitEndNotified = false
+        hitSpecialEffect = null
+        magicEmittedTick = null
         hitSkipTick = null
         hitKeyLatch.clear()
       }
@@ -306,13 +316,17 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         const stateTickNow = nowTick - releaseTick + HUMAN_PITCH_RELEASE_STATE_TICK
         /** 판정 틀 J 의 0x11 상태 틱 — 그 틀의 갱신이 0x6aa 로 0x13 을 예약한다 */
         const judgeStateTick = pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
-        // 판정 틀 J 의 그리기 0x49e64 가 타격점에 불꽃을 쏜다 (타자편 `BattingStage` 와 같은 근사 — 판정 순간에 쏜다)
+        // 판정 틀 J 의 그리기 0x49e64 가 타격점에 불꽃을 쏜다 (타자편 `BattingStage` 와 같은 근사 — 판정 순간에 쏜다). CPU 필살 스윙이
+        // 0x49aec 의 그림 갈래를 타면 보통 불꽃 대신 필살 파티클이다(49fa2 → 4a0ce · 49dbc · 49de0 — `pitcherHitContactOf`)
         if (stateTickNow >= judgeStateTick && !hitSparkShot) {
           hitSparkShot = true
-          if (hitBase.particleId !== null) {
-            const contact = ballPixelAt(pitch, hitBase.contactFrame)
-            emitParticles(sceneParticleScene(), particleConfigOf(hitBase.particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
+          const contact = ballPixelAt(pitch, hitBase.contactFrame)
+          const side = current.batterSide ?? batterSideOfForm(current.batterForm)
+          const chosen = pitcherHitContactOf(hitBase, current.batterForm, current.aceBatterOrder ?? null, side)
+          for (const particle of chosen.particles) {
+            emitParticles(sceneParticleScene(), particleConfigOf(particle.id), contact.x, contact.y + particle.offsetY, particle.img)
           }
+          hitSpecialEffect = chosen.effect === null ? null : { ...chosen.effect, x: contact.x, y: contact.y }
         }
         const hitTickRaw = stateTickNow - judgeStateTick - 1
         const endTick = hitEndTickOf(hit)
@@ -327,6 +341,28 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           hitEndNotified = true
           current.onHitSceneEnd?.()
         }
+      }
+      // 0x11 그림의 마구 공 파티클 — 공 그리기 0x3b2f4 3b496~3b62c(구질 22 · 투수 레코드 +0x18, `magicBallParticlesOf`). 0x11 그림마다
+      // 공 틱 [+0x1098](0 ~ N − 1 로 자른 점 0x35854)에 쏜다 — 타자편 `useStageAnimation` 과 같은 셈. 그림 한 번 = 장면 틱 하나.
+      // ⚠️ 근사: 진행기가 놓는 순간(0x11 틱 10)에 공을 알려 주므로 그 앞 0x11 그림(틱 0~9 — 원본은 앞 공 경로 자리)에는 안 쏜다
+      if (pitch !== null && releaseTick !== null && pitch.isMagicPitch === true) {
+        const from = magicEmittedTick === null ? releaseTick : magicEmittedTick + 1
+        for (let tick = from; tick <= nowTick; tick += 1) {
+          const at = pitcherSideStageFrameOf({
+            nowTick: tick, releaseTick, frameCount: pitch.frameCount,
+            resultTicks: resolution !== null && passesHeldResult(resolution) ? current.resultTicks : 0,
+            isPaused: false, pausedSinceTick: 0, aceOrder, hit,
+          })
+          if (at.phase.kind !== '투구중') continue
+          const ballTick = Math.max(0, at.ballFrame)
+          const particles = magicBallParticlesOf(pitch, ballTick, pitch.frameCount)
+          if (particles.length === 0) continue
+          const point = ballPixelAt(pitch, ballTick)
+          for (const particle of particles) {
+            emitParticles(sceneParticleScene(), particleConfigOf(particle.id), point.x, point.y, particle.img)
+          }
+        }
+        magicEmittedTick = Math.max(magicEmittedTick ?? releaseTick - 1, nowTick)
       }
       // 이 공의 원본 상태 경계(0x11 · 0x12 · 그 끝, 맞은 공은 0x11 · 0x13 · 0x17) — 장면 틱(팝업으로 뺀 틱을 되돌린 값)으로 적는다
       // (`sceneStateEntries`)
@@ -344,10 +380,22 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       const bodyType = bodyTypeOf(current.batterForm)
       const isIdle = stage.phase.kind === '대기'
       // 스윙은 이 공이 날거나 0x12 인 동안만 — 대기로 돌아오면 대기 자세
-      const swingTick =
+      const swingTickRaw =
         releaseTick === null || shownSwing === null || isIdle
           ? null
           : cpuSwingTickOf(releaseTick, shownSwing.frame, current.acePitcher?.order ?? null)
+      /**
+       * 0x13 의 장면 틱 경계 — 0x13 틱 0(판정 틀 J 다음 그림) · 0x17 이 선 그림. 맞은 공이 아니면 null
+       */
+      const hitStartTick =
+        hit === null || releaseTick === null
+          ? null
+          : releaseTick - HUMAN_PITCH_RELEASE_STATE_TICK + pitcherReleaseTicksOf(aceOrder) + hit.judgeBallTick + 1
+      // 0x13 의 스윙 멈춤 · 반 속도(0x3f060 3f1ea · 3f2dc — `bigHitSwingSkipsOf`) — 건너뛴 칸만큼 스윙 시작을 늦춰 본다(타자편과 같다)
+      const swingTick =
+        swingTickRaw === null || hitBase === null || hit === null || hitStartTick === null
+          ? swingTickRaw
+          : swingTickRaw + bigHitSwingSkipsOf(hitBase.watchesBigHit, hitStartTick, hitStartTick + hitEndTickOf(hit) + 1, nowTick)
       const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
       // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
       const inputKind = isIdle && !current.isPaused ? (current.inputOverlayRef?.current?.kind ?? null) : null
@@ -408,6 +456,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
                 }
               },
             })
+      /** 이 공의 판정 틀 J 의 0x11 상태 틱(= 투수 틱) — 맞은 공이 아니면 null */
+      const judgePitcherTick = hitBase === null ? null : pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
+      const isHitState = stage.phase.kind === '타격'
+      const contactPoint = hitBase === null || pitch === null ? null : ballPixelAt(pitch, hitBase.contactFrame)
       const stageScene: StageScene = {
         pitch: stage.phase.kind === '대기' ? null : pitch,
         frame: stage.ballFrame,
@@ -425,6 +477,30 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         homeRunTick: isResult ? stage.phase.tick : 0,
         isEagleEyeEnabled: false,
         shift: 0,
+        // 투수 그리기 0x38d1c 의 홈런 갈래(0x3908a — 애니 12 · 감상 플래그면 "!" 13)가 결과 코드 [경기+0xfd4] 를 본다. 0x11 진입(3deea)이
+        // 0 으로 지우고 판정 0x6aa 가 그 틀에 쓴다 — 투수를 그리는 0x11 · 0x12 · 0x13 에서 (타자편 `useStageAnimation` 과 같은 재료)
+        pitcherHitMark: isIdle
+          ? null
+          : {
+              codeBeforePitch: 0,
+              judgedTick: judgePitcherTick,
+              judgedCode: hitBase === null ? null : hitBase.resultCode,
+              isBigHit: hitBase?.watchesBigHit ?? false,
+            },
+        // 큰 타구 0x13 그리기 0x4cb1c 의 꼬리(확대 · 흐리기 · 번쩍임 · 테두리 / 애니 3) — 0x13 틱으로 센다(`bigHitScreen`, 타자편과 같다)
+        bigHitScreen:
+          isHitState && hitBase !== null
+            ? bigHitScreenOf(hitBase.watchesBigHit, stage.phase.tick, current.batterSide ?? batterSideOfForm(current.batterForm), contactPoint)
+            : null,
+        // 필살 스윙 연출 그림 0x49aec — 판정 틀 J(0x11)에 첫 부름, 이어 0x13 틱 d 의 그림이 d + 2 번째 부름 (`specialSwingEffect`)
+        specialSwingEffect:
+          hitSpecialEffect === null
+            ? null
+            : isHitState
+              ? { ...hitSpecialEffect, drawCall: stage.phase.tick + 2 }
+              : stage.phase.kind === '투구중' && judgePitcherTick !== null && stage.phase.tick === judgePitcherTick
+                ? { ...hitSpecialEffect, drawCall: 1 }
+                : null,
         swingFrame: batterFrameAt({
           tick: nowTick,
           swingTick: swingTick,

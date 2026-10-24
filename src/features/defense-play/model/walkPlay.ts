@@ -1,12 +1,11 @@
 import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
 import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
-import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
+import { DEFENSE_SCENE_START, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import {
   createFielders,
   createRunner,
   initialPlayView,
-  NONE,
   type PlayView,
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
@@ -170,8 +169,9 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
 
   const play: PlayView = {
     ...initialPlayView(WALK_PLAY_KIND),
-    // vt30(커버)를 안 부른다 — 커버 칸은 vt1c 가 지운 그대로
-    coverOfBase: [NONE, NONE, NONE, NONE],
+    // vt30(커버)를 안 부르고 vt1c 0xb0edc 도 +0xf0 을 안 적는다(b0eea~b0f7a 직접 뜸 — 정정 r171) — 앞 판이 남긴 +0xf0 그대로
+    // (`DefenseScene.playCovers`). 종류 2 · 3 은 vt4c 도 안 돌아 이 판은 이 칸을 바꾸지 않는다
+    coverOfBase: [...(input.scene?.playCovers ?? DEFENSE_SCENE_START.playCovers)],
     // P+0x130 = 1 · P+0x12c = 1. +0x112 · +0x128 은 안 선다
     ballHolderSlot: CATCHER_SLOT,
     catchFielderSlot: CATCHER_SLOT,

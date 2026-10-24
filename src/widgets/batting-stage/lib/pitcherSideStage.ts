@@ -9,7 +9,9 @@ import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { earlyHitPauseTickOf, hitPauseTicksOf, isBigHit } from '@/widgets/batting-stage/lib/hitPause'
 import type { HitPauseInput } from '@/widgets/batting-stage/lib/hitPause'
-import { hitParticleIdOf, hitParticleInputOf } from '@/widgets/batting-stage/lib/hitParticles'
+import { HIT_PARTICLE_IMAGE, hitParticleIdOf, hitParticleInputOf, specialSwingParticlesOf } from '@/widgets/batting-stage/lib/hitParticles'
+import { specialSwingStageEffectOf } from '@/widgets/batting-stage/lib/specialSwingEffect'
+import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 
 /**
  * **사람이 던지는 타석의 장면** — 투수편(모드 3) · 투수 미션(모드 5) · 팀 경기 수비 반 이닝.
@@ -244,10 +246,22 @@ export function pitchHitSceneTicksOf(hit: PitcherHitClock, aceOrder?: number | n
 export interface PitcherHitScene extends PitcherHitClock {
   /** 감상 플래그 +0x199a (0x392ac) — 큰 타구 멈춤 · 016 · OK 건너뛰기 */
   readonly watchesBigHit: boolean
-  /** 판정 틀에 타격점에 쏘는 불꽃 `.ptc` id (`hitParticles.hitParticleIdOf`) — 안 쏘면 null */
+  /**
+   * 판정 틀에 타격점에 쏘는 보통 불꽃 `.ptc` id (`hitParticles.hitParticleIdOf`) — 안 쏘면 null. 필살 스윙이 0x49aec 의 그림 갈래를 타면
+   * 장면이 이 불꽃 대신 필살 파티클을 쏜다(`specialSwing`)
+   */
   readonly particleId: number | null
   /** 타격점으로 보는 공 경로 번호 — 불꽃 · 016 자리 */
   readonly contactFrame: number
+  /**
+   * 판정 0x6aa 가 [경기+0xfd4] 에 쓴 결과 코드 — 투수 그리기의 홈런 갈래(0x3908a, `pitcherFatigue.pitcherHomeRunMarksOf`)가 본다
+   */
+  readonly resultCode: number
+  /**
+   * CPU 필살 스윙(S+0x10 ≠ 0)으로 맞은 공이면 그 번호(레코드 +0x18) · 마타자인가(0xb633d) — 스윙 그리기 0x49e64 49f7c 가 맞은 틀 ·
+   * 0x13 에 부르는 0x49aec 의 재료(`specialSwingEffect` · `hitParticles.specialSwingParticlesOf`). 공격 측을 안 가린다. 아니면 null
+   */
+  readonly specialSwing: { readonly number: number; readonly isAceBatter: boolean } | null
 }
 
 /**
@@ -262,7 +276,9 @@ export interface PitcherHitScene extends PitcherHitClock {
  * 번트는 자세가 선 뒤 공 틱 N − 1 에 판정한다. 키를 받아 판정하는 길(0x4e060)은 공격 측이 누구든 같다.
  * 0x13 길이 · 큰 타구 멈춤은 타자편과 같은 0x406e8 · 0x3f378 이다(`hitPause`). 판정 틀의 그리기 0x49e64 가 타격 불꽃을 쏘는 것도 같다
  * (`hitParticles` — 타자편 `BattingStage` 와 같은 근사로 판정 틀에 쏜다).
- * ⚠️ 미확인: 필살 스윙(0x49aec)으로 맞은 공은 보통 불꽃 대신 필살 파티클을 쏜다 — 이 장면은 아직 안 쏜다(`particleId` null).
+ * 필살 스윙(S+0x10)으로 맞은 공은 스윙 그리기 0x49e64 49f7c → 0x49aec 가 그림 갈래를 타면 [sp+0x60] = 1 로 보통 불꽃(49faa~4a0ce)을
+ * 건너뛰고 같은 타격점에 필살 파티클(49dbc · 49de0)을 쏜다 — 0x49aec 는 타자를 0xae89d(공격 팀)로 읽어 공격 측을 안 가린다(r174 직접 떴다).
+ * 그 갈래를 고르는 것은 장면이다(`specialSwing` — 그림이 없는 번호면 보통 불꽃).
  * ⚠️ 근사: 불꽃 자리는 타자편처럼 공 경로 F(번트는 N − 1)의 화면 점이다(타자편 `ballPixelAt(pitch, swing.frame)`).
  */
 export function pitcherHitSceneOf(
@@ -291,8 +307,37 @@ export function pitcherHitSceneOf(
     ticks: hitPauseTicksOf(pauseInput),
     skipTick: null,
     watchesBigHit,
-    particleId:
-      contact.specialSwing === undefined ? hitParticleIdOf(hitParticleInputOf(pattern, resultCode, watchesBigHit)) : null,
+    particleId: hitParticleIdOf(hitParticleInputOf(pattern, resultCode, watchesBigHit)),
     contactFrame: cpuSwing === null || isBunt ? frameCount - 1 : cpuSwing.frame,
+    resultCode,
+    specialSwing: contact.specialSwing ?? null,
   }
+}
+
+/** 판정 틀에 타격점에 쏘는 파티클 하나 — 0xbbc84(x, y + `offsetY`, id, img, …) */
+export interface PitcherHitParticle {
+  readonly id: number
+  readonly img: number
+  readonly offsetY: number
+}
+
+/**
+ * **판정 틀의 타격점 그림 · 파티클** — 스윙 그리기 0x49e64 49f7c(상태 0x13 이거나 맞음 +0xfd2 ∧ 0xb9271 == 0)가 0x49aec 를 부르고,
+ * 필살 스윙이 그림 갈래를 타면(`specialSwingStageEffectOf` ≠ null) [sp+0x60] = 1 이라 49fa2 가 보통 불꽃(49faa~4a0ce)을 건너뛰고
+ * 0x49aec 가 필살 파티클(49dbc · 49de0, `specialSwingParticlesOf`)을 쏜다. 아니면 보통 불꽃(`particleId`)이다 — 타자편 `BattingStage`
+ * 의 판정과 같은 갈래다. `aceBatterOrder` 는 0xb63a0(마타자 순번, 없으면 null), `side` 는 0xb63c1(타자 손).
+ */
+export function pitcherHitContactOf(
+  hit: Pick<PitcherHitScene, 'particleId' | 'specialSwing'>,
+  batterForm: number,
+  aceBatterOrder: number | null,
+  side: number,
+): { readonly effect: SpecialSwingStageEffect | null; readonly particles: readonly PitcherHitParticle[] } {
+  const special = hit.specialSwing
+  const aceIndex = special !== null && special.isAceBatter ? (aceBatterOrder ?? -1) : -1
+  const effect = special === null ? null : specialSwingStageEffectOf(special.number, batterForm, aceIndex, side)
+  if (special !== null && effect !== null) {
+    return { effect, particles: specialSwingParticlesOf(special.number, batterForm, aceIndex) }
+  }
+  return { effect: null, particles: hit.particleId === null ? [] : [{ id: hit.particleId, img: HIT_PARTICLE_IMAGE, offsetY: 0 }] }
 }
