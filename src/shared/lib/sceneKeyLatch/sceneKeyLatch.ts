@@ -138,7 +138,7 @@ export function runSceneKeys(latch: SceneKeyLatch, tick: number, stateTick: numb
 const owners: SceneKeyLatch[] = []
 
 /**
- * 받은 칸을 덮는 폰 키 — 숫자 · '*' · '#' · 방향 · OK · CLR(키패드 `phoneKeys`)와 웹이 같은 키로 읽는 스페이스 · Backspace ·
+ * 받은 칸을 덮는 폰 키 — 숫자 · '*' · '#' · 방향 · OK · CLR(터치 버튼 `touch-controls` · 예전 키패드)와 웹이 같은 키로 읽는 스페이스 · Backspace ·
  * Shift(번트 1 '8'). 그 밖의 키보드 키는 폰에 없는 키라 칸을 덮지 않는다
  */
 const SLOT_KEYS: ReadonlySet<string> = new Set([

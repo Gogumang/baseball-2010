@@ -26,7 +26,9 @@ const 가짜refs = (canBunt: boolean): StageRefs =>
     keyLatch: 칸,
   }) as unknown as StageRefs
 
-const 붙이기 = (actions: Partial<StageActions>, canBunt = true) => {
+const 붙이기 = (actions: Partial<StageActions>, canBunt = true) => 붙이기와손(actions, canBunt).손잡이
+
+const 붙이기와손 = (actions: Partial<StageActions>, canBunt = true) => {
   const 손잡이: StageActions = {
     swing: vi.fn(),
     pressBunt: vi.fn(),
@@ -36,8 +38,8 @@ const 붙이기 = (actions: Partial<StageActions>, canBunt = true) => {
   }
   칸 = createSceneKeyLatch()
   const refs = 가짜refs(canBunt)
-  renderHook(() => useStageControls(refs, 손잡이))
-  return 손잡이
+  const { result } = renderHook(() => useStageControls(refs, 손잡이))
+  return { 손잡이, 손: result.current }
 }
 
 describe('키 사건 0xbca05 — 받은 키는 다음 틀의 키 0x498d4(52d9e)가 처리한다', () => {
@@ -212,5 +214,36 @@ describe('공용 창이 서 있는 동안 (경기 장면 0x52c50 의 52cc6 — �
     // 장면 시각 1500ms(창이 떠 있던 3000ms 를 뺐다) → 62ms 틱 격자의 24 번 틱
     expect(손잡이.swing).toHaveBeenCalledWith(24)
     장면()
+  })
+})
+
+describe('화면 탭 (웹판 추가) — 손가락이 닿는 순간 키 하나', () => {
+  /** 캔버스 240 폭에 x 를 누른 사건 */
+  const 누름 = (x: number, button = 0) => {
+    const canvas = document.createElement('canvas')
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 240, height: 320, right: 240, bottom: 320, x: 0, y: 0, toJSON: () => ({}) })
+    return { currentTarget: canvas, clientX: x, clientY: 160, button, preventDefault: () => {} } as unknown as Parameters<ReturnType<typeof useStageControls>['onPointerDown']>[0]
+  }
+
+  it('가운데는 누르는 순간 스윙(OK) — 떼기를 기다리지 않는다, 처리는 다음 틀', () => {
+    const { 손잡이, 손 } = 붙이기와손({})
+    손.onPointerDown(누름(120))
+    expect(손잡이.swing).not.toHaveBeenCalled()
+    다음틀()
+    expect(손잡이.swing).toHaveBeenCalledTimes(1)
+    expect(손잡이.pressBunt).not.toHaveBeenCalled()
+  })
+
+  it("양 끝은 '4'/'6' 타자 이동 · 오른쪽 단추는 아무 일도 없다", () => {
+    const { 손잡이, 손 } = 붙이기와손({})
+    손.onPointerDown(누름(10))
+    다음틀()
+    손.onPointerDown(누름(230))
+    다음틀()
+    손.onPointerDown(누름(120, 2))
+    다음틀()
+    expect(손잡이.moveBatter).toHaveBeenNthCalledWith(1, -1)
+    expect(손잡이.moveBatter).toHaveBeenNthCalledWith(2, 1)
+    expect(손잡이.swing).not.toHaveBeenCalled()
   })
 })

@@ -1,0 +1,145 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { TouchControls } from '@/widgets/touch-controls/ui/TouchControls'
+import { offerTouchKey, resetTouchKeyOffersForTest, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
+
+/** jsdom 에는 PointerEvent 가 없다 — 단추(button) · pointerId 를 싣게 MouseEvent 로 흉내 낸다 */
+if (typeof window.PointerEvent === 'undefined') {
+  class TestPointerEvent extends MouseEvent {
+    readonly pointerId: number
+    readonly pointerType: string
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init)
+      this.pointerId = init.pointerId ?? 0
+      this.pointerType = init.pointerType ?? ''
+    }
+  }
+  Object.assign(window, { PointerEvent: TestPointerEvent })
+}
+
+interface Seen { readonly type: string; readonly key: string; readonly code: string; readonly repeat: boolean }
+
+let seen: Seen[] = []
+const record = (event: KeyboardEvent) => {
+  seen.push({ type: event.type, key: event.key, code: event.code, repeat: event.repeat })
+}
+const keys = () => seen.map((event) => `${event.type}:${event.key}`)
+
+const press = (element: HTMLElement, pointerId = 1) => fireEvent.pointerDown(element, { pointerId, pointerType: 'touch' })
+const lift = (element: HTMLElement, pointerId = 1) => fireEvent.pointerUp(element, { pointerId, pointerType: 'touch' })
+
+beforeEach(() => {
+  seen = []
+  window.addEventListener('keydown', record)
+  window.addEventListener('keyup', record)
+})
+
+afterEach(() => {
+  window.removeEventListener('keydown', record)
+  window.removeEventListener('keyup', record)
+  cleanup()
+  act(() => resetTouchKeyOffersForTest())
+})
+
+describe('TouchControls — 확인 · 뒤로는 늘, 숫자판은 없다', () => {
+  it('세로 배치는 뒤로 · 확인 두 버튼뿐 — 숫자 · 방향 키가 없다', () => {
+    render(<TouchControls layout="below" />)
+    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(names).toEqual(['뒤로', '확인'])
+  })
+
+  it('확인은 닿는 순간 keydown Enter, 떼면 keyup — window 에서 받는다 · 되풀이는 없다', () => {
+    render(<TouchControls layout="below" />)
+    const ok = screen.getByRole('button', { name: '확인' })
+    press(ok)
+    expect(seen).toEqual([{ type: 'keydown', key: 'Enter', code: 'Enter', repeat: false }])
+    lift(ok)
+    expect(keys()).toEqual(['keydown:Enter', 'keyup:Enter'])
+  })
+
+  it('뒤로는 CLR(Escape)', () => {
+    render(<TouchControls layout="below" />)
+    const back = screen.getByRole('button', { name: '뒤로' })
+    press(back)
+    lift(back)
+    expect(keys()).toEqual(['keydown:Escape', 'keyup:Escape'])
+  })
+
+  it('가로 배치 — 왼쪽 덩이(상황 · 뒤로) · 오른쪽 덩이(확인)', () => {
+    render(<TouchControls layout="sides" />)
+    expect(screen.getByRole('group', { name: '상황 버튼' })).toBeTruthy()
+    expect(screen.getByRole('group', { name: '확인' })).toBeTruthy()
+  })
+})
+
+describe('상황 버튼 — 화면이 알린 키만, 같은 키 사건으로', () => {
+  it('알린 동안만 뜨고, 거두면 사라진다', () => {
+    render(<TouchControls layout="below" />)
+    let withdraw = () => {}
+    act(() => {
+      withdraw = offerTouchKey({ key: '0', label: '필살타' })
+    })
+    const special = screen.getByRole('button', { name: '필살타' })
+    press(special)
+    lift(special)
+    expect(seen.map((event) => `${event.type}:${event.key}:${event.code}`)).toEqual(['keydown:0:Digit0', 'keyup:0:Digit0'])
+    act(() => withdraw())
+    expect(screen.queryByRole('button', { name: '필살타' })).toBeNull()
+  })
+
+  it("번트 '8' 은 누르고 있는 동안 keyup 이 없다 — 떼는 순간 keyup 한 번 (pointercancel · 잡기 풀림도)", () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      offerTouchKey({ key: '8', label: '번트', isHold: true })
+    })
+    const bunt = screen.getByRole('button', { name: '번트' })
+    press(bunt, 3)
+    expect(keys()).toEqual(['keydown:8'])
+    fireEvent.pointerCancel(bunt, { pointerId: 3, pointerType: 'touch' })
+    expect(keys()).toEqual(['keydown:8', 'keyup:8'])
+    fireEvent.lostPointerCapture(bunt, { pointerId: 3, pointerType: 'touch' })
+    expect(seen.filter((event) => event.type === 'keyup')).toHaveLength(1)
+  })
+
+  it('키 차례 — 필살타 · 번트 · 도루 · 교체 · 메뉴, 같은 키는 하나', () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      offerTouchKey({ key: '*', label: '메뉴' })
+      offerTouchKey({ key: '#', label: '교체' })
+      offerTouchKey({ key: '3', label: '도루 1루' })
+      offerTouchKey({ key: '0', label: '필살타' })
+      offerTouchKey({ key: '*', label: '메뉴' })
+    })
+    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+    expect(names).toEqual(['필살타', '도루 1루', '교체', '메뉴', '뒤로', '확인'])
+  })
+
+  it('PressArea 의 touchKey — 칸이 서 있고 막히지 않은 동안만 알린다', () => {
+    const Screen = ({ isDisabled, isShown }: { isDisabled: boolean; isShown: boolean }) => (
+      <>
+        <TouchControls layout="below" />
+        {isShown && <PressArea label="메뉴" onPress={() => {}} isDisabled={isDisabled} touchKey={{ key: '*', label: '메뉴' }} />}
+      </>
+    )
+    const { rerender } = render(<Screen isDisabled={false} isShown />)
+    expect(document.querySelector('[data-touch-key="*"]')?.textContent).toBe('메뉴')
+    rerender(<Screen isDisabled isShown />)
+    expect(document.querySelector('[data-touch-key="*"]')).toBeNull()
+    rerender(<Screen isDisabled={false} isShown={false} />)
+    expect(document.querySelector('[data-touch-key="*"]')).toBeNull()
+  })
+
+  it('useTouchKeyOffer(null) 은 아무것도 알리지 않는다', () => {
+    const Offer = ({ offer }: { offer: TouchKeyOffer | null }) => {
+      useTouchKeyOffer(offer)
+      return null
+    }
+    const { rerender } = render(<><TouchControls layout="below" /><Offer offer={null} /></>)
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+    rerender(<><TouchControls layout="below" /><Offer offer={{ key: '0', label: '마구' }} /></>)
+    expect(screen.getByRole('button', { name: '마구' })).toBeTruthy()
+  })
+})

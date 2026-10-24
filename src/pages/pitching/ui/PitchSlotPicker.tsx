@@ -40,6 +40,9 @@ interface PitchSlotPickerProps {
 /** 빈 칸 키 표지의 차례 — 화면이 다시 서도 겹치지 않게 모듈에서 센다 */
 let idlePressSerial = 0
 
+/** 마구 칸 — 키 '0' (0x534d8) */
+const MAGIC_SLOT = 5
+
 /** 칸 → 키 (0x534d8) — 누름 칸 읽기 이름 */
 const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
 
@@ -156,6 +159,8 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
             rect={rect}
             label={`${SLOT_KEY_LABELS[choice.slot] ?? ''} ${choice.name}`}
             isDisabled={choice.isBlocked === true}
+            // 마구 칸 '0' 은 터치 상황 버튼으로도 — 남은 마구가 있어 키를 받는 동안만(막힌 칸은 0x50db8 이 키를 버린다)
+            {...(choice.slot === MAGIC_SLOT && !isPaused ? { touchKey: { key: '0', label: '마구' } } : {})}
             onPress={() => keyLatch.push(() => pressRef.current(choice.slot))}
           />
         )

@@ -40,6 +40,7 @@ import { useStageCastPreload } from '@/widgets/batting-stage/model/useStageCastP
 import { useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
 import { SCENE_STATE, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
+import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { acceptsBattingKey, keyTickOf, swingReleaseTickOf } from '@/widgets/batting-stage/lib/swingWindow'
 import { RESULT_PHASE_TICKS, resultPhaseTicksOf } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import {
@@ -689,6 +690,16 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
   useClaimSceneParticles()
   useStageAnimation(refs, { judgePitch: finishPitch, endPitch, commitHit, releaseSwing })
   const pointerHandlers = useStageControls(refs, actions)
+  // 터치 상황 버튼 (웹 껍데기, `touchKeyOffer`) — 이 타석이 그 키를 받는 동안만 띄운다. 버튼은 같은 키 사건을 쏜다(위 `useStageControls`).
+  // 필살타 '0' 은 0x51e14 가드(번호 · 남은 횟수 — `canSpecialSwing`)가 열려 있을 때, 번트 '8' 은 화면이 번트 키를 열었고(`canBunt`)
+  // 마타자가 아닐 때(0x51e48 이 마선수면 예약하지 않는다). 공을 안 던지는 동안(결과 연출 `isPaused` · 결과 창 배경 · 공용 창)은 거둔다
+  const takesStageKeys = !props.isPaused && props.isResultBackdrop !== true && !isCommonWindowOpen
+  useTouchKeyOffer(
+    takesStageKeys && canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)
+      ? { key: '0', label: '필살타' }
+      : null,
+  )
+  useTouchKeyOffer(takesStageKeys && canBunt && aceBatterIndex < 0 ? { key: '8', label: '번트', isHold: true } : null)
 
   return (
     <canvas

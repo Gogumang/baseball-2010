@@ -698,7 +698,8 @@ export function PitchingScreen({
       */}
       {overlay !== '조작방법' && (
         <PressLayer testId="소프트키 누름 칸" isOnTop>
-          <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar} />
+          <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'}
+              touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.pressStar} />
         </PressLayer>
       )}
 

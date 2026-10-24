@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'react'
-import { keypadWantedOf, viewportFitOf } from '@/shared/lib/viewportFit/viewportFit'
+import { touchControlsWantedOf, viewportFitOf } from '@/shared/lib/viewportFit/viewportFit'
 import type { ViewportFit } from '@/shared/lib/viewportFit/viewportFit'
 
 const COARSE_POINTER = '(pointer: coarse)'
@@ -44,7 +44,7 @@ export function useViewportFit(): ViewportFit | null {
       frame = null
       const isTouch = coarse?.matches ?? false
       const { width, height } = availableSizeOf(document.body)
-      const next = viewportFitOf({ width, height, isTouch, showKeypad: keypadWantedOf(window.location.search, isTouch) })
+      const next = viewportFitOf({ width, height, isTouch, showControls: touchControlsWantedOf(window.location.search, isTouch) })
       const signature = JSON.stringify(next)
       if (signature === last) return
       last = signature
