@@ -178,17 +178,20 @@ export function HomeRunDerbyScreen({
    */
   const acceptsMenuKey = !isResultShown && session.loadingTip === null && !session.isBenchClearing
     && (isMenuOpen || session.distanceBoard === null) && overlay !== '조작방법'
-  const { toggle: toggleMenu } = menu
+  // '*' 는 장면 키 칸으로 — 받은 다음 틀의 키 0x498d4 '*' 가지(49918~49948, 모드를 안 본다)가 연다. 창이 서 있으면(메뉴 열림)
+  // 창 키 자리(52cc6 0x754f9 → 0x3c158)에서 닫는다(`pressStar` — 앱 키 문이 다음 앱 틱에 넘긴다). 0x463ac(463e6 0x741a1)는 키가
+  // 아니라 장면 vtable 0xcfa0c [6] 멈춤 콜백(0xcfa24)이 같은 메뉴를 여는 자리다
+  const { pressStar } = menu
   useEffect(() => {
     if (!acceptsMenuKey) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.key !== '*') return
       event.preventDefault()
-      toggleMenu()
+      pressStar()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [acceptsMenuKey, toggleMenu])
+  }, [acceptsMenuKey, pressStar])
 
   // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(로딩 판 0x667f8 · 진행 칸 0x54120 끝 0x24 · 팁 rand(0, 73) 0x53dbc) 뒤 7 · 9 · 8 의 적재가
   // 한 단계마다 0x54128 · 0x53e04(바탕 · loadingbar 판 · StrTIP 팁 · 진행 막대 · 막대 끝 달리는 선수)를 그린다. 모드를 안 가려 더비도

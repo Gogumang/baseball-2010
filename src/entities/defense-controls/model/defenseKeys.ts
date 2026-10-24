@@ -124,8 +124,8 @@ const ADVANCE_BY_KEY: Partial<Readonly<Record<OriginalKey, RunnerTarget>>> = {
  * 생긴 반복 사건뿐**이고, 새로 누른 키는 늘 `[+0x1c] = 0` 이라 게이트를 그냥 지난다.
  * → **귀루 셋은 꾹 누르고 있어도 되풀이되지 않는다.** 진루·CLR·OK·송구는 누르고 있으면 4틱마다 거듭 나간다.
  *
- * 웹에는 그 4틱 반복 대신 브라우저 키 반복(`KeyboardEvent.repeat`)이 있어 그것을 같은 사건으로 본다
- * (`isHoldRepeat`). 반복 간격이 원본 4틱과 다른 것은 입력 층의 **근사**다.
+ * 웹도 그 4틱 되풀이를 수비 화면이 원본 규칙(0xbca05 — `keyHold`: 누른 틀 뒤 4틀마다, keyup 이 뗌)대로 세어 이 사건으로
+ * 넣는다(`isHoldRepeat`). 브라우저 자동 되풀이 keydown 은 버린다(r172).
  */
 const RETURN_BY_KEY: Partial<Readonly<Record<OriginalKey, RunnerTarget>>> = {
   '3': 1,

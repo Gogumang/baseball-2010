@@ -429,6 +429,30 @@ function TeamGameScene({
   const isAwaitingConfirmRef = useRef(false)
   /** 대기 중 0xd 두 그림을 지나 0xe 에 들어섰는가 — '#' 는 0xe·0xf 에서만 열린다 */
   const isInConfirmStateRef = useRef(false)
+  /**
+   * '#' 키 — 받은 다음 틀에 처리한다(`pushSceneKey`). 0x498d4 의 '#' 가지(4994a~499f8)는 0x38984 참이고 상태 0xe · 0xf 면 0x49598 → 0xb
+   * (교체 창), 0xb 의 키 함수 0x495fc 의 '#' 는 교체 창을 닫는다(취소). 그 틀의 상태를 보므로 지금 값으로 다시 가린다.
+   */
+  const hashKeyRef = useRef<() => void>(() => undefined)
+  hashKeyRef.current = () => {
+    if (isSceneCovering || isDefenseInPlay || overlay !== null || isMenuOpen) return
+    // 0x495fc 의 '#' 는 교체 화면을 닫는다(취소). 그 밖에서는 0x49598 의 갈림길 그대로 —
+    // 공격이 사람이면 대타(0xaf06c), 아니면 투수 교체(0xaf09c)다
+    if (changeWindow !== null) return closeChangeWindow()
+    // '#' 가지(0x4994a)는 0xe·0xf 에서 열린다 — 0xe 의 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 진행기가
+    // OK 를 받을 때 돌리므로(`confirmScene`), 0xe 에서 열어 확정·취소해도 다시 선 0xe 의 OK 뒤 한 번뿐이다.
+    // 0xd(대기가 보인 뒤 두 그림)는 0x4994a 의 상태 범위 밖이라 안 열린다
+    if (isAwaitingConfirmRef.current && !isInConfirmStateRef.current) return
+    // 내 공이 날거나 0x12 인 동안(상태 0x11 · 0x12)도 범위 밖
+    if (pitchBusyTicksRef.current > 0) return
+    if (session.canChangePitcher) return setChangeWindow('투수')
+    if (session.canPinchHit) setChangeWindow('대타')
+  }
+  /** 교체 창(0xb)의 CLR — 0x495fc 가 받은 다음 틀에 닫는다 */
+  const changeWindowClearRef = useRef<() => void>(() => undefined)
+  changeWindowClearRef.current = () => {
+    if (changeWindow !== null && !isMenuOpen && overlay === null) closeChangeWindow()
+  }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -456,23 +480,16 @@ function TeamGameScene({
       }
       if (event.key === '#') {
         event.preventDefault()
-        // 0x495fc 의 '#' 는 교체 화면을 닫는다(취소). 그 밖에서는 0x49598 의 갈림길 그대로 —
-        // 공격이 사람이면 대타(0xaf06c), 아니면 투수 교체(0xaf09c)다
-        if (changeWindow !== null) return closeChangeWindow()
-        // '#' 가지(0x4994a)는 0xe·0xf 에서 열린다 — 0xe 의 OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 진행기가
-        // OK 를 받을 때 돌리므로(`confirmScene`), 0xe 에서 열어 확정·취소해도 다시 선 0xe 의 OK 뒤 한 번뿐이다.
-        // 0xd(대기가 보인 뒤 두 그림)는 0x4994a 의 상태 범위 밖이라 안 열린다
-        if (isAwaitingConfirmRef.current && !isInConfirmStateRef.current) return
-        // 내 공이 날거나 0x12 인 동안(상태 0x11 · 0x12)도 범위 밖
-        if (pitchBusyTicksRef.current > 0) return
-        if (session.canChangePitcher) return setChangeWindow('투수')
-        if (session.canPinchHit) return setChangeWindow('대타')
+        // 장면 키 칸으로 — 받은 다음 틀의 키 0x498d4 '#' 가지(4994a~499f8) · 0xb 키 함수 0x495fc 가 그 틀의 상태를 본다
+        pushSceneKey(() => hashKeyRef.current())
         return
       }
       if (event.key === 'Escape' || event.key === 'Backspace') {
         if (changeWindow !== null) {
           event.preventDefault()
-          return closeChangeWindow()
+          // 0x495fc 의 CLR — 장면 키 칸으로(다음 틀)
+          pushSceneKey(() => changeWindowClearRef.current())
+          return
         }
         // 코스 고르기(상태 0x10)의 CLR(−16)은 조준 화면(`AimCursor` 의 onCancel)이 받는다 — 0x50ee0 → 0xf
         return

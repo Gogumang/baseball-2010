@@ -146,6 +146,16 @@ const SLOT_KEYS: ReadonlySet<string> = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' ', 'Escape', 'Backspace', 'Shift',
 ])
 
+/** 받은 칸을 덮는 폰 키인가 (`SLOT_KEYS`) — 앱 키 문(`appKeyGate`)도 같은 키만 칸에 넣는다 */
+export function isSlotKey(key: string): boolean {
+  return SLOT_KEYS.has(key)
+}
+
+/** 장면 부품의 칸이 하나라도 올라 있는가 */
+export function hasOpenSceneKeyLatch(): boolean {
+  return owners.length > 0
+}
+
 let disarmHandle: ReturnType<typeof setTimeout> | null = null
 
 /** 창 잡기 단계 — 폰 키 사건마다 맨 위 칸에 빈 칸을 넣는다(손잡이가 없는 키도 받은 칸을 덮는다) */
@@ -153,7 +163,8 @@ function armSlot(event: KeyboardEvent, kind: SceneKeyKind): void {
   armed = null
   const owner = owners[owners.length - 1]
   if (owner === undefined || !SLOT_KEYS.has(event.key)) return
-  // 누르고 있는 반복은 폰에 없다(원본은 +0x44 되풀이 셈을 스스로 센다) · 창이 서 있으면 키 사건은 창 몫이다(52cc6)
+  // 누르고 있는 반복은 폰에 없다(원본은 0xbca05 가 누른 채 4틀마다 되풀이 [+0x38] 을 스스로 센다 — `keyHold`) · 창이 서 있으면
+  // 키 사건은 창 몫이다(52cc6)
   if (event.repeat || isGameSceneFrozen()) return
   const pushBlank = blankPushers.get(owner)
   if (pushBlank === undefined) return
