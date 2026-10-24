@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
@@ -624,7 +625,13 @@ function TeamGameScene({
    * **교체 연출 0x16** — 사람 `#` 교체 · 대타의 OK, 0xf 진입의 CPU 대타 · CPU 투수 교체 뒤 진행기가 싣는다(`substitutionScene`).
    * "CHANGE" 애니를 다 그린 뒤 0xd 두 그림 → 0xe(등판음 0x38b64 · OK 대기). 그동안은 0xe 대기를 세지 않는다.
    */
-  const substitution = useSubstitutionScene(progress.substitutionScene, progress.sceneConfirm, isSceneUncovered)
+  const substitution = useSubstitutionScene(
+    progress.substitutionScene,
+    progress.sceneConfirm,
+    isSceneUncovered,
+    // 0xe 첫 그림의 0x38b64 — 타석 캔버스가 그린 투수 · 타자 자리에 등판 파티클
+    (scene) => emitSubstitutionEntryParticle(scene.entryKind),
+  )
   const sceneConfirm = useSceneConfirm(
     // 진행기가 OK 를 아직 안 받은 0xe 대기 (OK 를 받으면 `confirmScene` 이 그 뒤 굴림을 돌린다)
     progress.sceneConfirmPending === true ? progress.sceneConfirm : null,

@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
@@ -457,6 +458,8 @@ function PitcherGameScene({
       overlay === null &&
       !asksGiveUp &&
       resolution === null,
+    // 0xe 첫 그림의 0x38b64 — 타석 캔버스가 그린 타자 자리에 대타 등판 파티클(ptc/003)
+    (scene) => emitSubstitutionEntryParticle(scene.entryKind),
   )
   const sceneConfirm = useSceneConfirm(
     // 진행기가 OK 를 아직 안 받은 0xe 대기 — 또는 0xe 진입에서 감독 강판으로 빠지는 지나감(0xd 두 그림 · 0xe 한 그림, `hooksAtEntry`)

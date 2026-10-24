@@ -2982,6 +2982,8 @@ function applyOpponentCpuPinchHit(
       substitutionScene: inScene
         ? {
             serial: (progress.substitutionScene?.serial ?? 0) + 1,
+            // 대타 예약 갈래 — 0xe 첫 그림의 0x38b64 타자 가지(ptc/003)
+            entryKind: '타자',
             incomingIsAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
             entrySoundId: substitutionEntrySoundIdOf({
               isAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,

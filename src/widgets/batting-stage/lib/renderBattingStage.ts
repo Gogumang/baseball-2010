@@ -1,3 +1,4 @@
+import { recordStageEntryPoints } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
@@ -397,6 +398,8 @@ export function renderBattingStage(
   )
   // 0x38dc6 바람 줄(애니 11) — 투수와 같은 깊이 24500 이지만 먼저 넣어 투수 밑에 그려진다
   drawPitchWind(context, scene, side, pitcherAnimation)
+  // 0x38d1c(38dc2) · 0x49e64(49f76)가 0x38b64 에 넘기는 그림 자리 — 교체 등판 파티클이 쓴다(`substitutionEntryParticle`)
+  recordStageEntryPoints(side, scene.pitcherHand ?? 0, scene.shift)
   drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0, pitcherOutfitOf(scene))
   // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
   drawPitcherMistakeMark(context, scene, side)
