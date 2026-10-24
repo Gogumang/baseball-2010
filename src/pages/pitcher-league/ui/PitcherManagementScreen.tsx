@@ -25,6 +25,9 @@ import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { CenterStage } from '@/pages/management/ui/CenterStage'
+import { RestScene } from '@/widgets/training-scene/ui/RestScene'
+import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+import { nariRestPresentationOf } from '@/widgets/training-scene/lib/restPresentation'
 import { nariStageCharactersOf } from '@/pages/management/lib/centerStage'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { PITCHER_COMMAND_BAR, pitcherLabelDxOf, pitcherParentSlotOf } from '@/pages/pitcher-league/lib/pitcherCommandBar'
@@ -289,11 +292,19 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === '' && menu.restPhase !== 'playing'} />
           <PitcherStatusBoard career={career} />
-          <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
-            morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
-          })} />
+          {/* 127(휴식 — 연출과 결과 창)은 가운데 판 0x7f814 를 빼는 상태다 (0x19da4 의 19dc0~19dd4) */}
+          {menu.restPhase === null && (
+            <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
+              morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
+            })} />
+          )}
+          {/* 127 그리기 0x19e08 → 0x8532c = 0x848d0(gfx, 0, 0) — 캐릭터 없는 훈련 팝업. 투수편([gfx+0x20] == 3)은 늘 애니 0x62 */}
+          {menu.restPhase === 'playing' && (
+            <RestScene presentation={nariRestPresentationOf({ isBatter: false, battingTypeIndex: 0 })}
+              char0Palette={portraitPaletteIndex(career.skinIndex)} onFinished={menu.finishRest} />
+          )}
         </>
       )}
       {/*

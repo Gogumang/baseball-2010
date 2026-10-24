@@ -565,3 +565,25 @@ describe('머리띠 미끄러짐 [skin+0x84] — 나리 105 는 세우지 않는
     expect(coinTop()).toBe(settled)
   })
 })
+
+describe('127 휴식 연출 (0x190e4 → 0x85230 · 키 0x10650 · 틀 0x19080 · 그리기 0x19e08)', () => {
+  it('팝업 0x2a "예" → 연출이 돌고, 끝난 틀에야 휴식(굴림 · 결과 창 0x18e3c)을 부른다', () => {
+    const onSelect = vi.fn()
+    const career = { ...createCareer('테스터'), morale: 50 }
+    render(<ManagementScreen {...propsWith({ career, onSelect })} />)
+
+    clickCommand('휴식')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    expect(onSelect).not.toHaveBeenCalled()
+    // 0x10650 — 취소 키는 없다, 확인은 게이지를 끝으로
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(screen.queryByTestId('나리-휴식연출')).toBeNull()
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenCalledWith('휴식')
+  })
+})

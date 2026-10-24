@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import type { AnimationEntry, FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
-import { animationStepAt } from '@/widgets/training-scene/lib/animationPlayback'
+import { EventAnimationSprite as AnimationSprite } from '@/widgets/training-scene/ui/EventAnimationSprite'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import {
   EVENT_CHAR_0, EVENT_CHAR_1, OUTING_PANEL, OUTING_PANEL_BAND, SEASON_OUTING_PRESENTATIONS, isSeasonOutingSkipKey,
 } from '@/pages/season/lib/seasonOutingPopup'
 import type { SeasonOutingPresentation } from '@/pages/season/lib/seasonOutingPopup'
-import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
@@ -119,12 +117,12 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
             )}
           </div>
           <div style={{ position: 'absolute', left: 0, top: 0, width: 240, height: ANIMATION_CLIP_HEIGHT, overflow: 'hidden' }}>
-            <AnimationSprite folder={presentation.folder} origins={origins} entries={animations?.[presentation.animation]} update={update} />
+            <AnimationSprite folder={presentation.folder} origins={origins} entries={animations?.[presentation.animation]} update={update} anchor={ANCHOR} />
             {overlays !== null && (
               <>
-                <AnimationSprite folder={EVENT_CHAR_1} origins={char1Origins} entries={char1Animations?.[overlays.char1]} update={update} />
+                <AnimationSprite folder={EVENT_CHAR_1} origins={char1Origins} entries={char1Animations?.[overlays.char1]} update={update} anchor={ANCHOR} />
                 <AnimationSprite folder={EVENT_CHAR_0} origins={char0Origins} entries={char0Animations?.[overlays.char0]} update={update}
-                  palette={char0Palette} />
+                  anchor={ANCHOR} palette={char0Palette} />
               </>
             )}
           </div>
@@ -147,36 +145,4 @@ function Band({ top, lines }: { readonly top: number; readonly lines: readonly (
       ))}
     </div>
   )
-}
-
-function AnimationSprite({ folder, origins, entries, update, palette = null }: {
-  readonly folder: string
-  readonly origins: FrameOrigins | null
-  readonly entries: readonly AnimationEntry[] | undefined
-  readonly update: number
-  readonly palette?: number | null
-}) {
-  // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
-  useWarmRecoloredSprites(recolorRequestsOf(folder, (entries ?? []).map((entry) => entry.frame), palette))
-  const step = entries === undefined ? null : animationStepAt(entries, update)
-  if (step === null) return null
-  const key = String(step.frame).padStart(3, '0')
-  const origin = origins?.[key]
-  if (origin === undefined) return null
-  const left = ANCHOR.x + origin.x + step.dx
-  const top = ANCHOR.y + origin.y + step.dy
-  if (palette !== null) {
-    // 프레임마다 따로 마운트한다 — `useRecoloredSprite` 가 앞 프레임 주소를 한 번 내보내지 않게 (CenterStage 와 같다)
-    return <RecoloredFrame key={key} url={`${folder}/${key}.png`} palette={palette} left={left} top={top} />
-  }
-  return <img className={styles.sprite} style={{ left, top }} src={`${folder}/${key}.png`} alt="" />
-}
-
-function RecoloredFrame({ url, palette, left, top }: {
-  readonly url: string
-  readonly palette: number
-  readonly left: number
-  readonly top: number
-}) {
-  return <img className={styles.sprite} style={{ left, top }} src={useRecoloredSprite(url, palette)} alt="" />
 }
