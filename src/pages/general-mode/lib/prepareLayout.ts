@@ -260,7 +260,9 @@ export const matchInfoLogoPressRectOf = (anchor: { readonly x: number; readonly 
 
 /**
  * 공용 목록 깜빡 [sp+0xd4] — 다섯째 인자(메인 메뉴 [메뉴+0x2c], 상태에 들어온 뒤 센 틱)가 `% 6 ≤ 3` 이면 1 (0x63b4a~0x63b5c).
- * ⚠️ 웹은 화면을 띄운 뒤 갱신 수로 센다 — 시작 위상은 원본과 같다고 본다(진입 때 0 으로 지우는 곳은 미확인).
+ * [메뉴+0x2c] 는 메뉴 상태 객체(+0x18)의 틱 +0x14 다 — 0x32fa0 이 32fb8 에서 틀마다 0xbc9c9 로 +1 하고 상태가 바뀐 틀에 0 으로
+ * 지운다(bc9ec, 2026-10-24 직접 떴다 — 시즌 0xe9ac · 나리 0x1cdec 도 같은 함수를 장면+0x18 로 부른다). 그리기는 같은 틀 뒤쪽이라
+ * 진입 틀의 그림이 0 이다 — 웹은 화면을 띄운 앱 틱을 0 으로 센다(`useUpdateCounter`).
  */
 export const isPrepareBobOn = (tick: number): boolean => ((tick % 6) + 6) % 6 <= 3
 

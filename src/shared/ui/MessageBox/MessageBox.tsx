@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { MarkupText } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useMarksCommonWindowShown, useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 
@@ -250,7 +250,7 @@ export function MessageBox({
   const animationKind = animation?.kind ?? null
   useEffect(() => {
     if (animationKind === null) return
-    const timer = window.setInterval(() => {
+    const timer = setAppTickInterval(() => {
       const previous = animationRef.current
       if (previous === null || isFinishedRef.current) return
       // 다음 틱 · 키는 그리기를 기다리지 않고 이 값을 본다 — 틱 여럿이 한 그리기에 묶여도 한 틱씩 나아간다
@@ -269,8 +269,8 @@ export function MessageBox({
       isFinishedRef.current = true
       setIsGone(true)
       onAnswerRef.current(previous.answer)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    })
+    return () => timer()
   }, [animationKind])
 
   /**

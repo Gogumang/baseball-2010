@@ -33,36 +33,38 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
     expect(frame.ballFrame).toBe(HUMAN_PITCH_RELEASE_STATE_TICK - PITCHER_RELEASE_TICKS)
   })
 
-  it('공 틱 N + 1 에서 0x12 로 — 0x12 대기 틱 동안 결과, 그 뒤 대기', () => {
+  // 공 틱 N + 1(= 21)의 갱신이 0x12 를 예약하고(0x4e24e → 4e26c 0xbcb49) 다음 틀 머리 0xbc9c8 에서 0x12 틱 0 이 선다
+  it('공 틱 N + 1 이 0x12 를 예약하고 다음 틀이 0x12 틱 0 — 0x12 대기 틱 동안 결과, 그 뒤 대기', () => {
     const release = 50
     const atFlightEnd = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 21
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd - 1, release)).phase.kind).toBe('투구중')
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd, release)).phase).toEqual({
+    const atEntry = atFlightEnd + 1
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd, release)).phase.kind).toBe('투구중')
+    expect(pitcherSideStageFrameOf(clock(atEntry, release)).phase).toEqual({
       kind: '결과',
       tick: 0,
       isPaused: false,
       isInPlay: false,
     })
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 14, release)).phase.kind).toBe('결과')
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 15, release)).phase.kind).toBe('대기')
+    expect(pitcherSideStageFrameOf(clock(atEntry + 14, release)).phase.kind).toBe('결과')
+    expect(pitcherSideStageFrameOf(clock(atEntry + 15, release)).phase.kind).toBe('대기')
   })
 
   it('0x12 에도 투수 틱이 이어진다 — 다음 0xf 진입(대기)까지 투수 그림 객체가 상태 1 의 마지막 자세다', () => {
     const release = 50
-    const atFlightEnd = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 21
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 3, release)).pitcherTick).toBe(
-      atFlightEnd + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK,
+    const atEntry = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 22
+    expect(pitcherSideStageFrameOf(clock(atEntry + 3, release)).pitcherTick).toBe(
+      atEntry + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK,
     )
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 15, release)).pitcherTick).toBeNull()
+    expect(pitcherSideStageFrameOf(clock(atEntry + 15, release)).pitcherTick).toBeNull()
   })
 
-  it('투수 단계는 공 틱 N + 1 의 0x4e060 갱신까지만 센다 — 0x12 에서는 그 틱에 굳는다 (0x9e004 는 0xf · 0x11 에서만)', () => {
+  it('투수 단계는 공 틱 N + 1 의 0x4e060 갱신(0x12 를 예약한 틀)까지만 센다 — 0x12 에서는 그 틱에 굳는다 (0x9e004 는 0xf · 0x11 에서만)', () => {
     const release = 50
     const atFlightEnd = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 21
     const endStateTick = atFlightEnd - release + HUMAN_PITCH_RELEASE_STATE_TICK
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd - 1, release)).pitcherTickEnd).toBeNull()
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd, release)).pitcherTickEnd).toBe(endStateTick)
-    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 9, release)).pitcherTickEnd).toBe(endStateTick)
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd, release)).pitcherTickEnd).toBeNull()
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 1, release)).pitcherTickEnd).toBe(endStateTick)
+    expect(pitcherSideStageFrameOf(clock(atFlightEnd + 10, release)).pitcherTickEnd).toBe(endStateTick)
   })
 
   it('마투수는 공 틱이 0xcfbe4[순번] 단계에서 오른다 — 싸이커(0)는 상태 틱 20', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { animationFolderOf, figurePosesOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import type { TrainingPresentation } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt, figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
@@ -60,10 +60,10 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, bat
       setUpdate(-1)
       return
     }
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let handle = 0
     const tick = (now: number) => {
-      const current = Math.floor((now - startedAt) / millisecondsPerFrame())
+      const current = Math.max(0, appTickOf(now) - startTick)
       setUpdate(current)
       if (current >= TRAINING_POPUP_UPDATES) {
         onFinishedRef.current?.()

@@ -3,7 +3,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   COUNTER_BASE, COUNTER_CLIP, GOAL_TEXT_WIDTH, MISSION_HUD_BASE, TEXT_CLIP, TIMER_ICON, TIMER_STRIP,
   goalCountOf, goalLineDrawsOf, limitStripsOf, missionHudIconOf, pitcherGoalCountOf, slashCounterGlyphsOf, timerGlyphsOf,
@@ -11,7 +10,7 @@ import {
 import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
-import { createGameSceneDrawGate } from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 
 interface MissionHudProps {
@@ -99,10 +98,10 @@ export function MissionHud({
     if (lineCount <= 1 || isFrozen) return
     // 0x36714 는 그리기 쪽이라 공용 창이 서 있으면 52efe 가 건너뛴다 — 창이 선 첫 그림([창+0x250])만 한 번 더 오르고 닫히면 이어 오른다
     const drawGate = createGameSceneDrawGate()
-    const timer = window.setInterval(() => {
+    const timer = setGameSceneTickInterval(() => {
       if (drawGate.allowsDraw()) setTick((value) => value + 1)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    })
+    return () => timer()
   }, [lineCount, isFrozen])
 
   const frame = goalTickerFrameAt(tick, lineCount)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
@@ -175,8 +175,7 @@ export function GameResultScreen({
   const [isEvaluationEntered, setEvaluationEntered] = useState(false)
   useEffect(() => {
     if (phase !== '평가' || isEvaluationEntered) return undefined
-    const timer = window.setTimeout(() => setEvaluationEntered(true), millisecondsPerFrame())
-    return () => window.clearTimeout(timer)
+    return setAppTickTimeout(() => setEvaluationEntered(true), 1)
   }, [phase, isEvaluationEntered])
   const [isTitlePopupOpen, setIsTitlePopupOpen] = useState(newTitles.length > 0)
   // 결과 배경의 하늘 줄은 경기를 세울 때 고른 구장 +0x10(`settlement.skyRow`, 0x783b0 모드 4 — 굴림 없음)이다. 원본은 경기 내내 같은

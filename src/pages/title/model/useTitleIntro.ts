@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { TITLE_KEY_FRAMES_TO_MENU, titleSceneAt } from '@/pages/title/model/titleIntro'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { TitleScene } from '@/pages/title/model/titleIntro'
 
 /**
@@ -17,7 +19,8 @@ import type { TitleScene } from '@/pages/title/model/titleIntro'
  * 섰으니 아무 일도 없다(같은 4 를 다시 예약할 뿐).
  */
 export function useTitleIntro(onStart: () => void): { scene: TitleScene; press: () => void } {
-  const startedAtRef = useRef(performance.now())
+  /** 인트로를 켠 앱 틱 — 그림 수는 (지금 앱 틱 − 이 틱)이다(`appTickOf`) */
+  const startTickRef = useRef(appTickNow())
   const [scene, setScene] = useState<TitleScene>(() => titleSceneAt(0))
   /** 키를 받은 그리기 차례 — 메뉴는 이 차례 + 2 틀에 선다 */
   const acceptedAtRef = useRef<number | null>(null)
@@ -28,7 +31,7 @@ export function useTitleIntro(onStart: () => void): { scene: TitleScene; press: 
   useEffect(() => {
     let handle = 0
     const step = (now: number) => {
-      const next = titleSceneAt(now - startedAtRef.current)
+      const next = titleSceneAt(Math.max(0, appTickOf(now) - startTickRef.current) * millisecondsPerFrame())
       const acceptedAt = acceptedAtRef.current
       if (acceptedAt !== null && next.draw >= acceptedAt + TITLE_KEY_FRAMES_TO_MENU) {
         if (!hasStartedRef.current) {
@@ -47,7 +50,7 @@ export function useTitleIntro(onStart: () => void): { scene: TitleScene; press: 
   const pressRef = useRef(() => {
     if (acceptedAtRef.current !== null) return
     // 키가 든 때의 그리기 차례 — 그 틀 뒤 갱신이 깃발(그리기 19 가 세움)을 봐야 받는다
-    const current = titleSceneAt(performance.now() - startedAtRef.current)
+    const current = titleSceneAt(Math.max(0, appTickNow() - startTickRef.current) * millisecondsPerFrame())
     if (current.isSettled) acceptedAtRef.current = current.draw
   })
 

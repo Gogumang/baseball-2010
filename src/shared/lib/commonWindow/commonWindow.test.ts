@@ -3,11 +3,15 @@ import {
   clearGameSceneTimeout,
   createGameSceneDrawGate,
   gameSceneNow,
+  gameSceneTickNow,
+  gameSceneTickOf,
+  gameSceneTickStartTime,
   gameSceneTimeOf,
   isGameSceneFrozen,
   markCommonWindowShown,
   markGameSceneUp,
   resetCommonWindowShownForTest,
+  setGameSceneTickTimeout,
   setGameSceneTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 
@@ -144,5 +148,44 @@ describe('창이 선 첫 그림 — 52efe [창+0x250] 이면 갱신 없이도 �
     expect(createGameSceneDrawGate().allowsDraw()).toBe(false)
     third()
     scene()
+  })
+})
+
+describe('경기 장면 틱 — 장면 시계를 한 틱 격자로 센 정수(0x52c50 한 틀 = 한 틱)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    resetCommonWindowShownForTest()
+  })
+
+  it('장면 시각을 62ms 격자로 센다 · 창이 떠 있는 동안 서고 닫히면 그 틱에서 이어 오른다', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000)
+    expect(gameSceneTickNow()).toBe(16)
+    const 장면 = markGameSceneUp()
+    const 창 = markCommonWindowShown()
+    now.mockReturnValue(5000)
+    expect(gameSceneTickNow()).toBe(16)
+    창()
+    // 4000ms 를 뺀 장면 시각 1000 → 그대로 16, 62ms 더 흐르면 17
+    expect(gameSceneTickNow()).toBe(16)
+    now.mockReturnValue(5000 + 62)
+    expect(gameSceneTickNow()).toBe(17)
+    expect(gameSceneTickOf(gameSceneTimeOf(5000 + 62))).toBe(17)
+    expect(gameSceneTickStartTime(17)).toBe(17 * 62)
+    장면()
+  })
+
+  it('틱으로 거는 setTimeout 은 끝을 틱 머리에 맞춘다 — 건 때가 틱 안쪽이어도', () => {
+    vi.useFakeTimers()
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(100) // 틱 1 (62~123) 안쪽
+    const 울림 = vi.fn()
+    setGameSceneTickTimeout(울림, 2)
+    // 틱 3 머리 = 186 → 86ms 뒤
+    vi.advanceTimersByTime(85)
+    expect(울림).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(울림).toHaveBeenCalledTimes(1)
   })
 })

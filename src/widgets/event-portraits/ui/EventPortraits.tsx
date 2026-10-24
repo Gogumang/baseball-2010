@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { CSSProperties } from 'react'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { EventPortrait } from '@/shared/config/original/eventTypes'
 import { placePortraits, portraitAnimationOf, portraitPaletteOf, slideX } from '@/widgets/event-portraits/lib/portraitSlots'
 import type { PlacedPortrait } from '@/widgets/event-portraits/lib/portraitSlots'
@@ -95,14 +95,14 @@ function PaintedFrame({
   return <img className={styles.sprite} style={style} src={useRecoloredSprite(url, palette)} alt="" />
 }
 
-/** 원작 갱신 횟수. 한 번 갱신 = millisecondsPerFrame(). */
+/** 원작 갱신 횟수 — 켠 앱 틱부터 센다(`appTickOf`, 한 틱 = millisecondsPerFrame()). */
 function useUpdateClock(): number {
   const [update, setUpdate] = useState(0)
   useEffect(() => {
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let handle = 0
     const tick = (now: number) => {
-      setUpdate(Math.floor((now - startedAt) / millisecondsPerFrame()))
+      setUpdate(Math.max(0, appTickOf(now) - startTick))
       handle = requestAnimationFrame(tick)
     }
     handle = requestAnimationFrame(tick)

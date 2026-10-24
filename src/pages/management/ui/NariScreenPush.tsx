@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { nariMatchPushDirectionOf, screenPushFrameAt } from '@/pages/management/lib/nariScreenPush'
 import type { NariMatchPushView, ScreenPushDirection, ScreenPushFrame } from '@/pages/management/lib/nariScreenPush'
 import * as styles from '@/pages/management/ui/NariScreenPush.css'
@@ -71,9 +71,9 @@ export function NariScreenPush({ view, children }: NariScreenPushProps) {
         cancelAnimationFrame(handleRef.current)
         host.replaceChildren(snapshot)
         setPush({ direction, frame: first })
-        const startedAt = performance.now()
+        const startTick = appTickNow()
         const tick = (now: number) => {
-          const current = screenPushFrameAt(direction, Math.floor((now - startedAt) / millisecondsPerFrame()))
+          const current = screenPushFrameAt(direction, Math.max(0, appTickOf(now) - startTick))
           if (current === null) {
             // 끝 다음 프레임에 효과기를 비운다(bd852) — 떠 둔 화면을 버린다
             host.replaceChildren()

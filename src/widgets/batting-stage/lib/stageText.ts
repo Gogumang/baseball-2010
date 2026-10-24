@@ -1,19 +1,20 @@
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { SwingSituation } from '@/entities/batting/model/swingSkills'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { PitchSituation } from '@/entities/pitching/model/selectPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 
-/** 지금 그릴 타자 자세 f — 틱은 게임 속도(한 틱 ms)로 센다. 자세표도 몸통 종류로 갈린다 */
-export function batterFrameNow(now: number, swingStartedAt: number, isBunting: boolean, bodyType: number, aceOrder = -1): number {
-  const tickOf = (time: number) => Math.floor(time / millisecondsPerFrame())
+/**
+ * 지금 그릴 타자 자세 f — 지금 장면 틱과 스윙이 나간 장면 틱(`gameSceneTickOf`)으로 센다. 자세표도 몸통 종류로 갈린다.
+ * 대기 자세의 흔들림도 같은 장면 틱으로 센다(스윙 틱 · 단계 틱과 한 격자)
+ */
+export function batterFrameNow(sceneTick: number, swingStartTick: number | null, isBunting: boolean, bodyType: number, aceOrder = -1): number {
   return batterFrameAt({
-    tick: tickOf(now),
-    swingTick: swingStartedAt < 0 ? null : tickOf(swingStartedAt),
+    tick: sceneTick,
+    swingTick: swingStartTick,
     isBunting,
     bodyType,
     aceOrder,

@@ -171,7 +171,7 @@ import {
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
-import { isGameSceneFrozen, setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -1008,8 +1008,8 @@ export function useMissionSession({
     const scene = substitutionScene
     if (scene === null) return
     setSubstitutionScene(null)
-    // 경기 장면 시계로 잰다 — 공용 창이 서 있으면 0xd 의 장면 틱(52cc6) · 0xe 그리기(52efe)가 서기 때문이다
-    setGameSceneTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES * millisecondsPerFrame())
+    // 경기 장면 틱으로 센다 — 공용 창이 서 있으면 0xd 의 장면 틱(52cc6) · 0xe 그리기(52efe)가 서기 때문이다
+    setGameSceneTickTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES)
   }
 
   /**

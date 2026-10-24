@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
@@ -26,12 +26,12 @@ export function MenuWheel() {
   const animations = useAnimations(BALL_FOLDER)
   const [update, setUpdate] = useState(0)
 
-  // 원본은 그리기마다 애니를 한 칸씩 진행시킨다 — 웹은 갱신 시간(millisecondsPerFrame)으로 센다.
+  // 원본은 그리기마다 애니를 한 칸씩 진행시킨다 — 웹은 앱 틱(`appTickOf`)으로 센다(그리기 한 번 = 한 틱).
   useEffect(() => {
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let handle = 0
     const tick = (now: number) => {
-      setUpdate(Math.floor((now - startedAt) / millisecondsPerFrame()))
+      setUpdate(Math.max(0, appTickOf(now) - startTick))
       handle = requestAnimationFrame(tick)
     }
     handle = requestAnimationFrame(tick)

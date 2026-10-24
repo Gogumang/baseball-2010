@@ -72,6 +72,8 @@ const LANDING_MARGIN = 7
  * 406cc  아니면                           → [[경기+0x204]+0xaa0] >> 1       ; 낙구틱의 절반(빼기 없음)
  * ```
  * 0x406e8 은 `문턱 ≤ 공 틱` 이면 넘기므로 음수 문턱은 첫 틱에 넘는다 — 자르지 않는다.
+ * 웹은 이 문턱을 0x13 상태 틱(0x13 이 선 틀이 0 — 판정 틀의 다음 틀, `phaseEntryRef`)과 견준다.
+ * ⚠️ 미확인: 0x13 틱 0 의 공 틱 [+0x1098] 값(판정 틀에 다시 0 으로 서는지 · 한 번 더 오른 뒤인지)은 안 읽었다 — 한 틱 어긋날 수 있다.
  */
 export function bigHitHoldTicksOf(angle: number, landingTick: number): number {
   const isCenter = angle > CENTER_ANGLE.exclusiveMinimum && angle < CENTER_ANGLE.exclusiveMaximum

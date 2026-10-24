@@ -258,20 +258,33 @@ export interface StageRefs {
   /** 지금 날아가는 공의 구질 번호 1~22 (`game+0xfc8`) — `pitchRef` 와 함께 세운다. 판정 detail 에 실어 보낸다 */
   readonly pitchTypeNumberRef: MutableRefObject<number | null>
   readonly phaseRef: MutableRefObject<StagePhase>
-  readonly phaseStartedAtRef: MutableRefObject<number>
+  /**
+   * 지금 단계가 선 **경기 장면 틱**(`gameSceneTickOf`) — 단계 안 틱은 (지금 장면 틱 − 이 값)이다. 원본 상태 틱 [장면+0x2c] 를
+   * 0 으로 적는 틀(0xbc9c8 bc9ec)과 같은 틀이다(`commonWindow` 의 `gameSceneTickOf` 머리말)
+   */
+  readonly phaseStartTickRef: MutableRefObject<number>
+  /**
+   * **예약한 다음 단계** — 갱신이 0xbcb48 로 예약한 상태는 그 틀이 아니라 다음 틀 머리 0xbc9c8 에서 틱 0 으로 선다(bc9e8~bc9f4).
+   * 판정 0x6aa → 0x13 · 공 끝 0x4e24e(4e26c `movs r1, #0x12` → 0xbcb49) · 0x13 끝 40786(→ 0xbcb49) 이 이 길이다 — 고리가 예약한 틀은
+   * 아직 0x11 · 0x13 으로 그리고, 루프가 `tick` 에 닿은 틀 머리에서 단계를 세운다. 없으면 null
+   */
+  readonly phaseEntryRef: MutableRefObject<{ readonly phase: StagePhase; readonly tick: number } | null>
+  /** 0x13 건너뛰기 키(OK · '5')를 읽는 갱신 틱 — 키는 다음 틀의 0x13 갱신 0x406e8(40708)이 [장면+0x40] 으로 읽는다. 없으면 null */
+  readonly hitSkipKeyTickRef: MutableRefObject<number | null>
   readonly resultTextRef: MutableRefObject<string>
   /**
-   * 홈런 글자 연출(원본 켜짐 칸 +0x1960)이 켜진 시각. −1 이면 꺼짐.
+   * 홈런 글자 연출(원본 켜짐 칸 +0x1960)이 켜진 장면 틱. null 이면 꺼짐.
    * 원본은 홈런 판정 가지에서 켜고 다음 플레이가 지울 때까지 돌리므로,
    * 웹도 결과 문구 시간과 따로 두고 **다음 투구가 시작할 때** 끈다.
    */
-  readonly homeRunStartedAtRef: MutableRefObject<number>
-  readonly swingStartedAtRef: MutableRefObject<number>
+  readonly homeRunStartTickRef: MutableRefObject<number | null>
+  /** 스윙이 나간 장면 틱(F + 1, 0xb9374). null 이면 대기 자세 */
+  readonly swingStartTickRef: MutableRefObject<number | null>
   /**
-   * 투수 그림 객체가 상태 1 에 든 시각 — 0x11 진입 0x3de10 이 걸고 다음 0xf 진입(0x3d954 → 0x340c0)이 상태 0 으로 되돌린다.
-   * −1 이면 상태 0(선 자세). 공이 끝난 0x12 · 0x13 동안에도 남아 투수가 마지막 단계 자세에 머문다
+   * 투수 그림 객체가 상태 1 에 든 장면 틱 — 0x11 진입 0x3de10 이 걸고 다음 0xf 진입(0x3d954 → 0x340c0)이 상태 0 으로 되돌린다.
+   * null 이면 상태 0(선 자세). 공이 끝난 0x12 · 0x13 동안에도 남아 투수가 마지막 단계 자세에 머문다
    */
-  readonly pitcherStartedAtRef: MutableRefObject<number>
+  readonly pitcherStartTickRef: MutableRefObject<number | null>
   readonly shiftRef: MutableRefObject<number>
   readonly buntRef: MutableRefObject<BuntStance | null>
   readonly deckRef: MutableRefObject<PatternDeck | null>
@@ -282,7 +295,7 @@ export interface StageRefs {
   /** 이 공이 판정됐나 — 경기+0xfe5 (0x4e18a · 0x4e216) */
   readonly pitchJudgedRef: MutableRefObject<boolean>
   /** 판정은 났지만 공 끝(0x12)까지 기다리는 결과(헛스윙 · 번트 헛맞음) — 공 끝에서 부른다 */
-  readonly heldResultRef: MutableRefObject<((now: number) => void) | null>
+  readonly heldResultRef: MutableRefObject<((tick: number) => void) | null>
   /** '결과' 단계(0x12)가 서 있을 그림 수 — 결과를 세울 때 정한다 (`resultPhaseTicksOf`) */
   readonly resultTicksRef: MutableRefObject<number>
   /** 지금 '결과' 가 맞은 공 뒤 인플레이(0x17) 자리인가 — 아니면 상태 0x12 (`StagePhaseSnapshot.isInPlay`) */
@@ -290,10 +303,10 @@ export interface StageRefs {
   /** 살아 있는 파티클 이미터 목록 — 앱 전역 관리자 [0x1400068] 하나(`widgets/particles` 의 `sceneParticleScene`) */
   readonly particlesRef: MutableRefObject<ParticleScene>
   /**
-   * 맞은 공이 0x13 을 끝내고 0x17(인플레이)로 넘어간 시각(`commitHit`) — 0x17 진입 0x46418 의 4673e 가 파티클 관리자를 갈래 없이
-   * 비운다(0x6dee4). 그 시각 뒤 첫 원본 틱에서 지우고 null 로 되돌린다
+   * 맞은 공이 0x13 을 끝내고 0x17(인플레이)로 넘어간 장면 틱(`commitHit`) — 0x17 진입 0x46418 의 4673e 가 파티클 관리자를 갈래 없이
+   * 비운다(0x6dee4). 그 틱 뒤 첫 틱에서 지우고 null 로 되돌린다
    */
-  readonly inPlayEnteredAtRef: MutableRefObject<number | null>
+  readonly inPlayEnteredTickRef: MutableRefObject<number | null>
   readonly pointerDownAtRef: MutableRefObject<number>
   readonly latestRef: MutableRefObject<StageLatest>
 }
@@ -312,41 +325,38 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     pitchRef: useRef<Pitch | null>(null),
     pitchTypeNumberRef: useRef<number | null>(null),
     phaseRef: useRef<StagePhase>('대기'),
-    phaseStartedAtRef: useRef(0),
+    phaseStartTickRef: useRef(0),
+    phaseEntryRef: useRef<{ readonly phase: StagePhase; readonly tick: number } | null>(null),
+    hitSkipKeyTickRef: useRef<number | null>(null),
     resultTextRef: useRef(''),
-    homeRunStartedAtRef: useRef(-1),
-    swingStartedAtRef: useRef(-1),
-    pitcherStartedAtRef: useRef(-1),
+    homeRunStartTickRef: useRef<number | null>(null),
+    swingStartTickRef: useRef<number | null>(null),
+    pitcherStartTickRef: useRef<number | null>(null),
     shiftRef: useRef(0),
     buntRef: useRef<BuntStance | null>(null),
     deckRef: useRef<PatternDeck | null>(null),
     pendingHitRef: useRef<PendingHit | null>(null),
     swingRef: useRef<SwingReservation | null>(null),
     pitchJudgedRef: useRef(false),
-    heldResultRef: useRef<((now: number) => void) | null>(null),
+    heldResultRef: useRef<((tick: number) => void) | null>(null),
     resultTicksRef: useRef(RESULT_PHASE_TICKS),
     isInPlayResultRef: useRef(false),
     particlesRef: useRef<ParticleScene>(sceneParticleScene()),
-    inPlayEnteredAtRef: useRef<number | null>(null),
+    inPlayEnteredTickRef: useRef<number | null>(null),
     pointerDownAtRef: useRef(0),
     latestRef,
   }
 }
 
-/** 투구 시작부터 흐른 틱 */
-export function pitchTickAt(now: number, startedAt: number, millisecondsPerTick: number): number {
-  return Math.floor((now - startedAt) / millisecondsPerTick)
-}
-
 /**
  * 공 프레임 F — 투수 애니가 놓는 단계(평범 6 · 마투수 0xcfbe4[순번])에 닿은 뒤부터 매 틱 +1 (0x3f378).
- * 그 전에는 음수라 공을 그리지 않는다. `aceOrder` 는 마운드 마투수 순번(없으면 평범한 투수)
+ * `phaseTicks` 는 0x11 에 든 뒤 흐른 장면 틱이다. 그 전에는 음수라 공을 그리지 않는다. `aceOrder` 는 마운드 마투수 순번(없으면 평범한 투수)
  */
-export function ballFrameAt(now: number, startedAt: number, millisecondsPerTick: number, aceOrder?: number | null): number {
-  return pitchTickAt(now, startedAt, millisecondsPerTick) - pitcherReleaseTicksOf(aceOrder)
+export function ballFrameOf(phaseTicks: number, aceOrder?: number | null): number {
+  return phaseTicks - pitcherReleaseTicksOf(aceOrder)
 }
 
-/** 공 프레임 F 가 시작하는 시각 — `ballFrameAt` 의 거꾸로 */
-export function ballFrameStartTime(frame: number, startedAt: number, millisecondsPerTick: number, aceOrder?: number | null): number {
-  return startedAt + (frame + pitcherReleaseTicksOf(aceOrder)) * millisecondsPerTick
+/** 공 프레임 F 가 서는 장면 틱 — `ballFrameOf` 의 거꾸로 (`phaseStartTick` = 0x11 에 든 장면 틱) */
+export function ballFrameStartTick(frame: number, phaseStartTick: number, aceOrder?: number | null): number {
+  return phaseStartTick + frame + pitcherReleaseTicksOf(aceOrder)
 }

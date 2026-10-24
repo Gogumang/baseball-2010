@@ -1,4 +1,5 @@
 import { createContext, useContext, useLayoutEffect } from 'react'
+import { createTickClock, setTickInterval } from '@/shared/lib/frameClock/frameClock'
 
 /**
  * **공용 창 [0x140005c] 이 떠 있는가** — 히든 오픈 알림(0x62368 → 0x74ef5)처럼 앱이 모든 화면 위에 얹는 창.
@@ -268,8 +269,62 @@ export function gameSceneNow(): number {
   return gameSceneTimeOf(performance.now())
 }
 
+/**
+ * **경기 장면 틱** — 경기 장면 시계(`gameSceneTimeOf`)를 그림 길이(`millisecondsPerFrame()`)로 센 정수. 원본 경기 장면 0x52c50 은 한 틀에
+ * 한 번 갱신하고(52cd4 의 0xbc9c9 — 상태 틱 [장면+0x2c] +1 · 진입) 한 번 그린다 — 이 틱 하나가 그 틀이다. 장면 부품은 단계 시작을
+ * **그 단계가 선 장면 틱 번호**로 적고 단계 안 진행은 (지금 틱 − 시작 틱)으로 센다 — 그래서 그림은 틱마다 많아야 한 번 바뀌고,
+ * 단계 경계가 모두 같은 격자 위에 선다. 창이 떠 있는 동안은 시계가 서므로 틱도 안 오른다(52cc6 — 따라잡지 않는다).
+ *
+ * 상태가 바뀌는 틱(2026-10-24 직접 떴다): 0xbcb48(상태 객체, 새 상태)이 +8 에 예약만 하고, 다음 틀 머리 0xbc9c8 이
+ * `+4 ≠ +8` 이면 +0x10 = 옛 상태 · **+0x14(틱) = 0** · +4 = 새 상태 · +0x19(진입) = 1 을 적는다(bc9e8~bc9f4). 같으면 +0x14 += 1 ·
+ * +0x19 = 0 (bc9de~bc9e4). 경기 장면은 그 뒤 52cdc 에서 [장면+0x31](진입)이 서 있으면 진입 표 0xd04bc 를 부르고, 52d9e 의 키 0x498d4 ·
+ * 52e14~ 의 갱신 표 0xd0530 이 같은 틀에 틱 0 으로 돈다. 곧 **갱신에서 예약한 상태는 다음 틀이 틱 0 이다** — 웹 루프는 앞 단계의
+ * 끝 틱을 본 그 틀(= 원본의 예약 다음 틀)에 새 단계를 세우므로 그 틀의 장면 틱이 새 단계의 시작 틱이다.
+ */
+const gameSceneTickClock = createTickClock()
+
+/** 경기 장면 시각 `sceneTime`(`gameSceneTimeOf` 가 돌려준 ms) 이 드는 장면 틱 */
+export function gameSceneTickOf(sceneTime: number): number {
+  return gameSceneTickClock.tickOf(sceneTime)
+}
+
+/** 지금 장면 틱 — `gameSceneTickOf(gameSceneNow())` */
+export function gameSceneTickNow(): number {
+  return gameSceneTickOf(gameSceneNow())
+}
+
+/** 장면 틱 `tick` 이 시작하는 경기 장면 시각(ms) */
+export function gameSceneTickStartTime(tick: number): number {
+  return gameSceneTickClock.startTimeOf(tick)
+}
+
+/**
+ * **장면 틱으로 재는 setTimeout** — 지금 틱에서 `ticks` 틱 뒤의 틀 머리에 `callback` 을 부른다. 상태 길이(그림 수)를 시각으로
+ * 곱해 걸면 건 때가 틱 안쪽이라 끝도 틱 안쪽에 선다 — 이 시계는 끝을 장면 틱 격자에 맞춘다(`setGameSceneTimeout` 위에 선다 —
+ * 창이 떠 있는 동안 선다).
+ */
+export function setGameSceneTickTimeout(callback: () => void, ticks: number): number {
+  const now = gameSceneNow()
+  const due = gameSceneTickStartTime(gameSceneTickOf(now) + Math.max(0, ticks))
+  return setGameSceneTimeout(callback, Math.max(0, due - now))
+}
+
+/**
+ * **장면 틱 머리마다 부르는 setInterval** — `window.setInterval(…, millisecondsPerFrame())` 대신 경기 장면 부품(구질 목록 · 조준 ·
+ * 게이지 따위)이 장면 틱 격자에 맞춰 센다. 공용 창이 서 있는 동안(장면 시계가 선다)은 실제 시각 한 틀마다 부른다 — 부르는 쪽이
+ * `isGameSceneFrozen` 으로 갱신을 거르고 창이 선 첫 그림(`createGameSceneDrawGate`)을 센다. 돌려준 함수로 거둔다.
+ */
+export function setGameSceneTickInterval(callback: () => void): () => void {
+  return setTickInterval(
+    callback,
+    { now: gameSceneNow, tickOf: gameSceneTickOf, startTimeOf: gameSceneTickStartTime },
+    isGameSceneFrozen,
+  )
+}
+
 /** 시험용 — 센 수를 되돌린다 */
 export function resetCommonWindowShownForTest(): void {
+  gameSceneTickClock.reset()
   testGeneration += 1
   shownCommonWindows = 0
   gameScenesUp = 0

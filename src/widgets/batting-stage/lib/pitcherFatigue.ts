@@ -17,7 +17,7 @@ import { pitchLastStepOf, pitchStepStartTickOf } from '@/widgets/batting-stage/l
  * ```
  * 투수 점 (x, y) 는 0x38e6c 가 투수 그림에 쓰는 자리(좌투면 x + 1)다. 애니 9 · 10 은 0xf 진입 0x3d954 가 되감고 돌림을 켠다
  * (돌림 비트표 0x1a610 의 비트 9 · 10). 그리기 목록은 그 뒤 비울 때 그려 k 번째 그림이 k 칸 나아간 칸이다.
- * ⚠️ 근사: 되감기 · 그린 수는 웹 장면 단계 틱으로 센다. +0x14 는 장면의 투수 그림 객체 상태(`stageScenery.pitcherAnimationAt`)다 —
+ * 되감기 · 그린 수는 웹 장면 단계 틱으로 센다(그림 한 번 = 장면 틱 하나 — 아래 실투 "!" 머리말). +0x14 는 장면의 투수 그림 객체 상태(`stageScenery.pitcherAnimationAt`)다 —
  * 투구 뒤 다음 0xf 진입까지 상태 1 에 머물므로 0x12 · 0x13 에도 안 그린다.
  */
 export const PLAYER_EFFECT_FRAMES = './sprites/player_effect/frames'
@@ -62,7 +62,9 @@ export function pitcherFatigueFrameAt(entries: readonly StageAnimationEntry[], d
  * 0x1a610(비트 4 · 9 · 10 · 13 · 15 · 16 — 즉치 마스크)으로 13 을 돌림으로 켠다. k 번째 그림은 k 칸 나아간 칸이다(체력 그림과 같은 셈).
  * 홈런 갈래의 "!"(3912c — 0x357e0 · 투수 단계 == 마지막 단계 13(마투수 0xcfd34[순번]) · +0x199a)는 `renderBattingStage` 의
  * `drawPitcherHomeRunMarks` 가 같은 애니 13 으로 그린다(효과는 좌투 0x11).
- * ⚠️ 근사: +8 은 그림마다 1 줄지만 웹은 놓은 틱(0x11 틱 10)부터 장면 틱으로 센다.
+ * +8 은 그림마다 1 준다 — 웹은 놓은 틱(0x11 틱 10)부터 장면 틱으로 센다.
+ * 그림 수 = 장면 틱 수다 — 원본 경기 장면 0x52c50 은 한 틀에 한 번 그리고(그리기 표 0xd05a0), 웹은 모든 단계를 같은 경기 장면 틱
+ * 격자로 센다. ⚠️ 남은 차이: 공용 창이 선 첫 그림([창+0x250], 52efe)은 갱신 없이 한 번 더 그려 +8 이 한 번 더 준다 — 웹은 안 센다.
  */
 export const MISTAKE_MARK_ANIMATION = 13
 /** 4deae — 실투면 +8 = 4 */

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, MessageBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -25,7 +26,6 @@ import {
   openingFold, panelClipOf, rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 
@@ -174,20 +174,20 @@ export function SettingsScreen({
   const isFolding = !fold.isDone
   useEffect(() => {
     if (!isFolding) return undefined
-    const timer = window.setInterval(() => {
+    const timer = setAppTickInterval(() => {
       // 0x5a6fe 는 0x593c8 이 판을 그린 뒤에만 부른다 — 머리띠가 미끄러지는 동안은 펼침도 멈춘다
       if (!isPageShownRef.current) return
       const next = nextPanelFold(foldRef.current, panel.height)
       // 접힘이 끝나면 갱신 끝 0x29688 이 상태 4 로 — 10 높이 판은 그려지지 않는다
       if (!next.isOpening && next.isDone) {
-        window.clearInterval(timer)
+        timer()
         foldRef.current = next
         return onBackRef.current()
       }
       foldRef.current = next
       setFold(next)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    })
+    return () => timer()
   }, [isFolding, panel.height])
 
   /**

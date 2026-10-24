@@ -140,7 +140,7 @@ describe('공용 창이 서 있는 동안 (경기 장면 0x52c50 의 52cc6 — �
     장면()
   })
 
-  it('창이 닫힌 뒤 키 시각은 경기 장면 시계다 — 창이 떠 있던 만큼 빠진다(단계 시작 시각과 같은 시계)', () => {
+  it('창이 닫힌 뒤 키 틱은 경기 장면 틱이다 — 창이 떠 있던 만큼 빠진다(단계 시작 틱과 같은 격자)', () => {
     const now = vi.spyOn(performance, 'now')
     now.mockReturnValue(1000)
     const 장면 = markGameSceneUp()
@@ -150,7 +150,8 @@ describe('공용 창이 서 있는 동안 (경기 장면 0x52c50 의 52cc6 — �
     now.mockReturnValue(4500)
     const 손잡이 = 붙이기({})
     fireEvent.keyDown(window, { key: '5' })
-    expect(손잡이.swing).toHaveBeenCalledWith(1500)
+    // 장면 시각 1500ms(창이 떠 있던 3000ms 를 뺐다) → 62ms 틱 격자의 24 번 틱
+    expect(손잡이.swing).toHaveBeenCalledWith(24)
     장면()
   })
 })

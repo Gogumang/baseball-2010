@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from 'react'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { EventStep } from '@/entities/story/model/eventScript'
 import { playEventSound } from '@/entities/story/model/eventSound'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { soundTimelineOf } from '@/pages/story/lib/eventBackdrop'
 import { stepKeyOf } from '@/pages/story/model/useScreenEffect'
 
@@ -20,10 +20,10 @@ export function useEventSounds(step: EventStep): void {
     const { played } = playedRef.current
     const timers = soundTimelineOf(step.passed).flatMap(({ id, start }, index) => played.has(index)
       ? []
-      : [window.setTimeout(() => {
+      : [setAppTickTimeout(() => {
         played.add(index)
         playEventSound(activeSound(), id)
-      }, start * millisecondsPerFrame())])
-    return () => timers.forEach((timer) => window.clearTimeout(timer))
+      }, start)])
+    return () => timers.forEach((clear) => clear())
   }, [step])
 }
