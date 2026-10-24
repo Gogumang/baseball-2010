@@ -72,8 +72,17 @@ const LANDING_MARGIN = 7
  * 406cc  아니면                           → [[경기+0x204]+0xaa0] >> 1       ; 낙구틱의 절반(빼기 없음)
  * ```
  * 0x406e8 은 `문턱 ≤ 공 틱` 이면 넘기므로 음수 문턱은 첫 틱에 넘는다 — 자르지 않는다.
- * 웹은 이 문턱을 0x13 상태 틱(0x13 이 선 틀이 0 — 판정 틀의 다음 틀, `phaseEntryRef`)과 견준다.
- * ⚠️ 미확인: 0x13 틱 0 의 공 틱 [+0x1098] 값(판정 틀에 다시 0 으로 서는지 · 한 번 더 오른 뒤인지)은 안 읽었다 — 한 틱 어긋날 수 있다.
+ * 웹은 이 문턱을 0x13 상태 틱(0x13 이 선 틀이 0 — 판정 틀의 다음 틀, `phaseEntryRef`)과 견준다. 0x13 에서는 공 틱 = 상태 틱이다
+ * (2026-10-24 직접 떴다):
+ * ```
+ * 0x3d720  0x13 진입(진입 표 — 갱신보다 앞): 3d76c +0x1090 = −1 · 3d77e **+0x1098(공 틱) = 0** · 3d786 +0x10a4 = 1 · 3d78e +0x1080 = 0
+ * 0x406e8  0x13 갱신: 406fe~40706 `문턱 ≤ [+0x1098]` 이면 40786 으로(0x17 예약) · 40714 꺼진 갈래는 [+0x2c] == 8
+ * 0x3f378  틀 끝(53086): 상태 0x13 이면 3f428~3f440 투수 단계 ≥ 릴리스 단계 · +0x10a4(= 1) > 0 · [+0x2c] % +0x10a4 == 0 일 때 3f450 +0x1098 += 1
+ * ```
+ * 곧 진입 틀의 갱신은 공 틱 0 을 보고 틀 끝에 1 이 된다 — 상태 틱 k 의 갱신이 공 틱 k 를 본다(투수는 0x11 에서 이미 릴리스 단계를
+ * 지났다). 다만 3f416 은 막음 바이트 [+0x10a0] 이 서 있으면 +1 을 건너뛴다 — 큰 타구 멈춤(`HIT_STOP_TICKS`)이 공 틱을 7 틀
+ * 붙잡아 상태 틱 k 의 공 틱이 max(0, k − 7) 이 된다(`hitPauseTicksOf`). 이른 넘김(`earlyHitPauseTickOf`)의
+ * `g == 공 틱 + 1` 은 멈춤이 없는 꺼진 갈래라 상태 틱과 같다.
  */
 export function bigHitHoldTicksOf(angle: number, landingTick: number): number {
   const isCenter = angle > CENTER_ANGLE.exclusiveMinimum && angle < CENTER_ANGLE.exclusiveMaximum
@@ -140,14 +149,33 @@ export interface HitPauseInput extends BigHitInput {
   readonly earlyTick?: number | null
 }
 
-/** 상태 0x13 이 화면을 붙잡아 두는 틱 수. */
+/**
+ * **큰 타구 멈춤** (2026-10-24 직접 떴다):
+ * ```
+ * 515e0  맞은 판정 0x51408 이 0x392ac 로 +0x199a 를 세운다
+ * 51818  0x357e0(+0xfd4 ∈ 24~26) && +0x199a 면 5182e +0x10a0 = 1(막음) · 5183c +0x10a8 = 6
+ * 3f416  틀 끝 0x3f378: +0x10a0 ≠ 0 이면 공 틱 +1 을 건너뛴다
+ * 4ccba  0x13 그리기 0x4cb1c: +0x199a 이고 공 틱 == 0 인 그림마다 옛값 = +0x10a8, +0x10a8 −= 1. 옛값 < 0 이면 4ccc6 막음을 풀고
+ *        4cd14 공 자리에 파티클 0xbbc85(…, 15, 10) — `016.ptc`. 4cc6c 옛값이 홀수면 번쩍임(0x75b19 …, 웹은 아직 안 그린다)
+ * ```
+ * +0x199a 는 0x392ac 가 홈런성(24~26)일 때만 세우므로 큰 타구는 늘 멈춘다 — 옛값 6 · 5 · … · 0 · −1 의 여덟째 그림(상태 틱 7)이
+ * 막음을 풀며 016 을 쏘고, 그 틀 끝부터 공 틱이 오른다. 곧 상태 틱 k 의 갱신이 보는 공 틱은 max(0, k − 7) 이다. 0x13 이 그보다
+ * 일찍 끝나면(문턱 ≤ 0 · OK 건너뛰기) 016 은 안 나가고 셈이 남지만, 다음 큰 타구가 다시 6 을 적어 남은 값은 쓰이지 않는다.
+ */
+export const HIT_STOP_TICKS = 7
+
+/**
+ * 상태 0x13 이 화면을 붙잡아 두는 틱 수 — 이 상태 틱의 갱신이 0x17 을 예약한다.
+ * 큰 타구는 `문턱 ≤ 공 틱` 인 첫 상태 틱이라 멈춤(`HIT_STOP_TICKS`) 때문에 문턱 + 7(문턱이 0 이하면 진입 틀 0) 이다.
+ */
 export function hitPauseTicksOf(input: HitPauseInput): number {
   if (!isBigHit(input)) {
     // 0x40714 상태 틱 == 8 이면 넘김 — 그 전에 이른 넘김 조건이 서면 그 틱(0x4071a~0x40784)
     const early = input.earlyTick ?? null
     return early !== null && early < SHORT_HIT_TICKS ? early : SHORT_HIT_TICKS
   }
-  return bigHitHoldTicksOf(input.angle, input.landingTick)
+  const threshold = bigHitHoldTicksOf(input.angle, input.landingTick)
+  return threshold > 0 ? threshold + HIT_STOP_TICKS : threshold
 }
 
 /**

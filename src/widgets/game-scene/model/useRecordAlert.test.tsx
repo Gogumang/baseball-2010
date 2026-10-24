@@ -6,12 +6,15 @@ import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import type { RecordAlertOptions } from '@/widgets/game-scene/model/useRecordAlert'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
+import { markSceneStateEntries, resetSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 
 beforeEach(() => {
   vi.useFakeTimers()
 })
 afterEach(() => {
   cleanup()
+  resetSceneStateEntries()
   vi.useRealTimers()
 })
 
@@ -92,6 +95,23 @@ describe('useRecordAlert — 칸 채우기 0x4e600 은 공 끝에만', () => {
     rerender({ ids: [1, 2], options: options('b', true) })
     tick(10)
     expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([true, false])
+  })
+
+  it('갈래 안의 원본 상태 경계 — 부품이 적은 장면 틱(예약 다음 틀)이 0 이다 (`sceneStateEntries`)', () => {
+    const options: RecordAlertOptions = { isDrawing: true, sceneStateKey: 'play', pitchEnd: { serial: 1 } }
+    const { result, rerender } = renderHook(({ ids, options: current }: Props) => useRecordAlert(ids, current), {
+      initialProps: { ids: [], options: { isDrawing: true, sceneStateKey: 'play', pitchEnd: { serial: 0 } } } as Props,
+    })
+    rerender({ ids: [1, 2], options })
+    // 0x12 가 지금 + 3 틱에 선다(앞 틀이 예약) — 그 틱이 상태 틱 0
+    const entry = gameSceneTickNow() + 3
+    markSceneStateEntries({ tick: entry, state: 0x12 })
+    tick(8)
+    // 상태 틱 = 8 − 3 = 5 → (5 % 18) / 6 = 0
+    expect(gameSceneTickNow() - entry).toBe(5)
+    expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([true, false])
+    tick()
+    expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([false, true])
   })
 })
 

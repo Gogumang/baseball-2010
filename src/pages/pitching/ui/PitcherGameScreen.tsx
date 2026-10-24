@@ -367,10 +367,9 @@ function PitcherGameScene({
    * 진행기가 같은 걸음에 다음 공의 0xf 진입까지 돌려도 원본 0xf 진입은 0x12 뒤라 공이 날거나 0x12 인 동안은 숨긴다 —
    * 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정(`lastResolution`)이 들어온 그림도 그동안으로 친다
    */
-  const hiddenRunnerBases = hiddenStealBasesOf(
-    progress,
-    isPitchSceneBusy || lastResolutionRef.current !== lastResolution,
-  )
+  /** 내 공이 날거나 0x12 인 동안(0x11 · 0x12) — 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정이 든 그림도 친다 */
+  const isPitchFlightShown = isPitchSceneBusy || lastResolutionRef.current !== lastResolution
+  const hiddenRunnerBases = hiddenStealBasesOf(progress, isPitchFlightShown)
   const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
@@ -528,7 +527,10 @@ function PitcherGameScene({
     isDrawing: !isInPlayShown,
     isFrozen: isPopupOpen || asksGiveUp,
     isSettled: progress.game.isFinished,
-    // ⚠️ 근사: 상태 틱 [+0x2c] 의 경계를 웹 화면 갈래(인트로 · 판 · 벤치 클리어링 · 0xe · 구질/코스/게이지 단계)로 가른다
+    // 상태 틱 [+0x2c] 의 0 점 — 화면 갈래(인트로 · 판 · 벤치 클리어링 · 0xd/0xe 대기 · 구질 0xf/코스 0x10/게이지 0x11 단계)가 바뀐 틱과,
+    // 원본 상태 경계(사람 투구 장면이 적는 0x11 · 0x12 · 그 끝, 확인 대기가 적는 0xd · 0xe — `sceneStateEntries`) 가운데 늦은 쪽.
+    // 공을 놓은 틱(0x11 틱 10)은 상태가 안 바뀐다 — 웹은 그때 입력 단계를 '구질' 로 되돌리지만 0x11 · 0x12 가 끝날 때까지는
+    // '게이지' 갈래로 둔다(`isPitchFlightShown`)
     sceneStateKey: !isIntroDone
       ? 'intro'
       : isHalfInningBoardOpen
@@ -539,7 +541,9 @@ function PitcherGameScene({
             ? isEndBoardClosed ? 'settlement' : 'endBoard'
             : isAwaitingConfirm
               ? `confirm-${pitchEndSerial}`
-              : `${phase}-${pitchEndSerial}`,
+              : isPitchFlightShown
+                ? '게이지'
+                : phase,
     pitchEnd: {
       serial: pitchEndSerial,
       humanCountOf: (added) =>

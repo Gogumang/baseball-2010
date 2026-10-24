@@ -5,6 +5,7 @@ import {
   clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import { SCENE_STATE, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /**
@@ -159,6 +160,12 @@ export function useSceneConfirm(
     const startTick =
       suspended !== null && suspended.wait === wait && suspended.confirmed === confirmed ? suspended.startTick : gameSceneTickNow()
     const elapsed = gameSceneTickNow() - startTick
+    // 상태 경계(`sceneStateEntries`) — 0xd 첫 그림이 0xd 틱 0, 0x39e14 가 틱 1 에 0xe 를 예약해 두 그림 뒤가 0xe 틱 0. 교체 창 0xb 에서
+    // 곧장 선 0xe(`skipsSceneD`)는 0xd 가 없다(웹은 그때도 두 그림을 센다 — 0xe 칸만 그 자리에 적는다)
+    markSceneStateEntries(
+      ...(wait.skipsSceneD === true ? [] : [{ tick: startTick, state: SCENE_STATE.준비 }]),
+      { tick: startTick + SCENE_PREPARE_FRAMES, state: SCENE_STATE.확인 },
+    )
     const enteredDelay = SCENE_PREPARE_FRAMES - elapsed
     const unlockedDelay = SCENE_CONFIRM_READY_FRAMES - elapsed
     const entered = enteredDelay <= 0 ? null : setGameSceneTickTimeout(() => setEnteredKey({ wait, confirmed }), enteredDelay)

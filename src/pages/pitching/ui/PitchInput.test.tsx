@@ -137,10 +137,10 @@ describe("'*' 로 메뉴를 연 그림에도 0x39c5c 가 한 번 돈다 (52cc6 �
 })
 
 describe('게이지 0x11 — 누름은 칸만 정하고 틱 10 에 놓는다', () => {
-  it('안 누르면 틱 10 에 칸 0 으로 놓는다', () => {
+  it('안 누르면 틱 10 에 칸 0 으로 놓는다 — 부품이 선 다음 틀 머리가 0x11 틱 0 이라 열한째 셈이다', () => {
     const onRelease = vi.fn()
     render(<PitchGradeGauge onRelease={onRelease} />)
-    틱(9)
+    틱(10)
     expect(onRelease).not.toHaveBeenCalled()
     틱(1)
     expect(onRelease.mock.calls).toEqual([[0]])
@@ -158,6 +158,8 @@ describe('게이지 0x11 — 누름은 칸만 정하고 틱 10 에 놓는다', (
     expect(screen.getByLabelText('투구 게이지 6칸')).toBeTruthy()
     expect(onRelease).not.toHaveBeenCalled()
     틱(2)
+    expect(onRelease).not.toHaveBeenCalled()
+    틱(1)
     expect(onRelease.mock.calls).toEqual([[6]])
   })
 })

@@ -15,7 +15,6 @@ import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneP
 import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { canSkipHitPause, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import {
-  BIG_HIT_PARTICLE,
   HIT_PARTICLE_IMAGE,
   hitParticleIdOf,
   hitParticleInputOf,
@@ -39,6 +38,7 @@ import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } f
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageCastPreload } from '@/widgets/batting-stage/model/useStageCastPreload'
 import { useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
+import { SCENE_STATE, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import { acceptsBattingKey, keyTickOf, swingReleaseTickOf } from '@/widgets/batting-stage/lib/swingWindow'
 import { RESULT_PHASE_TICKS, resultPhaseTicksOf } from '@/widgets/batting-stage/lib/stagePhaseTicks'
@@ -452,7 +452,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
         pitch,
         isUncatchable,
         isHomeRun,
-        // 큰 타구 감상이 끝나는 자리에 016 을 쏜다 (0x4cb1c → 0x4cd14)
+        // 큰 타구 멈춤이 풀리는 0x13 그림(틱 7)에 016 을 쏜다 (0x4cb1c → 0x4cd14, `useStageAnimation`)
         bigHitAt: watchesBigHit ? contact : null,
         watchesBigHit,
         resultText,
@@ -462,6 +462,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       // 0x6aa 가 이 틀(판정 틱)의 갱신에서 0x13 을 예약한다 — 0x13 은 다음 틀이 틱 0 이다(`phaseEntryRef`)
       hitSkipKeyTickRef.current = null
       phaseEntryRef.current = { phase: '타격', tick: tick + 1 }
+      markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.타격 })
       return
     }
 
@@ -486,6 +487,12 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
     isInPlayResultRef.current = false
     phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
+    // 0x12 는 다음 틀이 틱 0, 문턱 갱신이 예약한 다음 상태는 그 `resultTicks` 틀 뒤에 선다(0x4e6d4 → 판정 A)
+    markSceneStateEntries(
+      { tick: tick + 1, state: SCENE_STATE.결과 },
+      // 타석을 끝낸 공(문턱 0x1f)이면 판정 A 가 0xd(밀어내기면 0x17 판) — 아니면 같은 타석 다음 공 0xf
+      { tick: tick + 1 + resultTicksRef.current, state: resultTicksRef.current > RESULT_PHASE_TICKS ? SCENE_STATE.준비 : SCENE_STATE.선택 },
+    )
     latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
   }
 
@@ -539,16 +546,8 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     const pending = pendingHitRef.current
     if (pending === null) return
     pendingHitRef.current = null
-    // 상태 19 카운터가 다 되면 타격점에 016 (id 15, 프레임 10) 을 쏜다 (R2 3-4)
-    if (pending.bigHitAt !== null) {
-      emitParticles(
-        particlesRef.current,
-        particleConfigOf(BIG_HIT_PARTICLE.id),
-        pending.bigHitAt.x,
-        pending.bigHitAt.y,
-        BIG_HIT_PARTICLE.img,
-      )
-    }
+    // 016(id 15, 프레임 10)은 0x13 끝이 아니라 멈춤이 풀리는 0x13 그림(틱 7)이 쏜다 — 정정(2026-10-24, 0x4cb1c 4ccba~4cd14 직접
+    // 떴다): `useStageAnimation` 의 0x13 그리기 몫(`hitPause.HIT_STOP_TICKS`)
     // 0x13 → 0x17 — 0x17 진입 0x46418(4673e)이 다음 틱에 파티클 관리자를 비운다 (`useStageAnimation`)
     inPlayEnteredTickRef.current = tick
     hitSkipKeyTickRef.current = null
@@ -559,6 +558,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     resultTicksRef.current = RESULT_PHASE_TICKS
     isInPlayResultRef.current = true
     phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
+    markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.인플레이 })
     latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)
   }, [])
 

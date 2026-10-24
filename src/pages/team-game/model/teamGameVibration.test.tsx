@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
@@ -19,13 +22,25 @@ const 기본옵션: TeamGameOptions = {
 const 진동 = vi.fn<(pattern: VibratePattern) => boolean>(() => true)
 const 원래진동 = Object.getOwnPropertyDescriptor(navigator, 'vibrate')
 beforeEach(() => {
+  vi.useFakeTimers()
   진동.mockClear()
   Object.defineProperty(navigator, 'vibrate', { value: 진동, configurable: true, writable: true })
 })
 afterEach(() => {
+  vi.useRealTimers()
   if (원래진동 === undefined) delete (navigator as { vibrate?: unknown }).vibrate
   else Object.defineProperty(navigator, 'vibrate', 원래진동)
 })
+
+/**
+ * 삼진 진동은 0x12 틱 0 의 그림(0x4d0ba `[+0x2c] == 0`)에 울린다 — 놓은 틱에서 `pitchResultEntryDelayTicksOf` 뒤. 그 전 틱에는 안 울린다
+ */
+function 결과틀까지기다리기(frameCount: number, aceOrder?: number | null) {
+  const delay = pitchResultEntryDelayTicksOf(frameCount, aceOrder)
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame() * (delay - 1)))
+  expect(진동).not.toHaveBeenCalled()
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+}
 
 /** 수비 반 이닝에 공을 던져 가며 공마다 (그 전 스트라이크, 판정 종류, 울린 진동) 을 모은다 */
 function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
@@ -57,6 +72,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
     act(() =>
       result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), gaugeCell: 0 }),
     )
+    결과틀까지기다리기(result.current.progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order)
     기록.push({
       strikesBefore,
       kind: result.current.progress.lastResolution?.kind,

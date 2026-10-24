@@ -152,6 +152,7 @@ import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
+import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
@@ -1667,8 +1668,12 @@ export function useMissionSession({
     // 삼진 진동 100ms — 미션(모드 5)도 경기 장면 0x104 라 못 맞힌 공은 0x11 → 0x12 를 지나고, 그 그리기 0x4ce9c 는
     // 모드를 가리지 않는다(0x52fb6 표 0xd05a0[0x12]). 0x12 진입 3dfac 이 0x9d57c 로 state[0xc] = 5(삼진) 를 쓰면
     // 첫 그리기(경기+0x2c == 0)의 4d0ba → 4d0d6 0x3a44(100, 100) (`strikeoutVibration`). 난수 없음.
-    // ⚠️ 근사(때): 웹은 던지는 순간 판정이 나오므로 심판 콜과 같은 자리에서 울린다 (투수편 `usePitcherGame` 과 같다)
-    vibrate(strikeoutVibrationMillisecondsOf(resolution, strikesBefore), isVibrationOn !== false)
+    // 때: 0x12 틱 0 의 그림 — 놓은 틱에서 `pitchResultEntryDelayTicksOf` 뒤(미션 투수는 마투수가 아니다, 투수편과 같다)
+    const strikeoutMs = strikeoutVibrationMillisecondsOf(resolution, strikesBefore)
+    const isStrikeoutVibrationOn = isVibrationOn !== false
+    if (strikeoutMs > 0) {
+      setGameSceneTickTimeout(() => vibrate(strikeoutMs, isStrikeoutVibrationOn), pitchResultEntryDelayTicksOf(pitch.frameCount))
+    }
     playSoundIds(audio, [
       // 0x3f378 3f46a — 구질 22 면 28. 미션 투수는 육성·명예 투수(비트7)라 0xb633d 가 거짓이어서
       // 공+0x10 갈래(3f488)는 안 탄다 → 투수 +0x18 을 0 으로 넘긴다 (b008959)

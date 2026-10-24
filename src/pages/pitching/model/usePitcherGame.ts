@@ -42,6 +42,8 @@ import { pinchHitSoundIdsOf, stepSoundIdsOf } from '@/pages/team-game/model/team
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
+import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import type {
   PitchInput,
   PitcherGameOptions,
@@ -185,8 +187,16 @@ export function usePitcherGame(
             })
             const resolution = after.lastResolution
             if (resolution === null) return [releaseSound]
-            // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`)
-            vibrate(strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes), isVibrationOnRef.current !== false)
+            // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`). 0x12 틱 0 의
+            // 그림(놓은 틱에서 `pitchResultEntryDelayTicksOf` 뒤)에 울린다 — 나리 투수는 마투수가 아니다
+            const strikeoutMs = strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes)
+            const isVibrationOn = isVibrationOnRef.current !== false
+            if (strikeoutMs > 0) {
+              setGameSceneTickTimeout(
+                () => vibrate(strikeoutMs, isVibrationOn),
+                pitchResultEntryDelayTicksOf(after.lastPitch?.frameCount ?? 0),
+              )
+            }
             // 진행기가 타석이 끝나면 볼카운트를 새 타석으로 되돌리므로, 심판 콜이 보는
             // "이 공을 먹인 뒤" 의 카운트는 여기서 따로 만든다
             const nextAtBat = applyPitchResolution(before.atBat, resolution)

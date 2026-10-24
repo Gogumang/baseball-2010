@@ -3,7 +3,9 @@ import {
   cpuSwingTickOf,
   HUMAN_PITCH_RELEASE_STATE_TICK,
   passesHeldResult,
+  pitchSceneBusyTicksOf,
   pitcherSideStageFrameOf,
+  pitcherSideStateEntriesOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { PITCHER_RELEASE_TICKS, pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 
@@ -45,8 +47,9 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
       isPaused: false,
       isInPlay: false,
     })
-    expect(pitcherSideStageFrameOf(clock(atEntry + 14, release)).phase.kind).toBe('결과')
-    expect(pitcherSideStageFrameOf(clock(atEntry + 15, release)).phase.kind).toBe('대기')
+    // 0x4e6d4 4e72c — 틱 < 문턱 15 면 기다리고, 틱 15 의 갱신이 다음 상태를 예약한다 — 0x12 는 틱 0 ~ 15 의 16 그림
+    expect(pitcherSideStageFrameOf(clock(atEntry + 15, release)).phase.kind).toBe('결과')
+    expect(pitcherSideStageFrameOf(clock(atEntry + 16, release)).phase.kind).toBe('대기')
   })
 
   it('0x12 에도 투수 틱이 이어진다 — 다음 0xf 진입(대기)까지 투수 그림 객체가 상태 1 의 마지막 자세다', () => {
@@ -55,7 +58,7 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
     expect(pitcherSideStageFrameOf(clock(atEntry + 3, release)).pitcherTick).toBe(
       atEntry + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK,
     )
-    expect(pitcherSideStageFrameOf(clock(atEntry + 15, release)).pitcherTick).toBeNull()
+    expect(pitcherSideStageFrameOf(clock(atEntry + 16, release)).pitcherTick).toBeNull()
   })
 
   it('투수 단계는 공 틱 N + 1 의 0x4e060 갱신(0x12 를 예약한 틀)까지만 센다 — 0x12 에서는 그 틱에 굳는다 (0x9e004 는 0xf · 0x11 에서만)', () => {
@@ -99,5 +102,22 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
     const release = 50
     const swingTick = cpuSwingTickOf(release, 18)
     expect(pitcherSideStageFrameOf(clock(swingTick, release)).ballFrame).toBe(18)
+  })
+
+  it('공 하나의 상태 경계 — 0x11 은 놓은 틱 − 10, 0x12 는 공 틱 N + 2 의 틀, 그 끝은 문턱 + 1 그림 뒤 (바쁜 틱과 같은 끝)', () => {
+    const release = 50
+    const entries = pitcherSideStateEntriesOf(release, 20, 15)
+    const resultEntry = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 22
+    expect(entries).toEqual([
+      { tick: release - HUMAN_PITCH_RELEASE_STATE_TICK, state: 0x11 },
+      { tick: resultEntry, state: 0x12 },
+      { tick: resultEntry + 16, state: 0xf },
+    ])
+    expect(pitcherSideStageFrameOf(clock(resultEntry, release)).phase.kind).toBe('결과')
+    expect(release + pitchSceneBusyTicksOf(20, 15)).toBe(resultEntry + 16)
+    // 타석을 끝낸 공(문턱 31)은 0xd 로
+    expect(pitcherSideStateEntriesOf(release, 20, 31).at(-1)).toEqual({ tick: resultEntry + 32, state: 0xd })
+    // 맞은 공은 0x11 만
+    expect(pitcherSideStateEntriesOf(release, 20, 0)).toEqual([{ tick: release - HUMAN_PITCH_RELEASE_STATE_TICK, state: 0x11 }])
   })
 })

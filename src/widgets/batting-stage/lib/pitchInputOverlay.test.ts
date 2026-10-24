@@ -55,21 +55,22 @@ describe('0x11 게이지 (0x4d412~)', () => {
   })
 
   it('정한 뒤 — 멈춘 커서는 반투명 8/16, 애니 1 은 k 칸 나아간 칸, 끝나면 결과 원이 15 · 12 · 9 · 6 /16 으로 흐려진다', () => {
-    const 첫 = gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 0 }, 표)
+    // 누른 틀의 그림이 k = 1 — 게이지가 그 틀 그리기에서 decidedTicks 를 1 로 올린다
+    const 첫 = gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 1 }, 표)
     expect(첫).toEqual([
       { folder: './sprites/slt_pitch/frames', frame: 0x41, dy: 0, alpha: 0.5 },
       { folder: './sprites/slt_pitch/frames', frame: 0x41, dy: 0 },
       { folder: './sprites/slt_pitch/frames', frame: 55, dy: 0 },
     ])
     // k = 5: 애니 1 이 이 그림에서 끝난다 — 누른 칸 보통 그림과 결과 원(15/16)이 같이
-    const 끝 = gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 4 }, 표)
+    const 끝 = gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 5 }, 표)
     expect(끝.map((draw) => [draw.frame, draw.alpha])).toEqual([[0x41, 0.5], [0x41, undefined], [0x41, 15 / 16]])
-    expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 7 }, 표).at(-1)?.alpha).toBe(6 / 16)
-    expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 8 }, 표)).toHaveLength(1)
+    expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 8 }, 표).at(-1)?.alpha).toBe(6 / 16)
+    expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 9 }, 표)).toHaveLength(1)
   })
 
   it('누른 칸 9(t == 5) — game_effect 애니 0 을 같은 차례로 덧그린다', () => {
-    const draws = gaugeDrawsOf({ cursor: 9, pressed: 9, decidedTicks: 0 }, 표)
+    const draws = gaugeDrawsOf({ cursor: 9, pressed: 9, decidedTicks: 1 }, 표)
     expect(draws.at(-1)).toEqual({ folder: './sprites/game_effect/frames', frame: 1, dy: 0 })
   })
 })

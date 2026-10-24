@@ -7,6 +7,7 @@ import {
   carryScaleOf,
   CARRY_THRESHOLD,
   hitPauseTicksOf,
+  HIT_STOP_TICKS,
   isBigHit,
   pauseInputOf,
   SHORT_HIT_TICKS,
@@ -64,8 +65,9 @@ describe('상태 0x13 이 붙잡아 두는 틱', () => {
     expect(hitPauseTicksOf({ ...큰타구, resultCode: 15, angle: 90, landingTick: 40 })).toBe(SHORT_HIT_TICKS)
   })
 
-  it('가운데 부채꼴(54 < 각 < 126, 경계 미포함 — 0x406a4)이면 낙구틱 − 7 까지 기다린다', () => {
-    expect(hitPauseTicksOf({ ...큰타구, angle: 90, landingTick: 40 })).toBe(33)
+  it('가운데 부채꼴(54 < 각 < 126, 경계 미포함 — 0x406a4)이면 문턱이 낙구틱 − 7 이다', () => {
+    // 큰 타구는 멈춤(5182e — 공 틱을 7 틀 막는다)이 붙어 0x13 은 문턱 + 7 틱이다
+    expect(hitPauseTicksOf({ ...큰타구, angle: 90, landingTick: 40 })).toBe(33 + HIT_STOP_TICKS)
     expect(bigHitHoldTicksOf(55, 40)).toBe(33)
     expect(bigHitHoldTicksOf(125, 40)).toBe(33)
   })
@@ -79,6 +81,14 @@ describe('상태 0x13 이 붙잡아 두는 틱', () => {
 
   it('문턱을 자르지 않는다 — 음수 문턱은 첫 틱에 넘는다(0x406e8 `문턱 ≤ 공 틱`)', () => {
     expect(bigHitHoldTicksOf(90, 3)).toBe(-4)
+    // 멈춤 중에도 공 틱은 0 이라 문턱 0 이하는 진입 틀(상태 틱 0)에 넘긴다
+    expect(hitPauseTicksOf({ ...큰타구, angle: 90, landingTick: 3 })).toBe(-4)
+    expect(hitPauseTicksOf({ ...큰타구, angle: 90, landingTick: 7 })).toBe(0)
+  })
+
+  it('큰 타구 멈춤 — 상태 틱 k 의 공 틱은 max(0, k − 7) 이라 문턱 1 은 틱 8 에 넘긴다 (0x3f378 3f416 · 0x4cb1c 4ccba)', () => {
+    expect(hitPauseTicksOf({ ...큰타구, angle: 90, landingTick: 8 })).toBe(1 + HIT_STOP_TICKS)
+    expect(HIT_STOP_TICKS).toBe(7)
   })
 })
 

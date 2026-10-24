@@ -207,7 +207,8 @@ describe('투수편 경기 화면', () => {
     // 게이지 그림·안내는 없고 틱 10 까지는 아직 안 던졌다
     expect(게이지보임()).toBe(false)
     expect(screen.queryByLabelText(/투구 게이지/)).toBeNull()
-    틱(9)
+    // 게이지가 선 다음 틀 머리가 0x11 틱 0 — 틱 10 은 열한째 틀이다
+    틱(10)
     expect(구질보임()).toBe(false)
     틱(1)
     // 놓았다 — 남은 0x11 비행과 0x12 대기 동안은 원본도 다음 공 입력을 안 받는다
@@ -225,8 +226,10 @@ describe('투수편 경기 화면', () => {
 
     expect(게이지보임()).toBe(true)
     expect(screen.getByLabelText(/투구 게이지/)).toBeTruthy()
-    // 누르지 않아도 0x11 의 틱 10 에 놓는다 (0x4e060)
+    // 누르지 않아도 0x11 의 틱 10 에 놓는다 (0x4e060) — 게이지가 선 다음 틀 머리가 틱 0
     틱(10)
+    expect(게이지보임()).toBe(true)
+    틱(1)
     expect(게이지보임()).toBe(false)
   })
 
@@ -405,7 +408,7 @@ describe('내가 던진 인플레이 타구 — 수비 화면이 실시간으로
   function 한개던지기() {
     구질고르기('FASTBALL')
     조준확정()
-    틱(10)
+    틱(11)
   }
 
   /** 인플레이 타구가 떠서 수비 화면이 설 때까지 던진다 */

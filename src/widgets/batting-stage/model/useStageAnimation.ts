@@ -25,7 +25,10 @@ import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameOf, ballFrameStartTick } from '@/widgets/batting-stage/model/stageRefs'
-import { clearParticles } from '@/entities/particle/model/particleScene'
+import { clearParticles, emitParticles } from '@/entities/particle/model/particleScene'
+import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
+import { HIT_STOP_TICKS } from '@/widgets/batting-stage/lib/hitPause'
+import type { PendingHit } from '@/widgets/batting-stage/model/stageRefs'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
 import { claimSceneParticleTick } from '@/entities/particle/model/sceneParticleManager'
@@ -52,8 +55,13 @@ import { isBallInSwingReach, nextFlightEvent, swingReleaseTickOf } from '@/widge
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { resultBackdropOffsetAt, SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
+import {
+  SCENE_STATE, cancelSceneStateEntriesAfter, markSceneStateEntries, sceneStateEntryAt,
+} from '@/shared/lib/commonWindow/sceneStateEntries'
 import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
-import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
+import {
+  createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
+} from '@/widgets/batting-stage/model/sceneCloudClock'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
@@ -66,6 +74,8 @@ const HOME_RUN_DERBY_GAME_MODE = 7
 const INTIMIDATE_SKILL_ID = 22
 /** 0x10 의 목표 고르기 틱 — 0x53824 는 상태 틱 > 5 인 첫 틱(6)에 0x645 를 보낸다 */
 const CPU_AIM_TICK_IN_0X10 = 6
+/** 대기 셈이 미리 적는 상태 — 0xf · 0x10 · 0x11 (`sceneStateEntries`) */
+const PRE_PITCH_STATES: readonly number[] = [SCENE_STATE.선택, SCENE_STATE.조준, SCENE_STATE.투구]
 /** 0x11 의 공 놓기 틱 — 0x4e078 은 상태 틱 > 9 인 첫 틱(10)에 0x4dc78 을 부른다 */
 const CPU_RELEASE_TICK_IN_0X11 = 10
 
@@ -209,6 +219,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      */
     let resultCodeBeforePitch: number | null = sceneResultCodeNow()
     let judgedResultCode: { readonly tick: number; readonly code: number | null } | null = null
+    /** 큰 타구 멈춤을 푼(016 을 쏜) 타구 — 한 번만 */
+    let hitStopReleased: PendingHit | null = null
+    /**
+     * 0x13 그리기 0x4cb1c 4ccba~4cd14 — 큰 타구(+0x199a)면 공 틱이 0 인 그림마다 멈춤 셈 [+0x10a8](맞을 때 6)을 1 주고, 옛값이 −1 인
+     * 여덟째 그림(상태 틱 7)이 막음을 풀며 공 자리에 016(id 15, 프레임 10)을 쏜다(`hitPause.HIT_STOP_TICKS`) — 이 틀의 파티클
+     * 틱(53048) 앞이다. 0x13 이 틱 7 전에 끝나면(문턱 ≤ 0 · OK 건너뛰기) 안 쏜다
+     */
+    const drawHitStop = (pending: PendingHit, held: number) => {
+      if (!pending.watchesBigHit || held < HIT_STOP_TICKS || hitStopReleased === pending) return
+      hitStopReleased = pending
+      if (pending.bigHitAt === null) return
+      emitParticles(particlesRef.current, particleConfigOf(BIG_HIT_PARTICLE.id), pending.bigHitAt.x, pending.bigHitAt.y, BIG_HIT_PARTICLE.img)
+    }
     /** 그 틱에 원본이 읽는 재료 — 볼카운트 · 주자 · 마구 · 투수 (`selectPitch` 와 같은 인자) */
     const cpuPitchArgsNow = (): CpuPitchArgs => {
       const { pitcherAbility, hud, onPickoff } = latestRef.current
@@ -245,6 +268,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           // 타석이 끝나 쉬는 동안 — 다음 타석 준비(0x48d50)처럼 좌우 이동을 되돌린다
           shiftRef.current = 0
           phaseStartTickRef.current = sceneTick
+          // 쉬는 동안은 0xf · 0x10 · 0x11 이 안 선다 — 대기 셈이 미리 적어 둔 예약을 거둔다(지난 칸 · 확인 대기가 적은 0xd · 0xe 는 남는다)
+          cancelSceneStateEntriesAfter(sceneTick, PRE_PITCH_STATES)
           hasSeenPause = true
           return
         }
@@ -264,6 +289,13 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         const tick = sceneTick - phaseStartTickRef.current
         if (cpuPitchCycle === null || cpuPitchCycle.startTick !== phaseStartTickRef.current) {
           cpuPitchCycle = { startTick: phaseStartTickRef.current, typeRolls: 0, typeNumber: 0, target: null }
+          // 상태 경계 — 0xf 가 선 틱이 0, 0x39c1c 가 틱 8 에 0x10 을 예약해 틱 9 에, 0x39c5c 가 0x10 틱 6 에 0x11 을 예약해 틱 16 에 선다
+          const start = phaseStartTickRef.current
+          markSceneStateEntries(
+            { tick: start, state: SCENE_STATE.선택 },
+            { tick: start + CPU_PITCH_TYPE_TICKS, state: SCENE_STATE.조준 },
+            { tick: start + PRE_PITCH_TICKS, state: SCENE_STATE.투구 },
+          )
         }
         const cycle = cpuPitchCycle
         const { random } = latestRef.current
@@ -279,6 +311,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             // 견제 판(상태 0x17)이 끝나면 원본은 같은 타석 다음 공(0xf)으로 돌아온다 — 여기서는 다시 대기로 둔다
             pitchRef.current = null
             phaseStartTickRef.current = sceneTick
+            // 0x10 갱신이 견제 판(0x17)을 예약했다 — 다음 틀이 0x17 틱 0 이다(0x11 예약 자리를 지운다)
+            markSceneStateEntries({ tick: sceneTick + 1, state: SCENE_STATE.인플레이 })
             latestRef.current.onPickoff?.(aim.base)
             return
           }
@@ -297,6 +331,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           homeRunStartTickRef.current = null
           phaseRef.current = '투구중'
           phaseStartTickRef.current = sceneTick
+          markSceneStateEntries({ tick: sceneTick, state: SCENE_STATE.투구 })
           // 3de7c — 투수 그림 객체 상태 1(투구 동작)
           pitcherStartTickRef.current = sceneTick
           pitcherTickEnd = null
@@ -414,6 +449,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (phaseRef.current === '타격') {
         const pending = pendingHitRef.current
         const held = sceneTick - phaseStartTickRef.current
+        // 이 틀의 0x13 그리기 0x4cb1c 몫(갱신과 같은 틀 — 0x17 을 예약한 틀도 0x13 을 그린다) — 큰 타구 멈춤이 풀리는 그림
+        if (pending !== null) drawHitStop(pending, held)
         // 건너뛰기 키는 키 다음 틀의 이 갱신(0x406e8 40708)이 읽는다
         const skipKeyTick = hitSkipKeyTickRef.current
         const isSkipped = skipKeyTick !== null && sceneTick >= skipKeyTick
@@ -428,6 +465,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       ) {
         phaseRef.current = '대기'
         phaseStartTickRef.current = sceneTick
+        // 0x12 끝 — 판정 A 가 예약한 다음 상태(0xf · 0xd · 0x17)가 이 틀에 선다. 그 칸은 0x12 를 세울 때 이미 적었다(`BattingStage`
+        // 의 `showResult`) — 0xf 면 아래 대기 셈이 0x10 · 0x11 을 이어 적는다
         pitchRef.current = null
         // 0xf 진입 0x3d954 → 0x35650 → 0xb9318 이 스윙 객체를 대기(상태 5)로 되돌린다 — 그때까지 스윙 끝 칸에 머문다 (`batterFrameAt`)
         swingStartTickRef.current = null
@@ -507,24 +546,36 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       })
     }
 
-    /** 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 쉬기 시작한 뒤 틱(⚠️ 근사: 웹 쉬기는 0xd 두 그림부터라 0xe 진입보다 두 그림 이르다) */
     const specialSwingEffectNow = (sceneTick: number) => {
       const effect = pendingHitRef.current?.specialEffect ?? null
-      if (phaseRef.current !== '타격' || effect === null) return null
-      return { ...effect, drawCall: sceneTick - phaseStartTickRef.current + 1 }
+      if (effect === null) return null
+      // 맞은 틀 J(0x11 — 0x13 을 예약한 틀)의 그림이 첫 부름이다: 0x3f060 끝(3f320)이 스윙 객체를 틀 머리에 한 칸 넘기고 갱신
+      // 0x4e060 이 0xb9270 == 0(상태 3 · 프레임 1)에서 판정했으니 같은 틀 그리기 0x49e64 49f8c 도 0xb9271 == 0 · +0xfd2 를 본다
+      if (phaseRef.current === '투구중' && phaseEntryRef.current?.phase === '타격') return { ...effect, drawCall: 1 }
+      if (phaseRef.current !== '타격') return null
+      // 0x13 은 그림마다(49f7c 상태 == 0x13) — 틱 d 의 그림이 d + 2 번째 부름
+      return { ...effect, drawCall: sceneTick - phaseStartTickRef.current + 2 }
     }
 
+    /**
+     * 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 확인 대기가 적은 상태 경계(`sceneStateEntries`)로 0xd · 0xe 를 가르고 틱은 0xe 진입부터
+     * 센다(0xe 진입 0x50674 가 필살 판 애니를 되감는다). 경계가 없으면 쉬기 시작한 뒤 틱
+     */
     const stagePhaseNow = (sceneTick: number) => {
       // 쉬기가 풀렸어도 0xf 가 서기 전 틀(`advancePhase`)은 쉬던 그림 그대로다
       const isPaused = latestRef.current.isPaused || (phaseRef.current === '대기' && sceneTick < phaseStartTickRef.current)
       const pausedWaiting = phaseRef.current === '대기' && isPaused
       if (!pausedWaiting) pausedSince = null
       else if (pausedSince === null) pausedSince = sceneTick
+      const entry = pausedWaiting ? sceneStateEntryAt(sceneTick) : null
+      const confirmEntryTick = entry?.state === SCENE_STATE.확인 ? entry.tick : null
       return {
         kind: phaseRef.current,
-        tick: sceneTick - (pausedSince ?? phaseStartTickRef.current),
+        tick: sceneTick - (confirmEntryTick ?? pausedSince ?? phaseStartTickRef.current),
         isPaused,
         isInPlay: phaseRef.current === '결과' && isInPlayResultRef.current,
+        // 쉬는 동안 0xd(타석 준비 두 그림)인가
+        isSceneD: entry?.state === SCENE_STATE.준비,
       }
     }
 
@@ -687,7 +738,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
               ? null
               : homeRunTextFrameAt(latestRef.current.homeRunText, tickTime, tickLength),
         swingFrame: batterFrameNow(sceneTick, swingStartTickRef.current, buntRef.current !== null, bodyType, latestRef.current.aceBatterOrder),
-        // 필살 스윙 연출 그림 0x49aec — 상태 0x13('타격') 동안 그림마다 한 번 불린다 (k = 단계 틱 + 1, `specialSwingEffect`)
+        // 필살 스윙 연출 그림 0x49aec — 맞은 틀(0x11)에 처음, 이어 상태 0x13('타격') 그림마다 (k = 단계 틱 + 2, `specialSwingEffect`)
         specialSwingEffect: specialSwingEffectNow(sceneTick),
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
@@ -743,6 +794,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {
           cloudCalls,
+          // 전광판 글자 [구장+0x8c] — 이 장면에서 배경을 처음 그린 틱이 0 (`sceneScoreboardTickOf`)
+          scoreboardTick: sceneScoreboardTickOf(sceneTick),
           skyRow: skyRowNow(),
           stadium: latestRef.current.stadium ?? 0,
           fieldPalette: latestRef.current.fieldPalette ?? null,
@@ -782,6 +835,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     animationHandle = requestAnimationFrame(frame)
     return () => {
       cancelAnimationFrame(animationHandle)
+      // 부품이 내려가면 미리 적은 0x10 · 0x11 예약은 서지 않는다(지난 칸과 이미 정한 0x12 · 0x13 · 0x17 은 남는다 — 판정이 낸 것)
+      if (phaseRef.current === '대기') cancelSceneStateEntriesAfter(gameSceneTickNow(), PRE_PITCH_STATES)
       releaseKeyOwner()
     }
     // ref 묶음은 값이 바뀌지 않는다. 고리는 handlersRef 로 읽는다 — 루프를 다시 세우는 때는 예전처럼 판정 · 0x13 고리가 바뀔 때뿐이다

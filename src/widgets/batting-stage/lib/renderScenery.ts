@@ -74,8 +74,13 @@ export interface SceneryState {
   readonly skyRow: number
   /** 하늘 칸 — 구장 +0x14 = min(경기 상태 +0x6b, 12), 0부터 (`skyColumnOfInning`) */
   readonly skyColumn: number
-  /** 타석 화면이 열린 뒤 흐른 틱 — 전광판 글자 흐름 */
+  /** 타석 화면이 열린 뒤 흐른 틱 — 하늘 조명 애니 · (아래 `scoreboardTick` 이 없으면) 전광판 글자 흐름 */
   readonly tick: number
+  /**
+   * 전광판 글자 셈 — 이 장면에서 배경을 처음 그린 그림이 0 (`sceneCloudClock.sceneScoreboardTickOf`, 구장 +0x8c 의 시작값 자리).
+   * 생략하면 `tick`
+   */
+  readonly scoreboardTick?: number
   /**
    * 구름 흐르기 0x78448 이 센 부름 수(`cloudScrollAt` 의 `calls`) — 경기 장면 동안 이어지는 셈(`model/sceneCloudClock`).
    * 생략하면 0(구름 칸 처음 자리 — 0x78448 을 안 부르는 미리보기 0xb158 따위)
@@ -374,7 +379,7 @@ function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState, 
   // 전광판 (board_ani) — 환경설정 +0x3a OFF 면 그리지 않는다 (R2-game-effects.md 6절)
   if (state.isScoreboardOn === false) return
   const box = boxes[SCOREBOARD_BOX]
-  if (shift !== null && box !== undefined) drawScoreboardText(context, box, scoreboardScrollX(box[2], state.tick), shift)
+  if (shift !== null && box !== undefined) drawScoreboardText(context, box, scoreboardScrollX(box[2], state.scoreboardTick ?? state.tick), shift)
 }
 
 /**
@@ -409,7 +414,7 @@ function drawSeasonFenceParts(
   if (state.isScoreboardOn === false) return
   const box = seasonScoreboardBoxOf(season.board)
   if (box === null) return
-  drawScoreboardText(context, box, state.scoreboardX ?? scoreboardScrollX(box[2], state.tick), shift)
+  drawScoreboardText(context, box, state.scoreboardX ?? scoreboardScrollX(box[2], state.scoreboardTick ?? state.tick), shift)
 }
 
 /** 펜스 기준에 그림 하나 — 우타 거울(`RIGHT_HANDED_MIRROR_X`)이면 캔버스를 뒤집어 같은 자리에 그린다. `shiftX` 는 안 뒤집는 옮김 */

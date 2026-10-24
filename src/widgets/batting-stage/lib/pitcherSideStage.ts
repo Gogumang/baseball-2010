@@ -1,6 +1,8 @@
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { SCENE_STATE } from '@/shared/lib/commonWindow/sceneStateEntries'
+import type { SceneStateEntry } from '@/shared/lib/commonWindow/sceneStateEntries'
 
 /**
  * **사람이 던지는 타석의 장면** — 투수편(모드 3) · 투수 미션(모드 5) · 팀 경기 수비 반 이닝.
@@ -33,7 +35,11 @@ export interface PitcherSideStageClock {
   readonly releaseTick: number | null
   /** 그 공의 경로 점 수 N */
   readonly frameCount: number
-  /** 0x12 대기 틱 (0x4e6d4 — 15, 타석이 끝났으면 31). 0 이면 0x12 를 안 지난다(맞은 공) */
+  /**
+   * 0x12 대기 문턱 (0x4e6d4 — 15, 타석이 끝났으면 31). 0 이면 0x12 를 안 지난다(맞은 공).
+   * 0x12 는 상태 틱 0 ~ 문턱의 **문턱 + 1 그림**이다(4e72c `틱 < 문턱` 이면 기다리고, 문턱 틱의 갱신이 다음 상태를 예약한다 — 타자편
+   * `resultPhaseTicksOf` 와 같은 셈)
+   */
   readonly resultTicks: number
   /** 0xd · 0xe 확인 대기 따위 — 쉬는 '대기' */
   readonly isPaused: boolean
@@ -64,11 +70,12 @@ export interface PitcherSideStageFrame {
  * - 0x11: 공을 놓은 틱 − 10 에서 들어선다. 투수 단계가 릴리스(`pitcherReleaseTicksOf`)에 닿은 틱부터 공 틱이 오르고(0x3f378),
  *   공 틱 N + 1 의 갱신이 0x12 를 예약한다(0x4e24e → 4e26c 0xbcb49). 예약한 틀은 아직 0x11 이고 다음 틀(공 틱 N + 2)이 0x12 틱 0 이다
  *   (0xbc9c8 — 예약은 다음 틀 머리에서 선다).
- * - 0x12: `resultTicks` 동안 — 공은 마지막 점(`heldBall`).
+ * - 0x12: 상태 틱 0 ~ `resultTicks`(문턱)의 문턱 + 1 그림 — 공은 마지막 점(`heldBall`).
  * - 그 밖은 '대기'(0xd~0xf · 0x10 조준 — 장면은 대기 동작이다).
  * 게이지(`PitchGradeGauge`)도 경기 장면 틱 머리마다 센다(`setGameSceneTickInterval`) — 놓은 틱은 게이지가 놓은 그 장면 틱이다.
- * ⚠️ 남은 차이: 게이지 셈은 게이지 화면이 선 장면 틱에서 시작한다 — 원본 0x11 진입 틀(예약 다음 틀, 0xbc9c8)과 같은 틀인지는 웹 화면
- * 갈래(조준 → 게이지)가 서는 때에 달렸다.
+ * 게이지는 0x10 이 0x11 을 예약한 틀에 선 것으로 보고 다음 틀 머리를 0x11 틱 0 으로 센다(0xbc9c8 bc9ec — 예약 다음 틀이 틱 0).
+ * 그 "예약한 틀" 은 조준 OK 키를 읽는 틀이다 — 조준(`AimCursor`)은 키를 받은 다음 틀 머리에서 꺼내므로(`sceneKeyLatch`, 0x498d4)
+ * 게이지가 그 틀에 서고 다음 틀 머리가 0x11 틱 0 이다.
  */
 export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSideStageFrame {
   const idle: PitcherSideStageFrame = {
@@ -87,14 +94,19 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
   const ballFrame = stateTick - pitcherReleaseTicksOf(clock.aceOrder)
   /**
    * 0x12 틱 0 의 공 틱 — 공 틱 N + 1 이 예약한 다음 틀. 맞은 공(0x12 를 안 지남, `resultTicks` 0)은 이 장면이 0x13 을 따로 그리지 않아
-   * 예전처럼 공 틱 N + 1 에서 대기로 둔다(⚠️ 근사 그대로 — 원본은 판정 틱이 0x13 을 예약한다)
+   * 예전처럼 공 틱 N + 1 에서 대기로 둔다.
+   * ⚠️ 남은 차이(r161 조사): 원본은 CPU 스윙 판정 틀(스윙 F + 2, 0xb9270 == 0)이 0x13 을 예약하고 0x13 은 타자편과 같은 길이다
+   * (`hitPause.hitPauseTicksOf` — 큰 타구는 멈춤 7 틀 포함) — 그동안 0x4cb1c 가 공 · 타자 · 타구 불꽃 파티클(게임 난수로 틱)을 그린다.
+   * 웹 투수편 화면들은 진행기가 놓는 순간(0x11 틱 10) 수비 판(`pendingDefensePlay`)을 세워 그 자리에서 수비 화면으로 넘어가므로
+   * 맞은 공의 남은 0x11 · 0x13 이 아예 안 그려진다 — 수비 화면을 0x13 끝까지 미루고 이 장면이 0x13 을 그려야 맞는다(파티클이 들면 난수
+   * 차례도 바뀐다)
    */
   const flightEndFrame = clock.frameCount + (clock.resultTicks > 0 ? 2 : 1)
   if (ballFrame < flightEndFrame) {
     return { phase: { kind: '투구중', tick: stateTick, isPaused: false }, ballFrame, pitcherTick: stateTick, pitcherTickEnd: null }
   }
   const resultTick = ballFrame - flightEndFrame
-  if (resultTick < clock.resultTicks) {
+  if (clock.resultTicks > 0 && resultTick <= clock.resultTicks) {
     return {
       phase: { kind: '결과', tick: resultTick, isPaused: false, isInPlay: false },
       ballFrame: -1,
@@ -106,6 +118,40 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
   return idle
 }
 
+/** 0x4e6e2 — 타석을 안 끝낸 공의 0x12 문턱 */
+const NOT_AT_BAT_END_RESULT_THRESHOLD = 0xf
+
+/**
+ * 공 하나의 원본 상태 경계(장면 틱) — `pitcherSideStageFrameOf` 와 같은 셈이다.
+ * 0x11 은 놓은 틱 − 10 이 틱 0, 0x12 는 0x11 의 상태 틱 `pitcherReleaseTicksOf + N + 2` 가 틱 0(공 틱 N + 1 의 갱신이 예약한 다음 틀),
+ * 0x12 문턱 갱신(0x4e6d4)이 예약한 다음 상태는 `resultTicks + 1` 틀 뒤에 선다 — 타석을 끝낸 공(문턱 0x1f)이면 0xd, 아니면 0xf.
+ * 맞은 공(`resultTicks` 0)은 이 장면이 0x13 을 따로 세우지 않아 0x11 만 적는다.
+ */
+export function pitcherSideStateEntriesOf(
+  releaseTick: number,
+  frameCount: number,
+  resultTicks: number,
+  aceOrder?: number | null,
+): SceneStateEntry[] {
+  const flightEntry = releaseTick - HUMAN_PITCH_RELEASE_STATE_TICK
+  const entries: SceneStateEntry[] = [{ tick: flightEntry, state: SCENE_STATE.투구 }]
+  if (resultTicks <= 0) return entries
+  const resultEntry = flightEntry + pitcherReleaseTicksOf(aceOrder) + frameCount + 2
+  entries.push(
+    { tick: resultEntry, state: SCENE_STATE.결과 },
+    { tick: resultEntry + resultTicks + 1, state: resultTicks > NOT_AT_BAT_END_RESULT_THRESHOLD ? SCENE_STATE.준비 : SCENE_STATE.선택 },
+  )
+  return entries
+}
+
+/**
+ * 공을 놓은 틱(0x11 틱 10)에서 0x12 틱 0 까지 — 0x11 의 상태 틱 `pitcherReleaseTicksOf + N + 2` 가 0x12 틱 0 이다
+ * (`pitcherSideStageFrameOf` 와 같은 셈). 0x12 진입 틀의 그리기(0x4ce9c — 삼진 진동 4d0ba)가 이 틱에 돈다.
+ */
+export function pitchResultEntryDelayTicksOf(frameCount: number, aceOrder?: number | null): number {
+  return pitcherReleaseTicksOf(aceOrder) - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + 2
+}
+
 /**
  * 0x12 를 지나는 판정인가 — 맞히지 못한 공(볼 · 스트라이크 · 헛스윙 · 사구)만. 맞은 공(파울 포함)은 0x13 → 0x17 로 간다.
  */
@@ -114,11 +160,12 @@ export function passesHeldResult(resolution: PitchResolution): boolean {
 }
 
 /**
- * 공을 놓은 틱(0x11 틱 10)부터 장면이 다시 '대기' 로 돌아올 때까지의 틱 — 남은 0x11(공 틱 N + 1 — 0x12 를 예약한 틀 — 까지) + 0x12 대기.
+ * 공을 놓은 틱(0x11 틱 10)부터 장면이 다시 '대기' 로 돌아올 때까지의 틱 — 남은 0x11(공 틱 N + 1 — 0x12 를 예약한 틀 — 까지) + 0x12
+ * (문턱 + 1 그림 — 정정: 예전엔 문턱 그림만 세어 0x12 의 마지막 틀(문턱 틱, 4e72c 가 다음 상태를 예약한 틀)을 빠뜨렸다).
  * 원본은 그동안 상태가 0x11 · 0x12 라 구질 키(0xf) · 견제 · '#' · 0xe 의 OK 를 받지 않는다 (키 갈래 0x53580 은 상태별 표).
  */
 export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number, aceOrder?: number | null): number {
-  return pitcherReleaseTicksOf(aceOrder) - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + (resultTicks > 0 ? 2 : 1) + resultTicks
+  return pitcherReleaseTicksOf(aceOrder) - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + (resultTicks > 0 ? 2 + resultTicks + 1 : 1)
 }
 
 /**

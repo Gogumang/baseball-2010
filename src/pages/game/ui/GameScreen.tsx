@@ -141,7 +141,8 @@ interface GameScreenProps {
  * 기록 달성 알림을 든 쪽(`app/ui/GameRoute`)이 이 화면에서 알아야 할 것.
  * - `isFrozen`: 팝업 관리자 [0x140005c]+9 — 경기 중 메뉴 · 그 하위(조작방법 · 설정)가 떠 있으면 0x52cc6 이 장면 갱신을 막아
  *   알림의 폭 · 시간 · 상태 틱과 0x12 대기 틱이 안 오른다.
- * - `key`: 상태 틱 [+0x2c] 를 0 부터 다시 세는 장면 갈래 — ⚠️ 근사(벤치 클리어링 0x1e · 1회초 판 0x18 · 0xe 대기 · 타석).
+ * - `key`: 상태 틱 [+0x2c] 를 0 부터 다시 세는 화면 갈래(벤치 클리어링 0x1e · 판 0x18 · 0xd/0xe 대기 · 타석). 타석 안의 원본 상태
+ *   경계(0xf · 0x10 · 0x11 · 0x12 · 0x13)와 0xd → 0xe 는 그 상태를 세우는 부품이 장면 틱으로 적는다(`sceneStateEntries`).
  */
 export interface RecordAlertScene {
   readonly isFrozen: boolean

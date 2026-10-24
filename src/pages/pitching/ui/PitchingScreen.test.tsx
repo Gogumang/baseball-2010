@@ -263,7 +263,10 @@ describe('투수 미션 조준 (상태 0x10) — 세션의 틱 0x39c5c 를 매 �
     ])
     // OK 는 0x11 로 갈 뿐이다(0x50ed0) — 게이지를 안 써도 0x11 의 틱 10 에 놓는다(0x4e060)
     expect(onThrow).not.toHaveBeenCalled()
+    // 게이지가 선 다음 틀 머리가 0x11 틱 0 — 틱 10 은 열한째 틀이다
     틱(10)
+    expect(onThrow).not.toHaveBeenCalled()
+    틱(1)
     expect(onThrow).toHaveBeenCalledTimes(1)
     expect(onThrow.mock.calls[0]![1]).toEqual({ x: 20585 + 60, y: 1202, z: 29705 })
     // 게이지를 안 쓴 공 — 칸 0 · 게이지 안 씀

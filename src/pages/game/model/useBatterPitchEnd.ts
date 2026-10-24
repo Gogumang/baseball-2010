@@ -35,7 +35,13 @@ export interface BatterPitchEnd {
  * - 파울 각 공(2스트라이크 번트 파울 포함)도 원본처럼 0x17 판(`startPlayerFoulPlay`)을 돌아 그 판이 끝날 때다.
  * - 볼넷 · 사구는 0x12 대기 끝(0x4e796)에 한 번, 이어 판정 A 가 보낸 밀어내기 판(0x17, `walkPlay`)이 끝날 때(0x52a60) 또 한 번 —
  *   경기 화면이 그 판을 0x12 대기(0x1f 틱) 뒤에 세우므로(`useFreePassPlayStart`) 위 두 갈래가 차례로 선다.
- * ⚠️ 근사: 0x12 대기 중에 다음 공이 판정되면(느린 속도에서 웹 결과 표시 1150ms 가 대기보다 짧다) 앞 공 끝을 그 자리에서 부른다.
+ * 때 맞춤(장면 틱): 타석 화면은 판정 틀 T 에서 `onPitchResolved` 를 부르고 0x12 는 T + 1 이 틱 0 이다(`BattingStage.showResult`).
+ * 여기 셈은 T + 1 부터 장면 틱마다 1 이라 `waitTicks`(문턱) 번째 틱 T + 문턱 이 끝나면 칸 채우기가 서고, 알림 그리기(장면 틱마다)는
+ * T + 문턱 + 1 에서 처음 그것을 본다 — 원본은 상태 틱 문턱(= T + 문턱 + 1)의 갱신 0x4e796 이 칸을 채우고 같은 틀 뒤쪽 0x4e35c
+ * (53064)가 그린다. 그린 틀이 같다.
+ * 다음 공은 이 대기 안에 판정될 수 없다 — 타석 화면의 0x12 도 문턱 + 1 그림(`resultPhaseTicksOf`)을 다 선 뒤 0xf · 0x10 16 그림을
+ * 지나야 0x11 이고, 팝업(0x52cc6)이면 둘 다 선다. 아래 겹침 처리(앞 공 끝을 그 자리에서 부름)는 예전 결과 표시가 ms 로 짧던
+ * 때의 안전판으로만 남는다.
  */
 export function useBatterPitchEnd({ isPlayShown, isFrozen }: {
   /** 수비 판(상태 0x17)이 화면에 떠 있다 — 사람 주루 판 · 재생 판 */
@@ -87,7 +93,7 @@ export function useBatterPitchEnd({ isPlayShown, isFrozen }: {
 
   const notePitchResolved = useCallback((pitch: { readonly isHit: boolean; readonly waitTicks: number }) => {
     const previous = pendingRef.current
-    // 앞 공의 0x12 대기가 아직이면 그 끝을 이번 그림에서 함께 부른다 (위 ⚠️)
+    // 앞 공의 0x12 대기가 아직이면 그 끝을 이번 그림에서 함께 부른다 (안전판 — 장면 틱 셈에서는 안 일어난다, 머리말)
     if (previous?.kind === 'wait' || previous?.kind === 'due') serialRef.current += 1
     pendingRef.current = { kind: 'resolved', isHit: pitch.isHit, waitTicks: pitch.waitTicks }
     setVersion((version) => version + 1)

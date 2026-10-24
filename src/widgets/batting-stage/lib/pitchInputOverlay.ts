@@ -345,7 +345,8 @@ function frameAfterAdvances(entries: readonly StageAnimationEntry[], advances: n
  *   4d69e  애니 1 끝 비트가 섰고 [+0x17c4] ≤ 3 이면 min(0x3b + 누른 칸, 0x43) 를 효과 1 · 인자 max(15 − 3·[+0x17c4], 0) → +1
  * ```
  * 결과 원은 위로 떠오르는 것이 아니라 **제자리에서 흐려진다**(인자 15 · 12 · 9 · 6 — 그림 무게 L/16). 예전 웹은 인자를 y 로 읽었다.
- * 웹 `decidedTicks` 는 칸을 정한 뒤 흐른 그림 수라 부름 차례 k = decidedTicks + 1 로 본다(⚠️ 근사: 게이지 틱과 장면 그림의 맞물림).
+ * 웹 `decidedTicks` 는 칸을 정한 뒤 게이지가 그린 장면 틱 수다 — 누름은 받은 다음 틀의 키 처리(`sceneKeyLatch`, 0x498d4 → 0x50e08)가
+ * 같은 틀 그리기보다 먼저 정하고 그 틀 그리기에서 1 이 되므로 부름 차례 k = decidedTicks 다(누른 틀의 그림이 k = 1 — 원본과 같다).
  */
 export function gaugeDrawsOf(
   overlay: Pick<PitchGaugeOverlay, 'cursor' | 'pressed' | 'decidedTicks'>,
@@ -365,7 +366,7 @@ export function gaugeDrawsOf(
     draws.push({ folder: SLT_FRAMES, frame: GAUGE_TARGET_FRAME, dy: 0 })
     return draws
   }
-  const call = Math.max(0, overlay.decidedTicks) + 1
+  const call = Math.max(1, overlay.decidedTicks)
   const draws: GaugeDraw[] = [{ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0, alpha: STOPPED_CURSOR_LEVEL / EFFECT_LEVELS }]
   const resultLength = tables.result.length === 0 ? DEFAULT_RESULT_ANIMATION_LENGTH : onceLength(tables.result)
   // 4d586 의 검사는 이번 그림의 진행(4d60a) 앞이라 k − 1 번 나아간 상태를 본다

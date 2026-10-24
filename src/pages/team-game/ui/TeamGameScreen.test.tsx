@@ -160,7 +160,8 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     // 게이지 그림·안내는 없고 아직 안 던졌다
     expect(게이지보임()).toBe(false)
     expect(구질보임()).toBe(false)
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
+    // 게이지가 선 다음 틀 머리가 0x11 틱 0 — 틱 10 은 열한째 틀이다
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
     expect(구질보임()).toBe(false)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     // 놓았다 — 남은 0x11 비행과 0x12 대기 동안은 원본도 다음 공 입력을 안 받는다
@@ -184,9 +185,9 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 30))
     fireEvent.keyDown(window, { key: '*' })
 
-    // 0x11 그대로 — 처음부터가 아니라 남은 다섯 틱 뒤에 놓는다
+    // 0x11 그대로 — 처음부터가 아니라 남은 여섯 틱(틱 4 까지 셌다) 뒤에 놓는다
     expect(screen.getByTestId('게이지 누름 칸').closest('[hidden]')).toBeNull()
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 4))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 5))
     expect(게이지보임()).toBe(true)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(게이지보임()).toBe(false)
