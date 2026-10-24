@@ -121,6 +121,9 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
       봤다 = screen.queryByTestId('중계-CHANGE') !== null
     }
     expect(봤다).toBe(true)
+    // 42b44~42bba: (W/2 − 98/2, H/2 − 19/2) — 반은 부호 있는 정수 나눗셈이라 (71, 151) (U-57)
+    const 그림 = screen.getByTestId('중계-CHANGE')
+    expect([그림.style.left, 그림.style.top]).toEqual(['71px', '151px'])
   })
 
   it('질문 창이 떠 있는 동안은 장면이 멈춘다 — 틱 · 갱신(0xc262c)이 안 돌고, 아니오로 닫으면 멈춘 틱부터 다시 돈다 (52cc6 0x754f9)', () => {

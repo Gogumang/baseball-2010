@@ -23,10 +23,10 @@ import type { YearCellDrawing } from '@/pages/nari-record-room/lib/nariRecordRoo
  * ```
  * 깜빡 카운터 [판+0x410] · [판+0x40c] — 판 = [장면+0xa8] 은 **전역 스킨 객체**(0xb810 이 공 무늬 0x5fd61 · 0x581dd 를 이 객체로
  * 부른다)라 칸이 앱 전체에 하나다. +0x410 을 올리는 곳은 스킨 메서드들 — 머리띠 0x54d94(바닥 비트 0x40 일 때, 0x553f2) ·
- * 0x58d10 · 0x593c8 · 0x5d054 (re.py 로 `movs #0x82; lsls #3` 전수) — 이고, 0x5796c 는 읽기만 하며(0x579ca) 0xdb 그리기
+ * 기록연감 0x2e29c · 0x58d10 · 0x593c8 · 0x5d054 (re.py 로 `movs #0x82; lsls #3` 전수) — 이고, 0x5796c 는 읽기만 하며(0x579ca) 0xdb 그리기
  * 0xafa8 은 0x5796d · 0x7f4ed(바닥 5 — 비트 0x40 없음)뿐이라 이 화면에서는 안 오른다 → 앞 화면들이 남긴 값에 멈춘다.
- * ⚠️ 미확인(남김): 그 남은 값은 앱을 켠 뒤 지나온 화면 전체에 달려 있어 웹이 들지 않는다 — 둘 다 0 으로 둔다
- * (+0x40c 를 올리는 곳은 찾지 않았다).
+ * 그 값은 웹도 앱에 하나인 `skinBlinkCounterValue()`(U-90)로 든다 — 앱을 켤 때 0, 0 으로 되돌리는 곳은 없다.
+ * ⚠️ 미확인(남김): [판+0x40c] 를 올리는 곳은 못 찾았다(상수 0x40c 를 만드는 movs/lsls · 리터럴 없음) — 0 으로 둔다.
  */
 export const RANKING_BOARD = {
   panel: { x: 15, y: 55, width: 210, height: 220 },
@@ -72,7 +72,7 @@ export function rankingColumnXOf(column: number): number {
 /** 줄 i 의 칸 y */
 export const rankingRowYOf = (row: number) => RANKING_BOARD.firstRowY + row * RANKING_BOARD.rowStep
 
-/** 판 깜빡 카운터 — ⚠️ 미확인(머리말): 웹은 0 으로 둔다 */
+/** 판 깜빡 카운터 — [판+0x410] 은 앱에 하나인 값 · [판+0x40c] 는 ⚠️ 미확인(머리말) */
 export interface RankingBlinkCounters {
   /** [판+0x410] */
   readonly drawCount: number
@@ -81,6 +81,9 @@ export interface RankingBlinkCounters {
 }
 
 export const RANKING_BLINK_AT_REST: RankingBlinkCounters = { drawCount: 0, keyCount: 0 }
+
+/** 지금 그릴 카운터 — [판+0x410] 은 앞 화면들이 남긴 값 그대로 · [판+0x40c] 는 0 (⚠️ 미확인) */
+export const rankingBlinkCountersOf = (skinBlinkCount: number): RankingBlinkCounters => ({ drawCount: skinBlinkCount, keyCount: 0 })
 
 /** 쪽 화살 x — 왼쪽(◀) · 오른쪽(▶ 뒤집기) */
 export function rankingSideArrowXOf(side: 'left' | 'right', counters: RankingBlinkCounters): number {

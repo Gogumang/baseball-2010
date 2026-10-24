@@ -151,9 +151,9 @@ export const hasDownMark = (tab: number, top: number) => top <= (DOWN_MARK_MAX_T
  * 깜박임 (0x2e2dc~0x2e2f4): 그릴 때마다 [skin+0x410] 을 1 올리고 `값 % 8 ≤ 3` 이면 켜진다.
  * 켜지면 ▲ 은 y0 + 20(꺼지면 21), ▼ 은 y0 + 116(꺼지면 115), 고른 칸 테두리 21 은 켜졌을 때만,
  * 탭 커서 9 는 탭 막대에 초점이 있을 때만 깜박인다(본문에 있으면 늘 그린다, 0x2e5be).
- * ⚠️ [skin+0x410] 은 다른 화면과 함께 쓰는 셈이라 들어올 때의 위상은 알 수 없다 — 웹은 화면 갱신 수로 센다.
+ * [skin+0x410] 은 앱에 하나라 다른 화면과 함께 센다 — 넘기는 값은 `useSkinBlinkCounter` 가 올린 뒤의 값이다(U-90).
  */
-export const isBlinkOn = (tick: number) => tick % 8 <= 3
+export const isBlinkOn = (counter: number) => counter % 8 <= 3
 
 /**
  * 탭 0·4 목록 격자 [skin+0xe0] 의 줄 커서 깜박임 — 0x7a571 이 그릴 때마다 격자 +0x18 의 `% 8 ≤ 4` 를 보고

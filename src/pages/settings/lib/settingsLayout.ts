@@ -291,9 +291,9 @@ export const MODE_RESET_ROW = {
  * `0xca911(카운터, 8) ≤ 3` 이면 [sp+0x9c] = 1 로 두고, 테두리 0x6aa65 는 그 값이 켜졌을 때만 그린다 —
  * 첫 화면(종류 8) 0x598c4 · 상세 설정(0x20) 0x5a1aa · 모드 초기화(0x21) 0x5a4ae. 8 갱신 중 4 갱신 보인다.
  * 판이 펼쳐지는 동안은 0x59548 이 0 으로 끈다 — `nextPanelFold` 참고.
- * ⚠️ 카운터의 시작 위상은 미확인이다 — skin+0x410 은 화면을 건너 이어지는 값인데, 웹은 화면마다 갱신 수를 0 부터 센다.
+ * 카운터는 앱에 하나인 [skin+0x410] 이다(앱을 켤 때 0, 화면을 건너 이어진다 — `useSkinBlinkCounter`, U-90). `counter` 는 올린 뒤의 값.
  */
-export const isSelectedOutlineShown = (updates: number) => (updates + 1) % 8 <= 3
+export const isSelectedOutlineShown = (counter: number) => counter % 8 <= 3
 
 /** 머리띠 `0x54d95(skin, 0, 5, 0)` — 제목 0 "2010프로야구" · 바닥 5(되돌아가기). 상태 8·0x20·0x21 그리기 0x2dc90 · 0x2dc48 · 0x2dc00 */
 export const SETTINGS_FRAME = { title: '2010프로야구', footer: 5 } as const

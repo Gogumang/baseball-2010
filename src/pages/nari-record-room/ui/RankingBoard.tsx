@@ -1,10 +1,11 @@
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { skinBlinkCounterValue } from '@/shared/lib/skinBlink/skinBlink'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { CommonPanel, useImgTextPalette3 } from '@/shared/ui'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { yearLabelOffsetOf, yearNumberGlyphsOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import {
-  RANKING_BLINK_AT_REST, RANKING_BOARD, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
+  RANKING_BOARD, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
 } from '@/pages/nari-record-room/lib/rankingBoard'
 import { seasonRankingValueTextOf } from '@/entities/season-mode/model/seasonRecordRanking'
 import type { SeasonRankingEntry } from '@/entities/season-mode/model/seasonRecordRanking'
@@ -62,11 +63,11 @@ export function RankingBoard({
       })}
       {hasPreviousPage && (
         <img alt="앞 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
-          style={{ ...pixel, left: rankingSideArrowXOf('left', RANKING_BLINK_AT_REST), top: arrowTop }} />
+          style={{ ...pixel, left: rankingSideArrowXOf('left', rankingBlinkCountersOf(skinBlinkCounterValue())), top: arrowTop }} />
       )}
       {hasNextPage && (
         <img alt="다음 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
-          style={{ ...pixel, left: rankingSideArrowXOf('right', RANKING_BLINK_AT_REST), top: arrowTop, transform: 'scaleX(-1)' }} />
+          style={{ ...pixel, left: rankingSideArrowXOf('right', rankingBlinkCountersOf(skinBlinkCounterValue())), top: arrowTop, transform: 'scaleX(-1)' }} />
       )}
       {Array.from({ length: RANKING_BOARD.rowCount }, (_unused, row) => {
         const entry = entries[row]

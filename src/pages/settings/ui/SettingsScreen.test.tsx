@@ -470,7 +470,8 @@ describe('환경설정 머리띠와 흰 테두리 깜빡임', () => {
   })
 
   it('흰 테두리는 그릴 때마다 +1 한 카운터 % 8 ≤ 3 일 때만 — 8 갱신 중 4 갱신', () => {
-    const shown = Array.from({ length: 8 }, (_unused, updates) => isSelectedOutlineShown(updates))
+    // 카운터는 올린 뒤의 값 — 앱을 켠 뒤 첫 그림이 1
+    const shown = Array.from({ length: 8 }, (_unused, draw) => isSelectedOutlineShown(draw + 1))
     expect(shown).toEqual([true, true, true, false, false, false, false, true])
   })
 })
