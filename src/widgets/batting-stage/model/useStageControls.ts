@@ -47,10 +47,20 @@ const RIGHT_KEYS: ReadonlySet<string> = new Set(['ArrowRight', '6'])
 const SPECIAL_SWING_KEY = '0'
 
 export function useStageControls(refs: StageRefs, actions: StageActions) {
-  const { pointerDownAtRef, latestRef } = refs
+  const { pointerDownAtRef, latestRef, keyLatch } = refs
   /** 길게 누르기 번트 타이머와 그것이 번트를 걸었는지 (모바일용, 웹판 추가) */
   const buntHoldTimerRef = useRef<number | null>(null)
   const isPointerBuntingRef = useRef(false)
+
+  /**
+   * 키는 받은 그 자리에서 처리하지 않고 키 칸(`keyLatch`)에 든다 — 원본은 키 콜백이 [+0x20] 에 적기만 하고 다음 틀의 0xbca05 →
+   * 키 0x498d4(52d9e)가 진입(52cdc) 뒤 · 갱신(52e14) 앞에서 처리한다. 루프(`useStageAnimation`)가 그 자리에서 꺼낸다.
+   * 각 동작은 받은 장면 틱 `tick` 을 받는다 — 스윙 예약의 공 틱(`keyTickOf` = 보이던 공 틱 + 1)은 그 틱으로 센다.
+   */
+  const latch = (apply: (tick: number) => void) => {
+    const tick = gameSceneTickNow()
+    keyLatch.push(() => apply(tick))
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -58,23 +68,25 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다.
       // 때는 경기 장면 틱(`gameSceneTickNow`)으로 잰다 — 단계 시작 틱과 같은 격자라야 키 틱이 맞는다
       if (isGameSceneFrozen()) return
-      const tick = gameSceneTickNow()
       if (SWING_KEYS.has(event.key)) {
         event.preventDefault()
-        actions.swing(tick)
+        latch((tick) => actions.swing(tick))
       } else if (event.key === SPECIAL_SWING_KEY) {
         // 필살타법 — 화면이 손잡이를 안 넘겼으면 원본 키만 받아 두고 아무 일도 하지 않는다
         if (actions.specialSwing === undefined) return
         event.preventDefault()
-        actions.specialSwing(tick)
+        const { specialSwing } = actions
+        latch((tick) => specialSwing(tick))
       } else if (LEFT_KEYS.has(event.key)) {
         event.preventDefault()
-        actions.moveBatter(-1)
+        // 좌우 이동 0x53470 → 0x6a4 → 0x50f86 은 키 처리 안에서 +0xfe4 를 바로 고친다 — 다음 틀의 키 자리에서 바뀌고 그 틀부터 그린다
+        latch(() => actions.moveBatter(-1))
       } else if (RIGHT_KEYS.has(event.key)) {
         event.preventDefault()
-        actions.moveBatter(1)
+        latch(() => actions.moveBatter(1))
       } else if (BUNT_KEYS[event.key] !== undefined && latestRef.current.canBunt) {
-        actions.pressBunt(BUNT_KEYS[event.key], tick)
+        const kind = BUNT_KEYS[event.key]
+        latch((tick) => actions.pressBunt(kind, tick))
       }
     }
     // 0x5364c — 뗀 키가 '7'~'9' 면 0x6a8 (종류를 가리지 않는다).
@@ -85,7 +97,8 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
     // 그래서 창 아래에서 번트 키를 떼면 0x6a8 이 안 가고, 창이 닫힌 뒤에도 자세(+0xfdc)가 남는다(원본 그대로)
     const onKeyUp = (event: KeyboardEvent) => {
       if (BUNT_KEYS[event.key] === undefined || isGameSceneFrozen()) return
-      actions.releaseBunt(gameSceneTickNow())
+      // 뗌 [+0x24] 도 다음 틀의 0xbca05(bcaf0~) → 0x5364c 가 읽는다
+      latch((tick) => actions.releaseBunt(tick))
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -93,6 +106,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸(`keyLatch`)은 부품마다 하나다
   }, [actions])
 
   useEffect(
@@ -117,7 +131,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       buntHoldTimerRef.current = setGameSceneTimeout(() => {
         buntHoldTimerRef.current = null
         isPointerBuntingRef.current = true
-        actions.pressBunt(1, gameSceneTickNow())
+        latch((tick) => actions.pressBunt(1, tick))
       }, BUNT_HOLD_MILLISECONDS)
     },
 
@@ -127,20 +141,19 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
         clearGameSceneTimeout(buntHoldTimerRef.current)
         buntHoldTimerRef.current = null
       }
-      const tick = gameSceneTickNow()
       if (isPointerBuntingRef.current) {
         isPointerBuntingRef.current = false
         // 키 '8' 떼기와 같다 — 창이 서 있는 동안 뗀 것은 버려진다(위 `onKeyUp`)
         if (isGameSceneFrozen()) return
-        return actions.releaseBunt(tick)
+        return latch((tick) => actions.releaseBunt(tick))
       }
       // 공용 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 위 `onKeyDown` 과 같다
       if (isGameSceneFrozen()) return
       const bounds = event.currentTarget.getBoundingClientRect()
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
-      if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return actions.moveBatter(-1)
-      if (x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return actions.moveBatter(1)
-      actions.swing(tick)
+      if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return latch(() => actions.moveBatter(-1))
+      if (x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return latch(() => actions.moveBatter(1))
+      latch((tick) => actions.swing(tick))
     },
   }
 }

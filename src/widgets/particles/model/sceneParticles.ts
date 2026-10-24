@@ -49,6 +49,7 @@ import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
  * 타석(`useStageAnimation`) · 수비 판(`DefensePlayback` · `DefenseParticles`) · 경기 장면의 `SceneParticleLayer`(`isGameScene`)가 이 게이트를 본다.
  */
 export {
+  claimSceneParticleTick,
   claimSceneParticles,
   clearSceneParticles,
   isSceneParticlesClaimed,

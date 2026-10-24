@@ -16,13 +16,30 @@ export const DEFAULT_SPEED_LEVEL = 2
 
 let currentSpeedLevel = DEFAULT_SPEED_LEVEL
 
+/**
+ * 틀 길이가 바뀐 **그 순간**에 부르는 손잡이 — 틱 시계(`frameClock` 의 앱 틱)가 바뀐 때 든 틱의 머리를 새 기준점으로 잡게 한다.
+ * 원본은 앱 루프 하나가 틀 길이(0x9f524)만 바꿔 그 뒤로 새 길이로 돈다 — 시계가 다음에 읽힐 때 늦게 알아채면, 공용 창 아래에서
+ * 서 있던 경기 장면처럼 늦게 읽히는 쪽만 다른 자리에 기준점을 잡는다.
+ */
+const speedChangeListeners = new Set<() => void>()
+
+/** 틀 길이가 바뀐 때 알림을 받는다 — 돌려준 함수로 끊는다 */
+export function onGameSpeedChange(listener: () => void): () => void {
+  speedChangeListeners.add(listener)
+  return () => {
+    speedChangeListeners.delete(listener)
+  }
+}
+
 export function setGameSpeedLevel(level: number): void {
   if (!Number.isInteger(level) || MILLISECONDS_PER_FRAME_BY_SPEED[level] === undefined) {
     throw new Error(
       `속도 단계는 0~${MILLISECONDS_PER_FRAME_BY_SPEED.length - 1} 정수여야 합니다 (입력값: ${level})`,
     )
   }
+  if (level === currentSpeedLevel) return
   currentSpeedLevel = level
+  for (const listener of speedChangeListeners) listener()
 }
 
 export function gameSpeedLevel(): number {

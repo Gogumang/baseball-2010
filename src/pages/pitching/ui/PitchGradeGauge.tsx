@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { GAUGE_LAST_CELL } from '@/entities/pitcher-career/model/pitchGauge'
 import {
   gaugePressedCellOf,
@@ -13,7 +14,9 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import { createGameSceneDrawGate, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval,
+} from '@/shared/lib/commonWindow/commonWindow'
 
 interface PitchGradeGaugeProps {
   /**
@@ -106,15 +109,25 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   )
   const onReleaseRef = useRef(onRelease)
   onReleaseRef.current = onRelease
+  /** 받은 키 칸 — 메시지 9(OK · '5' → 0x50e08)는 받은 다음 틀의 키 0x498d4(52d9e)가 0x11 갱신보다 먼저 처리한다(`sceneKeyLatch`) */
+  const [keyLatch] = useState(createSceneKeyLatch)
+  useEffect(() => openSceneKeyLatch(keyLatch), [keyLatch])
 
   useEffect(() => {
-    if (isPaused) return
+    if (isPaused) {
+      keyLatch.clear()
+      return
+    }
     const drawGate = createGameSceneDrawGate()
     const handle = setGameSceneTickInterval(() => {
       if (releasedRef.current) return
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 상태 틱이 안 오르고 닫히면 이어 오른다.
       // 커서 · 결과 원 틱은 그리기 0x4d2ac 가 올리는 칸이라 창이 선 첫 그림([창+0x250], 52efe)에만 한 번 더 오른다
-      if (!isGameSceneFrozen()) {
+      if (isGameSceneFrozen()) {
+        keyLatch.clear()
+      } else {
+        // 키가 먼저다 — 누른 칸 +0x17c8 은 앞 틀 그림까지 오른 커서로 정한다
+        runSceneKeys(keyLatch, gameSceneTickNow())
         tickRef.current += 1
         if (isPitchReleaseDue(tickRef.current)) {
           releasedRef.current = true
@@ -132,7 +145,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       }
     })
     return () => handle()
-  }, [isPaused])
+  }, [isPaused, keyLatch])
 
   const press = () => {
     if (releasedRef.current || isPaused || !showsGauge) return
@@ -151,11 +164,11 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       // 메시지 9 의 0x50dfa — OK(−5) · '5' 만 0x50e08 로 간다
       if (code !== KEY_OK && code !== 0x35) return
       event.preventDefault()
-      pressRef.current()
+      keyLatch.push(() => pressRef.current())
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [keyLatch])
 
   // 게이지를 안 쓰는 공 — 0x11 의 10틱만 흘려 보낸다 (그림 없음)
   if (!showsGauge) return null
@@ -166,7 +179,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       <PressArea
         {...(overlay === undefined ? {} : { rect: gaugeTapRectOf(overlay.aim, overlay.aimSide) })}
         label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}
-        onPress={press}
+        onPress={() => keyLatch.push(() => pressRef.current())}
       />
     </PressLayer>
   )

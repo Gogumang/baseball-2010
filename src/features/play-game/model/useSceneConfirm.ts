@@ -5,6 +5,7 @@ import {
   clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /**
  * 상태 0xe 에 들어선 뒤 OK 를 안 받는 갱신 수 — 키 처리 0x498d4 끝(0x49a26~0x49a30)이
@@ -182,7 +183,7 @@ export function useSceneConfirm(
 
   const stateRef = useRef({ wait, confirmed, acceptsConfirm, onConfirm })
   stateRef.current = { wait, confirmed, acceptsConfirm, onConfirm }
-  const confirm = useCallback(() => {
+  const confirmNow = useCallback(() => {
     const current = stateRef.current
     if (!current.acceptsConfirm || current.wait == null || !isUnlockedRef.current) return
     // 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 키는 창이 가져간다
@@ -194,6 +195,14 @@ export function useSceneConfirm(
     for (const listener of confirmListeners) listener()
     current.onConfirm?.()
   }, [])
+  /**
+   * OK 는 받은 그 자리에서 처리하지 않고 장면 키 칸에 넣는다 — 0xe 의 OK 는 다음 틀의 키 0x498d4 → 0x532b0 이 읽어 메시지 1 로
+   * 0xf 를 예약하고(그 다음 틀이 0xf 틱 0), 타석(`BattingStage`)이 서 있으면 그 틀에서 꺼낸다(`pushSceneKey` — 없으면 바로)
+   */
+  const confirm = useCallback(() => {
+    if (!stateRef.current.acceptsConfirm || isGameSceneFrozen()) return
+    pushSceneKey(confirmNow)
+  }, [confirmNow])
 
   useEffect(() => {
     if (!acceptsConfirm) return

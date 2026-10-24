@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
@@ -20,6 +20,8 @@ import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
+import { createSceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import type { SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -308,6 +310,11 @@ export interface StageRefs {
    */
   readonly inPlayEnteredTickRef: MutableRefObject<number | null>
   readonly pointerDownAtRef: MutableRefObject<number>
+  /**
+   * 받은 키 칸 — 키 사건 0xbca05 (`sceneKeyLatch`). 키(누름 · 뗌 · 누름 칸)는 받은 장면 틱과 함께 여기 들고, 루프가 다음 틀의 진입 뒤 ·
+   * 갱신 앞(52d9e 키 0x498d4 자리)에서 꺼내 처리한다. 화면이 받은 도루 키도 이 칸에 든다(`pushSceneKey`)
+   */
+  readonly keyLatch: SceneKeyLatch
   readonly latestRef: MutableRefObject<StageLatest>
 }
 
@@ -344,6 +351,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     particlesRef: useRef<ParticleScene>(sceneParticleScene()),
     inPlayEnteredTickRef: useRef<number | null>(null),
     pointerDownAtRef: useRef(0),
+    keyLatch: useState(() => createSceneKeyLatch())[0],
     latestRef,
   }
 }

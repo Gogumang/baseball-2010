@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isPitchSelectionDue, pitchSlotOfKey } from '@/features/play-pitcher-game/model/pitchAim'
 import { slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { PressArea } from '@/shared/ui'
@@ -6,7 +7,7 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import { isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 구질 칸 하나 — 칸 번호는 0xb6d2c 의 칸 0~5 (5 = 마구) */
 export interface PitchSlotChoice {
@@ -83,13 +84,29 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
   const isDoneRef = useRef(false)
   const propsRef = useRef({ choices, onDecide, isPaused })
   propsRef.current = { choices, onDecide, isPaused }
+  /**
+   * 받은 키 칸 — 칸 키 0x534d8 · 견제 키 0x53548(부르는 쪽이 `pushSceneKey` 로 넣는다)는 받은 다음 틀의 키 0x498d4(52d9e)가
+   * 0xf 갱신 0x39c1c(52e14~)보다 먼저 처리한다(`sceneKeyLatch`)
+   */
+  const [keyLatch] = useState(createSceneKeyLatch)
+  useEffect(() => openSceneKeyLatch(keyLatch), [keyLatch])
 
   useEffect(() => {
-    if (isPaused) return
+    if (isPaused) {
+      // 일시정지 창(0x741a0)이 서면 그 틀의 키 사건은 0x754f9 가 가져간다 — 받아 둔 키는 버린다
+      keyLatch.clear()
+      return
+    }
     const handle = setGameSceneTickInterval(() => {
       if (isDoneRef.current) return
-      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
-      if (isGameSceneFrozen()) return
+      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다(받아 둔 키는 버린다)
+      if (isGameSceneFrozen()) {
+        keyLatch.clear()
+        return
+      }
+      // 키 0x498d4 → 0x534d8 → 메시지 7(0x50da8) — 갱신 0x39c1c 보다 먼저
+      runSceneKeys(keyLatch, gameSceneTickNow())
+      if (isDoneRef.current) return
       tickRef.current += 1
       setTick(tickRef.current)
       if (!isPitchSelectionDue(tickRef.current, chosenRef.current)) return
@@ -97,7 +114,7 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
       propsRef.current.onDecide(chosenRef.current as number)
     })
     return () => handle()
-  }, [isPaused])
+  }, [isPaused, keyLatch])
 
   const press = (slot: number) => {
     if (isDoneRef.current || propsRef.current.isPaused) return
@@ -122,11 +139,11 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
       const slot = pitchSlotOfKey(event.key)
       if (slot === null) return
       event.preventDefault()
-      pressRef.current(slot)
+      keyLatch.push(() => pressRef.current(slot))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [keyLatch])
 
   return (
     <PressLayer testId="구질 누름 칸">
@@ -139,7 +156,7 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
             rect={rect}
             label={`${SLOT_KEY_LABELS[choice.slot] ?? ''} ${choice.name}`}
             isDisabled={choice.isBlocked === true}
-            onPress={() => press(choice.slot)}
+            onPress={() => keyLatch.push(() => pressRef.current(choice.slot))}
           />
         )
       })}

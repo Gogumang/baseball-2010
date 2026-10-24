@@ -1,4 +1,5 @@
 import { derbyDistanceOf } from '@/entities/home-run-derby/model/derbyRules'
+import { claimSceneParticleTick } from '@/entities/particle/model/sceneParticleManager'
 import {
   initHomeRunFireworks,
   tickHomeRunFireworks,
@@ -162,6 +163,8 @@ export interface DefenseEffectsPorts {
   /** 경기 난수 — 없으면 홈런 효과 틱 · 파티클 틱을 안 돌린다(시험 · 난수 없는 판) */
   readonly random?: RandomPort
   readonly configOf: (id: number) => ParticleConfig | null
+  /** 이 그림이 든 앱 틱 — 앱 전역 관리자는 앱 틀당 한 번만 굴린다(`claimSceneParticleTick`). 없으면 늘 굴린다 */
+  readonly appTick?: number
 }
 
 /**
@@ -204,7 +207,7 @@ export function stepDefenseEffects(
     }
   }
   // 프레임 끝 — 0x6de84
-  if (ports.random !== undefined) tickParticles(ports.particles, ports.random)
+  if (ports.random !== undefined && claimSceneParticleTick(ports.particles, ports.appTick)) tickParticles(ports.particles, ports.random)
   return { effects: { textOn, text, fireworks, displayDistance, ballBounced }, text: textFrame, distanceBoard }
 }
 

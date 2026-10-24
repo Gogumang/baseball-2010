@@ -1,4 +1,4 @@
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { millisecondsPerFrame, onGameSpeedChange } from '@/shared/config/frameRate'
 
 /**
  * **틱 시계** — 시각(ms)을 원본 게임 루프의 정수 틱(한 틱 = `millisecondsPerFrame()`)으로 센다.
@@ -49,6 +49,11 @@ export function createTickClock(): TickClock {
  * 시각은 `performance.now()`(requestAnimationFrame 시각과 같은 시계)다.
  */
 const appClock = createTickClock()
+// 속도가 바뀐 그 순간 앱 틱의 기준점을 옮긴다 — 경기 장면 틱(`commonWindow`)은 이 앱 틱에서 셈하므로 기준점이 하나다.
+// 늦게(다음에 읽힐 때) 옮기면 공용 창 아래에서 서 있던 장면 시각처럼 늦게 읽히는 쪽이 다른 자리에 기준점을 잡는다
+onGameSpeedChange(() => {
+  appClock.tickOf(performance.now())
+})
 
 /** 실제 시각 `raw` 가 드는 앱 틱 */
 export function appTickOf(raw: number): number {
