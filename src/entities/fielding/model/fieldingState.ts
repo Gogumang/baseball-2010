@@ -72,6 +72,12 @@ export interface FielderState {
   readonly arrivalSlackTicks: number
   /** 동작 잠금 카운트 (+0xb4). 0 보다 크면 다른 동작을 못 받는다 */
   readonly actionLockTicks: number
+  /** 동작 번호 (+0xa8) — vt44 0xa1234 만 바꾼다 (`fielderPose`) */
+  readonly action: number
+  /** 동작 프레임 (+0xac) — 야수 틱 머리가 하나씩 올리고 vt44 가 번호를 바꿀 때 0 (`fielderPose`) */
+  readonly actionFrame: number
+  /** 자세 워드 +0xb0 의 네 바이트 (`fielderPose.POSE` 비트). 0 이 아니면 vtC4 · vtcc 가 거짓이다 */
+  readonly pose: number
   /** 경기용 수비 능력치 등급 0~7 (0xbbe98). 칸 0(투수)은 선수가 없어 g = 2 에 맞춘 1 이다(`UNSEARCHED_FIELDER_SLOT`) */
   readonly defenseGrade: number
   /**
@@ -307,6 +313,10 @@ export function createFielders(defenseAbilities: readonly number[], teamBonus = 
       actionRemainingTicks: 0,
       arrivalSlackTicks: 0,
       actionLockTicks: 0,
+      // 판 시작 0xb0fb4 의 b112e 가 야수마다 vt10 — 동작 0 · 워드 0
+      action: 0,
+      actionFrame: 0,
+      pose: 0,
       defenseGrade: grade,
       throwSpeed,
       baseThrowSpeed: throwSpeed,

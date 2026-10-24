@@ -21,6 +21,7 @@ import { secondBaseHelperPlacement } from '@/entities/fielding/model/throwArriva
  * - 판 시작 — 종류 5 `0xb2950`(b29d0) · 종류 9 `0xb284a`(b2884) 가 예보 vt24 · 고르기 vt34 뒤에 한 번. 종류 4 `0xb28be` 는
  *   부르지 않는다(b2942 → b29ec 0xb8dbc(투수, 0xe) → b2a1e 끝).
  * - 송구 `0xb2e38` 의 꼬리 b3094 — 예보 vt24(0) · 고르기 vt34 뒤 (판 종류를 안 본다).
+ * - 다시 쏘기 `0xb3148` 의 꼬리 b32b0 — 예보 vt24(1) · 고르기 vt34 뒤 (판 종류를 안 본다). 타구 진행기는 r171 부터 두 꼬리를 다 부른다.
  *
  * 차례도 원본대로다 — b1f06(2루 커버 · +0x138 도움) → **b203a 자리 잡기** → b23a4(공 가진 야수의 목표 루) · b23dc(되찾기) · b2564
  * (커버 AI). 자리 잡기는 `assignCoversForTick` 의 `placeHelper` 로 그 사이에 끼워, 바뀐 도움 야수의 목표점 · AI 0xa 를 뒤의 셋이 본다.

@@ -14,6 +14,8 @@ import {
 } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
+import { DEFENSE_SCENE_START } from '@/features/defense-play/model/defenseScene'
+import { runWalkPlay } from '@/features/defense-play/model/walkPlay'
 import { AI_STATE, createFielders } from '@/entities/fielding/model/fieldingState'
 import { throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 import {
@@ -2431,5 +2433,62 @@ describe('공 그리기 0x36dfc 파티클 — 진행기 쪽 조건 (큰 타구 0
     const 쥔때 = 결과.ticks.filter((view) => view.ball.isHeld === true)
     expect(쥔때.length).toBeGreaterThan(0)
     for (const view of 쥔때) expect(view.ballParticles?.bounceNextHeight ?? null).toBeNull()
+  })
+})
+
+describe('야수 자세 워드 +0xb0 · 판을 넘는 플레이 +0xf0 (r171)', () => {
+  it('바운드 전 낮은 공(종류 2) 포구 뒤 송구는 준비 틱(내야 3)이 아니라 워드가 지워진 포구 + 4 틱에 나간다', () => {
+    // 동작 시작 S = 포구 C − 1 · vt60 의 +0xb3 은 프레임 5(S + 5 = C + 4)의 야수 틱이 지운다 — 그때까지 vtC4 가 거짓
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([73, 1200, 100, 0]),
+      bases: { first: true, second: true, third: false },
+      outs: 0,
+      controls: 계속누름('수비', '6'),
+    })
+    expect(결과.log).toContain('5틱 0번 야수가 잡았다 (종류 2)')
+    expect(결과.log.some((line) => line.startsWith('9틱 1루로 송구'))).toBe(true)
+    expect(결과.log.some((line) => line.startsWith('8틱 1루로 송구'))).toBe(false)
+  })
+
+  it('가슴 높이(종류 1) 포구는 워드가 C + 3 에 지워져 내야 준비 틱과 같다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([75, 1732, 371, 0]),
+      bases: { first: true, second: true, third: false },
+      outs: 0,
+      controls: 계속누름('수비', '6'),
+    })
+    expect(결과.log).toContain('6틱 3번 야수가 잡았다 (종류 1)')
+    expect(결과.log.some((line) => line.startsWith('9틱 1루로 송구'))).toBe(true)
+  })
+
+  it('넓은 파울 각으로 열린 판(state[7] = 0)은 앞 판이 남긴 +0xf0 을 그대로 두고 끝에 다음 판으로 넘긴다', () => {
+    const 남은커버 = [8, 7, 6, 5]
+    const 입력 = (pattern: BattedBallPattern, resultCode: number): DefensePlayInput => ({
+      outcome: registerContact(땅볼아웃, { pattern, resultCode }),
+      trajectory: battedBallTrajectory(pattern),
+      bases: 주자1루,
+      outs: 0,
+      scene: { ...DEFENSE_SCENE_START, playCovers: 남은커버 },
+    })
+    // 각 311 — 넓은 쐐기 밖 파울: 판 시작 vt30 이 머리에서 끝나고 판 도중에도 안 돈다
+    expect(startDefensePlay(입력([311, 273, 247, 1], 9)).play.coverOfBase).toEqual(남은커버)
+    expect(runDefensePlay(입력([311, 273, 247, 1], 9)).scene.playCovers).toEqual(남은커버)
+    // 페어 땅볼은 b1cdc 가 기본 표를 베껴 다시 고른다
+    const 페어 = startDefensePlay(입력([51, 435, 315, 1], 1))
+    expect(페어.play.coverOfBase).not.toEqual(남은커버)
+  })
+
+  it('밀어내기(종류 2)는 +0xf0 을 안 건드린다 — vt1c 0xb0edc 도 안 지운다', () => {
+    const 남은커버 = [1, 2, 3, 4]
+    const result = runWalkPlay({
+      bases: EMPTY_BASES,
+      outs: 0,
+      pitchJudgement: 4,
+      runAbility: 500,
+      scene: { ...DEFENSE_SCENE_START, playCovers: 남은커버 },
+    })
+    expect(result.scene.playCovers).toEqual(남은커버)
   })
 })

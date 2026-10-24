@@ -48,6 +48,14 @@ export interface DefenseScene {
   readonly zoomPunch: ZoomPunchState
   /** deadly_effect 애니 0 — 경기 내내 되감기지 않는다 */
   readonly deadlyAnim: DeadlyAnimState
+  /**
+   * **플레이 객체 +0xf0 — 루 0~3 의 커버 야수 번호** (r171, 직접 뜬 것). 플레이 객체는 경기 장면과 함께 한 번 만들어지고(new(0x1fc)
+   * 0x3e756 의 memset 0 · 생성자 0xb0b68 은 이 칸을 안 적는다) 판마다 지워지지 않는다. +0xf0 에 쓰는 곳은 커버 0xb1c90 의 b1cdc(기본 표
+   * 0xd8764 베끼기)와 그 뒤 줄들 · 견제 시작 0xb28be 의 b2938 · 도루 시작 0xb2950 의 b29aa(둘 다 [1, 2, 3, 4]) · 루로 보내기 0xb2a48 뿐이다.
+   * 그래서 타구 판이 state[7] == 0(넓은 파울 각)으로 열려 판 시작 vt30 이 머리에서 끝나면 +0xf0 은 **앞 판이 남긴 값**이고, 밀어내기
+   * (종류 2 · 3 — vt4c 도 vt30 도 안 돈다)도 그 값을 그대로 둔다. 진행기는 끝날 때 제 +0xf0 을 여기에 적는다
+   */
+  readonly playCovers: readonly number[]
 }
 
 /** deadly_effect 애니 0 의 상태 칸 (애니 +8 객체의 [0] 칸 · [2] 비트) — 지연 0 이라 셈 칸은 늘 0 이다 */
@@ -72,6 +80,8 @@ export const DEFENSE_SCENE_START: DefenseScene = {
   slideDirection: 0,
   zoomPunch: NO_ZOOM_PUNCH,
   deadlyAnim: { frameIndex: 0, playing: false, ended: false },
+  // new(0x1fc) 의 memset 0
+  playCovers: [0, 0, 0, 0],
 }
 
 /**
