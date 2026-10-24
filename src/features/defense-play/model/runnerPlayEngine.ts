@@ -1095,7 +1095,8 @@ function* runnerPlaySteps(
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene,
+    // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`, r171)
+    scene: { ...scene, playCovers: play.coverOfBase },
     rundowns: 0,
     rundownOuts: 0,
     runnerFates: runners.map((runner) => runnerFateOf(runner.state)),

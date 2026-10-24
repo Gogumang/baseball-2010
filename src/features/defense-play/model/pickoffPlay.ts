@@ -1010,7 +1010,8 @@ function* pickoffPlaySteps(
     specialDefense: { jumpUnlocked: false, slideUnlocked: false },
     laserThrow: false,
     laserOutFlag,
-    scene,
+    // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`, r171)
+    scene: { ...scene, playCovers: play.coverOfBase },
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)

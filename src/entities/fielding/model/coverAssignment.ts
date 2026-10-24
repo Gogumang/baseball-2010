@@ -1,3 +1,4 @@
+import { isFreeToRetarget } from '@/entities/fielding/model/fielderPose'
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
@@ -67,23 +68,12 @@ import {
  *   타자주자는 +0x8c == 0 이라 루 1 은 "루 r−1 의 주자" 로 어차피 선다
  * - 머리 관문 state[7] · 홈런(+0x111 · +0x129 && 공 틱 > 담장 틱, b1ca2)은 `coverTick.runCoverTick` 의 `gateClosed` 로 본다(r164).
  *   +0x110 은 b1c90 머리 관문이 아니다(b2564 줄의 +0x110 == 0 만 — 아래)
- * - b1d96 의 H.vtcc()(0xa2138 = +0xb0 워드 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0, 직접 뜬 것) 중 **동작 잠금 +0xb4**(필살타법 타구에
- *   맞은 야수 vte4 0xa1e60 의 15)와 +0xcc 는 옮겼다(r158). vt30 은 AI 고리 vt4c 0xb45dc 끝(b4c72)이라 이 틱 머리 야수 틱이 줄인 값이다.
- *   ⚠️ 근사: +0xb0 워드(바이트 +0xb0~+0xb3 — 포구 · 다이빙 동작 vt 0xa1490(동작 7) · 0xa14ac(0xe) · 0xa1e28(6) · 0xa1ec4/0xa1f00
- *   (8~0x12) 가 1, 던지기 a1a3a 가 +0xb1 = 1, 야수 틱 a13a6~a143e 가 동작 칸 · +0xac 로 지운다)는 동작 번호 +0xa8 을 웹이 안 두어
- *   0 으로 본다 — 공 쫓는 유격수가 포구 동작을 시작한 뒤의 2루 막힘이 원본보다 늦게(안) 선다.
- *   지우는 규칙(a137a~a1456, r162 직접 뜸 — +0xac 는 동작 프레임으로 야수 틱 머리 a1288 이 매번 +1, 잠금 +0xb4 > 0 인 틱은 a12c6 에서 끝):
- *   동작 0xe~0x12 면 0xe 는 프레임 0xf · 0xf~0x12 는 프레임 0xc 에서만 지운다(a141c~a143c). 그 밖의 동작은 (7 · 프레임 5) ·
- *   (0xe · 0xf) · (5 · 2) · (6 · 2) · (+0xb3 && 프레임 5) 중 하나거나 **vtc8(0xa2118 = +0xb1 == 0 && +0xcc ≤ 0)이 참이면** 지운다
- *   (a13f2~a141a) — 곧 가슴 높이 포구(7)가 세운 +0xb0 은 던진 뒤 잠금 +0xb1 · +0xcc 가 없으면 다음 야수 틱에 바로 지워진다.
- *   지울 때 +0xb0 · +0xb1 · +0xb2 · +0xb3 = 0 · vt10(a143e~a1456).
- *   세터를 부르는 곳(r164 직접 뜸 — 야수 vtable 0xd7934 의 +0x5c · +0x60 · +0x90 · +0x94 · +0x98 을 부르는 곳은 이 한 곳뿐):
- *   플레이 틱 0xb401c 의 b4134~b419c — 공 틱이 동작 시작 틱(플레이+0x176)이면 포구 종류 +0x16c 로 표 0xd87f4 를 뛰어 잡을 야수에게
- *   종류 0 → vt94 0xa1e28(동작 6 · **+0xb2** = 1) · 1 → vt5c 0xa1490(동작 7 · **+0xb0** = 1) · 2 → vt60 0xa1ed8(동작 8~0xb · **+0xb3** = 1) ·
- *   3 → vt90 0xa14ac(동작 0xe · **+0xb0** = 1, 플레이+0x1f7 = 1) · 4 → vt98 0xa1e9c(동작 0xf~0x12 · **+0xb3** = 1, 플레이+0x1f8 = 1).
- *   곧 모든 포구 종류가 동작 시작 틱에 워드를 세운다 — 그 틱의 vt30(b1c90)은 그 야수(공 가진 야수 H 가 추적 야수)를 막힘으로 본다.
- *   ⚠️ 남은 근사: 같은 워드를 vtC4(0xa20ec — 던질 준비)도 읽어 점프 · 슬라이딩 포구(프레임 0xf · 0xc 까지 남음)의 송구 시각까지 바뀌고,
- *   지우는 규칙이 동작 번호 +0xa8(쥐기 뒤 바뀔 수 있음)을 봐서, 동작 칸 없이 반쪽만 옮기지 않았다
+ * - b1d96 의 H.vtcc()(0xa2138 = +0xb0 워드 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0, 직접 뜬 것)는 `fielderPose.isFreeToRetarget` 로 다 본다(r171).
+ *   vt30 은 AI 고리 vt4c 0xb45dc 끝(b4c72)이라 이 틱 머리 야수 틱이 줄이고 지운 값이다. 워드를 세우는 곳은 포구 동작 시작 b4134~b419c
+ *   (표 0xd87f4 — 모든 포구 종류) · 뜬공 기다리기 vt9c(b4130) · 던지기(+0xb1)이고, 지우는 규칙은 야수 틱 a137a~a1456 이다
+ *   (`fielderPose` 머리말). 곧 공 쫓는 유격수가 포구 동작을 시작한(또는 뜬공 밑에서 기다리는) 동안 2루가 막힌다.
+ *   정정(r171): 예전 주석의 "vtc8 이 참이면 지운다"는 거꾸로다 — a1412 `bl vtc8` · a141a `beq a143e` 라 **거짓**(+0xb1 · +0xcc)일 때
+ *   지운다(U-78 에뮬 확인과 같다). 가슴 높이 포구(7)의 +0xb0 은 프레임 5 까지 남는다
  * - +0x94 는 웹의 `requiredBase ≠ −1` 로 읽는다(0xa95e8 · 0xa9620 이 둘을 함께 세우고 지운다)
  */
 
@@ -235,8 +225,8 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
   // ── b1d96~b1f06: 2루 커버와 도움 ──
   const second = fielders[3]
   const short = fielders[5]
-  // b1d96~b1dc8 — 막힘 = 2루수 AI 1 || (유격수 AI 1 && !H.vtcc()) · H = +0x130(b1d0a 의 r5). +0xb0 워드는 0 으로 본다(머리말 ⚠️)
-  const holderReady = holder === undefined || (holder.actionLockTicks <= 0 && holder.arrivalSlackTicks <= 0)
+  // b1d96~b1dc8 — 막힘 = 2루수 AI 1 || (유격수 AI 1 && !H.vtcc()) · H = +0x130(b1d0a 의 r5) — vtcc 는 자세 워드까지 본다(r171)
+  const holderReady = holder === undefined || isFreeToRetarget(holder)
   const blocked = second?.aiState === AI_STATE.CHASE || (short?.aiState === AI_STATE.CHASE && !holderReady)
   let cover: number
   let helper: number
