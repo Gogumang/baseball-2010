@@ -117,6 +117,11 @@ describe('leagueSideOf — 홈/원정 배정 (0xb7844, R1 1절)', () => {
   it('23일째부터 한 번 더 뒤집는다 (`d > 0x16`)', () => {
     // 22 와 31 은 같은 요일(주기 위치)인데 22 는 뒤집기 전, 31 은 뒤집은 뒤다
     expect(leagueSideOf(22, 0)).toBe(1 - leagueSideOf(22 + 18, 0))
+    // 경계(b788c `cmp r4, #0x16 ; ble`): 22 는 같은 바퀴(18~26)의 4일차와 같고, 23 부터 5일차와 반대다
+    for (let team = 0; team < 10; team += 1) {
+      expect(leagueSideOf(22, team)).toBe(leagueSideOf(4, team))
+      expect(leagueSideOf(23, team)).toBe(1 - leagueSideOf(5, team))
+    }
   })
 
   it('짝 중 번호가 큰 쪽이 r7 을 받는다 — 첫날은 번호 큰 쪽이 원정이다', () => {
