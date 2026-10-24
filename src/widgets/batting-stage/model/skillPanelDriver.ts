@@ -32,6 +32,11 @@ export interface SkillPanelFrame {
   readonly batterHand: number
   /** 0xd 진입 0x445cc · 0x3d160 이 보는 경기 상황 — 0xd 진입을 처음 지나는 0xf 에서만 부른다 */
   readonly situation: () => SkillPanelSituation
+  /**
+   * 창이 선 첫 그림([창+0x250]) — 52efe 가 갱신 없이 HUD 0x4c4bc 를 한 번 더 돌려 0x4b5b4 가 한 번 더 돈다. 틱은 안 흘러 `nowTick` 은
+   * 마지막 그림 그대로이고, 판을 한 번 더 돌릴 뿐 마지막으로 센 틱은 안 바꾼다(`stageRedraws`)
+   */
+  readonly extraDraw?: boolean
 }
 
 /** 0xf 밖이라는 표지 */
@@ -76,8 +81,8 @@ export function createSkillPanelDriver(): (frame: SkillPanelFrame) => SkillPanel
       lastTick = -1
       return null
     }
-    const steps = lastTick < 0 ? 1 : Math.min(SKILL_PANEL_CATCH_UP_LIMIT, frame.nowTick - lastTick)
-    lastTick = frame.nowTick
+    const steps = frame.extraDraw === true ? 1 : lastTick < 0 ? 1 : Math.min(SKILL_PANEL_CATCH_UP_LIMIT, frame.nowTick - lastTick)
+    if (frame.extraDraw !== true || lastTick < 0) lastTick = frame.nowTick
     const drawSource = { batterHand: frame.batterHand, isDefenseCpu: source.isDefenseCpu ?? true }
     for (let step = 0; step < steps; step += 1) {
       const { view, next } = stepSkillPanel(scene.panel, drawSource, scene.arrowDraws)

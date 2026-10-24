@@ -74,6 +74,12 @@ describe('투수 그리기의 홈런 갈래 (0x3908a~0x39192)', () => {
     })
   })
 
+  it('창이 선 첫 그림([창+0x250])도 이 갈래를 돌아 애니 12 · 13 이 한 칸 더 간다 — 홈런성 코드를 본 그림만 (r178)', () => {
+    expect(pitcherHomeRunMarksOf({ ...base, pitcherTick: 34, redrawPitcherTicks: [32] })?.drawCall).toBe(6)
+    // 판정 앞(코드가 아직 홈런성 아님) · 지금 뒤의 자리는 안 센다
+    expect(pitcherHomeRunMarksOf({ ...base, pitcherTick: 34, redrawPitcherTicks: [29, 35] })?.drawCall).toBe(5)
+  })
+
   it('감상 플래그(+0x199a)가 없으면 "!" 는 안 그린다', () => {
     expect(pitcherHomeRunMarksOf({ ...base, isBigHit: false })?.showsBang).toBe(false)
   })

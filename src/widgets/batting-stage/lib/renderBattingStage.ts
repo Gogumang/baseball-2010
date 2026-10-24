@@ -66,6 +66,7 @@ import { GAUGE_TARGET_FRAME, drawPitchInputSprites, drawPitchInputUnderlay, draw
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { BATTER_SIDE, STAGE_HEIGHT, STAGE_SIDE, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
+import { drawCallWithRedraws, redrawsBetween, redrawsUpTo } from '@/widgets/batting-stage/lib/stageRedraws'
 import {
   MISTAKE_MARK_ANIMATION,
   MISTAKE_MARK_OFFSET_Y,
@@ -125,6 +126,12 @@ export interface StageScene {
   readonly pitcherHitMark?: (PitcherResultCodeClock & { readonly isBigHit: boolean }) | null
   /** 화면이 열린 뒤 흐른 틱 — 대기 동작 · 전광판 글자 (구름은 `scenery.cloudCalls`) */
   readonly tick: number
+  /**
+   * 창이 선 첫 그림([창+0x250] — 52efe 가 갱신 없이 그리기 표를 한 번 더 돈 그림)이 든 장면 틱(`tick` 과 같은 격자). 그 그림은 그리기
+   * 쪽에서 넘기는 애니(루상 주자 · 투수 덧그림 · 필살 스윙 그림 · 판정 글자 · 램프 확대 · 하늘 조명)를 한 칸 더 넘긴다(`stageRedraws`).
+   * 안 주면 없음
+   */
+  readonly redrawTicks?: readonly number[]
   /**
    * 루상 주자 애니 1 · 2 · 3 루의 지금 진행 수 — 장면에 남는 애니 시계(`stepRunnerAnimationClock`). 안 주면 `tick`(시험 · 옛 호출)
    */
@@ -275,9 +282,12 @@ export function renderBattingStage(
 ): void {
   const side = scene.side ?? STAGE_SIDE
   const backdropOffsetY = scene.resultBackdropOffsetY ?? null
+  /** 이 그림까지 든 창 첫 그림 수 — 장면이 사는 동안 도는 그리기 쪽 애니(하늘 조명 0x78490 · 램프 확대 0x37828)에 더한다 */
+  const redrawsSoFar = redrawsUpTo(scene.redrawTicks, scene.tick)
   drawScenery(context, {
     ...scene.scenery,
-    tick: scene.tick,
+    // 하늘 조명 0x78490 은 배경 0x41230 그림마다 한 칸(78542 0x93d91) — 창 첫 그림도 배경을 그린다(전광판 셈은 `scoreboardTick`)
+    tick: scene.tick + redrawsSoFar,
     side,
     // 하늘 칸 = 경기 상태 +0x6b(0부터 세는 이닝) — 1회가 칸 0
     skyColumn: scene.skyColumn ?? skyColumnOfInning(scene.hud?.inning ?? 1),
@@ -299,7 +309,8 @@ export function renderBattingStage(
   drawEffectPitcher(context, aceEffect, side)
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
-    drawBaseRunners(context, scene.hud, side, scene.tick, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
+    // 주자 시계를 안 넘기는 옛 길(`tick`)도 창 첫 그림(0x35b94 35c62 한 칸)을 센다 — 시계를 넘기면 부르는 쪽이 이미 셌다
+    drawBaseRunners(context, scene.hud, side, scene.tick + redrawsSoFar, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
   }
   const pitcherAnimation = pitcherAnimationAt(
     {
@@ -319,7 +330,10 @@ export function renderBattingStage(
   drawPitcherHomeRunMarks(context, scene, side, pitcherAnimation)
   // 0x46fa8(장면, 0) 붕붕머신 · 발렌타인 — 깊이 24501 이라 투수 덧그림(24500)들 다음 · 타자(29705) 앞이다
   drawAceMagicAnimation(context, aceEffect, side)
-  const special = scene.specialSwingEffect ?? null
+  const tickSpecial = scene.specialSwingEffect ?? null
+  // 49d50 애니 0 은 그림마다 한 칸 — 부르는 쪽은 장면 틱으로 센 수를 넘기고 창 첫 그림은 여기서 더한다(`stageRedraws`)
+  const special =
+    tickSpecial === null ? null : { ...tickSpecial, drawCall: drawCallWithRedraws(tickSpecial.drawCall, scene.tick, scene.redrawTicks) }
   // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
   if (special !== null && special.isBehindBatter) drawSpecialSwingPicture(context, special)
   drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder)
@@ -358,7 +372,8 @@ export function renderBattingStage(
   drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
-    drawHud(context, scene.hud, scene.tick)
+    // 램프 확대 0x37828 은 HUD 그리기 0x4c4bc(4c50c)가 부른다 — 창 첫 그림도 타이머를 한 번 더 줄인다(그림 번호로 넘긴다)
+    drawHud(context, scene.hud, scene.tick + redrawsSoFar)
   }
   // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
   // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
@@ -377,11 +392,11 @@ export function renderBattingStage(
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
-    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, scene.resultTick, side)
+    else if (!scene.isHomeRun && scene.resultText !== '') drawResultText(context, scene.resultText, resultDrawTickOf(scene), side)
   } else if (scene.isHomeRun) {
     drawHomeRunBanner(context, scene.homeRunTick)
   } else if (scene.resultText !== '') {
-    drawResultText(context, scene.resultText, scene.resultTick, side)
+    drawResultText(context, scene.resultText, resultDrawTickOf(scene), side)
   }
   // 파티클은 상태 그리기가 다 끝난 뒤 — 장면 그리기 0x52c50 의 53050~53060(0x6de85 · 0x6dd69), 그 뒤 0x4e35c(기록 알림 따위)
   if (scene.particles !== null && scene.particles !== undefined) {
@@ -495,8 +510,24 @@ function drawHalfShaded(context: CanvasRenderingContext2D, image: HTMLImageEleme
   context.drawImage(recoloredImageOf(image, DRAW_EFFECT.HALF_MIX, 0), x, y)
 }
 
+/**
+ * 판정 글자 애니(0x393b4 3946c — 0x12 그리기 0x4ce9c 의 0x39504)의 칸 셈 — 판정 글자가 뜬 뒤 틱에 그 사이 창 첫 그림 수를 더한다
+ * (`stageRedraws`)
+ */
+function resultDrawTickOf(scene: StageScene): number {
+  return scene.resultTick + redrawsBetween(scene.redrawTicks, scene.tick - scene.resultTick, scene.tick)
+}
+
+/** 창 첫 그림 자리를 투수 틱 격자로 — 이 그림(투수 틱 `pitcherTick`)까지 든 것만 */
+function pitcherRedrawTicksOf(scene: StageScene, pitcherTick: number): readonly number[] {
+  const offset = scene.tick - pitcherTick
+  return (scene.redrawTicks ?? []).filter((at) => at <= scene.tick).map((at) => at - offset)
+}
+
 function drawPitcherMistakeMark(context: CanvasRenderingContext2D, scene: StageScene, side: number): void {
-  const drawCall = scene.pitcherMistakeMarkDraw ?? null
+  // 38ef6 — 남은 수 +8 을 그림마다 1 준다 · 38f3c 애니 13 한 칸: 창 첫 그림도 센다(`stageRedraws`)
+  const tickDraw = scene.pitcherMistakeMarkDraw ?? null
+  const drawCall = tickDraw === null ? null : drawCallWithRedraws(tickDraw, scene.tick, scene.redrawTicks)
   if (!showsPitcherMistakeMark(scene.scenery.gameMode, drawCall) || drawCall === null) return
   const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[MISTAKE_MARK_ANIMATION]
   const step = entries === undefined ? null : pitcherFatigueFrameAt(entries, drawCall)
@@ -520,7 +551,9 @@ function drawPitcherFatigue(context: CanvasRenderingContext2D, scene: StageScene
   const animation = pitcherFatigueAnimationOf(stamina)
   if (!shows || animation === null) return
   const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[animation]
-  const step = entries === undefined ? null : pitcherFatigueFrameAt(entries, (scene.stagePhase?.tick ?? scene.tick) + 1)
+  // 체력 애니 9 · 10 은 0xf 진입이 되감은 뒤 그림마다 한 칸 — 창 첫 그림도 센다(`stageRedraws`)
+  const fatigueDraw = drawCallWithRedraws((scene.stagePhase?.tick ?? scene.tick) + 1, scene.tick, scene.redrawTicks)
+  const step = entries === undefined ? null : pitcherFatigueFrameAt(entries, fatigueDraw)
   const placed = step === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, step.frame)
   if (step === null || placed === null) return
   const anchor = stageLayoutOf(side).pitcherAnchor
@@ -619,13 +652,15 @@ function drawPitcher(
 
 /** 투구 바람 줄(0x38dc6~0x38e5e)을 `pitchWindDrawCallOf` 로 보고 player_effect 애니 11 을 투수 점 옆 8 에 그린다 */
 function drawPitchWind(context: CanvasRenderingContext2D, scene: StageScene, side: number, animation: PitcherAnimation): void {
-  const drawCall = pitchWindDrawCallOf({
+  const tickDraw = pitchWindDrawCallOf({
     state: animation.state,
     step: animation.step,
     pitcherTick: scene.pitcherTick,
     aceOrder: scene.acePitcher?.order ?? null,
   })
-  if (drawCall === null) return
+  if (tickDraw === null) return
+  // 38e5a 애니 11 은 그림마다 한 칸 — 창 첫 그림도 센다(`stageRedraws`)
+  const drawCall = drawCallWithRedraws(tickDraw, scene.tick, scene.redrawTicks)
   const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[PITCH_WIND_ANIMATION]
   const frameIndex = entries === undefined ? null : judgeFrameAt(entries, drawCall)
   const anchor = stageLayoutOf(side).pitcherAnchor
@@ -659,6 +694,8 @@ function drawPitcherHomeRunMarks(
           pitcherTick: scene.pitcherTick,
           step: animation.step,
           aceOrder: scene.acePitcher?.order ?? null,
+          // 창 첫 그림의 투수 틱 — 그 그림도 홈런 갈래(39084 · 3925e 의 0x93d91)를 돈다(`stageRedraws`)
+          redrawPitcherTicks: pitcherRedrawTicksOf(scene, scene.pitcherTick),
         })
   if (marks === null) return
   const animations = frameAnimations(PLAYER_EFFECT_FRAMES)

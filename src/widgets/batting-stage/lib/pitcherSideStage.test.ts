@@ -162,6 +162,14 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
     expect(hitEndTickOf({ ...hit, ticks: -5 })).toBe(0)
   })
 
+  it('큰 타구 멈춤 중 창이 선 첫 그림([창+0x250])이 [+0x10a8] 을 한 번 더 줄이면 막음이 일찍 풀려 0x17 도 그만큼 이르다 (r178)', () => {
+    // 창 그림이 없으면 문턱 그대로 · 0x13 틱 3 뒤 창 그림 하나 — 막음을 틱 6 그림이 푼다
+    expect(hitEndTickOf({ ...hit, ticks: 30 })).toBe(30)
+    expect(hitEndTickOf({ ...hit, ticks: 30, frozenDraws: [3] })).toBe(29)
+    // 건너뛰기 틱이 더 이르면 그 틱
+    expect(hitEndTickOf({ ...hit, ticks: 30, frozenDraws: [3], skipTick: 4 })).toBe(4)
+  })
+
   it('판정 공 틱 — 스윙은 F + 1(스윙이 나간 다음 틀), 번트는 N − 1 (0x4e15c)', () => {
     const pattern = [90, 900, 300, 0] as const
     const contact = { pattern, resultCode: 10 }

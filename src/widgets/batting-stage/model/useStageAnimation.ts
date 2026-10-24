@@ -62,6 +62,7 @@ import {
   SCENE_STATE, cancelSceneStateEntriesAfter, markSceneStateEntries, sceneStateEntryAt,
 } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
+import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import {
   createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
@@ -165,6 +166,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      */
     const localRunnerClock = createRunnerAnimationClock()
     let runnerTick = -1
+    /**
+     * 창이 선 첫 그림([창+0x250])이 든 장면 틱 — 그 그림은 그리기 쪽 애니(투수 덧그림 · 필살 스윙 그림 · 판정 글자 · 램프 확대 · 하늘 조명)를
+     * 한 칸 더 넘기고 그 앞당김이 남는다. 그림 입력에 실어 `renderBattingStage` 가 센다(`stageRedraws`)
+     */
+    let redrawTicks: readonly number[] = []
     /** 구름 셈(`sceneCloudClock`)에서 이 루프가 마지막으로 본 그림 */
     const cloudCursor = createCloudFrameCursor()
     // 파티클 파트 그림은 연출이 뜨기 전에 받아 둬야 첫 연출이 보인다
@@ -587,7 +593,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       }
     }
     /** 이 그림의 판 — 0xd · 0xf 진입을 보고 원본 틱마다 0x4b5b4 를 한 번 돌린다. 그리지 않는 상태면 null */
-    const stepSkillPanelNow = (nowTick: number): SkillPanelView | null => {
+    const stepSkillPanelNow = (nowTick: number, extraDraw = false): SkillPanelView | null => {
       const latest = latestRef.current
       const source = latest.skillPanel
       if (source === undefined) return null
@@ -604,6 +610,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         batterRecordSlot: latest.batterRecordSlot,
         batterHand: latest.batterHand ?? batterSideOfForm(latest.batterForm),
         situation: skillPanelSituationNow,
+        extraDraw,
       })
     }
 
@@ -649,7 +656,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 전광판 셈과 0x13 그리기 0x4cb1c 의 큰 타구 셈 [+0x10a8] · 애니 3 칸(`bigHitReleaseTickOf` — 막음을 푼 그림이면 016 도)만 고쳐
       // 한 번 다시 그린다(r175). 다른 상태의 그리기 쪽 셈은 그 부품이 센다 — 0x10 조준 애니 0 칸(`AimCursor`) · 0x11 커서 0x4d708 /
       // 결과 원 0x4d700(`PitchGradeGauge`) · 점수판 0x36714 목표 줄(`MissionHud`) · 더비 콤보 [+0x19ec](`useHomeRunDerby`).
-      // ⚠️ 미구현: 이 그림 안 타자 · 투수 · 주자 그림 객체의 애니 칸(그리기에서 넘기는 0x93d91 몫)은 앞 그림 그대로 둔다
+      // 그리기에서 0x93d91 로 넘기는 애니(r178 — `stageRedraws`): 루상 주자 0x35b94(35c62) 는 주자 시계를 한 번 더 돌리고, 투수 덧그림
+      // 0x38d1c(바람 줄 · 실투 "!" · 체력 · 홈런 갈래) · 필살 스윙 그림 0x49aec · 판정 글자 0x393b4 · 램프 확대 0x37828 · 하늘 조명 0x78490
+      // 은 이 그림의 틱을 `redrawTicks` 에 실어 그리기가 센다. 경기 스킬 표시 판 0x4b5b4 도 한 번 더 돈다. 타자 · 투수 몸통(스윙 3f320 ·
+      // 투수 0x9e004)은 갱신에서 넘어가 그대로다.
       if (isGameSceneFrozen()) {
         // 창이 서 있는 틀은 키 0x498d4 가 안 돌고 다음 틀 0xbca05 머리가 받은 키를 지운다 — 모아 두지 않는다
         keyLatch.clear()
@@ -671,11 +681,29 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             if (frozenBigHitScreen?.kind === '멈춤' && frozenBigHitScreen.counter < 0) emitHitStopParticle(frozenHit.pending)
             frozenHit.frozenDraws.push(lastHeld)
           }
+          redrawTicks = withRedrawAt(redrawTicks, frozenScene.tick)
+          // 0x35b94 35c62 — 루에 (숨김 없이) 주자가 선 애니가 한 칸 더 간다(0x13 은 그리지 않고 진행만)
+          const frozenHud = frozenScene.hud
+          const frozenRunnerSteps =
+            frozenScene.runnerAnimationSteps === undefined || frozenHud === null
+              ? frozenScene.runnerAnimationSteps
+              : stepRunnerAnimationClock(
+                  latestRef.current.runnerAnimationClock?.current ?? localRunnerClock,
+                  frozenHud.bases,
+                  frozenHud.hiddenRunnerBases ?? [],
+                  1,
+                )
           const redrawn: StageScene = {
             ...frozenScene,
             particles: null,
             bigHitScreen: frozenBigHitScreen,
             scenery: { ...frozenScene.scenery, scoreboardTick: sceneScoreboardTickOf(frozenTick) },
+            redrawTicks,
+            ...(frozenRunnerSteps === undefined ? {} : { runnerAnimationSteps: frozenRunnerSteps }),
+            // 0x4c4bc 4cad4 → 0x4b5b4 — 판을 그리던 상태면 한 번 더 돈다(마지막으로 센 틱은 그대로)
+            skillPanel: frozenScene.skillPanel === null || frozenScene.skillPanel === undefined
+              ? frozenScene.skillPanel
+              : stepSkillPanelNow(frozenScene.tick, true),
           }
           // 다음 그림이 이 그림과 견주도록 입력을 남긴다
           drawMemo.needsDraw(canvas, {
@@ -895,6 +923,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
                 isBigHit: pendingHit?.watchesBigHit ?? false,
               },
         tick: nowTick,
+        redrawTicks,
         ...(runnerAnimationSteps === undefined ? {} : { runnerAnimationSteps }),
         // 판이 효과 층을 깔았으면 배경 캔버스에는 배경만 — 비 · 파티클은 아래에서 그 층에 그린다
         particles: settlement?.layers === undefined && !isParticleGated ? particlesRef.current : null,
@@ -937,7 +966,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const particleLayer = layers?.particles.current ?? null
       // 위까지가 이 틀의 상태 갱신이다(틱 · 굴림은 틀마다 그대로). 그림은 입력이 앞 틀과 같으면 캔버스에 남은 그림이 곧 이 틀의
       // 그림이라 건너뛴다(`createDrawMemo`) — 파티클 관리자 · 비는 제자리에서 고쳐 쓰므로 그 모습(`particleSignatureOf` · 틱)으로 견준다
-      const shouldDraw = drawMemo.needsDraw(canvas, {
+      // 창이 닫힌 앱 틱 동안은 장면 틱이 창 첫 그림의 틱 그대로다 — 원본은 그 틱을 다시 그리지 않는다(창이 닫힌 틀은 갱신이 없고 다음
+      // 틀이 다음 틱을 그린다). 창 첫 그림을 그대로 둔다
+      const isRedrawnTick = redrawTicks.at(-1) === sceneTick
+      const shouldDraw = !isRedrawnTick && drawMemo.needsDraw(canvas, {
         scene: { ...stageScene, particles: particleSignatureOf(stageScene.particles) },
         layerParticles: layers === undefined || isParticleGated ? null : particleSignatureOf(particlesRef.current),
         rainLayer,
@@ -946,7 +978,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         particleLayerSize: particleLayer === null ? null : [particleLayer.width, particleLayer.height],
       })
       if (shouldDraw) renderBattingStage(context, stageScene)
-      lastStageScene = stageScene
+      if (!isRedrawnTick) lastStageScene = stageScene
       if (shouldDraw && layers !== undefined) {
         const rainContext = layers.rain.current?.getContext('2d') ?? null
         if (rainContext !== null) renderSettlementLayer(rainContext, { rain: settlementRain })

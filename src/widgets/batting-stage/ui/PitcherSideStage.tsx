@@ -19,9 +19,10 @@ import {
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { PitcherHitClock, PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
-import { HIT_STOP_TICKS, canSkipHitPause } from '@/widgets/batting-stage/lib/hitPause'
+import { canSkipHitPause } from '@/widgets/batting-stage/lib/hitPause'
 import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
-import { bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
@@ -34,6 +35,7 @@ import { SCENE_STATE, markSceneStateEntries, sceneStateEntryAt } from '@/shared/
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
+import type { SkillPanelFrame } from '@/widgets/batting-stage/model/skillPanelDriver'
 import {
   createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
@@ -41,7 +43,7 @@ import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
-import { gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { stageCastSpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
@@ -201,6 +203,14 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let handle = 0
     /** 그림 입력이 바뀐 틀에서만 다시 그린다(`createDrawMemo`) — 위 갱신은 틀마다 그대로 돈다 */
     const drawMemo = createDrawMemo()
+    /** 창이 선 첫 그림([창+0x250], 52efe)을 한 번 다시 그린다 — 마지막으로 그린 장면 그림 입력과 스킬 판 재료를 든다 */
+    const frozenDrawGate = createGameSceneDrawGate()
+    let lastStageScene: StageScene | null = null
+    let lastSkillPanelFrame: SkillPanelFrame | null = null
+    /** 창이 선 첫 그림이 든 장면 틱(`nowTick` 격자) — 그리기 쪽 애니를 한 칸 더 넘긴 몫(`stageRedraws`) */
+    let redrawTicks: readonly number[] = []
+    /** 지금 공의 큰 타구 0x13 동안 창 첫 그림이 든 0x13 틱(`PitcherHitClock.frozenDraws`) */
+    let hitFrozenDraws: readonly number[] = []
     /** 구름 셈(`sceneCloudClock`)에서 이 루프가 마지막으로 본 그림 */
     const cloudCursor = createCloudFrameCursor()
     /** 경기 스킬 표시 판 — 0xf 에 들 때마다 하나씩 올리는 표지(구질 목록이 새로 실리면 새 0xf 진입) */
@@ -238,9 +248,47 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     window.addEventListener('keydown', onKeyDown)
 
     const frame = (rawNow: number) => {
-      // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신을, 52efe 가 상태 그리기를 건너뛴다(창이 선 첫 그림
-      // [창+0x250] 의 다시 그리기는 갱신이 없어 앞 그림과 같다) — 캔버스를 그대로 두고 시계도 세운다
+      // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신을, 52efe 가 상태 그리기를 건너뛴다 — 시계도 선다.
+      // 창이 선 첫 그림([창+0x250])은 갱신 없이 그리기 표를 한 번 더 돈다(타자편 `useStageAnimation` 과 같다 — r175 · r178):
+      // 0x13 그리기 0x4cb1c 의 큰 타구 셈 [+0x10a8](멈춤 갈래면 한 번 더 줄고 옛값이 음수면 016 · 뒤 갈래면 애니 3 한 칸), 그리기에서
+      // 0x93d91 로 넘기는 애니(투수 덧그림 · 필살 스윙 그림 · 판정 글자 · 램프 확대 · 하늘 조명 · 주자 — `stageRedraws`), 스킬 판 0x4b5b4,
+      // 전광판 글자 [구장+0x8c](`sceneScoreboardTickOf` 가 멈춤 횟수로 센다). 파티클 틱 · 그리기(53048)는 건너뛴다
       if (isGameSceneFrozen()) {
+        const frozenScene = lastStageScene
+        if (frozenDrawGate.allowsDraw() && frozenScene !== null) {
+          const frozenPhase = frozenScene.stagePhase
+          let frozenBigHitScreen = frozenScene.bigHitScreen
+          const frozenPitch = shownPitch
+          if (
+            frozenPhase?.kind === '타격' && shownHit !== null && shownHit.watchesBigHit && !hitEndNotified &&
+            releaseTick !== null && frozenPitch !== null
+          ) {
+            // 마지막 갱신 0x13 틱 + 1 자리의 그림으로 센다(`bigHitScreenOf` 머리말)
+            const lastHeld = frozenPhase.tick
+            const contact = ballPixelAt(frozenPitch, shownHit.contactFrame)
+            frozenBigHitScreen = bigHitScreenOf(true, lastHeld + 1, frozenScene.side ?? 0, contact, hitFrozenDraws)
+            // 4ccba — 옛값이 음수면 이 그림이 막음을 풀고 016 을 쏜다(파티클 틱 53048 은 건너뛴다)
+            if (frozenBigHitScreen?.kind === '멈춤' && frozenBigHitScreen.counter < 0) {
+              emitParticles(sceneParticleScene(), particleConfigOf(BIG_HIT_PARTICLE.id), contact.x, contact.y, BIG_HIT_PARTICLE.img)
+            }
+            hitFrozenDraws = [...hitFrozenDraws, lastHeld]
+          }
+          redrawTicks = withRedrawAt(redrawTicks, frozenScene.tick)
+          const redrawn: StageScene = {
+            ...frozenScene,
+            bigHitScreen: frozenBigHitScreen,
+            scenery: { ...frozenScene.scenery, scoreboardTick: sceneScoreboardTickOf(gameSceneTickOf(gameSceneTimeOf(rawNow))) },
+            redrawTicks,
+            // 0x4c4bc 4cad4 → 0x4b5b4 — 판을 그리던 상태면 한 번 더 돈다(마지막으로 센 틱은 그대로)
+            skillPanel:
+              lastSkillPanelFrame === null || frozenScene.skillPanel === null || frozenScene.skillPanel === undefined
+                ? frozenScene.skillPanel
+                : stepSkillPanel({ ...lastSkillPanelFrame, extraDraw: true }),
+          }
+          drawMemo.needsDraw(canvasRef.current, redrawn)
+          renderBattingStage(context, redrawn)
+          lastStageScene = redrawn
+        }
         handle = requestAnimationFrame(frame)
         return
       }
@@ -268,6 +316,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         magicEmittedTick = null
         hitSkipTick = null
         hitKeyLatch.clear()
+        hitFrozenDraws = []
       }
       // 맞은 장면 재료가 공보다 한 그림 늦게 들면 그때 받는다
       if (releaseTick !== null && shownHit === null && current.hitScene != null) shownHit = current.hitScene
@@ -301,7 +350,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 팝업(0x52cc6)이 선 틀의 키는 버린다
       if (current.isFrozen === true) hitKeyLatch.clear()
       else runSceneKeys(hitKeyLatch, sceneTick)
-      const hit: PitcherHitClock | null = hitBase === null ? null : { ...hitBase, skipTick: hitSkipTick }
+      const hit: PitcherHitClock | null = hitBase === null ? null : { ...hitBase, skipTick: hitSkipTick, frozenDraws: hitFrozenDraws }
       const stage = pitcherSideStageFrameOf({
         nowTick,
         releaseTick,
@@ -330,8 +379,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         }
         const hitTickRaw = stateTickNow - judgeStateTick - 1
         const endTick = hitEndTickOf(hit)
-        // 0x4cb1c 4ccba~4cd14 — 큰 타구 멈춤이 풀리는 0x13 그림(틱 7)이 공 자리에 016 을 쏜다. 그 전에 0x13 이 끝나면 안 쏜다
-        if (hitBase.watchesBigHit && !hitStopShot && hitTickRaw >= HIT_STOP_TICKS && endTick >= HIT_STOP_TICKS) {
+        // 0x4cb1c 4ccba~4cd14 — 큰 타구 멈춤이 풀리는 0x13 그림(틱 7 — 창 첫 그림이 당긴다, `bigHitReleaseTickOf`)이 공 자리에 016 을
+        // 쏜다. 그 전에 0x13 이 끝나면 안 쏜다. 창 첫 그림이 이미 풀었어도 다음 갱신 틀의 그림이 다시 공 틱 0 을 보고 한 번 더 쏜다
+        const hitStopTick = bigHitReleaseTickOf(hitFrozenDraws)
+        if (hitBase.watchesBigHit && !hitStopShot && hitTickRaw >= hitStopTick && endTick >= hitStopTick) {
           hitStopShot = true
           const contact = ballPixelAt(pitch, hitBase.contactFrame)
           emitParticles(sceneParticleScene(), particleConfigOf(BIG_HIT_PARTICLE.id), contact.x, contact.y, BIG_HIT_PARTICLE.img)
@@ -395,7 +446,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       const swingTick =
         swingTickRaw === null || hitBase === null || hit === null || hitStartTick === null
           ? swingTickRaw
-          : swingTickRaw + bigHitSwingSkipsOf(hitBase.watchesBigHit, hitStartTick, hitStartTick + hitEndTickOf(hit) + 1, nowTick)
+          : swingTickRaw +
+            bigHitSwingSkipsOf(
+              hitBase.watchesBigHit, hitStartTick, hitStartTick + hitEndTickOf(hit) + 1, nowTick, bigHitReleaseTickOf(hitFrozenDraws),
+            )
       const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
       // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
       const inputKind = isIdle && !current.isPaused ? (current.inputOverlayRef?.current?.kind ?? null) : null
@@ -424,10 +478,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       if (entersStateF) skillPanelStateFSerial += 1
       wasSkillPanelStateF = isSkillPanelStateF
       const skillPanel = current.skillPanel
-      const skillPanelView: SkillPanelView | null =
+      const skillPanelFrame: SkillPanelFrame | null =
         skillPanel === undefined
           ? null
-          : stepSkillPanel({
+          : {
               source: { ...skillPanel, isDefenseCpu: skillPanel.isDefenseCpu ?? false },
               isStateF: isSkillPanelStateF,
               stateFMark: skillPanelStateFSerial,
@@ -455,7 +509,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
                   recentAtBatCodes: skillPanel.recentAtBatCodes,
                 }
               },
-            })
+            }
+      lastSkillPanelFrame = skillPanelFrame
+      const skillPanelView: SkillPanelView | null = skillPanelFrame === null ? null : stepSkillPanel(skillPanelFrame)
       /** 이 공의 판정 틀 J 의 0x11 상태 틱(= 투수 틱) — 맞은 공이 아니면 null */
       const judgePitcherTick = hitBase === null ? null : pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
       const isHitState = stage.phase.kind === '타격'
@@ -468,6 +524,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitcherIdleTick: idleStartTick === null ? null : nowTick - idleStartTick,
         pitcherIdleTickEnd: idleStartTick === null || idleEndTick === null ? null : idleEndTick - idleStartTick,
         tick: nowTick,
+        redrawTicks,
         resultTick: isResult ? stage.phase.tick : 0,
         resultText: isResult && resolution !== null ? describePitchResolution(resolution) : '',
         // CPU 홈런도 판정 v = 8 · 12 → 0x51cd8 이 +0x1960 을 켜 HOMERUN 글자(0x40b18)가 나간다 — 판정 글자는 없다 (타자편 `BattingStage` 와 같은 길).
@@ -490,7 +547,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         // 큰 타구 0x13 그리기 0x4cb1c 의 꼬리(확대 · 흐리기 · 번쩍임 · 테두리 / 애니 3) — 0x13 틱으로 센다(`bigHitScreen`, 타자편과 같다)
         bigHitScreen:
           isHitState && hitBase !== null
-            ? bigHitScreenOf(hitBase.watchesBigHit, stage.phase.tick, current.batterSide ?? batterSideOfForm(current.batterForm), contactPoint)
+            ? bigHitScreenOf(
+                hitBase.watchesBigHit, stage.phase.tick, current.batterSide ?? batterSideOfForm(current.batterForm), contactPoint, hitFrozenDraws,
+              )
             : null,
         // 필살 스윙 연출 그림 0x49aec — 판정 틀 J(0x11)에 첫 부름, 이어 0x13 틱 d 의 그림이 d + 2 번째 부름 (`specialSwingEffect`)
         specialSwingEffect:
@@ -544,7 +603,12 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           ...(current.seasonStadium === undefined ? {} : { seasonStadium: current.seasonStadium }),
         },
       }
-      if (drawMemo.needsDraw(canvasRef.current, stageScene)) renderBattingStage(context, stageScene)
+      // 창이 닫힌 앱 틱 동안은 장면 틱이 창 첫 그림의 틱 그대로다 — 원본은 그 틱을 다시 그리지 않으므로(창이 닫힌 틀은 갱신이 없고
+      // 다음 틀이 다음 틱을 그린다) 창 첫 그림을 그대로 둔다. 갱신(위)은 틀마다 그대로 돈다
+      if (redrawTicks.at(-1) !== nowTick) {
+        if (drawMemo.needsDraw(canvasRef.current, stageScene)) renderBattingStage(context, stageScene)
+        lastStageScene = stageScene
+      }
       handle = requestAnimationFrame(frame)
     }
     handle = requestAnimationFrame(frame)
