@@ -73,7 +73,11 @@ const 구질고르기 = (name: string) => {
 }
 
 /** 조준점을 안 움직이고 OK (0x50e9c) — 존 중심을 노린다 */
-const 조준확정 = () => fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
+const 조준확정 = () => {
+  fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
+  // 누름은 다음 틀의 키 0x498d4 가 읽는다(키 사건 0xbca05)
+  틱(1)
+}
 
 /**
  * 수비 화면에 무엇이 넘어가는지 적어 두려고 **원본을 그대로 감싼다** (그림은 원본이 그린다).
@@ -185,6 +189,7 @@ describe('투수편 경기 화면', () => {
     띄우기()
     구질고르기('FASTBALL')
     fireEvent.keyDown(window, { key: 'Escape' })
+    틱(1)
 
     expect(구질보임()).toBe(true)
   })

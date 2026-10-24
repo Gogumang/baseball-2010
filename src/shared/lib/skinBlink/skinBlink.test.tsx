@@ -37,4 +37,23 @@ describe('깜빡임 카운터 [skin+0x410] (U-90)', () => {
     머리띠.rerender(<판 tick={6} perDraw={1} />)
     expect(skinBlinkCounterValue()).toBe(1)
   })
+
+  it('한 틀에 두 그림이 불리면 두 번 오르고 뒤 그림은 앞 그림이 올린 값에서 센다 (그리기마다 +1 — 0x553f0 · 0x593ce)', () => {
+    resetSkinBlinkCounter()
+    const 두판 = (tick: number) => (
+      <>
+        <판 tick={tick} />
+        <판 tick={tick} />
+      </>
+    )
+    const 화면 = render(두판(0))
+    const 값들 = () => [...화면.container.querySelectorAll('span')].map((span) => Number(span.dataset.counter))
+    expect(값들()).toEqual([1, 2])
+    화면.rerender(두판(1))
+    expect(값들()).toEqual([3, 4])
+    // 같은 그림을 다시 그려도(다른 상태가 바뀌어) 다시 오르지 않는다
+    화면.rerender(두판(1))
+    expect(값들()).toEqual([3, 4])
+    expect(skinBlinkCounterValue()).toBe(4)
+  })
 })

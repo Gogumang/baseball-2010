@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import {
   CPU_PITCH_TYPE_TICKS,
   DEFAULT_REPERTOIRE,
@@ -28,6 +28,7 @@ import { ballFrameOf, ballFrameStartTick } from '@/widgets/batting-stage/model/s
 import { clearParticles } from '@/entities/particle/model/particleScene'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
+import { claimSceneParticleTick } from '@/entities/particle/model/sceneParticleManager'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { clearSceneResultCodeOnPitch, sceneResultCodeNow, writeSceneResultCode } from '@/widgets/batting-stage/model/sceneResultCodeStore'
 import { enterSettlementEffect, tickSettlementEffect, type SettlementEffect } from '@/entities/batting/model/settlementEffect'
@@ -40,8 +41,10 @@ import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
-  gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, gameSceneTimeOf, isCommonWindowShown, isGameSceneFrozen,
+  appTickOfGameSceneTick, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, gameSceneTimeOf, isCommonWindowShown,
+  isGameSceneFrozen,
 } from '@/shared/lib/commonWindow/commonWindow'
+import { openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
@@ -96,6 +99,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     phaseStartTickRef,
     phaseEntryRef,
     hitSkipKeyTickRef,
+    keyLatch,
     resultTextRef,
     homeRunStartTickRef,
     swingStartTickRef,
@@ -115,11 +119,24 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
   // 고리는 남은 필살 횟수 같은 props 로 자주 바뀐다 — 루프를 다시 세우면 투구 시작 시각이 지워지므로 ref 로 읽는다
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
+  /**
+   * 쉬기(`isPaused`)가 풀린 커밋의 장면 틱 — 쉬기를 푸는 쪽(견제 판 끝 `finishRunnerPlay` · 0xe 의 OK)은 원본에서 그 틀의 갱신이 다음
+   * 상태를 예약하는 자리라(0xbcb48 → 다음 틀 0xbc9c8 이 틱 0) 다음 틀이 0xf 틱 0 이다. 루프가 쉬는 '대기' 를 본 뒤에만 쓴다
+   */
+  const resumeTickRef = useRef<number | null>(null)
+  const pausedAtCommitRef = useRef(latestRef.current.isPaused)
+  useLayoutEffect(() => {
+    const isPaused = latestRef.current.isPaused
+    if (pausedAtCommitRef.current && !isPaused) resumeTickRef.current = gameSceneTickNow()
+    pausedAtCommitRef.current = isPaused
+  })
 
   useEffect(() => {
     const canvas = canvasRef.current
     const context = effectContextOf(canvas)
     if (!canvas || !context) return
+    // 화면이 받은 장면 키(도루 '3'/'2'/'1' 0x53670 → 0x53610 · 0xe 의 OK)도 이 루프가 도는 동안 이 칸에 받은 차례대로 든다
+    const releaseKeyOwner = openSceneKeyLatch(keyLatch)
 
     let animationHandle = 0
     /** 그림 입력이 바뀐 틀에서만 다시 그린다 — 루프를 다시 세우면 새로 그린다 */
@@ -228,8 +245,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           // 타석이 끝나 쉬는 동안 — 다음 타석 준비(0x48d50)처럼 좌우 이동을 되돌린다
           shiftRef.current = 0
           phaseStartTickRef.current = sceneTick
+          hasSeenPause = true
           return
         }
+        if (hasSeenPause) {
+          // 쉬기가 풀렸다 — 푼 틀(견제 판 끝 0x17 의 0xf 예약 · 0xe 키 처리의 메시지 1 → 0x50c18 의 0xf 예약)의 다음 틀이 0xf 틱 0 이다
+          // (0xbcb48 → 0xbc9c8). 예전에는 마지막으로 쉰 틀을 틱 0 으로 셌다 — 한 틀 일렀다
+          hasSeenPause = false
+          const resumeTick = resumeTickRef.current
+          resumeTickRef.current = null
+          if (resumeTick !== null) phaseStartTickRef.current = Math.max(phaseStartTickRef.current, resumeTick + 1)
+        }
+        // 0xf 가 아직 안 섰다 — 이 틀은 쉬던 상태 그대로다
+        if (sceneTick < phaseStartTickRef.current) return
         // 0xf(9 그림) + 0x10(7 그림) 뒤 0x11 — 틱으로 센다 (`PRE_PITCH_TICKS`). CPU 투구 굴림은 원본 틱 차례로 나눠
         // 그 틱의 파티클 틱(프레임 끝 0x6de84)보다 앞에 굴린다 — 조작 0x498d4 는 매 틱 그리기보다 먼저 돈다:
         //   0xf 틱 0~8 구질 0x344dc(틱마다 한 번) · 0x10 틱 6 목표 0x345fc(또는 견제) · 0x11 틱 10 놓기 0x4dc78
@@ -431,6 +459,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      * 0xe 진입 0x50674 가 필살 횟수 표시의 애니(game_ui 애니 5)를 되감아 거는 자리다 (`specialSwingBadge`).
      */
     let pausedSince: number | null = null
+    /** 루프가 쉬는 '대기' 를 본 적이 있다 — 풀린 첫 틀에 0xf 시작 틱을 다시 잡는다(`resumeTickRef`) */
+    let hasSeenPause = false
 
     /**
      * **경기 스킬 표시 판** (`model/skillPanelDriver`) — 사람이 치는 타석의 0xf 는 쉬지 않는 '대기', 0xf 진입은 그 단계에 든 장면 틱
@@ -461,7 +491,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const latest = latestRef.current
       const source = latest.skillPanel
       if (source === undefined) return null
-      const isStateF = phaseRef.current === '대기' && !latest.isPaused
+      const isStateF = phaseRef.current === '대기' && !latest.isPaused && nowTick >= phaseStartTickRef.current
       return stepSkillPanel({
         source,
         isStateF,
@@ -485,7 +515,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     }
 
     const stagePhaseNow = (sceneTick: number) => {
-      const isPaused = latestRef.current.isPaused
+      // 쉬기가 풀렸어도 0xf 가 서기 전 틀(`advancePhase`)은 쉬던 그림 그대로다
+      const isPaused = latestRef.current.isPaused || (phaseRef.current === '대기' && sceneTick < phaseStartTickRef.current)
       const pausedWaiting = phaseRef.current === '대기' && isPaused
       if (!pausedWaiting) pausedSince = null
       else if (pausedSince === null) pausedSince = sceneTick
@@ -504,6 +535,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // ⚠️ 미구현(원본 확인 — R10 7절 r107 보강): [+0x250] 그림은 갱신 없이 그리기만 한 번 돌아 그리기 쪽 셈(0x10 조준 애니 0 칸 ·
       // 0x11 커서 0x4d708 / 결과 원 0x4d700 · 점수판 0x36714 목표 줄)이 한 번 오른다 — 웹은 그 한 그림을 그리지 않아 안 오른다
       if (isGameSceneFrozen()) {
+        // 창이 서 있는 틀은 키 0x498d4 가 안 돌고 다음 틀 0xbca05 머리가 받은 키를 지운다 — 모아 두지 않는다
+        keyLatch.clear()
         animationHandle = requestAnimationFrame(frame)
         return
       }
@@ -532,6 +565,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         phaseStartTickRef.current = entry.tick
         phaseEntryRef.current = null
       }
+      // 52d9e 키 0x498d4 — 앞 틀 뒤에 받은 키를 진입 뒤 · 갱신 앞에서 처리한다(`sceneKeyLatch`). 좌우 이동은 이 틀의 그림부터,
+      // 스윙 · 번트 예약은 이 틀의 갱신(0x4e060)이 본다
+      runSceneKeys(keyLatch, sceneTick)
       if (!isBackdrop) advancePhase(sceneTick)
 
       const pitch = pitchRef.current
@@ -572,16 +608,19 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       }
       // 틱마다 원본 프레임 차례 — (치우기) → (홈런 효과 깔기) → 글자 유지 그림의 효과 틱 0x40faa → 파티클 틱 0x6de84
       const firstSteppedTick = nowTick - steps
+      /** 이 걸음(장면 틱 `firstSteppedTick + step + 1`)의 앱 틀에 관리자 틱이 아직 안 돌았는가 — 앱 틀당 한 번(`claimSceneParticleTick`) */
+      const claimsManagerTick = (step: number) =>
+        claimSceneParticleTick(particlesRef.current, appTickOfGameSceneTick(firstSteppedTick + step + 1))
       for (let step = 0; step < steps && settlement !== undefined; step += 1) {
         if (settlementEffect !== null && settlementEffect !== undefined) {
           tickSettlementEffect(settlementEffect, fireworksPortOf(particlesRef.current, particleConfigOf), settlement.random)
         }
-        tickParticles(particlesRef.current, settlement.random)
+        if (claimsManagerTick(step)) tickParticles(particlesRef.current, settlement.random)
       }
       // 정산 효과가 없는 결과 배경(홈런더비 결과 창 0x1a — 갱신 0x3c0b8 · 그리기 0x45c18 는 구름 0x78449 · 배경 0x78579 · 창뿐, 효과 틱 없음)도
       // 프레임 끝 관리자 틱 0x6de85 는 돈다(53048 의 게이트는 공용 창만 본다 — 경기 상태를 안 가린다). 굴림은 경기 난수
       for (let step = 0; step < steps && isBackdrop && settlement === undefined; step += 1) {
-        tickParticles(particlesRef.current, latestRef.current.random)
+        if (claimsManagerTick(step)) tickParticles(particlesRef.current, latestRef.current.random)
       }
       for (let step = 0; step < steps && !isBackdrop; step += 1) {
         const steppedTick = firstSteppedTick + step + 1
@@ -600,6 +639,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           particles: particlesRef.current,
           random: latestRef.current.random,
           configOf: particleConfigOf,
+          appTick: appTickOfGameSceneTick(steppedTick),
         })
       }
       particleTick = nowTick
@@ -740,7 +780,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
     phaseStartTickRef.current = gameSceneTickNow()
     animationHandle = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(animationHandle)
+    return () => {
+      cancelAnimationFrame(animationHandle)
+      releaseKeyOwner()
+    }
     // ref 묶음은 값이 바뀌지 않는다. 고리는 handlersRef 로 읽는다 — 루프를 다시 세우는 때는 예전처럼 판정 · 0x13 고리가 바뀔 때뿐이다
     // (타자가 바뀌면 판정 고리가 바뀐다). 필살 횟수로 바뀌는 고리(releaseSwing · endPitch)는 투구 도중이라 다시 세우지 않는다
   }, [handlers.judgePitch, handlers.commitHit])
@@ -754,6 +797,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       phaseRef.current = '대기'
       phaseStartTickRef.current = gameSceneTickNow()
       phaseEntryRef.current = null
+      keyLatch.clear()
       hitSkipKeyTickRef.current = null
       pitchRef.current = null
       buntRef.current = null

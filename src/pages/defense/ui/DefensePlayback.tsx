@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
-import { isCommonWindowShown, isGameSceneFrozen, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  appTickOfGameSceneTick, gameSceneTickNow, isCommonWindowShown, isGameSceneFrozen, useMarksGameScene,
+} from '@/shared/lib/commonWindow/commonWindow'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
@@ -131,6 +133,18 @@ const MAX_CLOSED_CATCH_UP = 30
 
 /** 원작 경기 루프는 한 갱신에 한 틱이다 (0xc2198) */
 const UPDATES_PER_TICK = 1
+
+/**
+ * 받은 키 줄 — 키마다 받은 장면 틱을 함께 든다. 원본은 키 콜백이 [+0x20] 에 적기만 하고 다음 틀의 0xbca05 → 키 0x498d4(52d9e) →
+ * 0x53420 이 그 틀의 갱신보다 먼저 처리한다(`sceneKeyLatch`) — 받은 틱의 갱신에는 먹이지 않고 그 뒤 갱신부터 먹인다.
+ * 웹은 한 갱신에 하나씩 먹인다(⚠️ 근사 — 원본 받은 칸은 하나라 한 틀에 둘이 오면 뒤 키만 남는다).
+ */
+function takePressFor(presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null): DefenseKeyPress | null {
+  const arrived = ticks[0]
+  if (arrived === undefined || (sceneTick !== null && arrived >= sceneTick)) return null
+  ticks.shift()
+  return presses.shift() ?? null
+}
 
 /**
  * **펌블 함성 29** — 펌블 갈래 b4274~b4286 은 야수 +0xb8 = 6 · 메시지 0xbc2(처리기는 `bx lr`)뿐이고 동작 잠금 · 동작 0xd 가 없다
@@ -269,13 +283,19 @@ function drawBallParticles(
   drawn: DefenseViewState | undefined,
   cameraOffset: { readonly x: number; readonly y: number } | null,
   random: RandomPort,
+  sceneTick: number | null,
 ): void {
   if (run.cleared) return
   const frame = stepDefenseEffects(
     run.effects,
     null,
-    // 53048 — 공용 창이 서 있는 그림은 관리자 틱이 없다(위 `effectsPorts` 와 같은 게이트)
-    { particles: run.scene, random: isCommonWindowShown() ? undefined : random, configOf: particleConfigOf },
+    // 53048 — 공용 창이 서 있는 그림은 관리자 틱이 없다(위 `effectsPorts` 와 같은 게이트). 관리자 틱은 앱 틀당 한 번
+    {
+      particles: run.scene,
+      random: isCommonWindowShown() ? undefined : random,
+      configOf: particleConfigOf,
+      ...(sceneTick === null ? {} : { appTick: appTickOfGameSceneTick(sceneTick) }),
+    },
     ballShotsAt(drawn, cameraOffset),
   )
   run.effects = frame.effects
@@ -400,7 +420,9 @@ function stepRecordedBoard(
 function RecordedPlayback({
   ticks, onDone, onFieldingErrors, grassPalette, runScoreBoard, freePassPlay, children,
 }: RecordedPlaybackProps) {
-  const update = useGameSceneUpdateCounter(ticks.length > 0)
+  /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
+  const updateStartTickRef = useRef<number | null>(null)
+  const update = useGameSceneUpdateCounter(ticks.length > 0, updateStartTickRef)
   const lastIndex = Math.max(0, ticks.length - 1)
   const index = Math.min(Math.floor(update / UPDATES_PER_TICK), lastIndex)
   /** 셈 — 갱신을 한 번씩만 지나도록 ref 로 든다 (재생 묶음이 바뀌면 처음부터) */
@@ -458,7 +480,10 @@ function RecordedPlayback({
     if (at <= lastIndex) for (const soundId of view.tickSoundIds ?? []) activeSound().play(soundId)
     playRunInCheers(holder.tally, isHomeRun)
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 파티클 · 프레임 끝 파티클 틱. 0x35108 로 끝난 갱신은 안 그린다
-    if (!holder.tally.ended) drawBallParticles(particles.run, view, cameraOffsetRef.current, particles.random)
+    const recordedStartTick = updateStartTickRef.current
+    if (!holder.tally.ended) {
+      drawBallParticles(particles.run, view, cameraOffsetRef.current, particles.random, recordedStartTick === null ? null : recordedStartTick + at)
+    }
     // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
     if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
@@ -513,7 +538,9 @@ interface LiveRunnerPlaybackProps {
  * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
  */
 function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
-  const update = useGameSceneUpdateCounter(true)
+  /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
+  const updateStartTickRef = useRef<number | null>(null)
+  const update = useGameSceneUpdateCounter(true, updateStartTickRef)
   const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(
     null,
   )
@@ -521,12 +548,15 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     stepperRef.current = { play, stepper: startLiveRunnerPlay(play), startedAt: update }
   }
   const pressesRef = useRef<DefenseKeyPress[]>([])
+  /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
+  const pressTicksRef = useRef<number[]>([])
   const tallyRef = useRef<{ readonly play: LiveRunnerPlay; tally: RecordedBoardTally } | null>(null)
   const particlesRef = useRef<{ readonly play: LiveRunnerPlay; readonly run: BallParticleRun } | null>(null)
   const cameraOffsetRef = useRef<{ readonly x: number; readonly y: number } | null>(null)
   if (tallyRef.current === null || tallyRef.current.play !== play) {
     tallyRef.current = { play, tally: EMPTY_RECORDED_TALLY }
     pressesRef.current = []
+    pressTicksRef.current = []
   }
   if (particlesRef.current === null || particlesRef.current.play !== play) {
     particlesRef.current = { play, run: startBallParticleRun() }
@@ -545,6 +575,7 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
       // 공용 창이 서 있으면 52cc6 이 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다
       if (isGameSceneFrozen()) return
       pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
+      pressTicksRef.current.push(gameSceneTickNow())
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -555,7 +586,11 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   const wanted = Math.floor((update - startedAt) / UPDATES_PER_TICK) + 1
   let guard = 0
   while (!stepper.finished && stepper.tick < wanted && guard < MAX_CLOSED_CATCH_UP) {
-    stepper.step(pressesRef.current.shift() ?? null)
+    // 이 걸음은 갱신 (startedAt + 틱) — 그 장면 틱보다 앞 틱에 받은 키만 먹인다
+    const updateStartTick = updateStartTickRef.current
+    stepper.step(
+      takePressFor(pressesRef.current, pressTicksRef.current, updateStartTick === null ? null : updateStartTick + startedAt + stepper.tick),
+    )
     // 그 틱의 소리 차례대로 — 슬라이딩 10(사람 OK 키 0x518da → 0x5199c · 자동 0x5268c)과 판정 콜(플레이 틱 b4562 의 메시지 0xbba →
     // 0x51a56 → 9 는 0x51c14 의 17 · 13 은 0x51b36 의 62/20). 콜은 판 끝이 아니라 결과 코드가 선 이 틱에 난다
     for (const soundId of stepper.soundsThisTick) activeSound().play(soundId)
@@ -580,7 +615,10 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     playRunInCheers(holder.tally, homeRunHit)
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 튐 파티클 · 프레임 끝 파티클 틱(경기 난수 — 그 틱 진행기 굴림 뒤).
     // 0x35108 로 끝난 갱신은 안 그린다. ⚠️ 판 틱을 미리 몇 틱 앞서 돌린 갱신(따라잡기)은 굴림 차례가 그 틱들 뒤로 몰린다(근사)
-    if (!holder.tally.ended && random !== undefined) drawBallParticles(particles.run, view, cameraOffsetRef.current, random)
+    const runnerStartTick = updateStartTickRef.current
+    if (!holder.tally.ended && random !== undefined) {
+      drawBallParticles(particles.run, view, cameraOffsetRef.current, random, runnerStartTick === null ? null : runnerStartTick + startedAt + at)
+    }
     // 같은 그리기의 야수 고리 0x43278 — 펌블 6 · 악송구 4 를 본 야수의 +0x2e (판 틱만. ⚠️ 닫힌 갱신의 다시 그리기는 안 센다)
     if (!holder.tally.ended && at <= lastIndex) drawnErrors.push(...drawnFieldingErrorsOf(view.fielders))
   }
@@ -648,7 +686,9 @@ interface RunScoreBoardView {
 function LivePlayback({
   input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children,
 }: LivePlaybackProps) {
-  const update = useGameSceneUpdateCounter(true)
+  /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
+  const updateStartTickRef = useRef<number | null>(null)
+  const update = useGameSceneUpdateCounter(true, updateStartTickRef)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
   const builtSideRef = useRef<ControlSide | undefined>(undefined)
@@ -656,6 +696,8 @@ function LivePlayback({
   const startedAtRef = useRef(0)
   /** 아직 진행기에 안 먹인 키들 */
   const pressesRef = useRef<DefenseKeyPress[]>([])
+  /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
+  const pressTicksRef = useRef<number[]>([])
   /** 판이 닫힌 뒤(+0x1094 셈) 온 키들 — 사람 수비면 0x533c8 → 0x588 → vt60 이 +0x160 에 적어 다음 판으로 남는다(`withClosedThrowKeys`) */
   const closedPressesRef = useRef<DefenseKeyPress[]>([])
   /** 그린 틱이 올린 실책 (야수 그리기 0x43278 4381a~43904) · 이미 본 진행기 틱 수 */
@@ -710,6 +752,7 @@ function LivePlayback({
       if (isGameSceneFrozen()) return
       // 누르고 있는 중인가 — 레이저 확정은 새로 누른 키만 받는다 (0x4e858 키 반복 계수 0)
       pressesRef.current.push({ key: event.key, isRepeat: event.repeat })
+      pressTicksRef.current.push(gameSceneTickNow())
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -722,6 +765,7 @@ function LivePlayback({
       stateRef.current = startDefensePlay(withSide(input, side))
       startedAtRef.current = update
       pressesRef.current = []
+      pressTicksRef.current = []
       closedPressesRef.current = []
       drawnErrorsRef.current = []
       seenTickCountRef.current = 0
@@ -780,7 +824,13 @@ function LivePlayback({
       const tickBefore = tickBeforeOf(running)
       const wasFastForward = running.fastForward
       // 건너뛰는 동안은 그 그림의 키 처리(0x498d4)가 다시 오지 않는다
-      running = stepDefensePlay(running, wasFastForward ? null : pressesRef.current.shift() ?? null)
+      // 이 걸음은 갱신 (startedAt + 틱) — 그 장면 틱보다 앞 틱에 받은 키만 먹인다
+      const updateStartTick = updateStartTickRef.current
+      const stepSceneTick = updateStartTick === null ? null : updateStartTick + startedAtRef.current + running.tick
+      running = stepDefensePlay(
+        running,
+        wasFastForward ? null : takePressFor(pressesRef.current, pressTicksRef.current, stepSceneTick),
+      )
       moved = true
       const facts = defenseTickFactsOf(tickBefore, running, isDefensePlayFinished(running))
       if (running.fastForward && !wasFastForward) {
@@ -816,7 +866,12 @@ function LivePlayback({
         skippedNow = true
       } else {
         // 홈런 연출 — 이 틱의 갱신 · 그리기 · 프레임 끝 파티클 틱 (진행기 굴림 뒤)
-        effectsFrame = stepDefenseEffects(effectsRef.current, facts, effectsPorts, ballShotsOf(running.ticks[running.ticks.length - 1]))
+        effectsFrame = stepDefenseEffects(
+          effectsRef.current,
+          facts,
+          stepSceneTick === null ? effectsPorts : { ...effectsPorts, appTick: appTickOfGameSceneTick(stepSceneTick) },
+          ballShotsOf(running.ticks[running.ticks.length - 1]),
+        )
         effectsRef.current = effectsFrame.effects
         // 득점 점수판 0x41a64 (그리기 0x46e62). 한 갱신에 여러 틱을 따라잡으면 마지막 틱 모습만 보인다
         board = drawBoard(running.held.scoreboardRuns)
@@ -840,10 +895,17 @@ function LivePlayback({
     if (running.tick > wanted) startedAtRef.current -= running.tick - wanted
     const finished = isDefensePlayFinished(running)
     // 닫힌 뒤(+0x1094 를 세는 갱신)에 온 키도 0x519cc 를 지난다 — 받으면 52b26 이 남은 셈을 이 그림 안에서 다 돈다
-    if (!moved && finished && pressesRef.current.length > 0) {
+    // 이 그림의 장면 틱보다 앞 틱에 받은 키만 이 그림의 키 처리가 읽는다
+    const updateStartTickNow = updateStartTickRef.current
+    const arrivedPresses: DefenseKeyPress[] = []
+    while (!moved && finished) {
+      const press = takePressFor(pressesRef.current, pressTicksRef.current, updateStartTickNow === null ? null : updateStartTickNow + update)
+      if (press === null) break
+      arrivedPresses.push(press)
+    }
+    if (!moved && finished && arrivedPresses.length > 0) {
       // 같은 키 처리 0x53420 이 0x587(건너뛰기)보다 먼저 사람 수비 송구 0x533c8 → 0x588 → +0x160 을 적는다 — 판 끝에 장면 칸으로 넘긴다
-      closedPressesRef.current.push(...pressesRef.current)
-      pressesRef.current = []
+      closedPressesRef.current.push(...arrivedPresses)
       if (acceptsFastForwardKey(running)) {
         // 0x519fe — 소리 끊기(0x6e418)
         activeSound().stop()
@@ -871,7 +933,14 @@ function LivePlayback({
           break
         }
         // 닫힌 뒤 그림도 공을 그린다 — 마지막 그림의 공 · 조건 그대로(카메라는 서 있다)
-        effectsFrame = stepDefenseEffects(effectsRef.current, null, effectsPorts, ballShotsOf(running.ticks[running.ticks.length - 1]))
+        // 이 닫힌 갱신의 장면 틱 — 따라잡는 갱신은 지금 갱신에서 거꾸로 센다
+        const closedSceneTick = updateStartTickNow === null ? null : updateStartTickNow + update - (closedFrames - 1 - frame)
+        effectsFrame = stepDefenseEffects(
+          effectsRef.current,
+          null,
+          closedSceneTick === null ? effectsPorts : { ...effectsPorts, appTick: appTickOfGameSceneTick(closedSceneTick) },
+          ballShotsOf(running.ticks[running.ticks.length - 1]),
+        )
         effectsRef.current = effectsFrame.effects
         board = drawBoard(running.held.scoreboardRuns)
       }
