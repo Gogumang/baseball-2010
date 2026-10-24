@@ -599,11 +599,12 @@ function drawPitchWind(context: CanvasRenderingContext2D, scene: StageScene, sid
   if (drawCall === null) return
   const entries = frameAnimations(PLAYER_EFFECT_FRAMES)?.[PITCH_WIND_ANIMATION]
   const frameIndex = entries === undefined ? null : judgeFrameAt(entries, drawCall)
-  const placed = frameIndex === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, frameIndex)
-  if (placed === null) return
   const anchor = stageLayoutOf(side).pitcherAnchor
   // 38df0 — 좌투면 x − 8 · 효과 0x11: 투수 점(좌투 + 1)을 축으로 한 거울 안에서 x + 8
   const { axisX, isMirrored } = pitcherMirrorOf(anchor.x, scene.pitcherHand ?? 0)
+  // 효과 0x11 이면 0xc9f98 ca07c 갈래 — 칸 40 · 41 의 0x66 반투명 파트를 섞지 않고 복사한다(복사판)
+  const placed = frameIndex === null ? null : placedFrame(PLAYER_EFFECT_FRAMES, frameIndex, null, isMirrored)
+  if (placed === null) return
   context.save()
   if (isMirrored) {
     context.translate(axisX * 2, 0)
@@ -712,8 +713,11 @@ function drawBatter(
     context.scale(-1, 1)
   }
   const layers = isAceBatterOrder(aceOrder) ? aceBatterLayersOf(swingFrame, aceOrder) : batterLayersOf(swingFrame, bodyType, equipment)
+  // 우타는 파트 프레임 vt+0x10 을 효과 0x11 로 부른다(78d16 · 78d80) — 0xc9f98 ca07c 갈래라 0x66 반투명 파트(머리 장비 3~6)도
+  // 섞지 않고 복사한다(`placedFrame` 의 복사판). 좌타(효과 0)는 구운 프레임(반투명 L/16 의 알파 근사)
+  const isFlipped = side === BATTER_SIDE.우타
   for (const layer of layers) {
-    const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, skinIndex, teamIndex))
+    const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, skinIndex, teamIndex), isFlipped)
     if (frame === null) continue
     context.drawImage(frame.image, axisX + frame.offsetX, anchor.y + frame.offsetY)
   }

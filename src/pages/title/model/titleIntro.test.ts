@@ -1,54 +1,39 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { INTRO_FRAME_COUNT, titlePoseAt } from '@/pages/title/model/titleIntro'
+import { INTRO_ANIMATION, INTRO_FRAME_COUNT, PROMPT_ANIMATION, titleSceneAt } from '@/pages/title/model/titleIntro'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
-const 프레임 = (index: number) => index * millisecondsPerFrame()
+const 그리기 = (index: number) => index * millisecondsPerFrame()
 
-describe('titlePoseAt — 원본 main_title 프레임 순서', () => {
-  it('f00 은 배경 없이 선수가 y=159 에서 시작한다', () => {
-    const pose = titlePoseAt(0)
-    expect(pose.playerY).toBe(159)
-    expect(pose.isBackgroundVisible).toBe(false)
-    expect(pose.isSettled).toBe(false)
+describe('titleSceneAt — main_title 애니 0 · 1 그대로 (0x2cbac · 0x93d91)', () => {
+  it('애니 표는 frames/animations.json 과 같다', () => {
+    const table = JSON.parse(readFileSync('public/sprites/main_title/frames/animations.json', 'utf8')) as {
+      frame: number
+      delay: number
+    }[][]
+    expect(table[0].map(({ frame, delay }) => ({ frame, delay }))).toEqual(INTRO_ANIMATION)
+    expect(table[1].map(({ frame, delay }) => ({ frame, delay }))).toEqual(PROMPT_ANIMATION)
   })
 
-  it('f13 부터 배경이 깔리고 로고가 원본 좌표대로 밀려 들어온다', () => {
-    expect(titlePoseAt(프레임(13)).logoX).toBe(-86)
-    expect(titlePoseAt(프레임(14)).logoX).toBe(-47)
-    expect(titlePoseAt(프레임(15)).logoX).toBe(-9)
-    expect(titlePoseAt(프레임(13)).isBackgroundVisible).toBe(true)
+  it('지연대로 칸이 넘어간다 — 0·0·1·1·2·2·3·4·5·7·6·8 …', () => {
+    const frames = Array.from({ length: 19 }, (_, draw) => titleSceneAt(그리기(draw)).introFrame)
+    expect(frames).toEqual([0, 0, 1, 1, 2, 2, 3, 4, 5, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15])
   })
 
-  it('f16 에서 로고가 x=4 에 닿으며 인트로가 끝난다', () => {
-    expect(INTRO_FRAME_COUNT).toBe(16)
-    const pose = titlePoseAt(프레임(16))
-    expect(pose.logoX).toBe(4)
-    expect(pose.isSettled).toBe(true)
+  it('지연 합 20 — 20 번째 그리기(차례 19)가 넘기며 끝 깃발이 서고 그 그리기부터 애니 1 을 그린다', () => {
+    expect(INTRO_FRAME_COUNT).toBe(19)
+    expect(titleSceneAt(그리기(18))).toEqual({ introFrame: 15, promptFrame: null, isSettled: false })
+    expect(titleSceneAt(그리기(19))).toEqual({ introFrame: 13, promptFrame: 13, isSettled: true })
+    // 한 번만 도는 애니라 마지막 칸 13 에 선다
+    expect(titleSceneAt(그리기(400)).introFrame).toBe(13)
   })
 
-  /**
-   * 예전 테스트는 8프레임마다 켜고 끄는 TOUCH SCREEN 을 못박고 있었다.
-   * 이 빌드는 TOUCH SCREEN(애니 2)을 쓰지 않고 **애니 1 의 PRESS ANY KEY** 를 돌린다
-   * (F-4·4-1 확정): 프레임 13(2틱 안 보임) → 16(1틱 흐림) → 17(4틱 밝음) → 16(1틱 흐림).
-   */
-  it('끝난 뒤 PRESS ANY KEY 가 8틱 주기로 안보임2·흐림1·밝음4·흐림1 을 돈다', () => {
-    const 주기 = [0, 1, 2, 3, 4, 5, 6, 7].map((tick) => titlePoseAt(프레임(16 + tick)).promptPhase)
-
-    expect(주기).toEqual(['hidden', 'hidden', 'dim', 'bright', 'bright', 'bright', 'bright', 'dim'])
-    expect(titlePoseAt(프레임(16 + 8)).promptPhase).toBe('hidden')
+  it('끝난 뒤 애니 1 이 8 그리기 주기로 13 ×2 · 16 · 17 ×4 · 16 을 돈다', () => {
+    const cycle = Array.from({ length: 9 }, (_, tick) => titleSceneAt(그리기(19 + tick)).promptFrame)
+    expect(cycle).toEqual([13, 13, 16, 17, 17, 17, 17, 16, 13])
   })
 
-  /**
-   * 예전에는 전체이용가를 인트로 **중에만** (0,5) 에 그렸다.
-   * 원본 0x2cbac 은 저작권·판 번호·전체이용가를 인트로가 끝난 뒤에만 지나간다.
-   */
-  it('인트로 중에는 저작권·판 번호·전체이용가를 그리지 않는다', () => {
-    expect(titlePoseAt(프레임(2)).isSettled).toBe(false)
-    expect(titlePoseAt(프레임(15)).isSettled).toBe(false)
-    expect(titlePoseAt(프레임(16)).isSettled).toBe(true)
-  })
-
-  it('음수 시간은 첫 프레임으로 본다', () => {
-    expect(titlePoseAt(-500).playerY).toBe(159)
+  it('음수 시간은 첫 그리기로 본다', () => {
+    expect(titleSceneAt(-500).introFrame).toBe(0)
   })
 })

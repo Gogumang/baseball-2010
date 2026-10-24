@@ -4,6 +4,8 @@ import { MarkupText, PressArea } from '@/shared/ui'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
+import { useSpriteJson } from '@/shared/lib/sprite/useSpriteJson'
 import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
 import { useCommonWindowPush } from '@/shared/lib/commonWindow/commonWindow'
 import type { BurstJudgement } from '@/entities/burst-mission/model/burstMissionJudge'
@@ -154,6 +156,8 @@ function BurstPortrait({ speaker, expression, draws, anchor }: {
   const folder = `./sprites/${portrait?.file ?? 'event_char_0'}/frames`
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
+  // 좌타는 깃발 0x11 로 그린다(0x8f310~) — 0xc9f98 ca07c 갈래라 0x66 반투명 파트(볼터치)도 섞지 않고 복사한 판(`frameCopies`)
+  const copies = useSpriteJson<unknown>(anchor.isFlipped && hasFrameCopies(folder) ? frameCopiesUrl(folder) : null)
   if (portrait === null) return null
   const entries = animations?.[portrait.animation]
   const step = entries === undefined ? null : animationStepAt(entries, draws)
@@ -166,5 +170,6 @@ function BurstPortrait({ speaker, expression, draws, anchor }: {
   const style: CSSProperties = anchor.isFlipped
     ? { left: x - origin.x - origin.width, top: y + origin.y, transform: 'scaleX(-1)' }
     : { left: x + origin.x, top: y + origin.y }
-  return <img className={styles.sprite} style={style} src={`${folder}/${key}.png`} alt="" data-frame={step.frame} />
+  const src = anchor.isFlipped ? flippedFrameUrlOf(folder, step.frame, copies) : `${folder}/${key}.png`
+  return <img className={styles.sprite} style={style} src={src} alt="" data-frame={step.frame} />
 }

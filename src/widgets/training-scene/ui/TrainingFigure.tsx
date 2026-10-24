@@ -1,4 +1,6 @@
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
+import { useSpriteJson } from '@/shared/lib/sprite/useSpriteJson'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { batterLayersOf, bodyTypeOf, layerPaletteIndexOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
@@ -62,7 +64,7 @@ export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex
     <div className={styles.figureAxis} style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}
       data-mirrored={isMirrored ? 'true' : undefined}>
       {layers.map((layer, index) => (
-        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={0} y={y}
+        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={0} y={y} isFlipped={isMirrored}
           paletteIndex={skinIndex === undefined || teamIndex === undefined
             ? layer.gradePaletteRow ?? null
             : layerPaletteIndexOf(layer, skinIndex, teamIndex)} />
@@ -76,15 +78,23 @@ interface FigureLayerProps {
   readonly x: number
   readonly y: number
   readonly paletteIndex: number | null
+  /** 우타 — 원본은 효과 0x11 로 부른다(78d16) */
+  readonly isFlipped?: boolean
 }
 
 /**
  * 겹 하나. 장비 손·다리는 **등급 줄(.mpl)** 로 갈아 끼워야 색이 맞는다 —
  * 장비 폴더는 `palette.json` 의 `baked` 가 null 이라 줄 0 도 갈아 끼운다 (`batterLayers` 주석).
  */
-function FigureLayer({ layer, x, y, paletteIndex }: FigureLayerProps) {
+function FigureLayer({ layer, x, y, paletteIndex, isFlipped = false }: FigureLayerProps) {
   const key = String(layer.frame).padStart(3, '0')
-  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, paletteIndex)
+  // 효과 0x11 이면 0xc9f98 ca07c 갈래 — 0x66 반투명 파트(머리 장비 3~6)를 섞지 않고 복사한 판(`frameCopies`)
+  const usesCopy = isFlipped && paletteIndex === null && hasFrameCopies(layer.folder)
+  const copies = useSpriteJson<unknown>(usesCopy ? frameCopiesUrl(layer.folder) : null)
+  const src = useRecoloredSprite(
+    usesCopy ? flippedFrameUrlOf(layer.folder, layer.frame, copies) : `${layer.folder}/${key}.png`,
+    paletteIndex,
+  )
   const origin = useFrameOrigins(layer.folder)?.[key]
   if (origin === undefined) return null
   return (

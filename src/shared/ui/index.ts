@@ -26,6 +26,7 @@ export {
   MODE_ICON,
 } from '@/shared/ui/PixelNumber/PixelNumber'
 export { FrameSprite } from '@/shared/ui/FrameSprite/FrameSprite'
+export { LayeredFrameSprite } from '@/shared/ui/LayeredFrameSprite/LayeredFrameSprite'
 export { SolidStamp } from '@/shared/ui/SolidStamp/SolidStamp'
 export { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 export { PressArea } from '@/shared/ui/PressArea/PressArea'

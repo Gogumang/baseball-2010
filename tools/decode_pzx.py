@@ -544,6 +544,41 @@ def write_frame_layers(frame_dir: Path, frames: list[dict], images, variants=Non
     return len(written)
 
 
+# ── 부른 쪽 효과 0x11(뒤집기) = 파트 효과 없이 복사 — 0x66 반투명 파트도 섞지 않는다 ─────────────
+#
+# 그리기 0xc9f98 ca074 `cmp [sp+0x2c],#0x11` → ca07c 뒤집기 갈래: 파트마다 이미지 그리기(vt+0xc)를
+# (X − (dx + 폭), Y + dy, …, 효과 [sp+0xc] = 0x11, 축 [sp+0x10] = b) 로 부르고 파트+0x10 · +0x14 는 읽지 않는다
+# (ca088~ca0d0 좌우 · ca0e0~ca128 상하). 곧 0x66(반투명 L/16) · 0x67(더하기) 파트도 **불투명하게 그대로** 찍힌다.
+# 구운 `frames/NNN.png` 는 0x66 파트를 섞어 두었으므로, 반투명(0x66 · 0x67) 파트가 든 프레임은 그 효과를 뺀 복사판을
+# `frames/copy/NNN.png` 에 따로 내고 번호를 `frames/copy.json` 에 적는다 (구운 프레임 · origins.json 은 그대로 —
+# 파트가 같으니 상자도 같다). 뒤집어 그리는 자리만 이 판을 쓴다.
+# ⚠️ 0x03 · 0x04(파트 뒤집기) · 0x6E/0x6F 채우기 · 변형 팔레트가 뒤집기 갈래에서 어떻게 되는지는 이 갈래에서 따로 안 봤다 —
+# 복사판을 싣는 폴더(item_bat_head_3~6 · player_effect · event_char_0/1)의 그런 프레임에는 0x66 말고 다른 효과가 없어(전수 확인)
+# 반투명 효과만 뺀다.
+def _without_alpha(parts: list[dict]) -> list[dict]:
+    return [dict(part, effects=[(k, v) for k, v in part['effects'] if k not in (ALPHA_SIXTEENTHS_EFFECT, ALPHA_BYTE_EFFECT)])
+            for part in parts]
+
+
+def write_frame_copies(frame_dir: Path, frames: list[dict], images, variants=None) -> int:
+    """`frames/copy.json` 과 `frames/copy/NNN.png` — 반투명 파트가 없는 PZX 는 json 을 지운다. 낸 그림 수를 돌려준다."""
+    listed: list[int] = []
+    for index, frame in enumerate(frames):
+        if not any(kind in (ALPHA_SIXTEENTHS_EFFECT, ALPHA_BYTE_EFFECT) for part in frame['parts'] for kind, _ in part['effects']):
+            continue
+        _, _, width, height, canvas, _ = compose_frame(_without_alpha(frame['parts']), images, variants)
+        if width <= 0 or height <= 0:
+            continue
+        (frame_dir / 'copy').mkdir(parents=True, exist_ok=True)
+        write_rgba_png(frame_dir / 'copy' / f'{index:03d}.png', width, height, canvas)
+        listed.append(index)
+    if not listed:
+        (frame_dir / 'copy.json').unlink(missing_ok=True)
+        return 0
+    (frame_dir / 'copy.json').write_text(json.dumps(listed), encoding='utf-8')
+    return len(listed)
+
+
 def decode_file(path: Path, output_dir: Path) -> int:
     raw = path.read_bytes()
     if raw[0:3] != b'PZX':
@@ -592,6 +627,7 @@ def decode_file(path: Path, output_dir: Path) -> int:
     (frame_dir / 'origins.json').write_text(json.dumps(origins, indent=1, sort_keys=True), encoding='utf-8')
     write_boxes(frame_dir, boxes)
     written += write_frame_layers(frame_dir, frames, images, variants)
+    written += write_frame_copies(frame_dir, frames, images, variants)
     if animations:
         (frame_dir / 'animations.json').write_text(json.dumps(animations, indent=1), encoding='utf-8')
     return written
