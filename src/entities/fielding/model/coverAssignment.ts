@@ -1,6 +1,7 @@
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
+  FIELDER_START_POSITIONS,
   horizontalDistance,
   isSamePoint,
   ticksToReach,
@@ -31,8 +32,10 @@ import {
  * b1d48  아니면 +0x130 == 1 → +0xf0[0] = 0 (투수) · 2 → +0xf0[1] = 0 · 4 → +0xf0[3] = 0
  *          그리고 0xb1b88(그 루) 가 거짓이면 그 칸 = −1
  * b1d96  막힘 = 2루수 AI == 1 || (유격수 AI == 1 && !H.vtcc())
- * b1dca  0xb1b88(2) && !막힘 → b1e12 규칙 / 아니면 공.vt68(0)(공 시작점) == 0xd8758(20000,1000,30000) 이면 b1e12 규칙,
+ * b1dca  !0xb1b88(2) → b1e12 규칙(b1dd4 `beq`) · 막힘 → b1e12 규칙(b1dd8 `bne`) — 둘 다 아니면(커버가 필요하고 안 막힘)
+ *        공.vt68(0)(공 첫 점) == 0xd8758(20000,1000,30000) 이면(0xbc0f4 = 세 좌표 같으면 1) b1e12 규칙,
  *        아니면 b1e86: 2루(0xd86c8)까지 거리가 먼 쪽이 돕는다 — 2루수가 멀면 (커버 5, 도움 3), 아니면 (3, 5)
+ *        (r162 정정: 예전 웹은 "필요 && !막힘 → 규칙" 으로 거꾸로 읽었다. 타구 판은 공 첫 점이 늘 0xd8758 이라 차이가 없었다)
  * b1e12  +0x130 == 3 → (커버 5, 도움 3) · == 5 → (3, 5) · 아니면 공 각 + 90 > 0 ? (5, 3) : (3, 5)
  * b1e66    도움 야수의 발밑 루(vt58 = 0xa0ae4)가 2 면 둘을 맞바꾼다
  * b1f06  +0xf0[2] = 커버 ; +0x138 = 도움 → (0xb203a 자리 잡기)
@@ -67,7 +70,13 @@ import {
  *   맞은 야수 vte4 0xa1e60 의 15)와 +0xcc 는 옮겼다(r158). vt30 은 AI 고리 vt4c 0xb45dc 끝(b4c72)이라 이 틱 머리 야수 틱이 줄인 값이다.
  *   ⚠️ 근사: +0xb0 워드(바이트 +0xb0~+0xb3 — 포구 · 다이빙 동작 vt 0xa1490(동작 7) · 0xa14ac(0xe) · 0xa1e28(6) · 0xa1ec4/0xa1f00
  *   (8~0x12) 가 1, 던지기 a1a3a 가 +0xb1 = 1, 야수 틱 a13a6~a143e 가 동작 칸 · +0xac 로 지운다)는 동작 번호 +0xa8 을 웹이 안 두어
- *   0 으로 본다 — 공 쫓는 유격수가 포구 동작을 시작한 뒤의 2루 막힘이 원본보다 늦게(안) 선다
+ *   0 으로 본다 — 공 쫓는 유격수가 포구 동작을 시작한 뒤의 2루 막힘이 원본보다 늦게(안) 선다.
+ *   지우는 규칙(a137a~a1456, r162 직접 뜸 — +0xac 는 동작 프레임으로 야수 틱 머리 a1288 이 매번 +1, 잠금 +0xb4 > 0 인 틱은 a12c6 에서 끝):
+ *   동작 0xe~0x12 면 0xe 는 프레임 0xf · 0xf~0x12 는 프레임 0xc 에서만 지운다(a141c~a143c). 그 밖의 동작은 (7 · 프레임 5) ·
+ *   (0xe · 0xf) · (5 · 2) · (6 · 2) · (+0xb3 && 프레임 5) 중 하나거나 **vtc8(0xa2118 = +0xb1 == 0 && +0xcc ≤ 0)이 참이면** 지운다
+ *   (a13f2~a141a) — 곧 가슴 높이 포구(7)가 세운 +0xb0 은 던진 뒤 잠금 +0xb1 · +0xcc 가 없으면 다음 야수 틱에 바로 지워진다.
+ *   지울 때 +0xb0 · +0xb1 · +0xb2 · +0xb3 = 0 · vt10(a143e~a1456). 세터 vt 는 야수 vtable(0xd7934) +0x5c(0xa1490) · +0x90(0xa14ac) ·
+ *   +0x94(0xa1e28) — 누가 어느 포구 종류에서 부르는지는 ⚠️ 미확인이라 옮기지 않았다
  * - +0x94 는 웹의 `requiredBase ≠ −1` 로 읽는다(0xa95e8 · 0xa9620 이 둘을 함께 세우고 지운다)
  */
 
@@ -204,7 +213,9 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
   const blocked = second?.aiState === AI_STATE.CHASE || (short?.aiState === AI_STATE.CHASE && !holderReady)
   let cover: number
   let helper: number
-  if ((needsCover(context, 2) && !blocked) || isSamePoint(input.ballStartPoint, BATTING_START)) {
+  // b1dce~b1e10 — 거리 갈래(b1e86)는 "2루 커버가 필요하고 · 안 막혔고 · 공 첫 점이 타격 지점이 아님" 일 때뿐
+  const distanceBranch = needsCover(context, 2) && !blocked && !isSamePoint(input.ballStartPoint, BATTING_START)
+  if (!distanceBranch) {
     if (holderSlot === 3) {
       cover = 5
       helper = 3
@@ -278,4 +289,22 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
     coverStates.push({ slot, base })
   }
   return { ran: true, covers, secondBaseHelper: helper, secondBaseCover: cover, idleSlots, coverStates }
+}
+
+/** `assignCoversForTick` 의 답을 야수에게 — AI 0(시작 자리로) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */
+export function applyCoverAssignment(
+  fielders: readonly FielderState[],
+  assigned: CoverAssignment,
+): readonly FielderState[] {
+  return fielders.map((fielder) => {
+    let next = fielder
+    if (assigned.idleSlots.includes(fielder.slot)) {
+      next = { ...next, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot] ?? next.target, targetBase: NONE }
+    }
+    const cover = assigned.coverStates.find((entry) => entry.slot === fielder.slot)
+    if (cover !== undefined) {
+      next = { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
+    }
+    return next
+  })
 }

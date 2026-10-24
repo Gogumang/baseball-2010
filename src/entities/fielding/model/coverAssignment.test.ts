@@ -107,23 +107,27 @@ describe('0xb1c90 커버 매 틱 다시 고르기 — 표 0xd8774 · b1d48 · b1
     expect(답.secondBaseHelper).toBe(3)
   })
 
-  it('타구가 아니면(공 시작점 ≠ 0xd8758) 2루가 필요 없을 때 2루에 가까운 쪽이 커버한다 (b1e86)', () => {
+  it('거리 갈래(b1e86)는 2루 커버가 필요하고 · 안 막혔고 · 공 첫 점이 0xd8758 이 아닐 때뿐이다 (b1dce~b1e10 직접 뜸, r162 정정)', () => {
     const 홈 = basePosition(0)
+    const 주자1루 = [createRunner(1, 1, 속도)]
     const 야수 = 고치기(5, { position: { x: 20_100, y: 0, z: 19_300 } })
-    expect(돌리기(문맥({ ballHolderSlot: 1 }, [], 야수), false, 홈).covers[2]).toBe(5)
-    // 타구 판이면 2루가 필요 없어도 b1e12 규칙(공 방향)이다
-    expect(돌리기(문맥({ ballHolderSlot: 1 }, [], 야수), false, 타격점).covers[2]).toBe(3)
+    // 1루 주자 → 2루 필요 · 안 막힘 · 공 첫 점 홈 → b1e86: 2루수가 더 멀어 유격수가 커버
+    expect(돌리기(문맥({ ballHolderSlot: 1 }, 주자1루, 야수), false, 홈).covers[2]).toBe(5)
+    // 2루가 필요 없으면(b1dd4 beq) b1e12 규칙(공 방향 — 3루 쪽이면 2루수)
+    expect(돌리기(문맥({ ballHolderSlot: 1 }, [], 야수), false, 홈).covers[2]).toBe(3)
+    // 타구 판(공 첫 점 = 0xd8758)이면 늘 b1e12 규칙이다
+    expect(돌리기(문맥({ ballHolderSlot: 1 }, 주자1루, 야수), false, 타격점).covers[2]).toBe(3)
   })
 
-  it('유격수가 공을 쫓는데 공 가진 야수의 vtcc 가 거짓(동작 잠금 +0xb4)이면 2루가 막혀 2루에 가까운 쪽이 커버한다 (b1d96~b1dc8 · r158)', () => {
-    // 공 시작점이 타격점이 아니고 1루 주자가 있어 2루가 필요하다 — 안 막히면 b1e12(공 가진 유격수 → 2루수 커버)
+  it('2루가 막히면(공 가진 야수의 vtcc 거짓 — 동작 잠금 +0xb4) 거리 갈래가 아니라 b1e12 규칙이다 (b1d96~b1dd8 · r158 · r162 정정)', () => {
+    // 공 첫 점이 타격점이 아니고 1루 주자가 있어 2루가 필요하다 — 안 막히면 b1e86: 2루에 가까운 유격수가 커버
     const 주자1루 = [createRunner(1, 1, 속도)]
     const 쫓는유격 = 고치기(5, { aiState: AI_STATE.CHASE, position: { x: 20_100, y: 0, z: 19_300 } })
     const 홈 = basePosition(0)
-    expect(돌리기(문맥({ ballHolderSlot: 5 }, 주자1루, 쫓는유격), false, 홈).covers[2]).toBe(3)
-    // H(+0x130) = 유격수가 필살타법 타구에 맞아 +0xb4 > 0 → vtcc(0xa2138) 거짓 → 막힘 → b1e86: 2루수가 더 멀어 유격수가 커버
+    expect(돌리기(문맥({ ballHolderSlot: 5 }, 주자1루, 쫓는유격), false, 홈).covers[2]).toBe(5)
+    // H(+0x130) = 유격수가 필살타법 타구에 맞아 +0xb4 > 0 → vtcc(0xa2138) 거짓 → 막힘(b1dd8 bne) → b1e12: 공 가진 유격수 → 2루수 커버
     const 잠긴 = 고치기(5, { actionLockTicks: 3 }, 쫓는유격)
-    expect(돌리기(문맥({ ballHolderSlot: 5 }, 주자1루, 잠긴), false, 홈).covers[2]).toBe(5)
+    expect(돌리기(문맥({ ballHolderSlot: 5 }, 주자1루, 잠긴), false, 홈).covers[2]).toBe(3)
   })
 
   it('공 가진 야수가 루로 가고 있으면 그 루의 커버다 — AI 9 면 아니다 (b23a4)', () => {

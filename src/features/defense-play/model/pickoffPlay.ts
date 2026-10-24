@@ -75,6 +75,12 @@ import {
   type LooseBallChase,
 } from '@/features/defense-play/model/looseBallChase'
 import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/throwLaunch'
+import {
+  PITCHER_BALL_POINT,
+  runCoverTick,
+  runnerPlayBallInput,
+  type CurrentBallPath,
+} from '@/features/defense-play/model/coverTick'
 
 /**
  * **견제 한 판** — 플레이 종류 4 를 틱 단위로 돌린다 (0x50f28 → 상태 0x17 → 0xb28be · 0xb47da · 0xb4292).
@@ -109,8 +115,10 @@ import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/th
  * ## 근사·미해결 (지어내지 않은 자리)
  * - ⚠️ 야수 이동이 슬롯 2 뒤라(타구 진행기와 같은 다리) 고른 야수는 포구 틱에 포구 지점(x, 0, z)으로 옮겨 쥔다.
  * - ⚠️ 중계 이어 던지기(b4616)는 이 판에 없다 — 중계맨이 받으면 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다.
- * - ⚠️ **커버 야수의 AI 상태**: 0xb28be 는 커버를 루 위에 놓기만 하고(0xbef58, b2908~b2930) AI 상태를 따로 쓰지 않는다.
+ * - **커버 야수의 AI 상태**: 0xb28be 는 커버를 루 위에 놓기만 하고(0xbef58, b2908~b2930) AI 상태를 따로 쓰지 않는다.
  *   (예전 웹은 "보내고" 를 목표점 걷기로 읽었다 — 0xbef58 은 기반 캐릭터의 위치 · 기준점 · 목표를 함께 놓는 함수다)
+ *   그 뒤 첫 틱부터 vt4c 끝(b4c72)의 0xb1c90 이 매 틱 커버를 다시 골라 b2564 가 AI 루 + 2 를 주고, 2루 커버가 아닌 유격수는
+ *   0xb203a 로 기본 자리 0xd8764 에 간다(`coverTick.runCoverTick`, r162). 견제 시작은 vt30 을 부르지 않는다(b2942 → b29ec)
  * - ⚠️ **레이저 굴림(0x66a8c)을 안 굴린다**: 창 0xb2648 이 보는 포구 틱(P+0x174)을 견제 시작이
  *   세우지 않아 그 값이 무엇인지 문서에 없다. 굴림 차례를 지어 넣지 않는다 — **미해결**.
  * - 메시지 처리기 0x509a0 앞머리는 CPU 송구 결정이 아니라 경기 로직의 빈 함수 0xae5f8 을 부른다(S8 4-3 정정,
@@ -331,6 +339,10 @@ function* pickoffPlaySteps(
   let chase = null as LooseBallChase | null
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 */
   let ballBody: LooseBallChase['body'] = undefined
+  /** 지금 공 궤적(공.vt68(0) · 공.vt60) — 송구 · 튕김이 새로 깐다. 그 전에는 0xa276c 의 점 하나(투수판 0xd7c24 · 각 0) */
+  let ballPath: CurrentBallPath | null = null
+  /** 플레이 +0x126 — 판 시작 vt20(b28cc → b11fe)이 1. 0xb203a 가 중계 자리를 잡으면 0 */
+  let relayFlag = true
   /** 처음 공을 쥔 틱 */
   let catchTick = -1
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
@@ -374,6 +386,21 @@ function* pickoffPlaySteps(
     // 공은 처음부터 쥐어져 있다 — 낙구 틱은 0 으로 둔다 (자동 진루의 "잡힐 뜬공" 갈래가 안 서게)
     landingTick: 0,
   })
+  /**
+   * 플레이 vt30 = 0xb1c90 한 번 (`coverTick.runCoverTick`) — vt4c 끝 b4c72(매 틱) · 송구 꼬리 b3094. 견제 시작 0xb28be 는 부르지 않는다.
+   * 0xb203a 의 자동 고리가 보는 +0x160 은 이 진행기의 `manualThrowBase` 다(`play.manualThrowBase` 는 다리라 비워 둔다 — 머리말)
+   */
+  const coverTick = (tick: number): void => {
+    const context = contextAt(tick)
+    const covered = runCoverTick({
+      context: { ...context, play: { ...context.play, manualThrowBase } },
+      ...runnerPlayBallInput(ballPath, PITCHER_BALL_POINT, tick),
+      relayFlag,
+    })
+    play = { ...covered.play, manualThrowBase: NONE }
+    fielders = covered.fielders
+    relayFlag = covered.relayFlag
+  }
 
   /** 0xb36d0 한 번 — 타구 진행기의 `runOutJudgement` 와 같은 자리, 다만 타자주자 제외가 없다 */
   /** 바로 앞 0xb36d0 한 번의 결과 — 같은 플레이 틱의 두 번째 판정이 state[0x87] 을 다시 적는다(타구 진행기 `grabOutThisTick`) */
@@ -488,16 +515,21 @@ function* pickoffPlaySteps(
     if (chase?.secondPassStarted === true) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     flight = { from: holderSlot, base, releaseTick: tick }
     thrownThisTick = holderSlot
-    // b2f80 · b3070 손을 떠난다 · b2df8~b2e14 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로)
+    // b2f80 · b3070 손을 떠난다
+    fielders = fielders.map((fielder) =>
+      fielder.slot === holderSlot ? { ...fielder, holdingBall: false, actionRemainingTicks: 0 } : fielder,
+    )
+    // b3094 vt30 = 0xb1c90 한 번 — 고르기 vt34 뒤의 공 가진 야수(받을 야수)로 커버를 다시 고른다(`coverTick.runCoverTick`)
+    coverTick(tick)
+    // b2df8~b2e14 — 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로)
     fielders = fielders.map((fielder) => {
       if (fielder.slot !== holderSlot) return fielder
-      const released = { ...fielder, holdingBall: false, actionRemainingTicks: 0 }
       const keeps =
         (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
         fielder.aiState === AI_STATE.RECEIVE
       return keeps
-        ? released
-        : { ...released, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
+        ? fielder
+        : { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
     })
     log.push(
       (chooser === PICKOFF_THROW
@@ -519,6 +551,7 @@ function* pickoffPlaySteps(
   const takeLooseBall = (next: LooseBallChase): void => {
     chase = next
     ballBody = next.body
+    ballPath = { trajectory: next.trajectory, startTick: next.startTick }
     fielders = fielders.map((fielder) =>
       fielder.slot === next.slot
         ? { ...fielder, target: next.catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
@@ -767,6 +800,10 @@ function* pickoffPlaySteps(
         }
       }
     }
+
+    // ── vt4c 의 끝 b4c72 — 플레이 vt30 = 0xb1c90: 커버(+0xf0) 다시 고르기 · 키스톤 자리 잡기 0xb203a (`runCoverTick`) ──
+    // 야수 AI 고리(b46ae~b4c6a — 위 AI 0xe · AI 9) 뒤 조건 없이 부른다. 종류 4 는 vt4c 가 도는 판이라 매 틱
+    if (!play.finished) coverTick(tick)
 
     // ── 자동 추가 진루 0xaf918 — 경기 장면 슬롯 2 가 매 틱 부른다 (종류 4 는 거르개 2·3·8 밖이다) ──
     // 결과 코드(9·13)가 선 뒤에도 돈다 — 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이 열려 있으면 매 틱 부르고, 결과 코드를
