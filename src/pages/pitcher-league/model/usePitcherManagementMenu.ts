@@ -37,6 +37,11 @@ import {
   selectPitchCell,
 } from '@/entities/pitcher-career/model/pitchSelection'
 import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
+import {
+  PITCHER_MAGIC_TRAINING_SLOT,
+  pitcherTrainingPresentationOf,
+} from '@/pages/pitcher-league/lib/pitcherTrainingPresentation'
+import type { PitcherTrainingPresentation } from '@/pages/pitcher-league/lib/pitcherTrainingPresentation'
 import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles'
 import { ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
@@ -185,6 +190,15 @@ export interface PitcherManagementMenu {
   readonly equipSkill: (skillId: number, on: boolean) => void
   /** 스킬 창(122) 대화 번호 6 — 슬롯 확장 0x1484c. G 가 모자라면 아무것도 안 바뀐다 */
   readonly expandSkillSlots: () => void
+  /**
+   * 125 훈련 연출이 도는 중이면 그 연출(0x84664 모드 3 갈래) — 게이지가 차면 `finishTraining` 이 훈련 0x17f5c 를 굴린다.
+   * 연출이 끝나 결과 창이 떠 있는 동안은 null 이다(0x84e58 이 애니를 지워 0x848d0 이 안 그린다).
+   */
+  readonly trainingPresentation: PitcherTrainingPresentation | null
+  /** 상태 125 인가(연출 · 결과 창) — 그림 0x19da4 가 가운데 판 0x7f814 를 빼고, 커맨드 줄 키는 안 받는다 */
+  readonly isTrainingState: boolean
+  /** 게이지 끝 — 틀 0x18dd8 의 `0x84e58 → 0x17f5c` */
+  readonly finishTraining: () => void
 }
 
 /** StrMODE 글 — 화면이 `!C` 를 붙여 그리므로 앞의 가운데 맞춤 표시는 뗀다 */
@@ -228,6 +242,35 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [detail, setDetail] = useState<PitcherMenuDetail | null>(null)
   /** 108 마구 창의 격자 커서 (창 객체 +0xc · +0x10 — 진입 0x17730 이 정한다) */
   const [magicTrainingCursor, setMagicTrainingCursor] = useState(0)
+  /**
+   * 상태 125 — 칸(107 메뉴 커서, 108 에서 와도 4)과 연출이 도는 중인지. 진입 0x11744 가 연출을 세우고, 틀 0x18dd8 이
+   * 게이지 끝(0x84e58)을 본 틀에 훈련 0x17f5c(굴림 · 결과 창)를 부른다 — 굴림은 연출 **뒤**다. 결과 창이 닫히면 105.
+   */
+  const [training, setTraining] = useState<{ readonly slot: number; readonly isPlaying: boolean } | null>(null)
+  const trainingRunRef = useRef<(() => void) | null>(null)
+
+  /** 125 진입 — 연출을 틀고, 끝나면 할 훈련(0x17f5c 갈래)을 들고 있는다. 그동안 105 가 아니다 */
+  const startTraining = useCallback((slot: number, run: () => void) => {
+    if (trainingRunRef.current !== null) return
+    trainingRunRef.current = run
+    setIsResultWindowOpen(true)
+    setTraining({ slot, isPlaying: true })
+  }, [])
+
+  /** 0x84e58 참 → 0x17f5c. 같은 연출이 두 번 끝났다고 알려도 한 번만 굴린다 */
+  const finishTraining = useCallback(() => {
+    const run = trainingRunRef.current
+    if (run === null) return
+    trainingRunRef.current = null
+    setTraining((current) => (current === null ? null : { ...current, isPlaying: false }))
+    run()
+  }, [])
+
+  /** 125 → 105 (`0xbcb49(0x69)` — 0x18dd8 · 0x1b5b8) */
+  const leaveTrainingResult = useCallback(() => {
+    setTraining(null)
+    onReenter?.(TRAINING_RESULT_STATE)
+  }, [onReenter])
 
   /** 두 갈래 팝업을 연다 — 커서는 늘 첫 칸부터다 (원본도 `+0x166` 을 0 으로 두고 연다) */
   const openChoice = useCallback((next: PitcherMenuChoice) => {
@@ -256,7 +299,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const rows = pitcherTrainingDetailRowsOf(outcome)
       if (rows === null) {
         // 알림 창이 닫히면 125 → 105
-        noticeThenRef.current = () => onReenter?.(TRAINING_RESULT_STATE)
+        noticeThenRef.current = leaveTrainingResult
         return setNotice([result, ...typeLine].join('!N'))
       }
       /*
@@ -279,11 +322,11 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
             }
           } else setIsResultWindowOpen(false)
           // 창이 닫히면 125 → 105 (0x1b5b8 `0xbcb49(0x69)`)
-          onReenter?.(TRAINING_RESULT_STATE)
+          leaveTrainingResult()
         },
       })
     },
-    [career, onReenter, onSave, random],
+    [career, leaveTrainingResult, onSave, random],
   )
 
   /** 마구 훈련 (108 → 팝업 [66] → 125 → 105) */
@@ -293,17 +336,20 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       onSave(outcome.career)
       setKind('관리')
       const magic = outcome.magic
-      if (magic === null) return onReenter?.(TRAINING_RESULT_STATE)
+      if (magic === null) {
+        setIsResultWindowOpen(false)
+        return leaveTrainingResult()
+      }
       /*
        * 125 → 0x17f5c 칸 4 갈래(0x18bd8 `[sp+0x40] == 4`) — 결과 글 [sp+0xfc] 를 알림 창 0xbbef8(글, 1, 코드 4, 1) 에 띄우고,
        * 창이 닫히면 125 틀 0x18dd8 이 105 로 간다(타자편 필살타법과 같은 길). 글은 마구 이름 StrCOMMON[0x1e + n] 으로
        * [87] "훈련 완료" 또는 [86] "[이름] %d/%d회 훈련", 그 뒤 "!N" + StrMODE[24] "사기" … (0x18116~0x181c6)
        */
       setIsResultWindowOpen(true)
-      noticeThenRef.current = () => onReenter?.(TRAINING_RESULT_STATE)
+      noticeThenRef.current = leaveTrainingResult
       setNotice(magicTrainingLinesOf(magic, outcome.moraleLoss).join('!N'))
     },
-    [career, onReenter, onSave, random],
+    [career, leaveTrainingResult, onSave, random],
   )
 
   const blockNoticeOf = useCallback(
@@ -355,12 +401,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       return setQuestion({
         text: modeTextOf(66).replace('%d', String(magicTrainingCellCostOf(cell))),
         onYes: () => {
+          // 틀 0x106bc 팝업 3 예 → 125 — 108 창은 떠나고, 연출(칸 4) 뒤에 0x17f5c 칸 4 갈래
           setSubWindow(null)
-          runMagicTraining(menu)
+          startTraining(PITCHER_MAGIC_TRAINING_SLOT, () => runMagicTraining(menu))
         },
       })
     },
-    [career, enterMagicTraining, runMagicTraining],
+    [career, enterMagicTraining, runMagicTraining, startTraining],
   )
 
   /** 팝업 0x78 — 마구/구질 두 갈래. 트레이닝(107)에서 열면 훈련 창 108, 선수정보(106)에서 열면 보기 창 123 */
@@ -458,9 +505,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const reason = pitcherTrainingBlockReasonOf(career, menu)
       if (reason !== null) return setNotice(blockNoticeOf(reason))
       const ability = menu.ability
-      return setQuestion({ text: trainingQuestionOf(menu.name), onYes: () => runAbilityTraining(menu, ability) })
+      // [85] 예 → 125 — 연출(칸 = 107 커서) 뒤에 훈련 0x17f5c 를 굴린다
+      const slot = PITCHER_TRAINING_MENUS.indexOf(menu)
+      return setQuestion({
+        text: trainingQuestionOf(menu.name),
+        onYes: () => startTraining(slot, () => runAbilityTraining(menu, ability)),
+      })
     },
-    [blockNoticeOf, career, openPitchWindow, runAbilityTraining],
+    [blockNoticeOf, career, openPitchWindow, runAbilityTraining, startTraining],
   )
 
   /** 110 아이템 하위 메뉴 — 고른 칸(장착·서브·GP)이 곧 111 상점의 창 종류(3·1·2)다 */
@@ -495,6 +547,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   }, [subWindow])
 
   const back = useCallback(() => {
+    // 125 키 0x105a4 는 확인 · '5' 만 본다 — 취소는 안 받는다(결과 창은 제 키로 닫힌다)
+    if (training !== null) return
     setNotice('')
     // 120 취소 → 119 (0x1b654)
     if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
@@ -507,7 +561,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       return onReenter?.()
     }
     return onExit()
-  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, onReenter, subWindow])
+  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, onReenter, subWindow, training])
 
   /*
    * 기본정보(119) 에서 칭호 목록(129) 을 여는 키.
@@ -655,17 +709,24 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
    * 108 탭 2 확인 [예] → 125 → 0x17f5c(탭 2 갈래 0x1836a — `runPitchTypeTraining`) → 알림 창(코드 4) → 닫히면 125 틀 0x18dd8 이
    * **105** 로. 창(108)은 떠나므로 하위 창을 닫고 알림은 관리 화면 위에 띄운다. 105 진입은 알림이 닫힐 때 친다(`dismissNotice`).
    */
-  const trainPitch = useCallback(
+  const runPitchTraining = useCallback(
     (row: number, column: number) => {
       const outcome = runPitchTypeTraining(career, row, column, random)
       onSave(outcome.career)
-      setSubWindow(null)
       setKind('관리')
       setIsResultWindowOpen(true)
-      noticeThenRef.current = () => onReenter?.(TRAINING_RESULT_STATE)
+      noticeThenRef.current = leaveTrainingResult
       setNotice(pitchTypeTrainingLinesOf(outcome).join('!N'))
     },
-    [career, onReenter, onSave, random],
+    [career, leaveTrainingResult, onSave, random],
+  )
+  /** 108 을 떠나 125 연출(칸 4)을 튼다 — 굴림은 연출이 끝난 뒤 `runPitchTraining` */
+  const trainPitch = useCallback(
+    (row: number, column: number) => {
+      setSubWindow(null)
+      startTraining(PITCHER_MAGIC_TRAINING_SLOT, () => runPitchTraining(row, column))
+    },
+    [runPitchTraining, startTraining],
   )
 
   /** 0xa4b04 켜기는 0xb663c 가 곧바로 저장(0x1f1e1)한다 — 웹은 `onSave` 가 저장이다 */
@@ -719,6 +780,11 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     confirmMagicTrainingCell,
     equipSkill,
     expandSkillSlots: expandPitcherSkillSlots,
+    trainingPresentation: training !== null && training.isPlaying
+      ? pitcherTrainingPresentationOf(training.slot, career.typeIndex)
+      : null,
+    isTrainingState: training !== null,
+    finishTraining,
   }
 }
 
