@@ -99,7 +99,8 @@ export function derbyLineupBatterOf(lineup: DerbyLineup): DerbyLineupBatter {
 export function derbyModeBatterPositionOf(lineup: DerbyLineup): number | undefined {
   const batters = teamBatters(lineup.teamId)
   // k 가 마스터 줄 수와 같으면(영입 자리 12) 옛 [k] 는 0xb4e34 가 늘린 끝 칸 — 새 칸 생성자 0xb8de5 가 0x30 바이트를 0 으로(memset)
-  // 채운 줄이라 수비 위치 0 이다. ⚠️ k > 12 는 0xb53d0 이 null → b55dc 가 모드 타자를 rec[0] 에 덮는다(U-111 (b)) — 웹은 안 옮겼다
+  // 채운 줄이라 수비 위치 0 이다. k > 12 는 0xb53d0 이 null → b55dc 가 모드 타자를 rec[0] 에 덮고, 팀+0x32 = k 의 지금 타자
+  // 0xae89c 는 팀[0xe + k] = k(0xb891c 가 0..0x15 를 채움) → 0xb53d0(k) = null 을 읽는다(주소 0 — 원본 정의 밖, U-111 (b)) — 옮길 값이 없다
   if (lineup.modeBatterSlot === batters.length) return 0
   const row = batters[lineup.modeBatterSlot]
   return row?.position === undefined ? undefined : row.position & 0xf
