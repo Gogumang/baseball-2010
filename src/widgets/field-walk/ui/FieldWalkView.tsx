@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { useRecoloredSprite, useWarmRecoloredFolder } from '@/shared/lib/sprite/paletteSwap'
 import { toScreenX, toScreenY } from '@/pages/defense/lib/defenseCamera'
 import {
   DEFENSE_BACKGROUND_HEIGHT,
   DEFENSE_BACKGROUND_URL,
   DEFENSE_BACKGROUND_WIDTH,
+  DEFENDER_FRAMES,
   defenderPaletteIndexOf,
 } from '@/pages/defense/lib/defenseView'
 import type { FieldWalker } from '@/widgets/field-walk/lib/fieldWalker'
@@ -46,6 +47,8 @@ interface FieldWalkViewProps {
  */
 export function FieldWalkView({ offset, grassPalette = null, rows, children }: FieldWalkViewProps) {
   const backgroundUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
+  // 걷는 칸마다 그림이 바뀐다 — 줄(팀) 벌로 defender 칸 전부를 미리 칠해 처음 딛는 칸에 구운 벌이 비치지 않게
+  useWarmRecoloredFolder(DEFENDER_FRAMES, rows.map((row) => defenderPaletteIndexOf(row.teamIndex)))
   const size = { width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }
   const actors = rows
     .flatMap((row, rowIndex) =>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { FrameSprite, LayeredFrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { useRecoloredSprite, useWarmRecoloredFolder } from '@/shared/lib/sprite/paletteSwap'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
 import { shinedSpriteUrl } from '@/pages/defense/lib/laserShine'
 import {
@@ -20,6 +20,7 @@ import {
   DEFENSE_BACKGROUND_HEIGHT,
   DEFENSE_BACKGROUND_URL,
   DEFENSE_BACKGROUND_WIDTH,
+  DEFENDER_FRAMES,
   type DefenseFielder,
   type DefenseRunner,
   type DefenseViewState,
@@ -212,6 +213,13 @@ export function DefenseScreen({
   const drawnPictures = update + drawRedraws
   // 시즌 잔디 (`0x7885c`) — 아직 다 안 칠했거나 캔버스가 없으면 구운 그림을 그대로 쓴다.
   const backgroundUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
+  // 야수 · 주자(defender)는 매 틱 동작이 바뀐다 — 두 팀 벌로 칸 전부를 미리 칠해 처음 서는 동작에 구운 벌이 비치지 않게
+  // (원본 0x48658 은 적재 때 팔레트를 갈아 끼운다). 그림만 — 진행 로직은 안 건드린다
+  useWarmRecoloredFolder(DEFENDER_FRAMES, [
+    ...state.fielders.map((fielder) => (fielder.aceIndex == null ? defenderPaletteIndexOf(fielder.teamIndex) : null)),
+    // 마선수 주자도 실린 그림이 없으면 defender 를 팀 벌로 그린다(`runnerSpriteFolderOf`) — 주자는 다 넣는다
+    ...state.runners.map((runner) => defenderPaletteIndexOf(runner.teamIndex)),
+  ])
   const bounds = cameraBoundsOf(styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)
   const target = cameraTargetOf(state)
 

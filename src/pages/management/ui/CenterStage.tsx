@@ -1,6 +1,6 @@
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { CENTER_STAGE, stageSlideOffsetAt } from '@/pages/management/lib/centerStage'
 import type { StageCharacter } from '@/pages/management/lib/centerStage'
@@ -35,6 +35,8 @@ function StageSprite({ character, x, update }: { readonly character: StageCharac
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const entries = animations?.[character.animation]
+  // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
+  useWarmRecoloredSprites(recolorRequestsOf(folder, (entries ?? []).map((entry) => entry.frame), character.palette))
   const step = entries === undefined ? null : animationStepAt(entries, update)
   const key = step === null ? '' : String(step.frame).padStart(3, '0')
   const origin = step === null ? undefined : origins?.[key]

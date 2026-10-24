@@ -1,5 +1,5 @@
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import {
   ACE_BATTER_DEFENDER_FRAMES,
   ACE_PITCHER_DEFENDER_FRAMES,
@@ -109,6 +109,11 @@ export function TeamRelayFigures({ figures }: { readonly figures: TeamRelayFigur
   const center = RELAY_FIGURES_CENTER
   const offensePalette = defenderPaletteIndexOf(figures.offenseTeam)
   const defensePalette = defenderPaletteIndexOf(figures.defenseTeam)
+  // 타자가 바뀌면 좌우 칸이 갈리고 주자 · 투수 · 포수도 나중에 선다 — 두 팀 벌로 그 칸들을 미리 칠해 처음 서는 그림에 구운 벌이 비치지 않게
+  useWarmRecoloredSprites([
+    ...recolorRequestsOf(DEFENDER_FRAMES, [RUNNER_FRAME, BATTER_LEFT_FRAME, BATTER_RIGHT_FRAME], offensePalette),
+    ...recolorRequestsOf(DEFENDER_FRAMES, [PITCHER_FRAME + FIELDER_FRAME_OFFSET, CATCHER_FRAME + FIELDER_FRAME_OFFSET], defensePalette),
+  ])
   const batter = figures.batter
   const pitcherAce = figures.pitcherAce
   return (

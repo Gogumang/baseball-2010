@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { acePitcherMirrorsOf, offenseTeamIdOf, pitcherMirrorOf, showsStrikeZone, strikeZoneAnchorOf } from '@/widgets/batting-stage/lib/renderBattingStage'
-import { pitcherFrameAt } from '@/widgets/batting-stage/lib/stageScenery'
+import {
+  acePitcherMirrorsOf, offenseTeamIdOf, pitcherMirrorOf, pitcherRecolorFramesOf, runnerRecolorFramesOf, showsStrikeZone, strikeZoneAnchorOf,
+} from '@/widgets/batting-stage/lib/renderBattingStage'
+import { NO_PITCHER_EQUIPMENT, pitcherEquipmentOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { RUNNER_FRAMES } from '@/widgets/batting-stage/lib/baseRunners'
+import { pitcherFrameAt, pitcherPoseFramesOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 
 describe('타석 화면 일반 투수 — 폼·손 (0x9e0b8 · 0x482c8 · 0x79524)', () => {
@@ -60,5 +64,25 @@ describe('마투수 그림 뒤집기 — 0x79524 의 +0x3d == 2 갈래 (79570)',
     for (const order of [0, 1, 3, 4]) {
       expect([acePitcherMirrorsOf(order, true, 0), acePitcherMirrorsOf(order, false, 1)]).toEqual([true, false])
     }
+  })
+})
+
+describe('미리 칠하기 목록 (r189 — 첫 와인드업 · 첫 주자 그림에 구운 벌이 비치지 않게)', () => {
+  it('투수: 자세 전부의 등급 색 장비 겹을 등급 줄로 — 맨몸이면 칠할 겹이 없다', () => {
+    expect(pitcherRecolorFramesOf(NO_PITCHER_EQUIPMENT).filter((frame) => frame.paletteIndex !== null)).toEqual([])
+    const equipment = pitcherEquipmentOf({ control: 3, velocity: 3, breaking: 3, stamina: 3 })
+    const frames = pitcherRecolorFramesOf(equipment)
+    for (const pose of pitcherPoseFramesOf(null)) {
+      for (const layer of pitcherLayersOf(pose, equipment)) {
+        if (layer.gradePaletteRow === undefined) continue
+        expect(frames).toContainEqual({ folder: layer.folder, frame: layer.frame, paletteIndex: layer.gradePaletteRow })
+      }
+    }
+    expect(frames.some((frame) => frame.paletteIndex !== null)).toBe(true)
+  })
+
+  it('주자: 애니 0 · 1 · 2 의 칸을 한 번씩 공격 팀 벌로 (애니 3 부터는 루 주자가 아니다)', () => {
+    const animations = [[{ frame: 0, delay: 1 }, { frame: 1, delay: 1 }], [{ frame: 1, delay: 1 }], [{ frame: 2, delay: 1 }], [{ frame: 9, delay: 1 }]]
+    expect(runnerRecolorFramesOf(animations, 4)).toEqual([0, 1, 2].map((frame) => ({ folder: RUNNER_FRAMES, frame, paletteIndex: 4 })))
   })
 })

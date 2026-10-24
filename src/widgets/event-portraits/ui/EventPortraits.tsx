@@ -6,7 +6,7 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { EventPortrait } from '@/shared/config/original/eventTypes'
 import { placePortraits, portraitAnimationOf, portraitPaletteOf, slideX } from '@/widgets/event-portraits/lib/portraitSlots'
 import type { PlacedPortrait } from '@/widgets/event-portraits/lib/portraitSlots'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/event-portraits/ui/EventPortraits.css'
 
 const SCREEN_WIDTH = 240
@@ -62,6 +62,9 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
 
   // 장타형 주인공은 애니 번호가 +8 이다 (0x63a70).
   const entries = animations?.[portraitAnimationOf(placed.portrait, battingTypeIndex)]
+  const palette = portraitPaletteOf(placed.portrait, skinIndex)
+  // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
+  useWarmRecoloredSprites(recolorRequestsOf(folder, (entries ?? []).map((entry) => entry.frame), palette))
   const step = entries === undefined ? null : animationStepAt(entries, update)
   const key = step === null ? '' : String(step.frame).padStart(3, '0')
   // 빈 자리 프레임은 그림도 원점도 없다 — 원작도 아무것도 그리지 않는다.
@@ -73,7 +76,7 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
   return (
     // 주인공이면 피부 .mpl 로 다시 칠한다 (`key` = 프레임 — 아래 주석 참고).
     <PaintedFrame key={key} url={`${folder}/${key}.png`} style={{ left: x, top: y }}
-      palette={portraitPaletteOf(placed.portrait, skinIndex)} />
+      palette={palette} />
   )
 }
 

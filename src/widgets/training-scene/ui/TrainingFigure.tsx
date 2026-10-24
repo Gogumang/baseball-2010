@@ -1,8 +1,8 @@
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
 import { useSpriteJson } from '@/shared/lib/sprite/useSpriteJson'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
-import { batterLayersOf, bodyTypeOf, layerPaletteIndexOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
+import { useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
+import { batterLayersOf, bodyTypeOf, layerPaletteIndexOf, layerRecolorRequestsOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import type { BatterEquipment, BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
@@ -53,11 +53,21 @@ interface TrainingFigureProps {
   readonly teamIndex?: number
   /** 폼 `rec[0xb] >> 4` = 2 × 타입 + 손 — 몸통 종류(폼 >> 1)와 뒤집기(손 0 = 우타)를 고른다. 안 넘기면 좌타 타격형(폼 1) */
   readonly form?: number
+  /**
+   * 이 애니가 앞으로 낼 자세들 — 그 겹을 미리 칠해 둔다(`useWarmRecoloredSprites`). 자세가 넘어가는 그 그림에 구운 벌이
+   * 한 박자 비치지 않게(원본은 적재 때 팔레트를 갈아 끼운다). 안 넘기면 지금 자세만
+   */
+  readonly warmPoses?: readonly number[]
 }
 
-export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex, form = 1 }: TrainingFigureProps) {
-  const layers = batterLayersOf(pose, bodyTypeOf(form), equipment, false)
+export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex, form = 1, warmPoses = [] }: TrainingFigureProps) {
+  const layersOf = (shown: number) => batterLayersOf(shown, bodyTypeOf(form), equipment, false)
     .filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
+  const layers = layersOf(pose)
+  const paletteOf = (layer: BatterLayer) => skinIndex === undefined || teamIndex === undefined
+    ? layer.gradePaletteRow ?? null
+    : layerPaletteIndexOf(layer, skinIndex, teamIndex)
+  useWarmRecoloredSprites(layerRecolorRequestsOf([...new Set(warmPoses)].flatMap(layersOf), paletteOf))
   const isMirrored = batterSideOfForm(form) === RIGHT_HANDED
   // 겹들을 그림 x 에 놓은 폭 0 상자 안에 두고 그 상자를 뒤집는다 — 축 = 그림 x
   return (
@@ -65,9 +75,7 @@ export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex
       data-mirrored={isMirrored ? 'true' : undefined}>
       {layers.map((layer, index) => (
         <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={0} y={y} isFlipped={isMirrored}
-          paletteIndex={skinIndex === undefined || teamIndex === undefined
-            ? layer.gradePaletteRow ?? null
-            : layerPaletteIndexOf(layer, skinIndex, teamIndex)} />
+          paletteIndex={paletteOf(layer)} />
       ))}
     </div>
   )
