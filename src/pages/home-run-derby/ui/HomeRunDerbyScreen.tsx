@@ -26,6 +26,8 @@ import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { pitcherCardStatsOf, pitcherLineOfRecord } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
+import { derbyStaminaGaugeOf } from '@/pages/home-run-derby/lib/derbyStaminaGauge'
+import type { StaminaGauge } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import type { MatchupBatterCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
@@ -365,6 +367,7 @@ export function HomeRunDerbyScreen({
                 pitcherName={pitcher.name ?? undefined}
                 pitcherRecord={pitcher.record}
                 isAcePitcher={pitcher.ace !== null}
+                pitcherStamina={derbyStaminaGaugeOf(pitcher, session.opponentTeamId)}
                 batter={stageMatchupBatter}
               />
             )}
@@ -442,12 +445,13 @@ export function HomeRunDerbyScreen({
  * - 단계 0 투수 이름: 상대 팀 v(장면 시작 굴림 3a454)의 마스터 투수 줄 2 (`derbyPitcherOf` · `DERBY_ORDINARY_PITCHER_ROW`).
  * - 투수 보직 · 좌우 · 방어율 · 탈삼진: 그 레코드의 +0xb · +0x20/+0x22/+0x26(`DerbyPitcher.record` — 마스터 줄 2 · 마투수 모두 Xls 행 줄,
  *   게이트 0xa56dc 는 모드 7 에서 거짓).
- * ⚠️ 비운 칸: 체력 막대 — 0xaebb0 은 모드 7 이면 100 이지만 길이 0x66e44 의 f(팀[+0x26] − [+0x33])가 난입 0x48d50 뒤 어떤지 안 읽었다.
+ * - 체력 막대: 길이 0x66e44(마스터 팀 v 레코드, 지금 투수, f = 늘 참) · % 0xaebb0 = 100 (`derbyStaminaGaugeOf`, U-133).
  */
 function DerbyMatchupCards({
-  batterHand, pitcherName, pitcherRecord, isAcePitcher, batter,
+  batterHand, pitcherName, pitcherRecord, isAcePitcher, pitcherStamina, batter,
 }: {
   readonly batterHand: number
+  readonly pitcherStamina: StaminaGauge | undefined
   readonly pitcherName: string | undefined
   readonly pitcherRecord: DerbyPitcher['record']
   readonly isAcePitcher: boolean
@@ -461,6 +465,7 @@ function DerbyMatchupCards({
       pitcher={{
         isComputer: true,
         ...(pitcherName === undefined ? {} : { name: pitcherName }),
+        ...(pitcherStamina === undefined ? {} : { stamina: pitcherStamina }),
         ...(pitcherRecord === undefined
           ? {}
           : {

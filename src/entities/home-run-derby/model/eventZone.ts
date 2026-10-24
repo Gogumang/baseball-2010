@@ -5,7 +5,8 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
  *
  * 원본(0x36dfc, 공 그리기 — 조건 읽기 0x372ca): 모드 7 이고 · 아직 존이 안 놓였고 · 공이 비행 상태(0x357e0 의 24~26)이고 ·
  * **공의 화면 y 가 화면 높이/3 보다 위**이고 · 플레이 객체 +0x127 이 서 있으면 그 자리에 존을 놓고 동시에 `+0x3f = 1` 을
- * 세운다. 0x41098 이 그 자리에 `stadium/event_zone.pzx` 를 **8프레임 주기로 깜빡이며** 그리고, 공 하나가 끝날 때
+ * 세운다. 0x41098 은 `stadium/event_zone.pzx` 프레임 0 을 필드 화면 오프셋(+0xfec · +0xff0)에 늘 그리고 존이 서면 **8틱 주기로
+ * 앞 4틱 반투명**(`isEventZoneTranslucentAt`)으로 깜빡인다 — 존 좌표는 그리는 자리가 아니다(U-44). 공 하나가 끝날 때
  * +0x3f 가 서 있으면 보너스 G += 200 이다.
  *
  * +0x127 (확정, P7 H1): 타구 시작 0x51408 이 0 으로 비우고(0x51470), 덱에서 꺼낸 패턴이 `0xb07c8(덱, 결과, 패턴)` == 1
@@ -51,11 +52,16 @@ export function isEventZoneHit({ pattern, isZonePlaced = false }: EventZoneCondi
   return isBigFlyPattern(pattern)
 }
 
+/** 존이 선 동안 반투명으로 그리는 효과 1 의 단계 — 0x41098 410ec `movs r2, #5` → [sp+8] (그림 5/16 + 화면 11/16) */
+export const EVENT_ZONE_TRANSLUCENT_LEVEL = 5
+
 /**
- * 8프레임 주기 깜빡임 — 반은 보이고 반은 안 보인다.
- * 듀티(4/8)는 원본 코드에서 못 읽어 **추정**이다. 주기 8 은 확정이다.
+ * **존이 선 동안의 깜빡임** (0x41098 직접 뜸 — 410bc~41116): t = 상태 틱 [장면+0x2c], `t − (t / 8 내림 0쪽) · 8 ≤ 3` 이면
+ * 프레임 0 을 효과 1 · 단계 5(반투명)로, 아니면 효과 0(그대로)으로 그린다. 곧 8틱 주기에 앞 4틱 반투명 · 뒤 4틱 불투명이다.
+ * 존이 안 섰으면(+0x17cc · +0x17d0 ≤ 0) 늘 효과 0 — 그림 자체는 늘 그린다.
  */
-export function isEventZoneVisibleAt(tick: number): boolean {
-  return ((tick % EVENT_ZONE_BLINK_PERIOD) + EVENT_ZONE_BLINK_PERIOD) % EVENT_ZONE_BLINK_PERIOD <
-    EVENT_ZONE_BLINK_PERIOD / 2
+export function isEventZoneTranslucentAt(tick: number): boolean {
+  // asrs 앞의 음수 보정(410c4 `adds r3, r2, #7`)은 0 쪽 내림 — 나머지가 음수면 ≤ 3 이라 반투명 쪽이다
+  const remainder = tick - Math.trunc(tick / EVENT_ZONE_BLINK_PERIOD) * EVENT_ZONE_BLINK_PERIOD
+  return remainder <= 3
 }

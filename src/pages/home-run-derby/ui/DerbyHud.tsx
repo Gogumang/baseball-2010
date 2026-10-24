@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
-import { isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
+import { EVENT_ZONE_TRANSLUCENT_LEVEL, isEventZoneTranslucentAt } from '@/entities/home-run-derby/model/eventZone'
 import {
   COMBO_DISPLAY, DISTANCE_BOARD, EVENT_ZONE_SPOT, HUD_PANEL,
   ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, distanceBoardGlyphsOf, totalDistanceGlyphsOf,
@@ -125,12 +125,16 @@ export function DerbyHud({
         </>
       )}
 
-      {/* 이벤트 존 — 부품 두 장을 8프레임 주기로 번갈아 그린다 (0x41098) */}
+      {/* 이벤트 존 (0x41098) — 같은 그림을 상태 틱 % 8 < 4 면 효과 1 · 단계 5(그림 5/16 + 화면 11/16), 아니면 효과 0 으로 그린다 */}
       {isEventZoneShown && (
         <img
           className={styles.sprite}
-          style={{ left: EVENT_ZONE_SPOT.x, top: EVENT_ZONE_SPOT.y }}
-          src={EVENT_ZONE_SPOT.parts[isEventZoneVisibleAt(tick) ? 0 : 1]}
+          style={{
+            left: EVENT_ZONE_SPOT.x,
+            top: EVENT_ZONE_SPOT.y,
+            ...(isEventZoneTranslucentAt(tick) ? { opacity: EVENT_ZONE_TRANSLUCENT_LEVEL / 16 } : {}),
+          }}
+          src={EVENT_ZONE_SPOT.src}
           alt="이벤트 존"
         />
       )}

@@ -242,8 +242,11 @@ export function comboDisplayPlacementOf(value: number, batterSide: number, drawI
 }
 
 /**
- * 이벤트 존 그림 자리 — 원본은 **공이 있던 자리**에 놓는데(0x36dfc) 이식판 타석 화면은
- * 타구를 그리지 않아 공 자리가 없다. 화면 위쪽 1/3 안(= 원본 조건 "화면 y < 높이/3")
- * 한가운데에 띄운다. **내가 정한 자리다.**
+ * 이벤트 존 그림 자리 (U-44, 0x41098 직접 뜸): 원본은 event_zone.pzx **프레임 0**(종류 1 — 부품 두 장, 원점 (51, 16) · 518×66)을
+ * 필드 화면 오프셋 (+0xfec, +0xff0)(= 구장 그림과 같은 자리, 0x41230)에 그린다 — 존 좌표 +0x17cc · +0x17d0 은 깜빡임을 켜는 문지기일 뿐
+ * 그리는 자리가 아니다. 곧 존은 **필드 그림 위쪽 관중석의 고정된 두 칸**이고, 모드 7 판(0x17) 필드 그리기 0x46c88 → 0x411e0 이
+ * 구장 0x78931 다음에 늘 그린다(존이 없으면 효과 0 그대로).
+ * ⚠️ 근사: 이식판 더비는 판의 필드 화면이 없어(타구 비행을 안 그린다) 필드 좌표에 놓을 수 없다 — 존이 선 공에서만 HUD 위쪽
+ * 1/3 한가운데에 부품 0 하나를 띄운다. **이 자리는 내가 정했다.** 깜빡임 규칙만 원본이다(`isEventZoneTranslucentAt`).
  */
-export const EVENT_ZONE_SPOT = { x: 120 - 35, y: Math.trunc(320 / 3) - 66, parts: ['./sprites/event_zone/000.png', './sprites/event_zone/001.png'] } as const
+export const EVENT_ZONE_SPOT = { x: 120 - 35, y: Math.trunc(320 / 3) - 66, src: './sprites/event_zone/000.png' } as const

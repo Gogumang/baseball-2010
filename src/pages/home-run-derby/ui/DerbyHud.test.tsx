@@ -71,6 +71,16 @@ describe('홈런더비 HUD (0x45a54)', () => {
     expect(screen.getByAltText('이벤트 존')).toBeTruthy()
   })
 
+  it('존 그림은 한 장을 틱 % 8 < 4 면 5/16 반투명, 4~7 은 그대로 그린다 (0x41098 효과 1 단계 5)', () => {
+    const hud = (tick: number) => <DerbyHud run={createDerbyRun()} bestDistance={0} isEventZoneShown tick={tick} />
+    const { rerender } = render(hud(2))
+    const zone = () => screen.getByAltText('이벤트 존') as HTMLImageElement
+    expect(zone().style.opacity).toBe(String(5 / 16))
+    rerender(hud(6))
+    expect(zone().style.opacity).toBe('')
+    expect(zone().getAttribute('src')).toBe('./sprites/event_zone/000.png')
+  })
+
   it('콤보 표시는 trainning.pzx "Combo" 가 미끄러져 온 뒤 셋째 갱신부터 숫자를 붙인다 (0x4585c — combo.pzx 는 안 그린다)', () => {
     const run = createDerbyRun()
     const hud = (tick: number) => (
