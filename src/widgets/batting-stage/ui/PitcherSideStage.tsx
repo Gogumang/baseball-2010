@@ -14,8 +14,18 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import {
-  cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf, pitcherSideStateEntriesOf,
+  cpuSwingTickOf, hitEndTickOf, HUMAN_PITCH_RELEASE_STATE_TICK, passesHeldResult, pitcherSideStageFrameOf, pitcherSideStateEntriesOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
+import type { PitcherHitClock, PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { HIT_STOP_TICKS, canSkipHitPause } from '@/widgets/batting-stage/lib/hitPause'
+import { BIG_HIT_PARTICLE, HIT_PARTICLE_IMAGE } from '@/widgets/batting-stage/lib/hitParticles'
+import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { emitParticles } from '@/entities/particle/model/particleScene'
+import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
+import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
+import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { KEY_OK, originalKeyCodeOf } from '@/features/play-pitcher-game/model/pitchAim'
 import { SCENE_STATE, markSceneStateEntries, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
@@ -121,6 +131,13 @@ interface PitcherSideStageProps {
    * 교체를 확정한 길(0xb → 0x16 → 0xd)은 0x16 동안 굳어 있다가 0xd 에서 되돌린다. 안 넘기면 0xf 진입만 본다
    */
   readonly sceneDEntryMark?: number
+  /**
+   * `pitch` 를 CPU 타자가 맞혔으면 그 0x11 끝 · 0x13 재료(`pitcherHitSceneOf`) — 이 장면이 판정 틀까지 0x11 을, 이어 0x13 을 그리고
+   * 0x17 이 서는 틀에 `onHitSceneEnd` 를 부른다(부르는 화면이 그때 수비 판을 띄운다). 안 넘기면 맞은 공은 공 틱 N + 1 에서 대기다
+   */
+  readonly hitScene?: PitcherHitScene | null
+  /** 0x13 이 끝나 0x17 이 선 틀 — 이 장면이 그 공을 날리지 않았으면(화면이 설 때 이미 있던 공) 첫 그림에 부른다 */
+  readonly onHitSceneEnd?: () => void
   /** 장면 위에 얹는 UI (소개 판 · 교체 연출 · 조준 그림 따위) — 원본도 상태 그리기가 장면 다음에 그린다 */
   readonly children?: ReactNode
 }
@@ -188,6 +205,29 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let wasSkillPanelStateF = false
     /** 마지막으로 본 0xd 진입 표지 */
     let seenSceneDEntryMark = latestRef.current.sceneDEntryMark
+    /** 0x13 재료 — 지금 공의 맞은 장면(공이 바뀌면 그때 받은 값) · 불꽃 · 016 · 끝 알림을 공마다 한 번 */
+    let shownHit: PitcherHitScene | null = null
+    let hitSparkShot = false
+    let hitStopShot = false
+    let hitEndNotified = false
+    /** OK · '5' 를 읽은 0x13 상태 틱 (0x406e8 40708) */
+    let hitSkipTick: number | null = null
+    /** 0x13 동안 받은 OK · '5' — 다음 틀 머리의 키 처리(0x498d4)가 꺼낸다(`sceneKeyLatch`) */
+    const hitKeyLatch = createSceneKeyLatch()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || shownHit === null || hitEndNotified || !canSkipHitPause(shownHit.watchesBigHit)) return
+      const code = originalKeyCodeOf(event.key)
+      // 0x406e8 40708~40712 — [장면+0x40](이 틀 키)가 OK(−5) · '5'(0x35) 면 넘긴다. 공격 측을 안 본다
+      if (code !== KEY_OK && code !== 0x35) return
+      event.preventDefault()
+      hitKeyLatch.push(() => {
+        // 키 처리는 진입 뒤 · 갱신 앞 — 이 틀의 0x13 갱신이 읽는다. 0x13 을 예약한 틀(J)에 누른 키도 다음 틀(틱 0)이 읽는다
+        if (hitSkipTick === null && keyHitTick !== null) hitSkipTick = keyHitTick
+      })
+    }
+    /** 키를 꺼내는 틀의 0x13 상태 틱 — 0x13 이 아니면 null */
+    let keyHitTick: number | null = null
+    window.addEventListener('keydown', onKeyDown)
 
     const frame = (rawNow: number) => {
       // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신을, 52efe 가 상태 그리기를 건너뛴다(창이 선 첫 그림
@@ -212,6 +252,19 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         shownMistake = current.pitch !== null && current.isMistakePitch === true
         // 0x11 진입 3de7c — 상태 1 이 대기 동작을 덮는다
         idleStartTick = null
+        shownHit = current.pitch === null ? null : (current.hitScene ?? null)
+        hitSparkShot = false
+        hitStopShot = false
+        hitEndNotified = false
+        hitSkipTick = null
+        hitKeyLatch.clear()
+      }
+      // 맞은 장면 재료가 공보다 한 그림 늦게 들면 그때 받는다
+      if (releaseTick !== null && shownHit === null && current.hitScene != null) shownHit = current.hitScene
+      if (releaseTick === null && current.hitScene != null && !hitEndNotified) {
+        // 이 장면이 날리지 않은 공(화면이 설 때 이미 있던 공)의 0x13 — 다시 그리지 않고 곧장 넘긴다
+        hitEndNotified = true
+        current.onHitSceneEnd?.()
       }
       // 0xd 진입 0x48d50 48ee4 → 0x35650 → 0x340c0 — 투수 그림 객체를 상태 0 으로 (굳은 대기 동작도 지운다)
       if (current.sceneDEntryMark !== seenSceneDEntryMark) {
@@ -224,6 +277,21 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
 
       const pitch = releaseTick === null ? null : shownPitch
       const resolution = current.resolution
+      const aceOrder = current.acePitcher?.order ?? null
+      // 52d9e 키 0x498d4 — 앞 틀 뒤에 받은 OK · '5' 를 이 틀의 0x13 갱신 앞에서 꺼낸다
+      const hitBase = pitch === null ? null : shownHit
+      const hitTickNow =
+        hitBase === null || releaseTick === null
+          ? null
+          : pitcherSideStageFrameOf({
+              nowTick, releaseTick, frameCount: pitch?.frameCount ?? 0, resultTicks: 0, isPaused: false, pausedSinceTick: 0, aceOrder,
+              hit: hitBase,
+            }).phase
+      keyHitTick = hitTickNow?.kind === '타격' ? hitTickNow.tick : null
+      // 팝업(0x52cc6)이 선 틀의 키는 버린다
+      if (current.isFrozen === true) hitKeyLatch.clear()
+      else runSceneKeys(hitKeyLatch, sceneTick)
+      const hit: PitcherHitClock | null = hitBase === null ? null : { ...hitBase, skipTick: hitSkipTick }
       const stage = pitcherSideStageFrameOf({
         nowTick,
         releaseTick,
@@ -231,17 +299,45 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         resultTicks: resolution !== null && passesHeldResult(resolution) ? current.resultTicks : 0,
         isPaused: current.isPaused,
         pausedSinceTick,
-        aceOrder: current.acePitcher?.order ?? null,
+        aceOrder,
+        hit,
       })
-      // 이 공의 원본 상태 경계(0x11 · 0x12 · 그 끝) — 장면 틱(팝업으로 뺀 틱을 되돌린 값)으로 적는다(`sceneStateEntries`)
+      if (hit !== null && hitBase !== null && pitch !== null && releaseTick !== null) {
+        const stateTickNow = nowTick - releaseTick + HUMAN_PITCH_RELEASE_STATE_TICK
+        /** 판정 틀 J 의 0x11 상태 틱 — 그 틀의 갱신이 0x6aa 로 0x13 을 예약한다 */
+        const judgeStateTick = pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
+        // 판정 틀 J 의 그리기 0x49e64 가 타격점에 불꽃을 쏜다 (타자편 `BattingStage` 와 같은 근사 — 판정 순간에 쏜다)
+        if (stateTickNow >= judgeStateTick && !hitSparkShot) {
+          hitSparkShot = true
+          if (hitBase.particleId !== null) {
+            const contact = ballPixelAt(pitch, hitBase.contactFrame)
+            emitParticles(sceneParticleScene(), particleConfigOf(hitBase.particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
+          }
+        }
+        const hitTickRaw = stateTickNow - judgeStateTick - 1
+        const endTick = hitEndTickOf(hit)
+        // 0x4cb1c 4ccba~4cd14 — 큰 타구 멈춤이 풀리는 0x13 그림(틱 7)이 공 자리에 016 을 쏜다. 그 전에 0x13 이 끝나면 안 쏜다
+        if (hitBase.watchesBigHit && !hitStopShot && hitTickRaw >= HIT_STOP_TICKS && endTick >= HIT_STOP_TICKS) {
+          hitStopShot = true
+          const contact = ballPixelAt(pitch, hitBase.contactFrame)
+          emitParticles(sceneParticleScene(), particleConfigOf(BIG_HIT_PARTICLE.id), contact.x, contact.y, BIG_HIT_PARTICLE.img)
+        }
+        // 0x13 틱 endTick 의 갱신 0x406e8 이 0x17 을 예약 — 다음 틀(0x17 틱 0)에 부르는 화면이 수비 판으로 넘긴다
+        if (hitTickRaw > endTick && !hitEndNotified) {
+          hitEndNotified = true
+          current.onHitSceneEnd?.()
+        }
+      }
+      // 이 공의 원본 상태 경계(0x11 · 0x12 · 그 끝, 맞은 공은 0x11 · 0x13 · 0x17) — 장면 틱(팝업으로 뺀 틱을 되돌린 값)으로 적는다
+      // (`sceneStateEntries`)
       if (releaseTick !== null && pitch !== null && stage.phase.kind !== '대기') {
         const resultTicks = resolution !== null && passesHeldResult(resolution) ? current.resultTicks : 0
-        // 판정 · 0x12 문턱은 공보다 한 그림 늦게 들 수 있다 — 바뀔 때만 다시 적는다
-        const marked = `${releaseTick + (sceneTick - nowTick)}-${resultTicks}`
+        // 판정 · 0x12 문턱은 공보다 한 그림 늦게 들 수 있다 · 0x13 은 건너뛰기 키로 짧아진다 — 바뀔 때만 다시 적는다
+        const marked = `${releaseTick + (sceneTick - nowTick)}-${resultTicks}-${hit === null ? '' : hitEndTickOf(hit)}`
         if (marked !== markedStateEntries) {
           markedStateEntries = marked
           markSceneStateEntries(
-            ...pitcherSideStateEntriesOf(releaseTick + (sceneTick - nowTick), pitch.frameCount, resultTicks, current.acePitcher?.order ?? null),
+            ...pitcherSideStateEntriesOf(releaseTick + (sceneTick - nowTick), pitch.frameCount, resultTicks, aceOrder, hit),
           )
         }
       }
@@ -376,7 +472,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       handle = requestAnimationFrame(frame)
     }
     handle = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(handle)
+    return () => {
+      cancelAnimationFrame(handle)
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [])
 
   return (
