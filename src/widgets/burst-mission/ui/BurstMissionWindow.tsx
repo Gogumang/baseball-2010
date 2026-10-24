@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import type { CSSProperties } from 'react'
 import { MarkupText, PressArea } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
@@ -66,13 +66,13 @@ export function BurstMissionWindow({
   stateRef.current = state
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    const timer = setAppTickInterval(() => {
       const next = tickBurstWindow(stateRef.current)
       stateRef.current = next
       setState(next)
       setDraws((count) => count + 1)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    })
+    return () => timer()
   }, [])
 
   useWholeScreenOffset(burstShakeOffsetOf(state))

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { MENU_BAND_GROW_TICKS, menuBandStateAt } from '@/pages/main-menu/lib/mainMenuLayout'
 import type { MenuBandState } from '@/pages/main-menu/lib/mainMenuLayout'
 
@@ -10,7 +10,7 @@ const CLOSED: MenuBandState = { spread: 0, isGrowing: false }
  * 아랫단 바탕 띠가 자라는 연출 (`[메뉴+0xe4]` · `[메뉴+0xe2]`).
  *
  * 원본은 **갱신 한 번에 한 칸**씩 ×4 로 키운다 (0x254e4). 웹판도 rAF 가 아니라 원본 틱
- * `millisecondsPerFrame()` 으로 센다 — `useMenuTurn` 과 같은 방식이다.
+ * 앱 틱(`appTickOf`)으로 센다 — `useMenuTurn` 과 같은 방식이다.
  *
  * **언제 1 로 되돌리는가** — `[0xe2] = 1 · [0xe4] = 1` 을 넣는 곳은 둘이다 (예전 주석의 "0x23846·0x254e6·0x25512 뿐" 은
  * 처음 메뉴 OK 의 `adds r3,#0xe2 ; strb ; adds r3,#2 ; strh` 를 놓쳤다 — 0x294b8 을 직접 떴다):
@@ -40,11 +40,11 @@ export function useMenuBand(isOpen: boolean, startsGrown = false): MenuBandState
   const isGrowing = isOpen && tick < MENU_BAND_GROW_TICKS
   useEffect(() => {
     if (!isGrowing) return undefined
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let handle = 0
     const step = (now: number) => {
-      // rAF 가 startedAt 직전 타임스탬프로 들어올 때가 있어 0 아래로는 안 내려가게 막는다
-      const next = Math.max(0, Math.floor((now - startedAt) / millisecondsPerFrame()))
+      // rAF 가 켠 틱 직전 타임스탬프로 들어올 때가 있어 0 아래로는 안 내려가게 막는다
+      const next = Math.max(0, appTickOf(now) - startTick)
       setTick(next)
       if (next >= MENU_BAND_GROW_TICKS) return
       handle = requestAnimationFrame(step)

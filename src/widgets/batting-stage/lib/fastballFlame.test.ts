@@ -53,9 +53,10 @@ describe('강속구 불꽃 — 0x3b2f4 꼬리 0x3b6e4~0x3b7d8 (game_effect 애�
     expect(hasFastballFlame(공(170, 한가운데 + 3000))).toBe(false)
   })
 
-  it('상태 0x11 · 0x12 만 — 웹 투구중은 공 프레임, 안 친 공 결과는 N + 1 + 단계 틱, 타격 · 인플레이 · 대기는 없다', () => {
+  // 0x12 틱 0 은 공 틱 N + 1 이 예약한 다음 틀(0xbc9c8)이라 공 틱 N + 2 다 — 0x3f378 은 0x12 에서도 +1
+  it('상태 0x11 · 0x12 만 — 웹 투구중은 공 프레임, 안 친 공 결과는 N + 2 + 단계 틱, 타격 · 인플레이 · 대기는 없다', () => {
     expect(fastballFlameBallTickOf({ kind: '투구중', tick: 30, isPaused: false }, 21, 20)).toBe(21)
-    expect(fastballFlameBallTickOf({ kind: '결과', tick: 3, isPaused: false }, -1, 20)).toBe(24)
+    expect(fastballFlameBallTickOf({ kind: '결과', tick: 3, isPaused: false }, -1, 20)).toBe(25)
     expect(fastballFlameBallTickOf({ kind: '결과', tick: 3, isPaused: false, isInPlay: true }, -1, 20)).toBeNull()
     expect(fastballFlameBallTickOf({ kind: '타격', tick: 0, isPaused: false }, -1, 20)).toBeNull()
     expect(fastballFlameBallTickOf({ kind: '대기', tick: 0, isPaused: false }, -1, 20)).toBeNull()

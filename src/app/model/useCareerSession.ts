@@ -1,6 +1,7 @@
 import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
+import { NARI_STATE, restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
@@ -356,9 +357,15 @@ interface CareerSessionInput {
    * `withAceMatchHeld`). 선수를 새로 만들어도 남는다. 안 넘기면 세션 메모리에만 든다.
    */
   readonly aceMatchPending?: AceMatchPendingPort
+  /**
+   * 화면이 '관리' 인 채 105 에 다시 들어온 앞 상태가 0x1aec4 의 배경음 4 목록에 들 때(125 훈련 결과 → 105) 부른다 — 배경음 표
+   * `useScreenBgm` 의 다시 틀기(`restartsManagementBgmFrom`). 앱이 세션보다 먼저 배경음 표를 세우므로 수를 앱이 든다
+   */
+  readonly onManagementBgmRestart?: () => void
 }
 
 const NO_STAT = () => {}
+const NO_BGM_RESTART = () => {}
 
 /**
  * 여기서 '관리' 로 돌아오는 것은 105 진입이 아니다 — 111 상점 취소는 110 · 121 장비착용 취소는 106 하위 메뉴로 선다
@@ -414,6 +421,7 @@ export function useCareerSession({
   openedAces = DEFAULT_NARI_OPENED_ACES,
   nariGameSave,
   aceMatchPending,
+  onManagementBgmRestart = NO_BGM_RESTART,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
   const silent = useMemo(() => createSilentSound(), [])
@@ -1245,7 +1253,16 @@ export function useCareerSession({
    * 취소 · 훈련 · 휴식 결과 창 닫기 · 필살타법 알림 닫기)은 `reenterManagement` 가 센다.
    */
   const [managementReentryCount, setManagementReentryCount] = useState(0)
-  const reenterManagement = useCallback(() => setManagementReentryCount((count) => count + 1), [])
+  const managementBgmRestartRef = useRef(onManagementBgmRestart)
+  managementBgmRestartRef.current = onManagementBgmRestart
+  /**
+   * `from` 은 105 로 다시 들어오는 원본 앞 상태 — 0x1aec4 의 배경음 4 목록에 들면(125 훈련 결과) 배경음 4 를 처음부터 다시 튼다
+   * (`restartsManagementBgmFrom`). 하위 메뉴 106 · 107 · 110 취소 · 127 휴식은 목록 밖이다
+   */
+  const reenterManagement = useCallback((from?: number) => {
+    setManagementReentryCount((count) => count + 1)
+    if (from !== undefined && restartsManagementBgmFrom(from)) managementBgmRestartRef.current()
+  }, [])
   /** 필살타법 결과 알림(125 의 알림 창)이 떠 있다 — 닫히면 105 진입 */
   const specialSwingNoticeRef = useRef(false)
   const managementEntryRef = useRef({ kind: screen.kind, reentryCount: managementReentryCount, isPending: false })
@@ -1345,15 +1362,15 @@ export function useCareerSession({
    * MVP 비트(career+0x1ca)는 여기서가 아니라 상태 131 이 375 를 틀기 전에 남긴다 (`enterSeasonEvent`).
    * 0x1b768 꼬리가 효과기 종류 1 · 장면+0x289 = 1 을 세우고, 부른 상태(114 · 134 · 141)의 틀이 효과기 끝에 137 을 예약한다
    * (`pages/management/lib/nariYearCover`). 난수는 1b86c 의 CPU 장비 굴림 하나뿐이고 137 은 난수를 안 쓴다.
-   * `showsCover` 가 거짓이면 곧장 105 — 이어하기 100 진입 1c25e(S+0x50 == 0x11)는 0x1b768 뒤 1c3be 로 빠져 0xbcb49(1) 만 걸고
-   * +0x289 를 보는 틀(114 0x1c014 · 134 0x1b92c · 141 0x1bbc4)을 안 지난다. ⚠️ 미확인: 그 길에서 남은 +0x289 가 뒤에 어디서
-   * 137 을 부르는지(상태 1 다음 칸 · 다음 114 끝)는 따라가지 않았다 — 예전대로 105.
+   * `fromResume` 은 이어하기 100 진입 1c25e(S+0x50 == 0x11) · 1c308(0xa 갈래)이다 — 0x1b768 뒤 1c3be 로 빠져 137 을 바로
+   * 예약하지 않지만, 100 → 1 → 100 → 1 → 105 → 115 → 114 로 가는 사이 남은 +0x289 를 연초 114 의 틀 0x1c014(1c0dc — 재생 중에도
+   * 매 틀)가 효과기 끝(0x1b768 의 틀부터 9 틀째)에 받아 137 을 띄운다(r156 직접 뜸 — `nariYearCover` 의 이어하기 길).
    */
-  const startNewSeason = (finished: PlayerCareer, showsCover = true) => {
+  const startNewSeason = (finished: PlayerCareer, fromResume = false) => {
     // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
     const next = startNextSeason(finished, random)
     setCareer(next)
-    setScreen(showsCover ? { kind: '연차표지' } : { kind: '관리' })
+    setScreen(fromResume ? { kind: '연차표지', fromResume: true } : { kind: '연차표지' })
   }
 
   /**
@@ -1745,6 +1762,10 @@ export function useCareerSession({
       if (savedCareer === null) return
       // 장면 0x106 이 새로 선다 — 장면+0x288 = 0 (0xfb7c) · 반복 이벤트 · 커서 · mgr+0x304 (0xf684)
       setUpNariScene()
+      // 100 진입 0x1c154 의 머리 1c15e `0x6e439` stopBgm — S+0x50 갈래보다 먼저 늘 부른다(r163 직접 뜸). 메인 메뉴 1 이 끊겨
+      // 134 대진판 · 116 경기 결과처럼 배경음을 안 트는 자리는 소리 없이 선다. 105 · 109 · 128 · 141 은 화면 배경음 표가 이 뒤
+      // 그리기에서 제 소리를 튼다(`useSceneBgm` — 번호가 1 에서 바뀐다)
+      audio.stopBgm()
       const point = resumePointOf(savedCareer)
       // 1c24e — S+0x50 == 6|7 이 맨 앞 갈래다: 141 진입 0x12300 을 다시 밟는다. 보너스를 받은 뒤 저장이라(S+0x7b) 키 0x1220c 가
       // 보너스 팝업 없이 등록 팝업 0x2d 를 띄운다(`EndingScreen.isBonusReceived`)
@@ -1771,8 +1792,9 @@ export function useCareerSession({
           streakRewards: streakEventOf(counted).rewards,
         })
       }
-      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 1c3be(0xbcb49(1)) — 137 을 안 거친다(`startNewSeason`)
-      if (point.kind === '새시즌') return startNewSeason(savedCareer, false)
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) · 1c308(0xa 갈래) → 새 시즌 처리 0x1b768 → 1c3be(0xbcb49(1)) — 남은 +0x289 를
+      // 연초 114 틀이 9 틀째에 받아 137 을 띄운다(`startNewSeason` · `nariYearCover` 의 이어하기 길)
+      if (point.kind === '새시즌') return startNewSeason(savedCareer, true)
       if (point.kind === '이벤트') {
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
         return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })
@@ -2093,7 +2115,7 @@ export function useCareerSession({
       const { afterClose } = managementDetail
       setManagementDetail(null)
       // 창을 닫으면 125(훈련 0x1b5b8) · 127(휴식 0x1b466)이 `0xbcb49(0x69)` 로 105 에 다시 들어온다 — 진입 · 자동 훑기
-      reenterManagement()
+      reenterManagement(afterClose.kind === '훈련' ? NARI_STATE.훈련결과 : NARI_STATE.휴식)
       if (afterClose.kind === '훈련') {
         const injury = rollTrainingInjury(career, afterClose.isSpecialSwing, random)
         setCareer(injury.career)
@@ -2110,7 +2132,7 @@ export function useCareerSession({
       // 필살타법 결과 알림이면 125 틀 0x18dd8 이 105 로 — 105 진입
       if (specialSwingNoticeRef.current) {
         specialSwingNoticeRef.current = false
-        reenterManagement()
+        reenterManagement(NARI_STATE.훈련결과)
       }
     },
 

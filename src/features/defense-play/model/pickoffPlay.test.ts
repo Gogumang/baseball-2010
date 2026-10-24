@@ -57,6 +57,16 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
     expect(second).toMatchObject({ x: basePosition(2).x, z: basePosition(2).z })
   })
 
+  it('견제 시작은 vt30 을 안 부르고, 첫 틱부터 vt4c 끝 0xb1c90 이 커버를 다시 고른다 — 유격수는 0xb203a 기본 자리로 (r162)', () => {
+    const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, offenseIsCpu: true, random: 세는난수(0.9) })
+    const 유격 = result.ticks.map((view) => view.fielders.find((fielder) => fielder.slot === 5))
+    // 첫 그림은 0 틱 슬롯 2 뒤 · 이동 앞 — 아직 시작 자리 0xd86ec[5]
+    expect(유격[0]).toMatchObject({ x: 17_273, z: 19_150 })
+    // 다음 그림부터 (14500, 17600) 쪽으로 걷는다
+    expect(유격[1]?.x).toBeLessThan(17_273)
+    expect(유격[1]?.z).toBeLessThan(19_150)
+  })
+
   it('타자주자를 만들지 않는다 — 그림의 주자는 루에 있던 주자뿐이다', () => {
     const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0 })
     expect(result.ticks[0].runners.map((runner) => runner.index)).toEqual([1])

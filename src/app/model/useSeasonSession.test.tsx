@@ -2741,3 +2741,40 @@ describe('모드 초기화 — 0x224ec(mgr, 2) 시즌 · 0x223a8 나리 선수 �
     expect((store.load() as { roster: { pitchers: unknown[] } }).roster.pitchers).toHaveLength(roster.pitchers.length)
   })
 })
+
+/**
+ * U-105 r154 — 0xdd 진입 0x6548 · CPU 끼리 0xc239c 의 마선수 넣기는 모드 2 에서 시즌 레코드(0x1f571)에 들어가고, 빼는 0xb512c 는
+ * 0xdf 진입 0x5980 · 0xe5 진입 0x5cd0 만 부른다 — 그 사이 0xe8 목록(0x5870)에 마투수 줄이 보이고 0x7c00 이 그 줄도 회복한다.
+ */
+describe('레코드에 남은 마선수 (0xb512c 는 0xdf · 0xe5 진입만)', () => {
+  it('경기 뒤 열 팀 레코드에 마선수가 남고 · 0xe8 은 내 마투수를 고칠 수 있고 · 0xdf 진입이 뺀다', () => {
+    const store = 메모리저장()
+    const { result } = 띄우기(store)
+    시작(result, 0)
+    act(() => result.current.actions.confirmNextGame())
+    act(() => result.current.actions.choosePreGameAce(1))
+    act(() => result.current.actions.choosePreGameAce(5 + 2))
+    if (result.current.isMatchSettingsOpen) act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.startPendingGame())
+    const options = result.current.gameOptions!
+    expect(options.acePitcherId).toBe(1)
+    act(() => result.current.actions.finishGame(요약({ opponentTeamId: options.opponentTeamId, ourAcePitcherStamina: 4000 })))
+
+    // 경기 끝 4f2bc 의 +20% 를 먹은 마투수 +0x2c
+    expect(result.current.myRecordAces).toEqual({ pitcher: 1, batter: 2, pitcherStamina: 6000 })
+    const saved = store.load() as { recordAces?: Record<string, unknown> }
+    expect(Object.keys(saved.recordAces ?? {})).toHaveLength(10)
+    expect(saved.recordAces?.[options.opponentTeamId]).toEqual(options.opponentAces)
+
+    // 0xe8 — 레코드 8번 칸이 마투수다: 가득이 아니면 회복, 가득이면 [211]
+    let 결과 = { notice: '', recovered: false }
+    act(() => { 결과 = result.current.actions.recoverSeasonPitcherStamina(8) })
+    expect(결과.recovered).toBe(true)
+    expect(result.current.myRecordAces?.pitcherStamina).toBe(10000)
+    act(() => { 결과 = result.current.actions.recoverSeasonPitcherStamina(8) })
+    expect(결과.recovered).toBe(false)
+
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수고르기))
+    expect(result.current.myRecordAces).toBeUndefined()
+  })
+})

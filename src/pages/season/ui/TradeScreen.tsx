@@ -116,6 +116,11 @@ export interface TradeScreenProps {
   readonly onFinish: () => void
   /** 요청 중 [216] 에 "예" — 원본 0x712a: 요청 플래그를 지우고 **구단관리(0xce)** 로 */
   readonly onCancelRequest?: () => void
+  /**
+   * 0xe5 진입 0x5cd0 첫머리(5cd8~5cee) — 열 팀 `0xb512c(0x1f571(저장, i))` 로 레코드에 남은 마선수를 뺀다. 그래서 0xe5 · 0xe6 · 0xe7
+   * 목록과 맞바꾸기 0xcf24 에는 마선수가 없다(0xe6 은 0xe5 키 0x7240 · 0xe7 0xc6aa 에서만 온다). 세션 `clearRecordAces` (U-105 r154)
+   */
+  readonly onEnterAcquired?: () => void
   /** 취소(−16) — 구단관리(0xce)로 되돌아간다 */
   readonly onBack: () => void
   /** 전역 저장 +0x70 + 칸 — 0xe4 히든 칸 힌트 글이 해금에 따라 [0] 줄을 넣고 뺀다 */
@@ -157,7 +162,7 @@ export interface TradeScreenProps {
  */
 export function TradeScreen({
   state, roster, opponentRosterOf = tableRosterOf, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest,
-  onBack, openedHiddenIds = [], entryCellSourceOf,
+  onBack, openedHiddenIds = [], entryCellSourceOf, onEnterAcquired,
 }: TradeScreenProps) {
   const { record } = state
   const forced = request !== null && request.isRequested ? request : null
@@ -187,6 +192,11 @@ export function TradeScreen({
    * 단계가 바뀌면 저절로 닫힌다
    */
   const [detailOpenedAt, setDetailOpenedAt] = useState<TradeStep | null>(null)
+
+  // 0x5cd0 — 0xe5 에 들어올 때마다(팀 고르기 · 요청 예 · 0xe6 취소) 첫머리에서 0xb512c × 열 팀
+  useEffect(() => {
+    if (step.kind === '영입') onEnterAcquired?.()
+  }, [step, onEnterAcquired])
 
   const isPitcher = tradeTab === TRADE_REQUEST_TAB.투수
   const isListPitcher = listTab === TRADE_REQUEST_TAB.투수

@@ -62,8 +62,8 @@ interface SpecialEditScreenProps {
  * 배경은 메뉴 바탕 0x58371(skin, main_title, 0) — 하위 0 · 1 · 2 모두 맨 먼저 깐다(0x2e1e0 의 첫 부름).
  * 엔트리 창(넓은 표 · 커서 이름 칸만 [skin+0x438] = 1 — `EntryEditorScreen` / `widgets/entry-editor/lib/entryListWindow`).
  *
- * ⚠️ 근사·미해결: 엔트리 창 아래에 깔린 팀 고르기 본문(격자 · 로고 · 도형)은 모두 판(15, 55, 210, 220) 안이라 가려져 따로 안 그린다 ·
- *    입력 창 판 높이와 칸 둘레 그림(아래 `EditNamePopup`).
+ * ⚠️ 근사: 엔트리 창 아래에 깔린 팀 고르기 본문(격자 · 로고 · 도형)은 모두 판(15, 55, 210, 220) 안이라 가려져 따로 안 그린다.
+ *    입력 창(판 높이 0x6e · 입력 방식 표시)은 아래 `EditNamePopup`.
  */
 export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditScreenProps) {
   const [state, setState] = useState(createSpecialEditState)
@@ -269,6 +269,20 @@ const POPUP_HEIGHT = 0x6e
 const PROMPT = { x: 120 - 100, y: 0x82, width: 0xc8 } as const
 /** 입력 칸 폭 100 × 높이 15 를 (W/2 − 50, 0xaf) 에 RGB(30,45,160) 로 채운다 (0x6b7d5) */
 const FIELD = { x: 120 - 50, y: 0xaf, width: 0x64, height: 0xf } as const
+/**
+ * 입력 칸 오른쪽 **입력 방식 표시** (U-91, 직접 뜸 — 0x32c96~0x32cf2 · 0x541ed · 0x676e9):
+ * ```
+ * 0x541ed(skin, x + w + 0xe = 184, y + 1 = 176, 흰색)   ; 글 = 표 0x1400148[입력기 +0x14] — 0 "A" · 1 "a" · 2 "1" · 3 "가"
+ *                                                       ; 0x6b391 로 x = (방식 3 ? 184 : 186)
+ * 0xba759([장면+0x9c] slt_frame, 이미지 20, 종류 0, x + w + 5 = 175, y + 2 = 177)          ; ◀ (5×8)
+ * 0xba759([장면+0x9c] slt_frame, 이미지 20, 종류 0, x + w + 0x18 = 194, y + 2 = 177, 효과 0x11) ; ▶ (뒤집기)
+ * ```
+ * 칸 둘레에 흰 선은 없다 — 0x541a9 는 입력 글(0x677d5), 0x541ed 는 이 방식 글이다(앞선 노트의 "흰 선" · "프레임 20/17" 은 오독).
+ * 입력기는 0x54145(skin, **3**, 8, 1, 1) 로 켜므로 처음 방식은 3 "가" 다. 웹은 방식을 바꾸는 키(←/→ 0x673ed · 0x673a9)가 없는
+ * 일반 입력 칸이라 처음 표시 "가" 에 머문다.
+ */
+const INPUT_MODE_MARK = { label: '가', x: 120 - 50 + 0x64 + 0xe, y: 0xaf + 1 } as const
+const INPUT_MODE_ARROWS = { image: './sprites/slt_frame/020.png', leftX: 120 - 50 + 0x64 + 5, rightX: 120 - 50 + 0x64 + 0x18, y: 0xaf + 2 } as const
 
 interface EditNamePopupProps {
   readonly onConfirm: (name: string) => void
@@ -286,11 +300,10 @@ interface EditNamePopupProps {
  * 원본 입력기([0x1552d00], 모드 A·a·1·가 를 좌우로 바꾸고 한글 조합은 폰 플랫폼이 한다 — R11 2절)는
  * 웹 입력 칸으로 대신하고 CP949 8 바이트 검사만 원본대로 둔다. Escape = CLR, Enter = OK.
  *
- * ⚠️ 미해결: 같은 틱에 CLR 이 마지막 한 글자를 지운 뒤 0x32b7d 가 빈 버퍼를 보고 곧장 취소까지 하는지 확정 못 했다 —
- *    웹은 글자가 있으면 지우기만 한다. 뜬 것: 키 콜백 0x32b5c 는 키를 입력기 0x54279 에 넘길 뿐이고, 취소 · 확인 검사는
- *    **그리기 콜백** 0x32b7c 안(32cf6~32d30)에서 키를 인자가 아니라 장면 칸 [장면+0x40](지금 키 — 0x1daa4 · R9 의 키 처리와 같은 칸)
- *    으로 읽는다. 남은 것은 [장면+0x40] 이 키를 처리한 그 그림 뒤에 언제 지워지는지(틀 쪽) 하나다.
- *    칸 둘레의 흰 선(0x541a9·0x541ed)과 [this+0x9c] 프레임 20·17 두 조각은 인자 뜻을 다 못 읽어 안 그렸다.
+ * **CLR 이 마지막 한 글자를 지우면 같은 그림에 곧장 취소된다** (U-91 닫음, 직접 뜸): 메뉴 틀 0x32fa0 은 한 그림에
+ *    0xbca05(키 → [장면+0x40], 그림마다 새로 적는다) → 갱신 0x32634(0x754f9 → 종류 8 이면 키 콜백 0x32b5d → 0x54279: CLR 이고
+ *    버퍼가 있으면 0x66fd5 한 글자 지우기) → 그리기 0x32dd8(끝의 0x746cd → 그리기 콜백 0x32b7c) 차례다. 0x32b7c 는 키를 인자가
+ *    아니라 [장면+0x40] 으로 읽으므로(32cf6) 같은 그림에서 CLR 과 방금 빈 버퍼를 보고 0x74361(창, −1) 로 닫는다.
  */
 function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
   const [name, setName] = useState('')
@@ -328,7 +341,11 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
       if (event.key === 'Escape') {
         event.preventDefault()
         if (nameRef.current.length === 0) return void motionRef.current.close('바로', () => handlersRef.current.onCancel())
-        setName((previous) => [...previous].slice(0, -1).join(''))
+        // 갱신의 키 콜백 0x32b5d 가 한 글자를 지운 뒤 같은 그림의 0x32b7c 가 [장면+0x40] = CLR 과 빈 버퍼를 보면 곧장 취소한다 (U-91)
+        const next = [...nameRef.current].slice(0, -1).join('')
+        nameRef.current = next
+        setName(next)
+        if (next.length === 0) motionRef.current.close('바로', () => handlersRef.current.onCancel())
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -352,6 +369,13 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
       <div className={styles.band} ref={bandRef} style={{ top: (320 - bandHeight) >> 1, height: bandHeight }} />
       <div className={styles.prompt} style={{ left: PROMPT.x, top: PROMPT.y, width: PROMPT.width, visibility: isOpening ? 'hidden' : undefined }}>
         <MarkupText raw={NAME_PROMPT} />
+      </div>
+      <img alt="" data-testid="입력방식-왼쪽" src={INPUT_MODE_ARROWS.image}
+        style={{ position: 'absolute', left: INPUT_MODE_ARROWS.leftX, top: INPUT_MODE_ARROWS.y, visibility: isOpening ? 'hidden' : undefined }} />
+      <img alt="" data-testid="입력방식-오른쪽" src={INPUT_MODE_ARROWS.image}
+        style={{ position: 'absolute', left: INPUT_MODE_ARROWS.rightX, top: INPUT_MODE_ARROWS.y, transform: 'scaleX(-1)', visibility: isOpening ? 'hidden' : undefined }} />
+      <div className={styles.prompt} data-testid="입력방식" style={{ left: INPUT_MODE_MARK.x, top: INPUT_MODE_MARK.y, visibility: isOpening ? 'hidden' : undefined }}>
+        <MarkupText raw={`!cFFFFFF${INPUT_MODE_MARK.label}`} />
       </div>
       <input ref={fieldRef} className={styles.field} aria-label="이름" value={name} autoFocus readOnly={isOpening}
         style={{ left: FIELD.x, top: FIELD.y, width: FIELD.width, height: FIELD.height, visibility: isOpening ? 'hidden' : undefined }}

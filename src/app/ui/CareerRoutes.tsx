@@ -24,10 +24,12 @@ import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { NariYearCoverScreen } from '@/pages/management/ui/NariYearCoverScreen'
+import { NariYearCoverScreen, YearCoverBlackFrame } from '@/pages/management/ui/NariYearCoverScreen'
+import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { NariResumeManagementFrame } from '@/pages/management/ui/NariResumeManagementFrame'
 import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
 import { isBattingOrderEventId } from '@/entities/career/model/battingOrder'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
@@ -372,9 +374,24 @@ function CareerScreens({
       )
     }
 
-    case '연차표지':
+    case '연차표지': {
+      /*
+       * 앞 화면 아홉 틀 — 원본은 앞 상태가 매 틀 그리기를 돈다(멈춘 판이 아니다). 114 끝(0x1c014 의 끝남 갈래가 0x1b768 을 부르고
+       * 상태를 안 바꾼다)은 0x19e64 → 0x19da4 = 상태판 0x7d34c(gfx, 0) · 머리띠(커맨드 줄은 앞 상태가 105 가 아니라 칸 수 0)로,
+       * 상태판은 새 시즌이 고친 S(소지금 S+2 · 연차)를 읽는다. 이어하기 길은 `resumeCoverUnderlayAt`.
+       * ⚠️ 134 대진판 · 141 엔딩 판은 화면 상태(대회 · 엔딩 단계)를 이 자리에서 다시 세울 수 없어 멈춘 판(`LeftFrame`) 그대로다
+       */
+      const statusBoard = <NariEventUnderlay career={career} />
+      const previousScreenAt = screen.fromResume === true
+        ? (frame: number) => {
+          const underlay = resumeCoverUnderlayAt(frame)
+          if (underlay === '검정') return <YearCoverBlackFrame />
+          return underlay === '관리' ? <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
+        }
+        : previousKind === '이벤트' ? () => statusBoard : undefined
       // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다
-      return <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} />
+      return <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} previousScreenAt={previousScreenAt} />
+    }
 
     case '다음경기순위':
       return (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import { MarkupText } from '@/shared/ui/MarkupText/MarkupText'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   DESCRIPTION_BAND, DESCRIPTION_BAND_FADE_END, descriptionBandAt,
 } from '@/shared/ui/DescriptionBand/descriptionBandLayout'
@@ -34,8 +34,7 @@ export function DescriptionBand({ text, seed, initialTicks = 0 }: {
 
   useEffect(() => {
     if (!band.isGrowing) return undefined
-    const timer = window.setTimeout(() => setTicks((tick) => tick + 1), millisecondsPerFrame())
-    return () => window.clearTimeout(timer)
+    return setAppTickTimeout(() => setTicks((tick) => tick + 1), 1)
   }, [band.isGrowing, ticks])
 
   const width = Math.min(band.spread, DESCRIPTION_BAND_FADE_END)

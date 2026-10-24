@@ -1,5 +1,4 @@
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
 import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
@@ -32,7 +31,7 @@ export function createCloudFrameCursor(): CloudFrameCursor {
 
 /** requestAnimationFrame 시각 → 경기 장면 그림 번호 (경기 장면 시계 기준 — 공용 창이 떠 있는 동안은 안 오른다) */
 export function sceneCloudFrameOf(rawNow: number): number {
-  return Math.floor(gameSceneTimeOf(rawNow) / millisecondsPerFrame())
+  return gameSceneTickOf(gameSceneTimeOf(rawNow))
 }
 
 /** 지금까지 센 0x78448 부름 수 */

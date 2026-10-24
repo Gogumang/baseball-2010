@@ -54,7 +54,7 @@ describe('스페셜 에디트 화면', () => {
     expect(screen.queryByRole('dialog', { name: '이름 입력' })).toBeNull()
   })
 
-  it('입력 창의 CLR — 글자가 있으면 한 글자 지우기, 비었으면 취소', () => {
+  it('입력 창의 CLR — 글자가 있으면 한 글자 지우기, 마지막 글자를 지운 그 그림에 곧장 취소 (0x32b5d → 0x32b7c, U-91)', () => {
     const onRename = vi.fn()
     render(<SpecialEditScreen gamePoint={0} onRename={onRename} onBack={vi.fn()} />)
     key('Enter')
@@ -62,7 +62,7 @@ describe('스페셜 에디트 화면', () => {
     fireEvent.change(screen.getByLabelText('이름'), { target: { value: 'AB' } })
     key('Escape')
     expect((screen.getByLabelText('이름') as HTMLInputElement).value).toBe('A')
-    key('Escape')
+    // 마지막 글자를 지운 CLR 하나로 닫힌다 — 빈 칸에서 CLR 을 한 번 더 누를 필요가 없다
     key('Escape')
     expect(screen.queryByRole('dialog', { name: '이름 입력' })).toBeNull()
     // 창이 닫혀도 명단(하위 1)에 남는다
@@ -92,6 +92,18 @@ describe('스페셜 에디트 화면', () => {
       height.mockRestore()
       vi.useRealTimers()
     }
+  })
+
+  it('입력 창 오른쪽에 입력 방식 "가" 와 slt_frame 이미지 20 화살 둘 — (184, 176) · ◀ (175, 177) · ▶ 뒤집기 (194, 177) (0x541ed, U-91)', () => {
+    render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={vi.fn()} />)
+    key('Enter')
+    key('Enter')
+    const 방식 = screen.getByTestId('입력방식')
+    expect([방식.style.left, 방식.style.top, 방식.textContent]).toEqual(['184px', '176px', '가'])
+    const 왼쪽 = screen.getByTestId('입력방식-왼쪽')
+    const 오른쪽 = screen.getByTestId('입력방식-오른쪽')
+    expect([왼쪽.style.left, 왼쪽.style.top, 왼쪽.getAttribute('src')]).toEqual(['175px', '177px', './sprites/slt_frame/020.png'])
+    expect([오른쪽.style.left, 오른쪽.style.transform]).toEqual(['194px', 'scaleX(-1)'])
   })
 
   it('입력 창이 떠 있는 동안 숫자·* 키는 뒤의 명단으로 안 간다', () => {

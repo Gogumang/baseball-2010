@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 import type { ScreenEffectFrame } from '@/entities/story/model/screenEffect'
 import type { EventStep } from '@/entities/story/model/eventScript'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { effectTimelineOf, effectorEndingFrameOf, effectorPhaseAt } from '@/pages/story/lib/eventBackdrop'
 import type { EffectorPhase, EffectTimelineEntry } from '@/pages/story/lib/eventBackdrop'
 
@@ -96,20 +97,20 @@ export function useScreenEffect(
     }
     if (entries.every((entry) => entry.kind === null)) {
       // 효과기를 안 건드리는 걸음 — 앞 효과는 그대로 돌고, 명령 하나에 한 틀씩 지나 멈출 명령이 돈다
-      const timers = entries.map((entry) => window.setTimeout(() => {
+      const timers = entries.map((entry) => setAppTickTimeout(() => {
         vibrateUpTo(entry.start)
         setView((previous) => ({ ...previous, lastEffectId: entry.id }))
-      }, entry.start * millisecondsPerFrame()))
-      const release = window.setTimeout(() => onReleaseRef.current?.(key), releaseFrame * millisecondsPerFrame())
+      }, entry.start))
+      const release = setAppTickTimeout(() => onReleaseRef.current?.(key), releaseFrame)
       return () => {
-        timers.forEach((timer) => window.clearTimeout(timer))
-        window.clearTimeout(release)
+        timers.forEach((clear) => clear())
+        release()
       }
     }
 
     serialRef.current += 1
     const serial = serialRef.current
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     /** 효과마다 '끝' 그리기를 봤는가 — 프레임이 건너뛰어도 꼭 한 번 거친다([mgr+0x2c8] 을 바꾸는 그리기다) */
     const ended = entries.map(() => false)
     let isReleased = false
@@ -165,7 +166,7 @@ export function useScreenEffect(
       return phase !== '없음' || activeEntryAt(entries, Infinity) !== active
     }
     const tick = (now: number) => {
-      const frameIndex = Math.floor((now - startedAt) / millisecondsPerFrame())
+      const frameIndex = Math.max(0, appTickOf(now) - startTick)
       if (!draw(frameIndex)) return
       const handle = requestAnimationFrame(tick)
       if (hasTakenOver) handleRef.current = handle

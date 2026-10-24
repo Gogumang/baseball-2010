@@ -9,6 +9,7 @@ import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManage
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
+import { PitcherResumeManagementFrame } from '@/pages/pitcher-league/ui/PitcherResumeManagementFrame'
 import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -21,7 +22,8 @@ import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoSt
 import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { NariYearCoverScreen } from '@/pages/management/ui/NariYearCoverScreen'
+import { NariYearCoverScreen, YearCoverBlackFrame } from '@/pages/management/ui/NariYearCoverScreen'
+import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
@@ -468,8 +470,18 @@ function PitcherLeagueScreens({
   if (scene === '외출') return outingMap
 
   if (scene === '연차표지') {
+    // 앞 화면 아홉 틀은 앞 상태가 매 틀 그린다 — 114 끝은 0x19da4(상태판 · 머리띠, 새 시즌의 S), 이어하기 길은 `resumeCoverUnderlayAt`.
+    // ⚠️ 134 대진판 · 141 엔딩 판은 멈춘 판(`LeftFrame`) 그대로 — 타자편 `CareerRoutes` 와 같다
+    const statusBoard = <PitcherEventUnderlay career={career} />
+    const previousScreenAt = session.yearCoverFromResume
+      ? (frame: number) => {
+        const underlay = resumeCoverUnderlayAt(frame)
+        if (underlay === '검정') return <YearCoverBlackFrame />
+        return underlay === '관리' ? <PitcherResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
+      }
+      : previousScene === '이벤트' ? () => statusBoard : undefined
     // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다 — 타자편과 같은 137
-    return <NariYearCoverScreen yearIndex={career.season - 1} onDone={() => actions.goto('관리')} />
+    return <NariYearCoverScreen yearIndex={career.season - 1} onDone={() => actions.goto('관리')} previousScreenAt={previousScreenAt} />
   }
 
   return (

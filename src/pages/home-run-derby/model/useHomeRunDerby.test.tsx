@@ -364,9 +364,10 @@ describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너
     const 째깍 = 시계()
     const rendered = 띄우기()
     const 판 = derbyBattedBallOf(홈런.pattern!)
-    const 시작 = 째깍.now
-    act(() => rendered.result.current.onPitchResolved(홈런))
     const ms = millisecondsPerFrame()
+    // 판 시각(공 틱 0) = 판을 넘긴 틀의 장면 틱 머리 — 1000ms 는 62ms 격자의 틱 16(992~1053) 안이다
+    const 시작 = Math.floor(째깍.now / ms) * ms
+    act(() => rendered.result.current.onPitchResolved(홈런))
     expect(rendered.result.current.homeRunText?.startedAt).toBe(시작 + 판.homeRunTicks[0]! * ms)
     expect(rendered.result.current.homeRunText?.endsAt).toBe(시작 + 판.closeTick * ms)
     expect(rendered.result.current.distanceBoard?.startedAt).toBe(시작)
@@ -400,7 +401,8 @@ describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너
     const 판 = derbyBattedBallOf(홈런.pattern!)
     const 홈런틱 = 판.homeRunTicks[0]!
     const ms = millisecondsPerFrame()
-    const 시작 = 째깍.now
+    // 판 시각(공 틱 0) = 판을 넘긴 틀의 장면 틱 머리
+    const 시작 = Math.floor(째깍.now / ms) * ms
     act(() => rendered.result.current.onPitchResolved(홈런))
     // 틱 홈런틱 의 그림이 지난 뒤 — 다음 틱(홈런틱 + 1)이 키를 받는다
     째깍.흘리기(홈런틱 * ms + 1)

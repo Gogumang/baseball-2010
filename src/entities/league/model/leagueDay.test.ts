@@ -159,6 +159,23 @@ describe('playLeagueDay — 내 팀 경기만 빼고 전적에 넣는다', () =>
     )
   })
 
+  it('CPU 경기 준비 0xc239c 가 넣은 마선수가 그 명단 팀 레코드에 남는다 — 내 경기 두 팀만 빠진다 (U-105 r154)', () => {
+    const 내팀 = 0
+    const 상대 = opponentOf(1, 내팀)
+    const { recordAces } = playLeagueDay(EMPTY_LEAGUE, 1, 내팀, 씨앗난수(77))
+    const teams = Object.keys(recordAces).map(Number).sort((a, b) => a - b)
+
+    expect(teams).toHaveLength(LEAGUE_TEAM_COUNT - 2)
+    expect(teams).not.toContain(내팀)
+    expect(teams).not.toContain(상대)
+    for (const aces of Object.values(recordAces)) {
+      expect(aces.batter).toBeGreaterThanOrEqual(0)
+      expect(aces.batter).toBeLessThan(5)
+      expect(aces.pitcher).toBeGreaterThanOrEqual(0)
+      expect(aces.pitcher).toBeLessThan(5)
+    }
+  })
+
   it('내 팀이 낀 경기의 상대도 전적이 늘지 않는다', () => {
     const 내팀 = 0
     const 상대 = opponentOf(1, 내팀)

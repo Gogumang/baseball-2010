@@ -349,6 +349,8 @@ function SeasonScreens({
   const goalRecordOf = session.recordSource()
   const goalSource = {
     state, league, roster, playerStats, series, ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+    // 레코드에 남은 마투수 — 목표 ④ 0xa3764 가 거르지 않고 센다 (U-105 r163)
+    recordAces: session.myRecordAces,
   }
   const goalInput = seasonGoalInputOf(goalSource)
   // 시상 순위표의 재료 — 시상 화면에서만 만든다(명전 기록을 그때 읽는다)
@@ -540,8 +542,10 @@ function SeasonScreens({
     return (
       <SeasonStaminaPickScreen
         teamId={state.record.teamId}
-        // 0x5870 — 내 팀 레코드(로테이션으로 섞인 차례)
+        // 0x5870 — 내 팀 레코드(로테이션으로 섞인 차례). 0xb512c 를 안 불러 레코드에 남은 마선수 줄도 보인다 (U-105 r154)
         roster={session.tradeRoster}
+        recordAces={session.myRecordAces}
+        {...(aceSelect === undefined ? {} : { aceLevels: aceSelect.levels })}
         nameOf={(player, isPitcher, index) => seasonPlayerRecordOf(state.record.teamId, player, isPitcher, index, recordOf).name}
         {...withEntryCells(session.entryCellSourceOf(state.record.teamId))}
         state={state}
@@ -593,6 +597,8 @@ function SeasonScreens({
         random={random}
         request={scene === SEASON_SCENE_STATE.트레이드영입선수 ? session.tradeRequest : null}
         onTrade={actions.finishTrade}
+        // 0xe5 진입 0x5cd0 첫머리 — 열 팀 0xb512c (U-105 r154)
+        onEnterAcquired={actions.clearRecordAces}
         onFinish={actions.closeTradeResult}
         onCancelRequest={actions.cancelTradeRequest}
         onBack={backToTeamMenu}

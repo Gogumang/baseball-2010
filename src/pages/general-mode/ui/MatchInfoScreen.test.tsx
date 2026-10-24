@@ -6,10 +6,15 @@ import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { INITIAL_SETUP } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 import { MATCH_INFO_LAYOUT } from '@/pages/general-mode/lib/prepareLayout'
+import { resetSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 
 /** 경기정보 (하위 상태 22, 목록 k = 4) */
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  // "0경기설정" 깜빡임 [skin+0x410] 은 앱에 하나라 시험마다 앱을 새로 켠 것처럼 0 으로 (U-90)
+  resetSkinBlinkCounter()
+})
 
 type Props = Parameters<typeof MatchInfoScreen>[0]
 
@@ -156,7 +161,7 @@ describe('PLAY BALL 공 누름 칸 (r157)', () => {
 describe('바닥 (0x2e0c4 모드 1 갈래)', () => {
   const marks = (container: HTMLElement) =>
     [...container.querySelectorAll('img[data-footer-mark]')].map((node) => Number((node as HTMLElement).dataset.footerMark))
-  // "0경기설정"(프레임 6)은 18틱 중 앞 9틱만 그린다 — 첫 그림(갱신 0)은 켜져 있다
+  // "0경기설정"(프레임 6)은 [skin+0x410] 을 올린 뒤 % 18 ≤ 8 일 때만 그린다 — 앱을 켠 뒤 첫 그림(카운터 1)은 켜져 있다
 
   it('보통은 0x44 — "0경기설정" + 되돌아가기', () => {
     const { container } = 띄우기()

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -133,8 +133,8 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
   const hasFrame = onFrame !== undefined
   useEffect(() => {
     if (!hasFrame || (!isSliding && !ticksEveryFrame)) return undefined
-    const timer = window.setInterval(() => frameRef.current?.(), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    const timer = setAppTickInterval(() => frameRef.current?.())
+    return () => timer()
   }, [hasFrame, isSliding, ticksEveryFrame])
 
   const isPitcherTab = editor.tab === ENTRY_TAB.투수

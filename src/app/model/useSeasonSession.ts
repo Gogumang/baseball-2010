@@ -73,11 +73,11 @@ import {
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  playerFaceOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  SEASON_RECORD_ACE_BATTER_SLOT, SEASON_RECORD_ACE_PITCHER_SLOT, playerFaceOf, recordAceSeatOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type {
-  SeasonEntryCellSource, SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource,
+  SeasonEntryCellSource, SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource, SeasonRecordAces,
 } from '@/entities/season-mode/model/seasonEntry'
 import {
   HALL_OF_FAME_FIRST_ID, removeCareerPlayerFromRoster, removeHallOfFamerFromRoster, tableTeamOf,
@@ -124,7 +124,7 @@ import type { SeasonEventCursor, SeasonEventReward } from '@/entities/season-mod
 import { rewardResumePatchOf } from '@/entities/story/model/storyScene'
 import {
   achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, seasonGoalWindowNumbersOf, seasonGoalWindowRankOf,
-  teamBattingAverageOf, teamEarnedRunAverageOf,
+  goalPitcherLinesWithAce, teamBattingAverageOf, teamEarnedRunAverageOf,
 } from '@/entities/season-mode/model/seasonGoals'
 import type { GoalPostseasonBracket, SeasonGoalInput, SeasonGoalWindowNumbers } from '@/entities/season-mode/model/seasonGoals'
 import {
@@ -186,6 +186,11 @@ export interface SeasonSession {
    * 화면이 낸 칸(`TradeSwap`)은 이 차례라 `finishTrade` 가 명단 첨자로 되돌린다
    */
   readonly tradeRoster: SeasonTeamRoster
+  /**
+   * 내 팀 레코드에 남은 마선수 (`SeasonSave.recordAces`) — 0xe8(0x5870)이 레코드를 그대로 보여 8 · 9번에 남은 마선수 줄이 든다
+   * (U-105 r154). 0xdf · 0xe5 진입이 지운 뒤나 없으면 undefined
+   */
+  readonly myRecordAces: SeasonRecordAces | undefined
   /**
    * 내 팀 투수 **레코드 칸 k → 명단 첨자** (`tradeRoster` 를 늘어세운 그 차례) — 선수영입 자리 고르기(0xdf 목적 3)가 레코드
    * 차례로 보이고 0xc554 가 레코드 칸 k 에 끼워넣으므로, 명단에 걸 때 첨자로 되돌린다
@@ -351,6 +356,8 @@ export interface SeasonActions {
    */
   readonly chooseTeam: (teamId: number, name: string) => void
   readonly goto: (scene: SeasonSceneState) => void
+  /** 0xe5 진입 0x5cd0 첫머리 `0xb512c` × 열 팀 — 레코드에 남은 마선수를 뺀다 (`SeasonSave.recordAces`, U-105 r154) */
+  readonly clearRecordAces: () => void
   readonly updateRecord: (record: SeasonRecord) => void
   readonly updateRoster: (roster: SeasonTeamRoster) => void
   /**
@@ -574,6 +581,14 @@ interface SeasonSave {
    * 없는 팀은 붙박이 표 명단(`tableRosterOf`)과 같다(옛 저장도 그렇다). 스태미나(+0x2c)는 `cpuPitcherStaminas` 가 주인이다.
    */
   readonly cpuRosters?: Readonly<Record<number, SeasonTeamRoster>>
+  /**
+   * **팀 레코드에 남은 마선수** — 팀 번호 → 그 팀 시즌 레코드(0x1f570) 8번 마투수 · 9번 마타자 (`SeasonRecordAces`, U-105 r154).
+   * 0xdd 진입 0x6548 · CPU 끼리 0xc239c 가 모드 2 에서 시즌 레코드에 넣고, 빼는 `0xb512c` 는 0xdf 진입 0x5980 · 0xe5 진입 0x5cd0
+   * 두 곳(열 팀 모두)만 부른다 — 그 사이 0xf1 트레이드 요청 0x93c8 · 0xe8 스태미나 목록 0x5870 이 마선수 줄을 본다.
+   * 경기 끝 0x4ea0c 의 저장(0x22755)이 레코드째 쓰므로 이어하기에도 남는다. 웹 명단 배열(`roster` · `cpuRosters`)에는 넣지 않는다.
+   * 이 칸이 없는 옛 저장은 마선수가 빠진 레코드(0xb512c 뒤)로 본다 — ⚠️ 옛 저장을 0xe9 · 0xf1 에서 이어 하면 그날 마선수 없이 굴린다.
+   */
+  readonly recordAces?: Readonly<Record<number, SeasonRecordAces>>
   /**
    * **전역기록 +0x4e — 시즌모드 경기가 중간 저장돼 있다.** 원본은 전역기록(game_o.sav) 칸이지만 쓰고 지우는 곳이 모두
    * 시즌 저장(game_s.sav)의 생사와 함께다 — 웹은 블록과 같이 시즌 저장에 둔다:
@@ -1008,6 +1023,34 @@ function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary, ownRotat
   }
 }
 
+/**
+ * 사람 경기 두 팀 레코드에 남는 마선수 (U-105 r154) — 0xdd 진입 0x6548 이 내 팀(66da · 66e6 — 0xd7 에서 고른 rec+0xe · +0xd)과
+ * 상대(66f8 · 670a — 굴린 `opponentAces`)의 **시즌 레코드**에 넣은 줄이다(0xb8680 모드 2 → 0x1f571). 내 마투수 +0x2c 는 경기 끝 값에
+ * 하루 끝 4f2bc `0xb617c`(팀 투수 수 [+0xc] 만큼 — 8번 마투수 포함 +20%)를 먹인 값이다. 국가대항전은 넣지 않는다(66ae).
+ */
+function humanGameRecordAcesOf(
+  options: TeamGameOptions | null,
+  summary: TeamGameSummary,
+  myTeamId: number,
+): Record<number, SeasonRecordAces> {
+  if (options === null) return {}
+  const aces: Record<number, SeasonRecordAces> = {}
+  const pitcher = options.acePitcherId ?? -1
+  const batter = options.aceBatterId ?? -1
+  if (pitcher >= 0 || batter >= 0) {
+    const ended = summary.ourAcePitcherStamina ?? FULL_PITCHER_STAMINA
+    aces[myTeamId] = {
+      pitcher,
+      batter,
+      ...(pitcher >= 0 ? { pitcherStamina: recoverStaminaAfterGameDay(ended, SEASON_STAMINA_RECOVERY) } : {}),
+    }
+  }
+  if (options.opponentAces !== undefined) {
+    aces[summary.opponentTeamId] = { pitcher: options.opponentAces.pitcher, batter: options.opponentAces.batter }
+  }
+  return aces
+}
+
 /** 하루 끝 4f2bc — 열 팀 모두 `0xb617c` (투수마다 +20%, 10000 에서 자름) */
 function withDayEndRecovery(save: SeasonSave): SeasonSave {
   const recover = (stamina: number) => recoverStaminaAfterGameDay(stamina, SEASON_STAMINA_RECOVERY)
@@ -1226,6 +1269,17 @@ function nextYearOf(save: SeasonSave, random: RandomPort): { readonly save: Seas
     save: Object.keys(equipped).length === 0 ? started : { ...started, cpuRosters: { ...started.cpuRosters, ...equipped } },
     scene: SEASON_SCENE_STATE.관리메뉴,
   }
+}
+
+/**
+ * 내 팀 레코드에 마선수가 남은 칸 — 마투수 8 · 마타자 9 (`SeasonSave.recordAces`), 없으면 undefined.
+ * 명전 삭제 0x221dc · 나리 초기화 0x223a8 는 마선수를 거르지 않고 레코드 맨 끝 줄을 옮긴다(U-105 r163 — `removeHallOfFamerFromRoster`)
+ */
+function recordAceSlotOf(save: SeasonSave, isPitcher: boolean): number | undefined {
+  const aces = save.recordAces?.[save.state.record.teamId]
+  if (aces === undefined) return undefined
+  if (isPitcher) return aces.pitcher >= 0 ? SEASON_RECORD_ACE_PITCHER_SLOT : undefined
+  return aces.batter >= 0 ? SEASON_RECORD_ACE_BATTER_SLOT : undefined
 }
 
 /**
@@ -1620,7 +1674,7 @@ export function useSeasonSession(
   const removeHallOfFamer = useCallback(
     (id: number, isPitcher: boolean) => {
       if (save === null) return
-      const roster = removeHallOfFamerFromRoster(save.roster, id, isPitcher)
+      const roster = removeHallOfFamerFromRoster(save.roster, id, isPitcher, recordAceSlotOf(save, isPitcher))
       if (roster !== save.roster) commit({ ...save, roster })
     },
     [commit, save],
@@ -1630,7 +1684,7 @@ export function useSeasonSession(
     (isPitcher: boolean) => {
       const current = latestSave.current
       if (current === null) return
-      const roster = removeCareerPlayerFromRoster(current.roster, isPitcher)
+      const roster = removeCareerPlayerFromRoster(current.roster, isPitcher, recordAceSlotOf(current, isPitcher))
       if (roster !== current.roster) commit({ ...current, roster })
     },
     [commit],
@@ -1713,7 +1767,24 @@ export function useSeasonSession(
     (recordIndex: number) => {
       const current = latestSave.current
       if (current === null) return { notice: '', recovered: false }
-      const rosterIndex = recordPitcherIndexOf(current, current.state.record.teamId, current.roster, recordIndex)
+      // 0x5870 목록은 레코드 그대로라 남은 마투수가 8번 칸에 있고 옛 8번은 맨 끝이다(`SeasonRecordAces`) — 목록 칸을 레코드 줄로
+      const myTeamId = current.state.record.teamId
+      const aces = current.recordAces?.[myTeamId]
+      const seat = recordAceSeatOf(current.roster.pitchers.length, aces === undefined ? -1 : aces.pitcher, SEASON_RECORD_ACE_PITCHER_SLOT)[recordIndex]
+      if (seat === 'ace' && aces !== undefined) {
+        // 7c5c~7c64 — 마투수 레코드 +0x2c 도 같은 검사 · 같은 값(마선수 거름 없음). 다음 0xdd · CPU 경기 넣기가 줄을 통째 덮는다
+        if ((aces.pitcherStamina ?? FULL_PITCHER_STAMINA) === FULL_PITCHER_STAMINA) {
+          return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나최대), recovered: false }
+        }
+        spendGamePoint(seasonGpItemPriceOf(SEASON_STAMINA_ITEM))
+        recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: SEASON_STAMINA_ITEM })
+        commit({
+          ...current,
+          recordAces: { ...current.recordAces, [myTeamId]: { ...aces, pitcherStamina: FULL_PITCHER_STAMINA } },
+        })
+        return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나회복), recovered: true }
+      }
+      const rosterIndex = recordPitcherIndexOf(current, myTeamId, current.roster, seat === undefined || seat === 'ace' ? recordIndex : seat)
       const pitcher = current.roster.pitchers[rosterIndex]
       if (pitcher === undefined) return { notice: '', recovered: false }
       if (pitcher.stamina === FULL_PITCHER_STAMINA) {
@@ -2254,6 +2325,8 @@ export function useSeasonSession(
           const advanced = advancePostseason(series, winner)
           commit({
             ...rested,
+            // 포스트시즌도 0xdd 진입이 두 팀 시즌 레코드에 마선수를 넣는다(L+0x34 를 안 본다 — 66ae 는 S+0x12c 만) (U-105 r154)
+            recordAces: { ...rested.recordAces, ...humanGameRecordAcesOf(gameOptions, summary, record.teamId) },
             // 사사구 +0x2a(정산 꼬리 a8b04~a8bee) · 실책 +0x2e(그림 0x43278)는 게이트 0xa56dc 밖이라 포스트시즌에도 쌓인다
             playerStats: recordUngatedSeasonRecords(current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS, summary),
             series: advanced,
@@ -2352,6 +2425,13 @@ export function useSeasonSession(
 
       commit({
         ...rested,
+        // 그날 열 팀 레코드에 들어간 마선수 — CPU 끼리 0xc239c(c24aa~c24ee) · 사람 경기 0xdd 0x6548. 0xb512c 는 0xdf · 0xe5 진입만
+        // 부르므로 0xf1 트레이드 요청 · 0xe8 목록까지 남는다 (U-105 r154)
+        recordAces: {
+          ...rested.recordAces,
+          ...Object.fromEntries(Object.entries(day.recordAces).map(([team, aces]) => [team, { pitcher: aces.pitcher, batter: aces.batter }])),
+          ...humanGameRecordAcesOf(gameOptions, summary, record.teamId),
+        },
         league: day.league,
         playerStats: day.playerStats,
         state: {
@@ -2472,11 +2552,13 @@ export function useSeasonSession(
       // 4b6a~4b7c 에서 [this+0xa4] = 0x1f570(저장, SR[1]) 을 다시 잡는다. 새 해 0x6e0c 의 리그 초기화(0xa305c → 0xb7b34)가 L+0xac 를
       // 지운 뒤라 리그 칸이다. 대회 중에는 경기 끝 0x4ea0c(4f02e~4f044)가 L+0xac 면 phase 2 를 안 세워 0xcb 가 0xe9 로 안 간다.
       // 곧 [this+0xa4] 가 상대국 슬롯인 동안(대회 경기 뒤 ~ 새 해 뒤 첫 0xcb) 0x93c8 은 돌지 않는다 — 버그는 새 해 사기(6ea4)에만 드러난다
+      // 그날 경기들이 넣은 마선수가 열 팀 레코드에 남아 있다 — 타자 9번 칸이 마타자다 (`SeasonSave.recordAces`, U-105 r154)
       const rolled = rollTradeRequest(
         random,
         settled,
         tradeRecordRosterOf(save, settled.teamId, save.roster),
         (team) => tradeRecordRosterOf(save, team, cpuRosterOf(save, team)),
+        (team) => save.recordAces?.[team],
       )
       commit({ ...save, state: { ...save.state, record: rolled.record } })
       setTradeRequest(rolled.request)
@@ -2816,6 +2898,8 @@ export function useSeasonSession(
             playerStats: next.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
             series: next.series ?? null,
             ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+            // 392 는 포스트시즌 첫날 — 마지막 정규 경기 날 넣은 마투수가 내 팀 레코드에 남아 있다 (0xa3764, U-105 r163)
+            recordAces: next.recordAces?.[applied.state.record.teamId],
           }),
         )))
       // 실행기 끝 0x8d134~0x8d19c: 370 · 371 은 0x8b04c, 376 은 0x8b370 이 결과 이벤트를 고른다(시즌 갈래)
@@ -3009,11 +3093,23 @@ export function useSeasonSession(
     setScene(SEASON_SCENE_STATE.관리메뉴)
   }, [])
 
+  /**
+   * `0xb512c` 를 열 팀에 — 0xdf 진입 0x5980(5988~599e) · 0xe5 진입 0x5cd0(5cd8~5cee)이 목록을 채우기 전에 부른다(U-105 r154).
+   * 저장은 따로 안 쓴다(다음 저장이 레코드째 쓴다) — 웹은 세이브 칸을 바로 비운다
+   */
+  const clearRecordAces = useCallback(() => {
+    const current = latestSave.current
+    if (current === null || current.recordAces === undefined) return
+    const { recordAces: _cleared, ...rest } = current
+    commit(rest)
+  }, [commit])
+
   const goto = useCallback((next: SeasonSceneState) => {
     // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
     if (next === SEASON_SCENE_STATE.선수단) setSquadPurpose(SQUAD_PURPOSE.코치채용)
+    if (next === SEASON_SCENE_STATE.선수고르기) clearRecordAces()
     setScene(next)
-  }, [])
+  }, [clearRecordAces])
   const clearNotice = useCallback(() => setNotice(''), [])
   const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
 
@@ -3027,6 +3123,7 @@ export function useSeasonSession(
       save === null ? undefined : seasonEntryCellSourceOf(save, teamId, teamId === save.state.record.teamId),
     recordSource: recordSourceNow,
     tradeRoster: save === null ? EMPTY_ROSTER : tradeRecordRosterOf(save, save.state.record.teamId, save.roster),
+    myRecordAces: save?.recordAces?.[save.state.record.teamId],
     pitcherRecordOrder: save === null ? [] : recordPitcherOrderOf(save, save.state.record.teamId, save.roster.pitchers.length),
     tradeRosterOf: (teamId: number) =>
       save === null ? cpuRosterOf(save, teamId) : tradeRecordRosterOf(save, teamId, cpuRosterOf(save, teamId)),
@@ -3069,7 +3166,7 @@ export function useSeasonSession(
     menuCursors,
     notice,
     actions: {
-      chooseTeam, goto, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, equipSeasonPlayer,
+      chooseTeam, goto, clearRecordAces, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, equipSeasonPlayer,
       buySeasonSubItem, buySeasonGpItem, recoverSeasonPitcherStamina,
       playNextGame,
       openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
@@ -3360,6 +3457,8 @@ export interface SeasonGoalSource {
   readonly series: PostseasonSeries | null
   /** 영입한 명전 선수의 기록 — 경기 명단(`entryOrderOf`)과 같은 칸을 보려고 같은 것을 넘긴다 */
   readonly recordOf?: SeasonEntryRecordSource
+  /** 내 팀 레코드에 남은 마선수 (`SeasonSave.recordAces[내 팀]`) — 목표 ④ 가 마투수 줄까지 센다 (`goalPitcherLinesWithAce`) */
+  readonly recordAces?: SeasonRecordAces | undefined
 }
 
 /**
@@ -3423,7 +3522,8 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
     wins: source.league.wins[team] ?? 0,
     losses: source.league.losses[team] ?? 0,
     teamBattingAverage: teamBattingAverageOf(batterLines),
-    teamEarnedRunAverage: teamEarnedRunAverageOf(pitcherLines),
+    // 0xa3764 는 마선수를 거르지 않는다 — 0xdf · 0xe5 전이면 레코드 8번 마투수 줄이 하나 더 든다 (U-105 r163)
+    teamEarnedRunAverage: teamEarnedRunAverageOf(goalPitcherLinesWithAce(pitcherLines, source.recordAces?.pitcher)),
     popularityGain: record.popularity - record.popularityAtSeasonStart,
   }
 }

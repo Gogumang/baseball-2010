@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite } from '@/shared/ui'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   EVALUATION_GAUGE_ANCHOR, EVALUATION_GAUGE_FILL, EVALUATION_GAUGE_FRAMES, EVALUATION_GAUGE_SIGN_COLOR,
   evaluationGaugeRowsOf, evaluationGaugeValueOf, startEvaluationGauge, tickEvaluationGauge,
@@ -30,8 +30,8 @@ export function EvaluationGauge({ popularityChange, divisor }: EvaluationGaugePr
   const origins = useFrameOrigins(MODE_UI)
 
   useEffect(() => {
-    const tick = window.setInterval(() => setState(tickEvaluationGauge), millisecondsPerFrame())
-    return () => window.clearInterval(tick)
+    const tick = setAppTickInterval(() => setState(tickEvaluationGauge))
+    return () => tick()
   }, [])
 
   const value = evaluationGaugeValueOf(popularityChange)

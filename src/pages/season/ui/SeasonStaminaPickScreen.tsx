@@ -5,7 +5,7 @@ import { SEASON_SHOP_TEXT, seasonShopTextOf } from '@/entities/season-mode/model
 import { ENTRY_TAB, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import { SEASON_ENTRY_CELL_SOURCE, seasonRecordEntryListsOf } from '@/entities/season-mode/model/seasonEntry'
-import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryCellSource, SeasonRecordAces } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { EntryEditorScreen } from '@/widgets/entry-editor'
@@ -20,6 +20,13 @@ export interface SeasonStaminaPickScreenProps {
   readonly nameOf?: (player: SeasonPlayer, isPitcher: boolean, index: number) => string | undefined
   /** 엔트리 목록 창 칸 재료 (세션 `entryCellSourceOf`) */
   readonly cells?: SeasonEntryCellSource
+  /**
+   * 내 팀 레코드에 남은 마선수 (세션 `myRecordAces`) — 0x5870 은 `0xb512c` 를 안 불러 경기 뒤 0xdf · 0xe5 를 지나기 전이면
+   * 8번 칸에 마투수 줄이 보인다(옛 8번은 맨 끝). 고르면 0x7c00 이 마선수 거름 없이 같은 +0x2c 검사를 한다 (U-105 r154)
+   */
+  readonly recordAces?: SeasonRecordAces | undefined
+  /** 마선수 줄 능력치의 레벨 배율 (`useAceLevels().levels`) */
+  readonly aceLevels?: Readonly<Record<number, number>>
   /** 공통 틀 0x9f60 의 상태판 · 가운데 판 재료 */
   readonly state: SeasonState
   readonly gamePoint: number
@@ -52,13 +59,13 @@ const STAMINA_PICK_FOOTER = 7
  * 부모 칸 '아이템'만 그린다(0xdc 화면과 같다, r99).
  */
 export function SeasonStaminaPickScreen({
-  teamId, roster, nameOf, cells = SEASON_ENTRY_CELL_SOURCE, state, gamePoint, onPick, onBack,
+  teamId, roster, nameOf, cells = SEASON_ENTRY_CELL_SOURCE, recordAces, aceLevels, state, gamePoint, onPick, onBack,
 }: SeasonStaminaPickScreenProps) {
   const [notice, setNotice] = useState<{ readonly text: string; readonly leave: boolean } | null>(
     { text: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나선택), leave: false },
   )
   const [editor, setEditor] = useState<EntryEditorState>(() => ({ ...openEntryEditor(false), tab: ENTRY_TAB.투수 }))
-  const lists = seasonRecordEntryListsOf(teamId, roster, cells, nameOf)
+  const lists = seasonRecordEntryListsOf(teamId, roster, cells, nameOf, recordAces, aceLevels)
 
   const onKey = useCallback((key: EntryKey) => {
     if (notice !== null) return

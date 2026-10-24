@@ -9,6 +9,7 @@ import {
   goalRankOf,
   teamBattingAverageOf,
   teamEarnedRunAverageOf,
+  goalPitcherLinesWithAce,
   seasonGoalResultEventId,
   seasonGoalWindowNumbersOf,
   seasonGoalWindowRankOf,
@@ -159,5 +160,17 @@ describe('판정 0xa37bc 와 창 0x8656c 는 같은 목표 값을 본다 (표 0x
     const 입력 = { ...다섯개달성, popularityGain: -3 }
     expect(seasonGoalWindowNumbersOf(0, 입력, 1).current[4]).toBe(0)
     expect(achievedSeasonGoalCount(0, 입력)).toBe(4)
+  })
+})
+
+describe('목표 ④ 0xa3764 — 레코드에 남은 마투수 줄 (U-105 r163)', () => {
+  it('마투수 줄(XlsACE_PIT 행 +0x20 · +0x22)이 하나 더 들어 평균과 수가 바뀐다', () => {
+    const lines = [{ outs: 27, runsAllowed: 3 }, { outs: 0, runsAllowed: 0 }]
+    // 싸이커 23 × 2700 / 300 = 207 → (300 + 0 + 207) / 3
+    expect(teamEarnedRunAverageOf(goalPitcherLinesWithAce(lines, 0))).toBe(169)
+    // 드래고나 5 × 2700 / 300 = 45
+    expect(teamEarnedRunAverageOf(goalPitcherLinesWithAce(lines, 4))).toBe(115)
+    expect(goalPitcherLinesWithAce(lines, -1)).toBe(lines)
+    expect(goalPitcherLinesWithAce(lines, undefined)).toBe(lines)
   })
 })

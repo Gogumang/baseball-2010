@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import { pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
@@ -244,6 +245,16 @@ type MatchCommand = Extract<EventCommand, { op: 'match' }>
 export interface PitcherLeagueSession {
   readonly career: PitcherCareer | null
   readonly scene: PitcherScene
+  /**
+   * 137 표지가 이어하기 100 진입의 새 시즌 갈래(1c25e S+0x50 == 0x11)에서 왔다 — 앞 화면이 100 · 1 · 105 · 115 · 114 이고
+   * 100 진입 1c15e 가 배경음을 끊는다(`pages/management/lib/nariYearCover` 의 이어하기 길). 타자편 `Screen` 의 `fromResume`
+   */
+  readonly yearCoverFromResume: boolean
+  /**
+   * 화면이 '관리' 인 채 105 에 다시 들어온 앞 상태가 0x1aec4 의 배경음 4 목록에 든 수(125 → 105) — 배경음 표
+   * `usePitcherLeagueBgmRestart` · `usePitcherLeagueBgm` 이 오르면 4 를 처음부터 다시 튼다(`restartsManagementBgmFrom`)
+   */
+  readonly managementBgmRestart: number
   /** 109 순위표의 이전 상태가 105(관리)인가 — 바닥 5(되돌아가기) / 1 */
   readonly nextGameFromManagement: boolean
   /** 142 진입 0x1c46c 가 이 장면에서 굴린 마선수 — 경기정보 마투수·마타자 줄 */
@@ -328,7 +339,8 @@ export interface PitcherLeagueSession {
     /** 명예의 전당 등록이 된 그 순간 — 모드 저장을 지운다(0x62dbe → 0x224ec). 엔딩을 떠날 때까지 다시 저장하지 않는다 */
     readonly eraseSaveForHallOfFame: () => void
     /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 하위 메뉴 취소 · 훈련 · 휴식 결과 창 닫기 (진입 0x11910 · 자동 훑기 0x1cf9c) */
-    readonly reenterManagement: () => void
+    /** `from` — 105 로 다시 들어오는 원본 앞 상태(125 · 127). 0x1aec4 의 배경음 4 목록에 들면 4 를 다시 튼다(`managementBgmRestart`) */
+    readonly reenterManagement: (from?: number) => void
     /** 125 · 127 결과 창이 떠 있는가 — 관리 메뉴 `onResultWindowChange` */
     readonly setResultWindowOpen: (isOpen: boolean) => void
     /** 105 관리 메뉴 확인 키(−5 · '5') — 0x12654 가 메뉴 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
@@ -599,8 +611,8 @@ function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
   return {
     career: saved !== null && point.kind === '이벤트'
       ? enterPitcherYearEndEvent(saved, point.eventId)
-      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 105(137 은 안 거친다 — `startNewSeason`)는 **투수편에 들어설 때** 돈다
-      // (`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137(연초 114 틀이 남은 +0x289 를 받는다 —
+      // `nariYearCover` 의 이어하기 길)은 **투수편에 들어설 때** 돈다(`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
       // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
       // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
       : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
@@ -626,6 +638,9 @@ function pitcherSceneOfResume(career: PitcherCareer | null, resumePoint: Pitcher
     // 1c24e S+0x50 == 6 → 141 — 보너스를 받은 저장(S+0x7b)이라 키 0x1220c 가 등록 팝업 0x2d 로 간다
     case '엔딩':
       return '엔딩'
+    // 1c25e S+0x50 == 0x11 → 0x1b768 → (100 · 1 · 105 · 115 · 114 를 지나며) 연초 114 틀이 남은 +0x289 로 137 — `nariYearCover`
+    case '새시즌':
+      return '연차표지'
     default:
       return '관리'
   }
@@ -742,6 +757,8 @@ export function usePitcherLeagueSession(
     skillEquipStatEventsOf(PITCHER_LEAGUE_MODE, before.ids, career.equippedSkillIds).forEach(recordStat)
   }, [career, recordStat])
   const [scene, setScene] = useState<PitcherScene>(() => pitcherSceneOfResume(career, resumePoint))
+  /** 137 표지가 이어하기 길에서 왔나 (`PitcherLeagueSession.yearCoverFromResume`) */
+  const [yearCoverFromResume, setYearCoverFromResume] = useState(() => resumePoint.kind === '새시즌')
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() => pitcherStoryOfResume(resumePoint))
   const [storyNotice, setStoryNotice] = useState('')
@@ -816,6 +833,19 @@ export function usePitcherLeagueSession(
       if (!shouldForgetRepeatable) setShouldForgetRepeatable(true)
     }
   }
+  /**
+   * 상태 100 진입 0x1c154 의 머리 1c15e `0x6e439([0x1400058])` = stopBgm — S+0x50 갈래(1c24e~)보다 먼저 늘 부른다(r163 직접 뜸).
+   * 이어하기로 투수편에 들어서면 메인 메뉴 배경음 1 이 끊긴다: 134 대진판 · 116 경기 결과 · 이벤트 재생(40 가드가 막으면) 같은
+   * 배경음을 안 트는 자리는 소리 없이 선다. 105 · 109 · 128(이전 1 → 4) · 141(46/52)은 App 의 `useSceneBgm` 이 이 효과 뒤(같은 커밋,
+   * 훅 차례 — 이 세션이 먼저 선다)에 제 배경음을 튼다. 저장이 없어 등록(104)으로 가는 길은 거치지 않는다.
+   */
+  const wasOnScreenForBgmRef = useRef(isOnScreen)
+  const hasCareer = career !== null
+  useEffect(() => {
+    const was = wasOnScreenForBgmRef.current
+    wasOnScreenForBgmRef.current = isOnScreen
+    if (isOnScreen && !was && hasCareer) activeSound().stopBgm()
+  }, [isOnScreen, hasCareer])
   /** 판정 없음(e = −1) 엔딩 · 명예의 전당 등록 뒤 저장 막기 — 아래 `commit` 머리글 */
   const isSaveErasedRef = useRef(false)
   /**
@@ -996,7 +1026,12 @@ export function usePitcherLeagueSession(
   const isFromShopRef = useRef(false)
   if (scene === '상점') isFromShopRef.current = true
   else if (scene !== '관리') isFromShopRef.current = false
-  const reenterManagement = useCallback(() => setManagementReentryCount((count) => count + 1), [])
+  /** 화면이 '관리' 인 채 125 → 105 로 다시 들어와 배경음 4 를 다시 튼 수 (`PitcherLeagueSession.managementBgmRestart`) */
+  const [managementBgmRestart, setManagementBgmRestart] = useState(0)
+  const reenterManagement = useCallback((from?: number) => {
+    setManagementReentryCount((count) => count + 1)
+    if (from !== undefined && restartsManagementBgmFrom(from)) setManagementBgmRestart((count) => count + 1)
+  }, [])
   /**
    * 결과 상태 125(훈련) · 127(휴식)의 창이 떠 있다 — 관리 메뉴가 알린다(`onResultWindowChange`). 원본은 그동안 105 가 아니라
    * 105 갱신 0x1aec4 끝의 칭호 판정이 돌지 않는다. 창이 닫히면 0x18dd8 · 0x1b5b8 · 0x1b466 이 `0xbcb49(0x69)` 로 105 에 들어온다
@@ -1447,14 +1482,15 @@ export function usePitcherLeagueSession(
 
   /**
    * 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (타자편 `startNewSeason` 과 같다 — `pages/management/lib/nariYearCover`).
-   * 난수는 1b86c 의 CPU 장비 굴림 하나뿐이고 137 은 난수를 안 쓴다. `showsCover` 가 거짓이면 곧장 105 — 이어하기 100 진입
-   * 1c25e 는 0x1b768 뒤 1c3be 로 빠져 +0x289 를 보는 틀을 안 지난다(⚠️ 미확인: 남은 +0x289 의 뒷일).
+   * 난수는 1b86c 의 CPU 장비 굴림 하나뿐이고 137 은 난수를 안 쓴다. `fromResume` 은 이어하기 100 진입 1c25e — 0x1b768 뒤 1c3be 로
+   * 빠져도 남은 +0x289 를 연초 114 틀 0x1c014 가 9 틀째에 받아 137 을 띄운다(r156 직접 뜸 — `nariYearCover` 의 이어하기 길).
    */
   const startNewSeason = useCallback(
-    (finished: PitcherCareer, showsCover = true) => {
+    (finished: PitcherCareer, fromResume = false) => {
       // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
       commit(startNextPitcherSeason(finished, random))
-      setScene(showsCover ? '연차표지' : '관리')
+      setYearCoverFromResume(fromResume)
+      setScene('연차표지')
     },
     [commit, random],
   )
@@ -1678,6 +1714,7 @@ export function usePitcherLeagueSession(
     setResumePoint(next.point)
     setCareer(next.career)
     setScene(pitcherSceneOfResume(next.career, next.point))
+    setYearCoverFromResume(next.point.kind === '새시즌')
     setStory(pitcherStoryOfResume(next.point))
     setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
     setCupView(cupViewOfResume(next.point))
@@ -1708,7 +1745,7 @@ export function usePitcherLeagueSession(
       return setScene('이벤트')
     }
     // 1c25e — S+0x50 == 0x11 → 새 시즌 처리 0x1b768 (경기 중에는 이 값이 남지 않지만 같은 분기라 함께 둔다)
-    if (point.kind === '새시즌') return startNewSeason(career, false)
+    if (point.kind === '새시즌') return startNewSeason(career, true)
     if (point.kind === '포스트시즌') setPostseasonPopup(regularSeasonPopupOnEnter(career))
     if (point.kind === '국가대항전') {
       // 그 밖 갈래 S+0x12c → 134 대진판 (1c348~1c358)
@@ -2205,6 +2242,8 @@ export function usePitcherLeagueSession(
   return {
     career: shown,
     scene,
+    yearCoverFromResume,
+    managementBgmRestart,
     nextGameFromManagement,
     matchAces,
     matchInfoStage,

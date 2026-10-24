@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { NO_LAST_EVALUATION, pitcherLastGameLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -73,8 +73,7 @@ export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: Pit
   const [isEvaluationEntered, setEvaluationEntered] = useState(false)
   useEffect(() => {
     if (isEvaluationEntered) return undefined
-    const timer = window.setTimeout(() => setEvaluationEntered(true), millisecondsPerFrame())
-    return () => window.clearTimeout(timer)
+    return setAppTickTimeout(() => setEvaluationEntered(true), 1)
   }, [isEvaluationEntered])
 
   if (!isEvaluationEntered) {

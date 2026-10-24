@@ -1068,6 +1068,11 @@ export interface LeagueDayResult {
    * 그 팀의 다음 **사람 경기**가 8번 칸을 그대로 읽을 때 쓸 값이다 — 다음 CPU 경기는 10000 으로 다시 덮는다.
    */
   readonly acePitcherStaminas: Readonly<Record<number, number>>
+  /**
+   * 팀 번호 → 오늘 CPU 경기 준비 `0xc239c` 가 그 팀 레코드(0xb8680 → 모드 2 는 시즌 저장 `0x1f571`)에 넣은 마선수.
+   * 빼는 `0xb512c` 는 시즌 0xdf · 0xe5 진입만 불러 경기 뒤에도 레코드에 남는다 (U-105 r154 — 시즌 `SeasonSave.recordAces`)
+   */
+  readonly recordAces: Readonly<Record<number, LeagueGameAces>>
 }
 
 /**
@@ -1116,6 +1121,7 @@ export function playLeagueDay(
   const scoresB = matchups.map(() => LEAGUE_DAY_NO_SCORE)
   const staminas: Record<number, readonly number[]> = { ...pitcherStaminas }
   const aceStaminas: Record<number, number> = {}
+  const recordAces: Record<number, LeagueGameAces> = {}
   // 리그 모드(2·3·4)는 g ≠ 0 이면 경기 준비마다 두 팀 레코드가 한 칸 돈다 — 모드 차이는 내 팀 쪽뿐이라 2 로 묻는다
   const rotates = cpuGameRotationAdvances(SEASON_MODE, day)
   const humanGame = matchupsOf(day).find((matchup) => matchup.away === myTeamId || matchup.home === myTeamId)
@@ -1135,13 +1141,17 @@ export function playLeagueDay(
     // 굴림 뒤 c24fc~c254e: g ≠ 0 이면 두 팀 레코드를 0xb5ca8 로 한 칸 돌린다(영구) — 0번 레코드가 오늘의 선발이다
     const current = rotates ? rotateLeaguePitchers(before, [sides.away, sides.home]) : before
     const orders = { away: pitcherOrderOf(current, sides.away), home: pitcherOrderOf(current, sides.home) }
+    // 명단 쪽 마선수 — 그 명단 팀의 레코드에 들어간다(0xb8680 은 팀 객체 +0x25 = 명단 팀으로 레코드를 고른다)
+    const aces = cpuGameAcesOf(rolls)
+    if (aces.away !== undefined) recordAces[sides.away] = aces.away
+    if (aces.home !== undefined) recordAces[sides.home] = aces.home
     const score = simulateLeagueGame(
       sides,
       random,
       { away: orders.away[0] ?? 0, home: orders.home[0] ?? 0 },
       { away: staminas[sides.away], home: staminas[sides.home] },
       {
-        aces: cpuGameAcesOf(rolls),
+        aces,
         aceLevels,
         pitcherOrders: orders,
         abilityContext,
@@ -1180,5 +1190,6 @@ export function playLeagueDay(
     ),
     pitcherStaminas: staminas,
     acePitcherStaminas: aceStaminas,
+    recordAces,
   }
 }

@@ -212,6 +212,38 @@ describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () 
     expect(removeHallOfFamerFromRoster(roster, 0xb5, true)).toBe(roster)
   })
 
+  it('레코드에 마투수가 남았으면 (U-105 r163): 레코드 끝 줄(옛 8번)이 옮겨 오고 0xb512c 뒤 8번은 옛 n−1번', () => {
+    // 레코드 [명전, 1..7, 마투수, 9, 10, 옛 8] → 빼기 [옛 8, 1..7, 마투수, 9, 10] → 0xb512c [옛 8, 1..7, 10, 9]
+    const roster: SeasonTeamRoster = {
+      pitchers: [명전투수(0), ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((slot) => 투수(slot, slot))],
+      batters: [],
+    }
+
+    const next = removeHallOfFamerFromRoster(roster, 0xb4, true, 8)
+
+    expect(next.pitchers.map((player) => player.id)).toEqual([8, 1, 2, 3, 4, 5, 6, 7, 10, 9])
+    // 마선수 없으면 [10, 1..9]
+    expect(removeHallOfFamerFromRoster(roster, 0xb4, true).pitchers.map((player) => player.id))
+      .toEqual([10, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('레코드에 마타자가 남았으면: 9번 뒤 칸이면 옛 9번이 수비 위치 · 칸 번호를 이어받고, 9번 자리 선수면 차례는 웹과 같다', () => {
+    const batters = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((slot) => 타자(slot, slot, slot % 9))
+    const withHallOfFamer = batters.map((player, index) => (index === 10 ? 명전타자(10, 4) : player))
+
+    const next = removeHallOfFamerFromRoster({ pitchers: [], batters: withHallOfFamer }, 0xc9, false, 9)
+
+    // 레코드 [0..8, 마타자, 명전, 11, 옛 9] → [0..8, 마타자, 옛 9(칸 10), 11] → 0xb512c [0..8, 11, 옛 9]
+    expect(next.batters.map((player) => player.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 9])
+    expect(slotOf(next.batters[10])).toBe(10)
+    expect(next.batters[10].fieldPosition).toBe(4)
+
+    const ninth = batters.map((player, index) => (index === 9 ? 명전타자(9, 0) : player))
+    const same = removeHallOfFamerFromRoster({ pitchers: [], batters: ninth }, 0xc9, false, 9)
+    expect(same.batters.map((player) => player.id))
+      .toEqual(removeHallOfFamerFromRoster({ pitchers: [], batters: ninth }, 0xc9, false).batters.map((player) => player.id))
+  })
+
   it('막기 — 내 팀에 있고 시즌모드 경기 진행 중일 때만 (0xb50ad && 전역기록 +0x4e)', () => {
     const roster: SeasonTeamRoster = { pitchers: [명전투수(0)], batters: [] }
     expect(isHallOfFameDeleteBlocked(roster, 0xb4, true, true)).toBe(true)

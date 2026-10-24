@@ -71,7 +71,7 @@ export interface PitcherManagementScreenProps {
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
   /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 세션의 `actions.reenterManagement` (`usePitcherManagementMenu` 의 `onReenter`) */
-  readonly onReenter?: () => void
+  readonly onReenter?: (from?: number) => void
   /** 125 · 127 결과 창이 떠 있는가 — 세션의 `actions.setResultWindowOpen` (`usePitcherManagementMenu` 의 `onResultWindowChange`) */
   readonly onResultWindowChange?: (isOpen: boolean) => void
   /** 105 메인 메뉴의 확인 키 — 0x12654 가 칸을 보기 전에 mgr+0x304 = 0 (세션 `pressManagementConfirm`) */

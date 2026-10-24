@@ -336,18 +336,59 @@ export function isHallOfFameRecord(player: SeasonPlayer): boolean {
  * 웹 시즌 저장의 명단은 내 팀 하나뿐이다 — 명전 선수는 영입(내 팀)으로만 들어가고 트레이드가 막혀(StrMODE[166])
  * 다른 팀에 있을 수 없으니 열 팀을 도는 것과 결과가 같다. 없으면 같은 객체.
  */
-export function removeHallOfFamerFromRoster(roster: SeasonTeamRoster, id: number, isPitcher: boolean): SeasonTeamRoster {
+export function removeHallOfFamerFromRoster(
+  roster: SeasonTeamRoster,
+  id: number,
+  isPitcher: boolean,
+  recordAceSlot?: number,
+): SeasonTeamRoster {
   const players = isPitcher ? roster.pitchers : roster.batters
   const found = players.findIndex((player) => isHallOfFameRecord(player) && player.id === id)
   if (found < 0) return roster
-  const next = players.slice(0, -1)
-  const last = players[players.length - 1]
-  if (found < next.length) {
-    next[found] = isPitcher
-      ? last
-      : withSlot({ ...last, fieldPosition: players[found].fieldPosition & 0xf }, found)
-  }
+  const next = recordLineRemoved(players, found, isPitcher, recordAceSlot)
   return isPitcher ? { ...roster, pitchers: next } : { ...roster, batters: next }
+}
+
+/**
+ * 레코드에서 j 번 줄 빼기 — `memcpy(T[j], T[끝])` · `memset(T[끝])` · 수 −1 (타자는 0xb8e85 · 0xb6605 로 j 의 수비 위치 · 칸 번호).
+ *
+ * `recordAceSlot` 은 이 편 레코드에 마선수가 남은 칸(투수 8 · 타자 9 — `SeasonSave.recordAces`, U-105 r163)이다. 웹 명단은 마선수를
+ * 뺀 모양(0xdf · 0xe5 진입 `0xb512c` 뒤)이라, 원본처럼 레코드 [0..k−1, 마선수, k+1.., 옛 k] 에서 빼고 `0xb512c`(8 · 9번이 마선수면
+ * 맨 끝 줄을 그 칸에 베끼고 수 −1)를 미리 돌린 모양으로 돌려준다 — 끝 줄이 옛 k 가 아니라 앞 줄이 되어 웹 차례와 갈린다:
+ * 예) 투수 n 줄 · j < 8 이면 j 에 옛 8번, 8번에 옛 n−1번 (마선수 없으면 j 에 n−1번, 8번 그대로). 원본 그대로다.
+ * 레코드에 남은 마선수는 그대로 남는다(0xdf · 0xe5 가 뺄 때 이 모양이 된다).
+ */
+function recordLineRemoved(
+  players: readonly SeasonPlayer[],
+  found: number,
+  isPitcher: boolean,
+  recordAceSlot: number | undefined,
+): SeasonPlayer[] {
+  const ACE = 'ace' as const
+  type Line = SeasonPlayer | typeof ACE
+  const lines: Line[] = [...players]
+  if (recordAceSlot !== undefined) {
+    // 넣기 0xb521c 0x60 · 0xb53f0 0x40 갈래 — 그 칸 줄을 맨 끝에 베끼고 그 칸에 마선수
+    const seated = lines[recordAceSlot]
+    if (seated !== undefined) lines.push(seated)
+    if (recordAceSlot > lines.length) lines.push(ACE)
+    else lines[recordAceSlot] = ACE
+  }
+  const j = recordAceSlot !== undefined && found === recordAceSlot ? lines.length - 1 : found
+  const removed = lines[j]
+  const last = lines[lines.length - 1]
+  const next = lines.slice(0, -1)
+  if (j < next.length && last !== undefined && removed !== undefined && removed !== ACE) {
+    next[j] = isPitcher || last === ACE
+      ? last
+      : withSlot({ ...last, fieldPosition: removed.fieldPosition & 0xf }, j)
+  }
+  if (recordAceSlot !== undefined && next[recordAceSlot] === ACE) {
+    // 0xb512c — 그 칸이 마선수면 맨 끝 줄을 그 칸에 베끼고 끝 줄을 지운다
+    const tail = next.pop()
+    if (tail !== undefined && recordAceSlot < next.length) next[recordAceSlot] = tail
+  }
+  return next.filter((line): line is SeasonPlayer => line !== ACE)
 }
 
 /**
@@ -362,17 +403,15 @@ export function removeHallOfFamerFromRoster(roster: SeasonTeamRoster, id: number
  * ```
  * 명전 삭제 `0x221dc` 와 같은 꼴이다(투수는 칸 번호 정리가 없다). 첫 하나만 뺀다. 없으면 같은 객체.
  */
-export function removeCareerPlayerFromRoster(roster: SeasonTeamRoster, isPitcher: boolean): SeasonTeamRoster {
+export function removeCareerPlayerFromRoster(
+  roster: SeasonTeamRoster,
+  isPitcher: boolean,
+  recordAceSlot?: number,
+): SeasonTeamRoster {
   const players = isPitcher ? roster.pitchers : roster.batters
   const found = players.findIndex((player) => (player.kindByte & PLAYER_OWN_BIT) !== 0)
   if (found < 0) return roster
-  const next = players.slice(0, -1)
-  const last = players[players.length - 1]
-  if (found < next.length) {
-    next[found] = isPitcher
-      ? last
-      : withSlot({ ...last, fieldPosition: players[found].fieldPosition & 0xf }, found)
-  }
+  const next = recordLineRemoved(players, found, isPitcher, recordAceSlot)
   return isPitcher ? { ...roster, pitchers: next } : { ...roster, batters: next }
 }
 

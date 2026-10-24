@@ -160,7 +160,14 @@ describe('그림 건너뛰기 — 타석(useStageAnimation)', () => {
     for (let index = 0; index < 틀수; index += 1) {
       if (후.틀마다[index] !== 전.틀마다[index]) throw new Error(`틀 ${index} 의 그림이 다르다`)
     }
-    // 틀 넷에 틱 하나 — 단계 시작 시각이 틀 시각이라 시계가 여럿이어도 틱 수의 두 배를 넘지 않는다
+    // 틀 넷에 틱 하나 — 단계 시작이 모두 경기 장면 틱 하나의 격자에 서므로(`gameSceneTickOf`) 그리기는 틱마다 많아야 한 번이다.
+    // 같은 틱에 두 번 그리는 것은 틀 사이에 끼어든 일(키 '4'/'6' 이동 · 메뉴 반짝이)이 그 자리에서 입력을 바꾼 때뿐이다
+    const 틱마다 = new Map<number, number>()
+    for (const scene of 후.장면) 틱마다.set(scene.tick, (틱마다.get(scene.tick) ?? 0) + 1)
+    const 두번그린틱 = [...틱마다.values()].filter((count) => count > 1).length
+    // 끼어든 일은 키 '6' 이 틀수/211 번 · 반짝이가 틀수/180 번 — 예전(단계 시작이 rAF 시각)은 1200 틀에 540 번 그리고 218 틱에서 두 번 그렸다
+    expect(두번그린틱).toBeLessThanOrEqual(Math.floor(틀수 / 211) + Math.ceil(틀수 / 180))
+    expect(후.그린수).toBeLessThanOrEqual(틱마다.size + 두번그린틱)
     expect(후.그린수).toBeLessThan(틀수 / 2)
     expect(후.그린수).toBeGreaterThanOrEqual(new Set(전.틀마다).size)
   })

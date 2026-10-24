@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { AnimationEntry, FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt } from '@/widgets/training-scene/lib/animationPlayback'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
@@ -62,7 +62,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
   onFinishedRef.current = onFinished
 
   useEffect(() => {
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let handle = 0
     let hasFinished = false
     const finish = () => {
@@ -74,7 +74,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
       onFinishedRef.current()
     }
     const tick = (now: number) => {
-      const current = Math.floor((now - startedAt) / millisecondsPerFrame())
+      const current = Math.max(0, appTickOf(now) - startTick)
       setUpdate(current)
       if (current >= TRAINING_POPUP_UPDATES) return finish()
       handle = requestAnimationFrame(tick)

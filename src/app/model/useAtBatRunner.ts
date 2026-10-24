@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { clearGameSceneTimeout, setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { clearGameSceneTimeout, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
@@ -46,8 +45,8 @@ export interface AtBatRunner {
   readonly resetAtBat: (count?: { balls: number; strikes: number }) => void
   /**
    * 결과를 `frames` 그림 동안 붙든 뒤 새 타석으로 넘긴다(`atBatEndFramesOf`). 뒷정리는 onElapsed가 맡는다.
-   * 경기 장면 시계로 잰다(`setGameSceneTimeout`): 공용 창이 서 있는 동안(0x52c50 52cc6 이 장면 틱 · 갱신을 건너뛴다) 서고 닫히면 남은
-   * 만큼 이어 센다. 그림 길이는 건 때의 속도(`millisecondsPerFrame`)로 셈한다 — 타석 화면의 0x12 단계(`pitchTickAt`)와 같은 잣대다.
+   * 경기 장면 틱으로 센다(`setGameSceneTickTimeout`): 공용 창이 서 있는 동안(0x52c50 52cc6 이 장면 틱 · 갱신을 건너뛴다) 서고 닫히면 남은
+   * 만큼 이어 센다. 끝은 장면 틱 격자의 틱 머리에 선다 — 타석 화면의 0x12 단계(장면 틱 − 시작 틱)와 같은 잣대다.
    */
   readonly pauseWithBanner: (text: string, frames: number, onElapsed?: () => void) => void
 }
@@ -87,7 +86,7 @@ export function useAtBatRunner(): AtBatRunner {
       setBannerText(text)
 
       clearGameSceneTimeout(bannerTimerRef.current)
-      bannerTimerRef.current = setGameSceneTimeout(() => {
+      bannerTimerRef.current = setGameSceneTickTimeout(() => {
         bannerTimerRef.current = null
         resetAtBat()
         setBannerText('')
@@ -96,7 +95,7 @@ export function useAtBatRunner(): AtBatRunner {
           return
         }
         onElapsed()
-      }, frames * millisecondsPerFrame())
+      }, frames)
     },
     [resetAtBat],
   )

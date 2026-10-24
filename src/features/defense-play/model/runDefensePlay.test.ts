@@ -729,6 +729,21 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     expect(필살.log[잡음]).toBe('23틱 3번 야수가 잡았다 (종류 0)')
   })
 
+  it('맞은 야수는 +0xb4 = 15 동안 제자리이고 잠금이 0 이 된 틱의 걸음부터 걷는다 (a12b4~a12d6 · a1376, r155)', () => {
+    // 야수 틱 0xa1284: +0xb4 > 0 이면 −1 만 하고 끝(a12c6 · a12d6) — 이동 0xbf094(a1376)는 그 뒤라 잠금 틱엔 못 간다.
+    // 웹 6 절 걸음은 원본의 다음 야수 틱 몫이라 맞은 틱(23) 그 걸음부터 15번(23~37)을 쉬고 38 의 걸음부터 걷는다.
+    // 그림 틱 N 은 N − 1 의 걸음 뒤 자리다
+    const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
+    expect(필살.log).toContain('23틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
+    const 중견수 = (tick: number) => {
+      const fielder = 필살.ticks.find((view) => view.tick === tick)?.fielders.find((entry) => entry.slot === 8)
+      return fielder === undefined ? null : { x: fielder.x, z: fielder.z }
+    }
+    expect(중견수(23)).not.toBeNull()
+    for (let tick = 24; tick <= 38; tick += 1) expect(중견수(tick)).toEqual(중견수(23))
+    expect(중견수(39)).not.toEqual(중견수(38))
+  })
+
   it('맞은 틱에만 효과음 53 칸이 선다 — 틱 끝 b4588 → 0xa1e60 a1e82 즉시 재생', () => {
     let state = startDefensePlay({
       outcome: 뜬공아웃,

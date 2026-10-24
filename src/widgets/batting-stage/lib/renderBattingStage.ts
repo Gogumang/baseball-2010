@@ -317,8 +317,13 @@ export function renderBattingStage(
     // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
     drawMagicBallEffect(context, scene.pitch, scene.frame)
   } else if (scene.pitch !== null) {
-    // 0x12 그리기 0x4ce9c 도 0x3b2f4 를 불러 공을 마지막 점에 그대로 둔다 — 0x11 이 아니라 마구 이펙트는 없다 (`heldBall`)
-    const heldTick = heldBallTickOf(scene.stagePhase, scene.pitch.frameCount)
+    // 0x12 그리기 0x4ce9c 도 0x3b2f4 를 불러 공을 마지막 점에 그대로 둔다 — 0x11 이 아니라 마구 이펙트는 없다 (`heldBall`).
+    // 0x11 의 공 틱 N · N + 1(0x12 를 예약한 틀) 도 같다: 0x11 그리기 0x4d64c 는 4d72c 에서 보임 칸(0x9e039 — 0x11 진입이 세우고
+    // 0xf · 0xd 진입 · 0x18 진입만 지운다)이 서 있으면 4d73a 에서 0x3b2f4 를 부르고, 0x3b2f4 는 3b310 의 0x35820 으로 공 틱을 N − 1 에
+    // 자른다(35828~3582e). ⚠️ 미확인: 그 두 틀의 마구 이펙트(0x3b546)는 안 그린다 — 이펙트가 잘린 틱을 쓰는지 못 읽었다
+    const heldTick =
+      heldBallTickOf(scene.stagePhase, scene.pitch.frameCount) ??
+      (scene.stagePhase?.kind === '투구중' && scene.frame >= scene.pitch.frameCount ? scene.frame : null)
     if (heldTick !== null) drawBall(context, scene.pitch, heldTick)
   }
   // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 · 마구 이펙트 다음이다. 공이 다 온 틱(N)부터라

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CommonPanel, InsetBox, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import {
   HELP_PAGER_GLYPH_HEIGHT,
   HELP_PANEL_CLOSE_HEIGHTS,
@@ -120,7 +121,9 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
       ? HELP_PANEL_CLOSE_HEIGHTS[Math.min(closingStep, HELP_PANEL_CLOSE_HEIGHTS.length - 1)]
       : (HELP_PANEL_OPEN_HEIGHTS[tick] ?? HELP_PANEL_FULL_HEIGHT)
   const isAnimating = panelHeight < HELP_PANEL_FULL_HEIGHT
-  const isBlinkOn = !isAnimating && tick % 8 <= 3
+  /** [skin+0x410] — 0x58d14 가 그릴 때마다 올린 뒤의 값으로 본다 (앱에 하나, U-90) */
+  const blinkCounter = useSkinBlinkCounter(tick)
+  const isBlinkOn = !isAnimating && blinkCounter % 8 <= 3
 
   const hasClosedRef = useRef(false)
   useEffect(() => {

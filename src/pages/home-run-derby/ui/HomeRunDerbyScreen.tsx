@@ -18,7 +18,6 @@ import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import { derbyDisplayDistanceAt } from '@/entities/home-run-derby/model/derbyBattedBall'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { derbyMasterBatterOf } from '@/entities/home-run-derby/model/derbyLineup'
@@ -33,7 +32,7 @@ import { LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
-import { gameSceneNow, useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, gameSceneTickOf, useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 더비 로딩 판 동안 받아 둘 그림 — 기다리지 않는다 */
 const DERBY_PRELOADS: readonly SpriteSceneKey[] = ['homeRunDerby']
@@ -354,7 +353,7 @@ export function HomeRunDerbyScreen({
                   ? null
                   : derbyDisplayDistanceAt(
                       session.distanceBoard.batted,
-                      Math.floor((gameSceneNow() - session.distanceBoard.startedAt) / millisecondsPerFrame()),
+                      gameSceneTickNow() - gameSceneTickOf(session.distanceBoard.startedAt),
                       session.distanceBoard.previous,
                     )
               }

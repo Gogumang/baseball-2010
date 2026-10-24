@@ -20,6 +20,7 @@ import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -116,6 +117,18 @@ describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
 
     expect(rendered.result.current.screen).toEqual({ kind: '연차표지' })
     expect(rendered.result.current.session.career?.season).toBe(2)
+  })
+
+  it('464 거절 뒤 끊긴 저장(S+0x50 = 0x11)을 이어하면 새 시즌 뒤 137 표지 — 남은 +0x289 를 연초 114 틀이 받는다 (1c25e · 1c0dc)', () => {
+    const rendered = 띄우기(목표달성선수({ seasonEndState: 137 }))
+    expect(rendered.result.current.screen).toEqual({ kind: '연차표지', fromResume: true })
+    expect(rendered.result.current.session.career?.season).toBe(2)
+  })
+
+  it('연봉 보상 뒤 끊긴 저장(S+0x50 = 0xa)의 새 시즌 갈래도 같다 (1c308)', () => {
+    const rendered = 띄우기(목표달성선수({ seasonEndState: 133, season: 2 }))
+    expect(rendered.result.current.screen).toEqual({ kind: '연차표지', fromResume: true })
+    expect(rendered.result.current.session.career?.season).toBe(3)
   })
 
   it('짝수 년차(2·4…년차) 연말에는 선발 판정 없이 새 시즌이다 (0x10cec)', () => {
@@ -236,7 +249,7 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     const 받은연봉 = 처음.result.current.session.career!.salary
     expect(홀수해.load()?.seasonEndState).toBe(133)
     const 다시 = 열기(홀수해)
-    expect(다시.result.current.screen).toEqual({ kind: '관리' })
+    expect(다시.result.current.screen).toEqual({ kind: '연차표지', fromResume: true })
     expect(다시.result.current.session.career).toMatchObject({ season: 3, salary: 받은연봉 })
 
     // 3년차(연차idx 2, 짝수) — 133 국가대표 판정 → 461(목표 4개 이상) 을 다시 튼다
@@ -341,7 +354,7 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(saveGame.load()?.seasonEndState).toBe(137)
 
     const 다시 = 열기(saveGame)
-    expect(다시.result.current.screen).toEqual({ kind: '관리' })
+    expect(다시.result.current.screen).toEqual({ kind: '연차표지', fromResume: true })
     expect(다시.result.current.session.career?.season).toBe(2)
     expect(다시.result.current.session.career?.seasonEndState).toBeNull()
     expect(다시.result.current.session.career?.reputation).toBe(받은평판)
@@ -1828,5 +1841,25 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
   it('지난 경기 재료가 없는 옛 저장은 예전처럼 116 의 끝으로 가른다', () => {
     const rendered = 띄우기({ ...평가중(), lastGame: undefined })
     expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+  })
+})
+
+describe('이어하기 100 진입 0x1c154 머리 1c15e stopBgm (r163)', () => {
+  it('어느 갈래로 이어도 먼저 배경음을 끊는다 — 국가대항전 134 는 제 배경음이 없어 소리 없이 선다', () => {
+    const calls: string[] = []
+    const sound = { ...createSilentSound(), stopBgm: () => { calls.push('stopBgm') } }
+    for (const saved of [목표달성선수({ nationalCup: createNationalCup() }), { ...createCareer('관리'), gamesPlayed: 4 }]) {
+      calls.length = 0
+      const saveGame = 메모리저장(saved)
+      const random = createSeededRandom(20100901)
+      const rendered = renderHook(() => {
+        const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+        const runner = useAtBatRunner()
+        return { screen, session: useCareerSession({ runner, random, saveGame, screen, setScreen, sound }) }
+      })
+      act(() => rendered.result.current.session.actions.continueSaved())
+      expect(calls).toEqual(['stopBgm'])
+      expect(rendered.result.current.screen.kind).not.toBe('메인메뉴')
+    }
   })
 })

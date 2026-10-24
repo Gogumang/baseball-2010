@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { FrameSprite, MessageBox, PressArea, RoundBox, SolidStamp } from '@/shared/ui'
 import { useImgTextPalette3 } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
@@ -361,8 +361,8 @@ function PauseWindow({
   const slide = Number.isFinite(slideFrame) ? inGameMenuSlideAt(slideFrame) : IN_GAME_MENU_SLIDE_END
   useEffect(() => {
     if (!isShown || slide >= IN_GAME_MENU_SLIDE_END) return
-    const timer = window.setInterval(() => setSlideFrame((frame) => frame + 1), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    const timer = setAppTickInterval(() => setSlideFrame((frame) => frame + 1))
+    return () => timer()
   }, [isShown, slide])
 
   const cursorRef = useRef(cursor)

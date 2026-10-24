@@ -120,8 +120,9 @@ export interface UsePitcherManagementMenuInput {
   /**
    * 화면이 '관리' 인 채 **105 에 다시 들어온다** — 하위 메뉴 106 · 107 · 110 취소, 훈련 결과 창(125 → 0x1b5b8) · 휴식(127 →
    * 0x1b466) · 마구 훈련(125) 뒤. 세션이 진입 0x11910 곁가지와 자동 훑기 0x1cf9c 를 돈다(상태가 바뀐 틀에만 — 0x1cdec 1ce02).
+   * `from` 은 그 앞 상태(125 · 127, 하위 메뉴 취소는 없음) — 0x1aec4 가 앞 상태로 배경음 4 를 다시 틀지 가른다(125 만 든다)
    */
-  readonly onReenter?: () => void
+  readonly onReenter?: (from?: number) => void
   /**
    * 결과 상태(훈련 125 · 휴식 127)의 창이 떠 있는가 — 원본은 그동안 105 가 아니라서 105 갱신 0x1aec4 끝의 칭호 판정 0x1a1c0 이
    * 돌지 않는다. 세션이 이 값으로 칭호 팝업을 멈춘다(`usePitcherLeagueSession` 의 `pendingTitle`).
@@ -186,6 +187,10 @@ export interface PitcherManagementMenu {
 }
 
 /** StrMODE 글 — 화면이 `!C` 를 붙여 그리므로 앞의 가운데 맞춤 표시는 뗀다 */
+/** 105 로 돌아오는 결과 상태 — 125 훈련 결과(0x18dd8 · 0x1b5b8) · 127 휴식(0x1b466) (`onReenter` 의 `from`) */
+const TRAINING_RESULT_STATE = 0x7d
+const REST_STATE = 0x7f
+
 const modeTextOf = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
@@ -250,7 +255,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const rows = pitcherTrainingDetailRowsOf(outcome)
       if (rows === null) {
         // 알림 창이 닫히면 125 → 105
-        noticeThenRef.current = () => onReenter?.()
+        noticeThenRef.current = () => onReenter?.(TRAINING_RESULT_STATE)
         return setNotice([result, ...typeLine].join('!N'))
       }
       /*
@@ -267,7 +272,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
           if (injury.notice !== null) setNotice(injury.notice)
           else setIsResultWindowOpen(false)
           // 창이 닫히면 125 → 105 (0x1b5b8 `0xbcb49(0x69)`)
-          onReenter?.()
+          onReenter?.(TRAINING_RESULT_STATE)
         },
       })
     },
@@ -281,14 +286,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       onSave(outcome.career)
       setKind('관리')
       const magic = outcome.magic
-      if (magic === null) return onReenter?.()
+      if (magic === null) return onReenter?.(TRAINING_RESULT_STATE)
       /*
        * 125 → 0x17f5c 칸 4 갈래(0x18bd8 `[sp+0x40] == 4`) — 결과 글 [sp+0xfc] 를 알림 창 0xbbef8(글, 1, 코드 4, 1) 에 띄우고,
        * 창이 닫히면 125 틀 0x18dd8 이 105 로 간다(타자편 필살타법과 같은 길). 글은 마구 이름 StrCOMMON[0x1e + n] 으로
        * [87] "훈련 완료" 또는 [86] "[이름] %d/%d회 훈련", 그 뒤 "!N" + StrMODE[24] "사기" … (0x18116~0x181c6)
        */
       setIsResultWindowOpen(true)
-      noticeThenRef.current = () => onReenter?.()
+      noticeThenRef.current = () => onReenter?.(TRAINING_RESULT_STATE)
       setNotice(magicTrainingLinesOf(magic, outcome.moraleLoss).join('!N'))
     },
     [career, onReenter, onSave, random],
@@ -407,7 +412,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
               if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
               else setIsResultWindowOpen(false)
               // 127 → 105 (0x1b466 `0xbcb49(0x69)`)
-              onReenter?.()
+              onReenter?.(REST_STATE)
             },
           })
         },
@@ -653,7 +658,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       setSubWindow(null)
       setKind('관리')
       setIsResultWindowOpen(true)
-      noticeThenRef.current = () => onReenter?.()
+      noticeThenRef.current = () => onReenter?.(TRAINING_RESULT_STATE)
       setNotice(pitchTypeTrainingLinesOf(outcome).join('!N'))
     },
     [career, onReenter, onSave, random],

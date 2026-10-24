@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
@@ -47,14 +47,14 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
   useEffect(() => {
     preloadSceneParticles()
     const scene = sceneParticleScene()
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let steppedTick = 0
     let wasShown = false
     let handle = 0
     /** 입자 모습이 바뀐 틀에서만 다시 칠한다(`createDrawMemo`) — 굴림은 위에서 틀마다 그대로 */
     const drawMemo = createDrawMemo()
     const frame = (now: number) => {
-      const tick = Math.floor((now - startedAt) / millisecondsPerFrame())
+      const tick = Math.max(0, appTickOf(now) - startTick)
       const isClaimed = isSceneParticlesClaimed()
       // 53048 — 경기 장면에 공용 창이 서 있으면 이 그림의 틱도 그림도 없다(따라잡지 않는다 — 원본 틀이 관리자를 안 부른 것이다).
       // 장면은 창이 선 첫 그림([창+0x250])에만 다시 그려지고(52efe~52f24) 그 그림에 파티클이 없으므로 멈춘 화면에도 파티클이 안 남는다

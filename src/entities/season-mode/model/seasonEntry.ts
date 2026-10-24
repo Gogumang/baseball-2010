@@ -207,7 +207,15 @@ export function seasonEntryCellsOf(
 }
 
 /** 마선수 줄 — XlsACE 행을 통째 베낀 레코드(0xb521c · 0xb53f0): +0xb 는 표의 `profile`, 줄은 표의 `recordLine` */
-function aceCellsOf(ace: AcePlayer, aceIndex: number, ability: readonly number[], isPitcher: boolean, source: SeasonEntryCellSource): SeasonEntryCells {
+function aceCellsOf(
+  ace: AcePlayer,
+  aceIndex: number,
+  ability: readonly number[],
+  isPitcher: boolean,
+  source: SeasonEntryCellSource,
+  /** 레코드 +0x2c — 넣은 그때는 10000, 경기 · 하루 끝을 지난 레코드면 그 값 (`SeasonRecordAces.pitcherStamina`) */
+  recordStamina: number = FULL_RECORD_STAMINA,
+): SeasonEntryCells {
   const detailSource = aceDetailSourceOf(ace, aceIndex, ability, isPitcher)
   if (!isPitcher) return { profileLow: ace.profile & 3, batterLine: entryBatterLineOfRecord(ace.recordLine), detailSource }
   return {
@@ -217,7 +225,7 @@ function aceCellsOf(ace: AcePlayer, aceIndex: number, ability: readonly number[]
     // 레코드 +0x2c = 10000 — 0xdd 진입 66da `0xb88c8` 이 저장의 마투수 레코드 `0x1f825(app, 번호)`(앱 데이터 +0xc64 + 번호×0x30,
     // 0x20094 6번 갈래가 XlsACE_PIT 행을 부은 것 — 다섯 줄 모두 0x2710)를 0xb521c 로 +0x2c 까지 통째 8번 칸에 넣는다(b5296~b529c).
     // 0x1f824 를 부르는 넷(0x48d50 · 0x5aefc · 0xaae7c · 0xb88c8)은 모두 베껴 가는 쪽이고, 0xe0 에서 돌아온 0xdd 는 다시 안 넣는다
-    stamina: { capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false), percent: staminaPercentOf(source.staminaMode, FULL_RECORD_STAMINA) },
+    stamina: { capacity: staminaCapacityOf(ability[3] ?? 0, source.teamMorale, false), percent: staminaPercentOf(source.staminaMode, recordStamina) },
   }
 }
 
@@ -226,6 +234,9 @@ export type SeasonEntryLists = EntryLists<SeasonEntryBatter, SeasonEntryPitcher>
 /** 마투수가 들어가는 칸 (`0xb521c` 의 0x60 가지) · 마타자가 들어가는 칸 (`0xb53f0` 의 0x40 가지) */
 const ACE_PITCHER_SLOT = 8
 const ACE_BATTER_SLOT = 9
+/** 시즌 레코드의 마투수 칸 · 마타자 칸 — 트레이드 요청 굴림(`tradeRequest`)이 같은 칸을 본다 */
+export const SEASON_RECORD_ACE_PITCHER_SLOT = ACE_PITCHER_SLOT
+export const SEASON_RECORD_ACE_BATTER_SLOT = ACE_BATTER_SLOT
 const NOT_IN_ROSTER = -1
 
 /** 붙박이 표의 한 팀을 시즌 명단 모양으로 — 칸 번호(`+0xa & 0x1f`)·id 는 표의 첨자, 수비 위치는 표의 값 */
@@ -278,7 +289,7 @@ export function playerFaceOf(
 }
 
 /** 마선수를 칸에 앉힌다 — 옛 칸 선수는 맨 끝으로 (`b527e` · `b544a`). 칸이 비어 있으면 그 자리에 덧붙는다 */
-function seatAce<T>(rows: readonly T[], slot: number, ace: T): T[] {
+export function seatAce<T>(rows: readonly T[], slot: number, ace: T): T[] {
   const next = [...rows]
   const seated = next[slot]
   if (seated !== undefined) next.push(seated)
@@ -386,33 +397,88 @@ export function seasonEntryListsOf(input: SeasonEntryInput): SeasonEntryLists {
 }
 
 /**
+ * **시즌 팀 레코드에 남은 마선수** (U-105 r154 — 직접 떴다). 0xdd 진입 0x6548(66da · 66e6 내 팀 · 66f8 · 670a 상대)과 CPU 끼리 경기 준비
+ * 0xc239c(c24aa~c24ee)의 `0xb88c8` · `0xb8870` 은 모드 2 에서 `0xb8680`(점프표 0xd8a30[1] = 0xb869e → b8724 `0x1f571(저장, 팀+0x25)`)
+ * 으로 **시즌 저장의 팀 레코드 자체**에 넣는다 — 마투수 `0xb521c` 0x60 갈래(b5244~b529c: 수 > 8 이고 8번이 마선수면 덮기, 아니면
+ * 0xb4e34(T, 1) 로 한 칸 늘려 8번을 맨 끝으로 베끼고 8번에) · 마타자 `0xb53f0` 0x40 갈래(b5418~b5470: 9번 같은 규칙). 빼는 곳은
+ * `0xb512c`(b512c~b51e6: 수 > 8 · 9 이고 8 · 9번이 0xb633d 마선수면 맨 끝 줄을 그 칸에 베끼고 끝 줄 memset 0 · 수 −1) 하나이고,
+ * 그것을 부르는 곳은 0xdf 진입 0x5980(5988~599e) · 0xe5 진입 0x5cd0(5cd8~5cee) 둘뿐이다 — 둘 다 열 팀 모두(i = 0..9 `0x1f571`).
+ * 그래서 경기 뒤 그 둘을 지나기 전까지 레코드에 마선수 줄이 남는다(경기 끝 0x4ea0c 의 0x22755 로 파일에도 든다).
+ * 웹 명단 배열(`roster` · `cpuRosters`)에는 넣지 않고 팀마다 무엇이 남았는지만 든다(`SeasonSave.recordAces`).
+ */
+export interface SeasonRecordAces {
+  /** 8번 칸 마투수 0..4 (`ACE_PITCHERS`) — 없으면 −1 */
+  readonly pitcher: number
+  /** 9번 칸 마타자 0..4 (`ACE_BATTERS`) — 없으면 −1 */
+  readonly batter: number
+  /** 마투수 레코드 +0x2c — 경기 끝 값에 하루 끝 4f2bc `0xb617c`(+20%)를 먹인 것. 없으면 10000 */
+  readonly pitcherStamina?: number
+}
+
+/**
+ * 레코드에 마선수를 앉힌 배열의 칸 → 앉히기 전 줄 번호 (마선수 칸은 `'ace'`). 마선수가 없으면(`ace` < 0) 그대로다.
+ * 예: 투수 8줄 · 8번 → [0..7, 'ace'] · 타자 12줄 · 9번 → [0..8, 'ace', 10, 11, 9]
+ */
+export function recordAceSeatOf(length: number, ace: number, slot: number): readonly (number | 'ace')[] {
+  const rows: (number | 'ace')[] = Array.from({ length }, (_, index) => index)
+  return ace < 0 ? rows : seatAce<number | 'ace'>(rows, slot, 'ace')
+}
+
+/**
  * 팀 레코드 차례 그대로의 편집기 목록 — 시즌 0xdf(0x5980) · 0xe5(0x5cd0) · 0xe6(0x5b28) · 0xe8(0x5870) 은 0x5561c 에 레코드를 그대로
- * 넘겨(투수는 로테이션으로 섞인 레코드 차례) 마선수를 끼우지 않는다. 이름은 `playerFaceOf`, `nameOf` 가 있으면 그것(표 밖 명전 기록 이름).
+ * 넘긴다(투수는 로테이션으로 섞인 레코드 차례). 이름은 `playerFaceOf`, `nameOf` 가 있으면 그것(표 밖 명전 기록 이름).
+ *
+ * 0xdf · 0xe5 는 진입 첫머리에 `0xb512c` 로 열 팀 마선수를 빼고(0xe6 은 0xe5 · 0xe7 에서만 온다 — 0x7240 · 0xc6aa) 0xe8(0x5870)은
+ * 안 뺀다 — 그래서 `recordAces` 는 0xe8 만 넘긴다: 레코드에 남은 마선수를 8 · 9번에 앉힌 모양(`SeasonRecordAces`, 원본 그대로).
  */
 export function seasonRecordEntryListsOf(
   teamId: number,
   roster: SeasonTeamRoster,
   cells: SeasonEntryCellSource,
   nameOf?: (player: SeasonPlayer, isPitcher: boolean, index: number) => string | undefined,
+  recordAces?: SeasonRecordAces,
+  aceLevels?: Readonly<Record<number, number>>,
 ): SeasonEntryLists {
   const faceOf = (player: SeasonPlayer, isPitcher: boolean, index: number) => {
     const face = playerFaceOf(teamId, player, isPitcher, index)
     const name = nameOf?.(player, isPitcher, index)
     return name === undefined ? face : { ...face, name }
   }
-  return {
-    batters: roster.batters.map((player, index): SeasonEntryBatter => {
-      const face = faceOf(player, false, index)
-      return {
-        ...face, ...seasonEntryCellsOf(teamId, player, false, index, face.ability, cells),
-        isAce: false, position: player.fieldPosition & 0xf, rosterIndex: index,
-      }
-    }),
-    pitchers: roster.pitchers.map((player, index): SeasonEntryPitcher => {
-      const face = faceOf(player, true, index)
-      return { ...face, ...seasonEntryCellsOf(teamId, player, true, index, face.ability, cells), isAce: false, rosterIndex: index }
-    }),
+  let batters = roster.batters.map((player, index): SeasonEntryBatter => {
+    const face = faceOf(player, false, index)
+    return {
+      ...face, ...seasonEntryCellsOf(teamId, player, false, index, face.ability, cells),
+      isAce: false, position: player.fieldPosition & 0xf, rosterIndex: index,
+    }
+  })
+  let pitchers = roster.pitchers.map((player, index): SeasonEntryPitcher => {
+    const face = faceOf(player, true, index)
+    return { ...face, ...seasonEntryCellsOf(teamId, player, true, index, face.ability, cells), isAce: false, rosterIndex: index }
+  })
+  const acePitcher = recordAces === undefined ? undefined : ACE_PITCHERS[recordAces.pitcher]
+  if (recordAces !== undefined && acePitcher !== undefined) {
+    const ability = aceFaceAbilityOf(acePitcher, recordAces.pitcher, aceLevels)
+    pitchers = seatAce(pitchers, ACE_PITCHER_SLOT, {
+      name: acePitcher.name,
+      ability,
+      ...aceCellsOf(acePitcher, recordAces.pitcher, ability, true, cells, recordAces.pitcherStamina),
+      isAce: true,
+      rosterIndex: NOT_IN_ROSTER,
+    })
   }
+  const aceBatter = recordAces === undefined ? undefined : ACE_BATTERS[recordAces.batter]
+  if (recordAces !== undefined && aceBatter !== undefined) {
+    const ability = aceFaceAbilityOf(aceBatter, recordAces.batter, aceLevels)
+    batters = seatAce(batters, ACE_BATTER_SLOT, {
+      name: aceBatter.name,
+      ability,
+      ...aceCellsOf(aceBatter, recordAces.batter, ability, false, cells),
+      isAce: true,
+      position: 0,
+      rosterIndex: NOT_IN_ROSTER,
+    })
+  }
+  return { batters, pitchers }
 }
 
 /** 시즌 진입들의 [ed+0x333] = 1 · [ed+0x334] = 2 — 칸 재료를 따로 안 줄 때 */

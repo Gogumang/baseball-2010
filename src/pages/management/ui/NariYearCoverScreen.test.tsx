@@ -45,4 +45,18 @@ describe('NariYearCoverScreen — 137 "N년차" 표지', () => {
     advance(10)
     expect(onDone).toHaveBeenCalledTimes(1)
   })
+
+  it('앞 화면 틀에는 넘긴 앞 상태 그림을 매 틀 다시 그린다 — 없으면 멈춘 판', () => {
+    const { container } = render(
+      <NariYearCoverScreen yearIndex={1} onDone={() => {}}
+        previousScreenAt={(frame) => <div data-part="앞상태" data-frame={frame} />} />,
+    )
+    expect(container.querySelector('[data-part="year-cover-left"]')).toBeNull()
+    expect(container.querySelector('[data-part="앞상태"]')?.getAttribute('data-frame')).toBe('0')
+    advance(4.5)
+    expect(container.querySelector('[data-part="앞상태"]')?.getAttribute('data-frame')).toBe('4')
+    advance(6)
+    expect(container.querySelector('[data-part="앞상태"]')).toBeNull()
+    expect(container.querySelector('[data-part="year-cover"]')).not.toBeNull()
+  })
 })

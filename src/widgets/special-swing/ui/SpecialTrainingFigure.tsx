@@ -132,7 +132,8 @@ export function SpecialTrainingFigure({
 }: SpecialTrainingFigureProps) {
   const uiOrigins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
-  // ⚠️ 상태 틱 [장면+0x2c] 의 첫 그림 값은 안 읽었다 — 창이 선 뒤의 갱신 수로 센다
+  // 상태 틱 [장면+0x2c] — 장면 프레임이 틀 머리에서 0xbc9c9(장면+0x18)로 세고, 상태가 바뀐 틀에 0(bc9ec) · 그 밖 틀마다 +1(bc9e2)이다.
+  // 그리기는 같은 틀 뒤쪽이라 진입 틀의 그림이 0 을 읽는다(2026-10-24 직접 떴다). 웹은 창이 선 앱 틱을 0 으로 센다(`useUpdateCounter`)
   const tick = useUpdateCounter()
   const isBlinkOn = isSpecialTrainingBlinkOn(tick)
   const isTraining = state === '훈련'

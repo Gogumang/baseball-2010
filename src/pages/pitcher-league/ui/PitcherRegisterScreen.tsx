@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp } from '@/shared/ui'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -7,7 +8,6 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { roundEdgePaintsOf } from '@/shared/lib/commonPanel/commonPanel'
 import { InputModeBox } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
@@ -138,8 +138,9 @@ export function PitcherRegisterScreen({
     setRegisterBandTicks(pitchTickRef.current + 1)
     setPhase('등록')
   }
-  // ⚠️ 0x66 의 상태 틱 첫 그림 값은 안 읽었다 — 화면이 선 뒤의 갱신 수로 깜빡인다
-  const tick = useUpdateCounter()
+  // 0x66 의 상태 틱 [장면+0x2c] — 진입 틀에 0(0xbc9c8 bc9ec), 그 뒤 틀마다 +1. 그리기는 같은 틀 뒤쪽이라 진입 틀의 그림이 0 을 읽는다.
+  // 0x67 에서 돌아오면(CLR) 다시 들어온 것이라 0 부터 센다 — 웹도 '등록' 에 들 때마다 앱 틱 셈을 새로 켠다
+  const tick = useUpdateCounter(phase !== '변화구')
   const isBlinkOn = (phase === '변화구' ? pitchTick : tick) % 10 !== 0
   const uiOrigins = useFrameOrigins(MODE_UI)
   const pitchOrigins = useFrameOrigins(SLT_PITCH)
@@ -147,8 +148,8 @@ export function PitcherRegisterScreen({
   useEffect(() => {
     if (phase !== '변화구') return undefined
     setPitchTick(0)
-    const timer = window.setInterval(() => setPitchTick((previous) => previous + 1), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    const timer = setAppTickInterval(() => setPitchTick((previous) => previous + 1))
+    return () => timer()
   }, [phase])
 
   /** 카드가 읽는 새 선수 레코드 — 등록 진입 0x17360 이 만든 것이라 스킬 · 장비가 없다 */

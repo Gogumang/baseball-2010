@@ -139,6 +139,37 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
     expect(nearestSlotTo(잠긴, 중견)).not.toBe(8)
   })
 
+  it('잠금 +0xb4 가 0 이 된 복제 틱의 vt10 이 목표를 제 자리로 둔다 — 움직임허용이 아닌 송구 예보에선 물려받은 목표로 안 걷는다 (a12c8 · r155)', () => {
+    // 송구 예보 vt24(0)(공+0xaac == 0): 정지(vt10)도 낙구 달리기도 없어 복제는 물려받은 목표 +0x2c 로 걷는다(b17fc vt0c).
+    // 잠긴 복제는 a12b4 에서 −1 만 하고, 0 이 된 틱에 a12c8 vt10(0xa124c → 0xbf2b0 목표 = 위치)로 끝난다
+    const 공자리 = 멈춘공.pointAt()
+    const 긴공 = { ...멈춘공, length: 30 }
+    const 목표든 = 야수들.map((야수) => (야수.slot === 8 ? { ...야수, target: { ...공자리 } } : 야수))
+    const 잠긴목표든 = 목표든.map((야수) => (야수.slot === 8 ? { ...야수, actionLockTicks: 3 } : 야수))
+    const 송구 = { onlySlot: 8, secondPass: { movable: false } }
+    // 잠금이 없으면 공 쪽으로 6걸음 — 1틱 판정은 제자리, 7틱째 판정에 닿는다
+    expect(forecastCatch(긴공, 목표든, 전구간, 송구).table.low).toEqual({ tick: 7, slot: 8 })
+    // 잠기면 3틱 뒤 목표 = 위치라 첫 패스(30틱)를 제자리에서 보내고, 두 번째 패스(t = 10 부터, 정지 n 셈)의 n = 6 인 15틱에 닿는다
+    expect(forecastCatch(긴공, 잠긴목표든, 전구간, 송구).table.low).toEqual({ tick: 15, slot: 8 })
+  })
+
+  it('잠긴 복제는 낙구 달리기 vt14 도 안 받는다 — 잠금이 풀린 다음 판정 틱부터 낙구 지점으로 간다 (b1416 · 0xa14c8)', () => {
+    const 공 = {
+      length: 20,
+      pointAt: (tick: number) =>
+        tick <= 10 ? { x: 중견.x, y: tick === 10 ? 0 : 3000, z: 중견.z + 5000 } : { x: 중견.x + 600, y: 0, z: 중견.z },
+      landingTick: 10,
+      fenceTick: -1,
+      poleTick: -1,
+      startedAtPlate: false,
+    }
+    const 잠긴 = 야수들.map((야수) => (야수.slot === 8 ? { ...야수, actionLockTicks: 4 } : 야수))
+    // 잠금 4틱(1~4)은 제자리 · 5~10틱 6걸음(1320)을 낙구 쪽으로 — 거리 isqrt(600² + 1320²) = 1449 · n 은 11틱에 1 → n = 6 인 16틱
+    expect(
+      forecastCatch(공, 잠긴, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low,
+    ).toEqual({ tick: 16, slot: 8 })
+  })
+
   it('+0x127 이면 낙구 틱까지 복제가 낙구 지점으로 실제로 달리고(b1416 vt14) n 은 낙구 뒤부터 센다', () => {
     // 10틱까지 중견수 뒤 5000 위로 높이 3000(못 잡음) · 낙구 뒤엔 중견수 옆 600 에 멈춘 공
     const 공 = {

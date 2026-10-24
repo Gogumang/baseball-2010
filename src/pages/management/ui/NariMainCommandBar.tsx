@@ -18,17 +18,22 @@ const NOOP = () => undefined
  * 커서는 [gfx+0x158] 메뉴 객체의 +0x14 × +0x10 + +0xc 칸(0x7e4a2~0x7e53c) — 루트가 들고 있는 관리 메뉴 커서(`NariMainMenuCursor`,
  * 105 진입이 행동함이면 0 으로 되돌린 뒤의 값)다.
  */
-export function NariMainCommandBar({ menuEnable, cursor }: {
+export function NariMainCommandBar({ menuEnable, cursor, slideUpdates = SETTLED_SLIDE_UPDATES }: {
   readonly menuEnable: NariMenuEnableInput
   /** 관리 메뉴 [this+0x8c] 의 커서 칸 */
   readonly cursor: number
+  /**
+   * 칸 등장 0x7ff8c 의 갱신 수 — 안 넘기면 다 내려온 뒤. 이어하기 길의 105 한 틀(`NariResumeManagementFrame`)은 진입 0x11910 의
+   * 11c26 `0x7ff21` 이 메뉴를 막 연 틀이라 0 이다
+   */
+  readonly slideUpdates?: number
 }) {
   const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
   const labelWidths = Object.fromEntries(
     COMMAND_SLOTS.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
   )
   return (
-    <CommandBar slots={COMMAND_SLOTS} cursor={cursor} bounce={0} slideUpdates={SETTLED_SLIDE_UPDATES}
+    <CommandBar slots={COMMAND_SLOTS} cursor={cursor} bounce={0} slideUpdates={slideUpdates}
       disabledIds={NO_IDS} grayedIds={nariMainMenuOffIdsOf(menuEnable)} labelWidths={labelWidths} parent={null}
       onHover={NOOP} onSelect={NOOP} />
   )
