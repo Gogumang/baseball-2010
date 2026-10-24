@@ -40,7 +40,7 @@ interface UsageNoticeScreenProps {
  * 줄 k 의 y = y + k × 줄 높이(−1 → 글꼴 높이 + 줄간 = 14)
  * 가운데 줄은 x + (폭 >> 1) 를 가운데로 (0x6f12c), 오른쪽 줄은 x + 폭 − 1 을 오른쪽 끝으로 (0x6f134)
  * ```
- * ⚠️ 근사: 글꼴은 웹 글자다 — 줄 나누기 · 줄 y · 정렬만 원본대로다.
+ * ⚠️ 근사(남김 — 웹 DOM 한계): 글꼴은 웹 글자다 — 줄 나누기 · 줄 y · 정렬만 원본대로다.
  */
 export function UsageNoticeScreen({ onNext }: UsageNoticeScreenProps) {
   const tick = useUpdateCounter()

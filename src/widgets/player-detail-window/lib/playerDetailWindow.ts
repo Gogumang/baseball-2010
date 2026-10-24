@@ -196,7 +196,8 @@ const ACE_BATTER_GRADES: readonly number[] = [20, 30, 40, 50, 40]
  * 레코드 한 장의 상세 창 값 (0x5b798 의 투수 갈래 0x5bf64~ · 타자 갈래 0x5b81e~).
  * 연봉 = 레코드 +0x1b × 10 × 100 (5c848~5c886: 모드 [0x1552d10] 3 · 4 이고 육성 0xb6389 면 저장 0x1f8d5(모드)+0x1c8 u16, 아니면 +0x1b).
  * 마선수는 육성이 아니라 +0x1b — 행 값(`ACE_*_GRADES`)이다.
- * ⚠️ 미확인: 그 밖에 등급을 모르는 선수(부르는 쪽이 `grade` null 로 넘긴 영입 기록 등)는 0 으로 둔다.
+ * ⚠️ 미확인(남김 — 웹 기록 꼴): 그 밖에 등급을 모르는 선수(부르는 쪽이 `grade` null 로 넘긴 영입 기록 등)는 0 으로 둔다 —
+ * 원본 레코드엔 +0x1b 가 늘 있어 null 은 웹 칸이 빈 경우(`salaryGrade` 를 남기기 전 옛 저장 · 표 찾기 실패)뿐이다.
  */
 export function playerDetailOf(source: PlayerDetailSource): PlayerDetail {
   const isAce = source.aceIndex >= 0

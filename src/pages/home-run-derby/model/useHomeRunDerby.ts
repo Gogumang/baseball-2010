@@ -612,11 +612,11 @@ export function useHomeRunDerby({
     const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // 공 틱 0 = 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 틀)의 장면 틱 — 판 시각은 그 틱의 머리라 판 안의 틱(소리 · 글자 창 ·
-    // 키 틱 · 판 끝)이 모두 경기 장면 틱 격자에 선다. ⚠️ 근사(때): 판을 넘긴 틀의 틱을 `gameSceneTickNow()` 로 다시 읽는다 —
+    // 키 틱 · 판 끝)이 모두 경기 장면 틱 격자에 선다. ⚠️ 근사(때 · 남김 — 웹 구조): 판을 넘긴 틀의 틱을 `gameSceneTickNow()` 로 다시 읽는다 —
     // rAF 틀 머리와 이 자리 사이에 틱 머리가 지나면 한 틱 늦게 선다
     // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.
     // 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 글자 창의 첫 그림(홈런 틱)에 타석 화면이 깔고, 유지 단계 그림마다 굴린다
-    // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
+    // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때 · 남김 — 웹 구조): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
     clearPlaySoundTimers()
     const startedAt = gameSceneTickStartTime(gameSceneTickNow())
     if (batted !== null) {

@@ -32,7 +32,11 @@ interface PixelTextProps {
    * 공용 글 그리기 0xba269 는 늘 앱 전역 글꼴 `[[0x1400070]+0x3c]`(자간 1)을 쓰고(0xba282~0xba28e — 2026-10-16 직접 떴다), 입력기
    * 0x677d4 도 같다. 자간 2 글꼴은 0x679d4 가 객체 +0x88 에 만드는 것(0x67a32~0x67a3a 의 0x9c9d0)인데, 0x679d4 는 로고 객체
    * (0x67989 가 만든다 — 같은 +0x94 상태 · +0x95 다음 상태 · +0x97 틱 칸)의 가상 함수라 그 글꼴은 로고 · 인증 창(웹 미이식) 몫이다.
-   * ⚠️ 미확인: R5 가 꼽은 다른 그리기 호출지(0x56b5c · 0x5acf0 · 0x5b25c · 0x5dcc0 · 0x6f278)가 넘기는 글꼴 객체는 하나씩 안 읽었다.
+   * R5 가 꼽은 다른 그리기 호출지도 모두 앱 전역 글꼴이다(r181 확정 — 0x9c069 를 담은 풀 9 곳 전수): 0x56cb6~0x56cde 는
+   * `[[0x1400070]]+0x3c` 를 곧장, 0x5ae48 · 0x5ae7c 는 함수 0x5a990 이 0x5a9b4~0x5a9c0 에서 [sp+0x58] 에 둔 [0x1400070],
+   * 0x5b6f4 · 0x5b728 은 0x5aefc 가 0x5af2a~0x5af34 에서 [sp+0x64] 에 둔 [0x1400070], 0x5e6be · 0x5e74a(0x5dcc0)는
+   * 0x5dd3a~0x5dd42 의 [sp+0x40] 에서 각각 +0x3c 를 넘긴다. 글상자 클래스(표 0xd32c4 — 0x6f278 은 [this+4])도 만들기
+   * 0x6ecb8 · 0x6ecd0 이 [this+4] = [[0x1400070]+0x3c] 로 채운다. 곧 자간 2 는 로고 객체 몫뿐이다.
    */
   readonly spacing?: keyof typeof FONT_SPACING
   /** 자간을 직접 주면 spacing 보다 우선한다 */
@@ -81,7 +85,7 @@ export function pieceMaskStyle(piece: PlacedPiece, scale: number): CSSProperties
 
 /**
  * 글꼴 색은 565 로 찍힌다(글꼴 색 +0x54 는 16비트 565 값 — 기본 흰색 0xFFFF, `PixelText.css`) — `style.color` 를 `solidColorCss` 로 내린다.
- * ⚠️ 근사: `className` · 부모에서 물려받은 색은 읽을 수 없어 그대로 둔다.
+ * ⚠️ 근사(남김 — 웹 DOM 한계): `className` · 부모에서 물려받은 색은 읽을 수 없어 그대로 둔다.
  */
 function color565StyleOf(style: CSSProperties | undefined): CSSProperties {
   return typeof style?.color === 'string' ? { color: solidColorCss(style.color) } : {}

@@ -66,8 +66,8 @@ interface SpecialEditScreenProps {
  * 엔트리 창 아래에 깔린 팀 고르기 본문(딱지 · 큰 로고 · 이름 막대 · 격자 30~267)은 판(15, 55, 210, 220) = x 15~224 안이라 가려진다.
  * 다만 능력치 도형의 오른쪽 이름 상자 둘(축 끝 x = 178 + (48·cos45 >> 16) = 211 → 상자 x 210, 폭 26 — 0x5b412~0x5b532)은
  * x 225~235 가 판 밖으로 나와 원본에서도 보인다(r166 확정) — 그래서 그 도형(커서 팀, 다 자란 값)만 엔트리 창 밑에 깐다.
- * 도형 객체 [skin+0xd4] 는 웹도 앱에 하나(`useRadarGrowth`)라 팀 고르기의 지난 목표값을 잇는다 — 다만 다 자라기 전에 골랐으면
- * 원본은 지금값(E+8)에서 이어 자라고 웹은 지난 목표값에서 다시 선다(⚠️ 근사, 그 몇 그림만 다르다).
+ * 도형 객체 [skin+0xd4] 는 웹도 앱에 하나(`useRadarGrowth`)라 하위가 바뀌어도 다시 만들지 않고(+0x1e3 그대로) 지금값(E+8)에서
+ * 한 그림 한 걸음씩 잇는다 — 다 자라기 전에 골라도 원본처럼 이어 자란다(r181 — `continueRadarGrowth`).
  * 입력 창(판 높이 0x6e · 입력 방식 표시)은 아래 `EditNamePopup`.
  */
 export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditScreenProps) {

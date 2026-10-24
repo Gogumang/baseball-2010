@@ -125,7 +125,7 @@ export function retargetRunner(
   const nextPrevious = changed ? next.targetBase : previousTarget
   // 웹 진행기는 +0x94 판정끝 표시(`settled`)를 도착 0xa040c 의 "이미 처리함" 표시로도 쓴다 — 새 목표를 받으면 다시 닿을 수 있게 내린다.
   // 구간 출발점(`legStart`, +0x14)은 웹 진행기들의 `startLeg` 관례대로 목표가 바뀐 자리에서 새로 잡는다(협살 대상 0xb398c 의
-  // 전체 틱 0xbf01c · 진행률이 이 칸을 본다). ⚠️ 미확인: 원본 +0x14 는 vt48 이 아니라 주자 틱 0xbf094 의 vt28(0xbf240 — 땅에
+  // 전체 틱 0xbf01c · 진행률이 이 칸을 본다). ⚠️ 미확인(남김 — 수비 묶음 몫): 원본 +0x14 는 vt48 이 아니라 주자 틱 0xbf094 의 vt28(0xbf240 — 땅에
   // 있으면 +0x14 = 위치)이 적는데, 그 갈래가 달리는 주자에게 언제 서는지(+0x24 높이)는 다 뜨지 않았다
   next = changed
     ? { ...next, targetBase: base, settled: false, legStart: next.position }

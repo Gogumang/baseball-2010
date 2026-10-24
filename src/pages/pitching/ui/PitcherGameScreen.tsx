@@ -6,6 +6,7 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
+import { useBurstObjectTicksReset } from '@/widgets/burst-mission/model/useBurstObjectTicksReset'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
 import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
@@ -178,6 +179,7 @@ interface PitcherGameScreenProps {
  * ⚠️ 근사(시간): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
  */
 export function PitcherGameScreen(props: PitcherGameScreenProps) {
+  useBurstObjectTicksReset() // 경기 장면 생성 0x48658 — 돌발 객체 [+0x224] = 0
   const session = usePitcherGame(props.options, props.random, props.settings?.isVibrationOn)
   if (session.loadingTip !== null) {
     return (

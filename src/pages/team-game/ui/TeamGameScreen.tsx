@@ -10,6 +10,7 @@ import { playerDetailOf, substitutionRowsOf } from '@/pages/team-game/lib/substi
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
+import { useBurstObjectTicksReset } from '@/widgets/burst-mission/model/useBurstObjectTicksReset'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
 import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
@@ -230,6 +231,7 @@ interface TeamGameScreenProps {
  * ⚠️ 근사(시간): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
  */
 export function TeamGameScreen(props: TeamGameScreenProps) {
+  useBurstObjectTicksReset() // 경기 장면 생성 0x48658 — 돌발 객체 [+0x224] = 0
   const session = useTeamGame(props.options, props.random, props.settings?.isVibrationOn, props.resumeFrom)
   // 로딩 판 목록 + 상대 명단 타자의 장비 겹 그림(타석 교대 0x47cc8 47e80 → 0x78fd8) — 명단은 경기 세우기 0x30f20 에서 서고 안 바뀐다
   const { opponentEntry } = session.progress

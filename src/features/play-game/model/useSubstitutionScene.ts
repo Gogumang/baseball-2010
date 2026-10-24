@@ -24,7 +24,7 @@ export interface SubstitutionScenePlayback {
  * - 0xe 대기가 `confirmsBefore` 번 OK 를 받은 뒤(없으면 곧장), `canRun`(덮개 · 팝업 · 결과 띠가 없을 때)이면 선다.
  * - 선 첫 그림에 `timeSoundId`(CPU 교체의 "Time!" 22 — 진행기가 안 낸 경우)를 낸다.
  * - 다 그리면(`finish`) 0xd 두 그림 뒤 0xe 그리기 0x38d1c(38dc2) → 0x38b64 가 등판음(26 · 15 · 14)을 낸다.
- *   ⚠️ 근사: 0xd 두 그림을 타이머로 센다 — 화면의 0xe 대기도 같은 때부터 0xd 두 그림을 센다(`useSceneConfirm`).
+ *   ⚠️ 근사(남김 — 웹 구조): 0xd 두 그림을 타이머로 센다 — 화면의 0xe 대기도 같은 때부터 0xd 두 그림을 센다(`useSceneConfirm`).
  * 한 번 다 본 번호는 다시 세우지 않는다(화면이 다시 서도 — 진행 상태가 같은 객체를 들고 있는 동안).
  */
 export function useSubstitutionScene(

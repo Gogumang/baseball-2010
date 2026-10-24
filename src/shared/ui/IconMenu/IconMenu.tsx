@@ -94,9 +94,10 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
             }}
           >
             <img className={styles.slotBack} src={SLOT_BACKGROUND} alt="" aria-hidden />
-            {/* 못 고르는 칸 아이콘 — 회색은 원본 효과 0xa 식(`EffectImage`). 어둡게 하는 것은 웹이 더한 표시다(IconMenu.css) */}
+            {/* 못 고르는 칸 아이콘 — 회색은 원본 효과 0xa 식(`EffectImage`) 하나다. 웹이 더하던 반 어둡게(brightness 0.5)는 원본에
+                없는 표시라 걷었다(r181 — 이 격자 부품은 지금 어느 화면도 안 쓴다) */}
             {item.isDisabled === true
-              ? <EffectImage className={`${styles.slotIcon} ${styles.slotIconDisabled}`} src={item.iconUrl} effect={DRAW_EFFECT.GRAY} />
+              ? <EffectImage className={styles.slotIcon} src={item.iconUrl} effect={DRAW_EFFECT.GRAY} />
               : <img className={styles.slotIcon} src={item.iconUrl} alt="" aria-hidden />}
             {index === selectedIndex && (
               <img className={styles.slotFrame} src={SELECTION_FRAME} alt="" aria-hidden />

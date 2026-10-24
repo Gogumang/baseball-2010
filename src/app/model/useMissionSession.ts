@@ -904,7 +904,7 @@ export function useMissionSession({
    * 다시 묻지 않는다.
    * - 새 타석: 0xe 의 OK(메시지 1 → 0x50c18 → 0xf)를 받는 화면 콜백(`confirmScene`)에서 묻는다 — 원본 차례 그대로 22 가 OK 뒤에 난다.
    * - 같은 타석 다음 공: 공 결과를 먹인 바로 뒤에 묻는다(아래 효과).
-   *   ⚠️ 근사(때): 원본은 결과 상태 0x12 가 끝난 뒤 0xf 로 들어서 22 가 그때 난다 — 웹은 심판 콜과 붙는다. 그 사이 굴림은 없다.
+   *   ⚠️ 근사(때 · 남김 — 웹 구조): 원본은 결과 상태 0x12 가 끝난 뒤 0xf 로 들어서 22 가 그때 난다 — 웹은 심판 콜과 붙는다. 그 사이 굴림은 없다.
    */
   const askPitchSelection = (kind: 'new' | 'same') => {
     // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e · 3da70)보다 앞이다
@@ -1002,7 +1002,7 @@ export function useMissionSession({
 
   /**
    * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 → 0x38b64)가 등판음을 낸다.
-   * ⚠️ 근사: 웹은 0xd 두 그림을 타이머로 센다(화면의 0xe 대기는 같은 때부터 0xd 두 그림을 센다).
+   * ⚠️ 근사(남김 — 웹 구조): 웹은 0xd 두 그림을 타이머로 센다(화면의 0xe 대기는 같은 때부터 0xd 두 그림을 센다).
    */
   const finishSubstitutionScene = () => {
     const scene = substitutionScene

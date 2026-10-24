@@ -30,7 +30,7 @@ import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
  * 5b47c  그다음 축 선 넷이 축 끝 → 꼭짓점(= 가운데) 으로 #6B92F4
  * ```
  * 기기 선 0x14006c8 은 두 끝을 다 칠하므로(`commonPanel` 머리말과 같은 가정) 가운데 한 점은 흰 테두리 뒤 축 선 끝이 덮어 **#6B92F4** 다.
- * ⚠️ 미확인: 기기 선(0x14006c8) 본문은 바이너리 밖이라 길이 0 선이 실제로 한 점을 찍는지는 못 봤다.
+ * ⚠️ 미확인(남김 — 단말 몫 · 바이너리 밖): 기기 선(0x14006c8) 본문은 바이너리 밖이라 길이 0 선이 실제로 한 점을 찍는지는 못 봤다.
  */
 export const ABILITY_RADAR_BACK = { image: 3, width: 31 } as const
 export const ABILITY_RADAR_BOX = { image: 0x11, width: 26, height: 29, labelInset: 3, numberDx: 0x12, numberDy: 0x11 } as const

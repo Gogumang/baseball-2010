@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { radarGrowthAt, radarGrowthStart, radarObject } from '@/shared/lib/radarGrowth/radarGrowth'
+import { continueRadarGrowth, radarGrowthAt, radarGrowthStart, radarObject } from '@/shared/lib/radarGrowth/radarGrowth'
 import type { RadarGrowthState } from '@/shared/lib/radarGrowth/radarGrowth'
 
 interface Segment {
@@ -19,8 +19,9 @@ export interface RadarGrowthOptions {
    */
   readonly restartKey?: string | number
   /**
-   * 붙을 때 0 에서 자라나(들어옴이 +0xad = 0 · +0x1e3 = 0 을 쓴다). 거짓이면 레이더 객체가 들고 있던 지난 목표값에서 이어 간다 —
-   * 같은 상태 안에서 하위 화면만 바뀌어 들어옴을 다시 안 거치는 곳(에디트 하위 1 · 2 → 0)이 그렇다. 기본 참.
+   * 붙을 때 0 에서 자라나(들어옴이 +0xad = 0 · +0x1e3 = 0 을 쓴다). 거짓이면 다시 만들지 않고 레이더 객체가 들고 있던 지금값 ·
+   * 끝 깃발에서 이어 굴린다(`continueRadarGrowth`) — 같은 상태 안에서 하위 화면만 바뀌어 들어옴을 다시 안 거치는 곳(에디트 하위
+   * 0 ↔ 1 · 2)이 그렇다. 다 자라기 전에 넘어가도 지금값(E+8)에서 잇는다. 기본 참.
    */
   readonly fromZero?: boolean
   /**
@@ -39,7 +40,9 @@ export function useRadarGrowth(targets: readonly number[], { restartKey, fromZer
   const draws = useUpdateCounter()
   const key = restartKey === undefined ? targets.join(',') : String(restartKey)
   const [segment, setSegment] = useState<Segment>(() => ({
-    restartKey: key, targets, startDraw: 0, start: radarGrowthStart(radarObject.previous, radarObject.hasPrevious, targets.length, fromZero),
+    restartKey: key, targets, startDraw: 0, start: fromZero
+      ? radarGrowthStart(radarObject.previous, radarObject.hasPrevious, targets.length, true)
+      : continueRadarGrowth(targets.length),
   }))
   let active = segment
   if (segment.restartKey !== key) {
@@ -52,6 +55,8 @@ export function useRadarGrowth(targets: readonly number[], { restartKey, fromZer
   useEffect(() => {
     radarObject.previous = state.previous
     radarObject.hasPrevious = state.hasPrevious
+    radarObject.current = state.current
+    radarObject.isDone = state.isDone
   })
   return state.current
 }

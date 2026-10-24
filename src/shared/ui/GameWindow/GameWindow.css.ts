@@ -19,7 +19,7 @@ export const layer = style({
 })
 
 /**
- * ⚠️ 근사 — 공용 창 0x55e60 의 CSS 흉내다. 원본 선 목록은 `shared/lib/commonPanel` 에서 확정했고
+ * ⚠️ 근사(남김 — 웹 DOM 한계) — 공용 창 0x55e60 의 CSS 흉내다. 원본 선 목록은 `shared/lib/commonPanel` 에서 확정했고
  * `shared/ui` 의 `CommonPanel` 이 그대로 그린다. 새 화면은 그것을 쓰고, 이 클래스는 아직 옮기지 않은 화면만 남아 쓴다.
  */
 export const window = style({

@@ -99,7 +99,7 @@ export interface NariEntryView {
  *   팀 레코드 +2 에 0xa3a24 를 쓰고, CPU 끼리 간이 엔진도 두 팀 모두 부른다(0xc1308 · 0xc1320, 넷째 인자 1). 커리어
  *   `teamRecordMorales`(r101 — 사람 경기 상대 · 그날 CPU 경기 여덟 팀 · CPU 포스트시즌 두 팀, 새 시즌 0x1b768 은 안 건드림)가 그 값이고
  *   옛 저장에 없으면 표값 100 (`nariTeamRecordMoraleOf`, r128 이음).
- * ⚠️ 미확인: 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다. 내 선수 줄(표 밖)도 비운다.
+ * ⚠️ 미확인(남김 — 웹 기록 꼴): 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다. 내 선수 줄(표 밖)도 비운다.
  */
 export interface NariEntryCellSource {
   readonly stats: LeaguePlayerStats

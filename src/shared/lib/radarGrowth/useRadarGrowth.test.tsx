@@ -29,6 +29,8 @@ afterEach(() => {
   vi.useRealTimers()
   radarObject.previous = []
   radarObject.hasPrevious = false
+  radarObject.current = []
+  radarObject.isDone = false
 })
 
 describe('useRadarGrowth — 목록 0x63b14 의 커서 이동 다시 만들기 (커서 +0x25 → [anim+0x1e3] = 0)', () => {
@@ -57,6 +59,16 @@ describe('useRadarGrowth — 목록 0x63b14 의 커서 이동 다시 만들기 (
     radarObject.hasPrevious = true
     render(<Probe targets={[300, 300, 300, 300]} fromZero={false} />)
     expect(current()).toBe('300,300,300,300')
+  })
+
+  it('fromZero 가 거짓이면 다시 만들지 않고 덜 자란 지금값(E+8)에서 한 걸음씩 잇는다 — 에디트 하위 0 → 1', () => {
+    vi.useFakeTimers()
+    const first = render(<Probe targets={[500, 500, 500, 500]} cursor={0} />)
+    advance(2)
+    expect(current()).toBe('96,96,96,96')
+    first.unmount()
+    render(<Probe targets={[500, 500, 500, 500]} cursor={0} fromZero={false} />)
+    expect(current()).toBe('144,144,144,144')
   })
 })
 

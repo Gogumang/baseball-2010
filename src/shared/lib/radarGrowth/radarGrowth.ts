@@ -81,8 +81,28 @@ export function radarGrowthAt(start: RadarGrowthState, targets: readonly number[
 }
 
 /**
- * 레이더 객체 [skin+0xd4] 는 하나라 지난 목표값 · 깃발이 화면을 건너 산다 — 웹은 모듈 칸 하나로 든다.
+ * 레이더 객체 [skin+0xd4] 는 하나라 지난 목표값 · 깃발 · 지금값(E+8) · 끝 깃발(+0x1e2)이 화면을 건너 산다 — 웹은 모듈 칸 하나로 든다.
  * 카드 레이더(0x5a990)와 팀 고르기 · 에디트 · 명전 목록 · 구단정보의 능력치 도형(0x5aefc)이 모두 이 칸을 읽고 고친다 —
  * 0x5aefc 도 [anim+0x1e3] == 0 이면 0x5b344~0x5b3b8 에서 0x75ebd(anim, 서술자, 4, 0) 로 다시 만들고 매 그림 0x764c9 를 부른다.
+ * 다시 거는 쪽이 없으면(+0x1e3 = 1 그대로) 다시 만들지 않고 지금값에서 한 걸음씩 이어 간다 — `continueRadarGrowth`.
  */
-export const radarObject: { previous: readonly number[]; hasPrevious: boolean } = { previous: [], hasPrevious: false }
+export const radarObject: {
+  previous: readonly number[]
+  hasPrevious: boolean
+  current: readonly number[]
+  isDone: boolean
+} = { previous: [], hasPrevious: false, current: [], isDone: false }
+
+/**
+ * 다시 만들지 않고 이어 가기 — [anim+0x1e3] 이 1 인 채 새 화면이 그리기만 이어 부를 때(에디트 하위 0 ↔ 1 · 2, 상태 29 의
+ * 그림 0x2e1e0 이 목록 k 9 를 늘 그려 같은 객체를 매 그림 굴린다). 객체가 그 축 수의 지금값을 안 들고 있으면 지난 목표값으로 다시 만든다.
+ */
+export function continueRadarGrowth(axes: number): RadarGrowthState {
+  if (radarObject.current.length !== axes) return radarGrowthStart(radarObject.previous, radarObject.hasPrevious, axes, false)
+  return {
+    current: radarObject.current,
+    previous: Array.from({ length: axes }, (_unused, axis) => radarObject.previous[axis] ?? 0),
+    hasPrevious: radarObject.hasPrevious,
+    isDone: radarObject.isDone,
+  }
+}

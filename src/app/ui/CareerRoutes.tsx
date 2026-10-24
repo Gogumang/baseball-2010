@@ -86,7 +86,7 @@ export type AceMatchStarter = (command: MatchCommand, carried: StoryCarry, conte
 
 /**
  * 경기 장면 0x104 쪽 화면 — 나리 장면 0x106 이 내려가 있다. 여기서 다른 화면으로 오면 장면이 새로 서서 상태 100 진입 0x1c154 를 지난다.
- * ⚠️ 근사: '경기결과' 는 정산 그림(경기 장면 0x19)과 평가 116(나리 장면)을 한 화면으로 보이므로 경기 장면 쪽으로 친다 —
+ * ⚠️ 근사(남김 — 웹 구조): '경기결과' 는 정산 그림(경기 장면 0x19)과 평가 116(나리 장면)을 한 화면으로 보이므로 경기 장면 쪽으로 친다 —
  * 원본은 116 앞 상태 100 에서 시각을 잡으니 몇 초 이르다.
  */
 const NARI_OUTSIDE_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결과', '대회경기결과', '마선수대결'])
