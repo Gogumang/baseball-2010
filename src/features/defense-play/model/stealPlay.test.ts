@@ -79,7 +79,9 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     // (튕김 rand(−20, 20) · 다시 줍는 펌블 굴림) — 그사이 도루 주자가 홈까지 간다
     const wild = 세는난수(0)
     const errant = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: wild, manualThrowBase: 2 })
-    expect(wild.count()).toBe(36)
+    // 판은 안전망(240틱)까지 간다 — 튕김마다 두 굴림(펌블 · rand(−20, 20)). r162: 판 시작 · 매 틱 0xb1c90 의 0xb203a 가 2루 커버가
+    // 아닌 유격수를 기본 자리 0xd8764(14500, 17600)로 물려 11틱 튕김을 유격수(예전 21틱) 대신 2루수가 12~15틱에 거푸 줍는다 → 36 → 44
+    expect(wild.count()).toBe(44)
     expect(errant.errantThrow).toBe(true)
     expect(errant.fumbled).toBe(true)
     expect(errant.resultCode).toBeNull()
@@ -114,6 +116,21 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     expect(covers.covers).toEqual([1, 2, 3, 4])
     // b2564 — AI 1 인 포수는 커버 상태로 안 바뀐다
     expect(covers.coverStates.map((state) => state.slot)).toEqual([2, 3, 4])
+  })
+
+  it('판 시작 b29d0 · 매 틱 vt4c 끝 0xb1c90 — 2루 커버가 아닌 유격수는 0xb203a 로 기본 자리 0xd8764(14500, 17600)에 간다 (r162)', () => {
+    const start = stealPlayEngineInputOf({ bases: 일루, stealingFrom: [1], outs: 0 })
+    expect(start.play.coverOfBase).toEqual([1, 2, 3, 4])
+    expect(start.fielders[5]?.target).toEqual({ x: 14_500, y: 0, z: 17_600 })
+    expect(start.fielders[5]?.aiState).toBe(AI_STATE.BUSY)
+    // 키 없는 사람 수비 — 포수가 공을 든 채 판이 닫힐 때까지 유격수가 그 자리로 걷는다
+    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500 })
+    const 유격 = result.ticks.map((view) => view.fielders.find((fielder) => fielder.slot === 5))
+    // 첫 그림은 이동 앞(시작 자리) — 다음 그림부터 걷는다
+    expect(유격[0]?.x).toBe(17_273)
+    expect(유격[1]?.x).toBeLessThan(17_273)
+    expect(유격[유격.length - 1]?.x).toBe(14_500)
+    expect(유격[유격.length - 1]?.z).toBe(17_600)
   })
 
   it('포수가 던지면 vt34 가 AI 1 을 내리고 vt30 의 b2564 가 커버 표의 포수를 홈 커버(AI 2)로 보낸다', () => {

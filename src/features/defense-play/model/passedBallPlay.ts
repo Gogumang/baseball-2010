@@ -5,25 +5,22 @@ import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/featur
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { battedBallTrajectory, BATTING_POINT } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
-import { basePosition, runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
+import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import {
   AI_STATE,
   createFielders,
   createRunner,
   initialPlayView,
-  NONE,
-  type FielderState,
   type PlayView,
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 import { PASSED_BALL_PLAY_KIND, type PassedBallShot } from '@/entities/fielding/model/passedBall'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { stealTargetBaseOf, type StealBase } from '@/entities/fielding/model/stealStart'
-import { secondBaseCoverSlot } from '@/entities/fielding/model/throwArrival'
-import { batterRunnerNeedsCover } from '@/entities/fielding/model/coverAssignment'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import { forecastCatch } from '@/features/defense-play/model/catchForecast'
+import { PITCHER_BALL_POINT, runCoverTick, runnerPlayBallInput } from '@/features/defense-play/model/coverTick'
 import type { DefensePlayControls, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import {
   RUNNER_PLAY_RESULT,
@@ -71,10 +68,9 @@ import {
  * - **포수 +0xb8 = 6(놓침 동작)** 은 포구 예보·이동에 효과가 없다 — `.text` 를 훑어(`adds rX, #0xb8` · `adds #0x80 + [#0x38]` ·
  *   `movs #0xb8` 레지스터 오프셋) 야수 +0xb8 을 만지는 곳은 쓰기 b4276(펌블) · 3e08e(폭투) · 줄이기 a12da(야수 틱) · 읽기
  *   4381a(그리기 — 29 · 실책 · "!") 넷뿐이다(나머지 `+0xb8` 은 vtable 칸 호출 · 주자 객체 베끼기 af786). 동작 잠금 칸은 +0xb4 라 따로다.
- * - ⚠️ **커버**: 0xb1c90 은 매 틱 다시 고르지만 여기서는 시작에 한 번 고른다 — 2루는 타구 진행기와 같은
- *   `secondBaseCoverSlot`, 쫓는 야수가 맡던 루는 0xb1d48 갈래대로 투수(0)가 맡되 `0xb1b88`(그 루로 올 주자가
- *   있는가)이 거짓이면 없음(−1). 0xb1b88 의 타자주자 갈래(0xb1bde~0xb1c08, P+0x168 비교)도 옮겼지만 P+0x168 을
- *   쓰는 곳이 바이너리에 없어 안 선다(`batterRunnerNeedsCover`).
+ * - **커버**: 0xb1c90 은 판 시작(b2884)과 vt4c 끝(b4c72)에서 매 틱 다시 고른다(`coverTick.runCoverTick` — r162). 공 첫 점이
+ *   웹 폭투 공의 시작점(표준 배팅 지점 = 0xd8758)이라 2루는 b1e12 규칙 — 공 각(+60…+130) + 90 > 0 이라 유격수, 2루수가 2루 위면 맞바꿈.
+ *   0xb1b88 의 타자주자 갈래(0xb1bde~0xb1c08, P+0x168 비교)는 P+0x168 을 쓰는 곳이 바이너리에 없어 안 선다(`batterRunnerNeedsCover`).
  * - 낫아웃 타자주자는 0xa93ac 가 세우는 대로 처음부터 1루로 뛴다 — a93f8~a9400 `주자.vt48(1)`(= 0xa07b0 → +0x80 · +0x7c ·
  *   +0x84 = 1)로 목표 루 1, a940a `+0x88 = 1`(요구 루) · a940c `+0x94 = 1` · a940e `+0x98 = 1`(타자주자). 판 시작 목표 0xa9e44 는
  *   목록 1 번부터 돌아(a9e5c `movs r1, #1`) 타자주자(0 번)를 건드리지 않는다.
@@ -140,7 +136,6 @@ export interface PassedBallPlayResult extends RunnerPlayEngineResult {
 
 const DEFAULT_ABILITY = 500
 const CATCHER_SLOT = 1
-const PITCHER_SLOT = 0
 
 /** 0x3507c 의 쏘기 값 → 웹 궤적 (근사 — 머리말). 시작점은 타구와 같은 표준 배팅 지점 */
 export function passedBallTrajectoryOf(shot: PassedBallShot): BattedBallTrajectory {
@@ -218,6 +213,16 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     const index = batterRuns ? runners.length : runners.length + 1
     runners.push(createRunner(index, base, speedOf(base), { isBatterRunner: false }))
   })
+  // 판 시작 vt30(b2884)이 보는 주자 — vt18(0xb284a)은 0x46418 의 타자주자 0xa93ac(4650e) · 목표 0xa9e44 · 리드 0x3d7b8 보다
+  // 앞이라 루에 선 주자들뿐이다(도루 주자의 목표는 투구 중 0xa9bd4 가 세운 다음 루)
+  const stealingFrom = input.stealingFrom ?? []
+  const coverRunners = runners
+    .filter((runner) => !runner.isBatterRunner)
+    .map((runner) =>
+      stealingFrom.includes(runner.startBase as StealBase)
+        ? { ...runner, targetBase: stealTargetBaseOf(runner.startBase) }
+        : runner,
+    )
   leadRunnersForPassedBall(runners, input, batterRuns)
 
   // ── 0xb284a: 예보(vt24, 추적야수 = 포수라 t ≤ 4 동안 포수를 건너뜀) → 고르기(vt34) ──
@@ -227,19 +232,14 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
   })
   const chaserSlot = forecast.choice.slot
   const catchTick = Math.max(0, forecast.choice.catchTick)
-  const catchPoint = trajectory.pointAt(catchTick)
 
-  // ── vt30 = 0xb1c90 커버 ──
-  const covers = passedBallCovers(chaserSlot, catchPoint.x > basePosition(0).x, runners)
-  const fielders: FielderState[] = startFielders.map((fielder) => {
-    if (fielder.slot === chaserSlot) return { ...fielder, aiState: AI_STATE.CHASE }
-    const base = covers.indexOf(fielder.slot)
-    if (base < 0) return fielder
-    return { ...fielder, target: basePosition(base), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
-  })
-  const play: PlayView = {
+  // ── b2884 vt30 = 0xb1c90 — 판 시작 커버 · 키스톤 자리 (`coverTick.runCoverTick`, 그 뒤로는 진행기가 vt4c 끝에서 매 틱) ──
+  // 고르기 vt34(b2878)가 쫓는 야수를 AI 1 로 둔다(b3e54 — 목표는 안 바꾼다). 공 첫 점 · 각은 메시지 0x11 이 쏜 폭투 공이다
+  const chased = startFielders.map((fielder) =>
+    fielder.slot === chaserSlot ? { ...fielder, aiState: AI_STATE.CHASE } : fielder,
+  )
+  const startPlay: PlayView = {
     ...initialPlayView(PASSED_BALL_PLAY_KIND),
-    coverOfBase: covers,
     ballHolderSlot: chaserSlot,
     catchFielderSlot: chaserSlot,
     catchKind: forecast.choice.kind,
@@ -248,11 +248,19 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     // 0xb28b6: P+0x112 = 1
     everHeld: true,
   }
+  const started = runCoverTick({
+    context: { play: startPlay, fielders: chased, runners: coverRunners, currentTick: 0, landingTick: trajectory.landingTick },
+    ...runnerPlayBallInput({ trajectory, startTick: 0 }, PITCHER_BALL_POINT, 0),
+    relayFlag: true,
+  })
+  const fielders = started.fielders
+  const play = started.play
 
   return {
     kind: PASSED_BALL_PLAY_KIND,
     fielders,
     play,
+    relayFlag: started.relayFlag,
     runners,
     abilities,
     outs: input.outs,
@@ -281,48 +289,6 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
 /** 판 끝 정리 */
 export function passedBallPlayResultOf(input: PassedBallPlayInput, result: RunnerPlayEngineResult): PassedBallPlayResult {
   return { ...result, shot: input.shot, batterRuns: input.batterRuns === true }
-}
-
-/**
- * 시작 커버 (0xb1c90 의 커버 부분 0xb1cd6~0xb1f04 를 시작 한 번만):
- * 표 0xd8774 = [1, 2, 3, 4] → 쫓는 야수(P+0x130)가 1·2·4 면 그 루를 투수(0)에게 넘기고(0xb1d48 갈래),
- * 0xb1b88 이 그 루로 올 주자가 없다고 하면 −1. 2루는 쫓는 야수가 2루수면 유격수, 유격수면 2루수,
- * 아니면 공이 1루 쪽이면 유격수 · 아니면 2루수(0xb1e2e~0xb1e64 = `secondBaseCoverSlot`).
- */
-export function passedBallCovers(
-  chaserSlot: number,
-  ballToFirstSide: boolean,
-  runners: readonly RunnerState[],
-): number[] {
-  const covers = [1, 2, 3, 4]
-  covers[2] = secondBaseCoverSlot(ballToFirstSide, chaserSlot)
-  const handedOver = chaserSlot === 1 ? 0 : chaserSlot === 2 ? 1 : chaserSlot === 4 ? 3 : NONE
-  if (handedOver !== NONE) covers[handedOver] = needsCover(handedOver, runners) ? PITCHER_SLOT : NONE
-  return covers
-}
-
-/**
- * 0xb1b88(P, 루 b) — 그 루에 커버가 필요한가 (state[7] = 1 · 협살 없음 일 때, 직접 뜬 것):
- * ```
- * 주자 중 +0x94 && +0x88 == b && 산 주자 → 1
- * 주자 목록 0 번이 살았고 (P+0x168 − 12) ≤ 2 || (P+0x168 − 6) ≤ 2 (부호 없는 bls) → 1   (b1bde~b1c08)
- * r = b == 0 ? 4 : b
- * 루 r 에 닿은 주자(0xa97a0) 있으면 → 살았나
- * 없고 루 r−1 에 닿은 주자 있으면 → 살았나
- * 없고 루 r−2 에 닿은 산 주자가 r−1 로 가는 중(+0x7c) 이면 1, 아니면 0
- * ```
- */
-function needsCover(base: number, runners: readonly RunnerState[]): boolean {
-  const alive = runners.filter((runner) => !runner.isOut)
-  if (alive.some((runner) => runner.settled && runner.requiredBase === base)) return true
-  // b1bde — 타자주자 갈래. P+0x168 은 쓰는 곳이 없어 생성 때 값(0)이다 (`coverAssignment` 머리말)
-  if (batterRunnerNeedsCover(runners)) return true
-  const r = base === 0 ? 4 : base
-  const on = (b: number) => alive.find((runner) => runner.startBase === b)
-  if (on(r) !== undefined) return true
-  if (on(r - 1) !== undefined) return true
-  const twoBack = on(r - 2)
-  return twoBack !== undefined && twoBack.targetBase === r - 1
 }
 
 /**
