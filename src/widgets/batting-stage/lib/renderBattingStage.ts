@@ -366,7 +366,7 @@ export function renderBattingStage(
   if (scene.pitch !== null) drawFastballFlame(context, scene.pitch, scene.frame, scene.stagePhase)
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
-  // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — ⚠️ 깊이 정렬 대신 선수 다음
+  // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — 깊이 29705(타자와 같다) · ⚠️ 공과의 앞뒤는 근사(`pitchInputOverlay` 머리말)
   drawPitchInputSprites(context, pitchInput, side)
   // 0x46fa8(장면, 1) 싸이커 · 드래고나 — 목록 비우기(0x4d744) 뒤 · HUD(0x4c4bc) 앞에 화면에 바로 섞어 그린다
   drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
@@ -940,7 +940,7 @@ function drawBigHitScreen(context: CanvasRenderingContext2D, effect: BigHitScree
   })
   if (bigHitFlashesAt(effect.counter)) {
     // 4cc8a~4ccb6 — 세모마다 0x75e31: 0x75c70 스캔라인 채우기 뒤 0x75dc4 테두리, 채우기 · 테두리 같은 색 0x78FFFFFF.
-    // ⚠️ 미확인: 반투명 섞기(0x1400698(gc, 4, 알파))는 단말 몫이라 바이너리에 없다 — 알파/255 로 섞는다(`RivalryBandCanvas` 와 같다)
+    // ⚠️ 미확인: 반투명 섞기(0x1400698(gc, 4, 알파))는 알파/255 로 섞는다(`RivalryBandCanvas` 와 같다)(남김 — 단말 몫이라 바이너리에 없다)
     const { r, g, b, alpha } = BIG_HIT_FLASH_COLOR
     context.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha / 255})`
     for (const triangle of BIG_HIT_FLASH_TRIANGLES) {

@@ -26,7 +26,8 @@ import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoad
  * 부름 차례(2026-10-24 직접 떴다): 맞은 틀 J 의 0x11 그림이 첫 부름이다 — 스윙 객체는 틀 머리 0x3f060 끝(3f320 vt+8)에서 한 칸
  * 넘어가고, 같은 틀 갱신 0x4e060 이 0xb9270(상태 [+0x18] == 3 이면 1 − 프레임 [+0x1c], 아니면 999) == 0 에서 판정(+0xfd2)하므로 그
  * 틀 그리기의 49f8c 도 0xb9271 == 0 을 본다. 그 뒤 0x13 은 그림마다 부르므로 0x13 틱 d 의 그림이 d + 2 번째 부름이다
- * (`useStageAnimation` 의 `specialSwingEffectNow`). ⚠️ 근사: 타격점은 맞은 틱의 공 자리(`BattingStage` 의 보통 타격 불꽃과 같은 근사).
+ * (`useStageAnimation` 의 `specialSwingEffectNow`). 타격점 (+0x10dc, +0x10e0) 은 놓기 0x4dc78(4dffa~4e024)만 적는 공 도착점이라
+ * 웹은 `platePixelOf`(경로 끝 점 투영)로 둔다(`BattingStage` — r184 직접 떴다).
  */
 
 /** 마타자 순번 → +0x1034 그림 (0x47e1c 점프표 0xd01a8) */

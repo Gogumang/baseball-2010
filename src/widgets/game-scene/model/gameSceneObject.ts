@@ -1,6 +1,7 @@
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
 import { resetSceneResultCode } from '@/widgets/batting-stage/model/sceneResultCodeStore'
 import { resetSceneCloudClock } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { resetSceneBallPath } from '@/widgets/batting-stage/model/sceneBallPath'
 import { resetSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 
 /**
@@ -12,6 +13,7 @@ import { resetSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntr
  * ```
  * 구장 [장면+0xf10] 도 장면과 함께 사라지고 다음 장면의 상태 7 이 새로 만든다 — 구름 셈을 되돌린다(`sceneCloudClock`).
  * 다음 경기 장면은 장면 전환 0x3874 가 new(0x1b80)(0 채움)로 새로 세우므로 [장면+0xfd4] 도 0 에서 시작한다(`sceneResultCodeStore`).
+ * 공 경로 칸 [장면+0x1140] 도 0 채움으로 다시 선다(`sceneBallPath`).
  * 상태 객체(장면+0x18)도 새로 서므로 적어 둔 상태 경계(`sceneStateEntries`)를 비운다.
  * 앱은 경기 장면 화면이 다 내려갈 때, 홈런더비는 같은 화면에서 장면을 새로 세울 때(결과 창 [예] · 다시하기 — 0x27) 부른다.
  */
@@ -19,5 +21,6 @@ export function leaveGameSceneObject(): void {
   clearSceneParticles()
   resetSceneResultCode()
   resetSceneCloudClock()
+  resetSceneBallPath()
   resetSceneStateEntries()
 }

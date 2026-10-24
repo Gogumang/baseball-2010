@@ -10,6 +10,7 @@ import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
 import { resetSceneParticlesForTest } from '@/widgets/particles/model/sceneParticles'
 import { resetSceneResultCode } from '@/widgets/batting-stage/model/sceneResultCodeStore'
 import { resetSceneCloudClock } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { resetSceneBallPath } from '@/widgets/batting-stage/model/sceneBallPath'
 
 /**
  * **0x11 마구 공 파티클이 그림마다 한 번씩 나가는가** — 홈런더비(모드 7)에 마구 22 를 넘기면 0x344ea 가 구질을 안 굴리고 늘 22 다.
@@ -67,6 +68,7 @@ beforeEach(() => {
   resetSceneResultCode()
   resetCommonWindowShownForTest()
   resetSceneCloudClock()
+  resetSceneBallPath()
 })
 afterEach(() => {
   cleanup()
@@ -81,7 +83,38 @@ const 그림 = (at: number) =>
     for (const callback of pending) callback(at)
   })
 
+const 타석 = () => (
+  <BattingStage
+    batterAbility={ROOKIE_BATTER_ABILITY}
+    pitcherAbility={{ control: 60, velocity: 60, repertoire: { form: 0, pitchMask: 1, magicId: 2 } }}
+    isEagleEyeEnabled={false}
+    hud={null}
+    acePitcher={null}
+    isPaused={false}
+    skyRow={2}
+    gameMode={7}
+    derbyPitchType={22}
+    random={createSeededRandom(7)}
+    onPitchResolved={vi.fn()}
+  />
+)
+
 describe('0x11 마구 공 파티클 (0x3b2f4 3b4fa)', () => {
+  it('경로 칸 [경기+0x1140] 은 장면에 붙는다 — 부품이 다시 서도 첫 공의 놓기 전 틱이 앞 공 경로 자리에 쏜다 (r184)', () => {
+    const 간격 = millisecondsPerFrame() / 4 + 0.37
+    const first = render(타석())
+    for (let index = 1; index <= 600; index += 1) 그림(index * 간격)
+    first.unmount()
+    쏜것.length = 0
+    그린장면.length = 0
+    render(타석())
+    for (let index = 601; index <= 1200; index += 1) 그림(index * 간격)
+    const 마구 = 쏜것.filter((call) => call.callId === 0x15)
+    const 투구틱 = new Set(그린장면.filter((scene) => scene.stagePhase?.kind === '투구중').map((scene) => scene.tick))
+    expect(투구틱.size).toBeGreaterThan(10)
+    expect(마구.length).toBe(투구틱.size)
+  })
+
   it('마구 번호 2 — 0x11 틱마다 id 0x15 · img 15 를 한 번씩, 0x11 밖에서는 안 쏜다', () => {
     render(
       <BattingStage

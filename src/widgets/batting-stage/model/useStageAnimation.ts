@@ -30,7 +30,6 @@ import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
 import { bigHitEndTickOf, bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
-import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PendingHit } from '@/widgets/batting-stage/model/stageRefs'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
@@ -66,6 +65,7 @@ import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import {
   createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { rememberSceneBallPath, sceneBallPathPitch } from '@/widgets/batting-stage/model/sceneBallPath'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
@@ -246,11 +246,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       /** 이 0x13 에서 창이 선 첫 그림([창+0x250])이 든 자리 — 그 앞 마지막 0x13 틱 (`bigHitReleaseTickOf`) */
       readonly frozenDraws: number[]
     } | null = null
-    /**
-     * 공 경로 [경기+0x1140](점 N 개, N = [+0x109c])를 마지막으로 채운 공 — 놓기 0x4dc78 만 쓰므로 0x11 의 놓기 전 그림은 앞 공의 경로를
-     * 본다(`magicBallParticlesOf` 의 자리 · N). ⚠️ 근사: 이 부품이 서고 처음 던지는 공의 놓기 전에는 앞 공을 몰라 그 파티클을 안 쏜다
-     */
-    let lastPathPitch: Pitch | null = null
+    // 공 경로 [경기+0x1140](점 N 개, N = [+0x109c])를 마지막으로 채운 공 — 놓기 0x4dc78 만 쓰므로 0x11 의 놓기 전 그림은 앞 공의 경로를
+    // 본다(`magicBallParticlesOf` 의 자리 · N). 경로 칸은 경기 장면에 붙어 부품이 새로 서도 이어진다(`sceneBallPath`, r184).
+    // ⚠️ 근사(남김 — 0 채움 칸): 장면의 첫 공은 놓기 전 경로가 0 채움(N = 0)이라 원본은 그 칸을 투영해 쏘지만, 웹은 0 점 경로를 짓지 않아 안 쏜다
     /**
      * 0x11 그림의 마구 공 파티클(0x3b2f4 3b496~3b62c — `magicBallParticlesOf`) — 장면 틱 `tick` 의 그림 몫. 그 틀 끝 관리자 틱(0x6de84)
      * 앞이다. 파티클이 늘면 관리자 틱의 굴림(경기 난수)도 그만큼 는다 — 원본과 같은 차례
@@ -258,8 +256,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     const emitMagicBallParticlesAt = (tick: number) => {
       const pitch = pitchRef.current
       if (phaseRef.current !== '투구중' || pitch === null || tick < phaseStartTickRef.current) return
-      if (pitch.worldPath !== null) lastPathPitch = pitch
-      const path = lastPathPitch
+      rememberSceneBallPath(pitch)
+      const path = sceneBallPathPitch()
       if (path === null) return
       // 공 틱 [+0x1098] — 0x11 진입이 0 으로 두고 투수가 놓는 단계에 닿은 틀 끝부터 오른다(`ballFrameOf` 가 음수인 동안 0)
       const ballTick = Math.max(0, ballFrameOf(tick - phaseStartTickRef.current, latestRef.current.acePitcher?.order))

@@ -262,8 +262,6 @@ export interface PitcherHitScene extends PitcherHitClock {
    * 장면이 이 불꽃 대신 필살 파티클을 쏜다(`specialSwing`)
    */
   readonly particleId: number | null
-  /** 타격점으로 보는 공 경로 번호 — 불꽃 · 016 자리 */
-  readonly contactFrame: number
   /**
    * 판정 0x6aa 가 [경기+0xfd4] 에 쓴 결과 코드 — 투수 그리기의 홈런 갈래(0x3908a, `pitcherFatigue.pitcherHomeRunMarksOf`)가 본다
    */
@@ -290,7 +288,9 @@ export interface PitcherHitScene extends PitcherHitClock {
  * 필살 스윙(S+0x10)으로 맞은 공은 스윙 그리기 0x49e64 49f7c → 0x49aec 가 그림 갈래를 타면 [sp+0x60] = 1 로 보통 불꽃(49faa~4a0ce)을
  * 건너뛰고 같은 타격점에 필살 파티클(49dbc · 49de0)을 쏜다 — 0x49aec 는 타자를 0xae89d(공격 팀)로 읽어 공격 측을 안 가린다(r174 직접 떴다).
  * 그 갈래를 고르는 것은 장면이다(`specialSwing` — 그림이 없는 번호면 보통 불꽃).
- * ⚠️ 근사: 불꽃 자리는 타자편처럼 공 경로 F(번트는 N − 1)의 화면 점이다(타자편 `ballPixelAt(pitch, swing.frame)`).
+ * 불꽃 · 필살 파티클 · 016 · 큰 타구 연출의 자리는 타격점 (+0x10dc, +0x10e0) 투영 0xb94b5 + 카메라다(49b02 · 4a03a · 4cb80 — r184 직접
+ * 떴다). +0x10dc 를 쓰는 곳은 놓기 0x4dc78 하나(4dffa~4e024: 표 0xcfb18[손] + 경로 끝 점 [+0x1134 + 12·N] 의 투영)라 공의 도착점이다 —
+ * 웹은 `platePixelOf`(경로 끝 점의 `projectToScreen`). 타자편 `BattingStage` 와 같다.
  */
 export function pitcherHitSceneOf(
   contact: BattedContact,
@@ -319,7 +319,6 @@ export function pitcherHitSceneOf(
     skipTick: null,
     watchesBigHit,
     particleId: hitParticleIdOf(hitParticleInputOf(pattern, resultCode, watchesBigHit)),
-    contactFrame: cpuSwing === null || isBunt ? frameCount - 1 : cpuSwing.frame,
     resultCode,
     specialSwing: contact.specialSwing ?? null,
   }

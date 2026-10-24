@@ -20,7 +20,7 @@ import {
   hitParticleInputOf,
   specialSwingParticlesOf,
 } from '@/widgets/batting-stage/lib/hitParticles'
-import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
 import { pitchVibrationMillisecondsOf } from '@/widgets/batting-stage/lib/pitchVibration'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
@@ -428,9 +428,10 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       buntRef.current = null
       const pauseInput = pauseInputOf(result.detail.resultCode, result.deck, latest.batterHand ?? batterSideOfForm(latest.batterForm))
       const watchesBigHit = isBigHit(pauseInput)
-      // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 맞은 틱의 공 자리로 본다 (근사)
+      // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 (+0x10dc, +0x10e0) 투영 0xb94b5 + 카메라(4a03a · 필살 49b02 · 큰 타구 4cb80).
+      // +0x10dc 는 놓기 0x4dc78(4dffa~4e024)만 적는 공 도착점(경로 끝 점의 투영)이라 `platePixelOf` 다 (r184 직접 떴다)
       const pattern = lastDrawnPattern(result.deck, result.detail.resultCode)
-      const contact = swing === null ? null : ballPixelAt(pitch, swing.frame)
+      const contact = swing === null ? null : platePixelOf(pitch)
       // 필살 스윙(S+0x10)이 0x49aec 의 그림 갈래를 타면 그 함수가 [sp+0x60] = 1 을 세워 보통 불꽃(49faa~4a0ce)을 건너뛰고,
       // 같은 타격점에 필살 파티클을 쏜다(49dbc · 49de0) — 0x49aec 는 0x13 · 맞은 공에서만 불리므로 헛스윙엔 아무것도 없다
       const specialEffect =

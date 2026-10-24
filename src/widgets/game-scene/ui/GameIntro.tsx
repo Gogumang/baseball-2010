@@ -70,7 +70,8 @@ interface GameIntroProps {
  *
  * 맨 위 겹: 라이벌전이고 `[+0x17e6] > 14`(흐려지기 전)면 라이벌전 띠 0x3b80c (41a00, `lib/rivalryBand`) — 그림 n 이 단계 min(n, 9).
  * 띠 칠 0x6a9f0(직접 뜸 6a9f0~6aa18): 색 윗바이트 알파가 0 · 0xff 가 아니면 플랫폼 그리기 속성 0x1400698(gc, 4, 알파)를 걸고 칠한다 —
- * 알파는 max(1, +0x17e4 − 0x55) = 1~170 이라 늘 섞는다. ⚠️ 미확인: 섞기 식은 단말 몫이라 바이너리에 없다 — 웹은 "윗바이트/255" 로 섞는다.
+ * 알파는 max(1, +0x17e4 − 0x55) = 1~170 이라 늘 섞는다. ⚠️ 미확인: 웹은 "윗바이트/255" 로 섞는다(남김 — 섞기 식은 단말 몫이라
+ * 바이너리에 없다).
  */
 export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRivalry = false, onDone }: GameIntroProps) {
   // 인트로 0xc도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은

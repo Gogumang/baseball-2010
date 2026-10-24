@@ -122,7 +122,6 @@ const 맞은장면: PitcherHitScene = {
   skipTick: null,
   watchesBigHit: true,
   particleId: 5,
-  contactFrame: 15,
   resultCode: 24,
   specialSwing: { number: 1, isAceBatter: false },
 }
