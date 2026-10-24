@@ -26,7 +26,9 @@ import type { YearCellDrawing } from '@/pages/nari-record-room/lib/nariRecordRoo
  * 기록연감 0x2e29c · 0x58d10 · 0x593c8 · 0x5d054 (re.py 로 `movs #0x82; lsls #3` 전수) — 이고, 0x5796c 는 읽기만 하며(0x579ca) 0xdb 그리기
  * 0xafa8 은 0x5796d · 0x7f4ed(바닥 5 — 비트 0x40 없음)뿐이라 이 화면에서는 안 오른다 → 앞 화면들이 남긴 값에 멈춘다.
  * 그 값은 웹도 앱에 하나인 `skinBlinkCounterValue()`(U-90)로 든다 — 앱을 켤 때 0, 0 으로 되돌리는 곳은 없다.
- * ⚠️ 미확인(남김): [판+0x40c] 를 올리는 곳은 못 찾았다(상수 0x40c 를 만드는 movs/lsls · 리터럴 없음) — 0 으로 둔다.
+ * [판+0x40c] — 확정(r166): 리터럴 0x40c 로 만든다(re.py xval 0x40c). 같은 스킨 칸을 엔트리 편집기(0x5561c 0 · 키 0x55864 +1) ·
+ * 이 판의 키 0x5787c(+1, 5793e) · 명전 몸 그림 0x5e8bc · 경기설정 창 0x6042c 가 함께 센다. 이 판의 진입 0x5761c 는 첫 인자 0 이면
+ * 0x5561c 를 안 지나 앞 화면이 남긴 값에서 잇는다 — 웹도 앱에 하나인 `skinStepCounterValue()`.
  */
 export const RANKING_BOARD = {
   panel: { x: 15, y: 55, width: 210, height: 220 },
@@ -72,7 +74,7 @@ export function rankingColumnXOf(column: number): number {
 /** 줄 i 의 칸 y */
 export const rankingRowYOf = (row: number) => RANKING_BOARD.firstRowY + row * RANKING_BOARD.rowStep
 
-/** 판 깜빡 카운터 — [판+0x410] 은 앱에 하나인 값 · [판+0x40c] 는 ⚠️ 미확인(머리말) */
+/** 판 깜빡 카운터 — [판+0x410] · [판+0x40c] 모두 앱에 하나인 스킨 칸(머리말) */
 export interface RankingBlinkCounters {
   /** [판+0x410] */
   readonly drawCount: number
@@ -82,8 +84,11 @@ export interface RankingBlinkCounters {
 
 export const RANKING_BLINK_AT_REST: RankingBlinkCounters = { drawCount: 0, keyCount: 0 }
 
-/** 지금 그릴 카운터 — [판+0x410] 은 앞 화면들이 남긴 값 그대로 · [판+0x40c] 는 0 (⚠️ 미확인) */
-export const rankingBlinkCountersOf = (skinBlinkCount: number): RankingBlinkCounters => ({ drawCount: skinBlinkCount, keyCount: 0 })
+/** 지금 그릴 카운터 — [판+0x410] 은 앞 화면들이 남긴 값 그대로 · [판+0x40c] 는 앞 화면들이 남긴 값 + 이 판의 키 수 */
+export const rankingBlinkCountersOf = (skinBlinkCount: number, skinStepCount: number): RankingBlinkCounters => ({
+  drawCount: skinBlinkCount,
+  keyCount: skinStepCount,
+})
 
 /** 쪽 화살 x — 왼쪽(◀) · 오른쪽(▶ 뒤집기) */
 export function rankingSideArrowXOf(side: 'left' | 'right', counters: RankingBlinkCounters): number {

@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useMirrorSkinStepCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
+import { useMarkSkinNameBars } from '@/shared/lib/skinNameBars/skinNameBars'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { measurePixelTextWidth } from '@/shared/lib/font/layout'
 import { CommonPanel, FrameSprite, PressArea, useImgTextPalette3 } from '@/shared/ui'
@@ -77,6 +79,10 @@ export function EntryListWindow({
   const imgText = useFrameOrigins(IMG_TEXT_FRAMES)
   const palette3 = useImgTextPalette3()
   const L = ENTRY_LIST_LAYOUT
+  // [ed+0x40c] 는 전역 스킨 칸이다 — 편집기가 0x5561c 의 0 에서 센 값을 그대로 옮겨 다음 화면(경기설정 창 · 순위 판 · 명전)이 잇게 한다
+  useMirrorSkinStepCounter(keyPresses)
+  // [ed+0x333] 도 전역 스킨 칸 — 이 창을 1 로 세우는 진입(시즌 0x5870 … · 0x16af8 · 0x2648c)이 적은 값을 다음 화면(스페셜 에디트)이 본다
+  useMarkSkinNameBars(showsNameBars)
   const geometry = entryListGeometryOf({ table, firstColumn, slideOffset, keyPresses })
   const visibleCount = Math.min(10, rows.length)
   const visibleRows = rows.slice(top, top + visibleCount)

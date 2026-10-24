@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { RawScreen } from '@/shared/ui'
+import { addSkinStepCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import { rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRanking'
@@ -8,6 +9,9 @@ import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { RankingBoard } from '@/pages/nari-record-room/ui/RankingBoard'
 
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
+
+/** 0x5787d 까지 가지만 쪽을 안 넘기는 키 — [skin+0x40c] 만 센다 */
+const RANK_OTHER_KEYS: ReadonlySet<string> = new Set(['ArrowUp', 'ArrowDown', 'Enter', '0', '1', '2', '3', '5', '7', '8', '9', '*', '#'])
 
 /** 두 칸 글 img_text — 392 "타자기록" · 393 "투수기록" (그림 객체 +8 의 +0x620 · +0x624 — 0xf3fa · 0xf502) */
 const PICK_LABEL_FRAMES = { 타자: 392, 투수: 393 } as const
@@ -71,9 +75,15 @@ export function SeasonRecordRankScreen({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
+      // 0x74c4: 취소(−16) → 0xcd · 그 밖은 모두 0x5787d — 쪽이 바뀌든 말든 [skin+0x40c] += 1 (5793e~57948, 쪽 화살 x 가 본다)
       if (isCancelKey(event.key)) current.onBack()
-      else if (event.key === 'ArrowRight' || event.key === '6') current.onMovePage(1)
-      else if (event.key === 'ArrowLeft' || event.key === '4') current.onMovePage(-1)
+      else if (event.key === 'ArrowRight' || event.key === '6') {
+        addSkinStepCounter()
+        current.onMovePage(1)
+      } else if (event.key === 'ArrowLeft' || event.key === '4') {
+        addSkinStepCounter()
+        current.onMovePage(-1)
+      } else if (RANK_OTHER_KEYS.has(event.key)) addSkinStepCounter()
       else return
       event.preventDefault()
     }

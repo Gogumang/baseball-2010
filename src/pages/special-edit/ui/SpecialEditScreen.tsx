@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
+import { skinNameBarsValue } from '@/shared/lib/skinNameBars/skinNameBars'
 import { MarkupText, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { nameByteLengthOf } from '@/entities/career/model/playerCareer'
@@ -62,8 +63,12 @@ interface SpecialEditScreenProps {
  * 배경은 메뉴 바탕 0x58371(skin, main_title, 0) — 하위 0 · 1 · 2 모두 맨 먼저 깐다(0x2e1e0 의 첫 부름).
  * 엔트리 창(넓은 표 · 커서 이름 칸만 [skin+0x438] = 1 — `EntryEditorScreen` / `widgets/entry-editor/lib/entryListWindow`).
  *
- * ⚠️ 근사: 엔트리 창 아래에 깔린 팀 고르기 본문(격자 · 로고 · 도형)은 모두 판(15, 55, 210, 220) 안이라 가려져 따로 안 그린다.
- *    입력 창(판 높이 0x6e · 입력 방식 표시)은 아래 `EditNamePopup`.
+ * 엔트리 창 아래에 깔린 팀 고르기 본문(딱지 · 큰 로고 · 이름 막대 · 격자 30~267)은 판(15, 55, 210, 220) = x 15~224 안이라 가려진다.
+ * 다만 능력치 도형의 오른쪽 이름 상자 둘(축 끝 x = 178 + (48·cos45 >> 16) = 211 → 상자 x 210, 폭 26 — 0x5b412~0x5b532)은
+ * x 225~235 가 판 밖으로 나와 원본에서도 보인다(r166 확정) — 그래서 그 도형(커서 팀, 다 자란 값)만 엔트리 창 밑에 깐다.
+ * 도형 객체 [skin+0xd4] 는 웹도 앱에 하나(`useRadarGrowth`)라 팀 고르기의 지난 목표값을 잇는다 — 다만 다 자라기 전에 골랐으면
+ * 원본은 지금값(E+8)에서 이어 자라고 웹은 지난 목표값에서 다시 선다(⚠️ 근사, 그 몇 그림만 다르다).
+ * 입력 창(판 높이 0x6e · 입력 방식 표시)은 아래 `EditNamePopup`.
  */
 export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditScreenProps) {
   const [state, setState] = useState(createSpecialEditState)
@@ -96,18 +101,26 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
     <EntryEditorScreen
       editor={state.editor}
       lists={lists}
-      underlay={<SkinBackdrop kind="메뉴바탕" />}
+      underlay={(
+        <>
+          <SkinBackdrop kind="메뉴바탕" />
+          {/* 팀 고르기 본문 0x63dee 의 ABILITY 판 — 오른쪽 이름 상자가 엔트리 창 오른쪽 밖으로 나온다(머리말) */}
+          <AbilityRadarPanel center={{ x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }}
+            radius={ABILITY_CHART.radius} maximumLength={abilityAxisMaximumLengthOf(ABILITY_CHART.radius)}
+            labelFrames={ABILITY_RADAR_LABELS.team} targets={(TEAMS[state.team] ?? TEAMS[0]).values.slice(2)}
+            restartKey={state.team} fromZero={false} />
+        </>
+      )}
       teamName={TEAMS[state.team]?.name ?? ''}
       isAceLocked={false}
       gamePoint={gamePoint}
       title="팀선택"
       slides={false}
       tables={ENTRY_TABLES_WIDE}
-      // 0x2b2e0 은 [skin+0x333] 을 세우지 않는다 — 앞 화면(일반 엔트리 0x2648c 가 1 로 세운다)이 남긴 값이다.
-      // 부팅 뒤 처음이면 0 — skin 할당 0x1238 → 0x2ac4 가 할당 뒤 memset(0) 한다(2ad4, 직접 뜬 것).
-      // ⚠️ 근사: 앞서 다른 화면(0x2648c 엔트리 · 0x16af8 · 0x37904 · 0x37e5c · 0x571da 등 [+0x333] 을 쓰는 곳)을 거쳤으면 그 값이 남는데
-      //    웹은 화면 사이에 이 칸을 들고 다니지 않아 늘 부팅 값(0)으로 그린다
-      showsNameBars={false}
+      // 0x2b2e0 은 [skin+0x333] 을 세우지 않는다 — 앞 화면이 남긴 값이다. 부팅 뒤 처음이면 0 — skin 할당 0x1238 → 0x2ac4 가
+      // 할당 뒤 memset(0) 한다(2ad4). 이 칸에 쓰는 곳은 모두 1 이다(시즌 엔트리 · 0x16af8 · 0x2648c · 교체 창 0x37904 · 0x37e5c —
+      // `shared/lib/skinNameBars`, 확정 r166) — 그 화면을 한 번이라도 거쳤으면 이름 칸을 덧그린다
+      showsNameBars={skinNameBarsValue() !== 0}
       isCursorNameOnly
       onFrame={onFrame}
       ticksEveryFrame

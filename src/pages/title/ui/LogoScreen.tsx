@@ -65,7 +65,9 @@ export function LogoScreen({ onDone, onVoice }: LogoScreenProps) {
 
   /**
    * 효과 1 · 인자 L — 아래가 흰 바탕 한 색이라 원본 표 식(0xd5e58 마스크 · 0xd5de0 밀기, 565 내림)을 흰색 위에 그대로 칠한다.
-   * ⚠️ 근사: 합성 프레임은 파트마다 따로 섞이는데(0x944b4) 웹 프레임 PNG 는 파트를 미리 겹친 한 장이다 — 파트가 겹친 칸만 다를 수 있다.
+   * 합성 프레임은 파트마다 따로 섞이는데(0x944b4) 웹 프레임 PNG 는 파트를 미리 겹친 한 장이다 — 같다(확정 r166): logo.pzx 를 풀어
+   * 보면 프레임 1 은 그림 1(−72, −53, 146×107) · 그림 3(−44, 56, 88×9) 두 파트로 y 가 겹치지 않고(−53~53 · 56~64), 프레임 2 는
+   * 그림 2 한 파트뿐이라 파트가 겹친 칸이 없다.
    */
   const translucentFrame = (index: number, level: number) => {
     const name = String(index).padStart(3, '0')
