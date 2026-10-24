@@ -143,7 +143,7 @@ export interface RunnerChange {
  * - 살아남은 주자(`survivorsFromBase`)를 주면 그대로 — 수비 진행기 판은 그 판의 주자 운명(`runnerFates`), 진행기를 안 도는
  *   삼진 · 볼넷 · 사구 · 홈런은 정산 0xa8024 가 보는 목록 그대로(`survivorsWithoutPlayOf`).
  * - 안 주면: 앞선 주자부터 [3루, 2루, 1루, (나간 타자)] 에서 득점 수만큼 앞에서 빼고, 남는 수가 찬 루보다 많으면 타자 바로 앞
- *   (가장 뒤의) 주자부터 아웃으로 본다 — ⚠️ 근사. 진행기를 도는 안타 · 아웃은 늘 운명을 싣고(타자편 · 팀 경기 · 투수편 · 미션),
+ *   (가장 뒤의) 주자부터 아웃으로 본다 — ⚠️ 근사(남김 — 원본에 없는 길). 진행기를 도는 안타 · 아웃은 늘 운명을 싣고(타자편 · 팀 경기 · 투수편 · 미션),
  *   운명 없이 안타 · 아웃이 오는 길은 결과만 넘겨받은 시험 · 옛 호출(원본에 없는 길)뿐이다.
  */
 export function runnersAfterPlay(before: BaseRunners, next: BaseState, change: RunnerChange): BaseRunners {

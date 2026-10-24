@@ -24,7 +24,7 @@ const ADDITIVE_BACKDROP = '#000000'
  *
  * 더하기는 아래 DOM 을 읽어야 하므로 `EffectImage`(효과 2 · 검정 바탕 = 그림 · b >> 8, 565 내림까지)를
  * `mix-blend-mode: plus-lighter`(채널마다 화면 + 칸, 끝에서 자름)로 얹는다 — `SceneParticleLayer` 와 같은 길.
- * ⚠️ 근사: 원본은 565 칸끼리 더하고 웹은 8비트로 펼친 값끼리 더해 채널마다 1 안팎 다를 수 있다.
+ * ⚠️ 근사(남김 — 웹 DOM 한계): 원본은 565 칸끼리 더하고 웹은 8비트로 펼친 값끼리 더해 채널마다 1 안팎 다를 수 있다.
  * 섞기는 가장 가까운 쌓임 맥락 안에서만 일어난다 — 부르는 쪽은 이 그림과 아래 화면 사이에 z-index · opacity 겹을 두지 말아야 한다.
  */
 export function LayeredFrameSprite({ folder, frame, origins, x, y }: LayeredFrameSpriteProps) {

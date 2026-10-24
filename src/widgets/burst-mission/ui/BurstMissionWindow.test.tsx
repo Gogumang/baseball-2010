@@ -8,13 +8,17 @@ import { CommonWindowPushContext } from '@/shared/lib/commonWindow/commonWindow'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
+import { burstObjectTicks, resetBurstObjectTicks } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 
 /**
  * 돌발미션 창 (경기 장면 상태 0x1b — 그리기 0x8f3c0 · 갱신 0x8e5b8).
  * 판이 오르고(5 갱신) 세 번 흔들린 뒤(3 갱신) 9 번째 갱신에서 글이 나오고 키를 받는다.
  */
 
-beforeEach(() => vi.useFakeTimers())
+beforeEach(() => {
+  vi.useFakeTimers()
+  resetBurstObjectTicks()
+})
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
@@ -66,6 +70,21 @@ describe('돌발미션 창 — 오르기 · 흔들기 · 글', () => {
     expect(mark.style.left).toBe('225px')
     // [+0x224] = 9 → 9 % 8 = 1 ≤ 3 → H − 8
     expect(mark.style.top).toBe('312px')
+  })
+
+  it('[+0x224] 는 창마다 0 이 아니라 경기 내내 이어 센다 — 제안 창 9 갱신 뒤 결과 창은 10 부터 (0x8e5b8 · 객체는 0x48658 에서 한 번)', () => {
+    띄우기()
+    다열기()
+    expect(burstObjectTicks.value).toBe(9)
+    cleanup()
+    const { dialog } = 띄우기({ judgement: '성공' })
+    다열기()
+    expect(burstObjectTicks.value).toBe(18)
+    const mark = dialog.querySelector('img[src="./sprites/game_ui/052.png"]') as HTMLImageElement
+    // 18 % 8 = 2 ≤ 3 → H − 8 (창마다 0 이면 9 → 같은 줄이라 한 그림 더 굴려 갈린다)
+    act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 2) })
+    // 20 % 8 = 4 > 3 → H − 10 (창마다 0 이면 11 % 8 = 3 → H − 8)
+    expect(mark.style.top).toBe('310px')
   })
 })
 

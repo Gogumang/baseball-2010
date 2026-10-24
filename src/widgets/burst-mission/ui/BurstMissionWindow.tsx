@@ -15,6 +15,7 @@ import {
   BURST_BAND_HEIGHT, BURST_BAND_SLASH_LENGTH, BURST_BAND_SLASH_X, BURST_COLORS, BURST_NEXT_MARK_IMAGE, BURST_SCREEN,
   BURST_WINDOW_START, burstBandTopOf, burstLineIndexOf, burstNextMarkAt, burstPortraitAnchorOf, burstPortraitOf,
   burstResultPopupTextOf, burstShakeOffsetOf, burstSpeakerPrefixOf, burstTextBoxOf, isBurstWindowOpen, tickBurstWindow,
+  burstObjectTicks,
 } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
@@ -52,22 +53,25 @@ interface BurstMissionWindowProps {
  *
  * 효과음(제안 0x2a · 성공 0x24 · 실패 0x20 · 무효 0x25)은 싣는 쪽(발동 0x8f000 · 판정 0x8f414)이 낸다 — 이 창 몫이 아니다.
  *
- * ⚠️ 근사(넘김 표시 위아래 차례): [+0x224] 는 경기 내내 이어 세는데 웹은 창마다 0 에서 센다 — 결과 창의 위아래 차례만 다를 수 있다.
+ * 넘김 표시 위아래 차례 [+0x224] 는 경기 내내 이어 센다 — 창은 `burstObjectTicks` 에서 이어 받고 돌려 적는다(r181 확정).
  * ⚠️ 유력: 초상 깃발 0x11 을 좌우 뒤집기로 본 것(엔딩 · 제작진과 같은 읽기, `FramePiece`).
  */
 export function BurstMissionWindow({
   lines, judgement, row = null, isBatterLeftHanded = false, replacements = [], onClose,
 }: BurstMissionWindowProps) {
   const line = lines[burstLineIndexOf(judgement)]
-  const [state, setState] = useState<BurstWindowState>(() => tickBurstWindow(BURST_WINDOW_START))
+  const [state, setState] = useState<BurstWindowState>(
+    () => tickBurstWindow({ ...BURST_WINDOW_START, ticks: burstObjectTicks.value }))
   /** 그린 수 — 초상 애니는 그린 뒤 한 칸 나아간다(0x93d91) */
   const [draws, setDraws] = useState(0)
   const stateRef = useRef(state)
   stateRef.current = state
 
   useEffect(() => {
+    burstObjectTicks.value = stateRef.current.ticks
     const timer = setAppTickInterval(() => {
       const next = tickBurstWindow(stateRef.current)
+      burstObjectTicks.value = next.ticks
       stateRef.current = next
       setState(next)
       setDraws((count) => count + 1)
@@ -173,3 +177,4 @@ function BurstPortrait({ speaker, expression, draws, anchor }: {
   const src = anchor.isFlipped ? flippedFrameUrlOf(folder, step.frame, copies) : `${folder}/${key}.png`
   return <img className={styles.sprite} style={style} src={src} alt="" data-frame={step.frame} />
 }
+

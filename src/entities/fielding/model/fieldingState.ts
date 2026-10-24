@@ -217,7 +217,7 @@ export function throwErrorBiasOf(defenseGrade: number): number {
  * ([장면+0x111c+4i])마다 수비 팀(팀[st[0xa]], 3fd3c~3fd4e) 레코드 차례로 자리 니블 == i + 1 인 첫 선수를 +0xec 에 넣는다 —
  * 칸 0 은 니블 1 = **지명타자**다. +0xec 를 읽는 펌블(b41e4 → 표 0xd87d4[등급]) · 레이저(66a94 → 66aba 등급) 굴림은 그래서
  * 투수 칸이면 지명타자의 수비로 돈다(`recordPlayerAbilityOf`).
- * ⚠️ 근사: 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만 불려(R10) 판이 안 선 반 이닝 뒤에는 앞 판의 값이 남고, 장면을 만든
+ * ⚠️ 근사(남김 — 수비 묶음 몫): 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만 불려(R10) 판이 안 선 반 이닝 뒤에는 앞 판의 값이 남고, 장면을 만든
  *    뒤 첫 판 앞에는 0(new 의 memset)이다 — 웹은 늘 지금 수비 팀의 지명타자로 본다(`fieldingErrors.fielderRecordIndexOf` 와 같은 다리).
  */
 export const UNSEARCHED_FIELDER_SLOT = 0

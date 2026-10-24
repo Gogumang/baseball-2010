@@ -54,7 +54,9 @@ import { lapPlayClock } from '@/entities/collection/model/playClock'
  * 오늘 타석 기록(링)은 비운다 — 더비 타석은 정산 0xa8024 를 안 지난다(2026-10-16 직접 떴다): 판정 A 0xae24c 의 더비 갈래
  * (st[1] == 7, ae270~ae336 → 0xd · 0x1a)와 판정 B 0xae3e8 의 더비 갈래(ae408~ae552 → ae5ca)는 0xa8024 를 부르지 않고(그 호출
  * ae36a · ae5b0 은 경기 끝 0xb68fc 갈래 · 보통 갈래 몫), 링 넣기 0xa908c 를 부르는 곳은 0xa8024 하나다(xref).
- * ⚠️ 미확인: 더비 경기를 세울 때 링(타순 칸 24바이트)이 비워지는지 — 웹은 빈 링으로 둔다.
+ * 더비 경기를 세울 때 링은 비워진다(r181 확정): 경기 장면 셋업 0x39fdc 의 모드 7 갈래(점프표 0xcfef8[7] = 0x3a43e)가 0x3a500 에서
+ * 팀 셋업 0xb891c 를 부르고, 그 b899e~b89ac 가 타순 칸 22개(24바이트 간격)마다 링 초기화 0xb8cfc(칸, 10)을 부른다 — 머리 +0xa ·
+ * 쓰기 +0xb · 개수 +0xc = 0, 용량 +0xd = 10. 곧 웹의 빈 링이 원본 그대로다.
  */
 function derbyMatchupBatterOf(
   famer: { readonly name: string; readonly recordLine?: readonly number[] } | null,

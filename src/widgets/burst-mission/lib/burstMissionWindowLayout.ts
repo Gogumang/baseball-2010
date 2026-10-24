@@ -51,6 +51,19 @@ export interface BurstWindowState {
 /** 대사를 실은 순간 (0x8e2dc: +0x220 = +0x221 = 0) */
 export const BURST_WINDOW_START: BurstWindowState = { height: 0, shake: 0, ticks: 0 }
 
+/**
+ * 돌발 객체의 [+0x224] — 창마다가 아니라 **경기 장면마다** 0 에서 선다(r181 확정): 경기 장면 생성 0x48658 이 모드 2~4 에서
+ * 48c24~48c36 으로 새 객체(0x244 바이트)를 할당 0x1238 → 0x2ac4(할당 뒤 memset 0)로 만들고, 만들기 0x8e0d0 · 0x8e1b0 과
+ * 대사 싣기 0x8e2dc 는 +0x224 를 안 건드린다. 올리는 곳은 갱신 0x8e5b8 의 += 1 하나라 제안 창 · 결과 창 · 다음 돌발이 이어 센다.
+ * 웹은 모듈 칸 하나로 들고 경기 화면이 붙을 때(`useBurstObjectTicksReset`) 0 으로 둔다.
+ */
+export const burstObjectTicks = { value: 0 }
+
+/** 경기 장면 생성 — [+0x224] = 0 */
+export function resetBurstObjectTicks(): void {
+  burstObjectTicks.value = 0
+}
+
 /** 갱신 0x8e5b8 의 앞부분 한 번 (키 처리 앞) */
 export function tickBurstWindow(state: BurstWindowState): BurstWindowState {
   const ticks = state.ticks + 1

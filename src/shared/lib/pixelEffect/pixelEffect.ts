@@ -113,7 +113,7 @@ export function translucentPixel565(level: number, source: number, screen: numbe
 
 /**
  * DOM 겹치기용 효과 1 무게 — 그림 L/16.
- * ⚠️ 근사: CSS opacity 는 화면 픽셀을 모르는 채 8비트로 섞어 마스크 내림 · 565 양자화를 못 따른다(캔버스면 `drawImageWithEffect`).
+ * ⚠️ 근사(남김 — 웹 DOM 한계): CSS opacity 는 화면 픽셀을 모르는 채 8비트로 섞어 마스크 내림 · 565 양자화를 못 따른다(캔버스면 `drawImageWithEffect`).
  */
 export const translucentOpacityOf = (level: number) => (isTranslucentLevelDrawn(level) ? level / 16 : 0)
 
@@ -295,7 +295,7 @@ export function color565Of(color: string): number | null {
 /**
  * 화면을 안 보는 효과(0 · 0xa · 0xb · 0xc · 0xd)를 그림 RGBA 에 입힌다 — 투명 칸(알파 0)은 그대로, 알파는 둔다.
  * 화면을 보는 효과(1 · 2 · 4)는 여기서 화면 0(검정)으로 계산된다 — 그런 효과는 `composeRgba` · `drawImageWithEffect` 를 쓴다.
- * ⚠️ 근사: 구운 PNG 의 반투명 칸(알파 1~254)은 원본 PZX 에 없다 — 색만 바꾸고 알파는 둔다.
+ * ⚠️ 근사(남김 — 웹 DOM 한계): 구운 PNG 의 반투명 칸(알파 1~254)은 원본 PZX 에 없다 — 색만 바꾸고 알파는 둔다.
  */
 export function recolorRgba(rgba: ArrayLike<number>, effect: number, argument: number): Uint8ClampedArray {
   const output = new Uint8ClampedArray(rgba)
@@ -343,7 +343,7 @@ export interface RgbaSurface {
 /**
  * 그림을 화면 RGBA 의 (x, y) 에 효과로 그린다 — 화면을 고친다. 화면 밖은 자른다.
  * 화면 칸이 불투명(알파 255)이면 원본 식 그대로. 화면 칸이 비어 있으면(DOM 겹치기 캔버스의 빈 칸 — 아래 화면을 모른다)
- * ⚠️ 근사: 효과 1 은 그림 색에 알파 L/16, 효과 2 는 그림 색에 알파 b/256 으로 남긴다.
+ * ⚠️ 근사(남김 — 웹 DOM 한계): 효과 1 은 그림 색에 알파 L/16, 효과 2 는 그림 색에 알파 b/256 으로 남긴다.
  * 효과 4 는 `random(bound)` 로 줄마다 r 을 뽑는다(원본 0x9b1ee 은 줄 머리에서 한 번).
  */
 export function composeRgba(
@@ -383,7 +383,7 @@ export function composeRgba(
         writePixel(out, at, source, Math.round(alpha))
         continue
       }
-      // ⚠️ 근사: 반투명 화면 칸 — 색은 원본 식, 알파는 그대로
+      // ⚠️ 근사(남김 — 웹 DOM 한계): 반투명 화면 칸 — 색은 원본 식, 알파는 그대로
       writePixel(out, at, effectPixel565(effect, argument, source, pixelOf(out, at)), out[at + 3])
     }
   }
@@ -588,7 +588,7 @@ function flushEffectDraws(
 /**
  * 캔버스에 그림을 효과로 그린다 — 그 자리 화면을 읽어(`getImageData`) `composeRgba` 로 섞고 다시 놓는다.
  * 좌표는 정수로 내린다(원본 화면 좌표는 정수다). 그림 RGBA 는 그림마다 한 번만 읽는다(`spriteRgbaOf`).
- * 변환(scale · translate)이 걸려 캔버스 칸이 화면 칸과 안 맞으면 ⚠️ 근사로 그린다 — 화면을 안 보는 효과는 다시 칠한 그림,
+ * 변환(scale · translate)이 걸려 캔버스 칸이 화면 칸과 안 맞으면 ⚠️ 근사(남김 — 웹 DOM 한계)로 그린다 — 화면을 안 보는 효과는 다시 칠한 그림,
  * 효과 1 은 globalAlpha L/16, 효과 2 는 'lighter' · globalAlpha b/256.
  */
 export function drawImageWithEffect(
@@ -689,8 +689,8 @@ export const brightenedImageOf = (image: DrawableImage, amount: number): Drawabl
 /**
  * 0xbb91d 종류 0x12 — 종류 2 크기 a/10 배(0xbb9d2~0xbb9f0: 그린 폭 = w·a/10 · 0xbbabc~0xbbacc: 원본 줄 = 그린 줄·10/a, a 가 20 이면
  * 시프트) · 종류 0x10 화면 섞기 0xbb8d4(b, `blendPixel565`). 투명 칸(풀어 둔 자홍 0xbbb4e~0xbbb5e)은 건너뛴다.
- * 그 자리 화면을 읽어 섞고 다시 놓는다. 변환이 걸린 캔버스는 ⚠️ 근사(globalAlpha (32 − b)/32 · 최근접 키우기).
- * 화면 칸이 비어 있으면(겹치기 층) 그림 색에 알파 (32 − b)/32 로 남긴다(⚠️ 근사 — `composeRgba` 와 같은 처리).
+ * 그 자리 화면을 읽어 섞고 다시 놓는다. 변환이 걸린 캔버스는 ⚠️ 근사(globalAlpha (32 − b · 남김 — 웹 DOM 한계)/32 · 최근접 키우기).
+ * 화면 칸이 비어 있으면(겹치기 층) 그림 색에 알파 (32 − b)/32 로 남긴다(⚠️ 근사(남김 — 웹 DOM 한계) — `composeRgba` 와 같은 처리).
  */
 export function drawImageScaledBlend(
   context: CanvasRenderingContext2D,

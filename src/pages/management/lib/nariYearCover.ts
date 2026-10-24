@@ -180,7 +180,7 @@ const STATE_ONE_FRAMES: readonly number[] = [1, 3]
  * 0x37ac 직전 틀 — 웹은 같은 커밋에 내려간 앞 화면 판, `LeftFrame`) 위에 상태 1 이 검정 덮기(단계 4)를 겹쳐 칠한다
  * (`resumeLeftFrameCoverOpacityAt`). 105(4 틀)는 0x19f0c = 0x19da4(커맨드 줄 칸 등장 0 · 상태판 · 가운데 판 미끄러짐 첫 자리 ·
  * 머리띠 — r163, `NariResumeManagementFrame`), 115 · 114 는 공 무늬 · 상태판 · 머리띠를 그린다(114 0x8b5ac 는 대화창도).
- * ⚠️ 근사: 114 의 대화창(연초 내장 이벤트 첫 대사 — 재생기를 이 자리에 세우지 않는다)은 그리지 않는다. 효과기가 절반 이상 덮는 틀이다
+ * ⚠️ 근사(남김 — 웹 구조): 114 의 대화창(연초 내장 이벤트 첫 대사 — 재생기를 이 자리에 세우지 않는다)은 그리지 않는다. 효과기가 절반 이상 덮는 틀이다
  */
 export function resumeCoverUnderlayAt(frame: number): ResumeCoverUnderlay {
   if (frame < RESUME_MANAGEMENT_FRAME) return '앞판'

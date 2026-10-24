@@ -38,12 +38,6 @@ export const slotIcon = style({
   top: '4px',
 })
 
-/**
- * 못 고르는 칸 아이콘 — 회색은 `EffectImage`(효과 0xa) 가 칠하고, 여기서는 반쯤 어둡게만 한다.
- * ⚠️ 미확인: 이 격자 부품(slt_frame + mode_icon)은 지금 어느 화면도 쓰지 않고, 어둡게 하는 것은 원본에서 찾지 못한 웹 표시다.
- */
-export const slotIconDisabled = style({ filter: 'brightness(0.5)' })
-
 /** 노란 테두리는 42px 이라 39px 칸보다 크다. 가운데를 맞춰 살짝 넘치게 둔다. */
 export const slotFrame = style({
   left: '-1px',

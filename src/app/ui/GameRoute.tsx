@@ -27,6 +27,7 @@ import type { DefensePlayResult } from '@/features/defense-play/model/runDefense
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
+import { useBurstObjectTicksReset } from '@/widgets/burst-mission/model/useBurstObjectTicksReset'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { castOfAces, castOfCareer, castOfTeamRecordEquipment, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
@@ -82,6 +83,7 @@ const INTIMIDATE_SKILL_ID = 22
  * 창이 떠 있는 동안 타석을 멈춰 둔다 — 원본도 장면 상태가 0xf 를 떠나 있어 투구가 나가지 않는다.
  */
 export function GameRoute({ session, progress, runner, random, career, gameSettings, aceLevels }: GameRouteProps) {
+  useBurstObjectTicksReset() // 경기 장면 생성 0x48658 — 돌발 객체 [+0x224] = 0
   // 이 경기 두 팀의 선수 그림 — 로딩 판 동안 타석 선수(마선수 · 내 선수 장비 · 몸통 폼)를, 경기 장면 동안 수비 그림을 받는다(안 기다린다)
   const { battingTypeIndex, battingSide, equipmentLevels } = career
   const gameCast = useMemo(
