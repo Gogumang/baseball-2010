@@ -8,6 +8,9 @@ import {
   HELP_PANEL_FULL_HEIGHT,
   HELP_PANEL_OPEN_HEIGHTS,
   RANKING_MENU_ITEMS,
+  helpPanelCloseHeightsFrom,
+  helpPanelHeightAfterCloseDraw,
+  helpPanelHeightAfterOpenDraw,
 } from '@/pages/help/lib/helpLayout'
 import { GAME_INQUIRY_CHAPTER } from '@/shared/config/helpSections'
 import { FRAME_SLIDE_BODY_FIRST_DRAW } from '@/widgets/screen-frame/lib/frameSlide'
@@ -56,6 +59,22 @@ describe('도움말 본문 (상태 7)', () => {
     expect(HELP_PANEL_OPEN_HEIGHTS).toEqual([32, 36, 52, 116])
     expect(HELP_PANEL_CLOSE_HEIGHTS).toEqual([212, 208, 192, 128])
     expect(HELP_PANEL_FULL_HEIGHT).toBe(BODY_PANEL.height)
+  })
+
+  it('CLR 은 연출 중에도 먹어 그때 높이 칸에서 걸음 1 로 다시 줄인다 (0x6385c · 0x6388a → 0x5938c~0x593a8, U-86)', () => {
+    // 다 열린 판은 예전 표 그대로
+    expect(helpPanelCloseHeightsFrom(HELP_PANEL_FULL_HEIGHT)).toEqual(HELP_PANEL_CLOSE_HEIGHTS)
+    // 닫는 중 192 를 그린 뒤 칸은 128 — 거기서 다시 누르면 128 → 124 → 108 → 44 → (−212 → 바닥 10, 끝)
+    expect(helpPanelHeightAfterCloseDraw(HELP_PANEL_CLOSE_HEIGHTS, 2)).toBe(128)
+    expect(helpPanelCloseHeightsFrom(128)).toEqual([128, 124, 108, 44])
+    // 끝(바닥 10)이 선 칸에서 다시 누르면 한 그림(10) 더 그리고 닫힌다
+    expect(helpPanelHeightAfterCloseDraw(HELP_PANEL_CLOSE_HEIGHTS, 3)).toBe(10)
+    expect(helpPanelCloseHeightsFrom(10)).toEqual([10])
+    // 여는 중(36 을 그린 뒤 칸 52)에 누르면 52 → 48 → 32
+    expect(helpPanelHeightAfterOpenDraw(1)).toBe(52)
+    expect(helpPanelCloseHeightsFrom(52)).toEqual([52, 48, 32])
+    // 본문 전(머리띠 미끄러짐)은 열기 칸 0x20 그대로
+    expect(helpPanelHeightAfterOpenDraw(-3)).toBe(32)
   })
 
   it('여는 때는 장 고르기 — 좌우가 장을 넘기고 0~5 를 돌며 되감는다 (0x638a0 · 0x638fe)', () => {
