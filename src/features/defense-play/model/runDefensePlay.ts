@@ -111,6 +111,7 @@ import { runCoverTick } from '@/features/defense-play/model/coverTick'
 import {
   FIELDER_ACTION,
   canStepNextListTick,
+  fielderSlackAtPlayEnd,
   isFreeToRetarget,
   isFreeToStep,
   isReadyToThrow,
@@ -990,6 +991,13 @@ export interface DefensePlayState {
   deferredThrowBase: number
   /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 (`passPlayGate`) — 한 그림에 서너 번 오른다(`passPlayGateBetweenTicks`) */
   endCounter: number
+  /** 판을 닫은 관문 다음 그림의 G1(3f0b8)이 열렸나 — 그 목록 틱 a1330 이 +0xcc 를 하나 더 줄인다(`fielderSlackAtPlayEnd`, r196) */
+  closingListTickOpen: boolean
+  /**
+   * 플레이 +0x13c[칸] — 마지막 예보 0xb12d0 이 아홉 칸에 같게 적은 움직임 허용(`CatchForecast.movable`, r196). 판 시작 예보는
+   * vt24(1)이라 참이고, 송구 예보 vt24(0)(b307c)는 악송구 · 원바운드(공+0xaac)거나 두 번째 패스로 갈 때만 참이다
+   */
+  forecastMovable: boolean
   /**
    * 이 틱 그림의 그리기 쪽 관문(0x46e3c, G3) — HOMERUN 글자가 이것을 본다. 판 시작 전 · 건너뛰기(+0xfe7) 중엔 null.
    * 틱 끝 G2 와 다를 수 있다 — +0x120 세기로 닫히는 판은 G3 이 열리고 그 뒤 G1 · G2 에서 닫힐 수 있다.
@@ -1319,6 +1327,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     deferredThrowReceiver: NONE,
     deferredThrowBase: NONE,
     endCounter: 0,
+    closingListTickOpen: false,
+    forecastMovable: forecast.movable,
     drawGateOpen: null,
     fastForward: false,
     lastEventCode: 0,
@@ -1940,6 +1950,8 @@ export function stepDefensePlay(
       slideUnlocked: state.specialDefense.slideUnlocked,
       chaseToLanding: landingChase,
     })
+    // b1376~b1398 · b189a — 움직임 허용 +0x13c 는 예보마다 다시 적힌다(AI 1 b4af6 이 본다, r196)
+    state.forecastMovable = forecast.movable
     // b188a — 송구 예보(a = 0)가 궤적 끝까지 못 줍고 두 번째 패스로 가면 그때의 +0x130(= 던진 야수, b307c 앞)의 +0xc0 = 4
     if (forecast.secondPassStarted && options.thrownSlot !== undefined) {
       const thrower = options.thrownSlot
@@ -2909,8 +2921,15 @@ export function stepDefensePlay(
         }
         // AI 1 b4aca~b4b5a — vtcc(b4ad2) · +0xe0 == 0(b4ae6) · 움직임 허용 +0x13c[칸](b4af6)이면 +0x127 && 낙구 틱 ≥ 공+0x68 은
         // 낙구점, 아니면 포구 틱(+0x174) 점의 (x, 0, z) 로 0xa100c(= vt14). 고리 안이라 같은 틱 끝 b4c72 의 커버 다시 고르기가
-        // 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐기 전(포구 틱 갈래가 앞선 1 절에서 쥔다)만 고친다
-        if (dispatchState === AI_STATE.CHASE && slot === chaserSlot && tick < catchTick && isFreeToRetarget(self)) {
+        // 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐기 전(포구 틱 갈래가 앞선 1 절에서 쥔다)만 고친다.
+        // +0x13c 는 마지막 예보가 적은 값이다(`forecastMovable`, r196 — 보통 송구를 받는 야수는 안 고친다)
+        if (
+          dispatchState === AI_STATE.CHASE &&
+          slot === chaserSlot &&
+          tick < catchTick &&
+          state.forecastMovable &&
+          isFreeToRetarget(self)
+        ) {
           const landingPoint = trajectory.pointAt(ballLandingTick)
           const chaseTarget =
             landingChase && ballLandingTick >= tick ? { x: landingPoint.x, y: 0, z: landingPoint.z } : catchPoint
@@ -3304,6 +3323,8 @@ export function stepDefensePlay(
     counterBeforeHead = gate.counterBeforeHead
     drawGateOpen = gate.drawOpen
     if (!gate.open) play = { ...play, finished: true }
+    // 닫힌 그림 다음의 G1 — 열렸으면 목록 틱 a1330 이 +0xcc 를 하나 더 줄인다(`fielderSlackAtPlayEnd`, r196)
+    if (!gate.open) state.closingListTickOpen = gate.listTickOpen === true
 
     // ── 9. 카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192 — `cameraFastForwardRunIn`) ──
     // 건너뛰는 동안 0x3f060 은 52b26(슬롯 2 뒤)에서 돈다 — 웹의 이 틱 6 절 이동 뒤 자리다
@@ -3473,8 +3494,13 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     specialDefense: state.specialDefense,
     laserThrow: state.laserThrow,
     laserOutFlag: state.laserOutFlag,
-    // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`)
-    scene: { ...state.scene, playCovers: state.play.coverOfBase },
+    // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`). 야수 +0xcc 도 — 파울 판(AI 0xf)의 4~5 를 다음 vt20(0) 판이
+    // 들고 연다(`DefenseScene.fielderSlack`, r196). 이 판은 vt20(1)(b2818)이라 0 으로 열었다
+    scene: {
+      ...state.scene,
+      playCovers: state.play.coverOfBase,
+      fielderSlack: fielderSlackAtPlayEnd(state.fielders, state.closingListTickOpen),
+    },
     rundowns: state.rundowns,
     rundownOuts: state.rundownOuts,
     // 진행기 주자 배열이 곧 원본 목록 순서다 — 0 = 타자주자, 그 뒤 찬 루 오름차순 (`createPlayRunners`)

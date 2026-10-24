@@ -38,11 +38,15 @@ import { baseUnderFoot, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/enti
 import { backupPointOf, CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import { baseAtPoint, claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
 import {
+  acceptsTargetVt14,
   canStepNextListTick,
+  fielderSlackAtPlayEnd,
   isFreeToRetarget,
   isFreeToStep,
   isReadyToThrow,
   listTickFielder,
+  placedAt,
+  withCarriedSlack,
   withCatchMotion,
   withFlyWaitPose,
   withPoseCleared,
@@ -305,15 +309,19 @@ function* pickoffPlaySteps(
 
   // ── 1. 시작 0xb28be ──
   const start = startPickoff(targetBase)
-  let fielders: readonly FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
+  // b28ca vt20(0) — b1144 가 +0xcc 쓰기(b1156)를 건너뛰어 앞 판이 남긴 값을 들고 연다(`DefenseScene.fielderSlack`, r196)
+  let fielders: readonly FielderState[] = withCarriedSlack(
+    createFielders(abilities, input.defenseTeamBonus ?? 0),
+    input.scene?.fielderSlack,
+  ).map((fielder) => {
     if (fielder.slot === PITCHER_SLOT) {
       return { ...fielder, holdingBall: true, aiState: start.pitcherAiState }
     }
     const goal = start.coverTargets.get(fielder.slot)
     if (goal === undefined) return fielder
-    // b2908~b2930: 야수(b + 1) 에 0xbef58(야수, 0xd86b0[b]) — 기반 캐릭터 "놓기"(위치 · 기준점 · 목표 +0x2c 를 그 점으로)라
-    // 커버는 판이 열리는 순간 **루 위에 서 있다**(걸어가는 것이 아니다)
-    return { ...fielder, position: goal, target: goal, targetBase: start.play.coverOfBase.indexOf(fielder.slot) }
+    // b2908~b2930: 야수(b + 1) 에 0xbef58(야수, 0xd86b0[b]) — 0xbee60(위치 · 구간 출발 = 그 점) 뒤 vt14(그 점)라
+    // 커버는 판이 열리는 순간 **루 위에 서 있다**(걸어가는 것이 아니다). 목표는 vt14 관문이 열릴 때만 그 점이다(`placedAt`, r196)
+    return placedAt(fielder, goal, start.play.coverOfBase.indexOf(fielder.slot))
   })
   // `manualThrowBase` 는 다리다(startPickoff 주석) — 웹 수비 판단 함수들이 사람 목표로 읽지 않게 지운다.
   // 대상 루는 이 함수의 `targetBase`(= state[0x27]) 가 들고 있다.
@@ -365,6 +373,8 @@ function* pickoffPlaySteps(
   let ballEventThisTick = false
   /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 */
   let endCounter = 0
+  /** 판을 닫은 관문 다음 그림의 G1 이 열렸나 (`fielderSlackAtPlayEnd`) */
+  let closingListTickOpen = false
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 결과 메시지 0xbba */
   let outJudgedThisTick = false
   /** 이번 틱 플레이 틱이 보낼 결과 메시지 0xbba 의 코드 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다(b4562 에서 한 번) */
@@ -464,7 +474,12 @@ function* pickoffPlaySteps(
     if (coverSlot === NONE) {
       // b2cc4 — 상태 6 · vt48(루) (r180 — 예전 웹은 AI 를 안 바꿨다)
       fielders = fielders.map((fielder) =>
-        fielder.slot === holderSlot ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY } : fielder,
+        // vt48 0xa0a18 → vt14 — 관문(잠금 · vtc8)이 막으면 목표는 그대로(`acceptsTargetVt14`, r196)
+        fielder.slot === holderSlot
+          ? acceptsTargetVt14(fielder)
+            ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY }
+            : { ...fielder, aiState: AI_STATE.CARRY }
+          : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
       return false
@@ -501,7 +516,10 @@ function* pickoffPlaySteps(
       deferredThrowBase = plan.base
       fielders = fielders.map((fielder) =>
         fielder.slot === holderSlot
-          ? { ...fielder, aiState: AI_STATE.RECEIVE, target: basePosition(plan.base), targetBase: wrapBase(plan.base) }
+          ? // b30d0 vt48(루) → vt14 — 관문이 막으면 목표는 그대로(r196)
+            acceptsTargetVt14(fielder)
+            ? { ...fielder, aiState: AI_STATE.RECEIVE, target: basePosition(plan.base), targetBase: wrapBase(plan.base) }
+            : { ...fielder, aiState: AI_STATE.RECEIVE }
           : fielder,
       )
       log.push(`${tick}틱 ${holderSlot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)`)
@@ -853,12 +871,15 @@ function* pickoffPlaySteps(
           }
         }
         // AI 1 b4aca~b4b5a — vtcc 이고 쥐지 않았으면(+0xe0, b4ae6) 포구 지점(x, 0, z)으로 0xa100c(= vt14). 고리 안이라 같은 틱 끝
-        // b4c72 의 커버 다시 고르기가 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐면 `chase` 가 비어 안 고친다
+        // b4c72 의 커버 다시 고르기가 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐면 `chase` 가 비어 안 고친다.
+        // b4af6 — 움직임 허용 +0x13c[칸](마지막 예보가 적은 값, `LooseBallChase.movable`)이 0 이면 안 고친다: 보통 송구(a = 0 ·
+        // 공+0xaac == 0)를 받는 야수는 두 번째 패스가 아니면 고르기 0xb3b38 이 준 목표 그대로다(r196)
         const chased = chase
         if (
           self.aiState === AI_STATE.CHASE &&
           chased !== null &&
           chased.slot === slot &&
+          chased.movable !== false &&
           isFreeToRetarget(self) &&
           !isSamePoint(self.target, chased.catchPoint)
         ) {
@@ -1072,6 +1093,8 @@ function* pickoffPlaySteps(
     )
     endCounter = gate.endCounter
     if (!gate.open) play = { ...play, finished: true }
+    // 닫힌 그림 다음의 G1 — 열렸으면 목록 틱 a1330 이 +0xcc 를 하나 더 줄인다(`fielderSlackAtPlayEnd`, r196)
+    if (!gate.open) closingListTickOpen = gate.listTickOpen === true
     // G2 만 닫힌 그림 — 다음 그림의 목록 틱(이동 · 야수 준비 틱 줄이기)과 카메라는 돌고 슬롯 2 는 빠진 채 그려진다
     // (`DefenseViewState.closingListFrame`, 타구 진행기 10 절과 같다)
     if (!gate.open && gate.listTickOpen === true) {
@@ -1103,7 +1126,8 @@ function* pickoffPlaySteps(
     laserThrow: false,
     laserOutFlag,
     // 플레이 객체 +0xf0 은 다음 판으로 남는다(`DefenseScene.playCovers`, r171)
-    scene: { ...scene, playCovers: play.coverOfBase },
+    // 야수 +0xcc 도 다음 판으로 남는다 — vt20(0) 판이 들고 연다(`DefenseScene.fielderSlack`, r196)
+    scene: { ...scene, playCovers: play.coverOfBase, fielderSlack: fielderSlackAtPlayEnd(fielders, closingListTickOpen) },
     rundowns: 0,
     rundownOuts: 0,
     // 목록 = 찬 루 오름차순, 타자주자 없음 (종류 4 — 위 "상태 0x17 진입" 주석)

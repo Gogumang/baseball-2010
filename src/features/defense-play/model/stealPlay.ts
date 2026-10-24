@@ -14,6 +14,7 @@ import {
 } from '@/entities/fielding/model/fieldingState'
 import { PICKOFF_COVER_OF_BASE } from '@/entities/fielding/model/pickoff'
 import { CATCHER_BALL_POINT, runCoverTick, runnerPlayBallInput } from '@/features/defense-play/model/coverTick'
+import { placedAt, withCarriedSlack } from '@/entities/fielding/model/fielderPose'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { STEAL_PLAY_KIND, stealTargetBaseOf, type StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -71,12 +72,21 @@ import {
  *   **판정(r190 — 직접 뜬 것)**: 남는다. 야수는 경기 장면 초기화 0x3e340 이 한 번 만들어(생성자 a0df0 +0xcc = 0) 판마다 다시 쓰고,
  *   +0xcc 쓰기는 a0df0 · vt8c a0ee0 · vt20 의 b1156 · 목록 틱 a1330(−1) 넷뿐이다(b0fa6 이 든 0xb0f88 은 부르는 곳이 없다 — `adds #0xcc`
  *   전수). 목록 틱은 0x3f060 이 관문 0xb0d28 이 열리고 상태 0x17 일 때만 돈다(3f0b8~3f0da) — 판 사이(정산 · 다음 투구)에는 안 줄어든다.
- *   AI 0xf 는 사건 7 · 12 를 받은 틱부터 판 끝까지 고리마다 5 를 다시 적으므로 파울 판이 닫힐 때 4(마지막 그림의 G1 이 열려 목록 틱이
- *   돌고 G2 에서 닫힘) 또는 5 가 남는다. 다음 판이 vt20(0)인 폭투 · 포일 0xb284a(b2856) · 견제 0xb28be(b28ca) · 도루 0xb2950(b295e) ·
- *   밀어내기(종류 2 · 3) 0xb288c(b2898)이면 b1144 가 b1156 을 건너뛰어 그 값으로 열린다 — 첫 4~5 목록 틱은 vtc8 이 닫혀 아무도 안 걷고(지우기 vt10 이
- *   목표 = 위치), vt14 · vtcc 를 거치는 목표 고치기가 막히며, 판 시작 예보 vt24 의 복제도 그 값을 들고 돈다. 타구 판은 vt20(1)이라 지운다.
- *   ⚠️ 웹 미반영: 진행기는 판 사이 야수 칸을 넘겨받지 않는다(경기 흐름 세 곳의 배선이 필요). 판 시작 +0xcc = 4 를 넣어 잰 값(씨앗 1 ·
- *   777 · 4242): 폭투 1080 판 중 결과 18 · 굴림 수 18 · 로그 1080(포수가 5 틱 늦게 쥔다), 도루 1080 · 견제 270 판은 그림만 바뀐다.
+ *   AI 0xf 는 사건 7 · 12 를 받은 틱부터 판 끝까지 고리마다 5 를 다시 적는다. 판이 닫힐 때 남는 값은 마지막 그림의 관문 차례로
+ *   갈린다(r196 — 직접 뜬 것): 한 그림은 G1(0x3f060 3f0b8 — 열리면 목록 틱 a1330 이 하나 줄인다) → G2(슬롯 2 52502 — 열리면 AI 고리가
+ *   5 를 다시 적는다) → G3(그리기 46e3a) → G4(0x3f378 3f3b2 — 열리면 3f3c6 0xa2594 가 공+0x68 을 올린다) 차례이고, 관문 0xb0d28 의
+ *   파울 갈래(+0x110 — b0d3a~b0db2)는 공 칸(멈춤 · aa0/aa4/+0x68 · z · 각)만 본다. 공은 G4 뒤에만 나아가므로 같은 그림의 G1 · G2 는
+ *   늘 같은 답이다 — 파울 판은 **5** 가 남는다(웹 표: 사건 7 판 모드마다 1536 — 씨앗 둘, 키스톤 자리 잡기로 AI 0xa 가 된 한 칸만 0~2).
+ *   폴 홈런(12)은 홈런 갈래가 목록 틱이 옮긴 주자(0xaa05c · 0xa990c)를 봐 G1 열림 · G2 닫힘이면 **4** 다(`fielderSlackAtPlayEnd`).
+ *   다음 판이 vt20(0)인 폭투 · 포일 0xb284a(b2856) · 견제 0xb28be(b28ca) · 도루 0xb2950(b295e) · 밀어내기(종류 2 · 3) 0xb288c(b2898)이면
+ *   b1144 가 b1156 을 건너뛰어 그 값으로 열린다 — 첫 4~5 목록 틱은 vtc8 이 닫혀 아무도 안 걷고(지우기 vt10 이 목표 = 위치), vt14 를
+ *   거치는 목표 고치기(판 시작 0xbef58 · 커버 b25b6 · vt48)가 막히며, 판 시작 예보 vt24 의 복제와 vtc0(도착 틱 + +0xcc)도 그 값을
+ *   들고 돈다. 타구 판은 vt20(1)이라 지운다.
+ *   **웹 반영(r196)**: 진행기는 끝날 때 제 +0xcc 를 `DefenseScene.fielderSlack` 에 적고, vt20(0) 판이 그것을 들고 연다 — 경기 흐름
+ *   셋(타자편 · 투수편 · 팀 경기)은 이미 판마다 수비 장면을 넘긴다. 이어하기는 장면을 새로 열어 0 부터다(저장 블록에 야수가 없다).
+ *   표(씨앗 1 · 777, +0xcc = 5 를 들고 연 판 ↔ 0): 도루 144 판 중 결과 24(1 · 3루 1루 도루 — vtc0 가 늦어 3루 주자가 판 시작 자동
+ *   진루로 홈에 뛰어 태그) · 굴림 수 6, 견제 144 판은 그림만, 폭투 1440 판은 로그 전부(포수 · 줍는 야수가 늦게 쥔다) · 결과 174 ·
+ *   굴림 수 12, 밀어내기 48 판은 그대로.
  *
  * ## 판정
  * - 송구 판단·도착·아웃·세이프는 `runnerPlayEngine` (+0x160 b4660 / 0xafa60 → 0xb2c90 · 0xb36d0 · 0xb4292).
@@ -212,15 +222,17 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
   const covers = [...PICKOFF_COVER_OF_BASE]
 
   // ── b297a: 야수 1~4 를 제 루로(위치 · 목표 = 루 좌표) · 커버 = 루 + 1 — 홈은 b23a4 가 포수로 되돌려 표 그대로(머리말) ──
-  const fielders: FielderState[] = createFielders(abilities, input.defenseTeamBonus ?? 0).map((fielder) => {
+  // b295e vt20(0) — b1144 가 +0xcc 쓰기(b1156)를 건너뛰어 앞 판이 남긴 값을 들고 연다(`DefenseScene.fielderSlack`, r196)
+  const fielders: FielderState[] = withCarriedSlack(
+    createFielders(abilities, input.defenseTeamBonus ?? 0),
+    input.scene?.fielderSlack,
+  ).map((fielder) => {
     const base = covers.indexOf(fielder.slot)
     if (base < 0) return fielder
     return {
-      ...fielder,
-      // 0xbef58 = 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 루 좌표) → vt14(루 좌표) — 판이 열리는 순간 **루 위에 서 있다**
-      position: basePosition(base),
-      target: basePosition(base),
-      targetBase: base,
+      // 0xbef58 = 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 루 좌표) → vt14(루 좌표) — 판이 열리는 순간 **루 위에 서 있다**.
+      // 목표는 vt14 관문이 열릴 때만 루 좌표다(+0xcc 가 남은 판은 시작 자리 — `placedAt`, r196)
+      ...placedAt(fielder, basePosition(base), base),
       // b2564 가 커버 1·2·3루 야수에게 AI 루 + 2 · 포수는 고르기 0xb3b38 의 b3e54 가 AI 1(쫓기 — 쥐고 있어 안 움직인다)
       aiState: fielder.slot === CATCHER_SLOT ? AI_STATE.CHASE : AI_STATE.COVER_HOME + base,
       // b29d4·b29de: 포수가 공을 쥐고(0xb2710 → 야수+0xe0 = 1) 준비 틱은 0 (vt88(0) → +0xc8 = 0)

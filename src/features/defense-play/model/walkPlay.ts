@@ -9,6 +9,7 @@ import {
   type PlayView,
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
+import { withCarriedSlack } from '@/entities/fielding/model/fielderPose'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -180,8 +181,9 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
 
   const result = runRunnerPlay({
     kind: WALK_PLAY_KIND,
-    // vt20(0) — 야수는 시작 자리, 아무도 손에 안 쥠(+0xe0 = 0)
-    fielders: createFielders(abilities, input.defenseTeamBonus ?? 0),
+    // b2898 vt20(0) — 야수는 시작 자리, 아무도 손에 안 쥠(+0xe0 = 0). b1144 가 +0xcc 쓰기(b1156)를 건너뛰어 앞 판이 남긴
+    // 값을 들고 연다(`DefenseScene.fielderSlack`, r196)
+    fielders: withCarriedSlack(createFielders(abilities, input.defenseTeamBonus ?? 0), input.scene?.fielderSlack),
     play,
     runners,
     abilities,
