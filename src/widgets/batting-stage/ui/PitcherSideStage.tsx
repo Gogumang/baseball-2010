@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -31,6 +31,8 @@ import { emitParticles } from '@/entities/particle/model/particleScene'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { KEY_OK, originalKeyCodeOf } from '@/features/play-pitcher-game/model/pitchAim'
 import { SCENE_STATE, markSceneStateEntries, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
@@ -159,10 +161,20 @@ interface PitcherSideStageProps {
  * 필살 남은 횟수(0x38a30)는 사람 수비면 원본도 안 그린다(38a42).
  * CPU 타자는 `cpuSwing` 의 스윙 프레임에 닿은 틱부터 스윙(번트면 번트) 자세다.
  */
+/** 큰 타구 건너뛰기 상황 버튼 — OK(Enter) */
+const HIT_SKIP_OFFER: TouchKeyOffer = { key: 'Enter', label: '넘기기' }
+
 export function PitcherSideStage(props: PitcherSideStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestRef = useRef(props)
   latestRef.current = props
+  /**
+   * 터치 기기 — 큰 타구 0x13 을 OK 로 건너뛸 수 있는 동안(아래 `onKeyDown` 과 같은 조건)만 '넘기기' 상황 버튼을 띄운다. 타자편은 캔버스
+   * 탭이 OK 지만 투수편 캔버스는 탭을 안 받는다(r186 — 늘 있던 확인 버튼을 걷었다). 버튼은 Enter 키 사건이라 키보드와 같은 길이다
+   */
+  const [offersHitSkip, setOffersHitSkip] = useState(false)
+  const setOffersHitSkipRef = useRef(setOffersHitSkip)
+  useTouchKeyOffer(offersHitSkip ? HIT_SKIP_OFFER : null)
 
   // 지금 타자의 장비 겹 그림(타석 교대 0x47cc8 47e80 → 0x78fd8) — 경기 진입 때 받은 목록이 놓친 타자(대타 · 굴린 장비)를 잡는다.
   // 아무도 안 기다린다 (타자편 `useStageCastPreload` 와 같다)
@@ -226,6 +238,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let hitSparkShot = false
     let hitStopShot = false
     let hitEndNotified = false
+    /** '넘기기' 상황 버튼을 알린 상태 — 바뀔 때만 React 에 알린다 */
+    let hitSkipOffered = false
     /** 판정 틀에 고른 0x49aec 그림 갈래(필살 스윙)와 타격점 — 맞은 틀 · 0x13 그림마다 그린다. 없으면 null */
     let hitSpecialEffect: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null = null
     /** 마구 공 파티클(0x3b2f4 3b496)을 마지막으로 쏜 장면 틱 — 그림(장면 틱) 하나에 한 번 */
@@ -396,6 +410,12 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           hitEndNotified = true
           current.onHitSceneEnd?.()
         }
+      }
+      const canSkipNow = hitBase !== null && keyHitTick !== null && !hitEndNotified && hitSkipTick === null &&
+        canSkipHitPause(hitBase.watchesBigHit)
+      if (canSkipNow !== hitSkipOffered) {
+        hitSkipOffered = canSkipNow
+        setOffersHitSkipRef.current(canSkipNow)
       }
       // 0x11 그림의 마구 공 파티클 — 공 그리기 0x3b2f4 3b496~3b62c(구질 22 · 투수 레코드 +0x18, `magicBallParticlesOf`). 0x11 그림마다
       // 공 틱 [+0x1098](0 ~ N − 1 로 자른 점 0x35854)에 쏜다 — 타자편 `useStageAnimation` 과 같은 셈. 그림 한 번 = 장면 틱 하나.

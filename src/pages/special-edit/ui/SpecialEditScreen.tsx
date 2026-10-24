@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { skinNameBarsValue } from '@/shared/lib/skinNameBars/skinNameBars'
 import { MarkupText, RawScreen } from '@/shared/ui'
@@ -302,6 +304,10 @@ interface EditNamePopupProps {
   readonly onCancel: () => void
 }
 
+/** 이름 창 확정 — OK(Enter) · 지우기/취소 — CLR(Escape) */
+const EDIT_NAME_CONFIRM_OFFER: TouchKeyOffer = { key: 'Enter', label: '확정' }
+const EDIT_NAME_CLEAR_OFFER: TouchKeyOffer = { key: 'Escape', label: '지우기·취소' }
+
 /**
  * **이름 입력 창** — 팝업 0x741a1(popup, 0x6e, 그리기·확인 0x32b7d, 키 0x32b5d) · 입력기 켜기 0x54145(skin, 3 한글, 8 바이트, 1, 1).
  * 켜기가 버퍼를 비우므로(0x670d5) 늘 빈 칸으로 열린다.
@@ -366,6 +372,10 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
   }, [])
 
   const isOpening = motion.openingHeight !== null
+  // 터치 기기 — 창 그림에 소프트키 글자가 없어 OK(확정) · CLR(지우기, 비면 취소)을 상황 버튼으로 낸다(r186 — 늘 있던 확인 · 뒤로 버튼을
+  // 걷었다). 버튼은 누르는 동안 초점을 안 빼앗아 키 사건이 입력칸으로 가고, 위 잡기 단계 듣는 곳이 받는다
+  useTouchKeyOffer(isOpening ? null : EDIT_NAME_CONFIRM_OFFER)
+  useTouchKeyOffer(isOpening ? null : EDIT_NAME_CLEAR_OFFER)
   // 펼치는 동안 칸은 visibility: hidden 이라 autoFocus 가 초점을 못 잡는다 — 다 펼쳐진 그 그림에 초점을 준다
   // (안 그러면 키보드 · 화면 자판 글자가 칸에 안 들어간다)
   const fieldRef = useRef<HTMLInputElement>(null)

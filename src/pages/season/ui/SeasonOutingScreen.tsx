@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { MAP_FRAMES, OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
@@ -26,6 +27,9 @@ export interface SeasonOutingScreenProps {
   /** 취소(−16) — 관리 메뉴(0xc9)로 되돌아간다 */
   readonly onBack: () => void
 }
+
+/** CLR 누름 칸 — 나리 외출 지도의 "취소" 칸과 같은 자리 */
+const SEASON_OUTING_CANCEL_PRESS_RECT = { x: 198, y: 307, width: 41, height: 12 } as const
 
 /**
  * 시즌 외출 지도 (장면 0x105 상태 **0xd1**, 진입 0xbd24 · 키 **0xbf50** · 그리기 0xa04c).
@@ -101,6 +105,11 @@ export function SeasonOutingScreen({ state, cursor, onCursorChange, onRun, onBac
           )
         })}
       </div>
+      {/*
+        CLR — 지도 그림 0xa04c 에는 소프트키 글자가 없다. 나리 외출 지도(112, `pages/outing-map` 의 투명 "취소" 칸)와 같은 자리
+        (198, 307, 41×12)에 웹 전용 누름 칸을 둔다(r186 — 늘 있던 뒤로 버튼을 걷었다). 키와 같은 길(위 듣는 곳)
+      */}
+      {isEnabled && <PressArea label="취소" rect={SEASON_OUTING_CANCEL_PRESS_RECT} onPress={() => tapKey('Escape')} />}
 
       {notice !== null && (
         <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />

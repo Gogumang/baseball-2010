@@ -9,6 +9,8 @@ import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/scene
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import { useInPlayTouchKeys } from '@/features/defense-play/model/inPlayTouchKeys'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import {
   acceptsFastForwardKey,
   defensePlayResultOf,
@@ -615,6 +617,11 @@ function RecordedPlayback({
     <DefenseScreen state={state} grassPalette={grassPalette} cameraOffsetRef={cameraOffsetRef} drawRedraws={redraws}>
       {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
       <DefenseParticles scene={particles.run.scene} version={particles.run.version} />
+      {/*
+        밀어내기 판은 원본이 아는 키 아무것이나 받아 넘긴다(0x519cc) — 화면에 그 글자는 없어 판 전체를 OK 누름 칸으로(웹 전용,
+        r186 — 늘 있던 확인 버튼을 걷었다). 키와 같은 길(keydown → 위 듣는 곳)로 들어간다
+      */}
+      {freePassPlay && <PressArea label="넘기기" onPress={() => tapKey('Enter')} />}
       {children}
     </DefenseScreen>
   )

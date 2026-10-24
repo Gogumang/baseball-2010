@@ -138,13 +138,30 @@ describe('도움말 본문 (상태 7)', () => {
     expect(onBack).toHaveBeenCalledOnce()
   })
 
-  it('바닥띠 되돌아가기를 누르면 메인 메뉴로 나간다 (바닥 비트 0x4)', () => {
-    const onBack = vi.fn()
-    띄우기({ onBack, gamePoint: 0 })
+  it('바닥띠 되돌아가기는 CLR 그대로 — 쪽 보기면 장 고르기로, 장 고르기면 닫기 연출 뒤 메인 메뉴로 (바닥 비트 0x4, r186)', () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout'] })
+    try {
+      const onBack = vi.fn()
+      띄우기({ onBack, gamePoint: 0 })
+      act(() => {
+        vi.advanceTimersByTime(62 * (FRAME_SLIDE_BODY_FIRST_DRAW + 6))
+      })
 
-    fireEvent.click(칸('되돌아가기'))
+      fireEvent.keyDown(window, { key: 'Enter' })
+      fireEvent.click(칸('되돌아가기'))
+      expect(onBack).not.toHaveBeenCalled()
+      // 다시 장 고르기라 좌우가 장을 넘긴다
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      expect(screen.getByText('<일반모드에 대하여>')).toBeTruthy()
 
-    expect(onBack).toHaveBeenCalled()
+      fireEvent.click(칸('되돌아가기'))
+      act(() => {
+        vi.advanceTimersByTime(62 * (FRAME_SLIDE_BODY_FIRST_DRAW + 6))
+      })
+      expect(onBack).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -166,8 +183,7 @@ describe('머리띠 0x54d95(skin, 0, 5) — 도움말(상태 7) 그리기 0x2fc8
     expect(srcs).toContain('./sprites/game_frame/003.png')
     expect(srcs).toContain('./sprites/gpoint/003.png')
     expect(srcs).toContain('./sprites/gpoint/005.png')
-    fireEvent.click(칸('되돌아가기'))
-    expect(onBack).toHaveBeenCalledOnce()
+    expect(칸('되돌아가기')).toBeTruthy()
   })
 
   it('G 를 안 넘기면(경기 중 [조작방법]) 머리띠·바닥띠가 없다 — 0x3cdd0 갈래 4 는 뷰어 0x639a5 만 그린다', () => {

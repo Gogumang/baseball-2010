@@ -10,11 +10,6 @@ export interface TouchKey {
   readonly code: string
 }
 
-/** 확인 — 원본 OK(가운데 키). 화면들은 Enter 를 OK 로 읽는다(타석 스윙 · 구질 칸 0 · 조준 확정 · 게이지 누름 …) */
-export const OK_KEY: TouchKey = { key: 'Enter', code: 'Enter' }
-/** 뒤로 — 원본 CLR. 화면들은 Escape 를 CLR 로 가장 널리 받는다(`Backspace` 만 받는 곳도 Escape 를 함께 읽는다) */
-export const CLEAR_KEY: TouchKey = { key: 'Escape', code: 'Escape' }
-
 const CODE_OF: Readonly<Record<string, string>> = {
   '*': 'NumpadMultiply',
   '#': 'Digit3',

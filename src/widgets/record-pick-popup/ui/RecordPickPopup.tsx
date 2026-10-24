@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { MarkupText } from '@/shared/ui'
+import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea } from '@/shared/ui'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import type { PopupCloseKind } from '@/shared/lib/commonWindow/popupWindow'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
@@ -171,6 +172,10 @@ export function RecordPickPopup({
           </button>
         )
       })}
+      {/* CLR — 창 아래 106 화면이 그대로 그리는 바닥띠 되돌아가기 표시 자리(웹 전용 누름 칸, r186). 키와 같은 길(위 듣는 곳) */}
+      <div style={{ pointerEvents: 'auto' }}>
+        <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />
+      </div>
       </>)}
     </div>
   )

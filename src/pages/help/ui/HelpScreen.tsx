@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CommonPanel, InsetBox, PressArea, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
-import { SCROLL_DOWN_OFFER, SCROLL_UP_OFFER, tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { SCROLL_DOWN_OFFER, SCROLL_UP_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
@@ -75,6 +76,9 @@ const viewerKeyOf = (key: string): HelpViewerKey | null => {
     default: return null
   }
 }
+
+/** 장 고르기 → 쪽 보기 — OK(Enter) */
+const HELP_OPEN_PAGE_OFFER: TouchKeyOffer = { key: 'Enter', label: '쪽 보기' }
 
 /**
  * StrHOWTO 뷰어 — 메인 메뉴 **상태 7** [도움말]·상태 10 [게임문의]·경기 중 메뉴 [조작방법](하위 4) 이 함께 쓴다
@@ -165,6 +169,9 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
       return next === '닫기' ? previous : { ...next, isChoosingChapter: previous.isChoosingChapter }
     })
   }
+  // 터치 기기 — 장 고르기의 OK(쪽 보기로)는 원본 그림에 글자 자리가 없어 '쪽 보기' 상황 버튼으로 낸다(r186 — 늘 있던 확인 버튼을
+  // 걷었다). 버튼은 Enter 키 사건이라 아래 듣는 곳(0x637d0)과 같은 길이다
+  useTouchKeyOffer(viewer.isChoosingChapter && isBodyShown && closingStep === null ? HELP_OPEN_PAGE_OFFER : null)
   const movePage = (step: number) => moveBy(false, step)
   const moveSection = (step: number) => moveBy(true, step)
 
@@ -406,7 +413,9 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
         </button>
       ) : (
         // 7 · 10 들어옴 0x2668c → 뷰어 열기 0x63688 이 미끄러짐을 세운다 (63728~63730, r168 정정 — 예전엔 false)
-        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />
+        // 되돌아가기 표시는 CLR 키 그대로(r186) — 쪽 보기면 장 고르기로, 장 고르기면 닫기 연출 뒤 닫는다(위 듣는 곳 0x637d0).
+        // 예전에는 onBack 을 바로 불러 쪽 보기에서도 도움말이 통째로 닫혔다
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={() => tapKey('Escape')} />
       )}
     </>
   )

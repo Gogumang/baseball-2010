@@ -195,9 +195,12 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
         </filter>
       </svg>
 
-      {notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-      )}
+      {/* 알림의 [확인] 클릭이 창 바깥 클릭(닫기)으로 번지지 않게 막는다 — 키(Enter)처럼 알림만 닫힌다 (SkillWindow 와 같다, r186) */}
+      <div onClick={(event) => event.stopPropagation()}>
+        {notice !== null && (
+          <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
+        )}
+      </div>
     </div>
   )
 }
