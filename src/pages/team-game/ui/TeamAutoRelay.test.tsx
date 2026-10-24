@@ -67,6 +67,8 @@ const 띄우기 = () => {
   vi.useFakeTimers()
   render(<TeamGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={vi.fn()} onQuit={vi.fn()} />)
   fireEvent.keyDown(window, { key: 'Enter' })
+  // 인트로 키 0x39b54 는 받은 다음 틀의 상태 키 자리에서 돈다(`sceneKeyLatch`)
+  흘리기(1)
 }
 
 describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 · 그리기 0x4258c · 키 0x3e25c)', () => {

@@ -19,18 +19,24 @@ describe('경기 끝 결과 판 (상태 0x18 경기 끝 가지)', () => {
     expect(screen.getByAltText('세이브')).toBeTruthy()
   })
 
-  it('처음 10틱(0~9)은 OK 가 먹지 않고 틱 10 부터 정산으로 간다 (경기+0x32 = 틱 ≤ 9)', () => {
+  it('키 자리의 상태 틱 0~9 에 처리된 OK 는 먹지 않고 틱 10 부터 정산으로 간다 (경기+0x32 = 틱 ≤ 9 · 다음 틀 0xbc9c8 이 예약을 되돌림)', () => {
     vi.useFakeTimers()
     const onConfirm = vi.fn()
     render(<GameEndBoard side0Score={0} side1Score={1} names={[null, null, null]} onConfirm={onConfirm} />)
 
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
+    // 틱 8 에 받은 OK — 틱 9 의 키 자리에서 처리되어 버려진다
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 8))
     fireEvent.keyDown(window, { key: 'Enter' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onConfirm).not.toHaveBeenCalled()
 
+    // 틱 9 에 받은 OK — 받은 틀에는 아무 일 없고 틱 10 의 키 자리에서 정산으로
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onConfirm).not.toHaveBeenCalled()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
     fireEvent.keyDown(window, { key: '5' })
-    fireEvent.keyDown(window, { key: '5' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
@@ -127,13 +133,17 @@ describe('OK 를 대신하는 투명 눌림 칸 (웹 전용)', () => {
     expect(onConfirm).not.toHaveBeenCalled()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
-  it('교대 판은 누르면 곧 넘어간다', () => {
+  it('교대 판은 누르면 다음 틀에 넘어간다 (잠금 없음)', () => {
+    vi.useFakeTimers()
     const onConfirm = vi.fn()
     render(<HalfInningBoard inning={1} half="초" onConfirm={onConfirm} />)
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(onConfirm).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 })

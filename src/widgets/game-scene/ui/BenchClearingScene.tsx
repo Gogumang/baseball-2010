@@ -25,6 +25,7 @@ import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 interface BenchClearingSceneProps {
   /** 운동장 18명 — 안 주면 바탕을 안 그린다(검정) */
@@ -55,7 +56,7 @@ interface BenchClearingSceneProps {
  *   타자는 마운드로, 틱 60 에 더그아웃으로)을 그리기 목록 차례로. 글 · 효과음 없음.
  * - 틱 100: 화면 전환 종류 7(원 닫기, `benchClearingIrisOf`) — 단계 32 를 그린 다음 갱신(틱 133)에서 소리 멈춤(0x6e418) 뒤 나간다.
  *   그림은 0xbd5bc 그대로 — 화면 전체 검정에 지름 240/단계 원 구멍을 뚫는다(`lib/irisClose`, `IrisCloseCanvas`).
- * - OK(−5)·'5'(0x40628): 소리 멈춤 · 입자 지움 · 같은 출구 — 건너뛰기. 웹은 Enter·Space 도 받는다.
+ * - OK(−5)·'5'(0x40628): 소리 멈춤 · 입자 지움 · 같은 출구 — 건너뛰기. 받은 다음 틀의 키 자리(갱신 앞)에서 돈다. 웹은 Enter·Space 도 받는다.
  *
  * 0x6e418 은 울리는 소리를 가리지 않고 끊는다(`SoundPort.stop`) — 44 가 아직 울리면 그것을 끊는다.
  * 화면을 누르는 투명 칸(`OkTapArea`)은 웹 전용이다(원본은 OK 키).
@@ -88,6 +89,11 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
     finish()
   }
 
+  /**
+   * 받은 키 칸 — 키 0x40628 은 받은 다음 틀의 52da2~ 상태 키 자리(52de8)에서 갱신 표(52e14 — 틱 10 의 목표 굴림)보다 먼저 돈다
+   * (`sceneKeyLatch`). 그래서 틱 10 머리에 처리된 건너뛰기는 목표 굴림 8 번을 안 낸다
+   */
+  const keyLatch = useSceneKeyLatchOwner()
   const tick = useSceneTick((next) => {
     if (doneRef.current) return
     if (next === BENCH_CLEARING_TARGET_TICK) {
@@ -96,7 +102,7 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
       if (randomRef.current !== undefined) targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
     }
     if (next >= BENCH_CLEARING_EXIT_TICK) finish()
-  })
+  }, true, false, keyLatch)
 
   // 진입 꼬리 0x3aba4 — 0x6e498(음, 0x2c, 0)
   useEffect(() => {
@@ -109,7 +115,7 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !isOkKey(event.key)) return
       event.preventDefault()
-      skip()
+      keyLatch.push(skip)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -134,7 +140,7 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
         />
       )}
       {iris !== null && <IrisCloseCanvas x={iris.x} y={iris.y} size={iris.size} />}
-      <OkTapArea onTap={skip} />
+      <OkTapArea onTap={() => keyLatch.push(skip)} />
     </RawScreen>
   )
 }

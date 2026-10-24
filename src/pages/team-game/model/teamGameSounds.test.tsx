@@ -46,6 +46,8 @@ const 판닫기 = () => {
   for (let 번 = 0; 번 < 2; 번 += 1) {
     if (screen.queryByRole('button', { name: '메뉴' }) !== null) return
     fireEvent.keyDown(window, { key: 'Enter' })
+    // 키는 받은 다음 틀의 키 자리에서 처리된다(`sceneKeyLatch`)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
   }
 }
 
@@ -236,6 +238,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
     // 상태 0xe 의 OK — 교체 창은 OK 뒤(0xf)에 열린다
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
     fireEvent.keyDown(window, { key: 'Enter' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     녹음.played.length = 0
 
     fireEvent.click(screen.getByRole('button', { name: '# 교체' }))
@@ -247,6 +250,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
   })
 
   it('경기 중 메뉴(*)에서는 22 가 안 난다 — 0x3c158 은 22 를 안 튼다', () => {
+    vi.useFakeTimers()
     const { unmount } = render(
       <TeamGameScreen
         options={기본옵션}
@@ -259,9 +263,12 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
     녹음.played.length = 0
 
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
 
+    expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
     expect(녹음.played).not.toContain(PITCHER_CHANGE_SOUND)
     unmount()
+    vi.useRealTimers()
   })
 })
 

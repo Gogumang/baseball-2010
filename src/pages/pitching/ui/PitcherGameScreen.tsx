@@ -303,11 +303,11 @@ function PitcherGameScene({
       // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
       if (overlay === '조작방법') return
       event.preventDefault()
-      menu.toggle()
+      menu.pressStar()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isSceneShowing, menu.toggle, overlay])
+  }, [isSceneShowing, menu.pressStar, overlay])
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
@@ -468,16 +468,24 @@ function PitcherGameScene({
     progress.managerHookText === null &&
     visibleBurstLines === null &&
     (isAwaitingConfirm ? sceneConfirm.isInConfirmState : phase === '구질')
+  const acceptsGiveUpKeyRef = useRef(acceptsGiveUpKey)
+  acceptsGiveUpKeyRef.current = acceptsGiveUpKey
+  /** '#' 는 장면 키 칸에 든다 — 받은 다음 틀의 키 0x498d4(4994a)가 그 틀의 상태(0xe · 0xf)를 보고 물음을 띄운다 */
+  const pressGiveUp = useCallback(() => {
+    pushSceneKey(() => {
+      if (acceptsGiveUpKeyRef.current) setAsksGiveUp(true)
+    })
+  }, [])
   useEffect(() => {
     if (!acceptsGiveUpKey) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.key !== '#') return
       event.preventDefault()
-      setAsksGiveUp(true)
+      pressGiveUp()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [acceptsGiveUpKey])
+  }, [acceptsGiveUpKey, pressGiveUp])
 
   const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
     if (slot === null) return
@@ -1007,8 +1015,8 @@ function PitcherGameScene({
         */}
         {acceptsMenuKey && (
           <PressLayer testId="소프트키 누름 칸" isOnTop>
-            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
-            {acceptsGiveUpKey && <PressArea rect={TIME_PRESS_RECT} label="# 강판" onPress={() => setAsksGiveUp(true)} />}
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar} />
+            {acceptsGiveUpKey && <PressArea rect={TIME_PRESS_RECT} label="# 강판" onPress={pressGiveUp} />}
           </PressLayer>
         )}
 

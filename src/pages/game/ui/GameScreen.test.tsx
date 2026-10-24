@@ -155,14 +155,19 @@ describe('1회초 판 (상태 0x18) — 선공·1번 타자', () => {
   const 선공1번 = () => startGame(createSeededRandom(3), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
 
   it('판이 먼저 서서 OK 를 기다리고, 그 동안 메뉴 키가 안 먹는다 — OK 뒤 타석', () => {
+    vi.useFakeTimers()
     띄우기({ progress: 선공1번() })
     expect(screen.getByTestId('교대-판-1회초')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '메뉴' })).toBeNull()
     fireEvent.keyDown(window, { key: '*' })
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(screen.queryByRole('option', { name: '게임방법' })).toBeNull()
 
+    // OK 는 받은 다음 틀의 키 0x498d4 가 처리한다(`sceneKeyLatch`)
     fireEvent.keyDown(window, { key: '5' })
+    act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(screen.getByRole('button', { name: '메뉴' })).toBeTruthy()
+    vi.useRealTimers()
   })
 
   it('첫 공이 나간 뒤(수비 재생으로 화면이 다시 올라와도) 판이 다시 서지 않는다', () => {

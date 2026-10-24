@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
@@ -24,6 +25,7 @@ const { staminaPercentOf } = await import('@/entities/pitcher-career/model/pitch
 afterEach(() => {
   cleanup()
   받은것.length = 0
+  vi.useRealTimers()
 })
 
 const 레오니 = ACE_PITCHERS[1]
@@ -42,6 +44,7 @@ const 띄우기 = (aceLevels?: Readonly<Record<number, number>>) => {
   }
   const runner = { atBat: createAtBat(), isPaused: false, bannerText: '' }
   const gameSettings = { settings: {}, setSettings: noop }
+  vi.useFakeTimers()
   render(
     <GameRoute
       session={session as never}
@@ -53,8 +56,9 @@ const 띄우기 = (aceLevels?: Readonly<Record<number, number>>) => {
       {...(aceLevels === undefined ? {} : { aceLevels })}
     />,
   )
-  // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다
+  // 경기 시작 인트로(상태 0xc)를 OK 로 건너뛴다 — 다음 틀의 상태 키 자리(0x39b54)에서
   fireEvent.keyDown(window, { key: 'Enter' })
+  act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
   return 받은것[받은것.length - 1]!
 }
 

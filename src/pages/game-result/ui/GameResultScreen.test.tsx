@@ -49,6 +49,8 @@ const 프레임 = (count: number) => act(() => {
 const 끝판넘기기 = () => {
   프레임(GAME_END_INPUT_LOCK_TICKS)
   fireEvent.click(screen.getByRole('button', { name: '확인' }))
+  // OK 는 받은 다음 틀의 키 0x498d4 가 처리한다(`sceneKeyLatch`)
+  프레임(1)
 }
 
 describe('경기 끝 판 (상태 0x18 · 0x4fe9c)', () => {

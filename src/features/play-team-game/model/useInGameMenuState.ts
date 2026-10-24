@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
+import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /**
  * 일시정지 창이 어떻게 떴는가 — 창 [+0x290] 과 펼침이 이것으로 갈린다 (2026-10-14 직접 뜸):
@@ -20,8 +22,9 @@ export type InGameMenuOpening = '별표' | '복귀' | '질문뒤'
 /**
  * **'*' 로 메뉴를 여는 그림의 남은 갱신** — 경기 장면 프레임 0x52c50 은 공용 창 게이트 0x754f9 를 52cc6 에서 **키보다 먼저** 보고,
  * 키 0x498d4(52d9e — '*' 49918 → 0x741a0 · 0x3c02c 가 창을 세운다) 뒤 52e14~ 의 갱신 표를 다시 묻지 않고 돈다. 그래서 '*' 를 누른
- * 그림에도 그 상태의 갱신(0x10 이면 0x39c5c)이 한 번 돈다. 웹은 키가 그림 사이에 들어와 다음 틱이 이미 멈춘 장면을 보므로, 그
- * 한 틱을 여는 자리에서 곧바로 돌린다 — 그 틱이 있는 부품(조준 `AimCursor`)이 여기에 건다. 장면 시계 구조는 그대로다.
+ * 그림에도 그 상태의 갱신(0x10 이면 0x39c5c)이 한 번 돈다. '*' 가 장면 키 칸으로 들어 그 틀의 키 자리에서 열리면(`pressStar` ·
+ * `isRunningSceneKeys`) 그 틀의 갱신이 뒤이어 그대로 돈다. 칸이 없어 키를 받은 자리에서 곧바로 열면 웹은 다음 틱이 이미 멈춘 장면을
+ * 보므로, 그 한 틱을 여는 자리에서 곧바로 돌린다 — 그 틱이 있는 부품(조준 `AimCursor`)이 여기에 건다.
  */
 const starOpenFrameListeners = new Set<() => void>()
 
@@ -46,6 +49,11 @@ export interface InGameMenuState {
   readonly setCursor: (cursor: number) => void
   /** '*'·소프트키1 — 닫혀 있으면 **새로 연다**(커서 0), 열려 있으면 닫는다(창이 떠 있으면 창의 닫힘을 따른다) */
   readonly toggle: () => void
+  /**
+   * '*' 키를 받았다 — 창이 없으면 경기 장면 키 칸에 넣어 **받은 다음 틀의 키 0x498d4**('*' 가지 49918~49948)가 연다(`sceneKeyLatch`).
+   * 창(메뉴 · 설정 따위)이 서 있으면 경기 장면 키는 안 돌고(52cc6) 키는 창 0x754f9 몫이라 그 자리에서 `toggle` 한다
+   */
+  readonly pressStar: () => void
   /**
    * 닫는다 (계속·CLR·'*', 또는 [조작방법]·[설정]으로 넘어갈 때). 일시정지 창이 떠 있으면 원본처럼 [창+0x215] 닫힘을 탄다 —
    * '별표' 창은 한 갱신, 그 밖은 두 갱신 뒤에 내려가고 그동안 메뉴는 그대로 그려지며 경기는 멈춰 있다(0x754f9 는 늘 1).
@@ -113,9 +121,16 @@ export function useInGameMenuState(): InGameMenuState {
     setOpening('별표')
     setOpen(true)
   }, [close])
+  const pressStar = useCallback(() => {
+    if (isOpenRef.current || isGameSceneFrozen()) return toggle()
+    pushSceneKey(() => {
+      // 받은 틀 뒤에 다른 길로 창이 섰으면 그 틀은 키가 없다(52cc6) — 칸은 그 틀에 비워진다
+      if (!isOpenRef.current) toggle()
+    })
+  }, [toggle])
   const bindCloser = useCallback((closer: InGameMenuCloser | null) => {
     closerRef.current = closer
   }, [])
 
-  return { isOpen, cursor, setCursor, toggle, close, reopen, slidesIn, opening, bindCloser }
+  return { isOpen, cursor, setCursor, toggle, pressStar, close, reopen, slidesIn, opening, bindCloser }
 }

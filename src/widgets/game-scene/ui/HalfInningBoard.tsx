@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { HALF_INNING_SCOREBOARD_FROM_TICK, SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
@@ -50,27 +51,32 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
   // 교대 판 0x18도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
   // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
   useMarksGameScene()
-  const tick = useSceneTick(onTick)
+  /**
+   * 받은 키 칸 — OK 는 받은 다음 틀의 키 0x498d4(52d9e → 0x536bc → 메시지 1)가 그 틀의 갱신 0x4f928 보다 먼저 처리한다
+   * (`sceneKeyLatch`)
+   */
+  const keyLatch = useSceneKeyLatchOwner()
+  const tick = useSceneTick(onTick, true, false, keyLatch)
   const confirmRef = useRef(onConfirm)
   confirmRef.current = onConfirm
   const doneRef = useRef(false)
-  const confirm = () => {
+  const confirmNow = () => {
     if (doneRef.current) return
     doneRef.current = true
     confirmRef.current()
   }
+  const confirm = () => keyLatch.push(confirmNow)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || !isOkKey(event.key)) return
       event.preventDefault()
-      if (doneRef.current) return
-      doneRef.current = true
-      confirmRef.current()
+      keyLatch.push(confirmNow)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸은 부품마다 하나 · 처리는 ref 만 본다
+  }, [keyLatch])
 
   return (
     <RawScreen>

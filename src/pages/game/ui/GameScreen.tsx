@@ -239,7 +239,7 @@ export function GameScreen({
       if (overlay === '조작방법') return
       if (event.key === '*') {
         event.preventDefault()
-        return menu.toggle()
+        return menu.pressStar()
       }
       if (isMenuOpen || overlay !== null) return
       const base = stealBaseOfKey(event.key)
@@ -251,7 +251,7 @@ export function GameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, menu.toggle, onSteal, overlay, stealableBases])
+  }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, menu.pressStar, onSteal, overlay, stealableBases])
 
   // 기록 달성 알림의 팝업 멈춤 · 장면 갈래를 알림을 든 쪽에 알린다 (`RecordAlertScene`)
   const isAlertFrozen = isMenuOpen || overlay !== null
@@ -482,7 +482,7 @@ export function GameScreen({
           stealableBases.map((base) => (
             <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
           ))}
-        <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.toggle} />
+        <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.pressStar} />
 
         {isMenuOpen ? (
           <div className={stageScreen.menuLayer}>

@@ -46,20 +46,32 @@ describe('키 사건 0xbca05 — 받은 키는 다음 틀의 키 0x498d4(52d9e)�
     resetCommonWindowShownForTest()
   })
 
-  it('받은 틱에는 아무 일도 없고 다음 틱 머리에서 받은 차례대로 처리한다 — 좌우 이동도 그 자리에서 바뀌지 않는다', () => {
+  it('받은 틱에는 아무 일도 없고 다음 틱 머리에서 처리한다 — 좌우 이동도 그 자리에서 바뀌지 않는다', () => {
     const now = vi.spyOn(performance, 'now')
     now.mockReturnValue(1000) // 틱 16
     const 손잡이 = 붙이기({})
     fireEvent.keyDown(window, { key: '4' })
-    fireEvent.keyDown(window, { key: '5' })
     expect(손잡이.moveBatter).not.toHaveBeenCalled()
-    expect(손잡이.swing).not.toHaveBeenCalled()
     // 같은 틱의 틀은 꺼내지 않는다
     runSceneKeys(칸, 16)
     expect(손잡이.moveBatter).not.toHaveBeenCalled()
     runSceneKeys(칸, 17)
     expect(손잡이.moveBatter).toHaveBeenCalledWith(-1)
+    now.mockReturnValue(1070) // 틱 17
+    fireEvent.keyDown(window, { key: '5' })
+    runSceneKeys(칸, 18)
     // 스윙은 받은 틱으로 센다(`keyTickOf` — 보이던 공 틱 + 1)
+    expect(손잡이.swing).toHaveBeenCalledWith(17)
+  })
+
+  it('받은 칸 [+0x20] 은 하나다 — 한 틀에 키가 둘 오면 뒤 키만 남는다(누름 0x39f4c 는 덮어쓰기만)', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000) // 틱 16
+    const 손잡이 = 붙이기({})
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '5' })
+    runSceneKeys(칸, 17)
+    expect(손잡이.moveBatter).not.toHaveBeenCalled()
     expect(손잡이.swing).toHaveBeenCalledWith(16)
   })
 })
@@ -97,11 +109,11 @@ describe('타석 키 배치 (0x53670 · 0x535a4)', () => {
   it('나머지 키는 그대로다 — 5 스윙 · 4/6 이동 · 8 번트', () => {
     const 손잡이 = 붙이기({ specialSwing: vi.fn() })
 
-    fireEvent.keyDown(window, { key: '5' })
-    fireEvent.keyDown(window, { key: '4' })
-    fireEvent.keyDown(window, { key: '6' })
-    fireEvent.keyDown(window, { key: '8' })
-    다음틀()
+    // 한 틀에 하나씩 — 같은 틀에 둘이면 뒤 키만 남는다
+    for (const key of ['5', '4', '6', '8']) {
+      fireEvent.keyDown(window, { key })
+      다음틀()
+    }
 
     expect(손잡이.swing).toHaveBeenCalledTimes(1)
     expect(손잡이.moveBatter).toHaveBeenNthCalledWith(1, -1)
@@ -126,6 +138,7 @@ describe('번트는 누르고 있는 동안만 — 뗄 때 0x5364c → 0x6a8 (0x
     const 손잡이 = 붙이기({})
 
     fireEvent.keyDown(window, { key: '8' })
+    다음틀()
     fireEvent.keyDown(window, { key: '8' })
     다음틀()
     expect(손잡이.pressBunt).toHaveBeenCalledTimes(2)

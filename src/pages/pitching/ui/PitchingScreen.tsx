@@ -326,11 +326,11 @@ export function PitchingScreen({
       // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
       if (overlay === '조작방법') return
       event.preventDefault()
-      menu.toggle()
+      menu.pressStar()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isRunning, menu.toggle, overlay])
+  }, [isRunning, menu.pressStar, overlay])
   /**
    * **상태 0xe — 새 타석마다 사람 OK 를 기다린다** (0x39e14 → 0x532b0 — 공수·모드 갈림 없음). 결과 연출 동안은 받지 않는다.
    * 0xe 그리기 0x4d9ec 가 0xd 그리기 위에 얹는 소개 판 0x44944 는 아래 `SceneMatchupCards` 가 그린다.
@@ -682,7 +682,7 @@ export function PitchingScreen({
       */}
       {overlay !== '조작방법' && (
         <PressLayer testId="소프트키 누름 칸" isOnTop>
-          <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle} />
+          <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar} />
         </PressLayer>
       )}
 

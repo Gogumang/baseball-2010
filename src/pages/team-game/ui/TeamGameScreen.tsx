@@ -444,7 +444,7 @@ function TeamGameScene({
         // 교체 창(상태 0xb)에서는 '*' 가 안 먹는다 — 0x498d4 의 '*' 가지(4991c)는 상태 0xd~0x15 만 받고,
         // 0xb 의 키 함수 0x495fc 는 '2'·'8'·'#'·'0'·'5' 만 본다. 창을 닫지도 메뉴를 열지도 않는다
         if (changeWindow !== null && !isMenuOpen) return
-        return menu.toggle()
+        return menu.pressStar()
       }
       if (isMenuOpen || overlay !== null) {
         // 교체 화면과 메뉴에서 CLR 은 닫기다 (0x495fc 의 '#'·CLR 가지)
@@ -500,7 +500,7 @@ function TeamGameScene({
     isMenuOpen,
     isStealable,
     menu.close,
-    menu.toggle,
+    menu.pressStar,
     overlay,
     phase,
     session.canChangePitcher,
@@ -1292,7 +1292,7 @@ function TeamGameScene({
         */}
         {overlay !== '조작방법' && (
           <PressLayer testId="소프트키 누름 칸" isOnTop>
-            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.toggle}
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar}
               isDisabled={changeWindow !== null && !isMenuOpen} />
             {acceptsChangeKey && (
               <PressArea rect={TIME_PRESS_RECT} label={session.canChangePitcher ? '# 교체' : '# 대타'}

@@ -39,8 +39,13 @@ const 판닫기 = () => {
   for (let 번 = 0; 번 < 2; 번 += 1) {
     if (screen.queryByRole('button', { name: '메뉴' }) !== null) return
     fireEvent.keyDown(window, { key: 'Enter' })
+    // 키는 받은 다음 틀의 키 자리에서 처리된다(`sceneKeyLatch`)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
   }
 }
+
+/** 한 틀 — 받은 키('*' · OK …)는 다음 틀의 키 0x498d4 가 처리한다(`sceneKeyLatch`) */
+const 다음틀 = () => act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
 
 /**
  * 상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x532b0). 들어선 뒤 세 갱신은 OK 를 안 받으니(0x49a26) 시계를 흘리고 누른다.
@@ -179,15 +184,17 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 5))
 
     fireEvent.keyDown(window, { key: '*' })
+    // '*' 는 다음 틀의 키 자리(49918)에서 창을 세우고, 그 틀의 갱신(0x11 게이지)은 게이트(52cc6) 뒤라 한 번 더 돈다
+    다음틀()
     // 내리지 않고 숨긴다
     expect(screen.getByTestId('게이지 누름 칸').closest('[hidden]')).not.toBeNull()
     // 메뉴 동안은 틱이 안 흘러 공이 안 나간다
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 30))
     fireEvent.keyDown(window, { key: '*' })
 
-    // 0x11 그대로 — 처음부터가 아니라 남은 여섯 틱(틱 4 까지 셌다) 뒤에 놓는다
+    // 0x11 그대로 — 처음부터가 아니라 남은 틱 뒤에 놓는다 (r161 게이지 열한째 셈 + r167 '*' 다음 틀)
     expect(screen.getByTestId('게이지 누름 칸').closest('[hidden]')).toBeNull()
-    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 5))
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 4))
     expect(게이지보임()).toBe(true)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(게이지보임()).toBe(false)
@@ -294,6 +301,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
   it('다섯 칸이 원본 차례대로 뜬다 — 계속·자동진행·조작방법·설정·나가기', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    다음틀()
 
     expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
     for (const 칸 of ['계속하기', '자동진행', '게임방법', '환경설정', '메인메뉴']) {
@@ -304,6 +312,9 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
   it("'*' 키로도 메뉴가 열린다 (0x498d4 는 소프트키1 을 '*' 로 읽는다)", () => {
     띄우기()
     fireEvent.keyDown(window, { key: '*' })
+    // 받은 틀에는 아직 없다 — 다음 틀의 키 0x498d4 가 연다
+    expect(screen.queryByRole('listbox', { name: '경기 중 메뉴' })).toBeNull()
+    다음틀()
 
     expect(screen.getByRole('listbox', { name: '경기 중 메뉴' })).toBeTruthy()
   })
@@ -311,6 +322,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
   it('나가기를 고르면 StrGAME[0] 확인 문구가 뜬다', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    다음틀()
     fireEvent.click(screen.getByRole('option', { name: '메인메뉴' }))
 
     expect(screen.getByText(/메인메뉴로 나가시겠습니까/)).toBeTruthy()
@@ -320,12 +332,14 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
   it('G포인트를 안 넘기면 자동진행 칸이 잠긴다 (비용을 검사할 수 없다)', () => {
     띄우기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    다음틀()
     const 자동진행 = screen.getByRole('option', { name: '자동진행' }).closest('button')
 
     expect(자동진행?.disabled).toBe(true)
   })
 
   it('자동진행은 30 G 를 묻고, 모자라면 StrGAME[5] 알림만 뜬다 (0x3c7d8)', () => {
+    vi.useFakeTimers()
     const onSpendGamePoint = vi.fn()
     render(
       <TeamGameScreen
@@ -339,6 +353,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     )
     판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    다음틀()
     fireEvent.click(screen.getByRole('option', { name: '자동진행' }))
 
     expect(screen.getByText(/30 G포인트/)).toBeTruthy()
@@ -365,6 +380,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     )
     판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    다음틀()
     fireEvent.click(screen.getByRole('option', { name: '자동진행' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
@@ -379,6 +395,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     expect(screen.queryByTestId('정산-판')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 10))
     fireEvent.keyDown(window, { key: 'Enter' })
+    다음틀()
     // 정산(0x19)은 원본 240×320 한 장 — 웹 껍데기 제목 띠("경기 결과")가 없다
     expect(screen.getByTestId('정산-판')).toBeTruthy()
     expect(screen.queryByText('경기 결과')).toBeNull()
@@ -386,6 +403,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
   })
 
   it('대전모드(8)는 100 G 다', () => {
+    vi.useFakeTimers()
     render(
       <TeamGameScreen
         options={{ ...기본옵션, mode: 8 }}
@@ -398,6 +416,7 @@ describe('경기 중 메뉴 (표 0xcfcfc 행 0)', () => {
     )
     판닫기()
     fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    다음틀()
     fireEvent.click(screen.getByRole('option', { name: '자동진행' }))
 
     expect(screen.getByText(/100 G포인트/)).toBeTruthy()
