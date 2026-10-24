@@ -63,7 +63,11 @@ import {
  *   그래서 갈래는 그대로 옮기되(`batterRunnerNeedsCover`) 칸 값은 생성 때 값 0 으로 둔다 → 안 선다.
  *   타자주자는 +0x8c == 0 이라 루 1 은 "루 r−1 의 주자" 로 어차피 선다
  * - ⚠️ 근사: state[7] · +0x110 · 판 끝(+0x111 · +0x129 && 공 틱 > 담장 틱, b1ca2) 관문은 판이 도는 동안 막지 않는다고 본다
- * - ⚠️ 근사: vtcc(0xa2138 = +0xb0 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0)는 이 진행기에 없는 동작 잠금이라 늘 참으로 본다
+ * - b1d96 의 H.vtcc()(0xa2138 = +0xb0 워드 == 0 && +0xb4 ≤ 0 && +0xcc ≤ 0, 직접 뜬 것) 중 **동작 잠금 +0xb4**(필살타법 타구에
+ *   맞은 야수 vte4 0xa1e60 의 15)와 +0xcc 는 옮겼다(r158). vt30 은 AI 고리 vt4c 0xb45dc 끝(b4c72)이라 이 틱 머리 야수 틱이 줄인 값이다.
+ *   ⚠️ 근사: +0xb0 워드(바이트 +0xb0~+0xb3 — 포구 · 다이빙 동작 vt 0xa1490(동작 7) · 0xa14ac(0xe) · 0xa1e28(6) · 0xa1ec4/0xa1f00
+ *   (8~0x12) 가 1, 던지기 a1a3a 가 +0xb1 = 1, 야수 틱 a13a6~a143e 가 동작 칸 · +0xac 로 지운다)는 동작 번호 +0xa8 을 웹이 안 두어
+ *   0 으로 본다 — 공 쫓는 유격수가 포구 동작을 시작한 뒤의 2루 막힘이 원본보다 늦게(안) 선다
  * - +0x94 는 웹의 `requiredBase ≠ −1` 로 읽는다(0xa95e8 · 0xa9620 이 둘을 함께 세우고 지운다)
  */
 
@@ -195,8 +199,9 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
   // ── b1d96~b1f06: 2루 커버와 도움 ──
   const second = fielders[3]
   const short = fielders[5]
-  // vtcc 는 늘 참으로 본다(머리말) — 둘째 항은 서지 않는다
-  const blocked = second?.aiState === AI_STATE.CHASE
+  // b1d96~b1dc8 — 막힘 = 2루수 AI 1 || (유격수 AI 1 && !H.vtcc()) · H = +0x130(b1d0a 의 r5). +0xb0 워드는 0 으로 본다(머리말 ⚠️)
+  const holderReady = holder === undefined || (holder.actionLockTicks <= 0 && holder.arrivalSlackTicks <= 0)
+  const blocked = second?.aiState === AI_STATE.CHASE || (short?.aiState === AI_STATE.CHASE && !holderReady)
   let cover: number
   let helper: number
   if ((needsCover(context, 2) && !blocked) || isSamePoint(input.ballStartPoint, BATTING_START)) {
