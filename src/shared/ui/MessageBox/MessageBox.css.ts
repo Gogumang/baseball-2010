@@ -1,6 +1,7 @@
 import { globalStyle, style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { theme } from '@/app/styles/theme.css'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 /**
  * 상자 크기 (0x74ef4, F-1 확정):
@@ -22,10 +23,14 @@ const BUTTON_HEIGHT = 15
 const LINE_HEIGHT = 14
 const FONT_SIZE = 11
 
+/**
+ * 상자 뒤 어둡게 — 상자 · 덮개 전체가 이 겹 하나로 선다. 겹 차례는 화면의 누름 칸(7)보다 위인 `SCREEN_LAYERS.POPUP_WINDOW` —
+ * 예전 5 에서는 화면에 남은 누름 칸(구질훈련 칸 따위)이 상자 단추를 덮어 클릭 · 탭을 먹었다(r203)
+ */
 export const dim = style({
   position: 'absolute',
   inset: 0,
-  zIndex: 5,
+  zIndex: SCREEN_LAYERS.POPUP_WINDOW,
   background: theme.color.scrim,
 })
 
