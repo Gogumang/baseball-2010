@@ -18,6 +18,7 @@ import {
   burstObjectTicks,
 } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
 
 interface BurstMissionWindowProps {
@@ -110,7 +111,10 @@ export function BurstMissionWindow({
   const nextMark = burstNextMarkAt(state.ticks)
 
   return (
-    <div className={styles.overlay} role="dialog" aria-label="돌발미션" onPointerDown={(event) => event.stopPropagation()}>
+    // 겹 차례 — 경기 화면의 누름 칸(PressArea 7: 다음 타석 OK 대기 0xe 의 '확인' · 도루 · '*')보다 위다. 결과 창이 설 때 다음 타석의
+    // 0xe 대기가 이미 실려 화면 전체 '확인' 칸(창 동안은 꺼짐)이 서는데, 이 창(예전 5)이 그 아래라 클릭 · 탭이 꺼진 칸에 먹혔다(r195)
+    <div className={styles.overlay} style={{ zIndex: SCREEN_LAYERS.SCENE_WINDOW }} role="dialog" aria-label="돌발미션"
+      onPointerDown={(event) => event.stopPropagation()}>
       {line !== undefined && (
         <BurstPortrait speaker={line.speaker} expression={line.expression} draws={draws}
           anchor={burstPortraitAnchorOf(state.height, isBatterLeftHanded)} />
@@ -143,8 +147,8 @@ export function BurstMissionWindow({
           <img className={styles.sprite} style={{ left: nextMark.x, top: nextMark.y }} src={BURST_NEXT_MARK_IMAGE} alt="" />
         </>
       )}
-      <PressArea label="돌발미션 넘기기" rect={{ x: 0, y: bandTop, width: BURST_SCREEN.width, height: BURST_SCREEN.height - bandTop }}
-        onPress={() => closeRef.current()} isDisabled={!isOpen} testId="돌발미션-넘기기" />
+      {/* 0x8e60c — 열린 뒤(c = −1)에는 키를 가리지 않고 닫는다. 누름도 아무 키와 같은 길이라 화면 어디를 눌러도 닫는다(Enter 와 같다) */}
+      <PressArea label="돌발미션 넘기기" onPress={() => closeRef.current()} isDisabled={!isOpen} testId="돌발미션-넘기기" />
     </div>
   )
 }

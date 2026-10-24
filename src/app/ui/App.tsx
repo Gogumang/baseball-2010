@@ -19,6 +19,7 @@ import { nariBatterOf, nariPitcherOf, useCollection } from '@/app/model/useColle
 import { useHiddenOpenNotice } from '@/app/model/useHiddenOpenNotice'
 import { SceneParticleLayer } from '@/widgets/particles/ui/SceneParticleLayer'
 import { MessageBox, ScreenOverlay } from '@/shared/ui'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 import { EMPTY_COLLECTION, hallOfFameRecordIdOf, pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { hasCareerPlayerInSeasonTeam, isHallOfFameDeleteBlocked } from '@/entities/season-mode/model/playerRecruit'
 import { careerResetTargetOf, judgeModeReset } from '@/entities/settings/model/modeReset'
@@ -518,7 +519,8 @@ export function App() {
         </CommonWindowSceneContext.Provider>
       </GameSceneMarkContext.Provider>
       {hiddenOpenNotice.text !== null && (
-        <ScreenOverlay>
+        // 공용 창은 키를 통째로 가져간다(0x754f9) — 누름도 창 것이라 화면의 누름 칸(경기 OK 대기 '확인' 7 따위)보다 위에 둔다(r195)
+        <ScreenOverlay zIndex={SCREEN_LAYERS.COMMON_WINDOW}>
           <MessageBox
             key={hiddenOpenNotice.serial}
             text={hiddenOpenNotice.text}
