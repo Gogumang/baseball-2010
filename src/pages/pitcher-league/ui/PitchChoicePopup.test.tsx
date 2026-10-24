@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PITCH_CHOICE_CELLS, PITCH_CHOICE_POPUP_HEIGHT, PITCH_CHOICE_TITLE_ID, PitchChoicePopup } from '@/pages/pitcher-league/ui/PitchChoicePopup'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  resetTouchKeyOffersForTest()
+})
 
 describe('투수 구질 두 갈래 팝업 0x78 (그리기 0x190f8 · 키 0x19398)', () => {
   it('판 · 칸 자리는 원본 값이다 — 높이 0x78 · 제목 StrMODE[59] · 칸 (W/2 − 0x38, H/2) 0x13 · (W/2 + 0x18, H/2) 0x12', () => {
@@ -35,5 +39,16 @@ describe('투수 구질 두 갈래 팝업 0x78 (그리기 0x190f8 · 키 0x19398
     fireEvent.keyDown(window, { key: '6' })
     expect(onMove).toHaveBeenLastCalledWith(1)
     expect(screen.getByRole('button', { name: '마구' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('창 그림 0x190f8 에 CLR 글자 자리가 없어 \'취소\' 상황 버튼(Escape)을 낸다 — 누르면 CLR 과 같이 상태를 안 바꾸고 닫는다 (r194)', () => {
+    const onChoose = vi.fn()
+    const onClosed = vi.fn()
+    render(<PitchChoicePopup selected={0} onMove={() => {}} onChoose={onChoose} onClosed={onClosed} />)
+    expect(touchKeyOffersNow()).toContainEqual({ key: 'Escape', label: '취소' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onChoose).not.toHaveBeenCalled()
+    expect(onClosed).toHaveBeenCalledTimes(1)
+    expect(touchKeyOffersNow().some((offer) => offer.key === 'Escape')).toBe(false)
   })
 })

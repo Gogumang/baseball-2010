@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea, ScreenOverlay } from '@/shared/ui'
-import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { CANCEL_KEY_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
@@ -122,6 +122,9 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
   }, [motion])
 
   const labelOrigins = useFrameOrigins(IMG_TEXT)
+  // 창 그림 0x190f8 은 제목 · 칸 둘만 그려 CLR 글자 자리가 없다(아래 바닥띠 표시는 뒤 어둡게에 덮인다) — 키를 받는 동안 '취소' 상황
+  // 버튼을 낸다(r194). Escape 키 사건이라 위 듣는 곳과 같은 길이다
+  useTouchKeyOffer(!motion.isClosed && motion.openingHeight === null && motion.closingWidth === null ? CANCEL_KEY_OFFER : null)
   if (motion.isClosed) return null
   /** 판 0x744c4 — 펼치는 동안 높이 [창+0x212], 줄이는 동안 폭 [창+0x210] 을 가로 가운데로 */
   const box = popupBoxStyleOf(motion, PITCH_CHOICE_POPUP_HEIGHT)

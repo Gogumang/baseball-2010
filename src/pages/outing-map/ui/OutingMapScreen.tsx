@@ -6,6 +6,7 @@ import { OutingMap } from '@/pages/outing-map/ui/OutingMap'
 import { PlaceBubble } from '@/pages/outing-map/ui/PlaceBubble'
 import { MessageBox } from '@/shared/ui'
 import { moveOutingMapCursor, outingMapDirectionOf } from '@/shared/lib/outingMap/outingMapCursor'
+import { BACK_KEY_OFFER, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 
 interface OutingMapScreenProps {
   /**
@@ -76,6 +77,9 @@ export function OutingMapScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMapKeyOn])
+  // 112 그리기 0x16854 는 지도만 그려 CLR 글자 자리가 없다 — 투명 "취소" 칸(`OutingMap`)은 눈에 안 보여, 터치 기기에는 지도가 키를 받는
+  // 동안 '뒤로' 상황 버튼을 낸다(r194). Escape 키 사건이라 위 듣는 곳(CLR → 105, 행동함 내림 `leaveOutingMap`)과 같은 길이다
+  useTouchKeyOffer(isMapKeyOn ? BACK_KEY_OFFER : null)
 
   return (
     <OutingMap

@@ -2,8 +2,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
+import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  resetTouchKeyOffersForTest()
+})
+const 뒤로버튼 = () => touchKeyOffersNow().find((offer) => offer.key === 'Escape')
 
 const 띄우기 = (onBack = vi.fn()) => render(
   <OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()} onEnter={vi.fn()} />,
@@ -43,5 +48,28 @@ describe('나리 외출 지도 키 0x13ba4', () => {
     누르기('ArrowDown')
     누르기('Enter')
     expect(onRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('112 그리기 0x16854 에 CLR 글자 자리가 없어 지도가 키를 받는 동안 \'뒤로\' 상황 버튼(Escape)을 낸다 — 누르면 CLR 과 같은 길 (r194)', () => {
+    const onBack = vi.fn()
+    띄우기(onBack)
+    expect(뒤로버튼()).toEqual({ key: 'Escape', label: '뒤로' })
+    // 투명 "취소" 칸은 그대로 남는다
+    expect(screen.getByRole('button', { name: '취소' })).toBeTruthy()
+    // 버튼은 Escape 키 사건을 쏜다 — 키 0x13ba4 의 CLR 가지
+    누르기('Escape')
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('말풍선(113)이 떠 있으면 지도가 키를 안 받으니 \'뒤로\' 버튼도 걷는다', () => {
+    띄우기()
+    누르기('Enter')
+    expect(screen.getByRole('button', { name: '들어가기' })).toBeTruthy()
+    expect(뒤로버튼()).toBeUndefined()
+  })
+
+  it('막힘 글 팝업이 떠 있어도 걷는다', () => {
+    render(<OutingMapScreen noticeText="막힘" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={vi.fn()} eventPlaceIds={new Set()} onEnter={vi.fn()} />)
+    expect(뒤로버튼()).toBeUndefined()
   })
 })
