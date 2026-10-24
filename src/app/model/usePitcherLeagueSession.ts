@@ -205,6 +205,8 @@ export type PitcherScene =
   | '경기결과'
   /** 국가대항전 대진 134 · 순위 135 (0x19f30 · 0x19fdc · 0x10680) — 타자편과 같은 상태 */
   | '국가대항전'
+  /** 새 시즌 "N년차" 표지 (상태 137 — 진입 0x1055c · 키 0x106a4 · 틀 0x12190 · 그리기 0x1cc4c) — 타자편과 같은 상태 */
+  | '연차표지'
 
 /**
  * 이벤트 재생(상태 114)을 **어디서** 틀었나 — 끝난 뒤 갈 곳(장면+0x24 "뒤 상태")이 이것으로 갈린다.
@@ -597,7 +599,7 @@ function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
   return {
     career: saved !== null && point.kind === '이벤트'
       ? enterPitcherYearEndEvent(saved, point.eventId)
-      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105 는 **투수편에 들어설 때** 돈다
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 105(137 은 안 거친다 — `startNewSeason`)는 **투수편에 들어설 때** 돈다
       // (`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
       // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
       // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
@@ -1443,12 +1445,16 @@ export function usePitcherLeagueSession(
   )
 
 
-  /** 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (웹은 표지를 건너뛴다) */
+  /**
+   * 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (타자편 `startNewSeason` 과 같다 — `pages/management/lib/nariYearCover`).
+   * 난수는 1b86c 의 CPU 장비 굴림 하나뿐이고 137 은 난수를 안 쓴다. `showsCover` 가 거짓이면 곧장 105 — 이어하기 100 진입
+   * 1c25e 는 0x1b768 뒤 1c3be 로 빠져 +0x289 를 보는 틀을 안 지난다(⚠️ 미확인: 남은 +0x289 의 뒷일).
+   */
   const startNewSeason = useCallback(
-    (finished: PitcherCareer) => {
+    (finished: PitcherCareer, showsCover = true) => {
       // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
       commit(startNextPitcherSeason(finished, random))
-      setScene('관리')
+      setScene(showsCover ? '연차표지' : '관리')
     },
     [commit, random],
   )
@@ -1702,7 +1708,7 @@ export function usePitcherLeagueSession(
       return setScene('이벤트')
     }
     // 1c25e — S+0x50 == 0x11 → 새 시즌 처리 0x1b768 (경기 중에는 이 값이 남지 않지만 같은 분기라 함께 둔다)
-    if (point.kind === '새시즌') return startNewSeason(career)
+    if (point.kind === '새시즌') return startNewSeason(career, false)
     if (point.kind === '포스트시즌') setPostseasonPopup(regularSeasonPopupOnEnter(career))
     if (point.kind === '국가대항전') {
       // 그 밖 갈래 S+0x12c → 134 대진판 (1c348~1c358)

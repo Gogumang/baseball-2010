@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -12,7 +12,7 @@ import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import { romanceEndingIndexOf, romanceEventsSeenOf } from '@/entities/career/model/seasonFlow'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
-import { takeLeftFrames } from '@/shared/lib/leftFrame/leftFrame'
+import { LeftFrame } from '@/shared/ui/LeftFrame/LeftFrame'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import type { ModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import {
@@ -231,7 +231,7 @@ export function EndingScreen(props: EndingScreenProps) {
     <RawScreen>
       {stage === 0
         // 단계 0 — 그리기 0x882c4 가 아무것도 안 그려 화면 버퍼에 앞 화면의 마지막 틀이 남는다 (`LeftFrame`)
-        ? <LeftFrame />
+        ? <LeftFrame part="stage-0" />
         : isCredits && creditsAt !== null
           ? <EndingCredits romanceEndingIndex={romanceEndingIndex} romanceEvents={romanceEventsSeenOf(seenEventIds)} look={walkInLook}
             tick={Math.max(0, tick - creditsAt)} band={band} />
@@ -295,29 +295,11 @@ function NoJudgementEnding() {
   )
 }
 
-/**
- * **단계 0 의 화면 버퍼** — 그리기 0x882c4 가 단계 0 이면 곧장 돌아가(882c8) 버퍼에는 141 에 들어오기 전 화면의 마지막 틀이 남는다.
- * 같은 커밋에 내려간 앞 화면 판(`takeLeftFrames`)을 한 번 복제해 깐다. 앞 화면 판이 없으면(판 없는 화면에서 왔다) 검정이다.
- * ⚠️ 미확인: 이어하기로 들어온 141(메인 메뉴 → 장면 0x106 → 상태 100 → 1 자원 적재 → 141)은 버퍼에 무엇이 남는지 대조하지 않았다 —
- * 웹은 메인 메뉴 판을 깐다.
+/*
+ * **단계 0 의 화면 버퍼** — 그리기 0x882c4 가 단계 0 이면 곧장 돌아가(882c8) 버퍼에는 141 에 들어오기 전 화면의 마지막 틀이 남는다
+ * (`shared/ui/LeftFrame`). ⚠️ 미확인: 이어하기로 들어온 141(메인 메뉴 → 장면 0x106 → 상태 100 → 1 자원 적재 → 141)은 버퍼에
+ * 무엇이 남는지 대조하지 않았다 — 웹은 메인 메뉴 판을 깐다.
  */
-function LeftFrame() {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const isTakenRef = useRef(false)
-  useLayoutEffect(() => {
-    const host = hostRef.current
-    // 시험용 엄격 모드의 두 번째 진입은 건너뛴다 — 처음 선 그 커밋에서만 앞 화면을 받는다
-    if (host === null || isTakenRef.current) return
-    isTakenRef.current = true
-    for (const frame of takeLeftFrames()) {
-      const copy = frame.cloneNode(true) as HTMLElement
-      copy.removeAttribute('data-original-screen')
-      Object.assign(copy.style, { position: 'absolute', left: '0', top: '0' })
-      host.appendChild(copy)
-    }
-  }, [])
-  return <div ref={hostRef} className={styles.blackScreen} data-part="stage-0" />
-}
 
 /** 띠 창 (0x883b6~0x88556 · 제작진 0x88bcc~0x88d64) — 가운데 박스 검정 + 박스 **바깥** 위·아래 11px 띠 + 선 */
 function BandWindow({ band, children }: { readonly band: ModeBackSprite; readonly children?: ReactNode }) {

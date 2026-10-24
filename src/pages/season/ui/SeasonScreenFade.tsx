@@ -11,6 +11,11 @@ export interface SeasonScreenFadeProps {
   readonly kind: SeasonScreenFadeKind
   /** 끝(+0x10 = 2)을 본 다음 틀 — 그 틀의 그리기가 끝을 보고 다음 일을 한다(0x8bd8 8ccc~8d2c) */
   readonly onEnd?: () => void
+  /**
+   * 칠하기 몇 번째부터 보이나 (기본 0) — 앞 상태의 마지막 틀이 효과기를 걸고 칠하기 0 을 그 틀에 그린 뒤 새 화면이 서는 길
+   * (나리 137 → 105: 0x12190 이 105 를 예약하며 건 종류 2 의 칠하기 0 은 137 위다)
+   */
+  readonly startFrame?: number
 }
 
 /**
@@ -22,8 +27,8 @@ export interface SeasonScreenFadeProps {
  * 틀마다 +0x10 = 1 로 두고(0xbd882) 마지막 칠하기(틀 8)에 +0x10 = 2(0xbd9c0), 그다음 그리기(틀 9)가 +0x10 = 0 · +4 = 0 으로 비운다
  * (0xbd852~0xbd864). 곧 틀 0 ~ 8 의 그리기 **뒤**에 든 키는 버려지고, 틀 9 의 그리기 뒤부터 받는다 — 덮개가 비워진 틀(effect = null)과 같다.
  */
-export function SeasonScreenFade({ kind, onEnd }: SeasonScreenFadeProps) {
-  const frame = useUpdateCounter()
+export function SeasonScreenFade({ kind, onEnd, startFrame = 0 }: SeasonScreenFadeProps) {
+  const frame = useUpdateCounter() + startFrame
   const effect = screenEffectFrameAt(kind, '검정', frame)
   // 틀 0 ~ 8 (끝 +0x10 = 2 를 세운 틀 8 까지) 막고, 비우는 틀 9 부터 받는다
   const isRunning = effect !== null

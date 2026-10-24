@@ -301,3 +301,40 @@ describe('이벤트 재생 배경음 40 — 114 진입 0x11d00 · 0xd3 진입 0x
     expect(result.current).toBe(40)
   })
 })
+
+describe('137 "N년차" 표지 뒤 배경음 — 105 처리 0x1aec4 의 이전 상태 목록에 0x89 가 없다 (1aece~1aef2)', () => {
+  it('타자편: 137 · 그 뒤 105 · 105 에서 간 109/상점/외출은 앞 배경음을 잇고, 외출 → 105 는 4 를 다시 튼다', () => {
+    const { result, rerender } = renderHook(({ screen }: { screen: Screen }) => useScreenBgm(screen), {
+      initialProps: { screen: { kind: '이벤트', eventId: 380, context: '시즌' } as Screen },
+    })
+    expect(result.current.bgm).toBe(40)
+    rerender({ screen: { kind: '연차표지' } })
+    expect(result.current.bgm).toBeNull()
+    rerender({ screen: { kind: '관리' } })
+    expect(result.current.bgm).toBeNull()
+    rerender({ screen: { kind: '아이템', tab: '장착' } })
+    expect(result.current.bgm).toBeNull()
+    rerender({ screen: { kind: '관리' } })
+    expect(result.current.bgm).toBeNull()
+    rerender({ screen: { kind: '외출' } })
+    expect(result.current.bgm).toBeNull()
+    rerender({ screen: { kind: '관리' } })
+    expect(result.current.bgm).toBe(4)
+  })
+
+  it('투수편: 137 → 105 는 잇고, 이벤트를 지나면 다시 표대로', () => {
+    const { result, rerender } = renderHook(
+      ({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene),
+      { initialProps: { scene: '연차표지' as PitcherScene } },
+    )
+    expect(result.current).toBeNull()
+    rerender({ scene: '관리' })
+    expect(result.current).toBeNull()
+    rerender({ scene: '상점' })
+    expect(result.current).toBeNull()
+    rerender({ scene: '이벤트' })
+    expect(result.current).toBe(40)
+    rerender({ scene: '관리' })
+    expect(result.current).toBe(4)
+  })
+})

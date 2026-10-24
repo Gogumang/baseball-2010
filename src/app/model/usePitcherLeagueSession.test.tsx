@@ -366,7 +366,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     // 연봉 수락 → 새 시즌 0x1b768 이 S+0x50 을 벗어난다
     연말끝까지(연말)
     expect(연말.current.career?.seasonEndState).toBeNull()
-    expect(연말.current.scene).toBe('관리')
+    expect(연말.current.scene).toBe('연차표지')
   })
 
   it('보상 명령 뒤 이어하기 자리(0x8c460 끝 8cc2e → 8cd44 저장) — 393 은 0xd(130) · 464 는 0x11(새 시즌) · 463 은 3 · S+0x12c', () => {
@@ -665,7 +665,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(본것.slice(2, 3)).toEqual([370])
     expect(본것).toContain(375)
     expect(본것.slice(-2)).toEqual([380, 383])
-    expect(result.current.scene).toBe('관리')
+    expect(result.current.scene).toBe('연차표지')
     expect(result.current.career?.season).toBe(3)
     expect(result.current.career?.gamesPlayed).toBe(0)
   })
@@ -708,7 +708,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     const 본것 = 연말끝까지(result)
 
     expect(본것.slice(-1)).toEqual([462])
-    expect(result.current.scene).toBe('관리')
+    expect(result.current.scene).toBe('연차표지')
     expect(result.current.career?.season).toBe(4)
   })
 
@@ -793,7 +793,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       reward: { messageId: 199, popularity: 20, reputation: 30, money: 20, gamePoint: 1000 },
       openedTeams: [10],
     } as never))
-    expect(result.current.scene).toBe('관리')
+    expect(result.current.scene).toBe('연차표지')
     expect(result.current.career?.season).toBe(2)
     // 대회 끝은 히든 팀을 열지 않는다 — 134 진입 0x19f30 이 화면에서 연다(`openCupHiddenTeams`)
     expect(result.current.career?.openedHiddenIds).not.toContain(10)
@@ -935,7 +935,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
 
     연말끝까지(result, { 502: [380, 383] })
 
-    expect(result.current.scene).toBe('관리')
+    expect(result.current.scene).toBe('연차표지')
     expect(result.current.career?.season).toBe(11)
   })
 
