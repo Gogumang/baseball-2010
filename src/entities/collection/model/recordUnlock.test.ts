@@ -28,4 +28,10 @@ describe('0x62234 기록달성 누계 해금', () => {
     expect(aceCellOfUnlock(7)).toBe(9)
     expect(aceCellOfUnlock(23)).toBeNull()
   })
+
+  it('드래고나(해금 id 3)를 여는 기록은 없다 — 원본은 온라인 선물함 0x2bb48 전용(R7 · U-05 원본처럼 잠금)', () => {
+    for (let recordId = 0; recordId <= 40; recordId += 1) {
+      expect(recordUnlockIdOf(statsWith(recordId, 255), recordId)).not.toBe(3)
+    }
+  })
 })
