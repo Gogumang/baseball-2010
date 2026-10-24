@@ -19,6 +19,7 @@ import {
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { PitcherHitClock, PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { hitByPitchMarkDrawCallOf, hitFlameAnimationOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import { canSkipHitPause } from '@/widgets/batting-stage/lib/hitPause'
 import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
 import { bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
@@ -520,6 +521,13 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       const judgePitcherTick = hitBase === null ? null : pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
       const isHitState = stage.phase.kind === '타격'
       const contactPoint = hitBase === null || pitch === null ? null : platePixelOf(pitch)
+      /** 보통 타격 불꽃의 game_effect 애니 — 필살 그림 갈래(0x49aec 가 [sp+0x57] 을 세운다) · 큰 타구면 null */
+      const hitFlameAnimation =
+        hitBase === null ||
+        pitcherHitContactOf(hitBase, current.batterForm, current.aceBatterOrder ?? null, current.batterSide ?? batterSideOfForm(current.batterForm))
+          .effect !== null
+          ? null
+          : hitFlameAnimationOf(hitBase.particleId, hitBase.watchesBigHit)
       const stageScene: StageScene = {
         pitch: stage.phase.kind === '대기' ? null : pitch,
         frame: stage.ballFrame,
@@ -556,6 +564,17 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
               )
             : null,
         // 필살 스윙 연출 그림 0x49aec — 판정 틀 J(0x11)에 첫 부름, 이어 0x13 틱 d 의 그림이 d + 2 번째 부름 (`specialSwingEffect`)
+        // 보통 타격 불꽃 0x49e64 49faa~4a0a2 — 필살 그림 갈래가 아니고 큰 타구가 아닌 맞은 공. 필살 그림과 같은 부름 차례 (`batterOverlayMarks`)
+        hitFlame:
+          hitFlameAnimation === null || contactPoint === null
+            ? null
+            : isHitState
+              ? { animation: hitFlameAnimation, x: contactPoint.x, y: contactPoint.y, drawCall: stage.phase.tick + 2 }
+              : stage.phase.kind === '투구중' && judgePitcherTick !== null && stage.phase.tick === judgePitcherTick
+                ? { animation: hitFlameAnimation, x: contactPoint.x, y: contactPoint.y, drawCall: 1 }
+                : null,
+        // 사구 표시 0x49e64 4a0ce — 사구 0x12 의 틱 0~7 (`batterOverlayMarks`)
+        hitByPitchMarkDraw: isResult && resolution !== null && resolution.kind === '사구' ? hitByPitchMarkDrawCallOf(stage.phase.tick) : null,
         specialSwingEffect:
           hitSpecialEffect === null
             ? null

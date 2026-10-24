@@ -212,6 +212,38 @@ export function stepDefenseEffects(
 }
 
 /**
+ * **창이 선 첫 그림([창+0x250])** — 갱신 없이 그리기 0x46c88 만 한 번 더 돈다(52efe). 그 그림은 앞 그림과 같은 상태를 그리므로
+ * 공 그리기 0x36dfc 의 파티클(같은 조건이면 같은 것)을 다시 쏘고, HOMERUN 글자 0x40b18 이 한 번 더 그려 글자 칸이 한 칸 더 가며
+ * 유지 단계면 홈런 효과 틱 0x40faa(경기 난수 — 굴림이 그만큼 는다)도 한 번 더 돈다. 프레임 끝 파티클 틱 0x6de85 는 53048 이 창이
+ * 서 있어 건너뛴다. `drawsText` 는 앞 그림의 그리기 관문(46e2e~46e58)이다 — 판이 닫힌 뒤 그림이면 거짓.
+ */
+export function redrawDefenseEffects(
+  effects: DefenseEffects,
+  drawsText: boolean,
+  ports: DefenseEffectsPorts,
+  ballShots: readonly BallParticleShot[] = [],
+): DefenseEffectsFrame {
+  let { text, fireworks } = effects
+  let ballBounced = effects.ballBounced === true
+  const distanceBoard = effects.textOn ? effects.displayDistance : null
+  for (const shot of ballShots) {
+    if (shot.bounce) ballBounced = true
+    emitParticles(ports.particles, ports.configOf(shot.id), shot.x, shot.y, shot.img)
+  }
+  let textFrame: HomeRunTextFrame | null = null
+  if (drawsText && effects.textOn) {
+    const isHold = text.stage >= 4
+    const drawn = drawHomeRunTextOnce(text)
+    textFrame = drawn.frame
+    text = drawn.next
+    if (isHold && fireworks !== null && ports.random !== undefined) {
+      fireworks = tickHomeRunFireworks(fireworks, fireworksPortOf(ports.particles, ports.configOf), ports.random)
+    }
+  }
+  return { effects: { ...effects, text, fireworks, ballBounced }, text: textFrame, distanceBoard }
+}
+
+/**
  * 키 건너뛰기 0x519cc(51a0a~51a32) — +0x1960 = 0(글자 끄기) · 0x8fc70(홈런 효과 칸 버리기) · 파티클 +0x57 = 0 · 0x6dee4(파티클 치우기).
  * 글자 칸(+0x1961~)과 +0x36 은 안 건드린다. 같은 처리의 소리 끊기 0x6e418(0x519fe)은 부르는 쪽(`DefensePlayback`)이 소리 포트 `stop` 으로 한다.
  */

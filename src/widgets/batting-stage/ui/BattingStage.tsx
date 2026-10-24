@@ -20,6 +20,7 @@ import {
   hitParticleInputOf,
   specialSwingParticlesOf,
 } from '@/widgets/batting-stage/lib/hitParticles'
+import { hitFlameAnimationOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import { platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
 import { pitchVibrationMillisecondsOf } from '@/widgets/batting-stage/lib/pitchVibration'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
@@ -345,7 +346,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     // 공용 창(히든 오픈 알림 등)이 떠 있으면 경기 장면 갱신이 멈춘다 (0x52cc6)
     isSceneFrozen: isCommonWindowOpen,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, phaseEntryRef, hitSkipKeyTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, phaseEntryRef, hitSkipKeyTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, isHitByPitchResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -448,6 +449,11 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
           emitParticles(particlesRef.current, particleConfigOf(particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
         }
       }
+      // 같은 갈래의 그림 — game_effect 애니 2 · 3 을 타격점에 (49fe6~4a0a2, `batterOverlayMarks`). 고르기는 ptc 와 같은 판정이다
+      const flameAnimation =
+        specialEffect !== null || pattern === null || contact === null
+          ? null
+          : hitFlameAnimationOf(hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit)), watchesBigHit)
       pendingHitRef.current = {
         ticks: hitPauseTicksOf(pauseInput),
         detail: result.detail,
@@ -460,6 +466,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
         resultText,
         buntKind: sceneBuntKindOfThisPitch(),
         specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
+        hitFlame: flameAnimation === null || contact === null ? null : { animation: flameAnimation, x: contact.x, y: contact.y },
       }
       // 0x6aa 가 이 틀(판정 틱)의 갱신에서 0x13 을 예약한다 — 0x13 은 다음 틀이 틱 0 이다(`phaseEntryRef`)
       hitSkipKeyTickRef.current = null
@@ -488,6 +495,8 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     homeRunStartTickRef.current = isHomeRun ? tick + 1 : null
     resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
     isInPlayResultRef.current = false
+    // 사구(st[0x12]) — 0x12 틱 0~7 에 타자 머리 위 표시(4a0ce, `batterOverlayMarks`)
+    isHitByPitchResultRef.current = detail.resolution.kind === '사구'
     phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
     // 0x12 는 다음 틀이 틱 0, 문턱 갱신이 예약한 다음 상태는 그 `resultTicks` 틀 뒤에 선다(0x4e6d4 → 판정 A)
     markSceneStateEntries(
@@ -559,6 +568,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
     resultTicksRef.current = RESULT_PHASE_TICKS
     isInPlayResultRef.current = true
+    isHitByPitchResultRef.current = false
     phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
     markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.인플레이 })
     latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)

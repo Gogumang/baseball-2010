@@ -60,7 +60,7 @@ export function bigHitReleaseTickOf(frozenDraws: readonly number[] = []): number
 
 /**
  * 0x13 틱 `stateTick` 의 그림 — 감상 플래그가 꺼진 타구(`watchesBigHit` 거짓)는 4cb7c 에서 끝나 null.
- * `point` 는 타격점의 화면 자리(웹은 맞은 틱의 공 자리 근사 — `BattingStage` 의 `contact`), `side` 는 +0x17e1(타자 손).
+ * `point` 는 타격점의 화면 자리(공 도착점 `platePixelOf` — `BattingStage` 의 `contact`), `side` 는 +0x17e1(타자 손).
  * `frozenDraws` 는 이 그림 앞의 창 첫 그림 자리(`bigHitReleaseTickOf`) — 창이 선 첫 그림은 `stateTick` = 마지막 갱신 틱 + 1 로,
  * 그 그림 앞의 자리만 넘겨 부른다.
  */
@@ -111,7 +111,7 @@ export function bigHitZoomCenterOf(side: number, width: number, height: number):
   return { x: Math.trunc((width * x) / 480), y: Math.trunc((height * y) / 390) }
 }
 
-/** 4cc7a — 흐리기 n (멈춤 갈래 2 · 뒤 갈래 1) */
+/** 흐리기 n — 멈춤 갈래 4cc52 `movs r3, #2` · 뒤 갈래 4cdc6 `movs r3, #1` (감사 2026-10-24: 예전 주소 4cc7a 는 번쩍임 표 복사 크기 자리였다) */
 export const BIG_HIT_HOLD_BLUR = 2
 export const BIG_HIT_FOLLOW_BLUR = 1
 

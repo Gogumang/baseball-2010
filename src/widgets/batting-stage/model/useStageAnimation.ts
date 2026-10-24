@@ -62,6 +62,7 @@ import {
 } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
+import { hitByPitchMarkDrawCallOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import {
   createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
@@ -123,6 +124,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     pendingHitRef,
     resultTicksRef,
     isInPlayResultRef,
+    isHitByPitchResultRef,
     swingRef,
     pitchJudgedRef,
     heldResultRef,
@@ -623,6 +625,21 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       return { ...effect, drawCall: sceneTick - phaseStartTickRef.current + 2 }
     }
 
+    /** 보통 타격 불꽃 0x49e64 49faa~4a0a2 — 필살 그림과 같은 부름 차례(맞은 틀 J 가 첫 부름, 0x13 틱 d 가 d + 2 번째, `batterOverlayMarks`) */
+    const hitFlameNow = (sceneTick: number) => {
+      const flame = pendingHitRef.current?.hitFlame ?? null
+      if (flame === null) return null
+      if (phaseRef.current === '투구중' && phaseEntryRef.current?.phase === '타격') return { ...flame, drawCall: 1 }
+      if (phaseRef.current !== '타격') return null
+      return { ...flame, drawCall: sceneTick - phaseStartTickRef.current + 2 }
+    }
+
+    /** 사구 표시 0x49e64 4a0ce — 사구 0x12 의 틱 0~7 그림 (`batterOverlayMarks`) */
+    const hitByPitchMarkNow = (sceneTick: number) => {
+      if (phaseRef.current !== '결과' || isInPlayResultRef.current || !isHitByPitchResultRef.current) return null
+      return hitByPitchMarkDrawCallOf(sceneTick - phaseStartTickRef.current)
+    }
+
     /**
      * 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 확인 대기가 적은 상태 경계(`sceneStateEntries`)로 0xd · 0xe 를 가르고 틱은 0xe 진입부터
      * 센다(0xe 진입 0x50674 가 필살 판 애니를 되감는다). 경계가 없으면 쉬기 시작한 뒤 틱
@@ -886,6 +903,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         ),
         // 필살 스윙 연출 그림 0x49aec — 맞은 틀(0x11)에 처음, 이어 상태 0x13('타격') 그림마다 (k = 단계 틱 + 2, `specialSwingEffect`)
         specialSwingEffect: specialSwingEffectNow(sceneTick),
+        // 0x49e64 꼬리 — 보통 타격 불꽃(game_effect 애니 2 · 3) · 사구 표시(player_effect 애니 14) (`batterOverlayMarks`)
+        hitFlame: isBackdrop ? null : hitFlameNow(sceneTick),
+        hitByPitchMarkDraw: isBackdrop ? null : hitByPitchMarkNow(sceneTick),
         // 큰 타구 0x13 그리기 0x4cb1c 의 꼬리(확대 · 흐리기 · 번쩍임 · 테두리 / 애니 3) — 0x13 틱으로 센다 (`bigHitScreen`)
         bigHitScreen:
           hitNow === null || isBackdrop
