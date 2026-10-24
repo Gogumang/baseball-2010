@@ -69,3 +69,65 @@ export function appTickStartTime(tick: number): number {
 export function resetAppTickClockForTest(): void {
   appClock.reset()
 }
+
+/**
+ * **틱 머리마다 부르는 setInterval** — `setInterval(콜백, millisecondsPerFrame())` 은 건 때부터 재므로 부품마다 틱 안쪽 다른 자리에서
+ * 울린다. 이 시계는 시계 `clock` 의 틱 머리에 맞춰 울린다(건 뒤 첫 머리부터, 머리 하나에 한 번). `now` 는 그 시계가 재는 지금 시각,
+ * `stands` 가 참이면 시계가 서 있다고 보고 실제 시각 한 틀마다 울린다(경기 장면 시계가 공용 창 아래에서 설 때 — 부르는 쪽이 그때를 거른다).
+ * 돌려준 함수로 거둔다.
+ */
+export function setTickInterval(
+  callback: () => void,
+  clock: { readonly now: () => number; readonly tickOf: (time: number) => number; readonly startTimeOf: (tick: number) => number },
+  stands: () => boolean = () => false,
+): () => void {
+  let handle: ReturnType<typeof setTimeout> | null = null
+  let lastTick = clock.tickOf(clock.now())
+  let isCleared = false
+  const arm = () => {
+    if (isCleared) return
+    const now = clock.now()
+    let delay: number
+    let target: number | null = null
+    if (stands()) {
+      delay = millisecondsPerFrame()
+    } else {
+      target = Math.max(lastTick + 1, clock.tickOf(now) + 1)
+      delay = Math.max(0, clock.startTimeOf(target) - now)
+    }
+    handle = setTimeout(() => {
+      handle = null
+      if (target !== null) {
+        // 시계가 섰다 풀린 사이(창 아래)면 머리에 아직 못 닿았다 — 다시 잰다
+        if (stands() || clock.tickOf(clock.now()) < target) {
+          arm()
+          return
+        }
+        lastTick = target
+      }
+      callback()
+      arm()
+    }, delay)
+  }
+  arm()
+  return () => {
+    isCleared = true
+    if (handle !== null) clearTimeout(handle)
+  }
+}
+
+/** 앱 틱 머리마다 부르는 setInterval (`setTickInterval`) — 경기 장면 밖 화면 · 공용 창의 틀 셈 */
+export function setAppTickInterval(callback: () => void): () => void {
+  return setTickInterval(callback, { now: () => performance.now(), tickOf: appTickOf, startTimeOf: appTickStartTime })
+}
+
+/**
+ * **앱 틱으로 재는 setTimeout** — 지금 앱 틱에서 `ticks` 틱 뒤의 틱 머리에 `callback`. `setTimeout(콜백, n × 틀 길이)` 는 건 때가 틱
+ * 안쪽이라 끝도 틱 안쪽에 선다 — 이 시계는 끝을 앱 틱 격자에 맞춘다. 돌려준 함수로 거둔다.
+ */
+export function setAppTickTimeout(callback: () => void, ticks: number): () => void {
+  const now = performance.now()
+  const due = appTickStartTime(appTickOf(now) + Math.max(0, ticks))
+  const handle = setTimeout(callback, Math.max(0, due - now))
+  return () => clearTimeout(handle)
+}

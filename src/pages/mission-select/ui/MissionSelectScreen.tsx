@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import { CommonPanel, FrameSprite, InsetBox, MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionRewardOf, missionRewardTierOf } from '@/entities/mission/model/missionReward'
@@ -130,13 +130,12 @@ export function MissionSelectScreen({
   const [eventKeyAnswer, setEventKeyAnswer] = useState<EventMissionAnswer | null>(null)
   useEffect(() => {
     if (eventKeyAnswer === null || eventWindow !== null) return undefined
-    const timer = window.setTimeout(() => {
+    return setAppTickTimeout(() => {
       setEventKeyAnswer(null)
       // 미션실행 · [미션+0xa4] == 0 → 하위 3(0x1dd06~0x1dd18) 의 키 함수 0x1dc00 이 0x74ef5 알림 · 하위 4 — 미션다운(하위 2 → 통신 —
       // 웹에 없다) · 취소(하위 0)는 목록으로
       if (eventKeyAnswer === '미션실행') setEventWindow('알림')
-    }, millisecondsPerFrame())
-    return () => window.clearTimeout(timer)
+    }, 1)
   }, [eventKeyAnswer, eventWindow])
 
   useEffect(() => {

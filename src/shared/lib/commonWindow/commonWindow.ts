@@ -1,5 +1,5 @@
 import { createContext, useContext, useLayoutEffect } from 'react'
-import { createTickClock } from '@/shared/lib/frameClock/frameClock'
+import { createTickClock, setTickInterval } from '@/shared/lib/frameClock/frameClock'
 
 /**
  * **공용 창 [0x140005c] 이 떠 있는가** — 히든 오픈 알림(0x62368 → 0x74ef5)처럼 앱이 모든 화면 위에 얹는 창.
@@ -307,6 +307,19 @@ export function setGameSceneTickTimeout(callback: () => void, ticks: number): nu
   const now = gameSceneNow()
   const due = gameSceneTickStartTime(gameSceneTickOf(now) + Math.max(0, ticks))
   return setGameSceneTimeout(callback, Math.max(0, due - now))
+}
+
+/**
+ * **장면 틱 머리마다 부르는 setInterval** — `window.setInterval(…, millisecondsPerFrame())` 대신 경기 장면 부품(구질 목록 · 조준 ·
+ * 게이지 따위)이 장면 틱 격자에 맞춰 센다. 공용 창이 서 있는 동안(장면 시계가 선다)은 실제 시각 한 틀마다 부른다 — 부르는 쪽이
+ * `isGameSceneFrozen` 으로 갱신을 거르고 창이 선 첫 그림(`createGameSceneDrawGate`)을 센다. 돌려준 함수로 거둔다.
+ */
+export function setGameSceneTickInterval(callback: () => void): () => void {
+  return setTickInterval(
+    callback,
+    { now: gameSceneNow, tickOf: gameSceneTickOf, startTimeOf: gameSceneTickStartTime },
+    isGameSceneFrozen,
+  )
 }
 
 /** 시험용 — 센 수를 되돌린다 */

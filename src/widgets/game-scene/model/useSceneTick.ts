@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 경기 장면 상태의 **틱** (경기+0x2c) — 상태가 바뀐 틱이 0 이고 갱신마다 1 씩 오른다.
@@ -27,14 +26,14 @@ export function useSceneTick(onTick?: (tick: number) => void, isRunning = true, 
 
   useEffect(() => {
     if (!isRunning) return
-    const handle = window.setInterval(() => {
+    const handle = setGameSceneTickInterval(() => {
       if (!runsUnderCommonWindowRef.current && isGameSceneFrozen()) return
       tickRef.current += 1
       const next = tickRef.current
       setTick(next)
       onTickRef.current?.(next)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(handle)
+    })
+    return () => handle()
   }, [isRunning])
 
   return tick

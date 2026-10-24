@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 
 /**
  * **이벤트 재생의 끝 틀** — 나리 114 · 시즌 0xd3 (직접 떴다).
@@ -13,7 +13,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
  * 공통 틀 0x9f60 — 같은 커맨드 줄 · 상태판(0) · 머리띠).
  *
  * 곧 이벤트가 끝나면 **한 틀** 동안 대화창 없는 그 그림이 서고, 다음 틀에 다음 상태로 넘어간다. 웹은 끝을 받으면 그 한 틀
- * (`millisecondsPerFrame` — 속도 설정의 갱신 간격) 동안 `isEnding` 을 세우고, 그 뒤에 넘긴다.
+ * (다음 앱 틱 머리까지 — `setAppTickTimeout`) 동안 `isEnding` 을 세우고, 그 뒤에 넘긴다.
  */
 export function useEventEndFrame<A extends readonly unknown[]>(complete: (...args: A) => void): {
   readonly isEnding: boolean
@@ -24,11 +24,11 @@ export function useEventEndFrame<A extends readonly unknown[]>(complete: (...arg
   completeRef.current = complete
   useEffect(() => {
     if (pending === null) return
-    const timer = setTimeout(() => {
+    const clear = setAppTickTimeout(() => {
       setPending(null)
       completeRef.current(...pending)
-    }, millisecondsPerFrame())
-    return () => clearTimeout(timer)
+    }, 1)
+    return clear
   }, [pending])
   return { isEnding: pending !== null, end: (...args: A) => setPending(args) }
 }

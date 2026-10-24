@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
@@ -101,14 +101,14 @@ export function EventDialogueBox({
   layoutRef.current = typingLayout
   // 명령이 돌거나 상자를 내린 틀은 위에서 이미 그렸다 — 다음 그리기는 한 틀 뒤다(틀 시계를 그 틀에 맞춘다)
   useEffect(() => {
-    const tick = window.setInterval(() => {
+    const tick = setAppTickInterval(() => {
       const next = tickDialogue(stateRef.current, layoutRef.current)
       stateRef.current = next
       setState(next)
       // 0x7fd9a — 다 올라온 그리기마다 넘김 표시를 그리고 한 칸 돌린다(0x93d90)
       if (next.height === EVENT_DIALOGUE.boxHeight) setCursorUpdates((count) => count + 1)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(tick)
+    })
+    return () => tick()
   }, [textKeySeen, lowerKeySeen])
   const isUp = state.height === EVENT_DIALOGUE.boxHeight
   const onAdvanceRef = useRef(onAdvance)

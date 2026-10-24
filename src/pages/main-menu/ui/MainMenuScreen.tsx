@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
@@ -223,8 +223,7 @@ export function MainMenuScreen({
   tenthTickRef.current = onTopMenuTenthTick
   useEffect(() => {
     if (!isWheel) return undefined
-    const timer = window.setTimeout(() => tenthTickRef.current?.(), millisecondsPerFrame() * TOP_MENU_REWARD_TICK)
-    return () => window.clearTimeout(timer)
+    return setAppTickTimeout(() => tenthTickRef.current?.(), TOP_MENU_REWARD_TICK)
   }, [isWheel])
   const entries = entriesOf(state.tier)
   const selectedId = selectedIdOf(state)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen } from '@/shared/ui'
 import { InputModeBox, inputModeLayoutOf } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -8,7 +9,6 @@ import {
 } from '@/entities/career/model/playerCareer'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { TEAMS } from '@/shared/config/original/teams'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { batterLayerPaletteIndex, batterLayersOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
@@ -114,8 +114,8 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
 
   // 커서 깜빡임용 틱. 원본은 게임 루프의 갱신 횟수([this+0x2c])를 그대로 쓴다
   useEffect(() => {
-    const timer = window.setInterval(() => setTick((previous) => previous + 1), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    const timer = setAppTickInterval(() => setTick((previous) => previous + 1))
+    return () => timer()
   }, [])
 
   useEffect(() => {

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { GAUGE_LAST_CELL } from '@/entities/pitcher-career/model/pitchGauge'
 import {
   gaugePressedCellOf,
@@ -14,7 +13,7 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import { createGameSceneDrawGate, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 
 interface PitchGradeGaugeProps {
   /**
@@ -111,7 +110,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   useEffect(() => {
     if (isPaused) return
     const drawGate = createGameSceneDrawGate()
-    const handle = window.setInterval(() => {
+    const handle = setGameSceneTickInterval(() => {
       if (releasedRef.current) return
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신을 건너뛴다 — 상태 틱이 안 오르고 닫히면 이어 오른다.
       // 커서 · 결과 원 틱은 그리기 0x4d2ac 가 올리는 칸이라 창이 선 첫 그림([창+0x250], 52efe)에만 한 번 더 오른다
@@ -131,8 +130,8 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
         cursorRef.current += 1
         setCursor(cursorRef.current)
       }
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(handle)
+    })
+    return () => handle()
   }, [isPaused])
 
   const press = () => {

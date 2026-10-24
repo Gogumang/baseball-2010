@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { useMarksCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
@@ -137,7 +137,7 @@ export function usePopupWindowMotion({
   const isMoving = openingHeight !== null || closingWidth !== null
   useEffect(() => {
     if (!isMoving || isClosedRef.current) return undefined
-    const timer = window.setInterval(() => {
+    const timer = setAppTickInterval(() => {
       if (isClosedRef.current) return
       if (openingRef.current !== null) {
         const next = expandsRef.current ? nextPopupOpeningHeight(openingRef.current, targetHeight) : null
@@ -152,8 +152,8 @@ export function usePopupWindowMotion({
       if (next === null) return finish()
       closingRef.current = next
       setClosingWidth(next)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    })
+    return () => timer()
   }, [isMoving, targetHeight, finish])
 
   const acceptsKeys = useCallback(

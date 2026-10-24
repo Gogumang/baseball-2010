@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { InputHTMLAttributes } from 'react'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import * as styles from '@/shared/ui/InputMethodText/InputMethodText.css'
 
 /**
@@ -44,11 +44,11 @@ function useCursorBlinkCount(isCursorOn: boolean): number {
   const [count, setCount] = useState(cursorBlinkCount)
   useEffect(() => {
     if (!isCursorOn) return
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let lastFrame = -1
     let handle = 0
     const tick = (now: number) => {
-      const frame = Math.floor((now - startedAt) / millisecondsPerFrame())
+      const frame = Math.max(0, appTickOf(now) - startTick)
       if (frame > lastFrame) {
         cursorBlinkCount += frame - lastFrame
         lastFrame = frame

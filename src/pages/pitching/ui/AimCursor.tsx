@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
   AIM_STILL,
@@ -14,7 +13,7 @@ import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import { createGameSceneDrawGate, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 import { subscribeInGameMenuStarOpen } from '@/features/play-team-game/model/useInGameMenuState'
 
 interface AimCursorProps {
@@ -83,14 +82,14 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   useEffect(() => {
     if (isPaused) return
     const drawGate = createGameSceneDrawGate()
-    const handle = window.setInterval(() => {
+    const handle = setGameSceneTickInterval(() => {
       if (isDoneRef.current) return
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신(0x39c5c 조준점 이동)을 건너뛴다 — 닫히면 이어 돈다.
       // 애니 0 칸은 그림마다 나가는 그리기 쪽이라 창이 선 첫 그림([창+0x250], 52efe)에만 한 번 더 나간다
       if (!isGameSceneFrozen()) tickRef.current()
       if (drawGate.allowsDraw()) setDrawTick((previous) => previous + 1)
-    }, millisecondsPerFrame())
-    return () => window.clearInterval(handle)
+    })
+    return () => handle()
   }, [isPaused])
 
   const apply = (action: AimKeyAction) => {

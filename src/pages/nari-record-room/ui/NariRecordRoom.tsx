@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import type { CSSProperties } from 'react'
 import { CommonPanel, RawScreen, ScreenOverlay, useImgTextPalette3 } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
@@ -196,8 +196,8 @@ function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecor
   const isSliding = view.slide !== null
   useEffect(() => {
     if (!isSliding) return undefined
-    const timer = window.setInterval(() => setView((held) => advanceYearSlide(held, columns.length)), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    const timer = setAppTickInterval(() => setView((held) => advanceYearSlide(held, columns.length)))
+    return () => timer()
   }, [isSliding, columns.length])
 
   const layout = YEAR_TABLE_LAYOUT

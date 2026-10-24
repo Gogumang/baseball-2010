@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -18,7 +19,6 @@ import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
 import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeFlowState } from '@/pages/general-mode/lib/generalModeFlow'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart,
 } from '@/pages/general-mode/lib/quickStart'
@@ -239,7 +239,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
 
   useEffect(() => {
     if (respinTick === null) return undefined
-    const timer = window.setTimeout(() => {
+    return setAppTickTimeout(() => {
       const tick = respinTick + 1
       if (tick < QUICK_RESPIN_TICKS) {
         const teams = rollQuickRespinTeams(random, openStateRef.current)
@@ -255,8 +255,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       setRespinBuilt(null)
       setRespinTick(null)
       bumpBlockWrite()
-    }, millisecondsPerFrame())
-    return () => window.clearTimeout(timer)
+    }, 1)
   }, [respinTick, flow.setup, random, bumpBlockWrite])
   const isRespinning = respinTick !== null
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { MenuTurnDirection } from '@/pages/main-menu/lib/mainMenuLayout'
 
 export interface MenuTurn {
@@ -45,11 +45,11 @@ export function useMenuTurn(cursor: number, count: number, ticks: number): MenuT
     }
 
     setTurn({ fromCursor: from, direction, counter: 0 })
-    const startedAt = performance.now()
+    const startTick = appTickNow()
     let handle = 0
     const tick = (now: number) => {
-      // rAF 가 startedAt 직전 타임스탬프로 들어올 때가 있어 0 아래로는 안 내려가게 막는다
-      const counter = Math.max(0, Math.floor((now - startedAt) / millisecondsPerFrame()))
+      // rAF 가 켠 틱 직전 타임스탬프로 들어올 때가 있어 0 아래로는 안 내려가게 막는다
+      const counter = Math.max(0, appTickOf(now) - startTick)
       if (counter >= ticks) {
         setTurn(STILL)
         return

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp } from '@/shared/ui'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -7,7 +8,6 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { roundEdgePaintsOf } from '@/shared/lib/commonPanel/commonPanel'
 import { InputModeBox } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { MAXIMUM_NAME_BYTES, nameByteLengthOf } from '@/entities/career/model/playerCareer'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
@@ -147,8 +147,8 @@ export function PitcherRegisterScreen({
   useEffect(() => {
     if (phase !== '변화구') return undefined
     setPitchTick(0)
-    const timer = window.setInterval(() => setPitchTick((previous) => previous + 1), millisecondsPerFrame())
-    return () => window.clearInterval(timer)
+    const timer = setAppTickInterval(() => setPitchTick((previous) => previous + 1))
+    return () => timer()
   }, [phase])
 
   /** 카드가 읽는 새 선수 레코드 — 등록 진입 0x17360 이 만든 것이라 스킬 · 장비가 없다 */
