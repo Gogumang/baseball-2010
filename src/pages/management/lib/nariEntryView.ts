@@ -152,7 +152,12 @@ function nariPitcherCellsOf(cells: NariEntryCellSource | undefined, teamId: numb
   }
 }
 
-/** 마선수 줄 — XlsACE 행을 통째 베낀 레코드(0xb521c · 0xb53f0): 줄은 표의 `recordLine`. ⚠️ 미확인: 마투수 +0x2c 는 가득으로 둔다 */
+/**
+ * 마선수 줄 — XlsACE 행을 통째 베낀 레코드(0xb521c · 0xb53f0): 줄은 표의 `recordLine`. 마투수 +0x2c 는 XlsACE_PIT_DATA 다섯 행 모두
+ * 0x2710(10000, r165 표 바이트 확인)이고 CPU 경기 준비 0xb88c8 → 0xb521c 가 경기마다 그 값으로 8번 칸을 다시 베낀다(P1 3-0).
+ * ⚠️ 미확인(남김): 경기가 깎은 끝 값이 팀 레코드 8번 칸에 남아 143 이 그 값을 읽는다 — 웹은 리그 하루(`playLeagueDay` 의
+ * `acePitcherStaminas`)가 내놓는 그 값을 커리어에 쌓지 않아(저장 꼴 변화 · 하루 끝 회복 0xb617c 가 8번 칸을 도는지 미확인) 가득으로 둔다
+ */
 function aceCellsOf(cells: NariEntryCellSource | undefined, recordLine: readonly number[], isPitcher: boolean, staminaAbility: number) {
   if (cells === undefined) return {}
   if (!isPitcher) return { batterLine: entryBatterLineOfRecord(recordLine) }

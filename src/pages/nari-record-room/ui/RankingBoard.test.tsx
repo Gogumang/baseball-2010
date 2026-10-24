@@ -24,4 +24,15 @@ describe('순위 판 0x5796c 그리기', () => {
     expect(container.querySelector('img[alt="다음 쪽"]')).not.toBeNull()
     expect(container.querySelector('img[alt="앞 쪽"]')).toBeNull()
   })
+
+  it('[판+0x40c] 키 수가 % 8 > 4 이면 쪽 화살이 2 줄어든 자리로 (57b74 · 57c08)', () => {
+    const 판 = (keyCount: number) => render(
+      <RankingBoard kind={12} kindLabelFrame={172} entries={[]} myTeamId={3}
+        hasPreviousPage hasNextPage={false} testIdPrefix="기록순위" keyCount={keyCount} />,
+    )
+    const 앞 = Number.parseFloat((판(0).container.querySelector('img[alt="앞 쪽"]') as HTMLElement).style.left)
+    cleanup()
+    const 뒤 = Number.parseFloat((판(5).container.querySelector('img[alt="앞 쪽"]') as HTMLElement).style.left)
+    expect(뒤 - 앞).toBe(2)
+  })
 })

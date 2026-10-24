@@ -22,7 +22,7 @@ import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoSt
 import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { NariYearCoverScreen, YearCoverBlackFrame } from '@/pages/management/ui/NariYearCoverScreen'
+import { NariYearCoverScreen, YearCoverResumeLeftFrame } from '@/pages/management/ui/NariYearCoverScreen'
 import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
@@ -408,6 +408,7 @@ function PitcherLeagueScreens({
     return (
       <EndingScreen
         playerName={career.name}
+        isResumed={session.endingFromResume}
         endingIndex={endingIndex}
         seenEventIds={career.seenEventIds}
         bonusGamePoint={pitcherEndingBonusOf(endingIndex)}
@@ -476,7 +477,7 @@ function PitcherLeagueScreens({
     const previousScreenAt = session.yearCoverFromResume
       ? (frame: number) => {
         const underlay = resumeCoverUnderlayAt(frame)
-        if (underlay === '검정') return <YearCoverBlackFrame />
+        if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
         return underlay === '관리' ? <PitcherResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
       }
       : previousScene === '이벤트' ? () => statusBoard : undefined

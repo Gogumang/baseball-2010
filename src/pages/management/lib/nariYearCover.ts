@@ -1,3 +1,6 @@
+import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
+import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
+
 /**
  * **나리 137 새 시즌 "N년차" 표지** (장면 0x106 — 진입 0x1055c · 키 0x106a4 · 틀 0x12190 · 그리기 0x1cc4c, r148 직접 뜸).
  *
@@ -163,21 +166,41 @@ export type YearCoverStep =
  * 9 틀에 끊겨 다시 안 뜬다 — 464 거절 보상에서 끊긴 저장에 대결 대기가 함께 남는 길이 사실상 없어(대기는 다음 105 진입이 먼저
  * 지운다) 웹은 대기를 그대로 둔다.
  */
-export type ResumeCoverUnderlay = '검정' | '관리' | '상태판'
+export type ResumeCoverUnderlay = '앞판' | '관리' | '상태판'
 
 /** 이어하기 길이 0x1b768 을 부른 뒤 105 에 들어서는 틀 (위 표의 4) */
 const RESUME_MANAGEMENT_FRAME = 4
+/** 상태 1 틀 0x13f08 이 13f88~13f9e 에서 [0x15605d4](0, 0, W, H, 4) 로 버퍼를 덮는 단계 */
+const STATE_ONE_COVER_STEP = 4
+/** 위 표에서 상태 1 이 도는 틀 */
+const STATE_ONE_FRAMES: readonly number[] = [1, 3]
 
 /**
- * 이어하기 길의 앞 화면 틀 `frame`(0 = 0x1b768 을 부른 틀) — 100 · 1 은 그리기가 없고 상태 1 이 버퍼에 검정 덮기(단계 4)를 겹쳐
- * 칠해 검게, 105(4 틀)는 0x19f0c = 0x19da4(커맨드 줄 칸 등장 0 · 상태판 · 가운데 판 미끄러짐 첫 자리 · 머리띠 — r163,
- * `NariResumeManagementFrame`), 115 · 114 는 공 무늬 · 상태판 · 머리띠를 그린다(114 0x8b5ac 는 대화창도).
- * ⚠️ 근사: 0 틀의 버퍼(장면 바꾸기 0x37ac 가 남긴 메인 메뉴 그림 — 웹은 앞 화면을 붙잡아 두지 않는다)와 114 의 대화창(연초 내장
- * 이벤트 첫 대사 — 재생기를 이 자리에 세우지 않는다)은 그리지 않는다. 둘 다 효과기가 절반 이상 덮는 틀이다
+ * 이어하기 길의 앞 화면 틀 `frame`(0 = 0x1b768 을 부른 틀) — 100 · 1 은 그리기가 없어 **버퍼에 남은 앞 장면 그림**(장면 바꾸기
+ * 0x37ac 직전 틀 — 웹은 같은 커밋에 내려간 앞 화면 판, `LeftFrame`) 위에 상태 1 이 검정 덮기(단계 4)를 겹쳐 칠한다
+ * (`resumeLeftFrameCoverOpacityAt`). 105(4 틀)는 0x19f0c = 0x19da4(커맨드 줄 칸 등장 0 · 상태판 · 가운데 판 미끄러짐 첫 자리 ·
+ * 머리띠 — r163, `NariResumeManagementFrame`), 115 · 114 는 공 무늬 · 상태판 · 머리띠를 그린다(114 0x8b5ac 는 대화창도).
+ * ⚠️ 근사: 114 의 대화창(연초 내장 이벤트 첫 대사 — 재생기를 이 자리에 세우지 않는다)은 그리지 않는다. 효과기가 절반 이상 덮는 틀이다
  */
 export function resumeCoverUnderlayAt(frame: number): ResumeCoverUnderlay {
-  if (frame < RESUME_MANAGEMENT_FRAME) return '검정'
+  if (frame < RESUME_MANAGEMENT_FRAME) return '앞판'
   return frame === RESUME_MANAGEMENT_FRAME ? '관리' : '상태판'
+}
+
+/**
+ * '앞판' 틀(0~3)에 남은 판 위에 깔 검정의 불투명도 — 100 · 1 은 버퍼를 다시 그리지 않아 덮개가 **쌓인다**(r165).
+ * 틀 k 의 끝 화면 = 남은 판 × Π(상태 1 덮기 4/16) × Π(효과기 0xbd844 가 틀마다 칠한 몫, 장면 틀 끝 1d4a4). 웹은 그 틀의 효과기를
+ * 따로 한 겹 칠하므로(`NariYearCoverScreen`) 여기는 앞 틀들까지의 효과기와 이 틀까지의 상태 1 덮기만 곱한다.
+ */
+export function resumeLeftFrameCoverOpacityAt(frame: number): number {
+  let remaining = 1
+  for (let k = 0; k < frame; k += 1) {
+    remaining *= 1 - (screenEffectFrameAt('검정에서밝아짐', '검정', k)?.overlay?.opacity ?? 0)
+  }
+  for (const k of STATE_ONE_FRAMES) {
+    if (k <= frame) remaining *= 1 - blackStepCoverOpacityOf(STATE_ONE_COVER_STEP)
+  }
+  return 1 - remaining
 }
 
 /** 앞 화면이 어두워지는 틀 수 + 137 예약 틀 */

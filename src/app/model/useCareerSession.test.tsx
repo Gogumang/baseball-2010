@@ -292,7 +292,8 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
 
     const 다시 = 열기(saveGame)
     act(() => 다시.result.current.session.actions.continueSaved())
-    expect(다시.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
+    // 이어하기 100 진입 1c24e 길 — 단계 0 의 남은 판에 상태 1 의 덮기가 얹힌다 (`EndingScreen.isResumed`)
+    expect(다시.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5, fromResume: true })
     act(() => 다시.result.current.session.actions.receiveEndingBonus())
     expect(다시.result.current.session.career?.gamePoint).toBe(12_000)
   })
@@ -319,7 +320,8 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     expect(saveGame.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true })
     expect(처음.result.current.session.savedCareer?.endingIndex).toBe(5)
     act(() => 처음.result.current.session.actions.continueSaved())
-    expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5 })
+    // 이어하기 100 진입 1c24e 길 — 단계 0 의 남은 판에 상태 1 의 덮기가 얹힌다 (`EndingScreen.isResumed`)
+    expect(처음.result.current.screen).toEqual({ kind: '엔딩', endingIndex: 5, fromResume: true })
 
     // 등록이 된 그 순간(0x62dbe) 지운다 — 완료 창을 닫기 전, 그 사이 커리어가 바뀌어도(지갑 다리의 G) 다시 쓰지 않는다
     act(() => 처음.result.current.session.actions.eraseSaveForHallOfFame())

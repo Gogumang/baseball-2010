@@ -6,6 +6,7 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { RecordPickPopup } from '@/widgets/record-pick-popup'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { RankingBoard } from '@/pages/nari-record-room/ui/RankingBoard'
+import { isRankingBoardKey } from '@/pages/nari-record-room/lib/rankingBoard'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { moveRankingPage, rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRanking'
@@ -302,14 +303,21 @@ interface NariRankingScreenProps {
 function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRankingScreenProps) {
   const side = nariRankingSideOf(edition)
   const [page, setPage] = useState(0)
+  /** [판+0x40c] — 124 진입 0x116d4 → 0x5761c → 0x5561c 가 0 으로 둔다(이 화면이 설 때) */
+  const [keyCount, setKeyCount] = useState(0)
   const latest = useRef({ onBack })
   latest.current = { onBack }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isCancelKey(event.key)) latest.current.onBack()
-      else if (event.key === 'ArrowRight' || event.key === '6') setPage((held) => moveRankingPage(side, held, 1))
-      else if (event.key === 'ArrowLeft' || event.key === '4') setPage((held) => moveRankingPage(side, held, -1))
-      else return
+      else if (!isRankingBoardKey(event.key)) return
+      else {
+        // 0x1463c → 판 키 0x5787d: 좌·우는 쪽을 옮기고, 어느 키든 끝에서 [판+0x40c] + 1 (5793e~57948).
+        // 취소도 0x6a 예약 뒤 같은 키로 떨어지지만 다음 틀 머리에 화면이 바뀌어 그 값으로 다시 그리지 않는다
+        if (event.key === 'ArrowRight' || event.key === '6') setPage((held) => moveRankingPage(side, held, 1))
+        else if (event.key === 'ArrowLeft' || event.key === '4') setPage((held) => moveRankingPage(side, held, -1))
+        setKeyCount((count) => count + 1)
+      }
       event.preventDefault()
       event.stopPropagation()
     }
@@ -325,7 +333,7 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`순위기록 ${side} ${category.label}`}>
         <RankingBoard kind={category.kind} kindLabelFrame={category.labelFrame} entries={entries} myTeamId={career.teamId}
-          hasPreviousPage={page > 0} hasNextPage={page < categories.length - 1} testIdPrefix="순위기록" />
+          hasPreviousPage={page > 0} hasNextPage={page < categories.length - 1} testIdPrefix="순위기록" keyCount={keyCount} />
       </div>
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
     </RawScreen>

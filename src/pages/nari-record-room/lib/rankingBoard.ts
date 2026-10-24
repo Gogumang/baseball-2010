@@ -26,7 +26,11 @@ import type { YearCellDrawing } from '@/pages/nari-record-room/lib/nariRecordRoo
  * 기록연감 0x2e29c · 0x58d10 · 0x593c8 · 0x5d054 (re.py 로 `movs #0x82; lsls #3` 전수) — 이고, 0x5796c 는 읽기만 하며(0x579ca) 0xdb 그리기
  * 0xafa8 은 0x5796d · 0x7f4ed(바닥 5 — 비트 0x40 없음)뿐이라 이 화면에서는 안 오른다 → 앞 화면들이 남긴 값에 멈춘다.
  * 그 값은 웹도 앱에 하나인 `skinBlinkCounterValue()`(U-90)로 든다 — 앱을 켤 때 0, 0 으로 되돌리는 곳은 없다.
- * ⚠️ 미확인(남김): [판+0x40c] 를 올리는 곳은 못 찾았다(상수 0x40c 를 만드는 movs/lsls · 리터럴 없음) — 0 으로 둔다.
+ * [판+0x40c] 는 **키 카운터**다(r165 확정 — re.py xval 0x40c 로 리터럴 0x57cbc 등 22 곳 전수): 순위 판 준비 0x5761c(시즌 0xdb 진입
+ * 0x56fc · 나리 124 진입 0x116d4 가 부른다)가 두 갈래 모두 목록 준비 0x5561c(556c4~556d0 `[판+0x40c] = 0`)를 불러 **진입마다 0**,
+ * 판 키 0x5787c 끝 5793e~57948 이 쪽이 바뀌든 말든 **키마다 + 1**. 키 0x5787c 를 부르는 곳은 시즌 0xdb 키 0x74c4(취소 −16 이면 0xcd 로만
+ * 가고 안 부른다 — 74cc~74de)와 나리 124 키 0x1463c(취소면 0x6a 를 예약한 뒤에도 떨어져 내려와 부른다 — 다음 틀 머리에 상태가 바뀌어
+ * 그 값으로 다시 그리지 않는다) 둘이다. 그 밖에 올리는 곳(목록 키 0x55864 · 0x5e8bc · 0x6042c)은 이 판이 떠 있지 않을 때다.
  */
 export const RANKING_BOARD = {
   panel: { x: 15, y: 55, width: 210, height: 220 },
@@ -72,7 +76,7 @@ export function rankingColumnXOf(column: number): number {
 /** 줄 i 의 칸 y */
 export const rankingRowYOf = (row: number) => RANKING_BOARD.firstRowY + row * RANKING_BOARD.rowStep
 
-/** 판 깜빡 카운터 — [판+0x410] 은 앱에 하나인 값 · [판+0x40c] 는 ⚠️ 미확인(머리말) */
+/** 판 깜빡 카운터 — [판+0x410] 은 앱에 하나인 값 · [판+0x40c] 는 진입 뒤 키 수(머리말) */
 export interface RankingBlinkCounters {
   /** [판+0x410] */
   readonly drawCount: number
@@ -82,8 +86,17 @@ export interface RankingBlinkCounters {
 
 export const RANKING_BLINK_AT_REST: RankingBlinkCounters = { drawCount: 0, keyCount: 0 }
 
-/** 지금 그릴 카운터 — [판+0x410] 은 앞 화면들이 남긴 값 그대로 · [판+0x40c] 는 0 (⚠️ 미확인) */
-export const rankingBlinkCountersOf = (skinBlinkCount: number): RankingBlinkCounters => ({ drawCount: skinBlinkCount, keyCount: 0 })
+/** 지금 그릴 카운터 — [판+0x410] 은 앞 화면들이 남긴 값 그대로 · [판+0x40c] 는 이 화면에 들어온 뒤 판 키 0x5787c 를 부른 수 */
+export const rankingBlinkCountersOf = (skinBlinkCount: number, keyCount: number): RankingBlinkCounters => ({
+  drawCount: skinBlinkCount, keyCount,
+})
+
+/**
+ * 판 키 0x5787c 까지 내려가는 키 — 웹 키 가운데 폰 키(방향 · 확인 · 숫자 · * · #)로 옮긴 것. 취소는 부르는 쪽이 따로 거른다
+ * (시즌 0x74c4 는 취소를 안 넘긴다 · 나리 0x1463c 는 넘기지만 그 틀로 화면이 끝난다).
+ */
+export const isRankingBoardKey = (key: string): boolean =>
+  /^[0-9*#]$/.test(key) || key === 'Enter' || key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown'
 
 /** 쪽 화살 x — 왼쪽(◀) · 오른쪽(▶ 뒤집기) */
 export function rankingSideArrowXOf(side: 'left' | 'right', counters: RankingBlinkCounters): number {

@@ -3014,7 +3014,8 @@ export function useSeasonSession(
    * 0x8bd8 의 8ccc~8d2c 가 팝업 없이 단계 1 이고 전환이 끝나면 **SR+0x1bc = 1** · 저장(0x1fded · 0x22755) · 0xbcb49(0xc9) ·
    * 전환(종류 2). 곧 엔딩 뒤는 메인 메뉴가 아니라 관리 메뉴 0xc9 이고, SR+0x1bc 는 이때 선다 — 그 전에 끄면 phase 6 이라
    * 다시 들어오면 0xf5 로 온다(보너스를 받았으면 SR+0x7b 가 서 있어 팝업 없이).
-   * ⚠️ 근사: 웹은 두 화면 전환(1500ms)을 기다리지 않고 곧바로 넘긴다.
+   * 두 효과기는 화면 쪽이 돈다(r165 확정 — 틱 시계 통일 뒤): 종류 1 은 `SeasonEndingScreen` 이 단계 1 의 `SeasonScreenFade` 끝에서야
+   * 이 함수를 부르고(8cd2~8cee 단계 == 1 · 끝 +0x10 == 2), 종류 2(8d1e~8d2c)는 `SeasonRoute` 가 0xc9 위에 건다. 그래서 여기는 기다리지 않는다.
    */
   const finishEnding = useCallback(() => {
     if (save === null) return

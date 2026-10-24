@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  RANKING_BLINK_AT_REST, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
+  RANKING_BLINK_AT_REST, isRankingBoardKey, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
 } from '@/pages/nari-record-room/lib/rankingBoard'
 
 describe('순위 판 0x5796c', () => {
@@ -19,8 +19,15 @@ describe('순위 판 0x5796c', () => {
   })
 
   it('[판+0x410] 은 앞 화면들이 남긴 앱 하나의 값을 그대로 읽는다 (U-90) — 4 면 꺼짐 ◀ 183 − 0 − 7', () => {
-    expect(rankingBlinkCountersOf(4)).toEqual({ drawCount: 4, keyCount: 0 })
-    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4))).toBe(176)
+    expect(rankingBlinkCountersOf(4, 0)).toEqual({ drawCount: 4, keyCount: 0 })
+    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4, 0))).toBe(176)
+    // [판+0x40c] — 진입 뒤 키 다섯 번이면 % 8 = 5 > 4 라 ◀ 는 −5, ▶ 는 −5 (57b74 · 57c08)
+    expect(rankingSideArrowXOf('left', rankingBlinkCountersOf(4, 5))).toBe(178)
+    expect(rankingSideArrowXOf('right', rankingBlinkCountersOf(4, 5))).toBe(217)
+    expect(isRankingBoardKey('ArrowRight')).toBe(true)
+    expect(isRankingBoardKey('5')).toBe(true)
+    expect(isRankingBoardKey('Escape')).toBe(false)
+    expect(isRankingBoardKey('a')).toBe(false)
   })
 
   it('값 0x6aff8 — 칸 x + 0x19 에서 오른쪽부터, 타율은 점', () => {

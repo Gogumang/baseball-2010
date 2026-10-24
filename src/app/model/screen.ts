@@ -159,7 +159,8 @@ export type Screen =
       /** 142 취소로 돌아왔다 — 135(순위표·다음 경기로)부터 그린다. 135 는 진입 함수가 없다(R9 표) */
       readonly atStandings?: boolean
     }
-  | { readonly kind: '엔딩'; readonly endingIndex: number }
+  /** `fromResume` — 이어하기 100 진입 1c24e(S+0x50 ∈ {6, 7})로 들어왔다 (`EndingScreen.isResumed`) */
+  | { readonly kind: '엔딩'; readonly endingIndex: number; readonly fromResume?: true }
   | { readonly kind: '미션선택' }
   | { readonly kind: '홈런더비' }
   | { readonly kind: '미션진행'; readonly mission: OriginalMission }

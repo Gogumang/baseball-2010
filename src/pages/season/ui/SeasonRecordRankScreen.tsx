@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { RecordPickPopup } from '@/widgets/record-pick-popup'
@@ -6,6 +6,7 @@ import { rankingCategoriesOf } from '@/entities/season-mode/model/seasonRecordRa
 import type { SeasonRankingEntry, SeasonRankingSide } from '@/entities/season-mode/model/seasonRecordRanking'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { RankingBoard } from '@/pages/nari-record-room/ui/RankingBoard'
+import { isRankingBoardKey } from '@/pages/nari-record-room/lib/rankingBoard'
 
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
 
@@ -66,15 +67,23 @@ export interface SeasonRecordRankScreenProps {
 export function SeasonRecordRankScreen({
   side, page, entries, myTeamId, gamePoint = 0, onMovePage, onBack,
 }: SeasonRecordRankScreenProps) {
+  /** [판+0x40c] — 0xdb 진입 0x56fc → 0x5761c → 0x5561c 가 0 으로 둔다(이 화면이 설 때) */
+  const [keyCount, setKeyCount] = useState(0)
   const latest = useRef({ onMovePage, onBack })
   latest.current = { onMovePage, onBack }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
-      if (isCancelKey(event.key)) current.onBack()
-      else if (event.key === 'ArrowRight' || event.key === '6') current.onMovePage(1)
+      if (isCancelKey(event.key)) {
+        current.onBack()
+        event.preventDefault()
+        return
+      }
+      if (!isRankingBoardKey(event.key)) return
+      // 0x74c4 — 취소가 아니면 판 키 0x5787d: 좌·우는 쪽을 옮기고, 어느 키든 끝에서 [판+0x40c] + 1 (5793e~57948)
+      if (event.key === 'ArrowRight' || event.key === '6') current.onMovePage(1)
       else if (event.key === 'ArrowLeft' || event.key === '4') current.onMovePage(-1)
-      else return
+      setKeyCount((count) => count + 1)
       event.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
@@ -89,7 +98,7 @@ export function SeasonRecordRankScreen({
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`기록순위 ${side} ${category.label}`}>
         <RankingBoard kind={category.kind} kindLabelFrame={category.labelFrame} entries={entries} myTeamId={myTeamId}
-          hasPreviousPage={page > 0} hasNextPage={page < categories.length - 1} testIdPrefix="기록순위" />
+          hasPreviousPage={page > 0} hasNextPage={page < categories.length - 1} testIdPrefix="기록순위" keyCount={keyCount} />
       </div>
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
     </RawScreen>

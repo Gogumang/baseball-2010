@@ -5,11 +5,12 @@ import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
   BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, ENDING_IMAGE, ENDING_STAGE, SHORT_ENDING_TEXT_TOP, WALK_IN,
-  creditsTopOf, creditsWalkersOf, endingImageOffsetOf, endingWalkInAnimationOf, endingWalkInPaletteOf,
+  creditsTopOf, creditsWalkersOf, endingImageOffsetOf, endingStageZeroCoverOpacityAt, endingWalkInAnimationOf, endingWalkInPaletteOf,
   irisCircleOf, irisStartTickOf, risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui'
+import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
 vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
@@ -411,6 +412,20 @@ describe('단계 [장면+0xd4] — 효과기 아홉 틀을 기다린다 (0x12300
     틀(4)
     expect(Number(덮개()?.style.opacity)).toBeGreaterThan(앞)
     expect(container.querySelector('[data-part="stage-0"]')?.textContent).toContain('관리 화면')
+  })
+
+  it('단계 0 은 다시 그리지 않아 효과기가 쌓인다 — 앞 틀들의 몫을 곱한 덮개가 남은 판에 얹힌다 (r165)', () => {
+    const 효과기 = (k: number) => screenEffectFrameAt('검정에서밝아짐', '검정', k)?.overlay?.opacity ?? 0
+    expect(endingStageZeroCoverOpacityAt(0, false, 효과기)).toBe(0)
+    expect(endingStageZeroCoverOpacityAt(3, false, 효과기)).toBeCloseTo(1 - (1 - 효과기(0)) * (1 - 효과기(1)) * (1 - 효과기(2)))
+    // 이어하기 141 은 상태 1 의 단계 4 덮기(13f88)가 먼저 4/16 만 남긴다
+    expect(endingStageZeroCoverOpacityAt(0, true, 효과기)).toBeCloseTo(0.75)
+    const { container } = render(
+      <EndingScreen playerName="홍길동" endingIndex={9} bonusGamePoint={3000} isContinuable={false} isResumed
+        hallOfFame={{ collection: EMPTY_COLLECTION, edition: '타자', nari: { 투수: null, 타자: null }, onRegister: vi.fn(() => '등록' as const) }}
+        onContinue={vi.fn(() => true)} onFinish={vi.fn()} />,
+    )
+    expect(Number((container.querySelector('[data-part="stage-0-cover"]') as HTMLElement).style.opacity)).toBeCloseTo(0.75)
   })
 
   it('앞 화면 판이 같은 커밋에 내려가지 않았으면 단계 0 은 검정 판만 둔다', () => {

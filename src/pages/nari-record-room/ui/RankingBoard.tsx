@@ -31,11 +31,13 @@ export interface RankingBoardProps {
   readonly hasNextPage: boolean
   /** 시험용 data-testid 머리 (`기록순위` · `순위기록`) */
   readonly testIdPrefix: string
+  /** [판+0x40c] — 진입(0x5561c 가 0) 뒤 판 키 0x5787c 를 부른 수 (`rankingBlinkCountersOf`) */
+  readonly keyCount?: number
 }
 
 /** **순위 판 0x5796c** — 배치는 `lib/rankingBoard.ts` 머리말(직접 떴다) */
 export function RankingBoard({
-  kind, kindLabelFrame, entries, myTeamId, hasPreviousPage, hasNextPage, testIdPrefix,
+  kind, kindLabelFrame, entries, myTeamId, hasPreviousPage, hasNextPage, testIdPrefix, keyCount = 0,
 }: RankingBoardProps) {
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const centered = (frame: number, column: number, top: number) => {
@@ -63,11 +65,11 @@ export function RankingBoard({
       })}
       {hasPreviousPage && (
         <img alt="앞 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
-          style={{ ...pixel, left: rankingSideArrowXOf('left', rankingBlinkCountersOf(skinBlinkCounterValue())), top: arrowTop }} />
+          style={{ ...pixel, left: rankingSideArrowXOf('left', rankingBlinkCountersOf(skinBlinkCounterValue(), keyCount)), top: arrowTop }} />
       )}
       {hasNextPage && (
         <img alt="다음 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
-          style={{ ...pixel, left: rankingSideArrowXOf('right', rankingBlinkCountersOf(skinBlinkCounterValue())), top: arrowTop, transform: 'scaleX(-1)' }} />
+          style={{ ...pixel, left: rankingSideArrowXOf('right', rankingBlinkCountersOf(skinBlinkCounterValue(), keyCount)), top: arrowTop, transform: 'scaleX(-1)' }} />
       )}
       {Array.from({ length: RANKING_BOARD.rowCount }, (_unused, row) => {
         const entry = entries[row]
