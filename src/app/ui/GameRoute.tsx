@@ -212,8 +212,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     isDrawing: session.loadingTip === null && isIntroDone && !isDefenseShown,
     isFrozen: alertScene.isFrozen,
     isSettled: released.game.isFinished,
-    // ⚠️ 근사: 상태 틱 [+0x2c] 의 경계를 웹 화면 갈래(인트로 · 판 · 벤치 클리어링 · 0xe · 타석)와 공 끝으로 가른다
-    sceneStateKey: !isIntroDone ? 'intro' : `${alertScene.key}-${pitchEnd.serial}`,
+    // 상태 틱 [+0x2c] 의 0 점 — 화면 갈래(인트로 0xc · 판 0x18 · 벤치 클리어링 0x1e · 0xd/0xe 대기 · 타석)가 바뀐 틱과, 갈래 안의
+    // 원본 상태 경계(타석 장면이 적는 0xf · 0x10 · 0x11 · 0x12 · 0x13 예약, 확인 대기가 적는 0xd · 0xe — `sceneStateEntries`) 가운데
+    // 늦은 쪽. 공 끝 번호는 넣지 않는다 — 0x12 끝은 문턱 갱신(0x4e796)이 예약한 다음 상태가 선 틀(타석 장면이 적는다)이 0 이다
+    sceneStateKey: !isIntroDone ? 'intro' : alertScene.key,
     pitchEnd: {
       serial: pitchEnd.serial,
       // 훅의 효과 안에서 불린다 — 그때 releasedRef 는 아직 지난번 값이다(아래 효과가 뒤에 돈다)

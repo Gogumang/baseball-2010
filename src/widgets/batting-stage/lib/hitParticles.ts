@@ -24,7 +24,7 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 /** 타격 불꽃이 쓰는 ptcimg 프레임 (0x4a0ca `r3 = 0xa`) */
 export const HIT_PARTICLE_IMAGE = 10
 
-/** 큰 타구 감상 뒤 상태 19 가 쏘는 파티클 — id 15 → `016.ptc`, 프레임 10 (0x4cd14) */
+/** 큰 타구 멈춤 셈 [+0x10a8] 이 풀리는 0x13 그림(틱 7)이 쏘는 파티클 — id 15 → `016.ptc`, 프레임 10 (0x4cd14, `hitPause.HIT_STOP_TICKS`) */
 export const BIG_HIT_PARTICLE = { id: 15, img: HIT_PARTICLE_IMAGE } as const
 
 /** id 5 → `006.ptc` (홈런성·강한 타구) */

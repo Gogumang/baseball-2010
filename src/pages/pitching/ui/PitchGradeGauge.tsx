@@ -65,8 +65,11 @@ const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
  * 정한 뒤 그림 수)를 싣고, 마우스 길로 목표점 둘레의 **투명한 누름 칸**(OK)만 낸다.
  */
 export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true, overlay }: PitchGradeGaugeProps) {
-  /** 0x11 상태 틱 `[+0x2c]` */
-  const tickRef = useRef(0)
+  /**
+   * 0x11 상태 틱 `[+0x2c]` — 이 부품은 0x10 이 0x11 을 예약한 틀(OK 를 읽은 틀)에 서고, 0x11 은 다음 틀 머리(0xbc9c8 bc9ec)에 틱 0 으로
+   * 선다. 그래서 첫 셈(다음 장면 틱 머리)이 틱 0 이다 — 아직 안 셌으면 −1. 0x4e060 은 `[+0x2c] > 9`(틱 10)에 놓는다
+   */
+  const tickRef = useRef(-1)
   /** 커서 `+0x17bc` */
   const [cursor, setCursor] = useState(0)
   const cursorRef = useRef(0)

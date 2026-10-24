@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useMissionSession } from '@/app/model/useMissionSession'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import type { Screen } from '@/app/model/screen'
@@ -18,13 +20,25 @@ import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 const 진동 = vi.fn<(pattern: VibratePattern) => boolean>(() => true)
 const 원래진동 = Object.getOwnPropertyDescriptor(navigator, 'vibrate')
 beforeEach(() => {
+  vi.useFakeTimers()
   진동.mockClear()
   Object.defineProperty(navigator, 'vibrate', { value: 진동, configurable: true, writable: true })
 })
 afterEach(() => {
+  vi.useRealTimers()
   if (원래진동 === undefined) delete (navigator as { vibrate?: unknown }).vibrate
   else Object.defineProperty(navigator, 'vibrate', 원래진동)
 })
+
+/**
+ * 삼진 진동은 0x12 틱 0 의 그림(0x4d0ba `[+0x2c] == 0`)에 울린다 — 놓은 틱에서 `pitchResultEntryDelayTicksOf` 뒤. 그 전 틱에는 안 울린다
+ */
+function 결과틀까지기다리기(frameCount: number, aceOrder?: number | null) {
+  const delay = pitchResultEntryDelayTicksOf(frameCount, aceOrder)
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame() * (delay - 1)))
+  expect(진동).not.toHaveBeenCalled()
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+}
 
 interface 공기록 {
   readonly strikesBefore: number
@@ -110,6 +124,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number, ac
     진동.mockClear()
     // 코스를 돌려 가며 게이지 없이 직구 — 스트라이크·볼이 섞이게
     act(() => session.handleThrow(PITCH_TYPES[0], aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), 0, false))
+    결과틀까지기다리기(rendered.result.current.lastPitcherThrow?.pitch.frameCount ?? 0)
     const thrown = 판정 as { strikesBefore: number; kind: PitchResolution['kind'] } | null
     기록.push({
       strikesBefore: thrown?.strikesBefore ?? -1,

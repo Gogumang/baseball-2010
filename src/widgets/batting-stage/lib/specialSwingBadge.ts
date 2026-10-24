@@ -72,12 +72,13 @@ export function showsSpecialSwingBadge(phase: StagePhaseSnapshot, remaining: num
 
 /**
  * 이번 그림의 애니 5 칸 — 0xe · 0xf 진입 뒤 그림 k 면 `칸[min(k, 끝)]`, 0x10 · 0x11 은 이미 끝 칸에 멈춰 있다.
- * 웹 '대기' 의 쉬는 동안(0xe)과 쉬지 않는 앞 그림(0xf)이 되감는 자리다.
+ * 웹 '대기' 의 쉬는 동안(0xe — 틱은 0xe 진입부터, 앞 두 그림 0xd 는 `isSceneD` 로 끝 칸)과 쉬지 않는 앞 그림(0xf)이 되감는 자리다.
  */
 export function specialSwingBadgeFrameOf(entries: readonly StageAnimationEntry[], phase: StagePhaseSnapshot): number | null {
   if (entries.length === 0) return null
   const last = entries.length - 1
-  if (phase.kind !== '대기') return entries[last].frame
+  // 0xd(타석 준비)는 되감지 않는다 — 앞 0xf 에서 끝 칸에 멈춘 그대로
+  if (phase.kind !== '대기' || phase.isSceneD === true) return entries[last].frame
   // 지연이 모두 1 이 아니어도 원본 규칙대로 센다 — 칸 길이 max(1, 지연), 끝 칸에 멈춤
   let remaining = Math.max(0, Math.floor(phase.tick))
   for (const entry of entries) {

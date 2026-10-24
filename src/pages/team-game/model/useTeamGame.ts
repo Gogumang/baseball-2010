@@ -73,6 +73,9 @@ import {
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
+import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
 
 /**
  * 팀 경기 한 판을 들고 있는 상태 고리 (일반·시즌·대전 공용).
@@ -314,9 +317,17 @@ export function useTeamGame(
             })
             const resolution = after.lastResolution
             if (resolution === null) return [releaseSound]
-            // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`).
+            // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`). 0x12 틱 0 의
+            // 그림(놓은 틱에서 `pitchResultEntryDelayTicksOf` 뒤 — 마투수면 릴리스 단계가 길다)에 울린다.
             // 우리 공격 반쪽의 삼진은 `BattingStage` 가 울린다
-            vibrate(strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes), isVibrationOnRef.current !== false)
+            const strikeoutMs = strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes)
+            const isVibrationOn = isVibrationOnRef.current !== false
+            if (strikeoutMs > 0) {
+              setGameSceneTickTimeout(
+                () => vibrate(strikeoutMs, isVibrationOn),
+                pitchResultEntryDelayTicksOf(after.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(before).acePitcher?.order),
+              )
+            }
             const nextAtBat = applyPitchResolution(before.atBat, resolution)
             return [
               releaseSound,

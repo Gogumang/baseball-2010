@@ -13,11 +13,16 @@ import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
-import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import {
+  cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf, pitcherSideStateEntriesOf,
+} from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { SCENE_STATE, markSceneStateEntries, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
-import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
+import {
+  createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
+} from '@/widgets/batting-stage/model/sceneCloudClock'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
@@ -162,6 +167,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let shownMistake = false
     let pausedSinceTick = 0
     let wasPaused = false
+    /** 상태 경계를 마지막으로 적은 공(놓은 장면 틱 · 0x12 문턱) */
+    let markedStateEntries = ''
     /** 빈 구질 칸 키(0x50de8 → 투수 그림 상태 2)를 본 표지와 그 장면 틱 — 새 공(상태 1)이 들면 지운다 */
     let seenIdlePress = 0
     let idleStartTick: number | null = null
@@ -226,6 +233,18 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pausedSinceTick,
         aceOrder: current.acePitcher?.order ?? null,
       })
+      // 이 공의 원본 상태 경계(0x11 · 0x12 · 그 끝) — 장면 틱(팝업으로 뺀 틱을 되돌린 값)으로 적는다(`sceneStateEntries`)
+      if (releaseTick !== null && pitch !== null && stage.phase.kind !== '대기') {
+        const resultTicks = resolution !== null && passesHeldResult(resolution) ? current.resultTicks : 0
+        // 판정 · 0x12 문턱은 공보다 한 그림 늦게 들 수 있다 — 바뀔 때만 다시 적는다
+        const marked = `${releaseTick + (sceneTick - nowTick)}-${resultTicks}`
+        if (marked !== markedStateEntries) {
+          markedStateEntries = marked
+          markSceneStateEntries(
+            ...pitcherSideStateEntriesOf(releaseTick + (sceneTick - nowTick), pitch.frameCount, resultTicks, current.acePitcher?.order ?? null),
+          )
+        }
+      }
       const bodyType = bodyTypeOf(current.batterForm)
       const isIdle = stage.phase.kind === '대기'
       // 스윙은 이 공이 날거나 0x12 인 동안만 — 대기로 돌아오면 대기 자세
@@ -253,7 +272,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 0x9e004 는 0xf 갱신 0x39c1c 에서만 대기 동작을 센다 — 0xf 를 떠난 그림의 앞 틱에서 굳는다
       if (idleStartTick !== null && idleEndTick === null && !isSkillPanelStateF) idleEndTick = Math.max(idleStartTick, nowTick - 1)
       // 0x4c92e — "#TIME" 은 상태 0xe · 0xf 만
-      const isTimeState = isIdle && (current.isPaused || pitchInput?.kind === '구질')
+      // 쉬는 대기의 앞 두 그림은 0xd(타석 준비) — 확인 대기가 적은 상태 경계로 가른다(`sceneStateEntries`)
+      const isSceneD = isIdle && current.isPaused && sceneStateEntryAt(sceneTick)?.state === SCENE_STATE.준비
+      const isTimeState = isIdle && ((current.isPaused && !isSceneD) || pitchInput?.kind === '구질')
       const isResult = stage.phase.kind === '결과'
       const side = current.batterSide ?? batterSideOfForm(current.batterForm)
       if (entersStateF) skillPanelStateFSerial += 1
@@ -331,7 +352,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,
         pitcherHand: current.pitcherHand,
-        stagePhase: stage.phase,
+        stagePhase: isSceneD ? { ...stage.phase, isSceneD } : stage.phase,
         pitchInput,
         timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,
         // 필살 남은 횟수 0x38a30 은 38a42 에서 0x33fe4(수비 조작 사람)면 바로 끝 — 사람이 던지는 장면엔 없다
@@ -341,6 +362,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         scenery: {
           // 구름 0x78448 — 0x3f060 은 '대기'(0xd~0x10)에서만 센다. 팝업으로 장면이 선 동안(`isFrozen`)은 안 센다
           cloudCalls: observeSceneCloudFrame(sceneCloudFrameOf(rawNow), isIdle && current.isFrozen !== true, cloudCursor),
+          // 전광판 글자 [구장+0x8c] — 이 장면에서 배경을 처음 그린 틱이 0 (`sceneScoreboardTickOf`)
+          scoreboardTick: sceneScoreboardTickOf(sceneTick),
           skyRow: current.skyRow,
           stadium: current.stadium,
           fieldPalette: current.fieldPalette,

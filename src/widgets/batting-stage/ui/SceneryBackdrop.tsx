@@ -5,7 +5,9 @@ import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
-import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
+import {
+  createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
+} from '@/widgets/batting-stage/model/sceneCloudClock'
 
 /** 배경 고르기 `0x40ff0` 이 쓰는 구장 값 — 틱(구름 · 전광판 흐름)과 세로 밀기는 부르는 쪽이 따로 준다 */
 export type SceneryBackdropStage = Omit<SceneryState, 'tick' | 'offsetY' | 'cloudCalls'>
@@ -24,9 +26,9 @@ interface SceneryBackdropProps {
  *   0x78448 을 상태 0xc 갱신마다 부른다. 로딩 판(상태 9 갱신 0x3f584 가 3f594 에서 구름을 0 으로 둔 뒤 상태 8 두 그림)에서 이미 두 번
  *   셌으므로 인트로 첫 그림이 세 번째 부름이다 — 경기 장면 구름 셈(`sceneCloudClock`)을 이 판의 그림마다 센다.
  * - **전광판 글자**(0x77fb4)도 상태 7 · 8 · 9 를 뺀 그림마다 부르는 0x41230(413e6)이 흘린다 — 타석 화면과 같은 경기 장면 틱
- *   (`gameSceneTickOf`)으로 흘려 인트로에서 타석으로 넘어가도 이어진다(구장 +0x8c 는 장면 동안 남는 칸이다).
- *   ⚠️ 미확인(위상): 원본 +0x8c 는 상태 7 의 구장 생성에서 0x77edc 가 시작값으로 두고 로딩(7 · 8 · 9) 뒤 첫 그림부터 흐르지만, 웹 장면 틱은
- *   장면 시작이 아니라 앱 시계에서 센다 — 흐름 속도와 이어짐은 같고 첫 그림의 글자 자리만 다르다.
+ *   (`gameSceneTickOf`)으로 흘려 인트로에서 타석으로 넘어가도 이어진다(구장 +0x8c 는 장면 동안 남는 칸이다). 위상: 원본 +0x8c 는
+ *   상태 7 의 구장 생성에서 0x77edc 가 시작값으로 두고 로딩(7 · 8 · 9) 뒤 첫 배경 그림부터 준다 — 웹도 이 장면에서 배경을 처음 그린
+ *   장면 틱을 0 으로 센다(`sceneScoreboardTickOf`, 인트로가 있으면 인트로 첫 그림).
  * - 그림이 늦게 실리므로 그림이 실릴 때마다(`assetLoadVersion`) · 값이 바뀔 때마다 다시 칠한다.
  * - **좌우(`stage.side`)** — 구장 +0x60 은 인트로 진입 0x3b084 가 3b0f2~3b108 에서 공격 팀 지금 타자(0xae89d)의 손(0xb63c1)으로
  *   쓴다(직접 떴다). 0(우타)이면 펜스 · 바닥이 거울 길이다(`RIGHT_HANDED_MIRROR_X`). 부르는 쪽이 1회초 첫 타자(측 0 의 1번 —
@@ -56,7 +58,8 @@ export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
       }
       if (context !== null) {
         const { stage: current, offsetY: y } = latestRef.current
-        const scenery = { ...current, tick: gameSceneTickOf(gameSceneTimeOf(rawNow)), cloudCalls, offsetY: y }
+        const sceneTick = gameSceneTickOf(gameSceneTimeOf(rawNow))
+        const scenery = { ...current, tick: sceneTick, scoreboardTick: sceneScoreboardTickOf(sceneTick), cloudCalls, offsetY: y }
         if (drawMemo.needsDraw(canvasRef.current, scenery)) drawScenery(context, scenery)
       }
       frame = requestAnimationFrame(draw)

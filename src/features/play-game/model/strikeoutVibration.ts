@@ -20,7 +20,8 @@ const STRIKEOUT_STRIKES_BEFORE = 2
  * 0x9d57c: 스트라이크(스윙했거나 존 안)이고 그 전 스트라이크 st[4] > 1 이면 5 — 곧 세 번째 스트라이크다.
  * 맞힌 공(파울·타구)은 0x12 가 아니라 0x13 으로 가므로 2S 파울은 울리지 않는다.
  *
- * ⚠️ 근사(때): 웹 투구 화면은 던지는 순간에 판정이 나오므로 그 자리에서 울린다 (심판 콜과 같은 근사).
+ * 때: 웹 투구 화면은 던지는 순간(0x11 틱 10)에 판정이 나오지만, 진동은 장면 틱으로 0x12 틱 0 의 그림까지 미뤄 울린다 —
+ * 놓은 틱에서 `pitchResultEntryDelayTicksOf`(투수 릴리스 단계 − 10 + N + 2) 틱 뒤(`setGameSceneTickTimeout`, 공용 창 아래에서는 선다).
  * 0.1% 낫아웃 · 삼진 + 도루도 진입 프레임 0x12 첫 그리기가 돌아 100ms 다 — 타석 화면 `pitchVibrationMillisecondsOf` 주석(U-71).
  *
  * @param strikesBefore 이 공 **전** 스트라이크 수

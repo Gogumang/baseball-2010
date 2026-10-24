@@ -80,8 +80,8 @@ export interface PendingHit {
   readonly isUncatchable: boolean
   readonly isHomeRun: boolean
   /**
-   * 큰 타구 감상이 끝나는 자리에 쏠 파티클의 화면 좌표 (0x4cb1c → 0x4cd14 의 `016.ptc`).
-   * 감상 플래그 `+0x199a` 가 꺼진 타구면 null 이라 아무것도 안 쏜다.
+   * 큰 타구 멈춤이 풀리는 0x13 그림(틱 7)에 쏠 파티클의 화면 좌표 (0x4cb1c → 0x4cd14 의 `016.ptc`, `hitPause.HIT_STOP_TICKS`).
+   * 감상 플래그 `+0x199a` 가 꺼진 타구면 null 이라 그 그리기 갈래(4cb76)를 안 탄다.
    */
   readonly bigHitAt: { readonly x: number; readonly y: number } | null
   /** 감상 플래그 `+0x199a` — 켜졌을 때만 OK·'5' 로 건너뛴다 (0x406e8 40708) */

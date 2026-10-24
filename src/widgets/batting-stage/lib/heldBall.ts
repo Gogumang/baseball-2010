@@ -15,11 +15,11 @@ import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabe
 
 /**
  * 0x12 에 공을 그릴 공 틱 — 웹 공 그리기(`ballPixelAt` · `ballFrameIndexAt`)는 이 값을 N − 1 로 잘라 마지막 점 · 마지막 크기를 고른다.
- * 종류 [+0x1080] 은 0x11 마지막 틱(공 틱 N)의 값이라 N 을 넘긴다.
- * ⚠️ 근사: 웹은 0x11 이 끝난 정확한 공 틱을 들고 있지 않아 N 으로 본다(마구 불꽃 공 전환은 경로 번호 8 부터라 N ≥ 9 면 같다).
+ * 웹은 종류 [+0x1080] 을 공 틱으로 다시 고르므로(`ballKindAt`) 0x11 의 마지막 그림이 본 공 틱을 넘긴다 — 0x12 는 늘 공 틱 N + 1 의
+ * 갱신(0x4e24e `공 틱 > N` → 4e26c 0x12 예약)이 연 것이라 그 틀의 0x11 그림(3b55e 가 종류를 적는 마지막 그림)은 공 틱 N + 1 이다.
  * 웹에서 0x12 는 안 친 공 · 헛스윙의 '결과'(`isInPlay` 거짓)다 — 맞은 공의 '결과'는 인플레이(0x17)라 이 길이 아니다. 0x12 가 아니면 null.
  */
 export function heldBallTickOf(phase: StagePhaseSnapshot | undefined, frameCount: number): number | null {
   if (phase?.kind !== '결과' || phase.isInPlay === true) return null
-  return frameCount
+  return frameCount + 1
 }

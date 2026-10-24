@@ -1,6 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
+import { sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import {
   EMPTY_RECORD_ALERT, drawRecordAlert, enqueueRecordAlert, flushRecordAlertQueue,
 } from '@/widgets/game-scene/lib/recordAlert'
@@ -30,7 +32,9 @@ export interface RecordAlertOptions {
   /** 상태 0x19(정산) — 0x4e600 이 줄을 그대로 둔다 */
   readonly isSettled?: boolean
   /**
-   * 장면 상태 — 바뀌면 노랑 줄을 고르는 틱 [+0x2c] 가 0 부터 다시 센다(0xbc9c8). 안 주면 훅이 센 갱신 수를 그대로 쓴다.
+   * 화면 갈래 — 바뀌면 노랑 줄을 고르는 틱 [+0x2c] 가 0 부터 다시 센다(0xbc9c8). 안 주면 훅이 센 갱신 수를 그대로 쓴다.
+   * 갈래 안의 원본 상태 경계(0xd · 0xe · 0xf · 0x10 · 0x11 · 0x12 · 0x13)는 그 상태를 세우는 부품이 적은 장면 틱(`sceneStateEntries`)으로
+   * 센다 — 둘 가운데 늦은 쪽이 0 점이다.
    */
   readonly sceneStateKey?: unknown
   /** 주면 0x4e600 을 원본 시점(공 끝)에만 부른다. 안 주면 기록이 들어온 그림에서 곧바로 칸에 넣는다(예전 근사) */
@@ -50,9 +54,11 @@ export interface RecordAlertOptions {
  * `isDrawing` 동안 갱신마다 0x4e35c 를 한 번 돌린다.
  *
  * - 새 경기(번호 목록이 줄면)는 장면 시작 0x3d6f4 처럼 칸 · 누계 · 줄을 비운다(폭 칸은 남는다).
- * - 노랑 줄 틱: 상태 객체 틱 [+0x2c] — `sceneStateKey` 가 바뀐 첫 갱신이 0, 이어서 +1, 팝업 중에는 그대로.
- * ⚠️ 근사: 웹 화면 갈래와 원본 장면 상태(0xd·0xe·0xf·0x10·0x11·0x12…)가 한 짝으로 맞지 않아 `sceneStateKey` 의 경계는
- *    부르는 화면이 가진 갈래로 근사한다.
+ * - 노랑 줄 틱: 상태 객체 틱 [+0x2c] — 0x4e35c 가 `(틱 % 18) / 6` 줄을 노랑으로 고른다. 상태가 선 틀이 0(0xbc9c8 bc9ec), 이어서
+ *   틀마다 +1, 공용 창 · 팝업 중에는 그대로(52cc6). 0 점은 (1) 부르는 화면의 갈래(`sceneStateKey` — 판 0x18 · 벤치 클리어링 0x1e ·
+ *   인트로 0xc 따위)가 바뀐 첫 갱신, (2) 원본 상태를 세우는 부품이 적은 장면 틱(`sceneStateEntries` — 타석 장면의 0xf · 0x10 · 0x11 ·
+ *   0x12 · 0x13 예약, 사람 투구 장면의 0x11 · 0x12, 확인 대기의 0xd · 0xe) 가운데 늦은 쪽이다. (2) 는 예약 다음 틀이 0 인 원본 차례
+ *   그대로라 장면 틱 격자에서 맞다. (1) 은 React 가 갈래를 바꾼 다음 장면 틱에 선다.
  */
 export function useRecordAlert(
   recordIds: readonly number[],
@@ -78,6 +84,8 @@ export function useRecordAlert(
   sceneKeyRef.current = sceneStateKey
   const tickedKeyRef = useRef(sceneStateKey)
   const stateTickRef = useRef(0)
+  /** 지금 상태 틱의 0 점(장면 틱) — 갈래가 바뀐 틱이나 부품이 적은 상태 칸. 아직 없으면 null */
+  const stateOriginRef = useRef<number | null>(null)
   const [frame, setFrame] = useState<RecordAlertFrame>(NO_FRAME)
   /** 0xa77f0 끝 a7922 `0x62234(ui, k)` — 기록이 새로 들어올 때마다 (`RecordAchievedContext`) */
   const onRecordAchieved = useContext(RecordAchievedContext)
@@ -120,11 +128,19 @@ export function useRecordAlert(
   useSceneTick(() => {
     // 0xbc9c8 — 팝업이 떠 있으면(0x754f9 참) 상태 틱을 안 건드린다
     if (!frozenRef.current) {
-      if (Object.is(tickedKeyRef.current, sceneKeyRef.current)) {
-        stateTickRef.current += 1
-      } else {
+      const now = gameSceneTickNow()
+      const entry = sceneStateEntryAt(now)
+      const origin = stateOriginRef.current
+      if (!Object.is(tickedKeyRef.current, sceneKeyRef.current)) {
         tickedKeyRef.current = sceneKeyRef.current
+        stateOriginRef.current = now
         stateTickRef.current = 0
+      } else if (entry !== null && (origin === null || entry.tick > origin)) {
+        // 부품이 적은 상태가 섰다 — 그 틱이 0 (이 갱신이 늦게 돌았어도 장면 틱으로 센다)
+        stateOriginRef.current = entry.tick
+        stateTickRef.current = now - entry.tick
+      } else {
+        stateTickRef.current += 1
       }
     }
     const drawn = drawRecordAlert(stateRef.current, stateTickRef.current, frozenRef.current)

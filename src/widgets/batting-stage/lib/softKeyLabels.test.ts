@@ -34,6 +34,11 @@ describe('소프트키 글자 — 0x4c8e0~0x4c9fc', () => {
     expect(isTimeLabelState({ kind: '결과', tick: 0, isPaused: false })).toBe(false)
   })
 
+  it('쉬는 대기의 앞 두 그림 0xd(타석 준비 0x48d50)는 0xe 가 아니라 "#TIME" 이 없다 (상태 문턱 4c92e `상태 − 0xe > 1`)', () => {
+    expect(isTimeLabelState({ kind: '대기', tick: 0, isPaused: true, isSceneD: true })).toBe(false)
+    expect(isTimeLabelState({ kind: '대기', tick: 2, isPaused: true, isSceneD: false })).toBe(true)
+  })
+
   it('벤치 수가 0 이하이거나 0x38984 가 거짓(null)이면 "#TIME" 을 안 그린다', () => {
     const state = { kind: '대기', tick: 0, isPaused: true } as const
     expect(showsTimeLabel(state, 3)).toBe(true)

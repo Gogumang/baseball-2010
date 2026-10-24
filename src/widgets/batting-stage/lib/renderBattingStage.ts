@@ -240,7 +240,7 @@ export interface StageScene {
   readonly skillPanel?: SkillPanelView | null
   /**
    * 필살 스윙 연출 그림 (0x49aec) — 타격점 (x, y) 에 그림 애니 0 의 `drawCall` 번째 부름 칸, 미라지면 반대쪽 타석의 타자 그림.
-   * 상태 0x13 동안만 부르는 쪽이 채운다 (`specialSwingEffect`). 없거나 null 이면 안 그린다
+   * 맞은 틀(0x11)과 상태 0x13 동안만 부르는 쪽이 채운다 (`specialSwingEffect`). 없거나 null 이면 안 그린다
    */
   readonly specialSwingEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number; readonly drawCall: number }) | null
   /**
@@ -318,13 +318,15 @@ export function renderBattingStage(
     drawMagicBallEffect(context, scene.pitch, scene.frame)
   } else if (scene.pitch !== null) {
     // 0x12 그리기 0x4ce9c 도 0x3b2f4 를 불러 공을 마지막 점에 그대로 둔다 — 0x11 이 아니라 마구 이펙트는 없다 (`heldBall`).
-    // 0x11 의 공 틱 N · N + 1(0x12 를 예약한 틀) 도 같다: 0x11 그리기 0x4d64c 는 4d72c 에서 보임 칸(0x9e039 — 0x11 진입이 세우고
+    // 0x11 의 공 틱 N · N + 1(0x12 를 예약한 틀) 도 공은 같다: 0x11 그리기 0x4d64c 는 4d72c 에서 보임 칸(0x9e039 — 0x11 진입이 세우고
     // 0xf · 0xd 진입 · 0x18 진입만 지운다)이 서 있으면 4d73a 에서 0x3b2f4 를 부르고, 0x3b2f4 는 3b310 의 0x35820 으로 공 틱을 N − 1 에
-    // 자른다(35828~3582e). ⚠️ 미확인: 그 두 틀의 마구 이펙트(0x3b546)는 안 그린다 — 이펙트가 잘린 틱을 쓰는지 못 읽었다
+    // 자른다(35828~3582e). 그 두 틀은 아직 0x11 이라 마구 이펙트도 돈다(2026-10-24 직접 떴다): 3b496 상태 == 0x11 이면 3b546 갈래가
+    // 자르지 않은 공 틱 [sp+0x38] > 7 · 애니가 마지막 칸 전이면 그리고, 자리는 잘린 점 [sp+0x4c](0x35854)다 — 공과 같은 자리 · 같은 셈
     const heldTick =
       heldBallTickOf(scene.stagePhase, scene.pitch.frameCount) ??
       (scene.stagePhase?.kind === '투구중' && scene.frame >= scene.pitch.frameCount ? scene.frame : null)
     if (heldTick !== null) drawBall(context, scene.pitch, heldTick)
+    if (heldTick !== null && scene.stagePhase?.kind === '투구중') drawMagicBallEffect(context, scene.pitch, heldTick)
   }
   // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 · 마구 이펙트 다음이다. 공이 다 온 틱(N)부터라
   // 0x12 에서도 마지막 점의 공 위에 돈다 (`fastballFlame`)
@@ -381,10 +383,11 @@ function runnerPaletteIndexOf(teamId: number | null): number | null {
 }
 
 /**
- * 주루 칸을 그리는 상태 0xe — 웹은 쉬는 '대기'(0xd · 0xe 확인 대기 · 메뉴)로 본다 (⚠️ 근사: 0xd 를 못 가른다, `softKeyLabels` 와 같은 한계)
+ * 주루 칸을 그리는 상태 0xe — 웹은 쉬는 '대기'(0xe 확인 대기 · 그 위 메뉴)로 본다. 앞 두 그림 0xd 는 확인 대기가 적은 상태 경계로
+ * 뺀다(`isSceneD`, `softKeyLabels` 와 같은 갈래)
  */
 function isRunPipState(phase: StagePhaseSnapshot | undefined): boolean {
-  return phase?.kind === '대기' && phase.isPaused
+  return phase?.kind === '대기' && phase.isPaused && phase.isSceneD !== true
 }
 
 const RUNNER_BASE_OF_ANIMATION: readonly BaseKey[] = ['first', 'second', 'third']

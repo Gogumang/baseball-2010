@@ -48,6 +48,11 @@ export interface StagePhaseSnapshot {
    * 0x12 만 그리는 "Km" 판(`pitchSpeedReadout`)이 가른다. 안 넘기면 0x12 로 본다
    */
   readonly isInPlay?: boolean
+  /**
+   * 쉬는 '대기' 가 원본 0xd(타석 준비 0x48d50 — 두 그림)인가 — 확인 대기가 적은 상태 경계(`sceneStateEntries`)로 가른다.
+   * 안 넘기면 쉬는 '대기' 를 0xe 로 본다
+   */
+  readonly isSceneD?: boolean
 }
 
 /** 0xf 갱신 0x39c1c 가 틱 > 7 에서 0x10 을 예약한다 — '대기' 의 앞 9 그림이 0xf 다 (`stagePhaseTicks`) */
@@ -55,12 +60,12 @@ const STATE_F_TICKS = 9
 
 /**
  * 지금 그림이 원본 상태 0xe · 0xf 인가 — "#TIME" 의 상태 조건.
- * '대기' 에서 쉬는 동안(0xe 확인 대기)과, 쉬지 않을 때 앞 9 그림(0xf)이다.
- * ⚠️ 근사: 웹 '대기' 의 쉬는 동안에는 0xd(두 그림)와 경기 중 메뉴도 섞인다 — 메뉴는 원본도 0xe · 0xf 위에 뜨는 팝업이다.
+ * '대기' 에서 쉬는 동안(0xe 확인 대기 — 0xd 두 그림은 뺀다, `isSceneD`)과, 쉬지 않을 때 앞 9 그림(0xf)이다.
+ * 쉬는 동안의 경기 중 메뉴는 원본도 0xe · 0xf 위에 뜨는 팝업(상태는 그대로)이라 같다.
  */
 export function isTimeLabelState(phase: StagePhaseSnapshot): boolean {
   if (phase.kind !== '대기') return false
-  return phase.isPaused || phase.tick < STATE_F_TICKS
+  return phase.isPaused ? phase.isSceneD !== true : phase.tick < STATE_F_TICKS
 }
 
 /**
@@ -72,16 +77,16 @@ export function showsTimeLabel(phase: StagePhaseSnapshot, benchCount: number | n
 }
 
 /**
- * 타석 캔버스 위에 "*MENU" · "#TIME" 을 그린다. 타석 화면이 서 있는 웹 단계(대기 · 투구중 · 타격 · 결과)는 모두
- * 원본 상태 0xd ~ 0x13 안이라 "*MENU" 는 늘 그린다.
- * ⚠️ 근사: 맞은 공 뒤 웹 '결과' 는 원본 인플레이(0x17, 그리기 0x46c88 이 0x4c4bc 를 안 부른다) 자리다 — 웹은 그 둘을 가르는 칸이
- *    없어 거기서도 "*MENU" 가 남는다.
+ * 타석 캔버스 위에 "*MENU" · "#TIME" 을 그린다. 타석 화면이 서 있는 웹 단계(대기 · 투구중 · 타격 · 안 친 공 결과)는 모두
+ * 원본 상태 0xd ~ 0x13 안이라 "*MENU" 를 그린다. 맞은 공 뒤 '결과'(`isInPlay`)는 원본 인플레이 0x17 이다 — 4c8e0 의 상태 문턱
+ * (0xd ~ 0x15) 밖이라 안 그린다(0x17 그리기 0x46c88 은 0x4c4bc 를 부르지도 않는다).
  */
 export function drawSoftKeyLabels(
   context: CanvasRenderingContext2D,
   phase: StagePhaseSnapshot,
   benchCount: number | null,
 ): void {
+  if (phase.kind === '결과' && phase.isInPlay === true) return
   drawLabel(context, MENU_LABEL_FRAME, MENU_LABEL_POSITION)
   if (showsTimeLabel(phase, benchCount)) drawLabel(context, TIME_LABEL_FRAME, TIME_LABEL_POSITION)
 }

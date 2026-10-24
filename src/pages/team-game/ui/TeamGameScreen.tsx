@@ -648,10 +648,13 @@ function TeamGameScene({
     isDrawing: isIntroDone && summary === null && !isDefenseInPlay && !isReplaying,
     isFrozen: isMenuOpen || overlay === '조작방법',
     isSettled: progress.game.isFinished,
-    // ⚠️ 근사: 상태 틱 [+0x2c] 의 경계를 웹 화면 갈래(판 · 타석/투구 · 확인 대기 · 공 끝)로 가른다
+    // 상태 틱 [+0x2c] 의 0 점 — 화면 갈래(판 · 타석/투구 입력 단계 · 확인 대기)가 바뀐 틱과, 원본 상태 경계(타석 장면이 적는
+    // 0xf · 0x10 · 0x11 · 0x12 · 0x13, 사람 투구 장면이 적는 0x11 · 0x12 · 그 끝, 확인 대기가 적는 0xd · 0xe — `sceneStateEntries`)
+    // 가운데 늦은 쪽. 내 공을 놓은 틱(0x11 틱 10)은 상태가 안 바뀌어 0x11 · 0x12 가 끝날 때까지 '게이지' 갈래로 둔다.
+    // 사람 장면이 없는 갈래(자동진행)만 공 끝 번호로 가른다
     sceneStateKey: isHalfInningBoardOpen
       ? `board-${board?.serial ?? 0}`
-      : `${canBat ? 'bat' : canPitch ? phase : 'auto'}-${isAwaitingConfirm ? 'confirm' : 'play'}-${pitchEndSerial}`,
+      : `${canBat ? 'bat' : canPitch ? (isPitchSceneBusy || isThrowPendingRef.current ? '게이지' : phase) : `auto-${pitchEndSerial}`}-${isAwaitingConfirm ? 'confirm' : 'play'}`,
     pitchEnd: {
       serial: pitchEndSerial,
       humanCountOf: (added) => leadingRecordCountOf(added, (id) => !isGameEndRecord(id)),
