@@ -148,6 +148,29 @@ describe('환경설정 값 바꾸기', () => {
     }
   })
 
+  it('숫자키 꼴 1 격자 — \'8\' ↓ · \'6\' → 로 값을 돌린다 (0x6c031 표 0xd2e7c)', () => {
+    const onChange = vi.fn()
+    띄우기({ onChange })
+
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: '6' })
+
+    expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, speedLevel: DEFAULT_SETTINGS.speedLevel + 1 })
+  })
+
+  it('\'5\' 로 상세 설정(32)에 들어가 \'4\' 가 칸 값을 뒤집는다 (0x288ac 의 0x34 갈래)', () => {
+    const onChange = vi.fn()
+    띄우기({ onChange })
+
+    for (let k = 0; k < 3; k += 1) fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: '4' })
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange.mock.calls[0]?.[0]?.pitchControl).not.toBe(DEFAULT_SETTINGS.pitchControl)
+  })
+
   it('게임 데이터 관리는 통신이 필요해 안내만 띄운다 (🌐)', () => {
     띄우기()
 

@@ -39,6 +39,11 @@ export function useSound(soundLevel: number): SoundPort {
     sound.setVolume(soundLevel * VOLUME_PER_LEVEL)
     const previous = lastLevelRef.current
     lastLevelRef.current = soundLevel
+    // 소리 단축키(0x2ddc)로 바꾼 값이면 미리듣기가 없다 — 0x2ddc 는 0x9f4fc · 0x9f524 만 부른다 (`useSoundLevelKeys`)
+    if (shortcutLevels.get(sound) === soundLevel) {
+      shortcutLevels.delete(sound)
+      return
+    }
     // 환경설정 칸 0 을 좌우로 움직여 값을 적용한 뒤(0x9f524) 효과음 5 로 미리듣기를 낸다
     // (0x2963e — 경기 중 메뉴의 같은 칸 0x3cbde 도 같다)
     if (previous !== null && previous !== soundLevel) sound.play(SOUND_LEVEL_PREVIEW)
@@ -49,6 +54,88 @@ export function useSound(soundLevel: number): SoundPort {
 
 /** 소리 크기를 바꿀 때 나는 미리듣기 (= 강한 타구 타격음과 같은 번호) */
 export const SOUND_LEVEL_PREVIEW = 5
+
+/** 소리 단축키가 막 정한 단계 — 그 단계로 바뀐 `useSound` 효과가 미리듣기를 건너뛴다 */
+const shortcutLevels = new WeakMap<SoundPort, number>()
+
+/** 소리 단계 칸 [저장+0x2e] 의 끝 (0x9f4fc 가 0~4 로 감는다) */
+const SOUND_LEVEL_MAX = 4
+
+/**
+ * 소리 단축키 → 원본 키 코드. 원본 −13 · −14 는 단말 옆 소리 키다. 웹은 미디어 소리 키와 '+' · '=' · '-' 를 쓴다
+ * (⚠️ 웹 전용 배치 — 원본 키판에 해당 글쇠가 없다)
+ */
+const SOUND_KEY_CODES: Readonly<Record<string, -13 | -14>> = {
+  AudioVolumeUp: -13, '+': -13, '=': -13,
+  AudioVolumeDown: -14, '-': -14,
+}
+
+/**
+ * 소리 단축키 −13 · −14 의 다음 단계 — 앱 전역 키 처리 0x2ddc(앱 vtable 0xcb988 슬롯 6, r197 직접 뜸):
+ * ```
+ * 2df6  키 == −13:  단계 = s8 [저장+0x2e]; 단계 ≤ 3 이면 0x9f4fc(+1) · 0x9f524(적용)
+ *                    새 단계 == 1 이고 1 ≤ 소리[+0x2c] ≤ 4 면 0x6ea6d(소리, [+0x2c], −1, 1)   ; 배경음 1~4 를 다시
+ * 2e38  키 == −14:  단계 > 0 이면 0x9f4fc(−1) · 0x9f524
+ * 2e5e  그 뒤 키를 장면 vt+0xc 로 넘긴다 (모든 키)
+ * ```
+ * 바뀌지 않으면 null. 미리듣기 5(0x2963e)는 없다 — 환경설정 칸만 낸다.
+ */
+export function soundLevelAfterKey(level: number, code: -13 | -14): number | null {
+  if (code === -13) return level <= SOUND_LEVEL_MAX - 1 ? level + 1 : null
+  return level > 0 ? level - 1 : null
+}
+
+/** 0 → 1 로 켤 때 다시 트는 번호 — 0x2e22 `subs r3, r1, #1 ; cmp r3, #3 ; bhi` (배경음 1~4 만) */
+export function bgmToRestoreOnUnmute(lastPlayed: number | null): number | null {
+  return lastPlayed !== null && lastPlayed >= 1 && lastPlayed <= 4 ? lastPlayed : null
+}
+
+/**
+ * 앱 전역 소리 단축키 (`soundLevelAfterKey`). 키는 막지 않는다 — 원본도 장면에 그대로 넘긴다.
+ * 단계는 그 자리에서 소리에 적용한다(0x9f524 → 0x6e4d0) — 0 → 1 로 켤 때 다시 트는 배경음이 볼륨 0 에 막히지 않게.
+ */
+export function useSoundLevelKeys(sound: SoundPort, soundLevel: number, onSoundLevelChange: (level: number) => void): void {
+  const levelRef = useRef(soundLevel)
+  levelRef.current = soundLevel
+  const changeRef = useRef(onSoundLevelChange)
+  changeRef.current = onSoundLevelChange
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const code = SOUND_KEY_CODES[event.key]
+      if (code === undefined) return
+      // ⚠️ 웹 전용: 글 입력 칸에 친 '-' · '+' 는 글자다
+      const target = event.target
+      if (target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      const next = soundLevelAfterKey(levelRef.current, code)
+      if (next === null) return
+      levelRef.current = next
+      shortcutLevels.set(sound, next)
+      sound.setVolume(next * VOLUME_PER_LEVEL)
+      if (next === 1) {
+        const bgm = bgmToRestoreOnUnmute(sound.lastPlayed?.() ?? null)
+        if (bgm !== null) sound.playBgm(bgm)
+      }
+      changeRef.current(next)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [sound])
+}
+
+/**
+ * 탭을 숨기면 소리를 멈춘다 — 원본 단말 일시정지(앱 vtable 0xcb988 슬롯 4 `0x2da0`)의 첫 줄 `0x6e690(소리)`.
+ * 기억한 배경음은 그대로 두고, 다시 보일 때(슬롯 5 `0x2e88` = 빈 함수) 앱은 아무것도 안 한다.
+ * ⚠️ 미구현: 같은 일시정지가 부르는 장면 vt+0x18 · 팝업 0x74458 은 옮기지 않았다.
+ */
+export function useSoundPauseOnHide(sound: SoundPort): void {
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') sound.suspendOutput?.()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [sound])
+}
 
 /**
  * 번호 목록을 원본 통로에 차례로 넣는다 — 알맹이는 `shared/api/audio/soundPort` 에 있다.

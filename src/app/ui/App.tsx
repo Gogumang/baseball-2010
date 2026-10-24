@@ -34,7 +34,7 @@ import { modeBatterOf } from '@/app/model/modeBatter'
 import { modePitcherOf } from '@/app/model/modePitcher'
 import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
-import { useSceneBgm, useSceneEnterSound, useSound } from '@/app/model/useSound'
+import { useSceneBgm, useSceneEnterSound, useSound, useSoundLevelKeys, useSoundPauseOnHide } from '@/app/model/useSound'
 import {
   screenEnterSoundOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useResumeCoverStop, useSceneEnterStop, useScreenBgm,
   useSeasonMenuBgm,
@@ -167,6 +167,11 @@ export function App() {
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
+  // 앱 전역 키 처리 0x2ddc 의 소리 단축키 −13 · −14 · 단말 일시정지 0x2da0 의 소리 멈춤 (`useSound.ts`)
+  useSoundLevelKeys(sound, gameSettings.settings.soundLevel, (soundLevel) => {
+    gameSettings.setSettings({ ...gameSettings.settings, soundLevel })
+  })
+  useSoundPauseOnHide(sound)
   // 부팅 씨앗 — 원본 0x2ed8 은 밀리초 시계의 아래 32비트 (저장 · 읽기 때 다시 세우기는 옮기지 않았다 — seededRandom 머리 주석)
   const random = useMemo(() => createSeededRandom(bootSeed()), [])
   // 켤 때는 장면 0x103 생성자의 [0x140006c] = −1 갈래 — 하위 0x2a <이용안내> 부터 (→ 2 로고 → 3 타이틀)
@@ -237,12 +242,22 @@ export function App() {
   const otherModesRef = useRef<{ batter?: RegularSeasonOtherModes; pitcher?: RegularSeasonOtherModes }>({})
   const readBatterOtherModes = useCallback(() => otherModesRef.current.batter, [])
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
+  const seasonGameSettingsRef = useRef(gameSettings.settings)
+  seasonGameSettingsRef.current = gameSettings.settings
+  const seasonGameSettingsNow = useCallback(() => ({
+    gaugeSettingOn: seasonGameSettingsRef.current.pitchControl === '게이지',
+    runningModeManual: seasonGameSettingsRef.current.runningMode === '수동',
+    throwModeManual: seasonGameSettingsRef.current.throwMode === '수동',
+  }), [])
   const seasonSession = useSeasonSession(
     seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
     // 전역기록 +0x11e — 0xdd 진입 0x6548 과 일반 22 진입 0x3163c 가 같은 칸을 본다
     modeSave.matchSettingsSeenPort,
     // 정산 0x4ea0c 의 정규시즌 승리 수 +0xbf → 100 이면 히든 45 (0x9f6f0 · 0x62368)
     recordSeasonRegularWin,
+    // 환경설정 투구 게이지(+0x2d, 0x3f500) · 주루(+0xbd, 0xae690) · 송구(+0xf4, 0xae6c8) — 원본은 모드를 안 가린다.
+    // 일반모드(아래 `GeneralModeScreen`)와 같이 경기를 세울 때 싣는다
+    seasonGameSettingsNow,
   )
   // 142 경기 준비 0x1c46c 가 내 마타자·마투수를 열린 것 중에서 굴린다 (0x9f604 · 0x9f650, 825865d)
   const nariOpenedAces = useMemo(
@@ -325,6 +340,8 @@ export function App() {
     recordStat,
     // 환경설정 "송구" (설정 +0xf4) — 투수편 미션은 사람이 늘 수비라 그대로 먹는다 (0xae6c8)
     throwModeManual: gameSettings.settings.throwMode === '수동',
+    // 환경설정 "주루" (설정 +0xbd) — 타자편 미션은 사람이 늘 공격이라 그대로 먹는다 (0xae690, 0x46418)
+    runningModeManual: gameSettings.settings.runningMode === '수동',
     // 환경설정 진동 (저장 +0x3b) — 투수 미션·투수편 마선수 대결의 사람 공 삼진 진동(0x4d0d6)이 본다
     isVibrationOn: gameSettings.settings.isVibrationOn,
     aceLevels: aceLevels.levels,

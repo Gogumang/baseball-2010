@@ -29,6 +29,7 @@ import { clearParticles, emitParticles } from '@/entities/particle/model/particl
 import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
 import { bigHitEndTickOf, bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
+import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import type { PendingHit } from '@/widgets/batting-stage/model/stageRefs'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
@@ -828,6 +829,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         }
         // 이 틱의 0x11 그림이 쏘는 마구 공 파티클 — 그 틀 끝 관리자 틱(아래 `stepStageFrame` 의 0x6de84) 앞
         emitMagicBallParticlesAt(steppedTick)
+        // 0x12 틱 0 의 그림 — 판정 글자 0x393b4 가 삼진이면 양끝 파티클을 쏜다(`strikeoutJudgeParticlesOf`). 맞은 공(0x13 · 0x17)은 0x12 가 아니다
+        if (phaseRef.current === '결과' && steppedTick === phaseStartTickRef.current && !isInPlayResultRef.current) {
+          for (const shot of strikeoutJudgeParticlesOf(resultTextRef.current, side)) {
+            emitParticles(particlesRef.current, particleConfigOf(shot.id), shot.x, shot.y, shot.img)
+          }
+        }
         stageEffects = stepStageFrame(stageEffects, {
           time: stepTime,
           millisecondsPerTick: tickLength,

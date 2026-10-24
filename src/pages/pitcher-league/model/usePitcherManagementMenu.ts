@@ -60,7 +60,7 @@ import {
 } from '@/pages/pitcher-league/model/pitcherRest'
 import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import type { DetailRow } from '@/pages/management/lib/detailPopup'
-import { rollTrainingInjury } from '@/entities/career/model/condition'
+import { INJURY_FOLLOW_UP_NOTICE, rollTrainingInjury } from '@/entities/career/model/condition'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { moveSpecialTrainingCursor, specialTrainingKeyOf } from '@/widgets/special-swing/lib/specialTrainingWindow'
 
@@ -270,8 +270,14 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
           const injury = rollTrainingInjury(outcome.career, false, random)
           if (injury.career !== outcome.career) onSave(injury.career)
           // 부상 알림은 그 알림이 닫힐 때까지 칭호 팝업을 막는다(타자편 `CareerRoutes` 의 알림 · 상세 창 검사와 같다)
-          if (injury.notice !== null) setNotice(injury.notice)
-          else setIsResultWindowOpen(false)
+          if (injury.notice !== null) {
+            setNotice(injury.notice)
+            // 0x28 을 닫으면 105 틀 0x1aec4(1af3c~1af7e)가 곧바로 0x29 StrMODE[212] 를 띄운다 — 그동안 칭호 팝업도 막는다
+            noticeThenRef.current = () => {
+              setNotice(INJURY_FOLLOW_UP_NOTICE)
+              setIsResultWindowOpen(true)
+            }
+          } else setIsResultWindowOpen(false)
           // 창이 닫히면 125 → 105 (0x1b5b8 `0xbcb49(0x69)`)
           onReenter?.(TRAINING_RESULT_STATE)
         },

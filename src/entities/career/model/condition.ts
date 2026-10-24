@@ -3,6 +3,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { isSkillEquipped, MAXIMUM_ABILITY } from '@/entities/career/model/playerCareer'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /**
  * 선수 상태 — 부상·질병 (StrHOWTO[14]).
@@ -139,6 +140,17 @@ export function trainingInjuryChanceOf(career: TrainingInjuryCareer, isSpecialSw
   if (isSkillEquipped(career, LUCK_SKILL)) chance -= LUCK_REDUCTION
   return Math.max(0, chance)
 }
+
+/**
+ * 부상 둘째 팝업 0x29 — StrMODE[212] "부상으로 선수 능력치가 60% 감소 …" (두 편 같다, r197 직접 뜸).
+ * 0x1b4c4 1b5a6 이 0x28 "부상을 당했습니다"(0xcca24, 종류 1)를 띄우고, 105 틀 0x1aec4 이 그 창을 본다:
+ * ```
+ * 1af3c  창이 떠 있고([0x140005c]+9) 꼬리표 [+0x248] == 0x28 이고 답 [+0x21c] ∈ {0, 0x14} 이면
+ * 1af60  답 = −1 · 0xbbef9(창, 0x702b5(StrMODE, 0xd4), 1, 0x29, 1)       ; 둘째 팝업
+ * ```
+ * 곧 첫 팝업을 닫으면 곧바로 이 팝업이 이어 뜬다. 알림 상자가 `!C` 를 붙이므로 머리의 `!C` 는 뗀다
+ */
+export const INJURY_FOLLOW_UP_NOTICE = (ORIGINAL_MODE_TEXT[212] ?? '').replace(/^!C/, '')
 
 export function rollTrainingInjury<T extends TrainingInjuryCareer>(
   career: T,

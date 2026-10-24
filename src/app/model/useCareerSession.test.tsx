@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
+import { INJURY_FOLLOW_UP_NOTICE } from '@/entities/career/model/condition'
 import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
 import { describe, expect, it } from 'vitest'
 import { NARI_YEAR_START_EVENT_ID } from '@/entities/story/model/storyScene'
@@ -892,6 +893,32 @@ describe('훈련·휴식 결과 창 — 변화량은 굴린 값 그대로, 필�
       act(() => rendered.result.current.session.actions.dismissManagementNotice())
       expect(rendered.result.current.session.managementNotice).toBe('')
       expect(rendered.result.current.session.career?.isInjured).toBe(trained?.isInjured)
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+})
+
+describe('부상 둘째 팝업 0x29 — 105 틀 0x1aec4 1af3c~1af7e (r197)', () => {
+  it('0x28 "부상을 당했습니다" 를 닫으면 StrMODE[212] 가 이어 뜨고, 그것을 닫아야 알림이 빈다', () => {
+    // 굴림이 모두 낮은 끝이면 부상 굴림(0x1b4c4 rand(0, 10000))이 확률 안에 든다
+    const random = { rand: (lo: number, hi: number) => Math.min(lo, hi), rand9d: () => 0 }
+    const saveGame = 메모리저장({ ...createCareer('부상팝업'), morale: 5 })
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    try {
+      act(() => rendered.result.current.session.actions.continueSaved())
+      act(() => rendered.result.current.session.actions.runTrainingMenu('히트'))
+      act(() => rendered.result.current.session.actions.closeManagementDetail())
+      expect(rendered.result.current.session.managementNotice).toBe('부상을 당했습니다.')
+      act(() => rendered.result.current.session.actions.dismissManagementNotice())
+      expect(rendered.result.current.session.managementNotice).toBe(INJURY_FOLLOW_UP_NOTICE)
+      expect(INJURY_FOLLOW_UP_NOTICE).toContain('60% 감소')
+      act(() => rendered.result.current.session.actions.dismissManagementNotice())
+      expect(rendered.result.current.session.managementNotice).toBe('')
     } finally {
       act(() => rendered.unmount())
     }

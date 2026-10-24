@@ -206,6 +206,11 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     const injured = onSave.mock.calls[1][0] as PitcherCareer
     expect([injured.isInjured, injured.injuryRemaining]).toEqual([true, 3])
     expect(screen.getByText('부상을 당했습니다.')).toBeTruthy()
+
+    // 0x28 을 닫으면 105 틀 0x1aec4(1af3c~1af7e)가 둘째 팝업 0x29 StrMODE[212] 를 띄운다
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByText('부상을 당했습니다.')).toBeNull()
+    expect(screen.getByText(/휴식커맨드/)).toBeTruthy()
   })
 
   it('능력치가 보직 한계면 StrMODE[192] 로 막는다', () => {

@@ -143,7 +143,7 @@ import {
 import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
-import { effectiveAbilityOf, rollTrainingInjury } from '@/entities/career/model/condition'
+import { effectiveAbilityOf, INJURY_FOLLOW_UP_NOTICE, rollTrainingInjury } from '@/entities/career/model/condition'
 import type { ManagementDetail } from '@/app/model/managementDetail'
 import { restDetailChangesOf, trainingDetailChangesOf } from '@/pages/management/lib/detailPopup'
 import { advanceStreaks, evaluateGame, managerCommentIndexOf, streakEventOf } from '@/entities/career/model/gameEvaluation'
@@ -1265,6 +1265,8 @@ export function useCareerSession({
   }, [])
   /** 필살타법 결과 알림(125 의 알림 창)이 떠 있다 — 닫히면 105 진입 */
   const specialSwingNoticeRef = useRef(false)
+  /** 부상 첫 팝업 0x28 이 떠 있다 — 닫히면 105 틀 0x1aec4 가 둘째 팝업 0x29(`INJURY_FOLLOW_UP_NOTICE`)를 띄운다 */
+  const injuryNoticeRef = useRef(false)
   const managementEntryRef = useRef({ kind: screen.kind, reentryCount: managementReentryCount, isPending: false })
   {
     const seen = managementEntryRef.current
@@ -2112,6 +2114,7 @@ export function useCareerSession({
       if (afterClose.kind === '훈련') {
         const injury = rollTrainingInjury(career, afterClose.isSpecialSwing, random)
         setCareer(injury.career)
+        injuryNoticeRef.current = injury.notice !== null
         return setManagementNotice(injury.notice ?? '')
       }
       const recovery = recoverAfterRest(career, random)
@@ -2121,6 +2124,11 @@ export function useCareerSession({
 
     /** 관리 화면 알림 상자 [확인] — 알림은 여기서만 지운다 (화면이 기억하면 같은 문구가 다시 안 뜬다) */
     dismissManagementNotice: () => {
+      // 부상 0x28 을 닫았다 — 1af3c~1af7e 가 곧바로 0x29 StrMODE[212] 를 띄운다
+      if (injuryNoticeRef.current) {
+        injuryNoticeRef.current = false
+        return setManagementNotice(INJURY_FOLLOW_UP_NOTICE)
+      }
       setManagementNotice('')
       // 필살타법 결과 알림이면 125 틀 0x18dd8 이 105 로 — 105 진입
       if (specialSwingNoticeRef.current) {

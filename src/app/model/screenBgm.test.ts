@@ -183,9 +183,8 @@ describe('시즌모드 10년차 엔딩 0xf5 배경음 — 진입 0x6be8 의 6c4a
 })
 
 describe('경기 장면 — 0x3e340 의 맨 앞 0x3e350 이 소리를 끊고 시작한다 (경기 안 배경음은 중계 33 · 벤치클리어링 44 뿐)', () => {
-  it('경기 · 미션 · 마선수대결 · 홈런더비 화면은 배경음을 안 바꾼다', () => {
+  it('경기 · 미션 · 마선수대결 화면은 배경음을 안 바꾼다', () => {
     expect(screenBgmOf({ kind: '경기' })).toBeNull()
-    expect(screenBgmOf({ kind: '홈런더비' })).toBeNull()
     expect(pitcherLeagueBgmOf('경기', false)).toBeNull()
   })
 
@@ -392,5 +391,17 @@ describe('이어하기 길의 137 — 100 진입 1c15e stopBgm', () => {
     rerender({ on: false })
     rerender({ on: true })
     expect(stops).toBe(2)
+  })
+})
+
+describe('메인 메뉴 상태 표 0xcea84 (0x24ab8, r197 직접 뜸)', () => {
+  it('상태 3 타이틀은 조건 없이 1 (24ae0)', () => {
+    expect(screenBgmOf({ kind: '타이틀' })).toBe(1)
+    expect(screenBgmOf({ kind: '타이틀' }, '로고')).toBe(1)
+  })
+
+  it('상태 16 홈런더비 고르기는 이전 상태 5(게임시작 목록)면 3 (24af0) — 그 밖 길은 안 바꾼다', () => {
+    expect(screenBgmOf({ kind: '홈런더비' }, '메인메뉴')).toBe(3)
+    expect(screenBgmOf({ kind: '홈런더비' })).toBeNull()
   })
 })
