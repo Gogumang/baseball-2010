@@ -1,10 +1,12 @@
-import { derbyAcePitcherOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
+import { ACE_PITCHERS, derbyAcePitcherOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { DERBY_MAGIC_PITCH_TYPE, DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { PITCHERS_PER_TEAM, skillIdsOfBits, teamPitchers } from '@/entities/team/model/teamRoster'
 import { masterGameAbilityOf } from '@/entities/mission/model/missionCpuTeam'
 import { ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel } from '@/entities/mission/model/aceLevel'
+import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 
 /** `0xaebb0` 의 모드 7 갈래 — 홈런더비 투수 체력%는 늘 100 */
 const HOME_RUN_DERBY_STAMINA_PERCENT = 100
@@ -108,6 +110,12 @@ export interface DerbyPitcher {
    * 상대 팀을 모를 때는 없다
    */
   readonly record?: { readonly profile: number; readonly recordLine: readonly number[] }
+  /**
+   * 체력 실효 능력치 `0xb6415(P, 3, 1)` — 소개 판(0x44944)의 체력 막대 용량 0x66e44 가 읽는다. 단계 0 은 마스터 줄 2 의
+   * 장비 · 스킬 보정 값(`masterGameAbilityOf(줄, 투수, 3)`), 마투수는 레벨 배율(0xd88aa[mgr[0x13a + 순번]]) 뒤 장착 스킬 단계.
+   * 상대 팀을 모를 때는 없다
+   */
+  readonly staminaAbility?: number
 }
 
 /**
@@ -148,7 +156,12 @@ export function derbyPitcherOf(
       ability: ordinary.ability,
       pitchType,
       ...(ordinary.equipment === undefined ? {} : { equipment: ordinary.equipment }),
-      ...(row === undefined ? {} : { record: { profile: row.profile, recordLine: row.recordLine } }),
+      ...(row === undefined
+        ? {}
+        : {
+            record: { profile: row.profile, recordLine: row.recordLine },
+            staminaAbility: masterGameAbilityOf(row, true, 3),
+          }),
     }
   }
   // 홈런더비(모드 7)는 0xaebb0 이 늘 100 — 피로(0xb58e6, 55 이상 그대로)도 지친 제구 등급도 없다
@@ -159,5 +172,19 @@ export function derbyPitcherOf(
     ability: pitcherAbilityOf(ace, aceLevels, HOME_RUN_DERBY_STAMINA_PERCENT),
     pitchType,
     record: { profile: ace.profile, recordLine: ace.recordLine },
+    staminaAbility: aceStaminaAbilityOf(ace, aceLevels),
   }
+}
+
+/**
+ * 마투수 체력 실효값 `0xb6415(P, 3, 1)` — `pitcherAbilityOf` 와 같은 단계(레벨을 안 넘기면 배율 없이 날 값, 넘기면
+ * 그 순번 칸 레벨 배율 뒤 장착 스킬 단계)
+ */
+function aceStaminaAbilityOf(ace: AcePlayer, aceLevels: Readonly<Record<number, number>> | undefined): number {
+  const order = ACE_PITCHERS.findIndex((candidate) => candidate.id === ace.id)
+  if (aceLevels === undefined || order < 0) {
+    const { hit, power, defense, run } = ace.ability
+    return recordAbilityOf({ ability: [hit, power, defense, run], skillBits: ace.skillBits, equipment: [] }, true)[3] ?? run
+  }
+  return aceRecordAbilityAtLevel(ace, aceLevelOf(aceLevels, aceLevelSlotOf('투수', order + 1))).run
 }

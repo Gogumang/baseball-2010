@@ -10,7 +10,7 @@ import { DERBY_DISTANCE_LIMIT, derbyDistanceOf } from '@/entities/home-run-derby
 import { battedBallTrajectory, isBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { isBigFlyPattern, isEventZoneHit, isEventZoneVisibleAt } from '@/entities/home-run-derby/model/eventZone'
+import { isBigFlyPattern, isEventZoneHit, isEventZoneTranslucentAt } from '@/entities/home-run-derby/model/eventZone'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 
@@ -108,10 +108,9 @@ describe('이벤트 존 — 플레이 +0x127 = 패턴 플래그 & 2 (0xb07c8)', 
     expect([센다(18), 센다(19), 센다(20)]).toEqual([35, 15, 15])
   })
 
-  it('8프레임 주기로 깜빡인다', () => {
-    const 보임 = Array.from({ length: 16 }, (_unused, tick) => isEventZoneVisibleAt(tick))
-    expect(보임.slice(0, 8)).toEqual(보임.slice(8, 16))
-    expect(보임.filter(Boolean)).toHaveLength(8)
+  it('존이 서면 상태 틱 % 8 ≤ 3 은 효과 1 반투명, 4~7 은 그대로 — 0x41098 410bc~41116', () => {
+    const 반투명 = Array.from({ length: 16 }, (_unused, tick) => isEventZoneTranslucentAt(tick))
+    expect(반투명).toEqual([true, true, true, true, false, false, false, false, true, true, true, true, false, false, false, false])
   })
 })
 
