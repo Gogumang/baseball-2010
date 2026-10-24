@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { castOfAces, castOfCareer, castOfTeamRecordEquipment, gameSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { castOfAces, castOfCareer, castOfRosterBatters, castOfTeamRecordEquipment, gameSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { teamBatters } from '@/entities/team/model/teamRoster'
+import { batterEquipmentOf, bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
 
 describe('gameSpritePreload — 경기 진입 때 두 팀 명단으로 고르는 선수 그림', () => {
@@ -50,5 +52,18 @@ describe('gameEntryCastPreloadsOf — 경기 첫 그림 몫', () => {
     expect(urls.some((url) => url.includes('item_bat_head_2/'))).toBe(true)
     expect(urls.some((url) => url.includes('item_pit_'))).toBe(true)
     expect(castOfTeamRecordEquipment(1, undefined)).toEqual({})
+  })
+})
+
+describe('castOfRosterBatters — 투수 미션 CPU 팀(마스터 줄) 타자의 Xls 니블 장비 그림', () => {
+  it('붙박이 표 타자 줄마다 몸통 폼(+0xb >> 4)과 니블(히트 · 파워 · 주루) 장비 겹 — 타석 교대 0x47cc8 47e80 → 0x78fd8', () => {
+    const roster = teamBatters(14)
+    const cast = castOfRosterBatters(14)
+    expect(cast.equippedBatters).toEqual(
+      roster.map((player) => ({
+        bodyType: bodyTypeOf(player.profile >> 4),
+        equipment: batterEquipmentOf({ hit: player.equipment[0], power: player.equipment[1], run: player.equipment[3] }),
+      })),
+    )
   })
 })

@@ -12,7 +12,7 @@ import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import { batterEquipmentOf, bodyTypeOf, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
-import { stageCastSpritePreloadsOf, stageEntrySpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
+import { equippedBattersOfRecords, stageCastSpritePreloadsOf, stageEntrySpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
 import type { StageCast } from '@/widgets/batting-stage/lib/stageSpritePreload'
 
 /** 두 팀의 마선수 → 타석 출연진 */
@@ -39,12 +39,12 @@ export function castOfCareer(career: Pick<PlayerCareer, 'battingTypeIndex' | 'ba
 export function castOfTeamRecordEquipment(teamId: number, equipment: TeamRecordEquipment | undefined): StageCast {
   if (equipment === undefined) return {}
   const roster = teamBatters(teamId)
-  const equippedBatters = Object.entries(equipment.batters ?? {}).flatMap(([slot, nibbles]) => {
-    const player = roster[Number(slot)]
-    if (player === undefined) return []
-    const [hit = 0, power = 0, , run = 0] = nibbles
-    return [{ bodyType: bodyTypeOf(player.profile >> 4), equipment: batterEquipmentOf({ hit, power, run }) }]
-  })
+  const equippedBatters = equippedBattersOfRecords(
+    Object.entries(equipment.batters ?? {}).flatMap(([slot, nibbles]) => {
+      const player = roster[Number(slot)]
+      return player === undefined ? [] : [{ profile: player.profile, equipment: nibbles }]
+    }),
+  )
   const pitcherEquipments = Object.values(equipment.pitchers ?? {}).map((nibbles) => pitcherEquipmentOfNibbles(nibbles))
   return { equippedBatters, pitcherEquipments }
 }
@@ -56,6 +56,14 @@ function mergedCast(...casts: readonly StageCast[]): StageCast {
     equippedBatters: casts.flatMap((cast) => cast.equippedBatters ?? []),
     pitcherEquipments: casts.flatMap((cast) => cast.pitcherEquipments ?? []),
   }
+}
+
+/**
+ * 붙박이 표 팀 타자 줄 전부의 **Xls 행 장비 니블** → 타석 출연진. 투수 미션 CPU 팀은 마스터 줄(Xls 행)로 서므로
+ * 타석 교대 0x47cc8 47e80~47eb6 이 그 행 니블 − 1 로 상대 타자 장비 겹(0x78fd8)을 싣는다. 리그 열 팀 니블은 0 이라 맨몸 겹뿐이다
+ */
+export function castOfRosterBatters(teamId: number): StageCast {
+  return { equippedBatters: equippedBattersOfRecords(teamBatters(teamId)) }
 }
 
 /** 타석 선수 그림(타자 · 투수 · 루 주자) */

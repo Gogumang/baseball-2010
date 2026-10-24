@@ -344,6 +344,7 @@ export function HomeRunDerbyScreen({
               run={run}
               bestDistance={bestDistance}
               isEventZoneShown={session.isEventZoneShown}
+              eventZoneRewardX={session.eventZoneRewardX}
               tick={tick}
               shownCombo={session.shownCombo}
               distanceBoardValue={

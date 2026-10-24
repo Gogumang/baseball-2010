@@ -4,8 +4,8 @@ import type { TeamEntryBatter, TeamEntryPitcher } from '@/features/play-team-gam
 import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
-import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames } from '@/widgets/batting-stage/model/stageRefs'
 import { countsAsAtBat, isHit } from '@/entities/at-bat/model/atBatOutcome'
@@ -275,6 +275,7 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   readonly batterTeamIndex: number
   readonly batterSide?: number
   readonly aceBatterOrder?: number
+  readonly batterEquipment?: BatterEquipment
   readonly pitcherForm: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
@@ -305,6 +306,36 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
     }
   }
   const profile = batterProfileOf(teamId, batter) ?? 0
-  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamId, ...mound }
+  return {
+    batterForm: profile >> 4,
+    batterSkinIndex: (profile >> 2) & 3,
+    batterTeamIndex: teamId,
+    // 타석 교대 0x47cc8 — 0x768b4 로 장비 칸을 비운 뒤 마타자가 아니면 47e80~47eb6 이 지금 타자 레코드(0xae89c(공격 팀 = 상대))
+    // +0x19 · +0x1a 니블 − 1 로 장비 겹 0x78fd8 을 싣는다(모드 갈래 없음). 명단 칸의 니블 = Xls 행 · 시즌 저장 명단 · 기록 사본
+    ...(batter.equipment === undefined
+      ? {}
+      : {
+          batterEquipment: batterEquipmentOf({
+            hit: batter.equipment[0] ?? 0,
+            power: batter.equipment[1] ?? 0,
+            run: batter.equipment[3] ?? 0,
+          }),
+        }),
+    ...mound,
+  }
+}
+
+/**
+ * 상대 명단 일반 타자 전부의 레코드 +0xb 와 장비 니블 — 팀 경기 로딩 판이 상대 타자 장비 겹(0x78fd8) 그림을 미리 받는 재료.
+ * 마타자(0xb63a0 ≥ 0)는 장비 겹이 없어 뺀다
+ */
+export function opponentBatterRecordsOf(
+  teamId: number,
+  entry: readonly TeamEntryBatter[],
+): { readonly profile: number; readonly equipment?: readonly number[] }[] {
+  return entry.flatMap((batter) =>
+    batter.aceIndex >= 0 || batter.equipment === undefined
+      ? []
+      : [{ profile: batterProfileOf(teamId, batter) ?? 0, equipment: batter.equipment }])
 }
 

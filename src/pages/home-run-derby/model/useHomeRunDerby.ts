@@ -32,7 +32,7 @@ import {
   shouldShowComboAtNextPitch,
 } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyResult, DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
-import { isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
+import { eventZoneRewardXOf, isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { FOUL_CALL_SOUND } from '@/features/play-at-bat/model/atBatSounds'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
@@ -258,6 +258,10 @@ export interface HomeRunDerbySession {
   /** 이번 공이 이벤트 존을 얻었나 — 존 그림을 띄우는 동안만 참이다 */
   readonly isEventZoneShown: boolean
   /**
+   * 이벤트 존 보상 "200G"(trainning 애니 3)의 x — 존이 서 있는 동안만 값, 아니면 null (`EVENT_ZONE_REWARD` · 0x41098)
+   */
+  readonly eventZoneRewardX: number | null
+  /**
    * HUD 콤보 표시(장면 +0x1b60)가 켜져 있으면 그리는 값(+0x84), 아니면 null.
    * 다음 공 준비(상태 0xf)에서 켜져 `COMBO_DISPLAY_FRAMES` 갱신 뒤 꺼진다 (`0x3dbf8` · `0x4585c`).
    */
@@ -354,6 +358,7 @@ export function useHomeRunDerby({
   const [isPreparing, setIsPreparing] = useState(true)
   const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(false)
   const [isEventZoneShown, setIsEventZoneShown] = useState(false)
+  const [eventZoneRewardX, setEventZoneRewardX] = useState<number | null>(null)
   const [shownCombo, setShownCombo] = useState<number | null>(null)
   const [result, setResult] = useState<DerbyResult | null>(null)
   const [homeRunText, setHomeRunText] = useState<HomeRunTextWindow | null>(null)
@@ -619,6 +624,8 @@ export function useHomeRunDerby({
     const zoneHit = isEventZoneHit({ pattern: detail.pattern ?? null })
     applyPlayResult(current, batted, zoneHit)
     setIsEventZoneShown(zoneHit)
+    // 존을 놓은 공의 "200G" 애니 자리 — 0x41098 4111c 가 +0xfcc(판정 수평각)로 가른다
+    setEventZoneRewardX(zoneHit && detail.pattern != null ? eventZoneRewardXOf(detail.pattern[0]) : null)
     setIsPaused(true)
     // 맞지 않은 공은 상태 0x12 — 15틱(볼넷 · 사구면 31틱) 뒤 0x4e740: 사구(st[0xb] == 4)면 벤치 클리어링 굴림
     isHitByPitchRef.current = call.judgment === 4
@@ -698,6 +705,7 @@ export function useHomeRunDerby({
       if (playRef.current !== null) setEffectsClearedAt(gameSceneNow())
       playRef.current = null
       setIsEventZoneShown(false)
+      setEventZoneRewardX(null)
       // 0x17 끝 0x35108 — HOMERUN 글자를 끄고(0x351d0) 0x17 그리기(비거리 판)도 더는 안 돈다
       setHomeRunText(null)
       setDistanceBoard(null)
@@ -818,6 +826,7 @@ export function useHomeRunDerby({
     enterScenePrepare()
     setIsPaused(false)
     setIsEventZoneShown(false)
+    setEventZoneRewardX(null)
     setResult(null)
   }, [])
 
@@ -856,6 +865,7 @@ export function useHomeRunDerby({
     isAwaitingConfirm,
     confirm,
     isEventZoneShown,
+    eventZoneRewardX,
     shownCombo,
     result,
     homeRunText,
