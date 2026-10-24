@@ -46,6 +46,7 @@ import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
 import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
+import { usePitchArrivalHold } from '@/widgets/batting-stage/model/usePitchArrivalHold'
 import { RecordAlertPanel, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
@@ -308,17 +309,14 @@ function TeamGameScene({
     if (!isThrowPendingRef.current) return
     isThrowPendingRef.current = false
     const thrown = progress.lastResolution
-    if (
-      thrown === null ||
-      session.pendingDefensePlay !== null ||
-      progress.pendingRunnerPlay != null ||
-      !passesHeldResult(thrown)
-    ) {
+    if (thrown === null || session.pendingDefensePlay !== null || !passesHeldResult(thrown)) {
       setHeldResultTicks(0)
       return
     }
     const waitTicks = resultWaitTicksOf(applyPitchResolution(atBatBeforeThrowRef.current, thrown).outcome)
     setHeldResultTicks(waitTicks)
+    // 공 도착 판(도루 · 폭투) — 장면은 0x12 틱 0 까지 그리고(`usePitchArrivalHold`) 키 막음은 판이 맡는다
+    if (progress.pendingRunnerPlay != null) return
     // 마투수가 던졌으면 공 틱이 오르는 단계가 0xcfbe4[순번]이라 0x11 이 그만큼 길다 (0x3f378)
     setPitchBusyTicks(
       pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks, teamPitcherSideStageOf(progress).acePitcher?.order),
@@ -432,7 +430,7 @@ function TeamGameScene({
   /**
    * 사람이 던진 공을 CPU 타자가 맞혔으면 판정 틀까지 0x11 · 이어 0x13 을 사람 수비 타석 장면이 그린 뒤 0x17(수비 판)이다
    * (`usePitcherHitScene` — 투수편과 같다). 그동안 수비 판은 진행기에 서 있지만 화면은 아직 안 띄운다.
-   * ⚠️ 키 막음(`isDefenseInPlay`)은 그대로라 0x11 끝 · 0x13 동안 '*' 메뉴가 안 열린다 — 원본은 0xd~0x15 에서 연다
+   * 그동안은 아직 0x17 이 아니라 '*' 메뉴가 열린다(0x498d4 4991c — 상태 0xd~0x15, `isPlayKeyBlocked`)
    */
   const pendingHumanDefense = session.pendingDefensePlay?.side === '수비' ? session.pendingDefensePlay.input : null
   const humanDefenseStage = teamPitcherSideStageOf(progress)
@@ -445,6 +443,22 @@ function TeamGameScene({
     isFrozen: isMenuOpen || overlay === '조작방법',
   })
   const isHitSceneShowing = teamHitScene.isShowing
+  /**
+   * 사람이 던진 공의 공 도착 판(도루 · 폭투) — 원본은 0x12 진입 0x3dfac 이 판을 열고 0x17 을 예약한다. 그 다음 그림까지 사람 수비 타석
+   * 장면(0x11 끝 · 0x12 틱 0)을 두고 수비 화면을 띄운다 (`usePitchArrivalHold` — 투수편과 같다)
+   */
+  const humanArrivalPlay =
+    progress.pendingRunnerPlay?.kind === 'arrival' && progress.pendingRunnerPlay.side !== '공격' ? progress.pendingRunnerPlay : null
+  const isArrivalHolding = usePitchArrivalHold({
+    play: humanArrivalPlay,
+    pitch: progress.lastPitch,
+    aceOrder: humanDefenseStage.acePitcher?.order ?? null,
+    isFrozen: isMenuOpen || overlay === '조작방법',
+  })
+  /** 사람 투구 장면이 아직 0x11 끝 · 0x12 · 0x13 을 그리는 동안(판은 섰지만 0x17 전) */
+  const isPitchSceneBeforePlay = isHitSceneShowing || isArrivalHolding
+  /** 원본 상태 0x17 — 공용 키 0x498d4 의 '*'(상태 0xd~0x15) · '#' · 도루가 안 열린다 */
+  const isPlayKeyBlocked = isDefenseInPlay && !isPitchSceneBeforePlay
   /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
   const isAwaitingConfirmRef = useRef(false)
   /** 대기 중 0xd 두 그림을 지나 0xe 에 들어섰는가 — '#' 는 0xe·0xf 에서만 열린다 */
@@ -479,8 +493,9 @@ function TeamGameScene({
       // 공수 교대 판(0x18)에는 공용 키 0x498d4 의 '*'·'#'·도루가 안 열린다 (그 상태 범위 밖)
       if (isSceneCovering) return
       // 수비 진행 중(상태 0x17)에는 이 키들이 원본에서도 안 먹는다 — '*' 는 경기 상태 0xd~0x15,
-      // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다
-      if (isDefenseInPlay) return
+      // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다. 판이 섰어도 0x11 끝 · 0x12 · 0x13 을 그리는
+      // 동안(`isPitchSceneBeforePlay`)은 아직 0x17 전이라 '*' 가 열린다 ('#' 는 `hashKeyRef` 가 그대로 막는다)
+      if (isPlayKeyBlocked) return
       // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
       if (overlay === '조작방법') return
       if (event.key === '*') {
@@ -532,7 +547,7 @@ function TeamGameScene({
     canPitch,
     changeWindow,
     closeChangeWindow,
-    isDefenseInPlay,
+    isPlayKeyBlocked,
     isSceneCovering,
     isMenuOpen,
     isStealable,
@@ -703,7 +718,7 @@ function TeamGameScene({
   const pitchEndSerial = pitchEnd.serial
   const recordAlert = useRecordAlert(progress.recordIds, {
     // 0x11 끝 · 0x13 을 그리는 동안은 아직 0x17 이 아니다
-    isDrawing: isIntroDone && summary === null && (!isDefenseInPlay || isHitSceneShowing) && !isReplaying,
+    isDrawing: isIntroDone && summary === null && (!isDefenseInPlay || isPitchSceneBeforePlay) && !isReplaying,
     isFrozen: isMenuOpen || overlay === '조작방법',
     isSettled: progress.game.isFinished,
     // 상태 틱 [+0x2c] 의 0 점 — 화면 갈래(판 · 타석/투구 입력 단계 · 확인 대기)가 바뀐 틱과, 원본 상태 경계(타석 장면이 적는
@@ -870,7 +885,7 @@ function TeamGameScene({
    * (`features/defense-play/model/liveRunnerPlay`). 다 돌면 `finishRunnerPlay` 가 결과를 먹이고 투구 흐름을 잇는다.
    */
   const runnerPlay = progress.pendingRunnerPlay
-  if (runnerPlay != null) {
+  if (runnerPlay != null && !isArrivalHolding) {
     return (
       <DefensePlayback
         runnerPlay={runnerPlay}
@@ -1164,7 +1179,7 @@ function TeamGameScene({
             {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
             <RecordAlertPanel frame={recordAlert} />
           </>
-        ) : canPitch || isHitSceneShowing ? (
+        ) : canPitch || isPitchSceneBeforePlay ? (
           /*
             사람 수비 타석 장면 — 원본은 누가 던지든 같은 프레임 0x52c50 · 그리기 표 0xd05a0 이 구장 · 투수 0x38d1c · 타자 0x49e64 ·
             주자 0x35b94 · HUD 0x4c4bc 를 그린다(`widgets/batting-stage/lib/pitcherSideStage`). 그 위에 0xe 소개 판 0x44944 ·
@@ -1305,7 +1320,7 @@ function TeamGameScene({
           (예전 웹 안내 "자동 진행 중…" 은 원본에 없다)
         */}
 
-        {(canPitch || isHitSceneShowing) && !canBat && <RecordAlertStageOverlay frame={recordAlert} />}
+        {(canPitch || isPitchSceneBeforePlay) && !canBat && <RecordAlertStageOverlay frame={recordAlert} />}
 
         {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
         {isAwaitingConfirm && !isPopupOpen && changeWindow === null && (
