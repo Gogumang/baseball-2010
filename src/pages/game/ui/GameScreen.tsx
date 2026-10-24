@@ -36,6 +36,8 @@ import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
+import { gameStageWarmCastOf } from '@/pages/game/lib/gameStageWarmCast'
+import { useWarmStageCast } from '@/widgets/batting-stage/model/useWarmStageCast'
 import { gameHalfInningCardsOf } from '@/pages/game/lib/gameHalfInningCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -44,6 +46,7 @@ import {
   mySpecialSwingRemainingOf,
   opponentMoundStaminaPercentOf,
   opponentPitcherEquipmentOf,
+  opponentPitcherSkinIndexOf,
   ourRunnerAcesOf,
   runnerRunAbilitiesOf,
   stealableBasesOf,
@@ -185,6 +188,9 @@ export function GameScreen({
   const menu = useInGameMenuState()
   // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
   useMarksGameScene()
+  // 내 선수 · 상대 투수 명단의 칠하기를 미리 건다 — 원본은 타석 교대 0x47cc8 의 적재 때 칠해 첫 그림부터 제 색이다(`gameStageWarmCastOf`)
+  const stageWarmCast = gameStageWarmCastOf(progress, career)
+  useWarmStageCast(stageWarmCast)
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
@@ -390,6 +396,10 @@ export function GameScreen({
             pitcherAbility={pitcherAbility}
             // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
             pitcherEquipmentNibbles={opponentPitcherEquipmentOf(progress)}
+            // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(482c0~482fc → 0x793b0 의 794c2) — 수비 팀 = 상대
+            pitcherSkinIndex={opponentPitcherSkinIndexOf(progress)}
+            pitcherTeamIndex={progress.opponentTeamId}
+            warmCast={stageWarmCast}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
             aceLevels={aceLevels}
             {...(cpuMagic === undefined ? {} : { cpuMagic })}

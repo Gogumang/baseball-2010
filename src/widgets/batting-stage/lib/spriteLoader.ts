@@ -115,6 +115,18 @@ function recoloredSprite(folder: string, url: string, paletteIndex: number): HTM
 }
 
 /**
+ * 바닥(attack/000) 잔디 벌의 칠하기를 미리 건다 — 원본 바닥 0x7725c 는 구장 객체 적재 때 `stadium/attack.mpl` 줄(+0xc)을 갈아 끼워
+ * 첫 그림부터 제 색이다. 타석이 서기 전(경기 화면 · 로딩 판)에 걸어 두면 `fieldBackground` 가 첫 그림부터 칠한 그림을 낸다.
+ * `palette.json` 이 아직이면 false(다시 부른다). 칠할 것이 없거나 걸었으면 true
+ */
+export function warmFieldBackground(paletteIndex: number | null): boolean {
+  if (paletteIndex === null) return true
+  if (spritePalettes(FIELD_FOLDER) === null) return false
+  recoloredSprite(FIELD_FOLDER, FIELD_BACKGROUND, paletteIndex)
+  return true
+}
+
+/**
  * 프레임 한 장의 칠하기를 미리 건다 — 그리기 전에 칠해 두면 처음 그리는 그림에 구운 벌이 비치지 않는다.
  * 원점 · `palette.json` 이 아직 안 왔으면 걸지 못해 false(다음에 다시 부른다). 칠하기를 걸었거나 칠할 것이 없으면 true.
  *
@@ -150,14 +162,16 @@ const warmedFrameSets = new Set<string>()
  * 한 그림 객체가 그릴 수 있는 프레임 전부의 칠하기를 미리 건다 (`warmRecoloredFrame`) — 원본은 팔레트를 적재 때 갈아 끼우므로
  * 어느 자세든 처음부터 제 색이다. 웹은 칠하기가 비동기라 처음 그리는 자세에 구운 벌이 한 박자 비치던 것을 막는다.
  * `key` 는 그 묶음(그림 · 벌)을 가린다 — 원점 · 팔레트가 다 와서 다 걸면 같은 열쇠는 다시 안 본다(목록도 안 만든다).
+ * 다 걸었으면(이번에 또는 예전에) true — 아직 원점 · 팔레트를 기다리면 false 라 다시 불러야 한다.
  */
-export function warmRecoloredFrames(key: string, framesOf: () => readonly RecolorFrame[]): void {
-  if (warmedFrameSets.has(key)) return
+export function warmRecoloredFrames(key: string, framesOf: () => readonly RecolorFrame[]): boolean {
+  if (warmedFrameSets.has(key)) return true
   let isAllWarmed = true
   for (const { folder, frame, paletteIndex } of framesOf()) {
     if (paletteIndex !== null && !warmRecoloredFrame(folder, frame, paletteIndex)) isAllWarmed = false
   }
   if (isAllWarmed) warmedFrameSets.add(key)
+  return isAllWarmed
 }
 
 /** 시험 전용 — 다 건 묶음 기억을 비운다 */

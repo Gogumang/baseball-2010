@@ -32,6 +32,7 @@ import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameOf, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
@@ -79,6 +80,18 @@ interface BattingStageProps {
    * 장비 겹 0x79790 을 부른다 — 모드를 안 가린다. 마투수(`acePitcher`)면 넘기지 않는다. 없으면 맨몸
    */
   readonly pitcherEquipmentNibbles?: readonly number[] | undefined
+  /**
+   * 마운드 투수 레코드의 **피부** `(rec[0xb] >> 2) & 3` 와 **수비 팀 번호** 0xb6c08(게임). 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림
+   * `[장면+0xf1c]` 을 적재 0x793b0 으로 다시 실을 때 이 둘을 넘기고, 794c2 가 `pitcher.pzx` 를 **피부 × 15 + 팀** 벌로 연다(모드 무관).
+   * 피부를 안 넘기면 0, 팀을 안 넘기면 `hud.opponentTeamId`(타석에 선 쪽이 내 팀이라는 `batterTeamIndex` 와 같은 근사)다
+   */
+  readonly pitcherSkinIndex?: number
+  readonly pitcherTeamIndex?: number
+  /**
+   * 곧 설 선수들(타순 다음 · 벤치 대타 · 교체 투수)의 생김새 — 타석 그림이 그림마다 그 칠하기를 미리 건다(`StageScene.warmCast`).
+   * 원본은 타석 교대 0x47cc8 의 적재 때 팔레트를 갈아 끼워 교대 직후 첫 그림부터 제 색이다. 안 넘기면 지금 선수만 칠한다
+   */
+  readonly warmCast?: StageWarmCast
   /** 번트를 쓸 수 있는지 */
   readonly canBunt?: boolean
   /** 판정 모드 — 나만의리그(모드 3·4)는 "내 선수"(비트7) 보너스, '미션'(모드 6)은 사람 공격 +100 (0xab214) */
@@ -319,7 +332,7 @@ const BUNT_9_TOUCH_ORDER = 1.5
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
 
-export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
+export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pitcherTeamIndex, batterHand, canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
   const isCommonWindowOpen = useIsCommonWindowOpen()
   // 지금 선 타자 · 투수의 스윙 · 번트 · 투구 그림을 미리 받는다(안 기다린다 — 그리기는 그대로)
   useStageCastPreload({
@@ -341,6 +354,9 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     batterEquipment: batterEquipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(batterEquipmentLevels),
     // 마운드 장비 겹 (48138~4816a → 0x79790) — 마투수 그림이면 0x482fc 의 0x793b0 이 따로 싣는다
     pitcherEquipment: pitcherEquipmentOfNibbles(pitcherEquipmentNibbles),
+    // 마운드 바탕 벌 = 피부 × 15 + 수비 팀 (482c0~482fc → 0x793b0 의 794c2)
+    pitcherSkinIndex,
+    pitcherTeamIndex: pitcherTeamIndex ?? props.hud?.opponentTeamId ?? null,
     // 팀을 안 넘기면 HUD 의 내 팀 번호를 쓴다 (근사 — props 주석 참고)
     batterTeamIndex: batterTeamIndex ?? props.hud?.ourTeamId ?? 0,
     batterSkillIds,

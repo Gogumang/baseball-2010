@@ -14,7 +14,7 @@ import type { useMissionSession } from '@/app/model/useMissionSession'
 import { MissionSelectScreen } from '@/pages/mission-select/ui/MissionSelectScreen'
 import { MissionPlayScreen } from '@/pages/mission-play/ui/MissionPlayScreen'
 import { cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
-import { missionCpuMoundPitcherEquipmentOf } from '@/entities/mission/model/missionCpuTeam'
+import { missionCpuMoundPitcherEquipmentOf, missionCpuMoundPitcherSkinIndexOf } from '@/entities/mission/model/missionCpuTeam'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection } from '@/entities/collection/model/collection'
@@ -322,6 +322,7 @@ export function MissionRoutes({
         opponent={missionMoundOpponent(missionRun)}
         // 마운드 마스터 줄 +0x19 · +0x1a 니블 — 마투수 칸이면 없다 (0x47cc8 48138~4816a)
         pitcherEquipmentNibbles={missionCpuMoundPitcherEquipmentOf(missionRun.cpu)}
+        pitcherSkinIndex={missionCpuMoundPitcherSkinIndexOf(missionRun.cpu)}
         atBat={runner.atBat}
         isPaused={runner.isPaused}
         bannerText={runner.bannerText}
@@ -881,6 +882,8 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     pitcherForm: form,
     pitcherHand: pitcherHandOf(form, false),
     ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),
+    // 마운드 바탕 벌 = 피부 × 15 + 사람 칸 팀 (482c0~482fc → 0x793b0 의 794c2) — 팀은 hud.ourTeamId
+    pitcherSkinIndex: session.pitcher.skinIndex,
     // 0x38d1c 의 지친 표시 — 미션 투수 +0x2c 도 공마다 깎인다(0xa5e14). 모드 5 는 0xaebb0 의 모드 7 갈래가 아니라 실제 체력%
     pitcherStaminaPercent: staminaPercentOf(session.pitcherStamina),
     batterForm: profile >> 4,

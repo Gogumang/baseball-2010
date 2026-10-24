@@ -361,6 +361,17 @@ export function missionCpuMoundPitcherEquipmentOf(team: MissionCpuTeam): readonl
 }
 
 /**
+ * **타자 미션 마운드 투수의 피부** `(rec[0xb] >> 2) & 3` — 마스터 줄(Xls 행 사본) +0xb. 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림
+ * 적재 0x793b0 에 넘겨 794c2 가 `pitcher.pzx` 를 피부 × 15 + 수비 팀(CPU 칸 팀) 벌로 연다. CPU 수비 팀이 없거나 줄이 없으면 0
+ */
+export function missionCpuMoundPitcherSkinIndexOf(team: MissionCpuTeam): number {
+  const pitching = team.pitching
+  if (pitching === null) return 0
+  const row = masterPitcherRowAt(pitching, pitching.mound.pitcherSlot)
+  return row === null ? 0 : (row.profile >> 2) & 3
+}
+
+/**
  * **투수 미션의 지금 CPU 타자** `0xae89c(공격 팀)` — 타순 `team+0x32` 칸에 선 명단 줄. 마타자 칸이면 `isAce`(줄은 null),
  * 아니면 마스터 팀 타자 줄(Xls 행 사본, 0x1ff98 — 대타로 들어온 벤치 줄 포함). CPU 공격 팀이 없으면(타자 미션) null.
  */

@@ -508,6 +508,17 @@ export interface TeamEntryPitcher {
 }
 
 /**
+ * **마운드 투수 그림의 피부** `(rec[0xb] >> 2) & 3` — 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림 적재 0x793b0 에 넘겨 794c2 가
+ * `pitcher.pzx` 를 피부 × 15 + 수비 팀 벌로 연다. 붙박이 표 칸(`tableSlot` · `tableTeamId`)이면 그 Xls 행의 +0xb 다.
+ * ⚠️ 표 밖 투수(영입한 명전·나리 기록 사본)는 명단에 +0xb 칸이 없어 0(구운 벌과 같은 피부)으로 둔다. 마투수는 ace/pitcher_* 라 안 쓴다
+ */
+export function teamPitcherSkinIndexOf(teamId: number, entry: TeamEntryPitcher | undefined): number {
+  if (entry === undefined || entry.aceIndex >= 0 || entry.tableSlot === undefined) return 0
+  const row = teamPitchers(entry.tableTeamId ?? teamId)[entry.tableSlot]
+  return row === undefined ? 0 : (row.profile >> 2) & 3
+}
+
+/**
  * **마투수가 들어가는 칸 = 8번**. 마타자의 9번과 **다르다** — 직접 떠서 확인했다.
  *
  * `0xb88c8(팀, k)` → `0x1f824(저장, k)` 로 마투수 레코드를 꺼내 `0xb521c(명부, 레코드, 1)`:

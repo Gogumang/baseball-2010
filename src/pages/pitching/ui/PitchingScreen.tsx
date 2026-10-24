@@ -70,6 +70,8 @@ export interface PitchingStageSource {
   readonly pitcherHand: number
   /** 미션 투수 장비 겹 (0x10810 → 0x79790) — 없으면 맨몸 */
   readonly pitcherEquipment?: PitcherEquipment
+  /** 미션 투수 피부 `(rec[0xb] >> 2) & 3` — 마운드 바탕 벌 = 피부 × 15 + 사람 칸 팀(0x47cc8 482c0~482fc → 0x793b0 의 794c2) */
+  readonly pitcherSkinIndex?: number
   readonly batterForm: number
   /** 타자 손 0xb63c0 — 마타자는 표 0xd88b0. 없으면 폼의 낮은 비트 */
   readonly batterSide?: number
@@ -567,6 +569,7 @@ export function PitchingScreen({
               pitcherForm={stage.pitcherForm}
               pitcherHand={stage.pitcherHand}
               {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
+              {...(stage.pitcherSkinIndex === undefined ? {} : { pitcherSkinIndex: stage.pitcherSkinIndex })}
             {...(stage.pitcherStaminaPercent === undefined ? {} : { pitcherStaminaPercent: stage.pitcherStaminaPercent })}
               {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
               {...(stage.aceBatterOrder === undefined ? {} : { aceBatterOrder: stage.aceBatterOrder })}

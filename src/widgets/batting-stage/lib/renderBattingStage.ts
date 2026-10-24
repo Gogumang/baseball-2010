@@ -60,8 +60,8 @@ import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedRea
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
-import { aceBatterLayersOf, batterLayersOf, batterPoseFramesOf, isAceBatterOrder, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
-import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import { aceBatterLayersOf, batterLayersOf, batterPoseFramesOf, isAceBatterOrder, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayerPaletteIndexOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, BatterLayer, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import { GAUGE_TARGET_FRAME, drawPitchInputSprites, drawPitchInputUnderlay, drawPitchMenu } from '@/widgets/batting-stage/lib/pitchInputOverlay'
@@ -227,6 +227,13 @@ export interface StageScene {
    */
   readonly pitcherHand?: number
   /**
+   * 마운드 투수 바탕 그림(`pitcher.pzx`)의 팔레트 재료 — 벌 = **피부 × 15 + 팀** (적재 0x793b0 의 794c2).
+   * 타석 교대 0x47cc8 의 482c0~482fc 가 팀 = 수비 팀 0xb6c08(게임) · 피부 = 투수 레코드 `(rec[0xb] >> 2) & 3` 으로 싣는다(모드 무관).
+   * 팀이 없으면(null · 안 넘김) 예전처럼 구운 벌 그대로 그린다(장비 등급 줄만 칠한다). 피부는 없으면 0
+   */
+  readonly pitcherSkinIndex?: number
+  readonly pitcherTeamIndex?: number | null
+  /**
    * 마운드 투수 체력 % (0xaebb1(수비 팀)) — 34 이하면 투수 그리기 0x38d1c 가 player_effect 애니 9 · 10 을 투수 자리에 그린다
    * (`pitcherFatigue`). 안 넘기면 안 그린다
    */
@@ -291,12 +298,62 @@ export interface StageScene {
    * game_effect 애니 3. 상태 0x13 이고 감상 플래그가 선 타구에만 부르는 쪽이 채운다. 없거나 null 이면 안 그린다
    */
   readonly bigHitScreen?: BigHitScreen | null
+  /**
+   * 곧 타석 · 마운드에 설 수 있는 선수들(타순 다음 · 벤치 대타 · 교체 투수)의 그림 생김새 — 그림마다 그 칠하기를 미리 건다
+   * (`warmStageCast`). 원본은 타석 교대 0x47cc8 이 적재(타자 0x78ab0 · 투수 0x793b0) 때 팔레트를 갈아 끼우므로 새 타자 · 투수의
+   * 첫 그림부터 제 색이다. 웹은 칠하기가 비동기라 교대 직후 첫 그림에 구운 벌이 비치던 것을 막는다. 그림 · 차례 · 난수는 안 바꾼다
+   */
+  readonly warmCast?: StageWarmCast | null
+}
+
+/** 타석 그림 생김새 하나 — 일반 타자(마타자는 구운 그림이라 칠할 것이 없다) */
+export interface StageBatterLook {
+  readonly bodyType: number
+  readonly skinIndex: number
+  readonly teamIndex: number
+  readonly equipment: BatterEquipment
+}
+
+/** 마운드 그림 생김새 하나 — 평범한 투수(마투수는 구운 그림) */
+export interface StagePitcherLook {
+  readonly skinIndex: number
+  readonly teamIndex: number
+  readonly equipment: PitcherEquipment
+}
+
+export interface StageWarmCast {
+  readonly batters: readonly StageBatterLook[]
+  readonly pitchers: readonly StagePitcherLook[]
+}
+
+/** 생김새 목록 → 겹치는 것을 걷은 미리 칠하기 묶음 (리그 팀은 피부 셋 · 몸통 둘 · 맨몸이라 몇 벌 안 된다) */
+export function stageWarmCastOf(batters: readonly StageBatterLook[], pitchers: readonly StagePitcherLook[]): StageWarmCast {
+  const unique = <T,>(looks: readonly T[]): T[] => [...new Map(looks.map((look) => [JSON.stringify(look), look])).values()]
+  return { batters: unique(batters), pitchers: unique(pitchers) }
+}
+
+/**
+ * 곧 설 선수들의 칠하기를 미리 건다 — 타자 · 투수 그리기가 거는 것과 **같은 열쇠**(`warmBatterRecolors` · `warmPitcherRecolors`)라
+ * 교대 뒤 그 선수 첫 그림은 다시 걸 것 없이 칠한 칸을 쓴다. 다 건 열쇠는 다시 안 보므로 그림마다 불러도 된다
+ */
+export function warmStageCast(cast: StageWarmCast | null | undefined): boolean {
+  if (cast === null || cast === undefined) return true
+  let isAllWarmed = true
+  for (const look of cast.batters) {
+    if (!warmBatterRecolors(look.bodyType, look.skinIndex, look.teamIndex, look.equipment)) isAllWarmed = false
+  }
+  for (const look of cast.pitchers) {
+    if (!warmPitcherRecolors(look.equipment, { skinIndex: look.skinIndex, teamIndex: look.teamIndex })) isAllWarmed = false
+  }
+  return isAllWarmed
 }
 
 export function renderBattingStage(
   context: CanvasRenderingContext2D,
   scene: StageScene,
 ): void {
+  // 결과 배경만 그리는 때(타석 사이)도 건다 — 다음 타자가 서기 전이 미리 칠할 때다
+  warmStageCast(scene.warmCast)
   const side = scene.side ?? STAGE_SIDE
   const backdropOffsetY = scene.resultBackdropOffsetY ?? null
   /** 이 그림까지 든 창 첫 그림 수 — 장면이 사는 동안 도는 그리기 쪽 애니(하늘 조명 0x78490 · 램프 확대 0x37828)에 더한다 */
@@ -340,7 +397,7 @@ export function renderBattingStage(
   )
   // 0x38dc6 바람 줄(애니 11) — 투수와 같은 깊이 24500 이지만 먼저 넣어 투수 밑에 그려진다
   drawPitchWind(context, scene, side, pitcherAnimation)
-  drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0)
+  drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0, pitcherOutfitOf(scene))
   // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
   drawPitcherMistakeMark(context, scene, side)
   drawPitcherFatigue(context, scene, side, pitcherAnimation)
@@ -635,18 +692,37 @@ export function acePitcherMirrorsOf(aceOrder: number, isLeftHanded: boolean, sid
   return isLeftHanded
 }
 
-/**
- * 평범한 투수가 그릴 수 있는 자세(선 자세 · 투구 · 대기 동작, `pitcherPoseFramesOf`)의 등급 색 장비 겹을 미리 칠한다 —
- * 첫 와인드업 · 첫 투구 칸에 구운 벌이 한 박자 비치지 않게(`warmBatterRecolors` 와 같은 까닭). 바탕 pitcher 겹은 구운 색 그대로다
- */
-function warmPitcherRecolors(equipment: PitcherEquipment): void {
-  warmRecoloredFrames(`pitcher|${JSON.stringify(equipment)}`, () => pitcherRecolorFramesOf(equipment))
+/** 마운드 투수 바탕 그림의 피부 · 팀 — 팀이 없으면 null(구운 벌) */
+export interface PitcherOutfit {
+  readonly skinIndex: number
+  readonly teamIndex: number
 }
 
-/** 평범한 투수 자세 전부의 겹 — 벌은 `drawPitcher` 와 같은 `layerPaletteIndexOf(겹, 0, 0)`(등급 줄만) */
-export function pitcherRecolorFramesOf(equipment: PitcherEquipment): RecolorFrame[] {
+/** 장면 → 마운드 투수 피부 · 팀 (`StageScene.pitcherTeamIndex` 주석) */
+export function pitcherOutfitOf(scene: Pick<StageScene, 'pitcherSkinIndex' | 'pitcherTeamIndex'>): PitcherOutfit | null {
+  const teamIndex = scene.pitcherTeamIndex
+  if (teamIndex === undefined || teamIndex === null) return null
+  return { skinIndex: scene.pitcherSkinIndex ?? 0, teamIndex }
+}
+
+/** 평범한 투수 겹 하나의 벌 — 팀을 알면 바탕은 피부 × 15 + 팀(0x794c2), 장비는 등급 줄 */
+function pitcherPaletteOf(layer: BatterLayer, outfit: PitcherOutfit | null): number | null {
+  return outfit === null ? layerPaletteIndexOf(layer, 0, 0) : pitcherLayerPaletteIndexOf(layer, outfit.skinIndex, outfit.teamIndex)
+}
+
+/**
+ * 평범한 투수가 그릴 수 있는 자세(선 자세 · 투구 · 대기 동작, `pitcherPoseFramesOf`)의 다시 칠할 겹(바탕 피부 × 15 + 팀 · 등급 색 장비)을
+ * 미리 칠한다 — 첫 와인드업 · 첫 투구 칸에 구운 벌이 한 박자 비치지 않게(`warmBatterRecolors` 와 같은 까닭). 원본은 적재 0x793b0 때 칠한다
+ */
+export function warmPitcherRecolors(equipment: PitcherEquipment, outfit: PitcherOutfit | null): boolean {
+  return warmRecoloredFrames(`pitcher|${JSON.stringify(equipment)}|${outfit?.skinIndex ?? ''}|${outfit?.teamIndex ?? ''}`, () =>
+    pitcherRecolorFramesOf(equipment, outfit))
+}
+
+/** 평범한 투수 자세 전부의 겹 — 벌은 `drawPitcher` 와 같은 `pitcherPaletteOf` */
+export function pitcherRecolorFramesOf(equipment: PitcherEquipment, outfit: PitcherOutfit | null = null): RecolorFrame[] {
   return pitcherPoseFramesOf(null).flatMap((pose) =>
-    pitcherLayersOf(pose, equipment).map((layer) => ({ folder: layer.folder, frame: layer.frame, paletteIndex: layerPaletteIndexOf(layer, 0, 0) })),
+    pitcherLayersOf(pose, equipment).map((layer) => ({ folder: layer.folder, frame: layer.frame, paletteIndex: pitcherPaletteOf(layer, outfit) })),
   )
 }
 
@@ -662,6 +738,7 @@ function drawPitcher(
   equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT,
   form = 0,
   hand = 0,
+  outfit: PitcherOutfit | null = null,
 ): void {
   // 투수 앵커 (프레임 원점 = 발밑) — 원본 표 0xcfb18 의 side 칸
   const { x: MOUND_CENTER_X, y: MOUND_BOTTOM_Y } = stageLayoutOf(side).pitcherAnchor
@@ -677,11 +754,11 @@ function drawPitcher(
     }
     // 원본 0x79524 는 바탕 프레임 f · 머리 · 몸 · **바탕 f+22** · 손 · 다리 여섯 칸을 이 차례로 쌓는다.
     // f+22 에 몸통·던지는 팔·글러브 안 공이 들어 있다 (PITCHER_OVERLAY_FRAME_OFFSET 주석).
-    // 장비 칸은 등급 줄(.mpl)로 색만 갈리므로 타자와 같은 `layerPaletteIndexOf` 를 그대로 쓴다 —
-    // 투수 폴더는 피부·팀 벌이 없어 뒤 두 인자는 무시된다 (`batterLayerPaletteIndex` 가 null).
-    warmPitcherRecolors(equipment)
+    // 장비 칸(손 · 다리)은 등급 줄(.mpl), 바탕 pitcher.pzx 두 칸은 피부 × 15 + 팀 벌이다 — 적재 0x793b0 의 794c2 가
+    // 타석 교대 0x47cc8(482c0~482fc)이 넘긴 수비 팀 · 투수 피부로 연다(`pitcherLayerPaletteIndexOf`)
+    warmPitcherRecolors(equipment, outfit)
     for (const layer of pitcherLayersOf(index, equipment)) {
-      const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, 0, 0))
+      const frame = placedFrame(layer.folder, layer.frame, pitcherPaletteOf(layer, outfit))
       if (frame === null) continue
       context.drawImage(frame.image, axisX + frame.offsetX, MOUND_BOTTOM_Y + frame.offsetY)
     }
@@ -841,8 +918,8 @@ function drawHitByPitchMark(context: CanvasRenderingContext2D, scene: StageScene
  * 이 타자가 그릴 수 있는 자세(대기 · 스윙 · 번트, `batterPoseFramesOf`)의 다시 칠할 겹을 미리 칠해 둔다 — 처음 스윙하는 틱에
  * 칠하기를 걸면 칠이 끝날 때까지 구운 벌이 비친다(`warmRecoloredFrame`). 원점 · 팔레트가 다 와서 다 걸면 다시 안 본다.
  */
-function warmBatterRecolors(bodyType: number, skinIndex: number, teamIndex: number, equipment: BatterEquipment): void {
-  warmRecoloredFrames(`batter|${bodyType}|${skinIndex}|${teamIndex}|${JSON.stringify(equipment)}`, () =>
+function warmBatterRecolors(bodyType: number, skinIndex: number, teamIndex: number, equipment: BatterEquipment): boolean {
+  return warmRecoloredFrames(`batter|${bodyType}|${skinIndex}|${teamIndex}|${JSON.stringify(equipment)}`, () =>
     batterPoseFramesOf(bodyType).flatMap((pose) =>
       batterLayersOf(pose, bodyType, equipment).map((layer) => ({
         folder: layer.folder, frame: layer.frame, paletteIndex: layerPaletteIndexOf(layer, skinIndex, teamIndex),

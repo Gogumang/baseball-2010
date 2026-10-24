@@ -179,6 +179,7 @@ function PitcherLeagueScreens({
         matchupRecords={{ mySeason: career.stats, stats: career.leaguePlayerStats }}
         // 마운드 내 투수 그림의 장비 겹 (0x108f8 모드 ≠ 4 → 0x79368 · 0x10810 → 0x79790)
         pitcherEquipmentLevels={career.equipmentLevels}
+        pitcherSkinIndex={career.skinIndex}
         // 두 팀 레코드 타자 배열 차례 — 교대 판 이름표 0x40008 · 운동장 마선수 그림 0x79b48 이 훑는다 (경기 장면 0x39fdc 의 0xb891c 모드 3)
         fieldLineups={{
           ours: nariRecordFieldersOf(nariGameRecordOf(career, gameOptions.ourTeamId), gameOptions.ourTeamId, null),
