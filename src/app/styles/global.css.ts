@@ -25,20 +25,14 @@ globalFontFace(PIXEL_FONT_FAMILY, {
  */
 
 /**
- * 원작 해상도는 240×320이다. 도트를 살리려면 화면 전체를 정수배로만 키워야 한다.
- * 어중간한 배율(1.58배 같은)은 픽셀을 불규칙하게 뭉갠다.
+ * 원작 해상도는 240×320이다. 화면 판은 `zoom: var(--zoom)` 으로 통째로 키운다.
+ * 값은 `app/model/useViewportFit` 이 창에 맞춰 적는다 — 데스크톱은 예전대로 정수배 1·2·3, 폰은 꽉 차게
+ * (정수배가 충분히 크면 정수배, 아니면 1/80 단위 최대 배율 — `shared/lib/viewportFit`).
+ * 아래 값은 그 전(시험 · 첫 틀)의 기본값이다.
  */
 globalStyle(':root', {
   colorScheme: 'dark',
-  vars: { '--zoom': '1' },
-})
-
-/** 화면이 넉넉하면 정확히 2배, 더 넉넉하면 3배로만 키운다. */
-globalStyle(':root', {
-  '@media': {
-    '(min-width: 500px) and (min-height: 660px)': { vars: { '--zoom': '2' } },
-    '(min-width: 740px) and (min-height: 980px)': { vars: { '--zoom': '3' } },
-  },
+  vars: { '--zoom': '1', '--game-height': '100dvh', '--game-track': '1fr' },
 })
 
 globalStyle('*', {
@@ -49,6 +43,27 @@ globalStyle('*', {
 globalStyle('html, body', {
   height: '100%',
   margin: 0,
+})
+
+/**
+ * 터치: 두 번 눌러 확대 · 300ms 지연 없게(`manipulation`), 끌어 당겨 새로고침 · 튕김 없게, 길게 눌러 고르기 · 메뉴 없게.
+ * 입력칸만 글자를 고를 수 있다.
+ */
+globalStyle('html', {
+  touchAction: 'manipulation',
+  overscrollBehavior: 'none',
+  WebkitTextSizeAdjust: '100%',
+})
+
+globalStyle('body', {
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+})
+
+globalStyle('input, textarea', {
+  userSelect: 'text',
+  WebkitUserSelect: 'text',
 })
 
 /**
@@ -76,6 +91,44 @@ globalStyle('body', {
 })
 
 /**
+ * 창 전체를 격자로 나눈다 — 노치·홈 막대(safe-area)를 빼고, 주소창이 오르내리면 `100dvh` 로 따라간다.
+ * `body[data-layout]` (`useViewportFit`):
+ * - `plain`  — 화면 칸(`#root`) 하나.
+ * - `below`  — 세로 폰: 화면 칸(확대한 판 높이 `--game-track`) 위, 키패드 두 덩이(`padL` · `padR`) 아래.
+ * - `sides`  — 가로 폰: 키패드 왼쪽 · 화면 칸(확대한 판 폭) · 키패드 오른쪽.
+ */
+globalStyle('body', {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100dvh',
+  boxSizing: 'border-box',
+  padding: 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
+  display: 'grid',
+  gridTemplateAreas: '"game"',
+  gridTemplateRows: 'minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+})
+
+globalStyle('body[data-layout="below"]', {
+  gridTemplateAreas: '"game game" "padL padR"',
+  gridTemplateRows: 'var(--game-track) minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+})
+
+globalStyle('body[data-layout="sides"]', {
+  gridTemplateAreas: '"padL game padR"',
+  gridTemplateRows: 'minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr) var(--game-track) minmax(0, 1fr)',
+})
+
+/** 키패드 자리는 감싸개 없이 두 덩이를 격자 칸에 바로 세운다 */
+globalStyle('#keypad-root', {
+  display: 'contents',
+})
+
+/**
  * 화면 한 장을 가운데에 세운다.
  *
  * ⚠️ `position: relative` 가 중요하다 — 화면 **위에 얹히는 덮개**(이벤트 대사창·돌발미션 창 등)는
@@ -83,7 +136,10 @@ globalStyle('body', {
  * **창 전체로 퍼져** 초상화·대사가 게임 화면 밖 구석에 나온다. 실제로 그런 상태였다.
  */
 globalStyle('#root', {
+  gridArea: 'game',
   position: 'relative',
+  minWidth: 0,
+  minHeight: 0,
   height: '100%',
   display: 'flex',
   justifyContent: 'center',
