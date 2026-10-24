@@ -31,6 +31,7 @@ import type { HelpViewerKey, HelpViewerState } from '@/pages/help/lib/helpViewer
 import * as styles from '@/pages/help/ui/HelpScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 const SLT_FRAME = './sprites/slt_frame'
 const SLT_FRAMES = './sprites/slt_frame/frames'
@@ -431,8 +432,9 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
    * 그 뒤로는 장면도 덮개도 다시 안 그려 **멈춘 장면 + 어둡게** 가 뷰어 뒤에 남는다(경기 갱신도 0x754f9 가 막는다).
    * 덮개는 [0x15605d0] = 색 덮기 0x9b3f4 에 색 0x1400748(0,0,0) 을 넘긴 것이라(0x74726~0x74744) 검정 몫 = (5 + 1)/16 이다.
    */
+  // 뷰어는 공용 팝업 0x741a0 안이라 키를 통째로 가져간다 — 누름도 경기 화면의 누름 칸(0xe '확인' 7 · '*' 따위)보다 위에 둔다(r195)
   return (
-    <ScreenOverlay>
+    <ScreenOverlay zIndex={SCREEN_LAYERS.COMMON_WINDOW}>
       <div className={styles.overGameDim} style={{ opacity: colorStepCoverOpacityOf(POPUP_DIM_STAGE) }} />
       <div className={styles.overGameCenter}>
         <div className={styles.overGameStage}>{body}</div>

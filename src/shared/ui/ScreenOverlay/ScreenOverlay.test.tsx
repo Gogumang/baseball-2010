@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { ScreenOverlay } from '@/shared/ui/ScreenOverlay/ScreenOverlay'
 import * as styles from '@/shared/ui/ScreenOverlay/ScreenOverlay.css'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 /**
  * 화면 위 덮개를 **240px 기둥 안에** 가둔다.
@@ -37,5 +38,17 @@ describe('화면 덮개 층', () => {
     const column = container.querySelector(`.${styles.column}`) as HTMLElement
 
     expect(column.querySelector('[data-testid="덮개"]')).not.toBeNull()
+  })
+
+  it('겹 차례를 주면 덮개 전체가 그 차례로 선다 — 공용 창은 화면 누름 칸보다 위 (r195)', () => {
+    const { container } = render(<ScreenOverlay zIndex={SCREEN_LAYERS.COMMON_WINDOW}><span>알림</span></ScreenOverlay>)
+    const layer = container.firstElementChild as HTMLElement
+    expect(Number(layer.style.zIndex)).toBe(SCREEN_LAYERS.COMMON_WINDOW)
+    expect(SCREEN_LAYERS.COMMON_WINDOW).toBeGreaterThan(SCREEN_LAYERS.PRESS_AREA)
+  })
+
+  it('겹 차례를 안 주면 층에 z-index 를 달지 않는다 — 안쪽 겹이 제 값으로 겨룬다', () => {
+    const { container } = render(<ScreenOverlay><span>대사</span></ScreenOverlay>)
+    expect((container.firstElementChild as HTMLElement).style.zIndex).toBe('')
   })
 })
