@@ -11,7 +11,8 @@ export const screen = style({
   alignItems: 'center',
   justifyContent: 'center',
   width: theme.size.screenWidth,
-  height: 'calc(100dvh / var(--zoom))',
+  // 화면 칸 높이(`--game-height`, `useViewportFit` — 키패드를 뺀 높이)를 배율로 나눈다 — zoom 안의 길이는 배율을 다시 먹는다
+  height: 'calc(var(--game-height, 100dvh) / var(--zoom))',
   zoom: 'var(--zoom)',
   background: ORIGINAL_COLORS.black,
   overflow: 'hidden',
