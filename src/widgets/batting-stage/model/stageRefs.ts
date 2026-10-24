@@ -96,6 +96,10 @@ export interface PendingHit {
    * 필살 갈래를 안 타는 스윙이면 null
    */
   readonly specialEffect?: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null
+  /**
+   * 보통 타격 불꽃(0x49e64 49faa~4a0a2) — game_effect 애니 2 · 3 을 타격점에 (`batterOverlayMarks`). 필살 그림 갈래 · 큰 타구면 null
+   */
+  readonly hitFlame?: { readonly animation: number; readonly x: number; readonly y: number } | null
 }
 
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */
@@ -302,6 +306,8 @@ export interface StageRefs {
   readonly resultTicksRef: MutableRefObject<number>
   /** 지금 '결과' 가 맞은 공 뒤 인플레이(0x17) 자리인가 — 아니면 상태 0x12 (`StagePhaseSnapshot.isInPlay`) */
   readonly isInPlayResultRef: MutableRefObject<boolean>
+  /** 지금 '결과'(0x12)가 사구(st[0x12])인가 — 0x49e64 4a0ce 가 0x12 틱 0~7 에 사구 표시를 그린다 (`batterOverlayMarks`) */
+  readonly isHitByPitchResultRef: MutableRefObject<boolean>
   /** 살아 있는 파티클 이미터 목록 — 앱 전역 관리자 [0x1400068] 하나(`widgets/particles` 의 `sceneParticleScene`) */
   readonly particlesRef: MutableRefObject<ParticleScene>
   /**
@@ -348,6 +354,7 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     heldResultRef: useRef<((tick: number) => void) | null>(null),
     resultTicksRef: useRef(RESULT_PHASE_TICKS),
     isInPlayResultRef: useRef(false),
+    isHitByPitchResultRef: useRef(false),
     particlesRef: useRef<ParticleScene>(sceneParticleScene()),
     inPlayEnteredTickRef: useRef<number | null>(null),
     pointerDownAtRef: useRef(0),

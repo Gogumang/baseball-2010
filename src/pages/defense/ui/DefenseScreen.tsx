@@ -87,6 +87,12 @@ interface DefenseScreenProps {
    * 화면 좌표로 쏘는데 파티클 장면은 재생 쪽(`DefensePlayback`)이 들고 있어서, 그쪽이 이 값을 읽는다. 그릴 때마다 덮어쓴다.
    */
   readonly cameraOffsetRef?: { current: { readonly x: number; readonly y: number } | null }
+  /**
+   * 지금까지 든 **창이 선 첫 그림([창+0x250])** 의 수 (`useGameSceneRedrawCount`). 그 그림은 갱신 없이 0x46c88 을 한 번 더 돌아 그리기에서
+   * 0x93d91 로 넘기는 애니 — 부착 효과(0x43278 의 애니 0~4 · 13 · 15 · 0x43a0c 의 5~8)와 공 가진 야수 고리(0x43cb0 43e38) — 가 한 칸 더 간다.
+   * 웹은 그 애니 칸을 화면 갱신 수로 고르므로(근사) 이 수를 더한다. 카메라(갱신 0x3f060)는 안 움직인다. 안 주면 0
+   */
+  readonly drawRedraws?: number
   /** 화면 위에 얹을 것 — 조작 버튼·점수판 같은 것 */
   readonly children?: ReactNode
 }
@@ -197,10 +203,13 @@ export function DefenseScreen({
   grassPalette = null,
   underActors,
   cameraOffsetRef,
+  drawRedraws = 0,
   children,
 }: DefenseScreenProps) {
   // 카메라 0x3f060 은 경기 장면 갱신이다 — 공용 창이 서 있으면 52cc6 이 건너뛰어 카메라도 선다(`useGameSceneUpdateCounter`)
   const update = useGameSceneUpdateCounter(isRunning)
+  /** 그리기 쪽 애니가 넘어간 수 — 갱신마다 한 그림 + 창이 선 첫 그림 (`drawRedraws`) */
+  const drawnPictures = update + drawRedraws
   // 시즌 잔디 (`0x7885c`) — 아직 다 안 칠했거나 캔버스가 없으면 구운 그림을 그대로 쓴다.
   const backgroundUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
   const bounds = cameraBoundsOf(styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)
@@ -310,7 +319,7 @@ export function DefenseScreen({
     // 같은 키면 먼저 넣은 선수 그림 뒤(위)다
     ...playerEffectMarksOf(state).map((mark) => ({
       key: mark.zKey,
-      node: <DefensePlayerEffect key={`effect-${mark.key}`} mark={mark} point={screenOf(mark)} update={update} />,
+      node: <DefensePlayerEffect key={`effect-${mark.key}`} mark={mark} point={screenOf(mark)} update={drawnPictures} />,
     })),
     // 0x36dfc 36e86~36ea4 — 쥔 공(+0x12c) · 담장 뒤로 사라진 공은 안 그린다
     ...(isBallDrawn(state.ball)
@@ -380,7 +389,7 @@ export function DefenseScreen({
             mark={holderMark}
             plate={state.holderPlate ?? null}
             fielderPoint={holderFielder === undefined ? null : fielderScreenOf(holderFielder)}
-            update={update}
+            update={drawnPictures}
             screen={{ width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT }}
           />
         )}
