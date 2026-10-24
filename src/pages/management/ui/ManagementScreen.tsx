@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
+import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { currentTitleOf } from '@/entities/career/model/titles'
@@ -149,8 +149,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {!menu.isShowingBasicInfo && (
         <ManagementBoard career={career} titleName={currentTitleOf(career)} />
       )}
-      {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc) · 훈련 연출(125) · 휴식(127 — 연출과 결과 창)에는 없다 */}
-      {!menu.isShowingBasicInfo && menu.playingMenuId === null && menu.restPhase === null && (
+      {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc) · 훈련(125 — 연출과 결과 창) · 휴식(127 — 연출과 결과 창)에는 없다 */}
+      {!menu.isShowingBasicInfo && !menu.isTrainingState && menu.restPhase === null && (
         <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
           morale: career.morale,
           isSick: career.isSick,
@@ -165,8 +165,7 @@ export function ManagementScreen(props: ManagementScreenProps) {
             caption={`${menu.playingMenuId}훈련`}
             // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
             battingTypeIndex={career.battingTypeIndex}
-            // 손(우타면 뒤집기)도 같은 0x10810 이 그림 객체에 넣는다 (0xb63c0 → +0x3c)
-            battingSide={career.battingSide}
+            // 손은 넘기지 않는다 — 0x10810 이 +0x3c 에 넣은 손을 진입 0x11744 가 1 로 덮어써 안 뒤집는다(11802~1181e)
             // 훈련 팝업 캐릭터도 0x10810 이 세운 그림 객체 그대로라 장착 장비를 입고 나온다
             equipmentLevels={career.equipmentLevels}
             // 몸통 = 피부 × 15 + 팀 · 헬멧 = 팀 (기본정보 카드와 같은 0x10810 → 0x78be8·0x78c14)
@@ -185,6 +184,10 @@ export function ManagementScreen(props: ManagementScreenProps) {
         // 켬 표 0 칸은 흑백 — 105 진입 0x11910(첫 해 10경기 전 외출 포함). 0x7e418 은 하위 메뉴가 없을 때만 본다
         grayedIds={menu.parent === null ? nariMainMenuOffIdsOf(career) : undefined}
         onHover={menu.moveCursor} onSelect={menu.select} />
+      {/* 125 연출 중 화면 탭 = 확인 키 — 0x105a4 가 게이지를 끝으로 보낸다(`TrainingScene` 이 키로 받는다) */}
+      {menu.playingMenuId !== null && (
+        <PressArea label="훈련 연출 건너뛰기" testId="훈련연출-건너뛰기" onPress={() => pressKey('5')} />
+      )}
       {/*
         기본정보 카드는 커맨드 줄 **뒤에** 그린다. 원본 그리기 순서(0x167cc)도 상태판 → 커맨드 줄 →
         덮개(훈련 팝업 0x7f814) 순이라 덮개가 커맨드 줄을 가린다.

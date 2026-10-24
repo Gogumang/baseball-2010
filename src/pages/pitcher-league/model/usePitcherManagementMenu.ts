@@ -272,8 +272,12 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     run()
   }, [])
 
-  /** 125 → 105 (`0xbcb49(0x69)` — 0x18dd8 · 0x1b5b8) */
+  /**
+   * 125 → 105 (`0xbcb49(0x69)` — 0x18dd8 · 0x1b5b8). 커맨드 줄도 이때 관리 6칸으로 — 125 진입(0x1cdec 1ce1e → 0x7e84c(0x7d))은
+   * 107 과 같은 다섯 칸 표를 세우고(7e8a4 → 7e8ec) 결과 창 · 알림 창이 닫힐 때까지 그대로 둔다. 105 진입이 0x7e84c(0x69) 로 바꾼다
+   */
   const leaveTrainingResult = useCallback(() => {
+    setKind('관리')
     setTraining(null)
     onReenter?.(TRAINING_RESULT_STATE)
   }, [onReenter])
@@ -296,7 +300,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const outcome = runPitcherTraining(career, menu, random)
       const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
       onSave(outcome.career)
-      setKind('관리')
       // 125 — 결과 창이 닫힐 때까지 105 가 아니다
       setIsResultWindowOpen(true)
       const result = trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0)
@@ -340,7 +343,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     (menu: PitcherTrainingMenu) => {
       const outcome = runPitcherTraining(career, menu, random)
       onSave(outcome.career)
-      setKind('관리')
       const magic = outcome.magic
       if (magic === null) {
         setIsResultWindowOpen(false)
@@ -480,7 +482,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         onSave(recovered.career)
         if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
         else setIsResultWindowOpen(false)
-        // 127 → 105 (0x1b466 `0xbcb49(0x69)`)
+        // 127 → 105 (0x1b466 `0xbcb49(0x69)`) — 알림(1b45c)은 105 위에 뜬다: 다음 틀 0xbc9c9 가 창과 상관없이 105 를 세운다
         onReenter?.(REST_STATE)
       },
     })
@@ -731,7 +733,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     (row: number, column: number) => {
       const outcome = runPitchTypeTraining(career, row, column, random)
       onSave(outcome.career)
-      setKind('관리')
       setIsResultWindowOpen(true)
       noticeThenRef.current = leaveTrainingResult
       setNotice(pitchTypeTrainingLinesOf(outcome).join('!N'))

@@ -22,8 +22,9 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  *   확정하지 못해 예전처럼 뺀다.
  * - **몸통 종류·좌우** — 0x10810 이 적재 vt8 에 `r2 = rec[0xb] >> 4`(폼, 0x1081a)와
  *   `[sp] = 0xb63c0(rec)`(손, 0x10820)을 넘긴다. 적재 0x78ab0 이 몸통을 `폼 >> 1` 로 고르고(0 balancer · 그 밖 sluger,
- *   `bodyTypeOf`), 손은 그림 +0x3c 에 들어가 그리기 0x78cfc 가 **우타(+0x3c == 0)면 효과 0x11 로 뒤집는다**(R6 4절).
- *   거울 축은 그림 x 로 둔다 — 타석 그림(`drawBatter`)과 같은 근사다.
+ *   `bodyTypeOf`), 손은 그림 +0x3c 에 들어가(78ade · 78bae) 그리기 0x78cfc 가 **+0x3c == 0 이면 효과 0x11 로 뒤집는다**(78d0c~78d18).
+ *   단 나리 훈련 팝업(진입 0x11744)은 적재 뒤 +0x3c 를 모드 4 면 1 로 덮어써(11802~1181e) 손과 상관없이 안 뒤집는다 —
+ *   그 값은 `mirrorFlag` 로 받는다. 거울 축은 그림 x 로 둔다 — 타석 그림(`drawBatter`)과 같은 근사다.
  * - 겹침 순서는 표 0xd3a54[자세] 로 바뀐다 (`batterLayersOf` 의 `ORDER_RULES`).
  *
  * **장착 아이템**(item_bat_*)은 0x10810 의 니블 루프(0x10866 — 부위 0~3, `rec[0x19]`·`rec[0x1a]`
@@ -36,7 +37,7 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
  *
  */
 
-/** 우타 — 그림이 좌타 자세로 그려져 있어 뒤집는다 (0x78d0c) */
+/** 그림 +0x3c 가 0(우타) 이면 뒤집는다 — 그림이 좌타 자세로 그려져 있다 (0x78d0c) */
 const RIGHT_HANDED = 0
 
 /** 이 팝업에서 빼는 겹 — 잔상(미확정). 그림자는 `batterLayersOf(…, false)` 가 뺀다 */
@@ -54,13 +55,18 @@ interface TrainingFigureProps {
   /** 폼 `rec[0xb] >> 4` = 2 × 타입 + 손 — 몸통 종류(폼 >> 1)와 뒤집기(손 0 = 우타)를 고른다. 안 넘기면 좌타 타격형(폼 1) */
   readonly form?: number
   /**
+   * 그림 +0x3c — 0 이면 효과 0x11 로 뒤집는다(0x78d0c). 안 넘기면 적재 0x78ab0 이 넣는 손(폼의 손 칸) 그대로다.
+   * 나리 타자편 훈련 팝업은 진입 0x11744 가 1 로 덮어쓴다
+   */
+  readonly mirrorFlag?: number
+  /**
    * 이 애니가 앞으로 낼 자세들 — 그 겹을 미리 칠해 둔다(`useWarmRecoloredSprites`). 자세가 넘어가는 그 그림에 구운 벌이
    * 한 박자 비치지 않게(원본은 적재 때 팔레트를 갈아 끼운다). 안 넘기면 지금 자세만
    */
   readonly warmPoses?: readonly number[]
 }
 
-export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex, form = 1, warmPoses = [] }: TrainingFigureProps) {
+export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex, form = 1, mirrorFlag, warmPoses = [] }: TrainingFigureProps) {
   const layersOf = (shown: number) => batterLayersOf(shown, bodyTypeOf(form), equipment, false)
     .filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
   const layers = layersOf(pose)
@@ -68,7 +74,7 @@ export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex
     ? layer.gradePaletteRow ?? null
     : layerPaletteIndexOf(layer, skinIndex, teamIndex)
   useWarmRecoloredSprites(layerRecolorRequestsOf([...new Set(warmPoses)].flatMap(layersOf), paletteOf))
-  const isMirrored = batterSideOfForm(form) === RIGHT_HANDED
+  const isMirrored = (mirrorFlag ?? batterSideOfForm(form)) === RIGHT_HANDED
   // 겹들을 그림 x 에 놓은 폭 0 상자 안에 두고 그 상자를 뒤집는다 — 축 = 그림 x
   return (
     <div className={styles.figureAxis} style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}
