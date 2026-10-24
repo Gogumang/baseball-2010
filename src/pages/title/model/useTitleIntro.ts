@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { titleSceneAt } from '@/pages/title/model/titleIntro'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { TitleScene } from '@/pages/title/model/titleIntro'
 
 /**
@@ -14,13 +16,14 @@ import type { TitleScene } from '@/pages/title/model/titleIntro'
  * 인트로가 끝난 뒤(`isSettled` — 애니 0 이 끝남)에야 아무 키나 받아 onStart 를 부른다.
  */
 export function useTitleIntro(onStart: () => void): { scene: TitleScene; press: () => void } {
-  const startedAtRef = useRef(performance.now())
+  /** 인트로를 켠 앱 틱 — 그림 수는 (지금 앱 틱 − 이 틱)이다(`appTickOf`) */
+  const startTickRef = useRef(appTickNow())
   const [scene, setScene] = useState<TitleScene>(() => titleSceneAt(0))
 
   useEffect(() => {
     let handle = 0
     const step = (now: number) => {
-      setScene(titleSceneAt(now - startedAtRef.current))
+      setScene(titleSceneAt(Math.max(0, appTickOf(now) - startTickRef.current) * millisecondsPerFrame()))
       handle = requestAnimationFrame(step)
     }
     handle = requestAnimationFrame(step)

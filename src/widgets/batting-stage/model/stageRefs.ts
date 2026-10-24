@@ -263,6 +263,14 @@ export interface StageRefs {
    * 0 으로 적는 틀(0xbc9c8 bc9ec)과 같은 틀이다(`commonWindow` 의 `gameSceneTickOf` 머리말)
    */
   readonly phaseStartTickRef: MutableRefObject<number>
+  /**
+   * **예약한 다음 단계** — 갱신이 0xbcb48 로 예약한 상태는 그 틀이 아니라 다음 틀 머리 0xbc9c8 에서 틱 0 으로 선다(bc9e8~bc9f4).
+   * 판정 0x6aa → 0x13 · 공 끝 0x4e24e(4e26c `movs r1, #0x12` → 0xbcb49) · 0x13 끝 40786(→ 0xbcb49) 이 이 길이다 — 고리가 예약한 틀은
+   * 아직 0x11 · 0x13 으로 그리고, 루프가 `tick` 에 닿은 틀 머리에서 단계를 세운다. 없으면 null
+   */
+  readonly phaseEntryRef: MutableRefObject<{ readonly phase: StagePhase; readonly tick: number } | null>
+  /** 0x13 건너뛰기 키(OK · '5')를 읽는 갱신 틱 — 키는 다음 틀의 0x13 갱신 0x406e8(40708)이 [장면+0x40] 으로 읽는다. 없으면 null */
+  readonly hitSkipKeyTickRef: MutableRefObject<number | null>
   readonly resultTextRef: MutableRefObject<string>
   /**
    * 홈런 글자 연출(원본 켜짐 칸 +0x1960)이 켜진 장면 틱. null 이면 꺼짐.
@@ -318,6 +326,8 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     pitchTypeNumberRef: useRef<number | null>(null),
     phaseRef: useRef<StagePhase>('대기'),
     phaseStartTickRef: useRef(0),
+    phaseEntryRef: useRef<{ readonly phase: StagePhase; readonly tick: number } | null>(null),
+    hitSkipKeyTickRef: useRef<number | null>(null),
     resultTextRef: useRef(''),
     homeRunStartTickRef: useRef<number | null>(null),
     swingStartTickRef: useRef<number | null>(null),

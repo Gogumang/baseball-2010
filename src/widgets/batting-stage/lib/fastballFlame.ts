@@ -37,7 +37,8 @@ export function animationLengthOf(entries: readonly AnimationEntry[]): number {
 }
 
 /**
- * 원본 공 틱 [+0x1098] — '투구중'(0x11)은 웹 공 프레임 그대로, 안 친 공 '결과'(0x12)는 공 끝 틱 N + 1(0x4e24e)부터 단계 틱만큼 더 간다.
+ * 원본 공 틱 [+0x1098] — '투구중'(0x11)은 웹 공 프레임 그대로, 안 친 공 '결과'(0x12)는 공 끝 틱 N + 1(0x4e24e 가 0x12 를 예약한 틀)
+ * 다음 틀이 0x12 틱 0 이라 공 틱 N + 2 부터 단계 틱만큼 더 간다(0x3f378 은 0x12 에서도 +1).
  * '결과' 의 단계 틱은 공 끝(N + 1)을 본 틀의 경기 장면 틱에서 센다 — 0x11 · 0x12 가 같은 장면 틱 격자라 틱 안쪽 어긋남이 없다
  * (`commonWindow` 의 `gameSceneTickOf` — 원본 0xbc9c8 은 예약 다음 틀에 틱 0).
  * 그 밖(대기 · 0x13 타격 · 인플레이 결과)은 null — 불꽃을 안 그린다.
@@ -49,7 +50,7 @@ export function fastballFlameBallTickOf(
 ): number | null {
   if (phase === undefined) return null
   if (phase.kind === '투구중') return ballFrame
-  if (phase.kind === '결과' && phase.isInPlay !== true) return frameCount + 1 + phase.tick
+  if (phase.kind === '결과' && phase.isInPlay !== true) return frameCount + 2 + phase.tick
   return null
 }
 

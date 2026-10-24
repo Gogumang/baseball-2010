@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { gameSceneNow, gameSceneTimeOf, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, gameSceneTickOf, gameSceneTimeOf, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { preloadSpriteScene, preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
@@ -82,10 +81,11 @@ export function LoadingTip({
   }, [preloadScenes, preloadRequests])
 
   useEffect(() => {
-    const startedAt = gameSceneNow()
+    // 판을 세운 경기 장면 틱부터 센다 — 같은 장면 틱 격자(`gameSceneTickOf`)
+    const startTick = gameSceneTickNow()
     let handle = 0
     const tick = (now: number) => {
-      const current = Math.floor((gameSceneTimeOf(now) - startedAt) / millisecondsPerFrame())
+      const current = Math.max(0, gameSceneTickOf(gameSceneTimeOf(now)) - startTick)
       setUpdate(current)
       // 칸 1 ~ 끝을 한 그림씩 그린 뒤 닫는다 — 끝(다 찬 막대)을 그린 그림 다음
       if (current >= steps) {

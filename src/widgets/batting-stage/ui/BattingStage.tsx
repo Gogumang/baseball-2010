@@ -344,7 +344,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     // 공용 창(히든 오픈 알림 등)이 떠 있으면 경기 장면 갱신이 멈춘다 (0x52cc6)
     isSceneFrozen: isCommonWindowOpen,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, phaseEntryRef, hitSkipKeyTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -459,8 +459,9 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
         buntKind: sceneBuntKindOfThisPitch(),
         specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
       }
-      phaseRef.current = '타격'
-      phaseStartTickRef.current = tick
+      // 0x6aa 가 이 틀(판정 틱)의 갱신에서 0x13 을 예약한다 — 0x13 은 다음 틀이 틱 0 이다(`phaseEntryRef`)
+      hitSkipKeyTickRef.current = null
+      phaseEntryRef.current = { phase: '타격', tick: tick + 1 }
       return
     }
 
@@ -480,11 +481,11 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     buntRef.current = null
     const isHomeRun = isHomeRunResolution(detail)
     resultTextRef.current = describeResolution(detail)
-    homeRunStartTickRef.current = isHomeRun ? tick : null
+    // 공 끝 0x4e24e 가 이 틀에 0x12 를 예약한다(4e26c → 0xbcb49) — 0x12 는 다음 틀이 틱 0 이다(`phaseEntryRef`)
+    homeRunStartTickRef.current = isHomeRun ? tick + 1 : null
     resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
     isInPlayResultRef.current = false
-    phaseRef.current = '결과'
-    phaseStartTickRef.current = tick
+    phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
     latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
   }
 
@@ -550,13 +551,14 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     }
     // 0x13 → 0x17 — 0x17 진입 0x46418(4673e)이 다음 틱에 파티클 관리자를 비운다 (`useStageAnimation`)
     inPlayEnteredTickRef.current = tick
+    hitSkipKeyTickRef.current = null
     resultTextRef.current = pending.resultText
-    homeRunStartTickRef.current = pending.isHomeRun ? tick : null
+    // 0x13 갱신이 이 틀에 0x17 을 예약한다(40786~407b0 → 0xbcb49) — 다음 틀이 틱 0 이다(`phaseEntryRef`)
+    homeRunStartTickRef.current = pending.isHomeRun ? tick + 1 : null
     // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
     resultTicksRef.current = RESULT_PHASE_TICKS
     isInPlayResultRef.current = true
-    phaseRef.current = '결과'
-    phaseStartTickRef.current = tick
+    phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
     latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)
   }, [])
 
@@ -594,9 +596,13 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       swing: (tick: number) => {
         // 상태 0x13 은 감상 플래그(+0x199a)가 켜진 큰 타구만 OK(−5)·'5' 로 건너뛴다 (0x406e8 40708~40712).
         // 꺼진 타구(틱 8)는 키를 안 본다. 어느 쪽이든 스윙 키는 이 단계에서 스윙이 아니다
-        if (phaseRef.current === '타격') {
+        // 키는 다음 틀의 0x13 갱신 0x406e8 이 [장면+0x40] 으로 읽는다 — 그 틀(키 틱 + 1)에 루프가 넘긴다. 0x13 을 예약한 틀(판정 틱)에
+        // 누른 키도 다음 틀(0x13 틱 0)의 갱신이 읽는다
+        if (phaseRef.current === '타격' || phaseEntryRef.current?.phase === '타격') {
           const pending = pendingHitRef.current
-          if (pending !== null && canSkipHitPause(pending.watchesBigHit)) commitHit(tick)
+          if (pending !== null && canSkipHitPause(pending.watchesBigHit) && hitSkipKeyTickRef.current === null) {
+            hitSkipKeyTickRef.current = tick + 1
+          }
           return
         }
         if (!isFlying(tick) || !takesKey(tick)) return

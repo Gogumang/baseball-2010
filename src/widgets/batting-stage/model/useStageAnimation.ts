@@ -94,6 +94,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     pitchTypeNumberRef,
     phaseRef,
     phaseStartTickRef,
+    phaseEntryRef,
+    hitSkipKeyTickRef,
     resultTextRef,
     homeRunStartTickRef,
     swingStartTickRef,
@@ -219,6 +221,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     }
 
     const advancePhase = (sceneTick: number) => {
+      // 예약한 단계가 아직 안 섰다(예약한 틀) — 옛 상태의 갱신은 이 틀에 이미 돌았다
+      if (phaseEntryRef.current !== null) return
       if (phaseRef.current === '대기') {
         if (latestRef.current.isPaused) {
           // 타석이 끝나 쉬는 동안 — 다음 타석 준비(0x48d50)처럼 좌우 이동을 되돌린다
@@ -358,8 +362,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             )
             // 0x6aa → 0x5130e 가 판정 결과를 +0xfcc~+0xfd7 에 쓴다 — 맞은 공이면 그 코드, 헛맞음이면 홈런성이 아닌 코드
             const pitcherTickNow = sceneTick - (pitcherStartTickRef.current ?? sceneTick)
-            // 맞은 공만 0x13('타격')으로 넘어간다 — 헛맞음은 0x11 에 남아 공 끝을 기다린다
-            const isContact = phaseRef.current !== '투구중'
+            // 맞은 공만 0x13('타격')을 예약한다 — 헛맞음은 0x11 에 남아 공 끝을 기다린다
+            // (판정 고리가 방금 예약 칸을 썼다 — 위 머리의 null 좁힘을 풀어 읽는다)
+            const reserved: StageRefs['phaseEntryRef']['current'] = phaseEntryRef.current as StageRefs['phaseEntryRef']['current']
+            const isContact = reserved?.phase === '타격'
             judgedResultCode = { tick: pitcherTickNow, code: isContact ? (pendingHitRef.current?.detail.resultCode ?? null) : null }
             writeSceneResultCode(judgedResultCode.code)
             if (isContact) {
@@ -380,7 +386,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (phaseRef.current === '타격') {
         const pending = pendingHitRef.current
         const held = sceneTick - phaseStartTickRef.current
-        if (pending === null || held >= pending.ticks) handlersRef.current.commitHit(sceneTick)
+        // 건너뛰기 키는 키 다음 틀의 이 갱신(0x406e8 40708)이 읽는다
+        const skipKeyTick = hitSkipKeyTickRef.current
+        const isSkipped = skipKeyTick !== null && sceneTick >= skipKeyTick
+        if (pending === null || held >= pending.ticks || isSkipped) handlersRef.current.commitHit(sceneTick)
         return
       }
 
@@ -516,6 +525,13 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         backdropClock = observeFrozenClock(backdropClock ?? startFrozenClock(tickTime), tickTime, latestRef.current.isSceneFrozen === true)
       }
       // 결과 창 뒤 배경(0x19 · 0x1a)에는 투구 갱신이 없다 — 투구 단계를 멈춘다(파티클 틱은 아래 — 프레임 끝 0x6de85 는 돈다)
+      // 0xbc9c8 — 앞 틀의 갱신이 예약한 단계는 이 틀 머리에서 틱 0 으로 선다(진입 → 키 → 갱신 차례, 52cd4~52e14)
+      const entry = phaseEntryRef.current
+      if (entry !== null && sceneTick >= entry.tick) {
+        phaseRef.current = entry.phase
+        phaseStartTickRef.current = entry.tick
+        phaseEntryRef.current = null
+      }
       if (!isBackdrop) advancePhase(sceneTick)
 
       const pitch = pitchRef.current
@@ -531,7 +547,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const pendingHit = phaseRef.current === '타격' ? pendingHitRef.current : null
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
       const homeRunStartTick = homeRunStartTickRef.current
-      const isHomeRun = homeRunStartTick !== null
+      // 글자는 결과 단계가 선 틀부터다 — 예약한 틀은 아직 0x11 · 0x13 그림이다
+      const isHomeRun = homeRunStartTick !== null && sceneTick >= homeRunStartTick
 
       const nowTick = sceneTick
       if (particleTick === null) particleTick = nowTick
@@ -621,7 +638,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         isEagleEyeEnabled: latestRef.current.isEagleEyeEnabled && phaseRef.current === '투구중',
         resultText: phaseRef.current === '결과' ? resultTextRef.current : '',
         isHomeRun,
-        homeRunTick: homeRunStartTick !== null ? sceneTick - homeRunStartTick : 0,
+        homeRunTick: isHomeRun && homeRunStartTick !== null ? sceneTick - homeRunStartTick : 0,
         // 부르는 쪽이 모는 글자 창이 있으면 그 칸대로만 그린다 (홈런더비 — `BattingStage` 의 `homeRunText`)
         homeRunFrame:
           latestRef.current.homeRunText === undefined
@@ -736,6 +753,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 타석을 다시 준비 상태로 되돌린다.
       phaseRef.current = '대기'
       phaseStartTickRef.current = gameSceneTickNow()
+      phaseEntryRef.current = null
+      hitSkipKeyTickRef.current = null
       pitchRef.current = null
       buntRef.current = null
       swingRef.current = null

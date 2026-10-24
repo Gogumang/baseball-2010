@@ -62,7 +62,8 @@ export interface PitcherSideStageFrame {
 /**
  * 지금 그림의 장면 단계.
  * - 0x11: 공을 놓은 틱 − 10 에서 들어선다. 투수 단계가 릴리스(`pitcherReleaseTicksOf`)에 닿은 틱부터 공 틱이 오르고(0x3f378),
- *   공 틱 N + 1 에서 0x12 로 간다(0x4e24e).
+ *   공 틱 N + 1 의 갱신이 0x12 를 예약한다(0x4e24e → 4e26c 0xbcb49). 예약한 틀은 아직 0x11 이고 다음 틀(공 틱 N + 2)이 0x12 틱 0 이다
+ *   (0xbc9c8 — 예약은 다음 틀 머리에서 선다).
  * - 0x12: `resultTicks` 동안 — 공은 마지막 점(`heldBall`).
  * - 그 밖은 '대기'(0xd~0xf · 0x10 조준 — 장면은 대기 동작이다).
  * 게이지(`PitchGradeGauge`)도 경기 장면 틱 머리마다 센다(`setGameSceneTickInterval`) — 놓은 틱은 게이지가 놓은 그 장면 틱이다.
@@ -84,7 +85,11 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
   const stateTick = clock.nowTick - clock.releaseTick + HUMAN_PITCH_RELEASE_STATE_TICK
   if (stateTick < 0) return idle
   const ballFrame = stateTick - pitcherReleaseTicksOf(clock.aceOrder)
-  const flightEndFrame = clock.frameCount + 1
+  /**
+   * 0x12 틱 0 의 공 틱 — 공 틱 N + 1 이 예약한 다음 틀. 맞은 공(0x12 를 안 지남, `resultTicks` 0)은 이 장면이 0x13 을 따로 그리지 않아
+   * 예전처럼 공 틱 N + 1 에서 대기로 둔다(⚠️ 근사 그대로 — 원본은 판정 틱이 0x13 을 예약한다)
+   */
+  const flightEndFrame = clock.frameCount + (clock.resultTicks > 0 ? 2 : 1)
   if (ballFrame < flightEndFrame) {
     return { phase: { kind: '투구중', tick: stateTick, isPaused: false }, ballFrame, pitcherTick: stateTick, pitcherTickEnd: null }
   }
@@ -94,7 +99,8 @@ export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSi
       phase: { kind: '결과', tick: resultTick, isPaused: false, isInPlay: false },
       ballFrame: -1,
       pitcherTick: stateTick,
-      pitcherTickEnd: stateTick - resultTick,
+      // 0x11 의 마지막 갱신(공 틱 N + 1 — 예약한 틀)
+      pitcherTickEnd: stateTick - resultTick - 1,
     }
   }
   return idle
@@ -108,11 +114,11 @@ export function passesHeldResult(resolution: PitchResolution): boolean {
 }
 
 /**
- * 공을 놓은 틱(0x11 틱 10)부터 장면이 다시 '대기' 로 돌아올 때까지의 틱 — 남은 0x11(공 틱 N + 1 까지) + 0x12 대기.
+ * 공을 놓은 틱(0x11 틱 10)부터 장면이 다시 '대기' 로 돌아올 때까지의 틱 — 남은 0x11(공 틱 N + 1 — 0x12 를 예약한 틀 — 까지) + 0x12 대기.
  * 원본은 그동안 상태가 0x11 · 0x12 라 구질 키(0xf) · 견제 · '#' · 0xe 의 OK 를 받지 않는다 (키 갈래 0x53580 은 상태별 표).
  */
 export function pitchSceneBusyTicksOf(frameCount: number, resultTicks: number, aceOrder?: number | null): number {
-  return pitcherReleaseTicksOf(aceOrder) - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + 1 + resultTicks
+  return pitcherReleaseTicksOf(aceOrder) - HUMAN_PITCH_RELEASE_STATE_TICK + frameCount + (resultTicks > 0 ? 2 : 1) + resultTicks
 }
 
 /**
