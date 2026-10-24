@@ -1771,7 +1771,7 @@ export function useCareerSession({
       // 보너스 팝업 없이 등록 팝업 0x2d 를 띄운다(`EndingScreen.isBonusReceived`)
       if (point.kind === '엔딩') {
         setCareer(savedCareer)
-        return setScreen({ kind: '엔딩', endingIndex: point.endingIndex })
+        return setScreen({ kind: '엔딩', endingIndex: point.endingIndex, fromResume: true })
       }
       const lastGame = savedCareer.lastGame
       if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {

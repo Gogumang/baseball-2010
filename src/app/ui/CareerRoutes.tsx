@@ -24,7 +24,7 @@ import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { NariYearCoverScreen, YearCoverBlackFrame } from '@/pages/management/ui/NariYearCoverScreen'
+import { NariYearCoverScreen, YearCoverResumeLeftFrame } from '@/pages/management/ui/NariYearCoverScreen'
 import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
@@ -385,7 +385,7 @@ function CareerScreens({
       const previousScreenAt = screen.fromResume === true
         ? (frame: number) => {
           const underlay = resumeCoverUnderlayAt(frame)
-          if (underlay === '검정') return <YearCoverBlackFrame />
+          if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
           return underlay === '관리' ? <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
         }
         : previousKind === '이벤트' ? () => statusBoard : undefined
@@ -469,6 +469,7 @@ function CareerScreens({
     case '엔딩':
       return (
         <EndingScreen playerName={career.name} endingIndex={screen.endingIndex} seenEventIds={career.seenEventIds}
+          isResumed={screen.fromResume === true}
           // 선수 생김새 +0xb — 타입(bit5~7)·손(bit4)·피부(bit2~3). 걸어 들어오는 그림·제작진 선수 애니와 팔레트 (0x63a5c)
           walkInLook={{ mode: 4, typeIndex: career.battingTypeIndex, handIndex: career.battingSide, skinIndex: career.skinIndex }}
           bonusGamePoint={endingBonusOf(screen.endingIndex)} isContinuable={isContinuableEnding(screen.endingIndex)}

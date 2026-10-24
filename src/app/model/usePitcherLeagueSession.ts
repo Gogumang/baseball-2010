@@ -250,6 +250,8 @@ export interface PitcherLeagueSession {
    * 100 진입 1c15e 가 배경음을 끊는다(`pages/management/lib/nariYearCover` 의 이어하기 길). 타자편 `Screen` 의 `fromResume`
    */
   readonly yearCoverFromResume: boolean
+  /** 엔딩 141 이 이어하기 100 진입 1c24e(S+0x50 ∈ {6, 7})에서 왔다 — 단계 0 의 남은 판에 상태 1 의 덮기가 얹힌다 (`EndingScreen.isResumed`) */
+  readonly endingFromResume: boolean
   /**
    * 화면이 '관리' 인 채 105 에 다시 들어온 앞 상태가 0x1aec4 의 배경음 4 목록에 든 수(125 → 105) — 배경음 표
    * `usePitcherLeagueBgmRestart` · `usePitcherLeagueBgm` 이 오르면 4 를 처음부터 다시 튼다(`restartsManagementBgmFrom`)
@@ -759,6 +761,8 @@ export function usePitcherLeagueSession(
   const [scene, setScene] = useState<PitcherScene>(() => pitcherSceneOfResume(career, resumePoint))
   /** 137 표지가 이어하기 길에서 왔나 (`PitcherLeagueSession.yearCoverFromResume`) */
   const [yearCoverFromResume, setYearCoverFromResume] = useState(() => resumePoint.kind === '새시즌')
+  /** 엔딩이 이어하기 길에서 왔나 (`PitcherLeagueSession.endingFromResume`) */
+  const [endingFromResume, setEndingFromResume] = useState(() => resumePoint.kind === '엔딩')
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() => pitcherStoryOfResume(resumePoint))
   const [storyNotice, setStoryNotice] = useState('')
@@ -1502,6 +1506,7 @@ export function usePitcherLeagueSession(
   const enterEnding = useCallback(
     (finished: PitcherCareer, endingIndex: number) => {
       commit({ ...finished, endingIndex })
+      setEndingFromResume(false)
       setScene('엔딩')
     },
     [commit],
@@ -1715,6 +1720,7 @@ export function usePitcherLeagueSession(
     setCareer(next.career)
     setScene(pitcherSceneOfResume(next.career, next.point))
     setYearCoverFromResume(next.point.kind === '새시즌')
+    setEndingFromResume(next.point.kind === '엔딩')
     setStory(pitcherStoryOfResume(next.point))
     setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
     setCupView(cupViewOfResume(next.point))
@@ -2243,6 +2249,7 @@ export function usePitcherLeagueSession(
     career: shown,
     scene,
     yearCoverFromResume,
+    endingFromResume,
     managementBgmRestart,
     nextGameFromManagement,
     matchAces,

@@ -79,6 +79,27 @@ export const ENDING_STAGE = {
   firstStageAt: 9,
 } as const
 
+/** 이어하기 길의 상태 1 틀 0x13f08 이 13f88~13f9e 에서 [0x15605d4](0, 0, W, H, 4) 로 버퍼를 덮는 단계 — 4/16 이 남는다 */
+const RESUME_STATE_ONE_REMAINING = 4 / 16
+
+/**
+ * **단계 0 의 남은 판에 쌓인 검정** (r165) — 그리기 0x882c4 가 단계 0 에서 아무것도 안 그려 버퍼를 다시 칠하지 않으므로,
+ * 장면 틀 끝 1d4a4 의 효과기 0xbd844 가 틀마다 칠한 어두워짐이 **곱으로 쌓인다**. 틀 n 의 화면 = 남은 판 × Π(k < n 의 효과기 몫)
+ * × (이 틀의 효과기 몫 — 웹은 따로 한 겹, `EndingScreen`). 이어하기로 들어온 141(100 진입 1c24e S+0x50 ∈ {6, 7} → 1c3b8
+ * 0xbcb49(141) → 1c3ee 0xbcb49(1) — 뒤 = 141)은 앞에 상태 1 한 틀이 단계 4 덮기를 한 번 더 칠한다. 남은 판은 장면 바꾸기 0x37ac
+ * 직전 틀(메인 메뉴 쪽 화면 — 웹은 같은 커밋에 내려간 앞 화면 판, `LeftFrame`)이다.
+ * `effectorOpacityAt(k)` = 효과기 종류 1 의 k 틀 덮개 불투명도.
+ */
+export function endingStageZeroCoverOpacityAt(
+  tick: number,
+  isResumed: boolean,
+  effectorOpacityAt: (frame: number) => number,
+): number {
+  let remaining = isResumed ? RESUME_STATE_ONE_REMAINING : 1
+  for (let k = 0; k < tick; k += 1) remaining *= 1 - effectorOpacityAt(k)
+  return 1 - remaining
+}
+
 /**
  * 걸어 들어오는 그림 두 개 (e 0·1 만) — S12 7절 · 0x885b0~0x88698.
  *

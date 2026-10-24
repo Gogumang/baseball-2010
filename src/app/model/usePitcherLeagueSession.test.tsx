@@ -1034,6 +1034,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     const result = 띄우기(store).result
     act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
     expect(result.current.scene).toBe('엔딩')
+    expect(result.current.endingFromResume).toBe(false)
 
     // 보너스 전에 떠나면 — 141 은 저장하지 않아 114 끝 저장(132)이 남고, 다시 들어오면 502 를 다시 튼다
     act(() => result.current.actions.finishEnding(false))
@@ -1049,6 +1050,8 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(store.load()).toMatchObject({ endingIndex: 5, endingBonusReceived: true })
     expect(result.current.scene).toBe('엔딩')
     expect(result.current.career?.endingIndex).toBe(5)
+    // 다음에 들어오면 이어하기 100 진입 1c24e 길이다 — 단계 0 의 남은 판에 상태 1 의 덮기가 얹힌다
+    expect(result.current.endingFromResume).toBe(true)
   })
 
   /**

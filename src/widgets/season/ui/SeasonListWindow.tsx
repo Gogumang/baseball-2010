@@ -28,7 +28,7 @@ export interface SeasonListWindowProps {
   readonly backLabel?: string
   /**
    * 판 인자 — 안 주면 기본 판(24, 54, 192, 212). 주면 그 자리 · 위 띠 · 제목 탭으로 긋고, 판 위 제목 글은 밝은 띠 · 탭 위에서
-   * 보이게 짙은 남색으로 둔다(⚠️ 근사 — 이 목록 창을 쓰는 원본 화면은 이제 없다. 아래 판 주석)
+   * 보이게 짙은 남색으로 둔다(웹 시험 전용 — 이 목록 창을 쓰는 원본 화면은 이제 없다. 아래 판 주석)
    */
   readonly panel?: SeasonListPanel
 }
@@ -46,7 +46,8 @@ export interface SeasonListPanel {
  * 시즌 화면들이 함께 쓰는 **공용 판 목록 창**.
  *
  * 판은 `0x55e61` 공용 판 (24, 54, 192, 212) 으로 **확정**이지만,
- * ⚠️ **줄 좌표·글 자리는 원본 배치 미해독 — 근사**다 (`seasonWindowLayout.ts` 머리 주석).
+ * ⚠️ **줄 좌표·글 자리는 원본 배치 미해독 — 근사**다 (`seasonWindowLayout.ts` 머리 주석). 이 창은 이제 웹 시험 전용이라(아래 판 주석)
+ * 앱 화면에는 안 나온다.
  * 줄 높이 18px 은 순위표(0x7f070)의 줄 간격을 그대로 따랐다.
  */
 export function SeasonListWindow({
@@ -61,7 +62,7 @@ export function SeasonListWindow({
 
   return (
     <div role="group" aria-label={title}>
-      {/* 공용 판 0x55e61 — ⚠️ 근사: 이 목록 창은 이제 선수영입 0xe2 의 `renderCandidates` 없는 길(시험)만 쓴다.
+      {/* 공용 판 0x55e61 — 웹 시험 전용: 이 목록 창은 이제 선수영입 0xe2 의 `renderCandidates` 없는 길(시험)만 쓰고 앱에는 안 나온다(r165).
           원본 화면마다의 그림은 각자 옮겼다(r89):
           · 0xe2 선수영입(0xa10c): 공용 목록 0x63b15 k 6 + 0x7f4ed — 앱은 명예의 전당 목록(`HallOfFameScreen`)을 꽂는다
           · 0xe4 트레이드 팀 고르기(0xa14c): 공용 목록 0x63b15 + 0x7f4ed — `TeamSelectScreen`

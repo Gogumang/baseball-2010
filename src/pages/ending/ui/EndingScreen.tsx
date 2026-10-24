@@ -18,7 +18,7 @@ import type { ModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import {
   BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, ENDING_STAGE, INJURY_ENDING, IRIS_COVER,
   LAST_WALK_IN_ENDING, RISING_TEXT, SCREEN, SHORT_ENDING_TEXT_TOP, WALK_IN, creditsTopOf, creditsWalkersOf,
-  endingImageOffsetOf, endingWalkInAnimationOf, endingWalkInPaletteOf, irisCircleOf, irisStartTickOf, risingTextTopOf,
+  endingImageOffsetOf, endingStageZeroCoverOpacityAt, endingWalkInAnimationOf, endingWalkInPaletteOf, irisCircleOf, irisStartTickOf, risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
 import type { CreditsWalker, EndingWalkInLook } from '@/pages/ending/lib/endingLayout'
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
@@ -83,6 +83,8 @@ interface EndingScreenProps {
   readonly walkInLook?: EndingWalkInLook
   /** 띠 창 배경의 시간대를 고를 한국 시각 (`BAND_BACKGROUND` 머리말). 안 주면 장면에 들어설 때 잡은 시각(`useSceneHour`) */
   readonly hour?: number
+  /** 이어하기 100 진입(1c24e S+0x50 ∈ {6, 7})으로 들어왔다 — 단계 0 의 남은 판에 상태 1 의 덮기가 얹힌다 */
+  readonly isResumed?: boolean
 }
 
 /** 안 주었을 때의 생김새 — 모두 0 (타자편 · 타격형 · 우타 · 황인) */
@@ -217,6 +219,10 @@ export function EndingScreen(props: EndingScreenProps) {
    * 이 틀의 효과기 덮개 — 단계 0 은 진입 0x12300 이 건 종류 1(어두워짐)이 남은 앞 화면 위에, 단계 1 은 종류 2(밝아짐),
    * 단계 2 는 종류 1(어두워짐), 단계 3 은 n = 0 부터 다시 종류 2
    */
+  const stageZeroCover = stage === 0
+    ? endingStageZeroCoverOpacityAt(tick, props.isResumed === true,
+      (k) => screenEffectFrameAt('검정에서밝아짐', '검정', k)?.overlay?.opacity ?? 0)
+    : 0
   const effect = stage === 0
     ? screenEffectFrameAt('검정에서밝아짐', '검정', tick)
     : stage === 1
@@ -230,8 +236,16 @@ export function EndingScreen(props: EndingScreenProps) {
   return (
     <RawScreen>
       {stage === 0
-        // 단계 0 — 그리기 0x882c4 가 아무것도 안 그려 화면 버퍼에 앞 화면의 마지막 틀이 남는다 (`LeftFrame`)
-        ? <LeftFrame part="stage-0" />
+        // 단계 0 — 그리기 0x882c4 가 아무것도 안 그려 화면 버퍼에 앞 화면의 마지막 틀이 남고 효과기가 쌓인다 (`LeftFrame`)
+        ? (
+          <>
+            <LeftFrame part="stage-0" />
+            {stageZeroCover > 0 && (
+              <div data-part="stage-0-cover"
+                style={{ position: 'absolute', inset: 0, background: '#000000', opacity: stageZeroCover, pointerEvents: 'none' }} />
+            )}
+          </>
+        )
         : isCredits && creditsAt !== null
           ? <EndingCredits romanceEndingIndex={romanceEndingIndex} romanceEvents={romanceEventsSeenOf(seenEventIds)} look={walkInLook}
             tick={Math.max(0, tick - creditsAt)} band={band} />
@@ -301,8 +315,8 @@ function NoJudgementEnding() {
 
 /*
  * **단계 0 의 화면 버퍼** — 그리기 0x882c4 가 단계 0 이면 곧장 돌아가(882c8) 버퍼에는 141 에 들어오기 전 화면의 마지막 틀이 남는다
- * (`shared/ui/LeftFrame`). ⚠️ 미확인: 이어하기로 들어온 141(메인 메뉴 → 장면 0x106 → 상태 100 → 1 자원 적재 → 141)은 버퍼에
- * 무엇이 남는지 대조하지 않았다 — 웹은 메인 메뉴 판을 깐다.
+ * (`shared/ui/LeftFrame`). 이어하기로 들어온 141(메인 메뉴 → 장면 0x106 → 상태 100 → 1 → 141)은 100 · 1 이 다시 그리지 않아
+ * 장면 바꾸기 직전 판에 상태 1 의 단계 4 검정 덮기(13f88)가 한 번 얹힌다(r165 확정 — `endingStageZeroCoverOpacityAt`).
  */
 
 /** 띠 창 (0x883b6~0x88556 · 제작진 0x88bcc~0x88d64) — 가운데 박스 검정 + 박스 **바깥** 위·아래 11px 띠 + 선 */

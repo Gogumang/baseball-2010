@@ -90,7 +90,8 @@ export interface RecruitCandidateActions {
  *   - 투수 쪽은 밀려난 선수의 칸 번호를 고쳐 주는 줄이 **빠져 있다** (S6 4-4).
  *   - 확정할 때 저장된 원본 기록의 칸 번호가 실제로 바뀐다 (`withSlot` 의 부작용).
  *
- * ⚠️ 근사: `renderCandidates` 없이 띄운 1단계(후보 목록)는 공용 판 목록이다 — 앱은 명예의 전당 목록을 꽂는다.
+ * `renderCandidates` 없이 띄운 1단계(공용 판 목록 `SeasonListWindow`)는 **웹 시험 전용 길**이다 — 앱(`SeasonRoute`)은 늘 명예의 전당
+ * 목록(원본 0xa10c 의 공용 목록 0x63b15 k 6)을 꽂아 이 길이 원본 화면으로 나오지 않는다(r165 전수 — 부르는 곳 하나).
  */
 export function PlayerRecruitScreen({
   teamId, roster, pitcherRecordOrder, list, gamePoint = 0, onRecruit, onDone, onBack, renderCandidates, cells,

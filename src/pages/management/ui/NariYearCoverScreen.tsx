@@ -7,7 +7,8 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 import {
-  YEAR_COVER_CLIP, YEAR_COVER_LABEL, YEAR_COVER_ORIGIN, YEAR_COVER_SCALE, yearCoverDigitsOf, yearCoverStepAt,
+  YEAR_COVER_CLIP, YEAR_COVER_LABEL, YEAR_COVER_ORIGIN, YEAR_COVER_SCALE, resumeLeftFrameCoverOpacityAt, yearCoverDigitsOf,
+  yearCoverStepAt,
 } from '@/pages/management/lib/nariYearCover'
 import type { YearCoverStep } from '@/pages/management/lib/nariYearCover'
 
@@ -82,9 +83,21 @@ export function NariYearCoverScreen({ yearIndex, onDone, previousScreenAt }: Nar
   )
 }
 
-/** 앞 화면 틀의 검정 — 그리기가 없는 상태(이어하기 길의 100 · 1)에 버퍼가 검정 덮기로 덮인 틀 (`resumeCoverUnderlayAt`) */
-export function YearCoverBlackFrame() {
-  return <div data-part="year-cover-black" style={{ position: 'absolute', inset: 0, background: '#000000', pointerEvents: 'none' }} />
+/**
+ * 이어하기 길의 앞 화면 틀 0~3 — 그리기가 없는 100 · 1 이라 버퍼에 남은 앞 장면 판(`LeftFrame`) 위에 쌓인 덮개
+ * (`resumeCoverUnderlayAt` 의 '앞판' · `resumeLeftFrameCoverOpacityAt`). 네 틀 내내 같은 자리 같은 꼴이라 판은 처음 틀에 한 번 받는다
+ */
+export function YearCoverResumeLeftFrame({ frame }: { readonly frame: number }) {
+  const opacity = resumeLeftFrameCoverOpacityAt(frame)
+  return (
+    <>
+      <LeftFrame part="year-cover-resume-left" />
+      {opacity > 0 && (
+        <div data-part="year-cover-resume-cover"
+          style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'none' }} />
+      )}
+    </>
+  )
 }
 
 /** 그리기 0x1cc4c — 검정 · 자르기 (0, 154, 240, 22) 안에 "년차"(img_text 398 팔레트 1) · 굴러가는 연차 숫자, 모두 두 배 */
