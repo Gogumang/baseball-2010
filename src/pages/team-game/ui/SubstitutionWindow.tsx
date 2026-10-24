@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -82,18 +83,19 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
+      // 상태 0xb 의 키 함수 0x495fc 는 장면 키 자리(52da2)에서 받은 다음 틀에 돈다 — 장면 키 칸으로
       if (event.key === 'ArrowUp' || event.key === '2') {
         event.preventDefault()
-        move(-1)
+        pushSceneKey(() => move(-1))
       } else if (event.key === 'ArrowDown' || event.key === '8') {
         event.preventDefault()
-        move(1)
+        pushSceneKey(() => move(1))
       } else if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()
-        confirm()
+        pushSceneKey(() => confirm())
       } else if (event.key === '0') {
         event.preventDefault()
-        toggleDetail()
+        pushSceneKey(() => toggleDetail())
       }
     }
     window.addEventListener('keydown', onKeyDown)

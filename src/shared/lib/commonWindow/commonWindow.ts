@@ -277,6 +277,14 @@ export function markGameSceneUp(): () => void {
   }
 }
 
+/**
+ * 경기 장면(0x104)이 서 있는가 — 그 장면의 받은 키는 장면 부품의 칸(`sceneKeyLatch` — 장면 틱)이 맡는다. 앱 키 문(`appKeyGate`)은
+ * 장면이 서 있고 창이 없을 때 키를 그 칸에 그대로 넘긴다
+ */
+export function isGameSceneUp(): boolean {
+  return gameScenesUp > 0
+}
+
 /** 경기 장면 0x52c50 이 52cc6 · 52efe · 53048 에서 이 그림을 건너뛰는가 (`gameScenesUp` 머리말) */
 export function isGameSceneFrozen(): boolean {
   return frozenSince !== null

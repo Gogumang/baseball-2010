@@ -178,8 +178,8 @@ export interface LaserKeyInput {
   readonly key: string | null
   /**
    * 키 반복인가. 원본은 `this+0x6c & 0xf == 0`(반복 계수 0 = 새로 누른 키)만 받아,
-   * **누르고 있기로는 레이저가 안 난다**. 웹에서는 `KeyboardEvent.repeat` 가 그 자리다
-   * (이 저장소의 `useStageControls.ts` 도 `event.repeat` 를 그렇게 버린다).
+   * **누르고 있기로는 레이저가 안 난다**(4e888 이 이 틀 누름 [+0x40] 도 본다). 웹은 0xbca05 의 4틀 되풀이를 수비 화면이 세어
+   * (`keyHold`) 되풀이 사건에 이 값을 세운다 — 브라우저 자동 되풀이는 버린다.
    */
   readonly isRepeat: boolean
 }
