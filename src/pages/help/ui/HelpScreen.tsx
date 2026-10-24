@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CommonPanel, InsetBox, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
+import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
+import { FRAME_SLIDE_BODY_FIRST_DRAW } from '@/widgets/screen-frame/lib/frameSlide'
 import {
   HELP_PAGER_GLYPH_HEIGHT,
   HELP_PANEL_CLOSE_HEIGHTS,
@@ -111,15 +113,28 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   const lines = useMemo(() => wrapHelpText(helpPageRawOf(section, page)), [section, page])
   const lineCountOf = (state: HelpViewerState) => wrapHelpText(helpPageRawOf(state.chapter, state.page)).length
 
-  /** 그린 횟수 — 깜빡임(+0x410)과 판 여닫기(+0x90)가 센다 */
+  // 경기 중 [조작방법] — 0x3c158 이 뷰어를 0x63689(skin, 0) 로 열자마자(+0x84 = 1) 3c26a 에서 [skin+0x84] = 0 으로 지운다.
+  // 머리띠가 없는 화면이라 미끄러짐 없이 바로 본문이고, 전역 칸은 내려온 채가 된다 (r168). 들어옴은 첫 그림보다 앞이다
+  useState(() => {
+    if (isOverGame) stopSkinFrameSlide()
+    return null
+  })
+  /** 그린 횟수 — 깜빡임(+0x410)이 센다 */
   const tick = useUpdateCounter()
-  /** CLR 로 닫기 연출을 시작한 그리기 번호 (메인 메뉴만 — 경기 중은 +0x125 라 곧장 닫는다) */
+  /**
+   * 본문 몇째 그림인가 — 메인 메뉴 7 · 10 은 뷰어 열기 0x63688 이 [skin+0x84] = 1 · [+0x86] = 1 을 써(63728~63730) 머리띠가
+   * 미끄러지고, 그리기 0x58d10 은 [skin+0x84] ≠ 0 이면(58d54~58d60) 판도 글도 없이 593aa 로 끝난다 — 깜빡임 +0x410 은 그 앞
+   * 58d14 에서 오른다. 판 여닫기(+0x90)도 본문에서만 걸음을 가므로 본문 첫 그림부터 센다 (r168).
+   */
+  const bodyTick = isOverGame ? tick : tick - FRAME_SLIDE_BODY_FIRST_DRAW
+  const isBodyShown = bodyTick >= 0
+  /** CLR 로 닫기 연출을 시작한 본문 그리기 번호 (메인 메뉴만 — 경기 중은 +0x125 라 곧장 닫는다) */
   const [closingFrom, setClosingFrom] = useState<number | null>(null)
-  const closingStep = closingFrom === null ? null : tick - closingFrom
+  const closingStep = closingFrom === null ? null : Math.max(0, bodyTick - closingFrom)
   const panelHeight =
     closingStep !== null
       ? HELP_PANEL_CLOSE_HEIGHTS[Math.min(closingStep, HELP_PANEL_CLOSE_HEIGHTS.length - 1)]
-      : (HELP_PANEL_OPEN_HEIGHTS[tick] ?? HELP_PANEL_FULL_HEIGHT)
+      : (HELP_PANEL_OPEN_HEIGHTS[Math.max(0, bodyTick)] ?? HELP_PANEL_FULL_HEIGHT)
   const isAnimating = panelHeight < HELP_PANEL_FULL_HEIGHT
   /** [skin+0x410] — 0x58d14 가 그릴 때마다 올린 뒤의 값으로 본다 (앱에 하나, U-90) */
   const blinkCounter = useSkinBlinkCounter(tick)
@@ -136,7 +151,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   /** 0x63850 · 0x6387e — `+0x125`(경기 장면)면 곧장 닫고, 아니면 닫기 연출을 건다 */
   const close = () => {
     if (isOverGame) return onBack()
-    setClosingFrom((previous) => previous ?? tick)
+    setClosingFrom((previous) => previous ?? Math.max(0, bodyTick))
   }
 
   /** 웹판 단추 — 단계와 상관없이 쪽 보기·장 고르기의 좌우와 같은 값을 낸다(단계는 그대로 둔다) */
@@ -190,7 +205,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   /** 웹판 단추 줄 — 원본은 키뿐이라 판 아래(y = 판 끝 + 4)에 둔다 */
   const webButtonTop = centerY + HELP_PANEL_FULL_HEIGHT / 2 + 4
 
-  const body = (
+  const viewerBody = isBodyShown && (
     <>
       {namePalette.definition}
       {/* 판 0x55e60(skin, W/2, H/2, 192, +0x90, 0, 0x22, …) — [+0x45c] 면 (띠 0, 0, 제목 탭 1) 아니면 (띠 0x10, 0, 0) (0x58dea~0x58ec6) */}
@@ -362,7 +377,12 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
           </button>
         </>
       )}
+    </>
+  )
 
+  const body = (
+    <>
+      {viewerBody}
       {gamePoint === undefined ? (
         // 경기 중 [조작방법] — 원본은 띠가 없고 CLR 로만 닫는다. 이 칸은 웹판 편의(터치)다
         <button
@@ -375,7 +395,8 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
           닫기
         </button>
       ) : (
-        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} slides={false} />
+        // 7 · 10 들어옴 0x2668c → 뷰어 열기 0x63688 이 미끄러짐을 세운다 (63728~63730, r168 정정 — 예전엔 false)
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} />
       )}
     </>
   )

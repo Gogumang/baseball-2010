@@ -5,6 +5,7 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
+import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import type { Collection } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { isMinusSkill } from '@/entities/career/model/playerCareer'
@@ -94,6 +95,12 @@ const SCREEN = { width: 240, height: 320 } as const
 export function RecordAnnals({
   collection, onBack, gamePoint = 0, secretCode: heldSecretCode, onSecretCodeChange, underlay,
 }: RecordAnnalsProps) {
+  // 들어옴 0x2407c 가 [skin+0x84] = 0 (240b2~240c0) — 앞 화면이 남긴 미끄러짐을 끊어 머리띠가 첫 그림부터 내려온 자리다(r168).
+  // 들어옴은 첫 그림보다 앞이라 머리띠(아래 ScreenFrame)가 그리기 전에 지운다
+  useState(() => {
+    stopSkinFrameSlide()
+    return null
+  })
   const [tab, setTab] = useState(0)
   const [page, setPage] = useState(0)
   const [cursor, setCursor] = useState(0)
@@ -422,7 +429,7 @@ export function RecordAnnals({
       </div>
 
       {/* 머리띠·바닥 — 그리기 꼬리 0x2fc1e `0x54d95(skin, 0, 5)` (판 자르기를 푼 뒤라 안 잘린다).
-          들어옴 0x2407c 가 [skin+0x84] = 0 이라 미끄러지지 않는다. 되돌아가기는 CLR 과 같은 일 */}
+          들어옴 0x2407c 가 [skin+0x84] = 0 이라(위 stopSkinFrameSlide) 미끄러지지 않는다. 되돌아가기는 CLR 과 같은 일 */}
       <ScreenFrame title="2010프로야구" gamePoint={gamePoint} footer={5} slides={false}
         onBack={() => isPanelOpen && pressClear()} />
     </RawScreen>

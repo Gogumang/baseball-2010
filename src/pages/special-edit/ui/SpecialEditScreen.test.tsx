@@ -138,12 +138,25 @@ describe('머리띠 미끄러짐 [skin+0x84] — 상태 29 는 처음 선 하위
 
   it('처음 하위 0 은 미끄러지고, 명단(하위 1)에서 돌아온 하위 0 은 다 내려온 자리다', async () => {
     const { ScreenFrame } = await import('@/widgets/screen-frame/ui/ScreenFrame')
+    // 앞 시험들이 세우다 만 미끄러짐(앱에 하나인 칸, r168)을 지워 앱을 막 띄운 것과 같게 둔다
+    const { resetSkinFrameSlide } = await import('@/shared/lib/skinFrameSlide/skinFrameSlide')
+    resetSkinFrameSlide()
     const settled = render(<ScreenFrame title="팀선택" gamePoint={0} onBack={null} slides={false} />)
     const settledTop = coinTop()
     settled.unmount()
 
-    render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={vi.fn()} />)
-    expect(coinTop()).not.toBe(settledTop)
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] })
+    try {
+      render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={vi.fn()} />)
+      expect(coinTop()).not.toBe(settledTop)
+      // 원본은 미끄러지는 동안 키를 버린다(0x63b14 [skin+0xe4]) — 이 시험은 키 막음을 풀어 두었으니 다 내려온 뒤에 누른다.
+      // 미끄러짐은 앱에 하나인 칸이라(r168) 도중에 누르면 명단 머리띠가 남은 걸음을 잇는다
+      act(() => {
+        vi.advanceTimersByTime(62 * 6)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
     key('Enter')
     expect(coinTop()).toBe(settledTop)
     key('Escape')
