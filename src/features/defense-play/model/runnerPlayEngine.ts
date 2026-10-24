@@ -970,6 +970,18 @@ function* runnerPlaySteps(
             fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: home } : fielder))
           }
         }
+        // AI 1 b4aca~b4b5a — vtcc 이고 쥐지 않았으면(+0xe0, b4ae6) 포구 지점(x, 0, z)으로 0xa100c(= vt14). 고리 안이라 같은 틱 끝
+        // b4c72 의 커버 다시 고르기가 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐면 `chase` 가 비어 안 고친다
+        const chased = chase
+        if (
+          dispatchState === AI_STATE.CHASE &&
+          chased !== null &&
+          chased.slot === slot &&
+          isFreeToRetarget(self) &&
+          !isSamePoint(self.target, chased.catchPoint)
+        ) {
+          fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: chased.catchPoint } : fielder))
+        }
         // AI 0xc b4b78 — 공 가진 야수(+0x130)의 목표 T 에서 2000 뒤(`backupPointOf`)로 vt14(잠금 +0xb4 ≤ 0 · vtc8 일 때만, r180)
         if (dispatchState === AI_STATE.BACKUP) {
           const backup = backupPointOf(fielders[play.ballHolderSlot]?.target ?? self.target, self.position)
@@ -1135,15 +1147,10 @@ function* runnerPlaySteps(
     const runnersBeforeListTick = runnerStates()
 
     // ── 6. 움직이기 ──
-    const chasing = chase
     const beforeMove = fielders
     fielders = fielders.map((fielder) => {
-      // 목표: AI 1(0xb4aca~0xb4afe) — 고른 야수는 쥐기 전까지 포구 지점(x, 0, z)으로. vtcc(자세 워드 0 · +0xb4 ≤ 0 · +0xcc ≤ 0)가
-      // 거짓이면(포구 동작 중) 목표를 안 고친다(b4ad6). AI 0(b476a)의 시작 자리 고치기는 AI 고리(3c 절)가 한다(r180) — 여기서는 그 목표로 걷는다
-      let target = fielder.target
-      if (chasing !== null && fielder.slot === chasing.slot) {
-        if (isFreeToRetarget(fielder)) target = chasing.catchPoint
-      }
+      // 목표: AI 1(b4aca 포구 지점 · r190) · AI 0(b476a 시작 자리 · r180)은 AI 고리가 고쳤다 — 여기서는 그 목표로 걷는다
+      const target = fielder.target
       // 걸음: 다음 야수 틱의 이동 관문 a1346~a1376 — 0xa0f7c(+0xb0 바이트면 프레임 1 · 2 만) && vtc8(+0xb1 — 던진 뒤 한 틱) &&
       // +0xb4 ≤ 0 (`canStepNextListTick`). 걸음 a1376(0xbf094)은 AI · 공 쥠을 안 본다 — 쥔 야수도 목표로 마저 걷는다
       if (isSamePoint(fielder.position, target) || !canStepNextListTick(fielder)) return { ...fielder, target }
