@@ -359,6 +359,8 @@ function* runnerPlaySteps(
   /** 지금 날아가는 송구 — 자동 슬라이딩 · 그림이 본다 */
   // (닫힘 안에서 바뀌어 흐름 좁히기가 못 따라간다 — 넓은 꼴로 둔다)
   let flight = null as ThrowInFlight | null
+  /** 이번 틱에 공을 던진 야수 — 던지기 0xa1620 끝(a1a3a)의 +0xb1 잠금 (U-78) */
+  let thrownThisTick: number = NONE
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 */
   let ballBody = chase?.body
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
@@ -524,6 +526,7 @@ function* runnerPlaySteps(
     // b188a — 송구 예보가 두 번째 패스로 가면 그때의 +0x130(던진 야수 — b307c 앞)의 +0xc0 = 4
     if (chase?.secondPassStarted === true) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     flight = { from: holderSlot, base, releaseTick: tick }
+    thrownThisTick = holderSlot
     if (firstThrowBase === NONE) {
       firstThrowBase = base
       firstThrowArrival = chase?.catchTick ?? tick
@@ -607,6 +610,7 @@ function* runnerPlaySteps(
     sound.slidingThisTick = false
     sound.thisTick = []
     outJudgedThisTick = false
+    thrownThisTick = NONE
     tickMessageCode = 0
     // ── 0. 야수 틱 0xa1284 — 공용 갱신 0x3f060 이 슬롯 2(0x524c0)보다 먼저 돈다. 쥔 동안 +0xc8 −= 1 (타구 진행기 0' 절) ──
     // a12da · a12e6 — 동작 잠금(+0xb4)이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 만 본다)
@@ -964,6 +968,8 @@ function* runnerPlaySteps(
         const goal = chasing.catchPoint
         return { ...fielder, target: goal, position: stepToward(fielder.position, goal, fielder.speed) }
       }
+      // 이번 틱에 던진 야수는 +0xb1 잠금으로 다음 야수 틱 하나를 걷지 않는다(a1346 · a143e — 타구 진행기 `thrownThisTick`, U-78)
+      if (fielder.slot === thrownThisTick) return fielder
       if (isSamePoint(fielder.position, fielder.target)) return fielder
       return { ...fielder, position: stepToward(fielder.position, fielder.target, fielder.speed) }
     })

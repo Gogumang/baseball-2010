@@ -325,6 +325,8 @@ function* pickoffPlaySteps(
   /** 날아가는 송구 — 견제 송구와 그 뒤 받은 야수의 이어 던지기 (0xb2e38). 그림 · 던지는 동작만 본다
    *  (닫힘 안에서 바뀌어 흐름 좁히기가 못 따라간다 — 넓은 꼴로 둔다) */
   let flight = null as { from: number; base: number; releaseTick: number } | null
+  /** 이번 틱에 공을 던진 야수 — 던지기 0xa1620 끝(a1a3a)의 +0xb1 잠금 (U-78) */
+  let thrownThisTick: number = NONE
   /** 쫓는 공 — 송구공(b307c) · 튕긴 공(0xb3148). 받을(주울) 야수 · 포구 틱. 쥐면 null */
   let chase = null as LooseBallChase | null
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 */
@@ -485,6 +487,7 @@ function* pickoffPlaySteps(
     // b188a — 송구 예보가 두 번째 패스로 가면 그때의 +0x130(던진 야수 — b307c 앞)의 +0xc0 = 4
     if (chase?.secondPassStarted === true) throwErrorMarks = markSlot(throwErrorMarks, holderSlot, THROW_ERROR_MARK_TICKS)
     flight = { from: holderSlot, base, releaseTick: tick }
+    thrownThisTick = holderSlot
     // b2f80 · b3070 손을 떠난다 · b2df8~b2e14 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로)
     fielders = fielders.map((fielder) => {
       if (fielder.slot !== holderSlot) return fielder
@@ -550,6 +553,7 @@ function* pickoffPlaySteps(
     sound.slidingThisTick = false
     sound.thisTick = []
     outJudgedThisTick = false
+    thrownThisTick = NONE
     tickMessageCode = 0
     // ── 야수 틱 0xa1284 — 공 쥔 야수의 준비 틱 +0xc8 −= 1 (공용 갱신 0x3f060 이 슬롯 2 보다 먼저, 타구 진행기 0' 절) ──
     // a12da · a12e6 — 동작 잠금(+0xb4)이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 만 본다)
@@ -884,6 +888,8 @@ function* pickoffPlaySteps(
       if (chasing !== null && fielder.slot === chasing.slot) {
         return { ...fielder, target: chasing.catchPoint, position: stepToward(fielder.position, chasing.catchPoint, fielder.speed) }
       }
+      // 이번 틱에 던진 야수는 +0xb1 잠금으로 다음 야수 틱 하나를 걷지 않는다(a1346 · a143e — 타구 진행기 `thrownThisTick`, U-78)
+      if (fielder.slot === thrownThisTick) return fielder
       if (fielder.target === fielder.position) return fielder
       return { ...fielder, position: stepToward(fielder.position, fielder.target, fielder.speed) }
     })

@@ -450,13 +450,35 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
 
     expect(결과.fumbled).toBe(false)
     expect(결과.errantThrow).toBe(true)
-    // 흔들린 공(h' · w' · φ', 중력 70%)을 세계 0xbfed0 이 깔고, 던진 투수는 t ≤ 4 건너뜀 + +0xb1 두 틱으로 빠져
+    // 흔들린 공(h' · w' · φ', 중력 70%)을 세계 0xbfed0 이 깔고, 던진 투수는 t ≤ 4 건너뜀 + +0xb1 첫 복제 틱으로 빠져
     // 홈 뒤의 포수가 4틱 뒤 가슴 높이로 줍는다 — 보통 포구 틱 갈래(펌블 굴림 · 쥐기)다
     expect(결과.log).toContain('9틱 0루로 송구 — 13틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
     expect(결과.log).toContain('13틱 1번 야수가 잡았다 (종류 1)')
     // 홈 송구가 빗나가 아무도 안 죽는다 — 사람 수동 송구는 키('8')대로만 던져 1루로는 아무도 안 던졌다
     expect(결과.advance.outsAdded).toBe(0)
     expect(결과.advance.bases).toEqual({ first: true, second: true, third: false })
+  })
+
+  it('던진 야수는 +0xb1 잠금으로 던진 틱의 이동 한 번을 쉬고 그다음 틱부터 시작 자리로 걷는다 (a1a3a · a1346 · a143e, U-78)', () => {
+    // 야수 틱 0xa1284: 동작이 14~18 이 아니고 vtc8(+0xb1 == 0 && +0xcc ≤ 0)이 거짓이면 이동(a1346) 없이 a143e 가 잠금을 지우고
+    // vt10(목표 = 위치)을 부른다 — 에뮬로 동작 5 · +0xac 0 · +0xb1 1 을 한 번 돌리면 +0xb1 0 · 위치 그대로다
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory(fixturePatternFor(땅볼아웃)),
+      bases: 주자1루,
+      outs: 0,
+      controls: 계속누름('수비', '8'),
+      random: 차례난수([0.9, 0.9, 0, 0.9]),
+    })
+    expect(결과.log).toContain('9틱 0루로 송구 — 13틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
+    const 투수 = (tick: number) => {
+      const fielder = 결과.ticks.find((view) => view.tick === tick)?.fielders.find((entry) => entry.slot === 0)
+      return fielder === undefined ? null : { x: fielder.x, z: fielder.z }
+    }
+    // 그림 틱 N 은 N − 1 의 이동 뒤 자리다 — 9틱 이동은 쉬고(10 == 9), 10틱 이동부터 걷는다(11 ≠ 10)
+    expect(투수(9)).not.toBeNull()
+    expect(투수(10)).toEqual(투수(9))
+    expect(투수(11)).not.toEqual(투수(10))
   })
 
   it('난수가 늘 1 에 가까우면 하나도 안 걸린다', () => {
