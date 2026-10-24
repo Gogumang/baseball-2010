@@ -1,7 +1,7 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
-import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
+import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite, warmRecoloredFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import {
@@ -58,7 +58,7 @@ import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedRea
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
-import { aceBatterLayersOf, batterLayersOf, isAceBatterOrder, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { aceBatterLayersOf, batterLayersOf, batterPoseFramesOf, isAceBatterOrder, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
@@ -798,6 +798,26 @@ function drawHitByPitchMark(context: CanvasRenderingContext2D, scene: StageScene
   )
 }
 
+/** 칠하기를 다 걸어 둔 타자 (몸통 폼 · 피부 · 팀 · 장비) */
+const warmedBatters = new Set<string>()
+
+/**
+ * 이 타자가 그릴 수 있는 자세(대기 · 스윙 · 번트, `batterPoseFramesOf`)의 다시 칠할 겹을 미리 칠해 둔다 — 처음 스윙하는 틱에
+ * 칠하기를 걸면 칠이 끝날 때까지 구운 벌이 비친다(`warmRecoloredFrame`). 원점 · 팔레트가 다 와서 다 걸면 다시 안 본다.
+ */
+function warmBatterRecolors(bodyType: number, skinIndex: number, teamIndex: number, equipment: BatterEquipment): void {
+  const key = `${bodyType}|${skinIndex}|${teamIndex}|${JSON.stringify(equipment)}`
+  if (warmedBatters.has(key)) return
+  let isAllWarmed = true
+  for (const pose of batterPoseFramesOf(bodyType)) {
+    for (const layer of batterLayersOf(pose, bodyType, equipment)) {
+      const paletteIndex = layerPaletteIndexOf(layer, skinIndex, teamIndex)
+      if (paletteIndex !== null && !warmRecoloredFrame(layer.folder, layer.frame, paletteIndex)) isAllWarmed = false
+    }
+  }
+  if (isAllWarmed) warmedBatters.add(key)
+}
+
 /**
  * 원작 타자는 그림자·몸통·헬멧·배트·몸통 앞·다리를 자세마다 다른 순서로 겹친다 (0x78cfc).
  * 그림은 **좌타 자세로 그려져 있어** 우타(+0x3c == 0)면 효과 0x11 로 좌우를 뒤집는다 (R6 4절).
@@ -831,6 +851,7 @@ function drawBatter(
   // 우타는 파트 프레임 vt+0x10 을 효과 0x11 로 부른다(78d16 · 78d80) — 0xc9f98 ca07c 갈래라 0x66 반투명 파트(머리 장비 3~6)도
   // 섞지 않고 복사한다(`placedFrame` 의 복사판). 좌타(효과 0)는 구운 프레임(반투명 L/16 의 알파 근사)
   const isFlipped = side === BATTER_SIDE.우타
+  if (!isAceBatterOrder(aceOrder)) warmBatterRecolors(bodyType, skinIndex, teamIndex, equipment)
   for (const layer of layers) {
     const frame = placedFrame(layer.folder, layer.frame, layerPaletteIndexOf(layer, skinIndex, teamIndex), isFlipped)
     if (frame === null) continue

@@ -114,6 +114,25 @@ function recoloredSprite(folder: string, url: string, paletteIndex: number): HTM
   return sprite(url)
 }
 
+/**
+ * 프레임 한 장의 칠하기를 미리 건다 — 그리기 전에 칠해 두면 처음 그리는 그림에 구운 벌이 비치지 않는다.
+ * 원점 · `palette.json` 이 아직 안 왔으면 걸지 못해 false(다음에 다시 부른다). 칠하기를 걸었거나 칠할 것이 없으면 true.
+ *
+ * 2026-10-25 플레이 점검(r177): 타자 스윙 프레임은 처음 스윙하는 틱에 처음 칠하기를 걸어서, 칠이 끝날 때까지(맞은 뒤 멈춤 틱 동안)
+ * 몸통 · 헬멧이 구운 벌(파란 헬멧)로 그려졌다 — 원본은 팔레트를 적재 때 갈아 끼우므로 그런 깜박임이 없다.
+ */
+export function warmRecoloredFrame(folder: string, index: number, paletteIndex: number): boolean {
+  // 둘 다 같이 청한다 — 원점이 올 때까지 팔레트 받기를 미루지 않는다
+  const origins = frameOrigins(folder)
+  const palettes = spritePalettes(folder)
+  if (origins === null) return false
+  const key = String(index).padStart(3, '0')
+  if (origins[key] === undefined) return true
+  if (palettes === null) return false
+  recoloredSprite(folder, `${folder}/${key}.png`, paletteIndex)
+  return true
+}
+
 function loadSprite(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const image = new Image()
