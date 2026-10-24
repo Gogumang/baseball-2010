@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { castOfAces, castOfCareer, gameSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { castOfAces, castOfCareer, castOfTeamRecordEquipment, gameSpritePreloadsOf } from '@/app/model/gameSpritePreload'
 import { preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
 
 describe('gameSpritePreload — 경기 진입 때 두 팀 명단으로 고르는 선수 그림', () => {
@@ -40,5 +40,15 @@ describe('gameEntryCastPreloadsOf — 경기 첫 그림 몫', () => {
     expect(urls).toContain('./sprites/defender/frames/017.png')
     expect(urls).toContain('./sprites/defender/frames/index/028.png')
     expect(urls).not.toContain('./sprites/defender/frames/055.png')
+  })
+
+  it('CPU 팀 레코드의 굴린 장비 니블(0x665e8)도 등급 그림을 받는다 — 타자는 그 붙박이 칸의 몸통 폼으로, 덮개가 없으면 빈 출연진', () => {
+    const cast = castOfTeamRecordEquipment(1, { batters: { 0: [3, 0, 0, 0] }, pitchers: { 2: [0, 0, 0, 4] } })
+    expect(cast.equippedBatters).toHaveLength(1)
+    expect(cast.pitcherEquipments).toHaveLength(1)
+    const urls = preloadImageUrlsOf(gameSpritePreloadsOf(cast))
+    expect(urls.some((url) => url.includes('item_bat_head_2/'))).toBe(true)
+    expect(urls.some((url) => url.includes('item_pit_'))).toBe(true)
+    expect(castOfTeamRecordEquipment(1, undefined)).toEqual({})
   })
 })

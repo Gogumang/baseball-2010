@@ -592,13 +592,13 @@ interface PitcherResume {
   readonly point: PitcherResumePoint
 }
 
-function pitcherResumeOf(saved: PitcherCareer | null, random: RandomPort): PitcherResume {
+function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
   const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
   return {
     career: saved !== null && point.kind === '이벤트'
       ? enterPitcherYearEndEvent(saved, point.eventId)
-      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105
-      : saved !== null && point.kind === '새시즌' ? startNextPitcherSeason(saved, random)
+      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137 → 105 는 **투수편에 들어설 때** 돈다
+      // (`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
       // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
       // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
       : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
@@ -718,7 +718,7 @@ export function usePitcherLeagueSession(
    * 타자편 794c8d9 `continueSaved` 와 같은 꼴이다.
    */
   const resumed = useRef<PitcherResume | null>(null)
-  if (resumed.current === null) resumed.current = pitcherResumeOf(loaded.current, random)
+  if (resumed.current === null) resumed.current = pitcherResumeOf(loaded.current)
   /** 이어할 자리 — 엔딩을 등록 없이 떠나면(`finishEnding(false)`) 남은 저장으로 다시 고른다 */
   const [resumePoint, setResumePoint] = useState<PitcherResumePoint>(resumed.current.point)
   const [career, setCareer] = useState<PitcherCareer | null>(resumed.current.career)
@@ -814,6 +814,25 @@ export function usePitcherLeagueSession(
       if (!shouldForgetRepeatable) setShouldForgetRepeatable(true)
     }
   }
+  /** 판정 없음(e = −1) 엔딩 · 명예의 전당 등록 뒤 저장 막기 — 아래 `commit` 머리글 */
+  const isSaveErasedRef = useRef(false)
+  /**
+   * **이어하기의 새 시즌 처리** — 원본은 투수편에 들어서야(장면 0x106 → 상태 100 진입 0x1c154) 1c25e 가 S+0x50 == 0x11 을 보고
+   * 새 시즌 0x1b768 을 부른다. 그 안 1b86c 의 CPU 장비 굴림 0x665e8 이 난수를 쓰고, 1b894~1b8a4 `0x1fded · 0x22755([0x1400054], 1)`
+   * 가 **곧바로 저장한다**(직접 떴다). 웹 세션은 앱을 띄울 때(메인 메뉴 앞) 서므로, 예전 웹은 그때 새 시즌을 처리해 굴림이 다른 화면의
+   * 난수보다 앞섰고 투수편에 안 들어가도 저장이 새 해로 바뀌었다 — 이제 투수편 화면이 섰을 때(`isOnScreen`) 한 번 돈다.
+   * 반복 이벤트 지우기(셋업 0xf684, 아래 고리)보다 먼저 값을 넣고, 그 지우기는 함수 꼴로 그 위에 얹힌다 — 105 도착 고리는
+   * 지우기가 끝난 다음 렌더에서야 돌므로 새 해 커리어를 본다.
+   */
+  const resumedNewSeasonRef = useRef(false)
+  useEffect(() => {
+    if (!isOnScreen || resumedNewSeasonRef.current || resumePoint.kind !== '새시즌' || career === null) return
+    resumedNewSeasonRef.current = true
+    // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
+    const started = startNextPitcherSeason(career, random)
+    setCareer(started)
+    if (!isSaveErasedRef.current) store.save(savedCareerOf(started))
+  }, [career, isOnScreen, random, resumePoint, store])
   useEffect(() => {
     if (!shouldForgetRepeatable || fileEvents === null) return
     setShouldForgetRepeatable(false)
@@ -827,7 +846,6 @@ export function usePitcherLeagueSession(
    * 명예의 전당 등록(0x62dbe → 0x224ec(저장, 3))으로 모드 저장을 지운 뒤 — 등록 꼬리(0x62dc4~)는 G − 20000 · 전역 저장 0x1f1b9 ·
    * 0x1f1e1 뿐이고 모드 저장 0x22755 를 다시 부르지 않는다. 엔딩을 떠날 때까지 커리어가 바뀌어도(지갑 다리의 G) 저장하지 않는다.
    */
-  const isSaveErasedRef = useRef(false)
   const commit = useCallback(
     (next: PitcherCareer) => {
       setCareer(next)
@@ -861,20 +879,6 @@ export function usePitcherLeagueSession(
     ])
   }, [resumePoint, store])
 
-  /**
-   * 이어하기로 새 시즌 처리를 했으면(`resumePoint` '새시즌' — 1c25e S+0x50 == 0x11 → 0x1b768) 그 자리에서 저장한다 — 한 번만.
-   * 0x1b768 은 연차 + 1 · 소지금 · S+0x50 = 1 · 기록 칸 정리 뒤 1b894~1b8a4 에서 `0x1fded · 0x22755([0x1400054], 1)` 로
-   * **곧바로 저장하고** 화면 전환(0xbdae9) · +0x289 = 1(→ 137) 을 건다(직접 떴다). 예전 웹은 띄울 때 메모리에만 두어, 다른 저장
-   * 없이 끄면 저장이 앞 해(S+0x50 = 0x11) 그대로 남았다.
-   */
-  const resumedNewSeasonRef = useRef(false)
-  useEffect(() => {
-    if (resumedNewSeasonRef.current || resumePoint.kind !== '새시즌') return
-    resumedNewSeasonRef.current = true
-    const started = resumed.current?.career
-    if (started === null || started === undefined) return
-    store.save(started)
-  }, [resumePoint, store])
 
   /**
    * 이어하기가 시즌 끝 사슬의 상태(136 · 130 · 131 · 132)로 들어갔으면 그 진입처럼 저장한다 — 한 번만. 136 진입 0x10bb0 은
@@ -1661,7 +1665,7 @@ export function usePitcherLeagueSession(
      * 연말 사슬 이벤트)는 굴림 · 저장 · 소리가 없다. 105 진입 곁가지(부상 엔딩 · 나간 대결 140 · 115 · 훑기 굴림)는 들어와 관리 장면에
      * 닿을 때 도는 도착 고리(`isOnScreen` — 투수편 화면일 때만)라 원본 진입 때와 같은 차례다.
      */
-    const next = pitcherResumeOf(normalizePitcherCareer(store.load()), random)
+    const next = pitcherResumeOf(normalizePitcherCareer(store.load()))
     resumed.current = next
     replayedEvaluationRef.current = false
     resumedNewSeasonRef.current = false

@@ -2,7 +2,9 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { nariGameRecordOf } from '@/entities/career/model/nariCupTeams'
 import { nariRecordFieldersOf } from '@/entities/career/model/nariTeamRecord'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
+import { castOfTeamRecordEquipment, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnderlay'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
@@ -90,6 +92,14 @@ export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
   const { scene, gameOptions } = props.session
   const isInNariScene = !(scene === '경기' && gameOptions !== null) && scene !== '마선수대결'
   const hour = useSceneEntryHour(isInNariScene)
+  // 상대 팀 레코드의 굴린 장비 니블(나리 새 시즌 0x665e8) — 타석 교대 0x47cc8 이 상대 타자(47e80 → 0x78fd8)에 싣는다.
+  // 경기 옵션이 서면 그 그림을 유휴로 받는다(안 기다린다)
+  const opponentTeamId = gameOptions?.opponentTeamId
+  const opponentEquipment = gameOptions?.opponentEquipment
+  useEffect(() => {
+    if (opponentTeamId === undefined || opponentEquipment === undefined) return
+    preloadSprites(stageSpritePreloadsOf(castOfTeamRecordEquipment(opponentTeamId, opponentEquipment)), 'idle')
+  }, [opponentTeamId, opponentEquipment])
   return (
     <SceneHourContext.Provider value={hour}>
       <PitcherLeagueScreens {...props} />

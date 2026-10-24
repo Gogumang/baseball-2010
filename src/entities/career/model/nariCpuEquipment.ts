@@ -31,8 +31,14 @@ import type { NariTeamRecord, NariTeamRecords } from '@/entities/career/model/na
  * - 투수: 레코드 투수 배열 0~7 차례는 리그(`League.pitcherOrders`)가 들고 있어, 칸 → 붙박이 표 칸으로 바꿔
  *   `NariTeamRecord.pitcherEquipment[표 칸]` 에 둔다(니블은 레코드째 로테이션 0xb5ca8 을 따라 돈다).
  * 둘 다 없으면 Xls 행 니블이다(옛 저장 = 굴리지 않은 첫 시즌 값).
- * ⚠️ 미확인: 새 시즌 때 웹 `pitcherOrders`(포스트시즌 뒤 `pitcherOrdersAfterPostseason`)가 원본 레코드 차례와 같다는 것은 시즌 모드와
- * 같은 가정이다(U-137 의 "나리 투수 배열 칸 차례").
+ * **투수 칸 차례 확인 (r143, 직접 뜸)**: 0xb51fc(레코드, k) = [레코드+0x14] + 0x30·k 가 가리키는 배열을 0~3 자리에서 섞는 곳은
+ * 0xb5ca8(제자리 memmove 0x1400418) 하나이고, 그 유일한 호출지 0xb8c80 = 0xb8680(팀) → 0xb5ca8 이다. 0xb8680 은 모드 3·4 에서
+ * 0x1f989 가 돌려주는 **같은 레코드 포인터**를 넘긴다(b86c6~b86d0). 0xb8c80 을 부르는 곳은 0x6548(시즌) · 0x1c46c(나리 사람 경기
+ * 1c582 · 1c5e8) · 0xc239c(CPU 경기 · 포스트시즌 c2518 · c2542) 셋뿐 — 웹 `League.pitcherOrders` 의 로테이션 · 포스트시즌 이월
+ * (`pitcherOrdersAfterPostseason`)이 옮긴 그 길이다. 그 밖에 투수 배열을 고치는 0xb521c(끼워넣기)는 칸 8(마투수 0xb88c8 · 미션
+ * 0xaae7c)이나 내 팀(0x1a090 등록)이라 0~3 차례를 안 건드리고, 0x1b684 는 내 팀만이다. 국가대항전 중에는 0x1f940 이 대회 칸
+ * (+0xbc4 / +0xbe0)을 돌려 리그 레코드가 안 돈다(웹 `nariCupTeams` 따로) · 1b774 가 S+0x12c 를 굴림 앞에서 내린다.
+ * 곧 굴림 때 칸 차례 = 새 시즌 리그의 `pitcherOrders` 다.
  */
 
 const NO_EQUIPMENT: readonly number[] = [0, 0, 0, 0]

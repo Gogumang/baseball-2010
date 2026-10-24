@@ -9,7 +9,9 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { defenseEntrySpritePreloadsOf, defenseSpritePreloadsOf } from '@/pages/defense/lib/defenseSpritePreload'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
-import { batterEquipmentOf, bodyTypeOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, bodyTypeOf, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
+import { teamBatters } from '@/entities/team/model/teamRoster'
+import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
 import { stageCastSpritePreloadsOf, stageEntrySpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
 import type { StageCast } from '@/widgets/batting-stage/lib/stageSpritePreload'
 
@@ -26,6 +28,25 @@ export function castOfAces(aces: GameAceSetup | undefined): StageCast {
 export function castOfCareer(career: Pick<PlayerCareer, 'battingTypeIndex' | 'battingSide' | 'equipmentLevels'>): StageCast {
   const bodyType = bodyTypeOf(career.battingTypeIndex * 2 + career.battingSide)
   return { equippedBatters: [{ bodyType, equipment: batterEquipmentOf(career.equipmentLevels) }] }
+}
+
+/**
+ * CPU 팀 레코드의 **굴린 장비 니블**(나리 새 시즌 0x665e8 — `nariTeamRecordEquipmentOf`) → 타석 출연진.
+ * 타석 교대 0x47cc8 이 타자(47e80~47eb6 → 0x78fd8) · 마운드 투수(48138~4816a → 0x79790)에 레코드 니블 − 1 로 장비 겹을 싣는다
+ * — 모드를 가리지 않으므로 상대 팀의 굴린 줄은 경기 중 언제든 선다. 타자 몸통 폼은 그 붙박이 표 칸의 Xls `+0xb >> 4`.
+ * 덮개가 없으면(첫 시즌 · 옛 저장) 빈 출연진 — 리그 열 팀 Xls 니블은 0 이라 맨몸 겹이 이미 받는다.
+ */
+export function castOfTeamRecordEquipment(teamId: number, equipment: TeamRecordEquipment | undefined): StageCast {
+  if (equipment === undefined) return {}
+  const roster = teamBatters(teamId)
+  const equippedBatters = Object.entries(equipment.batters ?? {}).flatMap(([slot, nibbles]) => {
+    const player = roster[Number(slot)]
+    if (player === undefined) return []
+    const [hit = 0, power = 0, , run = 0] = nibbles
+    return [{ bodyType: bodyTypeOf(player.profile >> 4), equipment: batterEquipmentOf({ hit, power, run }) }]
+  })
+  const pitcherEquipments = Object.values(equipment.pitchers ?? {}).map((nibbles) => pitcherEquipmentOfNibbles(nibbles))
+  return { equippedBatters, pitcherEquipments }
 }
 
 function mergedCast(...casts: readonly StageCast[]): StageCast {

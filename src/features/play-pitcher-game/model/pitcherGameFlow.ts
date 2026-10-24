@@ -931,6 +931,11 @@ export function opponentBatterOf(progress: PitcherGameProgress): {
   readonly name?: string
   readonly position?: number
   readonly profile?: number
+  /**
+   * 레코드 장비 니블 네 칸(히트 · 파워 · 수비 · 주루) — 상대 팀 레코드 덮개(나리 새 시즌 0x665e8 이 굴린 값), 없으면 Xls 행.
+   * 타석 교대 0x47cc8 이 마타자가 아니면 이 니블로 타자 그림 장비 겹(0x78fd8)을 싣는다(47e80~47eb6). 마타자는 없음
+   */
+  readonly equipment?: readonly number[]
   readonly aceIndex?: number
   readonly rosterSlot: number | null
 } {
@@ -943,11 +948,13 @@ export function opponentBatterOf(progress: PitcherGameProgress): {
   const roster = teamBatters(progress.options.opponentTeamId)
   const player = roster[rosterSlot % roster.length]
   if (player === undefined) return { rosterSlot }
+  const slot = rosterSlot % roster.length
   return {
     name: player.name,
     ...(player.position === undefined ? {} : { position: player.position }),
     profile: player.profile,
-    rosterSlot: rosterSlot % roster.length,
+    equipment: progress.options.opponentEquipment?.batters?.[slot] ?? player.equipment,
+    rosterSlot: slot,
   }
 }
 

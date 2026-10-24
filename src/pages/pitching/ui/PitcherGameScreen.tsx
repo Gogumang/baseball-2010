@@ -96,7 +96,8 @@ import {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
-import { pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import { pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
@@ -1085,6 +1086,7 @@ function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
   readonly batterTeamIndex: number
   readonly batterSide?: number
   readonly aceBatterOrder?: number
+  readonly batterEquipment?: BatterEquipment
 } {
   const batter = opponentBatterOf(progress)
   const teamIndex = progress.options.opponentTeamId
@@ -1099,7 +1101,16 @@ function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {
     }
   }
   const profile = batter.profile ?? 0
-  return { batterForm: profile >> 4, batterSkinIndex: (profile >> 2) & 3, batterTeamIndex: teamIndex }
+  const nibbles = batter.equipment
+  return {
+    batterForm: profile >> 4,
+    batterSkinIndex: (profile >> 2) & 3,
+    batterTeamIndex: teamIndex,
+    // 타석 교대 0x47cc8 47e80~47eb6 — 마타자가 아니면 레코드 +0x19 · +0x1a 니블 − 1 로 장비 겹(0x78fd8). 부위 2(밴드)는 그림이 없다
+    ...(nibbles === undefined
+      ? {}
+      : { batterEquipment: batterEquipmentOf({ hit: nibbles[0] ?? 0, power: nibbles[1] ?? 0, run: nibbles[3] ?? 0 }) }),
+  }
 }
 
 /** 칸 0..5 의 구질 번호 (경기 +0xfac + 4·칸) — 장면 위 구질 목록 재료 */

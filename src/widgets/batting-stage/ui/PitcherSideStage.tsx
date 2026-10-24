@@ -10,7 +10,7 @@ import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { bodyTypeOf, NO_EQUIPMENT, NO_PITCHER_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
-import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
@@ -67,6 +67,12 @@ interface PitcherSideStageProps {
    * +0x24(0x35686)로 자세표 0xb905c 의 마타자 갈래를 고른다. 없으면 일반 타자
    */
   readonly aceBatterOrder?: number
+  /**
+   * 타자 장비 겹 — 타석 교대 0x47cc8 이 타자 그림(장면 +0xf18)을 0x768b4 로 비운 뒤, 마타자(0xb63a0 ≥ 0)가 아니면 47e80~47eb6 에서
+   * 지금 타자 레코드(0xae89c(공격 팀)) +0x19 · +0x1a 의 니블 네 칸 − 1 을 장비 적재 0x78fd8 로 싣는다 — 모드를 가리지 않는다(직접 떴다).
+   * 안 주면 맨몸
+   */
+  readonly batterEquipment?: BatterEquipment
   /** 마운드의 내 투수 — 폼(단계 표) · 손(좌투 뒤집기) · 장비 겹(0x79790) */
   readonly pitcherForm: number
   readonly pitcherHand: number
@@ -301,7 +307,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         ...(current.aceBatterOrder === undefined ? {} : { aceBatterOrder: current.aceBatterOrder }),
         batterSkinIndex: current.batterSkinIndex,
         batterTeamIndex: current.batterTeamIndex,
-        batterEquipment: NO_EQUIPMENT,
+        batterEquipment: current.batterEquipment ?? NO_EQUIPMENT,
         side,
         hud: current.hud,
         pitcherStaminaPercent: current.pitcherStaminaPercent ?? null,

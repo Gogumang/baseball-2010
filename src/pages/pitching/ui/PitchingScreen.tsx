@@ -41,7 +41,7 @@ import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
-import type { PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
+import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { passesHeldResult, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -72,6 +72,8 @@ export interface PitchingStageSource {
   readonly batterSide?: number
   /** 마타자 순번 0xb63a0 (0~4) — 마타자 그림 `ace/batter_*`(0x78ab0) · 자세표(0xb905c). 없으면 일반 타자 */
   readonly aceBatterOrder?: number
+  /** 지금 타자 레코드의 장비 겹 (타석 교대 0x47cc8 47e80 → 0x78fd8) — 없으면 맨몸 */
+  readonly batterEquipment?: BatterEquipment
   readonly batterSkinIndex: number
   readonly batterTeamIndex: number
   /** 마운드 미션 투수의 체력% (0xaebb1 — +0x2c ÷ 100). 지친 표시 0x38d1c(player_effect 애니 9 · 10)를 고른다. 안 주면 안 그린다 */
@@ -546,6 +548,7 @@ export function PitchingScreen({
             {...(stage.pitcherStaminaPercent === undefined ? {} : { pitcherStaminaPercent: stage.pitcherStaminaPercent })}
               {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
               {...(stage.aceBatterOrder === undefined ? {} : { aceBatterOrder: stage.aceBatterOrder })}
+              {...(stage.batterEquipment === undefined ? {} : { batterEquipment: stage.batterEquipment })}
               // 미션은 구장 생성자 값 0 · 바닥 줄 기본 — 타자 미션 화면(`MissionPlayScreen`)과 같다
               stadium={0}
               fieldPalette={null}
