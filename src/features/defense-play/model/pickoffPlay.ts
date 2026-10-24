@@ -852,6 +852,18 @@ function* pickoffPlaySteps(
             fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: home } : fielder))
           }
         }
+        // AI 1 b4aca~b4b5a — vtcc 이고 쥐지 않았으면(+0xe0, b4ae6) 포구 지점(x, 0, z)으로 0xa100c(= vt14). 고리 안이라 같은 틱 끝
+        // b4c72 의 커버 다시 고르기가 고친 목표를 본다 (r190 — 예전 웹은 6 절 걸음에서 골랐다). 쥐면 `chase` 가 비어 안 고친다
+        const chased = chase
+        if (
+          self.aiState === AI_STATE.CHASE &&
+          chased !== null &&
+          chased.slot === slot &&
+          isFreeToRetarget(self) &&
+          !isSamePoint(self.target, chased.catchPoint)
+        ) {
+          fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: chased.catchPoint } : fielder))
+        }
         // AI 0xc b4b78 — 공 가진 야수(+0x130)의 목표 T 에서 2000 뒤(`backupPointOf`)로 vt14(잠금 +0xb4 ≤ 0 · vtc8 일 때만, r180)
         if (self.aiState === AI_STATE.BACKUP) {
           const backup = backupPointOf(fielders[play.ballHolderSlot]?.target ?? self.target, self.position)
@@ -1004,14 +1016,10 @@ function* pickoffPlaySteps(
     const runnersBeforeListTick = runnerStates()
 
     // ── 한 틱 움직이기 — 커버는 제 루로, 쫓는 야수는 포구 지점(x, 0, z)으로(AI 1), 나머지는 제자리 ──
-    const chasing = chase
     const beforeMove = fielders
     fielders = fielders.map((fielder) => {
-      // 목표: AI 1(b4aca) — vtcc 면 포구 지점(포구 동작 중이면 안 고친다, b4ad6). AI 0(b476a)의 시작 자리 고치기는 AI 고리가 한다(r180)
-      let target = fielder.target
-      if (chasing !== null && fielder.slot === chasing.slot) {
-        if (isFreeToRetarget(fielder)) target = chasing.catchPoint
-      }
+      // 목표: AI 1(b4aca 포구 지점 · r190) · AI 0(b476a 시작 자리 · r180)은 AI 고리가 고쳤다 — 여기서는 그 목표로 걷는다
+      const target = fielder.target
       // 걸음: 다음 야수 틱의 이동 관문 a1346~a1376(`canStepNextListTick`) — 던진 야수(+0xb1)는 한 틱 쉬고, 쥔 야수도 목표로 걷는다
       if (isSamePoint(fielder.position, target) || !canStepNextListTick(fielder)) return { ...fielder, target }
       return { ...fielder, target, position: stepToward(fielder.position, target, fielder.speed) }

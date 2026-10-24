@@ -8,6 +8,7 @@ import {
   type FielderState,
   type PlayView,
 } from '@/entities/fielding/model/fieldingState'
+import { acceptsTargetVt14 } from '@/entities/fielding/model/fielderPose'
 import { secondBaseHelperPlacement } from '@/entities/fielding/model/throwArrival'
 
 /**
@@ -74,8 +75,16 @@ export function runCoverTick(input: CoverTickInput): CoverTickResult {
       })
       if (placement.kind !== '자리') return fielders
       if (placement.relayPlaced) relayFlag = false
+      // b2312 · b2354 · b2380 — 목표는 야수 vt14(0xa14c8 — 0xa100c 도 같다)로 적어 잠금 +0xb4 ≤ 0 · vtc8(+0xb1 == 0 && +0xcc ≤ 0)일
+      // 때만 받는다. AI 0xa(b235c · b238e 0xb8dbc)는 관문 없이 건다 (r190 — 예전 웹은 목표를 관문 없이 적었다)
       return fielders.map((fielder) =>
-        fielder.slot === placement.slot ? { ...fielder, target: placement.target, aiState: AI_STATE.BUSY } : fielder,
+        fielder.slot === placement.slot
+          ? {
+              ...fielder,
+              target: acceptsTargetVt14(fielder) ? placement.target : fielder.target,
+              aiState: AI_STATE.BUSY,
+            }
+          : fielder,
       )
     },
   })

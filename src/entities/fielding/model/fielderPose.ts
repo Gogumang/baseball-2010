@@ -1,3 +1,4 @@
+import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
 import { AI_STATE, type FielderState } from '@/entities/fielding/model/fieldingState'
 
 /**
@@ -161,11 +162,47 @@ export function isFreeToStep(fielder: Pick<FielderState, 'pose' | 'arrivalSlackT
 /**
  * **다음 야수 틱의 이동 관문** (a1346~a1376) — 웹은 이동을 판 틱 끝(6 절)에 미리 하므로 그때의 칸으로 원본 다음 야수 틱을 본다:
  * 프레임은 그 틱 머리(a128e)에서 하나 오른 값이다. `0xa0f7c`(+0xb0 바이트 == 0 || 프레임 ∈ {1, 2}) && vtc8 && +0xb4 ≤ 0.
+ * vtc8 의 +0xcc 도 그 틱 a1330 에서 하나 줄인 값이다(a1346 이 뒤다 — AI 0xf 의 vt8c(5) 뒤 4 라 닫힌다, r190).
  */
 export function canStepNextListTick(
   fielder: Pick<FielderState, 'pose' | 'actionFrame' | 'actionLockTicks' | 'arrivalSlackTicks'>,
 ): boolean {
-  return isFreezeOpen(fielder.pose, fielder.actionFrame + 1) && isFreeToStep(fielder) && fielder.actionLockTicks <= 0
+  const slack = Math.max(0, fielder.arrivalSlackTicks - 1)
+  return (
+    isFreezeOpen(fielder.pose, fielder.actionFrame + 1) &&
+    isFreeToStep({ pose: fielder.pose, arrivalSlackTicks: slack }) &&
+    fielder.actionLockTicks <= 0
+  )
+}
+
+/**
+ * vt14 `0xa14c8` 의 관문 — 잠금 +0xb4 ≤ 0(a14d0~a14e4) · vtc8(a14ea). 목표가 같으면(0xbc0f4) 적을 것이 없다.
+ * 받으면 0xbf2cc 로 목표 +0x2c 를 적는다(방향 동작 0xa0ee8 은 웹이 옮기지 않았다 — 머리말)
+ */
+export function acceptsTargetVt14(fielder: Pick<FielderState, 'actionLockTicks' | 'pose' | 'arrivalSlackTicks'>): boolean {
+  return fielder.actionLockTicks <= 0 && isFreeToStep(fielder)
+}
+
+/** vt8c `0xa0ee0` 가 AI 0xf 에 적는 +0xcc (b4c5a `movs r1, #5`) */
+export const RETURN_SLACK_TICKS = 5
+
+/**
+ * **AI 0xf 한 번** (분기표 0xd8808[0xf] = b4c2a~b4c5c, 직접 뜬 것, r190):
+ * ```
+ * b4c2a  P = 0xd86ec[야수+0x88](시작 자리) ; 야수.vt14(P)   ; 0xa14c8 — +0xb4 ≤ 0 · vtc8 · 목표가 다를 때만 0xbf2cc 로 목표 = P
+ * b4c52  야수.vt8c(5)                                       ; 0xa0ee0 — +0xcc = 5
+ * ```
+ * 세우는 곳은 0xb2c58(사건 7 · 12 — 야수 0~8 모두, 0xb8dbc 로 +0x84 만)뿐이고, 상태를 바꾸는 줄이 분기 안에 없어 판이 끝날 때까지 이어진다.
+ * 그래서 첫 고리만 목표를 받고, 그 뒤로는 +0xcc 가 4 ~ 5 를 오가 vtc8 이 늘 거짓이다 — 걸음 a1346 이 닫히고 지우기 a143e(`!vtc8`)가
+ * 틱마다 vt10(목표 = 위치 · 동작 · 자세 워드 0)을 부른다.
+ */
+export function withReturnToStartTick(fielder: FielderState): FielderState {
+  const home = FIELDER_START_POSITIONS[fielder.slot]
+  const accepts =
+    home !== undefined &&
+    acceptsTargetVt14(fielder) &&
+    (fielder.target.x !== home.x || fielder.target.y !== home.y || fielder.target.z !== home.z)
+  return { ...fielder, target: accepts ? home : fielder.target, arrivalSlackTicks: RETURN_SLACK_TICKS }
 }
 
 /**
