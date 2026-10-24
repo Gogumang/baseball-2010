@@ -123,3 +123,19 @@ export const wideBack = style({
   flex: '1 1 auto',
   width: 'auto',
 })
+
+/**
+ * 가로 배치에서 상황 버튼이 많을 때(`SIDES_COLUMN_MAX` 넘게) — 세로 한 줄이면 왼쪽 칸 높이(가로 폰 ≈ 360px)를 넘어 뒤로 버튼이
+ * 화면 밖으로 밀린다. 옆 칸은 폭이 남으므로 두 줄 격자로 쌓는다(7개 → 4단 ≈ 216px).
+ */
+export const optionGrid = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: GAP,
+})
+
+/** 세로 배치에서 상황 버튼이 많을 때 — 한 줄은 지키되 글자를 줄여 "1루 견제" 같은 이름이 잘리지 않게 */
+export const denseOption = style({
+  fontSize: '13px',
+  padding: '0 2px',
+})

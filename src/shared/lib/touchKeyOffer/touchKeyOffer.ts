@@ -23,7 +23,7 @@ interface OfferEntry {
 }
 
 /** 버튼 차례 — 앞일수록 앞(확인 쪽)에 선다. 없는 키는 뒤로 */
-const KEY_ORDER: readonly string[] = ['0', '8', '3', '2', '1', '#', '*']
+const KEY_ORDER: readonly string[] = ['0', '8', '3', '2', '1', '7', '#', '*']
 
 let entries: OfferEntry[] = []
 let snapshot: readonly TouchKeyOffer[] = []

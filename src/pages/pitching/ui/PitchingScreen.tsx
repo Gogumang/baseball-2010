@@ -52,6 +52,7 @@ import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillChee
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 
 /**
  * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
@@ -375,6 +376,8 @@ export function PitchingScreen({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, onPickoffKey])
+  // 터치 기기 — 주자가 있는 루마다 "N루 견제" 상황 버튼(같은 키 사건을 쏜다)
+  usePickoffTouchKeys(acceptsPickoff, run.bases)
 
   const teamIds = missionTeamIdsOf(run)
 

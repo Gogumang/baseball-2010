@@ -137,6 +137,7 @@ import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillChee
 import { STEAL_KEY_OF_BASE, stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
+import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 
 /**
  * **팀 경기 화면** — 원본 게임 모드 1 일반 · 2 시즌 · 8·9 대전 이 쓰는 경기 장면(0x104)이다.
@@ -687,6 +688,8 @@ function TeamGameScene({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsPickoff, pickoff])
+  // 터치 기기 — 주자가 있는 루마다 "N루 견제" 상황 버튼(같은 키 사건을 쏜다)
+  usePickoffTouchKeys(acceptsPickoff, progress.game.bases)
   /**
    * 경기 중 기록 달성 알림 0x4e35c — 경기 장면이 상태 0x17(수비 인플레이)이 아니면 그린다(타석 · 투구 화면 모두).
    * - 칸 채우기 0x4e600 은 **공이 끝날 때**(0x12 끝 · 0x17 끝): 타석 공은 `onPitchResolved`, 내 공은 마지막 판정, 인플레이 ·
