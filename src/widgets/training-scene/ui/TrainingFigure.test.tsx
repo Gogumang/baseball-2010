@@ -53,3 +53,10 @@ describe('훈련 팝업 선수 몸통·좌우 (0x10810 → 0x78ab0 · 0x78cfc)',
     expect((좌타.container.firstElementChild as HTMLElement).style.transform).toBe('')
   })
 })
+
+describe('훈련 팝업 +0x3c 덮어쓰기 (진입 0x11744 11802~1181e)', () => {
+  it('+0x3c = 1 이면 우타 폼이어도 안 뒤집는다 (0x78d0c 는 0 일 때만 효과 0x11)', () => {
+    const 우타 = render(<TrainingFigure pose={0} x={120} y={0} form={0} mirrorFlag={1} />)
+    expect((우타.container.firstElementChild as HTMLElement).style.transform).toBe('')
+  })
+})

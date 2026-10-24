@@ -188,8 +188,12 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     // 0x84e58 이 애니를 지워 팝업은 안 그리지만 결과 창 동안은 아직 125 다
     expect(screen.queryByTestId('투수-훈련팝업')).toBeNull()
     expect(screen.queryByTestId('가운데판')).toBeNull()
+    // 커맨드 줄도 125 진입의 0x7e84c(0x7d) — 107 다섯 칸 그대로
+    expect(screen.getByRole('button', { name: '제구' })).toBeTruthy()
     fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
     expect(screen.getByTestId('가운데판')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '제구' })).toBeNull()
+    expect(screen.getByRole('button', { name: '트레이닝' })).toBeTruthy()
   })
 
   it('투수 그림은 칸 0 · 1 · 2 · 4 에만 — 칸 3(team) 에는 없다 (0x11744 · 0x848d0 마스크 0x17)', () => {
