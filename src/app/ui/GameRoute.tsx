@@ -29,7 +29,7 @@ import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissio
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
-import { castOfAces, castOfCareer, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import { castOfAces, castOfCareer, castOfTeamRecordEquipment, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
 import { useAfterGameEventPreload } from '@/app/model/afterGameEventPreload'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
@@ -85,8 +85,13 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   // 이 경기 두 팀의 선수 그림 — 로딩 판 동안 타석 선수(마선수 · 내 선수 장비 · 몸통 폼)를, 경기 장면 동안 수비 그림을 받는다(안 기다린다)
   const { battingTypeIndex, battingSide, equipmentLevels } = career
   const gameCast = useMemo(
-    () => [castOfAces(progress.aces), castOfCareer({ battingTypeIndex, battingSide, equipmentLevels })],
-    [progress.aces, battingTypeIndex, battingSide, equipmentLevels],
+    () => [
+      castOfAces(progress.aces),
+      castOfCareer({ battingTypeIndex, battingSide, equipmentLevels }),
+      // 상대 팀 레코드의 굴린 장비(나리 새 시즌 0x665e8) — 타석 교대 0x47cc8 이 마운드 투수 · 타자에 싣는다
+      castOfTeamRecordEquipment(progress.opponentTeamId, progress.opponentEquipment),
+    ],
+    [progress.aces, battingTypeIndex, battingSide, equipmentLevels, progress.opponentTeamId, progress.opponentEquipment],
   )
   const stagePreloads = useMemo(() => mergeSpritePreloads(gameEntryCastPreloadsOf(), stageSpritePreloadsOf(...gameCast)), [gameCast])
   useEffect(() => {

@@ -415,6 +415,45 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(출전.다시.current.career?.titleIds).toContain(TITLE_NAMES[8])
   })
 
+  it('464 거절 뒤 끊긴 저장(S+0x50 = 0x11)은 투수편에 들어설 때 새 시즌 0x1b768 — 메인 메뉴에 있는 동안은 굴림 · 저장이 없다 (1c25e)', () => {
+    const store = 메모리저장()
+    const 첫판 = 띄우기(store)
+    act(() => 첫판.result.current.actions.create('투수', 신인))
+    act(() => 첫판.result.current.actions.save({ ...첫판.result.current.career!, season: 2, gamesPlayed: 45, seasonEndState: 137 }))
+    const 저장전 = store.load()
+    let 굴림 = 0
+    const seeded = createSeededRandom(20100901)
+    const random = {
+      rand: (lo: number, hi: number) => {
+        굴림 += 1
+        return seeded.rand(lo, hi)
+      },
+      rand9d: (n: number) => seeded.rand9d(n),
+    }
+    const { result, rerender } = renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
+      store, random, false, null, null, true, undefined, undefined, undefined, undefined, undefined, undefined, onScreen,
+    ), { initialProps: { onScreen: false } })
+
+    // 앱을 띄운 동안(메인 메뉴) — 저장 그대로, 0x665e8 굴림 없음
+    expect(result.current.career).toMatchObject({ season: 2, seasonEndState: 137 })
+    expect(store.load()).toBe(저장전)
+    expect(굴림).toBe(0)
+
+    // 투수편에 들어서면 100 → 1c25e → 0x1b768: 2년차 → 3년차 · 굴림(새 연차 2 의 줄 수 × 9) · 곧바로 저장
+    rerender({ onScreen: true })
+    expect(result.current.scene).toBe('관리')
+    expect(result.current.career).toMatchObject({ season: 3, seasonEndState: null })
+    expect(store.load()).toMatchObject({ season: 3, seasonEndState: null })
+    expect(굴림).toBeGreaterThan(0)
+    const 들어선뒤 = 굴림
+
+    // 나갔다 다시 들어와도 두 번 돌지 않는다
+    rerender({ onScreen: false })
+    rerender({ onScreen: true })
+    expect(result.current.career?.season).toBe(3)
+    expect(굴림).toBe(들어선뒤)
+  })
+
   it('이어하기 — 109 진입이 S+0x50 = 4 를 저장했으면 109 로 (이전 상태 1 이라 취소가 안 먹는다)', () => {
     const 순위 = 이어하기({ gamesPlayed: 4, seasonEndState: 109 })
     expect(순위.current.scene).toBe('다음경기순위')

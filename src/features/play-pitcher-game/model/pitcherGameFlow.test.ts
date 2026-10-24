@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
@@ -16,6 +16,7 @@ import {
   confirmScene,
   MY_PITCHER_SLOT,
   myFielderPlatesOf,
+  opponentBatterOf,
   ourBenchPitcherCountOf,
   ourPitcherOrderOf,
   earnedRunAverageOf,
@@ -90,6 +91,19 @@ function 끝까지던지기(progress: PitcherGameProgress, seed = 1): PitcherGam
   }
   throw new Error('경기가 끝나지 않았습니다')
 }
+
+describe('상대 타자 그림 장비 니블 (타석 교대 0x47cc8 47e80 → 0x78fd8)', () => {
+  it('레코드 덮개(나리 새 시즌 0x665e8)가 있으면 그 니블, 없으면 Xls 행', () => {
+    const 덮개 = Object.fromEntries(Array.from({ length: 12 }, (_, slot) => [slot, [3, 4, 0, 5]]))
+    const 굴린 = startPitcherGame({ ...기본옵션, opponentEquipment: { batters: 덮개 } }, 씨앗(3))
+    const 타자 = opponentBatterOf(굴린)
+    if (타자.aceIndex === undefined) expect(타자.equipment).toEqual([3, 4, 0, 5])
+
+    const 맨 = startPitcherGame(기본옵션, 씨앗(3))
+    const 맨타자 = opponentBatterOf(맨)
+    if (맨타자.rosterSlot !== null) expect(맨타자.equipment).toEqual(teamBatters(1)[맨타자.rosterSlot]?.equipment)
+  })
+})
 
 describe('리그 투수 차례·레코드 스태미나', () => {
   it('상대 차례 0번이 선발이고 그 레코드 +0x2c 로 선다 — 경기 끝 표에 마운드 값이 얹힌다', () => {
