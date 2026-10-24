@@ -8,12 +8,14 @@ import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import { FRAME_SLIDE_BODY_FIRST_DRAW } from '@/widgets/screen-frame/lib/frameSlide'
 import {
   HELP_PAGER_GLYPH_HEIGHT,
-  HELP_PANEL_CLOSE_HEIGHTS,
   HELP_PANEL_FULL_HEIGHT,
   HELP_PANEL_OPEN_HEIGHTS,
   HELP_VIEWER,
   SCREEN,
   helpPagerOf,
+  helpPanelCloseHeightsFrom,
+  helpPanelHeightAfterCloseDraw,
+  helpPanelHeightAfterOpenDraw,
 } from '@/pages/help/lib/helpLayout'
 import {
   HELP_RATING_TABLE,
@@ -134,12 +136,15 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
    */
   const bodyTick = isOverGame ? tick : tick - FRAME_SLIDE_BODY_FIRST_DRAW
   const isBodyShown = bodyTick >= 0
-  /** CLR 로 닫기 연출을 시작한 본문 그리기 번호 (메인 메뉴만 — 경기 중은 +0x125 라 곧장 닫는다) */
-  const [closingFrom, setClosingFrom] = useState<number | null>(null)
-  const closingStep = closingFrom === null ? null : Math.max(0, bodyTick - closingFrom)
+  /**
+   * 닫기 연출 — CLR 을 받은 본문 그리기 번호와 그 뒤 그릴 높이들 (메인 메뉴만 — 경기 중은 +0x125 라 곧장 닫는다).
+   * CLR 을 다시 받으면 그때 높이 칸에서 걸음 1 로 다시 줄인다(0x6385c · 0x6388a — U-86, `helpPanelCloseHeightsFrom`)
+   */
+  const [closing, setClosing] = useState<{ readonly from: number; readonly heights: readonly number[] } | null>(null)
+  const closingStep = closing === null ? null : Math.max(0, bodyTick - closing.from)
   const panelHeight =
-    closingStep !== null
-      ? HELP_PANEL_CLOSE_HEIGHTS[Math.min(closingStep, HELP_PANEL_CLOSE_HEIGHTS.length - 1)]
+    closing !== null && closingStep !== null
+      ? closing.heights[Math.min(closingStep, closing.heights.length - 1)]
       : (HELP_PANEL_OPEN_HEIGHTS[Math.max(0, bodyTick)] ?? HELP_PANEL_FULL_HEIGHT)
   const isAnimating = panelHeight < HELP_PANEL_FULL_HEIGHT
   /** [skin+0x410] — 0x58d14 가 그릴 때마다 올린 뒤의 값으로 본다 (앱에 하나, U-90) */
@@ -148,16 +153,22 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
 
   const hasClosedRef = useRef(false)
   useEffect(() => {
-    if (closingStep === null || closingStep < HELP_PANEL_CLOSE_HEIGHTS.length || hasClosedRef.current) return
+    if (closing === null || closingStep === null || closingStep < closing.heights.length || hasClosedRef.current) return
     // 닫기 끝(+0x98)이 선 다음 갱신에 0x637d0 이 1 을 돌려준다
     hasClosedRef.current = true
     onBack()
-  }, [closingStep, onBack])
+  }, [closing, closingStep, onBack])
 
   /** 0x63850 · 0x6387e — `+0x125`(경기 장면)면 곧장 닫고, 아니면 닫기 연출을 건다 */
   const close = () => {
     if (isOverGame) return onBack()
-    setClosingFrom((previous) => previous ?? Math.max(0, bodyTick))
+    setClosing((previous) => {
+      // 지금 그림 뒤의 높이 칸 — 여는 중 · 다 열린 판이면 열기 걸음 뒤, 닫는 중이면 닫기 걸음 뒤(끝이 섰으면 바닥 10)
+      const start = previous === null
+        ? helpPanelHeightAfterOpenDraw(bodyTick)
+        : helpPanelHeightAfterCloseDraw(previous.heights, Math.max(0, bodyTick - previous.from))
+      return { from: Math.max(0, bodyTick), heights: helpPanelCloseHeightsFrom(start) }
+    })
   }
 
   /** 웹판 단추 — 단계와 상관없이 쪽 보기·장 고르기의 좌우와 같은 값을 낸다(단계는 그대로 둔다) */
