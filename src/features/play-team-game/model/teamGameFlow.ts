@@ -6312,6 +6312,11 @@ export interface TeamGameSummary {
   /** 상대 팀 투수의 끝 스태미나 — 표 칸 차례 (`opponentPitcherStaminas` 와 같은 차례) */
   readonly opponentPitcherStaminas?: readonly number[]
   /**
+   * 내 팀 **마투수**(명단 밖 8번 칸)의 끝 스태미나 `+0x2c` — 마투수를 안 넣은 경기면 없다. 원본은 이 줄도 시즌 레코드에
+   * 남는다(0xb512c 가 빼기 전까지 — 시즌 `SeasonRecordAces.pitcherStamina`, U-105 r154)
+   */
+  readonly ourAcePitcherStamina?: number
+  /**
    * 이 경기 **돌발 보상·페널티** — `resolveBurst` 의 `deltas` 를 판정 차례대로 모은 것 (시즌 모드 2 만, 한 경기 최대 1회
    * 발동이라 많아야 한 판정 몫). 원본 0x8e34c 는 판정이 난 경기 중에 더하므로 부르는 쪽이 경기 끝 평가 0x4ea0c **앞에**
    * 먹인다 (`seasonRewards`, fded413).
@@ -6332,6 +6337,14 @@ function orderedPitcherStaminasOf(
     out[pitcher.orderIndex] = index === moundIndex ? current : (staminas[index] ?? FULL_STAMINA)
   })
   return Array.from(out, (value) => value ?? FULL_STAMINA)
+}
+
+/** 내 팀 마투수 줄(`aceIndex` ≥ 0)의 끝 스태미나 — 마운드면 지금 값, 아니면 그 칸 값 */
+function acePitcherStaminaOf(progress: TeamGameProgress): { readonly ourAcePitcherStamina?: number } {
+  const index = progress.ourPitcherEntry.findIndex((pitcher) => pitcher.aceIndex >= 0)
+  if (index < 0) return {}
+  const stamina = index === progress.ourPitcherIndex ? progress.stamina : (progress.ourPitcherStaminas[index] ?? FULL_STAMINA)
+  return { ourAcePitcherStamina: stamina }
 }
 
 export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
@@ -6375,6 +6388,7 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
       progress.opponentPitcherIndex,
       progress.opponentStamina,
     ),
+    ...acePitcherStaminaOf(progress),
     leaguePitchers: {
       lines: progress.pitcherLines,
       decision: {

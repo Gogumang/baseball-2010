@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf,
+  SEASON_ENTRY_CELL_SOURCE, recordAceSeatOf, rotatedPitchersOf, seasonEntryListsOf, seasonRecordEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf,
   tableRosterOf, unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import { swapEntryBatters, swapEntryPitchers } from '@/entities/season-mode/model/entryEditor'
@@ -253,5 +253,33 @@ describe('0xe0 목록 능력치 = 레코드 0xb6415(rec, k, 1) — 상세 창 0x
     expect(lists.batters[1]?.ability).toEqual([550, 500 + equipmentBonusOf(5) + 50, 550, 550])
     // 밑값 칸이 없는 옛 사본은 영입 때 값 그대로
     expect(lists.batters[2]?.ability).toEqual([1, 2, 3, 4])
+  })
+})
+
+/**
+ * U-105 r154 — 0xe8(0x5870)은 0xb512c 를 안 불러 경기 뒤 레코드에 남은 마선수 줄을 그대로 보인다.
+ */
+describe('레코드 차례 목록 — 레코드에 남은 마선수', () => {
+  it('안 넘기면 마선수가 없다 (0xdf · 0xe5 는 진입에서 뺀다)', () => {
+    const lists = seasonRecordEntryListsOf(0, tableRosterOf(0), SEASON_ENTRY_CELL_SOURCE)
+    expect(lists.pitchers).toHaveLength(8)
+    expect(lists.batters).toHaveLength(12)
+  })
+
+  it('남은 마투수는 8번 · 마타자는 9번, 마투수 체력은 레코드 +0x2c 값', () => {
+    const lists = seasonRecordEntryListsOf(0, tableRosterOf(0), SEASON_ENTRY_CELL_SOURCE, undefined,
+      { pitcher: 1, batter: 2, pitcherStamina: 5000 })
+    expect(lists.pitchers).toHaveLength(9)
+    expect(lists.pitchers[8]).toMatchObject({ name: ACE_PITCHERS[1]?.name, isAce: true, rosterIndex: -1 })
+    expect(lists.pitchers[8]?.stamina?.percent).toBe(50)
+    expect(lists.batters).toHaveLength(13)
+    expect(lists.batters[9]).toMatchObject({ name: ACE_BATTERS[2]?.name, isAce: true })
+    expect(lists.batters[12]?.rosterIndex).toBe(9)
+  })
+
+  it('칸 → 레코드 줄: 투수 8줄은 [0..7, 마선수] · 타자 12줄은 [0..8, 마선수, 10, 11, 9]', () => {
+    expect(recordAceSeatOf(8, 0, 8)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 'ace'])
+    expect(recordAceSeatOf(12, 4, 9)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 'ace', 10, 11, 9])
+    expect(recordAceSeatOf(8, -1, 8)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
   })
 })
