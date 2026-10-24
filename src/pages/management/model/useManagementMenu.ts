@@ -14,8 +14,14 @@ import {
 
 /** 커서를 옮긴 뒤 두 번 갱신하는 동안 +1, −1 로 튄다 (카운터 +0x98) */
 const BOUNCE_BY_UPDATE = [1, -1]
-/** r_event_txt[176] 트레이닝·휴식·외출은 관리 주기마다 한 가지만 */
-const CYCLE_COMMANDS = ['트레이닝', '휴식', '외출']
+/**
+ * 관리 메뉴에 **막힌 칸은 없다** — 105 키 0x1261c 는 확인(−5 · '5')이면 켬 표(+0x28)를 보지 않고 커서 칸으로 곧장 간다
+ * (12644~12670 점프표 0xcc540 · 칸 3 = 126be → 0x70 = 112). 켬 표가 0 인 칸(행동함이면 트레이닝 · 휴식 · 외출, 첫 해
+ * 10경기 전 외출 — 105 진입 0x11910)은 흑백으로 그려질 뿐이고(`nariMainMenuOffIdsOf` → 커맨드 줄 0x7e418), 켬 표를 보는 곳은
+ * 메뉴 키 0x6c520(6c54e~6c55c — 숫자 바로 고르기만 막는다) 하나다. r_event_txt[176] "한 가지만" 은 안내 글일 뿐 원본 코드가
+ * 막지 않는다(107 키 0x12d48 · 휴식 1261c 12682 · 113 가드 0x16cf0 모두 S+4 를 안 본다) — 원본 그대로 옮긴다
+ */
+const NO_DISABLED_IDS: ReadonlySet<string> = new Set()
 const SUB_MENU_KINDS: readonly string[] = ['선수정보', '트레이닝', '아이템']
 /** 트레이닝 하위 메뉴 칸 4 — 능력 훈련(칸 0~3)과 흐름이 다르다 */
 const SPECIAL_SWING_MENU_ID = '필살타법'
@@ -68,7 +74,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
     setMainCursor(COMMAND_SLOTS.findIndex((slot) => slot.id === '트레이닝'))
   })
   const slots = kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[kind]
-  const disabledIds = new Set(kind === 'main' && props.career.hasActedThisCycle ? CYCLE_COMMANDS : [])
+  const disabledIds = NO_DISABLED_IDS
 
   const setMainCursor = (index: number) => {
     mainCursor.current = index

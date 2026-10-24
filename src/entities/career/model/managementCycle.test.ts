@@ -31,18 +31,24 @@ const 히트 = TRAINING_MENUS[0]
 const 외식 = OUTING_PLACES.flatMap((place) => place.functions).find((f) => f.id === '외식')!
 const 경기결과 = { result: '승', stats: EMPTY_SEASON_STATS, recordIds: [] } as unknown as GameSummary
 
-describe('관리 주기마다 한 가지만', () => {
-  it('트레이닝을 하면 같은 주기에 트레이닝·휴식·외출을 더 할 수 없다', () => {
+describe('행동함(S+4)은 막지 않는다 — 105 흑백 칸일 뿐', () => {
+  /*
+   * r_event_txt[176] 은 안내 글이다. 원본 코드는 행동함으로 트레이닝 · 휴식 · 외출을 막지 않는다:
+   * 105 키 0x1261c 확인은 켬 표를 안 보고 칸으로 가고, 107 키 0x12d48 은 사기만 · 휴식 칸(12682)은 사기 최고만 ·
+   * 113 가드 0x16cf0 은 인기도 · 소지금 · 건강 · 사기만 본다.
+   */
+  it('트레이닝을 한 뒤에도 트레이닝 · 휴식 · 외출 판정에 행동함이 끼지 않는다', () => {
     const trained = runTraining(부자선수(), 히트, createSeededRandom(1)).career
 
-    expect(blockReasonOf(trained, 히트)).toBe('이미행동함')
-    expect(restBlockReasonOf(trained)).toBe('이미행동함')
-    expect(outingBlockReasonOf(trained, 외식)).toBe('이미행동함')
+    expect(trained.hasActedThisCycle).toBe(true)
+    expect(blockReasonOf(trained, 히트)).toBeNull()
+    expect(restBlockReasonOf(trained)).toBeNull()
+    expect(outingBlockReasonOf(trained, 외식)).toBeNull()
   })
 
-  it('휴식이나 외출도 한 번 하면 주기가 끝난다', () => {
-    expect(restBlockReasonOf(runRest(부자선수(), createSeededRandom(1)).career)).toBe('이미행동함')
-    expect(blockReasonOf(runOuting(부자선수(), 외식, createSeededRandom(1)), 히트)).toBe('이미행동함')
+  it('휴식 · 외출도 행동함을 세운다', () => {
+    expect(runRest(부자선수(), createSeededRandom(1)).career.hasActedThisCycle).toBe(true)
+    expect(runOuting(부자선수(), 외식, createSeededRandom(1)).hasActedThisCycle).toBe(true)
   })
 
   /*
@@ -52,11 +58,10 @@ describe('관리 주기마다 한 가지만', () => {
    */
   it('경기를 한 번 치르면 행동 플래그가 풀린다 (0x4f158)', () => {
     const rested = runRest(부자선수({ gamesPlayed: 2 }), createSeededRandom(1)).career
-    expect(restBlockReasonOf(rested)).toBe('이미행동함')
+    expect(rested.hasActedThisCycle).toBe(true)
 
     const afterOneGame = applyGameResult(rested, 경기결과)
     expect(afterOneGame.hasActedThisCycle).toBe(false)
-    expect(restBlockReasonOf(afterOneGame)).toBeNull()
   })
 
   it('관리 화면이 열리는 때는 그대로 2경기마다다 (StrHOWTO[10][11])', () => {

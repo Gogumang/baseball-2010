@@ -87,7 +87,7 @@ export const PITCHER_TRAINING_MENUS: readonly PitcherTrainingMenu[] = [
   { id: '마구', name: '마구', ability: null },
 ]
 
-export type PitcherTrainingBlockReason = '이미행동함' | '사기부족' | '능력치최대' | '훈련완료' | '인기도부족'
+export type PitcherTrainingBlockReason = '사기부족' | '능력치최대' | '훈련완료' | '인기도부족'
 
 /** 108 마구 창(탭 1)의 칸 하나를 확인했을 때 막는 까닭 — StrMODE[63] · [62] · [64] · [65] */
 export type MagicTrainingCellBlock = '훈련완료' | '인기도부족' | '선행필요' | 'G포인트부족'
@@ -140,7 +140,7 @@ export function pitcherTrainingBlockReasonOf(
   career: PitcherCareer,
   menu: PitcherTrainingMenu,
 ): PitcherTrainingBlockReason | null {
-  if (career.hasActedThisCycle) return '이미행동함'
+  // 행동함(S+4)은 보지 않는다 — 107 키 0x12d48 확인(12d8a~)은 사기 0xa3a25 만 본다
   if (career.morale <= 0) return '사기부족'
   if (menu.ability === null) {
     if (career.magicLevel >= MAGIC_MAXIMUM_LEVEL) return '훈련완료'

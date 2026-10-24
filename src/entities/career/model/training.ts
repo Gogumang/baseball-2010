@@ -65,7 +65,7 @@ export interface TrainingOutcome {
   readonly career: PlayerCareer
 }
 
-export type TrainingBlockReason = '이미행동함' | '사기부족' | '능력치최대' | '훈련완료'
+export type TrainingBlockReason = '사기부족' | '능력치최대' | '훈련완료'
 
 /** [minimum, maximumExclusive) */
 interface IntegerRange {
@@ -142,7 +142,7 @@ export function specialSwingSlotBlockOf(
 }
 
 export function blockReasonOf(career: PlayerCareer, menu: TrainingMenu): TrainingBlockReason | null {
-  if (career.hasActedThisCycle) return '이미행동함'
+  // 행동함(S+4)은 보지 않는다 — 107 키 0x12d48 확인(12d8a~)은 사기 0xa3a25 만 본다(StrMODE[193]). 105 의 흑백 칸도 확인으로 들어온다
   if (career.morale <= 0) return '사기부족'
   // 훈련 **함수**(0xa3c78)는 G포인트가 모자라도 막지 않는다 — 0xa3c84 가 0 에서 바닥을 친다.
   // 막는 것은 그 앞의 **창**(0x17828)이고, 거기에 인기도 100/500/1000/1500 과 G 부족([65]) 가드가 있다

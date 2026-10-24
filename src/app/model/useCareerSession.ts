@@ -1852,15 +1852,8 @@ export function useCareerSession({
       // [다음경기](105 칸 5) → 109 순위표 (R9). 확인하면 142 → 경기 (웹은 142 없이 곧바로 경기)
       if (command === '다음경기') return enterNextGameStandings(true)
       if (command === '휴식') {
-        // 원작 [휴식] 커맨드 — 사기를 회복한다. 관리 주기마다 한 가지만 할 수 있다.
-        const blockReason = restBlockReasonOf(career)
-        if (blockReason !== null) {
-          return setManagementNotice(
-            blockReason === '사기최고'
-              ? '사기 최고 상태입니다' // StrMODE[91]
-              : '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다',
-          )
-        }
+        // 원작 [휴식] 커맨드 — 사기를 회복한다. 105 키 0x1261c 12682~126bc 는 사기 최고만 본다(행동함은 안 본다)
+        if (restBlockReasonOf(career) !== null) return setManagementNotice('사기 최고 상태입니다') // StrMODE[91]
         const rest = runRest(career, random)
         setCareer(rest.career)
         // StrMODE[24] "사기" + " " + 수치 + [83] (0x18e3c)
@@ -2193,6 +2186,16 @@ export function useCareerSession({
 
     /** 113 막힘 팝업(0xbbef9(글, 1, 1, 1)) [확인] — 상태는 113(말풍선) 그대로다 */
     closeOutingNotice: () => setOutingNotice(''),
+
+    /**
+     * 112 외출 지도 취소(CLR) → 105 — 키 0x13ba4 13bc0~13bca 가 **S+4(행동함) = 0** 으로 내린 뒤 0xbcb49(0x69) · 0x7ff21.
+     * 원본 그대로(버그로 보여도): 행동함 뒤 흑백 외출 칸으로 들어갔다 취소하면 트레이닝 · 휴식 · 외출 칸이 다시 켜진다.
+     * 저장은 이 키가 아니라 이어지는 105 진입 0x11910(119a2)이 한다 — 웹은 커리어가 바뀌면 저장한다
+     */
+    leaveOutingMap: () => {
+      if (career !== null && career.hasActedThisCycle) setCareer({ ...career, hasActedThisCycle: false })
+      setScreen({ kind: '관리' })
+    },
 
     /**
      * 126 효과 팝업 [확인] — 틀 0x1575c: 입원이면 회복 글 팝업(코드 1)을 띄우고, 어느 쪽이든 **105(관리)** 로 간다.

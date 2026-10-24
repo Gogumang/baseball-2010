@@ -302,7 +302,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   const blockNoticeOf = useCallback(
     (reason: PitcherTrainingBlockReason): string => {
-      if (reason === '이미행동함') return PITCHER_MANAGEMENT_TEXT.alreadyActed
       if (reason === '사기부족') return PITCHER_MANAGEMENT_TEXT.moraleEmpty
       if (reason === '능력치최대') return PITCHER_MANAGEMENT_TEXT.abilityAtLimit
       // StrMODE[62] — 마구 레벨마다 필요한 인기도 (표 0xcc3ea)
@@ -371,14 +370,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
           // 240 → 120 → 닫힌다. 다 닫히면 팝업이 `chooseOption(−1)` 로 치운다(`PitchChoicePopup`)
           if (!isTraining) return setSubWindow('구질목록')
           if (!isMagic) return setSubWindow('구질훈련')
-          // 웹이 둔 주기 검사(한 주기에 한 가지 — 원본 키에 없다)는 예전처럼 창 앞에서 본다
-          if (career.hasActedThisCycle) return setNotice(PITCHER_MANAGEMENT_TEXT.alreadyActed)
+          // 행동함(S+4)은 보지 않는다 — 원본 키(0x19398 · 0x17828)에 주기 검사가 없다
           // 탭 1 → 108(현재 상태가 107 이라) — 창을 거쳐 칸을 고른다. 칸 가드는 창의 확인 키 0x17828 이 본다
           return enterMagicTraining()
         },
       })
     },
-    [career.hasActedThisCycle, enterMagicTraining, openChoice],
+    [enterMagicTraining, openChoice],
   )
 
   const selectCommand = useCallback(
@@ -390,7 +388,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (id === '아이템') return setKind('아이템')
       // [휴식] — 가드(0x12682) 뒤 StrMODE[90] 확인 팝업 0x2a → 상태 127
       const reason = pitcherRestBlockReasonOf(career)
-      if (reason === '이미행동함') return setNotice(PITCHER_MANAGEMENT_TEXT.alreadyActed)
       if (reason === '사기최고') return setNotice(PITCHER_MANAGEMENT_TEXT.moraleAlreadyFull)
       return setQuestion({
         text: PITCHER_MANAGEMENT_TEXT.restQuestion,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
-import { FrameSprite } from '@/shared/ui'
+import { FrameSprite, PressArea } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
@@ -209,6 +209,15 @@ export function EventDialogueBox({
       <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />
       <button type="button" className={styles.hit} aria-label="대사 넘기기"
         style={{ height: height + EVENT_DIALOGUE.bandHeight }} onClick={isActive ? press : undefined} />
+      {/*
+        "CLR:SKIP" 장식(0xba19d — mode_ui 21 을 (W, 본체 위)) 자리의 투명 누름 칸 = CLR(−16). 0x8b804 는 say 갈래에서만 −16 을
+        0x8b7b0 으로 넘기므로 `onCancel` 이 있을 때만 세운다. 칸은 장식이 앉는 윗 띠의 곧은 오른쪽(꺾임 끝 ~ W)
+      */}
+      {isActive && choices === null && onCancel !== undefined && (
+        <PressArea label="CLR 건너뛰기" onPress={() => onCancelRef.current?.()} rect={{
+          x: split + slope, y: bandTop, width: SCREEN_WIDTH - split - slope, height: EVENT_DIALOGUE.bandHeight,
+        }} />
+      )}
       {placed.map(({ key, line, top, choice }) => (
         <div key={key} className={styles.textLine} data-part="글줄"
           role={choice === null ? undefined : 'option'}

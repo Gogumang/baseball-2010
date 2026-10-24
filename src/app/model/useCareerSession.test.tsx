@@ -448,6 +448,16 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
     expect(rendered.result.current.screen).not.toEqual({ kind: '이벤트', eventId: 500, context: '관리' })
   })
 
+  it('112 외출 지도 취소 → 105 는 행동함(S+4)을 0 으로 내린다 (키 0x13ba4 13bc8 — 원본 그대로)', async () => {
+    const rendered = 띄우기({ ...createCareer('외출취소'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true, hasActedThisCycle: true })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+    act(() => rendered.result.current.session.actions.leaveOutingMap())
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(false)
+    expect(rendered.result.current.screen.kind === '관리' || rendered.result.current.screen.kind === '이벤트').toBe(true)
+  })
+
   it('105 진입마다 자동 훑기 — 상점(111 → 110)에서 돌아오면 안 훑고, 하위 메뉴 취소(106 · 107 · 110 → 105)면 훑는다 (0x1cdec 1ce02 · 0x1cf9c)', async () => {
     const rendered = 띄우기({ ...createCareer('훑기'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true })
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })

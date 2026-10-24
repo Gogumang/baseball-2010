@@ -38,7 +38,5 @@ export function trainingBlockTextOf(reason: TrainingBlockReason, menuName: strin
       // StrMODE[63] "!C이미 훈련 완료된 스킬입니다" — 최고 레벨이면 필살타법 창 0x17828 이 칸마다(i < 배운 수) 이 글로 막는다
       // (R7 4절 · `specialSwingSlotBlockOf`). 원본에 "훈련을 모두 마쳤습니다" 같은 다른 글은 없다
       return '이미 훈련 완료된 스킬입니다'
-    case '이미행동함':
-      return '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다'
   }
 }
