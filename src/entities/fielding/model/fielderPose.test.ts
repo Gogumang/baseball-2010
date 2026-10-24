@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFielders, type FielderState } from '@/entities/fielding/model/fieldingState'
+import { AI_STATE, createFielders, type FielderState } from '@/entities/fielding/model/fieldingState'
 import {
   FIELDER_ACTION,
   POSE,
@@ -10,6 +10,7 @@ import {
   withAction,
   withCatchMotion,
   withFlyWaitPose,
+  withPoseCleared,
   withThrowMotion,
 } from '@/entities/fielding/model/fielderPose'
 
@@ -90,5 +91,28 @@ describe('포구 동작 표 0xd87f4 · 지우기 a137a~a1456', () => {
     expect(fielder).toMatchObject({ actionLockTicks: 1, pose: POSE.FREEZE, actionFrame: 1 })
     fielder = listTickFielder(fielder)
     expect(fielder).toMatchObject({ actionLockTicks: 0, pose: 0, action: FIELDER_ACTION.NONE, actionFrame: 2 })
+  })
+})
+
+describe('vt10 0xa124c — 0xbf2b0 목표 = 위치 (r176)', () => {
+  const 걷는야수 = (): FielderState => ({ ...withCatchMotion(야수(), 0), target: { x: 1, y: 0, z: 2 }, aiState: AI_STATE.CHASE })
+
+  it('동작 · 워드 · 잠금을 지우고 목표를 지금 위치로 둔다', () => {
+    const fielder = 걷는야수()
+    const cleared = withPoseCleared({ ...fielder, actionLockTicks: 3 })
+    expect(cleared).toMatchObject({ action: 0, pose: 0, actionLockTicks: 0, target: fielder.position })
+  })
+
+  it('포구 동작을 지우는 야수 틱(a143e)도 vt10 이라 쥔 AI 1 야수가 그 자리에 선다', () => {
+    let fielder = 걷는야수()
+    fielder = listTickFielder(fielder)
+    fielder = listTickFielder(fielder)
+    expect(fielder.pose).toBe(0)
+    expect(fielder.target).toEqual(fielder.position)
+  })
+
+  it('웹 AI 0xb 는 목표 칸에 +0x90 을 담아 두므로 그대로 둔다 — 원본도 같은 틱 b4b5c 가 vt14(+0x90)로 되돌린다', () => {
+    const fielder = { ...걷는야수(), aiState: AI_STATE.PICK_UP }
+    expect(withPoseCleared(fielder).target).toEqual({ x: 1, y: 0, z: 2 })
   })
 })

@@ -1,4 +1,4 @@
-import type { FielderState } from '@/entities/fielding/model/fieldingState'
+import { AI_STATE, type FielderState } from '@/entities/fielding/model/fieldingState'
 
 /**
  * **야수 동작 번호 +0xa8 · 동작 프레임 +0xac · 자세 워드 +0xb0** (야수 vtable 0xd7934 — 전부 직접 뜬 것, r171).
@@ -20,19 +20,23 @@ import type { FielderState } from '@/entities/fielding/model/fieldingState'
  *
  * 지우는 곳:
  * - 야수 틱 0xa1284 의 a137a~a1456(`listTickFielder`) — 동작 번호와 프레임으로.
- * - vt10 0xa124c — 동작 0 · 워드 0 · +0xbc · +0xb4 · +0xe8 = 0 (그리고 0xbf2b0 목표 = 위치). 부르는 곳: 위 지우기 · 잠금이 0 이 된
- *   야수 틱(a12c8) · 다시 쏘기 0xb3148 의 b31f0(공 가진 야수, 잠금 · +0xbc 가 없을 때) · 판 시작 0xb0fb4(b112e) · 협살.
+ * - vt10 0xa124c — 0xbf2b0(목표 = 위치) · 동작 0 · 워드 0 · +0xbc · +0xb4 · +0xe8 = 0. 부르는 곳: 위 지우기 · 잠금이 0 이 된 야수 틱(a12c8) ·
+ *   다시 쏘기 0xb3148 의 b31f0(공 가진 야수, 잠금 · +0xbc 가 없을 때) · 판 시작 0xb0fb4(b112e) · 협살 시작 0xb3a94 b3b0c(잠금 없는 두 야수 —
+ *   잠긴 야수는 AI 8 도 안 된다) · AI 8 의 공 없는 야수 b4aaa(주자 틱 r0 < r ≤ r0 + 4).
  * - vt34 0xa157c — +0xb0 바이트만(웹 진행기에는 부르는 곳이 없다).
  *
  * 동작 번호 칸은 vt44 `0xa1234` 로만 바뀐다 — 다른 번호일 때만 +0xa8 = 번호 · +0xac = 0 (같으면 프레임을 안 되감는다).
  * 야수 틱 머리(a1286~a1290)가 **잠금과 상관없이** +0xac 를 하나 올린다.
  *
- * ⚠️ 근사: 걸음 방향 동작 1~4(0xa0ee8 · vt14 가 위치 → 목표 방향으로 고른다)는 0 으로 본다. 워드 규칙은 0~4 를 가리지 않고(5 · 6 · 7 ·
- * 0xe~0x12 만 본다), 세터 변형(8~0xb · 0xf~0x12)도 같은 규칙 칸이다 — 다른 것은 지우기 전에 같은 야수에게 같은 종류 세터가 또 걸릴 때
- * 프레임이 되감기는가뿐이다. vt10 의 "목표 = 위치"는 옮기지 않는다(r158 — 같은 틱 AI 고리가 목표를 다시 세운다).
- * ⚠️ 미확인 · 남은 것: 주자 판 진행기(`runnerPlayEngine` · `pickoffPlay`)는 송구를 받는 포구 종류 · 동작 시작 틱이 없어 이 워드를
- * 안 세운다(원본은 같은 플레이 틱 b4134 라 받는 포구에도 선다). 협살의 vt10(0xb3a94 b3b0c · AI 8 b4aaa)과 AI 2~5 의
- * `+0x3b && vtcc → 0xb2a48`(b47f2~b4814)은 웹 협살 · 커버 걸음 근사에 자리가 없어 옮기지 않았다.
+ * 받는 송구 · 줍는 공(주자 판 진행기 `runnerPlayEngine` · `pickoffPlay` 포함)도 같은 플레이 틱 b4134 로 선다 — 종류(+0x16c)와 시작 틱(+0x176)은
+ * 고르기 0xb3b38 이 송구 0xb2e38 b307c · 다시 쏘기 b32a4 · 판 시작에서 적는 그대로다(`LooseBallChase.kind` · `actionStartTick`, r176).
+ *
+ * **걸음 방향 동작 1~4 — 0xa0ee8 (직접 뜬 것, r176)**: 위치(+0x20)와 목표(+0x2c)가 같으면 0, 아니면 dx = 목표 x − 위치 x · dz = 목표 z − 위치 z 로
+ * |dx| > |dz| 면 (dx > 0 ? 4 : 3), 아니면 (dz > 0 ? 1 : 2) → vt44. 부르는 곳은 셋 — 야수 틱 a145a(지우기 뒤: vt10 이 목표 = 위치로 둔 뒤거나
+ * +0x3b(막 닿음)라 **늘 0** — 웹 0 과 같다) · vt14 0xa14c8(잠금 +0xb4 ≤ 0 · vtc8 · 목표가 바뀔 때만 0xbf2cc 로 목표를 적고 부른다) · 0xa21bc.
+ * ⚠️ 웹은 vt14 의 방향 번호를 옮기지 않았다(목표를 적는 곳 30여 곳이 vt14 관문 없이 적는다). 그림은 이 칸을 안 읽고, 규칙 칸으로는
+ * "포구 동작 중 vt14 로 목표가 바뀌면 번호가 1~4 로 바뀌어 프레임 지우기 조건(6·2 · 7·5 · 0xe·0xf)을 놓쳐 워드가 남는" 경우만 갈린다 —
+ * 포구 동작 중인 야수는 AI 0 · 1 이 vtcc 로 목표를 안 고치고 커버 AI 는 같은 루 좌표라 드물 것으로 보지만, 몇 판인지는 아직 안 셌다.
  */
 
 /** 자세 워드의 바이트 — 웹은 비트 하나씩으로 든다 */
@@ -113,9 +117,21 @@ export function withThrowMotion<F extends PoseFields>(fielder: F): F {
   return { ...withAction(fielder, FIELDER_ACTION.THROW), pose: fielder.pose | POSE.THROWN }
 }
 
-/** vt10 `0xa124c` 의 자세 몫 — +0xa8 = 0 · 워드 0 · +0xb4 = 0 (+0xac 는 그대로). 목표 = 위치는 머리말 ⚠️ */
-export function withPoseCleared<F extends PoseFields & Pick<FielderState, 'actionLockTicks'>>(fielder: F): F {
-  return { ...fielder, action: FIELDER_ACTION.NONE, pose: 0, actionLockTicks: 0 }
+/**
+ * vt10 `0xa124c` — a1252 0xbf2b0(목표 +0x2c = 위치 +0x20 · +0x3a = 1) · +0xa8 = 0 · 워드 0 · +0xb4 = 0 (+0xac 는 그대로) (r176).
+ * 웹 AI 0xb(`PICK_UP`)는 목표 칸에 +0x90 을 담아 두므로 그 칸은 안 바꾼다 — 원본도 같은 틱 AI 고리 b4b5c 가 vt14(+0x90)로
+ * 곧바로 되돌린다(vt14 0xa14c8 관문 +0xb4 ≤ 0 · vtc8 은 vt10 뒤라 열려 있다).
+ */
+export function withPoseCleared<
+  F extends PoseFields & Pick<FielderState, 'actionLockTicks' | 'position' | 'target' | 'aiState'>,
+>(fielder: F): F {
+  return {
+    ...fielder,
+    target: fielder.aiState === AI_STATE.PICK_UP ? fielder.target : fielder.position,
+    action: FIELDER_ACTION.NONE,
+    pose: 0,
+    actionLockTicks: 0,
+  }
 }
 
 /** vtC4 `0xa20ec` — 던질 준비: 워드 0 · 잠금 +0xb4 ≤ 0 · 준비 틱 +0xc8 ≤ 0 */
