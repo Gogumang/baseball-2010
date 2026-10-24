@@ -752,3 +752,26 @@ describe('고른 줄 까딱임 (표 0xd1784 · 0xd1754)', () => {
     }
   })
 })
+
+describe('터치 −1 (웹 껍데기) — 원본 왼 화살 자리 투명 칸', () => {
+  it('사운드 · 속도 값을 하나 내리고 끝에서 감는다 — 왼 키(−3)와 같다', () => {
+    const onChange = vi.fn()
+    띄우기({ onChange, settings: { ...DEFAULT_SETTINGS, soundLevel: 0, speedLevel: 2 } })
+
+    fireEvent.click(screen.getByTestId('설정내리기-1'))
+    expect(onChange).toHaveBeenLastCalledWith({ ...DEFAULT_SETTINGS, soundLevel: 0, speedLevel: 1 })
+
+    fireEvent.click(screen.getByTestId('설정내리기-0'))
+    expect(onChange.mock.lastCall?.[0].soundLevel).toBeGreaterThan(0)
+  })
+
+  it('칸은 왼 화살(x0 + 91) 앞 4px 부터 막대 왼끝까지 · 막대 높이 — 값 줄 셋에만 있다', () => {
+    띄우기()
+
+    const area = screen.getByTestId('설정내리기-0')
+    expect(area.style.left).toBe(`${VALUE_ROW.leftArrow.x - 4}px`)
+    expect(area.style.width).toBe(`${VALUE_ROW.bar.x - VALUE_ROW.leftArrow.x + 4}px`)
+    expect(area.style.top).toBe(`${rowTopOf(0) + VALUE_ROW.bar.dy}px`)
+    expect(screen.queryByTestId('설정내리기-3')).toBeNull()
+  })
+})

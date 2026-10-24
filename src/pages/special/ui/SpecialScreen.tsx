@@ -651,6 +651,8 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
 
   /** 되돌아가기 — 등록 목록은 결과 0 → StrMODE[219] (0x1ca4c), 선수 고르기는 결과 0 (0x6286e), 스페셜은 상태 6 */
   const goBack = () => {
+    // 말풍선이 열렸으면 CLR 은 말풍선만 닫는다(키 갈래와 같다) — 바닥띠 되돌아가기(터치 · 마우스)도 같은 CLR 이다
+    if (isBubbleOpen) return setIsBubbleOpen(false)
     if (mode.kind === '등록') return setPopup({ kind: '나중에' })
     if (mode.kind === '선수고르기') return mode.onCancel()
     return onBack()
