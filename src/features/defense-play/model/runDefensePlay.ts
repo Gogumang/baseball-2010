@@ -101,11 +101,11 @@ import {
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
 import {
+  applyCoverAssignment,
   assignCoversForTick,
   baseAtPoint,
-  type CoverAssignment,
 } from '@/entities/fielding/model/coverAssignment'
-import { secondBaseHelperPlacement } from '@/entities/fielding/model/throwArrival'
+import { runCoverTick } from '@/features/defense-play/model/coverTick'
 import {
   planThrow,
   LASER_THROW_SPEED,
@@ -1134,7 +1134,9 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
 
   const chaserSlot = forecast.choice.slot
   let catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
-  const catchPoint = trajectory.pointAt(catchTick)
+  // 추적야수 AI 1(b4aca~b4b5a, 직접 뜬 것): b4b40 0xa25b0(공, +0x174 포구 틱)의 점 → b4b50~b4b5a 0xa100c(야수, x, **0**, z) —
+  // 야수 목표는 늘 땅 위다. 포구 틱 다리(6b 절 쥐기)도 이 점에 세운다(r162 — 예전 웹은 높이째 포구 지점이었다)
+  const catchPoint = groundPointOf(trajectory.pointAt(catchTick))
   // 시작 목표를 미리 세워 둔다 — 첫 틱부터 쫓는 야수는 공 쪽, 커버 야수는 제 루 쪽을 보고 있어야 한다.
   // 커버는 판 시작 상태로 0xb1c90 을 한 번 돌린 것이다(`assignCoversForTick` — 매 틱 6절이 다시 고른다)
   // 0xb3b38 담장 갈래 — 담장선이 먼저면 고른 야수는 AI 0xb 로 담장 앞 공점(aa4 − 2)에 간다(`fenceChasePoint`)
@@ -1736,7 +1738,7 @@ export function stepDefensePlay(
       // 못 줍으면 t = 10 부터 두 번째 패스 · vt34 = 0xb3b38 이 받을(주울) 야수를 AI 1 로. 받는 틱 = 그 포구 틱이다.
       // 보통 · 흔들린 · 레이저 송구는 공+0xaac = 0 이라 움직임허용 없음(복제가 제자리 · n 없음)이고, 던진 야수 · C(+0x154)가
       // 둘 다 내야(칸 ≤ 5)면 +0x1e8 = 1(b305a~b306c) — C 만 낮은 공 · 가슴 높이로 잡는다. 악송구는 움직임허용 모두 · +0x1e8 없음
-      takeLooseBall(thrown.ball, { ...forecastOptionsOf(thrown, fromSlot, coverSlot), thrownBall: true })
+      takeLooseBall(thrown.ball, forecastOptionsOf(thrown, fromSlot, coverSlot))
       receivingThrow = !thrown.loose
       throwArrivalTick = catchTick
     }
@@ -1841,8 +1843,6 @@ export function stepDefensePlay(
       readonly thrownSlot?: number
       readonly secondPass?: { readonly movable: boolean }
       readonly onlySlot?: number
-      /** 송구 0xb2e38 이 깐 공 — 아래 AI 1 목표를 원본대로 한다 */
-      readonly thrownBall?: boolean
     },
   ): void => {
     receivingThrow = false
@@ -1870,9 +1870,9 @@ export function stepDefensePlay(
     chaserSlot = forecast.choice.slot
     catchTick = Math.max(tick, Math.min(tick + forecast.choice.catchTick, maximumTicks))
     const caughtAt = next.pointAt(catchTick - tick)
-    // 송구공: 추적야수 AI 1(0xb4aca~0xb4afe)은 포구 틱 점의 (x, 0, z) 로 간다 — 받는 점 (목표 x, 1000, 목표 z) 에서 받으면
-    // 그 루 위에 선다(쥐기 0xb2710 은 야수를 옮기지 않는다). ⚠️ 타구 · 다시 쏘기(0xb3148)는 아직 웹 관례(높이째 포구 지점)다
-    catchPoint = options.thrownBall === true ? { x: caughtAt.x, y: 0, z: caughtAt.z } : caughtAt
+    // 추적야수 AI 1(0xb4aca~0xb4b5a)은 포구 틱 점의 (x, 0, z) 로 간다(0xa100c) — 송구공 · 타구 · 다시 쏘기(0xb3148) 모두.
+    // 송구는 받는 점 (목표 x, 1000, 목표 z) 에서 받으면 그 루 위에 선다(쥐기 0xb2710 은 야수를 옮기지 않는다)
+    catchPoint = groundPointOf(caughtAt)
     fielders = fielders.map((fielder) =>
       fielder.slot === chaserSlot
         ? forecast.fenceChasePoint !== null
@@ -2967,29 +2967,16 @@ export function stepDefensePlay(
     // (2루 커버가 아닌 키스톤 야수의 자리 — 중계 자리 · 기본 자리). 자리 잡기는 원본에서 b1f06 뒤 · b23a4 앞이라
     // 공 가진 야수의 루(b23a4) 넣기 전의 2루 커버로 본다
     if (!play.finished) {
-      const assigned = assignCoversForTick({
+      const covered = runCoverTick({
         context: contextAt(tick),
         ballToFirstSide: catchPoint.x > basePosition(0).x,
-        ballStartPoint: trajectory.pointAt(0),
-      })
-      if (assigned.ran) {
-        play = { ...play, coverOfBase: assigned.covers }
-        fielders = applyCoverAssignment(fielders, assigned)
-      }
-      const placement = secondBaseHelperPlacement({
-        context: contextAt(tick),
-        secondBaseCover: assigned.ran ? assigned.secondBaseCover : NONE,
-        ballToFirstSide: catchPoint.x > basePosition(0).x,
+        // b1ddc 공.vt68(0) — **지금** 공 궤적의 첫 점: 타구는 0xd8758, 송구 · 다시 쏘기(0xb3148)는 새로 깐 궤적의 첫 점(r162)
+        ballStartPoint: ballSegmentStart,
         relayFlag,
       })
-      if (placement.kind === '자리') {
-        if (placement.relayPlaced) relayFlag = false
-        fielders = fielders.map((fielder) =>
-          fielder.slot === placement.slot
-            ? { ...fielder, target: placement.target, aiState: AI_STATE.BUSY }
-            : fielder,
-        )
-      }
+      play = covered.play
+      fielders = covered.fielders
+      relayFlag = covered.relayFlag
     }
     const beforeMove = fielders
     // 추적야수 AI 1(0xb4afe): +0x127 && 낙구 틱 ≥ 공+0x68 이면 낙구 지점(x, 0, z), 아니면 포구 지점으로
@@ -3519,21 +3506,6 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
   return fielder
 }
 
-/** `assignCoversForTick` 의 답을 야수에게 — AI 0(시작 자리로) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */
-function applyCoverAssignment(fielders: readonly FielderState[], assigned: CoverAssignment): readonly FielderState[] {
-  return fielders.map((fielder) => {
-    let next = fielder
-    if (assigned.idleSlots.includes(fielder.slot)) {
-      next = { ...next, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[fielder.slot] ?? next.target, targetBase: NONE }
-    }
-    const cover = assigned.coverStates.find((entry) => entry.slot === fielder.slot)
-    if (cover !== undefined) {
-      next = { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
-    }
-    return next
-  })
-}
-
 interface BallPointInput {
   readonly tick: number
   readonly trajectory: BattedBallTrajectory
@@ -3636,4 +3608,9 @@ export function cpuSpecialThrowOf(
     bounce: horizontalDistance(holder.position, fielders[receiverSlot].target) > BOUNCE_THROW_DISTANCE,
     thrower: thrownWith(holder, true),
   }
+}
+
+/** 0xa100c(야수, x, 0, z) — 추적야수 AI 1 의 목표는 포구 틱 공 점의 높이를 버린 땅 위 점이다 (b4b50~b4b5a) */
+function groundPointOf(point: WorldPoint): WorldPoint {
+  return { x: point.x, y: 0, z: point.z }
 }

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_SPEED_LEVEL, setGameSpeedLevel } from '@/shared/config/frameRate'
+import { appTickOf } from '@/shared/lib/frameClock/frameClock'
 import {
   clearGameSceneTimeout,
   createGameSceneDrawGate,
@@ -172,7 +174,60 @@ describe('경기 장면 틱 — 장면 시계를 한 틱 격자로 센 정수(0x
     now.mockReturnValue(5000 + 62)
     expect(gameSceneTickNow()).toBe(17)
     expect(gameSceneTickOf(gameSceneTimeOf(5000 + 62))).toBe(17)
-    expect(gameSceneTickStartTime(17)).toBe(17 * 62)
+    // 장면 틱 머리는 앱 틱 머리다 — 멈춘 앱 틱 64 개(틱 16 → 80)를 빼 장면 틱 17 = 앱 틱 81(5022ms), 장면 시각으로 1022
+    expect(gameSceneTickStartTime(17)).toBe(81 * 62 - 4000)
+    장면()
+  })
+
+  it('장면 틱은 앱 틱 격자 위에 선다 — 창이 닫힌 앱 틱 안에서는 멈춘 틱 그대로, 다음 앱 틱 머리에서 하나 오른다', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000) // 앱 틱 16 (992~1053)
+    const 장면 = markGameSceneUp()
+    const 창 = markCommonWindowShown()
+    now.mockReturnValue(5000) // 앱 틱 80 (4960~5021)
+    창()
+    expect(gameSceneTickNow()).toBe(16)
+    now.mockReturnValue(5021)
+    expect(gameSceneTickNow()).toBe(16)
+    now.mockReturnValue(5022) // 앱 틱 81 머리
+    expect(gameSceneTickNow()).toBe(17)
+    expect(appTickOf(5022) - gameSceneTickNow()).toBe(64)
+    장면()
+  })
+
+  it('창이 떠 있는 동안 속도를 바꿔도 장면 틱은 앱 틱과 같은 기준점으로 센다', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000) // 앱 틱 16
+    const 장면 = markGameSceneUp()
+    const 창 = markCommonWindowShown()
+    now.mockReturnValue(2000) // 앱 틱 32 (1984~2045)
+    setGameSpeedLevel(0) // 250ms — 바뀐 그 순간 앱 틱 32 머리(1984)부터 새 길이
+    now.mockReturnValue(2300) // 앱 틱 33 (2234~2483)
+    창()
+    expect(gameSceneTickNow()).toBe(16)
+    now.mockReturnValue(2484) // 앱 틱 34 머리
+    expect(gameSceneTickNow()).toBe(17)
+    expect(appTickOf(2484) - gameSceneTickNow()).toBe(appTickOf(2300) - 16)
+    setGameSpeedLevel(DEFAULT_SPEED_LEVEL)
+    장면()
+  })
+
+  it('틱으로 건 setTimeout 은 창이 닫힌 뒤에도 앱 틱 머리에 울린다', () => {
+    vi.useFakeTimers()
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
+    vi.setSystemTime(1000) // 앱 틱 16
+    const 장면 = markGameSceneUp()
+    const 울림 = vi.fn()
+    setGameSceneTickTimeout(울림, 2) // 장면 틱 18
+    const 창 = markCommonWindowShown()
+    vi.advanceTimersByTime(4000) // 5000 — 앱 틱 80
+    창()
+    // 장면 틱 18 = 앱 틱 82 머리(5084)
+    vi.advanceTimersByTime(83)
+    expect(울림).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(울림).toHaveBeenCalledTimes(1)
+    now.mockRestore()
     장면()
   })
 

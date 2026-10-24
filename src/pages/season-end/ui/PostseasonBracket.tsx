@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
+import { usePostseasonNextKey } from '@/widgets/season/model/usePostseasonNextKey'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 
 interface PostseasonBracketProps {
@@ -21,8 +22,10 @@ interface PostseasonBracketProps {
  * (대진 칸은 두 길 모두 0x8533c 가 깐다 — 부르는 곳 0x693e 시즌 · 0x12110 나리).
  *
  * 다음(확인 키 0x13da0)은 원본 화면에 그림 자리가 없어 화면 전체 투명 누름 칸으로 둔다.
+ * 키는 0x13da0 머리(13da2~13db0) 그대로 −5(OK) · 0x35('5') 만 받는다 — 키패드·키보드만으로도 넘어간다.
  */
 export function PostseasonBracket({ series, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {
+  usePostseasonNextKey(onNext)
   return (
     <RawScreen>
       <PostseasonBracketWindow series={series} />

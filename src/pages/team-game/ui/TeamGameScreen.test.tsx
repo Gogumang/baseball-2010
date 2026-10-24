@@ -87,7 +87,11 @@ const 구질고르기 = (name: string) => {
 }
 
 /** 조준점을 안 움직이고 OK (0x50e9c) — 존 중심을 노린다 */
-const 조준확정 = () => fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
+const 조준확정 = () => {
+  fireEvent.click(screen.getByRole('button', { name: '조준 확정' }))
+  // 누름은 다음 틀의 키 0x498d4 가 읽는다(키 사건 0xbca05)
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+}
 
 /** 게이지를 안 쓰는 공 — OK 뒤 0x11 의 틱 10 에 놓인다 (0x50ed0 → 0x4e060) */
 const 조준확정후놓기 = () => {
@@ -140,6 +144,7 @@ describe('팀 경기 화면 — 수비(투구) 차례', () => {
     구질고르기('FASTBALL')
     expect(조준보임()).toBe(true)
     fireEvent.keyDown(window, { key: 'Escape' })
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
 
     expect(구질보임()).toBe(true)
     expect(조준보임()).toBe(false)

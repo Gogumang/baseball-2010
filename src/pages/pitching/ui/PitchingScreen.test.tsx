@@ -116,6 +116,9 @@ describe('투수 미션 사람 견제 키 — 구질 고르기(0xf)에서만 0x5
     const onPickoffKey = 견제띄우기()
     fireEvent.keyDown(window, { key: '3' })
     fireEvent.keyDown(window, { key: '7' })
+    // 견제 키도 다음 틀의 키 0x498d4 가 읽는다 — 구질 고르기의 키 칸에서 받은 차례대로
+    expect(onPickoffKey).not.toHaveBeenCalled()
+    틱(1)
     expect(onPickoffKey.mock.calls).toEqual([['3'], ['7']])
   })
 
@@ -248,6 +251,8 @@ describe('투수 미션 조준 (상태 0x10) — 세션의 틱 0x39c5c 를 매 �
     fireEvent.keyDown(window, { key: '6' })
     틱(3)
     fireEvent.keyDown(window, { key: 'Enter' })
+    // 키는 다음 틀의 키 0x498d4 가 읽는다
+    틱(1)
 
     // 세 틱은 오른쪽(dx 1), OK 틱은 방향을 지운 채(dx 0) 한 번 더
     expect(onAimTick.mock.calls.map(([, direction]) => direction)).toEqual([
@@ -272,6 +277,7 @@ describe('투수 미션 조준 (상태 0x10) — 세션의 틱 0x39c5c 를 매 �
   it('CLR 은 던지지 않고 0xf 진입을 다시 부른다 (0x50ee0)', () => {
     const { onThrow, onReturnToPitchSelection } = 조준띄우기()
     fireEvent.keyDown(window, { key: 'Backspace' })
+    틱(1)
 
     expect(onThrow).not.toHaveBeenCalled()
     expect(onReturnToPitchSelection).toHaveBeenCalledTimes(1)

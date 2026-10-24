@@ -1,5 +1,5 @@
 import { createContext, useContext, useLayoutEffect } from 'react'
-import { createTickClock, setTickInterval } from '@/shared/lib/frameClock/frameClock'
+import { appTickOf, appTickStartTime, resetAppTickClockForTest, setTickInterval } from '@/shared/lib/frameClock/frameClock'
 
 /**
  * **공용 창 [0x140005c] 이 떠 있는가** — 히든 오픈 알림(0x62368 → 0x74ef5)처럼 앱이 모든 화면 위에 얹는 창.
@@ -130,6 +130,13 @@ let gameScenesUp = 0
 let frozenSince: number | null = null
 /** 지금까지 멈춰 있던 실제 시간의 합 */
 let frozenTotal = 0
+/** 멈추기 시작한 때의 앱 틱 — 흐르는 중이면 null */
+let frozenSinceAppTick: number | null = null
+/**
+ * 지금까지 멈춰 있던 **앱 틱** 수의 합 — 경기 장면 틱 = 앱 틱 − 이 값 (`gameSceneTickOf`). 원본은 앱 루프 하나가 틀을 돌리고 경기 장면
+ * 0x52c50 은 창이 서 있는 틀(52cc6)에 갱신만 건너뛴다 — 틀 머리는 앱 틀 그대로라 장면 틱도 앱 틱 격자 위에 선다.
+ */
+let frozenTicks = 0
 /** `resetCommonWindowShownForTest` 마다 오른다 */
 let testGeneration = 0
 
@@ -140,11 +147,15 @@ function syncGameSceneFreeze(now: number = performance.now()): void {
   const isFrozen = gameScenesUp > 0 && shownCommonWindows > 0
   if (isFrozen && frozenSince === null) {
     frozenSince = now
+    frozenSinceAppTick = appTickOf(now)
     freezeSerial += 1
     for (const timer of sceneTimers.values()) pauseSceneTimer(timer, now)
   } else if (!isFrozen && frozenSince !== null) {
     frozenTotal += Math.max(0, now - frozenSince)
+    // 창이 선 틀부터 닫힌 틀까지 앱 틱 수 — 닫힌 틀이 든 앱 틱은 멈춘 장면 틱 그대로이고 다음 앱 틱 머리에서 하나 오른다
+    frozenTicks += Math.max(0, appTickOf(now) - (frozenSinceAppTick ?? appTickOf(now)))
     frozenSince = null
+    frozenSinceAppTick = null
     for (const [id, timer] of sceneTimers) runSceneTimer(id, timer, now)
   }
 }
@@ -157,8 +168,10 @@ function syncGameSceneFreeze(now: number = performance.now()): void {
  */
 interface SceneTimer {
   readonly callback: () => void
-  /** 아직 남은 장면 시간(ms) */
+  /** 아직 남은 장면 시간(ms) — 틱으로 건 시계(`dueTick`)는 쓰지 않는다 */
   remaining: number
+  /** 틱으로 건 시계(`setGameSceneTickTimeout`)가 울릴 장면 틱 — 그 틱 머리(앱 틱 격자)에 울린다. ms 시계면 null */
+  readonly dueTick: number | null
   /** 지금 도는 실제 시계를 건 실제 시각 — 붙잡혀 있으면 null */
   startedAt: number | null
   handle: ReturnType<typeof setTimeout> | null
@@ -169,29 +182,35 @@ let nextSceneTimerId = 1
 function runSceneTimer(id: number, timer: SceneTimer, now: number): void {
   if (timer.handle !== null) return
   timer.startedAt = now
+  // 틱 시계는 남은 ms 가 아니라 울릴 장면 틱의 머리(= 앱 틱 머리)까지 잰다 — 창이 닫힌 뒤에도 틱 머리에 선다
+  const delay = timer.dueTick === null ? timer.remaining : Math.max(0, appTickStartTime(timer.dueTick + frozenTicks) - now)
   timer.handle = setTimeout(() => {
     sceneTimers.delete(id)
     timer.handle = null
     timer.callback()
-  }, timer.remaining)
+  }, delay)
 }
 
 function pauseSceneTimer(timer: SceneTimer, now: number): void {
   if (timer.handle === null) return
   clearTimeout(timer.handle)
   timer.handle = null
-  timer.remaining = Math.max(0, timer.remaining - (now - (timer.startedAt ?? now)))
+  if (timer.dueTick === null) timer.remaining = Math.max(0, timer.remaining - (now - (timer.startedAt ?? now)))
   timer.startedAt = null
+}
+
+function addSceneTimer(callback: () => void, remaining: number, dueTick: number | null): number {
+  const id = nextSceneTimerId
+  nextSceneTimerId += 1
+  const timer: SceneTimer = { callback, remaining: Math.max(0, remaining), dueTick, startedAt: null, handle: null }
+  sceneTimers.set(id, timer)
+  if (frozenSince === null) runSceneTimer(id, timer, performance.now())
+  return id
 }
 
 /** 경기 장면 시계로 `delay` ms 뒤 `callback` — `clearGameSceneTimeout` 으로 거둔다 */
 export function setGameSceneTimeout(callback: () => void, delay: number): number {
-  const id = nextSceneTimerId
-  nextSceneTimerId += 1
-  const timer: SceneTimer = { callback, remaining: Math.max(0, delay), startedAt: null, handle: null }
-  sceneTimers.set(id, timer)
-  if (frozenSince === null) runSceneTimer(id, timer, performance.now())
-  return id
+  return addSceneTimer(callback, delay, null)
 }
 
 /** `setGameSceneTimeout` 으로 건 시계를 거둔다(이미 울렸거나 없는 번호면 아무 일 없다) */
@@ -275,17 +294,20 @@ export function gameSceneNow(): number {
  * **그 단계가 선 장면 틱 번호**로 적고 단계 안 진행은 (지금 틱 − 시작 틱)으로 센다 — 그래서 그림은 틱마다 많아야 한 번 바뀌고,
  * 단계 경계가 모두 같은 격자 위에 선다. 창이 떠 있는 동안은 시계가 서므로 틱도 안 오른다(52cc6 — 따라잡지 않는다).
  *
+ * 틱은 따로 기준점을 잡지 않고 **앱 틱(`frameClock`)에서 멈춰 있던 앱 틱 수를 뺀 값**이다(r160). 원본은 앱 루프 하나가 틀을 돌리고
+ * 경기 장면은 창이 선 틀에 갱신만 건너뛴다 — 틀 머리는 늘 앱 틀이다. 예전처럼 장면 시각(ms)에 따로 격자를 깔면 멈춘 ms 만큼 격자가
+ * 틀 안쪽으로 밀리고, 창이 떠 있는 동안 속도를 바꾸면 앱 틱과 장면 틱이 서로 다른 때에 기준점을 다시 잡았다.
+ *
  * 상태가 바뀌는 틱(2026-10-24 직접 떴다): 0xbcb48(상태 객체, 새 상태)이 +8 에 예약만 하고, 다음 틀 머리 0xbc9c8 이
  * `+4 ≠ +8` 이면 +0x10 = 옛 상태 · **+0x14(틱) = 0** · +4 = 새 상태 · +0x19(진입) = 1 을 적는다(bc9e8~bc9f4). 같으면 +0x14 += 1 ·
  * +0x19 = 0 (bc9de~bc9e4). 경기 장면은 그 뒤 52cdc 에서 [장면+0x31](진입)이 서 있으면 진입 표 0xd04bc 를 부르고, 52d9e 의 키 0x498d4 ·
  * 52e14~ 의 갱신 표 0xd0530 이 같은 틀에 틱 0 으로 돈다. 곧 **갱신에서 예약한 상태는 다음 틀이 틱 0 이다** — 웹 루프는 앞 단계의
  * 끝 틱을 본 그 틀(= 원본의 예약 다음 틀)에 새 단계를 세우므로 그 틀의 장면 틱이 새 단계의 시작 틱이다.
  */
-const gameSceneTickClock = createTickClock()
-
-/** 경기 장면 시각 `sceneTime`(`gameSceneTimeOf` 가 돌려준 ms) 이 드는 장면 틱 */
 export function gameSceneTickOf(sceneTime: number): number {
-  return gameSceneTickClock.tickOf(sceneTime)
+  const appTick = appTickOf(sceneTime + frozenTotal)
+  // 서 있는 동안은 창이 선 앱 틱에 머문다(그 뒤 시각을 받아도 오르지 않는다)
+  return (frozenSinceAppTick === null ? appTick : Math.min(appTick, frozenSinceAppTick)) - frozenTicks
 }
 
 /** 지금 장면 틱 — `gameSceneTickOf(gameSceneNow())` */
@@ -293,9 +315,14 @@ export function gameSceneTickNow(): number {
   return gameSceneTickOf(gameSceneNow())
 }
 
-/** 장면 틱 `tick` 이 시작하는 경기 장면 시각(ms) */
+/** 장면 틱 `tick` 이 시작하는 경기 장면 시각(ms) — 그 틱의 앱 틱 머리를 장면 시계로 옮긴 값 */
 export function gameSceneTickStartTime(tick: number): number {
-  return gameSceneTickClock.startTimeOf(tick)
+  return appTickStartTime(tick + frozenTicks) - frozenTotal
+}
+
+/** 장면 틱 `tick` 이 든 앱 틱 — 앱 전역 셈(파티클 관리자 틱 표지 따위)을 장면 부품이 같은 틀로 맞출 때 */
+export function appTickOfGameSceneTick(tick: number): number {
+  return tick + frozenTicks
 }
 
 /**
@@ -304,9 +331,7 @@ export function gameSceneTickStartTime(tick: number): number {
  * 창이 떠 있는 동안 선다).
  */
 export function setGameSceneTickTimeout(callback: () => void, ticks: number): number {
-  const now = gameSceneNow()
-  const due = gameSceneTickStartTime(gameSceneTickOf(now) + Math.max(0, ticks))
-  return setGameSceneTimeout(callback, Math.max(0, due - now))
+  return addSceneTimer(callback, 0, gameSceneTickNow() + Math.max(0, ticks))
 }
 
 /**
@@ -324,12 +349,14 @@ export function setGameSceneTickInterval(callback: () => void): () => void {
 
 /** 시험용 — 센 수를 되돌린다 */
 export function resetCommonWindowShownForTest(): void {
-  gameSceneTickClock.reset()
+  resetAppTickClockForTest()
   testGeneration += 1
   shownCommonWindows = 0
   gameScenesUp = 0
   // 붙잡혀 있던 시계는 다시 흘린다
   syncGameSceneFreeze()
   frozenSince = null
+  frozenSinceAppTick = null
   frozenTotal = 0
+  frozenTicks = 0
 }

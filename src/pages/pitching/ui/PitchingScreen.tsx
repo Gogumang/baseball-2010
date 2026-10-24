@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { MutableRefObject } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { MissionHud } from '@/pages/mission-play/ui/MissionHud'
@@ -354,7 +355,9 @@ export function PitchingScreen({
     if (!acceptsPickoff || onPickoffKey === undefined) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      onPickoffKey(event.key)
+      // 견제 키 0x53548 — 다음 틀의 키 0x498d4 가 0xf 갱신보다 먼저 처리한다(구질 고르기 `PitchSlotPicker` 의 키 칸에 든다)
+      const { key } = event
+      pushSceneKey(() => onPickoffKey(key))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

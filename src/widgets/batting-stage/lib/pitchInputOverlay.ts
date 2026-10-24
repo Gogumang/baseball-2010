@@ -345,10 +345,8 @@ function frameAfterAdvances(entries: readonly StageAnimationEntry[], advances: n
  *   4d69e  애니 1 끝 비트가 섰고 [+0x17c4] ≤ 3 이면 min(0x3b + 누른 칸, 0x43) 를 효과 1 · 인자 max(15 − 3·[+0x17c4], 0) → +1
  * ```
  * 결과 원은 위로 떠오르는 것이 아니라 **제자리에서 흐려진다**(인자 15 · 12 · 9 · 6 — 그림 무게 L/16). 예전 웹은 인자를 y 로 읽었다.
- * 웹 `decidedTicks` 는 칸을 정한 뒤 게이지가 센 장면 틱 수라 부름 차례 k = decidedTicks + 1 로 본다 — 키를 받은 틱의 남은 그림이 k = 1,
- * 다음 틱 머리부터 2, 3 … 이다. 원본은 키를 읽는 틀(다음 틀 머리의 0x498d4 → 0x50e08)의 그리기가 k = 1 이다.
- * ⚠️ 남은 차이: 웹 게이지 누름은 키를 받은 그 자리(틀 사이)에서 칸을 정해 원본보다 한 틀 이르다 — 셈 자체는 장면 틱 격자 위에서
- * 틱마다 1 이라 키 처리 틀 차례(`PitchGradeGauge` 누름)를 맞추면 이 식도 같이 옮겨야 한다.
+ * 웹 `decidedTicks` 는 칸을 정한 뒤 게이지가 그린 장면 틱 수다 — 누름은 받은 다음 틀의 키 처리(`sceneKeyLatch`, 0x498d4 → 0x50e08)가
+ * 같은 틀 그리기보다 먼저 정하고 그 틀 그리기에서 1 이 되므로 부름 차례 k = decidedTicks 다(누른 틀의 그림이 k = 1 — 원본과 같다).
  */
 export function gaugeDrawsOf(
   overlay: Pick<PitchGaugeOverlay, 'cursor' | 'pressed' | 'decidedTicks'>,
@@ -368,7 +366,7 @@ export function gaugeDrawsOf(
     draws.push({ folder: SLT_FRAMES, frame: GAUGE_TARGET_FRAME, dy: 0 })
     return draws
   }
-  const call = Math.max(0, overlay.decidedTicks) + 1
+  const call = Math.max(1, overlay.decidedTicks)
   const draws: GaugeDraw[] = [{ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0, alpha: STOPPED_CURSOR_LEVEL / EFFECT_LEVELS }]
   const resultLength = tables.result.length === 0 ? DEFAULT_RESULT_ANIMATION_LENGTH : onceLength(tables.result)
   // 4d586 의 검사는 이번 그림의 진행(4d60a) 앞이라 k − 1 번 나아간 상태를 본다

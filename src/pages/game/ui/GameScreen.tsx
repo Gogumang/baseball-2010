@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
@@ -198,8 +199,11 @@ export function GameScreen({
   /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
   const flightProbeRef = useRef<(() => boolean) | null>(null)
   const stealIfFlying = (base: StealBase) => {
-    if (flightProbeRef.current?.() !== true) return
-    onSteal?.(base)
+    // 도루 키는 장면 키 칸에 든다 — 다음 틀의 키 0x498d4 → 0x53670 → 0x53610 이 그 틀의 상태(0x11)를 보고 출발시킨다
+    pushSceneKey(() => {
+      if (flightProbeRef.current?.() !== true) return
+      onSteal?.(base)
+    })
   }
 
   const isBenchClearing = progress.pendingBenchClearing !== null
@@ -242,7 +246,7 @@ export function GameScreen({
       if (base !== null && stealableBases.includes(base)) {
         event.preventDefault()
         // 공이 나는 동안(상태 0x11)만 — 그 밖의 키는 원본도 먹고 끝난다
-        if (flightProbeRef.current?.() === true) onSteal?.(base)
+        stealIfFlying(base)
       }
     }
     window.addEventListener('keydown', onKeyDown)

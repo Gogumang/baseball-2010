@@ -20,6 +20,7 @@ import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -1840,5 +1841,25 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
   it('지난 경기 재료가 없는 옛 저장은 예전처럼 116 의 끝으로 가른다', () => {
     const rendered = 띄우기({ ...평가중(), lastGame: undefined })
     expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+  })
+})
+
+describe('이어하기 100 진입 0x1c154 머리 1c15e stopBgm (r163)', () => {
+  it('어느 갈래로 이어도 먼저 배경음을 끊는다 — 국가대항전 134 는 제 배경음이 없어 소리 없이 선다', () => {
+    const calls: string[] = []
+    const sound = { ...createSilentSound(), stopBgm: () => { calls.push('stopBgm') } }
+    for (const saved of [목표달성선수({ nationalCup: createNationalCup() }), { ...createCareer('관리'), gamesPlayed: 4 }]) {
+      calls.length = 0
+      const saveGame = 메모리저장(saved)
+      const random = createSeededRandom(20100901)
+      const rendered = renderHook(() => {
+        const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+        const runner = useAtBatRunner()
+        return { screen, session: useCareerSession({ runner, random, saveGame, screen, setScreen, sound }) }
+      })
+      act(() => rendered.result.current.session.actions.continueSaved())
+      expect(calls).toEqual(['stopBgm'])
+      expect(rendered.result.current.screen.kind).not.toBe('메인메뉴')
+    }
   })
 })

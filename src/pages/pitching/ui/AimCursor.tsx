@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
   AIM_STILL,
@@ -13,7 +14,9 @@ import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import { createGameSceneDrawGate, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval,
+} from '@/shared/lib/commonWindow/commonWindow'
 import { subscribeInGameMenuStarOpen } from '@/features/play-team-game/model/useInGameMenuState'
 
 interface AimCursorProps {
@@ -79,18 +82,32 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   const tickRef = useRef(tick)
   tickRef.current = tick
 
+  /** 받은 키 칸 — 메시지 8 은 받은 다음 틀의 키 0x498d4(52d9e)가 0x10 갱신 0x39c5c(52e14~)보다 먼저 처리한다(`sceneKeyLatch`) */
+  const [keyLatch] = useState(createSceneKeyLatch)
+  useEffect(() => openSceneKeyLatch(keyLatch), [keyLatch])
+
   useEffect(() => {
-    if (isPaused) return
+    if (isPaused) {
+      keyLatch.clear()
+      return
+    }
     const drawGate = createGameSceneDrawGate()
     const handle = setGameSceneTickInterval(() => {
       if (isDoneRef.current) return
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 갱신(0x39c5c 조준점 이동)을 건너뛴다 — 닫히면 이어 돈다.
       // 애니 0 칸은 그림마다 나가는 그리기 쪽이라 창이 선 첫 그림([창+0x250], 52efe)에만 한 번 더 나간다
-      if (!isGameSceneFrozen()) tickRef.current()
+      if (isGameSceneFrozen()) {
+        keyLatch.clear()
+      } else {
+        // 키(메시지 8 — 방향 · OK · CLR)가 먼저다. OK · CLR 은 그 안에서 이 틀의 0x39c5c 를 지운 방향으로 한 번 지나고 끝난다
+        runSceneKeys(keyLatch, gameSceneTickNow())
+        if (isDoneRef.current) return
+        tickRef.current()
+      }
       if (drawGate.allowsDraw()) setDrawTick((previous) => previous + 1)
     })
     return () => handle()
-  }, [isPaused])
+  }, [isPaused, keyLatch])
 
   const apply = (action: AimKeyAction) => {
     if (isDoneRef.current || propsRef.current.isPaused) return
@@ -125,15 +142,15 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
       const action = aimKeyActionOf(event.key)
       if (action === null) return
       event.preventDefault()
-      applyRef.current(action)
+      keyLatch.push(() => applyRef.current(action))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [keyLatch])
 
   const pressKey = (key: string) => {
     const action = aimKeyActionOf(key)
-    if (action !== null) apply(action)
+    if (action !== null) keyLatch.push(() => applyRef.current(action))
   }
   const rects = aimTapRectsOf(side)
 

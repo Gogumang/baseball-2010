@@ -2,13 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
-import { createRunner } from '@/entities/fielding/model/fieldingState'
 import { passedBallStrikeoutOf } from '@/entities/fielding/model/passedBall'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import {
   isPassedBallPlayResult,
   passedBallCallSoundIdOf,
-  passedBallCovers,
   passedBallPlayEngineInputOf,
   passedBallTrajectoryOf,
   runPassedBallPlay,
@@ -90,12 +88,20 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
     expect(kept.advance.bases.first).toBe(true)
   })
 
-  it('커버 — 포수가 쫓으면 홈은 투수가 맡되 홈으로 올 주자가 없으면 비운다 (0xb1d48 · 0xb1b88)', () => {
-    expect(passedBallCovers(1, false, [])).toEqual([-1, 2, 3, 4])
-    expect(passedBallCovers(1, false, [createRunner(1, 3, 335)])).toEqual([0, 2, 3, 4])
-    // 2루 주자는 3루로 가는 중일 때만 "홈으로 올 주자" 다 (r−2 갈래)
-    expect(passedBallCovers(1, true, [createRunner(1, 2, 335)])).toEqual([-1, 2, 5, 4])
-    expect(passedBallCovers(1, true, [createRunner(1, 2, 335, { targetBase: 3 })])).toEqual([0, 2, 5, 4])
+  it('판 시작 커버 b2884 vt30 — 포수가 쫓으면 홈은 투수가 맡되 홈으로 올 주자가 없으면 비운다 (0xb1d48 · 0xb1b88 · r162)', () => {
+    const coversOf = (bases: typeof EMPTY_BASES, stealingFrom?: readonly (1 | 2 | 3)[]) =>
+      passedBallPlayEngineInputOf({ shot: 가운데, bases, outs: 0, stealingFrom }).play.coverOfBase
+    const start = passedBallPlayEngineInputOf({ shot: 가운데, bases: EMPTY_BASES, outs: 0 })
+    expect(start.play.ballHolderSlot).toBe(1)
+    // 공 첫 점 = 표준 배팅 지점(0xd8758)이라 2루는 b1e12 규칙 — 폭투 공 각(+95) + 90 > 0 → 유격수
+    expect(coversOf(EMPTY_BASES)).toEqual([-1, 2, 5, 4])
+    expect(coversOf({ ...EMPTY_BASES, third: true })).toEqual([0, 2, 5, 4])
+    // 2루 주자는 3루로 가는 중일 때만 "홈으로 올 주자" 다 (r−2 갈래) — 판 시작 vt30 은 리드(0x3d7b8) 앞이라 도루 목표(0xa9bd4)만 본다
+    expect(coversOf({ ...EMPTY_BASES, second: true })).toEqual([-1, 2, 5, 4])
+    expect(coversOf({ ...EMPTY_BASES, second: true }, [2])).toEqual([0, 2, 5, 4])
+    // 투수는 홈 커버(AI 2) · 2루 커버가 아닌 2루수는 0xb203a 로 기본 자리 0xd8764[0] (AI 0xa)
+    expect(start.fielders[3]?.target).toEqual({ x: 25_500, y: 0, z: 17_500 })
+    expect(start.fielders[3]?.aiState).toBe(0xa)
   })
 
   it('재생 칸에 든 결과가 폭투·포일 판인지 가를 수 있다 — 도루 판은 아니다', () => {

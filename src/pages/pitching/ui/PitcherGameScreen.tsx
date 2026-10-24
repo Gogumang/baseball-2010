@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
@@ -440,7 +441,9 @@ function PitcherGameScene({
     if (!acceptsPickoff) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      pickoff(event.key)
+      // 견제 키 0x53548 — 다음 틀의 키 0x498d4 가 0xf 갱신보다 먼저 처리한다(구질 고르기 `PitchSlotPicker` 의 키 칸에 든다)
+      const { key } = event
+      pushSceneKey(() => pickoff(key))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

@@ -74,8 +74,8 @@ export interface PitcherSideStageFrame {
  * - 그 밖은 '대기'(0xd~0xf · 0x10 조준 — 장면은 대기 동작이다).
  * 게이지(`PitchGradeGauge`)도 경기 장면 틱 머리마다 센다(`setGameSceneTickInterval`) — 놓은 틱은 게이지가 놓은 그 장면 틱이다.
  * 게이지는 0x10 이 0x11 을 예약한 틀에 선 것으로 보고 다음 틀 머리를 0x11 틱 0 으로 센다(0xbc9c8 bc9ec — 예약 다음 틀이 틱 0).
- * ⚠️ 남은 차이: 그 "예약한 틀" 은 조준 OK 키를 읽는 틀이다 — 웹은 키를 받은 그 자리(틀 사이)에서 게이지를 세워 원본(키는 다음 틀의
- * 키 처리 0x498d4 가 읽는다)보다 한 틀 이르다. 키 처리 틀 차례는 따로 맞춘다(조준 `AimCursor`).
+ * 그 "예약한 틀" 은 조준 OK 키를 읽는 틀이다 — 조준(`AimCursor`)은 키를 받은 다음 틀 머리에서 꺼내므로(`sceneKeyLatch`, 0x498d4)
+ * 게이지가 그 틀에 서고 다음 틀 머리가 0x11 틱 0 이다.
  */
 export function pitcherSideStageFrameOf(clock: PitcherSideStageClock): PitcherSideStageFrame {
   const idle: PitcherSideStageFrame = {

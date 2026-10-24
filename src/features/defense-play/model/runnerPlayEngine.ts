@@ -81,6 +81,13 @@ import {
   type LooseBallChase as ChasedBall,
 } from '@/features/defense-play/model/looseBallChase'
 import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/throwLaunch'
+import {
+  CATCHER_BALL_POINT,
+  PITCHER_BALL_POINT,
+  runCoverTick,
+  runnerPlayBallInput,
+  type CurrentBallPath,
+} from '@/features/defense-play/model/coverTick'
 
 /**
  * **주자 판 진행기** — 타구가 없는 수비 판(플레이 종류 5 도루 · 9 폭투·포일)을 틱 단위로 돈다.
@@ -97,6 +104,8 @@ import { forecastOptionsOf, launchThrow } from '@/features/defense-play/model/th
  * 2. 같은 플레이 틱의 꼬리 — 아웃 판정 b43da → 낙구 틱 포스 요구 루 0xa95e8(b444e~b453c) → 결과 메시지 0xbba(b4562 — 13 이면
  *    0x51d40~0x51db4 가 사람 수비에서도 CPU 송구 결정 한 번) → 튕김 0xb3148(b45a0) → 득점 0xaa0a8 · 보류 풀기 0xaa34c(525fc)
  * 3b. 사람 목표 +0x160 — 플레이 vt4c 0xb45dc(52612)의 b4660~b46a8: 쥠 && 준비면 루로 보내기 `0xb2c90`, 그리고 −1 · 3c. AI 9
+ * 3d. vt4c 끝 b4c72 — 플레이 vt30 = 0xb1c90: 커버(+0xf0) 다시 고르기 · 키스톤 자리 0xb203a (`coverTick.runCoverTick`, r162).
+ *    송구 0xb2e38 꼬리 b3094 도 같은 것을 한 번 부른다(`sendToBase`)
  * 4. 자동 추가 진루 0xaf918 (`0xae690` 갈림, 진루시키면 +0x128 = 1) · 자동 슬라이딩 0xb030c
  * 4c. CPU 송구 결정 `0xafa60 → 0xafb24` — `0xae6c8`(수비 CPU || 송구 자동)일 때 매 틱, +0x128 && 준비일 때만 고르고
  *    0xb2c90 이 성공하면 +0x128 = 0. 받은 야수도 준비 틱이 지나면 이어 던진다.
@@ -155,6 +164,8 @@ export interface RunnerPlayEngineInput {
   readonly outs: number
   /** state[0x1e] 시작 값 — 공이 땅에 닿았거나 잡혔음 */
   readonly ballOnGround: boolean
+  /** 플레이 +0x126 — 판 시작 vt20(b11fe)이 1 로 세우고 판 시작 0xb1c90 의 0xb203a 가 중계 자리를 잡으면 0. 안 주면 1 */
+  readonly relayFlag?: boolean
   /** 없으면 처음부터 `play.ballHolderSlot` 이 쥐고 있다 */
   readonly chase?: LooseBallChase
   /**
@@ -363,6 +374,12 @@ function* runnerPlaySteps(
   let thrownThisTick: number = NONE
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 */
   let ballBody = chase?.body
+  /** 지금 공 궤적(공.vt68(0) · 공.vt60 이 읽는 점들) — 폭투 공 · 송구 · 튕김이 새로 깐다. 없으면 0xa276c 의 점 하나 */
+  let ballPath: CurrentBallPath | null = chase === null ? null : { trajectory: chase.trajectory, startTick: chase.startTick }
+  /** 0xa276c — 종류 5 는 포수 자리 0xd7c30, 그 밖은 투수판 0xd7c24 (밀어내기 종류 2 는 `restingBall` 로 받는다) */
+  const placedBallPoint = input.restingBall ?? (input.kind === 5 ? CATCHER_BALL_POINT : PITCHER_BALL_POINT)
+  /** 플레이 +0x126 — 판 시작 vt20(b11fe)이 1. 0xb203a 가 중계 자리를 잡으면 0 */
+  let relayFlag = input.relayFlag ?? true
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
   let ballEventThisTick = false
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
@@ -403,6 +420,17 @@ function* runnerPlaySteps(
     currentTick: tick,
     landingTick: input.chase?.trajectory.landingTick ?? 0,
   })
+  /** 플레이 vt30 = 0xb1c90 한 번 (`coverTick.runCoverTick`) — vt4c 끝 b4c72(매 틱) · 송구 꼬리 b3094 */
+  const coverTick = (tick: number): void => {
+    const covered = runCoverTick({
+      context: contextAt(tick),
+      ...runnerPlayBallInput(ballPath, placedBallPoint, tick),
+      relayFlag,
+    })
+    play = covered.play
+    fielders = covered.fielders
+    relayFlag = covered.relayFlag
+  }
 
   /** 0xb36d0 한 번 — 원본처럼 모든 주자를 본다(타자주자 제외 없음) */
   /** 바로 앞 0xb36d0 한 번의 결과 — 같은 플레이 틱의 두 번째 판정이 state[0x87] 을 다시 적는다(타구 진행기 `grabOutThisTick`) */
@@ -532,21 +560,21 @@ function* runnerPlaySteps(
       firstThrowArrival = chase?.catchTick ?? tick
     }
     // 던지면 손을 떠난다(b2f80 · b3070) — 준비 틱(+0xc8)도 썼다.
-    // b3094 vt30 = 0xb1c90 의 b2564: 던진 야수가 커버 표 +0xf0 에 있고 AI ∉ {8, 1, 9} 면 vt14(그 루) · AI 루 + 2 — 고르기 vt34 가 AI 1 을
-    // 0 으로 내린 뒤라(b3b7a) 공을 쥐고 AI 1 이던 도루 판 포수도 여기서 홈 커버로 돌아간다(`stealPlay` 머리말).
-    // 그다음 0xb2c90 b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리 0xd86ec 로 돌아간다(b476a)
-    const thrownCoverBase = play.coverOfBase.indexOf(holderSlot)
+    fielders = fielders.map((fielder) =>
+      fielder.slot === holderSlot ? { ...fielder, holdingBall: false, actionRemainingTicks: 0 } : fielder,
+    )
+    // b3094 vt30 = 0xb1c90 한 번 — 고르기 vt34 가 공 가진 야수(+0x130)를 받을 야수로 바꾸고 AI 1 을 0 으로 내린 뒤라(b3b7a)
+    // 커버를 그 상태로 다시 고른다. 던진 야수가 커버 표에 남으면 b2564 가 vt14(그 루) · AI 루 + 2 — 공을 쥐고 AI 1 이던 도루 판
+    // 포수도 여기서 홈 커버로 돌아간다(`stealPlay` 머리말)
+    coverTick(tick)
+    // 그다음 0xb2c90 b2df8~b2e14: 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 0xb8dbc(…, 0) — 시작 자리 0xd86ec 로(b476a)
     fielders = fielders.map((fielder) => {
       if (fielder.slot !== holderSlot) return fielder
-      const released = { ...fielder, holdingBall: false, actionRemainingTicks: 0 }
       const keeps =
         (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
         fielder.aiState === AI_STATE.RECEIVE
-      if (keeps) return released
-      if (thrownCoverBase !== NONE && fielder.aiState !== AI_STATE.RUNDOWN && fielder.aiState !== AI_STATE.CHASE) {
-        return { ...released, aiState: AI_STATE.COVER_HOME + thrownCoverBase, target: basePosition(thrownCoverBase), targetBase: thrownCoverBase }
-      }
-      return { ...released, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
+      if (keeps) return fielder
+      return { ...fielder, aiState: AI_STATE.IDLE, target: FIELDER_START_POSITIONS[holderSlot] ?? fielder.target, targetBase: NONE }
     })
     log.push(
       `${tick}틱 ${holderSlot}번 야수가 ${base}루로 송구 — ${chase?.catchTick ?? tick}틱 도착` +
@@ -566,6 +594,7 @@ function* runnerPlaySteps(
   const takeLooseBall = (next: ChasedBall): void => {
     chase = next
     ballBody = next.body
+    ballPath = { trajectory: next.trajectory, startTick: next.startTick }
     fielders = fielders.map((fielder) =>
       fielder.slot === next.slot
         ? { ...fielder, target: next.catchPoint, aiState: AI_STATE.CHASE, holdingBall: false }
@@ -832,6 +861,10 @@ function* runnerPlaySteps(
         }
       }
     }
+
+    // ── 3d. vt4c 의 끝 b4c72 — 플레이 vt30 = 0xb1c90: 커버(+0xf0) 다시 고르기 · 키스톤 자리 잡기 0xb203a (`runCoverTick`) ──
+    // 야수 AI 고리(b46ae~b4c6a) 뒤 조건 없이 부른다 — vt4c 가 도는 판(종류 4 · 5 · 9)이면 매 틱. 밀어내기(종류 2)는 vt4c 가 안 돈다
+    if (!play.finished && vt4cRuns) coverTick(tick)
 
     // ── 4. 자동 추가 진루 0xaf918 · 자동 슬라이딩 0xb030c ──
     // 결과 코드(9·13)가 선 뒤에도 돈다 — 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이 열려 있으면 매 틱 부르고 결과 코드를 안 본다

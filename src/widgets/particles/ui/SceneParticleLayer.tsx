@@ -6,6 +6,7 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import {
+  claimSceneParticleTick,
   isSceneParticlesClaimed,
   preloadSceneParticles,
   sceneParticleScene,
@@ -65,7 +66,8 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
         if (tick - steppedTick > CATCH_UP_LIMIT) steppedTick = tick - CATCH_UP_LIMIT
         while (steppedTick < tick) {
           steppedTick += 1
-          tickSceneParticles(randomRef.current)
+          // 앱 틀당 한 번 — 화면이 바뀌는 틀에 타석 · 수비 판 루프가 이 틀을 이미 굴렸으면 건너뛴다(`claimSceneParticleTick`)
+          if (claimSceneParticleTick(scene, startTick + steppedTick)) tickSceneParticles(randomRef.current)
         }
       }
       const shows = scene.emitters.length > 0 && !isClaimed && !isGated

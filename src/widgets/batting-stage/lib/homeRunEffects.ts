@@ -1,3 +1,4 @@
+import { claimSceneParticleTick } from '@/entities/particle/model/sceneParticleManager'
 import {
   initHomeRunFireworks,
   tickHomeRunFireworks,
@@ -55,6 +56,8 @@ export interface StageFrameInput {
   readonly random: RandomPort
   /** 0xbbc84 의 id → 설정 (`ptc/(id+1).ptc`) */
   readonly configOf: (id: number) => ParticleConfig | null
+  /** 이 틱 프레임이 든 앱 틱 — 앱 전역 관리자는 앱 틀당 한 번만 굴린다(`claimSceneParticleTick`). 없으면 늘 굴린다 */
+  readonly appTick?: number
 }
 
 /** 효과 객체가 파티클 장면에 닿는 자리 — 이미터 자리는 블록 번호다 (`emitParticles` · `blockStateOf`) */
@@ -101,8 +104,8 @@ export function stepStageFrame(effects: StageEffects, input: StageFrameInput): S
     lastDraw = draw
   }
 
-  // 4. 프레임 끝 0x6de84
-  tickParticles(input.particles, input.random)
+  // 4. 프레임 끝 0x6de84 — 다른 화면 루프가 이 앱 틀에 이미 굴렸으면 건너뛴다
+  if (claimSceneParticleTick(input.particles, input.appTick)) tickParticles(input.particles, input.random)
   return { window, lastDraw, fireworks, clearedAt }
 }
 

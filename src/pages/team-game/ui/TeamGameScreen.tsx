@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
@@ -480,8 +481,11 @@ function TeamGameScene({
       const stealBase = stealBaseOfKey(event.key)
       if (stealBase !== null && isStealable.includes(stealBase)) {
         event.preventDefault()
-        // 공이 나는 동안(상태 0x11)만 — 그 밖의 키는 원본도 먹고 끝난다
-        if (flightProbeRef.current?.() === true) actions.steal(stealBase)
+        // 공이 나는 동안(상태 0x11)만 — 그 밖의 키는 원본도 먹고 끝난다. 키는 장면 키 칸에 들어 다음 틀의 키 0x498d4 → 0x53610 이
+        // 그 틀의 상태를 본다
+        pushSceneKey(() => {
+          if (flightProbeRef.current?.() === true) actions.steal(stealBase)
+        })
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -624,7 +628,9 @@ function TeamGameScene({
     if (!acceptsPickoff) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      pickoff(event.key)
+      // 견제 키 0x53548 — 다음 틀의 키 0x498d4 가 0xf 갱신보다 먼저 처리한다(구질 고르기 `PitchSlotPicker` 의 키 칸에 든다)
+      const { key } = event
+      pushSceneKey(() => pickoff(key))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -1255,7 +1261,9 @@ function TeamGameScene({
             {isStealable.map((base) => (
               <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
                 onPress={() => {
-                  if (flightProbeRef.current?.() === true) actions.steal(base)
+                  pushSceneKey(() => {
+                    if (flightProbeRef.current?.() === true) actions.steal(base)
+                  })
                 }} />
             ))}
           </PressLayer>
