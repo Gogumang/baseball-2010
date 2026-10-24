@@ -92,7 +92,7 @@ export interface AutoAdvanceInput extends DefenseContext {
  * 9fed0  t != g → 0
  * 9fed4  0xbc124(위치 +0x20, 이동 목표점 +0x2c) = (두 점이 다르다) → 그 값        ; 0xbc124 = !0xbc0f4(같은 점)
  * ```
- * ⚠️ **근사 둘**: `+0x3a`(앞 틱 끝의 멈춤 값)는 지금의 `isRunnerStopped` 로, 이동 목표점 `+0x2c` 는 `basePosition(+0x7c)` 로
+ * ⚠️ 근사(남김 — 웹 주자 모델) 둘: `+0x3a`(앞 틱 끝의 멈춤 값)는 지금의 `isRunnerStopped` 로, 이동 목표점 `+0x2c` 는 `basePosition(+0x7c)` 로
  * 본다(웹 주자는 목표 루 좌표로만 걷는다 — `isRunnerStopped` 와 같은 근사).
  */
 export function isHeadingBack(runner: RunnerState, previousTarget: number): boolean {

@@ -313,7 +313,12 @@ interface BattingStageProps {
   readonly skillPanel?: SkillPanelSource
 }
 
+/** 터치 번트 '7' · '9' 의 버튼 차례 — `touchKeyOffer` 의 '8'(1) 과 '3'(2) 사이 */
+const BUNT_7_TOUCH_ORDER = 1.25
+const BUNT_9_TOUCH_ORDER = 1.5
+
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
+
 export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
   const isCommonWindowOpen = useIsCommonWindowOpen()
   // 지금 선 타자 · 투수의 스윙 · 번트 · 투구 그림을 미리 받는다(안 기다린다 — 그리기는 그대로)
@@ -709,7 +714,11 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       ? { key: '0', label: '필살타' }
       : null,
   )
-  useTouchKeyOffer(takesStageKeys && canBunt && aceBatterIndex < 0 ? { key: '8', label: '번트', isHold: true } : null)
+  // 번트 '7' · '9' 도 같은 0x51e48 로 종류 2 · 3 을 예약한다(0x535a4) — '8' 처럼 누르는 동안만(뗄 때 0x6a8). 버튼은 '8' 바로 뒤에 선다
+  const offersBunt = takesStageKeys && canBunt && aceBatterIndex < 0
+  useTouchKeyOffer(offersBunt ? { key: '8', label: '번트', isHold: true } : null)
+  useTouchKeyOffer(offersBunt ? { key: '7', label: '번트 7', isHold: true, order: BUNT_7_TOUCH_ORDER } : null)
+  useTouchKeyOffer(offersBunt ? { key: '9', label: '번트 9', isHold: true, order: BUNT_9_TOUCH_ORDER } : null)
 
   return (
     <canvas

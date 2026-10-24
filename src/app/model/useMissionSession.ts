@@ -1662,7 +1662,7 @@ export function useMissionSession({
         ),
     )
     // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
-    // ⚠️ **근사**: 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
+    // ⚠️ 근사(때 · 남김 — 웹 구조, 투수편 `usePitcherGame` 과 같은 자리): 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
     //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
     // 삼진 진동 100ms — 미션(모드 5)도 경기 장면 0x104 라 못 맞힌 공은 0x11 → 0x12 를 지나고, 그 그리기 0x4ce9c 는
     // 모드를 가리지 않는다(0x52fb6 표 0xd05a0[0x12]). 0x12 진입 3dfac 이 0x9d57c 로 state[0xc] = 5(삼진) 를 쓰면
@@ -1780,7 +1780,7 @@ export function useMissionSession({
       setPendingDefensePlay(null)
       if (pending.isFoulPlay === true && played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산 없이 0xf(같은 타석 다음 공) · 0x35108 이 0xa975c(주자를 판 앞 자리로) ·
-        // 0xb6b58(스트라이크 ≤ 1 이면 +1). 콜은 결과 코드 7 메시지 51c5c 의 25(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
+        // 0xb6b58(스트라이크 ≤ 1 이면 +1). 콜은 결과 코드 7 메시지 51c5c 의 25(⚠️ 근사(때 · 남김 — 웹 구조): 원본은 7 이 난 틱 — 판 끝에 낸다)
         // 화면이 돌린 판이면 25 는 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
         if (result === undefined) playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played)])
         runner.applyPitch({ kind: '파울' })
@@ -2038,7 +2038,7 @@ export function useMissionSession({
    * **상태 8 끝 → 첫 0x18** (48bf0 — 미션은 인트로 0xc 를 안 지난다). 부르는 쪽이 판을 세운 뒤(`startMission` · `startPitcherMission`
    * 은 굴리지 않는다) 하늘 줄 다음에 부른다. 첫 반 이닝이 사람 몫이면 판이 서고 틱 0 의 0x3fac4 가 rand 36 개를 굴린다
    * (`missionFirstHalfIsHuman` — 웹의 미션 · 마선수 대결은 모두 사람 몫이다).
-   * ⚠️ 사람 몫이 아니면 원본은 0x18 → 0x21 자동진행으로 가지만 그런 미션이 웹에 없어 그 길은 옮기지 않았다 — 판 없이 0xd → 0xe.
+   * ⚠️ 미구현(남김 — 웹에 없는 미션 꼴): 사람 몫이 아니면 원본은 0x18 → 0x21 자동진행으로 가지만 그런 미션이 웹에 없어 그 길은 옮기지 않았다 — 판 없이 0xd → 0xe.
    */
   const openFirstHalfBoard = (run: MissionRun | PitcherRun) => {
     if (!missionFirstHalfIsHuman(run)) {
@@ -2247,7 +2247,7 @@ export function useMissionSession({
      * 주루 설정은 안 넘긴다(진행기 기본 = 자동) — 미션 세션에는 환경설정 "주루" 가 들어오지 않는다(근사, 타구와 같다).
      *
      * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-     * ⚠️ 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기·나만의리그와 같은 근사).
+     * ⚠️ 근사(때 · 남김 — 웹 구조): 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기·나만의리그와 같다).
      */
     cpuPickoff: (base: PickoffBase) => {
       const current = missionRunRef.current

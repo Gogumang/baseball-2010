@@ -560,7 +560,7 @@ interface SeasonSave {
    * 경기진행 설정 시즌 칸 (전역 저장 +0x12c+m 계열, m = 1). 원본은 **전역 저장**이라 시즌을 새로 해도 남는다 —
    * 웹엔 그 전역 저장 객체가 없어 시즌 저장에 두되, 새 시즌(`chooseTeam`)이 앞 저장의 값을 그대로 넘겨받는다.
    * 모드 초기화 0x224ec(2) 는 이 칸을 안 지운다 — `resetSeason` 이 시즌 없는 덩어리에 남겨 둔다(`SeasonGlobalCarry`).
-   * ⚠️ 시즌 저장 칸을 통째로 지우면(브라우저 저장 삭제) 함께 사라진다 — 그 점만 근사다.
+   * ⚠️ 근사(남김 — 웹 저장 꼴): 시즌 저장 칸을 통째로 지우면(브라우저 저장 삭제) 함께 사라진다 — 그 점만 다르다.
    * 한 번도 고치지 않았으면 생성자 0x9f26c 의 기본값(`SEASON_DEFAULT_MATCH_SETTINGS` — 이닝 · 전체)이다.
    */
   readonly matchSettings?: MatchProgressSettings
@@ -586,7 +586,7 @@ interface SeasonSave {
    * 0xdd 진입 0x6548 · CPU 끼리 0xc239c 가 모드 2 에서 시즌 레코드에 넣고, 빼는 `0xb512c` 는 0xdf 진입 0x5980 · 0xe5 진입 0x5cd0
    * 두 곳(열 팀 모두)만 부른다 — 그 사이 0xf1 트레이드 요청 0x93c8 · 0xe8 스태미나 목록 0x5870 이 마선수 줄을 본다.
    * 경기 끝 0x4ea0c 의 저장(0x22755)이 레코드째 쓰므로 이어하기에도 남는다. 웹 명단 배열(`roster` · `cpuRosters`)에는 넣지 않는다.
-   * 이 칸이 없는 옛 저장은 마선수가 빠진 레코드(0xb512c 뒤)로 본다 — ⚠️ 옛 저장을 0xe9 · 0xf1 에서 이어 하면 그날 마선수 없이 굴린다.
+   * 이 칸이 없는 옛 저장은 마선수가 빠진 레코드(0xb512c 뒤)로 본다 — ⚠️ 근사(남김 — 옛 웹 저장 호환): 옛 저장을 0xe9 · 0xf1 에서 이어 하면 그날 마선수 없이 굴린다.
    */
   readonly recordAces?: Readonly<Record<number, SeasonRecordAces>>
   /**
@@ -2175,7 +2175,7 @@ export function useSeasonSession(
    * 이전 상태 0xe0 을 보고 아무것도 안 한다(설정 창 자동 열기·명단 다시 세우기 없음) — 그래서 장면만 바꾼다.
    *
    * 유저 팀 명단이 바뀌면 곧장 시즌 세이브에 적는다. 원본은 저장 객체의 팀 레코드를 바로 고치고 파일 쓰기는
-   * 0xdd 의 경기 시작(0x22754)이 하므로, ⚠️ 경기를 시작하지 않고 끄면 원본은 고친 것이 날아가지만 웹은 남는다.
+   * 0xdd 의 경기 시작(0x22754)이 하므로, ⚠️ 근사(남김 — 웹 저장 꼴): 경기를 시작하지 않고 끄면 원본은 고친 것이 날아가지만 웹은 남는다.
    */
   const pressEntryKeyAction = useCallback(
     (key: EntryKey) => {
@@ -2862,7 +2862,7 @@ export function useSeasonSession(
    * - 선택지로 다른 이벤트를 번호로 불렀으면 커서 +0x2c 가 마지막으로 부른 레코드 다음을 가리킨다.
    *
    * 재생 화면은 보상을 명령마다 그 자리에서 준다(`giveSeasonEventReward`, 알림 글 0x8beb8 와 함께) — 그때 여기 오는 `rewards` 는 비어 있다.
-   * ⚠️ 안 옮긴 것: 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
+   * ⚠️ 미구현(남김 — 웹 구조, 배경음은 장면 단위): 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
    */
   const finishSeasonEvent = useCallback(
     (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {
@@ -3322,7 +3322,7 @@ function postseasonDayOf(series: PostseasonSeries): number {
 /**
  * 0x8dd60 8dd9a~8ddf0 — 표 0xd4f34(일곱 칸)에서 `rand(0, 7)` 로 종류를 고르고 순위표 0x9d789(…, 종류, 2, 1)를 세워
  * 칸 수 0x9da19 가 0 이면(그 종류 1위가 없으면) **다시 굴린다**(8ddc8 고리). 빈 순위표마다 rand 한 번이 더 든다.
- * ⚠️ 원본은 일곱 종류가 모두 비면 끝없이 돈다 — 웹은 그때만 첫 굴림 하나로 멈춘다(정규시즌을 치른 리그에선 닿지 않는다).
+ * ⚠️ 근사(남김 — 원본 무한 고리 · 닿지 않는 길): 원본은 일곱 종류가 모두 비면 끝없이 돈다 — 웹은 그때만 첫 굴림 하나로 멈춘다(정규시즌을 치른 리그에선 닿지 않는다).
  */
 function rollSeasonMvpKind(
   save: SeasonSave,
@@ -3487,7 +3487,7 @@ export function seasonTeamRankOf(source: Pick<SeasonGoalSource, 'state' | 'leagu
  * `recordSeasonHumanGamePitchers` 로 넣는다(원본 0xa8024 · 0xa7de8, 0xa56dc 모드 2 갈래라 정규시즌만). 그래서 ④ 는 내 팀 투수가
  * 실점하면 0 보다 커진다.
  *
- * ⚠️ 한계 (지어내지 않고 남긴다):
+ * ⚠️ 근사(남김 — 웹 기록 꼴) 한계 (지어내지 않고 남긴다):
  * - 트레이드로 옮겨 온 선수는 옛 팀 표 자리(`tableTeamId` · id), 영입한 명전·나리 선수(id ≥ 0xb4 · 0xfe)는 원본 id 의
  *   표 밖 줄(`recordBatters`·`recordPitchers` — 0xa56dc 모드 2 갈래가 마선수만 거른다)로 쌓였다 — 같은 열쇠로 읽는다.
  *   기록을 못 찾은 표 밖 선수(`recordOf` 를 안 넘긴 길)는 경기가 남은 표 칸으로 세우고(`tableSlotsOfOrder`) 그 칸으로

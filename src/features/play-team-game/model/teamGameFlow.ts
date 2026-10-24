@@ -3981,7 +3981,7 @@ function withRunnerOnlyAdvance(
  * - `0xae5a8`: 그리고 정산 `0xa8024` 를 부른다 — **종류 4 라 타석 칸(+0x14)이 안 오른다**(`withPlateAppearance`
  *   에 결과 null). 타석에 서 있는 타자(사람 수비면 상대 타순 칸, 사람 공격이면 우리 타순 칸)의 칸이다.
  *
- * ⚠️ 미해결·근사
+ * ⚠️ 미확인(남김 — 0xae3e8 의 3아웃 갈래는 따로 안 떴다 · 판은 웹이 미리 돌린다)
  * - 0xf 에 다시 들어서며 진입 `0x3d954` 가 CPU 대타(0xac228)·CPU 투수 교체(0xac428)를 다시 부른다 —
  *   `enterPitchSelection` (공마다 다시 들어서는 것과 같은 자리).
  * - 견제 판이 아웃·진루를 내면(판 시작 리드 0x3d7b8 로 루를 떠난 주자 — 3370bf0) 경기 상태(루·아웃·점수·반 이닝
@@ -4633,7 +4633,7 @@ function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGamePro
  * 웹 칸: 안타·홈런 = 타순 칸 기록 `+0x12`·`+0x13`(`*EntryRecords[칸].hits`·`.homeRuns` — 양 팀 같은 칸),
  * 우리 투수 탈삼진 = `recordTally.moundStrikeouts`(교체 때 0), 상대 투수 탈삼진 = 그 투수의 경기 줄(`pitcherLines`).
  *
- * ⚠️ 미해결 하나 — **상대 마투수의 탈삼진**은 웹이 들고 있지 않아 0 이다(마투수는 리그 붙박이 표 칸이 없어 경기 줄이 없다).
+ * ⚠️ 미구현(남김 — 웹 기록 꼴 · 지금 표로는 결과 같음): **상대 마투수의 탈삼진**은 웹이 들고 있지 않아 0 이다(마투수는 리그 붙박이 표 칸이 없어 경기 줄이 없다).
  *    시즌 표(XlsSEASON_BURST 56행)에는 b6 ≠ 0 인 행이 하나도 없어 지금 경기 결과는 같다 (b6 은 타자·투수편 표만 쓴다).
  */
 export function burstGameRecordOf(

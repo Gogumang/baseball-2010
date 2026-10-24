@@ -396,9 +396,10 @@ export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[]
  * 일반모드 경기 세우기 `0x30f20` 이 준비 기록의 마타자 칸으로 이 함수를 부른다
  * (`31046: 0xb8870(teamA, [sp+0x45])`).
  *
- * ⚠️ **미확인**: 마타자 레코드의 수비 위치 니블(`+0x1c & 0xf`)은 저장 레코드에 있는 값이라
- * 못 읽었다. 벤치에 들어가는 선수이므로 **0(자리 없음)** 으로 둔다 — 대타 확정이 이 니블을
- * 옛 타자 것과 맞바꾸므로(0xaecce~0xacfe) 0 이어야 빠진 선수가 벤치로 내려간다.
+ * 마타자 레코드의 수비 위치 니블(`+0x1c & 0xf`)은 **0(자리 없음)** 이다 (직접 떴다): 레코드는 `0x1f84c` 의
+ * `[g+0xac] + 0xd54 + i × 0x30` 이고, 그 덩어리는 0x20138 이 통째 0 으로 지운 뒤(2028e) `0x20094(7)` 이
+ * `data/XlsACE_BAT_DATA.zt1` 을 풀어 머리 0x20 뒤를 그대로 베낀다(200dc~20104) — 다섯 행의 +0x1c 바이트가 모두 0 이다.
+ * 대타 확정이 이 니블을 옛 타자 것과 맞바꾸므로(0xaecce~0xacfe) 빠진 선수가 벤치로 내려간다.
  */
 export function withAceBatter(
   entry: readonly TeamEntryBatter[],
@@ -649,7 +650,7 @@ export interface TeamEntryPitcherRecord {
  * 차례의 로스터 칸 하나하나를 붙박이 표 칸으로 — 표에 없는 칸(`rosterSlot` −1 · 범위 밖)은
  * **아직 안 쓴 표 칸을 작은 번호부터** 채운다. 기록을 실은 칸(`null`)은 표 칸을 안 쓴다.
  *
- * ⚠️ 근사: 기록 없이 들어온 표 밖 선수(영입 선수의 기록을 부르는 쪽이 못 실었을 때)는 지어내지 않으려고
+ * ⚠️ 근사(남김 — 웹 기록 꼴): 기록 없이 들어온 표 밖 선수(영입 선수의 기록을 부르는 쪽이 못 실었을 때)는 지어내지 않으려고
  * 그 팀 표 선수로 자리만 채운다 (트레이드·영입 화면과 같은 한계).
  */
 function tableSlotsOfOrder(slots: readonly (number | null)[], tableSize: number): readonly (number | null)[] {

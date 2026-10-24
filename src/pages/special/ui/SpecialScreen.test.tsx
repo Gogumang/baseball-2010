@@ -314,6 +314,16 @@ describe('명예의 전당 격자 5×3', () => {
     expect(hallOfFameBubblePositionOf(오른쪽).x).toBe(오른쪽.x + 13 - HALL_OF_FAME_BUBBLE.width)
   })
 
+  it('말풍선이 열렸을 때 바닥띠 되돌아가기(CLR)는 말풍선만 닫는다 — 키 CLR 과 같다', () => {
+    찬칸열기()
+
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
+
+    expect(screen.queryByRole('menu', { name: '명예의 전당 슬롯' })).toBeNull()
+    expect(screen.getByRole('button', { name: '2번 슬롯' })).toBeTruthy()
+  })
+
   it('선물은 통신(🌐)이라 안내만 띄운다', () => {
     찬칸열기()
 

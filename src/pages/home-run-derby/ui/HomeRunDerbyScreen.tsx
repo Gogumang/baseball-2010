@@ -22,7 +22,7 @@ import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { derbyMasterBatterOf } from '@/entities/home-run-derby/model/derbyLineup'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
-import { pitcherCardStatsOf, pitcherLineOfRecord } from '@/widgets/matchup-cards/lib/matchupRecord'
+import { batterCardStatsOf, batterLineOfRecord, pitcherCardStatsOf, pitcherLineOfRecord } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { DerbyPitcher } from '@/entities/home-run-derby/model/derbyPitcher'
 import { derbyStaminaGaugeOf } from '@/pages/home-run-derby/lib/derbyStaminaGauge'
@@ -268,8 +268,8 @@ export function HomeRunDerbyScreen({
   const ace = pitcher.ace
   // 지금 타자 0xae89c(팀 0) — 볼넷 · 사구 뒤 0xd 를 지나 타순이 넘어갔으면 내 팀 r7 의 마스터 타자 줄이 친다. 능력치(0xab214) ·
   // 장착 스킬(실투 0x33d52 등) · 그림(타석 교대 0x47cc8 이 다시 싣는다) · 소개 판 모두 그 줄 것이다
-  const master =
-    session.batter.isModeBatter || session.batter.row === null ? null : derbyMasterBatterOf(session.batter.row)
+  const masterRow = session.batter.isModeBatter ? null : session.batter.row
+  const master = masterRow === null ? null : derbyMasterBatterOf(masterRow)
   const stageBatter =
     master === null
       ? { ability, form: batterForm, skinIndex: batterSkinIndex, equipmentLevels: batterEquipmentLevels, skillIds: batterSkillIds }
@@ -281,7 +281,8 @@ export function HomeRunDerbyScreen({
           skillIds: master.skillIds,
         }
   // 소개 판 0x44944 의 타자 판 — 타순은 팀+0x32, 모드 타자의 수비는 0xb53f0 이 남긴 옛 [k] 줄의 것.
-  // ⚠️ 미해결: 마스터 줄의 타율 · 홈런 · 타점(+0x20~)은 웹 명부에 없는 칸이라 비운다
+  // 마스터 줄의 타율(0xb8e3c) · 홈런(+0x28) · 타점(+0x2a)은 그 줄의 시즌 칸 +0x20~ 이다 — 마스터 팀 적재 0x1ff98 이 팀 표 행을
+  // 통째 베껴 표의 바이트 32~43 이 그대로 남는다(`RosterPlayer.recordLine`)
   const stageMatchupBatter: Omit<MatchupBatterCard, 'isComputer'> =
     master === null
       ? {
@@ -291,6 +292,7 @@ export function HomeRunDerbyScreen({
         }
       : {
           name: master.name,
+          ...(masterRow === null ? {} : batterCardStatsOf(batterLineOfRecord(masterRow.recordLine))),
           battingOrder: session.batter.order,
           ...(master.position === undefined ? {} : { position: master.position }),
         }

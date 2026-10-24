@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import type { ReactNode } from 'react'
-import { CommonPanel, FrameSprite, MessageBox, RawScreen, useImgTextPalette3 } from '@/shared/ui'
+import { CommonPanel, FrameSprite, MessageBox, PressArea, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
@@ -31,6 +31,8 @@ import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 
 const SLT_FRAME = './sprites/slt_frame'
+/** 값 줄 왼 화살 투명 칸 — 화살(x0 + 91) 앞으로 더 잡는 폭. 칸 끝은 막대 왼끝(x0 + 98) */
+const VALUE_ARROW_TOUCH_PAD = 4
 const IMG_TEXT = './sprites/img_text/frames'
 const POPUP = './sprites/popup/frames'
 
@@ -426,6 +428,16 @@ export function SettingsScreen({
             <button type="button" className={styles.row} aria-label={name}
               style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
               onClick={() => { setCursor(index); openRow(index) }} />
+            {/* 터치 −1 (웹 껍데기): 원본 왼 화살(이미지 20, 5×8) 자리의 투명 칸 — 왼 키(−3)와 같이 값을 하나 내린다.
+                줄을 누르면 +1(오른 키 · OK 와 같은 갈래)이라 내리는 길이 없었다 */}
+            {isValueRow && (
+              <PressArea label={`${name} 내리기`} testId={`설정내리기-${index}`}
+                rect={{
+                  x: VALUE_ROW.leftArrow.x - VALUE_ARROW_TOUCH_PAD, y: top + bar.dy,
+                  width: bar.x - VALUE_ROW.leftArrow.x + VALUE_ARROW_TOUCH_PAD, height: bar.height,
+                }}
+                onPress={() => { setCursor(index); changeValue(-1, index) }} />
+            )}
           </div>
         )
       })}

@@ -42,7 +42,7 @@ export interface SeasonTeamMenuScreenProps {
  * ```
  * 키 0x4e40 은 이 표를 안 본다 — 커서가 칸 1 에 있으면 흑백이어도 트레이드 0xe4 로 간다. 대신 위·아래 이동 0x6c444 가
  * 같은 표를 읽어 꺼진 칸을 건너뛴다(`useSeasonCursor` 의 `disabled`) — 커서가 그 칸에 새로 들어설 수 없다.
- * ⚠️ 원본 그대로의 어긋남(미해결): this+0x78 은 0x28 바이트짜리 0xd2e60 객체(0xf704 · 0x6bd7d)라 +0x28 은 객체 **밖**이다 —
+ * ⚠️ 미확인(남김 — 원본 정의 밖 · 힙 이웃 값): 원본 그대로의 어긋남 — this+0x78 은 0x28 바이트짜리 0xd2e60 객체(0xf704 · 0x6bd7d)라 +0x28 은 객체 **밖**이다 —
  * 진입이 쓰는 칸 1 말고 칸 0 · 2 · 3 의 값은 힙 이웃에 달려 정할 수 없어 켠 것으로 둔다.
  */
 export function SeasonTeamMenuScreen({

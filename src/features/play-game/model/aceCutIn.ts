@@ -309,7 +309,7 @@ export function scanlineSpans(points: readonly CutInPoint[]): readonly { readonl
   return spans
 }
 
-/** 선의 점들 — 브레젠험 (양 끝 포함). ⚠️ 플랫폼 drawLine 0x14006c8 의 본문은 못 읽었다 — 가로 · 세로선은 같고 빗선은 근사 */
+/** 선의 점들 — 브레젠험 (양 끝 포함). ⚠️ 근사(남김 — 단말 몫 · 바이너리 밖): 플랫폼 drawLine 0x14006c8 의 본문은 바이너리에 없다 — 가로 · 세로선은 같고 빗선은 브레젠험 */
 export function linePixels(from: CutInPoint, to: CutInPoint): readonly CutInPoint[] {
   const pixels: CutInPoint[] = []
   let x = from.x

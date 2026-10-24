@@ -226,7 +226,7 @@ import type { PlayerSide } from '@/entities/game/model/gameState'
  * 레코드 `+0x4a` = **직전 경기 인기도 변화 p** 로 확정돼 있다 (A 0절 "+0x4a s8: 지난 경기
  * 인기도 변화 (0xa68ca 가 쓴다) 확정" · P1 5-2 정정). 웹 값은 `evaluation.popularityChange` 다.
  *
- * ⚠️ **근사인 곳은 우는 자리뿐이다.** 원본은 결과 화면과 평가 창이 따로인데 웹은 한 화면이라
+ * ⚠️ 근사(때 · 남김 — 웹 구조): **근사인 곳은 우는 자리뿐이다.** 원본은 결과 화면과 평가 창이 따로인데 웹은 한 화면이라
  * 승패 징글(31·32) 바로 뒤에 이어 낸다 — 통로가 하나라 앞 소리가 끊긴다.
  */
 const MY_LEAGUE_EVALUATION_THRESHOLD = 1
@@ -1497,7 +1497,7 @@ export function useCareerSession({
       setProgress(resolved)
       if (played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 → 0xf(같은 타석 다음 공) · 0x35108 → 0xb6b58(스트라이크 ≤ 1 이면 +1).
-        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)과 파울 콜 25 가 이 판의 것이다(⚠️ 원본은 7 이 난 틱 — 판 끝은 근사)
+        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)과 파울 콜 25 가 이 판의 것이다(⚠️ 근사(때 · 남김 — 웹 구조): 원본은 7 이 난 틱 — 판 끝에 낸다)
         runner.applyPitch({ kind: '파울' })
         pitchTallyRef.current = tallyPitch(pitchTallyRef.current, { kind: '파울' })
         // 파울 콜 25 는 결과 코드 7 메시지(51c5c)가 낸다 — 화면이 돌린 판이면 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
