@@ -191,6 +191,7 @@ import {
   withAceBatter,
   withEntryRecordSlots,
   withAcePitcher,
+  teamPitcherSkinIndexOf,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type {
   TeamEntryBatter,
@@ -2332,6 +2333,12 @@ export function currentPitcherEquipment(progress: TeamGameProgress): readonly nu
   const entry = pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
   if (entry === undefined || entry.aceIndex >= 0) return undefined
   return entry.equipment
+}
+
+/** 사람 타석 마운드의 상대 투수 피부 (`teamPitcherSkinIndexOf` — 0x47cc8 의 482c0~482fc → 0x793b0 의 794c2) */
+export function currentPitcherSkinIndex(progress: TeamGameProgress): number {
+  const teamId = progress.options.opponentTeamId
+  return teamPitcherSkinIndexOf(teamId, pitcherEntryAt(progress, teamId, progress.opponentPitcherIndex))
 }
 
 /** 우리 선발 투수의 경기용 능력치 (제구·구속·변화·체력) */

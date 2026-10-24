@@ -4,7 +4,7 @@ import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
-import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
@@ -102,6 +102,14 @@ interface PitcherSideStageProps {
   readonly pitcherForm: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
+  /**
+   * 마운드 내 투수 레코드의 피부 `(rec[0xb] >> 2) & 3` · 수비 팀 0xb6c08(게임) — 타석 교대 0x47cc8 의 482c0~482fc 가 적재 0x793b0 에
+   * 넘겨 794c2 가 `pitcher.pzx` 를 **피부 × 15 + 팀** 벌로 연다. 피부를 안 주면 0, 팀을 안 주면 `hud.ourTeamId`(던지는 쪽이 내 팀)
+   */
+  readonly pitcherSkinIndex?: number
+  readonly pitcherTeamIndex?: number
+  /** 곧 설 선수들(다음 CPU 타자 · 대타 · 교체 투수)의 생김새 — 그림마다 칠하기를 미리 건다 (`BattingStage.warmCast`) */
+  readonly warmCast?: StageWarmCast
   /**
    * 마운드의 마투수 그림 — 타석 교대 0x482fc 의 적재 0x793b0 이 순번 0xb63a0 으로 `ace/pitcher_*` 를 싣는다. 없으면 평범한 투수
    */
@@ -626,6 +634,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,
         pitcherHand: current.pitcherHand,
+        pitcherSkinIndex: current.pitcherSkinIndex ?? 0,
+        pitcherTeamIndex: current.pitcherTeamIndex ?? current.hud?.ourTeamId ?? null,
+        warmCast: current.warmCast ?? null,
         stagePhase: isSceneD ? { ...stage.phase, isSceneD } : stage.phase,
         pitchInput,
         timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,

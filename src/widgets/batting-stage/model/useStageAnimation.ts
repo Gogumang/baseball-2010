@@ -927,6 +927,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
+        ...(latestRef.current.pitcherSkinIndex === undefined ? {} : { pitcherSkinIndex: latestRef.current.pitcherSkinIndex }),
+        ...(latestRef.current.pitcherTeamIndex === undefined ? {} : { pitcherTeamIndex: latestRef.current.pitcherTeamIndex }),
+        warmCast: latestRef.current.warmCast ?? null,
         pitcherTick: pitcherStartTick === null ? null : sceneTick - pitcherStartTick,
         pitcherTickEnd: pitcherStartTick === null ? null : pitcherTickEnd,
         // 투수 그리기의 홈런 갈래(0x3908a)가 결과 코드 [+0xfd4] · 감상 플래그 +0x199a 를 본다 — 투수를 그리는 0x11 · 0x12 · 0x13 에서.

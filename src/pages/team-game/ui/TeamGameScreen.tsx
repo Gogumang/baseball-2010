@@ -31,6 +31,7 @@ import {
   humanDefenseSkillPanelOf,
   currentPitcherAbility,
   currentPitcherEquipment,
+  currentPitcherSkinIndex,
   currentPitcherAceIndex,
   opponentMagicStateOf,
   pitchSlotsFor,
@@ -44,6 +45,7 @@ import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameE
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
+import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
 import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
 import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
@@ -90,10 +92,13 @@ import {
   teamIntroBatterHandOf,
   teamMatchupCardsOf,
   teamPitcherSideStageOf,
+  teamStageWarmCastOf,
   opponentBatterRecordsOf,
 } from '@/pages/team-game/lib/teamMatchupCards'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
+import { useWarmStageCast } from '@/widgets/batting-stage/model/useWarmStageCast'
+import { stageWarmCastOf } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { passesHeldResult, pitchResultEntryDelayTicksOf, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
@@ -279,6 +284,14 @@ function TeamGameScene({
   }, [halfInningSave])
   /** 지금 마운드에 선 상대 투수가 마투수면 그 선수 (0xb88c8 로 8번 칸에 앉은 그것) */
   const opposingAcePitcher = ACE_PITCHERS[currentPitcherAceIndex(progress)] ?? null
+  // 곧 설 선수들(두 팀 명단 · 투수 명단)의 칠하기 — 사람 타석(우리 공격) · 사람 수비 타석(상대 공격) 그림이 그림마다 걸고,
+  // 타석 캔버스가 아직 안 선 동안(수비 판 · 반 이닝 판)은 경기 화면이 건다. 원본은 타석 교대 0x47cc8 의 적재 때 칠한다
+  const ourBattingWarmCast = teamStageWarmCastOf(progress, true)
+  const theirBattingWarmCast = teamStageWarmCastOf(progress, false)
+  useWarmStageCast(stageWarmCastOf(
+    [...ourBattingWarmCast.batters, ...theirBattingWarmCast.batters],
+    [...ourBattingWarmCast.pitchers, ...theirBattingWarmCast.pitchers],
+  ))
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [slot, setSlot] = useState<PitchSlot | null>(null)
@@ -639,6 +652,8 @@ function TeamGameScene({
    */
   const sceneStadium = progress.sceneStadium ?? null
   const fieldPalette = seasonStadium?.grassPalette ?? sceneFieldPaletteOf(sceneStadium)
+  // 타석 바닥 · 수비 바탕을 미리 칠한다 — 원본은 구장 객체 적재 때 팔레트를 갈아 끼운다
+  useWarmFieldBackgrounds(fieldPalette)
   const sceneryProps = {
     ...(sceneStadium === null ? {} : { stadium: sceneStadium.stadium }),
     fieldPalette,
@@ -1148,6 +1163,11 @@ function TeamGameScene({
                 isEagleEyeEnabled={false}
                 // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
                 pitcherEquipmentNibbles={currentPitcherEquipment(progress)}
+                // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(482c0~482fc → 0x793b0 의 794c2) — 사람 타석의 수비 팀 = 상대
+                pitcherSkinIndex={currentPitcherSkinIndex(progress)}
+                pitcherTeamIndex={options.opponentTeamId}
+                // 다음 타자 · 대타 · 교체 투수를 미리 칠한다 — 원본은 타석 교대 0x47cc8 의 적재 때 칠해 첫 그림부터 제 색이다
+                warmCast={ourBattingWarmCast}
                 // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
                 acePitcher={opposingAcePitcher === null ? null : acePitcherFramesOf(opposingAcePitcher)}
                 // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
@@ -1219,6 +1239,8 @@ function TeamGameScene({
               hiddenRunnerBases: progress.stealDisplayFrom ?? [],
             }}
             {...teamStage}
+            // 다음 CPU 타자 · 대타 · 우리 교체 투수를 미리 칠한다(0x47cc8 의 적재 때 칠하는 몫)
+            warmCast={theirBattingWarmCast}
             stadium={sceneStadium?.stadium ?? 0}
             fieldPalette={fieldPalette}
             skyRow={stadiumSkyRow ?? 0}

@@ -14,7 +14,8 @@ import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCu
 import { ManagementBoard } from '@/pages/management/ui/ManagementBoard'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
-import { BasicInfoCard } from '@/pages/management/ui/BasicInfoCard'
+import { BasicInfoCard, basicInfoFigureRecolorRequestsOf } from '@/pages/management/ui/BasicInfoCard'
+import { useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import { DetailPopup, DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { batterAbilityDetailViewOf } from '@/pages/management/lib/abilityDetail'
 import { NariRecordPickPopup, NariRecordView } from '@/pages/nari-record-room'
@@ -103,6 +104,8 @@ const BASIC_INFO_FOOTER = 0x87
 export function ManagementScreen(props: ManagementScreenProps) {
   const { career, noticeText } = props
   const menu = useManagementMenu(props)
+  // '기본정보' 카드 선수 그림을 미리 칠한다 — 열린 첫 그림부터 제 색(원본은 0x10810 의 그림 적재 때 칠한다). 그림만 — 메뉴 진행은 안 건드린다
+  useWarmRecoloredSprites(basicInfoFigureRecolorRequestsOf(career))
   /** 칭호 목록 윗줄을 장면 동안 들고 있는 곳 — 루트가 준 커서 객체, 없으면 이 화면 몫 */
   const ownTitleHolder = useRef<{ titleListTop?: number }>({}).current
   const titleHolder = props.mainCursor ?? ownTitleHolder

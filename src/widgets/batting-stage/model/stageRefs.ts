@@ -11,7 +11,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
-import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
@@ -125,6 +125,11 @@ export interface StageLatest {
   readonly acePitcher: AcePitcherFrames | null
   /** 마운드 투수 장비 겹 (`BattingStage` 의 `pitcherEquipmentNibbles` 주석) — 없으면 맨몸 */
   readonly pitcherEquipment?: PitcherEquipment
+  /** 마운드 투수 바탕 그림 벌 = 피부 × 15 + 팀 (적재 0x793b0 의 794c2 · `StageScene.pitcherTeamIndex` 주석). 팀이 없으면 구운 벌 */
+  readonly pitcherSkinIndex?: number
+  readonly pitcherTeamIndex?: number | null
+  /** 곧 설 선수들의 생김새 — 그림마다 칠하기를 미리 건다 (`StageScene.warmCast`) */
+  readonly warmCast?: StageWarmCast
   readonly canBunt: boolean
   /** 타자 폼 (원본 rec[0xb] 윗니블 = 2 × 타입 + 손). 몸통·자세표를 `폼 >> 1` 로 고른다 */
   readonly batterForm: number
