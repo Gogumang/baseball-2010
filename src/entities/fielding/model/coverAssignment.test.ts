@@ -115,6 +115,17 @@ describe('0xb1c90 커버 매 틱 다시 고르기 — 표 0xd8774 · b1d48 · b1
     expect(돌리기(문맥({ ballHolderSlot: 1 }, [], 야수), false, 타격점).covers[2]).toBe(3)
   })
 
+  it('유격수가 공을 쫓는데 공 가진 야수의 vtcc 가 거짓(동작 잠금 +0xb4)이면 2루가 막혀 2루에 가까운 쪽이 커버한다 (b1d96~b1dc8 · r158)', () => {
+    // 공 시작점이 타격점이 아니고 1루 주자가 있어 2루가 필요하다 — 안 막히면 b1e12(공 가진 유격수 → 2루수 커버)
+    const 주자1루 = [createRunner(1, 1, 속도)]
+    const 쫓는유격 = 고치기(5, { aiState: AI_STATE.CHASE, position: { x: 20_100, y: 0, z: 19_300 } })
+    const 홈 = basePosition(0)
+    expect(돌리기(문맥({ ballHolderSlot: 5 }, 주자1루, 쫓는유격), false, 홈).covers[2]).toBe(3)
+    // H(+0x130) = 유격수가 필살타법 타구에 맞아 +0xb4 > 0 → vtcc(0xa2138) 거짓 → 막힘 → b1e86: 2루수가 더 멀어 유격수가 커버
+    const 잠긴 = 고치기(5, { actionLockTicks: 3 }, 쫓는유격)
+    expect(돌리기(문맥({ ballHolderSlot: 5 }, 주자1루, 잠긴), false, 홈).covers[2]).toBe(5)
+  })
+
   it('공 가진 야수가 루로 가고 있으면 그 루의 커버다 — AI 9 면 아니다 (b23a4)', () => {
     const 들고뛰기 = 고치기(7, { target: basePosition(3), aiState: AI_STATE.CARRY })
     expect(돌리기(문맥({ ballHolderSlot: 7 }, [], 들고뛰기)).covers[3]).toBe(7)
