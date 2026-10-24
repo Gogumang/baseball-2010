@@ -528,7 +528,12 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     누르기('휴식')
     expect(screen.getByText('휴식을 취하시겠습니까?')).toBeTruthy()
     fireEvent.click(칸('예'))
+    // 127 연출(0x85230) 동안은 굴리지도 저장하지도 않는다 — 확인 키(0x10650)가 게이지를 끝으로 건너뛴다
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: '5' })
 
+    expect(screen.queryByTestId('나리-휴식연출')).toBeNull()
     expect((onSave.mock.calls[0][0] as PitcherCareer).morale).toBe(60)
     expect(screen.getByText('사기 10 상승하였습니다')).toBeTruthy()
   })
@@ -539,6 +544,7 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
 
     누르기('휴식')
     fireEvent.click(칸('예'))
+    fireEvent.click(screen.getByTestId('나리-휴식연출'))
     // 사기 결과 창(상세 창 0x872a1)을 닫아야 회복 판정이 돈다 (콜백 0x1d671)
     fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
 
@@ -546,6 +552,15 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     const recovered = onSave.mock.calls[1][0] as PitcherCareer
     expect([recovered.isSick, recovered.isInjured]).toEqual([false, false])
     expect(screen.getByText(/부상에서 회복 되었습니다/)).toBeTruthy()
+  })
+
+  it('127 연출은 캐릭터 없이 event_ani 애니 5 · event_char_0 애니 0x62 (0x85230) — 취소 키는 안 먹는다 (0x10650)', () => {
+    화면({})
+    누르기('휴식')
+    fireEvent.click(칸('예'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '상세정보' })).toBeNull()
   })
 
   it('⚠️ 원본 그대로: 사기가 최고면 아프거나 다쳤어도 StrMODE[91] 로 거절한다 (0x12682)', () => {

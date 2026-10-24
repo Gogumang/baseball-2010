@@ -73,6 +73,15 @@ export function useManagementMenu(props: ManagementScreenProps) {
     // 125 → 105 — 커서는 메뉴 객체 그대로(트레이닝 칸). 행동함이면 105 진입이 첫 칸으로 (아래 `awaitingEntry`)
     setMainCursor(COMMAND_SLOTS.findIndex((slot) => slot.id === '트레이닝'))
   })
+  /**
+   * 127 휴식 — 'playing' 은 연출(0x85230 · 그리기 0x19e08), 'result' 는 연출 뒤 결과 창(0x18e3c)이 떠 있는 동안이다.
+   * 127 은 가운데 판 0x7f814 를 빼는 상태라(0x19da4 의 19dc0~19dd4) 두 때 모두 가운데 판을 그리지 않는다. 결과 창이 닫히면
+   * 0x1b466 이 105 로 — 그때 걷는다(아래 효과)
+   */
+  const [restPhase, setRestPhase] = useState<'playing' | 'result' | null>(null)
+  useLayoutEffect(() => {
+    if (restPhase === 'result' && props.detail === null) setRestPhase(null)
+  })
   const slots = kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[kind]
   const disabledIds = NO_DISABLED_IDS
 
@@ -96,7 +105,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
     setMovedAt(update)
   }
   const back = () => {
-    if (playback.playingMenuId !== null) return
+    // 127 키 0x10650 은 확인만 본다 — 취소 없음
+    if (playback.playingMenuId !== null || restPhase === 'playing') return
     // 120 의 취소 → 119 (0x1b654)
     if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
     if (overlay !== null) return setOverlay(null)
@@ -117,8 +127,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
    */
   const wasActed = useRef(props.career.hasActedThisCycle)
   const [awaitingEntry, setAwaitingEntry] = useState(false)
-  const isIdleMain = kind === 'main' && playback.playingMenuId === null && props.detail === null && question === null
-    && overlay === null && !isShowingBasicInfo
+  const isIdleMain = kind === 'main' && playback.playingMenuId === null && restPhase === null && props.detail === null
+    && question === null && overlay === null && !isShowingBasicInfo
   useLayoutEffect(() => {
     if (props.career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
     wasActed.current = props.career.hasActedThisCycle
@@ -137,14 +147,15 @@ export function useManagementMenu(props: ManagementScreenProps) {
   }
 
   const select = (id: string) => {
-    if (playback.playingMenuId !== null || question !== null || props.detail !== null || overlay !== null) return
+    if (playback.playingMenuId !== null || restPhase === 'playing' || question !== null || props.detail !== null || overlay !== null) return
     // 105 키 0x1261c — 확인(−5 · '5')이면 칸(꺼짐 · 하위 메뉴)을 보기 전에 0x12654 mgr+0x304 = 0
     if (kind === 'main') props.onMainConfirm?.()
     if (disabledIds.has(id)) return
     if (kind === 'main') {
       if (SUB_MENU_KINDS.includes(id)) return open(id as SubMenuKind, COMMAND_SLOTS.find((slot) => slot.id === id) ?? null)
       if (id === '휴식' && !props.isRestBlocked()) {
-        return ask('!C[!cFFFF00휴식!cFFFFFF]을 취하시겠습니까?', () => props.onSelect('휴식'))
+        // 팝업 0x2a "예" → 127 진입 0x190e4(연출 0x85230). 굴림 · 결과 창 · 저장(0x18e3c)은 연출이 끝난 틀이다(`finishRest`)
+        return ask('!C[!cFFFF00휴식!cFFFFFF]을 취하시겠습니까?', () => setRestPhase('playing'))
       }
       return props.onSelect(id as ManagementCommand)
     }
@@ -183,6 +194,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
         if (event.key === 'Enter' || event.key === 'Escape') props.onCloseDetail()
         return
       }
+      // 127 연출 중 확인 키는 `RestScene` 이 받는다(0x10650) — 그 밖 키는 아무 일도 없다
+      if (restPhase === 'playing') return
       // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8', 나머지 키는 아무 일도 없다)
       if (abilityDetailOffset !== null) {
         if (event.key === 'Escape' || event.key === 'Backspace' || event.key === '0') return setAbilityDetailOffset(null)
@@ -244,6 +257,13 @@ export function useManagementMenu(props: ManagementScreenProps) {
     slideUpdates: Math.max(0, update - openedAt),
     playingMenuId: playback.playingMenuId,
     finishTraining: playback.finish,
+    restPhase,
+    /** 127 틀 0x19080 — 연출 끝(0x84e58)을 본 틀에 0x18e3c(사기 굴림 · 결과 창 · 저장) */
+    finishRest: () => {
+      if (restPhase !== 'playing') return
+      setRestPhase('result')
+      props.onSelect('휴식')
+    },
     question,
     answer,
     moveCursor,

@@ -166,6 +166,10 @@ export interface PitcherManagementMenu {
   readonly detail: PitcherMenuDetail | null
   /** 상세 결과 창을 닫는다 — 훈련은 부상(0x1b4c4), 휴식은 회복(0x1b308)을 이때 굴린다 */
   readonly closeDetail: () => void
+  /** 127 휴식 — 'playing' 연출(0x85230) · 'result' 연출 뒤 결과 창. 둘 다 가운데 판 0x7f814 를 안 그린다(0x19da4) */
+  readonly restPhase: 'playing' | 'result' | null
+  /** 127 틀 0x19080 — 연출 끝(0x84e58)을 본 틀에 0x18e3c(사기 굴림 · 결과 창 · 저장) */
+  readonly finishRest: () => void
   readonly question: PitcherMenuQuestion | null
   readonly choice: PitcherMenuChoice | null
   /** 두 갈래 팝업의 커서 (원본 `장면+0x166`) — 좌우 키가 옮긴다 */
@@ -240,6 +244,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [choiceIndex, setChoiceIndex] = useState(0)
   /** 상세 결과 창 — 닫을 때 할 일(부상·회복 판정)을 같이 든다 */
   const [detail, setDetail] = useState<PitcherMenuDetail | null>(null)
+  /** 127 휴식 연출 · 결과 창 (`PitcherManagementMenu.restPhase`) */
+  const [restPhase, setRestPhase] = useState<'playing' | 'result' | null>(null)
   /** 108 마구 창의 격자 커서 (창 객체 +0xc · +0x10 — 진입 0x17730 이 정한다) */
   const [magicTrainingCursor, setMagicTrainingCursor] = useState(0)
   /**
@@ -445,32 +451,40 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       return setQuestion({
         text: PITCHER_MANAGEMENT_TEXT.restQuestion,
         onYes: () => {
-          const rest = runPitcherRest(career, random)
-          onSave(rest.career)
-          // 127 — 결과 창이 닫힐 때까지 105 가 아니다
+          // 127 — 결과 창이 닫힐 때까지 105 가 아니다. 진입 0x190e4 → 연출 0x85230(`RestScene`), 굴림은 연출 뒤(`finishRest`)
           setIsResultWindowOpen(true)
-          // 상세 결과 창(0x18fc2 → 0x872a1) — 글은 StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
-          setDetail({
-            rows: pitcherRestDetailRowsOf(rest.career, rest.moraleGain),
-            messages: [`사기 ${rest.moraleGain} 상승하였습니다`],
-            /*
-             * 결과 창을 **닫을 때** 회복 판정 0x1b308 (콜백 0x1d671, 질병 60% · 부상 30%, G 2-2).
-             * 타자편 `useCareerSession` 이 `recoverAfterRest` 를 부르는 자리와 같다.
-             */
-            afterClose: () => {
-              const recovered = recoverAfterPitcherRest(rest.career, random)
-              onSave(recovered.career)
-              if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
-              else setIsResultWindowOpen(false)
-              // 127 → 105 (0x1b466 `0xbcb49(0x69)`)
-              onReenter?.(REST_STATE)
-            },
-          })
+          setRestPhase('playing')
         },
       })
     },
-    [career, onNextGame, onOuting, onReenter, onSave, openOrNotice, random],
+    [career, onNextGame, onOuting, openOrNotice],
   )
+
+  /** 127 틀 0x19080 — 0x84e58 이 참인 틀에 0x18e3c (굴림 rand · 결과 창 0x741a0 · S+4 = 1 · 저장 0x1fded/0x22755) */
+  const finishRest = useCallback(() => {
+    if (restPhase !== 'playing') return
+    setRestPhase('result')
+    const rest = runPitcherRest(career, random)
+    onSave(rest.career)
+    // 상세 결과 창(0x18fc2 → 0x872a1) — 글은 StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
+    setDetail({
+      rows: pitcherRestDetailRowsOf(rest.career, rest.moraleGain),
+      messages: [`사기 ${rest.moraleGain} 상승하였습니다`],
+      /*
+       * 결과 창을 **닫을 때** 회복 판정 0x1b308 (콜백 0x1d671, 질병 60% · 부상 30%, G 2-2).
+       * 타자편 `useCareerSession` 이 `recoverAfterRest` 를 부르는 자리와 같다.
+       */
+      afterClose: () => {
+        setRestPhase(null)
+        const recovered = recoverAfterPitcherRest(rest.career, random)
+        onSave(recovered.career)
+        if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
+        else setIsResultWindowOpen(false)
+        // 127 → 105 (0x1b466 `0xbcb49(0x69)`)
+        onReenter?.(REST_STATE)
+      },
+    })
+  }, [career, onReenter, onSave, random, restPhase])
 
   const selectPlayerInfo = useCallback(
     (id: string) => {
@@ -526,6 +540,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   const select = useCallback(
     (id: string) => {
+      // 127 연출 중 — 키 0x10650 은 확인(게이지 건너뛰기, `RestScene`)만 본다
+      if (restPhase === 'playing') return
       setNotice('')
       if (kind === '관리') {
         // 105 키 0x1261c — 확인(−5 · '5')이면 칸을 보기 전에 0x12654 mgr+0x304 = 0
@@ -536,7 +552,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (kind === '아이템') return selectItemMenu(id)
       return selectTraining(id)
     },
-    [kind, onMainConfirm, selectCommand, selectItemMenu, selectPlayerInfo, selectTraining],
+    [kind, onMainConfirm, selectCommand, selectItemMenu, selectPlayerInfo, selectTraining, restPhase],
   )
 
   const closeWindow = useCallback(() => {
@@ -549,6 +565,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const back = useCallback(() => {
     // 125 키 0x105a4 는 확인 · '5' 만 본다 — 취소는 안 받는다(결과 창은 제 키로 닫힌다)
     if (training !== null) return
+    // 127 키 0x10650 — 취소 없음
+    if (restPhase === 'playing') return
     setNotice('')
     // 120 취소 → 119 (0x1b654)
     if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
@@ -561,7 +579,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       return onReenter?.()
     }
     return onExit()
-  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, onReenter, subWindow, training])
+  }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, onReenter, restPhase, subWindow, training])
 
   /*
    * 기본정보(119) 에서 칭호 목록(129) 을 여는 키.
@@ -573,8 +591,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
    */
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다)
-      if (question !== null || choice !== null || notice !== '') return
+      // 팝업이 떠 있으면 그쪽이 먼저 키를 가져간다 (원본도 창 위 팝업이 키를 잡는다). 127 연출은 `RestScene` 이 받는다
+      if (question !== null || choice !== null || notice !== '' || restPhase === 'playing') return
       /*
        * 108 마구 창 — 확인(−5 / '5')은 0x17828 의 칸 가드, 그 밖 키는 창 객체 0x80269 가 탭 격자(4, 1, 0x330)를 옮긴다.
        * 칸 넷이 한 줄이라 ←→ 로 돌고 끝에서 감기며, ↑ 는 왼쪽 · ↓ 는 오른쪽 칸이 된다(타자 필살타법 창과 같은 창 키). 취소는 `back`.
@@ -611,7 +629,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [abilityDetailOffset, back, career, choice, confirmMagicTrainingCell, isTitleWindowOpen, magicTrainingCursor, notice,
-    question, subWindow])
+    question, restPhase, subWindow])
 
   /** 129 확인 — `선수+0x1c4 = sel` 뒤 곧바로 저장한다 (0x11f78 의 확인 갈래) */
   const equipTitle = useCallback(
@@ -764,6 +782,8 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     notice,
     detail,
     closeDetail,
+    restPhase,
+    finishRest,
     question,
     choice,
     choiceIndex,

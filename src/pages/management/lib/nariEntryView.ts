@@ -41,7 +41,11 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import { aceDetailSourceOf, staminaPercentOf, tableDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
+import {
+  aceDetailSourceOf, seasonRecordProfileOf, staminaPercentOf, tableDetailSourceOf,
+} from '@/entities/season-mode/model/seasonEntry'
+import { equippedAbilityOf } from '@/entities/career/model/condition'
+import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import type { EntryBatterLine, EntryPitcherLine, PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 import { entryBatterLineOfRecord, entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
 import {
@@ -69,7 +73,10 @@ export interface NariEntryFace {
   readonly pitcherLine?: EntryPitcherLine
   /** 체력 줄 — 용량 0x66e44(팀 레코드, rec, 0) · 퍼센트 0x572a4 */
   readonly stamina?: { readonly capacity: number; readonly percent: number }
-  /** '0' 상세 창 0x5b798 레코드 칸 — 붙박이 표 행 · 마선수 표. ⚠️ 미구현(남김 — 웹 기록 꼴): 내 선수 줄은 커리어가 레코드 칸(+0xb · +0x1b 등)을 안 들어 비운다 */
+  /**
+   * '0' 상세 창 0x5b798 레코드 칸 — 붙박이 표 행 · 마선수 표 · 내 선수 줄(커리어를 레코드 칸으로 옮긴 것, `myBatterEntryFaceOf` ·
+   * 투수편 `pitcherEntryView`). 내 선수는 육성(+0xa 비트 7)이라 연봉 칸이 저장 +0x1c8 × 100 이다(`nurturedSalary`)
+   */
   readonly detailSource?: PlayerDetailSource
 }
 
@@ -285,10 +292,7 @@ export function batterNariEntryViewOf(
   isMyTeam: boolean,
   cup?: { readonly myTeam: number; readonly opponent: number },
 ): NariEntryView {
-  const me: NariEntryFace = {
-    name: career.name,
-    ability: [career.ability.hit, career.ability.power, career.ability.defense, career.ability.run],
-  }
+  const me = myBatterEntryFaceOf(career)
   if (cup !== undefined) {
     // 국가대항전 — 0x1f9a9 가 팀 10 은 대표팀 칸(+0xbc4, 내 선수가 낀), 그 밖은 상대국 칸(+0xbe0)을 준다. 투수는 142 가 돌린 그 칸 차례
     const teamId = isMyTeam ? cup.myTeam : cup.opponent
@@ -322,6 +326,27 @@ export function batterNariEntryViewOf(
       record.pitcherEquipment,
     ),
   })
+}
+
+/**
+ * **타자편 내 선수 줄** — 나리 팀 레코드의 내 칸은 커리어 0x30 바이트 레코드다(0x1fc75 · 시즌 영입 사본 `seasonNariBatterRecordOf` 와 같은 칸).
+ * 0x5b798 타자 갈래(5b81e~)가 읽는 것: 도형 0xb6414(rec, k, 1) = 장비 · 장착 스킬을 얹은 값(`equippedAbilityOf`) · +0xb 타입(>> 5) ·
+ * 손(비트 4) · +0x14 장착 스킬 비트 · +0x18 고른 필살 번호 · 연봉 — 육성(0xb6388 = +0xa 비트 7)이고 모드 3 · 4 라 +0x1b 가 아니라
+ * 저장 +0x1c8 × 100 (5c848~5c872). 보직 딱지 +0xb & 3 = 포지션 (등록 0x16f28)
+ */
+export function myBatterEntryFaceOf(career: PlayerCareer): NariEntryFace {
+  const equipped = equippedAbilityOf(career)
+  const ability = [equipped.hit, equipped.power, equipped.defense, equipped.run]
+  const profile = seasonRecordProfileOf(career.battingTypeIndex, career.battingSide, career.skinIndex, career.positionIndex)
+  return {
+    name: career.name,
+    ability,
+    profileLow: profile & 3,
+    detailSource: {
+      isPitcher: false, abilities: ability, aceIndex: -1, profile, skillBits: skillBitsOfIds(career.equippedSkillIds),
+      specialNumber: career.specialSwingNumber, grade: null, nurturedSalary: career.salary,
+    },
+  }
 }
 
 /**

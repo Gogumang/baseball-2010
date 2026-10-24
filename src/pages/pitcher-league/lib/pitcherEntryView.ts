@@ -2,10 +2,14 @@ import {
   MY_PITCHER_SLOT, OUR_ACE_PITCHER_SLOT, opponentPitcherOrderOf, ourPitcherOrderOf,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { equippedPitcherAbilityOf, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { seasonRecordProfileOf } from '@/entities/season-mode/model/seasonEntry'
+import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import { NO_RECORD_ACE, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
 import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import type { NariEntryFace } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import {
   acePitcherFace, nariEntryBattersOf, nariEntryPitchersOf, nariEntryTeamMoraleOf, openNariEntryView,
@@ -42,14 +46,33 @@ export function pitcherNariEntryViewOf(
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, null, cells),
     pitchers: nariEntryPitchersOf(teamId, order, (slot) => {
-      if (isMyTeam && slot === MY_PITCHER_SLOT) {
-        const { control, velocity, breaking, stamina } = career.ability
-        return { name: career.name, ability: [control, velocity, breaking, stamina], isAce: false }
-      }
+      if (isMyTeam && slot === MY_PITCHER_SLOT) return { ...myPitcherEntryFaceOf(career), isAce: false }
       if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
       return undefined
     }, cells, (slot) => (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE ? ACE_PITCHERS[record.acePitcher]?.recordLine ?? [] : undefined),
     // 레코드 투수 장비 니블 (나리 새 시즌 CPU 장비 굴림 0x665e8) — 상세 창 도형 값이 그 보너스를 먹는다
     record.pitcherEquipment),
   })
+}
+
+/**
+ * **투수편 내 투수 줄** — 나리 팀 레코드의 내 칸은 커리어 0x30 바이트 레코드다(시즌 영입 사본 `seasonNariPitcherRecordOf` 와 같은 칸).
+ * 0x5b798 투수 갈래(5bf64~)가 읽는 것: 도형 0xb6414(rec, k, 1) = 장비 · 장착 스킬을 얹은 값(`equippedPitcherAbilityOf`) ·
+ * 폼 +0xb >> 4(타입 · 손) · +0x1c 구질 마스크 · +0x14 장착 스킬 비트 · +0x18 고른 마구 · 연봉 — 육성(0xb6388)이고 모드 3 · 4 라
+ * 저장 +0x1c8 × 100 (5c848~5c872). 보직 딱지 +0xb & 3 = 보직
+ */
+export function myPitcherEntryFaceOf(career: PitcherCareer): NariEntryFace {
+  const equipped = equippedPitcherAbilityOf(career)
+  const ability = [equipped.control, equipped.velocity, equipped.breaking, equipped.stamina]
+  const profile = seasonRecordProfileOf(career.typeIndex, career.handIndex, career.skinIndex, career.role)
+  return {
+    name: career.name,
+    ability,
+    profileLow: profile & 3,
+    detailSource: {
+      isPitcher: true, abilities: ability, aceIndex: -1, profile, skillBits: skillBitsOfIds(career.equippedSkillIds),
+      repertoire: { form: pitcherFormOfCareer(career), magicNumber: career.selectedMagicNumber, pitchMask: career.pitchMask },
+      grade: null, nurturedSalary: career.salary,
+    },
+  }
 }

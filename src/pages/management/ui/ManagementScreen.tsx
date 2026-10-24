@@ -6,6 +6,8 @@ import { currentTitleOf } from '@/entities/career/model/titles'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { TrainingScene } from '@/widgets/training-scene/ui/TrainingScene'
+import { RestScene } from '@/widgets/training-scene/ui/RestScene'
+import { nariRestPresentationOf } from '@/widgets/training-scene/lib/restPresentation'
 import { TRAINING_PRESENTATION_OF } from '@/shared/config/original/trainingAnimation'
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
 import type { ManagementCommand } from '@/pages/management/lib/managementLayout'
@@ -15,7 +17,7 @@ import { ManagementBoard } from '@/pages/management/ui/ManagementBoard'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 import { BasicInfoCard, basicInfoFigureRecolorRequestsOf } from '@/pages/management/ui/BasicInfoCard'
-import { useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
+import { portraitPaletteIndex, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import { DetailPopup, DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { batterAbilityDetailViewOf } from '@/pages/management/lib/abilityDetail'
 import { NariRecordPickPopup, NariRecordView } from '@/pages/nari-record-room'
@@ -147,8 +149,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {!menu.isShowingBasicInfo && (
         <ManagementBoard career={career} titleName={currentTitleOf(career)} />
       )}
-      {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc)와 훈련 연출(125)에는 없다 */}
-      {!menu.isShowingBasicInfo && menu.playingMenuId === null && (
+      {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc) · 훈련 연출(125) · 휴식(127 — 연출과 결과 창)에는 없다 */}
+      {!menu.isShowingBasicInfo && menu.playingMenuId === null && menu.restPhase === null && (
         <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
           morale: career.morale,
           isSick: career.isSick,
@@ -172,6 +174,11 @@ export function ManagementScreen(props: ManagementScreenProps) {
             teamIndex={career.teamId}
             onFinished={menu.finishTraining} />
         </div>
+      )}
+      {/* 127 그리기 0x19e08 → 0x8532c = 0x848d0(gfx, 0, 0) — 캐릭터 없는 훈련 팝업 (`RestScene`) */}
+      {menu.restPhase === 'playing' && (
+        <RestScene presentation={nariRestPresentationOf({ isBatter: true, battingTypeIndex: career.battingTypeIndex })}
+          char0Palette={portraitPaletteIndex(career.skinIndex)} onFinished={menu.finishRest} />
       )}
       <CommandBar slots={slots} cursor={menu.cursor} bounce={menu.bounce} slideUpdates={menu.slideUpdates}
         disabledIds={menu.disabledIds} labelWidths={labelWidths} parent={menu.parent}

@@ -1856,6 +1856,8 @@ export function useCareerSession({
       if (command === '휴식') {
         // 원작 [휴식] 커맨드 — 사기를 회복한다. 105 키 0x1261c 12682~126bc 는 사기 최고만 본다(행동함은 안 본다)
         if (restBlockReasonOf(career) !== null) return setManagementNotice('사기 최고 상태입니다') // StrMODE[91]
+        // 관리 화면은 팝업 0x2a "예" 뒤 127 연출(0x85230, `RestScene`)이 끝난 틀에 이 길을 부른다 — 0x19080 → 0x18e3c 의
+        // 굴림 · 결과 창 · 저장이 연출 뒤라서다(연출에는 난수가 없어 굴림 차례는 그대로다)
         const rest = runRest(career, random)
         setCareer(rest.career)
         // StrMODE[24] "사기" + " " + 수치 + [83] (0x18e3c)
