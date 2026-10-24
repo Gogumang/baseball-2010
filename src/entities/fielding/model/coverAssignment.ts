@@ -17,6 +17,7 @@ import {
   runnerRemainingTicks,
   type DefenseContext,
   type FielderState,
+  type PlayView,
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 
@@ -332,4 +333,37 @@ export function applyCoverAssignment(
     }
     return next
   })
+}
+
+/**
+ * **0xb2a48(P, f, 루)** — 루 커버 칸을 f 가 가져간다 (직접 뜬 것, r176):
+ * ```
+ * b2a52  C = +0xf0[루 % 4] ; C == −1 || C == f 면 끝
+ * b2a7e  C.AI = 0 (0xb8dbc — +0x84 만)
+ * b2a8a  +0xf0[루] = f ; f.vt48(루) = 0xa0a18 → vt14(루 좌표 0xd78f0[루 % 4]) ; f.AI = 루 + 2
+ * b2ab6  +0x130 == C 면 +0x130 = f
+ * ```
+ * 부르는 곳: 루로 보내기 0xb2c90 의 직접 밟기(b2d64 — `runDefensePlay.sendToBase`)와 AI 2~5 의 b4814(+0x3b && vtcc).
+ * 내려간 C 는 목표를 안 고친다 — 다음 걸음 전 AI 0 b476a 가 vtcc 면 시작 자리로 고친다.
+ */
+export function claimCoverOfBase<P extends Pick<PlayView, 'coverOfBase' | 'ballHolderSlot'>>(
+  play: P,
+  fielders: readonly FielderState[],
+  slot: number,
+  base: number,
+): { readonly play: P; readonly fielders: readonly FielderState[] } {
+  const previous = play.coverOfBase[((base % 4) + 4) % 4] ?? NONE
+  if (previous === NONE || previous === slot) return { play, fielders }
+  const coverOfBase = [...play.coverOfBase]
+  coverOfBase[base] = slot
+  return {
+    play: { ...play, coverOfBase, ballHolderSlot: play.ballHolderSlot === previous ? slot : play.ballHolderSlot },
+    fielders: fielders.map((fielder) =>
+      fielder.slot === previous
+        ? { ...fielder, aiState: AI_STATE.IDLE }
+        : fielder.slot === slot
+          ? { ...fielder, target: basePosition(base), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
+          : fielder,
+    ),
+  }
 }

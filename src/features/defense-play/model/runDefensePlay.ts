@@ -106,9 +106,7 @@ import {
   OUT_KIND,
   releaseForcesAfterOut,
 } from '@/entities/fielding/model/outJudgement'
-import {
-  baseAtPoint,
-} from '@/entities/fielding/model/coverAssignment'
+import { baseAtPoint, claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
 import { runCoverTick } from '@/features/defense-play/model/coverTick'
 import {
   FIELDER_ACTION,
@@ -2049,8 +2047,9 @@ export function stepDefensePlay(
     // 포구 R 틱 뒤에 0 이 된다. 쥔 동안만 줄고, +0xc8 을 넣는 곳은 쥐기(vt88, b27aa·b27be)뿐이다.
     // a12b4: 동작 잠금 +0xb4 > 0 이면 −1 만 하고(0 이 되면 a12c8 +0xbd = 1 · vt10) a12c6/a12d6 에서 끝 — 그 틱은 +0xb8 · +0xc0 ·
     // +0xc8 · +0xcc 줄이기도 이동(a1376 0xbf094)도 없다. 이동을 막는 쪽은 6 절이 그때의 +0xb4 로 본다(그 걸음은 다음 야수 틱 몫)
-    // a12c8 의 vt10(0xa124c: 0xbf2b0 목표 = 위치 · +0xa8 · +0xb0~+0xb3 · +0xbc · +0xb4 · +0xe8 = 0)은 웹에 옮길 것이 없다(r158 확정):
-    // 같은 틱 슬롯 2 0x524c0 의 차례가 vt48 0xb401c(525e8) → vt18(525fc) → vt4c AI 고리 0xb45dc(52612) → 그 끝 vt30 0xb1c90(b4c72)라,
+    // a12c8 의 vt10(0xa124c: 0xbf2b0 목표 = 위치 · +0xa8 · +0xb0~+0xb3 · +0xbc · +0xb4 · +0xe8 = 0) — r176 부터 목표 = 위치도 옮긴다
+    // (`fielderPose.withPoseCleared`). 아래 r158 의 "다시 세운다" 는 AI 가 목표를 고치는 칸에서만 맞다 — 쥔 AI 1 야수(b4ae6)는 안 고쳐
+    // 포구 동작을 지운 vt10 에서 선다(쥐기가 야수를 옮기지 않게 되며 드러났다). r158 기록: 같은 틱 슬롯 2 0x524c0 의 차례가 vt48 0xb401c(525e8) → vt18(525fc) → vt4c AI 고리 0xb45dc(52612) → 그 끝 vt30 0xb1c90(b4c72)라,
     // 다음 야수 틱 걸음 전에 AI 가 목표를 다시 세운다 — AI 0 b476a(vtcc 면 목표 ≠ 시작 자리 → vt50) · 1 b4aca(0xa100c 포구점) ·
     // 2~5 b47f2 → b482c vt14(루) · 0xb b4b5c vt14(+0x90) · 키스톤 자리 b203a vt14. 맞은 야수는 다시 쏘기의 고르기(b3b38 머리 b3b7a)가
     // AI 1 → 0 으로 내려 이 밖의 상태(6 · 7 · 9 · 0xd · 0xe — 목표를 안 고치는 칸)에 있을 수 없고, 웹 6 절은 AI 상태로 목표를 다시
@@ -2251,7 +2250,8 @@ export function stepDefensePlay(
     // 플레이+0x1f7 = 1(필살 점프 캐치) · 종류 4 는 +0x1f8 = 1(필살 슬라이딩 캐치)
     // b40ca~b4130 (그 앞, 매 틱) — 잡을 야수(+0x170)가 서 있고(vt18) 목표점 x · z 가 포구 틱 공 점(0xa25b0(공, +0x174))과 같고
     // +0x174 < 공+0xaa0(낙구 틱) && 포구 종류 0 이면 vt9c 0xa1e44: 동작 0xc · 자세 +0xb2 (뜬공 기다리기 — 그동안 vtcc 가 거짓, r171).
-    // ⚠️ 미확인: 낙구가 없는 공(웹 −1)의 +0xaa0 — 웹은 이 갈래를 안 탄다
+    // 낙구가 없는 공은 +0xaa0 = −1(점 기록 a29f4 가 처음 높이 ≤ 0 에서만 적는다)이고 b4090 은 부호 있는 비교(ldrsh · bge)라
+    // +0x174 < −1 이 거짓 — vt9c 를 안 건다(r176 확정, 웹 −1 과 같다)
     if (catchGateOpen) {
       const catcher = fielders[play.catchFielderSlot]
       const ballAtCatch = trajectory.pointAt(catchTick)
@@ -2313,9 +2313,9 @@ export function stepDefensePlay(
       // b4292 (쥐기 b42c8 **앞**, 직접 뜬 것): b = 야수.vt58()(발밑 루 — 좌표 완전일치) ; b ≠ −1 이고 R = 0xa97a0(b)(아웃 아닌 주자 중
       // 그 루에 마지막으로 닿은 첫 주자)가 있고 R.vt18()(목표점에 있음)이면 결과 코드 sp+0x38 = 9 (b42bc). 모든 포구에 걸린다 —
       // 견제 · 주자 판(pickoffPlay · runnerPlayEngine)과 같은 갈래다. 쥐기 안 vt90 이 아웃을 내면 b4540 이 13 으로 덮는다.
-      // 웹 다리: 야수 이동이 슬롯 2 뒤라 쥐기와 같이 포구 지점에 선 야수로 본다(runnerPlayEngine 과 같다)
+      // 야수 자리는 그림 N 의 목록 틱(앞 판 틱의 6 절 이동)이 옮긴 그대로다 — 쥐기 0xb2710 은 위치를 안 바꾼다(r176)
       const catcher = fielders[chaserSlot]
-      const footBase = catcher === undefined ? NONE : baseUnderFoot({ ...catcher, position: catchPoint })
+      const footBase = catcher === undefined ? NONE : baseUnderFoot(catcher)
       if (footBase !== NONE) {
         const standing = runners.find((runner) => !runner.state.isOut && runner.state.startBase === footBase)
         if (standing !== undefined && isAtTarget(standing.state)) {
@@ -2326,9 +2326,11 @@ export function stepDefensePlay(
       fielders = fielders.map((fielder) =>
         fielder.slot === chaserSlot
           ? {
+              // 쥐기 0xb2710(b2710~b2786)은 +0x128 · +0x130 · +0x12c · +0x112 · 야수+0xe0 · +0x127 만 적는다 — 위치(+0x20) · 목표(+0x2c)를
+              // 안 바꾼다(r176, 예전 웹은 포구 지점으로 옮겼다). 포구 틱 갈래(b41aa)도 공 틱 == +0x174 만 보고 거리는 안 본다 —
+              // 예보(0xb12d0)가 d = 거리 − 220 × n ≤ 반경으로 고른 틱이라 못 닿은 채 쥘 수 있고, 쥔 뒤에는 AI 1(b4ae6 +0xe0)이
+              // 목표를 안 고쳐 다음 야수 틱들이 포구 지점으로 마저 걷다가 포구 동작이 지워지는 틱(a143e vt10 — 목표 = 위치)에 선다
               ...fielder,
-              position: catchPoint,
-              target: catchPoint,
               holdingBall: true,
               // 잡고 던지기까지의 준비 틱(내야 3 · 외야 6, cfg+0x20/+0x22) 을 동작 남은 틱(+0xc8)에 넣는다.
               // `defenseArrivalTicks` 의 "이미 잡았다" 갈래가 이 칸을 그대로 더한다 (0xaf53e).
@@ -2436,9 +2438,11 @@ export function stepDefensePlay(
         if (target !== NONE && canStartRundown(context, true)) {
           rundown = buildRundownPlan(context, target)
           rundowns += 1
+          // 0xb3a94 b3aec~b3b28 (직접 뜬 것, r176): 두 야수(+0x1ec · +0x1ed)마다 +0xb4(동작 잠금) ≤ 0 일 때만 b3b0c vt10
+          // (0xa124c — 목표 = 위치 · 동작 · 자세 워드 0) → b3b20 0xb8dbd(+0x80, 8). 잠긴 야수는 둘 다 건너뛴다(AI 8 이 안 된다)
           fielders = fielders.map((fielder) =>
-            fielder.slot === rundown.backFielder || fielder.slot === rundown.frontFielder
-              ? { ...fielder, aiState: AI_STATE.RUNDOWN }
+            (fielder.slot === rundown.backFielder || fielder.slot === rundown.frontFielder) && fielder.actionLockTicks <= 0
+              ? { ...withPoseCleared(fielder), aiState: AI_STATE.RUNDOWN }
               : fielder,
           )
           log.push(
@@ -2497,8 +2501,11 @@ export function stepDefensePlay(
                   ? { ...fielder, target: to, position: stepToward(fielder.position, to, fielder.speed) }
                   : fielder,
               )
+            } else if (action.kind === '대기' && slot !== play.ballHolderSlot) {
+              // '대기' — 공 없는 야수(b4aa0~b4aaa: 주자 틱 r > 짝 송구 틱 r0 이고 r ≤ r0 + 4)는 vt10 0xa124c(목표 = 위치 · 동작 ·
+              // 자세 워드 0, r176). 공 가진 야수의 '대기'(b4a3a — 안 쥠 +0x12c == 0)는 b4c60 으로 끝나 아무것도 안 한다
+              fielders = fielders.map((fielder) => (fielder.slot === slot ? withPoseCleared(fielder) : fielder))
             }
-            // '대기' 는 vt0x10(동작 정지) — 이번 틱에 아무것도 안 한다
 
             // ── 태그 아웃 판정 (0xb36d0 결과 3 → 0xb3946 이 협살을 끝낸다) ──
             // 원본은 AI 상태와 무관하게 아웃 판정이 돌아, **공 쥔 야수와 주자의 거리가 499 이하**이고
@@ -2820,9 +2827,25 @@ export function stepDefensePlay(
     // b4892: 아니면 플레이.vt58(+0x158, 0) = 0xb2c90 ; 참이면 b48ac 이 야수 AI 0
     // ```
     // 미룰 때 공 가진 야수는 vt48(루)로 그 루를 향해 걷는다(`moveFielder`). 특수 인자는 0 으로 다시 보낸다.
-    if (vt4cOpen && !play.finished && deferredThrowReceiver !== NONE) {
+    // AI 2~5 (같은 고리의 분기표 0xd8808[2..5] = b47f2, 직접 뜬 것, r176): +0x3b(앞 목록 틱에 목표점에 막 닿음) && vtcc 면
+    // b4814 0xb2a48(P, 칸, 루) — 그 루의 커버 칸(+0xf0)이 다른 야수면 그 야수를 AI 0 으로 내리고 이 야수가 커버가 된다
+    // (`claimCoverOfBase`). 그 뒤 b4818~b482e vt14(루 좌표)는 6 절 걸음이 한다. 고리는 칸 차례라 AI 9 와 섞어 돈다
+    if (vt4cOpen && !play.finished) {
       for (let slot = 0; slot < fielders.length; slot += 1) {
-        if (fielders[slot]?.aiState !== AI_STATE.RECEIVE) continue
+        const self = fielders[slot]
+        if (self === undefined) continue
+        if (isCoverState(self.aiState)) {
+          if (fielderArrivals[slot] === true && isFreeToRetarget(self)) {
+            const base = self.aiState - AI_STATE.COVER_HOME
+            const claimed = claimCoverOfBase(play, fielders, slot, base)
+            if (claimed.play !== play) log.push(`${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
+            play = claimed.play
+            fielders = claimed.fielders
+          }
+          continue
+        }
+        if (deferredThrowReceiver === NONE) continue
+        if (self.aiState !== AI_STATE.RECEIVE) continue
         const receiver = fielders[deferredThrowReceiver]
         const holder = fielders[play.ballHolderSlot]
         if (receiver === undefined || holder === undefined) continue
@@ -3601,6 +3624,8 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
     if (input.tick < input.catchTick) {
       return { ...walk(retarget ? input.catchPoint : fielder.target), aiState: AI_STATE.CHASE }
     }
+    // 쥔 AI 1 야수 — b4ae6(+0xe0)에서 목표를 안 고치고 끝나지만, 야수 틱의 걸음 a1376(0xbf094)은 AI · 공 쥠을 안 보고 목표로 간다(r176)
+    if (fielder.aiState !== AI_STATE.IDLE && fielder.holdingBall) return walk(fielder.target)
     if (fielder.aiState !== AI_STATE.IDLE) return fielder
   }
   if (fielder.aiState === AI_STATE.IDLE) {

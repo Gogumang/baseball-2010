@@ -3,6 +3,7 @@ import {
   assignCoversForTick,
   baseAtPoint,
   batterRunnerNeedsCover,
+  claimCoverOfBase,
   needsCover,
   PLAY_FIELD_0X168,
 } from '@/entities/fielding/model/coverAssignment'
@@ -227,3 +228,30 @@ describe('0xb203a 자리 잡기의 차례 — b1f06(2루 커버) 뒤 · b23a4 �
   })
 })
 
+
+describe('0xb2a48 — 루 커버 칸 가져가기 (AI 2~5 b4814 · 직접 밟기 b2d64, r176)', () => {
+  const 판 = (coverOfBase: number[], ballHolderSlot = 0): PlayView => ({ ...initialPlayView(1), coverOfBase, ballHolderSlot })
+  const 야수들 = () =>
+    createFielders(Array(9).fill(500)).map((fielder) =>
+      fielder.slot === 3 || fielder.slot === 5 ? { ...fielder, aiState: AI_STATE.COVER_SECOND, targetBase: 2 } : fielder,
+    )
+
+  it('그 루 커버가 다른 야수면 그 야수는 AI 0(목표는 그대로) · 이 야수가 커버가 되고 루 좌표로 간다', () => {
+    const fielders = 야수들()
+    const claimed = claimCoverOfBase(판([1, 2, 3, 4]), fielders, 5, 2)
+    expect(claimed.play.coverOfBase).toEqual([1, 2, 5, 4])
+    expect(claimed.fielders[3]).toMatchObject({ aiState: AI_STATE.IDLE, target: fielders[3]!.target })
+    expect(claimed.fielders[5]).toMatchObject({ aiState: AI_STATE.COVER_SECOND, target: basePosition(2), targetBase: 2 })
+  })
+
+  it('비었거나(−1) 이미 제 칸이면 아무것도 안 한다', () => {
+    const play = 판([1, 2, NONE, 4])
+    expect(claimCoverOfBase(play, 야수들(), 5, 2).play).toBe(play)
+    const mine = 판([1, 2, 5, 4])
+    expect(claimCoverOfBase(mine, 야수들(), 5, 2).play).toBe(mine)
+  })
+
+  it('공 가진 야수(+0x130)가 내려간 커버면 공 가진 야수도 바뀐다 (b2ab6)', () => {
+    expect(claimCoverOfBase(판([1, 2, 3, 4], 3), 야수들(), 5, 2).play.ballHolderSlot).toBe(5)
+  })
+})

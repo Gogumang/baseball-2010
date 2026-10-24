@@ -1,6 +1,6 @@
 import type { BallBody, BallPoint } from '@/entities/batting/model/ballPhysics'
 import { isBallTrajectory, launchTrajectory, type BallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
+import type { BattedBallTrajectory, CatchKind } from '@/entities/fielding/model/catchPrediction'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import { forecastCatch, type CatchForecastOptions } from '@/features/defense-play/model/catchForecast'
@@ -22,6 +22,10 @@ export interface LooseBallChase {
   readonly catchTick: number
   /** AI 1 목표 — 포구 틱 점의 (x, 0, z) */
   readonly catchPoint: WorldPoint
+  /** 포구 종류 (+0x16c) — 고르기 0xb3b38 가 정한다. 판 틱 b4134 가 동작 시작 틱에 표 0xd87f4 로 자세를 건다(`fielderPose`) */
+  readonly kind?: CatchKind
+  /** 동작 시작 틱 (+0x176, 판 틱) — 분기표 0xd87c0 */
+  readonly actionStartTick?: number
   /** 공 객체 칸 — 다음 쏘기가 이어 받는다 (원본 공은 한 경기 내내 같은 객체) */
   readonly body?: BallBody
   /** 이 공을 깐 판 틱 — 그 그림의 공+0x68 이 0 이다(b12da). 그림의 재생 틱 = 판 틱 − 이 값 (`DefenseBall.isPlaybackStart`) */
@@ -55,6 +59,8 @@ export function chaseLooseBall(
     slot: forecast.choice.slot,
     catchTick,
     catchPoint: { x: at.x, y: 0, z: at.z },
+    kind: forecast.choice.kind,
+    actionStartTick: atTick + forecast.choice.actionStartTick,
     body: ball.flight.body,
     startTick: atTick,
     secondPassStarted: forecast.secondPassStarted,
