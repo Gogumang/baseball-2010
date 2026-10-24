@@ -55,7 +55,9 @@ import {
   type HomeRunTextState,
   type HomeRunTextWindow,
 } from '@/widgets/batting-stage/lib/homeRunBanner'
-import { clearGameSceneTimeout, gameSceneNow, setGameSceneTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  clearGameSceneTimeout, gameSceneNow, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, setGameSceneTickTimeout, setGameSceneTimeout,
+} from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
@@ -451,10 +453,10 @@ export function useHomeRunDerby({
   const armConfirmLock = () => {
     clearConfirmLockTimer()
     isConfirmUnlockedRef.current = false
-    confirmLockTimerRef.current = setGameSceneTimeout(() => {
+    confirmLockTimerRef.current = setGameSceneTickTimeout(() => {
       confirmLockTimerRef.current = null
       isConfirmUnlockedRef.current = true
-    }, CONFIRM_LOCK_FRAMES * millisecondsPerFrame())
+    }, CONFIRM_LOCK_FRAMES)
   }
   /** 상태 0xd → 0xe 로 들어선다 — OK 를 기다린다 */
   const enterConfirmWait = () => {
@@ -497,11 +499,11 @@ export function useHomeRunDerby({
     // 모드 7 은 ae270 `cmp 7` 에서 ae274~ae336(기회 셈 → 0xd 또는 0x1a)으로 갈라 0x17 을 안 지난다 → 0xa97a1(2·3루)이 늘 거짓이라
     // 15 가 아니라 늘 14 다. 웹 더비에 주자 칸이 없는 것도 원본 그대로다
     playSoundIds(audioRef.current, [DERBY_AT_BAT_ENTRY_SOUND])
-    prepareTimerRef.current = setGameSceneTimeout(() => {
+    prepareTimerRef.current = setGameSceneTickTimeout(() => {
       prepareTimerRef.current = null
       setIsPreparing(false)
       enterConfirmWait()
-    }, SCENE_D_FRAMES * millisecondsPerFrame())
+    }, SCENE_D_FRAMES)
   }
   /** 상태 0xd 로 들어선다 — 아직 OK 를 받지 않는다. 로딩 판이 서 있으면 시계는 `finishLoading` 이 건다 */
   const enterScenePrepare = () => {
@@ -556,7 +558,7 @@ export function useHomeRunDerby({
     if (shouldShowComboAtNextPitch(runRef.current)) {
       setShownCombo(runRef.current.comboDisplay)
       clearComboTimer()
-      comboTimerRef.current = setGameSceneTimeout(endShownCombo, COMBO_DISPLAY_FRAMES * millisecondsPerFrame())
+      comboTimerRef.current = setGameSceneTickTimeout(endShownCombo, COMBO_DISPLAY_FRAMES)
     }
   }
 
@@ -599,12 +601,14 @@ export function useHomeRunDerby({
     // 이어 [경기+0xf2c] 공(수평각 d)의 점 깔기 — 폴에 맞으면 굴림이 하나 더 (`derbyBattedBallOf` 머리말)
     const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
-    // ⚠️ 근사(때): 공 틱 0 을 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 때)로 센다
+    // 공 틱 0 = 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 틀)의 장면 틱 — 판 시각은 그 틱의 머리라 판 안의 틱(소리 · 글자 창 ·
+    // 키 틱 · 판 끝)이 모두 경기 장면 틱 격자에 선다. ⚠️ 근사(때): 판을 넘긴 틀의 틱을 `gameSceneTickNow()` 로 다시 읽는다 —
+    // rAF 틀 머리와 이 자리 사이에 틱 머리가 지나면 한 틱 늦게 선다
     // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.
     // 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 글자 창의 첫 그림(홈런 틱)에 타석 화면이 깔고, 유지 단계 그림마다 굴린다
     // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
     clearPlaySoundTimers()
-    const startedAt = gameSceneNow()
+    const startedAt = gameSceneTickStartTime(gameSceneTickNow())
     if (batted !== null) {
       schedulePlaySounds(batted, startedAt, 0)
       playRef.current = {
@@ -629,11 +633,7 @@ export function useHomeRunDerby({
     setIsPaused(true)
     // 맞지 않은 공은 상태 0x12 — 15틱(볼넷 · 사구면 31틱) 뒤 0x4e740: 사구(st[0xb] == 4)면 벤치 클리어링 굴림
     isHitByPitchRef.current = call.judgment === 4
-    armPlayEnd(
-      batted === null
-        ? derbyNoContactWaitFramesOf(call.judgment) * millisecondsPerFrame()
-        : batted.endTicks * millisecondsPerFrame(),
-    )
+    armPlayEnd(batted === null ? derbyNoContactWaitFramesOf(call.judgment) : batted.endTicks)
   }, [])
 
   /** 이번 공이 사구(판정 v4)였나 — 0x12 대기 끝의 벤치 클리어링 굴림 조건 */
@@ -688,10 +688,10 @@ export function useHomeRunDerby({
     runRef.current = next
   }
 
-  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 */
-  const armPlayEnd = (delay: number) => {
+  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 — 지금 장면 틱에서 `ticks` 틱 뒤 틀 머리 */
+  const armPlayEnd = (ticks: number) => {
     clearTimer()
-    timerRef.current = setGameSceneTimeout(() => {
+    timerRef.current = setGameSceneTickTimeout(() => {
       timerRef.current = null
       // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
       // 맞지 않은 공(0xae24c)은 이 갈래가 없다
@@ -702,7 +702,7 @@ export function useHomeRunDerby({
         onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID)
       }
       // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
-      if (playRef.current !== null) setEffectsClearedAt(gameSceneNow())
+      if (playRef.current !== null) setEffectsClearedAt(gameSceneTickStartTime(gameSceneTickNow()))
       playRef.current = null
       setIsEventZoneShown(false)
       setEventZoneRewardX(null)
@@ -727,7 +727,7 @@ export function useHomeRunDerby({
         }
       }
       finishPitch()
-    }, delay)
+    }, ticks)
   }
 
   /** 0xae3e8 · 0xae24c 를 지난 뒤 — 화면 칸을 셈에 맞추고 다음 상태(0xf · 0xd · 0x1a)로 */
@@ -768,9 +768,9 @@ export function useHomeRunDerby({
   const skipHomeRun = useCallback(() => {
     const play = playRef.current
     if (play === null) return
-    const now = gameSceneNow()
-    // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 지금 흐르는 틱 다음 틱이 키를 받은 틱이다
-    const keyTick = Math.floor((now - play.startedAt) / millisecondsPerFrame()) + 1
+    // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 지금 흐르는 틱 다음 틱이 키를 받은 틱이다 (판 시각은 공 틱 0 의 머리)
+    const elapsedTicks = gameSceneTickNow() - gameSceneTickOf(play.startedAt)
+    const keyTick = elapsedTicks + 1
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
     if (skipped === play.batted) return
     playRef.current = { ...play, batted: skipped }
@@ -786,7 +786,7 @@ export function useHomeRunDerby({
     if (skipped.distance !== play.batted.distance || skipped.displayDistance !== play.batted.displayDistance) {
       applyPlayResult(play.runBefore, skipped, play.isEventZoneHit)
     }
-    armPlayEnd(Math.max(0, play.startedAt + skipped.endTicks * millisecondsPerFrame() - now))
+    armPlayEnd(Math.max(0, skipped.endTicks - elapsedTicks))
   }, [])
 
   /**

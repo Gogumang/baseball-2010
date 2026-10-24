@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
 import {
-  clearGameSceneTimeout, gameSceneNow, isGameSceneFrozen, setGameSceneTimeout,
+  clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 
@@ -131,8 +130,8 @@ export function useSceneConfirm(
   const acceptsConfirm = isCounting && wait?.hooksAtEntry !== true
 
   const isUnlockedRef = useRef(false)
-  /** 공용 창 아래에서 내려간 대기와 그 0xd 첫 그림의 장면 시각 — 창이 닫혀 다시 받으면 여기서 잇는다 */
-  const suspendedRef = useRef<{ readonly wait: SceneConfirmWait; readonly confirmed: number; readonly startedAt: number } | null>(null)
+  /** 공용 창 아래에서 내려간 대기와 그 0xd 첫 그림의 장면 틱 — 창이 닫혀 다시 받으면 여기서 잇는다 */
+  const suspendedRef = useRef<{ readonly wait: SceneConfirmWait; readonly confirmed: number; readonly startTick: number } | null>(null)
   const [sceneDEntryMark, setSceneDEntryMark] = useState(0)
   const [enteredKey, setEnteredKey] = useState<{ readonly wait: SceneConfirmWait; readonly confirmed: number } | null>(null)
   const isInConfirmState =
@@ -152,32 +151,32 @@ export function useSceneConfirm(
     }
     // 0xd 첫 그림 — 0x48d50 이 48ee4 에서 투수 그림 객체를 상태 0 으로 되돌린다(0x35650 → 0x340c0). 0xb 에서 곧장 선 0xe 는 0xd 가 없다
     if (wait.skipsSceneD !== true && marksSceneDEntered(wait, confirmed)) setSceneDEntryMark((mark) => mark + 1)
-    const frame = millisecondsPerFrame()
-    // 공용 창이 서 있는 채로 내려갔던 같은 대기면 그때 센 장면 시간에서 잇는다 — 장면 시계는 창 아래에서 안 흐른다
+    // 공용 창이 서 있는 채로 내려갔던 같은 대기면 그때 센 장면 틱에서 잇는다 — 장면 시계는 창 아래에서 안 흐른다.
+    // 0xd 첫 그림은 받기 시작한 틀의 장면 틱이고, 0xe · 잠금 풀림은 그 틱에서 센 틱 머리에 선다(`setGameSceneTickTimeout`)
     const suspended = suspendedRef.current
     suspendedRef.current = null
-    const startedAt =
-      suspended !== null && suspended.wait === wait && suspended.confirmed === confirmed ? suspended.startedAt : gameSceneNow()
-    const elapsed = gameSceneNow() - startedAt
-    const enteredDelay = SCENE_PREPARE_FRAMES * frame - elapsed
-    const unlockedDelay = SCENE_CONFIRM_READY_FRAMES * frame - elapsed
-    const entered = enteredDelay <= 0 ? null : setGameSceneTimeout(() => setEnteredKey({ wait, confirmed }), enteredDelay)
+    const startTick =
+      suspended !== null && suspended.wait === wait && suspended.confirmed === confirmed ? suspended.startTick : gameSceneTickNow()
+    const elapsed = gameSceneTickNow() - startTick
+    const enteredDelay = SCENE_PREPARE_FRAMES - elapsed
+    const unlockedDelay = SCENE_CONFIRM_READY_FRAMES - elapsed
+    const entered = enteredDelay <= 0 ? null : setGameSceneTickTimeout(() => setEnteredKey({ wait, confirmed }), enteredDelay)
     if (enteredDelay <= 0) setEnteredKey((key) => (key?.wait === wait && key.confirmed === confirmed ? key : { wait, confirmed }))
     // 강판 지나감 — 0xe 를 한 그림 그린 뒤 끝난다(OK 잠금은 안 푼다). 끝나면 강판 창 0x23 이 선다
     const unlocked = wait.hooksAtEntry === true
-      ? setGameSceneTimeout(() => {
+      ? setGameSceneTickTimeout(() => {
           passedHookWaits.add(wait)
           setVersion((version) => version + 1)
           for (const listener of confirmListeners) listener()
-        }, Math.max(0, (SCENE_PREPARE_FRAMES + HOOK_PASSAGE_CONFIRM_FRAMES) * frame - elapsed))
-      : setGameSceneTimeout(() => {
+        }, Math.max(0, SCENE_PREPARE_FRAMES + HOOK_PASSAGE_CONFIRM_FRAMES - elapsed))
+      : setGameSceneTickTimeout(() => {
           isUnlockedRef.current = true
         }, Math.max(0, unlockedDelay))
     return () => {
       clearGameSceneTimeout(entered)
       clearGameSceneTimeout(unlocked)
       // 창이 덮어 내려가는 것이면 센 자리를 남긴다 — 다른 덮개(결과 띠 · 교대 판 따위)면 다음에 처음부터 센다
-      if (isGameSceneFrozen()) suspendedRef.current = { wait, confirmed, startedAt }
+      if (isGameSceneFrozen()) suspendedRef.current = { wait, confirmed, startTick }
     }
   }, [isCounting, wait, confirmed])
 

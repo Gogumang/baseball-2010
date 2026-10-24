@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
@@ -16,7 +15,6 @@ import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import { cpuSwingTickOf, passesHeldResult, pitcherSideStageFrameOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
-import { pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import { createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf } from '@/widgets/batting-stage/model/sceneCloudClock'
@@ -24,7 +22,7 @@ import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
-import { gameSceneNow, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { stageCastSpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
@@ -153,9 +151,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
   useEffect(() => {
     const context = effectContextOf(canvasRef.current)
     if (!context) return
-    const tickLength = millisecondsPerFrame()
-    // 장면 시각은 경기 장면 시계로 잰다 — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다(`gameSceneTimeOf`)
-    const openedAt = gameSceneNow()
+    // 장면의 때는 경기 장면 틱 하나로 센다(`gameSceneTickOf`) — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다.
+    // 공을 놓은 틱 · 쉬기 시작한 틱 · 대기 동작 틱이 모두 이 격자 위에 선다
     /** 화면이 설 때 있던 공 — 수비 화면에서 돌아와 다시 서도 같은 공을 또 날리지 않는다 */
     let shownPitch: Pitch | null = latestRef.current.pitch
     let releaseTick: number | null = null
@@ -170,9 +167,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let idleStartTick: number | null = null
     /** 대기 동작의 마지막 갱신 틱 — 0xf 를 떠나면(0x10 조준 따위) 0x39c1c 가 안 불려 그 단계에 굳는다. 아직 0xf 면 null */
     let idleEndTick: number | null = null
-    /** 팝업 동안 멈춘 시간 — 장면 틱에서 뺀다 */
-    let frozenTotal = 0
-    let frozenSince: number | null = null
+    /** 팝업(`isFrozen`) 동안 멈춘 틱 수 — 장면 틱에서 뺀다 */
+    let frozenTicks = 0
+    let frozenSinceTick: number | null = null
     let handle = 0
     /** 그림 입력이 바뀐 틀에서만 다시 그린다(`createDrawMemo`) — 위 갱신은 틀마다 그대로 돈다 */
     const drawMemo = createDrawMemo()
@@ -192,16 +189,15 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         handle = requestAnimationFrame(frame)
         return
       }
-      const now = gameSceneTimeOf(rawNow)
+      const sceneTick = gameSceneTickOf(gameSceneTimeOf(rawNow))
       const current = latestRef.current
       if (current.isFrozen === true) {
-        if (frozenSince === null) frozenSince = now
-      } else if (frozenSince !== null) {
-        frozenTotal += now - frozenSince
-        frozenSince = null
+        if (frozenSinceTick === null) frozenSinceTick = sceneTick
+      } else if (frozenSinceTick !== null) {
+        frozenTicks += sceneTick - frozenSinceTick
+        frozenSinceTick = null
       }
-      const sceneNow = (frozenSince ?? now) - frozenTotal
-      const nowTick = pitchTickAt(sceneNow, openedAt, tickLength)
+      const nowTick = (frozenSinceTick ?? sceneTick) - frozenTicks
       if (current.pitch !== shownPitch) {
         shownPitch = current.pitch
         releaseTick = current.pitch === null ? null : nowTick

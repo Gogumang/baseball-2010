@@ -30,12 +30,11 @@ import type { SwingMode } from '@/entities/batting/model/swingResult'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
-import { ballFrameAt, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
+import { ballFrameOf, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageCastPreload } from '@/widgets/batting-stage/model/useStageCastPreload'
@@ -345,7 +344,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     // 공용 창(히든 오픈 알림 등)이 떠 있으면 경기 장면 갱신이 멈춘다 (0x52cc6)
     isSceneFrozen: isCommonWindowOpen,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartedAtRef, resultTextRef, homeRunStartedAtRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredAtRef, latestRef } = refs
+  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -363,7 +362,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     return memory.kind
   }
 
-  const finishPitch = useCallback((swing: BattingSwing | null, now: number) => {
+  const finishPitch = useCallback((swing: BattingSwing | null, tick: number) => {
     const pitch = pitchRef.current
     if (pitch === null) return
     const latest = latestRef.current
@@ -461,7 +460,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
         specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
       }
       phaseRef.current = '타격'
-      phaseStartedAtRef.current = now
+      phaseStartTickRef.current = tick
       return
     }
 
@@ -472,20 +471,20 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       showResult(result.detail, pitch, isUncatchable, at)
     }
     if (swing !== null) heldResultRef.current = show
-    else show(now)
+    else show(tick)
   }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
 
   /** 결과(0x12)를 세운다 — 문구 · 결과 길이 · 알림 */
-  const showResult = (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable: boolean, now: number) => {
+  const showResult = (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable: boolean, tick: number) => {
     const latest = latestRef.current
     buntRef.current = null
     const isHomeRun = isHomeRunResolution(detail)
     resultTextRef.current = describeResolution(detail)
-    homeRunStartedAtRef.current = isHomeRun ? now : -1
+    homeRunStartTickRef.current = isHomeRun ? tick : null
     resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
     isInPlayResultRef.current = false
     phaseRef.current = '결과'
-    phaseStartedAtRef.current = now
+    phaseStartTickRef.current = tick
     latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
   }
 
@@ -494,11 +493,11 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
    * (공이 타자 근처가 아니던 헛스윙 · 키 틱 N 의 늦은 스윙) 굴림 없는 헛스윙 스트라이크, 아니면 안 친 공 판정(사구 · 볼 · 스트라이크)이다.
    */
   const endPitch = useCallback(
-    (now: number) => {
+    (tick: number) => {
       const held = heldResultRef.current
       if (held !== null) {
         heldResultRef.current = null
-        held(now)
+        held(tick)
         return
       }
       const pitch = pitchRef.current
@@ -515,10 +514,10 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
           pitchVibrationMillisecondsOf(withType, swing.frame, pitch, latest.hud?.strikes ?? null),
           latest.isVibrationOn !== false,
         )
-        showResult(withType, pitch, false, now)
+        showResult(withType, pitch, false, tick)
         return
       }
-      finishPitch(null, now)
+      finishPitch(null, tick)
     },
     [aceBatterIndex, finishPitch],
   )
@@ -535,7 +534,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
   )
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
-  const commitHit = useCallback((now: number) => {
+  const commitHit = useCallback((tick: number) => {
     const pending = pendingHitRef.current
     if (pending === null) return
     pendingHitRef.current = null
@@ -550,33 +549,36 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       )
     }
     // 0x13 → 0x17 — 0x17 진입 0x46418(4673e)이 다음 틱에 파티클 관리자를 비운다 (`useStageAnimation`)
-    inPlayEnteredAtRef.current = now
+    inPlayEnteredTickRef.current = tick
     resultTextRef.current = pending.resultText
-    homeRunStartedAtRef.current = pending.isHomeRun ? now : -1
+    homeRunStartTickRef.current = pending.isHomeRun ? tick : null
     // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
     resultTicksRef.current = RESULT_PHASE_TICKS
     isInPlayResultRef.current = true
     phaseRef.current = '결과'
-    phaseStartedAtRef.current = now
+    phaseStartTickRef.current = tick
     latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)
   }, [])
 
   const actions = useMemo(() => {
-    const frameNow = (now: number) =>
-      ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame(), latestRef.current.acePitcher?.order)
+    /**
+     * 키를 받은 장면 틱 `tick` 에 보이던 공 틱 — 단계 시작 틱과 같은 장면 틱 격자로 센다. 그 틀의 그림은 이미 돌았으므로 키는
+     * 다음 틀의 키 처리 0x498d4(52d9e)가 읽는다(`keyTickOf`)
+     */
+    const frameNow = (tick: number) => ballFrameOf(tick - phaseStartTickRef.current, latestRef.current.acePitcher?.order)
     /** 키가 읽히는 틱 = 경기+0xfd8 — 보이던 공 틱 + 1 (`keyTickOf`) */
-    const keyTickNow = (now: number) => keyTickOf(frameNow(now))
+    const keyTickNow = (tick: number) => keyTickOf(frameNow(tick))
     // 스윙·번트는 공이 나는 동안(상태 0x11)만 받는다 — 릴리스 전에는 무시한다
-    const isFlying = (now: number) => phaseRef.current === '투구중' && pitchRef.current !== null && frameNow(now) >= 0
+    const isFlying = (tick: number) => phaseRef.current === '투구중' && pitchRef.current !== null && frameNow(tick) >= 0
     /**
      * 0x51db6 · 0x51dee 의 S+4 — 키 틱 F 가 1~N 이고(`acceptsBattingKey`) 이 공에 스윙이 아직 안 나갔을 때만.
      * 스윙이 나가면 0xb915c 가 S+4 를 내리고 +0xe 가 서 있어 0xb933c 가 다시 안 세운다 — 공마다 한 번이다.
      * 같은 그림 안에서 다시 누르면(예약이 아직 안 풀림) 0x51db6 이 같은 틱으로 다시 적는다.
      */
-    const takesKey = (now: number) => {
+    const takesKey = (tick: number) => {
       const pitch = pitchRef.current
-      if (pitch === null || !acceptsBattingKey(frameNow(now), pitch.frameCount)) return false
-      const keyTick = keyTickNow(now)
+      if (pitch === null || !acceptsBattingKey(frameNow(tick), pitch.frameCount)) return false
+      const keyTick = keyTickNow(tick)
       // 스윙이 나간 틱(F + 1) 뒤면 0xb915c(S, 3)가 S+4 를 내렸다 — 루프가 아직 못 풀었어도 틱으로 본다
       const swing = swingRef.current
       if (swing !== null && (swing.isReleased || keyTick >= swingReleaseTickOf(swing.frame))) return false
@@ -589,31 +591,31 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
       buntRef.current = null
     }
     return {
-      swing: (now: number) => {
+      swing: (tick: number) => {
         // 상태 0x13 은 감상 플래그(+0x199a)가 켜진 큰 타구만 OK(−5)·'5' 로 건너뛴다 (0x406e8 40708~40712).
         // 꺼진 타구(틱 8)는 키를 안 본다. 어느 쪽이든 스윙 키는 이 단계에서 스윙이 아니다
         if (phaseRef.current === '타격') {
           const pending = pendingHitRef.current
-          if (pending !== null && canSkipHitPause(pending.watchesBigHit)) commitHit(now)
+          if (pending !== null && canSkipHitPause(pending.watchesBigHit)) commitHit(tick)
           return
         }
-        if (!isFlying(now) || !takesKey(now)) return
+        if (!isFlying(tick) || !takesKey(tick)) return
         // 0x51dce — 스윙 키는 +0xfdc = 0 을 쓴다(번트 자세가 선 뒤에는 S+4 가 0 이라 여기 오지 않는다)
         sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindOfThisPitch(), { kind: '스윙' })
         dropPendingBunt()
         // 0x51db6: 예약 +0xfe0 = 1 · +0xfd8 = 지금 틱 — 스윙은 다음 갱신(F + 1)에 나가고 F + 2 에 판정한다(`useStageAnimation`)
-        swingRef.current = { frame: keyTickNow(now), isSpecial: false, isReleased: false, isUnjudgedWhiff: false }
+        swingRef.current = { frame: keyTickNow(tick), isSpecial: false, isReleased: false, isUnjudgedWhiff: false }
       },
       /**
        * 번트 키 '7'/'8'/'9' 누름 (0x535a4 → 메시지 0x6a7 → 0x51e48). 상태 0x11 · S+4 가 아니면 무시하고, 지금 타자가
        * 마선수(0xb633c)면 예약하지 않는다(`buntStanceAfterBuntKey`). 모드 갈림은 없다 — 화면은 `canBunt` 로 키를 연다.
        * 자세는 누르고 있는 동안만이다 — 떼면 `releaseBunt`.
        */
-      pressBunt: (kind: number, now: number) => {
-        if (!isFlying(now) || !takesKey(now)) return
+      pressBunt: (kind: number, tick: number) => {
+        if (!isFlying(tick) || !takesKey(tick)) return
         const isAceBatter = aceBatterIndex >= 0
         if (isAceBatter) return
-        const keyTick = keyTickNow(now)
+        const keyTick = keyTickNow(tick)
         const swing = swingRef.current
         if (swing !== null) {
           // 51e98 — 같은 틱의 스윙 예약(+0xfe0)이 남아 있으면 지우고 +0xfdc = 0: 스윙도 번트도 안 나간다
@@ -631,10 +633,10 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
        * 번트 키 '7'~'9' 뗌 (+0x1c 비트 9 → 0x5364c → 0x6a8 → 0x51eba) — 자세가 섰으면 풀고 +0xfdc = 0. 풀린 뒤 곧 0xb933c 가
        * S+4 를 다시 세워 그 공에 다시 스윙 · 번트할 수 있다. 상태 0x11 이 아니면 무시한다.
        */
-      releaseBunt: (now: number) => {
+      releaseBunt: (tick: number) => {
         if (phaseRef.current !== '투구중' || pitchRef.current === null) return
         const stance = buntRef.current
-        const released = buntStanceAfterRelease(stance, keyTickNow(now), aceBatterIndex >= 0)
+        const released = buntStanceAfterRelease(stance, keyTickNow(tick), aceBatterIndex >= 0)
         if (released === stance) return
         buntRef.current = released
         sceneBuntKindRef.current = 0
@@ -654,15 +656,15 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
        * 똑같이 경기+0xfe0 = 1 · +0xfdc(번트) = 0 · +0xfd8 = 지금 틱으로 스윙을 예약하고, S+0x10 에 0 대신
        * 타자 +0x18 을 쓰는 것만 다르다 (0x51e40). 상태 0x11(공이 나는 중)·S+4 가 아니면 무시한다.
        */
-      specialSwing: (now: number) => {
-        if (!isFlying(now) || !takesKey(now)) return
+      specialSwing: (tick: number) => {
+        if (!isFlying(tick) || !takesKey(tick)) return
         // 0x51e14: 남은 횟수 0xaea30 이 0 이면 무시 — 번호(+0x18)가 0 이면 늘 0 이다
         if (!canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)) return
         // 0x51e2c — 필살 키도 +0xfdc = 0 (번트 자세가 선 뒤에는 S+4 가 0 이라 여기 오지 않는다)
         sceneBuntKindRef.current = sceneBuntKindAfterKey(sceneBuntKindOfThisPitch(), { kind: '필살' })
         dropPendingBunt()
         // 0x51dee: 일반 스윙과 같은 예약에 S+0x10 = 타자 +0x18. 남은 횟수 −1 은 예약이 풀리는 틱(0x4e136, `releaseSwing`)
-        swingRef.current = { frame: keyTickNow(now), isSpecial: true, isReleased: false, isUnjudgedWhiff: false }
+        swingRef.current = { frame: keyTickNow(tick), isSpecial: true, isReleased: false, isUnjudgedWhiff: false }
       },
     }
   }, [commitHit, specialSwingNumber, aceBatterIndex, specialSwingRemaining])
@@ -675,7 +677,7 @@ export function BattingStage({ pitcherEquipmentNibbles, batterHand, canBunt = fa
     return () => {
       flightProbeRef.current = null
     }
-  }, [flightProbeRef, phaseRef, pitchRef, phaseStartedAtRef])
+  }, [flightProbeRef, phaseRef, pitchRef])
 
   // 타석 장면은 원본 틱 차례(갱신 → 그리기 → 프레임 끝 0x6de84)로 앱 전역 파티클 관리자를 직접 굴리고 그린다
   useClaimSceneParticles()

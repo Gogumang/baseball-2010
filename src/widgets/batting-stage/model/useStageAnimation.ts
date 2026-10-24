@@ -24,7 +24,7 @@ import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
-import { ballFrameAt, ballFrameStartTime, pitchTickAt } from '@/widgets/batting-stage/model/stageRefs'
+import { ballFrameOf, ballFrameStartTick } from '@/widgets/batting-stage/model/stageRefs'
 import { clearParticles } from '@/entities/particle/model/particleScene'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
@@ -39,7 +39,9 @@ import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { gameSceneNow, gameSceneTimeOf, isCommonWindowShown, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, gameSceneTimeOf, isCommonWindowShown, isGameSceneFrozen,
+} from '@/shared/lib/commonWindow/commonWindow'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { isBuntJudgeFrame } from '@/widgets/batting-stage/lib/buntStance'
 import type { StageRefs, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
@@ -71,12 +73,12 @@ function pitcherSkillBitsOf(pitcher: PitcherAbility): number {
 
 /** 투구 단계가 부르는 고리 — 타석 화면(`BattingStage`)이 채운다 */
 export interface StageHandlers {
-  /** 판정 0x6aa(0x51226) — 맞은 공이면 곧 0x13, 아니면 결과를 들고 공 끝까지 기다린다 */
-  readonly judgePitch: (swing: BattingSwing, now: number) => void
+  /** 판정 0x6aa(0x51226) — 맞은 공이면 곧 0x13, 아니면 결과를 들고 공 끝까지 기다린다. `tick` 은 그 틀의 장면 틱 */
+  readonly judgePitch: (swing: BattingSwing, tick: number) => void
   /** 공 끝(틱 N + 1, 0x4e24e) — 0x12 결과를 세운다 */
-  readonly endPitch: (now: number) => void
+  readonly endPitch: (tick: number) => void
   /** 상태 0x13 을 끝내고 인플레이로 넘기는 고리 */
-  readonly commitHit: (now: number) => void
+  readonly commitHit: (tick: number) => void
   /** 스윙이 나가는 틱(F + 1, 0x4e0ce) */
   readonly releaseSwing: (swing: SwingReservation) => void
 }
@@ -91,11 +93,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     pitchRef,
     pitchTypeNumberRef,
     phaseRef,
-    phaseStartedAtRef,
+    phaseStartTickRef,
     resultTextRef,
-    homeRunStartedAtRef,
-    swingStartedAtRef,
-    pitcherStartedAtRef,
+    homeRunStartTickRef,
+    swingStartTickRef,
+    pitcherStartTickRef,
     shiftRef,
     buntRef,
     pendingHitRef,
@@ -105,7 +107,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     pitchJudgedRef,
     heldResultRef,
     particlesRef,
-    inPlayEnteredAtRef,
+    inPlayEnteredTickRef,
     latestRef,
   } = refs
   // 고리는 남은 필살 횟수 같은 props 로 자주 바뀐다 — 루프를 다시 세우면 투구 시작 시각이 지워지므로 ref 로 읽는다
@@ -120,8 +122,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     let animationHandle = 0
     /** 그림 입력이 바뀐 틀에서만 다시 그린다 — 루프를 다시 세우면 새로 그린다 */
     const drawMemo = createDrawMemo()
-    // 장면의 모든 시각은 경기 장면 시계로 잰다 — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다(`gameSceneTimeOf`)
-    const openedAt = gameSceneNow()
+    // 장면의 모든 때는 경기 장면 틱 하나로 센다(`gameSceneTickOf`) — 공용 창이 떠 있는 동안 서고 닫히면 이어 흐른다.
+    // 단계 시작은 그 단계가 선 장면 틱이고, 단계 안 틱은 (지금 장면 틱 − 시작 틱)이다
     /**
      * 루상 주자 애니 시계(장면 +0xf24 의 애니 0~2) — 부르는 쪽이 경기 장면 수명의 칸을 넘기면 그것, 아니면 이 화면이 사는 동안.
      * `runnerTick` 은 이 화면에서 마지막으로 센 틱 — 첫 그림이 0x35b94 첫 부름이다
@@ -170,8 +172,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       latestRef.current.skyRow === undefined ? latestRef.current.random.rand(0, SKY_ROW_COUNT) : 0
     const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
 
-    /** 이번 0xf~0x10 의 CPU 투구 굴림 — 대기에 든 시각이 바뀌면(새 공 · 견제 뒤 · 쉼) 새로 센다 */
-    let cpuPitchCycle: { startedAt: number; typeRolls: number; typeNumber: number; target: WorldPoint | null } | null = null
+    /** 이번 0xf~0x10 의 CPU 투구 굴림 — 대기에 든 장면 틱이 바뀌면(새 공 · 견제 뒤 · 쉼) 새로 센다 */
+    let cpuPitchCycle: { startTick: number; typeRolls: number; typeNumber: number; target: WorldPoint | null } | null = null
     /** 0x11 에 들어서 놓기(틱 10)를 기다리는 공 — 0xf 의 마지막 구질과 0x10 의 목표점 */
     let releasePending: { typeNumber: number; target: WorldPoint } | null = null
     /** 실투로 놓은 공 — 놓기 0x4dc78 이 투구 객체 +8 = 4 (4deae), 투수 그리기 0x38d1c 가 그림마다 1 줄이며 "!" 를 그린다 */
@@ -216,20 +218,20 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       }
     }
 
-    const advancePhase = (now: number) => {
+    const advancePhase = (sceneTick: number) => {
       if (phaseRef.current === '대기') {
         if (latestRef.current.isPaused) {
           // 타석이 끝나 쉬는 동안 — 다음 타석 준비(0x48d50)처럼 좌우 이동을 되돌린다
           shiftRef.current = 0
-          phaseStartedAtRef.current = now
+          phaseStartTickRef.current = sceneTick
           return
         }
         // 0xf(9 그림) + 0x10(7 그림) 뒤 0x11 — 틱으로 센다 (`PRE_PITCH_TICKS`). CPU 투구 굴림은 원본 틱 차례로 나눠
         // 그 틱의 파티클 틱(프레임 끝 0x6de84)보다 앞에 굴린다 — 조작 0x498d4 는 매 틱 그리기보다 먼저 돈다:
         //   0xf 틱 0~8 구질 0x344dc(틱마다 한 번) · 0x10 틱 6 목표 0x345fc(또는 견제) · 0x11 틱 10 놓기 0x4dc78
-        const tick = pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
-        if (cpuPitchCycle === null || cpuPitchCycle.startedAt !== phaseStartedAtRef.current) {
-          cpuPitchCycle = { startedAt: phaseStartedAtRef.current, typeRolls: 0, typeNumber: 0, target: null }
+        const tick = sceneTick - phaseStartTickRef.current
+        if (cpuPitchCycle === null || cpuPitchCycle.startTick !== phaseStartTickRef.current) {
+          cpuPitchCycle = { startTick: phaseStartTickRef.current, typeRolls: 0, typeNumber: 0, target: null }
         }
         const cycle = cpuPitchCycle
         const { random } = latestRef.current
@@ -244,7 +246,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             // 0x34848 → 메시지 0x10: 공을 안 던진다(상태 0x11 예약 0x34888 을 안 지난다).
             // 견제 판(상태 0x17)이 끝나면 원본은 같은 타석 다음 공(0xf)으로 돌아온다 — 여기서는 다시 대기로 둔다
             pitchRef.current = null
-            phaseStartedAtRef.current = now
+            phaseStartTickRef.current = sceneTick
             latestRef.current.onPickoff?.(aim.base)
             return
           }
@@ -260,11 +262,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           pitchJudgedRef.current = false
           heldResultRef.current = null
           // 새 투구가 시작하면 홈런 글자 연출을 끈다 (원본 +0x1960 을 다음 플레이가 지우는 자리)
-          homeRunStartedAtRef.current = -1
+          homeRunStartTickRef.current = null
           phaseRef.current = '투구중'
-          phaseStartedAtRef.current = now
+          phaseStartTickRef.current = sceneTick
           // 3de7c — 투수 그림 객체 상태 1(투구 동작)
-          pitcherStartedAtRef.current = now
+          pitcherStartTickRef.current = sceneTick
           pitcherTickEnd = null
           // 3de42~3de66 — 0x11 진입: 구질 +0xfc8 == 22 이고 수비 팀 지금 투수의 순번 0xb63a1 == 2(붕붕머신)면 파티클 관리자를
           // 비운다(0x6dee4, 굴림 없음). 이 프레임의 파티클 틱보다 앞이다
@@ -282,7 +284,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
       // 0x11 틱 10 — 0x4dc78: 제구 등급 · 제구 오차 · 실투 · 곡선을 굴려 와인드업 자리를 진짜 공으로 바꾼다
       if (phaseRef.current === '투구중' && releasePending !== null) {
-        if (pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame()) < CPU_RELEASE_TICK_IN_0X11) return
+        if (sceneTick - phaseStartTickRef.current < CPU_RELEASE_TICK_IN_0X11) return
         const choice = releaseCpuPitch(
           cpuPitchArgsNow(),
           releasePending.typeNumber,
@@ -298,7 +300,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
       const pitch = pitchRef.current
       if (phaseRef.current === '투구중' && pitch !== null) {
-        const frame = ballFrameAt(now, phaseStartedAtRef.current, millisecondsPerFrame(), latestRef.current.acePitcher?.order)
+        const frame = ballFrameOf(sceneTick - phaseStartTickRef.current, latestRef.current.acePitcher?.order)
         // 투구 순간 소리 12 / 28 (0x3f378) — 공 프레임이 서는 틱(릴리스 단계 도달, `ballFrameAt` 0)에 한 번.
         // 사람이 칠 때 CPU 투수가 던지는 공이다 — 원본 식은 던지는 쪽을 가르지 않는다(사람 투구는 각 진행 고리가 낸다)
         if (frame >= 0 && releaseSoundPitch !== pitch) {
@@ -312,7 +314,6 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           )
         }
         const frameCount = pitch.frameCount
-        const tickLength = millisecondsPerFrame()
         const zoneDepth = (ZONE_CENTERS[pitch.stageSide] ?? ZONE_CENTERS[0]).z
         // 0x4e060 한 갱신의 차례대로 — 예약 풀기(F + 1) → 번트 · 스윙 판정(F + 2 · N − 1) → 공 끝(N + 1) (`nextFlightEvent`)
         for (;;) {
@@ -336,10 +337,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             // 0xb9374 — 그림의 스윙도 그 틱부터
             const released = { ...swing, isReleased: true }
             swingRef.current = released
-            swingStartedAtRef.current = ballFrameStartTime(
+            swingStartTickRef.current = ballFrameStartTick(
               swingReleaseTickOf(swing.frame),
-              phaseStartedAtRef.current,
-              tickLength,
+              phaseStartTickRef.current,
               latestRef.current.acePitcher?.order,
             )
             releaseSwing(released)
@@ -354,10 +354,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
                 buntKind: event.buntKind,
                 ...(event.isSpecial ? { isSpecial: true } : {}),
               },
-              now,
+              sceneTick,
             )
             // 0x6aa → 0x5130e 가 판정 결과를 +0xfcc~+0xfd7 에 쓴다 — 맞은 공이면 그 코드, 헛맞음이면 홈런성이 아닌 코드
-            const pitcherTickNow = pitchTickAt(now, pitcherStartedAtRef.current, tickLength)
+            const pitcherTickNow = sceneTick - (pitcherStartTickRef.current ?? sceneTick)
             // 맞은 공만 0x13('타격')으로 넘어간다 — 헛맞음은 0x11 에 남아 공 끝을 기다린다
             const isContact = phaseRef.current !== '투구중'
             judgedResultCode = { tick: pitcherTickNow, code: isContact ? (pendingHitRef.current?.detail.resultCode ?? null) : null }
@@ -369,8 +369,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             }
           } else {
             // 0x4e24e — 공 틱 > N 이고 맞지 않았으면 0x12. 이 그림의 0x4e060 이 투수를 마지막으로 센다
-            pitcherTickEnd = pitchTickAt(now, pitcherStartedAtRef.current, tickLength)
-            endPitch(now)
+            pitcherTickEnd = sceneTick - (pitcherStartTickRef.current ?? sceneTick)
+            endPitch(sceneTick)
             return
           }
         }
@@ -379,31 +379,31 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 상태 0x13 — 큰 타구면 낙구할 때까지, 아니면 틱 8 만에 인플레이로 넘어간다 (R10 4절)
       if (phaseRef.current === '타격') {
         const pending = pendingHitRef.current
-        const held = pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame())
-        if (pending === null || held >= pending.ticks) handlersRef.current.commitHit(now)
+        const held = sceneTick - phaseStartTickRef.current
+        if (pending === null || held >= pending.ticks) handlersRef.current.commitHit(sceneTick)
         return
       }
 
       // 0x12 는 16 그림(볼넷 · 사구 · 삼진 32) — 결과를 세울 때 정한 틱 수(`resultPhaseTicksOf`)
       if (
         phaseRef.current === '결과' &&
-        pitchTickAt(now, phaseStartedAtRef.current, millisecondsPerFrame()) >= resultTicksRef.current
+        sceneTick - phaseStartTickRef.current >= resultTicksRef.current
       ) {
         phaseRef.current = '대기'
-        phaseStartedAtRef.current = now
+        phaseStartTickRef.current = sceneTick
         pitchRef.current = null
         // 0xf 진입 0x3d954 → 0x35650 → 0xb9318 이 스윙 객체를 대기(상태 5)로 되돌린다 — 그때까지 스윙 끝 칸에 머문다 (`batterFrameAt`)
-        swingStartedAtRef.current = -1
+        swingStartTickRef.current = null
         // 같은 0x35650 → 0x340c0 이 투수 그림 객체를 상태 0(선 자세)으로 — 그때까지 투구 마지막 자세에 머문다
-        pitcherStartedAtRef.current = -1
+        pitcherStartTickRef.current = null
       }
     }
 
     /**
      * 파티클은 **원본 틱**에 맞춰 굴린다 — rAF 가 60fps 라도 갱신은 틱마다 한 번이다.
-     * 탭이 쉬다 돌아오면 밀린 틱이 한꺼번에 쌓이므로 따라잡기는 몇 틱으로 끊는다.
+     * 탭이 쉬다 돌아오면 밀린 틱이 한꺼번에 쌓이므로 따라잡기는 몇 틱으로 끊는다. 이 루프의 첫 그림은 세지 않는다(null)
      */
-    let particleTick = 0
+    let particleTick: number | null = null
     const PARTICLE_CATCH_UP_LIMIT = 4
     /** 홈런 효과 객체 [0x1400064] — 글자 창(`homeRunText`)이 몬다 (`lib/homeRunEffects`) */
     let stageEffects = NO_STAGE_EFFECTS
@@ -418,14 +418,14 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
      */
     let backdropClock: FrozenClock | null = null
     /**
-     * '대기' 에서 쉬기 시작한 시각 — 쉬는 동안은 단계 시작 시각을 그림마다 되밀어 틱이 늘 0 이라 따로 센다.
+     * '대기' 에서 쉬기 시작한 장면 틱 — 쉬는 동안은 단계 시작 틱을 그림마다 되밀어 단계 틱이 늘 0 이라 따로 센다.
      * 0xe 진입 0x50674 가 필살 횟수 표시의 애니(game_ui 애니 5)를 되감아 거는 자리다 (`specialSwingBadge`).
      */
     let pausedSince: number | null = null
 
     /**
-     * **경기 스킬 표시 판** (`model/skillPanelDriver`) — 사람이 치는 타석의 0xf 는 쉬지 않는 '대기', 0xf 진입은 그 단계에 든 시각
-     * (`phaseStartedAtRef`)이 바뀔 때, 0x10 · 0x11 은 '투구중'이다.
+     * **경기 스킬 표시 판** (`model/skillPanelDriver`) — 사람이 치는 타석의 0xf 는 쉬지 않는 '대기', 0xf 진입은 그 단계에 든 장면 틱
+     * (`phaseStartTickRef`)이 바뀔 때, 0x10 · 0x11 은 '투구중'이다.
      */
     const stepSkillPanel = createSkillPanelDriver()
     const skillPanelSituationNow = (): SkillPanelSituation => {
@@ -456,7 +456,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       return stepSkillPanel({
         source,
         isStateF,
-        stateFMark: phaseStartedAtRef.current,
+        stateFMark: phaseStartTickRef.current,
         isDrawnState: isStateF || phaseRef.current === '투구중',
         nowTick,
         batterSkillBits: skillBitsOfIds(latest.batterSkillIds, false),
@@ -469,20 +469,20 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     }
 
     /** 0x4c4bc 의 상태 갈래 재료 — 쉬는 '대기' 면 쉬기 시작한 뒤 틱(⚠️ 근사: 웹 쉬기는 0xd 두 그림부터라 0xe 진입보다 두 그림 이르다) */
-    const specialSwingEffectNow = (now: number, tickLength: number) => {
+    const specialSwingEffectNow = (sceneTick: number) => {
       const effect = pendingHitRef.current?.specialEffect ?? null
       if (phaseRef.current !== '타격' || effect === null) return null
-      return { ...effect, drawCall: pitchTickAt(now, phaseStartedAtRef.current, tickLength) + 1 }
+      return { ...effect, drawCall: sceneTick - phaseStartTickRef.current + 1 }
     }
 
-    const stagePhaseNow = (now: number, tickLength: number) => {
+    const stagePhaseNow = (sceneTick: number) => {
       const isPaused = latestRef.current.isPaused
       const pausedWaiting = phaseRef.current === '대기' && isPaused
       if (!pausedWaiting) pausedSince = null
-      else if (pausedSince === null) pausedSince = now
+      else if (pausedSince === null) pausedSince = sceneTick
       return {
         kind: phaseRef.current,
-        tick: pitchTickAt(now, pausedSince ?? phaseStartedAtRef.current, tickLength),
+        tick: sceneTick - (pausedSince ?? phaseStartTickRef.current),
         isPaused,
         isInPlay: phaseRef.current === '결과' && isInPlayResultRef.current,
       }
@@ -499,6 +499,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         return
       }
       const now = gameSceneTimeOf(rawNow)
+      /** 이 틀의 장면 틱 — 갱신 · 그리기가 모두 이 틱 하나로 센다 */
+      const sceneTick = gameSceneTickOf(now)
+      /** 이 틱의 머리 시각 — 부르는 쪽이 장면 시계(ms)로 넘긴 창(`homeRunText`)을 같은 격자에서 읽는다 */
+      const tickTime = gameSceneTickStartTime(sceneTick)
       const isBackdrop = latestRef.current.isResultBackdrop === true
       if (!isBackdrop) {
         if (settlementEffect !== undefined) {
@@ -509,10 +513,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         }
         backdropClock = null
       } else {
-        backdropClock = observeFrozenClock(backdropClock ?? startFrozenClock(now), now, latestRef.current.isSceneFrozen === true)
+        backdropClock = observeFrozenClock(backdropClock ?? startFrozenClock(tickTime), tickTime, latestRef.current.isSceneFrozen === true)
       }
       // 결과 창 뒤 배경(0x19 · 0x1a)에는 투구 갱신이 없다 — 투구 단계를 멈춘다(파티클 틱은 아래 — 프레임 끝 0x6de85 는 돈다)
-      if (!isBackdrop) advancePhase(now)
+      if (!isBackdrop) advancePhase(sceneTick)
 
       const pitch = pitchRef.current
       const tickLength = millisecondsPerFrame()
@@ -522,15 +526,15 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 그림 +0x48 · +0x60 에 같은 0xb63c1(타자)를 쓴다 — 마타자는 표 0xd88b0, 그 밖은 폼 & 1
       const side = latestRef.current.batterHand ?? batterSideOfForm(latestRef.current.batterForm)
       const isPitching = phaseRef.current === '투구중' && pitch !== null
-      const ballFrame = isPitching ? ballFrameAt(now, phaseStartedAtRef.current, tickLength, latestRef.current.acePitcher?.order) : -1
-      const pitcherStartedAt = pitcherStartedAtRef.current
+      const ballFrame = isPitching ? ballFrameOf(sceneTick - phaseStartTickRef.current, latestRef.current.acePitcher?.order) : -1
+      const pitcherStartTick = pitcherStartTickRef.current
       const pendingHit = phaseRef.current === '타격' ? pendingHitRef.current : null
       // 홈런 연출은 결과 문구 시간(1150ms)보다 길다 — 날아 들어오기만 22틱이라 따로 센다
-      const homeRunStartedAt = homeRunStartedAtRef.current
-      const isHomeRun = homeRunStartedAt >= 0
+      const homeRunStartTick = homeRunStartTickRef.current
+      const isHomeRun = homeRunStartTick !== null
 
-      const nowTick = pitchTickAt(now, openedAt, tickLength)
-      if (particleTick === 0) particleTick = nowTick
+      const nowTick = sceneTick
+      if (particleTick === null) particleTick = nowTick
       const settlement = isBackdrop ? latestRef.current.settlement : undefined
       // 경기 장면 프레임 0x52c50 의 파티클 게이트 53048~5304c — 공용 창 [0x140005c]+9 가 서 있으면 관리자 틱 0x6de85 · 그리기 0x6dd69 를
       // 둘 다 건너뛴다. 그동안 상태 갱신(52cc6 → 52ef2)과 상태 그리기(52f0e~52f24 → 53032, 장면을 다시 그리는 첫 그림 [+0x250] 말고)도
@@ -563,11 +567,12 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         tickParticles(particlesRef.current, latestRef.current.random)
       }
       for (let step = 0; step < steps && !isBackdrop; step += 1) {
-        const stepTime = openedAt + (firstSteppedTick + step + 1) * tickLength
+        const steppedTick = firstSteppedTick + step + 1
+        const stepTime = gameSceneTickStartTime(steppedTick)
         // 0x17 진입 0x46418 의 4673e — 0x13 을 끝낸 틱(그 틱의 파티클 틱 · 그리기는 0x13 끝에 쏜 016 까지 한 번 돈다) 다음 틱에 비운다
-        const inPlayEnteredAt = inPlayEnteredAtRef.current
-        if (inPlayEnteredAt !== null && stepTime > inPlayEnteredAt) {
-          inPlayEnteredAtRef.current = null
+        const inPlayEnteredTick = inPlayEnteredTickRef.current
+        if (inPlayEnteredTick !== null && steppedTick > inPlayEnteredTick) {
+          inPlayEnteredTickRef.current = null
           clearParticles(particlesRef.current)
         }
         stageEffects = stepStageFrame(stageEffects, {
@@ -616,17 +621,17 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         isEagleEyeEnabled: latestRef.current.isEagleEyeEnabled && phaseRef.current === '투구중',
         resultText: phaseRef.current === '결과' ? resultTextRef.current : '',
         isHomeRun,
-        homeRunTick: isHomeRun ? pitchTickAt(now, homeRunStartedAt, tickLength) : 0,
+        homeRunTick: homeRunStartTick !== null ? sceneTick - homeRunStartTick : 0,
         // 부르는 쪽이 모는 글자 창이 있으면 그 칸대로만 그린다 (홈런더비 — `BattingStage` 의 `homeRunText`)
         homeRunFrame:
           latestRef.current.homeRunText === undefined
             ? undefined
             : latestRef.current.homeRunText === null
               ? null
-              : homeRunTextFrameAt(latestRef.current.homeRunText, now, tickLength),
-        swingFrame: batterFrameNow(now, swingStartedAtRef.current, buntRef.current !== null, bodyType, latestRef.current.aceBatterOrder),
+              : homeRunTextFrameAt(latestRef.current.homeRunText, tickTime, tickLength),
+        swingFrame: batterFrameNow(sceneTick, swingStartTickRef.current, buntRef.current !== null, bodyType, latestRef.current.aceBatterOrder),
         // 필살 스윙 연출 그림 0x49aec — 상태 0x13('타격') 동안 그림마다 한 번 불린다 (k = 단계 틱 + 1, `specialSwingEffect`)
-        specialSwingEffect: specialSwingEffectNow(now, tickLength),
+        specialSwingEffect: specialSwingEffectNow(sceneTick),
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
         batterSkinIndex: latestRef.current.batterSkinIndex,
@@ -638,17 +643,17 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         // 실투 "!" — 놓은 0x11 틱 10 의 그림이 첫 그림(1)이다 (`pitcherFatigue` 의 실투 "!")
         pitcherMistakeMarkDraw:
           isPitching && pitch !== null && pitch === mistakeMarkPitch
-            ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) - CPU_RELEASE_TICK_IN_0X11 + 1
+            ? sceneTick - phaseStartTickRef.current - CPU_RELEASE_TICK_IN_0X11 + 1
             : null,
         ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
-        pitcherTick: pitcherStartedAt < 0 ? null : pitchTickAt(now, pitcherStartedAt, tickLength),
-        pitcherTickEnd: pitcherStartedAt < 0 ? null : pitcherTickEnd,
+        pitcherTick: pitcherStartTick === null ? null : sceneTick - pitcherStartTick,
+        pitcherTickEnd: pitcherStartTick === null ? null : pitcherTickEnd,
         // 투수 그리기의 홈런 갈래(0x3908a)가 결과 코드 [+0xfd4] · 감상 플래그 +0x199a 를 본다 — 투수를 그리는 0x11 · 0x12 · 0x13 에서.
         // 맞은 공의 인플레이(웹 '결과' isInPlay = 원본 0x17)는 그리기 0x46c88 이 0x38d1c 를 안 불러 없다
         pitcherHitMark:
-          pitcherStartedAt < 0 || (phaseRef.current === '결과' && isInPlayResultRef.current)
+          pitcherStartTick === null || (phaseRef.current === '결과' && isInPlayResultRef.current)
             ? null
             : {
                 codeBeforePitch: resultCodeBeforePitch,
@@ -668,11 +673,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           backdropClock === null
             ? null
             : (latestRef.current.resultBackdropOffsetOf ?? resultBackdropOffsetAt)(
-                pitchTickAt(frozenClockNowOf(backdropClock, now), backdropClock.startedAt, tickLength),
+                gameSceneTickOf(frozenClockNowOf(backdropClock, tickTime)) - gameSceneTickOf(backdropClock.startedAt),
               ),
-        resultTick: phaseRef.current === '결과' ? pitchTickAt(now, phaseStartedAtRef.current, tickLength) : 0,
+        resultTick: phaseRef.current === '결과' ? sceneTick - phaseStartTickRef.current : 0,
         // 0x4c4bc 의 상태 갈래 재료 — 웹 단계 · 그 단계에 든 뒤 틱 · 쉬는 중(0xd · 0xe 대기 따위)
-        stagePhase: stagePhaseNow(now, tickLength),
+        stagePhase: stagePhaseNow(sceneTick),
         timeKeyCount: latestRef.current.timeKeyCount ?? null,
         specialSwingRemaining: latestRef.current.specialSwingRemaining ?? null,
         // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판 (결과 창 뒤 배경에는 안 그린다)
@@ -716,7 +721,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       animationHandle = requestAnimationFrame(frame)
     }
 
-    phaseStartedAtRef.current = gameSceneNow()
+    phaseStartTickRef.current = gameSceneTickNow()
     animationHandle = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(animationHandle)
     // ref 묶음은 값이 바뀌지 않는다. 고리는 handlersRef 로 읽는다 — 루프를 다시 세우는 때는 예전처럼 판정 · 0x13 고리가 바뀔 때뿐이다
@@ -730,17 +735,17 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 통째로 쌓여 있으면 진행 중이던 투구가 곧바로 스트라이크로 처리되므로
       // 타석을 다시 준비 상태로 되돌린다.
       phaseRef.current = '대기'
-      phaseStartedAtRef.current = gameSceneNow()
+      phaseStartTickRef.current = gameSceneTickNow()
       pitchRef.current = null
       buntRef.current = null
       swingRef.current = null
-      swingStartedAtRef.current = -1
-      pitcherStartedAtRef.current = -1
+      swingStartTickRef.current = null
+      pitcherStartTickRef.current = null
       pitchJudgedRef.current = false
       heldResultRef.current = null
       pendingHitRef.current = null
       resultTextRef.current = ''
-      homeRunStartedAtRef.current = -1
+      homeRunStartTickRef.current = null
       // 쉬는 동안 밀린 연출은 버린다 (원본도 상태가 바뀔 때 목록을 비운다, 0x6dee4)
       clearParticles(particlesRef.current)
     }
