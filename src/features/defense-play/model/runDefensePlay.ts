@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import { judgeCallSoundIdOf } from '@/features/defense-play/model/judgeCall'
 import {
@@ -15,6 +16,7 @@ import {
   carryDistanceOf,
   isBallTrajectory,
   launchTrajectory,
+  holdTrajectoryAt,
   spliceTrajectory,
   trajectoryWithRandom,
   type BallTrajectory,
@@ -141,10 +143,13 @@ import {
   strikesAfterPlay,
   liveRunnerCountOf,
   gateRunnerViewsOf,
+  passPlayGate,
   passPlayGateBetweenTicks,
   playEndResultCode,
   someRunnerStillActive,
   type PlayEndState,
+  type PlayGateFrameResult,
+  type PlayGateInput,
 } from '@/entities/fielding/model/playGate'
 import { DIVE_TICK_NONE, forecastCatch } from '@/features/defense-play/model/catchForecast'
 import { diveCheckOf, logDiveCheck } from '@/features/defense-play/model/diveCheck'
@@ -247,7 +252,7 @@ export interface DefensePlayInput {
   /** 투구 때의 아웃 수 */
   readonly outs: number
   /** 수비 9명의 수비 능력치 (칸 순서). 기본 500 */
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
@@ -417,6 +422,8 @@ export interface DefensePlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   /** 수비 팀 번호 0~14 — 야수 그림 팔레트 `defender.mpl` (C-1, 15색) */
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number
   /**
@@ -463,7 +470,8 @@ export interface DefenseLineupPlayer {
  *
  * 칸 0(투수)은 판 시작 0xb0fb4 가 **선수를 찾지 않는다**(b1032 — `fielderAbilityOf` 주석). 그래서 송구 속도 g = 2 ·
  * 악송구 보정 8 로 고정이고 송구 쪽은 이 칸의 값을 읽지 않는다. 대신 공수 교대 판 0x3fac4 가 칸 0 의 +0xec 에 **지명타자**
- * (니블 1)를 넣어 펌블 · 레이저 굴림이 그 수비를 본다 — 칸 0 에는 지명타자의 수비를 넣는다(`recordPlayerAbilityOf`).
+ * (니블 1)를 넣어 펌블 · 레이저 굴림이 그 수비를 본다 — 칸 0 에는 지명타자의 수비를 넣는다(`recordPlayerAbilityOf`). 진행기는 이 값을
+ * 장면이 든 +0xec(마지막 교대 판의 레코드, 판이 없었으면 null — `entities/fielding/model/fielderRecords`)로 덮어 넘긴다.
  * (예전 웹은 마운드 투수의 능력치 칸 2(투수 레코드에서는 변화)를 넣었다 — 원본에 없는 길이라 걷었다.)
  *
  * 자리 코드가 없거나 겹치는 칸은 원본 평균대(등급 3 = 500)로 둔다.
@@ -840,7 +848,7 @@ export interface DefensePlayState {
   // ── 시작할 때 정해지는 것 ──
   readonly input: DefensePlayInput
   trajectory: BattedBallTrajectory
-  readonly abilities: readonly number[]
+  readonly abilities: readonly (number | null)[]
   readonly maximumTicks: number
   /** 아무도 잡지 못하는 타구인가 (필살타법 0x51800) */
   uncatchable: boolean
@@ -1537,8 +1545,9 @@ export function stepDefensePlay(
    * 건너뛰는 동안의 52b26(슬롯 2 뒤). **득점 차례(확정)**: 메시지 0x13(타자주자)은 목록 틱 카메라에서 곧바로 가고, 같은 목록 틱에 홈에
    * 닿은 앞 주자의 0x13 은 그 뒤 슬롯 2 의 0xaa0a8(6f 절)이 보낸다 — 타자주자가 먼저다. 0xaa0a8 은 +0x96 이 선 타자주자를 건너뛴다(aa0e6).
    * 이미 0xaa0a8 이 센 타자주자여도 원본은 1점을 또 올린다(0xb6a9c — 원본 그대로, 다만 그때는 보통 0xa990c == 0 이라 G1 이 닫혀 있다).
-   * ⚠️ 미확인: 52b26 에서 풀린 뒤 다음 그림은 52e16 의 목록 틱이 슬롯 2 보다 먼저 한 번 더 돌아(웹 틱에는 그 목록 틱이 없다) 앞 주자의
-   *    +0x3b 를 지우므로 원본에서는 그 앞 주자의 0xaa0a8 득점이 안 날 수 있다 — 에뮬레이터로 확인하기 전에는 웹은 다음 틱 6f 절에서 센다.
+   * 52b26 에서 풀린 그림은 52b36 → 52b42 로 되풀이를 멈추고 그린 뒤(G3 · G4), 다음 그림 52c50 이 키 0x498d4(52d9e) 다음 **52e16 의
+   * 0x3f060 을 갈래 없이** 부르고서야 0x524c0(52e94)의 G2 · 슬롯 2 로 간다(직접 뜸). 곧 목록 틱이 한 번 더 돌아 앞 주자의 +0x3b 를
+   * 지우므로 같은 목록 틱에 닿은 앞 주자는 0xaa0a8 이 세지 않는다 — 웹은 9 절 `passFastForwardGates` 가 그 목록 틱을 돈다(원본 그대로).
    */
   const cameraFastForwardRunIn = (): void => {
     const cameraBallStopped =
@@ -2133,15 +2142,17 @@ export function stepDefensePlay(
     // 키스톤 자리 잡기 b203a 의 목표도 vt14 관문(잠금 · vtc8)을 지난다 — AI 0xa 만 관문 없이 건다(`coverTick`, r190 — 예전 웹은 관문 없이
     // 적었다. 표 전체에서 관문에 막힌 호출 5932 번이 결과 · 로그 · 그림 어느 것도 바꾸지 않았다: 막힌 동안은 안 걷고 지우기 vt10 이 목표 =
     // 위치로 되돌려 다음 b203a 가 다시 적는다)
-    const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
-    // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱(야수 · 주자)이 없다
-    if (!pausedAtHead) {
+    // 키 건너뛰기가 풀린 그림 다음 그림의 목록 틱(아래 9 절 `extraListTick`)도 같은 몫을 돈다
+    const listTickHead = (): void => {
+      const lockedThisTick = fielders.map((fielder) => fielder.actionLockTicks > 0)
       // a12da · a12e6 — 잠금이 없는 틱에만 +0xb8 · +0xc0 을 −1 (그림의 "!" 표시만 본다)
       fumbleMarks = fumbleMarks.map((value, slot) => tickMarkCounter(value, lockedThisTick[slot] === true))
       throwErrorMarks = throwErrorMarks.map((value, slot) => tickMarkCounter(value, lockedThisTick[slot] === true))
       // a1286 프레임 +1 · 잠금 · 준비 틱 · 자세 워드 지우기 a137a~a1456 (`fielderPose.listTickFielder`, r171)
       fielders = fielders.map(listTickFielder)
     }
+    // 경기 멈춤(+0x1993)이 머리에서 서 있으면 0x3f060 이 3f0a4 에서 돌아가 목록 틱(야수 · 주자)이 없다
+    if (!pausedAtHead) listTickHead()
 
     // ── 0. 사람 조작 (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절) ──
     // 예전에는 `input.controls?.keyAt(tick)` 로 미리 물어봤다. 이제는 **이번 틱에 눌린 키**를 받는다
@@ -3189,6 +3200,7 @@ export function stepDefensePlay(
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
+        fielderRecords: input.fielderRecords,
         offenseTeamIndex: input.offenseTeamIndex,
       })
     ticks.push(snapshotAt(tick, fielders, pausedAtHead))
@@ -3237,10 +3249,8 @@ export function stepDefensePlay(
 
     // 관문 G3 · G4 · G1 은 다음 그림의 목록 틱(6 절 이동) 앞 주자를 본다 (`playGate.gateRunnerViewsOf`)
     const runnersBeforeListTick = runners.map((runner) => runner.state)
-    // 6~7 절은 다음 그림의 목록 틱(0x3f060)과 플레이 틱 꼬리다 — 이 틱에 멈췄으면 다음 그림도 멈춰 있어 없다
-    nextFrame: {
-    if (pausedThisTick) break nextFrame
-    // ── 6. 한 틱 움직이기 ──
+    // ── 6. 한 틱 움직이기 ── (키 건너뛰기가 풀린 그림 다음 그림의 목록 틱 — 9 절 `extraListTick` — 도 같은 이동이다)
+    const listTickMove = (): void => {
     const beforeMove = fielders
     // 추적야수 AI 1(0xb4afe)의 목표(+0x127 && 낙구 틱 ≥ 공+0x68 이면 낙구 지점, 아니면 포구 지점)는 AI 고리 1c 절이 고쳤다(r190)
     fielders = fielders.map((fielder) =>
@@ -3305,16 +3315,59 @@ export function stepDefensePlay(
         continue
       }
     }
-
     }
+    // 6~7 절은 다음 그림의 목록 틱(0x3f060)과 플레이 틱 꼬리다 — 이 틱에 멈췄으면 다음 그림도 멈춰 있어 없다
+    if (!pausedThisTick) listTickMove()
 
     // ── 8. 판 진행 관문 0xb0d28 — 이 틱 그리기 0x46e3c(G3) · 0x3f378(G4, 안 쥐었을 때) · 다음 틱 0x3f060(G1) · 슬롯 2 머리 52502(G2) ──
     // (전문은 `entities/fielding/model/playGate.ts` — `passPlayGateBetweenTicks`). 부를 때마다 +0x120 이 오르므로 주자가 다 서고
     // (+0x94 까지) 누가 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17 틱) 닫힌다. 그동안에도 자동 진루 · CPU 송구가 돈다.
     // 3아웃(b0dbe) · 사건 코드 11(b0db4)이면 곧바로 닫힌다. 악송구는 예보 vt24(0)가 고른 야수가 포구 틱 갈래로 주워 쥔다(`takeLooseBall`).
+    /**
+     * **키 건너뛰기 되풀이의 관문 (52b26~52b40 · 그 뒤 그림, 직접 뜸)** — 건너뛰는 동안 한 그림 안의 차례는
+     * ```
+     * 52b32  0x3f060: G1(3f0b8) → 열렸으면 목록 틱 → 카메라 3f164 (타자주자 홈이면 +0xfe7 = 0 · 메시지 0x13)
+     * 52b36  +0xfe7 이 서 있으면 524f8 → G2(52502) → 슬롯 2 … → 52b26 되풀이
+     *        풀렸으면 52b42 → 그리기 0x46c88(G3 0x46e3c) → 0x3f378(G4, 쥐지 않았을 때)
+     * 52e16  다음 그림 머리 0x3f060 — G1 → 목록 틱 **한 번 더**(주자 +0x3b 를 머리에서 지운다) → 0x524c0 의 G2 → 슬롯 2
+     * ```
+     * 그래서 풀린 틱은 G1 · 목록 틱 · 카메라 뒤에 G3 · G4 · G1 · 목록 틱이 더 돌고서야 G2 다. 웹 판 틱은 6 절 이동 하나가 목록 틱 하나라
+     * 풀린 그림 다음 그림의 목록 틱을 여기서 한 번 더 돈다(`listTickHead` — 앞 목록 틱의 야수 준비 틱 몫 · `listTickMove`). 같은 목록 틱에
+     * 타자주자와 함께 홈에 닿은 앞 주자는 그 목록 틱이 +0x3b 를 지워 다음 슬롯 2 의 0xaa0a8 이 세지 않는다(원본 그대로).
+     */
+    const passFastForwardGates = (
+      input: PlayGateInput,
+      views: { readonly frame: readonly RunnerState[]; readonly head: readonly RunnerState[] },
+      runnerInputOf: (views: readonly RunnerState[]) => Partial<PlayGateInput>,
+    ): PlayGateFrameResult => {
+      let counter = input.endCounter
+      const call = (override: Partial<PlayGateInput>): boolean => {
+        const result = passPlayGate({ ...input, ...override, endCounter: counter })
+        counter = result.endCounter
+        return result.open
+      }
+      // G1 — 52b32 의 0x3f060 (6 절 이동 앞 주자)
+      let listTickOpen = call(runnerInputOf(views.frame))
+      if (listTickOpen) cameraFastForwardRunIn()
+      let drawOpen: boolean | null = null
+      if (!fastForward) {
+        // 풀린 그림의 그리기 — 목록 틱 · 카메라(타자주자 득점) 뒤 주자를 본다
+        const drawn = runnerInputOf(runners.map((runner) => runner.state))
+        drawOpen = call(drawn)
+        if (!play.held) call(drawn)
+        // 다음 그림 머리 52e16 의 0x3f060 — G1 이 열렸으면 목록 틱 한 번 더
+        listTickOpen = call(drawn)
+        if (listTickOpen) {
+          listTickHead()
+          listTickMove()
+        }
+      }
+      const counterBeforeHead = counter
+      const headOpen = call(runnerInputOf(fastForward ? views.head : runners.map((runner) => runner.state)))
+      return { open: headOpen, endCounter: counter, drawOpen, counterBeforeHead, listTickOpen }
+    }
     const gateRunners = gateRunnerViewsOf(runnersBeforeListTick, runners.map((runner) => runner.state))
-    const gate = passPlayGateBetweenTicks(
-      {
+    const gateInput: PlayGateInput = {
         foulFlag,
         // 파울 갈래(b0d2c)만 본다 — 멈춤 · 담장선 넘은 뒤 떨어지는 틱 · 홈 뒤(z > 32599, −315 < 각 < −225)
         foulBall: foulFlag
@@ -3344,15 +3397,16 @@ export function stepDefensePlay(
         ballHeld: play.held,
         groundRuleFlag,
         endCounter,
-      },
-      fastForward,
-      gamePaused,
-      // G2(슬롯 2 머리 52502) — 목록 틱(6 절 이동) 뒤 · 득점 0xaa0a8(G2 뒤) 앞
-      {
-        someRunnerActive: someRunnerStillActive(gateRunners.head, isAtTarget),
-        liveRunnerCount: liveRunnerCountOf(gateRunners.head),
-      },
-    )
+    }
+    // G2(슬롯 2 머리 52502) — 목록 틱(6 절 이동) 뒤 · 득점 0xaa0a8(G2 뒤) 앞
+    const runnerGateInputOf = (views: readonly RunnerState[]): Partial<PlayGateInput> => ({
+      someRunnerActive: someRunnerStillActive(views, isAtTarget),
+      liveRunnerCount: liveRunnerCountOf(views),
+    })
+    const gate =
+      fastForward && !gamePaused
+        ? passFastForwardGates(gateInput, gateRunners, runnerGateInputOf)
+        : passPlayGateBetweenTicks(gateInput, fastForward, gamePaused, runnerGateInputOf(gateRunners.head))
     endCounter = gate.endCounter
     counterBeforeHead = gate.counterBeforeHead
     drawGateOpen = gate.drawOpen
@@ -3360,9 +3414,14 @@ export function stepDefensePlay(
     // 닫힌 그림 다음의 G1 — 열렸으면 목록 틱 a1330 이 +0xcc 를 하나 더 줄인다(`fielderSlackAtPlayEnd`, r196)
     if (!gate.open) state.closingListTickOpen = gate.listTickOpen === true
 
-    // ── 9. 카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192 — `cameraFastForwardRunIn`) ──
-    // 건너뛰는 동안 0x3f060 은 52b26(슬롯 2 뒤)에서 돈다 — 웹의 이 틱 6 절 이동 뒤 자리다
-    if (fastForward && gate.listTickOpen === true) cameraFastForwardRunIn()
+    // 키 건너뛰기 되풀이 52b26~52b40 동안은 그리기 · 0x3f378 이 없어 공+0x68 이 안 오른다(0xa2594 를 부르는 곳은 0x3f378 3f3c6 하나) —
+    // 다음 판 틱도 이 틱의 공 점을 본다. 풀린 그림은 그리고 0x3f378(G4)을 지나 다음 판 틱은 한 칸 나아간 점이다(쥐었으면 3f3aa 가 안 올린다 —
+    // 쥔 공은 진행기가 야수 손에 둔다)
+    if (fastForward && !gamePaused) {
+      trajectory = holdTrajectoryAt(trajectory, tick + 1)
+      if (ballLandingTick > tick) ballLandingTick += 1
+      if (catchTick > tick) catchTick += 1
+    }
     // ── 9b. 슬롯 2 꼬리 52b62~52bb2 — 깊은 낙구 함성 60 (직접 뜸) ──
     // 52b26 건너뛰기 되풀이가 끝난 뒤(+0xfe7 == 0) 한 번: 공+0xaa0(낙구 틱) ≠ −1 && == 공+0x68 && 공+0xac4(깊은 페어 낙구) &&
     // ¬0x357e0(결과 코드 24~26) && 플레이+0x113(b4492 — 낙구 틱에 아무도 안 쥐었다) → 즉시 60. 결과 코드(0x357e0)는 화면이 본다.

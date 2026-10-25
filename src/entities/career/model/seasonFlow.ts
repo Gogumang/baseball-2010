@@ -285,6 +285,8 @@ export interface SalaryHolder {
   readonly popularity: number
   readonly popularityAtSeasonStart: number
   readonly salary: number
+  /** 레코드 +0x1b — 0xa4fd8 이 감기기 전 v 로 쓴 값 (`nariRecordSalaryGradeOfCareer`) */
+  readonly salaryRecordGrade?: number
 }
 
 /**
@@ -306,7 +308,9 @@ export function applySalaryChange<C extends SalaryHolder>(career: C, code: numbe
   const base = salaryOfferOf(career).salary
   const rate = SALARY_RATE[code] ?? 0
   const change = Math.sign(rate) * Math.trunc((base * Math.abs(rate)) / 100)
-  return { ...career, salary: (base + change) & SALARY_MASK }
+  // 0x8cac0 의 v 는 32비트 정수(8cada · 8cb28)라 0xa4fd8 의 레코드 +0x1b 는 감기기 전 v 로 센다(a4ff6~a5006)
+  const salary = base + change
+  return { ...career, salary: salary & SALARY_MASK, salaryRecordGrade: nariRecordSalaryGradeOf(salary) }
 }
 
 /** 레코드 +0x1b 는 바이트 — 0xa4ffe `movs r3, #0xff ; cmp r0, #0xff ; bge` */
@@ -323,8 +327,15 @@ const RECORD_SALARY_GRADE_DIVISOR = 10
  * 부르는 곳은 등록 0x10fb4(11246, v = 0x32) · 보상 종류 20(8cb84) 둘뿐이라 +0x1b 는 늘 지금 연봉의 1/10 이다. 등록 0x1f654 ·
  * 0x1f680 과 시즌 영입 0xc554 는 이 0x30 바이트를 통째로 옮기므로 명전 · 영입 선수도 그때의 값을 든다. 시즌(모드 2) 상세 창
  * 0x5b798(5c848~5c886)은 이 칸 × 1000 을 연봉으로 찍는다.
- * ⚠️ 웹 연봉은 u16 으로 감긴 값만 든다 — 원본 v 는 감기기 전 정수라 v ≥ 65536 이면 원본은 0xff, 웹은 감긴 값의 1/10 이다(그 전에는 같다).
+ * v 는 0x8cac0 의 32비트 정수(감기기 전)라 v ≥ 65536 이면 S+0x1c8 은 감겨도 +0x1b 는 0xff 다(r244 — 8cada `ldrh` + 상승분 ·
+ * 8cb28 `adds` 뒤 곧장 a4fd8 로, 자르는 곳이 없다). 그래서 보상 20 이 그때 값을 `salaryRecordGrade` 에 남기고
+ * (`applySalaryChange`) 레코드를 베끼는 곳은 `nariRecordSalaryGradeOfCareer` 로 읽는다.
  */
 export function nariRecordSalaryGradeOf(salary: number): number {
   return Math.min(Math.trunc(salary / RECORD_SALARY_GRADE_DIVISOR), RECORD_SALARY_GRADE_MAXIMUM)
+}
+
+/** 레코드 +0x1b — 마지막 연봉 쓰기 0xa4fd8 가 남긴 값. 그 값이 없으면(등록 그대로 · 옛 저장) 지금 연봉에서 센다 */
+export function nariRecordSalaryGradeOfCareer(career: Pick<SalaryHolder, 'salary' | 'salaryRecordGrade'>): number {
+  return career.salaryRecordGrade ?? nariRecordSalaryGradeOf(career.salary)
 }

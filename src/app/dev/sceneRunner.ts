@@ -2,7 +2,7 @@
 import { sceneHandlesNow, setDevBootSeed } from '@/app/dev/sceneShortcut'
 import type { SceneHandles } from '@/app/dev/sceneShortcut'
 import { SCENES } from '@/app/dev/scenes'
-import { scenePeeksNow, setSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
+import { battingLogNow, scenePeeksNow, setSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { SceneStep } from '@/app/dev/scenes'
 
@@ -43,6 +43,8 @@ declare global {
     __scene?: SceneStatus
     /** 지금 화면 한 줄 요약 — e2e 도우미 `screenState` 가 읽는다 */
     __sceneProbe?: () => unknown
+    /** 타석 장면 시각 재기 — 공 그림 · 틱 격자(`BattingStagePeek`)와 스윙 · 판정 기록 (r242) */
+    __batting?: () => unknown
   }
 }
 
@@ -75,6 +77,7 @@ async function applyFixture(name: string): Promise<void> {
 
 /** 앱을 그리기 전에 부른다 — 픽스처를 깔고, 장면을 고른다. 실패해도 앱은 그린다(상태만 error) */
 export async function bootSceneShortcut(): Promise<void> {
+  window.__batting = () => ({ probe: scenePeeksNow().battingStage?.probe() ?? null, log: battingLogNow() })
   window.__sceneProbe = () => {
     const handles = sceneHandlesNow()
     if (handles === null) return null

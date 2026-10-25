@@ -146,8 +146,9 @@ export function abilityTrainingBonusLinesOf(source: AbilityTrainingBonusSource):
 }
 
 /**
- * 휴식 결과 창 글 — 0x18e3c 18e7c~18eb4: `strcpy(StrMODE[24])` · `strcat(" ")`(0xcc338) · `0xbc73d(|수치|)` ·
- * `strcat(수치 >= 0 ? StrMODE[83] : [84])`. 모드 갈래가 없어 타자편 · 투수편이 같다.
+ * 휴식 결과 창 글 — 0x18e3c: 18e46 `strcpy("!C")`(알림 창이 붙인다) 뒤 18e7c~18eb4 `strcat(StrMODE[24])` · `strcat(" ")`(0xcc338) ·
+ * `0xbc73d(|수치|)` · `strcat(수치 > 0 ? StrMODE[83] : [84])`(18ea8 `cmp r2,#0 ; ble`). 회복값은 18e4c~18e52 rand(10, 16) 이라
+ * 늘 0 보다 커서 아래 `>= 0` 과 결과가 같다(감사 r246). 모드 갈래가 없어 타자편 · 투수편이 같다.
  */
 export function restResultTextOf(moraleGain: number): string {
   const verb = rawModeText(moraleGain >= 0 ? RISE_TEXT : FALL_TEXT)

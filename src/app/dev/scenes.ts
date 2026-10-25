@@ -289,6 +289,19 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'nari-y1',
     steps: [...TO_NARI_MANAGEMENT, wait(900)],
   },
+  'nari-bat': {
+    description: '나리 타자편 경기 — 1년차 첫 경기 내 첫 타석 0xe (관리 [다음경기] → 순위표 · 경기 준비 OK → 경기). 타이밍 재기 r242',
+    fixture: 'nari-y1',
+    // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
+    seed: 1,
+    steps: [
+      ...TO_NARI_MANAGEMENT,
+      call('관리 [다음경기] (runCommand)', (h) => h.career.actions.runCommand('다음경기')),
+      // 타석 화면(`BattingStage`)이 서면 멈춘다 — 그 뒤 OK 는 스윙이라 누르지 않는다
+      keyUntil('Enter', '나리 타석 0xe', () => scenePeeksNow().battingStage !== undefined, 400, 90000),
+      wait(400),
+    ],
+  },
   'nari-outing': {
     description: '나리 타자편 외출 지도 112 (관리 [외출] — runCommand)',
     fixture: 'nari-y1',

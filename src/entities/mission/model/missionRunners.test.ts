@@ -171,6 +171,27 @@ describe('미션 수비 판 아홉 칸 수비 — 0xb0fb4 (수비 팀 레코드�
     )
   })
 
+  it('칸 0 은 첫 0x18 판(0x3fac4)이 적은 지명타자 레코드 — 그 뒤 대타로 지명 자리가 옮겨도 그대로, 판이 없으면 null', () => {
+    const mission = MISSIONS.find((m) => m.side === '투수')!
+    const run = startPitcherMission(mission)
+    const batting = run.game.humanBatting
+    const roster = teamBatters(batting.teamId)
+    const designatedOrder = Array.from({ length: 9 }, (_unused, order) => order).find(
+      (order) => ((roster[batting.records[order] ?? order]?.position ?? 0) & 0xf) === 1,
+    )
+    expect(designatedOrder).toBeDefined()
+    const designatedRecord = rosterSlotAt(batting.lineup, designatedOrder!)
+    expect(run.fielderZeroRecord).toBe(designatedRecord)
+    // 지명 타순 칸에 벤치 레코드 9 가 들어서 니블 1 을 받는다 — +0xec 는 옛 지명타자 그대로
+    const rosterSlots = [...batting.lineup.rosterSlots]
+    rosterSlots[designatedOrder!] = 9
+    rosterSlots[9] = designatedRecord
+    const swapped = { ...run, game: { ...run.game, humanBatting: { ...batting, lineup: { ...batting.lineup, rosterSlots } } } }
+    expect(missionDefenseAbilitiesOf(swapped)[0]).toBe(masterGameAbilityOf(roster[batting.records[designatedRecord] ?? designatedRecord]!, false, 2))
+    // 판이 안 섰으면(+0xec = 0) 펌블 0 · 레이저 굴림 없음
+    expect(missionDefenseAbilitiesOf({ ...run, fielderZeroRecord: null })[0]).toBeNull()
+  })
+
   it('수비 판 능력치 한 벌 — 루별 주루는 주자 신원대로', () => {
     const mission = MISSIONS.find((m) => m.side === '타자' && countOf(m.start.runners) >= 1)!
     const run = startMission(mission)

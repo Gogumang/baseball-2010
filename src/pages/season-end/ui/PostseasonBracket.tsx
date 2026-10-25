@@ -13,6 +13,11 @@ interface PostseasonBracketProps {
    * 장면 공통 틀이 0x7f53c 로 넣는다)를 0x54d95 로 그린다. 제목이 −1 이면 안 그린다. 대진 위·누름 칸 아래에 둔다.
    */
   readonly frame?: ReactNode
+  /**
+   * 대진 위 알림 팝업(공용 창 0xbbef9 — 0x744c4 가 x = (W − 폭) >> 1 로 가운데에 긋는다).
+   * 240×320 판(`RawScreen`) **안**에 둔다 — 판 밖 형제로 두면 상자가 zoom 밖 바깥 칸에 서서 왼쪽 위로 쏠린다(r251)
+   */
+  readonly overlay?: ReactNode
 }
 
 /**
@@ -24,13 +29,14 @@ interface PostseasonBracketProps {
  * 다음(확인 키 0x13da0)은 원본 화면에 그림 자리가 없어 화면 전체 투명 누름 칸으로 둔다.
  * 키는 0x13da0 머리(13da2~13db0) 그대로 −5(OK) · 0x35('5') 만 받는다 — 키패드·키보드만으로도 넘어간다.
  */
-export function PostseasonBracket({ series, onNext, nextLabel = '다음', frame }: PostseasonBracketProps) {
+export function PostseasonBracket({ series, onNext, nextLabel = '다음', frame, overlay }: PostseasonBracketProps) {
   usePostseasonNextKey(onNext)
   return (
     <RawScreen>
       <PostseasonBracketWindow series={series} />
       {onNext !== undefined && <PressArea label={nextLabel} onPress={onNext} />}
       {frame}
+      {overlay}
     </RawScreen>
   )
 }

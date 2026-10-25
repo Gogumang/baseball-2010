@@ -238,6 +238,39 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     expect(onContinue).toHaveBeenCalledOnce()
   })
 
+  it('징글 자리 — 승패 31 · 32 는 정산 0x19 진입(0x4ea0c 4f41a), 평가 36~38 은 116 진입(12c96)에서 한 번씩 (r244)', () => {
+    vi.useFakeTimers()
+    const onSettlementEnter = vi.fn()
+    const onEvaluationEnter = vi.fn()
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
+        career={createCareer('선수')} onContinue={vi.fn()} onSettlementEnter={onSettlementEnter} onEvaluationEnter={onEvaluationEnter}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
+    )
+    // 경기 끝 판 0x18 — 아직 아무 징글도 없다
+    expect(onSettlementEnter).not.toHaveBeenCalled()
+    끝판넘기기()
+    expect(onSettlementEnter).toHaveBeenCalledTimes(1)
+    expect(onEvaluationEnter).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    프레임(1)
+    expect(onEvaluationEnter).toHaveBeenCalledTimes(1)
+    프레임(5)
+    expect(onSettlementEnter).toHaveBeenCalledTimes(1)
+    expect(onEvaluationEnter).toHaveBeenCalledTimes(1)
+  })
+
+  it('이어하기 116 은 정산 징글 없이 평가 징글만 (1c26a → 0x1278c — 정산 0x4ea0c 를 다시 안 돈다)', () => {
+    const onSettlementEnter = vi.fn()
+    const onEvaluationEnter = vi.fn()
+    render(
+      <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}
+        career={createCareer('선수')} onContinue={vi.fn()} onSettlementEnter={onSettlementEnter} onEvaluationEnter={onEvaluationEnter} />,
+    )
+    expect(onSettlementEnter).not.toHaveBeenCalled()
+    expect(onEvaluationEnter).toHaveBeenCalledTimes(1)
+  })
+
   it('이어하기로 다시 띄운 116(정산 재료 없음)은 경기 끝 판 · 정산 판 없이 곧장 평가 — 배경 · 효과도 없다', () => {
     const { container } = render(
       <GameResultScreen summary={요약()} gamePointReward={0} newTitles={[]} evaluation={평가}

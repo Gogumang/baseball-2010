@@ -89,6 +89,11 @@ import {
   fieldingErrorRecordsOf,
   type DrawnFieldingError,
 } from '@/features/defense-play/model/fieldingErrors'
+import {
+  type FielderRecordSeat,
+  fielderRecordsAfterBoard,
+  fielderRecordsAtPlayStart,
+} from '@/entities/fielding/model/fielderRecords'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
 import {
@@ -469,6 +474,13 @@ export interface GameProgress {
     readonly fielderRolls?: readonly HalfInningFielderRoll[]
   } | null
   /**
+   * **수비 줄 야수 +0xec** — 장면이 사는 동안 칸별로 남는 선수 레코드 (`entities/fielding/model/fielderRecords`). 적는 곳은 교대 판
+   * 0x3fac4(`withFirstInningBoard`, 칸 0..8)와 판 시작 0xb0fb4(칸 1..8 — 판 입력을 만들 때 `opponentFielderRecordsOf` 가 다시 훑는다)뿐이다.
+   * 모드 4 는 1회초 판이 안 서면 경기 내내 칸 0 이 0 이라 상대 투수 칸의 펌블 확률 0 · 레이저 굴림 없음 · 실책 안 쌓임이다(원본 그대로).
+   * 없으면 장면을 세운 직후(아홉 칸 0)다.
+   */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
+  /**
    * **내 타순 칸의 필살타법 남은 횟수** — 팀 객체 `s8 team[+0x29 + 타순]` (H2 1-1·1-2).
    *
    * `UNFILLED_SPECIAL_SWING_COUNT`(−1) 는 "아직 안 채움" 이다. 타석 교대·교체 처리 `0xaebe4` 가 타석마다
@@ -741,6 +753,10 @@ function withFirstInningBoard(progress: GameProgress, random: RandomPort): GameP
   return {
     ...progress,
     halfInningBoard: { serial: 1, inning: progress.game.inning, half: progress.game.half, fielderRolls },
+    // 같은 틱의 0x3fac4 3fe0a~3fe4c — 판의 수비 팀(내 팀이 공격이니 상대) 레코드 차례로 야수 아홉의 +0xec 를 적는다
+    fielderRecords: fielderRecordsAfterBoard(progress.fielderRecords, teamBatters(progress.opponentTeamId), (index) =>
+      opponentFielderSeatOf(progress, index),
+    ),
   }
 }
 
@@ -1172,6 +1188,7 @@ function defensePlayInputOf(
     fielderSkillIds: opponentFielderSkillIdsOf(progress),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.opponentTeamId,
+    fielderRecords: opponentFielderRecordsOf(progress),
     offenseTeamIndex: progress.ourTeamId,
     // 마선수 주자 그림(0x79d10 · 적재 0x483a0) — 우리 타자 · 루 위 주자 중 142 가 넣은 마타자 칸
     runnerAces: ourRunnerAcesOf(progress),
@@ -1447,22 +1464,46 @@ function finishStrikeoutStealSettlement(
  * 붙지 않는다 → 로스터에 적힌 밑값을 그대로 쓴다.
  * 칸 0(투수)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다 — 여기서 넣지 않는다.
  */
-function opponentDefenseAbilitiesOf(progress: GameProgress): readonly number[] {
-  return defenseAbilitiesOf(
+function opponentDefenseAbilitiesOf(progress: GameProgress): readonly (number | null)[] {
+  const abilities: (number | null)[] = defenseAbilitiesOf(
     teamBatters(progress.opponentTeamId).map((player) => ({
       position: player.position,
       defense: player.ability[2],
     })),
   )
+  // 칸 0 은 +0xec(마지막 교대 판의 지명타자) — 비었으면 null(펌블 0 · 레이저 굴림 없음). 모드 4 라 팀 보정이 없어 레코드 밑값이다
+  const seat = opponentFielderRecordsOf(progress)[0]
+  abilities[0] = seat == null ? null : (teamBatters(seat.teamId)[seat.index]?.ability[2] ?? null)
+  return abilities
 }
 
 /** 수비 아홉 칸의 스킬 번호 — `opponentDefenseAbilitiesOf` 와 같은 칸 고르기(레이저 0x66a8c · 필살수비의 초감각 21, `defenseSkillIdsOf`) */
 function opponentFielderSkillIdsOf(progress: GameProgress): (readonly number[])[] {
-  return defenseSkillIdsOf(
+  const skills = defenseSkillIdsOf(
     teamBatters(progress.opponentTeamId).map((player) => ({
       position: player.position,
       skillIds: skillIdsOfBits(player.skillBits, false),
     })),
+  )
+  // 칸 0 — 66ad4 0xb62b4(+0xec, 0x15) 도 +0xec 레코드에 묻는다
+  const seat = opponentFielderRecordsOf(progress)[0]
+  const seatPlayer = seat == null ? undefined : teamBatters(seat.teamId)[seat.index]
+  skills[0] = seatPlayer === undefined ? [] : skillIdsOfBits(seatPlayer.skillBits, false)
+  return skills
+}
+
+/** 상대(수비 팀) 레코드 차례 칸 `index` 의 +0xec 자리 — 실책 열쇠는 그 타순 칸(마타자 칸은 경기 요약이 거른다) */
+function opponentFielderSeatOf(progress: GameProgress, index: number): FielderRecordSeat {
+  return { teamId: progress.opponentTeamId, index, errorKey: { teamId: progress.opponentTeamId, battingOrderIndex: index } }
+}
+
+/**
+ * 판 시작 0xb0fb4 뒤의 야수 +0xec 아홉 칸 — 칸 1..8 은 상대 명단으로 다시 훑고 칸 0 은 진행기가 든 값(`fielderRecords`).
+ * 타자편 수비 판의 수비 팀은 늘 상대다.
+ */
+export function opponentFielderRecordsOf(progress: GameProgress): readonly (FielderRecordSeat | null)[] {
+  return fielderRecordsAtPlayStart(progress.fielderRecords, teamBatters(progress.opponentTeamId), (index) =>
+    opponentFielderSeatOf(progress, index),
   )
 }
 
@@ -1472,13 +1513,13 @@ function opponentFielderSkillIdsOf(progress: GameProgress): (readonly number[])[
  */
 /**
  * 수비 그림이 올린 실책(+0x2e, `features/defense-play/model/fieldingErrors`)을 리그 기록 재료에 얹는다 — 화면이 판 끝에 넘긴다.
- * 야수 +0xec 는 수비 팀(상대) 레코드 차례에서 자리 니블이 칸 + 1 인 첫 타자다(이름 판 `opponentFielderPlatesOf` 와 같은 표 —
- * 칸 0 은 니블 1 = 지명타자). 그림의 수비 팀이 상대가 아니면 버린다.
+ * 야수 +0xec 는 그림이 실은 레코드(판 입력 `fielderRecords` — `opponentFielderRecordsOf`)다: 칸 1..8 은 상대 명단에서 자리 니블이
+ * 칸 + 1 인 첫 타자, 칸 0 은 1회초 판이 넣은 상대 지명타자이고 판이 안 섰으면 0 이라 안 쌓인다. 그림의 수비 팀이 상대가 아니면 버린다.
  */
 export function recordDrawnFieldingErrors(progress: GameProgress, drawn: readonly DrawnFieldingError[]): GameProgress {
   const lineup = teamBatters(progress.opponentTeamId)
-  const errors = fieldingErrorRecordsOf(drawn, (error) => {
-    if (error.teamIndex !== progress.opponentTeamId) return null
+  const opponentDrawn = drawn.filter((error) => error.teamIndex === progress.opponentTeamId)
+  const errors = fieldingErrorRecordsOf(opponentDrawn, (error) => {
     const index = fielderRecordIndexOf(lineup, error.slot)
     return index < 0 ? null : { teamId: progress.opponentTeamId, battingOrderIndex: index }
   })
@@ -1568,7 +1609,7 @@ export function opponentPitcherSkinIndexOf(progress: GameProgress): number {
 
 /**
  * **내 타석 마운드에 선 마투수** — 마선수 대결 투수(`aceOpponent`)나 142 가 상대 명부 8번 칸에 넣은 마투수(`0xb88c8`)가 지금
- * 마운드면 그 선수, 아니면 null. 타석 교대 0x47cc8 의 482d4~482da 가 마운드 그림 적재 0x793b0 의 넷째 스택 인자로
+ * 마운드면 그 선수, 아니면 null. 타석 교대 0x47cc8 의 482d4~482da 가 마운드 그림 적재 0x793b0 의 둘째 스택 인자 `[sp+4]`(482ee — 호출 인자로는 여섯째)로
  * `0xb63a0(투수)`(= `0xb633c` 마선수면 `0xb6394` 순번, 아니면 −1)를 모드를 안 가리고 넘기고, 0x793b0 은 793c2 `cmp r6, #0 ; blt` 로
  * 순번 ≥ 0 이면 점프표 0xd3d64 의 `ace/pitcher_*.pzx` 마투수 그림을, 음수면 `pitcher.pzx` 평범한 투수 갈래(79454)를 연다.
  * 8번 칸 마투수 레코드는 `0xb521c` 가 XlsACE_PIT 행을 통째 베껴 +0xa = 0x60 + 순번이라 마투수 그림이다 (`BattingStage.acePitcher`)
@@ -3002,6 +3043,7 @@ export function arrivePitch(
       fielderSkillIds: opponentFielderSkillIdsOf(progress),
       // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
       defenseTeamIndex: progress.opponentTeamId,
+      fielderRecords: opponentFielderRecordsOf(progress),
       offenseTeamIndex: progress.ourTeamId,
       runnerAces: ourRunnerAcesOf(progress),
       runAbilities: runAbilitiesOnBaseOf(progress),
@@ -3479,6 +3521,7 @@ export function cpuPickoff(
     fielderSkillIds: opponentFielderSkillIdsOf(progress),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.opponentTeamId,
+    fielderRecords: opponentFielderRecordsOf(progress),
     offenseTeamIndex: progress.ourTeamId,
     runnerAces: ourRunnerAcesOf(progress),
     runAbility: runnerRunAbilityOf(progress),

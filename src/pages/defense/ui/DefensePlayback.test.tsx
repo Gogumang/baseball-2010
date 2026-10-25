@@ -259,7 +259,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       const 기대 = 결.ticks.flatMap((view) =>
         view.fielders
           .filter((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6)
-          .map((fielder) => ({ slot: fielder.slot, teamIndex: 3 })),
+          .map((fielder) => ({ slot: fielder.slot, teamIndex: 3, isFumble: true })),
       )
       expect(기대.length).toBeGreaterThan(0)
       expect(onFieldingErrors).toHaveBeenCalledTimes(1)
@@ -473,7 +473,7 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
     return state.tick
   }
 
-  it('홈런(state[0x1d])이 선 뒤 키를 누르면 한 그림 안에서 되풀이하다, 공이 멈춘 뒤 타자주자가 홈에 닿는 그림에 카메라 0x3f060 이 풀어(3f17e) 그 뒤는 보통으로 끝낸다 — 결과는 안 누른 판과 같다', () => {
+  it('홈런(state[0x1d])이 선 뒤 공이 날던 중에 키를 누르면 한 그림 안에서 판 끝까지 되풀이한다 — 공+0x68 이 안 올라(0x3f378 없음) 카메라 0x3f060 은 안 푼다 · 결과는 안 누른 판과 같다', () => {
     vi.useFakeTimers()
     try {
       const input = 홈런()
@@ -485,18 +485,15 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       for (let i = 0; i < h + 1; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       expect(onDone).not.toHaveBeenCalled()
       fireEvent.keyDown(window, { key: '5' })
-      act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
-      // 3f164 — +0xfe7 && 주자 0 +0x7c == +0x8c == 4 → +0xfe7 = 0 · 메시지 0x13 : 52b36 이 되풀이를 멈추고 그 그림을 그린다
-      expect(onDone).not.toHaveBeenCalled()
-      // 그 뒤 G3 이 닫히는 그림 하나 · 닫힌 셈 11 갱신
-      for (let i = 0; i < 60 && onDone.mock.calls.length === 0; i += 1) {
+      // 키는 받은 다음 그림의 키 처리가 읽는다 — 그 그림의 52b26~52b40 이 판 끝 · 닫힌 셈 · 0x35108 까지 돈다
+      for (let i = 0; i < 2 && onDone.mock.calls.length === 0; i += 1) {
         act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       }
       expect(onDone).toHaveBeenCalledTimes(1)
       const 건너뜀 = 결과(onDone)
       expect(건너뜀.advance).toEqual(그대로.advance)
       expect(건너뜀.log.some((line) => line.includes('키 건너뛰기'))).toBe(true)
-      expect(건너뜀.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(true)
+      expect(건너뜀.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
     } finally {
       vi.useRealTimers()
     }

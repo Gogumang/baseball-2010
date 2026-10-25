@@ -46,11 +46,11 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { summaryAfterReplay, useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
@@ -219,7 +219,14 @@ function PitcherGameScene({
   fieldLineups: recordFieldLineups,
   session,
 }: PitcherGameScreenProps & { readonly session: PitcherGameSession }) {
-  const { progress, canPitch, summary, actions } = session
+  const { progress, canPitch, summary: progressSummary, actions } = session
+  /**
+   * 재생 칸의 판 — 경기를 끝낸 재생 판도 0x17 로 다 그린 뒤에야 0xd → 경기 끝 판 0x18 · 정산 0x19 다(판정 B 0xae3e8). 그 그리기
+   * 0x43278 의 실책 +0x2e 가 요약에 들도록 재생이 남은 동안은 요약을 안 낸다(`useShownReplay`, r248)
+   */
+  const play = progress.lastDefensePlay
+  const { shownPlay, finishPlayback, isReplayPending } = useShownReplay(play)
+  const summary = summaryAfterReplay(progressSummary, isReplayPending)
   const audio = activeSound()
   /** 경기 시작 인트로(상태 0xc)가 끝났는가 — 모드 3 은 인트로가 선다 (`hasGameIntro`) */
   const [isIntroDone, setIntroDone] = useState(!hasGameIntro(PITCHER_CAREER_MODE))
@@ -287,10 +294,6 @@ function PitcherGameScene({
   useMarksCommonWindowShown(overlay !== null)
   /** 일시정지 팝업이 떠 있는가 — 경기 중 메뉴, 또는 그 하위 4 [조작방법] 뷰어 (둘 다 0x741a0 팝업이라 경기 키·갱신이 멈춘다) */
   const isPopupOpen = isMenuOpen || overlay === '조작방법'
-  /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
-  const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
-  const play = progress.lastDefensePlay
-  const finishPlayback = useCallback(() => setShownPlay(play), [play])
   const [slot, setSlot] = useState<PitchSlot | null>(null)
   /** 0x10 에서 확정한 조준점 `+0x10b8` — 게이지(0x11) 뒤 놓을 때 쓴다 */
   const [aim, setAim] = useState<WorldPoint | null>(null)

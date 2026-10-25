@@ -289,6 +289,11 @@ export interface PlayerCareer {
   readonly yearGoalEventDone: boolean
   /** 연봉 (만원 단위, 추정) — 새 시즌 시작 때 소지금에 들어온다 */
   readonly salary: number
+  /**
+   * 나리 선수 레코드 **+0x1b** — 연봉 쓰기 0xa4fd8 이 **감기기 전** 값 v 로 둔 min(v / 10, 255) (`applySalaryChange`).
+   * 없으면(등록 그대로 · 옛 저장) 지금 연봉에서 센다 — v < 65536 이면 같은 값이다 (`nariRecordSalaryGradeOfCareer`)
+   */
+  readonly salaryRecordGrade?: number
   /** 선수 생활이 끝났으면 StrENDING 번호 */
   readonly endingIndex: number | null
   /**
@@ -419,6 +424,14 @@ export interface PlayerCareer {
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */
   readonly lastMidSeasonGoalCount: number
+  /**
+   * **그 해 중간 성적표(117)를 마쳤다** — 커리어 u32 S+0x180 의 비트(연차idx, 타자편은 비트 0 부터 · 투수편은 +13). 연차idx = `season − 1`.
+   * 켜는 곳은 보상 실행기 끝 0x8cbaa~0x8cbdc 하나다: 이벤트 번호가 0x1c3 < id ≤ 0x1c6(452~454)이면 `0xa424c(S, 모드 ≠ 3, S+0xb3, 1)`.
+   * 읽는 곳은 105 진입 0x11910 곁가지 11bda~11c06: `S+0xb2 == 22 && 0xa4280(S, 모드 == 4, S+0xb3) == 0` → 117. 그래서 117 은
+   * 이벤트의 보상 명령이 돈 뒤에만 그 해 다시 안 서고, 보상 전에 끊긴 저장은 다음 105 진입에서 117 을 다시 세운다.
+   * 투수편 `PitcherCareer.midSeasonEvaluatedYears` 와 같은 칸 꼴이다.
+   */
+  readonly midSeasonEvaluatedYears: readonly number[]
   /** 가진 스킬 번호 (0~39, original/skills). 원본 보유 비트 +0x1b8 — 얻은 차례대로 쌓인다 */
   readonly skillIds: readonly number[]
   /**
@@ -578,6 +591,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     battingOrder: ROOKIE_BATTER_SLOT + 1,
     battingOrderPath: null,
     lastMidSeasonGoalCount: 0,
+    midSeasonEvaluatedYears: [],
     skillIds: STARTING_SKILL_IDS,
     // 신인 스킬도 0xa4bd9 로 얻으니(0x11230) 그 자리에서 자동 장착된다 — 둘 다 플러스, 상한 6 안
     equippedSkillIds: STARTING_SKILL_IDS,
@@ -813,8 +827,11 @@ export function setSkillEquipped<T extends Pick<PlayerCareer, 'equippedSkillIds'
  * 장착 칸이 없는 옛 저장의 장착 칸 다시 세우기 — 웹에는 장착 창이 없었으므로 그동안의 장착은 **모두
  * 획득 때의 자동 장착(0xa4bd8 → 0xa4b04(P,s,1))** 뿐이었다. 그래서 보유 목록(얻은 차례)을 슬롯 단계 0 에서
  * 차례로 다시 자동 장착하면 원본이 그 선수에게 남겼을 장착과 같다.
- * ⚠️ 어긋나는 한 가지: 플러스 스킬이 상한을 넘겨 못 낀 뒤 앞선 플러스 스킬이 보상으로 지워진 경우 —
- *    원본은 빈자리를 다시 채우지 않지만 이 재구성은 채운다(웹 저장에 그 이력이 없다).
+ * ⚠️ 남김(옛 웹 저장 이사 — 이력 없음): 플러스 스킬이 상한을 넘겨 못 낀 뒤 앞선 플러스 스킬이 보상으로 지워진 경우 —
+ *    원본은 빈자리를 다시 채우지 않지만 이 재구성은 채운다. r244 에서 원본을 다시 떴다: 제거 0xa4430 은 보유 비트 S+0x1b8 을
+ *    끄고(a4440~a444e) `0xb66dd(레코드, s)` 로 그 스킬 장착만 끈 뒤 `0xa43fc(P, s, 1)` 해제 기록을 남길 뿐, 못 낀 스킬을 다시
+ *    켜는 곳이 없다 — 살아 있는 길(`applySkillReward` → `setSkillEquipped`)은 그대로 원본과 같다. 어긋남은 장착 칸(+0x14)이 없던
+ *    옛 저장을 불러올 때 한 번뿐이고, 그 저장에는 "어느 스킬이 상한에 막혔다가 앞 스킬이 지워졌는가" 가 남아 있지 않아 되살릴 수 없다.
  */
 export function rebuildEquippedSkillIds(skillIds: readonly number[]): readonly number[] {
   let equipped: Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'> = { equippedSkillIds: [], skillSlotLevel: 0 }
@@ -834,27 +851,34 @@ export type SkillRewardCareer = Pick<PlayerCareer, 'skillIds' | 'removedMinusSki
 /**
  * 보상 종류 4 — 양수 n 은 스킬 n−1 획득, 음수 −n 은 스킬 n−1 해제 (0x8c5bc).
  *
- * **마이너스 스킬을 해제하면 `+0x1d0+k` 플래그가 서서 그 해 안에는 다시 얻지 못한다** (0xa4430, A-6) — 연초 115 의
- * 0xa4ee8 이 지운다(R9 7절, `useCareerSession` 105 진입).
- * 획득 쪽도 그 플래그를 보고 막는다 — 웹에 통째로 빠져 있던 규칙이다.
+ * **마이너스 스킬을 해제하면 `+0x1d0+k` 해제 기록이 선다** (0xa4430 → 0xa43fc(P, s, 1), A-6) — 연초 115 의 0xa4ee8 이
+ * 지운다(R9 7절, `useCareerSession` 105 진입). 이 기록을 보고 막는 곳은 **이벤트 조건 20 의 하위 조건**(2 · 3 · 4 · 5 · 18 · 19 · 20,
+ * `skillCondition` 의 `wasRemoved`)뿐이다 — 보상 실행기는 막지 않는다 (r253, 0x8c580~0x8c5b6 · 0xa4bd8 · 0xa4430 직접 떴다):
+ * ```
+ * 8c580  v = 명령 값(s16) ; s = |v| − 1
+ * 8c596  v > 0 → 0xa4bd9(S, s)   ; 0xa4bd8: S+0x1b8 |= 1<<s ; 0xa4b04(S, s, 1) 자동 장착 — 해제 기록을 안 본다
+ * 8c5a6  v < 0 → 0xa4431(S, s)   ; 0xa4430: 0xa3a74(보유)면 비트를 끄고(a4440~a444e) · **보유와 상관없이** 0xb66dd 장착 끄기 ·
+ *                                 ;          0xa43fc(P, s, 1) — 표 0xd7e10 에 있으면 S+0x1d0+칸 = 1
+ * ```
+ * 그래서 그 해 풀었던 하락세(17)도 0x8a6fc 의 보상(+18)이 오면 다시 얻는다. 앞서 웹은 획득 쪽에서 해제 기록을 보고 막았고(원본에
+ * 없는 가드), 안 가진 스킬의 해제 보상은 해제 기록을 안 남겼다.
  */
 export function applySkillReward<T extends SkillRewardCareer>(career: T, value: number): T {
   const skillId = Math.abs(value) - 1
   const owns = career.skillIds.includes(skillId)
   if (value > 0) {
-    if (career.removedMinusSkillIds.includes(skillId)) return career
     // 획득 0xa4bd8 = 보유 비트를 켜고 **곧바로 0xa4b04(P, s, 1)** — 자리가 있으면 자동 장착.
     // 이미 가진 스킬이어도 장착은 다시 시도한다(0xa4bd8 에 보유 검사가 없다) — 창에서 뺀 플러스 스킬이
     // 다시 들어오면 자리가 있는 한 다시 끼워진다.
     const owned = owns ? career : { ...career, skillIds: [...career.skillIds, skillId] }
     return setSkillEquipped(owned, skillId, true)
   }
-  if (!owns) return career
   const removed = MINUS_SKILL_IDS.includes(skillId) && !career.removedMinusSkillIds.includes(skillId)
-  // 제거 0xa4430 = 보유 비트를 끄고 0xb66dd 로 장착도 끈다
+  // 제거 0xa4430 = 가졌으면 보유 비트를 끄고, 가졌든 안 가졌든 0xb66dd 로 장착을 끄고 해제 기록(0xa43fc)을 남긴다
+  if (!owns && !removed && !isSkillEquipped(career, skillId)) return career
   return setSkillEquipped({
     ...career,
-    skillIds: career.skillIds.filter((id) => id !== skillId),
+    skillIds: owns ? career.skillIds.filter((id) => id !== skillId) : career.skillIds,
     removedMinusSkillIds: removed ? [...career.removedMinusSkillIds, skillId] : career.removedMinusSkillIds,
   }, skillId, false)
 }

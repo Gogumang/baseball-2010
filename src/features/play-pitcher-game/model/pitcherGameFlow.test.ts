@@ -36,6 +36,7 @@ import {
   summaryOf,
   throwPitch,
   withPitcherGameMorale,
+  recordDrawnPitcherFieldingErrors,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
@@ -1052,6 +1053,18 @@ describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () =
     const 시작 = startPitcherGame({ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }, 씨앗(20100901))
     expect(isPitchTurn(시작)).toBe(true)
     expect(시작.halfInningBoard).toBeNull()
+  })
+
+  it('야수 +0xec 칸 0 — 1회초 판이 서면 우리 지명타자, 안 서면 경기 내내 0 (0x3fac4 만 적는다)', () => {
+    const 판 = startPitcherGame(기본옵션, 씨앗(20100901))
+    const 우리 = 판.options.ourTeamId
+    const 지명 = teamBatters(우리).findIndex((player) => ((player.position ?? 0) & 0xf) === 1)
+    expect(판.fielderRecords?.[0]).toEqual({ teamId: 우리, index: 지명, errorKey: { teamId: 우리, battingOrderIndex: 지명 } })
+    const 판없음 = startPitcherGame({ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }, 씨앗(20100901))
+    expect(판없음.fielderRecords).toBeUndefined()
+    // 그림이 레코드를 실었으면 그것으로 쌓는다 — 판 없는 경기의 투수 칸 실책은 그림이 이미 걸렀다(`drawnFieldingErrorsOf`)
+    const 칸0 = 판.fielderRecords![0]!
+    expect(recordDrawnPitcherFieldingErrors(판, [{ slot: 0, teamIndex: 우리, record: 칸0 }]).leagueErrors).toEqual([칸0.errorKey])
   })
 
   it('구원(8회 등판)은 앞이 자동 장면이라 판 없이 곧장 던진다', () => {

@@ -57,6 +57,7 @@ import {
   humanDefenseSkillPanelOf,
   entryBatterSkillIdsOf,
   recordDrawnTeamFieldingErrors,
+  isOurOffense,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { runLiveRunnerPlayWithoutKeys, startLiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -2130,6 +2131,51 @@ describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모�
   })
 })
 
+describe('야수 +0xec 칸 0 — 교대 판 0x3fac4 가 적고 판 없이 지난 반 이닝엔 남는다 (`entities/fielding/model/fielderRecords`)', () => {
+  const 지명칸 = (entry: readonly { readonly position: number }[]) => entry.findIndex((player) => (player.position & 0xf) === 1)
+  const 수비팀 = (progress: TeamGameProgress) =>
+    isOurOffense(progress) ? progress.options.opponentTeamId : progress.options.ourTeamId
+
+  it('1회초 판이 서면 칸 0 은 그 판 수비 팀의 지명타자 레코드다', () => {
+    const { progress } = 시작()
+    const 팀 = 수비팀(progress)
+    const 명단 = 팀 === progress.options.ourTeamId ? progress.ourEntry : progress.opponentEntry
+    expect(progress.fielderRecords?.[0]).toMatchObject({ teamId: 팀, index: 지명칸(명단), player: 명단[지명칸(명단)] })
+  })
+
+  it('일반(모드 1) 첫 반 이닝은 판이 없어 칸 0 이 0 — 그 반 이닝의 수비 판은 칸 0 능력치 null', () => {
+    expect(시작({ mode: 1, season: undefined }).progress.fielderRecords).toBeUndefined()
+    // 기본 옵션은 우리가 후공 — 1회초는 우리 수비라 공을 던진다. 선공으로 세워 우리 타석의 타구 판을 본다
+    const 선공 = 시작({ mode: 1, season: undefined, playerSide: PLAYER_SIDE_FIRST_BAT })
+    expect(선공.progress.fielderRecords).toBeUndefined()
+    const 판 = applyBatterOutcome(선공.progress, { kind: '아웃', detail: '땅볼아웃' }, 선공.random)
+    expect(판.lastDefensePlay?.ticks[0]?.fielders.find((fielder) => fielder.slot === 0)?.record).toBeNull()
+  })
+
+  it('판 없이 수비 팀이 바뀐 반 이닝 — 칸 0 은 앞 팀 지명타자를 가리킨 채 그 레코드에 실책이 붙는다(원본 그대로)', () => {
+    const { progress, random } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    expect(isOurOffense(progress)).toBe(true)
+    // 앞 판(우리 수비 반 이닝)이 남긴 칸 0 — 우리 지명타자
+    const 우리지명 = 지명칸(progress.ourEntry)
+    const 우리자리 = {
+      teamId: progress.options.ourTeamId,
+      index: 우리지명,
+      errorKey: { teamId: progress.options.ourTeamId, battingOrderIndex: progress.ourEntry[우리지명]!.rosterSlot },
+      player: progress.ourEntry[우리지명]!,
+    }
+    const 남은판 = { ...progress, fielderRecords: [우리자리, ...(progress.fielderRecords ?? []).slice(1)] }
+    const 끝 = applyBatterOutcome(남은판, { kind: '아웃', detail: '땅볼아웃' }, random)
+    const 첫그림 = 끝.lastDefensePlay?.ticks[0]
+    expect(첫그림).toBeDefined()
+    const 투수칸 = 첫그림!.fielders.find((fielder) => fielder.slot === 0)
+    // 수비는 상대 팀(그림 팔레트)인데 칸 0 레코드는 우리 지명타자
+    expect(투수칸?.teamIndex).toBe(progress.options.opponentTeamId)
+    expect(투수칸?.record).toMatchObject({ teamId: progress.options.ourTeamId, index: 우리지명 })
+    const 실책 = recordDrawnTeamFieldingErrors(끝, [{ slot: 0, teamIndex: progress.options.opponentTeamId, record: 우리자리 }])
+    expect(실책.leagueErrors?.slice(-1)).toEqual([우리자리.errorKey])
+  })
+})
+
 describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0c 가 G 로 준다 (모드 1·2·8·9)', () => {
   const 우리공격 = () => 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
   const 공 = (kind: '볼' | '파울') => ({
@@ -2983,5 +3029,20 @@ describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee
       { teamId: 1, battingOrderIndex: progress.opponentEntry[유격]!.rosterSlot },
     ])
     expect(summaryOf(끝).leagueErrors).toEqual(끝.leagueErrors)
+  })
+
+  it('펌블 갈래는 시즌 평판 코드 3(수비실수) — 우리 팀 수비 그림 · 레코드를 찾은 칸만, 악송구 · 상대 수비 · 시즌 밖은 없다 (43854 0xa755d, r248)', () => {
+    const { progress } = 시작()
+    const 앞 = progress.gameRecord[3] ?? 0
+    const 끝 = recordDrawnTeamFieldingErrors(progress, [
+      { slot: 5, teamIndex: 0, isFumble: true },
+      { slot: 5, teamIndex: 0 },
+      { slot: 5, teamIndex: 1, isFumble: true },
+    ])
+    // 칸 3 = 코드 3 (점프표 0xd7d7c 는 4 · 5 만 뒤집혔다)
+    expect(끝.gameRecord[3]).toBe(앞 + 1)
+    expect(summaryOf(끝).gameRecord).toEqual(끝.gameRecord)
+    const 일반 = 시작({ mode: 1 }).progress
+    expect(recordDrawnTeamFieldingErrors(일반, [{ slot: 5, teamIndex: 0, isFumble: true }]).gameRecord).toBe(일반.gameRecord)
   })
 })

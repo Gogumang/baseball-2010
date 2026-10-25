@@ -87,6 +87,7 @@ import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
+import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { gameSceneTickNow, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import { SCENE_STATE, resetSceneStateEntries, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
@@ -241,6 +242,8 @@ interface CareerSoakResult {
   readonly paths: Readonly<Record<string, number>>
   /** G 장부 — 출처별 합 */
   readonly ledger: Readonly<Record<string, number>>
+  /** 재생한 이벤트 번호마다 거친 횟수(선택지로 이어 본 것 포함) — 한 번도 안 걸리는 이벤트 찾기 (r253 — `StoryScreen` 이 알린 본 이벤트로 센다) */
+  readonly eventsViewed: Readonly<Record<number, number>>
 }
 
 interface CareerSoakOptions {
@@ -476,6 +479,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   const problems = new SoakProblems()
   const games = { 정규: 0, 포스트시즌: 0, 국가대항전: 0, 대결: 0 }
   const paths: Record<string, number> = {}
+  const eventsViewed: Record<number, number> = {}
   const walked = (path: string) => {
     paths[path] = (paths[path] ?? 0) + 1
   }
@@ -502,6 +506,21 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   /** 이 경기를 시작할 때의 커리어 — 결과 화면에서 누계 증가분을 본다 */
   let beforeGame: { career: PlayerCareer; kind: '정규' | '포스트시즌' | '국가대항전' } | null = null
   let checkedSummary: unknown = null
+  /**
+   * 이 경기에서 화면(수비 판 · 재생 판 — `DefensePlayback` 의 0x43278 +0x2e)이 그려 올린 실책(마타자 칸 뺌 — 요약과 같은 거르기). 정산 요약의
+   * 실책과 같아야 한다 (r248 — 경기를 끝낸 재생 판의 실책도 정산 앞에 든다). 진행의 실책 칸이 늘어난 만큼을 틀마다 모은다
+   */
+  let drawnErrorsThisGame: unknown[] = []
+  let seenErrors: { progress: unknown; count: number } = { progress: null, count: 0 }
+  const collectDrawnErrors = () => {
+    const progress = result.current.session.progress
+    if (progress === null) return
+    const errors = progress.leagueErrors ?? []
+    if (seenErrors.progress === null || errors.length < seenErrors.count) seenErrors = { progress, count: 0 }
+    const added = errors.slice(seenErrors.count)
+    drawnErrorsThisGame.push(...added.filter((error) => error.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT))
+    seenErrors = { progress, count: errors.length }
+  }
   /** 끝난 대결 — 같은 판을 두 번 안 센다 */
   let countedAceRun: unknown = null
 
@@ -511,7 +530,16 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       + ` · 화면 ${result.current.screen.kind} · 걸음 ${steps}`
   }
 
+  /** 이벤트 화면이 알린 본 이벤트를 센다 — 이어 온(대결 결과) 이벤트가 들고 온 앞 이벤트는 이미 셌으므로 뺀다 */
+  const countViewed = (viewedIds: readonly number[]) => {
+    const screen = result.current.screen
+    const carried = screen.kind === '이벤트' ? screen.carried?.viewedEventIds ?? [] : []
+    const ids = new Set(viewedIds)
+    if (screen.kind === '이벤트') ids.add(screen.eventId)
+    for (const id of ids) if (!carried.includes(id)) eventsViewed[id] = (eventsViewed[id] ?? 0) + 1
+  }
   sceneDoneRef.current = (viewedIds) => {
+    countViewed(viewedIds)
     const career = result.current.session.career
     for (const id of viewedIds.filter((viewedId) => MVP_EVENT_IDS.includes(viewedId))) {
       const series = career?.postseason
@@ -527,6 +555,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   /** 앱 `startAceMatch` 그대로 — 화면 콜백 안에서 불리므로 act 를 따로 걸지 않는다 */
   startAceMatchRef.current = (command, carried, context) => {
     const { session, mission, setScreen } = result.current
+    countViewed(carried.viewedEventIds)
     walked('마선수대결')
     if (context === '장소') session.actions.settlePlaceForAceMatch()
     const target = aceMatchMissionOf(command.team)
@@ -770,6 +799,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       idleFrames = 0
       pressKey('Enter')
     }
+    if (screen.kind === '경기') collectDrawnErrors()
     if (idleFrames > STUCK_FRAMES) stoppedAt = `멈춤(그림 ${STUCK_FRAMES}틀 그대로): ${where()} · ${signature}`
     checkProgress()
   }
@@ -787,6 +817,14 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     problems.add(where(), batterLineProblemsOf('summary.stats', s))
     if (s.plateAppearances < s.atBats) problems.add(where(), [`경기 타석 ${s.plateAppearances} < 타수 ${s.atBats}`])
     problems.add(where(), outOfRangeOf('summary', { ourScore: summary.ourScore, opponentScore: summary.opponentScore }, 0))
+    // 정산 실책 = 화면이 그린 실책 합 (r248)
+    collectDrawnErrors()
+    const settledErrors = JSON.stringify(summary.leagueErrors ?? [])
+    if (settledErrors !== JSON.stringify(drawnErrorsThisGame)) {
+      problems.add(where(), [`정산 실책 ${settledErrors} ≠ 그린 실책 ${JSON.stringify(drawnErrorsThisGame)}`])
+    }
+    drawnErrorsThisGame = []
+    seenErrors = { progress: null, count: 0 }
     if (beforeGame.kind === '정규') {
       // 일정표 0xd89cb 대로 — 정규 경기 상대는 그날(g) 일정표 상대다
       const expected = nextOpponentOf(beforeGame.career)
@@ -1158,6 +1196,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           break
         case '경기준비':
           if (career !== null) {
+            drawnErrorsThisGame = []
+            seenErrors = { progress: null, count: 0 }
             beforeGame = {
               career,
               kind: screen.cup !== undefined ? '국가대항전' : career.postseason !== null ? '포스트시즌' : '정규',
@@ -1213,14 +1253,14 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   const lastSeason = Math.max(lastSeenSeason, saveGame.held()?.season ?? result.current.session.career?.season ?? firstSeason)
   log.push(`판 ${JSON.stringify(heldPlays)} · 공 ${JSON.stringify(pitchOutcomes)}`)
   return {
-    problems, steps, frames, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths, ledger: ledgerSums,
+    problems, steps, frames, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths, ledger: ledgerSums, eventsViewed,
   }
 }
 
 function report(result: CareerSoakResult): string {
   return `걸음 ${result.steps} · 틀 ${result.frames} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전}`
     + ` · 대결 ${result.games.대결} · 시즌 ${result.seasons} · 엔딩 ${result.endingIndex} · [${result.log.join(' / ')}]`
-    + ` · 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)}`
+    + ` · 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 이벤트 ${JSON.stringify(result.eventsViewed)}`
     + `${result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`}`
     + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
 }

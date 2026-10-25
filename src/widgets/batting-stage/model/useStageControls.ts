@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { PointerEvent } from 'react'
 import type { SceneKeyKind } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import { screenRectOf } from '@/shared/lib/viewportFit/zoomedRect'
 import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { gameSceneNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
@@ -120,7 +121,9 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       if (event.button > 0) return
       // 공용 창이 서 있으면 키 처리 0x498d4 가 없다(52cc6) — 위 `onKeyDown` 과 같다
       if (isGameSceneFrozen()) return
-      const bounds = event.currentTarget.getBoundingClientRect()
+      // 판의 CSS zoom 을 웹킷은 사각형에서 뺀다 — 화면 좌표(`clientX` 와 같은 바탕)로 옮겨 잰다. 안 옮기면 아이폰 Safari 에서
+      // 가운데 탭이 오른쪽 이동 칸으로 읽혀 스윙이 안 나갔다 (r242)
+      const bounds = screenRectOf(event.currentTarget)
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
       if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return latch(event.nativeEvent, () => actions.moveBatter(-1))
       if (x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return latch(event.nativeEvent, () => actions.moveBatter(1))

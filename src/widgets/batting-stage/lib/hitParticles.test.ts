@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
+import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
+import { HIT_FLAME_STRONG_ANIMATION, hitFlameAnimationOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import {
   hitParticleIdOf,
   hitParticleInputOf,
@@ -129,5 +133,32 @@ describe('필살타법 파티클 (0x49aec)', () => {
     expect(마타자.map((player) => player.id)).toEqual(['medica', 'kao', 'roze', 'death', 'tiger'])
     // 다섯 줄이 모두 채워져 있어야 점프표를 다 옮긴 것이다
     expect(마타자.every((_, index) => specialSwingParticlesOf(0, 0, index).length > 0)).toBe(true)
+  })
+})
+
+describe('홈런이 아닌데 홈런과 같은 불꽃 (r252 — 원본 동작)', () => {
+  it('강한 타구 0x35988 은 결과 코드를 안 본다 — 담장을 맞는 가운데 뜬공(코드 0 [0])도 홈런성과 같은 006 · 애니 3', () => {
+    // 코드 0 의 첫 패턴은 담장 면을 맞고 튀어나오는 공이다(battedBallFlight.test 의 가운데담장면) — 담장선을 넘지 않는다
+    const fenceBall = BATTED_BALL_PATTERNS[0][0]
+    const flight = battedBallTrajectory(fenceBall)
+    expect(flight.fenceTick).toBe(-1)
+    expect(flight.wallTick).toBeGreaterThan(0)
+    const particleId = hitParticleIdOf(hitParticleInputOf(fenceBall, 0, false))
+    expect(particleId).toBe(STRONG_HIT_PARTICLE_ID)
+    expect(hitFlameAnimationOf(particleId, false)).toBe(HIT_FLAME_STRONG_ANIMATION)
+  })
+
+  it('큰 타구 감상 0x392ac 가 켜지는 패턴은 모두 땅에 닿기 전에 담장선을 넘는다 — 판 끝 코드 8(홈런)', () => {
+    let watched = 0
+    for (const code of [24, 25, 26]) {
+      for (const pattern of BATTED_BALL_PATTERNS[code]) {
+        const flight = battedBallTrajectory(pattern)
+        if (!isBigHitWatch({ resultCode: code, poleTick: flight.poleTick, carryScale: flight.carryScale })) continue
+        watched += 1
+        expect(flight.fenceTick).toBeGreaterThan(0)
+        expect(flight.fenceTick).toBeLessThan(flight.landingTick)
+      }
+    }
+    expect(watched).toBeGreaterThan(0)
   })
 })
