@@ -393,7 +393,7 @@ export function useHomeRunDerby({
 
   // 장면에 들어선 첫 그림 뒤 한 번 — 첫 공(상태 0xd → 투구)보다 앞이다. StrictMode 의 효과 두 번 돌기에도 한 번만
   const isSceneStartRolledRef = useRef(false)
-  /** 하늘 줄 — 구장 +0x10 (`rollDerbySceneStart` · 결과 진입 0x4f574). 굴리기 전(난수 없음)엔 undefined — 타석 그림이 굴린다 */
+  /** 하늘 줄 — 구장 +0x10 (`rollDerbySceneStart` · 결과 진입 0x4f574). 굴리기 전(첫 장면 시작 효과 앞 · 난수 없음)엔 undefined — 타석 그림은 0 줄로 그리고 굴리지 않는다 */
   const [skyRow, setSkyRow] = useState<number | undefined>(undefined)
   /** 두 구장 객체 — 장면 시작마다 새로 (`rollDerbySceneStart`) */
   const [sceneStadium, setSceneStadium] = useState<SceneStadium | null>(null)

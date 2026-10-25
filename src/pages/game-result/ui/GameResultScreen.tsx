@@ -116,7 +116,7 @@ interface GameResultScreenProps {
     readonly inning: number
     readonly playerSide: PlayerSide
     readonly random: RandomPort
-    /** 그 경기 구장의 하늘 줄 +0x10(0x783b0) — 경기 중 타석 화면과 같은 줄. 안 주면 배경 난수로 굴린다(옛 근사) */
+    /** 그 경기 구장의 하늘 줄 +0x10(0x783b0) — 경기 중 타석 화면과 같은 줄. 안 주면 0 줄(굴리지 않는다) */
     readonly skyRow?: number
     /** 그 경기의 타석 구장 객체(0x39fdc 모드 4) — 결과 배경 0x40ff0 → 0x78578 이 같은 펜스 · 바닥 줄로 그린다. 없으면 0번 · 기본색 */
     readonly stadium?: SceneStadium | null
