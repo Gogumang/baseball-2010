@@ -1884,14 +1884,15 @@ export function useMissionSession({
       setMissionRun((previous) =>
         previous === null
           ? previous
-          : settleBatterRun(applyMissionOutcome(previous, pending.outcome, pending.isBunt, random, played)),
+          // 판은 이미 돌았다(`played`) — 갱신 함수는 난수를 안 넘겨 순수하게 둔다(StrictMode 가 두 번 불러도 같다)
+          : settleBatterRun(applyMissionOutcome(previous, pending.outcome, pending.isBunt, undefined, played)),
       )
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
       enterNewAtBatConfirm()
       // 0x17 판 끝 → 판정 B 가 곧장 0xd
       runner.pauseWithBanner(describeOutcomeBanner(settled, pending.runnersOnBase), 0)
     },
-    [aceLevels, audio, random, runner],
+    [aceLevels, audio, runner],
   )
 
   /**

@@ -225,12 +225,12 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     steps: TO_GENERAL_QUICK,
   },
   'general-bat': {
-    description: '일반모드 타석 — 경기 시작 직후 1회초 사람 팀 첫 타자 (씨앗 2: 사람 선공 · 이닝플레이 자동진행 없음)',
+    description: '일반모드 타석 — 경기 시작 직후 1회초 사람 팀 첫 타자 (씨앗 1: 사람 선공 · 이닝플레이 자동진행 없음)',
     fixture: 'general-bat',
     steps: [...TO_GENERAL_GAME, until('사람 타석 0xe · 0xf', teamGameIs((peek) => peek.canBat && peek.acceptsChangeKey), 15000), wait(300)],
   },
   'general-pitch': {
-    description: '일반모드 투구 — 경기 시작 직후 1회초 사람 투수 구질 고르기 (씨앗 1: CPU 선공)',
+    description: '일반모드 투구 — 경기 시작 직후 1회초 사람 투수 구질 고르기 (씨앗 2: CPU 선공)',
     fixture: 'general-pitch',
     steps: [
       ...TO_GENERAL_GAME,
@@ -241,7 +241,7 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     ],
   },
   'general-defense': {
-    description: '일반모드 수비 — 사람 투수가 던져 타구가 뜬 인플레이 (씨앗 1 · OK 만 되풀이)',
+    description: '일반모드 수비 — 사람 투수가 던져 타구가 뜬 인플레이 (씨앗 2 · OK 만 되풀이)',
     fixture: 'general-pitch',
     steps: [
       ...TO_GENERAL_GAME,

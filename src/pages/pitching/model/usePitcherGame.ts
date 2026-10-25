@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { mountOnce } from '@/shared/lib/strictMount/strictMount'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
@@ -121,14 +122,16 @@ export function usePitcherGame(
 ): PitcherGameSession {
   // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 갱신 0x3e340 의 덱 1275 보다 먼저 (`rollSceneLoadingTip`).
   // 이 칸이 아래 진행 칸보다 먼저 선다
-  const [loadingTip, setLoadingTip] = useState<string | null>(() => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
-  const [progress, setProgress] = useState<PitcherGameProgress>(() => {
+  // 두 초기화는 마운트에 한 번 — 개발 StrictMode 의 두 번째 그림이 난수를 더 굴리지 않게(`mountOnce`)
+  const [loadingTip, setLoadingTip] = useState<string | null>(() =>
+    mountOnce('pitcherGame.loadingTip', () => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null))
+  const [progress, setProgress] = useState<PitcherGameProgress>(() => mountOnce('pitcherGame.progress', () => {
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다 (인트로 61 효과보다 먼저)
     activeSound().stop()
     // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
     startPlayClock()
     return startPitcherGame(options, random)
-  })
+  }))
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 내면 StrictMode 가
