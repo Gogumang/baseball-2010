@@ -49,11 +49,12 @@ export interface TitleWindowLines {
  * 모르는 이름이면 null.
  */
 export function titleWindowLinesOf(title: string): TitleWindowLines | null {
-  const index = ORIGINAL_TITLES.slice(0, NAME_COUNT).indexOf(title)
+  // 웹이 드는 이름은 저장 열쇠(`TITLE_NAMES` — 앞뒤 빈칸 뗀 꼴)다. 원문 [1] · [2] 는 끝 빈칸이 있어 그대로 찾으면 못 찾는다(r225)
+  const index = ORIGINAL_TITLES.slice(0, NAME_COUNT).findIndex((name) => name.trim() === title.trim())
   if (index < 0) return null
   return {
     conditionRaw: `!C${ORIGINAL_TITLES[index + NAME_COUNT]}`,
-    // 기본색 RGB(255,255,0) — 웹 글 그리기는 기본색 인자가 없어 !c 로 앞에 둔다
-    nameRaw: `!C!cFFFF00"${title}"`,
+    // 기본색 RGB(255,255,0) — 웹 글 그리기는 기본색 인자가 없어 !c 로 앞에 둔다. 이름은 원문 StrNICKNAME[i] 그대로(끝 빈칸 포함)
+    nameRaw: `!C!cFFFF00"${ORIGINAL_TITLES[index]}"`,
   }
 }

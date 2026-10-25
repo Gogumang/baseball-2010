@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { MessageBox } from '@/shared/ui'
-import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { myBatterIndexOf, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
 import { batterCardStatsOf, batterLineOfRecord } from '@/widgets/matchup-cards/lib/matchupRecord'
@@ -24,26 +23,35 @@ import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import type { Collection } from '@/entities/collection/model/collection'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
-import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
-import { ACE_PHASE, AceSelectScreen } from '@/pages/general-mode'
+import { ACE_PHASE } from '@/pages/general-mode/lib/generalModeSetup'
 import { TitleScreen } from '@/pages/title/ui/TitleScreen'
 import { UsageNoticeScreen } from '@/pages/title/ui/UsageNoticeScreen'
 import { LogoScreen } from '@/pages/title/ui/LogoScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { createGameStartCursor } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mainMenu'
-import { CreatePlayerScreen } from '@/pages/create-player/ui/CreatePlayerScreen'
-import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { MY_LEAGUE_TEAM_GRID_SHAPE } from '@/pages/create-player/lib/teamSelectLayout'
 import { INITIAL_SECRET_CODE_STATE } from '@/pages/record/lib/statCells'
-import { HelpScreen } from '@/pages/help/ui/HelpScreen'
-import { SpecialEditScreen } from '@/pages/special-edit/ui/SpecialEditScreen'
-import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock } from '@/entities/collection/model/playClock'
+import { lazyScreen } from '@/shared/lib/lazyScreen/lazyScreen'
+
+/*
+ * 메인 메뉴에서 들어가는 화면은 따로 받는다(`lazyScreen`, r224) — 켤 때 길(로고가 끝난 뒤 타이틀 · 메인 메뉴)에서 미리 받아 둔다.
+ * 켤 때 앞 화면 셋과 메인 메뉴는 앱 덩이에 그대로 둔다. 뒤 숫자가 받는 차례다(작을수록 먼저).
+ */
+const HelpScreen = lazyScreen(() => import('@/pages/help/ui/HelpScreen').then((module) => module.HelpScreen), 60)
+const SettingsScreen = lazyScreen(() => import('@/pages/settings/ui/SettingsScreen').then((module) => module.SettingsScreen), 60)
+const TeamSelectScreen = lazyScreen(() => import('@/pages/create-player/ui/TeamSelectScreen').then((module) => module.TeamSelectScreen), 20)
+const CreatePlayerScreen = lazyScreen(() => import('@/pages/create-player/ui/CreatePlayerScreen').then((module) => module.CreatePlayerScreen), 20)
+const SpecialScreen = lazyScreen(() => import('@/pages/special/ui/SpecialScreen').then((module) => module.SpecialScreen), 50)
+const HallOfFameScreen = lazyScreen(() => import('@/pages/special/ui/SpecialScreen').then((module) => module.HallOfFameScreen), 40)
+const AceSelectScreen = lazyScreen(() => import('@/pages/general-mode/ui/AceSelectScreen').then((module) => module.AceSelectScreen), 50)
+const SpecialEditScreen = lazyScreen(() => import('@/pages/special-edit/ui/SpecialEditScreen').then((module) => module.SpecialEditScreen), 60)
+const HomeRunDerbyScreen = lazyScreen(() => import('@/pages/home-run-derby/ui/HomeRunDerbyScreen').then((module) => module.HomeRunDerbyScreen), 40)
 
 /**
  * **홈런더비 상태 0xe 의 타자 판 값** (0x44944 — 타자 `0xae89c(팀 0)` = 모드 타자 기록 0x1fc20 의 사본).

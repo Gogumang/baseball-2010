@@ -645,6 +645,13 @@ function TeamGameScene({
    * 인트로·교대 판·수비 화면·벤치 클리어링·경기 중 메뉴·조작방법·설정·교체 창이 덮고 있으면 받지 않는다.
    * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
+  const pitchEnd = useBatterPitchEnd({ isPlayShown: isDefenseInPlay || isReplaying, isFrozen: isMenuOpen || overlay === '조작방법' })
+  /**
+   * 사람 타석 공의 0x12 대기 — 갱신 0x4e6d4 가 상태 틱이 15(타석 끝 31: 삼진 · 볼넷 · 사구)에 닿아야 판정 A 0xae24c 가 다음 상태
+   * (+0x1b6c → 0xd)를 정한다. 그 전에는 0xd · 0xe 가 아니라 다음 타자 소개 판 0x44944 도 OK 도 없다. 웹 진행기는 판정 틀에서 다음 타석
+   * 대기까지 실어 두므로 공 끝 대기(`useBatterPitchEnd`)가 남은 동안은 대기를 세지 않는다 (r226 — 삼진 글자가 날던 중 소개 판이 들던 것)
+   */
+  const isBatterPitchEndHolding = canBat && pitchEnd.isHolding
   const isSceneUncovered =
     isIntroDone &&
     summary === null &&
@@ -657,7 +664,8 @@ function TeamGameScene({
     changeWindow === null &&
     !isPitchSceneBusy &&
     // 타석이 끝나며 난 돌발 결과 창(0x1d)은 다음 0xd 보다 먼저다 (+0x1b6c) — 닫은 뒤에야 0xe 다
-    resolution === null
+    resolution === null &&
+    !isBatterPitchEndHolding
   /**
    * **교체 연출 0x16** — 사람 `#` 교체 · 대타의 OK, 0xf 진입의 CPU 대타 · CPU 투수 교체 뒤 진행기가 싣는다(`substitutionScene`).
    * "CHANGE" 애니를 다 그린 뒤 0xd 두 그림 → 0xe(등판음 0x38b64 · OK 대기). 그동안은 0xe 대기를 세지 않는다.
@@ -763,7 +771,6 @@ function TeamGameScene({
    * 타석 공은 판정 틀(`onPitchResolved`)에, 내 공은 진행기가 판정을 낸 그림(놓은 틱)에 싣고 0x12 틱 0 까지(`pitchResultEntryDelayTicksOf`)를
    * 앞에 붙인다. 판(타구 · 주자 판 · 견제 · 밀어내기 재생)은 그 판이 끝나는 그림이다
    */
-  const pitchEnd = useBatterPitchEnd({ isPlayShown: isDefenseInPlay || isReplaying, isFrozen: isMenuOpen || overlay === '조작방법' })
   const { notePitchResolved } = pitchEnd
   useEffect(() => {
     if (!isThrowPitchEndPendingRef.current) return

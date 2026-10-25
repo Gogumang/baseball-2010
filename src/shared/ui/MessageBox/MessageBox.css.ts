@@ -41,12 +41,23 @@ const PANEL_BACKGROUND = [
   ORIGINAL_COLORS.boardFill,
 ].join(', ')
 
+/**
+ * 세로 가운데는 **위아래 0 + 위아래 여백 auto** 로 잡는다 — 높이는 내용 높이(`fit-content`)거나 띄운 쪽이 준 값(펼침 · 고정 창).
+ * 예전에는 `top: 50%` + `translateY(-50%)` 였다. 판(`RawScreen`)에 CSS `zoom` 이 걸려 있어 백분율 · transform 을 zoom 안에서 다시
+ * 계산하는데, 아이폰 Safari 에서 국가대항전 우승 상자가 가운데에 안 선다는 보고가 있었다(r228). 백분율도 transform 도 안 쓰는 길로 바꾼다.
+ * 자리를 px 로 주는 창(`top` 을 직접 주는 쪽)은 `bottom: 'auto'` 를 같이 주면 여백 auto 가 0 이 된다(CSS 2.1 §10.6.4).
+ * `isolation` 은 예전 transform 이 만들던 쌓임 맥락을 그대로 둔다 — 닫히는 판(z −1)이 상자 안 글 · 버튼 밑에 깔린다.
+ */
 export const box = style({
   position: 'absolute',
   left: 0,
-  top: '50%',
+  top: 0,
+  bottom: 0,
+  marginTop: 'auto',
+  marginBottom: 'auto',
+  height: 'fit-content',
   width: '240px',
-  transform: 'translateY(-50%)',
+  isolation: 'isolate',
   boxSizing: 'border-box',
   padding: `${TEXT_TOP}px 0 ${BUTTONS_TO_BOTTOM}px`,
   background: PANEL_BACKGROUND,
@@ -54,7 +65,7 @@ export const box = style({
 
 /**
  * 닫히는 동안의 판 — 폭 [+0x210] 만 줄고 x = (W − 폭) >> 1 (0x744de~0x74520). 글 · 버튼보다 아래에 그린다
- * (상자의 transform 이 쌓임 맥락을 만들어 z-index −1 이 상자 안 글 · 버튼 밑에 깔린다)
+ * (상자의 `isolation` 이 쌓임 맥락을 만들어 z-index −1 이 상자 안 글 · 버튼 밑에 깔린다)
  */
 export const closingPanel = style({
   position: 'absolute',

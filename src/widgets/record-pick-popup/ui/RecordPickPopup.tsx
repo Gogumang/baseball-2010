@@ -134,7 +134,7 @@ export function RecordPickPopup({
       {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
       <div style={{ ...pixel, left: 0, top: 0, width: 240, height: 320, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
       <div className={boxStyles.box} data-testid={`${testIdPrefix}-판`} ref={boxRef}
-        style={{ ...box, top: recordPickPopupTopOf(box.height), transform: 'none', padding: 0 }} />
+        style={{ ...box, top: recordPickPopupTopOf(box.height), bottom: 'auto', padding: 0 }} />
       {motion.openingHeight === null && (<>
       {/* "!C보고 싶은 기록을!N선택해주세요" — 0xba269 폭 −1: 날 글 전체를 잰 폭(서식 넉 자 포함, 165)의 반을 두 줄 모두의 가운데로
           (`measuredTitleCenterXOf`) — 가운데 x = 0x24 + 82 = 118 이라 화면 가운데보다 2px 왼쪽이다 */}

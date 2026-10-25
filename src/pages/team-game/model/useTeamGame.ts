@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { startPlayClock } from '@/entities/collection/model/playClock'
+import { mountOnce } from '@/shared/lib/strictMount/strictMount'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import { autoRelayModeSlotOf, autoRelayRecordPort } from '@/entities/mode-save/model/autoRelayRecord'
@@ -207,8 +208,10 @@ export function useTeamGame(
 ): TeamGameSession {
   // 맨 앞은 상태 7 **진입** 0x39f88 → 0x53dbc 의 로딩 팁 rand(0, 73) — 모드를 안 가려 새 경기 · 이어하기 모두
   // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 이 칸이 아래 진행 칸보다 먼저 선다
-  const [loadingTip, setLoadingTip] = useState<string | null>(() => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null)
-  const [progress, setProgress] = useState<TeamGameProgress>(() => {
+  // 두 초기화는 마운트에 한 번 — 개발 StrictMode 의 두 번째 그림이 난수를 더 굴리지 않게(`mountOnce`)
+  const [loadingTip, setLoadingTip] = useState<string | null>(() =>
+    mountOnce('teamGame.loadingTip', () => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null))
+  const [progress, setProgress] = useState<TeamGameProgress>(() => mountOnce('teamGame.progress', () => {
     // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다. 그리는 자리라
     // 자식 화면(자동진행 중계 0x21 의 33 · 인트로 61)의 효과보다 먼저다
     activeSound().stop()
@@ -227,7 +230,7 @@ export function useTeamGame(
     // 이어하기 — 0xc0e60 이 전역기록 +0x14d + m 에서 sim+0x9f 를 되살린다
     return resumeTeamGame({ ...resumeFrom, options: { ...resumeFrom.options, liveAutoRelay: true } }, random,
       record.read().stopped[slot])
-  })
+  }))
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 소리를 내면

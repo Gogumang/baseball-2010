@@ -323,7 +323,7 @@ export function MessageBox({
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [answer, buttons.length, columns, cancelAnswer])
 
-  // 펼치는 동안에는 높이만 원본 값으로 눌러 그린다. 세로 가운데는 CSS(top 50% + translateY(−50%))가 이미 맞춰 준다.
+  // 펼치는 동안에는 높이만 원본 값으로 눌러 그린다. 세로 가운데는 CSS(위아래 0 + 여백 auto)가 이미 맞춰 준다.
   // 닫는 동안에는 판만 폭을 줄인다 — 판 0x744c4 는 채움 0x6a9f0 · 가로줄 0x6a904 뿐이고 자르기 칸을 안 세워, 뒤에 그리는 글 0x74664 ·
   // 버튼 0x7448c 는 (W/2 − 75, …) · 버튼 자리 그대로 판 밖까지 그려진다. 그래서 상자는 240 폭 그대로 두고 판만 따로 줄인다.
   const boxStyle =

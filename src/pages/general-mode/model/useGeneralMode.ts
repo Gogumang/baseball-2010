@@ -34,6 +34,7 @@ import {
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { readSetupRecord, writeSetupRecord } from '@/pages/general-mode/model/setupRecord'
+import { mountOnce } from '@/shared/lib/strictMount/strictMount'
 
 export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly random: RandomPort
@@ -162,8 +163,9 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    * 상태 22 진입 `0x314b0` — 빠른실행이면 기록을 통째로 굴리고(31500~31546), 모드 1 이면 이어서 **`0x30f20` 으로
    * 경기를 세운다**(3158c): 상대 마선수 둘 → AI 선발 → 사람 선발 굴림 넷 (`rollTeamSetup`). 원본은 경기 장면이
    * 아니라 여기서 굴리므로 경기정보·엔트리 편집(상태 23)이 이미 굴린 팀을 보고, OK 키(0x311a8)는 굴리지 않는다.
+   * 마운트에 한 번만 굴린다 — 개발 StrictMode 의 두 번째 그림은 첫 그림의 값을 받는다(`mountOnce`, r231).
    */
-  const [initial] = useState(() => {
+  const [initial] = useState(() => mountOnce('generalMode.initial', () => {
     const created = createFlowState({
       isQuickStart,
       // 준비 기록 skin+0xbc 는 앱 전역이다 — 새로하기는 지난 판 기록에서 시작한다(`setupRecord`)
@@ -173,7 +175,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     })
     const entry = created.step === GENERAL_MODE_STEP.경기정보 ? matchInfoEntryOf(created.setup, random) : null
     return { flow: created, rolls: entry?.rolls ?? null, stadium: entry?.stadium ?? null, stage: entry?.stage ?? null }
-  })
+  }))
   const [flow, setFlow] = useState<GeneralModeFlowState>(initial.flow)
   // 갱신 함수 끝의 되쓰기 — 화면이 고친 기록(빠른실행 굴림 · 재굴림 포함)이 다음 판까지 남는다
   useEffect(() => {

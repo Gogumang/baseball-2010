@@ -297,6 +297,10 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
             isKeyEnabled={!menu.isTrainingState && !isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === '' && menu.restPhase !== 'playing'} />
           <PitcherStatusBoard career={career} />
           {/* 상태 125(훈련 연출 · 결과 창)·127(휴식 — 연출과 결과 창)은 0x19da4 가 가운데 판 0x7f814 를 뺀다(19dc0~19dd4) */}
+          {/*
+            가운데 판은 상태판 다음에 그린다(0x19da4: 19db6 0x7d34d → 19de6 0x7f815). 0x7f814 의 자르기는 0xbae25(0, 0, 폭, 판 아래 − 1)
+            — 위쪽은 안 자르니 선수 모자가 상태판 "STAMINA" 글자를 덮는 것도 원본 그대로다 (r226, r219 pm1)
+          */}
           {!menu.isTrainingState && menu.restPhase === null && (
             <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
               morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,

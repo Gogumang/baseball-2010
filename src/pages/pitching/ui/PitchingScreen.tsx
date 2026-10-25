@@ -212,7 +212,7 @@ interface PitchingScreenProps {
    */
   readonly substitutionScene?: SubstitutionScene | null
   readonly onSubstitutionSceneDone?: () => void
-  /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 타석 그림이 굴린다 */
+  /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 0 줄(타석 그림은 굴리지 않는다) */
   readonly skyRow?: number
   /**
    * **경기 난수** — 결과 판(경기 상태 0x19)의 배경 · 정산 효과(0x4ea0c 꼬리: 성공이면 밤하늘일 때 불꽃, 실패면 비)와 그림마다
