@@ -1567,6 +1567,17 @@ export function opponentPitcherSkinIndexOf(progress: GameProgress): number {
 }
 
 /**
+ * **내 타석 마운드에 선 마투수** — 마선수 대결 투수(`aceOpponent`)나 142 가 상대 명부 8번 칸에 넣은 마투수(`0xb88c8`)가 지금
+ * 마운드면 그 선수, 아니면 null. 타석 교대 0x47cc8 의 482d4~482da 가 마운드 그림 적재 0x793b0 의 넷째 스택 인자로
+ * `0xb63a0(투수)`(= `0xb633c` 마선수면 `0xb6394` 순번, 아니면 −1)를 모드를 안 가리고 넘기고, 0x793b0 은 793c2 `cmp r6, #0 ; blt` 로
+ * 순번 ≥ 0 이면 점프표 0xd3d64 의 `ace/pitcher_*.pzx` 마투수 그림을, 음수면 `pitcher.pzx` 평범한 투수 갈래(79454)를 연다.
+ * 8번 칸 마투수 레코드는 `0xb521c` 가 XlsACE_PIT 행을 통째 베껴 +0xa = 0x60 + 순번이라 마투수 그림이다 (`BattingStage.acePitcher`)
+ */
+export function opponentMoundAcePlayerOf(progress: GameProgress): AcePlayer | null {
+  return progress.aceOpponent ?? moundAcePitcherOf(progress, false)?.player ?? null
+}
+
+/**
  * **내 타석 마운드 투수의 체력%** — 투수 그리기 0x38d1c 의 38f68 이 `0xaebb1(수비 팀)` = trunc(지금 마운드 +0x2c / 100) 로 읽어
  * 34 이하면 지친 눈(player_effect 애니 9 · 10)을 그린다(`BattingStage.pitcherStaminaPercent`).
  * 38f56 이 투수가 마선수(0xb633d)면 건너뛰므로 마선수 대결 투수(`aceOpponent`)나 142 가 8번 칸에 넣은 마투수가 서 있으면 null.
