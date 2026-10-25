@@ -20,6 +20,9 @@ function sceneNames() {
   return [...table.matchAll(/^ {2}'?([a-z][a-z0-9-]*)'?: \{/gm)].map((match) => match[1])
 }
 
+/** 공을 여러 번 보내야 닿는 장면 — 넉넉히 기다린다 */
+const LONG_SCENES = new Set(['nari-burst-result', 'mission-result'])
+
 const RUNS = [
   { browserName: 'chromium', device: 'desktop' },
   { browserName: 'webkit', device: 'iphone' },
@@ -41,8 +44,8 @@ async function runBrowser({ browserName, device }, names) {
       const started = Date.now()
       let error = null
       try {
-        // nari-burst-result 는 씨앗대로 넷째 타석까지 공을 보내 약 110초 걸린다
-        await openScene(page, scene, { timeout: scene === 'nari-burst-result' ? 240000 : 60000 })
+        // nari-burst-result(약 45초) · mission-result(약 55초)는 씨앗 · 투구 제한까지 공을 보낸다
+        await openScene(page, scene, { timeout: LONG_SCENES.has(scene) ? 240000 : 60000 })
       } catch (caught) {
         error = String(caught).slice(0, 300)
       }

@@ -53,6 +53,7 @@ import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
+import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 
 /**
  * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
@@ -386,6 +387,19 @@ export function PitchingScreen({
   usePickoffTouchKeys(acceptsPickoff, run.bases)
 
   const teamIds = missionTeamIdsOf(run)
+
+  // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
+  const peekPitchSlotPicker = isRunning && !isPopupOpen && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy
+  const peekResultShown = !isRunning
+  useEffect(() => {
+    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
+    publishScenePeek('mission', {
+      side: '투수', isAwaitingConfirm, isPitchSlotPickerShown: peekPitchSlotPicker, isResultShown: peekResultShown,
+    })
+  }, [isAwaitingConfirm, peekPitchSlotPicker, peekResultShown])
+  useEffect(() => () => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('mission', null)
+  }, [])
 
   if (run.status !== '진행중') {
     // [미션+0xbc] — 0x4ea0c 4ef2a · 0x4a384 4a3ea 의 "이겼나"

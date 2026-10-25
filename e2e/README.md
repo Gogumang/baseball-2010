@@ -26,13 +26,17 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `season-management` · `season-outing` | 시즌 관리 메뉴 0xc9 · 외출 지도 0xd1 | `season-y1` |
 | `general-quick` | 일반모드 빠른실행 경기정보 (경기설정 창) | `general-bat` |
 | `general-bat` · `general-pitch` · `general-defense` | 일반모드 1회 타석 · 구질 고르기 · 타구 수비 (약 5~10초) | `general-bat` · `general-pitch` |
+| `pitcher-pitch` · `pitcher-defense` | 나리 투수편 첫 경기 — 첫 수비 타석 구질 고르기 · 던진 공이 맞은 내 수비 판 (관리 [다음경기] → 경기시작, 약 5~7초) | `pitcher-y1` |
+| `general-relay` | 일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (약 8초) | `general-bat` |
+| `mission-bat` · `mission-pitch` | 타자 미션 1 첫 타석 0xe · 투수 미션 3 구질 고르기 (미션 선수 고르기 → 나리 선수 → [61] 예, 약 2초) | `nari-y1` · `pitcher-y1` |
+| `mission-result` | 투수 미션 3 결과 판 0x19 — 10구 제한까지 OK 만 되풀이 (약 55초) | `pitcher-y1` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
-| `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 17 로 넷째 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 110초) | `nari-y1` + 씨앗 17 |
+| `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 이른 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 45초) | `nari-y1` + 씨앗 5 |
 
 장면 표의 `seed` 나 주소의 `&seed=<수>` 는 픽스처의 부팅 씨앗 대신 쓴다(난수로만 닿는 장면 · 씨앗 찾기). 키를 누르는 시각이 아니라
 난수 차례로만 가므로 chromium · webkit · 세로 · 가로 모두 같은 자리에 닿는다.
 
-경기 장면은 버튼 글자가 아니라 화면이 알리는 자리(`src/shared/lib/scenePeek` — 사람 타석 0xe · 구질 고르기 · 수비 판 · 더비 OK 대기)를 기다린다.
+경기 장면은 버튼 글자가 아니라 화면이 알리는 자리(`src/shared/lib/scenePeek` — 팀 경기 · 투수편 경기 · 미션 · 더비의 타석 0xe · 구질 고르기 · 수비 판 · 자동진행 중계 · 미션 결과 판 · 더비 OK 대기)를 기다린다.
 진행기가 단계를 밟는 동안만 경기 로딩 판을 기다리지 않고, 인트로는 원본처럼 OK 로 넘긴다(난수 차례는 그대로).
 콘솔의 `net::ERR_FAILED` 는 도우미가 일부러 끊는 웹폰트 CDN(Galmuri)이다.
 
@@ -40,7 +44,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 16개 × chromium · webkit 아이폰 (약 1분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs                  # 장면 23개 × chromium · webkit 아이폰 (약 3분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
@@ -75,7 +79,7 @@ jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
 
 ```sh
-yarn e2e:hits                                   # 장면 17개 × 기기 넷, 약 4분 (서버가 없으면 띄우고 끝에 끈다)
+yarn e2e:hits                                   # 장면 23개 × 기기 넷, 약 6분 (서버가 없으면 띄우고 끝에 끈다)
 yarn e2e:hits general-bat derby-start           # 장면만 골라
 E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
 E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)
@@ -89,10 +93,10 @@ E2E_HITS_VERBOSE=1 yarn e2e:hits                # 동작 뒤 장면을 다시 �
 - 점: 가운데 + 네 모서리 안쪽(최대 8px 안). `elementFromPoint` 가 그 요소나 그 자손이 아니면 덮인 것이다.
   웹킷은 CSS `zoom` 안 요소의 `getBoundingClientRect` 를 zoom 뺀 좌표로 내서 조상 zoom 곱을 곱해 화면 좌표로 옮긴다.
 - 창 아래: 덮은 것이 열린 창(`[role=dialog]`) 안이고 덮인 것은 그 창 밖이면 실패가 아니다(원본도 창이 키를 가져간다). 수만 센다.
-- 연 상태: `e2e/hits.mjs` 의 `ACTIONS` — 메뉴 '*' · 교체 '#' · 질문 · 알림 상자 · 칭호 창 · 기록실 · 외출 말풍선. 걸음은
+- 연 상태: `e2e/hits.mjs` 의 `ACTIONS` — 메뉴 '*' · 교체 '#' · 투수편 강판 '#' · 자동진행 중단 질문 · 질문 · 알림 상자 · 칭호 창 · 기록실 · 외출 말풍선. 걸음은
   키 이름 · `@이름`(그 이름의 단추를 실제로 탭/클릭) · `w밀리초`이고, `expect` 가 안 서면 동작 실패로 친다.
 - 허용 목록: `e2e/lib/hits.mjs` 의 `ALLOWED_OVERLAPS` — 의도된 겹침을 `why` 와 함께 둔다(외출 건물 모서리 · 외출 말풍선 아래 건물 ·
-  판 전체 확인 칸 위 소프트키 · 시즌 다음경기 되돌아가기 r186).
+  판 전체 확인 칸 위 소프트키 · 시즌 다음경기 되돌아가기 r186 · 구질 고리 칸 0 과 "OK" 글자 칸 r219).
 - 결과: 화면에 기기별 요약 · 허용된 겹침 · 실패 줄(장면 · 상태 · 덮인 것 z ← 덮은 것 z · 못 맞은 점). 전부는 `e2e/.run/hits-report.json`.
   실패가 있으면 끝 코드 1.
 
@@ -101,5 +105,5 @@ E2E_HITS_VERBOSE=1 yarn e2e:hits                # 동작 뒤 장면을 다시 �
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST' dist || echo clean
+yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|pitcherGame|isAutoRelay' dist || echo clean
 ```

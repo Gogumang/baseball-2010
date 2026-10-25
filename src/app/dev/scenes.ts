@@ -1,7 +1,8 @@
 import type { SceneHandles } from '@/app/dev/sceneShortcut'
 import { scenePeeksNow } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import type { TeamGamePeek } from '@/shared/lib/scenePeek/scenePeek'
+import type { MissionPeek, PitcherGamePeek, TeamGamePeek } from '@/shared/lib/scenePeek/scenePeek'
+import { MISSIONS } from '@/shared/config/original/missions'
 
 /**
  * **장면 바로가기 표** (개발 · e2e 전용). 단계는 화면 상태를 꽂지 않고 메인 메뉴 · 관리 메뉴가 부르는 **그 진입 함수**를 부른다
@@ -38,7 +39,7 @@ export interface SceneDefinition {
 }
 
 /** 메인 메뉴의 +0x3c 모드 번호 (`App.tsx` · `EntryRoutes.tsx` 와 같은 값) */
-const MODE = { 일반: 1, 시즌: 2, 투수편: 3, 타자편: 4 } as const
+const MODE = { 일반: 1, 시즌: 2, 투수편: 3, 타자편: 4, 투수미션: 5, 타자미션: 6 } as const
 
 const call = (label: string, run: (handles: SceneHandles) => void): SceneStep => ({ kind: 'call', label, run })
 const until = (label: string, test: (handles: SceneHandles) => boolean, timeoutMs?: number): SceneStep =>
@@ -74,6 +75,16 @@ const teamGameIs = (test: (peek: TeamGamePeek) => boolean) => () => {
   const peek = scenePeeksNow().teamGame
   return peek !== undefined && test(peek)
 }
+/** 나리 투수편 경기 화면이 알리는 지금 자리 (`PitcherGameScreen`) */
+const pitcherGameIs = (test: (peek: PitcherGamePeek) => boolean) => () => {
+  const peek = scenePeeksNow().pitcherGame
+  return peek !== undefined && test(peek)
+}
+/** 미션 경기 화면이 알리는 지금 자리 (`MissionPlayScreen` · `PitchingScreen`) */
+const missionIs = (test: (peek: MissionPeek) => boolean) => () => {
+  const peek = scenePeeksNow().mission
+  return peek !== undefined && test(peek)
+}
 const screenIs = (kind: SceneHandles['screen']['kind']) => until(`화면 ${kind}`, (handles) => handles.screen.kind === kind)
 
 /** 켤 때 길 그대로 — 이용안내(아무 키) → 로고(저절로) → 타이틀 */
@@ -101,6 +112,45 @@ const TO_SEASON_MANAGEMENT: readonly SceneStep[] = [
     h.setScreen({ kind: '시즌모드' })
   }),
   until('시즌 관리 메뉴 0xc9', (h) => h.screen.kind === '시즌모드' && h.season.scene === 0xc9),
+]
+
+/** 나리 투수편 — 게임시작 목록 [나만의리그] → [14] 투수편 답(`onNewGame('투수편')`): 저장이 있으면 관리 */
+const TO_PITCHER_MANAGEMENT: readonly SceneStep[] = [
+  call('투수편 들어가기 (onNewGame 투수편)', (h) => {
+    h.setLastPlayedMode(MODE.투수편)
+    h.setScreen({ kind: '투수편' })
+  }),
+  until('투수편 관리', (h) => h.screen.kind === '투수편' && h.pitcher.scene === '관리'),
+]
+
+/**
+ * 투수편 관리 [다음경기] 하위 메뉴 [경기시작] 답(`onNextGame` = `openNextGameStandings`) → 109 순위 · 142 경기 준비 · 로딩 · 인트로 ·
+ * 0xe 소개 판은 OK. 우리 공격 반 이닝은 간이 엔진 중계(모드 3 은 키를 안 받는다)라 그대로 흘려보낸다. 구질 고르기(0xf)가 서면 멈춘다
+ */
+const TO_PITCHER_PITCH: readonly SceneStep[] = [
+  ...TO_PITCHER_MANAGEMENT,
+  call('관리 [다음경기] → 경기시작 (openNextGameStandings)', (h) => h.pitcher.actions.openNextGameStandings()),
+  keyUntil('Enter', '투수편 구질 고르기 0xf', pitcherGameIs((peek) => peek.isPitchSlotPickerShown), 400, 90000),
+]
+
+/** 미션 하나 — 게임시작 목록 [미션] 답(하위 17 선수 고르기) → 나리 선수 → 미션 목록에서 고른 미션의 [61] 예(`actions.begin`) */
+const toMission = (side: '타자' | '투수', id: number): readonly SceneStep[] => [
+  call('미션 (onSelectMode 미션)', (h) => h.setScreen({ kind: '미션선택' })),
+  screenIs('미션선택'),
+  call(`선수 고르기 나리 ${side} (choosePlayer)`, (h) => {
+    if (side === '타자' ? h.career.savedCareer === null : h.pitcher.career === null) throw new Error(`나리 ${side} 저장이 없다`)
+    // 메인 메뉴 길의 choosePlayer 는 모드를 먼저 적는다(App 의 missionFromMenu)
+    h.setLastPlayedMode(side === '투수' ? MODE.투수미션 : MODE.타자미션)
+    h.mission.actions.choosePlayer({ side, hallOfFameIndex: null })
+  }),
+  until('미션 목록', (h) => h.mission.player !== null),
+  wait(300),
+  call(`미션 ${side} ${id} [61] 예 (begin)`, (h) => {
+    const mission = MISSIONS.find((row) => row.side === side && row.id === id)
+    if (mission === undefined) throw new Error(`미션이 없다: ${side} ${id}`)
+    h.mission.actions.begin(mission)
+  }),
+  screenIs(side === '투수' ? '투수미션' : '미션진행'),
 ]
 
 /** 게임시작 목록 [홈런더비] 답 — 선수 고르기(하위 16). 커서는 나리 타자 칸 */
@@ -195,13 +245,24 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
   'pitcher-management': {
     description: '나리 투수편 관리 화면',
     fixture: 'pitcher-y1',
+    steps: [...TO_PITCHER_MANAGEMENT, wait(900)],
+  },
+  'pitcher-pitch': {
+    description: '나리 투수편 경기 — 1년차 첫 경기 첫 수비 타석의 구질 고르기 0xf (관리 [다음경기] → 경기시작)',
+    fixture: 'pitcher-y1',
+    // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
+    seed: 1,
+    steps: [...TO_PITCHER_PITCH, wait(400)],
+  },
+  'pitcher-defense': {
+    description: '나리 투수편 경기 — 던진 공이 맞아 뜬 내 수비 판 0x17 (구질 · 코스 · 게이지 OK 만 되풀이)',
+    fixture: 'pitcher-y1',
+    // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
+    seed: 1,
     steps: [
-      call('투수편 들어가기 (onNewGame 투수편)', (h) => {
-        h.setLastPlayedMode(MODE.투수편)
-        h.setScreen({ kind: '투수편' })
-      }),
-      until('투수편 관리', (h) => h.screen.kind === '투수편' && h.pitcher.scene === '관리'),
-      wait(900),
+      ...TO_PITCHER_PITCH,
+      keyUntil('Enter', '투수편 수비 판 0x17', pitcherGameIs((peek) => peek.isDefensePlayShown), 500, 90000),
+      wait(300),
     ],
   },
   'season-management': {
@@ -252,9 +313,10 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     ],
   },
   'nari-burst-result': {
-    description: '나리 타자편 돌발미션 결과 창 — 다음 타석 OK 대기의 꺼진 화면 전체 확인 칸 위 (r195). 씨앗 17: 넷째 타석 앞 제안',
+    description: '나리 타자편 돌발미션 결과 창 — 다음 타석 OK 대기의 꺼진 화면 전체 확인 칸 위 (r195). 씨앗 5: 첫 경기 일찍 제안(약 25초)',
     fixture: 'nari-y1',
-    seed: 17,
+    // 씨앗 0~19 를 훑어 제안 창이 가장 일찍 뜬 씨앗(r227 — 17 은 넷째 타석 앞 · 약 105초, 5 는 약 43초에 결과 창)
+    seed: 5,
     steps: [
       ...TO_NARI_MANAGEMENT,
       call('관리 [다음경기]', (h) => h.career.actions.runCommand('다음경기')),
@@ -265,6 +327,55 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
       // 판이 오르고 글이 다 나올 때까지 — 결과 창이 선 직후 한 그림쯤 경기 화면이 다시 서며 창이 잠깐 빠지는 틈이 있어 넉넉히
       wait(3000),
       until('돌발미션 결과 창 그대로', (h) => burstWindowOf(h) === '결과', 3000),
+    ],
+  },
+  'general-relay': {
+    description: "일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (씨앗 2)",
+    fixture: 'general-bat',
+    steps: [
+      ...TO_GENERAL_GAME,
+      until('사람 타석 0xe · 0xf', teamGameIs((peek) => peek.canBat && peek.acceptsChangeKey), 15000),
+      key('*'),
+      wait(500),
+      key('ArrowDown'),
+      key('Enter'),
+      wait(400),
+      // 자동진행 질문 상자 — 처음 커서 [예]
+      keyUntil('Enter', '자동진행 중계 0x21', teamGameIs((peek) => peek.isAutoRelay), 400, 8000),
+      wait(800),
+    ],
+  },
+  'mission-bat': {
+    description: '타자 미션 1 「명품 타자의 첫 걸음」 첫 타석 0xe (나리 타자편 저장의 선수 — 미션 선수 고르기 · 목록 [61] 예)',
+    fixture: 'nari-y1',
+    // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
+    seed: 1,
+    steps: [
+      ...toMission('타자', 1),
+      keyUntil('Enter', '미션 타석 0xe', missionIs((peek) => peek.side === '타자' && peek.isAwaitingConfirm), 400, 30000),
+      wait(400),
+    ],
+  },
+  'mission-pitch': {
+    description: '투수 미션 3 「혼이 실린 스트라이크」 구질 고르기 0xf (나리 투수편 저장의 선수)',
+    fixture: 'pitcher-y1',
+    // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
+    seed: 1,
+    steps: [
+      ...toMission('투수', 3),
+      keyUntil('Enter', '미션 구질 고르기 0xf', missionIs((peek) => peek.side === '투수' && peek.isPitchSlotPickerShown), 400, 30000),
+      wait(400),
+    ],
+  },
+  'mission-result': {
+    description: '투수 미션 3 결과 판 0x19 — 10구 제한까지 구질 · 코스 · 게이지 OK 만 되풀이',
+    fixture: 'pitcher-y1',
+    // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
+    seed: 1,
+    steps: [
+      ...toMission('투수', 3),
+      keyUntil('Enter', '미션 결과 판 0x19', missionIs((peek) => peek.isResultShown), 300, 150000),
+      wait(1500),
     ],
   },
   'derby-pick': {

@@ -812,14 +812,17 @@ function TeamGameScene({
     (session.canChangePitcher || session.canPinchHit)
   // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
   const isPitchSlotPickerShown = canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null
+  // 경기가 끝나 요약 판(0x18 · 0x19)이 서면 중계가 아니다 — 아래 그림 갈래와 같은 차례
+  const isAutoRelay = progress.autoRelay != null && summary === null
   const defensePlaySide = isPlayKeyBlocked ? session.pendingDefensePlay?.side ?? progress.pendingRunnerPlay?.side ?? null : null
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
     publishScenePeek('teamGame', {
       isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown,
       defensePlaySide: defensePlaySide === '수비' || defensePlaySide === '공격' ? defensePlaySide : null,
+      isAutoRelay,
     })
-  }, [isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown, defensePlaySide])
+  }, [isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown, defensePlaySide, isAutoRelay])
   useEffect(() => () => {
     if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('teamGame', null)
   }, [])
