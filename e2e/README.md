@@ -90,6 +90,12 @@ SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 yarn vitest run src/app/model/soak/soakFixture
 나리 타자편도 134 에 선 저장을 이어하면 134 로 돌아온다 — 이어하기 0x1c154 의 그 밖 갈래는 S+0x12c(대회 칸)를 S+0xb4(끝난 포스트시즌)보다
 먼저 본다(1c346~1c364, 투수편과 같은 함수). r236 때는 타자편 `resumePointOf` 가 거꾸로 봐 392 로 갔고, r241 이 고쳐 `nari-cup` 을 134 저장으로 다시 떴다.
 
+r249 — 저장 꼴이 늘었다(타자편 `midSeasonEvaluatedYears` · 두 편 `salaryRecordGrade`, r244). 다시 뜨자 씨앗 1 은 엔진 변경으로 판이
+갈라져 정규시즌 1위가 아니고(128 진입 팝업 없음) 4년차 부상 엔딩 0(보너스 없음)으로 끝나, hits 의 `nari-postseason` · `nari-ending` ·
+`nari-hall-of-fame` 동작이 서지 않았다. 타자편 기본 씨앗을 **4**(1위 진입 팝업 · 13년차 엔딩 4)로 옮겨 다섯 개를 다시 떴다.
+다시 뜬 뒤에는 `smoke` 뿐 아니라 `yarn e2e:hits <그 장면들>` 로 연 상태 동작까지 서는지 본다 — 닿는 자리는 같아도 판 내용(순위 · 엔딩 번호)이 달라질 수 있다.
+개발 서버가 떠 있는 동안 픽스처를 다시 뜨면 HMR 로 쪽이 다시 실려 그때 돌던 hits 가 엉뚱하게 깨진다. `--mode e2e` 빌드는 빌드 때의 픽스처를 굳혀 두므로 다시 빌드한다.
+
 ## 4. 브라우저 시험 (실제 CSS · z-index · zoom)
 
 ```sh
@@ -146,3 +152,28 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 ```sh
 yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|soakFixtures|SOAK' dist || echo clean
 ```
+
+## 전체 회귀 (`yarn e2e:all`)
+
+위 넷과 픽스처 · 바로가기 새는지까지 한 번에 돌리고 요약을 낸다 — `e2e/all.mjs`.
+
+```sh
+yarn e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (r249 에 16.7분, 끝 코드 1 이면 실패)
+E2E_ALL_TARGETS=e2e yarn e2e:all          # 한쪽만 (dev · e2e)
+E2E_ALL_SKIP=perf,hits yarn e2e:all       # 빼기 (smoke · hits · browser · fixtures · perf · leak)
+E2E_ALL_PORT=5640 yarn e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드 preview +2
+```
+
+차례: smoke(대상끼리 함께) → hits(대상마다 차례로, 보고는 `e2e/.run/hits-report-<대상>.json`) → `yarn test:browser` →
+`SOAK_FIXTURE_DRY=1 yarn e2e:fixtures` → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
+서버는 떠 있으면 그대로 쓰고 제가 띄운 것만 끈다. 그런데 이미 떠 있는 e2e 빌드는 **그때 픽스처 · 코드로 굳은 것**이라, 고친 뒤에는 그 포트를
+`e2e/serve.sh stop` 으로 끄고 돌린다. 요약은 `e2e/.run/all-report.json` 에도 남는다.
+
+| r249 (main 3a3f7ae5 + 픽스처 다시 뜸) | 결과 | 초 |
+|---|---|---:|
+| smoke dev · e2e | 72/72 · 72/72 | 240 · 217 |
+| hits dev · e2e | 겹침 없음 288 상태 · 허용 78건 (둘 다) | 325 · 297 |
+| test:browser | 12 파일 · 42 시험 통과 | 8 |
+| fixtures (dry) | 3 통과 | 27 |
+| perf | 숫자만 | 94 |
+| leak | clean | 0 |

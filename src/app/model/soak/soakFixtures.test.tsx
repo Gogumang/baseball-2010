@@ -861,8 +861,8 @@ async function checkAndWrite(captures: readonly Capture[]): Promise<void> {
   }
 }
 
-/** 씨앗 — 포스트시즌 · 국가대항전을 둘 다 지나 엔딩까지 가는 판 (`SOAK_FIXTURE_NARI_SEED` · `SOAK_FIXTURE_PITCHER_SEED` 로 바꿔 찾는다) */
-const NARI_SEED = Number(process.env.SOAK_FIXTURE_NARI_SEED ?? 1)
+/** 씨앗 — 포스트시즌(정규시즌 1위 진입 팝업) · 국가대항전을 둘 다 지나 보너스 엔딩(4)까지 가는 판. r249 에 엔진 변경(r244 정산 따위)으로 씨앗 1 이 4년차 부상 엔딩 0 · 1위 아님으로 갈라져 4 로 옮겼다 (`SOAK_FIXTURE_NARI_SEED` · `SOAK_FIXTURE_PITCHER_SEED` 로 바꿔 찾는다) */
+const NARI_SEED = Number(process.env.SOAK_FIXTURE_NARI_SEED ?? 4)
 const PITCHER_SEED = Number(process.env.SOAK_FIXTURE_PITCHER_SEED ?? 2)
 
 describe.runIf(isEnabled)('soak 로 e2e 픽스처 뜨기 (SOAK_FIXTURE=1)', () => {
