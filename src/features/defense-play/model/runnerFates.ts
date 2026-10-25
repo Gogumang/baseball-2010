@@ -220,6 +220,7 @@ export function baserunnerAllowedOfPlay(
     if (isHit(outcome) || isFreePass(outcome)) return quickAdvance.runsScored === 0
     return runnerCountOf(bases) > 0
   }
-  // ⚠️ 미확인: 판도 간이 엔진도 아닌 타석(지금은 부르는 곳이 없다) — 예전 근사(안타·볼넷·사구면 선다)
+  // ⚠️ 근사(남김 — 원본에 없는 길): 판도 간이 엔진도 아닌 타석은 원본에 없다(정산 0xa8024 를 부르는 곳은 수비 판 · 사람 장면 · 간이 엔진
+  // 넷뿐 — 위 머리말). 웹도 시험 · 옛 호출(패턴 없이 온 결과)만 여기 온다 — 예전 근사(안타·볼넷·사구면 선다)를 둔다
   return isHit(outcome) || isFreePass(outcome)
 }

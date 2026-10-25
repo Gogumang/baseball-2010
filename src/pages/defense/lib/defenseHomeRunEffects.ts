@@ -80,8 +80,8 @@ export interface DefenseEffects {
   /** +0x36 */
   readonly displayDistance: number
   /**
-   * 공+0xab4 — 공 그리기의 튐 파티클(0x37042)이 1 로 세우고 0x17 진입 0x46734 가 0 으로 내린다. 읽는 곳은 못 찾았다
-   * (`lib/ballParticles` 머리말) ⚠️ 미확인. 안 주면 거짓
+   * 공+0xab4 — 공 그리기의 튐 파티클(0x37042)이 1 로 세우고 0x17 진입 0x46734 · 공 초기화 0xa267c(a26bc)가 0 으로 내린다. 읽는 곳은
+   * 없다(r247 전수 훑기 — `lib/ballParticles` 머리말). 안 주면 거짓
    */
   readonly ballBounced?: boolean
 }

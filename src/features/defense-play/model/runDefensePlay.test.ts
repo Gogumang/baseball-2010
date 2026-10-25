@@ -34,6 +34,7 @@ import type {
   DefensePlayControls,
   DefensePlayInput,
   DefensePlayResult,
+  DefensePlayState,
 } from '@/features/defense-play/model/runDefensePlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
@@ -2409,13 +2410,16 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     bases: { first: true, second: false, third: false },
     outs: 0,
   })
+  /** 공이 멈춘 뒤(건너뛰는 동안은 공+0x68 이 안 올라 멈춘 공이어야 카메라가 푼다) 타자주자가 홈에 닿기 전에 누른다 */
+  const 멈춘뒤누름 = (state: DefensePlayState): boolean =>
+    state.homeRunFlag && state.trajectory.isStoppedAt?.(state.tick) === true && !state.runners[0]!.state.scored
 
-  it('건너뛰는 동안 공이 멈추고 타자주자가 홈(+0x7c == +0x8c == 4)에 닿는 틱에 +0xfe7 이 풀리고, 그 1점은 그 틱 메시지 0x13 이다', () => {
+  it('공이 멈춘 뒤 건너뛰면 타자주자가 홈(+0x7c == +0x8c == 4)에 닿는 틱에 +0xfe7 이 풀리고, 그 1점은 그 틱 메시지 0x13 이다', () => {
     let state = startDefensePlay(홈런판())
     let pressed = false
     let 풀린틱 = -1
     while (!isDefensePlayFinished(state)) {
-      const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+      const key = !pressed && 멈춘뒤누름(state) ? { key: '5', isRepeat: false } : null
       if (key !== null) pressed = true
       const before = state.fastForward
       state = stepDefensePlay(state, key)
@@ -2425,10 +2429,14 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
         expect(state.runners[0].state).toMatchObject({ targetBase: 4, startBase: 4, scored: true })
       }
     }
+    expect(pressed).toBe(true)
     expect(풀린틱).toBeGreaterThan(0)
     expect(state.log).toContain(`${풀린틱}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
-    // 점수는 안 누른 판과 같다 — 새로 올리지 않는다
-    expect(defensePlayResultOf(state).advance).toEqual(runDefensePlay(홈런판()).advance)
+    // 1루 주자는 타자주자와 같은 목록 틱에 홈을 밟는다 — 풀린 그림 다음 그림의 목록 틱(52e16)이 +0x3b 를 지워 0xaa0a8 이 못 센다.
+    // +0x96 이 안 선 주자가 남아 관문(b0e04 → b0e24)이 늘 열린다 — 원본은 판이 안 끝나고, 웹은 판 틱 상한(원본에 없는 안전망)에서 끊는다
+    expect(state.runners[1]!.state.scored).toBe(false)
+    expect(state.tick).toBeGreaterThan(state.maximumTicks)
+    expect(defensePlayResultOf(state).advance.runsScored).toBe(runDefensePlay(홈런판()).advance.runsScored - 1)
   })
 
   it('건너뛰지 않으면 아무것도 안 한다', () => {
@@ -2436,14 +2444,37 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     expect(결과.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
   })
 
-  it('같은 목록 틱에 앞 주자도 홈에 닿으면 타자주자의 0x13(카메라 3f17e)이 먼저고, 앞 주자는 다음 그림의 득점 0xaa0a8 이 센다', () => {
-    // 원본 차례: 건너뛰는 동안 52b26 의 0x3f060 = 목록 틱(주자 이동) → 카메라 3f164 가 곧바로 타자주자 메시지 0x13 → 52b36 에서 멈추고 그린다.
-    // 같은 목록 틱에 닿은 앞 주자의 +0x3b 는 그 뒤 슬롯 2 의 0xaa0a8(525fc)이 본다 — 웹은 다음 판 틱 6f 절이다
+  it('건너뛰는 동안은 공+0x68 이 안 오른다(0x3f378 이 없다) — 날던 공은 그 점에 서 있고 카메라가 안 풀어 판 끝까지 건너뛴다', () => {
+    let state = startDefensePlay(홈런판())
+    let pressed = false
+    let 누른틱 = -1
+    let 그점: { x: number; y: number; z: number } | null = null
+    while (!isDefensePlayFinished(state)) {
+      const key = !pressed && state.homeRunFlag ? { key: '5', isRepeat: false } : null
+      if (key !== null) {
+        pressed = true
+        누른틱 = state.tick
+        그점 = state.trajectory.pointAt(state.tick)
+      }
+      state = stepDefensePlay(state, key)
+      if (pressed && !isDefensePlayFinished(state)) {
+        expect(state.fastForward).toBe(true)
+        expect(state.trajectory.pointAt(state.tick)).toEqual(그점)
+      }
+    }
+    expect(누른틱).toBeGreaterThan(0)
+    expect(state.log.some((line) => line.includes('건너뛰기 풀림'))).toBe(false)
+    expect(defensePlayResultOf(state).advance).toEqual(runDefensePlay(홈런판()).advance)
+  })
+
+  it('풀린 그림 다음 그림은 52e16 의 목록 틱이 한 번 더 돈다 — 같은 목록 틱에 홈에 닿은 앞 주자는 +0x3b 가 지워져 0xaa0a8 이 안 센다', () => {
+    // 원본 차례: 52b26 의 0x3f060 = 목록 틱 → 카메라 3f164 가 곧바로 타자주자 메시지 0x13 → 52b36 에서 멈추고 그린다 →
+    // 다음 그림 52e16 의 0x3f060 이 목록 틱을 한 번 더(+0x3b 를 머리에서 지움) → 슬롯 2 의 0xaa0a8 은 앞 주자를 못 본다
     const 풀린틱 = (() => {
       let state = startDefensePlay(홈런판())
       let pressed = false
       while (!isDefensePlayFinished(state)) {
-        const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+        const key = !pressed && 멈춘뒤누름(state) ? { key: '5', isRepeat: false } : null
         if (key !== null) pressed = true
         const before = state.fastForward || key !== null
         state = stepDefensePlay(state, key)
@@ -2456,7 +2487,7 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     let state = startDefensePlay(홈런판())
     let pressed = false
     while (state.tick < 풀린틱) {
-      const key = state.homeRunFlag && !pressed ? { key: '5', isRepeat: false } : null
+      const key = !pressed && 멈춘뒤누름(state) ? { key: '5', isRepeat: false } : null
       if (key !== null) pressed = true
       state = stepDefensePlay(state, key)
     }
@@ -2473,11 +2504,13 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     expect(state.runInsThisTick).toEqual([0])
     expect(앞주자.state.scored).toBe(false)
     expect(state.held.scoreboardRuns).toBe(앞점수 + 1)
+    // 다음 그림 머리의 목록 틱이 +0x3b 를 지웠다
+    expect(앞주자.arrivedThisListTick).toBe(false)
 
     state = stepDefensePlay(state, null)
-    expect(state.runInsThisTick).toEqual([앞주자.state.index])
-    expect(앞주자.state.scored).toBe(true)
-    expect(state.held.scoreboardRuns).toBe(앞점수 + 2)
+    expect(state.runInsThisTick).toEqual([])
+    expect(앞주자.state.scored).toBe(false)
+    expect(state.held.scoreboardRuns).toBe(앞점수 + 1)
   })
 })
 
