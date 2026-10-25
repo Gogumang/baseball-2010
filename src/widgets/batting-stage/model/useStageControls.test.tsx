@@ -247,6 +247,40 @@ describe('화면 탭 (웹판 추가) — 손가락이 닿는 순간 키 하나',
     expect(손잡이.swing).not.toHaveBeenCalled()
   })
 
+  it('공이 나는 동안(`isBallInFlight`)은 양 끝도 스윙이다 — 이동 칸에 닿아 스윙이 안 나가던 일 (r256)', () => {
+    let 날고있다 = false
+    const isBallInFlight = vi.fn((_tick: number) => 날고있다)
+    const { 손잡이, 손 } = 붙이기와손({ isBallInFlight })
+    // 공을 놓기 전(대기 · 와인드업): 끝 칸은 이동
+    손.onPointerDown(누름(10))
+    다음틀()
+    expect(손잡이.moveBatter).toHaveBeenCalledWith(-1)
+    // 공이 날면 판 어디든 스윙
+    날고있다 = true
+    손.onPointerDown(누름(10))
+    다음틀()
+    손.onPointerDown(누름(230))
+    다음틀()
+    손.onPointerDown(누름(120))
+    다음틀()
+    expect(손잡이.moveBatter).toHaveBeenCalledTimes(1)
+    expect(손잡이.swing).toHaveBeenCalledTimes(3)
+    // 받은 틱으로 묻는다 — 스윙에 넘기는 틱과 같은 셈(`tickAt`)
+    const 물은틱 = isBallInFlight.mock.calls.at(-1)?.[0]
+    expect(손잡이.swing).toHaveBeenLastCalledWith(물은틱)
+  })
+
+  it("공이 나는 동안에도 키 '4'/'6' 은 이동이다 — 원본 0x53670 이 0x11 의 누름마다 0x53470 을 부른다", () => {
+    const { 손잡이 } = 붙이기와손({ isBallInFlight: () => true })
+    fireEvent.keyDown(window, { key: '4' })
+    다음틀()
+    fireEvent.keyDown(window, { key: '6' })
+    다음틀()
+    expect(손잡이.moveBatter).toHaveBeenNthCalledWith(1, -1)
+    expect(손잡이.moveBatter).toHaveBeenNthCalledWith(2, 1)
+    expect(손잡이.swing).not.toHaveBeenCalled()
+  })
+
   it('아이폰 Safari(웹킷) — 판 zoom 을 뺀 사각형이어도 화면 가운데 탭은 스윙이다 (r242)', () => {
     // playwright 웹킷 아이폰 13 세로로 직접 잰 값: 배율 1.625, 캔버스 사각형 폭 240 = offsetWidth, clientX 는 화면 좌표 0~390.
     // 예전에는 (195 − 0) / 240 × 240 = 195 > 180 이라 가운데 탭이 '6' 오른쪽 이동이 됐다
