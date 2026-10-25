@@ -243,6 +243,8 @@ export function missionDefensePlayInputOf(
     ...(abilities === undefined
       ? {}
       : { defenseAbilities: abilities.defenseAbilities, runAbilities: abilities.runAbilities }),
+    // 초감각(21) — 필살수비 0x66b30 · 레이저 0x66a8c 가 야수 +0xec 레코드에 묻는다 (`missionFielderSkillIdsOf`)
+    ...(abilities?.fielderSkillIds === undefined ? {} : { fielderSkillIds: abilities.fielderSkillIds }),
     // 그림 전용 — 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10). 난수와 무관하다
     ...(abilities?.fielderPlates === undefined ? {} : { fielderPlates: abilities.fielderPlates }),
     ...(abilities?.runnerAces === undefined ? {} : { runnerAces: abilities.runnerAces }),

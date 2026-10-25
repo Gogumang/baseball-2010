@@ -166,7 +166,7 @@ describe('도루 (0x53610 → 0xa9bd4 출발 · 공 도착 0x3dfac 의 종류 5 
   }
 
   it('출발한 주자는 공이 도착해야 판정된다 — 판이 열리면 1루가 빈다', () => {
-    const before = startSteal(주자있는경기(), 1)
+    const before = startSteal(주자있는경기(), 1, createSeededRandom(0))
     const 결과들 = Array.from({ length: 10 }, (_unused, seed) =>
       arrivePitch(before, { resolution: { kind: '볼' }, outcomeAfter: null }, 씨앗(seed + 1)),
     )
@@ -181,12 +181,12 @@ describe('도루 (0x53610 → 0xa9bd4 출발 · 공 도착 0x3dfac 의 종류 5 
     const 막힘 = { ...주자있는경기() }
     const before = { ...막힘, game: { ...막힘.game, bases: { first: true, second: true, third: false } } }
 
-    expect(startSteal(before, 1)).toBe(before)
+    expect(startSteal(before, 1, createSeededRandom(0))).toBe(before)
   })
 
   it('주자가 없으면 아무 일도 없다', () => {
     const before = startGame(씨앗(20100901))
 
-    expect(startSteal(before, 2)).toBe(before)
+    expect(startSteal(before, 2, createSeededRandom(0))).toBe(before)
   })
 })

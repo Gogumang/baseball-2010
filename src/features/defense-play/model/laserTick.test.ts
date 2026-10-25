@@ -8,7 +8,7 @@ import { canFireLaserNow, isOutfieldSlot, laserWindowTick, NO_LASER_FLAGS } from
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 import { runRunnerPlay, runnerPlayCallSoundIdOf } from '@/features/defense-play/model/runnerPlayEngine'
 import { stealStartThrowDecision } from '@/features/defense-play/model/stealPlay'
-import { openPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { openPitchArrivalPlay, stealStartSceneOf } from '@/features/defense-play/model/pitchArrivalPlay'
 import { DEFENSE_SCENE_START, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
@@ -237,17 +237,24 @@ describe('도루 키 0x583 끝의 0xafa60 한 번 — 앞 판이 끝난 그대�
     expect(결과.scene!.playEnd!.fielders[picker]?.target).toEqual(scene.playEnd!.fielders[picker]?.target)
   })
 
-  it('공 도착 판은 도루 출발마다 그 결정을 폭투 굴림 0x35034 보다 먼저 돌린다', () => {
+  // r214: 굴림 자리를 공 도착 판 맨 앞에서 출발한 그 자리(`stealStartSceneOf`)로 옮겼다 — 예전 시험은 공 도착 판이 굴리기를 기대했다
+  it('도루 출발 자리에서 굴리고(stealStartSceneOf) 공 도착 판은 그 결정을 다시 안 굴린다', () => {
+    const random = 던지는난수()
+    const 출발뒤 = stealStartSceneOf({ scene: 앞판(), bases: { ...EMPTY_BASES, second: true }, outs: 0 }, [2], random)
+    expect(random.calls).toEqual(['0,10000'])
+    expect(출발뒤?.playEnd?.play.wantsThrow).toBe(false)
     const 기록 = (scene: DefenseScene | undefined) => {
-      const random = 던지는난수()
+      const arrival = 던지는난수()
       openPitchArrivalPlay(
         { gameMode: 1, pitchJudgement: 2, stealingFrom: [2], bases: { ...EMPTY_BASES, second: true }, outs: 0, scene },
-        random,
+        arrival,
       )
-      return random.calls
+      return arrival.calls
     }
-    const 앞판없음 = 기록(undefined)
-    const 앞판있음 = 기록(앞판())
-    expect(앞판있음).toEqual(['0,10000', ...앞판없음])
+    expect(기록(출발뒤)).toEqual(기록(undefined))
+    // 출발이 없으면 굴리지 않는다
+    const 없음 = 적는난수(() => 0)
+    expect(stealStartSceneOf({ scene: 앞판(), bases: { ...EMPTY_BASES, second: true }, outs: 0 }, [], 없음)).toBeDefined()
+    expect(없음.calls).toEqual([])
   })
 })

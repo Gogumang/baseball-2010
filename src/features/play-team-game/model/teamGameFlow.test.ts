@@ -570,20 +570,20 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
 
   it('키는 주자를 출발만 시킨다 — 루·아웃·기록은 그대로, 난수 없음', () => {
     const { progress } = 일루주자()
-    const started = startSteal(progress, 1)
+    const started = startSteal(progress, 1, createSeededRandom(0))
 
     expect(started.stealingFrom).toEqual([1])
     expect(started.game).toBe(progress.game)
     expect(started.recordIds).toBe(progress.recordIds)
     // 이미 출발했거나 걸 수 없는 루면 같은 객체
-    expect(startSteal(started, 1)).toBe(started)
-    expect(startSteal(progress, 2)).toBe(progress)
+    expect(startSteal(started, 1, createSeededRandom(0))).toBe(started)
+    expect(startSteal(progress, 2, createSeededRandom(0))).toBe(progress)
   })
 
   it('공이 도착하면 도루 판(종류 5)이 열린다 — 1루 도루는 늘 세이프, 기록 8 · 타석은 이어진다', () => {
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const { progress } = 일루주자()
-      const started = startSteal(progress, 1)
+      const started = startSteal(progress, 1, createSeededRandom(0))
       const next = applyBatterPitch(started, 볼, createSeededRandom(seed))
 
       expect(next.stealingFrom).toEqual([])
@@ -601,7 +601,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
 
   it('출발 표시 st[0x15 + i] 는 판정 때가 아니라 0xf 진입(3d966~3d976)에서 지운다 — 같은 타석 다음 공이면 그 걸음에 지워진다', () => {
     const { progress } = 일루주자()
-    const started = startSteal(progress, 1)
+    const started = startSteal(progress, 1, createSeededRandom(0))
     expect(started.stealDisplayFrom).toEqual([1])
     const next = applyBatterPitch(started, 볼, createSeededRandom(1))
     expect(next.stealingFrom).toEqual([])
@@ -610,7 +610,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
 
   it('볼넷 + 도루(밀어내기 판 — 종류 2)는 표시를 안 지운다 — 다음 0xf 진입까지 남는다 (0x3d7b8 은 종류 1 만)', () => {
     const { progress } = 일루주자()
-    const 쓰리볼 = { ...startSteal(progress, 1), atBat: { ...progress.atBat, balls: 3 } }
+    const 쓰리볼 = { ...startSteal(progress, 1, createSeededRandom(0)), atBat: { ...progress.atBat, balls: 3 } }
     const next = applyBatterPitch(쓰리볼, 볼, createSeededRandom(1))
     expect(next.stealingFrom).toEqual([])
     expect(next.game.bases).toEqual({ first: true, second: true, third: false })
@@ -677,7 +677,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
   it('화면이 도는 갈래(`startBatterPitch`)는 우리 공격의 도루 판도 붙든다(사람 주루 키 0x5331c) — 키 없이 끝내면 미리 돌린 판과 같다', () => {
     for (const seed of [1, 2, 3]) {
       const { progress } = 일루주자()
-      const started = startSteal(progress, 1)
+      const started = startSteal(progress, 1, createSeededRandom(0))
       const 미리Random = createSeededRandom(seed)
       const 미리 = applyBatterPitch(started, 볼, 미리Random)
       const 실시간Random = createSeededRandom(seed)
@@ -702,7 +702,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
 
   it('붙든 도루 판에서 귀루 키(\'3\' — 0x584 · 인자 1)를 누르면 1루 주자가 돌아서고 도루 기록 8 이 안 선다', () => {
     const { progress } = 일루주자()
-    const started = startSteal(progress, 1)
+    const started = startSteal(progress, 1, createSeededRandom(0))
     const random = createSeededRandom(1)
     const 붙듦 = startBatterPitch(started, 볼, random)
     const pending = 붙듦.pendingRunnerPlay
@@ -753,7 +753,7 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
   it('우리 타자 삼진 + 도루 — 타석 칸 · 결과 링(a8ac8 · a8a04) · 리그 타수(a8852)가 안 오르고, 상대 투수 탈삼진(a8d14)은 오른다', () => {
     const { progress } = 투스트라이크일루()
     const slot = progress.game.battingOrderIndex
-    const 도루 = applyBatterPitch(startSteal(progress, 1), 헛스윙, createSeededRandom(1))
+    const 도루 = applyBatterPitch(startSteal(progress, 1, createSeededRandom(0)), 헛스윙, createSeededRandom(1))
     const 그냥 = applyBatterPitch(progress, 헛스윙, createSeededRandom(1))
 
     expect(도루.lastArrivalPlay?.kind).toBe(5)
@@ -1150,6 +1150,26 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
       if (plate != null) expect(plate.positionCode).toBe(index + 2)
     })
     expect(진행중.pendingDefensePlay!.input.runnerAces).toEqual({ batter: null, first: null, second: null, third: null })
+  })
+
+  it('수비 칸별 스킬(초감각 21)은 명단 줄 레코드 +0x14 를 같은 칸 고르기로 싣는다 — 레이저 0x66a8c · 필살수비가 본다 (r214)', () => {
+    const 번호 = 붙들리는투구번호(20100901)
+    expect(번호).not.toBeNull()
+    const { progress, input, random } = 송구직전(20100901, 번호!)
+    // 자리 코드 8(좌익, 칸 7)에 선 우리 타자에게 초감각 비트를 단다
+    const at = progress.ourEntry.findIndex((entry) => ((entry.position ?? 0) & 0xf) === 8)
+    expect(at).toBeGreaterThanOrEqual(0)
+    const 초감각 = {
+      ...progress,
+      ourEntry: progress.ourEntry.map((entry, index) =>
+        index === at ? { ...entry, aceIndex: -1, skillBits: (entry.skillBits ?? 0) | (1 << 21) } : entry,
+      ),
+    }
+    const 진행중 = startThrowPitch(초감각, input, random)
+    const skills = 진행중.pendingDefensePlay!.input.fielderSkillIds!
+    expect(skills).toHaveLength(9)
+    expect(skills[7]).toContain(21)
+    expect(skills.filter((ids, slot) => slot !== 7 && ids.includes(21))).toEqual([])
   })
 
   it('사람이 던진 타석은 사람이 **수비**(송구 0x533c8)를 잡는다 — 같은 표의 반대 갈래', () => {

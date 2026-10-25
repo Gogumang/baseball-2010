@@ -66,6 +66,12 @@ export interface FielderState {
   readonly holdingBall: boolean
   /** AI 상태 (+0x84) */
   readonly aiState: number
+  /**
+   * **+0x90 — AI 0xb 의 목표점** (r214, 직접 뜸). 고르기 0xb3b38 의 담장 갈래(b3e96~b3eba)가 담장 앞 공점(aa4 − 2)의 (x, 0, z) 를
+   * 여기에만 적고 목표 +0x2c 는 안 건드린다. AI 고리 b4b5c 가 매 틱 이 점을 [sp+0x40] 에 베껴 b482e vt14(관문 — 잠금 +0xb4 · vtc8)로
+   * 목표에 적는다. 없으면 아직 안 적힌 칸이다
+   */
+  readonly pickUpPoint?: WorldPoint
   /** 진행 중인 동작의 남은 틱 (+0xc8) */
   readonly actionRemainingTicks: number
   /** 도착 틱에 더해지는 여유 (+0xcc). vtc0 = 남은 이동 틱 + 이 값 */

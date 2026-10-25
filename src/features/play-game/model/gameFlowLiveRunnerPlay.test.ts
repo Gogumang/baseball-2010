@@ -45,7 +45,7 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
     let held = 0
     for (let seed = 1; seed <= 20; seed += 1) {
       const 시작 = startGame(createSeededRandom(seed))
-      const 출발 = startSteal(주자(시작, 일루), 1)
+      const 출발 = startSteal(주자(시작, 일루), 1, createSeededRandom(0))
       const step = arrivePitch(출발, 공({ kind: '볼' }, null), createSeededRandom(seed), { live: true })
       const pending = step.progress.pendingRunnerPlay
       if (pending == null) continue // 판이 안 열렸다 — 없는 판
@@ -56,7 +56,7 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
       expect(step.progress.game).toBe(출발.game)
       expect(step.progress.lastDefensePlay).toBe(출발.lastDefensePlay)
       // 판이 도는 동안 도루 · 견제 · 다음 공이 안 나간다
-      expect(startSteal(step.progress, 1)).toBe(step.progress)
+      expect(startSteal(step.progress, 1, createSeededRandom(0))).toBe(step.progress)
       expect(cpuPickoff(step.progress, 1, createSeededRandom(1))).toBe(step.progress)
       expect(arrivePitch(step.progress, 공({ kind: '볼' }, null), createSeededRandom(1)).progress).toBe(step.progress)
     }
@@ -72,7 +72,7 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
     ] as const) {
       for (let seed = 1; seed <= 12; seed += 1) {
         const 시작 = startGame(createSeededRandom(seed))
-        const 출발 = startSteal(주자(시작, 일루), 1)
+        const 출발 = startSteal(주자(시작, 일루), 1, createSeededRandom(0))
         const 미리Random = createSeededRandom(seed * 7)
         const 미리 = arrivePitch(출발, 공(resolution, outcomeAfter), 미리Random)
         const 실시간Random = createSeededRandom(seed * 7)
@@ -134,7 +134,7 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
   it("붙든 도루 판에서 귀루 키('3' — 0x584 · 인자 1)를 누르면 1루 주자가 돌아서고 도루 기록 8 이 안 선다", () => {
     for (let seed = 1; seed <= 20; seed += 1) {
       const 시작 = startGame(createSeededRandom(seed))
-      const 출발 = startSteal(주자(시작, 일루), 1)
+      const 출발 = startSteal(주자(시작, 일루), 1, createSeededRandom(0))
       const random = createSeededRandom(seed)
       const 붙듦 = arrivePitch(출발, 공({ kind: '볼' }, null), random, { live: true })
       const pending = 붙듦.progress.pendingRunnerPlay
@@ -155,7 +155,7 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
 
   it('밀어내기 판(종류 2)은 키가 할 일이 없어 붙들지 않는다 (0xae794 마스크 0x232 · 0x518da)', () => {
     const 시작 = startGame(createSeededRandom(4))
-    const 출발 = startSteal(주자(시작, 일루), 1)
+    const 출발 = startSteal(주자(시작, 일루), 1, createSeededRandom(0))
     const step = arrivePitch(출발, 공({ kind: '볼' }, { kind: '볼넷' }), createSeededRandom(4), { live: true })
     expect(step.progress.pendingRunnerPlay ?? null).toBeNull()
     expect(step.play?.kind).toBe(2)
@@ -192,7 +192,7 @@ describe('붙든 판도 판 끝 0xf 진입의 볼카운트를 들고 간다 — 
     let held = 0
     for (let seed = 1; seed <= 20 && held === 0; seed += 1) {
       const 시작 = startGame(createSeededRandom(seed))
-      const 출발 = startSteal(주자(시작, 일루), 1)
+      const 출발 = startSteal(주자(시작, 일루), 1, createSeededRandom(0))
       const step = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, createSeededRandom(seed), {
         live: true,
         countAfter: { strikes: 1, balls: 2 },

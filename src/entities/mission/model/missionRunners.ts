@@ -10,7 +10,7 @@ import {
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { lineupSlotOf, rosterSlotAt } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
-import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
+import { skillIdsOfBits, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
 import { defenseFielderPlatesOf } from '@/features/defense-play/model/runDefensePlay'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
@@ -197,6 +197,18 @@ export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[
 }
 
 /**
+ * 수비 아홉 칸의 **스킬 번호** — `missionDefenseAbilitiesOf` 와 같은 레코드(칸 0 은 지명타자). 레이저 0x66a8c · 필살수비 0x66b30 이
+ * 야수 +0xec 에 `0xb62b4(선수, 0x15)`(초감각)를 묻는다 — 레코드 +0x14 는 마스터 줄 Xls 행 그대로다. 표지 레코드 · 빈 칸은 빈 목록.
+ */
+export function missionFielderSkillIdsOf(run: MissionDefenseSituation): (readonly number[])[] {
+  const skills: (readonly number[])[] = Array.from({ length: FIELDER_COUNT }, () => [])
+  for (const { slot, player } of missionDefenseFieldersOf(run, true)) {
+    if (player !== undefined) skills[slot] = skillIdsOfBits(player.skillBits, false)
+  }
+  return skills
+}
+
+/**
  * 판 시작 0xb0fb4 가 칸 1~8 에 앉히는 **야수 레코드** — 레코드 차례로 자리 니블 − 1 칸에 첫 레코드(겹치면 앞 레코드).
  * 미션 타자 · 마타자 표지면 `player` 가 없다(수비 팀에는 안 생긴다). 자리 니블은 `missionDefenseAbilitiesOf` 머리말대로 대타가 맞바꾼 값.
  */
@@ -236,6 +248,8 @@ const QUICK_LINEUP_SLOTS = 9
 export interface MissionPlayAbilities {
   readonly defenseAbilities: readonly number[]
   readonly runAbilities: Partial<Record<0 | 1 | 2 | 3, number>>
+  /** 수비 칸별 스킬 번호 — 레이저 0x66a8c · 필살수비의 초감각(21) (`missionFielderSkillIdsOf`) */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
   /** 수비 칸별 이름 판 선수 (0x43cb0 — `missionFielderPlatesOf`). 안 주면 고리만 그린다 */
   readonly fielderPlates?: ReturnType<typeof defenseFielderPlatesOf>
   /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (주자 그림 0x79d10 · 적재 0x483a0 — `missionRunnerAcesOf`) */
@@ -260,6 +274,7 @@ export function missionPlayAbilitiesOf(
 ): MissionPlayAbilities {
   return {
     defenseAbilities: missionDefenseAbilitiesOf(run),
+    fielderSkillIds: missionFielderSkillIdsOf(run),
     runAbilities: missionRunAbilitiesOnBaseOf(run, special),
     ...(plates === undefined
       ? {}

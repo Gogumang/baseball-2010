@@ -120,6 +120,7 @@ import {
  *    (늘 먹는다) → 움직이는 공이면 펌블(0xbc2 · 틱 끝 0xb3148 튕김) / 아니면 b4292 결과 9 검사 · 쥐기 0xb2710(P, f, 1) · vt90
  * 2. 같은 플레이 틱의 꼬리 — 아웃 판정 b43da → 낙구 틱 포스 요구 루 0xa95e8(b444e~b453c) → 결과 메시지 0xbba(b4562 — 13 이면
  *    0x51d40~0x51db4 가 사람 수비에서도 CPU 송구 결정 한 번) → 튕김 0xb3148(b45a0) → 득점 0xaa0a8 · 보류 풀기 0xaa34c(525fc)
+ * 3a. 중계 이어 던지기 — 플레이 vt4c 0xb45dc 머리 b4616: 계획 +0x14c 가 중계고 중계맨이 쥐었으면 최종 받는 야수에게 0xb2e38
  * 3b. 사람 목표 +0x160 — 플레이 vt4c 0xb45dc(52612)의 b4660~b46a8: 쥠 && 준비면 루로 보내기 `0xb2c90`, 그리고 −1 · 3c. AI 9
  * 3d. vt4c 끝 b4c72 — 플레이 vt30 = 0xb1c90: 커버(+0xf0) 다시 고르기 · 키스톤 자리 0xb203a (`coverTick.runCoverTick`, r162).
  *    송구 0xb2e38 꼬리 b3094 도 같은 것을 한 번 부른다(`sendToBase`)
@@ -137,7 +138,9 @@ import {
  * - 움직이기(6 절)는 다음 그림의 목록 틱(0x3f060)이라 슬롯 2 뒤에 둔다. 아웃 판정 · 득점은 원본처럼 슬롯 2(이동 앞)다.
  *   쥐기 0xb2710 은 야수를 옮기지 않는다(r176 — 예전 웹은 포구 지점으로 옮겨 쥐었다). 받는 포구 · 줍는 포구도 b4134 의 포구 동작 ·
  *   자세 워드(`fielderPose`)를 건다. ⚠️ AI 고리(b46ae~)는 AI 0 의 시작 자리 되돌리기 · AI 2~5 의 b4814 · AI 9 만 옮겼다.
- * - ⚠️ 중계 이어 던지기(b4616)는 이 판에 없다 — 중계맨이 받으면 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다.
+ * - 중계 이어 던지기 b4616 (3a 절, r214): 0xb2e38 이 적은 송구 계획 +0x14c 가 중계면 중계맨이 쥔 뒤 준비 틱이 지난 틱에 최종 받는
+ *   야수에게 던진다. CPU 송구 결정 0xafa60 은 성공하면 계획을 지우므로(afb08 0xb0ea0) CPU 가 정한 송구는 중계맨이 받아도 이 길이
+ *   아니라 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다 — 사람 목표 · 미룬 송구(AI 9)의 0xb2c90 이 낸 중계만 잇는다.
  * - 자동 추가 진루는 결과 코드가 선 뒤에도 판이 닫힐 때까지 매 틱 묻는다 — +0x111 은 "끝" 이 아니라 홈런 코드 8 이다
  *   (`playGate`). 판은 0xb0d28 대로 주자가 다 서고 공을 쥔 채 관문을 51 번 지나면(그림마다 3 번 — 17틱) 닫힌다.
  * - 레이저 송구(0x523bc 굴림 · 0x4e858 반짝임 · 0x400bc 발사 · 경기 멈춤 +0x1993 · b2f06 레이저 송구)는 타구 진행기와 같은
@@ -161,6 +164,9 @@ const MINIMUM_THROW_DISTANCE = 600
 
 /** 결과 코드 — 9 세이프(0xb4292) · 13 아웃(0xb4556) */
 export const RUNNER_PLAY_RESULT = { SAFE: 9, OUT: 13 } as const
+/** 송구를 고른 쪽 — 사람 키(참) · CPU 결정(거짓) · AI 9 미룬 송구 · 중계 이어 던지기(b4616) */
+type ThrowChooser = boolean | '미룬' | '중계'
+
 export type RunnerPlayResultCode = (typeof RUNNER_PLAY_RESULT)[keyof typeof RUNNER_PLAY_RESULT]
 
 /** (종류 9) 공을 쫓아 줍는 갈래 */
@@ -455,6 +461,12 @@ function* runnerPlaySteps(
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
   /**
+   * 송구 계획 +0x14c [4](+0x150) — 계획이 중계([0] = 1)면 최종 받는 야수, 아니면 −1 · [7](+0x153) 그 목표 루. 0xb2e38 이 덮어쓰고
+   * 0xb0ea0 이 지운다(판 시작 vt1c b0f48 · CPU 송구 결정 0xafa60 성공 뒤 afb08). 중계맨이 쥐면 플레이 틱 b4616 이 [4] 에게 던진다
+   */
+  let relayFinalSlot = NONE
+  let relayBase = NONE
+  /**
    * **그림 전용** 경기+0x19ac — 쥐기 0xb2710 의 메시지 0x15(0x51872)가 세우고 0x17 진입 0x467de 가 내린다. 도루 판의 포수 ·
    * 판 시작 쥐기(b29d4 의 0xb2710)는 0x17 진입 0x46418 안에서 0x467de 보다 앞이라 지워진다 — 판 동안 새로 쥘 때 선다
    */
@@ -539,7 +551,7 @@ function* runnerPlaySteps(
    * 커버 없음 → 공 가진 야수가 들고 뛴다(0) · 커버 목표 루 ≠ 루(0) · 직접 밟는 게 빠름(1) · 600 이하 · 자기 자신(0) ·
    * 그 밖에는 송구 0xb2e38 → 0xa1620(악송구 굴림 0xa1828)(1).
    */
-  const sendToBase = (tick: number, base: number, byHuman: boolean | '미룬', cpuSpecial: boolean): boolean => {
+  const sendToBase = (tick: number, base: number, byHuman: ThrowChooser, cpuSpecial: boolean): boolean => {
     const holderSlot = play.ballHolderSlot
     const holder = fielders[holderSlot]
     if (holder === undefined) return false
@@ -580,7 +592,36 @@ function* runnerPlaySteps(
     if (coverSlot === holderSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
       return false
     }
+    // b2d7e: +0x154 = C · vt5c(C, 특수) = 0xb2e38
+    if (!throwBall(tick, coverSlot, base, byHuman, cpuSpecial)) return false
+    // 그다음 0xb2c90 b2df8~b2e14: 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 0xb8dbc(…, 0) — 시작 자리 0xd86ec 로(b476a).
+    // 미룬 송구(b30a2)는 던질 야수가 AI 9 라 그대로다
+    fielders = fielders.map((fielder) => {
+      if (fielder.slot !== holderSlot) return fielder
+      const keeps =
+        (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
+        fielder.aiState === AI_STATE.RECEIVE
+      if (keeps) return fielder
+      return { ...fielder, aiState: AI_STATE.IDLE }
+    })
+    return true
+  }
 
+  /**
+   * **송구 0xb2e38**(플레이.vt5c, 인자 받을 야수 C · 특수) — 공 가진 야수가 C 에게 던진다. 던졌거나 미뤘으면(AI 9) 참.
+   * 부르는 곳은 루로 보내기 0xb2c90(`sendToBase`)과 중계 이어 던지기 b4616 둘이다(`runDefensePlay` 의 throwBall 과 같은 갈래).
+   * b2e6c~b2ea0 이 송구 계획 0xb3444 를 +0x14c..+0x153 에 **미루기 검사(b2eb2) 앞에서** 적는다 — 미뤄도 계획은 새것이다.
+   */
+  const throwBall = (
+    tick: number,
+    coverSlot: number,
+    base: number,
+    byHuman: ThrowChooser,
+    cpuSpecial: boolean,
+  ): boolean => {
+    const holderSlot = play.ballHolderSlot
+    const holder = fielders[holderSlot]
+    if (holder === undefined) return false
     // ── 송구 0xb2e38 → 0xa1620 (악송구 굴림 0xa1828) ──
     // b2e44: vtC4(준비) — 던진 야수는 0xa1620 끝의 +0xb1 잠금으로 못 던진다(공을 안 쥔 야수는 못 던지는 것으로 본다,
     // `runDefensePlay` 의 throwBall 과 같은 근사)
@@ -589,6 +630,9 @@ function* runnerPlaySteps(
     // b2f06 — 레이저 발사 0x400bc 가 세운 플레이+0x1f4 를 본다. 레이저는 특수라 계획 0xb3444 가 중계를 안 끼운다(b3528)
     let laser = laserArmed
     const plan = planThrow({ fielders, fromSlot: holderSlot, finalSlot: coverSlot, base, special: laser || cpuSpecial })
+    // b2e92~b2ea0: 계획을 +0x14c.. 에 덮어쓴다 — 중계면 [0] = 1 · [4] = 최종 받는 야수 · [7] = 목표 루 (b4616 이 본다)
+    relayFinalSlot = plan.relayed ? coverSlot : NONE
+    relayBase = plan.relayed ? base : NONE
     const receiver = fielders[plan.toSlot]
     if (
       receiver !== undefined &&
@@ -660,22 +704,20 @@ function* runnerPlaySteps(
     // 커버를 그 상태로 다시 고른다. 던진 야수가 커버 표에 남으면 b2564 가 vt14(그 루) · AI 루 + 2 — 공을 쥐고 AI 1 이던 도루 판
     // 포수도 여기서 홈 커버로 돌아간다(`stealPlay` 머리말)
     coverTick(tick)
-    // 그다음 0xb2c90 b2df8~b2e14: 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 0xb8dbc(…, 0) — 시작 자리 0xd86ec 로(b476a)
-    fielders = fielders.map((fielder) => {
-      if (fielder.slot !== holderSlot) return fielder
-      const keeps =
-        (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
-        fielder.aiState === AI_STATE.RECEIVE
-      if (keeps) return fielder
-      return { ...fielder, aiState: AI_STATE.IDLE }
-    })
     log.push(
       `${tick}틱 ${holderSlot}번 야수가 ${base}루로 ${laser ? '레이저 ' : ''}송구 — ${chase?.catchTick ?? tick}틱 도착` +
         (cpuSpecial ? ' (특수)' : '') +
+        (plan.relayed ? ` (${plan.toSlot}번 야수 중계)` : '') +
         (thrown.bounce ? ' (원바운드)' : '') +
         (thrown.errant ? ' (악송구)' : thrown.wobbled ? ' (흔들린 긴 송구)' : '') +
-        (chase !== null && chase.slot !== coverSlot ? ` (${chase.slot}번 야수가 줍는다)` : '') +
-        (byHuman === '미룬' ? ' (AI 9 미룬 송구)' : byHuman ? '' : ' (CPU 결정)'),
+        (chase !== null && chase.slot !== plan.toSlot ? ` (${chase.slot}번 야수가 줍는다)` : '') +
+        (byHuman === '미룬'
+          ? ' (AI 9 미룬 송구)'
+          : byHuman === '중계'
+            ? ' (중계 이어 던지기)'
+            : byHuman
+              ? ''
+              : ' (CPU 결정)'),
     )
     return true
   }
@@ -738,7 +780,13 @@ function* runnerPlaySteps(
     if (base === NONE) return
     const cpuSpecial =
       base === 0 && input.random !== undefined && isSpecialThrow(base, input.random.rand(0, 100))
-    if (sendToBase(tick, base, false, cpuSpecial)) play = { ...play, wantsThrow: false }
+    if (sendToBase(tick, base, false, cpuSpecial)) {
+      // afafc +0x128 = 0 · afb08 0xb0ea0 — 계획(+0x14c)을 지운다: CPU 가 정한 송구는 중계맨이 받아도 b4616 이 안 잇고,
+      // 쥐기의 +0x128 로 이 결정이 다시 고른다
+      play = { ...play, wantsThrow: false }
+      relayFinalSlot = NONE
+      relayBase = NONE
+    }
   }
 
   // ── 0x46766 — 0x17 진입 0x46418 끝: 판 진행 관문 0xb0d28 이 열려 있으면 `0xaf8c0(제어기, 1)` 을 **한 번**, 주루 설정
@@ -1041,7 +1089,25 @@ function* runnerPlaySteps(
       someRunnerStillActive: someRunnerStillActive(runnerStates(), isAtTarget),
     })
 
-    // 3b · 3c 는 플레이 vt4c 0xb45dc 다 — 슬롯 2 52612 라 플레이 틱(vt48) · 득점 0xaa0a8 뒤에 돈다
+    // 3a · 3b · 3c 는 플레이 vt4c 0xb45dc 다 — 슬롯 2 52612 라 플레이 틱(vt48) · 득점 0xaa0a8 뒤에 돈다
+    // ── 3a. 중계 이어 던지기 — vt4c 머리 b45ee~b465e (직접 뜬 것, `runDefensePlay` 1a 절과 같다) ──
+    // ```
+    // b45f0: +0x12c(쥠) 이면
+    // b4608:   [4](+0x150) ≠ +0x130(공 가진 야수) && [0](+0x14c 중계) 이면 vt5c([4], 0) = 0xb2e38 ; 참이면 메시지 0xbc6
+    // b4638: [4] == +0x130 이면 [0] = 0 · +0x117 = 0
+    // ```
+    // 중계맨은 쥐기(0xb2710)가 넣은 준비 틱(내야 3)이 끝난 틱에 던진다 — 0xb2e38 머리의 vtC4 가 그때까지 0 을 돌려준다.
+    // 0xb2c90 을 거치지 않으므로 들고 뛰기 · 직접 밟기 관문도, 던진 뒤 AI 0 도 없다. CPU 송구 결정이 던진 공은 계획이 지워져
+    // 여기를 안 탄다(4c 절) — 사람 목표(3b) · 미룬 송구(3c)의 0xb2c90 이 낸 중계만 남는다
+    if (!play.finished && vt4cRuns) {
+      const holderSlot = play.ballHolderSlot
+      if (play.held && relayFinalSlot !== NONE && relayFinalSlot !== holderSlot) {
+        throwBall(tick, relayFinalSlot, relayBase, '중계', false)
+      } else if (relayFinalSlot === holderSlot) {
+        relayFinalSlot = NONE
+        relayBase = NONE
+      }
+    }
     // ── 3b. 사람 목표 +0x160 — 플레이 틱 vt4c 의 b4660~b46a8: 쥠 && 준비(vtC4) 이면 발밑 루가 아닐 때 vt58, 그리고 −1 ──
     // vt4c 는 판 종류가 마스크 0x58c 밖일 때만 돈다(0x52602) — 밀어내기(종류 2)는 키가 +0x160 만 적고 안 던진다(다음 판 시작 vt1c 가 지운다)
     if (!play.finished && vt4cRuns && manualThrowBase !== NONE && isHolderReady()) {

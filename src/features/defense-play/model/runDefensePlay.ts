@@ -108,6 +108,7 @@ import { baseAtPoint, claimCoverOfBase, needsCover, withCoverBaseTarget } from '
 import { runCoverTick } from '@/features/defense-play/model/coverTick'
 import {
   FIELDER_ACTION,
+  acceptsTargetVt14,
   canStepNextListTick,
   fielderSlackAtPlayEnd,
   isFreeToRetarget,
@@ -480,6 +481,26 @@ export function defenseAbilitiesOf(lineup: readonly DefenseLineupPlayer[]): numb
     filled[slot] = true
   }
   return abilities
+}
+
+/**
+ * 수비 아홉 칸의 **스킬 번호** (`fielderSkillIds`) — 칸을 고르는 법은 `defenseAbilitiesOf` 와 같다(자리 코드 − 1 칸, 겹치면 앞 선수,
+ * 칸 0 은 니블 1 = 지명타자). 레이저 굴림 0x66a8c(66ad4~66aee)와 필살수비 0x66b30 · 0x66be4 는 야수 +0xec 레코드에
+ * `0xb62b4(선수, 0x15)`(초감각)를 묻는다 — 그 레코드가 이 칸 고르기로 앉은 선수다. 선수가 없는 칸은 빈 목록이다
+ * (0x66a8c 는 +0xec 가 비면 굴리지 않는다 — 66aa6).
+ */
+export function defenseSkillIdsOf(
+  lineup: readonly { readonly position?: number; readonly skillIds: readonly number[] }[],
+): (readonly number[])[] {
+  const skills: (readonly number[])[] = Array.from({ length: FIELDER_COUNT }, () => [])
+  const filled = Array.from({ length: FIELDER_COUNT }, () => false)
+  for (const player of lineup) {
+    const slot = ((player.position ?? 0) & 0xf) - 1
+    if (slot < 0 || slot >= FIELDER_COUNT || filled[slot]) continue
+    skills[slot] = player.skillIds
+    filled[slot] = true
+  }
+  return skills
 }
 
 /**
@@ -1193,7 +1214,8 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   fielders = fielders.map((fielder) =>
     fielder.slot === chaserSlot
       ? forecast.fenceChasePoint !== null
-        ? { ...fielder, target: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP }
+        ? // b3e8c AI 0xb · b3e96~b3eba +0x90 만 — 목표(+0x2c)는 AI 고리 b4b5c 가 vt14 로 적는다(1c 절, r214)
+          { ...fielder, pickUpPoint: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP }
         : { ...fielder, target: catchPoint, aiState: AI_STATE.CHASE }
       : // b3f5c — 백업 갈래: 외야 추적야수 곁의 가장 가까운 외야수 AI 0xc (목표는 AI 고리 b4b78 이 고른다, r180)
         fielder.slot === forecast.backupSlot
@@ -1728,6 +1750,10 @@ export function stepDefensePlay(
     // b2f06 — 레이저 발사 0x400bc 가 세운 플레이+0x1f4 를 본다(발사는 슬롯 2 머리에서 따로 — 0b 절 끝)
     let laser = laserArmed
     const plan = planThrow({ fielders, fromSlot, finalSlot: coverSlot, base, special: laser || cpuSpecial })
+    // b2e92~b2ea0: 계획을 +0x14c.. 에 덮어쓴다 — **미루기 검사(b2eb2) 앞**이라 미뤄도 새 계획이다(r214 — 예전 웹은 던질 때만 적었다).
+    // 중계면 [0] = 1 · [4] = 최종 받는 야수 (b4616 이 본다). 레이저 · 특수는 0xb3444 가 중계를 안 끼운다(b3528)
+    relayFinalSlot = plan.relayed ? coverSlot : NONE
+    relayBase = plan.relayed ? base : NONE
     // b2eb2~b2ee4: 받는 야수(중계면 중계맨)가 목표점에 없고 1구간 틱 안에 못 닿으면 미룬다 (AI 9)
     const receiver = fielders[plan.toSlot]
     if (
@@ -1809,9 +1835,6 @@ export function stepDefensePlay(
     throwReleaseTick = tick
     // 받을 야수는 예보가 고른다(아래) — 2 절의 "받은 야수 손으로 옮기기" 는 더 없다
     throwReceiverSlot = NONE
-    // +0x14c..: 계획을 덮어쓴다 — 중계면 [0] = 1 · [4] = 최종 받는 야수 (b4616 이 본다)
-    relayFinalSlot = relayed ? coverSlot : NONE
-    relayBase = relayed ? base : NONE
     throwCount += 1
     // 손을 떠난다 — 받을 야수 · 받는 틱을 다시 세운다 (b2f80 · b3070 · b307c)
     // a1a26~a1a3a(레이저 a240c~a2418) 동작 5 · 야수+0xb1 = 1 — 다음 야수 틱은 vtc8 이 거짓이라 걸음 없이(`canStepNextListTick`)
@@ -1972,8 +1995,9 @@ export function stepDefensePlay(
     fielders = fielders.map((fielder) =>
       fielder.slot === chaserSlot
         ? forecast.fenceChasePoint !== null
-          ? // 0xb3b38 담장 갈래 — AI 0xb · 목표 = 담장 앞 공점(aa4 − 2)의 (x, 0, z)
-            { ...fielder, target: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP, holdingBall: false }
+          ? // 0xb3b38 담장 갈래 — AI 0xb · +0x90 = 담장 앞 공점(aa4 − 2)의 (x, 0, z). 목표(+0x2c)는 안 적는다 — AI 고리 b4b5c 가
+            // vt14(+0x90)로 적는다(1c 절, r214 — 예전 웹은 여기서 목표에 바로 적었다)
+            { ...fielder, pickUpPoint: forecast.fenceChasePoint, aiState: AI_STATE.PICK_UP, holdingBall: false }
           : // b3e4e — 이미 AI 0xb 인 야수는 AI 1 로 안 바꾼다(머리의 되돌리기도 1 · 0xc 만 본다).
             // b3e54 는 AI 1 만 걸고 목표(+0x2c)는 안 적는다 — 포구점은 AI 고리 b4aca(1c 절)가 움직임 허용 +0x13c 를 보고 vt14 로 적는다
             // (r201 — 예전 웹은 여기서 포구점을 바로 적어, 슬롯 2 뒤쪽 CPU 송구(526ae)를 받는 야수가 한 틱 일찍 걸었다)
@@ -2072,7 +2096,13 @@ export function stepDefensePlay(
     // afad2: 홈(0)을 골랐을 때**만** rand(0,100) — 0xb2c90 이 실패해도 굴림은 먹는다
     const cpuSpecial =
       base === 0 && input.random !== undefined && isSpecialThrow(base, input.random.rand(0, 100))
-    if (sendToBase(play.ballHolderSlot, base, 'CPU', cpuSpecial)) play = { ...play, wantsThrow: false }
+    if (sendToBase(play.ballHolderSlot, base, 'CPU', cpuSpecial)) {
+      // afafc +0x128 = 0 · afb08 0xb0ea0 — 송구 계획(+0x14c)을 지운다(r214, 직접 뜸). CPU 가 정한 먼 송구는 중계맨이 받아도
+      // b4616 이 잇지 않고, 쥐기의 +0x128 로 이 결정이 다시 고른다
+      play = { ...play, wantsThrow: false }
+      relayFinalSlot = NONE
+      relayBase = NONE
+    }
   }
 
   // 아래 묶음은 예전 `for (let tick = 0; …)` 루프의 **몸통 그대로**다.
@@ -2937,6 +2967,16 @@ export function stepDefensePlay(
         // 이 고리가 다시 5 를 적는다 — 사건 7 · 12 를 받은 틱 뒤로 야수는 그 자리에 선다(원본 그대로, r190)
         if (dispatchState === AI_STATE.RETURN) {
           fielders = fielders.map((fielder) => (fielder.slot === slot ? withReturnToStartTick(fielder) : fielder))
+        }
+        // AI 0xb b4b5c — +0x90 을 [sp+0x40] 에 베껴 b482e 에서 **조건 없이** vt14(+0x90) 뒤 다음 칸(b4c60). vt14 = 0xa14c8 관문(잠금
+        // +0xb4 ≤ 0 · vtc8)이 막으면 목표는 그대로다. 공 쥠 +0xe0 은 안 본다 — 쥐었어도 담장 앞으로 걷는다 (r214 — 예전 웹은 고르기에서
+        // 목표에 바로 적고 vt10 지우기가 목표를 안 건드리게 해 두었다)
+        if (dispatchState === AI_STATE.PICK_UP) {
+          const point = self.pickUpPoint
+          if (point !== undefined && acceptsTargetVt14(self) && !isSamePoint(self.target, point)) {
+            fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: point } : fielder))
+          }
+          continue
         }
         if (isCoverState(dispatchState)) {
           const base = dispatchState - AI_STATE.COVER_HOME
