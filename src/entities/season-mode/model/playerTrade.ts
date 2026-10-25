@@ -235,6 +235,11 @@ export interface TradeSettlement {
   readonly swap?: TradeSwap
 }
 
+/** 0xd1cc 고리 — 장비 니블 네 칸을 0 으로. 칸이 없으면(표 값 — 리그 열 팀은 0) 그대로 */
+function withClearedEquipment(player: SeasonPlayer): SeasonPlayer {
+  return player.equipment === undefined ? player : { ...player, equipment: [0, 0, 0, 0] }
+}
+
 export interface TradedRosters {
   readonly mine: SeasonTeamRoster
   readonly theirs: SeasonTeamRoster
@@ -261,9 +266,11 @@ export interface TradedRosters {
  * - 레코드 0x30 바이트째 옮기므로 id(+0, 곧 붙박이 표 행)·+0x1b·스태미나(+0x2c)·성적 칸이 선수를 따라간다 — 웹은
  *   `tableTeamId`(`withTableTeam`)·`stamina` 로 따라가게 한다. **투수는 칸 번호(+0xa 하위 5비트)도 옛 팀 것 그대로**다
  *   (0xb5625 는 고치지 않는다 — 영입 0xb521c 투수 가지처럼 표시용 칸 번호만 어긋난다, 원본 그대로).
- * - 장비 니블(+0x19·+0x1a, 0xb646c 의 장비 보너스 칸)은 두 선수 모두 0 이 된다. 리그 열 팀(Xls 0~9팀) 선수는
- *   원래 그 두 바이트가 0 이고(`XlsPITCHER_DATA`·`XlsBATTER_DATA` 를 줄마다 확인 — 0 이 아닌 줄은 14팀뿐),
- *   웹 시즌 선수에는 장비 칸이 없어 할 일이 없다. 나리·명전 선수(장비가 있을 수 있다)는 트레이드에서 거절된다.
+ * - 장비 니블(+0x19·+0x1a, 0xb646c 의 장비 보너스 칸)은 두 선수 모두 0 이 된다(d1cc 고리 — i = 0..3 이 한 니블씩 지워
+ *   두 바이트가 다 0). 리그 열 팀(Xls 0~9팀) 선수는 표의 그 두 바이트가 0 이지만(`XlsPITCHER_DATA`·`XlsBATTER_DATA` 를 줄마다
+ *   확인 — 0 이 아닌 줄은 14팀뿐), 장착아이템(0xdc 종류 3 → `SeasonPlayer.equipment`)으로 산 니블은 남아 있을 수 있다 — 그 칸을
+ *   0 네 칸으로 지운다(`withClearedEquipment`, r235 soak 이 찾았다: 예전엔 산 장비를 단 채 상대 팀으로 갔다).
+ *   칸이 없는(표 값 = 0) 선수는 그대로 둔다. 나리·명전 선수(장비가 있을 수 있다)는 트레이드에서 거절된다.
  * - 임시 레코드 생성자·소멸자(0xb6c81/0xb6cb5 · 0xb8de5/0xb8e19)는 버퍼 준비뿐이라 옮길 것이 없다.
  */
 export function swapTradedPlayers(
@@ -274,8 +281,10 @@ export function swapTradedPlayers(
   const { mine, theirs } = rosters
   const { opponentTeamId, tab, myIndex, opponentIndex } = swap
   if (tab === TRADE_TAB.투수) {
-    const given = mine.pitchers[myIndex]
-    const taken = theirs.pitchers[opponentIndex]
+    const givenRecord = mine.pitchers[myIndex]
+    const takenRecord = theirs.pitchers[opponentIndex]
+    const given = givenRecord === undefined ? undefined : withClearedEquipment(givenRecord)
+    const taken = takenRecord === undefined ? undefined : withClearedEquipment(takenRecord)
     // 0xb51fc 가 0(칸 밖)을 돌려주는 판은 원본도 널 포인터를 건드린다 — 웹 명단은 늘 8명 이상이라 닿지 않는다
     if (given === undefined || taken === undefined) return rosters
     const mineNext = [...mine.pitchers]
@@ -285,8 +294,10 @@ export function swapTradedPlayers(
     return { mine: { ...mine, pitchers: mineNext }, theirs: { ...theirs, pitchers: theirsNext } }
   }
   if (tab === TRADE_TAB.타자) {
-    const given = mine.batters[myIndex]
-    const taken = theirs.batters[opponentIndex]
+    const givenRecord = mine.batters[myIndex]
+    const takenRecord = theirs.batters[opponentIndex]
+    const given = givenRecord === undefined ? undefined : withClearedEquipment(givenRecord)
+    const taken = takenRecord === undefined ? undefined : withClearedEquipment(takenRecord)
     if (given === undefined || taken === undefined) return rosters
     const mineNext = [...mine.batters]
     const theirsNext = [...theirs.batters]
