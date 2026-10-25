@@ -38,6 +38,11 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `pitcher-cup` · `pitcher-cup-result` | 나리 투수편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) | `pitcher-cup` · `pitcher-cup-result` |
 | `nari-ending` · `pitcher-ending` | 나리 타자편 · 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 은퇴 이벤트 114 로 가고 OK 로 넘긴다 (약 11초) | `nari-ending` · `pitcher-ending` |
 | `nari-hall-of-fame` · `pitcher-hall-of-fame` | 명예의 전당 등록 질문 0x2d — 보너스를 받은 저장으로 141 에 곧장 들어가 키로 제작진 → 질문 (약 3초) | `nari-hall-of-fame` · `pitcher-hall-of-fame` |
+| `nari-postseason-game` · `pitcher-postseason-game` | 사람 팀 포스트시즌 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기(타자편 첫 내 타석 · 투수편 첫 구질 고르기, 약 6초) | `nari-postseason-game` · `pitcher-postseason-game` |
+| `nari-postseason-next` · `pitcher-postseason-next` | 내 시리즈(준플레이오프)를 이기고 116 → 114 → 128 로 돌아온 다음 라운드(플레이오프) 대진 — [다음]이 142 | `nari-postseason-next` · `pitcher-postseason-next` |
+| `nari-postseason-champion` · `pitcher-postseason-champion` | 내 팀이 한국시리즈를 이긴 끝난 대진 [다음] → 우승 팀 발표 StrMODE[137] 팝업 7 | `nari-postseason-champion` · `pitcher-postseason-champion` |
+| `nari-korean-series` · `pitcher-korean-series` | 팝업 7 을 OK 로 닫아 내 팀 한국시리즈 우승 StrMODE[190] 팝업 8 | `nari-postseason-champion` · `pitcher-postseason-champion` |
+| `nari-cup-win` · `pitcher-cup-win` | 국가대항전 한국 우승 — 끝난 대진판 확인 → 결과 팝업 0x25 "[대한민국] 대표팀 제n회 국가대항전 우승!!" | `nari-cup-win`(씨앗 5 판) · `pitcher-cup-win` |
 | `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 이른 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 45초) | `nari-y1` + 씨앗 5 |
 
 G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/devOptions.ts` — vitest 밖에서는 켜짐) 때문에 늘 99999 로 보이고 써도 줄지 않는다. 실제로 깎이는 것을 볼 때는 주소에 `&real-gp`(또는 `&원본G`)를 붙인다.
@@ -53,7 +58,7 @@ G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 36개 × chromium · webkit 아이폰 (약 4분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs                  # 장면 46개 × chromium · webkit 아이폰 (약 5분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
@@ -73,14 +78,18 @@ kill "$(cat e2e/.run/drive.pid)"
 새로 뜨려면 drive 로 `{"scene":"nari-new"}` 부터 플레이한 뒤 `{"dump":"e2e/fixtures/<이름>.json","note":"…"}` 를 보낸다.
 손으로 짜지 않는다.
 
-### soak 로 뜬 픽스처 (r236)
+### soak 로 뜬 픽스처 (r236 · r254)
 
 브라우저로 몇 시간 쳐야 닿는 자리는 화면 없이 세션 훅을 돌려 뜬다 — `src/app/model/soak/soakFixtures.test.tsx`.
 `season-ending` · `nari-postseason` · `nari-cup` · `nari-cup-result` · `nari-ending` · `nari-hall-of-fame` · `pitcher-postseason` · `pitcher-cup` ·
 `pitcher-cup-result` · `pitcher-ending` · `pitcher-hall-of-fame` 이 그것이다. r233 soak 하네스의 사람 흉내 정책으로 새 선수(팀)부터
 돌리고, 그 자리에 닿은 순간 앱의 실제 저장 모듈(`createLocalStorageSaveGame` · `createLocalStorageJsonStore`)이 jsdom localStorage 에
 쓴 칸을 그대로 뜬다. 뜬 뒤에는 픽스처 칸만 깐 새 세션으로 이어하기가 기대한 자리(장면 · 이벤트)로 가는지 본다.
-저장 꼴이 바뀌어 장면이 깨지면 다시 뜬다 (약 25초, 같은 씨앗이면 같은 파일):
+r254 가 같은 판에서 사람 팀 포스트시즌 자리 셋(`*-postseason-game` 그해 내 경기를 아직 안 친 내 차례 대진 · `*-postseason-next` 내 시리즈를
+이기고 돌아온 다음 라운드 대진 · `*-postseason-champion` 내 팀이 한국시리즈를 이긴 끝난 대진)과 국가대항전 한국 우승 대진판(`*-cup-win`)을 더 떴다.
+세션 난수를 안 건드리고 뜨기만 해서 다른 픽스처는 그대로다. 타자편 씨앗 4 는 13년 내내 한국이 대회를 못 이겨 `nari-cup-win` 만 씨앗 5 로 한 판 더
+돌린다(`SOAK_FIXTURE_NARI_CUP_WIN_SEED`).
+저장 꼴이 바뀌어 장면이 깨지면 다시 뜬다 (약 30초, 같은 씨앗이면 같은 파일):
 
 ```sh
 yarn e2e:fixtures                        # = SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx
@@ -95,6 +104,15 @@ r249 — 저장 꼴이 늘었다(타자편 `midSeasonEvaluatedYears` · 두 편 
 `nari-hall-of-fame` 동작이 서지 않았다. 타자편 기본 씨앗을 **4**(1위 진입 팝업 · 13년차 엔딩 4)로 옮겨 다섯 개를 다시 떴다.
 다시 뜬 뒤에는 `smoke` 뿐 아니라 `yarn e2e:hits <그 장면들>` 로 연 상태 동작까지 서는지 본다 — 닿는 자리는 같아도 판 내용(순위 · 엔딩 번호)이 달라질 수 있다.
 개발 서버가 떠 있는 동안 픽스처를 다시 뜨면 HMR 로 쪽이 다시 실려 그때 돌던 hits 가 엉뚱하게 깨진다. `--mode e2e` 빌드는 빌드 때의 픽스처를 굳혀 두므로 다시 빌드한다.
+
+### 팝업이 판 가운데인지 (r254)
+
+```sh
+E2E_PORT=5670 yarn node e2e/popup-center.mjs        # 우승 팀 발표 · 한국시리즈 우승 · 국가대항전 우승 팝업 × chromium · webkit 아이폰 세로 · 가로
+```
+
+알림 상자(role dialog '알림')의 중심을 원본 판 중심과 Playwright `boundingBox`(화면 좌표)로 견준다. 원본 1px 넘게 벗어나거나 폭이 240 이 아니면 끝 코드 1.
+스크린샷은 `e2e/.run/popup-<장면>-<기기>.png`. r254 실측: 18/18 모두 dx 0 · dy 0 · 폭 240 (배율 2 · 1.625 · 1.212).
 
 ## 4. 브라우저 시험 (실제 CSS · z-index · zoom)
 
@@ -111,7 +129,7 @@ jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
 
 ```sh
-yarn e2e:hits                                   # 장면 36개 × 기기 넷, 약 8분 (서버가 없으면 띄우고 끝에 끈다)
+yarn e2e:hits                                   # 장면 46개 × 기기 넷, 약 9분 (서버가 없으면 띄우고 끝에 끈다)
 yarn e2e:hits general-bat derby-start           # 장면만 골라
 E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
 E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)
@@ -150,7 +168,7 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|soakFixtures|SOAK' dist || echo clean
+yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK' dist || echo clean
 ```
 
 ## 전체 회귀 (`yarn e2e:all`)

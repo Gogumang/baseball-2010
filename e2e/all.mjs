@@ -28,7 +28,7 @@ const PORTS = { dev: BASE_PORT, e2e: BASE_PORT + 1, deploy: BASE_PORT + 2 }
 
 /** README 「배포 빌드에 안 들어가는지」 와 같은 낱말 */
 const LEAK_PATTERN =
-  '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|soakFixtures|SOAK'
+  '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK'
 
 mkdirSync(RUN, { recursive: true })
 const ownedServers = []

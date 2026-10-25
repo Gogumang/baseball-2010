@@ -233,6 +233,42 @@ const CLOSE_CUP_ENTRY_POPUPS = keyUntil(
   10000,
 )
 
+/** 대진 128 위에 뜬 팝업 (타자편 화면 · 투수편 세션) — 없으면 null */
+const postseasonPopupOf = (h: SceneHandles): string | null => {
+  if (h.screen.kind === '포스트시즌') return h.screen.popup?.kind ?? null
+  if (h.screen.kind === '투수편' && h.pitcher.scene === '포스트시즌') return h.pitcher.postseasonPopup?.kind ?? null
+  return null
+}
+
+/**
+ * 내 시리즈 차례인 대진 128 에서 [다음](키 0x13da0 — 내 차례면 142) → 142 경기 준비 [확인] → 144 → 경기 장면 인트로를 OK 로 넘긴다.
+ * `isStarted`(타자편 첫 내 타석 · 투수편 첫 구질 고르기 0xf)가 서면 더 누르지 않는다(타석 · 구질 고르기의 OK 를 먹지 않게)
+ */
+const POSTSEASON_GAME_START = (isPrepare: (h: SceneHandles) => boolean, isStarted: (h: SceneHandles) => boolean): readonly SceneStep[] => [
+  wait(600),
+  keyUntil('Enter', '142 경기 준비', isPrepare, 700, 10000),
+  wait(900),
+  keyUntil('Enter', '포스트시즌 경기 시작', isStarted, 400, 90000),
+  wait(300),
+]
+
+/** 끝난 대진(내 팀 우승)에서 [다음] → StrMODE[137] 우승 팀 발표(팝업 7) — `korean` 이면 OK 로 닫아 StrMODE[190] 내 팀 우승(팝업 8)까지 */
+const POSTSEASON_CHAMPION = (korean: boolean): readonly SceneStep[] => [
+  wait(600),
+  keyUntil('Enter', '우승 팀 발표 팝업 7 (StrMODE[137])', (h) => postseasonPopupOf(h) === '우승발표', 700, 10000),
+  ...(korean ? [wait(700), keyUntil('Enter', '한국시리즈 우승 팝업 8 (StrMODE[190])', (h) => postseasonPopupOf(h) === '한국시리즈우승', 700, 10000)] : []),
+  wait(900),
+]
+
+/** 대회가 끝난 대진판(진입 팝업 닫음)에서 확인(0x19fdc) → 결과 팝업 0x25 */
+const CUP_RESULT_POPUP: readonly SceneStep[] = [
+  wait(600),
+  CLOSE_CUP_ENTRY_POPUPS,
+  wait(600),
+  keyUntil('Enter', '국가대항전 결과 팝업 0x25', messageBoxHas('확인'), 700, 10000),
+  wait(900),
+]
+
 /** 엔딩 141 이 선 뒤 — 연말 · 은퇴 이벤트(114)를 OK 로 넘긴다(선택지는 처음 커서). 엔딩 화면이 서면 멈춘다 */
 const EVENT_TO_ENDING = (isEnding: (h: SceneHandles) => boolean): readonly SceneStep[] => [
   keyUntil('Enter', '엔딩 141', isEnding, 300, 90000),
@@ -531,5 +567,76 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
       keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000),
       wait(600),
     ],
+  },
+  // r254 — 사람 팀이 포스트시즌 시리즈를 직접 치르는 길 · 한국시리즈 우승 팝업 · 국가대항전 한국 우승 (soak 픽스처)
+  'nari-postseason-game': {
+    description: '나리 타자편 포스트시즌 내 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기 첫 내 타석 (soak 픽스처)',
+    fixture: 'nari-postseason-game',
+    seed: 1,
+    steps: [
+      ...toNariResume('포스트시즌'),
+      // 타자편 경기 화면(`GameRoute`)은 들여다보기 칸이 없다 — 내 타석(터치 상황 버튼 번트 '8')이 서면 멈춘다(돌발미션 장면과 같은 표지)
+      ...POSTSEASON_GAME_START((h) => h.screen.kind === '경기준비', (h) => h.screen.kind === '경기' && offersHave('번트')()),
+    ],
+  },
+  'nari-postseason-next': {
+    description: '나리 타자편 포스트시즌 내 시리즈가 끝나고 다음 라운드 — 7년차 준플레이오프를 이기고 116 → 114 → 128 로 돌아온 플레이오프 대진 (soak 픽스처)',
+    fixture: 'nari-postseason-next',
+    seed: 1,
+    steps: [...toNariResume('포스트시즌'), wait(900)],
+  },
+  'nari-postseason-champion': {
+    description: '나리 타자편 포스트시즌 끝 — 내 팀이 한국시리즈를 이긴 대진 [다음] → StrMODE[137] 우승 팀 발표 팝업 7 (soak 픽스처)',
+    fixture: 'nari-postseason-champion',
+    seed: 1,
+    steps: [...toNariResume('포스트시즌'), ...POSTSEASON_CHAMPION(false)],
+  },
+  'nari-korean-series': {
+    description: '나리 타자편 한국시리즈 우승 — 우승 팀 발표 팝업 7 을 OK 로 닫아 StrMODE[190] 내 팀 우승 팝업 8 (soak 픽스처)',
+    fixture: 'nari-postseason-champion',
+    seed: 1,
+    steps: [...toNariResume('포스트시즌'), ...POSTSEASON_CHAMPION(true)],
+  },
+  'nari-cup-win': {
+    description: '나리 타자편 국가대항전 한국 우승 — 대회가 끝난 대진판 확인 → 결과 팝업 0x25 (soak 픽스처, 씨앗 5 판)',
+    fixture: 'nari-cup-win',
+    seed: 1,
+    steps: [...toNariResume('국가대항전'), ...CUP_RESULT_POPUP],
+  },
+  'pitcher-postseason-game': {
+    description: '나리 투수편 포스트시즌 내 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기 첫 구질 고르기 0xf (soak 픽스처)',
+    fixture: 'pitcher-postseason-game',
+    seed: 1,
+    steps: [
+      ...toPitcherResume('포스트시즌'),
+      ...POSTSEASON_GAME_START(
+        (h) => h.screen.kind === '투수편' && h.pitcher.scene === '경기준비',
+        (h) => h.screen.kind === '투수편' && h.pitcher.scene === '경기' && pitcherGameIs((peek) => peek.isPitchSlotPickerShown)(),
+      ),
+    ],
+  },
+  'pitcher-postseason-next': {
+    description: '나리 투수편 포스트시즌 내 시리즈가 끝나고 다음 라운드 — 6년차 준플레이오프를 이기고 돌아온 플레이오프 대진 (soak 픽스처)',
+    fixture: 'pitcher-postseason-next',
+    seed: 1,
+    steps: [...toPitcherResume('포스트시즌'), wait(900)],
+  },
+  'pitcher-postseason-champion': {
+    description: '나리 투수편 포스트시즌 끝 — 내 팀이 한국시리즈를 이긴 대진 [다음] → StrMODE[137] 우승 팀 발표 팝업 7 (soak 픽스처)',
+    fixture: 'pitcher-postseason-champion',
+    seed: 1,
+    steps: [...toPitcherResume('포스트시즌'), ...POSTSEASON_CHAMPION(false)],
+  },
+  'pitcher-korean-series': {
+    description: '나리 투수편 한국시리즈 우승 — 우승 팀 발표 팝업 7 을 OK 로 닫아 StrMODE[190] 내 팀 우승 팝업 8 (soak 픽스처)',
+    fixture: 'pitcher-postseason-champion',
+    seed: 1,
+    steps: [...toPitcherResume('포스트시즌'), ...POSTSEASON_CHAMPION(true)],
+  },
+  'pitcher-cup-win': {
+    description: '나리 투수편 국가대항전 한국 우승 — 3년차 대회가 끝난 대진판 확인 → 결과 팝업 0x25 (soak 픽스처)',
+    fixture: 'pitcher-cup-win',
+    seed: 1,
+    steps: [...toPitcherResume('국가대항전'), ...CUP_RESULT_POPUP],
   },
 }
