@@ -14,13 +14,15 @@ import type { EventReward } from '@/entities/story/model/eventReward'
  *   trigger   0 관리 화면 · 1 외출 지도 진입 · 2~6 장소(event_map 프레임 1~5 + 1: 경기장·번화가·병원·학교·방송국)
  *             — 장소마다 대사 내용이 그 장소 인물(병원=메디카, 방송국=발렌타인…)이라 맞춘 것이다
  *   audience  0 코드가 직접 부름(분기·평가·엔딩) · 1 공통 · 2 타자 · 3 투수 → 타자편은 1·2 만
- *   날짜 창   [연차, 경기 번호] 범위. [0,0]~[0,0] 이면 언제든. 경기 번호는 "다음 경기" 로 본다 (추정)
+ *   날짜 창   [연차, 경기 번호] 범위 — 네 바이트 중 하나라도 0 이면 언제든 (`isInDateWindow`, 0xacfbc 7번)
  *   requiresEvent 이 이벤트를 본 뒤에만
- *   조건      (switch 0xd83a0, 점검 에이전트 확인) 0~3 능력치 ≥ 값(0~999) · 18 인기도 ≥ 값 ·
- *             19 평판 ≥ 값 · 22 질병 확률(0xadb32 — 선수 +5 질병 중이면 불발) · 24 이벤트를 봤다 · 25 아직 안 봤다.
+ *   조건      (switch 0xad1ba · 점프표 0xd83a0, r253 직접 떴다) — 값 v 는 s16 (0xacd80):
+ *             0~3 기본 능력치(0xb6414(레코드, 종류, 0) — 히트·파워·수비·주루, 장비·스킬 보정 전) · 18 인기도(0xb6e78) ·
+ *             19 평판(+0x62) — 셋 다 v ≥ 0 이면 `값 ≥ v`, v < 0 이면 `값 < |v|` ·
+ *             20/21 스킬 v−1 획득/해제 (`skillCondition`) · 22 질병 확률(0xadb32 — 선수 +5 질병 중이면 불발) ·
+ *             23 질병 중 rand(0, 100) ≤ 9 (0xadbe6, 데이터 미사용) · 24 v ≤ 0 이거나 이벤트 v 를 봤다 · 25 v ≤ 0 이거나 아직 안 봤다 ·
+ *             **4~17 · 26 이상은 통과**(점프표 칸 0xadc34 · 0xad1bc `cmp r7, #0x19 ; bls` 밖도 0xadc34).
  *             질병 쿨다운(+0x7c)은 조건 22 가 아니라 판정 머리(②, `isIllnessCooldownBlocked`)가 본다.
- *             20/21 은 스킬 v−1 획득/해제 조건(세부 표 0xd8408·0xd8454 미해독)이라 아직 띄우지 않는다.
- *             능력치 0~3 의 순서는 StrMODE 순서(히트·파워·수비·주루)로 둔다 — 추정
  * 본 이벤트는 반복 이벤트까지 모두 막힌다 (0xacf30). 반복 이벤트의 본 표시는 나리 장면이 **새로 설 때마다**(셋업 0xf684 의
  * fb1c `0x8ce94` → `0xacf60`) 풀린다 — 이어하기 · 경기 뒤 · 마선수 대결 뒤 (`forgetRepeatableEvents`).
  */
@@ -36,7 +38,7 @@ export const OPENING_EVENT_ID = 451
 
 const BATTER_AUDIENCES: ReadonlySet<number> = new Set([1, 2])
 
-const CONDITION = { 인기도: 18, 평판: 19, 스킬획득: 20, 스킬해제: 21, 질병: 22, 봤음: 24, 안봤음: 25 } as const
+const CONDITION = { 인기도: 18, 평판: 19, 스킬획득: 20, 스킬해제: 21, 질병: 22, 아플때: 23, 봤음: 24, 안봤음: 25 } as const
 const ABILITY_CONDITIONS = ['hit', 'power', 'defense', 'run'] as const
 
 /** 유리몸 — 질병 확률 +10 (0xadb32) */
@@ -136,19 +138,30 @@ function isInDateWindow(event: OriginalEvent, career: PlayerCareer): boolean {
   return now >= from && now <= to
 }
 
+/**
+ * 0~3 · 18 · 19 의 견주기 (0xad1e0~0xad20e · 0xad212~0xad23e) — v ≥ 0 이면 `값 ≥ v`, v < 0 이면 `값 < |v|`.
+ * 원본 데이터에는 음수 값이 없다
+ */
+const meetsSigned = (actual: number, value: number) => (value >= 0 ? actual >= value : actual < -value)
+
+/** 조건 23 의 문턱 — rand(0, 100) ≤ 9 면 통과 (0xadc02 `cmp r0, #9 ; ble`) */
+const SICK_EVENT_ROLL_MAX = 9
+
 function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: RandomPort | undefined): boolean {
   return event.conditions.every((condition) => {
     const ability = ABILITY_CONDITIONS[condition.type]
-    if (ability !== undefined) return career.ability[ability] >= condition.value
+    if (ability !== undefined) return meetsSigned(career.ability[ability], condition.value)
     switch (condition.type) {
       case CONDITION.인기도:
-        return career.popularity >= condition.value
+        return meetsSigned(career.popularity, condition.value)
       case CONDITION.평판:
-        return career.reputation >= condition.value
+        return meetsSigned(career.reputation, condition.value)
       case CONDITION.봤음:
-        return hasSeen(career, condition.value)
+        // 0xadc0c — v ≤ 0 이면 곧 통과
+        return condition.value <= 0 || hasSeen(career, condition.value)
       case CONDITION.안봤음:
-        return !hasSeen(career, condition.value)
+        // 0xadc22 — v ≤ 0 이면 곧 통과
+        return condition.value <= 0 || !hasSeen(career, condition.value)
       case CONDITION.스킬획득:
         return meetsSkillAcquireCondition(career, condition.value, random)
       case CONDITION.스킬해제:
@@ -157,8 +170,13 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
         // 0xadb32 — 선수 +5(질병 중)만 본다. 쿨다운은 판정 머리 ②(`isIllnessCooldownBlocked`)
         if (random === undefined || career.isSick) return false
         return random.rand(0, PERCENT) < illnessChanceOf(career.morale, career.skillIds, career.equippedSkillIds)
+      case CONDITION.아플때:
+        // 0xadbe6 — (모드 2 면 불발) 질병 중이 아니면 불발, 이어서 rand(0, 100) ≤ 9. 원본 데이터는 이 조건을 안 쓴다
+        if (random === undefined || !career.isSick) return false
+        return random.rand(0, PERCENT) <= SICK_EVENT_ROLL_MAX
       default:
-        return false
+        // 4~17 · 26 이상 — 0xadc34(다음 조건)로 곧장 간다
+        return true
     }
   })
 }
