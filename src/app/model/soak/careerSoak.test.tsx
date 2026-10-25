@@ -108,6 +108,9 @@ import {
 
 setActiveSound(createSilentSound())
 
+/** MVP 발표 375 · 결과 376/377 (0x8b370) */
+const MVP_EVENT_IDS = [375, 376, 377]
+
 /** 나리 타자편 모드 번호 (`App` 의 NARI_BATTER_MODE) */
 const NARI_BATTER_MODE = 4
 /** 타석 화면의 압도 스킬 번호 (`GameRoute` 의 INTIMIDATE_SKILL_ID) */
@@ -389,6 +392,12 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     paths[path] = (paths[path] ?? 0) + 1
   }
   const log: string[] = []
+  /**
+   * 끝낸 MVP 발표(375) · 결과(376/377) 장면 수 — (시즌 · 포스트시즌 자리)마다. 원본은 정규시즌 끝에 한 번, 그리고 **내 시리즈가
+   * 끝난 경기마다** 116 끝(0x12b74)이 L+0x32 == 0 을 보고 136 부터 사슬을 다시 돌아 375 → 376/377 이 보상째 또 나온다
+   * (0xb7724 b777a L+0x32 = −1 → 하루 끝 0xb818c +1 → 0). 그래서 한 해 두 번 이상은 원본이고, **같은 자리에서 두 번**만 문제다
+   */
+  const mvpScenes = new Map<string, number>()
   let steps = 0
   let trainingSlot = 0
   let managementVisits = 0
@@ -1009,6 +1018,15 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           if (playback.match !== null && extras) {
             startAceMatch(playback.match, { rewards, viewedEventIds: viewed }, context)
             break
+          }
+          for (const id of playback.viewed.filter((viewedId) => MVP_EVENT_IDS.includes(viewedId))) {
+            const series = career?.postseason
+            const spot = series === null || series === undefined ? '정규' : `${series.round}:${series.teams.join(',')}:${series.wins.join(',')}`
+            const mvpKey = `${career?.season}:${spot}:${id}`
+            const count = (mvpScenes.get(mvpKey) ?? 0) + 1
+            mvpScenes.set(mvpKey, count)
+            if (count > 1) problems.add(where(), [`${career?.season}년차 ${spot} 자리에서 MVP 이벤트 ${id} 를 ${count}번째 끝냈다`])
+            if (id === 375) log.push(`${career?.season}년차 MVP 발표(${spot})`)
           }
           act(() => result.current.session.actions.completeScene(rewards, viewed, playback.endingEventId))
           break
