@@ -113,8 +113,9 @@ export function attendanceOf(record: SeasonRecord, input: AttendanceInput): Atte
   const base = Math.trunc((Math.trunc(attendance / 20) * 15) / 1000)
   const income = clampTo(base + (record.storeGames > 0 ? STORE_INCOME_BONUS : 0), MONEY_LIMIT)
 
-  // 만원 판정 SR+0x65 — 수용의 80% 이상이면 2, 35% 를 넘으면 1 (유력: 관중 그림 단계)
-  const crowdLevel = attendance >= capacity * 0.8 ? 2 : attendance > capacity * 0.35 ? 1 : 0
+  // 만원 판정 SR+0x65 (a3690~a36ca, r260 다시 뜸) — 관중 ≥ 수용×80/100 이면 2, > 수용×35/100 이면 1, 그 밖 0 (정수 나눗셈)
+  const crowdLevel =
+    attendance >= Math.trunc((capacity * 80) / 100) ? 2 : attendance > Math.trunc((capacity * 35) / 100) ? 1 : 0
 
   return { attendance, income, crowdLevel }
 }

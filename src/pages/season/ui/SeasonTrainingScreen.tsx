@@ -58,7 +58,8 @@ interface TrainingPopup {
  * 칸 4 지옥훈련: G < 500           → [65]                         (2,2) — 예는 G 충전 페이지 0xfa (이식 대상 아님)
  *               능력치 > 998 인 칸마다 sprintf([192], [44+i]) + "!N" 을 이어 붙인다
  *               넷 다 최대          → 그 글                         (1,1)
- *               그 밖              → 그 글 + [141]                 (2,0x12)
+ *               하나 이상 최대     → 그 글 + "!N" + [141]          (2,0x12) — 922e 가 "!N" 을 한 번 더 붙인다
+ *               최대 없음          → [141]                        (2,0x12)
  * 칸 0~3: 그 칸 > 998              → sprintf([192], [44+칸])       (1,1)
  *         그 밖                    → sprintf([85], [44+칸])        (2,0x11)
  * ```
@@ -79,7 +80,10 @@ function trainingPopupOf(
       .map((value, slot) => (value > TRAINING_GUARD_CEILING ? `${maxedLineOf(slot)}!N` : ''))
       .join('')
     if (!checked.ok) return { text: maxed, asks: false, trainIndex: null }
-    return { text: maxed + (ORIGINAL_MODE_TEXT[TEXT.지옥훈련확인] ?? ''), asks: true, trainIndex: index }
+    // 일부만 최대면 목록 뒤에 "!N" 을 한 번 더 붙이고 [141] 을 잇는다 (922e strcat(buf, "!N") → 9248 strcat(buf, [141]))
+    // — 목록과 질문 사이에 빈 줄 하나. 최대가 없으면 [141] 만 (9256)
+    const gap = maxed === '' ? '' : '!N'
+    return { text: maxed + gap + (ORIGINAL_MODE_TEXT[TEXT.지옥훈련확인] ?? ''), asks: true, trainIndex: index }
   }
   if (!checked.ok) return { text: maxedLineOf(index), asks: false, trainIndex: null }
   return {

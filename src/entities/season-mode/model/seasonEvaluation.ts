@@ -73,7 +73,11 @@ const kindOf = (flags: CompleteGameFlags): CompleteGameKind => {
   return '완투'
 }
 
-/** 퍼펙트로 치는 아웃 수 상한 — 인기도식에만 있다 (`아웃 ≤ 27`) */
+/**
+ * 퍼펙트로 치는 아웃 수 상한 (`아웃 ≤ 27`) — 인기도식(a67d0 `cmp r0, #0x1b ; bhi`)과 평판식(a703a 같은 비교) **둘 다** 본다.
+ * 넘으면 노히트 칸으로 떨어진다. (예전 주석은 "인기도식에만" 이라 적었다 — r260 에서 0xa6f1c 를 다시 떠 고쳤다.
+ * 평판식은 아웃이 정규 마지막 이닝×3+3 = 27 일 때만 와서 값은 같다.)
+ */
 export const PERFECT_OUT_LIMIT = 27
 
 /** 인기도용 완투 판정 (`아웃 == 현재이닝×3+3`, 퍼펙트는 아웃 ≤ 27 도 봐야 한다) */
@@ -88,13 +92,16 @@ export function popularityCompleteGameOf(
   return kind
 }
 
-/** 평판용 완투 판정 (`아웃 == 정규 마지막 이닝×3+3`) */
+/** 평판용 완투 판정 (`아웃 == 정규 마지막 이닝×3+3`, 퍼펙트는 아웃 ≤ 27 도 — a7014 · a703a) */
 export function reputationCompleteGameOf(
   outs: number,
   lastRegularInningIndex: number,
   flags: CompleteGameFlags,
 ): CompleteGameKind {
-  return outs === lastRegularInningIndex * 3 + 3 ? kindOf(flags) : null
+  if (outs !== lastRegularInningIndex * 3 + 3) return null
+  const kind = kindOf(flags)
+  if (kind === '퍼펙트' && outs > PERFECT_OUT_LIMIT) return '노히트'
+  return kind
 }
 
 /**
