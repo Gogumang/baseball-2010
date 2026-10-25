@@ -85,6 +85,43 @@ const ACTIONS = {
   'mission-pitch': [
     { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
   ],
+  // r236 — soak 픽스처 장면(시즌 엔딩 · 나리 포스트시즌 · 국가대항전 · 엔딩 · 명예의 전당)
+  'season-ending': [
+    // 엔딩 0xf5 의 키 0x6b3c — 저장의 보너스 칸(SR+0x7b)이 서 있어 팝업 없이 관리 메뉴 0xc9 로 (시즌모드는 등록 질문이 없다)
+    { name: '엔딩 키 → 관리 메뉴', steps: ['Enter', 'w1500'], expect: '다음경기' },
+  ],
+  'nari-postseason': [
+    // 128 진입 팝업(0xbbef9)을 닫으면 대진판 [다음] 이 선다
+    { name: '진입 팝업 닫기 → 대진판', steps: ['@OK', 'w600'], expect: '다음' },
+  ],
+  'pitcher-postseason': [
+    { name: '진입 팝업 닫기 → 대진판', steps: ['@OK', 'w600'], expect: '다음' },
+  ],
+  'nari-cup': [
+    // 134 진입 팝업 — 히든 팀 열림(StrCOMMON[138]) 다음에 칭호 8 "국가 대표" 창
+    { name: '히든 팀 팝업 닫기 → 칭호 창', steps: ['@확인', 'w700'], expect: '칭호' },
+  ],
+  'pitcher-cup': [
+    { name: '히든 팀 팝업 닫기 → 대진판', steps: ['@확인', 'w700'], expect: '국가대항전 대진' },
+  ],
+  'pitcher-cup-result': [
+    // 대회가 끝난 대진판 확인(0x19fdc) → 결과 팝업 0x25 (탈락이면 보상 없이 [확인] 이 대회를 끝낸다)
+    { name: '대진판 확인 → 결과 팝업', steps: ['Enter', 'w700'], expect: '알림' },
+  ],
+  'nari-ending': [
+    // 키 0x1220c — 단계 1 의 키가 제작진으로, 제작진의 키가 보너스 팝업 0x2b
+    { name: '엔딩 키 → 제작진 → 보너스 팝업', steps: ['Enter', 'w2500', 'Enter', 'w800'], expect: 'OK' },
+  ],
+  'pitcher-ending': [
+    { name: '엔딩 키 → 제작진 → 보너스 팝업', steps: ['Enter', 'w2500', 'Enter', 'w800'], expect: 'OK' },
+  ],
+  'nari-hall-of-fame': [
+    // 등록 질문 0x2d [예] → 상태 145 명예의 전당 등록 목록
+    { name: '등록 질문 예 → 등록 목록', steps: ['@예', 'w800'], expect: '1번 슬롯' },
+  ],
+  'pitcher-hall-of-fame': [
+    { name: '등록 질문 예 → 등록 목록', steps: ['@예', 'w800'], expect: '1번 슬롯' },
+  ],
 }
 
 /** 기본 상태에서 서 있어야 할 것 — 안 서면 자리가 멈춘 뒤 한 번 더 본다 */
@@ -96,6 +133,8 @@ const SCENE_NAMES = [
   'title', 'main-menu', 'nari-new', 'pitcher-new', 'season-new', 'nari-management', 'nari-outing', 'pitcher-management',
   'season-management', 'season-outing', 'general-quick', 'general-bat', 'general-pitch', 'general-defense', 'derby-pick', 'derby-start',
   'nari-burst-result', 'pitcher-pitch', 'pitcher-defense', 'general-relay', 'mission-bat', 'mission-pitch', 'mission-result', 'season-postseason', 'season-cup',
+  'season-ending', 'nari-postseason', 'nari-cup', 'nari-ending', 'nari-hall-of-fame', 'pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result',
+  'pitcher-ending', 'pitcher-hall-of-fame',
 ]
 
 const argScenes = process.argv.slice(2)

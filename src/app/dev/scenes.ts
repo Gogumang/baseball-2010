@@ -196,6 +196,49 @@ const TO_GENERAL_GAME: readonly SceneStep[] = [
   keyUntil('Enter', '인트로 OK', teamGameIs((peek) => peek.isIntroDone), 300, 15000),
 ]
 
+/**
+ * 나리 타자편 이어하기 — [14] 타자편 답(`onNewGame('타자편')`)의 `continueSaved`(0x1c154)가 저장의 S+0x50 · 대회 칸 · 엔딩 칸으로
+ * 고른 자리까지 (soak 픽스처 — `src/app/model/soak/soakFixtures.test.tsx`)
+ */
+const toNariResume = (kind: SceneHandles['screen']['kind']): readonly SceneStep[] => [
+  call('타자편 이어하기 (onNewGame 타자편)', (h) => {
+    h.setLastPlayedMode(MODE.타자편)
+    h.career.actions.continueSaved()
+  }),
+  screenIs(kind),
+]
+
+/** 나리 투수편 들어가기 — 투수 저장의 이어할 자리(`pitcherResumePointOf`)가 고른 장면까지 */
+const toPitcherResume = (scene: SceneHandles['pitcher']['scene']): readonly SceneStep[] => [
+  call('투수편 들어가기 (onNewGame 투수편)', (h) => {
+    h.setLastPlayedMode(MODE.투수편)
+    h.setScreen({ kind: '투수편' })
+  }),
+  until(`투수편 ${scene}`, (h) => h.screen.kind === '투수편' && h.pitcher.scene === scene),
+]
+
+/** 지금 뜬 알림 상자(`MessageBox` — role dialog '알림')에 그 이름의 단추가 있는가 */
+const messageBoxHas = (button: string) => () =>
+  document.querySelector(`[role="dialog"][aria-label="알림"] button[aria-label="${button}"]`) !== null
+
+/**
+ * 134 진입 팝업(히든 팀 열림 · 칭호 8)을 OK 로 닫는다 — 대진판의 확인 칸(`NationalCupBracket` — 팝업이 다 닫혀야 선다)이 서면 멈춘다.
+ * 대진판 확인 자체는 누르지 않는다
+ */
+const CLOSE_CUP_ENTRY_POPUPS = keyUntil(
+  'Enter',
+  '134 진입 팝업 닫힘',
+  () => document.querySelector('[role="group"][aria-label="국가대항전 대진"] button[aria-label="확인"]') !== null,
+  700,
+  10000,
+)
+
+/** 엔딩 141 이 선 뒤 — 연말 · 은퇴 이벤트(114)를 OK 로 넘긴다(선택지는 처음 커서). 엔딩 화면이 서면 멈춘다 */
+const EVENT_TO_ENDING = (isEnding: (h: SceneHandles) => boolean): readonly SceneStep[] => [
+  keyUntil('Enter', '엔딩 141', isEnding, 300, 90000),
+  wait(1500),
+]
+
 export const SCENES: Readonly<Record<string, SceneDefinition>> = {
   title: {
     description: '타이틀 (켤 때 길: 이용안내 → 로고 → 타이틀)',
@@ -414,5 +457,73 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     description: '홈런더비 시작 — 나리 타자를 골라 첫 공 앞 (1/10)',
     fixture: 'nari-y1',
     steps: [...TO_DERBY_PICK, key('Enter'), until('더비 타석 0xe (첫 공 앞)', () => scenePeeksNow().homeRunDerby?.acceptsConfirm === true, 15000), wait(500)],
+  },
+  'season-ending': {
+    description: '시즌모드 10년차 엔딩 0xf5 — 저장 phase 6(엔딩)이라 진입 분기 0xcb 가 곧장 엔딩으로 (soak 픽스처)',
+    fixture: 'season-ending',
+    seed: 1,
+    steps: [...toSeasonState(0xf5, '시즌 엔딩 0xf5'), wait(1500)],
+  },
+  'nari-postseason': {
+    description: '나리 타자편 포스트시즌 128 시작 — 1년차 45경기 뒤 준플레이오프 대진 (이어하기가 128 진입 0x120a4 를 다시 밟는다, soak 픽스처)',
+    fixture: 'nari-postseason',
+    seed: 1,
+    steps: [...toNariResume('포스트시즌'), wait(900)],
+  },
+  'nari-cup': {
+    description: '나리 타자편 국가대항전 134 진입 대진판 — 그 앞 연말 이벤트(380 연봉 → 대표 선발) 저장의 이어하기를 OK 로 넘겨 134 (히든 팀 · 칭호 8 팝업, soak 픽스처)',
+    fixture: 'nari-cup',
+    seed: 1,
+    steps: [...toNariResume('이벤트'), keyUntil('Enter', '국가대항전 134', (h) => h.screen.kind === '국가대항전', 300, 60000), wait(900)],
+  },
+  'nari-ending': {
+    description: '나리 타자편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 연말 · 은퇴 이벤트 114 로 가고 OK 로 넘겨 141 (soak 픽스처)',
+    fixture: 'nari-ending',
+    seed: 1,
+    steps: [...toNariResume('이벤트'), ...EVENT_TO_ENDING((h) => h.screen.kind === '엔딩')],
+  },
+  'nari-hall-of-fame': {
+    description: '나리 타자편 명예의 전당 등록 질문 0x2d — 보너스 뒤 저장의 이어하기가 141 로 곧장, 키로 제작진 → 등록 질문 (soak 픽스처)',
+    fixture: 'nari-hall-of-fame',
+    seed: 1,
+    steps: [
+      ...toNariResume('엔딩'),
+      keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000),
+      wait(600),
+    ],
+  },
+  'pitcher-postseason': {
+    description: '나리 투수편 포스트시즌 128 시작 — 1년차 45경기 뒤 준플레이오프 대진 (soak 픽스처)',
+    fixture: 'pitcher-postseason',
+    seed: 1,
+    steps: [...toPitcherResume('포스트시즌'), wait(900)],
+  },
+  'pitcher-cup': {
+    description: '나리 투수편 국가대항전 134 진입 대진판 — 저장의 대회 칸으로 들어서 히든 팀 팝업이 뜬 자리 (soak 픽스처)',
+    fixture: 'pitcher-cup',
+    seed: 1,
+    steps: [...toPitcherResume('국가대항전'), wait(900)],
+  },
+  'pitcher-cup-result': {
+    description: '나리 투수편 국가대항전 134 — 대회가 끝난 대진판, 진입 팝업(히든 팀)을 닫은 자리 (OK 가 결과 팝업 0x25, soak 픽스처)',
+    fixture: 'pitcher-cup-result',
+    seed: 1,
+    steps: [...toPitcherResume('국가대항전'), wait(600), CLOSE_CUP_ENTRY_POPUPS, wait(600)],
+  },
+  'pitcher-ending': {
+    description: '나리 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장으로 들어서 은퇴 이벤트 114 를 OK 로 넘겨 141 (soak 픽스처)',
+    fixture: 'pitcher-ending',
+    seed: 1,
+    steps: [...toPitcherResume('이벤트'), ...EVENT_TO_ENDING((h) => h.screen.kind === '투수편' && h.pitcher.scene === '엔딩')],
+  },
+  'pitcher-hall-of-fame': {
+    description: '나리 투수편 명예의 전당 등록 질문 0x2d — 보너스 뒤 저장으로 141 에 곧장, 키로 제작진 → 등록 질문 (soak 픽스처)',
+    fixture: 'pitcher-hall-of-fame',
+    seed: 1,
+    steps: [
+      ...toPitcherResume('엔딩'),
+      keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000),
+      wait(600),
+    ],
   },
 }

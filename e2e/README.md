@@ -32,6 +32,12 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `mission-bat` · `mission-pitch` | 타자 미션 1 첫 타석 0xe · 투수 미션 3 구질 고르기 (미션 선수 고르기 → 나리 선수 → [61] 예, 약 2초) | `nari-y1` · `pitcher-y1` |
 | `mission-result` | 투수 미션 3 결과 판 0x19 — 10구 제한까지 OK 만 되풀이 (약 55초) | `pitcher-y1` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
+| `season-ending` | 시즌모드 10년차 엔딩 0xf5 (저장 phase 6 → 진입 분기가 곧장 엔딩, 약 3초) | `season-ending` |
+| `nari-postseason` · `pitcher-postseason` | 나리 타자편 · 투수편 포스트시즌 128 시작 — 1년차 45경기 뒤 준플레이오프 대진, 진입 팝업이 뜬 자리 (약 2초) | `nari-postseason` · `pitcher-postseason` |
+| `nari-cup` | 나리 타자편 국가대항전 134 진입 대진판 + 히든 팀 팝업 — 그 앞 연말 이벤트(380) 저장의 이어하기를 OK 로 넘긴다 (약 12초) | `nari-cup` |
+| `pitcher-cup` · `pitcher-cup-result` | 나리 투수편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) | `pitcher-cup` · `pitcher-cup-result` |
+| `nari-ending` · `pitcher-ending` | 나리 타자편 · 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 은퇴 이벤트 114 로 가고 OK 로 넘긴다 (약 11초) | `nari-ending` · `pitcher-ending` |
+| `nari-hall-of-fame` · `pitcher-hall-of-fame` | 명예의 전당 등록 질문 0x2d — 보너스를 받은 저장으로 141 에 곧장 들어가 키로 제작진 → 질문 (약 3초) | `nari-hall-of-fame` · `pitcher-hall-of-fame` |
 | `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 이른 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 45초) | `nari-y1` + 씨앗 5 |
 
 G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/devOptions.ts` — vitest 밖에서는 켜짐) 때문에 늘 99999 로 보이고 써도 줄지 않는다. 실제로 깎이는 것을 볼 때는 주소에 `&real-gp`(또는 `&원본G`)를 붙인다.
@@ -47,7 +53,7 @@ G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 25개 × chromium · webkit 아이폰 (약 3분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs                  # 장면 35개 × chromium · webkit 아이폰 (약 4분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
@@ -67,6 +73,24 @@ kill "$(cat e2e/.run/drive.pid)"
 새로 뜨려면 drive 로 `{"scene":"nari-new"}` 부터 플레이한 뒤 `{"dump":"e2e/fixtures/<이름>.json","note":"…"}` 를 보낸다.
 손으로 짜지 않는다.
 
+### soak 로 뜬 픽스처 (r236)
+
+브라우저로 몇 시간 쳐야 닿는 자리는 화면 없이 세션 훅을 돌려 뜬다 — `src/app/model/soak/soakFixtures.test.tsx`.
+`season-ending` · `nari-postseason` · `nari-cup` · `nari-ending` · `nari-hall-of-fame` · `pitcher-postseason` · `pitcher-cup` ·
+`pitcher-cup-result` · `pitcher-ending` · `pitcher-hall-of-fame` 이 그것이다. r233 soak 하네스의 사람 흉내 정책으로 새 선수(팀)부터
+돌리고, 그 자리에 닿은 순간 앱의 실제 저장 모듈(`createLocalStorageSaveGame` · `createLocalStorageJsonStore`)이 jsdom localStorage 에
+쓴 칸을 그대로 뜬다. 뜬 뒤에는 픽스처 칸만 깐 새 세션으로 이어하기가 기대한 자리(장면 · 이벤트)로 가는지 본다.
+저장 꼴이 바뀌어 장면이 깨지면 다시 뜬다 (약 25초, 같은 씨앗이면 같은 파일):
+
+```sh
+yarn e2e:fixtures                        # = SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx
+SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 yarn vitest run src/app/model/soak/soakFixtures.test.tsx   # 쓰지 않고 닿는지만
+```
+
+⚠️ 나리 타자편은 134 에 선 뒤의 저장을 이어하면 134 가 아니라 392(연말 사슬)로 간다 — `resumePointOf` 가 S+0x12c(대회 칸)보다
+S+0xb4(끝난 포스트시즌 · g == 0)를 먼저 본다(투수편 `pitcherResumePointOf` 는 S+0x12c 가 먼저다). 그래서 `nari-cup` 은 그 앞 연말
+이벤트 저장으로 뜨고, 대회가 끝난 대진판(결과 팝업)은 투수편(`pitcher-cup-result`)으로 본다.
+
 ## 4. 브라우저 시험 (실제 CSS · z-index · zoom)
 
 ```sh
@@ -82,7 +106,7 @@ jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
 
 ```sh
-yarn e2e:hits                                   # 장면 25개 × 기기 넷, 약 6분 (서버가 없으면 띄우고 끝에 끈다)
+yarn e2e:hits                                   # 장면 35개 × 기기 넷, 약 8분 (서버가 없으면 띄우고 끝에 끈다)
 yarn e2e:hits general-bat derby-start           # 장면만 골라
 E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
 E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)
@@ -121,5 +145,5 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST' dist || echo clean
+yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|soakFixtures|SOAK' dist || echo clean
 ```

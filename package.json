@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "verify": "yarn typecheck && yarn test && yarn build",
     "test:browser": "vitest run --config vitest.browser.config.ts",
-    "e2e:hits": "node e2e/hits.mjs"
+    "e2e:hits": "node e2e/hits.mjs",
+    "e2e:fixtures": "SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx"
   },
   "dependencies": {
     "react": "^18.3.1",
