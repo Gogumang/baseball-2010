@@ -25,13 +25,19 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `pitcher-management` | 나리 투수편 관리 | `pitcher-y1` |
 | `season-management` · `season-outing` | 시즌 관리 메뉴 0xc9 · 외출 지도 0xd1 | `season-y1` |
 | `general-quick` | 일반모드 빠른실행 경기정보 (경기설정 창) | `general-bat` |
-| `general-bat` · `general-pitch` · `general-defense` | 일반모드 1회 타석 · 구질 고르기 · 타구 수비 (약 10~15초) | `general-bat` · `general-pitch` |
+| `general-bat` · `general-pitch` · `general-defense` | 일반모드 1회 타석 · 구질 고르기 · 타구 수비 (약 5~10초) | `general-bat` · `general-pitch` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
+
+경기 장면은 버튼 글자가 아니라 화면이 알리는 자리(`src/shared/lib/scenePeek` — 사람 타석 0xe · 구질 고르기 · 수비 판 · 더비 OK 대기)를 기다린다.
+진행기가 단계를 밟는 동안만 경기 로딩 판을 기다리지 않고, 인트로는 원본처럼 OK 로 넘긴다(난수 차례는 그대로).
+콘솔의 `net::ERR_FAILED` 는 도우미가 일부러 끊는 웹폰트 CDN(Galmuri)이다.
 
 스크립트에서 쓰는 도우미는 `e2e/lib/scene.mjs` 에 있다.
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
+yarn node e2e/smoke.mjs                  # 장면 16개 × chromium · webkit 아이폰 (약 1분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
 

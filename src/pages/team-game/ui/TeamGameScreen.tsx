@@ -1,6 +1,7 @@
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
@@ -116,6 +117,7 @@ import type {
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
+import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 import type { TeamGameSession } from '@/pages/team-game/model/useTeamGame'
 import { GAME_LOADING_PRELOADS } from '@/pages/team-game/lib/gameLoadingPreloads'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
@@ -796,6 +798,32 @@ function TeamGameScene({
     },
   })
 
+  /** 원본 화면에서 '#' 가 먹는가 — 0x4994a: 상태 0xe · 0xf, 교대 판 · 수비 판 · 팝업 · 내 공(0x11 · 0x12) 밖 (위 '#' 키 주석) */
+  const acceptsChangeKey =
+    changeWindow === null &&
+    !isSceneCovering &&
+    !isDefenseInPlay &&
+    !isMenuOpen &&
+    overlay === null &&
+    !(isAwaitingConfirm && !sceneConfirm.isInConfirmState) &&
+    !isPitchSceneBusy &&
+    // 조준(0x10) · 게이지(0x11)는 '#' 범위 밖 — 그 자리는 CLR 누름 칸이 쓴다
+    !(canPitch && phase !== '구질') &&
+    (session.canChangePitcher || session.canPinchHit)
+  // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
+  const isPitchSlotPickerShown = canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null
+  const defensePlaySide = isPlayKeyBlocked ? session.pendingDefensePlay?.side ?? progress.pendingRunnerPlay?.side ?? null : null
+  useEffect(() => {
+    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
+    publishScenePeek('teamGame', {
+      isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown,
+      defensePlaySide: defensePlaySide === '수비' || defensePlaySide === '공격' ? defensePlaySide : null,
+    })
+  }, [isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown, defensePlaySide])
+  useEffect(() => () => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('teamGame', null)
+  }, [])
+
   const game = progress.game
   // 점수판 틀 0x41440 의 두 측 — 사람 팀(우리) PLAYER · 상대 COM
   const scoreboardSides = humanVsComputerSidesOf(options.playerSide, options.ourTeamId, options.opponentTeamId)
@@ -1110,18 +1138,6 @@ function TeamGameScene({
   /** 사람 수비 타석 장면의 투수 · 타자 그림 재료 — 구질 누름 칸도 그 배치(타자 손)를 따른다 */
   const teamStage = teamPitcherSideStageOf(progress)
 
-  /** 원본 화면에서 '#' 가 먹는가 — 0x4994a: 상태 0xe · 0xf, 교대 판 · 수비 판 · 팝업 · 내 공(0x11 · 0x12) 밖 (위 '#' 키 주석) */
-  const acceptsChangeKey =
-    changeWindow === null &&
-    !isSceneCovering &&
-    !isDefenseInPlay &&
-    !isMenuOpen &&
-    overlay === null &&
-    !(isAwaitingConfirm && !sceneConfirm.isInConfirmState) &&
-    !isPitchSceneBusy &&
-    // 조준(0x10) · 게이지(0x11)는 '#' 범위 밖 — 그 자리는 CLR 누름 칸이 쓴다
-    !(canPitch && phase !== '구질') &&
-    (session.canChangePitcher || session.canPinchHit)
   /** 사람 수비 마운드(우리 투수)가 마투수면 0x38d1c 38f56 이 체력 그림을 거른다 */
   const ourMoundIsAce = (progress.ourPitcherEntry[progress.ourPitcherIndex]?.aceIndex ?? -1) >= 0
   const substitutionRows =
@@ -1411,10 +1427,11 @@ function TeamGameScene({
           <PressLayer testId="도루 누름 칸">
             {isStealable.map((base) => (
               <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
-                onPress={() => {
+                onPress={(event) => {
+                  // 키와 같은 길 — 칸에 받은 틱은 손가락 · 마우스가 닿은 시각에 본 그림의 틱(`PressArea`, r222)
                   pushSceneKey(() => {
                     if (flightProbeRef.current?.() === true) actions.steal(base)
-                  })
+                  }, 'press', inputTimeOf(event))
                 }} />
             ))}
           </PressLayer>

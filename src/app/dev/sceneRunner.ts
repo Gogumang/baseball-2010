@@ -2,6 +2,7 @@
 import { sceneHandlesNow, setDevBootSeed } from '@/app/dev/sceneShortcut'
 import type { SceneHandles } from '@/app/dev/sceneShortcut'
 import { SCENES } from '@/app/dev/scenes'
+import { scenePeeksNow, setSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { SceneStep } from '@/app/dev/scenes'
 
@@ -85,6 +86,8 @@ export async function bootSceneShortcut(): Promise<void> {
       hasSavedCareer: handles.career.savedCareer !== null,
       // 그 순간 화면이 받는 키(터치 상황 버튼) — 경기 장면의 타석 · 투구 · 수비를 가르는 데 쓴다
       offers: touchKeyOffersNow().map((offer) => `${offer.key}:${offer.label}`),
+      // 팀 경기 화면이 알리는 자리(`shared/lib/scenePeek`)
+      peeks: scenePeeksNow(),
     }
   }
   const params = new URLSearchParams(window.location.search)
@@ -160,6 +163,8 @@ export async function runSceneShortcut(): Promise<void> {
   if (status.status === 'error' || status.scene === null) return
   const scene = SCENES[status.scene]
   if (scene === undefined) return
+  // 단계를 밟는 동안만 연출 판(로딩)을 건너뛴다 — 장면에 닿으면 끈다(그 뒤 손으로 하는 플레이는 원래대로)
+  setSceneFastForward(true)
   try {
     for (const step of scene.steps) {
       status.steps.push(step.kind === 'key' ? `key ${step.key}` : step.kind === 'wait' ? `wait ${step.ms}` : step.label)
@@ -171,5 +176,7 @@ export async function runSceneShortcut(): Promise<void> {
     report({ status: 'ready' })
   } catch (error) {
     report({ status: 'error', error: String(error) })
+  } finally {
+    setSceneFastForward(false)
   }
 }

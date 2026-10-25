@@ -1,6 +1,7 @@
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import { useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
@@ -291,11 +292,12 @@ export function MissionPlayScreen({
   const canSteal = !isOver && stealableBases.length > 0
   /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
   const flightProbeRef = useRef<(() => boolean) | null>(null)
-  const stealIfFlying = (base: StealBase) => {
+  /** `event` — 누름 칸의 사건(닿은 시각이 붙어 있다 — `PressArea`). 키는 창 잡기 단계가 이미 사건 시각으로 칸을 넣었다 */
+  const stealIfFlying = (base: StealBase, event?: Event) => {
     // 도루 키는 장면 키 칸에 든다 — 다음 틀의 키 0x498d4 → 0x53670 → 0x53610 이 그 틀의 상태(0x11)를 보고 출발시킨다
     pushSceneKey(() => {
       if (flightProbeRef.current?.() === true) onSteal(base)
-    })
+    }, 'press', event === undefined ? undefined : inputTimeOf(event))
   }
   // 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
   const { pressStar } = menu
@@ -514,7 +516,7 @@ export function MissionPlayScreen({
         )}
         {!isAwaitingConfirm && !isMenuOpen && canSteal &&
           stealableBases.map((base) => (
-            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
+            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={(event) => stealIfFlying(base, event)} />
           ))}
         {!isOver && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.pressStar} />}
 

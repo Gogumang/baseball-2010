@@ -78,6 +78,20 @@ describe('키 사건 칸 0xbca05 — 틀 T 에 받은 키는 틀 T+1 의 키 0x4
     expect(바로).toHaveBeenCalledTimes(2)
   })
 
+  it('누름 칸이 넘긴 사건 시각이 있으면 그때 본 그림의 틱으로 칸에 든다 (r222 — 도루 누름 칸)', () => {
+    // 칸의 셈: 시각 100 에 본 그림은 틱 5, 지금은 틱 7
+    const 칸 = createSceneKeyLatch(() => 7, (inputTime) => (inputTime <= 100 ? 5 : 7))
+    openSceneKeyLatch(칸)
+    const 차례: string[] = []
+    pushSceneKey(() => 차례.push('지금'))
+    pushSceneKey(() => 차례.push('닿은 때'), 'press', 100)
+    // 틱 6 머리 — 틱 5 에 받은 누름만 나온다
+    runSceneKeys(칸, 6)
+    expect(차례).toEqual(['닿은 때'])
+    runSceneKeys(칸, 8)
+    expect(차례).toEqual(['닿은 때', '지금'])
+  })
+
   it('손잡이가 없는 폰 키도 받은 칸을 덮는다 — 같은 틀에 스윙 뒤 다른 키가 오면 스윙은 사라진다', () => {
     const 칸 = createSceneKeyLatch(() => 7)
     openSceneKeyLatch(칸)
