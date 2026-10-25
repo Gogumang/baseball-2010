@@ -879,12 +879,8 @@ export function useCareerSession({
       const recordLine = isEvaluated || previous === undefined
         ? nariRecordLineOf(summary.stats)
         : previous.recordLine ?? nariRecordLineOf(previous.summary.stats)
-      // 승리 31 · 패배 32 징글 (무승부는 0xb6a0c 가 측 0 을 이긴 칸으로 본다 — 선공 31 · 후공 32) →
-      // 평가 창 징글 36·37·38 (12c96~: +0x4a). 원본은 두 화면이 따로지만 웹은 한 화면이라 이어서 낸다
-      playSoundIds(audio, [
-        gameResultSoundIdOf(summary.result, finished.game.playerSide),
-        evaluationJingleIdOf(staleEvaluation.popularityChange),
-      ])
+      // 승리 31 · 패배 32 징글은 정산 0x19 진입(경기 끝 판 0x18 의 OK 뒤), 평가 징글 36 · 37 · 38 은 116 진입이 낸다 —
+      // 결과 화면이 단계에 들어설 때 부른다(`enterGameSettlement` · `enterGameEvaluation`)
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다.
       // CPU 끼리의 포스트시즌 경기는 **여기서 돌리지 않는다** — 원본은 대진 화면 128 의 [확인](0x13da0)에서 돌린다
@@ -1020,8 +1016,7 @@ export function useCareerSession({
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
       // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 시간을 모드 칸 플레이 시간에 (0x22efc)
       recordStat({ kind: '플레이시간', mode: BATTER_LEAGUE_MODE, elapsed: lapPlayClock() })
-      // 승리 31 · 패배 32 징글 — 정규 경기 결과 화면과 같은 자리 (116 의 평가 징글은 없다)
-      playSoundIds(audio, [gameResultSoundIdOf(summary.result, finished.game.playerSide)])
+      // 승리 31 · 패배 32 징글 — 정규 경기와 같이 정산 0x19 진입에서(`enterGameSettlement`). 116 의 평가 징글은 없다
       setScreen({
         kind: '대회경기결과', summary, gamePointReward, cup: next, settlementInning: finished.game.inning,
         settlementPlayerSide: finished.game.playerSide, settlementSkyRow: stadiumSkyRowRef.current,
@@ -1029,6 +1024,38 @@ export function useCareerSession({
     },
     [audio, random, recordStat, setCareer, setScreen, setUpNariScene],
   )
+
+  /**
+   * **재생 판 뒤의 경기 끝** — 미리 돌려 재생 칸(`lastDefensePlay`)에 넣은 판(밀어내기 · 낫아웃 · 진루만 하는 판)이 경기를 끝내면
+   * 원본은 그 판을 상태 0x17 로 끝까지 그린 뒤에야 0xd → 경기 끝 판 0x18 로 간다(판정 A/B 0xae3e8). 그 그리기 0x43278 이 실책 +0x2e 를
+   * 올리므로(`recordFieldingErrors`) 정산 0x4ea0c 의 기록에 그 판 실책이 든다. 예전 웹은 판 결과를 먹인 자리에서 곧장 정산해
+   * 재생이 잘리고 그 판 실책이 요약에서 빠졌다(r237 남김 — "웹 구조"). 재생 화면(`GameRoute`)은 판을 다 그리면 `finishReplay` 로
+   * 알리므로 그때까지 정산을 미룬다. 재생 화면이 붙어 있지 않으면(화면 없는 시험) 곧장 정산한다 — 예전과 같다. soak 는 재생 화면 대신 붙어 알린다.
+   */
+  const replayHostCountRef = useRef(0)
+  const replayedPlayRef = useRef<DefensePlayResult | null>(null)
+  const isGameEndPendingRef = useRef(false)
+  const endGame = useCallback(
+    (finished: GameProgress) => {
+      // 재생 판이 실책을 올렸으면 진행 칸이 더 새 값이다 — 같은 끝난 경기면 그것으로 정산한다
+      const latest = progressRef.current
+      const settled = latest !== null && latest.game.isFinished ? latest : finished
+      const play = settled.lastDefensePlay
+      if (replayHostCountRef.current > 0 && play !== null && play.ticks.length > 0 && play !== replayedPlayRef.current) {
+        isGameEndPendingRef.current = true
+        return
+      }
+      isGameEndPendingRef.current = false
+      // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (상태 142 → 101 → 134)
+      const cup = cupGameRef.current
+      if (cup !== null) return finishCupGame(settled, cup)
+      const currentCareer = careerRef.current
+      if (currentCareer !== null) finishGame(settled, currentCareer)
+    },
+    [finishCupGame, finishGame],
+  )
+  const endGameRef = useRef(endGame)
+  endGameRef.current = endGame
 
   /**
    * 타석 하나가 경기 상태에 다 먹은 뒤 — 결과 배너를 띄우고, 경기가 끝났으면 정산으로 넘긴다.
@@ -1041,14 +1068,10 @@ export function useCareerSession({
           runner.setIsPaused(false)
           return
         }
-        // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (상태 142 → 101 → 134)
-        const cup = cupGameRef.current
-        if (cup !== null) return finishCupGame(advanced, cup)
-        const currentCareer = careerRef.current
-        if (currentCareer !== null) finishGame(advanced, currentCareer)
+        endGame(advanced)
       })
     },
-    [finishCupGame, finishGame, runner],
+    [endGame, runner],
   )
 
   /**
@@ -1077,10 +1100,7 @@ export function useCareerSession({
         pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
         runner.resetAtBat()
         if (!arrival.progress.game.isFinished) return
-        const cup = cupGameRef.current
-        if (cup !== null) return finishCupGame(arrival.progress, cup)
-        const currentCareer = careerRef.current
-        if (currentCareer !== null) finishGame(arrival.progress, currentCareer)
+        endGame(arrival.progress)
         return
       }
       if (!isAtBatFinished(context.nextAtBat) || context.nextAtBat.outcome === null) return
@@ -1130,7 +1150,7 @@ export function useCareerSession({
       const arrivalKind = arrival?.play?.kind ?? null
       finishAtBat(advanced, context.nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(context.nextAtBat.outcome, arrivalKind))
     },
-    [audio, finishAtBat, finishCupGame, finishGame, random, runner],
+    [audio, endGame, finishAtBat, random, runner],
   )
 
   const handlePitchResolved = useCallback(
@@ -1364,6 +1384,20 @@ export function useCareerSession({
     const orderEventId = battingOrderEventId(career)
     const event = story.eventFor(career, EVENT_TRIGGER.관리, random)
     if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
+    /*
+     * **117 중간 성적표** — 진입 곁가지 11bda~11c0e: 115 다음, 138 앞. `S+0xb2 == 22 && 0xa4280(S, 모드 == 4, S+0xb3) == 0`
+     * (그 해 비트 S+0x180 — `midSeasonEvaluatedYears`)이면 `0xbcb49(117)` 로 예약하고 11c1a 로 건너뛰어 138 은 안 본다.
+     * 117 은 114 · 115 가 아니라 같은 틀의 자동 훑기(1cfdc)가 돌고, 찾으면 `[다음 114, 뒤 105]` 로 예약을 덮는다 — 그래서 훑기가 먼저다
+     * (덮인 117 은 이벤트 뒤 105 재진입이 다시 세운다. 비트는 452~454 의 보상이 돌아야 켜진다 — `applyEventRewards`).
+     * 117 진입 0x11e84: k = 0xa3de9(S, 1) → 452 · 453 · 454 · 칭호 1 · 9 를 +0x270 에 · 끝에 S+0x1cc = k → `[다음 114, 뒤 105]`.
+     * 원래 웹은 116 [확인]에서 곧장 117 을 띄웠다(105 진입 · 훑기 · 저장을 건너뛰었다).
+     */
+    if (leagueDayCounterOf(career) === MID_SEASON_GAME && !career.midSeasonEvaluatedYears.includes(career.season - 1)) {
+      const achieved = achievedGoalCount(career, '중간')
+      const evaluated = awardTitles(career, midSeasonTitlesOf(career, achieved).filter((title) => !career.titleIds.includes(title)))
+      setCareer({ ...evaluated, lastMidSeasonGoalCount: achieved })
+      return setScreen({ kind: '이벤트', eventId: midSeasonEventId(achieved), context: '관리' })
+    }
     if (orderEventId !== null) setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
   }, [isManagementEntry, managementReentryCount, career, story, random, setScreen, shouldForgetRepeatable])
 
@@ -1598,10 +1632,7 @@ export function useCareerSession({
     pitchTallyRef.current = EMPTY_AT_BAT_PITCH_TALLY
     runner.resetAtBat()
     if (!next.game.isFinished) return
-    const cup = cupGameRef.current
-    if (cup !== null) return finishCupGame(next, cup)
-    const currentCareer = careerRef.current
-    if (currentCareer !== null) finishGame(next, currentCareer)
+    endGame(next)
   }
 
   const actions = {
@@ -1612,8 +1643,33 @@ export function useCareerSession({
     finishDefensePlay,
 
     /**
+     * 재생 화면이 붙었다 — 붙어 있는 동안 재생 판으로 끝난 경기의 정산을 재생 뒤로 미룬다(`endGame`). 돌려준 함수로 뗀다.
+     * 떼는 자리에서 미룬 정산이 남았으면 곧장 한다(화면이 그 판을 못 그리고 내려갔다)
+     */
+    attachReplayHost: () => {
+      replayHostCountRef.current += 1
+      return () => {
+        replayHostCountRef.current -= 1
+        if (replayHostCountRef.current > 0 || !isGameEndPendingRef.current) return
+        const current = progressRef.current
+        if (current !== null && current.game.isFinished) {
+          replayedPlayRef.current = current.lastDefensePlay
+          endGameRef.current(current)
+        }
+      }
+    },
+
+    /** 재생 판(`lastDefensePlay`)을 다 그렸다 — 그 판 실책(`recordFieldingErrors`)이 먼저 들어와 있다. 미룬 정산이 있으면 이제 한다 */
+    finishReplay: (play: DefensePlayResult | null) => {
+      replayedPlayRef.current = play
+      if (!isGameEndPendingRef.current) return
+      const current = progressRef.current
+      if (current !== null && current.game.isFinished) endGameRef.current(current)
+    },
+
+    /**
      * 수비 그림(0x43278)이 올린 실책 +0x2e — 화면이 판 끝(`finishDefensePlay` 바로 앞)에 넘긴다. 난수 · 소리 없음.
-     * ⚠️ 경기를 끝낸 재생 판(견제 · 도루 판 등 미리 돈 판)은 정산(`finishGame`)이 재생보다 먼저라 그 판의 실책이 요약에 안 든다
+     * 경기를 끝낸 재생 판도 정산이 재생 뒤라(`endGame` · `finishReplay`) 그 판의 실책이 요약에 든다.
      */
     recordFieldingErrors: (errors: readonly DrawnFieldingError[]) => {
       const current = progressRef.current
@@ -1803,8 +1859,8 @@ export function useCareerSession({
         const counted = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
         // 1299e 도 다시 — 비트가 이미 섰으면 팝업을 안 건다. 주는 것은 키 0x1b1e4 (`confirmGameResultTitle`)
         const dynamite = gameResultTitleOf(counted.titleIds, (lastGame.recordLine ?? lastGame.summary.stats).homeRuns)
+        // 평가 징글(12c96)은 결과 화면이 116 에 들어설 때 낸다(`enterGameEvaluation`)
         setCareer(counted)
-        playSoundIds(audio, [evaluationJingleIdOf(lastGame.evaluation.popularityChange)])
         return setScreen({
           kind: '경기결과',
           summary: lastGame.summary,
@@ -1963,6 +2019,22 @@ export function useCareerSession({
       recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: career.gamePoint - result.career.gamePoint })
     },
 
+    /**
+     * 정산 상태 0x19 진입 — 0x4ea0c 끝 4f41a~4f544: 0x4a350(이긴 칸이 사람 팀) ≠ 0 이면 31, 아니면 32 를 예약한다(무승부는 0xb6a0c 가
+     * 측 0 을 이긴 칸으로 본다 — 선공 31 · 후공 32). 대회 경기도 같은 정산을 지난다
+     */
+    enterGameSettlement: () => {
+      if (screen.kind !== '경기결과' && screen.kind !== '대회경기결과') return
+      if (screen.settlementPlayerSide === undefined) return
+      playSoundIds(audio, [gameResultSoundIdOf(screen.summary.result, screen.settlementPlayerSide)])
+    },
+
+    /** 116 진입 0x1278c 의 12c96~12cc2 — +0x4a(평가 경기 인기도 변화)로 36 · 37 · 38 (`evaluationJingleIdOf`). 이어하기로 다시 선 116 도 */
+    enterGameEvaluation: () => {
+      if (screen.kind !== '경기결과') return
+      playSoundIds(audio, [evaluationJingleIdOf(screen.evaluation.popularityChange)])
+    },
+
     /** 116 의 칭호 39 팝업 키 0x1b1e4 — 비트 · 곧바로 장착(+0x1c4) · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
     confirmGameResultTitle: () => {
       if (career === null || screen.kind !== '경기결과') return
@@ -1993,13 +2065,7 @@ export function useCareerSession({
         return enterPostseason(career)
       }
       if (isSeasonFinished(career)) return enterYearEndChain(career)
-      // 22경기 뒤 중간평가 (0x11910 → 0x11e84)
-      if (career.gamesPlayed === MID_SEASON_GAME) {
-        const achieved = achievedGoalCount(career, '중간')
-        const evaluated = awardTitles(career, midSeasonTitlesOf(career, achieved).filter((title) => !career.titleIds.includes(title)))
-        setCareer({ ...evaluated, lastMidSeasonGoalCount: achieved })
-        return setScreen({ kind: '이벤트', eventId: midSeasonEventId(achieved), context: '시즌' })
-      }
+      // 22경기 뒤 중간 성적표 117 은 여기가 아니라 [114 → 105] 뒤 105 진입 곁가지(0x11910 11bda)가 세운다 — 22 는 짝수라 관리 주기다
       if (isManagementCycleOpen(career)) {
         return setScreen({ kind: '관리' })
       }

@@ -569,6 +569,25 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     })
   }
 
+  /**
+   * 재생 화면(`GameRoute`) 대신 (r244) — 경기 화면 동안 세션에 붙어(`attachReplayHost`) 재생 칸의 새 판을 다 그린 것으로 알린다
+   * (`finishReplay`). 재생 판으로 끝난 경기는 세션이 정산을 그 알림 뒤로 미루므로 이 길이 멈추지 않는지도 함께 본다
+   */
+  let replayHosted: typeof rendered | null = null
+  let replayedPlay: unknown = null
+  const replayStep = () => {
+    if (replayHosted !== rendered) {
+      replayHosted = rendered
+      act(() => {
+        result.current.session.actions.attachReplayHost()
+      })
+    }
+    const play = result.current.session.progress?.lastDefensePlay ?? null
+    if (play === null || play.ticks.length === 0 || play === replayedPlay) return
+    replayedPlay = play
+    act(() => result.current.session.actions.finishReplay(play))
+  }
+
   /** 경기 한 걸음 — 붙든 판을 풀거나 공 하나 */
   const gameStep = () => {
     const { session, runner } = result.current
@@ -961,6 +980,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           act(() => actions.confirmMatchPrepare())
           break
         case '경기':
+          replayStep()
           gameStep()
           break
         case '마선수대결':

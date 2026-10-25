@@ -220,8 +220,12 @@ function nariPitcherCellsOf(cells: NariEntryCellSource | undefined, teamId: numb
 /**
  * 마선수 줄 — XlsACE 행을 통째 베낀 레코드(0xb521c · 0xb53f0): 줄은 표의 `recordLine`. 마투수 +0x2c 는 XlsACE_PIT_DATA 다섯 행 모두
  * 0x2710(10000, r165 표 바이트 확인)이고 CPU 경기 준비 0xb88c8 → 0xb521c 가 경기마다 그 값으로 8번 칸을 다시 베낀다(P1 3-0).
- * ⚠️ 미확인(남김): 경기가 깎은 끝 값이 팀 레코드 8번 칸에 남아 143 이 그 값을 읽는다 — 웹은 리그 하루(`playLeagueDay` 의
- * `acePitcherStaminas`)가 내놓는 그 값을 커리어에 쌓지 않아(저장 꼴 변화 · 하루 끝 회복 0xb617c 가 8번 칸을 도는지 미확인) 가득으로 둔다
+ * **143 의 마투수 체력은 늘 가득이다** (r244 확정 — 직접 떴다): 경기가 깎은 끝 값은 팀 레코드 8번 칸에 남고 하루 끝 0xb617c 도
+ * 그 칸을 돈다(0xb60e0 은 투수 수 [+0xc] — 0xb521c 의 0xb4e34 가 늘린 8번 칸 포함 — 만큼 +0x2c 를 채운다). 그런데 143 에 오는 길은
+ * 142 하나이고, 142 진입 0x1c46c 는 앞 상태가 143 이 아니고(1c560) 장면+0x288 == 0 이면(1c56e) 국가대항전이 아닐 때(1c5fc S+0x12c)
+ * 두 팀 모두 `0xb88c8` → `0xb521c` 로 마투수 행을 8번 칸에 **통째로 다시 베낀다**(b528e~b529c memcpy 0x30 — 8번이 이미 마선수여도
+ * 덮는 갈래 b5262 가 같은 memcpy 로 간다). +0x288 은 장면 0x106 이 새로 설 때(경기 뒤)만 0 이라 같은 장면의 142 재진입 사이에는
+ * 경기가 없다. 그래서 143 이 보는 두 팀의 8번 칸은 늘 방금 베낀 행 +0x2c = 10000 이다 — 아래 `FULL_RECORD_STAMINA` 가 원본 그대로다.
  */
 function aceCellsOf(cells: NariEntryCellSource | undefined, recordLine: readonly number[], isPitcher: boolean, staminaAbility: number) {
   if (cells === undefined) return {}

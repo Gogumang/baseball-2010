@@ -5,6 +5,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { effectiveAbilityOf, equippedAbilityOf } from '@/entities/career/model/condition'
 import {
+  nariRecordSalaryGradeOfCareer,
   achievedGoalCount,
   applyEndingBonus,
   canContinueAfterEnding,
@@ -147,6 +148,19 @@ describe('연봉 협상 (0x8d05a, 0x8cac0)', () => {
   it('연봉 칸 +0x1c8 은 u16 — 0xa4fd8 strh 로 65536 을 넘으면 감긴다(상한에 붙지 않는다)', () => {
     // base = 1 + 60000 · +30% → 60001 + 18000 = 78001 → 78001 − 65536
     expect(applySalaryChange(선수({ popularity: 0, popularityAtSeasonStart: 0, salary: 60000 }), 0).salary).toBe(78001 - 65536)
+  })
+
+  it('레코드 +0x1b 는 감기기 전 v 로 센다 — 0xa4fd8 a4ff6~a5006 min(v / 10, 255), v 는 0x8cac0 의 32비트 정수 (r244)', () => {
+    const wrapped = applySalaryChange(선수({ popularity: 0, popularityAtSeasonStart: 0, salary: 60000 }), 0)
+    // 감긴 연봉 12465 의 1/10 = 1246 → 255 가 아니라, v = 78001 의 1/10 → 255
+    expect(wrapped.salaryRecordGrade).toBe(255)
+    expect(nariRecordSalaryGradeOfCareer(wrapped)).toBe(255)
+    // 감김 경계 바로 뒤 — 감긴 값은 작아도 레코드는 255
+    const edge = applySalaryChange(선수({ popularity: 0, popularityAtSeasonStart: 0, salary: 65535 }), 8)
+    expect(edge.salary).toBe(0)
+    expect(nariRecordSalaryGradeOfCareer(edge)).toBe(255)
+    // 보상 20 을 안 탄 선수(등록 0x10fb4 의 v = 0x32)는 지금 연봉에서 센다
+    expect(nariRecordSalaryGradeOfCareer(선수({ salary: 50 }))).toBe(5)
   })
 })
 

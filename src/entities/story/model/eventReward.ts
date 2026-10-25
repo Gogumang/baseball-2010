@@ -175,5 +175,22 @@ export function applyEventRewards(
   eventId?: number,
 ): PlayerCareer {
   const adjusted = applyYearAdjust(rewards, eventId, career.season)
-  return adjusted.reduce((current, reward) => applyReward(current, reward, random), career)
+  const rewarded = adjusted.reduce((current, reward) => applyReward(current, reward, random), career)
+  return rewards.length > 0 && isMidSeasonEventId(eventId) ? markMidSeasonEvaluated(rewarded) : rewarded
+}
+
+/** 452~454 — 중간 성적표(117) 이벤트 (0x8cbaa: `0x1c3 < id ≤ 0x1c6`) */
+const MID_SEASON_EVENT_FIRST = 452
+const MID_SEASON_EVENT_LAST = 454
+const isMidSeasonEventId = (eventId: number | undefined) =>
+  eventId !== undefined && eventId >= MID_SEASON_EVENT_FIRST && eventId <= MID_SEASON_EVENT_LAST
+
+/**
+ * 보상 실행기 0x8c460 끝(0x8cbaa~0x8cbdc) — 이벤트 452~454 의 보상 명령을 마치면 `0xa424c(S, 모드 ≠ 3, S+0xb3, 1)` 로 그 해
+ * 중간 성적표 비트(S+0x180, 타자편 비트 = 연차idx)를 켠다 — 투수편 `applyPitcherEventRewards` 와 같은 자리
+ */
+function markMidSeasonEvaluated(career: PlayerCareer): PlayerCareer {
+  const yearIndex = career.season - 1
+  if (career.midSeasonEvaluatedYears.includes(yearIndex)) return career
+  return { ...career, midSeasonEvaluatedYears: [...career.midSeasonEvaluatedYears, yearIndex] }
 }
