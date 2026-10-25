@@ -7,7 +7,10 @@ import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import { gameSceneNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
-/** 화면 좌우 이 비율 안쪽을 누르면 타자를 옮긴다 (모바일용, 웹판 추가) */
+/**
+ * 화면 좌우 이 비율 안쪽을 누르면 타자를 옮긴다 (모바일용, 웹판 추가). **공이 날기 전에만** 이동 칸이다 —
+ * 공이 날면(`isBallInFlight`) 판 전체가 스윙이다(r256, `onPointerDown` 주석)
+ */
 const SHIFT_EDGE_RATIO = 0.25
 
 export interface StageActions {
@@ -18,6 +21,12 @@ export interface StageActions {
   /** 번트 키 뗌 — 0x6a8 (`BattingStage` 의 `releaseBunt`). 번트는 누르고 있는 동안만이다 */
   readonly releaseBunt: (tick: number) => void
   readonly moveBatter: (direction: -1 | 1) => void
+  /**
+   * 받은 장면 틱 `tick` 에 공이 날고 있는가 — 상태 0x11 이고 공이 놓였다(공 틱 ≥ 0). **화면 탭 배치만** 이것을 본다:
+   * 참이면 양 끝도 이동이 아니라 스윙이다. 키('4'/'6')는 원본대로 공이 나는 동안에도 이동이다(0x53670 이 0x11 의 누름마다
+   * 0x53470 을 부른다). 안 넘기면 늘 거짓(예전 배치 그대로)
+   */
+  readonly isBallInFlight?: (tick: number) => boolean
   /**
    * **필살타법** — 원본 `0x535a4` 의 '0' 가지(메시지 **0x6a6**, I-controls 0절). 거는 단계 없이
    * **그 자리에서 필살 스윙**이 나간다 (0x51dee — 일반 스윙 0x51db6 과 같은 예약, S+0x10 만 다르다).
@@ -55,8 +64,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
    * 받은 틱은 **키 사건이 난 시각에 화면에 있던 그림의 틱**이다(`keyLatch.tickAt` — 원본은 키를 받은 틀 = 마지막으로 그린 틀). 손잡이가
    * 돈 때의 시각 틱으로 세면 그리기 · 주 스레드가 밀린 만큼(한두 틱) 늦게 누른 것이 된다 (r211)
    */
-  const latch = (event: Event, apply: (tick: number) => void, kind: SceneKeyKind = 'press') => {
-    const inputTime = inputTimeOf(event)
+  const latch = (event: Event, apply: (tick: number) => void, kind: SceneKeyKind = 'press', inputTime = inputTimeOf(event)) => {
     const tick = keyLatch.tickAt(inputTime)
     keyLatch.push(() => apply(tick), kind, inputTime)
   }
@@ -111,7 +119,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
   return {
     /**
      * 화면 탭 (웹판 추가 — 원본은 키뿐). **손가락이 닿는 순간** 키를 받는다(떼는 순간이 아니다 — 키패드 키도 누름에 keydown 이다).
-     * 가운데 = OK 스윙, 양 끝(`SHIFT_EDGE_RATIO`) = '4'/'6' 타자 이동. 번트('8', 누르고 있는 동안)는 터치 상황 버튼 · 키로 한다
+     * 가운데 = OK 스윙, 양 끝(`SHIFT_EDGE_RATIO`) = '4'/'6' 타자 이동 — 단 공이 나는 동안(`isBallInFlight`)은 양 끝도 스윙. 번트('8', 누르고 있는 동안)는 터치 상황 버튼 · 키로 한다
      * (r173 — 예전에는 길게 누르면 번트라 스윙이 손을 뗄 때 나가 한두 틀 늦었다).
      */
     onPointerDown: (event: PointerEvent<HTMLCanvasElement>) => {
@@ -125,9 +133,14 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       // 가운데 탭이 오른쪽 이동 칸으로 읽혀 스윙이 안 나갔다 (r242)
       const bounds = screenRectOf(event.currentTarget)
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
-      if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return latch(event.nativeEvent, () => actions.moveBatter(-1))
-      if (x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return latch(event.nativeEvent, () => actions.moveBatter(1))
-      latch(event.nativeEvent, (tick) => actions.swing(tick))
+      // 공이 나는 동안은 판 전체가 스윙이다 (r256 — 웹 터치 배치만). 원본 '4'/'6' 은 공이 나는 동안에도 먹지만(0x53670 →
+      // 0x53470 → 0x6a4 → 0x50f86: +0xfe4 ±3, ±9 로 자름), 터치에서는 스윙하려던 손가락이 끝 칸에 닿아 스윙 대신 이동이 되는
+      // 일이 잦았다. 이동은 공을 놓기 전(대기 · 와인드업)에 끝 칸으로, 공이 나는 중이면 키로 한다
+      const inputTime = inputTimeOf(event.nativeEvent)
+      const isFlying = actions.isBallInFlight?.(keyLatch.tickAt(inputTime)) === true
+      if (!isFlying && x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return latch(event.nativeEvent, () => actions.moveBatter(-1), 'press', inputTime)
+      if (!isFlying && x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return latch(event.nativeEvent, () => actions.moveBatter(1), 'press', inputTime)
+      latch(event.nativeEvent, (tick) => actions.swing(tick), 'press', inputTime)
     },
   }
 }

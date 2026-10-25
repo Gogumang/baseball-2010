@@ -1074,6 +1074,15 @@ function drawAceMagicScaled(context: CanvasRenderingContext2D, input: AcePitcher
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */
 const BALL_FRAMES = './sprites/ball/frames'
 
+/*
+ * ⚠️ 미이식 — **공 그림자** (r256 에서 떴다, 웹에 없다). 타석 공 그리기 0x3b2f4 가 공 그림(3b6ac) 앞에서 그린다:
+ *   3b388  공 틱 [+0x1098] ≠ 0 이고 공 그림 칸이 있을 때만
+ *   3b33a · 3b350  공 점(0x35820)을 높이 0 으로 내린 점을 변환 → 3b3ca 0xb94b5 투영(표 0xcfb18[+0x17e1]) — 투영 수식이라 해석하지 않았다
+ *   3b3ce  크기 s = max(공 크기 칸 0x358fc − 4, 2)          ; 공 크기 2~9 → 그림자 2~5
+ *   3b3d8  상태 0x11 이면 아래 끝(0x14008c8)을 넘지 않을 때만, 0x13 이면 늘 — 자리 (카메라 +0xff4 + x, +0xff8 + y + 2)
+ *   0x356f8  (x − s/2, y − s/2) 에 s + 1 덩이(0x14006e8) · s > 2 면 rgb(100,100,100)(0x1400748) 선 넷(0x14006c8) — 그리기 스텁 뜻은 유력
+ * 공이 타자에 다가올수록 그림자가 공 밑으로 붙는 타이밍 단서다. 자리 셈이 공 궤적 투영이라(지침) 옮기지 않았다.
+ */
 function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number): void {
   const position = ballPixelAt(pitch, frame)
   const ballFrame = ballFrameIndexAt(pitch, frame)

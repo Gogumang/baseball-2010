@@ -653,6 +653,8 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
       buntRef.current = null
     }
     return {
+      // 화면 탭 배치만 본다 — 공이 나는 동안은 판 전체가 스윙(r256, `useStageControls`). 키 '4'/'6' 은 그대로 이동이다
+      isBallInFlight: isFlying,
       swing: (tick: number) => {
         // 상태 0x13 은 감상 플래그(+0x199a)가 켜진 큰 타구만 OK(−5)·'5' 로 건너뛴다 (0x406e8 40708~40712).
         // 꺼진 타구(틱 8)는 키를 안 본다. 어느 쪽이든 스윙 키는 이 단계에서 스윙이 아니다
