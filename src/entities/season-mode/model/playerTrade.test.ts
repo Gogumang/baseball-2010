@@ -183,6 +183,19 @@ describe('성공 뒤 두 명단 맞바꾸기 (0xd1cc~0xd3ae)', () => {
     expect(결과.mine.pitchers).toBe(mine.pitchers)
   })
 
+  it('맞바꾼 두 선수의 장비 니블은 0 이 된다 — 장착아이템으로 산 칸도 (0xd1cc 고리, r235)', () => {
+    const 산내팀: SeasonTeamRoster = { ...mine, batters: [선수({ id: 0, kindByte: 0, fieldPosition: 2, equipment: [3, 0, 1, 0] }), mine.batters[1]!] }
+    const 산상대: SeasonTeamRoster = { ...theirs, pitchers: [선수({ id: 0, kindByte: 0, equipment: [0, 2, 0, 0] }), ...theirs.pitchers.slice(1)] }
+
+    const 타자 = swapTradedPlayers(내팀, { mine: 산내팀, theirs }, { opponentTeamId: 상대팀, tab: 1, myIndex: 0, opponentIndex: 1 })
+    expect(타자.theirs.batters[1]?.equipment).toEqual([0, 0, 0, 0])
+    // 칸이 없는 선수(표 값 — 리그 열 팀은 0)는 칸을 만들지 않는다
+    expect(타자.mine.batters[0]?.equipment).toBeUndefined()
+
+    const 투수 = swapTradedPlayers(내팀, { mine, theirs: 산상대 }, { opponentTeamId: 상대팀, tab: 0, myIndex: 0, opponentIndex: 0 })
+    expect(투수.mine.pitchers[0]?.equipment).toEqual([0, 0, 0, 0])
+  })
+
   it('제 팀으로 돌아온 선수는 표 팀 칸을 지운다', () => {
     const 한번 = swapTradedPlayers(내팀, { mine, theirs }, { opponentTeamId: 상대팀, tab: 0, myIndex: 0, opponentIndex: 0 })
     const 두번 = swapTradedPlayers(내팀, 한번, { opponentTeamId: 상대팀, tab: 0, myIndex: 0, opponentIndex: 0 })
