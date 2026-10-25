@@ -188,6 +188,13 @@ describe('국가대항전 저장 · 이어하기 (S+0x12c · L+0xa8~ — 463 끝
     expect(rendered.result.current.screen).toEqual({ kind: '국가대항전', cup })
   })
 
+  it('포스트시즌이 끝난 해(S+0xb4 ≠ 0 · g == 0)의 대회 중 저장도 134 로 — 0x1c154 는 S+0x12c 를 S+0xb4 보다 먼저 본다 (1c346~1c364)', () => {
+    const 끝난대진 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), round: '종료' as const }
+    const cup = { ...createNationalCup(), stage: 3, day: 1, wins: [1, 0, 1, 0], losses: [0, 1, 0, 1] }
+    const rendered = 띄우기(목표달성선수({ seasonEndState: null, postseason: 끝난대진, nationalCup: cup }))
+    expect(rendered.result.current.screen).toEqual({ kind: '국가대항전', cup })
+  })
+
   it('S+0x50 특수값(132 연말 등)이 S+0x12c 보다 먼저다 — 463 전에 끊긴 저장은 132 로', () => {
     const rendered = 띄우기(목표달성선수({ seasonEndState: 132, nationalCup: createNationalCup() }))
     expect(rendered.result.current.screen.kind).toBe('이벤트')

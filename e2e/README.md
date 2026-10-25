@@ -34,7 +34,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
 | `season-ending` | 시즌모드 10년차 엔딩 0xf5 (저장 phase 6 → 진입 분기가 곧장 엔딩, 약 3초) | `season-ending` |
 | `nari-postseason` · `pitcher-postseason` | 나리 타자편 · 투수편 포스트시즌 128 시작 — 1년차 45경기 뒤 준플레이오프 대진, 진입 팝업이 뜬 자리 (약 2초) | `nari-postseason` · `pitcher-postseason` |
-| `nari-cup` | 나리 타자편 국가대항전 134 진입 대진판 + 히든 팀 팝업 — 그 앞 연말 이벤트(380) 저장의 이어하기를 OK 로 넘긴다 (약 12초) | `nari-cup` |
+| `nari-cup` · `nari-cup-result` | 나리 타자편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) — 134 에 선 저장의 이어하기가 134 로 돌아온다 | `nari-cup` · `nari-cup-result` |
 | `pitcher-cup` · `pitcher-cup-result` | 나리 투수편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) | `pitcher-cup` · `pitcher-cup-result` |
 | `nari-ending` · `pitcher-ending` | 나리 타자편 · 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 은퇴 이벤트 114 로 가고 OK 로 넘긴다 (약 11초) | `nari-ending` · `pitcher-ending` |
 | `nari-hall-of-fame` · `pitcher-hall-of-fame` | 명예의 전당 등록 질문 0x2d — 보너스를 받은 저장으로 141 에 곧장 들어가 키로 제작진 → 질문 (약 3초) | `nari-hall-of-fame` · `pitcher-hall-of-fame` |
@@ -53,7 +53,7 @@ G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 35개 × chromium · webkit 아이폰 (약 4분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs                  # 장면 36개 × chromium · webkit 아이폰 (약 4분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
@@ -76,7 +76,7 @@ kill "$(cat e2e/.run/drive.pid)"
 ### soak 로 뜬 픽스처 (r236)
 
 브라우저로 몇 시간 쳐야 닿는 자리는 화면 없이 세션 훅을 돌려 뜬다 — `src/app/model/soak/soakFixtures.test.tsx`.
-`season-ending` · `nari-postseason` · `nari-cup` · `nari-ending` · `nari-hall-of-fame` · `pitcher-postseason` · `pitcher-cup` ·
+`season-ending` · `nari-postseason` · `nari-cup` · `nari-cup-result` · `nari-ending` · `nari-hall-of-fame` · `pitcher-postseason` · `pitcher-cup` ·
 `pitcher-cup-result` · `pitcher-ending` · `pitcher-hall-of-fame` 이 그것이다. r233 soak 하네스의 사람 흉내 정책으로 새 선수(팀)부터
 돌리고, 그 자리에 닿은 순간 앱의 실제 저장 모듈(`createLocalStorageSaveGame` · `createLocalStorageJsonStore`)이 jsdom localStorage 에
 쓴 칸을 그대로 뜬다. 뜬 뒤에는 픽스처 칸만 깐 새 세션으로 이어하기가 기대한 자리(장면 · 이벤트)로 가는지 본다.
@@ -87,9 +87,8 @@ yarn e2e:fixtures                        # = SOAK_FIXTURE=1 vitest run src/app/m
 SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 yarn vitest run src/app/model/soak/soakFixtures.test.tsx   # 쓰지 않고 닿는지만
 ```
 
-⚠️ 나리 타자편은 134 에 선 뒤의 저장을 이어하면 134 가 아니라 392(연말 사슬)로 간다 — `resumePointOf` 가 S+0x12c(대회 칸)보다
-S+0xb4(끝난 포스트시즌 · g == 0)를 먼저 본다(투수편 `pitcherResumePointOf` 는 S+0x12c 가 먼저다). 그래서 `nari-cup` 은 그 앞 연말
-이벤트 저장으로 뜨고, 대회가 끝난 대진판(결과 팝업)은 투수편(`pitcher-cup-result`)으로 본다.
+나리 타자편도 134 에 선 저장을 이어하면 134 로 돌아온다 — 이어하기 0x1c154 의 그 밖 갈래는 S+0x12c(대회 칸)를 S+0xb4(끝난 포스트시즌)보다
+먼저 본다(1c346~1c364, 투수편과 같은 함수). r236 때는 타자편 `resumePointOf` 가 거꾸로 봐 392 로 갔고, r241 이 고쳐 `nari-cup` 을 134 저장으로 다시 떴다.
 
 ## 4. 브라우저 시험 (실제 CSS · z-index · zoom)
 
@@ -106,7 +105,7 @@ jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
 
 ```sh
-yarn e2e:hits                                   # 장면 35개 × 기기 넷, 약 8분 (서버가 없으면 띄우고 끝에 끈다)
+yarn e2e:hits                                   # 장면 36개 × 기기 넷, 약 8분 (서버가 없으면 띄우고 끝에 끈다)
 yarn e2e:hits general-bat derby-start           # 장면만 골라
 E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
 E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)

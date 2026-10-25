@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { batterSalaryNegotiationRankOf, enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
 import { startPostseason } from '@/entities/league/model/league'
 import { createCareer } from '@/entities/career/model/playerCareer'
+import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 
 const 선수 = (overrides = {}) => ({ ...createCareer('테스트'), ...overrides })
 
@@ -92,6 +93,17 @@ describe('이어하기 분기 0x1c154 — S+0x50(seasonEndState)', () => {
     expect(resumePointOf(선수({ seasonEndState: 128, postseason: 대진 }))).toEqual({ kind: '포스트시즌' })
     expect(resumePointOf(선수({ postseason: 대진 }))).toEqual({ kind: '이벤트', eventId: 392 })
     expect(resumePointOf(선수())).toEqual({ kind: '관리' })
+  })
+
+  it('그 밖 갈래는 S+0x12c(대회 칸)를 S+0xb4(포스트시즌)보다 먼저 본다 — 끝난 포스트시즌(g == 0) 뒤 대회 중 저장은 134 (1c346~1c364)', () => {
+    // 463 끝 0x8cca2 가 S+0x50 = 3(웹 null) · S+0x12c = 1. 포스트시즌 칸(S+0xb4)은 새 시즌 처리까지 남아 있다
+    const 끝난대진 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), round: '종료' as const }
+    const cup = { ...createNationalCup(), stage: 3, day: 1 }
+    expect(resumePointOf(선수({ postseason: 끝난대진, nationalCup: cup }))).toEqual({ kind: '국가대항전', cup })
+    // 대진이 없는 해도 같다
+    expect(resumePointOf(선수({ nationalCup: cup }))).toEqual({ kind: '국가대항전', cup })
+    // S+0x50 특수값(132 · 0xa 등)은 그보다 앞이다
+    expect(resumePointOf(선수({ seasonEndState: 132, postseason: 끝난대진, nationalCup: cup }))).toEqual({ kind: '이벤트', eventId: 380 })
   })
 
   it('S+0x50 == 6(1c24e) → 141 — 보너스 팝업을 닫으며 저장한 엔딩 칸이 있으면 엔딩으로 간다', () => {

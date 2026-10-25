@@ -1823,12 +1823,13 @@ export function useCareerSession({
         setCareer(enterSeasonEvent(savedCareer, point.eventId))
         return setScreen({ kind: '이벤트', eventId: point.eventId, context: '시즌' })
       }
-      // 그 밖 갈래의 첫 줄 1c348~1c358 — S+0x12c(국가대항전 중)면 134 대진판. 463 끝이 S+0x50 = 3 으로 두므로 대회 중엔 늘 이 갈래다
-      if (savedCareer.nationalCup !== undefined) {
+      // 그 밖 갈래의 첫 줄 1c346~1c35a — S+0x12c(국가대항전 중)면 134 대진판. S+0xb4(끝난 포스트시즌)보다 먼저다(`resumePointOf`).
+      // 463 끝이 S+0x50 = 3 으로 두므로 대회 중엔 늘 이 갈래다
+      if (point.kind === '국가대항전') {
         // 134 의 틀 0x1b92c 머리 — 들어온 첫 틀에 비트 8 이 없으면 칭호 8 "국가 대표" 팝업. 이어하기로 들어와도 같다
         // (463 보상 뒤 끊겼으면 아직 없다 — 대회 중 끊겼으면 이미 있어 안 뜬다). 팝업 · 히든 팀 열기는 화면 몫이다
         setCareer(savedCareer)
-        return setScreen({ kind: '국가대항전', cup: savedCareer.nationalCup })
+        return setScreen({ kind: '국가대항전', cup: point.cup })
       }
       if (point.kind === '포스트시즌') return enterPostseason(savedCareer, true)
       setCareer(savedCareer)

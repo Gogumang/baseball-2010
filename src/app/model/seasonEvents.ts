@@ -1,4 +1,5 @@
 import type { PlayerCareer, SeasonEndState } from '@/entities/career/model/playerCareer'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   achievedGoalCount,
@@ -100,6 +101,11 @@ export type ResumePoint =
   | { readonly kind: '다음경기순위' }
   /** S+0x50 == 0x11(464 거절 보상 0x8ccba — `seasonEndState` 137) → 1c25e 새 시즌 0x1b768 */
   | { readonly kind: '새시즌' }
+  /**
+   * 그 밖 갈래의 첫 줄 S+0x12c(국가대항전 중) → 134 대진판 (1c346~1c35a) — 저장의 대회 그대로. S+0xb4(포스트시즌) 보다 **먼저** 본다:
+   * 포스트시즌이 끝난 해(S+0xb4 ≠ 0 · g == 0)의 대회 중 저장도 134 다(r241 — 전엔 392 로 갔다). 투수편 `pitcherResumePointOf` 와 같은 함수다
+   */
+  | { readonly kind: '국가대항전'; readonly cup: NationalCup }
 
 /**
  * 이어하기 분기 0x1c154 (R9 2b, 직접 떴다 — 1c24c~1c3b8):
@@ -126,7 +132,7 @@ export type ResumePoint =
  * 뒤 `str` · 레지스터 오프셋 `str` 도 S+0x50 이 아니다(+0xd0 칸). 곧 1c252 의 `cmp #7` 은 닿지 않는 갈래다(웹은 6 과 같이 141).
  * 정규시즌 웹 null 은 1 · 2 · 3 이다. 2 는 116 을 다시 띄워 그 끝(0x12b98~0x12bb0)이 g 짝수 → 105 · 홀수 → 109 로 가고,
  * 1 · 3 은 위 맨 끝 갈래가 같은 g 짝홀로 가른다 — 셋 모두 **g 짝수면 105, 홀수면 109** 다. 4 는 g 와 상관없이 109.
- * 웹은 국가대항전(S+0x12c)을 저장하지 않는다. S+0x50 == 2(116 경기 뒤 평가 — 웹은 경기 뒤 `seasonEndState` null)는
+ * 국가대항전(S+0x12c)은 저장의 대회 칸(`nationalCup`)으로 본다 — S+0xb4 보다 먼저다(1c346, r241). S+0x50 == 2(116 경기 뒤 평가 — 웹은 경기 뒤 `seasonEndState` null)는
  * 116 의 끝(0x12b74)으로 옮긴다: 대진이 있으면 g(= L+0x32) == 0 → 136, 아니면 128 · 대진이 없으면 g 짝수 105 · 홀수 109.
  * 웹의 116 대응은 결과 화면이라 다시 못 띄우므로 그 다음 화면으로 돌아간다(⚠️ 근사(남김 — 웹 구조): 116 · 114 를 다시 보이지 않는다).
  * 132 뒤 국가대표 133·국가대항전 134 는 S+0x50 을 안 바꾼다(0x1a090·0x19f30 머리 확인) — 연봉 결과(384~391)의 보상 20 이
@@ -175,6 +181,9 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
     default:
       break
   }
+  // 그 밖 갈래 1c346~1c35a — S+0x12c(국가대항전 중)면 134. S+0xb4(1c35c) 보다 먼저다. 463 끝 0x8cca2 가 S+0x50 = 3(웹 null)으로
+  // 두므로 대회 중엔 늘 이 갈래다
+  if (career.nationalCup !== undefined) return { kind: '국가대항전', cup: career.nationalCup }
   if (career.postseason === null) {
     // 맨 끝 갈래 1c38e~1c3b6 — S+0x50 == 4(109) 는 {1,3} 이 아니라 늘 109
     if (career.seasonEndState === 109) return { kind: '다음경기순위' }

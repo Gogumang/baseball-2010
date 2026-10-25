@@ -471,10 +471,16 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     steps: [...toNariResume('포스트시즌'), wait(900)],
   },
   'nari-cup': {
-    description: '나리 타자편 국가대항전 134 진입 대진판 — 그 앞 연말 이벤트(380 연봉 → 대표 선발) 저장의 이어하기를 OK 로 넘겨 134 (히든 팀 · 칭호 8 팝업, soak 픽스처)',
+    description: '나리 타자편 국가대항전 134 진입 대진판 — 134 가 처음 선 순간(463 끝) 저장의 이어하기가 134 로 돌아와 히든 팀 · 칭호 8 팝업 (soak 픽스처)',
     fixture: 'nari-cup',
     seed: 1,
-    steps: [...toNariResume('이벤트'), keyUntil('Enter', '국가대항전 134', (h) => h.screen.kind === '국가대항전', 300, 60000), wait(900)],
+    steps: [...toNariResume('국가대항전'), wait(900)],
+  },
+  'nari-cup-result': {
+    description: '나리 타자편 국가대항전 134 — 대회가 끝난 대진판, 진입 팝업(히든 팀)을 닫은 자리 (OK 가 결과 팝업 0x25, soak 픽스처)',
+    fixture: 'nari-cup-result',
+    seed: 1,
+    steps: [...toNariResume('국가대항전'), wait(600), CLOSE_CUP_ENTRY_POPUPS, wait(600)],
   },
   'nari-ending': {
     description: '나리 타자편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 연말 · 은퇴 이벤트 114 로 가고 OK 로 넘겨 141 (soak 픽스처)',
