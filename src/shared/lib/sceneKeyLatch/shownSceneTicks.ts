@@ -1,0 +1,76 @@
+/**
+ * **키를 누를 때 화면에 있던 그림의 틱** — 웹판 전용 (r211).
+ *
+ * 원본은 틀마다 갱신하고 한 번 그린 뒤 다음 틀까지 쉰다. 키 콜백은 그 쉬는 사이에 와서 받은 칸에 적히고(0x39f4c), 다음 틀 머리가
+ * 읽는다(`sceneKeyLatch`). 그래서 키를 받은 틀 = **마지막으로 그린 틀** = 누른 사람이 본 그림이다 — 스윙 키 틱 F = 보이던 공 틱 + 1
+ * (`keyTickOf`)의 "보이던" 이 이것이다.
+ *
+ * 웹의 장면 틱은 실제 시각에서 센다(`gameSceneTickOf`). 그리기(requestAnimationFrame)가 밀리면(느린 기기 · 30Hz 절전 · 무거운 틀) 시각으로는
+ * 이미 다음 틱인데 화면은 아직 앞 틱 그림이다. 또 주 스레드가 바쁘면 키 사건 손잡이가 늦게 돌아, 그 사이 새 그림이 한 장 더 그려진다.
+ * 손잡이에서 지금 틱(`gameSceneTickNow`)을 읽으면 본 그림보다 한두 틱 늦게 센다 — 사람은 그림을 보고 눌렀는데 판정은 늦게 누른 것이 된다
+ * (한 틱 늦으면 타이밍 100 → 79, 두 틱이면 판정 없음 — r209).
+ *
+ * 그래서 루프가 그린 그림마다 (그린 시각, 그 그림의 장면 틱)을 적어 두고(`mark`), 키는 **사건이 난 시각**(`inputTimeOf`) 앞에 마지막으로
+ * 그린 그림의 틱으로 센다(`tickSeenAt`). 원본의 "받은 틀 = 마지막으로 그린 틀" 과 같은 셈이다. 그림 기록이 없으면(루프 전 · 시험) 지금 틱이다.
+ */
+export interface ShownSceneTicks {
+  /** 장면 틱 `tick` 의 그림을 실제 시각 `at`(`performance.now()` 기준)에 다 그렸다 */
+  readonly mark: (tick: number, at?: number) => void
+  /**
+   * 실제 시각 `inputTime` 에 화면에 있던 그림의 틱 — 그 앞에 마지막으로 그린 그림. 없거나 너무 오래됐으면(`MAX_SEEN_LAG_TICKS`) `nowTick`.
+   * `nowTick`(지금 장면 틱)보다 뒤일 수는 없다
+   */
+  readonly tickSeenAt: (inputTime: number, nowTick: number) => number
+  /** 기록을 비운다 — 루프가 내려가거나 처음부터 다시 셀 때 */
+  readonly clear: () => void
+}
+
+/** 적어 두는 그림 수 — 60Hz 에서 0.5초 남짓. 키 손잡이가 이보다 늦게 도는 일은 없다 */
+const SHOWN_LIMIT = 32
+/** 본 그림이 지금 틱보다 이만큼 넘게 앞이면 기록이 낡은 것으로 본다(루프가 오래 섰다) — 지금 틱으로 센다 */
+export const MAX_SEEN_LAG_TICKS = 8
+
+export function createShownSceneTicks(): ShownSceneTicks {
+  let shown: { readonly at: number; readonly tick: number }[] = []
+  return {
+    mark: (tick, at = performance.now()) => {
+      shown.push({ at, tick })
+      if (shown.length > SHOWN_LIMIT) shown = shown.slice(-SHOWN_LIMIT)
+    },
+    tickSeenAt: (inputTime, nowTick) => {
+      for (let index = shown.length - 1; index >= 0; index -= 1) {
+        const entry = shown[index]
+        if (entry === undefined || entry.at > inputTime) continue
+        if (nowTick - entry.tick > MAX_SEEN_LAG_TICKS) return nowTick
+        return Math.min(entry.tick, nowTick)
+      }
+      return nowTick
+    },
+    clear: () => {
+      shown = []
+    },
+  }
+}
+
+/** 웹이 대신 쏜 키 사건(터치 버튼)의 진짜 누른 시각 — 손가락이 닿은 pointer 사건의 시각 */
+const stampedTimes = new WeakMap<Event, number>()
+
+/** 대신 쏘는 사건 `event` 에 진짜 누른 시각을 붙인다 (`widgets/touch-controls` 의 키 쏘기) */
+export function stampInputTime(event: Event, time: number): void {
+  stampedTimes.set(event, time)
+}
+
+/** 사건 시각이 이보다 오래 전이면 믿지 않는다(시각 바탕이 다른 환경) */
+const MAX_INPUT_AGE_MS = 1000
+
+/**
+ * 키 · 누름 사건이 난 실제 시각(`performance.now()` 기준). `event.timeStamp` 는 주 스레드가 손잡이를 돌린 때가 아니라 사건이 난 때다.
+ * 터치 버튼이 대신 쏜 사건은 붙여 둔 손가락 시각(`stampInputTime`). 시각 바탕이 다르거나(옛 브라우저 · jsdom 의 Date 시각) 앞뒤가 안 맞으면 지금 시각
+ */
+export function inputTimeOf(event: Event | null | undefined, now: number = performance.now()): number {
+  if (event === null || event === undefined) return now
+  const stamped = stampedTimes.get(event)
+  const time = stamped ?? event.timeStamp
+  if (!Number.isFinite(time) || time <= 0 || time > now + 1 || now - time > MAX_INPUT_AGE_MS) return now
+  return time
+}

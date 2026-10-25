@@ -48,7 +48,7 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
       if (press === undefined) return
       pressesRef.current.delete(event.pointerId)
       delete event.currentTarget.dataset.pressed
-      press.release()
+      press.release(event.nativeEvent.timeStamp)
     }
     return {
       onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -66,13 +66,15 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
         }
         event.currentTarget.dataset.pressed = ''
         pointerPressedKeysRef.current.add(touchKey.key)
-        pressesRef.current.set(event.pointerId, startTouchKeyPress(touchKey))
+        // 손가락이 닿은 시각을 키에 붙인다 — 타석 스윙은 그때 보이던 그림의 틱으로 센다(`shownSceneTicks`)
+        pressesRef.current.set(event.pointerId, startTouchKeyPress(touchKey, document, event.nativeEvent.timeStamp))
       },
       // pointer 사건이 안 오고 click 만 오는 탭(iOS Safari 가 사건 추적 영역 밖이라 여긴 손가락 따위, r208)도 키 한 번이다.
       // pointer 로 이미 누른 탭 뒤의 click 은 버린다 — 키가 두 번 가지 않는다
-      onClick: () => {
+      onClick: (event: { readonly nativeEvent: Event }) => {
         if (pointerPressedKeysRef.current.delete(touchKey.key)) return
-        startTouchKeyPress(touchKey).release()
+        const at = event.nativeEvent.timeStamp
+        startTouchKeyPress(touchKey, document, at).release(at)
       },
       onPointerUp: release,
       onPointerCancel: release,
