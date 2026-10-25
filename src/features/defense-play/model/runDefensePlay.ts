@@ -1547,7 +1547,8 @@ export function stepDefensePlay(
    * 이미 0xaa0a8 이 센 타자주자여도 원본은 1점을 또 올린다(0xb6a9c — 원본 그대로, 다만 그때는 보통 0xa990c == 0 이라 G1 이 닫혀 있다).
    * 52b26 에서 풀린 그림은 52b36 → 52b42 로 되풀이를 멈추고 그린 뒤(G3 · G4), 다음 그림 52c50 이 키 0x498d4(52d9e) 다음 **52e16 의
    * 0x3f060 을 갈래 없이** 부르고서야 0x524c0(52e94)의 G2 · 슬롯 2 로 간다(직접 뜸). 곧 목록 틱이 한 번 더 돌아 앞 주자의 +0x3b 를
-   * 지우므로 같은 목록 틱에 닿은 앞 주자는 0xaa0a8 이 세지 않는다 — 웹은 9 절 `passFastForwardGates` 가 그 목록 틱을 돈다(원본 그대로).
+   * 지우므로 같은 목록 틱에 닿은 앞 주자는 0xaa0a8 이 세지 않는다(원본 버그) — 웹은 9 절 `passFastForwardGates` 가 그 목록 틱을 돌되,
+   * **사용자 결정 2026-10-26: 원본 버그를 고침** — 홈에 닿은 앞 주자의 +0x3b 를 남겨 다음 판 틱 0xaa0a8 이 센다.
    */
   const cameraFastForwardRunIn = (): void => {
     const cameraBallStopped =
@@ -3333,7 +3334,8 @@ export function stepDefensePlay(
      * ```
      * 그래서 풀린 틱은 G1 · 목록 틱 · 카메라 뒤에 G3 · G4 · G1 · 목록 틱이 더 돌고서야 G2 다. 웹 판 틱은 6 절 이동 하나가 목록 틱 하나라
      * 풀린 그림 다음 그림의 목록 틱을 여기서 한 번 더 돈다(`listTickHead` — 앞 목록 틱의 야수 준비 틱 몫 · `listTickMove`). 같은 목록 틱에
-     * 타자주자와 함께 홈에 닿은 앞 주자는 그 목록 틱이 +0x3b 를 지워 다음 슬롯 2 의 0xaa0a8 이 세지 않는다(원본 그대로).
+     * 타자주자와 함께 홈에 닿은 앞 주자는 원본에서 그 목록 틱이 +0x3b 를 지워 다음 슬롯 2 의 0xaa0a8 이 세지 않는다(원본 버그) —
+     * **사용자 결정 2026-10-26: 원본 버그를 고침** — 웹은 그 앞 주자의 +0x3b 를 남겨 센다.
      */
     const passFastForwardGates = (
       input: PlayGateInput,
@@ -3358,8 +3360,22 @@ export function stepDefensePlay(
         // 다음 그림 머리 52e16 의 0x3f060 — G1 이 열렸으면 목록 틱 한 번 더
         listTickOpen = call(drawn)
         if (listTickOpen) {
+          // **사용자 결정 2026-10-26: 원본 버그를 고침.** 원본은 이 목록 틱 머리 0xbf094(bf0a2)가 +0x3b 를 지워, 타자주자와 같은
+          // 목록 틱에 홈을 밟은 앞 주자를 0xaa0a8 이 못 센다(1점이 빠지고 +0x96 이 안 서 관문이 늘 열려 판이 안 끝난다 — r247).
+          // 웹은 그 앞 주자의 +0x3b 를 이 목록 틱 뒤에도 남겨, 다음 판 틱 6f 절의 0xaa0a8 이 (타자주자 다음 차례로) 센다.
+          // 카메라가 푸는 것은 홈런(+0x111 · +0x129)뿐이라 이 갈래도 홈런에만 선다
+          const homeArrivals = runners.filter(
+            (runner) =>
+              runner.arrivedThisListTick &&
+              !runner.counted &&
+              !runner.state.isOut &&
+              !runner.state.scored &&
+              runner.state.targetBase === 4 &&
+              isAtTarget(runner.state),
+          )
           listTickHead()
           listTickMove()
+          for (const runner of homeArrivals) runner.arrivedThisListTick = true
         }
       }
       const counterBeforeHead = counter
