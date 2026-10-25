@@ -51,17 +51,17 @@ describe('힌트 팝업 글', () => {
     )
   })
 
-  it('다른 모드에서 열린 팀은 "일반모드에서 사용 할 수 있습니다" 만 붙는다', () => {
+  it('나리 101(0x14114)에서 열린 팀은 0xcc1ec "%s!N%s!N!N%s" — [225] · [226+k] · [1]', () => {
     const message = hiddenTeamHintMessage(10, { openedHiddenIds: [10], mode: TEAM_GAME_MODE.시즌 })
 
-    expect(message).toBe(ORIGINAL_MODE_TEXT[225] + ORIGINAL_MODE_TEXT[226] + ORIGINAL_MODE_TEXT[1])
+    expect(message).toBe(`${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[226]}!N!N${ORIGINAL_MODE_TEXT[1]}`)
   })
 
-  it('다른 모드에서 잠긴 팀은 두 줄이 모두 붙는다', () => {
+  it('나리 101(0x14114)에서 잠긴 팀은 0xcc1fc "%s!N%s!N!N%s!N%s" — [225] · [226+k] · [0] · [1]', () => {
     const message = hiddenTeamHintMessage(14, { openedHiddenIds: [], mode: TEAM_GAME_MODE.시즌 })
 
     expect(message).toBe(
-      ORIGINAL_MODE_TEXT[225] + ORIGINAL_MODE_TEXT[230] + ORIGINAL_MODE_TEXT[0] + ORIGINAL_MODE_TEXT[1],
+      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[230]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`,
     )
   })
 

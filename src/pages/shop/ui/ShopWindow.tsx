@@ -34,6 +34,11 @@ interface ShopWindowProps {
   readonly money: number
   /** 팝업이 떠 있으면 창은 키를 안 받는다 */
   readonly isKeyEnabled: boolean
+  /**
+   * 취소 키(CLR) — 상점 111 키 0x13460 의 종류 1(1364e → 13722) · 2(1372e → 13b16)는 확인이 아닌 키가 −16 이면
+   * `0xbcb49(0x6e)` 로 110 아이템 하위 메뉴에 돌아간다(13b1e). 안 주면 받지 않는다.
+   */
+  readonly onCancel?: () => void
 }
 
 /**
@@ -49,7 +54,7 @@ interface ShopWindowProps {
  * 커서 칸이 비었으면 이름 · 값 · 설명을 그리지 않는다(종류 2 칸 > 6 은 0x826a6 · 0x827c6 · 0x828b4, 종류 5 안 가진 칸은 0x82646).
  */
 export function ShopWindow({
-  kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled,
+  kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled, onCancel,
 }: ShopWindowProps) {
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const modeUiOrigins = useFrameOrigins(MODE_UI)
@@ -61,6 +66,10 @@ export function ShopWindow({
   useEffect(() => {
     if (!isKeyEnabled) return undefined
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && onCancel !== undefined) {
+        event.preventDefault()
+        return onCancel()
+      }
       const key = slotGridKeyOf(event.key)
       if (key === null) return
       if (key === '확인') onSelect(cursor)

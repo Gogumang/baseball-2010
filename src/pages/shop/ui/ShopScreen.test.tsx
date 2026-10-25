@@ -47,6 +47,29 @@ describe('상점 구매 확인', () => {
   })
 })
 
+describe('CLR 로 110 에 돌아간다 — 0x13460 종류 1(13722) · 2(13b16) → 13b1e 0xbcb49(0x6e)', () => {
+  it.each(['서브', 'GP'])('%s 창에서 Escape 는 onBack', (initialTab) => {
+    const onBack = vi.fn()
+    render(<ShopScreen initialTab={initialTab} career={{ ...createCareer('테스터'), gamePoint: 9999 }} noticeText=""
+      onPurchase={vi.fn()} onBack={onBack} />)
+
+    pressKey('Escape')
+
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('확인 창이 떠 있으면 Escape 는 창만 닫는다 — 상점은 그대로', () => {
+    const onBack = vi.fn()
+    render(<ShopScreen initialTab="GP" career={{ ...createCareer('테스터'), gamePoint: 9999 }} noticeText=""
+      onPurchase={vi.fn()} onBack={onBack} />)
+
+    pressKey('Enter')
+    pressKey('Escape')
+
+    expect(onBack).not.toHaveBeenCalled()
+  })
+})
+
 describe('GP 결과 창 (0x872a1)', () => {
   it('detail 이 있으면 결과 창이 뜨고 목록 키는 막힌다 — Enter 로 닫으면 onCloseGpDetail 만 (굴림 없음)', () => {
     const before = { ...createCareer('테스터'), gamePoint: 9999, morale: 30 }
