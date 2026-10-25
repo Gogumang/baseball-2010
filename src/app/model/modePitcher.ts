@@ -88,6 +88,11 @@ export interface ModePitcher {
    */
   readonly equipmentLevels?: PitcherAbility
   /**
+   * 피부 `(rec[0xb] >> 2) & 3` — 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림 적재 0x793b0 에 넘겨 794c2 가 `pitcher.pzx` 를
+   * 피부 × 15 + 수비 팀(사람 칸 팀) 벌로 연다. 대체 투수는 0
+   */
+  readonly skinIndex: number
+  /**
    * 장착 비트(+0x14)의 **투수 스킬 번호**(비트 + 16) — CPU 타자 스윙 0xab214 의 스킬 갈래(ab91c~)가 모드 검사 없이
    * `0xb62b4(투수, n)` 로 읽는다 (`equippedPitcherSkillIdsOf`)
    */
@@ -138,6 +143,7 @@ function rookieModePitcher(): ModePitcher {
     isCool: false,
     hasSpiritSkill: false,
     skillIds: [],
+    skinIndex: profile.skinIndex,
   }
 }
 
@@ -148,9 +154,11 @@ function modePitcherFromRecord(
   record: { readonly equippedSkillIds: readonly number[]; readonly equipmentLevels?: PitcherAbility },
   stamina: number,
   plate: ModePitcher['plate'],
+  skinIndex: number,
   recordLine?: readonly number[],
 ): ModePitcher {
   return {
+    skinIndex,
     ...(plate === undefined ? {} : { plate }),
     ...(recordLine === undefined ? {} : { recordLine }),
     ...(record.equipmentLevels === undefined ? {} : { equipmentLevels: record.equipmentLevels }),
@@ -178,6 +186,7 @@ export function modePitcherOf(career: PitcherCareer | null): ModePitcher {
     // 저장된 나리 투수의 +0x2c (`PitcherCareer.stamina`)
     career.stamina,
     { name: career.name, role: career.role },
+    career.skinIndex,
     pitcherRecordLineOf(career.stats),
   )
 }
@@ -209,6 +218,7 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
     MISSION_STAMINA,
     // ⚠️ 보직을 안 남긴 옛 명전 기록은 보직이 없다(판 없음) — 원본 기록에는 늘 있는 칸이다
     famer.role === undefined ? { name: famer.name } : { name: famer.name, role: famer.role },
+    famer.look.skinIndex,
     famer.recordLine,
   )
 }

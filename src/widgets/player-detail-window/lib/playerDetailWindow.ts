@@ -202,7 +202,10 @@ const ACE_BATTER_GRADES: readonly number[] = [20, 30, 40, 50, 40]
 export function playerDetailOf(source: PlayerDetailSource): PlayerDetail {
   const isAce = source.aceIndex >= 0
   const aceGrade = isAce ? (source.isPitcher ? ACE_PITCHER_GRADES : ACE_BATTER_GRADES)[source.aceIndex] : undefined
-  const salary = textValue(salaryTextOf((source.grade ?? aceGrade ?? 0) * 1000))
+  // 5c848~5c886 — 모드 3 · 4 의 육성 선수는 저장 +0x1c8 × 100, 그 밖은 +0x1b × 10 × 100
+  const salary = textValue(source.nurturedSalary !== undefined
+    ? salaryTextOf(source.nurturedSalary * 100)
+    : salaryTextOf((source.grade ?? aceGrade ?? 0) * 1000))
   if (source.isPitcher) {
     const { form, magicNumber, pitchMask } = source.repertoire ?? { form: 0, magicNumber: 0, pitchMask: 0 }
     const pitches: string[] = []

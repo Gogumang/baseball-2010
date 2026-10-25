@@ -9,6 +9,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
 import { burstObjectTicks, resetBurstObjectTicks } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 /**
  * 돌발미션 창 (경기 장면 상태 0x1b — 그리기 0x8f3c0 · 갱신 0x8e5b8).
@@ -96,11 +97,23 @@ describe('돌발미션 창 닫기', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('판 자리 누름 칸으로도 닫힌다', () => {
+  it('누름 칸으로도 닫힌다 — 아무 키와 같은 길이라 화면 전체가 누름 칸이다 (0x8e60c)', () => {
     const { onClose } = 띄우기()
     다열기()
-    fireEvent.click(screen.getByTestId('돌발미션-넘기기'))
+    const 칸 = screen.getByTestId('돌발미션-넘기기')
+    expect([칸.style.left, 칸.style.top, 칸.style.width, 칸.style.height]).toEqual(['0px', '0px', '240px', '320px'])
+    fireEvent.click(칸)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * r195 사용자 보고 "타자편에서 미션 완료 후 대화가 나오면 클릭이 안 넘어가" — 결과 창이 설 때 다음 타석 0xe 대기가 이미 실려
+   * 경기 화면 전체 '확인' 누름 칸(PressArea 7, 창 동안 꺼짐)이 서는데, 창 덮개가 5 라 그 아래였다. 클릭 · 탭이 꺼진 칸에 먹혔다.
+   */
+  it('창 덮개는 경기 화면의 누름 칸보다 위 겹이다 — 클릭 · 탭이 뒤 화면의 꺼진 확인 칸에 먹히지 않는다', () => {
+    const { dialog } = 띄우기({ judgement: '성공', row: 행() })
+    expect(Number(dialog.style.zIndex)).toBe(SCREEN_LAYERS.SCENE_WINDOW)
+    expect(SCREEN_LAYERS.SCENE_WINDOW).toBeGreaterThan(SCREEN_LAYERS.PRESS_AREA)
   })
 
   it('성공을 닫으면 보상 글을 공용 창에 띄운다 (0x8e5b8 → 0x74ef5)', () => {

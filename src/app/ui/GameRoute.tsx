@@ -23,6 +23,7 @@ import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
@@ -124,6 +125,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), sceneSerialRef.current)
   /** 수비 재생 · 중계 바탕 0x35218 의 팔레트 줄 — 수비 구장 +0xc(0x39fdc 모드 4 의 0x788f8, 0~9 는 타석 줄과 같다) */
   const grassPalette = sceneFieldPaletteOf(session.sceneStadium)
+  // 타석 바닥 · 수비 바탕을 미리 칠한다 — 원본은 구장 객체 적재 때 팔레트를 갈아 끼운다
+  useWarmFieldBackgrounds(grassPalette)
 
   /**
    * **자동진행 중계(상태 0x21)** — 내 타석 사이에 돈 동료 타석 · 상대 반 이닝(`progress.autoRelay`)을 틱마다 한 칸씩 튼다.

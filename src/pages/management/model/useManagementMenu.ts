@@ -14,8 +14,14 @@ import {
 
 /** 커서를 옮긴 뒤 두 번 갱신하는 동안 +1, −1 로 튄다 (카운터 +0x98) */
 const BOUNCE_BY_UPDATE = [1, -1]
-/** r_event_txt[176] 트레이닝·휴식·외출은 관리 주기마다 한 가지만 */
-const CYCLE_COMMANDS = ['트레이닝', '휴식', '외출']
+/**
+ * 관리 메뉴에 **막힌 칸은 없다** — 105 키 0x1261c 는 확인(−5 · '5')이면 켬 표(+0x28)를 보지 않고 커서 칸으로 곧장 간다
+ * (12644~12670 점프표 0xcc540 · 칸 3 = 126be → 0x70 = 112). 켬 표가 0 인 칸(행동함이면 트레이닝 · 휴식 · 외출, 첫 해
+ * 10경기 전 외출 — 105 진입 0x11910)은 흑백으로 그려질 뿐이고(`nariMainMenuOffIdsOf` → 커맨드 줄 0x7e418), 켬 표를 보는 곳은
+ * 메뉴 키 0x6c520(6c54e~6c55c — 숫자 바로 고르기만 막는다) 하나다. r_event_txt[176] "한 가지만" 은 안내 글일 뿐 원본 코드가
+ * 막지 않는다(107 키 0x12d48 · 휴식 1261c 12682 · 113 가드 0x16cf0 모두 S+4 를 안 본다) — 원본 그대로 옮긴다
+ */
+const NO_DISABLED_IDS: ReadonlySet<string> = new Set()
 const SUB_MENU_KINDS: readonly string[] = ['선수정보', '트레이닝', '아이템']
 /** 트레이닝 하위 메뉴 칸 4 — 능력 훈련(칸 0~3)과 흐름이 다르다 */
 const SPECIAL_SWING_MENU_ID = '필살타법'
@@ -60,15 +66,45 @@ export function useManagementMenu(props: ManagementScreenProps) {
   /** 예/아니오 질문 (StrMODE[85] 훈련 · [90] 휴식) */
   const [question, setQuestion] = useState<{ text: string; onYes: () => void } | null>(null)
   const update = useUpdateCounter()
-  // 훈련 연출이 끝나면 결과를 반영하고 메인 메뉴(상태 0x69)로 돌아간다
+  /*
+   * 125 의 결과 창 — 연출이 끝난 틀(0x18dd8 의 0x84e58 → 0x17f5c)부터 그 창이 닫힐 때까지 원본은 아직 125 다. 칸 0~3 은 상세 결과 창
+   * (닫으면 콜백 0x1b5b8 이 `0xbcb49(0x69)`), 칸 4(필살타법)는 알림 창(닫히면 틀 0x18dd8 이 105)이다. 그동안 그림 0x19da4 는 가운데
+   * 판 0x7f814 를 빼고(19dc0~19dd4 — 상태 0x7d), 커맨드 줄은 125 진입이 세운 107 표 그대로다(0x1cdec 1ce1e → 0x7e84c(0x7d) 는
+   * 0x6b 와 같은 다섯 칸, 커서는 107 메뉴 객체). 'pending' 은 훈련을 굴린 그 갱신 — 어느 창이 떴는지 다음 그림에서 본다
+   */
+  const [trainingResult, setTrainingResult] = useState<'pending' | 'detail' | 'notice' | null>(null)
+  // 훈련 연출이 끝나면 결과를 반영한다 — 메인 메뉴(상태 0x69)로는 결과 창이 닫힐 때 돌아간다(아래 효과)
   const playback = useTrainingPlayback((menuId) => {
+    setTrainingResult('pending')
     props.onTraining(menuId)
+  })
+  useLayoutEffect(() => {
+    if (trainingResult === null) return
+    if (trainingResult === 'pending') {
+      if (props.detail !== null) return setTrainingResult('detail')
+      if (props.noticeText !== '') return setTrainingResult('notice')
+    } else if (trainingResult === 'detail' ? props.detail !== null : props.noticeText !== '') return
+    // 창이 닫혔다(창이 아예 안 떴으면 곧바로) — 125 → 105. 상세 창 뒤 부상 알림은 105 위에 뜬다(0x1b5b8 이 알림 0x28 을 띄운 뒤 예약)
+    setTrainingResult(null)
     open('main', null)
-    // 125 → 105 — 커서는 메뉴 객체 그대로(트레이닝 칸). 행동함이면 105 진입이 첫 칸으로 (아래 `awaitingEntry`)
+    // 커서는 메뉴 객체 그대로(트레이닝 칸). 행동함이면 105 진입이 첫 칸으로 (아래 `awaitingEntry`)
     setMainCursor(COMMAND_SLOTS.findIndex((slot) => slot.id === '트레이닝'))
   })
+  /** 상태 125 — 연출(`playback`)과 결과 창 */
+  const isTrainingState = playback.playingMenuId !== null || trainingResult !== null
+  /**
+   * 127 휴식 — 'playing' 은 연출(0x85230 · 그리기 0x19e08), 'result' 는 연출 뒤 결과 창(0x18e3c)이 떠 있는 동안이다.
+   * 127 은 가운데 판 0x7f814 를 빼는 상태라(0x19da4 의 19dc0~19dd4) 두 때 모두 가운데 판을 그리지 않는다. 결과 창이 닫히면
+   * 0x1b466 이 105 로 — 그때 걷는다(아래 효과). 회복 알림은 105 위에 뜬다: 창 콜백 0x1b308 이 창을 닫고(0x742a9) 굴린 뒤
+   * 알림 0xbbef9 를 띄우고(1b45c) 0xbcb49(0x69) 를 예약하면(1b466), 다음 틀 머리 0x1cdec 의 0xbc9c9 가 창과 상관없이 105 를
+   * 세운다(창 게이트 0x754f9 는 1d070 에서 키만 막는다) — 알림이 떠 있는 동안 가운데 판이 보이는 것이 원본이다
+   */
+  const [restPhase, setRestPhase] = useState<'playing' | 'result' | null>(null)
+  useLayoutEffect(() => {
+    if (restPhase === 'result' && props.detail === null) setRestPhase(null)
+  })
   const slots = kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[kind]
-  const disabledIds = new Set(kind === 'main' && props.career.hasActedThisCycle ? CYCLE_COMMANDS : [])
+  const disabledIds = NO_DISABLED_IDS
 
   const setMainCursor = (index: number) => {
     mainCursor.current = index
@@ -90,7 +126,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
     setMovedAt(update)
   }
   const back = () => {
-    if (playback.playingMenuId !== null) return
+    // 125 키 0x105a4 · 127 키 0x10650 은 확인만 본다 — 취소 없음(결과 창은 제 키로 닫힌다)
+    if (isTrainingState || restPhase === 'playing') return
     // 120 의 취소 → 119 (0x1b654)
     if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
     if (overlay !== null) return setOverlay(null)
@@ -111,8 +148,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
    */
   const wasActed = useRef(props.career.hasActedThisCycle)
   const [awaitingEntry, setAwaitingEntry] = useState(false)
-  const isIdleMain = kind === 'main' && playback.playingMenuId === null && props.detail === null && question === null
-    && overlay === null && !isShowingBasicInfo
+  const isIdleMain = kind === 'main' && !isTrainingState && restPhase === null && props.detail === null
+    && question === null && overlay === null && !isShowingBasicInfo
   useLayoutEffect(() => {
     if (props.career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
     wasActed.current = props.career.hasActedThisCycle
@@ -131,14 +168,15 @@ export function useManagementMenu(props: ManagementScreenProps) {
   }
 
   const select = (id: string) => {
-    if (playback.playingMenuId !== null || question !== null || props.detail !== null || overlay !== null) return
+    if (isTrainingState || restPhase === 'playing' || question !== null || props.detail !== null || overlay !== null) return
     // 105 키 0x1261c — 확인(−5 · '5')이면 칸(꺼짐 · 하위 메뉴)을 보기 전에 0x12654 mgr+0x304 = 0
     if (kind === 'main') props.onMainConfirm?.()
     if (disabledIds.has(id)) return
     if (kind === 'main') {
       if (SUB_MENU_KINDS.includes(id)) return open(id as SubMenuKind, COMMAND_SLOTS.find((slot) => slot.id === id) ?? null)
       if (id === '휴식' && !props.isRestBlocked()) {
-        return ask('!C[!cFFFF00휴식!cFFFFFF]을 취하시겠습니까?', () => props.onSelect('휴식'))
+        // 팝업 0x2a "예" → 127 진입 0x190e4(연출 0x85230). 굴림 · 결과 창 · 저장(0x18e3c)은 연출이 끝난 틀이다(`finishRest`)
+        return ask('!C[!cFFFF00휴식!cFFFFFF]을 취하시겠습니까?', () => setRestPhase('playing'))
       }
       return props.onSelect(id as ManagementCommand)
     }
@@ -177,6 +215,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
         if (event.key === 'Enter' || event.key === 'Escape') props.onCloseDetail()
         return
       }
+      // 127 연출 중 확인 키는 `RestScene` 이 받는다(0x10650) — 그 밖 키는 아무 일도 없다
+      if (restPhase === 'playing') return
       // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8', 나머지 키는 아무 일도 없다)
       if (abilityDetailOffset !== null) {
         if (event.key === 'Escape' || event.key === 'Backspace' || event.key === '0') return setAbilityDetailOffset(null)
@@ -237,7 +277,16 @@ export function useManagementMenu(props: ManagementScreenProps) {
     bounce: movedAt === null ? 0 : (BOUNCE_BY_UPDATE[update - movedAt] ?? 0),
     slideUpdates: Math.max(0, update - openedAt),
     playingMenuId: playback.playingMenuId,
+    /** 상태 125(연출 · 결과 창) — 가운데 판 0x7f814 를 뺀다 */
+    isTrainingState,
     finishTraining: playback.finish,
+    restPhase,
+    /** 127 틀 0x19080 — 연출 끝(0x84e58)을 본 틀에 0x18e3c(사기 굴림 · 결과 창 · 저장) */
+    finishRest: () => {
+      if (restPhase !== 'playing') return
+      setRestPhase('result')
+      props.onSelect('휴식')
+    },
     question,
     answer,
     moveCursor,

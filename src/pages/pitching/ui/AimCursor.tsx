@@ -11,6 +11,7 @@ import type { AimDirection, AimKeyAction } from '@/features/play-pitcher-game/mo
 import { AIM_KEYPAD_KEYS, aimTapRectsOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { PressArea } from '@/shared/ui'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
@@ -57,6 +58,9 @@ const KEYPAD_LABELS: Readonly<Record<string, string>> = {
  * `projectToScreen`) 자리에 slt_pitch 애니 0 을, 존 위에 구질 이름을 그린다. 이 부품은 키 · 틱과, 마우스 길로 조준 영역(자르기
  * 상자의 투영)을 3 × 3 으로 나눈 **투명한 누름 칸**(숫자 1~9, 가운데 = OK)과 CLR 칸만 낸다 (`pitchInputTapZones`).
  */
+/** 조준의 CLR — 구질 고르기로 돌아간다 */
+const AIM_CANCEL_OFFER: TouchKeyOffer = { key: 'Escape', label: '구질로' }
+
 export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false, overlay }: AimCursorProps) {
   const [aim, setAim] = useState<WorldPoint>(() => aimStartOf(side))
   /** 0x10 에 든 뒤 그림 수 — 애니 0 칸 */
@@ -167,7 +171,10 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
           onPress={() => pressKey(key)}
         />
       ))}
-      {onCancel !== undefined && <PressArea rect={CLEAR_PRESS_RECT} label="CLR 구질로" onPress={() => pressKey('Escape')} />}
+      {onCancel !== undefined && (
+        // 조준(0x10)은 "#TIME" 도 CLR 글자도 안 그린다 — 투명 칸이라 터치 기기에는 상황 버튼도 낸다(r194, 키 CLR 과 같은 길)
+        <PressArea rect={CLEAR_PRESS_RECT} label="CLR 구질로" touchKey={AIM_CANCEL_OFFER} onPress={() => pressKey('Escape')} />
+      )}
     </PressLayer>
   )
 }

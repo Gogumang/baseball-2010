@@ -4,7 +4,7 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import type { Collection, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
@@ -493,6 +493,8 @@ function WalkIn({ tick, look, hasInjuryIcon }: {
   const entries = animations?.[endingWalkInAnimationOf(look)]
   const step = entries === undefined ? null : animationStepAt(entries, tick)
   const palette = endingWalkInPaletteOf(look)
+  // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
+  useWarmRecoloredSprites(recolorRequestsOf(WALK_IN.characterFolder, (entries ?? []).map((entry) => entry.frame), palette))
 
   return (
     <div data-palette={palette} data-animation={endingWalkInAnimationOf(look)}>
@@ -531,6 +533,8 @@ function CreditsWalkerSprite({ walker, tick, playerPalette }: {
   const origins = useFrameOrigins(walker.folder)
   const animations = useAnimations(walker.folder)
   const entries = animations?.[walker.animation]
+  // 선수 인물만 칠한다 — 그 애니의 칸 전부를 미리 칠해 넘어가는 칸에 구운 벌이 비치지 않게
+  useWarmRecoloredSprites(recolorRequestsOf(walker.folder, (entries ?? []).map((entry) => entry.frame), walker.isPlayer ? playerPalette : null))
   const step = entries === undefined ? null : animationStepAt(entries, tick)
   if (step === null) return null
   const isFlipped = walker.turnsEvery20 ? Math.trunc(tick / TURN_TICKS) % 2 === 0 : walker.isFlipped

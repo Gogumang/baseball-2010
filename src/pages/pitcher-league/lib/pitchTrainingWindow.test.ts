@@ -4,8 +4,9 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { DEFAULT_PITCHER_ROOKIE_PROFILE } from '@/entities/pitcher-career/model/pitcherRegistration'
 import {
   PITCH_TRAINING_START, cellLookOf, pitchTrainingKeyOutcomeOf, pitchTrainingWindowCostOf, pitchTrainingWindowProgressOf,
-  statusLabelOf, tabMarkTopLeftOf,
+  PITCH_TRAINING_CELL_BOXES, statusLabelOf, tabMarkTopLeftOf,
 } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...createPitcherCareer('테스트', { ...DEFAULT_PITCHER_ROOKIE_PROFILE, breakingPitchSlots: [0, 1] }),
@@ -77,5 +78,23 @@ describe('키 0x17828 · 0x80268', () => {
     expect(pitchTrainingKeyOutcomeOf({ isCellFocus: true, tab: 0, cell: 2 }, 'clr'))
       .toEqual({ kind: 'move', cursor: { isCellFocus: false, tab: 0, cell: 2 } })
     expect(pitchTrainingKeyOutcomeOf(PITCH_TRAINING_START, 'clr')).toEqual({ kind: 'close' })
+  })
+})
+
+/**
+ * r203 — '???' 칸(5 번째, 96~149 × 172~187)의 누름 칸은 창이 띄운 상자(알림 '확인' 100~141 × 177~192, 예/아니오 59~100 · 140~181 —
+ * 헤드리스로 잰 값)의 단추 자리를 덮는다. 상자가 칸 아래 겹(예전 5 < 7)이면 '예' 끝을 누를 때 '???' 칸이 눌려 "아직 배울 수 없는 구질"
+ * 상자가 새로 떴고, 알림 확인은 위 ⅔ 가 죽었다. 칸은 원본 좌표 그대로 두고 상자 겹을 칸 위로 올린다.
+ */
+describe('구질훈련 창 — 칸 누름과 상자 단추가 겹친다', () => {
+  const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+
+  it('\'???\' 칸이 알림 확인 · 예 · 아니오 단추와 겹치므로 상자 겹은 누름 칸보다 위다', () => {
+    const cell = PITCH_TRAINING_CELL_BOXES[4]
+    expect(overlaps(cell, { x: 100, y: 177, width: 41, height: 15 })).toBe(true)
+    expect(overlaps(cell, { x: 59, y: 177, width: 41, height: 15 })).toBe(true)
+    expect(overlaps(cell, { x: 140, y: 177, width: 41, height: 15 })).toBe(true)
+    expect(SCREEN_LAYERS.POPUP_WINDOW).toBeGreaterThan(SCREEN_LAYERS.PRESS_AREA)
   })
 })

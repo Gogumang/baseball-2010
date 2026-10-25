@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
+import { INJURY_FOLLOW_UP_NOTICE } from '@/entities/career/model/condition'
 import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
 import { describe, expect, it } from 'vitest'
 import { NARI_YEAR_START_EVENT_ID } from '@/entities/story/model/storyScene'
@@ -448,6 +449,16 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
     expect(rendered.result.current.screen).not.toEqual({ kind: '이벤트', eventId: 500, context: '관리' })
   })
 
+  it('112 외출 지도 취소 → 105 는 행동함(S+4)을 0 으로 내린다 (키 0x13ba4 13bc8 — 원본 그대로)', async () => {
+    const rendered = 띄우기({ ...createCareer('외출취소'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true, hasActedThisCycle: true })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    act(() => rendered.result.current.setScreen({ kind: '외출' }))
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
+    act(() => rendered.result.current.session.actions.leaveOutingMap())
+    expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(false)
+    expect(rendered.result.current.screen.kind === '관리' || rendered.result.current.screen.kind === '이벤트').toBe(true)
+  })
+
   it('105 진입마다 자동 훑기 — 상점(111 → 110)에서 돌아오면 안 훑고, 하위 메뉴 취소(106 · 107 · 110 → 105)면 훑는다 (0x1cdec 1ce02 · 0x1cf9c)', async () => {
     const rendered = 띄우기({ ...createCareer('훑기'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true })
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
@@ -882,6 +893,32 @@ describe('훈련·휴식 결과 창 — 변화량은 굴린 값 그대로, 필�
       act(() => rendered.result.current.session.actions.dismissManagementNotice())
       expect(rendered.result.current.session.managementNotice).toBe('')
       expect(rendered.result.current.session.career?.isInjured).toBe(trained?.isInjured)
+    } finally {
+      act(() => rendered.unmount())
+    }
+  })
+})
+
+describe('부상 둘째 팝업 0x29 — 105 틀 0x1aec4 1af3c~1af7e (r197)', () => {
+  it('0x28 "부상을 당했습니다" 를 닫으면 StrMODE[212] 가 이어 뜨고, 그것을 닫아야 알림이 빈다', () => {
+    // 굴림이 모두 낮은 끝이면 부상 굴림(0x1b4c4 rand(0, 10000))이 확률 안에 든다
+    const random = { rand: (lo: number, hi: number) => Math.min(lo, hi), rand9d: () => 0 }
+    const saveGame = 메모리저장({ ...createCareer('부상팝업'), morale: 5 })
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    try {
+      act(() => rendered.result.current.session.actions.continueSaved())
+      act(() => rendered.result.current.session.actions.runTrainingMenu('히트'))
+      act(() => rendered.result.current.session.actions.closeManagementDetail())
+      expect(rendered.result.current.session.managementNotice).toBe('부상을 당했습니다.')
+      act(() => rendered.result.current.session.actions.dismissManagementNotice())
+      expect(rendered.result.current.session.managementNotice).toBe(INJURY_FOLLOW_UP_NOTICE)
+      expect(INJURY_FOLLOW_UP_NOTICE).toContain('60% 감소')
+      act(() => rendered.result.current.session.actions.dismissManagementNotice())
+      expect(rendered.result.current.session.managementNotice).toBe('')
     } finally {
       act(() => rendered.unmount())
     }

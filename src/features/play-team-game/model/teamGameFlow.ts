@@ -191,6 +191,7 @@ import {
   withAceBatter,
   withEntryRecordSlots,
   withAcePitcher,
+  teamPitcherSkinIndexOf,
 } from '@/features/play-team-game/model/teamGameRoster'
 import type {
   TeamEntryBatter,
@@ -1056,6 +1057,9 @@ export function resumeTeamGame(
     lastDefensePlay: null,
     lastArrivalPlay: null,
     pendingDefensePlay: null,
+    // 수비 장면 연출 칸 · 플레이 +0xf0 · 야수 +0xcc(`DefenseScene`)는 경기 장면 객체 쪽이다 — 상태 7 의 0x3e340 이 플레이(new(0x1fc))와
+    // 야수 아홉(생성자 a0df0 +0xcc = 0)을 새로 만든다. 저장 블록(0x4f928 — 팀 둘 · st 0xa4 · 플레이 시간)에는 없다(r196)
+    defenseScene: undefined,
     scenePinchHit: null,
     scenePitcherChange: null,
     // 장면 초기화 0xc0e60 — sim+0x9f(중단)는 전역 기록에서 되살리고 sim+0xa0(자동진행)은 0 이다
@@ -2332,6 +2336,12 @@ export function currentPitcherEquipment(progress: TeamGameProgress): readonly nu
   const entry = pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
   if (entry === undefined || entry.aceIndex >= 0) return undefined
   return entry.equipment
+}
+
+/** 사람 타석 마운드의 상대 투수 피부 (`teamPitcherSkinIndexOf` — 0x47cc8 의 482c0~482fc → 0x793b0 의 794c2) */
+export function currentPitcherSkinIndex(progress: TeamGameProgress): number {
+  const teamId = progress.options.opponentTeamId
+  return teamPitcherSkinIndexOf(teamId, pitcherEntryAt(progress, teamId, progress.opponentPitcherIndex))
 }
 
 /** 우리 선발 투수의 경기용 능력치 (제구·구속·변화·체력) */
@@ -4543,6 +4553,8 @@ function substitutionSceneAfter(
   const incomingIsAce = aceIndex >= 0
   return {
     serial: (progress.substitutionScene?.serial ?? 0) + 1,
+    // 0x38b64 의 가지 — 투수 ptc/004 · 타자 ptc/003
+    entryKind: side,
     incomingIsAce,
     entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: progress.game.bases }),
     ...(incomingIsAce ? { aceSlot: aceCutInSlotOf(side, aceIndex) } : {}),

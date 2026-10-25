@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { MutableRefObject } from 'react'
@@ -36,6 +37,8 @@ import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { gameMatchupCardsOf } from '@/pages/game/lib/gameMatchupCards'
+import { gameStageWarmCastOf } from '@/pages/game/lib/gameStageWarmCast'
+import { useWarmStageCast } from '@/widgets/batting-stage/model/useWarmStageCast'
 import { gameHalfInningCardsOf } from '@/pages/game/lib/gameHalfInningCards'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
@@ -44,6 +47,7 @@ import {
   mySpecialSwingRemainingOf,
   opponentMoundStaminaPercentOf,
   opponentPitcherEquipmentOf,
+  opponentPitcherSkinIndexOf,
   ourRunnerAcesOf,
   runnerRunAbilitiesOf,
   stealableBasesOf,
@@ -185,6 +189,9 @@ export function GameScreen({
   const menu = useInGameMenuState()
   // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
   useMarksGameScene()
+  // 내 선수 · 상대 투수 명단의 칠하기를 미리 건다 — 원본은 타석 교대 0x47cc8 의 적재 때 칠해 첫 그림부터 제 색이다(`gameStageWarmCastOf`)
+  const stageWarmCast = gameStageWarmCastOf(progress, career)
+  useWarmStageCast(stageWarmCast)
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
   // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
@@ -227,7 +234,13 @@ export function GameScreen({
    * 타석 중간(볼 · 스트라이크 · 파울 · 판 끝 · 견제 끝의 0xf 진입, be9a27f)이면 진행기가 새 대기(entries 1)와 `confirmsBefore` 0
    * 연출을 싣는다 — 곧장 서고, 카운트는 그대로(0xd 가 앞 상태 0x16 이라 타석 초기화를 건너뜀, 48e94) 0xe 의 OK 를 기다린다.
    */
-  const substitution = useSubstitutionScene(progress.substitutionScene, progress.sceneConfirm, isSceneUncovered)
+  const substitution = useSubstitutionScene(
+    progress.substitutionScene,
+    progress.sceneConfirm,
+    isSceneUncovered,
+    // 0xe 첫 그림의 0x38b64 — 타석 캔버스가 그린 투수 · 타자 자리에 등판 파티클
+    (scene) => emitSubstitutionEntryParticle(scene.entryKind),
+  )
   const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {
@@ -390,6 +403,10 @@ export function GameScreen({
             pitcherAbility={pitcherAbility}
             // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
             pitcherEquipmentNibbles={opponentPitcherEquipmentOf(progress)}
+            // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(482c0~482fc → 0x793b0 의 794c2) — 수비 팀 = 상대
+            pitcherSkinIndex={opponentPitcherSkinIndexOf(progress)}
+            pitcherTeamIndex={progress.opponentTeamId}
+            warmCast={stageWarmCast}
             // 마선수 대결의 상대 마투수 마구 횟수 = 0xd8509[mgr[0x13a + 순번]] (0xaebe4)
             aceLevels={aceLevels}
             {...(cpuMagic === undefined ? {} : { cpuMagic })}

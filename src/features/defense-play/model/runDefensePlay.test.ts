@@ -409,8 +409,9 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
 
   it('펌블이 나면 쥐지 않고, 틱 끝 0xb3148 이 공을 그 야수 자리에서 다시 쏘아 새 예보로 줍는다 (b4280 · b45a4)', () => {
     // 2루수(3)가 줍는 땅볼 — 투수(0)는 선수가 없어 펌블하지 않는다(아래 시험). 쫓는 야수가 2루수라 필살수비 A · B 를 굴린다.
-    // 굴림 차례: 필살수비 A · B 실패(0.9) → 레이저 실패(0.9) → 펌블 성공(0) → 0xb3148 의 rand(−20, 20)(0.9 → +16)
-    const 결과 = 굴림포함(차례난수([0.9, 0.9, 0.9, 0, 0.9]), { trajectory: battedBallTrajectory(이루수땅볼) })
+    // 굴림 차례: 필살수비 A · B 실패(0.9) → 펌블 성공(0) → 0xb3148 의 rand(−20, 20)(0.9 → +16).
+    // 레이저 굴림 0x66a8c 는 공 가진 야수가 외야수일 때만 돈다(0x523e6 — r201, 예전엔 내야 땅볼에도 0.9 하나를 먹었다)
+    const 결과 = 굴림포함(차례난수([0.9, 0.9, 0, 0.9]), { trajectory: battedBallTrajectory(이루수땅볼) })
     const 보통 = 굴림포함(고정난수(0.9), { trajectory: battedBallTrajectory(이루수땅볼) })
 
     expect(결과.fumbled).toBe(true)
@@ -443,10 +444,10 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
   })
 
   it('악송구가 나면 받을 야수가 아니라 예보 vt24(0)가 고른 야수가 줍는다 (0xa1828 · 0xb2e38 b2f8c 세계 · b307c)', () => {
-    // 굴림 순서대로 값을 먹인다: (필살수비 A → B) → (레이저) → 펌블 → 악송구.
+    // 굴림 순서대로 값을 먹인다: (필살수비 A → B) → 펌블 → 악송구.
     // 대표 땅볼(원본 궤적)은 투수(0)가 줍는다 — 쫓는 야수가 투수·포수면 필살수비를 안 굴린다(0x50faa).
-    // 레이저 굴림 0x66a8c 는 쫓는 야수+0xec 를 본다 — 투수 칸은 공수 교대 판 0x3fac4 가 넣은 지명타자라 굴린다.
-    // 그래서 레이저 0.9 · 펌블 0.9, 악송구만 성공(0) 시켜 **악송구만** 떼어 본다.
+    // 레이저 굴림 0x66a8c 는 공 가진 야수가 외야수일 때만 돈다(0x523e6 — r201, 예전엔 투수가 줍는 땅볼에도 굴렸다).
+    // 그래서 펌블 0.9, 악송구만 성공(0) 시켜 **악송구만** 떼어 본다.
     // 투수의 악송구 보정은 선수 없는 칸의 8 이다(b10a2 — 판 시작이 칸 0 의 선수를 안 찾는다, b1032).
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
@@ -455,7 +456,7 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
       outs: 0,
       // 키 없는 사람 수동 송구는 안 던지므로 사람이 '8'(홈 송구)을 누른 판으로 본다 — 사람 송구는 특수 굴림이 없다
       controls: 계속누름('수비', '8'),
-      random: 차례난수([0.9, 0.9, 0, 0.9]),
+      random: 차례난수([0.9, 0, 0.9]),
     })
 
     expect(결과.fumbled).toBe(false)
@@ -478,7 +479,8 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
       bases: 주자1루,
       outs: 0,
       controls: 계속누름('수비', '8'),
-      random: 차례난수([0.9, 0.9, 0, 0.9]),
+      // 펌블(0.9) → 악송구(0) — 레이저는 외야수만 굴린다(0x523e6, r201)
+      random: 차례난수([0.9, 0, 0.9]),
     })
     expect(결과.log).toContain('9틱 0루로 송구 — 13틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
     const 투수 = (tick: number) => {
@@ -665,25 +667,24 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     expect(state.ticks.some((view) => view.bigOut != null)).toBe(false)
   })
 
-  it('큰 OUT 은 결과 판 타이머(메시지 0xbba 의 10 그림) 안에서만 — 뜬공 아웃(13) 뒤 레이저 단계 3 이 +0x1998 을 세운 그림부터 남은 타이머만큼 애니 2', () => {
-    // 원본 표 코드 0 패턴 [100, 757, 705, 0] — 유격수(5)가 16틱 뜬공 아웃(메시지 13 · 타이머 10) 뒤 19틱 레이저 발사(단계 0 이 +0x1997 = 0),
-    // 22틱 그리기의 단계 3 이 +0x1998 을 세워 23 · 24 · 25틱에 애니 2 의 35 · 35 · 36 을 유격수 자리에 그리고 타이머가 다한다.
-    // (투수가 잡는 뜬공은 레이저 굴림 0x66a8c 가 +0xec 없음으로 난수 없이 실패한다 — 투수 칸은 선수가 없다)
+  it('내야수가 잡은 뜬공 뒤에는 레이저도 큰 OUT 도 없다 — 레이저 굴림은 공 가진 야수가 외야수일 때만(0x523e6)', () => {
+    // 원본 표 코드 0 패턴 [100, 757, 705, 0] — 유격수(5)가 16틱 뜬공 아웃(메시지 13 · 타이머 10). 예전 웹은 0x523e6 의 외야 관문을
+    // "준비됐는지" 로 읽어 유격수에게도 레이저를 굴려 19틱 발사 · 22틱 단계 3 의 +0x1998 로 23~25틱 큰 OUT 을 그렸다(r201 에서 걷음).
+    // 큰 OUT 이 결과 판 타이머 안에서만 남은 그림만큼 그려지는 것은 `laserPresentation.test.ts` 가 본다
     const pattern: BattedBallPattern = [100, 757, 705, 0]
     let state = startDefensePlay({
       outcome: { kind: '아웃', detail: '땅볼아웃' },
       trajectory: battedBallTrajectory(pattern),
       bases: 주자1루,
       outs: 0,
-      random: 차례난수([0, 0, 0.999, 0]),
+      // 굴림 차례: 필살수비 A(0) → 펌블(0.999, 실패) — 레이저 굴림이 없어 예전 차례 [0, 0, 0.999, 0] 에서 하나 빠진다
+      random: 차례난수([0, 0.999, 0]),
       controls: 계속누름('수비', '2'),
     })
     while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '2', isRepeat: false })
-    expect(state.ticks.filter((view) => view.bigOut != null).map((view) => [view.tick, view.bigOut!.frame, view.bigOut!.holderSlot])).toEqual([
-      [23, 35, 5],
-      [24, 35, 5],
-      [25, 36, 5],
-    ])
+    expect(state.log).toContain('16틱 0번 주자 뜬공 아웃 (0xb36d0 결과 1)')
+    expect(state.log.some((line) => line.includes('레이저'))).toBe(false)
+    expect(state.ticks.some((view) => view.bigOut != null)).toBe(false)
   })
 })
 
@@ -1487,12 +1488,12 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     })
 
     it('받는 것도 포구 틱 갈래다 — 펌블 굴림 b4228 을 먹고, 움직이는 송구공을 놓치면 0xb3148 로 튕긴다 (b307c → 포구 틱)', () => {
-      // 씨앗 7 — 공을 바꾸며(r176) 다시 골랐다
-      const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(7) })
+      // 씨앗 95 — 공을 바꾸며(r176) 7 로, 레이저 굴림을 외야수만 돌리며(0x523e6, r201 — 투수가 줍는 이 공은 이제 굴림이 없다) 다시 골랐다
+      const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(95) })
 
       expect(결과.log).toContain('7틱 0루로 송구 — 11틱 도착 (CPU 결정) (0번 야수)')
       expect(결과.log).toContain('11틱 1번 야수 펌블 (0xbc2)')
-      expect(결과.log).toContain('11틱 공 튕김 (0xb3148) — 속도 567 · v0 47 · 각 63 · 1번 야수가 27틱에 줍는다')
+      expect(결과.log).toContain('11틱 공 튕김 (0xb3148) — 속도 567 · v0 47 · 각 91 · 1번 야수가 27틱에 줍는다')
       expect(결과.log).toContain('27틱 1번 야수가 잡았다 (종류 0)')
       expect(결과.fumbled).toBe(true)
     })
@@ -1741,27 +1742,29 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
     })
   })
 
-  it('내야수 → 내야수 송구는 레이저 표시를 지운다 — 확정돼 있어도 보통 송구(악송구 굴림 포함)로 나간다 (b2ee6)', () => {
+  it('내야수 → 내야수 송구는 레이저 표시를 지운다 — 확정돼 있어도 보통 송구(악송구 · 흔들림 굴림 포함)로 나간다 (b2ee6)', () => {
+    // 레이저 굴림 0x66a8c 는 공 가진 야수가 외야수일 때만 돈다(0x523e6, r201). 그래서 좌익수(7)가 쫓는 공에 굴려 확정한 뒤
+    // 그가 펌블해 튕긴 공(0xb3148)을 유격수(5)가 주워 2루수(3)에게 던지는 판으로 본다 — 확정 칸(+0x19ae)은 쥔 야수가 바뀌어도 남는다.
+    // 굴림 차례: 필살수비 A · B(0.9, 실패) → 레이저(0, 통과 — 사람 수비라 반짝임, 같은 틱 새 키로 확정) → 펌블(0, 좌익수) →
+    // 튕김 rand(−20, 20)(0.5) → 펌블(0.999, 실패) → 그 뒤 0.999 · 0
     let state = startDefensePlay({
       outcome: 땅볼아웃,
-      trajectory: battedBallTrajectory(이루수땅볼),
+      trajectory: battedBallTrajectory([115, 1401, 400, 2]), // 원본 코드 19
       bases: 주자1루,
       outs: 0,
-      // 굴림 차례: 필살수비 A · B(0.9, 실패) → 레이저(0, 확정) → 펌블(0.999, 실패) → 그 뒤 0.
-      // 2루수가 줍는 땅볼이다 — 투수가 줍는 대표 땅볼은 레이저 굴림 0x66a8c 가 +0xec 없음으로 난수 없이 실패한다(66aa6)
-      random: 차례난수([0.9, 0.9, 0, 0.999, 0]),
-      controls: 계속누름('수비', '6'),
+      random: 차례난수([0.9, 0.9, 0, 0, 0.5, 0.999, 0.999, 0]),
+      controls: 계속누름('수비', '2'),
     })
-    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '6', isRepeat: false })
+    while (!isDefensePlayFinished(state)) state = stepDefensePlay(state, { key: '2', isRepeat: false })
 
     // 확정(+0x19ae)으로 0x400bc 가 쏘아 +0x1f4 를 세우고 경기를 멈춘다 — 연출 0x4403c 단계 0 이 +0x19ae 를 내린다.
-    // 2루수(3)가 1루수(2)에게 던지므로 0xb2e38 이 +0x1f4 를 지워(b2ee6) 보통 송구로 나간다
-    expect(state.log.filter((line) => line.includes('레이저'))).toEqual([expect.stringContaining('레이저 발사 (0x400bc)')])
-    expect(state.log).toContain('14틱 1루로 송구 — 18틱 도착 (악송구 — 2번 야수가 줍는다) (3번 야수)')
+    // 유격수(5)가 2루수(3)에게 던지므로 0xb2e38 이 +0x1f4 를 지워(b2ee6) 보통 송구(0xa1620 — 흔들림 굴림)로 나간다
+    expect(state.log).toContain('52틱 7번 야수 펌블 (0xbc2)')
+    expect(state.log.filter((line) => line.includes('레이저'))).toEqual(['75틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993'])
+    expect(state.log).toContain('77틱 2루로 송구 — 97틱 도착 (흔들린 긴 송구 — 3번 야수가 받는다) (5번 야수)')
     expect(state.laserConfirmed).toBe(false)
     expect(state.laserArmed).toBe(false)
     expect(state.laserThrow).toBe(false)
-    expect(state.errantThrow).toBe(true)
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
@@ -2252,13 +2255,13 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
   })
 
   it('펌블한 틱의 그림이 +0xb8 = 6 을 보고, 다음 틱부터 야수 틱이 하나씩 줄인다 (b4280 · a12da)', () => {
-    // 2루수가 9틱에 펌블한다 (필살수비 A · B · 레이저 실패 → 펌블 0) — 투수는 선수가 없어 펌블하지 않는다
+    // 2루수가 9틱에 펌블한다 (필살수비 A · B 실패 → 펌블 0) — 투수는 선수가 없어 펌블하지 않는다. 레이저는 외야수만(0x523e6, r201)
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory(이루수땅볼),
       bases: EMPTY_BASES,
       outs: 0,
-      random: 차례난수([0.9, 0.9, 0.9, 0, 0.9]),
+      random: 차례난수([0.9, 0.9, 0, 0.9]),
     })
     expect(야수(결과, 8, 3)?.fumbleTicks).toBe(0)
     expect(야수(결과, 9, 3)?.fumbleTicks).toBe(6)
@@ -2274,8 +2277,8 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
       bases: 주자1루,
       outs: 0,
       controls: 계속누름('수비', '8'),
-      // 레이저(0.9) → 펌블(0.9) → 악송구(0) — 투수가 쫓는 공이라 필살수비는 없고 레이저는 +0xec(지명타자)로 굴린다
-      random: 차례난수([0.9, 0.9, 0, 0.9]),
+      // 펌블(0.9) → 악송구(0) — 투수가 쫓는 공이라 필살수비는 없고, 레이저는 외야수만 굴린다(0x523e6, r201)
+      random: 차례난수([0.9, 0, 0.9]),
     })
     expect(결과.errantThrow).toBe(true)
     expect(야수(결과, 9, 0)?.throwErrorTicks).toBe(4)

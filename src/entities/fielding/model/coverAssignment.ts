@@ -1,4 +1,4 @@
-import { isFreeToRetarget } from '@/entities/fielding/model/fielderPose'
+import { acceptsTargetVt14, isFreeToRetarget } from '@/entities/fielding/model/fielderPose'
 import {
   BASE_DEFAULT_FIELDER,
   basePosition,
@@ -328,7 +328,10 @@ export function applyCoverAssignment(
     }
     const cover = assigned.coverStates.find((entry) => entry.slot === fielder.slot)
     if (cover !== undefined) {
-      next = { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
+      // b25b6 vt14(루 좌표) = 0xa14c8 — 잠금 +0xb4 ≤ 0 · vtc8(+0xb1 · +0xcc)일 때만 목표를 받는다(r196). AI 는 b25c4 가 늘 루 + 2
+      next = acceptsTargetVt14(next)
+        ? { ...next, aiState: AI_STATE.COVER_HOME + cover.base, target: basePosition(cover.base), targetBase: cover.base }
+        : { ...next, aiState: AI_STATE.COVER_HOME + cover.base }
     }
     return next
   })
@@ -361,8 +364,24 @@ export function claimCoverOfBase<P extends Pick<PlayView, 'coverOfBase' | 'ballH
       fielder.slot === previous
         ? { ...fielder, aiState: AI_STATE.IDLE }
         : fielder.slot === slot
-          ? { ...fielder, target: basePosition(base), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
+          ? // vt48 0xa0a18 → vt14(루 좌표) — 관문(`acceptsTargetVt14`)이 막으면 목표는 그대로(r196)
+            acceptsTargetVt14(fielder)
+            ? { ...fielder, target: basePosition(base), targetBase: base, aiState: AI_STATE.COVER_HOME + base }
+            : { ...fielder, aiState: AI_STATE.COVER_HOME + base }
           : fielder,
     ),
   }
+}
+
+/**
+ * **AI 2~5 b4818~b482e — 커버 야수의 vt14(루 좌표)** (직접 뜸, r201). 분기표 0xd8808[2..5] = b47f2 는 +0x3b && vtcc 면 0xb2a48 을 부른 뒤
+ * 조건 없이 `vt14(야수, 0xd86b0[상태 − 2])` 로 간다. vt14 = 0xa14c8 은 잠금 +0xb4 ≤ 0 · vtc8 일 때만 목표 +0x2c 를 받는다
+ * (`acceptsTargetVt14`). 걸음 a1376 은 그 목표로만 가므로, 막힌 동안은 앞서 받은 목표(지우기 vt10 이면 제자리)로 간다.
+ */
+export function withCoverBaseTarget(fielders: readonly FielderState[], slot: number, base: number): readonly FielderState[] {
+  const self = fielders[slot]
+  if (self === undefined || !acceptsTargetVt14(self)) return fielders
+  const point = basePosition(base)
+  if (isSamePoint(self.target, point) && self.targetBase === base) return fielders
+  return fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: point, targetBase: base } : fielder))
 }

@@ -179,6 +179,7 @@ function PitcherLeagueScreens({
         matchupRecords={{ mySeason: career.stats, stats: career.leaguePlayerStats }}
         // 마운드 내 투수 그림의 장비 겹 (0x108f8 모드 ≠ 4 → 0x79368 · 0x10810 → 0x79790)
         pitcherEquipmentLevels={career.equipmentLevels}
+        pitcherSkinIndex={career.skinIndex}
         // 두 팀 레코드 타자 배열 차례 — 교대 판 이름표 0x40008 · 운동장 마선수 그림 0x79b48 이 훑는다 (경기 장면 0x39fdc 의 0xb891c 모드 3)
         fieldLineups={{
           ours: nariRecordFieldersOf(nariGameRecordOf(career, gameOptions.ourTeamId), gameOptions.ourTeamId, null),
@@ -269,8 +270,11 @@ function PitcherLeagueScreens({
       noticeText={session.outingNotice}
       onCloseNotice={actions.closeOutingNotice}
       onRun={actions.runOutingFunction}
-      // 112 취소 → 105 (키 0x13ba4)
-      onBack={() => actions.goto('관리')}
+      // 112 취소 → 105 (키 0x13ba4) — 13bc0~13bca 가 S+4(행동함) = 0 으로 내린다(원본 그대로 — 두 편 공용 키)
+      onBack={() => {
+        if (career.hasActedThisCycle) actions.save({ ...career, hasActedThisCycle: false })
+        actions.goto('관리')
+      }}
       // 장소 이벤트 배정 0x8cdc0 — 장소마다 파일 순서 첫 이벤트(대상 1·3)
       eventPlaceIds={session.eventPlaceIds}
       onEnter={actions.enterOutingPlace}

@@ -4,7 +4,7 @@ import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
-import type { StageScene } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
@@ -30,6 +30,7 @@ import { ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajector
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
+import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
 import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
@@ -102,6 +103,14 @@ interface PitcherSideStageProps {
   readonly pitcherForm: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
+  /**
+   * 마운드 내 투수 레코드의 피부 `(rec[0xb] >> 2) & 3` · 수비 팀 0xb6c08(게임) — 타석 교대 0x47cc8 의 482c0~482fc 가 적재 0x793b0 에
+   * 넘겨 794c2 가 `pitcher.pzx` 를 **피부 × 15 + 팀** 벌로 연다. 피부를 안 주면 0, 팀을 안 주면 `hud.ourTeamId`(던지는 쪽이 내 팀)
+   */
+  readonly pitcherSkinIndex?: number
+  readonly pitcherTeamIndex?: number
+  /** 곧 설 선수들(다음 CPU 타자 · 대타 · 교체 투수)의 생김새 — 그림마다 칠하기를 미리 건다 (`BattingStage.warmCast`) */
+  readonly warmCast?: StageWarmCast
   /**
    * 마운드의 마투수 그림 — 타석 교대 0x482fc 의 적재 0x793b0 이 순번 0xb63a0 으로 `ace/pitcher_*` 를 싣는다. 없으면 평범한 투수
    */
@@ -244,6 +253,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let hitSpecialEffect: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null = null
     /** 마구 공 파티클(0x3b2f4 3b496)을 마지막으로 쏜 장면 틱 — 그림(장면 틱) 하나에 한 번 */
     let magicEmittedTick: number | null = null
+    /** 이 공의 0x12 첫 그림에서 삼진 양끝 파티클을 쐈나 (`strikeoutJudgeParticlesOf`) */
+    let strikeoutShot = false
     /** OK · '5' 를 읽은 0x13 상태 틱 (0x406e8 40708) */
     let hitSkipTick: number | null = null
     /** 0x13 동안 받은 OK · '5' — 다음 틀 머리의 키 처리(0x498d4)가 꺼낸다(`sceneKeyLatch`) */
@@ -332,6 +343,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         hitEndNotified = false
         hitSpecialEffect = null
         magicEmittedTick = null
+        strikeoutShot = false
         hitSkipTick = null
         hitKeyLatch.clear()
         hitFrozenDraws = []
@@ -500,6 +512,13 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       const isTimeState = isIdle && ((current.isPaused && !isSceneD) || pitchInput?.kind === '구질')
       const isResult = stage.phase.kind === '결과'
       const side = current.batterSide ?? batterSideOfForm(current.batterForm)
+      // 0x12 틱 0 의 그림 — 판정 글자 0x393b4 가 삼진이면 양끝 파티클(394b2 · 394d2). 틀이 틱 0 을 건너뛰었으면 그 뒤 첫 그림에서 한 번
+      if (isResult && resolution !== null && !strikeoutShot) {
+        strikeoutShot = true
+        for (const shot of strikeoutJudgeParticlesOf(describePitchResolution(resolution), side)) {
+          emitParticles(sceneParticleScene(), particleConfigOf(shot.id), shot.x, shot.y, shot.img)
+        }
+      }
       if (entersStateF) skillPanelStateFSerial += 1
       wasSkillPanelStateF = isSkillPanelStateF
       const skillPanel = current.skillPanel
@@ -626,6 +645,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,
         pitcherForm: current.pitcherForm,
         pitcherHand: current.pitcherHand,
+        pitcherSkinIndex: current.pitcherSkinIndex ?? 0,
+        pitcherTeamIndex: current.pitcherTeamIndex ?? current.hud?.ourTeamId ?? null,
+        warmCast: current.warmCast ?? null,
         stagePhase: isSceneD ? { ...stage.phase, isSceneD } : stage.phase,
         pitchInput,
         timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,

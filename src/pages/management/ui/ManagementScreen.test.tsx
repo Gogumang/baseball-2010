@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -563,5 +564,102 @@ describe('머리띠 미끄러짐 [skin+0x84] — 나리 105 는 세우지 않는
     unmount()
     render(<ManagementScreen {...propsWith({})} />)
     expect(coinTop()).toBe(settled)
+  })
+})
+
+describe('127 휴식 연출 (0x190e4 → 0x85230 · 키 0x10650 · 틀 0x19080 · 그리기 0x19e08)', () => {
+  it('팝업 0x2a "예" → 연출이 돌고, 끝난 틀에야 휴식(굴림 · 결과 창 0x18e3c)을 부른다', () => {
+    const onSelect = vi.fn()
+    const career = { ...createCareer('테스터'), morale: 50 }
+    render(<ManagementScreen {...propsWith({ career, onSelect })} />)
+
+    clickCommand('휴식')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    expect(onSelect).not.toHaveBeenCalled()
+    // 0x10650 — 취소 키는 없다, 확인은 게이지를 끝으로
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(screen.queryByTestId('나리-휴식연출')).toBeNull()
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenCalledWith('휴식')
+  })
+})
+
+describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 0x18dd8 · 그림 0x19da4)', () => {
+  const startHit = () => {
+    clickCommand('트레이닝')
+    clickCommand('히트')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+  }
+
+  it('확인 · \'5\' 는 게이지를 끝으로 보내 곧바로 훈련을 굴린다 — 취소 키는 없다', () => {
+    const onTraining = vi.fn()
+    render(<ManagementScreen {...propsWith({ onTraining })} />)
+    startHit()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onTraining).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(onTraining).toHaveBeenCalledTimes(1)
+    expect(onTraining).toHaveBeenCalledWith('히트')
+  })
+
+  it('화면 탭도 확인 키다', () => {
+    const onTraining = vi.fn()
+    render(<ManagementScreen {...propsWith({ onTraining })} />)
+    startHit()
+
+    fireEvent.click(screen.getByTestId('훈련연출-건너뛰기'))
+
+    expect(onTraining).toHaveBeenCalledWith('히트')
+    expect(screen.queryByTestId('훈련연출-건너뛰기')).toBeNull()
+  })
+
+  it('결과 창이 닫힐 때까지 가운데 판을 빼고 커맨드 줄은 107 그대로 — 닫히면 105', () => {
+    const career = createCareer('테스터')
+    const result = { before: career, after: career, messages: ['히트 1 상승하였습니다'] }
+    // 세션처럼 — 훈련을 굴린 그 갱신에 결과 창을 세운다(0x17f5c)
+    function Harness() {
+      const [detail, setDetail] = useState<typeof result | null>(null)
+      return <ManagementScreen {...propsWith({ career, detail, onTraining: () => setDetail(result),
+        onCloseDetail: () => setDetail(null) })} />
+    }
+    render(<Harness />)
+    startHit()
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+    expect(screen.getByRole('button', { name: '히트' })).toBeTruthy()
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(screen.getByTestId('가운데판')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '히트' })).toBeNull()
+    expect(screen.getByRole('button', { name: '트레이닝' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('결과가 알림 창이면(칸 4 갈래 0x18bd8 → 0xbbef8) 그 창이 닫힐 때까지 125 다 — 틀 0x18dd8 이 105 로', () => {
+    function Harness() {
+      const [notice, setNotice] = useState('')
+      return <ManagementScreen {...propsWith({ noticeText: notice, onTraining: () => setNotice('훈련 완료'),
+        onDismissNotice: () => setNotice('') })} />
+    }
+    render(<Harness />)
+    startHit()
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(noticeBox()).toBeTruthy()
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    expect(screen.getByTestId('가운데판')).toBeTruthy()
   })
 })

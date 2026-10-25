@@ -35,6 +35,11 @@ export interface LooseBallChase {
    * +0xc0 = 4 를 적는다(그림 "!" 만 본다, `catchForecast.secondPassStarted`). 다른 예보는 늘 거짓
    */
   readonly secondPassStarted?: boolean
+  /**
+   * 예보가 적은 움직임 허용 +0x13c(`catchForecast.movable`, r196) — 거짓이면 추적야수 AI 1(b4af6)이 목표를 안 고친다(보통 송구를 받는
+   * 야수). 없으면 참(판 시작 예보 vt24(1))
+   */
+  readonly movable?: boolean
   /** 예보가 적은 다이빙 후보 틱 +0x178[칸](공 틱 — `catchForecast.diveTicks`). 없으면 모두 1000 으로 본다 */
   readonly diveTicks?: readonly number[]
   /** 고르기 0xb3b38 이 적은 +0x174(공 틱, 판 끝으로 자르기 전) — 다이빙 검사 b4704 가 `ldrsh` 로 읽는다 */
@@ -70,6 +75,7 @@ export function chaseLooseBall(
     body: ball.flight.body,
     startTick: atTick,
     secondPassStarted: forecast.secondPassStarted,
+    movable: forecast.movable,
     diveTicks: forecast.diveTicks,
     forecastCatchTick: forecast.choice.catchTick,
     backupSlot: forecast.backupSlot,

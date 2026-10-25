@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
 import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
+import { eventPortraitCastOf } from '@/pages/story/lib/eventPortraitCast'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
 import { useEventSounds } from '@/pages/story/model/useEventSounds'
@@ -129,6 +130,8 @@ export function StoryScreen({
   systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
   rewardNoticeContext, onSystemWindowConfirm, onReward, onChoiceConfirm,
 }: StoryScreenProps) {
+  // 대본이 적어 둔 표정 전부 — 주인공 초상화의 표정 애니를 미리 칠한다(`eventPortraitCastOf`)
+  const upcomingPortraits = useMemo(() => eventPortraitCastOf(events, event), [events, event])
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
   const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
     ? undefined
@@ -275,7 +278,7 @@ export function StoryScreen({
       <div className={styles.portraitLayer} data-testid="event-portrait-layer"
         style={{ bottom: SCREEN_HEIGHT - portraitBaseY }}>
         <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
-          skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
+          skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} upcomingPortraits={upcomingPortraits} />
       </div>
 
       {box !== null && (

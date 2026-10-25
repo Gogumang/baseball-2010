@@ -1,3 +1,4 @@
+import { FIELDER_START_POSITIONS, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import { AI_STATE, type FielderState } from '@/entities/fielding/model/fieldingState'
 
 /**
@@ -161,11 +162,77 @@ export function isFreeToStep(fielder: Pick<FielderState, 'pose' | 'arrivalSlackT
 /**
  * **다음 야수 틱의 이동 관문** (a1346~a1376) — 웹은 이동을 판 틱 끝(6 절)에 미리 하므로 그때의 칸으로 원본 다음 야수 틱을 본다:
  * 프레임은 그 틱 머리(a128e)에서 하나 오른 값이다. `0xa0f7c`(+0xb0 바이트 == 0 || 프레임 ∈ {1, 2}) && vtc8 && +0xb4 ≤ 0.
+ * vtc8 의 +0xcc 도 그 틱 a1330 에서 하나 줄인 값이다(a1346 이 뒤다 — AI 0xf 의 vt8c(5) 뒤 4 라 닫힌다, r190).
  */
 export function canStepNextListTick(
   fielder: Pick<FielderState, 'pose' | 'actionFrame' | 'actionLockTicks' | 'arrivalSlackTicks'>,
 ): boolean {
-  return isFreezeOpen(fielder.pose, fielder.actionFrame + 1) && isFreeToStep(fielder) && fielder.actionLockTicks <= 0
+  const slack = Math.max(0, fielder.arrivalSlackTicks - 1)
+  return (
+    isFreezeOpen(fielder.pose, fielder.actionFrame + 1) &&
+    isFreeToStep({ pose: fielder.pose, arrivalSlackTicks: slack }) &&
+    fielder.actionLockTicks <= 0
+  )
+}
+
+/**
+ * vt14 `0xa14c8` 의 관문 — 잠금 +0xb4 ≤ 0(a14d0~a14e4) · vtc8(a14ea). 목표가 같으면(0xbc0f4) 적을 것이 없다.
+ * 받으면 0xbf2cc 로 목표 +0x2c 를 적는다(방향 동작 0xa0ee8 은 웹이 옮기지 않았다 — 머리말)
+ */
+export function acceptsTargetVt14(fielder: Pick<FielderState, 'actionLockTicks' | 'pose' | 'arrivalSlackTicks'>): boolean {
+  return fielder.actionLockTicks <= 0 && isFreeToStep(fielder)
+}
+
+/**
+ * **0xbef58(야수, 점)** — 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 점) 뒤 야수.vt14(점) = 0xa14c8 (직접 뜬 것, r196).
+ * 위치는 늘 옮기지만 목표 +0x2c 는 vt14 관문(`acceptsTargetVt14` — 잠금 +0xb4 ≤ 0 · vtc8)이 열릴 때만 받는다. 판 시작
+ * vt20 0xb0fb4 의 b1124 → b112e vt10 이 목표 = 위치(시작 자리)로 둔 뒤라 막히면 목표는 시작 자리에 남는다 — 목표 루(vt68 0xa0b4c)는
+ * 목표 좌표로 셈하므로 그대로다. 막히는 것은 앞 판이 남긴 +0xcc(`DefenseScene.fielderSlack`)를 들고 연 vt20(0) 판뿐이다
+ */
+export function placedAt(fielder: FielderState, point: WorldPoint, base: number): FielderState {
+  const accepts = acceptsTargetVt14(fielder)
+  return accepts ? { ...fielder, position: point, target: point, targetBase: base } : { ...fielder, position: point }
+}
+
+/** 판 시작 — 앞 판이 남긴 +0xcc 를 칸마다 얹는다(vt20(0) 판 — `DefenseScene.fielderSlack`) */
+export function withCarriedSlack<F extends Pick<FielderState, 'slot' | 'arrivalSlackTicks'>>(
+  fielders: readonly F[],
+  slack: readonly number[] | undefined,
+): F[] {
+  return fielders.map((fielder) => ({ ...fielder, arrivalSlackTicks: slack?.[fielder.slot] ?? 0 }))
+}
+
+/**
+ * **판이 닫힐 때 남는 +0xcc** — 마지막 판 틱의 AI 고리 뒤 값에, 관문이 G2(슬롯 2 머리 52502)에서만 닫혀 그다음 그림의 G1(3f0b8)이
+ * 열렸으면 그 그림의 목록 틱 a1330 이 하나 더 줄인다(`closingListFrame` — `listTickFielder`). 그 뒤로는 관문이 다시 안 열려
+ * (파울 갈래는 공이 0x3f378 의 G4 가 열릴 때만 나아가고, 그 밖 갈래는 목록 틱이 옮기는 주자 · 쥠 · 세기만 본다) 다음 판까지 그대로다.
+ * 파울 판(AI 0xf — 고리마다 5)은 파울 갈래가 공 칸만 보므로 같은 그림의 G1 · G2 가 같아 **5** 가 남고, 폴 홈런(12 — 홈런 갈래가
+ * 목록 틱이 옮긴 주자를 본다)은 G1 열림 · G2 닫힘이면 **4** 다
+ */
+export function fielderSlackAtPlayEnd(fielders: readonly FielderState[], listTickOpen: boolean): number[] {
+  return fielders.map((fielder) => (listTickOpen ? listTickFielder(fielder) : fielder).arrivalSlackTicks)
+}
+
+/** vt8c `0xa0ee0` 가 AI 0xf 에 적는 +0xcc (b4c5a `movs r1, #5`) */
+export const RETURN_SLACK_TICKS = 5
+
+/**
+ * **AI 0xf 한 번** (분기표 0xd8808[0xf] = b4c2a~b4c5c, 직접 뜬 것, r190):
+ * ```
+ * b4c2a  P = 0xd86ec[야수+0x88](시작 자리) ; 야수.vt14(P)   ; 0xa14c8 — +0xb4 ≤ 0 · vtc8 · 목표가 다를 때만 0xbf2cc 로 목표 = P
+ * b4c52  야수.vt8c(5)                                       ; 0xa0ee0 — +0xcc = 5
+ * ```
+ * 세우는 곳은 0xb2c58(사건 7 · 12 — 야수 0~8 모두, 0xb8dbc 로 +0x84 만)뿐이고, 상태를 바꾸는 줄이 분기 안에 없어 판이 끝날 때까지 이어진다.
+ * 그래서 첫 고리만 목표를 받고, 그 뒤로는 +0xcc 가 4 ~ 5 를 오가 vtc8 이 늘 거짓이다 — 걸음 a1346 이 닫히고 지우기 a143e(`!vtc8`)가
+ * 틱마다 vt10(목표 = 위치 · 동작 · 자세 워드 0)을 부른다.
+ */
+export function withReturnToStartTick(fielder: FielderState): FielderState {
+  const home = FIELDER_START_POSITIONS[fielder.slot]
+  const accepts =
+    home !== undefined &&
+    acceptsTargetVt14(fielder) &&
+    (fielder.target.x !== home.x || fielder.target.y !== home.y || fielder.target.z !== home.z)
+  return { ...fielder, target: accepts ? home : fielder.target, arrivalSlackTicks: RETURN_SLACK_TICKS }
 }
 
 /**

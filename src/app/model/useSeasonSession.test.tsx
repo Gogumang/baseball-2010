@@ -1260,6 +1260,17 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.gameOptions?.aceLevels).toEqual(레벨)
   })
 
+  it('시즌 경기 옵션에 환경설정 게이지 · 주루 · 송구를 싣는다 — 0x3f500 · 0xae690 · 0xae6c8 은 모드를 안 가린다', () => {
+    const 설정 = { gaugeSettingOn: true, runningModeManual: true, throwModeManual: false }
+    const { result } = renderHook(() => useSeasonSession(
+      메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      () => 설정,
+    ))
+    시작(result, 0)
+    act(() => result.current.actions.playNextGame())
+    expect(result.current.gameOptions).toMatchObject(설정)
+  })
+
   it('정규 경기 옵션의 시즌 팀 번호는 내 팀과 같다', () => {
     const { result } = 띄우기()
     시작(result, 4)

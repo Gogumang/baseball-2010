@@ -1,4 +1,6 @@
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import type { FielderState, PlayView } from '@/entities/fielding/model/fieldingState'
+import { listTickFielder } from '@/entities/fielding/model/fielderPose'
 import {
   JUDGE_POPUP_START,
   NO_ZOOM_PUNCH,
@@ -56,6 +58,31 @@ export interface DefenseScene {
    * (종류 2 · 3 — vt4c 도 vt30 도 안 돈다)도 그 값을 그대로 둔다. 진행기는 끝날 때 제 +0xf0 을 여기에 적는다
    */
   readonly playCovers: readonly number[]
+  /**
+   * **야수 +0xcc — 칸 0~8** (r196, 직접 뜬 것). 야수 9명은 경기 장면 초기화 0x3e340(상태 7 — 새 경기 · 이어하기 모두 여기서 장면을
+   * 새로 연다)이 한 번 만들고(생성자 a0df0 +0xcc = 0) 판마다 다시 쓴다. +0xcc 를 쓰는 곳은 a0df0 · vt8c a0ee0(AI 0xf b4c52 의 5) ·
+   * 판 시작 vt20 0xb0fb4 의 b1156(**인자 ≠ 0 일 때만** — b1144 가 인자 0 이면 건너뛴다) · 목록 틱 a1330(−1) 넷뿐이고, 목록 틱은
+   * 0x3f060 이 관문 G1(3f0b8)이 열리고 상태 0x17 일 때만 돈다. 그래서 판 사이(정산 · 다음 투구)에는 안 줄고, vt20(0)으로 여는 판
+   * (판 시작 표 0xd877c — 종류 2 · 3 밀어내기 b288c · 4 견제 b28be · 5 도루 b2950 · 9 폭투 b284a)이 앞 판의 값을 들고 연다.
+   * 타구 판(종류 1 b280a)과 홈런더비(8 b29f2)는 vt20(1)이라 0 으로 지운다. 진행기는 끝날 때 제 +0xcc 를 여기에 적는다
+   * (`fielderSlackAtPlayEnd`). 저장 블록(0x4f928 — 팀 둘 · st 0xa4 · 플레이 시간)에는 야수 객체가 없다
+   */
+  readonly fielderSlack?: readonly number[]
+  /**
+   * **판이 끝난 그대로의 플레이 객체 · 야수** (r201, 직접 뜸). 도루 키 메시지 0x583(0x520de)은 주자를 출발시킨 뒤(0xa9bd4) 52222 에서
+   * 제어기 0xaf8e0 → vt0xc = **0xafa60(CPU 송구 결정)을 한 번** 부른다 — 수비가 사람이든 CPU 든, 투구 중(판이 열리기 전)에. 그 순간의
+   * 플레이 칸은 앞 판이 끝난 그대로다: +0x128(쥐기 · 자동 진루 · 결과 메시지 · 주루 키가 1, 0xafa60 성공만 0 — 판 시작 vt1c 는 안 지운다) ·
+   * +0x130(공 가진 야수) · 야수 +0xe0(쥠 — 송구 b2f80 · 튕김 b3362 · 판 시작 vt20 b1140 만 지운다) · +0xc8 · 자리 · AI(야수 틱은 상태
+   * 0x17 에서만 돈다). 진행기는 끝날 때 제 플레이 · 야수를 여기에 적고(닫힌 그림의 G1 이 열렸으면 그 목록 틱 몫까지), 공 도착 판
+   * (`pitchArrivalPlay`)이 도루 출발마다 그 상태로 0xafa60 을 돌린다(`stealPlay.stealStartThrowDecision`). 0x3e340 이 장면을 새로 열면 없다
+   */
+  readonly playEnd?: PlayEndState
+}
+
+/** 판이 끝난 그대로의 플레이 · 야수 (`DefenseScene.playEnd`) */
+export interface PlayEndState {
+  readonly play: PlayView
+  readonly fielders: readonly FielderState[]
 }
 
 /** deadly_effect 애니 0 의 상태 칸 (애니 +8 객체의 [0] 칸 · [2] 비트) — 지연 0 이라 셈 칸은 늘 0 이다 */
@@ -82,6 +109,8 @@ export const DEFENSE_SCENE_START: DefenseScene = {
   deadlyAnim: { frameIndex: 0, playing: false, ended: false },
   // new(0x1fc) 의 memset 0
   playCovers: [0, 0, 0, 0],
+  // 야수 생성자 a0df0 — +0xcc = 0
+  fielderSlack: [0, 0, 0, 0, 0, 0, 0, 0, 0],
 }
 
 /**
@@ -293,4 +322,9 @@ export function drawDefenseScene(scene: DefenseScene, context: SceneDrawContext)
     unpaused,
     flashEnded,
   }
+}
+
+/** 판 끝 — 플레이 · 야수를 `playEnd` 로 남긴다. 판을 닫은 그림의 G1 이 열렸으면 그 목록 틱(a1286~a1456)을 한 번 더 지난 야수다 */
+export function playEndStateOf(play: PlayView, fielders: readonly FielderState[], closingListTickOpen: boolean): PlayEndState {
+  return { play, fielders: closingListTickOpen ? fielders.map(listTickFielder) : fielders }
 }

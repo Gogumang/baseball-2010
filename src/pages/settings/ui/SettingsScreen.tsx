@@ -41,6 +41,18 @@ const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStar
 /** 고르지 않은 줄 — 까딱임 없음 */
 const NO_SHIFT = { dx: 0, dy: 0 } as const
 
+/**
+ * 숫자키 꼴 1 격자 키 — 격자 키 처리 0x6c031 이 숫자를 방향 · OK 로 바꿔 **바꾼 값을 돌려준다**(표 0xd2e7c, r197 직접 뜸):
+ * '2' → −1(↑) · '8' → −2(↓) · '4' → −3(←) · '6' → −4(→) · '5' → −5(OK). 세 페이지의 격자가 모두 이 꼴이다 —
+ * 환경설정(8) [this+0x70] 진입 0x259fc `vt+0x10(1, 7, 1, 0x20)` · 상세 설정(32) [this+0x84] 0x2421c `(1, 4, 1, 0x20)` ·
+ * 모드 초기화(33) 0x242a4 `(1, 3, 1, 0x20)`. 갱신(8 0x29550 · 32 0x288ac · 33 0x2c6d8 · 경기 중 0x3cae0~)은 격자가 돌려준 키로
+ * 가르고 0x5550d 에도 그 키를 넘긴다 — 그래서 숫자키도 화살표와 같이 까딱인다. 8 · 32 는 '4'(0x34) · '6'(0x36) 도 따로 견준다(같은 갈래).
+ */
+const GRID_NUMERIC_KEYS: Readonly<Record<string, string>> = {
+  '2': 'ArrowUp', '8': 'ArrowDown', '4': 'ArrowLeft', '6': 'ArrowRight', '5': 'Enter',
+}
+const gridKeyOf = (key: string): string => GRID_NUMERIC_KEYS[key] ?? key
+
 interface SettingsScreenProps {
   readonly settings: GameSettings
   readonly onChange: (settings: GameSettings) => void
@@ -252,7 +264,9 @@ export function SettingsScreen({
   useEffect(() => {
     if (isBlocked) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      // 숫자키 꼴 1 격자 — '2' '8' '4' '6' '5' 를 ↑ ↓ ← → OK 로 (`gridKeyOf`)
+      const key = gridKeyOf(event.key)
+      const vertical = key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
         // 1열 격자라 세로 키는 늘 커서를 옮긴다(끝에서 감는다) → 격자 +0x25 가 서고 그 방향으로 까딱인다.
@@ -260,7 +274,7 @@ export function SettingsScreen({
         if (!isHeaderSliding) rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + cursorCount) % cursorCount)
       }
-      const horizontal = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+      const horizontal = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0
       if (horizontal !== 0 && cursor < FIRST_MENU_ROW) {
         event.preventDefault()
         return changeValue(horizontal)
@@ -271,11 +285,11 @@ export function SettingsScreen({
         event.preventDefault()
         return onBack()
       }
-      if (event.key === 'Enter' || event.key === ' ') {
+      if (key === 'Enter' || key === ' ') {
         event.preventDefault()
         return openRow(cursor)
       }
-      if (event.key === 'Escape' || event.key === 'Backspace') {
+      if (key === 'Escape' || key === 'Backspace') {
         event.preventDefault()
         leave()
       }
@@ -557,7 +571,9 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      // 숫자키 꼴 1 격자 — '2' '8' '4' '6' '5' 를 ↑ ↓ ← → OK 로 (`gridKeyOf`)
+      const key = gridKeyOf(event.key)
+      const vertical = key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
         // 0x20 진입 0x2421c 가 머리띠를 다시 미끄러뜨린다 — 그동안은 페이지를 안 그리고 +0x25 만 지운다(0x5a772)
@@ -565,14 +581,15 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
         return setCursor((previous) => (previous + vertical + DETAIL_ROW_COUNT) % DETAIL_ROW_COUNT)
       }
       // 갱신 0x288ac 가 OK(−5) · 좌우(−3 · −4) · '4'(0x34) · '6'(0x36) 을 모두 같은 갈래 0x28920(칸 값 ^= 1)으로 보낸다 — 확정.
+      // '5' 는 격자가 −5 로 바꿔 돌려주므로 같은 갈래다 (`gridKeyOf`)
       // CLR(−16)은 판·키 상태와 상관없이 곧바로 상태 8 (0xbcb49(…, 8)) — 펴는 도중에도 키를 받는다
-      const isToggle = event.key === 'Enter' || event.key === ' '
-        || event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+      const isToggle = key === 'Enter' || key === ' '
+        || key === 'ArrowLeft' || key === 'ArrowRight'
       if (isToggle) {
         event.preventDefault()
         return onChange(toggleDetail(settings, cursor))
       }
-      if (event.key === 'Escape' || event.key === 'Backspace') {
+      if (key === 'Escape' || key === 'Backspace') {
         event.preventDefault()
         onBack()
       }
@@ -765,18 +782,20 @@ function ModeResetPage({
   useEffect(() => {
     if (popup !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const vertical = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      // 숫자키 꼴 1 격자 — '2' '8' '4' '6' '5' 를 ↑ ↓ ← → OK 로 (`gridKeyOf`)
+      const key = gridKeyOf(event.key)
+      const vertical = key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
         // 0x21 진입 0x242a4 도 머리띠를 미끄러뜨린다 — 그동안은 +0x25 만 지워 까딱이지 않는다(0x5a772)
         if (!isFrameSlidingAt(tick)) rowShake.start(vertical > 0 ? 'down' : 'up')
         return setCursor((previous) => (previous + vertical + MODE_RESET_ROW_COUNT) % MODE_RESET_ROW_COUNT)
       }
-      if (event.key === 'Enter' || event.key === ' ') {
+      if (key === 'Enter' || key === ' ') {
         event.preventDefault()
         return openRow(cursor)
       }
-      if (event.key === 'Escape' || event.key === 'Backspace') {
+      if (key === 'Escape' || key === 'Backspace') {
         event.preventDefault()
         onBack()
       }

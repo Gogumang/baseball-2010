@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { aceBatterLayersOf, batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { aceBatterLayersOf, batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayerPaletteIndexOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
@@ -237,5 +238,20 @@ describe('마타자 그림 — 적재 0x78ab0 (표 0xd3adc) · 자세 0xb905c �
 
   it('순번이 없거나 음수면 일반 타자 자세표', () => {
     expect(batterFrameAt({ tick: 0, swingTick: null, isBunting: true, bodyType: 1, aceOrder: -1 })).toBe(12)
+  })
+})
+
+describe('r193 — 투수 그림 겹의 벌 (`pitcherLayerPaletteIndexOf`, 0x793b0 의 794c2)', () => {
+  it('바탕 pitcher.pzx 는 피부 × 15 + 팀, 장비 손 · 다리는 등급 줄, 머리 장비는 칠하지 않는다', () => {
+    const equipment = pitcherEquipmentOf({ control: 3, velocity: 3, breaking: 0, stamina: 3 })
+    const layers = pitcherLayersOf(0, equipment)
+    const base = layers.filter((layer) => layer.folder === PITCHER_FRAMES)
+    expect(base).toHaveLength(2)
+    for (const layer of base) expect(pitcherLayerPaletteIndexOf(layer, 1, 9)).toBe(1 * 15 + 9)
+    for (const layer of layers.filter((layer) => layer.gradePaletteRow !== undefined)) {
+      expect(pitcherLayerPaletteIndexOf(layer, 1, 9)).toBe(layer.gradePaletteRow)
+    }
+    const head = layers.find((layer) => layer.folder.includes('item_pit_head'))
+    expect(head === undefined ? null : pitcherLayerPaletteIndexOf(head, 1, 9)).toBeNull()
   })
 })

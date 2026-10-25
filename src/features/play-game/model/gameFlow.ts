@@ -1543,6 +1543,15 @@ export function opponentPitcherEquipmentOf(progress: GameProgress): readonly num
 }
 
 /**
+ * **내 타석 마운드의 상대 투수 피부** `(rec[0xb] >> 2) & 3` — 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림 적재 0x793b0 에 넘겨
+ * 794c2 가 `pitcher.pzx` 를 피부 × 15 + 수비 팀 벌로 연다. 레코드는 `opponentPitcherEquipmentOf` 와 같은 붙박이 표 칸이다
+ */
+export function opponentPitcherSkinIndexOf(progress: GameProgress): number {
+  const row = teamPitchers(progress.opponentTeamId)[progress.opponentMound.pitcherSlot]
+  return row === undefined ? 0 : (row.profile >> 2) & 3
+}
+
+/**
  * **내 타석 마운드 투수의 체력%** — 투수 그리기 0x38d1c 의 38f68 이 `0xaebb1(수비 팀)` = trunc(지금 마운드 +0x2c / 100) 로 읽어
  * 34 이하면 지친 눈(player_effect 애니 9 · 10)을 그린다(`BattingStage.pitcherStaminaPercent`).
  * 38f56 이 투수가 마선수(0xb633d)면 건너뛰므로 마선수 대결 투수(`aceOpponent`)나 142 가 8번 칸에 넣은 마투수가 서 있으면 null.
@@ -2114,6 +2123,8 @@ function selectPitchAfterClear(
     const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
     const scene: SubstitutionScene = {
       serial: (current.substitutionScene?.serial ?? 0) + 1,
+      // 투수 예약 갈래 — 0xe 첫 그림의 0x38b64 투수 가지(ptc/004)
+      entryKind: '투수',
       incomingIsAce,
       // 0x473f0 컷인 번호 — 0xb63a1(마투수) (투수라 +5 없음)
       ...(incomingIsAce && changed.aces !== undefined

@@ -747,6 +747,14 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
     expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('첫 대사')
   })
 
+  it('"CLR:SKIP" 장식 자리 투명 칸을 누르면 Escape 와 같다', () => {
+    render(<StoryScreen events={[취소이벤트]} event={취소이벤트} playerName="테스트" teamName="드래곤즈"
+      onComplete={vi.fn()} onMatch={() => {}} />)
+    틀(1)
+    fireEvent.click(screen.getByRole('button', { name: 'CLR 건너뛰기' }))
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('알림 글')
+  })
+
   it('뒤에 멈출 명령이 없으면 이벤트가 끝난다', () => {
     const onComplete = vi.fn()
     const 끝이벤트 = { ...이벤트, commands: [취소이벤트.commands[0], 취소이벤트.commands[1], { op: 'effect', id: 1 }] } as unknown as OriginalEvent

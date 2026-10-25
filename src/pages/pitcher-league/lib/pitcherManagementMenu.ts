@@ -87,8 +87,6 @@ export const PITCHER_MANAGEMENT_TEXT = {
   abilityAtLimit: '더 이상 능력치를 올릴 수 없습니다',
   /** StrMODE[193] — 사기가 0 이라 훈련 불가 */
   moraleEmpty: '사기가 부족하여 훈련할 수 없습니다',
-  /** r_event_txt[176] — 한 주기에 트레이닝·휴식·외출 중 한 가지 */
-  alreadyActed: '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다',
   /** StrMODE[69] — 123 창에서 이미 쓰는 마구를 또 고름 */
   magicAlreadyInUse: '현재 사용 중인 스킬입니다',
   /** StrMODE[71] — 아직 배우지 않은 마구 칸 */

@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
@@ -45,6 +46,7 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
@@ -102,7 +104,11 @@ import {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
-import { batterEquipmentOf, pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { batterEquipmentOf, bodyTypeOf, NO_PITCHER_EQUIPMENT, pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
+import { stageWarmCastOf } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { useWarmStageCast } from '@/widgets/batting-stage/model/useWarmStageCast'
+import { teamBatters } from '@/entities/team/model/teamRoster'
 import type { BatterEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { PitcherSideStage } from '@/widgets/batting-stage/ui/PitcherSideStage'
@@ -167,6 +173,11 @@ interface PitcherGameScreenProps {
    */
   readonly pitcherEquipmentLevels?: PitcherAbility
   /**
+   * 내 투수의 피부 `(rec[0xb] >> 2) & 3` — 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림 적재 0x793b0 에 넘겨 794c2 가 `pitcher.pzx` 를
+   * 피부 × 15 + 수비 팀(내 팀) 벌로 연다. 안 주면 0
+   */
+  readonly pitcherSkinIndex?: number
+  /**
    * 두 팀의 레코드 타자 배열 차례 — 경기 장면 0x39fdc 가 `0xb891c(…, 모드 3, 팀)` 로 세운 나리 팀 레코드(국가대항전이면 대회 칸).
    * 공수 교대 판 이름표 0x40008 · +0xec(마선수 그림) · 벤치 클리어링이 이 차례로 훑는다. 안 주면 이름표는 투수만, 마선수 그림은 보통 그림
    */
@@ -203,6 +214,7 @@ function PitcherGameScene({
   matchupRecords,
   gamePoint,
   pitcherEquipmentLevels,
+  pitcherSkinIndex = 0,
   fieldLineups: recordFieldLineups,
   session,
 }: PitcherGameScreenProps & { readonly session: PitcherGameSession }) {
@@ -218,6 +230,9 @@ function PitcherGameScene({
   const [backdropRandom] = useState(() => createSeededRandom(0))
   /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
+  // 상대 타자 명단 · 내 투수의 칠하기를 미리 건다 — 원본은 타석 교대 0x47cc8 의 적재 때 칠해 첫 그림부터 제 색이다
+  const stageWarmCast = pitcherGameWarmCastOf(progress, pitcherEquipmentLevels, pitcherSkinIndex)
+  useWarmStageCast(stageWarmCast)
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
   const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, options)
   /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c(0x3301c 가 두 측 0x3ff) · 애니 7 · 8 — 경기 장면 수명 (`skillPanel`) */
@@ -443,6 +458,8 @@ function PitcherGameScene({
       overlay === null &&
       !asksGiveUp &&
       resolution === null,
+    // 0xe 첫 그림의 0x38b64 — 타석 캔버스가 그린 타자 자리에 대타 등판 파티클(ptc/003)
+    (scene) => emitSubstitutionEntryParticle(scene.entryKind),
   )
   const sceneConfirm = useSceneConfirm(
     // 진행기가 OK 를 아직 안 받은 0xe 대기 — 또는 0xe 진입에서 감독 강판으로 빠지는 지나감(0xd 두 그림 · 0xe 한 그림, `hooksAtEntry`)
@@ -562,6 +579,8 @@ function PitcherGameScene({
     options.nationalCupStage ?? null,
   )
   const grassPalette = sceneFieldPaletteOf(sceneStadium)
+  // 타석 바닥 · 수비 바탕을 미리 칠한다 — 원본은 구장 객체 적재 때 팔레트를 갈아 끼운다
+  useWarmFieldBackgrounds(grassPalette)
 
   /**
    * **경기 중 기록 달성 알림 0x4e35c** — 프레임 0x52c50 이 상태 0x17(수비 인플레이)만 빼고 늘 그리므로 내가 던지는 화면에도 뜬다.
@@ -944,6 +963,11 @@ function PitcherGameScene({
         {...(pitcherEquipmentLevels === undefined || !progress.onMound
           ? {}
           : { pitcherEquipment: pitcherEquipmentOf(pitcherEquipmentLevels) })}
+        // 마운드 바탕 벌 = 피부 × 15 + 내 팀 (482c0~482fc → 0x793b0 의 794c2).
+        // ⚠️ 강판 뒤 마운드 투수의 피부는 명단 레코드를 아직 안 이어 0 으로 둔다(팀 색은 그대로 내 팀)
+        pitcherSkinIndex={progress.onMound ? pitcherSkinIndex : 0}
+        pitcherTeamIndex={options.ourTeamId}
+        warmCast={stageWarmCast}
         // 타석 구장 +0x70 · 바닥 줄 +0xc — 셋업 0x39fdc 모드 3 갈래 (정산 배경과 같은 구장)
         stadium={sceneStadium.stadium}
         fieldPalette={grassPalette}
@@ -1172,6 +1196,34 @@ const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(tea
 function stageBatterHandOf(progress: Parameters<typeof opponentBatterOf>[0]): number {
   const batter = stageBatterOf(progress)
   return batter.batterSide ?? batter.batterForm & 1
+}
+
+/**
+ * **나리 투수편 타석의 곧 설 그림** (`StageWarmCast`) — 상대 팀 붙박이 타자 명단 전부(덮개 니블이 있으면 그것 — `opponentBatterOf` 와
+ * 같은 칸)와 마운드의 내 투수(피부 × 15 + 내 팀 · 장비 0x79790). 마타자는 구운 그림이라 칠할 것이 없다
+ */
+function pitcherGameWarmCastOf(
+  progress: Parameters<typeof opponentBatterOf>[0],
+  equipmentLevels: PitcherAbility | undefined,
+  skinIndex: number,
+): StageWarmCast {
+  const teamIndex = progress.options.opponentTeamId
+  const batters = teamBatters(teamIndex).map((player, slot) => {
+    const profile = player.profile
+    const nibbles = progress.options.opponentEquipment?.batters?.[slot] ?? player.equipment
+    return {
+      bodyType: bodyTypeOf(profile >> 4),
+      skinIndex: (profile >> 2) & 3,
+      teamIndex,
+      equipment: batterEquipmentOf({ hit: nibbles[0] ?? 0, power: nibbles[1] ?? 0, run: nibbles[3] ?? 0 }),
+    }
+  })
+  const pitcher = {
+    skinIndex: progress.onMound ? skinIndex : 0,
+    teamIndex: progress.options.ourTeamId,
+    equipment: equipmentLevels === undefined || !progress.onMound ? NO_PITCHER_EQUIPMENT : pitcherEquipmentOf(equipmentLevels),
+  }
+  return stageWarmCastOf(batters, [pitcher])
 }
 
 function stageBatterOf(progress: Parameters<typeof opponentBatterOf>[0]): {

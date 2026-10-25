@@ -6,7 +6,7 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { EventPortrait } from '@/shared/config/original/eventTypes'
 import { placePortraits, portraitAnimationOf, portraitPaletteOf, slideX } from '@/widgets/event-portraits/lib/portraitSlots'
 import type { PlacedPortrait } from '@/widgets/event-portraits/lib/portraitSlots'
-import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/event-portraits/ui/EventPortraits.css'
 
 const SCREEN_WIDTH = 240
@@ -22,6 +22,11 @@ interface EventPortraitsProps {
   readonly skinIndex?: number
   /** 육성 선수 배팅 타입 (0 타격형 · 1 장타형) — 장타형이면 주인공 애니가 **+8** 이다. */
   readonly battingTypeIndex?: number
+  /**
+   * 이 재생이 앞으로 띄울 수 있는 초상화(대본이 적어 둔 인물 · 표정) — 다시 칠하는 것(주인공 피부)의 표정 애니 칸 전부를 미리 칠한다.
+   * 표정이 바뀌는 그림부터 칠한 색이 나오게 (원본은 그림 객체 적재 때 팔레트를 갈아 끼워 표정이 바뀌어도 제 색이다). 안 주면 지금 표정만
+   */
+  readonly upcomingPortraits?: readonly EventPortrait[]
 }
 
 /**
@@ -31,8 +36,9 @@ interface EventPortraitsProps {
  * 값은 `app/ui/CareerRoutes.tsx` → `StoryScreen` → 여기로 `career.skinIndex`·`career.battingTypeIndex`
  * 가 내려온다. 안 넘기는 자리(미션·이야기 밖 화면)만 기본값 황인·타격형으로 돈다.
  */
-export function EventPortraits({ portraits, height, skinIndex = 0, battingTypeIndex = 0 }: EventPortraitsProps) {
+export function EventPortraits({ portraits, height, skinIndex = 0, battingTypeIndex = 0, upcomingPortraits = [] }: EventPortraitsProps) {
   const placed = placePortraits(portraits, SCREEN_WIDTH)
+  useWarmPortraitExpressions(upcomingPortraits, skinIndex, battingTypeIndex)
   return (
     <div className={styles.stage} style={{ height }}>
       {placed.map((item) => (
@@ -41,6 +47,24 @@ export function EventPortraits({ portraits, height, skinIndex = 0, battingTypeIn
       ))}
     </div>
   )
+}
+
+/** 다시 칠하는 초상화가 쓰는 폴더 — 팔레트가 붙는 것은 주인공(event_char_0)뿐이다 (`portraitPaletteOf`) */
+const HERO_FOLDER = './sprites/event_char_0/frames'
+
+/**
+ * 앞으로 띄울 초상화 중 다시 칠하는 것(벌이 있는 것)의 표정 애니 칸 전부를 미리 칠한다 — 애니 번호는 화면에서 그리는 것과 같은
+ * `portraitAnimationOf`(장타형 +8), 벌은 `portraitPaletteOf` 다
+ */
+function useWarmPortraitExpressions(portraits: readonly EventPortrait[], skinIndex: number, battingTypeIndex: number): void {
+  const animations = useAnimations(HERO_FOLDER)
+  const requests = portraits.flatMap((portrait) => {
+    const palette = portraitPaletteOf(portrait, skinIndex)
+    if (palette === null || `./sprites/${portrait.file}/frames` !== HERO_FOLDER) return []
+    const entries = animations?.[portraitAnimationOf(portrait, battingTypeIndex)] ?? []
+    return recolorRequestsOf(HERO_FOLDER, entries.map((entry) => entry.frame), palette)
+  })
+  useWarmRecoloredSprites(requests)
 }
 
 interface PortraitSpriteProps {
@@ -62,6 +86,9 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
 
   // 장타형 주인공은 애니 번호가 +8 이다 (0x63a70).
   const entries = animations?.[portraitAnimationOf(placed.portrait, battingTypeIndex)]
+  const palette = portraitPaletteOf(placed.portrait, skinIndex)
+  // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
+  useWarmRecoloredSprites(recolorRequestsOf(folder, (entries ?? []).map((entry) => entry.frame), palette))
   const step = entries === undefined ? null : animationStepAt(entries, update)
   const key = step === null ? '' : String(step.frame).padStart(3, '0')
   // 빈 자리 프레임은 그림도 원점도 없다 — 원작도 아무것도 그리지 않는다.
@@ -73,7 +100,7 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
   return (
     // 주인공이면 피부 .mpl 로 다시 칠한다 (`key` = 프레임 — 아래 주석 참고).
     <PaintedFrame key={key} url={`${folder}/${key}.png`} style={{ left: x, top: y }}
-      palette={portraitPaletteOf(placed.portrait, skinIndex)} />
+      palette={palette} />
   )
 }
 

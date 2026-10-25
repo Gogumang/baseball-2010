@@ -47,9 +47,9 @@ describe('투수 훈련 메뉴 — 타자편과 다른 점', () => {
     expect(pitcherTrainingBlockReasonOf({ ...구원, role: PITCHER_ROLE.starter }, 메뉴('체력'))).toBeNull()
   })
 
-  it('사기 0 과 이미 한 행동은 타자편과 같은 이유로 막는다', () => {
+  it('사기 0 은 막고 행동함은 안 막는다 — 107 키 0x12d48 은 사기만 본다(타자편과 같다)', () => {
     expect(pitcherTrainingBlockReasonOf(투수({ morale: 0 }), 메뉴('제구'))).toBe('사기부족')
-    expect(pitcherTrainingBlockReasonOf(투수({ hasActedThisCycle: true }), 메뉴('제구'))).toBe('이미행동함')
+    expect(pitcherTrainingBlockReasonOf(투수({ hasActedThisCycle: true }), 메뉴('제구'))).toBeNull()
   })
 })
 

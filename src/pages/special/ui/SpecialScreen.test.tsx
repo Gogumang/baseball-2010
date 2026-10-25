@@ -181,6 +181,17 @@ describe('스페셜 칸 고르기', () => {
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
   })
 
+  it('날 키 0x28b9c — \'2\' · \'4\' · ← 는 앞 칸, \'6\' · \'8\' · → 는 뒤 칸, \'5\' 로 연다', () => {
+    띄우기()
+
+    fireEvent.keyDown(window, { key: '4' })  // 앞 칸 = 마지막 칸 선물받기
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
+  })
+
   it('바닥띠 되돌아가기를 누르면 메인 메뉴로 나간다 (바닥 비트 0x4)', () => {
     const onBack = vi.fn()
     띄우기({ onBack })

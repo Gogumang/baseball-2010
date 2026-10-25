@@ -75,6 +75,8 @@ interface MissionPlayScreenProps {
   readonly opponent: AcePlayer | null
   /** 마운드 투수 레코드 +0x19 · +0x1a 장비 니블 — 마투수면 안 넘긴다 (`BattingStage.pitcherEquipmentNibbles`) */
   readonly pitcherEquipmentNibbles?: readonly number[] | undefined
+  /** 마운드 투수 레코드 피부 `(rec[0xb] >> 2) & 3` (`BattingStage.pitcherSkinIndex`) — 팀은 hud 의 CPU 칸 팀 */
+  readonly pitcherSkinIndex?: number
   readonly atBat: AtBatState
   readonly isPaused: boolean
   readonly bannerText: string
@@ -197,6 +199,7 @@ export function MissionPlayScreen({
   pitcherAbility,
   opponent,
   pitcherEquipmentNibbles,
+  pitcherSkinIndex = 0,
   atBat,
   isPaused,
   bannerText,
@@ -375,6 +378,8 @@ export function MissionPlayScreen({
             pitcherAbility={pitcherAbility}
             // 마운드 투수 장비 겹 — 타석 교대 0x47cc8 의 48138~4816a (모드 6 도 같다)
             pitcherEquipmentNibbles={opponent === null ? pitcherEquipmentNibbles : undefined}
+            // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(hud CPU 칸 팀) — 482c0~482fc → 0x793b0 의 794c2
+            pitcherSkinIndex={pitcherSkinIndex}
             {...(runnerAces === undefined ? {} : { runnerAces })}
             pitcherStaminaPercent={pitcherStaminaPercent ?? null}
             isEagleEyeEnabled={false}

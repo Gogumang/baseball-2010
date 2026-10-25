@@ -40,7 +40,9 @@ import { POSE, isFreezeOpen, shouldClearPose, withThrowMotion } from '@/entities
  * vt10(잠금 +0xb4 가 0 이 된 틱 a12c8 · 던진 뒤 +0xb1 을 푼 a143e). 걸음(a1376 0xbf094)은 그 목표로 간다 — 움직임허용이 아닐 때
  * (송구 0xb2e38 의 vt24(0) · 공+0xaac == 0) 커버가 물려받은 루로 달려가 받는 것도, +0xcc 가 a1330 에서 막 0 이 된 틱에 vtc8 이
  * 열려 그때의 목표로 한 걸음 가는 것도 이 한 칸으로 원본대로 된다. (+0xcc 를 세우는 곳은 vt8c 0xa0ee0 — AI 0xf b4c52 의
- * vt8c(5) — 와 판 시작의 0 쓰기 b0fa6 · b1156 뿐이고 웹 판에는 AI 0xf 가 없어 늘 0 이다)
+ * vt8c(5) — 와 판 시작의 0 쓰기 b1156(vt20 인자 ≠ 0) · 생성자 a0df0 뿐이다(b0fa6 의 0xb0f88 은 부르는 곳이 없다). AI 0xf 는 사건
+ * 7 · 12 뒤라(r190) 그 판에서는 예보가 다시 돌지 않고, 다음 판이 vt20(0)(폭투 · 견제 · 도루)이면 남은 값(파울 5 · 폴 홈런 4~5)이
+ * 복제에 실린다 — 웹도 판 사이로 넘긴다(`DefenseScene.fielderSlack`, r196 — 폭투 판의 포수가 늦게 쥔다))
  */
 
 /** 표를 만들 때 살펴볼 최대 틱 — 원본은 끝이 없다(첫 포구 가능 틱 뒤 5틱에서 끝). n 이 쌓여 그 전에 늘 누군가 닿는다 */
@@ -66,6 +68,12 @@ export interface CatchForecast {
    * 그림 0x438c4 의 "!"(애니 13)만 본다. `secondPass` 를 안 준 예보(a = 1)는 늘 거짓
    */
   readonly secondPassStarted: boolean
+  /**
+   * **움직임 허용 +0x13c[칸]** (r196, 직접 뜬 것) — 예보 머리 b1376~b1398 이 아홉 칸 모두 `a ≠ 0 || 공+0xaac ≠ 0`(악송구 · 원바운드)로
+   * 적고, 두 번째 패스 b189a~b18b4 가 모두 1 로 고친다. 플레이 객체 칸이라 다음 예보까지 남는다 — 추적야수 AI 1(b4af6)이 0 이면 목표를
+   * 안 고친다(보통 송구를 받는 야수). `secondPass` 를 안 준 예보(a = 1)는 늘 참
+   */
+  readonly movable: boolean
   /**
    * **다이빙 후보 틱 +0x178[칸]** (b15e4~b1642, 직접 뜬 것 — r180): 예보 머리 b130c~b1334 가 아홉 칸을 1000(+0x19c 거리는 9999)으로
    * 채우고, 판정 갈래(잠금 · vtc8 관문 뒤 b14d0)에서 `공 첫 점 0xa25b0(공, 0) == 0xd8758 (20000, 1000, 30000)`(0xbc0f4 — 세 칸 같음) &&
@@ -279,6 +287,7 @@ export function forecastCatch(
     point: trajectory.pointAt(choice.catchTick),
     fenceChasePoint,
     secondPassStarted: options.secondPass !== undefined && !firstPass,
+    movable,
     diveTicks,
     backupSlot: fenceChasePoint === null ? backupSlotOf(fielders, choice.slot, lowPoint) : -1,
   }

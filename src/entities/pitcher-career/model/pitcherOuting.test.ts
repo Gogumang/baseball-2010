@@ -70,6 +70,7 @@ describe('투수편 외출 (모드 3 — 타자편과 같은 코드)', () => {
     expect(outingBlockReasonOf(투수({ money: 0 }), 기능('외식'))).toBe('소지금부족')
     expect(outingBlockReasonOf(투수(), 기능('입원'))).toBe('건강함')
     expect(outingBlockReasonOf(투수({ morale: 100 }), 기능('외식'))).toBe('사기최고')
-    expect(outingBlockReasonOf(투수({ hasActedThisCycle: true }), 기능('외식'))).toBe('이미행동함')
+    // 행동함(S+4)은 0x16cf0 이 보지 않는다
+    expect(outingBlockReasonOf(투수({ hasActedThisCycle: true }), 기능('외식'))).toBeNull()
   })
 })

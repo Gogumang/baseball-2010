@@ -24,6 +24,7 @@ import {
   layerPaletteIndexOf,
   NO_EQUIPMENT,
   NO_PITCHER_EQUIPMENT,
+  pitcherLayerPaletteIndexOf,
   pitcherLayersOf,
 } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, BatterLayer, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
@@ -68,6 +69,11 @@ function layerPreloadsOf(layers: readonly BatterLayer[], isRecolored: (layer: Ba
 const isBatterLayerRecolored = (layer: BatterLayer) => layerPaletteIndexOf(layer, 0, 0) !== null
 
 /**
+ * 평범한 투수 겹 중 칠하는 것 — 바탕 pitcher.pzx(피부 × 15 + 팀, 적재 0x793b0 의 794c2)와 등급 색 장비(`pitcherLayerPaletteIndexOf`)
+ */
+const isPitcherLayerRecolored = (layer: BatterLayer) => pitcherLayerPaletteIndexOf(layer, 0, 0) !== null
+
+/**
  * 일반 타자 한 명 — 몸통 폼의 대기 · 스윙 · 번트 프레임마다 겹(그림자 · 몸통 · 헬멧 · 배트 · 잔상 · 장비) 전부.
  * `equipment` 를 안 주면 맨몸(기본 배트)이다.
  */
@@ -93,7 +99,7 @@ const IDLE_CYCLE_TICKS = 4 * 5
 export function stageEntrySpritePreloadsOf(): SpriteFolderPreload[] {
   return mergeSpritePreloads(
     ...BATTER_BODY_TYPES.map(batterStanceSpritePreloadsOf),
-    layerPreloadsOf(pitcherLayersOf(0), () => false),
+    layerPreloadsOf(pitcherLayersOf(0), isPitcherLayerRecolored),
     runnerSpritePreloadsOf(),
   )
 }
@@ -108,7 +114,7 @@ export function aceBatterSpritePreloadsOf(aceOrder: number): SpriteFolderPreload
 /** 평범한 투수 — 투구 · 대기 프레임과 덧그림(+0x16), 장비 겹 */
 export function pitcherSpritePreloadsOf(equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT): SpriteFolderPreload[] {
   const layers = pitcherPoseFramesOf(null).flatMap((frame) => pitcherLayersOf(frame, equipment))
-  return layerPreloadsOf(layers, (layer) => layer.gradePaletteRow !== undefined)
+  return layerPreloadsOf(layers, isPitcherLayerRecolored)
 }
 
 /** 마투수 한 명 (순번 0~4) — 그 순번 줄의 투구 프레임과 경기 카드의 서 있는 그림 */

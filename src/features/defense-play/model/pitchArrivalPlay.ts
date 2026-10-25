@@ -27,6 +27,7 @@ import {
   stealCallSoundIdOf,
   stealPlayEngineInputOf,
   stealPlayResultOf,
+  stealStartThrowDecision,
   type StealPlayInput,
   type StealPlayResult,
 } from '@/features/defense-play/model/stealPlay'
@@ -262,7 +263,27 @@ export type OpenedPitchArrivalPlay =
     }
 
 /** 공 도착 판을 판 시작까지 연다 — 판이 안 열리면 null (굴림: `runPitchArrivalPlay` 의 앞부분) */
-export function openPitchArrivalPlay(input: PitchArrivalPlayInput, random: RandomPort): OpenedPitchArrivalPlay | null {
+export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: RandomPort): OpenedPitchArrivalPlay | null {
+  // 도루 키 0x583 마다 52222 의 0xafa60 한 번 — 앞 판이 끝난 그대로의 플레이 · 야수로, 출발한 차례대로(`stealStartThrowDecision`, r201).
+  // ⚠️ 원본은 키를 받은 투구 틱에 굴린다 — CPU 공격 도루는 그 뒤 CPU 타자 결정 0x34334 굴림이 먼저 돌았다(stealPlay 머리말)
+  let scene = arrival.scene
+  for (let count = 1; count <= arrival.stealingFrom.length; count += 1) {
+    scene = stealStartThrowDecision({
+      scene,
+      bases: arrival.bases,
+      stealingFrom: arrival.stealingFrom.slice(0, count),
+      outs: arrival.outs,
+      defenseAbilities: arrival.defenseAbilities,
+      runAbilities:
+        arrival.runAbilities === undefined
+          ? undefined
+          : { 1: arrival.runAbilities[1], 2: arrival.runAbilities[2], 3: arrival.runAbilities[3] },
+      runAbility: arrival.runAbility,
+      runnerTeamGrade: arrival.runnerTeamGrade,
+      random,
+    }).scene
+  }
+  const input: PitchArrivalPlayInput = scene === arrival.scene ? arrival : { ...arrival, scene }
   const passedBall = rollPassedBall(input.gameMode, random)
   const kind = pitchPlayKindOf({
     passedBall,

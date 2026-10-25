@@ -1,3 +1,4 @@
+import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { FRESH_HELD_CPU_MAGIC, cpuMagicStateOf } from '@/entities/pitching/model/magicPitchGame'
@@ -204,6 +205,13 @@ interface MissionSessionInput {
    * `missionDefensePlayInputOf` 주석).
    */
   readonly throwModeManual?: boolean
+  /**
+   * 환경설정 "주루" 가 **수동**인가 (설정 +0xbd). 안 넘기면 자동이다.
+   * `0xae690` = `(경기[0x31 + 공격측] == 1) || (설정+0xbd != 0)` 이고 0x46418 이 설정+0xbd 를 넘긴다 — 모드를 안 본다.
+   * **타자편 미션은 사람이 공격**이라 앞 항이 거짓이어서 이 설정이 그대로 답이 된다(나리 타자편 0xae690 과 같다).
+   * 투수편 미션은 공격이 CPU 라 앞 항이 늘 참이어서 상관이 없다.
+   */
+  readonly runningModeManual?: boolean
   /**
    * 마선수 레벨 `mgr[0x13a + idx]` (idx 0~4 마투수 · 5~9 마타자 → 0~4 = Lv1~5).
    * 0xb6414 가 마선수 능력치마다 배율 0xd88aa[레벨] 을 곱한다 (`entities/mission/model/aceLevel`).
@@ -538,6 +546,7 @@ export function useMissionSession({
   recordStat,
   sound,
   throwModeManual,
+  runningModeManual,
   aceLevels,
   pitcher: pitcherInput,
   batterSkillIds: nariBatterSkillIds = NO_SKILLS,
@@ -552,6 +561,11 @@ export function useMissionSession({
   /** 지금 대기 칸 — 전역기록이라 렌더마다 읽는다 */
   const hold = aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD
   const nariPitcher = useMemo(() => pitcherInput ?? modePitcherOf(null), [pitcherInput])
+  /**
+   * 타자편 미션(사람 공격) 판에 싣는 환경설정 "주루" — 0x46418 이 설정+0xbd 를 0xae690 의 둘째 인자로 넘긴다.
+   * 사람이 공격이라 첫 항(`경기[0x31 + 공격측] == 1`)이 거짓이어서 이 값이 자동 진루 제어기 0xaf8c0 을 켜고 끈다
+   */
+  const batterRunningMode = runningModeManual === true ? ('수동' as const) : ('자동' as const)
   /**
    * **미션 선수 고르기 결과** (하위 17 0x29a54 · 칸 코드 0x5eae0) — 편과 명전 번호(+0xa5 투수 · +0xa6 타자, 나리면 null).
    * 아직 안 골랐으면 null — 화면이 고르기 창(`HallOfFameScreen` 선수고르기)을 먼저 띄운다.
@@ -957,6 +971,8 @@ export function useMissionSession({
     playSoundIds(audio, [PITCHER_CHANGE_SOUND])
     setSubstitutionScene((previous) => ({
       serial: (previous?.serial ?? 0) + 1,
+      // 0x38b64 의 가지 — 투수 교체는 투수 ptc/004 · 대타는 타자 ptc/003
+      entryKind: substitution.kind === '대타' ? '타자' : '투수',
       incomingIsAce: substitution.incomingIsAce,
       entrySoundId: pitcherEntrySoundIdOf({ isAce: substitution.incomingIsAce, bases: run.bases }),
       // 마선수 등장 컷인 0x473f0 번호 — 미션 상대 마선수(1 부터) 0xb63a1 = opponentAce − 1, 대타면 +5
@@ -1001,7 +1017,8 @@ export function useMissionSession({
   }
 
   /**
-   * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 → 0x38b64)가 등판음을 낸다.
+   * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 · 0x49e64 49f76 → 0x38b64)가
+   * 들어온 선수 자리에 파티클을 쏘고 등판음을 낸다.
    * ⚠️ 근사(남김 — 웹 구조): 웹은 0xd 두 그림을 타이머로 센다(화면의 0xe 대기는 같은 때부터 0xd 두 그림을 센다).
    */
   const finishSubstitutionScene = () => {
@@ -1009,7 +1026,11 @@ export function useMissionSession({
     if (scene === null) return
     setSubstitutionScene(null)
     // 경기 장면 틱으로 센다 — 공용 창이 서 있으면 0xd 의 장면 틱(52cc6) · 0xe 그리기(52efe)가 서기 때문이다
-    setGameSceneTickTimeout(() => playSoundIds(audio, [scene.entrySoundId]), SCENE_PREPARE_FRAMES)
+    // 0x38b64 — 들어온 선수 자리에 파티클(투수 ptc/004 · 타자 ptc/003)을 먼저 쏘고 등판음
+    setGameSceneTickTimeout(() => {
+      emitSubstitutionEntryParticle(scene.entryKind)
+      playSoundIds(audio, [scene.entrySoundId])
+    }, SCENE_PREPARE_FRAMES)
   }
 
   /**
@@ -1168,6 +1189,8 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(foulRun.bases, foulRun.outs, foulOutcome, random, undefined, undefined, playAbilitiesOf(foulRun)),
+            // 사람 공격 — 환경설정 주루(설정 +0xbd, 0xae690 둘째 항)
+            runningMode: batterRunningMode,
             // 수비 장면 칸은 판을 넘어 남는다
             scene: missionSceneRef.current,
             stealingFrom: foulStealing,
@@ -1206,9 +1229,10 @@ export function useMissionSession({
                 // 루별 주루 — 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로 0xb570d(ctx, 3, 주자, 1, 90, 1), 0 은 지금 타자.
                 // 아홉 칸 수비는 CPU 수비 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)
                 ...playAbilitiesOf(current),
-                // 타자 미션은 수비가 CPU · 공격이 사람. 주루 설정은 안 넘긴다(기본 자동 — 견제와 같다)
+                // 타자 미션은 수비가 CPU · 공격이 사람. 사람 공격이라 0xae690 첫 항이 거짓 — 환경설정 주루(+0xbd)가 답이다
                 defenseIsCpu: true,
                 offenseIsCpu: false,
+                runningMode: batterRunningMode,
                 // 장면 +0xfdc — 못 맞힌 번트의 번트 종류. 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
                 buntKind,
                 // 경기 +0xfd4 — 이 공의 값
@@ -1262,6 +1286,8 @@ export function useMissionSession({
           side: '타자',
           input: {
             ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random, undefined, undefined, playAbilitiesOf(current)),
+            // 사람 공격 — 환경설정 주루(설정 +0xbd, 0xae690 둘째 항)
+            runningMode: batterRunningMode,
             // 수비 장면 칸은 판을 넘어 남는다
             scene: missionSceneRef.current,
             isUncatchable,
@@ -1281,7 +1307,7 @@ export function useMissionSession({
       finishMissionArrivalAtBat(play, { hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase })
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [aceLevels, audio, batterSkillIds, random, runner],
+    [aceLevels, audio, batterRunningMode, batterSkillIds, random, runner],
   )
 
   /**
@@ -2244,7 +2270,7 @@ export function useMissionSession({
      * 남은 타석·스윙은 그대로다 — 공을 안 던졌다. 볼카운트도 그대로지만, 견제사로 3아웃이면 판정 B 0xae3e8 이 0x18 로 보내
      * 이 타석이 끊기고 다음은 새 타석(0xd → 0xe)이다.
      * 수비 능력치·주루는 미션 타구와 같은 값이다(`missionPlayAbilitiesOf` — CPU 수비 팀 레코드 0xb0fb4 · 주자 신원의 주력), 사람 공격,
-     * 주루 설정은 안 넘긴다(진행기 기본 = 자동) — 미션 세션에는 환경설정 "주루" 가 들어오지 않는다(근사, 타구와 같다).
+     * 주루는 환경설정 "주루"(설정 +0xbd)다 — 사람 공격이라 0xae690 첫 항이 거짓이어서 둘째 항(0x46418 이 넘기는 +0xbd)이 답이다.
      *
      * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
      * ⚠️ 근사(때 · 남김 — 웹 구조): 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기·나만의리그와 같다).
@@ -2259,8 +2285,9 @@ export function useMissionSession({
         bases: current.bases,
         outs: current.outs,
         random,
-        // 타자 미션은 사람이 공격이다 (`missionDefensePlayInputOf` 의 offenseIsCpu 와 같다)
+        // 타자 미션은 사람이 공격이다 (`missionDefensePlayInputOf` 의 offenseIsCpu 와 같다) — 주루 설정이 먹는다 (0xae690)
         offenseIsCpu: false,
+        runningMode: batterRunningMode,
         // 수비는 CPU 다 — 미션 경기 준비 0xaa57c 가 레코드 +3 의 윗 4비트 칸을 사람(aa658 `0xb6c18(st, 칸, 0)`),
         // 다른 칸을 CPU(aa666 `… , 1)`)로 세우고, 타자 미션의 사람 칸은 공격이라 수비측 경기[0x31 + 수비측] == 1 이다.
         // 슬롯 2 의 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a · 4dec1e1 의 타자편 cpuPickoff 와 같다).

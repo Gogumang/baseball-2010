@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { playerDetailOf } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { nextOpponentOf } from '@/entities/career/model/playerCareer'
 import { seatNariMatchAces, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
@@ -112,5 +113,18 @@ describe('143 경기 전 엔트리 보기 — 진입 0x16af8 (0x5561c 셋째 인
     expect(capacityOf(mine)).toBe(staminaCapacityOf(staminaOf(mine), 70, false))
     const old = batterNariEntryViewOf(career, false)
     expect(capacityOf(old)).toBe(staminaCapacityOf(staminaOf(old), 100, false))
+  })
+})
+
+describe("143 '0' 상세 창 — 내 선수 줄 (0x5b798 타자 갈래 · 육성 연봉 5c848~5c872)", () => {
+  it('타입 · 손 · 장착 스킬 · 필살 · 연봉(저장 +0x1c8 × 100)을 커리어에서 채운다', () => {
+    const { career } = 선수()
+    const me = { ...career, battingTypeIndex: 1, battingSide: 1, specialSwingNumber: 2, salary: 123, equippedSkillIds: [] }
+    const row = batterNariEntryViewOf(me, true).lists.batters[7]
+    expect(row.name).toBe('보기')
+    expect(row.detailSource).toBeDefined()
+    const detail = playerDetailOf(row.detailSource!)
+    expect(detail.values.map((value) => value.text)).toEqual(['장타형', '좌타', '-', '플레임 스윙', '1억2300'])
+    expect(row.profileLow).toBe(me.positionIndex & 3)
   })
 })

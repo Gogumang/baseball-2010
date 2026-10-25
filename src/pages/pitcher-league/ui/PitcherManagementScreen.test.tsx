@@ -63,6 +63,9 @@ const 칸 = (name: string) => screen.getByRole('button', { name })
 const 칸이름 = (element: Element) => (element.textContent ?? '').replace('▶', '').trim()
 const 칸이름들 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')].map((button) => button.getAttribute('aria-label'))
 
+/** 125 훈련 연출(0x848d0)을 확인 키 0x105a4 처럼 끝으로 보낸다 — 그 틀의 0x84e58 이 참이라 훈련 0x17f5c 가 돈다 */
+const 연출넘기기 = () => fireEvent.click(screen.getByTestId('투수-훈련팝업'))
+
 /** 커맨드·하위 메뉴 칸 (`role="option"`) 과 보통 버튼을 함께 찾는다 */
 function 누르기(name: string) {
   const candidates = [...screen.queryAllByRole('option'), ...screen.queryAllByRole('button')]
@@ -150,6 +153,57 @@ describe('상태판 0x7d34c 모드 3 · 커맨드 줄 0x7e418 투수 표', () =>
 })
 
 describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
+  it('[85] 예 → 125 연출 — 0xd4990 모드 3 표: 칸 0 raise 4t+3 · 칸 1 4t+5 · 칸 2 4t+4 · 칸 3 team 3 (0x84664)', () => {
+    const 연출 = (typeIndex: number, name: string) => {
+      화면({ career: 투수({ typeIndex }) })
+      누르기('트레이닝')
+      누르기(name)
+      fireEvent.click(칸('예'))
+      const 팝업 = screen.getByTestId('투수-훈련팝업')
+      const 값 = [팝업.dataset.file, Number(팝업.dataset.animation)]
+      cleanup()
+      return 값
+    }
+    expect(연출(0, '제구')).toEqual(['raise_traning_ani', 3])
+    expect(연출(1, '구속')).toEqual(['raise_traning_ani', 9])
+    expect(연출(2, '변화')).toEqual(['raise_traning_ani', 12])
+    expect(연출(2, '체력')).toEqual(['team_traning_ani', 3])
+  })
+
+  it('125 는 가운데 판을 빼고(0x19da4 19dc6) 취소를 안 받는다(0x105a4) — 결과 창이 닫히면 105 로 돌아와 다시 깐다', () => {
+    const onExit = vi.fn()
+    render(
+      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onExit={onExit} />,
+    )
+    누르기('트레이닝')
+    누르기('제구')
+    fireEvent.click(칸('예'))
+
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('투수-훈련팝업')).toBeTruthy()
+    expect(onExit).not.toHaveBeenCalled()
+
+    연출넘기기()
+    // 0x84e58 이 애니를 지워 팝업은 안 그리지만 결과 창 동안은 아직 125 다
+    expect(screen.queryByTestId('투수-훈련팝업')).toBeNull()
+    expect(screen.queryByTestId('가운데판')).toBeNull()
+    // 커맨드 줄도 125 진입의 0x7e84c(0x7d) — 107 다섯 칸 그대로
+    expect(screen.getByRole('button', { name: '제구' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
+    expect(screen.getByTestId('가운데판')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '제구' })).toBeNull()
+    expect(screen.getByRole('button', { name: '트레이닝' })).toBeTruthy()
+  })
+
+  it('투수 그림은 칸 0 · 1 · 2 · 4 에만 — 칸 3(team) 에는 없다 (0x11744 · 0x848d0 마스크 0x17)', () => {
+    화면()
+    누르기('트레이닝')
+    누르기('체력')
+    fireEvent.click(칸('예'))
+    expect(screen.queryByTestId('투수-훈련-투수')).toBeNull()
+  })
+
   it('칸 0~3 이 제구·구속·변화·체력이고 칸 4 가 마구다', () => {
     화면()
 
@@ -168,6 +222,9 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     expect(screen.getByText('[제구훈련]을 하시겠습니까?')).toBeTruthy()
     fireEvent.click(칸('예'))
 
+    // 125 — 연출이 도는 동안은 굴리지 않는다(틀 0x18dd8 이 0x84e58 을 본 뒤 0x17f5c)
+    expect(onSave).not.toHaveBeenCalled()
+    연출넘기기()
     expect(onSave).toHaveBeenCalledOnce()
     const trained = onSave.mock.calls[0][0] as PitcherCareer
     // 고정 난수 0 → bfa55(4,7) 의 최솟값 4
@@ -185,6 +242,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     누르기('트레이닝')
     누르기('구속')
     fireEvent.click(칸('예'))
+    연출넘기기()
 
     const 그림들 = Array.from(screen.getByRole('dialog', { name: '상세정보' }).querySelectorAll('img'))
       .map((image) => image.getAttribute('src') ?? '')
@@ -199,6 +257,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     누르기('트레이닝')
     누르기('제구')
     fireEvent.click(칸('예'))
+    연출넘기기()
     expect(onSave).toHaveBeenCalledOnce()
 
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -206,6 +265,11 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     const injured = onSave.mock.calls[1][0] as PitcherCareer
     expect([injured.isInjured, injured.injuryRemaining]).toEqual([true, 3])
     expect(screen.getByText('부상을 당했습니다.')).toBeTruthy()
+
+    // 0x28 을 닫으면 105 틀 0x1aec4(1af3c~1af7e)가 둘째 팝업 0x29 StrMODE[212] 를 띄운다
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.queryByText('부상을 당했습니다.')).toBeNull()
+    expect(screen.getByText(/휴식커맨드/)).toBeTruthy()
   })
 
   it('능력치가 보직 한계면 StrMODE[192] 로 막는다', () => {
@@ -468,7 +532,12 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     누르기('휴식')
     expect(screen.getByText('휴식을 취하시겠습니까?')).toBeTruthy()
     fireEvent.click(칸('예'))
+    // 127 연출(0x85230) 동안은 굴리지도 저장하지도 않는다 — 확인 키(0x10650)가 게이지를 끝으로 건너뛴다
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: '5' })
 
+    expect(screen.queryByTestId('나리-휴식연출')).toBeNull()
     expect((onSave.mock.calls[0][0] as PitcherCareer).morale).toBe(60)
     expect(screen.getByText('사기 10 상승하였습니다')).toBeTruthy()
   })
@@ -479,6 +548,7 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
 
     누르기('휴식')
     fireEvent.click(칸('예'))
+    fireEvent.click(screen.getByTestId('나리-휴식연출'))
     // 사기 결과 창(상세 창 0x872a1)을 닫아야 회복 판정이 돈다 (콜백 0x1d671)
     fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
 
@@ -486,6 +556,15 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     const recovered = onSave.mock.calls[1][0] as PitcherCareer
     expect([recovered.isSick, recovered.isInjured]).toEqual([false, false])
     expect(screen.getByText(/부상에서 회복 되었습니다/)).toBeTruthy()
+  })
+
+  it('127 연출은 캐릭터 없이 event_ani 애니 5 · event_char_0 애니 0x62 (0x85230) — 취소 키는 안 먹는다 (0x10650)', () => {
+    화면({})
+    누르기('휴식')
+    fireEvent.click(칸('예'))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '상세정보' })).toBeNull()
   })
 
   it('⚠️ 원본 그대로: 사기가 최고면 아프거나 다쳤어도 StrMODE[91] 로 거절한다 (0x12682)', () => {
@@ -498,12 +577,12 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('한 주기에 한 가지만 — 이미 행동했으면 막는다 (r_event_txt[176])', () => {
+  it('행동함이어도 휴식을 막지 않는다 — 105 키 0x1261c 휴식 칸(12682)은 사기 최고만 본다', () => {
     화면({ career: 투수({ hasActedThisCycle: true }) })
 
     누르기('휴식')
 
-    expect(screen.getByText('트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다')).toBeTruthy()
+    expect(screen.getByText(/휴식.*을 취하시겠습니까/)).toBeTruthy()
   })
 })
 
@@ -661,6 +740,10 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키('Enter')
     // StrMODE[66] 확인 팝업의 [예]
     키('Enter')
+    // 125 연출(칸 4) — 확인 키 0x105a4 가 게이지를 끝으로 보낸다
+    expect(screen.getByTestId('투수-훈련팝업')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+    키('Enter')
 
     expect(onSave).toHaveBeenCalled()
     // 0x17f5c 칸 4 — 마구 이름 StrCOMMON[0x1e + 1] 로 StrMODE[86] "[이름] %d/%d회 훈련"
@@ -679,6 +762,9 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
     키로마구칸까지()
     키('Enter')
     키('Enter')
+    키('Enter')
+    // 125 연출 동안도 105 가 아니다
+    expect(onResultWindowChange).toHaveBeenLastCalledWith(true)
     키('Enter')
 
     // 125 — 알림이 떠 있는 동안은 105 진입이 아니다

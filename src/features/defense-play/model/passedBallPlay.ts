@@ -15,6 +15,7 @@ import {
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
 import { PASSED_BALL_PLAY_KIND, type PassedBallShot } from '@/entities/fielding/model/passedBall'
+import { withCarriedSlack } from '@/entities/fielding/model/fielderPose'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { stealTargetBaseOf, type StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -106,6 +107,8 @@ export interface PassedBallPlayInput {
   readonly runnerTeamGrade?: number
   /** 주면 펌블(0xb41d0) · 악송구(0xa1828) · 특수 송구(0xafa60) 굴림이 돈다 */
   readonly random?: RandomPort
+  /** 수비 9명의 스킬 번호 (칸 순서) — 레이저 굴림 0x66a8c 의 초감각(21) (`DefensePlayInput.fielderSkillIds`) */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
   readonly defenseIsCpu?: boolean
   readonly throwMode?: ManualAutoMode
   readonly manualThrowBase?: number
@@ -226,7 +229,9 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
   leadRunnersForPassedBall(runners, input, batterRuns)
 
   // ── 0xb284a: 예보(vt24, 추적야수 = 포수라 t ≤ 4 동안 포수를 건너뜀) → 고르기(vt34) ──
-  const startFielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
+  // b2856 vt20(0) — b1144 가 +0xcc 쓰기(b1156)를 건너뛰어 앞 판이 남긴 값을 들고 연다(`DefenseScene.fielderSlack`, r196).
+  // 예보 복제(0xb12d0)도 그 +0xcc 를 베낀다 — 막힌 복제는 판정 없이 복제 틱만 돈다(`forecastCatch`)
+  const startFielders = withCarriedSlack(createFielders(abilities, input.defenseTeamBonus ?? 0), input.scene?.fielderSlack)
   const forecast = forecastCatch(trajectory, startFielders, { from: 0, to: Number.POSITIVE_INFINITY }, {
     initialChaserSlot: CATCHER_SLOT,
   })
@@ -272,6 +277,7 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
     ballOnGround: false,
     chase: { trajectory, slot: chaserSlot, catchTick, diveTicks: forecast.diveTicks, forecastCatchTick: forecast.choice.catchTick },
     random: input.random,
+    fielderSkillIds: input.fielderSkillIds,
     defenseIsCpu: input.defenseIsCpu,
     throwMode: input.throwMode,
     manualThrowBase: input.manualThrowBase,

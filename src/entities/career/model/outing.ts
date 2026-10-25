@@ -19,7 +19,7 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
  */
 
 
-export type OutingBlockReason = '소지금부족' | '이미행동함' | '건강함' | '인기도부족' | '사기최고'
+export type OutingBlockReason = '소지금부족' | '건강함' | '인기도부족' | '사기최고'
 
 /**
  * 외출이 읽고 쓰는 칸만 추린 것 — **타자편·투수편이 함께 쓴다.**
@@ -52,7 +52,7 @@ export function outingBlockReasonOf(
   career: OutingCareer,
   outingFunction: OutingFunction,
 ): OutingBlockReason | null {
-  if (career.hasActedThisCycle) return '이미행동함'
+  // 행동함(S+4)은 보지 않는다 — 0x16cf0 은 아래 넷뿐이다
   // StrMODE[62] "인기도가 부족합니다. 필요한 인기도 : %d"
   if (career.popularity < outingFunction.requiredPopularity) return '인기도부족'
   // StrMODE[77] — 보험증서(서브아이템 7)를 보지 않는다 (원본 그대로)
@@ -75,8 +75,6 @@ export function outingBlockTextOf(reason: OutingBlockReason, outingFunction: Out
       return '건강한 상태입니다 입원할 필요가 없습니다'
     case '사기최고':
       return '사기 최고 상태입니다'
-    case '이미행동함':
-      return '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다'
   }
 }
 
@@ -220,8 +218,8 @@ export function runOuting<T extends OutingCareer>(career: T, outingFunction: Out
  */
 const REST_MORALE_RANGE = { minimum: 10, maximumExclusive: 16 }
 
-export function restBlockReasonOf(career: PlayerCareer): '이미행동함' | '사기최고' | null {
-  if (career.hasActedThisCycle) return '이미행동함'
+export function restBlockReasonOf(career: PlayerCareer): '사기최고' | null {
+  // 행동함(S+4)은 보지 않는다 — 105 키 0x1261c 휴식 칸(12682~126bc)은 사기만 본다
   // 0x1261c — 사기가 100 이면 아파도 StrMODE[91] 로 거절한다 (행동으로 치지 않음)
   return career.morale >= MAXIMUM_MORALE ? '사기최고' : null
 }

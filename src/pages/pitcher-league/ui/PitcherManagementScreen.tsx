@@ -21,10 +21,15 @@ import { NariRecordPickPopup, NariRecordView } from '@/pages/nari-record-room'
 import type { RecordRoomPick } from '@/pages/nari-record-room'
 import { PitchTrainingScreen } from '@/pages/pitcher-league/ui/PitchTrainingScreen'
 import { PitchChoicePopup } from '@/pages/pitcher-league/ui/PitchChoicePopup'
+import { PitcherTrainingScene } from '@/pages/pitcher-league/ui/PitcherTrainingScene'
+import { pitcherCardLookOf } from '@/pages/pitcher-league/lib/pitcherCardFigure'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
 import { CenterStage } from '@/pages/management/ui/CenterStage'
+import { RestScene } from '@/widgets/training-scene/ui/RestScene'
+import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+import { nariRestPresentationOf } from '@/widgets/training-scene/lib/restPresentation'
 import { nariStageCharactersOf } from '@/pages/management/lib/centerStage'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { PITCHER_COMMAND_BAR, pitcherLabelDxOf, pitcherParentSlotOf } from '@/pages/pitcher-league/lib/pitcherCommandBar'
@@ -289,11 +294,19 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
             mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
-            isKeyEnabled={!isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === ''} />
+            isKeyEnabled={!menu.isTrainingState && !isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === '' && menu.restPhase !== 'playing'} />
           <PitcherStatusBoard career={career} />
-          <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
-            morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
-          })} />
+          {/* 상태 125(훈련 연출 · 결과 창)·127(휴식 — 연출과 결과 창)은 0x19da4 가 가운데 판 0x7f814 를 뺀다(19dc0~19dd4) */}
+          {!menu.isTrainingState && menu.restPhase === null && (
+            <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
+              morale: career.morale, isSick: career.isSick, isInjured: career.isInjured, isSlugger: false, skinIndex: career.skinIndex,
+            })} />
+          )}
+          {/* 127 그리기 0x19e08 → 0x8532c = 0x848d0(gfx, 0, 0) — 캐릭터 없는 훈련 팝업. 투수편([gfx+0x20] == 3)은 늘 애니 0x62 */}
+          {menu.restPhase === 'playing' && (
+            <RestScene presentation={nariRestPresentationOf({ isBatter: false, battingTypeIndex: 0 })}
+              char0Palette={portraitPaletteIndex(career.skinIndex)} onFinished={menu.finishRest} />
+          )}
         </>
       )}
       {/*
@@ -345,6 +358,15 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
           [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
           [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') },
         }} />
+
+      {/*
+        125 그림 0x19eb8 — 0x19da4(커맨드 줄 · 상태판 · 머리띠) 다음 훈련 팝업 0x848d0(팝업, 1, 0). 게이지가 차면 틀 0x18dd8 이
+        훈련 0x17f5c 로 간다(굴림은 연출 뒤). 그림 객체 값은 0x11744 → 0x10810(내 기록) — 기본정보 카드와 같다
+      */}
+      {menu.trainingPresentation !== null && (
+        <PitcherTrainingScene presentation={menu.trainingPresentation}
+          look={pitcherCardLookOf(career, career.equipmentLevels)} onFinished={menu.finishTraining} />
+      )}
 
 
       {/*

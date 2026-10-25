@@ -79,8 +79,21 @@ export function isSubstitutionSceneLastDraw(draw: number): boolean {
  * 들어온 선수의 등판음(0x38b64 — 마선수 26 · 2·3루 주자 15 · 그 밖 14)은 0x16 이 아니라 0xe 그리기(0x38d1c 의 38dc2)가
  * 내므로 0x16 이 끝나고 0xd 두 그림 뒤다.
  */
+/**
+ * 0x3d458 의 갈래 — 투수 예약(+0x195c 비트1) · 대타 예약(비트0). 0xe 첫 그림의 0x38b64 가 투수 그리기(38dc2)에서 투수 가지,
+ * 타자 그리기(49f76)에서 타자 가지를 탄다 — 가지마다 파티클이 다르다(ptc/004 · 프레임 9 / ptc/003 · 프레임 4, `substitutionEntryParticle`)
+ *
+ * 두 가지가 장면 메시지 줄(+0x70, 0xbfbad)에 넣는 메시지 (r205 직접 뜸 — 화면에 뜨는 글자는 없다):
+ * - 투수 0xbc0(인자 0xb633d 마선수) → 처리기 0x509a0 의 50bb2~50bba → 0x5227c = 세이브 후보 0xa60c0 (웹 `decisionsAfterPitcherChange`)
+ * - 타자 0xbbe → **처리처가 없다**: 50b68 0xbbf(→ 0x5226c) · 50b76 0x76d · 50b96 0xbba 어디에도 안 걸려 50ba0 끝으로 간다(0xbc3 과 같은 빠진 가지).
+ *   줄 비우기 0xbfc8c 는 +0x70 겹의 vt0xc(썽크 0x53138 `sub r0, #0x70` → 0x509a1)만 부르고, 경기 로직 vt0xc 0xae5f8 은 빈 함수다 — 웹 할 일 없음
+ */
+export type SubstitutionEntryKind = '투수' | '타자'
+
 export interface SubstitutionScene {
   readonly serial: number
+  /** 들어온 선수가 투수(투수 교체)인가 타자(대타)인가 — 0x38b64 의 가지 */
+  readonly entryKind: SubstitutionEntryKind
   /** 들어온 선수가 마선수인가 — 원본은 컷인 0x473f0 을 더 그린다(`aceSlot`) */
   readonly incomingIsAce: boolean
   /**

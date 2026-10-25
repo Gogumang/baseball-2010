@@ -322,6 +322,8 @@ export function HomeRunDerbyScreen({
             pitcherAbility={pitcher.ability}
             // 단계 0 마스터 줄 2 의 장비 니블 → 장비 겹 (0x47cc8 48138~4816a). 마투수 단계는 없다
             pitcherEquipmentNibbles={pitcher.equipment}
+            // 마운드 바탕 벌 = 피부 × 15 + 수비 팀 v(hud 상대 팀) — 마스터 줄 2 의 +0xb (482c0~482fc → 0x793b0 의 794c2)
+            pitcherSkinIndex={((pitcher.record?.profile ?? 0) >> 2) & 3}
             aceLevels={aceLevels}
             swingMode="홈런더비"
             // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드 7 도 막지 않는다(모드 갈림 없음). 내 선수가 쳐서 마선수가 아니다

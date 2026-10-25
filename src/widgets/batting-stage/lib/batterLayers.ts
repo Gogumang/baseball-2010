@@ -19,6 +19,7 @@
  * `BatterLayer`·`layerPaletteIndexOf` 를 쓰기 때문이다. 두 쪽 차이는 `PitcherEquipment` 주석 참고.
  */
 import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
+import type { RecolorRequest } from '@/shared/lib/sprite/paletteSwap'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import { PITCHER_OVERLAY_FRAME_OFFSET } from '@/widgets/batting-stage/lib/stageScenery'
 
@@ -164,6 +165,33 @@ export function batterLayerPaletteIndex(folder: string, skinIndex: number, teamI
  */
 export function layerPaletteIndexOf(layer: BatterLayer, skinIndex: number, teamIndex: number): number | null {
   return layer.gradePaletteRow ?? batterLayerPaletteIndex(layer.folder, skinIndex, teamIndex)
+}
+
+/**
+ * 평범한 투수 그림(단일 PZX, vtbl 0xd3ce0) 한 겹의 팔레트 번호 — 장비(손·다리)는 **등급 줄**, 바탕 `pitcher.pzx` 는 **피부 × 15 + 팀**.
+ * 적재 0x793b0 의 평범한 투수 갈래(+0x3d < 0)가 794c2~794d4 에서 `pitcher.pzx` 를 `r3 = 피부 × 15 + 팀` 벌로 연다
+ * (같은 레코드면 79482~79490 이 팔레트만 0xb9c34 로 갈아 끼운다). 팀 = 둘째 인자 r1, 피부 = 넷째 인자 r3 이다.
+ * 머리 · 몸 장비 겹(item_pit_head · item_pit_body)은 .mpl 이 없어 구운 색 그대로다(`gradePaletteRow` 도 없다).
+ *
+ * 타석 마운드도 같다 — 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림 `[장면+0xf1c]->vt8`(= 0x793b0) 을
+ * `(팀 = 0xb6c08(게임) 수비 팀, 0xb6e24(투수), 피부 = (rec[0xb] << 28) >>> 30, 손 0xb63c0, 마투수 0xb63a0)` 로 부른다(모드를 안 가린다).
+ */
+export function pitcherLayerPaletteIndexOf(layer: BatterLayer, skinIndex: number, teamIndex: number): number | null {
+  return layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(skinIndex, teamIndex) : null)
+}
+
+/**
+ * 겹들 → 미리 칠하기 요청 (`useWarmRecoloredSprites`) — 그림 객체가 그릴 수 있는 자세의 겹을 모아 넘기면
+ * 자세가 넘어가는 그 그림부터 칠한 색이 나간다(원본은 적재 때 팔레트를 갈아 끼운다). 벌이 없는 겹은 뺀다.
+ */
+export function layerRecolorRequestsOf(
+  layers: readonly BatterLayer[],
+  paletteOf: (layer: BatterLayer) => number | null,
+): RecolorRequest[] {
+  return layers.flatMap((layer) => {
+    const paletteIndex = paletteOf(layer)
+    return paletteIndex === null ? [] : [{ url: `${layer.folder}/${String(layer.frame).padStart(3, '0')}.png`, paletteIndex }]
+  })
 }
 
 interface PoseTable {

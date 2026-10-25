@@ -199,3 +199,39 @@ export const HELP_VIEWER = {
 export const HELP_PANEL_OPEN_HEIGHTS: readonly number[] = [32, 36, 52, 116]
 export const HELP_PANEL_CLOSE_HEIGHTS: readonly number[] = [212, 208, 192, 128]
 export const HELP_PANEL_FULL_HEIGHT = 0xd4
+/** 닫는 중 높이의 바닥 — 0x5939e `cmp #0xa ; bgt` · 0x593a2 `movs #0xa` (여기에 닿으면 끝 +0x98 = 1) */
+const HELP_PANEL_CLOSED_FLOOR = 10
+/** 연출 걸음 — CLR(0x6385c~0x63868 · 0x6388a~0x63896)이 1 로 되돌리고 그릴 때마다 ×4 (0x59394 `lsls #2`) */
+const HELP_PANEL_STEP_GROWTH = 4
+
+/**
+ * **닫기 연출이 그리는 높이들** — 높이 칸이 `start` 일 때 CLR 을 받으면(걸음 1 · 끝 0 · 방향 0), 그 뒤 그림마다 지금 높이로 판을 그린 다음
+ * 걸음 ×= 4 · 높이 −= 걸음(0x5938c~0x593a8)이고, ≤ 10 이면 끝이 서서 다음 갱신에 0x637d0 이 1 을 돌려준다(0x63964) — 그 높이는 안 그린다.
+ * 다 열린 판(212)이면 `HELP_PANEL_CLOSE_HEIGHTS` 와 같다. **CLR 은 연출 중에도 먹는다**(0x637d0 은 +0x99 · +0x98 을 안 본다) —
+ * 여는 중이나 닫는 중에 CLR 을 다시 누르면 그때 높이 칸에서 걸음 1 로 다시 줄기 시작한다(U-86, r205 직접 뜸).
+ */
+export function helpPanelCloseHeightsFrom(start: number): readonly number[] {
+  const heights = [start]
+  let height = start
+  let step = 1
+  for (;;) {
+    step *= HELP_PANEL_STEP_GROWTH
+    height -= step
+    if (height <= HELP_PANEL_CLOSED_FLOOR) return heights
+    heights.push(height)
+  }
+}
+
+/**
+ * 여는 중 · 다 열린 판에서 `drawn` 번째 본문 그림을 그린 **뒤**의 높이 칸 — 다음 그림이 그릴 높이다(그리기가 판을 그린 뒤 걸음을 간다,
+ * 0x59306~0x59342). 본문 그림 전(머리띠 미끄러짐 동안, `drawn < 0`)은 열기 0x63734 의 0x20 그대로다.
+ */
+export function helpPanelHeightAfterOpenDraw(drawn: number): number {
+  if (drawn < 0) return HELP_PANEL_OPEN_HEIGHTS[0]
+  return HELP_PANEL_OPEN_HEIGHTS[drawn + 1] ?? HELP_PANEL_FULL_HEIGHT
+}
+
+/** 닫는 중 `drawn` 번째 그림을 그린 뒤의 높이 칸 — 끝이 섰으면 바닥 10 (0x593a2) */
+export function helpPanelHeightAfterCloseDraw(heights: readonly number[], drawn: number): number {
+  return heights[drawn + 1] ?? HELP_PANEL_CLOSED_FLOOR
+}
