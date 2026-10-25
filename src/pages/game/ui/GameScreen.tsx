@@ -5,7 +5,7 @@ import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
-import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
+import { gameStageAcePitcherOf } from '@/pages/game/lib/gameStageAcePitcher'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/stagePressAreas'
@@ -199,7 +199,8 @@ export function GameScreen({
   // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
   useMarksCommonWindowShown(overlay !== null)
   const isEagleEyeEnabled = career.eagleEyeGamesRemaining > 0
-  const ace = progress.aceOpponent
+  // 마운드 마투수 그림 — 마선수 대결 투수 · 142 가 8번 칸에 넣은 마투수 (`gameStageAcePitcherOf`, 0x793b0 의 793c2)
+  const acePitcherFrames = gameStageAcePitcherOf(progress)
   /** 운동장 전경 · 벤치 클리어링의 두 팀 — 레코드 타자 배열 차례 · 지금 투수 마선수 (`gameFieldTeamsOf`) */
   const fieldTeams = gameFieldTeamsOf(career, progress)
 
@@ -442,7 +443,7 @@ export function GameScreen({
             // 투수 그리기 0x38d1c — 상대 마운드 체력% ≤ 34 면 지친 눈(모드 4 도 그린다 — 38ed6 은 모드 7 만 거른다). 마투수면 null
             pitcherStaminaPercent={opponentMoundStaminaPercentOf(progress)}
             isEagleEyeEnabled={isEagleEyeEnabled}
-            acePitcher={ace === null ? null : acePitcherFramesOf(ace)}
+            acePitcher={acePitcherFrames}
             // 조작방법 뷰어 동안도 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             // 0xe(OK 대기)에서도 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
             isPaused={isPaused || isMenuOpen || overlay !== null || sceneConfirm.isAwaiting}
