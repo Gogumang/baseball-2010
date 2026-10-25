@@ -592,7 +592,8 @@ function* runnerPlaySteps(
     if (coverSlot === holderSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
       return false
     }
-    // b2d7e: +0x154 = C · vt5c(C, 특수) = 0xb2e38
+    // b2d7e~b2dea: 거리(공가진야수, C) 0xbf9f0 > 600(b2dbe~b2dc8) · C ≠ +0x130(b2dd4) 관문(바로 위 `MINIMUM_THROW_DISTANCE`) 뒤
+    //   +0x154 = C(b2dde) · vt5c(C, 특수) = 0xb2e38(b2de4~b2dea)
     if (!throwBall(tick, coverSlot, base, byHuman, cpuSpecial)) return false
     // 그다음 0xb2c90 b2df8~b2e14: 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 0xb8dbc(…, 0) — 시작 자리 0xd86ec 로(b476a).
     // 미룬 송구(b30a2)는 던질 야수가 AI 9 라 그대로다
@@ -1094,7 +1095,8 @@ function* runnerPlaySteps(
     // ```
     // b45f0: +0x12c(쥠) 이면
     // b4608:   [4](+0x150) ≠ +0x130(공 가진 야수) && [0](+0x14c 중계) 이면 vt5c([4], 0) = 0xb2e38 ; 참이면 메시지 0xbc6
-    // b4638: [4] == +0x130 이면 [0] = 0 · +0x117 = 0
+    // b4638: (쥠이 0 인 틱(b45f4 beq)도, 위 두 조건이 깨진 틱(b460a · b4614)도 여기로 온다 — 쥠 갈래 밖)
+    //        [4] == +0x130 이면 [0] = 0 · +0x117 = 0
     // ```
     // 중계맨은 쥐기(0xb2710)가 넣은 준비 틱(내야 3)이 끝난 틱에 던진다 — 0xb2e38 머리의 vtC4 가 그때까지 0 을 돌려준다.
     // 0xb2c90 을 거치지 않으므로 들고 뛰기 · 직접 밟기 관문도, 던진 뒤 AI 0 도 없다. CPU 송구 결정이 던진 공은 계획이 지워져

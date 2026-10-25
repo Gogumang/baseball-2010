@@ -33,7 +33,7 @@ const REFUSE_CAREER = ORIGINAL_MODE_TEXT[165] // "나만의 리그 선수는 트
 const REFUSE_HALL_OF_FAME = ORIGINAL_MODE_TEXT[166] // "명예의 전당 선수는 트레이드 할 수 없습니다"
 // [167] "트레이드 비용 :" · [168]~[170] 비용 칸 글은 확인 판(`TradeConfirmWindow` · `lib/tradeConfirmLayout`)이 그린다
 const TRADE_QUESTION = ORIGINAL_MODE_TEXT[171] // "!C트레이드를 하시겠습니까?"
-const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // "!cFFFF00G포인트!cFFFFFF가 소모됩니다"
+const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // " !cFFFF00G포인트!cFFFFFF가 소모됩니다"(앞 빈칸 원문)
 
 /**
  * 0xe7 확인(−5 · '5') 이 띄우는 [171] 팝업 글 — 0xc6ae~0xc736 (직접 떴다). 버퍼는 "!C"(0xcc210) 로 시작한다:
@@ -45,8 +45,8 @@ const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // "!cFFFF00G포인트!cFFFFFF�
  */
 export function tradeQuestionTextOf(boost: number): string {
   if (boost === 0) return `!C${TRADE_QUESTION}`
-  // [172] 원문은 " !cFFFF00G포인트…" 로 앞에 빈칸이 있다 — 생성기(`clean_strings`)가 깎은 빈칸을 되붙인다
-  return `!C${tradeBoostCostOf(boost)} ${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
+  // [172] 원문은 " !cFFFF00G포인트…" 로 앞에 빈칸이 있다 — 생성 표가 원문 빈칸을 그대로 둔다(r223)
+  return `!C${tradeBoostCostOf(boost)}${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
 }
 const TRADE_PROGRESS = ORIGINAL_MODE_TEXT[173] // "트레이드 진행 중"
 const TRADE_SUCCESS = ORIGINAL_MODE_TEXT[174] // "트레이드 성공!!!"

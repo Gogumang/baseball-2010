@@ -13,10 +13,10 @@ const RISE_TEXT = 83
 const FALL_TEXT = 84
 
 /**
- * 원본 StrMODE[83] · [84] 는 **앞에 빈칸 하나**가 붙은 글이다(" !c00CC00상승…"). 생성기(`clean_strings`)가 앞뒤 빈칸을 깎아
- * `ORIGINAL_MODE_TEXT` 에는 빈칸이 없으므로 여기서 되붙인다.
+ * 원본 StrMODE[83] · [84] · [87] 는 **앞에 빈칸 하나**가 붙은 글이다(" !c00CC00상승…"). 생성 표(`ORIGINAL_MODE_TEXT`)가
+ * 원문 앞뒤 빈칸을 그대로 두므로(r223 — 생성기 `clean_strings`) 이어 붙이기만 한다.
  */
-export const modeTextWithLeadingSpace = (index: number): string => ` ${ORIGINAL_MODE_TEXT[index] ?? ''}`
+const rawModeText = (index: number): string => ORIGINAL_MODE_TEXT[index] ?? ''
 
 /** StrMODE[86] "[%s] %d/%d회 훈련" · [87] " 훈련 완료!…" · [88] "구질 훈련 완료!…" · [89] "해당 구질 %d/%d회 훈련" */
 const SESSIONS_TEXT = 86
@@ -29,7 +29,7 @@ const PITCH_SESSIONS_TEXT = 89
  * 아니면 `sprintf(StrMODE[86], 이름, 횟수, 필요 횟수)` (0x18170~0x18188). 이름은 StrCOMMON[0x18 + n](타자) · [0x1e + n](투수)
  */
 export function specialTrainingHeadTextOf(name: string, isLevelUp: boolean, sessions: number, required: number): string {
-  if (isLevelUp) return `${name}${modeTextWithLeadingSpace(LEARNED_TEXT)}` // [87] 도 앞에 빈칸이 있다
+  if (isLevelUp) return `${name}${rawModeText(LEARNED_TEXT)}` // [87] 도 앞에 빈칸이 있다
   return (ORIGINAL_MODE_TEXT[SESSIONS_TEXT] ?? '').replace('%s', name).replace('%d', String(sessions)).replace('%d', String(required))
 }
 
@@ -68,7 +68,7 @@ const hasModifier = (modifiers: TrainingModifiers) => modifiers.rookie || modifi
 export function trainingMoraleLossTextOf(moraleLoss: number, modifiers: TrainingModifiers = NO_TRAINING_MODIFIERS): string {
   const adjustment = trainingMoraleAdjustmentOf(modifiers)
   const bracket = hasModifier(modifiers) ? `(${adjustment > 0 ? '+' : '-'}${Math.abs(adjustment)})` : ''
-  return `${ORIGINAL_MODE_TEXT[MORALE_NAME] ?? ''} ${moraleLoss}${bracket}${modeTextWithLeadingSpace(FALL_TEXT)}`
+  return `${ORIGINAL_MODE_TEXT[MORALE_NAME] ?? ''} ${moraleLoss}${bracket}${rawModeText(FALL_TEXT)}`
 }
 
 /** 스킬 이름 StrCOMMON[0x37 + n] — 표 [0x1552cf8] 0x37 병아리 · 0x3a 몹쓸몸 */
@@ -150,7 +150,7 @@ export function abilityTrainingBonusLinesOf(source: AbilityTrainingBonusSource):
  * `strcat(수치 >= 0 ? StrMODE[83] : [84])`. 모드 갈래가 없어 타자편 · 투수편이 같다.
  */
 export function restResultTextOf(moraleGain: number): string {
-  const verb = modeTextWithLeadingSpace(moraleGain >= 0 ? RISE_TEXT : FALL_TEXT)
+  const verb = rawModeText(moraleGain >= 0 ? RISE_TEXT : FALL_TEXT)
   return `${ORIGINAL_MODE_TEXT[MORALE_NAME] ?? ''} ${Math.abs(moraleGain)}${verb}`
 }
 

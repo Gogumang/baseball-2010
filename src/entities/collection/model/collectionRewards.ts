@@ -16,6 +16,7 @@
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import { RECORD_COUNT_KINDS, recordCountOf } from '@/entities/collection/model/annalsStats'
 import { COMMON_TITLE_COUNT, PITCHER_TITLE_OFFSET, TITLE_COUNT, titleNumberOf } from '@/entities/career/model/titles'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 export interface CollectionRewardRecord {
   /** 전역기록 +0x145 — 비트 k 가 서 있으면 k 번 보상을 이미 받았다 (u8) */
@@ -64,14 +65,14 @@ export const collectionRewardGamePointOf = (kind: number): number => (REWARD_THO
  * k 0~2 의 [180]~[182] 는 통계 칸 이름("유료 충전 GP" …)이라 이 팝업에 오지 않는다 — 리그 1위는 StrMODE[223] 로 따로 준다.
  */
 const REWARD_TITLES: Readonly<Record<number, string>> = {
-  3: '미션모드 모두 성공', // [183]
-  4: '기록달성 모두 성공 ', // [184]
-  5: '스킬 모두 수집 ', // [185]
-  6: '닉네임 모두 수집 ', // [186]
-  7: '엔딩 모두 수집 ', // [187]
+  3: ORIGINAL_MAIN_MENU_TEXT[183] ?? '', // [183]
+  4: ORIGINAL_MAIN_MENU_TEXT[184] ?? '', // [184]
+  5: ORIGINAL_MAIN_MENU_TEXT[185] ?? '', // [185]
+  6: ORIGINAL_MAIN_MENU_TEXT[186] ?? '', // [186]
+  7: ORIGINAL_MAIN_MENU_TEXT[187] ?? '', // [187]
 }
 /** StrMAINMENU[188] 원문 그대로 */
-const REWARD_BODY = '달성!N[!cFFFF00%d G포인트!cFFFFFF] 지급'
+const REWARD_BODY = ORIGINAL_MAIN_MENU_TEXT[188] ?? ''
 
 /**
  * 팝업 0x292f8(this, k) 의 글 — 제목 `StrMAINMENU[180 + k]` 를 문자열에 붙이고(0xbc965) 이어서

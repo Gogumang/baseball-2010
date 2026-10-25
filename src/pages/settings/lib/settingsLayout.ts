@@ -10,6 +10,8 @@
  * 그림은 `img_text` 가 아니라 **`ui/slt_frame.pzx`** 다 (F-8 의 img_text 표기는 잘못 읽은 것).
  * 제목만 img_text 프레임 289 "기본 설정"(46×10) 을 쓴다.
  */
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+
 export const SCREEN = { width: 240, height: 320 } as const
 
 export const PANEL = { x: 24, y: 54, width: 192, height: 212 } as const
@@ -362,18 +364,18 @@ export const MAIN_MENU_CURSOR_COUNT = ROW_COUNT + 1
 
 /** 첫 화면 줄 설명 StrMAINMENU[0x20 + 커서] (커서 0~5) */
 export const SETTINGS_DESCRIPTIONS = [
-  '배경음과 효과음의 크기를!N조절할 수 있습니다', // [32]
-  '게임 속도의 빠르기를!N조절할 수 있습니다', // [33]
-  '진동을 발생 여부를!N선택할 수 있습니다', // [34]
-  '경기 중 조작 범위 및!N화면 효과를 설정합니다', // [35]
-  '게임 모드를 초기화!N시킬 수 있습니다', // [36]
-  '게임 데이터를 백업하거나!N복구할 수 있습니다', // [37]
+  ORIGINAL_MAIN_MENU_TEXT[32] ?? '', // [32]
+  ORIGINAL_MAIN_MENU_TEXT[33] ?? '', // [33]
+  ORIGINAL_MAIN_MENU_TEXT[34] ?? '', // [34]
+  ORIGINAL_MAIN_MENU_TEXT[35] ?? '', // [35]
+  ORIGINAL_MAIN_MENU_TEXT[36] ?? '', // [36]
+  ORIGINAL_MAIN_MENU_TEXT[37] ?? '', // [37]
 ] as const
 
 /** 상세 설정 줄 설명 StrMAINMENU[0x26 + 커서] (커서 0~3) */
 export const DETAIL_DESCRIPTIONS = [
-  '투구 게이지 사용 여부를!N선택할 수 있습니다', // [38]
-  '주루 플레이 자동 여부를!N설정할 수 있습니다', // [39]
-  '수비 송구 자동 여부를!N설정할 수 있습니다', // [40]
-  '전광판 애니메이션의 발생!N여부를 선택할 수 있습니다', // [41]
+  ORIGINAL_MAIN_MENU_TEXT[38] ?? '', // [38]
+  ORIGINAL_MAIN_MENU_TEXT[39] ?? '', // [39]
+  ORIGINAL_MAIN_MENU_TEXT[40] ?? '', // [40]
+  ORIGINAL_MAIN_MENU_TEXT[41] ?? '', // [41]
 ] as const

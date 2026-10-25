@@ -21,14 +21,15 @@ import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const SLT_FRAME = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
 
 /** StrMAINMENU[60] — 잠긴 칸 OK (0x1db84~0x1dba4: 0x74ef5(…, 종류 1)) */
-const LOCKED_MISSION_TEXT = '!C오픈 되지 않은 미션입니다.!N이전 단계를 클리어해주세요'
+const LOCKED_MISSION_TEXT = ORIGINAL_MAIN_MENU_TEXT[60] ?? ''
 /** StrMAINMENU[61] — 열린 칸 OK, %s = 미션 레코드 +0x2e 이름 (0x1db34~0x1db7c: 0x74ef5(…, 종류 2)) */
-const challengeTextOf = (name: string) => `!C[!cFFFF00${name}!cFFFFFF]!N미션에 도전하시겠습니까?`
+const challengeTextOf = (name: string) => (ORIGINAL_MAIN_MENU_TEXT[61] ?? '').replace('%s', name)
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 

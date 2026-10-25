@@ -1,5 +1,6 @@
 import { ABILITY_AXIS_ANGLES, abilityVertexOf } from '@/pages/create-player/lib/teamSelectLayout'
 import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 /**
  * 스페셜 목록 배치 (메인 메뉴 상태 6 — P6 2d).
@@ -42,44 +43,44 @@ export interface SpecialItem {
 export const SPECIAL_ITEMS: readonly SpecialItem[] = [
   {
     id: 'G포인트 충전', labelFrame: 15, labelWidth: 124, labelHeight: 27, state: 24,
-    description: 'G포인트를 충전!N할 수 있습니다', // [16]
+    description: ORIGINAL_MAIN_MENU_TEXT[16] ?? '', // [16]
     availability: '통신', blockedText: 'G포인트 충전은!N통신이 필요합니다',
   },
   {
     id: 'G포인트 선물', labelFrame: 16, labelWidth: 125, labelHeight: 27, state: 25,
-    description: '친구에게 G포인트를!N선물할 수 있습니다', // [17]
+    description: ORIGINAL_MAIN_MENU_TEXT[17] ?? '', // [17]
     availability: '통신', blockedText: 'G포인트 선물은!N통신이 필요합니다',
   },
   {
     id: '친구추천', labelFrame: 17, labelWidth: 97, labelHeight: 27, state: 26,
-    description: '친구에게 2010프로야구를!N추천할 수 있습니다', // [18]
+    description: ORIGINAL_MAIN_MENU_TEXT[18] ?? '', // [18]
     availability: '통신', blockedText: '친구추천은!N통신이 필요합니다',
   },
   {
     id: '명예의전당', labelFrame: 18, labelWidth: 115, labelHeight: 27, state: 27,
-    description: '명예 선수를 확인하거나!N선물할 수 있습니다', // [19]
+    description: ORIGINAL_MAIN_MENU_TEXT[19] ?? '', // [19]
     availability: '됨',
   },
   {
     id: '마선수선택', labelFrame: 19, labelWidth: 118, labelHeight: 27, state: 28,
-    description: '마선수의 오픈이나 레벨을!N관리할 수 있습니다', // [20]
+    description: ORIGINAL_MAIN_MENU_TEXT[20] ?? '', // [20]
     // 상태 28 (그리기 0x2df78 · 갱신 0x2af20) — 화면은 앱이 `renderAceSelect` 로 꽂는다 (pages 끼리 import 금지)
     availability: '됨',
   },
   {
     id: '에디트', labelFrame: 20, labelWidth: 73, labelHeight: 27, state: 29,
-    description: '선수의 이름을 자유롭게!N변경할 수 있습니다', // [21]
+    description: ORIGINAL_MAIN_MENU_TEXT[21] ?? '', // [21]
     // 상태 29 (진입 0x24804 · 갱신 0x2b2e0 · 그리기 0x2e1e0) — 화면은 앱이 `renderEdit` 으로 꽂는다 (pages 끼리 import 금지)
     availability: '됨',
   },
   {
     id: '기록연감', labelFrame: 21, labelWidth: 97, labelHeight: 27, state: 30,
-    description: '각종 기록과 게임 통계를!N확인할 수 있습니다', // [22]
+    description: ORIGINAL_MAIN_MENU_TEXT[22] ?? '', // [22]
     availability: '됨',
   },
   {
     id: '선물받기', labelFrame: 28, labelWidth: 90, labelHeight: 25, state: 31,
-    description: '친구에게 받은 선물을!N확인할 수 있습니다', // [23]
+    description: ORIGINAL_MAIN_MENU_TEXT[23] ?? '', // [23]
     availability: '통신', blockedText: '선물받기는!N통신이 필요합니다',
   },
 ]

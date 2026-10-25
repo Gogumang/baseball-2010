@@ -40,7 +40,8 @@ export function useSound(soundLevel: number): SoundPort {
     sound.setVolume(soundLevel * VOLUME_PER_LEVEL)
     const previous = lastLevelRef.current
     lastLevelRef.current = soundLevel
-    // 소리 단축키(0x2ddc)로 바꾼 값이면 미리듣기가 없다 — 0x2ddc 는 0x9f4fc · 0x9f524 만 부른다 (`useSoundLevelKeys`)
+    // 소리 단축키(0x2ddc)로 바꾼 값이면 미리듣기가 없다 — 0x2ddc 가 부르는 것은 저장 칸 얻기 0x1f1d8(2dec) · 단계 0x9f4fc ·
+    // 적용 0x9f524 · 배경음 다시 틀기 0x6ea6c(2e32)뿐, 미리듣기 0x2963e 는 없다 (`useSoundLevelKeys`)
     if (shortcutLevels.get(sound) === soundLevel) {
       shortcutLevels.delete(sound)
       return
@@ -74,6 +75,7 @@ const SOUND_KEY_CODES: Readonly<Record<string, -13 | -14>> = {
 /**
  * 소리 단축키 −13 · −14 의 다음 단계 — 앱 전역 키 처리 0x2ddc(앱 vtable 0xcb988 슬롯 6, r197 직접 뜸):
  * ```
+ * 2dec  저장 = 0x1f1d8([0x1400054]) — 저장 칸(+0xac) 얻기
  * 2df6  키 == −13:  단계 = s8 [저장+0x2e]; 단계 ≤ 3 이면 0x9f4fc(+1) · 0x9f524(적용)
  *                    새 단계 == 1 이고 1 ≤ 소리[+0x2c] ≤ 4 면 0x6ea6d(소리, [+0x2c], −1, 1)   ; 배경음 1~4 를 다시
  * 2e38  키 == −14:  단계 > 0 이면 0x9f4fc(−1) · 0x9f524

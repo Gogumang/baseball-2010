@@ -19,9 +19,9 @@ describe('필살타법 · 마구 창 0x803d4 탭 0 · 1', () => {
   })
 
   it('설명 — StrMODE[60] + 인기도 (+ " / " 앞 칸) + !N + StrMODE[61] + 사용 횟수 (emu: 타자 c=1 · 투수 c=3)', () => {
-    expect(slotDescriptionOf('타자', 0, 0)).toBe('!cFFFFFF조건: 인기도100!N사용 횟수:2')
-    expect(slotDescriptionOf('타자', 1, 0)).toBe('!cFFFFFF조건: 인기도500 / 파워 스윙!N사용 횟수:3')
-    expect(slotDescriptionOf('투수', 3, 1)).toBe('!cFFFFFF조건: 인기도1500 / 썬더 볼!N사용 횟수:7')
+    expect(slotDescriptionOf('타자', 0, 0)).toBe('!cFFFFFF조건: 인기도100!N사용 횟수: 2')
+    expect(slotDescriptionOf('타자', 1, 0)).toBe('!cFFFFFF조건: 인기도500 / 파워 스윙!N사용 횟수: 3')
+    expect(slotDescriptionOf('투수', 3, 1)).toBe('!cFFFFFF조건: 인기도1500 / 썬더 볼!N사용 횟수: 7')
   })
 
   it('비용 |0xd4700| × 100 · 횟수 — c < L 이면 필요/필요, c == L 이면 쌓은 수, c > L 이면 0', () => {

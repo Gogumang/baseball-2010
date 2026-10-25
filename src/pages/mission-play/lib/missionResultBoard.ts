@@ -41,6 +41,7 @@
  * 대결 끝 길 0x4090e: g[0xf6](원래 모드) 가 4 · 3 이면 0x140006c = 0x69 · 화면 전환, 아니면 아무 일 없음
  * ```
  */
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
@@ -72,7 +73,7 @@ export const MISSION_POINT_ROWS = [
 export const MISSION_POINT_VALUE = { x: CENTER_X - 0xb, width: 0x50, align: 1, plate: false } as const
 
 /** StrMAINMENU[53] 원문 — `!C` 가운데 · `!cFFFFFF` 흰색 */
-export const MISSION_RETRY_QUESTION = '!C!cFFFFFF재도전하시겠습니까?'
+export const MISSION_RETRY_QUESTION = ORIGINAL_MAIN_MENU_TEXT[53] ?? ''
 export const MISSION_RETRY_TEXT = { x: BOX_LEFT, y: CENTER_Y + 0x17, width: BOX_WIDTH } as const
 
 /** popup 프레임 1 의 크기 41×15 — 두 단추 · 덧그림 모두 이 크기로 자리를 잡는다 (0x4a808 0xba815 한 번) */

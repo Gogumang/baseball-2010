@@ -178,7 +178,8 @@ def quote(text: str) -> str:
 
 
 def clean_strings(entries: list[str]) -> list[str]:
-    return [entry.rstrip('\x00').strip() for entry in entries]
+    """원문 그대로 — 끝 NUL 만 뗀다. 앞뒤 빈칸은 원본 글의 일부다(가운데 맞춤 폭 · 이어 붙이기에 그대로 든다)."""
+    return [entry.rstrip('\x00') for entry in entries]
 
 
 def write(filename: str, body: str) -> None:
@@ -346,8 +347,10 @@ def generate_ace_open() -> None:
         ' * 0G 인 네 칸의 뜻이 서로 다르다 (K-3 3-0 · 3-1 · 3-3):',
         ' *   - 칸 0 싸이커 · 칸 5 메디카 = **기본 개방** (해금 id 가 없다. 힌트도 "기본 개방")',
         ' *   - 칸 4 드래고나 · 칸 9 킹타이거 = **G포인트로 열 수 없다** (StrCOMMON[42]).',
-        ' *     킹타이거는 만루홈런 누계 54 로 열리고(해금 id 7), 드래고나는 기록 누계 표에 아예 없어',
-        ' *     힌트 "2010.gamevil.com" 대로 웹/이벤트 쪽 해금으로 보인다 — **미해결**.',
+        ' *     킹타이거는 만루홈런 누계 54 로 열리고(해금 id 7), 드래고나(해금 id 3)는 기록 누계 표 0xd1ca8 에 아예 없다.',
+        ' *     원본에서 id 3 을 여는 길은 메인 메뉴 하위 상태 31 **온라인 선물함 0x2bb48** 이 받는 "히든 오픈" 64비트 마스크뿐이다',
+        ' *     (R7 확정, 🌐). **U-05 사용자 결정(2026-10-24): 원본처럼 잠가 둔다** — 웹에는 선물함 통신이 없으므로 드래고나 칸 4 는',
+        ' *     열리지 않는다(기본 개방 아님 · G 오픈 막힘 0xa68e · 기록 해금 표에 없음 · 대체 조건 두지 않음).',
         ' * 나머지 여섯 칸은 가격만 내면 기록 달성 없이도 열 수 있다 (StrCOMMON[43] "오픈 조건을 달성하지 않고…").',
         ' */',
         'export const ACE_OPEN_TABLE: readonly AceOpenEntry[] = [',
@@ -1737,7 +1740,7 @@ BALANCE_LITERALS = {
             {'hit': 80, 'power': 150, 'defense': 80, 'run': 80},
         ],
         'rookiePositionBonus': 30,
-        'source': '상한 0xc1b38 · 신인 표 0xcc3fa · 포지션 보너스 0x16e2c (포지션 뜻은 추정)',
+        'source': '상한 0xc1b38 · 신인 표 0xcc3fa · 포지션 보너스 0x16e2c (둘째 목록 0 내야 → 수비 · 1 외야 → 주루, StrMODE[4])',
     },
     'rookie': {
         'popularity': 0, 'reputation': 300, 'morale': 100, 'salary': 50,
@@ -1999,6 +2002,7 @@ def main() -> None:
     generate_string_list('StrHOWTO', 'ORIGINAL_HOWTO', 'howto.ts', '게임 내 도움말')
     generate_string_list('StrUSER_EVT', 'ORIGINAL_USER_EVENTS', 'userEvents.ts', '경기 후 평가·목표·연속 기록 문구')
     generate_string_list('StrMODE', 'ORIGINAL_MODE_TEXT', 'modeText.ts', '모드 화면 문구 (관리·상점·시즌·투수편 팝업)')
+    generate_string_list('StrMAINMENU', 'ORIGINAL_MAIN_MENU_TEXT', 'mainMenuText.ts', '메인 메뉴 화면 문구 (메뉴 설명·환경설정·미션 선택·기록연감 팝업)')
     generate_bursts()
     generate_burst_missions()
     generate_mode_menus()

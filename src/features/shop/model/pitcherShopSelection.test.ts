@@ -108,7 +108,7 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
 
   it('GP: 사면 G 를 빼고 곧바로 쓴다', () => {
     const { career, notice } = selectPitcherShopItem(투수({ gamePoint: 1000, stamina: 10 }), shopItemId('GP', 9), 고정(0))
-    expect(notice).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다')
+    expect(notice).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다 ') // StrMODE[125] 끝 빈칸 원문
     expect(career).toMatchObject({ gamePoint: 500, stamina: 10_000 })
   })
 })

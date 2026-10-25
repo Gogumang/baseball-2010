@@ -85,7 +85,7 @@ describe('장비 창 0x83378 그림', () => {
 
   it('히든 칸 — 잠기면 "????" · 힌트, 열리면 이름 · 설명 없음', () => {
     expect(equipmentItemNameOf(true, 1, 7, () => false)).toBe('????')
-    expect(equipmentDescriptionOf(true, 1, 7, () => false)).toBe('한라산까지 홈런!')
+    expect(equipmentDescriptionOf(true, 1, 7, () => false)).toBe('한라산까지 홈런! ') // StrITEM[206] 끝 빈칸 원문
     expect(equipmentDescriptionOf(false, 0, 8, () => false)).toBe('나는야!N모자 컬렉터')
     expect(equipmentItemNameOf(true, 1, 7, () => true)).not.toBe('????')
     expect(equipmentDescriptionOf(true, 1, 7, () => true)).toBeNull()

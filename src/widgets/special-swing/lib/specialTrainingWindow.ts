@@ -113,7 +113,7 @@ const COST_HUNDREDS: readonly number[] = [-5, -7, -9, -12]
 /** 표 0xd46f8 — 필요 횟수 (s16 [4, 5, 6, 7]) */
 const REQUIRED_SESSIONS: readonly number[] = [4, 5, 6, 7]
 
-/** StrMODE[60] "조건: 인기도" · [61] "사용 횟수:" — 설명 글을 잇는 두 조각 ([gfx+0x164] = StrMODE) */
+/** StrMODE[60] "조건: 인기도" · [61] "사용 횟수: "(끝 빈칸 원문) — 설명 글을 잇는 두 조각 ([gfx+0x164] = StrMODE) */
 export const SPECIAL_TRAINING_CONDITION_TEXT = ORIGINAL_MODE_TEXT[60] ?? ''
 export const SPECIAL_TRAINING_USES_TEXT = ORIGINAL_MODE_TEXT[61] ?? ''
 
