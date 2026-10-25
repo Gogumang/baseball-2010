@@ -110,15 +110,27 @@ export interface TeamRelayFigures {
 }
 
 /**
- * **중계 진입의 실린 마선수 그림** — 0x18 → 0x21 이 0x47cc8(그림 다시 적재)을 부른다(R10 4절 4). 그 안 483a0~48400:
- * 지금 타자가 마선수면 그 그림, 아니면 주자 목록을 뒤 → 앞으로 덮어써 가장 앞선 마선수 주자 그림(`loadedRunnerAceOf`).
- * ⚠️ 미확인: 메뉴 자동진행(0x3c8da → 0x21)은 0x47cc8 을 안 거쳐 그 타석 교대 때 실린 그림이 남는다 — 같은 타석이라 같은 값으로 둔다.
- * ⚠️ 미확인: 0x47cc8 이 보는 "지금 타자" 는 팀[+0x32](예약 확정 앞)인데 웹은 다음에 칠 타자로 둔다.
+ * **타석 교대 0x47cc8 이 주자 그림판에 싣는 마선수 그림** — 그 안 483a0~48400(직접 뜸, r215): 483a0 `0xb633d([sp+0x28])` —
+ * [sp+0x28] 은 47d36 의 `0xae89d(팀[st[9]])` = 공격 팀 팀[+0x32] 칸 — 가 참이면 그 그림, 아니면 주자 목록을 뒤 → 앞으로 덮어써
+ * 가장 앞선 마선수 주자 그림(`loadedRunnerAceOf`). 마선수가 하나도 없으면 아무것도 안 싣는다(null — 그때는 마선수 주자도 없다).
  */
-export function teamRelayEntryFiguresOf(progress: TeamGameProgress): TeamRelayFigures {
+export function teamLoadedRunnerAceOf(progress: TeamGameProgress): number | null {
   const ourHalf = progress.game.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
-  const aces = runnerAcesFor(progress, progress.game.half === ourHalf)
-  return teamRelayFiguresOf({ progress, before: progress.game, atBat: null }, loadedRunnerAceOf(aces, progress.game.bases))
+  return loadedRunnerAceOf(runnerAcesFor(progress, progress.game.half === ourHalf), progress.game.bases)
+}
+
+/**
+ * **중계 진입의 실린 마선수 그림** — 두 길이 있다.
+ * - 0x18 → 0x21: 갱신 0x4f928 틱 0 이 4f972 `0xaebe4`(두 팀 예약 확정)를 먼저 하고 4facc `0xc2198` 참이면 4faf8 에서 0x47cc8 을
+ *   부른다(R10 5절 1 · 4, 직접 뜸 r215). 그래서 0x47cc8 이 보는 팀[+0x32] 는 확정 뒤 = 다음에 칠 타자다 — 웹 타순 칸
+ *   (`battingOrderIndex` · `opponentOrderIndex`)과 같다(`teamLoadedRunnerAceOf`).
+ * - 경기 중 메뉴 자동진행(0x3c8da → 0x21): 0x47cc8 을 안 거친다(부르는 곳은 48526 · 48ca0 · 48e90 · 4faf8 넷뿐 — xref). 그래서 그
+ *   타석의 마지막 0xd 진입 0x48d50(48ddc 예약 확정 → 48e90 0x47cc8)이 실은 그림이 남는다 — 타석 사이 도루 · 견제 · 폭투로 주자가
+ *   바뀌었어도 그때 주자로 실은 그림이다. 부르는 쪽이 그 값을 `loadedAtAtBatStart` 로 준다(`TeamGameScreen` 이 0xd 마다 떠 둔다).
+ */
+export function teamRelayEntryFiguresOf(progress: TeamGameProgress, loadedAtAtBatStart?: number | null): TeamRelayFigures {
+  const loaded = loadedAtAtBatStart === undefined ? teamLoadedRunnerAceOf(progress) : loadedAtAtBatStart
+  return teamRelayFiguresOf({ progress, before: progress.game, atBat: null }, loaded)
 }
 
 /**
@@ -128,7 +140,7 @@ export function teamRelayEntryFiguresOf(progress: TeamGameProgress): TeamRelayFi
  * 0xaebe5 로 새 타자를 세우고 0xb633d(마선수)면 0xb63a1(번호), 아니면 −1 로 쓴다 — 곧 이 틱의 타자가 마선수면 그 그림, 아니면 앞 그림 그대로다.
  * 3아웃 넘김 틱(c21fc)의 0x47cc8 다시 적재는 루가 비어 있어 타자만 보므로 같은 결과다. 실린 그림이 없으면 원본 0x79d10 은
  * 빈 그림(+0x1c = 0)을 79d68 에서 읽는다 — `ldr r3, [r5, #0xc]` 가 r5 = 0 으로 주소 0xc 를 읽는 널 포인터 읽기라(직접 뜬 것, r180)
- * 기기 메모리에 달린다. ⚠️ 미확인(옮길 수 없음 — 웹은 타석 화면 `aceRunnerFramesOf` 처럼 보통 그림으로 그린다).
+ * 기기 메모리에 달린다. ⚠️ 미확인(남김 — 기기 메모리 주소 0xc 의 값이라 웹에 옮길 수 없다. 웹은 타석 화면 `aceRunnerFramesOf` 처럼 보통 그림으로 그린다).
  */
 export function teamRelayFiguresOf(
   tick: Pick<TeamAutoRelayTick, 'progress' | 'before' | 'atBat'>,

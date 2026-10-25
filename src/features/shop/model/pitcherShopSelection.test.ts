@@ -34,11 +34,11 @@ describe('투수 장비 상점', () => {
   it('막힌 칸은 묻지 않고, 고르면 그 문구만 낸다', () => {
     const 가난 = 투수({ money: 0 })
     expect(pitcherPurchaseQuestionOf(가난, shopItemId('장착', 0, 0))).toBeNull()
-    expect(selectPitcherShopItem(가난, shopItemId('장착', 0, 0), 무작위)).toEqual({ career: 가난, notice: '소지금이 부족합니다' })
+    expect(selectPitcherShopItem(가난, shopItemId('장착', 0, 0), 무작위)).toEqual({ career: 가난, notice: '!C소지금이 부족합니다' })
     expect(selectPitcherShopItem(투수({ popularity: 0 }), shopItemId('장착', 0, 1), 무작위).notice)
-      .toBe('인기도가 부족합니다. 필요한 인기도 : 50')
+      .toBe('!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 50')
     expect(selectPitcherShopItem(투수(), shopItemId('장착', 0, 7), 무작위).notice)
-      .toBe('아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다')
+      .toBe('!C아직 구매할 수 없는 아이템!N입니다. 특별한 조건을 통해!N오픈됩니다')
   })
 
   it('사면 곧바로 장착된다 — 구매 완료 창(StrMODE[92])은 없다 (0x14a74 kind 3)', () => {
@@ -61,7 +61,7 @@ describe('투수 장비착용 (121)', () => {
 
   it('장착 중이면 StrMODE[80] 만 — 묻지도 않는다', () => {
     expect(pitcherPurchaseQuestionOf(둘, shopItemId('착용', 0, 2))).toBeNull()
-    expect(selectPitcherShopItem(둘, shopItemId('착용', 0, 2), 무작위).notice).toBe('현재 장착 중인 장비입니다')
+    expect(selectPitcherShopItem(둘, shopItemId('착용', 0, 2), 무작위).notice).toBe('!C현재 장착 중인 장비입니다')
   })
 
   it('가진 다른 것은 StrMODE[81] 로 묻고 바꿔 낀다', () => {
@@ -89,8 +89,8 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
 
   it('서브: 보유(78) → 소지금(77) 차례로 막는다', () => {
     expect(selectPitcherShopItem(투수({ subItemIds: [1], money: 0 }), shopItemId('서브', 1), 무작위).notice)
-      .toBe('이미 가지고 있는 아이템입니다')
-    expect(selectPitcherShopItem(투수({ money: 0 }), shopItemId('서브', 1), 무작위).notice).toBe('소지금이 부족합니다')
+      .toBe('!C이미 가지고 있는!N아이템입니다')
+    expect(selectPitcherShopItem(투수({ money: 0 }), shopItemId('서브', 1), 무작위).notice).toBe('!C소지금이 부족합니다')
     expect(pitcherPurchaseQuestionOf(투수({ money: 0 }), shopItemId('서브', 1))).toBeNull()
   })
 
@@ -98,7 +98,7 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
     const 빈G = 투수({ gamePoint: 0 })
     expect(selectPitcherShopItem(빈G, shopItemId('GP', 9), 무작위)).toEqual({ career: 빈G, notice: 'G포인트가 부족합니다' })
     expect(selectPitcherShopItem(투수({ gamePoint: 1000 }), shopItemId('GP', 9), 무작위).notice)
-      .toBe('스태미나가 최대입니다 구매 할 수 없습니다')
+      .toBe('!C스태미나가 최대입니다!N구매 할 수 없습니다')
   })
 
   it('GP: 십전대보탕 확인창엔 이글아이 안내줄(224)이 안 붙는다 (0x13ab4 는 모드 4 만)', () => {
@@ -108,7 +108,7 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
 
   it('GP: 사면 G 를 빼고 곧바로 쓴다', () => {
     const { career, notice } = selectPitcherShopItem(투수({ gamePoint: 1000, stamina: 10 }), shopItemId('GP', 9), 고정(0))
-    expect(notice).toBe('스태미나가 100% 회복되었습니다')
+    expect(notice).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다 ') // StrMODE[125] 끝 빈칸 원문
     expect(career).toMatchObject({ gamePoint: 500, stamina: 10_000 })
   })
 })

@@ -1,6 +1,7 @@
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import { PressArea, RawScreen } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
@@ -82,6 +83,7 @@ import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBa
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
 import { SettlementPressArea } from '@/pages/team-game/ui/SettlementPressArea'
 import { TeamAutoRelay } from '@/pages/team-game/ui/TeamAutoRelay'
+import { teamLoadedRunnerAceOf } from '@/pages/team-game/lib/teamAutoRelay'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
@@ -113,8 +115,9 @@ import type {
   TeamGameSummary,
 } from '@/features/play-team-game/model/teamGameFlow'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
-import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
+import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 import type { TeamGameSession } from '@/pages/team-game/model/useTeamGame'
 import { GAME_LOADING_PRELOADS } from '@/pages/team-game/lib/gameLoadingPreloads'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
@@ -235,7 +238,7 @@ interface TeamGameScreenProps {
  * 일반(1) · 시즌(2) · 대전(8 · 9) 모두 새 경기 · 이어하기마다 로딩 판(상태 7 · 9 · 8)을 먼저 지난다. 진입 0x39f88 이 진행 칸 끝을
  * 0x24(모드 ≠ 4, 39f92~39f98)로 두고 0x53dbc 가 팁을 굴린다(`useTeamGame` 의 맨 앞 굴림). 판이 다 그려지면(상태 8 끝) 경기 화면이 선다 —
  * 경기 화면의 키 · 상태 틱 · 인트로(0xc)는 그 뒤에 시작한다.
- * ⚠️ 근사(시간): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
+ * ⚠️ 근사(시간)(남김 — 단말 몫 · 바이너리 밖): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
  */
 export function TeamGameScreen(props: TeamGameScreenProps) {
   useBurstObjectTicksReset() // 경기 장면 생성 0x48658 — 돌발 객체 [+0x224] = 0
@@ -378,6 +381,35 @@ function TeamGameScene({
     carriedRelayRef.current = relaySerial
     fieldCarryRef.current = fieldCarryAfterRelay(fieldCarryRef.current)
   }
+  /**
+   * 주자 그림판 [장면+0xf24] +0x1c 에 실린 마선수 그림 — 타석 0xd 진입 0x48d50 이 48ddc 예약 확정 뒤 48e90 0x47cc8 로 싣는다(직접 뜸, r215).
+   * 0xd 는 새 타석 · 교체 연출 0x16 뒤(대타 · 투수 교체)에 서고, 타석 사이 도루 · 견제 · 폭투는 다시 싣지 않는다. 메뉴 자동진행(0x3c8da)은
+   * 0x47cc8 을 안 거쳐 이 값이 중계 첫 그림에 남는다(`TeamAutoRelay.entryLoadedRunnerAce`). 웹은 타석이 선 그림(판 · 중계가 없는)마다
+   * 타석 열쇠(이닝 · 초말 · 두 타순 · 그 칸 선수 · 두 투수)가 바뀌면 그때 주자로 떠 둔다.
+   */
+  const atBatLoadRef = useRef<{ readonly key: readonly unknown[]; readonly loaded: number | null } | null>(null)
+  if (progress.autoRelay == null && progress.pendingDefensePlay === null && progress.pendingRunnerPlay == null && !progress.game.isFinished) {
+    const ourOffense = progress.game.half === (progress.game.playerSide === 0 ? '초' : '말')
+    const offenseEntry = ourOffense
+      ? progress.ourEntry[progress.game.battingOrderIndex]
+      : progress.opponentEntry[progress.opponentOrderIndex]
+    const key: readonly unknown[] = [
+      progress.game.inning,
+      progress.game.half,
+      progress.game.battingOrderIndex,
+      progress.opponentOrderIndex,
+      offenseEntry,
+      progress.ourPitcherIndex,
+      progress.opponentPitcherIndex,
+    ]
+    const before = atBatLoadRef.current
+    if (before === null || key.some((value, index) => value !== before.key[index])) {
+      atBatLoadRef.current = { key, loaded: teamLoadedRunnerAceOf(progress) }
+    }
+  }
+  /** 메뉴 자동진행으로 들어설 때 넘길 실린 그림 — 중계가 아닌 그림에서는 걷는다 */
+  const menuRelayLoadedRef = useRef<number | null | undefined>(undefined)
+  if (progress.autoRelay == null) menuRelayLoadedRef.current = undefined
   /** 실시간으로 돈 판 — 결과를 먹이기 앞에 자리 · 카메라를 받는다 */
   const carryLivePlay = (result: DefensePlayResult | undefined) => {
     if (result !== undefined) fieldCarryRef.current = fieldCarryAfterPlay(result.ticks, fieldCarryRef.current)
@@ -504,6 +536,11 @@ function TeamGameScene({
   changeWindowClearRef.current = () => {
     if (changeWindow !== null && !isMenuOpen && overlay === null) closeChangeWindow()
   }
+  // 단말 일시정지 0x463ac — '*' 가 메뉴를 여는 때(경기 끝 판 · 중계 0x21 · 교대 판 · 수비 진행 · 교체 창 0xb 밖)이고 하위 창이 없으면 같은 메뉴를 연다
+  useInGameMenuOpenOnHide(
+    menu,
+    summary === null && progress.autoRelay == null && !isSceneCovering && !isPlayKeyBlocked && overlay === null && changeWindow === null,
+  )
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -760,6 +797,32 @@ function TeamGameScene({
       humanCountOf: (added) => leadingRecordCountOf(added, (id) => !isGameEndRecord(id)),
     },
   })
+
+  /** 원본 화면에서 '#' 가 먹는가 — 0x4994a: 상태 0xe · 0xf, 교대 판 · 수비 판 · 팝업 · 내 공(0x11 · 0x12) 밖 (위 '#' 키 주석) */
+  const acceptsChangeKey =
+    changeWindow === null &&
+    !isSceneCovering &&
+    !isDefenseInPlay &&
+    !isMenuOpen &&
+    overlay === null &&
+    !(isAwaitingConfirm && !sceneConfirm.isInConfirmState) &&
+    !isPitchSceneBusy &&
+    // 조준(0x10) · 게이지(0x11)는 '#' 범위 밖 — 그 자리는 CLR 누름 칸이 쓴다
+    !(canPitch && phase !== '구질') &&
+    (session.canChangePitcher || session.canPinchHit)
+  // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
+  const isPitchSlotPickerShown = canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null
+  const defensePlaySide = isPlayKeyBlocked ? session.pendingDefensePlay?.side ?? progress.pendingRunnerPlay?.side ?? null : null
+  useEffect(() => {
+    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
+    publishScenePeek('teamGame', {
+      isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown,
+      defensePlaySide: defensePlaySide === '수비' || defensePlaySide === '공격' ? defensePlaySide : null,
+    })
+  }, [isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown, defensePlaySide])
+  useEffect(() => () => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('teamGame', null)
+  }, [])
 
   const game = progress.game
   // 점수판 틀 0x41440 의 두 측 — 사람 팀(우리) PLAYER · 상대 COM
@@ -1035,6 +1098,7 @@ function TeamGameScene({
         sideTeams={options.playerSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId]}
         humanSide={options.playerSide}
         grassPalette={fieldPalette}
+        entryLoadedRunnerAce={menuRelayLoadedRef.current}
       />
     )
   }
@@ -1074,18 +1138,6 @@ function TeamGameScene({
   /** 사람 수비 타석 장면의 투수 · 타자 그림 재료 — 구질 누름 칸도 그 배치(타자 손)를 따른다 */
   const teamStage = teamPitcherSideStageOf(progress)
 
-  /** 원본 화면에서 '#' 가 먹는가 — 0x4994a: 상태 0xe · 0xf, 교대 판 · 수비 판 · 팝업 · 내 공(0x11 · 0x12) 밖 (위 '#' 키 주석) */
-  const acceptsChangeKey =
-    changeWindow === null &&
-    !isSceneCovering &&
-    !isDefenseInPlay &&
-    !isMenuOpen &&
-    overlay === null &&
-    !(isAwaitingConfirm && !sceneConfirm.isInConfirmState) &&
-    !isPitchSceneBusy &&
-    // 조준(0x10) · 게이지(0x11)는 '#' 범위 밖 — 그 자리는 CLR 누름 칸이 쓴다
-    !(canPitch && phase !== '구질') &&
-    (session.canChangePitcher || session.canPinchHit)
   /** 사람 수비 마운드(우리 투수)가 마투수면 0x38d1c 38f56 이 체력 그림을 거른다 */
   const ourMoundIsAce = (progress.ourPitcherEntry[progress.ourPitcherIndex]?.aceIndex ?? -1) >= 0
   const substitutionRows =
@@ -1375,10 +1427,11 @@ function TeamGameScene({
           <PressLayer testId="도루 누름 칸">
             {isStealable.map((base) => (
               <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
-                onPress={() => {
+                onPress={(event) => {
+                  // 키와 같은 길 — 칸에 받은 틱은 손가락 · 마우스가 닿은 시각에 본 그림의 틱(`PressArea`, r222)
                   pushSceneKey(() => {
                     if (flightProbeRef.current?.() === true) actions.steal(base)
-                  })
+                  }, 'press', inputTimeOf(event))
                 }} />
             ))}
           </PressLayer>
@@ -1447,6 +1500,7 @@ function TeamGameScene({
                   ? undefined
                   : (cost) => {
                       onSpendGamePoint(cost)
+                      menuRelayLoadedRef.current = atBatLoadRef.current?.loaded ?? null
                       actions.autoProgress()
                       menu.close()
                     }

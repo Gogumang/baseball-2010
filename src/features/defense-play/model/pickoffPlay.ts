@@ -134,7 +134,8 @@ import {
  * ## 근사·미해결 (지어내지 않은 자리)
  * - 쥐기 0xb2710 은 야수를 옮기지 않는다(r176 — 예전 웹은 포구 지점(x, 0, z)으로 옮겨 쥐었다). 받는 포구도 동작 시작 틱에
  *   포구 동작 · 자세 워드를 걸고(b4134), 야수 틱이 지운다(`fielderPose`) — 그동안 vtC4 가 거짓이라 못 던진다.
- * - ⚠️ 중계 이어 던지기(b4616)는 이 판에 없다 — 중계맨이 받으면 쥐기의 +0x128 로 CPU 송구 결정이 다시 고른다.
+ * - 중계 이어 던지기 b4616 (r214): 0xb2e38 이 적은 계획 +0x14c 가 중계면 중계맨이 쥔 뒤 준비가 끝난 틱에 최종 받는 야수에게
+ *   던진다. CPU 송구 결정 0xafa60 은 성공하면 계획을 지워(afb08 0xb0ea0) 그 중계는 쥐기의 +0x128 로 CPU 결정이 다시 고른다.
  * - **커버 야수의 AI 상태**: 0xb28be 는 커버를 루 위에 놓기만 하고(0xbef58, b2908~b2930) AI 상태를 따로 쓰지 않는다.
  *   (예전 웹은 "보내고" 를 목표점 걷기로 읽었다 — 0xbef58 은 기반 캐릭터의 위치 · 기준점 · 목표를 함께 놓는 함수다)
  *   그 뒤 첫 틱부터 vt4c 끝(b4c72)의 0xb1c90 이 매 틱 커버를 다시 골라 b2564 가 AI 루 + 2 를 주고, 2루 커버가 아닌 유격수는
@@ -409,6 +410,12 @@ function* pickoffPlaySteps(
   let deferredThrowReceiver = NONE
   let deferredThrowBase = NONE
   /**
+   * 송구 계획 +0x14c [4] · [7] — 중계([0] = 1)면 최종 받는 야수 · 목표 루, 아니면 −1. 0xb2e38 이 덮어쓰고 0xb0ea0(판 시작 vt1c ·
+   * CPU 송구 결정 0xafa60 성공 뒤)이 지운다. 중계맨이 쥐면 플레이 틱 b4616 이 [4] 에게 던진다 (`runnerPlayEngine` 3a 절)
+   */
+  let relayFinalSlot = NONE
+  let relayBase = NONE
+  /**
    * **그림 전용** 경기+0x19ac — 쥐기 0xb2710 의 메시지 0x15 가 세우고 0x17 진입 0x467de 가 내린다. 판 시작에 투수가 쥔 공
    * (0xb28be)은 0x46418 안에서 0x467de 보다 앞이라 지워진다 — 견제 송구를 받은(주운) 야수가 쥘 때 선다
    */
@@ -519,11 +526,38 @@ function* pickoffPlaySteps(
     if (coverSlot === holderSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
       return false
     }
+    // b2d7e~b2dea: 거리(공가진야수, C) 0xbf9f0 > 600(b2dbe~b2dc8) · C ≠ +0x130(b2dd4) 관문(바로 위 `MINIMUM_THROW_DISTANCE`) 뒤
+    //   +0x154 = C(b2dde) · vt5c(C, 특수) = 0xb2e38(b2de4~b2dea)
+    if (!throwBall(tick, coverSlot, base, chooser, cpuSpecial)) return false
+    // b2df8~b2e14 — 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로). 미룬 송구는 AI 9 라 그대로
+    fielders = fielders.map((fielder) => {
+      if (fielder.slot !== holderSlot) return fielder
+      const keeps =
+        (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
+        fielder.aiState === AI_STATE.RECEIVE
+      return keeps
+        ? fielder
+        : { ...fielder, aiState: AI_STATE.IDLE }
+    })
+    return true
+  }
+
+  /**
+   * **송구 0xb2e38**(플레이.vt5c, 인자 받을 야수 C · 특수) — 던졌거나 미뤘으면(AI 9) 참. 부르는 곳은 루로 보내기 0xb2c90 과
+   * 중계 이어 던지기 b4616 둘(`runnerPlayEngine` 의 throwBall 과 같다). 계획 0xb3444 는 미루기 검사(b2eb2) 앞에서 +0x14c 에 적는다.
+   */
+  const throwBall = (tick: number, coverSlot: number, base: number, chooser: string, cpuSpecial: boolean): boolean => {
+    const holderSlot = play.ballHolderSlot
+    const holder = fielders[holderSlot]
+    if (holder === undefined) return false
     // ── 0xb2e38 ──
     if (!holder.holdingBall || !isReadyToThrow(holder)) return false
     // b2f06 — 레이저 발사 0x400bc 가 세운 플레이+0x1f4 를 본다. 레이저는 특수라 계획 0xb3444 가 중계를 안 끼운다(b3528)
     let laser = laserArmed
     const plan = planThrow({ fielders, fromSlot: holderSlot, finalSlot: coverSlot, base, special: laser || cpuSpecial })
+    // b2e92~b2ea0: 계획을 +0x14c.. 에 덮어쓴다 — 중계면 [0] = 1 · [4] = 최종 받는 야수 · [7] = 목표 루 (b4616 이 본다)
+    relayFinalSlot = plan.relayed ? coverSlot : NONE
+    relayBase = plan.relayed ? base : NONE
     const receiver = fielders[plan.toSlot]
     if (
       receiver !== undefined &&
@@ -587,24 +621,15 @@ function* pickoffPlaySteps(
     )
     // b3094 vt30 = 0xb1c90 한 번 — 고르기 vt34 뒤의 공 가진 야수(받을 야수)로 커버를 다시 고른다(`coverTick.runCoverTick`)
     coverTick(tick)
-    // b2df8~b2e14 — 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로)
-    fielders = fielders.map((fielder) => {
-      if (fielder.slot !== holderSlot) return fielder
-      const keeps =
-        (fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD) ||
-        fielder.aiState === AI_STATE.RECEIVE
-      return keeps
-        ? fielder
-        : { ...fielder, aiState: AI_STATE.IDLE }
-    })
     log.push(
       (chooser === PICKOFF_THROW
         ? `${tick}틱 ${base}루 견제 송구 — ${chase?.catchTick ?? tick}틱 도착`
         : `${tick}틱 ${holderSlot}번 야수가 ${base}루로 ${laser ? '레이저 ' : ''}송구 — ${chase?.catchTick ?? tick}틱 도착`) +
         (cpuSpecial ? ' (특수)' : '') +
+        (plan.relayed ? ` (${plan.toSlot}번 야수 중계)` : '') +
         (thrown.bounce ? ' (원바운드)' : '') +
         (thrown.errant ? ' (악송구)' : thrown.wobbled ? ' (흔들린 긴 송구)' : '') +
-        (chase !== null && chase.slot !== coverSlot ? ` (${chase.slot}번 야수가 줍는다)` : '') +
+        (chase !== null && chase.slot !== plan.toSlot ? ` (${chase.slot}번 야수가 줍는다)` : '') +
         (chooser === PICKOFF_THROW ? '' : chooser),
     )
     return true
@@ -655,7 +680,12 @@ function* pickoffPlaySteps(
     if (base === NONE) return
     const cpuSpecial =
       base === 0 && input.random !== undefined && isSpecialThrow(base, input.random.rand(0, 100))
-    if (sendToBase(tick, base, ' (CPU 결정)', cpuSpecial)) play = { ...play, wantsThrow: false }
+    if (sendToBase(tick, base, ' (CPU 결정)', cpuSpecial)) {
+      // afafc +0x128 = 0 · afb08 0xb0ea0 — 계획을 지운다(CPU 가 정한 중계는 b4616 이 안 잇는다)
+      play = { ...play, wantsThrow: false }
+      relayFinalSlot = NONE
+      relayBase = NONE
+    }
   }
 
   // ── 0x46766 — 0x17 진입 0x46418 끝: 관문 0xb0d28 이 열려 있으면 `0xaf8c0(제어기, 1)` 한 번(주루 설정 갈림 없음).
@@ -935,7 +965,18 @@ function* pickoffPlaySteps(
       log.push(`${tick}틱 ${runner.state.index}번 주자 홈인`)
     }
 
-    // 2c · 3 · AI 9 는 플레이 vt4c 0xb45dc 다 — 슬롯 2 52612 라 플레이 틱(vt48) · 득점 0xaa0a8 뒤에 돈다
+    // 2b' · 2c · 3 · AI 9 는 플레이 vt4c 0xb45dc 다 — 슬롯 2 52612 라 플레이 틱(vt48) · 득점 0xaa0a8 뒤에 돈다
+    // ── 2b'. 중계 이어 던지기 — vt4c 머리 b45ee~b465e (`runnerPlayEngine` 3a 절과 같다): 쥠 && 계획 [4] ≠ 공 가진 야수 && [0](중계)면
+    //         vt5c([4], 0) = 0xb2e38, [4] == 공 가진 야수면 [0] = 0. 준비 틱(쥐기의 내야 3)이 끝날 때까지 0xb2e38 머리 vtC4 가 막는다 ──
+    if (!play.finished) {
+      const holderSlot = play.ballHolderSlot
+      if (play.held && relayFinalSlot !== NONE && relayFinalSlot !== holderSlot) {
+        throwBall(tick, relayFinalSlot, relayBase, ' (중계 이어 던지기)', false)
+      } else if (relayFinalSlot === holderSlot) {
+        relayFinalSlot = NONE
+        relayBase = NONE
+      }
+    }
     // ── 2c. 사람 목표 +0x160 — 플레이 vt4c 0xb45dc 의 b4660~b46a8 (야수 고리의 AI 0xe b47da 보다 앞): 쥠 && 준비(vtC4)면
     //        발밑 루가 아닐 때 0xb2c90, 그리고 −1. 판 시작에 투수가 쥔 공(b29da vt88(0) — 준비 틱 0)도 이 갈래가 먼저 본다 ──
     if (!play.finished && manualThrowBase !== NONE && isHolderReady()) {

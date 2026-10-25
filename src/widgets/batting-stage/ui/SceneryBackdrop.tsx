@@ -32,8 +32,8 @@ interface SceneryBackdropProps {
  * - 그림이 늦게 실리므로 그림이 실릴 때마다(`assetLoadVersion`) · 값이 바뀔 때마다 다시 칠한다.
  * - **좌우(`stage.side`)** — 구장 +0x60 은 인트로 진입 0x3b084 가 3b0f2~3b108 에서 공격 팀 지금 타자(0xae89d)의 손(0xb63c1)으로
  *   쓴다(직접 떴다). 0(우타)이면 펜스 · 바닥이 거울 길이다(`RIGHT_HANDED_MIRROR_X`). 부르는 쪽이 1회초 첫 타자(측 0 의 1번 —
- *   st[9] = 0 은 0xb6814, 팀[+0x32] = 0 은 상태 7 의 0 채운 새 팀 객체) 손을 넘긴다 — 팀 경기 `teamIntroBatterHandOf` ·
- *   투수편 `pitcherIntroBatterHandOf` · 타자편 `gameIntroBatterHandOf`.
+ *   st[9] = 0 은 0xb6814, 팀[+0x32] = 0 은 상태 7 의 0 채운 새 팀 객체) 손을 넘긴다 — 팀 경기 `teamIntroBatterHandOf`(이어하기면
+ *   되복사한 블록의 지금 공격 팀 다음 타자) · 투수편 `pitcherIntroBatterHandOf` · 타자편 `gameIntroBatterHandOf`.
  */
 export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)

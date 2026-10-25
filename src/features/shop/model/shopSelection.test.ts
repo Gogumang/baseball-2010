@@ -39,7 +39,7 @@ describe('상점 선택 — 0x14a74', () => {
   it('상점에서 가진 장비를 고르면 "이미 가지고 있는" 알림뿐이다 (0x13506, 점검 12차)', () => {
     const 보유 = 선수({ ownedEquipment: ['0-0'], equipmentLevels: { hit: 1, power: 0, defense: 0, run: 0 } })
 
-    expect(selectShopItem(보유, shopItemId('장착', 0, 0), 난수)).toMatchObject({ notice: '이미 가지고 있는 아이템입니다', career: 보유 })
+    expect(selectShopItem(보유, shopItemId('장착', 0, 0), 난수)).toMatchObject({ notice: '!C이미 가지고 있는!N아이템입니다', career: 보유 })
   })
 
   it('장비착용 화면에서는 가진 장비를 끼고, 성공 알림은 없다 — 확인 팝업(81) 뒤 알림 없음 (0x17b66, StrMODE[80])', () => {
@@ -48,7 +48,7 @@ describe('상점 선택 — 0x14a74', () => {
     // StrMODE 에 "장착 했습니다" 같은 문구가 없다 — 원본은 확인 팝업 뒤 따로 알리지 않는다 (R12-shop-guards.md 5절)
     expect(selectShopItem(보유, shopItemId('착용', 0, 0), 난수)).toMatchObject({ notice: '' })
     expect(selectShopItem(보유, shopItemId('착용', 0, 0), 난수).career.equipmentLevels.hit).toBe(1)
-    expect(selectShopItem(보유, shopItemId('착용', 0, 1), 난수).notice).toBe('현재 장착 중인 장비입니다')
+    expect(selectShopItem(보유, shopItemId('착용', 0, 1), 난수).notice).toBe('!C현재 장착 중인 장비입니다')
     expect(selectShopItem(보유, shopItemId('착용', 0, 3), 난수).notice).toBe('')
   })
 
@@ -59,9 +59,9 @@ describe('상점 선택 — 0x14a74', () => {
   })
 
   it('막히면 원문 이유를 알린다', () => {
-    expect(selectShopItem(선수({ money: 0 }), shopItemId('장착', 0, 0), 난수).notice).toBe('소지금이 부족합니다')
-    expect(selectShopItem(선수({ popularity: 0, money: 99999 }), shopItemId('장착', 0, 1), 난수).notice).toBe('인기도가 부족합니다. 필요한 인기도 : 50')
-    expect(selectShopItem(선수({ money: 99999 }), shopItemId('장착', 0, 8), 난수).notice).toBe('아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다')
+    expect(selectShopItem(선수({ money: 0 }), shopItemId('장착', 0, 0), 난수).notice).toBe('!C소지금이 부족합니다')
+    expect(selectShopItem(선수({ popularity: 0, money: 99999 }), shopItemId('장착', 0, 1), 난수).notice).toBe('!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 50')
+    expect(selectShopItem(선수({ money: 99999 }), shopItemId('장착', 0, 8), 난수).notice).toBe('!C아직 구매할 수 없는 아이템!N입니다. 특별한 조건을 통해!N오픈됩니다')
   })
 
   it('장비 구매는 구매 완료 창이 없고(0x14a74 kind 3) 새로 연 컬렉터 k 만 낸다 — 공용 창이 확인 창 뒤에 띄운다', () => {
@@ -97,6 +97,6 @@ describe('상점 선택 — 0x14a74', () => {
       .toEqual([true, true, true, true, true, false, true, false, false, false])
     const sick = selectShopItem(선수({ gamePoint: 500, isSick: true, illnessName: '감기', illnessRemaining: 3 }), shopItemId('GP', 7), 난수)
     expect(sick.detail ?? null).toBeNull()
-    expect(sick.notice).toBe('부상 및 질병이 모두 치료 되었습니다')
+    expect(sick.notice).toBe('!C부상 및 질병이!N!cFFFF00모두 치료!cFFFFFF 되었습니다')
   })
 })

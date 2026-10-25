@@ -34,6 +34,11 @@ const 등록 = () => {
 }
 
 describe('선수 등록 배치', () => {
+  it('안내는 흐르는 설명 띠다 — 0x15f34 162a6 0x55544(띠, StrMODE[0xcc6d8 줄]) · 투수 등록과 같은 그리기', () => {
+    const { container } = 화면()
+    expect(container.querySelector('[data-description-band]')).not.toBeNull()
+  })
+
   it('정보 칸 여덟을 원본 값으로 채운다 — 타순은 보여 주기만 하는 신인 8번이다 (+0xa = 0xa7)', () => {
     화면()
 

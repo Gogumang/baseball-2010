@@ -63,6 +63,7 @@ import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annals
 import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const MAIN_UI = './sprites/main_ui'
 const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
@@ -497,8 +498,8 @@ const HALL_OF_FAME_TEXT = {
   done: '!C!cffffff명예의 전당에!N등록이 완료되었습니다', // StrCOMMON[52]
   shortage: '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?', // 0xcc214
   later: '!C나중에 등록 하시겠습니까?!N메인 메뉴로 이동합니다', // StrMODE[219]
-  deleteConfirm: '!C!cFFFFFF현재 명예선수를!N삭제 하시겠습니까?!N(!cFF0000삭제 시 복구 불가!cFFFFFF)', // StrMAINMENU[128]
-  deleteBlocked: '!C!cFFFFFF시즌모드 경기 진행 중에는!N삭제 하실 수 없습니다', // StrMAINMENU[213]
+  deleteConfirm: ORIGINAL_MAIN_MENU_TEXT[128] ?? '', // StrMAINMENU[128]
+  deleteBlocked: ORIGINAL_MAIN_MENU_TEXT[213] ?? '', // StrMAINMENU[213]
   deleted: '!C!cffffff선수를 삭제하였습니다', // StrCOMMON[46]
   hallOfFameFirst: '!C!cFFFFFF명예의전당 선수를!N먼저 등록해야합니다', // StrCOMMON[39]
   // StrCOMMON[45] / [54] — 슬롯 현금 구매 (🌐)

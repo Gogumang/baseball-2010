@@ -8,9 +8,8 @@ import {
   setPitcherSkillEquipped,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
+import { restResultTextOf } from '@/entities/career/model/trainingText'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
-import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import {
   MAGIC_MAXIMUM_LEVEL,
   MAGIC_REQUIRED_POPULARITY,
@@ -19,7 +18,7 @@ import {
   magicTrainingCellCostOf,
   magicTrainingCursorOf,
   magicTrainingLinesOf,
-  PITCHER_TYPE_NAMES,
+  pitcherAbilityTrainingLinesOf,
   pitcherTrainingBlockReasonOf,
   pitchTypeTrainingLinesOf,
   runPitchTypeTraining,
@@ -53,8 +52,9 @@ import {
   PITCHER_PLAYER_INFO_SLOTS,
   PITCH_WINDOW_CHOICES,
   PITCH_WINDOW_TABS,
+  abilityAtLimitTextOf,
+  popularityShortageTextOf,
   trainingQuestionOf,
-  trainingResultOf,
   useQuestionOf,
 } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import type { PitcherManagementCommand } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
@@ -296,20 +296,18 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   /** 능력치 훈련 한 칸 (107 칸 0~3 → 연출 뒤 105) */
   const runAbilityTraining = useCallback(
-    (menu: PitcherTrainingMenu, ability: keyof PitcherAbility) => {
+    (menu: PitcherTrainingMenu) => {
       const outcome = runPitcherTraining(career, menu, random)
-      const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
       onSave(outcome.career)
       // 125 — 결과 창이 닫힐 때까지 105 가 아니다
       setIsResultWindowOpen(true)
-      const result = trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0)
-      // 타입 보너스 줄 — "[" + 타입 이름(0x1400080 [2+타입]) + "]" + StrMODE[194] (0x187a8~0x187f2)
-      const typeLine = outcome.typeBonus > 0 ? [`[${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}] 타입 보너스 +1`] : []
+      // 결과 창 글 — 0x17f5c 186c4~18a58 의 보정 줄만(타입 · 서브 아이템 · 자동안마기 · 병아리 · 몹쓸몸). 상승 수치 줄은 원본에 없다
+      const lines = pitcherAbilityTrainingLinesOf(outcome, career.typeIndex)
       const rows = pitcherTrainingDetailRowsOf(outcome)
       if (rows === null) {
         // 알림 창이 닫히면 125 → 105
         noticeThenRef.current = leaveTrainingResult
-        return setNotice([result, ...typeLine].join('!N'))
+        return setNotice(lines.join('!N'))
       }
       /*
        * 칸 0~3 은 타자편과 같은 상세 결과 창(0x872a1)을 띄운다 — 0x17f5c 가 모드 공용이다.
@@ -317,7 +315,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       return setDetail({
         rows,
-        messages: [result, ...typeLine],
+        messages: lines,
         afterClose: () => {
           const injury = rollTrainingInjury(outcome.career, false, random)
           if (injury.career !== outcome.career) onSave(injury.career)
@@ -355,23 +353,24 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       setIsResultWindowOpen(true)
       noticeThenRef.current = leaveTrainingResult
-      setNotice(magicTrainingLinesOf(magic, outcome.moraleLoss).join('!N'))
+      setNotice(magicTrainingLinesOf(magic, outcome).join('!N'))
     },
     [career, leaveTrainingResult, onSave, random],
   )
 
   const blockNoticeOf = useCallback(
-    (reason: PitcherTrainingBlockReason): string => {
+    (reason: PitcherTrainingBlockReason, slot: number): string => {
       if (reason === '사기부족') return PITCHER_MANAGEMENT_TEXT.moraleEmpty
-      if (reason === '능력치최대') return PITCHER_MANAGEMENT_TEXT.abilityAtLimit
+      // StrMODE[192] — %s 는 그 칸의 능력치 이름 StrMODE[0x28 + 칸] (키 0x12d48 12ef2~12f10)
+      if (reason === '능력치최대') return abilityAtLimitTextOf(slot)
       // StrMODE[62] — 마구 레벨마다 필요한 인기도 (표 0xcc3ea)
-      if (reason === '인기도부족') return '인기도가 부족합니다'
+      if (reason === '인기도부족') return popularityShortageTextOf(MAGIC_REQUIRED_POPULARITY[career.magicLevel] ?? 0)
       /*
        * ⚠️ `pitcherTrainingBlockReasonOf` 는 "마구를 다 배웠다" 와 "G포인트가 모자란다" 를
        *    **한 값('훈련완료')으로 묶어** 돌려준다 (entities 쪽 그대로 둔다).
-       *    글만 여기서 갈라 준다 — StrMODE[65] 가 G 부족이다.
+       *    글만 여기서 갈라 준다 — 다 배웠으면 StrMODE[63](108 창 0x17828 과 같은 글), G 부족은 [65].
        */
-      return career.magicLevel >= MAGIC_MAXIMUM_LEVEL ? '마구 훈련을 모두 마쳤습니다' : 'G포인트가 부족합니다'
+      return career.magicLevel >= MAGIC_MAXIMUM_LEVEL ? PITCHER_MANAGEMENT_TEXT.magicAllTrained : PITCHER_MANAGEMENT_TEXT.gamePointShortage
     },
     [career.magicLevel],
   )
@@ -468,10 +467,10 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     setRestPhase('result')
     const rest = runPitcherRest(career, random)
     onSave(rest.career)
-    // 상세 결과 창(0x18fc2 → 0x872a1) — 글은 StrMODE[24] "사기" + 수치 + [83] (0x18e3c)
+    // 상세 결과 창(0x18fc2 → 0x872a1) — 글은 StrMODE[24] "사기" + " " + |수치| + [83]/[84] (0x18e3c 18e7c~18eb4, `restResultTextOf`)
     setDetail({
       rows: pitcherRestDetailRowsOf(rest.career, rest.moraleGain),
-      messages: [`사기 ${rest.moraleGain} 상승하였습니다`],
+      messages: [restResultTextOf(rest.moraleGain)],
       /*
        * 결과 창을 **닫을 때** 회복 판정 0x1b308 (콜백 0x1d671, 질병 60% · 부상 30%, G 2-2).
        * 타자편 `useCareerSession` 이 `recoverAfterRest` 를 부르는 자리와 같다.
@@ -518,14 +517,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       if (career.morale <= 0) return setNotice(PITCHER_MANAGEMENT_TEXT.moraleEmpty)
       if (menu.ability === null) return openPitchWindow(true)
-      const reason = pitcherTrainingBlockReasonOf(career, menu)
-      if (reason !== null) return setNotice(blockNoticeOf(reason))
-      const ability = menu.ability
-      // [85] 예 → 125 — 연출(칸 = 107 커서) 뒤에 훈련 0x17f5c 를 굴린다
       const slot = PITCHER_TRAINING_MENUS.indexOf(menu)
+      const reason = pitcherTrainingBlockReasonOf(career, menu)
+      if (reason !== null) return setNotice(blockNoticeOf(reason, slot))
+      // [85] 예 → 125 — 연출(칸 = 107 커서) 뒤에 훈련 0x17f5c 를 굴린다
       return setQuestion({
-        text: trainingQuestionOf(menu.name),
-        onYes: () => startTraining(slot, () => runAbilityTraining(menu, ability)),
+        text: trainingQuestionOf(slot),
+        onYes: () => startTraining(slot, () => runAbilityTraining(menu)),
       })
     },
     [blockNoticeOf, career, openPitchWindow, runAbilityTraining, startTraining],

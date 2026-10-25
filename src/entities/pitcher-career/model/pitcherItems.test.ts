@@ -1,5 +1,6 @@
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
+import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -44,7 +45,7 @@ describe('투수 서브 아이템 (창 종류 1 — 0x1364e · 0x14c8c 모드 �
 describe('투수 GP 아이템 (창 종류 2)', () => {
   it('가격은 0xcc41b 앞 10칸(타자 블록과 같은 값), 칸 9 만 십전대보탕이다 (StrITEM[107] · [171])', () => {
     expect(PITCHER_GP_ITEMS.map((item) => item.price)).toEqual(BATTER_GP_ITEMS.map((item) => item.price))
-    expect(PITCHER_GP_ITEMS[9]).toMatchObject({ name: '십전대보탕', effectText: '스태미나 100% 회복', price: 500 })
+    expect(PITCHER_GP_ITEMS[9]).toMatchObject({ name: '십전대보탕', effectText: '스태미나 100% 회복 ', price: 500 })
     expect(PITCHER_GP_ITEMS[0].effectText).toBe('제구 능력치 + 10')
     expect(PITCHER_GP_ITEMS[4].effectText).toBe('모든 능력치 + 10')
     // 아이콘 표 0xd4676 — 칸 9 만 20 (타자 이글아이는 19)
@@ -89,7 +90,7 @@ describe('투수 GP 아이템 (창 종류 2)', () => {
     expect(결과.lotteryPrize).toBe('아차상')
     expect(결과.prizeItemId).toBe(3)
     expect(결과.career.ability.stamina).toBe(투수().ability.stamina + 10)
-    expect(pitcherGpItemNoticeOf(5, 결과.lotteryPrize, 결과.prizeItemId)).toBe('아차상 당첨!! [고려인삼] 획득!')
+    expect(stripGameMarkup(pitcherGpItemNoticeOf(5, 결과.lotteryPrize, 결과.prizeItemId))).toBe('아차상 당첨!!\n[고려인삼] 획득!\n체력 10  상승하였습니다')
   })
 
   it('사면 G 를 먼저 뺀다 — 모자라면 거절', () => {
@@ -103,32 +104,32 @@ describe('투수 GP 가드 (0x13460 kind 2)', () => {
   it('능력치 아이템은 기본 능력치가 보직 한계 이상이면 StrMODE[192] — 이름은 StrMODE[40+k]', () => {
     const 꽉 = 투수({ ability: { control: 800, velocity: 100, breaking: 100, stamina: 800 } })
 
-    expect(pitcherGpItemBlockReasonOf(꽉, 0)).toBe('[제구] 능력치가 최대입니다')
+    expect(pitcherGpItemBlockReasonOf(꽉, 0)).toBe('!C[!cFFFF00제구!cFFFFFF] 능력치가 최대입니다') // StrMODE[192] 원문, %s = [40]
     expect(pitcherGpItemBlockReasonOf(꽉, 1)).toBeNull()
     // 도시락은 넷 다 최대일 때만 막는다
     expect(pitcherGpItemBlockReasonOf(꽉, 4)).toBeNull()
   })
 
   it('십전대보탕은 스태미나가 10000 이면 StrMODE[211]', () => {
-    expect(pitcherGpItemBlockReasonOf(투수({ stamina: FULL_STAMINA }), 9)).toBe('스태미나가 최대입니다 구매 할 수 없습니다')
+    expect(pitcherGpItemBlockReasonOf(투수({ stamina: FULL_STAMINA }), 9)).toBe('!C스태미나가 최대입니다!N구매 할 수 없습니다')
     expect(pitcherGpItemBlockReasonOf(투수({ stamina: FULL_STAMINA - 1 }), 9)).toBeNull()
   })
 
   it('영지버섯 91 · 건강진단 208 · 최면요법 209 는 타자편과 같다', () => {
-    expect(pitcherGpItemBlockReasonOf(투수({ morale: 100 }), 6)).toBe('사기 최고 상태입니다')
-    expect(pitcherGpItemBlockReasonOf(투수(), 7)).toBe('건강한 상태입니다 구매 할 수 없습니다')
-    expect(pitcherGpItemBlockReasonOf(투수({ skillIds: [0] }), 8)).toBe('마이너스 스킬이 없습니다 구매 할 수 없습니다')
+    expect(pitcherGpItemBlockReasonOf(투수({ morale: 100 }), 6)).toBe('!C사기 최고 상태입니다')
+    expect(pitcherGpItemBlockReasonOf(투수(), 7)).toBe('!C건강한 상태입니다!N구매 할 수 없습니다')
+    expect(pitcherGpItemBlockReasonOf(투수({ skillIds: [0] }), 8)).toBe('!C마이너스 스킬이 없습니다!N구매 할 수 없습니다')
     expect(pitcherGpItemBlockReasonOf(투수({ skillIds: [17] }), 8)).toBeNull()
   })
 })
 
 describe('투수 GP 알림 (0xa4488)', () => {
   it('능력치 이름은 StrMODE[40+k], 모든능력치는 [39] — 숫자 6·8 은 원본 그대로', () => {
-    expect(pitcherGpItemNoticeOf(1, null)).toBe('구속 6 상승하였습니다')
-    expect(pitcherGpItemNoticeOf(4, null)).toBe('모든능력치 8 상승하였습니다')
+    expect(pitcherGpItemNoticeOf(1, null)).toBe('구속 6  !c00CC00상승!cFFFFFF하였습니다')
+    expect(pitcherGpItemNoticeOf(4, null)).toBe('모든능력치 8  !c00CC00상승!cFFFFFF하였습니다')
   })
 
   it('십전대보탕은 StrMODE[125]', () => {
-    expect(pitcherGpItemNoticeOf(9, null)).toBe('스태미나가 100% 회복되었습니다')
+    expect(pitcherGpItemNoticeOf(9, null)).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다 ') // [125] 끝 빈칸 원문
   })
 })

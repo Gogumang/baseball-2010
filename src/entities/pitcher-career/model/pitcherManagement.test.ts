@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   MAGIC_MAXIMUM_LEVEL,
   MAGIC_REQUIRED_POPULARITY,
@@ -189,11 +190,14 @@ describe('구질 훈련 (108 탭 2 → 0x17f5c 의 0x1836a 갈래)', () => {
 
   it('알림 글 — 덜 찼으면 StrMODE[89] "%d/%d회", 차면 [88] "구질 훈련 완료!"', () => {
     const 한번 = runPitchTypeTraining(구질투수(), 0, 2, 최소)
-    expect(pitchTypeTrainingLinesOf(한번)).toEqual(['해당 구질 1/4회 훈련', '사기 -6'])
+    expect(pitchTypeTrainingLinesOf(한번)).toEqual(['해당 구질 !cFFFF001/4회!cFFFFFF 훈련', '사기 6 !cFF0000하락!cFFFFFF하였습니다', ''])
+    // 자동안마기 — 괄호 "(-1)" 와 효과 줄 (0x184d8~0x186c2)
+    const 안마 = runPitchTypeTraining(구질투수({ subItemIds: [4] }), 0, 2, 최소)
+    expect(pitchTypeTrainingLinesOf(안마).slice(1)).toEqual(['사기 5(-1) !cFF0000하락!cFFFFFF하였습니다', '', '!cFFFF00자동안마기 효과'])
     const 다른칸 = runPitchTypeTraining(구질투수({ pitchTrainingCounts: [1, 0, 0, 0, 0, 0, 0, 0] }), 2, 0, 최소)
-    expect(pitchTypeTrainingLinesOf(다른칸)[0]).toBe('해당 구질 1/2회 훈련')
+    expect(stripGameMarkup(pitchTypeTrainingLinesOf(다른칸)[0] ?? '')).toBe('해당 구질 1/2회 훈련')
     const 마지막 = runPitchTypeTraining(구질투수({ pitchTrainingCounts: [3, 0, 0, 0, 0, 0, 0, 0] }), 0, 2, 최소)
-    expect(pitchTypeTrainingLinesOf(마지막).slice(0, 1)).toEqual(['구질 훈련 완료!'])
+    expect(pitchTypeTrainingLinesOf(마지막).slice(0, 1)).toEqual(['구질 훈련 완료!!N[!cFFFF00선수정보!cFFFFFF]에서 사용!N여부 변경 가능'])
   })
 })
 

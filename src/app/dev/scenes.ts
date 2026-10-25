@@ -1,5 +1,7 @@
 import type { SceneHandles } from '@/app/dev/sceneShortcut'
+import { scenePeeksNow } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TeamGamePeek } from '@/shared/lib/scenePeek/scenePeek'
 
 /**
  * **장면 바로가기 표** (개발 · e2e 전용). 단계는 화면 상태를 꽂지 않고 메인 메뉴 · 관리 메뉴가 부르는 **그 진입 함수**를 부른다
@@ -54,13 +56,8 @@ const keyUntil = (
   holdWhen === undefined
     ? { kind: 'keyUntil', key: name, label, test, everyMs, timeoutMs }
     : { kind: 'keyUntil', key: name, label, test, everyMs, timeoutMs, holdWhen }
-/** 그 순간 화면이 알리는 터치 상황 버튼 — 경기 장면의 타석('#' 대타) · 투구('#' 교체) · 수비('… 송구')를 가른다 */
+/** 그 순간 화면이 알리는 터치 상황 버튼 — 나리 타석(번트 '8')을 가른다(돌발미션 장면이 타석에서 OK 를 안 누르게) */
 const offersHave = (label: string) => () => touchKeyOffersNow().some((offer) => offer.label.includes(label))
-/**
- * 화면 안 누름 칸(`PressArea` 의 aria-label)이 섰는가 — '#' 대타 · 교체 · '*' 메뉴는 바닥띠 글자 자리 칸이라 상황 버튼으로 안 뜬다
- * (r192 · r212). 그래서 타석 · 투구는 이 칸으로 가른다
- */
-const pressAreaIs = (label: string) => () => document.querySelector(`button[aria-label="${label}"]`) !== null
 /**
  * 돌발미션 창(`BurstMissionWindow`, role dialog '돌발미션') — 진행기에 판정(`lastBurstResolution`)이 있으면 결과 창, 없으면 타석 앞 제안 창.
  * 창이 없으면 null
@@ -68,6 +65,14 @@ const pressAreaIs = (label: string) => () => document.querySelector(`button[aria
 const burstWindowOf = (handles: SceneHandles): '제안' | '결과' | null => {
   if (document.querySelector('[role="dialog"][aria-label="돌발미션"]') === null) return null
   return handles.career.progress?.lastBurstResolution == null ? '제안' : '결과'
+}
+/**
+ * 팀 경기 화면이 알리는 지금 자리(`shared/lib/scenePeek` — 버튼 글자 · 화면 구조에 기대지 않는다). r192 가 '*' · '#' 상황 버튼을
+ * 걷고 "*MENU" · "#TIME" 글자 자리 누름 칸으로 바꾼 뒤 예전 표('대타' · '교체' 버튼 기다림)는 시간 초과로 끝났다(r222).
+ */
+const teamGameIs = (test: (peek: TeamGamePeek) => boolean) => () => {
+  const peek = scenePeeksNow().teamGame
+  return peek !== undefined && test(peek)
 }
 const screenIs = (kind: SceneHandles['screen']['kind']) => until(`화면 ${kind}`, (handles) => handles.screen.kind === kind)
 
@@ -115,7 +120,10 @@ const TO_GENERAL_QUICK: readonly SceneStep[] = [
   wait(1200),
 ]
 
-/** 경기설정 창 [이닝 플레이](처음 칸) → [자동진행 없음] → "현재 설정으로 플레이" 예 → 경기정보 PLAY BALL */
+/**
+ * 경기설정 창 [이닝 플레이](처음 칸) → [자동진행 없음] → "현재 설정으로 플레이" 예 → 경기정보 PLAY BALL → 로딩 판 → 인트로(0xc).
+ * 인트로는 원본도 OK 로 끝난다(0x39b54 — 54틱을 다 안 기다린다). 인트로가 끝나면 더 누르지 않는다(첫 타석 0xe 의 OK 를 먹지 않게)
+ */
 const TO_GENERAL_GAME: readonly SceneStep[] = [
   ...TO_GENERAL_QUICK,
   key('Enter'),
@@ -125,6 +133,8 @@ const TO_GENERAL_GAME: readonly SceneStep[] = [
   key('Enter'),
   wait(1000),
   key('Enter'),
+  until('경기 화면(인트로)', teamGameIs(() => true), 15000),
+  keyUntil('Enter', '인트로 OK', teamGameIs((peek) => peek.isIntroDone), 300, 15000),
 ]
 
 export const SCENES: Readonly<Record<string, SceneDefinition>> = {
@@ -217,22 +227,16 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
   'general-bat': {
     description: '일반모드 타석 — 경기 시작 직후 1회초 사람 팀 첫 타자 (씨앗 2: 사람 선공 · 이닝플레이 자동진행 없음)',
     fixture: 'general-bat',
-    steps: [
-      ...TO_GENERAL_GAME,
-      until('타석 앞(# 대타 칸)', pressAreaIs('# 대타'), 15000),
-      // 타자 소개 판을 OK 로 넘겨 타석에 들어선다(번트 '8' 이 뜬다) — 들어선 뒤에는 누르지 않는다(OK 는 스윙)
-      keyUntil('Enter', '타석(번트 버튼)', offersHave('번트'), 700, 15000),
-      wait(300),
-    ],
+    steps: [...TO_GENERAL_GAME, until('사람 타석 0xe · 0xf', teamGameIs((peek) => peek.canBat && peek.acceptsChangeKey), 15000), wait(300)],
   },
   'general-pitch': {
     description: '일반모드 투구 — 경기 시작 직후 1회초 사람 투수 구질 고르기 (씨앗 1: CPU 선공)',
     fixture: 'general-pitch',
     steps: [
       ...TO_GENERAL_GAME,
-      until('투구 앞(# 교체 칸)', pressAreaIs('# 교체'), 15000),
-      // 타자 소개 판을 OK 로 넘겨 구질 고르기 판(`PitchSlotPicker` 의 누름 칸)이 설 때까지
-      keyUntil('Enter', '구질 고르기', () => document.querySelector('[data-testid="구질 누름 칸"]') !== null, 700, 15000),
+      until('사람 수비 타석 0xe · 0xf', teamGameIs((peek) => peek.canPitch && peek.acceptsChangeKey), 15000),
+      // 타자 소개 판을 OK 로 넘겨 구질 고르기 판(`PitchSlotPicker`)이 설 때까지
+      keyUntil('Enter', '구질 고르기 0xf', teamGameIs((peek) => peek.isPitchSlotPickerShown), 700, 15000),
       wait(400),
     ],
   },
@@ -241,9 +245,9 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'general-pitch',
     steps: [
       ...TO_GENERAL_GAME,
-      until('투구 앞(# 교체 칸)', pressAreaIs('# 교체'), 15000),
+      until('사람 수비 타석 0xe · 0xf', teamGameIs((peek) => peek.canPitch && peek.acceptsChangeKey), 15000),
       // 구질 · 코스 · 게이지 모두 OK — 공을 칠 때까지 던진다
-      keyUntil('Enter', '수비(송구 버튼)', offersHave('송구'), 500, 60000),
+      keyUntil('Enter', '수비 판 0x17', teamGameIs((peek) => peek.defensePlaySide === '수비'), 500, 60000),
       wait(300),
     ],
   },
@@ -271,12 +275,6 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
   'derby-start': {
     description: '홈런더비 시작 — 나리 타자를 골라 첫 공 앞 (1/10)',
     fixture: 'nari-y1',
-    steps: [
-      ...TO_DERBY_PICK,
-      key('Enter'),
-      until('더비 타석 앞(메뉴 칸)', pressAreaIs('메뉴'), 15000),
-      keyUntil('Enter', '더비 타석(번트 버튼)', offersHave('번트'), 700, 15000),
-      wait(500),
-    ],
+    steps: [...TO_DERBY_PICK, key('Enter'), until('더비 타석 0xe (첫 공 앞)', () => scenePeeksNow().homeRunDerby?.acceptsConfirm === true, 15000), wait(500)],
   },
 }

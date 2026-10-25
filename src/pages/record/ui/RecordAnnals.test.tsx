@@ -217,11 +217,11 @@ describe('기록연감 칸 격자', () => {
     fireEvent.click(screen.getByRole('button', { name: '통계' }))
 
     expect(STAT_NAMES).toHaveLength(182 - 129 + 1)
-    expect(STAT_NAMES[0]).toBe('일반 모드')
+    expect(STAT_NAMES[0]).toBe('일반 모드 ') // [129] 끝 빈칸까지 원문
     expect(STAT_NAMES[STAT_NAMES.length - 1]).toBe('선물 받은 GP')
     // 쪽 0 = 칸 0~6 플레이 시간 [129]~[135] — 칸 7 은 비어 있다 (0x7a08c)
-    for (const name of STAT_NAMES.slice(0, 7)) expect(screen.getByText(name)).toBeTruthy()
-    expect(screen.queryByText(STAT_NAMES[7])).toBeNull()
+    for (const name of STAT_NAMES.slice(0, 7)) expect(screen.getByText(name.trim())).toBeTruthy()
+    expect(screen.queryByText(STAT_NAMES[7].trim())).toBeNull()
   })
 
   it('통계 탭 글 자리 — 이름 (36, 92 + 18줄, 164) · 값 (31, 91 + 18줄, 170) 오른쪽 (0x7a542 · 0x7a1f8 꼴 8갈래)', () => {

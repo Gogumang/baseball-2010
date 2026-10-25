@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+import { stampInputTime } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import * as styles from '@/shared/ui/PressArea/PressArea.css'
@@ -14,7 +16,11 @@ interface PressAreaProps {
   readonly label: string
   /** 240×320 원본 좌표의 누름 칸. 안 주면 화면 전체 */
   readonly rect?: PressRect
-  readonly onPress: () => void
+  /**
+   * 눌렀다 — `event` 는 이 누름의 사건이다. 타이밍이 결과를 바꾸는 칸(투구 게이지 · 조준 · 도루)은 키 사건과 같은 길로
+   * `inputTimeOf(event)` 를 키 칸에 넘긴다 — 손가락 · 마우스가 **닿은 시각**(pointerdown)이 붙어 있다(아래 `PressArea`). 안 쓰면 무시한다
+   */
+  readonly onPress: (event: Event) => void
   readonly isDisabled?: boolean
   /**
    * 목록 칸으로 읽히게 할 때 — 원본 목록 그림(경기 중 메뉴 칸 따위) 위의 누름 칸이 `role="option"` 과 고름 상태를 갖는다.
@@ -47,6 +53,11 @@ const WHOLE_SCREEN: PressRect = { x: 0, y: 0, width: 240, height: 320 }
  */
 export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = false, option, testId, touchKey }: PressAreaProps) {
   useTouchKeyOffer(isDisabled ? null : touchKey ?? null)
+  /**
+   * 이 칸에 손가락 · 마우스가 닿은 사건 시각(`event.timeStamp`) — 누름(onPress)은 떼는 click 에 나가지만, 키패드 키가 누를 때 keydown 이듯
+   * 사람이 누른 때는 닿은 때다. click 사건에 이 시각을 붙여(`stampInputTime`) 받는 쪽이 `inputTimeOf` 로 "그때 본 그림의 틱"을 센다(r222)
+   */
+  const pointerDownAtRef = useRef<number | null>(null)
   return (
     <button
       type="button"
@@ -61,9 +72,16 @@ export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = fa
         // 마우스 · 터치로 누른 것(detail ≥ 1)이면 초점을 놓는다 — 눌린 칸에 초점이 남으면 다음 키(OK · 화살표)에서 크롬이
         // :focus-visible 점선을 그려, 원본에 없는 점선 네모가 바닥띠 위에 남았다 (r82 나리 선수 등록 OK 뒤 Enter)
         if (event.detail > 0) event.currentTarget.blur()
-        onPress()
+        const pointerDownAt = pointerDownAtRef.current
+        pointerDownAtRef.current = null
+        // 키보드로 누른 click(detail 0)은 닿은 때가 없다 — click 사건 시각 그대로
+        if (pointerDownAt !== null && event.detail > 0) stampInputTime(event.nativeEvent, pointerDownAt)
+        onPress(event.nativeEvent)
       }}
-      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        pointerDownAtRef.current = event.timeStamp
+      }}
     />
   )
 }

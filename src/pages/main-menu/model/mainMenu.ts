@@ -1,5 +1,6 @@
 import { GAME_START_MENU, SEASON_FIRST_NOTICE, TOP_MENU } from '@/shared/config/original/mainMenu'
 import type { MainMenuEntry } from '@/shared/config/original/mainMenu'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 /**
  * 원작 메인 메뉴는 **두 단**이다. 장면 0x103 의 하위 상태 번호를 그대로 단 번호로 쓴다
@@ -28,11 +29,11 @@ export const TOP_ENTRIES: readonly MainMenuEntry[] = TOP_MENU.map((entry) =>
  * OK 는 `[skin+0xe6]` = 커서 · 하위 37(랭킹 모드별 화면 → 38 서버 🌐) — 웹은 통신이 없다 (`RANKING_SERVER_NOTICE`).
  */
 export const RANKING_ENTRIES: readonly MainMenuEntry[] = [
-  { id: '랭킹일반모드', labelFrame: 7, isAvailable: true, description: '일반모드의!N순위를 확인합니다' }, // [24]
-  { id: '랭킹나만의리그', labelFrame: 8, isAvailable: true, description: '나만의 리그의!N순위를 확인합니다' }, // [25]
-  { id: '랭킹시즌모드', labelFrame: 9, isAvailable: true, description: '시즌모드의!N순위를 확인합니다' }, // [26]
-  { id: '랭킹대전모드', labelFrame: 10, isAvailable: true, description: '대전모드의!N순위를 확인합니다' }, // [27]
-  { id: '랭킹홈런더비', labelFrame: 13, isAvailable: true, description: '훈련모드의!N순위를 확인합니다' }, // [28]
+  { id: '랭킹일반모드', labelFrame: 7, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[24] ?? '' }, // [24]
+  { id: '랭킹나만의리그', labelFrame: 8, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[25] ?? '' }, // [25]
+  { id: '랭킹시즌모드', labelFrame: 9, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[26] ?? '' }, // [26]
+  { id: '랭킹대전모드', labelFrame: 10, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[27] ?? '' }, // [27]
+  { id: '랭킹홈런더비', labelFrame: 13, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[28] ?? '' }, // [28]
 ]
 
 /**

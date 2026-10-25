@@ -361,7 +361,7 @@ export function renderBattingStage(
   warmStageCast(scene.warmCast)
   const side = scene.side ?? STAGE_SIDE
   const backdropOffsetY = scene.resultBackdropOffsetY ?? null
-  /** 이 그림까지 든 창 첫 그림 수 — 장면이 사는 동안 도는 그리기 쪽 애니(하늘 조명 0x78490 · 램프 확대 0x37828)에 더한다 */
+  /** 이 그림까지 든 창 첫 그림 수 — 장면이 사는 동안 도는 그리기 쪽 애니(하늘 조명 0x78490 · 램프 그리기 0x373d0 의 확대 갈래 0x37828~0x37858)에 더한다 */
   const redrawsSoFar = redrawsUpTo(scene.redrawTicks, scene.tick)
   drawScenery(context, {
     ...scene.scenery,
@@ -458,8 +458,9 @@ export function renderBattingStage(
   // 0x46fa8(장면, 1) 싸이커 · 드래고나 — 목록 비우기(0x4d744) 뒤 · HUD(0x4c4bc) 앞에 화면에 바로 섞어 그린다
   drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   if (scene.hud !== null) {
-    // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x37828)이 5틱 동안 배율을 줄인다
-    // 램프 확대 0x37828 은 HUD 그리기 0x4c4bc(4c50c)가 부른다 — 창 첫 그림도 타이머를 한 번 더 줄인다(그림 번호로 넘긴다)
+    // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x373d0 안 갈래 0x37828~0x37858)이 5틱 동안 배율을 줄인다
+    // HUD 그리기 0x4c4bc 가 4c50c 에서 램프 그리기 함수 0x373d0(373d0~378f8)을 부르고, 확대는 그 안 갈래다 — 0x37828 을 부르는
+    // BL · 리터럴은 없다. 창 첫 그림도 타이머를 한 번 더 줄인다(그림 번호로 넘긴다)
     drawHud(context, scene.hud, scene.tick + redrawsSoFar)
   }
   // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다

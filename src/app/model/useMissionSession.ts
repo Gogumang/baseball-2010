@@ -60,6 +60,7 @@ import {
   rollCpuStealStart,
   runOpenedPitchArrivalPlay,
   startHumanSteal,
+  stealStartSceneOf,
   type PitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runLiveRunnerPlayWithoutKeys, type LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
@@ -864,8 +865,16 @@ export function useMissionSession({
     }
   }
   /** 공 도착 판에 얹는 그림 전용 두 칸 (능력치 칸은 부르는 쪽이 따로 넣는다) */
-  const pitchArrivalPlatesOf = ({ fielderPlates, runnerAces, defenseTeamIndex, offenseTeamIndex }: MissionPlayAbilities) => ({
+  const pitchArrivalPlatesOf = ({
+    fielderPlates,
+    fielderSkillIds,
+    runnerAces,
+    defenseTeamIndex,
+    offenseTeamIndex,
+  }: MissionPlayAbilities) => ({
     ...(fielderPlates === undefined ? {} : { fielderPlates }),
+    // 초감각(21) — 레이저 0x66a8c 가 야수 +0xec 레코드에 묻는다(그림 전용 칸은 아니지만 같은 레코드 고르기다)
+    ...(fielderSkillIds === undefined ? {} : { fielderSkillIds }),
     ...(runnerAces === undefined ? {} : { runnerAces }),
     ...(defenseTeamIndex === undefined ? {} : { defenseTeamIndex }),
     ...(offenseTeamIndex === undefined ? {} : { offenseTeamIndex }),
@@ -1582,6 +1591,19 @@ export function useMissionSession({
     const pitcherRunAbilities = missionRunAbilitiesOnBaseOf(pitcherRun, specialRunnersRef.current(pitcherRun.mission))
     const stealingFrom = rollCpuStealStart(
       { bases: pitcherRun.bases, offenseIsCpu: true, runAbilityOf: (base) => pitcherRunAbilities[base] ?? 0 },
+      random,
+    )
+    // 같은 메시지 0x583 의 52222 — CPU 송구 결정 0xafa60 한 번(앞 판이 끝난 그대로의 사람 칸 수비). 11번째 틱 CPU 타자 결정보다
+    // 먼저다(`stealStartSceneOf`, r214 — 예전 웹은 공 도착 판 맨 앞에서 굴렸다). 수비 · 주자 칸은 아래 공 도착 판과 같다
+    missionSceneRef.current = stealStartSceneOf(
+      {
+        scene: missionSceneRef.current,
+        bases: pitcherRun.bases,
+        outs: pitcherRun.outs,
+        defenseAbilities: missionDefenseAbilitiesOf(pitcherRun),
+        runAbilities: pitcherRunAbilities,
+      },
+      stealingFrom,
       random,
     )
     // 0xa9bd4 가 세운 st[0x14 + 루] 는 화면 표시 칸이기도 하다 — 0x35b94 가 그 루 주자를 안 그린다(`pitcherStealDisplay`).
@@ -2431,7 +2453,8 @@ export function useMissionSession({
 
     /**
      * **도루 출발** — 타자 미션의 사람 키 '3' 1루 · '2' 2루 · '1' 3루 주자(`0x53610` → 메시지 0x583 → `0xa9bd4`).
-     * 주자를 출발만 시킨다(난수·소리 없음). 성공·실패는 공이 도착할 때 도루 판(종류 5)이 정한다(`handleMissionPitch`).
+     * 주자를 출발시키고 같은 메시지의 52222 가 CPU 송구 결정 0xafa60 을 한 번 돌린다(앞 판 수비가 공을 쥐었을 때만 굴림 —
+     * `stealStartSceneOf`, r214). 성공·실패는 공이 도착할 때 도루 판(종류 5)이 정한다(`handleMissionPitch`). 소리 없음.
      * 사람 경기 도루는 간이 엔진 표 0xd9064 가 아니다(c18a833).
      */
     steal: (base: StealBase) => {
@@ -2440,6 +2463,13 @@ export function useMissionSession({
       if (pendingDefensePlayRef.current !== null || pendingRunnerPlayRef.current !== null) return
       const next = startHumanSteal(current.bases, stealingFromRef.current, base)
       if (next === stealingFromRef.current) return
+      // 수비 · 주자 칸은 공 도착 판(`playAbilitiesOf` — CPU 수비 팀 레코드 · 사람 칸 타순 주자)과 같다
+      const { defenseAbilities, runAbilities } = playAbilitiesOf(current)
+      missionSceneRef.current = stealStartSceneOf(
+        { scene: missionSceneRef.current, bases: current.bases, outs: current.outs, defenseAbilities, runAbilities },
+        next,
+        random,
+      )
       stealingFromRef.current = next
       setStealingFrom(next)
     },

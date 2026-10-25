@@ -16,6 +16,7 @@
  *   그리기 0x6042c 는 [skin+0x2a4] 표에서 0x702b5(표, 121 + 줄)로 읽는다(61b1c~61b2a).
  * - **이름 그림**은 `ui/img_text.pzx` 합성 프레임이다(`public/sprites/img_text/frames`).
  */
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 /** 이름 그림 폴더 — 다른 화면들과 같은 경로 관례 */
 export const IMG_TEXT = './sprites/img_text/frames'
@@ -68,17 +69,17 @@ export const DETAIL_CONFIRM_LABEL = '확인'
 
 /** 상세 네 줄 설명 — StrMAINMENU[121]~[124] */
 export const DETAIL_ROW_DESCRIPTIONS = [
-  '!cFFFFFF[!cFFFF00타자조작!cFFFFFF]: 지정한 타순 타자만 플레이합니다 ', // [121] — 끝 빈칸까지 원문
-  '!cFFFFFF[!cFFFF00공격주자!cFFFFFF]: 공격 시 해당 베이스 주자 있을 때 플레이합니다', // [122]
-  '!cFFFFFF[!cFFFF00투수조작!cFFFFFF]: 지정한 이닝에 투수 수비를 플레이합니다', // [123]
-  '!cFFFFFF[!cFFFF00수비주자!cFFFFFF]: 수비 시 해당 베이스 주자 있을 때 플레이합니다', // [124]
+  ORIGINAL_MAIN_MENU_TEXT[121] ?? '', // [121] — 끝 빈칸까지 원문
+  ORIGINAL_MAIN_MENU_TEXT[122] ?? '', // [122]
+  ORIGINAL_MAIN_MENU_TEXT[123] ?? '', // [123]
+  ORIGINAL_MAIN_MENU_TEXT[124] ?? '', // [124]
 ] as const
 
 /** 확인창 — StrMAINMENU[125] (0x74ef5, skin+0x314 = 1) */
-export const CONFIRM_TEXT = '!C!cFFFFFF현재 설정으로 플레이!N하시겠습니까?' // [125]
+export const CONFIRM_TEXT = ORIGINAL_MAIN_MENU_TEXT[125] ?? '' // [125]
 
 /** 상세에서 한 항목도 안 골랐을 때 — StrMAINMENU[126] (0x60240) */
-export const NO_DETAIL_TEXT = '!C!cFFFFFF상세 설정된 항목이!N없습니다. 최소 한가지!N항목은 선택해야 합니다' // [126]
+export const NO_DETAIL_TEXT = ORIGINAL_MAIN_MENU_TEXT[126] ?? '' // [126]
 
 /** 확인창 버튼 — 원본 예/아니오 팝업 (그림은 `ui/popup.pzx` 1·2) */
 export const CONFIRM_BUTTONS = ['예', '아니오'] as const

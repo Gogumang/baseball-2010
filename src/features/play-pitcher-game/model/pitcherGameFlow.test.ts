@@ -38,6 +38,7 @@ import {
   withPitcherGameMorale,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import type {
   PitcherGameOptions,
@@ -1320,6 +1321,52 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
       }
     }
     expect(opened).toBeGreaterThan(0)
+  })
+
+  it('0x583 의 CPU 송구 결정 0xafa60 은 도루 굴림 0x520de 바로 뒤 · CPU 타자 결정 앞에서 돈다 — 그 장면이 경기에 남는다 (r214)', () => {
+    // 앞 판 — 포수가 공을 쥔 채 끝나 +0x128 = 1 (`DefenseScene.playEnd`)
+    const 앞판 = runDefensePlay({
+      outcome: { kind: '아웃', detail: '땅볼아웃' },
+      trajectory: battedBallTrajectory([160, 101, 752, 0]),
+      bases: { first: false, second: false, third: false },
+      outs: 0,
+      random: 씨앗(1),
+    }).scene
+    expect(앞판.playEnd?.play.wantsThrow).toBe(true)
+    let started = 0
+    for (let seed = 1; seed <= 3000 && started < 3; seed += 1) {
+      const progress = startPitcherGame(기본옵션, 씨앗(1))
+      const 일루 = {
+        ...progress,
+        defenseScene: 앞판,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+      }
+      const inner = 씨앗(seed)
+      const calls: string[] = []
+      const 적는: RandomPort = {
+        rand: (lo, hi) => {
+          calls.push(`${lo},${hi}`)
+          return inner.rand(lo, hi)
+        },
+        rand9d: (n) => {
+          calls.push(`9d ${n}`)
+          return inner.rand9d(n)
+        },
+      }
+      const 끝 = startPitch(일루, 가운데직구, 적는)
+      // 0x520de 의 rand(0,1000) 다음이 CPU 타자 결정(0x34334 의 rand(0,100))이면 도루가 안 나간 공이다
+      const at = calls.indexOf('0,1000')
+      expect(at).toBeGreaterThanOrEqual(0)
+      if (calls[at + 1] === '0,100') continue
+      started += 1
+      // 도루가 나갔다 — 바로 다음이 0xafa60 → 0xb2c90 → 0xb2e38 의 악송구 굴림 rand(0,10000), 그 뒤에 CPU 타자 결정
+      expect(calls[at + 1]).toBe('0,10000')
+      expect(calls.slice(at + 2)).toContain('0,100')
+      // 결정 뒤 장면(+0x128 = 0)이 경기에 남는다 — 이 공의 판(타구 · 공 도착)도 그 장면을 이어받는다
+      const scene = 끝.pendingDefensePlay?.scene ?? (끝.lastArrivalPlay?.kind === 5 ? undefined : 끝.defenseScene)
+      if (scene !== undefined) expect(scene.playEnd?.play.wantsThrow).toBe(false)
+    }
+    expect(started).toBeGreaterThan(0)
   })
 
   it('화면이 도는 갈래(`live`)는 도루 판을 붙든다(송구 키 +0x160) — 키 없이 끝내면 미리 돌린 판과 경기 · 굴림 차례가 같다', () => {

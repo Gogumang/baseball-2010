@@ -45,9 +45,10 @@ export interface ShopSelection {
 }
 
 const EQUIPMENT_BLOCK_TEXT: Readonly<Record<Exclude<EquipmentBlockReason, '인기도부족'>, string>> = {
-  미오픈: '아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다', // StrMODE[76]
-  이미보유: '이미 가지고 있는 아이템입니다', // StrMODE[78]
-  소지금부족: '소지금이 부족합니다', // StrMODE[77]
+  // 원문 표 그대로 (r216 — 예전엔 !N 을 띄어 쓰고 마크업을 뺀 글이었다)
+  미오픈: ORIGINAL_MODE_TEXT[76] ?? '',
+  이미보유: ORIGINAL_MODE_TEXT[78] ?? '',
+  소지금부족: ORIGINAL_MODE_TEXT[77] ?? '',
 }
 /**
  * StrMODE[92] 원문 마크업 `!C[!cFFFF00%s!cFFFFFF] 구매 완료` — 서브아이템(kind 1)만 띄운다. 0x14d28 이 `0x702b5(글표, 0x5c)` 로 꺼내
@@ -63,7 +64,7 @@ const PURCHASED_TEXT_ID = 92
 function wearEquipment(career: PlayerCareer, part: number, level: number): ShopSelection {
   if (!ownsEquipment(career, part, level)) return { career, notice: '' }
   const isEquipped = career.equipmentLevels[EQUIPMENT_PARTS[part].ability] === level + 1
-  if (isEquipped) return { career, notice: '현재 장착 중인 장비입니다' } // StrMODE[80]
+  if (isEquipped) return { career, notice: ORIGINAL_MODE_TEXT[80] ?? '' } // StrMODE[80]
   // 장착 성공 알림은 없다 — StrMODE 에 그런 문구가 없고, 원본은 확인 팝업(81) 뒤 알림이 따로 없다 (R12-shop-guards.md 5절)
   return { career: equipOwned(career, part, level), notice: '' }
 }
@@ -89,7 +90,7 @@ function selectEquipment(career: PlayerCareer, part: number, level: number): Sho
   const item = equipmentItemOf(part, level)
   const blockReason = equipmentBlockReasonOf(career, part, level)
   if (blockReason === '인기도부족') {
-    return { career, notice: `인기도가 부족합니다. 필요한 인기도 : ${item.requiredPopularity}` } // StrMODE[62]
+    return { career, notice: (ORIGINAL_MODE_TEXT[62] ?? '').replace('%d', String(item.requiredPopularity)) } // StrMODE[62] 원문
   }
   if (blockReason !== null) return { career, notice: EQUIPMENT_BLOCK_TEXT[blockReason] }
   const bought = purchaseEquipment(career, part, level)
@@ -170,5 +171,8 @@ export function selectShopItem(career: PlayerCareer, itemId: string, random: Ran
   if (opensGpDetailWindow(index)) {
     return { career: result.career, notice: '', detail: { itemIndex: index, before: career, after: result.career } }
   }
-  return { career: result.career, notice: gpItemNoticeOf(index, result.lotteryPrize, result.prizeItemId) }
+  return {
+    career: result.career,
+    notice: gpItemNoticeOf(index, result.lotteryPrize, result.prizeItemId, result.career.eagleEyeGamesRemaining),
+  }
 }

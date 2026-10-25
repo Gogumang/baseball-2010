@@ -1737,7 +1737,7 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
     expect((store.load() as { subItemIds: number[] }).subItemIds).toEqual([0])
 
     act(() => result.current.actions.purchase(shopItemId('서브', 0)))
-    expect(result.current.shopNotice).toBe('이미 가지고 있는 아이템입니다')
+    expect(result.current.shopNotice).toBe('!C이미 가지고 있는!N아이템입니다')
   })
 
   it('또또상품권은 **한 번만** 굴린다 — 알림과 저장이 같은 결과다', () => {
@@ -1755,7 +1755,7 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
 
     expect(rolls).toBe(1)
     // 굴림 0 → 1등 1억 (0xd80b1 · 0xd80a7)
-    expect(result.current.shopNotice).toBe('1등 당첨!! [1억] 획득!')
+    expect(result.current.shopNotice).toBe('1등  당첨!!!N[!cFFFF001억!cFFFFFF] 획득!')
     expect(result.current.career?.money).toBe(10_000)
     expect(result.current.career?.lotteryPurchases).toBe(1)
     expect(result.current.career?.lotteryFirstPrizes).toBe(1)
@@ -1770,7 +1770,7 @@ describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
 
     act(() => result.current.actions.purchase(shopItemId('장착', 0, 9)))
 
-    expect(result.current.shopNotice).toBe('아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다')
+    expect(result.current.shopNotice).toBe('!C아직 구매할 수 없는 아이템!N입니다. 특별한 조건을 통해!N오픈됩니다')
     expect(result.current.career).toBe(before)
   })
 })
@@ -1796,7 +1796,7 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
     expect(saved.hasActedThisCycle).toBe(true)
     expect(saved.outingsThisSeason).toBe(1)
     // 126 효과 팝업이 지도 위에 뜬다 (StrMODE[25] 소지금 · [24] 사기 + 외식회원증 보정 · [195] 효과 줄)
-    expect(result.current.outingResult?.effectText).toMatch(/^!C소지금 100!cFF0000하락!cFFFFFF하였습니다!N사기 \d+\(\+4\)!c00CC00상승!cFFFFFF하였습니다!N!N!cFFFF00외식회원증 효과$/)
+    expect(result.current.outingResult?.effectText).toMatch(/^!C소지금 100 !cFF0000하락!cFFFFFF하였습니다!N사기 \d+\(\+4\) !c00CC00상승!cFFFFFF하였습니다!N!N!cFFFF00외식회원증 효과$/)
     expect(result.current.scene).toBe('외출')
 
     // [확인] → 105 (입원이 아니라 회복 글 없음)
@@ -1833,7 +1833,7 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
     act(() => result.current.actions.openOuting())
     act(() => result.current.actions.runOutingFunction('팬미팅'))
 
-    expect(result.current.outingNotice).toBe('인기도가 부족합니다. 필요한 인기도 : 600')
+    expect(result.current.outingNotice).toBe('!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 600')
     expect(result.current.career).toBe(before)
   })
 })

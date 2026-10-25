@@ -3,6 +3,7 @@ import { MarkupText } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { gameSceneTickNow, gameSceneTickOf, gameSceneTimeOf, useMarksGameScene, useMarksGameSceneLoading } from '@/shared/lib/commonWindow/commonWindow'
+import { isSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
 import { preloadSpriteScene, preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
@@ -89,8 +90,10 @@ export function LoadingTip({
     const tick = (now: number) => {
       const current = Math.max(0, gameSceneTickOf(gameSceneTimeOf(now)) - startTick)
       setUpdate(current)
+      // 장면 바로가기가 단계를 밟는 중이면(개발 · e2e 전용 — `shared/lib/scenePeek`) 기다리지 않는다. 판은 난수를 안 굴린다
+      const isFastForward = (import.meta.env.DEV || import.meta.env.MODE === 'e2e') && isSceneFastForward()
       // 칸 1 ~ 끝을 한 그림씩 그린 뒤 닫는다 — 끝(다 찬 막대)을 그린 그림 다음
-      if (current >= steps) {
+      if (current >= steps || isFastForward) {
         onDoneRef.current()
         return
       }

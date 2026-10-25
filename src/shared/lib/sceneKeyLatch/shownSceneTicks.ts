@@ -1,3 +1,5 @@
+import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
+
 /**
  * **키를 누를 때 화면에 있던 그림의 틱** — 웹판 전용 (r211).
  *
@@ -50,6 +52,19 @@ export function createShownSceneTicks(): ShownSceneTicks {
       shown = []
     },
   }
+}
+
+/**
+ * **경기 장면 그림 기록(하나뿐)** — 장면 그림과 그 위 입력 부품이 따로 선 자리를 위한 칸 (r217).
+ * 투수편 장면(`PitcherSideStage`)이 그림마다 적고, 그 위에 서는 투구 게이지(`PitchGradeGauge`) · 조준(`AimCursor`)이 키를 받은 틱을
+ * 여기서 센다 — 게이지 커서 · 조준점은 부품이 틱 시계로 올리고 그림은 장면이 그리므로, 사람이 본 것은 장면이 마지막으로 그린 그림이다.
+ * 장면이 내려가면 비운다. 기록이 없으면(장면 없이 선 부품 · 시험) 지금 틱이다
+ */
+export const gameSceneShownTicks: ShownSceneTicks = createShownSceneTicks()
+
+/** 실제 시각 `inputTime` 에 경기 장면 화면에 있던 그림의 틱(`gameSceneShownTicks`) — 기록이 없으면 지금 틱 */
+export function gameSceneTickSeenAt(inputTime: number): number {
+  return gameSceneShownTicks.tickSeenAt(inputTime, gameSceneTickNow())
 }
 
 /** 웹이 대신 쏜 키 사건(터치 버튼)의 진짜 누른 시각 — 손가락이 닿은 pointer 사건의 시각 */

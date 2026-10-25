@@ -54,13 +54,13 @@ describe('시즌 GP 상점 0xdc 종류 2 — 가드 0x98ba~0x9a00 · 효과 0xa3
   it('복권 — rand(0,10000) 이 누적표 [2,7,15,30,55,90,100] × 100 을 처음 넘는 칸, 1등 1억(+100) · 꽝은 영지버섯(사기 +40)', () => {
     const 일등 = applySeasonGpItem(레코드({ money: 0 }), 50, 0, 고정난수(0))
     expect(일등.record.money).toBe(100)
-    expect(일등.notice).toBe('!C1등 당첨!!!N[!cFFFF001억!cFFFFFF] 획득!')
+    expect(일등.notice).toBe('!C1등  당첨!!!N[!cFFFF001억!cFFFFFF] 획득!')
     const 이등 = applySeasonGpItem(레코드({ money: 0 }), 50, 0, 고정난수(0.05))
-    expect(이등.notice).toContain('2등 당첨!!!N[!cFFFF005000만')
+    expect(이등.notice).toContain('2등  당첨!!!N[!cFFFF005000만')
     const 꽝 = applySeasonGpItem(레코드({ money: 0 }), 80, 0, 고정난수(0.95))
     expect(꽝.record.money).toBe(0)
     expect(꽝.teamMorale).toBe(100)
-    expect(꽝.notice).toContain('우정상당첨!!!N[!cFFFF00영지버섯')
+    expect(꽝.notice).toContain('우정상 당첨!!!N[!cFFFF00영지버섯') // [116] 앞 빈칸(원문)
   })
 
   it('효과 — 치료(SR+5·6 = 0, 쿨다운 20) · 이글아이 +20(상한 99, 글은 늘어난 값) · 협회허가증 · 구내매점 45', () => {

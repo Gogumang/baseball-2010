@@ -66,6 +66,12 @@ export interface FielderState {
   readonly holdingBall: boolean
   /** AI 상태 (+0x84) */
   readonly aiState: number
+  /**
+   * **+0x90 — AI 0xb 의 목표점** (r214, 직접 뜸). 고르기 0xb3b38 의 담장 갈래(b3e96~b3eba)가 담장 앞 공점(aa4 − 2)의 (x, 0, z) 를
+   * 여기에만 적고 목표 +0x2c 는 안 건드린다. AI 고리 b4b5c 가 매 틱 이 점을 [sp+0x40] 에 베껴 b482e vt14(관문 — 잠금 +0xb4 · vtc8)로
+   * 목표에 적는다. 없으면 아직 안 적힌 칸이다
+   */
+  readonly pickUpPoint?: WorldPoint
   /** 진행 중인 동작의 남은 틱 (+0xc8) */
   readonly actionRemainingTicks: number
   /** 도착 틱에 더해지는 여유 (+0xcc). vtc0 = 남은 이동 틱 + 이 값 */
@@ -290,7 +296,7 @@ export function runnerTeamGradeOf(mode: number, teamGrit: number): number {
 }
 
 /**
- * 플레이 시작 때의 야수 9명 (0xb0fb4 + 0xb0f88).
+ * 플레이 시작 때의 야수 9명 (판 시작 vt20 0xb0fb4 — 0xb0f88 은 부르는 BL · 리터럴이 없는 죽은 함수다, r190 · 감사 r220).
  * 능력치는 송구 속도·악송구·펌블·필살수비 확률에만 쓰이고 **이동 속도에는 전혀 안 들어간다** (P2 1c).
  * `teamBonus` 는 `defenseTeamBonusOf` — 아홉 칸(칸 0 포함) 모두의 송구 속도에 더한다(등급 · 악송구 보정은 그대로).
  */

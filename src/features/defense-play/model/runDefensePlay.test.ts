@@ -26,6 +26,7 @@ import {
   isBallBeyondFence,
   isDefensePlayFinished,
   runDefensePlay,
+  defenseSkillIdsOf,
   startDefensePlay,
   stepDefensePlay,
 } from '@/features/defense-play/model/runDefensePlay'
@@ -1651,6 +1652,8 @@ describe('슬라이딩 효과음 10 — 사람 키 0x5199c · 자동 0x5268c', (
 })
 
 describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 0 · 내야 레이저 지우기 · 결과 코드 9', () => {
+  // r214: 사람 키(b4660 → 0xb2c90)로 고른 송구로 바꿨다. CPU 송구 결정 0xafa60 은 성공하면 afb08 에서 0xb0ea0 으로 계획(+0x14c)을
+  // 지우므로(직접 뜸) CPU 가 정한 먼 송구는 b4616 이 잇지 않는다 — 예전 시험은 CPU 송구로 이어 던지기를 기대했다(원본과 다름)
   it('외야수의 먼 송구는 중계맨이 받아 준비 틱(내야 3)이 지난 틱에 이어 던진다 (0xb3444 [0]·[4] · b4616)', () => {
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
@@ -1658,16 +1661,34 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       bases: EMPTY_BASES,
       outs: 0,
       runAbility: 500,
-      defenseIsCpu: true,
+      defenseIsCpu: false,
+      throwMode: '수동',
+      controls: { side: '수비', keyAt: (tick) => (tick === 36 ? { key: '2' } : null) },
     })
     const [첫, 둘] = 결과.log.filter((line) => line.includes('송구 —'))
 
     // 좌익수(7)가 2루로 — 거리 ≥ 17000 이라 유격수(5)가 중계한다. 첫 송구의 도착은 중계맨이 받는 틱이다
-    expect(첫).toMatch(/^41틱 2루로 송구 — \d+틱 도착 \(5번 야수 중계\) \(CPU 결정\) \(7번 야수\)$/)
+    expect(첫).toMatch(/^41틱 2루로 송구 — \d+틱 도착 \(5번 야수 중계\) \(7번 야수\)$/)
     const 받는틱 = Number(첫.split('— ')[1].split('틱')[0])
     expect(결과.throwArrivalTick).toBe(받는틱)
     // 쥐기 0xb2710 이 +0xc8 = 3 을 넣고, b4616 의 0xb2e38 은 vtC4 가 참이 되는 틱에 최종 받는 야수에게 던진다
     expect(둘).toMatch(new RegExp(`^${받는틱 + 3}틱 2루로 송구 — \\d+틱 도착 \\(중계 이어 던지기\\) \\(5번 야수\\)$`))
+  })
+
+  it('CPU 송구 결정 0xafa60 이 던진 먼 송구는 계획이 지워져(afb08 0xb0ea0) 중계맨이 이어 던지지 않는다 — 쥐기의 +0x128 로 다시 고른다', () => {
+    const 결과 = runDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([134, 670, 1552, 0]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+    })
+    const 송구 = 결과.log.filter((line) => line.includes('송구 —'))
+    expect(송구[0]).toMatch(/^41틱 2루로 송구 — \d+틱 도착 \(5번 야수 중계\) \(CPU 결정\) \(7번 야수\)$/)
+    // 주자가 없어 0xafb24 가 고를 루가 없다 — 유격수가 공을 든 채 판이 닫힌다
+    expect(송구).toHaveLength(1)
+    expect(결과.log.some((line) => line.includes('중계 이어 던지기'))).toBe(false)
   })
 
   it('던진 야수는 커버·AI 9 가 아니면 AI 0 — 시작 자리 0xd86ec 로 걸어 돌아간다 (b2df8~b2e14 · b476a)', () => {
@@ -2023,17 +2044,56 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
   })
 })
 
+describe('defenseSkillIdsOf — 수비 칸별 스킬은 능력치와 같은 칸 고르기다 (r214)', () => {
+  it('자리 코드 − 1 칸 · 겹치면 앞 선수 · 칸 0 은 니블 1(지명타자) · 빈 칸은 빈 목록', () => {
+    const skills = defenseSkillIdsOf([
+      { position: 8, skillIds: [21] },
+      { position: 8, skillIds: [5] },
+      { position: 1, skillIds: [3] },
+      { position: 0x24, skillIds: [7] },
+    ])
+    expect(skills).toHaveLength(9)
+    expect(skills[7]).toEqual([21])
+    expect(skills[0]).toEqual([3])
+    expect(skills[3]).toEqual([7])
+    expect(skills[5]).toEqual([])
+  })
+})
+
+describe('AI 0xb 담장 갈래 — 고르기 0xb3b38 은 +0x90 만 적고 목표는 AI 고리 b4b5c 가 vt14 로 적는다 (r214)', () => {
+  it('판 시작에는 목표가 그대로이고 첫 틱 AI 고리가 담장 앞 점(+0x90)을 목표로 적어 그쪽으로 걷는다', () => {
+    // 원본 코드 9 [144, 1010, 1250] — 좌익수(7)가 담장 갈래로 간다
+    const state = startDefensePlay({
+      outcome: 땅볼아웃,
+      trajectory: battedBallTrajectory([144, 1010, 1250, 0]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      defenseIsCpu: true,
+    })
+    const 처음 = state.fielders[7]
+    expect(처음.aiState).toBe(AI_STATE.PICK_UP)
+    expect(처음.pickUpPoint).toBeDefined()
+    // b3e96~b3eba 는 +0x90 만 — 목표(+0x2c)는 아직 시작 자리다
+    expect(처음.target).toEqual(FIELDER_START_POSITIONS[7])
+    stepDefensePlay(state)
+    expect(state.fielders[7].target).toEqual(처음.pickUpPoint)
+    const 거리 = (point: { x: number; z: number }) => Math.hypot(point.x - 처음.pickUpPoint!.x, point.z - 처음.pickUpPoint!.z)
+    expect(거리(state.fielders[7].position)).toBeLessThan(거리(처음.position))
+  })
+})
+
 describe('포구 틱 b4292 — 발밑 루에 주자가 서 있는 포구는 결과 코드 9 (쥐기 b42c8 앞)', () => {
   it('2루 위에서 송구를 받는 틱에 2루에 마지막으로 닿은 주자가 서 있으면 9 — 타구 포구뿐 아니라 송구 받기에도 걸린다', () => {
-    // 원본 코드 0 [90, 810, 1592]: 중견수 뜬공 아웃 뒤 2루 위의 3번 야수가 송구를 받는다
+    // 원본 코드 0 [90, 810, 1592]: 중견수 뜬공 아웃 뒤 2루 위의 3번 야수가 (유격수 중계로) 송구를 받는다.
+    // r214: CPU 송구는 계획이 지워져 중계가 안 이어지므로(afb08 0xb0ea0) 사람 키 '2' 로 고른 송구로 바꿨다. 굴림을 빼 레이저가 안 선다
     const result = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory([90, 810, 1592, 0]),
       bases: 주자1루,
       outs: 1,
-      defenseIsCpu: true,
-      throwMode: '자동',
-      random: createSeededRandom(4),
+      defenseIsCpu: false,
+      throwMode: '수동',
+      controls: { side: '수비', keyAt: (tick) => (tick === 37 ? { key: '2' } : null) },
     })
     expect(result.log).toContain('64틱 결과 코드 9 — 3번 야수가 2루 위에서 잡았지만 1번 주자가 서 있다 (b4292)')
     // 9 를 내는 틱에도 쥐기는 그대로 돈다(b42c8)

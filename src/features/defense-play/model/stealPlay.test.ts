@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
-import { RUNNER_PLAY_RESULT } from '@/features/defense-play/model/runnerPlayEngine'
+import { RUNNER_PLAY_RESULT, runRunnerPlay } from '@/features/defense-play/model/runnerPlayEngine'
 import { isStealPlayResult, runStealPlay, stealCallSoundIdOf, stealPlayEngineInputOf } from '@/features/defense-play/model/stealPlay'
 import { assignCoversForTick } from '@/entities/fielding/model/coverAssignment'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
@@ -169,5 +169,38 @@ describe('도루 판 그림 칸 — 공 가진 야수 고리(0x43cb0) · 이름 
     expect(쥔틱?.holderPlate).toEqual({ name: '이루수', positionCode: 4 })
     expect(result.ticks[0].runners[0]?.isAce).toBe(true)
     expect(result.ticks[0].runnerAceSprite).toBe(3)
+  })
+})
+
+describe('중계 이어 던지기 b4616 — 주자 판에도 있다 (r214)', () => {
+  // 3루 주자 하나 · 공은 중견수(8)가 쥐었다 — 홈까지 21705 라 0xb3444 가 내야 중계를 끼운다
+  const 판 = (cpu: boolean) => {
+    const base = stealPlayEngineInputOf({ bases: { ...EMPTY_BASES, third: true }, stealingFrom: [], outs: 0 })
+    return runRunnerPlay({
+      ...base,
+      fielders: base.fielders.map((fielder) =>
+        fielder.slot === 8
+          ? { ...fielder, holdingBall: true, actionRemainingTicks: 0 }
+          : fielder.slot === 1
+            ? { ...fielder, holdingBall: false }
+            : fielder,
+      ),
+      play: { ...base.play, ballHolderSlot: 8, catchFielderSlot: 8, held: true, wantsThrow: cpu },
+      defenseIsCpu: cpu,
+      throwMode: '수동',
+      ...(cpu ? {} : { manualThrowBase: 0 }),
+    })
+  }
+
+  it('사람 목표(b4660 → 0xb2c90)로 던진 먼 송구는 중계맨이 쥔 뒤 준비 틱(내야 3)이 지난 틱에 최종 받는 야수에게 이어 던진다', () => {
+    const 결과 = 판(false)
+    expect(결과.log).toContain('0틱 8번 야수가 0루로 송구 — 12틱 도착 (5번 야수 중계)')
+    expect(결과.log).toContain('12틱 5번 야수가 공을 쥐었다')
+    expect(결과.log.some((line) => line.startsWith('15틱 5번 야수가 0루로 송구') && line.endsWith('(중계 이어 던지기)'))).toBe(true)
+  })
+
+  it('CPU 송구 결정 0xafa60 이 던진 공은 계획이 지워져(afb08 0xb0ea0) 이어 던지지 않는다', () => {
+    const 결과 = 판(true)
+    expect(결과.log.some((line) => line.includes('중계 이어 던지기'))).toBe(false)
   })
 })

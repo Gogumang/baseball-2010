@@ -73,8 +73,9 @@ export interface DefenseScene {
    * 제어기 0xaf8e0 → vt0xc = **0xafa60(CPU 송구 결정)을 한 번** 부른다 — 수비가 사람이든 CPU 든, 투구 중(판이 열리기 전)에. 그 순간의
    * 플레이 칸은 앞 판이 끝난 그대로다: +0x128(쥐기 · 자동 진루 · 결과 메시지 · 주루 키가 1, 0xafa60 성공만 0 — 판 시작 vt1c 는 안 지운다) ·
    * +0x130(공 가진 야수) · 야수 +0xe0(쥠 — 송구 b2f80 · 튕김 b3362 · 판 시작 vt20 b1140 만 지운다) · +0xc8 · 자리 · AI(야수 틱은 상태
-   * 0x17 에서만 돈다). 진행기는 끝날 때 제 플레이 · 야수를 여기에 적고(닫힌 그림의 G1 이 열렸으면 그 목록 틱 몫까지), 공 도착 판
-   * (`pitchArrivalPlay`)이 도루 출발마다 그 상태로 0xafa60 을 돌린다(`stealPlay.stealStartThrowDecision`). 0x3e340 이 장면을 새로 열면 없다
+   * 0x17 에서만 돈다). 진행기는 끝날 때 제 플레이 · 야수를 여기에 적고(닫힌 그림의 G1 이 열렸으면 그 목록 틱 몫까지),
+   * 경기 흐름이 도루가 출발한 그 자리마다 그 상태로 0xafa60 을 돌려 여기에 다시 적는다(`pitchArrivalPlay.stealStartSceneOf`, r214).
+   * 0x3e340 이 장면을 새로 열면 없다
    */
   readonly playEnd?: PlayEndState
 }

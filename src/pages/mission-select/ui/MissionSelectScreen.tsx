@@ -21,14 +21,15 @@ import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const SLT_FRAME = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
 
 /** StrMAINMENU[60] — 잠긴 칸 OK (0x1db84~0x1dba4: 0x74ef5(…, 종류 1)) */
-const LOCKED_MISSION_TEXT = '!C오픈 되지 않은 미션입니다.!N이전 단계를 클리어해주세요'
+const LOCKED_MISSION_TEXT = ORIGINAL_MAIN_MENU_TEXT[60] ?? ''
 /** StrMAINMENU[61] — 열린 칸 OK, %s = 미션 레코드 +0x2e 이름 (0x1db34~0x1db7c: 0x74ef5(…, 종류 2)) */
-const challengeTextOf = (name: string) => `!C[!cFFFF00${name}!cFFFFFF]!N미션에 도전하시겠습니까?`
+const challengeTextOf = (name: string) => (ORIGINAL_MAIN_MENU_TEXT[61] ?? '').replace('%s', name)
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
@@ -249,11 +250,12 @@ export function MissionSelectScreen({
         width={DESCRIPTION_BOX.width} height={DESCRIPTION_BOX.height} testId="미션-설명-칸" />
       <div className={styles.descriptionText}
         style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
+        {/* 1e5e8~1e624: sprintf("%s"(0xd09bc), 레코드 +0x4e 설명) → 0xba269(45, 197, 폭 0x96, 흰 글). 잠김 0xa520d 는 이 그리기에서
+            안 본다(부르는 곳은 진입 1da6c · 키 1db26 · 격자 칸 0x7a690 뿐) — 잠긴 칸도 그 미션 설명이 그대로 나온다.
+            원문 StrMAINMENU[60] "오픈 되지 않은 미션입니다…" 은 OK 팝업(1db84)에만 쓴다 */}
         {selected === undefined
           ? <MarkupText raw={NO_MISSION_TEXT} />
-          : isLockedAt(cursor)
-            ? '오픈 되지 않은 미션입니다 이전 단계를 클리어해주세요'
-            : stripGameMarkup(selected.briefing)}
+          : stripGameMarkup(selected.briefing)}
       </div>
 
       <FrameSprite folder={IMG_TEXT} frame={REWARD_ROW.labelFrame} origins={textFrames}

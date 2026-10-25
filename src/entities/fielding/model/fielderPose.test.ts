@@ -111,8 +111,13 @@ describe('vt10 0xa124c — 0xbf2b0 목표 = 위치 (r176)', () => {
     expect(fielder.target).toEqual(fielder.position)
   })
 
-  it('웹 AI 0xb 는 목표 칸에 +0x90 을 담아 두므로 그대로 둔다 — 원본도 같은 틱 b4b5c 가 vt14(+0x90)로 되돌린다', () => {
-    const fielder = { ...걷는야수(), aiState: AI_STATE.PICK_UP }
-    expect(withPoseCleared(fielder).target).toEqual({ x: 1, y: 0, z: 2 })
+  // r214: AI 0xb 의 담장 앞 점을 +0x90(`pickUpPoint`)에 따로 두게 되어 vt10 이 AI 0xb 도 목표 = 위치로 덮는다(원본 a1252 는 AI 를 안 본다).
+  // 예전 시험은 목표 칸에 +0x90 을 담아 둔 근사라 그대로 두기를 기대했다
+  it('AI 0xb 도 목표 = 위치 — 담장 앞 점은 +0x90 에 남아 다음 AI 고리 b4b5c 가 vt14 로 다시 적는다', () => {
+    const point = { x: 1, y: 0, z: 2 }
+    const fielder = { ...걷는야수(), aiState: AI_STATE.PICK_UP, pickUpPoint: point }
+    const cleared = withPoseCleared(fielder)
+    expect(cleared.target).toEqual(fielder.position)
+    expect(cleared.pickUpPoint).toEqual(point)
   })
 })

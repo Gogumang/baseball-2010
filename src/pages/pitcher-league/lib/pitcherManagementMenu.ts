@@ -76,10 +76,19 @@ export const PITCH_WINDOW_CHOICES: readonly [string, string] = ['마구', '구�
  */
 export const PITCH_WINDOW_TABS = { 마구: 1, 구질: 2 } as const
 
-/** 팝업 글 — 휴식 둘(90 · 91)은 원문 표(`ORIGINAL_MODE_TEXT`) 그대로, 나머지는 StrMODE 번호만 맞추고 뜻만 옮겼다(⚠️ 남김) */
+/** StrMODE 글 — 알림 창(`MessageBox`)이 `!C` 를 붙여 그리므로 앞의 가운데 맞춤 표시는 뗀다 */
+const modeText = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
+
+/** 투수 능력치 이름 StrMODE[40+칸] (제구·구속·변화·체력) — 키 0x12d48 의 `adds r1,#0x28` (12ea6 · 12f80) */
+const PITCHER_ABILITY_NAME_BASE = 0x28
+
+/**
+ * 팝업 글 — 모두 원문 표(`ORIGINAL_MODE_TEXT`)에서 읽는다 (r216 화면 글 감사).
+ * 예전에는 59 · 69 · 71 · 72 · 73 · 192 · 193 을 번호만 맞추고 뜻만 옮겨 적었다.
+ */
 export const PITCHER_MANAGEMENT_TEXT = {
-  /** StrMODE[59] — 팝업 0x78 */
-  chooseItem: '원하는 항목을 선택해주세요',
+  /** StrMODE[59] — 팝업 0x78 (그리기 0x190f8) */
+  chooseItem: modeText(59),
   /**
    * StrMODE[90] — 휴식 확인 (팝업 0x2a). 105 키 0x1261c 휴식 칸(12682~126bc)이 사기 0xa3a25 == 100 이 아니면
    * `0x702b5([장면+0x144], 0x5a)` 로 이 글을 꺼내 팝업 0x2a 를 세운다 — 모드 갈래가 없어 타자편(`useManagementMenu`)과 같은 글이다
@@ -87,33 +96,50 @@ export const PITCHER_MANAGEMENT_TEXT = {
   restQuestion: ORIGINAL_MODE_TEXT[90] ?? '',
   /** StrMODE[91] — 사기가 이미 최고 (같은 칸 1269a `movs r1, #0x5b` · 팝업 1) */
   moraleAlreadyFull: ORIGINAL_MODE_TEXT[91] ?? '',
-  /** StrMODE[192] — 능력치가 한계 */
-  abilityAtLimit: '더 이상 능력치를 올릴 수 없습니다',
-  /** StrMODE[193] — 사기가 0 이라 훈련 불가 */
-  moraleEmpty: '사기가 부족하여 훈련할 수 없습니다',
-  /** StrMODE[69] — 123 창에서 이미 쓰는 마구를 또 고름 */
-  magicAlreadyInUse: '현재 사용 중인 스킬입니다',
-  /** StrMODE[71] — 아직 배우지 않은 마구 칸 */
-  magicNeedsTraining: '트레이닝 완료 후 사용할 수 있습니다',
-  /** StrMODE[72] — 이미 쓰는 구질 */
-  pitchAlreadyInUse: '현재 사용 중인 구질입니다',
-  /** StrMODE[73] — 구질 고르기 확인 */
-  pitchUseQuestion: '해당 구질을 사용하시겠습니까?',
+  /** StrMODE[193] — 사기가 0 이라 훈련 불가 (키 0x12d48: 12d90 `0xa3a25 == 0` → 12da2 `movs r1,#0xc1`) */
+  moraleEmpty: modeText(193),
+  /** StrMODE[69] — 123 창에서 이미 쓰는 마구를 또 고름 (키 0x17cec) */
+  magicAlreadyInUse: modeText(69),
+  /** StrMODE[71] — 아직 배우지 않은 마구 · 구질 칸 (키 0x17cec · 0x17df8) */
+  magicNeedsTraining: modeText(71),
+  /** StrMODE[72] — 이미 쓰는 구질 (키 0x17df8) */
+  pitchAlreadyInUse: modeText(72),
+  /** StrMODE[73] — 구질 고르기 확인 (키 0x17df8) */
+  pitchUseQuestion: modeText(73),
+  /** StrMODE[63] — 마구를 다 배웠다 (108 창 0x17828 과 같은 글) */
+  magicAllTrained: modeText(63),
+  /** StrMODE[65] — G포인트가 모자란다 */
+  gamePointShortage: modeText(65),
   /** ⚠️ 웹판 문구 — 원본에는 없다. 아직 옮기지 않은 화면을 고른 자리 */
   notPorted: '아직 옮기지 않은 화면입니다',
 } as const
 
-/** StrMODE[70] "[%s] 을 사용하시겠습니까?" — 123 창의 마구 고르기 확인 (0x17cec) */
+/** StrMODE[40+칸] — 투수 능력치 이름 (칸 0 제구 · 1 구속 · 2 변화 · 3 체력) */
+export function pitcherAbilityTextOf(slot: number): string {
+  return ORIGINAL_MODE_TEXT[PITCHER_ABILITY_NAME_BASE + slot] ?? ''
+}
+
+/**
+ * StrMODE[192] "[%s] 능력치가 최대입니다" — 키 0x12d48 이 `b6414(선수, 칸, 0)` ≥ 한계면
+ * 12ef2 `0x702b5(…, 0xc0)` 에 %s = StrMODE[0x28 + 칸](12f0a~12f10, 타자는 0x23 + 칸) 을 끼워 sprintf 한다 (0x1400468)
+ */
+export function abilityAtLimitTextOf(slot: number): string {
+  return modeText(192).replace('%s', pitcherAbilityTextOf(slot))
+}
+
+/** StrMODE[62] "인기도가 부족합니다. 필요한 인기도 : %d" */
+export function popularityShortageTextOf(required: number): string {
+  return modeText(62).replace('%d', String(required))
+}
+
+/** StrMODE[70] "[%s] 을 사용하시겠습니까?" — 123 창의 마구 고르기 확인 (0x17cec), %s = 마구 이름 */
 export function useQuestionOf(name: string): string {
-  return `[${name}] 을 사용하시겠습니까?`
+  return modeText(70).replace('%s', name)
 }
 
-/** StrMODE[85] "[%s훈련]을 하시겠습니까?" (0x12e40) */
-export function trainingQuestionOf(menuName: string): string {
-  return `[${menuName}훈련]을 하시겠습니까?`
-}
-
-/** 훈련 결과 글 — StrMODE[40+칸](투수 능력치 이름) + " " + 수치 + " " + StrMODE[83] (G 2절) */
-export function trainingResultOf(abilityName: string, gain: number): string {
-  return `${abilityName} ${gain} 상승하였습니다`
+/**
+ * StrMODE[85] "[%s훈련]을 하시겠습니까?" — 키 0x12d48 12f28~12f82: %s = StrMODE[0x28 + 칸](투수 · 타자는 0x23 + 칸)
+ */
+export function trainingQuestionOf(slot: number): string {
+  return modeText(85).replace('%s', pitcherAbilityTextOf(slot))
 }

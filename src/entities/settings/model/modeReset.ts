@@ -53,6 +53,8 @@
  * 경기진행 설정(+0x12c+1)·창 본 표시(+0x11e)는 원본에서 이 함수가 안 건드리는 전역 칸이라 시즌 초기화 뒤에도 남긴다
  * (`useSeasonSession.resetSeason`).
  */
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+
 export type ModeResetTarget = 'career-batter' | 'career-pitcher' | 'season' | 'edit'
 
 /** 나만의리그 칸 고르기 창 0xcf848 의 두 편 — 답 0 타자편 · 1 투수편 */
@@ -66,15 +68,13 @@ export const MODE_RESET_TEXT = {
   /** 0xcf848 — 나만의리그 칸 고르기 창 */
   careerChoose: '!C!cffffff초기화할 데이터를 선택하세요',
   /** StrMAINMENU[210] */
-  careerBatterConfirm:
-    '!C!cFFFFFF나만의 리그 타자편!N초기화를 하시겠습니까?!N(!cFF0000G포인트 아이템도!N함께 삭제됩니다!cFFFFFF)',
+  careerBatterConfirm: ORIGINAL_MAIN_MENU_TEXT[210] ?? '',
   /** StrMAINMENU[211] */
-  careerPitcherConfirm:
-    '!C!cFFFFFF나만의 리그 투수편!N초기화를 하시겠습니까?!N(!cFF0000G포인트 아이템도!N함께 삭제됩니다!cFFFFFF)',
+  careerPitcherConfirm: ORIGINAL_MAIN_MENU_TEXT[211] ?? '',
   /** StrMAINMENU[212] — 타자편 막기 */
-  blockedReset: '!C!cFFFFFF시즌모드 경기 진행 중에는!N초기화 하실 수 없습니다',
+  blockedReset: ORIGINAL_MAIN_MENU_TEXT[212] ?? '',
   /** StrMAINMENU[213] — 투수편 막기가 이 글을 띄운다(원본 버그) */
-  blockedDelete: '!C!cFFFFFF시즌모드 경기 진행 중에는!N삭제 하실 수 없습니다',
+  blockedDelete: ORIGINAL_MAIN_MENU_TEXT[213] ?? '',
 } as const
 
 /**

@@ -79,7 +79,8 @@ import {
   awardTitles, equipTitle, gameResultTitleOf, nationalCupStandingsTitleOf, nextTitleOf,
 } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/career/model/training'
-import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
+import { restResultTextOf, trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
+import { BATTING_TYPE_NAMES } from '@/pages/management/lib/basicInfoLayout'
 import {
   outingBlockReasonOf,
   outingBlockTextOf,
@@ -173,6 +174,7 @@ import {
   nariCupRecordOf,
   nextNariCupDayTeams,
   prepareNariCupMatch,
+  recordNariCupGame,
 } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
@@ -1001,7 +1003,17 @@ export function useCareerSession({
           nationalCup: next,
           ...(current.nariCupTeams === undefined
             ? {}
-            : { nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) }),
+            : {
+              // 대표팀 칸(+0xbc4)에 남는 것 먼저 — +2 사기는 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값, 상대 칸
+              // 덮기와 같은 공이라 `opponentRecordMorale` 과 같은 때). 실책 +0x2e 는 타자편 수비 그림이 상대 야수뿐이라 대표팀 몫이 없다
+              nariCupTeams: nextNariCupDayTeams(
+                recordNariCupGame(current.nariCupTeams, {
+                  morale: finished.opponentRecordMorale ?? finished.teamMorale,
+                  errors: summary.leagueErrors,
+                }),
+                nationalCupMatchupOf(next)?.opponent ?? null,
+              ),
+            }),
         })
       // 0x4ec82 `0x22c7d(G, 모드 4)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointReward })
@@ -1614,12 +1626,13 @@ export function useCareerSession({
 
     /**
      * 도루 출발 (원본 키 '3' 1루 · '2' 2루 · '1' 3루 주자 → `0x53610` → 0x583 → `0xa9bd4`).
-     * 주자를 출발만 시킨다 — 판정은 공이 도착할 때 도루 판(종류 5)이 한다 (`arrivePitch`). 난수·소리 없음.
+     * 주자를 출발시키고 같은 메시지의 CPU 송구 결정 0xafa60 을 한 번 돌린다(앞 판 수비가 공을 쥐었을 때만 굴림 — `startSteal`).
+     * 판정은 공이 도착할 때 도루 판(종류 5)이 한다 (`arrivePitch`). 소리 없음.
      */
     stealBase: (base: StealBase) => {
       const current = progressRef.current
       if (current === null) return
-      const next = startSteal(current, base)
+      const next = startSteal(current, base, random)
       if (next === current) return
       progressRef.current = next
       setProgress(next)
@@ -1869,11 +1882,11 @@ export function useCareerSession({
         // 굴림 · 결과 창 · 저장이 연출 뒤라서다(연출에는 난수가 없어 굴림 차례는 그대로다)
         const rest = runRest(career, random)
         setCareer(rest.career)
-        // StrMODE[24] "사기" + " " + 수치 + [83] (0x18e3c)
+        // StrMODE[24] "사기" + " " + 수치 + [83] (0x18e3c — 원문 표, 색 마크업 그대로)
         return setManagementDetail({
           before: career,
           after: rest.career,
-          messages: [`사기 ${rest.moraleGain} 상승하였습니다`],
+          messages: [restResultTextOf(rest.moraleGain)],
           // 변화량 칸은 굴린 회복값 그대로 — 100 에서 잘리기 전 [sp+0x10] (0x18fb4)
           changes: restDetailChangesOf(rest.moraleGain),
           afterClose: { kind: '휴식' },
@@ -2102,12 +2115,12 @@ export function useCareerSession({
         recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: specialSwingCostOf(career) })
         // 알림 창이 닫히면 125 틀 0x18dd8 이 105 로 — 그 105 진입(`dismissManagementNotice`)
         specialSwingNoticeRef.current = true
-        return setManagementNotice(trainingOutcomeLinesOf(outcome).join('!N'))
+        return setManagementNotice(trainingOutcomeLinesOf(outcome, BATTING_TYPE_NAMES[career.battingTypeIndex]).join('!N'))
       }
       setManagementDetail({
         before: career,
         after: trained,
-        messages: trainingOutcomeLinesOf(outcome),
+        messages: trainingOutcomeLinesOf(outcome, BATTING_TYPE_NAMES[career.battingTypeIndex]),
         // 변화량 칸은 굴린 값 그대로 — 훈련 칸 [sp+0x34] · 사기 칸 −[sp+0x38] (0x18d0e~0x18d38)
         changes,
         // 이 창은 칸 0~3 에서만 뜬다 — 0x1b4c4 가 보는 칸은 4 가 아니다

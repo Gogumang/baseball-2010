@@ -3,6 +3,7 @@ import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen } from '@/shared/ui'
 import { InputModeBox, inputModeLayoutOf } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   DEFAULT_ROOKIE_PROFILE, DEFAULT_TEAM_ID, MAXIMUM_NAME_BYTES, nameByteLengthOf, rookieAbilityOf,
@@ -19,7 +20,7 @@ import { CardPlate } from '@/pages/management/ui/CardPlate'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import {
-  ARROW, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, HINT_BOX, INFO_CELLS,
+  ARROW, arrowTopLeftOf, CHOICES, CURSOR_COLOR, FIGURE_POSE_FRAME, INFO_CELLS,
   INFO_FRAME, ROOKIE_BATTING_ORDER, ROW_HINTS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
 } from '@/pages/create-player/lib/createPlayerLayout'
 import type { CreatePlayerRowId, InfoCellId } from '@/pages/create-player/lib/createPlayerLayout'
@@ -248,9 +249,9 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
         </>
       )}
 
-      <div className={styles.hint} style={{ left: HINT_BOX.x, top: HINT_BOX.y, width: HINT_BOX.width }}>
-        {ROW_HINTS[selectedId]}
-      </div>
+      {/* 안내 띠 — 그리기 0x15f34 161f4~162a6: 점프표 0xcc6d8(고른 줄) 로 StrMODE 번호를 골라 0x55544(띠 [장면+0xd8], 글) 를 부른다.
+          투수 등록과 같은 흐르는 설명 띠다. 줄이 바뀌면 다시 편다 */}
+      <DescriptionBand text={ROW_HINTS[selectedId] ?? ''} seed={selectedRow} />
 
       {/*
         머리띠 · 바닥 — 그리기 0x15f34 머리(15f40)의 0x7f4ed. 칸은 나리 틀 0x16928 기본 갈래(0x169ea): 0x66 은 제목 [장면+0xcc] == 4 ? 8 : 9

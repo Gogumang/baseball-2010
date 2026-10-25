@@ -30,7 +30,6 @@ export interface SeasonItemMenuEntry {
   readonly windowKind: ItemWindowKind
   /** 이 칸이 가는 장면 상태 */
   readonly target: SeasonSceneState
-  readonly description: string
 }
 
 /** 아이템 메뉴 칸 — 키 0x4da4 · 0xdc 들어옴 0x5f3c 의 칸 차례 그대로 */
@@ -40,24 +39,20 @@ export const SEASON_ITEM_MENU: readonly SeasonItemMenuEntry[] = [
     windowKind: ITEM_WINDOW_KIND.장비,
     // 칸 0 만 선수를 먼저 고른다 (this+0x110 = 1 → 0xdf, 취소하면 0xd0 으로 — P4 5절)
     target: SEASON_SCENE_STATE.선수고르기,
-    description: '일반 선수를 골라 장비를 사서 장착한다',
   },
   {
     label: '구장아이템',
     windowKind: ITEM_WINDOW_KIND.구장아이템,
     target: SEASON_SCENE_STATE.아이템상점,
-    description: '관중석·전광판·잔디를 산다 (교체는 구단관리 → 구장관리)',
   },
   {
     label: '서브아이템',
     windowKind: ITEM_WINDOW_KIND.서브아이템,
     target: SEASON_SCENE_STATE.아이템상점,
-    description: '트레이닝·외출 서브 아이템 (가격표 0xcc430)',
   },
   {
     label: 'GP아이템',
     windowKind: ITEM_WINDOW_KIND.GP아이템,
     target: SEASON_SCENE_STATE.아이템상점,
-    description: 'G포인트로 사는 아이템 (효과표 0xa310c)',
   },
 ]

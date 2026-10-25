@@ -73,11 +73,8 @@ export function moneyTextOf(value: number): string {
   return rest === 0 ? `${eok}억` : `${eok}억${String(rest).padStart(3, '0')}`
 }
 
-/**
- * StrMODE[167] 원문 "트레이드 비용 : " — 끝에 빈칸이 하나 있다(`base/extracted/StrMODE.json`). 생성된 `modeText` 는 끝 빈칸을
- * 잘라 두어 그 빈칸을 되붙인다.
- */
-const COST_LABEL = `${(ORIGINAL_MODE_TEXT[167] ?? '').trimEnd()} `
+/** StrMODE[167] 원문 "트레이드 비용 : " — 끝에 빈칸이 하나 있다(생성 표가 원문 그대로 둔다, r223) */
+const COST_LABEL = ORIGINAL_MODE_TEXT[167] ?? ''
 
 /** 비용 글 — StrMODE[167] + 부호 + 0x55cf5(|d| × 100) */
 export function tradeCostTextOf(myGrade: number, opponentGrade: number): string {

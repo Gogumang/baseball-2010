@@ -1,4 +1,5 @@
 import { BALANCE } from '@/shared/config/original/balance'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { PITCHER_BURSTS } from '@/shared/config/original/bursts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
@@ -14,6 +15,15 @@ import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { PITCHER_TYPE_BONUS_ABILITY } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { subItemMoraleRelief, subItemSlotTrainingBonus } from '@/entities/career/model/subItems'
+import {
+  abilityTrainingBonusLinesOf,
+  pitchTrainingHeadTextOf,
+  specialTrainingHeadTextOf,
+  specialTrainingTailLinesOf,
+  trainingMoraleAdjustmentOf,
+  trainingMoraleLossTextOf,
+} from '@/entities/career/model/trainingText'
+import type { TrainingModifiers } from '@/entities/career/model/trainingText'
 import { applyPitchTypeTraining } from '@/entities/pitcher-career/model/pitchTraining'
 import type { PitchTrainingProgress } from '@/entities/pitcher-career/model/pitchTraining'
 
@@ -174,6 +184,10 @@ export interface PitcherTrainingOutcome {
    */
   readonly rolledGain: number
   readonly rolledMoraleLoss: number
+  /** 사기 보정을 낸 것 — 결과 글의 "(±n)" 괄호와 보정 줄 (0x17f5c [sp+0xf8] · [sp+0x28]) */
+  readonly modifiers: TrainingModifiers
+  /** 훈련 칸 k 의 서브 아이템(+2)을 가졌는가 (0x187f6) */
+  readonly hasSubItemBonus: boolean
   readonly magic: PitcherMagicProgress | null
   readonly career: PitcherCareer
 }
@@ -199,13 +213,12 @@ export function runPitcherTraining(
  * 굴린 사기 감소에 병아리 −1 · 몹쓸몸 +2 · 자동안마기(서브 4, `기록+0x5c`) −1 ([sp+0xf8]) 을 더한다.
  * 자동안마기는 능력치 갈래 0x188cc · 필살/마구 갈래 0x18036 모두 모드 갈림 없이 본다.
  */
-function moraleLossOf(career: PitcherCareer, rolledMoraleLoss: number): number {
-  return (
-    rolledMoraleLoss -
-    (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
-    (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
-    subItemMoraleRelief(career)
-  )
+function trainingModifiersOf(career: PitcherCareer): TrainingModifiers {
+  return {
+    rookie: isPitcherSkillEquipped(career, ROOKIE_SKILL),
+    weakBody: isPitcherSkillEquipped(career, WEAK_BODY_SKILL),
+    massage: subItemMoraleRelief(career) > 0,
+  }
 }
 
 function runAbilityTraining(
@@ -224,7 +237,8 @@ function runAbilityTraining(
   // 서브 아이템 0~3 은 훈련 칸 k 로 `기록[0x58+k]` 를 본다 (0x187f6, 모드 공용) — 표적판 = 제구 … 하드타이어 = 체력
   const subItemGain = subItemSlotTrainingBonus(career, slot)
   const gains: Partial<PitcherAbility> = { [ability]: rolled + typeBonus + skillGain + subItemGain }
-  const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
+  const modifiers = trainingModifiersOf(career)
+  const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
   const spent = spendPitcherCycleAction(gainPitcherMorale(career, -moraleLoss))
   return {
     menuId: menu.id,
@@ -233,6 +247,8 @@ function runAbilityTraining(
     moraleLoss,
     rolledGain: rolled,
     rolledMoraleLoss,
+    modifiers,
+    hasSubItemBonus: subItemGain > 0,
     magic: null,
     career: countReleaseTrainingStreak(countPitcherTraining(gainPitcherAbility(spent, gains), menu.id), slot),
   }
@@ -248,7 +264,8 @@ function runMagicTraining(
   const sessions = career.magicSessions + 1
   const isLevelUp = sessions >= required
   const rolledMoraleLoss = roll(random, MAGIC_MORALE_RANGE)
-  const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
+  const modifiers = trainingModifiersOf(career)
+  const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
   const spent = spendPitcherCycleAction(gainPitcherMorale(career, -moraleLoss))
   const trained: PitcherCareer = {
     ...spent,
@@ -267,6 +284,8 @@ function runMagicTraining(
     moraleLoss,
     rolledGain: 0,
     rolledMoraleLoss,
+    modifiers,
+    hasSubItemBonus: false,
     magic: {
       sessions, required, isLevelUp,
       name: PITCHER_BURSTS[number - 1 + (number === 4 ? career.typeIndex : 0)] ?? '',
@@ -286,6 +305,8 @@ const MAGIC_TRAINING_SLOT = 4
 export interface PitchTypeTrainingOutcome {
   readonly progress: PitchTrainingProgress
   readonly rolledMoraleLoss: number
+  /** 사기 보정 — 0x18384~0x183d0 (괄호 "(±n)" 와 효과 줄) */
+  readonly modifiers: TrainingModifiers
   readonly moraleLoss: number
   readonly career: PitcherCareer
 }
@@ -309,39 +330,62 @@ export function runPitchTypeTraining(
   random: RandomPort,
 ): PitchTypeTrainingOutcome {
   const rolledMoraleLoss = roll(random, PITCH_TYPE_MORALE_RANGE)
-  const moraleLoss = moraleLossOf(career, rolledMoraleLoss)
+  const modifiers = trainingModifiersOf(career)
+  const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
   const applied = applyPitchTypeTraining(career, row, column)
   const trained = spendPitcherCycleAction(gainPitcherMorale(applied.career, -moraleLoss))
   return {
     progress: applied.progress,
     rolledMoraleLoss,
+    modifiers,
     moraleLoss,
     career: countReleaseTrainingStreak(countPitcherTraining(trained, MAGIC_TRAINING_MENU.id), MAGIC_TRAINING_SLOT),
   }
 }
 
 /**
- * 구질 훈련 알림 글 (0x18474~0x1858c) — 첫 줄 StrMODE[88] "구질 훈련 완료!" / [89] "해당 구질 %d/%d회 훈련", 다음 줄 사기.
- * ⚠️ 원본은 그 뒤에 병아리 · 몹쓸몸 · 자동안마기 "효과" 줄(0x185a8~0x186c2 — 이름 표 [0x1552cf8] 0x37 · 0x3a · 0x845d5)을
- *    붙이는데 그 줄과 색 표시는 옮기지 않았다 — 타자편 `trainingOutcomeLinesOf` 와 같은 근사 글이다.
+ * 구질 훈련 알림 글 (0x18474~0x186c2) — 첫 줄 StrMODE[88] "구질 훈련 완료!" / [89] "해당 구질 %d/%d회 훈련",
+ * 다음 줄 사기(보정이 있으면 "(±n)"), 그 뒤 "!N" 과 병아리 · 몹쓸몸 · 자동안마기 효과 줄(0x185a8~0x186c2). 모두 원문 표에서 읽는다.
  */
 export function pitchTypeTrainingLinesOf(outcome: PitchTypeTrainingOutcome): string[] {
-  const head = outcome.progress.isLearned
-    ? ['구질 훈련 완료!', '[선수정보]에서 사용 여부 변경 가능']
-    : [`해당 구질 ${outcome.progress.sessions}/${outcome.progress.required}회 훈련`]
-  return [...head, `사기 -${outcome.moraleLoss}`]
+  const { isLearned, sessions, required } = outcome.progress
+  return [
+    pitchTrainingHeadTextOf(isLearned, sessions, required),
+    trainingMoraleLossTextOf(outcome.moraleLoss, outcome.modifiers),
+    ...specialTrainingTailLinesOf(outcome.modifiers),
+  ]
 }
 
 /**
- * 마구 훈련 알림 글 — 0x17f5c 칸 4 갈래(모드 3)는 타자편 필살타법과 같은 줄이다(0x18116~0x181c6): 마구 이름 StrCOMMON[0x1e + n] 으로
+ * 마구 훈련 알림 글 — 0x17f5c 칸 4 갈래(모드 3)는 타자편 필살타법과 같은 줄이다(0x18116~0x18368): 마구 이름 StrCOMMON[0x1e + n] 으로
  * 훈련 완료면 이름 + StrMODE[87] " 훈련 완료!!N[선수정보]에서 사용!N여부 변경 가능", 아니면 [86] "[이름] %d/%d회 훈련",
- * 다음 줄 사기. 타자편 `trainingOutcomeLinesOf` 와 같은 근사 줄 나눔이다(효과 줄 · 색은 옮기지 않았다).
+ * 다음 줄 사기 StrMODE[24] + 감소 + "(±보정)" + [84], 그 뒤 효과 줄 — 모두 원문 표에서 읽는다.
  */
-export function magicTrainingLinesOf(magic: PitcherMagicProgress, moraleLoss: number): string[] {
-  const head = magic.isLevelUp
-    ? [`${magic.name} 훈련 완료!`, '[선수정보]에서 사용 여부 변경 가능']
-    : [`[${magic.name}] ${magic.sessions}/${magic.required}회 훈련`]
-  return [...head, `사기 -${moraleLoss}`]
+export function magicTrainingLinesOf(magic: PitcherMagicProgress, outcome: Pick<PitcherTrainingOutcome, 'moraleLoss' | 'modifiers'>): string[] {
+  return [
+    specialTrainingHeadTextOf(magic.name, magic.isLevelUp, magic.sessions, magic.required),
+    trainingMoraleLossTextOf(outcome.moraleLoss, outcome.modifiers),
+    ...specialTrainingTailLinesOf(outcome.modifiers),
+  ]
+}
+
+/** 투수 능력치 이름 StrMODE[0x28 + k] (0x188a4) */
+const PITCHER_ABILITY_NAME_BASE = 0x28
+
+/**
+ * 투수편 능력치 훈련(칸 0~3) 결과 창 글 — 타자편과 같은 0x17f5c 186c4~18a58: 보정 줄만 남는다(`abilityTrainingBonusLinesOf`).
+ * 타입 이름은 0x1400080[2 + 타입](0x187be), 서브 아이템 줄의 능력치 이름은 StrMODE[0x28 + k].
+ * 상승 수치 줄은 원본 글에 없다(결과 창의 능력치 행이 보인다).
+ */
+export function pitcherAbilityTrainingLinesOf(outcome: PitcherTrainingOutcome, typeIndex: number): string[] {
+  const [ability] = Object.keys(outcome.gains) as (keyof PitcherAbility)[]
+  const slot = ability === undefined ? -1 : PITCHER_ABILITY_ORDER.indexOf(ability)
+  return abilityTrainingBonusLinesOf({
+    typeName: outcome.typeBonus > 0 ? (PITCHER_TYPE_NAMES[typeIndex] ?? '') : null,
+    subItemSlot: outcome.hasSubItemBonus && slot >= 0 ? slot : null,
+    abilityName: ORIGINAL_MODE_TEXT[PITCHER_ABILITY_NAME_BASE + slot] ?? '',
+    modifiers: outcome.modifiers,
+  })
 }
 
 /** 몹쓸몸 · 유리몸 보유 비트 — 투수 비트 0~7 은 타자와 같은 공통 스킬이다(2 먹튀 · 5 무력감과 같은 짝) */

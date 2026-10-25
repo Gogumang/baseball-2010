@@ -66,7 +66,7 @@ describe('투수편 외출 (모드 3 — 타자편과 같은 코드)', () => {
 
   it('가드 순서·알림은 원본 0x16cf0 그대로 — 인기도 [62] → 소지금 [77] → 건강 [196] → 사기 [91]', () => {
     expect(outingBlockReasonOf(투수({ popularity: 599 }), 기능('팬미팅'))).toBe('인기도부족')
-    expect(outingBlockTextOf('인기도부족', 기능('팬미팅'))).toBe('인기도가 부족합니다. 필요한 인기도 : 600')
+    expect(outingBlockTextOf('인기도부족', 기능('팬미팅'))).toBe('!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 600')
     expect(outingBlockReasonOf(투수({ money: 0 }), 기능('외식'))).toBe('소지금부족')
     expect(outingBlockReasonOf(투수(), 기능('입원'))).toBe('건강함')
     expect(outingBlockReasonOf(투수({ morale: 100 }), 기능('외식'))).toBe('사기최고')

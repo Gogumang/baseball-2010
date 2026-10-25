@@ -2,6 +2,7 @@ import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { MutableRefObject } from 'react'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { acePitcherFramesOf } from '@/widgets/batting-stage/model/stageRefs'
@@ -11,7 +12,7 @@ import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/st
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
-import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
@@ -206,12 +207,13 @@ export function GameScreen({
   const stealableBases = onSteal === undefined ? [] : stealableBasesOf(progress)
   /** 타석 화면이 채우는 "공이 나는 동안(상태 0x11)인가" — 원본 도루 키 0x53610 은 이때만 받는다 */
   const flightProbeRef = useRef<(() => boolean) | null>(null)
-  const stealIfFlying = (base: StealBase) => {
+  /** `event` — 누름 칸의 사건(닿은 시각이 붙어 있다 — `PressArea`). 키는 창 잡기 단계가 이미 사건 시각으로 칸을 넣었다 */
+  const stealIfFlying = (base: StealBase, event?: Event) => {
     // 도루 키는 장면 키 칸에 든다 — 다음 틀의 키 0x498d4 → 0x53670 → 0x53610 이 그 틀의 상태(0x11)를 보고 출발시킨다
     pushSceneKey(() => {
       if (flightProbeRef.current?.() !== true) return
       onSteal?.(base)
-    })
+    }, 'press', event === undefined ? undefined : inputTimeOf(event))
   }
 
   const isBenchClearing = progress.pendingBenchClearing !== null
@@ -243,6 +245,8 @@ export function GameScreen({
     (scene) => emitSubstitutionEntryParticle(scene.entryKind),
   )
   const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)
+  // 단말 일시정지 0x463ac — '*' 가 열리는 때(벤치 클리어링 · 1회초 판 밖)이고 하위 창이 없으면 같은 메뉴를 연다
+  useInGameMenuOpenOnHide(menu, !isBenchClearing && !isHalfInningBoardOpen && overlay === null)
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -498,7 +502,7 @@ export function GameScreen({
         )}
         {!sceneConfirm.isAwaiting && !isMenuOpen &&
           stealableBases.map((base) => (
-            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
+            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={(event) => stealIfFlying(base, event)} />
           ))}
         <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.pressStar} />
 

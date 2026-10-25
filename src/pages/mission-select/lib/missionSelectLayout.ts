@@ -10,6 +10,7 @@
  * 그때 인자 이름을 잘못 읽은 것). 왼쪽 x 는 `cx − (Σ칸너비 + (열−1)·가로틈)/2` 로 가운데를 맞춘다.
  */
 import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const SCREEN_WIDTH = 240
 
@@ -103,7 +104,7 @@ export const GRADE_MARKS = { image: 0x26, x: SCREEN_WIDTH / 2 + (169 >> 1) - 0x2
 export const EVENT_MISSION_TITLE = '이벤트 미션'
 
 /** 같은 때의 설명 StrMAINMENU[57] (45, 197, 폭 0x96, 흰 글) — 0x702b5(…, 0x39) → 0xba269 호출 1e302. 0x0a(!N)에서 줄을 끊는다 */
-export const NO_MISSION_TEXT = '미션이 존재하지 않습니다!N[!cFFFF00미션다운!cFFFFFF] 메뉴를 통해서!N등록해주세요'
+export const NO_MISSION_TEXT = ORIGINAL_MAIN_MENU_TEXT[57] ?? ''
 
 /**
  * 미션 고르기 격자 [this+0x70] 의 꼴 — 장면 진입 0x1d9a4 가 `new` → 0x6c219(vtable 0xd2ea0) 뒤
@@ -130,7 +131,7 @@ export const EVENT_MISSION_WINDOW = {
   openStartHeight: 6,
   /** StrMAINMENU[56] — (W/2 − 0x58, H/2 − 0x23, 폭 0xb0) */
   text: {
-    raw: '!C!cFFFFFF어떤 메뉴를 실행하시!N겠습니까? [!cFFFF00미션다운!cFFFFFF] 시!N소량의 통화료가 부과됩니다',
+    raw: ORIGINAL_MAIN_MENU_TEXT[56] ?? '',
     x: SCREEN_WIDTH / 2 - 0x58, y: 320 / 2 - 0x23, width: 0xb0,
   },
   /** 0xcd6f0 / 고름 0xcd718 — (W/2 − 0x50, H/2 + 0x14, 폭 0x50) */

@@ -280,6 +280,18 @@ export function markGameSceneLoading(): () => void {
   }
 }
 
+/**
+ * **단말 일시정지가 창이 선 첫 그림을 다시 세운다** — 앱 일시정지 0x2da0 이 장면 vt+0x18(경기 장면 0x463ac 463c0~463ca 도
+ * [창+0x250] = 1) 뒤 0x74458([0x140005c])을 부른다: [+0x24d] = 1 · [+0x250] = 1 · [+0x24e] = [+0x24f] (7445a~74472, 직접 뜸 r215).
+ * 경기 장면에 창이 서 있으면(52efe) 다음 그림이 장면 · 배경을 한 번 더 그린다 — 창이 처음 선 그림과 같다. 창이 없으면 52efe 가
+ * [+9] 를 먼저 봐 아무 일 없다. 웹은 멈춤 셈을 한 번 더 올린다(`createGameSceneDrawGate` · `gameSceneFreezeSerialNow`).
+ */
+export function rearmGameSceneFirstDraw(): void {
+  if (frozenSince === null) return
+  freezeSerial += 1
+  if (loadingScenesUp === 0) backdropFreezeSerial += 1
+}
+
 export interface GameSceneDrawGate {
   readonly allowsDraw: () => boolean
 }

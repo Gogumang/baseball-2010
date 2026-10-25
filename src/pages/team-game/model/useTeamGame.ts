@@ -365,8 +365,8 @@ export function useTeamGame(
       cancelSubstitution: () => step((current) => cancelSubstitution(current)),
       // 코스 고르기(0x10)의 CLR → 0xf (0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
       returnToPitchSelection: () => step((current) => returnToPitchSelection(current, random)),
-      // 도루 출발 — 주자를 출발만 시킨다(난수·소리 없음). 판정은 공이 도착할 때 도루 판(종류 5)이 한다
-      steal: (base: StealBase) => step((current) => startSteal(current, base)),
+      // 도루 출발 — 주자를 출발시키고 0x583 의 CPU 송구 결정 0xafa60 한 번(앞 판 수비가 공을 쥐었을 때만 굴림). 판정은 공이 도착할 때 도루 판(종류 5)이 한다
+      steal: (base: StealBase) => step((current) => startSteal(current, base, random)),
       autoProgress: () => {
         // 3c94a 0xc0ea8(sim, 0) — sim+0x9f = 0 을 전역기록 +0x14d + m 에도 쓴다
         const after = step((current) => runAutoProgress(current, random))

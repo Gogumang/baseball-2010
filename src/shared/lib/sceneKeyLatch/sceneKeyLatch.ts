@@ -221,11 +221,14 @@ export function openSceneKeyLatch(latch: SceneKeyLatch): () => void {
   }
 }
 
-/** 화면이 받은 장면 키 — 지금 올라 있는 장면 부품의 칸에 넣는다(없으면 바로 처리) */
-export function pushSceneKey(apply: SceneKeyApply, kind: SceneKeyKind = 'press'): void {
+/**
+ * 화면이 받은 장면 키 — 지금 올라 있는 장면 부품의 칸에 넣는다(없으면 바로 처리). `inputTime` 은 누름 칸(`PressArea`)이 넘기는
+ * 사건 시각(`inputTimeOf`) — 키 사건은 창 잡기 단계가 이미 그 시각으로 칸을 넣어 두었다(`armSlot`)
+ */
+export function pushSceneKey(apply: SceneKeyApply, kind: SceneKeyKind = 'press', inputTime?: number): void {
   const owner = owners[owners.length - 1]
   if (owner === undefined) apply(gameSceneTickNow())
-  else owner.push(apply, kind)
+  else owner.push(apply, kind, inputTime)
 }
 
 /** 시험용 — 올린 칸을 다 내린다 */

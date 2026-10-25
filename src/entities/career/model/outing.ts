@@ -64,17 +64,17 @@ export function outingBlockReasonOf(
   return null
 }
 
-/** 막힘 알림 원문 — StrMODE[62] · [77] · [196] · [91] (색 표식 `!C`·`!N`·`!c…` 은 뺐다), 이미 행동함은 r_event_txt[176] */
+/** 막힘 알림 원문 — StrMODE[62] · [77] · [196] · [91] 을 원문 표에서 마크업째 읽는다(r216), 이미 행동함은 r_event_txt[176] */
 export function outingBlockTextOf(reason: OutingBlockReason, outingFunction: OutingFunction): string {
   switch (reason) {
     case '인기도부족':
-      return `인기도가 부족합니다. 필요한 인기도 : ${outingFunction.requiredPopularity}`
+      return (ORIGINAL_MODE_TEXT[62] ?? '').replace('%d', String(outingFunction.requiredPopularity))
     case '소지금부족':
-      return '소지금이 부족합니다'
+      return ORIGINAL_MODE_TEXT[77] ?? ''
     case '건강함':
-      return '건강한 상태입니다 입원할 필요가 없습니다'
+      return ORIGINAL_MODE_TEXT[196] ?? ''
     case '사기최고':
-      return '사기 최고 상태입니다'
+      return ORIGINAL_MODE_TEXT[91] ?? ''
   }
 }
 
@@ -127,7 +127,8 @@ const MODE_TEXT_ILLNESS_CURED = 206
 /**
  * 효과 한 줄 (0x15382~0x1541a 와 같은 꼴 네 번) — **굴린 값(보정 전)이 0 이면 줄이 없다**.
  *   이름 StrMODE[n] + " " + |굴림+보정| + (보정 ≠ 0 이면 "(" + 부호 + |보정| + ")") + ([83] 상승 | [84] 하락) + "!N"
- * 상승·하락은 **굴림+보정 ≥ 0** 으로 고른다 (0x153fa). 숫자와 [83]·[84] 사이에 띄어쓰기가 없다 (원본 그대로).
+ * 상승·하락은 **굴림+보정 ≥ 0** 으로 고른다 (0x153fa). 원본 [83]·[84] 는 앞에 빈칸이 붙은 글(" !c00CC00상승…")이라
+ * 숫자 뒤에 빈칸 하나가 들어간다 — 생성 표가 원문 앞 빈칸을 그대로 둔다(r223).
  */
 function effectLineOf(nameId: number, rolled: number, bonus: number): string {
   if (rolled === 0) return ''

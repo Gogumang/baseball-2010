@@ -3,7 +3,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { FULL_PLAY_SETTINGS, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import { startTeamGame, stepAutoRelay } from '@/features/play-team-game/model/teamGameFlow'
-import { teamRelayEntryFiguresOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
+import { teamLoadedRunnerAceOf, teamRelayEntryFiguresOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
 
 const 옵션 = {
   mode: 2,
@@ -94,5 +94,14 @@ describe('팀경기 0x21 마선수 주자 (0x79d10 · 0x48480 의 sim+0xa4)', ()
     const 그림 = teamRelayEntryFiguresOf({ ...경기, game: 앞, opponentOrderIndex: 0 })
     expect(그림.loadedRunnerAce).toBe(1)
     expect(그림.aceRunners).toEqual([true, true, false])
+  })
+
+  it('메뉴 자동진행(0x3c8da)은 0x47cc8 을 안 거쳐 그 타석 0xd 때 실린 그림이 남는다', () => {
+    const 경기 = 마선수경기({ 7: 1, 8: 2 })
+    const 앞 = { ...경기.game, bases: { first: true, second: true, third: false }, runners: { first: 8, second: 7, third: null } }
+    // 0xd 때는 3루에 마선수 2 가 있었고(실린 그림 2), 그 뒤 견제 · 도루로 주자가 바뀌었다
+    const 그림 = teamRelayEntryFiguresOf({ ...경기, game: 앞, opponentOrderIndex: 0 }, 2)
+    expect(그림.loadedRunnerAce).toBe(2)
+    expect(teamLoadedRunnerAceOf({ ...경기, game: 앞, opponentOrderIndex: 0 })).toBe(1)
   })
 })

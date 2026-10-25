@@ -223,7 +223,8 @@ export type { DetailRow, DetailRowValue, DetailWindowFrame, PlayerDetail } from 
 /**
  * 레코드 +0x1b — 상세 창 0x5b798 은 모드 2 에서 이 칸을 표 선수 · 영입 선수 가리지 않고 연봉으로 찍는다(5c87c~5c884).
  * 영입 선수(명전 · 나리 사본)는 기록 사본의 `salaryGrade`, 표 선수는 붙박이 표 행 값이다.
- * ⚠️ 미확인: 옛 사본이라 `salaryGrade` 가 없는 영입 선수는 값을 몰라 비운다(0)
+ * ⚠️ 미확인(남김 — 웹 기록 꼴: 원본 영입 선수는 레코드 통째 사본이라 +0x1b 가 늘 있다. `salaryGrade` 없이 저장된 웹 옛 사본만의 일이라
+ * 되살릴 값이 없다): 그런 영입 선수는 값을 몰라 비운다(0)
  */
 function pitcherGradeOf(teamId: number, entry: TeamEntryPitcher): number | null {
   if (entry.salaryGrade !== undefined) return entry.salaryGrade

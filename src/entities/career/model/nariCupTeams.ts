@@ -42,6 +42,25 @@ export interface NariCupTeams {
    * 돌발 보상 사기(0x8e34c)가 여기 쌓이고, 하루 끝 b8216 의 새 복사가 지운다(`nextNariCupDayTeams`)
    */
   readonly opponentMorale?: number
+  /**
+   * **대표팀 칸 +2 (팀 사기)** — 마스터 복사라 처음엔 팀 10 표값이고, 대회 사람 경기가 덮는다: 경기 셋업 0x39fdc 3a31e 가
+   * `0xa3a25(0x1f8d5(g, 모드))` 를 0..100 으로 잘라 `strh [팀+2]`, 실효 능력치 0xb570c 모드 3·4 갈래 b5762~b576a 가 공마다 넘겨 받은
+   * 두 팀 레코드 +2 에 같은 `0xa3a25` 를 쓴다. 대회 중 `0xa3a25` 는 상대국 칸 +2 를 읽으니(원본 버그, `nariMorale`) 대표팀 칸에는
+   * **경기 끝 무렵의 상대국 칸 사기**가 남고, 대표팀 칸은 하루 끝(b8216 은 상대국 칸만 새로 복사)에도 안 지워진다. 없으면 표값
+   */
+  readonly koreaMorale?: number
+  /**
+   * **대표팀 타자 칸별 +0x2e 실책** (붙박이 칸 → 쌓인 수) — 수비 그림 0x43278 4381a~43904 가 펌블 6 · 악송구 4 를 본 야수 레코드(+0xec)에
+   * 게이트 없이 +1(0~9999) 한다. 대회 사람 경기의 그 레코드는 대표팀 칸(+0xbc4) 복사본이라 거기 쌓인다 — 투수편에서 사람이 수비할 때.
+   * (타자편은 수비 그림이 상대 야수만이라 상대국 칸에 쌓이고, 그 칸은 하루 끝 b8216 이 새로 복사해 지운다.) 마스터 행 +0x2e 는 0
+   */
+  readonly koreaErrors?: Readonly<Record<number, number>>
+  /**
+   * **투수편 대표팀 칸 안 내 투수 +0x2a 에 대회 중 더해진 사사구** — 정산 0xa8024 꼬리 a8b04~a8bee 는 게이트 0xa56dc 밖이라 볼넷 · 사구마다
+   * 지금 마운드 투수 레코드(0xae83c)에 +1(0~9999). 대회 중 그 레코드는 133 이 내 레코드 0x30 바이트를 베낀 대표팀 칸 사본이라 거기 쌓이고
+   * 내 원래 레코드(커리어 시즌 줄)는 그대로다
+   */
+  readonly myCupWalks?: number
 }
 
 /** 대표팀 팀 번호 */
@@ -77,7 +96,60 @@ export function prepareNariCupMatch(teams: NariCupTeams, cupDay: number): NariCu
  */
 export function nextNariCupDayTeams(teams: NariCupTeams, nextOpponentTeamId: number | null): NariCupTeams {
   if (nextOpponentTeamId === null) return teams
-  return { korea: teams.korea, opponent: masterCupRecordOf(nextOpponentTeamId), opponentTeamId: nextOpponentTeamId }
+  // 대표팀 칸(+0xbc4)과 거기 쌓인 사기 · 실책 · 사사구는 그대로 — 상대국 칸만 새로 선다
+  const next: NariCupTeams = { ...teams, opponent: masterCupRecordOf(nextOpponentTeamId), opponentTeamId: nextOpponentTeamId }
+  delete (next as { opponentMorale?: number }).opponentMorale
+  return next
+}
+
+/** a8b5a · 0x43838 의 `0x270f` 상한 */
+const CUP_RECORD_COUNTER_LIMIT = 9999
+
+/** 대회 사람 경기 하나가 대표팀 칸에 남긴 것 (`recordNariCupGame`) */
+export interface NariCupGameMarks {
+  /** 경기 끝 무렵 0xb570c 가 대표팀 칸 +2 에 마지막으로 쓴 나리 사기 (대회 중이라 상대국 칸 +2 값) */
+  readonly morale?: number
+  /** 수비 그림 0x43278 이 올린 실책 — 대표팀(팀 10) 것만 쓴다 */
+  readonly errors?: readonly { readonly teamId: number; readonly battingOrderIndex: number }[]
+  /** 투수편 — 내 투수가 낸 사사구 (a8b04~a8bee) */
+  readonly myWalks?: number
+}
+
+/**
+ * 대회 사람 경기가 **대표팀 칸**(+0xbc4)에 남기는 것을 얹는다 — 하루 끝 상대국 새 복사(`nextNariCupDayTeams`)보다 먼저 부른다.
+ * 대회 정산 0xa8024 앞머리는 게이트 0xa56dc(a5704~a571a `ldrb [S, #0x12c]`)가 거짓이라 타석 · 투구 줄은 안 쌓이고, 게이트 밖인
+ * +0x2a 사사구(a8b04~a8bee) · +0x2e 실책(0x43278 4381a~43904) · +2 사기(3a31e · b5762)만 남는다. 상대국 칸 몫은 그날 밤 지워져 안 담는다
+ */
+export function recordNariCupGame(teams: NariCupTeams, marks: NariCupGameMarks): NariCupTeams {
+  const koreaErrors: Record<number, number> = { ...teams.koreaErrors }
+  let hasError = false
+  for (const error of marks.errors ?? []) {
+    if (error.teamId !== KOREA_TEAM) continue
+    koreaErrors[error.battingOrderIndex] = Math.min(CUP_RECORD_COUNTER_LIMIT, (koreaErrors[error.battingOrderIndex] ?? 0) + 1)
+    hasError = true
+  }
+  const myWalks = marks.myWalks ?? 0
+  return {
+    ...teams,
+    ...(marks.morale === undefined ? {} : { koreaMorale: marks.morale }),
+    ...(hasError ? { koreaErrors } : {}),
+    ...(myWalks > 0 ? { myCupWalks: (teams.myCupWalks ?? 0) + myWalks } : {}),
+  }
+}
+
+/**
+ * 투수편 대표팀 칸 안 내 투수 +0x2c — 대회 초기화 0xb7bf0 가 0xb6191 로 대한민국 투수 전원 10000 을 넣은 **뒤** 133 이 내 레코드를
+ * 통째 베끼니 첫날은 그때 내 스태미나, 하루 끝 0xb818c 가 대회 중이면 늘 b81e0 `0xb6191(0x1f9a9(g, 모드, 10))` 로 대표팀 투수 배열
+ * `[팀+0x14]` 전원 +0x2c = 10000(0xb6190 61a4 `strh`)을 다시 채우니 둘째 날부터는 10000 이다
+ */
+export function myCupPitcherStaminaOf(cupDay: number, staminaAtEntry: number): number {
+  return cupDay === 0 ? staminaAtEntry : FULL_CUP_PITCHER_STAMINA
+}
+const FULL_CUP_PITCHER_STAMINA = 10000
+
+/** 대표팀 칸 안 내 투수 +0x2a — 내 레코드를 베낀 값(커리어 시즌 줄) + 대회 중 사사구, 0~9999 */
+export function myCupPitcherWalksOf(teams: NariCupTeams | undefined, careerWalks: number): number {
+  return Math.min(CUP_RECORD_COUNTER_LIMIT, careerWalks + (teams?.myCupWalks ?? 0))
 }
 
 /** 대회 칸의 팀 레코드 — 팀 10 은 대표팀 칸, 그 밖은 상대국 칸(0x1f8f8). 상대국 칸이 다른 팀이면 마스터 복사 */
