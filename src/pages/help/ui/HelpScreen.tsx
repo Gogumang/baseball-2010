@@ -192,6 +192,10 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
       // 경기 중 메뉴 하위 4 의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — 뒤에 깔린 경기 화면(스윙·이동·'*')은 아무 키도 못 받는다.
       // 창의 잡기 단계에서 먼저 받아 뒤쪽 듣개로 안 넘긴다
       if (isOverGame) event.stopPropagation()
+      // 63804 는 [뷰어+0x314] ≠ 0 이면 키를 다 버린다. 그 칸은 앱 전역 객체 [0x1552cfc](메인 장면 +0x120 도 같은 것 — 23634)의
+      // 장면 팝업 걸음이라 뷰어 skin 과 같은 객체지만, 뷰어를 열 때 0x63688 이 0 을 쓰고(63774) 메인 장면은 상태가 바뀔 때마다
+      // 0x3299c 가 0 으로 지운다. 0 아닌 값은 뷰어가 아닌 메인 상태 21(0x29df8) · 27(0x2ad88 · 0x2ae56) · 28(0x2b234)의 팝업만
+      // 쓴다 — 뷰어 키(메인 상태 7 · 10 의 0x2cd54, 경기 0x3ca36) 때는 늘 0 이라 버리는 길이 서지 않는다(r207, U-86)
       const key = viewerKeyOf(event.key)
       if (key === null) return
       event.preventDefault()

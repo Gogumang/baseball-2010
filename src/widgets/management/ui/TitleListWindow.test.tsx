@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
+import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import {
   TITLE_CURSOR_BOX, TITLE_LIST_BOXES, TITLE_ROW_STEP, titleListTopAfter, titleNumberLeftOf, titleScrollBarRectsOf,
 } from '@/widgets/management/lib/titleListLayout'
@@ -79,5 +80,19 @@ describe('칭호 목록 윗줄 — 스크롤 격자 0x6c2bd (한 줄씩)', () =>
     render(<TitleListWindow career={careerOf()} onEquip={vi.fn()} onClose={vi.fn()} initialTop={3} />)
     expect(screen.queryByText(twelve[0]!)).toBeNull()
     expect(screen.getByText(twelve[3]!)).toBeTruthy()
+  })
+})
+
+describe('칭호 창 안 알림 상자의 겹 (r207)', () => {
+  it('알림이 떠 있는 동안만 덮개가 상자 겹(POPUP_WINDOW)으로 올라 바닥 누름 칸(7)이 상자 위로 새지 않는다', () => {
+    const career = { ...createCareer('타자'), titleIds: [TITLE_NAMES[0], TITLE_NAMES[3]], equippedTitle: 3 }
+    render(<TitleListWindow career={career} onEquip={vi.fn()} onClose={vi.fn()} />)
+    const overlay = screen.getByRole('dialog', { name: '칭호' })
+    expect(overlay.className).not.toContain(windowStyles.overlayWithPopup)
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('dialog', { name: '알림' })).toBeTruthy()
+    expect(overlay.className).toContain(windowStyles.overlayWithPopup)
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    expect(overlay.className).not.toContain(windowStyles.overlayWithPopup)
   })
 })

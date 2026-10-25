@@ -107,7 +107,7 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
   const { window: windowBox, header: headerBox, scrollBar, number: numberBox, name: nameBox } = TITLE_LIST_BOXES
 
   return (
-    <div className={styles.overlay} role="dialog" aria-label="칭호" onClick={onClose}>
+    <div className={notice !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay} role="dialog" aria-label="칭호" onClick={onClose}>
       {/* 박스 0 — 19974 공용 판 0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
           (1993a~19974 직접 뜸 — 박스 0 은 그림 자료 +0xfc = mode_ui 프레임 63). 제목 탭이 서서 위 띠는 안 본다 */}
       <CommonPanel x={windowBox.x} y={windowBox.y} width={windowBox.width} height={windowBox.height}
