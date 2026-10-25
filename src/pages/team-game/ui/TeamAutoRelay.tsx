@@ -85,6 +85,11 @@ interface TeamAutoRelayProps {
   readonly humanSide: 0 | 1
   /** 시즌 홈 경기 잔디 팔레트 — 배경(수비 운동장)을 그 벌로 칠한다 */
   readonly grassPalette?: number | null
+  /**
+   * 경기 중 메뉴 자동진행(0x3c8da → 0x21)으로 들어섰으면 그 타석의 0xd 진입 0x48d50 이 48e90 0x47cc8 로 실은 마선수 그림 —
+   * 이 길은 0x47cc8 을 안 거친다(`teamRelayEntryFiguresOf`). 안 주면(0x18 → 0x21 길) 들어설 때 다시 싣는다.
+   */
+  readonly entryLoadedRunnerAce?: number | null
 }
 
 /**
@@ -116,10 +121,10 @@ interface TeamAutoRelayProps {
  * 함께 창이 내려간다(미이식).
  *
  */
-export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, grassPalette = null }: TeamAutoRelayProps) {
+export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, grassPalette = null, entryLoadedRunnerAce }: TeamAutoRelayProps) {
   const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
-  // 진입 0x47cc8 — 주자 그림판에 마선수 그림을 다시 싣는다(타자 → 가장 앞선 마선수 주자)
-  const [figures, setFigures] = useState<TeamRelayFiguresValue>(() => teamRelayEntryFiguresOf(progress))
+  // 0x18 길은 4faf8 0x47cc8 이 주자 그림판에 마선수 그림을 다시 싣는다(타자 → 가장 앞선 마선수 주자) · 메뉴 길은 타석 0xd 때 그림
+  const [figures, setFigures] = useState<TeamRelayFiguresValue>(() => teamRelayEntryFiguresOf(progress, entryLoadedRunnerAce))
   const [speed, setSpeed] = useState(autoRelaySpeed)
   const speedRef = useRef(speed)
   speedRef.current = speed

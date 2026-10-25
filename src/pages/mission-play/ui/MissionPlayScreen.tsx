@@ -12,7 +12,7 @@ import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import { MissionHud } from '@/pages/mission-play/ui/MissionHud'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
-import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
@@ -299,6 +299,8 @@ export function MissionPlayScreen({
   }
   // 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
   const { pressStar } = menu
+  // 단말 일시정지 0x463ac — 끝난 미션(결과 판) 밖이고 하위 창이 없으면 같은 메뉴를 연다
+  useInGameMenuOpenOnHide(menu, !isOver && overlay === null)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return

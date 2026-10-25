@@ -11,7 +11,7 @@ import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/st
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
-import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
@@ -243,6 +243,8 @@ export function GameScreen({
     (scene) => emitSubstitutionEntryParticle(scene.entryKind),
   )
   const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)
+  // 단말 일시정지 0x463ac — '*' 가 열리는 때(벤치 클리어링 · 1회초 판 밖)이고 하위 창이 없으면 같은 메뉴를 연다
+  useInGameMenuOpenOnHide(menu, !isBenchClearing && !isHalfInningBoardOpen && overlay === null)
   /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

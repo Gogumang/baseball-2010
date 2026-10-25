@@ -149,17 +149,20 @@ export function teamBatterHandOf(teamId: number, entry: TeamEntryBatter): number
 
 /**
  * **경기 시작 인트로 배경의 타자 손** — 인트로 진입 0x3b084 가 3b0d2 에서 공격 측 `st[9]` 팀을 장면 +0x220 에 두고
- * 3b0f2 `0xae89d`(그 팀의 지금 타자 = 팀[+0x32] 칸) → 3b0fe `0xb63c1`(손) 을 3b108 에서 경기 구장 `[장면+0xf10]` +0x60 에 쓴다.
- * 그래서 인트로 배경 0x40ff0 은 **1회초 첫 타자(측 0 의 1번)** 손으로 좌우가 갈린다(0 이면 우타 거울).
- * 새 팀 객체는 상태 7(0x3e340)이 0 으로 채워 만든다(+0x32 = 0, `pitcherIntroBatterHandOf` 주석). ⚠️ 미확인: 팀 경기(모드 1)는 상태 9 의
- * 0x21c54 가 저장 블록을 팀 · st 로 되복사하므로(R10) 그 블록의 +0x32 · st[9] 가 경기 시작 값인지는 직접 안 떴다 — 1번(칸 0)으로 둔다.
+ * 3b0f2 `0xae89d`(그 팀의 지금 타자 = 팀[+0x32] 칸) → 3b0fe `0xb63c1`(손) 을 3b108 에서 경기 구장 `[장면+0xf10]` +0x60 에 쓴다
+ * (직접 뜸, r215). 인트로 배경 0x40ff0 은 그 손으로 좌우가 갈린다(0 이면 우타 거울).
+ * - 새 경기: 팀[+0x32] 를 쓰는 곳은 넷뿐(팀 초기화 0xb7c42 = 0 · 0x3a55a 모드 7 · 미션 0xaa888/0xaa89e · 확정 0xaebe4 — E 문서)이고
+ *   st[9] = 0(0xb6814)이라 **1회초 첫 타자(측 0 의 1번)** 다.
+ * - 이어하기(모드 1 · 2 · 8 · 9): 상태 9 의 0x21c54 가 저장 블록을 팀 · st 로 되복사한 뒤 인트로를 다시 탄다(R10 5절). 블록은 0x18
+ *   틱 0 의 0x4f928 이 4f972 예약 확정 0xaebe4 **뒤** 4f9ae 0x1fdec 로 쓴 것이라(직접 뜸) 팀[+0x32] 는 다음에 칠 타자 · st[9] 는 그때
+ *   공격 측 — 곧 이어하기 경기의 **지금 공격 팀 · 다음 타자**(웹 `game.half` · `battingOrderIndex` · `opponentOrderIndex`)다.
  */
 export function teamIntroBatterHandOf(progress: TeamGameProgress): number {
   const { options } = progress
-  const isOursFirst = options.playerSide === 0
-  const entry = isOursFirst ? progress.ourEntry[0] : progress.opponentEntry[0]
+  const ours = isOurOffense(progress)
+  const entry = ours ? progress.ourEntry[progress.game.battingOrderIndex] : progress.opponentEntry[progress.opponentOrderIndex]
   if (entry === undefined) return 0
-  return teamBatterHandOf(isOursFirst ? options.ourTeamId : options.opponentTeamId, entry)
+  return teamBatterHandOf(ours ? options.ourTeamId : options.opponentTeamId, entry)
 }
 
 /**

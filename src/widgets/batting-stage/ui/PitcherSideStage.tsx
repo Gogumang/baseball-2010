@@ -571,9 +571,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       const judgePitcherTick = hitBase === null ? null : pitcherReleaseTicksOf(aceOrder) + hitBase.judgeBallTick
       const isHitState = stage.phase.kind === '타격'
       const contactPoint = hitBase === null || pitch === null ? null : platePixelOf(pitch)
-      /** 보통 타격 불꽃의 game_effect 애니 — 필살 그림 갈래(0x49aec 가 [sp+0x57] 을 세운다) · 큰 타구면 null */
+      /** 보통 타격 불꽃의 game_effect 애니 — 번트 자세(49faa S+8) · 필살 그림 갈래(0x49aec 가 [sp+0x57] 을 세운다) · 큰 타구면 null */
       const hitFlameAnimation =
         hitBase === null ||
+        hitBase.isBuntStance === true ||
         pitcherHitContactOf(hitBase, current.batterForm, current.aceBatterOrder ?? null, current.batterSide ?? batterSideOfForm(current.batterForm))
           .effect !== null
           ? null

@@ -17,6 +17,7 @@ import {
   setGameSceneTickTimeout,
   setGameSceneTimeout,
   markGameSceneLoading,
+  rearmGameSceneFirstDraw,
 } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
@@ -263,5 +264,26 @@ describe('경기 장면 틱 — 장면 시계를 한 틱 격자로 센 정수(0x
     expect(울림).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(울림).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('단말 일시정지 0x2da0 → 0x74458 — 창이 선 첫 그림을 다시 세운다([창+0x250] = 1)', () => {
+  afterEach(() => resetCommonWindowShownForTest())
+
+  it('경기 장면에 창이 서 있으면 다음 그림이 장면 · 배경을 한 번 더 그린다 — 창이 없으면 아무 일 없다', () => {
+    const scene = markGameSceneUp()
+    const gate = createGameSceneDrawGate()
+    const backdrop = gameSceneBackdropFreezeSerialNow()
+    rearmGameSceneFirstDraw()
+    expect(gameSceneBackdropFreezeSerialNow()).toBe(backdrop)
+    const window = markCommonWindowShown()
+    expect(gate.allowsDraw()).toBe(true)
+    expect(gate.allowsDraw()).toBe(false)
+    rearmGameSceneFirstDraw()
+    expect(gate.allowsDraw()).toBe(true)
+    expect(gate.allowsDraw()).toBe(false)
+    expect(gameSceneBackdropFreezeSerialNow()).toBe(backdrop + 2)
+    window()
+    scene()
   })
 })

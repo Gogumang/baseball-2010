@@ -15,6 +15,8 @@ import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
 import { leagueBatterIdOf, leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
 import {
   XLS_ROW_MATCHUP_RECORDS,
+  teamBatterHandOf,
+  teamIntroBatterHandOf,
   teamBattingStageBatterOf,
   teamMatchupCardsOf,
   opponentBatterRecordsOf,
@@ -218,5 +220,23 @@ describe('사람 수비 장면의 상대 타자 장비 겹 — 타석 교대 0x4
     const stage = teamPitcherSideStageOf({ ...started, opponentEntry: aceEntry, opponentOrderIndex: aceSlot })
     expect(stage.aceBatterOrder).toBe(0)
     expect(stage.batterEquipment).toBeUndefined()
+  })
+})
+
+describe('경기 시작 인트로 배경의 타자 손 — 0x3b084 3b0f2 0xae89d(팀[st[9]]) → 0xb63c1', () => {
+  it('새 경기는 1회초 측 0 의 1번 타자 손이다 (팀[+0x32] = 0 · st[9] = 0)', () => {
+    const progress = startTeamGame(기본옵션, createSeededRandom(1))
+    const first = progress.opponentEntry[0]!
+    expect(teamIntroBatterHandOf(progress)).toBe(teamBatterHandOf(기본옵션.opponentTeamId, first))
+  })
+
+  it('이어하기는 되복사한 블록의 지금 공격 팀 · 다음 타자 손이다', () => {
+    const progress = startTeamGame(기본옵션, createSeededRandom(1))
+    // 후공(우리)의 말 공격 · 타순 칸 4 에서 저장된 경기
+    const resumed = { ...progress, game: { ...progress.game, inning: 3, half: '말' as const, battingOrderIndex: 4 } }
+    expect(teamIntroBatterHandOf(resumed)).toBe(teamBatterHandOf(기본옵션.ourTeamId, resumed.ourEntry[4]!))
+    // 상대 공격이면 상대 타순 칸
+    const opponentAtBat = { ...progress, game: { ...progress.game, inning: 5, half: '초' as const }, opponentOrderIndex: 7 }
+    expect(teamIntroBatterHandOf(opponentAtBat)).toBe(teamBatterHandOf(기본옵션.opponentTeamId, opponentAtBat.opponentEntry[7]!))
   })
 })

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { createWebAudioSound } from '@/shared/api/audio/webAudioSound'
+import { rearmGameSceneFirstDraw } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 환경설정 칸(0~4) → 원본 소리 크기 (옵션 +0x2e × 25, 0x2963e) */
 const VOLUME_PER_LEVEL = 25
@@ -125,12 +126,20 @@ export function useSoundLevelKeys(sound: SoundPort, soundLevel: number, onSoundL
 /**
  * 탭을 숨기면 소리를 멈춘다 — 원본 단말 일시정지(앱 vtable 0xcb988 슬롯 4 `0x2da0`)의 첫 줄 `0x6e690(소리)`.
  * 기억한 배경음은 그대로 두고, 다시 보일 때(슬롯 5 `0x2e88` = 빈 함수) 앱은 아무것도 안 한다.
- * ⚠️ 미구현: 같은 일시정지가 부르는 장면 vt+0x18 · 팝업 0x74458 은 옮기지 않았다.
+ * 같은 일시정지 0x2da0(직접 뜸, r215)은 2dae [앱+0x78](지금 장면)이 있으면 장면 vt+0x18 · 0x74458([0x140005c]) 을 잇는다.
+ * - 장면 vt+0x18: 경기 장면 0x104(vtable 0xcfa0c [6] = 0x463ac)는 창이 없고 상태 0xd~0x15 면 '*' 와 같은 경기 중 메뉴를 연다 — 각 경기
+ *   화면이 `useInGameMenuOpenOnHide` 로 건다. 시즌 0x105 · 나리 0x106 · 미션 고르기 0x107 은 빈 함수 0xf670 이다.
+ *   메인 메뉴 0x103(0xcdc5c [6] = 0x24710)은 [장면+0x161] = 0 — 랭킹 통신(0x26860 · 0x2d370)의 예/아니오 칸이다.
+ *   ⚠️ 미구현(남김 — 서버 기능 제외, 사용자 결정 10-24): 웹에 통신 화면이 없어 그 칸이 없다.
+ * - 0x74458: 창이 선 첫 그림을 다시 세운다(`rearmGameSceneFirstDraw`). 끝의 0xbaf8c 는 화면 객체 [0x1400070]+8 을 다루는 단말 화면 몫이라
+ *   옮기지 않는다.
  */
 export function useSoundPauseOnHide(sound: SoundPort): void {
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') sound.suspendOutput?.()
+      if (document.visibilityState !== 'hidden') return
+      sound.suspendOutput?.()
+      rearmGameSceneFirstDraw()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)

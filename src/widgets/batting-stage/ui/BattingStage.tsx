@@ -462,6 +462,9 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
       const contact = swing === null ? null : platePixelOf(pitch)
       // 필살 스윙(S+0x10)이 0x49aec 의 그림 갈래를 타면 그 함수가 [sp+0x60] = 1 을 세워 보통 불꽃(49faa~4a0ce)을 건너뛰고,
       // 같은 타격점에 필살 파티클을 쏜다(49dbc · 49de0) — 0x49aec 는 0x13 · 맞은 공에서만 불리므로 헛스윙엔 아무것도 없다
+      // 49faa 스윙 객체 S+8(번트 자세 — 0xb93a8 이 쓰는 번트 종류) ≠ 0 이면 보통 불꽃 · ptc 를 건너뛴다(직접 뜸, r215).
+      // 번트 판정은 자세가 선 채 나므로(`buntStance`) 맞은 번트에는 불꽃 · 007/006 이 없다
+      const isBuntStance = (swing?.buntKind ?? 0) !== 0
       const specialEffect =
         swing?.isSpecial === true
           ? specialSwingStageEffectOf(specialSwingNumber, latest.batterForm, aceBatterIndex, latest.batterHand ?? batterSideOfForm(latest.batterForm))
@@ -470,7 +473,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         for (const special of specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)) {
           emitParticles(particlesRef.current, particleConfigOf(special.id), contact.x, contact.y + special.offsetY, special.img)
         }
-      } else if (specialEffect === null && pattern !== null && contact !== null) {
+      } else if (specialEffect === null && !isBuntStance && pattern !== null && contact !== null) {
         const particleId = hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))
         if (particleId !== null) {
           emitParticles(particlesRef.current, particleConfigOf(particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
@@ -478,7 +481,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
       }
       // 같은 갈래의 그림 — game_effect 애니 2 · 3 을 타격점에 (49fe6~4a0a2, `batterOverlayMarks`). 고르기는 ptc 와 같은 판정이다
       const flameAnimation =
-        specialEffect !== null || pattern === null || contact === null
+        specialEffect !== null || isBuntStance || pattern === null || contact === null
           ? null
           : hitFlameAnimationOf(hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit)), watchesBigHit)
       pendingHitRef.current = {

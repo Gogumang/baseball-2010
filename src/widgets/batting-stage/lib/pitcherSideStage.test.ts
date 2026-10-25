@@ -198,4 +198,12 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
     expect(plain.particleId).toBe(5)
     expect(pitcherHitContactOf(plain, 0, null, 0)).toEqual({ effect: null, particles: [{ id: 5, img: HIT_PARTICLE_IMAGE, offsetY: 0 }] })
   })
+
+  it('번트로 맞은 공은 보통 불꽃 · ptc 가 없다 — 49faa 스윙 객체 S+8(번트 자세) ≠ 0 (r215)', () => {
+    const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10 }
+    const bunt = pitcherHitSceneOf(contact, { frame: 5, buntKind: 2 }, 20, 0)
+    expect(bunt.isBuntStance).toBe(true)
+    expect(pitcherHitContactOf(bunt, 0, null, 0)).toEqual({ effect: null, particles: [] })
+    expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).isBuntStance).toBe(false)
+  })
 })

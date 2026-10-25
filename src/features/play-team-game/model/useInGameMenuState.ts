@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { isCommonWindowShown, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /**
@@ -72,6 +72,11 @@ export interface InGameMenuState {
   readonly opening: InGameMenuOpening
   /** `InGameMenu` 가 창을 세우면 닫기를 맡긴다 — `InGameMenu` 의 `bindCloser` 에 넘긴다 */
   readonly bindCloser: (closer: InGameMenuCloser | null) => void
+  /**
+   * 단말 일시정지(멈춤 콜백 0x463ac)가 연다 — 463e6 0x741a1(창, 0, 0x3cdd1, 0x3c159, 장면) · 463f4 [창+0x290] = 0 · 463f8 0x3c02c 로
+   * '*' 와 같은 창('별표')을 그 자리에서 세운다. 키 틀 밖이라 그 틀의 갱신(`subscribeInGameMenuStarOpen`)은 없다. 이미 열려 있으면 아무 일 없다
+   */
+  readonly openFromPause: () => void
 }
 
 /**
@@ -107,10 +112,7 @@ export function useInGameMenuState(): InGameMenuState {
     setOpening('복귀')
     setOpen(true)
   }, [])
-  const toggle = useCallback(() => {
-    if (isOpenRef.current) return close()
-    // 그 그림의 키 뒤 갱신(52e14~) — 창은 이미 섰지만 게이트(52cc6)는 키 앞에서 지나갔다
-    for (const listener of [...starOpenFrameListeners]) listener()
+  const openAsStar = useCallback(() => {
     // 0x3c02c 맨 앞 0x3c036 — 울리던 소리를 끊는다(0x6e418)
     activeSound().stop()
     // 0x3c02c → 0x6c00c(메뉴, 0, 0) — 새로 열면 첫 칸
@@ -120,7 +122,17 @@ export function useInGameMenuState(): InGameMenuState {
     setSlidesIn(true)
     setOpening('별표')
     setOpen(true)
-  }, [close])
+  }, [])
+  const toggle = useCallback(() => {
+    if (isOpenRef.current) return close()
+    // 그 그림의 키 뒤 갱신(52e14~) — 창은 이미 섰지만 게이트(52cc6)는 키 앞에서 지나갔다
+    for (const listener of [...starOpenFrameListeners]) listener()
+    openAsStar()
+  }, [close, openAsStar])
+  const openFromPause = useCallback(() => {
+    if (isOpenRef.current) return
+    openAsStar()
+  }, [openAsStar])
   const pressStar = useCallback(() => {
     if (isOpenRef.current || isGameSceneFrozen()) return toggle()
     pushSceneKey(() => {
@@ -132,5 +144,30 @@ export function useInGameMenuState(): InGameMenuState {
     closerRef.current = closer
   }, [])
 
-  return { isOpen, cursor, setCursor, toggle, pressStar, close, reopen, slidesIn, opening, bindCloser }
+  return { isOpen, cursor, setCursor, toggle, pressStar, close, reopen, slidesIn, opening, bindCloser, openFromPause }
+}
+
+/**
+ * **탭을 숨기면 경기 중 메뉴를 연다** — 앱 일시정지 0x2da0 이 2db4 에서 장면 vt+0x18 을 부르고, 경기 장면 0x104 의 그 칸
+ * (vtable 0xcfa0c [6] = 0x463ac, 직접 뜸 r215)은:
+ * ```
+ * 463b2  0x457cc · [장면+0x1084] = 1 · [창+0x250] = 1
+ * 463ce  [창+9](공용 창이 떠 있음) == 0 이고 0xd ≤ 상태 [장면+0x1c] ≤ 0x15 면 463e6 0x741a1 · [창+0x290] = 0 · 0x3c02c(장면)
+ * ```
+ * '*'(4991c 상태 0xd~0x15)와 같은 메뉴다. 웹은 탭 숨김을 단말 일시정지로 본다(`app/model/useSound.useSoundPauseOnHide`).
+ * `canOpen` 은 그 화면에서 '*' 가 메뉴를 여는 때(상태 0xd~0x15)이고 하위 창(조작방법 · 설정)이 없을 때다 — 공용 창은 여기서 본다.
+ */
+export function useInGameMenuOpenOnHide(menu: Pick<InGameMenuState, 'openFromPause'>, canOpen: boolean): void {
+  const canOpenRef = useRef(canOpen)
+  canOpenRef.current = canOpen
+  const { openFromPause } = menu
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return
+      if (!canOpenRef.current || isCommonWindowShown()) return
+      openFromPause()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [openFromPause])
 }

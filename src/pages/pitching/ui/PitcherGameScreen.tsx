@@ -23,7 +23,7 @@ import type {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
-import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { usePitcherGame } from '@/pages/pitching/model/usePitcherGame'
@@ -188,7 +188,7 @@ interface PitcherGameScreenProps {
  * 나리 투수편 경기 화면 — 경기 장면 0x104 하나. 생성자 0x3301c 가 33100 `0xbcb49(상태, 7)` 로 모드 갈래 없이 상태 7 을 예약해
  * 로딩 판(상태 7 · 9 · 8)을 먼저 지난다. 진행 칸 끝은 0x24(모드 3 ≠ 4 — 0x39f88 39f92~39f98), 팁은 0x53dbc 의 굴림(`usePitcherGame`
  * 의 맨 앞). 판이 다 그려지면(상태 8 끝 → 인트로 0xc) 경기 화면이 선다.
- * ⚠️ 근사(시간): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
+ * ⚠️ 근사(시간)(남김 — 단말 몫 · 바이너리 밖): 원본 판 길이는 단말의 적재 시간 — 웹은 나리 타자편 · 미션과 같은 `LoadingTip`(칸 하나 = 한 그림)
  */
 export function PitcherGameScreen(props: PitcherGameScreenProps) {
   useBurstObjectTicksReset() // 경기 장면 생성 0x48658 — 돌발 객체 [+0x224] = 0
@@ -317,6 +317,8 @@ function PitcherGameScene({
    * 원본 공용 키 처리 `0x498d4` 의 '\*' — 경기 중 메뉴.
    * ('#' 는 이 모드에서 교체 화면이 아니라 "그만 던지시겠습니까"(StrGAME[104])로 간다 — I-controls 4b.)
    */
+  // 단말 일시정지 0x463ac — '*' 가 받는 때이고 하위 창이 없으면 같은 메뉴를 연다
+  useInGameMenuOpenOnHide(menu, !isSceneShowing && overlay === null)
   useEffect(() => {
     if (isSceneShowing) return
     const onKeyDown = (event: KeyboardEvent) => {
