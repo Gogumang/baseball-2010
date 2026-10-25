@@ -124,9 +124,13 @@ export interface NariEntryCellSource {
    * 읽는다(`nariCupEntryCellSourceOf` 근거). `stats` · `staminas` 는 안 쓴다
    */
   readonly isCupRecord?: boolean
+  /** 대회 칸이 대표팀 칸이면 거기 쌓인 붙박이 칸별 +0x2e 실책 (`NariCupTeams.koreaErrors`) */
+  readonly cupErrors?: Readonly<Record<number, number>>
 }
 
 const FULL_RECORD_STAMINA = 10000
+/** 대표팀 칸(+0xbc4)의 팀 번호 — 0x1f8f8 이 S+0x12c 동안 팀 10 을 그 칸으로 준다 */
+const KOREA_CUP_TEAM = 10
 
 /**
  * **국가대항전 143 의 기록 열 · 체력 줄 재료** (r216 직접 떴다). 목록 칸 그리기 0x56ebc 는 모드 갈래 없이 줄 레코드
@@ -143,9 +147,11 @@ const FULL_RECORD_STAMINA = 10000
  * 곧 143 의 붙박이 줄 +0x20~+0x2b 는 그 선수의 **Xls 행 기록 줄**(`RosterPlayer.recordLine` — 0 이 아니다, 예: 타자 1000타수)이고
  * 행 +0x2c~+0x2f 는 Xls 표 바이트가 타자 180행 모두 0(도루 · 실책 0) · 투수 120행 모두 `10 27 00 00`(+0x2c 10000 · 승 0 · 패 0)이다.
  * 마선수는 없다(142 1c5fe: S+0x12c 면 안 넣는다).
- * 팀 레코드 +2(체력 줄 용량 0x66e44): 상대국 칸은 `NariCupTeams.opponentMorale`(대회 중 0xa3a24 가 읽고 쓰는 칸), 대표팀 칸은 마스터 복사 표값.
- * ⚠️ 미확인(남김 — 웹 기록 꼴): 대회 사람 경기가 게이트 밖에서 대표팀 칸에 올리는 투수 +0x2a 사사구(a8b04) · 타자 +0x2e 실책(0x43278),
- * 경기 셋업 0x39fdc(3a31e) · 0xb570c 가 대표팀 칸 +2 에 쓰는 그날의 나리 사기는 웹이 대회 칸에 안 쌓아, 둘째 날부터의 대표팀 줄은 표값 그대로다.
+ * 팀 레코드 +2(체력 줄 용량 0x66e44): 상대국 칸은 `NariCupTeams.opponentMorale`(대회 중 0xa3a24 가 읽고 쓰는 칸), 대표팀 칸은
+ * 처음엔 마스터 복사 표값이고 사람 경기 셋업 0x39fdc 3a31e · 공마다 0xb570c b5762 가 쓴 그날의 나리 사기가 남는다(`koreaMorale`).
+ * 게이트 밖이라 대회 경기도 대표팀 칸에 쌓는 둘(r221 직접 떴다): 타자 +0x2e 실책(수비 그림 0x43278 4381a~43904 — 투수편 사람 수비,
+ * `koreaErrors`) · 투수 +0x2a 사사구(정산 꼬리 a8b04~a8bee `0xae83d` 지금 마운드 투수 — 투수편 내 투수 사본, `myCupWalks`).
+ * 붙박이 투수는 사람 판정(볼 넷)으로 공을 안 던지니(강판 뒤 0x21 간이) 사사구가 안 붙는다.
  */
 export function nariCupEntryCellSourceOf(
   stats: LeaguePlayerStats,
@@ -154,8 +160,14 @@ export function nariCupEntryCellSourceOf(
   teams: NariCupTeams | undefined,
 ): NariEntryCellSource {
   const isOpponentSlot = teams !== undefined && teams.opponentTeamId === teamId
-  const morale = isOpponentSlot ? teams.opponentMorale ?? teamRecordMoraleOf(teamId) : teamRecordMoraleOf(teamId)
-  return { stats, staminas: undefined, staminaMode, morale, isCupRecord: true }
+  const isKoreaSlot = teamId === KOREA_CUP_TEAM
+  const morale = isOpponentSlot
+    ? teams.opponentMorale ?? teamRecordMoraleOf(teamId)
+    : isKoreaSlot ? teams?.koreaMorale ?? teamRecordMoraleOf(teamId) : teamRecordMoraleOf(teamId)
+  return {
+    stats, staminas: undefined, staminaMode, morale, isCupRecord: true,
+    ...(isKoreaSlot && teams?.koreaErrors !== undefined ? { cupErrors: teams.koreaErrors } : {}),
+  }
 }
 
 /**
@@ -172,8 +184,10 @@ export function nariEntryTeamMoraleOf(
 
 function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number, player: RosterPlayer) {
   if (cells === undefined) return {}
-  // 대회 칸 — Xls 행 +0x20~+0x2b 그대로, +0x2c 도루 · +0x2e 실책은 표 바이트 0 (`nariCupEntryCellSourceOf`)
-  if (cells.isCupRecord === true) return { batterLine: entryBatterLineOfRecord(player.recordLine) }
+  // 대회 칸 — Xls 행 +0x20~+0x2b 그대로, +0x2c 도루는 표 바이트 0 · +0x2e 실책은 표 0 에 대회 중 대표팀 칸에 쌓인 수
+  if (cells.isCupRecord === true) {
+    return { batterLine: { ...entryBatterLineOfRecord(player.recordLine), errors: cells.cupErrors?.[slot] ?? 0 } }
+  }
   const line = leagueBatterLineOf(cells.stats, leagueBatterIdOf(teamId, slot))
   // +0x2e 실책 — 수비 그림 0x43278 4381a~43904 가 쌓은 칸(옛 저장은 0)
   const batterLine: EntryBatterLine = {

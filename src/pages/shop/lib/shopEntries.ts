@@ -27,10 +27,13 @@ export interface ShopEntry {
   readonly blockNotice: string | null
 }
 
-/** 아이템 설명 줄 조립 0x82400 (Q3 N-2) — 조건 줄 뒤에 `!N효과 : !cFFFF00` + 효과 문구 */
-export function itemDescriptionOf(effectText: string, conditionText = ''): string {
-  const effectLine = `효과 : !cFFFF00${effectText}`
-  return conditionText === '' ? effectLine : `${conditionText}!N${effectLine}`
+/**
+ * 아이템 설명 조립 — 창 0x81dc0 이 칸마다 0x82400 을 돌며 지은 글 (나만의리그 갈래 0x82890~0x82b6e, 직접 떴다):
+ * `"!cFFFFFF"(0xcc260) + 설명(StrITEM) + "!N효과 : !cFFFF00"(0xcc9f0) + 효과(StrITEM)` — 설명 · 효과 모두 원문 `!N` 그대로.
+ * 시즌 갈래(`widgets/season/lib/seasonSubItems`)와 같은 꼴이다.
+ */
+export function itemDescriptionOf(descriptionText: string, effectText: string): string {
+  return `!cFFFFFF${descriptionText}!N효과 : !cFFFF00${effectText}`
 }
 
 /** 서브아이템 상점 — 창 종류 1 (R12 1b-나: 보유 → 소지금) */
@@ -40,7 +43,7 @@ function subEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
     return {
       id: shopItemId('서브', index),
       name: item.name,
-      description: itemDescriptionOf(item.effectText),
+      description: itemDescriptionOf(item.descriptionText, item.effectText),
       price: item.price,
       iconFrame: itemIconFrameOf('서브', index),
       isOwned: hasSubItem(career, item.id),
@@ -57,7 +60,7 @@ function gpEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
   return BATTER_GP_ITEMS.map((item, index) => ({
     id: shopItemId('GP', index),
     name: item.name,
-    description: itemDescriptionOf(item.effectText),
+    description: itemDescriptionOf(item.descriptionText, item.effectText),
     price: item.price,
     iconFrame: itemIconFrameOf('GP', index),
     isOwned: false,

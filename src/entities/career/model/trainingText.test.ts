@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { createCareer } from '@/entities/career/model/playerCareer'
-import { trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
+import { NO_TRAINING_MODIFIERS, trainingBlockTextOf, trainingMoraleLossTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import type { TrainingOutcome } from '@/entities/career/model/training'
 
 const 결과 = (overrides: Partial<TrainingOutcome> = {}): TrainingOutcome => ({
@@ -11,18 +11,36 @@ const 결과 = (overrides: Partial<TrainingOutcome> = {}): TrainingOutcome => ({
   moraleLoss: 6,
   rolledGain: 4,
   rolledMoraleLoss: 6,
+  modifiers: NO_TRAINING_MODIFIERS,
+  hasSubItemBonus: false,
   specialSwing: null,
   career: createCareer('테스트'),
   ...overrides,
 })
 
 describe('훈련 알림 문구', () => {
-  it('능력치 훈련은 상승·타입 보너스·사기를 **줄로 나눠** 준다', () => {
-    // 타입 보너스 줄 — "!cFFFFFF[!cFFFF00" + 타입 이름 + "!cFFFFFF]" + " " + StrMODE[194] (0x17f5c 18750~187e0)
-    expect(trainingOutcomeLinesOf(결과(), '타격형')).toEqual([
-      '히트 +5 상승하였습니다', '!cFFFFFF[!cFFFF00타격형!cFFFFFF] 타입 보너스 +1', '사기 -6',
+  it('능력치 훈련 결과 창 글은 보정 줄뿐이다 — 상승 · 사기 줄은 원본 글에 없다 (0x17f5c 1872a 길이 0 → 18750~189fc)', () => {
+    // 타입 보너스 줄 — "!cFFFFFF[!cFFFF00" + 타입 이름 + "!cFFFFFF]" + " " + StrMODE[194]
+    expect(trainingOutcomeLinesOf(결과(), '타격형')).toEqual(['!cFFFFFF[!cFFFF00타격형!cFFFFFF] 타입 보너스 +1'])
+    // 보정이 없으면 글 칸이 빈다 (18a34 길이 > 0 일 때만 0x1552af4 에 옮긴다)
+    expect(trainingOutcomeLinesOf(결과({ typeBonus: 0 }))).toEqual([])
+    // 차례: 타입 → 서브 아이템(StrITEM[0x58+k] + 능력치 이름 + "+2") → 자동안마기 "사기감소-1" → 병아리 [201] → 몹쓸몸 [202]
+    expect(trainingOutcomeLinesOf(결과({
+      hasSubItemBonus: true, modifiers: { rookie: true, weakBody: true, massage: true },
+    }), '타격형')).toEqual([
+      '!cFFFFFF[!cFFFF00타격형!cFFFFFF] 타입 보너스 +1',
+      '!cFFFFFF[!cFFFF00표적판!cFFFFFF] 히트 +2',
+      '!cFFFFFF[!cFFFF00자동안마기!cFFFFFF] 사기감소-1',
+      '!cFFFFFF[!cFFFF00병아리!cFFFFFF] 능력치+1/사기감소-1',
+      '!cFFFFFF[!cFFFF00몹쓸몸!cFFFFFF] 능력치-2/사기감소+2',
     ])
-    expect(trainingOutcomeLinesOf(결과({ typeBonus: 0 }))).toEqual(['히트 +5 상승하였습니다', '사기 -6'])
+  })
+
+  it('사기 줄 괄호 보정 — 보정이 있으면 "(" ± |보정| ")" (0x181ca~0x18254), 0 이면 "(-0)" (원본 그대로)', () => {
+    expect(trainingMoraleLossTextOf(10, { rookie: false, weakBody: false, massage: true })).toBe('사기 10(-1) !cFF0000하락!cFFFFFF하였습니다')
+    expect(trainingMoraleLossTextOf(12, { rookie: false, weakBody: true, massage: false })).toBe('사기 12(+2) !cFF0000하락!cFFFFFF하였습니다')
+    expect(trainingMoraleLossTextOf(10, { rookie: true, weakBody: true, massage: true })).toBe('사기 10(-0) !cFF0000하락!cFFFFFF하였습니다')
+    expect(trainingMoraleLossTextOf(10)).toBe('사기 10 !cFF0000하락!cFFFFFF하였습니다')
   })
 
   it('한 줄이 메시지 칸(170px)을 넘지 않는다 — 넘치면 원본이 잘라 버린다', () => {
@@ -43,11 +61,17 @@ describe('훈련 알림 문구', () => {
     const 진행 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 2, required: 4, isLevelUp: false, name: '파워 스윙' } })
     const 완료 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true, name: '파워 스윙' } })
     // StrMODE[86] sprintf · [87](앞 빈칸) 원문 그대로, 사기 줄은 [24] + " " + 수치 + " " + [84] (0x18196~0x1825e)
+    // 사기 줄 끝 "!N"(0x18270) 이 늘 붙어 빈 줄이 하나 따른다
     expect(trainingOutcomeLinesOf(진행)).toEqual([
-      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련', '사기 6 !cFF0000하락!cFFFFFF하였습니다',
+      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련', '사기 6 !cFF0000하락!cFFFFFF하였습니다', '',
     ])
     expect(trainingOutcomeLinesOf(완료)).toEqual([
-      '파워 스윙 훈련 완료!!N[!cFFFF00선수정보!cFFFFFF]에서 사용!N여부 변경 가능', '사기 6 !cFF0000하락!cFFFFFF하였습니다',
+      '파워 스윙 훈련 완료!!N[!cFFFF00선수정보!cFFFFFF]에서 사용!N여부 변경 가능', '사기 6 !cFF0000하락!cFFFFFF하였습니다', '',
+    ])
+    // 보정이 있으면 괄호와 효과 줄 (0x18274~0x18368)
+    expect(trainingOutcomeLinesOf({ ...진행, moraleLoss: 7, modifiers: { rookie: true, weakBody: false, massage: true } })).toEqual([
+      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련', '사기 7(-2) !cFF0000하락!cFFFFFF하였습니다', '',
+      '!cFFFF00병아리 스킬 효과', '!cFFFF00자동안마기 효과',
     ])
   })
 

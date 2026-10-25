@@ -10,7 +10,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { seasonRecordProfileOf } from '@/entities/season-mode/model/seasonEntry'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import { NO_RECORD_ACE, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
-import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
+import { myCupPitcherStaminaOf, myCupPitcherWalksOf, nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import type { NariEntryFace } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
@@ -40,8 +40,8 @@ export function pitcherNariEntryViewOf(
   const aceSlot = isMyTeam ? OUR_ACE_PITCHER_SLOT : ACE_PITCHER_SLOT
   // 기록 열 · 체력 줄 — [ed+0x334] = 3 (`NariEntryCellSource`). 국가대항전 칸은 마스터 복사(Xls 행) 줄 · +0x2c 10000
   // (`nariCupEntryCellSourceOf`). 내 투수 줄은 상태 133 의 0xb53f1 이 내 레코드 0x30 바이트를 그대로 memcpy 한 것이라 커리어 시즌 줄이다
-  // (대회 경기는 0xa56dc 거짓이라 안 쌓는다). ⚠️ 미확인(남김): 그 복사본 +0x2c 는 하루 끝 b81e0 의 0xb6190 이 10000 으로 채우는데
-  // 웹은 내 줄 체력을 커리어 스태미나(`myPitcherEntryCellsOf`)로 둔다
+  // (대회 경기는 0xa56dc 거짓이라 안 쌓는다) — 다만 게이트 밖 +0x2a 사사구(a8b04~a8bee)는 그 사본에 쌓이고(`myCupWalks`), 사본 +0x2c 는
+  // 첫날 베낀 내 스태미나 · 둘째 날부터 하루 끝 b81e0 의 0xb6190 이 채운 10000 이다(`myCupPitcherStaminaOf`)
   const cells: NariEntryCellSource = cupTeams !== undefined
     ? nariCupEntryCellSourceOf(career.leaguePlayerStats, PITCHER_EDITION_MODE, teamId, cupTeams)
     : {
@@ -56,7 +56,8 @@ export function pitcherNariEntryViewOf(
     pitchers: nariEntryPitchersOf(teamId, order, (slot) => {
       if (isMyTeam && slot === MY_PITCHER_SLOT) {
         const face = myPitcherEntryFaceOf(career)
-        return { ...face, ...myPitcherEntryCellsOf(career, face, cells), isAce: false }
+        const cup = cupTeams === undefined ? undefined : { teams: cupTeams, day: career.nationalCup?.day ?? 0 }
+        return { ...face, ...myPitcherEntryCellsOf(career, face, cells, cup), isAce: false }
       }
       if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
       return undefined
@@ -77,17 +78,21 @@ export function myPitcherEntryCellsOf(
   career: PitcherCareer,
   face: NariEntryFace,
   cells: NariEntryCellSource,
+  /** 국가대항전이면 대표팀 칸 사본 — 그 칸과 대회 날짜 g(L+0x32) */
+  cup?: { readonly teams: NariCupTeams; readonly day: number },
 ): Pick<NariEntryFace, 'pitcherLine' | 'stamina'> {
   const { stats } = career
+  const line = entryPitcherLineOfRecord(pitcherRecordLineOf(stats))
   return {
     pitcherLine: {
-      ...entryPitcherLineOfRecord(pitcherRecordLineOf(stats)),
+      ...line,
+      ...(cup === undefined ? {} : { walks: myCupPitcherWalksOf(cup.teams, line.walks) }),
       wins: stats.wins,
       losses: stats.losses,
     },
     stamina: {
       capacity: staminaCapacityOf(face.ability[3] ?? 0, cells.morale, false),
-      percent: staminaPercentOf(cells.staminaMode, career.stamina),
+      percent: staminaPercentOf(cells.staminaMode, cup === undefined ? career.stamina : myCupPitcherStaminaOf(cup.day, career.stamina)),
     },
   }
 }

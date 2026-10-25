@@ -190,7 +190,10 @@ describe('구질 훈련 (108 탭 2 → 0x17f5c 의 0x1836a 갈래)', () => {
 
   it('알림 글 — 덜 찼으면 StrMODE[89] "%d/%d회", 차면 [88] "구질 훈련 완료!"', () => {
     const 한번 = runPitchTypeTraining(구질투수(), 0, 2, 최소)
-    expect(pitchTypeTrainingLinesOf(한번)).toEqual(['해당 구질 !cFFFF001/4회!cFFFFFF 훈련', '사기 6 !cFF0000하락!cFFFFFF하였습니다'])
+    expect(pitchTypeTrainingLinesOf(한번)).toEqual(['해당 구질 !cFFFF001/4회!cFFFFFF 훈련', '사기 6 !cFF0000하락!cFFFFFF하였습니다', ''])
+    // 자동안마기 — 괄호 "(-1)" 와 효과 줄 (0x184d8~0x186c2)
+    const 안마 = runPitchTypeTraining(구질투수({ subItemIds: [4] }), 0, 2, 최소)
+    expect(pitchTypeTrainingLinesOf(안마).slice(1)).toEqual(['사기 5(-1) !cFF0000하락!cFFFFFF하였습니다', '', '!cFFFF00자동안마기 효과'])
     const 다른칸 = runPitchTypeTraining(구질투수({ pitchTrainingCounts: [1, 0, 0, 0, 0, 0, 0, 0] }), 2, 0, 최소)
     expect(stripGameMarkup(pitchTypeTrainingLinesOf(다른칸)[0] ?? '')).toBe('해당 구질 1/2회 훈련')
     const 마지막 = runPitchTypeTraining(구질투수({ pitchTrainingCounts: [3, 0, 0, 0, 0, 0, 0, 0] }), 0, 2, 최소)

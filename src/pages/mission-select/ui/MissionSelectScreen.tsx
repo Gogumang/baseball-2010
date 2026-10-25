@@ -249,11 +249,12 @@ export function MissionSelectScreen({
         width={DESCRIPTION_BOX.width} height={DESCRIPTION_BOX.height} testId="미션-설명-칸" />
       <div className={styles.descriptionText}
         style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
+        {/* 1e5e8~1e624: sprintf("%s"(0xd09bc), 레코드 +0x4e 설명) → 0xba269(45, 197, 폭 0x96, 흰 글). 잠김 0xa520d 는 이 그리기에서
+            안 본다(부르는 곳은 진입 1da6c · 키 1db26 · 격자 칸 0x7a690 뿐) — 잠긴 칸도 그 미션 설명이 그대로 나온다.
+            원문 StrMAINMENU[60] "오픈 되지 않은 미션입니다…" 은 OK 팝업(1db84)에만 쓴다 */}
         {selected === undefined
           ? <MarkupText raw={NO_MISSION_TEXT} />
-          : isLockedAt(cursor)
-            ? '오픈 되지 않은 미션입니다 이전 단계를 클리어해주세요'
-            : stripGameMarkup(selected.briefing)}
+          : stripGameMarkup(selected.briefing)}
       </div>
 
       <FrameSprite folder={IMG_TEXT} frame={REWARD_ROW.labelFrame} origins={textFrames}

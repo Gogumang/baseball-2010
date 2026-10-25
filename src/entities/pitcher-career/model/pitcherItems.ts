@@ -3,12 +3,13 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
   BATTER_GP_ITEMS,
   applyGpItemWith,
+  gpItemOf,
   gpItemBlockReasonWith,
   gpItemNoticeWith,
   purchaseGpItemWith,
 } from '@/entities/career/model/gpItems'
 import type { GpItem, GpItemResultOf, GpItemRules, GpPurchaseOf, LotteryPrize } from '@/entities/career/model/gpItems'
-import { SUB_ITEMS } from '@/entities/career/model/subItems'
+import { SUB_ITEMS, subItemEffectTextOf } from '@/entities/career/model/subItems'
 import type { SubItem } from '@/entities/career/model/subItems'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitcherAbilityLimitsOf } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -43,23 +44,17 @@ import { applyStaminaTonic, canBuyStaminaTonic } from '@/entities/pitcher-career
  *     칸 9 는 `[0x1fbd1(app)+0x2c] = 10000` + StrMODE[125] (0xa49ec). 나머지(복권·영지버섯·건강진단·최면요법)는 같다.
  */
 
-/** 서브 아이템 — 이름·가격은 타자편 그대로, 칸 0~3 설명만 투수 능력치 이름 */
-export const PITCHER_SUB_ITEMS: readonly SubItem[] = SUB_ITEMS.map((item) =>
-  item.id < PITCHER_ABILITY_NAMES.length
-    ? { ...item, effectText: `${PITCHER_ABILITY_NAMES[item.id]} 훈련 시 +2` }
-    : item,
-)
+/** 투수 능력치 이름 StrMODE[0x28 + k] (0x7b984 갈래) */
+const PITCHER_ABILITY_NAME_BASE = 0x28
 
-const STAMINA_TONIC_ID = 9
+/** 서브 아이템 — 이름·가격·설명은 타자편 그대로, 칸 0~3 효과 글의 %s 만 투수 능력치 이름 (0x82938~0x8296a) */
+export const PITCHER_SUB_ITEMS: readonly SubItem[] = SUB_ITEMS.map((item) => ({
+  ...item,
+  effectText: subItemEffectTextOf(item.id, PITCHER_ABILITY_NAME_BASE),
+}))
 
-/** GP 아이템 — 칸 0~3 설명·칸 9 이름/설명만 투수 것 */
-export const PITCHER_GP_ITEMS: readonly GpItem[] = BATTER_GP_ITEMS.map((item) => {
-  if (item.id < PITCHER_ABILITY_NAMES.length) {
-    return { ...item, effectText: `${PITCHER_ABILITY_NAMES[item.id]} 능력치 + 10` } // StrITEM[165]
-  }
-  if (item.id === STAMINA_TONIC_ID) return { ...item, name: '십전대보탕', effectText: '스태미나 100% 회복' } // StrITEM[107] · [171]
-  return item
-})
+/** GP 아이템 — 칸 0~3 효과 글 · 칸 9 이름/설명/효과(십전대보탕 StrITEM[107] · [182] · [171])만 투수 것 */
+export const PITCHER_GP_ITEMS: readonly GpItem[] = BATTER_GP_ITEMS.map((item) => gpItemOf(item.id, false))
 
 /** GP 아이콘 표 0xd4676 (투수) — 칸 9 십전대보탕만 20 이다 (타자 0xd468a 는 19) */
 export const PITCHER_GP_ICON_FRAMES: readonly number[] = [10, 11, 12, 13, 14, 15, 16, 17, 18, 20]

@@ -90,7 +90,7 @@ describe('투수 GP 아이템 (창 종류 2)', () => {
     expect(결과.lotteryPrize).toBe('아차상')
     expect(결과.prizeItemId).toBe(3)
     expect(결과.career.ability.stamina).toBe(투수().ability.stamina + 10)
-    expect(stripGameMarkup(pitcherGpItemNoticeOf(5, 결과.lotteryPrize, 결과.prizeItemId))).toBe('아차상 당첨!!\n[고려인삼] 획득!')
+    expect(stripGameMarkup(pitcherGpItemNoticeOf(5, 결과.lotteryPrize, 결과.prizeItemId))).toBe('아차상 당첨!!\n[고려인삼] 획득!\n체력 10  상승하였습니다')
   })
 
   it('사면 G 를 먼저 뺀다 — 모자라면 거절', () => {

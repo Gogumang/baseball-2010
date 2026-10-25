@@ -4,6 +4,7 @@ import { applySkillReward, isMinusSkill, isSkillEquipped, MAXIMUM_MORALE, MINUS_
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 
 /**
  * GP 아이템 (binary.mod 0xa4488 — 누락 탐색 5차). **타자편·투수편이 같은 함수**를 탄다 (구매 확정 0x14fda 가
@@ -19,6 +20,9 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 export interface GpItem {
   readonly id: number
   readonly name: string
+  /** 설명 첫 줄 — StrITEM[0xad + k] (타자 칸 9 는 [0xb7]) — 원문 `!N` 그대로 */
+  readonly descriptionText: string
+  /** 효과 글 — `gpItemEffectTextOf` (원문 `!N` · 들여쓰기 그대로) */
   readonly effectText: string
   /** G포인트 (표 0xcc41b × 100) */
   readonly price: number
@@ -28,18 +32,54 @@ const PRICE_TABLE = [3, 3, 3, 3, 10, 3, 3, 5, 20, 5]
 const PRICE_UNIT = 100
 const MAXIMUM_GAME_POINT = 99_999
 
-const NAMES = ['장어구이', '붕붕드링크', '빌리언XZ', '고려인삼', '엄마의도시락', '또또상품권', '영지버섯', '종합건강진단', '최면요법', '이글아이']
-const EFFECT_TEXTS = [
-  '히트 능력치 + 10', '파워 능력치 + 10', '수비 능력치 + 10', '주루 능력치 + 10', '모든 능력치 + 10',
-  '랜덤으로 아이템 및 소지금 획득', '사기 회복 + 40', '부상 / 질병 즉시 회복', '마이너스 스킬 모두 삭제',
-  '20게임 동안 상대 투수가 던질 곳 보기',
-]
-export const BATTER_GP_ITEMS: readonly GpItem[] = NAMES.map((name, id) => ({
-  id,
-  name,
-  effectText: EFFECT_TEXTS[id],
-  price: PRICE_TABLE[id] * PRICE_UNIT,
-}))
+/** 이름 StrITEM[0x62 + k] — 칸 9 는 타자(모드 4)면 [0x6c] 이글아이, 투수면 [0x62 + 9] 십전대보탕 (0x826b0) */
+const NAME_BASE = 0x62
+const BATTER_NINTH_NAME = 0x6c
+const DESCRIPTION_BASE = 0xad
+const BATTER_NINTH_DESCRIPTION = 0xb7
+const ABILITY_EFFECT_FORMAT = 0xa5
+const OTHER_EFFECT_BASE = 0xa2
+const BATTER_NINTH_EFFECT = 0xac
+const ABILITY_ITEM_COUNT = 4
+const NINTH_ITEM = 9
+/** 능력치 이름 StrMODE[0x23 + k] (타자) — 투수는 [0x28 + k] */
+const BATTER_ABILITY_NAME_BASE = 0x23
+
+const itemText = (index: number): string => ORIGINAL_ITEMS[index] ?? ''
+
+/**
+ * GP 아이템 설명 조립 — 아이템 창 0x81dc0 창 종류 2 의 나만의리그 갈래 (직접 떴다, 0x828a6~0x829ea):
+ * ```
+ * 82890  "!cFFFFFF"
+ * 828c8  + StrITEM[0xad + k]  (k == 9 이고 모드 4(0x7b970) 면 [0xb7])
+ * 82906  + "!N효과 : !cFFFF00"(0xcc9f0)
+ * 82932  k ≤ 3: + sprintf(StrITEM[0xa5], StrMODE[0x23 + k])  ; 투수(0x7b984)면 [0x28 + k]
+ * 829a2  k == 9 이고 모드 4: + StrITEM[0xac]
+ * 829d0  그 밖: + StrITEM[0xa2 + k]
+ * ```
+ */
+export function gpItemEffectTextOf(id: number, isBatter = true): string {
+  if (id < ABILITY_ITEM_COUNT) {
+    const nameBase = isBatter ? BATTER_ABILITY_NAME_BASE : BATTER_ABILITY_NAME_BASE + 5
+    return itemText(ABILITY_EFFECT_FORMAT).replace('%s', ORIGINAL_MODE_TEXT[nameBase + id] ?? '')
+  }
+  if (id === NINTH_ITEM && isBatter) return itemText(BATTER_NINTH_EFFECT)
+  return itemText(OTHER_EFFECT_BASE + id)
+}
+
+/** 이름 · 설명 · 효과를 원문 표에서 (모드 4 = 타자) */
+export function gpItemOf(id: number, isBatter = true): GpItem {
+  const isBatterNinth = id === NINTH_ITEM && isBatter
+  return {
+    id,
+    name: itemText(isBatterNinth ? BATTER_NINTH_NAME : NAME_BASE + id),
+    descriptionText: itemText(isBatterNinth ? BATTER_NINTH_DESCRIPTION : DESCRIPTION_BASE + id),
+    effectText: gpItemEffectTextOf(id, isBatter),
+    price: PRICE_TABLE[id] * PRICE_UNIT,
+  }
+}
+
+export const BATTER_GP_ITEMS: readonly GpItem[] = PRICE_TABLE.map((_price, id) => gpItemOf(id))
 
 const ABILITY_ORDER: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
 const ABILITY_ITEM_GAIN = 10
@@ -360,9 +400,30 @@ export function eagleEyeNoticeOf(gamesRemaining: number): string {
 }
 
 function prizeLabelOf(prize: LotteryPrize, prizeItemId: number | undefined): string {
-  if (typeof prize !== 'number') return NAMES[prizeItemId ?? LOTTERY_EFFECT_OF[prize]] ?? ''
+  // 아이템 상의 이름 StrITEM[0x62 + n] — 모드 갈림이 없다 (0xa4720~0xa4730, n 은 0~7 이라 칸 9 이름 갈래를 안 탄다)
+  if (typeof prize !== 'number') return itemText(NAME_BASE + (prizeItemId ?? LOTTERY_EFFECT_OF[prize]))
   const amount = LOTTERY_MONEY[prize - 1]
   return amount >= MONEY_UNIT ? `${amount / MONEY_UNIT}억` : `${amount * MONEY_UNIT}만`
+}
+
+/** 상으로 받은 능력치 아이템 알림의 숫자 — 복권 갈래는 0xbc73d 에 **10** 을 넘긴다 (0xa4868 `movs r1,#0xa`, 일반 갈래 6·8 과 다르다) */
+const LOTTERY_ABILITY_NOTICE_NUMBER = 10
+const LOTTERY_LINE_BREAK = '!N'
+
+/**
+ * 아이템 상의 뒷줄 — 0xa474e~0xa48ee (직접 떴다). 효과를 그 자리에서 다시 적용하고(일반 갈래와 같은 계산) 글을 잇는다:
+ * ```
+ * a474e  n ≤ 3 (아차상): StrMODE[0x23 + n](모드 4) / [0x28 + n] + " " + "10" + " " + StrMODE[83]
+ * a480c  n == 4 (엄마상): StrMODE[0x27] "모든능력치" + " " + "10" + " " + StrMODE[83]
+ * a4888  n == 7 (메디카상): StrMODE[0x7b]
+ * a48cc  n == 6 (우정상): StrMODE[0x7a]
+ * ```
+ */
+function lotteryPrizeEffectNoticeOf(texts: GpNoticeTexts, prizeItemId: number): string {
+  if (prizeItemId <= ALL_ABILITY_ITEM) {
+    return `${texts.abilityNames[prizeItemId] ?? ''} ${LOTTERY_ABILITY_NOTICE_NUMBER} ${spacedModeText(RISE_TEXT)}`
+  }
+  return STATIC_NOTICES[prizeItemId] ?? ''
 }
 
 /** 모드로 갈리는 알림 조각 — 능력치 이름 5칸(0~3 + 모든능력치 StrMODE[39]) 과 아이템 9 글 */
@@ -383,10 +444,12 @@ export function gpItemNoticeWith(
   if (id < texts.abilityNames.length) return `${texts.abilityNames[id]} ${ABILITY_NOTICE_NUMBERS[id]} ${spacedModeText(RISE_TEXT)}`
   if (id === LOTTERY_ITEM && prize !== null) {
     // 돈 상: sprintf("%d등 "(0xd7e08), 등수) + StrMODE[116] + 금액 + StrMODE[117] (0xa4658~0xa46c0)
-    // 아이템 상: StrMODE[0x70 + 칸](118 엄마상 …) + [116] + StrITEM[0x62 + n] + [117] + "!N" (0xa46f8~0xa474a)
-    // ⚠️ 아이템 상은 원본이 "!N" 뒤에 그 아이템의 효과 알림을 더 잇는다(0xa474e~) — 그 뒷줄은 옮기지 않았다
+    // 아이템 상: StrMODE[0x70 + 칸](118 엄마상 …) + [116] + StrITEM[0x62 + n] + [117] + "!N"(0xd80a4) (0xa46f8~0xa474a)
+    //          뒤에 그 아이템의 효과 알림을 잇는다 (0xa474e~0xa48ee — `lotteryPrizeEffectNoticeOf`)
     const title = typeof prize === 'number' ? `${prize}등 ` : prize
-    return `${title}${spacedModeText(LOTTERY_HEAD_TEXT)}${prizeLabelOf(prize, prizeItemId)}${modeText(LOTTERY_TAIL_TEXT)}`
+    const head = `${title}${spacedModeText(LOTTERY_HEAD_TEXT)}${prizeLabelOf(prize, prizeItemId)}${modeText(LOTTERY_TAIL_TEXT)}`
+    if (typeof prize === 'number') return head
+    return `${head}${LOTTERY_LINE_BREAK}${lotteryPrizeEffectNoticeOf(texts, prizeItemId ?? LOTTERY_EFFECT_OF[prize])}`
   }
   if (id === ITEM.이글아이) return texts.ninthItemNotice
   return STATIC_NOTICES[id] ?? ''
