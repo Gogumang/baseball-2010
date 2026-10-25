@@ -1,4 +1,5 @@
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
   BATTING_TYPE_NAMES, INFO_BOARD, INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP,
   POSITION_NAMES, SIDE_NAMES, SKIN_NAMES,
@@ -28,14 +29,16 @@ export type InfoCellId = '팀명' | '필살' | '타순' | SelectableRowId
  */
 export const ROW_ORDER: readonly SelectableRowId[] = ['이름', '타입', '포지션', '손', '피부']
 
-/** 고른 줄의 안내 문구 (StrMODE[3] 이름 · [4] 포지션 · [9] 손 — RALPH 18회차 기록) */
-export const ROW_HINTS: Readonly<Record<string, string>> = {
-  이름: '한글 4글자, 영문 8글자까지 입력할 수 있습니다',
-  타입: '배팅 타입을 선택합니다. 타입에 따라 능력치가 달라집니다',
-  포지션: '내야 : 포수/유격/1루/2루/3루 · 외야 : 좌익/중견/우익',
-  손: '우타 : 오른손 타자 · 좌타 : 왼손 타자',
-  피부: '피부 색상을 선택합니다',
-}
+/**
+ * 고른 줄의 안내 문구 — 원문 표 StrMODE 에서 읽는다(r216 화면 글 감사: 예전엔 줄바꿈 !N 을 " · " 로 이어 뜻만 옮겼다).
+ * 번호는 그리기 0x15f34 161f4~16252 (점프표 0xcc6d8, 고른 줄 번호): 줄 0 → 3 · 1 → 모드 4 면 7(투수 8) · 2 → 4(5) ·
+ * 3 → 9(10) · 4 → 11 · 5 → 6. 타자는 이름 [3] · 타입 [7] · 포지션 [4] · 손 [9] · 피부 [11] (투수는 `REGISTER_ROW_HINTS`).
+ */
+export const ROW_HINT_TEXT_IDS: Readonly<Record<string, number>> = { 이름: 3, 타입: 7, 포지션: 4, 손: 9, 피부: 11 }
+
+export const ROW_HINTS: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(ROW_HINT_TEXT_IDS).map(([row, id]) => [row, ORIGINAL_MODE_TEXT[id] ?? '']),
+)
 
 /** 한 줄의 선택지와 그 값이 앉는 자리 */
 export interface RowChoice {

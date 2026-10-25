@@ -1,4 +1,5 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RolledOutingEffect } from '@/shared/config/outingPlaces'
 
@@ -42,8 +43,8 @@ export const SUB_ITEMS: readonly SubItem[] = NAMES.map((name, id) => ({
 
 /** 원문 알림 — StrMODE[77] · [78] */
 export const SUB_ITEM_BLOCK_TEXT: Readonly<Record<'소지금부족' | '이미보유', string>> = {
-  소지금부족: '소지금이 부족합니다',
-  이미보유: '이미 가지고 있는 아이템입니다',
+  소지금부족: ORIGINAL_MODE_TEXT[77] ?? '',
+  이미보유: ORIGINAL_MODE_TEXT[78] ?? '',
 }
 
 export type SubItemBlockReason = '소지금부족' | '이미보유'

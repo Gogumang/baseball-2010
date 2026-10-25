@@ -9,6 +9,8 @@ import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { batterNariEntryViewOf, pressNariEntryKey } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
 import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
+import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { entryBatterLineOfRecord, entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
 
 const 선수 = () => {
   const career = createCareer('보기')
@@ -79,6 +81,30 @@ describe('143 경기 전 엔트리 보기 — 진입 0x16af8 (0x5561c 셋째 인
     expect(view.teamId).toBe(10)
     expect(view.lists.batters.map((row) => row.name)).toEqual(teamBatters(10).map((player) => player.name))
     expect(view.lists.pitchers.map((row) => row.name)).toEqual(teamPitchers(10).map((player) => player.name))
+  })
+
+  it('국가대항전 기록 열 — 붙박이 줄은 마스터 복사(Xls 행) 줄 · +0x2c 10000, 내 선수 줄은 커리어 시즌 줄 (0x205c0 · 0x20648 · 0x1fe5c · 0xb53f1)', () => {
+    const base = createCareer('대회')
+    const stats = { ...base.stats, atBats: 30, hits: 9, homeRuns: 2, runsBattedIn: 5, stolenBases: 1 }
+    const nariCupTeams = { ...createNariCupTeams(2, 11), opponentMorale: 30 }
+    const career = { ...base, stats, nariCupTeams }
+    const korea = batterNariEntryViewOf(career, true, { myTeam: 10, opponent: 11 })
+    const table = teamBatters(10)
+    const mine = korea.lists.batters.find((row) => row.name === '대회')
+    expect(mine?.batterLine).toMatchObject({ atBats: 30, hits: 9, homeRuns: 2, runsBattedIn: 5, steals: 1, errors: 0 })
+    const other = korea.lists.batters.find((row) => row.name !== '대회')!
+    const player = table.find((candidate) => candidate.name === other.name)!
+    expect(player.recordLine.some((value) => value !== 0)).toBe(true)
+    expect(other.batterLine).toEqual(entryBatterLineOfRecord(player.recordLine))
+    const pitcher = korea.lists.pitchers[0]!
+    const tablePitcher = teamPitchers(10).find((candidate) => candidate.name === pitcher.name)!
+    expect(pitcher.pitcherLine).toEqual(entryPitcherLineOfRecord(tablePitcher.recordLine))
+    expect(pitcher.stamina).toEqual({ capacity: staminaCapacityOf(tablePitcher.ability[3], 100, false), percent: 100 })
+    // 상대국 칸 +2 — 대회 중 0xa3a24 가 읽고 쓰는 칸
+    const opponent = batterNariEntryViewOf(career, false, { myTeam: 10, opponent: 11 })
+    const theirPitcher = opponent.lists.pitchers[0]!
+    expect(theirPitcher.stamina?.capacity).toBe(staminaCapacityOf(theirPitcher.ability[3] ?? 0, 30, false))
+    expect(opponent.lists.batters.every((row) => row.batterLine !== undefined)).toBe(true)
   })
 
   it('기록 열 · 체력 줄 — 커리어 리그 기록표 줄 · 칸별 +0x2c 를 [ed+0x334] = 4 로 (0x16c0c~16c24 · 0x572a4)', () => {

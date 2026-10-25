@@ -34,6 +34,8 @@ import {
 import type { NariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import { leagueGamePitchersOf, nextOpponentOf } from '@/entities/career/model/playerCareer'
 import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
+import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
@@ -107,7 +109,7 @@ export interface NariEntryView {
  *   팀 레코드 +2 에 0xa3a24 를 쓰고, CPU 끼리 간이 엔진도 두 팀 모두 부른다(0xc1308 · 0xc1320, 넷째 인자 1). 커리어
  *   `teamRecordMorales`(r101 — 사람 경기 상대 · 그날 CPU 경기 여덟 팀 · CPU 포스트시즌 두 팀, 새 시즌 0x1b768 은 안 건드림)가 그 값이고
  *   옛 저장에 없으면 표값 100 (`nariTeamRecordMoraleOf`, r128 이음).
- * ⚠️ 미확인(남김 — 웹 기록 꼴): 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다(내 선수 줄 포함).
+ * 국가대항전 두 칸(+0xbc4 · +0xbe0)은 `isCupRecord` — 마스터 팀 복사본이라 붙박이 줄 +0x20~ 가 Xls 행 그대로다(`nariCupEntryCellSourceOf`).
  * 정규·포스트시즌의 내 선수 줄(표 밖)은 커리어 시즌 줄로 채운다(`myBatterEntryLineOf` · 투수편 `myPitcherEntryCellsOf`, r213).
  */
 export interface NariEntryCellSource {
@@ -117,9 +119,44 @@ export interface NariEntryCellSource {
   /** [ed+0x334] = 모드 */
   readonly staminaMode: number
   readonly morale: number
+  /**
+   * 국가대항전 대회 칸(+0xbc4 대표팀 · +0xbe0 상대국)인가 — 참이면 붙박이 줄의 기록 열 · +0x2c 를 리그 기록표가 아니라 그 선수 Xls 행에서
+   * 읽는다(`nariCupEntryCellSourceOf` 근거). `stats` · `staminas` 는 안 쓴다
+   */
+  readonly isCupRecord?: boolean
 }
 
 const FULL_RECORD_STAMINA = 10000
+
+/**
+ * **국가대항전 143 의 기록 열 · 체력 줄 재료** (r216 직접 떴다). 목록 칸 그리기 0x56ebc 는 모드 갈래 없이 줄 레코드
+ * `[팀+0x18/0x14][i] × 0x30 + 0x20` 을 읽고, 대회 중 0x1f9a9 → 0x1f8f8/0x1f940 이 대회 칸 두 개를 준다. 그 두 칸이 서는 곳:
+ * ```
+ * 0x205c0(g, 모드)    +0xbc4 를 0x1c 바이트 지우고(205fa~20610 memset) 0x1f8c0(g, 10) 마스터 팀 10 → 0x1fe5c(.., 0) 깊은 복사
+ * 0x20648(g, 모드, t) +0xbe0 ← 0x1f8c0(g, t) 마스터 팀 t 를 0x1fe5c 로 복사 (대회 초기화 b7ca4 · 하루 끝 b8216 이 날마다 다시)
+ * 0x1f8c0(g, t)       [g+0xac] + 0xac0 + 0x1c·t — 마스터 팀. 0x1ff98 이 Xls 행 0x30 바이트를 통째 베껴 싣는다(1ffe0~2004e)
+ * 0x1fe5c             머리 0xc 바이트 + 타자 [+0x14] · 투수 [+0x18] 배열을 0x30 × 개수로 memcpy(0x1400418) — 레코드 칸 그대로
+ * 0xb6190(팀)         투수 전원 +0x2c = 0x2710 — 대표팀은 대회 초기화 · 하루 끝 b81e0 이 부른다
+ * ```
+ * 시즌 시작 지우기 0xb6cc4(부르는 곳 0xc3e8 · 0x1b768 · 0x204e0 · 0xa3fec)는 나리 열 팀 복사본만 지우고 마스터는 안 건드리며,
+ * 대회 경기의 정산 0xa8024 는 게이트 0xa56dc 가 S+0x12c(a5704~a571a `ldrb [S, #0x12c]`)에서 거짓이라 안 쌓는다.
+ * 곧 143 의 붙박이 줄 +0x20~+0x2b 는 그 선수의 **Xls 행 기록 줄**(`RosterPlayer.recordLine` — 0 이 아니다, 예: 타자 1000타수)이고
+ * 행 +0x2c~+0x2f 는 Xls 표 바이트가 타자 180행 모두 0(도루 · 실책 0) · 투수 120행 모두 `10 27 00 00`(+0x2c 10000 · 승 0 · 패 0)이다.
+ * 마선수는 없다(142 1c5fe: S+0x12c 면 안 넣는다).
+ * 팀 레코드 +2(체력 줄 용량 0x66e44): 상대국 칸은 `NariCupTeams.opponentMorale`(대회 중 0xa3a24 가 읽고 쓰는 칸), 대표팀 칸은 마스터 복사 표값.
+ * ⚠️ 미확인(남김 — 웹 기록 꼴): 대회 사람 경기가 게이트 밖에서 대표팀 칸에 올리는 투수 +0x2a 사사구(a8b04) · 타자 +0x2e 실책(0x43278),
+ * 경기 셋업 0x39fdc(3a31e) · 0xb570c 가 대표팀 칸 +2 에 쓰는 그날의 나리 사기는 웹이 대회 칸에 안 쌓아, 둘째 날부터의 대표팀 줄은 표값 그대로다.
+ */
+export function nariCupEntryCellSourceOf(
+  stats: LeaguePlayerStats,
+  staminaMode: number,
+  teamId: number,
+  teams: NariCupTeams | undefined,
+): NariEntryCellSource {
+  const isOpponentSlot = teams !== undefined && teams.opponentTeamId === teamId
+  const morale = isOpponentSlot ? teams.opponentMorale ?? teamRecordMoraleOf(teamId) : teamRecordMoraleOf(teamId)
+  return { stats, staminas: undefined, staminaMode, morale, isCupRecord: true }
+}
 
 /**
  * 143 의 나리 리그 팀 레코드 +2 (`NariEntryCellSource.morale`). 내 팀 칸은 0xa3a24 가 읽는 칸 그 자체라 커리어 사기
@@ -133,8 +170,10 @@ export function nariEntryTeamMoraleOf(
   return isMyTeam ? career.morale : nariTeamRecordMoraleOf(career, teamId)
 }
 
-function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number) {
+function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number, player: RosterPlayer) {
   if (cells === undefined) return {}
+  // 대회 칸 — Xls 행 +0x20~+0x2b 그대로, +0x2c 도루 · +0x2e 실책은 표 바이트 0 (`nariCupEntryCellSourceOf`)
+  if (cells.isCupRecord === true) return { batterLine: entryBatterLineOfRecord(player.recordLine) }
   const line = leagueBatterLineOf(cells.stats, leagueBatterIdOf(teamId, slot))
   // +0x2e 실책 — 수비 그림 0x43278 4381a~43904 가 쌓은 칸(옛 저장은 0)
   const batterLine: EntryBatterLine = {
@@ -144,8 +183,11 @@ function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: numbe
   return { batterLine }
 }
 
-function nariPitcherCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number, staminaAbility: number) {
+function nariPitcherCellsOf(cells: NariEntryCellSource | undefined, teamId: number, slot: number, player: RosterPlayer) {
   if (cells === undefined) return {}
+  const staminaAbility = player.ability[3] ?? 0
+  // 대회 칸 — Xls 행 줄 그대로(승 · 패 0), +0x2c 는 표값 · 0xb6190 모두 10000 (`nariCupEntryCellSourceOf`)
+  if (cells.isCupRecord === true) return aceCellsOf(cells, player.recordLine, true, staminaAbility)
   const line = leaguePitcherLineOf(cells.stats, leaguePitcherIdOf(teamId, slot))
   // +0x2a 사사구 — 정산 0xa8024 꼬리 a8b04~a8bee 가 쌓은 칸(옛 저장은 0)
   const pitcherLine: EntryPitcherLine = {
@@ -215,7 +257,7 @@ export function nariEntryBattersOf(
     return {
       name: player?.name ?? '', ability, isAce: false, position: row.position,
       ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, false, ability) }),
-      ...(player === undefined ? {} : nariBatterCellsOf(cells, teamId, row.slot)),
+      ...(player === undefined ? {} : nariBatterCellsOf(cells, teamId, row.slot, player)),
     }
   })
 }
@@ -244,7 +286,7 @@ export function nariEntryPitchersOf(
     return {
       name: player?.name ?? '', ability, isAce: false,
       ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, true, ability) }),
-      ...(player === undefined ? {} : nariPitcherCellsOf(cells, teamId, slot, player.ability[3])),
+      ...(player === undefined ? {} : nariPitcherCellsOf(cells, teamId, slot, player)),
     }
   })
 }
@@ -302,9 +344,12 @@ export function batterNariEntryViewOf(
     const record = career.nariCupTeams === undefined
       ? tableNariTeamRecord(teamId)
       : nariCupRecordOf(career.nariCupTeams, teamId)
+    // 기록 열 — 붙박이 줄은 마스터 복사(Xls 행) 줄, 내 선수 줄은 상태 133 의 0xb53f1 이 0x1fc21(g) 내 레코드 0x30 바이트를 그대로
+    // memcpy(b54f6 · 0x1400418)한 것이라 커리어 시즌 줄이다(대회 경기는 게이트 0xa56dc 가 거짓이라 그 뒤로 안 바뀐다)
+    const cells = nariCupEntryCellSourceOf(career.leaguePlayerStats, BATTER_EDITION_MODE, teamId, career.nariCupTeams)
     return openNariEntryView(isMyTeam, teamId, {
-      batters: nariEntryBattersOf(record, teamId, me),
-      pitchers: nariEntryPitchersOf(teamId, record.pitchers ?? UNSHUFFLED_PITCHER_ORDER),
+      batters: nariEntryBattersOf(record, teamId, { ...me, batterLine: myBatterEntryLineOf(career) }, cells),
+      pitchers: nariEntryPitchersOf(teamId, record.pitchers ?? UNSHUFFLED_PITCHER_ORDER, undefined, cells),
     })
   }
   const opponent = nextOpponentOf(career)

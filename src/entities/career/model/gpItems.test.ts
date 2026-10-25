@@ -1,3 +1,4 @@
+import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -30,12 +31,16 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
 
   it('알림은 원문 조각으로 만든다 — StrMODE[35+k]+[83], [122], 복권은 [116]/[117]', () => {
     // ⚠️ 원본 버그 그대로 — 실제로는 +10 오르는데 글에는 6(엄마의도시락은 8)이 찍힌다
-    expect(gpItemNoticeOf(1, null)).toBe('파워 6 상승하였습니다')
-    expect(gpItemNoticeOf(4, null)).toBe('모든능력치 8 상승하였습니다')
-    expect(gpItemNoticeOf(6, null)).toBe('사기 +40 회복되었습니다')
-    expect(gpItemNoticeOf(5, 1)).toBe('1등 당첨!! [1억] 획득!')
-    expect(gpItemNoticeOf(5, '우정상')).toBe('우정상 당첨!! [영지버섯] 획득!')
-    expect(gpItemNoticeOf(5, '아차상', 2)).toBe('아차상 당첨!! [빌리언XZ] 획득!')
+    // 0xa455c: 이름 + " " + 6 + " " + StrMODE[83](앞 빈칸 포함 " !c00CC00상승…") — 빈칸이 둘이다
+    expect(gpItemNoticeOf(1, null)).toBe('파워 6  !c00CC00상승!cFFFFFF하였습니다')
+    expect(gpItemNoticeOf(4, null)).toBe('모든능력치 8  !c00CC00상승!cFFFFFF하였습니다')
+    expect(gpItemNoticeOf(6, null)).toBe('!C!cFFFF00사기 +40!cFFFFFF 회복되었습니다') // StrMODE[122] 원문
+    // 돈 상: "%d등 "(0xd7e08) + " 당첨!!!N[!cFFFF00" + 금액 + "!cFFFFFF] 획득!"
+    expect(gpItemNoticeOf(5, 1)).toBe('1등  당첨!!!N[!cFFFF001억!cFFFFFF] 획득!')
+    expect(stripGameMarkup(gpItemNoticeOf(5, '우정상'))).toBe('우정상 당첨!!\n[영지버섯] 획득!')
+    expect(stripGameMarkup(gpItemNoticeOf(5, '아차상', 2))).toBe('아차상 당첨!!\n[빌리언XZ] 획득!')
+    // 이글아이 — sprintf(StrMODE[126], 쓴 뒤 남은 경기) (0xa49a6~0xa49e2)
+    expect(gpItemNoticeOf(9, null, undefined, 40)).toBe('!C40게임 동안 상대 투구!N목표점을 볼 수 있습니다')
   })
 
   it('능력치 아이템은 히트·파워·수비·주루 +10, 엄마의도시락은 모두 +10', () => {

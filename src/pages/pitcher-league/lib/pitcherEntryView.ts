@@ -15,7 +15,7 @@ import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import type { NariEntryFace } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import {
-  acePitcherFace, nariEntryBattersOf, nariEntryPitchersOf, nariEntryTeamMoraleOf, openNariEntryView,
+  acePitcherFace, nariCupEntryCellSourceOf, nariEntryBattersOf, nariEntryPitchersOf, nariEntryTeamMoraleOf, openNariEntryView,
 } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryCellSource, NariEntryView } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
@@ -38,20 +38,25 @@ export function pitcherNariEntryViewOf(
   const record = cupTeams === undefined ? nariTeamRecordOf(nariTeamsOf(career), teamId) : nariCupRecordOf(cupTeams, teamId)
   const order = isMyTeam ? ourPitcherOrderOf(options) : opponentPitcherOrderOf(options)
   const aceSlot = isMyTeam ? OUR_ACE_PITCHER_SLOT : ACE_PITCHER_SLOT
-  // 기록 열 · 체력 줄 — [ed+0x334] = 3 (`NariEntryCellSource`). 국가대항전 칸은 비운다(⚠️ 그 주석)
-  const cells: NariEntryCellSource | undefined = cupTeams !== undefined ? undefined : {
-    stats: career.leaguePlayerStats,
-    staminas: humanGamePitcherStaminasOf(career, options.dayCounter, teamId),
-    staminaMode: PITCHER_EDITION_MODE,
-    // 팀 레코드 +2 — 내 팀은 커리어 사기(0x1f988 +2), 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기 (`teamRecordMorales`, r128)
-    morale: nariEntryTeamMoraleOf(career, isMyTeam, teamId),
-  }
+  // 기록 열 · 체력 줄 — [ed+0x334] = 3 (`NariEntryCellSource`). 국가대항전 칸은 마스터 복사(Xls 행) 줄 · +0x2c 10000
+  // (`nariCupEntryCellSourceOf`). 내 투수 줄은 상태 133 의 0xb53f1 이 내 레코드 0x30 바이트를 그대로 memcpy 한 것이라 커리어 시즌 줄이다
+  // (대회 경기는 0xa56dc 거짓이라 안 쌓는다). ⚠️ 미확인(남김): 그 복사본 +0x2c 는 하루 끝 b81e0 의 0xb6190 이 10000 으로 채우는데
+  // 웹은 내 줄 체력을 커리어 스태미나(`myPitcherEntryCellsOf`)로 둔다
+  const cells: NariEntryCellSource = cupTeams !== undefined
+    ? nariCupEntryCellSourceOf(career.leaguePlayerStats, PITCHER_EDITION_MODE, teamId, cupTeams)
+    : {
+      stats: career.leaguePlayerStats,
+      staminas: humanGamePitcherStaminasOf(career, options.dayCounter, teamId),
+      staminaMode: PITCHER_EDITION_MODE,
+      // 팀 레코드 +2 — 내 팀은 커리어 사기(0x1f988 +2), 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기 (`teamRecordMorales`, r128)
+      morale: nariEntryTeamMoraleOf(career, isMyTeam, teamId),
+    }
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, null, cells),
     pitchers: nariEntryPitchersOf(teamId, order, (slot) => {
       if (isMyTeam && slot === MY_PITCHER_SLOT) {
         const face = myPitcherEntryFaceOf(career)
-        return { ...face, ...(cells === undefined ? {} : myPitcherEntryCellsOf(career, face, cells)), isAce: false }
+        return { ...face, ...myPitcherEntryCellsOf(career, face, cells), isAce: false }
       }
       if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
       return undefined

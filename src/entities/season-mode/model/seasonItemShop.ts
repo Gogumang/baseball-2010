@@ -184,11 +184,11 @@ export function applySeasonGpItem<R extends GpRecord>(
       while (rank <= 6 && (LOTTERY_CUMULATIVE[rank] ?? 0) * 100 <= roll) rank += 1
       if (rank <= LOTTERY_LAST_PRIZE) {
         const prize = LOTTERY_PRIZES[rank] ?? 0
-        text += `${rank + 1}등 ${modeText(116)}${moneyTextOf(prize * 100)}${rank !== 0 ? '만' : ''}${modeText(117)}`
+        text += `${rank + 1}등  ${modeText(116)}${moneyTextOf(prize * 100)}${rank !== 0 ? '만' : ''}${modeText(117)}` // "%d등 " + " 당첨…" (원본 [116] 앞 빈칸은 생성기가 깎았다)
         return { record: { ...record, money: clampTo(record.money + prize, MONEY_LIMIT) }, teamMorale, notice: text }
       }
       // 꽝(10%) — "우정상 당첨!! [영지버섯] 획득!" 뒤 영지버섯 효과를 그대로 (0xa3212~0xa3288)
-      text += `${modeText(CONSOLATION_TITLE)}${modeText(116)}${ORIGINAL_ITEMS[CONSOLATION_ITEM] ?? ''}${modeText(117)}!N${modeText(122)}`
+      text += `${modeText(CONSOLATION_TITLE)} ${modeText(116)}${ORIGINAL_ITEMS[CONSOLATION_ITEM] ?? ''}${modeText(117)}!N${modeText(122)}`
       return { record, teamMorale: raiseMorale(), notice: text }
     }
     case 1:

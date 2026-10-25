@@ -158,8 +158,8 @@ describe('runRest', () => {
 })
 
 describe('126 결과 팝업 글 — 효과 0x15234 · 입원 회복 0x1575c', () => {
-  const 상승 = '!c00CC00상승!cFFFFFF하였습니다'
-  const 하락 = '!cFF0000하락!cFFFFFF하였습니다'
+  const 상승 = ' !c00CC00상승!cFFFFFF하였습니다'
+  const 하락 = ' !cFF0000하락!cFFFFFF하였습니다'
 
   it('줄 차례는 인기도 → 평판 → 소지금 → 사기, 굴린 값이 0 인 칸은 줄이 없다', () => {
     const outcome = performOuting(선수({ money: 9999, popularity: 9000 }), 기능('CF촬영'), 최소)
