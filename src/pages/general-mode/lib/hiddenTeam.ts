@@ -12,6 +12,7 @@
  */
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
+import { hiddenTeamUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
 
 /** 히든 팀은 10번부터 다섯이다 (teams.ts 와 같은 번호) */
 export const HIDDEN_TEAM_FIRST_ID = 10
@@ -34,7 +35,11 @@ export function isHiddenTeam(teamId: number): boolean {
 
 /** 전역 기록 +0x70+idx 가 켜졌는가 — 0~9 는 늘 열려 있다 */
 export function isTeamOpened(teamId: number, openedHiddenIds: readonly number[]): boolean {
-  return !isHiddenTeam(teamId) || openedHiddenIds.includes(teamId)
+  if (!isHiddenTeam(teamId)) return true
+  // 해금 표(`unlocks.json`)가 풀면 열린 팀으로 본다 — 저장의 해금 기록은 그대로다
+  const unlockId = hiddenTeamUnlockIdOf(teamId)
+  const original = () => openedHiddenIds.includes(teamId)
+  return unlockId === null ? original() : isUnlocked(unlockId, original)
 }
 
 /** 히든 팀을 고를 수 있는 모드 — **일반모드(1) 하나뿐**이다 (StrMODE[1]) */

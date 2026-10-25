@@ -8,6 +8,7 @@ import type { StadiumKind } from '@/entities/season-mode/model/stadiumItems'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { EQUIPMENT_COLORS, EQUIPMENT_WINDOW } from '@/pages/season/lib/seasonEquipmentWindow'
 import type { WindowBox } from '@/pages/season/lib/seasonEquipmentWindow'
+import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
 /**
  * **구장 아이템 창 — 아이템 창 0x83378 의 창 종류 4** (시즌 0xdc 상점 · 0xea 구장관리 — 직접 떴다).
@@ -76,7 +77,8 @@ export function stadiumKindBoxOf(kind: StadiumKind): WindowBox {
 export function isLockedStadiumSlot(kind: StadiumKind, slot: number, isHiddenOpen: (unlockId: number) => boolean): boolean {
   if (slot < STADIUM_HIDDEN_FIRST_SLOT) return false
   const unlockId = STADIUM_HIDDEN_UNLOCK_IDS[kindIndexOf(kind)]?.[slot - STADIUM_HIDDEN_FIRST_SLOT]
-  return unlockId !== undefined && !isHiddenOpen(unlockId)
+  // 해금 표(`unlocks.json`)가 풀면 열린 칸으로 그린다
+  return unlockId !== undefined && !isHiddenUnlocked(unlockId, () => isHiddenOpen(unlockId))
 }
 
 const NAME_BASE: Readonly<Record<StadiumKind, number>> = { 관중석: 126, 전광판: 133, 잔디: 140 }

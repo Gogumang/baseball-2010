@@ -12,6 +12,7 @@ import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { SeasonTeamCard } from '@/pages/season/ui/SeasonTeamCard'
 import { SeasonTeamInfoPanel } from '@/pages/season/ui/SeasonTeamInfoScreen'
 import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
+import { hiddenTeamUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
 
 /** 0xca 에서 고를 수 있는 칸의 끝 — 칸 > 9(히든 팀 10~14)는 힌트만 띄운다 (0x8e06 `cmp r3, #9`) */
 const LAST_PICKABLE_TEAM = 9
@@ -32,7 +33,10 @@ export function hiddenTeamHintOf(teamId: number, openedHiddenIds: readonly numbe
   const hint = ORIGINAL_MODE_TEXT[226 + teamId - FIRST_HIDDEN_TEAM] ?? ''
   const cannotPick = ORIGINAL_MODE_TEXT[0] ?? ''
   const generalModeOnly = ORIGINAL_MODE_TEXT[1] ?? ''
-  return openedHiddenIds.includes(teamId)
+  // 해금 표(`unlocks.json`)가 풀면 열린 팀의 글([0] 줄 없음)이다
+  const unlockId = hiddenTeamUnlockIdOf(teamId)
+  const original = () => openedHiddenIds.includes(teamId)
+  return (unlockId === null ? original() : isUnlocked(unlockId, original))
     ? `${title}!N${hint}!N!N${generalModeOnly}`
     : `${title}!N${hint}!N!N${cannotPick}!N${generalModeOnly}`
 }

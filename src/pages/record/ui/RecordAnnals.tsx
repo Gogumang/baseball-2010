@@ -41,6 +41,7 @@ import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import { RECORD_COUNT_KINDS, achievementMarkOf, annalsSkillOfCell, isAnnalsSkillGained, recordCountOf } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
+import { ANNALS_SECRET_PAGES_UNLOCK_ID, isUnlocked } from '@/shared/config/unlocks'
 
 const SLT_FRAME = './sprites/slt_frame'
 const SLT_FRAMES = `${SLT_FRAME}/frames`
@@ -159,7 +160,9 @@ export function RecordAnnals({
   }))
 
   // 쪽 넘기기 한도 — 통계 탭은 비밀 번호가 열려 있으면 8쪽 (0x2ba32 · 0x2ba8c). 쪽 번호 "/전체" 는 늘 표 값이다
-  const pageLimit = tab === 4 && secretCode.isUnlocked ? UNLOCKED_STAT_PAGE_COUNT : TAB_PAGE_COUNTS[tab]
+  // 숨은 쪽 — 비밀 번호(0x2b7a0)로 열거나 해금 표(`unlocks.json`)가 풀면 여덟 쪽을 돈다. 비밀 번호 상태는 그대로다
+  const isSecretOpen = isUnlocked(ANNALS_SECRET_PAGES_UNLOCK_ID, () => secretCode.isUnlocked)
+  const pageLimit = tab === 4 && isSecretOpen ? UNLOCKED_STAT_PAGE_COUNT : TAB_PAGE_COUNTS[tab]
   const pageCount = TAB_PAGE_COUNTS[tab]
   /** 탭 3 닉네임 스크롤 객체 (skin +0x108~+0x120) — 탭 3 을 새로 시작하거나 탭 3 에서 쪽을 넘길 때만 다시 세운다 */
   const [nicknameScroll, setNicknameScroll] = useState<NicknameScroll>(() => startNicknameScroll(NICKNAME_PAGE_TOTALS[0]))

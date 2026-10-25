@@ -22,6 +22,7 @@ import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+import { isUnlocked, missionUnlockIdOf } from '@/shared/config/unlocks'
 
 const SLT_FRAME = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -107,9 +108,12 @@ export function MissionSelectScreen({
   const selected = cursor === EVENT_MISSION_CELL ? undefined : missions[cursor]
 
   // 원작: "오픈 되지 않은 미션입니다. 이전 단계를 클리어해주세요"
+  // 해금 표(`unlocks.json`)가 풀면 열린 칸이다 — 클리어 기록은 그대로다
   const isLockedAt = (index: number) => {
     const previous = missions[index - 1]
-    return previous !== undefined && !clearedKeys.includes(missionKeyOf(previous))
+    const original = () => previous === undefined || clearedKeys.includes(missionKeyOf(previous))
+    const unlockId = missionUnlockIdOf(side, index)
+    return !(unlockId === null ? original() : isUnlocked(unlockId, original))
   }
 
   /**

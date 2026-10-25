@@ -493,6 +493,8 @@ export function App({ bootScreen }: AppProps = {}) {
     // 0x7b408 — 격자 종류 7(일반모드 21 · 시즌 0xd7 경기 전)에서 열 칸이 다 열렸으면 0x62368(ui, 12, 0) 히든 팀 외인구단.
     // 웹 표에는 팀 번호 14 로 든다(`hiddenOpenStoredIdOf`)
     onAllAcesOpen: () => {
+      // 해금 표(`unlocks.json`)로 풀린 칸은 저장에 없다 — 저장의 열 칸이 다 켜졌을 때만 원본처럼 기록한다
+      if (!aceOpen.save.cells.every((open) => open)) return
       collection.openHidden(ALL_ACES_HIDDEN_TEAM_ID)
     },
   }

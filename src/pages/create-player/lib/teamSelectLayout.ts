@@ -14,6 +14,7 @@
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
+import { hiddenTeamUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
@@ -145,7 +146,11 @@ export const teamGridOpenShapeOf = (count = TEAM_COUNT): GridOpenShape => ({
 
 /** 팀이 열려 있는가 — 0~9 는 늘 열려 있고, 10~14 히든은 해금 기록이 있어야 한다 */
 export function isTeamOpen(teamId: number, openedHiddenIds: readonly number[]): boolean {
-  return teamId < OPEN_TEAM_COUNT || openedHiddenIds.includes(teamId)
+  if (teamId < OPEN_TEAM_COUNT) return true
+  // 해금 표(`unlocks.json`)가 풀면 열린 팀으로 본다 — 저장의 해금 기록은 그대로다
+  const unlockId = hiddenTeamUnlockIdOf(teamId)
+  const original = () => openedHiddenIds.includes(teamId)
+  return unlockId === null ? original() : isUnlocked(unlockId, original)
 }
 
 /**

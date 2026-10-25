@@ -1,5 +1,6 @@
 import { MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
+import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
 /**
  * 시즌 구장 아이템(관중석·전광판·잔디) — `docs/re/S3-stadium-items.md` **확정**.
@@ -117,7 +118,8 @@ export function checkStadiumPurchase(
 
   if (isHiddenStadiumSlot(kind, slot)) {
     const unlockId = STADIUM_HIDDEN_UNLOCK_IDS[kindIndexOf(kind)][slot - STADIUM_HIDDEN_FIRST_SLOT]
-    if (unlockId === undefined || !isHiddenOpen(unlockId)) return { ok: false, reason: '미오픈' }
+    // 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다 — 원본 판정 `isHiddenOpen` 은 그대로 감싼다
+    if (unlockId === undefined || !isHiddenUnlocked(unlockId, () => isHiddenOpen(unlockId))) return { ok: false, reason: '미오픈' }
   }
   if (ownsStadiumItem(record, kind, slot)) return { ok: false, reason: '이미보유' }
   if (popularity < required) return { ok: false, reason: '인기도부족', required }

@@ -1,6 +1,7 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
+import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
 /**
  * 장착 아이템 (타자편 — 누락 탐색 4·6차, 바이트 확인).
@@ -123,7 +124,9 @@ const isCollector = (career: PlayerCareer, part: number) =>
  */
 export function isHiddenOpen(career: PlayerCareer, part: number, level: number): boolean {
   if (level < FIRST_HIDDEN_LEVEL) return true
-  return career.openedHiddenIds.includes(hiddenOpenIdOf(part, level))
+  const id = hiddenOpenIdOf(part, level)
+  // 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다 — 저장의 전역 해금표는 그대로다
+  return isHiddenUnlocked(id, () => career.openedHiddenIds.includes(id))
 }
 
 /*

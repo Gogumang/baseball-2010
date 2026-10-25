@@ -24,7 +24,7 @@ import {
   NO_ACE,
   type GeneralModeSetup,
 } from '@/pages/general-mode/lib/generalModeSetup'
-import { HIDDEN_TEAM_FIRST_ID } from '@/pages/general-mode/lib/hiddenTeam'
+import { HIDDEN_TEAM_COUNT, HIDDEN_TEAM_FIRST_ID, isTeamOpened } from '@/pages/general-mode/lib/hiddenTeam'
 
 /** 기본(히든이 아닌) 팀 열 개는 늘 후보다 */
 export const OPEN_TEAM_COUNT = 10
@@ -49,7 +49,10 @@ function uniform(random: RandomPort, count: number): number {
  * 목록은 번호 오름차순으로 쌓인다.
  */
 export function quickStartTeamCandidates(openedHiddenTeamIds: readonly number[] = []): readonly number[] {
-  const hidden = [...new Set(openedHiddenTeamIds)]
+  // 해금 표(`unlocks.json`)가 푼 히든 팀도 열린 팀으로 얹는다 (표가 원본 그대로면 같은 목록)
+  const unlocked = Array.from({ length: HIDDEN_TEAM_COUNT }, (_unused, index) => HIDDEN_TEAM_FIRST_ID + index)
+    .filter((id) => isTeamOpened(id, openedHiddenTeamIds))
+  const hidden = [...new Set([...openedHiddenTeamIds, ...unlocked])]
     .filter((id) => id >= HIDDEN_TEAM_FIRST_ID)
     .sort((left, right) => left - right)
   return [...Array.from({ length: OPEN_TEAM_COUNT }, (_unused, index) => index), ...hidden]
