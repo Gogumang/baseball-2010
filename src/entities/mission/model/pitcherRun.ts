@@ -93,13 +93,24 @@ export function startPitcherMission(mission: OriginalMission, setup: MissionGame
   }
 }
 
-/** 공 하나를 던졌다. 아직 타석이 끝나지 않은 경우에도 투구 수는 줄어든다. */
+/**
+ * 공 하나를 던졌다. 아직 타석이 끝나지 않은 경우에도 투구 수는 줄어든다.
+ *
+ * **MAX게이지(R+0x158)는 그 공에서 곧바로 센다** — 공 도착 0x3dfac 의 스트라이크(3e13e) · 삼진(3e168) 갈래가 등급 5 면 코드 0x21 로
+ * 올리고, 같은 공의 판정 A 0xae24c 가 끝에서(ae382) 미션 판정 0xaaa6c 를 부른다 — 타석이 안 끝난 공(r4 = 0xf)도 판정한다.
+ * 그래서 목표가 그 공에서 다 차면 타석 도중이라도 성공이고(`checkPitchExhausted`), HUD 줄(0x36358 의 P+0x34)도 공마다 오른다.
+ * 예전 웹은 타석이 끝날 때 한꺼번에 더해 성공 · HUD 가 늦었다. `perfectGauges` 는 이번 타석의 수만 따로 든다.
+ */
 export function recordPitch(run: PitcherRun, wasPerfectGauge: boolean): PitcherRun {
   if (run.status !== '진행중') return run
 
   const remaining = run.remainingPitches === null ? null : run.remainingPitches - 1
+  const progress = wasPerfectGauge
+    ? { ...run.progress, counts: { ...run.progress.counts, MAX게이지: (run.progress.counts['MAX게이지'] ?? 0) + 1 } }
+    : run.progress
   return {
     ...run,
+    progress,
     remainingPitches: remaining,
     perfectGauges: run.perfectGauges + (wasPerfectGauge ? 1 : 0),
   }
@@ -230,7 +241,8 @@ export function applyPitcherOutcome(
   const progress = recordPitcherOutcome(
     run.progress,
     settled,
-    run.perfectGauges,
+    // MAX게이지는 `recordPitch` 가 공마다 이미 셌다
+    0,
     brokenConditionsOf(run.mission, allowed),
     // 아웃 콜 수 — 병살 2 · 삼중살 3 · 안타 판의 주자 아웃 1 (R+0x13c, `recordPitcherOutcome` 머리글). 셋째 아웃에서 판이 끝난다
     defense.outsAtSettlement - run.outs,
@@ -365,8 +377,12 @@ function isOutOfChances(remainingPlate: number | null, remainingPitches: number 
   return remainingPitches !== null && remainingPitches <= 0
 }
 
-/** 투구 수를 다 쓰면 타석 도중이라도 실패다. */
+/**
+ * **타석이 안 끝난 공의 판정** — 판정 A 0xae24c 는 공마다 끝(ae374~ae384)에서 모드 5 · 6 이면 0xaaa6c 를 부른다(r4 = 0xf 인 볼 ·
+ * 스트라이크도). 차례는 판 끝 판정과 같다: 목표 칸(aac76~aacd6) → 다 찼으면 성공(aace6 → aad20) · 아니면 타석 · 투구 수 한도
+ * (aace8~aad1c, R+0x140 ≥ 한도면 실패). 그래서 투구 수를 다 쓰면 타석 도중이라도 실패지만, 그 공으로 목표(MAX게이지)가 다 찼으면 성공이다.
+ */
 export function checkPitchExhausted(run: PitcherRun): PitcherRun {
-  if (run.status !== '진행중' || run.remainingPitches === null) return run
-  return run.remainingPitches <= 0 ? { ...run, status: '실패' } : run
+  const judged = judgePitcherRun(run)
+  return judged.status === run.status ? run : judged
 }

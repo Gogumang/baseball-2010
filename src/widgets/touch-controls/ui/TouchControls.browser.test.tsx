@@ -6,6 +6,7 @@ import { ViewportShell } from '@/app/ui/ViewportShell'
 import { offerTouchKey, resetTouchKeyOffersForTest } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
+import { screenRectOf } from '@/shared/lib/viewportFit/zoomedRect'
 
 /**
  * **브라우저 시험 — 세로 폰에서 게임 화면 아래 칸의 상황 버튼이 실제로 눌리는가** (아이폰 Safari 의심 · r208).
@@ -106,11 +107,14 @@ describe('상황 버튼 — 게임 화면 바깥 칸', () => {
     const { button, screenElement, stopListening } = await 세우기()
     stopListening()
     const layout = document.body.dataset.layout
+    // 버튼(`#keypad-root` — zoom 밖)은 화면 좌표 그대로다. 화면 판은 `zoom: var(--zoom)` 안이라 웹킷의 `getBoundingClientRect` 가
+    // zoom 을 뺀 값(아이폰 세로면 높이 320 — 화면에서는 520)을 낸다 — 그 값과 견주면 판이 버튼 칸을 덮어도 늘 통과했다(r255 가 남김).
+    // `screenRectOf` 로 두 엔진 모두 화면 좌표 사각형을 잰다
     const buttonBox = button.getBoundingClientRect()
-    const screenBox = screenElement.getBoundingClientRect()
+    const screenBox = screenRectOf(screenElement)
     // 아이폰 세로(390×664)는 below, 데스크톱 chromium 창(1000×800)은 가로라 sides
     expect(layout).toBe(window.innerWidth < window.innerHeight ? 'below' : 'sides')
-    if (layout === 'below') expect(buttonBox.top).toBeGreaterThanOrEqual(Math.floor(screenBox.bottom))
+    if (layout === 'below') expect(buttonBox.top).toBeGreaterThanOrEqual(Math.floor(screenBox.top + screenBox.height))
     else expect(buttonBox.right).toBeLessThanOrEqual(Math.ceil(screenBox.left))
   })
 
