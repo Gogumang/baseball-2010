@@ -246,6 +246,34 @@ describe('화면 탭 (웹판 추가) — 손가락이 닿는 순간 키 하나',
     expect(손잡이.moveBatter).toHaveBeenNthCalledWith(2, 1)
     expect(손잡이.swing).not.toHaveBeenCalled()
   })
+
+  it('아이폰 Safari(웹킷) — 판 zoom 을 뺀 사각형이어도 화면 가운데 탭은 스윙이다 (r242)', () => {
+    // playwright 웹킷 아이폰 13 세로로 직접 잰 값: 배율 1.625, 캔버스 사각형 폭 240 = offsetWidth, clientX 는 화면 좌표 0~390.
+    // 예전에는 (195 − 0) / 240 × 240 = 195 > 180 이라 가운데 탭이 '6' 오른쪽 이동이 됐다
+    const real = window.getComputedStyle.bind(window)
+    const spy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      const style = real(element)
+      return { ...style, zoom: element instanceof HTMLCanvasElement ? '1.625' : '' } as CSSStyleDeclaration
+    })
+    const 웹킷누름 = (clientX: number) => {
+      const event = 누름(clientX)
+      Object.defineProperty(event.currentTarget, 'offsetWidth', { configurable: true, value: 240 })
+      return event
+    }
+    const { 손잡이, 손 } = 붙이기와손({})
+    손.onPointerDown(웹킷누름(195))
+    다음틀()
+    손.onPointerDown(웹킷누름(280))
+    다음틀()
+    손.onPointerDown(웹킷누름(50))
+    다음틀()
+    손.onPointerDown(웹킷누름(350))
+    다음틀()
+    expect(손잡이.swing).toHaveBeenCalledTimes(2)
+    expect(손잡이.moveBatter).toHaveBeenNthCalledWith(1, -1)
+    expect(손잡이.moveBatter).toHaveBeenNthCalledWith(2, 1)
+    spy.mockRestore()
+  })
 })
 
 describe('받은 틱 — 키 사건이 난 때 화면에 있던 그림의 틱 (r211)', () => {
