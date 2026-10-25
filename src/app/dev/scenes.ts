@@ -41,8 +41,13 @@ const key = (name: string, times?: number): SceneStep => (times === undefined ? 
 const wait = (ms: number): SceneStep => ({ kind: 'wait', ms })
 const keyUntil = (name: string, label: string, test: (handles: SceneHandles) => boolean, everyMs: number, timeoutMs: number): SceneStep =>
   ({ kind: 'keyUntil', key: name, label, test, everyMs, timeoutMs })
-/** 그 순간 화면이 알리는 터치 상황 버튼 — 경기 장면의 타석('#' 대타) · 투구('#' 교체) · 수비('… 송구')를 가른다 */
+/** 그 순간 화면이 알리는 터치 상황 버튼 — 수비('… 송구')를 가른다 */
 const offersHave = (label: string) => () => touchKeyOffersNow().some((offer) => offer.label.includes(label))
+/**
+ * 원본 글자 자리 투명 누름 칸(`PressArea`, aria-label)이 서 있는지 — '*MENU' · '#TIME'(대타 · 교체)은 r192 부터 상황 버튼이 아니라
+ * 글자 자리 칸으로만 뜬다(`touchKey` 없음). 상황 버튼 알림판으로는 못 가른다
+ */
+const pressAreaHas = (label: string) => () => document.querySelector(`button[aria-label="${label}"]:not([disabled])`) !== null
 const screenIs = (kind: SceneHandles['screen']['kind']) => until(`화면 ${kind}`, (handles) => handles.screen.kind === kind)
 
 /** 켤 때 길 그대로 — 이용안내(아무 키) → 로고(저절로) → 타이틀 */
@@ -191,14 +196,14 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
   'general-bat': {
     description: '일반모드 타석 — 경기 시작 직후 1회초 사람 팀 첫 타자 (씨앗 2: 사람 선공 · 이닝플레이 자동진행 없음)',
     fixture: 'general-bat',
-    steps: [...TO_GENERAL_GAME, until('타석(대타 버튼)', offersHave('대타'), 15000), wait(300)],
+    steps: [...TO_GENERAL_GAME, until('타석(# 대타 칸)', pressAreaHas('# 대타'), 15000), wait(300)],
   },
   'general-pitch': {
     description: '일반모드 투구 — 경기 시작 직후 1회초 사람 투수 구질 고르기 (씨앗 1: CPU 선공)',
     fixture: 'general-pitch',
     steps: [
       ...TO_GENERAL_GAME,
-      until('투구(교체 버튼)', offersHave('교체'), 15000),
+      until('투구(# 교체 칸)', pressAreaHas('# 교체'), 15000),
       // 타자 소개 판을 OK 로 넘겨 구질 고르기 판(`PitchSlotPicker` 의 누름 칸)이 설 때까지
       keyUntil('Enter', '구질 고르기', () => document.querySelector('[data-testid="구질 누름 칸"]') !== null, 700, 15000),
       wait(400),
@@ -209,7 +214,7 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'general-pitch',
     steps: [
       ...TO_GENERAL_GAME,
-      until('투구(교체 버튼)', offersHave('교체'), 15000),
+      until('투구(# 교체 칸)', pressAreaHas('# 교체'), 15000),
       // 구질 · 코스 · 게이지 모두 OK — 공을 칠 때까지 던진다
       keyUntil('Enter', '수비(송구 버튼)', offersHave('송구'), 500, 60000),
       wait(300),
@@ -223,6 +228,6 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
   'derby-start': {
     description: '홈런더비 시작 — 나리 타자를 골라 첫 공 앞 (1/10)',
     fixture: 'nari-y1',
-    steps: [...TO_DERBY_PICK, key('Enter'), until('더비 타석(메뉴 버튼)', offersHave('메뉴'), 15000), wait(500)],
+    steps: [...TO_DERBY_PICK, key('Enter'), until('더비 타석(메뉴 칸)', pressAreaHas('메뉴'), 15000), wait(500)],
   },
 }

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isPitchSelectionDue, pitchSlotOfKey } from '@/features/play-pitcher-game/model/pitchAim'
-import { slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { okBadgeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
@@ -151,15 +151,17 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
       {choices.map((choice) => {
         const rect = slotTapRectOf(choice.slot, stageSide)
         if (rect === null) return null
+        const label = `${SLOT_KEY_LABELS[choice.slot] ?? ''} ${choice.name}`
+        // 마구 칸 '0' 도 이 칸 탭으로 닿는다 — 같은 키를 상황 버튼으로 또 내지 않는다(r192, 필요한 버튼만)
+        const onPress = () => keyLatch.push(() => pressRef.current(choice.slot))
         return (
-          <PressArea
-            key={choice.slot}
-            rect={rect}
-            label={`${SLOT_KEY_LABELS[choice.slot] ?? ''} ${choice.name}`}
-            isDisabled={choice.isBlocked === true}
-            // 마구 칸 '0' 도 이 칸 탭으로 닿는다 — 같은 키를 상황 버튼으로 또 내지 않는다(r192, 필요한 버튼만)
-            onPress={() => keyLatch.push(() => pressRef.current(choice.slot))}
-          />
+          <Fragment key={choice.slot}>
+            <PressArea rect={rect} label={label} isDisabled={choice.isBlocked === true} onPress={onPress} />
+            {/* 칸 0 은 고리 귀의 "OK" 글자도 같은 칸이다 */}
+            {choice.slot === 0 && (
+              <PressArea rect={okBadgeTapRectOf(stageSide)} label={`${label} (OK 글자)`} isDisabled={choice.isBlocked === true} onPress={onPress} />
+            )}
+          </Fragment>
         )
       })}
     </PressLayer>

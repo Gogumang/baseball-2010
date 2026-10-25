@@ -32,6 +32,18 @@ const SLOT_RECTS_FROM_ANCHOR: readonly PressRect[] = [
   { x: 14, y: 6, width: 51, height: 28 },
 ]
 
+/**
+ * 칸 0 의 **"OK" 글자** 자리 — 고리 프레임 25(원점 (−45, −53))의 왼쪽 위 귀에 그려진 "OK" 딱지(약 22 × 13). 칸 0 누름 칸은 고리
+ * 가운데(투수)라, "OK" 글자를 누르면 아무 칸에도 안 닿았다(r219 아이폰 점검). 칸 1(위 −70 ~ −50) · 칸 2(위 −36 ~)와 겹치지 않는다
+ */
+const OK_BADGE_RECT_FROM_ANCHOR: PressRect = { x: -46, y: -54, width: 24, height: 15 }
+
+/** 칸 0 의 "OK" 글자 누름 칸 — `side` 는 장면 배치(타자 손 0 우타 · 1 좌타) */
+export function okBadgeTapRectOf(side: number): PressRect {
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  return { ...OK_BADGE_RECT_FROM_ANCHOR, x: anchor.x + OK_BADGE_RECT_FROM_ANCHOR.x, y: anchor.y + OK_BADGE_RECT_FROM_ANCHOR.y }
+}
+
 /** 칸 0..5 의 누름 칸 — `side` 는 장면 배치(타자 손 0 우타 · 1 좌타) */
 export function slotTapRectOf(slot: number, side: number): PressRect | null {
   const rect = SLOT_RECTS_FROM_ANCHOR[slot]
