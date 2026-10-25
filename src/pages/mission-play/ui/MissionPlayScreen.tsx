@@ -170,7 +170,7 @@ interface MissionPlayScreenProps {
    */
   readonly substitutionScene?: SubstitutionScene | null
   readonly onSubstitutionSceneDone?: () => void
-  /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 타석 그림이 굴린다 */
+  /** 하늘 줄 — 구장 +0x10 (0x783b0). 미션은 장면마다 한 번 굴린 rand(0, 6) — 세션이 든다. 안 넘기면 0 줄(타석 그림은 굴리지 않는다) */
   readonly skyRow?: number
   /**
    * 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있는지 바뀔 때마다 — 그동안 0x12 상태 틱이 멈춘다(0x52cc6).
