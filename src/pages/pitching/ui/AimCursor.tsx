@@ -163,7 +163,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     [],
   )
 
-  /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 지금 시각에 화면에 있던 그림) */
+  /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 닿은 시각 — `PressArea`) */
   const pushAction = (action: AimKeyAction, event: Event | undefined) => {
     const inputTime = inputTimeOf(event)
     const seenTick = keyLatch.tickAt(inputTime)
@@ -185,9 +185,10 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [keyLatch])
 
-  const pressKey = (key: string) => {
+  /** 누름 칸 — 키와 같은 길로 누름 사건(닿은 시각이 붙어 있다)을 넘긴다 (r222) */
+  const pressKey = (key: string, event: Event) => {
     const action = aimKeyActionOf(key)
-    if (action !== null) pushAction(action, undefined)
+    if (action !== null) pushAction(action, event)
   }
   const rects = aimTapRectsOf(side)
 
@@ -200,12 +201,12 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
           key={key}
           rect={rects[index]}
           label={key === '5' ? '조준 확정' : `조준 ${KEYPAD_LABELS[key] ?? key}`}
-          onPress={() => pressKey(key)}
+          onPress={(event) => pressKey(key, event)}
         />
       ))}
       {onCancel !== undefined && (
         // 조준(0x10)은 "#TIME" 도 CLR 글자도 안 그린다 — 투명 칸이라 터치 기기에는 상황 버튼도 낸다(r194, 키 CLR 과 같은 길)
-        <PressArea rect={CLEAR_PRESS_RECT} label="CLR 구질로" touchKey={AIM_CANCEL_OFFER} onPress={() => pressKey('Escape')} />
+        <PressArea rect={CLEAR_PRESS_RECT} label="CLR 구질로" touchKey={AIM_CANCEL_OFFER} onPress={(event) => pressKey('Escape', event)} />
       )}
     </PressLayer>
   )

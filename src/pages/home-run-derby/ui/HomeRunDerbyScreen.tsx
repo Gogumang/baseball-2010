@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PressArea } from '@/shared/ui'
+import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -156,6 +157,14 @@ export function HomeRunDerbyScreen({
    * 다음 틀의 0xbca05 → 키 0x498d4(52d9e) → 0x536bc 가 그 틀의 상태로 가른다(0xe 0x532b0 · 0x17 0x53420 → 0x587 → 0x519cc).
    * 타석(`BattingStage`)이 칸을 올려 두었으면 그 틀 머리에서 꺼낸다(`pushSceneKey` — 없으면 바로). 꺼낸 틀의 상태를 다시 본다
    */
+  // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
+  useEffect(() => {
+    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
+    publishScenePeek('homeRunDerby', { acceptsConfirm, isPlayRunning, isResultShown })
+  }, [acceptsConfirm, isPlayRunning, isResultShown])
+  useEffect(() => () => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('homeRunDerby', null)
+  }, [])
   const { confirm, skipHomeRun } = session
   const sceneKeyStateRef = useRef({ acceptsConfirm, isPlayRunning })
   sceneKeyStateRef.current = { acceptsConfirm, isPlayRunning }

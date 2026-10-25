@@ -195,7 +195,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   const isPausedRef = useRef(isPaused)
   isPausedRef.current = isPaused
 
-  /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 사건이 없어 지금 시각에 화면에 있던 그림) */
+  /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 닿은 시각 — `PressArea`) */
   const pushPress = (event: Event | undefined) => {
     const inputTime = inputTimeOf(event)
     const seenTick = keyLatch.tickAt(inputTime)
@@ -226,7 +226,8 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       <PressArea
         {...(overlay === undefined ? {} : { rect: gaugeTapRectOf(overlay.aim, overlay.aimSide) })}
         label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}
-        onPress={() => pushPress(undefined)}
+        // 누름 칸도 키와 같은 길 — 손가락 · 마우스가 닿은 시각에 본 그림의 틱(`PressArea` 가 사건에 붙인다, r222)
+        onPress={(event) => pushPress(event)}
       />
     </PressLayer>
   )
