@@ -18,6 +18,7 @@
  * 이 표는 메뉴 뜻(칸 id · 글)만 담는다 — 좌표는 쓰지 않는다. 커맨드 줄 그림은 `pitcherCommandBar`(0x7e418),
  * 등록(0x66 · 0x67)은 `pitcherRegisterLayout`, 구질 훈련 창(108 탭 2)은 `pitchTrainingWindow` 가 원본 배치를 맡는다.
  */
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /** 105 커맨드 여섯 칸 — 점프표 0xcc540 차례 그대로 */
 export type PitcherManagementCommand = '선수정보' | '트레이닝' | '휴식' | '외출' | '아이템' | '다음경기'
@@ -75,14 +76,17 @@ export const PITCH_WINDOW_CHOICES: readonly [string, string] = ['마구', '구�
  */
 export const PITCH_WINDOW_TABS = { 마구: 1, 구질: 2 } as const
 
-/** 팝업 글 (StrMODE 번호만 확정이고 원문은 표가 웹에 없어 뜻만 옮겼다) */
+/** 팝업 글 — 휴식 둘(90 · 91)은 원문 표(`ORIGINAL_MODE_TEXT`) 그대로, 나머지는 StrMODE 번호만 맞추고 뜻만 옮겼다(⚠️ 남김) */
 export const PITCHER_MANAGEMENT_TEXT = {
   /** StrMODE[59] — 팝업 0x78 */
   chooseItem: '원하는 항목을 선택해주세요',
-  /** StrMODE[90] — 휴식 확인 (팝업 0x2a) */
-  restQuestion: '휴식을 취하시겠습니까?',
-  /** StrMODE[91] — 사기가 이미 최고 */
-  moraleAlreadyFull: '사기 최고 상태입니다',
+  /**
+   * StrMODE[90] — 휴식 확인 (팝업 0x2a). 105 키 0x1261c 휴식 칸(12682~126bc)이 사기 0xa3a25 == 100 이 아니면
+   * `0x702b5([장면+0x144], 0x5a)` 로 이 글을 꺼내 팝업 0x2a 를 세운다 — 모드 갈래가 없어 타자편(`useManagementMenu`)과 같은 글이다
+   */
+  restQuestion: ORIGINAL_MODE_TEXT[90] ?? '',
+  /** StrMODE[91] — 사기가 이미 최고 (같은 칸 1269a `movs r1, #0x5b` · 팝업 1) */
+  moraleAlreadyFull: ORIGINAL_MODE_TEXT[91] ?? '',
   /** StrMODE[192] — 능력치가 한계 */
   abilityAtLimit: '더 이상 능력치를 올릴 수 없습니다',
   /** StrMODE[193] — 사기가 0 이라 훈련 불가 */

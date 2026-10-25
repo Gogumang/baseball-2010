@@ -530,7 +530,8 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     화면({ onSave })
 
     누르기('휴식')
-    expect(screen.getByText('휴식을 취하시겠습니까?')).toBeTruthy()
+    // StrMODE[90] 원문 "[휴식]을 취하시겠습니까?" — 타자편과 같은 글 (0x1261c 126a8 · 0x702b5(…, 0x5a))
+    expect(document.body.textContent).toContain('[휴식]을 취하시겠습니까?')
     fireEvent.click(칸('예'))
     // 127 연출(0x85230) 동안은 굴리지도 저장하지도 않는다 — 확인 키(0x10650)가 게이지를 끝으로 건너뛴다
     expect(screen.getByTestId('나리-휴식연출')).toBeTruthy()
@@ -582,7 +583,7 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
 
     누르기('휴식')
 
-    expect(screen.getByText(/휴식.*을 취하시겠습니까/)).toBeTruthy()
+    expect(document.body.textContent).toContain('[휴식]을 취하시겠습니까?')
   })
 })
 

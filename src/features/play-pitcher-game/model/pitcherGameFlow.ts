@@ -126,6 +126,7 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
   arrivalApplicationOf,
   arrivesUnhit,
+  clearsPitchJudgement,
   finishPitchArrivalPlay,
   openPitchArrivalPlay,
   pitchJudgementOf,
@@ -617,6 +618,12 @@ export interface PitcherGameProgress {
    * 걸음 앞뒤가 다른 객체면 이번 걸음에 새로 열린 판이다. 재생은 `lastDefensePlay` 가 맡는다.
    */
   readonly lastArrivalPlay: PitchArrivalPlay | null
+  /**
+   * **마지막 공 도착(0x3dfac)이 판정 칸 [장면+0x10ac] 를 지웠나** — 낫아웃 갈래 3e0aa (`clearsPitchJudgement`). 사람이 던지는 타석
+   * (`PitcherSideStage.isJudgementCleared`)의 0x12 틱 0 판정 글자 · 삼진 양끝 파티클이 이 값으로 선다. 못 맞힌 공마다 공 도착이 다시
+   * 적는다 — 맞힌 공은 안 적어 앞 값이 남지만 그 공은 판정 글자 삼진이 없다. 없으면 거짓
+   */
+  readonly lastPitchJudgementCleared?: boolean
   /**
    * **지금 화면이 실시간으로 돌리고 있는 타구.** 차 있으면 이 경기는 "수비 진행 중" 이고,
    * 타석 결과(안타/아웃 코드)만 정해졌을 뿐 **진루·아웃·실점은 아직 하나도 안 먹였다**.
@@ -1538,13 +1545,14 @@ function arrivePitcherPitch(
     },
     random,
   )
+  // 3e0aa — 낫아웃 갈래가 판정 칸을 지웠나. 같은 진입이 적고 0x12 틱 0 그림이 읽는다 (바뀔 때만 새 객체)
+  const judgementCleared = clearsPitchJudgement(opened)
+  const judged: PitcherGameProgress =
+    (progress.lastPitchJudgementCleared === true) === judgementCleared ? progress : { ...progress, lastPitchJudgementCleared: judgementCleared }
   // R+0x158 — 판 종류를 정한 같은 진입이 결과 코드 스위치(0x3e11a, 표 0xcffb4)로 간다 (`countsTopGradePitch`)
-  const graded = countsTopGradePitch(
-    pitch.resolution.kind === '스트라이크',
-    opened !== null && opened.kind === 9 && opened.strikeout === 'batterRuns',
-  )
-    ? { ...progress, pitcherRecord: recordPitchGrade(progress.pitcherRecord, pitch.grade) }
-    : progress
+  const graded = countsTopGradePitch(pitch.resolution.kind === '스트라이크', judgementCleared)
+    ? { ...judged, pitcherRecord: recordPitchGrade(judged.pitcherRecord, pitch.grade) }
+    : judged
   if (opened === null) return { progress: withoutSteal(graded), play: null, interrupted: false }
   // 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 실시간으로 돌린다 (`liveRunnerPlay`). 밀어내기(종류 2)는 미리 돌린다
   if (live !== undefined && opened.kind !== 2) {

@@ -2,7 +2,10 @@ import {
   MY_PITCHER_SLOT, OUR_ACE_PITCHER_SLOT, opponentPitcherOrderOf, ourPitcherOrderOf,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import { equippedPitcherAbilityOf, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedPitcherAbilityOf, pitcherFormOfCareer, pitcherRecordLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
+import { entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
+import { staminaPercentOf } from '@/entities/season-mode/model/seasonEntry'
+import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { seasonRecordProfileOf } from '@/entities/season-mode/model/seasonEntry'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
@@ -46,13 +49,42 @@ export function pitcherNariEntryViewOf(
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, null, cells),
     pitchers: nariEntryPitchersOf(teamId, order, (slot) => {
-      if (isMyTeam && slot === MY_PITCHER_SLOT) return { ...myPitcherEntryFaceOf(career), isAce: false }
+      if (isMyTeam && slot === MY_PITCHER_SLOT) {
+        const face = myPitcherEntryFaceOf(career)
+        return { ...face, ...(cells === undefined ? {} : myPitcherEntryCellsOf(career, face, cells)), isAce: false }
+      }
       if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
       return undefined
     }, cells, (slot) => (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE ? ACE_PITCHERS[record.acePitcher]?.recordLine ?? [] : undefined),
     // 레코드 투수 장비 니블 (나리 새 시즌 CPU 장비 굴림 0x665e8) — 상세 창 도형 값이 그 보너스를 먹는다
     record.pitcherEquipment),
   })
+}
+
+/**
+ * **투수편 내 투수 줄의 기록 열 · 체력 줄** — 목록 칸 그리기 0x56ebc 는 투수 비트도 줄 레코드 `[팀+0x14][i] × 0x30 + 0x20` 을 그대로
+ * 읽고(56f44~56f56 — 육성 · 모드 갈래 없음), 체력 줄은 용량 0x66e44(팀 레코드, rec, 0) · 퍼센트 0x572a4(+0x2c) 다(붙박이 줄과 같은 길,
+ * `NariEntryCellSource`). 내 칸 +0x20~ 는 커리어 시즌 줄(`career.stats` — +0x20 아웃 · +0x22 실점 · +0x24 세이브 · +0x26 탈삼진 ·
+ * +0x28 투구 수 · +0x2a 사사구 · +0x2e 승 · +0x2f 패), +0x2c 는 `career.stamina`(142 진입 0x1c8a8 이 g == 0 이면 10000 —
+ * `prepareMyPitcherMatch`). 용량의 체력 실효 능력치는 0xb6415(rec, 3, 1) = 장비 · 스킬을 얹은 값이다.
+ */
+export function myPitcherEntryCellsOf(
+  career: PitcherCareer,
+  face: NariEntryFace,
+  cells: NariEntryCellSource,
+): Pick<NariEntryFace, 'pitcherLine' | 'stamina'> {
+  const { stats } = career
+  return {
+    pitcherLine: {
+      ...entryPitcherLineOfRecord(pitcherRecordLineOf(stats)),
+      wins: stats.wins,
+      losses: stats.losses,
+    },
+    stamina: {
+      capacity: staminaCapacityOf(face.ability[3] ?? 0, cells.morale, false),
+      percent: staminaPercentOf(cells.staminaMode, career.stamina),
+    },
+  }
 }
 
 /**

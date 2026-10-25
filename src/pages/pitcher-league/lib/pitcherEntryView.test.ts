@@ -41,3 +41,15 @@ describe("투수편 143 '0' 상세 창 — 내 투수 줄 (0x5b798 투수 갈래
     expect(detail.values[2].text).not.toBe('')
   })
 })
+
+describe('투수편 143 내 투수 줄의 기록 열 · 체력 줄 — 0x56ebc 줄 레코드 +0x20~ · 0x572a4(+0x2c) (r213)', () => {
+  it('커리어 시즌 줄과 +0x2c 스태미나 · 0x66e44 용량(장비 · 스킬을 얹은 체력)으로 선다', () => {
+    const base = { ...createPitcherCareer('보기'), morale: 80, stamina: 4321 }
+    const stats = { ...base.stats, outs: 27, runsAllowed: 4, saves: 1, strikeouts: 11, pitches: 120, walks: 3, wins: 2, losses: 1 }
+    const career = { ...base, stats }
+    const view = pitcherNariEntryViewOf(career, pitcherGameOptionsOf(career), true)
+    const row = view.lists.pitchers.find((candidate) => candidate.name === '보기')
+    expect(row?.pitcherLine).toEqual({ outs: 27, runsAllowed: 4, saves: 1, strikeouts: 11, pitches: 120, walks: 3, wins: 2, losses: 1 })
+    expect(row?.stamina).toEqual({ capacity: staminaCapacityOf(row!.ability[3] ?? 0, 80, false), percent: 43 })
+  })
+})

@@ -51,6 +51,7 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
   arrivalApplicationOf,
   arrivesUnhit,
+  clearsPitchJudgement,
   finishPitchArrivalPlay,
   openPitchArrivalPlay,
   pitchJudgementOf,
@@ -873,6 +874,12 @@ export interface TeamGameProgress {
    * 걸음 앞뒤가 다른 객체면 이번 걸음에 새로 열린 판이다. 재생은 `lastDefensePlay` 가 맡는다.
    */
   readonly lastArrivalPlay: PitchArrivalPlay | null
+  /**
+   * **마지막 공 도착(0x3dfac)이 판정 칸 [장면+0x10ac] 를 지웠나** — 낫아웃 갈래 3e0aa (`clearsPitchJudgement`). 0x12 틱 0 그림의
+   * 판정 글자 · 삼진 양끝 파티클이 이 값으로 선다(타석 화면 `onPitchResolved` 의 답 · 사람이 던지는 타석 `PitcherSideStage`).
+   * 못 맞힌 공마다 공 도착이 다시 적는다 — 맞힌 공은 안 적어 앞 값이 남지만 그 공은 판정 글자 삼진이 없다. 없으면 거짓
+   */
+  readonly lastPitchJudgementCleared?: boolean
   /**
    * **정산 사건 목록(ctx+0x30)에 남은 앞 판의 몫** — 같은 투구 틈에 앞서 돈 도루 · 폭투·포일 · 견제 판의 아웃 · 득점.
    * 견제 판(종류 4) 정산이 함께 센다(`features/defense-play/model/settlementEvents`). 공이 손을 떠날 때(0xa5e14) 비운다.
@@ -4191,6 +4198,11 @@ function arriveTeamPitch(
     },
     random,
   )
+  // 3e0aa — 낫아웃 갈래가 판정 칸을 지웠나. 같은 진입이 적고 0x12 틱 0 그림이 읽는다 (바뀔 때만 새 객체)
+  const judgementCleared = clearsPitchJudgement(opened)
+  if ((progress.lastPitchJudgementCleared === true) !== judgementCleared) {
+    progress = { ...progress, lastPitchJudgementCleared: judgementCleared }
+  }
   if (opened === null) return { progress: withoutSteal(progress), play: null, interrupted: false }
   // 사람 수비의 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 실시간으로 돌린다 (`liveRunnerPlay`). 밀어내기(종류 2)는 vt4c 가
   // 안 돌아 키 송구가 없으니 미리 돌린다

@@ -31,12 +31,27 @@ export function describeResolution(detail: PitchOutcomeDetail): string {
  * (표 0xcfe90: v 3 → 애니 6 · v 5 → 애니 9). 0x9d57c 는 스윙했거나 존이면 `스트라이크 수 > 1` 일 때 5, 볼이면 `볼 수 > 2` 일 때 3 을 낸다
  * (9d598~9d5b4) — 곧 타석을 끝낸 공(결과 문턱 0x1f, `resultPhaseTicksOf`)의 스트라이크는 삼진 · 볼은 볼넷 글자다(r204).
  * 이 글자가 있어야 삼진 양끝 파티클(`strikeoutJudgeParticlesOf`, 39498 애니 9)도 선다.
- * ⚠️ 남김: 0.1% 낫아웃은 0x3dfac 가 v 를 지워(3e0aa) 글자가 없다 — 웹은 이 자리에서 낫아웃을 몰라 삼진 글자로 둔다.
+ * 0.1% 낫아웃은 같은 0x12 진입 0x3dfac 가 v 를 지워(3e0aa — 1루 주자 && 1아웃 이하면 3e0cc 가 되돌린다) 글자도 파티클도 없다
+ * (`clearsPitchJudgement`). 진입이 그림보다 먼저라 웹도 공 도착 판을 연 뒤의 값(`judgementCleared`)으로 고른다(r213) —
+ * 타자편 타석은 `onPitchResolved` 의 답, 사람이 던지는 타석은 진행기 칸(`lastPitchJudgementCleared` 따위)이 싣는다.
  */
-export function judgeTextOf(resolution: PitchOutcomeDetail['resolution'], endsAtBat: boolean): string {
-  if (endsAtBat && resolution.kind === '스트라이크') return '삼진'
+export function judgeTextOf(
+  resolution: PitchOutcomeDetail['resolution'],
+  endsAtBat: boolean,
+  judgementCleared = false,
+): string {
+  if (endsAtBat && resolution.kind === '스트라이크') return judgementCleared ? '' : '삼진'
   if (endsAtBat && resolution.kind === '볼') return '볼넷'
   return describePitchResolution(resolution)
+}
+
+/**
+ * `onPitchResolved` 의 답 — 타석 화면이 0x12 진입(0x3dfac)을 진행기에 맡기고 돌려받는 값. 진입이 공 도착 판을 열어 판정 칸을
+ * 지웠으면(낫아웃, `clearsPitchJudgement`) 참이다. 같은 틀의 0x12 틱 0 그림(판정 글자 · 삼진 파티클)이 이 값으로 고른다.
+ * 답을 안 주는 쪽(홈런더비 · 연습 따위 — 공 도착 판이 없다)은 지우지 않은 것으로 본다.
+ */
+export interface PitchResolvedReply {
+  readonly judgementCleared?: boolean
 }
 
 /** 판정 하나의 문구 — 공 판정만 아는 화면(사람이 던지는 타석 `PitcherSideStage`)이 쓴다 */

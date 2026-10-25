@@ -112,6 +112,27 @@ export function pitchJudgementOf(resolution: PitchResolution, outcomeAfter: AtBa
   return outcomeAfter?.kind === '삼진' ? PITCH_JUDGEMENT.STRIKEOUT : PITCH_JUDGEMENT.STRIKE
 }
 
+/**
+ * **낫아웃이 판정 칸을 지웠는가** — 0x3dfac 의 낫아웃 갈래(직접 떴다, r213):
+ * ```
+ * 3e05a  v = 0x9d57c(…) ; [장면+0x10ac] = v          ; 판정 글자 0x39504 가 읽는 칸
+ * 3e062  r(0.1%) && v ≠ 3·4 → 3e070 0x3507c · 3e080 0xb0cb8(플레이, 9) · 3e09a 상태 0x17 예약
+ * 3e0a2  v == 5 → 3e0a8 st[0xc] = 5 · 3e0aa [장면+0x10ac] = 0
+ * 3e0b8  0xa9879(1)(1루 주자) && st[6] ≤ 1 → 3e0cc [장면+0x10ac] = 5 되돌림(삼진 그대로)
+ *        아니면 3e0da 0xa7c4c(삼진 기록) · 3e0e0 st[0x1a] = 1(낫아웃)          ; v 는 0 으로 남는다
+ * 3e1d4  v ≠ 0 일 때만 st[0xc] = v · 메시지 0xbba(v)
+ * ```
+ * 판정 글자는 같은 0x12 의 틱 0 그림 0x4ce9c → 0x39504 가 [장면+0x10ac] 로 game_judge 애니를 고르는데(표 0xcfe90, v 0 → 글자 없음),
+ * 이 진입 0x3dfac 가 그 그림보다 **먼저** 돈다(진입 → 같은 틀의 그리기). 그래서 낫아웃이면 '삼진' 글자도, 그 글자가 쏘는
+ * 양끝 파티클(0x393b4 39498)도 없다. 판 종류 9 · 낫아웃 갈래 `'batterRuns'`(`passedBallStrikeoutOf`)가 그 경우다 — 열어 둔 판
+ * (`OpenedPitchArrivalPlay`)이든 다 돈 판(`PitchArrivalPlay`)이든 같은 칸을 본다.
+ */
+export function clearsPitchJudgement(
+  play: { readonly kind: number; readonly strikeout?: PassedBallStrikeout | 'none' } | null | undefined,
+): boolean {
+  return play != null && play.kind === PASSED_BALL_PLAY_KIND && play.strikeout === 'batterRuns'
+}
+
 /** 사람 공격의 도루 키 — `canStartSteal` 이 받으면 넣는다. 난수 없음. 못 받으면 같은 배열을 돌려준다 */
 export function startHumanSteal(
   bases: BaseState,

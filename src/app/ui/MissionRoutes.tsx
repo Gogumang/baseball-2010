@@ -329,7 +329,8 @@ export function MissionRoutes({
         random={random}
         onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
           sceneBuntKindRef.current = buntKind ?? 0
-          session.handleMissionPitch(detail, isUncatchable, buntKind)
+          // 0x3dfac 의 답(낫아웃이면 판정 칸을 지웠다) — 타석 화면이 0x12 틱 0 그림에 쓴다
+          return session.handleMissionPitch(detail, isUncatchable, buntKind)
         }}
         sceneBuntKind={sceneBuntKindRef.current}
         // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)

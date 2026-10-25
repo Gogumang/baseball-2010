@@ -934,6 +934,8 @@ function PitcherGameScene({
         pitch={progress.lastPitch}
         resolution={progress.lastResolution}
         resultTicks={heldResultTicks}
+        // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
+        isJudgementCleared={progress.lastPitchJudgementCleared === true}
         cpuSwing={progress.lastCpuSwing ?? null}
         // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
         hitScene={pitcherHitScene.hitScene}

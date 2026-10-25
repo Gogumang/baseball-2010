@@ -48,6 +48,7 @@ import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import type { EntryBatterLine, EntryPitcherLine, PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 import { entryBatterLineOfRecord, entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
+import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
 import {
   leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
@@ -106,7 +107,8 @@ export interface NariEntryView {
  *   팀 레코드 +2 에 0xa3a24 를 쓰고, CPU 끼리 간이 엔진도 두 팀 모두 부른다(0xc1308 · 0xc1320, 넷째 인자 1). 커리어
  *   `teamRecordMorales`(r101 — 사람 경기 상대 · 그날 CPU 경기 여덟 팀 · CPU 포스트시즌 두 팀, 새 시즌 0x1b768 은 안 건드림)가 그 값이고
  *   옛 저장에 없으면 표값 100 (`nariTeamRecordMoraleOf`, r128 이음).
- * ⚠️ 미확인(남김 — 웹 기록 꼴): 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다. 내 선수 줄(표 밖)도 비운다.
+ * ⚠️ 미확인(남김 — 웹 기록 꼴): 국가대항전 두 칸(+0xbc4 · +0xbe0)은 대회마다 새로 베끼는 레코드라 이 재료를 안 쓰고 비운다(내 선수 줄 포함).
+ * 정규·포스트시즌의 내 선수 줄(표 밖)은 커리어 시즌 줄로 채운다(`myBatterEntryLineOf` · 투수편 `myPitcherEntryCellsOf`, r213).
  */
 export interface NariEntryCellSource {
   readonly stats: LeaguePlayerStats
@@ -292,8 +294,9 @@ export function batterNariEntryViewOf(
   isMyTeam: boolean,
   cup?: { readonly myTeam: number; readonly opponent: number },
 ): NariEntryView {
-  const me = myBatterEntryFaceOf(career)
+  const face = myBatterEntryFaceOf(career)
   if (cup !== undefined) {
+    const me = face
     // 국가대항전 — 0x1f9a9 가 팀 10 은 대표팀 칸(+0xbc4, 내 선수가 낀), 그 밖은 상대국 칸(+0xbe0)을 준다. 투수는 142 가 돌린 그 칸 차례
     const teamId = isMyTeam ? cup.myTeam : cup.opponent
     const record = career.nariCupTeams === undefined
@@ -308,6 +311,8 @@ export function batterNariEntryViewOf(
   const teamId = isMyTeam ? career.teamId : opponent
   const record = nariTeamRecordOf(nariTeamsOf(career), teamId)
   const pitchers = leagueGamePitchersOf(career, opponent)
+  // 내 선수 줄의 기록 열 — 레코드 +0x20~ 는 커리어 시즌 줄이다(`myBatterEntryLineOf`). 표 밖 줄이라 내 팀 탭에만 선다
+  const me: NariEntryFace = { ...face, batterLine: myBatterEntryLineOf(career) }
   const cells: NariEntryCellSource = {
     stats: career.leaguePlayerStats,
     staminas: humanGamePitcherStaminasOf(career, leagueDayCounterOf(career), teamId),
@@ -347,6 +352,19 @@ export function myBatterEntryFaceOf(career: PlayerCareer): NariEntryFace {
       specialNumber: career.specialSwingNumber, grade: null, nurturedSalary: career.salary,
     },
   }
+}
+
+/**
+ * **타자편 내 선수 줄의 기록 열** — 목록 칸 그리기 0x56ebc 는 줄 레코드 `[팀+0x18][i] × 0x30 + 0x20` 을 그대로 읽는다(56f44~56f56 ·
+ * 비트 갈래 5700a~57036: 1 → +0x20 타수 · 2 → +0x22 안타 · 4 → +0x24 2루타 · 8 → +0x26 3루타 · 0x10 → +0x28 홈런 · 0x20 → +0x2a 타점 ·
+ * 0x40 → +0x2c 도루 · 0x80 → +0x2e 실책, 0 → 타율 0xb8e3d(레코드)). 육성 비트 · 모드 갈래가 없어 내 칸도 같은 줄을 읽는다.
+ * 내 칸 +0x20~ 는 다른 칸처럼 시즌 시작 0xb6cc4 가 지우고 정산 0xa8024 가 게이트 0xa56dc(정규시즌)를 지날 때 쌓는다 —
+ * 웹은 커리어 시즌 줄(`career.stats` — 포스트시즌은 `withoutRecordLine` 으로 안 쌓는다)이 그 칸이다(`batterRecordLineOf`).
+ * +0x2c 도루는 `SeasonStats.stolenBases`(동료 간이 타석 0xc1818 의 도루). +0x2e 실책은 수비 그림 0x43278 이 야수로 선 선수에게만
+ * 올리는데 타자편 내 팀 수비는 그리지 않아(간이 엔진) 늘 0 이다.
+ */
+export function myBatterEntryLineOf(career: PlayerCareer): EntryBatterLine {
+  return { ...entryBatterLineOfRecord(batterRecordLineOf(career.stats)), steals: career.stats.stolenBases ?? 0, errors: 0 }
 }
 
 /**

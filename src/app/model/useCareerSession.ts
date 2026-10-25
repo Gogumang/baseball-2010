@@ -1,3 +1,6 @@
+import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
+import { clearsPitchJudgement } from '@/features/defense-play/model/pitchArrivalPlay'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
@@ -1119,7 +1122,7 @@ export function useCareerSession({
   )
 
   const handlePitchResolved = useCallback(
-    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean, buntKind?: number) => {
+    (detail: PitchOutcomeDetail, _pitch?: unknown, isUncatchable?: boolean, buntKind?: number): PitchResolvedReply | undefined => {
       // 공이 손을 떠날 때 상대 투수 투구 수·스태미나를 깎는다 (0x3dec6 → 0xa5e14(ctx, 구질)).
       // 타자 스킬 22 압도(0xb62b4(현재 타자, 22) — 장착 비트)면 소모 ×2
       const beforePitch = progressRef.current
@@ -1192,15 +1195,21 @@ export function useCareerSession({
               },
             )
       const context: ArrivalContext = { nextAtBat, tally, isUncatchable, pattern: detail.pattern, buntKind: buntKind ?? 0 }
+      // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠나 — 타석 화면이 0x12 틱 0 의 판정 글자 · 삼진 파티클을 고른다
+      const held = arrival?.deferred === true ? arrival.progress.pendingRunnerPlay : null
+      const reply: PitchResolvedReply = {
+        judgementCleared: clearsPitchJudgement(arrival?.play) || (held?.kind === 'arrival' && clearsPitchJudgement(held.opened)),
+      }
       if (beforeArrival !== null && arrival !== null && arrival.deferred === true) {
         // 판이 도는 동안(상태 0x17) 다음 공은 없다 — 판 끝에서 `finishRunnerPlay` 가 아래 나머지를 잇는다
         progressRef.current = arrival.progress
         setProgress(arrival.progress)
         arrivalContextRef.current = context
         runner.setIsPaused(true)
-        return
+        return reply
       }
       continueAfterArrival(beforeArrival, arrival, context)
+      return reply
     },
     [aceLevels, audio, continueAfterArrival, random, runner],
   )
@@ -1855,7 +1864,7 @@ export function useCareerSession({
       if (command === '다음경기') return enterNextGameStandings(true)
       if (command === '휴식') {
         // 원작 [휴식] 커맨드 — 사기를 회복한다. 105 키 0x1261c 12682~126bc 는 사기 최고만 본다(행동함은 안 본다)
-        if (restBlockReasonOf(career) !== null) return setManagementNotice('사기 최고 상태입니다') // StrMODE[91]
+        if (restBlockReasonOf(career) !== null) return setManagementNotice(ORIGINAL_MODE_TEXT[91] ?? '') // StrMODE[91] (1269a)
         // 관리 화면은 팝업 0x2a "예" 뒤 127 연출(0x85230, `RestScene`)이 끝난 틀에 이 길을 부른다 — 0x19080 → 0x18e3c 의
         // 굴림 · 결과 창 · 저장이 연출 뒤라서다(연출에는 난수가 없어 굴림 차례는 그대로다)
         const rest = runRest(career, random)

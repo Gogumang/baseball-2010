@@ -128,3 +128,12 @@ describe("143 '0' 상세 창 — 내 선수 줄 (0x5b798 타자 갈래 · 육성
     expect(row.profileLow).toBe(me.positionIndex & 3)
   })
 })
+
+describe('143 내 선수 줄의 기록 열 — 0x56ebc 가 줄 레코드 +0x20~ 를 그대로 읽는다 (r213)', () => {
+  it('타율 · 홈런 칸이 커리어 시즌 줄(레코드 +0x20 타수 · +0x22 안타 · +0x28 홈런 · +0x2c 도루)로 선다', () => {
+    const { career } = 선수()
+    const stats = { ...career.stats, atBats: 40, hits: 13, doubles: 2, triples: 1, homeRuns: 5, runsBattedIn: 9, stolenBases: 3 }
+    const row = batterNariEntryViewOf({ ...career, stats }, true).lists.batters[7]
+    expect(row.batterLine).toEqual({ atBats: 40, hits: 13, doubles: 2, triples: 1, homeRuns: 5, runsBattedIn: 9, steals: 3, errors: 0 })
+  })
+})

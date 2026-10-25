@@ -1,3 +1,4 @@
+import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import { useRef, useState } from 'react'
 import type { MutableRefObject, RefObject } from 'react'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
@@ -192,7 +193,7 @@ export interface StageLatest {
   /** 타자 레코드 칸 `0xb6394` = +0xa & 0x1f — 투수 스킬 31(0xabcd8)이 본다 (`BattingStageProps.batterRecordSlot`) */
   readonly batterRecordSlot: number
   /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => PitchResolvedReply | void
   /**
    * CPU 투수가 공 대신 **견제**를 걸었다 (0x34848 → 메시지 0x10). 없으면 CPU 견제가 꺼진다 —
    * `BattingStage` 의 같은 이름 props 주석 참고.
