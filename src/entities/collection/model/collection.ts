@@ -7,7 +7,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { nariRecordSalaryGradeOf, romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
+import { nariRecordSalaryGradeOfCareer, romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
 import { FIRST_HIDDEN_LEVEL, hiddenOpenIdOf, ownsEquipment } from '@/entities/career/model/equipment'
 import { ownsPitcherEquipment, pitcherHiddenOpenIdOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
@@ -334,7 +334,7 @@ export function registerHallOfFame(
     specialSwingNumber: career.specialSwingNumber,
     positionIndex: career.positionIndex,
     recordLine: batterRecordLineOf(career.stats),
-    salaryGrade: nariRecordSalaryGradeOf(career.salary),
+    salaryGrade: nariRecordSalaryGradeOfCareer(career),
   }
   return { kind: '등록', slot: target, collection: { ...collection, hallOfFame: [...collection.hallOfFame, famer] } }
 }
@@ -367,7 +367,7 @@ export function registerHallOfFamePitcher(
     selectedMagicNumber: career.selectedMagicNumber,
     role: career.role,
     recordLine: pitcherRecordLineOf(career.stats),
-    salaryGrade: nariRecordSalaryGradeOf(career.salary),
+    salaryGrade: nariRecordSalaryGradeOfCareer(career),
   }
   return {
     kind: '등록',

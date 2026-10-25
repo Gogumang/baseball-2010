@@ -289,6 +289,11 @@ export interface PlayerCareer {
   readonly yearGoalEventDone: boolean
   /** 연봉 (만원 단위, 추정) — 새 시즌 시작 때 소지금에 들어온다 */
   readonly salary: number
+  /**
+   * 나리 선수 레코드 **+0x1b** — 연봉 쓰기 0xa4fd8 이 **감기기 전** 값 v 로 둔 min(v / 10, 255) (`applySalaryChange`).
+   * 없으면(등록 그대로 · 옛 저장) 지금 연봉에서 센다 — v < 65536 이면 같은 값이다 (`nariRecordSalaryGradeOfCareer`)
+   */
+  readonly salaryRecordGrade?: number
   /** 선수 생활이 끝났으면 StrENDING 번호 */
   readonly endingIndex: number | null
   /**
@@ -419,6 +424,14 @@ export interface PlayerCareer {
   readonly battingOrderPath: '4번' | '1번' | null
   /** 지난 중간평가 달성 수 (원본 +0x1cc) — 칭호 "전년 대비 성적 우수" */
   readonly lastMidSeasonGoalCount: number
+  /**
+   * **그 해 중간 성적표(117)를 마쳤다** — 커리어 u32 S+0x180 의 비트(연차idx, 타자편은 비트 0 부터 · 투수편은 +13). 연차idx = `season − 1`.
+   * 켜는 곳은 보상 실행기 끝 0x8cbaa~0x8cbdc 하나다: 이벤트 번호가 0x1c3 < id ≤ 0x1c6(452~454)이면 `0xa424c(S, 모드 ≠ 3, S+0xb3, 1)`.
+   * 읽는 곳은 105 진입 0x11910 곁가지 11bda~11c06: `S+0xb2 == 22 && 0xa4280(S, 모드 == 4, S+0xb3) == 0` → 117. 그래서 117 은
+   * 이벤트의 보상 명령이 돈 뒤에만 그 해 다시 안 서고, 보상 전에 끊긴 저장은 다음 105 진입에서 117 을 다시 세운다.
+   * 투수편 `PitcherCareer.midSeasonEvaluatedYears` 와 같은 칸 꼴이다.
+   */
+  readonly midSeasonEvaluatedYears: readonly number[]
   /** 가진 스킬 번호 (0~39, original/skills). 원본 보유 비트 +0x1b8 — 얻은 차례대로 쌓인다 */
   readonly skillIds: readonly number[]
   /**
@@ -578,6 +591,7 @@ export function createCareer(name: string, profile: RookieProfile = DEFAULT_ROOK
     battingOrder: ROOKIE_BATTER_SLOT + 1,
     battingOrderPath: null,
     lastMidSeasonGoalCount: 0,
+    midSeasonEvaluatedYears: [],
     skillIds: STARTING_SKILL_IDS,
     // 신인 스킬도 0xa4bd9 로 얻으니(0x11230) 그 자리에서 자동 장착된다 — 둘 다 플러스, 상한 6 안
     equippedSkillIds: STARTING_SKILL_IDS,
@@ -813,8 +827,11 @@ export function setSkillEquipped<T extends Pick<PlayerCareer, 'equippedSkillIds'
  * 장착 칸이 없는 옛 저장의 장착 칸 다시 세우기 — 웹에는 장착 창이 없었으므로 그동안의 장착은 **모두
  * 획득 때의 자동 장착(0xa4bd8 → 0xa4b04(P,s,1))** 뿐이었다. 그래서 보유 목록(얻은 차례)을 슬롯 단계 0 에서
  * 차례로 다시 자동 장착하면 원본이 그 선수에게 남겼을 장착과 같다.
- * ⚠️ 어긋나는 한 가지: 플러스 스킬이 상한을 넘겨 못 낀 뒤 앞선 플러스 스킬이 보상으로 지워진 경우 —
- *    원본은 빈자리를 다시 채우지 않지만 이 재구성은 채운다(웹 저장에 그 이력이 없다).
+ * ⚠️ 남김(옛 웹 저장 이사 — 이력 없음): 플러스 스킬이 상한을 넘겨 못 낀 뒤 앞선 플러스 스킬이 보상으로 지워진 경우 —
+ *    원본은 빈자리를 다시 채우지 않지만 이 재구성은 채운다. r244 에서 원본을 다시 떴다: 제거 0xa4430 은 보유 비트 S+0x1b8 을
+ *    끄고(a4440~a444e) `0xb66dd(레코드, s)` 로 그 스킬 장착만 끈 뒤 `0xa43fc(P, s, 1)` 해제 기록을 남길 뿐, 못 낀 스킬을 다시
+ *    켜는 곳이 없다 — 살아 있는 길(`applySkillReward` → `setSkillEquipped`)은 그대로 원본과 같다. 어긋남은 장착 칸(+0x14)이 없던
+ *    옛 저장을 불러올 때 한 번뿐이고, 그 저장에는 "어느 스킬이 상한에 막혔다가 앞 스킬이 지워졌는가" 가 남아 있지 않아 되살릴 수 없다.
  */
 export function rebuildEquippedSkillIds(skillIds: readonly number[]): readonly number[] {
   let equipped: Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'> = { equippedSkillIds: [], skillSlotLevel: 0 }

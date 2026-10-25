@@ -370,6 +370,11 @@ export interface PitcherCareer {
   readonly money: number
   readonly salary: number
   /**
+   * 나리 선수 레코드 **+0x1b** — 연봉 쓰기 0xa4fd8 이 **감기기 전** 값 v 로 둔 min(v / 10, 255) (`applySalaryChange`).
+   * 없으면(등록 그대로 · 옛 저장) 지금 연봉에서 센다 — v < 65536 이면 같은 값이다 (`nariRecordSalaryGradeOfCareer`)
+   */
+  readonly salaryRecordGrade?: number
+  /**
    * 가진 스킬 — 보유 비트 `+0x1b8`. 번호는 **투수 비트 번호 0~23** 이다 — 8 이상은 표(skills.json) 번호
    * `비트 + 16` 의 투수 스킬이다 (이름 0x8457c: 모드 3 이면 StrCOMMON[71 + 비트], `pitcherSkillTableIdOf`).
    */

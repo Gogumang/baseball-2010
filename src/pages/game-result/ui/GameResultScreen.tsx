@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { RawScreen } from '@/shared/ui'
@@ -96,6 +96,13 @@ interface GameResultScreenProps {
   readonly career: PlayerCareer
   readonly onContinue: () => void
   /**
+   * 정산 상태 0x19 에 들어섰다 — 진입 0x4ea0c 끝 4f41a~4f544 가 승리 31 · 패배 32 징글을 예약하는 자리(경기 끝 판 0x18 의 OK 뒤).
+   * 이어하기로 곧장 평가인 116(정산을 다시 안 돈다)에서는 안 부른다
+   */
+  readonly onSettlementEnter?: () => void
+  /** 116 평가에 들어섰다 — 진입 0x1278c 의 12c96~12cc2 가 평가 징글 36 · 37 · 38 을 내는 자리(이어하기로 다시 선 116 도) */
+  readonly onEvaluationEnter?: () => void
+  /**
    * 나리 116 평가 대화(114 · 내장 이벤트 0x8a6fc)의 밑그림. 116 그림 0x11e0c 와 대화창 0x8b5ac 가
    * 공 무늬 · 상태판 0x7d34c(gfx, [이벤트+0xb] = 1 — 메시지줄 경기 번호 −1) · 머리띠를 깐다. 부르는 쪽이 넘긴다.
    * 결과 판(0x18 · 0x19 — 경기 장면)이 아니라 평가 단계에만 깐다.
@@ -162,6 +169,8 @@ export function GameResultScreen({
   recordLine,
   career,
   onContinue,
+  onSettlementEnter,
+  onEvaluationEnter,
   underlay,
   entryUnderlay,
   settlement,
@@ -177,6 +186,17 @@ export function GameResultScreen({
     if (phase !== '평가' || isEvaluationEntered) return undefined
     return setAppTickTimeout(() => setEvaluationEntered(true), 1)
   }, [phase, isEvaluationEntered])
+  /**
+   * 단계마다 진입 소리를 한 번 — 원본은 결과 판 0x18 · 정산 0x19(0x4ea0c) · 116(0x1278c)이 따로 서 각 진입이 징글을 낸다(승패 31 · 32 는
+   * 정산 진입, 평가 36~38 은 116 진입). 예전 웹은 경기가 끝난 자리에서 둘을 한꺼번에 내 통로 하나에서 앞 소리가 끊겼다
+   */
+  const enteredPhasesRef = useRef<ReadonlySet<Phase>>(new Set())
+  useEffect(() => {
+    if (enteredPhasesRef.current.has(phase)) return
+    enteredPhasesRef.current = new Set([...enteredPhasesRef.current, phase])
+    if (phase === '정산' && settlement !== undefined) onSettlementEnter?.()
+    if (phase === '평가' && evaluation !== undefined) onEvaluationEnter?.()
+  }, [phase, settlement, evaluation, onSettlementEnter, onEvaluationEnter])
   const [isTitlePopupOpen, setIsTitlePopupOpen] = useState(newTitles.length > 0)
   // 결과 배경의 하늘 줄은 경기를 세울 때 고른 구장 +0x10(`settlement.skyRow`, 0x783b0 모드 4 — 굴림 없음)이다. 원본은 경기 내내 같은
   // 구장객체라 정산 그림도 그 줄이다. 배경 난수는 줄을 안 받았을 때(옛 호출)만 쓰여 경기 난수에 새지 않게 따로 든다

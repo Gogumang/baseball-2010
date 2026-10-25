@@ -1,6 +1,7 @@
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer, rebuildEquippedSkillIds } from '@/entities/career/model/playerCareer'
+import { MID_SEASON_GAME } from '@/entities/career/model/seasonFlow'
 
 const STORAGE_KEY = 'compus-baseball/career'
 
@@ -110,5 +111,10 @@ function normalizeCareer(saved: PlayerCareer): PlayerCareer {
     // 새 선수 기본값([0, 8])을 그대로 덮으면 마이너스 스킬이 빠지고 7번째 플러스부터도 켜져 버린다.
     equippedSkillIds: saved.equippedSkillIds ?? rebuildEquippedSkillIds(saved.skillIds ?? base.skillIds),
     seenEventIds: saved.seenEventIds ?? [],
+    // 그 해 중간 성적표 비트(S+0x180)는 나중에 생긴 칸이다. 예전 웹은 22경기째 116 [확인]에서 곧장 117 을 띄웠으므로 올해 22경기를
+    // 넘긴(또는 막 마친) 저장은 이미 본 것으로 둔다 — 지난 해들의 비트는 다시 읽는 곳이 없다(연차가 바뀐다)
+    midSeasonEvaluatedYears: saved.midSeasonEvaluatedYears
+      ?? ((saved.gamesPlayed ?? 0) >= MID_SEASON_GAME ? [(saved.season ?? 1) - 1] : []),
   }
 }
+

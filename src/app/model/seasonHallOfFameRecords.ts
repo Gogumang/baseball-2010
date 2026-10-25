@@ -14,7 +14,7 @@ import type {
 } from '@/entities/season-mode/model/seasonEntry'
 import { modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
-import { nariRecordSalaryGradeOf } from '@/entities/career/model/seasonFlow'
+import { nariRecordSalaryGradeOfCareer } from '@/entities/career/model/seasonFlow'
 
 /** 명전 칸 사본 — 시즌 영입 후보·경기 명단이 읽는 두 목록 */
 export type SeasonHallOfFame = Pick<Collection, 'hallOfFame' | 'hallOfFamePitchers'>
@@ -128,7 +128,7 @@ export function seasonNariPitcherRecordOf(career: PitcherCareer): SeasonEntryPit
     role: career.role,
     profile: seasonRecordProfileOf(career.typeIndex, career.handIndex, career.skinIndex, career.role),
     // +0x1b — 연봉 쓰기 0xa4fd8 가 둔 min(연봉 / 10, 255)
-    salaryGrade: nariRecordSalaryGradeOf(career.salary),
+    salaryGrade: nariRecordSalaryGradeOfCareer(career),
   }
 }
 
@@ -146,7 +146,7 @@ export function seasonNariBatterRecordOf(career: PlayerCareer): SeasonEntryBatte
     // +0xb (등록 0x16f28) · +0x18 고른 필살타법 — 영입 0xc554 가 통째로 옮기는 0x30 바이트의 칸
     profile: seasonRecordProfileOf(career.battingTypeIndex, career.battingSide, career.skinIndex, career.positionIndex),
     specialNumber: career.specialSwingNumber,
-    salaryGrade: nariRecordSalaryGradeOf(career.salary),
+    salaryGrade: nariRecordSalaryGradeOfCareer(career),
   }
 }
 

@@ -1628,6 +1628,43 @@ describe('연초 115 (0x16aac) — 105 진입이 S+0x1b7 == 0 이면 내장 이�
   })
 })
 
+describe('117 중간 성적표 — 105 진입 곁가지 11bda: S+0xb2 == 22 && 그 해 비트 0xa4280 == 0 (r244)', () => {
+  /** 105 에 들어선 뒤 훑기 이벤트를 마치며 117(452~454)이 설 때까지 — 끝까지 안 서면 null */
+  const 성적표까지 = (rendered: ReturnType<typeof 띄우기>) => {
+    for (let step = 0; step < 30; step += 1) {
+      const screen = rendered.result.current.screen
+      if (screen.kind !== '이벤트') return null
+      if (screen.eventId >= 452 && screen.eventId <= 454) return screen
+      act(() => rendered.result.current.session.actions.completeScene([], [screen.eventId]))
+    }
+    return null
+  }
+
+  it('22경기째 105 에 들어서면 훑기 다음 117 이 서고([다음 114, 뒤 105] — 맥락 관리), 보상이 돌면 그 해 비트가 켜져 다시 안 선다', async () => {
+    const rendered = 띄우기({ ...createCareer('절반'), season: 2, gamesPlayed: 22, seenEventIds: ['451'], hasSeenYearGoalWindow: true })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen.kind).toBe('이벤트'))
+    const report = 성적표까지(rendered)
+    expect(report).toEqual(expect.objectContaining({ kind: '이벤트', context: '관리' }))
+    if (report === null || report.kind !== '이벤트') return
+    // 보상 명령 전 — 비트는 아직이다(끊긴 저장은 다음 105 진입이 117 을 다시 세운다)
+    expect(rendered.result.current.session.career?.midSeasonEvaluatedYears).toEqual([])
+    act(() => rendered.result.current.session.actions.giveEventReward([{ kind: 1, value: 5 }], report.eventId))
+    // 0x8cbaa — 452~454 의 보상이 돌면 0xa424c(S, 1, 연차idx 1, 1)
+    expect(rendered.result.current.session.career?.midSeasonEvaluatedYears).toEqual([1])
+    act(() => rendered.result.current.session.actions.completeScene([], [report.eventId]))
+    expect(성적표까지(rendered)).toBeNull()
+  })
+
+  it('그 해 비트가 이미 켜져 있으면 22경기째여도 117 을 안 세운다', async () => {
+    const rendered = 띄우기({
+      ...createCareer('절반'), season: 2, gamesPlayed: 22, seenEventIds: ['451'], hasSeenYearGoalWindow: true, midSeasonEvaluatedYears: [1],
+    })
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    expect(성적표까지(rendered)).toBeNull()
+  })
+})
+
 describe('칭호는 관리 화면에서 하나씩 — 판정 0x1a1c0 (0x1afac) · 팝업 0x1274c · 확인 0x1b1e4', () => {
   it('들어온 관리 화면에서 처음 맞는 하나만 띄우고, 확인하면 주고 곧바로 장착한 뒤 다음 것을 띄운다', async () => {
     const rendered = 띄우기({ ...createCareer('칭호'), season: 2, gamesPlayed: 10, popularity: 4500, seenEventIds: ['451'], titleIds: [TITLE_NAMES[0]], hasSeenYearGoalWindow: true })
