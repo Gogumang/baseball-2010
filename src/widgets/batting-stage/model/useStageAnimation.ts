@@ -674,7 +674,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 한 번 다시 그린다(r175). 다른 상태의 그리기 쪽 셈은 그 부품이 센다 — 0x10 조준 애니 0 칸(`AimCursor`) · 0x11 커서 0x4d708 /
       // 결과 원 0x4d700(`PitchGradeGauge`) · 점수판 0x36714 목표 줄(`MissionHud`) · 더비 콤보 [+0x19ec](`useHomeRunDerby`).
       // 그리기에서 0x93d91 로 넘기는 애니(r178 — `stageRedraws`): 루상 주자 0x35b94(35c62) 는 주자 시계를 한 번 더 돌리고, 투수 덧그림
-      // 0x38d1c(바람 줄 · 실투 "!" · 체력 · 홈런 갈래) · 필살 스윙 그림 0x49aec · 판정 글자 0x393b4 · 램프 확대 0x37828 · 하늘 조명 0x78490
+      // 0x38d1c(바람 줄 · 실투 "!" · 체력 · 홈런 갈래) · 필살 스윙 그림 0x49aec · 판정 글자 0x393b4 · 램프 확대(0x373d0 안 갈래 0x37828) · 하늘 조명 0x78490
       // 은 이 그림의 틱을 `redrawTicks` 에 실어 그리기가 센다. 경기 스킬 표시 판 0x4b5b4 도 한 번 더 돈다. 타자 · 투수 몸통(스윙 3f320 ·
       // 투수 0x9e004)은 갱신에서 넘어가 그대로다.
       if (isGameSceneFrozen()) {

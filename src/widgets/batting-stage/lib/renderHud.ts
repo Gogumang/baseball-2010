@@ -14,7 +14,7 @@ import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
  *
  * **확정** (F-3 · 3-1): 숫자 글꼴 = `ui/num.pzx` (0x3740c → 0x330f0), 점수 **오른쪽 정렬**
  * (0x3756c 정렬 0x24 = 오른쪽+세로 가운데, 아래 줄은 오른쪽만),
- * 그리고 **새 램프 확대 연출이 있다** (0x37828, `stepLampZoom`) — 예전 주석의 "없음" 은 틀렸다.
+ * 그리고 **새 램프 확대 연출이 있다** (램프 그리기 0x373d0 안 갈래 0x37828~0x37858, `stepLampZoom`) — 예전 주석의 "없음" 은 틀렸다.
  */
 export interface HudState {
   readonly inning: number

@@ -526,7 +526,8 @@ function* pickoffPlaySteps(
     if (coverSlot === holderSlot || horizontalDistance(holder.position, cover.position) <= MINIMUM_THROW_DISTANCE) {
       return false
     }
-    // b2d7e: +0x154 = C · vt5c(C, 특수) = 0xb2e38
+    // b2d7e~b2dea: 거리(공가진야수, C) 0xbf9f0 > 600(b2dbe~b2dc8) · C ≠ +0x130(b2dd4) 관문(바로 위 `MINIMUM_THROW_DISTANCE`) 뒤
+    //   +0x154 = C(b2dde) · vt5c(C, 특수) = 0xb2e38(b2de4~b2dea)
     if (!throwBall(tick, coverSlot, base, chooser, cpuSpecial)) return false
     // b2df8~b2e14 — 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로). 미룬 송구는 AI 9 라 그대로
     fielders = fielders.map((fielder) => {
