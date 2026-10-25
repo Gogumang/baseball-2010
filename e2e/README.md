@@ -119,5 +119,5 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|pitcherGame|isAutoRelay' dist || echo clean
+yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST' dist || echo clean
 ```
