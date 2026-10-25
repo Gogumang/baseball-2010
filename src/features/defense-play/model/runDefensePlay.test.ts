@@ -2432,11 +2432,13 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     expect(pressed).toBe(true)
     expect(풀린틱).toBeGreaterThan(0)
     expect(state.log).toContain(`${풀린틱}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
-    // 1루 주자는 타자주자와 같은 목록 틱에 홈을 밟는다 — 풀린 그림 다음 그림의 목록 틱(52e16)이 +0x3b 를 지워 0xaa0a8 이 못 센다.
-    // +0x96 이 안 선 주자가 남아 관문(b0e04 → b0e24)이 늘 열린다 — 원본은 판이 안 끝나고, 웹은 판 틱 상한(원본에 없는 안전망)에서 끊는다
-    expect(state.runners[1]!.state.scored).toBe(false)
-    expect(state.tick).toBeGreaterThan(state.maximumTicks)
-    expect(defensePlayResultOf(state).advance.runsScored).toBe(runDefensePlay(홈런판()).advance.runsScored - 1)
+    // 1루 주자는 타자주자와 같은 목록 틱에 홈을 밟는다. 원본은 풀린 그림 다음 그림의 목록 틱(52e16)이 +0x3b 를 지워 0xaa0a8 이 못 세고,
+    // +0x96 이 안 선 주자가 남아 관문(b0e04 → b0e24)이 늘 열려 판이 안 끝난다(원본 버그).
+    // 사용자 결정 2026-10-26: 원본 버그를 고침 — 앞 주자도 세고, 판은 안전망(판 틱 상한)에 닿지 않고 관문으로 끝난다
+    expect(state.runners[1]!.state.scored).toBe(true)
+    expect(state.play.finished).toBe(true)
+    expect(state.tick).toBeLessThanOrEqual(state.maximumTicks)
+    expect(defensePlayResultOf(state).advance.runsScored).toBe(runDefensePlay(홈런판()).advance.runsScored)
   })
 
   it('건너뛰지 않으면 아무것도 안 한다', () => {
@@ -2467,9 +2469,10 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     expect(defensePlayResultOf(state).advance).toEqual(runDefensePlay(홈런판()).advance)
   })
 
-  it('풀린 그림 다음 그림은 52e16 의 목록 틱이 한 번 더 돈다 — 같은 목록 틱에 홈에 닿은 앞 주자는 +0x3b 가 지워져 0xaa0a8 이 안 센다', () => {
+  it('풀린 그림 다음 그림은 52e16 의 목록 틱이 한 번 더 돈다 — 같은 목록 틱에 홈에 닿은 앞 주자도 다음 판 틱 0xaa0a8 이 센다(원본 버그 고침)', () => {
     // 원본 차례: 52b26 의 0x3f060 = 목록 틱 → 카메라 3f164 가 곧바로 타자주자 메시지 0x13 → 52b36 에서 멈추고 그린다 →
-    // 다음 그림 52e16 의 0x3f060 이 목록 틱을 한 번 더(+0x3b 를 머리에서 지움) → 슬롯 2 의 0xaa0a8 은 앞 주자를 못 본다
+    // 다음 그림 52e16 의 0x3f060 이 목록 틱을 한 번 더(+0x3b 를 머리에서 지움) → 슬롯 2 의 0xaa0a8 은 앞 주자를 못 본다(원본 버그).
+    // 사용자 결정 2026-10-26: 원본 버그를 고침 — 홈에 닿은 앞 주자의 +0x3b 는 남아 다음 판 틱에 타자주자 다음으로 센다
     const 풀린틱 = (() => {
       let state = startDefensePlay(홈런판())
       let pressed = false
@@ -2504,13 +2507,13 @@ describe('카메라 0x3f060 의 키 건너뛰기 부수효과 (3f164~3f192)', ()
     expect(state.runInsThisTick).toEqual([0])
     expect(앞주자.state.scored).toBe(false)
     expect(state.held.scoreboardRuns).toBe(앞점수 + 1)
-    // 다음 그림 머리의 목록 틱이 +0x3b 를 지웠다
-    expect(앞주자.arrivedThisListTick).toBe(false)
+    // 원본이면 다음 그림 머리의 목록 틱이 +0x3b 를 지운다 — 웹은 홈에 닿은 앞 주자만 남긴다
+    expect(앞주자.arrivedThisListTick).toBe(true)
 
     state = stepDefensePlay(state, null)
-    expect(state.runInsThisTick).toEqual([])
-    expect(앞주자.state.scored).toBe(false)
-    expect(state.held.scoreboardRuns).toBe(앞점수 + 1)
+    expect(state.runInsThisTick).toEqual([앞주자.state.index])
+    expect(앞주자.state.scored).toBe(true)
+    expect(state.held.scoreboardRuns).toBe(앞점수 + 2)
   })
 })
 
