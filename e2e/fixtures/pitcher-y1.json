@@ -1,0 +1,1086 @@
+{
+  "note": "나리 투수편 1년차 1/45경기 관리 — 빈 저장에서 투수편 등록(서울드래곤즈 · 이름 PTEST · 나머지 기본값) → 첫 이벤트(CLR 로 넘김) · 닉네임 창을 닫은 직후. r210 이 chromium 으로 떴다",
+  "localStorage": {
+    "compus-baseball/ace-level": {
+      "levels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "compus-baseball/ace-open": {
+      "cells": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "compus-baseball/collection": {
+      "titles": [
+        "이름 없는 신인"
+      ],
+      "endings": [],
+      "seasonEndings": [],
+      "hallOfFame": [],
+      "hallOfFamePitchers": [],
+      "openedHiddenIds": [],
+      "stats": {
+        "recordCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "itemPurchaseCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gamePointUsage": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gamePointEarned": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "batterEquippedSkillBits": 0,
+        "pitcherEquippedSkillBits": 257,
+        "achievementMarks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "playTimes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "compus-baseball/collection-rewards": {
+      "awardedBits": 0
+    },
+    "compus-baseball/mode-save": {
+      "lastPlayedMode": 3,
+      "isGeneralGameInProgress": false,
+      "generalGame": null,
+      "nariGames": {
+        "3": {
+          "isInProgress": false,
+          "match": null
+        },
+        "4": {
+          "isInProgress": false,
+          "match": null
+        }
+      },
+      "aceMatchPending": {
+        "3": null,
+        "4": null
+      },
+      "aceMatchWon": {
+        "3": false,
+        "4": false
+      },
+      "aceMatchMode": 0,
+      "generalMatchSettings": {
+        "kind": 1,
+        "value": 0,
+        "battingOrderBits": 0,
+        "pitchingInningBits": 0,
+        "offenseRunnerBits": 0,
+        "defenseRunnerBits": 0
+      },
+      "matchSettingsSeen": false
+    },
+    "compus-baseball/pitcher-league": {
+      "name": "PTEST",
+      "ability": {
+        "control": 100,
+        "velocity": 130,
+        "breaking": 100,
+        "stamina": 200
+      },
+      "role": 0,
+      "positionCode": 0,
+      "typeIndex": 0,
+      "handIndex": 0,
+      "skinIndex": 0,
+      "pitchMask": 19,
+      "magicLevel": 0,
+      "selectedMagicNumber": 0,
+      "magicSessions": 0,
+      "pitchTrainingStages": [
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "hiddenPitchRows": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "stamina": 10000,
+      "gamePoint": 0,
+      "season": 1,
+      "gamesPlayed": 0,
+      "stats": {
+        "games": 0,
+        "outs": 0,
+        "runsAllowed": 0,
+        "saves": 0,
+        "strikeouts": 0,
+        "pitches": 0,
+        "wins": 0,
+        "losses": 0,
+        "walks": 0
+      },
+      "careerStats": {
+        "games": 0,
+        "outs": 0,
+        "runsAllowed": 0,
+        "saves": 0,
+        "strikeouts": 0,
+        "pitches": 0,
+        "wins": 0,
+        "losses": 0,
+        "walks": 0
+      },
+      "teamId": 0,
+      "popularity": 0,
+      "reputation": 300,
+      "morale": 100,
+      "money": 6000,
+      "salary": 50,
+      "skillIds": [
+        0,
+        8
+      ],
+      "equippedSkillIds": [
+        0,
+        8
+      ],
+      "skillSlotLevel": 0,
+      "removedMinusSkillIds": [],
+      "titleIds": [
+        "이름 없는 신인"
+      ],
+      "equippedTitle": 0,
+      "subItemIds": [],
+      "equipmentLevels": {
+        "control": 0,
+        "velocity": 0,
+        "breaking": 0,
+        "stamina": 0
+      },
+      "ownedEquipment": [],
+      "openedHiddenIds": [],
+      "affection": {},
+      "seenEventIds": [
+        "451",
+        "1",
+        "2",
+        "34"
+      ],
+      "storySceneIndex": 0,
+      "trainingCounts": {},
+      "seasonStartTrainingCounts": {},
+      "consecutiveTrainingCounts": {},
+      "releaseTrainingStreaks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "badBodyTrainings": 0,
+      "fragileTrainings": 0,
+      "hasActedThisCycle": false,
+      "outingsThisSeason": 0,
+      "outingsLastSeason": 0,
+      "isInjured": false,
+      "injuredGamesPlayed": 0,
+      "injuryRemaining": 0,
+      "isSick": false,
+      "illnessName": null,
+      "illnessRemaining": 0,
+      "illnessCooldown": 0,
+      "mvpSeasonBits": 0,
+      "lotteryPurchases": 0,
+      "lotteryFirstPrizes": 0,
+      "completeGameCounts": {
+        "perfect": 0,
+        "noHitter": 0,
+        "shutout": 0,
+        "completeGame": 0
+      },
+      "seasonPopularityGain": 0,
+      "popularityAtSeasonStart": 0,
+      "hasSeenYearGoalWindow": true,
+      "yearGoalEventDone": false,
+      "endingIndex": null,
+      "league": {
+        "wins": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "losses": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "streak": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "bestStreak": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "losingStreak": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "headToHead": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "nariTeams": [
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 8
+            },
+            {
+              "slot": 1,
+              "position": 9
+            },
+            {
+              "slot": 2,
+              "position": 5
+            },
+            {
+              "slot": 3,
+              "position": 1
+            },
+            {
+              "slot": 4,
+              "position": 7
+            },
+            {
+              "slot": 5,
+              "position": 3
+            },
+            {
+              "slot": 6,
+              "position": 4
+            },
+            {
+              "slot": 7,
+              "position": 2
+            },
+            {
+              "slot": 8,
+              "position": 6
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1,
+          "pitchers": [
+            -1,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            0
+          ]
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 9
+            },
+            {
+              "slot": 1,
+              "position": 4
+            },
+            {
+              "slot": 2,
+              "position": 8
+            },
+            {
+              "slot": 3,
+              "position": 5
+            },
+            {
+              "slot": 4,
+              "position": 1
+            },
+            {
+              "slot": 5,
+              "position": 6
+            },
+            {
+              "slot": 6,
+              "position": 3
+            },
+            {
+              "slot": 7,
+              "position": 2
+            },
+            {
+              "slot": 8,
+              "position": 7
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 4
+            },
+            {
+              "slot": 1,
+              "position": 8
+            },
+            {
+              "slot": 2,
+              "position": 1
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 7
+            },
+            {
+              "slot": 5,
+              "position": 5
+            },
+            {
+              "slot": 6,
+              "position": 2
+            },
+            {
+              "slot": 7,
+              "position": 6
+            },
+            {
+              "slot": 8,
+              "position": 9
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 9
+            },
+            {
+              "slot": 1,
+              "position": 8
+            },
+            {
+              "slot": 2,
+              "position": 7
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
+              "position": 1
+            },
+            {
+              "slot": 6,
+              "position": 6
+            },
+            {
+              "slot": 7,
+              "position": 2
+            },
+            {
+              "slot": 8,
+              "position": 4
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 4
+            },
+            {
+              "slot": 1,
+              "position": 9
+            },
+            {
+              "slot": 2,
+              "position": 7
+            },
+            {
+              "slot": 3,
+              "position": 1
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
+              "position": 6
+            },
+            {
+              "slot": 6,
+              "position": 3
+            },
+            {
+              "slot": 7,
+              "position": 8
+            },
+            {
+              "slot": 8,
+              "position": 2
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 9
+            },
+            {
+              "slot": 1,
+              "position": 7
+            },
+            {
+              "slot": 2,
+              "position": 1
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
+              "position": 2
+            },
+            {
+              "slot": 6,
+              "position": 8
+            },
+            {
+              "slot": 7,
+              "position": 6
+            },
+            {
+              "slot": 8,
+              "position": 4
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 3
+            },
+            {
+              "slot": 1,
+              "position": 9
+            },
+            {
+              "slot": 2,
+              "position": 4
+            },
+            {
+              "slot": 3,
+              "position": 5
+            },
+            {
+              "slot": 4,
+              "position": 1
+            },
+            {
+              "slot": 5,
+              "position": 7
+            },
+            {
+              "slot": 6,
+              "position": 2
+            },
+            {
+              "slot": 7,
+              "position": 8
+            },
+            {
+              "slot": 8,
+              "position": 6
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 8
+            },
+            {
+              "slot": 1,
+              "position": 5
+            },
+            {
+              "slot": 2,
+              "position": 9
+            },
+            {
+              "slot": 3,
+              "position": 1
+            },
+            {
+              "slot": 4,
+              "position": 3
+            },
+            {
+              "slot": 5,
+              "position": 7
+            },
+            {
+              "slot": 6,
+              "position": 6
+            },
+            {
+              "slot": 7,
+              "position": 2
+            },
+            {
+              "slot": 8,
+              "position": 4
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 7
+            },
+            {
+              "slot": 1,
+              "position": 8
+            },
+            {
+              "slot": 2,
+              "position": 4
+            },
+            {
+              "slot": 3,
+              "position": 5
+            },
+            {
+              "slot": 4,
+              "position": 3
+            },
+            {
+              "slot": 5,
+              "position": 6
+            },
+            {
+              "slot": 6,
+              "position": 2
+            },
+            {
+              "slot": 7,
+              "position": 1
+            },
+            {
+              "slot": 8,
+              "position": 9
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 8
+            },
+            {
+              "slot": 1,
+              "position": 4
+            },
+            {
+              "slot": 2,
+              "position": 1
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
+              "position": 9
+            },
+            {
+              "slot": 6,
+              "position": 7
+            },
+            {
+              "slot": 7,
+              "position": 6
+            },
+            {
+              "slot": 8,
+              "position": 2
+            },
+            {
+              "slot": 9,
+              "position": 0
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            }
+          ],
+          "acePitcher": -1
+        }
+      ],
+      "leaguePlayerStats": {
+        "batters": {}
+      },
+      "regularSeasonFirstCount": 0,
+      "regularSeasonRewardTaken": false,
+      "seasonEndState": null,
+      "streaks": {
+        "win": 0,
+        "strikeout": 0,
+        "loss": 0
+      },
+      "postseason": null,
+      "lastMidSeasonGoalCount": 0,
+      "reputationZeroGames": 0,
+      "midSeasonEvaluatedYears": [],
+      "wins": 0,
+      "draws": 0,
+      "losses": 0
+    },
+    "compus-baseball/settings": {
+      "speedLevel": 2,
+      "pitchControl": "기본",
+      "soundLevel": 2,
+      "isVibrationOn": true,
+      "runningMode": "자동",
+      "throwMode": "수동",
+      "isScoreboardOn": true
+    },
+    "compus-baseball/wallet": {
+      "gamePoint": 0
+    }
+  }
+}

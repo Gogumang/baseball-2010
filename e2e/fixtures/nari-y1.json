@@ -1,0 +1,522 @@
+{
+  "note": "나리 타자편 1년차 1/45경기 관리 105 — 새 저장에서 타자편 등록(서울 드래곤즈 · 이름 TEST · 나머지 기본값) → 첫 이벤트 · 올해의 목표 · 닉네임 창을 넘긴 직후. r210 이 chromium 으로 떴다",
+  "localStorage": {
+    "compus-baseball/ace-level": {
+      "levels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "compus-baseball/ace-open": {
+      "cells": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "compus-baseball/career": {
+      "version": 2,
+      "career": {
+        "name": "TEST",
+        "ability": {
+          "hit": 100,
+          "power": 100,
+          "defense": 130,
+          "run": 100
+        },
+        "gamePoint": 99999,
+        "season": 1,
+        "gamesPlayed": 0,
+        "stats": {
+          "games": 0,
+          "plateAppearances": 0,
+          "atBats": 0,
+          "hits": 0,
+          "doubles": 0,
+          "triples": 0,
+          "homeRuns": 0,
+          "runsBattedIn": 0,
+          "walks": 0,
+          "strikeouts": 0
+        },
+        "careerStats": {
+          "games": 0,
+          "plateAppearances": 0,
+          "atBats": 0,
+          "hits": 0,
+          "doubles": 0,
+          "triples": 0,
+          "homeRuns": 0,
+          "runsBattedIn": 0,
+          "walks": 0,
+          "strikeouts": 0
+        },
+        "affection": {},
+        "titleIds": [
+          "이름 없는 신인"
+        ],
+        "equippedTitle": 0,
+        "eagleEyeGamesRemaining": 0,
+        "seenEventIds": [
+          "451",
+          "1",
+          "2"
+        ],
+        "storySceneIndex": 0,
+        "teamId": 0,
+        "trainingCounts": {},
+        "seasonStartTrainingCounts": {},
+        "consecutiveTrainingCounts": {},
+        "mvpSeasonBits": 0,
+        "seasonPopularityGain": 0,
+        "moneyGrubberPopularityGain": 0,
+        "moneyGrubberGames": 0,
+        "highMoraleStreak": 0,
+        "reputationZeroGames": 0,
+        "badBodyTrainings": 0,
+        "fragileTrainings": 0,
+        "popularity": 0,
+        "reputation": 300,
+        "morale": 100,
+        "money": 6000,
+        "removedMinusSkillIds": [],
+        "isInjured": false,
+        "injuredGamesPlayed": 0,
+        "isSick": false,
+        "illnessName": null,
+        "hasActedThisCycle": false,
+        "outingsThisSeason": 0,
+        "outingsLastSeason": 0,
+        "bestHomeRunsInGame": 0,
+        "cycleHitGames": 0,
+        "popularityAtSeasonStart": 0,
+        "hasSeenYearGoalWindow": true,
+        "yearGoalEventDone": false,
+        "salary": 50,
+        "endingIndex": null,
+        "illnessCooldown": 0,
+        "battingTypeIndex": 0,
+        "positionIndex": 0,
+        "battingSide": 0,
+        "skinIndex": 0,
+        "subItemIds": [],
+        "illnessRemaining": 0,
+        "injuryRemaining": 0,
+        "equipmentLevels": {
+          "hit": 0,
+          "power": 0,
+          "defense": 0,
+          "run": 0
+        },
+        "ownedEquipment": [],
+        "openedHiddenIds": [],
+        "league": {
+          "wins": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "losses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "streak": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "bestStreak": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "losingStreak": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "headToHead": [
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "leaguePlayerStats": {
+          "batters": {}
+        },
+        "regularSeasonFirstCount": 0,
+        "regularSeasonRewardTaken": false,
+        "seasonEndState": null,
+        "postseason": null,
+        "lotteryPurchases": 0,
+        "lotteryFirstPrizes": 0,
+        "specialSwingLevel": 0,
+        "specialSwingSessions": 0,
+        "specialSwingNumber": 0,
+        "battingOrder": 8,
+        "battingOrderPath": null,
+        "lastMidSeasonGoalCount": 0,
+        "skillIds": [
+          0,
+          8
+        ],
+        "equippedSkillIds": [
+          0,
+          8
+        ],
+        "skillSlotLevel": 0,
+        "streaks": {
+          "multiHit": 0,
+          "homeRun": 0,
+          "hitless": 0
+        },
+        "wins": 0,
+        "draws": 0,
+        "losses": 0
+      }
+    },
+    "compus-baseball/collection": {
+      "titles": [
+        "이름 없는 신인"
+      ],
+      "endings": [],
+      "seasonEndings": [],
+      "hallOfFame": [],
+      "hallOfFamePitchers": [],
+      "openedHiddenIds": [],
+      "stats": {
+        "recordCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "itemPurchaseCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gamePointUsage": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gamePointEarned": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "batterEquippedSkillBits": 257,
+        "pitcherEquippedSkillBits": 0,
+        "achievementMarks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "playTimes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "compus-baseball/collection-rewards": {
+      "awardedBits": 0
+    },
+    "compus-baseball/mode-save": {
+      "lastPlayedMode": 4,
+      "isGeneralGameInProgress": false,
+      "generalGame": null,
+      "nariGames": {
+        "3": {
+          "isInProgress": false,
+          "match": null
+        },
+        "4": {
+          "isInProgress": false,
+          "match": null
+        }
+      },
+      "aceMatchPending": {
+        "3": null,
+        "4": null
+      },
+      "aceMatchWon": {
+        "3": false,
+        "4": false
+      },
+      "aceMatchMode": 0,
+      "generalMatchSettings": {
+        "kind": 1,
+        "value": 0,
+        "battingOrderBits": 0,
+        "pitchingInningBits": 0,
+        "offenseRunnerBits": 0,
+        "defenseRunnerBits": 0
+      },
+      "matchSettingsSeen": false
+    },
+    "compus-baseball/settings": {
+      "speedLevel": 2,
+      "pitchControl": "기본",
+      "soundLevel": 2,
+      "isVibrationOn": true,
+      "runningMode": "자동",
+      "throwMode": "수동",
+      "isScoreboardOn": true
+    },
+    "compus-baseball/wallet": {
+      "gamePoint": 0
+    }
+  }
+}
