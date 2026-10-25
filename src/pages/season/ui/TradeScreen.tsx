@@ -45,7 +45,8 @@ const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // "!cFFFF00G포인트!cFFFFFF�
  */
 export function tradeQuestionTextOf(boost: number): string {
   if (boost === 0) return `!C${TRADE_QUESTION}`
-  return `!C${tradeBoostCostOf(boost)}${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
+  // [172] 원문은 " !cFFFF00G포인트…" 로 앞에 빈칸이 있다 — 생성기(`clean_strings`)가 깎은 빈칸을 되붙인다
+  return `!C${tradeBoostCostOf(boost)} ${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
 }
 const TRADE_PROGRESS = ORIGINAL_MODE_TEXT[173] // "트레이드 진행 중"
 const TRADE_SUCCESS = ORIGINAL_MODE_TEXT[174] // "트레이드 성공!!!"

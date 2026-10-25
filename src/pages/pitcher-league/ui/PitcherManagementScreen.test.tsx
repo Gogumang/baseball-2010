@@ -219,7 +219,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
 
     누르기('트레이닝')
     누르기('제구')
-    expect(screen.getByText('[제구훈련]을 하시겠습니까?')).toBeTruthy()
+    expect(document.body.textContent).toContain('[제구훈련]을 하시겠습니까?') // StrMODE[85], %s = StrMODE[40]
     fireEvent.click(칸('예'))
 
     // 125 — 연출이 도는 동안은 굴리지 않는다(틀 0x18dd8 이 0x84e58 을 본 뒤 0x17f5c)
@@ -278,7 +278,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     누르기('트레이닝')
     누르기('제구')
 
-    expect(screen.getByText('더 이상 능력치를 올릴 수 없습니다')).toBeTruthy()
+    expect(document.body.textContent).toContain('[제구] 능력치가 최대입니다') // StrMODE[192] 원문, %s = StrMODE[40]
   })
 
   it('⚠️ 원본 그대로: 사기 0 검사가 맨 앞이라 마구·구질 창(칸 4)도 열리지 않는다 (0x12d48)', () => {
@@ -287,7 +287,7 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     누르기('트레이닝')
     누르기('마구')
 
-    expect(screen.getByText('사기가 부족하여 훈련할 수 없습니다')).toBeTruthy()
+    expect(document.body.textContent).toContain('사기가 0일 때는') // StrMODE[193] 원문
     expect(screen.queryByText('원하는 항목을 선택해주세요')).toBeNull()
   })
 
@@ -398,7 +398,7 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     expect(screen.getByTestId('필살타법-그림').getAttribute('data-state')).toBe('사용')
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(screen.getByText('[웨이브 볼] 을 사용하시겠습니까?')).toBeTruthy()
+    expect(document.body.textContent).toContain('[웨이브 볼] 을') // StrMODE[70] 원문
     fireEvent.click(칸('예'))
     expect((onSave.mock.calls[0][0] as PitcherCareer).selectedMagicNumber).toBe(2)
   })
@@ -413,7 +413,7 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
 
     // 칸 넷은 표 0xcc368 = [1,2,3,4] 이름 그대로다 (번호 4 는 폼 0 → 샤이닝 볼)
     누르기('웨이브 볼')
-    expect(screen.getByText('[웨이브 볼] 을 사용하시겠습니까?')).toBeTruthy()
+    expect(document.body.textContent).toContain('[웨이브 볼] 을') // StrMODE[70] 원문
     fireEvent.click(칸('예'))
 
     expect((onSave.mock.calls[0][0] as PitcherCareer).selectedMagicNumber).toBe(2)
@@ -428,7 +428,7 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     누르기('마구')
 
     누르기('웨이브 볼')
-    expect(screen.getByText('트레이닝 완료 후 사용할 수 있습니다')).toBeTruthy()
+    expect(document.body.textContent).toContain('트레이닝 완료 후') // StrMODE[71] 원문
 
     누르기('파이어 볼')
     expect(screen.getByText('현재 사용 중인 스킬입니다')).toBeTruthy()
@@ -448,9 +448,9 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
     누르기('H.FAST')
     expect(screen.getByText('현재 사용 중인 구질입니다')).toBeTruthy()
     누르기('CUT FAST')
-    expect(screen.getByText('트레이닝 완료 후 사용할 수 있습니다')).toBeTruthy()
+    expect(document.body.textContent).toContain('트레이닝 완료 후') // StrMODE[71] 원문
     누르기('TWO-SEAM')
-    expect(screen.getByText('해당 구질을 사용하시겠습니까?')).toBeTruthy()
+    expect(document.body.textContent).toContain('해당 구질을') // StrMODE[73] 원문
     fireEvent.click(칸('예'))
     expect((onSave.mock.calls[0][0] as PitcherCareer).pitchMask).toBe(0b10)
   })
@@ -540,7 +540,7 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
 
     expect(screen.queryByTestId('나리-휴식연출')).toBeNull()
     expect((onSave.mock.calls[0][0] as PitcherCareer).morale).toBe(60)
-    expect(screen.getByText('사기 10 상승하였습니다')).toBeTruthy()
+    expect(document.body.textContent).toContain('사기 10 상승하였습니다') // StrMODE[24] + 수치 + [83] (0x18e3c)
   })
 
   it('결과 창을 닫을 때 회복 판정 0x1b308 을 굴린다 (질병 60% · 부상 30%)', () => {
@@ -748,7 +748,7 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
 
     expect(onSave).toHaveBeenCalled()
     // 0x17f5c 칸 4 — 마구 이름 StrCOMMON[0x1e + 1] 로 StrMODE[86] "[이름] %d/%d회 훈련"
-    expect(screen.getByText(/\[파이어 볼\] 1\/4회 훈련/)).toBeTruthy()
+    expect(document.body.textContent).toContain('[파이어 볼] 1/4회 훈련') // StrMODE[86] 원문
 
     // 결과 알림을 닫으면 105 허브로 돌아온다
     키('Enter')

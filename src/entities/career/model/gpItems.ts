@@ -3,6 +3,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { applySkillReward, isMinusSkill, isSkillEquipped, MAXIMUM_MORALE, MINUS_SKILL_IDS } from '@/entities/career/model/playerCareer'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /**
  * GP 아이템 (binary.mod 0xa4488 — 누락 탐색 5차). **타자편·투수편이 같은 함수**를 탄다 (구매 확정 0x14fda 가
@@ -234,6 +235,11 @@ const LIMIT_ABILITY_NAMES = ['히트', '파워', '수비', '주루'] as const
 const ABILITY_KEYS = ['hit', 'power', 'defense', 'run'] as const
 /** 이글아이는 99 회가 상한이고 98 을 넘으면 맥스로 본다 (0x13a5c) */
 const EAGLE_EYE_MAX_THRESHOLD = 98
+/**
+ * StrMODE[192] "[%s] 능력치가 최대입니다" — R12 1b: 칸 0~3 은 한 줄, 엄마의도시락은 최대인 칸마다 이 줄을
+ * "!N"(0xcc330) 으로 잇는다. %s 는 능력치 이름 StrMODE[35+k](투수 40+k)
+ */
+const abilityMaxTextOf = (name: string): string => (ORIGINAL_MODE_TEXT[192] ?? '').replace('%s', name)
 const ITEM = { 도시락: 4, 영지버섯: 6, 건강진단: 7, 최면요법: 8, 이글아이: 9 } as const
 
 /**
@@ -256,20 +262,20 @@ export function gpItemBlockReasonWith(view: GpGuardView, id: number): string | n
   const maxedNames = view.abilityNames.filter((_name, i) => view.abilities[i] >= view.limits[i])
   if (id < view.abilities.length) {
     // StrMODE[192] "[%s] 능력치가 최대입니다"
-    return view.abilities[id] >= view.limits[id] ? `[${view.abilityNames[id]}] 능력치가 최대입니다` : null
+    return view.abilities[id] >= view.limits[id] ? abilityMaxTextOf(view.abilityNames[id] ?? '') : null
   }
   if (id === ITEM.도시락) {
     // 일부만 최대면 살 수 있다 — 네 개 다 최대일 때만 막는다
     return maxedNames.length === view.abilities.length
-      ? maxedNames.map((name) => `[${name}] 능력치가 최대입니다`).join('!N')
+      ? maxedNames.map(abilityMaxTextOf).join('!N')
       : null
   }
-  if (id === ITEM.영지버섯) return view.morale >= MAXIMUM_MORALE ? '사기 최고 상태입니다' : null
-  if (id === ITEM.건강진단) return !view.isInjured && !view.isSick ? '건강한 상태입니다 구매 할 수 없습니다' : null
+  if (id === ITEM.영지버섯) return view.morale >= MAXIMUM_MORALE ? ORIGINAL_MODE_TEXT[91] ?? '' : null
+  if (id === ITEM.건강진단) return !view.isInjured && !view.isSick ? ORIGINAL_MODE_TEXT[208] ?? '' : null
   if (id === ITEM.최면요법) {
     return view.skillIds.some((skill) => MINUS_SKILL_IDS.includes(skill))
       ? null
-      : '마이너스 스킬이 없습니다 구매 할 수 없습니다'
+      : ORIGINAL_MODE_TEXT[209] ?? ''
   }
   if (id === ITEM.이글아이) return view.ninthItemBlock
   return null
@@ -296,7 +302,7 @@ export function gpItemBlockReasonOf(career: PlayerCareer, id: number): string | 
       isInjured: career.isInjured,
       isSick: career.isSick,
       skillIds: career.skillIds,
-      ninthItemBlock: career.eagleEyeGamesRemaining > EAGLE_EYE_MAX_THRESHOLD ? '[이글아이] 맥스 상태입니다' : null,
+      ninthItemBlock: career.eagleEyeGamesRemaining > EAGLE_EYE_MAX_THRESHOLD ? (ORIGINAL_MODE_TEXT[210] ?? '') : null,
     },
     id,
   )
@@ -330,11 +336,27 @@ const ABILITY_NAMES = ['히트', '파워', '수비', '주루', '모든능력치'
  * 글 = StrMODE[35+k] + " " + 숫자 + " " + StrMODE[83] 이고, 그 숫자 인자가 6·8 로 박혀 있다.
  */
 const ABILITY_NOTICE_NUMBERS = [6, 6, 6, 6, 8]
+const modeText = (index: number): string => ORIGINAL_MODE_TEXT[index] ?? ''
+/** 원본 [83] · [116] 은 앞에 빈칸이 있는 글이다 — 생성기가 깎은 빈칸을 되붙인다 (`modeTextWithLeadingSpace`) */
+const spacedModeText = (index: number): string => ` ${modeText(index)}`
+/** StrMODE[83] " 상승하였습니다"(색 마크업) · [116] " 당첨!!!N[" · [117] "] 획득!" · [126] "%d게임 동안 상대 투구…" */
+const RISE_TEXT = 83
+const LOTTERY_HEAD_TEXT = 116
+const LOTTERY_TAIL_TEXT = 117
+const EAGLE_EYE_USED_TEXT = 126
+/** 아이템 6~8 의 알림 — StrMODE[122] 사기 +40 · [123] 부상 및 질병 치료 · [124] 마이너스 스킬 삭제 (0xa48e2 · 0xa4956 · 0xa49a2) */
 const STATIC_NOTICES: Readonly<Record<number, string>> = {
-  6: '사기 +40 회복되었습니다', // StrMODE[122]
-  7: '부상 및 질병이 모두 치료 되었습니다', // StrMODE[123]
-  8: '마이너스 스킬이 모두 삭제 되었습니다', // StrMODE[124]
-  9: '20게임 동안 상대 투구 목표점을 볼 수 있습니다', // StrMODE[126]
+  6: modeText(122),
+  7: modeText(123),
+  8: modeText(124),
+}
+
+/**
+ * 이글아이 알림 — 0xa49a6~0xa49e2: 남은 경기 `min(SR+0x54 + 20, 99)` 를 저장하고 그 **새 값**을
+ * sprintf(StrMODE[126], 값) 에 끼운다 (`ldrsb r2,[r5]` → 0x1400468). 처음 사면 20, 쌓이면 40 · 60 … 99.
+ */
+export function eagleEyeNoticeOf(gamesRemaining: number): string {
+  return modeText(EAGLE_EYE_USED_TEXT).replace('%d', String(gamesRemaining))
 }
 
 function prizeLabelOf(prize: LotteryPrize, prizeItemId: number | undefined): string {
@@ -356,16 +378,26 @@ export function gpItemNoticeWith(
   prize: LotteryPrize | null,
   prizeItemId?: number,
 ): string {
-  // 실제 상승은 +10 이지만 글에는 6·8 이 찍힌다 (원본 그대로)
-  if (id < texts.abilityNames.length) return `${texts.abilityNames[id]} ${ABILITY_NOTICE_NUMBERS[id]} 상승하였습니다`
+  // 실제 상승은 +10 이지만 글에는 6·8 이 찍힌다 (원본 그대로).
+  // 0xa455c~0xa45fe: StrMODE[35+k](투수 40+k · 모든능력치 39) + " "(0xd80bc) + 0xbc73d(6 · 8) + " "(0xd80bc) + StrMODE[83]
+  if (id < texts.abilityNames.length) return `${texts.abilityNames[id]} ${ABILITY_NOTICE_NUMBERS[id]} ${spacedModeText(RISE_TEXT)}`
   if (id === LOTTERY_ITEM && prize !== null) {
-    const title = typeof prize === 'number' ? `${prize}등` : prize
-    return `${title} 당첨!! [${prizeLabelOf(prize, prizeItemId)}] 획득!`
+    // 돈 상: sprintf("%d등 "(0xd7e08), 등수) + StrMODE[116] + 금액 + StrMODE[117] (0xa4658~0xa46c0)
+    // 아이템 상: StrMODE[0x70 + 칸](118 엄마상 …) + [116] + StrITEM[0x62 + n] + [117] + "!N" (0xa46f8~0xa474a)
+    // ⚠️ 아이템 상은 원본이 "!N" 뒤에 그 아이템의 효과 알림을 더 잇는다(0xa474e~) — 그 뒷줄은 옮기지 않았다
+    const title = typeof prize === 'number' ? `${prize}등 ` : prize
+    return `${title}${spacedModeText(LOTTERY_HEAD_TEXT)}${prizeLabelOf(prize, prizeItemId)}${modeText(LOTTERY_TAIL_TEXT)}`
   }
   if (id === ITEM.이글아이) return texts.ninthItemNotice
   return STATIC_NOTICES[id] ?? ''
 }
 
-export function gpItemNoticeOf(id: number, prize: LotteryPrize | null, prizeItemId?: number): string {
-  return gpItemNoticeWith({ abilityNames: ABILITY_NAMES, ninthItemNotice: STATIC_NOTICES[ITEM.이글아이] }, id, prize, prizeItemId)
+/** `eagleEyeGamesRemaining` — 이글아이를 쓴 **뒤** 남은 경기 (알림 [126] 의 %d) */
+export function gpItemNoticeOf(
+  id: number,
+  prize: LotteryPrize | null,
+  prizeItemId?: number,
+  eagleEyeGamesRemaining: number = EAGLE_EYE_GAMES,
+): string {
+  return gpItemNoticeWith({ abilityNames: ABILITY_NAMES, ninthItemNotice: eagleEyeNoticeOf(eagleEyeGamesRemaining) }, id, prize, prizeItemId)
 }

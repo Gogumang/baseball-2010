@@ -5,6 +5,9 @@ import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamin
 import { pitcherGameOptionsOf } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import { pitcherNariEntryViewOf } from '@/pages/pitcher-league/lib/pitcherEntryView'
 import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
+import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
+import { entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
+import { teamPitchers } from '@/entities/team/model/teamRoster'
 
 const capacityOf = (view: NariEntryView, slot: number) => view.lists.pitchers[slot]?.stamina?.capacity
 const staminaOf = (view: NariEntryView, slot: number) => view.lists.pitchers[slot]?.ability[3] ?? 0
@@ -51,5 +54,20 @@ describe('투수편 143 내 투수 줄의 기록 열 · 체력 줄 — 0x56ebc �
     const row = view.lists.pitchers.find((candidate) => candidate.name === '보기')
     expect(row?.pitcherLine).toEqual({ outs: 27, runsAllowed: 4, saves: 1, strikeouts: 11, pitches: 120, walks: 3, wins: 2, losses: 1 })
     expect(row?.stamina).toEqual({ capacity: staminaCapacityOf(row!.ability[3] ?? 0, 80, false), percent: 43 })
+  })
+})
+
+describe('투수편 143 국가대항전 — 대회 칸 기록 열 (0x20648 마스터 복사 · 0xa56dc 거짓, r216)', () => {
+  it('상대국 투수 줄은 Xls 행 줄 · 체력 100%, 용량은 상대국 칸 +2', () => {
+    const base = createPitcherCareer('보기')
+    const options = { ...pitcherGameOptionsOf(base), opponentTeamId: 12 }
+    const cup = { ...createNariCupTeams(0, 12), opponentMorale: 55 }
+    const view = pitcherNariEntryViewOf(base, options, false, cup)
+    const row = view.lists.pitchers[0]!
+    const player = teamPitchers(12).find((candidate) => candidate.name === row.name)!
+    expect(row.pitcherLine).toEqual(entryPitcherLineOfRecord(player.recordLine))
+    expect(row.pitcherLine?.outs).toBeGreaterThan(0)
+    expect(row.stamina).toEqual({ capacity: staminaCapacityOf(player.ability[3], 55, false), percent: 100 })
+    expect(view.lists.batters.every((batter) => batter.batterLine !== undefined)).toBe(true)
   })
 })

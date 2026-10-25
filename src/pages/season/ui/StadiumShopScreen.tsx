@@ -22,13 +22,13 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 
-/** 가드 문구 — 원본 StrMODE (S3 4절). 웹에 StrMODE 표가 없어 다른 화면들처럼 글을 그대로 적는다 */
+/** 가드 문구 — 원본 StrMODE (S3 4절). 원문 표(`ORIGINAL_MODE_TEXT`)에서 읽는다 (r216) */
 const REFUSAL_TEXT: Readonly<Record<StadiumPurchaseRefusal, (required: number) => string>> = {
   없는칸: () => '', // 목록에 없는 칸 — 원본에는 생길 수 없다
-  미오픈: () => '아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다', // StrMODE[76]
-  이미보유: () => '이미 가지고 있는 아이템입니다', // StrMODE[78]
-  인기도부족: (required) => `인기도가 부족합니다. 필요한 인기도 : ${required}`, // StrMODE[62]
-  소지금부족: () => '소지금이 부족합니다', // StrMODE[77]
+  미오픈: () => ORIGINAL_MODE_TEXT[76] ?? '', // StrMODE[76]
+  이미보유: () => ORIGINAL_MODE_TEXT[78] ?? '', // StrMODE[78]
+  인기도부족: (required) => (ORIGINAL_MODE_TEXT[62] ?? '').replace('%d', String(required)), // StrMODE[62]
+  소지금부족: () => ORIGINAL_MODE_TEXT[77] ?? '', // StrMODE[77]
 }
 
 /** 전역 게임 모드 [0x1552d10] — 시즌 2 (0x783b0 의 하늘 줄 갈래) */

@@ -1,4 +1,5 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
   equipOwnedPitcherEquipment, isPitcherEquipmentEquipped, ownsPitcherEquipment, pitcherEquipmentBlockReasonOf,
   pitcherEquipmentItemOf, purchasePitcherEquipment,
@@ -36,9 +37,10 @@ export interface PitcherShopSelection {
 }
 
 const BLOCK_TEXT: Readonly<Record<Exclude<PitcherEquipmentBlockReason, '인기도부족'>, string>> = {
-  미오픈: '아직 구매할 수 없는 아이템입니다. 특별한 조건을 통해 오픈됩니다', // StrMODE[76]
-  이미보유: '이미 가지고 있는 아이템입니다', // StrMODE[78]
-  소지금부족: '소지금이 부족합니다', // StrMODE[77]
+  // 원문 표 그대로 (r216 — 예전엔 !N 을 띄어 쓰고 마크업을 뺀 글이었다)
+  미오픈: ORIGINAL_MODE_TEXT[76] ?? '',
+  이미보유: ORIGINAL_MODE_TEXT[78] ?? '',
+  소지금부족: ORIGINAL_MODE_TEXT[77] ?? '',
 }
 
 const parse = (itemId: string) => {
@@ -52,7 +54,7 @@ export function pitcherEquipmentBlockNoticeOf(career: PitcherCareer, part: numbe
   if (reason === null) return null
   if (reason === '인기도부족') {
     // StrMODE[62]
-    return `인기도가 부족합니다. 필요한 인기도 : ${pitcherEquipmentItemOf(part, level).requiredPopularity}`
+    return (ORIGINAL_MODE_TEXT[62] ?? '').replace('%d', String(pitcherEquipmentItemOf(part, level).requiredPopularity)) // StrMODE[62] 원문
   }
   return BLOCK_TEXT[reason]
 }
@@ -118,7 +120,7 @@ export function selectPitcherShopItem(career: PitcherCareer, itemId: string, ran
   if (tab === '착용') {
     if (!ownsPitcherEquipment(career, part, level)) return { career, notice: '' }
     // 0x17ad0 의 가드는 "지금 장착 중"(StrMODE[80]) 하나뿐이다. 장착 뒤 따로 알림은 없다
-    if (isPitcherEquipmentEquipped(career, part, level)) return { career, notice: '현재 장착 중인 장비입니다' }
+    if (isPitcherEquipmentEquipped(career, part, level)) return { career, notice: ORIGINAL_MODE_TEXT[80] ?? '' } // StrMODE[80] 원문
     return { career: equipOwnedPitcherEquipment(career, part, level), notice: '' }
   }
   const blockNotice = pitcherEquipmentBlockNoticeOf(career, part, level)

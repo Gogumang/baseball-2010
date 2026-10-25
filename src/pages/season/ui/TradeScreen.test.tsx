@@ -390,12 +390,12 @@ describe('0xe7 확인·진행 (J 4-4)', () => {
 
   it('[171] 팝업 글 — 칸 0 은 "!C" + [171], 비용 칸은 "!C" + 비용 + [172] + "!N" + [171] (0xc6ae~0xc736)', () => {
     expect(tradeQuestionTextOf(0)).toBe('!C!C트레이드를 하시겠습니까?')
-    expect(tradeQuestionTextOf(1)).toBe('!C2000!cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
-    expect(tradeQuestionTextOf(2)).toBe('!C1000!cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
+    expect(tradeQuestionTextOf(1)).toBe('!C2000 !cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
+    expect(tradeQuestionTextOf(2)).toBe('!C1000 !cFFFF00G포인트!cFFFFFF가 소모됩니다!N!C트레이드를 하시겠습니까?')
 
     확인까지()
     누르기(/\+20%/)
-    expect(알림글()).toContain('1000G포인트가 소모됩니다')
+    expect(알림글()).toContain('1000 G포인트가 소모됩니다') // [172] 앞 빈칸(원문)
     expect(알림글()).toContain('트레이드를 하시겠습니까?')
   })
 

@@ -14,6 +14,7 @@ import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { PITCHER_TYPE_BONUS_ABILITY } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { subItemMoraleRelief, subItemSlotTrainingBonus } from '@/entities/career/model/subItems'
+import { pitchTrainingHeadTextOf, specialTrainingHeadTextOf, trainingMoraleLossTextOf } from '@/entities/career/model/trainingText'
 import { applyPitchTypeTraining } from '@/entities/pitcher-career/model/pitchTraining'
 import type { PitchTrainingProgress } from '@/entities/pitcher-career/model/pitchTraining'
 
@@ -323,25 +324,23 @@ export function runPitchTypeTraining(
 /**
  * 구질 훈련 알림 글 (0x18474~0x1858c) — 첫 줄 StrMODE[88] "구질 훈련 완료!" / [89] "해당 구질 %d/%d회 훈련", 다음 줄 사기.
  * ⚠️ 원본은 그 뒤에 병아리 · 몹쓸몸 · 자동안마기 "효과" 줄(0x185a8~0x186c2 — 이름 표 [0x1552cf8] 0x37 · 0x3a · 0x845d5)을
- *    붙이는데 그 줄과 색 표시는 옮기지 않았다 — 타자편 `trainingOutcomeLinesOf` 와 같은 근사 글이다.
+ *    붙이는데 그 줄은 옮기지 않았다. 첫 줄 · 사기 줄은 원문 표(색 마크업 포함)에서 읽는다(r216).
  */
 export function pitchTypeTrainingLinesOf(outcome: PitchTypeTrainingOutcome): string[] {
-  const head = outcome.progress.isLearned
-    ? ['구질 훈련 완료!', '[선수정보]에서 사용 여부 변경 가능']
-    : [`해당 구질 ${outcome.progress.sessions}/${outcome.progress.required}회 훈련`]
-  return [...head, `사기 -${outcome.moraleLoss}`]
+  const { isLearned, sessions, required } = outcome.progress
+  return [pitchTrainingHeadTextOf(isLearned, sessions, required), trainingMoraleLossTextOf(outcome.moraleLoss)]
 }
 
 /**
  * 마구 훈련 알림 글 — 0x17f5c 칸 4 갈래(모드 3)는 타자편 필살타법과 같은 줄이다(0x18116~0x181c6): 마구 이름 StrCOMMON[0x1e + n] 으로
  * 훈련 완료면 이름 + StrMODE[87] " 훈련 완료!!N[선수정보]에서 사용!N여부 변경 가능", 아니면 [86] "[이름] %d/%d회 훈련",
- * 다음 줄 사기. 타자편 `trainingOutcomeLinesOf` 와 같은 근사 줄 나눔이다(효과 줄 · 색은 옮기지 않았다).
+ * 다음 줄 사기 StrMODE[24] + |감소| + [84] — 모두 원문 표에서 읽는다(r216). ⚠️ 효과 줄 · 사기 괄호 보정은 옮기지 않았다.
  */
 export function magicTrainingLinesOf(magic: PitcherMagicProgress, moraleLoss: number): string[] {
-  const head = magic.isLevelUp
-    ? [`${magic.name} 훈련 완료!`, '[선수정보]에서 사용 여부 변경 가능']
-    : [`[${magic.name}] ${magic.sessions}/${magic.required}회 훈련`]
-  return [...head, `사기 -${moraleLoss}`]
+  return [
+    specialTrainingHeadTextOf(magic.name, magic.isLevelUp, magic.sessions, magic.required),
+    trainingMoraleLossTextOf(moraleLoss),
+  ]
 }
 
 /** 몹쓸몸 · 유리몸 보유 비트 — 투수 비트 0~7 은 타자와 같은 공통 스킬이다(2 먹튀 · 5 무력감과 같은 짝) */

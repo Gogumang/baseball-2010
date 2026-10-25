@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
   BATTER_GP_ITEMS,
   applyGpItemWith,
@@ -99,7 +100,7 @@ export function pitcherGpItemBlockReasonOf(career: PitcherCareer, id: number): s
       isSick: career.isSick,
       skillIds: career.skillIds,
       // StrMODE[211]
-      ninthItemBlock: canBuyStaminaTonic(career.stamina) ? null : '스태미나가 최대입니다 구매 할 수 없습니다',
+      ninthItemBlock: canBuyStaminaTonic(career.stamina) ? null : (ORIGINAL_MODE_TEXT[211] ?? ''),
     },
     id,
   )
@@ -110,7 +111,8 @@ export function pitcherGpItemNoticeOf(id: number, prize: LotteryPrize | null, pr
   return gpItemNoticeWith(
     {
       abilityNames: [...PITCHER_ABILITY_NAMES, '모든능력치'],
-      ninthItemNotice: '스태미나가 100% 회복되었습니다',
+      // StrMODE[125] — 0xa49ec~0xa4a00 (`movs r1,#0x7d`)
+      ninthItemNotice: ORIGINAL_MODE_TEXT[125] ?? '',
     },
     id,
     prize,

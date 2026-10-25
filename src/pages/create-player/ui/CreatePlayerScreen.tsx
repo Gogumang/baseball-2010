@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
-import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen } from '@/shared/ui'
+import { FrameSprite, InputMethodText, MarkupText, MessageBox, PaintedRects, PressArea, RawScreen } from '@/shared/ui'
 import { InputModeBox, inputModeLayoutOf } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -249,7 +249,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
       )}
 
       <div className={styles.hint} style={{ left: HINT_BOX.x, top: HINT_BOX.y, width: HINT_BOX.width }}>
-        {ROW_HINTS[selectedId]}
+        <MarkupText raw={ROW_HINTS[selectedId] ?? ''} />
       </div>
 
       {/*
