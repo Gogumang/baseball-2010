@@ -18,6 +18,14 @@ describe('빠른실행 후보 목록', () => {
     expect(quickStartTeamCandidates()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     expect(quickStartTeamCandidates([14, 11])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14])
   })
+
+  it('0x9f5a0 은 히든 팀 다섯 칸(저장+0x7a..0x7e)만 본다 — 전역 표의 다른 번호는 후보도 bfa55 범위도 늘리지 않는다', () => {
+    expect(quickStartTeamCandidates([33, 11, 13, 50])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13])
+    // 0.95 × 10 = 9 → 팀 9 (예전에는 33 이 끼어 0.95 × 11 = 10 → "팀 33" 이 나왔다)
+    const setup = rollQuickStart(정해진난수([0.95, 0.95, 0, 0, 0]), { openedHiddenTeamIds: [33] })
+    expect(setup.userTeamId).toBe(9)
+    expect(setup.aiTeamId).toBe(9)
+  })
 })
 
 describe('빠른실행 굴림', () => {

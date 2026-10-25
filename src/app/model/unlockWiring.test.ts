@@ -105,8 +105,11 @@ describe('마선수 · 히든 팀', () => {
     expect(quickStartTeamCandidates([])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
   })
 
-  it('빠른 실행 후보 — 원본 표에서는 예전 목록과 같다 (전역 표의 아이템 번호가 섞여 들어오는 것까지)', () => {
-    expect(quickStartTeamCandidates([12, 10, 33])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 33])
+  it('빠른 실행 후보 — 원본 0x9f5a0 은 저장+0x7a..0x7e(팀 10~14) 다섯 칸만 본다. 전역 표의 다른 번호(33 장비 등)는 안 섞인다', () => {
+    expect(quickStartTeamCandidates([12, 10, 33])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12])
+    expect(quickStartTeamCandidates([0, 7, 13, 15, 33, 50])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 13])
+    withUnlockAll()
+    expect(quickStartTeamCandidates([33, 50])).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
   })
 })
 
